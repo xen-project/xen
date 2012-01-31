@@ -92,31 +92,31 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     if (info->dom_name)
         flexarray_vappend(dm_args, "-domain-name", info->dom_name, NULL);
 
-    if (info->vnc) {
+    if (info->vnc.enable) {
         char *vncarg;
-        if (info->vncdisplay) {
-            if (info->vnclisten && strchr(info->vnclisten, ':') == NULL) {
+        if (info->vnc.display) {
+            if (info->vnc.listen && strchr(info->vnc.listen, ':') == NULL) {
                 vncarg = libxl__sprintf(gc, "%s:%d",
-                                  info->vnclisten,
-                                  info->vncdisplay);
+                                  info->vnc.listen,
+                                  info->vnc.display);
             } else {
-                vncarg = libxl__sprintf(gc, "127.0.0.1:%d", info->vncdisplay);
+                vncarg = libxl__sprintf(gc, "127.0.0.1:%d", info->vnc.display);
             }
-        } else if (info->vnclisten) {
-            if (strchr(info->vnclisten, ':') != NULL) {
-                vncarg = info->vnclisten;
+        } else if (info->vnc.listen) {
+            if (strchr(info->vnc.listen, ':') != NULL) {
+                vncarg = info->vnc.listen;
             } else {
-                vncarg = libxl__sprintf(gc, "%s:0", info->vnclisten);
+                vncarg = libxl__sprintf(gc, "%s:0", info->vnc.listen);
             }
         } else {
             vncarg = "127.0.0.1:0";
         }
-        if (info->vncpasswd && (info->vncpasswd[0] != '\0'))
+        if (info->vnc.passwd && (info->vnc.passwd[0] != '\0'))
             vncarg = libxl__sprintf(gc, "%s,password", vncarg);
         flexarray_append(dm_args, "-vnc");
         flexarray_append(dm_args, vncarg);
 
-        if (info->vncunused) {
+        if (info->vnc.findunused) {
             flexarray_append(dm_args, "-vncunused");
         }
     }
@@ -129,7 +129,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     if (info->keymap) {
         flexarray_vappend(dm_args, "-k", info->keymap, NULL);
     }
-    if (info->nographic && (!info->sdl && !info->vnc)) {
+    if (info->nographic && (!info->sdl && !info->vnc.enable)) {
         flexarray_append(dm_args, "-nographic");
     }
     if (info->serial) {
@@ -260,32 +260,32 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     if (info->dom_name) {
         flexarray_vappend(dm_args, "-name", info->dom_name, NULL);
     }
-    if (info->vnc) {
+    if (info->vnc.enable) {
         int display = 0;
         const char *listen = "127.0.0.1";
 
-        if (info->vncpasswd && info->vncpasswd[0]) {
+        if (info->vnc.passwd && info->vnc.passwd[0]) {
             assert(!"missing code for supplying vnc password to qemu");
         }
         flexarray_append(dm_args, "-vnc");
 
-        if (info->vncdisplay) {
-            display = info->vncdisplay;
-            if (info->vnclisten && strchr(info->vnclisten, ':') == NULL) {
-                listen = info->vnclisten;
+        if (info->vnc.display) {
+            display = info->vnc.display;
+            if (info->vnc.listen && strchr(info->vnc.listen, ':') == NULL) {
+                listen = info->vnc.listen;
             }
-        } else if (info->vnclisten) {
-            listen = info->vnclisten;
+        } else if (info->vnc.listen) {
+            listen = info->vnc.listen;
         }
 
         if (strchr(listen, ':') != NULL)
             flexarray_append(dm_args,
                     libxl__sprintf(gc, "%s%s", listen,
-                        info->vncunused ? ",to=99" : ""));
+                        info->vnc.findunused ? ",to=99" : ""));
         else
             flexarray_append(dm_args,
                     libxl__sprintf(gc, "%s:%d%s", listen, display,
-                        info->vncunused ? ",to=99" : ""));
+                        info->vnc.findunused ? ",to=99" : ""));
     }
     if (info->sdl) {
         flexarray_append(dm_args, "-sdl");
@@ -335,7 +335,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     if (info->keymap) {
         flexarray_vappend(dm_args, "-k", info->keymap, NULL);
     }
-    if (info->nographic && (!info->sdl && !info->vnc)) {
+    if (info->nographic && (!info->sdl && !info->vnc.enable)) {
         flexarray_append(dm_args, "-nographic");
     }
     if (info->serial) {
@@ -524,10 +524,6 @@ static int libxl__vfb_and_vkb_from_device_model_info(libxl__gc *gc,
     vfb->backend_domid = 0;
     vfb->devid = 0;
     vfb->vnc = info->vnc;
-    vfb->vnclisten = info->vnclisten;
-    vfb->vncdisplay = info->vncdisplay;
-    vfb->vncunused = info->vncunused;
-    vfb->vncpasswd = info->vncpasswd;
     vfb->keymap = info->keymap;
     vfb->sdl = info->sdl;
     vfb->opengl = info->opengl;
@@ -851,7 +847,7 @@ int libxl__create_device_model(libxl__gc *gc,
         goto out_close;
     }
 
-    if (info->vncpasswd) {
+    if (info->vnc.passwd) {
 retry_transaction:
         /* Find uuid and the write the vnc password to xenstore for qemu. */
         t = xs_transaction_start(ctx->xsh);
@@ -860,7 +856,7 @@ retry_transaction:
             /* Now write the vncpassword into it. */
             pass_stuff = libxl__calloc(gc, 3, sizeof(char *));
             pass_stuff[0] = "vncpasswd";
-            pass_stuff[1] = info->vncpasswd;
+            pass_stuff[1] = info->vnc.passwd;
             libxl__xs_writev(gc,t,vm_path,pass_stuff);
             if (!xs_transaction_end(ctx->xsh, t, 0))
                 if (errno == EAGAIN)
@@ -975,13 +971,13 @@ static int libxl__build_xenpv_qemu_args(libxl__gc *gc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
 
     if (vfb != NULL) {
-        info->vnc = vfb->vnc;
-        if (vfb->vnclisten)
-            info->vnclisten = libxl__strdup(gc, vfb->vnclisten);
-        info->vncdisplay = vfb->vncdisplay;
-        info->vncunused = vfb->vncunused;
-        if (vfb->vncpasswd)
-            info->vncpasswd = vfb->vncpasswd;
+        info->vnc.enable = vfb->vnc.enable;
+        if (vfb->vnc.listen)
+            info->vnc.listen = libxl__strdup(gc, vfb->vnc.listen);
+        info->vnc.display = vfb->vnc.display;
+        info->vnc.findunused = vfb->vnc.findunused;
+        if (vfb->vnc.passwd)
+            info->vnc.passwd = vfb->vnc.passwd;
         if (vfb->keymap)
             info->keymap = libxl__strdup(gc, vfb->keymap);
         info->sdl = vfb->sdl;

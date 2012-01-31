@@ -90,6 +90,16 @@ libxl_tsc_mode = Enumeration("tsc_mode", [
 #
 # Complex libxl types
 #
+libxl_vnc_info = Struct("vnc_info", [
+    ("enable",        bool),
+    # "address:port" that should be listened on
+    ("listen",        string),
+    ("passwd",        string),
+    ("display",       integer),
+    # If set then try to find an unused port
+    ("findunused",    bool),
+    ])
+
 libxl_dominfo = Struct("dominfo",[
     ("uuid",        libxl_uuid),
     ("domid",       libxl_domid),
@@ -218,14 +228,7 @@ libxl_device_model_info = Struct("device_model_info",[
     # size of the videoram in MB
     ("videoram",         integer), 
     ("stdvga",           bool),
-    ("vnc",              bool),
-    # "address:port" that should be listened on for the VNC server
-    ("vnclisten",        string),
-    ("vncpasswd",        string),
-    # VNC display number
-    ("vncdisplay",       integer),
-    # If set then try to find an unused port for the VNC server
-    ("vncunused",        bool),
+    ("vnc",              libxl_vnc_info),
     # keyboard layout, default is en-us keyboard
     ("keymap",           string),
     ("sdl",              bool),
@@ -264,12 +267,7 @@ libxl_device_model_info = Struct("device_model_info",[
 libxl_device_vfb = Struct("device_vfb", [
     ("backend_domid", libxl_domid),
     ("devid",         integer),
-    ("vnc",           bool),
-    # address:port that should be listened on for the VNC server if vnc is set
-    ("vnclisten",     string),
-    ("vncpasswd",     string),
-    ("vncdisplay",    integer),
-    ("vncunused",     bool),
+    ("vnc",           libxl_vnc_info),
     # set keyboard layout, default is en-us keyboard
     ("keymap",        string),
     ("sdl",           bool),

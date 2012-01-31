@@ -367,10 +367,10 @@ static void printf_info(int domid,
         printf("\t\t\t(device_model %s)\n", dm_info->device_model ? : "default");
         printf("\t\t\t(videoram %d)\n", dm_info->videoram);
         printf("\t\t\t(stdvga %d)\n", dm_info->stdvga);
-        printf("\t\t\t(vnc %d)\n", dm_info->vnc);
-        printf("\t\t\t(vnclisten %s)\n", dm_info->vnclisten);
-        printf("\t\t\t(vncdisplay %d)\n", dm_info->vncdisplay);
-        printf("\t\t\t(vncunused %d)\n", dm_info->vncunused);
+        printf("\t\t\t(vnc %d)\n", dm_info->vnc.enable);
+        printf("\t\t\t(vnclisten %s)\n", dm_info->vnc.listen);
+        printf("\t\t\t(vncdisplay %d)\n", dm_info->vnc.display);
+        printf("\t\t\t(vncunused %d)\n", dm_info->vnc.findunused);
         printf("\t\t\t(keymap %s)\n", dm_info->keymap);
         printf("\t\t\t(sdl %d)\n", dm_info->sdl);
         printf("\t\t\t(gfx_passthru %d)\n", dm_info->gfx_passthru);
@@ -457,10 +457,10 @@ static void printf_info(int domid,
         printf("\t\t\t(backend_domid %d)\n", d_config->vfbs[i].backend_domid);
         printf("\t\t\t(frontend_domid %d)\n", domid);
         printf("\t\t\t(devid %d)\n", d_config->vfbs[i].devid);
-        printf("\t\t\t(vnc %d)\n", d_config->vfbs[i].vnc);
-        printf("\t\t\t(vnclisten %s)\n", d_config->vfbs[i].vnclisten);
-        printf("\t\t\t(vncdisplay %d)\n", d_config->vfbs[i].vncdisplay);
-        printf("\t\t\t(vncunused %d)\n", d_config->vfbs[i].vncunused);
+        printf("\t\t\t(vnc %d)\n", d_config->vfbs[i].vnc.enable);
+        printf("\t\t\t(vnclisten %s)\n", d_config->vfbs[i].vnc.listen);
+        printf("\t\t\t(vncdisplay %d)\n", d_config->vfbs[i].vnc.display);
+        printf("\t\t\t(vncunused %d)\n", d_config->vfbs[i].vnc.findunused);
         printf("\t\t\t(keymap %s)\n", d_config->vfbs[i].keymap);
         printf("\t\t\t(sdl %d)\n", d_config->vfbs[i].sdl);
         printf("\t\t\t(opengl %d)\n", d_config->vfbs[i].opengl);
@@ -1045,17 +1045,17 @@ skip:
                     break;
                 *p2 = '\0';
                 if (!strcmp(p, "vnc")) {
-                    vfb->vnc = atoi(p2 + 1);
+                    vfb->vnc.enable = atoi(p2 + 1);
                 } else if (!strcmp(p, "vnclisten")) {
-                    free(vfb->vnclisten);
-                    vfb->vnclisten = strdup(p2 + 1);
+                    free(vfb->vnc.listen);
+                    vfb->vnc.listen = strdup(p2 + 1);
                 } else if (!strcmp(p, "vncpasswd")) {
-                    free(vfb->vncpasswd);
-                    vfb->vncpasswd = strdup(p2 + 1);
+                    free(vfb->vnc.passwd);
+                    vfb->vnc.passwd = strdup(p2 + 1);
                 } else if (!strcmp(p, "vncdisplay")) {
-                    vfb->vncdisplay = atoi(p2 + 1);
+                    vfb->vnc.display = atoi(p2 + 1);
                 } else if (!strcmp(p, "vncunused")) {
-                    vfb->vncunused = atoi(p2 + 1);
+                    vfb->vnc.findunused = atoi(p2 + 1);
                 } else if (!strcmp(p, "keymap")) {
                     free(vfb->keymap);
                     vfb->keymap = strdup(p2 + 1);
@@ -1262,13 +1262,13 @@ skip_vfb:
         if (!xlu_cfg_get_long (config, "stdvga", &l, 0))
             dm_info->stdvga = l;
         if (!xlu_cfg_get_long (config, "vnc", &l, 0))
-            dm_info->vnc = l;
-        xlu_cfg_replace_string (config, "vnclisten", &dm_info->vnclisten, 0);
-        xlu_cfg_replace_string (config, "vncpasswd", &dm_info->vncpasswd, 0);
+            dm_info->vnc.enable = l;
+        xlu_cfg_replace_string (config, "vnclisten", &dm_info->vnc.listen, 0);
+        xlu_cfg_replace_string (config, "vncpasswd", &dm_info->vnc.passwd, 0);
         if (!xlu_cfg_get_long (config, "vncdisplay", &l, 0))
-            dm_info->vncdisplay = l;
+            dm_info->vnc.display = l;
         if (!xlu_cfg_get_long (config, "vncunused", &l, 0))
-            dm_info->vncunused = l;
+            dm_info->vnc.findunused = l;
         xlu_cfg_replace_string (config, "keymap", &dm_info->keymap, 0);
         if (!xlu_cfg_get_long (config, "sdl", &l, 0))
             dm_info->sdl = l;

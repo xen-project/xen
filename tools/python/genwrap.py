@@ -4,7 +4,7 @@ import sys,os
 
 import libxltypes
 
-(TYPE_BOOL, TYPE_INT, TYPE_UINT, TYPE_STRING) = range(4)
+(TYPE_BOOL, TYPE_INT, TYPE_UINT, TYPE_STRING, TYPE_AGGREGATE) = range(5)
 
 def py_type(ty):
     if ty == libxltypes.bool:
@@ -16,6 +16,8 @@ def py_type(ty):
             return TYPE_INT
         else:
             return TYPE_UINT
+    if isinstance(ty, libxltypes.Aggregate):
+        return TYPE_AGGREGATE
     if ty == libxltypes.string:
         return TYPE_STRING
     return None
@@ -66,6 +68,9 @@ def py_attrib_get(ty, f):
         l.append('    return genwrap__ull_get(self->obj.%s);'%f.name)
     elif t == TYPE_STRING:
         l.append('    return genwrap__string_get(&self->obj.%s);'%f.name)
+    elif t == TYPE_AGGREGATE:
+        l.append('    PyErr_SetString(PyExc_NotImplementedError, "Getting %s");'%ty.typename)
+        l.append('    return NULL;')
     else:
         tn = f.type.typename
         l.append('    return attrib__%s_get((%s *)&self->obj.%s);'%(fsanitize(tn), tn, f.name))
@@ -92,6 +97,9 @@ def py_attrib_set(ty, f):
         l.append('    return ret;')
     elif t == TYPE_STRING:
         l.append('    return genwrap__string_set(v, &self->obj.%s);'%f.name)
+    elif t == TYPE_AGGREGATE:
+        l.append('    PyErr_SetString(PyExc_NotImplementedError, "Setting %s");'%ty.typename)
+        l.append('    return -1;')
     else:
         tn = f.type.typename
         l.append('    return attrib__%s_set(v, (%s *)&self->obj.%s);'%(fsanitize(tn), tn, f.name))

@@ -129,10 +129,10 @@ int libxl_init_dm_info(libxl_ctx *ctx,
     dm_info->vcpu_avail = b_info->cur_vcpus;
 
     dm_info->stdvga = 0;
-    dm_info->vnc = 1;
-    dm_info->vnclisten = strdup("127.0.0.1");
-    dm_info->vncdisplay = 0;
-    dm_info->vncunused = 1;
+    dm_info->vnc.enable = 1;
+    dm_info->vnc.listen = strdup("127.0.0.1");
+    dm_info->vnc.display = 0;
+    dm_info->vnc.findunused = 1;
     dm_info->keymap = NULL;
     dm_info->sdl = 0;
     dm_info->opengl = 0;
