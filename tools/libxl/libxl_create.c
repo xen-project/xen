@@ -106,6 +106,11 @@ int libxl_init_build_info(libxl_ctx *ctx,
         b_info->u.hvm.sdl.enable = 0;
         b_info->u.hvm.sdl.opengl = 0;
         b_info->u.hvm.nographic = 0;
+        b_info->u.hvm.serial = NULL;
+        b_info->u.hvm.boot = strdup("cda");
+        b_info->u.hvm.usb = 0;
+        b_info->u.hvm.usbdevice = NULL;
+        b_info->u.hvm.xen_platform_pci = 1;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         b_info->u.pv.slack_memkb = 8 * 1024;
@@ -132,11 +137,6 @@ int libxl_init_dm_info(libxl_ctx *ctx,
     dm_info->device_model_stubdomain = false;
     dm_info->device_model = NULL;
 
-    dm_info->serial = NULL;
-    dm_info->boot = strdup("cda");
-    dm_info->usb = 0;
-    dm_info->usbdevice = NULL;
-    dm_info->xen_platform_pci = 1;
     return 0;
 }
 

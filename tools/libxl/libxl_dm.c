@@ -171,11 +171,12 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     if (keymap) {
         flexarray_vappend(dm_args, "-k", keymap, NULL);
     }
-    if (info->serial) {
-        flexarray_vappend(dm_args, "-serial", info->serial, NULL);
-    }
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         int ioemu_vifs = 0;
+
+        if (b_info->u.hvm.serial) {
+            flexarray_vappend(dm_args, "-serial", b_info->u.hvm.serial, NULL);
+        }
 
         if (b_info->u.hvm.nographic && (!sdl && !vnc)) {
             flexarray_append(dm_args, "-nographic");
@@ -191,17 +192,18 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             flexarray_append(dm_args, "-std-vga");
         }
 
-        if (info->boot) {
-            flexarray_vappend(dm_args, "-boot", info->boot, NULL);
+        if (b_info->u.hvm.boot) {
+            flexarray_vappend(dm_args, "-boot", b_info->u.hvm.boot, NULL);
         }
-        if (info->usb || info->usbdevice) {
+        if (b_info->u.hvm.usb || b_info->u.hvm.usbdevice) {
             flexarray_append(dm_args, "-usb");
-            if (info->usbdevice) {
-                flexarray_vappend(dm_args, "-usbdevice", info->usbdevice, NULL);
+            if (b_info->u.hvm.usbdevice) {
+                flexarray_vappend(dm_args,
+                                  "-usbdevice", b_info->u.hvm.usbdevice, NULL);
             }
         }
-        if (info->soundhw) {
-            flexarray_vappend(dm_args, "-soundhw", info->soundhw, NULL);
+        if (b_info->u.hvm.soundhw) {
+            flexarray_vappend(dm_args, "-soundhw", b_info->u.hvm.soundhw, NULL);
         }
         if (b_info->u.hvm.acpi) {
             flexarray_append(dm_args, "-acpi");
@@ -398,11 +400,12 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         flexarray_vappend(dm_args, "-k", keymap, NULL);
     }
 
-    if (info->serial) {
-        flexarray_vappend(dm_args, "-serial", info->serial, NULL);
-    }
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         int ioemu_vifs = 0;
+
+        if (b_info->u.hvm.serial) {
+            flexarray_vappend(dm_args, "-serial", b_info->u.hvm.serial, NULL);
+        }
 
         if (b_info->u.hvm.nographic && (!sdl && !vnc)) {
             flexarray_append(dm_args, "-nographic");
@@ -422,17 +425,19 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                 flexarray_vappend(dm_args, "-vga", "std", NULL);
         }
 
-        if (info->boot) {
-            flexarray_vappend(dm_args, "-boot", libxl__sprintf(gc, "order=%s", info->boot), NULL);
+        if (b_info->u.hvm.boot) {
+            flexarray_vappend(dm_args, "-boot",
+                    libxl__sprintf(gc, "order=%s", b_info->u.hvm.boot), NULL);
         }
-        if (info->usb || info->usbdevice) {
+        if (b_info->u.hvm.usb || b_info->u.hvm.usbdevice) {
             flexarray_append(dm_args, "-usb");
-            if (info->usbdevice) {
-                flexarray_vappend(dm_args, "-usbdevice", info->usbdevice, NULL);
+            if (b_info->u.hvm.usbdevice) {
+                flexarray_vappend(dm_args,
+                                  "-usbdevice", b_info->u.hvm.usbdevice, NULL);
             }
         }
-        if (info->soundhw) {
-            flexarray_vappend(dm_args, "-soundhw", info->soundhw, NULL);
+        if (b_info->u.hvm.soundhw) {
+            flexarray_vappend(dm_args, "-soundhw", b_info->u.hvm.soundhw, NULL);
         }
         if (!b_info->u.hvm.acpi) {
             flexarray_append(dm_args, "-no-acpi");
@@ -778,7 +783,7 @@ retry_transaction:
     if (ret)
         goto out_free;
 
-    if (info->serial)
+    if (guest_config->b_info.u.hvm.serial)
         num_console++;
 
     console = libxl__calloc(gc, num_console, sizeof(libxl_device_console));
@@ -906,7 +911,8 @@ int libxl__create_device_model(libxl__gc *gc,
 
     path = libxl__sprintf(gc, "/local/domain/0/device-model/%d", info->domid);
     xs_mkdir(ctx->xsh, XBT_NULL, path);
-    libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/disable_pf", path), "%d", !info->xen_platform_pci);
+    libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/disable_pf", path),
+                    "%d", !guest_config->b_info.u.hvm.xen_platform_pci);
 
     libxl_create_logfile(ctx,
                          libxl__sprintf(gc, "qemu-dm-%s", c_info->name),

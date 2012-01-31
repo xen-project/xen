@@ -383,10 +383,10 @@ static void printf_info(int domid,
 
         printf("\t\t\t(device_model %s)\n", dm_info->device_model ? : "default");
         printf("\t\t\t(gfx_passthru %d)\n", dm_info->gfx_passthru);
-        printf("\t\t\t(serial %s)\n", dm_info->serial);
-        printf("\t\t\t(boot %s)\n", dm_info->boot);
-        printf("\t\t\t(usb %d)\n", dm_info->usb);
-        printf("\t\t\t(usbdevice %s)\n", dm_info->usbdevice);
+        printf("\t\t\t(serial %s)\n", b_info->u.hvm.serial);
+        printf("\t\t\t(boot %s)\n", b_info->u.hvm.boot);
+        printf("\t\t\t(usb %d)\n", b_info->u.hvm.usb);
+        printf("\t\t\t(usbdevice %s)\n", b_info->u.hvm.usbdevice);
         printf("\t\t)\n");
         break;
     case LIBXL_DOMAIN_TYPE_PV:
@@ -1293,14 +1293,14 @@ skip_vfb:
             b_info->u.hvm.nographic = l;
         if (!xlu_cfg_get_long (config, "gfx_passthru", &l, 0))
             dm_info->gfx_passthru = l;
-        xlu_cfg_replace_string (config, "serial", &dm_info->serial, 0);
-        xlu_cfg_replace_string (config, "boot", &dm_info->boot, 0);
+        xlu_cfg_replace_string (config, "serial", &b_info->u.hvm.serial, 0);
+        xlu_cfg_replace_string (config, "boot", &b_info->u.hvm.boot, 0);
         if (!xlu_cfg_get_long (config, "usb", &l, 0))
-            dm_info->usb = l;
-        xlu_cfg_replace_string (config, "usbdevice", &dm_info->usbdevice, 0);
-        xlu_cfg_replace_string (config, "soundhw", &dm_info->soundhw, 0);
+            b_info->u.hvm.usb = l;
+        xlu_cfg_replace_string (config, "usbdevice", &b_info->u.hvm.usbdevice, 0);
+        xlu_cfg_replace_string (config, "soundhw", &b_info->u.hvm.soundhw, 0);
         if (!xlu_cfg_get_long (config, "xen_platform_pci", &l, 0))
-            dm_info->xen_platform_pci = l;
+            b_info->u.hvm.xen_platform_pci = l;
     }
 
     dm_info->type = c_info->type;

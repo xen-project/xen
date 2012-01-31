@@ -222,6 +222,16 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("keymap",           string),
                                        ("sdl",              libxl_sdl_info),
                                        ("spice",            libxl_spice_info),
+                                       
+                                       ("serial",           string),
+                                       ("boot",             string),
+                                       ("usb",              bool),
+                                       # usbdevice:
+                                       # - "tablet" for absolute mouse,
+                                       # - "mouse" for PS/2 protocol relative mouse
+                                       ("usbdevice",        string),
+                                       ("soundhw",          string),
+                                       ("xen_platform_pci", bool),
                                        ])),
                  ("pv", Struct(None, [("kernel", libxl_file_reference),
                                       ("slack_memkb", uint32),
@@ -251,13 +261,6 @@ libxl_device_model_info = Struct("device_model_info",[
     ("saved_state",      string),
     ("type",             libxl_domain_type),
     ("gfx_passthru",     bool),
-    ("serial",           string),
-    ("boot",             string),
-    ("usb",              bool),
-    # usbdevice: "tablet" for absolute mouse, "mouse" for PS/2 protocol relative mouse
-    ("usbdevice",        string),
-    ("soundhw",          string),
-    ("xen_platform_pci", bool),
     # extra parameters pass directly to qemu, NULL terminated
     ("extra",            libxl_string_list),
     # extra parameters pass directly to qemu for PV guest, NULL terminated
