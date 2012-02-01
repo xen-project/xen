@@ -3376,12 +3376,12 @@ void write_efer(u64 val)
 static void ler_enable(void)
 {
     u64 debugctl;
-    
+
     if ( !this_cpu(ler_msr) )
         return;
 
     rdmsrl(MSR_IA32_DEBUGCTLMSR, debugctl);
-    wrmsrl(MSR_IA32_DEBUGCTLMSR, debugctl | 1);
+    wrmsrl(MSR_IA32_DEBUGCTLMSR, debugctl | IA32_DEBUGCTLMSR_LBR);
 }
 
 void do_debug(struct cpu_user_regs *regs)

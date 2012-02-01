@@ -1944,11 +1944,12 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
     case MSR_IA32_DEBUGCTLMSR: {
         int i, rc = 0;
+        uint64_t supported = IA32_DEBUGCTLMSR_LBR | IA32_DEBUGCTLMSR_BTF;
 
-        if ( !msr_content || (msr_content & ~3) )
+        if ( !msr_content || (msr_content & ~supported) )
             break;
 
-        if ( msr_content & 1 )
+        if ( msr_content & IA32_DEBUGCTLMSR_LBR )
         {
             const struct lbr_info *lbr = last_branch_msr_get();
             if ( lbr == NULL )
