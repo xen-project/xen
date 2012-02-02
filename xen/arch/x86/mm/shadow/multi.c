@@ -2444,7 +2444,7 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     perfc_incr(shadow_validate_gl1e_calls);
 
     gfn = guest_l1e_get_gfn(new_gl1e);
-    gmfn = get_gfn_query(v->domain, gfn, &p2mt);
+    gmfn = get_gfn_query_unlocked(v->domain, gfn_x(gfn), &p2mt);
 
     l1e_propagate_from_guest(v, new_gl1e, gmfn, &new_sl1e, ft_prefetch, p2mt);
     result |= shadow_set_l1e(v, sl1p, new_sl1e, p2mt, sl1mfn);
@@ -2466,7 +2466,6 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
     }
 #endif /* OOS */
 
-    put_gfn(v->domain, gfn_x(gfn));
     return result;
 }
 
@@ -4715,8 +4714,6 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     unsigned long l3gfn;
     mfn_t l3mfn;
 
-    paging_lock(v->domain);
-
     gcr3 = (v->arch.hvm_vcpu.guest_cr[3]);
     /* fast path: the pagetable belongs to the current context */
     if ( gcr3 == gpa )
@@ -4728,8 +4725,11 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     {
         printk(XENLOG_DEBUG "sh_pagetable_dying: gpa not valid %"PRIpaddr"\n",
                gpa);
-        goto out;
+        goto out_put_gfn;
     }
+
+    paging_lock(v->domain);
+
     if ( !fast_path )
     {
         gl3pa = sh_map_domain_page(l3mfn);
@@ -4770,11 +4770,11 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
 
     v->arch.paging.shadow.pagetable_dying = 1;
 
-out:
     if ( !fast_path )
         unmap_domain_page(gl3pa);
-    put_gfn(v->domain, l3gfn);
     paging_unlock(v->domain);
+out_put_gfn:
+    put_gfn(v->domain, l3gfn);
 }
 #else
 static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
@@ -4782,15 +4782,14 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     mfn_t smfn, gmfn;
     p2m_type_t p2mt;
 
+    gmfn = get_gfn_query(v->domain, _gfn(gpa >> PAGE_SHIFT), &p2mt);
     paging_lock(v->domain);
 
-    gmfn = get_gfn_query(v->domain, _gfn(gpa >> PAGE_SHIFT), &p2mt);
 #if GUEST_PAGING_LEVELS == 2
     smfn = shadow_hash_lookup(v, mfn_x(gmfn), SH_type_l2_32_shadow);
 #else
     smfn = shadow_hash_lookup(v, mfn_x(gmfn), SH_type_l4_64_shadow);
 #endif
-    put_gfn(v->domain, gpa >> PAGE_SHIFT);
     
     if ( mfn_valid(smfn) )
     {
@@ -4808,6 +4807,7 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
     v->arch.paging.shadow.pagetable_dying = 1;
 
     paging_unlock(v->domain);
+    put_gfn(v->domain, gpa >> PAGE_SHIFT);
 }
 #endif
 

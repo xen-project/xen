@@ -3609,6 +3609,8 @@ int shadow_track_dirty_vram(struct domain *d,
             || end_pfn >= p2m->max_mapped_pfn)
         return -EINVAL;
 
+    /* We perform p2m lookups, so lock the p2m upfront to avoid deadlock */
+    p2m_lock(p2m_get_hostp2m(d));
     paging_lock(d);
 
     if ( dirty_vram && (!nr ||
@@ -3782,6 +3784,7 @@ out_dirty_vram:
 
 out:
     paging_unlock(d);
+    p2m_unlock(p2m_get_hostp2m(d));
     return rc;
 }
 
