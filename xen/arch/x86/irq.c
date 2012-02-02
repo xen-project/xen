@@ -2001,6 +2001,7 @@ static void dump_irqs(unsigned char key)
     struct domain *d;
     const struct pirq *info;
     unsigned long flags;
+    char *ssid;
 
     printk("Guest interrupt information:\n");
 
@@ -2012,6 +2013,8 @@ static void dump_irqs(unsigned char key)
         if ( !irq_desc_initialized(desc) || desc->handler == &no_irq_type )
             continue;
 
+        ssid = xsm_show_irq_sid(irq);
+
         spin_lock_irqsave(&desc->lock, flags);
 
         cpumask_scnprintf(keyhandler_scratch, sizeof(keyhandler_scratch),
@@ -2020,6 +2023,9 @@ static void dump_irqs(unsigned char key)
                " status=%08x ",
                irq, keyhandler_scratch, desc->arch.vector,
                desc->handler->typename, desc->status);
+
+        if ( ssid )
+            printk("Z=%-25s ", ssid);
 
         if ( !(desc->status & IRQ_GUEST) )
             printk("mapped, unbound\n");
@@ -2053,6 +2059,8 @@ static void dump_irqs(unsigned char key)
         }
 
         spin_unlock_irqrestore(&desc->lock, flags);
+
+        xfree(ssid);
     }
 
     dump_ioapic_irq_info();

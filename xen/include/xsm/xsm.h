@@ -113,6 +113,8 @@ struct xsm_operations {
 
     int (*kexec) (void);
     int (*schedop_shutdown) (struct domain *d1, struct domain *d2);
+
+    char *(*show_irq_sid) (int irq);
     int (*irq_permission) (struct domain *d, int pirq, uint8_t allow);
     int (*iomem_permission) (struct domain *d, uint64_t s, uint64_t e, uint8_t allow);
     int (*pci_config_permission) (struct domain *d, uint32_t machine_bdf, uint16_t start, uint16_t end, uint8_t access);
@@ -475,6 +477,11 @@ static inline int xsm_kexec (void)
 static inline int xsm_schedop_shutdown (struct domain *d1, struct domain *d2)
 {
     return xsm_call(schedop_shutdown(d1, d2));
+}
+
+static inline char *xsm_show_irq_sid (int irq)
+{
+    return xsm_call(show_irq_sid(irq));
 }
 
 static inline int xsm_irq_permission (struct domain *d, int pirq, uint8_t allow)

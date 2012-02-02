@@ -712,6 +712,20 @@ static inline u32 resource_to_perm(uint8_t access)
         return RESOURCE__REMOVE;
 }
 
+static char *flask_show_irq_sid (int irq)
+{
+    u32 sid, ctx_len;
+    char *ctx;
+    int rc = security_irq_sid(irq, &sid);
+    if ( rc )
+        return NULL;
+
+    if (security_sid_to_context(sid, &ctx, &ctx_len))
+        return NULL;
+
+    return ctx;
+}
+
 static int flask_irq_permission (struct domain *d, int pirq, uint8_t access)
 {
     u32 perm;
@@ -1542,6 +1556,8 @@ static struct xsm_operations flask_ops = {
 
     .kexec = flask_kexec,
     .schedop_shutdown = flask_schedop_shutdown,
+
+    .show_irq_sid = flask_show_irq_sid,
 
     .irq_permission = flask_irq_permission,
     .iomem_permission = flask_iomem_permission,
