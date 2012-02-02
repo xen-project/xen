@@ -18,13 +18,11 @@
 #include "avc.h"
 
 struct domain_security_struct {
-    struct domain *d;      /* back pointer to domain object */
     u32 sid;               /* current SID */
     u32 create_sid;
 };
 
 struct evtchn_security_struct {
-    struct evtchn *chn;      /* back pointer to evtchn object */
     u32 sid;                 /* current SID */
 };
 

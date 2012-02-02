@@ -104,8 +104,6 @@ static int flask_domain_alloc_security(struct domain *d)
 
     memset(dsec, 0, sizeof(struct domain_security_struct));
 
-    dsec->d = d;
-
     if ( is_idle_domain(d) )
     {
         dsec->sid = SECINITSID_XEN;
@@ -281,7 +279,6 @@ static int flask_alloc_security_evtchn(struct evtchn *chn)
 
     memset(esec, 0, sizeof(struct evtchn_security_struct));
 
-    esec->chn = chn;
     esec->sid = SECINITSID_UNLABELED;
 
     chn->ssid = esec;
