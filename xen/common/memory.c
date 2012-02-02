@@ -183,14 +183,14 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
             
     page = mfn_to_page(mfn);
 #ifdef CONFIG_X86
-    /* If gmfn is shared, just drop the guest reference (which may or may not
-     * free the page) */
-    if(p2m_is_shared(p2mt))
+    if ( p2m_is_shared(p2mt) )
     {
-        put_page_and_type(page);
-        guest_physmap_remove_page(d, gmfn, mfn, 0);
-        put_gfn(d, gmfn);
-        return 1;
+        /* Unshare the page, bail out on error. We unshare because 
+         * we might be the only one using this shared page, and we
+         * need to trigger proper cleanup. Once done, this is 
+         * like any other page. */
+        if ( mem_sharing_unshare_page(d, gmfn, 0) )
+            return 0;
     }
 
 #endif /* CONFIG_X86 */
