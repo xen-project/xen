@@ -3173,6 +3173,11 @@ static void nmi_mce_softirq(void)
     st->vcpu = NULL;
 }
 
+static void pci_serr_softirq(void)
+{
+    printk("\n\nNMI - PCI system error (SERR)\n");
+}
+
 void async_exception_cleanup(struct vcpu *curr)
 {
     int trap;
@@ -3259,10 +3264,11 @@ static void nmi_dom0_report(unsigned int reason_idx)
 
 static void pci_serr_error(struct cpu_user_regs *regs)
 {
-    console_force_unlock();
-    printk("\n\nNMI - PCI system error (SERR)\n");
-
     outb((inb(0x61) & 0x0f) | 0x04, 0x61); /* clear-and-disable the PCI SERR error line. */
+
+    /* Would like to print a diagnostic here but can't call printk()
+       from NMI context -- raise a softirq instead. */
+    raise_softirq(PCI_SERR_SOFTIRQ);
 }
 
 static void io_check_error(struct cpu_user_regs *regs)
@@ -3563,6 +3569,7 @@ void __init trap_init(void)
     cpu_init();
 
     open_softirq(NMI_MCE_SOFTIRQ, nmi_mce_softirq);
+    open_softirq(PCI_SERR_SOFTIRQ, pci_serr_softirq);
 }
 
 long register_guest_nmi_callback(unsigned long address)
