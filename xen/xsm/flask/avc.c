@@ -539,7 +539,7 @@ static struct avc_node *avc_insert(u32 ssid, u32 tsid, u16 tclass,
 void avc_audit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
                struct av_decision *avd, int result, struct avc_audit_data *a)
 {
-    struct domain *d = current->domain;
+    struct domain *cdom = current->domain;
     u32 denied, audited;
 
     denied = requested & ~avd->allowed;
@@ -564,10 +564,17 @@ void avc_audit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
     avc_dump_av(tclass, audited);
     printk(" for ");
 
-    if ( a && a->d )
-        d = a->d;
-    if ( d )
-        printk("domid=%d ", d->domain_id);
+    if ( a && (a->sdom || a->tdom) )
+    {
+        if ( a->sdom && a->tdom && a->sdom != a->tdom )
+            printk("domid=%d target=%d ", a->sdom->domain_id, a->tdom->domain_id);
+        else if ( a->sdom )
+            printk("domid=%d ", a->sdom->domain_id);
+        else
+            printk("target=%d ", a->tdom->domain_id);
+    }
+    else if ( cdom )
+        printk("domid=%d ", cdom->domain_id);
     switch ( a ? a->type : 0 ) {
     case AVC_AUDIT_DATA_DEV:
         printk("device=0x%lx ", a->device);

@@ -37,11 +37,15 @@ static int domain_has_perm(struct domain *dom1, struct domain *dom2,
                            u16 class, u32 perms)
 {
     struct domain_security_struct *dsec1, *dsec2;
+    struct avc_audit_data ad;
+    AVC_AUDIT_DATA_INIT(&ad, NONE);
+    ad.sdom = dom1;
+    ad.tdom = dom2;
 
     dsec1 = dom1->ssid;
     dsec2 = dom2->ssid;
 
-    return avc_has_perm(dsec1->sid, dsec2->sid, class, perms, NULL);
+    return avc_has_perm(dsec1->sid, dsec2->sid, class, perms, &ad);
 }
 
 static int domain_has_evtchn(struct domain *d, struct evtchn *chn, u32 perms)
@@ -1323,6 +1327,7 @@ static int flask_mmu_normal_update(struct domain *d, struct domain *t,
     unsigned long fmfn;
     struct domain_security_struct *dsec;
     u32 fsid;
+    struct avc_audit_data ad;
 
     if (d != t)
         rc = domain_has_perm(d, t, SECCLASS_MMU, MMU__REMOTE_REMAP);
@@ -1337,13 +1342,22 @@ static int flask_mmu_normal_update(struct domain *d, struct domain *t,
     if ( l1e_get_flags(l1e_from_intpte(fpte)) & _PAGE_RW )
         map_perms |= MMU__MAP_WRITE;
 
+    AVC_AUDIT_DATA_INIT(&ad, RANGE);
     fmfn = get_gfn_untyped(f, l1e_get_pfn(l1e_from_intpte(fpte)));
 
+    ad.sdom = d;
+    ad.tdom = f;
+    ad.range.start = fpte;
+    ad.range.end = fmfn;
+
     rc = get_mfn_sid(fmfn, &fsid);
+
+    put_gfn(f, fmfn);
+
     if ( rc )
         return rc;
 
-    return avc_has_perm(dsec->sid, fsid, SECCLASS_MMU, map_perms, NULL);
+    return avc_has_perm(dsec->sid, fsid, SECCLASS_MMU, map_perms, &ad);
 }
 
 static int flask_mmu_machphys_update(struct domain *d, unsigned long mfn)

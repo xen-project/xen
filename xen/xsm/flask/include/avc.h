@@ -38,10 +38,12 @@ struct sk_buff;
 /* Auxiliary data to use in generating the audit record. */
 struct avc_audit_data {
     char    type;
+#define AVC_AUDIT_DATA_NONE  0
 #define AVC_AUDIT_DATA_DEV   1
 #define AVC_AUDIT_DATA_IRQ   2
 #define AVC_AUDIT_DATA_RANGE 3
-    struct domain *d;
+    struct domain *sdom;
+    struct domain *tdom;
     union {
         unsigned long device;
         int irq;
