@@ -82,9 +82,8 @@ typedef enum {
     p2m_ram_paging_out = 9,       /* Memory that is being paged out */
     p2m_ram_paged = 10,           /* Memory that has been paged out */
     p2m_ram_paging_in = 11,       /* Memory that is being paged in */
-    p2m_ram_paging_in_start = 12, /* Memory that is being paged in */
-    p2m_ram_shared = 13,          /* Shared or sharable memory */
-    p2m_ram_broken = 14,          /* Broken page, access cause domain crash */
+    p2m_ram_shared = 12,          /* Shared or sharable memory */
+    p2m_ram_broken = 13,          /* Broken page, access cause domain crash */
 } p2m_type_t;
 
 /*
@@ -131,7 +130,6 @@ typedef enum {
                        | p2m_to_mask(p2m_ram_ro)              \
                        | p2m_to_mask(p2m_ram_paging_out)      \
                        | p2m_to_mask(p2m_ram_paged)           \
-                       | p2m_to_mask(p2m_ram_paging_in_start) \
                        | p2m_to_mask(p2m_ram_paging_in)       \
                        | p2m_to_mask(p2m_ram_shared))
 
@@ -158,7 +156,6 @@ typedef enum {
 
 #define P2M_PAGING_TYPES (p2m_to_mask(p2m_ram_paging_out)        \
                           | p2m_to_mask(p2m_ram_paged)           \
-                          | p2m_to_mask(p2m_ram_paging_in_start) \
                           | p2m_to_mask(p2m_ram_paging_in))
 
 #define P2M_PAGED_TYPES (p2m_to_mask(p2m_ram_paged))

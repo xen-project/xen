@@ -932,7 +932,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
         if ( p2mt == p2m_ram_paging_out )
             req.flags |= MEM_EVENT_FLAG_EVICT_FAIL;
 
-        set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_ram_paging_in_start, a);
+        set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_ram_paging_in, a);
     }
     p2m_unlock(p2m);
 
@@ -991,7 +991,7 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer)
 
     ret = -ENOENT;
     /* Allow missing pages */
-    if ( (p2mt != p2m_ram_paging_in_start) && (p2mt != p2m_ram_paged) )
+    if ( (p2mt != p2m_ram_paging_in) && (p2mt != p2m_ram_paged) )
         goto out;
 
     /* Allocate a page if the gfn does not have one yet */
@@ -1083,8 +1083,7 @@ void p2m_mem_paging_resume(struct domain *d)
             mfn = p2m->get_entry(p2m, rsp.gfn, &p2mt, &a, p2m_query, NULL);
             /* Allow only pages which were prepared properly, or pages which
              * were nominated but not evicted */
-            if ( mfn_valid(mfn) && 
-                 (p2mt == p2m_ram_paging_in || p2mt == p2m_ram_paging_in_start) )
+            if ( mfn_valid(mfn) && (p2mt == p2m_ram_paging_in) )
             {
                 set_p2m_entry(p2m, rsp.gfn, mfn, PAGE_ORDER_4K, 
                                 paging_mode_log_dirty(d) ? p2m_ram_logdirty : 

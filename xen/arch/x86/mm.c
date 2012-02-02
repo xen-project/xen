@@ -3573,7 +3573,7 @@ int do_mmu_update(
                         rc = -ENOENT;
                         break;
                     }
-                    else if ( p2m_ram_paging_in_start == l1e_p2mt && 
+                    else if ( p2m_ram_paging_in == l1e_p2mt && 
                                 !mfn_valid(l1emfn) )
                     {
                         put_gfn(pg_owner, l1egfn);
@@ -3622,7 +3622,7 @@ int do_mmu_update(
                         rc = -ENOENT;
                         break;
                     }
-                    else if ( p2m_ram_paging_in_start == l2e_p2mt && 
+                    else if ( p2m_ram_paging_in == l2e_p2mt && 
                                 !mfn_valid(l2emfn) )
                     {
                         put_gfn(pg_owner, l2egfn);
@@ -3657,7 +3657,7 @@ int do_mmu_update(
                         rc = -ENOENT;
                         break;
                     }
-                    else if ( p2m_ram_paging_in_start == l3e_p2mt && 
+                    else if ( p2m_ram_paging_in == l3e_p2mt && 
                                 !mfn_valid(l3emfn) )
                     {
                         put_gfn(pg_owner, l3egfn);
@@ -3692,7 +3692,7 @@ int do_mmu_update(
                         rc = -ENOENT;
                         break;
                     }
-                    else if ( p2m_ram_paging_in_start == l4e_p2mt && 
+                    else if ( p2m_ram_paging_in == l4e_p2mt && 
                                 !mfn_valid(l4emfn) )
                     {
                         put_gfn(pg_owner, l4egfn);

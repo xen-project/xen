@@ -82,7 +82,6 @@ static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type, p2m_acces
         case p2m_ram_paging_out:
         case p2m_ram_paged:
         case p2m_ram_paging_in:
-        case p2m_ram_paging_in_start:
         default:
             entry->r = entry->w = entry->x = 0;
             break;
@@ -381,7 +380,7 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         old_entry = *ept_entry;
 
         if ( mfn_valid(mfn_x(mfn)) || direct_mmio || p2m_is_paged(p2mt) ||
-             (p2mt == p2m_ram_paging_in_start) )
+             (p2mt == p2m_ram_paging_in) )
         {
             /* Construct the new entry, and then write it once */
             new_entry.emt = epte_get_entry_emt(p2m->domain, gfn, mfn, &ipat,
