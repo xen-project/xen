@@ -21,6 +21,9 @@ int flask_context_to_sid(xc_interface *xc_handle, char *buf, uint32_t size, uint
 int flask_sid_to_context(xc_interface *xc_handle, int sid, char *buf, uint32_t size);
 int flask_getenforce(xc_interface *xc_handle);
 int flask_setenforce(xc_interface *xc_handle, int mode);
+int flask_getbool_byid(xc_interface *xc_handle, int id, char *name, int *curr, int *pend);
+int flask_getbool_byname(xc_interface *xc_handle, char *name, int *curr, int *pend);
+int flask_setbool(xc_interface *xc_handle, char *name, int value, int commit);
 int flask_add_pirq(xc_interface *xc_handle, unsigned int pirq, char *scontext);
 int flask_add_ioport(xc_interface *xc_handle, unsigned long low, unsigned long high,
                       char *scontext);

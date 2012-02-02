@@ -109,6 +109,65 @@ int flask_setenforce(xc_interface *xc_handle, int mode)
     return 0;
 }
 
+int flask_getbool_byid(xc_interface *xc_handle, int id, char *name, int *curr, int *pend)
+{
+    flask_op_t op;
+    char buf[255];
+    int rv;
+
+    op.cmd = FLASK_GETBOOL2;
+    op.buf = buf;
+    op.size = 255;
+
+    snprintf(buf, sizeof buf, "%i", id);
+
+    rv = xc_flask_op(xc_handle, &op);
+
+    if ( rv )
+        return rv;
+    
+    sscanf(buf, "%i %i %s", curr, pend, name);
+
+    return rv;
+}
+
+int flask_getbool_byname(xc_interface *xc_handle, char *name, int *curr, int *pend)
+{
+    flask_op_t op;
+    char buf[255];
+    int rv;
+
+    op.cmd = FLASK_GETBOOL_NAMED;
+    op.buf = buf;
+    op.size = 255;
+
+    strncpy(buf, name, op.size);
+
+    rv = xc_flask_op(xc_handle, &op);
+
+    if ( rv )
+        return rv;
+    
+    sscanf(buf, "%i %i", curr, pend);
+
+    return rv;
+}
+
+int flask_setbool(xc_interface *xc_handle, char *name, int value, int commit)
+{
+    flask_op_t op;
+    char buf[255];
+    int size = 255;
+
+    op.cmd = FLASK_SETBOOL_NAMED;
+    op.buf = buf;
+    op.size = size;
+
+    snprintf(buf, size, "%s %i %i", name, value, commit);
+
+    return xc_flask_op(xc_handle, &op);
+}
+
 int flask_add_pirq(xc_interface *xc_handle, unsigned int pirq, char *scontext)
 {
     int err;
