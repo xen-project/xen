@@ -55,10 +55,11 @@ kernel; it is normally placed either just above the dom0 kernel or at the end.
 Once dom0 is running, the policy can be reloaded using "xl loadpolicy".
 
 The example policy included with Xen demonstrates most of the features of FLASK
-that can be used without dom0 disaggregation. It has two main types for domUs:
+that can be used without dom0 disaggregation. The main types for domUs are:
 
  - domU_t is a domain that can communicate with any other domU_t
  - isolated_domU_t can only communicate with dom0
+ - prot_domU_t is a domain type whose creation can be disabled with a boolean
 
 One disadvantage of using type enforcement to enforce isolation is that a new
 type is needed for each group of domains. In addition, it is not possible to

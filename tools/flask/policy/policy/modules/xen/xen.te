@@ -73,7 +73,7 @@ allow dom0_t domio_t:mmu { map_read map_write };
 
 domain_self_comms(dom0_t)
 
-auditallow dom0_t security_t:security { load_policy setenforce };
+auditallow dom0_t security_t:security { load_policy setenforce setbool };
 
 ###############################################################################
 #
@@ -91,6 +91,14 @@ declare_domain(isolated_domU_t)
 create_domain(dom0_t, isolated_domU_t)
 manage_domain(dom0_t, isolated_domU_t)
 domain_comms(dom0_t, isolated_domU_t)
+
+gen_bool(prot_doms_locked, false)
+declare_domain(prot_domU_t)
+if (!prot_doms_locked) {
+	create_domain(dom0_t, prot_domU_t)
+}
+domain_comms(dom0_t, prot_domU_t)
+domain_comms(domU_t, prot_domU_t)
 
 ###############################################################################
 #
