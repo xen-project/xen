@@ -19,6 +19,7 @@
 #include <xen/errno.h>
 #include <xen/guest_access.h>
 #include <xen/xenoprof.h>
+#include <asm/msi.h>
 #include <public/xen.h>
 #include <public/physdev.h>
 #include <public/platform.h>
@@ -60,6 +61,36 @@ static int domain_has_xen(struct domain *d, u32 perms)
     dsec = d->ssid;
 
     return avc_has_perm(dsec->sid, SECINITSID_XEN, SECCLASS_XEN, perms, NULL);
+}
+
+static int get_irq_sid(int irq, u32 *sid, struct avc_audit_data *ad)
+{
+    struct irq_desc *desc = irq_to_desc(irq);
+    if ( irq >= nr_irqs || irq < 0 )
+        return -EINVAL;
+    if ( irq < nr_irqs_gsi ) {
+        if (ad) {
+            AVC_AUDIT_DATA_INIT(ad, IRQ);
+            ad->irq = irq;
+        }
+        return security_irq_sid(irq, sid);
+    }
+    if ( desc->msi_desc ) {
+        struct pci_dev *dev = desc->msi_desc->dev;
+        u32 sbdf = (dev->seg << 16) | (dev->bus << 8) | dev->devfn;
+        if (ad) {
+            AVC_AUDIT_DATA_INIT(ad, DEV);
+            ad->device = sbdf;
+        }
+        return security_device_sid(sbdf, sid);
+    }
+    if (ad) {
+        AVC_AUDIT_DATA_INIT(ad, IRQ);
+        ad->irq = irq;
+    }
+    /* HPET or IOMMU IRQ, should not be seen by domains */
+    *sid = SECINITSID_UNLABELED;
+    return 0;
 }
 
 static int flask_domain_alloc_security(struct domain *d)
@@ -292,8 +323,8 @@ static char *flask_show_security_evtchn(struct domain *d, const struct evtchn *c
         break;
     case ECS_PIRQ:
         irq = domain_pirq_to_irq(d, chn->u.pirq.irq);
-        if (irq)
-            security_irq_sid(irq, &sid);
+        if (irq && get_irq_sid(irq, &sid, NULL))
+            return NULL;
         break;
     }
     if ( !sid )
@@ -716,7 +747,7 @@ static char *flask_show_irq_sid (int irq)
 {
     u32 sid, ctx_len;
     char *ctx;
-    int rc = security_irq_sid(irq, &sid);
+    int rc = get_irq_sid(irq, &sid, NULL);
     if ( rc )
         return NULL;
 
@@ -726,7 +757,7 @@ static char *flask_show_irq_sid (int irq)
     return ctx;
 }
 
-static int flask_irq_permission (struct domain *d, int pirq, uint8_t access)
+static int flask_irq_permission (struct domain *d, int irq, uint8_t access)
 {
     u32 perm;
     u32 rsid;
@@ -749,12 +780,9 @@ static int flask_irq_permission (struct domain *d, int pirq, uint8_t access)
     ssec = current->domain->ssid;
     tsec = d->ssid;
 
-    rc = security_irq_sid(pirq, &rsid);
+    rc = get_irq_sid(irq, &rsid, &ad);
     if ( rc )
         return rc;
-
-    AVC_AUDIT_DATA_INIT(&ad, IRQ);
-    ad.irq = pirq;
 
     rc = avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, perm, &ad);
     if ( rc )
@@ -915,12 +943,10 @@ static int flask_resource_setup_gsi(int gsi)
     struct avc_audit_data ad;
     struct domain_security_struct *ssec;
 
-    rc = security_irq_sid(gsi, &rsid);
+    rc = get_irq_sid(gsi, &rsid, &ad);
     if ( rc )
         return rc;
 
-    AVC_AUDIT_DATA_INIT(&ad, IRQ);
-    ad.irq = gsi;
     ssec = current->domain->ssid;
     return avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, RESOURCE__SETUP, &ad);
 }
@@ -1424,12 +1450,9 @@ static int flask_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *b
 
     irq = domain_pirq_to_irq(d, bind->machine_irq);
 
-    rc = security_irq_sid(irq, &rsid);
+    rc = get_irq_sid(irq, &rsid, &ad);
     if ( rc )
         return rc;
-
-    AVC_AUDIT_DATA_INIT(&ad, IRQ);
-    ad.irq = irq;
 
     ssec = current->domain->ssid;
     rc = avc_has_perm(ssec->sid, rsid, SECCLASS_HVM, HVM__BIND_IRQ, &ad);
