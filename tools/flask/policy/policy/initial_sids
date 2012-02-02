@@ -1,0 +1,12 @@
+# Labels for initial SIDs
+
+sid xen gen_context(system_u:system_r:xen_t,s0)
+sid dom0 gen_context(system_u:system_r:dom0_t,s0)
+sid domxen gen_context(system_u:system_r:domxen_t,s0)
+sid domio gen_context(system_u:system_r:domio_t,s0)
+sid unlabeled gen_context(system_u:system_r:unlabeled_t,s0)
+sid security gen_context(system_u:system_r:security_t,s0)
+sid irq gen_context(system_u:object_r:irq_t,s0)
+sid iomem gen_context(system_u:object_r:iomem_t,s0)
+sid ioport gen_context(system_u:object_r:ioport_t,s0)
+sid device gen_context(system_u:object_r:device_t,s0)
