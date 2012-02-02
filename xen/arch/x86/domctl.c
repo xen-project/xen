@@ -648,7 +648,7 @@ long arch_do_domctl(
 
         ret = xsm_machine_address_size(d, domctl->cmd);
         if ( ret )
-            rcu_unlock_domain(d);
+            goto set_machine_address_size_out;
 
         ret = -EBUSY;
         if ( d->tot_pages > 0 )
