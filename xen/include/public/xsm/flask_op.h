@@ -47,8 +47,11 @@
 #define FLASK_MEMBER            20
 #define FLASK_ADD_OCONTEXT      21
 #define FLASK_DEL_OCONTEXT      22
+#define FLASK_GETBOOL_NAMED     23
+#define FLASK_GETBOOL2          24
+#define FLASK_SETBOOL_NAMED     25
 
-#define FLASK_LAST              FLASK_DEL_OCONTEXT
+#define FLASK_LAST              FLASK_SETBOOL_NAMED
 
 typedef struct flask_op {
     uint32_t  cmd;

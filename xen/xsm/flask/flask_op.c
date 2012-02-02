@@ -47,7 +47,10 @@ integer_param("flask_enabled", flask_enabled);
         1UL<<FLASK_SETAVC_THRESHOLD | \
         1UL<<FLASK_MEMBER | \
         1UL<<FLASK_ADD_OCONTEXT | \
-        1UL<<FLASK_DEL_OCONTEXT \
+        1UL<<FLASK_DEL_OCONTEXT | \
+        1UL<<FLASK_GETBOOL_NAMED | \
+        1UL<<FLASK_GETBOOL2 | \
+        1UL<<FLASK_SETBOOL_NAMED \
     )
 
 #define FLASK_COPY_OUT \
@@ -65,7 +68,9 @@ integer_param("flask_enabled", flask_enabled);
         1UL<<FLASK_GETAVC_THRESHOLD | \
         1UL<<FLASK_AVC_HASHSTATS | \
         1UL<<FLASK_AVC_CACHESTATS | \
-        1UL<<FLASK_MEMBER \
+        1UL<<FLASK_MEMBER | \
+        1UL<<FLASK_GETBOOL_NAMED | \
+        1UL<<FLASK_GETBOOL2 \
     )
 
 static DEFINE_SPINLOCK(sel_sem);
@@ -73,6 +78,7 @@ static DEFINE_SPINLOCK(sel_sem);
 /* global data for booleans */
 static int bool_num = 0;
 static int *bool_pending_values = NULL;
+static int flask_security_make_bools(void);
 
 extern int ss_initialized;
 
@@ -573,7 +579,7 @@ static int flask_security_setavc_threshold(char *buf, uint32_t count)
 static int flask_security_set_bool(char *buf, uint32_t count)
 {
     int length = -EFAULT;
-    int i, new_value;
+    unsigned int i, new_value;
 
     spin_lock(&sel_sem);
 
@@ -585,10 +591,14 @@ static int flask_security_set_bool(char *buf, uint32_t count)
     if ( sscanf(buf, "%d %d", &i, &new_value) != 2 )
         goto out;
 
+    if (!bool_pending_values)
+        flask_security_make_bools();
+
+    if ( i >= bool_num )
+        goto out;
+
     if ( new_value )
-    {
         new_value = 1;
-    }
 
     bool_pending_values[i] = new_value;
     length = count;
@@ -596,6 +606,57 @@ static int flask_security_set_bool(char *buf, uint32_t count)
  out:
     spin_unlock(&sel_sem);
     return length;
+}
+
+static int flask_security_set_bool_name(char *buf, uint32_t count)
+{
+    int rv, num;
+    int i, new_value, commit;
+    int *values = NULL;
+    char *name;
+    
+    name = xmalloc_bytes(count);
+    if ( name == NULL )
+        return -ENOMEM;
+
+    spin_lock(&sel_sem);
+
+    rv = domain_has_security(current->domain, SECURITY__SETBOOL);
+    if ( rv )
+        goto out;
+    
+    rv = -EINVAL;
+    if ( sscanf(buf, "%s %d %d", name, &new_value, &commit) != 3 )
+        goto out;
+
+    i = security_find_bool(name);
+    if ( i < 0 )
+        goto out;
+
+    if ( new_value )
+        new_value = 1;
+
+    if ( commit ) {
+        rv = security_get_bools(&num, NULL, &values);
+        if ( rv != 0 )
+            goto out;
+        values[i] = new_value;
+        if (bool_pending_values)
+            bool_pending_values[i] = new_value;
+        rv = security_set_bools(num, values);
+        xfree(values);
+    } else {
+        if (!bool_pending_values)
+            flask_security_make_bools();
+
+        bool_pending_values[i] = new_value;
+        rv = count;
+    }
+
+ out:
+    xfree(name);
+    spin_unlock(&sel_sem);
+    return rv;
 }
 
 static int flask_security_commit_bools(char *buf, uint32_t count)
@@ -613,7 +674,7 @@ static int flask_security_commit_bools(char *buf, uint32_t count)
     if ( sscanf(buf, "%d", &new_value) != 1 )
         goto out;
 
-    if ( new_value )
+    if ( new_value && bool_pending_values )
         security_set_bools(bool_num, bool_pending_values);
     
     length = count;
@@ -623,10 +684,11 @@ static int flask_security_commit_bools(char *buf, uint32_t count)
     return length;
 }
 
-static int flask_security_get_bool(char *buf, uint32_t count)
+static int flask_security_get_bool(char *buf, uint32_t count, int named)
 {
     int length;
-    int i, cur_enforcing;
+    int i, cur_enforcing, pend_enforcing;
+    char* name = NULL;
     
     spin_lock(&sel_sem);
     
@@ -641,25 +703,70 @@ static int flask_security_get_bool(char *buf, uint32_t count)
         goto out;
     }
 
+    if ( bool_pending_values )
+        pend_enforcing = bool_pending_values[i];
+    else
+        pend_enforcing = cur_enforcing;
+
+    if ( named )
+        name = security_get_bool_name(i);
+    if ( named && !name )
+        goto out;
+
     memset(buf, 0, count);
-    length = snprintf(buf, count, "%d %d", cur_enforcing,
-                      bool_pending_values[i]);
+    if ( named )
+        length = snprintf(buf, count, "%d %d %s", cur_enforcing,
+                          pend_enforcing, name);
+    else
+        length = snprintf(buf, count, "%d %d", cur_enforcing,
+                          pend_enforcing);
 
  out:
+    xfree(name);
     spin_unlock(&sel_sem);
     return length;
 }
 
+static int flask_security_get_bool_name(char *buf, uint32_t count)
+{
+    int rv = -ENOENT;
+    int i, cur_enforcing, pend_enforcing;
+    
+    spin_lock(&sel_sem);
+    
+    i = security_find_bool(buf);
+    if ( i < 0 )
+        goto out;
+
+    cur_enforcing = security_get_bool_value(i);
+    if ( cur_enforcing < 0 )
+    {
+        rv = cur_enforcing;
+        goto out;
+    }
+
+    if ( bool_pending_values )
+        pend_enforcing = bool_pending_values[i];
+    else
+        pend_enforcing = cur_enforcing;
+
+    memset(buf, 0, count);
+    rv = snprintf(buf, count, "%d %d", cur_enforcing, pend_enforcing);
+
+ out:
+    spin_unlock(&sel_sem);
+    return rv;
+}
+
 static int flask_security_make_bools(void)
 {
-    int i, ret = 0;
-    char **names = NULL;
+    int ret = 0;
     int num;
     int *values = NULL;
     
     xfree(bool_pending_values);
     
-    ret = security_get_bools(&num, &names, &values);
+    ret = security_get_bools(&num, NULL, &values);
     if ( ret != 0 )
         goto out;
 
@@ -667,12 +774,6 @@ static int flask_security_make_bools(void)
     bool_pending_values = values;
 
  out:
-    if ( names )
-    {
-        for ( i = 0; i < num; i++ )
-            xfree(names[i]);
-        xfree(names);
-    }    
     return ret;
 }
 
@@ -938,7 +1039,7 @@ long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
 
     case FLASK_GETBOOL:
     {
-        length = flask_security_get_bool(arg, op->size);
+        length = flask_security_get_bool(arg, op->size, 0);
     }
     break;
 
@@ -1009,6 +1110,24 @@ long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
         length = flask_ocontext_del(arg, op->size);
         break;
     }
+
+    case FLASK_GETBOOL_NAMED:
+    {
+        length = flask_security_get_bool_name(arg, op->size);
+    }
+    break;
+
+    case FLASK_GETBOOL2:
+    {
+        length = flask_security_get_bool(arg, op->size, 1);
+    }
+    break;
+
+    case FLASK_SETBOOL_NAMED:
+    {
+        length = flask_security_set_bool_name(arg, op->size);
+    }
+    break;
 
     default:
         length = -ENOSYS;

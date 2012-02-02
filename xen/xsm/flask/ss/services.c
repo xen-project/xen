@@ -1883,12 +1883,30 @@ out:
     return rc;
 }
 
+int security_find_bool(const char *name)
+{
+    int i, rv = -ENOENT;
+    POLICY_RDLOCK;
+    for ( i = 0; i < policydb.p_bools.nprim; i++ )
+    {
+        if (!strcmp(name, policydb.p_bool_val_to_name[i]))
+        {
+            rv = i;
+            break;
+        }
+    }
+
+    POLICY_RDUNLOCK;
+    return rv;
+}
+
 int security_get_bools(int *len, char ***names, int **values)
 {
     int i, rc = -ENOMEM;
 
     POLICY_RDLOCK;
-    *names = NULL;
+    if ( names )
+        *names = NULL;
     *values = NULL;
 
     *len = policydb.p_bools.nprim;
@@ -1898,10 +1916,12 @@ int security_get_bools(int *len, char ***names, int **values)
         goto out;
     }
 
-    *names = (char**)xmalloc_array(char*, *len);
-    if ( !*names )
-        goto err;
-    memset(*names, 0, sizeof(char*) * *len);
+    if ( names ) {
+        *names = (char**)xmalloc_array(char*, *len);
+        if ( !*names )
+            goto err;
+        memset(*names, 0, sizeof(char*) * *len);
+    }
 
     *values = (int*)xmalloc_array(int, *len);
     if ( !*values )
@@ -1911,19 +1931,21 @@ int security_get_bools(int *len, char ***names, int **values)
     {
         size_t name_len;
         (*values)[i] = policydb.bool_val_to_struct[i]->state;
-        name_len = strlen(policydb.p_bool_val_to_name[i]) + 1;
-        (*names)[i] = (char*)xmalloc_array(char, name_len);
-        if ( !(*names)[i] )
-            goto err;
-        strlcpy((*names)[i], policydb.p_bool_val_to_name[i], name_len);
-        (*names)[i][name_len - 1] = 0;
+        if ( names ) {
+            name_len = strlen(policydb.p_bool_val_to_name[i]) + 1;
+            (*names)[i] = (char*)xmalloc_array(char, name_len);
+            if ( !(*names)[i] )
+                goto err;
+            strlcpy((*names)[i], policydb.p_bool_val_to_name[i], name_len);
+            (*names)[i][name_len - 1] = 0;
+        }
     }
     rc = 0;
 out:
     POLICY_RDUNLOCK;
     return rc;
 err:
-    if ( *names )
+    if ( names && *names )
     {
         for ( i = 0; i < *len; i++ )
             xfree((*names)[i]);
@@ -1984,17 +2006,17 @@ out:
     return rc;
 }
 
-int security_get_bool_value(int bool)
+int security_get_bool_value(unsigned int bool)
 {
     int rc = 0;
-    int len;
+    unsigned int len;
 
     POLICY_RDLOCK;
 
     len = policydb.p_bools.nprim;
     if ( bool >= len )
     {
-        rc = -EFAULT;
+        rc = -ENOENT;
         goto out;
     }
 
@@ -2002,6 +2024,29 @@ int security_get_bool_value(int bool)
 out:
     POLICY_RDUNLOCK;
     return rc;
+}
+
+char *security_get_bool_name(unsigned int bool)
+{
+    unsigned int len;
+    char *rv = NULL;
+
+    POLICY_RDLOCK;
+
+    len = policydb.p_bools.nprim;
+    if ( bool >= len )
+    {
+        goto out;
+    }
+
+    len = strlen(policydb.p_bool_val_to_name[bool]) + 1;
+    rv = xmalloc_array(char, len);
+    if ( !rv )
+        goto out;
+    memcpy(rv, policydb.p_bool_val_to_name[bool], len);
+out:
+    POLICY_RDUNLOCK;
+    return rv;
 }
 
 static int security_preserve_bools(struct policydb *p)
