@@ -1256,6 +1256,7 @@ void evtchn_move_pirqs(struct vcpu *v)
 static void domain_dump_evtchn_info(struct domain *d)
 {
     unsigned int port;
+    int irq;
 
     bitmap_scnlistprintf(keyhandler_scratch, sizeof(keyhandler_scratch),
                          d->poll_mask, d->max_vcpus);
@@ -1268,6 +1269,7 @@ static void domain_dump_evtchn_info(struct domain *d)
     for ( port = 1; port < MAX_EVTCHNS(d); ++port )
     {
         const struct evtchn *chn;
+        char *ssid;
 
         if ( !port_is_valid(d, port) )
             continue;
@@ -1275,11 +1277,12 @@ static void domain_dump_evtchn_info(struct domain *d)
         if ( chn->state == ECS_FREE )
             continue;
 
-        printk("    %4u [%d/%d]: s=%d n=%d",
+        printk("    %4u [%d/%d]: s=%d n=%d x=%d",
                port,
                !!test_bit(port, &shared_info(d, evtchn_pending)),
                !!test_bit(port, &shared_info(d, evtchn_mask)),
-               chn->state, chn->notify_vcpu_id);
+               chn->state, chn->notify_vcpu_id, chn->xen_consumer);
+
         switch ( chn->state )
         {
         case ECS_UNBOUND:
@@ -1291,13 +1294,21 @@ static void domain_dump_evtchn_info(struct domain *d)
                    chn->u.interdomain.remote_port);
             break;
         case ECS_PIRQ:
-            printk(" p=%d", chn->u.pirq.irq);
+            irq = domain_pirq_to_irq(d, chn->u.pirq.irq);
+            printk(" p=%d i=%d", chn->u.pirq.irq, irq);
             break;
         case ECS_VIRQ:
             printk(" v=%d", chn->u.virq);
             break;
         }
-        printk(" x=%d\n", chn->xen_consumer);
+
+        ssid = xsm_show_security_evtchn(d, chn);
+        if (ssid) {
+            printk(" Z=%s\n", ssid);
+            xfree(ssid);
+        } else {
+            printk("\n");
+        }
     }
 
     spin_unlock(&d->event_lock);

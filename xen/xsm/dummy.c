@@ -290,6 +290,11 @@ static void dummy_free_security_evtchn (struct evtchn *chn)
     return;
 }
 
+static char *dummy_show_security_evtchn (struct domain *d, const struct evtchn *chn)
+{
+    return NULL;
+}
+
 static int dummy_test_assign_device (uint32_t machine_bdf)
 {
     return 0;
@@ -637,6 +642,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, free_security_domain);
     set_to_dummy_if_null(ops, alloc_security_evtchn);
     set_to_dummy_if_null(ops, free_security_evtchn);
+    set_to_dummy_if_null(ops, show_security_evtchn);
 
     set_to_dummy_if_null(ops, memory_adjust_reservation);
     set_to_dummy_if_null(ops, memory_stat_reservation);

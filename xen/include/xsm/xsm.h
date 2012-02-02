@@ -99,6 +99,7 @@ struct xsm_operations {
     void (*free_security_domain) (struct domain *d);
     int (*alloc_security_evtchn) (struct evtchn *chn);
     void (*free_security_evtchn) (struct evtchn *chn);
+    char *(*show_security_evtchn) (struct domain *d, const struct evtchn *chn);
 
     int (*get_pod_target) (struct domain *d);
     int (*set_pod_target) (struct domain *d);
@@ -422,6 +423,11 @@ static inline int xsm_alloc_security_evtchn (struct evtchn *chn)
 static inline void xsm_free_security_evtchn (struct evtchn *chn)
 {
     (void)xsm_call(free_security_evtchn(chn));
+}
+
+static inline char *xsm_show_security_evtchn (struct domain *d, const struct evtchn *chn)
+{
+    return xsm_call(show_security_evtchn(d, chn));
 }
 
 static inline int xsm_get_pod_target (struct domain *d)

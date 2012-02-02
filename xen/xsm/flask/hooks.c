@@ -274,6 +274,35 @@ static void flask_free_security_evtchn(struct evtchn *chn)
     xfree(esec);
 }
 
+static char *flask_show_security_evtchn(struct domain *d, const struct evtchn *chn)
+{
+    struct evtchn_security_struct *esec;
+    int irq;
+    u32 sid = 0;
+    char *ctx;
+    u32 ctx_len;
+
+    switch ( chn->state )
+    {
+    case ECS_UNBOUND:
+    case ECS_INTERDOMAIN:
+        esec = chn->ssid;
+        if ( esec )
+            sid = esec->sid;
+        break;
+    case ECS_PIRQ:
+        irq = domain_pirq_to_irq(d, chn->u.pirq.irq);
+        if (irq)
+            security_irq_sid(irq, &sid);
+        break;
+    }
+    if ( !sid )
+        return NULL;
+    if (security_sid_to_context(sid, &ctx, &ctx_len))
+        return NULL;
+    return ctx;
+}
+
 static int flask_grant_mapref(struct domain *d1, struct domain *d2, 
                               uint32_t flags)
 {
@@ -1499,6 +1528,7 @@ static struct xsm_operations flask_ops = {
     .free_security_domain = flask_domain_free_security,
     .alloc_security_evtchn = flask_alloc_security_evtchn,
     .free_security_evtchn = flask_free_security_evtchn,
+    .show_security_evtchn = flask_show_security_evtchn,
 
     .get_pod_target = flask_get_pod_target,
     .set_pod_target = flask_set_pod_target,
