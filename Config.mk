@@ -179,9 +179,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 3981d218912e186cb4205ee6732f446c177a36a2
-# Tue Nov 22 18:49:15 2011 +0000
-# qemu-xen: Don't redefine libpci (3.1.7) defines.
+QEMU_TAG ?= 3cf61880403b4e484539596a95937cc066243388
+# Thu Feb 2 13:47:06 2012 +0000
+# e1000: bounds packet size against buffer size
 
 # Optional components
 XENSTAT_XENTOP     ?= y
