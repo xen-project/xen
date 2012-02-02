@@ -5,10 +5,10 @@
 # Domain creation and setup
 #
 ################################################################################
-# declare_domain(type)
+# declare_domain(type, attrs...)
 #   Declare a type as a domain type, and allow basic domain setup
 define(`declare_domain', `
-	type $1, domain_type;
+	type $1, domain_type`'ifelse(`$#', `1', `', `,shift($@)');
 	allow $1 $1:grant { query setup };
 	allow $1 $1:mmu { adjust physmap map_read map_write stat pinpage };
 	allow $1 $1:hvm { getparam setparam };

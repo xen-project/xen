@@ -25,7 +25,7 @@ attribute mls_priv;
 type xen_t, xen_type, mls_priv;
 
 # Domain 0
-type dom0_t, domain_type, mls_priv;
+declare_domain(dom0_t, mls_priv);
 
 # Untracked I/O memory (pseudo-domain)
 type domio_t, xen_type;
@@ -63,8 +63,6 @@ allow dom0_t security_t:security { check_context compute_av compute_create
 	setbool setsecparam add_ocontext del_ocontext };
 
 allow dom0_t dom0_t:domain { getdomaininfo getvcpuinfo getvcpuaffinity };
-allow dom0_t dom0_t:grant { query setup };
-allow dom0_t dom0_t:mmu { adjust physmap map_read map_write stat pinpage };
 allow dom0_t dom0_t:resource { add remove };
 
 admin_device(dom0_t, device_t)
