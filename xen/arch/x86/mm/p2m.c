@@ -499,6 +499,11 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
             /* Count how man PoD entries we'll be replacing if successful */
             pod_count++;
         }
+        else if ( p2m_is_paging(ot) && (ot != p2m_ram_paging_out) )
+        {
+            /* We're plugging a hole in the physmap where a paged out page was */
+            atomic_dec(&d->paged_pages);
+        }
     }
 
     /* Then, look for m->p mappings for this range and deal with them */
@@ -856,7 +861,8 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
  * released by the guest. The pager is supposed to drop its reference of the
  * gfn.
  */
-void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn)
+void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
+                                p2m_type_t p2mt)
 {
     mem_event_request_t req;
 
@@ -875,6 +881,10 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn)
     req.flags = MEM_EVENT_FLAG_DROP_PAGE;
 
     mem_event_put_request(d, &d->mem_event->paging, &req);
+
+    /* Update stats unless the page hasn't yet been evicted */
+    if ( p2mt != p2m_ram_paging_out )
+        atomic_dec(&d->paged_pages);
 }
 
 /**

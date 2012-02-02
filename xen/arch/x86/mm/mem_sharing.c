@@ -878,8 +878,12 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
         ret = -ENOENT;
         mem_sharing_gfn_destroy(cd, gfn_info);
         put_page_and_type(spage);
-    } else
+    } else {
         ret = 0;
+        /* There is a chance we're plugging a hole where a paged out page was */
+        if ( p2m_is_paging(cmfn_type) && (cmfn_type != p2m_ram_paging_out) )
+            atomic_dec(&cd->paged_pages);
+    }
 
     atomic_inc(&nr_saved_mfns);
 
