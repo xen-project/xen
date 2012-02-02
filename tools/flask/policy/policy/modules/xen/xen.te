@@ -22,22 +22,22 @@ attribute mls_priv;
 ################################################################################
 
 # The hypervisor itself
-type xen_t, xen_type, domain_type, mls_priv;
+type xen_t, xen_type, mls_priv;
 
 # Domain 0
 type dom0_t, domain_type, mls_priv;
 
 # Untracked I/O memory (pseudo-domain)
-type domio_t, domain_type;
+type domio_t, xen_type;
 
 # Xen heap (pseudo-domain)
-type domxen_t, domain_type;
+type domxen_t, xen_type;
 
 # Unlabeled objects
-type unlabeled_t, domain_type;
+type unlabeled_t, xen_type;
 
 # The XSM/FLASK security server
-type security_t, domain_type;
+type security_t, xen_type;
 
 # Unlabeled device resources
 # Note: don't allow access to these types directly; see below for how to label
@@ -143,7 +143,11 @@ delegate_devices(dom0_t, domU_t)
 
 ################################################################################
 #
-# Constraints
+# Policy constraints
+#
+# Neverallow rules will cause the policy build to fail if an allow rule exists
+# that violates the expression. This is used to ensure proper labeling of
+# objects.
 #
 ################################################################################
 
@@ -159,9 +163,19 @@ neverallow * ~event_type:event { create send status };
 
 ################################################################################
 #
-# Labels for initial SIDs and system role
+# Roles
 #
 ################################################################################
 
+# The object role (object_r) is used for devices, resources, and event channels;
+# it does not need to be defined here and should not be used for domains.
+
+# The system role is used for utility domains and pseudo-domains
 role system_r;
 role system_r types { xen_type domain_type };
+# If you want to prevent domUs from being placed in system_r:
+##role system_r types { xen_type dom0_t };
+
+# The vm role is used for customer virtual machines
+role vm_r;
+role vm_r types { domain_type -dom0_t };

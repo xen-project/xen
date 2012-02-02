@@ -27,14 +27,17 @@ FLASK_ENABLE to "y"; this change requires a make clean and rebuild.
 
 FLASK uses only one domain configuration parameter (seclabel) defining the
 full security label of the newly created domain. If using the example policy,
-"seclabel='system_u:system_r:domU_t'" would be used for normal domains. For
-simple policies including the example policy, the user and role portions of the
-label are unused and will always be "system_u:system_r".  Most of FLASK policy
-consists of defining the interactions allowed between different types (domU_t
-would be the type in this example); FLASK policy does not distinguish between
-domains with the same type. This is the same format as used for SELinux
-labeling; see http://selinuxproject.org for more details on the use of the user,
-role, and optional MLS/MCS labels.
+"seclabel='system_u:system_r:domU_t'" is an example of a normal domain. The
+labels are in the same format as SELinux labels; see http://selinuxproject.org
+for more details on the use of the user, role, and optional MLS/MCS labels.
+
+FLASK policy overview
+---------------------
+
+Most of FLASK policy consists of defining the interactions allowed between
+different types (domU_t would be the type in this example). For simple policies,
+only type enforcement is used and the user and role are set to system_u and
+system_r for all domains.
 
 The FLASK security framework is mostly configured using a security policy file.
 This policy file is not normally generated during the Xen build process because
@@ -57,8 +60,27 @@ that can be used without dom0 disaggregation. It has two main types for domUs:
  - domU_t is a domain that can communicate with any other domU_t
  - isolated_domU_t can only communicate with dom0
 
-More types can be added to allow groups of domains to communicate without
-allowing communication between groups, or only between certain groups.
+One disadvantage of using type enforcement to enforce isolation is that a new
+type is needed for each group of domains. In addition, it is not possible to
+allow isolated_domU_t cannot to create loopback event channels without allowing
+two domains of type isolated_domU_t to communicate with one another.
+
+Users and roles
+---------------
+
+Users are defined in tools/flask/policy/policy/users. The example policy defines
+two users (customer_1 and customer_2) in addition to the system user system_u.
+Users are visible in the labels of domains and associated objects (event
+channels); in the example policy, "customer_1:vm_r:domU_t" is a valid label for
+the customer_1 user.
+
+Access control rules involving users and roles are defined in the policy
+constraints file (tools/flask/policy/policy/constraints). The example policy
+provides constraints that prevent different users from communicating using
+grants or event channels, while still allowing communication with dom0.
+
+Resource Policy
+---------------
 
 The example policy also includes a resource type (nic_dev_t) for device
 passthrough, configured to allow use by domU_t. To label the PCI device 3:2.0

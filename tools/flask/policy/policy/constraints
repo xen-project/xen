@@ -22,6 +22,19 @@
 # role_op : == | != | eq | dom | domby | incomp
 #
 # names : name | { name_list }
-# name_list : name | name_list name		
+# name_list : name | name_list name
 #
 
+# Prevent event channels and grants between different customers
+
+constrain event bind (
+	u1 == system_u or
+	u2 == system_u or
+	u1 == u2
+);
+
+constrain grant { map_read map_write copy } (
+	u1 == system_u or
+	u2 == system_u or
+	u1 == u2
+);

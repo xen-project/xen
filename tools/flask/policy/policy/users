@@ -3,15 +3,9 @@
 # System User configuration.
 #
 
-#
-# gen_user(username, role_set, mls_defaultlevel, mls_range)
-#
-
-#
-# system_u is the user identity for system processes and objects.
-# There should be no corresponding Unix user identity for system,
-# and a user process should never be assigned the system user
-# identity.
-#
+# system_u is the user identity for system domains and objects
 gen_user(system_u,, system_r, s0, s0 - mls_systemhigh)
 
+# Other users are defined using the vm role
+gen_user(customer_1,, vm_r, s0, s0)
+gen_user(customer_2,, vm_r, s0, s0)
