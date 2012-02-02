@@ -11,7 +11,7 @@ TESTDIR  = testsuite/tmp
 TESTFLAGS= -DTESTING
 TESTENV  = XENSTORED_ROOTDIR=$(TESTDIR) XENSTORED_RUNDIR=$(TESTDIR)
 
-CLIENTS := flask-loadpolicy flask-setenforce flask-getenforce flask-label-pci
+CLIENTS := flask-loadpolicy flask-setenforce flask-getenforce flask-label-pci flask-get-bool flask-set-bool
 CLIENTS_SRCS := $(patsubst flask-%,%.c,$(CLIENTS))
 CLIENTS_OBJS := $(patsubst flask-%,%.o,$(CLIENTS))
 
@@ -28,6 +28,12 @@ flask-getenforce: getenforce.o
 	$(CC) $(LDFLAGS) $< $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
 
 flask-label-pci: label-pci.o
+	$(CC) $(LDFLAGS) $< $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
+
+flask-get-bool: get-bool.o
+	$(CC) $(LDFLAGS) $< $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
+
+flask-set-bool: set-bool.o
 	$(CC) $(LDFLAGS) $< $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
 
 .PHONY: clean
