@@ -375,6 +375,11 @@ static char *dummy_show_irq_sid (int irq)
     return NULL;
 }
 
+static int dummy_map_domain_pirq (struct domain *d, int irq, void *data)
+{
+    return 0;
+}
+
 static int dummy_irq_permission (struct domain *d, int pirq, uint8_t allow)
 {
     return 0;
@@ -660,6 +665,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, schedop_shutdown);
 
     set_to_dummy_if_null(ops, show_irq_sid);
+    set_to_dummy_if_null(ops, map_domain_pirq);
     set_to_dummy_if_null(ops, irq_permission);
     set_to_dummy_if_null(ops, iomem_permission);
     set_to_dummy_if_null(ops, pci_config_permission);

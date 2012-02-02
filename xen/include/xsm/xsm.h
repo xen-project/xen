@@ -115,6 +115,7 @@ struct xsm_operations {
     int (*schedop_shutdown) (struct domain *d1, struct domain *d2);
 
     char *(*show_irq_sid) (int irq);
+    int (*map_domain_pirq) (struct domain *d, int irq, void *data);
     int (*irq_permission) (struct domain *d, int pirq, uint8_t allow);
     int (*iomem_permission) (struct domain *d, uint64_t s, uint64_t e, uint8_t allow);
     int (*pci_config_permission) (struct domain *d, uint32_t machine_bdf, uint16_t start, uint16_t end, uint8_t access);
@@ -482,6 +483,11 @@ static inline int xsm_schedop_shutdown (struct domain *d1, struct domain *d2)
 static inline char *xsm_show_irq_sid (int irq)
 {
     return xsm_call(show_irq_sid(irq));
+}
+
+static inline int xsm_map_domain_pirq (struct domain *d, int irq, void *data)
+{
+    return xsm_call(map_domain_pirq(d, irq, data));
 }
 
 static inline int xsm_irq_permission (struct domain *d, int pirq, uint8_t allow)

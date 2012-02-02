@@ -757,6 +757,42 @@ static char *flask_show_irq_sid (int irq)
     return ctx;
 }
 
+static int flask_map_domain_pirq (struct domain *d, int irq, void *data)
+{
+    u32 sid;
+    int rc = -EPERM;
+    struct msi_info *msi = data;
+
+    struct domain_security_struct *ssec, *tsec;
+    struct avc_audit_data ad;
+
+    rc = domain_has_perm(current->domain, d, SECCLASS_RESOURCE, RESOURCE__ADD);
+
+    if ( rc )
+        return rc;
+
+    if ( irq >= nr_irqs_gsi && msi ) {
+        u32 machine_bdf = (msi->seg << 16) | (msi->bus << 8) | msi->devfn;
+        AVC_AUDIT_DATA_INIT(&ad, DEV);
+        ad.device = machine_bdf;
+        rc = security_device_sid(machine_bdf, &sid);
+    } else {
+        rc = get_irq_sid(irq, &sid, &ad);
+    }
+    if ( rc )
+        return rc;
+
+    ssec = current->domain->ssid;
+    tsec = d->ssid;
+
+    rc = avc_has_perm(ssec->sid, sid, SECCLASS_RESOURCE, RESOURCE__ADD_IRQ, &ad);
+    if ( rc )
+        return rc;
+
+    rc = avc_has_perm(tsec->sid, sid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
+    return rc;
+}
+
 static int flask_irq_permission (struct domain *d, int irq, uint8_t access)
 {
     u32 perm;
@@ -1582,6 +1618,7 @@ static struct xsm_operations flask_ops = {
 
     .show_irq_sid = flask_show_irq_sid,
 
+    .map_domain_pirq = flask_map_domain_pirq,
     .irq_permission = flask_irq_permission,
     .iomem_permission = flask_iomem_permission,
     .pci_config_permission = flask_pci_config_permission,

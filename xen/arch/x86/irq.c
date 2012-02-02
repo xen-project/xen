@@ -1828,7 +1828,7 @@ int map_domain_pirq(
         return 0;
     }
 
-    ret = xsm_irq_permission(d, irq, 1);
+    ret = xsm_map_domain_pirq(d, irq, data);
     if ( ret )
     {
         dprintk(XENLOG_G_ERR, "dom%d: could not permit access to irq %d mapping to pirq %d\n",
