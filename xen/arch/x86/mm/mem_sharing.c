@@ -45,12 +45,12 @@ typedef struct pg_lock_data {
 
 DEFINE_PER_CPU(pg_lock_data_t, __pld);
 
+#define MEM_SHARING_DEBUG(_f, _a...)                                  \
+    debugtrace_printk("mem_sharing_debug: %s(): " _f, __func__, ##_a)
+
 #if MEM_SHARING_AUDIT
 
 static void mem_sharing_audit(void);
-
-#define MEM_SHARING_DEBUG(_f, _a...)                                  \
-    debugtrace_printk("mem_sharing_debug: %s(): " _f, __func__, ##_a)
 
 static struct list_head shr_audit_list;
 static spinlock_t shr_audit_lock;
@@ -398,111 +398,6 @@ int mem_sharing_sharing_resume(struct domain *d)
     return 0;
 }
 
-int mem_sharing_debug_mfn(unsigned long mfn)
-{
-    struct page_info *page;
-
-    if ( !mfn_valid(_mfn(mfn)) )
-    {
-        gdprintk(XENLOG_ERR, "Invalid MFN=%lx\n", mfn);
-        return -1;
-    }
-    page = mfn_to_page(_mfn(mfn));
-
-    gdprintk(XENLOG_DEBUG, 
-            "Debug page: MFN=%lx is ci=%lx, ti=%lx, owner_id=%d\n",
-            mfn_x(page_to_mfn(page)), 
-            page->count_info, 
-            page->u.inuse.type_info,
-            page_get_owner(page)->domain_id);
-
-    return 0;
-}
-
-int mem_sharing_debug_gfn(struct domain *d, unsigned long gfn)
-{
-    p2m_type_t p2mt;
-    mfn_t mfn;
-
-    mfn = get_gfn_query_unlocked(d, gfn, &p2mt);
-
-    gdprintk(XENLOG_DEBUG, "Debug for domain=%d, gfn=%lx, ", 
-               d->domain_id, 
-               gfn);
-    return mem_sharing_debug_mfn(mfn_x(mfn));
-}
-
-#define SHGNT_PER_PAGE_V1 (PAGE_SIZE / sizeof(grant_entry_v1_t))
-#define shared_entry_v1(t, e) \
-    ((t)->shared_v1[(e)/SHGNT_PER_PAGE_V1][(e)%SHGNT_PER_PAGE_V1])
-#define SHGNT_PER_PAGE_V2 (PAGE_SIZE / sizeof(grant_entry_v2_t))
-#define shared_entry_v2(t, e) \
-    ((t)->shared_v2[(e)/SHGNT_PER_PAGE_V2][(e)%SHGNT_PER_PAGE_V2])
-#define STGNT_PER_PAGE (PAGE_SIZE / sizeof(grant_status_t))
-#define status_entry(t, e) \
-    ((t)->status[(e)/STGNT_PER_PAGE][(e)%STGNT_PER_PAGE])
-
-static grant_entry_header_t *
-shared_entry_header(struct grant_table *t, grant_ref_t ref)
-{
-    ASSERT (t->gt_version != 0);
-    if ( t->gt_version == 1 )
-        return (grant_entry_header_t*)&shared_entry_v1(t, ref);
-    else
-        return &shared_entry_v2(t, ref).hdr;
-}
-
-static int mem_sharing_gref_to_gfn(struct domain *d, 
-                                   grant_ref_t ref, 
-                                   unsigned long *gfn)
-{
-    if ( d->grant_table->gt_version < 1 )
-        return -1;
-
-    if ( d->grant_table->gt_version == 1 ) 
-    {
-        grant_entry_v1_t *sha1;
-        sha1 = &shared_entry_v1(d->grant_table, ref);
-        *gfn = sha1->frame;
-    } 
-    else 
-    {
-        grant_entry_v2_t *sha2;
-        sha2 = &shared_entry_v2(d->grant_table, ref);
-        *gfn = sha2->full_page.frame;
-    }
- 
-    return 0;
-}
-
-
-int mem_sharing_debug_gref(struct domain *d, grant_ref_t ref)
-{
-    grant_entry_header_t *shah;
-    uint16_t status;
-    unsigned long gfn;
-
-    if ( d->grant_table->gt_version < 1 )
-    {
-        gdprintk(XENLOG_ERR, 
-                "Asked to debug [dom=%d,gref=%d], but not yet inited.\n",
-                d->domain_id, ref);
-        return -1;
-    }
-    (void)mem_sharing_gref_to_gfn(d, ref, &gfn); 
-    shah = shared_entry_header(d->grant_table, ref);
-    if ( d->grant_table->gt_version == 1 ) 
-        status = shah->flags;
-    else 
-        status = status_entry(d->grant_table, ref);
-    
-    gdprintk(XENLOG_DEBUG,
-            "==> Grant [dom=%d,ref=%d], status=%x. ", 
-            d->domain_id, ref, status);
-
-    return mem_sharing_debug_gfn(d, gfn); 
-}
-
 /* Functions that change a page's type and ownership */
 static int page_make_sharable(struct domain *d, 
                        struct page_info *page, 
@@ -602,6 +497,117 @@ static inline struct page_info *__grab_shared_page(mfn_t mfn)
     }
 
     return pg;
+}
+
+int mem_sharing_debug_mfn(mfn_t mfn)
+{
+    struct page_info *page;
+    int num_refs;
+
+    if ( (page = __grab_shared_page(mfn)) == NULL)
+    {
+        gdprintk(XENLOG_ERR, "Invalid MFN=%lx\n", mfn_x(mfn));
+        return -1;
+    }
+
+    MEM_SHARING_DEBUG( 
+            "Debug page: MFN=%lx is ci=%lx, ti=%lx, owner_id=%d\n",
+            mfn_x(page_to_mfn(page)), 
+            page->count_info, 
+            page->u.inuse.type_info,
+            page_get_owner(page)->domain_id);
+
+    /* -1 because the page is locked and that's an additional type ref */
+    num_refs = ((int) (page->u.inuse.type_info & PGT_count_mask)) - 1;
+    mem_sharing_page_unlock(page);
+    return num_refs;
+}
+
+int mem_sharing_debug_gfn(struct domain *d, unsigned long gfn)
+{
+    p2m_type_t p2mt;
+    mfn_t mfn;
+    int num_refs;
+
+    mfn = get_gfn_query(d, gfn, &p2mt);
+
+    MEM_SHARING_DEBUG("Debug for domain=%d, gfn=%lx, ", 
+               d->domain_id, 
+               gfn);
+    num_refs = mem_sharing_debug_mfn(mfn);
+    put_gfn(d, gfn);
+    return num_refs;
+}
+
+#define SHGNT_PER_PAGE_V1 (PAGE_SIZE / sizeof(grant_entry_v1_t))
+#define shared_entry_v1(t, e) \
+    ((t)->shared_v1[(e)/SHGNT_PER_PAGE_V1][(e)%SHGNT_PER_PAGE_V1])
+#define SHGNT_PER_PAGE_V2 (PAGE_SIZE / sizeof(grant_entry_v2_t))
+#define shared_entry_v2(t, e) \
+    ((t)->shared_v2[(e)/SHGNT_PER_PAGE_V2][(e)%SHGNT_PER_PAGE_V2])
+#define STGNT_PER_PAGE (PAGE_SIZE / sizeof(grant_status_t))
+#define status_entry(t, e) \
+    ((t)->status[(e)/STGNT_PER_PAGE][(e)%STGNT_PER_PAGE])
+
+static grant_entry_header_t *
+shared_entry_header(struct grant_table *t, grant_ref_t ref)
+{
+    ASSERT (t->gt_version != 0);
+    if ( t->gt_version == 1 )
+        return (grant_entry_header_t*)&shared_entry_v1(t, ref);
+    else
+        return &shared_entry_v2(t, ref).hdr;
+}
+
+static int mem_sharing_gref_to_gfn(struct domain *d, 
+                                   grant_ref_t ref, 
+                                   unsigned long *gfn)
+{
+    if ( d->grant_table->gt_version < 1 )
+        return -1;
+
+    if ( d->grant_table->gt_version == 1 ) 
+    {
+        grant_entry_v1_t *sha1;
+        sha1 = &shared_entry_v1(d->grant_table, ref);
+        *gfn = sha1->frame;
+    } 
+    else 
+    {
+        grant_entry_v2_t *sha2;
+        sha2 = &shared_entry_v2(d->grant_table, ref);
+        *gfn = sha2->full_page.frame;
+    }
+ 
+    return 0;
+}
+
+
+int mem_sharing_debug_gref(struct domain *d, grant_ref_t ref)
+{
+    grant_entry_header_t *shah;
+    uint16_t status;
+    unsigned long gfn;
+
+    if ( d->grant_table->gt_version < 1 )
+    {
+        MEM_SHARING_DEBUG( 
+                "Asked to debug [dom=%d,gref=%d], but not yet inited.\n",
+                d->domain_id, ref);
+        return -1;
+    }
+    (void)mem_sharing_gref_to_gfn(d, ref, &gfn); 
+    shah = shared_entry_header(d->grant_table, ref);
+    if ( d->grant_table->gt_version == 1 ) 
+        status = shah->flags;
+    else 
+        status = status_entry(d->grant_table, ref);
+    
+    MEM_SHARING_DEBUG(
+            "==> Grant [dom=%d,ref=%d], status=%x. ", 
+            d->domain_id, ref, status);
+
+    return mem_sharing_debug_gfn(d, gfn); 
 }
 
 int mem_sharing_nominate_page(struct domain *d,
@@ -1165,7 +1171,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         case XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_MFN:
         {
             unsigned long mfn = mec->u.debug.u.mfn;
-            rc = mem_sharing_debug_mfn(mfn);
+            rc = mem_sharing_debug_mfn(_mfn(mfn));
         }
         break;
 
