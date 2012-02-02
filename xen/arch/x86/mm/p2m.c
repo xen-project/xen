@@ -759,7 +759,7 @@ int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn)
          (1 | PGC_allocated) )
         goto out;
 
-    if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_none )
+    if ( (page->u.inuse.type_info & PGT_count_mask) != 0 )
         goto out;
 
     /* Fix p2m entry */
@@ -820,7 +820,7 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
          (2 | PGC_allocated) )
         goto out_put;
 
-    if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_none )
+    if ( (page->u.inuse.type_info & PGT_count_mask) != 0 )
         goto out_put;
 
     /* Decrement guest domain's ref count of the page */
