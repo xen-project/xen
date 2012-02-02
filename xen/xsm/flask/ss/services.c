@@ -2084,8 +2084,10 @@ int security_ocontext_add( char *ocontext, unsigned long low, unsigned long high
         {
             if ( c->u.pirq == add->u.pirq )
             {
+                if ( c->sid[0] == sid )
+                    break;
                 printk("%s: Duplicate pirq %d\n", __FUNCTION__, add->u.pirq);
-                ret = -EINVAL;
+                ret = -EEXIST;
                 break;
             }
             c = c->next;
@@ -2112,10 +2114,14 @@ int security_ocontext_add( char *ocontext, unsigned long low, unsigned long high
 
         if (c && c->u.ioport.low_ioport <= high)
         {
+            if (c->u.ioport.low_ioport == low &&
+                c->u.ioport.high_ioport == high && c->sid[0] == sid)
+                break;
+
             printk("%s: IO Port overlap with entry 0x%x - 0x%x\n",
                    __FUNCTION__, c->u.ioport.low_ioport,
                    c->u.ioport.high_ioport);
-            ret = -EINVAL;
+            ret = -EEXIST;
             break;
         }
 
@@ -2142,10 +2148,14 @@ int security_ocontext_add( char *ocontext, unsigned long low, unsigned long high
 
         if (c && c->u.iomem.low_iomem <= high)
         {
+            if (c->u.iomem.low_iomem == low &&
+                c->u.iomem.high_iomem == high && c->sid[0] == sid)
+                break;
+
             printk("%s: IO Memory overlap with entry 0x%x - 0x%x\n",
                    __FUNCTION__, c->u.iomem.low_iomem,
                    c->u.iomem.high_iomem);
-            ret = -EINVAL;
+            ret = -EEXIST;
             break;
         }
 
@@ -2171,9 +2181,12 @@ int security_ocontext_add( char *ocontext, unsigned long low, unsigned long high
         {
             if ( c->u.device == add->u.device )
             {
+                if ( c->sid[0] == sid )
+                    break;
+
                 printk("%s: Duplicate PCI Device 0x%x\n", __FUNCTION__,
                         add->u.device);
-                ret = -EINVAL;
+                ret = -EEXIST;
                 break;
             }
             c = c->next;
@@ -2230,7 +2243,7 @@ int security_ocontext_del( char *ocontext, unsigned int low, unsigned int high )
         }
 
         printk("%s: ocontext not found: pirq %d\n", __FUNCTION__, low);
-        ret = -EINVAL;
+        ret = -ENOENT;
         break;
 
     case OCON_IOPORT:
@@ -2257,7 +2270,7 @@ int security_ocontext_del( char *ocontext, unsigned int low, unsigned int high )
 
         printk("%s: ocontext not found: ioport 0x%x - 0x%x\n", __FUNCTION__,
                 low, high);
-        ret = -EINVAL;
+        ret = -ENOENT;
         break;
 
     case OCON_IOMEM:
@@ -2284,7 +2297,7 @@ int security_ocontext_del( char *ocontext, unsigned int low, unsigned int high )
 
         printk("%s: ocontext not found: iomem 0x%x - 0x%x\n", __FUNCTION__,
                 low, high);
-        ret = -EINVAL;
+        ret = -ENOENT;
         break;
 
     case OCON_DEVICE:
@@ -2309,7 +2322,7 @@ int security_ocontext_del( char *ocontext, unsigned int low, unsigned int high )
         }
 
         printk("%s: ocontext not found: pcidevice 0x%x\n", __FUNCTION__, low);
-        ret = -EINVAL;
+        ret = -ENOENT;
         break;
 
     default:
