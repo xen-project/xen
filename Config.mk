@@ -227,9 +227,9 @@ SEABIOS_UPSTREAM_TAG ?= rel-1.6.3.1
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= de05447400930da4be216e4fb0fe52b8be81490e
-# Tue Jan 31 15:42:38 2012 +0000
-# block-vbd: update to new mini-os wait queue API (new linked list API)
+QEMU_TAG ?= ebe37b2a3f844bad02dcc30d081f39eda06118f8
+# Thu Feb 2 13:47:06 2012 +0000
+# e1000: bounds packet size against buffer size
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
