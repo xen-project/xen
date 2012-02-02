@@ -178,10 +178,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.0.3
-#QEMU_TAG ?= 6d5b7ee3acfe8cc10681d2583a38398f7470ec2a
-# Wed Jan 5 23:42:03 2011 +0000
-# Change tap device mac address to prevent change of bridge's mac
+QEMU_TAG := 36984c285a765541b04f378bfa84d2c850c167d3
+# Thu Feb 2 13:47:06 2012 +0000
+# e1000: bounds packet size against buffer size
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
