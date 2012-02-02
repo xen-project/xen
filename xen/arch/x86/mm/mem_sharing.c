@@ -197,7 +197,10 @@ static struct page_info* mem_sharing_lookup(unsigned long mfn)
         struct page_info* page = mfn_to_page(_mfn(mfn));
         if ( page_get_owner(page) == dom_cow )
         {
-            ASSERT(page->u.inuse.type_info & PGT_type_mask); 
+            /* Count has to be at least two, because we're called
+             * with the mfn locked (1) and this is supposed to be 
+             * a shared page (1). */
+            ASSERT((page->u.inuse.type_info & PGT_count_mask) >= 2); 
             ASSERT(get_gpfn_from_mfn(mfn) == SHARED_M2P_ENTRY); 
             return page;
         }
