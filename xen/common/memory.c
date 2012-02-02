@@ -182,7 +182,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     }
             
     page = mfn_to_page(mfn);
-#ifdef CONFIG_X86
+#ifdef CONFIG_X86_64
     if ( p2m_is_shared(p2mt) )
     {
         /* Unshare the page, bail out on error. We unshare because 
@@ -192,8 +192,8 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         if ( mem_sharing_unshare_page(d, gmfn, 0) )
             return 0;
     }
+#endif /* CONFIG_X86_64 */
 
-#endif /* CONFIG_X86 */
     if ( unlikely(!get_page(page, d)) )
     {
         put_gfn(d, gmfn);
