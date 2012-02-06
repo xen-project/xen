@@ -213,6 +213,7 @@ tools/tests/regression/installed/*
 tools/tests/regression/build/*
 tools/tests/regression/downloads/*
 tools/tests/mem-sharing/memshrtool
+tools/tests/mce-test/tools/xen-mceinj
 tools/vnet/Make.local
 tools/vnet/build/*
 tools/vnet/gc

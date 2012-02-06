@@ -224,6 +224,7 @@
 ^tools/tests/regression/downloads/.*$
 ^tools/tests/xen-access/xen-access$
 ^tools/tests/mem-sharing/memshrtool$
+^tools/tests/mce-test/tools/xen-mceinj$
 ^tools/vnet/Make.local$
 ^tools/vnet/build/.*$
 ^tools/vnet/gc$
