@@ -89,10 +89,6 @@ extern int scnprintf(char * buf, size_t size, const char * fmt, ...)
     __attribute__ ((format (printf, 3, 4)));
 extern int vscnprintf(char *buf, size_t size, const char *fmt, va_list args)
     __attribute__ ((format (printf, 3, 0)));
-extern int sscanf(const char * buf, const char * fmt, ...)
-    __attribute__ ((format (scanf, 2, 3)));
-extern int vsscanf(const char * buf, const char * fmt, va_list args)
-    __attribute__ ((format (scanf, 2, 0)));
 
 long simple_strtol(
     const char *cp,const char **endp, unsigned int base);
