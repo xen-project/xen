@@ -28,6 +28,7 @@
 #include <xen/rcupdate.h>
 #include <asm/atomic.h>
 #include <asm/current.h>
+#include <public/xsm/flask_op.h>
 
 #include "avc.h"
 #include "avc_ss.h"
@@ -251,7 +252,7 @@ void __init avc_init(void)
     printk("AVC INITIALIZED\n");
 }
 
-int avc_get_hash_stats(char *buf, uint32_t size)
+int avc_get_hash_stats(struct xen_flask_hash_stats *arg)
 {
     int i, chain_len, max_chain_len, slots_used;
     struct avc_node *node;
@@ -279,10 +280,12 @@ int avc_get_hash_stats(char *buf, uint32_t size)
 
     rcu_read_unlock(&avc_rcu_lock);
     
-    return snprintf(buf, size, "entries: %d\nbuckets used: %d/%d\n"
-                    "longest chain: %d\n",
-                    atomic_read(&avc_cache.active_nodes),
-                    slots_used, AVC_CACHE_SLOTS, max_chain_len);
+    arg->entries = atomic_read(&avc_cache.active_nodes);
+    arg->buckets_used = slots_used;
+    arg->buckets_total = AVC_CACHE_SLOTS;
+    arg->max_chain_len = max_chain_len;
+
+    return 0;
 }
 
 static void avc_node_free(struct rcu_head *rhead)

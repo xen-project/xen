@@ -104,7 +104,8 @@ int avc_add_callback(int (*callback)(u32 event, u32 ssid, u32 tsid,
                                     u32 ssid, u32 tsid, u16 tclass, u32 perms);
 
 /* Exported to selinuxfs */
-int avc_get_hash_stats(char *buf, uint32_t size);
+struct xen_flask_hash_stats;
+int avc_get_hash_stats(struct xen_flask_hash_stats *arg);
 extern unsigned int avc_cache_threshold;
 
 #ifdef FLASK_AVC_STATS

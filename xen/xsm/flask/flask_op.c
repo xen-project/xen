@@ -30,10 +30,9 @@ integer_param("flask_enabled", flask_enabled);
 #endif
 
 #define MAX_POLICY_SIZE 0x4000000
-#define FLASK_COPY_IN \
+
+#define FLASK_COPY_OUT \
     ( \
-        1UL<<FLASK_LOAD | \
-        1UL<<FLASK_SETENFORCE | \
         1UL<<FLASK_CONTEXT_TO_SID | \
         1UL<<FLASK_SID_TO_CONTEXT | \
         1UL<<FLASK_ACCESS | \
@@ -42,36 +41,10 @@ integer_param("flask_enabled", flask_enabled);
         1UL<<FLASK_USER | \
         1UL<<FLASK_GETBOOL | \
         1UL<<FLASK_SETBOOL | \
-        1UL<<FLASK_COMMITBOOLS | \
-        1UL<<FLASK_DISABLE | \
-        1UL<<FLASK_SETAVC_THRESHOLD | \
-        1UL<<FLASK_MEMBER | \
-        1UL<<FLASK_ADD_OCONTEXT | \
-        1UL<<FLASK_DEL_OCONTEXT | \
-        1UL<<FLASK_GETBOOL_NAMED | \
-        1UL<<FLASK_GETBOOL2 | \
-        1UL<<FLASK_SETBOOL_NAMED \
-    )
-
-#define FLASK_COPY_OUT \
-    ( \
-        1UL<<FLASK_GETENFORCE | \
-        1UL<<FLASK_CONTEXT_TO_SID | \
-        1UL<<FLASK_SID_TO_CONTEXT | \
-        1UL<<FLASK_ACCESS | \
-        1UL<<FLASK_CREATE | \
-        1UL<<FLASK_RELABEL | \
-        1UL<<FLASK_USER | \
-        1UL<<FLASK_POLICYVERS | \
-        1UL<<FLASK_GETBOOL | \
-        1UL<<FLASK_MLS | \
-        1UL<<FLASK_GETAVC_THRESHOLD | \
         1UL<<FLASK_AVC_HASHSTATS | \
         1UL<<FLASK_AVC_CACHESTATS | \
         1UL<<FLASK_MEMBER | \
-        1UL<<FLASK_GETBOOL_NAMED | \
-        1UL<<FLASK_GETBOOL2 \
-    )
+   0)
 
 static DEFINE_SPINLOCK(sel_sem);
 
@@ -96,412 +69,186 @@ static int domain_has_security(struct domain *d, u32 perms)
                         perms, NULL);
 }
 
-static int flask_security_user(char *buf, uint32_t size)
+static int flask_copyin_string(XEN_GUEST_HANDLE(char) u_buf, char **buf, uint32_t size)
 {
-    char *page = NULL;
-    char *con, *user, *ptr;
-    u32 sid, *sids;
-    int length;
-    char *newcon;
-    int i, rc;
-    u32 len, nsids;
-        
-    length = domain_has_security(current->domain, SECURITY__COMPUTE_USER);
-    if ( length )
-        return length;
-            
-    length = -ENOMEM;
-    con = xmalloc_array(char, size+1);
-    if ( !con )
-        return length;
-    memset(con, 0, size+1);
-    
-    user = xmalloc_array(char, size+1);
-    if ( !user )
+    char *tmp = xmalloc_bytes(size + 1);
+    if ( !tmp )
+        return -ENOMEM;
+
+    if ( copy_from_guest(tmp, u_buf, size) )
+    {
+        xfree(tmp);
+        return -EFAULT;
+    }
+    tmp[size] = 0;
+
+    *buf = tmp;
+    return 0;
+}
+
+static int flask_security_user(struct xen_flask_userlist *arg)
+{
+    char *user;
+    u32 *sids;
+    u32 nsids;
+    int rv;
+
+    rv = domain_has_security(current->domain, SECURITY__COMPUTE_USER);
+    if ( rv )
+        return rv;
+
+    rv = flask_copyin_string(arg->u.user, &user, arg->size);
+    if ( rv )
+        return rv;
+
+    rv = security_get_user_sids(arg->start_sid, user, &sids, &nsids);
+    if ( rv < 0 )
         goto out;
-    memset(user, 0, size+1);
-    
-    length = -ENOMEM;
-    page = xmalloc_bytes(PAGE_SIZE);
-    if ( !page )
-        goto out2;
-    memset(page, 0, PAGE_SIZE);
 
-    length = -EINVAL;
-    if ( sscanf(buf, "%s %s", con, user) != 2 )
-        goto out2;
+    if ( nsids * sizeof(sids[0]) > arg->size )
+        nsids = arg->size / sizeof(sids[0]);
 
-    length = security_context_to_sid(con, strlen(con)+1, &sid);
-    if ( length < 0 )
-        goto out2;
-            
-    length = security_get_user_sids(sid, user, &sids, &nsids);
-    if ( length < 0 )
-        goto out2;
-    
-    length = snprintf(page, PAGE_SIZE, "%u", nsids) + 1;
-    ptr = page + length;
-    for ( i = 0; i < nsids; i++ )
-    {
-        rc = security_sid_to_context(sids[i], &newcon, &len);
-        if ( rc )
-        {
-            length = rc;
-            goto out3;
-        }
-        if ( (length + len) >= PAGE_SIZE )
-        {
-            xfree(newcon);
-            length = -ERANGE;
-            goto out3;
-        }
-        memcpy(ptr, newcon, len);
-        xfree(newcon);
-        ptr += len;
-        length += len;
-    }
-    
-    if ( length > size )
-    {
-        printk( "%s:  context size (%u) exceeds payload "
-                "max\n", __FUNCTION__, length);
-        length = -ERANGE;
-        goto out3;
-    }
+    arg->size = nsids;
 
-    memset(buf, 0, size);
-    memcpy(buf, page, length);
-        
- out3:
+    if ( copy_to_guest(arg->u.sids, sids, nsids) )
+        rv = -EFAULT;
+
     xfree(sids);
- out2:
-    if ( page )
-        xfree(page);
+ out:
     xfree(user);
- out:
-    xfree(con);
-    return length;
+    return rv;
 }
 
-static int flask_security_relabel(char *buf, uint32_t size)
+static int flask_security_relabel(struct xen_flask_transition *arg)
 {
-    char *scon, *tcon;
-    u32 ssid, tsid, newsid;
-    u16 tclass;
-    int length;
-    char *newcon;
-    u32 len;
+    int rv;
 
-    length = domain_has_security(current->domain, SECURITY__COMPUTE_RELABEL);
-    if ( length )
-        return length;
-            
-    length = -ENOMEM;
-    scon = xmalloc_array(char, size+1);
-    if ( !scon )
-        return length;
-    memset(scon, 0, size+1);
-        
-    tcon = xmalloc_array(char, size+1);
-    if ( !tcon )
-        goto out;
-    memset(tcon, 0, size+1);
-        
-    length = -EINVAL;
-    if ( sscanf(buf, "%s %s %hu", scon, tcon, &tclass) != 3 )
-        goto out2;
-            
-    length = security_context_to_sid(scon, strlen(scon)+1, &ssid);
-    if ( length < 0 )
-        goto out2;
-    length = security_context_to_sid(tcon, strlen(tcon)+1, &tsid);
-    if ( length < 0 )
-        goto out2;
-            
-    length = security_change_sid(ssid, tsid, tclass, &newsid);
-    if ( length < 0 )
-        goto out2;
-            
-    length = security_sid_to_context(newsid, &newcon, &len);
-    if ( length < 0 )
-        goto out2;
-            
-    if ( len > size )
-    {
-        printk( "%s:  context size (%u) exceeds payload "
-                "max\n", __FUNCTION__, len);
-        length = -ERANGE;
-        goto out3;
-    }
+    rv = domain_has_security(current->domain, SECURITY__COMPUTE_RELABEL);
+    if ( rv )
+        return rv;
 
-    memset(buf, 0, size);
-    memcpy(buf, newcon, len);
-    length = len;
+    rv = security_change_sid(arg->ssid, arg->tsid, arg->tclass, &arg->newsid);
 
- out3:
-    xfree(newcon);
- out2:
-    xfree(tcon);
- out:
-    xfree(scon);
-    return length;
+    return rv;
 }
 
-static int flask_security_create(char *buf, uint32_t size)
+static int flask_security_create(struct xen_flask_transition *arg)
 {
-    char *scon, *tcon;
-    u32 ssid, tsid, newsid;
-    u16 tclass;
-    int length;
-    char *newcon;
-    u32 len;
+    int rv;
 
-    length = domain_has_security(current->domain, SECURITY__COMPUTE_CREATE);
-    if ( length )
-        return length;
+    rv = domain_has_security(current->domain, SECURITY__COMPUTE_CREATE);
+    if ( rv )
+        return rv;
 
-    length = -ENOMEM;
-    scon = xmalloc_array(char, size+1);
-    if ( !scon )
-        return length;
-    memset(scon, 0, size+1);
+    rv = security_transition_sid(arg->ssid, arg->tsid, arg->tclass, &arg->newsid);
 
-    tcon = xmalloc_array(char, size+1);
-    if ( !tcon )
-        goto out;
-    memset(tcon, 0, size+1);
-
-    length = -EINVAL;
-    if ( sscanf(buf, "%s %s %hu", scon, tcon, &tclass) != 3 )
-        goto out2;
-
-    length = security_context_to_sid(scon, strlen(scon)+1, &ssid);
-    if ( length < 0 )
-        goto out2;
-
-    length = security_context_to_sid(tcon, strlen(tcon)+1, &tsid);
-    if ( length < 0 )
-        goto out2;
-
-    length = security_transition_sid(ssid, tsid, tclass, &newsid);
-    if ( length < 0 )
-        goto out2;
-
-    length = security_sid_to_context(newsid, &newcon, &len);
-    if ( length < 0 )    
-        goto out2;
-
-    if ( len > size )
-    {
-        printk( "%s:  context size (%u) exceeds payload "
-                "max\n", __FUNCTION__, len);
-        length = -ERANGE;
-        goto out3;
-    }
-
-    memset(buf, 0, size);
-    memcpy(buf, newcon, len);
-    length = len;
-        
- out3:
-    xfree(newcon);
- out2:
-    xfree(tcon);
- out:
-    xfree(scon);
-    return length;
+    return rv;
 }
 
-static int flask_security_access(char *buf, uint32_t size)
+static int flask_security_access(struct xen_flask_access *arg)
 {
-    char *scon, *tcon;
-    u32 ssid, tsid;
-    u16 tclass;
-    u32 req;
     struct av_decision avd;
-    int length;
+    int rv;
 
-    length = domain_has_security(current->domain, SECURITY__COMPUTE_AV);
-    if ( length )
-        return length;
+    rv = domain_has_security(current->domain, SECURITY__COMPUTE_AV);
+    if ( rv )
+        return rv;
 
-    length = -ENOMEM;
-    scon = xmalloc_array(char, size+1);
-    if (!scon)
-        return length;
-    memset(scon, 0, size+1);
+    rv = security_compute_av(arg->ssid, arg->tsid, arg->tclass, arg->req, &avd);
+    if ( rv < 0 )
+        return rv;
 
-    tcon = xmalloc_array(char, size+1);
-    if ( !tcon )
-        goto out;
-    memset( tcon, 0, size+1 );
-
-    length = -EINVAL;
-    if (sscanf(buf, "%s %s %hu %x", scon, tcon, &tclass, &req) != 4)
-        goto out2;
-
-    length = security_context_to_sid(scon, strlen(scon)+1, &ssid);
-    if ( length < 0 )
-        goto out2;
-
-    length = security_context_to_sid(tcon, strlen(tcon)+1, &tsid);
-    if ( length < 0 )
-        goto out2;
-
-    length = security_compute_av(ssid, tsid, tclass, req, &avd);
-    if ( length < 0 )
-        goto out2;
-
-    memset(buf, 0, size);
-    length = snprintf(buf, size, "%x %x %x %x %u", 
-                      avd.allowed, 0xffffffff,
-                      avd.auditallow, avd.auditdeny, 
-                      avd.seqno);
+    arg->allowed = avd.allowed;
+    arg->audit_allow = avd.auditallow;
+    arg->audit_deny = avd.auditdeny;
+    arg->seqno = avd.seqno;
                 
- out2:
-    xfree(tcon);
- out:
-    xfree(scon);
-    return length;
+    return rv;
 }
 
-static int flask_security_member(char *buf, uint32_t size)
+static int flask_security_member(struct xen_flask_transition *arg)
 {
-    char *scon, *tcon;
-    u32 ssid, tsid, newsid;
-    u16 tclass;
-    int length;
-    char *newcon;
-    u32 len;
+    int rv;
 
-    length = domain_has_security(current->domain, SECURITY__COMPUTE_MEMBER);
-    if ( length )
-        return length;
+    rv = domain_has_security(current->domain, SECURITY__COMPUTE_MEMBER);
+    if ( rv )
+        return rv;
 
-    length = -ENOMEM;
-    scon = xmalloc_array(char, size+1);
-    if ( !scon )
-        return length;
-    memset(scon, 0, size+1);
+    rv = security_member_sid(arg->ssid, arg->tsid, arg->tclass, &arg->newsid);
 
-    tcon = xmalloc_array(char, size+1);
-    if ( !tcon )
-        goto out;
-    memset(tcon, 0, size+1);
-
-    length = -EINVAL;
-    if ( sscanf(buf, "%s, %s, %hu", scon, tcon, &tclass) != 3 )
-        goto out2;
-
-    length = security_context_to_sid(scon, strlen(scon)+1, &ssid);
-    if ( length < 0 )
-        goto out2;
-
-    length = security_context_to_sid(tcon, strlen(tcon)+1, &tsid);
-    if ( length < 0 )
-        goto out2;
-
-    length = security_member_sid(ssid, tsid, tclass, &newsid);
-    if ( length < 0 )
-        goto out2;
-
-    length = security_sid_to_context(newsid, &newcon, &len);
-    if ( length < 0 )
-        goto out2;
-
-    if ( len > size )
-    {
-        printk("%s:  context size (%u) exceeds payload "
-               "max\n", __FUNCTION__, len);
-        length = -ERANGE;
-        goto out3;
-    }
-
-    memset(buf, 0, size);
-    memcpy(buf, newcon, len);
-    length = len;
-
- out3:
-    xfree(newcon);
- out2:
-    xfree(tcon);
- out:
-    xfree(scon);
-    return length;
+    return rv;
 }
 
-static int flask_security_setenforce(char *buf, uint32_t count)
+static int flask_security_setenforce(struct xen_flask_setenforce *arg)
 {
-    int length;
-    int new_value;
+    int enforce = !!(arg->enforcing);
+    int rv;
 
-    if ( sscanf(buf, "%d", &new_value) != 1 )
-        return -EINVAL;
+    if ( enforce == flask_enforcing )
+        return 0;
 
-    if ( new_value != flask_enforcing )
-    {
-        length = domain_has_security(current->domain, SECURITY__SETENFORCE);
-        if ( length )
-            goto out;
-        flask_enforcing = new_value;
-        if ( flask_enforcing )
-            avc_ss_reset(0);
-    }
-    length = count;
+    rv = domain_has_security(current->domain, SECURITY__SETENFORCE);
+    if ( rv )
+        return rv;
 
- out:
-    return length;
+    flask_enforcing = enforce;
+
+    if ( flask_enforcing )
+        avc_ss_reset(0);
+
+    return 0;
 }
 
-static int flask_security_context(char *buf, uint32_t count)
+static int flask_security_context(struct xen_flask_sid_context *arg)
 {
-    u32 sid;
-    int length;
+    int rv;
+    char *buf;
 
-    length = domain_has_security(current->domain, SECURITY__CHECK_CONTEXT);
-    if ( length )
+    rv = domain_has_security(current->domain, SECURITY__CHECK_CONTEXT);
+    if ( rv )
+        return rv;
+
+    rv = flask_copyin_string(arg->context, &buf, arg->size);
+    if ( rv )
+        return rv;
+
+    rv = security_context_to_sid(buf, arg->size, &arg->sid);
+    if ( rv < 0 )
         goto out;
 
-    length = security_context_to_sid(buf, count, &sid);
-    if ( length < 0 )
-        goto out;
-
-    memset(buf, 0, count);
-    length = snprintf(buf, count, "%u", sid);
-
  out:
-    return length;
+    xfree(buf);
+
+    return rv;
 }
 
-static int flask_security_sid(char *buf, uint32_t count)
+static int flask_security_sid(struct xen_flask_sid_context *arg)
 {
+    int rv;
     char *context;
-    u32 sid;
     u32 len;
-    int length;
 
-    length = domain_has_security(current->domain, SECURITY__CHECK_CONTEXT);
-    if ( length )
-        goto out;
+    rv = domain_has_security(current->domain, SECURITY__CHECK_CONTEXT);
+    if ( rv )
+        return rv;
 
-    if ( sscanf(buf, "%u", &sid) != 1 )
-        goto out;
+    rv = security_sid_to_context(arg->sid, &context, &len);
+    if ( rv < 0 )
+        return rv;
 
-    length = security_sid_to_context(sid, &context, &len);
-    if ( length < 0 )
-        goto out;
+    rv = 0;
 
-    if ( len > count )
-        return -ERANGE; 
+    if ( len > arg->size )
+        rv = -ERANGE;
 
-    memset(buf, 0, count);
-    memcpy(buf, context, len);
-    length = len;
+    arg->size = len;
+
+    if ( !rv && copy_to_guest(arg->context, context, len) )
+        rv = -EFAULT;
 
     xfree(context);
 
- out:
-    return length;
+    return rv;
 }
 
 int flask_disable(void)
@@ -530,228 +277,153 @@ int flask_disable(void)
     return 0;
 }
 
-static int flask_security_disable(char *buf, uint32_t count)
+static int flask_security_setavc_threshold(struct xen_flask_setavc_threshold *arg)
 {
-    int length;
-    int new_value;
+    int rv = 0;
 
-    length = -EINVAL;
-    if ( sscanf(buf, "%d", &new_value) != 1 )
-        goto out;
-
-    if ( new_value )
+    if ( arg->threshold != avc_cache_threshold )
     {
-        length = flask_disable();
-        if ( length < 0 )
+        rv = domain_has_security(current->domain, SECURITY__SETSECPARAM);
+        if ( rv )
             goto out;
+        avc_cache_threshold = arg->threshold;
     }
-
-    length = count;
 
  out:
-    return length;
+    return rv;
 }
 
-static int flask_security_setavc_threshold(char *buf, uint32_t count)
+static int flask_security_resolve_bool(struct xen_flask_boolean *arg)
 {
-    int ret;
-    int new_value;
+    char *name;
+    int rv;
 
-    if ( sscanf(buf, "%u", &new_value) != 1 )
-    {
-        ret = -EINVAL;
-        goto out;
-    }
+    if ( arg->bool_id != -1 )
+        return 0;
 
-    if ( new_value != avc_cache_threshold )
-    {
-        ret = domain_has_security(current->domain, SECURITY__SETSECPARAM);
-        if ( ret )
-            goto out;
-        avc_cache_threshold = new_value;
-    }
-    ret = count;
+    rv = flask_copyin_string(arg->name, &name, arg->size);
+    if ( rv )
+        return rv;
 
- out:
-    return ret;
+    arg->bool_id = security_find_bool(name);
+    arg->size = 0;
+
+    xfree(name);
+
+    return 0;
 }
 
-static int flask_security_set_bool(char *buf, uint32_t count)
+static int flask_security_set_bool(struct xen_flask_boolean *arg)
 {
-    int length = -EFAULT;
-    unsigned int i, new_value;
+    int rv;
+
+    rv = flask_security_resolve_bool(arg);
+    if ( rv )
+        return rv;
+
+    rv = domain_has_security(current->domain, SECURITY__SETBOOL);
+    if ( rv )
+        return rv;
 
     spin_lock(&sel_sem);
 
-    length = domain_has_security(current->domain, SECURITY__SETBOOL);
-    if ( length )
-        goto out;
+    if ( arg->commit )
+    {
+        int num;
+        int *values;
 
-    length = -EINVAL;
-    if ( sscanf(buf, "%d %d", &i, &new_value) != 2 )
-        goto out;
+        rv = security_get_bools(&num, NULL, &values);
+        if ( rv != 0 )
+            goto out;
 
-    if (!bool_pending_values)
-        flask_security_make_bools();
+        if ( arg->bool_id >= num )
+        {
+            rv = -ENOENT;
+            goto out;
+        }
+        values[arg->bool_id] = !!(arg->new_value);
 
-    if ( i >= bool_num )
-        goto out;
+        arg->enforcing = arg->pending = !!(arg->new_value);
 
-    if ( new_value )
-        new_value = 1;
+        if ( bool_pending_values )
+            bool_pending_values[arg->bool_id] = !!(arg->new_value);
 
-    bool_pending_values[i] = new_value;
-    length = count;
+        rv = security_set_bools(num, values);
+        xfree(values);
+    }
+    else
+    {
+        if ( !bool_pending_values )
+            flask_security_make_bools();
+
+        if ( arg->bool_id >= bool_num )
+            goto out;
+
+        bool_pending_values[arg->bool_id] = !!(arg->new_value);
+        arg->pending = !!(arg->new_value);
+        arg->enforcing = security_get_bool_value(arg->bool_id);
+
+        rv = 0;
+    }
 
  out:
     spin_unlock(&sel_sem);
-    return length;
+    return rv;
 }
 
-static int flask_security_set_bool_name(char *buf, uint32_t count)
+static int flask_security_commit_bools(void)
 {
-    int rv, num;
-    int i, new_value, commit;
-    int *values = NULL;
-    char *name;
-    
-    name = xmalloc_bytes(count);
-    if ( name == NULL )
-        return -ENOMEM;
+    int rv;
 
     spin_lock(&sel_sem);
 
     rv = domain_has_security(current->domain, SECURITY__SETBOOL);
     if ( rv )
         goto out;
+
+    if ( bool_pending_values )
+        rv = security_set_bools(bool_num, bool_pending_values);
     
-    rv = -EINVAL;
-    if ( sscanf(buf, "%s %d %d", name, &new_value, &commit) != 3 )
-        goto out;
-
-    i = security_find_bool(name);
-    if ( i < 0 )
-        goto out;
-
-    if ( new_value )
-        new_value = 1;
-
-    if ( commit ) {
-        rv = security_get_bools(&num, NULL, &values);
-        if ( rv != 0 )
-            goto out;
-        values[i] = new_value;
-        if (bool_pending_values)
-            bool_pending_values[i] = new_value;
-        rv = security_set_bools(num, values);
-        xfree(values);
-    } else {
-        if (!bool_pending_values)
-            flask_security_make_bools();
-
-        bool_pending_values[i] = new_value;
-        rv = count;
-    }
-
  out:
-    xfree(name);
     spin_unlock(&sel_sem);
     return rv;
 }
 
-static int flask_security_commit_bools(char *buf, uint32_t count)
+static int flask_security_get_bool(struct xen_flask_boolean *arg)
 {
-    int length = -EFAULT;
-    int new_value;
+    int rv;
+
+    rv = flask_security_resolve_bool(arg);
+    if ( rv )
+        return rv;
 
     spin_lock(&sel_sem);
 
-    length = domain_has_security(current->domain, SECURITY__SETBOOL);
-    if ( length )
+    rv = security_get_bool_value(arg->bool_id);
+    if ( rv < 0 )
         goto out;
 
-    length = -EINVAL;
-    if ( sscanf(buf, "%d", &new_value) != 1 )
-        goto out;
-
-    if ( new_value && bool_pending_values )
-        security_set_bools(bool_num, bool_pending_values);
-    
-    length = count;
-
- out:
-    spin_unlock(&sel_sem);
-    return length;
-}
-
-static int flask_security_get_bool(char *buf, uint32_t count, int named)
-{
-    int length;
-    int i, cur_enforcing, pend_enforcing;
-    char* name = NULL;
-    
-    spin_lock(&sel_sem);
-    
-    length = -EINVAL;
-    if ( sscanf(buf, "%d", &i) != 1 )
-        goto out;
-
-    cur_enforcing = security_get_bool_value(i);
-    if ( cur_enforcing < 0 )
-    {
-        length = cur_enforcing;
-        goto out;
-    }
+    arg->enforcing = rv;
 
     if ( bool_pending_values )
-        pend_enforcing = bool_pending_values[i];
+        arg->pending = bool_pending_values[arg->bool_id];
     else
-        pend_enforcing = cur_enforcing;
+        arg->pending = rv;
 
-    if ( named )
-        name = security_get_bool_name(i);
-    if ( named && !name )
-        goto out;
+    rv = 0;
 
-    memset(buf, 0, count);
-    if ( named )
-        length = snprintf(buf, count, "%d %d %s", cur_enforcing,
-                          pend_enforcing, name);
-    else
-        length = snprintf(buf, count, "%d %d", cur_enforcing,
-                          pend_enforcing);
-
- out:
-    xfree(name);
-    spin_unlock(&sel_sem);
-    return length;
-}
-
-static int flask_security_get_bool_name(char *buf, uint32_t count)
-{
-    int rv = -ENOENT;
-    int i, cur_enforcing, pend_enforcing;
-    
-    spin_lock(&sel_sem);
-    
-    i = security_find_bool(buf);
-    if ( i < 0 )
-        goto out;
-
-    cur_enforcing = security_get_bool_value(i);
-    if ( cur_enforcing < 0 )
+    if ( arg->size )
     {
-        rv = cur_enforcing;
-        goto out;
+        char *nameout = security_get_bool_name(arg->bool_id);
+        size_t nameout_len = strlen(nameout);
+        if ( nameout_len > arg->size )
+            rv = -ERANGE;
+        arg->size = nameout_len;
+ 
+        if ( !rv && copy_to_guest(arg->name, nameout, nameout_len) )
+            rv = -EFAULT;
+        xfree(nameout);
     }
-
-    if ( bool_pending_values )
-        pend_enforcing = bool_pending_values[i];
-    else
-        pend_enforcing = cur_enforcing;
-
-    memset(buf, 0, count);
-    rv = snprintf(buf, count, "%d %d", cur_enforcing, pend_enforcing);
 
  out:
     spin_unlock(&sel_sem);
@@ -779,380 +451,212 @@ static int flask_security_make_bools(void)
 
 #ifdef FLASK_AVC_STATS
 
-static int flask_security_avc_cachestats(char *buf, uint32_t count)
+static int flask_security_avc_cachestats(struct xen_flask_cache_stats *arg)
 {
-    char *page = NULL;
-    int len = 0;
-    int length = 0;
-    int cpu;
     struct avc_cache_stats *st;
 
-    page = (char *)xmalloc_bytes(PAGE_SIZE);
-    if ( !page )
-        return -ENOMEM;
-    memset(page, 0, PAGE_SIZE);
+    if ( arg->cpu > nr_cpu_ids )
+        return -ENOENT;
+    if ( !cpu_online(arg->cpu) )
+        return -ENOENT;
 
-    len = snprintf(page, PAGE_SIZE, "lookups hits misses allocations reclaims "
-                   "frees\n");
-    if ( len > count ) {
-        length = -EINVAL;
-        goto out;
-    }
-    
-    memcpy(buf, page, len);
-    buf += len;
-    length += len;
-    count -= len;
+    st = &per_cpu(avc_cache_stats, arg->cpu);
 
-    for_each_online_cpu ( cpu )
-    {
-        st = &per_cpu(avc_cache_stats, cpu);
+    arg->lookups = st->lookups;
+    arg->hits = st->hits;
+    arg->misses = st->misses;
+    arg->allocations = st->allocations;
+    arg->reclaims = st->reclaims;
+    arg->frees = st->frees;
 
-        len = snprintf(page, PAGE_SIZE, "%u %u %u %u %u %u\n", st->lookups,
-                       st->hits, st->misses, st->allocations,
-                       st->reclaims, st->frees);
-        if ( len > count ) {
-            length = -EINVAL;
-            goto out;
-        }
-        memcpy(buf, page, len);
-        buf += len;
-        length += len;
-        count -= len;
-    }
-
- out:
-    xfree(page);    
-    return length;
+    return 0;
 }
 
 #endif
 
-static int flask_security_load(char *buf, uint32_t count)
+static int flask_security_load(struct xen_flask_load *load)
 {
     int ret;
-    int length;
+    void *buf = NULL;
+
+    ret = domain_has_security(current->domain, SECURITY__LOAD_POLICY);
+    if ( ret )
+        return ret;
+
+    if ( load->size > MAX_POLICY_SIZE )
+        return -EINVAL;
+
+    buf = xmalloc_bytes(load->size);
+    if ( !buf )
+        return -ENOMEM;
+
+    if ( copy_from_guest(buf, load->buffer, load->size) )
+    {
+        ret = -EFAULT;
+        goto out_free;
+    }
 
     spin_lock(&sel_sem);
 
-    length = domain_has_security(current->domain, SECURITY__LOAD_POLICY);
-    if ( length )
-        goto out;
-
-    length = security_load_policy(buf, count);
-    if ( length )
-        goto out;
-
-    ret = flask_security_make_bools();
+    ret = security_load_policy(buf, load->size);
     if ( ret )
-        length = ret;
-    else
-        length = count;
+        goto out;
+
+    xfree(bool_pending_values);
+    bool_pending_values = NULL;
+    ret = 0;
 
  out:
     spin_unlock(&sel_sem);
-    return length;
+ out_free:
+    xfree(buf);
+    return ret;
 }
 
-static int flask_ocontext_del(char *buf, uint32_t size)
+static int flask_ocontext_del(struct xen_flask_ocontext *arg)
 {
-    int len = 0;
-    char *ocontext;
-    unsigned long low  = 0;
-    unsigned long high = 0;
+    int rv;
 
-    len = domain_has_security(current->domain, SECURITY__DEL_OCONTEXT);
-    if ( len )
-        return len;
+    if ( arg->low > arg->high )
+        return -EINVAL;
 
-    if ( (ocontext = xmalloc_bytes(size) ) == NULL )
-        return -ENOMEM;
+    rv = domain_has_security(current->domain, SECURITY__DEL_OCONTEXT);
+    if ( rv )
+        return rv;
 
-    len = sscanf(buf, "%s %lu %lu", ocontext, &low, &high);
-    if ( len < 2 )
-    {
-        len = -EINVAL;
-        goto out;
-    }
-    else if ( len == 2 )
-        high = low;
-
-    if ( low > high )
-    {
-        len = -EINVAL;
-        goto out;
-    }
-
-    len = security_ocontext_del(ocontext, low, high);
- out:
-    xfree(ocontext);
-    return len;
+    return security_ocontext_del(arg->ocon, arg->low, arg->high);
 }
 
-static int flask_ocontext_add(char *buf, uint32_t size)
+static int flask_ocontext_add(struct xen_flask_ocontext *arg)
 {
-    int len = 0;
-    u32 sid = 0;
-    unsigned long low  = 0;
-    unsigned long high = 0;
-    char *scontext;
-    char *ocontext;
+    int rv;
 
-    len = domain_has_security(current->domain, SECURITY__ADD_OCONTEXT);
-    if ( len )
-        return len;
+    if ( arg->low > arg->high )
+        return -EINVAL;
 
-    if ( (scontext = xmalloc_bytes(size) ) == NULL )
-        return -ENOMEM;
+    rv = domain_has_security(current->domain, SECURITY__ADD_OCONTEXT);
+    if ( rv )
+        return rv;
 
-    if ( (ocontext = xmalloc_bytes(size) ) == NULL )
-    {
-        xfree(scontext);
-        return -ENOMEM;
-    }
-
-    memset(scontext, 0, size);
-    memset(ocontext, 0, size);
-
-    len = sscanf(buf, "%s %s %lu %lu", ocontext, scontext, &low, &high);
-    if ( len < 3 )
-    {
-        len = -EINVAL;
-        goto out;
-    }
-    else if ( len == 3 )
-        high = low;
-
-    if ( low > high )
-    {
-        len = -EINVAL;
-        goto out;
-    }
-    len = security_context_to_sid(scontext, strlen(scontext)+1, &sid);
-    if ( len < 0 )
-    {
-        len = -EINVAL;
-        goto out;
-    }
-    len = security_ocontext_add(ocontext, low, high, sid);
- out:
-    xfree(ocontext);
-    xfree(scontext);
-    return len;
+    return security_ocontext_add(arg->ocon, arg->low, arg->high, arg->sid);
 }
 
 long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
 {
-    flask_op_t curop, *op = &curop;
-    int rc = 0;
-    int length = 0;
-    char *arg = NULL;
+    xen_flask_op_t op;
+    int rv;
 
-    if ( copy_from_guest(op, u_flask_op, 1) )
+    if ( copy_from_guest(&op, u_flask_op, 1) )
         return -EFAULT;
 
-    if ( op->cmd > FLASK_LAST)
-        return -EINVAL;
+    if ( op.interface_version != XEN_FLASK_INTERFACE_VERSION )
+        return -ENOSYS;
 
-    if ( op->size > MAX_POLICY_SIZE )
-        return -EINVAL;
-
-    if ( (op->buf == NULL && op->size != 0) || 
-         (op->buf != NULL && op->size == 0) )
-        return -EINVAL;
-
-    arg = xmalloc_bytes(op->size + 1);
-    if ( !arg )
-        return -ENOMEM;
-
-    memset(arg, 0, op->size + 1);
-
-    if ( (FLASK_COPY_IN&(1UL<<op->cmd)) && op->buf != NULL && 
-         copy_from_guest(arg, guest_handle_from_ptr(op->buf, char), op->size) )
+    switch ( op.cmd )
     {
-        rc = -EFAULT;
-        goto out;
-    }
-
-    switch ( op->cmd )
-    {
-
     case FLASK_LOAD:
-    {
-        length = flask_security_load(arg, op->size);
-    }
-    break;
-    
+        rv = flask_security_load(&op.u.load);
+        break;
+
     case FLASK_GETENFORCE:
-    {
-        length = snprintf(arg, op->size, "%d", flask_enforcing);
-    }
-    break;    
+        rv = flask_enforcing;
+        break;
 
     case FLASK_SETENFORCE:
-    {
-        length = flask_security_setenforce(arg, op->size);
-    }
-    break;    
+        rv = flask_security_setenforce(&op.u.enforce);
+        break;
 
     case FLASK_CONTEXT_TO_SID:
-    {
-        length = flask_security_context(arg, op->size);
-    }
-    break;    
+        rv = flask_security_context(&op.u.sid_context);
+        break;
 
     case FLASK_SID_TO_CONTEXT:
-    {
-        length = flask_security_sid(arg, op->size);
-    }
-    break; 
+        rv = flask_security_sid(&op.u.sid_context);
+        break;
 
     case FLASK_ACCESS:
-    {
-        length = flask_security_access(arg, op->size);
-    }
-    break;    
+        rv = flask_security_access(&op.u.access);
+        break;
 
     case FLASK_CREATE:
-    {
-        length = flask_security_create(arg, op->size);
-    }
-    break;    
+        rv = flask_security_create(&op.u.transition);
+        break;
 
     case FLASK_RELABEL:
-    {
-        length = flask_security_relabel(arg, op->size);
-    }
-    break;
+        rv = flask_security_relabel(&op.u.transition);
+        break;
 
     case FLASK_USER:
-    {
-        length = flask_security_user(arg, op->size);
-    }
-    break;    
+        rv = flask_security_user(&op.u.userlist);
+        break;
 
     case FLASK_POLICYVERS:
-    {
-        length = snprintf(arg, op->size, "%d", POLICYDB_VERSION_MAX);
-    }
-    break;    
+        rv = POLICYDB_VERSION_MAX;
+        break;
 
     case FLASK_GETBOOL:
-    {
-        length = flask_security_get_bool(arg, op->size, 0);
-    }
-    break;
+        rv = flask_security_get_bool(&op.u.boolean);
+        break;
 
     case FLASK_SETBOOL:
-    {
-        length = flask_security_set_bool(arg, op->size);
-    }
-    break;
+        rv = flask_security_set_bool(&op.u.boolean);
+        break;
 
     case FLASK_COMMITBOOLS:
-    {
-        length = flask_security_commit_bools(arg, op->size);
-    }
-    break;
+        rv = flask_security_commit_bools();
+        break;
 
     case FLASK_MLS:
-    {
-        length = snprintf(arg, op->size, "%d", flask_mls_enabled);
-    }
-    break;    
+        rv = flask_mls_enabled;
+        break;    
 
     case FLASK_DISABLE:
-    {
-        length = flask_security_disable(arg, op->size);
-    }
-    break;    
+        rv = flask_disable();
+        break;
 
     case FLASK_GETAVC_THRESHOLD:
-    {
-        length = snprintf(arg, op->size, "%d", avc_cache_threshold);
-    }
-    break;
+        rv = avc_cache_threshold;
+        break;
 
     case FLASK_SETAVC_THRESHOLD:
-    {
-        length = flask_security_setavc_threshold(arg, op->size);
-    }
-    break;
+        rv = flask_security_setavc_threshold(&op.u.setavc_threshold);
+        break;
 
     case FLASK_AVC_HASHSTATS:
-    {
-        length = avc_get_hash_stats(arg, op->size);
-    }
-    break;
+        rv = avc_get_hash_stats(&op.u.hash_stats);
+        break;
 
-#ifdef FLASK_AVC_STATS    
+#ifdef FLASK_AVC_STATS
     case FLASK_AVC_CACHESTATS:
-    {
-        length = flask_security_avc_cachestats(arg, op->size);
-    }
-    break;
+        rv = flask_security_avc_cachestats(&op.u.cache_stats);
+        break;
 #endif
 
     case FLASK_MEMBER:
-    {
-        length = flask_security_member(arg, op->size);
-    }
-    break;    
+        rv = flask_security_member(&op.u.transition);
+        break;
 
     case FLASK_ADD_OCONTEXT:
-    {
-        length = flask_ocontext_add(arg, op->size);
+        rv = flask_ocontext_add(&op.u.ocontext);
         break;
-    }
 
     case FLASK_DEL_OCONTEXT:
-    {
-        length = flask_ocontext_del(arg, op->size);
+        rv = flask_ocontext_del(&op.u.ocontext);
         break;
-    }
-
-    case FLASK_GETBOOL_NAMED:
-    {
-        length = flask_security_get_bool_name(arg, op->size);
-    }
-    break;
-
-    case FLASK_GETBOOL2:
-    {
-        length = flask_security_get_bool(arg, op->size, 1);
-    }
-    break;
-
-    case FLASK_SETBOOL_NAMED:
-    {
-        length = flask_security_set_bool_name(arg, op->size);
-    }
-    break;
 
     default:
-        length = -ENOSYS;
-        break;
-
+        rv = -ENOSYS;
     }
 
-    if ( length < 0 )
-    {
-        rc = length;
+    if ( rv < 0 )
         goto out;
-    }
-    
-    if ( (FLASK_COPY_OUT&(1UL<<op->cmd)) && op->buf != NULL && 
-         copy_to_guest(guest_handle_from_ptr(op->buf, char), arg, op->size) )
-    {
-        rc = -EFAULT;
-        goto out;
-    }
 
-    op->size = length;
-    if ( copy_to_guest(u_flask_op, op, 1) )
-        rc = -EFAULT;
+    if ( (FLASK_COPY_OUT&(1UL<<op.cmd)) )
+    {
+        if ( copy_to_guest(u_flask_op, &op, 1) )
+            rv = -EFAULT;
+    }
 
  out:
-    xfree(arg);
-    return rc;
+    return rv;
 }

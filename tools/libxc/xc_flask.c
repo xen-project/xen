@@ -30,17 +30,20 @@
 #include <sys/ioctl.h>
 #include <stdint.h>
 
-#define OCON_PIRQ_STR   "pirq"
-#define OCON_IOPORT_STR "ioport"
-#define OCON_IOMEM_STR  "iomem"
-#define OCON_DEVICE_STR "pcidevice"
+#define OCON_ISID    0    /* initial SIDs */
+#define OCON_PIRQ    1    /* physical irqs */
+#define OCON_IOPORT  2    /* io ports */
+#define OCON_IOMEM   3    /* io memory */
+#define OCON_DEVICE  4    /* pci devices */
 #define INITCONTEXTLEN  256
 
-int xc_flask_op(xc_interface *xch, flask_op_t *op)
+int xc_flask_op(xc_interface *xch, xen_flask_op_t *op)
 {
     int ret = -1;
     DECLARE_HYPERCALL;
     DECLARE_HYPERCALL_BOUNCE(op, sizeof(*op), XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
+
+    op->interface_version = XEN_FLASK_INTERFACE_VERSION;
 
     if ( xc_hypercall_bounce_pre(xch, op) )
     {
@@ -63,402 +66,360 @@ int xc_flask_op(xc_interface *xch, flask_op_t *op)
     return ret;
 }
 
-int xc_flask_load(xc_interface *xc_handle, char *buf, uint32_t size)
+int xc_flask_load(xc_interface *xch, char *buf, uint32_t size)
 {
     int err;
-    flask_op_t op;
-    
+    DECLARE_FLASK_OP;
+    DECLARE_HYPERCALL_BOUNCE(buf, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
+    if ( xc_hypercall_bounce_pre(xch, buf) )
+    {
+        PERROR("Could not bounce memory for flask op hypercall");
+        return -1;
+    }
+
     op.cmd = FLASK_LOAD;
-    op.buf = buf;
-    op.size = size;
+    op.u.load.size = size;
+    set_xen_guest_handle(op.u.load.buffer, buf);
     
-    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
-        return err;
+    err = xc_flask_op(xch, &op);
 
-    return 0;
+    xc_hypercall_bounce_post(xch, buf);
+
+    return err;
 }
 
-int xc_flask_context_to_sid(xc_interface *xc_handle, char *buf, uint32_t size, uint32_t *sid)
+int xc_flask_context_to_sid(xc_interface *xch, char *buf, uint32_t size, uint32_t *sid)
 {
     int err;
-    flask_op_t op;
-    
+    DECLARE_FLASK_OP;
+    DECLARE_HYPERCALL_BOUNCE(buf, size, XC_HYPERCALL_BUFFER_BOUNCE_IN);
+
+    if ( xc_hypercall_bounce_pre(xch, buf) )
+    {
+        PERROR("Could not bounce memory for flask op hypercall");
+        return -1;
+    }
+
     op.cmd = FLASK_CONTEXT_TO_SID;
-    op.buf = buf;
-    op.size = size;
+    op.u.sid_context.size = size;
+    set_xen_guest_handle(op.u.sid_context.context, buf);
     
-    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
-        return err;
-    
-    sscanf(buf, "%u", sid);
+    err = xc_flask_op(xch, &op);
 
-    return 0;
+    if ( !err )
+        *sid = op.u.sid_context.sid;
+
+    xc_hypercall_bounce_post(xch, buf);
+
+    return err;
 }
 
-int xc_flask_sid_to_context(xc_interface *xc_handle, int sid, char *buf, uint32_t size)
+int xc_flask_sid_to_context(xc_interface *xch, int sid, char *buf, uint32_t size)
 {
     int err;
-    flask_op_t op;
-    
+    DECLARE_FLASK_OP;
+    DECLARE_HYPERCALL_BOUNCE(buf, size, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    if ( xc_hypercall_bounce_pre(xch, buf) )
+    {
+        PERROR("Could not bounce memory for flask op hypercall");
+        return -1;
+    }
+
     op.cmd = FLASK_SID_TO_CONTEXT;
-    op.buf = buf;
-    op.size = size;
+    op.u.sid_context.sid = sid;
+    op.u.sid_context.size = size;
+    set_xen_guest_handle(op.u.sid_context.context, buf);
     
-    snprintf(buf, size, "%u", sid);
+    err = xc_flask_op(xch, &op);
 
-    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
-        return err;
-
-    return 0;
-}
-
-int xc_flask_getenforce(xc_interface *xc_handle)
-{
-    int err;
-    flask_op_t op;
-    char buf[20];            
-    int size = 20;
-    int mode;
- 
-    op.cmd = FLASK_GETENFORCE;
-    op.buf = buf;
-    op.size = size;
-    
-    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
-        return err;
-
-    sscanf(buf, "%i", &mode);
-
-    return mode;
-}
-
-int xc_flask_setenforce(xc_interface *xc_handle, int mode)
-{
-    int err;
-    flask_op_t op;
-    char buf[20];
-    int size = 20; 
- 
-    op.cmd = FLASK_SETENFORCE;
-    op.buf = buf;
-    op.size = size;
+    xc_hypercall_bounce_post(xch, buf);
    
-    snprintf(buf, size, "%i", mode);
- 
-    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    return err;
+}
+
+int xc_flask_getenforce(xc_interface *xch)
+{
+    DECLARE_FLASK_OP;
+    op.cmd = FLASK_GETENFORCE;
+    
+    return xc_flask_op(xch, &op);
+}
+
+int xc_flask_setenforce(xc_interface *xch, int mode)
+{
+    DECLARE_FLASK_OP;
+    op.cmd = FLASK_SETENFORCE;
+    op.u.enforce.enforcing = mode;
+   
+    return xc_flask_op(xch, &op);
+}
+
+int xc_flask_getbool_byid(xc_interface *xch, int id, char *name, uint32_t size, int *curr, int *pend)
+{
+    int rv;
+    DECLARE_FLASK_OP;
+    DECLARE_HYPERCALL_BOUNCE(name, size, XC_HYPERCALL_BUFFER_BOUNCE_OUT);
+
+    if ( xc_hypercall_bounce_pre(xch, name) )
+    {
+        PERROR("Could not bounce memory for flask op hypercall");
+        return -1;
+    }
+
+    op.cmd = FLASK_GETBOOL;
+    op.u.boolean.bool_id = id;
+    op.u.boolean.size = size;
+    set_xen_guest_handle(op.u.boolean.name, name);
+
+    rv = xc_flask_op(xch, &op);
+
+    xc_hypercall_bounce_post(xch, name);
+
+    if ( rv )
+        return rv;
+    
+    if ( curr )
+        *curr = op.u.boolean.enforcing;
+    if ( pend )
+        *pend = op.u.boolean.pending;
+
+    return rv;
+}
+
+int xc_flask_getbool_byname(xc_interface *xch, char *name, int *curr, int *pend)
+{
+    int rv;
+    DECLARE_FLASK_OP;
+    DECLARE_HYPERCALL_BOUNCE(name, strlen(name), XC_HYPERCALL_BUFFER_BOUNCE_IN);
+
+    op.cmd = FLASK_GETBOOL;
+    op.u.boolean.bool_id = -1;
+    op.u.boolean.size = strlen(name);
+    set_xen_guest_handle(op.u.boolean.name, name);
+
+    rv = xc_flask_op(xch, &op);
+
+    xc_hypercall_bounce_post(xch, name);
+
+    if ( rv )
+        return rv;
+    
+    if ( curr )
+        *curr = op.u.boolean.enforcing;
+    if ( pend )
+        *pend = op.u.boolean.pending;
+
+    return rv;
+}
+
+int xc_flask_setbool(xc_interface *xch, char *name, int value, int commit)
+{
+    int rv;
+    DECLARE_FLASK_OP;
+    DECLARE_HYPERCALL_BOUNCE(name, strlen(name), XC_HYPERCALL_BUFFER_BOUNCE_IN);
+
+    op.cmd = FLASK_SETBOOL;
+    op.u.boolean.bool_id = -1;
+    op.u.boolean.new_value = value;
+    op.u.boolean.commit = 1;
+    op.u.boolean.size = strlen(name);
+    set_xen_guest_handle(op.u.boolean.name, name);
+
+    rv = xc_flask_op(xch, &op);
+
+    xc_hypercall_bounce_post(xch, name);
+
+    return rv;
+}
+
+
+static int xc_flask_add(xc_interface *xch, uint32_t ocon, uint64_t low, uint64_t high, char *scontext)
+{
+    uint32_t sid;
+    int err;
+    DECLARE_FLASK_OP;
+
+    err = xc_flask_context_to_sid(xch, scontext, strlen(scontext), &sid);
+    if ( err )
         return err;
 
-    return 0;
-}
-
-int xc_flask_getbool_byid(xc_interface *xc_handle, int id, char *name, uint32_t size, int *curr, int *pend)
-{
-    flask_op_t op;
-    char buf[255];
-    int rv;
-
-    op.cmd = FLASK_GETBOOL2;
-    op.buf = buf;
-    op.size = 255;
-
-    snprintf(buf, sizeof buf, "%i", id);
-
-    rv = xc_flask_op(xc_handle, &op);
-
-    if ( rv )
-        return rv;
-    
-    sscanf(buf, "%i %i %s", curr, pend, name);
-
-    return rv;
-}
-
-int xc_flask_getbool_byname(xc_interface *xc_handle, char *name, int *curr, int *pend)
-{
-    flask_op_t op;
-    char buf[255];
-    int rv;
-
-    op.cmd = FLASK_GETBOOL_NAMED;
-    op.buf = buf;
-    op.size = 255;
-
-    strncpy(buf, name, op.size);
-
-    rv = xc_flask_op(xc_handle, &op);
-
-    if ( rv )
-        return rv;
-    
-    sscanf(buf, "%i %i", curr, pend);
-
-    return rv;
-}
-
-int xc_flask_setbool(xc_interface *xc_handle, char *name, int value, int commit)
-{
-    flask_op_t op;
-    char buf[255];
-    int size = 255;
-
-    op.cmd = FLASK_SETBOOL_NAMED;
-    op.buf = buf;
-    op.size = size;
-
-    snprintf(buf, size, "%s %i %i", name, value, commit);
-
-    return xc_flask_op(xc_handle, &op);
-}
-
-static int xc_flask_add(xc_interface *xc_handle, char *cat, char *arg, char *scontext)
-{
-    char buf[512];
-    flask_op_t op;
-
-    memset(buf, 0, 512);
-    snprintf(buf, 512, "%s %255s %s", cat, scontext, arg);
     op.cmd = FLASK_ADD_OCONTEXT;
-    op.buf = buf;
-    op.size = 512;
+    op.u.ocontext.ocon = ocon;
+    op.u.ocontext.sid = sid;
+    op.u.ocontext.low = low;
+    op.u.ocontext.high = high;
     
-    return xc_flask_op(xc_handle, &op);
+    return xc_flask_op(xch, &op);
 }
 
-int xc_flask_add_pirq(xc_interface *xc_handle, unsigned int pirq, char *scontext)
+int xc_flask_add_pirq(xc_interface *xch, unsigned int pirq, char *scontext)
 {
-    char arg[16];
-
-    snprintf(arg, 16, "%u", pirq);
-    return xc_flask_add(xc_handle, OCON_PIRQ_STR, arg, scontext);
+    return xc_flask_add(xch, OCON_PIRQ, pirq, pirq, scontext);
 }
 
-int xc_flask_add_ioport(xc_interface *xc_handle, unsigned long low, unsigned long high,
+int xc_flask_add_ioport(xc_interface *xch, unsigned long low, unsigned long high,
                       char *scontext)
 {
-    char arg[64];
-
-    snprintf(arg, 64, "%lu %lu", low, high);
-    return xc_flask_add(xc_handle, OCON_IOPORT_STR, arg, scontext);
+    return xc_flask_add(xch, OCON_IOPORT, low, high, scontext);
 }
 
-int xc_flask_add_iomem(xc_interface *xc_handle, unsigned long low, unsigned long high,
+int xc_flask_add_iomem(xc_interface *xch, unsigned long low, unsigned long high,
                      char *scontext)
 {
-    char arg[64];
-
-    snprintf(arg, 64, "%lu %lu", low, high);
-    return xc_flask_add(xc_handle, OCON_IOMEM_STR, arg, scontext);
+    return xc_flask_add(xch, OCON_IOMEM, low, high, scontext);
 }
 
-int xc_flask_add_device(xc_interface *xc_handle, unsigned long device, char *scontext)
+int xc_flask_add_device(xc_interface *xch, unsigned long device, char *scontext)
 {
-    char arg[32];
-
-    snprintf(arg, 32, "%lu", device);
-    return xc_flask_add(xc_handle, OCON_DEVICE_STR, arg, scontext);
+    return xc_flask_add(xch, OCON_DEVICE, device, device, scontext);
 }
 
-static int xc_flask_del(xc_interface *xc_handle, char *cat, char *arg)
+static int xc_flask_del(xc_interface *xch, uint32_t ocon, uint64_t low, uint64_t high)
 {
-    char buf[256];
-    flask_op_t op;
+    DECLARE_FLASK_OP;
 
-    memset(buf, 0, 256);
-    snprintf(buf, 256, "%s %s", cat, arg);
     op.cmd = FLASK_DEL_OCONTEXT;
-    op.buf = buf;
-    op.size = 256;
+    op.u.ocontext.ocon = ocon;
+    op.u.ocontext.low = low;
+    op.u.ocontext.high = high;
     
-    return xc_flask_op(xc_handle, &op);
+    return xc_flask_op(xch, &op);
 }
 
-int xc_flask_del_pirq(xc_interface *xc_handle, unsigned int pirq)
+int xc_flask_del_pirq(xc_interface *xch, unsigned int pirq)
 {
-    char arg[16];
-
-    snprintf(arg, 16, "%u", pirq);
-    return xc_flask_del(xc_handle, OCON_PIRQ_STR, arg);
+    return xc_flask_del(xch, OCON_PIRQ, pirq, pirq);
 }
 
-int xc_flask_del_ioport(xc_interface *xc_handle, unsigned long low, unsigned long high)
+int xc_flask_del_ioport(xc_interface *xch, unsigned long low, unsigned long high)
 {
-    char arg[64];
-
-    snprintf(arg, 64, "%lu %lu", low, high);
-    return xc_flask_del(xc_handle, OCON_IOPORT_STR, arg);
+    return xc_flask_del(xch, OCON_IOPORT, low, high);
 }
 
-int xc_flask_del_iomem(xc_interface *xc_handle, unsigned long low, unsigned long high)
+int xc_flask_del_iomem(xc_interface *xch, unsigned long low, unsigned long high)
 {
-    char arg[64];
-
-    snprintf(arg, 64, "%lu %lu", low, high);
-    return xc_flask_del(xc_handle, OCON_IOMEM_STR, arg);
+    return xc_flask_del(xch, OCON_IOMEM, low, high);
 }
 
-int xc_flask_del_device(xc_interface *xc_handle, unsigned long device)
+int xc_flask_del_device(xc_interface *xch, unsigned long device)
 {
-    char arg[32];
-
-    snprintf(arg, 32, "%lu", device);
-    return xc_flask_del(xc_handle, OCON_DEVICE_STR, arg);
+    return xc_flask_del(xch, OCON_DEVICE, device, device);
 }
 
-int xc_flask_access(xc_interface *xc_handle, const char *scon, const char *tcon,
+int xc_flask_access(xc_interface *xch, const char *scon, const char *tcon,
                 uint16_t tclass, uint32_t req,
                 uint32_t *allowed, uint32_t *decided,
                 uint32_t *auditallow, uint32_t *auditdeny,
                 uint32_t *seqno)
 {
-/* maximum number of digits in a 16-bit decimal number: */
-#define MAX_SHORT_DEC_LEN 5
-
-    char *buf;
-    int bufLen;
+    DECLARE_FLASK_OP;
     int err;
-    flask_op_t op;
-    uint32_t dummy_allowed;
-    uint32_t dummy_decided;
-    uint32_t dummy_auditallow;
-    uint32_t dummy_auditdeny;
-    uint32_t dummy_seqno;
-  
-    if (!allowed)
-        allowed = &dummy_allowed;
-    if (!decided)
-        decided = &dummy_decided;
-    if (!auditallow)
-        auditallow = &dummy_auditallow;
-    if (!auditdeny)
-        auditdeny = &dummy_auditdeny;
-    if (!seqno)
-        seqno = &dummy_seqno;
 
-    if (!scon)
-        return -EINVAL;
-    if (!tcon)
-        return -EINVAL;
-
-    bufLen = strlen(scon) + 1 + strlen(tcon) + 1 +
-        MAX_SHORT_DEC_LEN + 1 +
-        sizeof(req)*2 + 1;
-    buf = malloc(bufLen);
-    snprintf(buf, bufLen, "%s %s %hu %x", scon, tcon, tclass, req);
+    err = xc_flask_context_to_sid(xch, (char*)scon, strlen(scon), &op.u.access.ssid);
+    if ( err )
+        return err;
+    err = xc_flask_context_to_sid(xch, (char*)tcon, strlen(tcon), &op.u.access.tsid);
+    if ( err )
+        return err;
 
     op.cmd = FLASK_ACCESS;
-    op.buf = buf;
-    op.size = strlen(buf)+1;
+    op.u.access.tclass = tclass;
+    op.u.access.req = req;
     
-    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
-    {
-        free(buf);
-        return err;
-    }
-   
-    if (sscanf(op.buf, "%x %x %x %x %u",
-               allowed, decided,
-               auditallow, auditdeny,
-               seqno) != 5) {
-        err = -EILSEQ;
-    }
+    err = xc_flask_op(xch, &op);
 
-    err = ((*allowed & req) == req)? 0 : -EPERM;
+    if ( err )
+        return err;
+
+    if ( allowed )
+        *allowed = op.u.access.allowed;
+    if ( decided )
+        *decided = 0xffffffff;
+    if ( auditallow )
+        *auditallow = op.u.access.audit_allow;
+    if ( auditdeny )
+        *auditdeny = op.u.access.audit_deny;
+    if ( seqno )
+        *seqno = op.u.access.seqno;
+
+    if ( (op.u.access.allowed & req) != req )
+        err = -EPERM;
 
     return err;
-
 }
 
-int xc_flask_avc_hashstats(xc_interface *xc_handle, char *buf, int size)
+int xc_flask_avc_hashstats(xc_interface *xch, char *buf, int size)
 {
     int err;
-    flask_op_t op;
+    DECLARE_FLASK_OP;
   
     op.cmd = FLASK_AVC_HASHSTATS;
-    op.buf = buf;
-    op.size = size;
   
-    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
-    {
-        free(buf);
-        return err;
-    }
+    err = xc_flask_op(xch, &op);
 
-    return 0;
+    snprintf(buf, size,
+             "entries: %d\nbuckets used: %d/%d\nlongest chain: %d\n",
+             op.u.hash_stats.entries, op.u.hash_stats.buckets_used,
+             op.u.hash_stats.buckets_total, op.u.hash_stats.max_chain_len);
+
+    return err;
 }
 
-int xc_flask_avc_cachestats(xc_interface *xc_handle, char *buf, int size)
+int xc_flask_avc_cachestats(xc_interface *xch, char *buf, int size)
 {
-    int err;
-    flask_op_t op;
+    int err, n;
+    int i = 0;
+    DECLARE_FLASK_OP;
+
+    n = snprintf(buf, size, "lookups hits misses allocations reclaims frees\n");
+    buf += n;
+    size -= n;
   
     op.cmd = FLASK_AVC_CACHESTATS;
-    op.buf = buf;
-    op.size = size;
-  
-    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
+    while ( size > 0 )
     {
-        free(buf);
-        return err;
+        op.u.cache_stats.cpu = i;
+        err = xc_flask_op(xch, &op);
+        if ( err && errno == ENOENT )
+            return 0;
+        if ( err )
+            return err;
+        n = snprintf(buf, size, "%u %u %u %u %u %u\n",
+                     op.u.cache_stats.lookups, op.u.cache_stats.hits,
+                     op.u.cache_stats.misses, op.u.cache_stats.allocations,
+                     op.u.cache_stats.reclaims, op.u.cache_stats.frees);
+        buf += n;
+        size -= n;
+        i++;
     }
 
     return 0;
 }
 
-int xc_flask_policyvers(xc_interface *xc_handle, char *buf, int size)
+int xc_flask_policyvers(xc_interface *xch)
 {
-    int err;
-    flask_op_t op;
-  
+    DECLARE_FLASK_OP;
     op.cmd = FLASK_POLICYVERS;
-    op.buf = buf;
-    op.size = size;
 
-    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
-    {
-        free(buf);
-        return err;
-    }
-
-    return 0;
+    return xc_flask_op(xch, &op);
 }
 
-int xc_flask_getavc_threshold(xc_interface *xc_handle)
+int xc_flask_getavc_threshold(xc_interface *xch)
 {
-    int err;
-    flask_op_t op;
-    char buf[20];            
-    int size = 20;
-    int threshold;
- 
+    DECLARE_FLASK_OP;
     op.cmd = FLASK_GETAVC_THRESHOLD;
-    op.buf = buf;
-    op.size = size;
     
-    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
-        return err;
-
-    sscanf(buf, "%i", &threshold);
-
-    return threshold;
+    return xc_flask_op(xch, &op);
 }
 
-int xc_flask_setavc_threshold(xc_interface *xc_handle, int threshold)
+int xc_flask_setavc_threshold(xc_interface *xch, int threshold)
 {
-    int err;
-    flask_op_t op;
-    char buf[20];            
-    int size = 20;
- 
+    DECLARE_FLASK_OP;
     op.cmd = FLASK_SETAVC_THRESHOLD;
-    op.buf = buf;
-    op.size = size;
+    op.u.setavc_threshold.threshold = threshold;
 
-    snprintf(buf, size, "%i", threshold);
- 
-    if ( (err = xc_flask_op(xc_handle, &op)) != 0 )
-        return err;
-
-    return 0;
+    return xc_flask_op(xch, &op);
 }
 
 /*

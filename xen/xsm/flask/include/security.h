@@ -90,8 +90,8 @@ int security_iterate_iomem_sids(unsigned long start, unsigned long end,
 int security_iterate_ioport_sids(u32 start, u32 end,
                                 security_iterate_fn fn, void *data);
 
-int security_ocontext_add(char *ocontext, unsigned long low,
+int security_ocontext_add(u32 ocontext, unsigned long low,
                            unsigned long high, u32 sid);
 
-int security_ocontext_del(char *ocontext, unsigned int low, unsigned int high);
+int security_ocontext_del(u32 ocontext, unsigned int low, unsigned int high);
 #endif /* _FLASK_SECURITY_H_ */

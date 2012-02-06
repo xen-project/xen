@@ -42,11 +42,13 @@
 #define DECLARE_DOMCTL struct xen_domctl domctl = { 0 }
 #define DECLARE_SYSCTL struct xen_sysctl sysctl = { 0 }
 #define DECLARE_PHYSDEV_OP struct physdev_op physdev_op = { 0 }
+#define DECLARE_FLASK_OP struct xen_flask_op op = { 0 }
 #else
 #define DECLARE_HYPERCALL privcmd_hypercall_t hypercall
 #define DECLARE_DOMCTL struct xen_domctl domctl
 #define DECLARE_SYSCTL struct xen_sysctl sysctl
 #define DECLARE_PHYSDEV_OP struct physdev_op physdev_op
+#define DECLARE_FLASK_OP struct xen_flask_op op
 #endif
 
 #undef PAGE_SHIFT

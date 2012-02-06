@@ -2097,17 +2097,14 @@ int determine_ocontext( char *ocontext )
         return -1;
 }
 
-int security_ocontext_add( char *ocontext, unsigned long low, unsigned long high
+int security_ocontext_add( u32 ocon, unsigned long low, unsigned long high
                             ,u32 sid )
 {
     int ret = 0;
-    int ocon = 0;
     struct ocontext *c;
     struct ocontext *prev;
     struct ocontext *add;
 
-    if ( (ocon = determine_ocontext(ocontext)) < 0 )
-        return -EINVAL;
     if ( (add = xmalloc(struct ocontext)) == NULL )
         return -ENOMEM;
     memset(add, 0, sizeof(struct ocontext));
@@ -2254,14 +2251,10 @@ int security_ocontext_add( char *ocontext, unsigned long low, unsigned long high
     return ret;
 }
 
-int security_ocontext_del( char *ocontext, unsigned int low, unsigned int high )
+int security_ocontext_del( u32 ocon, unsigned int low, unsigned int high )
 {
     int ret = 0;
-    int ocon = 0;
     struct ocontext *c, *before_c;
-
-    if ( (ocon = determine_ocontext(ocontext)) < 0 )
-        return -EINVAL;
 
     POLICY_WRLOCK;
     switch( ocon )

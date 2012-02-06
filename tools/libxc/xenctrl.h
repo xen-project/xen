@@ -1326,7 +1326,7 @@ int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl);
 
 int xc_version(xc_interface *xch, int cmd, void *arg);
 
-int xc_flask_op(xc_interface *xch, flask_op_t *op);
+int xc_flask_op(xc_interface *xch, xen_flask_op_t *op);
 
 /*
  * Subscribe to state changes in a domain via evtchn.
@@ -1974,7 +1974,7 @@ int xc_flask_access(xc_interface *xc_handle, const char *scon, const char *tcon,
                   uint32_t *auditallow, uint32_t *auditdeny,
                   uint32_t *seqno);
 int xc_flask_avc_cachestats(xc_interface *xc_handle, char *buf, int size);
-int xc_flask_policyvers(xc_interface *xc_handle, char *buf, int size);
+int xc_flask_policyvers(xc_interface *xc_handle);
 int xc_flask_avc_hashstats(xc_interface *xc_handle, char *buf, int size);
 int xc_flask_getavc_threshold(xc_interface *xc_handle);
 int xc_flask_setavc_threshold(xc_interface *xc_handle, int threshold);
