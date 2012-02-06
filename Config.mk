@@ -243,6 +243,7 @@ OCAML_TOOLS        ?= y
 CONFIG_MINITERM    ?= n
 CONFIG_LOMOUNT     ?= n
 CONFIG_SYSTEM_LIBAIO ?= y
+CONFIG_TESTS       ?= y
 
 ifeq ($(OCAML_TOOLS),y)
 OCAML_TOOLS := $(shell ocamlopt -v > /dev/null 2>&1 && echo "y" || echo "n")
