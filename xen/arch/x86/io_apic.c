@@ -2374,6 +2374,23 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     return 0;
 }
 
+static const char * delivery_mode_2_str(
+    const enum ioapic_irq_destination_types mode)
+{
+    switch ( mode )
+    {
+    case dest_Fixed: return "Fixed";
+    case dest_LowestPrio: return "LoPri";
+    case dest_SMI: return "SMI";
+    case dest_NMI: return "NMI";
+    case dest_INIT: return "INIT";
+    case dest_ExtINT: return "ExINT";
+    case dest__reserved_1:
+    case dest__reserved_2: return "Resvd";
+    default: return "INVAL";
+    }
+}
+
 void dump_ioapic_irq_info(void)
 {
     struct irq_pin_list *entry;
@@ -2406,13 +2423,12 @@ void dump_ioapic_irq_info(void)
             *(((int *)&rte) + 1) = io_apic_read(entry->apic, 0x11 + 2 * pin);
             spin_unlock_irqrestore(&ioapic_lock, flags);
 
-            printk("vector=%u, delivery_mode=%u, dest_mode=%s, "
-                   "delivery_status=%d, polarity=%d, irr=%d, "
-                   "trigger=%s, mask=%d, dest_id:%d\n",
-                   rte.vector, rte.delivery_mode,
-                   rte.dest_mode ? "logical" : "physical",
+            printk("vec=%02x delivery=%-5s dest=%c status=%d "
+                   "polarity=%d irr=%d trig=%c mask=%d dest_id:%d\n",
+                   rte.vector, delivery_mode_2_str(rte.delivery_mode),
+                   rte.dest_mode ? 'L' : 'P',
                    rte.delivery_status, rte.polarity, rte.irr,
-                   rte.trigger ? "level" : "edge", rte.mask,
+                   rte.trigger ? 'L' : 'E', rte.mask,
                    rte.dest.logical.logical_dest);
 
             if ( entry->next == 0 )
