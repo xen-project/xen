@@ -16,7 +16,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
-#include <libflask.h>
 
 static void usage(char **argv)
 {
@@ -56,9 +55,9 @@ int main(int argc, char **argv)
 		goto done;
 	}
 
-	err = flask_setbool(xch, argv[1], value, 1);
+	err = xc_flask_setbool(xch, argv[1], value, 1);
 	if (err) {
-		fprintf(stderr, "flask_setbool: Unable to set boolean %s=%s: %s (%d)",
+		fprintf(stderr, "xc_flask_setbool: Unable to set boolean %s=%s: %s (%d)",
 			argv[1], argv[2], strerror(errno), err);
 		err = 2;
 		goto done;

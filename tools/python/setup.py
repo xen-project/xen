@@ -48,7 +48,7 @@ flask = Extension("flask",
                include_dirs       = [ PATH_XEN, PATH_LIBXC, "xen/lowlevel/flask",
                                       "../flask/libflask/include" ],
                library_dirs       = [ PATH_LIBXC, "../flask/libflask" ],
-               libraries          = [ "xenctrl", "flask" ],
+               libraries          = [ "xenctrl" ],
                depends            = [ PATH_LIBXC + "/libxenctrl.so",
                                       XEN_ROOT + "/tools/flask/libflask/libflask.so" ],
                sources            = [ "xen/lowlevel/flask/flask.c" ])

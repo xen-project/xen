@@ -12,7 +12,6 @@
 
 #include <Python.h>
 #include <xenctrl.h>
-#include <libflask.h>
 
 #define PKG "xen.lowlevel.flask"
 #define CLS "flask"
@@ -58,7 +57,7 @@ static PyObject *pyflask_context_to_sid(PyObject *self, PyObject *args,
         return PyErr_SetFromErrno(xc_error_obj);
     }
     
-    ret = flask_context_to_sid(xc_handle, buf, len, &sid);
+    ret = xc_flask_context_to_sid(xc_handle, buf, len, &sid);
         
     xc_interface_close(xc_handle);
 
@@ -92,7 +91,7 @@ static PyObject *pyflask_sid_to_context(PyObject *self, PyObject *args,
         return PyErr_SetFromErrno(xc_error_obj);
     }
     
-    ret = flask_sid_to_context(xc_handle, sid, ctx, ctx_len);
+    ret = xc_flask_sid_to_context(xc_handle, sid, ctx, ctx_len);
     
     xc_interface_close(xc_handle);
     
@@ -121,7 +120,7 @@ static PyObject *pyflask_load(PyObject *self, PyObject *args, PyObject *kwds)
         return PyErr_SetFromErrno(xc_error_obj);
     }
 
-    ret = flask_load(xc_handle, policy, len);
+    ret = xc_flask_load(xc_handle, policy, len);
 
     xc_interface_close(xc_handle);
 
@@ -143,7 +142,7 @@ static PyObject *pyflask_getenforce(PyObject *self)
         return PyErr_SetFromErrno(xc_error_obj);
     }
     
-    ret = flask_getenforce(xc_handle);
+    ret = xc_flask_getenforce(xc_handle);
     
     xc_interface_close(xc_handle);
     
@@ -173,7 +172,7 @@ static PyObject *pyflask_setenforce(PyObject *self, PyObject *args,
         return PyErr_SetFromErrno(xc_error_obj);
     }
     
-    ret = flask_setenforce(xc_handle, mode);
+    ret = xc_flask_setenforce(xc_handle, mode);
     
     xc_interface_close(xc_handle);
     
@@ -209,7 +208,7 @@ static PyObject *pyflask_access(PyObject *self, PyObject *args,
         return PyErr_SetFromErrno(xc_error_obj);
     }
     
-    ret = flask_access(xc_handle, scon, tcon, tclass, req, &allowed, &decided,
+    ret = xc_flask_access(xc_handle, scon, tcon, tclass, req, &allowed, &decided,
                         &auditallow, &auditdeny, &seqno);
         
     xc_interface_close(xc_handle);

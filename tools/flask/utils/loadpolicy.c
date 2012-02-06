@@ -17,7 +17,6 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
-#include <libflask.h>
 
 #define USE_MMAP
 
@@ -94,7 +93,7 @@ int main (int argCnt, const char *args[])
     }
 #endif
 
-    ret = flask_load(xch, polMemCp, info.st_size);
+    ret = xc_flask_load(xch, polMemCp, info.st_size);
     if ( ret < 0 )
     {
         errno = -ret;

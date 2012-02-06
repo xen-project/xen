@@ -16,7 +16,6 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
-#include <libflask.h>
 
 static void usage (int argCnt, const char *args[])
 {
@@ -41,7 +40,7 @@ int main (int argCnt, const char *args[])
         goto done;
     }
 
-    ret = flask_getenforce(xch);
+    ret = xc_flask_getenforce(xch);
     if ( ret < 0 )
     {
         errno = -ret;

@@ -1955,6 +1955,9 @@ int xc_flask_context_to_sid(xc_interface *xc_handle, char *buf, uint32_t size, u
 int xc_flask_sid_to_context(xc_interface *xc_handle, int sid, char *buf, uint32_t size);
 int xc_flask_getenforce(xc_interface *xc_handle);
 int xc_flask_setenforce(xc_interface *xc_handle, int mode);
+int xc_flask_getbool_byid(xc_interface *xc_handle, int id, char *name, uint32_t size, int *curr, int *pend);
+int xc_flask_getbool_byname(xc_interface *xc_handle, char *name, int *curr, int *pend);
+int xc_flask_setbool(xc_interface *xc_handle, char *name, int value, int commit);
 int xc_flask_add_pirq(xc_interface *xc_handle, unsigned int pirq, char *scontext);
 int xc_flask_add_ioport(xc_interface *xc_handle, unsigned long low, unsigned long high,
                       char *scontext);

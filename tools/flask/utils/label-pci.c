@@ -16,7 +16,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
-#include <libflask.h>
 
 /* Pulled from linux/include/linux/ioport.h */
 #define IORESOURCE_TYPE_BITS    0x00001f00  /* Resource type */
@@ -69,9 +68,9 @@ int main (int argCnt, char *argv[])
 		goto done;
 	}
 
-	ret = flask_add_device(xch, sbdf, argv[2]);
+	ret = xc_flask_add_device(xch, sbdf, argv[2]);
 	if (ret) {
-		fprintf(stderr, "flask_add_device: Unable to set context of PCI device %s (0x%x) to %s: %d\n",
+		fprintf(stderr, "xc_flask_add_device: Unable to set context of PCI device %s (0x%x) to %s: %d\n",
 			argv[1], sbdf, argv[2], ret);
 		err = 2;
 		goto done;
@@ -80,9 +79,9 @@ int main (int argCnt, char *argv[])
 	while (fscanf(f, "0x%"SCNx64" 0x%"SCNx64" 0x%"SCNx64"\n", &start, &end, &flags) == 3) {
 		if (flags & IORESOURCE_IO) {
 			// printf("Port %"PRIx64"-%"PRIx64"\n", start, end);
-			ret = flask_add_ioport(xch, start, end, argv[2]);
+			ret = xc_flask_add_ioport(xch, start, end, argv[2]);
 			if (ret) {
-				fprintf(stderr, "flask_add_ioport %"PRIx64"-%"PRIx64" failed: %d\n",
+				fprintf(stderr, "xc_flask_add_ioport %"PRIx64"-%"PRIx64" failed: %d\n",
 						start, end, ret);
 				err = 2;
 			}
@@ -90,9 +89,9 @@ int main (int argCnt, char *argv[])
 			start >>= 12;
 			end >>= 12;
 			// printf("IOMEM %"PRIx64"-%"PRIx64"\n", start, end);
-			ret = flask_add_iomem(xch, start, end, argv[2]);
+			ret = xc_flask_add_iomem(xch, start, end, argv[2]);
 			if (ret) {
-				fprintf(stderr, "flask_add_iomem %"PRIx64"-%"PRIx64" failed: %d\n",
+				fprintf(stderr, "xc_flask_add_iomem %"PRIx64"-%"PRIx64" failed: %d\n",
 						start, end, ret);
 				err = 2;
 			}
@@ -108,9 +107,9 @@ int main (int argCnt, char *argv[])
 	if (fscanf(f, "%" SCNu64, &start) != 1)
 		start = 0;
 	if (start) {
-		ret = flask_add_pirq(xch, start, argv[2]);
+		ret = xc_flask_add_pirq(xch, start, argv[2]);
 		if (ret) {
-			fprintf(stderr, "flask_add_pirq %"PRIu64" failed: %d\n",
+			fprintf(stderr, "xc_flask_add_pirq %"PRIu64" failed: %d\n",
 					start, ret);
 			err = 2;
 		}

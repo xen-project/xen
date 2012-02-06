@@ -1,11 +1,8 @@
 XEN_ROOT=$(CURDIR)/../../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-LIBFLASK_ROOT = $(XEN_ROOT)/tools/flask/libflask
-
 CFLAGS += -Wall -g -Werror
 CFLAGS += $(CFLAGS_libxenctrl)
-CFLAGS += -I$(LIBFLASK_ROOT)/include
 
 TESTDIR  = testsuite/tmp
 TESTFLAGS= -DTESTING
@@ -19,22 +16,22 @@ CLIENTS_OBJS := $(patsubst flask-%,%.o,$(CLIENTS))
 all: $(CLIENTS)
 
 flask-loadpolicy: loadpolicy.o
-	$(CC) $(LDFLAGS) $< $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
+	$(CC) $(LDFLAGS) $< $(LDLIBS) $(LDLIBS_libxenctrl) -o $@
 
 flask-setenforce: setenforce.o
-	$(CC) $(LDFLAGS) $< $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
+	$(CC) $(LDFLAGS) $< $(LDLIBS) $(LDLIBS_libxenctrl) -o $@
 
 flask-getenforce: getenforce.o
-	$(CC) $(LDFLAGS) $< $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
+	$(CC) $(LDFLAGS) $< $(LDLIBS) $(LDLIBS_libxenctrl) -o $@
 
 flask-label-pci: label-pci.o
-	$(CC) $(LDFLAGS) $< $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
+	$(CC) $(LDFLAGS) $< $(LDLIBS) $(LDLIBS_libxenctrl) -o $@
 
 flask-get-bool: get-bool.o
-	$(CC) $(LDFLAGS) $< $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
+	$(CC) $(LDFLAGS) $< $(LDLIBS) $(LDLIBS_libxenctrl) -o $@
 
 flask-set-bool: set-bool.o
-	$(CC) $(LDFLAGS) $< $(LDLIBS) -L$(LIBFLASK_ROOT) -lflask $(LDLIBS_libxenctrl) -o $@
+	$(CC) $(LDFLAGS) $< $(LDLIBS) $(LDLIBS_libxenctrl) -o $@
 
 .PHONY: clean
 clean: 

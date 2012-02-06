@@ -2,7 +2,6 @@ XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS :=
-SUBDIRS += libflask
 SUBDIRS += utils
 
 .PHONY: all clean install

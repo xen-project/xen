@@ -16,7 +16,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <inttypes.h>
-#include <libflask.h>
 
 static void usage(char **argv)
 {
@@ -29,11 +28,11 @@ static int all_bools(xc_interface *xch)
 	int err = 0, i = 0, curr, pend;
 	char name[256];
 	while (1) {
-		err = flask_getbool_byid(xch, i, name, &curr, &pend);
+		err = xc_flask_getbool_byid(xch, i, name, sizeof name, &curr, &pend);
 		if (err < 0) {
 			if (errno == ENOENT)
 				return 0;
-			fprintf(stderr, "flask_getbool: Unable to get boolean #%d: %s (%d)",
+			fprintf(stderr, "xc_flask_getbool: Unable to get boolean #%d: %s (%d)",
 				i, strerror(errno), err);
 			return 2;
 		}
@@ -69,9 +68,9 @@ int main(int argc, char **argv)
 		goto done;
 	}
 
-	err = flask_getbool_byname(xch, argv[1], &curr, &pend);
+	err = xc_flask_getbool_byname(xch, argv[1], &curr, &pend);
 	if (err) {
-		fprintf(stderr, "flask_getbool: Unable to get boolean %s: %s (%d)",
+		fprintf(stderr, "xc_flask_getbool: Unable to get boolean %s: %s (%d)",
 			argv[1], strerror(errno), err);
 		err = 2;
 		goto done;

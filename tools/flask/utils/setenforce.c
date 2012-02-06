@@ -16,7 +16,6 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <unistd.h>
-#include <libflask.h>
 
 static void usage (int argCnt, const char *args[])
 {
@@ -45,12 +44,12 @@ int main (int argCnt, const char *args[])
 
     if( strlen(args[1]) == 1 && (args[1][0] == '0' || args[1][0] == '1')){
         mode = strtol(args[1], &end, 10);
-        ret = flask_setenforce(xch, mode);
+        ret = xc_flask_setenforce(xch, mode);
     } else {
         if( strcasecmp(args[1], "enforcing") == 0 ){
-            ret = flask_setenforce(xch, 1);
+            ret = xc_flask_setenforce(xch, 1);
         } else if( strcasecmp(args[1], "permissive") == 0 ){
-            ret = flask_setenforce(xch, 0);
+            ret = xc_flask_setenforce(xch, 0);
         } else {
             usage(argCnt, args);
         }
