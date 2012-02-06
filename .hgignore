@@ -154,10 +154,11 @@
 ^tools/firmware/rombios/32bit/32bitbios_flat\.h$
 ^tools/firmware/vgabios/vbetables-gen$
 ^tools/firmware/vgabios/vbetables\.h$
-^tools/flask/loadpolicy/flask-loadpolicy$
 ^tools/flask/utils/flask-getenforce$
+^tools/flask/utils/flask-get-bool$
 ^tools/flask/utils/flask-loadpolicy$
 ^tools/flask/utils/flask-setenforce$
+^tools/flask/utils/flask-set-bool$
 ^tools/flask/utils/flask-label-pci$
 ^tools/fs-back/fs-backend$
 ^tools/hotplug/common/hotplugpath\.sh$
@@ -249,6 +250,7 @@
 ^tools/xenpmd/xenpmd$
 ^tools/xenstat/xentop/xentop$
 ^tools/xenstore/testsuite/tmp/.*$
+^tools/xenstore/init-xenstore-domain$
 ^tools/xenstore/xen$
 ^tools/xenstore/xenstore$
 ^tools/xenstore/xenstore-chmod$
