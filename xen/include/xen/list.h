@@ -8,7 +8,6 @@
 #define __XEN_LIST_H__
 
 #include <xen/lib.h>
-#include <xen/prefetch.h>
 #include <asm/system.h>
 
 /* These are non-NULL pointers that will result in page faults
@@ -39,6 +38,9 @@ struct list_head {
 
 #define LIST_HEAD_READ_MOSTLY(name) \
     struct list_head __read_mostly name = LIST_HEAD_INIT(name)
+
+/* Do not move this ahead of the struct list_head definition! */
+#include <xen/prefetch.h>
 
 static inline void INIT_LIST_HEAD(struct list_head *list)
 {

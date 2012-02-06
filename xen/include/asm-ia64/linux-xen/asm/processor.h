@@ -17,7 +17,12 @@
 
 #include <asm/intrinsics.h>
 #include <asm/kregs.h>
+#if !defined(XEN)
 #include <asm/ptrace.h>
+#elif !defined(__ASSEMBLY__)
+struct cpu_user_regs;
+#define pt_regs cpu_user_regs
+#endif
 #include <asm/ustack.h>
 
 /* Our arch specific arch_init_sched_domain is in arch/ia64/kernel/domain.c */
@@ -782,5 +787,9 @@ ia64_get_cpl(unsigned long psr)
 #endif
 
 #endif /* !__ASSEMBLY__ */
+
+#ifdef XEN
+#include <asm/ptrace.h>
+#endif
 
 #endif /* _ASM_IA64_PROCESSOR_H */

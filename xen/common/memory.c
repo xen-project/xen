@@ -683,7 +683,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
         mfn = get_gfn_untyped(d, xrfp.gpfn);
 
         if ( mfn_valid(mfn) )
-            guest_physmap_remove_page(d, xrfp.gpfn, mfn, PAGE_ORDER_4K);
+            guest_physmap_remove_page(d, xrfp.gpfn, mfn, 0);
         else
             rc = -ENOENT;
 

@@ -72,7 +72,7 @@ extern int request_irq_vector(unsigned int vector,
 #define irq_complete_move(x) do {} \
     while(!x)
 
-#define domain_pirq_to_irq(d, irq) domain_irq_to_vector(d, irq)
+#define domain_pirq_to_irq(d, irq) (irq) /* domain_irq_to_vector(d, irq) */
 
 #define hvm_domain_use_pirq(d, info) 0
 #endif
