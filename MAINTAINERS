@@ -138,7 +138,7 @@ F:	xen/arch/x86/tboot.c
 F:	xen/include/asm-x86/tboot.h
 
 INTEL(R) VT FOR DIRECTED I/O (VT-D)
-M:	Allen Kay <allen.m.kay@intel.com>
+M:	Xiantao Zhang <xiantao.zhang@intel.com>
 S:	Supported
 F:	xen/drivers/passthrough/vtd/
 
