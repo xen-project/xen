@@ -60,7 +60,7 @@ class ExtLinuxImage(object):
 
                 # Bypass regular self.commands handling
                 com = None
-            elif arg.find("initrd="):
+            elif "initrd=" in arg:
                 # find initrd image in append line
                 args = arg.strip().split(" ")
                 for a in args:
