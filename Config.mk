@@ -227,9 +227,9 @@ SEABIOS_UPSTREAM_TAG ?= rel-1.6.3.1
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= ebe37b2a3f844bad02dcc30d081f39eda06118f8
-# Thu Feb 2 13:47:06 2012 +0000
-# e1000: bounds packet size against buffer size
+QEMU_TAG ?= 8cc8a3651c9c5bc2d0086d12f4b870fc525b9387
+# Tue Feb 7 18:42:56 2012 +0000
+# qemu-dm: fix unregister_iomem()
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
