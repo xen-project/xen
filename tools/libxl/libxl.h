@@ -130,6 +130,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <string.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <sys/wait.h> /* for pid_t */
@@ -304,6 +305,7 @@ typedef struct {
     libxl_action_on_shutdown on_watchdog;
     libxl_action_on_shutdown on_crash;
 } libxl_domain_config;
+char *libxl_domain_config_to_json(libxl_ctx *ctx, libxl_domain_config *p);
 
 /* context functions */
 int libxl_ctx_alloc(libxl_ctx **pctx, int version,

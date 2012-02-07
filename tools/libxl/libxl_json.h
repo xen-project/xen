@@ -70,4 +70,7 @@ static inline yajl_gen libxl__yajl_gen_alloc(const yajl_alloc_funcs *allocFuncs)
 
 #endif /* !HAVE_YAJL_V2 */
 
+yajl_gen_status libxl_domain_config_gen_json(yajl_gen hand,
+                                             libxl_domain_config *p);
+
 #endif /* LIBXL_JSON_H */

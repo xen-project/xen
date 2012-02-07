@@ -38,6 +38,7 @@
 
 #include "libxl.h"
 #include "libxl_utils.h"
+#include "libxl_json.h"
 #include "libxlutil.h"
 #include "xl.h"
 
@@ -289,187 +290,66 @@ static void dolog(const char *file, int line, const char *func, char *fmt, ...)
     free(s);
 }
 
-static void printf_info(int domid,
+static void printf_info(enum output_format output_format,
+                        int domid,
                         libxl_domain_config *d_config)
 {
-    int i;
-    libxl_dominfo info;
+    if (output_format == OUTPUT_FORMAT_SXP)
+        return printf_info_sexp(domid, d_config);
 
-    libxl_domain_create_info *c_info = &d_config->c_info;
-    libxl_domain_build_info *b_info = &d_config->b_info;
+    yajl_gen_config conf = { 1, "    " };
+    const char *buf;
+    unsigned int len = 0;
+    yajl_gen_status s;
+    yajl_gen hand;
 
-    printf("(domain\n\t(domid %d)\n", domid);
-    printf("\t(create_info)\n");
-    printf("\t(hvm %d)\n", c_info->type == LIBXL_DOMAIN_TYPE_HVM);
-    printf("\t(hap %d)\n", c_info->hap);
-    printf("\t(oos %d)\n", c_info->oos);
-    printf("\t(ssidref %d)\n", c_info->ssidref);
-    printf("\t(name %s)\n", c_info->name);
-
-    /* retrieve the UUID from dominfo, since it is probably generated
-     * during parsing and thus does not match the real one
-     */
-    if (libxl_domain_info(ctx, &info, domid) == 0) {
-        printf("\t(uuid " LIBXL_UUID_FMT ")\n", LIBXL_UUID_BYTES(info.uuid));
-    } else {
-        printf("\t(uuid <unknown>)\n");
+    hand = yajl_gen_alloc(&conf, NULL);
+    if (!hand) {
+        fprintf(stderr, "unable to allocate JSON generator\n");
+        return;
     }
 
-    printf("\t(cpupool %s)\n", libxl_cpupoolid_to_name(ctx, c_info->poolid));
-    if (c_info->xsdata)
-        printf("\t(xsdata contains data)\n");
+    s = yajl_gen_map_open(hand);
+    if (s != yajl_gen_status_ok)
+        goto out;
+
+    s = yajl_gen_string(hand, (const unsigned char *)"domid",
+                        sizeof("domid")-1);
+    if (s != yajl_gen_status_ok)
+        goto out;
+    if (domid != -1)
+        s = yajl_gen_integer(hand, domid);
     else
-        printf("\t(xsdata (null))\n");
-    if (c_info->platformdata)
-        printf("\t(platformdata contains data)\n");
-    else
-        printf("\t(platformdata (null))\n");
+        s = yajl_gen_null(hand);
+    if (s != yajl_gen_status_ok)
+        goto out;
 
+    s = yajl_gen_string(hand, (const unsigned char *)"config",
+                        sizeof("config")-1);
+    if (s != yajl_gen_status_ok)
+        goto out;
+    s = libxl_domain_config_gen_json(hand, d_config);
+    if (s != yajl_gen_status_ok)
+        goto out;
 
-    printf("\t(build_info)\n");
-    printf("\t(max_vcpus %d)\n", b_info->max_vcpus);
-    printf("\t(tsc_mode %s)\n", libxl_tsc_mode_to_string(b_info->tsc_mode));
-    printf("\t(max_memkb %d)\n", b_info->max_memkb);
-    printf("\t(target_memkb %d)\n", b_info->target_memkb);
-    printf("\t(nomigrate %d)\n", b_info->disable_migrate);
+    s = yajl_gen_map_close(hand);
+    if (s != yajl_gen_status_ok)
+        goto out;
 
-    if (c_info->type == LIBXL_DOMAIN_TYPE_PV && b_info->u.pv.bootloader) {
-        int i;
-        printf("\t(bootloader %s)\n", b_info->u.pv.bootloader);
-        if (b_info->u.pv.bootloader_args) {
-            printf("\t(bootloader_args");
-            for (i=0; b_info->u.pv.bootloader_args[i]; i++)
-                printf(" %s", b_info->u.pv.bootloader_args[i]);
-            printf(")\n");
-        }
-    }
+    s = yajl_gen_get_buf(hand, (const unsigned char **)&buf, &len);
+    if (s != yajl_gen_status_ok)
+        goto out;
 
-    printf("\t(image\n");
-    switch (c_info->type) {
-    case LIBXL_DOMAIN_TYPE_HVM:
-        printf("\t\t(hvm\n");
-        printf("\t\t\t(firmware %s)\n", b_info->u.hvm.firmware);
-        printf("\t\t\t(video_memkb %d)\n", b_info->video_memkb);
-        printf("\t\t\t(shadow_memkb %d)\n", b_info->shadow_memkb);
-        printf("\t\t\t(pae %d)\n", b_info->u.hvm.pae);
-        printf("\t\t\t(apic %d)\n", b_info->u.hvm.apic);
-        printf("\t\t\t(acpi %d)\n", b_info->u.hvm.acpi);
-        printf("\t\t\t(nx %d)\n", b_info->u.hvm.nx);
-        printf("\t\t\t(viridian %d)\n", b_info->u.hvm.viridian);
-        printf("\t\t\t(hpet %d)\n", b_info->u.hvm.hpet);
-        printf("\t\t\t(vpt_align %d)\n", b_info->u.hvm.vpt_align);
-        printf("\t\t\t(timer_mode %s)\n",
-               libxl_timer_mode_to_string(b_info->u.hvm.timer_mode));
+    puts(buf);
 
-        printf("\t\t\t(nestedhvm %d)\n", b_info->u.hvm.nested_hvm);
-        printf("\t\t\t(no_incr_generationid %d)\n",
-                    b_info->u.hvm.no_incr_generationid);
+out:
+    yajl_gen_free(hand);
 
-        printf("\t\t\t(stdvga %d)\n", b_info->u.hvm.stdvga);
-        printf("\t\t\t(vnc %d)\n", b_info->u.hvm.vnc.enable);
-        printf("\t\t\t(vnclisten %s)\n", b_info->u.hvm.vnc.listen);
-        printf("\t\t\t(vncdisplay %d)\n", b_info->u.hvm.vnc.display);
-        printf("\t\t\t(vncunused %d)\n", b_info->u.hvm.vnc.findunused);
-        printf("\t\t\t(keymap %s)\n", b_info->u.hvm.keymap);
-        printf("\t\t\t(sdl %d)\n", b_info->u.hvm.sdl.enable);
-        printf("\t\t\t(opengl %d)\n", b_info->u.hvm.sdl.opengl);
-        printf("\t\t\t(nographic %d)\n", b_info->u.hvm.nographic);
-        printf("\t\t\t(spice %d)\n", b_info->u.hvm.spice.enable);
-        printf("\t\t\t(spiceport %d)\n", b_info->u.hvm.spice.port);
-        printf("\t\t\t(spicetls_port %d)\n", b_info->u.hvm.spice.tls_port);
-        printf("\t\t\t(spicehost %s)\n", b_info->u.hvm.spice.host);
-        printf("\t\t\t(spicedisable_ticketing %d)\n",
-                    b_info->u.hvm.spice.disable_ticketing);
-        printf("\t\t\t(spiceagent_mouse %d)\n", b_info->u.hvm.spice.agent_mouse);
+    if (s != yajl_gen_status_ok)
+        fprintf(stderr,
+                "unable to format domain config as JSON (YAJL:%d)\n", s);
 
-        printf("\t\t\t(device_model %s)\n", b_info->device_model ? : "default");
-        printf("\t\t\t(gfx_passthru %d)\n", b_info->u.hvm.gfx_passthru);
-        printf("\t\t\t(serial %s)\n", b_info->u.hvm.serial);
-        printf("\t\t\t(boot %s)\n", b_info->u.hvm.boot);
-        printf("\t\t\t(usb %d)\n", b_info->u.hvm.usb);
-        printf("\t\t\t(usbdevice %s)\n", b_info->u.hvm.usbdevice);
-        printf("\t\t)\n");
-        break;
-    case LIBXL_DOMAIN_TYPE_PV:
-        printf("\t\t(linux %d)\n", 0);
-        printf("\t\t\t(kernel %s)\n", b_info->u.pv.kernel.path);
-        printf("\t\t\t(cmdline %s)\n", b_info->u.pv.cmdline);
-        printf("\t\t\t(ramdisk %s)\n", b_info->u.pv.ramdisk.path);
-        printf("\t\t\t(e820_host %d)\n", b_info->u.pv.e820_host);
-        printf("\t\t)\n");
-        break;
-    default:
-        fprintf(stderr, "Unknown domain type %d\n", c_info->type);
-        exit(1);
-    }
-    printf("\t)\n");
-
-    for (i = 0; i < d_config->num_disks; i++) {
-        printf("\t(device\n");
-        printf("\t\t(tap\n");
-        printf("\t\t\t(backend_domid %d)\n", d_config->disks[i].backend_domid);
-        printf("\t\t\t(frontend_domid %d)\n", domid);
-        printf("\t\t\t(physpath %s)\n", d_config->disks[i].pdev_path);
-        printf("\t\t\t(phystype %d)\n", d_config->disks[i].backend);
-        printf("\t\t\t(virtpath %s)\n", d_config->disks[i].vdev);
-        printf("\t\t\t(unpluggable %d)\n", d_config->disks[i].removable);
-        printf("\t\t\t(readwrite %d)\n", d_config->disks[i].readwrite);
-        printf("\t\t\t(is_cdrom %d)\n", d_config->disks[i].is_cdrom);
-        printf("\t\t)\n");
-        printf("\t)\n");
-    }
-
-    for (i = 0; i < d_config->num_vifs; i++) {
-        printf("\t(device\n");
-        printf("\t\t(vif\n");
-        if (d_config->vifs[i].ifname)
-            printf("\t\t\t(vifname %s)\n", d_config->vifs[i].ifname);
-        printf("\t\t\t(backend_domid %d)\n", d_config->vifs[i].backend_domid);
-        printf("\t\t\t(frontend_domid %d)\n", domid);
-        printf("\t\t\t(devid %d)\n", d_config->vifs[i].devid);
-        printf("\t\t\t(mtu %d)\n", d_config->vifs[i].mtu);
-        printf("\t\t\t(model %s)\n", d_config->vifs[i].model);
-        printf("\t\t\t(mac %02x%02x%02x%02x%02x%02x)\n",
-               d_config->vifs[i].mac[0], d_config->vifs[i].mac[1],
-               d_config->vifs[i].mac[2], d_config->vifs[i].mac[3],
-               d_config->vifs[i].mac[4], d_config->vifs[i].mac[5]);
-        printf("\t\t)\n");
-        printf("\t)\n");
-    }
-
-    for (i = 0; i < d_config->num_pcidevs; i++) {
-        printf("\t(device\n");
-        printf("\t\t(pci\n");
-        printf("\t\t\t(pci dev %04x:%02x:%02x.%01x@%02x)\n",
-               d_config->pcidevs[i].domain, d_config->pcidevs[i].bus,
-               d_config->pcidevs[i].dev, d_config->pcidevs[i].func,
-               d_config->pcidevs[i].vdevfn);
-        printf("\t\t\t(opts msitranslate %d power_mgmt %d)\n",
-               d_config->pcidevs[i].msitranslate,
-               d_config->pcidevs[i].power_mgmt);
-        printf("\t\t)\n");
-        printf("\t)\n");
-    }
-
-    for (i = 0; i < d_config->num_vfbs; i++) {
-        printf("\t(device\n");
-        printf("\t\t(vfb\n");
-        printf("\t\t\t(backend_domid %d)\n", d_config->vfbs[i].backend_domid);
-        printf("\t\t\t(frontend_domid %d)\n", domid);
-        printf("\t\t\t(devid %d)\n", d_config->vfbs[i].devid);
-        printf("\t\t\t(vnc %d)\n", d_config->vfbs[i].vnc.enable);
-        printf("\t\t\t(vnclisten %s)\n", d_config->vfbs[i].vnc.listen);
-        printf("\t\t\t(vncdisplay %d)\n", d_config->vfbs[i].vnc.display);
-        printf("\t\t\t(vncunused %d)\n", d_config->vfbs[i].vnc.findunused);
-        printf("\t\t\t(keymap %s)\n", d_config->vfbs[i].keymap);
-        printf("\t\t\t(sdl %d)\n", d_config->vfbs[i].sdl.enable);
-        printf("\t\t\t(opengl %d)\n", d_config->vfbs[i].sdl.opengl);
-        printf("\t\t\t(display %s)\n", d_config->vfbs[i].sdl.display);
-        printf("\t\t\t(xauthority %s)\n", d_config->vfbs[i].sdl.xauthority);
-        printf("\t\t)\n");
-        printf("\t)\n");
-    }
-    printf(")\n");
+    if (ferror(stdout) || fflush(stdout)) { perror("stdout"); exit(-1); }
 }
 
 static int parse_action_on_shutdown(const char *buf, libxl_action_on_shutdown *a)
@@ -682,7 +562,7 @@ static void parse_config_data(const char *configfile_filename_report,
         c_info->hap = l;
 
     if (xlu_cfg_replace_string (config, "name", &c_info->name, 0)) {
-        fprintf(stderr, "Domain name must be specified.");
+        fprintf(stderr, "Domain name must be specified.\n");
         exit(1);
     }
 
@@ -1723,7 +1603,7 @@ static int create_domain(struct domain_create *dom_info)
             dom_info->no_incr_generationid;
 
     if (debug || dom_info->dryrun)
-        printf_info(-1, &d_config);
+        printf_info(default_output_format, -1, &d_config);
 
     ret = 0;
     if (dom_info->dryrun)
@@ -2525,7 +2405,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         CHK_ERRNO(asprintf(&config_file, "<domid %d data>", info[i].domid));
         memset(&d_config, 0x00, sizeof(d_config));
         parse_config_data(config_file, (char *)data, len, &d_config);
-        printf_info(info[i].domid, &d_config);
+        printf_info(default_output_format, info[i].domid, &d_config);
         libxl_domain_config_dispose(&d_config);
         free(data);
         free(config_file);

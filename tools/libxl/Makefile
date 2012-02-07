@@ -66,7 +66,7 @@ $(LIBXLU_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 
 CLIENTS = xl testidl
 
-XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o
+XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o xl_sxp.o
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenlight)
 

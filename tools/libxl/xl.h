@@ -111,6 +111,14 @@ extern int dryrun_only;
 extern char *lockfile;
 extern char *default_vifscript;
 
+enum output_format {
+    OUTPUT_FORMAT_JSON,
+    OUTPUT_FORMAT_SXP,
+};
+extern enum output_format default_output_format;
+
+extern void printf_info_sexp(int domid, libxl_domain_config *d_config);
+
 #endif /* XL_H */
 
 /*
