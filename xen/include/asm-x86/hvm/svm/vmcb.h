@@ -516,6 +516,12 @@ struct arch_svm_struct {
     
     /* AMD lightweight profiling MSR */
     uint64_t guest_lwp_cfg;
+
+    /* OSVW MSRs */
+    struct {
+        u64 length;
+        u64 status;
+    } osvw;
 };
 
 struct vmcb_struct *alloc_vmcb(void);

@@ -69,6 +69,7 @@ void arch_dump_domain_info(struct domain *d);
 
 void arch_vcpu_reset(struct vcpu *v);
 
+extern spinlock_t vcpu_alloc_lock;
 bool_t domctl_lock_acquire(void);
 void domctl_lock_release(void);
 

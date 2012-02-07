@@ -83,6 +83,10 @@ static DEFINE_PER_CPU_READ_MOSTLY(void *, root_vmcb);
 
 static bool_t amd_erratum383_found __read_mostly;
 
+/* OSVW bits */
+static uint64_t osvw_length, osvw_status;
+static DEFINE_SPINLOCK(osvw_lock);
+
 void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len)
 {
     struct vcpu *curr = current;
@@ -902,6 +906,69 @@ static void svm_do_resume(struct vcpu *v)
     reset_stack_and_jump(svm_asm_do_resume);
 }
 
+static void svm_guest_osvw_init(struct vcpu *vcpu)
+{
+    if ( boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
+        return;
+
+    /*
+     * Guests should see errata 400 and 415 as fixed (assuming that
+     * HLT and IO instructions are intercepted).
+     */
+    vcpu->arch.hvm_svm.osvw.length = (osvw_length >= 3) ? osvw_length : 3;
+    vcpu->arch.hvm_svm.osvw.status = osvw_status & ~(6ULL);
+
+    /*
+     * By increasing VCPU's osvw.length to 3 we are telling the guest that
+     * all osvw.status bits inside that length, including bit 0 (which is
+     * reserved for erratum 298), are valid. However, if host processor's
+     * osvw_len is 0 then osvw_status[0] carries no information. We need to
+     * be conservative here and therefore we tell the guest that erratum 298
+     * is present (because we really don't know).
+     */
+    if ( osvw_length == 0 && boot_cpu_data.x86 == 0x10 )
+        vcpu->arch.hvm_svm.osvw.status |= 1;
+}
+
+void svm_host_osvw_reset()
+{
+    spin_lock(&osvw_lock);
+
+    osvw_length = 64; /* One register (MSRC001_0141) worth of errata */
+    osvw_status = 0;
+
+    spin_unlock(&osvw_lock);
+}
+
+void svm_host_osvw_init()
+{
+    spin_lock(&osvw_lock);
+
+    /*
+     * Get OSVW bits. If bits are not the same on different processors then
+     * choose the worst case (i.e. if erratum is present on one processor and
+     * not on another assume that the erratum is present everywhere).
+     */
+    if ( test_bit(X86_FEATURE_OSVW, &boot_cpu_data.x86_capability) )
+    {
+        uint64_t len, status;
+
+        if ( rdmsr_safe(MSR_AMD_OSVW_ID_LENGTH, len) ||
+             rdmsr_safe(MSR_AMD_OSVW_STATUS, status) )
+            len = status = 0;
+
+        if (len < osvw_length)
+            osvw_length = len;
+
+        osvw_status |= status;
+        osvw_status &= (1ULL << osvw_length) - 1;
+    }
+    else
+        osvw_length = osvw_status = 0;
+
+    spin_unlock(&osvw_lock);
+}
+
 static int svm_domain_initialise(struct domain *d)
 {
     return 0;
@@ -930,6 +997,9 @@ static int svm_vcpu_initialise(struct vcpu *v)
     }
 
     vpmu_initialise(v);
+
+    svm_guest_osvw_init(v);
+
     return 0;
 }
 
@@ -1044,6 +1114,27 @@ static void svm_init_erratum_383(struct cpuinfo_x86 *c)
     }
 }
 
+static int svm_handle_osvw(struct vcpu *v, uint32_t msr, uint64_t *val, bool_t read)
+{
+    uint eax, ebx, ecx, edx;
+
+    /* Guest OSVW support */
+    hvm_cpuid(0x80000001, &eax, &ebx, &ecx, &edx);
+    if ( !test_bit((X86_FEATURE_OSVW & 31), &ecx) )
+        return -1;
+
+    if ( read )
+    {
+        if (msr == MSR_AMD_OSVW_ID_LENGTH)
+            *val = v->arch.hvm_svm.osvw.length;
+        else
+            *val = v->arch.hvm_svm.osvw.status;
+    }
+    /* Writes are ignored */
+
+    return 0;
+}
+
 static int svm_cpu_up(void)
 {
     uint64_t msr_content;
@@ -1094,6 +1185,9 @@ static int svm_cpu_up(void)
     }
 #endif
 
+    /* Initialize OSVW bits to be used by guests */
+    svm_host_osvw_init();
+
     return 0;
 }
 
@@ -1103,6 +1197,8 @@ struct hvm_function_table * __init start_svm(void)
 
     if ( !test_bit(X86_FEATURE_SVM, &boot_cpu_data.x86_capability) )
         return NULL;
+
+    svm_host_osvw_reset();
 
     if ( svm_cpu_up() )
     {
@@ -1388,6 +1484,13 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         vpmu_do_rdmsr(msr, msr_content);
         break;
 
+    case MSR_AMD_OSVW_ID_LENGTH:
+    case MSR_AMD_OSVW_STATUS:
+        ret = svm_handle_osvw(v, msr, msr_content, 1);
+        if ( ret < 0 )
+            goto gpf;
+        break;
+
     default:
         ret = nsvm_rdmsr(v, msr, msr_content);
         if ( ret < 0 )
@@ -1510,6 +1613,13 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
          * all write accesses. This behaviour matches real HW, so guests should
          * have no problem with this.
          */
+        break;
+
+    case MSR_AMD_OSVW_ID_LENGTH:
+    case MSR_AMD_OSVW_STATUS:
+        ret = svm_handle_osvw(v, msr, &msr_content, 0);
+        if ( ret < 0 )
+            goto gpf;
         break;
 
     default:

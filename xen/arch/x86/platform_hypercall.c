@@ -166,7 +166,23 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             break;
 
         guest_from_compat_handle(data, op->u.microcode.data);
+
+        /*
+         * alloc_vcpu() will access data which is modified during
+         * microcode update
+         */
+        while ( !spin_trylock(&vcpu_alloc_lock) )
+        {
+            if ( hypercall_preempt_check() )
+            {
+                ret = hypercall_create_continuation(
+                    __HYPERVISOR_platform_op, "h", u_xenpf_op);
+                goto out;
+            }
+        }
+
         ret = microcode_update(data, op->u.microcode.length);
+        spin_unlock(&vcpu_alloc_lock);
     }
     break;
 

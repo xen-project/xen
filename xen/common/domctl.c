@@ -29,6 +29,7 @@
 #include <xsm/xsm.h>
 
 static DEFINE_SPINLOCK(domctl_lock);
+DEFINE_SPINLOCK(vcpu_alloc_lock);
 
 int cpumask_to_xenctl_cpumap(
     struct xenctl_cpumap *xenctl_cpumap, const cpumask_t *cpumask)
@@ -506,6 +507,20 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         /* Needed, for example, to ensure writable p.t. state is synced. */
         domain_pause(d);
 
+        /*
+         * Certain operations (e.g. CPU microcode updates) modify data which is
+         * used during VCPU allocation/initialization
+         */
+        while ( !spin_trylock(&vcpu_alloc_lock) )
+        {
+            if ( hypercall_preempt_check() )
+            {
+                ret =  hypercall_create_continuation(
+                    __HYPERVISOR_domctl, "h", u_domctl);
+                goto maxvcpu_out_novcpulock;
+            }
+        }
+
         /* We cannot reduce maximum VCPUs. */
         ret = -EINVAL;
         if ( (max < d->max_vcpus) && (d->vcpu[max] != NULL) )
@@ -555,6 +570,9 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         ret = 0;
 
     maxvcpu_out:
+        spin_unlock(&vcpu_alloc_lock);
+
+    maxvcpu_out_novcpulock:
         domain_unpause(d);
         rcu_unlock_domain(d);
     }

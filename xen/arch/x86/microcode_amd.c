@@ -25,6 +25,7 @@
 #include <asm/msr.h>
 #include <asm/processor.h>
 #include <asm/microcode.h>
+#include <asm/hvm/svm/svm.h>
 
 struct equiv_cpu_entry {
     uint32_t installed_cpu;
@@ -71,6 +72,7 @@ struct mpbhdr {
 /* serialize access to the physical write */
 static DEFINE_SPINLOCK(microcode_update_lock);
 
+/* See comment in start_update() for cases when this routine fails */
 static int collect_cpu_info(int cpu, struct cpu_signature *csig)
 {
     struct cpuinfo_x86 *c = &cpu_data[cpu];
@@ -287,7 +289,8 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
     {
         printk(KERN_ERR "microcode: error! Wrong "
                "microcode patch file magic\n");
-        return -EINVAL;
+        error = -EINVAL;
+        goto out;
     }
 
     mc_amd = xmalloc(struct microcode_amd);
@@ -295,7 +298,8 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
     {
         printk(KERN_ERR "microcode: error! "
                "Can not allocate memory for microcode patch\n");
-        return -ENOMEM;
+        error = -ENOMEM;
+        goto out;
     }
 
     error = install_equiv_cpu_table(mc_amd, buf, &offset);
@@ -303,7 +307,8 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
     {
         xfree(mc_amd);
         printk(KERN_ERR "microcode: installing equivalent cpu table failed\n");
-        return -EINVAL;
+        error = -EINVAL;
+        goto out;
     }
 
     mc_old = uci->mc.mc_amd;
@@ -337,13 +342,19 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
     /* On success keep the microcode patch for
      * re-apply on resume.
      */
-    if (error == 1)
+    if ( error == 1 )
     {
         xfree(mc_old);
-        return 0;
+        error = 0;
     }
-    xfree(mc_amd);
-    uci->mc.mc_amd = mc_old;
+    else
+    {
+        xfree(mc_amd);
+        uci->mc.mc_amd = mc_old;
+    }
+
+  out:
+    svm_host_osvw_init();
 
     return error;
 }
@@ -395,11 +406,28 @@ err1:
     return -ENOMEM;
 }
 
+static int start_update(void)
+{
+    /*
+     * We assume here that svm_host_osvw_init() will be called on each cpu (from
+     * cpu_request_microcode()).
+     *
+     * Note that if collect_cpu_info() returns an error then
+     * cpu_request_microcode() will not invoked thus leaving OSVW bits not
+     * updated. Currently though collect_cpu_info() will not fail on processors
+     * supporting OSVW so we will not deal with this possibility.
+     */
+    svm_host_osvw_reset();
+
+    return 0;
+}
+
 static const struct microcode_ops microcode_amd_ops = {
     .microcode_resume_match           = microcode_resume_match,
     .cpu_request_microcode            = cpu_request_microcode,
     .collect_cpu_info                 = collect_cpu_info,
     .apply_microcode                  = apply_microcode,
+    .start_update                     = start_update,
 };
 
 static __init int microcode_init_amd(void)

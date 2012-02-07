@@ -98,4 +98,7 @@ extern u32 svm_feature_flags;
                                   ~TSC_RATIO_RSVD_BITS )
 #define vcpu_tsc_ratio(v)       TSC_RATIO((v)->domain->arch.tsc_khz, cpu_khz)
 
+extern void svm_host_osvw_reset(void);
+extern void svm_host_osvw_init(void);
+
 #endif /* __ASM_X86_HVM_SVM_H__ */

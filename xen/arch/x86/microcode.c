@@ -218,6 +218,16 @@ int microcode_update(XEN_GUEST_HANDLE(const_void) buf, unsigned long len)
     info->error = 0;
     info->cpu = cpumask_first(&cpu_online_map);
 
+    if ( microcode_ops->start_update )
+    {
+        ret = microcode_ops->start_update();
+        if ( ret != 0 )
+        {
+            xfree(info);
+            return ret;
+        }
+    }
+
     return continue_hypercall_on_cpu(info->cpu, do_microcode_update, info);
 }
 
@@ -239,6 +249,12 @@ static int __init microcode_init(void)
     data = ucode_mod_map(&ucode_mod);
     if ( !data )
         return -ENOMEM;
+
+    if ( microcode_ops->start_update && microcode_ops->start_update() != 0 )
+    {
+        ucode_mod_map(NULL);
+        return 0;
+    }
 
     softirq_tasklet_init(&tasklet, _do_microcode_update, (unsigned long)data);
 

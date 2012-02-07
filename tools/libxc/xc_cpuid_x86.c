@@ -108,6 +108,7 @@ static void amd_xc_cpuid_policy(
                     bitmaskof(X86_FEATURE_SSE4A) |
                     bitmaskof(X86_FEATURE_MISALIGNSSE) |
                     bitmaskof(X86_FEATURE_3DNOWPREFETCH) |
+                    bitmaskof(X86_FEATURE_OSVW) |
                     bitmaskof(X86_FEATURE_XOP) |
                     bitmaskof(X86_FEATURE_FMA4) |
                     bitmaskof(X86_FEATURE_TBM) |
