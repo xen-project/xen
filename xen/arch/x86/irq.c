@@ -608,6 +608,8 @@ void move_native_irq(struct irq_desc *desc)
     desc->handler->enable(desc);
 }
 
+static void dump_irqs(unsigned char key);
+
 fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
 {
     unsigned vector, me;
@@ -667,7 +669,18 @@ fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
 
             if ( desc->arch.used_vectors )
             {
-                ASSERT(test_bit(vector, desc->arch.used_vectors));
+                if ( unlikely(!test_bit(vector, desc->arch.used_vectors)) )
+                {
+                    bitmap_scnlistprintf(keyhandler_scratch,
+                                         sizeof(keyhandler_scratch),
+                                         desc->arch.used_vectors->_bits,
+                                         NR_VECTORS);
+                    printk("*** IRQ BUG found ***\n"
+                           "CPU%d -Testing vector %d from bitmap %s\n",
+                           me, vector, keyhandler_scratch);
+                    dump_irqs('i');
+                    BUG();
+                }
                 clear_bit(vector, desc->arch.used_vectors);
             }
         }
