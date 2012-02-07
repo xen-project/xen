@@ -5585,11 +5585,9 @@ int main_cpupoollist(int argc, char **argv)
     int option_index = 0;
     static struct option long_options[] = {
         {"help", 0, 0, 'h'},
-        {"long", 0, 0, 'l'},
         {"cpus", 0, 0, 'c'},
         {0, 0, 0, 0}
     };
-    int opt_long = 0;
     int opt_cpus = 0;
     const char *pool = NULL;
     libxl_cpupoolinfo *poolinfo;
@@ -5599,7 +5597,7 @@ int main_cpupoollist(int argc, char **argv)
     int ret = 0;
 
     while (1) {
-        opt = getopt_long(argc, argv, "hlc", long_options, &option_index);
+        opt = getopt_long(argc, argv, "hc", long_options, &option_index);
         if (opt == -1)
             break;
 
@@ -5607,9 +5605,6 @@ int main_cpupoollist(int argc, char **argv)
         case 'h':
             help("cpupool-list");
             return 0;
-        case 'l':
-            opt_long = 1;
-            break;
         case 'c':
             opt_cpus = 1;
             break;
