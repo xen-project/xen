@@ -39,6 +39,8 @@ struct mmio_handler {
     mmio_write_t write_handler;
 };
 
+extern const struct mmio_handler vgic_distr_mmio_handler;
+
 extern int handle_mmio(mmio_info_t *info);
 
 #endif

@@ -121,6 +121,9 @@
 #define GICH_LR_CPUID_SHIFT     9
 #define GICH_VTR_NRLRGS         0x3f
 
+extern int domain_vgic_init(struct domain *d);
+extern int vcpu_vgic_init(struct vcpu *v);
+extern void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq,int virtual);
 extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
 
 extern void gic_route_irqs(void);

@@ -136,7 +136,8 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq)
 
         desc->status |= IRQ_INPROGRESS;
 
-        /* XXX: inject irq into the guest */
+        /* XXX: inject irq into all guest vcpus */
+        vgic_vcpu_inject_irq(d->vcpu[0], irq, 0);
         goto out_no_end;
     }
 

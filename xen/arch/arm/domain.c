@@ -212,6 +212,9 @@ int vcpu_initialise(struct vcpu *v)
 {
     int rc = 0;
 
+    if ( (rc = vcpu_vgic_init(v)) != 0 )
+        return rc;
+
     return rc;
 }
 
@@ -229,6 +232,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         goto fail;
 
     d->max_vcpus = 8;
+
+    if ( (rc = domain_vgic_init(d)) != 0 )
+        goto fail;
 
     rc = 0;
 fail:
