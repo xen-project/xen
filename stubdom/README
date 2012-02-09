@@ -10,25 +10,26 @@ Due to a race between the creation of the IOEMU stubdomain itself and allocation
 of video memory for the HVM domain, you need to avoid the need for ballooning,
 by using the hypervisor dom0_mem= option for instance.
 
+Using with XL
+-------------
+
+The enable IOEMU stub domains set the following in your domain
+config:
+
+    device_model_stubdomain_override = 1
+
+See xl.cfg(5) for more details of the xl domain configuration syntax
+and http://wiki.xen.org/wiki/Device_Model_Stub_Domains for more
+information on device model stub domains
+
+Using with XM/xend
+------------------
 
 There is a sample configuration set in xmexample.hvm-stubdom
 
 In your HVM config "hvmconfig" use stubdom-dm as dm script:
 
 device_model = 'stubdom-dm'
-
-
-To run
-======
-
-mkdir -p /exports/usr/share/xen/qemu
-ln -s /usr/share/xen/qemu/keymaps /exports/usr/share/xen/qemu
-mkdir -p /exports/var/lib
-ln -s /var/lib/xen /exports/var/lib
-/usr/sbin/fs-backend &
-
-xm create hvmconfig
-
 
 
                                    PV-GRUB
