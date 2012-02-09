@@ -10,6 +10,7 @@
 #include <xen/mm.h>
 #include <xen/domain_page.h>
 #include <xen/sched.h>
+#include <asm/byteorder.h>
 
 #include "kernel.h"
 
@@ -22,6 +23,40 @@
 #define ZIMAGE_END_OFFSET   0x2c
 
 #define ZIMAGE_MAGIC 0x016f2818
+
+struct minimal_dtb_header {
+    uint32_t magic;
+    uint32_t total_size;
+    /* There are other fields but we don't use them yet. */
+};
+
+#define DTB_MAGIC 0xd00dfeed
+
+static void copy_from_flash(void *dst, paddr_t flash, unsigned long len)
+{
+    void *src = (void *)FIXMAP_ADDR(FIXMAP_MISC);
+
+    printk("Copying %#lx bytes from flash %"PRIpaddr" to %p",
+           len, flash, dst);
+
+    while (len) {
+        paddr_t p;
+        unsigned long l, s;
+
+        p = flash >> PAGE_SHIFT;
+        s = flash & (PAGE_SIZE-1);
+        l = min(PAGE_SIZE - s, len);
+
+        set_fixmap(FIXMAP_MISC, p, DEV_SHARED);
+        memcpy(dst, src + s, l);
+
+        flash += l;
+        dst += l;
+        len -= l;
+    }
+
+    clear_fixmap(FIXMAP_MISC);
+}
 
 static void kernel_zimage_load(struct kernel_info *info)
 {
@@ -58,6 +93,7 @@ static int kernel_try_zimage_prepare(struct kernel_info *info)
 {
     uint32_t *zimage = (void *)FIXMAP_ADDR(FIXMAP_MISC);
     uint32_t start, end;
+    struct minimal_dtb_header dtb_hdr;
 
     set_fixmap(FIXMAP_MISC, KERNEL_FLASH_ADDRESS >> PAGE_SHIFT, DEV_SHARED);
 
@@ -68,6 +104,14 @@ static int kernel_try_zimage_prepare(struct kernel_info *info)
     end = zimage[ZIMAGE_END_OFFSET/4];
 
     clear_fixmap(FIXMAP_MISC);
+
+    /*
+     * Check for an appended DTB.
+     */
+    copy_from_flash(&dtb_hdr, KERNEL_FLASH_ADDRESS + end - start, sizeof(dtb_hdr));
+    if (be32_to_cpu(dtb_hdr.magic) == DTB_MAGIC) {
+        end += be32_to_cpu(dtb_hdr.total_size);
+    }
 
     /* FIXME: get RAM location from appended DTB (if there is one)? */
 
@@ -95,25 +139,6 @@ static void kernel_elf_load(struct kernel_info *info)
 
     printk("Free temporary kernel buffer\n");
     free_xenheap_pages(info->kernel_img, info->kernel_order);
-}
-
-static void copy_from_flash(void *dst, paddr_t flash, unsigned long len)
-{
-    void *src = (void *)FIXMAP_ADDR(FIXMAP_MISC);
-    unsigned long offs;
-
-    printk("Copying %#lx bytes from flash %"PRIpaddr" to %p-%p: [",
-           len, flash, dst, dst+(1<<23));
-    for ( offs = 0; offs < len ; offs += PAGE_SIZE )
-    {
-        if ( ( offs % (1<<20) ) == 0 )
-            printk(".");
-        set_fixmap(FIXMAP_MISC, (flash+offs) >> PAGE_SHIFT, DEV_SHARED);
-        memcpy(dst+offs, src, PAGE_SIZE);
-    }
-    printk("]\n");
-
-    clear_fixmap(FIXMAP_MISC);
 }
 
 static int kernel_try_elf_prepare(struct kernel_info *info)
