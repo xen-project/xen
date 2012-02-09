@@ -35,7 +35,7 @@
 #include <xen/grant_table.h>
 
 static xc_interface **xc_handle;
-static xc_gnttab **xcg_handle;
+xc_gnttab **xcg_handle;
 static evtchn_port_t virq_port;
 
 xc_evtchn *xce_handle = NULL;

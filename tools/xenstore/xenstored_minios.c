@@ -46,15 +46,17 @@ void xenbus_notify_running(void)
 
 evtchn_port_t xenbus_evtchn(void)
 {
-	return -1;
+	return dom0_event;
 }
 
 void *xenbus_map(void)
 {
-	return NULL;
+	return xc_gnttab_map_grant_ref(*xcg_handle, 0,
+			GNTTAB_RESERVED_XENSTORE, PROT_READ|PROT_WRITE);
 }
 
 void unmap_xenbus(void *interface)
 {
+	xc_gnttab_munmap(*xcg_handle, interface, 1);
 }
 

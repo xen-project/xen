@@ -168,6 +168,7 @@ void trace(const char *fmt, ...);
 void dtrace_io(const struct connection *conn, const struct buffered_data *data, int out);
 
 extern int event_fd;
+extern int dom0_event;
 
 /* Map the kernel's xenstore page. */
 void *xenbus_map(void);
@@ -189,6 +190,8 @@ void finish_daemonize(void);
 
 /* Open a pipe for signal handling */
 void init_pipe(int reopen_log_pipe[2]);
+
+xc_gnttab **xcg_handle;
 
 #endif /* _XENSTORED_CORE_H */
 

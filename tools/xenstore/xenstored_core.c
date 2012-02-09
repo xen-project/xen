@@ -1749,6 +1749,7 @@ static struct option options[] = {
 	{ "no-domain-init", 0, NULL, 'D' },
 	{ "entry-nb", 1, NULL, 'E' },
 	{ "pid-file", 1, NULL, 'F' },
+	{ "event", 1, NULL, 'e' },
 	{ "help", 0, NULL, 'H' },
 	{ "no-fork", 0, NULL, 'N' },
 	{ "output-pid", 0, NULL, 'P' },
@@ -1763,6 +1764,7 @@ static struct option options[] = {
 	{ NULL, 0, NULL, 0 } };
 
 extern void dump_conn(struct connection *conn); 
+int dom0_event = 0;
 
 int main(int argc, char *argv[])
 {
@@ -1819,6 +1821,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'W':
 			quota_nb_watch_per_domain = strtol(optarg, NULL, 10);
+			break;
+		case 'e':
+			dom0_event = strtol(optarg, NULL, 10);
 			break;
 		}
 	}
