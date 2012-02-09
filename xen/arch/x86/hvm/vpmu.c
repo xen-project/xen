@@ -86,7 +86,7 @@ void vpmu_initialise(struct vcpu *v)
     if ( !opt_vpmu_enabled )
         return;
 
-    if ( vpmu->flags & VPMU_CONTEXT_ALLOCATED )
+    if ( vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
         vpmu_destroy(v);
 
     switch ( vendor )
@@ -110,7 +110,7 @@ void vpmu_initialise(struct vcpu *v)
 
     if ( vpmu->arch_vpmu_ops != NULL )
     {
-        vpmu->flags = 0;
+        vpmu_clear(vpmu);
         vpmu->context = NULL;
         vpmu->arch_vpmu_ops->arch_vpmu_initialise(v);
     }

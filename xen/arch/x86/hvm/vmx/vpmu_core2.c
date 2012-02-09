@@ -266,17 +266,17 @@ static void core2_vpmu_save(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    if ( !((vpmu->flags & VPMU_CONTEXT_ALLOCATED) &&
-           (vpmu->flags & VPMU_CONTEXT_LOADED)) )
+    if ( !(vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) &&
+           vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED)) )
         return;
 
     __core2_vpmu_save(v);
 
     /* Unset PMU MSR bitmap to trap lazy load. */
-    if ( !(vpmu->flags & VPMU_RUNNING) && cpu_has_vmx_msr_bitmap )
+    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) && cpu_has_vmx_msr_bitmap )
         core2_vpmu_unset_msr_bitmap(v->arch.hvm_vmx.msr_bitmap);
 
-    vpmu->flags &= ~VPMU_CONTEXT_LOADED;
+    vpmu_reset(vpmu, VPMU_CONTEXT_LOADED);
     return;
 }
 
@@ -303,11 +303,11 @@ static void core2_vpmu_load(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
     /* Only when PMU is counting, we load PMU context immediately. */
-    if ( !((vpmu->flags & VPMU_CONTEXT_ALLOCATED) &&
-           (vpmu->flags & VPMU_RUNNING)) )
+    if ( !(vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) &&
+           vpmu_is_set(vpmu, VPMU_RUNNING)) )
         return;
     __core2_vpmu_load(v);
-    vpmu->flags |= VPMU_CONTEXT_LOADED;
+    vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
 }
 
 static int core2_vpmu_alloc_resource(struct vcpu *v)
@@ -373,17 +373,17 @@ static int core2_vpmu_msr_common_check(u32 msr_index, int *type, int *index)
     if ( !is_core2_vpmu_msr(msr_index, type, index) )
         return 0;
 
-    if ( unlikely(!(vpmu->flags & VPMU_CONTEXT_ALLOCATED)) &&
+    if ( unlikely(!vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED)) &&
 	 (vpmu->context != NULL ||
 	  !core2_vpmu_alloc_resource(current)) )
         return 0;
-    vpmu->flags |= VPMU_CONTEXT_ALLOCATED;
+    vpmu_set(vpmu, VPMU_CONTEXT_ALLOCATED);
 
     /* Do the lazy load staff. */
-    if ( !(vpmu->flags & VPMU_CONTEXT_LOADED) )
+    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
     {
         __core2_vpmu_load(current);
-        vpmu->flags |= VPMU_CONTEXT_LOADED;
+        vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
         if ( cpu_has_vmx_msr_bitmap )
             core2_vpmu_set_msr_bitmap(current->arch.hvm_vmx.msr_bitmap);
     }
@@ -467,12 +467,12 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
     for ( i = 0; i < core2_get_pmc_count(); i++ )
         pmu_enable |= core2_vpmu_cxt->pmu_enable->arch_pmc_enable[i];
     if ( pmu_enable )
-        vpmu->flags |= VPMU_RUNNING;
+        vpmu_set(vpmu, VPMU_RUNNING);
     else
-        vpmu->flags &= ~VPMU_RUNNING;
+        vpmu_reset(vpmu, VPMU_RUNNING);
 
     /* Setup LVTPC in local apic */
-    if ( vpmu->flags & VPMU_RUNNING &&
+    if ( vpmu_is_set(vpmu, VPMU_RUNNING) &&
          is_vlapic_lvtpc_enabled(vcpu_vlapic(v)) )
         apic_write_around(APIC_LVTPC, PMU_APIC_VECTOR);
     else
@@ -588,14 +588,14 @@ static void core2_vpmu_destroy(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct core2_vpmu_context *core2_vpmu_cxt = vpmu->context;
 
-    if ( !(vpmu->flags & VPMU_CONTEXT_ALLOCATED) )
+    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
         return;
     xfree(core2_vpmu_cxt->pmu_enable);
     xfree(vpmu->context);
     if ( cpu_has_vmx_msr_bitmap )
         core2_vpmu_unset_msr_bitmap(v->arch.hvm_vmx.msr_bitmap);
     release_pmu_ownship(PMU_OWNER_HVM);
-    vpmu->flags &= ~VPMU_CONTEXT_ALLOCATED;
+    vpmu_reset(vpmu, VPMU_CONTEXT_ALLOCATED);
 }
 
 struct arch_vpmu_ops core2_vpmu_ops = {

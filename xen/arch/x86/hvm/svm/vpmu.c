@@ -188,8 +188,8 @@ static void amd_vpmu_restore(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct amd_vpmu_context *ctxt = vpmu->context;
 
-    if ( !((vpmu->flags & VPMU_CONTEXT_ALLOCATED) &&
-           (vpmu->flags & VPMU_RUNNING)) )
+    if ( !(vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) &&
+           vpmu_is_set(vpmu, VPMU_RUNNING)) )
         return;
 
     context_restore(v);
@@ -214,8 +214,8 @@ static void amd_vpmu_save(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct amd_vpmu_context *ctx = vpmu->context;
 
-    if ( !((vpmu->flags & VPMU_CONTEXT_ALLOCATED) &&
-           (vpmu->flags & VPMU_RUNNING)) )
+    if ( !(vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) &&
+           vpmu_is_set(vpmu, VPMU_RUNNING)) )
         return;
 
     context_save(v);
@@ -261,20 +261,20 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
 
     /* check if the first counter is enabled */
     if ( (get_pmu_reg_type(msr) == MSR_TYPE_CTRL) &&
-        is_pmu_enabled(msr_content) && !(vpmu->flags & VPMU_RUNNING) )
+        is_pmu_enabled(msr_content) && !vpmu_is_set(vpmu, VPMU_RUNNING) )
     {
         if ( !acquire_pmu_ownership(PMU_OWNER_HVM) )
             return 1;
-        vpmu->flags |= VPMU_RUNNING;
+        vpmu_set(vpmu, VPMU_RUNNING);
         apic_write(APIC_LVTPC, PMU_APIC_VECTOR);
     }
 
     /* stop saving & restore if guest stops first counter */
-    if ( (get_pmu_reg_type(msr) == MSR_TYPE_CTRL) && 
-        (is_pmu_enabled(msr_content) == 0) && (vpmu->flags & VPMU_RUNNING) )
+    if ( (get_pmu_reg_type(msr) == MSR_TYPE_CTRL) &&
+        (is_pmu_enabled(msr_content) == 0) && vpmu_is_set(vpmu, VPMU_RUNNING) )
     {
         apic_write(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
-        vpmu->flags &= ~VPMU_RUNNING;
+        vpmu_reset(vpmu, VPMU_RUNNING);
         release_pmu_ownship(PMU_OWNER_HVM);
     }
 
@@ -298,7 +298,7 @@ static void amd_vpmu_initialise(struct vcpu *v)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t family = current_cpu_data.x86;
 
-    if ( vpmu->flags & VPMU_CONTEXT_ALLOCATED )
+    if ( vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
         return;
 
     if ( counters == NULL )
@@ -333,22 +333,22 @@ static void amd_vpmu_initialise(struct vcpu *v)
     }
 
     vpmu->context = (void *)ctxt;
-    vpmu->flags |= VPMU_CONTEXT_ALLOCATED;
+    vpmu_set(vpmu, VPMU_CONTEXT_ALLOCATED);
 }
 
 static void amd_vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    if ( !(vpmu->flags & VPMU_CONTEXT_ALLOCATED) )
+    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
         return;
 
     xfree(vpmu->context);
-    vpmu->flags &= ~VPMU_CONTEXT_ALLOCATED;
+    vpmu_reset(vpmu, VPMU_CONTEXT_ALLOCATED);
 
-    if ( vpmu->flags & VPMU_RUNNING )
+    if ( vpmu_is_set(vpmu, VPMU_RUNNING) )
     {
-        vpmu->flags &= ~VPMU_RUNNING;
+        vpmu_reset(vpmu, VPMU_RUNNING);
         release_pmu_ownship(PMU_OWNER_HVM);
     }
 }

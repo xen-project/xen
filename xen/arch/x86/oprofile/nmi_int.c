@@ -47,7 +47,7 @@ static int passive_domain_msr_op_checks(unsigned int msr, int *typep, int *index
 	if ( !model->is_arch_pmu_msr(msr, typep, indexp) )
 		return 0;
 
-	if ( !(vpmu->flags & PASSIVE_DOMAIN_ALLOCATED) )
+	if ( !vpmu_is_set(vpmu, PASSIVE_DOMAIN_ALLOCATED) )
 		if ( ! model->allocated_msr(current) )
 			return 0;
 	return 1;
@@ -78,7 +78,7 @@ int passive_domain_do_wrmsr(unsigned int msr, uint64_t msr_content)
 void passive_domain_destroy(struct vcpu *v)
 {
 	struct vpmu_struct *vpmu = vcpu_vpmu(v);
-	if ( vpmu->flags & PASSIVE_DOMAIN_ALLOCATED )
+	if ( vpmu_is_set(vpmu, PASSIVE_DOMAIN_ALLOCATED) )
 		model->free_msr(v);
 }
 

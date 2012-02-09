@@ -143,7 +143,7 @@ static int ppro_check_ctrs(unsigned int const cpu,
 			xenoprof_log_event(current, regs, eip, mode, i);
 			wrmsrl(msrs->counters[i].addr, -reset_value[i]);
 			if ( is_passive(current->domain) && (mode != 2) && 
-				(vcpu_vpmu(current)->flags & PASSIVE_DOMAIN_ALLOCATED) ) 
+				vpmu_is_set(vcpu_vpmu(current), PASSIVE_DOMAIN_ALLOCATED) ) 
 			{
 				if ( IS_ACTIVE(msrs_content[i].control) )
 				{
@@ -230,8 +230,8 @@ static int ppro_allocate_msr(struct vcpu *v)
 	if ( !msr_content )
 		goto out;
 	vpmu->context = (void *)msr_content;
-	vpmu->flags = 0;
-	vpmu->flags |= PASSIVE_DOMAIN_ALLOCATED;
+	vpmu_clear(vpmu);
+	vpmu_set(vpmu, PASSIVE_DOMAIN_ALLOCATED);
 	return 1;
 out:
         gdprintk(XENLOG_WARNING, "Insufficient memory for oprofile, oprofile is "
@@ -244,10 +244,10 @@ static void ppro_free_msr(struct vcpu *v)
 {
 	struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-	if ( !(vpmu->flags & PASSIVE_DOMAIN_ALLOCATED) )
+	if ( !vpmu_is_set(vpmu, PASSIVE_DOMAIN_ALLOCATED) )
 		return;
 	xfree(vpmu->context);
-	vpmu->flags &= ~PASSIVE_DOMAIN_ALLOCATED;
+	vpmu_reset(vpmu, PASSIVE_DOMAIN_ALLOCATED);
 }
 
 static void ppro_load_msr(struct vcpu *v, int type, int index, u64 *msr_content)

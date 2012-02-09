@@ -69,6 +69,12 @@ struct vpmu_struct {
 #define VPMU_CONTEXT_LOADED                 0x2
 #define VPMU_RUNNING                        0x4
 #define PASSIVE_DOMAIN_ALLOCATED	    0x8
+
+#define vpmu_set(_vpmu, _x)    ((_vpmu)->flags |= (_x))
+#define vpmu_reset(_vpmu, _x)  ((_vpmu)->flags &= ~(_x))
+#define vpmu_is_set(_vpmu, _x) ((_vpmu)->flags & (_x))
+#define vpmu_clear(_vpmu)      ((_vpmu)->flags = 0)
+
 int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content);
 int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content);
 int vpmu_do_interrupt(struct cpu_user_regs *regs);
