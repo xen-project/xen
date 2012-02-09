@@ -139,6 +139,8 @@ struct ns16550_defaults {
 };
 void ns16550_init(int index, struct ns16550_defaults *defaults);
 
+void pl011_init(int index, unsigned long register_base_address);
+
 /* Baud rate was pre-configured before invoking the UART driver. */
 #define BAUD_AUTO (-1)
 
