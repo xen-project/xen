@@ -397,7 +397,8 @@ static int _set_status_v2(domid_t  domid,
              (id != domid) ||
              (!readonly && (flags & GTF_readonly)) )
         {
-            gnttab_clear_flag(_GTF_reading | _GTF_writing, status);
+            gnttab_clear_flag(_GTF_writing, status);
+            gnttab_clear_flag(_GTF_reading, status);
             PIN_FAIL(done, GNTST_general_error,
                      "Unstable flags (%x) or dom (%d). (expected dom %d) "
                      "(r/w: %d)\n",
@@ -1716,14 +1717,14 @@ __release_grant_for_copy(
    under the domain's grant table lock. */
 /* Only safe on transitive grants.  Even then, note that we don't
    attempt to drop any pin on the referent grant. */
-static void __fixup_status_for_pin(struct active_grant_entry *act,
+static void __fixup_status_for_pin(const struct active_grant_entry *act,
                                    uint16_t *status)
 {
     if ( !(act->pin & GNTPIN_hstw_mask) )
-        *status &= ~_GTF_writing;
+        *status &= ~GTF_writing;
 
     if ( !(act->pin & GNTPIN_hstr_mask) )
-        *status &= ~_GTF_reading;
+        *status &= ~GTF_reading;
 }
 
 /* Grab a frame number from a grant entry and update the flags and pin

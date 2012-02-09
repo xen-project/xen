@@ -5,6 +5,8 @@
 #ifndef __ASM_GRANT_TABLE_H__
 #define __ASM_GRANT_TABLE_H__
 
+#include <asm/intrinsics.h>
+
 #define INITIAL_NR_GRANT_FRAMES 1
 
 // for grant map/unmap
@@ -82,9 +84,19 @@ int guest_physmap_add_page(struct domain *d, unsigned long gpfn, unsigned long m
 
 #define gnttab_mark_dirty(d, f) ((void)f)
 
-static inline void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
+static inline void gnttab_clear_flag(unsigned int nr, volatile uint16_t *st)
 {
-	clear_bit(nr, addr);
+	/*
+	 * Note that this cannot be clear_bit(), as the access must be
+	 * confined to the specified 2 bytes.
+	 */
+	uint16_t mask = ~(1 << nr), old;
+	CMPXCHG_BUGCHECK_DECL
+
+	do {
+		CMPXCHG_BUGCHECK(st);
+		old = *st;
+	} while (cmpxchg_rel(st, old, old & mask) != old);
 }
 
 #define gnttab_host_mapping_get_page_type(op, ld, rd)   \
