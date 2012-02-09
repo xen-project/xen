@@ -343,13 +343,6 @@ static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock,
 	return max;
 }
 
-static int destroy_fd(void *_fd)
-{
-	int *fd = _fd;
-	close(*fd);
-	return 0;
-}
-
 /* Is child a subnode of parent, or equal? */
 bool is_child(const char *child, const char *parent)
 {
@@ -1705,6 +1698,51 @@ static void daemonize(void)
 	umask(0);
 }
 
+static int destroy_fd(void *_fd)
+{
+	int *fd = _fd;
+	close(*fd);
+	return 0;
+}
+
+static void init_sockets(int **psock, int **pro_sock)
+{
+	struct sockaddr_un addr;
+	int *sock, *ro_sock;
+	/* Create sockets for them to listen to. */
+	*psock = sock = talloc(talloc_autofree_context(), int);
+	*sock = socket(PF_UNIX, SOCK_STREAM, 0);
+	if (*sock < 0)
+		barf_perror("Could not create socket");
+	*pro_sock = ro_sock = talloc(talloc_autofree_context(), int);
+	*ro_sock = socket(PF_UNIX, SOCK_STREAM, 0);
+	if (*ro_sock < 0)
+		barf_perror("Could not create socket");
+	talloc_set_destructor(sock, destroy_fd);
+	talloc_set_destructor(ro_sock, destroy_fd);
+
+	/* FIXME: Be more sophisticated, don't mug running daemon. */
+	unlink(xs_daemon_socket());
+	unlink(xs_daemon_socket_ro());
+
+	addr.sun_family = AF_UNIX;
+	strcpy(addr.sun_path, xs_daemon_socket());
+	if (bind(*sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
+		barf_perror("Could not bind socket to %s", xs_daemon_socket());
+	strcpy(addr.sun_path, xs_daemon_socket_ro());
+	if (bind(*ro_sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
+		barf_perror("Could not bind socket to %s",
+			    xs_daemon_socket_ro());
+	if (chmod(xs_daemon_socket(), 0600) != 0
+	    || chmod(xs_daemon_socket_ro(), 0660) != 0)
+		barf_perror("Could not chmod sockets");
+
+	if (listen(*sock, 1) != 0
+	    || listen(*ro_sock, 1) != 0)
+		barf_perror("Could not listen on sockets");
+
+
+}
 
 static void usage(void)
 {
@@ -1753,7 +1791,6 @@ extern void dump_conn(struct connection *conn);
 int main(int argc, char *argv[])
 {
 	int opt, *sock, *ro_sock, max;
-	struct sockaddr_un addr;
 	fd_set inset, outset;
 	bool dofork = true;
 	bool outputpid = false;
@@ -1837,40 +1874,10 @@ int main(int argc, char *argv[])
 	if (!dofork)
 		talloc_enable_leak_report_full();
 
-	/* Create sockets for them to listen to. */
-	sock = talloc(talloc_autofree_context(), int);
-	*sock = socket(PF_UNIX, SOCK_STREAM, 0);
-	if (*sock < 0)
-		barf_perror("Could not create socket");
-	ro_sock = talloc(talloc_autofree_context(), int);
-	*ro_sock = socket(PF_UNIX, SOCK_STREAM, 0);
-	if (*ro_sock < 0)
-		barf_perror("Could not create socket");
-	talloc_set_destructor(sock, destroy_fd);
-	talloc_set_destructor(ro_sock, destroy_fd);
-
 	/* Don't kill us with SIGPIPE. */
 	signal(SIGPIPE, SIG_IGN);
 
-	/* FIXME: Be more sophisticated, don't mug running daemon. */
-	unlink(xs_daemon_socket());
-	unlink(xs_daemon_socket_ro());
-
-	addr.sun_family = AF_UNIX;
-	strcpy(addr.sun_path, xs_daemon_socket());
-	if (bind(*sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
-		barf_perror("Could not bind socket to %s", xs_daemon_socket());
-	strcpy(addr.sun_path, xs_daemon_socket_ro());
-	if (bind(*ro_sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
-		barf_perror("Could not bind socket to %s",
-			    xs_daemon_socket_ro());
-	if (chmod(xs_daemon_socket(), 0600) != 0
-	    || chmod(xs_daemon_socket_ro(), 0660) != 0)
-		barf_perror("Could not chmod sockets");
-
-	if (listen(*sock, 1) != 0
-	    || listen(*ro_sock, 1) != 0)
-		barf_perror("Could not listen on sockets");
+	init_sockets(&sock, &ro_sock);
 
 	if (pipe(reopen_log_pipe)) {
 		barf_perror("pipe");
