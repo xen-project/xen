@@ -106,6 +106,8 @@ static void do_get_hw_residencies(void *arg)
 
     switch ( c->x86_model )
     {
+    /* Ivy bridge */
+    case 0x3A:
     /* Sandy bridge */
     case 0x2A:
     case 0x2D:

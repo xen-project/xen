@@ -623,8 +623,10 @@ int vmx_vpmu_initialise(struct vcpu *v)
         case 26:
         case 29:
         case 42:
+        case 45:
         case 46:
         case 47:
+        case 58:
             vpmu->arch_vpmu_ops = &core2_vpmu_ops;
             return 0;
         }
