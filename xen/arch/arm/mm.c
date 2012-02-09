@@ -311,6 +311,10 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     frametable_virt_end = FRAMETABLE_VIRT_START + (nr_pages * sizeof(struct page_info));
 }
 
+void arch_dump_shared_mem_info(void)
+{
+}
+
 /*
  * Local variables:
  * mode: C
