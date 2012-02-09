@@ -19,6 +19,8 @@ struct irq_cfg {
 
 void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq);
 
+#define domain_pirq_to_irq(d, pirq) (pirq)
+
 #endif /* _ASM_HW_IRQ_H */
 /*
  * Local variables:
