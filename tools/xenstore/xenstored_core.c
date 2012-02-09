@@ -1752,6 +1752,7 @@ static struct option options[] = {
 	{ "event", 1, NULL, 'e' },
 	{ "help", 0, NULL, 'H' },
 	{ "no-fork", 0, NULL, 'N' },
+	{ "priv-domid", 1, NULL, 'p' },
 	{ "output-pid", 0, NULL, 'P' },
 	{ "entry-size", 1, NULL, 'S' },
 	{ "trace-file", 1, NULL, 'T' },
@@ -1765,6 +1766,7 @@ static struct option options[] = {
 
 extern void dump_conn(struct connection *conn); 
 int dom0_event = 0;
+int priv_domid = 0;
 
 int main(int argc, char *argv[])
 {
@@ -1824,6 +1826,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'e':
 			dom0_event = strtol(optarg, NULL, 10);
+			break;
+		case 'p':
+			priv_domid = strtol(optarg, NULL, 10);
 			break;
 		}
 	}

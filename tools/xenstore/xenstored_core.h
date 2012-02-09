@@ -169,6 +169,7 @@ void dtrace_io(const struct connection *conn, const struct buffered_data *data, 
 
 extern int event_fd;
 extern int dom0_event;
+extern int priv_domid;
 
 /* Map the kernel's xenstore page. */
 void *xenbus_map(void);

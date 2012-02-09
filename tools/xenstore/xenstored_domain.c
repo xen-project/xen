@@ -259,7 +259,7 @@ bool domain_can_read(struct connection *conn)
 
 bool domain_is_unprivileged(struct connection *conn)
 {
-	return (conn && conn->domain && conn->domain->domid != 0);
+	return (conn && conn->domain && conn->domain->domid != 0 && conn->domain->domid != priv_domid);
 }
 
 bool domain_can_write(struct connection *conn)
