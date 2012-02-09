@@ -30,11 +30,7 @@
 #include <xen/smp.h>
 #include <public/hvm/save.h>
 
-#if !VIOAPIC_IS_IOSAPIC
 #define VIOAPIC_VERSION_ID 0x11 /* IOAPIC version */
-#else
-#define VIOAPIC_VERSION_ID 0x21 /* IOSAPIC version */
-#endif
 
 #define VIOAPIC_EDGE_TRIG  0
 #define VIOAPIC_LEVEL_TRIG 1

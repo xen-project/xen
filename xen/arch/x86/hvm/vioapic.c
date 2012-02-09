@@ -59,12 +59,10 @@ static unsigned long vioapic_read_indirect(struct hvm_hw_vioapic *vioapic,
                   | (VIOAPIC_VERSION_ID & 0xff));
         break;
 
-#if !VIOAPIC_IS_IOSAPIC
     case VIOAPIC_REG_APIC_ID:
     case VIOAPIC_REG_ARB_ID:
         result = ((vioapic->id & 0xf) << 24);
         break;
-#endif
 
     default:
     {
@@ -179,14 +177,12 @@ static void vioapic_write_indirect(
         /* Writes are ignored. */
         break;
 
-#if !VIOAPIC_IS_IOSAPIC
     case VIOAPIC_REG_APIC_ID:
         vioapic->id = (val >> 24) & 0xf;
         break;
 
     case VIOAPIC_REG_ARB_ID:
         break;
-#endif
 
     default:
     {
@@ -227,7 +223,7 @@ static int vioapic_write(
         vioapic_write_indirect(vioapic, length, val);
         break;
 
-#if VIOAPIC_IS_IOSAPIC
+#if VIOAPIC_VERSION_ID >= 0x20
     case VIOAPIC_REG_EOI:
         vioapic_update_EOI(v->domain, val);
         break;

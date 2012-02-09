@@ -344,12 +344,7 @@ DECLARE_HVM_SAVE_TYPE(PIC, 3, struct hvm_hw_vpic);
  * IO-APIC
  */
 
-#ifdef __ia64__
-#define VIOAPIC_IS_IOSAPIC 1
-#define VIOAPIC_NUM_PINS  24
-#else
 #define VIOAPIC_NUM_PINS  48 /* 16 ISA IRQs, 32 non-legacy PCI IRQS. */
-#endif
 
 struct hvm_hw_vioapic {
     uint64_t base_address;
@@ -368,13 +363,8 @@ struct hvm_hw_vioapic {
             uint8_t trig_mode:1;
             uint8_t mask:1;
             uint8_t reserve:7;
-#if !VIOAPIC_IS_IOSAPIC
             uint8_t reserved[4];
             uint8_t dest_id;
-#else
-            uint8_t reserved[3];
-            uint16_t dest_id;
-#endif
         } fields;
     } redirtbl[VIOAPIC_NUM_PINS];
 };
