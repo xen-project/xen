@@ -21,7 +21,7 @@
 #include <asm/current.h>
 #include <asm/hvm/vpmu.h>
 #include <asm/hvm/vmx/vpmu_core2.h>
- 
+
 #include "op_x86_model.h"
 #include "op_counter.h"
 
@@ -42,7 +42,7 @@ union cpuid10_eax {
 static int num_counters = 2;
 static int counter_width = 32;
 
-#define CTR_OVERFLOWED(n) (!((n) & (1ULL<<(counter_width-1)))) 
+#define CTR_OVERFLOWED(n) (!((n) & (1ULL<<(counter_width-1))))
 
 #define CTRL_READ(msr_content,msrs,c) do {rdmsrl((msrs->controls[(c)].addr), (msr_content));} while (0)
 #define CTRL_WRITE(msr_content,msrs,c) do {wrmsrl((msrs->controls[(c)].addr), (msr_content));} while (0)
@@ -54,11 +54,11 @@ static int counter_width = 32;
 #define CTRL_SET_KERN(val,k) (val |= ((k & 1ULL) << 17))
 #define CTRL_SET_UM(val, m) (val |= (m << 8))
 #define CTRL_SET_EVENT(val, e) (val |= e)
-#define IS_ACTIVE(val) (val & (1ULL << 22) )  
+#define IS_ACTIVE(val) (val & (1ULL << 22) )
 #define IS_ENABLE(val) (val & (1ULL << 20) )
 static unsigned long reset_value[OP_MAX_COUNTER];
 int ppro_has_global_ctrl = 0;
- 
+
 static void ppro_fill_in_addresses(struct op_msrs * const msrs)
 {
 	int i;
@@ -74,7 +74,7 @@ static void ppro_setup_ctrs(struct op_msrs const * const msrs)
 {
 	uint64_t msr_content;
 	int i;
-	
+
 	if (cpu_has_arch_perfmon) {
 		union cpuid10_eax eax;
 		eax.full = cpuid_eax(0xa);
@@ -98,7 +98,7 @@ static void ppro_setup_ctrs(struct op_msrs const * const msrs)
 		CTRL_CLEAR(msr_content);
 		CTRL_WRITE(msr_content, msrs, i);
 	}
-	
+
 	/* avoid a false detection of ctr overflows in NMI handler */
 	for (i = 0; i < num_counters; ++i)
 		wrmsrl(msrs->counters[i].addr, ~0x0ULL);
@@ -142,8 +142,8 @@ static int ppro_check_ctrs(unsigned int const cpu,
 		if (CTR_OVERFLOWED(val)) {
 			xenoprof_log_event(current, regs, eip, mode, i);
 			wrmsrl(msrs->counters[i].addr, -reset_value[i]);
-			if ( is_passive(current->domain) && (mode != 2) && 
-				vpmu_is_set(vcpu_vpmu(current), PASSIVE_DOMAIN_ALLOCATED) ) 
+			if ( is_passive(current->domain) && (mode != 2) &&
+				vpmu_is_set(vcpu_vpmu(current), PASSIVE_DOMAIN_ALLOCATED) )
 			{
 				if ( IS_ACTIVE(msrs_content[i].control) )
 				{
@@ -164,7 +164,7 @@ static int ppro_check_ctrs(unsigned int const cpu,
 	return ovf;
 }
 
- 
+
 static void ppro_start(struct op_msrs const * const msrs)
 {
 	uint64_t msr_content;
@@ -206,7 +206,7 @@ static int ppro_is_arch_pmu_msr(u64 msr_index, int *type, int *index)
 	if ( (msr_index >= MSR_IA32_PERFCTR0) &&
             (msr_index < (MSR_IA32_PERFCTR0 + num_counters)) )
 	{
-        	*type = MSR_TYPE_ARCH_COUNTER;
+		*type = MSR_TYPE_ARCH_COUNTER;
 		*index = msr_index - MSR_IA32_PERFCTR0;
 		return 1;
         }
@@ -237,7 +237,7 @@ out:
         gdprintk(XENLOG_WARNING, "Insufficient memory for oprofile, oprofile is "
                  "unavailable on domain %d vcpu %d.\n",
                  v->vcpu_id, v->domain->domain_id);
-        return 0;	
+        return 0;
 }
 
 static void ppro_free_msr(struct vcpu *v)
@@ -261,13 +261,13 @@ static void ppro_load_msr(struct vcpu *v, int type, int index, u64 *msr_content)
 	case MSR_TYPE_ARCH_CTRL:
 		*msr_content = msrs[index].control;
 		break;
-	}	
+	}
 }
 
 static void ppro_save_msr(struct vcpu *v, int type, int index, u64 msr_content)
 {
 	struct arch_msr_pair *msrs = vcpu_vpmu(v)->context;
-	
+
 	switch ( type )
 	{
 	case MSR_TYPE_ARCH_COUNTER:
@@ -276,7 +276,7 @@ static void ppro_save_msr(struct vcpu *v, int type, int index, u64 msr_content)
 	case MSR_TYPE_ARCH_CTRL:
 		msrs[index].control = msr_content;
 		break;
-	}	
+	}
 }
 
 /*

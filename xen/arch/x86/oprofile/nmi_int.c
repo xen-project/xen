@@ -24,10 +24,10 @@
 #include <asm/apic.h>
 #include <asm/regs.h>
 #include <asm/current.h>
- 
+
 #include "op_counter.h"
 #include "op_x86_model.h"
- 
+
 struct op_counter_config counter_config[OP_MAX_COUNTER];
 struct op_ibs_config ibs_config;
 
@@ -91,12 +91,12 @@ static int nmi_callback(struct cpu_user_regs *regs, int cpu)
 	if ( ovf && is_active(current->domain) && !xen_mode )
 		send_guest_vcpu_virq(current, VIRQ_XENOPROF);
 
-	if ( ovf == 2 ) 
+	if ( ovf == 2 )
                 current->nmi_pending = 1;
 	return 1;
 }
- 
- 
+
+
 static void nmi_cpu_save_registers(struct op_msrs *msrs)
 {
 	unsigned int const nr_ctrs = model->num_counters;
@@ -108,7 +108,7 @@ static void nmi_cpu_save_registers(struct op_msrs *msrs)
 	for (i = 0; i < nr_ctrs; ++i) {
 		rdmsrl(counters[i].addr, counters[i].value);
 	}
- 
+
 	for (i = 0; i < nr_ctrls; ++i) {
 		rdmsrl(controls[i].addr, controls[i].value);
 	}
@@ -195,7 +195,7 @@ int nmi_reserve_counters(void)
 	 * of msrs are distinct for save and setup operations
 	 */
 	on_each_cpu(nmi_save_registers, NULL, 1);
- 	return 0;
+	return 0;
 }
 
 int nmi_enable_virq(void)
@@ -208,7 +208,7 @@ int nmi_enable_virq(void)
 void nmi_disable_virq(void)
 {
 	unset_nmi_callback();
-} 
+}
 
 
 static void nmi_restore_registers(struct op_msrs * msrs)
@@ -222,12 +222,12 @@ static void nmi_restore_registers(struct op_msrs * msrs)
 	for (i = 0; i < nr_ctrls; ++i) {
 		wrmsrl(controls[i].addr, controls[i].value);
 	}
- 
+
 	for (i = 0; i < nr_ctrs; ++i) {
 		wrmsrl(counters[i].addr, counters[i].value);
 	}
 }
- 
+
 
 static void nmi_cpu_shutdown(void * dummy)
 {
@@ -236,7 +236,7 @@ static void nmi_cpu_shutdown(void * dummy)
 	nmi_restore_registers(msrs);
 }
 
- 
+
 void nmi_release_counters(void)
 {
 	on_each_cpu(nmi_cpu_shutdown, NULL, 1);
@@ -244,7 +244,7 @@ void nmi_release_counters(void)
 	free_msrs();
 }
 
- 
+
 static void nmi_cpu_start(void * dummy)
 {
 	int cpu = smp_processor_id();
@@ -253,15 +253,15 @@ static void nmi_cpu_start(void * dummy)
 	apic_write(APIC_LVTPC, APIC_DM_NMI);
 	model->start(msrs);
 }
- 
+
 
 int nmi_start(void)
 {
 	on_each_cpu(nmi_cpu_start, NULL, 1);
 	return 0;
 }
- 
- 
+
+
 static void nmi_cpu_stop(void * dummy)
 {
 	unsigned int v;
@@ -285,8 +285,8 @@ static void nmi_cpu_stop(void * dummy)
 	apic_write(APIC_LVTPC, saved_lvtpc[cpu]);
 	apic_write(APIC_LVTERR, v);
 }
- 
- 
+
+
 void nmi_stop(void)
 {
 	on_each_cpu(nmi_cpu_stop, NULL, 1);
@@ -294,7 +294,7 @@ void nmi_stop(void)
 
 
 static int __init p4_init(char ** cpu_type)
-{ 
+{
 	__u8 cpu_model = current_cpu_data.x86_model;
 
 	if ((cpu_model > 6) || (cpu_model == 5)) {
@@ -402,7 +402,7 @@ static int __init nmi_init(void)
 	__u8 vendor = current_cpu_data.x86_vendor;
 	__u8 family = current_cpu_data.x86;
 	__u8 _model = current_cpu_data.x86_model;
- 
+
 	if (!cpu_has_apic) {
 		printk("xenoprof: Initialization failed. No APIC\n");
 		return -ENODEV;
@@ -451,7 +451,7 @@ static int __init nmi_init(void)
                                 break;
 			}
 			break;
- 
+
 		case X86_VENDOR_INTEL:
 			switch (family) {
 				/* Pentium IV */
