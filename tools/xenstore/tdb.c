@@ -2103,6 +2103,41 @@ TDB_CONTEXT *tdb_copy(TDB_CONTEXT *tdb, const char *outfile)
 	int fd, saved_errno;
 	TDB_CONTEXT *copy;
 
+	if (tdb->flags & TDB_INTERNAL) {
+		struct tdb_header *copydb;
+		
+		copy = talloc_zero(outfile, TDB_CONTEXT);
+		if (copy == NULL) {
+			errno = ENOMEM;
+			goto intfail;
+		}
+		memcpy(copy, tdb, sizeof(TDB_CONTEXT));
+
+		if (copy->name || copy->locked || copy->device || copy->inode) {
+			fprintf(stderr, "tdb_copy assumption(s) failed\n");
+			goto intfail;
+		}
+
+		copydb = talloc_zero_size(copy, copy->map_size);
+		if (copydb == NULL) {
+			errno = ENOMEM;
+			goto intfail;
+		}
+		memcpy(copydb, copy->map_ptr, copy->map_size);
+		copy->map_ptr = (char*) copydb;
+
+		if (tdb_brlock(tdb, GLOBAL_LOCK, F_UNLCK, F_SETLKW, 0) == -1)
+			goto intfail;
+
+		copy->next = tdbs;
+		tdbs = copy;
+
+		return copy;
+intfail:
+		talloc_free(copy);
+		return NULL;
+	}
+
 	fd = open(outfile, O_TRUNC|O_CREAT|O_WRONLY, 0640);
 	if (fd < 0)
 		return NULL;
