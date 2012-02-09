@@ -703,6 +703,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
     dm_config.c_info.type = LIBXL_DOMAIN_TYPE_PV;
     dm_config.c_info.name = libxl__sprintf(gc, "%s-dm",
                                     libxl__domid_to_name(gc, guest_domid));
+    dm_config.c_info.ssidref = guest_config->b_info.device_model_ssidref;
 
     libxl_uuid_generate(&dm_config.c_info.uuid);
 

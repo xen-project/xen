@@ -1134,6 +1134,21 @@ skip_vfb:
     if (!xlu_cfg_get_long (config, "device_model_stubdomain_override", &l, 0))
         b_info->device_model_stubdomain = l;
 
+    if (!xlu_cfg_get_string (config, "device_model_stubdomain_seclabel",
+                             &buf, 0)) {
+        e = libxl_flask_context_to_sid(ctx, (char *)buf, strlen(buf),
+                                    &b_info->device_model_ssidref);
+        if (e) {
+            if (errno == ENOSYS) {
+                fprintf(stderr, "XSM Disabled:"
+                        " device_model_stubdomain_seclabel not supported\n");
+            } else {
+                fprintf(stderr, "Invalid device_model_stubdomain_seclabel:"
+                        " %s\n", buf);
+                exit(1);
+            }
+        }
+    }
 #define parse_extra_args(type)                                            \
     e = xlu_cfg_get_list_as_string_list(config, "device_model_args"#type, \
                                     &b_info->extra##type, 0);            \
