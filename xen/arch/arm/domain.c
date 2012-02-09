@@ -11,6 +11,8 @@
 #include <asm/p2m.h>
 #include <asm/irq.h>
 
+#include "gic.h"
+
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 
 static void continue_idle_domain(struct vcpu *v)
