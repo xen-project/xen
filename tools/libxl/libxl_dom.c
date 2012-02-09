@@ -355,6 +355,15 @@ out:
     return rc;
 }
 
+int libxl__qemu_traditional_cmd(libxl__gc *gc, uint32_t domid,
+                                const char *cmd)
+{
+    char *path = NULL;
+    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/command",
+                          domid);
+    return libxl__xs_write(gc, XBT_NULL, path, "%s", cmd);
+}
+
 int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
                                  libxl_domain_build_info *info,
                                  libxl__domain_build_state *state,
@@ -637,12 +646,9 @@ int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd)
 
     switch (libxl__device_model_version_running(gc, domid)) {
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
-        char *path = NULL;
         LIBXL__LOG(ctx, LIBXL__LOG_DEBUG,
                    "Saving device model state to %s", filename);
-        path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/command",
-                              domid);
-        libxl__xs_write(gc, XBT_NULL, path, "save");
+        libxl__qemu_traditional_cmd(gc, domid, "save");
         libxl__wait_for_device_model(gc, domid, "paused", NULL, NULL, NULL);
         break;
     }

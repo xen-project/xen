@@ -617,6 +617,8 @@ _hidden int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
               libxl_domain_build_info *info,
               libxl__domain_build_state *state);
 
+_hidden int libxl__qemu_traditional_cmd(libxl__gc *gc, uint32_t domid,
+                                        const char *cmd);
 _hidden int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
                                  const char *old_name, const char *new_name,
                                  xs_transaction_t trans);
