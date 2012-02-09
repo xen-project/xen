@@ -32,8 +32,10 @@
 #include "xenstored_watch.h"
 
 #include <xenctrl.h>
+#include <xen/grant_table.h>
 
 static xc_interface **xc_handle;
+static xc_gnttab **xcg_handle;
 static evtchn_port_t virq_port;
 
 xc_evtchn *xce_handle = NULL;
@@ -163,6 +165,26 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 	return len;
 }
 
+static void *map_interface(domid_t domid, unsigned long mfn)
+{
+	if (*xcg_handle >= 0) {
+		/* this is the preferred method */
+		return xc_gnttab_map_grant_ref(*xcg_handle, domid,
+			GNTTAB_RESERVED_XENSTORE, PROT_READ|PROT_WRITE);
+	} else {
+		return xc_map_foreign_range(*xc_handle, domid,
+			getpagesize(), PROT_READ|PROT_WRITE, mfn);
+	}
+}
+
+static void unmap_interface(void *interface)
+{
+	if (*xcg_handle >= 0)
+		xc_gnttab_munmap(*xcg_handle, interface, 1);
+	else
+		munmap(interface, getpagesize());
+}
+
 static int destroy_domain(void *_domain)
 {
 	struct domain *domain = _domain;
@@ -174,8 +196,14 @@ static int destroy_domain(void *_domain)
 			eprintf("> Unbinding port %i failed!\n", domain->port);
 	}
 
-	if (domain->interface)
-		munmap(domain->interface, getpagesize());
+	if (domain->interface) {
+		/* Domain 0 was mapped by dom0_init, so it must be unmapped
+		   using munmap() and not the grant unmap call. */
+		if (domain->domid == 0)
+			munmap(domain->interface, getpagesize());
+		else
+			unmap_interface(domain->interface);
+	}
 
 	fire_watches(NULL, "@releaseDomain", false);
 
@@ -344,9 +372,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 	domain = find_domain_by_domid(domid);
 
 	if (domain == NULL) {
-		interface = xc_map_foreign_range(
-			*xc_handle, domid,
-			getpagesize(), PROT_READ|PROT_WRITE, mfn);
+		interface = map_interface(domid, mfn);
 		if (!interface) {
 			send_error(conn, errno);
 			return;
@@ -354,7 +380,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		/* Hang domain off "in" until we're finished. */
 		domain = new_domain(in, domid, port);
 		if (!domain) {
-			munmap(interface, getpagesize());
+			unmap_interface(interface);
 			send_error(conn, errno);
 			return;
 		}
@@ -552,6 +578,12 @@ static int close_xc_handle(void *_handle)
 	return 0;
 }
 
+static int close_xcg_handle(void *_handle)
+{
+	xc_gnttab_close(*(xc_gnttab **)_handle);
+	return 0;
+}
+
 /* Returns the implicit path of a connection (only domains have this) */
 const char *get_implicit_path(const struct connection *conn)
 {
@@ -602,6 +634,16 @@ void domain_init(void)
 		barf_perror("Failed to open connection to hypervisor");
 
 	talloc_set_destructor(xc_handle, close_xc_handle);
+
+	xcg_handle = talloc(talloc_autofree_context(), xc_gnttab*);
+	if (!xcg_handle)
+		barf_perror("Failed to allocate domain gnttab handle");
+
+	*xcg_handle = xc_gnttab_open(NULL, 0);
+	if (*xcg_handle < 0)
+		xprintf("WARNING: Failed to open connection to gnttab\n");
+	else
+		talloc_set_destructor(xcg_handle, close_xcg_handle);
 
 	xce_handle = xc_evtchn_open(NULL, 0);
 
