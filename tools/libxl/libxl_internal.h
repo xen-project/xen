@@ -595,9 +595,11 @@ _hidden int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid);
     libxl__domain_type((gc), (domid)) == LIBXL_DOMAIN_TYPE_##type
 typedef struct {
     uint32_t store_port;
+    uint32_t store_domid;
     unsigned long store_mfn;
 
     uint32_t console_port;
+    uint32_t console_domid;
     unsigned long console_mfn;
 
     unsigned long vm_generationid_addr;

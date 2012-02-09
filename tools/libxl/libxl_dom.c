@@ -64,6 +64,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int tsc_mode;
+    char *xs_domid, *con_domid;
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
     libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus, &info->cpumap);
     xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + LIBXL_MAXMEM_CONSTANT);
@@ -96,9 +97,18 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
         xc_shadow_control(ctx->xch, domid, XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION, NULL, 0, &shadow, 0, NULL);
     }
 
-    state->store_port = xc_evtchn_alloc_unbound(ctx->xch, domid, 0);
-    state->console_port = xc_evtchn_alloc_unbound(ctx->xch, domid, 0);
+    xs_domid = xs_read(ctx->xsh, XBT_NULL, "/tool/xenstored/domid", NULL);
+    state->store_domid = xs_domid ? atoi(xs_domid) : 0;
+    free(xs_domid);
+
+    con_domid = xs_read(ctx->xsh, XBT_NULL, "/tool/xenconsoled/domid", NULL);
+    state->console_domid = con_domid ? atoi(con_domid) : 0;
+    free(con_domid);
+
+    state->store_port = xc_evtchn_alloc_unbound(ctx->xch, domid, state->store_domid);
+    state->console_port = xc_evtchn_alloc_unbound(ctx->xch, domid, state->console_domid);
     state->vm_generationid_addr = 0;
+
     return 0;
 }
 
