@@ -370,7 +370,6 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 {
 	u32 l, h;
 
-#ifdef CONFIG_SMP
 	unsigned long long value;
 
 	/* Disable TLB flush filter by setting HWCR.FFDIS on K8
@@ -384,7 +383,6 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		value |= 1 << 6;
 		wrmsrl(MSR_K7_HWCR, value);
 	}
-#endif
 
 	/*
 	 *	FIXME: We should handle the K5 here. Set up the write

@@ -279,9 +279,7 @@ cyrix_arr_init(void)
 	struct set_mtrr_context ctxt;
 	unsigned char ccr[7];
 	int ccrc[7] = { 0, 0, 0, 0, 0, 0, 0 };
-#ifdef CONFIG_SMP
 	int i;
-#endif
 
 	/* flush cache and enable MAPEN */
 	set_mtrr_prepare_save(&ctxt);
@@ -334,14 +332,13 @@ cyrix_arr_init(void)
 		ccrc[5] = 1;
 		setCx86(CX86_CCR5, ccr[5]);
 	}
-#ifdef CONFIG_SMP
+
 	for (i = 0; i < 7; i++)
 		ccr_state[i] = ccr[i];
 	for (i = 0; i < 8; i++)
 		cyrix_get_arr(i,
 			      &arr_state[i].base, &arr_state[i].size,
 			      &arr_state[i].type);
-#endif
 
 	set_mtrr_done(&ctxt);	/* flush cache and disable MAPEN */
 

@@ -40,19 +40,13 @@ static unsigned int num_counters = NUM_COUNTERS_NON_HT;
    kernel boot-time. */
 static inline void setup_num_counters(void)
 {
-#ifdef CONFIG_SMP
 	if (boot_cpu_data.x86_num_siblings == 2) 	/* XXX */
 		num_counters = NUM_COUNTERS_HT2;
-#endif
 }
 
 static int inline addr_increment(void)
 {
-#ifdef CONFIG_SMP
 	return boot_cpu_data.x86_num_siblings == 2 ? 2 : 1;
-#else
-	return 1;
-#endif
 }
 
 
@@ -383,11 +377,8 @@ static const struct p4_event_binding p4_events[NUM_EVENTS] = {
    or "odd" part of all the divided resources. */
 static unsigned int get_stagger(void)
 {
-#ifdef CONFIG_SMP
 	int cpu = smp_processor_id();
 	return (cpu != cpumask_first(per_cpu(cpu_sibling_mask, cpu)));
-#endif	
-	return 0;
 }
 
 
@@ -709,7 +700,6 @@ static void p4_stop(struct op_msrs const * const msrs)
 }
 
 
-#ifdef CONFIG_SMP
 struct op_x86_model_spec const op_p4_ht2_spec = {
 	.num_counters = NUM_COUNTERS_HT2,
 	.num_controls = NUM_CONTROLS_HT2,
@@ -719,7 +709,7 @@ struct op_x86_model_spec const op_p4_ht2_spec = {
 	.start = &p4_start,
 	.stop = &p4_stop
 };
-#endif
+
 
 struct op_x86_model_spec const op_p4_spec = {
 	.num_counters = NUM_COUNTERS_NON_HT,

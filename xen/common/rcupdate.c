@@ -83,9 +83,7 @@ struct rcu_data {
     long            blimit;           /* Upper limit on a processed batch */
     int cpu;
     struct rcu_head barrier;
-#ifdef CONFIG_SMP
     long            last_rs_qlen;     /* qlen during the last resched */
-#endif
 };
 
 static DEFINE_PER_CPU(struct rcu_data, rcu_data);

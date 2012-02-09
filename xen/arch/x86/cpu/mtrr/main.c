@@ -142,8 +142,6 @@ struct set_mtrr_data {
  */
 int hold_mtrr_updates_on_aps;
 
-#ifdef CONFIG_SMP
-
 static void ipi_handler(void *info)
 /*  [SUMMARY] Synchronisation handler. Executed by "other" CPUs.
     [RETURNS] Nothing.
@@ -174,8 +172,6 @@ static void ipi_handler(void *info)
 	atomic_dec(&data->count);
 	local_irq_restore(flags);
 }
-
-#endif
 
 static inline int types_compatible(mtrr_type type1, mtrr_type type2) {
 	return type1 == MTRR_TYPE_UNCACHABLE ||

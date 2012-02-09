@@ -145,9 +145,8 @@ void ack_bad_irq(unsigned int irq)
 
 void __init apic_intr_init(void)
 {
-#ifdef CONFIG_SMP
     smp_intr_init();
-#endif
+
     /* self generated IPI for local APIC timer */
     set_intr_gate(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
 

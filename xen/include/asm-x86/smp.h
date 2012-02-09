@@ -17,7 +17,6 @@
 #endif
 
 #define BAD_APICID -1U
-#ifdef CONFIG_SMP
 #ifndef __ASSEMBLY__
 
 /*
@@ -65,11 +64,4 @@ void __stop_this_cpu(void);
 
 #endif /* !__ASSEMBLY__ */
 
-#else /* CONFIG_SMP */
-
-#define cpu_physical_id(cpu)		boot_cpu_physical_apicid
-
-#define NO_PROC_ID		0xFF		/* No processor magic marker */
-
-#endif
 #endif

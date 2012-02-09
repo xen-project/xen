@@ -154,15 +154,9 @@ static always_inline unsigned long __cmpxchg(
 #define rmb()           barrier()
 #define wmb()           barrier()
 
-#ifdef CONFIG_SMP
 #define smp_mb()        mb()
 #define smp_rmb()       rmb()
 #define smp_wmb()       wmb()
-#else
-#define smp_mb()        barrier()
-#define smp_rmb()       barrier()
-#define smp_wmb()       barrier()
-#endif
 
 #define set_mb(var, value) do { xchg(&var, value); } while (0)
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)

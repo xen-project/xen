@@ -513,7 +513,6 @@ static void clear_IO_APIC (void)
     }
 }
 
-#ifdef CONFIG_SMP
 static void
 set_ioapic_affinity_irq(struct irq_desc *desc, const cpumask_t *mask)
 {
@@ -550,7 +549,6 @@ set_ioapic_affinity_irq(struct irq_desc *desc, const cpumask_t *mask)
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
 }
-#endif /* CONFIG_SMP */
 
 /*
  * Find the IRQ entry number of a certain pin.
@@ -630,7 +628,6 @@ static int pin_2_irq(int idx, int apic, int pin);
  * we need to reprogram the ioredtbls to cater for the cpus which have come online
  * so mask in all cases should simply be TARGET_CPUS
  */
-#ifdef CONFIG_SMP
 void /*__init*/ setup_ioapic_dest(void)
 {
     int pin, ioapic, irq, irq_entry;
@@ -653,7 +650,6 @@ void /*__init*/ setup_ioapic_dest(void)
 
     }
 }
-#endif
 
 /*
  * EISA Edge/Level control register, ELCR
