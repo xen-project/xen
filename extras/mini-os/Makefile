@@ -19,6 +19,7 @@ endif
 CONFIG_START_NETWORK ?= y
 CONFIG_SPARSE_BSS ?= y
 CONFIG_QEMU_XS_ARGS ?= n
+CONFIG_TEST ?= n
 
 # Export config items as compiler directives
 flags-$(CONFIG_START_NETWORK) += -DCONFIG_START_NETWORK
@@ -63,6 +64,7 @@ src-y += mm.c
 src-y += netfront.c
 src-y += pcifront.c
 src-y += sched.c
+src-$(CONFIG_TEST) += test.c
 
 src-y += lib/ctype.c
 src-y += lib/math.c
