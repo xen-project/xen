@@ -7,6 +7,7 @@ obj-y += domain_build.o
 obj-y += gic.o
 obj-y += io.o
 obj-y += irq.o
+obj-y += kernel.o
 obj-y += mm.o
 obj-y += p2m.o
 obj-y += guestcopy.o

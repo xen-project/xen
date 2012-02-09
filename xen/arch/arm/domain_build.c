@@ -4,10 +4,10 @@
 #include <xen/mm.h>
 #include <xen/domain_page.h>
 #include <xen/sched.h>
-#include <xen/libelf.h>
 #include <asm/irq.h>
 
 #include "gic.h"
+#include "kernel.h"
 
 static unsigned int __initdata opt_dom0_max_vcpus;
 integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
@@ -27,25 +27,6 @@ struct vcpu *__init alloc_dom0_vcpu0(void)
 }
 
 extern void guest_mode_entry(void);
-
-static void copy_from_flash(void *dst, paddr_t flash, unsigned long len)
-{
-    void *src = (void *)FIXMAP_ADDR(FIXMAP_MISC);
-    unsigned long offs;
-
-    printk("Copying %#lx bytes from flash %"PRIpaddr" to %p-%p: [",
-           len, flash, dst, dst+(1<<23));
-    for ( offs = 0; offs < len ; offs += PAGE_SIZE )
-    {
-        if ( ( offs % (1<<20) ) == 0 )
-            printk(".");
-        set_fixmap(FIXMAP_MISC, (flash+offs) >> PAGE_SHIFT, DEV_SHARED);
-        memcpy(dst+offs, src, PAGE_SIZE);
-    }
-    printk("]\n");
-
-    clear_fixmap(FIXMAP_MISC);
-}
 
 static void setup_linux_atag(paddr_t tags, paddr_t ram_s, paddr_t ram_e)
 {
@@ -84,20 +65,13 @@ static void setup_linux_atag(paddr_t tags, paddr_t ram_s, paddr_t ram_e)
     unmap_domain_page(map);
 }
 
-/* Store kernel in first 8M of flash */
-#define KERNEL_FLASH_ADDRESS 0x00000000UL
-#define KERNEL_FLASH_SIZE    0x00800000UL
-
 int construct_dom0(struct domain *d)
 {
-    int rc, kernel_order;
-    void *kernel_img;
+    struct kernel_info kinfo = {};
+    int rc;
 
     struct vcpu *v = d->vcpu[0];
     struct cpu_user_regs *regs = &v->arch.user_regs;
-
-    struct elf_binary elf;
-    struct elf_dom_parms parms;
 
     /* Sanity! */
     BUG_ON(d->domain_id != 0);
@@ -106,31 +80,22 @@ int construct_dom0(struct domain *d)
 
     printk("*** LOADING DOMAIN 0 ***\n");
 
-    kernel_order = get_order_from_bytes(KERNEL_FLASH_SIZE);
-    kernel_img = alloc_xenheap_pages(kernel_order, 0);
-    if ( kernel_img == NULL )
-        panic("Cannot allocate temporary buffer for kernel.\n");
+    /* 128M at 2G physical */
+    /* TODO size and location from DT. */
+    kinfo.ram_start = 0x80000000;
+    kinfo.ram_end   = 0x88000000;
 
-    copy_from_flash(kernel_img, KERNEL_FLASH_ADDRESS, KERNEL_FLASH_SIZE);
+    rc = kernel_prepare(&kinfo);
+    if (rc < 0)
+        return rc;
 
     d->max_pages = ~0U;
-
-    if ( (rc = elf_init(&elf, kernel_img, KERNEL_FLASH_SIZE )) != 0 )
-        return rc;  memset(regs, 0, sizeof(*regs));
-#ifdef VERBOSE
-    elf_set_verbose(&elf);
-#endif
-    elf_parse_binary(&elf);
-    if ( (rc = elf_xen_parse(&elf, &parms)) != 0 )
-        return rc;
 
     if ( (rc = p2m_alloc_table(d)) != 0 )
         return rc;
 
-    /* 128M at 3G physical */
-    /* TODO size and location according to platform info */
-    printk("Populate P2M %#llx->%#llx\n", 0xc0000000ULL, 0xc8000000ULL);
-    p2m_populate_ram(d, 0xc0000000ULL, 0xc8000000ULL);
+    printk("Populate P2M %#llx->%#llx\n", kinfo.ram_start, kinfo.ram_end);
+    p2m_populate_ram(d, kinfo.ram_start, kinfo.ram_end);
 
     printk("Map CS2 MMIO regions 1:1 in the P2M %#llx->%#llx\n", 0x18000000ULL, 0x1BFFFFFFULL);
     map_mmio_regions(d, 0x18000000, 0x1BFFFFFF, 0x18000000);
@@ -161,20 +126,15 @@ int construct_dom0(struct domain *d)
     /* The following load uses domain's p2m */
     p2m_load_VTTBR(d);
 
-    printk("Loading ELF image into guest memory\n");
-    elf.dest = (void*)(unsigned long)parms.virt_kstart;
-    elf_load_binary(&elf);
+    kernel_load(&kinfo);
 
-    printk("Free temporary kernel buffer\n");
-    free_xenheap_pages(kernel_img, kernel_order);
-
-    setup_linux_atag(0xc0000100ULL, 0xc0000000ULL, 0xc8000000ULL);
+    setup_linux_atag(kinfo.ram_start + 0x100, kinfo.ram_start, kinfo.ram_end);
 
     clear_bit(_VPF_down, &v->pause_flags);
 
     memset(regs, 0, sizeof(*regs));
 
-    regs->pc = (uint32_t)parms.virt_entry;
+    regs->pc = (uint32_t)kinfo.entry;
 
     regs->cpsr = PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_SVC;
 
@@ -191,7 +151,7 @@ int construct_dom0(struct domain *d)
 
     regs->r0 = 0; /* SBZ */
     regs->r1 = 2272; /* Machine NR: Versatile Express */
-    regs->r2 = 0xc0000100; /* ATAGS */
+    regs->r2 = kinfo.ram_start + 0x100; /* ATAGS */
 
     WRITE_CP32(SCTLR_BASE, SCTLR);
 
