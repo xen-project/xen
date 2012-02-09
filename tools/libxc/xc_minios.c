@@ -20,6 +20,7 @@
  */
 
 #undef NDEBUG
+#include "xen-external/bsd-sys-queue.h"
 #include <mini-os/types.h>
 #include <mini-os/os.h>
 #include <mini-os/mm.h>
@@ -210,15 +211,34 @@ static struct xc_osdep_ops minios_privcmd_ops = {
     },
 };
 
+
+/* XXX Note: This is not threadsafe */
+static struct evtchn_port_info* port_alloc(int fd) {
+    struct evtchn_port_info *port_info;
+    port_info = malloc(sizeof(struct evtchn_port_info));
+    if (port_info == NULL)
+        return NULL;
+    port_info->pending = 0;
+    port_info->port = -1;
+    port_info->bound = 0;
+
+    LIST_INSERT_HEAD(&files[fd].evtchn.ports, port_info, list);
+    return port_info;
+}
+
+static void port_dealloc(struct evtchn_port_info *port_info) {
+    if (port_info->bound)
+        unbind_evtchn(port_info->port);
+    LIST_REMOVE(port_info, list);
+    free(port_info);
+}
+
 static xc_osdep_handle minios_evtchn_open(xc_evtchn *xce)
 {
-    int fd = alloc_fd(FTYPE_EVTCHN), i;
+    int fd = alloc_fd(FTYPE_EVTCHN);
     if ( fd == -1 )
         return XC_OSDEP_OPEN_ERROR;
-    for (i = 0; i < MAX_EVTCHN_PORTS; i++) {
-	files[fd].evtchn.ports[i].port = -1;
-        files[fd].evtchn.ports[i].bound = 0;
-    }
+    LIST_INIT(&files[fd].evtchn.ports);
     printf("evtchn_open() -> %d\n", fd);
     return (xc_osdep_handle)fd;
 }
@@ -231,10 +251,10 @@ static int minios_evtchn_close(xc_evtchn *xce, xc_osdep_handle h)
 
 void minios_evtchn_close_fd(int fd)
 {
-    int i;
-    for (i = 0; i < MAX_EVTCHN_PORTS; i++)
-        if (files[fd].evtchn.ports[i].bound)
-            unbind_evtchn(files[fd].evtchn.ports[i].port);
+    struct evtchn_port_info *port_info, *tmp;
+    LIST_FOREACH_SAFE(port_info, &files[fd].evtchn.ports, list, tmp)
+        port_dealloc(port_info);
+
     files[fd].type = FTYPE_NONE;
 }
 
@@ -256,35 +276,21 @@ static int minios_evtchn_notify(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t
     return ret;
 }
 
-/* XXX Note: This is not threadsafe */
-static int port_alloc(int fd) {
-    int i;
-    for (i= 0; i < MAX_EVTCHN_PORTS; i++)
-	if (files[fd].evtchn.ports[i].port == -1)
-	    break;
-    if (i == MAX_EVTCHN_PORTS) {
-	printf("Too many ports in xc handle\n");
-	errno = EMFILE;
-	return -1;
-    }
-    files[fd].evtchn.ports[i].pending = 0;
-    return i;
-}
-
 static void evtchn_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
 {
     int fd = (int)(intptr_t)data;
-    int i;
+    struct evtchn_port_info *port_info;
     assert(files[fd].type == FTYPE_EVTCHN);
     mask_evtchn(port);
-    for (i= 0; i < MAX_EVTCHN_PORTS; i++)
-	if (files[fd].evtchn.ports[i].port == port)
-	    break;
-    if (i == MAX_EVTCHN_PORTS) {
-	printk("Unknown port for handle %d\n", fd);
-	return;
+    LIST_FOREACH(port_info, &files[fd].evtchn.ports, list) {
+        if (port_info->port == port)
+            goto found;
     }
-    files[fd].evtchn.ports[i].pending = 1;
+    printk("Unknown port for handle %d\n", fd);
+    return;
+
+ found:
+    port_info->pending = 1;
     files[fd].read = 1;
     wake_up(&event_queue);
 }
@@ -292,12 +298,13 @@ static void evtchn_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
 static evtchn_port_or_error_t minios_evtchn_bind_unbound_port(xc_evtchn *xce, xc_osdep_handle h, int domid)
 {
     int fd = (int)h;
-    int ret, i;
+    struct evtchn_port_info *port_info;
+    int ret;
     evtchn_port_t port;
 
     assert(get_current() == main_thread);
-    i = port_alloc(fd);
-    if (i == -1)
+    port_info = port_alloc(fd);
+    if (port_info == NULL)
 	return -1;
 
     printf("xc_evtchn_bind_unbound_port(%d)", domid);
@@ -305,11 +312,12 @@ static evtchn_port_or_error_t minios_evtchn_bind_unbound_port(xc_evtchn *xce, xc
     printf(" = %d\n", ret);
 
     if (ret < 0) {
+	port_dealloc(port_info);
 	errno = -ret;
 	return -1;
     }
-    files[fd].evtchn.ports[i].bound = 1;
-    files[fd].evtchn.ports[i].port = port;
+    port_info->bound = 1;
+    port_info->port = port;
     unmask_evtchn(port);
     return port;
 }
@@ -318,12 +326,13 @@ static evtchn_port_or_error_t minios_evtchn_bind_interdomain(xc_evtchn *xce, xc_
     evtchn_port_t remote_port)
 {
     int fd = (int)h;
+    struct evtchn_port_info *port_info;
     evtchn_port_t local_port;
-    int ret, i;
+    int ret;
 
     assert(get_current() == main_thread);
-    i = port_alloc(fd);
-    if (i == -1)
+    port_info = port_alloc(fd);
+    if (port_info == NULL)
 	return -1;
 
     printf("xc_evtchn_bind_interdomain(%d, %"PRId32")", domid, remote_port);
@@ -331,11 +340,12 @@ static evtchn_port_or_error_t minios_evtchn_bind_interdomain(xc_evtchn *xce, xc_
     printf(" = %d\n", ret);
 
     if (ret < 0) {
+	port_dealloc(port_info);
 	errno = -ret;
 	return -1;
     }
-    files[fd].evtchn.ports[i].bound = 1;
-    files[fd].evtchn.ports[i].port = local_port;
+    port_info->bound = 1;
+    port_info->port = local_port;
     unmask_evtchn(local_port);
     return local_port;
 }
@@ -343,42 +353,40 @@ static evtchn_port_or_error_t minios_evtchn_bind_interdomain(xc_evtchn *xce, xc_
 static int minios_evtchn_unbind(xc_evtchn *xce, xc_osdep_handle h, evtchn_port_t port)
 {
     int fd = (int)h;
-    int i;
-    for (i = 0; i < MAX_EVTCHN_PORTS; i++)
-	if (files[fd].evtchn.ports[i].port == port) {
-	    files[fd].evtchn.ports[i].port = -1;
-	    break;
-	}
-    if (i == MAX_EVTCHN_PORTS) {
-	printf("Warning: couldn't find port %"PRId32" for xc handle %x\n", port, fd);
-	errno = -EINVAL;
-	return -1;
+    struct evtchn_port_info *port_info;
+
+    LIST_FOREACH(port_info, &files[fd].evtchn.ports, list) {
+        if (port_info->port == port) {
+            port_dealloc(port_info);
+            return 0;
+        }
     }
-    files[fd].evtchn.ports[i].bound = 0;
-    unbind_evtchn(port);
-    return 0;
+    printf("Warning: couldn't find port %"PRId32" for xc handle %x\n", port, fd);
+    errno = -EINVAL;
+    return -1;
 }
 
 static evtchn_port_or_error_t minios_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_handle h, unsigned int virq)
 {
     int fd = (int)h;
+    struct evtchn_port_info *port_info;
     evtchn_port_t port;
-    int i;
 
     assert(get_current() == main_thread);
-    i = port_alloc(fd);
-    if (i == -1)
+    port_info = port_alloc(fd);
+    if (port_info == NULL)
 	return -1;
 
     printf("xc_evtchn_bind_virq(%d)", virq);
     port = bind_virq(virq, evtchn_handler, (void*)(intptr_t)fd);
 
     if (port < 0) {
+	port_dealloc(port_info);
 	errno = -port;
 	return -1;
     }
-    files[fd].evtchn.ports[i].bound = 1;
-    files[fd].evtchn.ports[i].port = port;
+    port_info->bound = 1;
+    port_info->port = port;
     unmask_evtchn(port);
     return port;
 }
@@ -386,18 +394,18 @@ static evtchn_port_or_error_t minios_evtchn_bind_virq(xc_evtchn *xce, xc_osdep_h
 static evtchn_port_or_error_t minios_evtchn_pending(xc_evtchn *xce, xc_osdep_handle h)
 {
     int fd = (int)h;
-    int i;
+    struct evtchn_port_info *port_info;
     unsigned long flags;
     evtchn_port_t ret = -1;
 
     local_irq_save(flags);
     files[fd].read = 0;
-    for (i = 0; i < MAX_EVTCHN_PORTS; i++) {
-        evtchn_port_t port = files[fd].evtchn.ports[i].port;
-        if (port != -1 && files[fd].evtchn.ports[i].pending) {
+
+    LIST_FOREACH(port_info, &files[fd].evtchn.ports, list) {
+        if (port_info->port != -1 && port_info->pending) {
             if (ret == -1) {
-                ret = port;
-                files[fd].evtchn.ports[i].pending = 0;
+                ret = port_info->port;
+                port_info->pending = 0;
             } else {
                 files[fd].read = 1;
                 break;

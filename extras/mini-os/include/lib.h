@@ -52,6 +52,7 @@
 #include <stddef.h>
 #include <xen/xen.h>
 #include <xen/event_channel.h>
+#include <sys/queue.h>
 #include "gntmap.h"
 
 #ifdef HAVE_LIBC
@@ -143,7 +144,14 @@ enum fd_type {
     FTYPE_SAVEFILE,
 };
 
-#define MAX_EVTCHN_PORTS 16
+LIST_HEAD(evtchn_port_list, evtchn_port_info);
+
+struct evtchn_port_info {
+        LIST_ENTRY(evtchn_port_info) list;
+        evtchn_port_t port;
+        unsigned long pending;
+        int bound;
+};
 
 extern struct file {
     enum fd_type type;
@@ -158,13 +166,7 @@ extern struct file {
 	    off_t offset;
 	} file;
 	struct {
-            /* To each event channel FD is associated a series of ports which
-             * wakes select for this FD. */
-            struct {
-                evtchn_port_t port;
-                unsigned long pending;
-                int bound;
-            } ports[MAX_EVTCHN_PORTS];
+	    struct evtchn_port_list ports;
 	} evtchn;
 	struct gntmap gntmap;
 	struct {
