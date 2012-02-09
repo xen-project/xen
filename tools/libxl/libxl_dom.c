@@ -225,7 +225,9 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
 
     dom->flags = flags;
     dom->console_evtchn = state->console_port;
+    dom->console_domid = state->console_domid;
     dom->xenstore_evtchn = state->store_port;
+    dom->xenstore_domid = state->store_domid;
 
     if ( (ret = xc_dom_boot_xen_init(dom, ctx->xch, domid)) != 0 ) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_boot_xen_init failed");
@@ -251,6 +253,10 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_boot_image failed");
         goto out;
     }
+    if ( (ret = xc_dom_gnttab_init(dom)) != 0 ) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_gnttab_init failed");
+        goto out;
+    }
 
     state->console_mfn = xc_dom_p2m_host(dom, dom->console_pfn);
     state->store_mfn = xc_dom_p2m_host(dom, dom->xenstore_pfn);
@@ -271,7 +277,8 @@ static unsigned long timer_mode(const libxl_domain_build_info *info)
 static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
                                 libxl_domain_build_info *info,
                                 int store_evtchn, unsigned long *store_mfn,
-                                int console_evtchn, unsigned long *console_mfn)
+                                int console_evtchn, unsigned long *console_mfn,
+                                domid_t store_domid, domid_t console_domid)
 {
     struct hvm_info_table *va_hvm;
     uint8_t *va_map, sum;
@@ -304,6 +311,8 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     xc_set_hvm_param(handle, domid, HVM_PARAM_NESTEDHVM, info->u.hvm.nested_hvm);
     xc_set_hvm_param(handle, domid, HVM_PARAM_STORE_EVTCHN, store_evtchn);
     xc_set_hvm_param(handle, domid, HVM_PARAM_CONSOLE_EVTCHN, console_evtchn);
+
+    xc_dom_gnttab_hvm_seed(handle, domid, *console_mfn, *store_mfn, console_domid, store_domid);
     return 0;
 }
 
@@ -355,7 +364,9 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
         goto out;
     }
     ret = hvm_build_set_params(ctx->xch, domid, info, state->store_port,
-                               &state->store_mfn, state->console_port, &state->console_mfn);
+                               &state->store_mfn, state->console_port,
+                               &state->console_mfn, state->store_domid,
+                               state->console_domid);
     if (ret) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, ret, "hvm build set params failed");
         goto out;
@@ -402,7 +413,8 @@ int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
     }
     rc = xc_domain_restore(ctx->xch, fd, domid,
                            state->store_port, &state->store_mfn,
-                           state->console_port, &state->console_mfn,
+                           state->store_domid, state->console_port,
+                           &state->console_mfn, state->console_domid,
                            hvm, pae, superpages, no_incr_generationid,
                            &state->vm_generationid_addr);
     if ( rc ) {

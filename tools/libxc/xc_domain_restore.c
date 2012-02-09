@@ -1259,7 +1259,8 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
 
 int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned int store_evtchn, unsigned long *store_mfn,
-                      unsigned int console_evtchn, unsigned long *console_mfn,
+                      domid_t store_domid, unsigned int console_evtchn,
+                      unsigned long *console_mfn, domid_t console_domid,
                       unsigned int hvm, unsigned int pae, int superpages,
                       int no_incr_generationid,
                       unsigned long *vm_generationid_addr)
@@ -2018,6 +2019,14 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         memcpy(ctx->live_p2m, ctx->p2m, dinfo->p2m_size * sizeof(xen_pfn_t));
     munmap(ctx->live_p2m, P2M_FL_ENTRIES * PAGE_SIZE);
 
+    rc = xc_dom_gnttab_seed(xch, dom, *console_mfn, *store_mfn,
+                            console_domid, store_domid);
+    if (rc != 0)
+    {
+        ERROR("error seeding grant table");
+        goto out;
+    }
+
     DPRINTF("Domain ready to be built.\n");
     rc = 0;
     goto out;
@@ -2073,6 +2082,14 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     if ( frc )
     {
         PERROR("error setting the HVM context");
+        goto out;
+    }
+
+    rc = xc_dom_gnttab_hvm_seed(xch, dom, *console_mfn, *store_mfn,
+                                console_domid, store_domid);
+    if (rc != 0)
+    {
+        ERROR("error seeding grant table");
         goto out;
     }
 

@@ -18,6 +18,9 @@
 
 #define INVALID_P2M_ENTRY   ((xen_pfn_t)-1)
 
+/* Scrach PFN for temporary mappings in HVM */
+#define SCRATCH_PFN_GNTTAB 0xFFFFE
+
 /* --- typedefs and structs ---------------------------------------- */
 
 typedef uint64_t xen_vaddr_t;
@@ -107,6 +110,8 @@ struct xc_dom_image {
     unsigned long flags;
     unsigned int console_evtchn;
     unsigned int xenstore_evtchn;
+    domid_t console_domid;
+    domid_t xenstore_domid;
     xen_pfn_t shared_info_mfn;
 
     xc_interface *xch;
@@ -200,6 +205,17 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
                            xen_pfn_t count);
 int xc_dom_boot_image(struct xc_dom_image *dom);
 int xc_dom_compat_check(struct xc_dom_image *dom);
+int xc_dom_gnttab_init(struct xc_dom_image *dom);
+int xc_dom_gnttab_hvm_seed(xc_interface *xch, domid_t domid,
+                           xen_pfn_t console_gmfn,
+                           xen_pfn_t xenstore_gmfn,
+                           domid_t console_domid,
+                           domid_t xenstore_domid);
+int xc_dom_gnttab_seed(xc_interface *xch, domid_t domid,
+                       xen_pfn_t console_gmfn,
+                       xen_pfn_t xenstore_gmfn,
+                       domid_t console_domid,
+                       domid_t xenstore_domid);
 
 /* --- debugging bits ---------------------------------------------- */
 
