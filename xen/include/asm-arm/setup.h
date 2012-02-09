@@ -5,6 +5,8 @@
 
 void arch_get_xen_caps(xen_capabilities_info_t *info);
 
+int construct_dom0(struct domain *d);
+
 #endif
 /*
  * Local variables:

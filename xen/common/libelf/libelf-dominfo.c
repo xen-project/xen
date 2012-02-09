@@ -341,6 +341,12 @@ static int elf_xen_note_check(struct elf_binary *elf,
         return 0;
     }
 
+    if ( elf_uval(elf, elf->ehdr, e_machine) == EM_ARM )
+    {
+         elf_msg(elf, "%s: Not bothering with notes on ARM\n", __FUNCTION__);
+         return 0;
+    }
+
     /* Check the contents of the Xen notes or guest string. */
     if ( ((strlen(parms->loader) == 0) ||
           strncmp(parms->loader, "generic", 7)) &&
