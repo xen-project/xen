@@ -106,6 +106,19 @@ extern irq_desc_t irq_desc[NR_VECTORS];
 
 #define request_irq(irq, handler, irqflags, devname, devid) \
     request_irq_vector(irq_to_vector(irq), handler, irqflags, devname, devid)
+
+#elif defined(__arm__)
+
+#define NR_IRQS		1024
+#define nr_irqs NR_IRQS
+extern irq_desc_t irq_desc[NR_IRQS];
+
+extern int setup_irq(unsigned int irq, struct irqaction *);
+extern void release_irq(unsigned int irq);
+extern int request_irq(unsigned int irq,
+               void (*handler)(int, void *, struct cpu_user_regs *),
+               unsigned long irqflags, const char * devname, void *dev_id);
+
 #else
 extern int setup_irq(unsigned int irq, struct irqaction *);
 extern void release_irq(unsigned int irq);
