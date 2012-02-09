@@ -142,10 +142,6 @@ void stop_kernel(void)
     /* Reset grant tables */
     fini_gnttab();
 
-    /* Reset the console driver. */
-    fini_console(NULL);
-    /* TODO: record new ring mfn & event in start_info */
-
     /* Reset XenBus */
     fini_xenbus();
 

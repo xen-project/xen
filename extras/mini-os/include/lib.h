@@ -184,11 +184,13 @@ extern struct file {
 	struct {
 	    struct consfront_dev *dev;
 	} cons;
+#ifdef CONFIG_XENBUS
         struct {
             /* To each xenbus FD is associated a queue of watch events for this
              * FD.  */
             xenbus_event_queue events;
         } xenbus;
+#endif
     };
     int read;	/* maybe available for read */
 } files[];

@@ -20,11 +20,25 @@ CONFIG_START_NETWORK ?= y
 CONFIG_SPARSE_BSS ?= y
 CONFIG_QEMU_XS_ARGS ?= n
 CONFIG_TEST ?= n
+CONFIG_PCIFRONT ?= n
+CONFIG_BLKFRONT ?= y
+CONFIG_NETFRONT ?= y
+CONFIG_FBFRONT ?= y
+CONFIG_KBDFRONT ?= y
+CONFIG_CONSFRONT ?= y
+CONFIG_XENBUS ?= y
 
 # Export config items as compiler directives
 flags-$(CONFIG_START_NETWORK) += -DCONFIG_START_NETWORK
 flags-$(CONFIG_SPARSE_BSS) += -DCONFIG_SPARSE_BSS
 flags-$(CONFIG_QEMU_XS_ARGS) += -DCONFIG_QEMU_XS_ARGS
+flags-$(CONFIG_PCIFRONT) += -DCONFIG_PCIFRONT
+flags-$(CONFIG_BLKFRONT) += -DCONFIG_BLKFRONT
+flags-$(CONFIG_NETFRONT) += -DCONFIG_NETFRONT
+flags-$(CONFIG_KBDFRONT) += -DCONFIG_KBDFRONT
+flags-$(CONFIG_FBFRONT) += -DCONFIG_FBFRONT
+flags-$(CONFIG_CONSFRONT) += -DCONFIG_CONSFRONT
+flags-$(CONFIG_XENBUS) += -DCONFIG_XENBUS
 
 DEF_CFLAGS += $(flags-y)
 
@@ -50,10 +64,10 @@ TARGET := mini-os
 # Subdirectories common to mini-os
 SUBDIRS := lib xenbus console
 
-src-y += blkfront.c
+src-$(CONFIG_BLKFRONT) += blkfront.c
 src-y += daytime.c
 src-y += events.c
-src-y += fbfront.c
+src-$(CONFIG_FBFRONT) += fbfront.c
 src-y += gntmap.c
 src-y += gnttab.c
 src-y += hypervisor.c
@@ -61,8 +75,8 @@ src-y += kernel.c
 src-y += lock.c
 src-y += main.c
 src-y += mm.c
-src-y += netfront.c
-src-y += pcifront.c
+src-$(CONFIG_NETFRONT) += netfront.c
+src-$(CONFIG_PCIFRONT) += pcifront.c
 src-y += sched.c
 src-$(CONFIG_TEST) += test.c
 
@@ -73,12 +87,13 @@ src-y += lib/stack_chk_fail.c
 src-y += lib/string.c
 src-y += lib/sys.c
 src-y += lib/xmalloc.c
-src-y += lib/xs.c
+src-$(CONFIG_XENBUS) += lib/xs.c
 
-src-y += xenbus/xenbus.c
+src-$(CONFIG_XENBUS) += xenbus/xenbus.c
 
 src-y += console/console.c
 src-y += console/xencons_ring.c
+src-$(CONFIG_CONSFRONT) += console/xenbus.c
 
 # The common mini-os objects to build.
 APP_OBJS :=
@@ -113,7 +128,10 @@ ifeq ($(lwip),y)
 LWC	:= $(shell find $(LWIPDIR)/ -type f -name '*.c')
 LWC	:= $(filter-out %6.c %ip6_addr.c %ethernetif.c, $(LWC))
 LWO	:= $(patsubst %.c,%.o,$(LWC))
-LWO	+= $(addprefix $(OBJ_DIR)/,lwip-arch.o lwip-net.o)
+LWO	+= $(OBJ_DIR)/lwip-arch.o
+ifeq ($(CONFIG_NETFRONT),y)
+LWO += $(OBJ_DIR)/lwip-net.o
+endif
 
 $(OBJ_DIR)/lwip.a: $(LWO)
 	$(RM) $@

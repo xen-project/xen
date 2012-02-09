@@ -158,8 +158,3 @@ void init_console(void)
     /* This is also required to notify the daemon */
     printk("done.\n");
 }
-
-void fini_console(struct consfront_dev *dev)
-{
-    if (dev) free_consfront(dev);
-}

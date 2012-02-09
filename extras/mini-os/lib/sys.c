@@ -164,6 +164,7 @@ int mkdir(const char *pathname, mode_t mode)
     return -1;
 }
 
+#ifdef CONFIG_CONSFRONT
 int posix_openpt(int flags)
 {
     struct consfront_dev *dev;
@@ -192,6 +193,18 @@ int open_savefile(const char *path, int save)
     printk("fd(%d) = open_savefile\n", dev->fd);
     return(dev->fd);
 }
+#else
+int posix_openpt(int flags)
+{
+	errno = EIO;
+	return -1;
+}
+int open_savefile(const char *path, int save)
+{
+	errno = EIO;
+	return -1;
+}
+#endif
 
 int open(const char *pathname, int flags, ...)
 {
@@ -241,6 +254,7 @@ int read(int fd, void *buf, size_t nbytes)
 	case FTYPE_SOCKET:
 	    return lwip_read(files[fd].socket.fd, buf, nbytes);
 #endif
+#ifdef CONFIG_NETFRONT
 	case FTYPE_TAP: {
 	    ssize_t ret;
 	    ret = netfront_receive(files[fd].tap.dev, buf, nbytes);
@@ -250,6 +264,8 @@ int read(int fd, void *buf, size_t nbytes)
 	    }
 	    return ret;
 	}
+#endif
+#ifdef CONFIG_KBDFRONT
         case FTYPE_KBD: {
             int ret, n;
             n = nbytes / sizeof(union xenkbd_in_event);
@@ -260,6 +276,8 @@ int read(int fd, void *buf, size_t nbytes)
 	    }
 	    return ret * sizeof(union xenkbd_in_event);
         }
+#endif
+#ifdef CONFIG_FBFRONT
         case FTYPE_FB: {
             int ret, n;
             n = nbytes / sizeof(union xenfb_in_event);
@@ -270,6 +288,7 @@ int read(int fd, void *buf, size_t nbytes)
 	    }
 	    return ret * sizeof(union xenfb_in_event);
         }
+#endif
 	default:
 	    break;
     }
@@ -297,9 +316,11 @@ int write(int fd, const void *buf, size_t nbytes)
 	case FTYPE_SOCKET:
 	    return lwip_write(files[fd].socket.fd, (void*) buf, nbytes);
 #endif
+#ifdef CONFIG_NETFRONT
 	case FTYPE_TAP:
 	    netfront_xmit(files[fd].tap.dev, (void*) buf, nbytes);
 	    return nbytes;
+#endif
 	default:
 	    break;
     }
@@ -326,9 +347,11 @@ int close(int fd)
         default:
 	    files[fd].type = FTYPE_NONE;
 	    return 0;
+#ifdef CONFIG_XENBUS
 	case FTYPE_XENBUS:
             xs_daemon_close((void*)(intptr_t) fd);
             return 0;
+#endif
 #ifdef HAVE_LWIP
 	case FTYPE_SOCKET: {
 	    int res = lwip_close(files[fd].socket.fd);
@@ -345,27 +368,37 @@ int close(int fd)
 	case FTYPE_GNTMAP:
 	    minios_gnttab_close_fd(fd);
 	    return 0;
+#ifdef CONFIG_NETFRONT
 	case FTYPE_TAP:
 	    shutdown_netfront(files[fd].tap.dev);
 	    files[fd].type = FTYPE_NONE;
 	    return 0;
+#endif
+#ifdef CONFIG_BLKFRONT
 	case FTYPE_BLK:
             shutdown_blkfront(files[fd].blk.dev);
 	    files[fd].type = FTYPE_NONE;
 	    return 0;
+#endif
+#ifdef CONFIG_KBDFRONT
 	case FTYPE_KBD:
             shutdown_kbdfront(files[fd].kbd.dev);
             files[fd].type = FTYPE_NONE;
             return 0;
+#endif
+#ifdef CONFIG_FBFRONT
 	case FTYPE_FB:
             shutdown_fbfront(files[fd].fb.dev);
             files[fd].type = FTYPE_NONE;
             return 0;
+#endif
+#ifdef CONFIG_CONSFRONT
         case FTYPE_SAVEFILE:
         case FTYPE_CONSOLE:
             fini_console(files[fd].cons.dev);
             files[fd].type = FTYPE_NONE;
             return 0;
+#endif
 	case FTYPE_NONE:
 	    break;
     }
@@ -611,6 +644,7 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
                 n++;
 	    FD_CLR(i, exceptfds);
 	    break;
+#ifdef CONFIG_XENBUS
 	case FTYPE_XENBUS:
 	    if (FD_ISSET(i, readfds)) {
                 if (files[i].xenbus.events)
@@ -621,6 +655,7 @@ static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exce
 	    FD_CLR(i, writefds);
 	    FD_CLR(i, exceptfds);
 	    break;
+#endif
 	case FTYPE_EVTCHN:
 	case FTYPE_TAP:
 	case FTYPE_BLK:
@@ -705,11 +740,19 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     fd_set myread, mywrite, myexcept;
     struct thread *thread = get_current();
     s_time_t start = NOW(), stop;
+#ifdef CONFIG_NETFRONT
     DEFINE_WAIT(netfront_w);
+#endif
     DEFINE_WAIT(event_w);
+#ifdef CONFIG_BLKFRONT
     DEFINE_WAIT(blkfront_w);
+#endif
+#ifdef CONFIG_XENBUS
     DEFINE_WAIT(xenbus_watch_w);
+#endif
+#ifdef CONFIG_KBDFRONT
     DEFINE_WAIT(kbdfront_w);
+#endif
     DEFINE_WAIT(console_w);
 
     assert(thread == main_thread);
@@ -727,11 +770,19 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     /* Tell people we're going to sleep before looking at what they are
      * saying, hence letting them wake us if events happen between here and
      * schedule() */
+#ifdef CONFIG_NETFRONT
     add_waiter(netfront_w, netfront_queue);
+#endif
     add_waiter(event_w, event_queue);
+#ifdef CONFIG_BLKFRONT
     add_waiter(blkfront_w, blkfront_queue);
+#endif
+#ifdef CONFIG_XENBUS
     add_waiter(xenbus_watch_w, xenbus_watch_queue);
+#endif
+#ifdef CONFIG_KBDFRONT
     add_waiter(kbdfront_w, kbdfront_queue);
+#endif
     add_waiter(console_w, console_queue);
 
     if (readfds)
@@ -814,11 +865,19 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
     ret = -1;
 
 out:
+#ifdef CONFIG_NETFRONT
     remove_waiter(netfront_w, netfront_queue);
+#endif
     remove_waiter(event_w, event_queue);
+#ifdef CONFIG_BLKFRONT
     remove_waiter(blkfront_w, blkfront_queue);
+#endif
+#ifdef CONFIG_XENBUS
     remove_waiter(xenbus_watch_w, xenbus_watch_queue);
+#endif
+#ifdef CONFIG_KBDFRONT
     remove_waiter(kbdfront_w, kbdfront_queue);
+#endif
     remove_waiter(console_w, console_queue);
     return ret;
 }
