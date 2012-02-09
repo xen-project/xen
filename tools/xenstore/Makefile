@@ -27,7 +27,7 @@ LIBXENSTORE := libxenstore.a
 xenstore xenstore-control: CFLAGS += -static
 endif
 
-ALL_TARGETS = libxenstore.so libxenstore.a clients xs_tdb_dump xenstored
+ALL_TARGETS = libxenstore.so libxenstore.a clients xs_tdb_dump xenstored init-xenstore-domain
 
 ifdef CONFIG_STUBDOM
 CFLAGS += -DNO_SOCKETS=1
@@ -50,7 +50,12 @@ xenstored_probes.o: xenstored_solaris.o
 
 CFLAGS += -DHAVE_DTRACE=1
 endif
- 
+
+init-xenstore-domain.o: CFLAGS += $(CFLAGS_libxenguest)
+
+init-xenstore-domain: init-xenstore-domain.o $(LIBXENSTORE)
+	$(CC) $(LDFLAGS) $^ $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) -o $@ $(APPEND_LDFLAGS)
+
 xenstored: $(XENSTORED_OBJS)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS_libxenctrl) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
 
@@ -86,7 +91,7 @@ libxenstore.a: xs.o xs_lib.o
 clean:
 	rm -f *.a *.o *.opic *.so* xenstored_probes.h
 	rm -f xenstored xs_random xs_stress xs_crashme
-	rm -f xs_tdb_dump xenstore-control
+	rm -f xs_tdb_dump xenstore-control init-xenstore-domain
 	rm -f xenstore $(CLIENTS)
 	$(RM) $(DEPS)
 
