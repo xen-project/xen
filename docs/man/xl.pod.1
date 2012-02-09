@@ -512,6 +512,9 @@ Attempting to set the VCPUs to a number larger than the initially
 configured VCPU count is an error.  Trying to set VCPUs to < 1 will be
 quietly ignored.
 
+Some guests may need to actually bring the newly added CPU online
+after B<vcpu-set>, go to B<SEE ALSO> section for information.
+
 =item B<vcpu-list> [I<domain-id>]
 
 Lists VCPU information for a specific domain.  If no domain is
@@ -1092,6 +1095,10 @@ And the following documents on the xen.org website:
 L<http://xenbits.xen.org/docs/unstable/misc/xl-network-configuration.html>
 L<http://xenbits.xen.org/docs/unstable/misc/xl-disk-configuration.txt>
 L<http://xenbits.xen.org/docs/unstable/misc/xsm-flask.txt>
+
+For systems that don't automatically bring CPU online:
+
+L<http://wiki.xen.org/wiki/Paravirt_Linux_CPU_Hotplug>
 
 =head1 BUGS
 
