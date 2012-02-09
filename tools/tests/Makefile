@@ -11,9 +11,7 @@ ifeq ($(XEN_TARGET_ARCH),__fixme__)
 SUBDIRS-y += regression
 endif
 SUBDIRS-y += x86_emulator
-ifneq ($(XEN_TARGET_ARCH),x86_32)
 SUBDIRS-y += xen-access
-endif
 
 .PHONY: all clean install distclean
 all clean distclean: %: subdirs-%

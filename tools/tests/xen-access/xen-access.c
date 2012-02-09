@@ -600,14 +600,15 @@ int main(int argc, char *argv[])
             case MEM_EVENT_REASON_VIOLATION:
                 rc = xc_hvm_get_mem_access(xch, domain_id, req.gfn, &access);
 
-                printf("PAGE ACCESS: %c%c%c for GFN %lx (offset %06lx) gla %016lx (vcpu %d)\n",
-                        req.access_r ? 'r' : '-',
-                        req.access_w ? 'w' : '-',
-                        req.access_x ? 'x' : '-',
-                        req.gfn,
-                        req.offset,
-                        req.gla,
-                        req.vcpu_id);
+                printf("PAGE ACCESS: %c%c%c for GFN %"PRIx64" (offset %06"
+                       PRIx64") gla %016"PRIx64" (vcpu %d)\n",
+                       req.access_r ? 'r' : '-',
+                       req.access_w ? 'w' : '-',
+                       req.access_x ? 'x' : '-',
+                       req.gfn,
+                       req.offset,
+                       req.gla,
+                       req.vcpu_id);
 
                 if ( default_access != after_first_access )
                     rc = xc_hvm_set_mem_access(xch, domain_id, after_first_access, req.gfn, 1);
@@ -617,8 +618,10 @@ int main(int argc, char *argv[])
                 rsp.p2mt = req.p2mt;
                 break;
             case MEM_EVENT_REASON_INT3:
-                printf("INT3: rip=%016lx, gfn=%lx (vcpu %d)\n", req.gla, req.gfn,
-                        req.vcpu_id);
+                printf("INT3: rip=%016"PRIx64", gfn=%"PRIx64" (vcpu %d)\n", 
+                       req.gla, 
+                       req.gfn,
+                       req.vcpu_id);
 
                 /* Reinject */
                 rc = xc_hvm_inject_trap(xch, domain_id, req.vcpu_id, 3, -1, 0);
