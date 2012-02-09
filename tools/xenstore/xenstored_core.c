@@ -63,7 +63,7 @@ static bool recovery = true;
 static bool remove_local = true;
 static int reopen_log_pipe[2];
 static char *tracefile = NULL;
-static TDB_CONTEXT *tdb_ctx;
+static TDB_CONTEXT *tdb_ctx = NULL;
 
 static void corrupt(struct connection *conn, const char *fmt, ...);
 static void check_store(void);
@@ -92,8 +92,9 @@ TDB_CONTEXT *tdb_context(struct connection *conn)
 
 bool replace_tdb(const char *newname, TDB_CONTEXT *newtdb)
 {
-	if (rename(newname, xs_daemon_tdb()) != 0)
-		return false;
+	if (!(tdb_ctx->flags & TDB_INTERNAL))
+		if (rename(newname, xs_daemon_tdb()) != 0)
+			return false;
 	tdb_close(tdb_ctx);
 	tdb_ctx = talloc_steal(talloc_autofree_context(), newtdb);
 	return true;
@@ -1410,7 +1411,7 @@ static void accept_connection(int sock, bool canwrite)
 }
 #endif
 
-#define TDB_FLAGS 0
+static int tdb_flags;
 
 /* We create initial nodes manually. */
 static void manual_node(const char *name, const char *child)
@@ -1435,7 +1436,9 @@ static void setup_structure(void)
 {
 	char *tdbname;
 	tdbname = talloc_strdup(talloc_autofree_context(), xs_daemon_tdb());
-	tdb_ctx = tdb_open(tdbname, 0, TDB_FLAGS, O_RDWR, 0);
+
+	if (!(tdb_flags & TDB_INTERNAL))
+		tdb_ctx = tdb_open(tdbname, 0, tdb_flags, O_RDWR, 0);
 
 	if (tdb_ctx) {
 		/* XXX When we make xenstored able to restart, this will have
@@ -1466,7 +1469,7 @@ static void setup_structure(void)
 		talloc_free(tlocal);
 	}
 	else {
-		tdb_ctx = tdb_open(tdbname, 7919, TDB_FLAGS, O_RDWR|O_CREAT,
+		tdb_ctx = tdb_open(tdbname, 7919, tdb_flags, O_RDWR|O_CREAT,
 				   0640);
 		if (!tdb_ctx)
 			barf_perror("Could not create tdb file %s", tdbname);
@@ -1783,6 +1786,7 @@ static void usage(void)
 "  --transaction <nb>  limit the number of transaction allowed per domain,\n"
 "  --no-recovery       to request that no recovery should be attempted when\n"
 "                      the store is corrupted (debug only),\n"
+"  --internal-db       store database in memory, not on disk\n"
 "  --preserve-local    to request that /local is preserved on start-up,\n"
 "  --verbose           to request verbose execution.\n");
 }
@@ -1800,6 +1804,7 @@ static struct option options[] = {
 	{ "transaction", 1, NULL, 't' },
 	{ "no-recovery", 0, NULL, 'R' },
 	{ "preserve-local", 0, NULL, 'L' },
+	{ "internal-db", 0, NULL, 'I' },
 	{ "verbose", 0, NULL, 'V' },
 	{ "watch-nb", 1, NULL, 'W' },
 	{ NULL, 0, NULL, 0 } };
@@ -1852,6 +1857,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'T':
 			tracefile = optarg;
+			break;
+		case 'I':
+			tdb_flags = TDB_INTERNAL|TDB_NOLOCK;
 			break;
 		case 'V':
 			verbose = true;
