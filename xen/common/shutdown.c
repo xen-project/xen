@@ -6,7 +6,9 @@
 #include <xen/delay.h>
 #include <xen/shutdown.h>
 #include <xen/console.h>
+#ifdef CONFIG_KEXEC
 #include <xen/kexec.h>
+#endif
 #include <asm/debugger.h>
 #include <public/sched.h>
 
@@ -58,7 +60,9 @@ void dom0_shutdown(u8 reason)
     case SHUTDOWN_watchdog:
     {
         printk("Domain 0 shutdown: watchdog rebooting machine.\n");
+#ifdef CONFIG_KEXEC
         kexec_crash();
+#endif
         machine_restart(0);
         break; /* not reached */
     }

@@ -4,6 +4,11 @@
 ia64 := y
 HAS_ACPI := y
 HAS_VGA  := y
+HAS_CPUFREQ := y
+HAS_PCI := y
+HAS_PASSTHROUGH := y
+HAS_NS16550 := y
+HAS_KEXEC := y
 xenoprof := y
 no_warns ?= n
 vti_debug ?= n

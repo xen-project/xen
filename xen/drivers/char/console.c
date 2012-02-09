@@ -22,7 +22,9 @@
 #include <xen/guest_access.h>
 #include <xen/shutdown.h>
 #include <xen/vga.h>
+#ifdef CONFIG_KEXEC
 #include <xen/kexec.h>
+#endif
 #include <asm/debugger.h>
 #include <asm/div64.h>
 #include <xen/hypercall.h> /* for do_console_io */
@@ -963,7 +965,9 @@ void panic(const char *fmt, ...)
 
     debugger_trap_immediate();
 
+#ifdef CONFIG_KEXEC
     kexec_crash();
+#endif
 
     if ( opt_noreboot )
     {
