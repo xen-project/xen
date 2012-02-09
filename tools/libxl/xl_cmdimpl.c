@@ -1852,7 +1852,7 @@ waitpid_out:
      * If we have daemonized then do not return to the caller -- this has
      * already happened in the parent.
      */
-    if ( !need_daemon )
+    if ( daemonize && !need_daemon )
         exit(ret);
 
     return ret;
