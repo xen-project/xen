@@ -1,0 +1,76 @@
+subdir-y += lib
+
+obj-y += dummy.o
+obj-y += entry.o
+obj-y += domain.o
+obj-y += domain_build.o
+obj-y += gic.o
+obj-y += io.o
+obj-y += irq.o
+obj-y += mm.o
+obj-y += p2m.o
+obj-y += guestcopy.o
+obj-y += setup.o
+obj-y += time.o
+obj-y += smpboot.o
+obj-y += smp.o
+obj-y += shutdown.o
+obj-y += traps.o
+obj-y += vgic.o
+obj-y += vtimer.o
+
+#obj-bin-y += ....o
+
+ALL_OBJS := head.o $(ALL_OBJS)
+
+$(TARGET): $(TARGET)-syms
+	# XXX: VE model loads by VMA so instead of
+	# making a proper ELF we link with LMA == VMA and adjust crudely
+	$(OBJCOPY) --change-addresses +0x7fe00000 $< $@
+	# XXX strip it
+
+#$(TARGET): $(TARGET)-syms $(efi-y) boot/mkelf32
+#	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
+#	`$(NM) -nr $(TARGET)-syms | head -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`
+
+ifeq ($(lto),y)
+# Gather all LTO objects together
+prelink_lto.o: $(ALL_OBJS)
+	$(LD_LTO) -r -o $@ $^
+
+# Link it with all the binary objects
+prelink.o: $(patsubst %/built_in.o,%/built_in_bin.o,$(ALL_OBJS)) prelink_lto.o
+	$(LD) $(LDFLAGS) -r -o $@ $^
+else
+prelink.o: $(ALL_OBJS)
+	$(LD) $(LDFLAGS) -r -o $@ $^
+endif
+
+$(BASEDIR)/common/symbols-dummy.o:
+	$(MAKE) -f $(BASEDIR)/Rules.mk -C $(BASEDIR)/common symbols-dummy.o
+
+$(TARGET)-syms: prelink.o xen.lds $(BASEDIR)/common/symbols-dummy.o
+	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o \
+	    $(BASEDIR)/common/symbols-dummy.o -o $(@D)/.$(@F).0
+	$(NM) -n $(@D)/.$(@F).0 | $(BASEDIR)/tools/symbols >$(@D)/.$(@F).0.S
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).0.o
+	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o \
+	    $(@D)/.$(@F).0.o -o $(@D)/.$(@F).1
+	$(NM) -n $(@D)/.$(@F).1 | $(BASEDIR)/tools/symbols >$(@D)/.$(@F).1.S
+	$(MAKE) -f $(BASEDIR)/Rules.mk $(@D)/.$(@F).1.o
+	$(LD) $(LDFLAGS) -T xen.lds -N prelink.o \
+	    $(@D)/.$(@F).1.o -o $@
+	rm -f $(@D)/.$(@F).[0-9]*
+
+asm-offsets.s: asm-offsets.c
+	$(CC) $(filter-out -flto,$(CFLAGS)) -S -o $@ $<
+
+xen.lds: xen.lds.S
+	$(CC) -P -E -Ui386 $(AFLAGS) -DXEN_PHYS_START=$(CONFIG_LOAD_ADDRESS) -o $@ $<
+	sed -e 's/xen\.lds\.o:/xen\.lds:/g' <.xen.lds.d >.xen.lds.d.new
+	mv -f .xen.lds.d.new .xen.lds.d
+
+.PHONY: clean
+clean::
+	rm -f asm-offsets.s xen.lds
+	rm -f $(BASEDIR)/.xen-syms.[0-9]*
