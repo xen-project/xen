@@ -16,6 +16,8 @@ struct pending_irq
 
 struct arch_domain
 {
+    struct p2m_domain p2m;
+
 }  __cacheline_aligned;
 
 struct arch_vcpu

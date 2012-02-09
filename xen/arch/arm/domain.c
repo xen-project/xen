@@ -224,6 +224,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
     int rc;
 
+    rc = -ENOMEM;
+    if ( (rc = p2m_init(d)) != 0 )
+        goto fail;
+
     d->max_vcpus = 8;
 
     rc = 0;
