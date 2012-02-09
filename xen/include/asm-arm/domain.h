@@ -57,6 +57,13 @@ struct arch_vcpu
         struct list_head inflight_irqs;
         spinlock_t lock;
     } vgic;
+
+    struct {
+        struct timer timer;
+        uint32_t ctl;
+        s_time_t offset;
+        s_time_t cval;
+    } vtimer;
 }  __cacheline_aligned;
 
 void vcpu_show_execution_state(struct vcpu *);

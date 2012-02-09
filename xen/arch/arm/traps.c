@@ -468,7 +468,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
         break;
     case HSR_CPREG32(CNTP_CTL):
     case HSR_CPREG32(CNTP_TVAL):
-        /* emulate timer */
+        BUG_ON(!vtimer_emulate(regs, hsr));
         break;
     default:
         printk("%s p15, %d, r%d, cr%d, cr%d, %d @ %#08x\n",
@@ -498,7 +498,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
     switch ( hsr.bits & HSR_CP64_REGS_MASK )
     {
     case HSR_CPREG64(CNTPCT):
-        /* emulate timer */
+        BUG_ON(!vtimer_emulate(regs, hsr));
         break;
     default:
         printk("%s p15, %d, r%d, r%d, cr%d @ %#08x\n",

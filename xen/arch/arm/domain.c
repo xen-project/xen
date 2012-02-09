@@ -12,6 +12,7 @@
 #include <asm/irq.h>
 
 #include "gic.h"
+#include "vtimer.h"
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 
@@ -213,6 +214,9 @@ int vcpu_initialise(struct vcpu *v)
     int rc = 0;
 
     if ( (rc = vcpu_vgic_init(v)) != 0 )
+        return rc;
+
+    if ( (rc = vcpu_vtimer_init(v)) != 0 )
         return rc;
 
     return rc;
