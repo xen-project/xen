@@ -13,9 +13,10 @@ CLIENTS += xenstore-write xenstore-ls xenstore-watch
 
 XENSTORED_OBJS = xenstored_core.o xenstored_watch.o xenstored_domain.o xenstored_transaction.o xs_lib.o talloc.o utils.o tdb.o hashtable.o
 
-XENSTORED_OBJS_$(CONFIG_Linux) = xenstored_linux.o
-XENSTORED_OBJS_$(CONFIG_SunOS) = xenstored_solaris.o xenstored_probes.o
-XENSTORED_OBJS_$(CONFIG_NetBSD) = xenstored_netbsd.o
+XENSTORED_OBJS_$(CONFIG_Linux) = xenstored_linux.o xenstored_posix.o
+XENSTORED_OBJS_$(CONFIG_SunOS) = xenstored_solaris.o xenstored_posix.o xenstored_probes.o
+XENSTORED_OBJS_$(CONFIG_NetBSD) = xenstored_netbsd.o xenstored_posix.o
+XENSTORED_OBJS_$(CONFIG_MiniOS) = xenstored_minios.o
 
 XENSTORED_OBJS += $(XENSTORED_OBJS_y)
 
@@ -27,6 +28,10 @@ xenstore xenstore-control: CFLAGS += -static
 endif
 
 ALL_TARGETS = libxenstore.so libxenstore.a clients xs_tdb_dump xenstored
+
+ifdef CONFIG_STUBDOM
+CFLAGS += -DNO_SOCKETS=1
+endif
 
 .PHONY: all
 all: $(ALL_TARGETS)
@@ -48,6 +53,9 @@ endif
  
 xenstored: $(XENSTORED_OBJS)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS_libxenctrl) $(SOCKET_LIBS) -o $@ $(APPEND_LDFLAGS)
+
+xenstored.a: $(XENSTORED_OBJS)
+	$(AR) cr $@ $^
 
 $(CLIENTS): xenstore
 	ln -f xenstore $@

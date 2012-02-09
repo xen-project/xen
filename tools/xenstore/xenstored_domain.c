@@ -200,7 +200,7 @@ static int destroy_domain(void *_domain)
 		/* Domain 0 was mapped by dom0_init, so it must be unmapped
 		   using munmap() and not the grant unmap call. */
 		if (domain->domid == 0)
-			munmap(domain->interface, getpagesize());
+			unmap_xenbus(domain->interface);
 		else
 			unmap_interface(domain->interface);
 	}

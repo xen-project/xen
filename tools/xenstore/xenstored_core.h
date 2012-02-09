@@ -171,12 +171,24 @@ extern int event_fd;
 
 /* Map the kernel's xenstore page. */
 void *xenbus_map(void);
+void unmap_xenbus(void *interface);
 
 /* Return the event channel used by xenbus. */
 evtchn_port_t xenbus_evtchn(void);
 
 /* Tell the kernel xenstored is running. */
 void xenbus_notify_running(void);
+
+/* Write out the pidfile */
+void write_pidfile(const char *pidfile);
+
+/* Fork but do not close terminal FDs */
+void daemonize(void);
+/* Close stdin/stdout/stderr to complete daemonize */
+void finish_daemonize(void);
+
+/* Open a pipe for signal handling */
+void init_pipe(int reopen_log_pipe[2]);
 
 #endif /* _XENSTORED_CORE_H */
 
