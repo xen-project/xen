@@ -19,9 +19,11 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/socket.h>
 #include <sys/select.h>
+#ifndef NO_SOCKETS
+#include <sys/socket.h>
 #include <sys/un.h>
+#endif
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
@@ -320,8 +322,10 @@ static int initialize_set(fd_set *inset, fd_set *outset, int sock, int ro_sock,
 	FD_ZERO(inset);
 	FD_ZERO(outset);
 
-	set_fd(sock,               inset, &max);
-	set_fd(ro_sock,            inset, &max);
+	if (sock != -1)
+		set_fd(sock, inset, &max);
+	if (ro_sock != -1)
+		set_fd(ro_sock, inset, &max);
 	set_fd(reopen_log_pipe[0], inset, &max);
 
 	if (xce_handle != NULL)
@@ -1345,6 +1349,11 @@ struct connection *new_connection(connwritefn_t *write, connreadfn_t *read)
 	return new;
 }
 
+#ifdef NO_SOCKETS
+static void accept_connection(int sock, bool canwrite)
+{
+}
+#else
 static int writefd(struct connection *conn, const void *data, unsigned int len)
 {
 	int rc;
@@ -1399,6 +1408,7 @@ static void accept_connection(int sock, bool canwrite)
 	} else
 		close(fd);
 }
+#endif
 
 #define TDB_FLAGS 0
 
@@ -1698,6 +1708,13 @@ static void daemonize(void)
 	umask(0);
 }
 
+#ifdef NO_SOCKETS
+static void init_sockets(int **psock, int **pro_sock)
+{
+	static int minus_one = -1;
+	*psock = *pro_sock = &minus_one;
+}
+#else
 static int destroy_fd(void *_fd)
 {
 	int *fd = _fd;
@@ -1743,6 +1760,7 @@ static void init_sockets(int **psock, int **pro_sock)
 
 
 }
+#endif
 
 static void usage(void)
 {
@@ -1938,10 +1956,10 @@ int main(int argc, char *argv[])
 			reopen_log();
 		}
 
-		if (FD_ISSET(*sock, &inset))
+		if (*sock != -1 && FD_ISSET(*sock, &inset))
 			accept_connection(*sock, true);
 
-		if (FD_ISSET(*ro_sock, &inset))
+		if (*ro_sock != -1 && FD_ISSET(*ro_sock, &inset))
 			accept_connection(*ro_sock, false);
 
 		if (evtchn_fd != -1 && FD_ISSET(evtchn_fd, &inset))
