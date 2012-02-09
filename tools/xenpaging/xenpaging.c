@@ -911,7 +911,7 @@ int main(int argc, char *argv[])
                         !!(req.flags & MEM_EVENT_FLAG_EVICT_FAIL) );
 
                 /* Tell Xen to resume the vcpu */
-                if ( req.flags & MEM_EVENT_FLAG_VCPU_PAUSED )
+                if (( req.flags & MEM_EVENT_FLAG_VCPU_PAUSED ) || ( req.flags & MEM_EVENT_FLAG_EVICT_FAIL ))
                 {
                     /* Prepare the response */
                     rsp.gfn = req.gfn;
