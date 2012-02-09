@@ -25,7 +25,10 @@ static inline void notify_daemon(struct consfront_dev *dev)
 
 static inline struct xencons_interface *xencons_interface(void)
 {
-    return mfn_to_virt(start_info.console.domU.mfn);
+    if (start_info.console.domU.evtchn)
+        return mfn_to_virt(start_info.console.domU.mfn);
+    else
+        return NULL;
 } 
  
 int xencons_ring_send_no_notify(struct consfront_dev *dev, const char *data, unsigned len)
@@ -38,6 +41,8 @@ int xencons_ring_send_no_notify(struct consfront_dev *dev, const char *data, uns
             intf = xencons_interface();
         else
             intf = dev->ring;
+        if (!intf)
+            return sent;
 
 	cons = intf->out_cons;
 	prod = intf->out_prod;
