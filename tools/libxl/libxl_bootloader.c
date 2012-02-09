@@ -49,9 +49,11 @@ static char **make_bootloader_args(libxl__gc *gc,
     flexarray_set(args, nr++, libxl__sprintf(gc, "--output-directory=%s", "/var/run/libxl/"));
 
     if (info->u.pv.bootloader_args) {
-        char *p = info->u.pv.bootloader_args[0];
-        while (*(p++))
-            flexarray_set(args, nr++, p);
+        char **p = info->u.pv.bootloader_args;
+        while (*p) {
+            flexarray_set(args, nr++, *p);
+            p++;
+        }
     }
 
     flexarray_set(args, nr++, disk);
