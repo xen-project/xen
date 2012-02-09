@@ -30,6 +30,9 @@
 
 #define asmlinkage /* Nothing needed */
 
+#define __LINUX_ARM_ARCH__ 7
+#define CONFIG_AEABI
+
 /* Linkage for ARM */
 #define __ALIGN .align 2
 #define __ALIGN_STR ".align 2"
