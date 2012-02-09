@@ -354,7 +354,7 @@ void do_introduce(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
-	if (conn->id != 0 || !conn->can_write) {
+	if (domain_is_unprivileged(conn) || !conn->can_write) {
 		send_error(conn, EACCES);
 		return;
 	}
@@ -418,7 +418,7 @@ void do_set_target(struct connection *conn, struct buffered_data *in)
 		return;
 	}
 
-	if (conn->id != 0 || !conn->can_write) {
+	if (domain_is_unprivileged(conn) || !conn->can_write) {
 		send_error(conn, EACCES);
 		return;
 	}
@@ -470,7 +470,7 @@ void do_release(struct connection *conn, const char *domid_str)
 		return;
 	}
 
-	if (conn->id != 0) {
+	if (domain_is_unprivileged(conn)) {
 		send_error(conn, EACCES);
 		return;
 	}
@@ -507,7 +507,7 @@ void do_resume(struct connection *conn, const char *domid_str)
 		return;
 	}
 
-	if (conn->id != 0) {
+	if (domain_is_unprivileged(conn)) {
 		send_error(conn, EACCES);
 		return;
 	}

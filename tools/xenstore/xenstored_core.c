@@ -462,7 +462,7 @@ static enum xs_perm_type perm_for_conn(struct connection *conn,
 		mask &= ~XS_PERM_WRITE;
 
 	/* Owners and tools get it all... */
-	if (!conn->id || perms[0].id == conn->id
+	if (!domain_is_unprivileged(conn) || perms[0].id == conn->id
                 || (conn->target && perms[0].id == conn->target->id))
 		return (XS_PERM_READ|XS_PERM_WRITE|XS_PERM_OWNER) & mask;
 
@@ -800,11 +800,11 @@ static struct node *construct_node(struct connection *conn, const char *name)
 	node->tdb = tdb_context(conn);
 	node->name = talloc_strdup(node, name);
 
-	/* Inherit permissions, except domains own what they create */
+	/* Inherit permissions, except unprivileged domains own what they create */
 	node->num_perms = parent->num_perms;
 	node->perms = talloc_memdup(node, parent->perms,
 				    node->num_perms * sizeof(node->perms[0]));
-	if (conn && conn->id)
+	if (domain_is_unprivileged(conn))
 		node->perms[0].id = conn->id;
 
 	/* No children, no data */
