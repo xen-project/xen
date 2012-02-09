@@ -805,9 +805,6 @@ int guest_iommu_set_base(struct domain *d, uint64_t base)
     p2m_type_t t;
     struct guest_iommu *iommu = domain_iommu(d);
 
-    if ( !is_hvm_domain(d) || !iommu_enabled || !iommuv2_enabled )
-        return 0;
-
     if ( !iommu )
         return -EACCES;
 
@@ -895,9 +892,6 @@ int guest_iommu_init(struct domain* d)
 void guest_iommu_destroy(struct domain *d)
 {
     struct guest_iommu *iommu;
-
-    if ( !is_hvm_domain(d) || !iommu_enabled || !iommuv2_enabled )
-        return;
 
     iommu = domain_iommu(d);
     if ( !iommu )
