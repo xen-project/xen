@@ -22,6 +22,7 @@
 #include <xen/rbtree.h>
 #include <xen/radix-tree.h>
 #include <xen/list.h>
+#include <xen/init.h>
 
 #define EXPORT /* indicates code other modules are dependent upon */
 #define FORWARD
@@ -49,7 +50,7 @@
 #define INVERT_SENTINEL(_x,_y) _x->sentinel = ~_y##_SENTINEL
 #define ASSERT_SENTINEL(_x,_y) \
     ASSERT(_x->sentinel != ~_y##_SENTINEL);ASSERT(_x->sentinel == _y##_SENTINEL)
-#ifdef __i386__
+#if defined(__i386__) || defined(CONFIG_ARM)
 #define POOL_SENTINEL 0x87658765
 #define OBJ_SENTINEL 0x12345678
 #define OBJNODE_SENTINEL 0xfedcba09

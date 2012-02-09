@@ -12,6 +12,8 @@
 #include <xen/paging.h>
 #include <xen/domain_page.h>
 #include <xen/cpu.h>
+#include <xen/init.h>
+#include <asm/p2m.h>
 
 #define EXPORT /* indicates code other modules are dependent upon */
 
@@ -87,7 +89,7 @@ void tmh_copy_page(char *to, char*from)
 #endif
 }
 
-#ifdef __ia64__
+#if defined(__ia64__) || defined (CONFIG_ARM)
 static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
                                  pfp_t **pcli_pfp, bool_t cli_write)
 {
