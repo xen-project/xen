@@ -61,6 +61,10 @@ that can be used without dom0 disaggregation. The main types for domUs are:
  - isolated_domU_t can only communicate with dom0
  - prot_domU_t is a domain type whose creation can be disabled with a boolean
 
+HVM domains with stubdomain device models use two types (one per domain):
+ - domHVM_t is an HVM domain that uses a stubdomain device model
+ - dm_dom_t is the device model for a domain with type domHVM_t
+
 One disadvantage of using type enforcement to enforce isolation is that a new
 type is needed for each group of domains. In addition, it is not possible to
 allow isolated_domU_t cannot to create loopback event channels without allowing

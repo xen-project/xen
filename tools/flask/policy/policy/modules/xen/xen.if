@@ -25,7 +25,7 @@ define(`create_domain', `
 	allow $1 $2:shadow enable;
 	allow $1 $2:mmu {map_read map_write adjust memorymap physmap pinpage};
 	allow $1 $2:grant setup;
-	allow $1 $2:hvm { cacheattr getparam hvmctl irqlevel pciroute setparam };
+	allow $1 $2:hvm { cacheattr getparam hvmctl irqlevel pciroute setparam pcilevel trackdirtyvram };
 	allow $1 $2_$1_channel:event create;
 ')
 
@@ -36,6 +36,7 @@ define(`manage_domain', `
 			getaddrsize pause unpause trigger shutdown destroy
 			setvcpuaffinity setdomainmaxmem };
 ')
+
 ################################################################################
 #
 # Inter-domain communication
@@ -75,6 +76,14 @@ define(`domain_self_comms', `
 	allow $1 $1:grant { map_read map_write copy unmap };
 ')
 
+# device_model(dm_dom, hvm_dom)
+#   Define how a device model domain interacts with its target
+define(`device_model', `
+	domain_comms($1, $2)
+	allow $1 $2:domain { set_target shutdown };
+	allow $1 $2:mmu { map_read map_write adjust physmap };
+	allow $1 $2:hvm { getparam setparam trackdirtyvram hvmctl irqlevel pciroute };
+')
 ################################################################################
 #
 # Device types and delegation (PCI passthrough)

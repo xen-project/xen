@@ -100,6 +100,19 @@ if (!prot_doms_locked) {
 domain_comms(dom0_t, prot_domU_t)
 domain_comms(domU_t, prot_domU_t)
 
+# domHVM_t is meant to be paired with a qemu-dm stub domain of type dm_dom_t
+declare_domain(domHVM_t)
+create_domain(dom0_t, domHVM_t)
+manage_domain(dom0_t, domHVM_t)
+domain_comms(dom0_t, domHVM_t)
+domain_self_comms(domHVM_t)
+
+declare_domain(dm_dom_t)
+create_domain(dom0_t, dm_dom_t)
+manage_domain(dom0_t, dm_dom_t)
+domain_comms(dom0_t, dm_dom_t)
+device_model(dm_dom_t, domHVM_t)
+
 ###############################################################################
 #
 # Device delegation
