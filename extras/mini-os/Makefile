@@ -27,6 +27,7 @@ CONFIG_FBFRONT ?= y
 CONFIG_KBDFRONT ?= y
 CONFIG_CONSFRONT ?= y
 CONFIG_XENBUS ?= y
+CONFIG_LWIP ?= $(lwip)
 
 # Export config items as compiler directives
 flags-$(CONFIG_START_NETWORK) += -DCONFIG_START_NETWORK
@@ -123,7 +124,7 @@ links: include/list.h $(ARCH_LINKS)
 arch_lib:
 	$(MAKE) --directory=$(TARGET_ARCH_DIR) OBJ_DIR=$(OBJ_DIR)/$(TARGET_ARCH_DIR) || exit 1;
 
-ifeq ($(lwip),y)
+ifeq ($(CONFIG_LWIP),y)
 # lwIP library
 LWC	:= $(shell find $(LWIPDIR)/ -type f -name '*.c')
 LWC	:= $(filter-out %6.c %ip6_addr.c %ethernetif.c, $(LWC))

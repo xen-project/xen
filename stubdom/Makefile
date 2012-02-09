@@ -74,14 +74,14 @@ TARGET_CPPFLAGS += -I$(XEN_ROOT)/xen/include
 
 TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
 
-TARGETS=ioemu c caml grub
+TARGETS=ioemu c caml grub xenstore
 
 CROSS_MAKE := $(MAKE) DESTDIR=
 
 .PHONY: all
 all: build
 ifeq ($(STUBDOM_SUPPORTED),1)
-build: genpath ioemu-stubdom c-stubdom pv-grub
+build: genpath ioemu-stubdom c-stubdom pv-grub xenstore-stubdom
 else
 build: genpath
 endif
@@ -262,6 +262,11 @@ mk-headers-$(XEN_TARGET_ARCH): ioemu/linkfarm.stamp
 	  ln -sf $(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/*.c . && \
 	  ln -sf $(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/*.h . && \
 	  ln -sf $(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/Makefile . )
+	mkdir -p xenstore
+	[ -h xenstore/Makefile ] || ( cd xenstore && \
+	  ln -sf $(XEN_ROOT)/tools/xenstore/*.c . && \
+	  ln -sf $(XEN_ROOT)/tools/xenstore/*.h . && \
+	  ln -sf $(XEN_ROOT)/tools/xenstore/Makefile . )
 	$(CROSS_MAKE) -C $(MINI_OS) links
 	touch mk-headers-$(XEN_TARGET_ARCH)
 
@@ -334,6 +339,14 @@ grub: grub-upstream $(CROSS_ROOT)
 	mkdir -p grub-$(XEN_TARGET_ARCH)
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(CROSS_MAKE) -C $@ OBJ_DIR=$(CURDIR)/grub-$(XEN_TARGET_ARCH)
 
+##########
+# xenstore
+##########
+
+.PHONY: xenstore
+xenstore: $(CROSS_ROOT)
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(CROSS_MAKE) -C $@ xenstored.a CONFIG_STUBDOM=y
+
 ########
 # minios
 ########
@@ -355,12 +368,16 @@ c-stubdom: mini-os-$(XEN_TARGET_ARCH)-c lwip-$(XEN_TARGET_ARCH) libxc c
 pv-grub: mini-os-$(XEN_TARGET_ARCH)-grub libxc grub
 	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/grub/minios.cfg" $(CROSS_MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/grub-$(XEN_TARGET_ARCH)/main.a
 
+.PHONY: xenstore-stubdom
+xenstore-stubdom: mini-os-$(XEN_TARGET_ARCH)-xenstore libxc xenstore
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/xenstore-minios.cfg" $(CROSS_MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/xenstore/xenstored.a
+
 #########
 # install
 #########
 
 ifeq ($(STUBDOM_SUPPORTED),1)
-install: genpath install-readme install-ioemu install-grub
+install: genpath install-readme install-ioemu install-grub install-xenstore
 else
 install: genpath
 endif
@@ -379,6 +396,10 @@ install-grub: pv-grub
 	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
 	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-grub/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/pv-grub-$(XEN_TARGET_ARCH).gz"
 
+install-xenstore: xenstore-stubdom
+	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
+	$(INSTALL_PROG) mini-os-$(XEN_TARGET_ARCH)-xenstore/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/xenstore-stubdom.gz"
+
 #######
 # clean
 #######
@@ -390,12 +411,14 @@ clean:
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-c
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-caml
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-grub
+	rm -fr mini-os-$(XEN_TARGET_ARCH)-xenstore
 	$(CROSS_MAKE) -C caml clean
 	$(CROSS_MAKE) -C c clean
 	rm -fr grub-$(XEN_TARGET_ARCH)
 	rm -f $(STUBDOMPATH)
 	[ ! -d libxc-$(XEN_TARGET_ARCH) ] || $(CROSS_MAKE) -C libxc-$(XEN_TARGET_ARCH) clean
 	-[ ! -d ioemu ] || $(CROSS_MAKE) -C ioemu clean
+	-[ ! -d xenstore ] || $(CROSS_MAKE) -C xenstore clean
 
 # clean the cross-compilation result
 .PHONY: crossclean
