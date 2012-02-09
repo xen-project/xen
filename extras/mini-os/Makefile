@@ -8,9 +8,24 @@ export XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/Config.mk
 OBJ_DIR ?= $(CURDIR)
 
-ifneq ($(stubdom),y)
+ifeq ($(MINIOS_CONFIG),)
 include Config.mk
+else
+EXTRA_DEPS += $(MINIOS_CONFIG)
+include $(MINIOS_CONFIG)
 endif
+
+# Configuration defaults
+CONFIG_START_NETWORK ?= y
+CONFIG_SPARSE_BSS ?= y
+CONFIG_QEMU_XS_ARGS ?= n
+
+# Export config items as compiler directives
+flags-$(CONFIG_START_NETWORK) += -DCONFIG_START_NETWORK
+flags-$(CONFIG_SPARSE_BSS) += -DCONFIG_SPARSE_BSS
+flags-$(CONFIG_QEMU_XS_ARGS) += -DCONFIG_QEMU_XS_ARGS
+
+DEF_CFLAGS += $(flags-y)
 
 # Include common mini-os makerules.
 include minios.mk
@@ -34,13 +49,38 @@ TARGET := mini-os
 # Subdirectories common to mini-os
 SUBDIRS := lib xenbus console
 
+src-y += blkfront.c
+src-y += daytime.c
+src-y += events.c
+src-y += fbfront.c
+src-y += gntmap.c
+src-y += gnttab.c
+src-y += hypervisor.c
+src-y += kernel.c
+src-y += lock.c
+src-y += main.c
+src-y += mm.c
+src-y += netfront.c
+src-y += pcifront.c
+src-y += sched.c
+
+src-y += lib/ctype.c
+src-y += lib/math.c
+src-y += lib/printf.c
+src-y += lib/stack_chk_fail.c
+src-y += lib/string.c
+src-y += lib/sys.c
+src-y += lib/xmalloc.c
+src-y += lib/xs.c
+
+src-y += xenbus/xenbus.c
+
+src-y += console/console.c
+src-y += console/xencons_ring.c
+
 # The common mini-os objects to build.
 APP_OBJS :=
-OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(wildcard *.c))
-OBJS += $(patsubst %.c,$(OBJ_DIR)/%.o,$(wildcard lib/*.c))
-OBJS += $(patsubst %.c,$(OBJ_DIR)/%.o,$(wildcard xenbus/*.c))
-OBJS += $(patsubst %.c,$(OBJ_DIR)/%.o,$(wildcard console/*.c))
-
+OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(src-y))
 
 .PHONY: default
 default: $(OBJ_DIR)/$(TARGET)

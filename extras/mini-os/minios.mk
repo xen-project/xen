@@ -39,8 +39,8 @@ LDFLAGS := $(DEF_LDFLAGS) $(ARCH_LDFLAGS)
 
 # Special build dependencies.
 # Rebuild all after touching this/these file(s)
-EXTRA_DEPS = $(MINI-OS_ROOT)/minios.mk \
-		$(MINI-OS_ROOT)/$(TARGET_ARCH_DIR)/arch.mk
+EXTRA_DEPS += $(MINI-OS_ROOT)/minios.mk
+EXTRA_DEPS += $(MINI-OS_ROOT)/$(TARGET_ARCH_DIR)/arch.mk
 
 # Find all header files for checking dependencies.
 HDRS := $(wildcard $(MINI-OS_ROOT)/include/*.h)

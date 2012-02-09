@@ -43,13 +43,13 @@ extern char __app_bss_start, __app_bss_end;
 static void call_main(void *p)
 {
     char *c, quote;
-#ifdef CONFIG_QEMU
+#ifdef CONFIG_QEMU_XS_ARGS
     char *domargs, *msg;
 #endif
     int argc;
     char **argv;
     char *envp[] = { NULL };
-#ifdef CONFIG_QEMU
+#ifdef CONFIG_QEMU_XS_ARGS
     char *vm;
     char path[128];
     int domid;
@@ -60,15 +60,15 @@ static void call_main(void *p)
      * crashing. */
     //sleep(1);
 
-#ifndef CONFIG_GRUB
+#ifdef CONFIG_SPARSE_BSS
     sparse((unsigned long) &__app_bss_start, &__app_bss_end - &__app_bss_start);
-#if defined(HAVE_LWIP) && !defined(CONFIG_QEMU)
-    start_networking();
 #endif
+#if defined(HAVE_LWIP) && defined(CONFIG_START_NETWORK)
+    start_networking();
 #endif
     create_thread("pcifront", pcifront_watches, NULL);
 
-#ifdef CONFIG_QEMU
+#ifdef CONFIG_QEMU_XS_ARGS
     /* Fetch argc, argv from XenStore */
     domid = xenbus_read_integer("target");
     if (domid == -1) {
@@ -132,7 +132,7 @@ static void call_main(void *p)
 #define PARSE_ARGS_STORE(ARGS) PARSE_ARGS(ARGS, argv[argc++] = c, memmove(c, c + 1, strlen(c + 1) + 1), *c++ = 0)
 
     PARSE_ARGS_COUNT((char*)start_info.cmd_line);
-#ifdef CONFIG_QEMU
+#ifdef CONFIG_QEMU_XS_ARGS
     PARSE_ARGS_COUNT(domargs);
 #endif
 
@@ -141,7 +141,7 @@ static void call_main(void *p)
     argc = 1;
 
     PARSE_ARGS_STORE((char*)start_info.cmd_line)
-#ifdef CONFIG_QEMU
+#ifdef CONFIG_QEMU_XS_ARGS
     PARSE_ARGS_STORE(domargs)
 #endif
 
