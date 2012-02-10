@@ -1130,17 +1130,18 @@ void p2m_mem_paging_resume(struct domain *d)
 }
 
 bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla, 
-                          bool_t access_r, bool_t access_w, bool_t access_x)
+                          bool_t access_r, bool_t access_w, bool_t access_x,
+                          mem_event_request_t **req_ptr)
 {
     struct vcpu *v = current;
-    mem_event_request_t req;
     unsigned long gfn = gpa >> PAGE_SHIFT;
     struct domain *d = v->domain;    
     struct p2m_domain* p2m = p2m_get_hostp2m(d);
     mfn_t mfn;
     p2m_type_t p2mt;
     p2m_access_t p2ma;
-    
+    mem_event_request_t *req;
+
     /* First, handle rx2rw conversion automatically */
     gfn_lock(p2m, gfn, 0);
     mfn = p2m->get_entry(p2m, gfn, &p2mt, &p2ma, p2m_query, NULL);
@@ -1159,7 +1160,7 @@ bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long g
     gfn_unlock(p2m, gfn, 0);
 
     /* Otherwise, check if there is a memory event listener, and send the message along */
-    if ( mem_event_claim_slot(d, &d->mem_event->access) == -ENOSYS )
+    if ( !mem_event_check_ring(&d->mem_event->access) || !req_ptr ) 
     {
         /* No listener */
         if ( p2m->access_required ) 
@@ -1183,29 +1184,34 @@ bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long g
         }
     }
 
-    memset(&req, 0, sizeof(req));
-    req.type = MEM_EVENT_TYPE_ACCESS;
-    req.reason = MEM_EVENT_REASON_VIOLATION;
+    *req_ptr = NULL;
+    req = xmalloc(mem_event_request_t);
+    if ( req )
+    {
+        *req_ptr = req;
+        memset(req, 0, sizeof(req));
+        req->type = MEM_EVENT_TYPE_ACCESS;
+        req->reason = MEM_EVENT_REASON_VIOLATION;
+
+        /* Pause the current VCPU */
+        if ( p2ma != p2m_access_n2rwx )
+            req->flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
+
+        /* Send request to mem event */
+        req->gfn = gfn;
+        req->offset = gpa & ((1 << PAGE_SHIFT) - 1);
+        req->gla_valid = gla_valid;
+        req->gla = gla;
+        req->access_r = access_r;
+        req->access_w = access_w;
+        req->access_x = access_x;
+    
+        req->vcpu_id = v->vcpu_id;
+    }
 
     /* Pause the current VCPU */
     if ( p2ma != p2m_access_n2rwx )
-    {
         vcpu_pause_nosync(v);
-        req.flags |= MEM_EVENT_FLAG_VCPU_PAUSED;
-    } 
-
-    /* Send request to mem event */
-    req.gfn = gfn;
-    req.offset = gpa & ((1 << PAGE_SHIFT) - 1);
-    req.gla_valid = gla_valid;
-    req.gla = gla;
-    req.access_r = access_r;
-    req.access_w = access_w;
-    req.access_x = access_x;
-    
-    req.vcpu_id = v->vcpu_id;
-
-    mem_event_put_request(d, &d->mem_event->access, &req);
 
     /* VCPU may be paused, return whether we promoted automatically */
     return (p2ma == p2m_access_n2rwx);

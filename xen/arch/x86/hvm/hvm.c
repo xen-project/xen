@@ -64,6 +64,7 @@
 #include <public/version.h>
 #include <public/memory.h>
 #include <asm/mem_event.h>
+#include <asm/mem_access.h>
 #include <public/mem_event.h>
 
 bool_t __read_mostly hvm_enabled;
@@ -363,8 +364,8 @@ static int hvm_set_ioreq_page(
     }
     if ( p2m_is_paging(p2mt) )
     {
-        p2m_mem_paging_populate(d, gmfn);
         put_gfn(d, gmfn);
+        p2m_mem_paging_populate(d, gmfn);
         return -ENOENT;
     }
     if ( p2m_is_shared(p2mt) )
@@ -1195,7 +1196,8 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
     mfn_t mfn;
     struct vcpu *v = current;
     struct p2m_domain *p2m;
-    int rc, fall_through = 0;
+    int rc, fall_through = 0, paged = 0;
+    mem_event_request_t *req_ptr = NULL;
 
     /* On Nested Virtualization, walk the guest page table.
      * If this succeeds, all is fine.
@@ -1270,7 +1272,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
         if ( violation )
         {
             if ( p2m_mem_access_check(gpa, gla_valid, gla, access_r, 
-                                        access_w, access_x) )
+                                        access_w, access_x, &req_ptr) )
             {
                 fall_through = 1;
             } else {
@@ -1297,7 +1299,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
 #ifdef __x86_64__
     /* Check if the page has been paged out */
     if ( p2m_is_paged(p2mt) || (p2mt == p2m_ram_paging_out) )
-        p2m_mem_paging_populate(v->domain, gfn);
+        paged = 1;
 
     /* Mem sharing: unshare the page and try again */
     if ( access_w && (p2mt == p2m_ram_shared) )
@@ -1343,6 +1345,13 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
 
 out_put_gfn:
     put_gfn(p2m->domain, gfn);
+    if ( paged )
+        p2m_mem_paging_populate(v->domain, gfn);
+    if ( req_ptr )
+    {
+        mem_access_send_req(v->domain, req_ptr);
+        xfree(req_ptr);
+    }
     return rc;
 }
 
@@ -1849,8 +1858,8 @@ static void *__hvm_map_guest_frame(unsigned long gfn, bool_t writable)
     }
     if ( p2m_is_paging(p2mt) )
     {
-        p2m_mem_paging_populate(d, gfn);
         put_gfn(d, gfn);
+        p2m_mem_paging_populate(d, gfn);
         return NULL;
     }
 
@@ -2325,8 +2334,8 @@ static enum hvm_copy_result __hvm_copy(
 
         if ( p2m_is_paging(p2mt) )
         {
-            p2m_mem_paging_populate(curr->domain, gfn);
             put_gfn(curr->domain, gfn);
+            p2m_mem_paging_populate(curr->domain, gfn);
             return HVMCOPY_gfn_paged_out;
         }
         if ( p2m_is_shared(p2mt) )
@@ -3923,8 +3932,8 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             mfn_t mfn = get_gfn_unshare(d, pfn, &t);
             if ( p2m_is_paging(t) )
             {
-                p2m_mem_paging_populate(d, pfn);
                 put_gfn(d, pfn);
+                p2m_mem_paging_populate(d, pfn);
                 rc = -EINVAL;
                 goto param_fail3;
             }
@@ -4040,8 +4049,8 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             mfn = get_gfn_unshare(d, pfn, &t);
             if ( p2m_is_paging(t) )
             {
-                p2m_mem_paging_populate(d, pfn);
                 put_gfn(d, pfn);
+                p2m_mem_paging_populate(d, pfn);
                 rc = -EINVAL;
                 goto param_fail4;
             }

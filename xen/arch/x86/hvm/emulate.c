@@ -67,8 +67,8 @@ static int hvmemul_do_io(
     ram_mfn = get_gfn_unshare(curr->domain, ram_gfn, &p2mt);
     if ( p2m_is_paging(p2mt) )
     {
-        p2m_mem_paging_populate(curr->domain, ram_gfn);
         put_gfn(curr->domain, ram_gfn); 
+        p2m_mem_paging_populate(curr->domain, ram_gfn);
         return X86EMUL_RETRY;
     }
     if ( p2m_is_shared(p2mt) )

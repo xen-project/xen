@@ -24,6 +24,9 @@
 #ifndef __MEM_EVENT_H__
 #define __MEM_EVENT_H__
 
+/* Returns whether a ring has been set up */
+bool_t mem_event_check_ring(struct mem_event_domain *med);
+
 /* Returns 0 on success, -ENOSYS if there is no ring, -EBUSY if there is no
  * available space. For success or -EBUSY, the vCPU may be left blocked
  * temporarily to ensure that the ring does not lose future events.  In

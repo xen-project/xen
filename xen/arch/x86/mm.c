@@ -3536,8 +3536,8 @@ int do_mmu_update(
 
             if ( p2m_is_paged(p2mt) )
             {
-                p2m_mem_paging_populate(pg_owner, gmfn);
                 put_gfn(pt_owner, gmfn);
+                p2m_mem_paging_populate(pg_owner, gmfn);
                 rc = -ENOENT;
                 break;
             }
@@ -3568,8 +3568,8 @@ int do_mmu_update(
 
                     if ( p2m_is_paged(l1e_p2mt) )
                     {
-                        p2m_mem_paging_populate(pg_owner, l1e_get_pfn(l1e));
                         put_gfn(pg_owner, l1egfn);
+                        p2m_mem_paging_populate(pg_owner, l1e_get_pfn(l1e));
                         rc = -ENOENT;
                         break;
                     }
@@ -3617,8 +3617,8 @@ int do_mmu_update(
 
                     if ( p2m_is_paged(l2e_p2mt) )
                     {
-                        p2m_mem_paging_populate(pg_owner, l2egfn);
                         put_gfn(pg_owner, l2egfn);
+                        p2m_mem_paging_populate(pg_owner, l2egfn);
                         rc = -ENOENT;
                         break;
                     }
@@ -3652,8 +3652,8 @@ int do_mmu_update(
 
                     if ( p2m_is_paged(l3e_p2mt) )
                     {
-                        p2m_mem_paging_populate(pg_owner, l3egfn);
                         put_gfn(pg_owner, l3egfn);
+                        p2m_mem_paging_populate(pg_owner, l3egfn);
                         rc = -ENOENT;
                         break;
                     }
@@ -3687,8 +3687,8 @@ int do_mmu_update(
 
                     if ( p2m_is_paged(l4e_p2mt) )
                     {
-                        p2m_mem_paging_populate(pg_owner, l4egfn);
                         put_gfn(pg_owner, l4egfn);
+                        p2m_mem_paging_populate(pg_owner, l4egfn);
                         rc = -ENOENT;
                         break;
                     }

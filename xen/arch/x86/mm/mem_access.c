@@ -47,6 +47,16 @@ int mem_access_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
     return rc;
 }
 
+int mem_access_send_req(struct domain *d, mem_event_request_t *req)
+{
+    int rc = mem_event_claim_slot(d, &d->mem_event->access);
+    if ( rc < 0 )
+        return rc;
+
+    mem_event_put_request(d, &d->mem_event->access, req);
+
+    return 0;
+} 
 
 /*
  * Local variables:

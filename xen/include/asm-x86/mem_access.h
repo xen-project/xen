@@ -23,6 +23,7 @@
 
 int mem_access_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
                       XEN_GUEST_HANDLE(void) u_domctl);
+int mem_access_send_req(struct domain *d, mem_event_request_t *req);
 
 
 /*

@@ -166,8 +166,8 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     if ( unlikely(p2m_is_paging(p2mt)) )
     {
         guest_physmap_remove_page(d, gmfn, mfn, 0);
-        p2m_mem_paging_drop_page(d, gmfn, p2mt);
         put_gfn(d, gmfn);
+        p2m_mem_paging_drop_page(d, gmfn, p2mt);
         return 1;
     }
 #else

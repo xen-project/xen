@@ -423,6 +423,11 @@ static int mem_event_wait_slot(struct mem_event_domain *med)
     return rc;
 }
 
+bool_t mem_event_check_ring(struct mem_event_domain *med)
+{
+    return (med->ring_page != NULL);
+}
+
 /*
  * Determines whether or not the current vCPU belongs to the target domain,
  * and calls the appropriate wait function.  If it is a guest vCPU, then we

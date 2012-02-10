@@ -102,8 +102,8 @@ static inline void *map_domain_gfn(struct p2m_domain *p2m,
     if ( p2m_is_paging(*p2mt) )
     {
         ASSERT(!p2m_is_nestedp2m(p2m));
-        p2m_mem_paging_populate(p2m->domain, gfn_x(gfn));
         __put_gfn(p2m, gfn_x(gfn));
+        p2m_mem_paging_populate(p2m->domain, gfn_x(gfn));
         *rc = _PAGE_PAGED;
         return NULL;
     }
