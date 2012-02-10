@@ -727,11 +727,11 @@ int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t 
     int ret = -EINVAL;
     mfn_t smfn, cmfn;
     p2m_type_t smfn_type, cmfn_type;
+    struct two_gfns tg;
 
-    /* XXX if sd == cd handle potential deadlock by ordering
-     * the get_ and put_gfn's */
-    smfn = get_gfn(sd, sgfn, &smfn_type);
-    cmfn = get_gfn(cd, cgfn, &cmfn_type);
+    get_two_gfns(sd, sgfn, &smfn_type, NULL, &smfn,
+                 cd, cgfn, &cmfn_type, NULL, &cmfn,
+                 p2m_query, &tg);
 
     /* This tricky business is to avoid two callers deadlocking if 
      * grabbing pages in opposite client/source order */
@@ -828,8 +828,7 @@ int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t 
     ret = 0;
     
 err_out:
-    put_gfn(cd, cgfn);
-    put_gfn(sd, sgfn);
+    put_two_gfns(&tg);
     return ret;
 }
 
@@ -843,11 +842,11 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
     struct gfn_info *gfn_info;
     struct p2m_domain *p2m = p2m_get_hostp2m(cd);
     p2m_access_t a;
-    
-    /* XXX if sd == cd handle potential deadlock by ordering
-     * the get_ and put_gfn's */
-    smfn = get_gfn_query(sd, sgfn, &smfn_type);
-    cmfn = get_gfn_type_access(p2m, cgfn, &cmfn_type, &a, p2m_query, NULL);
+    struct two_gfns tg;
+
+    get_two_gfns(sd, sgfn, &smfn_type, NULL, &smfn,
+                 cd, cgfn, &cmfn_type, &a, &cmfn,
+                 p2m_query, &tg);
 
     /* Get the source shared page, check and lock */
     ret = XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID;
@@ -897,8 +896,7 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
 err_unlock:
     mem_sharing_page_unlock(spage);
 err_out:
-    put_gfn(cd, cgfn);
-    put_gfn(sd, sgfn);
+    put_two_gfns(&tg);
     return ret;
 }
 

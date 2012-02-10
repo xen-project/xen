@@ -660,12 +660,13 @@ static int hvmemul_rep_movs(
 {
     struct hvm_emulate_ctxt *hvmemul_ctxt =
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
-    unsigned long saddr, daddr, bytes, sgfn, dgfn;
+    unsigned long saddr, daddr, bytes;
     paddr_t sgpa, dgpa;
     uint32_t pfec = PFEC_page_present;
-    p2m_type_t p2mt;
+    p2m_type_t sp2mt, dp2mt;
     int rc, df = !!(ctxt->regs->eflags & X86_EFLAGS_DF);
     char *buf;
+    struct two_gfns tg;
 
     rc = hvmemul_virtual_to_linear(
         src_seg, src_offset, bytes_per_rep, reps, hvm_access_read,
@@ -693,26 +694,23 @@ static int hvmemul_rep_movs(
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    /* XXX In a fine-grained p2m locking scenario, we need to sort this
-     * get_gfn's, or else we might deadlock */
-    sgfn = sgpa >> PAGE_SHIFT;
-    (void)get_gfn(current->domain, sgfn, &p2mt);
-    if ( !p2m_is_ram(p2mt) && !p2m_is_grant(p2mt) )
+    get_two_gfns(current->domain, sgpa >> PAGE_SHIFT, &sp2mt, NULL, NULL,
+                 current->domain, dgpa >> PAGE_SHIFT, &dp2mt, NULL, NULL,
+                 p2m_guest, &tg);
+
+    if ( !p2m_is_ram(sp2mt) && !p2m_is_grant(sp2mt) )
     {
         rc = hvmemul_do_mmio(
             sgpa, reps, bytes_per_rep, dgpa, IOREQ_READ, df, NULL);
-        put_gfn(current->domain, sgfn);
+        put_two_gfns(&tg);
         return rc;
     }
 
-    dgfn = dgpa >> PAGE_SHIFT;
-    (void)get_gfn(current->domain, dgfn, &p2mt);
-    if ( !p2m_is_ram(p2mt) && !p2m_is_grant(p2mt) )
+    if ( !p2m_is_ram(dp2mt) && !p2m_is_grant(dp2mt) )
     {
         rc = hvmemul_do_mmio(
             dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE, df, NULL);
-        put_gfn(current->domain, sgfn);
-        put_gfn(current->domain, dgfn);
+        put_two_gfns(&tg);
         return rc;
     }
 
@@ -730,8 +728,7 @@ static int hvmemul_rep_movs(
      */
     if ( ((dgpa + bytes_per_rep) > sgpa) && (dgpa < (sgpa + bytes)) )
     {
-        put_gfn(current->domain, sgfn);
-        put_gfn(current->domain, dgfn);
+        put_two_gfns(&tg);
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -743,8 +740,7 @@ static int hvmemul_rep_movs(
     buf = xmalloc_bytes(bytes);
     if ( buf == NULL )
     {
-        put_gfn(current->domain, sgfn);
-        put_gfn(current->domain, dgfn);
+        put_two_gfns(&tg);
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -757,8 +753,7 @@ static int hvmemul_rep_movs(
         rc = hvm_copy_to_guest_phys(dgpa, buf, bytes);
 
     xfree(buf);
-    put_gfn(current->domain, sgfn);
-    put_gfn(current->domain, dgfn);
+    put_two_gfns(&tg);
 
     if ( rc == HVMCOPY_gfn_paged_out )
         return X86EMUL_RETRY;
