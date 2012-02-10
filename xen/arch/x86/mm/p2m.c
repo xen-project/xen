@@ -72,6 +72,7 @@ boolean_param("hap_2mb", opt_hap_2mb);
 static void p2m_initialise(struct domain *d, struct p2m_domain *p2m)
 {
     mm_lock_init(&p2m->lock);
+    mm_lock_init(&p2m->pod.lock);
     INIT_LIST_HEAD(&p2m->np2m_list);
     INIT_PAGE_LIST_HEAD(&p2m->pages);
     INIT_PAGE_LIST_HEAD(&p2m->pod.super);
@@ -568,8 +569,10 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
             rc = -EINVAL;
         else
         {
-            p2m->pod.entry_count -= pod_count; /* Lock: p2m */
+            pod_lock(p2m);
+            p2m->pod.entry_count -= pod_count;
             BUG_ON(p2m->pod.entry_count < 0);
+            pod_unlock(p2m);
         }
     }
 
@@ -1350,6 +1353,7 @@ p2m_flush_table(struct p2m_domain *p2m)
     /* "Host" p2m tables can have shared entries &c that need a bit more 
      * care when discarding them */
     ASSERT(p2m_is_nestedp2m(p2m));
+    /* Nested p2m's do not do pod, hence the asserts (and no pod lock)*/
     ASSERT(page_list_empty(&p2m->pod.super));
     ASSERT(page_list_empty(&p2m->pod.single));
 
@@ -1507,6 +1511,7 @@ void audit_p2m(struct domain *d,
     P2M_PRINTK("p2m audit starts\n");
 
     p2m_lock(p2m);
+    pod_lock(p2m);
 
     if (p2m->audit_p2m)
         pmbad = p2m->audit_p2m(p2m);
@@ -1567,6 +1572,7 @@ void audit_p2m(struct domain *d,
     }
     spin_unlock(&d->page_alloc_lock);
 
+    pod_unlock(p2m);
     p2m_unlock(p2m);
  
     P2M_PRINTK("p2m audit complete\n");

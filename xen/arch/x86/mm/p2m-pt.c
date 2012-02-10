@@ -954,6 +954,7 @@ long p2m_pt_audit_p2m(struct p2m_domain *p2m)
     struct domain *d = p2m->domain;
 
     ASSERT(p2m_locked_by_me(p2m));
+    ASSERT(pod_locked_by_me(p2m));
 
     test_linear = ( (d == current->domain)
                     && !pagetable_is_null(current->arch.monitor_table) );

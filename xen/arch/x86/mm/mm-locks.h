@@ -194,6 +194,16 @@ declare_mm_order_constraint(per_page_sharing)
  * - setting the "cr3" field of any p2m table to a non-CR3_EADDR value. 
  *   (i.e. assigning a p2m table to be the shadow of that cr3 */
 
+/* PoD lock (per-p2m-table)
+ * 
+ * Protects private PoD data structs: entry and cache
+ * counts, page lists, sweep parameters. */
+
+declare_mm_lock(pod)
+#define pod_lock(p)           mm_lock(pod, &(p)->pod.lock)
+#define pod_unlock(p)         mm_unlock(&(p)->pod.lock)
+#define pod_locked_by_me(p)   mm_locked_by_me(&(p)->pod.lock)
+
 /* Page alloc lock (per-domain)
  *
  * This is an external lock, not represented by an mm_lock_t. However, 
