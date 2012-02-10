@@ -473,31 +473,6 @@ out:
 }
 
 
-/* Non-ept "lock-and-check" wrapper */
-static int p2m_pod_check_and_populate(struct p2m_domain *p2m, unsigned long gfn,
-                                      l1_pgentry_t *p2m_entry, int order,
-                                      p2m_query_t q)
-{
-    int r;
-
-    /* This is called from the p2m lookups, which can happen with or 
-     * without the lock hed. */
-    p2m_lock_recursive(p2m);
-
-    /* Check to make sure this is still PoD */
-    if ( p2m_flags_to_type(l1e_get_flags(*p2m_entry)) != p2m_populate_on_demand )
-    {
-        p2m_unlock(p2m);
-        return 0;
-    }
-
-    r = p2m_pod_demand_populate(p2m, gfn, order, q);
-
-    p2m_unlock(p2m);
-
-    return r;
-}
-
 /* Read the current domain's p2m table (through the linear mapping). */
 static mfn_t p2m_gfn_to_mfn_current(struct p2m_domain *p2m, 
                                     unsigned long gfn, p2m_type_t *t, 
@@ -540,8 +515,7 @@ pod_retry_l3:
             /* The read has succeeded, so we know that mapping exists */
             if ( q != p2m_query )
             {
-                if ( !p2m_pod_check_and_populate(p2m, gfn,
-                                      (l1_pgentry_t *) &l3e, PAGE_ORDER_1G, q) )
+                if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_1G, q) )
                     goto pod_retry_l3;
                 p2mt = p2m_invalid;
                 gdprintk(XENLOG_ERR, "%s: Allocate 1GB failed!\n", __func__);
@@ -593,8 +567,8 @@ pod_retry_l2:
              * exits at this point.  */
             if ( q != p2m_query )
             {
-                if ( !p2m_pod_check_and_populate(p2m, gfn,
-                                                 p2m_entry, 9, q) )
+                if ( !p2m_pod_demand_populate(p2m, gfn, 
+                                                PAGE_ORDER_2M, q) )
                     goto pod_retry_l2;
 
                 /* Allocate failed. */
@@ -651,8 +625,8 @@ pod_retry_l1:
              * exits at this point.  */
             if ( q != p2m_query )
             {
-                if ( !p2m_pod_check_and_populate(p2m, gfn,
-                                                 (l1_pgentry_t *)p2m_entry, 0, q) )
+                if ( !p2m_pod_demand_populate(p2m, gfn, 
+                                                PAGE_ORDER_4K, q) )
                     goto pod_retry_l1;
 
                 /* Allocate failed. */
@@ -742,8 +716,7 @@ pod_retry_l3:
             {
                 if ( q != p2m_query )
                 {
-                    if ( !p2m_pod_check_and_populate(p2m, gfn,
-                                      (l1_pgentry_t *) l3e, PAGE_ORDER_1G, q) )
+                    if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_1G, q) )
                         goto pod_retry_l3;
                     gdprintk(XENLOG_ERR, "%s: Allocate 1GB failed!\n", __func__);
                 }
@@ -781,8 +754,7 @@ pod_retry_l2:
         if ( p2m_flags_to_type(l2e_get_flags(*l2e)) == p2m_populate_on_demand )
         {
             if ( q != p2m_query ) {
-                if ( !p2m_pod_check_and_populate(p2m, gfn,
-                                                 (l1_pgentry_t *)l2e, PAGE_ORDER_2M, q) )
+                if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_2M, q) )
                     goto pod_retry_l2;
             } else
                 *t = p2m_populate_on_demand;
@@ -815,8 +787,7 @@ pod_retry_l1:
         if ( p2m_flags_to_type(l1e_get_flags(*l1e)) == p2m_populate_on_demand )
         {
             if ( q != p2m_query ) {
-                if ( !p2m_pod_check_and_populate(p2m, gfn,
-                                                 (l1_pgentry_t *)l1e, PAGE_ORDER_4K, q) )
+                if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_4K, q) )
                     goto pod_retry_l1;
             } else
                 *t = p2m_populate_on_demand;

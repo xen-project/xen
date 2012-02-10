@@ -46,31 +46,6 @@ static inline bool_t is_epte_valid(ept_entry_t *e)
     return (e->epte != 0 && e->sa_p2mt != p2m_invalid);
 }
 
-/* Non-ept "lock-and-check" wrapper */
-static int ept_pod_check_and_populate(struct p2m_domain *p2m, unsigned long gfn,
-                                      ept_entry_t *entry, int order,
-                                      p2m_query_t q)
-{
-    int r;
-
-    /* This is called from the p2m lookups, which can happen with or 
-     * without the lock hed. */
-    p2m_lock_recursive(p2m);
-
-    /* Check to make sure this is still PoD */
-    if ( entry->sa_p2mt != p2m_populate_on_demand )
-    {
-        p2m_unlock(p2m);
-        return 0;
-    }
-
-    r = p2m_pod_demand_populate(p2m, gfn, order, q);
-
-    p2m_unlock(p2m);
-
-    return r;
-}
-
 static void ept_p2m_type_to_flags(ept_entry_t *entry, p2m_type_t type, p2m_access_t access)
 {
     /* First apply type permissions */
@@ -551,8 +526,8 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
             index = gfn_remainder >> ( i * EPT_TABLE_ORDER);
             ept_entry = table + index;
 
-            if ( !ept_pod_check_and_populate(p2m, gfn,
-                                             ept_entry, 9, q) )
+            if ( !p2m_pod_demand_populate(p2m, gfn, 
+                                            PAGE_ORDER_2M, q) )
                 goto retry;
             else
                 goto out;
@@ -574,8 +549,8 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
 
         ASSERT(i == 0);
         
-        if ( ept_pod_check_and_populate(p2m, gfn,
-                                        ept_entry, 0, q) )
+        if ( p2m_pod_demand_populate(p2m, gfn, 
+                                        PAGE_ORDER_4K, q) )
             goto out;
     }
 

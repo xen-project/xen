@@ -521,7 +521,7 @@ p2m_pod_decrease_reservation(struct domain *d,
     /* Figure out if we need to steal some freed memory for our cache */
     steal_for_cache =  ( p2m->pod.entry_count > p2m->pod.count );
 
-    p2m_lock(p2m);
+    gfn_lock(p2m, gpfn, order);
 
     if ( unlikely(d->is_dying) )
         goto out_unlock;
@@ -615,7 +615,7 @@ out_entry_check:
     }
 
 out_unlock:
-    p2m_unlock(p2m);
+    gfn_unlock(p2m, gpfn, order);
 
 out:
     return ret;
@@ -964,7 +964,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     mfn_t mfn;
     int i;
 
-    ASSERT(p2m_locked_by_me(p2m));
+    ASSERT(gfn_locked_by_me(p2m, gfn));
 
     /* This check is done with the p2m lock held.  This will make sure that
      * even if d->is_dying changes under our feet, p2m_pod_empty_cache() 
@@ -972,6 +972,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     if ( unlikely(d->is_dying) )
         goto out_fail;
 
+    
     /* Because PoD does not have cache list for 1GB pages, it has to remap
      * 1GB region to 2MB chunks for a retry. */
     if ( order == PAGE_ORDER_1G )
@@ -981,6 +982,9 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
          * split 1GB into 512 2MB pages here. But We only do once here because
          * set_p2m_entry() should automatically shatter the 1GB page into 
          * 512 2MB pages. The rest of 511 calls are unnecessary.
+         *
+         * NOTE: In a fine-grained p2m locking scenario this operation
+         * may need to promote its locking from gfn->1g superpage
          */
         set_p2m_entry(p2m, gfn_aligned, _mfn(0), PAGE_ORDER_2M,
                       p2m_populate_on_demand, p2m->default_access);
@@ -1104,7 +1108,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     if ( rc != 0 )
         return rc;
 
-    p2m_lock(p2m);
+    gfn_lock(p2m, gfn, order);
 
     P2M_DEBUG("mark pod gfn=%#lx\n", gfn);
 
@@ -1138,7 +1142,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
         BUG_ON(p2m->pod.entry_count < 0);
     }
 
-    p2m_unlock(p2m);
+    gfn_unlock(p2m, gfn, order);
 
 out:
     return rc;

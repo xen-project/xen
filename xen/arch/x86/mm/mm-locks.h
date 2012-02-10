@@ -165,9 +165,11 @@ declare_mm_lock(nestedp2m)
 
 declare_mm_lock(p2m)
 #define p2m_lock(p)           mm_lock_recursive(p2m, &(p)->lock)
-#define p2m_lock_recursive(p) mm_lock_recursive(p2m, &(p)->lock)
+#define gfn_lock(p,g,o)       mm_lock_recursive(p2m, &(p)->lock)
 #define p2m_unlock(p)         mm_unlock(&(p)->lock)
+#define gfn_unlock(p,g,o)     mm_unlock(&(p)->lock)
 #define p2m_locked_by_me(p)   mm_locked_by_me(&(p)->lock)
+#define gfn_locked_by_me(p,g) mm_locked_by_me(&(p)->lock)
 
 /* Sharing per page lock
  *
