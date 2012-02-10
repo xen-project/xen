@@ -23,6 +23,7 @@
 #define __MEM_SHARING_H__
 
 #include <public/domctl.h>
+#include <public/memory.h>
 
 /* Auditing of memory sharing code? */
 #define MEM_SHARING_AUDIT 0
@@ -56,6 +57,8 @@ int mem_sharing_unshare_page(struct domain *d,
                              unsigned long gfn, 
                              uint16_t flags);
 int mem_sharing_sharing_resume(struct domain *d);
+int mem_sharing_memop(struct domain *d, 
+                       xen_mem_sharing_op_t *mec);
 int mem_sharing_domctl(struct domain *d, 
                        xen_domctl_mem_sharing_op_t *mec);
 void mem_sharing_init(void);

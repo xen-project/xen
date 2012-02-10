@@ -1883,8 +1883,10 @@ int xc_tmem_restore_extra(xc_interface *xch, int dom, int fd);
  * mem_event operations
  */
 int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
-                         unsigned int mode, void *shared_page,
-                          void *ring_page, unsigned long gfn);
+                         unsigned int mode, void *shared_page, void *ring_page);
+int xc_mem_event_memop(xc_interface *xch, domid_t domain_id, 
+                        unsigned int op, unsigned int mode,
+                        uint64_t gfn, void *buffer);
 
 int xc_mem_paging_enable(xc_interface *xch, domid_t domain_id,
                         void *shared_page, void *ring_page);

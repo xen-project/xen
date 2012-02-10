@@ -186,12 +186,12 @@ int memshr_vbd_issue_ro_request(char *buf,
            remove the relevant ones from the map */
         switch(ret)
         {
-            case XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID:
+            case XENMEM_SHARING_OP_S_HANDLE_INVALID:
                 ret = blockshr_shrhnd_remove(memshr.blks, source_st, NULL);
                 if(ret) DPRINTF("Could not rm invl s_hnd: %u %"PRId64" %"PRId64"\n", 
                                     source_st.domain, source_st.frame, source_st.handle);
                 break;
-            case XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID:
+            case XENMEM_SHARING_OP_C_HANDLE_INVALID:
                 ret = blockshr_shrhnd_remove(memshr.blks, client_st, NULL);
                 if(ret) DPRINTF("Could not rm invl c_hnd: %u %"PRId64" %"PRId64"\n", 
                                     client_st.domain, client_st.frame, client_st.handle);

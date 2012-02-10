@@ -747,12 +747,12 @@ int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t 
     }
     else if ( mfn_x(smfn) < mfn_x(cmfn) )
     {
-        ret = XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID;
+        ret = XENMEM_SHARING_OP_S_HANDLE_INVALID;
         spage = firstpg = __grab_shared_page(smfn);
         if ( spage == NULL )
             goto err_out;
 
-        ret = XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID;
+        ret = XENMEM_SHARING_OP_C_HANDLE_INVALID;
         cpage = secondpg = __grab_shared_page(cmfn);
         if ( cpage == NULL )
         {
@@ -760,12 +760,12 @@ int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t 
             goto err_out;
         }
     } else {
-        ret = XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID;
+        ret = XENMEM_SHARING_OP_C_HANDLE_INVALID;
         cpage = firstpg = __grab_shared_page(cmfn);
         if ( cpage == NULL )
             goto err_out;
 
-        ret = XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID;
+        ret = XENMEM_SHARING_OP_S_HANDLE_INVALID;
         spage = secondpg = __grab_shared_page(smfn);
         if ( spage == NULL )
         {
@@ -780,14 +780,14 @@ int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t 
     /* Check that the handles match */
     if ( spage->sharing->handle != sh )
     {
-        ret = XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID;
+        ret = XENMEM_SHARING_OP_S_HANDLE_INVALID;
         mem_sharing_page_unlock(secondpg);
         mem_sharing_page_unlock(firstpg);
         goto err_out;
     }
     if ( cpage->sharing->handle != ch )
     {
-        ret = XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID;
+        ret = XENMEM_SHARING_OP_C_HANDLE_INVALID;
         mem_sharing_page_unlock(secondpg);
         mem_sharing_page_unlock(firstpg);
         goto err_out;
@@ -849,7 +849,7 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
                  p2m_query, &tg);
 
     /* Get the source shared page, check and lock */
-    ret = XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID;
+    ret = XENMEM_SHARING_OP_S_HANDLE_INVALID;
     spage = __grab_shared_page(smfn);
     if ( spage == NULL )
         goto err_out;
@@ -863,7 +863,7 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
     if ( mfn_valid(cmfn) ||
          (!(p2m_is_ram(cmfn_type))) )
     {
-        ret = XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID;
+        ret = XENMEM_SHARING_OP_C_HANDLE_INVALID;
         goto err_unlock;
     }
 
@@ -1014,9 +1014,9 @@ private_page_found:
     return 0;
 }
 
-int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
+int mem_sharing_memop(struct domain *d, xen_mem_sharing_op_t *mec)
 {
-    int rc;
+    int rc = 0;
 
     /* Only HAP is supported */
     if ( !hap_enabled(d) )
@@ -1024,14 +1024,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
 
     switch(mec->op)
     {
-        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_CONTROL:
-        {
-            d->arch.hvm_domain.mem_sharing_enabled = mec->u.enable;
-            rc = 0;
-        }
-        break;
-
-        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_NOMINATE_GFN:
+        case XENMEM_sharing_op_nominate_gfn:
         {
             unsigned long gfn = mec->u.nominate.u.gfn;
             shr_handle_t handle;
@@ -1042,7 +1035,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         }
         break;
 
-        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_NOMINATE_GREF:
+        case XENMEM_sharing_op_nominate_gref:
         {
             grant_ref_t gref = mec->u.nominate.u.grant_ref;
             unsigned long gfn;
@@ -1057,7 +1050,7 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         }
         break;
 
-        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_SHARE:
+        case XENMEM_sharing_op_share:
         {
             unsigned long sgfn, cgfn;
             struct domain *cd;
@@ -1066,38 +1059,38 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
             if ( !mem_sharing_enabled(d) )
                 return -EINVAL;
 
-            cd = get_domain_by_id(mec->u.share.client_domain);
+            cd = get_mem_event_op_target(mec->u.share.client_domain, &rc);
             if ( !cd )
-                return -ESRCH;
+                return rc;
 
             if ( !mem_sharing_enabled(cd) )
             {
-                put_domain(cd);
+                rcu_unlock_domain(cd);
                 return -EINVAL;
             }
 
-            if ( XEN_DOMCTL_MEM_SHARING_FIELD_IS_GREF(mec->u.share.source_gfn) )
+            if ( XENMEM_SHARING_OP_FIELD_IS_GREF(mec->u.share.source_gfn) )
             {
                 grant_ref_t gref = (grant_ref_t) 
-                                    (XEN_DOMCTL_MEM_SHARING_FIELD_GET_GREF(
+                                    (XENMEM_SHARING_OP_FIELD_GET_GREF(
                                         mec->u.share.source_gfn));
                 if ( mem_sharing_gref_to_gfn(d, gref, &sgfn) < 0 )
                 {
-                    put_domain(cd);
+                    rcu_unlock_domain(cd);
                     return -EINVAL;
                 }
             } else {
                 sgfn  = mec->u.share.source_gfn;
             }
 
-            if ( XEN_DOMCTL_MEM_SHARING_FIELD_IS_GREF(mec->u.share.client_gfn) )
+            if ( XENMEM_SHARING_OP_FIELD_IS_GREF(mec->u.share.client_gfn) )
             {
                 grant_ref_t gref = (grant_ref_t) 
-                                    (XEN_DOMCTL_MEM_SHARING_FIELD_GET_GREF(
+                                    (XENMEM_SHARING_OP_FIELD_GET_GREF(
                                         mec->u.share.client_gfn));
                 if ( mem_sharing_gref_to_gfn(cd, gref, &cgfn) < 0 )
                 {
-                    put_domain(cd);
+                    rcu_unlock_domain(cd);
                     return -EINVAL;
                 }
             } else {
@@ -1109,11 +1102,11 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
 
             rc = mem_sharing_share_pages(d, sgfn, sh, cd, cgfn, ch); 
 
-            put_domain(cd);
+            rcu_unlock_domain(cd);
         }
         break;
 
-        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_ADD_PHYSMAP:
+        case XENMEM_sharing_op_add_physmap:
         {
             unsigned long sgfn, cgfn;
             struct domain *cd;
@@ -1122,20 +1115,20 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
             if ( !mem_sharing_enabled(d) )
                 return -EINVAL;
 
-            cd = get_domain_by_id(mec->u.share.client_domain);
+            cd = get_mem_event_op_target(mec->u.share.client_domain, &rc);
             if ( !cd )
-                return -ESRCH;
+                return rc;
 
             if ( !mem_sharing_enabled(cd) )
             {
-                put_domain(cd);
+                rcu_unlock_domain(cd);
                 return -EINVAL;
             }
 
-            if ( XEN_DOMCTL_MEM_SHARING_FIELD_IS_GREF(mec->u.share.source_gfn) )
+            if ( XENMEM_SHARING_OP_FIELD_IS_GREF(mec->u.share.source_gfn) )
             {
                 /* Cannot add a gref to the physmap */
-                put_domain(cd);
+                rcu_unlock_domain(cd);
                 return -EINVAL;
             }
 
@@ -1145,11 +1138,11 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
 
             rc = mem_sharing_add_to_physmap(d, sgfn, sh, cd, cgfn); 
 
-            put_domain(cd);
+            rcu_unlock_domain(cd);
         }
         break;
 
-        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_RESUME:
+        case XENMEM_sharing_op_resume:
         {
             if ( !mem_sharing_enabled(d) )
                 return -EINVAL;
@@ -1157,21 +1150,21 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
         }
         break;
 
-        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_GFN:
+        case XENMEM_sharing_op_debug_gfn:
         {
             unsigned long gfn = mec->u.debug.u.gfn;
             rc = mem_sharing_debug_gfn(d, gfn);
         }
         break;
 
-        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_MFN:
+        case XENMEM_sharing_op_debug_mfn:
         {
             unsigned long mfn = mec->u.debug.u.mfn;
             rc = mem_sharing_debug_mfn(_mfn(mfn));
         }
         break;
 
-        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_DEBUG_GREF:
+        case XENMEM_sharing_op_debug_gref:
         {
             grant_ref_t gref = mec->u.debug.u.gref;
             rc = mem_sharing_debug_gref(d, gref);
@@ -1184,6 +1177,30 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
     }
 
     mem_sharing_audit();
+
+    return rc;
+}
+
+int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
+{
+    int rc;
+
+    /* Only HAP is supported */
+    if ( !hap_enabled(d) )
+         return -ENODEV;
+
+    switch(mec->op)
+    {
+        case XEN_DOMCTL_MEM_SHARING_CONTROL:
+        {
+            d->arch.hvm_domain.mem_sharing_enabled = mec->u.enable;
+            rc = 0;
+        }
+        break;
+
+        default:
+            rc = -ENOSYS;
+    }
 
     return rc;
 }

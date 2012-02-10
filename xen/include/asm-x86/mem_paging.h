@@ -21,8 +21,7 @@
  */
 
 
-int mem_paging_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
-                      XEN_GUEST_HANDLE(void) u_domctl);
+int mem_paging_memop(struct domain *d, xen_mem_event_op_t *meo);
 
 
 /*

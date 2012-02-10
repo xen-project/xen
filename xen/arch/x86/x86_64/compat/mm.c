@@ -2,6 +2,7 @@
 #include <xen/multicall.h>
 #include <compat/memory.h>
 #include <compat/xen.h>
+#include <asm/mem_event.h>
 
 int compat_set_gdt(XEN_GUEST_HANDLE(uint) frame_list, unsigned int entries)
 {
@@ -210,6 +211,28 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
     case XENMEM_get_sharing_shared_pages:
         return mem_sharing_get_nr_shared_mfns();
+
+    case XENMEM_paging_op:
+    case XENMEM_access_op:
+    {
+        xen_mem_event_op_t meo;
+        if ( copy_from_guest(&meo, arg, 1) )
+            return -EFAULT;
+        rc = do_mem_event_op(op, meo.domain, (void *) &meo);
+        if ( !rc && copy_to_guest(arg, &meo, 1) )
+            return -EFAULT;
+        break;
+    }
+    case XENMEM_sharing_op:
+    {
+        xen_mem_sharing_op_t mso;
+        if ( copy_from_guest(&mso, arg, 1) )
+            return -EFAULT;
+        rc = do_mem_event_op(op, mso.domain, (void *) &mso);
+        if ( !rc && copy_to_guest(arg, &mso, 1) )
+            return -EFAULT;
+        break;
+    }
 
     default:
         rc = -ENOSYS;

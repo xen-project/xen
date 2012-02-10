@@ -42,6 +42,8 @@ void mem_event_put_request(struct domain *d, struct mem_event_domain *med,
 int mem_event_get_response(struct domain *d, struct mem_event_domain *med,
                            mem_event_response_t *rsp);
 
+struct domain *get_mem_event_op_target(uint32_t domain, int *rc);
+int do_mem_event_op(int op, uint32_t domain, void *arg);
 int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
                      XEN_GUEST_HANDLE(void) u_domctl);
 

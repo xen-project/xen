@@ -30,7 +30,7 @@ int xc_mem_paging_enable(xc_interface *xch, domid_t domain_id,
     return xc_mem_event_control(xch, domain_id,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING_ENABLE,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING,
-                                shared_page, ring_page, INVALID_MFN);
+                                shared_page, ring_page);
 }
 
 int xc_mem_paging_disable(xc_interface *xch, domid_t domain_id)
@@ -38,31 +38,31 @@ int xc_mem_paging_disable(xc_interface *xch, domid_t domain_id)
     return xc_mem_event_control(xch, domain_id,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING_DISABLE,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING,
-                                NULL, NULL, INVALID_MFN);
+                                NULL, NULL);
 }
 
 int xc_mem_paging_nominate(xc_interface *xch, domid_t domain_id, unsigned long gfn)
 {
-    return xc_mem_event_control(xch, domain_id,
-                                XEN_DOMCTL_MEM_EVENT_OP_PAGING_NOMINATE,
-                                XEN_DOMCTL_MEM_EVENT_OP_PAGING,
-                                NULL, NULL, gfn);
+    return xc_mem_event_memop(xch, domain_id,
+                                XENMEM_paging_op_nominate,
+                                XENMEM_paging_op,
+                                gfn, NULL);
 }
 
 int xc_mem_paging_evict(xc_interface *xch, domid_t domain_id, unsigned long gfn)
 {
-    return xc_mem_event_control(xch, domain_id,
-                                XEN_DOMCTL_MEM_EVENT_OP_PAGING_EVICT,
-                                XEN_DOMCTL_MEM_EVENT_OP_PAGING,
-                                NULL, NULL, gfn);
+    return xc_mem_event_memop(xch, domain_id,
+                                XENMEM_paging_op_evict,
+                                XENMEM_paging_op,
+                                gfn, NULL);
 }
 
 int xc_mem_paging_prep(xc_interface *xch, domid_t domain_id, unsigned long gfn)
 {
-    return xc_mem_event_control(xch, domain_id,
-                                XEN_DOMCTL_MEM_EVENT_OP_PAGING_PREP,
-                                XEN_DOMCTL_MEM_EVENT_OP_PAGING,
-                                NULL, NULL, gfn);
+    return xc_mem_event_memop(xch, domain_id,
+                                XENMEM_paging_op_prep,
+                                XENMEM_paging_op,
+                                gfn, NULL);
 }
 
 int xc_mem_paging_load(xc_interface *xch, domid_t domain_id, 
@@ -81,10 +81,10 @@ int xc_mem_paging_load(xc_interface *xch, domid_t domain_id,
     if ( mlock(buffer, XC_PAGE_SIZE) )
         return -1;
         
-    rc = xc_mem_event_control(xch, domain_id,
-                                XEN_DOMCTL_MEM_EVENT_OP_PAGING_PREP,
-                                XEN_DOMCTL_MEM_EVENT_OP_PAGING,
-                                buffer, NULL, gfn);
+    rc = xc_mem_event_memop(xch, domain_id,
+                                XENMEM_paging_op_prep,
+                                XENMEM_paging_op,
+                                gfn, buffer);
 
     old_errno = errno;
     munlock(buffer, XC_PAGE_SIZE);
@@ -95,10 +95,10 @@ int xc_mem_paging_load(xc_interface *xch, domid_t domain_id,
 
 int xc_mem_paging_resume(xc_interface *xch, domid_t domain_id, unsigned long gfn)
 {
-    return xc_mem_event_control(xch, domain_id,
-                                XEN_DOMCTL_MEM_EVENT_OP_PAGING_RESUME,
-                                XEN_DOMCTL_MEM_EVENT_OP_PAGING,
-                                NULL, NULL, gfn);
+    return xc_mem_event_memop(xch, domain_id,
+                                XENMEM_paging_op_resume,
+                                XENMEM_paging_op,
+                                gfn, NULL);
 }
 
 

@@ -28,6 +28,7 @@
 #include <asm/mem_event.h>
 #include <asm/mem_paging.h>
 #include <asm/mem_access.h>
+#include <asm/mem_sharing.h>
 
 /* for public/io/ring.h macros */
 #define xen_mb()   mb()
@@ -49,7 +50,7 @@ static int mem_event_enable(
     struct domain *dom_mem_event = current->domain;
     struct vcpu *v = current;
     unsigned long ring_addr = mec->ring_addr;
-    unsigned long shared_addr = mec->u.shared_addr;
+    unsigned long shared_addr = mec->shared_addr;
     l1_pgentry_t l1e;
     unsigned long shared_gfn = 0, ring_gfn = 0; /* gcc ... */
     p2m_type_t p2mt;
@@ -460,6 +461,54 @@ static void mem_access_notification(struct vcpu *v, unsigned int port)
     p2m_mem_access_resume(v->domain);
 }
 
+struct domain *get_mem_event_op_target(uint32_t domain, int *rc)
+{
+    struct domain *d;
+
+    /* Get the target domain */
+    *rc = rcu_lock_remote_target_domain_by_id(domain, &d);
+    if ( *rc != 0 )
+        return NULL;
+
+    /* Not dying? */
+    if ( d->is_dying )
+    {
+        rcu_unlock_domain(d);
+        *rc = -EINVAL;
+        return NULL;
+    }
+    
+    return d;
+}
+
+int do_mem_event_op(int op, uint32_t domain, void *arg)
+{
+    int ret;
+    struct domain *d;
+
+    d = get_mem_event_op_target(domain, &ret);
+    if ( !d )
+        return ret;
+
+    switch (op)
+    {
+        case XENMEM_paging_op:
+            ret = mem_paging_memop(d, (xen_mem_event_op_t *) arg);
+            break;
+        case XENMEM_access_op:
+            ret = mem_access_memop(d, (xen_mem_event_op_t *) arg);
+            break;
+        case XENMEM_sharing_op:
+            ret = mem_sharing_memop(d, (xen_mem_sharing_op_t *) arg);
+            break;
+        default:
+            ret = -ENOSYS;
+    }
+
+    rcu_unlock_domain(d);
+    return ret;
+}
+
 int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
                      XEN_GUEST_HANDLE(void) u_domctl)
 {
@@ -533,11 +582,8 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         break;
 
         default:
-        {
-            if ( med->ring_page )
-                rc = mem_paging_domctl(d, mec, u_domctl);
-        }
-        break;
+            rc = -ENOSYS;
+            break;
         }
     }
     break;
@@ -572,14 +618,14 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         break;
 
         default:
-        {
-            if ( med->ring_page )
-                rc = mem_access_domctl(d, mec, u_domctl);
-        }
-        break;
+            rc = -ENOSYS;
+            break;
         }
     }
     break;
+
+    default:
+        rc = -ENOSYS;
     }
 
     return rc;

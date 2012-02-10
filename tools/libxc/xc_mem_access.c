@@ -30,7 +30,7 @@ int xc_mem_access_enable(xc_interface *xch, domid_t domain_id,
     return xc_mem_event_control(xch, domain_id,
                                 XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE,
                                 XEN_DOMCTL_MEM_EVENT_OP_ACCESS,
-                                shared_page, ring_page, INVALID_MFN);
+                                shared_page, ring_page);
 }
 
 int xc_mem_access_disable(xc_interface *xch, domid_t domain_id)
@@ -38,15 +38,15 @@ int xc_mem_access_disable(xc_interface *xch, domid_t domain_id)
     return xc_mem_event_control(xch, domain_id,
                                 XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE,
                                 XEN_DOMCTL_MEM_EVENT_OP_ACCESS,
-                                NULL, NULL, INVALID_MFN);
+                                NULL, NULL);
 }
 
 int xc_mem_access_resume(xc_interface *xch, domid_t domain_id, unsigned long gfn)
 {
-    return xc_mem_event_control(xch, domain_id,
-                                XEN_DOMCTL_MEM_EVENT_OP_ACCESS_RESUME,
-                                XEN_DOMCTL_MEM_EVENT_OP_ACCESS,
-                                NULL, NULL, gfn);
+    return xc_mem_event_memop(xch, domain_id,
+                                XENMEM_access_op_resume,
+                                XENMEM_access_op,
+                                gfn, NULL);
 }
 
 /*

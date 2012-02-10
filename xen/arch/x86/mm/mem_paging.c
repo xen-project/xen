@@ -25,33 +25,32 @@
 #include <asm/mem_event.h>
 
 
-int mem_paging_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
-                      XEN_GUEST_HANDLE(void) u_domctl)
+int mem_paging_memop(struct domain *d, xen_mem_event_op_t *mec)
 {
     switch( mec->op )
     {
-    case XEN_DOMCTL_MEM_EVENT_OP_PAGING_NOMINATE:
+    case XENMEM_paging_op_nominate:
     {
         unsigned long gfn = mec->gfn;
         return p2m_mem_paging_nominate(d, gfn);
     }
     break;
 
-    case XEN_DOMCTL_MEM_EVENT_OP_PAGING_EVICT:
+    case XENMEM_paging_op_evict:
     {
         unsigned long gfn = mec->gfn;
         return p2m_mem_paging_evict(d, gfn);
     }
     break;
 
-    case XEN_DOMCTL_MEM_EVENT_OP_PAGING_PREP:
+    case XENMEM_paging_op_prep:
     {
         unsigned long gfn = mec->gfn;
-        return p2m_mem_paging_prep(d, gfn, mec->u.buffer);
+        return p2m_mem_paging_prep(d, gfn, mec->buffer);
     }
     break;
 
-    case XEN_DOMCTL_MEM_EVENT_OP_PAGING_RESUME:
+    case XENMEM_paging_op_resume:
     {
         p2m_mem_paging_resume(d);
         return 0;

@@ -25,14 +25,13 @@
 #include <asm/mem_event.h>
 
 
-int mem_access_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
-                      XEN_GUEST_HANDLE(void) u_domctl)
+int mem_access_memop(struct domain *d, xen_mem_event_op_t *meo)
 {
     int rc;
 
-    switch( mec->op )
+    switch( meo->op )
     {
-    case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_RESUME:
+    case XENMEM_access_op_resume:
     {
         p2m_mem_access_resume(d);
         rc = 0;

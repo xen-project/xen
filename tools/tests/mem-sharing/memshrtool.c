@@ -34,9 +34,9 @@ static int usage(const char* prog)
     int rc = f; \
     if ( rc < 0 ) { \
         printf("error executing %s: %s\n", #f, \
-                ((errno * -1) == XEN_DOMCTL_MEM_SHARING_C_HANDLE_INVALID) ? \
+                ((errno * -1) == XENMEM_SHARING_OP_S_HANDLE_INVALID) ? \
                 "problem with client handle" :\
-                ((errno * -1) == XEN_DOMCTL_MEM_SHARING_S_HANDLE_INVALID) ? \
+                ((errno * -1) == XENMEM_SHARING_OP_C_HANDLE_INVALID) ? \
                 "problem with source handle" : strerror(errno)); \
         return rc; \
     } \

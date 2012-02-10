@@ -1463,7 +1463,6 @@ long arch_do_domctl(
             if ( !ret )
                 ret = mem_sharing_domctl(d, &domctl->u.mem_sharing_op);
             rcu_unlock_domain(d);
-            copy_to_guest(u_domctl, domctl, 1);
         } 
     }
     break;
