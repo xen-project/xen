@@ -309,9 +309,14 @@ struct p2m_domain *p2m_get_p2m(struct vcpu *v);
 
 #define p2m_get_pagetable(p2m)  ((p2m)->phys_table)
 
-/**** p2m query accessors. After calling any of the variants below, you
- * need to call put_gfn(domain, gfn). If you don't, you'll lock the
- * hypervisor. ****/
+/**** p2m query accessors. They lock p2m_lock, and thus serialize
+ * lookups wrt modifications. They _do not_ release the lock on exit.
+ * After calling any of the variants below, caller needs to use
+ * put_gfn. ****/
+
+mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
+                    p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
+                    unsigned int *page_order, bool_t locked);
 
 /* Read a particular P2M table, mapping pages as we go.  Most callers
  * should _not_ call this directly; use the other get_gfn* functions
@@ -320,9 +325,8 @@ struct p2m_domain *p2m_get_p2m(struct vcpu *v);
  * If the lookup succeeds, the return value is != INVALID_MFN and 
  * *page_order is filled in with the order of the superpage (if any) that
  * the entry was found in.  */
-mfn_t get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
-                    p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
-                    unsigned int *page_order);
+#define get_gfn_type_access(p, g, t, a, q, o)   \
+        __get_gfn_type_access((p), (g), (t), (a), (q), (o), 1)
 
 /* General conversion function from gfn to mfn */
 static inline mfn_t get_gfn_type(struct domain *d,
@@ -353,21 +357,28 @@ static inline unsigned long get_gfn_untyped(struct domain *d, unsigned long gpfn
     return INVALID_MFN;
 }
 
-/* This is a noop for now. */
-static inline void __put_gfn(struct p2m_domain *p2m, unsigned long gfn)
-{
-}
+/* Will release the p2m_lock for this gfn entry. */
+void __put_gfn(struct p2m_domain *p2m, unsigned long gfn);
 
 #define put_gfn(d, gfn) __put_gfn(p2m_get_hostp2m((d)), (gfn))
 
-/* These are identical for now. The intent is to have the caller not worry 
- * about put_gfn. To only be used in printk's, crash situations, or to 
- * peek at a type. You're not holding the p2m entry exclsively after calling
- * this. */
-#define get_gfn_unlocked(d, g, t)         get_gfn_type((d), (g), (t), p2m_alloc)
-#define get_gfn_query_unlocked(d, g, t)   get_gfn_type((d), (g), (t), p2m_query)
-#define get_gfn_guest_unlocked(d, g, t)   get_gfn_type((d), (g), (t), p2m_guest)
-#define get_gfn_unshare_unlocked(d, g, t) get_gfn_type((d), (g), (t), p2m_unshare)
+/* The intent of the "unlocked" accessor is to have the caller not worry about
+ * put_gfn. They apply to very specific situations: debug printk's, dumps 
+ * during a domain crash, or to peek at a p2m entry/type. Caller is not 
+ * holding the p2m entry exclusively during or after calling this. 
+ *
+ * Note that an unlocked accessor only makes sense for a "query" lookup.
+ * Any other type of query can cause a change in the p2m and may need to
+ * perform locking.
+ */
+static inline mfn_t get_gfn_query_unlocked(struct domain *d, 
+                                           unsigned long gfn, 
+                                           p2m_type_t *t)
+{
+    p2m_access_t a;
+    return __get_gfn_type_access(p2m_get_hostp2m(d), gfn, t, &a, 
+                                    p2m_query, NULL, 0);
+}
 
 /* General conversion function from mfn to gfn */
 static inline unsigned long mfn_to_gfn(struct domain *d, mfn_t mfn)

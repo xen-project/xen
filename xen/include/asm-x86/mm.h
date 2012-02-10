@@ -350,9 +350,9 @@ void clear_superpage_mark(struct page_info *page);
  * of (gfn,domain) tupples to a list of gfn's that the shared page is currently 
  * backing. Nesting may happen when sharing (and locking) two pages -- deadlock 
  * is avoided by locking pages in increasing order.
- * Memory sharing may take the p2m_lock within a page_lock/unlock
- * critical section. We enforce ordering between page_lock and p2m_lock using an
- * mm-locks.h construct. 
+ * All memory sharing code paths take the p2m lock of the affected gfn before
+ * taking the lock for the underlying page. We enforce ordering between page_lock 
+ * and p2m_lock using an mm-locks.h construct. 
  *
  * These two users (pte serialization and memory sharing) do not collide, since
  * sharing is only supported for hvm guests, which do not perform pv pte updates.

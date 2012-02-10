@@ -144,9 +144,9 @@ void p2m_change_entry_type_global(struct domain *d,
     p2m_unlock(p2m);
 }
 
-mfn_t get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
+mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
                     p2m_type_t *t, p2m_access_t *a, p2m_query_t q,
-                    unsigned int *page_order)
+                    unsigned int *page_order, bool_t locked)
 {
     mfn_t mfn;
 
@@ -157,6 +157,11 @@ mfn_t get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
         *t = p2m_ram_rw;
         return _mfn(gfn);
     }
+
+    /* For now only perform locking on hap domains */
+    if ( locked && (hap_enabled(p2m->domain)) )
+        /* Grab the lock here, don't release until put_gfn */
+        p2m_lock(p2m);
 
     mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order);
 
@@ -180,6 +185,18 @@ mfn_t get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
 #endif
 
     return mfn;
+}
+
+void __put_gfn(struct p2m_domain *p2m, unsigned long gfn)
+{
+    if ( !p2m || !paging_mode_translate(p2m->domain) 
+              || !hap_enabled(p2m->domain) )
+        /* Nothing to do in this case */
+        return;
+
+    ASSERT(p2m_locked_by_me(p2m));
+
+    p2m_unlock(p2m);
 }
 
 int set_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn, 

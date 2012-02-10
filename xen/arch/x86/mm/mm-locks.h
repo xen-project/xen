@@ -144,6 +144,31 @@ static inline void mm_enforce_order_unlock(int unlock_level,
  *                                                                      *
  ************************************************************************/
 
+declare_mm_lock(nestedp2m)
+#define nestedp2m_lock(d)   mm_lock(nestedp2m, &(d)->arch.nested_p2m_lock)
+#define nestedp2m_unlock(d) mm_unlock(&(d)->arch.nested_p2m_lock)
+
+/* P2M lock (per-p2m-table)
+ * 
+ * This protects all queries and updates to the p2m table. 
+ *
+ * A note about ordering:
+ *   The order established here is enforced on all mutations of a p2m.
+ *   For lookups, the order established here is enforced only for hap
+ *   domains (1. shadow domains present a few nasty inversions; 
+ *            2. shadow domains do not support paging and sharing, 
+ *               the main sources of dynamic p2m mutations)
+ * 
+ * The lock is recursive as it is common for a code path to look up a gfn
+ * and later mutate it.
+ */
+
+declare_mm_lock(p2m)
+#define p2m_lock(p)           mm_lock_recursive(p2m, &(p)->lock)
+#define p2m_lock_recursive(p) mm_lock_recursive(p2m, &(p)->lock)
+#define p2m_unlock(p)         mm_unlock(&(p)->lock)
+#define p2m_locked_by_me(p)   mm_locked_by_me(&(p)->lock)
+
 /* Sharing per page lock
  *
  * This is an external lock, not represented by an mm_lock_t. The memory
@@ -166,21 +191,6 @@ declare_mm_order_constraint(per_page_sharing)
  * - the array of nested-p2m tables, and all LRU activity therein; and
  * - setting the "cr3" field of any p2m table to a non-CR3_EADDR value. 
  *   (i.e. assigning a p2m table to be the shadow of that cr3 */
-
-declare_mm_lock(nestedp2m)
-#define nestedp2m_lock(d)   mm_lock(nestedp2m, &(d)->arch.nested_p2m_lock)
-#define nestedp2m_unlock(d) mm_unlock(&(d)->arch.nested_p2m_lock)
-
-/* P2M lock (per-p2m-table)
- * 
- * This protects all updates to the p2m table.  Updates are expected to
- * be safe against concurrent reads, which do *not* require the lock. */
-
-declare_mm_lock(p2m)
-#define p2m_lock(p)           mm_lock(p2m, &(p)->lock)
-#define p2m_lock_recursive(p) mm_lock_recursive(p2m, &(p)->lock)
-#define p2m_unlock(p)         mm_unlock(&(p)->lock)
-#define p2m_locked_by_me(p)   mm_locked_by_me(&(p)->lock)
 
 /* Page alloc lock (per-domain)
  *

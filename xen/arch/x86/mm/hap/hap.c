@@ -786,7 +786,14 @@ hap_paging_get_mode(struct vcpu *v)
 static void hap_update_paging_modes(struct vcpu *v)
 {
     struct domain *d = v->domain;
+    unsigned long cr3_gfn = v->arch.hvm_vcpu.guest_cr[3];
+    p2m_type_t t;
 
+    /* We hold onto the cr3 as it may be modified later, and
+     * we need to respect lock ordering. No need for 
+     * checks here as they are performed by vmx_load_pdptrs
+     * (the potential user of the cr3) */
+    (void)get_gfn(d, cr3_gfn, &t);
     paging_lock(d);
 
     v->arch.paging.mode = hap_paging_get_mode(v);
@@ -803,6 +810,7 @@ static void hap_update_paging_modes(struct vcpu *v)
     hap_update_cr3(v, 0);
 
     paging_unlock(d);
+    put_gfn(d, cr3_gfn);
 }
 
 #if CONFIG_PAGING_LEVELS == 3
