@@ -26,7 +26,7 @@
 #include <public/memory.h>
 
 /* Auditing of memory sharing code? */
-#define MEM_SHARING_AUDIT 0
+#define MEM_SHARING_AUDIT 1
 
 typedef uint64_t shr_handle_t; 
 
@@ -61,6 +61,7 @@ int mem_sharing_memop(struct domain *d,
                        xen_mem_sharing_op_t *mec);
 int mem_sharing_domctl(struct domain *d, 
                        xen_domctl_mem_sharing_op_t *mec);
+int mem_sharing_audit(void);
 void mem_sharing_init(void);
 
 #else 

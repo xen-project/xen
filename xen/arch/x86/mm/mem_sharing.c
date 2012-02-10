@@ -50,8 +50,6 @@ DEFINE_PER_CPU(pg_lock_data_t, __pld);
 
 #if MEM_SHARING_AUDIT
 
-static void mem_sharing_audit(void);
-
 static struct list_head shr_audit_list;
 static spinlock_t shr_audit_lock;
 DEFINE_RCU_READ_LOCK(shr_audit_read_lock);
@@ -81,7 +79,10 @@ static inline void audit_del_list(struct page_info *page)
 
 #else
 
-#define mem_sharing_audit() ((void)0)
+int mem_sharing_audit(void)
+{
+    return -ENOSYS;
+}
 
 #define audit_add_list(p)  ((void)0)
 static inline void audit_del_list(struct page_info *page)
@@ -210,7 +211,7 @@ static struct page_info* mem_sharing_lookup(unsigned long mfn)
 }
 
 #if MEM_SHARING_AUDIT
-static void mem_sharing_audit(void)
+int mem_sharing_audit(void)
 {
     int errors = 0;
     unsigned long count_expected;
@@ -336,6 +337,7 @@ static void mem_sharing_audit(void)
         errors++;
     }
 
+    return errors;
 }
 #endif
 
@@ -912,7 +914,6 @@ int mem_sharing_unshare_page(struct domain *d,
     gfn_info_t *gfn_info = NULL;
     struct list_head *le;
    
-    mem_sharing_audit();
     mfn = get_gfn(d, gfn, &p2mt);
     
     /* Has someone already unshared it? */
@@ -1175,8 +1176,6 @@ int mem_sharing_memop(struct domain *d, xen_mem_sharing_op_t *mec)
             rc = -ENOSYS;
             break;
     }
-
-    mem_sharing_audit();
 
     return rc;
 }

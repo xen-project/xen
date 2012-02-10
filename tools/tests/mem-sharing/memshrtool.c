@@ -27,6 +27,7 @@ static int usage(const char* prog)
     printf("  add-to-physmap <domid> <gfn> <source> <source-gfn> <source-handle>\n");
     printf("                          - Populate a page in a domain with a shared page.\n");
     printf("  debug-gfn <domid> <gfn> - Debug a particular domain and gfn.\n");
+    printf("  audit                   - Audit the sharing subsytem in Xen.\n");
     return 1;
 }
 
@@ -159,6 +160,16 @@ int main(int argc, const char** argv)
         domid = strtol(argv[2], NULL, 0);
         gfn = strtol(argv[3], NULL, 0);
         R(xc_memshr_debug_gfn(xch, domid, gfn));
+    }
+    else if( !strcasecmp(cmd, "audit") )
+    {
+        int rc = xc_memshr_audit(xch);
+        if ( rc < 0 )
+        {
+            printf("error executing xc_memshr_audit: %s\n", strerror(errno));
+            return rc;
+        }
+        printf("Audit returned %d errors.\n", rc);
     }
 
     return 0;

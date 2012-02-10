@@ -1117,6 +1117,8 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         xen_mem_sharing_op_t mso;
         if ( copy_from_guest(&mso, arg, 1) )
             return -EFAULT;
+        if ( mso.op == XENMEM_sharing_op_audit )
+            return mem_sharing_audit(); 
         rc = do_mem_event_op(op, mso.domain, (void *) &mso);
         if ( !rc && copy_to_guest(arg, &mso, 1) )
             return -EFAULT;

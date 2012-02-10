@@ -1951,6 +1951,7 @@ int xc_memshr_debug_mfn(xc_interface *xch,
 int xc_memshr_debug_gref(xc_interface *xch,
                          domid_t domid,
                          grant_ref_t gref);
+int xc_memshr_audit(xc_interface *xch);
 
 int xc_flask_load(xc_interface *xc_handle, char *buf, uint32_t size);
 int xc_flask_context_to_sid(xc_interface *xc_handle, char *buf, uint32_t size, uint32_t *sid);

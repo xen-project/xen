@@ -211,6 +211,17 @@ int xc_memshr_debug_gref(xc_interface *xch,
     return xc_memshr_memop(xch, domid, &mso);
 }
 
+int xc_memshr_audit(xc_interface *xch)
+{
+    xen_mem_sharing_op_t mso;
+
+    memset(&mso, 0, sizeof(mso));
+
+    mso.op = XENMEM_sharing_op_audit;
+
+    return do_memory_op(xch, XENMEM_sharing_op, &mso, sizeof(mso));
+}
+
 long xc_sharing_freed_pages(xc_interface *xch)
 {
     return do_memory_op(xch, XENMEM_get_sharing_freed_pages, NULL, 0);

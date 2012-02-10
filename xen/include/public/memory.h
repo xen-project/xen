@@ -349,6 +349,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_event_op_t);
 #define XENMEM_sharing_op_debug_mfn         5
 #define XENMEM_sharing_op_debug_gref        6
 #define XENMEM_sharing_op_add_physmap       7
+#define XENMEM_sharing_op_audit             8
 
 #define XENMEM_SHARING_OP_S_HANDLE_INVALID  (-10)
 #define XENMEM_SHARING_OP_C_HANDLE_INVALID  (-9)
