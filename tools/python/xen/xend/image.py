@@ -971,6 +971,13 @@ class HVMImageHandler(ImageHandler):
         xc.hvm_set_param(self.vm.getDomid(), HVM_PARAM_STORE_EVTCHN,
                          store_evtchn)
 
+        console_mfn = xc.hvm_get_param(self.vm.getDomid(), HVM_PARAM_CONSOLE_PFN)
+        xc.gnttab_hvm_seed(domid = self.vm.getDomid(),
+                           console_gmfn = console_mfn,
+                           xenstore_gmfn = rc['store_mfn'],
+                           console_domid = 0,
+                           xenstore_domid = 0)
+
         return rc
 
 

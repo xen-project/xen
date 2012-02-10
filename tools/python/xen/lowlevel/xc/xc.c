@@ -1008,6 +1008,30 @@ static PyObject *pyxc_hvm_build(XcObject *self,
     return Py_BuildValue("{}");
 }
 
+static PyObject *pyxc_gnttab_hvm_seed(XcObject *self,
+				      PyObject *args,
+				      PyObject *kwds)
+{
+    uint32_t dom, console_domid, xenstore_domid;
+    unsigned long xenstore_gmfn = 0;
+    unsigned long console_gmfn = 0;
+    static char *kwd_list[] = { "domid",
+				"console_gmfn", "xenstore_gmfn",
+				"console_domid", "xenstore_domid", NULL };
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiii", kwd_list,
+                                      &dom,
+				      &console_gmfn, &xenstore_gmfn,
+				      &console_domid, &xenstore_domid) )
+        return NULL;
+
+    if ( xc_dom_gnttab_hvm_seed(self->xc_handle, dom,
+				console_gmfn, xenstore_gmfn,
+				console_domid, xenstore_domid) != 0 )
+        return pyxc_error_to_exception(self->xc_handle);
+
+    return Py_None;
+}
+
 static PyObject *pyxc_evtchn_alloc_unbound(XcObject *self,
                                            PyObject *args,
                                            PyObject *kwds)
@@ -2438,6 +2462,17 @@ static PyMethodDef pyxc_methods[] = {
       " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
       " vcpu_avail [long, 1]: Which Virtual CPUS available.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "gnttab_hvm_seed",
+      (PyCFunction)pyxc_gnttab_hvm_seed,
+      METH_KEYWORDS, "\n"
+      "Initialise HVM guest grant table.\n"
+      " dom     [int]:      Identifier of domain to build into.\n"
+      " console_gmfn [int]: \n"
+      " xenstore_gmfn [int]: \n"
+      " console_domid [int]: \n"
+      " xenstore_domid [int]: \n"
+      "Returns: None on sucess. Raises exception on error.\n" },
 
     { "hvm_get_param", 
       (PyCFunction)pyxc_get_hvm_param, 
