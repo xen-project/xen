@@ -361,6 +361,8 @@ void p2m_teardown(struct p2m_domain *p2m)
     if (p2m == NULL)
         return;
 
+    p2m_lock(p2m);
+
 #ifdef __x86_64__
     for ( gfn=0; gfn < p2m->max_mapped_pfn; gfn++ )
     {
@@ -373,8 +375,6 @@ void p2m_teardown(struct p2m_domain *p2m)
         }
     }
 #endif
-
-    p2m_lock(p2m);
 
     p2m->phys_table = pagetable_null();
 
