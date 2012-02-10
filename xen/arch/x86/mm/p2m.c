@@ -438,7 +438,7 @@ p2m_remove_page(struct p2m_domain *p2m, unsigned long gfn, unsigned long mfn,
         for ( i = 0; i < (1UL << page_order); i++ )
         {
             mfn_return = p2m->get_entry(p2m, gfn + i, &t, &a, p2m_query, NULL);
-            if ( !p2m_is_grant(t) )
+            if ( !p2m_is_grant(t) && !p2m_is_shared(t) )
                 set_gpfn_from_mfn(mfn+i, INVALID_M2P_ENTRY);
             ASSERT( !p2m_is_valid(t) || mfn + i == mfn_x(mfn_return) );
         }
@@ -500,6 +500,22 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     for ( i = 0; i < (1UL << page_order); i++ )
     {
         omfn = p2m->get_entry(p2m, gfn + i, &ot, &a, p2m_query, NULL);
+#ifdef __x86_64__
+        if ( p2m_is_shared(ot) )
+        {
+            /* Do an unshare to cleanly take care of all corner 
+             * cases. */
+            int rc;
+            rc = mem_sharing_unshare_page(p2m->domain, gfn + i, 0);
+            if ( rc )
+            {
+                p2m_unlock(p2m);
+                return rc;
+            }
+            omfn = p2m->get_entry(p2m, gfn + i, &ot, &a, p2m_query, NULL);
+            ASSERT(!p2m_is_shared(ot));
+        }
+#endif /* __x86_64__ */
         if ( p2m_is_grant(ot) )
         {
             /* Really shouldn't be unmapping grant maps this way */
@@ -528,6 +544,14 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     /* Then, look for m->p mappings for this range and deal with them */
     for ( i = 0; i < (1UL << page_order); i++ )
     {
+        if ( page_get_owner(mfn_to_page(_mfn(mfn + i))) == dom_cow )
+        {
+            /* This is no way to add a shared page to your physmap! */
+            gdprintk(XENLOG_ERR, "Adding shared mfn %lx directly to dom %hu "
+                        "physmap not allowed.\n", mfn+i, d->domain_id);
+            p2m_unlock(p2m);
+            return -EINVAL;
+        }
         if ( page_get_owner(mfn_to_page(_mfn(mfn + i))) != d )
             continue;
         ogfn = mfn_to_gfn(d, _mfn(mfn+i));
