@@ -49,27 +49,32 @@ LIB-SRCS        += atomicio.c
 LIB-OBJS         = $(patsubst %.c,%.o,$(LIB-SRCS))
 LIB-OBJS        += $(LVM-UTIL-OBJ)
 
+LIB-PICOBJS      = $(patsubst %.o,%.opic,$(LIB-OBJS))
+
 LIBVHD           = libvhd.a libvhd.so.$(LIBVHD-MAJOR).$(LIBVHD-MINOR)
 
 all: build
 
-build: $(LIBVHD-BUILD)
+build: libvhd.a libvhd.so.$(LIBVHD-MAJOR).$(LIBVHD-MINOR)
 
 libvhd.a: $(LIB-OBJS)
+	$(AR) rc $@ $^
+
+libvhd.so.$(LIBVHD-MAJOR).$(LIBVHD-MINOR): $(LIB-PICOBJS)
 	$(CC) -Wl,$(SONAME_LDFLAG),$(LIBVHD-SONAME) $(SHLIB_LDFLAGS) \
 		$(LDFLAGS) -o libvhd.so.$(LIBVHD-MAJOR).$(LIBVHD-MINOR) $^ $(LIBS)
 	ln -sf libvhd.so.$(LIBVHD-MAJOR).$(LIBVHD-MINOR) libvhd.so.$(LIBVHD-MAJOR)
 	ln -sf libvhd.so.$(LIBVHD-MAJOR) libvhd.so
-	$(AR) rc $@ $^
 
 install: all
 	$(INSTALL_DIR) -p $(DESTDIR)$(INST-DIR)
-	$(INSTALL_PROG) $(LIBVHD) $(DESTDIR)$(INST-DIR)
+	$(INSTALL_PROG) libvhd.a $(DESTDIR)$(INST-DIR)
+	$(INSTALL_PROG) libvhd.so.$(LIBVHD-MAJOR).$(LIBVHD-MINOR) $(DESTDIR)$(INST-DIR)
 	ln -sf libvhd.so.$(LIBVHD-MAJOR).$(LIBVHD-MINOR) $(DESTDIR)$(INST-DIR)/libvhd.so.$(LIBVHD-MAJOR)
 	ln -sf libvhd.so.$(LIBVHD-MAJOR) $(DESTDIR)$(INST-DIR)/libvhd.so
 
 clean:
-	rm -rf *.a *.so* *.o *~ $(DEPS) $(LIBVHD)
+	rm -rf *.a *.so* *.o *.opic *~ $(DEPS) $(LIBVHD)
 
 .PHONY: all build clean install libvhd
 
