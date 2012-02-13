@@ -97,6 +97,15 @@ M:	Wei Huang <wei.huang2@amd.com>
 S:	Supported
 F:	xen/arch/x86/hvm/svm/
 
+ARM (W/ VIRTUALISATION EXTENSIONS) ARCHITECTURE
+M:	Ian Campbell <ian.campbell@citrix.com>
+M:	Stefano Stabellini <stefano.stabellini@citrix.com>
+M:	Tim Deegan <tim@xen.org>
+S:	Supported
+L:	xen-devel@lists.xensource.com
+F:	xen/arch/arm/
+F:	xen/include/asm-arm/
+
 CPU POOLS
 M:	Juergen Gross <juergen.gross@ts.fujitsu.com>
 S:	Supported
