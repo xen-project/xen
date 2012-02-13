@@ -55,6 +55,12 @@ start:
        adr   r9, start              /* r9  := paddr (start) */
        sub   r10, r9, r0            /* r10 := phys-offset */
 
+        /* Using the DTB in the .dtb section? */
+#ifdef CONFIG_DTB_FILE
+        ldr   r8, =_sdtb
+        add   r8, r10                /* r8 := paddr(DTB) */
+#endif
+
 #ifdef EARLY_UART_ADDRESS
        /* Say hello */
        ldr   r11, =EARLY_UART_ADDRESS  /* r11 := UART base address */

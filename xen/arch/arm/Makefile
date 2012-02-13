@@ -22,12 +22,17 @@ obj-y += vtimer.o
 
 #obj-bin-y += ....o
 
+ifdef CONFIG_DTB_FILE
+obj-y += dtb.o
+AFLAGS += -DCONFIG_DTB_FILE=\"$(CONFIG_DTB_FILE)\"
+endif
+
 ALL_OBJS := head.o $(ALL_OBJS)
 
 $(TARGET): $(TARGET)-syms
 	# XXX: VE model loads by VMA so instead of
 	# making a proper ELF we link with LMA == VMA and adjust crudely
-	$(OBJCOPY) --change-addresses +0x7fe00000 $< $@
+	$(OBJCOPY) --change-addresses +0x80000000 $< $@
 	# XXX strip it
 
 #$(TARGET): $(TARGET)-syms $(efi-y) boot/mkelf32
@@ -70,6 +75,8 @@ xen.lds: xen.lds.S
 	$(CC) -P -E -Ui386 $(AFLAGS) -DXEN_PHYS_START=$(CONFIG_LOAD_ADDRESS) -o $@ $<
 	sed -e 's/xen\.lds\.o:/xen\.lds:/g' <.xen.lds.d >.xen.lds.d.new
 	mv -f .xen.lds.d.new .xen.lds.d
+
+dtb.o: $(CONFIG_DTB_FILE)
 
 .PHONY: clean
 clean::

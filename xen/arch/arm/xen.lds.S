@@ -122,6 +122,10 @@ SECTIONS
   } :text
   _end = . ;
 
+  /* Section for the device tree blob (if any). */
+  _sdtb = .;
+  .dtb : { *(.dtb) } :text
+
   /* Sections to be discarded */
   /DISCARD/ : {
        *(.exit.text)
