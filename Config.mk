@@ -222,6 +222,8 @@ endif
 QEMU_UPSTREAM_REVISION ?= master
 SEABIOS_UPSTREAM_TAG ?= rel-1.6.3.1
 
+ETHERBOOT_NICS ?= rtl8139 8086100e
+
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git

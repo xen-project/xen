@@ -17,22 +17,15 @@ IPXE_TARBALL_URL := $(XEN_EXTFILES_URL)/ipxe-git-$(IPXE_GIT_TAG).tar.gz
 D=ipxe
 T=ipxe.tar.gz
 
-ROMS = $(addprefix $D/src/bin/, $(addsuffix .rom, $(NICS)))
+ROMS = $(addprefix $D/src/bin/, $(addsuffix .rom, $(ETHERBOOT_NICS)))
 
 .NOTPARALLEL:
 
 .PHONY: all
-all: eb-roms.h
+all: $(ROMS)
 
 %.rom: $D/src/arch/i386/Makefile
 	$(MAKE) -C $D/src bin/$(*F).rom
-
-eb-roms.h.new: $(ROMS)
-	cat $^ | ../hvmloader/mkhex etherboot >$@
-
-eb-roms.h: Config
-	$(MAKE) NO_WERROR=1 $@.new
-	mv -f $@.new $@
 
 $T:
 	if ! wget -O _$T $(IPXE_TARBALL_URL); then \
@@ -56,7 +49,7 @@ $D/src/bin/NIC: $D/src/arch/i386/Makefile
 
 .PHONY: clean
 clean:
-	rm -rf $D $D.git *~ eb-roms.h _$T $T
+	rm -rf $D $D.git *~ _$T $T
 
 .PHONY: distclean
 distclean: clean
