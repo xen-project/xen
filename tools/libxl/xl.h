@@ -110,6 +110,7 @@ extern int autoballoon;
 extern int dryrun_only;
 extern char *lockfile;
 extern char *default_vifscript;
+extern char *default_bridge;
 
 enum output_format {
     OUTPUT_FORMAT_JSON,

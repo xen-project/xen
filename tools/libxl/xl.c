@@ -38,6 +38,7 @@ int dryrun_only;
 int autoballoon = 1;
 char *lockfile;
 char *default_vifscript = NULL;
+char *default_bridge = NULL;
 enum output_format default_output_format = OUTPUT_FORMAT_JSON;
 
 static xentoollog_level minmsglevel = XTL_PROGRESS;
@@ -78,6 +79,9 @@ static void parse_global_config(const char *configfile,
 
     if (!xlu_cfg_get_string (config, "vifscript", &buf, 0))
         default_vifscript = strdup(buf);
+
+    if (!xlu_cfg_get_string (config, "defaultbridge", &buf, 0))
+	default_bridge = strdup(buf);
 
     if (!xlu_cfg_get_string (config, "output_format", &buf, 0)) {
         if (!strcmp(buf, "json"))
