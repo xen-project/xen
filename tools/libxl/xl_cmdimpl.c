@@ -756,8 +756,6 @@ static void parse_config_data(const char *configfile_filename_report,
 
         xlu_cfg_replace_string (config, "kernel", &b_info->u.pv.kernel.path, 0);
 
-        xlu_cfg_replace_string (config, "kernel", &b_info->u.pv.kernel.path, 0);
-
         xlu_cfg_get_string (config, "root", &root, 0);
         xlu_cfg_get_string (config, "extra", &extra, 0);
 
