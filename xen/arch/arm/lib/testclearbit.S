@@ -14,5 +14,5 @@
                 .text
 
 ENTRY(_test_and_clear_bit)
-       testop  bicne, strne
+	testop	bicne, strne
 ENDPROC(_test_and_clear_bit)

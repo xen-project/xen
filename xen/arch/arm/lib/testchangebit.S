@@ -14,5 +14,5 @@
                 .text
 
 ENTRY(_test_and_change_bit)
-       testop  eor, str
+	testop	eor, str
 ENDPROC(_test_and_change_bit)

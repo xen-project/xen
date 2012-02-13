@@ -1,69 +1,69 @@
 #include <xen/config.h>
 #include <asm/asm_defns.h>
 
-#define SAVE_ONE_BANKED(reg)   mrs r11, reg; str r11, [sp, #UREGS_##reg]
-#define RESTORE_ONE_BANKED(reg)        ldr r11, [sp, #UREGS_##reg]; msr reg, r11
+#define SAVE_ONE_BANKED(reg)	mrs r11, reg; str r11, [sp, #UREGS_##reg]
+#define RESTORE_ONE_BANKED(reg)	ldr r11, [sp, #UREGS_##reg]; msr reg, r11
 
 #define SAVE_BANKED(mode) \
-       SAVE_ONE_BANKED(SP_##mode) ; SAVE_ONE_BANKED(LR_##mode) ; SAVE_ONE_BANKED(SPSR_##mode)
+	SAVE_ONE_BANKED(SP_##mode) ; SAVE_ONE_BANKED(LR_##mode) ; SAVE_ONE_BANKED(SPSR_##mode)
 
 #define RESTORE_BANKED(mode) \
-       RESTORE_ONE_BANKED(SP_##mode) ; RESTORE_ONE_BANKED(LR_##mode) ; RESTORE_ONE_BANKED(SPSR_##mode)
+	RESTORE_ONE_BANKED(SP_##mode) ; RESTORE_ONE_BANKED(LR_##mode) ; RESTORE_ONE_BANKED(SPSR_##mode)
 
-#define SAVE_ALL                                                                                       \
-       sub sp, #(UREGS_R8_fiq - UREGS_sp); /* SP, LR, SPSR, PC */                                      \
-       push {r0-r12}; /* Save R0-R12 */                                                                \
-                                                                                                       \
-       mrs r11, ELR_hyp;               /* ELR_hyp is return address. */                                \
-       str r11, [sp, #UREGS_pc];                                                                       \
-                                                                                                       \
-       str lr, [sp, #UREGS_lr];                                                                        \
-                                                                                                       \
-       add r11, sp, #UREGS_kernel_sizeof+4;                                                            \
-       str r11, [sp, #UREGS_sp];                                                                       \
-                                                                                                       \
-       mrs r11, SPSR_hyp;                                                                              \
-       str r11, [sp, #UREGS_cpsr];                                                                     \
-       and r11, #PSR_MODE_MASK;                                                                        \
-       cmp r11, #PSR_MODE_HYP;                                                                         \
-       blne save_guest_regs
+#define SAVE_ALL											\
+	sub sp, #(UREGS_R8_fiq - UREGS_sp); /* SP, LR, SPSR, PC */					\
+	push {r0-r12}; /* Save R0-R12 */								\
+													\
+	mrs r11, ELR_hyp;		/* ELR_hyp is return address. */				\
+	str r11, [sp, #UREGS_pc];									\
+													\
+	str lr, [sp, #UREGS_lr];									\
+													\
+	add r11, sp, #UREGS_kernel_sizeof+4;								\
+	str r11, [sp, #UREGS_sp];									\
+													\
+	mrs r11, SPSR_hyp;										\
+	str r11, [sp, #UREGS_cpsr];									\
+	and r11, #PSR_MODE_MASK;									\
+	cmp r11, #PSR_MODE_HYP;										\
+	blne save_guest_regs
 
 save_guest_regs:
-       ldr r11, [sp, #UREGS_lr]
-       str r11, [sp, #UREGS_LR_usr]
-       ldr r11, =0xffffffff  /* Clobber SP which is only valid for hypervisor frames. */
-       str r11, [sp, #UREGS_sp]
-       SAVE_ONE_BANKED(SP_usr)
-       SAVE_BANKED(svc)
-       SAVE_BANKED(abt)
-       SAVE_BANKED(und)
-       SAVE_BANKED(irq)
-       SAVE_BANKED(fiq)
-       SAVE_ONE_BANKED(R8_fiq); SAVE_ONE_BANKED(R9_fiq); SAVE_ONE_BANKED(R10_fiq)
-       SAVE_ONE_BANKED(R11_fiq); SAVE_ONE_BANKED(R12_fiq);
-       mov pc, lr
+	ldr r11, [sp, #UREGS_lr]
+	str r11, [sp, #UREGS_LR_usr]
+	ldr r11, =0xffffffff  /* Clobber SP which is only valid for hypervisor frames. */
+	str r11, [sp, #UREGS_sp]
+	SAVE_ONE_BANKED(SP_usr)
+	SAVE_BANKED(svc)
+	SAVE_BANKED(abt)
+	SAVE_BANKED(und)
+	SAVE_BANKED(irq)
+	SAVE_BANKED(fiq)
+	SAVE_ONE_BANKED(R8_fiq); SAVE_ONE_BANKED(R9_fiq); SAVE_ONE_BANKED(R10_fiq)
+	SAVE_ONE_BANKED(R11_fiq); SAVE_ONE_BANKED(R12_fiq);
+	mov pc, lr
 
-#define DEFINE_TRAP_ENTRY(trap)                                                                                \
-       ALIGN;                                                                                          \
-trap_##trap:                                                                                           \
-       SAVE_ALL;                                                                                       \
-       adr lr, return_from_trap;                                                                       \
-       mov r0, sp;                                                                                     \
-       mov r11, sp;                                                                                    \
-       bic sp, #7; /* Align the stack pointer (noop on guest trap) */                                  \
-       b do_trap_##trap
+#define DEFINE_TRAP_ENTRY(trap)										\
+	ALIGN;												\
+trap_##trap:												\
+	SAVE_ALL;											\
+	adr lr, return_from_trap;									\
+	mov r0, sp;											\
+	mov r11, sp;											\
+	bic sp, #7; /* Align the stack pointer (noop on guest trap) */					\
+	b do_trap_##trap
 
 .globl hyp_traps_vector
-       .align 5
+	.align 5
 hyp_traps_vector:
-       .word 0                         /* 0x00 - Reset */
-       b trap_undefined_instruction    /* 0x04 - Undefined Instruction */
-       b trap_supervisor_call          /* 0x08 - Supervisor Call */
-       b trap_prefetch_abort           /* 0x0c - Prefetch Abort */
-       b trap_data_abort               /* 0x10 - Data Abort */
-       b trap_hypervisor               /* 0x14 - Hypervisor */
-       b trap_irq                      /* 0x18 - IRQ */
-       b trap_fiq                      /* 0x1c - FIQ */
+	.word 0				/* 0x00 - Reset */
+	b trap_undefined_instruction	/* 0x04 - Undefined Instruction */
+	b trap_supervisor_call		/* 0x08 - Supervisor Call */
+	b trap_prefetch_abort		/* 0x0c - Prefetch Abort */
+	b trap_data_abort		/* 0x10 - Data Abort */
+	b trap_hypervisor		/* 0x14 - Hypervisor */
+	b trap_irq			/* 0x18 - IRQ */
+	b trap_fiq			/* 0x1c - FIQ */
 
 DEFINE_TRAP_ENTRY(undefined_instruction)
 DEFINE_TRAP_ENTRY(supervisor_call)
@@ -74,34 +74,34 @@ DEFINE_TRAP_ENTRY(irq)
 DEFINE_TRAP_ENTRY(fiq)
 
 ENTRY(return_from_trap)
-       ldr r11, [sp, #UREGS_cpsr]
-       and r11, #PSR_MODE_MASK
-       cmp r11, #PSR_MODE_HYP
-       beq return_to_hypervisor
+	ldr r11, [sp, #UREGS_cpsr]
+	and r11, #PSR_MODE_MASK
+	cmp r11, #PSR_MODE_HYP
+	beq return_to_hypervisor
 
 ENTRY(return_to_guest)
-       mov r11, sp
-       bic sp, #7 /* Align the stack pointer */
-       bl leave_hypervisor_tail
-       ldr r11, [sp, #UREGS_pc]
-       msr ELR_hyp, r11
-       ldr r11, [sp, #UREGS_cpsr]
-       msr SPSR_hyp, r11
-       RESTORE_ONE_BANKED(SP_usr)
-       RESTORE_BANKED(svc)
-       RESTORE_BANKED(abt)
-       RESTORE_BANKED(und)
-       RESTORE_BANKED(irq)
-       RESTORE_BANKED(fiq)
-       RESTORE_ONE_BANKED(R8_fiq); RESTORE_ONE_BANKED(R9_fiq); RESTORE_ONE_BANKED(R10_fiq)
-       RESTORE_ONE_BANKED(R11_fiq); RESTORE_ONE_BANKED(R12_fiq);
-       ldr lr, [sp, #UREGS_LR_usr]
-       pop {r0-r12}
-       add sp, #(UREGS_R8_fiq - UREGS_sp); /* SP, LR, SPSR, PC */
-       eret
+	mov r11, sp
+	bic sp, #7 /* Align the stack pointer */
+	bl leave_hypervisor_tail
+	ldr r11, [sp, #UREGS_pc]
+	msr ELR_hyp, r11
+	ldr r11, [sp, #UREGS_cpsr]
+	msr SPSR_hyp, r11
+	RESTORE_ONE_BANKED(SP_usr)
+	RESTORE_BANKED(svc)
+	RESTORE_BANKED(abt)
+	RESTORE_BANKED(und)
+	RESTORE_BANKED(irq)
+	RESTORE_BANKED(fiq)
+	RESTORE_ONE_BANKED(R8_fiq); RESTORE_ONE_BANKED(R9_fiq); RESTORE_ONE_BANKED(R10_fiq)
+	RESTORE_ONE_BANKED(R11_fiq); RESTORE_ONE_BANKED(R12_fiq);
+	ldr lr, [sp, #UREGS_LR_usr]
+	pop {r0-r12}
+	add sp, #(UREGS_R8_fiq - UREGS_sp); /* SP, LR, SPSR, PC */
+	eret
 
 ENTRY(return_to_hypervisor)
-       ldr lr, [sp, #UREGS_lr]
-       pop {r0-r12}
-       add sp, #(UREGS_R8_fiq - UREGS_sp); /* SP, LR, SPSR, PC */
-       eret
+	ldr lr, [sp, #UREGS_lr]
+	pop {r0-r12}
+	add sp, #(UREGS_R8_fiq - UREGS_sp); /* SP, LR, SPSR, PC */
+	eret

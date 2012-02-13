@@ -11,8 +11,8 @@
 
 #include "assembler.h"
 #include "bitops.h"
-       .text
+	.text
 
 ENTRY(_set_bit)
-       bitop   orr
+	bitop	orr
 ENDPROC(_set_bit)

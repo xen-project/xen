@@ -14,5 +14,5 @@
                 .text
 
 ENTRY(_test_and_set_bit)
-       testop  orreq, streq
+	testop	orreq, streq
 ENDPROC(_test_and_set_bit)

@@ -15,5 +15,5 @@
                 .text
 
 ENTRY(_clear_bit)
-       bitop   bic
+	bitop	bic
 ENDPROC(_clear_bit)

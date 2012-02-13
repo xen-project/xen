@@ -1,13 +1,13 @@
 /* Nothing is mapped at 1G, for the moment */
 #define DUMMY(x) \
-       .globl x; \
-x:     .word 0xe7f000f0
-/* x:  mov r0, #0x40000000 ; str r0, [r0]; b x */
+	.globl x; \
+x:	.word 0xe7f000f0
+/* x:	mov r0, #0x40000000 ; str r0, [r0]; b x */
 
 #define  NOP(x) \
-       .globl x; \
-x:     mov pc, lr
-
+	.globl x; \
+x:	mov pc, lr
+	
 DUMMY(alloc_pirq_struct);
 DUMMY(alloc_vcpu_guest_context);
 DUMMY(arch_do_domctl);

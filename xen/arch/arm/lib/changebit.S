@@ -14,5 +14,5 @@
                 .text
 
 ENTRY(_change_bit)
-       bitop   eor
+	bitop	eor
 ENDPROC(_change_bit)
