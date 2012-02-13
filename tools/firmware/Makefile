@@ -5,19 +5,20 @@ include $(XEN_ROOT)/tools/Rules.mk
 TARGET      := hvmloader/hvmloader
 INST_DIR := $(DESTDIR)$(XENFIRMWAREDIR)
 
-SUBDIRS :=
-SUBDIRS += seabios-dir
-SUBDIRS += rombios
-SUBDIRS += vgabios
-SUBDIRS += etherboot
-SUBDIRS += hvmloader
+SUBDIRS-y :=
+SUBDIRS-$(CONFIG_SEABIOS) += seabios-dir
+SUBDIRS-$(CONFIG_ROMBIOS) += rombios
+SUBDIRS-$(CONFIG_ROMBIOS) += vgabios
+SUBDIRS-$(CONFIG_ROMBIOS) += etherboot
+SUBDIRS-y += hvmloader
 
 seabios-dir:
 	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh $(SEABIOS_UPSTREAM_URL) $(SEABIOS_UPSTREAM_TAG) seabios-dir
 	cp seabios-config seabios-dir/.config;
 
 .PHONY: all
-all: seabios-dir
+all: $(SUBDIRS-y)
+ifeq ($(CONFIG_ROMBIOS),y)
 	@set -e; if [ $$((`( bcc -v 2>&1 | grep version || echo 0.0.0 ) | cut -d' ' -f 3 | awk -F. '{ printf "0x%02x%02x%02x", $$1, $$2, $$3}'`)) -lt $$((0x00100e)) ] ; then \
 	echo "==========================================================================="; \
 	echo "Require dev86 rpm or bin86 & bcc debs version >= 0.16.14 to build firmware!"; \
@@ -25,7 +26,8 @@ all: seabios-dir
 	echo "==========================================================================="; \
 	false ; \
 	fi
-	$(MAKE) subdirs-$@; \
+endif
+	$(MAKE) subdirs-$@
 
 
 .PHONY: install
