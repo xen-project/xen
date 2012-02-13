@@ -202,7 +202,16 @@ hyp:
        orr   r2, r2, #0x071         /* r2:r3 := 2MB dev map including UART */
        add   r4, r4, #8
        strd  r2, r3, [r1, r4]       /* Map it in the fixmap's slot */
+#else
+       add   r4, r4, #8             /* Skip over unused fixmap slot */
 #endif
+       mov   r3, #0x0
+       lsr   r2, r8, #21
+       lsl   r2, r2, #21            /* 2MB-aligned paddr of DTB */
+       orr   r2, r2, #0xf00
+       orr   r2, r2, #0x07d         /* r2:r3 := 2MB RAM incl. DTB */
+       add   r4, r4, #8
+       strd  r2, r3, [r1, r4]       /* Map it in the early boot slot */
 
        PRINT("- Turning on paging -\r\n")
 

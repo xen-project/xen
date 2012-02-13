@@ -161,10 +161,11 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
 
     xen_paddr = XEN_PADDR;
 
-    /* Map the destination in the empty L2 above the fixmap */
-    dest_va = FIXMAP_ADDR(0) + (1u << SECOND_SHIFT);
+    /* Map the destination in the boot misc area. */
+    dest_va = BOOT_MISC_VIRT_START;
     pte = mfn_to_xen_entry(xen_paddr >> PAGE_SHIFT);
     write_pte(xen_second + second_table_offset(dest_va), pte);
+    flush_xen_data_tlb_va(dest_va);
 
     /* Calculate virt-to-phys offset for the new location */
     phys_offset = xen_paddr - (unsigned long) _start;

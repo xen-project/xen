@@ -55,15 +55,21 @@
  *  0  -   2M   Unmapped
  *  2M -   4M   Xen text, data, bss
  *  4M -   6M   Fixmap: special-purpose 4K mapping slots
+ *  6M  -  8M   Early boot misc (see below)
  *
  * 32M - 128M   Frametable: 24 bytes per page for 16GB of RAM
  *
  *  1G -   2G   Xenheap: always-mapped memory
  *  2G -   4G   Domheap: on-demand-mapped
+ *
+ * The early boot misc area is used:
+ *   - in head.S for the DTB for device_tree_early_init().
+ *   - in setup_pagetables() when relocating Xen.
  */
 
 #define XEN_VIRT_START         0x00200000
 #define FIXMAP_ADDR(n)        (0x00400000 + (n) * PAGE_SIZE)
+#define BOOT_MISC_VIRT_START   0x00600000
 #define FRAMETABLE_VIRT_START  0x02000000
 #define XENHEAP_VIRT_START     0x40000000
 #define DOMHEAP_VIRT_START     0x80000000
