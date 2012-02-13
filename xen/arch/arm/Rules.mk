@@ -6,6 +6,8 @@
 # 'make clean' before rebuilding.
 #
 
+HAS_DEVICE_TREE := y
+
 CFLAGS += -fno-builtin -fno-common -Wredundant-decls
 CFLAGS += -iwithprefix include -Werror -Wno-pointer-arith -pipe
 CFLAGS += -I$(BASEDIR)/include

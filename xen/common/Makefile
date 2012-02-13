@@ -59,3 +59,4 @@ subdir-$(x86_64) += hvm
 subdir-$(ia64) += hvm
 
 subdir-y += libelf
+subdir-$(HAS_DEVICE_TREE) += libfdt
