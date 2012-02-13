@@ -57,4 +57,6 @@ typedef __u32 __be32;
 typedef __u64 __le64;
 typedef __u64 __be64;
 
+typedef unsigned long uintptr_t;
+
 #endif /* __TYPES_H__ */
