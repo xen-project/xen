@@ -11,6 +11,7 @@
 #include <xen/domain_page.h>
 #include <xen/sched.h>
 #include <asm/byteorder.h>
+#include <asm/setup.h>
 
 #include "kernel.h"
 
@@ -32,25 +33,28 @@ struct minimal_dtb_header {
 
 #define DTB_MAGIC 0xd00dfeed
 
-static void copy_from_flash(void *dst, paddr_t flash, unsigned long len)
+/**
+ * copy_from_paddr - copy data from a physical address
+ * @dst: destination virtual address
+ * @paddr: source physical address
+ * @len: length to copy
+ */
+void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len)
 {
     void *src = (void *)FIXMAP_ADDR(FIXMAP_MISC);
-
-    printk("Copying %#lx bytes from flash %"PRIpaddr" to %p",
-           len, flash, dst);
 
     while (len) {
         paddr_t p;
         unsigned long l, s;
 
-        p = flash >> PAGE_SHIFT;
-        s = flash & (PAGE_SIZE-1);
+        p = paddr >> PAGE_SHIFT;
+        s = paddr & (PAGE_SIZE-1);
         l = min(PAGE_SIZE - s, len);
 
         set_fixmap(FIXMAP_MISC, p, DEV_SHARED);
         memcpy(dst, src + s, l);
 
-        flash += l;
+        paddr += l;
         dst += l;
         len -= l;
     }
@@ -108,7 +112,7 @@ static int kernel_try_zimage_prepare(struct kernel_info *info)
     /*
      * Check for an appended DTB.
      */
-    copy_from_flash(&dtb_hdr, KERNEL_FLASH_ADDRESS + end - start, sizeof(dtb_hdr));
+    copy_from_paddr(&dtb_hdr, KERNEL_FLASH_ADDRESS + end - start, sizeof(dtb_hdr));
     if (be32_to_cpu(dtb_hdr.magic) == DTB_MAGIC) {
         end += be32_to_cpu(dtb_hdr.total_size);
     }
@@ -150,7 +154,7 @@ static int kernel_try_elf_prepare(struct kernel_info *info)
     if ( info->kernel_img == NULL )
         panic("Cannot allocate temporary buffer for kernel.\n");
 
-    copy_from_flash(info->kernel_img, KERNEL_FLASH_ADDRESS, KERNEL_FLASH_SIZE);
+    copy_from_paddr(info->kernel_img, KERNEL_FLASH_ADDRESS, KERNEL_FLASH_SIZE);
 
     if ( (rc = elf_init(&info->elf.elf, info->kernel_img, KERNEL_FLASH_SIZE )) != 0 )
         return rc;

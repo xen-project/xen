@@ -128,6 +128,8 @@ extern void share_xen_page_with_privileged_guests(
     struct page_info *page, int readonly);
 
 #define frame_table ((struct page_info *)FRAMETABLE_VIRT_START)
+/* MFN of the first page in the frame table. */
+extern unsigned long frametable_base_mfn;
 
 extern unsigned long max_page;
 extern unsigned long total_pages;
@@ -151,15 +153,14 @@ extern void clear_fixmap(unsigned map);
 })
 
 #define max_pdx                 max_page
-/* XXX Assume everything in the 40-bit physical alias 0x8000000000 for now */
-#define pfn_to_pdx(pfn)         ((pfn) - 0x8000000UL)
-#define pdx_to_pfn(pdx)         ((pdx) + 0x8000000UL)
+#define pfn_to_pdx(pfn)         (pfn)
+#define pdx_to_pfn(pdx)         (pdx)
 #define virt_to_pdx(va)         virt_to_mfn(va)
 #define pdx_to_virt(pdx)        mfn_to_virt(pdx)
 
 /* Convert between machine frame numbers and page-info structures. */
-#define mfn_to_page(mfn)  (frame_table + pfn_to_pdx(mfn))
-#define page_to_mfn(pg)   pdx_to_pfn((unsigned long)((pg) - frame_table))
+#define mfn_to_page(mfn)  (frame_table + (pfn_to_pdx(mfn) - frametable_base_mfn))
+#define page_to_mfn(pg)   pdx_to_pfn((unsigned long)((pg) - frame_table) + frametable_base_mfn)
 #define __page_to_mfn(pg)  page_to_mfn(pg)
 #define __mfn_to_page(mfn) mfn_to_page(mfn)
 

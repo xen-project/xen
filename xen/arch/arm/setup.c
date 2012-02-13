@@ -64,17 +64,90 @@ static void __init init_idle_domain(void)
         /* TODO: setup_idle_pagetable(); */
 }
 
+static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
+{
+    paddr_t ram_start;
+    paddr_t ram_end;
+    paddr_t ram_size;
+    unsigned long ram_pages;
+    unsigned long heap_pages, xenheap_pages, domheap_pages;
+    unsigned long dtb_pages;
+    unsigned long boot_mfn_start, boot_mfn_end;
+
+    /*
+     * TODO: only using the first RAM bank for now.  The heaps and the
+     * frame table assume RAM is physically contiguous.
+     */
+    ram_start = early_info.mem.bank[0].start;
+    ram_size  = early_info.mem.bank[0].size;
+    ram_end = ram_start + ram_size;
+    ram_pages = ram_size >> PAGE_SHIFT;
+
+    /*
+     * Calculate the sizes for the heaps using these constraints:
+     *
+     *  - heaps must be 32 MiB aligned
+     *  - must not include Xen itself
+     *  - xen heap must be at most 1 GiB
+     *
+     * XXX: needs a platform with at least 1GiB of RAM or the dom
+     * heap will be empty and no domains can be created.
+     */
+    heap_pages = (ram_size >> PAGE_SHIFT) - (32 << (20 - PAGE_SHIFT));
+    xenheap_pages = min(1ul << (30 - PAGE_SHIFT), heap_pages);
+    domheap_pages = heap_pages - xenheap_pages;
+
+    printk("Xen heap: %lu pages  Dom heap: %lu pages\n", xenheap_pages, domheap_pages);
+
+    setup_xenheap_mappings(ram_start >> PAGE_SHIFT, xenheap_pages);
+
+    /*
+     * Need a single mapped page for populating bootmem_region_list
+     * and enough mapped pages for copying the DTB.
+     *
+     * TODO: The DTB (and other payloads) are assumed to be towards
+     * the start of RAM.
+     */
+    dtb_pages = (dtb_size + PAGE_SIZE-1) >> PAGE_SHIFT;
+    boot_mfn_start = xenheap_mfn_end - dtb_pages - 1;
+    boot_mfn_end = xenheap_mfn_end;
+
+    init_boot_pages(pfn_to_paddr(boot_mfn_start), pfn_to_paddr(boot_mfn_end));
+
+    /*
+     * Copy the DTB.
+     *
+     * TODO: handle other payloads too.
+     */
+    device_tree_flattened = mfn_to_virt(alloc_boot_pages(dtb_pages, 1));
+    copy_from_paddr(device_tree_flattened, dtb_paddr, dtb_size);
+
+    /* Add non-xenheap memory */
+    init_boot_pages(pfn_to_paddr(xenheap_mfn_start + xenheap_pages),
+                    pfn_to_paddr(xenheap_mfn_start + xenheap_pages + domheap_pages));
+
+    setup_frametable_mappings(ram_start, ram_end);
+
+    /* Add xenheap memory that was not already added to the boot
+       allocator. */
+    init_xenheap_pages(pfn_to_paddr(xenheap_mfn_start),
+                       pfn_to_paddr(boot_mfn_start));
+
+    end_boot_allocator();
+}
+
 void __init start_xen(unsigned long boot_phys_offset,
                       unsigned long arm_type,
                       unsigned long atag_paddr)
 
 {
     void *fdt;
+    size_t fdt_size;
     int i;
 
     fdt = (void *)BOOT_MISC_VIRT_START
         + (atag_paddr & ((1 << SECOND_SHIFT) - 1));
-    device_tree_early_init(fdt);
+    fdt_size = device_tree_early_init(fdt);
 
     setup_pagetables(boot_phys_offset);
 
@@ -98,28 +171,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     init_xen_time();
 
-    /* TODO: This needs some thought, as well as device-tree mapping.
-     * For testing, assume that the whole xenheap is contiguous in RAM */
-    setup_xenheap_mappings(0x8000000, 0x40000); /* 1 GB @ 512GB */
-    /* Must pass a single mapped page for populating bootmem_region_list. */
-    init_boot_pages(pfn_to_paddr(xenheap_mfn_start),
-                    pfn_to_paddr(xenheap_mfn_start+1));
-
-    /* Add non-xenheap memory */
-    init_boot_pages(0x8040000000, 0x80c0000000); /* 2 GB @513GB */
-
-    /* TODO Make sure Xen's own pages aren't added
-     *     -- the memory above doesn't include our relocation target.  */
-    /* TODO Handle payloads too */
-
-    /* TODO Need to find actual memory, for now use 4GB at 512GB */
-    setup_frametable_mappings(0x8000000000ULL, 0x8100000000UL);
-
-    /* Add xenheap memory */
-    init_xenheap_pages(pfn_to_paddr(xenheap_mfn_start+1),
-                       pfn_to_paddr(xenheap_mfn_end));
-
-    end_boot_allocator();
+    setup_mm(atag_paddr, fdt_size);
 
     /* Setup Hyp vector base */
     WRITE_CP32((uint32_t) hyp_traps_vector, HVBAR);

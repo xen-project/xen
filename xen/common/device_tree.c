@@ -22,6 +22,7 @@
 #include <libfdt.h>
 
 struct dt_early_info __initdata early_info;
+void *device_tree_flattened;
 
 static void __init get_val(const u32 **cell, u32 cells, u64 *val)
 {
@@ -126,8 +127,10 @@ static void __init early_print_info(void)
 /**
  * device_tree_early_init - initialize early info from a DTB
  * @fdt: flattened device tree binary
+ *
+ * Returns the size of the DTB.
  */
-void __init device_tree_early_init(const void *fdt)
+size_t __init device_tree_early_init(const void *fdt)
 {
     int ret;
 
@@ -137,6 +140,8 @@ void __init device_tree_early_init(const void *fdt)
 
     early_scan(fdt);
     early_print_info();
+
+    return fdt_totalsize(fdt);
 }
 
 /**

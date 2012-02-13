@@ -39,6 +39,7 @@ static lpae_t xen_xenmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 unsigned long xenheap_mfn_start, xenheap_mfn_end;
 unsigned long xenheap_virt_end;
 
+unsigned long frametable_base_mfn;
 unsigned long frametable_virt_end;
 
 /* Map a 4k page in a fixmap entry */
@@ -300,6 +301,8 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     unsigned long nr_pages = (pe - ps) >> PAGE_SHIFT;
     unsigned long frametable_size = nr_pages * sizeof(struct page_info);
     unsigned long base_mfn;
+
+    frametable_base_mfn = ps >> PAGE_SHIFT;
 
     /* Round up to 32M boundary */
     frametable_size = (frametable_size + 0x1ffffff) & ~0x1ffffff;

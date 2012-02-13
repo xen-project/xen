@@ -29,8 +29,9 @@ struct dt_early_info {
 };
 
 extern struct dt_early_info early_info;
+extern void *device_tree_flattened;
 
-void device_tree_early_init(const void *fdt);
+size_t device_tree_early_init(const void *fdt);
 paddr_t device_tree_get_xen_paddr(void);
 
 #endif
