@@ -110,6 +110,8 @@ typedef struct arch_vcpu_info arch_vcpu_info_t;
 
 struct arch_shared_info { };
 typedef struct arch_shared_info arch_shared_info_t;
+typedef uint64_t xen_callback_t;
+
 #endif
 
 #endif /*  __XEN_PUBLIC_ARCH_ARM_H__ */
