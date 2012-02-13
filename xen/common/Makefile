@@ -1,6 +1,7 @@
 obj-y += bitmap.o
 obj-y += cpu.o
 obj-y += cpupool.o
+obj-$(HAS_DEVICE_TREE) += device_tree.o
 obj-y += domctl.o
 obj-y += domain.o
 obj-y += event_channel.o
@@ -60,3 +61,5 @@ subdir-$(ia64) += hvm
 
 subdir-y += libelf
 subdir-$(HAS_DEVICE_TREE) += libfdt
+
+CFLAGS += -Ilibfdt

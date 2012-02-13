@@ -20,6 +20,7 @@
 #include <xen/config.h>
 #include <xen/compile.h>
 #include <xen/types.h>
+#include <xen/device_tree.h>
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/preempt.h>
@@ -159,7 +160,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
         write_pte(xen_second + second_linear_offset(dest_va), pte);
     }
 
-    xen_paddr = XEN_PADDR;
+    xen_paddr = device_tree_get_xen_paddr();
 
     /* Map the destination in the boot misc area. */
     dest_va = BOOT_MISC_VIRT_START;

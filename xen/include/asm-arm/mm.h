@@ -6,9 +6,8 @@
 #include <asm/page.h>
 #include <public/xen.h>
 
-/* Find a suitable place at the top of memory for Xen to live */
-/* XXX For now, use the top of the VE's 4GB RAM, at a 40-bit alias */
-#define XEN_PADDR 0x80ffe00000ull
+/* Align Xen to a 2 MiB boundary. */
+#define XEN_PADDR_ALIGN (1 << 21)
 
 /*
  * Per-page-frame information.

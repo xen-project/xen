@@ -19,6 +19,7 @@
 
 #include <xen/config.h>
 #include <xen/compile.h>
+#include <xen/device_tree.h>
 #include <xen/domain_page.h>
 #include <xen/types.h>
 #include <xen/string.h>
@@ -68,7 +69,12 @@ void __init start_xen(unsigned long boot_phys_offset,
                       unsigned long atag_paddr)
 
 {
+    void *fdt;
     int i;
+
+    fdt = (void *)BOOT_MISC_VIRT_START
+        + (atag_paddr & ((1 << SECOND_SHIFT) - 1));
+    device_tree_early_init(fdt);
 
     setup_pagetables(boot_phys_offset);
 
