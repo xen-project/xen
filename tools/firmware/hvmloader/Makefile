@@ -29,7 +29,7 @@ LOADADDR = 0x100000
 CFLAGS += $(CFLAGS_xeninclude)
 
 OBJS  = hvmloader.o mp_tables.o util.o smbios.o 
-OBJS += 32bitbios_support.o smp.o cacheattr.o xenbus.o
+OBJS += smp.o cacheattr.o xenbus.o
 OBJS += e820.o pci.o pir.o ctype.o
 ifeq ($(debug),y)
 OBJS += tests.o
@@ -39,7 +39,7 @@ CIRRUSVGA_DEBUG ?= n
 
 ROMBIOS_DIR := ../rombios
 ifneq ($(ROMBIOS_DIR),)
-OBJS += rombios.o
+OBJS += 32bitbios_support.o rombios.o
 CFLAGS += -DENABLE_ROMBIOS
 ROMBIOS_ROM := $(ROMBIOS_DIR)/BIOS-bochs-latest
 endif
