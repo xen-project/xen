@@ -29,10 +29,13 @@
 #include "pci_regs.h"
 #include "util.h"
 #include "hypercall.h"
+#include "option_rom.h"
 
 #include <xen/hvm/params.h>
 
 #define ROM_INCLUDE_ROMBIOS
+#define ROM_INCLUDE_VGABIOS
+#define ROM_INCLUDE_ETHERBOOT
 #include "roms.inc"
 
 #define ROMBIOS_BEGIN          0x000F0000
@@ -62,6 +65,61 @@ static void rombios_setup_bios_info(void)
 
     info = (struct rombios_info *)BIOS_INFO_PHYSICAL_ADDRESS;
     memset(info, 0, sizeof(*info));
+}
+
+static void rombios_load_roms(void)
+{
+    int option_rom_sz = 0, vgabios_sz = 0, etherboot_sz = 0;
+    uint32_t etherboot_phys_addr = 0, option_rom_phys_addr = 0;
+
+    switch ( virtual_vga )
+    {
+    case VGA_cirrus:
+        printf("Loading Cirrus VGABIOS ...\n");
+        memcpy((void *)VGABIOS_PHYSICAL_ADDRESS,
+               vgabios_cirrusvga, sizeof(vgabios_cirrusvga));
+        vgabios_sz = round_option_rom(sizeof(vgabios_cirrusvga));
+        break;
+    case VGA_std:
+        printf("Loading Standard VGABIOS ...\n");
+        memcpy((void *)VGABIOS_PHYSICAL_ADDRESS,
+               vgabios_stdvga, sizeof(vgabios_stdvga));
+        vgabios_sz = round_option_rom(sizeof(vgabios_stdvga));
+        break;
+    case VGA_pt:
+        printf("Loading VGABIOS of passthroughed gfx ...\n");
+        vgabios_sz = round_option_rom(
+            (*(uint8_t *)(VGABIOS_PHYSICAL_ADDRESS+2)) * 512);
+        break;
+    default:
+        printf("No emulated VGA adaptor ...\n");
+        break;
+    }
+
+    etherboot_phys_addr = VGABIOS_PHYSICAL_ADDRESS + vgabios_sz;
+    if ( etherboot_phys_addr < OPTIONROM_PHYSICAL_ADDRESS )
+        etherboot_phys_addr = OPTIONROM_PHYSICAL_ADDRESS;
+    etherboot_sz = scan_etherboot_nic(OPTIONROM_PHYSICAL_END,
+                                      etherboot_phys_addr,
+                                      etherboot);
+
+    option_rom_phys_addr = etherboot_phys_addr + etherboot_sz;
+    option_rom_sz = pci_load_option_roms(OPTIONROM_PHYSICAL_END,
+                                         option_rom_phys_addr);
+
+    printf("Option ROMs:\n");
+    if ( vgabios_sz )
+        printf(" %05x-%05x: VGA BIOS\n",
+               VGABIOS_PHYSICAL_ADDRESS,
+               VGABIOS_PHYSICAL_ADDRESS + vgabios_sz - 1);
+    if ( etherboot_sz )
+        printf(" %05x-%05x: Etherboot ROM\n",
+               etherboot_phys_addr,
+               etherboot_phys_addr + etherboot_sz - 1);
+    if ( option_rom_sz )
+        printf(" %05x-%05x: PCI Option ROMs\n",
+               option_rom_phys_addr,
+               option_rom_phys_addr + option_rom_sz - 1);
 }
 
 static void rombios_load(const struct bios_config *config)
@@ -158,10 +216,7 @@ struct bios_config rombios_config =  {
 
     .bios_address = ROMBIOS_PHYSICAL_ADDRESS,
 
-    .load_roms = 1,
-
-    .optionrom_start = OPTIONROM_PHYSICAL_ADDRESS,
-    .optionrom_end = OPTIONROM_PHYSICAL_END,
+    .load_roms = rombios_load_roms,
 
     .bios_load = rombios_load,
 

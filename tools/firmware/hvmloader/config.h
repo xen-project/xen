@@ -18,8 +18,7 @@ struct bios_config {
     unsigned int bios_address;
 
     /* ROMS */
-    int load_roms;
-    unsigned int optionrom_start, optionrom_end;
+    void (*load_roms)(void);
 
     void (*bios_load)(const struct bios_config *config);
 

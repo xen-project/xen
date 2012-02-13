@@ -47,6 +47,13 @@ struct option_rom_pci_header {
     uint16_t reserved;
 } __attribute__ ((packed));
 
+#define round_option_rom(x) (((x) + 2047) & ~2047)
+int scan_etherboot_nic(unsigned int option_rom_end,
+                       uint32_t copy_rom_dest,
+                       void *etherboot_rom);
+int pci_load_option_roms(unsigned int option_rom_end,
+                         uint32_t rom_base_addr);
+
 #endif /* __HVMLOADER_OPTION_ROM_H__ */
 
 /*

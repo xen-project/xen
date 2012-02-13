@@ -39,7 +39,7 @@ CIRRUSVGA_DEBUG ?= n
 
 ROMBIOS_DIR := ../rombios
 ifneq ($(ROMBIOS_DIR),)
-OBJS += 32bitbios_support.o rombios.o
+OBJS += optionroms.o 32bitbios_support.o rombios.o
 CFLAGS += -DENABLE_ROMBIOS
 ROMBIOS_ROM := $(ROMBIOS_DIR)/BIOS-bochs-latest
 endif

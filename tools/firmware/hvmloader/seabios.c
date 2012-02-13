@@ -143,10 +143,7 @@ struct bios_config seabios_config = {
 
     .bios_address = SEABIOS_PHYSICAL_ADDRESS,
 
-    .load_roms = 0,
-
-    .optionrom_start = 0,
-    .optionrom_end = 0,
+    .load_roms = NULL,
 
     .bios_load = NULL,
 
