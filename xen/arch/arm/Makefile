@@ -1,6 +1,7 @@
 subdir-y += lib
 
 obj-y += dummy.o
+obj-y += early_printk.o
 obj-y += entry.o
 obj-y += domain.o
 obj-y += domain_build.o
