@@ -39,7 +39,7 @@ int vmce_init_msr(struct domain *d)
         return -ENOMEM;
     }
     memset(dom_vmce(d)->mci_ctl, ~0,
-           sizeof(dom_vmce(d)->mci_ctl));
+           nr_mce_banks * sizeof(*dom_vmce(d)->mci_ctl));
 
     dom_vmce(d)->mcg_status = 0x0;
     dom_vmce(d)->mcg_cap = g_mcg_cap;
@@ -438,7 +438,7 @@ int vmce_domain_inject(
 int vmce_init(struct cpuinfo_x86 *c)
 {
     u64 value;
-    int i;
+    unsigned int i;
 
     if ( !h_mci_ctrl )
     {
@@ -449,17 +449,17 @@ int vmce_init(struct cpuinfo_x86 *c)
             return -ENOMEM;
         }
         /* Don't care banks before firstbank */
-        memset(h_mci_ctrl, 0xff, sizeof(h_mci_ctrl));
+        memset(h_mci_ctrl, ~0,
+               min(firstbank, nr_mce_banks) * sizeof(*h_mci_ctrl));
         for (i = firstbank; i < nr_mce_banks; i++)
             rdmsrl(MSR_IA32_MCx_CTL(i), h_mci_ctrl[i]);
     }
 
-    if (g_mcg_cap & MCG_CTL_P)
-        rdmsrl(MSR_IA32_MCG_CTL, h_mcg_ctl);
-
     rdmsrl(MSR_IA32_MCG_CAP, value);
     /* For Guest vMCE usage */
     g_mcg_cap = value & ~MCG_CMCI_P;
+    if (value & MCG_CTL_P)
+        rdmsrl(MSR_IA32_MCG_CTL, h_mcg_ctl);
 
     return 0;
 }

@@ -52,7 +52,7 @@ int is_vmce_ready(struct mcinfo_bank *bank, struct domain *d);
 int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn);
 
 u64 mce_cap_init(void);
-extern int firstbank;
+extern unsigned int firstbank;
 
 int intel_mce_rdmsr(uint32_t msr, uint64_t *val);
 int intel_mce_wrmsr(uint32_t msr, uint64_t val);
@@ -61,7 +61,7 @@ struct mcinfo_extended *intel_get_extended_msrs(
     struct mcinfo_global *mig, struct mc_info *mi);
 
 int mce_available(struct cpuinfo_x86 *c);
-int mce_firstbank(struct cpuinfo_x86 *c);
+unsigned int mce_firstbank(struct cpuinfo_x86 *c);
 /* Helper functions used for collecting error telemetry */
 struct mc_info *x86_mcinfo_getptr(void);
 void mc_panic(char *s);

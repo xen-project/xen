@@ -29,7 +29,7 @@ invbool_param("mce", mce_disabled);
 bool_t __read_mostly mce_broadcast = 0;
 bool_t is_mc_panic;
 unsigned int __read_mostly nr_mce_banks;
-int __read_mostly firstbank;
+unsigned int __read_mostly firstbank;
 
 static void intpose_init(void);
 static void mcinfo_clear(struct mc_info *);
@@ -650,7 +650,7 @@ int mce_available(struct cpuinfo_x86 *c)
  * Check if bank 0 is usable for MCE. It isn't for AMD K7,
  * and Intel P6 family before model 0x1a.
  */
-int mce_firstbank(struct cpuinfo_x86 *c)
+unsigned int mce_firstbank(struct cpuinfo_x86 *c)
 {
     if (c->x86 == 6) {
         if (c->x86_vendor == X86_VENDOR_AMD)
