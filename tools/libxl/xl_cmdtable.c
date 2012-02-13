@@ -48,12 +48,19 @@ struct cmd_spec cmd_table[] = {
     { "shutdown",
       &main_shutdown, 0,
       "Issue a shutdown signal to a domain",
-      "<Domain>",
+      "[options] <Domain>",
+      "-h                      Print this help.\n"
+      "-F                      Fallback to ACPI power event for HVM guests with\n"
+      "                        no PV drivers.\n"
+      "-w                      Wait for guest to shutdown.\n"
     },
     { "reboot",
       &main_reboot, 0,
       "Issue a reboot signal to a domain",
-      "<Domain>",
+      "[options] <Domain>",
+      "-h                      Print this help.\n"
+      "-F                      Fallback to ACPI reset event for HVM guests with\n"
+      "                        no PV drivers.\n"
     },
     { "pci-attach",
       &main_pciattach, 0,
