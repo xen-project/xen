@@ -21,11 +21,11 @@
  */
 
 #include <xen/init.h>
+#include <xen/guest_access.h>
 #include <asm/paging.h>
 #include <asm/shadow.h>
 #include <asm/p2m.h>
 #include <asm/hap.h>
-#include <asm/guest_access.h>
 #include <asm/hvm/nestedhvm.h>
 #include <xen/numa.h>
 #include <xsm/xsm.h>
@@ -383,26 +383,30 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
                   (pages < sc->pages) && (i2 < LOGDIRTY_NODE_ENTRIES);
                   i2++ )
             {
-                static unsigned long zeroes[PAGE_SIZE/BYTES_PER_LONG];
                 unsigned int bytes = PAGE_SIZE;
                 l1 = ((l2 && mfn_valid(l2[i2])) ?
-                      map_domain_page(mfn_x(l2[i2])) : zeroes);
+                      map_domain_page(mfn_x(l2[i2])) : NULL);
                 if ( unlikely(((sc->pages - pages + 7) >> 3) < bytes) )
                     bytes = (unsigned int)((sc->pages - pages + 7) >> 3);
                 if ( likely(peek) )
                 {
-                    if ( copy_to_guest_offset(sc->dirty_bitmap, pages >> 3,
-                                              (uint8_t *)l1, bytes) != 0 )
+                    if ( (l1 ? copy_to_guest_offset(sc->dirty_bitmap,
+                                                    pages >> 3, (uint8_t *)l1,
+                                                    bytes)
+                             : clear_guest_offset(sc->dirty_bitmap,
+                                                  pages >> 3, bytes)) != 0 )
                     {
                         rv = -EFAULT;
                         goto out;
                     }
                 }
-                if ( clean && l1 != zeroes )
-                    clear_page(l1);
                 pages += bytes << 3;
-                if ( l1 != zeroes )
+                if ( l1 )
+                {
+                    if ( clean )
+                        clear_page(l1);
                     unmap_domain_page(l1);
+                }
             }
             if ( l2 )
                 unmap_domain_page(l2);
@@ -462,12 +466,9 @@ int paging_log_dirty_range(struct domain *d,
 
     if ( !d->arch.paging.log_dirty.fault_count &&
          !d->arch.paging.log_dirty.dirty_count ) {
-        int size = (nr + BITS_PER_LONG - 1) / BITS_PER_LONG;
-        unsigned long zeroes[size];
-        memset(zeroes, 0x00, size * BYTES_PER_LONG);
-        rv = 0;
-        if ( copy_to_guest_offset(dirty_bitmap, 0, (uint8_t *) zeroes,
-                                  size * BYTES_PER_LONG) != 0 )
+        unsigned int size = BITS_TO_LONGS(nr);
+
+        if ( clear_guest(dirty_bitmap, size * BYTES_PER_LONG) != 0 )
             rv = -EFAULT;
         goto out;
     }
@@ -495,11 +496,10 @@ int paging_log_dirty_range(struct domain *d,
                   (pages < nr) && (i2 < LOGDIRTY_NODE_ENTRIES);
                   i2++ )
             {
-                static unsigned long zeroes[PAGE_SIZE/BYTES_PER_LONG];
                 unsigned int bytes = PAGE_SIZE;
                 uint8_t *s;
                 l1 = ((l2 && mfn_valid(l2[i2])) ?
-                      map_domain_page(mfn_x(l2[i2])) : zeroes);
+                      map_domain_page(mfn_x(l2[i2])) : NULL);
 
                 s = ((uint8_t*)l1) + (b1 >> 3);
                 bytes -= b1 >> 3;
@@ -507,9 +507,18 @@ int paging_log_dirty_range(struct domain *d,
                 if ( likely(((nr - pages + 7) >> 3) < bytes) )
                     bytes = (unsigned int)((nr - pages + 7) >> 3);
 
+                if ( !l1 )
+                {
+                    if ( clear_guest_offset(dirty_bitmap, pages >> 3,
+                                            bytes) != 0 )
+                    {
+                        rv = -EFAULT;
+                        goto out;
+                    }
+                }
                 /* begin_pfn is not 32K aligned, hence we have to bit
                  * shift the bitmap */
-                if ( b1 & 0x7 )
+                else if ( b1 & 0x7 )
                 {
                     int i, j;
                     uint32_t *l = (uint32_t*) s;
@@ -553,11 +562,12 @@ int paging_log_dirty_range(struct domain *d,
                     }
                 }
 
-                if ( l1 != zeroes )
-                    clear_page(l1);
                 pages += bytes << 3;
-                if ( l1 != zeroes )
+                if ( l1 )
+                {
+                    clear_page(l1);
                     unmap_domain_page(l1);
+                }
                 b1 = b1 & 0x7;
             }
             b2 = 0;
