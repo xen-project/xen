@@ -155,6 +155,7 @@ subdir-all-qemu-xen-dir subdir-install-qemu-xen-dir: qemu-xen-dir-find
 		-L$(XEN_ROOT)/tools/xenstore" \
 		--bindir=$(LIBEXEC) \
 		--disable-kvm \
+		--python=$(PYTHON) \
 		$(IOEMU_CONFIGURE_CROSS); \
 	$(MAKE) install
 
