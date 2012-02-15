@@ -13,7 +13,7 @@ realpath = $(wildcard $(foreach file,$(1),$(shell cd -P $(dir $(file)) && echo "
 debug ?= y
 
 XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/ \
-                         -e s/i86pc/x86_32/ -e s/amd64/x86_64/)
+                         -e s/i86pc/x86_32/ -e s/amd64/x86_64/ -e s/arm.*/arm/)
 XEN_TARGET_ARCH     ?= $(XEN_COMPILE_ARCH)
 XEN_OS              ?= $(shell uname -s)
 
