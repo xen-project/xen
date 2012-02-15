@@ -43,6 +43,8 @@ unsigned long xenheap_virt_end;
 unsigned long frametable_base_mfn;
 unsigned long frametable_virt_end;
 
+unsigned long max_page;
+
 /* Map a 4k page in a fixmap entry */
 void set_fixmap(unsigned map, unsigned long mfn, unsigned attributes)
 {

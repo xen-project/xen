@@ -32,6 +32,7 @@
 #include <xen/softirq.h>
 #include <xen/keyhandler.h>
 #include <xen/cpu.h>
+#include <xen/pfn.h>
 #include <asm/page.h>
 #include <asm/current.h>
 #include <asm/setup.h>
@@ -141,6 +142,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
                     pfn_to_paddr(xenheap_mfn_start + xenheap_pages + domheap_pages));
 
     setup_frametable_mappings(ram_start, ram_end);
+    max_page = PFN_DOWN(ram_end);
 
     /* Add xenheap memory that was not already added to the boot
        allocator. */

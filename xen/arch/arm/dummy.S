@@ -28,7 +28,6 @@ DUMMY(gnttab_clear_flag);
 DUMMY(gnttab_mark_dirty);
 DUMMY(hypercall_create_continuation);
 DUMMY(is_iomem_page);
-DUMMY(max_page);
 DUMMY(node_online_map);
 DUMMY(nr_irqs_gsi);
 DUMMY(page_get_owner_and_reference);
