@@ -24,6 +24,7 @@
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/preempt.h>
+#include <xen/errno.h>
 #include <asm/page.h>
 #include <asm/current.h>
 

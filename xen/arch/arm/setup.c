@@ -271,6 +271,18 @@ void __init start_xen(unsigned long boot_phys_offset,
     reset_stack_and_jump(init_done);
 }
 
+void arch_get_xen_caps(xen_capabilities_info_t *info)
+{
+    /* Interface name is always xen-3.0-* for Xen-3.x. */
+    int major = 3, minor = 0;
+    char s[32];
+
+    (*info)[0] = '\0';
+
+    snprintf(s, sizeof(s), "xen-%d.%d-armv7l ", major, minor);
+    safe_strcat(*info, s);
+}
+
 /*
  * Local variables:
  * mode: C
