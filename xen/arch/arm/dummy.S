@@ -31,8 +31,6 @@ DUMMY(is_iomem_page);
 DUMMY(max_page);
 DUMMY(node_online_map);
 DUMMY(nr_irqs_gsi);
-DUMMY(p2m_pod_decrease_reservation);
-DUMMY(guest_physmap_mark_populate_on_demand);
 DUMMY(page_get_owner_and_reference);
 DUMMY(page_is_ram_type);
 DUMMY(per_cpu__cpu_core_mask);

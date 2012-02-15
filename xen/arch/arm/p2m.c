@@ -18,6 +18,20 @@ void p2m_load_VTTBR(struct domain *d)
     isb(); /* Ensure update is visible */
 }
 
+int guest_physmap_mark_populate_on_demand(struct domain *d,
+                                          unsigned long gfn,
+                                          unsigned int order)
+{
+    return -ENOSYS;
+}
+
+int p2m_pod_decrease_reservation(struct domain *d,
+                                 xen_pfn_t gpfn,
+                                 unsigned int order)
+{
+    return -ENOSYS;
+}
+
 static int p2m_create_entry(struct domain *d,
                             lpae_t *entry)
 {
