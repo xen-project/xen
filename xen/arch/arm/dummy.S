@@ -27,8 +27,6 @@ DUMMY(gmfn_to_mfn);
 DUMMY(gnttab_clear_flag);
 DUMMY(gnttab_mark_dirty);
 DUMMY(hypercall_create_continuation);
-DUMMY(iommu_map_page);
-DUMMY(iommu_unmap_page);
 DUMMY(is_iomem_page);
 DUMMY(max_page);
 DUMMY(node_online_map);

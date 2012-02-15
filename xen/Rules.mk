@@ -51,6 +51,7 @@ CFLAGS-$(perfc)         += -DPERF_COUNTERS
 CFLAGS-$(perfc_arrays)  += -DPERF_ARRAYS
 CFLAGS-$(lock_profile)  += -DLOCK_PROFILE
 CFLAGS-$(HAS_ACPI)      += -DHAS_ACPI
+CFLAGS-$(HAS_PASSTHROUGH) += -DHAS_PASSTHROUGH
 CFLAGS-$(frame_pointer) += -fno-omit-frame-pointer -DCONFIG_FRAME_POINTER
 
 ifneq ($(max_phys_cpus),)

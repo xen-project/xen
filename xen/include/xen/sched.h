@@ -266,8 +266,10 @@ struct domain
 
     /* Is this an HVM guest? */
     bool_t           is_hvm;
+#ifdef HAS_PASSTHROUGH
     /* Does this guest need iommu mappings? */
     bool_t           need_iommu;
+#endif
     /* Is this guest fully privileged (aka dom0)? */
     bool_t           is_privileged;
     /* Which guest this guest has privileges on */
@@ -687,7 +689,11 @@ void watchdog_domain_destroy(struct domain *d);
 #define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
 #define is_pinned_vcpu(v) ((v)->domain->is_pinned || \
                            cpumask_weight((v)->cpu_affinity) == 1)
+#ifdef HAS_PASSTHROUGH
 #define need_iommu(d)    ((d)->need_iommu)
+#else
+#define need_iommu(d)    (0)
+#endif
 
 void set_vcpu_migration_delay(unsigned int delay);
 unsigned int get_vcpu_migration_delay(void);
