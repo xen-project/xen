@@ -20,7 +20,6 @@ DUMMY(domain_get_maximum_gpfn);
 DUMMY(domain_relinquish_resources);
 DUMMY(domain_set_time_offset);
 DUMMY(dom_cow);
-DUMMY(donate_page);
 DUMMY(flush_tlb_mask);
 DUMMY(free_vcpu_guest_context);
 DUMMY(get_page);

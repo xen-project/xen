@@ -325,6 +325,12 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
     return -ENOSYS;
 }
 
+int donate_page(struct domain *d, struct page_info *page, unsigned int memflags)
+{
+    ASSERT(0);
+    return -ENOSYS;
+}
+
 /*
  * Local variables:
  * mode: C
