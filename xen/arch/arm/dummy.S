@@ -1,8 +1,6 @@
-/* Nothing is mapped at 1G, for the moment */
 #define DUMMY(x) \
 	.globl x; \
-x:	.word 0xe7f000f0
-/* x:	mov r0, #0x40000000 ; str r0, [r0]; b x */
+x:	.word 0xe7f000f0 /* Undefined instruction */
 
 #define  NOP(x) \
 	.globl x; \
@@ -35,15 +33,11 @@ DUMMY(get_page);
 DUMMY(get_page_type);
 DUMMY(gmfn_to_mfn);
 DUMMY(gnttab_clear_flag);
-DUMMY(gnttab_host_mapping_get_page_type);
 DUMMY(gnttab_mark_dirty);
 DUMMY(hypercall_create_continuation);
 DUMMY(iommu_map_page);
 DUMMY(iommu_unmap_page);
 DUMMY(is_iomem_page);
-DUMMY(local_event_delivery_enable);
-DUMMY(local_events_need_delivery);
-DUMMY(machine_to_phys_mapping_valid);
 DUMMY(max_page);
 DUMMY(node_online_map);
 DUMMY(nr_irqs_gsi);
