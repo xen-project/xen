@@ -194,3 +194,12 @@ void kernel_load(struct kernel_info *info)
 {
     info->load(info);
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
