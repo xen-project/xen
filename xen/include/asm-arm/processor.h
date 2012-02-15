@@ -17,12 +17,12 @@
 #define PSR_MODE_UND 0x1b
 #define PSR_MODE_SYS 0x1f
 
-#define PSR_THUMB        (1<<5)        /* Thumb Mode enable */
-#define PSR_FIQ_MASK        (1<<6)        /* Fast Interrupt mask */
-#define PSR_IRQ_MASK        (1<<7)        /* Interrupt mask */
-#define PSR_ABT_MASK         (1<<8)        /* Asynchronous Abort mask */
-#define PSR_BIG_ENDIAN        (1<<9)        /* Big Endian Mode */
-#define PSR_JAZELLE        (1<<24)        /* Jazelle Mode */
+#define PSR_THUMB       (1<<5)        /* Thumb Mode enable */
+#define PSR_FIQ_MASK    (1<<6)        /* Fast Interrupt mask */
+#define PSR_IRQ_MASK    (1<<7)        /* Interrupt mask */
+#define PSR_ABT_MASK    (1<<8)        /* Asynchronous Abort mask */
+#define PSR_BIG_ENDIAN  (1<<9)        /* Big Endian Mode */
+#define PSR_JAZELLE     (1<<24)       /* Jazelle Mode */
 
 /* TTBCR Translation Table Base Control Register */
 #define TTBCR_N_MASK 0x07
@@ -35,56 +35,56 @@
 /* SCTLR System Control Register. */
 /* HSCTLR is a subset of this. */
 #define SCTLR_TE        (1<<30)
-#define SCTLR_AFE        (1<<29)
-#define SCTLR_TRE        (1<<28)
-#define SCTLR_NMFI        (1<<27)
+#define SCTLR_AFE       (1<<29)
+#define SCTLR_TRE       (1<<28)
+#define SCTLR_NMFI      (1<<27)
 #define SCTLR_EE        (1<<25)
 #define SCTLR_VE        (1<<24)
-#define SCTLR_U                (1<<22)
+#define SCTLR_U         (1<<22)
 #define SCTLR_FI        (1<<21)
-#define SCTLR_WXN        (1<<19)
+#define SCTLR_WXN       (1<<19)
 #define SCTLR_HA        (1<<17)
 #define SCTLR_RR        (1<<14)
-#define SCTLR_V                (1<<13)
-#define SCTLR_I                (1<<12)
-#define SCTLR_Z                (1<<11)
+#define SCTLR_V         (1<<13)
+#define SCTLR_I         (1<<12)
+#define SCTLR_Z         (1<<11)
 #define SCTLR_SW        (1<<10)
-#define SCTLR_B                (1<<7)
-#define SCTLR_C                (1<<2)
-#define SCTLR_A                (1<<1)
-#define SCTLR_M                (1<<0)
+#define SCTLR_B         (1<<7)
+#define SCTLR_C         (1<<2)
+#define SCTLR_A         (1<<1)
+#define SCTLR_M         (1<<0)
 
 #define SCTLR_BASE        0x00c50078
-#define HSCTLR_BASE        0x30c51878
+#define HSCTLR_BASE       0x30c51878
 
 /* HCR Hyp Configuration Register */
-#define HCR_TGE                (1<<27)
-#define HCR_TVM                (1<<26)
+#define HCR_TGE         (1<<27)
+#define HCR_TVM         (1<<26)
 #define HCR_TTLB        (1<<25)
-#define HCR_TPU                (1<<24)
-#define HCR_TPC                (1<<23)
-#define HCR_TSW                (1<<22)
-#define HCR_TAC                (1<<21)
-#define HCR_TIDCP        (1<<20)
-#define HCR_TSC                (1<<19)
+#define HCR_TPU         (1<<24)
+#define HCR_TPC         (1<<23)
+#define HCR_TSW         (1<<22)
+#define HCR_TAC         (1<<21)
+#define HCR_TIDCP       (1<<20)
+#define HCR_TSC         (1<<19)
 #define HCR_TID3        (1<<18)
 #define HCR_TID2        (1<<17)
 #define HCR_TID1        (1<<16)
 #define HCR_TID0        (1<<15)
-#define HCR_TWE                (1<<14)
-#define HCR_TWI                (1<<13)
-#define HCR_DC                (1<<12)
-#define HCR_BSU_MASK        (3<<10)
-#define HCR_FB                (1<<9)
-#define HCR_VA                (1<<8)
-#define HCR_VI                (1<<7)
-#define HCR_VF                (1<<6)
-#define HCR_AMO                (1<<5)
-#define HCR_IMO                (1<<4)
-#define HCR_FMO                (1<<3)
-#define HCR_PTW                (1<<2)
+#define HCR_TWE         (1<<14)
+#define HCR_TWI         (1<<13)
+#define HCR_DC          (1<<12)
+#define HCR_BSU_MASK    (3<<10)
+#define HCR_FB          (1<<9)
+#define HCR_VA          (1<<8)
+#define HCR_VI          (1<<7)
+#define HCR_VF          (1<<6)
+#define HCR_AMO         (1<<5)
+#define HCR_IMO         (1<<4)
+#define HCR_FMO         (1<<3)
+#define HCR_PTW         (1<<2)
 #define HCR_SWIO        (1<<1)
-#define HCR_VM                (1<<0)
+#define HCR_VM          (1<<0)
 
 #define HSR_EC_WFI_WFE              0x01
 #define HSR_EC_CP15_32              0x03
