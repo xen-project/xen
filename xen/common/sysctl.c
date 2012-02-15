@@ -224,6 +224,7 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
     }
     break;
 
+#ifdef HAS_ACPI
     case XEN_SYSCTL_get_pmstat:
     {
         ret = xsm_get_pmstat();
@@ -259,6 +260,7 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         }
     }
     break;
+#endif
 
     case XEN_SYSCTL_page_offline_op:
     {
