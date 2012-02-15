@@ -8,12 +8,8 @@ x:	mov pc, lr
 	
 DUMMY(alloc_pirq_struct);
 DUMMY(alloc_vcpu_guest_context);
-DUMMY(arch_do_domctl);
-DUMMY(arch_do_sysctl);
-DUMMY(arch_do_vcpu_op);
 DUMMY(arch_get_info_guest);
 DUMMY(arch_get_xen_caps);
-DUMMY(arch_memory_op);
 DUMMY(arch_set_info_guest);
 DUMMY(arch_vcpu_reset);
 DUMMY(create_grant_host_mapping);

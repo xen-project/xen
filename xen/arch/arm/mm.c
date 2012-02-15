@@ -320,6 +320,11 @@ void arch_dump_shared_mem_info(void)
 {
 }
 
+long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
+{
+    return -ENOSYS;
+}
+
 /*
  * Local variables:
  * mode: C

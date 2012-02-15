@@ -255,6 +255,11 @@ void arch_dump_domain_info(struct domain *d)
 {
 }
 
+long arch_do_vcpu_op(int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg)
+{
+    return -ENOSYS;
+}
+
 void arch_dump_vcpu_info(struct vcpu *v)
 {
 }
