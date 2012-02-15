@@ -869,7 +869,7 @@ get_page_from_l1e(
             return -EINVAL;
         }
 
-        if ( !(l1f & _PAGE_RW) || IS_PRIV(pg_owner) ||
+        if ( !(l1f & _PAGE_RW) ||
              !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
             return 0;
         dprintk(XENLOG_G_WARNING,
