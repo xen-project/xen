@@ -64,6 +64,20 @@ static void __init init_idle_domain(void)
         /* TODO: setup_idle_pagetable(); */
 }
 
+static void processor_id(void)
+{
+    printk("Processor Features: %08x %08x\n",
+           READ_CP32(ID_PFR0), READ_CP32(ID_PFR0));
+    printk("Debug Features: %08x\n", READ_CP32(ID_DFR0));
+    printk("Auxiliary Features: %08x\n", READ_CP32(ID_AFR0));
+    printk("Memory Model Features: %08x %08x %08x %08x\n",
+           READ_CP32(ID_MMFR0), READ_CP32(ID_MMFR1),
+           READ_CP32(ID_MMFR2), READ_CP32(ID_MMFR3));
+    printk("ISA Features: %08x %08x %08x %08x %08x %08x\n",
+           READ_CP32(ID_ISAR0), READ_CP32(ID_ISAR1), READ_CP32(ID_ISAR2),
+           READ_CP32(ID_ISAR3), READ_CP32(ID_ISAR4), READ_CP32(ID_ISAR5));
+}
+
 static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 {
     paddr_t ram_start;
@@ -185,7 +199,10 @@ void __init start_xen(unsigned long boot_phys_offset,
      */
     WRITE_CP32(0x80002558, VTCR); isb();
 
+    processor_id();
+
     softirq_init();
+
     tasklet_subsys_init();
 
     init_IRQ();

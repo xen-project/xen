@@ -93,6 +93,18 @@
 /* CP15 CR0: CPUID and Cache Type Registers */
 #define ID_PFR0         p15,0,c0,c1,0   /* Processor Feature Register 0 */
 #define ID_PFR1         p15,0,c0,c1,1   /* Processor Feature Register 1 */
+#define ID_DFR0         p15,0,c0,c1,2   /* Debug Feature Register 0 */
+#define ID_AFR0         p15,0,c0,c1,3   /* Auxiliary Feature Register 0 */
+#define ID_MMFR0        p15,0,c0,c1,4   /* Memory Model Feature Register 0 */
+#define ID_MMFR1        p15,0,c0,c1,5   /* Memory Model Feature Register 1 */
+#define ID_MMFR2        p15,0,c0,c1,6   /* Memory Model Feature Register 2 */
+#define ID_MMFR3        p15,0,c0,c1,7   /* Memory Model Feature Register 3 */
+#define ID_ISAR0        p15,0,c0,c2,0   /* ISA Feature Register 0 */
+#define ID_ISAR1        p15,0,c0,c2,1   /* ISA Feature Register 1 */
+#define ID_ISAR2        p15,0,c0,c2,2   /* ISA Feature Register 2 */
+#define ID_ISAR3        p15,0,c0,c2,3   /* ISA Feature Register 3 */
+#define ID_ISAR4        p15,0,c0,c2,4   /* ISA Feature Register 4 */
+#define ID_ISAR5        p15,0,c0,c2,5   /* ISA Feature Register 5 */
 #define CCSIDR          p15,1,c0,c0,0   /* Cache Size ID Registers */
 #define CLIDR           p15,1,c0,c0,1   /* Cache Level ID Register */
 #define CSSELR          p15,2,c0,c0,0   /* Cache Size Selection Register */
@@ -134,7 +146,11 @@
 #define ICIALLUIS       p15,0,c7,c1,0   /* Invalidate all instruction caches to PoU inner shareable */
 #define BPIALLIS        p15,0,c7,c1,6   /* Invalidate entire branch predictor array inner shareable */
 #define ICIALLU         p15,0,c7,c5,0   /* Invalidate all instruction caches to PoU */
+#define ICIMVAU         p15,0,c7,c5,1   /* Invalidate instruction caches by MVA to PoU */
 #define BPIALL          p15,0,c7,c5,6   /* Invalidate entire branch predictor array */
+#define BPIMVA          p15,0,c7,c5,7   /* Invalidate MVA from branch predictor array */
+#define DCIMVAC         p15,0,c7,c6,1   /* Invalidate data cache line by MVA to PoC */
+#define DCISW           p15,0,c7,c2,1   /* Invalidate data cache line by set/way */
 #define ATS1CPR         p15,0,c7,c8,0   /* Address Translation Stage 1. Non-Secure Kernel Read */
 #define ATS1CPW         p15,0,c7,c8,1   /* Address Translation Stage 1. Non-Secure Kernel Write */
 #define ATS1CUR         p15,0,c7,c8,2   /* Address Translation Stage 1. Non-Secure User Read */
@@ -144,6 +160,8 @@
 #define ATS12NSOUR      p15,0,c7,c8,6   /* Address Translation Stage 1+2 Non-Secure User Read */
 #define ATS12NSOUW      p15,0,c7,c8,7   /* Address Translation Stage 1+2 Non-Secure User Write */
 #define DCCMVAC         p15,0,c7,c10,1  /* Clean data or unified cache line by MVA to PoC */
+#define DCCSW           p15,0,c7,c10,2  /* Clean data cache line by set/way */
+#define DCCMVAU         p15,0,c7,c11,1  /* Clean data cache line by MVA to PoU */
 #define DCCISW          p15,0,c7,c14,2  /* Clean and invalidate data cache line by set/way */
 #define ATS1HR          p15,4,c7,c8,0   /* Address Translation Stage 1 Hyp. Read */
 #define ATS1HW          p15,4,c7,c8,1   /* Address Translation Stage 1 Hyp. Write */
