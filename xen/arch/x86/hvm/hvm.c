@@ -681,7 +681,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     vcpuid = hvm_load_instance(h);
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
     {
-        gdprintk(XENLOG_ERR, "HVM restore: domain has no vcpu %u\n", vcpuid);
+        dprintk(XENLOG_G_ERR, "HVM restore: dom%u has no vcpu%u\n",
+                d->domain_id, vcpuid);
         return -EINVAL;
     }
 
@@ -693,15 +694,15 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
          !(ctxt.cr0 & X86_CR0_ET) ||
          ((ctxt.cr0 & (X86_CR0_PE|X86_CR0_PG)) == X86_CR0_PG) )
     {
-        gdprintk(XENLOG_ERR, "HVM restore: bad CR0 0x%"PRIx64"\n",
-                 ctxt.cr0);
+        printk(XENLOG_G_ERR "HVM%d restore: bad CR0 %#" PRIx64 "\n",
+               d->domain_id, ctxt.cr0);
         return -EINVAL;
     }
 
     if ( ctxt.cr4 & HVM_CR4_GUEST_RESERVED_BITS(v) )
     {
-        gdprintk(XENLOG_ERR, "HVM restore: bad CR4 0x%"PRIx64"\n",
-                 ctxt.cr4);
+        printk(XENLOG_G_ERR "HVM%d restore: bad CR4 %#" PRIx64 "\n",
+               d->domain_id, ctxt.cr4);
         return -EINVAL;
     }
 
@@ -709,8 +710,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
                    | EFER_NX | EFER_SCE;
     if ( !hvm_efer_valid(d, ctxt.msr_efer, efer_validbits) )
     {
-        gdprintk(XENLOG_ERR, "HVM restore: bad EFER 0x%"PRIx64"\n",
-                 ctxt.msr_efer);
+        printk(XENLOG_G_ERR "HVM%d restore: bad EFER %#" PRIx64 "\n",
+               d->domain_id, ctxt.msr_efer);
         return -EINVAL;
     }
 
@@ -889,7 +890,8 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     vcpuid = hvm_load_instance(h);
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
     {
-        gdprintk(XENLOG_ERR, "HVM restore: domain has no vcpu %u\n", vcpuid);
+        dprintk(XENLOG_G_ERR, "HVM restore: dom%d has no vcpu%u\n",
+                d->domain_id, vcpuid);
         return -EINVAL;
     }
 
@@ -901,25 +903,25 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     desc = (struct hvm_save_descriptor *)&h->data[h->cur];
     if ( sizeof (*desc) > h->size - h->cur)
     {
-        gdprintk(XENLOG_WARNING,
-                 "HVM restore: not enough data left to read descriptpr"
-                 "for type %u\n", CPU_XSAVE_CODE);
+        printk(XENLOG_G_WARNING
+               "HVM%d restore: not enough data left to read descriptor"
+               "for type %u\n", d->domain_id, CPU_XSAVE_CODE);
         return -1;
     }
     if ( desc->length + sizeof (*desc) > h->size - h->cur)
     {
-        gdprintk(XENLOG_WARNING,
-                 "HVM restore: not enough data left to read %u bytes "
-                 "for type %u\n", desc->length, CPU_XSAVE_CODE);
+        printk(XENLOG_G_WARNING
+               "HVM%d restore: not enough data left to read %u bytes "
+               "for type %u\n", d->domain_id, desc->length, CPU_XSAVE_CODE);
         return -1;
     }
     if ( CPU_XSAVE_CODE != desc->typecode || (desc->length > HVM_CPU_XSAVE_SIZE) )
     {
-        gdprintk(XENLOG_WARNING,
-                 "HVM restore mismatch: expected type %u with max length %u, "
-                 "saw type %u length %u\n", CPU_XSAVE_CODE,
-                 (uint32_t)HVM_CPU_XSAVE_SIZE,
-                 desc->typecode, desc->length);
+        printk(XENLOG_G_WARNING
+               "HVM%d restore mismatch: expected type %u with max length %u, "
+               "saw type %u length %u\n", d->domain_id, CPU_XSAVE_CODE,
+               (unsigned int)HVM_CPU_XSAVE_SIZE,
+               desc->typecode, desc->length);
         return -1;
     }
     h->cur += sizeof (*desc);

@@ -144,8 +144,8 @@ share_xenoprof_page_with_guest(struct domain *d, unsigned long mfn, int npages)
         struct page_info *page = mfn_to_page(mfn + i);
         if ( (page->count_info & (PGC_allocated|PGC_count_mask)) != 0 )
         {
-            gdprintk(XENLOG_INFO, "mfn 0x%lx page->count_info 0x%lx\n",
-                     mfn + i, (unsigned long)page->count_info);
+            printk(XENLOG_G_INFO "dom%d mfn %#lx page->count_info %#lx\n",
+                   d->domain_id, mfn + i, page->count_info);
             return -EBUSY;
         }
         page_set_owner(page, NULL);

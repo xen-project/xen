@@ -945,8 +945,8 @@ int cpu_frequency_change(u64 freq)
     /* Sanity check: CPU frequency allegedly dropping below 1MHz? */
     if ( freq < 1000000u )
     {
-        gdprintk(XENLOG_WARNING, "Rejecting CPU frequency change "
-                 "to %"PRIu64" Hz.\n", freq);
+        printk(XENLOG_WARNING "Rejecting CPU frequency change "
+               "to %"PRIu64" Hz\n", freq);
         return -EINVAL;
     }
 

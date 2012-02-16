@@ -301,8 +301,6 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
                     ret = query_page_offline(pfn, ptr++);
                     break;
                 default:
-                    gdprintk(XENLOG_WARNING, "invalid page offline op %x\n",
-                            op->u.page_offline.cmd);
                     ret = -EINVAL;
                     break;
             }

@@ -42,24 +42,24 @@ int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
 
     if ( hdr->magic != HVM_FILE_MAGIC )
     {
-        gdprintk(XENLOG_ERR, 
-                 "HVM restore: bad magic number %#"PRIx32"\n", hdr->magic);
+        printk(XENLOG_G_ERR "HVM%d restore: bad magic number %#"PRIx32"\n",
+               d->domain_id, hdr->magic);
         return -1;
     }
 
     if ( hdr->version != HVM_FILE_VERSION )
     {
-        gdprintk(XENLOG_ERR, 
-                 "HVM restore: unsupported version %u\n", hdr->version);
+        printk(XENLOG_G_ERR "HVM%d restore: unsupported version %u\n",
+               d->domain_id, hdr->version);
         return -1;
     }
 
     cpuid(1, &eax, &ebx, &ecx, &edx);
     /* CPUs ought to match but with feature-masking they might not */
     if ( (hdr->cpuid & ~0x0fUL) != (eax & ~0x0fUL) )
-        gdprintk(XENLOG_INFO, "HVM restore (%u): VM saved on one CPU "
-                 "(%#"PRIx32") and restored on another (%#"PRIx32").\n", 
-                 d->domain_id, hdr->cpuid, eax);
+        printk(XENLOG_G_INFO "HVM%d restore: VM saved on one CPU "
+               "(%#"PRIx32") and restored on another (%#"PRIx32").\n",
+               d->domain_id, hdr->cpuid, eax);
 
     /* Restore guest's preferred TSC frequency. */
     if ( hdr->gtsc_khz )

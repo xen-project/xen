@@ -235,10 +235,10 @@ static int ppro_allocate_msr(struct vcpu *v)
 	vpmu_set(vpmu, VPMU_PASSIVE_DOMAIN_ALLOCATED);
 	return 1;
 out:
-        gdprintk(XENLOG_WARNING, "Insufficient memory for oprofile, oprofile is "
-                 "unavailable on domain %d vcpu %d.\n",
-                 v->vcpu_id, v->domain->domain_id);
-        return 0;
+	printk(XENLOG_G_WARNING "Insufficient memory for oprofile,"
+	       " oprofile is unavailable on dom%d vcpu%d\n",
+	       v->vcpu_id, v->domain->domain_id);
+	return 0;
 }
 
 static void ppro_free_msr(struct vcpu *v)

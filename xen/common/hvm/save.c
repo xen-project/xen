@@ -108,8 +108,8 @@ int hvm_save_one(struct domain *d, uint16_t typecode, uint16_t instance,
 
     if ( hvm_sr_handlers[typecode].save(d, &ctxt) != 0 )
     {
-        gdprintk(XENLOG_ERR, 
-                 "HVM save: failed to save type %"PRIu16"\n", typecode);
+        printk(XENLOG_G_ERR "HVM%d save: failed to save type %"PRIu16"\n",
+               d->domain_id, typecode);
         rv = -EFAULT;
     }
     else if ( copy_to_guest(handle,
@@ -149,7 +149,8 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
 
     if ( hvm_save_entry(HEADER, 0, h, &hdr) != 0 )
     {
-        gdprintk(XENLOG_ERR, "HVM save: failed to write header\n");
+        printk(XENLOG_G_ERR "HVM%d save: failed to write header\n",
+               d->domain_id);
         return -EFAULT;
     } 
 
@@ -159,11 +160,13 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
         handler = hvm_sr_handlers[i].save;
         if ( handler != NULL ) 
         {
-            gdprintk(XENLOG_INFO, "HVM save: %s\n",  hvm_sr_handlers[i].name);
+            printk(XENLOG_G_INFO "HVM%d save: %s\n",
+                   d->domain_id, hvm_sr_handlers[i].name);
             if ( handler(d, h) != 0 ) 
             {
-                gdprintk(XENLOG_ERR, 
-                         "HVM save: failed to save type %"PRIu16"\n", i);
+                printk(XENLOG_G_ERR
+                       "HVM%d save: failed to save type %"PRIu16"\n",
+                       d->domain_id, i);
                 return -EFAULT;
             } 
         }
@@ -173,7 +176,8 @@ int hvm_save(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_save_entry(END, 0, h, &end) != 0 )
     {
         /* Run out of data */
-        gdprintk(XENLOG_ERR, "HVM save: no room for end marker.\n");
+        printk(XENLOG_G_ERR "HVM%d save: no room for end marker\n",
+               d->domain_id);
         return -EFAULT;
     }
 
@@ -209,8 +213,9 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
         if ( h->size - h->cur < sizeof(struct hvm_save_descriptor) )
         {
             /* Run out of data */
-            gdprintk(XENLOG_ERR, 
-                     "HVM restore: save did not end with a null entry\n");
+            printk(XENLOG_G_ERR
+                   "HVM%d restore: save did not end with a null entry\n",
+                   d->domain_id);
             return -1;
         }
         
@@ -223,20 +228,18 @@ int hvm_load(struct domain *d, hvm_domain_context_t *h)
         if ( (desc->typecode > HVM_SAVE_CODE_MAX) ||
              ((handler = hvm_sr_handlers[desc->typecode].load) == NULL) )
         {
-            gdprintk(XENLOG_ERR, 
-                     "HVM restore: unknown entry typecode %u\n", 
-                     desc->typecode);
+            printk(XENLOG_G_ERR "HVM%d restore: unknown entry typecode %u\n",
+                   d->domain_id, desc->typecode);
             return -1;
         }
 
         /* Load the entry */
-        gdprintk(XENLOG_INFO, "HVM restore: %s %"PRIu16"\n",  
-                 hvm_sr_handlers[desc->typecode].name, desc->instance);
+        printk(XENLOG_G_INFO "HVM%d restore: %s %"PRIu16"\n", d->domain_id,
+               hvm_sr_handlers[desc->typecode].name, desc->instance);
         if ( handler(d, h) != 0 ) 
         {
-            gdprintk(XENLOG_ERR, 
-                     "HVM restore: failed to load entry %u/%u\n", 
-                     desc->typecode, desc->instance);
+            printk(XENLOG_G_ERR "HVM%d restore: failed to load entry %u/%u\n",
+                   d->domain_id, desc->typecode, desc->instance);
             return -1;
         }
     }
@@ -251,10 +254,9 @@ int _hvm_init_entry(struct hvm_domain_context *h,
         = (struct hvm_save_descriptor *)&h->data[h->cur];
     if ( h->size - h->cur < len + sizeof (*d) )
     {
-        gdprintk(XENLOG_WARNING,
-                 "HVM save: no room for %"PRIu32" + %u bytes "
-                 "for typecode %"PRIu16"\n",
-                 len, (unsigned) sizeof (*d), tc);
+        printk(XENLOG_G_WARNING "HVM save: no room for"
+               " %"PRIu32" + %zu bytes for typecode %"PRIu16"\n",
+               len, sizeof(*d), tc);
         return -1;
     }
     d->typecode = tc;
@@ -278,17 +280,17 @@ int _hvm_check_entry(struct hvm_domain_context *h,
         = (struct hvm_save_descriptor *)&h->data[h->cur];
     if ( len + sizeof (*d) > h->size - h->cur)
     {
-        gdprintk(XENLOG_WARNING, 
-                 "HVM restore: not enough data left to read %u bytes "
-                 "for type %u\n", len, type);
+        printk(XENLOG_G_WARNING
+               "HVM restore: not enough data left to read %u bytes "
+               "for type %u\n", len, type);
         return -1;
     }    
     if ( (type != d->typecode) || (len < d->length) ||
          (strict_length && (len != d->length)) )
     {
-        gdprintk(XENLOG_WARNING, 
-                 "HVM restore mismatch: expected type %u length %u, "
-                 "saw type %u length %u\n", type, len, d->typecode, d->length);
+        printk(XENLOG_G_WARNING
+               "HVM restore mismatch: expected type %u length %u, "
+               "saw type %u length %u\n", type, len, d->typecode, d->length);
         return -1;
     }
     h->cur += sizeof(*d);

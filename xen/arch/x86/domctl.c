@@ -783,7 +783,8 @@ long arch_do_domctl(
             spin_unlock(&pcidevs_lock);
         }
         if ( ret < 0 )
-            gdprintk(XENLOG_ERR, "pt_irq_create_bind failed!\n");
+            printk(XENLOG_G_ERR "pt_irq_create_bind failed (%ld) for dom%d\n",
+                   ret, d->domain_id);
 
     bind_out:
         rcu_unlock_domain(d);
@@ -812,7 +813,8 @@ long arch_do_domctl(
             spin_unlock(&pcidevs_lock);
         }
         if ( ret < 0 )
-            gdprintk(XENLOG_ERR, "pt_irq_destroy_bind failed!\n");
+            printk(XENLOG_G_ERR "pt_irq_destroy_bind failed (%ld) for dom%d\n",
+                   ret, d->domain_id);
 
     unbind_out:
         rcu_unlock_domain(d);
@@ -849,9 +851,9 @@ long arch_do_domctl(
 
         if ( add )
         {
-            gdprintk(XENLOG_INFO,
-                "memory_map:add: gfn=%lx mfn=%lx nr_mfns=%lx\n",
-                gfn, mfn, nr_mfns);
+            printk(XENLOG_G_INFO
+                   "memory_map:add: dom%d gfn=%lx mfn=%lx nr=%lx\n",
+                   d->domain_id, gfn, mfn, nr_mfns);
 
             ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
             for ( i = 0; i < nr_mfns; i++ )
@@ -859,9 +861,9 @@ long arch_do_domctl(
         }
         else
         {
-            gdprintk(XENLOG_INFO,
-                "memory_map:remove: gfn=%lx mfn=%lx nr_mfns=%lx\n",
-                 gfn, mfn, nr_mfns);
+            printk(XENLOG_G_INFO
+                   "memory_map:remove: dom%d gfn=%lx mfn=%lx nr=%lx\n",
+                   d->domain_id, gfn, mfn, nr_mfns);
 
             for ( i = 0; i < nr_mfns; i++ )
                 clear_mmio_p2m_entry(d, gfn+i);
@@ -888,9 +890,9 @@ long arch_do_domctl(
         if ( (np == 0) || (fgp > MAX_IOPORTS) || (fmp > MAX_IOPORTS) ||
             ((fgp + np) > MAX_IOPORTS) || ((fmp + np) > MAX_IOPORTS) )
         {
-            gdprintk(XENLOG_ERR,
-                "ioport_map:invalid:gport=%x mport=%x nr_ports=%x\n",
-                fgp, fmp, np);
+            printk(XENLOG_G_ERR
+                   "ioport_map:invalid:dom%d gport=%x mport=%x nr=%x\n",
+                   domctl->domain, fgp, fmp, np);
             break;
         }
 
@@ -912,9 +914,9 @@ long arch_do_domctl(
         hd = domain_hvm_iommu(d);
         if ( add )
         {
-            gdprintk(XENLOG_INFO,
-                "ioport_map:add f_gport=%x f_mport=%x np=%x\n",
-                fgp, fmp, np);
+            printk(XENLOG_G_INFO
+                   "ioport_map:add: dom%d gport=%x mport=%x nr=%x\n",
+                   d->domain_id, fgp, fmp, np);
 
             list_for_each_entry(g2m_ioport, &hd->g2m_ioport_list, list)
                 if (g2m_ioport->mport == fmp )
@@ -936,9 +938,9 @@ long arch_do_domctl(
         }
         else
         {
-            gdprintk(XENLOG_INFO,
-                "ioport_map:remove f_gport=%x f_mport=%x np=%x\n",
-                fgp, fmp, np);
+            printk(XENLOG_G_INFO
+                   "ioport_map:remove: dom%d gport=%x mport=%x nr=%x\n",
+                   d->domain_id, fgp, fmp, np);
             list_for_each_entry(g2m_ioport, &hd->g2m_ioport_list, list)
                 if ( g2m_ioport->mport == fmp )
                 {

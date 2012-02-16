@@ -566,9 +566,9 @@ int iommu_do_domctl(
 
         if ( device_assigned(seg, bus, devfn) )
         {
-            gdprintk(XENLOG_ERR, "XEN_DOMCTL_test_assign_device: "
-                     "%04x:%02x:%02x.%u already assigned, or non-existent\n",
-                     seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            printk(XENLOG_G_INFO
+                   "%04x:%02x:%02x.%u already assigned, or non-existent\n",
+                   seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
             ret = -EINVAL;
         }
         break;
@@ -576,8 +576,8 @@ int iommu_do_domctl(
     case XEN_DOMCTL_assign_device:
         if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
         {
-            gdprintk(XENLOG_ERR,
-                "XEN_DOMCTL_assign_device: get_domain_by_id() failed\n");
+            printk(XENLOG_G_ERR
+                   "XEN_DOMCTL_assign_device: get_domain_by_id() failed\n");
             ret = -EINVAL;
             break;
         }
@@ -593,9 +593,9 @@ int iommu_do_domctl(
 #ifdef __ia64__ /* XXX Is this really needed? */
         if ( device_assigned(seg, bus, devfn) )
         {
-            gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
-                     "%x:%x.%x already assigned, or non-existent\n",
-                     bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            printk(XENLOG_G_ERR "XEN_DOMCTL_assign_device: "
+                   "%04x:%02x:%02x.%u already assigned, or non-existent\n",
+                   seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
             ret = -EINVAL;
             goto assign_device_out;
         }
@@ -603,9 +603,10 @@ int iommu_do_domctl(
 
         ret = assign_device(d, seg, bus, devfn);
         if ( ret )
-            gdprintk(XENLOG_ERR, "XEN_DOMCTL_assign_device: "
-                     "assign device (%04x:%02x:%02x.%u) failed\n",
-                     seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            printk(XENLOG_G_ERR "XEN_DOMCTL_assign_device: "
+                   "assign %04x:%02x:%02x.%u to dom%d failed (%d)\n",
+                   seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                   d->domain_id, ret);
 
     assign_device_out:
         put_domain(d);
@@ -614,8 +615,8 @@ int iommu_do_domctl(
     case XEN_DOMCTL_deassign_device:
         if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
         {
-            gdprintk(XENLOG_ERR,
-                "XEN_DOMCTL_deassign_device: get_domain_by_id() failed\n");
+            printk(XENLOG_G_ERR
+                   "XEN_DOMCTL_deassign_device: get_domain_by_id() failed\n");
             ret = -EINVAL;
             break;
         }
@@ -640,9 +641,10 @@ int iommu_do_domctl(
         ret = deassign_device(d, seg, bus, devfn);
         spin_unlock(&pcidevs_lock);
         if ( ret )
-            gdprintk(XENLOG_ERR, "XEN_DOMCTL_deassign_device: "
-                     "deassign device (%04x:%02x:%02x.%u) failed\n",
-                     seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+            printk(XENLOG_G_ERR
+                   "deassign %04x:%02x:%02x.%u from dom%d failed (%d)\n",
+                   seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                   d->domain_id, ret);
 
     deassign_device_out:
         put_domain(d);

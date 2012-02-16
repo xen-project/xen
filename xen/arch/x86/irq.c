@@ -1517,9 +1517,9 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
     {
         if ( desc->action != NULL )
         {
-            gdprintk(XENLOG_INFO,
-                    "Cannot bind IRQ %d to guest. In use by '%s'.\n",
-                    pirq->pirq, desc->action->name);
+            printk(XENLOG_G_INFO
+                   "Cannot bind IRQ%d to dom%d. In use by '%s'.\n",
+                   pirq->pirq, v->domain->domain_id, desc->action->name);
             rc = -EBUSY;
             goto unlock_out;
         }
@@ -1531,9 +1531,9 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
                  zalloc_cpumask_var(&newaction->cpu_eoi_map) )
                 goto retry;
             xfree(newaction);
-            gdprintk(XENLOG_INFO,
-                     "Cannot bind IRQ %d to guest. Out of memory.\n",
-                     pirq->pirq);
+            printk(XENLOG_G_INFO
+                   "Cannot bind IRQ%d to dom%d. Out of memory.\n",
+                   pirq->pirq, v->domain->domain_id);
             rc = -ENOMEM;
             goto out;
         }
@@ -1558,11 +1558,10 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
     }
     else if ( !will_share || !action->shareable )
     {
-        gdprintk(XENLOG_INFO, "Cannot bind IRQ %d to guest. %s.\n",
-                 pirq->pirq,
-                 will_share ?
-                 "Others do not share" :
-                 "Will not share with others");
+        printk(XENLOG_G_INFO "Cannot bind IRQ%d to dom%d. %s.\n",
+               pirq->pirq, v->domain->domain_id,
+               will_share ? "Others do not share"
+                          : "Will not share with others");
         rc = -EBUSY;
         goto unlock_out;
     }
@@ -1581,8 +1580,9 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
 
     if ( action->nr_guests == IRQ_MAX_GUESTS )
     {
-        gdprintk(XENLOG_INFO, "Cannot bind IRQ %d to guest. "
-               "Already at max share.\n", pirq->pirq);
+        printk(XENLOG_G_INFO "Cannot bind IRQ%d to dom%d. "
+               "Already at max share.\n",
+               pirq->pirq, v->domain->domain_id);
         rc = -EBUSY;
         goto unlock_out;
     }
