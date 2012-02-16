@@ -1010,12 +1010,22 @@ static void vmx_load_pdptrs(struct vcpu *v)
     if ( (cr3 & 0x1fUL) && !hvm_pcid_enabled(v) )
         goto crash;
 
-    mfn = mfn_x(get_gfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
-    if ( !p2m_is_ram(p2mt) )
+    mfn = mfn_x(get_gfn_unshare(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
+    if ( !p2m_is_ram(p2mt) || !mfn_valid(mfn) || 
+         /* If we didn't succeed in unsharing, get_page will fail
+          * (page still belongs to dom_cow) */
+         !get_page(mfn_to_page(mfn), v->domain) )
     {
+        /* Ideally you don't want to crash but rather go into a wait 
+         * queue, but this is the wrong place. We're holding at least
+         * the paging lock */
+        gdprintk(XENLOG_ERR,
+                 "Bad cr3 on load pdptrs gfn %lx mfn %lx type %d\n",
+                 cr3 >> PAGE_SHIFT, mfn, (int) p2mt);
         put_gfn(v->domain, cr3 >> PAGE_SHIFT);
         goto crash;
     }
+    put_gfn(v->domain, cr3 >> PAGE_SHIFT);
 
     p = map_domain_page(mfn);
 
@@ -1043,7 +1053,7 @@ static void vmx_load_pdptrs(struct vcpu *v)
     vmx_vmcs_exit(v);
 
     unmap_domain_page(p);
-    put_gfn(v->domain, cr3 >> PAGE_SHIFT);
+    put_page(mfn_to_page(mfn));
     return;
 
  crash:
