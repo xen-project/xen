@@ -929,11 +929,14 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
     req.gfn = gfn;
     req.flags = MEM_EVENT_FLAG_DROP_PAGE;
 
-    mem_event_put_request(d, &d->mem_event->paging, &req);
-
     /* Update stats unless the page hasn't yet been evicted */
     if ( p2mt != p2m_ram_paging_out )
         atomic_dec(&d->paged_pages);
+    else
+        /* Evict will fail now, tag this request for pager */
+        req.flags |= MEM_EVENT_FLAG_EVICT_FAIL;
+
+    mem_event_put_request(d, &d->mem_event->paging, &req);
 }
 
 /**

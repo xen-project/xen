@@ -167,6 +167,15 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     {
         guest_physmap_remove_page(d, gmfn, mfn, 0);
         put_gfn(d, gmfn);
+        /* If the page hasn't yet been paged out, there is an
+         * actual page that needs to be released. */
+        if ( p2mt == p2m_ram_paging_out )
+        {
+            ASSERT(mfn_valid(mfn));
+            page = mfn_to_page(mfn);
+            if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+                put_page(page);
+        }
         p2m_mem_paging_drop_page(d, gmfn, p2mt);
         return 1;
     }
@@ -181,7 +190,6 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
         return 0;
     }
             
-    page = mfn_to_page(mfn);
 #ifdef CONFIG_X86_64
     if ( p2m_is_shared(p2mt) )
     {
@@ -190,10 +198,17 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
          * need to trigger proper cleanup. Once done, this is 
          * like any other page. */
         if ( mem_sharing_unshare_page(d, gmfn, 0) )
+        {
+            put_gfn(d, gmfn);
             return 0;
+        }
+        /* Maybe the mfn changed */
+        mfn = mfn_x(get_gfn_query_unlocked(d, gmfn, &p2mt));
+        ASSERT(!p2m_is_shared(p2mt));
     }
 #endif /* CONFIG_X86_64 */
 
+    page = mfn_to_page(mfn);
     if ( unlikely(!get_page(page, d)) )
     {
         put_gfn(d, gmfn);
