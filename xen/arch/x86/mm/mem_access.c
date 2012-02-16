@@ -29,6 +29,9 @@ int mem_access_memop(struct domain *d, xen_mem_event_op_t *meo)
 {
     int rc;
 
+    if ( unlikely(!d->mem_event->access.ring_page) )
+        return -ENODEV;
+
     switch( meo->op )
     {
     case XENMEM_access_op_resume:

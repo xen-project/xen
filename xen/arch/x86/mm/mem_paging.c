@@ -27,6 +27,9 @@
 
 int mem_paging_memop(struct domain *d, xen_mem_event_op_t *mec)
 {
+    if ( unlikely(!d->mem_event->paging.ring_page) )
+        return -ENODEV;
+
     switch( mec->op )
     {
     case XENMEM_paging_op_nominate:

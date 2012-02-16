@@ -452,13 +452,15 @@ int mem_event_claim_slot(struct domain *d, struct mem_event_domain *med)
 /* Registered with Xen-bound event channel for incoming notifications. */
 static void mem_paging_notification(struct vcpu *v, unsigned int port)
 {
-    p2m_mem_paging_resume(v->domain);
+    if ( likely(v->domain->mem_event->paging.ring_page != NULL) )
+        p2m_mem_paging_resume(v->domain);
 }
 
 /* Registered with Xen-bound event channel for incoming notifications. */
 static void mem_access_notification(struct vcpu *v, unsigned int port)
 {
-    p2m_mem_access_resume(v->domain);
+    if ( likely(v->domain->mem_event->access.ring_page != NULL) )
+        p2m_mem_access_resume(v->domain);
 }
 
 struct domain *get_mem_event_op_target(uint32_t domain, int *rc)

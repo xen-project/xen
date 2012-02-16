@@ -1022,7 +1022,7 @@ int mem_sharing_memop(struct domain *d, xen_mem_sharing_op_t *mec)
     int rc = 0;
 
     /* Only HAP is supported */
-    if ( !hap_enabled(d) )
+    if ( !hap_enabled(d) || !d->arch.hvm_domain.mem_sharing_enabled )
          return -ENODEV;
 
     switch(mec->op)
