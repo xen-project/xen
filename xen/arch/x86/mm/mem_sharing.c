@@ -201,7 +201,9 @@ static struct page_info* mem_sharing_lookup(unsigned long mfn)
             /* Count has to be at least two, because we're called
              * with the mfn locked (1) and this is supposed to be 
              * a shared page (1). */
-            ASSERT((page->u.inuse.type_info & PGT_count_mask) >= 2); 
+            unsigned long t = read_atomic(&page->u.inuse.type_info);
+            ASSERT((t & PGT_type_mask) == PGT_shared_page);
+            ASSERT((t & PGT_count_mask) >= 2);
             ASSERT(get_gpfn_from_mfn(mfn) == SHARED_M2P_ENTRY); 
             return page;
         }
