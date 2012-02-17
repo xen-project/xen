@@ -243,6 +243,9 @@ static int mem_event_disable(struct domain *d, struct mem_event_domain *med)
             return -EBUSY;
         }
 
+        /* Free domU's event channel and leave the other one unbound */
+        free_xen_event_channel(d->vcpu[0], med->xen_port);
+        
         unmap_domain_page(med->ring_page);
         med->ring_page = NULL;
 
