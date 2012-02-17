@@ -163,15 +163,15 @@ void sync_local_execstate(void)
 
 void startup_cpu_idle_loop(void)
 {
-        struct vcpu *v = current;
+    struct vcpu *v = current;
 
-        ASSERT(is_idle_vcpu(v));
-        /* TODO
-           cpumask_set_cpu(v->processor, v->domain->domain_dirty_cpumask);
-           cpumask_set_cpu(v->processor, v->vcpu_dirty_cpumask);
-        */
+    ASSERT(is_idle_vcpu(v));
+    /* TODO
+       cpumask_set_cpu(v->processor, v->domain->domain_dirty_cpumask);
+       cpumask_set_cpu(v->processor, v->vcpu_dirty_cpumask);
+    */
 
-        reset_stack_and_jump(idle_loop);
+    reset_stack_and_jump(idle_loop);
 }
 
 struct domain *alloc_domain_struct(void)
