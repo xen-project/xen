@@ -390,13 +390,16 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
             LIBXL__LOG(qmp->ctx, LIBXL__LOG_ERROR, "timeout");
             return -1;
         } else if (ret < 0) {
+            if (errno == EINTR)
+                continue;
             LIBXL__LOG_ERRNO(qmp->ctx, LIBXL__LOG_ERROR, "Select error");
             return -1;
         }
 
         rd = read(qmp->qmp_fd, qmp->buffer, QMP_RECEIVE_BUFFER_SIZE);
         if (rd == 0) {
-            continue;
+            LIBXL__LOG(qmp->ctx, LIBXL__LOG_ERROR, "Unexpected end of socket");
+            return -1;
         } else if (rd < 0) {
             LIBXL__LOG_ERRNO(qmp->ctx, LIBXL__LOG_ERROR, "Socket read error");
             return rd;
