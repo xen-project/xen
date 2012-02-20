@@ -448,6 +448,14 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
         goto err;
     }
 
+    /* Open file */
+    paging->fd = open(filename, O_CREAT | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
+    if ( paging->fd < 0 )
+    {
+        PERROR("failed to open file");
+        goto err;
+    }
+
     return paging;
 
  err:
@@ -562,7 +570,7 @@ static void put_response(struct mem_event *mem_event, mem_event_response_t *rsp)
  * Returns 0 on successful evict
  * Returns > 0 if gfn can not be evicted
  */
-static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int fd, int slot)
+static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int slot)
 {
     xc_interface *xch = paging->xc_handle;
     void *page;
@@ -593,7 +601,7 @@ static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int
     }
 
     /* Copy page */
-    ret = write_page(fd, page, slot);
+    ret = write_page(paging->fd, page, slot);
     if ( ret < 0 )
     {
         PERROR("Error copying page %lx", gfn);
@@ -670,7 +678,7 @@ static int xenpaging_resume_page(struct xenpaging *paging, mem_event_response_t 
     return ret;
 }
 
-static int xenpaging_populate_page(struct xenpaging *paging, unsigned long gfn, int fd, int i)
+static int xenpaging_populate_page(struct xenpaging *paging, unsigned long gfn, int i)
 {
     xc_interface *xch = paging->xc_handle;
     int ret;
@@ -679,7 +687,7 @@ static int xenpaging_populate_page(struct xenpaging *paging, unsigned long gfn, 
     DPRINTF("populate_page < gfn %lx pageslot %d\n", gfn, i);
 
     /* Read page */
-    ret = read_page(fd, paging_buffer, i);
+    ret = read_page(paging->fd, paging_buffer, i);
     if ( ret != 0 )
     {
         PERROR("Error reading page");
@@ -738,7 +746,7 @@ static void resume_pages(struct xenpaging *paging, int num_pages)
  * Returns 0 on successful evict
  * Returns > 0 if no gfn can be evicted
  */
-static int evict_victim(struct xenpaging *paging, int fd, int slot)
+static int evict_victim(struct xenpaging *paging, int slot)
 {
     xc_interface *xch = paging->xc_handle;
     unsigned long gfn;
@@ -771,7 +779,7 @@ static int evict_victim(struct xenpaging *paging, int fd, int slot)
             goto out;
         }
 
-        ret = xenpaging_evict_page(paging, gfn, fd, slot);
+        ret = xenpaging_evict_page(paging, gfn, slot);
         if ( ret < 0 )
             goto out;
     }
@@ -791,7 +799,7 @@ static int evict_victim(struct xenpaging *paging, int fd, int slot)
  * Returns 0 if no gfn can be evicted
  * Returns > 0 on successful evict
  */
-static int evict_pages(struct xenpaging *paging, int fd, int num_pages)
+static int evict_pages(struct xenpaging *paging, int num_pages)
 {
     xc_interface *xch = paging->xc_handle;
     int rc, slot, num = 0;
@@ -802,7 +810,7 @@ static int evict_pages(struct xenpaging *paging, int fd, int num_pages)
         if ( paging->slot_to_gfn[slot] )
             continue;
 
-        rc = evict_victim(paging, fd, slot);
+        rc = evict_victim(paging, slot);
         if ( rc )
         {
             num = rc < 0 ? -1 : num;
@@ -826,10 +834,6 @@ int main(int argc, char *argv[])
     int rc;
     xc_interface *xch;
 
-    int open_flags = O_CREAT | O_TRUNC | O_RDWR;
-    mode_t open_mode = S_IRUSR | S_IWUSR;
-    int fd;
-
     /* Initialise domain paging */
     paging = xenpaging_init(argc, argv);
     if ( paging == NULL )
@@ -840,14 +844,6 @@ int main(int argc, char *argv[])
     xch = paging->xc_handle;
 
     DPRINTF("starting %s for domain_id %u with pagefile %s\n", argv[0], paging->mem_event.domain_id, filename);
-
-    /* Open file */
-    fd = open(filename, open_flags, open_mode);
-    if ( fd < 0 )
-    {
-        perror("failed to open file");
-        return 2;
-    }
 
     /* ensure that if we get a signal, we'll do cleanup, then exit */
     act.sa_handler = close_handler;
@@ -911,7 +907,7 @@ int main(int argc, char *argv[])
                 else
                 {
                     /* Populate the page */
-                    if ( xenpaging_populate_page(paging, req.gfn, fd, slot) < 0 )
+                    if ( xenpaging_populate_page(paging, req.gfn, slot) < 0 )
                     {
                         ERROR("Error populating page %"PRIx64"", req.gfn);
                         goto out;
@@ -1005,7 +1001,7 @@ int main(int argc, char *argv[])
                 paging->use_poll_timeout = 0;
                 num = 42;
             }
-            if ( evict_pages(paging, fd, num) < 0 )
+            if ( evict_pages(paging, num) < 0 )
                 goto out;
         }
         /* Resume some pages if target not reached */
@@ -1033,7 +1029,7 @@ int main(int argc, char *argv[])
     DPRINTF("xenpaging got signal %d\n", interrupted);
 
  out:
-    close(fd);
+    close(paging->fd);
     unlink_pagefile();
 
     /* Tear down domain paging */

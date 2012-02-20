@@ -50,6 +50,7 @@ struct xenpaging {
     int *gfn_to_slot;
 
     struct mem_event mem_event;
+    int fd;
     /* number of pages for which data structures were allocated */
     int max_pages;
     int num_paged_out;
