@@ -347,7 +347,7 @@ int mem_sharing_audit(void)
 static void mem_sharing_notify_helper(struct domain *d, unsigned long gfn)
 {
     struct vcpu *v = current;
-    mem_event_request_t req = { .type = MEM_EVENT_TYPE_SHARED };
+    mem_event_request_t req = { .gfn = gfn };
 
     if ( v->domain != d )
     {
@@ -369,7 +369,6 @@ static void mem_sharing_notify_helper(struct domain *d, unsigned long gfn)
     req.flags = MEM_EVENT_FLAG_VCPU_PAUSED;
     vcpu_pause_nosync(v);
 
-    req.gfn = gfn;
     req.p2mt = p2m_ram_shared;
     req.vcpu_id = v->vcpu_id;
     mem_event_put_request(d, &d->mem_event->share, &req);

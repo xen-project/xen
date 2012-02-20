@@ -925,7 +925,6 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
 
     /* Send release notification to pager */
     memset(&req, 0, sizeof(req));
-    req.type = MEM_EVENT_TYPE_PAGING;
     req.gfn = gfn;
     req.flags = MEM_EVENT_FLAG_DROP_PAGE;
 
@@ -982,7 +981,6 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
         return;
 
     memset(&req, 0, sizeof(req));
-    req.type = MEM_EVENT_TYPE_PAGING;
 
     /* Fix p2m mapping */
     gfn_lock(p2m, gfn, 0);
@@ -1221,7 +1219,6 @@ bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long g
     {
         *req_ptr = req;
         memset(req, 0, sizeof(req));
-        req->type = MEM_EVENT_TYPE_ACCESS;
         req->reason = MEM_EVENT_REASON_VIOLATION;
 
         /* Pause the current VCPU */

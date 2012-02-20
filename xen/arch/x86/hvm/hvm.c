@@ -4322,7 +4322,6 @@ static int hvm_memory_event_traps(long p, uint32_t reason,
         return rc;
 
     memset(&req, 0, sizeof(req));
-    req.type = MEM_EVENT_TYPE_ACCESS;
     req.reason = reason;
 
     if ( (p & HVMPME_MODE_MASK) == HVMPME_mode_sync ) 
