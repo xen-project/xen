@@ -243,63 +243,54 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
          * IOCTL_PRIVCMD_MMAPBATCH_V2 is not supported - fall back to
          * IOCTL_PRIVCMD_MMAPBATCH.
          */
+        privcmd_mmapbatch_t ioctlx;
         xen_pfn_t *pfn = alloca(num * sizeof(*pfn));
 
-        if ( pfn )
+        memcpy(pfn, arr, num * sizeof(*arr));
+
+        ioctlx.num = num;
+        ioctlx.dom = dom;
+        ioctlx.addr = (unsigned long)addr;
+        ioctlx.arr = pfn;
+
+        rc = ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx);
+
+        rc = rc < 0 ? -errno : 0;
+
+        for ( i = 0; i < num; ++i )
         {
-            privcmd_mmapbatch_t ioctlx;
-
-            memcpy(pfn, arr, num * sizeof(*arr));
-
-            ioctlx.num = num;
-            ioctlx.dom = dom;
-            ioctlx.addr = (unsigned long)addr;
-            ioctlx.arr = pfn;
-
-            rc = ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx);
-
-            rc = rc < 0 ? -errno : 0;
-
-            for ( i = 0; i < num; ++i )
+            switch ( pfn[i] ^ arr[i] )
             {
-                switch ( pfn[i] ^ arr[i] )
+            case 0:
+                err[i] = rc != -ENOENT ? rc : 0;
+                continue;
+            default:
+                err[i] = -EINVAL;
+                continue;
+            case XEN_DOMCTL_PFINFO_PAGEDTAB:
+                if ( rc != -ENOENT )
                 {
-                case 0:
-                    err[i] = rc != -ENOENT ? rc : 0;
+                    err[i] = rc ?: -EINVAL;
                     continue;
-                default:
-                    err[i] = -EINVAL;
-                    continue;
-                case XEN_DOMCTL_PFINFO_PAGEDTAB:
-                    if ( rc != -ENOENT )
-                    {
-                        err[i] = rc ?: -EINVAL;
-                        continue;
-                    }
-                    rc = xc_map_foreign_batch_single(fd, dom, pfn + i,
+                 }
+                rc = xc_map_foreign_batch_single(fd, dom, pfn + i,
                         (unsigned long)addr + ((unsigned long)i<<XC_PAGE_SHIFT));
-                    if ( rc < 0 )
-                    {
-                        rc = -errno;
-                        break;
-                    }
-                    rc = -ENOENT;
-                    continue;
+                if ( rc < 0 )
+                {
+                    rc = -errno;
+                    break;
                 }
-                break;
+                rc = -ENOENT;
+                continue;
             }
-
-            if ( rc == -ENOENT && i == num )
-                rc = 0;
-            else if ( rc )
-            {
-                errno = -rc;
-                rc = -1;
-            }
+            break;
         }
-        else
+
+        if ( rc == -ENOENT && i == num )
+            rc = 0;
+        else if ( rc )
         {
-            errno = -ENOMEM;
+            errno = -rc;
             rc = -1;
         }
     }
@@ -525,8 +516,6 @@ static void *linux_gnttab_grant_map(xc_gnttab *xch, xc_osdep_handle h,
 
     map = alloca(sizeof(*map) +
                  (count - 1) * sizeof(struct ioctl_gntdev_map_grant_ref));
-    if ( map == NULL )
-        return NULL;
 
     for ( i = 0; i < count; i++ )
     {
