@@ -793,9 +793,9 @@ static const char *yajl_gen_status_to_string(yajl_gen_status s)
             return "generation complete";
         case yajl_gen_invalid_number:
             return "invalid number";
+#if 0 /* This is in the docs but not implemented in the version I am running. */
         case yajl_gen_no_buf:
             return "no buffer";
-#if 0 /* This is in the docs but not implemented in the version I am running. */
         case yajl_gen_invalid_string:
             return "invalid string";
 #endif
