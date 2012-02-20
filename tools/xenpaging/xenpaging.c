@@ -571,6 +571,11 @@ static void put_response(struct mem_event *mem_event, mem_event_response_t *rsp)
     RING_PUSH_RESPONSES(back_ring);
 }
 
+/* Evict a given gfn
+ * Returns < 0 on fatal error
+ * Returns 0 on successful evict
+ * Returns > 0 if gfn can not be evicted
+ */
 static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int fd, int slot)
 {
     xc_interface *xch = paging->xc_handle;
@@ -580,31 +585,51 @@ static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int
 
     DECLARE_DOMCTL;
 
+    /* Nominate page */
+    ret = xc_mem_paging_nominate(xch, paging->mem_event.domain_id, gfn);
+    if ( ret < 0 )
+    {
+        /* unpageable gfn is indicated by EBUSY */
+        if ( errno == EBUSY )
+            ret = 1;
+        else
+            PERROR("Error nominating page %lx", gfn);
+        goto out;
+    }
+
     /* Map page */
-    ret = -EFAULT;
     page = xc_map_foreign_pages(xch, paging->mem_event.domain_id, PROT_READ, &victim, 1);
     if ( page == NULL )
     {
         PERROR("Error mapping page %lx", gfn);
+        ret = -1;
         goto out;
     }
 
     /* Copy page */
     ret = write_page(fd, page, slot);
-    if ( ret != 0 )
+    if ( ret < 0 )
     {
         PERROR("Error copying page %lx", gfn);
         munmap(page, PAGE_SIZE);
+        ret = -1;
         goto out;
     }
 
+    /* Release page */
     munmap(page, PAGE_SIZE);
 
     /* Tell Xen to evict page */
     ret = xc_mem_paging_evict(xch, paging->mem_event.domain_id, gfn);
-    if ( ret != 0 )
+    if ( ret < 0 )
     {
-        PERROR("Error evicting page %lx", gfn);
+        /* A gfn in use is indicated by EBUSY */
+        if ( errno == EBUSY )
+        {
+                ret = 1;
+                DPRINTF("Nominated page %lx busy", gfn);
+        } else
+            PERROR("Error evicting page %lx", gfn);
         goto out;
     }
 
@@ -618,6 +643,8 @@ static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int
 
     /* Record number of evicted pages */
     paging->num_paged_out++;
+
+    ret = 0;
 
  out:
     return ret;
@@ -753,9 +780,10 @@ static int evict_victim(struct xenpaging *paging, int fd, int slot)
             ret = -EINTR;
             goto out;
         }
-        ret = xc_mem_paging_nominate(xch, paging->mem_event.domain_id, gfn);
-        if ( ret == 0 )
-            ret = xenpaging_evict_page(paging, gfn, fd, slot);
+
+        ret = xenpaging_evict_page(paging, gfn, fd, slot);
+        if ( ret < 0 )
+            goto out;
     }
     while ( ret );
 
