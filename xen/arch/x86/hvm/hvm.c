@@ -4302,7 +4302,7 @@ static int hvm_memory_event_traps(long p, uint32_t reason,
 {
     struct vcpu* v = current;
     struct domain *d = v->domain;
-    mem_event_request_t req;
+    mem_event_request_t req = { .reason = reason };
     int rc;
 
     if ( !(p & HVMPME_MODE_MASK) ) 
@@ -4320,9 +4320,6 @@ static int hvm_memory_event_traps(long p, uint32_t reason,
     }
     else if ( rc < 0 )
         return rc;
-
-    memset(&req, 0, sizeof(req));
-    req.reason = reason;
 
     if ( (p & HVMPME_MODE_MASK) == HVMPME_mode_sync ) 
     {

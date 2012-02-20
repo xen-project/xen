@@ -913,7 +913,7 @@ int p2m_mem_paging_evict(struct domain *d, unsigned long gfn)
 void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
                                 p2m_type_t p2mt)
 {
-    mem_event_request_t req;
+    mem_event_request_t req = { .gfn = gfn };
 
     /* We allow no ring in this unique case, because it won't affect
      * correctness of the guest execution at this point.  If this is the only
@@ -924,8 +924,6 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
         return;
 
     /* Send release notification to pager */
-    memset(&req, 0, sizeof(req));
-    req.gfn = gfn;
     req.flags = MEM_EVENT_FLAG_DROP_PAGE;
 
     /* Update stats unless the page hasn't yet been evicted */
@@ -962,7 +960,7 @@ void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
 void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
 {
     struct vcpu *v = current;
-    mem_event_request_t req;
+    mem_event_request_t req = { .gfn = gfn };
     p2m_type_t p2mt;
     p2m_access_t a;
     mfn_t mfn;
@@ -979,8 +977,6 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     }
     else if ( rc < 0 )
         return;
-
-    memset(&req, 0, sizeof(req));
 
     /* Fix p2m mapping */
     gfn_lock(p2m, gfn, 0);
@@ -1011,7 +1007,6 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     }
 
     /* Send request to pager */
-    req.gfn = gfn;
     req.p2mt = p2mt;
     req.vcpu_id = v->vcpu_id;
 
