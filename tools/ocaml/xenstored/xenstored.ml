@@ -86,7 +86,7 @@ let parse_config filename =
 		("quota-maxentity", Config.Set_int Quota.maxent);
 		("quota-maxsize", Config.Set_int Quota.maxsize);
 		("test-eagain", Config.Set_bool Transaction.test_eagain);
-		("persistant", Config.Set_bool Disk.enable);
+		("persistent", Config.Set_bool Disk.enable);
 		("xenstored-log-file", Config.Set_string Logging.xenstored_log_file);
 		("xenstored-log-level", Config.String
 			(fun s -> Logging.xenstored_log_level := Logging.level_of_string s));
