@@ -77,7 +77,7 @@ int policy_init(struct xenpaging *paging)
     return rc;
 }
 
-int policy_choose_victim(struct xenpaging *paging, struct victim *victim)
+unsigned long policy_choose_victim(struct xenpaging *paging)
 {
     xc_interface *xch = paging->xc_handle;
     unsigned long wrap = current_gfn;
@@ -102,16 +102,13 @@ int policy_choose_victim(struct xenpaging *paging, struct victim *victim)
                 /* One more round before returning ENOSPC */
                 continue;
             }
-            victim->gfn = INVALID_MFN;
-            return -ENOSPC;
+            return INVALID_MFN;
         }
     }
     while ( test_bit(current_gfn, bitmap) || test_bit(current_gfn, unconsumed) );
 
     set_bit(current_gfn, unconsumed);
-    victim->gfn = current_gfn;
-
-    return 0;
+    return current_gfn;
 }
 
 void policy_notify_paged_out(unsigned long gfn)

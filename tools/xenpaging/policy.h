@@ -29,7 +29,7 @@
 
 
 int policy_init(struct xenpaging *paging);
-int policy_choose_victim(struct xenpaging *paging, struct victim *victim);
+unsigned long policy_choose_victim(struct xenpaging *paging);
 void policy_notify_paged_out(unsigned long gfn);
 void policy_notify_paged_in(unsigned long gfn);
 void policy_notify_paged_in_nomru(unsigned long gfn);

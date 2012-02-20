@@ -430,6 +430,12 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     }
     DPRINTF("max_pages = %d\n", paging->max_pages);
 
+    /* Allocate indicies for pagefile slots */
+    paging->slot_to_gfn = calloc(paging->max_pages, sizeof(*paging->slot_to_gfn));
+    paging->gfn_to_slot = calloc(paging->max_pages, sizeof(*paging->gfn_to_slot));
+    if ( !paging->slot_to_gfn || !paging->gfn_to_slot )
+        goto err;
+
     /* Initialise policy */
     rc = policy_init(paging);
     if ( rc != 0 )
@@ -468,6 +474,8 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
 
         free(dom_path);
         free(watch_target_tot_pages);
+        free(paging->slot_to_gfn);
+        free(paging->gfn_to_slot);
         free(paging->bitmap);
         free(paging);
     }
@@ -561,31 +569,29 @@ static void put_response(struct mem_event *mem_event, mem_event_response_t *rsp)
     RING_PUSH_RESPONSES(back_ring);
 }
 
-static int xenpaging_evict_page(struct xenpaging *paging, struct victim *victim, int fd, int i)
+static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int fd, int slot)
 {
     xc_interface *xch = paging->xc_handle;
     void *page;
-    unsigned long gfn;
+    xen_pfn_t victim = gfn;
     int ret;
 
     DECLARE_DOMCTL;
 
     /* Map page */
-    gfn = victim->gfn;
     ret = -EFAULT;
-    page = xc_map_foreign_pages(xch, paging->mem_event.domain_id,
-                                PROT_READ, &gfn, 1);
+    page = xc_map_foreign_pages(xch, paging->mem_event.domain_id, PROT_READ, &victim, 1);
     if ( page == NULL )
     {
-        PERROR("Error mapping page %lx", victim->gfn);
+        PERROR("Error mapping page %lx", gfn);
         goto out;
     }
 
     /* Copy page */
-    ret = write_page(fd, page, i);
+    ret = write_page(fd, page, slot);
     if ( ret != 0 )
     {
-        PERROR("Error copying page %lx", victim->gfn);
+        PERROR("Error copying page %lx", gfn);
         munmap(page, PAGE_SIZE);
         goto out;
     }
@@ -593,17 +599,20 @@ static int xenpaging_evict_page(struct xenpaging *paging, struct victim *victim,
     munmap(page, PAGE_SIZE);
 
     /* Tell Xen to evict page */
-    ret = xc_mem_paging_evict(xch, paging->mem_event.domain_id,
-                              victim->gfn);
+    ret = xc_mem_paging_evict(xch, paging->mem_event.domain_id, gfn);
     if ( ret != 0 )
     {
-        PERROR("Error evicting page %lx", victim->gfn);
+        PERROR("Error evicting page %lx", gfn);
         goto out;
     }
 
-    DPRINTF("evict_page > gfn %lx pageslot %d\n", victim->gfn, i);
+    DPRINTF("evict_page > gfn %lx pageslot %d\n", gfn, slot);
     /* Notify policy of page being paged out */
-    policy_notify_paged_out(victim->gfn);
+    policy_notify_paged_out(gfn);
+
+    /* Update index */
+    paging->slot_to_gfn[slot] = gfn;
+    paging->gfn_to_slot[gfn] = slot;
 
     /* Record number of evicted pages */
     paging->num_paged_out++;
@@ -710,19 +719,19 @@ static void resume_pages(struct xenpaging *paging, int num_pages)
         page_in_trigger();
 }
 
-static int evict_victim(struct xenpaging *paging, struct victim *victim, int fd, int i)
+static int evict_victim(struct xenpaging *paging, int fd, int slot)
 {
     xc_interface *xch = paging->xc_handle;
+    unsigned long gfn;
     int j = 0;
     int ret;
 
     do
     {
-        ret = policy_choose_victim(paging, victim);
-        if ( ret != 0 )
+        gfn = policy_choose_victim(paging);
+        if ( gfn == INVALID_MFN )
         {
-            if ( ret != -ENOSPC )
-                ERROR("Error choosing victim");
+            ret = -ENOSPC;
             goto out;
         }
 
@@ -731,9 +740,9 @@ static int evict_victim(struct xenpaging *paging, struct victim *victim, int fd,
             ret = -EINTR;
             goto out;
         }
-        ret = xc_mem_paging_nominate(xch, paging->mem_event.domain_id, victim->gfn);
+        ret = xc_mem_paging_nominate(xch, paging->mem_event.domain_id, gfn);
         if ( ret == 0 )
-            ret = xenpaging_evict_page(paging, victim, fd, i);
+            ret = xenpaging_evict_page(paging, gfn, fd, slot);
         else
         {
             if ( j++ % 1000 == 0 )
@@ -743,7 +752,7 @@ static int evict_victim(struct xenpaging *paging, struct victim *victim, int fd,
     }
     while ( ret );
 
-    if ( test_and_set_bit(victim->gfn, paging->bitmap) )
+    if ( test_and_set_bit(gfn, paging->bitmap) )
         ERROR("Page has been evicted before");
 
     ret = 0;
@@ -753,7 +762,7 @@ static int evict_victim(struct xenpaging *paging, struct victim *victim, int fd,
 }
 
 /* Evict a batch of pages and write them to a free slot in the paging file */
-static int evict_pages(struct xenpaging *paging, int fd, struct victim *victims, int num_pages)
+static int evict_pages(struct xenpaging *paging, int fd, int num_pages)
 {
     xc_interface *xch = paging->xc_handle;
     int rc, slot, num = 0;
@@ -761,10 +770,10 @@ static int evict_pages(struct xenpaging *paging, int fd, struct victim *victims,
     for ( slot = 0; slot < paging->max_pages && num < num_pages; slot++ )
     {
         /* Slot is allocated */
-        if ( victims[slot].gfn != INVALID_MFN )
+        if ( paging->slot_to_gfn[slot] )
             continue;
 
-        rc = evict_victim(paging, &victims[slot], fd, slot);
+        rc = evict_victim(paging, fd, slot);
         if ( rc == -ENOSPC )
             break;
         if ( rc == -EINTR )
@@ -780,11 +789,10 @@ int main(int argc, char *argv[])
 {
     struct sigaction act;
     struct xenpaging *paging;
-    struct victim *victims;
     mem_event_request_t req;
     mem_event_response_t rsp;
     int num, prev_num = 0;
-    int i;
+    int slot;
     int tot_pages;
     int rc = -1;
     int rc1;
@@ -812,15 +820,6 @@ int main(int argc, char *argv[])
         perror("failed to open file");
         return 2;
     }
-
-    /* Allocate upper limit of pages to allow growing and shrinking */
-    victims = calloc(paging->max_pages, sizeof(struct victim));
-    if ( !victims )
-        goto out;
-
-    /* Mark all slots as unallocated */
-    for ( i = 0; i < paging->max_pages; i++ )
-        victims[i].gfn = INVALID_MFN;
 
     /* ensure that if we get a signal, we'll do cleanup, then exit */
     act.sa_handler = close_handler;
@@ -853,32 +852,35 @@ int main(int argc, char *argv[])
         {
             get_request(&paging->mem_event, &req);
 
+            if ( req.gfn > paging->max_pages )
+            {
+                ERROR("Requested gfn %"PRIx64" higher than max_pages %lx\n", req.gfn, paging->max_pages);
+                goto out;
+            }
+
             /* Check if the page has already been paged in */
             if ( test_and_clear_bit(req.gfn, paging->bitmap) )
             {
                 /* Find where in the paging file to read from */
-                for ( i = 0; i < paging->max_pages; i++ )
+                slot = paging->gfn_to_slot[req.gfn];
+
+                /* Sanity check */
+                if ( paging->slot_to_gfn[slot] != req.gfn )
                 {
-                    if ( victims[i].gfn == req.gfn )
-                        break;
-                }
-    
-                if ( i >= paging->max_pages )
-                {
-                    DPRINTF("Couldn't find page %"PRIx64"\n", req.gfn);
+                    ERROR("Expected gfn %"PRIx64" in slot %d, but found gfn %lx\n", req.gfn, slot, paging->slot_to_gfn[slot]);
                     goto out;
                 }
-                
+
                 if ( req.flags & MEM_EVENT_FLAG_DROP_PAGE )
                 {
-                    DPRINTF("drop_page ^ gfn %"PRIx64" pageslot %d\n", req.gfn, i);
+                    DPRINTF("drop_page ^ gfn %"PRIx64" pageslot %d\n", req.gfn, slot);
                     /* Notify policy of page being dropped */
                     policy_notify_dropped(req.gfn);
                 }
                 else
                 {
                     /* Populate the page */
-                    rc = xenpaging_populate_page(paging, req.gfn, fd, i);
+                    rc = xenpaging_populate_page(paging, req.gfn, fd, slot);
                     if ( rc != 0 )
                     {
                         PERROR("Error populating page %"PRIx64"", req.gfn);
@@ -899,7 +901,7 @@ int main(int argc, char *argv[])
                 }
 
                 /* Clear this pagefile slot */
-                victims[i].gfn = INVALID_MFN;
+                paging->slot_to_gfn[slot] = 0;
             }
             else
             {
@@ -969,7 +971,7 @@ int main(int argc, char *argv[])
             /* Limit the number of evicts to be able to process page-in requests */
             if ( num > 42 )
                 num = 42;
-            evict_pages(paging, fd, victims, num);
+            evict_pages(paging, fd, num);
         }
         /* Resume some pages if target not reached */
         else if ( tot_pages < paging->target_tot_pages && paging->num_paged_out )
@@ -989,7 +991,6 @@ int main(int argc, char *argv[])
  out:
     close(fd);
     unlink_pagefile();
-    free(victims);
 
     /* Tear down domain paging */
     rc1 = xenpaging_teardown(paging);

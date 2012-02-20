@@ -46,6 +46,9 @@ struct xenpaging {
 
     unsigned long *bitmap;
 
+    unsigned long *slot_to_gfn;
+    int *gfn_to_slot;
+
     struct mem_event mem_event;
     /* number of pages for which data structures were allocated */
     int max_pages;
@@ -55,13 +58,6 @@ struct xenpaging {
     int debug;
     unsigned long pagein_queue[XENPAGING_PAGEIN_QUEUE_SIZE];
 };
-
-
-struct victim {
-    /* the gfn of the page to evict */
-    unsigned long gfn;
-};
-
 
 extern void create_page_in_thread(struct xenpaging *paging);
 extern void page_in_trigger(void);
