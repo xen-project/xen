@@ -432,6 +432,11 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     if ( !paging->slot_to_gfn || !paging->gfn_to_slot )
         goto err;
 
+    /* Allocate stack for known free slots in pagefile */
+    paging->free_slot_stack = calloc(paging->max_pages, sizeof(*paging->free_slot_stack));
+    if ( !paging->free_slot_stack )
+        goto err;
+
     /* Initialise policy */
     rc = policy_init(paging);
     if ( rc != 0 )
@@ -483,6 +488,7 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
 
         free(dom_path);
         free(watch_target_tot_pages);
+        free(paging->free_slot_stack);
         free(paging->slot_to_gfn);
         free(paging->gfn_to_slot);
         free(paging->bitmap);
@@ -807,6 +813,20 @@ static int evict_pages(struct xenpaging *paging, int num_pages)
     xc_interface *xch = paging->xc_handle;
     int rc, slot, num = 0;
 
+    /* Reuse known free slots */
+    while ( paging->stack_count > 0 && num < num_pages )
+    {
+        slot = paging->free_slot_stack[--paging->stack_count];
+        rc = evict_victim(paging, slot);
+        if ( rc )
+        {
+            num = rc < 0 ? -1 : num;
+            return num;
+        }
+        num++;
+    }
+
+    /* Scan all slots slots for remainders */
     for ( slot = 0; slot < paging->max_pages && num < num_pages; slot++ )
     {
         /* Slot is allocated */
@@ -930,6 +950,9 @@ int main(int argc, char *argv[])
 
                 /* Clear this pagefile slot */
                 paging->slot_to_gfn[slot] = 0;
+
+                /* Record this free slot */
+                paging->free_slot_stack[paging->stack_count++] = slot;
             }
             else
             {

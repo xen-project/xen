@@ -60,6 +60,8 @@ struct xenpaging {
     int policy_mru_size;
     int use_poll_timeout;
     int debug;
+    int stack_count;
+    int *free_slot_stack;
     unsigned long pagein_queue[XENPAGING_PAGEIN_QUEUE_SIZE];
 };
 
