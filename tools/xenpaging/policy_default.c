@@ -80,33 +80,58 @@ int policy_init(struct xenpaging *paging)
 unsigned long policy_choose_victim(struct xenpaging *paging)
 {
     xc_interface *xch = paging->xc_handle;
-    unsigned long wrap = current_gfn;
+    unsigned long i;
 
-    do
+    /* One iteration over all possible gfns */
+    for ( i = 0; i < max_pages; i++ )
     {
+        /* Try next gfn */
         current_gfn++;
+
+        /* Restart on wrap */
         if ( current_gfn >= max_pages )
             current_gfn = 0;
-        /* Could not nominate any gfn */
-        if ( wrap == current_gfn )
+
+        if ( (current_gfn & (BITS_PER_LONG - 1)) == 0 )
         {
-            paging->use_poll_timeout = 1;
-            /* Count wrap arounds */
-            unconsumed_cleared++;
-            /* Force retry every few seconds (depends on poll() timeout) */
-            if ( unconsumed_cleared > 123)
+            /* All gfns busy */
+            if ( ~bitmap[current_gfn >> ORDER_LONG] == 0 || ~unconsumed[current_gfn >> ORDER_LONG] == 0 )
             {
-                /* Force retry of unconsumed gfns */
-                bitmap_clear(unconsumed, max_pages);
-                unconsumed_cleared = 0;
-                DPRINTF("clearing unconsumed, wrap %lx", wrap);
-                /* One more round before returning ENOSPC */
+                current_gfn += BITS_PER_LONG;
+                i += BITS_PER_LONG;
                 continue;
             }
-            return INVALID_MFN;
         }
+
+        /* gfn busy */
+        if ( test_bit(current_gfn, bitmap) )
+            continue;
+
+        /* gfn already tested */
+        if ( test_bit(current_gfn, unconsumed) )
+            continue;
+
+        /* gfn found */
+        break;
     }
-    while ( test_bit(current_gfn, bitmap) || test_bit(current_gfn, unconsumed) );
+
+    /* Could not nominate any gfn */
+    if ( i >= max_pages )
+    {
+        /* No more pages, wait in poll */
+        paging->use_poll_timeout = 1;
+        /* Count wrap arounds */
+        unconsumed_cleared++;
+        /* Force retry every few seconds (depends on poll() timeout) */
+        if ( unconsumed_cleared > 123)
+        {
+            /* Force retry of unconsumed gfns on next call */
+            bitmap_clear(unconsumed, max_pages);
+            unconsumed_cleared = 0;
+            DPRINTF("clearing unconsumed, current_gfn %lx", current_gfn);
+        }
+        return INVALID_MFN;
+    }
 
     set_bit(current_gfn, unconsumed);
     return current_gfn;
