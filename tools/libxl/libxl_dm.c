@@ -73,7 +73,7 @@ static const char *libxl__domain_bios(libxl__gc *gc,
     }
 }
 
-static const libxl_vnc_info *dm_vnc(const libxl_domain_config *guest_config)
+const libxl_vnc_info *libxl__dm_vnc(const libxl_domain_config *guest_config)
 {
     const libxl_vnc_info *vnc = NULL;
     if (guest_config->b_info.type == LIBXL_DOMAIN_TYPE_HVM) {
@@ -113,7 +113,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     const libxl_domain_create_info *c_info = &guest_config->c_info;
     const libxl_domain_build_info *b_info = &guest_config->b_info;
     const libxl_device_nic *vifs = guest_config->vifs;
-    const libxl_vnc_info *vnc = dm_vnc(guest_config);
+    const libxl_vnc_info *vnc = libxl__dm_vnc(guest_config);
     const libxl_sdl_info *sdl = dm_sdl(guest_config);
     const int num_vifs = guest_config->num_vifs;
     const char *keymap = dm_keymap(guest_config);
@@ -328,7 +328,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     const libxl_device_nic *vifs = guest_config->vifs;
     const int num_disks = guest_config->num_disks;
     const int num_vifs = guest_config->num_vifs;
-    const libxl_vnc_info *vnc = dm_vnc(guest_config);
+    const libxl_vnc_info *vnc = libxl__dm_vnc(guest_config);
     const libxl_sdl_info *sdl = dm_sdl(guest_config);
     const char *keymap = dm_keymap(guest_config);
     flexarray_t *dm_args;
@@ -890,7 +890,7 @@ int libxl__create_device_model(libxl__gc *gc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     const libxl_domain_create_info *c_info = &guest_config->c_info;
     const libxl_domain_build_info *b_info = &guest_config->b_info;
-    const libxl_vnc_info *vnc = dm_vnc(guest_config);
+    const libxl_vnc_info *vnc = libxl__dm_vnc(guest_config);
     char *path, *logfile;
     int logfile_w, null;
     int rc;
