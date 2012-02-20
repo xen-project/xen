@@ -594,7 +594,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     if (dm_starting) {
         if (d_config->b_info.device_model_version
             == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
-            libxl__qmp_initializations(ctx, domid);
+            libxl__qmp_initializations(gc, domid);
         }
         ret = libxl__confirm_device_model_startup(gc, &state, dm_starting);
         if (ret < 0) {

@@ -995,7 +995,7 @@ typedef struct libxl__qmp_handler libxl__qmp_handler;
 /* Initialise and connect to the QMP socket.
  *   Return an handler or NULL if there is an error
  */
-_hidden libxl__qmp_handler *libxl__qmp_initialize(libxl_ctx *ctx,
+_hidden libxl__qmp_handler *libxl__qmp_initialize(libxl__gc *gc,
                                                   uint32_t domid);
 /* ask to QEMU the serial port information and store it in xenstore. */
 _hidden int libxl__qmp_query_serial(libxl__qmp_handler *qmp);
@@ -1011,7 +1011,7 @@ _hidden void libxl__qmp_close(libxl__qmp_handler *qmp);
 _hidden void libxl__qmp_cleanup(libxl__gc *gc, uint32_t domid);
 
 /* this helper calls qmp_initialize, query_serial and qmp_close */
-_hidden int libxl__qmp_initializations(libxl_ctx *ctx, uint32_t domid);
+_hidden int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid);
 
 /* from libxl_json */
 #include <yajl/yajl_gen.h>
