@@ -49,6 +49,8 @@ struct xenpaging {
     unsigned long *slot_to_gfn;
     int *gfn_to_slot;
 
+    void *paging_buffer;
+
     struct mem_event mem_event;
     int fd;
     /* number of pages for which data structures were allocated */

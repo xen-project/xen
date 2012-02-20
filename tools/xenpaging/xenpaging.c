@@ -44,7 +44,6 @@ static char *dom_path;
 static char watch_token[16];
 static char *filename;
 static int interrupted;
-static void *paging_buffer = NULL;
 
 static void unlink_pagefile(void)
 {
@@ -441,8 +440,8 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
         goto err;
     }
 
-    paging_buffer = init_page();
-    if ( !paging_buffer )
+    paging->paging_buffer = init_page();
+    if ( !paging->paging_buffer )
     {
         PERROR("Creating page aligned load buffer");
         goto err;
@@ -465,6 +464,11 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
             xs_close(paging->xs_handle);
         if ( xch )
             xc_interface_close(xch);
+        if ( paging->paging_buffer )
+        {
+            munlock(paging->paging_buffer, PAGE_SIZE);
+            free(paging->paging_buffer);
+        }
         if ( paging->mem_event.shared_page )
         {
             munlock(paging->mem_event.shared_page, PAGE_SIZE);
@@ -687,7 +691,7 @@ static int xenpaging_populate_page(struct xenpaging *paging, unsigned long gfn, 
     DPRINTF("populate_page < gfn %lx pageslot %d\n", gfn, i);
 
     /* Read page */
-    ret = read_page(paging->fd, paging_buffer, i);
+    ret = read_page(paging->fd, paging->paging_buffer, i);
     if ( ret != 0 )
     {
         PERROR("Error reading page");
@@ -697,8 +701,7 @@ static int xenpaging_populate_page(struct xenpaging *paging, unsigned long gfn, 
     do
     {
         /* Tell Xen to allocate a page for the domain */
-        ret = xc_mem_paging_load(xch, paging->mem_event.domain_id, gfn,
-                                    paging_buffer);
+        ret = xc_mem_paging_load(xch, paging->mem_event.domain_id, gfn, paging->paging_buffer);
         if ( ret < 0 )
         {
             if ( errno == ENOMEM )
