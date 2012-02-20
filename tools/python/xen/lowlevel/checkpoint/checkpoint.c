@@ -155,6 +155,7 @@ static PyObject* pycheckpoint_start(PyObject* obj, PyObject* args) {
   } else
     self->checkpoint_cb = NULL;
 
+  memset(&callbacks, 0, sizeof(callbacks));
   callbacks.suspend = suspend_trampoline;
   callbacks.postcopy = postcopy_trampoline;
   callbacks.checkpoint = checkpoint_trampoline;
