@@ -328,7 +328,6 @@ static int allocate_xenbus_id(void)
 void init_xenbus(void)
 {
     int err;
-    printk("Initialising xenbus\n");
     DEBUG("init_xenbus called.\n");
     xenstore_buf = mfn_to_virt(start_info.store_mfn);
     create_thread("xenstore", xenbus_thread_func, NULL);
@@ -337,7 +336,8 @@ void init_xenbus(void)
 		      xenbus_evtchn_handler,
               NULL);
     unmask_evtchn(start_info.store_evtchn);
-    DEBUG("xenbus on irq %d\n", err);
+    printk("xenbus initialised on irq %d mfn %#lx\n",
+	   err, start_info.store_mfn);
 }
 
 void fini_xenbus(void)
@@ -478,7 +478,7 @@ static void xenbus_debug_msg(const char *msg)
     struct xsd_sockmsg *reply;
 
     reply = xenbus_msg_reply(XS_DEBUG, 0, req, ARRAY_SIZE(req));
-    DEBUG("Got a reply, type %d, id %d, len %d.\n",
+    printk("Got a reply, type %d, id %d, len %d.\n",
             reply->type, reply->req_id, reply->len);
 }
 
@@ -752,16 +752,16 @@ static void do_ls_test(const char *pre)
     char **dirs, *msg;
     int x;
 
-    DEBUG("ls %s...\n", pre);
+    printk("ls %s...\n", pre);
     msg = xenbus_ls(XBT_NIL, pre, &dirs);
     if (msg) {
-	DEBUG("Error in xenbus ls: %s\n", msg);
+	printk("Error in xenbus ls: %s\n", msg);
 	free(msg);
 	return;
     }
     for (x = 0; dirs[x]; x++) 
     {
-        DEBUG("ls %s[%d] -> %s\n", pre, x, dirs[x]);
+        printk("ls %s[%d] -> %s\n", pre, x, dirs[x]);
         free(dirs[x]);
     }
     free(dirs);
@@ -770,68 +770,68 @@ static void do_ls_test(const char *pre)
 static void do_read_test(const char *path)
 {
     char *res, *msg;
-    DEBUG("Read %s...\n", path);
+    printk("Read %s...\n", path);
     msg = xenbus_read(XBT_NIL, path, &res);
     if (msg) {
-	DEBUG("Error in xenbus read: %s\n", msg);
+	printk("Error in xenbus read: %s\n", msg);
 	free(msg);
 	return;
     }
-    DEBUG("Read %s -> %s.\n", path, res);
+    printk("Read %s -> %s.\n", path, res);
     free(res);
 }
 
 static void do_write_test(const char *path, const char *val)
 {
     char *msg;
-    DEBUG("Write %s to %s...\n", val, path);
+    printk("Write %s to %s...\n", val, path);
     msg = xenbus_write(XBT_NIL, path, val);
     if (msg) {
-	DEBUG("Result %s\n", msg);
+	printk("Result %s\n", msg);
 	free(msg);
     } else {
-	DEBUG("Success.\n");
+	printk("Success.\n");
     }
 }
 
 static void do_rm_test(const char *path)
 {
     char *msg;
-    DEBUG("rm %s...\n", path);
+    printk("rm %s...\n", path);
     msg = xenbus_rm(XBT_NIL, path);
     if (msg) {
-	DEBUG("Result %s\n", msg);
+	printk("Result %s\n", msg);
 	free(msg);
     } else {
-	DEBUG("Success.\n");
+	printk("Success.\n");
     }
 }
 
 /* Simple testing thing */
 void test_xenbus(void)
 {
-    DEBUG("Doing xenbus test.\n");
+    printk("Doing xenbus test.\n");
     xenbus_debug_msg("Testing xenbus...\n");
 
-    DEBUG("Doing ls test.\n");
+    printk("Doing ls test.\n");
     do_ls_test("device");
     do_ls_test("device/vif");
     do_ls_test("device/vif/0");
 
-    DEBUG("Doing read test.\n");
+    printk("Doing read test.\n");
     do_read_test("device/vif/0/mac");
     do_read_test("device/vif/0/backend");
 
-    DEBUG("Doing write test.\n");
+    printk("Doing write test.\n");
     do_write_test("device/vif/0/flibble", "flobble");
     do_read_test("device/vif/0/flibble");
     do_write_test("device/vif/0/flibble", "widget");
     do_read_test("device/vif/0/flibble");
 
-    DEBUG("Doing rm test.\n");
+    printk("Doing rm test.\n");
     do_rm_test("device/vif/0/flibble");
     do_read_test("device/vif/0/flibble");
-    DEBUG("(Should have said ENOENT)\n");
+    printk("(Should have said ENOENT)\n");
 }
 
 /*
