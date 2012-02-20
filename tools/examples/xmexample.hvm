@@ -346,7 +346,7 @@ tsc_mode=0
 
 #   Enable graphics passthrough:
 #
-#   If it's set, and specify grapchis device BDF in pci passthrough option,
+#   If it's set, and specify graphics device BDF in pci passthrough option,
 # like pci=['xx:xx.x'], it enables graphics passthrough, default=0 (disabled)
 #gfx_passthru=0
 
