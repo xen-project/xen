@@ -232,9 +232,9 @@ CONFIG_SEABIOS ?= y
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 414b878e8ea17c65cd0d7f9dfc38dba472857f74
-# Mon Feb 13 17:00:13 2012 +0000
-# qemu: Don't access /proc/bus/pci unless graphics pass-thru is enabled
+QEMU_TAG ?= 128de2549c5f24e4a437b86bd2e46f023976d50a
+# Mon Feb 20 16:21:47 2012 +0000
+# Intel GPU passthrough: Host bridge config space
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
