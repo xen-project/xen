@@ -282,6 +282,9 @@ xen/arch/x86/asm-offsets.s
 xen/arch/x86/boot/mkelf32
 xen/arch/x86/xen.lds
 xen/arch/x86/boot/reloc.S
+xen/arch/x86/efi.lds
+xen/arch/x86/efi/disabled
+xen/arch/x86/efi/mkreloc
 xen/ddb/*
 xen/include/headers.chk
 xen/include/asm
