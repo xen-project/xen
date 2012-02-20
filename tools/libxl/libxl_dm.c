@@ -361,10 +361,8 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     if (vnc) {
         int display = 0;
         const char *listen = "127.0.0.1";
+        char *vncarg = NULL;
 
-        if (vnc->passwd && vnc->passwd[0]) {
-            assert(!"missing code for supplying vnc password to qemu");
-        }
         flexarray_append(dm_args, "-vnc");
 
         if (vnc->display) {
@@ -377,13 +375,19 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         }
 
         if (strchr(listen, ':') != NULL)
-            flexarray_append(dm_args,
-                    libxl__sprintf(gc, "%s%s", listen,
-                        vnc->findunused ? ",to=99" : ""));
+            vncarg = libxl__sprintf(gc, "%s", listen);
         else
-            flexarray_append(dm_args,
-                    libxl__sprintf(gc, "%s:%d%s", listen, display,
-                        vnc->findunused ? ",to=99" : ""));
+            vncarg = libxl__sprintf(gc, "%s:%d", listen, display);
+        if (vnc->passwd && vnc->passwd[0]) {
+            vncarg = libxl__sprintf(gc, "%s,password", vncarg);
+        }
+        if (vnc->findunused) {
+            /* This option asks to QEMU to try this number of port before to
+             * give up.  So QEMU will try ports between $display and $display +
+             * 99.  This option needs to be the last one of the vnc options. */
+            vncarg = libxl__sprintf(gc, "%s,to=99", vncarg);
+        }
+        flexarray_append(dm_args, vncarg);
     }
     if (sdl) {
         flexarray_append(dm_args, "-sdl");
@@ -965,6 +969,8 @@ int libxl__create_device_model(libxl__gc *gc,
     }
 
     if (vnc && vnc->passwd) {
+        /* This xenstore key will only be used by qemu-xen-traditionnal.
+         * The code to supply vncpasswd to qemu-xen is later. */
 retry_transaction:
         /* Find uuid and the write the vnc password to xenstore for qemu. */
         t = xs_transaction_start(ctx->xsh);

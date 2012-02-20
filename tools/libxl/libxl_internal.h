@@ -1013,7 +1013,8 @@ _hidden void libxl__qmp_close(libxl__qmp_handler *qmp);
 _hidden void libxl__qmp_cleanup(libxl__gc *gc, uint32_t domid);
 
 /* this helper calls qmp_initialize, query_serial and qmp_close */
-_hidden int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid);
+_hidden int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
+                                       const libxl_domain_config *guest_config);
 
 /* from libxl_json */
 #include <yajl/yajl_gen.h>

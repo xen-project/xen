@@ -880,8 +880,33 @@ out:
     return rc;
 }
 
-int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid)
+static int qmp_change(libxl__gc *gc, libxl__qmp_handler *qmp,
+                      char *device, char *target, char *arg)
 {
+    flexarray_t *parameters = NULL;
+    libxl_key_value_list args = NULL;
+    int rc = 0;
+
+    parameters = flexarray_make(6, 1);
+    flexarray_append_pair(parameters, "device", device);
+    flexarray_append_pair(parameters, "target", target);
+    if (arg)
+        flexarray_append_pair(parameters, "arg", arg);
+    args = libxl__xs_kvs_of_flexarray(gc, parameters, parameters->count);
+    if (!args)
+        return ERROR_NOMEM;
+
+    rc = qmp_synchronous_send(qmp, "change", &args,
+                              NULL, NULL, qmp->timeout);
+
+    flexarray_free(parameters);
+    return rc;
+}
+
+int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
+                               const libxl_domain_config *guest_config)
+{
+    const libxl_vnc_info *vnc = libxl__dm_vnc(guest_config);
     libxl__qmp_handler *qmp = NULL;
     int ret = 0;
 
@@ -889,6 +914,9 @@ int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid)
     if (!qmp)
         return -1;
     ret = libxl__qmp_query_serial(qmp);
+    if (!ret && vnc && vnc->passwd) {
+        ret = qmp_change(gc, qmp, "vnc", "password", vnc->passwd);
+    }
     libxl__qmp_close(qmp);
     return ret;
 }
