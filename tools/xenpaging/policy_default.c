@@ -90,6 +90,7 @@ unsigned long policy_choose_victim(struct xenpaging *paging)
         /* Could not nominate any gfn */
         if ( wrap == current_gfn )
         {
+            paging->use_poll_timeout = 1;
             /* Count wrap arounds */
             unconsumed_cleared++;
             /* Force retry every few seconds (depends on poll() timeout) */

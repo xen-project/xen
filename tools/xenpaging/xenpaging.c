@@ -84,6 +84,7 @@ static int xenpaging_wait_for_event_or_timeout(struct xenpaging *paging)
     struct pollfd fd[2];
     int port;
     int rc;
+    int timeout;
 
     /* Wait for event channel and xenstore */
     fd[0].fd = xc_evtchn_fd(xce);
@@ -91,7 +92,9 @@ static int xenpaging_wait_for_event_or_timeout(struct xenpaging *paging)
     fd[1].fd = xs_fileno(paging->xs_handle);
     fd[1].events = POLLIN | POLLERR;
 
-    rc = poll(fd, 2, 100);
+    /* No timeout while page-out is still in progress */
+    timeout = paging->use_poll_timeout ? 100 : 0;
+    rc = poll(fd, 2, timeout);
     if ( rc < 0 )
     {
         if (errno == EINTR)
@@ -133,6 +136,8 @@ static int xenpaging_wait_for_event_or_timeout(struct xenpaging *paging)
                         if ( target_tot_pages < 0 || target_tot_pages > paging->max_pages )
                             target_tot_pages = paging->max_pages;
                         paging->target_tot_pages = target_tot_pages;
+                        /* Disable poll() delay while new target is not yet reached */
+                        paging->use_poll_timeout = 0;
                         DPRINTF("new target_tot_pages %d\n", target_tot_pages);
                     }
                     free(val);
@@ -970,7 +975,10 @@ int main(int argc, char *argv[])
             }
             /* Limit the number of evicts to be able to process page-in requests */
             if ( num > 42 )
+            {
+                paging->use_poll_timeout = 0;
                 num = 42;
+            }
             evict_pages(paging, fd, num);
         }
         /* Resume some pages if target not reached */
@@ -983,6 +991,11 @@ int main(int argc, char *argv[])
                 prev_num = num;
             }
             resume_pages(paging, num);
+        }
+        /* Now target was reached, enable poll() timeout */
+        else
+        {
+            paging->use_poll_timeout = 1;
         }
 
     }
