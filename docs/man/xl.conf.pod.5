@@ -47,13 +47,13 @@ The semantics of each C<KEY> defines which form of C<VALUE> is required.
 
 =item B<autoballoon=BOOLEAN>
 
-If enabled then C<xl> will not attempt to reduce the amount of memory
+If disabled then C<xl> will not attempt to reduce the amount of memory
 assigned to domain 0 in order to create free memory when starting a
 new domain. You should set this if you use the C<dom0_mem> hypervisor
 command line to reduce the amount of memory given to domain 0 by
 default.
 
-Default: C<0>
+Default: C<1>
 
 =item B<lockfile="PATH">
 
