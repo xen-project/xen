@@ -574,7 +574,7 @@ static int xenpaging_evict_page(struct xenpaging *paging, struct victim *victim,
     gfn = victim->gfn;
     ret = -EFAULT;
     page = xc_map_foreign_pages(xch, paging->mem_event.domain_id,
-                                PROT_READ | PROT_WRITE, &gfn, 1);
+                                PROT_READ, &gfn, 1);
     if ( page == NULL )
     {
         PERROR("Error mapping page %lx", victim->gfn);
