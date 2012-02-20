@@ -61,18 +61,15 @@ static void close_handler(int sig)
     unlink_pagefile();
 }
 
-static int xenpaging_mem_paging_flush_ioemu_cache(struct xenpaging *paging)
+static void xenpaging_mem_paging_flush_ioemu_cache(struct xenpaging *paging)
 {
     struct xs_handle *xsh = paging->xs_handle;
     domid_t domain_id = paging->mem_event.domain_id;
     char path[80];
-    bool rc;
 
     sprintf(path, "/local/domain/0/device-model/%u/command", domain_id);
 
-    rc = xs_write(xsh, XBT_NULL, path, "flush-cache", strlen("flush-cache")); 
-
-    return rc == true ? 0 : -1;
+    xs_write(xsh, XBT_NULL, path, "flush-cache", strlen("flush-cache")); 
 }
 
 static int xenpaging_wait_for_event_or_timeout(struct xenpaging *paging)
@@ -728,7 +725,7 @@ static int evict_victim(struct xenpaging *paging, int fd, int slot)
 {
     xc_interface *xch = paging->xc_handle;
     unsigned long gfn;
-    int j = 0;
+    static int num_paged_out;
     int ret;
 
     do
@@ -736,6 +733,17 @@ static int evict_victim(struct xenpaging *paging, int fd, int slot)
         gfn = policy_choose_victim(paging);
         if ( gfn == INVALID_MFN )
         {
+            /* If the number did not change after last flush command then
+             * the command did not reach qemu yet, or qemu still processes
+             * the command, or qemu has nothing to release.
+             * Right now there is no need to issue the command again.
+             */
+            if ( num_paged_out != paging->num_paged_out )
+            {
+                DPRINTF("Flushing qemu cache\n");
+                xenpaging_mem_paging_flush_ioemu_cache(paging);
+                num_paged_out = paging->num_paged_out;
+            }
             ret = -ENOSPC;
             goto out;
         }
@@ -748,12 +756,6 @@ static int evict_victim(struct xenpaging *paging, int fd, int slot)
         ret = xc_mem_paging_nominate(xch, paging->mem_event.domain_id, gfn);
         if ( ret == 0 )
             ret = xenpaging_evict_page(paging, gfn, fd, slot);
-        else
-        {
-            if ( j++ % 1000 == 0 )
-                if ( xenpaging_mem_paging_flush_ioemu_cache(paging) )
-                    PERROR("Error flushing ioemu cache");
-        }
     }
     while ( ret );
 
