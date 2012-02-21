@@ -3008,13 +3008,13 @@ int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid, libxl_sched_cr
 
 
     if (scinfo->weight < 1 || scinfo->weight > 65535) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
             "Cpu weight out of range, valid values are within range from 1 to 65535");
         return ERROR_INVAL;
     }
 
     if (scinfo->cap < 0 || scinfo->cap > (domaininfo.max_vcpu_id + 1) * 100) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
             "Cpu cap out of range, valid range is from 0 to %d for specified number of vcpus",
             ((domaininfo.max_vcpu_id + 1) * 100));
         return ERROR_INVAL;
