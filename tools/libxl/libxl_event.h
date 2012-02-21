@@ -17,6 +17,8 @@
 #define LIBXL_EVENT_H
 
 #include <libxl.h>
+#include <poll.h>
+#include <sys/time.h>
 
 /*======================================================================*/
 
