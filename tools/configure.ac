@@ -62,7 +62,6 @@ AX_SET_FLAGS
 
 AC_ARG_VAR([PYTHON], [Path to the Python parser])
 AC_ARG_VAR([PERL], [Path to Perl parser])
-AC_ARG_VAR([BRCTL], [Path to brctl tool])
 AC_ARG_VAR([IP], [Path to ip tool])
 AC_ARG_VAR([BISON], [Path to Bison parser generator])
 AC_ARG_VAR([FLEX], [Path to Flex lexical analyser generator])
