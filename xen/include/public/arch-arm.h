@@ -63,7 +63,12 @@ struct cpu_user_regs
     uint32_t r12;
 
     uint32_t sp; /* r13 - SP: Valid for Hyp. frames only, o/w banked (see below) */
-    uint32_t lr; /* r14 - LR: Valid for Hyp. Same physical register as lr_usr. */
+
+    /* r14 - LR: is the same physical register as LR_usr */
+    union {
+        uint32_t lr; /* r14 - LR: Valid for Hyp. Same physical register as lr_usr. */
+        uint32_t lr_usr;
+    };
 
     uint32_t pc; /* Return IP */
     uint32_t cpsr; /* Return mode */
@@ -73,10 +78,14 @@ struct cpu_user_regs
 
     uint32_t r8_fiq, r9_fiq, r10_fiq, r11_fiq, r12_fiq;
 
-    uint32_t sp_usr, sp_svc, sp_abt, sp_und, sp_irq, sp_fiq;
-    uint32_t lr_usr, lr_svc, lr_abt, lr_und, lr_irq, lr_fiq;
+    uint32_t sp_usr; /* LR_usr is the same register as LR, see above */
+
+    uint32_t sp_svc, sp_abt, sp_und, sp_irq, sp_fiq;
+    uint32_t lr_svc, lr_abt, lr_und, lr_irq, lr_fiq;
 
     uint32_t spsr_svc, spsr_abt, spsr_und, spsr_irq, spsr_fiq;
+
+    uint32_t pad1; /* Doubleword-align the user half of the frame */
 };
 typedef struct cpu_user_regs cpu_user_regs_t;
 DEFINE_XEN_GUEST_HANDLE(cpu_user_regs_t);

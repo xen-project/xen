@@ -29,11 +29,10 @@
 	blne save_guest_regs
 
 save_guest_regs:
-	ldr r11, [sp, #UREGS_lr]
-	str r11, [sp, #UREGS_LR_usr]
 	ldr r11, =0xffffffff  /* Clobber SP which is only valid for hypervisor frames. */
 	str r11, [sp, #UREGS_sp]
 	SAVE_ONE_BANKED(SP_usr)
+	/* LR_usr is the same physical register as lr and is saved in SAVE_ALL */
 	SAVE_BANKED(svc)
 	SAVE_BANKED(abt)
 	SAVE_BANKED(und)
@@ -78,16 +77,13 @@ ENTRY(return_from_trap)
 	and r11, #PSR_MODE_MASK
 	cmp r11, #PSR_MODE_HYP
 	beq return_to_hypervisor
-
+	/* Fall thru */
 ENTRY(return_to_guest)
 	mov r11, sp
 	bic sp, #7 /* Align the stack pointer */
 	bl leave_hypervisor_tail
-	ldr r11, [sp, #UREGS_pc]
-	msr ELR_hyp, r11
-	ldr r11, [sp, #UREGS_cpsr]
-	msr SPSR_hyp, r11
 	RESTORE_ONE_BANKED(SP_usr)
+	/* LR_usr is the same physical register as lr and is restored below */
 	RESTORE_BANKED(svc)
 	RESTORE_BANKED(abt)
 	RESTORE_BANKED(und)
@@ -95,11 +91,7 @@ ENTRY(return_to_guest)
 	RESTORE_BANKED(fiq)
 	RESTORE_ONE_BANKED(R8_fiq); RESTORE_ONE_BANKED(R9_fiq); RESTORE_ONE_BANKED(R10_fiq)
 	RESTORE_ONE_BANKED(R11_fiq); RESTORE_ONE_BANKED(R12_fiq);
-	ldr lr, [sp, #UREGS_LR_usr]
-	pop {r0-r12}
-	add sp, #(UREGS_R8_fiq - UREGS_sp); /* SP, LR, SPSR, PC */
-	eret
-
+	/* Fall thru */
 ENTRY(return_to_hypervisor)
 	ldr lr, [sp, #UREGS_lr]
 	ldr r11, [sp, #UREGS_pc]
