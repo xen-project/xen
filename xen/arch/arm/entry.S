@@ -102,6 +102,10 @@ ENTRY(return_to_guest)
 
 ENTRY(return_to_hypervisor)
 	ldr lr, [sp, #UREGS_lr]
+	ldr r11, [sp, #UREGS_pc]
+	msr ELR_hyp, r11
+	ldr r11, [sp, #UREGS_cpsr]
+	msr SPSR_hyp, r11
 	pop {r0-r12}
 	add sp, #(UREGS_R8_fiq - UREGS_sp); /* SP, LR, SPSR, PC */
 	eret
