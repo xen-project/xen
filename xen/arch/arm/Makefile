@@ -28,6 +28,10 @@ obj-y += vtimer.o
 ifdef CONFIG_DTB_FILE
 obj-y += dtb.o
 AFLAGS += -DCONFIG_DTB_FILE=\"$(CONFIG_DTB_FILE)\"
+else
+# XXX: When running on the model there is no bootloader to provide a
+# device tree.  It must be linked into Xen.
+$(error CONFIG_DTB_FILE must be set to the absolute filename of a DTB)
 endif
 
 ALL_OBJS := head.o $(ALL_OBJS)

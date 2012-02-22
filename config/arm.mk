@@ -16,9 +16,3 @@ LDFLAGS_DIRECT_Linux = _linux
 LDFLAGS_DIRECT += -marmelf$(LDFLAGS_DIRECT_$(XEN_OS))_eabi
 
 CONFIG_LOAD_ADDRESS ?= 0x80000000
-
-# XXX: When running on the model there is no bootloader to provide a
-# device tree.  It must be linked into Xen.
-ifndef CONFIG_DTB_FILE
-$(error CONFIG_DTB_FILE must be set to the absolute filename of a DTB)
-endif
