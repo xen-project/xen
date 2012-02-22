@@ -28,9 +28,7 @@
     (diff == 0);                                                              \
 })
 
-#define return_reg(v) ((v)->arch.user_regs.r0)
-
-#define CTXT_SWITCH_STACK_BYTES (sizeof(struct cpu_user_regs))
+#define return_reg(v) ((v)->arch.cpu_info->guest_cpu_user_regs.r0)
 
 #endif /* __ARM_REGS_H__ */
 /*

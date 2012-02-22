@@ -5,6 +5,7 @@
 #include <xen/domain_page.h>
 #include <xen/sched.h>
 #include <asm/irq.h>
+#include <asm/regs.h>
 
 #include "gic.h"
 #include "kernel.h"
@@ -71,7 +72,7 @@ int construct_dom0(struct domain *d)
     int rc;
 
     struct vcpu *v = d->vcpu[0];
-    struct cpu_user_regs *regs = &v->arch.user_regs;
+    struct cpu_user_regs *regs = &v->arch.cpu_info->guest_cpu_user_regs;
 
     /* Sanity! */
     BUG_ON(d->domain_id != 0);

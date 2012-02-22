@@ -191,6 +191,8 @@ static inline int local_fiq_is_enabled(void)
     return !!(flags & PSR_FIQ_MASK);
 }
 
+extern struct vcpu *__context_switch(struct vcpu *prev, struct vcpu *next);
+
 #endif
 /*
  * Local variables:

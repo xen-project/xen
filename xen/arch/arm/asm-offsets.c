@@ -7,6 +7,7 @@
 
 #include <xen/config.h>
 #include <xen/types.h>
+#include <xen/sched.h>
 #include <public/xen.h>
 #include <asm/current.h>
 
@@ -65,7 +66,10 @@ void __dummy__(void)
    BLANK();
 
    DEFINE(CPUINFO_sizeof, sizeof(struct cpu_info));
+
+   OFFSET(VCPU_arch_saved_context, struct vcpu, arch.saved_context);
 }
+
 /*
  * Local variables:
  * mode: C

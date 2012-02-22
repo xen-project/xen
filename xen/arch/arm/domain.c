@@ -44,7 +44,7 @@ void idle_loop(void)
 
 static void ctxt_switch_from(struct vcpu *p)
 {
-
+    context_saved(p);
 }
 
 static void ctxt_switch_to(struct vcpu *n)
@@ -52,52 +52,36 @@ static void ctxt_switch_to(struct vcpu *n)
     p2m_load_VTTBR(n->domain);
 }
 
-static void __context_switch(void)
+static void schedule_tail(struct vcpu *prev)
 {
-    struct cpu_user_regs *stack_regs = guest_cpu_user_regs();
-    unsigned int          cpu = smp_processor_id();
-    struct vcpu          *p = per_cpu(curr_vcpu, cpu);
-    struct vcpu          *n = current;
+    /* Re-enable interrupts before restoring state which may fault. */
+    local_irq_enable();
 
-    ASSERT(p != n);
-    ASSERT(cpumask_empty(n->vcpu_dirty_cpumask));
+    ctxt_switch_from(prev);
 
-    if ( !is_idle_vcpu(p) )
-    {
-        memcpy(&p->arch.user_regs, stack_regs, CTXT_SWITCH_STACK_BYTES);
-        ctxt_switch_from(p);
-    }
-
-    if ( !is_idle_vcpu(n) )
-    {
-        memcpy(stack_regs, &n->arch.user_regs, CTXT_SWITCH_STACK_BYTES);
-        ctxt_switch_to(n);
-    }
-
-    per_cpu(curr_vcpu, cpu) = n;
-
+    /* TODO
+       update_runstate_area(current);
+    */
+    ctxt_switch_to(current);
 }
 
-static void schedule_tail(struct vcpu *v)
+static void continue_new_vcpu(struct vcpu *prev)
 {
-    if ( is_idle_vcpu(v) )
-        continue_idle_domain(v);
+    schedule_tail(prev);
+
+    if ( is_idle_vcpu(current) )
+        continue_idle_domain(current);
     else
-        continue_nonidle_domain(v);
+        continue_nonidle_domain(current);
 }
 
 void context_switch(struct vcpu *prev, struct vcpu *next)
 {
-    unsigned int cpu = smp_processor_id();
-
     ASSERT(local_irq_is_enabled());
-
-    printk("context switch %d:%d%s -> %d:%d%s\n",
-           prev->domain->domain_id, prev->vcpu_id, is_idle_vcpu(prev) ? " (idle)" : "",
-           next->domain->domain_id, next->vcpu_id, is_idle_vcpu(next) ? " (idle)" : "");
+    ASSERT(prev != next);
+    ASSERT(cpumask_empty(next->vcpu_dirty_cpumask));
 
     /* TODO
-       if (prev != next)
        update_runstate_area(prev);
     */
 
@@ -105,60 +89,19 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     set_current(next);
 
-    if ( (per_cpu(curr_vcpu, cpu) == next) ||
-         (is_idle_vcpu(next) && cpu_online(cpu)) )
-    {
-        local_irq_enable();
-    }
-    else
-    {
-        __context_switch();
+    prev = __context_switch(prev, next);
 
-        /* Re-enable interrupts before restoring state which may fault. */
-        local_irq_enable();
-    }
-
-    context_saved(prev);
-
-    /* TODO
-       if (prev != next)
-       update_runstate_area(next);
-    */
-
-    schedule_tail(next);
-    BUG();
-
+    schedule_tail(prev);
 }
 
 void continue_running(struct vcpu *same)
 {
-    schedule_tail(same);
-    BUG();
-}
-
-int __sync_local_execstate(void)
-{
-    unsigned long flags;
-    int switch_required;
-
-    local_irq_save(flags);
-
-    switch_required = (this_cpu(curr_vcpu) != current);
-
-    if ( switch_required )
-    {
-        ASSERT(current == idle_vcpu[smp_processor_id()]);
-        __context_switch();
-    }
-
-    local_irq_restore(flags);
-
-    return switch_required;
+    /* Nothing to do */
 }
 
 void sync_local_execstate(void)
 {
-    (void)__sync_local_execstate();
+    /* Nothing to do -- no lazy switching */
 }
 
 void startup_cpu_idle_loop(void)
@@ -213,6 +156,18 @@ int vcpu_initialise(struct vcpu *v)
 {
     int rc = 0;
 
+    v->arch.stack = alloc_xenheap_pages(STACK_ORDER, MEMF_node(vcpu_to_node(v)));
+    if ( v->arch.stack == NULL )
+        return -ENOMEM;
+
+    v->arch.cpu_info = (struct cpu_info *)(v->arch.stack
+                                           + STACK_SIZE
+                                           - sizeof(struct cpu_info));
+
+    memset(&v->arch.saved_context, 0, sizeof(v->arch.saved_context));
+    v->arch.saved_context.sp = (uint32_t)v->arch.cpu_info;
+    v->arch.saved_context.pc = (uint32_t)continue_new_vcpu;
+
     if ( (rc = vcpu_vgic_init(v)) != 0 )
         return rc;
 
@@ -224,7 +179,7 @@ int vcpu_initialise(struct vcpu *v)
 
 void vcpu_destroy(struct vcpu *v)
 {
-
+    free_xenheap_pages(v->arch.stack, STACK_ORDER);
 }
 
 int arch_domain_create(struct domain *d, unsigned int domcr_flags)

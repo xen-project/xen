@@ -42,7 +42,7 @@
 static unsigned int __initdata max_cpus = NR_CPUS;
 
 /* Xen stack for bringing up the first CPU. */
-unsigned char init_stack[STACK_SIZE] __attribute__((__aligned__(STACK_SIZE)));
+unsigned char __initdata init_stack[STACK_SIZE] __attribute__((__aligned__(STACK_SIZE)));
 
 extern char __init_begin[], __init_end[], __bss_start[];
 
@@ -61,7 +61,6 @@ static void __init init_idle_domain(void)
 {
         scheduler_init();
         set_current(idle_vcpu[0]);
-        this_cpu(curr_vcpu) = current;
         /* TODO: setup_idle_pagetable(); */
 }
 
@@ -175,7 +174,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     console_init_preirq();
 #endif
 
-    set_current((struct vcpu *)0xfffff000); /* debug sanity */
+    __set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
     set_processor_id(0); /* needed early, for smp_processor_id() */
 

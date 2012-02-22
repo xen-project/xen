@@ -105,3 +105,19 @@ ENTRY(return_to_hypervisor)
 	pop {r0-r12}
 	add sp, #(UREGS_R8_fiq - UREGS_sp); /* SP, LR, SPSR, PC */
 	eret
+
+/*
+ * struct vcpu *__context_switch(struct vcpu *prev, struct vcpu *next)
+ *
+ * r0 - prev
+ * r1 - next
+ *
+ * Returns prev in r0
+ */
+ENTRY(__context_switch)
+	add     ip, r0, #VCPU_arch_saved_context
+	stmia   ip!, {r4 - sl, fp, sp, lr}      /* Save register state */
+
+	add     r4, r1, #VCPU_arch_saved_context
+	ldmia   r4, {r4 - sl, fp, sp, pc}       /* Load registers and return */
+

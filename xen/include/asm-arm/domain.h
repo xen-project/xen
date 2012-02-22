@@ -47,7 +47,26 @@ struct arch_domain
 
 struct arch_vcpu
 {
-    struct cpu_user_regs user_regs;
+    struct {
+        uint32_t    r4;
+        uint32_t    r5;
+        uint32_t    r6;
+        uint32_t    r7;
+        uint32_t    r8;
+        uint32_t    r9;
+        uint32_t    sl;
+        uint32_t    fp;
+        uint32_t    sp;
+        uint32_t    pc;
+    } saved_context;
+
+    void *stack;
+
+    /*
+     * Points into ->stack, more convenient than doing pointer arith
+     * all the time.
+     */
+    struct cpu_info *cpu_info;
 
     uint32_t sctlr;
     uint32_t ttbr0, ttbr1, ttbcr;
