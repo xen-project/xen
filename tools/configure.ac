@@ -29,7 +29,6 @@ m4_include([m4/path_or_fail.m4])
 m4_include([m4/python_xml.m4])
 m4_include([m4/python_version.m4])
 m4_include([m4/python_devel.m4])
-m4_include([m4/udev.m4])
 m4_include([m4/ocaml.m4])
 m4_include([m4/default_lib.m4])
 m4_include([m4/set_cflags_ldflags.m4])
@@ -107,7 +106,6 @@ AS_IF([test "x$pythontools" = "xy"], [
     AX_CHECK_PYTHON_DEVEL()
 ])
 AX_PATH_PROG_OR_FAIL([XGETTEXT], [xgettext])
-AX_CHECK_UDEV([59])
 AX_CHECK_UUID
 PKG_CHECK_MODULES(glib, glib-2.0)
 
