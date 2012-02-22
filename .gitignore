@@ -105,6 +105,12 @@ stubdom/lwip/
 stubdom/ioemu/
 stubdom/stubdompath.sh
 tools/*/build/lib*/*.py
+tools/autom4te.cache
+tools/config.h
+tools/config.log
+tools/config.status
+tools/config.cache
+config/Tools.mk
 tools/blktap2/daemon/blktapctrl
 tools/blktap2/drivers/img2qcow
 tools/blktap2/drivers/lock-util
