@@ -64,6 +64,10 @@ AC_ARG_VAR([CURL], [Path to curl-config tool])
 AC_ARG_VAR([XML], [Path to xml2-config tool])
 AC_ARG_VAR([BASH], [Path to bash shell])
 AC_ARG_VAR([XGETTEXT], [Path to xgetttext tool])
+AC_ARG_VAR([AS86], [Path to as86 tool])
+AC_ARG_VAR([LD86], [Path to ld86 tool])
+AC_ARG_VAR([BCC], [Path to bcc tool])
+AC_ARG_VAR([IASL], [Path to iasl tool])
 
 # Checks for programs.
 AC_PROG_SED
@@ -96,6 +100,10 @@ AS_IF([test "x$pythontools" = "xy"], [
     AX_CHECK_PYTHON_DEVEL()
 ])
 AX_PATH_PROG_OR_FAIL([XGETTEXT], [xgettext])
+AX_PATH_PROG_OR_FAIL([AS86], [as86])
+AX_PATH_PROG_OR_FAIL([LD86], [ld86])
+AX_PATH_PROG_OR_FAIL([BCC], [bcc])
+AX_PATH_PROG_OR_FAIL([IASL], [iasl])
 AX_CHECK_UUID
 AX_CHECK_CURSES
 PKG_CHECK_MODULES(glib, glib-2.0)

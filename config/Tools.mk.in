@@ -15,6 +15,10 @@ CURL_CONFIG         := @CURL@
 XML2_CONFIG         := @XML@
 BASH                := @BASH@
 XGETTTEXT           := @XGETTEXT@
+AS86                := @AS86@
+LD86                := @LD86@
+BCC                 := @BCC@
+IASL                := @IASL@
 
 # Extra folder for libs/includes
 PREPEND_INCLUDES    := @PREPEND_INCLUDES@
