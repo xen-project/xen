@@ -611,10 +611,6 @@ glib_CFLAGS
 PKG_CONFIG_LIBDIR
 PKG_CONFIG_PATH
 PKG_CONFIG
-VNCONFIG
-HOTPLUG
-UDEVINFO
-UDEVADM
 PYTHONPATH
 OCAMLBUILD
 OCAMLDOC
@@ -642,7 +638,6 @@ CURL
 FLEX
 BISON
 IP
-BRCTL
 PERL
 PYTHON
 APPEND_LIB
@@ -744,7 +739,6 @@ APPEND_INCLUDES
 APPEND_LIB
 PYTHON
 PERL
-BRCTL
 IP
 BISON
 FLEX
@@ -1400,7 +1394,6 @@ Some influential environment variables:
   APPEND_LIB  List of library folders to append to LDFLAGS (without -L)
   PYTHON      Path to the Python parser
   PERL        Path to Perl parser
-  BRCTL       Path to brctl tool
   IP          Path to ip tool
   BISON       Path to Bison parser generator
   FLEX        Path to Flex lexical analyser generator
@@ -3858,8 +3851,6 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 
-
-
 # pkg.m4 - Macros to locate and utilise pkg-config.            -*- Autoconf -*-
 # serial 1 (pkg-config-0.24)
 #
@@ -4157,7 +4148,6 @@ do
 done
 CFLAGS="$PREPEND_CFLAGS $CFLAGS $APPEND_CFLAGS"
 LDFLAGS="$PREPEND_LDFLAGS $LDFLAGS $APPEND_LDFLAGS"
-
 
 
 
@@ -4958,51 +4948,6 @@ fi
 if test x"${PERL}" == x"no"
 then
     as_fn_error $? "Unable to find perl, please install perl" "$LINENO" 5
-fi
-# Extract the first word of "brctl", so it can be a program name with args.
-set dummy brctl; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_BRCTL+set}" = set; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $BRCTL in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_BRCTL="$BRCTL" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_BRCTL="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_BRCTL" && ac_cv_path_BRCTL="no"
-  ;;
-esac
-fi
-BRCTL=$ac_cv_path_BRCTL
-if test -n "$BRCTL"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $BRCTL" >&5
-$as_echo "$BRCTL" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-if test x"${BRCTL}" == x"no"
-then
-    as_fn_error $? "Unable to find brctl, please install brctl" "$LINENO" 5
 fi
 # Extract the first word of "ip", so it can be a program name with args.
 set dummy ip; ac_word=$2
@@ -6438,196 +6383,6 @@ if test x"${XGETTEXT}" == x"no"
 then
     as_fn_error $? "Unable to find xgettext, please install xgettext" "$LINENO" 5
 fi
-if test "x$host_os" == "xlinux-gnu"
-then
-    # Extract the first word of "udevadm", so it can be a program name with args.
-set dummy udevadm; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_UDEVADM+set}" = set; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $UDEVADM in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_UDEVADM="$UDEVADM" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_UDEVADM="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_UDEVADM" && ac_cv_path_UDEVADM="no"
-  ;;
-esac
-fi
-UDEVADM=$ac_cv_path_UDEVADM
-if test -n "$UDEVADM"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $UDEVADM" >&5
-$as_echo "$UDEVADM" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-    if test x"${UDEVADM}" == x"no"
-    then
-        # Extract the first word of "udevinfo", so it can be a program name with args.
-set dummy udevinfo; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_UDEVINFO+set}" = set; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $UDEVINFO in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_UDEVINFO="$UDEVINFO" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_UDEVINFO="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_UDEVINFO" && ac_cv_path_UDEVINFO="no"
-  ;;
-esac
-fi
-UDEVINFO=$ac_cv_path_UDEVINFO
-if test -n "$UDEVINFO"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $UDEVINFO" >&5
-$as_echo "$UDEVINFO" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-        if test x"${UDEVINFO}" == x"no"
-        then
-            as_fn_error $? "Unable to find udevadm or udevinfo, please install udev" "$LINENO" 5
-        fi
-        udevver=`${UDEVINFO} -V | awk '{print $NF}'`
-    else
-        udevver=`${UDEVADM} info -V | awk '{print $NF}'`
-    fi
-    if test ${udevver} -lt 59
-    then
-        # Extract the first word of "hotplug", so it can be a program name with args.
-set dummy hotplug; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_HOTPLUG+set}" = set; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $HOTPLUG in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_HOTPLUG="$HOTPLUG" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_HOTPLUG="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_HOTPLUG" && ac_cv_path_HOTPLUG="no"
-  ;;
-esac
-fi
-HOTPLUG=$ac_cv_path_HOTPLUG
-if test -n "$HOTPLUG"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $HOTPLUG" >&5
-$as_echo "$HOTPLUG" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-        if test x"${HOTPLUG}" == x"no"
-        then
-            as_fn_error $? "udev is too old, upgrade to version 59 or later" "$LINENO" 5
-        fi
-    fi
-else
-    # Extract the first word of "vnconfig", so it can be a program name with args.
-set dummy vnconfig; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_VNCONFIG+set}" = set; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $VNCONFIG in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_VNCONFIG="$VNCONFIG" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_VNCONFIG="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_VNCONFIG" && ac_cv_path_VNCONFIG="no"
-  ;;
-esac
-fi
-VNCONFIG=$ac_cv_path_VNCONFIG
-if test -n "$VNCONFIG"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $VNCONFIG" >&5
-$as_echo "$VNCONFIG" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-    if test x"${VNCONFIG}" == x"no"
-    then
-        as_fn_error $? "Not a Linux system and unable to find vnd" "$LINENO" 5
-    fi
-fi
-
 if test "x$host_os" == "xlinux-gnu"
 then
     ac_fn_c_check_header_mongrel "$LINENO" "uuid/uuid.h" "ac_cv_header_uuid_uuid_h" "$ac_includes_default"
