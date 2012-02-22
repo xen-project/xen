@@ -22,12 +22,12 @@ MAJOR = 1.0
 MINOR = 0
 
 CFLAGS += -Iinclude                     \
-          $(shell xml2-config --cflags) \
-          $(shell curl-config --cflags) \
+          $(shell $(XML2_CONFIG) --cflags) \
+          $(shell $(CURL_CONFIG) --cflags) \
           -fPIC
 
-LDFLAGS += $(shell xml2-config --libs) \
-           $(shell curl-config --libs)
+LDFLAGS += $(shell $(XML2_CONFIG) --libs) \
+           $(shell $(CURL_CONFIG) --libs)
 
 LIBXENAPI_HDRS = $(wildcard include/xen/api/*.h) include/xen/api/xen_all.h
 LIBXENAPI_OBJS = $(patsubst %.c, %.o, $(wildcard src/*.c))

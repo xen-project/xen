@@ -6,7 +6,6 @@ SUBDIRS-libaio := libaio
 endif
 
 SUBDIRS-y :=
-SUBDIRS-y += check
 SUBDIRS-y += include
 SUBDIRS-y += libxc
 SUBDIRS-y += flask
@@ -79,6 +78,8 @@ clean: subdirs-clean
 distclean: subdirs-distclean
 	rm -rf qemu-xen-traditional-dir qemu-xen-traditional-dir-remote
 	rm -rf qemu-xen-dir qemu-xen-dir-remote
+	rm -rf ../config/Tools.mk config.h config.log config.status \
+		config.cache autom4te.cache
 
 ifneq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
 IOEMU_CONFIGURE_CROSS ?= --cpu=$(XEN_TARGET_ARCH) \

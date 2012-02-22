@@ -19,10 +19,6 @@ ifeq ($(CONFIG_Linux),y)
 LIBUUID_LIBS += -luuid
 endif
 
-ifeq ($(CONFIG_YAJL_VERSION),y)
-CFLAGS += -DHAVE_YAJL_VERSION
-endif
-
 LIBXL_LIBS =
 LIBXL_LIBS = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(LDLIBS_libblktapctl) $(UTIL_LIBS) $(LIBUUID_LIBS)
 
@@ -56,7 +52,7 @@ LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_qmp.o libxl_event.o $(LIBXL_OBJS-y)
 LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
 
-$(LIBXL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl)
+$(LIBXL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl) -include $(XEN_ROOT)/tools/config.h
 
 AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h
 AUTOSRCS= libxlu_cfg_y.c libxlu_cfg_l.c
@@ -69,6 +65,7 @@ CLIENTS = xl testidl
 XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o xl_sxp.o
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenlight)
+$(XL_OBJS): CFLAGS += -include $(XEN_ROOT)/tools/config.h # libxl_json.h needs it.
 
 testidl.o: CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenlight)
 testidl.c: libxl_types.idl gentest.py libxl.h $(AUTOINCS)

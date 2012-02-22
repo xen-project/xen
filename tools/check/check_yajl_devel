@@ -1,8 +1,0 @@
-#!/bin/sh
-# CHECK-BUILD
-
-. ./funcs.sh
-
-has_header yajl/yajl_parse.h || fail "can't find yajl/yajl_parse.h"
-has_header yajl/yajl_gen.h || fail "can't find yajl/yajl_gen.h"
-has_lib libyajl.so || fail "can't find libyajl.so"

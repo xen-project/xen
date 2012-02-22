@@ -1,0 +1,50 @@
+# Prefix and install folder
+PREFIX              := @prefix@
+LIBLEAFDIR_x86_64   := @LIB_PATH@
+
+# A debug build of tools?
+debug               := @debug@
+
+# Tools path
+BISON               := @BISON@
+FLEX                := @FLEX@
+PYTHON              := @PYTHON@
+PYTHON_PATH         := @PYTHONPATH@
+PERL                := @PERL@
+BRCTL               := @BRCTL@
+IP                  := @IP@
+CURL_CONFIG         := @CURL@
+XML2_CONFIG         := @XML@
+BASH                := @BASH@
+XGETTTEXT           := @XGETTEXT@
+
+# Extra folder for libs/includes
+PREPEND_INCLUDES    := @PREPEND_INCLUDES@
+PREPEND_LIB         := @PREPEND_LIB@
+APPEND_INCLUDES     := @APPEND_INCLUDES@
+APPEND_LIB          := @APPEND_LIB@
+
+# Enable XSM security module (by default, Flask).
+XSM_ENABLE          := @xsm@
+FLASK_ENABLE        := @xsm@
+
+# Download GIT repositories via HTTP or GIT's own protocol?
+# GIT's protocol is faster and more robust, when it works at all (firewalls
+# may block it). We make it the default, but if your GIT repository downloads
+# fail or hang, please specify GIT_HTTP=y in your environment.
+GIT_HTTP            := @githttp@
+
+# Optional components
+XENSTAT_XENTOP      := @monitors@
+VTPM_TOOLS          := @vtpm@
+LIBXENAPI_BINDINGS  := @xapi@
+PYTHON_TOOLS        := @pythontools@
+OCAML_TOOLS         := @ocamltools@
+CONFIG_MINITERM     := @miniterm@
+CONFIG_LOMOUNT      := @lomount@
+
+#System options
+CONFIG_SYSTEM_LIBAIO:= @system_aio@
+CONFIG_LIBICONV     := @libiconv@
+CONFIG_GCRYPT       := @libgcrypt@
+CONFIG_EXT2FS       := @libext2fs@

@@ -70,9 +70,6 @@ EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
 EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBLEAFDIR)
 endif
 
-BISON	?= bison
-FLEX	?= flex
-
 PYTHON      ?= python
 PYTHON_PREFIX_ARG ?= --prefix="$(PREFIX)"
 # The above requires that PREFIX contains *no spaces*. This variable is here
@@ -175,31 +172,8 @@ CFLAGS += $(foreach i, $(PREPEND_INCLUDES), -I$(i))
 APPEND_LDFLAGS += $(foreach i, $(APPEND_LIB), -L$(i))
 APPEND_CFLAGS += $(foreach i, $(APPEND_INCLUDES), -I$(i))
 
-CHECK_LIB = $(EXTRA_LIB) $(PREPEND_LIB) $(APPEND_LIB)
-CHECK_INCLUDES = $(EXTRA_INCLUDES) $(PREPEND_INCLUDES) $(APPEND_INCLUDES)
-
 EMBEDDED_EXTRA_CFLAGS := -nopie -fno-stack-protector -fno-stack-protector-all
 EMBEDDED_EXTRA_CFLAGS += -fno-exceptions
-
-CONFIG_LIBICONV   := $(shell export OS="`uname -s`"; \
-                       export CHECK_LIB="$(CHECK_LIB)"; \
-                       . $(XEN_ROOT)/tools/check/funcs.sh; \
-                       has_lib libiconv.so && echo 'y' || echo 'n')
-
-CONFIG_YAJL_VERSION := $(shell export OS="`uname -s`"; \
-                       export CHECK_INCLUDES="$(CHECK_INCLUDES)"; \
-                       . $(XEN_ROOT)/tools/check/funcs.sh; \
-                       has_header yajl/yajl_version.h && echo 'y' || echo 'n')
-
-# Enable XSM security module (by default, Flask).
-XSM_ENABLE ?= n
-FLASK_ENABLE ?= $(XSM_ENABLE)
-
-# Download GIT repositories via HTTP or GIT's own protocol?
-# GIT's protocol is faster and more robust, when it works at all (firewalls
-# may block it). We make it the default, but if your GIT repository downloads
-# fail or hang, please specify GIT_HTTP=y in your environment.
-GIT_HTTP ?= n
 
 XEN_EXTFILES_URL=http://xenbits.xensource.com/xen-extfiles
 # All the files at that location were downloaded from elsewhere on
@@ -239,17 +213,4 @@ QEMU_TAG ?= 128de2549c5f24e4a437b86bd2e46f023976d50a
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
 
-# Optional components
-XENSTAT_XENTOP     ?= y
-VTPM_TOOLS         ?= n
-LIBXENAPI_BINDINGS ?= n
-PYTHON_TOOLS       ?= y
-OCAML_TOOLS        ?= y
-CONFIG_MINITERM    ?= n
-CONFIG_LOMOUNT     ?= n
-CONFIG_SYSTEM_LIBAIO ?= y
 CONFIG_TESTS       ?= y
-
-ifeq ($(OCAML_TOOLS),y)
-OCAML_TOOLS := $(shell ocamlopt -v > /dev/null 2>&1 && echo "y" || echo "n")
-endif

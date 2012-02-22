@@ -40,11 +40,10 @@ dist: DESTDIR=$(DISTDIR)/install
 dist: dist-xen dist-kernels dist-tools dist-stubdom dist-docs dist-misc
 
 dist-misc:
-	$(INSTALL_DIR) $(DISTDIR)/check
+	$(INSTALL_DIR) $(DISTDIR)/
 	$(INSTALL_DATA) ./COPYING $(DISTDIR)
 	$(INSTALL_DATA) ./README $(DISTDIR)
 	$(INSTALL_PROG) ./install.sh $(DISTDIR)
-	$(INSTALL_PROG) tools/check/chk tools/check/check_* tools/check/funcs.sh $(DISTDIR)/check
 dist-%: DESTDIR=$(DISTDIR)/install
 dist-%: install-%
 	@: # do nothing

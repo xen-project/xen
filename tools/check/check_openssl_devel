@@ -1,6 +1,0 @@
-#!/bin/sh
-# CHECK-BUILD
-
-. ./funcs.sh
-
-has_header openssl/md5.h || fail "missing openssl headers"

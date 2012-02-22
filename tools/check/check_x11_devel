@@ -1,9 +1,0 @@
-#!/bin/sh
-# CHECK-BUILD
-
-. ./funcs.sh
-
-has_header X11/keysymdef.h || \
-has_header /usr/X11R6/include/X11/keysymdef.h || \
-has_header /usr/X11R7/include/X11/keysymdef.h || \
-warning "can't find X11 headers"

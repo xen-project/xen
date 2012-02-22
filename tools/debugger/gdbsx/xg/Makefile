@@ -21,7 +21,6 @@ xg_all.a: $(XG_OBJS) Makefile $(XG_HDRS)
 #	$(CC) -m32 -c -o $@ $^
 
 xen-headers:
-	$(MAKE) -C ../../../check 
 	$(MAKE) -C ../../../include
 
 # xg_main.o: xg_main.c Makefile $(XG_HDRS)

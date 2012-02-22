@@ -18,7 +18,7 @@
 #include <yajl/yajl_gen.h>
 #include <yajl/yajl_parse.h>
 
-#ifdef HAVE_YAJL_VERSION
+#ifdef HAVE_YAJL_YAJL_VERSION_H
 #  include <yajl/yajl_version.h>
 #endif
 

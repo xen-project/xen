@@ -4,6 +4,7 @@
 all:
 
 include $(XEN_ROOT)/Config.mk
+include $(XEN_ROOT)/config/Tools.mk
 
 export _INSTALL := $(INSTALL)
 INSTALL = $(XEN_ROOT)/tools/cross-install
@@ -80,8 +81,6 @@ check-$(CONFIG_X86) = $(call cc-ver-check,CC,0x030400,\
                         "Xen requires at least gcc-3.4")
 $(eval $(check-y))
 
-_PYTHON_PATH := $(shell which $(PYTHON))
-PYTHON_PATH ?= $(_PYTHON_PATH)
 INSTALL_PYTHON_PROG = \
 	$(XEN_ROOT)/tools/python/install-wrap "$(PYTHON_PATH)" $(INSTALL_PROG)
 
@@ -109,3 +108,7 @@ subdir-all-% subdir-clean-% subdir-install-%: .phony
 
 subdir-distclean-%: .phony
 	$(MAKE) -C $* clean
+
+$(XEN_ROOT)/config/Tools.mk:
+	@echo "You have to run ./configure before building or installing the tools"
+	@exit 1

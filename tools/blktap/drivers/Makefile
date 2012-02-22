@@ -13,7 +13,7 @@ CFLAGS   += $(CFLAGS_libxenstore)
 CFLAGS   += -I $(MEMSHR_DIR)
 CFLAGS   += -D_GNU_SOURCE
 
-ifeq ($(shell . ./check_gcrypt $(CC)),yes)
+ifeq ($CONFIG_GCRYPT,y)
 CFLAGS += -DUSE_GCRYPT
 CRYPT_LIB := -lgcrypt
 else

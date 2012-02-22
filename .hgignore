@@ -303,6 +303,12 @@
 ^tools/ocaml/libs/xl/xenlight\.ml$
 ^tools/ocaml/libs/xl/xenlight\.mli$
 ^tools/ocaml/xenstored/oxenstored$
+^tools/autom4te\.cache$
+^tools/config\.h$
+^tools/config\.log$
+^tools/config\.status$
+^tools/config\.cache$
+^config/Tools\.mk$
 ^xen/\.banner.*$
 ^xen/BLOG$
 ^xen/System.map$

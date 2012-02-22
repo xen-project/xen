@@ -1,6 +1,0 @@
-#!/bin/sh
-# CHECK-BUILD
-
-. ./funcs.sh
-
-has_header zlib.h || fail "can't find zlib headers"
