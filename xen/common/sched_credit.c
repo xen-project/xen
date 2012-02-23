@@ -1504,6 +1504,7 @@ csched_dump(const struct scheduler *ops)
            "\trunq_sort          = %u\n"
            "\tdefault-weight     = %d\n"
            "\ttslice             = %dms\n"
+           "\tratelimit          = %dus\n"
            "\tcredits per msec   = %d\n"
            "\tticks per tslice   = %d\n"
            "\tmigration delay    = %uus\n",
@@ -1515,6 +1516,7 @@ csched_dump(const struct scheduler *ops)
            prv->runq_sort,
            CSCHED_DEFAULT_WEIGHT,
            prv->tslice_ms,
+           prv->ratelimit_us,
            CSCHED_CREDITS_PER_MSEC,
            prv->ticks_per_tslice,
            vcpu_migration_delay);
