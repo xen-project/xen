@@ -424,9 +424,15 @@ int __init verify_local_APIC(void)
      */
     if ( reg0 & APIC_LVR_DIRECTED_EOI )
     {
-        ioapic_ack_new = 0;
-        directed_eoi_enabled = 1;
-        printk("Enabled directed EOI with ioapic_ack_old on!\n");
+        if ( ioapic_ack_new == 1 && ioapic_ack_forced == 1 )
+            printk("Not enabling directed EOI because ioapic_ack_new has been "
+                   "forced on the command line\n");
+        else
+        {
+            ioapic_ack_new = 0;
+            directed_eoi_enabled = 1;
+            printk("Enabled directed EOI with ioapic_ack_old on!\n");
+        }
     }
 
     /*

@@ -180,6 +180,7 @@ static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned 
 /* 1 if "noapic" boot option passed */
 extern bool_t skip_ioapic_setup;
 extern bool_t ioapic_ack_new;
+extern bool_t ioapic_ack_forced;
 
 #ifdef CONFIG_ACPI_BOOT
 extern int io_apic_get_unique_id (int ioapic, int apic_id);
