@@ -564,6 +564,19 @@ struct xen_sysctl_arinc653_schedule {
 typedef struct xen_sysctl_arinc653_schedule xen_sysctl_arinc653_schedule_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_arinc653_schedule_t);
 
+struct xen_sysctl_credit_schedule {
+    /* Length of timeslice in milliseconds */
+#define XEN_SYSCTL_CSCHED_TSLICE_MAX 1000
+#define XEN_SYSCTL_CSCHED_TSLICE_MIN 1
+    unsigned tslice_ms;
+    /* Rate limit (minimum timeslice) in microseconds */
+#define XEN_SYSCTL_SCHED_RATELIMIT_MAX 500000
+#define XEN_SYSCTL_SCHED_RATELIMIT_MIN 100
+    unsigned ratelimit_us;
+};
+typedef struct xen_sysctl_credit_schedule xen_sysctl_credit_schedule_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_credit_schedule_t);
+
 /* XEN_SYSCTL_scheduler_op */
 /* Set or get info? */
 #define XEN_SYSCTL_SCHEDOP_putinfo 0
@@ -576,6 +589,7 @@ struct xen_sysctl_scheduler_op {
         struct xen_sysctl_sched_arinc653 {
             XEN_GUEST_HANDLE_64(xen_sysctl_arinc653_schedule_t) schedule;
         } sched_arinc653;
+        struct xen_sysctl_credit_schedule sched_credit;
     } u;
 };
 typedef struct xen_sysctl_scheduler_op xen_sysctl_scheduler_op_t;
