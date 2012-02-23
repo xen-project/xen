@@ -35,6 +35,8 @@ struct bios_config {
 
 extern struct bios_config rombios_config;
 extern struct bios_config seabios_config;
+extern struct bios_config ovmf32_config;
+extern struct bios_config ovmf64_config;
 
 #define PAGE_SHIFT 12
 #define PAGE_SIZE  (1ul << PAGE_SHIFT)

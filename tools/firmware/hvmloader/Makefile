@@ -37,6 +37,7 @@ endif
 
 CIRRUSVGA_DEBUG ?= n
 
+OVMF_DIR := ../ovmf
 ROMBIOS_DIR := ../rombios
 SEABIOS_DIR := ../seabios-dir
 
@@ -51,6 +52,14 @@ ETHERBOOT_ROMS := $(addprefix ../etherboot/ipxe/src/bin/, $(addsuffix .rom, $(ET
 endif
 
 ROMS := 
+
+ifeq ($(CONFIG_OVMF),y)
+OBJS += ovmf.o
+CFLAGS += -DENABLE_OVMF32 -DENABLE_OVMF64
+OVMF32_ROM := $(OVMF_DIR)/ovmf-ia32.bin
+OVMF64_ROM := $(OVMF_DIR)/ovmf-x64.bin
+ROMS += $(OVMF32_ROM) $(OVMF64_ROM)
+endif
 
 ifeq ($(CONFIG_ROMBIOS),y)
 OBJS += optionroms.o 32bitbios_support.o rombios.o
@@ -70,7 +79,7 @@ endif
 all: subdirs-all
 	$(MAKE) hvmloader
 
-rombios.o seabios.o hvmloader.o: roms.inc
+ovmf.o rombios.o seabios.o hvmloader.o: roms.inc
 smbios.o: CFLAGS += -D__SMBIOS_DATE__="\"$(shell date +%m/%d/%Y)\""
 
 hvmloader: $(OBJS) acpi/acpi.a
@@ -92,6 +101,18 @@ ifneq ($(SEABIOS_ROM),)
 	sh ./mkhex seabios $(SEABIOS_ROM) >> $@.new
 	echo "#endif" >> $@.new
 endif
+
+ifneq ($(OVMF32_ROM),)
+	echo "#ifdef ROM_INCLUDE_OVMF32" >> $@.new
+	sh ./mkhex ovmf32 $(OVMF32_ROM) >> $@.new
+	echo "#endif" >> $@.new	
+endif 
+
+ifneq ($(OVMF64_ROM),)
+	echo "#ifdef ROM_INCLUDE_OVMF64" >> $@.new
+	sh ./mkhex ovmf64 $(OVMF64_ROM) >> $@.new
+	echo "#endif" >> $@.new	
+endif 
 
 ifneq ($(STDVGA_ROM),)
 	echo "#ifdef ROM_INCLUDE_VGABIOS" >> $@.new
