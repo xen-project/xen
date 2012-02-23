@@ -22,6 +22,7 @@
  * DEALINGS IN THE SOFTWARE.
  *
  * Copyright (c) 2003-2004, Keir Fraser
+ * Copyright (c) 2012, Spectra Logic Corporation
  */
 
 #ifndef __XEN_PUBLIC_IO_BLKIF_H__
@@ -48,32 +49,253 @@
 #define blkif_sector_t uint64_t
 
 /*
+ * Feature and Parameter Negotiation
+ * =================================
+ * The two halves of a Xen block driver utilize nodes within the XenStore to
+ * communicate capabilities and to negotiate operating parameters.  This
+ * section enumerates these nodes which reside in the respective front and
+ * backend portions of the XenStore, following the XenBus convention.
+ *
+ * All data in the XenStore is stored as strings.  Nodes specifying numeric
+ * values are encoded in decimal.  Integer value ranges listed below are
+ * expressed as fixed sized integer types capable of storing the conversion
+ * of a properly formated node string, without loss of information.
+ *
+ * Any specified default value is in effect if the corresponding XenBus node
+ * is not present in the XenStore.
+ *
+ * XenStore nodes in sections marked "PRIVATE" are solely for use by the
+ * driver side whose XenBus tree contains them.
+ *
+ * See the XenBus state transition diagram below for details on when XenBus
+ * nodes must be published and when they can be queried.
+ *
+ *****************************************************************************
+ *                            Backend XenBus Nodes
+ *****************************************************************************
+ *
+ *------------------ Backend Device Identification (PRIVATE) ------------------
+ *
+ * mode
+ *      Values:         "r" (read only), "w" (writable)
+ *
+ *      The read or write access permissions to the backing store to be
+ *      granted to the frontend.
+ *
+ * params
+ *      Values:         string
+ *
+ *      A free formatted string providing sufficient information for the
+ *      backend driver to open the backing device.  (e.g. the path to the
+ *      file or block device representing the backing store.)
+ *
+ * type
+ *      Values:         "file", "phy", "tap"
+ *
+ *      The type of the backing device/object.
+ *
+ *--------------------------------- Features ---------------------------------
+ *
+ * feature-barrier
+ *      Values:         0/1 (boolean)
+ *      Default Value:  0
+ *
+ *      A value of "1" indicates that the backend can process requests
+ *      containing the BLKIF_OP_WRITE_BARRIER request opcode.  Requests
+ *      of this type may still be returned at any time with the
+ *      BLKIF_RSP_EOPNOTSUPP result code.
+ *
+ * feature-flush-cache
+ *      Values:         0/1 (boolean)
+ *      Default Value:  0
+ *
+ *      A value of "1" indicates that the backend can process requests
+ *      containing the BLKIF_OP_FLUSH_DISKCACHE request opcode.  Requests
+ *      of this type may still be returned at any time with the
+ *      BLKIF_RSP_EOPNOTSUPP result code.
+ *
+ * feature-discard
+ *      Values:         0/1 (boolean)
+ *      Default Value:  0
+ *
+ *      A value of "1" indicates that the backend can process requests
+ *      containing the BLKIF_OP_DISCARD request opcode.  Requests
+ *      of this type may still be returned at any time with the
+ *      BLKIF_RSP_EOPNOTSUPP result code.
+ *
+ *------------------------- Backend Device Properties -------------------------
+ *
+ * discard-aligment
+ *      Values:         <uint32_t>
+ *      Default Value:  0
+ *      Notes:          1, 2
+ *
+ *      The offset, in bytes from the beginning of the virtual block device,
+ *      to the first, addressable, discard extent on the underlying device.
+ *
+ * discard-granularity
+ *      Values:         <uint32_t>
+ *      Default Value:  <"sector-size">
+ *      Notes:          1
+ *
+ *      The size, in bytes, of the individually addressable discard extents
+ *      of the underlying device.
+ *
+ * discard-secure
+ *      Values:         0/1 (boolean)
+ *      Default Value:  0
+ *
+ *      A value of "1" indicates that the backend can process BLKIF_OP_DISCARD
+ *      requests with the BLKIF_DISCARD_SECURE flag set.
+ *
+ * info
+ *      Values:         <uint32_t> (bitmap)
+ *
+ *      A collection of bit flags describing attributes of the backing
+ *      device.  The VDISK_* macros define the meaning of each bit
+ *      location.
+ *
+ * sector-size
+ *      Values:         <uint32_t>
+ *
+ *      The native sector size, in bytes, of the backend device.
+ *
+ * sectors
+ *      Values:         <uint64_t>
+ *
+ *      The size of the backend device, expressed in units of its native
+ *      sector size ("sector-size").
+ *
+ *****************************************************************************
+ *                            Frontend XenBus Nodes
+ *****************************************************************************
+ *
+ *----------------------- Request Transport Parameters -----------------------
+ *
+ * event-channel
+ *      Values:         <uint32_t>
+ *
+ *      The identifier of the Xen event channel used to signal activity
+ *      in the ring buffer.
+ *
+ * ring-ref
+ *      Values:         <uint32_t>
+ *
+ *      The Xen grant reference granting permission for the backend to map
+ *      the sole page in a single page sized ring buffer.
+ *
+ * protocol
+ *      Values:         string (XEN_IO_PROTO_ABI_*)
+ *      Default Value:  XEN_IO_PROTO_ABI_NATIVE
+ *
+ *      The machine ABI rules governing the format of all ring request and
+ *      response structures.
+ *
+ *------------------------- Virtual Device Properties -------------------------
+ *
+ * device-type
+ *      Values:         "disk", "cdrom", "floppy", etc.
+ *
+ * virtual-device
+ *      Values:         <uint32_t>
+ *
+ *      A value indicating the physical device to virtualize within the
+ *      frontend's domain.  (e.g. "The first ATA disk", "The third SCSI
+ *      disk", etc.)
+ *
+ *      See docs/misc/vbd-interface.txt for details on the format of this
+ *      value.
+ *
+ * Notes
+ * -----
+ * (1) Devices that support discard functionality may internally allocate
+ *     space (discardable extents) in units that are larger than the
+ *     exported logical block size.
+ * (2) The discard-alignment parameter allows a physical device to be
+ *     partitioned into virtual devices that do not necessarily begin or
+ *     end on a discardable extent boundary.
+ */
+
+/*
+ * STATE DIAGRAMS
+ *
+ *****************************************************************************
+ *                                   Startup                                 *
+ *****************************************************************************
+ *
+ * Tool stack creates front and back nodes with state XenbusStateInitialising.
+ *
+ * Front                                Back
+ * =================================    =====================================
+ * XenbusStateInitialising              XenbusStateInitialising
+ *  o Query virtual device               o Query backend device identification
+ *    properties.                          data.
+ *  o Setup OS device instance.          o Open and validate backend device.
+ *                                       o Publish backend features.
+ *                                                      |
+ *                                                      |
+ *                                                      V
+ *                                      XenbusStateInitWait
+ *
+ * o Query backend features.
+ * o Allocate and initialize the
+ *   request ring.
+ *              |
+ *              |
+ *              V
+ * XenbusStateInitialised
+ *
+ *                                       o Connect to the request ring and
+ *                                         event channel.
+ *                                       o Publish backend device properties.
+ *                                                      |
+ *                                                      |
+ *                                                      V
+ *                                      XenbusStateConnected
+ *
+ *  o Query backend device properties.
+ *  o Finalize OS virtual device
+ *    instance.
+ *              |
+ *              |
+ *              V
+ * XenbusStateConnected
+ *
+ * Note: Drivers that do not support any optional features can skip certain
+ *       states in the state machine:
+ *
+ *       o A frontend may transition to XenbusStateInitialised without
+ *         waiting for the backend to enter XenbusStateInitWait.
+ *
+ *       o A backend may transition to XenbusStateInitialised, bypassing
+ *         XenbusStateInitWait, without waiting for the frontend to first
+ *         enter the XenbusStateInitialised state.
+ *
+ *       Drivers that support optional features must tolerate these additional
+ *       state transition paths.  In general this means performing the work of
+ *       any skipped state transition, if it has not already been performed,
+ *       in addition to the work associated with entry into the current state.
+ */
+
+/*
  * REQUEST CODES.
  */
 #define BLKIF_OP_READ              0
 #define BLKIF_OP_WRITE             1
 /*
- * Recognised only if "feature-barrier" is present in backend xenbus info.
- * The "feature-barrier" node contains a boolean indicating whether barrier
- * requests are likely to succeed or fail. Either way, a barrier request
- * may fail at any time with BLKIF_RSP_EOPNOTSUPP if it is unsupported by
- * the underlying block-device hardware. The boolean simply indicates whether
- * or not it is worthwhile for the frontend to attempt barrier requests.
- * If a backend does not recognise BLKIF_OP_WRITE_BARRIER, it should *not*
- * create the "feature-barrier" node!
+ * All writes issued prior to a request with the BLKIF_OP_WRITE_BARRIER
+ * operation code ("barrier request") must be completed prior to the
+ * execution of the barrier request.  All writes issued after the barrier
+ * request must not execute until after the completion of the barrier request.
+ *
+ * Optional.  See "feature-barrier" XenBus node documentation above.
  */
 #define BLKIF_OP_WRITE_BARRIER     2
 /*
- * Recognised if "feature-flush-cache" is present in backend xenbus
- * info.  A flush will ask the underlying storage hardware to flush its
- * non-volatile caches as appropriate.  The "feature-flush-cache" node
- * contains a boolean indicating whether flush requests are likely to
- * succeed or fail. Either way, a flush request may fail at any time
- * with BLKIF_RSP_EOPNOTSUPP if it is unsupported by the underlying
- * block-device hardware. The boolean simply indicates whether or not it
- * is worthwhile for the frontend to attempt flushes.  If a backend does
- * not recognise BLKIF_OP_WRITE_FLUSH_CACHE, it should *not* create the
- * "feature-flush-cache" node!
+ * Commit any uncommitted contents of the backing device's volatile cache
+ * to stable storage.
+ *
+ * Optional.  See "feature-flush-cache" XenBus node documentation above.
  */
 #define BLKIF_OP_FLUSH_DISKCACHE   3
 /*
@@ -82,47 +304,24 @@
  */
 #define BLKIF_OP_RESERVED_1        4
 /*
- * Recognised only if "feature-discard" is present in backend xenbus info.
- * The "feature-discard" node contains a boolean indicating whether trim
- * (ATA) or unmap (SCSI) - conviently called discard requests are likely
- * to succeed or fail. Either way, a discard request
- * may fail at any time with BLKIF_RSP_EOPNOTSUPP if it is unsupported by
- * the underlying block-device hardware. The boolean simply indicates whether
- * or not it is worthwhile for the frontend to attempt discard requests.
- * If a backend does not recognise BLKIF_OP_DISCARD, it should *not*
- * create the "feature-discard" node!
+ * Indicate to the backend device that a region of storage is no longer in
+ * use, and may be discarded at any time without impact to the client.  If
+ * the BLKIF_DISCARD_SECURE flag is set on the request, all copies of the
+ * discarded region on the device must be rendered unrecoverable before the
+ * command returns.
  *
- * Discard operation is a request for the underlying block device to mark
- * extents to be erased. However, discard does not guarantee that the blocks
- * will be erased from the device - it is just a hint to the device
- * controller that these blocks are no longer in use. What the device
- * controller does with that information is left to the controller.
- * Discard operations are passed with sector_number as the
- * sector index to begin discard operations at and nr_sectors as the number of
- * sectors to be discarded. The specified sectors should be discarded if the
- * underlying block device supports trim (ATA) or unmap (SCSI) operations,
- * or a BLKIF_RSP_EOPNOTSUPP  should be returned.
- * More information about trim/unmap operations at:
+ * This operation is analogous to performing a trim (ATA) or unamp (SCSI),
+ * command on a native device.
+ *
+ * More information about trim/unmap operations can be found at:
  * http://t13.org/Documents/UploadedDocuments/docs2008/
  *     e07154r6-Data_Set_Management_Proposal_for_ATA-ACS2.doc
  * http://www.seagate.com/staticfiles/support/disc/manuals/
  *     Interface%20manuals/100293068c.pdf
- * The backend can optionally provide these extra XenBus attributes to
- * further optimize the discard functionality:
- * 'discard-aligment' - Devices that support discard functionality may
- * internally allocate space in units that are bigger than the exported
- * logical block size. The discard-alignment parameter indicates how many bytes
- * the beginning of the partition is offset from the internal allocation unit's
- * natural alignment. Do not confuse this with natural disk alignment offset.
- * 'discard-granularity'  - Devices that support discard functionality may
- * internally allocate space using units that are bigger than the logical block
- * size. The discard-granularity parameter indicates the size of the internal
- * allocation unit in bytes if reported by the device. Otherwise the
- * discard-granularity will be set to match the device's physical block size.
- * It is the minimum size you can discard.
- * 'discard-secure' - All copies of the discarded sectors (potentially created
- * by garbage collection) must also be erased.  To use this feature, the flag
- * BLKIF_DISCARD_SECURE must be set in the blkif_request_discard.
+ *
+ * Optional.  See "feature-discard", "discard-alignment",
+ * "discard-granularity", and "discard-secure" in the XenBus node
+ * documentation above.
  */
 #define BLKIF_OP_DISCARD           5
 
@@ -147,6 +346,9 @@ struct blkif_request_segment {
     uint8_t     first_sect, last_sect;
 };
 
+/*
+ * Starting ring element for any I/O request.
+ */
 struct blkif_request {
     uint8_t        operation;    /* BLKIF_OP_???                         */
     uint8_t        nr_segments;  /* number of segments                   */
@@ -158,7 +360,7 @@ struct blkif_request {
 typedef struct blkif_request blkif_request_t;
 
 /*
- * Cast to this structure when blkif_request.operation == BLKIF_OP_TRIM
+ * Cast to this structure when blkif_request.operation == BLKIF_OP_DISCARD
  * sizeof(struct blkif_request_discard) <= sizeof(struct blkif_request)
  */
 struct blkif_request_discard {
