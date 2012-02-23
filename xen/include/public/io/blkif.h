@@ -67,6 +67,9 @@
  * XenStore nodes in sections marked "PRIVATE" are solely for use by the
  * driver side whose XenBus tree contains them.
  *
+ * XenStore nodes marked "DEPRECATED" in their notes section should only be
+ * used to provide interoperability with legacy implementations.
+ *
  * See the XenBus state transition diagram below for details on when XenBus
  * nodes must be published and when they can be queried.
  *
@@ -123,12 +126,31 @@
  *      of this type may still be returned at any time with the
  *      BLKIF_RSP_EOPNOTSUPP result code.
  *
+ *----------------------- Request Transport Parameters ------------------------
+ *
+ * max-ring-page-order
+ *      Values:         <uint32_t>
+ *      Default Value:  0
+ *      Notes:          1, 3
+ *
+ *      The maximum supported size of the request ring buffer in units of
+ *      lb(machine pages). (e.g. 0 == 1 page,  1 = 2 pages, 2 == 4 pages,
+ *      etc.).
+ *
+ * max-ring-pages
+ *      Values:         <uint32_t>
+ *      Default Value:  1
+ *      Notes:          DEPRECATED, 2, 3
+ *
+ *      The maximum supported size of the request ring buffer in units of
+ *      machine pages.  The value must be a power of 2.
+ *
  *------------------------- Backend Device Properties -------------------------
  *
  * discard-aligment
  *      Values:         <uint32_t>
  *      Default Value:  0
- *      Notes:          1, 2
+ *      Notes:          4, 5
  *
  *      The offset, in bytes from the beginning of the virtual block device,
  *      to the first, addressable, discard extent on the underlying device.
@@ -136,7 +158,7 @@
  * discard-granularity
  *      Values:         <uint32_t>
  *      Default Value:  <"sector-size">
- *      Notes:          1
+ *      Notes:          4
  *
  *      The size, in bytes, of the individually addressable discard extents
  *      of the underlying device.
@@ -180,9 +202,19 @@
  *
  * ring-ref
  *      Values:         <uint32_t>
+ *      Notes:          6
  *
  *      The Xen grant reference granting permission for the backend to map
  *      the sole page in a single page sized ring buffer.
+ *
+ * ring-ref%u
+ *      Values:         <uint32_t>
+ *      Notes:          6
+ *
+ *      For a frontend providing a multi-page ring, a "number of ring pages"
+ *      sized list of nodes, each containing a Xen grant reference granting
+ *      permission for the backend to map the page of the ring located
+ *      at page index "%u".  Page indexes are zero based.
  *
  * protocol
  *      Values:         string (XEN_IO_PROTO_ABI_*)
@@ -190,6 +222,25 @@
  *
  *      The machine ABI rules governing the format of all ring request and
  *      response structures.
+ *
+ * ring-page-order
+ *      Values:         <uint32_t>
+ *      Default Value:  0
+ *      Maximum Value:  MAX(ffs(max-ring-pages) - 1, max-ring-page-order)
+ *      Notes:          1, 3
+ *
+ *      The size of the frontend allocated request ring buffer in units
+ *      of lb(machine pages). (e.g. 0 == 1 page, 1 = 2 pages, 2 == 4 pages,
+ *      etc.).
+ *
+ * num-ring-pages
+ *      Values:         <uint32_t>
+ *      Default Value:  1
+ *      Maximum Value:  MAX(max-ring-pages,(0x1 << max-ring-page-order))
+ *      Notes:          DEPRECATED, 2, 3
+ *
+ *      The size of the frontend allocated request ring buffer in units of
+ *      machine pages.  The value must be a power of 2.
  *
  *------------------------- Virtual Device Properties -------------------------
  *
@@ -208,12 +259,26 @@
  *
  * Notes
  * -----
- * (1) Devices that support discard functionality may internally allocate
+ * (1) Multi-page ring buffer scheme first developed in the Citrix XenServer
+ *     PV drivers.
+ * (2) Multi-page ring buffer scheme first used in some RedHat distributions
+ *     including a distribution deployed on certain nodes of the Amazon
+ *     EC2 cluster.
+ * (3) Support for multi-page ring buffers was implemented independently,
+ *     in slightly different forms, by both Citrix and RedHat/Amazon.
+ *     For full interoperability, block front and backends should publish
+ *     identical ring parameters, adjusted for unit differences, to the
+ *     XenStore nodes used in both schemes.
+ * (4) Devices that support discard functionality may internally allocate
  *     space (discardable extents) in units that are larger than the
  *     exported logical block size.
- * (2) The discard-alignment parameter allows a physical device to be
+ * (5) The discard-alignment parameter allows a physical device to be
  *     partitioned into virtual devices that do not necessarily begin or
  *     end on a discardable extent boundary.
+ * (6) When there is only a single page allocated to the request ring,
+ *     'ring-ref' is used to communicate the grant reference for this
+ *     page to the backend.  When using a multi-page ring, the 'ring-ref'
+ *     node is not created.  Instead 'ring-ref0' - 'ring-refN' are used.
  */
 
 /*
@@ -231,20 +296,26 @@
  *  o Query virtual device               o Query backend device identification
  *    properties.                          data.
  *  o Setup OS device instance.          o Open and validate backend device.
- *                                       o Publish backend features.
+ *                                       o Publish backend features and
+ *                                         transport parameters.
  *                                                      |
  *                                                      |
  *                                                      V
  *                                      XenbusStateInitWait
  *
- * o Query backend features.
+ * o Query backend features and
+ *   transport parameters.
  * o Allocate and initialize the
  *   request ring.
+ * o Publish transport parameters
+ *   that will be in effect during
+ *   this connection.
  *              |
  *              |
  *              V
  * XenbusStateInitialised
  *
+ *                                       o Query frontend transport parameters.
  *                                       o Connect to the request ring and
  *                                         event channel.
  *                                       o Publish backend device properties.
@@ -261,20 +332,26 @@
  *              V
  * XenbusStateConnected
  *
- * Note: Drivers that do not support any optional features can skip certain
- *       states in the state machine:
+ * Note: Drivers that do not support any optional features, or the negotiation
+ *       of transport parameters, can skip certain states in the state machine:
  *
  *       o A frontend may transition to XenbusStateInitialised without
- *         waiting for the backend to enter XenbusStateInitWait.
+ *         waiting for the backend to enter XenbusStateInitWait.  In this
+ *         case, default transport parameters are in effect and any
+ *         transport parameters published by the frontend must contain
+ *         their default values.
  *
  *       o A backend may transition to XenbusStateInitialised, bypassing
  *         XenbusStateInitWait, without waiting for the frontend to first
- *         enter the XenbusStateInitialised state.
+ *         enter the XenbusStateInitialised state.  In this case, default
+ *         transport parameters are in effect and any transport parameters
+ *         published by the backend must contain their default values.
  *
- *       Drivers that support optional features must tolerate these additional
- *       state transition paths.  In general this means performing the work of
- *       any skipped state transition, if it has not already been performed,
- *       in addition to the work associated with entry into the current state.
+ *       Drivers that support optional features and/or transport parameter
+ *       negotiation must tolerate these additional state transition paths.
+ *       In general this means performing the work of any skipped state
+ *       transition, if it has not already been performed, in addition to the
+ *       work associated with entry into the current state.
  */
 
 /*
