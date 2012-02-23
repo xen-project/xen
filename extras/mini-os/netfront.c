@@ -421,6 +421,7 @@ again:
 abort_transaction:
     free(err);
     err = xenbus_transaction_end(xbt, 1, &retry);
+    printk("Abort transaction %s\n", message);
     goto error;
 
 done:
