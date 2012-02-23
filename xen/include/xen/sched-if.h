@@ -18,6 +18,7 @@ extern cpumask_t cpupool_free_cpus;
 
 /* Scheduler generic parameters
  * */
+#define SCHED_DEFAULT_RATELIMIT_US 1000
 extern int sched_ratelimit_us;
 
 
