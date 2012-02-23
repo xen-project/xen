@@ -473,7 +473,7 @@ value stub_xl_sched_credit_domain_get(value domid)
 {
 	CAMLparam1(domid);
 	CAMLlocal1(scinfo);
-	libxl_sched_credit c_scinfo;
+	libxl_sched_credit_domain c_scinfo;
 	int ret;
 	INIT_STRUCT();
 
@@ -483,18 +483,18 @@ value stub_xl_sched_credit_domain_get(value domid)
 		failwith_xl("sched_credit_domain_get", &lg);
 	FREE_CTX();
 
-	scinfo = Val_sched_credit(&gc, &lg, &c_scinfo);
+	scinfo = Val_sched_credit_domain(&gc, &lg, &c_scinfo);
 	CAMLreturn(scinfo);
 }
 
 value stub_xl_sched_credit_domain_set(value domid, value scinfo)
 {
 	CAMLparam2(domid, scinfo);
-	libxl_sched_credit c_scinfo;
+	libxl_sched_credit_domain c_scinfo;
 	int ret;
 	INIT_STRUCT();
 
-	sched_credit_val(&gc, &lg, &c_scinfo, scinfo);
+	sched_credit_domain_val(&gc, &lg, &c_scinfo, scinfo);
 
 	INIT_CTX();
 	ret = libxl_sched_credit_domain_set(ctx, Int_val(domid), &c_scinfo);

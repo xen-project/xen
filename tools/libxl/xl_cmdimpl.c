@@ -3913,7 +3913,7 @@ int main_sharing(int argc, char **argv)
 }
 
 static int sched_credit_domain_get(
-    int domid, libxl_sched_credit *scinfo)
+    int domid, libxl_sched_credit_domain *scinfo)
 {
     int rc;
 
@@ -3925,7 +3925,7 @@ static int sched_credit_domain_get(
 }
 
 static int sched_credit_domain_set(
-    int domid, libxl_sched_credit *scinfo)
+    int domid, libxl_sched_credit_domain *scinfo)
 {
     int rc;
 
@@ -3940,7 +3940,7 @@ static int sched_credit_domain_output(
     int domid)
 {
     char *domname;
-    libxl_sched_credit scinfo;
+    libxl_sched_credit_domain scinfo;
     int rc;
 
     if (domid < 0) {
@@ -3961,7 +3961,7 @@ static int sched_credit_domain_output(
 }
 
 static int sched_credit2_domain_get(
-    int domid, libxl_sched_credit2 *scinfo)
+    int domid, libxl_sched_credit2_domain *scinfo)
 {
     int rc;
 
@@ -3973,7 +3973,7 @@ static int sched_credit2_domain_get(
 }
 
 static int sched_credit2_domain_set(
-    int domid, libxl_sched_credit2 *scinfo)
+    int domid, libxl_sched_credit2_domain *scinfo)
 {
     int rc;
 
@@ -3988,7 +3988,7 @@ static int sched_credit2_domain_output(
     int domid)
 {
     char *domname;
-    libxl_sched_credit2 scinfo;
+    libxl_sched_credit2_domain scinfo;
     int rc;
 
     if (domid < 0) {
@@ -4008,7 +4008,7 @@ static int sched_credit2_domain_output(
 }
 
 static int sched_sedf_domain_get(
-    int domid, libxl_sched_sedf *scinfo)
+    int domid, libxl_sched_sedf_domain *scinfo)
 {
     int rc;
 
@@ -4020,7 +4020,7 @@ static int sched_sedf_domain_get(
 }
 
 static int sched_sedf_domain_set(
-    int domid, libxl_sched_sedf *scinfo)
+    int domid, libxl_sched_sedf_domain *scinfo)
 {
     int rc;
 
@@ -4035,7 +4035,7 @@ static int sched_sedf_domain_output(
     int domid)
 {
     char *domname;
-    libxl_sched_sedf scinfo;
+    libxl_sched_sedf_domain scinfo;
     int rc;
 
     if (domid < 0) {
@@ -4116,7 +4116,7 @@ static int sched_domain_output(
 
 int main_sched_credit(int argc, char **argv)
 {
-    libxl_sched_credit scinfo;
+    libxl_sched_credit_domain scinfo;
     const char *dom = NULL;
     const char *cpupool = NULL;
     int weight = 256, cap = 0, opt_w = 0, opt_c = 0;
@@ -4198,7 +4198,7 @@ int main_sched_credit(int argc, char **argv)
 
 int main_sched_credit2(int argc, char **argv)
 {
-    libxl_sched_credit2 scinfo;
+    libxl_sched_credit2_domain scinfo;
     const char *dom = NULL;
     const char *cpupool = NULL;
     int weight = 256, opt_w = 0;
@@ -4272,7 +4272,7 @@ int main_sched_credit2(int argc, char **argv)
 
 int main_sched_sedf(int argc, char **argv)
 {
-    libxl_sched_sedf scinfo;
+    libxl_sched_sedf_domain scinfo;
     const char *dom = NULL;
     const char *cpupool = NULL;
     int period = 0, opt_p = 0;

@@ -390,16 +390,16 @@ libxl_cputopology = Struct("cputopology", [
     ("node", uint32),
     ])
 
-libxl_sched_credit = Struct("sched_credit", [
+libxl_sched_credit_domain = Struct("sched_credit_domain", [
     ("weight", integer),
     ("cap", integer),
     ], dispose_fn=None)
 
-libxl_sched_credit2 = Struct("sched_credit2", [
+libxl_sched_credit2_domain = Struct("sched_credit2_domain", [
     ("weight", integer),
     ], dispose_fn=None)
 
-libxl_sched_sedf = Struct("sched_sedf", [
+libxl_sched_sedf_domain = Struct("sched_sedf_domain", [
     ("period", integer),
     ("slice", integer),
     ("latency", integer),

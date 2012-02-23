@@ -2975,7 +2975,8 @@ int libxl_get_sched_id(libxl_ctx *ctx)
     return sched;
 }
 
-int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid, libxl_sched_credit *scinfo)
+int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_sched_credit_domain *scinfo)
 {
     struct xen_domctl_sched_credit sdom;
     int rc;
@@ -2992,7 +2993,8 @@ int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid, libxl_sched_cr
     return 0;
 }
 
-int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid, libxl_sched_credit *scinfo)
+int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_sched_credit_domain *scinfo)
 {
     struct xen_domctl_sched_credit sdom;
     xc_domaininfo_t domaininfo;
@@ -3033,7 +3035,7 @@ int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid, libxl_sched_cr
 }
 
 int libxl_sched_credit2_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                   libxl_sched_credit2 *scinfo)
+                                   libxl_sched_credit2_domain *scinfo)
 {
     struct xen_domctl_sched_credit2 sdom;
     int rc;
@@ -3051,7 +3053,7 @@ int libxl_sched_credit2_domain_get(libxl_ctx *ctx, uint32_t domid,
 }
 
 int libxl_sched_credit2_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                   libxl_sched_credit2 *scinfo)
+                                   libxl_sched_credit2_domain *scinfo)
 {
     struct xen_domctl_sched_credit2 sdom;
     xc_domaininfo_t domaininfo;
@@ -3086,7 +3088,7 @@ int libxl_sched_credit2_domain_set(libxl_ctx *ctx, uint32_t domid,
 }
 
 int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                libxl_sched_sedf *scinfo)
+                                libxl_sched_sedf_domain *scinfo)
 {
     uint64_t period;
     uint64_t slice;
@@ -3112,7 +3114,7 @@ int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
 }
 
 int libxl_sched_sedf_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                libxl_sched_sedf *scinfo)
+                                libxl_sched_sedf_domain *scinfo)
 {
     xc_domaininfo_t domaininfo;
     int rc;

@@ -588,17 +588,17 @@ int libxl_get_sched_id(libxl_ctx *ctx);
 
 
 int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                  libxl_sched_credit *scinfo);
+                                  libxl_sched_credit_domain *scinfo);
 int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                  libxl_sched_credit *scinfo);
+                                  libxl_sched_credit_domain *scinfo);
 int libxl_sched_credit2_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                   libxl_sched_credit2 *scinfo);
+                                   libxl_sched_credit2_domain *scinfo);
 int libxl_sched_credit2_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                   libxl_sched_credit2 *scinfo);
+                                   libxl_sched_credit2_domain *scinfo);
 int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                libxl_sched_sedf *scinfo);
+                                libxl_sched_sedf_domain *scinfo);
 int libxl_sched_sedf_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                libxl_sched_sedf *scinfo);
+                                libxl_sched_sedf_domain *scinfo);
 int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
                        libxl_trigger trigger, uint32_t vcpuid);
 int libxl_send_sysrq(libxl_ctx *ctx, uint32_t domid, char sysrq);
