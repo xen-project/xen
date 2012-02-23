@@ -2321,6 +2321,8 @@ gnttab_get_version(XEN_GUEST_HANDLE(gnttab_get_version_t uop))
     op.version = d->grant_table->gt_version;
     spin_unlock(&d->grant_table->lock);
 
+    rcu_unlock_domain(d);
+
     if ( copy_to_guest(uop, &op, 1) )
         return -EFAULT;
 
