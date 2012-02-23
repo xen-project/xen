@@ -168,5 +168,5 @@ efi/mkreloc: efi/mkreloc.c
 clean::
 	rm -f asm-offsets.s xen.lds boot/*.o boot/*~ boot/core boot/mkelf32
 	rm -f $(BASEDIR)/.xen-syms.[0-9]* boot/.*.d
-	rm -f $(BASEDIR)/.xen.efi.[0-9]* efi/*.o efi/mkreloc
+	rm -f $(BASEDIR)/.xen.efi.[0-9]* efi/*.o efi/mkreloc efi/.*.d
 	rm -f boot/reloc.S boot/reloc.lnk boot/reloc.bin
