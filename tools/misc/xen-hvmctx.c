@@ -383,6 +383,13 @@ static void dump_viridian_vcpu(void)
            (unsigned long long) p.apic_assist);           
 }
 
+static void dump_vmce_vcpu(void)
+{
+    HVM_SAVE_TYPE(VMCE_VCPU) p;
+    READ(p);
+    printf("    VMCE_VCPU: caps %" PRIx64 "\n", p.caps);
+}
+
 int main(int argc, char **argv)
 {
     int entry, domid;
@@ -449,6 +456,7 @@ int main(int argc, char **argv)
         case HVM_SAVE_CODE(MTRR): dump_mtrr(); break;
         case HVM_SAVE_CODE(VIRIDIAN_DOMAIN): dump_viridian_domain(); break;
         case HVM_SAVE_CODE(VIRIDIAN_VCPU): dump_viridian_vcpu(); break;
+        case HVM_SAVE_CODE(VMCE_VCPU): dump_vmce_vcpu(); break;
         case HVM_SAVE_CODE(END): break;
         default:
             printf(" ** Don't understand type %u: skipping\n",

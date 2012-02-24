@@ -16,7 +16,6 @@ struct bank_entry {
 struct domain_mca_msrs
 {
     /* Guest should not change below values after DOM boot up */
-    uint64_t mcg_cap;
     uint64_t mcg_ctl;
     uint64_t mcg_status;
     uint64_t *mci_ctl;
@@ -28,6 +27,8 @@ struct domain_mca_msrs
 /* Guest vMCE MSRs virtualization */
 extern int vmce_init_msr(struct domain *d);
 extern void vmce_destroy_msr(struct domain *d);
+extern void vmce_init_vcpu(struct vcpu *);
+extern int vmce_restore_vcpu(struct vcpu *, uint64_t caps);
 extern int vmce_wrmsr(uint32_t msr, uint64_t val);
 extern int vmce_rdmsr(uint32_t msr, uint64_t *val);
 

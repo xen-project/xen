@@ -422,6 +422,8 @@ int vcpu_initialise(struct vcpu *v)
     if ( (rc = vcpu_init_fpu(v)) != 0 )
         return rc;
 
+    vmce_init_vcpu(v);
+
     if ( is_hvm_domain(d) )
     {
         rc = hvm_vcpu_initialise(v);

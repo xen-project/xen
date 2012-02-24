@@ -1879,6 +1879,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
         domctl.cmd = XEN_DOMCTL_get_ext_vcpucontext;
         domctl.domain = dom;
+        memset(&domctl.u, 0, sizeof(domctl.u));
         domctl.u.ext_vcpucontext.vcpu = i;
         if ( xc_domctl(xch, &domctl) < 0 )
         {

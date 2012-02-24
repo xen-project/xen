@@ -575,9 +575,15 @@ struct hvm_viridian_vcpu_context {
 
 DECLARE_HVM_SAVE_TYPE(VIRIDIAN_VCPU, 17, struct hvm_viridian_vcpu_context);
 
+struct hvm_vmce_vcpu {
+    uint64_t caps;
+};
+
+DECLARE_HVM_SAVE_TYPE(VMCE_VCPU, 18, struct hvm_vmce_vcpu);
+
 /* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX 17
+#define HVM_SAVE_CODE_MAX 18
 
 #endif /* __XEN_PUBLIC_HVM_SAVE_X86_H__ */

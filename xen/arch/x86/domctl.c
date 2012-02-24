@@ -1029,11 +1029,12 @@ long arch_do_domctl(
                 evc->syscall32_callback_eip    = 0;
                 evc->syscall32_disables_events = 0;
             }
+            evc->mcg_cap = v->arch.mcg_cap;
         }
         else
         {
             ret = -EINVAL;
-            if ( evc->size != sizeof(*evc) )
+            if ( evc->size < offsetof(typeof(*evc), mcg_cap) )
                 goto ext_vcpucontext_out;
 #ifdef __x86_64__
             if ( !is_hvm_domain(d) )
@@ -1061,6 +1062,10 @@ long arch_do_domctl(
                  (evc->syscall32_callback_cs & ~3) ||
                  evc->syscall32_callback_eip )
                 goto ext_vcpucontext_out;
+
+            if ( evc->size >= offsetof(typeof(*evc), mcg_cap) +
+                              sizeof(evc->mcg_cap) )
+                ret = vmce_restore_vcpu(v, evc->mcg_cap);
         }
 
         ret = 0;

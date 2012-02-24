@@ -1421,11 +1421,12 @@ enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
 }
 
 /* intel specific MCA MSR */
-int intel_mce_wrmsr(uint32_t msr, uint64_t val)
+int intel_mce_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 {
     int ret = 0;
 
-    if (msr >= MSR_IA32_MC0_CTL2 && msr < (MSR_IA32_MC0_CTL2 + nr_mce_banks))
+    if ( msr >= MSR_IA32_MC0_CTL2 &&
+         msr < MSR_IA32_MCx_CTL2(v->arch.mcg_cap & MCG_CAP_COUNT) )
     {
         mce_printk(MCE_QUIET, "We have disabled CMCI capability, "
                  "Guest should not write this MSR!\n");
@@ -1435,11 +1436,12 @@ int intel_mce_wrmsr(uint32_t msr, uint64_t val)
     return ret;
 }
 
-int intel_mce_rdmsr(uint32_t msr, uint64_t *val)
+int intel_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 {
     int ret = 0;
 
-    if (msr >= MSR_IA32_MC0_CTL2 && msr < (MSR_IA32_MC0_CTL2 + nr_mce_banks))
+    if ( msr >= MSR_IA32_MC0_CTL2 &&
+         msr < MSR_IA32_MCx_CTL2(v->arch.mcg_cap & MCG_CAP_COUNT) )
     {
         mce_printk(MCE_QUIET, "We have disabled CMCI capability, "
                  "Guest should not read this MSR!\n");

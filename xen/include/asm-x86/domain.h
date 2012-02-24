@@ -488,6 +488,8 @@ struct arch_vcpu
     /* This variable determines whether nonlazy extended state has been used,
      * and thus should be saved/restored. */
     bool_t nonlazy_xstate_used;
+
+    uint64_t mcg_cap;
     
     struct paging_vcpu paging;
 

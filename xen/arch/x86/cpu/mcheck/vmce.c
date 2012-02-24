@@ -10,6 +10,7 @@
 #include <xen/delay.h>
 #include <xen/smp.h>
 #include <xen/mm.h>
+#include <xen/hvm/save.h>
 #include <asm/processor.h>
 #include <public/sysctl.h>
 #include <asm/system.h>
@@ -42,7 +43,6 @@ int vmce_init_msr(struct domain *d)
            nr_mce_banks * sizeof(*dom_vmce(d)->mci_ctl));
 
     dom_vmce(d)->mcg_status = 0x0;
-    dom_vmce(d)->mcg_cap = g_mcg_cap;
     dom_vmce(d)->mcg_ctl = ~(uint64_t)0x0;
     dom_vmce(d)->nr_injection = 0;
 
@@ -61,21 +61,41 @@ void vmce_destroy_msr(struct domain *d)
     dom_vmce(d) = NULL;
 }
 
-static int bank_mce_rdmsr(struct domain *d, uint32_t msr, uint64_t *val)
+void vmce_init_vcpu(struct vcpu *v)
 {
-    int bank, ret = 1;
-    struct domain_mca_msrs *vmce = dom_vmce(d);
+    v->arch.mcg_cap = g_mcg_cap;
+}
+
+int vmce_restore_vcpu(struct vcpu *v, uint64_t caps)
+{
+    if ( caps & ~g_mcg_cap & ~MCG_CAP_COUNT & ~MCG_CTL_P )
+    {
+        dprintk(XENLOG_G_ERR, "%s restore: unsupported MCA capabilities"
+                " %#" PRIx64 " for d%d:v%u (supported: %#Lx)\n",
+                is_hvm_vcpu(v) ? "HVM" : "PV", caps, v->domain->domain_id,
+                v->vcpu_id, g_mcg_cap & ~MCG_CAP_COUNT);
+        return -EPERM;
+    }
+
+    v->arch.mcg_cap = caps;
+    return 0;
+}
+
+static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
+{
+    int ret = 1;
+    unsigned int bank = (msr - MSR_IA32_MC0_CTL) / 4;
+    struct domain_mca_msrs *vmce = dom_vmce(v->domain);
     struct bank_entry *entry;
 
-    bank = (msr - MSR_IA32_MC0_CTL) / 4;
-    if ( bank >= nr_mce_banks )
-        return -1;
+    *val = 0;
 
     switch ( msr & (MSR_IA32_MC0_CTL | 3) )
     {
     case MSR_IA32_MC0_CTL:
-        *val = vmce->mci_ctl[bank] &
-            (h_mci_ctrl ? h_mci_ctrl[bank] : ~0UL);
+        if ( bank < nr_mce_banks )
+            *val = vmce->mci_ctl[bank] &
+                   (h_mci_ctrl ? h_mci_ctrl[bank] : ~0UL);
         mce_printk(MCE_VERBOSE, "MCE: rdmsr MC%u_CTL 0x%"PRIx64"\n",
                    bank, *val);
         break;
@@ -126,7 +146,7 @@ static int bank_mce_rdmsr(struct domain *d, uint32_t msr, uint64_t *val)
         switch ( boot_cpu_data.x86_vendor )
         {
         case X86_VENDOR_INTEL:
-            ret = intel_mce_rdmsr(msr, val);
+            ret = intel_mce_rdmsr(v, msr, val);
             break;
         default:
             ret = 0;
@@ -145,13 +165,13 @@ static int bank_mce_rdmsr(struct domain *d, uint32_t msr, uint64_t *val)
  */
 int vmce_rdmsr(uint32_t msr, uint64_t *val)
 {
-    struct domain *d = current->domain;
-    struct domain_mca_msrs *vmce = dom_vmce(d);
+    const struct vcpu *cur = current;
+    struct domain_mca_msrs *vmce = dom_vmce(cur->domain);
     int ret = 1;
 
     *val = 0;
 
-    spin_lock(&dom_vmce(d)->lock);
+    spin_lock(&vmce->lock);
 
     switch ( msr )
     {
@@ -162,39 +182,38 @@ int vmce_rdmsr(uint32_t msr, uint64_t *val)
                        "MCE: rdmsr MCG_STATUS 0x%"PRIx64"\n", *val);
         break;
     case MSR_IA32_MCG_CAP:
-        *val = vmce->mcg_cap;
+        *val = cur->arch.mcg_cap;
         mce_printk(MCE_VERBOSE, "MCE: rdmsr MCG_CAP 0x%"PRIx64"\n",
                    *val);
         break;
     case MSR_IA32_MCG_CTL:
         /* Always 0 if no CTL support */
-        *val = vmce->mcg_ctl & h_mcg_ctl;
+        if ( cur->arch.mcg_cap & MCG_CTL_P )
+            *val = vmce->mcg_ctl & h_mcg_ctl;
         mce_printk(MCE_VERBOSE, "MCE: rdmsr MCG_CTL 0x%"PRIx64"\n",
                    *val);
         break;
     default:
-        ret = mce_bank_msr(msr) ? bank_mce_rdmsr(d, msr, val) : 0;
+        ret = mce_bank_msr(cur, msr) ? bank_mce_rdmsr(cur, msr, val) : 0;
         break;
     }
 
-    spin_unlock(&dom_vmce(d)->lock);
+    spin_unlock(&vmce->lock);
     return ret;
 }
 
-static int bank_mce_wrmsr(struct domain *d, u32 msr, u64 val)
+static int bank_mce_wrmsr(struct vcpu *v, u32 msr, u64 val)
 {
-    int bank, ret = 1;
-    struct domain_mca_msrs *vmce = dom_vmce(d);
+    int ret = 1;
+    unsigned int bank = (msr - MSR_IA32_MC0_CTL) / 4;
+    struct domain_mca_msrs *vmce = dom_vmce(v->domain);
     struct bank_entry *entry = NULL;
-
-    bank = (msr - MSR_IA32_MC0_CTL) / 4;
-    if ( bank >= nr_mce_banks )
-        return -EINVAL;
 
     switch ( msr & (MSR_IA32_MC0_CTL | 3) )
     {
     case MSR_IA32_MC0_CTL:
-        vmce->mci_ctl[bank] = val;
+        if ( bank < nr_mce_banks )
+            vmce->mci_ctl[bank] = val;
         break;
     case MSR_IA32_MC0_STATUS:
         /* Give the first entry of the list, it corresponds to current
@@ -202,9 +221,9 @@ static int bank_mce_wrmsr(struct domain *d, u32 msr, u64 val)
          * the guest, this node will be deleted.
          * Only error bank is written. Non-error banks simply return.
          */
-        if ( !list_empty(&dom_vmce(d)->impact_header) )
+        if ( !list_empty(&vmce->impact_header) )
         {
-            entry = list_entry(dom_vmce(d)->impact_header.next,
+            entry = list_entry(vmce->impact_header.next,
                                struct bank_entry, list);
             if ( entry->bank == bank )
                 entry->mci_status = val;
@@ -228,7 +247,7 @@ static int bank_mce_wrmsr(struct domain *d, u32 msr, u64 val)
         switch ( boot_cpu_data.x86_vendor )
         {
         case X86_VENDOR_INTEL:
-            ret = intel_mce_wrmsr(msr, val);
+            ret = intel_mce_wrmsr(v, msr, val);
             break;
         default:
             ret = 0;
@@ -247,9 +266,9 @@ static int bank_mce_wrmsr(struct domain *d, u32 msr, u64 val)
  */
 int vmce_wrmsr(u32 msr, u64 val)
 {
-    struct domain *d = current->domain;
+    struct vcpu *cur = current;
     struct bank_entry *entry = NULL;
-    struct domain_mca_msrs *vmce = dom_vmce(d);
+    struct domain_mca_msrs *vmce = dom_vmce(cur->domain);
     int ret = 1;
 
     if ( !g_mcg_cap )
@@ -266,7 +285,7 @@ int vmce_wrmsr(u32 msr, u64 val)
         vmce->mcg_status = val;
         mce_printk(MCE_VERBOSE, "MCE: wrmsr MCG_STATUS %"PRIx64"\n", val);
         /* For HVM guest, this is the point for deleting vMCE injection node */
-        if ( d->is_hvm && (vmce->nr_injection > 0) )
+        if ( is_hvm_vcpu(cur) && (vmce->nr_injection > 0) )
         {
             vmce->nr_injection--; /* Should be 0 */
             if ( !list_empty(&vmce->impact_header) )
@@ -293,13 +312,53 @@ int vmce_wrmsr(u32 msr, u64 val)
         ret = -1;
         break;
     default:
-        ret = mce_bank_msr(msr) ? bank_mce_wrmsr(d, msr, val) : 0;
+        ret = mce_bank_msr(cur, msr) ? bank_mce_wrmsr(cur, msr, val) : 0;
         break;
     }
 
     spin_unlock(&vmce->lock);
     return ret;
 }
+
+static int vmce_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
+{
+    struct vcpu *v;
+    int err = 0;
+
+    for_each_vcpu( d, v ) {
+        struct hvm_vmce_vcpu ctxt = {
+            .caps = v->arch.mcg_cap
+        };
+
+        err = hvm_save_entry(VMCE_VCPU, v->vcpu_id, h, &ctxt);
+        if ( err )
+            break;
+    }
+
+    return err;
+}
+
+static int vmce_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
+{
+    unsigned int vcpuid = hvm_load_instance(h);
+    struct vcpu *v;
+    struct hvm_vmce_vcpu ctxt;
+    int err;
+
+    if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
+    {
+        dprintk(XENLOG_G_ERR, "HVM restore: dom%d has no vcpu%u\n",
+                d->domain_id, vcpuid);
+        err = -EINVAL;
+    }
+    else
+        err = hvm_load_entry(VMCE_VCPU, h, &ctxt);
+
+    return err ?: vmce_restore_vcpu(v, ctxt.caps);
+}
+
+HVM_REGISTER_SAVE_RESTORE(VMCE_VCPU, vmce_save_vcpu_ctxt,
+                          vmce_load_vcpu_ctxt, 1, HVMSR_PER_VCPU);
 
 int inject_vmce(struct domain *d)
 {

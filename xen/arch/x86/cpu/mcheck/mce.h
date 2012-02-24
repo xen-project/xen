@@ -3,6 +3,7 @@
 #define _MCE_H
 
 #include <xen/init.h>
+#include <xen/sched.h>
 #include <xen/smp.h>
 #include <asm/types.h>
 #include <asm/traps.h>
@@ -54,8 +55,8 @@ int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn);
 u64 mce_cap_init(void);
 extern unsigned int firstbank;
 
-int intel_mce_rdmsr(uint32_t msr, uint64_t *val);
-int intel_mce_wrmsr(uint32_t msr, uint64_t val);
+int intel_mce_rdmsr(const struct vcpu *, uint32_t msr, uint64_t *val);
+int intel_mce_wrmsr(struct vcpu *, uint32_t msr, uint64_t val);
 
 struct mcinfo_extended *intel_get_extended_msrs(
     struct mcinfo_global *mig, struct mc_info *mi);
@@ -171,18 +172,20 @@ int vmce_domain_inject(struct mcinfo_bank *bank, struct domain *d, struct mcinfo
 
 extern int vmce_init(struct cpuinfo_x86 *c);
 
-static inline int mce_vendor_bank_msr(uint32_t msr)
+static inline int mce_vendor_bank_msr(const struct vcpu *v, uint32_t msr)
 {
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
-         msr >= MSR_IA32_MC0_CTL2 && msr < (MSR_IA32_MC0_CTL2 + nr_mce_banks) )
+         msr >= MSR_IA32_MC0_CTL2 &&
+         msr < MSR_IA32_MCx_CTL2(v->arch.mcg_cap & MCG_CAP_COUNT) )
           return 1;
     return 0;
 }
 
-static inline int mce_bank_msr(uint32_t msr)
+static inline int mce_bank_msr(const struct vcpu *v, uint32_t msr)
 {
-    if ( (msr >= MSR_IA32_MC0_CTL && msr < MSR_IA32_MCx_CTL(nr_mce_banks)) ||
-        mce_vendor_bank_msr(msr) )
+    if ( (msr >= MSR_IA32_MC0_CTL &&
+          msr < MSR_IA32_MCx_CTL(v->arch.mcg_cap & MCG_CAP_COUNT)) ||
+         mce_vendor_bank_msr(v, msr) )
         return 1;
     return 0;
 }

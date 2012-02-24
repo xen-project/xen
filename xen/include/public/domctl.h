@@ -559,7 +559,7 @@ struct xen_domctl_ext_vcpucontext {
     uint32_t         vcpu;
     /*
      * SET: Size of struct (IN)
-     * GET: Size of struct (OUT)
+     * GET: Size of struct (OUT, up to 128 bytes)
      */
     uint32_t         size;
 #if defined(__i386__) || defined(__x86_64__)
@@ -571,6 +571,7 @@ struct xen_domctl_ext_vcpucontext {
     uint16_t         sysenter_callback_cs;
     uint8_t          syscall32_disables_events;
     uint8_t          sysenter_disables_events;
+    uint64_aligned_t mcg_cap;
 #endif
 };
 typedef struct xen_domctl_ext_vcpucontext xen_domctl_ext_vcpucontext_t;
