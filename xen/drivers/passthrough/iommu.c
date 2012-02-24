@@ -574,7 +574,8 @@ int iommu_do_domctl(
         break;
 
     case XEN_DOMCTL_assign_device:
-        if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) )
+        if ( unlikely((d = get_domain_by_id(domctl->domain)) == NULL) ||
+             unlikely(d->is_dying) )
         {
             printk(XENLOG_G_ERR
                    "XEN_DOMCTL_assign_device: get_domain_by_id() failed\n");

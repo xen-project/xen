@@ -673,10 +673,8 @@ void arch_domain_destroy(struct domain *d)
 		free_xenheap_pages(d->shared_info,
 				   get_order_from_shift(XSI_SHIFT));
 
-	if ( iommu_enabled && need_iommu(d) )	{
-		pci_release_devices(d);
+	if ( iommu_enabled && need_iommu(d) )
 		iommu_domain_destroy(d);
-	}
 
 	tlb_track_destroy(d);
 
@@ -1721,6 +1719,8 @@ int domain_relinquish_resources(struct domain *d)
 
 	switch (d->arch.relres) {
 	case RELRES_not_started:
+		pci_release_devices(d);
+
 		/* Relinquish guest resources for VT-i domain. */
 		if (is_hvm_domain(d))
 			vmx_relinquish_guest_resources(d);
