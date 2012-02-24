@@ -30,12 +30,13 @@
 
 
 /* Bitfield of the MSR_IA32_MCG_CAP register */
-#define MCG_SER_P               (1UL<<24)
 #define MCG_CAP_COUNT           0x00000000000000ffULL
-#define MCG_CTL_P               0x0000000000000100ULL
-#define MCG_EXT_P		(1UL<<9)
-#define MCG_EXT_CNT		(16)
-#define MCG_CMCI_P		(1UL<<10)
+#define MCG_CTL_P               (1ULL<<8)
+#define MCG_EXT_P               (1ULL<<9)
+#define MCG_CMCI_P              (1ULL<<10)
+#define MCG_TES_P               (1ULL<<11)
+#define MCG_EXT_CNT             16
+#define MCG_SER_P               (1ULL<<24)
 /* Other bits are reserved */
 
 /* Bitfield of the MSR_IA32_MCG_STATUS register */

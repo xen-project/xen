@@ -457,7 +457,7 @@ int vmce_init(struct cpuinfo_x86 *c)
 
     rdmsrl(MSR_IA32_MCG_CAP, value);
     /* For Guest vMCE usage */
-    g_mcg_cap = value & ~MCG_CMCI_P;
+    g_mcg_cap = value & (MCG_CAP_COUNT | MCG_CTL_P | MCG_TES_P | MCG_SER_P);
     if (value & MCG_CTL_P)
         rdmsrl(MSR_IA32_MCG_CTL, h_mcg_ctl);
 
