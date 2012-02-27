@@ -194,7 +194,9 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-unstable.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 QEMU_UPSTREAM_REVISION ?= master
-SEABIOS_UPSTREAM_TAG ?= rel-1.6.3.1
+SEABIOS_UPSTREAM_TAG ?= 002d30b5f4f48ee203be3bad9d68dc8b538ee35b
+# Wed Feb 8 20:21:29 2012 -0500
+# Add PYTHON definition to Makefile.
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
