@@ -194,9 +194,9 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-unstable.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 QEMU_UPSTREAM_REVISION ?= master
-SEABIOS_UPSTREAM_TAG ?= 002d30b5f4f48ee203be3bad9d68dc8b538ee35b
-# Wed Feb 8 20:21:29 2012 -0500
-# Add PYTHON definition to Makefile.
+SEABIOS_UPSTREAM_TAG ?= c69e288adfe6c273df4b1f3d9c223d8a4fb613cd
+# Wed Feb 8 20:23:36 2012 -0500
+# Permit .rodata.__PRETTY_FUNCTION__. sections in roms.
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
