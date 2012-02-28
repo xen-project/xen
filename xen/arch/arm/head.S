@@ -61,6 +61,19 @@ start:
 	add   r8, r10                /* r8 := paddr(DTB) */
 #endif
 
+	/* Are we the boot CPU? */
+	mrc   CP32(r0, MPIDR)
+	tst   r0, #(1<<31)           /* Multiprocessor extension supported? */
+	beq   boot_cpu
+	tst   r0, #(1<<30)           /* Uniprocessor system? */
+	bne   boot_cpu
+	bics  r0, r0, #(0xff << 24)  /* Ignore flags */
+	beq   boot_cpu               /* If all other fields are 0, we win */
+
+1:	wfi
+	b     1b
+	
+boot_cpu:
 #ifdef EARLY_UART_ADDRESS
 	/* Say hello */
 	ldr   r11, =EARLY_UART_ADDRESS  /* r11 := UART base address */
