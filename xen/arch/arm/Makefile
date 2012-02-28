@@ -40,7 +40,7 @@ $(TARGET): $(TARGET)-syms
 	# XXX: VE model loads by VMA so instead of
 	# making a proper ELF we link with LMA == VMA and adjust crudely
 	$(OBJCOPY) --change-addresses +0x80000000 $< $@
-	# XXX strip it
+	$(STRIP) $@
 
 #$(TARGET): $(TARGET)-syms $(efi-y) boot/mkelf32
 #	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
