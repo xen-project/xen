@@ -149,11 +149,13 @@
 /* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx), word 7 */
 #define X86_FEATURE_FSGSBASE	(7*32+ 0) /* {RD,WR}{FS,GS}BASE instructions */
 #define X86_FEATURE_BMI1	(7*32+ 3) /* 1st bit manipulation extensions */
+#define X86_FEATURE_HLE 	(7*32+ 4) /* Hardware Lock Elision */
 #define X86_FEATURE_AVX2	(7*32+ 5) /* AVX2 instructions */
 #define X86_FEATURE_SMEP	(7*32+ 7) /* Supervisor Mode Execution Protection */
 #define X86_FEATURE_BMI2	(7*32+ 8) /* 2nd bit manipulation extensions */
 #define X86_FEATURE_ERMS	(7*32+ 9) /* Enhanced REP MOVSB/STOSB */
 #define X86_FEATURE_INVPCID	(7*32+10) /* Invalidate Process Context ID */
+#define X86_FEATURE_RTM 	(7*32+11) /* Restricted Transactional Memory */
 
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)

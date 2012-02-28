@@ -857,9 +857,11 @@ static void pv_cpuid(struct cpu_user_regs *regs)
     case 0x00000007:
         if ( regs->ecx == 0 )
             b &= (cpufeat_mask(X86_FEATURE_BMI1) |
+                  cpufeat_mask(X86_FEATURE_HLE)  |
                   cpufeat_mask(X86_FEATURE_AVX2) |
                   cpufeat_mask(X86_FEATURE_BMI2) |
                   cpufeat_mask(X86_FEATURE_ERMS) |
+                  cpufeat_mask(X86_FEATURE_RTM)  |
                   cpufeat_mask(X86_FEATURE_FSGSBASE));
         else
             b = 0;
