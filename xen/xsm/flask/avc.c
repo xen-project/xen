@@ -132,12 +132,54 @@ static inline int avc_hash(u32 ssid, u32 tsid, u16 tclass)
     return (ssid ^ (tsid<<2) ^ (tclass<<4)) & (AVC_CACHE_SLOTS - 1);
 }
 
+/* no use making this larger than the printk buffer */
+#define AVC_BUF_SIZE 1024
+static DEFINE_SPINLOCK(avc_emerg_lock);
+static char avc_emerg_buf[AVC_BUF_SIZE];
+
+struct avc_dump_buf {
+    char *start;
+    char *pos;
+    u32 free;
+};
+
+static void avc_printk(struct avc_dump_buf *buf, const char *fmt, ...)
+{
+    int i;
+    va_list args;
+
+ again:
+    va_start(args, fmt);
+    i = vsnprintf(buf->pos, buf->free, fmt, args);
+    va_end(args);
+    if ( i < buf->free )
+    {
+        buf->pos += i;
+        buf->free -= i;
+    }
+    else if ( buf->free < AVC_BUF_SIZE )
+    {
+        buf->pos[0] = 0;
+        printk("%s", buf->start);
+        buf->pos = buf->start;
+        buf->free = AVC_BUF_SIZE;
+        goto again;
+    }
+    else
+    {
+        printk("%s", buf->start);
+        printk("\navc_printk: overflow\n");
+        buf->pos = buf->start;
+        buf->free = AVC_BUF_SIZE;
+    }
+}
+
 /**
  * avc_dump_av - Display an access vector in human-readable form.
  * @tclass: target security class
  * @av: access vector
  */
-static void avc_dump_av(u16 tclass, u32 av)
+static void avc_dump_av(struct avc_dump_buf *buf, u16 tclass, u32 av)
 {
     const char **common_pts = NULL;
     u32 common_base = 0;
@@ -145,7 +187,7 @@ static void avc_dump_av(u16 tclass, u32 av)
 
     if ( av == 0 )
     {
-        printk(" null");
+        avc_printk(buf, " null");
         return;
     }
 
@@ -159,14 +201,14 @@ static void avc_dump_av(u16 tclass, u32 av)
         }
     }
 
-    printk(" {");
+    avc_printk(buf, " {");
     i = 0;
     perm = 1;
     while ( perm < common_base )
     {
         if (perm & av)
         {
-            printk(" %s", common_pts[i]);
+            avc_printk(buf, " %s", common_pts[i]);
             av &= ~perm;
         }
         i++;
@@ -185,7 +227,7 @@ static void avc_dump_av(u16 tclass, u32 av)
             }
             if ( i2 < ARRAY_SIZE(av_perm_to_string) )
             {
-                printk(" %s", av_perm_to_string[i2].name);
+                avc_printk(buf, " %s", av_perm_to_string[i2].name);
                 av &= ~perm;
             }
         }
@@ -194,9 +236,9 @@ static void avc_dump_av(u16 tclass, u32 av)
     }
 
     if ( av )
-        printk(" 0x%x", av);
+        avc_printk(buf, " 0x%x", av);
 
-    printk(" }");
+    avc_printk(buf, " }");
 }
 
 /**
@@ -205,7 +247,7 @@ static void avc_dump_av(u16 tclass, u32 av)
  * @tsid: target security identifier
  * @tclass: target security class
  */
-static void avc_dump_query(u32 ssid, u32 tsid, u16 tclass)
+static void avc_dump_query(struct avc_dump_buf *buf, u32 ssid, u32 tsid, u16 tclass)
 {
     int rc;
     char *scontext;
@@ -213,23 +255,23 @@ static void avc_dump_query(u32 ssid, u32 tsid, u16 tclass)
 
     rc = security_sid_to_context(ssid, &scontext, &scontext_len);
     if ( rc )
-        printk("ssid=%d", ssid);
+        avc_printk(buf, "ssid=%d", ssid);
     else
     {
-        printk("scontext=%s", scontext);
+        avc_printk(buf, "scontext=%s", scontext);
         xfree(scontext);
     }
 
     rc = security_sid_to_context(tsid, &scontext, &scontext_len);
     if ( rc )
-        printk(" tsid=%d", tsid);
+        avc_printk(buf, " tsid=%d", tsid);
     else
     {
-        printk(" tcontext=%s", scontext);
+        avc_printk(buf, " tcontext=%s", scontext);
         xfree(scontext);
     }
 
-    printk(" tclass=%s", class_to_string[tclass]);
+    avc_printk(buf, " tclass=%s", class_to_string[tclass]);
 }
 
 /**
@@ -544,6 +586,7 @@ void avc_audit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
 {
     struct domain *cdom = current->domain;
     u32 denied, audited;
+    struct avc_dump_buf buf;
 
     denied = requested & ~avd->allowed;
     if ( denied )
@@ -562,36 +605,50 @@ void avc_audit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
         if ( !(audited & avd->auditallow) )
             return;
     }
+    buf.start = xmalloc_bytes(AVC_BUF_SIZE);
+    if ( !buf.start )
+    {
+        spin_lock(&avc_emerg_lock);
+        buf.start = avc_emerg_buf;
+    }
+    buf.pos = buf.start;
+    buf.free = AVC_BUF_SIZE;
 
-    printk("avc:  %s ", denied ? "denied" : "granted");
-    avc_dump_av(tclass, audited);
-    printk(" for ");
+    avc_printk(&buf, "avc:  %s ", denied ? "denied" : "granted");
+    avc_dump_av(&buf, tclass, audited);
+    avc_printk(&buf, " for ");
 
     if ( a && (a->sdom || a->tdom) )
     {
         if ( a->sdom && a->tdom && a->sdom != a->tdom )
-            printk("domid=%d target=%d ", a->sdom->domain_id, a->tdom->domain_id);
+            avc_printk(&buf, "domid=%d target=%d ", a->sdom->domain_id, a->tdom->domain_id);
         else if ( a->sdom )
-            printk("domid=%d ", a->sdom->domain_id);
+            avc_printk(&buf, "domid=%d ", a->sdom->domain_id);
         else
-            printk("target=%d ", a->tdom->domain_id);
+            avc_printk(&buf, "target=%d ", a->tdom->domain_id);
     }
     else if ( cdom )
-        printk("domid=%d ", cdom->domain_id);
+        avc_printk(&buf, "domid=%d ", cdom->domain_id);
     switch ( a ? a->type : 0 ) {
     case AVC_AUDIT_DATA_DEV:
-        printk("device=0x%lx ", a->device);
+        avc_printk(&buf, "device=0x%lx ", a->device);
         break;
     case AVC_AUDIT_DATA_IRQ:
-        printk("irq=%d ", a->irq);
+        avc_printk(&buf, "irq=%d ", a->irq);
         break;
     case AVC_AUDIT_DATA_RANGE:
-        printk("range=0x%lx-0x%lx ", a->range.start, a->range.end);
+        avc_printk(&buf, "range=0x%lx-0x%lx ", a->range.start, a->range.end);
         break;
     }
 
-    avc_dump_query(ssid, tsid, tclass);
-    printk("\n");
+    avc_dump_query(&buf, ssid, tsid, tclass);
+    avc_printk(&buf, "\n");
+    printk("%s", buf.start);
+
+    if ( buf.start == avc_emerg_buf )
+        spin_unlock(&avc_emerg_lock);
+    else
+        xfree(buf.start);
 }
 
 /**
