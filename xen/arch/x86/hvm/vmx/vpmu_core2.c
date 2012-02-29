@@ -112,6 +112,11 @@ u32 core2_ctrls_msr[] = {
     MSR_IA32_PEBS_ENABLE,
     MSR_IA32_DS_AREA};
 
+struct pmumsr {
+    unsigned int num;
+    u32 *msr;
+};
+
 struct pmumsr core2_counters = {
     3,
     core2_counters_msr

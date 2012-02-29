@@ -34,16 +34,6 @@
 #define MSR_TYPE_ARCH_COUNTER       3
 #define MSR_TYPE_ARCH_CTRL          4
 
-struct pmumsr {
-    unsigned int num;
-    u32 *msr;
-};
-
-struct msr_load_store_entry {
-    u32 msr_index;
-    u32 msr_reserved;
-    u64 msr_data;
-};
 
 /* Arch specific operations shared by all vpmus */
 struct arch_vpmu_ops {
