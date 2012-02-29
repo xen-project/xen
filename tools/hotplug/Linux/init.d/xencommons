@@ -58,7 +58,6 @@ do_start () {
 	modprobe xen-gntdev 2>/dev/null
 	modprobe evtchn 2>/dev/null
 	modprobe gntdev 2>/dev/null
-	modprobe processor-passthru 2>/dev/null
 
 	if ! `xenstore-read -s / >/dev/null 2>&1`
 	then
