@@ -813,7 +813,7 @@ char *libxl__object_to_json(libxl_ctx *ctx, const char *type,
     yajl_gen_status s;
     yajl_gen hand;
 
-    hand = libxl__yajl_gen_alloc(NULL);
+    hand = libxl_yajl_gen_alloc(NULL);
     if (!hand)
         return NULL;
 

@@ -464,7 +464,7 @@ static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
     yajl_gen hand;
     callback_id_pair *elm = NULL;
 
-    hand = libxl__yajl_gen_alloc(NULL);
+    hand = libxl_yajl_gen_alloc(NULL);
 
     if (!hand) {
         return NULL;

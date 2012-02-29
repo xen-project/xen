@@ -40,7 +40,7 @@ static inline yajl_handle libxl__yajl_alloc(const yajl_callbacks *callbacks,
     return yajl_alloc(callbacks, allocFuncs, ctx);
 }
 
-static inline yajl_gen libxl__yajl_gen_alloc(const yajl_alloc_funcs *allocFuncs)
+static inline yajl_gen libxl_yajl_gen_alloc(const yajl_alloc_funcs *allocFuncs)
 {
     return yajl_gen_alloc(allocFuncs);
 }
@@ -62,7 +62,7 @@ static inline yajl_handle libxl__yajl_alloc(const yajl_callbacks *callbacks,
     return yajl_alloc(callbacks, &cfg, allocFuncs, ctx);
 }
 
-static inline yajl_gen libxl__yajl_gen_alloc(const yajl_alloc_funcs *allocFuncs)
+static inline yajl_gen libxl_yajl_gen_alloc(const yajl_alloc_funcs *allocFuncs)
 {
     yajl_gen_config conf = { 1, "    " };
     return yajl_gen_alloc(&conf, allocFuncs);
