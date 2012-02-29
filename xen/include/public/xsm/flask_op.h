@@ -135,6 +135,13 @@ struct xen_flask_ocontext {
     uint64_t low, high;
 };
 
+struct xen_flask_peersid {
+    /* IN */
+    evtchn_port_t evtchn;
+    /* OUT */
+    uint32_t sid;
+};
+
 struct xen_flask_op {
     uint32_t cmd;
 #define FLASK_LOAD              1
@@ -159,6 +166,7 @@ struct xen_flask_op {
 #define FLASK_MEMBER            20
 #define FLASK_ADD_OCONTEXT      21
 #define FLASK_DEL_OCONTEXT      22
+#define FLASK_GET_PEER_SID      23
     uint32_t interface_version; /* XEN_FLASK_INTERFACE_VERSION */
     union {
         struct xen_flask_load load;
@@ -176,6 +184,7 @@ struct xen_flask_op {
         struct xen_flask_cache_stats cache_stats;
         /* FLASK_ADD_OCONTEXT, FLASK_DEL_OCONTEXT */
         struct xen_flask_ocontext ocontext;
+        struct xen_flask_peersid peersid;
     } u;
 };
 typedef struct xen_flask_op xen_flask_op_t;

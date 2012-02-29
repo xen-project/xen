@@ -9,6 +9,7 @@
  */
 
 #include <xen/errno.h>
+#include <xen/event.h>
 #include <xsm/xsm.h>
 #include <xen/guest_access.h>
 
@@ -44,6 +45,7 @@ integer_param("flask_enabled", flask_enabled);
         1UL<<FLASK_AVC_HASHSTATS | \
         1UL<<FLASK_AVC_CACHESTATS | \
         1UL<<FLASK_MEMBER | \
+        1UL<<FLASK_GET_PEER_SID | \
    0)
 
 static DEFINE_SPINLOCK(sel_sem);
@@ -541,6 +543,36 @@ static int flask_ocontext_add(struct xen_flask_ocontext *arg)
     return security_ocontext_add(arg->ocon, arg->low, arg->high, arg->sid);
 }
 
+static int flask_get_peer_sid(struct xen_flask_peersid *arg)
+{
+    int rv = -EINVAL;
+    struct domain *d = current->domain;
+    struct domain *peer;
+    struct evtchn *chn;
+    struct domain_security_struct *dsec;
+
+    spin_lock(&d->event_lock);
+
+    if ( !port_is_valid(d, arg->evtchn) )
+        goto out;
+
+    chn = evtchn_from_port(d, arg->evtchn);
+    if ( chn->state != ECS_INTERDOMAIN )
+        goto out;
+
+    peer = chn->u.interdomain.remote_dom;
+    if ( !peer )
+        goto out;
+
+    dsec = peer->ssid;
+    arg->sid = dsec->sid;
+    rv = 0;
+
+ out:
+    spin_unlock(&d->event_lock);
+    return rv;
+}
+
 long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
 {
     xen_flask_op_t op;
@@ -642,6 +674,10 @@ long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
 
     case FLASK_DEL_OCONTEXT:
         rv = flask_ocontext_del(&op.u.ocontext);
+        break;
+
+    case FLASK_GET_PEER_SID:
+        rv = flask_get_peer_sid(&op.u.peersid);
         break;
 
     default:

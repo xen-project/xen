@@ -32,14 +32,6 @@
 #include <public/event_channel.h>
 #include <xsm/xsm.h>
 
-#define bucket_from_port(d,p) \
-    ((d)->evtchn[(p)/EVTCHNS_PER_BUCKET])
-#define port_is_valid(d,p)    \
-    (((p) >= 0) && ((p) < MAX_EVTCHNS(d)) && \
-     (bucket_from_port(d,p) != NULL))
-#define evtchn_from_port(d,p) \
-    (&(bucket_from_port(d,p))[(p)&(EVTCHNS_PER_BUCKET-1)])
-
 #define ERROR_EXIT(_errno)                                          \
     do {                                                            \
         gdprintk(XENLOG_WARNING,                                    \
