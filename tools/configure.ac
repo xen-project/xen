@@ -78,8 +78,6 @@ AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 AX_PATH_PROG_OR_FAIL([PERL], [perl])
 AX_PATH_PROG_OR_FAIL([IP], [ip])
-AX_PATH_PROG_OR_FAIL([BISON], [bison])
-AX_PATH_PROG_OR_FAIL([FLEX], [flex])
 AS_IF([test "x$xapi" = "xy"], [
     AX_PATH_PROG_OR_FAIL([CURL], [curl-config])
     AX_PATH_PROG_OR_FAIL([XML], [xml2-config])
