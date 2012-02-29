@@ -297,13 +297,12 @@ static void printf_info(enum output_format output_format,
     if (output_format == OUTPUT_FORMAT_SXP)
         return printf_info_sexp(domid, d_config);
 
-    yajl_gen_config conf = { 1, "    " };
     const char *buf;
-    unsigned int len = 0;
+    libxl_yajl_length len = 0;
     yajl_gen_status s;
     yajl_gen hand;
 
-    hand = yajl_gen_alloc(&conf, NULL);
+    hand = libxl_yajl_gen_alloc(NULL);
     if (!hand) {
         fprintf(stderr, "unable to allocate JSON generator\n");
         return;
