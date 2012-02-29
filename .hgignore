@@ -309,7 +309,6 @@
 ^tools/config\.status$
 ^tools/config\.cache$
 ^config/Tools\.mk$
-^config/Xen\.mk$
 ^xen/\.banner.*$
 ^xen/BLOG$
 ^xen/System.map$

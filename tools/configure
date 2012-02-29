@@ -2446,8 +2446,6 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 ac_config_files="$ac_config_files ../config/Tools.mk"
 
-ac_config_files="$ac_config_files ../config/Xen.mk"
-
 ac_config_headers="$ac_config_headers config.h"
 
 
@@ -9657,7 +9655,6 @@ for ac_config_target in $ac_config_targets
 do
   case $ac_config_target in
     "../config/Tools.mk") CONFIG_FILES="$CONFIG_FILES ../config/Tools.mk" ;;
-    "../config/Xen.mk") CONFIG_FILES="$CONFIG_FILES ../config/Xen.mk" ;;
     "config.h") CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;
