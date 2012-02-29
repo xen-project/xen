@@ -430,6 +430,33 @@ accept the defaults for these options wherever possible.
 
 =over 4
 
+=item B<bios="STRING">
+
+Select the virtual firmware that is exposed to the guest.
+By default, a guess is made based on the device model, but sometimes
+it may be useful to request a different one, like UEFI.
+
+=over 4
+
+=item B<rombios>
+
+Loads ROMBIOS, a 16-bit x86 compatible BIOS. This is used by default
+when device_model_version=qemu-xen-traditional. This is the only BIOS
+option supported when device_model_version=qemu-xen-traditional. This is
+the BIOS used by all previous Xen versions.
+
+=item B<seabios>
+
+Loads SeaBIOS, a 16-bit x86 compatible BIOS. This is used by default
+with device_model_version=qemu-xen.
+
+=item B<ovmf>
+
+Loads OVMF, a standard UEFI firmware by Tianocore project.
+Requires device_model_version=qemu-xen.
+
+=back
+
 =item B<pae=BOOLEAN>
 
 Hide or expose the IA32 Physical Address Extensions. These extensions

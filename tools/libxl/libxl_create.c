@@ -89,6 +89,7 @@ int libxl_init_build_info(libxl_ctx *ctx,
     case LIBXL_DOMAIN_TYPE_HVM:
         b_info->video_memkb = 8 * 1024;
         b_info->u.hvm.firmware = NULL;
+        b_info->u.hvm.bios = 0;
         b_info->u.hvm.pae = 1;
         b_info->u.hvm.apic = 1;
         b_info->u.hvm.acpi = 1;

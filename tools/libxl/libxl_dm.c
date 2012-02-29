@@ -66,6 +66,8 @@ const char *libxl__domain_device_model(libxl__gc *gc,
 static const char *libxl__domain_bios(libxl__gc *gc,
                                 const libxl_domain_build_info *info)
 {
+    if (info->u.hvm.bios)
+       return libxl_bios_type_to_string(info->u.hvm.bios);
     switch (info->device_model_version) {
     case 1: return "rombios";
     case 2: return "seabios";

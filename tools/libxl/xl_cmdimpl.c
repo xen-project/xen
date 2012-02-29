@@ -703,6 +703,12 @@ static void parse_config_data(const char *configfile_filename_report,
 
         xlu_cfg_replace_string (config, "firmware_override",
                                 &b_info->u.hvm.firmware, 0);
+        if (!xlu_cfg_get_string(config, "bios", &buf, 0) &&
+            libxl_bios_type_from_string(buf, &b_info->u.hvm.bios)) {
+                fprintf(stderr, "ERROR: invalid value \"%s\" for \"bios\"\n",
+                    buf);
+                exit (1);
+        }
         if (!xlu_cfg_get_long (config, "pae", &l, 0))
             b_info->u.hvm.pae = l;
         if (!xlu_cfg_get_long (config, "apic", &l, 0))

@@ -99,6 +99,12 @@ libxl_timer_mode = Enumeration("timer_mode", [
     (3, "one_missed_tick_pending"),
     ])
 
+libxl_bios_type = Enumeration("bios_type", [
+    (1, "rombios"),
+    (2, "seabios"),
+    (3, "ovmf"),
+    ])
+
 #
 # Complex libxl types
 #
@@ -228,6 +234,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
 
     ("u", KeyedUnion(None, libxl_domain_type, "type",
                 [("hvm", Struct(None, [("firmware", string),
+                                       ("bios", libxl_bios_type),
                                        ("pae", bool),
                                        ("apic", bool),
                                        ("acpi", bool),
