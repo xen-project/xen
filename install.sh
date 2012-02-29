@@ -49,9 +49,4 @@ rm -rf "$tmp"
 
 echo "All done."
 
-echo "Checking to see whether prerequisite tools are installed..."
-cd $src/../check
-./chk install
-echo "All done."
-
 exit 0
