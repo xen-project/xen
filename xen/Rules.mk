@@ -12,6 +12,7 @@ frame_pointer ?= n
 lto           ?= n
 
 include $(XEN_ROOT)/Config.mk
+include $(XEN_ROOT)/config/Xen.mk
 
 # Hardcoded configuration implications and dependencies.
 # Do this is a neater way if it becomes unwieldy.

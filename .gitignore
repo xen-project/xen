@@ -111,6 +111,7 @@ tools/config.log
 tools/config.status
 tools/config.cache
 config/Tools.mk
+config/Xen.mk
 tools/blktap2/daemon/blktapctrl
 tools/blktap2/drivers/img2qcow
 tools/blktap2/drivers/lock-util
