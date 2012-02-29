@@ -182,12 +182,12 @@ static int flask_evtchn_unbound(struct domain *d1, struct evtchn *chn,
 static int flask_evtchn_interdomain(struct domain *d1, struct evtchn *chn1, 
                                     struct domain *d2, struct evtchn *chn2)
 {
-    u32 newsid1;
-    u32 newsid2;
+    u32 newsid;
     int rc;
-    struct domain_security_struct *dsec1, *dsec2;
+    struct domain_security_struct *dsec, *dsec1, *dsec2;
     struct evtchn_security_struct *esec1, *esec2;
 
+    dsec = current->domain->ssid;
     dsec1 = d1->ssid;
     dsec2 = d2->ssid;
 
@@ -195,7 +195,7 @@ static int flask_evtchn_interdomain(struct domain *d1, struct evtchn *chn1,
     esec2 = chn2->ssid;
 
     rc = security_transition_sid(dsec1->sid, dsec2->sid, 
-                                 SECCLASS_EVENT, &newsid1);
+                                 SECCLASS_EVENT, &newsid);
     if ( rc )
     {
         printk("%s: security_transition_sid failed, rc=%d (domain=%d)\n",
@@ -203,33 +203,19 @@ static int flask_evtchn_interdomain(struct domain *d1, struct evtchn *chn1,
         return rc;
     }
 
-    rc = avc_has_perm(dsec1->sid, newsid1, SECCLASS_EVENT, EVENT__CREATE, NULL);
+    rc = avc_has_perm(dsec->sid, newsid, SECCLASS_EVENT, EVENT__CREATE, NULL);
     if ( rc )
         return rc;
 
-    rc = security_transition_sid(dsec2->sid, dsec1->sid, 
-                                 SECCLASS_EVENT, &newsid2);
-    if ( rc )
-    {
-        printk("%s: security_transition_sid failed, rc=%d (domain=%d)\n",
-               __FUNCTION__, -rc, d1->domain_id);
-        return rc;
-    }
-
-    rc = avc_has_perm(dsec2->sid, newsid2, SECCLASS_EVENT, EVENT__CREATE, NULL);
+    rc = avc_has_perm(newsid, dsec2->sid, SECCLASS_EVENT, EVENT__BIND, NULL);
     if ( rc )
         return rc;
 
-    rc = avc_has_perm(newsid1, dsec2->sid, SECCLASS_EVENT, EVENT__BIND, NULL);
+    rc = avc_has_perm(esec2->sid, dsec1->sid, SECCLASS_EVENT, EVENT__BIND, NULL);
     if ( rc )
         return rc;
 
-    rc = avc_has_perm(newsid2, dsec1->sid, SECCLASS_EVENT, EVENT__BIND, NULL);
-    if ( rc )
-        return rc;    
-
-    esec1->sid = newsid1;
-    esec2->sid = newsid2;
+    esec1->sid = newsid;
 
     return rc;
 }
