@@ -212,11 +212,8 @@ struct bios_info {
 #ifdef ENABLE_SEABIOS
     { "seabios", &seabios_config, },
 #endif
-#ifdef ENABLE_OVMF32
-    { "ovmf-ia32", &ovmf32_config, },
-#endif
-#ifdef ENABLE_OVMF64
-    { "ovmf-x64", &ovmf64_config, },
+#ifdef ENABLE_OVMF
+    { "ovmf", &ovmf_config, },
 #endif
     { NULL, NULL }
 };

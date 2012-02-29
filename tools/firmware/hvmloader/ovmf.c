@@ -35,8 +35,7 @@
 #include <xen/hvm/ioreq.h>
 #include <xen/memory.h>
 
-#define ROM_INCLUDE_OVMF32
-#define ROM_INCLUDE_OVMF64
+#define ROM_INCLUDE_OVMF
 #include "roms.inc"
 
 #define OVMF_BEGIN              0xFFF00000ULL
@@ -48,8 +47,8 @@
 #define LOWCHUNK_MAXOFFSET      0x0000FFFF
 #define LOWCHUNK_END            (OVMF_BEGIN + OVMF_SIZE)
 
-extern unsigned char dsdt_anycpu[], dsdt_15cpu[];
-extern int dsdt_anycpu_len, dsdt_15cpu_len;
+extern unsigned char dsdt_anycpu[];
+extern int dsdt_anycpu_len;
 
 static void ovmf_load(const struct bios_config *config)
 {
@@ -79,8 +78,8 @@ static void ovmf_acpi_build_tables(void)
     struct acpi_config config = {
         .dsdt_anycpu = dsdt_anycpu,
         .dsdt_anycpu_len = dsdt_anycpu_len,
-        .dsdt_15cpu = dsdt_15cpu,
-        .dsdt_15cpu_len = dsdt_15cpu_len,
+        .dsdt_15cpu = NULL, 
+        .dsdt_15cpu_len = 0
     };
 
     acpi_build_tables(&config, ACPI_PHYSICAL_ADDRESS);
@@ -94,33 +93,11 @@ static void ovmf_create_smbios_tables(void)
         SMBIOS_PHYSICAL_END);
 }
 
-struct bios_config ovmf32_config =  {
-    .name = "OVMF-IA32",
+struct bios_config ovmf_config =  {
+    .name = "OVMF",
 
-    .image = ovmf32,
-    .image_size = sizeof(ovmf32),
-
-    .bios_address = 0,
-    .bios_load = ovmf_load,
-
-    .load_roms = 0,
-
-    .bios_info_setup = NULL,
-    .bios_info_finish = NULL,
-
-    .e820_setup = NULL,
-
-    .acpi_build_tables = ovmf_acpi_build_tables,
-    .create_mp_tables = NULL,
-    .create_smbios_tables = ovmf_create_smbios_tables,
-    .create_pir_tables = NULL,
-};
-
-struct bios_config ovmf64_config =  {
-    .name = "OVMF-X64",
-
-    .image = ovmf64,
-    .image_size = sizeof(ovmf64),
+    .image = ovmf,
+    .image_size = sizeof(ovmf),
 
     .bios_address = 0,
     .bios_load = ovmf_load,

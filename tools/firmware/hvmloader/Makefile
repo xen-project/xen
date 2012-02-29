@@ -55,10 +55,9 @@ ROMS :=
 
 ifeq ($(CONFIG_OVMF),y)
 OBJS += ovmf.o
-CFLAGS += -DENABLE_OVMF32 -DENABLE_OVMF64
-OVMF32_ROM := $(OVMF_DIR)/ovmf-ia32.bin
-OVMF64_ROM := $(OVMF_DIR)/ovmf-x64.bin
-ROMS += $(OVMF32_ROM) $(OVMF64_ROM)
+CFLAGS += -DENABLE_OVMF
+OVMF_ROM := $(OVMF_DIR)/ovmf.bin
+ROMS += $(OVMF_ROM)
 endif
 
 ifeq ($(CONFIG_ROMBIOS),y)
@@ -102,15 +101,9 @@ ifneq ($(SEABIOS_ROM),)
 	echo "#endif" >> $@.new
 endif
 
-ifneq ($(OVMF32_ROM),)
-	echo "#ifdef ROM_INCLUDE_OVMF32" >> $@.new
-	sh ./mkhex ovmf32 $(OVMF32_ROM) >> $@.new
-	echo "#endif" >> $@.new	
-endif 
-
-ifneq ($(OVMF64_ROM),)
-	echo "#ifdef ROM_INCLUDE_OVMF64" >> $@.new
-	sh ./mkhex ovmf64 $(OVMF64_ROM) >> $@.new
+ifneq ($(OVMF_ROM),)
+	echo "#ifdef ROM_INCLUDE_OVMF" >> $@.new
+	sh ./mkhex ovmf $(OVMF_ROM) >> $@.new
 	echo "#endif" >> $@.new	
 endif 
 
