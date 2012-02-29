@@ -1105,7 +1105,7 @@ int alloc_unbound_xen_event_channel(
 {
     struct evtchn *chn;
     struct domain *d = local_vcpu->domain;
-    int            port;
+    int            port, rc;
 
     spin_lock(&d->event_lock);
 
@@ -1113,10 +1113,12 @@ int alloc_unbound_xen_event_channel(
         goto out;
     chn = evtchn_from_port(d, port);
 
+    rc = xsm_evtchn_unbound(d, chn, remote_domid);
+
     chn->state = ECS_UNBOUND;
     chn->xen_consumer = get_xen_consumer(notification_fn);
     chn->notify_vcpu_id = local_vcpu->vcpu_id;
-    chn->u.unbound.remote_domid = remote_domid;
+    chn->u.unbound.remote_domid = !rc ? remote_domid : DOMID_INVALID;
 
  out:
     spin_unlock(&d->event_lock);
