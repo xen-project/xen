@@ -88,6 +88,8 @@ void vpmu_initialise(struct vcpu *v)
 
     if ( vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
         vpmu_destroy(v);
+    vpmu_clear(vpmu);
+    vpmu->context = NULL;
 
     switch ( vendor )
     {
@@ -106,13 +108,6 @@ void vpmu_initialise(struct vcpu *v)
                "Unknown CPU vendor %d\n", vendor);
         opt_vpmu_enabled = 0;
         break;
-    }
-
-    if ( vpmu->arch_vpmu_ops != NULL )
-    {
-        vpmu_clear(vpmu);
-        vpmu->context = NULL;
-        vpmu->arch_vpmu_ops->arch_vpmu_initialise(v);
     }
 }
 

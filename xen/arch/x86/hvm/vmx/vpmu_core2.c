@@ -583,9 +583,10 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
     return 1;
 }
 
-static void core2_vpmu_initialise(struct vcpu *v)
+static int core2_vpmu_initialise(struct vcpu *v)
 {
     check_pmc_quirk();
+    return 0;
 }
 
 static void core2_vpmu_destroy(struct vcpu *v)
@@ -607,7 +608,6 @@ struct arch_vpmu_ops core2_vpmu_ops = {
     .do_wrmsr = core2_vpmu_do_wrmsr,
     .do_rdmsr = core2_vpmu_do_rdmsr,
     .do_interrupt = core2_vpmu_do_interrupt,
-    .arch_vpmu_initialise = core2_vpmu_initialise,
     .arch_vpmu_destroy = core2_vpmu_destroy,
     .arch_vpmu_save = core2_vpmu_save,
     .arch_vpmu_load = core2_vpmu_load
@@ -633,7 +633,7 @@ int vmx_vpmu_initialise(struct vcpu *v)
         case 47:
         case 58:
             vpmu->arch_vpmu_ops = &core2_vpmu_ops;
-            return 0;
+            return core2_vpmu_initialise(v);
         }
     }
 

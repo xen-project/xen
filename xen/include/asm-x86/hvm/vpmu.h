@@ -40,7 +40,6 @@ struct arch_vpmu_ops {
     int (*do_wrmsr)(unsigned int msr, uint64_t msr_content);
     int (*do_rdmsr)(unsigned int msr, uint64_t *msr_content);
     int (*do_interrupt)(struct cpu_user_regs *regs);
-    void (*arch_vpmu_initialise)(struct vcpu *v);
     void (*arch_vpmu_destroy)(struct vcpu *v);
     void (*arch_vpmu_save)(struct vcpu *v);
     void (*arch_vpmu_load)(struct vcpu *v);

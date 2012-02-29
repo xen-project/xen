@@ -292,14 +292,14 @@ static int amd_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
     return 1;
 }
 
-static void amd_vpmu_initialise(struct vcpu *v)
+static int amd_vpmu_initialise(struct vcpu *v)
 {
     struct amd_vpmu_context *ctxt = NULL;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t family = current_cpu_data.x86;
 
     if ( vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
-        return;
+        return 0;
 
     if ( counters == NULL )
     {
@@ -329,11 +329,12 @@ static void amd_vpmu_initialise(struct vcpu *v)
         gdprintk(XENLOG_WARNING, "Insufficient memory for PMU, "
             " PMU feature is unavailable on domain %d vcpu %d.\n",
             v->vcpu_id, v->domain->domain_id);
-        return;
+        return -ENOMEM;
     }
 
     vpmu->context = (void *)ctxt;
     vpmu_set(vpmu, VPMU_CONTEXT_ALLOCATED);
+    return 0;
 }
 
 static void amd_vpmu_destroy(struct vcpu *v)
@@ -357,7 +358,6 @@ struct arch_vpmu_ops amd_vpmu_ops = {
     .do_wrmsr = amd_vpmu_do_wrmsr,
     .do_rdmsr = amd_vpmu_do_rdmsr,
     .do_interrupt = amd_vpmu_do_interrupt,
-    .arch_vpmu_initialise = amd_vpmu_initialise,
     .arch_vpmu_destroy = amd_vpmu_destroy,
     .arch_vpmu_save = amd_vpmu_save,
     .arch_vpmu_load = amd_vpmu_restore
@@ -375,7 +375,7 @@ int svm_vpmu_initialise(struct vcpu *v)
     case 0x14:
     case 0x15:
         vpmu->arch_vpmu_ops = &amd_vpmu_ops;
-        return 0;
+        return amd_vpmu_initialise(v);
     }
 
     printk("VPMU: Initialization failed. "
