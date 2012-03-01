@@ -382,7 +382,7 @@ static void parse_disk_config_multistring(XLU_Config **config,
 {
     int e;
 
-    libxl_device_disk_init(ctx, disk);
+    libxl_device_disk_init(disk);
 
     if (!*config) {
         *config = xlu_cfg_init(stderr, "command line");

@@ -1186,10 +1186,19 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
 
 /******************************************************************************/
 
-int libxl_device_disk_init(libxl_ctx *ctx, libxl_device_disk *disk)
+void libxl_device_disk_init(libxl_device_disk *disk)
 {
     memset(disk, 0x00, sizeof(libxl_device_disk));
-    return 0;
+}
+
+int libxl__device_disk_setdefault(libxl__gc *gc, libxl_device_disk *disk)
+{
+    int rc;
+
+    rc = libxl__device_disk_set_backend(gc, disk);
+    if (rc) return rc;
+
+    return rc;
 }
 
 static int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
@@ -1241,10 +1250,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     libxl__device device;
     int major, minor, rc;
 
-    rc = libxl__device_disk_set_backend(gc, disk);
-    if (rc) goto out;
-
-    rc = libxl__device_disk_set_backend(gc, disk);
+    rc = libxl__device_disk_setdefault(gc, disk);
     if (rc) goto out;
 
     front = flexarray_make(16, 1);
@@ -1396,7 +1402,7 @@ static void libxl__device_disk_from_xs_be(libxl__gc *gc,
     unsigned int len;
     char *tmp;
 
-    libxl_device_disk_init(ctx, disk);
+    libxl_device_disk_init(disk);
 
     tmp = xs_read(ctx->xsh, XBT_NULL,
                   libxl__sprintf(gc, "%s/params", be_path), &len);
@@ -1440,7 +1446,7 @@ int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
     char *dompath, *path;
     int rc = ERROR_FAIL;
 
-    libxl_device_disk_init(ctx, disk);
+    libxl_device_disk_init(disk);
 
     dompath = libxl__xs_get_dompath(gc, domid);
     if (!dompath) {
@@ -1604,7 +1610,7 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
     char *ret = NULL;
     int rc;
 
-    rc = libxl__device_disk_set_backend(gc, disk);
+    rc = libxl__device_disk_setdefault(gc, disk);
     if (rc) goto out;
 
     switch (disk->backend) {

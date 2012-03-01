@@ -536,7 +536,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     if (ret) goto error_out;
 
     for (i = 0; i < d_config->num_disks; i++) {
-        ret = libxl__device_disk_set_backend(gc, &d_config->disks[i]);
+        ret = libxl__device_disk_setdefault(gc, &d_config->disks[i]);
         if (ret) goto error_out;
     }
 

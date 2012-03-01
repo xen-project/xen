@@ -498,7 +498,7 @@ void libxl_vminfo_list_free(libxl_vminfo *list, int nr);
  */
 
 /* Disks */
-int libxl_device_disk_init(libxl_ctx *ctx, libxl_device_disk *disk);
+void libxl_device_disk_init(libxl_device_disk *disk);
 int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 int libxl_device_disk_remove(libxl_ctx *ctx, uint32_t domid,
                              libxl_device_disk *disk,
