@@ -3843,8 +3843,6 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 
-
-
 # pkg.m4 - Macros to locate and utilise pkg-config.            -*- Autoconf -*-
 # serial 1 (pkg-config-0.24)
 #
@@ -6137,18 +6135,6 @@ then
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
     as_fn_error $? "$python_version is too old, minimum required version is 2.3" "$LINENO" 5
-else
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-fi
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for python xml.dom.minidom" >&5
-$as_echo_n "checking for python xml.dom.minidom... " >&6; }
-`$PYTHON -c 'import xml.dom.minidom'`
-if test "$?" != "0"
-then
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-    as_fn_error $? "Unable to find xml.dom.minidom module" "$LINENO" 5
 else
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
