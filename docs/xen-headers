@@ -86,13 +86,13 @@ sub compile_fglobs () {
     local ($_);
     my $f = "sub file_wanted (\$) {\n    local (\$_) = \"/\$leaf\";\n";
     foreach my $fglob (@fglobs) {
-	$_ = $fglob->[0];
-	$_ = "**$_**" unless m/[?*]/;
-	s/\W/\\$&/g;
-	s,\\\*\\\*,.*,g;
-	s,\\\*,[^/]*,g;
-	s,\\\?,[^/],g;
-	$f .= "    return $fglob->[1] if m,$_,o;\n";
+        $_ = $fglob->[0];
+        $_ = "**$_**" unless m/[?*]/;
+        s/\W/\\$&/g;
+        s,\\\*\\\*,.*,g;
+        s,\\\*,[^/]*,g;
+        s,\\\?,[^/],g;
+        $f .= "    return $fglob->[1] if m,$_,o;\n";
     }
     $f .= "    return 1;\n}\n1;\n";
     debug(3, $f);
@@ -136,15 +136,15 @@ sub norm ($) {
     local ($_) = @_;
     my $no = '';
     while (length) {
-	if (s/^(?:\s|^\W)+//) {
-	    $no .= $&;
-	} elsif (s/^(struct|union|enum)\s+(\w+)\b//) {
-	    $no .= ahref($&, (ucfirst $1), $2);
-	} elsif (s/^\w+\b//) {
-	    $no .= ahref($&, [qw(Func Typedef)], $&);
-	} else {
-	    die "$_ ?";
-	}
+        if (s/^(?:\s|^\W)+//) {
+            $no .= $&;
+        } elsif (s/^(struct|union|enum)\s+(\w+)\b//) {
+            $no .= ahref($&, (ucfirst $1), $2);
+        } elsif (s/^\w+\b//) {
+            $no .= ahref($&, [qw(Func Typedef)], $&);
+        } else {
+            die "$_ ?";
+        }
     }
     return $no;
 }
@@ -195,25 +195,25 @@ sub ahref ($$$) {
 sub defmacro ($) {
     my ($valname) = @_;
     if (!$in_enum) {
-	return $valname;
+        return $valname;
     } elsif (substr($valname, 0, (length $in_enum->[0])) ne $in_enum->[0]) {
-	warning("in enum expecting $in_enum->[0]* got $valname");
-	return $valname;
+        warning("in enum expecting $in_enum->[0]* got $valname");
+        return $valname;
     } else {
-	my $reftype = $in_enum->[1];
-	my $refname = $in_enum->[2].substr($valname, (length $in_enum->[0]));
-	$sdef{$reftype}{$refname}{Xrefs}{$leaf,$.} =
-	    "[see <a href=\"$leaf_opath#EnumVal_$valname\">$valname</a>]";
-	$sdef{EnumVal}{$valname}{Used} = 1;
-	return defn($valname,'EnumVal',$valname, refhref($reftype,$refname));
+        my $reftype = $in_enum->[1];
+        my $refname = $in_enum->[2].substr($valname, (length $in_enum->[0]));
+        $sdef{$reftype}{$refname}{Xrefs}{$leaf,$.} =
+            "[see <a href=\"$leaf_opath#EnumVal_$valname\">$valname</a>]";
+        $sdef{EnumVal}{$valname}{Used} = 1;
+        return defn($valname,'EnumVal',$valname, refhref($reftype,$refname));
     }
 }
 
 sub out_xrefs ($) {
     my ($linemapfunc) = @_;
     foreach my $xref (@pending_xrefs) {
-	$o .= $linemapfunc->($xref);
-	$o .= "\n";
+        $o .= $linemapfunc->($xref);
+        $o .= "\n";
     }
     @pending_xrefs = ();
 }
@@ -222,11 +222,11 @@ sub incontents ($$$) {
     my ($text, $seq, $anchor) = @_;
     $anchor = "incontents_$anchor";
     if ($pass==2) {
-	push @incontents, { 
-	    Seq => $seq,
-	    Href => "$leaf_opath#$anchor",
-	    Title => $text,
-	};
+        push @incontents, { 
+            Seq => $seq,
+            Href => "$leaf_opath#$anchor",
+            Title => $text,
+        };
     }
     return "<a name=\"$anchor\"><strong>$text</strong></a>";
 }
@@ -250,41 +250,41 @@ sub process_file ($$) {
     $o .= "<html><head><title>$leaf - $xtitle</title></head><body><pre>\n";
     
     while (<$in>) {
-	s/\&/\&amp;/g;
-	s/\</\&lt;/g;
-	s/\>/\&gt;/g;
+        s/\&/\&amp;/g;
+        s/\</\&lt;/g;
+        s/\>/\&gt;/g;
 
-	if (m/^(.*\`)[ \t]*$/) {
-	    my $lhs = $1;
-	    out_xrefs(sub { "$1 $_[0]"; });
-	} elsif (m/^\s*$/) {
-	    out_xrefs(sub { sprintf "/* %70s */", $_[0]; });
-	}
+        if (m/^(.*\`)[ \t]*$/) {
+            my $lhs = $1;
+            out_xrefs(sub { "$1 $_[0]"; });
+        } elsif (m/^\s*$/) {
+            out_xrefs(sub { sprintf "/* %70s */", $_[0]; });
+        }
 
-	# In case of comments, strip " /* ` " and " * ` ";
-	my $lstripped = s,^ \s* /? \* \s* \` \  ,,x ? $&: '';
+        # In case of comments, strip " /* ` " and " * ` ";
+        my $lstripped = s,^ \s* /? \* \s* \` \  ,,x ? $&: '';
 
-	# Strip trailing whitespace and perhaps trailing "*/" or "*"
-	s,(?: \s* \* /? )? \s* $,,x or die;
-	my $rstripped = $&;
+        # Strip trailing whitespace and perhaps trailing "*/" or "*"
+        s,(?: \s* \* /? )? \s* $,,x or die;
+        my $rstripped = $&;
 
-	# Now the actual functionality:
+        # Now the actual functionality:
 
-	debug(3,"$. $_");
+        debug(3,"$. $_");
 
-	if (!m/^(?: __attribute__ | __pragma__ )\b/x &&
-	    s/^( (?: \w+\  )? ) (\w+[a-z]\w+) ( \( .*)$
+        if (!m/^(?: __attribute__ | __pragma__ )\b/x &&
+            s/^( (?: \w+\  )? ) (\w+[a-z]\w+) ( \( .*)$
              / $1.defn($2,'Func',$2).norm($3) /xe) {
-	} elsif (s/^((struct|union|enum) \  (\w+)) ( \s+ \{ .* )$
+        } elsif (s/^((struct|union|enum) \  (\w+)) ( \s+ \{ .* )$
                   / defn($1,(ucfirst $2),$3).norm($4) /xe) {
-	    if ($2 eq 'enum') {
-		if (m,/[/*] (\w+)\* \=\&gt\; (\w+)\*\(\),) { 
-		    in_enum($1,'Func',$2)
-		} elsif (m,/[/*] (\w+)\* \=\&gt\; (struct) (\w+)\*,) { 
-		    in_enum($1,(ucfirst $2),$3);
-	        }
-	    }
-	} elsif (s/^(typedef \s+ )((struct|union|enum) \  (\w+))
+            if ($2 eq 'enum') {
+                if (m,/[/*] (\w+)\* \=\&gt\; (\w+)\*\(\),) { 
+                    in_enum($1,'Func',$2)
+                } elsif (m,/[/*] (\w+)\* \=\&gt\; (struct) (\w+)\*,) { 
+                    in_enum($1,(ucfirst $2),$3);
+                }
+            }
+        } elsif (s/^(typedef \s+ )((struct|union|enum) \  (\w+))
                       (\s+) (\w+)(\;)$
                   / norm($1).norm($2).$5.
                     defn($6,'Typedef',$6,undef,[(ucfirst $3),$4]).
@@ -292,32 +292,32 @@ sub process_file ($$) {
         } elsif (s/^(typedef \s+) (\w+) (\s+) (\w+) (\;)$
                   / $1.norm($2).$3.
                     defn($4,'Typedef',$4,undef,['Typedef',$2]). $5 /xe) {
-	} elsif (s/^( \s* \#define \s+ ) (\w+) ( \s+\S )
+        } elsif (s/^( \s* \#define \s+ ) (\w+) ( \s+\S )
                   / $1.defmacro($2).norm($3) /xe) {
-	} elsif (s/( \`incontents \s+ (\d+) \s+ (\w+) \s+ )(\S .* \S)
+        } elsif (s/( \`incontents \s+ (\d+) \s+ (\w+) \s+ )(\S .* \S)
                  / norm($1).incontents($4, $2, $3) /xe) {
-	} else {
-	    if (m/^\s*\}/) {
-		$in_enum = undef;
-	    }
-	    $_ = norm($_);
-	}
+        } else {
+            if (m/^\s*\}/) {
+                $in_enum = undef;
+            }
+            $_ = norm($_);
+        }
 
-	# Write the line out
+        # Write the line out
 
-	if ($pass == 2) {
-	    $o .= $lstripped;
-	    $o .= $_;
-	    $o .= $rstripped;
-	}
+        if ($pass == 2) {
+            $o .= $lstripped;
+            $o .= $_;
+            $o .= $rstripped;
+        }
     }
 
     warning("pending xrefs at end of file") if @pending_xrefs;
 
     if ($pass == 2) {
-	push @outfiles, [ $leaf, $leaf_opath ];
-	$o .= "</pre></body></html>";
-	write_file($outfile, $o);
+        push @outfiles, [ $leaf, $leaf_opath ];
+        $o .= "</pre></body></html>";
+        write_file($outfile, $o);
     }
 }
 
@@ -332,18 +332,18 @@ sub output_index () {
 <ul>
 END
     foreach my $ic (sort { $a->{Seq} <=> $b->{Seq} } @incontents) {
-	$o .= "<li><a href=\"$ic->{Href}\">$ic->{Title}</a></li>\n";
+        $o .= "<li><a href=\"$ic->{Href}\">$ic->{Title}</a></li>\n";
     }
     $o .= "</ul>\n";
     my $forkind = sub {
-	my ($type,$desc,$pfx,$sfx) = @_;
-	$o .= "<h2>$desc</h2><ul>\n";
-	foreach my $name (sort keys %{ $sdef{$type} }) {
-	    my $href = refhref($type,$name);
-	    next unless $href =~ m/\S/;
-	    $o .= "<li><a $href>$pfx$name$sfx</a></li>\n";
-	}
-	$o .= "</ul>\n";
+        my ($type,$desc,$pfx,$sfx) = @_;
+        $o .= "<h2>$desc</h2><ul>\n";
+        foreach my $name (sort keys %{ $sdef{$type} }) {
+            my $href = refhref($type,$name);
+            next unless $href =~ m/\S/;
+            $o .= "<li><a $href>$pfx$name$sfx</a></li>\n";
+        }
+        $o .= "</ul>\n";
     };
     $forkind->('Func','Functions','','()');
     $forkind->('Struct','Structs','struct ','');
@@ -352,7 +352,7 @@ END
     $forkind->('EnumVal','Enum values and individual #defines','','');
     $o .= "</ul>\n<h2>Files</h2><ul>\n";
     foreach my $of (sort { $a->[0] cmp $b->[0] } @outfiles) {
-	$o .= "<li><a href=\"$of->[1]\">$of->[0]</a></li>\n";
+        $o .= "<li><a href=\"$of->[1]\">$of->[0]</a></li>\n";
     }
     $o .= "</ul></body></html>\n";
     write_file("$outdir/index.html", $o);
@@ -362,37 +362,37 @@ foreach $pass (qw(1 2)) {
     my $depspath = "$outdir/.deps";
     my $depsout;
     if ($pass==2) {
-	$depsout = new IO::File "$depspath.new", 'w' or die $!;
+        $depsout = new IO::File "$depspath.new", 'w' or die $!;
     }
 
     find({ wanted => 
-	       sub {
-		   return unless m/\.h$/;
-		   lstat $File::Find::name or die "$File::Find::name $!";
-		   -f _ or die "$File::Find::name";
-		   substr($File::Find::name, 0, 1+length $basedir) 
-		       eq "$basedir/"
-		       or die "$File::Find::name $basedir";
-		   $leaf = substr($File::Find::name, 1+length $basedir);
-		   if (!file_wanted()) {
-		       debug(1,"$pass $File::Find::name excluded");
-		       return;
-		   }
-		   $leaf_opath = $leaf;
-		   $leaf_opath =~ s#/#,#g;
-		   $leaf_opath .= ".html";
-		   print $depsout "$outdir/index.html: $File::Find::name\n"
-		       or die $!
-		       if $pass==2;
-		   process_file($File::Find::name, $outdir.'/'.$leaf_opath);
-	   },
-	   no_chdir => 1,
-	 },
-	 map { "$basedir/$_" } @indirs);
+               sub {
+                   return unless m/\.h$/;
+                   lstat $File::Find::name or die "$File::Find::name $!";
+                   -f _ or die "$File::Find::name";
+                   substr($File::Find::name, 0, 1+length $basedir) 
+                       eq "$basedir/"
+                       or die "$File::Find::name $basedir";
+                   $leaf = substr($File::Find::name, 1+length $basedir);
+                   if (!file_wanted()) {
+                       debug(1,"$pass $File::Find::name excluded");
+                       return;
+                   }
+                   $leaf_opath = $leaf;
+                   $leaf_opath =~ s#/#,#g;
+                   $leaf_opath .= ".html";
+                   print $depsout "$outdir/index.html: $File::Find::name\n"
+                       or die $!
+                       if $pass==2;
+                   process_file($File::Find::name, $outdir.'/'.$leaf_opath);
+           },
+           no_chdir => 1,
+         },
+         map { "$basedir/$_" } @indirs);
 
     if ($pass==2) {
-	close $depsout or die $!;
-	rename "$depspath.new", "$depspath" or die $!;
+        close $depsout or die $!;
+        rename "$depspath.new", "$depspath" or die $!;
     }
 }
 
