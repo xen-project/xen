@@ -46,7 +46,8 @@
 #define NR_SPECIAL_PAGES     5
 #define special_pfn(x) (0xff000u - NR_SPECIAL_PAGES + (x))
 
-static void build_hvm_info(void *hvm_info_page, uint64_t mem_size)
+static void build_hvm_info(void *hvm_info_page, uint64_t mem_size,
+                           uint64_t mmio_start, uint64_t mmio_size)
 {
     struct hvm_info_table *hvm_info = (struct hvm_info_table *)
         (((unsigned char *)hvm_info_page) + HVM_INFO_OFFSET);
@@ -54,10 +55,10 @@ static void build_hvm_info(void *hvm_info_page, uint64_t mem_size)
     uint8_t sum;
     int i;
 
-    if ( lowmem_end > HVM_BELOW_4G_RAM_END )
+    if ( lowmem_end > mmio_start )
     {
-        highmem_end = lowmem_end + (1ull<<32) - HVM_BELOW_4G_RAM_END;
-        lowmem_end = HVM_BELOW_4G_RAM_END;
+        highmem_end = (1ull<<32) + (lowmem_end - mmio_start);
+        lowmem_end = mmio_start;
     }
 
     memset(hvm_info_page, 0, PAGE_SIZE);
@@ -126,10 +127,10 @@ static int loadelfimage(
  * Check whether there exists mmio hole in the specified memory range.
  * Returns 1 if exists, else returns 0.
  */
-static int check_mmio_hole(uint64_t start, uint64_t memsize)
+static int check_mmio_hole(uint64_t start, uint64_t memsize,
+                           uint64_t mmio_start, uint64_t mmio_size)
 {
-    if ( start + memsize <= HVM_BELOW_4G_MMIO_START ||
-         start >= HVM_BELOW_4G_MMIO_START + HVM_BELOW_4G_MMIO_LENGTH )
+    if ( start + memsize <= mmio_start || start >= mmio_start + mmio_size )
         return 0;
     else
         return 1;
@@ -142,6 +143,8 @@ static int setup_guest(xc_interface *xch,
     xen_pfn_t *page_array = NULL;
     unsigned long i, nr_pages = args->mem_size >> PAGE_SHIFT;
     unsigned long target_pages = args->mem_target >> PAGE_SHIFT;
+    uint64_t mmio_start = (1ull << 32) - args->mmio_size;
+    uint64_t mmio_size = args->mmio_size;
     unsigned long entry_eip, cur_pages, cur_pfn;
     void *hvm_info_page;
     uint32_t *ident_pt;
@@ -188,8 +191,8 @@ static int setup_guest(xc_interface *xch,
 
     for ( i = 0; i < nr_pages; i++ )
         page_array[i] = i;
-    for ( i = HVM_BELOW_4G_RAM_END >> PAGE_SHIFT; i < nr_pages; i++ )
-        page_array[i] += HVM_BELOW_4G_MMIO_LENGTH >> PAGE_SHIFT;
+    for ( i = mmio_start >> PAGE_SHIFT; i < nr_pages; i++ )
+        page_array[i] += mmio_size >> PAGE_SHIFT;
 
     /*
      * Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000.
@@ -230,7 +233,8 @@ static int setup_guest(xc_interface *xch,
         if ( ((count | cur_pfn) & (SUPERPAGE_1GB_NR_PFNS - 1)) == 0 &&
              /* Check if there exists MMIO hole in the 1GB memory range */
              !check_mmio_hole(cur_pfn << PAGE_SHIFT,
-                              SUPERPAGE_1GB_NR_PFNS << PAGE_SHIFT) )
+                              SUPERPAGE_1GB_NR_PFNS << PAGE_SHIFT,
+                              mmio_start, mmio_size) )
         {
             long done;
             unsigned long nr_extents = count >> SUPERPAGE_1GB_SHIFT;
@@ -327,7 +331,7 @@ static int setup_guest(xc_interface *xch,
               xch, dom, PAGE_SIZE, PROT_READ | PROT_WRITE,
               HVM_INFO_PFN)) == NULL )
         goto error_out;
-    build_hvm_info(hvm_info_page, v_end);
+    build_hvm_info(hvm_info_page, v_end, mmio_start, mmio_size);
     munmap(hvm_info_page, PAGE_SIZE);
 
     /* Allocate and clear special pages. */
@@ -407,6 +411,9 @@ int xc_hvm_build(xc_interface *xch, uint32_t domid,
 
     if ( args.mem_target == 0 )
         args.mem_target = args.mem_size;
+
+    if ( args.mmio_size == 0 )
+        args.mmio_size = HVM_BELOW_4G_MMIO_LENGTH;
 
     /* An HVM guest must be initialised with at least 2MB memory. */
     if ( args.mem_size < (2ull << 20) || args.mem_target < (2ull << 20) )

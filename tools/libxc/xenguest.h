@@ -174,6 +174,7 @@ int xc_linux_build_mem(xc_interface *xch,
 struct xc_hvm_build_args {
     uint64_t mem_size;           /* Memory size in bytes. */
     uint64_t mem_target;         /* Memory target in bytes. */
+    uint64_t mmio_size;          /* Size of the MMIO hole in bytes. */
     const char *image_file_name; /* File name of the image to load. */
 };
 
