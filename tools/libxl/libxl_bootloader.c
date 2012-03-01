@@ -346,6 +346,9 @@ int libxl_run_bootloader(libxl_ctx *ctx,
 
     struct stat st_buf;
 
+    rc = libxl__domain_build_info_setdefault(gc, info);
+    if (rc) goto out;
+
     if (info->type != LIBXL_DOMAIN_TYPE_PV || !info->u.pv.bootloader)
         goto out;
 

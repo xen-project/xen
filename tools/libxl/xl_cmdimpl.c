@@ -584,8 +584,7 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
     }
 
-    if (libxl_init_build_info(ctx, b_info, c_info))
-        exit(1);
+    libxl_domain_build_info_init(b_info, c_info);
 
     /* the following is the actual config parsing with overriding values in the structures */
     if (!xlu_cfg_get_long (config, "vcpus", &l, 0)) {
@@ -598,6 +597,11 @@ static void parse_config_data(const char *configfile_filename_report,
 
     if (!xlu_cfg_get_list (config, "cpus", &cpus, 0, 1)) {
         int i, n_cpus = 0;
+
+        if (libxl_cpumap_alloc(ctx, &b_info->cpumap)) {
+            fprintf(stderr, "Unable to allocate cpumap\n");
+            exit(1);
+        }
 
         libxl_cpumap_set_none(&b_info->cpumap);
         while ((buf = xlu_cfg_get_listitem(cpus, n_cpus)) != NULL) {
@@ -612,6 +616,11 @@ static void parse_config_data(const char *configfile_filename_report,
     }
     else if (!xlu_cfg_get_string (config, "cpus", &buf, 0)) {
         char *buf2 = strdup(buf);
+
+        if (libxl_cpumap_alloc(ctx, &b_info->cpumap)) {
+            fprintf(stderr, "Unable to allocate cpumap\n");
+            exit(1);
+        }
 
         libxl_cpumap_set_none(&b_info->cpumap);
         if (vcpupin_parse(buf2, &b_info->cpumap))

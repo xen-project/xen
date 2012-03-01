@@ -713,13 +713,12 @@ static int libxl__create_stubdom(libxl__gc *gc,
 
     libxl_uuid_generate(&dm_config.c_info.uuid);
 
-    memset(&dm_config.b_info, 0x00, sizeof(libxl_domain_build_info));
-    dm_config.b_info.type = dm_config.c_info.type;
+    libxl_domain_build_info_init(&dm_config.b_info, &dm_config.c_info);
+
     dm_config.b_info.max_vcpus = 1;
     dm_config.b_info.max_memkb = 32 * 1024;
     dm_config.b_info.target_memkb = dm_config.b_info.max_memkb;
 
-    dm_config.b_info.type = LIBXL_DOMAIN_TYPE_PV;
     dm_config.b_info.u.pv.kernel.path = libxl__abs_path(gc, "ioemu-stubdom.gz",
                                               libxl_xenfirmwaredir_path());
     dm_config.b_info.u.pv.cmdline = libxl__sprintf(gc, " -d %d", guest_domid);
@@ -741,6 +740,8 @@ static int libxl__create_stubdom(libxl__gc *gc,
     dm_config.num_vifs = guest_config->num_vifs;
 
     ret = libxl__domain_create_info_setdefault(gc, &dm_config.c_info);
+    if (ret) goto out;
+    ret = libxl__domain_build_info_setdefault(gc, &dm_config.b_info);
     if (ret) goto out;
 
     libxl__vfb_and_vkb_from_hvm_guest_config(gc, guest_config, &vfb, &vkb);

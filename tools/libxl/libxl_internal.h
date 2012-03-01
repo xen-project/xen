@@ -189,6 +189,8 @@ libxl__ev_xswatch *libxl__watch_slot_contents(libxl__gc *gc, int slotnum);
  */
 _hidden int libxl__domain_create_info_setdefault(libxl__gc *gc,
                                         libxl_domain_create_info *c_info);
+_hidden int libxl__domain_build_info_setdefault(libxl__gc *gc,
+                                        libxl_domain_build_info *b_info);
 
 struct libxl__evgen_domain_death {
     uint32_t domid;

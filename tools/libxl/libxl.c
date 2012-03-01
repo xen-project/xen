@@ -2625,7 +2625,11 @@ int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
                              uint32_t *need_memkb)
 {
     GC_INIT(ctx);
-    int rc = ERROR_INVAL;
+    int rc;
+
+    rc = libxl__domain_build_info_setdefault(gc, b_info);
+    if (rc) goto out;
+
     *need_memkb = b_info->target_memkb;
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
@@ -2637,6 +2641,7 @@ int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
         *need_memkb += b_info->shadow_memkb + LIBXL_PV_EXTRA_MEMORY;
         break;
     default:
+        rc = ERROR_INVAL;
         goto out;
     }
     if (*need_memkb % (2 * 1024))

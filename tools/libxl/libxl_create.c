@@ -66,16 +66,10 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
     return 0;
 }
 
-int libxl_init_build_info(libxl_ctx *ctx,
-                          libxl_domain_build_info *b_info,
-                          libxl_domain_create_info *c_info)
+void libxl_domain_build_info_init(libxl_domain_build_info *b_info,
+                                  const libxl_domain_create_info *c_info)
 {
     memset(b_info, '\0', sizeof(*b_info));
-    b_info->max_vcpus = 1;
-    b_info->cur_vcpus = 1;
-    if (libxl_cpumap_alloc(ctx, &b_info->cpumap))
-        return ERROR_NOMEM;
-    libxl_cpumap_set_any(&b_info->cpumap);
     b_info->max_memkb = 32 * 1024;
     b_info->target_memkb = b_info->max_memkb;
     b_info->disable_migrate = 0;
@@ -83,8 +77,6 @@ int libxl_init_build_info(libxl_ctx *ctx,
     b_info->shadow_memkb = 0;
     b_info->type = c_info->type;
 
-    b_info->device_model_version =
-        LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
     b_info->device_model_stubdomain = false;
     b_info->device_model = NULL;
 
@@ -108,15 +100,9 @@ int libxl_init_build_info(libxl_ctx *ctx,
 
         b_info->u.hvm.stdvga = 0;
         b_info->u.hvm.vnc.enable = 1;
-        b_info->u.hvm.vnc.listen = strdup("127.0.0.1");
         b_info->u.hvm.vnc.display = 0;
         b_info->u.hvm.vnc.findunused = 1;
-        b_info->u.hvm.keymap = NULL;
-        b_info->u.hvm.sdl.enable = 0;
-        b_info->u.hvm.sdl.opengl = 0;
-        b_info->u.hvm.nographic = 0;
         b_info->u.hvm.serial = NULL;
-        b_info->u.hvm.boot = strdup("cda");
         b_info->u.hvm.usb = 0;
         b_info->u.hvm.usbdevice = NULL;
         b_info->u.hvm.xen_platform_pci = 1;
@@ -125,7 +111,47 @@ int libxl_init_build_info(libxl_ctx *ctx,
         b_info->u.pv.slack_memkb = 8 * 1024;
         break;
     default:
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+        abort();
+    }
+}
+
+int libxl__domain_build_info_setdefault(libxl__gc *gc,
+                                        libxl_domain_build_info *b_info)
+{
+    if (!b_info->device_model_version)
+        b_info->device_model_version =
+            LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
+
+    if (!b_info->max_vcpus)
+        b_info->max_vcpus = 1;
+    if (!b_info->cur_vcpus)
+        b_info->cur_vcpus = 1;
+
+    if (!b_info->cpumap.size) {
+        if (libxl_cpumap_alloc(CTX, &b_info->cpumap))
+            return ERROR_NOMEM;
+        libxl_cpumap_set_any(&b_info->cpumap);
+    }
+
+    switch (b_info->type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
+        if (!b_info->u.hvm.boot) {
+            b_info->u.hvm.boot = strdup("cda");
+            if (!b_info->u.hvm.boot) return ERROR_NOMEM;
+        }
+
+        if (b_info->u.hvm.vnc.enable) {
+            if (!b_info->u.hvm.vnc.listen) {
+                b_info->u.hvm.vnc.listen = strdup("127.0.0.1");
+                if (!b_info->u.hvm.vnc.listen) return ERROR_NOMEM;
+            }
+        }
+
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
+        break;
+    default:
+        LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
                    "invalid domain type %s in create info",
                    libxl_domain_type_to_string(b_info->type));
         return ERROR_INVAL;
@@ -488,6 +514,8 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
             goto error_out;
     }
 
+    ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
+    if (ret) goto error_out;
 
     for (i = 0; i < d_config->num_disks; i++) {
         ret = libxl__device_disk_set_backend(gc, &d_config->disks[i]);

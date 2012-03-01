@@ -357,9 +357,8 @@ int libxl_ctx_postfork(libxl_ctx *ctx);
 
 /* domain related functions */
 void libxl_domain_create_info_init(libxl_domain_create_info *c_info);
-int libxl_init_build_info(libxl_ctx *ctx,
-                          libxl_domain_build_info *b_info,
-                          libxl_domain_create_info *c_info);
+void libxl_domain_build_info_init(libxl_domain_build_info *b_info,
+                          const libxl_domain_create_info *c_info);
 typedef int (*libxl_console_ready)(libxl_ctx *ctx, uint32_t domid, void *priv);
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid);
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid, int restore_fd);
