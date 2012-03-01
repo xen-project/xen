@@ -24,10 +24,6 @@ PREPEND_LIB         := @PREPEND_LIB@
 APPEND_INCLUDES     := @APPEND_INCLUDES@
 APPEND_LIB          := @APPEND_LIB@
 
-# Enable XSM security module (by default, Flask).
-XSM_ENABLE          := @xsm@
-FLASK_ENABLE        := @xsm@
-
 # Download GIT repositories via HTTP or GIT's own protocol?
 # GIT's protocol is faster and more robust, when it works at all (firewalls
 # may block it). We make it the default, but if your GIT repository downloads

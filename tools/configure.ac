@@ -36,8 +36,6 @@ m4_include([m4/uuid.m4])
 m4_include([m4/pkg.m4])
 
 # Enable/disable options
-AX_ARG_ENABLE_AND_EXPORT([xsm],
-    [Enable XSM security module (by default, Flask)])
 AX_ARG_ENABLE_AND_EXPORT([githttp], [Download GIT repositories via HTTP])
 AX_ARG_DISABLE_AND_EXPORT([monitors],
     [Disable xenstat and xentop monitoring tools])
@@ -47,7 +45,7 @@ AX_ARG_DISABLE_AND_EXPORT([pythontools], [Disable Python tools])
 AX_ARG_DISABLE_AND_EXPORT([ocamltools], [Disable Ocaml tools])
 AX_ARG_ENABLE_AND_EXPORT([miniterm], [Enable miniterm])
 AX_ARG_ENABLE_AND_EXPORT([lomount], [Enable lomount])
-AX_ARG_DISABLE_AND_EXPORT([debug], [Disable debug build of Xen and tools])
+AX_ARG_DISABLE_AND_EXPORT([debug], [Disable debug build of tools])
 
 AC_ARG_VAR([PREPEND_INCLUDES],
     [List of include folders to prepend to CFLAGS (without -I)])

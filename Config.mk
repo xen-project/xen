@@ -175,6 +175,10 @@ APPEND_CFLAGS += $(foreach i, $(APPEND_INCLUDES), -I$(i))
 EMBEDDED_EXTRA_CFLAGS := -nopie -fno-stack-protector -fno-stack-protector-all
 EMBEDDED_EXTRA_CFLAGS += -fno-exceptions
 
+# Enable XSM security module (by default, Flask).
+XSM_ENABLE ?= n
+FLASK_ENABLE ?= $(XSM_ENABLE)
+
 XEN_EXTFILES_URL=http://xenbits.xensource.com/xen-extfiles
 # All the files at that location were downloaded from elsewhere on
 # the internet.  The original download URL is preserved as a comment
