@@ -94,7 +94,7 @@ void libxl_domain_build_info_init(libxl_domain_build_info *b_info,
         b_info->u.hvm.viridian = 0;
         b_info->u.hvm.hpet = 1;
         b_info->u.hvm.vpt_align = 1;
-        b_info->u.hvm.timer_mode = 1;
+        b_info->u.hvm.timer_mode = LIBXL_TIMER_MODE_DEFAULT;
         b_info->u.hvm.nested_hvm = 0;
         b_info->u.hvm.no_incr_generationid = 0;
 
@@ -135,6 +135,10 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
 
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
+        if (b_info->u.hvm.timer_mode == LIBXL_TIMER_MODE_DEFAULT)
+            b_info->u.hvm.timer_mode =
+                LIBXL_TIMER_MODE_NO_DELAY_FOR_MISSED_TICKS;
+
         if (!b_info->u.hvm.boot) {
             b_info->u.hvm.boot = strdup("cda");
             if (!b_info->u.hvm.boot) return ERROR_NOMEM;
