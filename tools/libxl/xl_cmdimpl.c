@@ -1357,7 +1357,7 @@ struct domain_create {
     const char *restore_file;
     int migrate_fd; /* -1 means none */
     char **migration_domname_r; /* from malloc */
-    int no_incr_generationid;
+    int incr_generationid;
 };
 
 static int freemem(libxl_domain_build_info *b_info)
@@ -1608,8 +1608,8 @@ static int create_domain(struct domain_create *dom_info)
     }
 
     if (d_config.c_info.type == LIBXL_DOMAIN_TYPE_HVM)
-        d_config.b_info.u.hvm.no_incr_generationid =
-            dom_info->no_incr_generationid;
+        libxl_defbool_set(&d_config.b_info.u.hvm.incr_generationid,
+                          dom_info->incr_generationid);
 
     if (debug || dom_info->dryrun)
         printf_info(default_output_format, -1, &d_config);
@@ -2884,7 +2884,7 @@ static void migrate_receive(int debug, int daemonize, int monitor)
     dom_info.restore_file = "incoming migration stream";
     dom_info.migrate_fd = 0; /* stdin */
     dom_info.migration_domname_r = &migration_domname;
-    dom_info.no_incr_generationid = 1;
+    dom_info.incr_generationid = 0;
 
     rc = create_domain(&dom_info);
     if (rc < 0) {
@@ -3009,6 +3009,7 @@ int main_restore(int argc, char **argv)
     dom_info.restore_file = checkpoint_file;
     dom_info.migrate_fd = -1;
     dom_info.console_autoconnect = console_autoconnect;
+    dom_info.incr_generationid = 1;
 
     rc = create_domain(&dom_info);
     if (rc < 0)
@@ -3394,6 +3395,7 @@ int main_create(int argc, char **argv)
     dom_info.extra_config = extra_config;
     dom_info.migrate_fd = -1;
     dom_info.console_autoconnect = console_autoconnect;
+    dom_info.incr_generationid = 0;
 
     rc = create_domain(&dom_info);
     if (rc < 0)

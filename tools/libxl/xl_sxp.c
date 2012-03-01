@@ -108,8 +108,8 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
                libxl_timer_mode_to_string(b_info->u.hvm.timer_mode));
         printf("\t\t\t(nestedhvm %s)\n",
                libxl_defbool_to_string(b_info->u.hvm.nested_hvm));
-        printf("\t\t\t(no_incr_generationid %d)\n",
-                    b_info->u.hvm.no_incr_generationid);
+        printf("\t\t\t(no_incr_generationid %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.incr_generationid));
 
         printf("\t\t\t(stdvga %d)\n", b_info->u.hvm.stdvga);
         printf("\t\t\t(vnc %d)\n", b_info->u.hvm.vnc.enable);

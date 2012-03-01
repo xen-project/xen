@@ -89,7 +89,6 @@ void libxl_domain_build_info_init(libxl_domain_build_info *b_info,
         b_info->u.hvm.firmware = NULL;
         b_info->u.hvm.bios = 0;
         b_info->u.hvm.timer_mode = LIBXL_TIMER_MODE_DEFAULT;
-        b_info->u.hvm.no_incr_generationid = 0;
 
         b_info->u.hvm.stdvga = 0;
         b_info->u.hvm.vnc.enable = 1;
@@ -151,6 +150,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_defbool_setdefault(&b_info->u.hvm.hpet,               true);
         libxl_defbool_setdefault(&b_info->u.hvm.vpt_align,          true);
         libxl_defbool_setdefault(&b_info->u.hvm.nested_hvm,         false);
+        libxl_defbool_setdefault(&b_info->u.hvm.incr_generationid,  false);
         libxl_defbool_setdefault(&b_info->u.hvm.usb,                false);
         libxl_defbool_setdefault(&b_info->u.hvm.xen_platform_pci,   true);
 

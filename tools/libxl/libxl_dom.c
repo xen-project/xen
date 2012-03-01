@@ -406,7 +406,7 @@ int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
         hvm = 1;
         superpages = 1;
         pae = libxl_defbool_val(info->u.hvm.pae);
-        no_incr_generationid = info->u.hvm.no_incr_generationid;
+        no_incr_generationid = !libxl_defbool_val(info->u.hvm.incr_generationid);
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         hvm = 0;
