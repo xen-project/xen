@@ -156,6 +156,21 @@ int genwrap__ll_set(PyObject *v, long long *val, long long mask)
     return 0;
 }
 
+PyObject *genwrap__defbool_get(libxl_defbool *db)
+{
+    PyObject *ret;
+    ret = libxl_defbool_val(*db) ? Py_True : Py_False;
+    Py_INCREF(ret);
+    return ret;
+}
+
+int genwrap__defbool_set(PyObject *v, libxl_defbool *db)
+{
+    bool val = !(NULL == v || Py_None == v || Py_False == v);
+    libxl_defbool_set(db, val);
+    return 0;
+}
+
 static int fixed_bytearray_set(PyObject *v, uint8_t *ptr, size_t len)
 {
     char *tmp;

@@ -184,6 +184,47 @@ void libxl_key_value_list_dispose(libxl_key_value_list *pkvl)
     free(kvl);
 }
 
+#define LIBXL__DEFBOOL_DEFAULT (0)
+#define LIBXL__DEFBOOL_FALSE (-1)
+#define LIBXL__DEFBOOL_TRUE (1)
+
+void libxl_defbool_set(libxl_defbool *db, bool b)
+{
+    db->val = b ? LIBXL__DEFBOOL_TRUE : LIBXL__DEFBOOL_FALSE;
+}
+
+void libxl_defbool_unset(libxl_defbool *db)
+{
+    db->val = LIBXL__DEFBOOL_DEFAULT;
+}
+
+bool libxl_defbool_is_default(libxl_defbool db)
+{
+    return !db.val;
+}
+
+void libxl_defbool_setdefault(libxl_defbool *db, bool b)
+{
+    if (libxl_defbool_is_default(*db))
+        libxl_defbool_set(db, b);
+}
+
+bool libxl_defbool_val(libxl_defbool db)
+{
+    assert(!libxl_defbool_is_default(db));
+    return db.val > 0;
+}
+
+const char *libxl_defbool_to_string(libxl_defbool b)
+{
+    if (b.val < 0)
+        return "False";
+    else if (b.val > 0)
+        return "True";
+    else
+        return "<default>";
+}
+
 /******************************************************************************/
 
 

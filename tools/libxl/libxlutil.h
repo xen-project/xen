@@ -52,6 +52,8 @@ int xlu_cfg_replace_string(const XLU_Config *cfg, const char *n,
                            char **value_r, int dont_warn);
 int xlu_cfg_get_long(const XLU_Config*, const char *n, long *value_r,
                      int dont_warn);
+int xlu_cfg_get_defbool(const XLU_Config*, const char *n, libxl_defbool *b,
+                     int dont_warn);
 
 int xlu_cfg_get_list(const XLU_Config*, const char *n,
                      XLU_ConfigList **list_r /* may be 0 */,

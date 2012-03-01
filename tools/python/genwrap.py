@@ -4,11 +4,13 @@ import sys,os
 
 import idl
 
-(TYPE_BOOL, TYPE_INT, TYPE_UINT, TYPE_STRING, TYPE_AGGREGATE) = range(5)
+(TYPE_DEFBOOL, TYPE_BOOL, TYPE_INT, TYPE_UINT, TYPE_STRING, TYPE_AGGREGATE) = range(6)
 
 def py_type(ty):
     if ty == idl.bool:
         return TYPE_BOOL
+    if ty.typename == "libxl_defbool":
+        return TYPE_DEFBOOL
     if isinstance(ty, idl.Enumeration):
         return TYPE_UINT
     if isinstance(ty, idl.Number):
@@ -44,6 +46,8 @@ def py_decls(ty):
         for f in ty.fields:
             if py_type(f.type) is not None:
                 continue
+            if py_type(f.type) == TYPE_DEFBOOL:
+                continue
             if ty.marshal_out():
                 l.append('_hidden PyObject *attrib__%s_get(%s *%s);'%(\
                     fsanitize(f.type.typename), f.type.typename, f.name))
@@ -62,6 +66,8 @@ def py_attrib_get(ty, f):
         l.append('    ret = (self->obj.%s) ? Py_True : Py_False;'%f.name)
         l.append('    Py_INCREF(ret);')
         l.append('    return ret;')
+    elif t == TYPE_DEFBOOL:
+        l.append('    return genwrap__defbool_get(&self->obj.%s);'%f.name)
     elif t == TYPE_INT:
         l.append('    return genwrap__ll_get(self->obj.%s);'%f.name)
     elif t == TYPE_UINT:
@@ -85,6 +91,8 @@ def py_attrib_set(ty, f):
     if t == TYPE_BOOL:
         l.append('    self->obj.%s = (NULL == v || Py_None == v || Py_False == v) ? 0 : 1;'%f.name)
         l.append('    return 0;')
+    elif t == TYPE_DEFBOOL:
+        l.append('    return genwrap__defbool_set(v, &self->obj.%s);'%f.name)
     elif t == TYPE_UINT or t == TYPE_INT:
         l.append('    %slong long tmp;'%(t == TYPE_UINT and 'unsigned ' or ''))
         l.append('    int ret;')
@@ -275,6 +283,8 @@ _hidden PyObject *genwrap__ull_get(unsigned long long val);
 _hidden int genwrap__ull_set(PyObject *v, unsigned long long *val, unsigned long long mask);
 _hidden PyObject *genwrap__ll_get(long long val);
 _hidden int genwrap__ll_set(PyObject *v, long long *val, long long mask);
+_hidden PyObject *genwrap__defbool_get(libxl_defbool *db);
+_hidden int genwrap__defbool_set(PyObject *v, libxl_defbool *db);
 
 """ % " ".join(sys.argv))
     for ty in [ty for ty in types if isinstance(ty, idl.Aggregate)]:

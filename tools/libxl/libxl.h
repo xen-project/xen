@@ -243,6 +243,30 @@ typedef struct {
 struct libxl_event;
 typedef LIBXL_TAILQ_ENTRY(struct libxl_event) libxl_ev_link;
 
+/*
+ * A boolean variable with an explicit default state.
+ *
+ * Users should treat this struct as opaque and use the following
+ * defined macros and accessor functions.
+ *
+ * To allow users of the library to naively select all defaults this
+ * state is represented as 0. False is < 0 and True is > 0.
+ */
+typedef struct {
+    int val;
+} libxl_defbool;
+
+void libxl_defbool_set(libxl_defbool *db, bool b);
+/* Resets to default */
+void libxl_defbool_unset(libxl_defbool *db);
+/* Sets db only if it is currently == default */
+void libxl_defbool_setdefault(libxl_defbool *db, bool b);
+bool libxl_defbool_is_default(libxl_defbool db);
+/* db must not be == default */
+bool libxl_defbool_val(libxl_defbool db);
+
+const char *libxl_defbool_to_string(libxl_defbool b);
+
 typedef struct libxl__ctx libxl_ctx;
 
 #define LIBXL_TIMER_MODE_DEFAULT -1

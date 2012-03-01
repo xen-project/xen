@@ -20,7 +20,8 @@ def randomize_case(s):
 def randomize_enum(e):
     return random.choice([v.name for v in e.values])
 
-handcoded = ["libxl_cpumap", "libxl_key_value_list",
+handcoded = ["libxl_defbool", # Temp until a user appears in the next patch
+             "libxl_cpumap", "libxl_key_value_list",
              "libxl_cpuid_policy_list", "libxl_file_reference",
              "libxl_string_list"]
 
@@ -55,6 +56,8 @@ def gen_rand_init(ty, v, indent = "    ", parent = None):
               ty.pass_arg(v, parent is None))
     elif ty.typename in ["bool"]:
         s += "%s = rand() %% 2;\n" % v
+    elif ty.typename in ["libxl_defbool"]:
+        s += "libxl_defbool_set(%s, !!rand() %% 1);\n" % v
     elif ty.typename in ["char *"]:
         s += "%s = rand_str();\n" % v
     elif ty.private:

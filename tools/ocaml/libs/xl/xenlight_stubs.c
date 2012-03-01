@@ -195,6 +195,33 @@ static int Uuid_val(caml_gc *gc, struct caml_logger *lg, libxl_uuid *c_val, valu
 	CAMLreturn(0);
 }
 
+static value Val_defbool(libxl_defbool c_val)
+{
+	CAMLparam0();
+	CAMLlocal1(v);
+
+	if (libxl_defbool_is_default(c_val))
+		v = Val_none;
+	else {
+		bool b = libxl_defbool_val(c_val);
+		v = Val_some(b ? Val_bool(true) : Val_bool(false));
+	}
+	CAMLreturn(v);
+}
+
+static libxl_defbool Defbool_val(value v)
+{
+	CAMLparam1(v);
+	libxl_defbool db;
+	if (v == Val_none)
+		libxl_defbool_unset(&db);
+	else {
+		bool b = Bool_val(Some_val(v));
+		libxl_defbool_set(&db, b);
+	}
+	return db;
+}
+
 static value Val_hwcap(libxl_hwcap *c_val)
 {
 	CAMLparam0();
