@@ -73,7 +73,6 @@ void libxl_domain_build_info_init(libxl_domain_build_info *b_info,
                                   const libxl_domain_create_info *c_info)
 {
     memset(b_info, '\0', sizeof(*b_info));
-    b_info->cpuid = NULL;
     b_info->type = c_info->type;
 
     b_info->max_memkb = LIBXL_MEMKB_DEFAULT;
@@ -86,13 +85,7 @@ void libxl_domain_build_info_init(libxl_domain_build_info *b_info,
 
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
-        b_info->u.hvm.firmware = NULL;
-        b_info->u.hvm.bios = 0;
         b_info->u.hvm.timer_mode = LIBXL_TIMER_MODE_DEFAULT;
-
-        b_info->u.hvm.vnc.display = 0;
-        b_info->u.hvm.serial = NULL;
-        b_info->u.hvm.usbdevice = NULL;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         b_info->u.pv.slack_memkb = 0;
