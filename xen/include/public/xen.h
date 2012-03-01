@@ -146,6 +146,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
  * The latter can be allocated only once per guest: they must initially be
  * allocated to VCPU0 but can subsequently be re-bound.
  */
+/* ` enum virq { */
 #define VIRQ_TIMER      0  /* V. Timebase update, and/or requested timeout.  */
 #define VIRQ_DEBUG      1  /* V. Request guest to dump debug info.           */
 #define VIRQ_CONSOLE    2  /* G. (DOM0) Bytes received on emergency console. */
@@ -167,6 +168,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define VIRQ_ARCH_5    21
 #define VIRQ_ARCH_6    22
 #define VIRQ_ARCH_7    23
+/* ` } */
 
 #define NR_VIRQS       24
 
