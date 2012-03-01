@@ -3842,7 +3842,6 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 
-
 # pkg.m4 - Macros to locate and utilise pkg-config.            -*- Autoconf -*-
 # serial 1 (pkg-config-0.24)
 #
@@ -6437,13 +6436,26 @@ $as_echo "yes" >&6; }
 fi
 
 # Check library path
-if test -d "$prefix/lib64"; then :
+if test "\${exec_prefix}/lib" = "$libdir"; then :
+  if test "$exec_prefix" = "NONE" && test "$prefix" != "NONE"; then :
+  exec_prefix=$prefix
+fi
+    if test "$exec_prefix" = "NONE"; then :
+  exec_prefix=$ac_default_prefix
+fi
+    if test -d "${exec_prefix}/lib64"; then :
 
-    LIB_PATH="lib64"
+        LIB_PATH="lib64"
 
 else
 
-    LIB_PATH="lib"
+        LIB_PATH="lib"
+
+fi
+
+else
+
+    LIB_PATH="${libdir:`expr length "$exec_prefix" + 1`}"
 
 fi
 
