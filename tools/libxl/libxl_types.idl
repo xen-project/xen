@@ -237,7 +237,6 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("shadow_memkb",    MemKB),
     ("disable_migrate", libxl_defbool),
     ("cpuid",           libxl_cpuid_policy_list),
-    ("type",            libxl_domain_type),
     
     ("device_model_version", libxl_device_model_version),
     ("device_model_stubdomain", libxl_defbool),
@@ -447,7 +446,6 @@ libxl_event = Struct("event",[
     ("domid",    libxl_domid),
     ("domuuid",  libxl_uuid),
     ("for_user", libxl_ev_user),
-    ("type",     libxl_event_type),
     ("u", KeyedUnion(None, libxl_event_type, "type",
           [("domain_shutdown", Struct(None, [
                                              ("shutdown_reason", uint8),

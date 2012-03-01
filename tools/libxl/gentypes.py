@@ -32,6 +32,9 @@ def libxl_C_type_define(ty, indent = ""):
             s += "} %s" % ty.typename
 
     elif isinstance(ty, idl.Aggregate):
+        if isinstance(ty, idl.KeyedUnion):
+            s += libxl_C_instance_of(ty.keyvar.type, ty.keyvar.name) + ";\n"
+            
         if ty.typename is None:
             s += "%s {\n" % ty.kind
         else:
