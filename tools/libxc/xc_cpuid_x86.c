@@ -363,11 +363,13 @@ static void xc_cpuid_hvm_policy(
     case 0x00000007: /* Intel-defined CPU features */
         if ( input[1] == 0 ) {
             regs[1] &= (bitmaskof(X86_FEATURE_BMI1) |
+                        bitmaskof(X86_FEATURE_HLE)  |
                         bitmaskof(X86_FEATURE_AVX2) |
                         bitmaskof(X86_FEATURE_SMEP) |
                         bitmaskof(X86_FEATURE_BMI2) |
                         bitmaskof(X86_FEATURE_ERMS) |
                         bitmaskof(X86_FEATURE_INVPCID) |
+                        bitmaskof(X86_FEATURE_RTM)  |
                         bitmaskof(X86_FEATURE_FSGSBASE));
         } else
             regs[1] = 0;
@@ -496,9 +498,11 @@ static void xc_cpuid_pv_policy(
     case 0x00000007:
         if ( input[1] == 0 )
             regs[1] &= (bitmaskof(X86_FEATURE_BMI1) |
+                        bitmaskof(X86_FEATURE_HLE)  |
                         bitmaskof(X86_FEATURE_AVX2) |
                         bitmaskof(X86_FEATURE_BMI2) |
                         bitmaskof(X86_FEATURE_ERMS) |
+                        bitmaskof(X86_FEATURE_RTM)  |
                         bitmaskof(X86_FEATURE_FSGSBASE));
         else
             regs[1] = 0;

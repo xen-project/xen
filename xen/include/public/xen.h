@@ -158,6 +158,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define VIRQ_PCPU_STATE 9  /* G. (DOM0) PCPU state changed                   */
 #define VIRQ_MEM_EVENT  10 /* G. (DOM0) A memory event has occured           */
 #define VIRQ_XC_RESERVED 11 /* G. Reserved for XenClient                     */
+#define VIRQ_ENOMEM     12 /* G. (DOM0) Low on heap memory       */
 
 /* Architecture-specific VIRQ definitions. */
 #define VIRQ_ARCH_0    16
