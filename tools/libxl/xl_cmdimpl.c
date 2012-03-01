@@ -940,12 +940,12 @@ skip:
 
             d_config->vfbs = (libxl_device_vfb *) realloc(d_config->vfbs, sizeof(libxl_device_vfb) * (d_config->num_vfbs + 1));
             vfb = d_config->vfbs + d_config->num_vfbs;
-            libxl_device_vfb_init(ctx, vfb);
+            libxl_device_vfb_init(vfb);
             vfb->devid = d_config->num_vfbs;
 
             d_config->vkbs = (libxl_device_vkb *) realloc(d_config->vkbs, sizeof(libxl_device_vkb) * (d_config->num_vkbs + 1));
             vkb = d_config->vkbs + d_config->num_vkbs;
-            libxl_device_vkb_init(ctx, vkb);
+            libxl_device_vkb_init(vkb);
             vkb->devid = d_config->num_vkbs;
 
             p = strtok(buf2, ",");

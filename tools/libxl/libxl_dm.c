@@ -616,8 +616,8 @@ static int libxl__vfb_and_vkb_from_hvm_guest_config(libxl__gc *gc,
     if (b_info->type != LIBXL_DOMAIN_TYPE_HVM)
         return ERROR_INVAL;
 
-    memset(vfb, 0x00, sizeof(libxl_device_vfb));
-    memset(vkb, 0x00, sizeof(libxl_device_vkb));
+    libxl_device_vfb_init(vfb);
+    libxl_device_vkb_init(vkb);
 
     vfb->backend_domid = 0;
     vfb->devid = 0;

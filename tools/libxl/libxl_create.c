@@ -595,9 +595,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         libxl__device_console_add(gc, domid, &console, &state);
         libxl_device_console_dispose(&console);
 
-        ret = libxl_device_vkb_init(ctx, &vkb);
-        if ( ret )
-            goto error_out;
+        libxl_device_vkb_init(&vkb);
         libxl_device_vkb_add(ctx, domid, &vkb);
         libxl_device_vkb_dispose(&vkb);
 

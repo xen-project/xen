@@ -536,7 +536,7 @@ int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_nic *nic, libxl_nicinfo *nicinfo);
 
 /* Keyboard */
-int libxl_device_vkb_init(libxl_ctx *ctx, libxl_device_vkb *vkb);
+void libxl_device_vkb_init(libxl_device_vkb *vkb);
 int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb);
 int libxl_device_vkb_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_vkb *vkb,
@@ -544,7 +544,7 @@ int libxl_device_vkb_remove(libxl_ctx *ctx, uint32_t domid,
 int libxl_device_vkb_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb);
 
 /* Framebuffer */
-int libxl_device_vfb_init(libxl_ctx *ctx, libxl_device_vfb *vfb);
+void libxl_device_vfb_init(libxl_device_vfb *vfb);
 int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
 int libxl_device_vfb_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_vfb *vfb,

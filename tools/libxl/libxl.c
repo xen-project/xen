@@ -2101,9 +2101,13 @@ out:
 }
 
 /******************************************************************************/
-int libxl_device_vkb_init(libxl_ctx *ctx, libxl_device_vkb *vkb)
+void libxl_device_vkb_init(libxl_device_vkb *vkb)
 {
     memset(vkb, 0x00, sizeof(libxl_device_vkb));
+}
+
+int libxl__device_vkb_setdefault(libxl__gc *gc, libxl_device_vkb *vkb)
+{
     return 0;
 }
 
@@ -2128,6 +2132,9 @@ int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
     flexarray_t *back;
     libxl__device device;
     int rc;
+
+    rc = libxl__device_vkb_setdefault(gc, vkb);
+    if (rc) goto out;
 
     front = flexarray_make(16, 1);
     if (!front) {
@@ -2206,12 +2213,11 @@ out:
 }
 
 /******************************************************************************/
-int libxl_device_vfb_init(libxl_ctx *ctx, libxl_device_vfb *vfb)
+void libxl_device_vfb_init(libxl_device_vfb *vfb)
 {
     memset(vfb, 0x00, sizeof(libxl_device_vfb));
     vfb->vnc.enable = 1;
     vfb->vnc.passwd = NULL;
-    vfb->vnc.listen = strdup("127.0.0.1");
     vfb->vnc.display = 0;
     vfb->vnc.findunused = 1;
     vfb->keymap = NULL;
@@ -2219,6 +2225,15 @@ int libxl_device_vfb_init(libxl_ctx *ctx, libxl_device_vfb *vfb)
     vfb->sdl.opengl = 0;
     vfb->sdl.display = NULL;
     vfb->sdl.xauthority = NULL;
+}
+
+int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb)
+{
+    if (!vfb->vnc.listen) {
+        vfb->vnc.listen = strdup("127.0.0.1");
+        if (!vfb->vnc.listen) return ERROR_NOMEM;
+    }
+
     return 0;
 }
 
@@ -2242,6 +2257,9 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
     flexarray_t *back;
     libxl__device device;
     int rc;
+
+    rc = libxl__device_vfb_setdefault(gc, vfb);
+    if (rc) goto out;
 
     front = flexarray_make(16, 1);
     if (!front) {
