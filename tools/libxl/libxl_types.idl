@@ -113,6 +113,15 @@ libxl_scheduler = Enumeration("scheduler", [
     (7, "arinc653"),
     ])
 
+# Consistent with SHUTDOWN_* in sched.h
+libxl_shutdown_reason = Enumeration("shutdown_reason", [
+    (0, "poweroff"),
+    (1, "reboot"),
+    (2, "suspend"),
+    (3, "crash"),
+    (4, "watchdog"),
+    ])
+
 #
 # Complex libxl types
 #
@@ -156,11 +165,11 @@ libxl_dominfo = Struct("dominfo",[
     ("shutdown",    bool),
     ("dying",       bool),
 
-    # Valid SHUTDOWN_* value from xen/sched.h iff (shutdown||dying).
+    # Valid iff (shutdown||dying).
     #
     # Otherwise set to a value guaranteed not to clash with any valid
-    # SHUTDOWN_* constant.
-    ("shutdown_reason", uint8),
+    # LIBXL_SHUTDOWN_REASON_* constant.
+    ("shutdown_reason", libxl_shutdown_reason),
     ("current_memkb",   uint64),
     ("shared_memkb", uint64),
     ("max_memkb",   uint64),

@@ -507,6 +507,13 @@ void libxl_cputopology_list_free(libxl_cputopology *list, int nr)
     free(list);
 }
 
+int libxl_domid_valid_guest(uint32_t domid)
+{
+    /* returns 1 if the value _could_ be a valid guest domid, 0 otherwise
+     * does not check whether the domain actually exists */
+    return domid > 0 && domid < DOMID_FIRST_RESERVED;
+}
+
 /*
  * Local variables:
  * mode: C

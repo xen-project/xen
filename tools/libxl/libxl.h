@@ -137,8 +137,6 @@
 
 #include <xentoollog.h>
 
-#include <xen/sched.h>
-
 #include <libxl_uuid.h>
 #include <_libxl_list.h>
 
@@ -638,12 +636,7 @@ int libxl_cpupool_cpuremove(libxl_ctx *ctx, uint32_t poolid, int cpu);
 int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
 int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid);
 
-static inline int libxl_domid_valid_guest(uint32_t domid)
-{
-    /* returns 1 if the value _could_ be a valid guest domid, 0 otherwise
-     * does not check whether the domain actually exists */
-    return domid > 0 && domid < DOMID_FIRST_RESERVED;
-}
+int libxl_domid_valid_guest(uint32_t domid);
 
 int libxl_flask_context_to_sid(libxl_ctx *ctx, char *buf, size_t len,
                                uint32_t *ssidref);

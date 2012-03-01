@@ -1235,19 +1235,19 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid,
     libxl_action_on_shutdown action;
 
     switch (event->u.domain_shutdown.shutdown_reason) {
-    case SHUTDOWN_poweroff:
+    case LIBXL_SHUTDOWN_REASON_POWEROFF:
         action = d_config->on_poweroff;
         break;
-    case SHUTDOWN_reboot:
+    case LIBXL_SHUTDOWN_REASON_REBOOT:
         action = d_config->on_reboot;
         break;
-    case SHUTDOWN_suspend:
+    case LIBXL_SHUTDOWN_REASON_SUSPEND:
         LOG("Domain has suspended.");
         return 0;
-    case SHUTDOWN_crash:
+    case LIBXL_SHUTDOWN_REASON_CRASH:
         action = d_config->on_crash;
         break;
-    case SHUTDOWN_watchdog:
+    case LIBXL_SHUTDOWN_REASON_WATCHDOG:
         action = d_config->on_watchdog;
         break;
     default:

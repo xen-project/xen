@@ -762,11 +762,11 @@ PyMODINIT_FUNC initxl(void)
     Py_INCREF(xl_error_obj);
     PyModule_AddObject(m, "Error", xl_error_obj);
 
-    _INT_CONST(m, SHUTDOWN_poweroff);
-    _INT_CONST(m, SHUTDOWN_reboot);
-    _INT_CONST(m, SHUTDOWN_suspend);
-    _INT_CONST(m, SHUTDOWN_crash);
-    _INT_CONST(m, SHUTDOWN_watchdog);
+    _INT_CONST_LIBXL(m, SHUTDOWN_REASON_POWEROFF);
+    _INT_CONST_LIBXL(m, SHUTDOWN_REASON_REBOOT);
+    _INT_CONST_LIBXL(m, SHUTDOWN_REASON_SUSPEND);
+    _INT_CONST_LIBXL(m, SHUTDOWN_REASON_CRASH);
+    _INT_CONST_LIBXL(m, SHUTDOWN_REASON_WATCHDOG);
 
     genwrap__init(m);
 }
