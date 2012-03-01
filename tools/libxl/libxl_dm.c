@@ -194,7 +194,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         if (b_info->u.hvm.boot) {
             flexarray_vappend(dm_args, "-boot", b_info->u.hvm.boot, NULL);
         }
-        if (b_info->u.hvm.usb || b_info->u.hvm.usbdevice) {
+        if (libxl_defbool_val(b_info->u.hvm.usb) || b_info->u.hvm.usbdevice) {
             flexarray_append(dm_args, "-usb");
             if (b_info->u.hvm.usbdevice) {
                 flexarray_vappend(dm_args,
@@ -204,7 +204,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         if (b_info->u.hvm.soundhw) {
             flexarray_vappend(dm_args, "-soundhw", b_info->u.hvm.soundhw, NULL);
         }
-        if (b_info->u.hvm.acpi) {
+        if (libxl_defbool_val(b_info->u.hvm.acpi)) {
             flexarray_append(dm_args, "-acpi");
         }
         if (b_info->max_vcpus > 1) {
@@ -433,7 +433,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_vappend(dm_args, "-boot",
                     libxl__sprintf(gc, "order=%s", b_info->u.hvm.boot), NULL);
         }
-        if (b_info->u.hvm.usb || b_info->u.hvm.usbdevice) {
+        if (libxl_defbool_val(b_info->u.hvm.usb) || b_info->u.hvm.usbdevice) {
             flexarray_append(dm_args, "-usb");
             if (b_info->u.hvm.usbdevice) {
                 flexarray_vappend(dm_args,
@@ -443,7 +443,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         if (b_info->u.hvm.soundhw) {
             flexarray_vappend(dm_args, "-soundhw", b_info->u.hvm.soundhw, NULL);
         }
-        if (!b_info->u.hvm.acpi) {
+        if (!libxl_defbool_val(b_info->u.hvm.acpi)) {
             flexarray_append(dm_args, "-no-acpi");
         }
         if (b_info->max_vcpus > 1) {
@@ -945,7 +945,7 @@ int libxl__create_device_model(libxl__gc *gc,
         b_info->device_model_version
         == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL)
         libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/disable_pf", path),
-                        "%d", !b_info->u.hvm.xen_platform_pci);
+                    "%d", !libxl_defbool_val(b_info->u.hvm.xen_platform_pci));
 
     libxl_create_logfile(ctx,
                          libxl__sprintf(gc, "qemu-dm-%s", c_info->name),

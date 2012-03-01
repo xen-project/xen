@@ -71,7 +71,8 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
     printf("\t(tsc_mode %s)\n", libxl_tsc_mode_to_string(b_info->tsc_mode));
     printf("\t(max_memkb %"PRId64")\n", b_info->max_memkb);
     printf("\t(target_memkb %"PRId64")\n", b_info->target_memkb);
-    printf("\t(nomigrate %d)\n", b_info->disable_migrate);
+    printf("\t(nomigrate %s)\n",
+           libxl_defbool_to_string(b_info->disable_migrate));
 
     if (c_info->type == LIBXL_DOMAIN_TYPE_PV && b_info->u.pv.bootloader) {
         int i;
@@ -91,16 +92,22 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
         printf("\t\t\t(firmware %s)\n", b_info->u.hvm.firmware);
         printf("\t\t\t(video_memkb %"PRId64")\n", b_info->video_memkb);
         printf("\t\t\t(shadow_memkb %"PRId64")\n", b_info->shadow_memkb);
-        printf("\t\t\t(pae %d)\n", b_info->u.hvm.pae);
-        printf("\t\t\t(apic %d)\n", b_info->u.hvm.apic);
-        printf("\t\t\t(acpi %d)\n", b_info->u.hvm.acpi);
-        printf("\t\t\t(nx %d)\n", b_info->u.hvm.nx);
-        printf("\t\t\t(viridian %d)\n", b_info->u.hvm.viridian);
-        printf("\t\t\t(hpet %d)\n", b_info->u.hvm.hpet);
-        printf("\t\t\t(vpt_align %d)\n", b_info->u.hvm.vpt_align);
+        printf("\t\t\t(pae %s)\n", libxl_defbool_to_string(b_info->u.hvm.pae));
+        printf("\t\t\t(apic %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.apic));
+        printf("\t\t\t(acpi %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.acpi));
+        printf("\t\t\t(nx %s)\n", libxl_defbool_to_string(b_info->u.hvm.nx));
+        printf("\t\t\t(viridian %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.viridian));
+        printf("\t\t\t(hpet %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.hpet));
+        printf("\t\t\t(vpt_align %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.vpt_align));
         printf("\t\t\t(timer_mode %s)\n",
                libxl_timer_mode_to_string(b_info->u.hvm.timer_mode));
-        printf("\t\t\t(nestedhvm %d)\n", b_info->u.hvm.nested_hvm);
+        printf("\t\t\t(nestedhvm %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.nested_hvm));
         printf("\t\t\t(no_incr_generationid %d)\n",
                     b_info->u.hvm.no_incr_generationid);
 
@@ -125,7 +132,7 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
         printf("\t\t\t(gfx_passthru %d)\n", b_info->u.hvm.gfx_passthru);
         printf("\t\t\t(serial %s)\n", b_info->u.hvm.serial);
         printf("\t\t\t(boot %s)\n", b_info->u.hvm.boot);
-        printf("\t\t\t(usb %d)\n", b_info->u.hvm.usb);
+        printf("\t\t\t(usb %s)\n", libxl_defbool_to_string(b_info->u.hvm.usb));
         printf("\t\t\t(usbdevice %s)\n", b_info->u.hvm.usbdevice);
         printf("\t\t)\n");
         break;
@@ -134,7 +141,8 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
         printf("\t\t\t(kernel %s)\n", b_info->u.pv.kernel.path);
         printf("\t\t\t(cmdline %s)\n", b_info->u.pv.cmdline);
         printf("\t\t\t(ramdisk %s)\n", b_info->u.pv.ramdisk.path);
-        printf("\t\t\t(e820_host %d)\n", b_info->u.pv.e820_host);
+        printf("\t\t\t(e820_host %s)\n",
+               libxl_defbool_to_string(b_info->u.pv.e820_host));
         printf("\t\t)\n");
         break;
     default:

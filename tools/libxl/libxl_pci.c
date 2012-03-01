@@ -1378,7 +1378,7 @@ int libxl__e820_alloc(libxl__gc *gc, uint32_t domid, libxl_domain_config *d_conf
         return ERROR_INVAL;
 
     b_info = &d_config->b_info;
-    if (!b_info->u.pv.e820_host)
+    if (!libxl_defbool_val(b_info->u.pv.e820_host))
         return ERROR_INVAL;
 
     rc = xc_get_machine_memory_map(ctx->xch, map, E820MAX);

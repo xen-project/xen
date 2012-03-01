@@ -671,8 +671,7 @@ static void parse_config_data(const char *configfile_filename_report,
         : libxl_get_required_shadow_memory(b_info->max_memkb,
                                            b_info->max_vcpus);
 
-    if (!xlu_cfg_get_long (config, "nomigrate", &l, 0))
-        b_info->disable_migrate = l;
+    xlu_cfg_get_defbool(config, "nomigrate", &b_info->disable_migrate, 0);
 
     if (!xlu_cfg_get_long(config, "tsc_mode", &l, 1)) {
         const char *s = libxl_tsc_mode_to_string(l);
@@ -714,24 +713,16 @@ static void parse_config_data(const char *configfile_filename_report,
                     buf);
                 exit (1);
         }
-        if (!xlu_cfg_get_long (config, "pae", &l, 0))
-            b_info->u.hvm.pae = l;
-        if (!xlu_cfg_get_long (config, "apic", &l, 0))
-            b_info->u.hvm.apic = l;
-        if (!xlu_cfg_get_long (config, "acpi", &l, 0))
-            b_info->u.hvm.acpi = l;
-        if (!xlu_cfg_get_long (config, "acpi_s3", &l, 0))
-            b_info->u.hvm.acpi_s3 = l;
-        if (!xlu_cfg_get_long (config, "acpi_s4", &l, 0))
-            b_info->u.hvm.acpi_s4 = l;
-        if (!xlu_cfg_get_long (config, "nx", &l, 0))
-            b_info->u.hvm.nx = l;
-        if (!xlu_cfg_get_long (config, "viridian", &l, 0))
-            b_info->u.hvm.viridian = l;
-        if (!xlu_cfg_get_long (config, "hpet", &l, 0))
-            b_info->u.hvm.hpet = l;
-        if (!xlu_cfg_get_long (config, "vpt_align", &l, 0))
-            b_info->u.hvm.vpt_align = l;
+
+        xlu_cfg_get_defbool(config, "pae", &b_info->u.hvm.pae, 0);
+        xlu_cfg_get_defbool(config, "apic", &b_info->u.hvm.apic, 0);
+        xlu_cfg_get_defbool(config, "acpi", &b_info->u.hvm.acpi, 0);
+        xlu_cfg_get_defbool(config, "acpi_s3", &b_info->u.hvm.acpi_s3, 0);
+        xlu_cfg_get_defbool(config, "acpi_s4", &b_info->u.hvm.acpi_s4, 0);
+        xlu_cfg_get_defbool(config, "nx", &b_info->u.hvm.nx, 0);
+        xlu_cfg_get_defbool(config, "viridian", &b_info->u.hvm.viridian, 0);
+        xlu_cfg_get_defbool(config, "hpet", &b_info->u.hvm.hpet, 0);
+        xlu_cfg_get_defbool(config, "vpt_align", &b_info->u.hvm.vpt_align, 0);
 
         if (!xlu_cfg_get_long(config, "timer_mode", &l, 1)) {
             const char *s = libxl_timer_mode_to_string(l);
@@ -756,8 +747,7 @@ static void parse_config_data(const char *configfile_filename_report,
             }
         }
 
-        if (!xlu_cfg_get_long (config, "nestedhvm", &l, 0))
-            b_info->u.hvm.nested_hvm = l;
+        xlu_cfg_get_defbool(config, "nestedhvm", &b_info->u.hvm.nested_hvm, 0);
         break;
     case LIBXL_DOMAIN_TYPE_PV:
     {
@@ -997,19 +987,10 @@ skip_vfb:
 
     /* To be reworked (automatically enabled) once the auto ballooning
      * after guest starts is done (with PCI devices passed in). */
-    if (!xlu_cfg_get_long (config, "e820_host", &l, 0)) {
-        switch (c_info->type) {
-        case LIBXL_DOMAIN_TYPE_HVM:
-            fprintf(stderr, "Can't do e820_host in HVM mode!");
-            break;
-        case LIBXL_DOMAIN_TYPE_PV:
-            if (l)
-                b_info->u.pv.e820_host = true;
-            break;
-        default:
-            abort();
-        }
+    if (c_info->type == LIBXL_DOMAIN_TYPE_PV) {
+        xlu_cfg_get_defbool(config, "e820_host", &b_info->u.pv.e820_host, 0);
     }
+
     if (!xlu_cfg_get_list (config, "pci", &pcis, 0, 0)) {
         int i;
         d_config->num_pcidevs = 0;
@@ -1027,7 +1008,7 @@ skip_vfb:
                 d_config->num_pcidevs++;
         }
         if (d_config->num_pcidevs && c_info->type == LIBXL_DOMAIN_TYPE_PV)
-            b_info->u.pv.e820_host = true;
+            libxl_defbool_set(&b_info->u.pv.e820_host, true);
     }
 
     switch (xlu_cfg_get_list(config, "cpuid", &cpuids, 0, 1)) {
@@ -1219,12 +1200,12 @@ skip_vfb:
             b_info->u.hvm.gfx_passthru = l;
         xlu_cfg_replace_string (config, "serial", &b_info->u.hvm.serial, 0);
         xlu_cfg_replace_string (config, "boot", &b_info->u.hvm.boot, 0);
-        if (!xlu_cfg_get_long (config, "usb", &l, 0))
-            b_info->u.hvm.usb = l;
-        xlu_cfg_replace_string (config, "usbdevice", &b_info->u.hvm.usbdevice, 0);
+        xlu_cfg_get_defbool(config, "usb", &b_info->u.hvm.usb, 0);
+        xlu_cfg_replace_string (config, "usbdevice",
+                                &b_info->u.hvm.usbdevice, 0);
         xlu_cfg_replace_string (config, "soundhw", &b_info->u.hvm.soundhw, 0);
-        if (!xlu_cfg_get_long (config, "xen_platform_pci", &l, 0))
-            b_info->u.hvm.xen_platform_pci = l;
+        xlu_cfg_get_defbool(config, "xen_platform_pci",
+                            &b_info->u.hvm.xen_platform_pci, 0);
     }
 
     xlu_cfg_destroy(config);

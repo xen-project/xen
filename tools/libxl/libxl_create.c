@@ -73,7 +73,6 @@ void libxl_domain_build_info_init(libxl_domain_build_info *b_info,
                                   const libxl_domain_create_info *c_info)
 {
     memset(b_info, '\0', sizeof(*b_info));
-    b_info->disable_migrate = 0;
     b_info->cpuid = NULL;
     b_info->type = c_info->type;
 
@@ -89,17 +88,7 @@ void libxl_domain_build_info_init(libxl_domain_build_info *b_info,
     case LIBXL_DOMAIN_TYPE_HVM:
         b_info->u.hvm.firmware = NULL;
         b_info->u.hvm.bios = 0;
-        b_info->u.hvm.pae = 1;
-        b_info->u.hvm.apic = 1;
-        b_info->u.hvm.acpi = 1;
-        b_info->u.hvm.acpi_s3 = 1;
-        b_info->u.hvm.acpi_s4 = 1;
-        b_info->u.hvm.nx = 1;
-        b_info->u.hvm.viridian = 0;
-        b_info->u.hvm.hpet = 1;
-        b_info->u.hvm.vpt_align = 1;
         b_info->u.hvm.timer_mode = LIBXL_TIMER_MODE_DEFAULT;
-        b_info->u.hvm.nested_hvm = 0;
         b_info->u.hvm.no_incr_generationid = 0;
 
         b_info->u.hvm.stdvga = 0;
@@ -107,9 +96,7 @@ void libxl_domain_build_info_init(libxl_domain_build_info *b_info,
         b_info->u.hvm.vnc.display = 0;
         b_info->u.hvm.vnc.findunused = 1;
         b_info->u.hvm.serial = NULL;
-        b_info->u.hvm.usb = 0;
         b_info->u.hvm.usbdevice = NULL;
-        b_info->u.hvm.xen_platform_pci = 1;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         b_info->u.pv.slack_memkb = 0;
@@ -142,6 +129,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     if (b_info->target_memkb == LIBXL_MEMKB_DEFAULT)
         b_info->target_memkb = b_info->max_memkb;
 
+    libxl_defbool_setdefault(&b_info->disable_migrate, false);
+
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         if (b_info->shadow_memkb == LIBXL_MEMKB_DEFAULT)
@@ -151,6 +140,19 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         if (b_info->u.hvm.timer_mode == LIBXL_TIMER_MODE_DEFAULT)
             b_info->u.hvm.timer_mode =
                 LIBXL_TIMER_MODE_NO_DELAY_FOR_MISSED_TICKS;
+
+        libxl_defbool_setdefault(&b_info->u.hvm.pae,                true);
+        libxl_defbool_setdefault(&b_info->u.hvm.apic,               true);
+        libxl_defbool_setdefault(&b_info->u.hvm.acpi,               true);
+        libxl_defbool_setdefault(&b_info->u.hvm.acpi_s3,            true);
+        libxl_defbool_setdefault(&b_info->u.hvm.acpi_s4,            true);
+        libxl_defbool_setdefault(&b_info->u.hvm.nx,                 true);
+        libxl_defbool_setdefault(&b_info->u.hvm.viridian,           false);
+        libxl_defbool_setdefault(&b_info->u.hvm.hpet,               true);
+        libxl_defbool_setdefault(&b_info->u.hvm.vpt_align,          true);
+        libxl_defbool_setdefault(&b_info->u.hvm.nested_hvm,         false);
+        libxl_defbool_setdefault(&b_info->u.hvm.usb,                false);
+        libxl_defbool_setdefault(&b_info->u.hvm.xen_platform_pci,   true);
 
         if (!b_info->u.hvm.boot) {
             b_info->u.hvm.boot = strdup("cda");
@@ -166,6 +168,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
 
         break;
     case LIBXL_DOMAIN_TYPE_PV:
+        libxl_defbool_setdefault(&b_info->u.pv.e820_host, false);
         if (b_info->shadow_memkb == LIBXL_MEMKB_DEFAULT)
             b_info->shadow_memkb = 0;
         if (b_info->u.pv.slack_memkb == LIBXL_MEMKB_DEFAULT)
@@ -221,11 +224,11 @@ int libxl__domain_build(libxl__gc *gc,
 
         localents = libxl__calloc(gc, 7, sizeof(char *));
         localents[0] = "platform/acpi";
-        localents[1] = (info->u.hvm.acpi) ? "1" : "0";
+        localents[1] = libxl_defbool_val(info->u.hvm.acpi) ? "1" : "0";
         localents[2] = "platform/acpi_s3";
-        localents[3] = (info->u.hvm.acpi_s3) ? "1" : "0";
+        localents[3] = libxl_defbool_val(info->u.hvm.acpi_s3) ? "1" : "0";
         localents[4] = "platform/acpi_s4";
-        localents[5] = (info->u.hvm.acpi_s4) ? "1" : "0";
+        localents[5] = libxl_defbool_val(info->u.hvm.acpi_s4) ? "1" : "0";
 
         break;
     case LIBXL_DOMAIN_TYPE_PV:
@@ -426,7 +429,6 @@ retry_transaction:
 
     xs_rm(ctx->xsh, t, dom_path);
     libxl__xs_mkdir(gc, t, dom_path, roperm, ARRAY_SIZE(roperm));
-
 
     xs_rm(ctx->xsh, t, vm_path);
     libxl__xs_mkdir(gc, t, vm_path, roperm, ARRAY_SIZE(roperm));
@@ -674,7 +676,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     }
 
     if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
-        d_config->b_info.u.pv.e820_host) {
+        libxl_defbool_val(d_config->b_info.u.pv.e820_host)) {
         int rc;
         rc = libxl__e820_alloc(gc, domid, d_config);
         if (rc)
