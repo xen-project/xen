@@ -946,7 +946,7 @@ skip:
                     break;
                 *p2 = '\0';
                 if (!strcmp(p, "vnc")) {
-                    vfb->vnc.enable = atoi(p2 + 1);
+                    libxl_defbool_set(&vfb->vnc.enable, atoi(p2 + 1));
                 } else if (!strcmp(p, "vnclisten")) {
                     free(vfb->vnc.listen);
                     vfb->vnc.listen = strdup(p2 + 1);
@@ -956,14 +956,14 @@ skip:
                 } else if (!strcmp(p, "vncdisplay")) {
                     vfb->vnc.display = atoi(p2 + 1);
                 } else if (!strcmp(p, "vncunused")) {
-                    vfb->vnc.findunused = atoi(p2 + 1);
+                    libxl_defbool_set(&vfb->vnc.findunused, atoi(p2 + 1));
                 } else if (!strcmp(p, "keymap")) {
                     free(vfb->keymap);
                     vfb->keymap = strdup(p2 + 1);
                 } else if (!strcmp(p, "sdl")) {
-                    vfb->sdl.enable = atoi(p2 + 1);
+                    libxl_defbool_set(&vfb->sdl.enable, atoi(p2 + 1));
                 } else if (!strcmp(p, "opengl")) {
-                    vfb->sdl.opengl = atoi(p2 + 1);
+                    libxl_defbool_set(&vfb->sdl.opengl, atoi(p2 + 1));
                 } else if (!strcmp(p, "display")) {
                     free(vfb->sdl.display);
                     vfb->sdl.display = strdup(p2 + 1);
@@ -1163,41 +1163,35 @@ skip_vfb:
 #undef parse_extra_args
 
     if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        if (!xlu_cfg_get_long (config, "stdvga", &l, 0))
-            b_info->u.hvm.stdvga = l;
-        if (!xlu_cfg_get_long (config, "vnc", &l, 0))
-            b_info->u.hvm.vnc.enable = l;
-        xlu_cfg_replace_string (config, "vnclisten", &b_info->u.hvm.vnc.listen, 0);
-        xlu_cfg_replace_string (config, "vncpasswd", &b_info->u.hvm.vnc.passwd, 0);
+        xlu_cfg_get_defbool(config, "stdvga", &b_info->u.hvm.stdvga, 0);
+        xlu_cfg_get_defbool(config, "vnc", &b_info->u.hvm.vnc.enable, 0);
+        xlu_cfg_replace_string (config, "vnclisten",
+                                &b_info->u.hvm.vnc.listen, 0);
+        xlu_cfg_replace_string (config, "vncpasswd",
+                                &b_info->u.hvm.vnc.passwd, 0);
         if (!xlu_cfg_get_long (config, "vncdisplay", &l, 0))
             b_info->u.hvm.vnc.display = l;
-        if (!xlu_cfg_get_long (config, "vncunused", &l, 0))
-            b_info->u.hvm.vnc.findunused = l;
+        xlu_cfg_get_defbool(config, "vncunused",
+                            &b_info->u.hvm.vnc.findunused, 0);
         xlu_cfg_replace_string (config, "keymap", &b_info->u.hvm.keymap, 0);
-        if (!xlu_cfg_get_long (config, "sdl", &l, 0))
-            b_info->u.hvm.sdl.enable = l;
-        if (!xlu_cfg_get_long (config, "opengl", &l, 0))
-            b_info->u.hvm.sdl.opengl = l;
-        if (!xlu_cfg_get_long (config, "spice", &l, 0))
-            b_info->u.hvm.spice.enable = l;
+        xlu_cfg_get_defbool(config, "sdl", &b_info->u.hvm.sdl.enable, 0);
+        xlu_cfg_get_defbool(config, "opengl", &b_info->u.hvm.sdl.opengl, 0);
+        xlu_cfg_get_defbool (config, "spice", &b_info->u.hvm.spice.enable, 0);
         if (!xlu_cfg_get_long (config, "spiceport", &l, 0))
             b_info->u.hvm.spice.port = l;
         if (!xlu_cfg_get_long (config, "spicetls_port", &l, 0))
             b_info->u.hvm.spice.tls_port = l;
         xlu_cfg_replace_string (config, "spicehost",
                                 &b_info->u.hvm.spice.host, 0);
-        if (!xlu_cfg_get_long (config, "spicedisable_ticketing", &l, 0))
-            b_info->u.hvm.spice.disable_ticketing = l;
+        xlu_cfg_get_defbool(config, "spicedisable_ticketing",
+                            &b_info->u.hvm.spice.disable_ticketing, 0);
         xlu_cfg_replace_string (config, "spicepasswd",
                                 &b_info->u.hvm.spice.passwd, 0);
-        if (!xlu_cfg_get_long (config, "spiceagent_mouse", &l, 0))
-            b_info->u.hvm.spice.agent_mouse = l;
-        else
-            b_info->u.hvm.spice.agent_mouse = 1;
-        if (!xlu_cfg_get_long (config, "nographic", &l, 0))
-            b_info->u.hvm.nographic = l;
-        if (!xlu_cfg_get_long (config, "gfx_passthru", &l, 0))
-            b_info->u.hvm.gfx_passthru = l;
+        xlu_cfg_get_defbool(config, "spiceagent_mouse",
+                            &b_info->u.hvm.spice.agent_mouse, 0);
+        xlu_cfg_get_defbool(config, "nographic", &b_info->u.hvm.nographic, 0);
+        xlu_cfg_get_defbool(config, "gfx_passthru", 
+                            &b_info->u.hvm.gfx_passthru, 0);
         xlu_cfg_replace_string (config, "serial", &b_info->u.hvm.serial, 0);
         xlu_cfg_replace_string (config, "boot", &b_info->u.hvm.boot, 0);
         xlu_cfg_get_defbool(config, "usb", &b_info->u.hvm.usb, 0);

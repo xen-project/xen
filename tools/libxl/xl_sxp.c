@@ -110,26 +110,34 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
                libxl_defbool_to_string(b_info->u.hvm.nested_hvm));
         printf("\t\t\t(no_incr_generationid %s)\n",
                libxl_defbool_to_string(b_info->u.hvm.incr_generationid));
-
-        printf("\t\t\t(stdvga %d)\n", b_info->u.hvm.stdvga);
-        printf("\t\t\t(vnc %d)\n", b_info->u.hvm.vnc.enable);
+        printf("\t\t\t(stdvga %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.stdvga));
+        printf("\t\t\t(vnc %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.vnc.enable));
         printf("\t\t\t(vnclisten %s)\n", b_info->u.hvm.vnc.listen);
         printf("\t\t\t(vncdisplay %d)\n", b_info->u.hvm.vnc.display);
-        printf("\t\t\t(vncunused %d)\n", b_info->u.hvm.vnc.findunused);
+        printf("\t\t\t(vncunused %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.vnc.findunused));
         printf("\t\t\t(keymap %s)\n", b_info->u.hvm.keymap);
-        printf("\t\t\t(sdl %d)\n", b_info->u.hvm.sdl.enable);
-        printf("\t\t\t(opengl %d)\n", b_info->u.hvm.sdl.opengl);
-        printf("\t\t\t(nographic %d)\n", b_info->u.hvm.nographic);
-        printf("\t\t\t(spice %d)\n", b_info->u.hvm.spice.enable);
+        printf("\t\t\t(sdl %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.sdl.enable));
+        printf("\t\t\t(opengl %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.sdl.opengl));
+        printf("\t\t\t(nographic %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.nographic));
+        printf("\t\t\t(spice %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.spice.enable));
         printf("\t\t\t(spiceport %d)\n", b_info->u.hvm.spice.port);
         printf("\t\t\t(spicetls_port %d)\n", b_info->u.hvm.spice.tls_port);
         printf("\t\t\t(spicehost %s)\n", b_info->u.hvm.spice.host);
-        printf("\t\t\t(spicedisable_ticketing %d)\n",
-                    b_info->u.hvm.spice.disable_ticketing);
-        printf("\t\t\t(spiceagent_mouse %d)\n", b_info->u.hvm.spice.agent_mouse);
+        printf("\t\t\t(spicedisable_ticketing %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.spice.disable_ticketing));
+        printf("\t\t\t(spiceagent_mouse %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.spice.agent_mouse));
 
         printf("\t\t\t(device_model %s)\n", b_info->device_model ? : "default");
-        printf("\t\t\t(gfx_passthru %d)\n", b_info->u.hvm.gfx_passthru);
+        printf("\t\t\t(gfx_passthru %s)\n",
+               libxl_defbool_to_string(b_info->u.hvm.gfx_passthru));
         printf("\t\t\t(serial %s)\n", b_info->u.hvm.serial);
         printf("\t\t\t(boot %s)\n", b_info->u.hvm.boot);
         printf("\t\t\t(usb %s)\n", libxl_defbool_to_string(b_info->u.hvm.usb));
@@ -204,13 +212,17 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
         printf("\t\t\t(backend_domid %d)\n", d_config->vfbs[i].backend_domid);
         printf("\t\t\t(frontend_domid %d)\n", domid);
         printf("\t\t\t(devid %d)\n", d_config->vfbs[i].devid);
-        printf("\t\t\t(vnc %d)\n", d_config->vfbs[i].vnc.enable);
+        printf("\t\t\t(vnc %s)\n",
+               libxl_defbool_to_string(d_config->vfbs[i].vnc.enable));
         printf("\t\t\t(vnclisten %s)\n", d_config->vfbs[i].vnc.listen);
         printf("\t\t\t(vncdisplay %d)\n", d_config->vfbs[i].vnc.display);
-        printf("\t\t\t(vncunused %d)\n", d_config->vfbs[i].vnc.findunused);
+        printf("\t\t\t(vncunused %s)\n",
+               libxl_defbool_to_string(d_config->vfbs[i].vnc.findunused));
         printf("\t\t\t(keymap %s)\n", d_config->vfbs[i].keymap);
-        printf("\t\t\t(sdl %d)\n", d_config->vfbs[i].sdl.enable);
-        printf("\t\t\t(opengl %d)\n", d_config->vfbs[i].sdl.opengl);
+        printf("\t\t\t(sdl %s)\n",
+               libxl_defbool_to_string(d_config->vfbs[i].sdl.enable));
+        printf("\t\t\t(opengl %s)\n",
+               libxl_defbool_to_string(d_config->vfbs[i].sdl.opengl));
         printf("\t\t\t(display %s)\n", d_config->vfbs[i].sdl.display);
         printf("\t\t\t(xauthority %s)\n", d_config->vfbs[i].sdl.xauthority);
         printf("\t\t)\n");

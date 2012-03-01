@@ -90,10 +90,7 @@ void libxl_domain_build_info_init(libxl_domain_build_info *b_info,
         b_info->u.hvm.bios = 0;
         b_info->u.hvm.timer_mode = LIBXL_TIMER_MODE_DEFAULT;
 
-        b_info->u.hvm.stdvga = 0;
-        b_info->u.hvm.vnc.enable = 1;
         b_info->u.hvm.vnc.display = 0;
-        b_info->u.hvm.vnc.findunused = 1;
         b_info->u.hvm.serial = NULL;
         b_info->u.hvm.usbdevice = NULL;
         break;
@@ -159,12 +156,31 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             if (!b_info->u.hvm.boot) return ERROR_NOMEM;
         }
 
-        if (b_info->u.hvm.vnc.enable) {
+        libxl_defbool_setdefault(&b_info->u.hvm.stdvga, false);
+        libxl_defbool_setdefault(&b_info->u.hvm.vnc.enable, true);
+        if (libxl_defbool_val(b_info->u.hvm.vnc.enable)) {
+            libxl_defbool_setdefault(&b_info->u.hvm.vnc.findunused, true);
             if (!b_info->u.hvm.vnc.listen) {
                 b_info->u.hvm.vnc.listen = strdup("127.0.0.1");
                 if (!b_info->u.hvm.vnc.listen) return ERROR_NOMEM;
             }
         }
+
+        libxl_defbool_setdefault(&b_info->u.hvm.sdl.enable, false);
+        if (libxl_defbool_val(b_info->u.hvm.sdl.enable)) {
+            libxl_defbool_setdefault(&b_info->u.hvm.sdl.opengl, false);
+        }
+
+        libxl_defbool_setdefault(&b_info->u.hvm.spice.enable, false);
+        if (libxl_defbool_val(b_info->u.hvm.spice.enable)) {
+            libxl_defbool_setdefault(&b_info->u.hvm.spice.disable_ticketing,
+                                     false);
+            libxl_defbool_setdefault(&b_info->u.hvm.spice.agent_mouse, true);
+        }
+
+        libxl_defbool_setdefault(&b_info->u.hvm.nographic, false);
+
+        libxl_defbool_setdefault(&b_info->u.hvm.gfx_passthru, false);
 
         break;
     case LIBXL_DOMAIN_TYPE_PV:

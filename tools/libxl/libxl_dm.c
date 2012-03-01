@@ -83,7 +83,7 @@ const libxl_vnc_info *libxl__dm_vnc(const libxl_domain_config *guest_config)
     } else if (guest_config->num_vfbs > 0) {
         vnc = &guest_config->vfbs[0].vnc;
     }
-    return vnc && vnc->enable ? vnc : NULL;
+    return vnc && libxl_defbool_val(vnc->enable) ? vnc : NULL;
 }
 
 static const libxl_sdl_info *dm_sdl(const libxl_domain_config *guest_config)
@@ -94,7 +94,7 @@ static const libxl_sdl_info *dm_sdl(const libxl_domain_config *guest_config)
     } else if (guest_config->num_vfbs > 0) {
         sdl = &guest_config->vfbs[0].sdl;
     }
-    return sdl && sdl->enable ? sdl : NULL;
+    return sdl && libxl_defbool_val(sdl->enable) ? sdl : NULL;
 }
 
 static const char *dm_keymap(const libxl_domain_config *guest_config)
@@ -156,13 +156,13 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         flexarray_append(dm_args, "-vnc");
         flexarray_append(dm_args, vncarg);
 
-        if (vnc->findunused) {
+        if (libxl_defbool_val(vnc->findunused)) {
             flexarray_append(dm_args, "-vncunused");
         }
     }
     if (sdl) {
         flexarray_append(dm_args, "-sdl");
-        if (!sdl->opengl) {
+        if (!libxl_defbool_val(sdl->opengl)) {
             flexarray_append(dm_args, "-disable-opengl");
         }
         /* XXX sdl->{display,xauthority} into $DISPLAY/$XAUTHORITY */
@@ -177,7 +177,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             flexarray_vappend(dm_args, "-serial", b_info->u.hvm.serial, NULL);
         }
 
-        if (b_info->u.hvm.nographic && (!sdl && !vnc)) {
+        if (libxl_defbool_val(b_info->u.hvm.nographic) && (!sdl && !vnc)) {
             flexarray_append(dm_args, "-nographic");
         }
 
@@ -187,7 +187,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
                                    libxl__sizekb_to_mb(b_info->video_memkb)),
                     NULL);
         }
-        if (b_info->u.hvm.stdvga) {
+        if (libxl_defbool_val(b_info->u.hvm.stdvga)) {
             flexarray_append(dm_args, "-std-vga");
         }
 
@@ -240,7 +240,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         if ( ioemu_vifs == 0 ) {
             flexarray_vappend(dm_args, "-net", "none", NULL);
         }
-        if (b_info->u.hvm.gfx_passthru) {
+        if (libxl_defbool_val(b_info->u.hvm.gfx_passthru)) {
             flexarray_append(dm_args, "-gfx_passthru");
         }
     } else {
@@ -293,7 +293,7 @@ static char *dm_spice_options(libxl__gc *gc,
         return NULL;
     }
 
-    if (!spice->disable_ticketing) {
+    if (!libxl_defbool_val(spice->disable_ticketing)) {
         if (!spice->passwd) {
             LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
                        "spice ticketing is enabled but missing password");
@@ -309,12 +309,12 @@ static char *dm_spice_options(libxl__gc *gc,
                          spice->port, spice->tls_port);
     if (spice->host)
         opt = libxl__sprintf(gc, "%s,addr=%s", opt, spice->host);
-    if (spice->disable_ticketing)
+    if (libxl_defbool_val(spice->disable_ticketing))
         opt = libxl__sprintf(gc, "%s,disable-ticketing", opt);
     else
         opt = libxl__sprintf(gc, "%s,password=%s", opt, spice->passwd);
     opt = libxl__sprintf(gc, "%s,agent-mouse=%s", opt,
-                         spice->agent_mouse ? "on" : "off");
+                         libxl_defbool_val(spice->agent_mouse) ? "on" : "off");
     return opt;
 }
 
@@ -383,7 +383,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         if (vnc->passwd && vnc->passwd[0]) {
             vncarg = libxl__sprintf(gc, "%s,password", vncarg);
         }
-        if (vnc->findunused) {
+        if (libxl_defbool_val(vnc->findunused)) {
             /* This option asks to QEMU to try this number of port before to
              * give up.  So QEMU will try ports between $display and $display +
              * 99.  This option needs to be the last one of the vnc options. */
@@ -411,11 +411,11 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_vappend(dm_args, "-serial", b_info->u.hvm.serial, NULL);
         }
 
-        if (b_info->u.hvm.nographic && (!sdl && !vnc)) {
+        if (libxl_defbool_val(b_info->u.hvm.nographic) && (!sdl && !vnc)) {
             flexarray_append(dm_args, "-nographic");
         }
 
-        if (b_info->u.hvm.spice.enable) {
+        if (libxl_defbool_val(b_info->u.hvm.spice.enable)) {
             const libxl_spice_info *spice = &b_info->u.hvm.spice;
             char *spiceoptions = dm_spice_options(gc, spice);
             if (!spiceoptions)
@@ -425,7 +425,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append(dm_args, spiceoptions);
         }
 
-        if (b_info->u.hvm.stdvga) {
+        if (libxl_defbool_val(b_info->u.hvm.stdvga)) {
                 flexarray_vappend(dm_args, "-vga", "std", NULL);
         }
 
@@ -485,7 +485,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append(dm_args, "-net");
             flexarray_append(dm_args, "none");
         }
-        if (b_info->u.hvm.gfx_passthru) {
+        if (libxl_defbool_val(b_info->u.hvm.gfx_passthru)) {
             flexarray_append(dm_args, "-gfx_passthru");
         }
     } else {

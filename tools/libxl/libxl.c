@@ -2257,22 +2257,23 @@ out:
 void libxl_device_vfb_init(libxl_device_vfb *vfb)
 {
     memset(vfb, 0x00, sizeof(libxl_device_vfb));
-    vfb->vnc.enable = 1;
-    vfb->vnc.passwd = NULL;
-    vfb->vnc.display = 0;
-    vfb->vnc.findunused = 1;
-    vfb->keymap = NULL;
-    vfb->sdl.enable = 0;
-    vfb->sdl.opengl = 0;
-    vfb->sdl.display = NULL;
-    vfb->sdl.xauthority = NULL;
 }
 
 int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb)
 {
-    if (!vfb->vnc.listen) {
-        vfb->vnc.listen = strdup("127.0.0.1");
-        if (!vfb->vnc.listen) return ERROR_NOMEM;
+    libxl_defbool_setdefault(&vfb->vnc.enable, true);
+    if (libxl_defbool_val(vfb->vnc.enable)) {
+        if (!vfb->vnc.listen) {
+            vfb->vnc.listen = strdup("127.0.0.1");
+            if (!vfb->vnc.listen) return ERROR_NOMEM;
+        }
+
+        libxl_defbool_setdefault(&vfb->vnc.findunused, true);
+    }
+
+    libxl_defbool_setdefault(&vfb->sdl.enable, false);
+    if (libxl_defbool_val(vfb->sdl.enable)) {
+        libxl_defbool_setdefault(&vfb->sdl.opengl, false);
     }
 
     return 0;
@@ -2321,17 +2322,17 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
     flexarray_append_pair(back, "state", libxl__sprintf(gc, "%d", 1));
     flexarray_append_pair(back, "domain", libxl__domid_to_name(gc, domid));
     flexarray_append_pair(back, "vnc",
-                          libxl__sprintf(gc, "%d", vfb->vnc.enable));
+                          libxl_defbool_val(vfb->vnc.enable) ? "1" : "0");
     flexarray_append_pair(back, "vnclisten", vfb->vnc.listen);
     flexarray_append_pair(back, "vncpasswd", vfb->vnc.passwd);
     flexarray_append_pair(back, "vncdisplay",
                           libxl__sprintf(gc, "%d", vfb->vnc.display));
     flexarray_append_pair(back, "vncunused",
-                          libxl__sprintf(gc, "%d", vfb->vnc.findunused));
+                          libxl_defbool_val(vfb->vnc.findunused) ? "1" : "0");
     flexarray_append_pair(back, "sdl",
-                          libxl__sprintf(gc, "%d", vfb->sdl.enable));
+                          libxl_defbool_val(vfb->sdl.enable) ? "1" : "0");
     flexarray_append_pair(back, "opengl",
-                          libxl__sprintf(gc, "%d", vfb->sdl.opengl));
+                          libxl_defbool_val(vfb->sdl.opengl) ? "1" : "0");
     if (vfb->sdl.xauthority) {
         flexarray_append_pair(back, "xauthority", vfb->sdl.xauthority);
     }

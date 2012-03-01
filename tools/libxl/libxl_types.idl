@@ -129,31 +129,31 @@ libxl_shutdown_reason = Enumeration("shutdown_reason", [
 # Complex libxl types
 #
 libxl_vnc_info = Struct("vnc_info", [
-    ("enable",        bool),
+    ("enable",        libxl_defbool),
     # "address:port" that should be listened on
     ("listen",        string),
     ("passwd",        string),
     ("display",       integer),
     # If set then try to find an unused port
-    ("findunused",    bool),
+    ("findunused",    libxl_defbool),
     ])
 
 libxl_spice_info = Struct("spice_info", [
-    ("enable",            bool),
+    ("enable",      libxl_defbool),
     # At least one of spice port or spicetls_post must be given
     ("port",        integer),
     ("tls_port",    integer),
     # Interface to bind to
     ("host",        string),
     # enable client connection with no password
-    ("disable_ticketing", bool),
+    ("disable_ticketing", libxl_defbool),
     ("passwd",      string),
-    ("agent_mouse", bool),
+    ("agent_mouse", libxl_defbool),
     ])
 
 libxl_sdl_info = Struct("sdl_info", [
-    ("enable",        bool),
-    ("opengl",        bool),
+    ("enable",        libxl_defbool),
+    ("opengl",        libxl_defbool),
     ("display",       string),
     ("xauthority",    string),
     ])
@@ -268,15 +268,15 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("timer_mode",       libxl_timer_mode),
                                        ("nested_hvm",       libxl_defbool),
                                        ("incr_generationid",libxl_defbool),
-                                       ("nographic",        bool),
-                                       ("stdvga",           bool),
+                                       ("nographic",        libxl_defbool),
+                                       ("stdvga",           libxl_defbool),
                                        ("vnc",              libxl_vnc_info),
                                        # keyboard layout, default is en-us keyboard
                                        ("keymap",           string),
                                        ("sdl",              libxl_sdl_info),
                                        ("spice",            libxl_spice_info),
                                        
-                                       ("gfx_passthru",     bool),
+                                       ("gfx_passthru",     libxl_defbool),
                                        
                                        ("serial",           string),
                                        ("boot",             string),
