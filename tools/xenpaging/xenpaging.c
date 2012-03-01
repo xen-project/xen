@@ -656,8 +656,6 @@ static int xenpaging_evict_page(struct xenpaging *paging, unsigned long gfn, int
 
 static int xenpaging_resume_page(struct xenpaging *paging, mem_event_response_t *rsp, int notify_policy)
 {
-    int ret;
-
     /* Put the page info on the ring */
     put_response(&paging->mem_event, rsp);
 
@@ -678,14 +676,7 @@ static int xenpaging_resume_page(struct xenpaging *paging, mem_event_response_t 
     }
 
     /* Tell Xen page is ready */
-    ret = xc_mem_paging_resume(paging->xc_handle, paging->mem_event.domain_id,
-                               rsp->gfn);
-    if ( ret == 0 ) 
-        ret = xc_evtchn_notify(paging->mem_event.xce_handle,
-                               paging->mem_event.port);
-
- out:
-    return ret;
+    return xc_evtchn_notify(paging->mem_event.xce_handle, paging->mem_event.port);
 }
 
 static int xenpaging_populate_page(struct xenpaging *paging, unsigned long gfn, int i)

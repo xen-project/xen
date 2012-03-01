@@ -93,14 +93,6 @@ int xc_mem_paging_load(xc_interface *xch, domid_t domain_id,
     return rc;
 }
 
-int xc_mem_paging_resume(xc_interface *xch, domid_t domain_id, unsigned long gfn)
-{
-    return xc_mem_event_memop(xch, domain_id,
-                                XENMEM_paging_op_resume,
-                                XENMEM_paging_op,
-                                gfn, NULL);
-}
-
 
 /*
  * Local variables:

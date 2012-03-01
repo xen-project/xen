@@ -53,13 +53,6 @@ int mem_paging_memop(struct domain *d, xen_mem_event_op_t *mec)
     }
     break;
 
-    case XENMEM_paging_op_resume:
-    {
-        p2m_mem_paging_resume(d);
-        return 0;
-    }
-    break;
-
     default:
         return -ENOSYS;
         break;

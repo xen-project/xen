@@ -322,7 +322,6 @@ typedef struct xen_pod_target xen_pod_target_t;
 #define XENMEM_paging_op_nominate           0
 #define XENMEM_paging_op_evict              1
 #define XENMEM_paging_op_prep               2
-#define XENMEM_paging_op_resume             3
 
 #define XENMEM_access_op                    21
 #define XENMEM_access_op_resume             0
