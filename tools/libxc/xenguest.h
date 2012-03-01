@@ -171,22 +171,29 @@ int xc_linux_build_mem(xc_interface *xch,
                        unsigned int console_evtchn,
                        unsigned long *console_mfn);
 
-int xc_hvm_build(xc_interface *xch,
-                 uint32_t domid,
-                 int memsize,
-                 const char *image_name);
+struct xc_hvm_build_args {
+    uint64_t mem_size;           /* Memory size in bytes. */
+    uint64_t mem_target;         /* Memory target in bytes. */
+    const char *image_file_name; /* File name of the image to load. */
+};
+
+/**
+ * Build a HVM domain.
+ * @parm xch      libxc context handle.
+ * @parm domid    domain ID for the new domain.
+ * @parm hvm_args parameters for the new domain.
+ *
+ * The memory size and image file parameters are required, the rest
+ * are optional.
+ */
+int xc_hvm_build(xc_interface *xch, uint32_t domid,
+                 const struct xc_hvm_build_args *hvm_args);
 
 int xc_hvm_build_target_mem(xc_interface *xch,
                             uint32_t domid,
                             int memsize,
                             int target,
                             const char *image_name);
-
-int xc_hvm_build_mem(xc_interface *xch,
-                     uint32_t domid,
-                     int memsize,
-                     const char *image_buffer,
-                     unsigned long image_size);
 
 int xc_suspend_evtchn_release(xc_interface *xch, xc_evtchn *xce, int domid, int suspend_evtchn);
 

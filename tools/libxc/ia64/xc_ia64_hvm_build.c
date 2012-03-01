@@ -912,8 +912,8 @@ setup_guest(xc_interface *xch, uint32_t dom, unsigned long memsize,
             char *image, unsigned long image_size)
 {
     xen_pfn_t *pfn_list;
-    unsigned long dom_memsize = memsize << 20;
-    unsigned long nr_pages = memsize << (20 - PAGE_SHIFT);
+    unsigned long dom_memsize = memsize;
+    unsigned long nr_pages = memsize >> PAGE_SHIFT;
     unsigned long vcpus;
     unsigned long nr_special_pages;
     unsigned long memmap_info_pfn;
@@ -1072,14 +1072,14 @@ error_out:
 }
 
 int
-xc_hvm_build(xc_interface *xch, uint32_t domid, int memsize, const char *image_name)
+xc_hvm_build(xc_interface *xch, uint32_t domid, const struct xc_hvm_build_args *args)
 {
     vcpu_guest_context_any_t st_ctxt_any;
     vcpu_guest_context_t *ctxt = &st_ctxt_any.c;
     char *image = NULL;
     unsigned long image_size;
 
-    image = xc_read_image(xch, image_name, &image_size);
+    image = xc_read_image(xch, args->image_file_name, &image_size);
     if (image == NULL) {
         PERROR("Could not read guest firmware image %s", image_name);
         goto error_out;
@@ -1087,7 +1087,7 @@ xc_hvm_build(xc_interface *xch, uint32_t domid, int memsize, const char *image_n
 
     image_size = (image_size + PAGE_SIZE - 1) & PAGE_MASK;
 
-    if (setup_guest(xch, domid, (unsigned long)memsize, image,
+    if (setup_guest(xch, domid, (unsigned long)args->mem_size, image,
                     image_size) < 0) {
         ERROR("Error constructing guest OS");
         goto error_out;
@@ -1114,6 +1114,8 @@ error_out:
  * files/filenames.  If target < memsize, domain is created with
  * memsize pages marked populate-on-demand, and with a PoD cache size
  * of target.  If target == memsize, pages are populated normally.
+ *
+ * XXX:PoD isn't supported yet so setting target does nothing.
  */
 int xc_hvm_build_target_mem(xc_interface *xch,
                             uint32_t domid,
@@ -1121,8 +1123,13 @@ int xc_hvm_build_target_mem(xc_interface *xch,
                             int target,
                             const char *image_name)
 {
-    /* XXX:PoD isn't supported yet */
-    return xc_hvm_build(xch, domid, target, image_name);
+    struct xc_hvm_build_args args;
+
+    args.mem_size = (uint64_t)memsize << 20;
+    args.mem_target = (uint64_t)target << 20;
+    args.image_file_name = image_name;
+
+    return xc_hvm_build(xch, domid, &args);
 }
 
 /*

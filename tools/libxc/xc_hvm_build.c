@@ -136,12 +136,12 @@ static int check_mmio_hole(uint64_t start, uint64_t memsize)
 }
 
 static int setup_guest(xc_interface *xch,
-                       uint32_t dom, int memsize, int target,
+                       uint32_t dom, const struct xc_hvm_build_args *args,
                        char *image, unsigned long image_size)
 {
     xen_pfn_t *page_array = NULL;
-    unsigned long i, nr_pages = (unsigned long)memsize << (20 - PAGE_SHIFT);
-    unsigned long target_pages = (unsigned long)target << (20 - PAGE_SHIFT);
+    unsigned long i, nr_pages = args->mem_size >> PAGE_SHIFT;
+    unsigned long target_pages = args->mem_target >> PAGE_SHIFT;
     unsigned long entry_eip, cur_pages, cur_pfn;
     void *hvm_info_page;
     uint32_t *ident_pt;
@@ -153,11 +153,7 @@ static int setup_guest(xc_interface *xch,
         stat_1gb_pages = 0;
     int pod_mode = 0;
 
-    /* An HVM guest must be initialised with at least 2MB memory. */
-    if ( memsize < 2 || target < 2 )
-        goto error_out;
-
-    if ( memsize > target )
+    if ( nr_pages > target_pages )
         pod_mode = 1;
 
     memset(&elf, 0, sizeof(elf));
@@ -168,7 +164,7 @@ static int setup_guest(xc_interface *xch,
 
     elf_parse_binary(&elf);
     v_start = 0;
-    v_end = (unsigned long long)memsize << 20;
+    v_end = args->mem_size;
 
     if ( xc_version(xch, XENVER_capabilities, &caps) != 0 )
     {
@@ -393,39 +389,34 @@ static int setup_guest(xc_interface *xch,
     return -1;
 }
 
-static int xc_hvm_build_internal(xc_interface *xch,
-                                 uint32_t domid,
-                                 int memsize,
-                                 int target,
-                                 char *image,
-                                 unsigned long image_size)
-{
-    if ( (image == NULL) || (image_size == 0) )
-    {
-        ERROR("Image required");
-        return -1;
-    }
-
-    return setup_guest(xch, domid, memsize, target, image, image_size);
-}
-
 /* xc_hvm_build:
  * Create a domain for a virtualized Linux, using files/filenames.
  */
-int xc_hvm_build(xc_interface *xch,
-                 uint32_t domid,
-                 int memsize,
-                 const char *image_name)
+int xc_hvm_build(xc_interface *xch, uint32_t domid,
+                 const struct xc_hvm_build_args *hvm_args)
 {
-    char *image;
-    int  sts;
+    struct xc_hvm_build_args args = *hvm_args;
+    void *image;
     unsigned long image_size;
+    int sts;
 
-    if ( (image_name == NULL) ||
-         ((image = xc_read_image(xch, image_name, &image_size)) == NULL) )
+    if ( domid == 0 )
+        return -1;
+    if ( args.image_file_name == NULL )
         return -1;
 
-    sts = xc_hvm_build_internal(xch, domid, memsize, memsize, image, image_size);
+    if ( args.mem_target == 0 )
+        args.mem_target = args.mem_size;
+
+    /* An HVM guest must be initialised with at least 2MB memory. */
+    if ( args.mem_size < (2ull << 20) || args.mem_target < (2ull << 20) )
+        return -1;
+
+    image = xc_read_image(xch, args.image_file_name, &image_size);
+    if ( image == NULL )
+        return -1;
+
+    sts = setup_guest(xch, domid, &args, image, image_size);
 
     free(image);
 
@@ -445,59 +436,13 @@ int xc_hvm_build_target_mem(xc_interface *xch,
                            int target,
                            const char *image_name)
 {
-    char *image;
-    int  sts;
-    unsigned long image_size;
+    struct xc_hvm_build_args args = {};
 
-    if ( (image_name == NULL) ||
-         ((image = xc_read_image(xch, image_name, &image_size)) == NULL) )
-        return -1;
+    args.mem_size = (uint64_t)memsize << 20;
+    args.mem_target = (uint64_t)target << 20;
+    args.image_file_name = image_name;
 
-    sts = xc_hvm_build_internal(xch, domid, memsize, target, image, image_size);
-
-    free(image);
-
-    return sts;
-}
-
-/* xc_hvm_build_mem:
- * Create a domain for a virtualized Linux, using memory buffers.
- */
-int xc_hvm_build_mem(xc_interface *xch,
-                     uint32_t domid,
-                     int memsize,
-                     const char *image_buffer,
-                     unsigned long image_size)
-{
-    int           sts;
-    unsigned long img_len;
-    char         *img;
-
-    /* Validate that there is a kernel buffer */
-
-    if ( (image_buffer == NULL) || (image_size == 0) )
-    {
-        ERROR("kernel image buffer not present");
-        return -1;
-    }
-
-    img = xc_inflate_buffer(xch, image_buffer, image_size, &img_len);
-    if ( img == NULL )
-    {
-        ERROR("unable to inflate ram disk buffer");
-        return -1;
-    }
-
-    sts = xc_hvm_build_internal(xch, domid, memsize, memsize,
-                                img, img_len);
-
-    /* xc_inflate_buffer may return the original buffer pointer (for
-       for already inflated buffers), so exercise some care in freeing */
-
-    if ( (img != NULL) && (img != image_buffer) )
-        free(img);
-
-    return sts;
+    return xc_hvm_build(xch, domid, &args);
 }
 
 /*
