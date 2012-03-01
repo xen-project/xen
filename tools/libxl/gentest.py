@@ -31,7 +31,7 @@ def gen_rand_init(ty, v, indent = "    ", parent = None):
     elif isinstance(ty, idl.KeyedUnion):
         if parent is None:
             raise Exception("KeyedUnion type must have a parent")
-        s += "switch (%s) {\n" % (parent + ty.keyvar_name)
+        s += "switch (%s) {\n" % (parent + ty.keyvar.name)
         for f in ty.fields:
             (nparent,fexpr) = ty.member(v, f, parent is None)
             s += "case %s:\n" % f.enumname

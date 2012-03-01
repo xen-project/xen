@@ -128,10 +128,9 @@ idl.KeyedUnion
  where the currently valid member of the union can be determined based
  upon another member in the containing type.
 
- The KeyedUnion.keyvar_name must contain the name of the member of the
+ The KeyedUnion.keyvar contains an idl.type the member of the
  containing type which determines the valid member of the union. The
- member referenced by KeyedUnion.keyvar_name has type
- KeyedUnion.keyvar_type which must be an instance of the Enumeration type.
+ must be an instance of the Enumeration type.
 
 Standard Types
 --------------

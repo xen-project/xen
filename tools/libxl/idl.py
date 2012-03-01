@@ -206,8 +206,9 @@ class KeyedUnion(Aggregate):
         if not isinstance(keyvar_type, Enumeration):
             raise ValueError
 
-        self.keyvar_name = keyvar_name
-        self.keyvar_type = keyvar_type
+        kv_kwargs = dict([(x.lstrip('keyvar_'),y) for (x,y) in kwargs.items() if x.startswith('keyvar_')])
+        
+        self.keyvar = Field(keyvar_type, keyvar_name, **kv_kwargs)
 
         for f in fields:
             # (name, enum, type)
