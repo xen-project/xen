@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import os
 import sys
 import re
 import random
@@ -72,7 +73,7 @@ if __name__ == '__main__':
         print >>sys.stderr, "Usage: gentest.py <idl> <implementation>"
         sys.exit(1)
 
-    random.seed()
+    random.seed(os.getenv('LIBXL_TESTIDL_SEED'))
 
     (builtins,types) = idl.parse(sys.argv[1])
 
