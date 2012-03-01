@@ -213,9 +213,9 @@ CONFIG_SEABIOS ?= y
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 128de2549c5f24e4a437b86bd2e46f023976d50a
-# Mon Feb 20 16:21:47 2012 +0000
-# Intel GPU passthrough: Host bridge config space
+QEMU_TAG ?= 2503d4d5a29e7af8dffd1e11229e11c1917d2ccf
+# Thu Mar 1 18:58:27 2012 +0000
+# qemu-xen: ignore console disconnect events for console/0
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
