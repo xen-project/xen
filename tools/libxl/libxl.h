@@ -524,7 +524,7 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk);
 int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk);
 
 /* Network Interfaces */
-int libxl_device_nic_init(libxl_ctx *ctx, libxl_device_nic *nic);
+void libxl_device_nic_init(libxl_device_nic *nic);
 int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
 int libxl_device_nic_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_nic *nic,

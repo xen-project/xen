@@ -1677,32 +1677,43 @@ int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk)
 }
 
 /******************************************************************************/
-int libxl_device_nic_init(libxl_ctx *ctx, libxl_device_nic *nic)
+void libxl_device_nic_init(libxl_device_nic *nic)
 {
-    const uint8_t *r;
-    libxl_uuid uuid;
-
-    libxl_uuid_generate(&uuid);
-    r = libxl_uuid_bytearray(&uuid);
     memset(nic, '\0', sizeof(*nic));
+}
 
-    nic->backend_domid = 0;
-    nic->devid = -1;
-    nic->mtu = 1492;
-    nic->model = strdup("rtl8139");
-    nic->mac[0] = 0x00;
-    nic->mac[1] = 0x16;
-    nic->mac[2] = 0x3e;
-    nic->mac[3] = r[0] & 0x7f;
-    nic->mac[4] = r[1];
-    nic->mac[5] = r[2];
-    nic->ifname = NULL;
-    nic->bridge = strdup("xenbr0");
-    nic->ip = NULL;
-    if ( asprintf(&nic->script, "%s/vif-bridge",
-               libxl_xen_script_dir_path()) < 0 )
+int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic)
+{
+    if (!nic->mtu)
+        nic->mtu = 1492;
+    if (!nic->model) {
+        nic->model = strdup("rtl8139");
+        if (!nic->model) return ERROR_NOMEM;
+    }
+    if (!nic->mac[0] && !nic->mac[1] && !nic->mac[2] &&
+        !nic->mac[3] && !nic->mac[4] && !nic->mac[5]) {
+        const uint8_t *r;
+        libxl_uuid uuid;
+
+        libxl_uuid_generate(&uuid);
+        r = libxl_uuid_bytearray(&uuid);
+
+        nic->mac[0] = 0x00;
+        nic->mac[1] = 0x16;
+        nic->mac[2] = 0x3e;
+        nic->mac[3] = r[0] & 0x7f;
+        nic->mac[4] = r[1];
+        nic->mac[5] = r[2];
+    }
+    if (!nic->bridge) {
+        nic->bridge = strdup("xenbr0");
+        if (!nic->bridge) return ERROR_NOMEM;
+    }
+    if ( !nic->script && asprintf(&nic->script, "%s/vif-bridge",
+                                  libxl_xen_script_dir_path()) < 0 )
         return ERROR_FAIL;
-    nic->nictype = LIBXL_NIC_TYPE_IOEMU;
+    if (!nic->nictype)
+        nic->nictype = LIBXL_NIC_TYPE_IOEMU;
     return 0;
 }
 
@@ -1728,6 +1739,9 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
     libxl__device device;
     char *dompath, **l;
     unsigned int nb, rc;
+
+    rc = libxl__device_nic_setdefault(gc, nic);
+    if (rc) goto out;
 
     front = flexarray_make(16, 1);
     if (!front) {
