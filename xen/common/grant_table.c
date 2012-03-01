@@ -585,6 +585,8 @@ __gnttab_map_grant_ref(
             act->start = 0;
             act->length = PAGE_SIZE;
             act->is_sub_page = 0;
+            act->trans_domain = rd;
+            act->trans_gref = op->ref;
         }
     }
 
