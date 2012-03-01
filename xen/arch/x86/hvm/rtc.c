@@ -33,6 +33,8 @@
 #define vrtc_domain(x) (container_of((x), struct domain, \
                                      arch.hvm_domain.pl_time.vrtc))
 #define vrtc_vcpu(x)   (pt_global_vcpu_target(vrtc_domain(x)))
+#define epoch_year     1900
+#define get_year(x)    (x + epoch_year)
 
 static void rtc_periodic_cb(struct vcpu *v, void *opaque)
 {
@@ -165,7 +167,7 @@ static void rtc_set_time(RTCState *s)
       
     ASSERT(spin_is_locked(&s->lock));
 
-    before = mktime(tm->tm_year, tm->tm_mon + 1, tm->tm_mday,
+    before = mktime(get_year(tm->tm_year), tm->tm_mon + 1, tm->tm_mday,
 		    tm->tm_hour, tm->tm_min, tm->tm_sec);
     
     tm->tm_sec = from_bcd(s, s->hw.cmos_data[RTC_SECONDS]);
@@ -179,7 +181,7 @@ static void rtc_set_time(RTCState *s)
     tm->tm_mon = from_bcd(s, s->hw.cmos_data[RTC_MONTH]) - 1;
     tm->tm_year = from_bcd(s, s->hw.cmos_data[RTC_YEAR]) + 100;
 
-    after = mktime(tm->tm_year, tm->tm_mon + 1, tm->tm_mday,
+    after = mktime(get_year(tm->tm_year), tm->tm_mon + 1, tm->tm_mday,
                    tm->tm_hour, tm->tm_min, tm->tm_sec);
 
     /* We use the guest's setting of the RTC to define the local-time 
@@ -257,7 +259,7 @@ static void rtc_next_second(RTCState *s)
                 if ( (unsigned)tm->tm_wday >= 7 )
                     tm->tm_wday = 0;
                 days_in_month = get_days_in_month(tm->tm_mon, 
-                                                  tm->tm_year + 1900);
+                                                  get_year(tm->tm_year));
                 tm->tm_mday++;
                 if ( tm->tm_mday < 1 )
                 {
