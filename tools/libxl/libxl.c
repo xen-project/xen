@@ -1227,11 +1227,6 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
 
 /******************************************************************************/
 
-void libxl_device_disk_init(libxl_device_disk *disk)
-{
-    memset(disk, 0x00, sizeof(libxl_device_disk));
-}
-
 int libxl__device_disk_setdefault(libxl__gc *gc, libxl_device_disk *disk)
 {
     int rc;
@@ -1718,10 +1713,6 @@ int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk)
 }
 
 /******************************************************************************/
-void libxl_device_nic_init(libxl_device_nic *nic)
-{
-    memset(nic, '\0', sizeof(*nic));
-}
 
 int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic)
 {
@@ -2142,10 +2133,6 @@ out:
 }
 
 /******************************************************************************/
-void libxl_device_vkb_init(libxl_device_vkb *vkb)
-{
-    memset(vkb, 0x00, sizeof(libxl_device_vkb));
-}
 
 int libxl__device_vkb_setdefault(libxl__gc *gc, libxl_device_vkb *vkb)
 {
@@ -2254,10 +2241,6 @@ out:
 }
 
 /******************************************************************************/
-void libxl_device_vfb_init(libxl_device_vfb *vfb)
-{
-    memset(vfb, 0x00, sizeof(libxl_device_vfb));
-}
 
 int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb)
 {
@@ -3067,6 +3050,8 @@ int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
     struct xen_domctl_sched_credit sdom;
     int rc;
 
+    libxl_sched_credit_domain_init(scinfo);
+
     rc = xc_sched_credit_domain_get(ctx->xch, domid, &sdom);
     if (rc != 0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain sched credit");
@@ -3126,6 +3111,8 @@ int libxl_sched_credit2_domain_get(libxl_ctx *ctx, uint32_t domid,
     struct xen_domctl_sched_credit2 sdom;
     int rc;
 
+    libxl_sched_credit2_domain_init(scinfo);
+
     rc = xc_sched_credit2_domain_get(ctx->xch, domid, &sdom);
     if (rc != 0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
@@ -3182,6 +3169,8 @@ int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
     uint16_t extratime;
     uint16_t weight;
     int rc;
+
+    libxl_sched_sedf_domain_init(scinfo);
 
     rc = xc_sedf_domain_get(ctx->xch, domid, &period, &slice, &latency,
                             &extratime, &weight);

@@ -100,7 +100,7 @@ libxl_timer_mode = Enumeration("timer_mode", [
     (1, "no_delay_for_missed_ticks"),
     (2, "no_missed_ticks_pending"),
     (3, "one_missed_tick_pending"),
-    ])
+    ], init_val = "LIBXL_TIMER_MODE_DEFAULT")
 
 libxl_bios_type = Enumeration("bios_type", [
     (1, "rombios"),
@@ -180,19 +180,19 @@ libxl_dominfo = Struct("dominfo",[
     ("vcpu_max_id", uint32),
     ("vcpu_online", uint32),
     ("cpupool",     uint32),
-    ])
+    ], dir=DIR_OUT)
 
 libxl_cpupoolinfo = Struct("cpupoolinfo", [
     ("poolid",      uint32),
     ("sched",       libxl_scheduler),
     ("n_dom",       uint32),
     ("cpumap",      libxl_cpumap)
-    ])
+    ], dir=DIR_OUT)
 
 libxl_vminfo = Struct("vminfo", [
     ("uuid", libxl_uuid),
     ("domid", libxl_domid),
-    ])
+    ], dir=DIR_OUT)
 
 libxl_version_info = Struct("version_info", [
     ("xen_version_major", integer),
@@ -207,7 +207,7 @@ libxl_version_info = Struct("version_info", [
     ("virt_start",        uint64),
     ("pagesize",          integer),
     ("commandline",       string),
-    ])
+    ], dir=DIR_OUT)
 
 libxl_domain_create_info = Struct("domain_create_info",[
     ("type",         libxl_domain_type),
@@ -219,7 +219,9 @@ libxl_domain_create_info = Struct("domain_create_info",[
     ("xsdata",       libxl_key_value_list),
     ("platformdata", libxl_key_value_list),
     ("poolid",       uint32),
-    ])
+    ], dir=DIR_IN)
+
+MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT")
 
 # Instances of libxl_file_reference contained in this struct which
 # have been mapped (with libxl_file_reference_map) will be unmapped
@@ -297,8 +299,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                       # Use host's E820 for PCI passthrough.
                                       ("e820_host", libxl_defbool),
                                       ])),
-                 ])),
-    ],
+                 ], keyvar_init_val = "-1")),
+    ], dir=DIR_IN
 )
 
 libxl_device_vfb = Struct("device_vfb", [
@@ -360,7 +362,7 @@ libxl_diskinfo = Struct("diskinfo", [
     ("state", integer),
     ("evtch", integer),
     ("rref", integer),
-    ])
+    ], dir=DIR_OUT)
 
 libxl_nicinfo = Struct("nicinfo", [
     ("backend", string),
@@ -372,7 +374,7 @@ libxl_nicinfo = Struct("nicinfo", [
     ("evtch", integer),
     ("rref_tx", integer),
     ("rref_rx", integer),
-    ])
+    ], dir=DIR_OUT)
 
 libxl_vcpuinfo = Struct("vcpuinfo", [
     ("vcpuid", uint32),
@@ -382,7 +384,7 @@ libxl_vcpuinfo = Struct("vcpuinfo", [
     ("running", bool),
     ("vcpu_time", uint64), # total vcpu time ran (ns)
     ("cpumap", libxl_cpumap), # current cpu's affinities
-    ])
+    ], dir=DIR_OUT)
 
 libxl_physinfo = Struct("physinfo", [
     ("threads_per_core", uint32),
@@ -409,7 +411,7 @@ libxl_cputopology = Struct("cputopology", [
     ("core", uint32),
     ("socket", uint32),
     ("node", uint32),
-    ])
+    ], dir=DIR_OUT)
 
 libxl_sched_credit_domain = Struct("sched_credit_domain", [
     ("weight", integer),

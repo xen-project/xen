@@ -381,10 +381,6 @@ int libxl_ctx_free(libxl_ctx *ctx /* 0 is OK */);
 int libxl_ctx_postfork(libxl_ctx *ctx);
 
 /* domain related functions */
-void libxl_domain_create_info_init(libxl_domain_create_info *c_info);
-void libxl_domain_build_info_init(libxl_domain_build_info *b_info);
-void libxl_domain_build_info_init_type(libxl_domain_build_info *b_info,
-                                       libxl_domain_type type);
 typedef int (*libxl_console_ready)(libxl_ctx *ctx, uint32_t domid, void *priv);
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid);
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid, int restore_fd);
@@ -523,7 +519,6 @@ void libxl_vminfo_list_free(libxl_vminfo *list, int nr);
  */
 
 /* Disks */
-void libxl_device_disk_init(libxl_device_disk *disk);
 int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 int libxl_device_disk_remove(libxl_ctx *ctx, uint32_t domid,
                              libxl_device_disk *disk,
@@ -549,7 +544,6 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk);
 int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk);
 
 /* Network Interfaces */
-void libxl_device_nic_init(libxl_device_nic *nic);
 int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
 int libxl_device_nic_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_nic *nic,
@@ -561,7 +555,6 @@ int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_nic *nic, libxl_nicinfo *nicinfo);
 
 /* Keyboard */
-void libxl_device_vkb_init(libxl_device_vkb *vkb);
 int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb);
 int libxl_device_vkb_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_vkb *vkb,
@@ -569,7 +562,6 @@ int libxl_device_vkb_remove(libxl_ctx *ctx, uint32_t domid,
 int libxl_device_vkb_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb);
 
 /* Framebuffer */
-void libxl_device_vfb_init(libxl_device_vfb *vfb);
 int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
 int libxl_device_vfb_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_vfb *vfb,
@@ -577,7 +569,6 @@ int libxl_device_vfb_remove(libxl_ctx *ctx, uint32_t domid,
 int libxl_device_vfb_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
 
 /* PCI Passthrough */
-void libxl_device_pci_init(libxl_device_pci *pci);
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
 int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
 int libxl_device_pci_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);

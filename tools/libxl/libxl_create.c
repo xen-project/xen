@@ -50,11 +50,6 @@ void libxl_domain_config_dispose(libxl_domain_config *d_config)
     libxl_domain_build_info_dispose(&d_config->b_info);
 }
 
-void libxl_domain_create_info_init(libxl_domain_create_info *c_info)
-{
-    memset(c_info, '\0', sizeof(*c_info));
-}
-
 int libxl__domain_create_info_setdefault(libxl__gc *gc,
                                          libxl_domain_create_info *c_info)
 {
@@ -67,35 +62,6 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
     }
 
     return 0;
-}
-
-void libxl_domain_build_info_init(libxl_domain_build_info *b_info)
-{
-    memset(b_info, '\0', sizeof(*b_info));
-    b_info->type = -1;
-
-    b_info->max_memkb = LIBXL_MEMKB_DEFAULT;
-    b_info->target_memkb = LIBXL_MEMKB_DEFAULT;
-    b_info->shadow_memkb = LIBXL_MEMKB_DEFAULT;
-    b_info->video_memkb =  LIBXL_MEMKB_DEFAULT;
-
-}
-
-void libxl_domain_build_info_init_type(libxl_domain_build_info *b_info,
-                                       libxl_domain_type type)
-{
-    assert(b_info->type == -1);
-    b_info->type = type;
-    switch (b_info->type) {
-    case LIBXL_DOMAIN_TYPE_HVM:
-        b_info->u.hvm.timer_mode = LIBXL_TIMER_MODE_DEFAULT;
-        break;
-    case LIBXL_DOMAIN_TYPE_PV:
-        b_info->u.pv.slack_memkb = LIBXL_MEMKB_DEFAULT;
-        break;
-    default:
-        abort();
-    }
 }
 
 int libxl__domain_build_info_setdefault(libxl__gc *gc,

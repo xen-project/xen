@@ -765,11 +765,6 @@ static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned 
     return -1;
 }
 
-void libxl_device_pci_init(libxl_device_pci *pci)
-{
-    memset(pci, '\0', sizeof(*pci));
-}
-
 int libxl__device_pci_setdefault(libxl__gc *gc, libxl_device_pci *pci)
 {
     return 0;

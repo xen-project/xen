@@ -78,6 +78,88 @@ def libxl_C_type_dispose(ty, v, indent = "    ", parent = None):
         s = indent + s
     return s.replace("\n", "\n%s" % indent).rstrip(indent)
 
+def libxl_init_members(ty, nesting = 0):
+    """Returns a list of members of ty which require a separate init"""
+
+    if isinstance(ty, idl.Aggregate):
+        return [f for f in ty.fields if not f.const and isinstance(f.type,idl.KeyedUnion)]
+    else:
+        return []
+    
+def _libxl_C_type_init(ty, v, indent = "    ", parent = None, subinit=False):
+    s = ""
+    if isinstance(ty, idl.KeyedUnion):
+        if parent is None:
+            raise Exception("KeyedUnion type must have a parent")
+        if subinit:
+            s += "switch (%s) {\n" % (parent + ty.keyvar.name)
+            for f in ty.fields:
+                (nparent,fexpr) = ty.member(v, f, parent is None)
+                s += "case %s:\n" % f.enumname
+                s += _libxl_C_type_init(f.type, fexpr, "    ", nparent)
+                s += "    break;\n"
+            s += "}\n"
+        else:
+            if ty.keyvar.init_val:
+                s += "%s = %s;\n" % (parent + ty.keyvar.name, ty.keyvar.init_val)
+            elif ty.keyvar.type.init_val:
+                s += "%s = %s;\n" % (parent + ty.keyvar.name, ty.keyvar.type.init_val)
+    elif isinstance(ty, idl.Struct) and (parent is None or ty.init_fn is None):
+        for f in [f for f in ty.fields if not f.const]:
+            (nparent,fexpr) = ty.member(v, f, parent is None)
+            if f.init_val is not None:
+                s += "%s = %s;\n" % (fexpr, f.init_val)
+            else:
+                s += _libxl_C_type_init(f.type, fexpr, "", nparent)
+    else:
+        if ty.init_val is not None:
+            s += "%s = %s;\n" % (ty.pass_arg(v, parent is None), ty.init_val)
+        elif ty.init_fn is not None:
+            s += "%s(%s);\n" % (ty.init_fn, ty.pass_arg(v, parent is None))
+
+    if s != "":
+        s = indent + s
+    return s.replace("\n", "\n%s" % indent).rstrip(indent)
+
+def libxl_C_type_init(ty):
+    s = ""
+    s += "void %s(%s)\n" % (ty.init_fn, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE))
+    s += "{\n"
+    s += "    memset(p, '\\0', sizeof(*p));\n"
+    s += _libxl_C_type_init(ty, "p")
+    s += "}\n"
+    s += "\n"
+    return s
+
+def libxl_C_type_member_init(ty, field):
+    if not isinstance(field.type, idl.KeyedUnion):
+        raise Exception("Only KeyedUnion is supported for member init")
+
+    ku = field.type
+    
+    s = ""
+    s += "void %s(%s, %s)\n" % (ty.init_fn + "_" + ku.keyvar.name,
+                                ty.make_arg("p", passby=idl.PASS_BY_REFERENCE),
+                                ku.keyvar.type.make_arg(ku.keyvar.name))
+    s += "{\n"
+    
+    if ku.keyvar.init_val:
+        init_val = ku.keyvar.init_val
+    elif ku.keyvar.type.init_val:
+        init_val = ku.keyvar.type.init_val
+    else:
+        init_val = None
+        
+    if init_val is not None:
+        (nparent,fexpr) = ty.member(ty.pass_arg("p"), ku.keyvar, isref=True)
+        s += "    assert(%s == %s);\n" % (fexpr, init_val)
+        s += "    %s = %s;\n" % (fexpr, ku.keyvar.name)
+    (nparent,fexpr) = ty.member(ty.pass_arg("p"), field, isref=True)
+    s += _libxl_C_type_init(ku, fexpr, parent=nparent, subinit=True)
+    s += "}\n"
+    s += "\n"
+    return s
+
 def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
     s = ""
     if parent is None:
@@ -199,6 +281,15 @@ if __name__ == '__main__':
         f.write(libxl_C_type_define(ty) + ";\n")
         if ty.dispose_fn is not None:
             f.write("void %s(%s);\n" % (ty.dispose_fn, ty.make_arg("p")))
+        if ty.init_fn is not None:
+            f.write("void %s(%s);\n" % (ty.init_fn, ty.make_arg("p")))
+            for field in libxl_init_members(ty):
+                if not isinstance(field.type, idl.KeyedUnion):
+                    raise Exception("Only KeyedUnion is supported for member init")
+                ku = field.type
+                f.write("void %s(%s, %s);\n" % (ty.init_fn + "_" + ku.keyvar.name,
+                                               ty.make_arg("p"),
+                                               ku.keyvar.type.make_arg(ku.keyvar.name)))
         if ty.json_fn is not None:
             f.write("char *%s_to_json(libxl_ctx *ctx, %s);\n" % (ty.typename, ty.make_arg("p")))
         if isinstance(ty, idl.Enumeration):
@@ -227,7 +318,7 @@ if __name__ == '__main__':
 
 """ % (header_json_define, header_json_define, " ".join(sys.argv)))
 
-    for ty in [ty for ty in types+builtins if ty.json_fn is not None]:
+    for ty in [ty for ty in types if ty.json_fn is not None]:
         f.write("yajl_gen_status %s_gen_json(yajl_gen hand, %s);\n" % (ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
 
     f.write("\n")
@@ -264,6 +355,11 @@ if __name__ == '__main__':
         f.write("    memset(p, LIBXL_DTOR_POISON, sizeof(*p));\n")
         f.write("}\n")
         f.write("\n")
+        
+    for ty in [t for t in types if t.init_fn is not None and t.autogenerate_init_fn]:
+        f.write(libxl_C_type_init(ty))
+        for field in libxl_init_members(ty):
+            f.write(libxl_C_type_member_init(ty, field))
 
     for ty in [t for t in types if isinstance(t,idl.Enumeration)]:
         f.write("const char *%s_to_string(%s e)\n" % (ty.typename, ty.typename))

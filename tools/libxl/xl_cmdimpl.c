@@ -3922,6 +3922,7 @@ static int sched_credit_domain_set(
 {
     int rc;
 
+    
     rc = libxl_sched_credit_domain_set(ctx, domid, scinfo);
     if (rc)
         fprintf(stderr, "libxl_sched_credit_domain_set failed.\n");
@@ -3950,6 +3951,7 @@ static int sched_credit_domain_output(
         scinfo.weight,
         scinfo.cap);
     free(domname);
+    libxl_sched_credit_domain_dispose(&scinfo);
     return 0;
 }
 
@@ -3997,6 +3999,7 @@ static int sched_credit2_domain_output(
         domid,
         scinfo.weight);
     free(domname);
+    libxl_sched_credit2_domain_dispose(&scinfo);
     return 0;
 }
 
@@ -4020,7 +4023,6 @@ static int sched_sedf_domain_set(
     rc = libxl_sched_sedf_domain_set(ctx, domid, scinfo);
     if (rc)
         fprintf(stderr, "libxl_sched_sedf_domain_set failed.\n");
-
     return rc;
 }
 
@@ -4049,6 +4051,7 @@ static int sched_sedf_domain_output(
         scinfo.extratime,
         scinfo.weight);
     free(domname);
+    libxl_sched_sedf_domain_dispose(&scinfo);
     return 0;
 }
 
@@ -4181,6 +4184,7 @@ int main_sched_credit(int argc, char **argv)
             if (opt_c)
                 scinfo.cap = cap;
             rc = sched_credit_domain_set(domid, &scinfo);
+            libxl_sched_credit_domain_dispose(&scinfo);
             if (rc)
                 return -rc;
         }
@@ -4255,6 +4259,7 @@ int main_sched_credit2(int argc, char **argv)
             if (opt_w)
                 scinfo.weight = weight;
             rc = sched_credit2_domain_set(domid, &scinfo);
+            libxl_sched_credit2_domain_dispose(&scinfo);
             if (rc)
                 return -rc;
         }
@@ -4373,6 +4378,7 @@ int main_sched_sedf(int argc, char **argv)
                 scinfo.slice = 0;
             }
             rc = sched_sedf_domain_set(domid, &scinfo);
+            libxl_sched_sedf_domain_dispose(&scinfo);
             if (rc)
                 return -rc;
         }
