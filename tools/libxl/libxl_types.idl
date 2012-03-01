@@ -18,6 +18,12 @@ libxl_file_reference = Builtin("file_reference", dispose_fn="libxl_file_referenc
 libxl_hwcap = Builtin("hwcap", passby=PASS_BY_REFERENCE)
 
 #
+# Specific integer types
+#
+
+MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT")
+
+#
 # Constants / Enumerations
 #
 
@@ -170,9 +176,9 @@ libxl_dominfo = Struct("dominfo",[
     # Otherwise set to a value guaranteed not to clash with any valid
     # LIBXL_SHUTDOWN_REASON_* constant.
     ("shutdown_reason", libxl_shutdown_reason),
-    ("current_memkb",   uint64),
-    ("shared_memkb", uint64),
-    ("max_memkb",   uint64),
+    ("current_memkb",   MemKB),
+    ("shared_memkb", MemKB),
+    ("max_memkb",   MemKB),
     ("cpu_time",    uint64),
     ("vcpu_max_id", uint32),
     ("vcpu_online", uint32),
@@ -228,10 +234,10 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("cur_vcpus",       integer),
     ("cpumap",          libxl_cpumap),
     ("tsc_mode",        libxl_tsc_mode),
-    ("max_memkb",       uint32),
-    ("target_memkb",    uint32),
-    ("video_memkb",     uint32),
-    ("shadow_memkb",    uint32),
+    ("max_memkb",       MemKB),
+    ("target_memkb",    MemKB),
+    ("video_memkb",     MemKB),
+    ("shadow_memkb",    MemKB),
     ("disable_migrate", bool),
     ("cpuid",           libxl_cpuid_policy_list),
     ("type",            libxl_domain_type),
@@ -286,7 +292,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("xen_platform_pci", bool),
                                        ])),
                  ("pv", Struct(None, [("kernel", libxl_file_reference),
-                                      ("slack_memkb", uint32),
+                                      ("slack_memkb", MemKB),
                                       ("bootloader", string),
                                       ("bootloader_args", libxl_string_list),
                                       ("cmdline", string),

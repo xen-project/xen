@@ -129,11 +129,12 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
 
     ents = libxl__calloc(gc, 12 + (info->max_vcpus * 2) + 2, sizeof(char *));
     ents[0] = "memory/static-max";
-    ents[1] = libxl__sprintf(gc, "%d", info->max_memkb);
+    ents[1] = libxl__sprintf(gc, "%"PRId64, info->max_memkb);
     ents[2] = "memory/target";
-    ents[3] = libxl__sprintf(gc, "%d", info->target_memkb - info->video_memkb);
+    ents[3] = libxl__sprintf(gc, "%"PRId64,
+                             info->target_memkb - info->video_memkb);
     ents[4] = "memory/videoram";
-    ents[5] = libxl__sprintf(gc, "%d", info->video_memkb);
+    ents[5] = libxl__sprintf(gc, "%"PRId64, info->video_memkb);
     ents[6] = "domid";
     ents[7] = libxl__sprintf(gc, "%d", domid);
     ents[8] = "store/port";

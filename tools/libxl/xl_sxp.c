@@ -21,6 +21,7 @@
 #include "libxl_osdeps.h"
 
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include "libxl.h"
 #include "libxl_utils.h"
@@ -68,8 +69,8 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
     printf("\t(build_info)\n");
     printf("\t(max_vcpus %d)\n", b_info->max_vcpus);
     printf("\t(tsc_mode %s)\n", libxl_tsc_mode_to_string(b_info->tsc_mode));
-    printf("\t(max_memkb %d)\n", b_info->max_memkb);
-    printf("\t(target_memkb %d)\n", b_info->target_memkb);
+    printf("\t(max_memkb %"PRId64")\n", b_info->max_memkb);
+    printf("\t(target_memkb %"PRId64")\n", b_info->target_memkb);
     printf("\t(nomigrate %d)\n", b_info->disable_migrate);
 
     if (c_info->type == LIBXL_DOMAIN_TYPE_PV && b_info->u.pv.bootloader) {
@@ -88,8 +89,8 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
     case LIBXL_DOMAIN_TYPE_HVM:
         printf("\t\t(hvm\n");
         printf("\t\t\t(firmware %s)\n", b_info->u.hvm.firmware);
-        printf("\t\t\t(video_memkb %d)\n", b_info->video_memkb);
-        printf("\t\t\t(shadow_memkb %d)\n", b_info->shadow_memkb);
+        printf("\t\t\t(video_memkb %"PRId64")\n", b_info->video_memkb);
+        printf("\t\t\t(shadow_memkb %"PRId64")\n", b_info->shadow_memkb);
         printf("\t\t\t(pae %d)\n", b_info->u.hvm.pae);
         printf("\t\t\t(apic %d)\n", b_info->u.hvm.apic);
         printf("\t\t\t(acpi %d)\n", b_info->u.hvm.acpi);

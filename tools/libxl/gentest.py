@@ -197,6 +197,7 @@ static void libxl_string_list_rand_init(libxl_string_list *p)
 }
 """)
     for ty in builtins + types:
+        if isinstance(ty, idl.Number): continue
         if ty.typename not in handcoded:
             f.write("static void %s_rand_init(%s);\n" % \
                     (ty.typename,

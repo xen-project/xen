@@ -70,19 +70,20 @@ void libxl_domain_build_info_init(libxl_domain_build_info *b_info,
                                   const libxl_domain_create_info *c_info)
 {
     memset(b_info, '\0', sizeof(*b_info));
-    b_info->max_memkb = 32 * 1024;
-    b_info->target_memkb = b_info->max_memkb;
     b_info->disable_migrate = 0;
     b_info->cpuid = NULL;
-    b_info->shadow_memkb = 0;
     b_info->type = c_info->type;
+
+    b_info->max_memkb = LIBXL_MEMKB_DEFAULT;
+    b_info->target_memkb = LIBXL_MEMKB_DEFAULT;
+    b_info->shadow_memkb = LIBXL_MEMKB_DEFAULT;
+    b_info->video_memkb =  LIBXL_MEMKB_DEFAULT;
 
     b_info->device_model_stubdomain = false;
     b_info->device_model = NULL;
 
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
-        b_info->video_memkb = 8 * 1024;
         b_info->u.hvm.firmware = NULL;
         b_info->u.hvm.bios = 0;
         b_info->u.hvm.pae = 1;
@@ -133,8 +134,17 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_cpumap_set_any(&b_info->cpumap);
     }
 
+    if (b_info->max_memkb == LIBXL_MEMKB_DEFAULT)
+        b_info->max_memkb = 32 * 1024;
+    if (b_info->target_memkb == LIBXL_MEMKB_DEFAULT)
+        b_info->target_memkb = b_info->max_memkb;
+
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
+        if (b_info->shadow_memkb == LIBXL_MEMKB_DEFAULT)
+            b_info->shadow_memkb = 0;
+        if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
+            b_info->video_memkb = 8 * 1024;
         if (b_info->u.hvm.timer_mode == LIBXL_TIMER_MODE_DEFAULT)
             b_info->u.hvm.timer_mode =
                 LIBXL_TIMER_MODE_NO_DELAY_FOR_MISSED_TICKS;
@@ -153,6 +163,10 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
 
         break;
     case LIBXL_DOMAIN_TYPE_PV:
+        if (b_info->shadow_memkb == LIBXL_MEMKB_DEFAULT)
+            b_info->shadow_memkb = 0;
+        if (b_info->u.pv.slack_memkb == LIBXL_MEMKB_DEFAULT)
+            b_info->u.pv.slack_memkb = 0;
         break;
     default:
         LIBXL__LOG(CTX, LIBXL__LOG_ERROR,

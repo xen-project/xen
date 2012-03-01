@@ -246,6 +246,7 @@ typedef LIBXL_TAILQ_ENTRY(struct libxl_event) libxl_ev_link;
 typedef struct libxl__ctx libxl_ctx;
 
 #define LIBXL_TIMER_MODE_DEFAULT -1
+#define LIBXL_MEMKB_DEFAULT ~0ULL
 
 #include "_libxl_types.h"
 
