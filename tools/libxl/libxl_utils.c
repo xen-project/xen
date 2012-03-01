@@ -507,6 +507,22 @@ void libxl_cputopology_list_free(libxl_cputopology *list, int nr)
     free(list);
 }
 
+void libxl_dominfo_list_free(libxl_dominfo *list, int nr)
+{
+    int i;
+    for (i = 0; i < nr; i++)
+        libxl_dominfo_dispose(&list[i]);
+    free(list);
+}
+
+void libxl_vminfo_list_free(libxl_vminfo *list, int nr)
+{
+    int i;
+    for (i = 0; i < nr; i++)
+        libxl_vminfo_dispose(&list[i]);
+    free(list);
+}
+
 int libxl_domid_valid_guest(uint32_t domid)
 {
     /* returns 1 if the value _could_ be a valid guest domid, 0 otherwise

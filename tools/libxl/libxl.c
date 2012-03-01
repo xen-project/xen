@@ -442,6 +442,7 @@ libxl_dominfo * libxl_list_domain(libxl_ctx *ctx, int *nb_domain)
     ret = xc_domain_getinfolist(ctx->xch, 0, 1024, info);
     if (ret<0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "geting domain info list");
+        free(ptr);
         return NULL;
     }
 
@@ -464,7 +465,8 @@ int libxl_domain_info(libxl_ctx *ctx, libxl_dominfo *info_r,
     }
     if (ret==0 || xcinfo.domain != domid) return ERROR_INVAL;
 
-    xcinfo2xlinfo(&xcinfo, info_r);
+    if (info_r)
+        xcinfo2xlinfo(&xcinfo, info_r);
     return 0;
 }
 
@@ -986,13 +988,12 @@ void libxl_evdisable_disk_eject(libxl_ctx *ctx, libxl_evgen_disk_eject *evg) {
 int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid)
 {
     GC_INIT(ctx);
-    libxl_dominfo dominfo;
     char *dom_path;
     char *vm_path;
     char *pid;
     int rc, dm_present;
 
-    rc = libxl_domain_info(ctx, &dominfo, domid);
+    rc = libxl_domain_info(ctx, NULL, domid);
     switch(rc) {
     case 0:
         break;

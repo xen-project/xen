@@ -177,7 +177,7 @@ libxl_dominfo = Struct("dominfo",[
     ("vcpu_max_id", uint32),
     ("vcpu_online", uint32),
     ("cpupool",     uint32),
-    ], dispose_fn=None)
+    ])
 
 libxl_cpupoolinfo = Struct("cpupoolinfo", [
     ("poolid",      uint32),
@@ -189,7 +189,7 @@ libxl_cpupoolinfo = Struct("cpupoolinfo", [
 libxl_vminfo = Struct("vminfo", [
     ("uuid", libxl_uuid),
     ("domid", libxl_domid),
-    ], dispose_fn=None)
+    ])
 
 libxl_version_info = Struct("version_info", [
     ("xen_version_major", integer),
@@ -408,7 +408,7 @@ libxl_physinfo = Struct("physinfo", [
 
     ("cap_hvm", bool),
     ("cap_hvm_directio", bool),
-    ], dispose_fn=None, dir=DIR_OUT)
+    ], dir=DIR_OUT)
 
 libxl_cputopology = Struct("cputopology", [
     ("core", uint32),
@@ -419,11 +419,11 @@ libxl_cputopology = Struct("cputopology", [
 libxl_sched_credit_domain = Struct("sched_credit_domain", [
     ("weight", integer),
     ("cap", integer),
-    ], dispose_fn=None)
+    ])
 
 libxl_sched_credit2_domain = Struct("sched_credit2_domain", [
     ("weight", integer),
-    ], dispose_fn=None)
+    ])
 
 libxl_sched_sedf_domain = Struct("sched_sedf_domain", [
     ("period", integer),
@@ -431,7 +431,7 @@ libxl_sched_sedf_domain = Struct("sched_sedf_domain", [
     ("latency", integer),
     ("extratime", integer),
     ("weight", integer),
-    ], dispose_fn=None)
+    ])
 
 libxl_event_type = Enumeration("event_type", [
     (1, "DOMAIN_SHUTDOWN"),

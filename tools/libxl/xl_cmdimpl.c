@@ -144,7 +144,6 @@ static int qualifier_to_id(const char *p, uint32_t *id_r)
 static int domain_qualifier_to_domid(const char *p, uint32_t *domid_r,
                                      int *was_name_r)
 {
-    libxl_dominfo dominfo;
     int was_name, rc;
 
     was_name = qualifier_to_id(p, domid_r);
@@ -156,7 +155,7 @@ static int domain_qualifier_to_domid(const char *p, uint32_t *domid_r,
         if (rc)
             return rc;
     } else {
-        rc = libxl_domain_info(ctx, &dominfo, *domid_r);
+        rc = libxl_domain_info(ctx, NULL, *domid_r);
         /* error only if domain does not exist */
         if (rc == ERROR_INVAL)
             return rc;
@@ -2505,7 +2504,7 @@ static void list_vm(void)
             info[i].domid, domname);
         free(domname);
     }
-    free(info);
+    libxl_vminfo_list_free(info, nb_vm);
 }
 
 static void save_domain_core_begin(const char *domain_spec,
@@ -3302,7 +3301,10 @@ int main_list(int argc, char **argv)
     else
         list_domains(verbose, context, info, nb_domain);
 
-    free(info_free);
+    if (info_free)
+        libxl_dominfo_list_free(info, nb_domain);
+    else
+        libxl_dominfo_dispose(info);
 
     return 0;
 }
@@ -3565,8 +3567,7 @@ static void vcpulist(int argc, char **argv)
         for (i = 0; i<nb_domain; i++)
             print_domain_vcpuinfo(dominfo[i].domid, physinfo.nr_cpus);
 
-        free(dominfo);
-
+        libxl_dominfo_list_free(dominfo, nb_domain);
     } else {
         for (; argc > 0; ++argv, --argc) {
             if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
@@ -3578,7 +3579,7 @@ static void vcpulist(int argc, char **argv)
         }
     }
   vcpulist_out:
-    ;
+    libxl_physinfo_dispose(&physinfo);
 }
 
 int main_vcpulist(int argc, char **argv)
@@ -3778,6 +3779,7 @@ static void output_physinfo(void)
         free(cpumap.map);
     }
 
+    libxl_physinfo_dispose(&info);
     return;
 }
 
@@ -3912,7 +3914,9 @@ int main_sharing(int argc, char **argv)
     sharing(info, nb_domain);
 
     if (info_free)
-        free(info_free);
+        libxl_dominfo_list_free(info_free, nb_domain);
+    else
+        libxl_dominfo_dispose(info);
 
     return 0;
 }
@@ -4968,6 +4972,7 @@ static void print_uptime(int short_mode, uint32_t doms[], int nb_doms)
         info = libxl_list_vm(ctx, &nb_vm);
         for (i = 0; i < nb_vm; i++)
             print_domU_uptime(info[i].domid, short_mode, now);
+        libxl_vminfo_list_free(info, nb_vm);
     } else {
         for (i = 0; i < nb_doms; i++) {
             if (doms[i] == 0)

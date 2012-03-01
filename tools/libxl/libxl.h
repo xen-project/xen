@@ -387,11 +387,14 @@ int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_conso
  * guests using pygrub. */
 int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm);
 
+/* May be called with info_r == NULL to check for domain's existance */
 int libxl_domain_info(libxl_ctx*, libxl_dominfo *info_r,
                       uint32_t domid);
 libxl_dominfo * libxl_list_domain(libxl_ctx*, int *nb_domain);
+void libxl_dominfo_list_free(libxl_dominfo *list, int nr);
 libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool);
 libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm);
+void libxl_vminfo_list_free(libxl_vminfo *list, int nr);
 
 /*
  * Devices
