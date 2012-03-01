@@ -653,7 +653,6 @@ xapi
 vtpm
 monitors
 githttp
-xsm
 host_os
 host_vendor
 host_cpu
@@ -713,7 +712,6 @@ SHELL'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
-enable_xsm
 enable_githttp
 enable_monitors
 enable_vtpm
@@ -1366,7 +1364,6 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --enable-xsm            Enable XSM security module (by default, Flask)
   --enable-githttp        Download GIT repositories via HTTP
   --disable-monitors      Disable xenstat and xentop monitoring tools
   --enable-vtpm           Enable Virtual Trusted Platform Module
@@ -1375,7 +1372,7 @@ Optional Features:
   --disable-ocamltools    Disable Ocaml tools
   --enable-miniterm       Enable miniterm
   --enable-lomount        Enable lomount
-  --disable-debug         Disable debug build of Xen and tools
+  --disable-debug         Disable debug build of tools
 
 Some influential environment variables:
   CC          C compiler command
@@ -3914,27 +3911,6 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 # Enable/disable options
-# Check whether --enable-xsm was given.
-if test "${enable_xsm+set}" = set; then :
-  enableval=$enable_xsm;
-fi
-
-
-if test "x$enable_xsm" = "xyes"; then :
-
-    ax_cv_xsm="y"
-
-elif test "x$enable_xsm" = "xno"; then :
-
-    ax_cv_xsm="n"
-
-elif test -z $ax_cv_xsm; then :
-
-    ax_cv_xsm="n"
-
-fi
-xsm=$ax_cv_xsm
-
 # Check whether --enable-githttp was given.
 if test "${enable_githttp+set}" = set; then :
   enableval=$enable_githttp;
