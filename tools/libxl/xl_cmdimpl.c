@@ -1021,7 +1021,7 @@ skip_vfb:
 
             d_config->pcidevs = (libxl_device_pci *) realloc(d_config->pcidevs, sizeof (libxl_device_pci) * (d_config->num_pcidevs + 1));
             pcidev = d_config->pcidevs + d_config->num_pcidevs;
-            memset(pcidev, 0x00, sizeof(libxl_device_pci));
+            libxl_device_pci_init(pcidev);
 
             pcidev->msitranslate = pci_msitranslate;
             pcidev->power_mgmt = pci_power_mgmt;

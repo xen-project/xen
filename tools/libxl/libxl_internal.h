@@ -196,6 +196,7 @@ _hidden int libxl__device_disk_setdefault(libxl__gc *gc,
 _hidden int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic);
 _hidden int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb);
 _hidden int libxl__device_vkb_setdefault(libxl__gc *gc, libxl_device_vkb *vkb);
+_hidden int libxl__device_pci_setdefault(libxl__gc *gc, libxl_device_pci *pci);
 
 struct libxl__evgen_domain_death {
     uint32_t domid;

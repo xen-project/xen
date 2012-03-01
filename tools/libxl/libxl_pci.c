@@ -765,6 +765,16 @@ static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned 
     return -1;
 }
 
+void libxl_device_pci_init(libxl_device_pci *pci)
+{
+    memset(pci, '\0', sizeof(*pci));
+}
+
+int libxl__device_pci_setdefault(libxl__gc *gc, libxl_device_pci *pci)
+{
+    return 0;
+}
+
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
     GC_INIT(ctx);
@@ -781,6 +791,9 @@ int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcide
     libxl_device_pci *assigned;
     int num_assigned, i, rc;
     int stubdomid = 0;
+
+    rc = libxl__device_pci_setdefault(gc, pcidev);
+    if (rc) goto out;
 
     rc = get_all_assigned_devices(gc, &assigned, &num_assigned);
     if ( rc ) {
