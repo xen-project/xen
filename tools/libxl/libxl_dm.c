@@ -63,18 +63,6 @@ const char *libxl__domain_device_model(libxl__gc *gc,
     return dm;
 }
 
-static const char *libxl__domain_bios(libxl__gc *gc,
-                                const libxl_domain_build_info *info)
-{
-    if (info->u.hvm.bios)
-       return libxl_bios_type_to_string(info->u.hvm.bios);
-    switch (info->device_model_version) {
-    case 1: return "rombios";
-    case 2: return "seabios";
-    default:return NULL;
-    }
-}
-
 const libxl_vnc_info *libxl__dm_vnc(const libxl_domain_config *guest_config)
 {
     const libxl_vnc_info *vnc = NULL;
@@ -933,10 +921,13 @@ int libxl__create_device_model(libxl__gc *gc,
         goto out;
     }
 
-    path = xs_get_domain_path(ctx->xsh, domid);
-    libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/hvmloader/bios", path),
-                    "%s", libxl__domain_bios(gc, b_info));
-    free(path);
+    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
+        path = xs_get_domain_path(ctx->xsh, domid);
+        libxl__xs_write(gc, XBT_NULL,
+                        libxl__sprintf(gc, "%s/hvmloader/bios", path),
+                        "%s", libxl_bios_type_to_string(b_info->u.hvm.bios));
+        free(path);
+    }
 
     path = libxl__sprintf(gc, "/local/domain/0/device-model/%d", domid);
     xs_mkdir(ctx->xsh, XBT_NULL, path);

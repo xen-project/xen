@@ -109,6 +109,26 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         b_info->device_model_version =
             LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
 
+    if (!b_info->u.hvm.bios)
+        switch (b_info->device_model_version) {
+        case 1: b_info->u.hvm.bios = LIBXL_BIOS_TYPE_ROMBIOS; break;
+        case 2: b_info->u.hvm.bios = LIBXL_BIOS_TYPE_SEABIOS; break;
+        default:return ERROR_INVAL;
+    }
+
+    /* Enforce BIOS<->Device Model version relationship */
+    switch (b_info->device_model_version) {
+    case 1:
+        if (b_info->u.hvm.bios != LIBXL_BIOS_TYPE_ROMBIOS)
+            return ERROR_INVAL;
+        break;
+    case 2:
+        if (b_info->u.hvm.bios == LIBXL_BIOS_TYPE_ROMBIOS)
+            return ERROR_INVAL;
+        break;
+    default:abort();
+    }
+
     if (!b_info->max_vcpus)
         b_info->max_vcpus = 1;
     if (!b_info->cur_vcpus)
