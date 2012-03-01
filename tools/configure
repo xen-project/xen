@@ -6127,7 +6127,7 @@ then
 fi
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for python version >= 2.3 " >&5
 $as_echo_n "checking for python version >= 2.3 ... " >&6; }
-`$PYTHON -c 'import sys; exit(eval("sys.version_info < (2, 3)"))'`
+`$PYTHON -c 'import sys; sys.exit(eval("sys.version_info < (2, 3)"))'`
 if test "$?" != "0"
 then
     python_version=`$PYTHON -V 2>&1`
