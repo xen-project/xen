@@ -120,11 +120,12 @@ sub aelem ($$$) {
     return "<a $hparams>$ytext</a>";
 }
 
-sub defn ($$$;$) {
-    my ($text,$type,$name,$hparams) = @_;
+sub defn ($$$;$$) {
+    my ($text,$type,$name,$hparams,$deref) = @_;
     $hparams='' if !defined $hparams;
-    debug(2,"DEFN $. $type $name $hparams");
+    debug(2,"DEFN $. $type $name $hparams |$text|");
     $sdef{$type}{$name}{DefLocs}{"$leaf:$."} = $leaf_opath;
+    $sdef{$type}{$name}{Derefs}{"$leaf:$."} = $deref;
     my $xrefs = $sdef{$type}{$name}{Xrefs};
     push @pending_xrefs, values %$xrefs if $xrefs;
     $hparams .= " name=\"${type}_$name\"" if $sdef{$type}{$name}{Used};
@@ -140,7 +141,7 @@ sub norm ($) {
 	} elsif (s/^(struct|union|enum)\s+(\w+)\b//) {
 	    $no .= ahref($&, (ucfirst $1), $2);
 	} elsif (s/^\w+\b//) {
-	    $no .= ahref($&, 'Func', $&);
+	    $no .= ahref($&, [qw(Func Typedef)], $&);
 	} else {
 	    die "$_ ?";
 	}
@@ -148,18 +149,42 @@ sub norm ($) {
     return $no;
 }
 
-sub refhref ($$) {
-    my ($type,$name) = @_;
+sub sdefval ($$$) {
+    my ($type,$name,$hkey) = @_;
     $sdef{$type}{$name}{Used} = 1;
-    my $locs = $sdef{$type}{$name}{DefLocs};
-    return '' unless $locs;
-    if ((scalar keys %$locs) != 1 && !$sdef{$type}{$name}{MultiWarned}) {
-	warning("multiple definitions of $type $name: $_")
-	    foreach keys %$locs;
-	$sdef{$type}{$name}{MultiWarned}=1;
+    my $sdef = $sdef{$type}{$name};
+    my $hash = $sdef->{$hkey};
+    if ((scalar keys %$hash) > 1 && !$sdef->{MultiWarned}{$hkey}) {
+        warning("multiple definitions of $type $name: $_")
+            foreach keys %$hash;
+        $sdef->{MultiWarned}{$hkey}=1;
     }
-    my ($loc) = values %$locs;
-    return "href=\"$loc#${type}_$name\"";
+    my ($val) = values %$hash;
+    return $val;
+}
+
+sub refhref ($$) {
+    my ($types,$name) = @_;
+    foreach my $type (ref($types) ? @$types : ($types)) {
+        my ($ttype,$tname) = ($type,$name);
+        my $loc = sdefval($ttype,$tname,'DefLocs');
+        for (;;) {
+            my $deref = sdefval($ttype,$tname,'Derefs');
+            last unless $deref;
+            my ($type2,$name2,$loc2);
+            my @deref = @$deref;
+            while (@deref) {
+                ($type2,$name2,@deref) = @deref;
+                $loc2 = sdefval($type2,$name2,'DefLocs');
+                last if defined $loc2;
+            }
+            last unless defined $loc2;
+            ($loc,$ttype,$tname) = ($loc2,$type2,$name2);
+        }
+        next unless defined $loc;
+        return "href=\"$loc#${ttype}_$tname\"";
+    }
+    return '';
 }
 
 sub ahref ($$$) {
@@ -259,6 +284,14 @@ sub process_file ($$) {
 		    in_enum($1,(ucfirst $2),$3);
 	        }
 	    }
+	} elsif (s/^(typedef \s+ )((struct|union|enum) \  (\w+))
+                      (\s+) (\w+)(\;)$
+                  / norm($1).norm($2).$5.
+                    defn($6,'Typedef',$6,undef,[(ucfirst $3),$4]).
+                    $7 /xe) {
+        } elsif (s/^(typedef \s+) (\w+) (\s+) (\w+) (\;)$
+                  / $1.norm($2).$3.
+                    defn($4,'Typedef',$4,undef,['Typedef',$2]). $5 /xe) {
 	} elsif (s/^( \s* \#define \s+ ) (\w+) ( \s+\S )
                   / $1.defmacro($2).norm($3) /xe) {
 	} elsif (s/( \`incontents \s+ (\d+) \s+ (\w+) \s+ )(\S .* \S)
@@ -315,6 +348,7 @@ END
     $forkind->('Func','Functions','','()');
     $forkind->('Struct','Structs','struct ','');
     $forkind->('Enum','Enums and sets of #defines','','');
+    $forkind->('Typedef','Typedefs','typedef ','');
     $forkind->('EnumVal','Enum values and individual #defines','','');
     $o .= "</ul>\n<h2>Files</h2><ul>\n";
     foreach my $of (sort { $a->[0] cmp $b->[0] } @outfiles) {

@@ -120,7 +120,7 @@ html/hypercall/index.html: ./xen-headers
 	@$(INSTALL_DIR) $(@D)
 	./xen-headers -O $(@D) \
 		-T 'arch-x86_64 - Xen public headers' \
-		-X arch-ia64 -X arch-x86_32 -X xen-x86_32 \
+		-X arch-ia64 -X arch-x86_32 -X xen-x86_32 -X arch-arm \
 		../xen include/public include/xen/errno.h
 
 -include html/hypercall/.deps
