@@ -582,7 +582,8 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
     }
 
-    libxl_domain_build_info_init(b_info, c_info);
+    libxl_domain_build_info_init(b_info);
+    libxl_domain_build_info_init_type(b_info, c_info->type);
 
     /* the following is the actual config parsing with overriding values in the structures */
     if (!xlu_cfg_get_long (config, "vcpus", &l, 0)) {
@@ -699,7 +700,7 @@ static void parse_config_data(const char *configfile_filename_report,
     if (!xlu_cfg_get_long (config, "videoram", &l, 0))
         b_info->video_memkb = l * 1024;
 
-    switch(c_info->type) {
+    switch(b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         if (!xlu_cfg_get_string (config, "kernel", &buf, 0))
             fprintf(stderr, "WARNING: ignoring \"kernel\" directive for HVM guest. "

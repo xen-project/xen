@@ -701,7 +701,8 @@ static int libxl__create_stubdom(libxl__gc *gc,
 
     libxl_uuid_generate(&dm_config.c_info.uuid);
 
-    libxl_domain_build_info_init(&dm_config.b_info, &dm_config.c_info);
+    libxl_domain_build_info_init(&dm_config.b_info);
+    libxl_domain_build_info_init_type(&dm_config.b_info, LIBXL_DOMAIN_TYPE_PV);
 
     dm_config.b_info.max_vcpus = 1;
     dm_config.b_info.max_memkb = 32 * 1024;
