@@ -39,7 +39,7 @@ const char *libxl__domain_device_model(libxl__gc *gc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     const char *dm;
 
-    if (info->device_model_stubdomain)
+    if (libxl_defbool_val(info->device_model_stubdomain))
         return NULL;
 
     if (info->device_model) {
@@ -899,7 +899,7 @@ int libxl__create_device_model(libxl__gc *gc,
     char **pass_stuff;
     const char *dm;
 
-    if (b_info->device_model_stubdomain) {
+    if (libxl_defbool_val(b_info->device_model_stubdomain)) {
         rc = libxl__create_stubdom(gc, domid, guest_config, state, starting_r);
         goto out;
     }

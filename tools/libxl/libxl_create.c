@@ -80,9 +80,6 @@ void libxl_domain_build_info_init(libxl_domain_build_info *b_info,
     b_info->shadow_memkb = LIBXL_MEMKB_DEFAULT;
     b_info->video_memkb =  LIBXL_MEMKB_DEFAULT;
 
-    b_info->device_model_stubdomain = false;
-    b_info->device_model = NULL;
-
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         b_info->u.hvm.timer_mode = LIBXL_TIMER_MODE_DEFAULT;
@@ -120,6 +117,17 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             return ERROR_INVAL;
         break;
     default:abort();
+    }
+
+    libxl_defbool_setdefault(&b_info->device_model_stubdomain, false);
+
+    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM &&
+        b_info->device_model_version !=
+            LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL &&
+        libxl_defbool_val(b_info->device_model_stubdomain)) {
+        LIBXL__LOG(CTX, XTL_ERROR,
+            "device model stubdomains require \"qemu-xen-traditional\"");
+        return ERROR_INVAL;
     }
 
     if (!b_info->max_vcpus)

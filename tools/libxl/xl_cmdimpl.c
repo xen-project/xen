@@ -1125,8 +1125,8 @@ skip_vfb:
         }
     } else if (b_info->device_model)
         fprintf(stderr, "WARNING: device model override given without specific DM version\n");
-    if (!xlu_cfg_get_long (config, "device_model_stubdomain_override", &l, 0))
-        b_info->device_model_stubdomain = l;
+    xlu_cfg_get_defbool (config, "device_model_stubdomain_override",
+                         &b_info->device_model_stubdomain, 0);
 
     if (!xlu_cfg_get_string (config, "device_model_stubdomain_seclabel",
                              &buf, 0)) {

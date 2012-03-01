@@ -2714,7 +2714,7 @@ int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         *need_memkb += b_info->shadow_memkb + LIBXL_HVM_EXTRA_MEMORY;
-        if (b_info->device_model_stubdomain)
+        if (libxl_defbool_val(b_info->device_model_stubdomain))
             *need_memkb += 32 * 1024;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
