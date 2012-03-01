@@ -155,6 +155,8 @@ int xc_core_arch_map_p2m_writable(xc_interface *xch, unsigned int guest_width,
 # include "xc_core_x86.h"
 #elif defined (__ia64__)
 # include "xc_core_ia64.h"
+#elif defined (__arm__)
+# include "xc_core_arm.h"
 #else
 # error "unsupported architecture"
 #endif

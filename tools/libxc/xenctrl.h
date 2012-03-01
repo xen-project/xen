@@ -83,6 +83,10 @@
 #define xen_mb()   asm volatile ("mf" ::: "memory")
 #define xen_rmb()  asm volatile ("mf" ::: "memory")
 #define xen_wmb()  asm volatile ("mf" ::: "memory")
+#elif defined(__arm__)
+#define xen_mb()   asm volatile ("dmb" : : : "memory")
+#define xen_rmb()  asm volatile ("dmb" : : : "memory")
+#define xen_wmb()  asm volatile ("dmb" : : : "memory")
 #else
 #error "Define barriers"
 #endif
