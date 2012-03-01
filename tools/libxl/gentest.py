@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import os
 import sys
 import re
 import random
@@ -30,7 +31,7 @@ def gen_rand_init(ty, v, indent = "    ", parent = None):
     elif isinstance(ty, idl.KeyedUnion):
         if parent is None:
             raise Exception("KeyedUnion type must have a parent")
-        s += "switch (%s) {\n" % (parent + ty.keyvar_name)
+        s += "switch (%s) {\n" % (parent + ty.keyvar.name)
         for f in ty.fields:
             (nparent,fexpr) = ty.member(v, f, parent is None)
             s += "case %s:\n" % f.enumname
@@ -54,6 +55,8 @@ def gen_rand_init(ty, v, indent = "    ", parent = None):
               ty.pass_arg(v, parent is None))
     elif ty.typename in ["bool"]:
         s += "%s = rand() %% 2;\n" % v
+    elif ty.typename in ["libxl_defbool"]:
+        s += "libxl_defbool_set(%s, !!rand() %% 1);\n" % v
     elif ty.typename in ["char *"]:
         s += "%s = rand_str();\n" % v
     elif ty.private:
@@ -72,7 +75,7 @@ if __name__ == '__main__':
         print >>sys.stderr, "Usage: gentest.py <idl> <implementation>"
         sys.exit(1)
 
-    random.seed()
+    random.seed(os.getenv('LIBXL_TESTIDL_SEED'))
 
     (builtins,types) = idl.parse(sys.argv[1])
 
@@ -196,6 +199,7 @@ static void libxl_string_list_rand_init(libxl_string_list *p)
 }
 """)
     for ty in builtins + types:
+        if isinstance(ty, idl.Number): continue
         if ty.typename not in handcoded:
             f.write("static void %s_rand_init(%s);\n" % \
                     (ty.typename,

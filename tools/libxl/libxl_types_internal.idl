@@ -1,5 +1,7 @@
 namespace("libxl__")
 
+libxl_domid = Builtin("domid", namespace="libxl_", json_fn = "yajl_gen_integer")
+
 libxl__qmp_message_type = Enumeration("qmp_message_type", [
     (1, "QMP"),
     (2, "return"),
@@ -16,4 +18,16 @@ libxl__device_kind = Enumeration("device_kind", [
     (5, "VFB"),
     (6, "VKBD"),
     (7, "CONSOLE"),
+    ])
+
+libxl__console_backend = Enumeration("console_backend", [
+    (1, "XENCONSOLED"),
+    (2, "IOEMU"),
+    ])
+
+libxl__device_console = Struct("device_console", [
+    ("backend_domid", libxl_domid),
+    ("devid", integer),
+    ("consback", libxl__console_backend),
+    ("output", string),
     ])

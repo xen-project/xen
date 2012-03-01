@@ -50,79 +50,141 @@ void libxl_domain_config_dispose(libxl_domain_config *d_config)
     libxl_domain_build_info_dispose(&d_config->b_info);
 }
 
-int libxl_init_create_info(libxl_ctx *ctx, libxl_domain_create_info *c_info)
+int libxl__domain_create_info_setdefault(libxl__gc *gc,
+                                         libxl_domain_create_info *c_info)
 {
-    memset(c_info, '\0', sizeof(*c_info));
-    c_info->xsdata = NULL;
-    c_info->platformdata = NULL;
-    c_info->hap = 1;
-    c_info->type = LIBXL_DOMAIN_TYPE_HVM;
-    c_info->oos = 1;
-    c_info->ssidref = 0;
-    c_info->poolid = 0;
+    if (!c_info->type)
+        return ERROR_INVAL;
+
+    if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
+        libxl_defbool_setdefault(&c_info->hap, true);
+        libxl_defbool_setdefault(&c_info->oos, true);
+    }
+
     return 0;
 }
 
-int libxl_init_build_info(libxl_ctx *ctx,
-                          libxl_domain_build_info *b_info,
-                          libxl_domain_create_info *c_info)
+int libxl__domain_build_info_setdefault(libxl__gc *gc,
+                                        libxl_domain_build_info *b_info)
 {
-    memset(b_info, '\0', sizeof(*b_info));
-    b_info->max_vcpus = 1;
-    b_info->cur_vcpus = 1;
-    if (libxl_cpumap_alloc(ctx, &b_info->cpumap))
-        return ERROR_NOMEM;
-    libxl_cpumap_set_any(&b_info->cpumap);
-    b_info->max_memkb = 32 * 1024;
-    b_info->target_memkb = b_info->max_memkb;
-    b_info->disable_migrate = 0;
-    b_info->cpuid = NULL;
-    b_info->shadow_memkb = 0;
-    b_info->type = c_info->type;
+    if (!b_info->device_model_version)
+        b_info->device_model_version =
+            LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
 
-    b_info->device_model_version =
-        LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
-    b_info->device_model_stubdomain = false;
-    b_info->device_model = NULL;
+    if (!b_info->u.hvm.bios)
+        switch (b_info->device_model_version) {
+        case 1: b_info->u.hvm.bios = LIBXL_BIOS_TYPE_ROMBIOS; break;
+        case 2: b_info->u.hvm.bios = LIBXL_BIOS_TYPE_SEABIOS; break;
+        default:return ERROR_INVAL;
+    }
+
+    /* Enforce BIOS<->Device Model version relationship */
+    switch (b_info->device_model_version) {
+    case 1:
+        if (b_info->u.hvm.bios != LIBXL_BIOS_TYPE_ROMBIOS)
+            return ERROR_INVAL;
+        break;
+    case 2:
+        if (b_info->u.hvm.bios == LIBXL_BIOS_TYPE_ROMBIOS)
+            return ERROR_INVAL;
+        break;
+    default:abort();
+    }
+
+    libxl_defbool_setdefault(&b_info->device_model_stubdomain, false);
+
+    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM &&
+        b_info->device_model_version !=
+            LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL &&
+        libxl_defbool_val(b_info->device_model_stubdomain)) {
+        LIBXL__LOG(CTX, XTL_ERROR,
+            "device model stubdomains require \"qemu-xen-traditional\"");
+        return ERROR_INVAL;
+    }
+
+    if (!b_info->max_vcpus)
+        b_info->max_vcpus = 1;
+    if (!b_info->cur_vcpus)
+        b_info->cur_vcpus = 1;
+
+    if (!b_info->cpumap.size) {
+        if (libxl_cpumap_alloc(CTX, &b_info->cpumap))
+            return ERROR_NOMEM;
+        libxl_cpumap_set_any(&b_info->cpumap);
+    }
+
+    if (b_info->max_memkb == LIBXL_MEMKB_DEFAULT)
+        b_info->max_memkb = 32 * 1024;
+    if (b_info->target_memkb == LIBXL_MEMKB_DEFAULT)
+        b_info->target_memkb = b_info->max_memkb;
+
+    libxl_defbool_setdefault(&b_info->disable_migrate, false);
 
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
-        b_info->video_memkb = 8 * 1024;
-        b_info->u.hvm.firmware = NULL;
-        b_info->u.hvm.bios = 0;
-        b_info->u.hvm.pae = 1;
-        b_info->u.hvm.apic = 1;
-        b_info->u.hvm.acpi = 1;
-        b_info->u.hvm.acpi_s3 = 1;
-        b_info->u.hvm.acpi_s4 = 1;
-        b_info->u.hvm.nx = 1;
-        b_info->u.hvm.viridian = 0;
-        b_info->u.hvm.hpet = 1;
-        b_info->u.hvm.vpt_align = 1;
-        b_info->u.hvm.timer_mode = 1;
-        b_info->u.hvm.nested_hvm = 0;
-        b_info->u.hvm.no_incr_generationid = 0;
+        if (b_info->shadow_memkb == LIBXL_MEMKB_DEFAULT)
+            b_info->shadow_memkb = 0;
+        if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
+            b_info->video_memkb = 8 * 1024;
+        if (b_info->u.hvm.timer_mode == LIBXL_TIMER_MODE_DEFAULT)
+            b_info->u.hvm.timer_mode =
+                LIBXL_TIMER_MODE_NO_DELAY_FOR_MISSED_TICKS;
 
-        b_info->u.hvm.stdvga = 0;
-        b_info->u.hvm.vnc.enable = 1;
-        b_info->u.hvm.vnc.listen = strdup("127.0.0.1");
-        b_info->u.hvm.vnc.display = 0;
-        b_info->u.hvm.vnc.findunused = 1;
-        b_info->u.hvm.keymap = NULL;
-        b_info->u.hvm.sdl.enable = 0;
-        b_info->u.hvm.sdl.opengl = 0;
-        b_info->u.hvm.nographic = 0;
-        b_info->u.hvm.serial = NULL;
-        b_info->u.hvm.boot = strdup("cda");
-        b_info->u.hvm.usb = 0;
-        b_info->u.hvm.usbdevice = NULL;
-        b_info->u.hvm.xen_platform_pci = 1;
+        libxl_defbool_setdefault(&b_info->u.hvm.pae,                true);
+        libxl_defbool_setdefault(&b_info->u.hvm.apic,               true);
+        libxl_defbool_setdefault(&b_info->u.hvm.acpi,               true);
+        libxl_defbool_setdefault(&b_info->u.hvm.acpi_s3,            true);
+        libxl_defbool_setdefault(&b_info->u.hvm.acpi_s4,            true);
+        libxl_defbool_setdefault(&b_info->u.hvm.nx,                 true);
+        libxl_defbool_setdefault(&b_info->u.hvm.viridian,           false);
+        libxl_defbool_setdefault(&b_info->u.hvm.hpet,               true);
+        libxl_defbool_setdefault(&b_info->u.hvm.vpt_align,          true);
+        libxl_defbool_setdefault(&b_info->u.hvm.nested_hvm,         false);
+        libxl_defbool_setdefault(&b_info->u.hvm.incr_generationid,  false);
+        libxl_defbool_setdefault(&b_info->u.hvm.usb,                false);
+        libxl_defbool_setdefault(&b_info->u.hvm.xen_platform_pci,   true);
+
+        if (!b_info->u.hvm.boot) {
+            b_info->u.hvm.boot = strdup("cda");
+            if (!b_info->u.hvm.boot) return ERROR_NOMEM;
+        }
+
+        libxl_defbool_setdefault(&b_info->u.hvm.stdvga, false);
+        libxl_defbool_setdefault(&b_info->u.hvm.vnc.enable, true);
+        if (libxl_defbool_val(b_info->u.hvm.vnc.enable)) {
+            libxl_defbool_setdefault(&b_info->u.hvm.vnc.findunused, true);
+            if (!b_info->u.hvm.vnc.listen) {
+                b_info->u.hvm.vnc.listen = strdup("127.0.0.1");
+                if (!b_info->u.hvm.vnc.listen) return ERROR_NOMEM;
+            }
+        }
+
+        libxl_defbool_setdefault(&b_info->u.hvm.sdl.enable, false);
+        if (libxl_defbool_val(b_info->u.hvm.sdl.enable)) {
+            libxl_defbool_setdefault(&b_info->u.hvm.sdl.opengl, false);
+        }
+
+        libxl_defbool_setdefault(&b_info->u.hvm.spice.enable, false);
+        if (libxl_defbool_val(b_info->u.hvm.spice.enable)) {
+            libxl_defbool_setdefault(&b_info->u.hvm.spice.disable_ticketing,
+                                     false);
+            libxl_defbool_setdefault(&b_info->u.hvm.spice.agent_mouse, true);
+        }
+
+        libxl_defbool_setdefault(&b_info->u.hvm.nographic, false);
+
+        libxl_defbool_setdefault(&b_info->u.hvm.gfx_passthru, false);
+
         break;
     case LIBXL_DOMAIN_TYPE_PV:
-        b_info->u.pv.slack_memkb = 8 * 1024;
+        libxl_defbool_setdefault(&b_info->u.pv.e820_host, false);
+        if (b_info->shadow_memkb == LIBXL_MEMKB_DEFAULT)
+            b_info->shadow_memkb = 0;
+        if (b_info->u.pv.slack_memkb == LIBXL_MEMKB_DEFAULT)
+            b_info->u.pv.slack_memkb = 0;
         break;
     default:
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+        LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
                    "invalid domain type %s in create info",
                    libxl_domain_type_to_string(b_info->type));
         return ERROR_INVAL;
@@ -130,17 +192,16 @@ int libxl_init_build_info(libxl_ctx *ctx,
     return 0;
 }
 
-static int init_console_info(libxl_device_console *console, int dev_num)
+static int init_console_info(libxl__device_console *console, int dev_num)
 {
-    memset(console, 0x00, sizeof(libxl_device_console));
+    memset(console, 0x00, sizeof(libxl__device_console));
     console->devid = dev_num;
-    console->consback = LIBXL_CONSOLE_BACKEND_XENCONSOLED;
+    console->consback = LIBXL__CONSOLE_BACKEND_XENCONSOLED;
     console->output = strdup("pty");
-    if ( NULL == console->output )
+    if (!console->output)
         return ERROR_NOMEM;
     return 0;
 }
-
 int libxl__domain_build(libxl__gc *gc,
                         libxl_domain_build_info *info,
                         uint32_t domid,
@@ -172,11 +233,11 @@ int libxl__domain_build(libxl__gc *gc,
 
         localents = libxl__calloc(gc, 7, sizeof(char *));
         localents[0] = "platform/acpi";
-        localents[1] = (info->u.hvm.acpi) ? "1" : "0";
+        localents[1] = libxl_defbool_val(info->u.hvm.acpi) ? "1" : "0";
         localents[2] = "platform/acpi_s3";
-        localents[3] = (info->u.hvm.acpi_s3) ? "1" : "0";
+        localents[3] = libxl_defbool_val(info->u.hvm.acpi_s3) ? "1" : "0";
         localents[4] = "platform/acpi_s4";
-        localents[5] = (info->u.hvm.acpi_s4) ? "1" : "0";
+        localents[5] = libxl_defbool_val(info->u.hvm.acpi_s4) ? "1" : "0";
 
         break;
     case LIBXL_DOMAIN_TYPE_PV:
@@ -320,8 +381,8 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
     flags = 0;
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         flags |= XEN_DOMCTL_CDF_hvm_guest;
-        flags |= info->hap ? XEN_DOMCTL_CDF_hap : 0;
-        flags |= info->oos ? 0 : XEN_DOMCTL_CDF_oos_off;
+        flags |= libxl_defbool_val(info->hap) ? XEN_DOMCTL_CDF_hap : 0;
+        flags |= libxl_defbool_val(info->oos) ? 0 : XEN_DOMCTL_CDF_oos_off;
     }
     *domid = -1;
 
@@ -377,7 +438,6 @@ retry_transaction:
 
     xs_rm(ctx->xsh, t, dom_path);
     libxl__xs_mkdir(gc, t, dom_path, roperm, ARRAY_SIZE(roperm));
-
 
     xs_rm(ctx->xsh, t, vm_path);
     libxl__xs_mkdir(gc, t, vm_path, roperm, ARRAY_SIZE(roperm));
@@ -470,6 +530,12 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
 
     domid = 0;
 
+    ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
+    if (ret) goto error_out;
+
+    ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
+    if (ret) goto error_out;
+
     ret = libxl__domain_make(gc, &d_config->c_info, &domid);
     if (ret) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot make domain: %d", ret);
@@ -482,9 +548,11 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
             goto error_out;
     }
 
+    ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
+    if (ret) goto error_out;
 
     for (i = 0; i < d_config->num_disks; i++) {
-        ret = libxl__device_disk_set_backend(gc, &d_config->disks[i]);
+        ret = libxl__device_disk_setdefault(gc, &d_config->disks[i]);
         if (ret) goto error_out;
     }
 
@@ -534,18 +602,16 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     switch (d_config->c_info.type) {
     case LIBXL_DOMAIN_TYPE_HVM:
     {
-        libxl_device_console console;
+        libxl__device_console console;
         libxl_device_vkb vkb;
 
         ret = init_console_info(&console, 0);
         if ( ret )
             goto error_out;
         libxl__device_console_add(gc, domid, &console, &state);
-        libxl_device_console_dispose(&console);
+        libxl__device_console_dispose(&console);
 
-        ret = libxl_device_vkb_init(ctx, &vkb);
-        if ( ret )
-            goto error_out;
+        libxl_device_vkb_init(&vkb);
         libxl_device_vkb_add(ctx, domid, &vkb);
         libxl_device_vkb_dispose(&vkb);
 
@@ -561,7 +627,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     case LIBXL_DOMAIN_TYPE_PV:
     {
         int need_qemu = 0;
-        libxl_device_console console;
+        libxl__device_console console;
 
         for (i = 0; i < d_config->num_vfbs; i++) {
             libxl_device_vfb_add(ctx, domid, &d_config->vfbs[i]);
@@ -577,10 +643,10 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
                 d_config->num_disks, &d_config->disks[0]);
 
         if (need_qemu)
-             console.consback = LIBXL_CONSOLE_BACKEND_IOEMU;
+             console.consback = LIBXL__CONSOLE_BACKEND_IOEMU;
 
         libxl__device_console_add(gc, domid, &console, &state);
-        libxl_device_console_dispose(&console);
+        libxl__device_console_dispose(&console);
 
         if (need_qemu) {
             libxl__create_xenpv_qemu(gc, domid, d_config, &state, &dm_starting);
@@ -619,7 +685,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     }
 
     if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
-        d_config->b_info.u.pv.e820_host) {
+        libxl_defbool_val(d_config->b_info.u.pv.e820_host)) {
         int rc;
         rc = libxl__e820_alloc(gc, domid, d_config);
         if (rc)

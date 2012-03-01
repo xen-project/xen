@@ -39,7 +39,7 @@ const char *libxl__domain_device_model(libxl__gc *gc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     const char *dm;
 
-    if (info->device_model_stubdomain)
+    if (libxl_defbool_val(info->device_model_stubdomain))
         return NULL;
 
     if (info->device_model) {
@@ -63,18 +63,6 @@ const char *libxl__domain_device_model(libxl__gc *gc,
     return dm;
 }
 
-static const char *libxl__domain_bios(libxl__gc *gc,
-                                const libxl_domain_build_info *info)
-{
-    if (info->u.hvm.bios)
-       return libxl_bios_type_to_string(info->u.hvm.bios);
-    switch (info->device_model_version) {
-    case 1: return "rombios";
-    case 2: return "seabios";
-    default:return NULL;
-    }
-}
-
 const libxl_vnc_info *libxl__dm_vnc(const libxl_domain_config *guest_config)
 {
     const libxl_vnc_info *vnc = NULL;
@@ -83,7 +71,7 @@ const libxl_vnc_info *libxl__dm_vnc(const libxl_domain_config *guest_config)
     } else if (guest_config->num_vfbs > 0) {
         vnc = &guest_config->vfbs[0].vnc;
     }
-    return vnc && vnc->enable ? vnc : NULL;
+    return vnc && libxl_defbool_val(vnc->enable) ? vnc : NULL;
 }
 
 static const libxl_sdl_info *dm_sdl(const libxl_domain_config *guest_config)
@@ -94,7 +82,7 @@ static const libxl_sdl_info *dm_sdl(const libxl_domain_config *guest_config)
     } else if (guest_config->num_vfbs > 0) {
         sdl = &guest_config->vfbs[0].sdl;
     }
-    return sdl && sdl->enable ? sdl : NULL;
+    return sdl && libxl_defbool_val(sdl->enable) ? sdl : NULL;
 }
 
 static const char *dm_keymap(const libxl_domain_config *guest_config)
@@ -156,13 +144,13 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         flexarray_append(dm_args, "-vnc");
         flexarray_append(dm_args, vncarg);
 
-        if (vnc->findunused) {
+        if (libxl_defbool_val(vnc->findunused)) {
             flexarray_append(dm_args, "-vncunused");
         }
     }
     if (sdl) {
         flexarray_append(dm_args, "-sdl");
-        if (!sdl->opengl) {
+        if (!libxl_defbool_val(sdl->opengl)) {
             flexarray_append(dm_args, "-disable-opengl");
         }
         /* XXX sdl->{display,xauthority} into $DISPLAY/$XAUTHORITY */
@@ -177,7 +165,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             flexarray_vappend(dm_args, "-serial", b_info->u.hvm.serial, NULL);
         }
 
-        if (b_info->u.hvm.nographic && (!sdl && !vnc)) {
+        if (libxl_defbool_val(b_info->u.hvm.nographic) && (!sdl && !vnc)) {
             flexarray_append(dm_args, "-nographic");
         }
 
@@ -187,14 +175,14 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
                                    libxl__sizekb_to_mb(b_info->video_memkb)),
                     NULL);
         }
-        if (b_info->u.hvm.stdvga) {
+        if (libxl_defbool_val(b_info->u.hvm.stdvga)) {
             flexarray_append(dm_args, "-std-vga");
         }
 
         if (b_info->u.hvm.boot) {
             flexarray_vappend(dm_args, "-boot", b_info->u.hvm.boot, NULL);
         }
-        if (b_info->u.hvm.usb || b_info->u.hvm.usbdevice) {
+        if (libxl_defbool_val(b_info->u.hvm.usb) || b_info->u.hvm.usbdevice) {
             flexarray_append(dm_args, "-usb");
             if (b_info->u.hvm.usbdevice) {
                 flexarray_vappend(dm_args,
@@ -204,7 +192,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         if (b_info->u.hvm.soundhw) {
             flexarray_vappend(dm_args, "-soundhw", b_info->u.hvm.soundhw, NULL);
         }
-        if (b_info->u.hvm.acpi) {
+        if (libxl_defbool_val(b_info->u.hvm.acpi)) {
             flexarray_append(dm_args, "-acpi");
         }
         if (b_info->max_vcpus > 1) {
@@ -240,7 +228,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         if ( ioemu_vifs == 0 ) {
             flexarray_vappend(dm_args, "-net", "none", NULL);
         }
-        if (b_info->u.hvm.gfx_passthru) {
+        if (libxl_defbool_val(b_info->u.hvm.gfx_passthru)) {
             flexarray_append(dm_args, "-gfx_passthru");
         }
     } else {
@@ -293,7 +281,7 @@ static char *dm_spice_options(libxl__gc *gc,
         return NULL;
     }
 
-    if (!spice->disable_ticketing) {
+    if (!libxl_defbool_val(spice->disable_ticketing)) {
         if (!spice->passwd) {
             LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
                        "spice ticketing is enabled but missing password");
@@ -309,12 +297,12 @@ static char *dm_spice_options(libxl__gc *gc,
                          spice->port, spice->tls_port);
     if (spice->host)
         opt = libxl__sprintf(gc, "%s,addr=%s", opt, spice->host);
-    if (spice->disable_ticketing)
+    if (libxl_defbool_val(spice->disable_ticketing))
         opt = libxl__sprintf(gc, "%s,disable-ticketing", opt);
     else
         opt = libxl__sprintf(gc, "%s,password=%s", opt, spice->passwd);
     opt = libxl__sprintf(gc, "%s,agent-mouse=%s", opt,
-                         spice->agent_mouse ? "on" : "off");
+                         libxl_defbool_val(spice->agent_mouse) ? "on" : "off");
     return opt;
 }
 
@@ -383,7 +371,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         if (vnc->passwd && vnc->passwd[0]) {
             vncarg = libxl__sprintf(gc, "%s,password", vncarg);
         }
-        if (vnc->findunused) {
+        if (libxl_defbool_val(vnc->findunused)) {
             /* This option asks to QEMU to try this number of port before to
              * give up.  So QEMU will try ports between $display and $display +
              * 99.  This option needs to be the last one of the vnc options. */
@@ -411,11 +399,11 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_vappend(dm_args, "-serial", b_info->u.hvm.serial, NULL);
         }
 
-        if (b_info->u.hvm.nographic && (!sdl && !vnc)) {
+        if (libxl_defbool_val(b_info->u.hvm.nographic) && (!sdl && !vnc)) {
             flexarray_append(dm_args, "-nographic");
         }
 
-        if (b_info->u.hvm.spice.enable) {
+        if (libxl_defbool_val(b_info->u.hvm.spice.enable)) {
             const libxl_spice_info *spice = &b_info->u.hvm.spice;
             char *spiceoptions = dm_spice_options(gc, spice);
             if (!spiceoptions)
@@ -425,7 +413,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append(dm_args, spiceoptions);
         }
 
-        if (b_info->u.hvm.stdvga) {
+        if (libxl_defbool_val(b_info->u.hvm.stdvga)) {
                 flexarray_vappend(dm_args, "-vga", "std", NULL);
         }
 
@@ -433,7 +421,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_vappend(dm_args, "-boot",
                     libxl__sprintf(gc, "order=%s", b_info->u.hvm.boot), NULL);
         }
-        if (b_info->u.hvm.usb || b_info->u.hvm.usbdevice) {
+        if (libxl_defbool_val(b_info->u.hvm.usb) || b_info->u.hvm.usbdevice) {
             flexarray_append(dm_args, "-usb");
             if (b_info->u.hvm.usbdevice) {
                 flexarray_vappend(dm_args,
@@ -443,7 +431,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         if (b_info->u.hvm.soundhw) {
             flexarray_vappend(dm_args, "-soundhw", b_info->u.hvm.soundhw, NULL);
         }
-        if (!b_info->u.hvm.acpi) {
+        if (!libxl_defbool_val(b_info->u.hvm.acpi)) {
             flexarray_append(dm_args, "-no-acpi");
         }
         if (b_info->max_vcpus > 1) {
@@ -485,7 +473,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append(dm_args, "-net");
             flexarray_append(dm_args, "none");
         }
-        if (b_info->u.hvm.gfx_passthru) {
+        if (libxl_defbool_val(b_info->u.hvm.gfx_passthru)) {
             flexarray_append(dm_args, "-gfx_passthru");
         }
     } else {
@@ -616,8 +604,8 @@ static int libxl__vfb_and_vkb_from_hvm_guest_config(libxl__gc *gc,
     if (b_info->type != LIBXL_DOMAIN_TYPE_HVM)
         return ERROR_INVAL;
 
-    memset(vfb, 0x00, sizeof(libxl_device_vfb));
-    memset(vkb, 0x00, sizeof(libxl_device_vkb));
+    libxl_device_vfb_init(vfb);
+    libxl_device_vkb_init(vkb);
 
     vfb->backend_domid = 0;
     vfb->devid = 0;
@@ -688,7 +676,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int i, num_console = STUBDOM_SPECIAL_CONSOLES, ret;
-    libxl_device_console *console;
+    libxl__device_console *console;
     libxl_domain_config dm_config;
     libxl_device_vfb vfb;
     libxl_device_vkb vkb;
@@ -705,7 +693,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
         goto out;
     }
 
-    memset(&dm_config.c_info, 0x00, sizeof(libxl_domain_create_info));
+    libxl_domain_create_info_init(&dm_config.c_info);
     dm_config.c_info.type = LIBXL_DOMAIN_TYPE_PV;
     dm_config.c_info.name = libxl__sprintf(gc, "%s-dm",
                                     libxl__domid_to_name(gc, guest_domid));
@@ -713,13 +701,13 @@ static int libxl__create_stubdom(libxl__gc *gc,
 
     libxl_uuid_generate(&dm_config.c_info.uuid);
 
-    memset(&dm_config.b_info, 0x00, sizeof(libxl_domain_build_info));
-    dm_config.b_info.type = dm_config.c_info.type;
+    libxl_domain_build_info_init(&dm_config.b_info);
+    libxl_domain_build_info_init_type(&dm_config.b_info, LIBXL_DOMAIN_TYPE_PV);
+
     dm_config.b_info.max_vcpus = 1;
     dm_config.b_info.max_memkb = 32 * 1024;
     dm_config.b_info.target_memkb = dm_config.b_info.max_memkb;
 
-    dm_config.b_info.type = LIBXL_DOMAIN_TYPE_PV;
     dm_config.b_info.u.pv.kernel.path = libxl__abs_path(gc, "ioemu-stubdom.gz",
                                               libxl_xenfirmwaredir_path());
     dm_config.b_info.u.pv.cmdline = libxl__sprintf(gc, " -d %d", guest_domid);
@@ -739,6 +727,11 @@ static int libxl__create_stubdom(libxl__gc *gc,
 
     dm_config.vifs = guest_config->vifs;
     dm_config.num_vifs = guest_config->num_vifs;
+
+    ret = libxl__domain_create_info_setdefault(gc, &dm_config.c_info);
+    if (ret) goto out;
+    ret = libxl__domain_build_info_setdefault(gc, &dm_config.b_info);
+    if (ret) goto out;
 
     libxl__vfb_and_vkb_from_hvm_guest_config(gc, guest_config, &vfb, &vkb);
     dm_config.vfbs = &vfb;
@@ -816,7 +809,7 @@ retry_transaction:
     if (guest_config->b_info.u.hvm.serial)
         num_console++;
 
-    console = libxl__calloc(gc, num_console, sizeof(libxl_device_console));
+    console = libxl__calloc(gc, num_console, sizeof(libxl__device_console));
     if (!console) {
         ret = ERROR_NOMEM;
         goto out_free;
@@ -824,7 +817,7 @@ retry_transaction:
 
     for (i = 0; i < num_console; i++) {
         console[i].devid = i;
-        console[i].consback = LIBXL_CONSOLE_BACKEND_IOEMU;
+        console[i].consback = LIBXL__CONSOLE_BACKEND_IOEMU;
         /* STUBDOM_CONSOLE_LOGGING (console 0) is for minios logging
          * STUBDOM_CONSOLE_SAVE (console 1) is for writing the save file
          * STUBDOM_CONSOLE_RESTORE (console 2) is for reading the save file
@@ -907,7 +900,7 @@ int libxl__create_device_model(libxl__gc *gc,
     char **pass_stuff;
     const char *dm;
 
-    if (b_info->device_model_stubdomain) {
+    if (libxl_defbool_val(b_info->device_model_stubdomain)) {
         rc = libxl__create_stubdom(gc, domid, guest_config, state, starting_r);
         goto out;
     }
@@ -929,10 +922,13 @@ int libxl__create_device_model(libxl__gc *gc,
         goto out;
     }
 
-    path = xs_get_domain_path(ctx->xsh, domid);
-    libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/hvmloader/bios", path),
-                    "%s", libxl__domain_bios(gc, b_info));
-    free(path);
+    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
+        path = xs_get_domain_path(ctx->xsh, domid);
+        libxl__xs_write(gc, XBT_NULL,
+                        libxl__sprintf(gc, "%s/hvmloader/bios", path),
+                        "%s", libxl_bios_type_to_string(b_info->u.hvm.bios));
+        free(path);
+    }
 
     path = libxl__sprintf(gc, "/local/domain/0/device-model/%d", domid);
     xs_mkdir(ctx->xsh, XBT_NULL, path);
@@ -941,7 +937,7 @@ int libxl__create_device_model(libxl__gc *gc,
         b_info->device_model_version
         == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL)
         libxl__xs_write(gc, XBT_NULL, libxl__sprintf(gc, "%s/disable_pf", path),
-                        "%d", !b_info->u.hvm.xen_platform_pci);
+                    "%d", !libxl_defbool_val(b_info->u.hvm.xen_platform_pci));
 
     libxl_create_logfile(ctx,
                          libxl__sprintf(gc, "qemu-dm-%s", c_info->name),
@@ -1088,7 +1084,7 @@ out:
 }
 
 int libxl__need_xenpv_qemu(libxl__gc *gc,
-        int nr_consoles, libxl_device_console *consoles,
+        int nr_consoles, libxl__device_console *consoles,
         int nr_vfbs, libxl_device_vfb *vfbs,
         int nr_disks, libxl_device_disk *disks)
 {
@@ -1100,7 +1096,7 @@ int libxl__need_xenpv_qemu(libxl__gc *gc,
     }
 
     for (i = 0; i < nr_consoles; i++) {
-        if (consoles[i].consback == LIBXL_CONSOLE_BACKEND_IOEMU) {
+        if (consoles[i].consback == LIBXL__CONSOLE_BACKEND_IOEMU) {
             ret = 1;
             goto out;
         }

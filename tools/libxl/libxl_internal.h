@@ -187,6 +187,16 @@ libxl__ev_xswatch *libxl__watch_slot_contents(libxl__gc *gc, int slotnum);
  * version of the _evdisable_FOO function; the internal one is
  * used during cleanup.
  */
+_hidden int libxl__domain_create_info_setdefault(libxl__gc *gc,
+                                        libxl_domain_create_info *c_info);
+_hidden int libxl__domain_build_info_setdefault(libxl__gc *gc,
+                                        libxl_domain_build_info *b_info);
+_hidden int libxl__device_disk_setdefault(libxl__gc *gc,
+                                          libxl_device_disk *disk);
+_hidden int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic);
+_hidden int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb);
+_hidden int libxl__device_vkb_setdefault(libxl__gc *gc, libxl_device_vkb *vkb);
+_hidden int libxl__device_pci_setdefault(libxl__gc *gc, libxl_device_pci *pci);
 
 struct libxl__evgen_domain_death {
     uint32_t domid;
@@ -652,7 +662,7 @@ _hidden int libxl__device_disk_dev_number(const char *virtpath,
                                           int *pdisk, int *ppartition);
 
 _hidden int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
-                                      libxl_device_console *console,
+                                      libxl__device_console *console,
                                       libxl__domain_build_state *state);
 
 _hidden int libxl__device_generic_add(libxl__gc *gc, libxl__device *device,
@@ -664,6 +674,19 @@ _hidden int libxl__parse_backend_path(libxl__gc *gc, const char *path,
 _hidden int libxl__device_destroy(libxl__gc *gc, libxl__device *dev);
 _hidden int libxl__devices_destroy(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state);
+
+/*
+ * For each aggregate type which can be used as an input we provide:
+ *
+ * int libxl__<type>_setdefault(gc, <type> *p):
+ *
+ *     Idempotently sets any members of "p" which is currently set to
+ *     a special value indicating that the defaults should be used
+ *     (per libxl_<type>_init) to a specific value.
+ *
+ *     All libxl API functions are expected to have arranged for this
+ *     to be called before using any values within these structures.
+ */
 
 /* Arranges that dev will be removed from its guest.  When
  * this is done, the ao will be completed.  An error
@@ -882,7 +905,7 @@ _hidden int libxl__create_xenpv_qemu(libxl__gc *gc, uint32_t domid,
                               libxl__domain_build_state *state,
                               libxl__spawner_starting **starting_r);
 _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
-        int nr_consoles, libxl_device_console *consoles,
+        int nr_consoles, libxl__device_console *consoles,
         int nr_vfbs, libxl_device_vfb *vfbs,
         int nr_disks, libxl_device_disk *disks);
   /* Caller must either: pass starting_r==0, or on successful

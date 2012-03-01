@@ -19,18 +19,6 @@
 
 #include "libxl_internal.h"
 
-struct schedid_name {
-    char *name;
-    int id;
-};
-
-static struct schedid_name schedid_name[] = {
-    { "credit", XEN_SCHEDULER_CREDIT },
-    { "sedf", XEN_SCHEDULER_SEDF },
-    { "credit2", XEN_SCHEDULER_CREDIT2 },
-    { NULL, -1 }
-};
-
 const char *libxl_basename(const char *name)
 {
     const char *filename;
@@ -149,28 +137,6 @@ int libxl_name_to_cpupoolid(libxl_ctx *ctx, const char *name,
     }
     free(poolinfo);
     return ret;
-}
-
-int libxl_name_to_schedid(libxl_ctx *ctx, const char *name)
-{
-    int i;
-
-    for (i = 0; schedid_name[i].name != NULL; i++)
-        if (strcmp(name, schedid_name[i].name) == 0)
-            return schedid_name[i].id;
-
-    return ERROR_INVAL;
-}
-
-char *libxl_schedid_to_name(libxl_ctx *ctx, int schedid)
-{
-    int i;
-
-    for (i = 0; schedid_name[i].name != NULL; i++)
-        if (schedid_name[i].id == schedid)
-            return schedid_name[i].name;
-
-    return "unknown";
 }
 
 int libxl_get_stubdom_id(libxl_ctx *ctx, int guest_domid)
@@ -539,6 +505,29 @@ void libxl_cputopology_list_free(libxl_cputopology *list, int nr)
     for (i = 0; i < nr; i++)
         libxl_cputopology_dispose(&list[i]);
     free(list);
+}
+
+void libxl_dominfo_list_free(libxl_dominfo *list, int nr)
+{
+    int i;
+    for (i = 0; i < nr; i++)
+        libxl_dominfo_dispose(&list[i]);
+    free(list);
+}
+
+void libxl_vminfo_list_free(libxl_vminfo *list, int nr)
+{
+    int i;
+    for (i = 0; i < nr; i++)
+        libxl_vminfo_dispose(&list[i]);
+    free(list);
+}
+
+int libxl_domid_valid_guest(uint32_t domid)
+{
+    /* returns 1 if the value _could_ be a valid guest domid, 0 otherwise
+     * does not check whether the domain actually exists */
+    return domid > 0 && domid < DOMID_FIRST_RESERVED;
 }
 
 /*

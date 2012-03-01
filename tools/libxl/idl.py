@@ -51,6 +51,10 @@ class Type(object):
 
         self.autogenerate_dispose_fn = kwargs.setdefault('autogenerate_dispose_fn', True)
 
+        self.init_fn = kwargs.setdefault('init_fn', None)
+        self.init_val = kwargs.setdefault('init_val', None)
+        self.autogenerate_init_fn = kwargs.setdefault('autogenerate_init_fn', False)
+
         if self.typename is not None and not self.private:
             self.json_fn = kwargs.setdefault('json_fn', self.typename + "_gen_json")
         else:
@@ -144,11 +148,19 @@ class Field(object):
         self.name = name
         self.const = kwargs.setdefault('const', False)
         self.enumname = kwargs.setdefault('enumname', None)
+        self.init_val = kwargs.setdefault('init_val', None)
 
 class Aggregate(Type):
     """A type containing a collection of other types"""
     def __init__(self, kind, typename, fields, **kwargs):
         Type.__init__(self, typename, **kwargs)
+
+        if self.typename is not None:
+            self.init_fn = kwargs.setdefault('init_fn', self.typename + "_init")
+        else:
+            self.init_fn = kwargs.setdefault('init_fn', None)
+
+        self.autogenerate_init_fn = kwargs.setdefault('autogenerate_init_fn', True)
 
         self.kind = kind
 
@@ -206,8 +218,9 @@ class KeyedUnion(Aggregate):
         if not isinstance(keyvar_type, Enumeration):
             raise ValueError
 
-        self.keyvar_name = keyvar_name
-        self.keyvar_type = keyvar_type
+        kv_kwargs = dict([(x.lstrip('keyvar_'),y) for (x,y) in kwargs.items() if x.startswith('keyvar_')])
+        
+        self.keyvar = Field(keyvar_type, keyvar_name, **kv_kwargs)
 
         for f in fields:
             # (name, enum, type)

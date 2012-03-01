@@ -124,6 +124,50 @@
  * Therefore public functions which initialize a libxl__gc MUST call
  * libxl__free_all() before returning.
  */
+/*
+ * libxl types
+ *
+ * Most libxl types are defined by the libxl IDL (see
+ * libxl_types.idl). The library provides a common set of methods for
+ * initialising and freeing these types.
+ *
+ * void libxl_<type>_init(<type> *p):
+ *
+ *    Initialises the members of "p" to all defaults. These may either
+ *    be special value which indicates to the library that it should
+ *    select an appropriate default when using this field or actual
+ *    default values.
+ *
+ *    Some fields within a data type (e.g. unions) cannot be sensibly
+ *    initialised without further information. In these cases a
+ *    separate subfield initialisation function is provided (see
+ *    below).
+ *
+ *    An instance which has been initialised using this method can
+ *    always be safely passed to the dispose function (see
+ *    below). This is true even if the data type contains fields which
+ *    require a separate call to a subfield initialisation function.
+ *
+ *    This method is provided for any aggregate type which is used as
+ *    an input parameter.
+ *
+ * void libxl_<type>_init_<subfield>(<type> *p, subfield):
+ *
+ *    Initialise those parts of "p" which are not initialised by the
+ *    main init function due to the unknown value of "subfield". Sets
+ *    p->subfield as well as initialising any fields to their default
+ *    values.
+ *
+ *    p->subfield must not have been previously initialised.
+ *
+ *    This method is provided for any aggregate type.
+ *
+ * void libxl_<type>_dispose(instance *p):
+ *
+ *    Frees any dynamically allocated memory used by the members of
+ *    "p" but not the storage used by "p" itself (this allows for the
+ *    allocation of arrays of types and for the composition of types).
+ */
 #ifndef LIBXL_H
 #define LIBXL_H
 
@@ -136,9 +180,6 @@
 #include <sys/wait.h> /* for pid_t */
 
 #include <xentoollog.h>
-
-#include <xen/sched.h>
-#include <xen/sysctl.h>
 
 #include <libxl_uuid.h>
 #include <_libxl_list.h>
@@ -202,9 +243,34 @@ typedef struct {
 struct libxl_event;
 typedef LIBXL_TAILQ_ENTRY(struct libxl_event) libxl_ev_link;
 
+/*
+ * A boolean variable with an explicit default state.
+ *
+ * Users should treat this struct as opaque and use the following
+ * defined macros and accessor functions.
+ *
+ * To allow users of the library to naively select all defaults this
+ * state is represented as 0. False is < 0 and True is > 0.
+ */
+typedef struct {
+    int val;
+} libxl_defbool;
+
+void libxl_defbool_set(libxl_defbool *db, bool b);
+/* Resets to default */
+void libxl_defbool_unset(libxl_defbool *db);
+/* Sets db only if it is currently == default */
+void libxl_defbool_setdefault(libxl_defbool *db, bool b);
+bool libxl_defbool_is_default(libxl_defbool db);
+/* db must not be == default */
+bool libxl_defbool_val(libxl_defbool db);
+
+const char *libxl_defbool_to_string(libxl_defbool b);
+
 typedef struct libxl__ctx libxl_ctx;
 
-#define LIBXL_TIMER_MODE_DEFAULT LIBXL_TIMER_MODE_NO_DELAY_FOR_MISSED_TICKS
+#define LIBXL_TIMER_MODE_DEFAULT -1
+#define LIBXL_MEMKB_DEFAULT ~0ULL
 
 #include "_libxl_types.h"
 
@@ -315,10 +381,6 @@ int libxl_ctx_free(libxl_ctx *ctx /* 0 is OK */);
 int libxl_ctx_postfork(libxl_ctx *ctx);
 
 /* domain related functions */
-int libxl_init_create_info(libxl_ctx *ctx, libxl_domain_create_info *c_info);
-int libxl_init_build_info(libxl_ctx *ctx,
-                          libxl_domain_build_info *b_info,
-                          libxl_domain_create_info *c_info);
 typedef int (*libxl_console_ready)(libxl_ctx *ctx, uint32_t domid, void *priv);
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid);
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid, int restore_fd);
@@ -390,11 +452,14 @@ int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_conso
  * guests using pygrub. */
 int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm);
 
+/* May be called with info_r == NULL to check for domain's existance */
 int libxl_domain_info(libxl_ctx*, libxl_dominfo *info_r,
                       uint32_t domid);
 libxl_dominfo * libxl_list_domain(libxl_ctx*, int *nb_domain);
+void libxl_dominfo_list_free(libxl_dominfo *list, int nr);
 libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool);
 libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm);
+void libxl_vminfo_list_free(libxl_vminfo *list, int nr);
 
 /*
  * Devices
@@ -405,8 +470,9 @@ libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm);
  * additional data type libxl_device_<TYPE>_getinfo which contains
  * further runtime information about the device.
  *
- * A common set of methods are available for each device type. These
- * are described below.
+ * In addition to the general methods available for libxl types (see
+ * "libxl types" above) a common set of methods are available for each
+ * device type. These are described below.
  *
  * Querying
  * --------
@@ -423,10 +489,6 @@ libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm);
  *
  * Creation / Control
  * ------------------
- *
- * libxl_device_<type>_init(ctx, device):
- *
- *    Initalises device to a default configuration.
  *
  * libxl_device_<type>_add(ctx, domid, device):
  *
@@ -457,7 +519,6 @@ libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm);
  */
 
 /* Disks */
-int libxl_device_disk_init(libxl_ctx *ctx, libxl_device_disk *disk);
 int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 int libxl_device_disk_remove(libxl_ctx *ctx, uint32_t domid,
                              libxl_device_disk *disk,
@@ -483,7 +544,6 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk);
 int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk);
 
 /* Network Interfaces */
-int libxl_device_nic_init(libxl_ctx *ctx, libxl_device_nic *nic);
 int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
 int libxl_device_nic_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_nic *nic,
@@ -495,7 +555,6 @@ int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_nic *nic, libxl_nicinfo *nicinfo);
 
 /* Keyboard */
-int libxl_device_vkb_init(libxl_ctx *ctx, libxl_device_vkb *vkb);
 int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb);
 int libxl_device_vkb_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_vkb *vkb,
@@ -503,7 +562,6 @@ int libxl_device_vkb_remove(libxl_ctx *ctx, uint32_t domid,
 int libxl_device_vkb_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb);
 
 /* Framebuffer */
-int libxl_device_vfb_init(libxl_ctx *ctx, libxl_device_vfb *vfb);
 int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
 int libxl_device_vfb_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_vfb *vfb,
@@ -511,7 +569,6 @@ int libxl_device_vfb_remove(libxl_ctx *ctx, uint32_t domid,
 int libxl_device_vfb_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
 
 /* PCI Passthrough */
-int libxl_device_pci_init(libxl_ctx *ctx, libxl_device_pci *pci);
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
 int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
 int libxl_device_pci_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
@@ -584,7 +641,7 @@ int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,
                                unsigned int max_vcpus, libxl_cpumap *cpumap);
 int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_cpumap *cpumap);
 
-int libxl_get_sched_id(libxl_ctx *ctx);
+libxl_scheduler libxl_get_scheduler(libxl_ctx *ctx);
 
 
 int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
@@ -627,7 +684,8 @@ int libxl_tmem_shared_auth(libxl_ctx *ctx, uint32_t domid, char* uuid,
 int libxl_tmem_freeable(libxl_ctx *ctx);
 
 int libxl_get_freecpus(libxl_ctx *ctx, libxl_cpumap *cpumap);
-int libxl_cpupool_create(libxl_ctx *ctx, const char *name, int schedid,
+int libxl_cpupool_create(libxl_ctx *ctx, const char *name,
+                         libxl_scheduler sched,
                          libxl_cpumap cpumap, libxl_uuid *uuid,
                          uint32_t *poolid);
 int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid);
@@ -638,12 +696,7 @@ int libxl_cpupool_cpuremove(libxl_ctx *ctx, uint32_t poolid, int cpu);
 int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cpus);
 int libxl_cpupool_movedomain(libxl_ctx *ctx, uint32_t poolid, uint32_t domid);
 
-static inline int libxl_domid_valid_guest(uint32_t domid)
-{
-    /* returns 1 if the value _could_ be a valid guest domid, 0 otherwise
-     * does not check whether the domain actually exists */
-    return domid > 0 && domid < DOMID_FIRST_RESERVED;
-}
+int libxl_domid_valid_guest(uint32_t domid);
 
 int libxl_flask_context_to_sid(libxl_ctx *ctx, char *buf, size_t len,
                                uint32_t *ssidref);

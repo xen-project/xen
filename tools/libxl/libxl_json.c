@@ -85,6 +85,12 @@ yajl_gen_status libxl__yajl_gen_enum(yajl_gen hand, const char *str)
 /*
  * YAJL generators for builtin libxl types.
  */
+yajl_gen_status libxl_defbool_gen_json(yajl_gen hand,
+                                       libxl_defbool *db)
+{
+    return libxl__yajl_gen_asciiz(hand, libxl_defbool_to_string(*db));
+}
+
 yajl_gen_status libxl_uuid_gen_json(yajl_gen hand,
                                     libxl_uuid *uuid)
 {

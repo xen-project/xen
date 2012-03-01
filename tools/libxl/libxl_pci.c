@@ -765,6 +765,11 @@ static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned 
     return -1;
 }
 
+int libxl__device_pci_setdefault(libxl__gc *gc, libxl_device_pci *pci)
+{
+    return 0;
+}
+
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
 {
     GC_INIT(ctx);
@@ -781,6 +786,9 @@ int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcide
     libxl_device_pci *assigned;
     int num_assigned, i, rc;
     int stubdomid = 0;
+
+    rc = libxl__device_pci_setdefault(gc, pcidev);
+    if (rc) goto out;
 
     rc = get_all_assigned_devices(gc, &assigned, &num_assigned);
     if ( rc ) {
@@ -1365,7 +1373,7 @@ int libxl__e820_alloc(libxl__gc *gc, uint32_t domid, libxl_domain_config *d_conf
         return ERROR_INVAL;
 
     b_info = &d_config->b_info;
-    if (!b_info->u.pv.e820_host)
+    if (!libxl_defbool_val(b_info->u.pv.e820_host))
         return ERROR_INVAL;
 
     rc = xc_get_machine_memory_map(ctx->xch, map, E820MAX);

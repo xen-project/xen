@@ -5,6 +5,8 @@
 
 namespace("libxl_")
 
+libxl_defbool = Builtin("defbool", passby=PASS_BY_REFERENCE)
+
 libxl_domid = Builtin("domid", json_fn = "yajl_gen_integer", autogenerate_json = False)
 libxl_uuid = Builtin("uuid", passby=PASS_BY_REFERENCE)
 libxl_mac = Builtin("mac", passby=PASS_BY_REFERENCE)
@@ -16,6 +18,12 @@ libxl_key_value_list = Builtin("key_value_list", dispose_fn="libxl_key_value_lis
 libxl_file_reference = Builtin("file_reference", dispose_fn="libxl_file_reference_dispose", passby=PASS_BY_REFERENCE)
 
 libxl_hwcap = Builtin("hwcap", passby=PASS_BY_REFERENCE)
+
+#
+# Specific integer types
+#
+
+MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT")
 
 #
 # Constants / Enumerations
@@ -34,11 +42,6 @@ libxl_device_model_version = Enumeration("device_model_version", [
 libxl_console_type = Enumeration("console_type", [
     (1, "SERIAL"),
     (2, "PV"),
-    ])
-
-libxl_console_backend = Enumeration("console_backend", [
-    (1, "XENCONSOLED"),
-    (2, "IOEMU"),
     ])
 
 libxl_disk_format = Enumeration("disk_format", [
@@ -97,7 +100,7 @@ libxl_timer_mode = Enumeration("timer_mode", [
     (1, "no_delay_for_missed_ticks"),
     (2, "no_missed_ticks_pending"),
     (3, "one_missed_tick_pending"),
-    ])
+    ], init_val = "LIBXL_TIMER_MODE_DEFAULT")
 
 libxl_bios_type = Enumeration("bios_type", [
     (1, "rombios"),
@@ -105,35 +108,52 @@ libxl_bios_type = Enumeration("bios_type", [
     (3, "ovmf"),
     ])
 
+# Consistent with values defined in domctl.h
+libxl_scheduler = Enumeration("scheduler", [
+    (4, "sedf"),
+    (5, "credit"),
+    (6, "credit2"),
+    (7, "arinc653"),
+    ])
+
+# Consistent with SHUTDOWN_* in sched.h
+libxl_shutdown_reason = Enumeration("shutdown_reason", [
+    (0, "poweroff"),
+    (1, "reboot"),
+    (2, "suspend"),
+    (3, "crash"),
+    (4, "watchdog"),
+    ])
+
 #
 # Complex libxl types
 #
 libxl_vnc_info = Struct("vnc_info", [
-    ("enable",        bool),
+    ("enable",        libxl_defbool),
     # "address:port" that should be listened on
     ("listen",        string),
     ("passwd",        string),
     ("display",       integer),
     # If set then try to find an unused port
-    ("findunused",    bool),
+    ("findunused",    libxl_defbool),
     ])
 
 libxl_spice_info = Struct("spice_info", [
-    ("enable",            bool),
+    ("enable",      libxl_defbool),
     # At least one of spice port or spicetls_post must be given
     ("port",        integer),
     ("tls_port",    integer),
     # Interface to bind to
     ("host",        string),
     # enable client connection with no password
-    ("disable_ticketing", bool),
+    ("disable_ticketing", libxl_defbool),
     ("passwd",      string),
-    ("agent_mouse", bool),
+    ("agent_mouse", libxl_defbool),
     ])
 
 libxl_sdl_info = Struct("sdl_info", [
-    ("enable",        bool),
-    ("opengl",        bool),
+    ("enable",        libxl_defbool),
+    ("opengl",        libxl_defbool),
     ("display",       string),
     ("xauthority",    string),
     ])
@@ -148,31 +168,31 @@ libxl_dominfo = Struct("dominfo",[
     ("shutdown",    bool),
     ("dying",       bool),
 
-    # Valid SHUTDOWN_* value from xen/sched.h iff (shutdown||dying).
+    # Valid iff (shutdown||dying).
     #
     # Otherwise set to a value guaranteed not to clash with any valid
-    # SHUTDOWN_* constant.
-    ("shutdown_reason", uint8),
-    ("current_memkb",   uint64),
-    ("shared_memkb", uint64),
-    ("max_memkb",   uint64),
+    # LIBXL_SHUTDOWN_REASON_* constant.
+    ("shutdown_reason", libxl_shutdown_reason),
+    ("current_memkb",   MemKB),
+    ("shared_memkb", MemKB),
+    ("max_memkb",   MemKB),
     ("cpu_time",    uint64),
     ("vcpu_max_id", uint32),
     ("vcpu_online", uint32),
     ("cpupool",     uint32),
-    ], dispose_fn=None)
+    ], dir=DIR_OUT)
 
 libxl_cpupoolinfo = Struct("cpupoolinfo", [
     ("poolid",      uint32),
-    ("sched_id",    uint32),
+    ("sched",       libxl_scheduler),
     ("n_dom",       uint32),
     ("cpumap",      libxl_cpumap)
-    ])
+    ], dir=DIR_OUT)
 
 libxl_vminfo = Struct("vminfo", [
     ("uuid", libxl_uuid),
     ("domid", libxl_domid),
-    ], dispose_fn=None)
+    ], dir=DIR_OUT)
 
 libxl_version_info = Struct("version_info", [
     ("xen_version_major", integer),
@@ -187,19 +207,21 @@ libxl_version_info = Struct("version_info", [
     ("virt_start",        uint64),
     ("pagesize",          integer),
     ("commandline",       string),
-    ])
+    ], dir=DIR_OUT)
 
 libxl_domain_create_info = Struct("domain_create_info",[
     ("type",         libxl_domain_type),
-    ("hap",          bool),
-    ("oos",          bool),
+    ("hap",          libxl_defbool),
+    ("oos",          libxl_defbool),
     ("ssidref",      uint32),
     ("name",         string),
     ("uuid",         libxl_uuid),
     ("xsdata",       libxl_key_value_list),
     ("platformdata", libxl_key_value_list),
     ("poolid",       uint32),
-    ])
+    ], dir=DIR_IN)
+
+MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT")
 
 # Instances of libxl_file_reference contained in this struct which
 # have been mapped (with libxl_file_reference_map) will be unmapped
@@ -211,17 +233,16 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("cur_vcpus",       integer),
     ("cpumap",          libxl_cpumap),
     ("tsc_mode",        libxl_tsc_mode),
-    ("max_memkb",       uint32),
-    ("target_memkb",    uint32),
-    ("video_memkb",     uint32),
-    ("shadow_memkb",    uint32),
-    ("disable_migrate", bool),
+    ("max_memkb",       MemKB),
+    ("target_memkb",    MemKB),
+    ("video_memkb",     MemKB),
+    ("shadow_memkb",    MemKB),
+    ("disable_migrate", libxl_defbool),
     ("cpuid",           libxl_cpuid_policy_list),
-    ("type",            libxl_domain_type),
     
     ("device_model_version", libxl_device_model_version),
-    ("device_model_stubdomain", bool),
-    # you set device_model you must set device_model_version too
+    ("device_model_stubdomain", libxl_defbool),
+    # if you set device_model you must set device_model_version too
     ("device_model",     string),
     ("device_model_ssidref", uint32),
 
@@ -233,53 +254,53 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("extra_hvm",        libxl_string_list),
 
     ("u", KeyedUnion(None, libxl_domain_type, "type",
-                [("hvm", Struct(None, [("firmware", string),
-                                       ("bios", libxl_bios_type),
-                                       ("pae", bool),
-                                       ("apic", bool),
-                                       ("acpi", bool),
-                                       ("acpi_s3", bool),
-                                       ("acpi_s4", bool),
-                                       ("nx", bool),
-                                       ("viridian", bool),
-                                       ("timeoffset", string),
-                                       ("hpet", bool),
-                                       ("vpt_align", bool),
-                                       ("timer_mode", libxl_timer_mode),
-                                       ("nested_hvm", bool),
-                                       ("no_incr_generationid", bool),
-                                       ("nographic",        bool),
-                                       ("stdvga",           bool),
+                [("hvm", Struct(None, [("firmware",         string),
+                                       ("bios",             libxl_bios_type),
+                                       ("pae",              libxl_defbool),
+                                       ("apic",             libxl_defbool),
+                                       ("acpi",             libxl_defbool),
+                                       ("acpi_s3",          libxl_defbool),
+                                       ("acpi_s4",          libxl_defbool),
+                                       ("nx",               libxl_defbool),
+                                       ("viridian",         libxl_defbool),
+                                       ("timeoffset",       string),
+                                       ("hpet",             libxl_defbool),
+                                       ("vpt_align",        libxl_defbool),
+                                       ("timer_mode",       libxl_timer_mode),
+                                       ("nested_hvm",       libxl_defbool),
+                                       ("incr_generationid",libxl_defbool),
+                                       ("nographic",        libxl_defbool),
+                                       ("stdvga",           libxl_defbool),
                                        ("vnc",              libxl_vnc_info),
                                        # keyboard layout, default is en-us keyboard
                                        ("keymap",           string),
                                        ("sdl",              libxl_sdl_info),
                                        ("spice",            libxl_spice_info),
                                        
-                                       ("gfx_passthru",     bool),
+                                       ("gfx_passthru",     libxl_defbool),
                                        
                                        ("serial",           string),
                                        ("boot",             string),
-                                       ("usb",              bool),
+                                       ("usb",              libxl_defbool),
                                        # usbdevice:
                                        # - "tablet" for absolute mouse,
                                        # - "mouse" for PS/2 protocol relative mouse
                                        ("usbdevice",        string),
                                        ("soundhw",          string),
-                                       ("xen_platform_pci", bool),
+                                       ("xen_platform_pci", libxl_defbool),
                                        ])),
                  ("pv", Struct(None, [("kernel", libxl_file_reference),
-                                      ("slack_memkb", uint32),
+                                      ("slack_memkb", MemKB),
                                       ("bootloader", string),
                                       ("bootloader_args", libxl_string_list),
                                       ("cmdline", string),
                                       ("ramdisk", libxl_file_reference),
                                       ("features", string, {'const': True}),
                                       # Use host's E820 for PCI passthrough.
-                                      ("e820_host", bool),
+                                      ("e820_host", libxl_defbool),
                                       ])),
-                 ])),
-    ],
+                 ], keyvar_init_val = "-1")),
+    ], dir=DIR_IN
 )
 
 libxl_device_vfb = Struct("device_vfb", [
@@ -294,13 +315,6 @@ libxl_device_vfb = Struct("device_vfb", [
 libxl_device_vkb = Struct("device_vkb", [
     ("backend_domid", libxl_domid),
     ("devid", integer),
-    ])
-
-libxl_device_console = Struct("device_console", [
-    ("backend_domid", libxl_domid),
-    ("devid", integer),
-    ("consback", libxl_console_backend),
-    ("output", string),
     ])
 
 libxl_device_disk = Struct("device_disk", [
@@ -348,7 +362,7 @@ libxl_diskinfo = Struct("diskinfo", [
     ("state", integer),
     ("evtch", integer),
     ("rref", integer),
-    ])
+    ], dir=DIR_OUT)
 
 libxl_nicinfo = Struct("nicinfo", [
     ("backend", string),
@@ -360,7 +374,7 @@ libxl_nicinfo = Struct("nicinfo", [
     ("evtch", integer),
     ("rref_tx", integer),
     ("rref_rx", integer),
-    ])
+    ], dir=DIR_OUT)
 
 libxl_vcpuinfo = Struct("vcpuinfo", [
     ("vcpuid", uint32),
@@ -370,7 +384,7 @@ libxl_vcpuinfo = Struct("vcpuinfo", [
     ("running", bool),
     ("vcpu_time", uint64), # total vcpu time ran (ns)
     ("cpumap", libxl_cpumap), # current cpu's affinities
-    ])
+    ], dir=DIR_OUT)
 
 libxl_physinfo = Struct("physinfo", [
     ("threads_per_core", uint32),
@@ -388,23 +402,25 @@ libxl_physinfo = Struct("physinfo", [
 
     ("nr_nodes", uint32),
     ("hw_cap", libxl_hwcap),
-    ("phys_cap", uint32),
-    ], dispose_fn=None, dir=DIR_OUT)
+
+    ("cap_hvm", bool),
+    ("cap_hvm_directio", bool),
+    ], dir=DIR_OUT)
 
 libxl_cputopology = Struct("cputopology", [
     ("core", uint32),
     ("socket", uint32),
     ("node", uint32),
-    ])
+    ], dir=DIR_OUT)
 
 libxl_sched_credit_domain = Struct("sched_credit_domain", [
     ("weight", integer),
     ("cap", integer),
-    ], dispose_fn=None)
+    ])
 
 libxl_sched_credit2_domain = Struct("sched_credit2_domain", [
     ("weight", integer),
-    ], dispose_fn=None)
+    ])
 
 libxl_sched_sedf_domain = Struct("sched_sedf_domain", [
     ("period", integer),
@@ -412,7 +428,7 @@ libxl_sched_sedf_domain = Struct("sched_sedf_domain", [
     ("latency", integer),
     ("extratime", integer),
     ("weight", integer),
-    ], dispose_fn=None)
+    ])
 
 libxl_event_type = Enumeration("event_type", [
     (1, "DOMAIN_SHUTDOWN"),
@@ -432,7 +448,6 @@ libxl_event = Struct("event",[
     ("domid",    libxl_domid),
     ("domuuid",  libxl_uuid),
     ("for_user", libxl_ev_user),
-    ("type",     libxl_event_type),
     ("u", KeyedUnion(None, libxl_event_type, "type",
           [("domain_shutdown", Struct(None, [
                                              ("shutdown_reason", uint8),

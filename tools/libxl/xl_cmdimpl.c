@@ -144,7 +144,6 @@ static int qualifier_to_id(const char *p, uint32_t *id_r)
 static int domain_qualifier_to_domid(const char *p, uint32_t *domid_r,
                                      int *was_name_r)
 {
-    libxl_dominfo dominfo;
     int was_name, rc;
 
     was_name = qualifier_to_id(p, domid_r);
@@ -156,7 +155,7 @@ static int domain_qualifier_to_domid(const char *p, uint32_t *domid_r,
         if (rc)
             return rc;
     } else {
-        rc = libxl_domain_info(ctx, &dominfo, *domid_r);
+        rc = libxl_domain_info(ctx, NULL, *domid_r);
         /* error only if domain does not exist */
         if (rc == ERROR_INVAL)
             return rc;
@@ -383,7 +382,7 @@ static void parse_disk_config_multistring(XLU_Config **config,
 {
     int e;
 
-    libxl_device_disk_init(ctx, disk);
+    libxl_device_disk_init(disk);
 
     if (!*config) {
         *config = xlu_cfg_init(stderr, "command line");
@@ -536,8 +535,7 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
     }
 
-    if (libxl_init_create_info(ctx, c_info))
-        exit(1);
+    libxl_domain_create_info_init(c_info);
 
     if (!xlu_cfg_get_string (config, "seclabel", &buf, 0)) {
         e = libxl_flask_context_to_sid(ctx, (char *)buf, strlen(buf),
@@ -557,8 +555,7 @@ static void parse_config_data(const char *configfile_filename_report,
         !strncmp(buf, "hvm", strlen(buf)))
         c_info->type = LIBXL_DOMAIN_TYPE_HVM;
 
-    if (!xlu_cfg_get_long (config, "hap", &l, 0))
-        c_info->hap = l;
+    xlu_cfg_get_defbool(config, "hap", &c_info->hap, 0);
 
     if (xlu_cfg_replace_string (config, "name", &c_info->name, 0)) {
         fprintf(stderr, "Domain name must be specified.\n");
@@ -574,8 +571,7 @@ static void parse_config_data(const char *configfile_filename_report,
         libxl_uuid_generate(&c_info->uuid);
     }
 
-    if (!xlu_cfg_get_long(config, "oos", &l, 0))
-        c_info->oos = l;
+    xlu_cfg_get_defbool(config, "oos", &c_info->oos, 0);
 
     if (!xlu_cfg_get_string (config, "pool", &buf, 0)) {
         c_info->poolid = -1;
@@ -586,8 +582,8 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
     }
 
-    if (libxl_init_build_info(ctx, b_info, c_info))
-        exit(1);
+    libxl_domain_build_info_init(b_info);
+    libxl_domain_build_info_init_type(b_info, c_info->type);
 
     /* the following is the actual config parsing with overriding values in the structures */
     if (!xlu_cfg_get_long (config, "vcpus", &l, 0)) {
@@ -600,6 +596,11 @@ static void parse_config_data(const char *configfile_filename_report,
 
     if (!xlu_cfg_get_list (config, "cpus", &cpus, 0, 1)) {
         int i, n_cpus = 0;
+
+        if (libxl_cpumap_alloc(ctx, &b_info->cpumap)) {
+            fprintf(stderr, "Unable to allocate cpumap\n");
+            exit(1);
+        }
 
         libxl_cpumap_set_none(&b_info->cpumap);
         while ((buf = xlu_cfg_get_listitem(cpus, n_cpus)) != NULL) {
@@ -614,6 +615,11 @@ static void parse_config_data(const char *configfile_filename_report,
     }
     else if (!xlu_cfg_get_string (config, "cpus", &buf, 0)) {
         char *buf2 = strdup(buf);
+
+        if (libxl_cpumap_alloc(ctx, &b_info->cpumap)) {
+            fprintf(stderr, "Unable to allocate cpumap\n");
+            exit(1);
+        }
 
         libxl_cpumap_set_none(&b_info->cpumap);
         if (vcpupin_parse(buf2, &b_info->cpumap))
@@ -666,8 +672,7 @@ static void parse_config_data(const char *configfile_filename_report,
         : libxl_get_required_shadow_memory(b_info->max_memkb,
                                            b_info->max_vcpus);
 
-    if (!xlu_cfg_get_long (config, "nomigrate", &l, 0))
-        b_info->disable_migrate = l;
+    xlu_cfg_get_defbool(config, "nomigrate", &b_info->disable_migrate, 0);
 
     if (!xlu_cfg_get_long(config, "tsc_mode", &l, 1)) {
         const char *s = libxl_tsc_mode_to_string(l);
@@ -695,7 +700,7 @@ static void parse_config_data(const char *configfile_filename_report,
     if (!xlu_cfg_get_long (config, "videoram", &l, 0))
         b_info->video_memkb = l * 1024;
 
-    switch(c_info->type) {
+    switch(b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         if (!xlu_cfg_get_string (config, "kernel", &buf, 0))
             fprintf(stderr, "WARNING: ignoring \"kernel\" directive for HVM guest. "
@@ -709,24 +714,16 @@ static void parse_config_data(const char *configfile_filename_report,
                     buf);
                 exit (1);
         }
-        if (!xlu_cfg_get_long (config, "pae", &l, 0))
-            b_info->u.hvm.pae = l;
-        if (!xlu_cfg_get_long (config, "apic", &l, 0))
-            b_info->u.hvm.apic = l;
-        if (!xlu_cfg_get_long (config, "acpi", &l, 0))
-            b_info->u.hvm.acpi = l;
-        if (!xlu_cfg_get_long (config, "acpi_s3", &l, 0))
-            b_info->u.hvm.acpi_s3 = l;
-        if (!xlu_cfg_get_long (config, "acpi_s4", &l, 0))
-            b_info->u.hvm.acpi_s4 = l;
-        if (!xlu_cfg_get_long (config, "nx", &l, 0))
-            b_info->u.hvm.nx = l;
-        if (!xlu_cfg_get_long (config, "viridian", &l, 0))
-            b_info->u.hvm.viridian = l;
-        if (!xlu_cfg_get_long (config, "hpet", &l, 0))
-            b_info->u.hvm.hpet = l;
-        if (!xlu_cfg_get_long (config, "vpt_align", &l, 0))
-            b_info->u.hvm.vpt_align = l;
+
+        xlu_cfg_get_defbool(config, "pae", &b_info->u.hvm.pae, 0);
+        xlu_cfg_get_defbool(config, "apic", &b_info->u.hvm.apic, 0);
+        xlu_cfg_get_defbool(config, "acpi", &b_info->u.hvm.acpi, 0);
+        xlu_cfg_get_defbool(config, "acpi_s3", &b_info->u.hvm.acpi_s3, 0);
+        xlu_cfg_get_defbool(config, "acpi_s4", &b_info->u.hvm.acpi_s4, 0);
+        xlu_cfg_get_defbool(config, "nx", &b_info->u.hvm.nx, 0);
+        xlu_cfg_get_defbool(config, "viridian", &b_info->u.hvm.viridian, 0);
+        xlu_cfg_get_defbool(config, "hpet", &b_info->u.hvm.hpet, 0);
+        xlu_cfg_get_defbool(config, "vpt_align", &b_info->u.hvm.vpt_align, 0);
 
         if (!xlu_cfg_get_long(config, "timer_mode", &l, 1)) {
             const char *s = libxl_timer_mode_to_string(l);
@@ -751,8 +748,7 @@ static void parse_config_data(const char *configfile_filename_report,
             }
         }
 
-        if (!xlu_cfg_get_long (config, "nestedhvm", &l, 0))
-            b_info->u.hvm.nested_hvm = l;
+        xlu_cfg_get_defbool(config, "nestedhvm", &b_info->u.hvm.nested_hvm, 0);
         break;
     case LIBXL_DOMAIN_TYPE_PV:
     {
@@ -837,7 +833,7 @@ static void parse_config_data(const char *configfile_filename_report,
 
             d_config->vifs = (libxl_device_nic *) realloc(d_config->vifs, sizeof (libxl_device_nic) * (d_config->num_vifs+1));
             nic = d_config->vifs + d_config->num_vifs;
-            CHK_ERRNO( libxl_device_nic_init(ctx, nic) );
+            libxl_device_nic_init(nic);
             nic->devid = d_config->num_vifs;
 
             if (default_vifscript) {
@@ -933,12 +929,12 @@ skip:
 
             d_config->vfbs = (libxl_device_vfb *) realloc(d_config->vfbs, sizeof(libxl_device_vfb) * (d_config->num_vfbs + 1));
             vfb = d_config->vfbs + d_config->num_vfbs;
-            libxl_device_vfb_init(ctx, vfb);
+            libxl_device_vfb_init(vfb);
             vfb->devid = d_config->num_vfbs;
 
             d_config->vkbs = (libxl_device_vkb *) realloc(d_config->vkbs, sizeof(libxl_device_vkb) * (d_config->num_vkbs + 1));
             vkb = d_config->vkbs + d_config->num_vkbs;
-            libxl_device_vkb_init(ctx, vkb);
+            libxl_device_vkb_init(vkb);
             vkb->devid = d_config->num_vkbs;
 
             p = strtok(buf2, ",");
@@ -951,7 +947,7 @@ skip:
                     break;
                 *p2 = '\0';
                 if (!strcmp(p, "vnc")) {
-                    vfb->vnc.enable = atoi(p2 + 1);
+                    libxl_defbool_set(&vfb->vnc.enable, atoi(p2 + 1));
                 } else if (!strcmp(p, "vnclisten")) {
                     free(vfb->vnc.listen);
                     vfb->vnc.listen = strdup(p2 + 1);
@@ -961,14 +957,14 @@ skip:
                 } else if (!strcmp(p, "vncdisplay")) {
                     vfb->vnc.display = atoi(p2 + 1);
                 } else if (!strcmp(p, "vncunused")) {
-                    vfb->vnc.findunused = atoi(p2 + 1);
+                    libxl_defbool_set(&vfb->vnc.findunused, atoi(p2 + 1));
                 } else if (!strcmp(p, "keymap")) {
                     free(vfb->keymap);
                     vfb->keymap = strdup(p2 + 1);
                 } else if (!strcmp(p, "sdl")) {
-                    vfb->sdl.enable = atoi(p2 + 1);
+                    libxl_defbool_set(&vfb->sdl.enable, atoi(p2 + 1));
                 } else if (!strcmp(p, "opengl")) {
-                    vfb->sdl.opengl = atoi(p2 + 1);
+                    libxl_defbool_set(&vfb->sdl.opengl, atoi(p2 + 1));
                 } else if (!strcmp(p, "display")) {
                     free(vfb->sdl.display);
                     vfb->sdl.display = strdup(p2 + 1);
@@ -992,19 +988,10 @@ skip_vfb:
 
     /* To be reworked (automatically enabled) once the auto ballooning
      * after guest starts is done (with PCI devices passed in). */
-    if (!xlu_cfg_get_long (config, "e820_host", &l, 0)) {
-        switch (c_info->type) {
-        case LIBXL_DOMAIN_TYPE_HVM:
-            fprintf(stderr, "Can't do e820_host in HVM mode!");
-            break;
-        case LIBXL_DOMAIN_TYPE_PV:
-            if (l)
-                b_info->u.pv.e820_host = true;
-            break;
-        default:
-            abort();
-        }
+    if (c_info->type == LIBXL_DOMAIN_TYPE_PV) {
+        xlu_cfg_get_defbool(config, "e820_host", &b_info->u.pv.e820_host, 0);
     }
+
     if (!xlu_cfg_get_list (config, "pci", &pcis, 0, 0)) {
         int i;
         d_config->num_pcidevs = 0;
@@ -1014,7 +1001,7 @@ skip_vfb:
 
             d_config->pcidevs = (libxl_device_pci *) realloc(d_config->pcidevs, sizeof (libxl_device_pci) * (d_config->num_pcidevs + 1));
             pcidev = d_config->pcidevs + d_config->num_pcidevs;
-            memset(pcidev, 0x00, sizeof(libxl_device_pci));
+            libxl_device_pci_init(pcidev);
 
             pcidev->msitranslate = pci_msitranslate;
             pcidev->power_mgmt = pci_power_mgmt;
@@ -1022,7 +1009,7 @@ skip_vfb:
                 d_config->num_pcidevs++;
         }
         if (d_config->num_pcidevs && c_info->type == LIBXL_DOMAIN_TYPE_PV)
-            b_info->u.pv.e820_host = true;
+            libxl_defbool_set(&b_info->u.pv.e820_host, true);
     }
 
     switch (xlu_cfg_get_list(config, "cpuid", &cpuids, 0, 1)) {
@@ -1139,8 +1126,8 @@ skip_vfb:
         }
     } else if (b_info->device_model)
         fprintf(stderr, "WARNING: device model override given without specific DM version\n");
-    if (!xlu_cfg_get_long (config, "device_model_stubdomain_override", &l, 0))
-        b_info->device_model_stubdomain = l;
+    xlu_cfg_get_defbool (config, "device_model_stubdomain_override",
+                         &b_info->device_model_stubdomain, 0);
 
     if (!xlu_cfg_get_string (config, "device_model_stubdomain_seclabel",
                              &buf, 0)) {
@@ -1177,49 +1164,43 @@ skip_vfb:
 #undef parse_extra_args
 
     if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        if (!xlu_cfg_get_long (config, "stdvga", &l, 0))
-            b_info->u.hvm.stdvga = l;
-        if (!xlu_cfg_get_long (config, "vnc", &l, 0))
-            b_info->u.hvm.vnc.enable = l;
-        xlu_cfg_replace_string (config, "vnclisten", &b_info->u.hvm.vnc.listen, 0);
-        xlu_cfg_replace_string (config, "vncpasswd", &b_info->u.hvm.vnc.passwd, 0);
+        xlu_cfg_get_defbool(config, "stdvga", &b_info->u.hvm.stdvga, 0);
+        xlu_cfg_get_defbool(config, "vnc", &b_info->u.hvm.vnc.enable, 0);
+        xlu_cfg_replace_string (config, "vnclisten",
+                                &b_info->u.hvm.vnc.listen, 0);
+        xlu_cfg_replace_string (config, "vncpasswd",
+                                &b_info->u.hvm.vnc.passwd, 0);
         if (!xlu_cfg_get_long (config, "vncdisplay", &l, 0))
             b_info->u.hvm.vnc.display = l;
-        if (!xlu_cfg_get_long (config, "vncunused", &l, 0))
-            b_info->u.hvm.vnc.findunused = l;
+        xlu_cfg_get_defbool(config, "vncunused",
+                            &b_info->u.hvm.vnc.findunused, 0);
         xlu_cfg_replace_string (config, "keymap", &b_info->u.hvm.keymap, 0);
-        if (!xlu_cfg_get_long (config, "sdl", &l, 0))
-            b_info->u.hvm.sdl.enable = l;
-        if (!xlu_cfg_get_long (config, "opengl", &l, 0))
-            b_info->u.hvm.sdl.opengl = l;
-        if (!xlu_cfg_get_long (config, "spice", &l, 0))
-            b_info->u.hvm.spice.enable = l;
+        xlu_cfg_get_defbool(config, "sdl", &b_info->u.hvm.sdl.enable, 0);
+        xlu_cfg_get_defbool(config, "opengl", &b_info->u.hvm.sdl.opengl, 0);
+        xlu_cfg_get_defbool (config, "spice", &b_info->u.hvm.spice.enable, 0);
         if (!xlu_cfg_get_long (config, "spiceport", &l, 0))
             b_info->u.hvm.spice.port = l;
         if (!xlu_cfg_get_long (config, "spicetls_port", &l, 0))
             b_info->u.hvm.spice.tls_port = l;
         xlu_cfg_replace_string (config, "spicehost",
                                 &b_info->u.hvm.spice.host, 0);
-        if (!xlu_cfg_get_long (config, "spicedisable_ticketing", &l, 0))
-            b_info->u.hvm.spice.disable_ticketing = l;
+        xlu_cfg_get_defbool(config, "spicedisable_ticketing",
+                            &b_info->u.hvm.spice.disable_ticketing, 0);
         xlu_cfg_replace_string (config, "spicepasswd",
                                 &b_info->u.hvm.spice.passwd, 0);
-        if (!xlu_cfg_get_long (config, "spiceagent_mouse", &l, 0))
-            b_info->u.hvm.spice.agent_mouse = l;
-        else
-            b_info->u.hvm.spice.agent_mouse = 1;
-        if (!xlu_cfg_get_long (config, "nographic", &l, 0))
-            b_info->u.hvm.nographic = l;
-        if (!xlu_cfg_get_long (config, "gfx_passthru", &l, 0))
-            b_info->u.hvm.gfx_passthru = l;
+        xlu_cfg_get_defbool(config, "spiceagent_mouse",
+                            &b_info->u.hvm.spice.agent_mouse, 0);
+        xlu_cfg_get_defbool(config, "nographic", &b_info->u.hvm.nographic, 0);
+        xlu_cfg_get_defbool(config, "gfx_passthru", 
+                            &b_info->u.hvm.gfx_passthru, 0);
         xlu_cfg_replace_string (config, "serial", &b_info->u.hvm.serial, 0);
         xlu_cfg_replace_string (config, "boot", &b_info->u.hvm.boot, 0);
-        if (!xlu_cfg_get_long (config, "usb", &l, 0))
-            b_info->u.hvm.usb = l;
-        xlu_cfg_replace_string (config, "usbdevice", &b_info->u.hvm.usbdevice, 0);
+        xlu_cfg_get_defbool(config, "usb", &b_info->u.hvm.usb, 0);
+        xlu_cfg_replace_string (config, "usbdevice",
+                                &b_info->u.hvm.usbdevice, 0);
         xlu_cfg_replace_string (config, "soundhw", &b_info->u.hvm.soundhw, 0);
-        if (!xlu_cfg_get_long (config, "xen_platform_pci", &l, 0))
-            b_info->u.hvm.xen_platform_pci = l;
+        xlu_cfg_get_defbool(config, "xen_platform_pci",
+                            &b_info->u.hvm.xen_platform_pci, 0);
     }
 
     xlu_cfg_destroy(config);
@@ -1235,19 +1216,19 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid,
     libxl_action_on_shutdown action;
 
     switch (event->u.domain_shutdown.shutdown_reason) {
-    case SHUTDOWN_poweroff:
+    case LIBXL_SHUTDOWN_REASON_POWEROFF:
         action = d_config->on_poweroff;
         break;
-    case SHUTDOWN_reboot:
+    case LIBXL_SHUTDOWN_REASON_REBOOT:
         action = d_config->on_reboot;
         break;
-    case SHUTDOWN_suspend:
+    case LIBXL_SHUTDOWN_REASON_SUSPEND:
         LOG("Domain has suspended.");
         return 0;
-    case SHUTDOWN_crash:
+    case LIBXL_SHUTDOWN_REASON_CRASH:
         action = d_config->on_crash;
         break;
-    case SHUTDOWN_watchdog:
+    case LIBXL_SHUTDOWN_REASON_WATCHDOG:
         action = d_config->on_watchdog;
         break;
     default:
@@ -1371,7 +1352,7 @@ struct domain_create {
     const char *restore_file;
     int migrate_fd; /* -1 means none */
     char **migration_domname_r; /* from malloc */
-    int no_incr_generationid;
+    int incr_generationid;
 };
 
 static int freemem(libxl_domain_build_info *b_info)
@@ -1622,8 +1603,8 @@ static int create_domain(struct domain_create *dom_info)
     }
 
     if (d_config.c_info.type == LIBXL_DOMAIN_TYPE_HVM)
-        d_config.b_info.u.hvm.no_incr_generationid =
-            dom_info->no_incr_generationid;
+        libxl_defbool_set(&d_config.b_info.u.hvm.incr_generationid,
+                          dom_info->incr_generationid);
 
     if (debug || dom_info->dryrun)
         printf_info(default_output_format, -1, &d_config);
@@ -2505,7 +2486,7 @@ static void list_vm(void)
             info[i].domid, domname);
         free(domname);
     }
-    free(info);
+    libxl_vminfo_list_free(info, nb_vm);
 }
 
 static void save_domain_core_begin(const char *domain_spec,
@@ -2898,7 +2879,7 @@ static void migrate_receive(int debug, int daemonize, int monitor)
     dom_info.restore_file = "incoming migration stream";
     dom_info.migrate_fd = 0; /* stdin */
     dom_info.migration_domname_r = &migration_domname;
-    dom_info.no_incr_generationid = 1;
+    dom_info.incr_generationid = 0;
 
     rc = create_domain(&dom_info);
     if (rc < 0) {
@@ -3023,6 +3004,7 @@ int main_restore(int argc, char **argv)
     dom_info.restore_file = checkpoint_file;
     dom_info.migrate_fd = -1;
     dom_info.console_autoconnect = console_autoconnect;
+    dom_info.incr_generationid = 1;
 
     rc = create_domain(&dom_info);
     if (rc < 0)
@@ -3302,7 +3284,10 @@ int main_list(int argc, char **argv)
     else
         list_domains(verbose, context, info, nb_domain);
 
-    free(info_free);
+    if (info_free)
+        libxl_dominfo_list_free(info, nb_domain);
+    else
+        libxl_dominfo_dispose(info);
 
     return 0;
 }
@@ -3405,6 +3390,7 @@ int main_create(int argc, char **argv)
     dom_info.extra_config = extra_config;
     dom_info.migrate_fd = -1;
     dom_info.console_autoconnect = console_autoconnect;
+    dom_info.incr_generationid = 0;
 
     rc = create_domain(&dom_info);
     if (rc < 0)
@@ -3565,8 +3551,7 @@ static void vcpulist(int argc, char **argv)
         for (i = 0; i<nb_domain; i++)
             print_domain_vcpuinfo(dominfo[i].domid, physinfo.nr_cpus);
 
-        free(dominfo);
-
+        libxl_dominfo_list_free(dominfo, nb_domain);
     } else {
         for (; argc > 0; ++argv, --argc) {
             if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
@@ -3578,7 +3563,7 @@ static void vcpulist(int argc, char **argv)
         }
     }
   vcpulist_out:
-    ;
+    libxl_physinfo_dispose(&physinfo);
 }
 
 int main_vcpulist(int argc, char **argv)
@@ -3693,15 +3678,15 @@ int main_vcpuset(int argc, char **argv)
 static void output_xeninfo(void)
 {
     const libxl_version_info *info;
-    int sched_id;
+    libxl_scheduler sched;
 
     if (!(info = libxl_get_version_info(ctx))) {
         fprintf(stderr, "libxl_get_version_info failed.\n");
         return;
     }
 
-    if ((sched_id = libxl_get_sched_id(ctx)) < 0) {
-        fprintf(stderr, "get_sched_id sysctl failed.\n");
+    if ((sched = libxl_get_scheduler(ctx)) < 0) {
+        fprintf(stderr, "get_scheduler sysctl failed.\n");
         return;
     }
 
@@ -3709,7 +3694,7 @@ static void output_xeninfo(void)
     printf("xen_minor              : %d\n", info->xen_version_minor);
     printf("xen_extra              : %s\n", info->xen_version_extra);
     printf("xen_caps               : %s\n", info->capabilities);
-    printf("xen_scheduler          : %s\n", libxl_schedid_to_name(ctx, sched_id));
+    printf("xen_scheduler          : %s\n", libxl_scheduler_to_string(sched));
     printf("xen_pagesize           : %u\n", info->pagesize);
     printf("platform_params        : virt_start=0x%"PRIx64"\n", info->virt_start);
     printf("xen_changeset          : %s\n", info->changeset);
@@ -3757,9 +3742,9 @@ static void output_physinfo(void)
     for (i = 0; i < 8; i++)
         printf("%08x%c", info.hw_cap[i], i < 7 ? ':' : '\n');
     printf("virt_caps              :");
-    if (info.phys_cap & XEN_SYSCTL_PHYSCAP_hvm)
+    if (info.cap_hvm)
         printf(" hvm");
-    if (info.phys_cap & XEN_SYSCTL_PHYSCAP_hvm_directio)
+    if (info.cap_hvm_directio)
         printf(" hvm_directio");
     printf("\n");
     vinfo = libxl_get_version_info(ctx);
@@ -3778,6 +3763,7 @@ static void output_physinfo(void)
         free(cpumap.map);
     }
 
+    libxl_physinfo_dispose(&info);
     return;
 }
 
@@ -3912,7 +3898,9 @@ int main_sharing(int argc, char **argv)
     sharing(info, nb_domain);
 
     if (info_free)
-        free(info_free);
+        libxl_dominfo_list_free(info_free, nb_domain);
+    else
+        libxl_dominfo_dispose(info);
 
     return 0;
 }
@@ -3934,6 +3922,7 @@ static int sched_credit_domain_set(
 {
     int rc;
 
+    
     rc = libxl_sched_credit_domain_set(ctx, domid, scinfo);
     if (rc)
         fprintf(stderr, "libxl_sched_credit_domain_set failed.\n");
@@ -3962,6 +3951,7 @@ static int sched_credit_domain_output(
         scinfo.weight,
         scinfo.cap);
     free(domname);
+    libxl_sched_credit_domain_dispose(&scinfo);
     return 0;
 }
 
@@ -4009,6 +3999,7 @@ static int sched_credit2_domain_output(
         domid,
         scinfo.weight);
     free(domname);
+    libxl_sched_credit2_domain_dispose(&scinfo);
     return 0;
 }
 
@@ -4032,7 +4023,6 @@ static int sched_sedf_domain_set(
     rc = libxl_sched_sedf_domain_set(ctx, domid, scinfo);
     if (rc)
         fprintf(stderr, "libxl_sched_sedf_domain_set failed.\n");
-
     return rc;
 }
 
@@ -4061,11 +4051,12 @@ static int sched_sedf_domain_output(
         scinfo.extratime,
         scinfo.weight);
     free(domname);
+    libxl_sched_sedf_domain_dispose(&scinfo);
     return 0;
 }
 
 static int sched_domain_output(
-    uint32_t sched, int (*output)(int), const char *cpupool)
+    libxl_scheduler sched, int (*output)(int), const char *cpupool)
 {
     libxl_dominfo *info;
     libxl_cpupoolinfo *poolinfo = NULL;
@@ -4094,7 +4085,7 @@ static int sched_domain_output(
     }
 
     for (p = 0; !rc && (p < n_pools); p++) {
-        if ((poolinfo[p].sched_id != sched) ||
+        if ((poolinfo[p].sched != sched) ||
             (cpupool && (poolid != poolinfo[p].poolid)))
             continue;
 
@@ -4175,7 +4166,7 @@ int main_sched_credit(int argc, char **argv)
     }
 
     if (!dom) { /* list all domain's credit scheduler info */
-        return -sched_domain_output(XEN_SCHEDULER_CREDIT,
+        return -sched_domain_output(LIBXL_SCHEDULER_CREDIT,
                                     sched_credit_domain_output, cpupool);
     } else {
         find_domain(dom);
@@ -4193,6 +4184,7 @@ int main_sched_credit(int argc, char **argv)
             if (opt_c)
                 scinfo.cap = cap;
             rc = sched_credit_domain_set(domid, &scinfo);
+            libxl_sched_credit_domain_dispose(&scinfo);
             if (rc)
                 return -rc;
         }
@@ -4251,7 +4243,7 @@ int main_sched_credit2(int argc, char **argv)
     }
 
     if (!dom) { /* list all domain's credit scheduler info */
-        return -sched_domain_output(XEN_SCHEDULER_CREDIT2,
+        return -sched_domain_output(LIBXL_SCHEDULER_CREDIT2,
                                     sched_credit2_domain_output, cpupool);
     } else {
         find_domain(dom);
@@ -4267,6 +4259,7 @@ int main_sched_credit2(int argc, char **argv)
             if (opt_w)
                 scinfo.weight = weight;
             rc = sched_credit2_domain_set(domid, &scinfo);
+            libxl_sched_credit2_domain_dispose(&scinfo);
             if (rc)
                 return -rc;
         }
@@ -4353,7 +4346,7 @@ int main_sched_sedf(int argc, char **argv)
     }
 
     if (!dom) { /* list all domain's credit scheduler info */
-        return -sched_domain_output(XEN_SCHEDULER_SEDF,
+        return -sched_domain_output(LIBXL_SCHEDULER_SEDF,
                                     sched_sedf_domain_output, cpupool);
     } else {
         find_domain(dom);
@@ -4385,6 +4378,7 @@ int main_sched_sedf(int argc, char **argv)
                 scinfo.slice = 0;
             }
             rc = sched_sedf_domain_set(domid, &scinfo);
+            libxl_sched_sedf_domain_dispose(&scinfo);
             if (rc)
                 return -rc;
         }
@@ -4602,7 +4596,7 @@ int main_networkattach(int argc, char **argv)
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
-    libxl_device_nic_init(ctx, &nic);
+    libxl_device_nic_init(&nic);
     for (argv += optind+1, argc -= optind+1; argc > 0; ++argv, --argc) {
         if (MATCH_OPTION("type", *argv, oparg)) {
             if (!strcmp("vif", oparg)) {
@@ -4968,6 +4962,7 @@ static void print_uptime(int short_mode, uint32_t doms[], int nb_doms)
         info = libxl_list_vm(ctx, &nb_vm);
         for (i = 0; i < nb_vm; i++)
             print_domU_uptime(info[i].domid, short_mode, now);
+        libxl_vminfo_list_free(info, nb_vm);
     } else {
         for (i = 0; i < nb_doms; i++) {
             if (doms[i] == 0)
@@ -5292,9 +5287,8 @@ int main_cpupoolcreate(int argc, char **argv)
     XLU_Config *config;
     const char *buf;
     const char *name;
-    const char *sched;
     uint32_t poolid;
-    int schedid = -1;
+    libxl_scheduler sched = 0;
     XLU_ConfigList *cpus;
     XLU_ConfigList *nodes;
     int n_cpus, n_nodes, i, n;
@@ -5389,17 +5383,16 @@ int main_cpupoolcreate(int argc, char **argv)
     }
 
     if (!xlu_cfg_get_string (config, "sched", &buf, 0)) {
-        if ((schedid = libxl_name_to_schedid(ctx, buf)) < 0) {
+        if ((libxl_scheduler_from_string(buf, &sched)) < 0) {
             fprintf(stderr, "Unknown scheduler\n");
             return -ERROR_FAIL;
         }
     } else {
-        if ((schedid = libxl_get_sched_id(ctx)) < 0) {
-            fprintf(stderr, "get_sched_id sysctl failed.\n");
+        if ((sched = libxl_get_scheduler(ctx)) < 0) {
+            fprintf(stderr, "get_scheduler sysctl failed.\n");
             return -ERROR_FAIL;
         }
     }
-    sched = libxl_schedid_to_name(ctx, schedid);
 
     if (libxl_get_freecpus(ctx, &freemap)) {
         fprintf(stderr, "libxl_get_freecpus failed\n");
@@ -5467,14 +5460,14 @@ int main_cpupoolcreate(int argc, char **argv)
 
     printf("Using config file \"%s\"\n", filename);
     printf("cpupool name:   %s\n", name);
-    printf("scheduler:      %s\n", sched);
+    printf("scheduler:      %s\n", libxl_scheduler_to_string(sched));
     printf("number of cpus: %d\n", n_cpus);
 
     if (dryrun_only)
         return 0;
 
     poolid = 0;
-    if (libxl_cpupool_create(ctx, name, schedid, cpumap, &uuid, &poolid)) {
+    if (libxl_cpupool_create(ctx, name, sched, cpumap, &uuid, &poolid)) {
         fprintf(stderr, "error on creating cpupool\n");
         return -ERROR_FAIL;
     }
@@ -5559,7 +5552,7 @@ int main_cpupoollist(int argc, char **argv)
                     }
                 if (!opt_cpus) {
                     printf("%3d %9s       y       %4d", n,
-                           libxl_schedid_to_name(ctx, poolinfo[p].sched_id),
+                           libxl_scheduler_to_string(poolinfo[p].sched),
                            poolinfo[p].n_dom);
                 }
                 printf("\n");
@@ -5744,7 +5737,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
     int c;
     int n;
     uint32_t poolid;
-    int schedid;
+    libxl_scheduler sched;
     int n_pools;
     int node;
     int n_cpus;
@@ -5765,7 +5758,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
         return -ERROR_NOMEM;
     }
     poolid = poolinfo[0].poolid;
-    schedid = poolinfo[0].sched_id;
+    sched = poolinfo[0].sched;
     for (p = 0; p < n_pools; p++) {
         libxl_cpupoolinfo_dispose(poolinfo + p);
     }
@@ -5845,7 +5838,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
         snprintf(name, 15, "Pool-node%d", node);
         libxl_uuid_generate(&uuid);
         poolid = 0;
-        ret = -libxl_cpupool_create(ctx, name, schedid, cpumap, &uuid, &poolid);
+        ret = -libxl_cpupool_create(ctx, name, sched, cpumap, &uuid, &poolid);
         if (ret) {
             fprintf(stderr, "error on creating cpupool\n");
             goto out;

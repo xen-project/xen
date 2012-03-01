@@ -88,7 +88,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
         abort();
     }
     xc_domain_set_tsc_info(ctx->xch, domid, tsc_mode, 0, 0, 0);
-    if ( info->disable_migrate )
+    if (libxl_defbool_val(info->disable_migrate))
         xc_domain_disable_migrate(ctx->xch, domid);
 
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
@@ -129,11 +129,12 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
 
     ents = libxl__calloc(gc, 12 + (info->max_vcpus * 2) + 2, sizeof(char *));
     ents[0] = "memory/static-max";
-    ents[1] = libxl__sprintf(gc, "%d", info->max_memkb);
+    ents[1] = libxl__sprintf(gc, "%"PRId64, info->max_memkb);
     ents[2] = "memory/target";
-    ents[3] = libxl__sprintf(gc, "%d", info->target_memkb - info->video_memkb);
+    ents[3] = libxl__sprintf(gc, "%"PRId64,
+                             info->target_memkb - info->video_memkb);
     ents[4] = "memory/videoram";
-    ents[5] = libxl__sprintf(gc, "%d", info->video_memkb);
+    ents[5] = libxl__sprintf(gc, "%"PRId64, info->video_memkb);
     ents[6] = "domid";
     ents[7] = libxl__sprintf(gc, "%d", domid);
     ents[8] = "store/port";
@@ -291,7 +292,7 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
         return -1;
 
     va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
-    va_hvm->apic_mode = info->u.hvm.apic;
+    va_hvm->apic_mode = libxl_defbool_val(info->u.hvm.apic);
     va_hvm->nr_vcpus = info->max_vcpus;
     memcpy(va_hvm->vcpu_online, &info->cur_vcpus, sizeof(info->cur_vcpus));
     for (i = 0, sum = 0; i < va_hvm->length; i++)
@@ -301,14 +302,19 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
 
     xc_get_hvm_param(handle, domid, HVM_PARAM_STORE_PFN, store_mfn);
     xc_get_hvm_param(handle, domid, HVM_PARAM_CONSOLE_PFN, console_mfn);
-    xc_set_hvm_param(handle, domid, HVM_PARAM_PAE_ENABLED, info->u.hvm.pae);
+    xc_set_hvm_param(handle, domid, HVM_PARAM_PAE_ENABLED,
+                     libxl_defbool_val(info->u.hvm.pae));
 #if defined(__i386__) || defined(__x86_64__)
-    xc_set_hvm_param(handle, domid, HVM_PARAM_VIRIDIAN, info->u.hvm.viridian);
-    xc_set_hvm_param(handle, domid, HVM_PARAM_HPET_ENABLED, (unsigned long) info->u.hvm.hpet);
+    xc_set_hvm_param(handle, domid, HVM_PARAM_VIRIDIAN,
+                     libxl_defbool_val(info->u.hvm.viridian));
+    xc_set_hvm_param(handle, domid, HVM_PARAM_HPET_ENABLED,
+                     libxl_defbool_val(info->u.hvm.hpet));
 #endif
     xc_set_hvm_param(handle, domid, HVM_PARAM_TIMER_MODE, timer_mode(info));
-    xc_set_hvm_param(handle, domid, HVM_PARAM_VPT_ALIGN, (unsigned long) info->u.hvm.vpt_align);
-    xc_set_hvm_param(handle, domid, HVM_PARAM_NESTEDHVM, info->u.hvm.nested_hvm);
+    xc_set_hvm_param(handle, domid, HVM_PARAM_VPT_ALIGN,
+                     libxl_defbool_val(info->u.hvm.vpt_align));
+    xc_set_hvm_param(handle, domid, HVM_PARAM_NESTEDHVM,
+                     libxl_defbool_val(info->u.hvm.nested_hvm));
     xc_set_hvm_param(handle, domid, HVM_PARAM_STORE_EVTCHN, store_evtchn);
     xc_set_hvm_param(handle, domid, HVM_PARAM_CONSOLE_EVTCHN, console_evtchn);
 
@@ -399,8 +405,8 @@ int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
     case LIBXL_DOMAIN_TYPE_HVM:
         hvm = 1;
         superpages = 1;
-        pae = info->u.hvm.pae;
-        no_incr_generationid = info->u.hvm.no_incr_generationid;
+        pae = libxl_defbool_val(info->u.hvm.pae);
+        no_incr_generationid = !libxl_defbool_val(info->u.hvm.incr_generationid);
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         hvm = 0;
