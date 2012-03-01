@@ -665,6 +665,19 @@ _hidden int libxl__device_destroy(libxl__gc *gc, libxl__device *dev);
 _hidden int libxl__devices_destroy(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state);
 
+/*
+ * For each aggregate type which can be used as an input we provide:
+ *
+ * int libxl__<type>_setdefault(gc, <type> *p):
+ *
+ *     Idempotently sets any members of "p" which is currently set to
+ *     a special value indicating that the defaults should be used
+ *     (per libxl_<type>_init) to a specific value.
+ *
+ *     All libxl API functions are expected to have arranged for this
+ *     to be called before using any values within these structures.
+ */
+
 /* Arranges that dev will be removed from its guest.  When
  * this is done, the ao will be completed.  An error
  * return from libxl__initiate_device_remove means that the ao

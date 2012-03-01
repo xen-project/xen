@@ -124,6 +124,50 @@
  * Therefore public functions which initialize a libxl__gc MUST call
  * libxl__free_all() before returning.
  */
+/*
+ * libxl types
+ *
+ * Most libxl types are defined by the libxl IDL (see
+ * libxl_types.idl). The library provides a common set of methods for
+ * initialising and freeing these types.
+ *
+ * void libxl_<type>_init(<type> *p):
+ *
+ *    Initialises the members of "p" to all defaults. These may either
+ *    be special value which indicates to the library that it should
+ *    select an appropriate default when using this field or actual
+ *    default values.
+ *
+ *    Some fields within a data type (e.g. unions) cannot be sensibly
+ *    initialised without further information. In these cases a
+ *    separate subfield initialisation function is provided (see
+ *    below).
+ *
+ *    An instance which has been initialised using this method can
+ *    always be safely passed to the dispose function (see
+ *    below). This is true even if the data type contains fields which
+ *    require a separate call to a subfield initialisation function.
+ *
+ *    This method is provided for any aggregate type which is used as
+ *    an input parameter.
+ *
+ * void libxl_<type>_init_<subfield>(<type> *p, subfield):
+ *
+ *    Initialise those parts of "p" which are not initialised by the
+ *    main init function due to the unknown value of "subfield". Sets
+ *    p->subfield as well as initialising any fields to their default
+ *    values.
+ *
+ *    p->subfield must not have been previously initialised.
+ *
+ *    This method is provided for any aggregate type.
+ *
+ * void libxl_<type>_dispose(instance *p):
+ *
+ *    Frees any dynamically allocated memory used by the members of
+ *    "p" but not the storage used by "p" itself (this allows for the
+ *    allocation of arrays of types and for the composition of types).
+ */
 #ifndef LIBXL_H
 #define LIBXL_H
 
@@ -405,8 +449,9 @@ void libxl_vminfo_list_free(libxl_vminfo *list, int nr);
  * additional data type libxl_device_<TYPE>_getinfo which contains
  * further runtime information about the device.
  *
- * A common set of methods are available for each device type. These
- * are described below.
+ * In addition to the general methods available for libxl types (see
+ * "libxl types" above) a common set of methods are available for each
+ * device type. These are described below.
  *
  * Querying
  * --------
@@ -423,10 +468,6 @@ void libxl_vminfo_list_free(libxl_vminfo *list, int nr);
  *
  * Creation / Control
  * ------------------
- *
- * libxl_device_<type>_init(ctx, device):
- *
- *    Initalises device to a default configuration.
  *
  * libxl_device_<type>_add(ctx, domid, device):
  *
