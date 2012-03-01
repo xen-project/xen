@@ -65,6 +65,7 @@ struct ring_buffer {
     unsigned long alloc_size;
     uint32_t tail;
     uint32_t head;
+    spinlock_t lock;    /* protect buffer pointers */
 };
 
 typedef struct iommu_cap {

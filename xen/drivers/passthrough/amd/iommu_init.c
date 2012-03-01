@@ -367,6 +367,8 @@ static int iommu_read_log(struct amd_iommu *iommu,
     u32 tail, head, *entry, tail_offest, head_offset;
 
     BUG_ON(!iommu || ((log != &iommu->event_log) && (log != &iommu->ppr_log)));
+    
+    spin_lock(&log->lock);
 
     /* make sure there's an entry in the log */
     tail_offest = ( log == &iommu->event_log ) ?
@@ -396,6 +398,8 @@ static int iommu_read_log(struct amd_iommu *iommu,
         writel(head, iommu->mmio_base + head_offset);
     }
 
+    spin_unlock(&log->lock);
+   
     return 0;
 }
 
@@ -618,11 +622,11 @@ static void iommu_check_event_log(struct amd_iommu *iommu)
     u32 entry;
     unsigned long flags;
 
-    spin_lock_irqsave(&iommu->lock, flags);
-
     iommu_read_log(iommu, &iommu->event_log,
                    sizeof(event_entry_t), parse_event_log_entry);
 
+    spin_lock_irqsave(&iommu->lock, flags);
+    
     /*check event overflow */
     entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
 
@@ -651,13 +655,9 @@ void parse_ppr_log_entry(struct amd_iommu *iommu, u32 entry[])
     bus = PCI_BUS(device_id);
     devfn = PCI_DEVFN2(device_id);
 
-    local_irq_enable();
-
     spin_lock(&pcidevs_lock);
     pdev = pci_get_pdev(iommu->seg, bus, devfn);
     spin_unlock(&pcidevs_lock);
-
-    local_irq_disable();
 
     if ( pdev == NULL )
         return;
@@ -672,10 +672,10 @@ static void iommu_check_ppr_log(struct amd_iommu *iommu)
     u32 entry;
     unsigned long flags;
 
-    spin_lock_irqsave(&iommu->lock, flags);
-
     iommu_read_log(iommu, &iommu->ppr_log,
                    sizeof(ppr_entry_t), parse_ppr_log_entry);
+    
+    spin_lock_irqsave(&iommu->lock, flags);
 
     /*check event overflow */
     entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
@@ -852,6 +852,8 @@ static void * __init allocate_ring_buffer(struct ring_buffer *ring_buf,
     ring_buf->head = 0;
     ring_buf->tail = 0;
 
+    spin_lock_init(&ring_buf->lock);
+    
     ring_buf->alloc_size = PAGE_SIZE << get_order_from_bytes(entries *
                                                              entry_size);
     ring_buf->entries = ring_buf->alloc_size / entry_size;
