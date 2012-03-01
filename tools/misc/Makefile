@@ -18,7 +18,7 @@ SUBDIRS-$(CONFIG_LOMOUNT) += lomount
 SUBDIRS-$(CONFIG_MINITERM) += miniterm
 SUBDIRS := $(SUBDIRS-y)
 
-INSTALL_BIN-y := xencons
+INSTALL_BIN-y := xencons xenpvnetboot
 INSTALL_BIN-$(CONFIG_X86) += xen-detect
 INSTALL_BIN := $(INSTALL_BIN-y)
 
