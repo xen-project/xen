@@ -27,10 +27,11 @@ LIBXENSTORE := libxenstore.a
 xenstore xenstore-control: CFLAGS += -static
 endif
 
-ALL_TARGETS = libxenstore.so libxenstore.a clients xs_tdb_dump xenstored init-xenstore-domain
+ALL_TARGETS = libxenstore.so libxenstore.a clients xs_tdb_dump xenstored
 
 ifdef CONFIG_STUBDOM
 CFLAGS += -DNO_SOCKETS=1
+ALL_TARGETS += init-xenstore-domain
 endif
 
 .PHONY: all
