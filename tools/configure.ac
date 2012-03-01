@@ -60,7 +60,6 @@ AX_SET_FLAGS
 
 AC_ARG_VAR([PYTHON], [Path to the Python parser])
 AC_ARG_VAR([PERL], [Path to Perl parser])
-AC_ARG_VAR([IP], [Path to ip tool])
 AC_ARG_VAR([BISON], [Path to Bison parser generator])
 AC_ARG_VAR([FLEX], [Path to Flex lexical analyser generator])
 AC_ARG_VAR([CURL], [Path to curl-config tool])
@@ -75,7 +74,6 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 AX_PATH_PROG_OR_FAIL([PERL], [perl])
-AX_PATH_PROG_OR_FAIL([IP], [ip])
 AS_IF([test "x$xapi" = "xy"], [
     AX_PATH_PROG_OR_FAIL([CURL], [curl-config])
     AX_PATH_PROG_OR_FAIL([XML], [xml2-config])
