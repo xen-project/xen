@@ -705,7 +705,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
         goto out;
     }
 
-    memset(&dm_config.c_info, 0x00, sizeof(libxl_domain_create_info));
+    libxl_domain_create_info_init(&dm_config.c_info);
     dm_config.c_info.type = LIBXL_DOMAIN_TYPE_PV;
     dm_config.c_info.name = libxl__sprintf(gc, "%s-dm",
                                     libxl__domid_to_name(gc, guest_domid));
@@ -739,6 +739,9 @@ static int libxl__create_stubdom(libxl__gc *gc,
 
     dm_config.vifs = guest_config->vifs;
     dm_config.num_vifs = guest_config->num_vifs;
+
+    ret = libxl__domain_create_info_setdefault(gc, &dm_config.c_info);
+    if (ret) goto out;
 
     libxl__vfb_and_vkb_from_hvm_guest_config(gc, guest_config, &vfb, &vkb);
     dm_config.vfbs = &vfb;

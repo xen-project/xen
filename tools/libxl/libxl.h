@@ -356,7 +356,7 @@ int libxl_ctx_free(libxl_ctx *ctx /* 0 is OK */);
 int libxl_ctx_postfork(libxl_ctx *ctx);
 
 /* domain related functions */
-int libxl_init_create_info(libxl_ctx *ctx, libxl_domain_create_info *c_info);
+void libxl_domain_create_info_init(libxl_domain_create_info *c_info);
 int libxl_init_build_info(libxl_ctx *ctx,
                           libxl_domain_build_info *b_info,
                           libxl_domain_create_info *c_info);

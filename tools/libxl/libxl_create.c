@@ -50,16 +50,19 @@ void libxl_domain_config_dispose(libxl_domain_config *d_config)
     libxl_domain_build_info_dispose(&d_config->b_info);
 }
 
-int libxl_init_create_info(libxl_ctx *ctx, libxl_domain_create_info *c_info)
+void libxl_domain_create_info_init(libxl_domain_create_info *c_info)
 {
     memset(c_info, '\0', sizeof(*c_info));
-    c_info->xsdata = NULL;
-    c_info->platformdata = NULL;
     c_info->hap = 1;
-    c_info->type = LIBXL_DOMAIN_TYPE_HVM;
     c_info->oos = 1;
-    c_info->ssidref = 0;
-    c_info->poolid = 0;
+}
+
+int libxl__domain_create_info_setdefault(libxl__gc *gc,
+                                         libxl_domain_create_info *c_info)
+{
+    if (!c_info->type)
+        return ERROR_INVAL;
+
     return 0;
 }
 
@@ -469,6 +472,9 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     int i, ret;
 
     domid = 0;
+
+    ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
+    if (ret) goto error_out;
 
     ret = libxl__domain_make(gc, &d_config->c_info, &domid);
     if (ret) {

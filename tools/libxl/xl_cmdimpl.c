@@ -535,8 +535,7 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
     }
 
-    if (libxl_init_create_info(ctx, c_info))
-        exit(1);
+    libxl_domain_create_info_init(c_info);
 
     if (!xlu_cfg_get_string (config, "seclabel", &buf, 0)) {
         e = libxl_flask_context_to_sid(ctx, (char *)buf, strlen(buf),
