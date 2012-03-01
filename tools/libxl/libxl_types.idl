@@ -42,11 +42,6 @@ libxl_console_type = Enumeration("console_type", [
     (2, "PV"),
     ])
 
-libxl_console_backend = Enumeration("console_backend", [
-    (1, "XENCONSOLED"),
-    (2, "IOEMU"),
-    ])
-
 libxl_disk_format = Enumeration("disk_format", [
     (0, "UNKNOWN"),
     (1, "QCOW"),
@@ -317,13 +312,6 @@ libxl_device_vfb = Struct("device_vfb", [
 libxl_device_vkb = Struct("device_vkb", [
     ("backend_domid", libxl_domid),
     ("devid", integer),
-    ])
-
-libxl_device_console = Struct("device_console", [
-    ("backend_domid", libxl_domid),
-    ("devid", integer),
-    ("consback", libxl_console_backend),
-    ("output", string),
     ])
 
 libxl_device_disk = Struct("device_disk", [

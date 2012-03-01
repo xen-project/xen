@@ -177,17 +177,16 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     return 0;
 }
 
-static int init_console_info(libxl_device_console *console, int dev_num)
+static int init_console_info(libxl__device_console *console, int dev_num)
 {
-    memset(console, 0x00, sizeof(libxl_device_console));
+    memset(console, 0x00, sizeof(libxl__device_console));
     console->devid = dev_num;
-    console->consback = LIBXL_CONSOLE_BACKEND_XENCONSOLED;
+    console->consback = LIBXL__CONSOLE_BACKEND_XENCONSOLED;
     console->output = strdup("pty");
-    if ( NULL == console->output )
+    if (!console->output)
         return ERROR_NOMEM;
     return 0;
 }
-
 int libxl__domain_build(libxl__gc *gc,
                         libxl_domain_build_info *info,
                         uint32_t domid,
@@ -586,14 +585,14 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     switch (d_config->c_info.type) {
     case LIBXL_DOMAIN_TYPE_HVM:
     {
-        libxl_device_console console;
+        libxl__device_console console;
         libxl_device_vkb vkb;
 
         ret = init_console_info(&console, 0);
         if ( ret )
             goto error_out;
         libxl__device_console_add(gc, domid, &console, &state);
-        libxl_device_console_dispose(&console);
+        libxl__device_console_dispose(&console);
 
         libxl_device_vkb_init(&vkb);
         libxl_device_vkb_add(ctx, domid, &vkb);
@@ -611,7 +610,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     case LIBXL_DOMAIN_TYPE_PV:
     {
         int need_qemu = 0;
-        libxl_device_console console;
+        libxl__device_console console;
 
         for (i = 0; i < d_config->num_vfbs; i++) {
             libxl_device_vfb_add(ctx, domid, &d_config->vfbs[i]);
@@ -627,10 +626,10 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
                 d_config->num_disks, &d_config->disks[0]);
 
         if (need_qemu)
-             console.consback = LIBXL_CONSOLE_BACKEND_IOEMU;
+             console.consback = LIBXL__CONSOLE_BACKEND_IOEMU;
 
         libxl__device_console_add(gc, domid, &console, &state);
-        libxl_device_console_dispose(&console);
+        libxl__device_console_dispose(&console);
 
         if (need_qemu) {
             libxl__create_xenpv_qemu(gc, domid, d_config, &state, &dm_starting);

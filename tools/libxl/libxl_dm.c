@@ -688,7 +688,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int i, num_console = STUBDOM_SPECIAL_CONSOLES, ret;
-    libxl_device_console *console;
+    libxl__device_console *console;
     libxl_domain_config dm_config;
     libxl_device_vfb vfb;
     libxl_device_vkb vkb;
@@ -820,7 +820,7 @@ retry_transaction:
     if (guest_config->b_info.u.hvm.serial)
         num_console++;
 
-    console = libxl__calloc(gc, num_console, sizeof(libxl_device_console));
+    console = libxl__calloc(gc, num_console, sizeof(libxl__device_console));
     if (!console) {
         ret = ERROR_NOMEM;
         goto out_free;
@@ -828,7 +828,7 @@ retry_transaction:
 
     for (i = 0; i < num_console; i++) {
         console[i].devid = i;
-        console[i].consback = LIBXL_CONSOLE_BACKEND_IOEMU;
+        console[i].consback = LIBXL__CONSOLE_BACKEND_IOEMU;
         /* STUBDOM_CONSOLE_LOGGING (console 0) is for minios logging
          * STUBDOM_CONSOLE_SAVE (console 1) is for writing the save file
          * STUBDOM_CONSOLE_RESTORE (console 2) is for reading the save file
@@ -1092,7 +1092,7 @@ out:
 }
 
 int libxl__need_xenpv_qemu(libxl__gc *gc,
-        int nr_consoles, libxl_device_console *consoles,
+        int nr_consoles, libxl__device_console *consoles,
         int nr_vfbs, libxl_device_vfb *vfbs,
         int nr_disks, libxl_device_disk *disks)
 {
@@ -1104,7 +1104,7 @@ int libxl__need_xenpv_qemu(libxl__gc *gc,
     }
 
     for (i = 0; i < nr_consoles; i++) {
-        if (consoles[i].consback == LIBXL_CONSOLE_BACKEND_IOEMU) {
+        if (consoles[i].consback == LIBXL__CONSOLE_BACKEND_IOEMU) {
             ret = 1;
             goto out;
         }

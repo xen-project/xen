@@ -661,7 +661,7 @@ _hidden int libxl__device_disk_dev_number(const char *virtpath,
                                           int *pdisk, int *ppartition);
 
 _hidden int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
-                                      libxl_device_console *console,
+                                      libxl__device_console *console,
                                       libxl__domain_build_state *state);
 
 _hidden int libxl__device_generic_add(libxl__gc *gc, libxl__device *device,
@@ -904,7 +904,7 @@ _hidden int libxl__create_xenpv_qemu(libxl__gc *gc, uint32_t domid,
                               libxl__domain_build_state *state,
                               libxl__spawner_starting **starting_r);
 _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
-        int nr_consoles, libxl_device_console *consoles,
+        int nr_consoles, libxl__device_console *consoles,
         int nr_vfbs, libxl_device_vfb *vfbs,
         int nr_disks, libxl_device_disk *disks);
   /* Caller must either: pass starting_r==0, or on successful

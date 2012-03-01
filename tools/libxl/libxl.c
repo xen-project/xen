@@ -2023,7 +2023,7 @@ int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
 
 /******************************************************************************/
 int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
-                              libxl_device_console *console,
+                              libxl__device_console *console,
                               libxl__domain_build_state *state)
 {
     flexarray_t *front;
@@ -2070,7 +2070,7 @@ int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
     flexarray_append(front, "limit");
     flexarray_append(front, libxl__sprintf(gc, "%d", LIBXL_XENCONSOLE_LIMIT));
     flexarray_append(front, "type");
-    if (console->consback == LIBXL_CONSOLE_BACKEND_XENCONSOLED)
+    if (console->consback == LIBXL__CONSOLE_BACKEND_XENCONSOLED)
         flexarray_append(front, "xenconsoled");
     else
         flexarray_append(front, "ioemu");
