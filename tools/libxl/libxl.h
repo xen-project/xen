@@ -138,7 +138,6 @@
 #include <xentoollog.h>
 
 #include <xen/sched.h>
-#include <xen/sysctl.h>
 
 #include <libxl_uuid.h>
 #include <_libxl_list.h>
@@ -584,7 +583,7 @@ int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,
                                unsigned int max_vcpus, libxl_cpumap *cpumap);
 int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_cpumap *cpumap);
 
-int libxl_get_sched_id(libxl_ctx *ctx);
+libxl_scheduler libxl_get_scheduler(libxl_ctx *ctx);
 
 
 int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
@@ -627,7 +626,8 @@ int libxl_tmem_shared_auth(libxl_ctx *ctx, uint32_t domid, char* uuid,
 int libxl_tmem_freeable(libxl_ctx *ctx);
 
 int libxl_get_freecpus(libxl_ctx *ctx, libxl_cpumap *cpumap);
-int libxl_cpupool_create(libxl_ctx *ctx, const char *name, int schedid,
+int libxl_cpupool_create(libxl_ctx *ctx, const char *name,
+                         libxl_scheduler sched,
                          libxl_cpumap cpumap, libxl_uuid *uuid,
                          uint32_t *poolid);
 int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid);

@@ -491,7 +491,7 @@ libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx *ctx, int *nb_pool)
         }
         ptr = tmp;
         ptr[i].poolid = info->cpupool_id;
-        ptr[i].sched_id = info->sched_id;
+        ptr[i].sched = info->sched_id;
         ptr[i].n_dom = info->n_dom;
         if (libxl_cpumap_alloc(ctx, &ptr[i].cpumap)) {
             xc_cpupool_infofree(ctx->xch, info);
@@ -2750,7 +2750,10 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     physinfo->sharing_used_frames = xc_sharing_used_frames(ctx->xch);
     physinfo->nr_nodes = xcphysinfo.nr_nodes;
     memcpy(physinfo->hw_cap,xcphysinfo.hw_cap, sizeof(physinfo->hw_cap));
-    physinfo->phys_cap = xcphysinfo.capabilities;
+
+    physinfo->cap_hvm = !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_hvm);
+    physinfo->cap_hvm_directio =
+        !!(xcphysinfo.capabilities & XEN_SYSCTL_PHYSCAP_hvm_directio);
 
     return 0;
 }
@@ -2961,14 +2964,11 @@ out:
     return rc;
 }
 
-/*
- * returns one of the XEN_SCHEDULER_* constants from public/domctl.h
- */
-int libxl_get_sched_id(libxl_ctx *ctx)
+libxl_scheduler libxl_get_scheduler(libxl_ctx *ctx)
 {
-    int sched, ret;
+    libxl_scheduler sched, ret;
 
-    if ((ret = xc_sched_id(ctx->xch, &sched)) != 0) {
+    if ((ret = xc_sched_id(ctx->xch, (int *)&sched)) != 0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain info list");
         return ERROR_FAIL;
     }
@@ -3443,7 +3443,8 @@ int libxl_get_freecpus(libxl_ctx *ctx, libxl_cpumap *cpumap)
     return 0;
 }
 
-int libxl_cpupool_create(libxl_ctx *ctx, const char *name, int schedid,
+int libxl_cpupool_create(libxl_ctx *ctx, const char *name,
+                         libxl_scheduler sched,
                          libxl_cpumap cpumap, libxl_uuid *uuid,
                          uint32_t *poolid)
 {
@@ -3459,7 +3460,7 @@ int libxl_cpupool_create(libxl_ctx *ctx, const char *name, int schedid,
         return ERROR_NOMEM;
     }
 
-    rc = xc_cpupool_create(ctx->xch, poolid, schedid);
+    rc = xc_cpupool_create(ctx->xch, poolid, sched);
     if (rc) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
            "Could not create cpupool");

@@ -19,18 +19,6 @@
 
 #include "libxl_internal.h"
 
-struct schedid_name {
-    char *name;
-    int id;
-};
-
-static struct schedid_name schedid_name[] = {
-    { "credit", XEN_SCHEDULER_CREDIT },
-    { "sedf", XEN_SCHEDULER_SEDF },
-    { "credit2", XEN_SCHEDULER_CREDIT2 },
-    { NULL, -1 }
-};
-
 const char *libxl_basename(const char *name)
 {
     const char *filename;
@@ -149,28 +137,6 @@ int libxl_name_to_cpupoolid(libxl_ctx *ctx, const char *name,
     }
     free(poolinfo);
     return ret;
-}
-
-int libxl_name_to_schedid(libxl_ctx *ctx, const char *name)
-{
-    int i;
-
-    for (i = 0; schedid_name[i].name != NULL; i++)
-        if (strcmp(name, schedid_name[i].name) == 0)
-            return schedid_name[i].id;
-
-    return ERROR_INVAL;
-}
-
-char *libxl_schedid_to_name(libxl_ctx *ctx, int schedid)
-{
-    int i;
-
-    for (i = 0; schedid_name[i].name != NULL; i++)
-        if (schedid_name[i].id == schedid)
-            return schedid_name[i].name;
-
-    return "unknown";
 }
 
 int libxl_get_stubdom_id(libxl_ctx *ctx, int guest_domid)

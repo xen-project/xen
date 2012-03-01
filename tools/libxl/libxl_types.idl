@@ -105,6 +105,14 @@ libxl_bios_type = Enumeration("bios_type", [
     (3, "ovmf"),
     ])
 
+# Consistent with values defined in domctl.h
+libxl_scheduler = Enumeration("scheduler", [
+    (4, "sedf"),
+    (5, "credit"),
+    (6, "credit2"),
+    (7, "arinc653"),
+    ])
+
 #
 # Complex libxl types
 #
@@ -164,7 +172,7 @@ libxl_dominfo = Struct("dominfo",[
 
 libxl_cpupoolinfo = Struct("cpupoolinfo", [
     ("poolid",      uint32),
-    ("sched_id",    uint32),
+    ("sched",       libxl_scheduler),
     ("n_dom",       uint32),
     ("cpumap",      libxl_cpumap)
     ])
@@ -388,7 +396,9 @@ libxl_physinfo = Struct("physinfo", [
 
     ("nr_nodes", uint32),
     ("hw_cap", libxl_hwcap),
-    ("phys_cap", uint32),
+
+    ("cap_hvm", bool),
+    ("cap_hvm_directio", bool),
     ], dispose_fn=None, dir=DIR_OUT)
 
 libxl_cputopology = Struct("cputopology", [

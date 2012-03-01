@@ -3693,15 +3693,15 @@ int main_vcpuset(int argc, char **argv)
 static void output_xeninfo(void)
 {
     const libxl_version_info *info;
-    int sched_id;
+    libxl_scheduler sched;
 
     if (!(info = libxl_get_version_info(ctx))) {
         fprintf(stderr, "libxl_get_version_info failed.\n");
         return;
     }
 
-    if ((sched_id = libxl_get_sched_id(ctx)) < 0) {
-        fprintf(stderr, "get_sched_id sysctl failed.\n");
+    if ((sched = libxl_get_scheduler(ctx)) < 0) {
+        fprintf(stderr, "get_scheduler sysctl failed.\n");
         return;
     }
 
@@ -3709,7 +3709,7 @@ static void output_xeninfo(void)
     printf("xen_minor              : %d\n", info->xen_version_minor);
     printf("xen_extra              : %s\n", info->xen_version_extra);
     printf("xen_caps               : %s\n", info->capabilities);
-    printf("xen_scheduler          : %s\n", libxl_schedid_to_name(ctx, sched_id));
+    printf("xen_scheduler          : %s\n", libxl_scheduler_to_string(sched));
     printf("xen_pagesize           : %u\n", info->pagesize);
     printf("platform_params        : virt_start=0x%"PRIx64"\n", info->virt_start);
     printf("xen_changeset          : %s\n", info->changeset);
@@ -3757,9 +3757,9 @@ static void output_physinfo(void)
     for (i = 0; i < 8; i++)
         printf("%08x%c", info.hw_cap[i], i < 7 ? ':' : '\n');
     printf("virt_caps              :");
-    if (info.phys_cap & XEN_SYSCTL_PHYSCAP_hvm)
+    if (info.cap_hvm)
         printf(" hvm");
-    if (info.phys_cap & XEN_SYSCTL_PHYSCAP_hvm_directio)
+    if (info.cap_hvm_directio)
         printf(" hvm_directio");
     printf("\n");
     vinfo = libxl_get_version_info(ctx);
@@ -4065,7 +4065,7 @@ static int sched_sedf_domain_output(
 }
 
 static int sched_domain_output(
-    uint32_t sched, int (*output)(int), const char *cpupool)
+    libxl_scheduler sched, int (*output)(int), const char *cpupool)
 {
     libxl_dominfo *info;
     libxl_cpupoolinfo *poolinfo = NULL;
@@ -4094,7 +4094,7 @@ static int sched_domain_output(
     }
 
     for (p = 0; !rc && (p < n_pools); p++) {
-        if ((poolinfo[p].sched_id != sched) ||
+        if ((poolinfo[p].sched != sched) ||
             (cpupool && (poolid != poolinfo[p].poolid)))
             continue;
 
@@ -4175,7 +4175,7 @@ int main_sched_credit(int argc, char **argv)
     }
 
     if (!dom) { /* list all domain's credit scheduler info */
-        return -sched_domain_output(XEN_SCHEDULER_CREDIT,
+        return -sched_domain_output(LIBXL_SCHEDULER_CREDIT,
                                     sched_credit_domain_output, cpupool);
     } else {
         find_domain(dom);
@@ -4251,7 +4251,7 @@ int main_sched_credit2(int argc, char **argv)
     }
 
     if (!dom) { /* list all domain's credit scheduler info */
-        return -sched_domain_output(XEN_SCHEDULER_CREDIT2,
+        return -sched_domain_output(LIBXL_SCHEDULER_CREDIT2,
                                     sched_credit2_domain_output, cpupool);
     } else {
         find_domain(dom);
@@ -4353,7 +4353,7 @@ int main_sched_sedf(int argc, char **argv)
     }
 
     if (!dom) { /* list all domain's credit scheduler info */
-        return -sched_domain_output(XEN_SCHEDULER_SEDF,
+        return -sched_domain_output(LIBXL_SCHEDULER_SEDF,
                                     sched_sedf_domain_output, cpupool);
     } else {
         find_domain(dom);
@@ -5292,9 +5292,8 @@ int main_cpupoolcreate(int argc, char **argv)
     XLU_Config *config;
     const char *buf;
     const char *name;
-    const char *sched;
     uint32_t poolid;
-    int schedid = -1;
+    libxl_scheduler sched = 0;
     XLU_ConfigList *cpus;
     XLU_ConfigList *nodes;
     int n_cpus, n_nodes, i, n;
@@ -5389,17 +5388,16 @@ int main_cpupoolcreate(int argc, char **argv)
     }
 
     if (!xlu_cfg_get_string (config, "sched", &buf, 0)) {
-        if ((schedid = libxl_name_to_schedid(ctx, buf)) < 0) {
+        if ((libxl_scheduler_from_string(buf, &sched)) < 0) {
             fprintf(stderr, "Unknown scheduler\n");
             return -ERROR_FAIL;
         }
     } else {
-        if ((schedid = libxl_get_sched_id(ctx)) < 0) {
-            fprintf(stderr, "get_sched_id sysctl failed.\n");
+        if ((sched = libxl_get_scheduler(ctx)) < 0) {
+            fprintf(stderr, "get_scheduler sysctl failed.\n");
             return -ERROR_FAIL;
         }
     }
-    sched = libxl_schedid_to_name(ctx, schedid);
 
     if (libxl_get_freecpus(ctx, &freemap)) {
         fprintf(stderr, "libxl_get_freecpus failed\n");
@@ -5467,14 +5465,14 @@ int main_cpupoolcreate(int argc, char **argv)
 
     printf("Using config file \"%s\"\n", filename);
     printf("cpupool name:   %s\n", name);
-    printf("scheduler:      %s\n", sched);
+    printf("scheduler:      %s\n", libxl_scheduler_to_string(sched));
     printf("number of cpus: %d\n", n_cpus);
 
     if (dryrun_only)
         return 0;
 
     poolid = 0;
-    if (libxl_cpupool_create(ctx, name, schedid, cpumap, &uuid, &poolid)) {
+    if (libxl_cpupool_create(ctx, name, sched, cpumap, &uuid, &poolid)) {
         fprintf(stderr, "error on creating cpupool\n");
         return -ERROR_FAIL;
     }
@@ -5559,7 +5557,7 @@ int main_cpupoollist(int argc, char **argv)
                     }
                 if (!opt_cpus) {
                     printf("%3d %9s       y       %4d", n,
-                           libxl_schedid_to_name(ctx, poolinfo[p].sched_id),
+                           libxl_scheduler_to_string(poolinfo[p].sched),
                            poolinfo[p].n_dom);
                 }
                 printf("\n");
@@ -5744,7 +5742,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
     int c;
     int n;
     uint32_t poolid;
-    int schedid;
+    libxl_scheduler sched;
     int n_pools;
     int node;
     int n_cpus;
@@ -5765,7 +5763,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
         return -ERROR_NOMEM;
     }
     poolid = poolinfo[0].poolid;
-    schedid = poolinfo[0].sched_id;
+    sched = poolinfo[0].sched;
     for (p = 0; p < n_pools; p++) {
         libxl_cpupoolinfo_dispose(poolinfo + p);
     }
@@ -5845,7 +5843,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
         snprintf(name, 15, "Pool-node%d", node);
         libxl_uuid_generate(&uuid);
         poolid = 0;
-        ret = -libxl_cpupool_create(ctx, name, schedid, cpumap, &uuid, &poolid);
+        ret = -libxl_cpupool_create(ctx, name, sched, cpumap, &uuid, &poolid);
         if (ret) {
             fprintf(stderr, "error on creating cpupool\n");
             goto out;
