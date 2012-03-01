@@ -108,7 +108,7 @@ void libxl_domain_build_info_init(libxl_domain_build_info *b_info,
         b_info->u.hvm.xen_platform_pci = 1;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
-        b_info->u.pv.slack_memkb = 8 * 1024;
+        b_info->u.pv.slack_memkb = 0;
         break;
     default:
         abort();
