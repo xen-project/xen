@@ -35,6 +35,7 @@
 #include <xen/perfc.h>
 #include <xen/numa.h>
 #include <xen/nodemask.h>
+#include <xen/event.h>
 #include <xen/tmem.h>
 #include <xen/tmem_xen.h>
 #include <public/sysctl.h>
@@ -300,6 +301,107 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
     return needed;
 }
 
+/* Default to 64 MiB */
+#define DEFAULT_LOW_MEM_VIRQ    (((paddr_t) 64)   << 20)
+#define MAX_LOW_MEM_VIRQ        (((paddr_t) 1024) << 20)
+
+static paddr_t __read_mostly opt_low_mem_virq = ((paddr_t) -1);
+size_param("low_mem_virq_limit", opt_low_mem_virq);
+
+/* Thresholds to control hysteresis. In pages */
+/* When memory grows above this threshold, reset hysteresis.
+ * -1 initially to not reset until at least one virq issued. */
+static unsigned long low_mem_virq_high      = -1UL;
+/* Threshold at which we issue virq */
+static unsigned long low_mem_virq_th        = 0;
+/* Original threshold after all checks completed */
+static unsigned long low_mem_virq_orig      = 0;
+/* Order for current threshold */
+static unsigned int  low_mem_virq_th_order  = 0;
+
+/* Perform bootstrapping checks and set bounds */
+static void __init setup_low_mem_virq(void)
+{
+    unsigned int order;
+    paddr_t threshold;
+    bool_t halve;
+
+    /* If the user specifies zero, then he/she doesn't want this virq
+     * to ever trigger. */
+    if ( opt_low_mem_virq == 0 )
+    {
+        low_mem_virq_th = -1UL;
+        return;
+    }
+
+    /* If the user did not specify a knob, remember that */
+    halve = (opt_low_mem_virq == ((paddr_t) -1));
+    threshold = halve ? DEFAULT_LOW_MEM_VIRQ : opt_low_mem_virq;
+
+    /* Dom0 has already been allocated by now. So check we won't be
+     * complaining immediately with whatever's left of the heap. */
+    threshold = min(threshold,
+                    ((paddr_t) total_avail_pages) << PAGE_SHIFT);
+
+    /* Then, cap to some predefined maximum */
+    threshold = min(threshold, MAX_LOW_MEM_VIRQ);
+
+    /* If the user specified no knob, and we are at the current available
+     * level, halve the threshold. */
+    if ( halve &&
+         (threshold == (((paddr_t) total_avail_pages) << PAGE_SHIFT)) )
+        threshold >>= 1;
+
+    /* Zero? Have to fire immediately */
+    threshold = max(threshold, (paddr_t) PAGE_SIZE);
+
+    /* Threshold bytes -> pages */
+    low_mem_virq_th = threshold >> PAGE_SHIFT;
+
+    /* Next, round the threshold down to the next order */
+    order = get_order_from_pages(low_mem_virq_th);
+    if ( (1UL << order) > low_mem_virq_th )
+        order--;
+
+    /* Set bounds, ready to go */
+    low_mem_virq_th = low_mem_virq_orig = 1UL << order;
+    low_mem_virq_th_order = order;
+
+    printk("Initial low memory virq threshold set at 0x%lx pages.\n",
+            low_mem_virq_th);
+}
+
+static void check_low_mem_virq(void)
+{
+    if ( unlikely(total_avail_pages <= low_mem_virq_th) )
+    {
+        send_global_virq(VIRQ_ENOMEM);
+
+        /* Update thresholds. Next warning will be when we drop below
+         * next order. However, we wait until we grow beyond one
+         * order above us to complain again at the current order */
+        low_mem_virq_high   = 1UL << (low_mem_virq_th_order + 1);
+        if ( low_mem_virq_th_order > 0 )
+            low_mem_virq_th_order--;
+        low_mem_virq_th     = 1UL << low_mem_virq_th_order;
+        return;
+    }
+
+    if ( unlikely(total_avail_pages >= low_mem_virq_high) )
+    {
+        /* Reset hysteresis. Bring threshold up one order.
+         * If we are back where originally set, set high
+         * threshold to -1 to avoid further growth of
+         * virq threshold. */
+        low_mem_virq_th_order++;
+        low_mem_virq_th = 1UL << low_mem_virq_th_order;
+        if ( low_mem_virq_th == low_mem_virq_orig )
+            low_mem_virq_high = -1UL;
+        else
+            low_mem_virq_high = 1UL << (low_mem_virq_th_order + 2);
+    }
+}
+
 /* Allocate 2^@order contiguous pages. */
 static struct page_info *alloc_heap_pages(
     unsigned int zone_lo, unsigned int zone_hi,
@@ -419,6 +521,8 @@ static struct page_info *alloc_heap_pages(
     avail[node][zone] -= request;
     total_avail_pages -= request;
     ASSERT(total_avail_pages >= 0);
+
+    check_low_mem_virq();
 
     if ( d != NULL )
         d->last_alloc_node = node;
@@ -1022,6 +1126,10 @@ void __init scrub_heap_pages(void)
     }
 
     printk("done.\n");
+
+    /* Now that the heap is initialized, run checks and set bounds
+     * for the low mem virq algorithm. */
+    setup_low_mem_virq();
 }
 
 
