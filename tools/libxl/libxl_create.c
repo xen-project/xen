@@ -53,8 +53,6 @@ void libxl_domain_config_dispose(libxl_domain_config *d_config)
 void libxl_domain_create_info_init(libxl_domain_create_info *c_info)
 {
     memset(c_info, '\0', sizeof(*c_info));
-    c_info->hap = 1;
-    c_info->oos = 1;
 }
 
 int libxl__domain_create_info_setdefault(libxl__gc *gc,
@@ -62,6 +60,11 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
 {
     if (!c_info->type)
         return ERROR_INVAL;
+
+    if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
+        libxl_defbool_setdefault(&c_info->hap, true);
+        libxl_defbool_setdefault(&c_info->oos, true);
+    }
 
     return 0;
 }
@@ -366,8 +369,8 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
     flags = 0;
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         flags |= XEN_DOMCTL_CDF_hvm_guest;
-        flags |= info->hap ? XEN_DOMCTL_CDF_hap : 0;
-        flags |= info->oos ? 0 : XEN_DOMCTL_CDF_oos_off;
+        flags |= libxl_defbool_val(info->hap) ? XEN_DOMCTL_CDF_hap : 0;
+        flags |= libxl_defbool_val(info->oos) ? 0 : XEN_DOMCTL_CDF_oos_off;
     }
     *domid = -1;
 
@@ -515,6 +518,9 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     int i, ret;
 
     domid = 0;
+
+    ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
+    if (ret) goto error_out;
 
     ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
     if (ret) goto error_out;

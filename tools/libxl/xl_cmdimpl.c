@@ -555,8 +555,7 @@ static void parse_config_data(const char *configfile_filename_report,
         !strncmp(buf, "hvm", strlen(buf)))
         c_info->type = LIBXL_DOMAIN_TYPE_HVM;
 
-    if (!xlu_cfg_get_long (config, "hap", &l, 0))
-        c_info->hap = l;
+    xlu_cfg_get_defbool(config, "hap", &c_info->hap, 0);
 
     if (xlu_cfg_replace_string (config, "name", &c_info->name, 0)) {
         fprintf(stderr, "Domain name must be specified.\n");
@@ -572,8 +571,7 @@ static void parse_config_data(const char *configfile_filename_report,
         libxl_uuid_generate(&c_info->uuid);
     }
 
-    if (!xlu_cfg_get_long(config, "oos", &l, 0))
-        c_info->oos = l;
+    xlu_cfg_get_defbool(config, "oos", &c_info->oos, 0);
 
     if (!xlu_cfg_get_string (config, "pool", &buf, 0)) {
         c_info->poolid = -1;

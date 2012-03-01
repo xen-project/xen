@@ -20,8 +20,7 @@ def randomize_case(s):
 def randomize_enum(e):
     return random.choice([v.name for v in e.values])
 
-handcoded = ["libxl_defbool", # Temp until a user appears in the next patch
-             "libxl_cpumap", "libxl_key_value_list",
+handcoded = ["libxl_cpumap", "libxl_key_value_list",
              "libxl_cpuid_policy_list", "libxl_file_reference",
              "libxl_string_list"]
 

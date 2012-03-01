@@ -41,8 +41,8 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
     printf("(domain\n\t(domid %d)\n", domid);
     printf("\t(create_info)\n");
     printf("\t(hvm %d)\n", c_info->type == LIBXL_DOMAIN_TYPE_HVM);
-    printf("\t(hap %d)\n", c_info->hap);
-    printf("\t(oos %d)\n", c_info->oos);
+    printf("\t(hap %s)\n", libxl_defbool_to_string(c_info->hap));
+    printf("\t(oos %s)\n", libxl_defbool_to_string(c_info->oos));
     printf("\t(ssidref %d)\n", c_info->ssidref);
     printf("\t(name %s)\n", c_info->name);
 

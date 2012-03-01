@@ -211,8 +211,8 @@ libxl_version_info = Struct("version_info", [
 
 libxl_domain_create_info = Struct("domain_create_info",[
     ("type",         libxl_domain_type),
-    ("hap",          bool),
-    ("oos",          bool),
+    ("hap",          libxl_defbool),
+    ("oos",          libxl_defbool),
     ("ssidref",      uint32),
     ("name",         string),
     ("uuid",         libxl_uuid),
