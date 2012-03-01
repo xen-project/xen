@@ -3105,6 +3105,67 @@ int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
+int libxl_sched_credit_params_get(libxl_ctx *ctx, uint32_t poolid,
+                                  libxl_sched_credit_params *scinfo)
+{
+    struct xen_sysctl_credit_schedule sparam;
+    int rc;
+
+    rc = xc_sched_credit_params_get(ctx->xch, poolid, &sparam);
+    if (rc != 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting sched credit param");
+        return ERROR_FAIL;
+    }
+
+    scinfo->tslice_ms = sparam.tslice_ms;
+    scinfo->ratelimit_us = sparam.ratelimit_us;
+
+    return 0;
+}
+
+int libxl_sched_credit_params_set(libxl_ctx *ctx, uint32_t poolid,
+                                  libxl_sched_credit_params *scinfo)
+{
+    struct xen_sysctl_credit_schedule sparam;
+    int rc=0;
+
+    if (scinfo->tslice_ms <  XEN_SYSCTL_CSCHED_TSLICE_MIN
+        || scinfo->tslice_ms > XEN_SYSCTL_CSCHED_TSLICE_MAX) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+            "Time slice out of range, valid range is from %d to %d",
+                            XEN_SYSCTL_CSCHED_TSLICE_MIN,
+                            XEN_SYSCTL_CSCHED_TSLICE_MAX);
+        return ERROR_INVAL;
+    }
+    if (scinfo->ratelimit_us <  XEN_SYSCTL_SCHED_RATELIMIT_MIN
+        || scinfo->ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+            "Ratelimit out of range, valid range is from %d to %d",
+                            XEN_SYSCTL_SCHED_RATELIMIT_MIN,
+                            XEN_SYSCTL_SCHED_RATELIMIT_MAX);
+        return ERROR_INVAL;
+    }
+    if (scinfo->ratelimit_us > scinfo->tslice_ms*1000) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                   "Ratelimit cannot be greater than timeslice\n");
+        return ERROR_INVAL;
+    }
+
+    sparam.tslice_ms = scinfo->tslice_ms;
+    sparam.ratelimit_us = scinfo->ratelimit_us;
+
+    rc = xc_sched_credit_params_set(ctx->xch, poolid, &sparam);
+    if ( rc < 0 ) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "setting sched credit param");
+        return ERROR_FAIL;
+    }
+
+    scinfo->tslice_ms = sparam.tslice_ms;
+    scinfo->ratelimit_us = sparam.ratelimit_us;
+
+    return 0;
+}
+
 int libxl_sched_credit2_domain_get(libxl_ctx *ctx, uint32_t domid,
                                    libxl_sched_credit2_domain *scinfo)
 {

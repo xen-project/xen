@@ -648,6 +648,10 @@ int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
                                   libxl_sched_credit_domain *scinfo);
 int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid,
                                   libxl_sched_credit_domain *scinfo);
+int libxl_sched_credit_params_get(libxl_ctx *ctx, uint32_t poolid,
+                                  libxl_sched_credit_params *scinfo);
+int libxl_sched_credit_params_set(libxl_ctx *ctx, uint32_t poolid,
+                                  libxl_sched_credit_params *scinfo);
 int libxl_sched_credit2_domain_get(libxl_ctx *ctx, uint32_t domid,
                                    libxl_sched_credit2_domain *scinfo);
 int libxl_sched_credit2_domain_set(libxl_ctx *ctx, uint32_t domid,

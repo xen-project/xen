@@ -418,6 +418,11 @@ libxl_sched_credit_domain = Struct("sched_credit_domain", [
     ("cap", integer),
     ])
 
+libxl_sched_credit_params = Struct("sched_credit_params", [
+    ("tslice_ms", integer),
+    ("ratelimit_us", integer),
+    ], dispose_fn=None)
+
 libxl_sched_credit2_domain = Struct("sched_credit2_domain", [
     ("weight", integer),
     ])
