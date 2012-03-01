@@ -5,6 +5,7 @@ CFLAGS += -Werror
 
 CFLAGS += $(CFLAGS_libxenctrl)
 CFLAGS += $(CFLAGS_xeninclude)
+CFLAGS += $(CFLAGS_libxenstore)
 
 HDRS     = $(wildcard *.h)
 
