@@ -67,28 +67,34 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
 int libxl__domain_build_info_setdefault(libxl__gc *gc,
                                         libxl_domain_build_info *b_info)
 {
+    if (b_info->type != LIBXL_DOMAIN_TYPE_HVM &&
+        b_info->type != LIBXL_DOMAIN_TYPE_PV)
+        return ERROR_INVAL;
+
     if (!b_info->device_model_version)
         b_info->device_model_version =
             LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
 
-    if (!b_info->u.hvm.bios)
-        switch (b_info->device_model_version) {
-        case 1: b_info->u.hvm.bios = LIBXL_BIOS_TYPE_ROMBIOS; break;
-        case 2: b_info->u.hvm.bios = LIBXL_BIOS_TYPE_SEABIOS; break;
-        default:return ERROR_INVAL;
-    }
+    if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
+        if (!b_info->u.hvm.bios)
+            switch (b_info->device_model_version) {
+            case 1: b_info->u.hvm.bios = LIBXL_BIOS_TYPE_ROMBIOS; break;
+            case 2: b_info->u.hvm.bios = LIBXL_BIOS_TYPE_SEABIOS; break;
+            default:return ERROR_INVAL;
+            }
 
-    /* Enforce BIOS<->Device Model version relationship */
-    switch (b_info->device_model_version) {
-    case 1:
-        if (b_info->u.hvm.bios != LIBXL_BIOS_TYPE_ROMBIOS)
-            return ERROR_INVAL;
-        break;
-    case 2:
-        if (b_info->u.hvm.bios == LIBXL_BIOS_TYPE_ROMBIOS)
-            return ERROR_INVAL;
-        break;
-    default:abort();
+        /* Enforce BIOS<->Device Model version relationship */
+        switch (b_info->device_model_version) {
+        case 1:
+            if (b_info->u.hvm.bios != LIBXL_BIOS_TYPE_ROMBIOS)
+                return ERROR_INVAL;
+            break;
+        case 2:
+            if (b_info->u.hvm.bios == LIBXL_BIOS_TYPE_ROMBIOS)
+                return ERROR_INVAL;
+            break;
+        default:abort();
+        }
     }
 
     libxl_defbool_setdefault(&b_info->device_model_stubdomain, false);
