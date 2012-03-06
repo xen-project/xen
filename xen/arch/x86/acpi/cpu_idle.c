@@ -602,6 +602,23 @@ static void acpi_dead_idle(void)
             __mwait(cx->address, 0);
         }
     }
+    else if ( current_cpu_data.x86_vendor == X86_VENDOR_AMD &&
+              cx->entry_method == ACPI_CSTATE_EM_SYSIO )
+    {
+        /* Intel prefers not to use SYSIO */
+
+        /* Avoid references to shared data after the cache flush */
+        u32 address = cx->address;
+        u32 pmtmr_ioport_local = pmtmr_ioport;
+
+        wbinvd();
+
+        while ( 1 )
+        {
+            inb(address);
+            inl(pmtmr_ioport_local);
+        }
+    }
 
 default_halt:
     for ( ; ; )
