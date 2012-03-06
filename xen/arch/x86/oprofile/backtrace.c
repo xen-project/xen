@@ -13,18 +13,22 @@
 #include<xen/types.h>
 #include<asm/page.h>
 #include<xen/xenoprof.h>
-#include<asm/guest_access.h>
+#include<xen/guest_access.h>
 
 struct frame_head {
     struct frame_head * ebp;
     unsigned long ret;
 } __attribute__((packed));
+typedef struct frame_head frame_head_t;
+DEFINE_XEN_GUEST_HANDLE(frame_head_t);
 
 #ifdef CONFIG_X86_64
 struct frame_head_32bit {
     uint32_t ebp;
-    unsigned long ret;
+    uint32_t ret;
 } __attribute__((packed));
+typedef struct frame_head_32bit frame_head32_t;
+DEFINE_COMPAT_HANDLE(frame_head32_t);
 #endif
 
 static struct frame_head *
@@ -54,44 +58,47 @@ static inline int is_32bit_vcpu(struct vcpu *vcpu)
 
 static struct frame_head *
 dump_guest_backtrace(struct domain *d, struct vcpu *vcpu, 
-		     struct frame_head * head, int mode)
+		     const struct frame_head *head, int mode)
 {
-    struct frame_head bufhead[2];
-    XEN_GUEST_HANDLE(char) guest_head = guest_handle_from_ptr(head, char);
+    frame_head_t bufhead;
 
 #ifdef CONFIG_X86_64
     if ( is_32bit_vcpu(vcpu) )
     {
-        struct frame_head_32bit bufhead32[2];
+        __compat_handle_const_frame_head32_t guest_head =
+            { .c = (unsigned long)head };
+        frame_head32_t bufhead32;
+
         /* Also check accessibility of one struct frame_head beyond */
-        if (!guest_handle_okay(guest_head, sizeof(bufhead32)))
+        if (!compat_handle_okay(guest_head, 2))
             return 0;
-        if (__copy_from_guest_offset((char *)bufhead32, guest_head, 0, 
-                                     sizeof(bufhead32)))
+        if (__copy_from_compat(&bufhead32, guest_head, 1))
             return 0;
-        bufhead[0].ebp=(struct frame_head *)(unsigned long)bufhead32[0].ebp;
-        bufhead[0].ret=bufhead32[0].ret;
+        bufhead.ebp = (struct frame_head *)(unsigned long)bufhead32.ebp;
+        bufhead.ret = bufhead32.ret;
     }
     else
 #endif
     {
+        XEN_GUEST_HANDLE(const_frame_head_t) guest_head =
+            const_guest_handle_from_ptr(head, frame_head_t);
+
         /* Also check accessibility of one struct frame_head beyond */
-        if (!guest_handle_okay(guest_head, sizeof(bufhead)))
+        if (!guest_handle_okay(guest_head, 2))
             return 0;
-        if (__copy_from_guest_offset((char *)bufhead, guest_head, 0, 
-                                     sizeof(bufhead)))
+        if (__copy_from_guest(&bufhead, guest_head, 1))
             return 0;
     }
     
-    if (!xenoprof_add_trace(d, vcpu, bufhead[0].ret, mode))
+    if (!xenoprof_add_trace(d, vcpu, bufhead.ret, mode))
         return 0;
     
     /* frame pointers should strictly progress back up the stack
      * (towards higher addresses) */
-    if (head >= bufhead[0].ebp)
+    if (head >= bufhead.ebp)
         return NULL;
     
-    return bufhead[0].ebp;
+    return bufhead.ebp;
 }
 
 /*
