@@ -565,7 +565,6 @@ static void acpi_dead_idle(void)
 {
     struct acpi_processor_power *power;
     struct acpi_processor_cx *cx;
-    void *mwait_ptr;
 
     if ( (power = processor_powers[smp_processor_id()]) == NULL )
         goto default_halt;
@@ -573,10 +572,10 @@ static void acpi_dead_idle(void)
     if ( (cx = &power->states[power->count-1]) == NULL )
         goto default_halt;
 
-    mwait_ptr = (void *)&mwait_wakeup(smp_processor_id());
-
     if ( cx->entry_method == ACPI_CSTATE_EM_FFH )
     {
+        void *mwait_ptr = &mwait_wakeup(smp_processor_id());
+
         /*
          * Cache must be flushed as the last operation before sleeping.
          * Otherwise, CPU may still hold dirty data, breaking cache coherency,
