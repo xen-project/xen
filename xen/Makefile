@@ -20,8 +20,8 @@ default: build
 .PHONY: dist
 dist: install
 
-.PHONY: build install clean distclean cscope TAGS tags MAP
-build install debug clean distclean cscope TAGS tags MAP::
+.PHONY: build install clean distclean cscope TAGS tags MAP gtags
+build install debug clean distclean cscope TAGS tags MAP gtags::
 	$(MAKE) -f Rules.mk _$@
 
 .PHONY: _build
@@ -67,7 +67,7 @@ _clean: delete-unfresh-files
 
 .PHONY: _distclean
 _distclean: clean
-	rm -f tags TAGS cscope.files cscope.in.out cscope.out cscope.po.out
+	rm -f tags TAGS cscope.files cscope.in.out cscope.out cscope.po.out GTAGS GPATH GRTAGS GSYMS
 
 $(TARGET).gz: $(TARGET)
 	gzip -f -9 < $< > $@.new
@@ -158,6 +158,11 @@ _tags:
 	set -e; rm -f tags; \
 	$(call set_exuberant_flags,ctags); \
 	$(all_sources) | xargs ctags $$exuberant_flags -a
+
+.PHONY: _gtags
+_gtags:
+	set -e; rm -f GTAGS GSYMS GPATH GRTAGS
+	$(all_sources) | gtags -f -
 
 .PHONY: _cscope
 _cscope:

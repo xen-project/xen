@@ -23,6 +23,7 @@
 ^\.config$
 ^\.pc
 (^|/)(tags|TAGS)$
+(^|/)(GTAGS|GPATH|GSYMS|GRTAGS)$
 ^build-.*$
 ^dist/.*$
 ^docs/.*\.aux$
