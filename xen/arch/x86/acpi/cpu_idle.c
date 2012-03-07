@@ -566,7 +566,6 @@ static void acpi_dead_idle(void)
 {
     struct acpi_processor_power *power;
     struct acpi_processor_cx *cx;
-    struct cpuinfo_x86 *c = &current_cpu_data;
 
     if ( (power = processor_powers[smp_processor_id()]) == NULL )
         goto default_halt;
@@ -601,23 +600,6 @@ static void acpi_dead_idle(void)
             __monitor(mwait_ptr, 0, 0);
             mb();
             __mwait(cx->address, 0);
-        }
-    } 
-    else if ( c->x86_vendor == X86_VENDOR_AMD && 
-              cx->entry_method == ACPI_CSTATE_EM_SYSIO )
-    {
-        /* Intel prefers not to use SYSIO */
-
-        /* Avoid references to shared data after the cache flush */
-        u32 address = cx->address;
-        u32 pmtmr_ioport_local = pmtmr_ioport;
-
-        wbinvd();
-
-        while ( 1 )
-        {
-            inb(address);
-            inl(pmtmr_ioport_local);
         }
     }
     else if ( current_cpu_data.x86_vendor == X86_VENDOR_AMD &&
