@@ -734,8 +734,34 @@ static void pv_cpuid(struct cpu_user_regs *regs)
 
     if ( current->domain->domain_id != 0 )
     {
+        unsigned int cpuid_leaf = a, sub_leaf = c;
+
         if ( !cpuid_hypervisor_leaves(a, c, &a, &b, &c, &d) )
             domain_cpuid(current->domain, a, c, &a, &b, &c, &d);
+
+        switch ( cpuid_leaf )
+        {
+        case 0xd:
+        {
+            unsigned int _eax, _ebx, _ecx, _edx;
+            /* EBX value of main leaf 0 depends on enabled xsave features */
+            if ( sub_leaf == 0 && current->arch.xcr0 )
+            {
+                /* reset EBX to default value first */
+                b = XSAVE_AREA_MIN_SIZE;
+                for ( sub_leaf = 2; sub_leaf < 63; sub_leaf++ )
+                {
+                    if ( !(current->arch.xcr0 & (1ULL << sub_leaf)) )
+                        continue;
+                    domain_cpuid(current->domain, cpuid_leaf, sub_leaf,
+                                 &_eax, &_ebx, &_ecx, &_edx);
+                    if ( (_eax + _ebx) > b )
+                        b = _eax + _ebx;
+                }
+            }
+        break;
+        }
+        }
         goto out;
     }
 
