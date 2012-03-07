@@ -168,6 +168,19 @@ static inline int from_bcd(RTCState *s, int a)
         return ((a >> 4) * 10) + (a & 0x0f);
 }
 
+/* Hours in 12 hour mode are in 1-12 range, not 0-11.
+ * So we need convert it before using it*/
+static inline int convert_hour(RTCState *s, int hour)
+{
+    if (!(s->hw.cmos_data[RTC_REG_B] & RTC_24H))
+    {
+        hour %= 12;
+        if (s->hw.cmos_data[RTC_HOURS] & 0x80)
+            hour += 12;
+    }
+    return hour;
+}
+
 static void rtc_set_time(RTCState *s)
 {
     struct tm *tm = &s->current_tm;
@@ -182,9 +195,7 @@ static void rtc_set_time(RTCState *s)
     tm->tm_sec = from_bcd(s, s->hw.cmos_data[RTC_SECONDS]);
     tm->tm_min = from_bcd(s, s->hw.cmos_data[RTC_MINUTES]);
     tm->tm_hour = from_bcd(s, s->hw.cmos_data[RTC_HOURS] & 0x7f);
-    if ( !(s->hw.cmos_data[RTC_REG_B] & 0x02) &&
-         (s->hw.cmos_data[RTC_HOURS] & 0x80) )
-        tm->tm_hour += 12;
+    tm->tm_hour = convert_hour(s, tm->tm_hour);
     tm->tm_wday = from_bcd(s, s->hw.cmos_data[RTC_DAY_OF_WEEK]);
     tm->tm_mday = from_bcd(s, s->hw.cmos_data[RTC_DAY_OF_MONTH]);
     tm->tm_mon = from_bcd(s, s->hw.cmos_data[RTC_MONTH]) - 1;
@@ -217,7 +228,8 @@ static void rtc_copy_date(RTCState *s)
     else
     {
         /* 12 hour format */
-        s->hw.cmos_data[RTC_HOURS] = to_bcd(s, tm->tm_hour % 12);
+        int h = (tm->tm_hour % 12) ? tm->tm_hour % 12 : 12;
+        s->hw.cmos_data[RTC_HOURS] = to_bcd(s, h);
         if ( tm->tm_hour >= 12 )
             s->hw.cmos_data[RTC_HOURS] |= 0x80;
     }
