@@ -162,8 +162,11 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     l4p = (guest_l4e_t *) top_map;
     gw->l4e = l4p[guest_l4_table_offset(va)];
     gflags = guest_l4e_get_flags(gw->l4e) ^ iflags;
+    if ( !(gflags & _PAGE_PRESENT) ) {
+        rc |= _PAGE_PRESENT;
+        goto out;
+    }
     rc |= ((gflags & mflags) ^ mflags);
-    if ( rc & _PAGE_PRESENT ) goto out;
 
     /* Map the l3 table */
     l3p = map_domain_gfn(p2m, 
@@ -176,9 +179,11 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     /* Get the l3e and check its flags*/
     gw->l3e = l3p[guest_l3_table_offset(va)];
     gflags = guest_l3e_get_flags(gw->l3e) ^ iflags;
-    rc |= ((gflags & mflags) ^ mflags);
-    if ( rc & _PAGE_PRESENT )
+    if ( !(gflags & _PAGE_PRESENT) ) {
+        rc |= _PAGE_PRESENT;
         goto out;
+    }
+    rc |= ((gflags & mflags) ^ mflags);
 
 #else /* PAE only... */
 
@@ -213,9 +218,11 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
 #endif /* All levels... */
 
     gflags = guest_l2e_get_flags(gw->l2e) ^ iflags;
-    rc |= ((gflags & mflags) ^ mflags);
-    if ( rc & _PAGE_PRESENT )
+    if ( !(gflags & _PAGE_PRESENT) ) {
+        rc |= _PAGE_PRESENT;
         goto out;
+    }
+    rc |= ((gflags & mflags) ^ mflags);
 
     pse = (guest_supports_superpages(v) && 
            (guest_l2e_get_flags(gw->l2e) & _PAGE_PSE)); 
@@ -277,6 +284,10 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
             goto out;
         gw->l1e = l1p[guest_l1_table_offset(va)];
         gflags = guest_l1e_get_flags(gw->l1e) ^ iflags;
+        if ( !(gflags & _PAGE_PRESENT) ) {
+            rc |= _PAGE_PRESENT;
+            goto out;
+        }
         rc |= ((gflags & mflags) ^ mflags);
     }
 
