@@ -832,6 +832,9 @@ long arch_do_domctl(
             break;
         }
 
+        if ( d->is_dying )
+            goto assign_device_out;
+
         ret = xsm_assign_device(d, domctl->u.assign_device.machine_bdf);
         if ( ret )
             goto assign_device_out;
