@@ -202,25 +202,6 @@ static inline paddr_t gvirt_to_maddr(uint32_t va)
 #define mfn_to_virt(mfn)  (maddr_to_virt((paddr_t)(mfn) << PAGE_SHIFT))
 
 
-static inline int get_order_from_bytes(paddr_t size)
-{
-    int order;
-    size = (size-1) >> PAGE_SHIFT;
-    for ( order = 0; size; order++ )
-        size >>= 1;
-    return order;
-}
-
-static inline int get_order_from_pages(unsigned long nr_pages)
-{
-    int order;
-    nr_pages--;
-    for ( order = 0; nr_pages; order++ )
-        nr_pages >>= 1;
-    return order;
-}
-
-
 /* Convert between Xen-heap virtual addresses and page-info structures. */
 static inline struct page_info *virt_to_page(const void *v)
 {

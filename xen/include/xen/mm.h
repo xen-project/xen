@@ -318,6 +318,28 @@ page_list_splice(struct page_list_head *list, struct page_list_head *head)
 # define page_list_splice(list, hd)        list_splice(list, hd)
 #endif
 
+static inline unsigned int get_order_from_bytes(paddr_t size)
+{
+    unsigned int order;
+
+    size = (size - 1) >> PAGE_SHIFT;
+    for ( order = 0; size; order++ )
+        size >>= 1;
+
+    return order;
+}
+
+static inline unsigned int get_order_from_pages(unsigned long nr_pages)
+{
+    unsigned int order;
+
+    nr_pages--;
+    for ( order = 0; nr_pages; order++ )
+        nr_pages >>= 1;
+
+    return order;
+}
+
 void scrub_one_page(struct page_info *);
 
 /* Returns 1 on success, 0 on error, negative if the ring
