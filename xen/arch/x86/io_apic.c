@@ -44,6 +44,7 @@ static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 static DEFINE_SPINLOCK(ioapic_lock);
 
 bool_t __read_mostly skip_ioapic_setup;
+bool_t __read_mostly ioapic_ack_forced = 0;
 
 #ifndef sis_apic_bug
 /*
@@ -1610,9 +1611,15 @@ int __read_mostly ioapic_ack_new = 1;
 static void setup_ioapic_ack(char *s)
 {
     if ( !strcmp(s, "old") )
+    {
         ioapic_ack_new = 0;
+        ioapic_ack_forced = 1;
+    }
     else if ( !strcmp(s, "new") )
+    {
         ioapic_ack_new = 1;
+        ioapic_ack_forced = 1;
+    }
     else
         printk("Unknown ioapic_ack value specified: '%s'\n", s);
 }
