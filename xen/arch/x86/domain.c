@@ -605,7 +605,6 @@ void arch_domain_destroy(struct domain *d)
         hvm_domain_destroy(d);
 
     vmce_destroy_msr(d);
-    pci_release_devices(d);
     free_domain_pirqs(d);
     if ( !is_idle_domain(d) )
         iommu_domain_destroy(d);
@@ -1954,6 +1953,8 @@ int domain_relinquish_resources(struct domain *d)
     switch ( d->arch.relmem )
     {
     case RELMEM_not_started:
+        pci_release_devices(d);
+
         /* Tear down paging-assistance stuff. */
         paging_teardown(d);
 
