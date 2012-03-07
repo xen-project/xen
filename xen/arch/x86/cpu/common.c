@@ -326,7 +326,7 @@ void __cpuinit generic_identify(struct cpuinfo_x86 * c)
 	early_intel_workaround(c);
 
 #ifdef CONFIG_X86_HT
-	phys_proc_id[smp_processor_id()] = (cpuid_ebx(1) >> 24) & 0xff;
+	c->phys_proc_id = (cpuid_ebx(1) >> 24) & 0xff;
 #endif
 }
 
@@ -362,6 +362,8 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_max_cores = 1;
 	c->x86_num_siblings = 1;
 	c->x86_clflush_size = 0;
+	c->phys_proc_id = BAD_APICID;
+	c->cpu_core_id = BAD_APICID;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 
 	if (!have_cpuid_p()) {
@@ -510,7 +512,6 @@ void __cpuinit detect_extended_topology(struct cpuinfo_x86 *c)
 	unsigned int ht_mask_width, core_plus_mask_width;
 	unsigned int core_select_mask, core_level_siblings;
 	unsigned int initial_apicid;
-	int cpu = smp_processor_id();
 
 	if ( c->cpuid_level < 0xb )
 		return;
@@ -545,9 +546,9 @@ void __cpuinit detect_extended_topology(struct cpuinfo_x86 *c)
 
 	core_select_mask = (~(-1 << core_plus_mask_width)) >> ht_mask_width;
 
-	cpu_core_id[cpu] = phys_pkg_id(initial_apicid, ht_mask_width)
+	c->cpu_core_id = phys_pkg_id(initial_apicid, ht_mask_width)
 		& core_select_mask;
-	phys_proc_id[cpu] = phys_pkg_id(initial_apicid, core_plus_mask_width);
+	c->phys_proc_id = phys_pkg_id(initial_apicid, core_plus_mask_width);
 
 	c->apicid = phys_pkg_id(initial_apicid, 0);
 	c->x86_max_cores = (core_level_siblings / c->x86_num_siblings);
@@ -555,10 +556,10 @@ void __cpuinit detect_extended_topology(struct cpuinfo_x86 *c)
 	if ( opt_cpu_info )
 	{
 		printk("CPU: Physical Processor ID: %d\n",
-		       phys_proc_id[cpu]);
+		       c->phys_proc_id);
 		if ( c->x86_max_cores > 1 )
 			printk("CPU: Processor Core ID: %d\n",
-			       cpu_core_id[cpu]);
+			       c->cpu_core_id);
 	}
 }
 
@@ -567,7 +568,6 @@ void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 {
 	u32 	eax, ebx, ecx, edx;
 	int 	index_msb, core_bits;
-	int 	cpu = smp_processor_id();
 
 	cpuid(1, &eax, &ebx, &ecx, &edx);
 
@@ -590,11 +590,11 @@ void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 		}
 
 		index_msb = get_count_order(c->x86_num_siblings);
-		phys_proc_id[cpu] = phys_pkg_id((ebx >> 24) & 0xFF, index_msb);
+		c->phys_proc_id = phys_pkg_id((ebx >> 24) & 0xFF, index_msb);
 
 		if (opt_cpu_info)
 			printk("CPU: Physical Processor ID: %d\n",
-			       phys_proc_id[cpu]);
+			       c->phys_proc_id);
 
 		c->x86_num_siblings = c->x86_num_siblings / c->x86_max_cores;
 
@@ -602,12 +602,12 @@ void __cpuinit detect_ht(struct cpuinfo_x86 *c)
 
 		core_bits = get_count_order(c->x86_max_cores);
 
-		cpu_core_id[cpu] = phys_pkg_id((ebx >> 24) & 0xFF, index_msb) &
+		c->cpu_core_id = phys_pkg_id((ebx >> 24) & 0xFF, index_msb) &
 					       ((1 << core_bits) - 1);
 
 		if (opt_cpu_info && c->x86_max_cores > 1)
 			printk("CPU: Processor Core ID: %d\n",
-			       cpu_core_id[cpu]);
+			       c->cpu_core_id);
 	}
 }
 #endif
