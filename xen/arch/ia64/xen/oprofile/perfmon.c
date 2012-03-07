@@ -38,8 +38,6 @@
 #include <asm/vmx.h>    /* for vmx_user_mode() */
 
 // XXX move them to an appropriate header file
-extern void xenoprof_log_event(struct vcpu *vcpu, struct pt_regs * regs,
-                               unsigned long eip, int mode, int event);
 extern int is_active(struct domain *d);
 
 static int allow_virq;
