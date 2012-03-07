@@ -418,13 +418,14 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         if ( (g_info->xen_cpuid >= NR_CPUS) ||
              !cpu_present(g_info->xen_cpuid) )
         {
-            g_info->flags |= XEN_PCPU_FLAGS_INVALID;
+            g_info->flags = XEN_PCPU_FLAGS_INVALID;
         }
         else
         {
             g_info->apic_id = x86_cpu_to_apicid[g_info->xen_cpuid];
             g_info->acpi_id = acpi_get_processor_id(g_info->xen_cpuid);
             ASSERT(g_info->apic_id != BAD_APICID);
+            g_info->flags = 0;
             if (cpu_online(g_info->xen_cpuid))
                 g_info->flags |= XEN_PCPU_FLAGS_ONLINE;
         }
@@ -442,7 +443,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         int cpu;
 
         cpu = op->u.cpu_ol.cpuid;
-        if (!cpu_present(cpu))
+        if (cpu >= NR_CPUS || !cpu_present(cpu))
         {
             ret = -EINVAL;
             break;
@@ -462,15 +463,25 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
         int cpu;
 
         cpu = op->u.cpu_ol.cpuid;
-        if (!cpu_present(cpu))
+
+        if ( cpu == 0 )
+        {
+            ret = -EOPNOTSUPP;
+            break;
+        }
+
+        if ( cpu >= NR_CPUS || !cpu_present(cpu) )
         {
             ret = -EINVAL;
             break;
-        } else if (!cpu_online(cpu))
+        }
+        
+        if (!cpu_online(cpu))
         {
             ret = 0;
             break;
         }
+
         ret = continue_hypercall_on_cpu(
           0, cpu_down_helper, (void *)(unsigned long)cpu);
         break;
