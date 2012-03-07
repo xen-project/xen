@@ -2752,9 +2752,11 @@ set_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn)
     if ( !paging_mode_translate(p2m->domain) )
         return 0;
 
+    p2m_lock(p2m);
     omfn = gfn_to_mfn_query(p2m, gfn, &ot);
     if ( p2m_is_grant(ot) )
     {
+        p2m_unlock(p2m);
         domain_crash(p2m->domain);
         return 0;
     }
@@ -2765,7 +2767,6 @@ set_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn)
     }
 
     P2M_DEBUG("set mmio %lx %lx\n", gfn, mfn_x(mfn));
-    p2m_lock(p2m);
     rc = set_p2m_entry(p2m, gfn, mfn, 0, p2m_mmio_direct, p2m->default_access);
     audit_p2m(p2m, 1);
     p2m_unlock(p2m);
@@ -2786,18 +2787,20 @@ clear_mmio_p2m_entry(struct p2m_domain *p2m, unsigned long gfn)
     if ( !paging_mode_translate(p2m->domain) )
         return 0;
 
-    mfn = gfn_to_mfn(p2m, gfn, &t);
+    p2m_lock(p2m);
+    mfn = gfn_to_mfn_query(p2m, gfn, &t);
 
     /* Do not use mfn_valid() here as it will usually fail for MMIO pages. */
     if ( (INVALID_MFN == mfn_x(mfn)) || (t != p2m_mmio_direct) )
     {
         gdprintk(XENLOG_ERR,
             "clear_mmio_p2m_entry: gfn_to_mfn failed! gfn=%08lx\n", gfn);
-        return 0;
+        goto out;
     }
-    p2m_lock(p2m);
     rc = set_p2m_entry(p2m, gfn, _mfn(INVALID_MFN), 0, p2m_invalid, p2m->default_access);
     audit_p2m(p2m, 1);
+
+out:
     p2m_unlock(p2m);
 
     return rc;
@@ -2814,6 +2817,8 @@ set_shared_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn)
     if ( !paging_mode_translate(p2m->domain) )
         return 0;
 
+    if ( need_lock ) 
+        p2m_lock(p2m);
     omfn = gfn_to_mfn_query(p2m, gfn, &ot);
     /* At the moment we only allow p2m change if gfn has already been made
      * sharable first */
@@ -2823,8 +2828,6 @@ set_shared_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn)
     set_gpfn_from_mfn(mfn_x(omfn), INVALID_M2P_ENTRY);
 
     P2M_DEBUG("set shared %lx %lx\n", gfn, mfn_x(mfn));
-    if ( need_lock ) 
-        p2m_lock(p2m);
     rc = set_p2m_entry(p2m, gfn, mfn, 0, p2m_ram_shared, p2m->default_access);
     if ( need_lock ) 
         p2m_unlock(p2m);
