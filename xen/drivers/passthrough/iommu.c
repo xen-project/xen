@@ -580,6 +580,8 @@ int iommu_do_domctl(
             printk(XENLOG_G_ERR
                    "XEN_DOMCTL_assign_device: get_domain_by_id() failed\n");
             ret = -EINVAL;
+            if ( d )
+                goto assign_device_out;
             break;
         }
 
