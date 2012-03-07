@@ -29,6 +29,7 @@
 #include <asm/current.h>
 
 #define USEC_PER_SEC    1000000UL
+#define NS_PER_USEC     1000UL
 
 #define domain_vrtc(x) (&(x)->arch.hvm_domain.pl_time.vrtc)
 #define vcpu_vrtc(x)   (domain_vrtc((x)->domain))
@@ -72,6 +73,84 @@ static void rtc_timer_update(RTCState *s)
     {
         destroy_periodic_time(&s->pt);
     }
+}
+
+/* handle update-ended timer */
+static void check_update_timer(RTCState *s)
+{
+    uint64_t next_update_time, expire_time;
+    uint64_t guest_usec;
+    struct domain *d = vrtc_domain(s);
+    stop_timer(&s->update_timer);
+    stop_timer(&s->update_timer2);
+
+    ASSERT(spin_is_locked(&s->lock));
+
+    if (!(s->hw.cmos_data[RTC_REG_C] & RTC_UF) &&
+            !(s->hw.cmos_data[RTC_REG_B] & RTC_SET))
+    {
+        s->use_timer = 1;
+        guest_usec = get_localtime_us(d) % USEC_PER_SEC;
+        if (guest_usec >= (USEC_PER_SEC - 244))
+        {
+            /* RTC is in update cycle when enabling UIE */
+            s->hw.cmos_data[RTC_REG_A] |= RTC_UIP;
+            next_update_time = (USEC_PER_SEC - guest_usec) * NS_PER_USEC;
+            expire_time = NOW() + next_update_time;
+            /* release lock before set timer */
+            spin_unlock(&s->lock);
+            set_timer(&s->update_timer2, expire_time);
+            /* fetch lock again */
+            spin_lock(&s->lock);
+        }
+        else
+        {
+            next_update_time = (USEC_PER_SEC - guest_usec - 244) * NS_PER_USEC;
+            expire_time = NOW() + next_update_time;
+            s->next_update_time = expire_time;
+            /* release lock before set timer */
+            spin_unlock(&s->lock);
+            set_timer(&s->update_timer, expire_time);
+            /* fetch lock again */
+            spin_lock(&s->lock);
+        }
+    }
+    else
+        s->use_timer = 0;
+}
+
+static void rtc_update_timer(void *opaque)
+{
+    RTCState *s = opaque;
+
+    spin_lock(&s->lock);
+    if (!(s->hw.cmos_data[RTC_REG_B] & RTC_SET))
+    {
+        s->hw.cmos_data[RTC_REG_A] |= RTC_UIP;
+        set_timer(&s->update_timer2, s->next_update_time + 244000UL);
+    }
+    spin_unlock(&s->lock);
+}
+
+static void rtc_update_timer2(void *opaque)
+{
+    RTCState *s = opaque;
+    struct domain *d = vrtc_domain(s);
+
+    spin_lock(&s->lock);
+    if (!(s->hw.cmos_data[RTC_REG_B] & RTC_SET))
+    {
+        s->hw.cmos_data[RTC_REG_C] |= RTC_UF;
+        s->hw.cmos_data[RTC_REG_A] &= ~RTC_UIP;
+        if ((s->hw.cmos_data[RTC_REG_B] & RTC_UIE))
+        {
+            s->hw.cmos_data[RTC_REG_C] |= RTC_IRQF;
+            hvm_isa_irq_deassert(d, RTC_IRQ);
+            hvm_isa_irq_assert(d, RTC_IRQ);
+        }
+        check_update_timer(s);
+    }
+    spin_unlock(&s->lock);
 }
 
 static void rtc_set_time(RTCState *s);
@@ -140,8 +219,17 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
             if ( s->hw.cmos_data[RTC_REG_B] & RTC_SET )
                 rtc_set_time(s);
         }
+        /* if the interrupt is already set when the interrupt become
+         * enabled, raise an interrupt immediately*/
+        if ((data & RTC_UIE) && !(s->hw.cmos_data[RTC_REG_B] & RTC_UIE))
+            if (s->hw.cmos_data[RTC_REG_C] & RTC_UF)
+            {
+                hvm_isa_irq_deassert(d, RTC_IRQ);
+                hvm_isa_irq_assert(d, RTC_IRQ);
+            }
         s->hw.cmos_data[RTC_REG_B] = data;
         rtc_timer_update(s);
+        check_update_timer(s);
         break;
     case RTC_REG_C:
     case RTC_REG_D:
@@ -286,13 +374,14 @@ static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
         break;
     case RTC_REG_A:
         ret = s->hw.cmos_data[s->hw.cmos_index];
-        if (update_in_progress(s))
+        if ((s->use_timer == 0) && update_in_progress(s))
             ret |= RTC_UIP;
         break;
     case RTC_REG_C:
         ret = s->hw.cmos_data[s->hw.cmos_index];
         hvm_isa_irq_deassert(vrtc_domain(s), RTC_IRQ);
         s->hw.cmos_data[RTC_REG_C] = 0x00;
+        check_update_timer(s);
         break;
     default:
         ret = s->hw.cmos_data[s->hw.cmos_index];
@@ -331,9 +420,12 @@ static int handle_rtc_io(
 
 void rtc_migrate_timers(struct vcpu *v)
 {
+    RTCState *s = vcpu_vrtc(v);
+
     if ( v->vcpu_id == 0 )
     {
-        ;
+        migrate_timer(&s->update_timer, v->processor);;
+        migrate_timer(&s->update_timer2, v->processor);;
     }
 }
 
@@ -369,6 +461,7 @@ static int rtc_load(struct domain *d, hvm_domain_context_t *h)
 
     /* Reset the periodic interrupt timer based on the registers */
     rtc_timer_update(s);
+    check_update_timer(s);
 
     spin_unlock(&s->lock);
 
@@ -391,9 +484,13 @@ void rtc_init(struct domain *d)
 
     spin_lock_init(&s->lock);
 
+    init_timer(&s->update_timer, rtc_update_timer, s, smp_processor_id());
+    init_timer(&s->update_timer2, rtc_update_timer2, s, smp_processor_id());
+
     register_portio_handler(d, RTC_PORT(0), 2, handle_rtc_io);
 
     rtc_reset(d);
+
 
     spin_lock(&s->lock);
 
@@ -406,6 +503,7 @@ void rtc_init(struct domain *d)
 
     rtc_copy_date(s);
 
+    check_update_timer(s);
     spin_unlock(&s->lock);
 }
 
@@ -416,6 +514,8 @@ void rtc_deinit(struct domain *d)
     spin_barrier(&s->lock);
 
     destroy_periodic_time(&s->pt);
+    kill_timer(&s->update_timer);
+    kill_timer(&s->update_timer2);
 }
 
 void rtc_update_clock(struct domain *d)
