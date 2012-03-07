@@ -106,8 +106,6 @@ typedef struct RTCState {
     struct tm current_tm;
     /* second update */
     int64_t next_second_time;
-    struct timer second_timer;
-    struct timer second_timer2;
     struct periodic_time pt;
     spinlock_t lock;
 } RTCState;

@@ -36,6 +36,8 @@
 #define epoch_year     1900
 #define get_year(x)    (x + epoch_year)
 
+static void rtc_copy_date(RTCState *s);
+
 static void rtc_periodic_cb(struct vcpu *v, void *opaque)
 {
     RTCState *s = opaque;
@@ -75,6 +77,7 @@ static void rtc_set_time(RTCState *s);
 static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
 {
     RTCState *s = opaque;
+    struct domain *d = vrtc_domain(s);
 
     spin_lock(&s->lock);
 
@@ -122,6 +125,12 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
         {
             /* set mode: reset UIP mode */
             s->hw.cmos_data[RTC_REG_A] &= ~RTC_UIP;
+            /* adjust cmos before stopping */
+            if (!(s->hw.cmos_data[RTC_REG_B] & RTC_SET))
+            {
+                s->current_tm = gmtime(get_localtime(d));
+                rtc_copy_date(s);
+            }
         }
         else
         {
@@ -218,156 +227,10 @@ static void rtc_copy_date(RTCState *s)
     s->hw.cmos_data[RTC_YEAR] = to_bcd(s, tm->tm_year % 100);
 }
 
-/* month is between 0 and 11. */
-static int get_days_in_month(int month, int year)
-{
-    static const int days_tab[12] = { 
-        31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 
-    };
-    int d;
-    if ( (unsigned)month >= 12 )
-        return 31;
-    d = days_tab[month];
-    if ( month == 1 )
-        if ( (year % 4) == 0 && ((year % 100) != 0 || (year % 400) == 0) )
-            d++;
-    return d;
-}
-
-/* update 'tm' to the next second */
-static void rtc_next_second(RTCState *s)
-{
-    struct tm *tm = &s->current_tm;
-    int days_in_month;
-
-    ASSERT(spin_is_locked(&s->lock));
-
-    tm->tm_sec++;
-    if ( (unsigned)tm->tm_sec >= 60 )
-    {
-        tm->tm_sec = 0;
-        tm->tm_min++;
-        if ( (unsigned)tm->tm_min >= 60 )
-        {
-            tm->tm_min = 0;
-            tm->tm_hour++;
-            if ( (unsigned)tm->tm_hour >= 24 )
-            {
-                tm->tm_hour = 0;
-                /* next day */
-                tm->tm_wday++;
-                if ( (unsigned)tm->tm_wday >= 7 )
-                    tm->tm_wday = 0;
-                days_in_month = get_days_in_month(tm->tm_mon, 
-                                                  get_year(tm->tm_year));
-                tm->tm_mday++;
-                if ( tm->tm_mday < 1 )
-                {
-                    tm->tm_mday = 1;
-                }
-                else if ( tm->tm_mday > days_in_month )
-                {
-                    tm->tm_mday = 1;
-                    tm->tm_mon++;
-                    if ( tm->tm_mon >= 12 )
-                    {
-                        tm->tm_mon = 0;
-                        tm->tm_year++;
-                    }
-                }
-            }
-        }
-    }
-}
-
-static void rtc_update_second(void *opaque)
-{
-    RTCState *s = opaque;
-    s_time_t now = NOW();
-
-    spin_lock(&s->lock);
-
-    /* If we somehow get way out of sync (say, Xen time leaps forward), 
-     * don't livelock the system trying to emulate every second.  Time 
-     * is already in bad trouble, so just skip forward rather than 
-     * trying to sync the RTC registers */
-    if ( unlikely(now - s->next_second_time > SECONDS(86400)) )
-    {
-        dprintk(XENLOG_WARNING, "HVM RTC: dom %u skipping %"PRId64" seconds\n",
-                vrtc_domain(s)->domain_id, 
-                (int64_t)((now - s->next_second_time) / SYSTEM_TIME_HZ));
-        s->next_second_time = now;
-    }
-
-    /* if the oscillator is not in normal operation, we do not update */
-    if ( (s->hw.cmos_data[RTC_REG_A] & RTC_DIV_CTL) != RTC_REF_CLCK_32KHZ )
-    {
-        s->next_second_time += 1000000000ULL;
-        set_timer(&s->second_timer, s->next_second_time);
-    }
-    else
-    {
-        rtc_next_second(s);
-        
-        if ( !(s->hw.cmos_data[RTC_REG_B] & RTC_SET) )
-            s->hw.cmos_data[RTC_REG_A] |= RTC_UIP;
-
-        /* Delay time before update cycle */
-        set_timer(&s->second_timer2, s->next_second_time + 244000);
-    }
-
-    spin_unlock(&s->lock);
-}
-
-static void rtc_update_second2(void *opaque)
-{
-    RTCState *s = opaque;
-    struct domain *d = vrtc_domain(s);
-
-    spin_lock(&s->lock);
-
-    if ( !(s->hw.cmos_data[RTC_REG_B] & RTC_SET) )
-        rtc_copy_date(s);
-
-    /* check alarm */
-    if ( s->hw.cmos_data[RTC_REG_B] & RTC_AIE )
-    {
-        if ( ((s->hw.cmos_data[RTC_SECONDS_ALARM] & 0xc0) == 0xc0 ||
-              from_bcd(s, s->hw.cmos_data[RTC_SECONDS_ALARM]) ==
-              s->current_tm.tm_sec) &&
-             ((s->hw.cmos_data[RTC_MINUTES_ALARM] & 0xc0) == 0xc0 ||
-              from_bcd(s, s->hw.cmos_data[RTC_MINUTES_ALARM]) ==
-              s->current_tm.tm_min) &&
-             ((s->hw.cmos_data[RTC_HOURS_ALARM] & 0xc0) == 0xc0 ||
-              from_bcd(s, s->hw.cmos_data[RTC_HOURS_ALARM]) ==
-              s->current_tm.tm_hour) )
-        {
-            s->hw.cmos_data[RTC_REG_C] |= 0xa0; 
-            hvm_isa_irq_deassert(d, RTC_IRQ);
-            hvm_isa_irq_assert(d, RTC_IRQ);
-        }
-    }
-
-    /* update ended interrupt */
-    if ( (s->hw.cmos_data[RTC_REG_B] & (RTC_UIE|RTC_SET)) == RTC_UIE )
-    {
-        s->hw.cmos_data[RTC_REG_C] |= 0x90; 
-        hvm_isa_irq_deassert(d, RTC_IRQ);
-        hvm_isa_irq_assert(d, RTC_IRQ);
-    }
-
-    /* clear update in progress bit */
-    s->hw.cmos_data[RTC_REG_A] &= ~RTC_UIP;
-
-    s->next_second_time += 1000000000ULL;
-    set_timer(&s->second_timer, s->next_second_time);
-
-    spin_unlock(&s->lock);
-}
-
 static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
 {
     int ret;
+    struct domain *d = vrtc_domain(s);
 
     if ( (addr & 1) == 0 )
         return 0xff;
@@ -383,6 +246,12 @@ static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
     case RTC_DAY_OF_MONTH:
     case RTC_MONTH:
     case RTC_YEAR:
+        /* if not in set mode, adjust cmos before reading*/
+        if (!(s->hw.cmos_data[RTC_REG_B] & RTC_SET))
+        {
+            s->current_tm = gmtime(get_localtime(d));
+            rtc_copy_date(s);
+        }
         ret = s->hw.cmos_data[s->hw.cmos_index];
         break;
     case RTC_REG_A:
@@ -430,12 +299,9 @@ static int handle_rtc_io(
 
 void rtc_migrate_timers(struct vcpu *v)
 {
-    RTCState *s = vcpu_vrtc(v);
-
     if ( v->vcpu_id == 0 )
     {
-        migrate_timer(&s->second_timer, v->processor);
-        migrate_timer(&s->second_timer2, v->processor);
+        ;
     }
 }
 
@@ -468,9 +334,6 @@ static int rtc_load(struct domain *d, hvm_domain_context_t *h)
      * time, so let's keep doing that. */
     s->current_tm = gmtime(get_localtime(d));
     rtc_copy_date(s);
-    s->next_second_time = NOW() + 1000000000ULL;
-    stop_timer(&s->second_timer);
-    set_timer(&s->second_timer2, s->next_second_time);
 
     /* Reset the periodic interrupt timer based on the registers */
     rtc_timer_update(s);
@@ -496,9 +359,6 @@ void rtc_init(struct domain *d)
 
     spin_lock_init(&s->lock);
 
-    init_timer(&s->second_timer, rtc_update_second, s, smp_processor_id());
-    init_timer(&s->second_timer2, rtc_update_second2, s, smp_processor_id());
-
     register_portio_handler(d, RTC_PORT(0), 2, handle_rtc_io);
 
     rtc_reset(d);
@@ -514,10 +374,6 @@ void rtc_init(struct domain *d)
 
     rtc_copy_date(s);
 
-    s->next_second_time = NOW() + 1000000000ULL;
-    stop_timer(&s->second_timer);
-    set_timer(&s->second_timer2, s->next_second_time);
-
     spin_unlock(&s->lock);
 }
 
@@ -528,8 +384,6 @@ void rtc_deinit(struct domain *d)
     spin_barrier(&s->lock);
 
     destroy_periodic_time(&s->pt);
-    kill_timer(&s->second_timer);
-    kill_timer(&s->second_timer2);
 }
 
 void rtc_update_clock(struct domain *d)
