@@ -41,15 +41,9 @@
  */
 #define CSCHED_DEFAULT_WEIGHT       256
 #define CSCHED_TICKS_PER_TSLICE     3
-#define CSCHED_TICKS_PER_ACCT       3
-#define CSCHED_MSECS_PER_TICK       10
-#define CSCHED_MSECS_PER_TSLICE     \
-    (CSCHED_MSECS_PER_TICK * CSCHED_TICKS_PER_TSLICE)
+/* Default timeslice: 30ms */
+#define CSCHED_DEFAULT_TSLICE_MS    30
 #define CSCHED_CREDITS_PER_MSEC     10
-#define CSCHED_CREDITS_PER_TSLICE   \
-    (CSCHED_CREDITS_PER_MSEC * CSCHED_MSECS_PER_TSLICE)
-#define CSCHED_CREDITS_PER_ACCT     \
-    (CSCHED_CREDITS_PER_MSEC * CSCHED_MSECS_PER_TICK * CSCHED_TICKS_PER_ACCT)
 
 
 /*
@@ -113,6 +107,8 @@
  */
 static bool_t __read_mostly sched_credit_default_yield;
 boolean_param("sched_credit_default_yield", sched_credit_default_yield);
+static int __read_mostly sched_credit_tslice_ms = CSCHED_DEFAULT_TSLICE_MS;
+integer_param("sched_credit_tslice_ms", sched_credit_tslice_ms);
 
 /*
  * Physical CPU
@@ -176,6 +172,9 @@ struct csched_private {
     uint32_t credit;
     int credit_balance;
     uint32_t runq_sort;
+    /* Period of master and tick in milliseconds */
+    unsigned tslice_ms, tick_period_us, ticks_per_tslice;
+    unsigned credits_per_tslice;
 };
 
 static void csched_tick(void *_cpu);
@@ -326,7 +325,7 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 
     spin_lock_irqsave(&prv->lock, flags);
 
-    prv->credit -= CSCHED_CREDITS_PER_ACCT;
+    prv->credit -= prv->credits_per_tslice;
     prv->ncpus--;
     cpu_clear(cpu, prv->idlers);
     cpu_clear(cpu, prv->cpus);
@@ -360,19 +359,19 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
     spin_lock_irqsave(&prv->lock, flags);
 
     /* Initialize/update system-wide config */
-    prv->credit += CSCHED_CREDITS_PER_ACCT;
+    prv->credit += prv->credits_per_tslice;
     prv->ncpus++;
     cpu_set(cpu, prv->cpus);
     if ( prv->ncpus == 1 )
     {
         prv->master = cpu;
         init_timer(&prv->master_ticker, csched_acct, prv, cpu);
-        set_timer(&prv->master_ticker, NOW() +
-                  MILLISECS(CSCHED_MSECS_PER_TICK) * CSCHED_TICKS_PER_ACCT);
+        set_timer(&prv->master_ticker,
+                  NOW() + MILLISECS(prv->tslice_ms));
     }
 
     init_timer(&spc->ticker, csched_tick, (void *)(unsigned long)cpu, cpu);
-    set_timer(&spc->ticker, NOW() + MILLISECS(CSCHED_MSECS_PER_TICK));
+    set_timer(&spc->ticker, NOW() + MICROSECS(prv->tick_period_us) );
 
     INIT_LIST_HEAD(&spc->runq);
     spc->runq_sort_last = prv->runq_sort;
@@ -1000,7 +999,7 @@ csched_acct(void* dummy)
          * for one full accounting period. We allow a domain to earn more
          * only when the system-wide credit balance is negative.
          */
-        credit_peak = sdom->active_vcpu_count * CSCHED_CREDITS_PER_ACCT;
+        credit_peak = sdom->active_vcpu_count * prv->credits_per_tslice;
         if ( prv->credit_balance < 0 )
         {
             credit_peak += ( ( -prv->credit_balance
@@ -1012,7 +1011,7 @@ csched_acct(void* dummy)
 
         if ( sdom->cap != 0U )
         {
-            credit_cap = ((sdom->cap * CSCHED_CREDITS_PER_ACCT) + 99) / 100;
+            credit_cap = ((sdom->cap * prv->credits_per_tslice) + 99) / 100;
             if ( credit_cap < credit_peak )
                 credit_peak = credit_cap;
 
@@ -1090,10 +1089,10 @@ csched_acct(void* dummy)
                 }
 
                 /* Lower bound on credits */
-                if ( credit < -CSCHED_CREDITS_PER_TSLICE )
+                if ( credit < -prv->credits_per_tslice )
                 {
                     CSCHED_STAT_CRANK(acct_min_credit);
-                    credit = -CSCHED_CREDITS_PER_TSLICE;
+                    credit = -prv->credits_per_tslice;
                     atomic_set(&svc->credit, credit);
                 }
             }
@@ -1115,7 +1114,7 @@ csched_acct(void* dummy)
                 }
 
                 /* Upper bound on credits means VCPU stops earning */
-                if ( credit > CSCHED_CREDITS_PER_TSLICE )
+                if ( credit > prv->credits_per_tslice )
                 {
                     __csched_vcpu_acct_stop_locked(prv, svc);
                     /* Divide credits in half, so that when it starts
@@ -1139,8 +1138,8 @@ csched_acct(void* dummy)
     prv->runq_sort++;
 
 out:
-    set_timer( &prv->master_ticker, NOW() +
-            MILLISECS(CSCHED_MSECS_PER_TICK) * CSCHED_TICKS_PER_ACCT );
+    set_timer( &prv->master_ticker,
+               NOW() + MILLISECS(prv->tslice_ms));
 }
 
 static void
@@ -1167,7 +1166,7 @@ csched_tick(void *_cpu)
      */
     csched_runq_sort(prv, cpu);
 
-    set_timer(&spc->ticker, NOW() + MILLISECS(CSCHED_MSECS_PER_TICK));
+    set_timer(&spc->ticker, NOW() + MICROSECS(prv->tick_period_us) );
 }
 
 static struct csched_vcpu *
@@ -1373,7 +1372,7 @@ csched_schedule(
      * Return task to run next...
      */
     ret.time = (is_idle_vcpu(snext->vcpu) ?
-                -1 : MILLISECS(CSCHED_MSECS_PER_TSLICE));
+                -1 : MILLISECS(prv->tslice_ms));
     ret.task = snext->vcpu;
 
     CSCHED_VCPU_CHECK(ret.task);
@@ -1463,10 +1462,9 @@ csched_dump(const struct scheduler *ops)
            "\tweight             = %u\n"
            "\trunq_sort          = %u\n"
            "\tdefault-weight     = %d\n"
-           "\tmsecs per tick     = %dms\n"
+           "\ttslice             = %dms\n"
            "\tcredits per msec   = %d\n"
            "\tticks per tslice   = %d\n"
-           "\tticks per acct     = %d\n"
            "\tmigration delay    = %uus\n",
            prv->ncpus,
            prv->master,
@@ -1475,10 +1473,9 @@ csched_dump(const struct scheduler *ops)
            prv->weight,
            prv->runq_sort,
            CSCHED_DEFAULT_WEIGHT,
-           CSCHED_MSECS_PER_TICK,
+           prv->tslice_ms,
            CSCHED_CREDITS_PER_MSEC,
-           CSCHED_TICKS_PER_TSLICE,
-           CSCHED_TICKS_PER_ACCT,
+           prv->ticks_per_tslice,
            vcpu_migration_delay);
 
     cpumask_scnprintf(idlers_buf, sizeof(idlers_buf), prv->idlers);
@@ -1518,6 +1515,13 @@ csched_init(struct scheduler *ops)
     INIT_LIST_HEAD(&prv->active_sdom);
     prv->master = UINT_MAX;
 
+    prv->tslice_ms = sched_credit_tslice_ms;
+    prv->ticks_per_tslice = CSCHED_TICKS_PER_TSLICE;
+    if ( prv->tslice_ms < prv->ticks_per_tslice )
+        prv->ticks_per_tslice = 1;
+    prv->tick_period_us = prv->tslice_ms * 1000 / prv->ticks_per_tslice;
+    prv->credits_per_tslice = CSCHED_CREDITS_PER_MSEC * prv->tslice_ms;
+
     return 0;
 }
 
@@ -1542,13 +1546,16 @@ static void csched_tick_suspend(const struct scheduler *ops, unsigned int cpu)
 
 static void csched_tick_resume(const struct scheduler *ops, unsigned int cpu)
 {
+    struct csched_private *prv;
     struct csched_pcpu *spc;
     uint64_t now = NOW();
 
     spc = CSCHED_PCPU(cpu);
 
-    set_timer(&spc->ticker, now + MILLISECS(CSCHED_MSECS_PER_TICK)
-            - now % MILLISECS(CSCHED_MSECS_PER_TICK) );
+    prv = CSCHED_PRIV(ops);
+
+    set_timer(&spc->ticker, now + MICROSECS(prv->tick_period_us)
+            - now % MICROSECS(prv->tick_period_us) );
 }
 
 static struct csched_private _csched_priv;
