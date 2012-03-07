@@ -257,6 +257,9 @@ uninstall:
 linux26:
 	$(MAKE) 'KERNELS=linux-2.6*' kernels
 
+.PHONY: xenversion
+xenversion:
+	@$(MAKE) --no-print-directory -C xen xenversion
 
 #
 # tboot targets
