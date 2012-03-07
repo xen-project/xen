@@ -567,7 +567,7 @@ __gnttab_map_grant_ref(
             gfn = sha1 ? sha1->frame : sha2->full_page.frame;
             rc = __get_paged_frame(gfn, &frame, !!(op->flags & GNTMAP_readonly), rd);
             if ( rc != GNTST_okay )
-                goto unlock_out;
+                goto unlock_out_clear;
             act->gfn = gfn;
             act->domid = ld->domain_id;
             act->frame = frame;
@@ -722,7 +722,8 @@ __gnttab_map_grant_ref(
     if ( op->flags & GNTMAP_host_map )
         act->pin -= (op->flags & GNTMAP_readonly) ?
             GNTPIN_hstr_inc : GNTPIN_hstw_inc;
-
+ 
+ unlock_out_clear:
     if ( !(op->flags & GNTMAP_readonly) &&
          !(act->pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
         gnttab_clear_flag(_GTF_writing, status);
