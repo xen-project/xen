@@ -35,9 +35,34 @@ bool_t xsave_enabled(const struct vcpu *v);
 #define XSTATE_YMM_SIZE    256
 #define XSAVEOPT        (1 << 0)
 
+#define FCW_DEFAULT               0x037f
+#define MXCSR_DEFAULT             0x1f80
+
 struct xsave_struct
 {
-    struct { char x[512]; } fpu_sse;         /* FPU/MMX, SSE */
+    union {                                  /* FPU/MMX, SSE */
+        char x[512];
+        struct {
+            uint16_t fcw;
+            uint16_t fsw;
+            uint8_t ftw;
+            uint8_t rsvd1;
+            uint16_t fop;
+            union {
+#ifdef __x86_64__
+                uint64_t addr;
+#endif
+                struct {
+                    uint32_t offs;
+                    uint16_t sel;
+                    uint16_t rsvd;
+                };
+            } fip, fdp;
+            uint32_t mxcsr;
+            uint32_t mxcsr_mask;
+            /* data registers follow here */
+        };
+    } fpu_sse;
 
     struct {
         u64 xstate_bv;

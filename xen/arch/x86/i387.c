@@ -287,7 +287,7 @@ void xsave_init(void)
 
 int xsave_alloc_save_area(struct vcpu *v)
 {
-    void *save_area;
+    struct xsave_struct *save_area;
 
     if ( !cpu_has_xsave || is_idle_vcpu(v) )
         return 0;
@@ -300,8 +300,9 @@ int xsave_alloc_save_area(struct vcpu *v)
         return -ENOMEM;
 
     memset(save_area, 0, xsave_cntxt_size);
-    ((u32 *)save_area)[6] = 0x1f80;  /* MXCSR */
-    *(uint64_t *)(save_area + 512) = XSTATE_FP_SSE;  /* XSETBV */
+    save_area->fpu_sse.fcw = FCW_DEFAULT;
+    save_area->fpu_sse.mxcsr = MXCSR_DEFAULT;
+    save_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
 
     v->arch.xsave_area = save_area;
     v->arch.xcr0 = XSTATE_FP_SSE;
