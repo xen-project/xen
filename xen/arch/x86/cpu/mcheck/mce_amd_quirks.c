@@ -19,6 +19,7 @@
 
 #include <asm-x86/msr.h>
 #include <asm-x86/processor.h>
+#include <xen/errno.h>
 
 #include "mce_quirks.h"
 
@@ -56,7 +57,7 @@ mcequirk_lookup_amd_quirkdata(struct cpuinfo_x86 *c)
 
 int mcequirk_amd_apply(enum mcequirk_amd_flags flags)
 {
-	u64 val;
+    u32 lo, hi;
 
 	switch (flags) {
 	case MCEQUIRK_K7_BANK0:
@@ -72,8 +73,8 @@ int mcequirk_amd_apply(enum mcequirk_amd_flags flags)
 		wrmsrl(MSR_IA32_MC4_STATUS, 0ULL);
 		break;
 	case MCEQUIRK_F10_GART:
-		if (rdmsr_safe(MSR_AMD64_MCx_MASK(4), val) == 0)
-			wrmsr_safe(MSR_AMD64_MCx_MASK(4), val | (1 << 10));
+            if (rdmsr_safe(MSR_AMD64_MCx_MASK(4), lo, hi) == 0)
+                    wrmsr_safe(MSR_AMD64_MCx_MASK(4), lo | (1 << 10), hi);
 		break;
 	}
 
