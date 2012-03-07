@@ -34,6 +34,7 @@ typedef s64 s_time_t;
 
 s_time_t get_s_time(void);
 unsigned long get_localtime(struct domain *d);
+uint64_t get_localtime_us(struct domain *d);
 
 struct tm {
     int     tm_sec;         /* seconds */

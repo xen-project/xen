@@ -28,6 +28,8 @@
 #include <asm/hvm/support.h>
 #include <asm/current.h>
 
+#define USEC_PER_SEC    1000000UL
+
 #define domain_vrtc(x) (&(x)->arch.hvm_domain.pl_time.vrtc)
 #define vcpu_vrtc(x)   (domain_vrtc((x)->domain))
 #define vrtc_domain(x) (container_of((x), struct domain, \
@@ -239,6 +241,22 @@ static void rtc_copy_date(RTCState *s)
     s->hw.cmos_data[RTC_YEAR] = to_bcd(s, tm->tm_year % 100);
 }
 
+static int update_in_progress(RTCState *s)
+{
+    uint64_t guest_usec;
+    struct domain *d = vrtc_domain(s);
+
+    if (s->hw.cmos_data[RTC_REG_B] & RTC_SET)
+        return 0;
+
+    guest_usec = get_localtime_us(d);
+    /* UIP bit will be set at last 244us of every second. */
+    if ((guest_usec % USEC_PER_SEC) >= (USEC_PER_SEC - 244))
+        return 1;
+
+    return 0;
+}
+
 static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
 {
     int ret;
@@ -268,6 +286,8 @@ static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
         break;
     case RTC_REG_A:
         ret = s->hw.cmos_data[s->hw.cmos_index];
+        if (update_in_progress(s))
+            ret |= RTC_UIP;
         break;
     case RTC_REG_C:
         ret = s->hw.cmos_data[s->hw.cmos_index];

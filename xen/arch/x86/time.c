@@ -1601,6 +1601,13 @@ unsigned long get_localtime(struct domain *d)
         + d->time_offset_seconds;
 }
 
+/* Return microsecs after 00:00:00 localtime, 1 January, 1970. */
+uint64_t get_localtime_us(struct domain *d)
+{
+    return ((wc_sec + d->time_offset_seconds) * 1000000000ULL
+        + wc_nsec + NOW()) / 1000UL;
+}
+
 unsigned long get_sec(void)
 {
     return wc_sec + (wc_nsec + NOW()) / 1000000000ULL;
