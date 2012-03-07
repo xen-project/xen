@@ -233,7 +233,8 @@ static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
     if ( is_hvm_domain(d) )
     {
         spin_lock(&d->event_lock);
-        ret = unmap_domain_pirq_emuirq(d, unmap->pirq);
+        if ( domain_pirq_to_emuirq(d, unmap->pirq) != IRQ_UNBOUND )
+            ret = unmap_domain_pirq_emuirq(d, unmap->pirq);
         spin_unlock(&d->event_lock);
         if ( unmap->domid == DOMID_SELF || ret )
             goto free_domain;
