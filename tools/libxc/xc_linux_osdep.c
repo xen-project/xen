@@ -218,7 +218,7 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
          * IOCTL_PRIVCMD_MMAPBATCH_V2 is not supported - fall back to
          * IOCTL_PRIVCMD_MMAPBATCH.
          */
-        xen_pfn_t *pfn = malloc(num * sizeof(*pfn));
+        xen_pfn_t *pfn = alloca(num * sizeof(*pfn));
 
         if ( pfn )
         {
@@ -263,8 +263,6 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
                 }
                 break;
             }
-
-            free(pfn);
 
             if ( rc == -ENOENT && i == num )
                 rc = 0;
@@ -532,7 +530,7 @@ static void *do_gnttab_map_grant_refs(xc_gnttab *xch, xc_osdep_handle h,
     void *addr = NULL;
     int i;
 
-    map = malloc(sizeof(*map) +
+    map = alloca(sizeof(*map) +
                  (count - 1) * sizeof(struct ioctl_gntdev_map_grant_ref));
     if ( map == NULL )
         return NULL;
@@ -567,7 +565,6 @@ static void *do_gnttab_map_grant_refs(xc_gnttab *xch, xc_osdep_handle h,
     }
 
  out:
-    free(map);
 
     return addr;
 }
