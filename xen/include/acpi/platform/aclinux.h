@@ -77,10 +77,7 @@
 #define acpi_thread_id struct vcpu *
 
 #define ACPI_ALLOCATE(a)	xmalloc_bytes(a)
-#define ACPI_ALLOCATE_ZEROED(a)	({              \
-    void *p = xmalloc_bytes(a);                 \
-    if ( p ) memset(p, 0, a);                   \
-    p; })
+#define ACPI_ALLOCATE_ZEROED(a)	xzalloc_bytes(a)
 #define ACPI_FREE(a)		xfree(a)
 
 #endif				/* __ACLINUX_H__ */
