@@ -722,10 +722,6 @@ int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
 /* Call when destroying a domain */
 void paging_teardown(struct domain *d)
 {
-    /* Make sure log-dirty is turned off before trying to dismantle it. 
-     * Needs to be done here becuse it's covered by the hap/shadow lock */
-    d->arch.paging.log_dirty.disable_log_dirty(d);
-
     if ( hap_enabled(d) )
         hap_teardown(d);
     else
