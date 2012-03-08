@@ -11,6 +11,8 @@
 #include <xen/types.h>
 #include <xen/list.h>
 #include <xen/spinlock.h>
+#include <xen/pci_regs.h>
+#include <asm/page.h>
 
 /*
  * The PCI interface treats multi-function devices as independent
@@ -29,8 +31,10 @@
 #define PCI_BDF(b,d,f)  ((((b) & 0xff) << 8) | PCI_DEVFN(d,f))
 #define PCI_BDF2(b,df)  ((((b) & 0xff) << 8) | ((df) & 0xff))
 
-#define MAX_MSIX_TABLE_ENTRIES  2048
-#define MAX_MSIX_TABLE_PAGES    8
+#define MAX_MSIX_TABLE_ENTRIES  (PCI_MSIX_FLAGS_QSIZE + 1)
+#define MAX_MSIX_TABLE_PAGES    PFN_UP(MAX_MSIX_TABLE_ENTRIES * \
+                                       PCI_MSIX_ENTRY_SIZE + \
+                                       (~PCI_MSIX_FLAGS_BIRMASK & (PAGE_SIZE - 1)))
 struct pci_dev_info {
     unsigned is_extfn;
     unsigned is_virtfn;
