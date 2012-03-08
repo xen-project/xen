@@ -1917,6 +1917,11 @@ int xc_mem_access_resume(xc_interface *xch, domid_t domain_id,
 int xc_memshr_control(xc_interface *xch,
                       domid_t domid,
                       int enable);
+int xc_memshr_ring_enable(xc_interface *xch, 
+                          domid_t domid, 
+                          uint32_t *port);
+int xc_memshr_ring_disable(xc_interface *xch, 
+                           domid_t domid);
 int xc_memshr_nominate_gfn(xc_interface *xch,
                            domid_t domid,
                            unsigned long gfn,
