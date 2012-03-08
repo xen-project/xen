@@ -558,7 +558,7 @@ long arch_do_domctl(xen_domctl_t *op, XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         switch(mec->op)
         {
-            case XEN_DOMCTL_MEM_EVENT_OP_SHARING_CONTROL:
+            case XEN_DOMCTL_MEM_SHARING_CONTROL:
             {
                 if (mec->u.enable) {
                     ret = -EINVAL; /* not implemented */

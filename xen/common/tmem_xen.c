@@ -13,7 +13,6 @@
 #include <xen/domain_page.h>
 #include <xen/cpu.h>
 #include <xen/init.h>
-#include <asm/p2m.h>
 
 #define EXPORT /* indicates code other modules are dependent upon */
 
@@ -103,6 +102,8 @@ static inline void cli_put_page(tmem_cli_mfn_t cmfn, void *cli_va, pfp_t *cli_pf
     ASSERT(0);
 }
 #else
+#include <asm/p2m.h>
+
 static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
                                  pfp_t **pcli_pfp, bool_t cli_write)
 {
