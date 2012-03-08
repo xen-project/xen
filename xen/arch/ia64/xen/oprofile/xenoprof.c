@@ -27,7 +27,7 @@
 #include <asm/vmx.h>    /* for vmx_user_mode() */
 
 int
-xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs)
+xenoprofile_get_mode(const struct vcpu *v, const struct cpu_user_regs *regs)
 {
     int mode;
 

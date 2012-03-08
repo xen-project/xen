@@ -56,16 +56,15 @@ static inline void ibs_init(void) {}
 #define ibs_caps 0
 #endif
 
-int xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs);
+int xenoprofile_get_mode(const struct vcpu *, const struct cpu_user_regs *);
 
 static inline int xenoprof_backtrace_supported(void)
 {
     return 1;
 }
 
-void xenoprof_backtrace(
-    struct domain *d, struct vcpu *vcpu, 
-    struct cpu_user_regs *const regs, unsigned long depth, int mode);
+void xenoprof_backtrace(struct vcpu *, const struct cpu_user_regs *,
+                        unsigned long depth, int mode);
 
 #define xenoprof_shared_gmfn(d, gmaddr, maddr)                      \
     do {                                                            \

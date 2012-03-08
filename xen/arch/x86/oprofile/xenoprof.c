@@ -10,6 +10,7 @@
 
 #include <xen/guest_access.h>
 #include <xen/sched.h>
+#include <xen/xenoprof.h>
 #include <public/xenoprof.h>
 #ifdef CONFIG_COMPAT
 #include <compat/xenoprof.h>
@@ -77,7 +78,8 @@ int compat_oprof_arch_counter(XEN_GUEST_HANDLE(void) arg)
 }
 #endif
 
-int xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs)
+int xenoprofile_get_mode(const struct vcpu *v,
+                         const struct cpu_user_regs *regs)
 {
     if ( !guest_mode(regs) )
         return 2;

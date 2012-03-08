@@ -45,14 +45,13 @@ static inline int xenoprof_arch_ibs_counter(XEN_GUEST_HANDLE(void) arg)
 
 struct vcpu;
 struct cpu_user_regs;
-int xenoprofile_get_mode(struct vcpu *v, struct cpu_user_regs * const regs);
+int xenoprofile_get_mode(const struct vcpu *, const struct cpu_user_regs *);
 static inline int xenoprof_backtrace_supported(void)
 {
     return 0;
 }
-static inline void xenoprof_backtrace(
-    struct domain *d, struct vcpu *vcpu, 
-    struct pt_regs *const regs, unsigned long depth, int mode)
+static inline void xenoprof_backtrace(struct vcpu *vcpu,
+    const struct pt_regs *regs, unsigned long depth, int mode)
 {
     /* To be implemented */
     return;

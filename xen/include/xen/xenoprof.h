@@ -68,8 +68,7 @@ int is_active(struct domain *d);
 int is_passive(struct domain *d);
 void free_xenoprof_pages(struct domain *d);
 
-int xenoprof_add_trace(struct domain *d, struct vcpu *v, 
-                       uint64_t eip, int mode);
+int xenoprof_add_trace(struct vcpu *, uint64_t pc, int mode);
 
 #define PMU_OWNER_NONE          0
 #define PMU_OWNER_XENOPROF      1
@@ -77,8 +76,7 @@ int xenoprof_add_trace(struct domain *d, struct vcpu *v,
 int acquire_pmu_ownship(int pmu_ownership);
 void release_pmu_ownship(int pmu_ownership);
 
-void xenoprof_log_event(struct vcpu *vcpu,
-                        struct cpu_user_regs * regs, uint64_t eip,
-                        int mode, int event);
+void xenoprof_log_event(struct vcpu *, const struct cpu_user_regs *,
+                        uint64_t pc, int mode, int event);
 
 #endif  /* __XEN__XENOPROF_H__ */
