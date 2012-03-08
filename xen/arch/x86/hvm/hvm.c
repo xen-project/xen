@@ -339,6 +339,19 @@ static void hvm_init_ioreq_page(
     domain_pause(d);
 }
 
+void destroy_ring_for_helper(
+    void **_va, struct page_info *page)
+{
+    void *va = *_va;
+
+    if ( va != NULL )
+    {
+        unmap_domain_page_global(va);
+        put_page_and_type(page);
+        *_va = NULL;
+    }
+}
+
 static void hvm_destroy_ioreq_page(
     struct domain *d, struct hvm_ioreq_page *iorp)
 {
@@ -346,18 +359,14 @@ static void hvm_destroy_ioreq_page(
 
     ASSERT(d->is_dying);
 
-    if ( iorp->va != NULL )
-    {
-        unmap_domain_page_global(iorp->va);
-        put_page_and_type(iorp->page);
-        iorp->va = NULL;
-    }
+    destroy_ring_for_helper(&iorp->va, iorp->page);
 
     spin_unlock(&iorp->lock);
 }
 
-static int hvm_set_ioreq_page(
-    struct domain *d, struct hvm_ioreq_page *iorp, unsigned long gmfn)
+int prepare_ring_for_helper(
+    struct domain *d, unsigned long gmfn, struct page_info **_page,
+    void **_va)
 {
     struct page_info *page;
     p2m_type_t p2mt;
@@ -398,14 +407,30 @@ static int hvm_set_ioreq_page(
         return -ENOMEM;
     }
 
+    *_va = va;
+    *_page = page;
+
+    put_gfn(d, gmfn);
+
+    return 0;
+}
+
+static int hvm_set_ioreq_page(
+    struct domain *d, struct hvm_ioreq_page *iorp, unsigned long gmfn)
+{
+    struct page_info *page;
+    void *va;
+    int rc;
+
+    if ( (rc = prepare_ring_for_helper(d, gmfn, &page, &va)) )
+        return rc;
+
     spin_lock(&iorp->lock);
 
     if ( (iorp->va != NULL) || d->is_dying )
     {
+        destroy_ring_for_helper(&iorp->va, iorp->page);
         spin_unlock(&iorp->lock);
-        unmap_domain_page_global(va);
-        put_page_and_type(mfn_to_page(mfn));
-        put_gfn(d, gmfn);
         return -EINVAL;
     }
 
@@ -413,7 +438,6 @@ static int hvm_set_ioreq_page(
     iorp->page = page;
 
     spin_unlock(&iorp->lock);
-    put_gfn(d, gmfn);
 
     domain_unpause(d);
 
