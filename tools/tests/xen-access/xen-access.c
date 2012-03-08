@@ -269,6 +269,11 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
                    (mem_event_sring_t *)xenaccess->mem_event.ring_page,
                    PAGE_SIZE);
 
+    /* Now that the ring is set, remove it from the guest's physmap */
+    if ( xc_domain_decrease_reservation_exact(xch, 
+                    xenaccess->mem_event.domain_id, 1, 0, &ring_pfn) )
+        PERROR("Failed to remove ring from guest physmap");
+
     /* Get platform info */
     xenaccess->platform_info = malloc(sizeof(xc_platform_info_t));
     if ( xenaccess->platform_info == NULL )

@@ -416,6 +416,11 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
                    (mem_event_sring_t *)paging->mem_event.ring_page,
                    PAGE_SIZE);
 
+    /* Now that the ring is set, remove it from the guest's physmap */
+    if ( xc_domain_decrease_reservation_exact(xch, 
+                    paging->mem_event.domain_id, 1, 0, &ring_pfn) )
+        PERROR("Failed to remove ring from guest physmap");
+
     /* Get max_pages from guest if not provided via cmdline */
     if ( !paging->max_pages )
     {
