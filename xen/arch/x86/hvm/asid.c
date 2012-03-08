@@ -25,6 +25,10 @@
 #include <xen/percpu.h>
 #include <asm/hvm/asid.h>
 
+/* Xen command-line option to enable ASIDs */
+static int opt_asid_enabled = 1;
+boolean_param("asid", opt_asid_enabled);
+
 /*
  * ASIDs partition the physical TLB.  In the current implementation ASIDs are
  * introduced to reduce the number of TLB flushes.  Each time the guest's
@@ -62,7 +66,7 @@ void hvm_asid_init(int nasids)
     struct hvm_asid_data *data = &this_cpu(hvm_asid_data);
 
     data->max_asid = nasids - 1;
-    data->disabled = (nasids <= 1);
+    data->disabled = !opt_asid_enabled || (nasids <= 1);
 
     if ( g_disabled != data->disabled )
     {
