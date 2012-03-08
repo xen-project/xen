@@ -431,6 +431,13 @@ static void mem_access_notification(struct vcpu *v, unsigned int port)
         p2m_mem_access_resume(v->domain);
 }
 
+/* Registered with Xen-bound event channel for incoming notifications. */
+static void mem_sharing_notification(struct vcpu *v, unsigned int port)
+{
+    if ( likely(v->domain->mem_event->share.ring_page != NULL) )
+        mem_sharing_sharing_resume(v->domain);
+}
+
 struct domain *get_mem_event_op_target(uint32_t domain, int *rc)
 {
     struct domain *d;
@@ -585,6 +592,40 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
         break;
 
         case XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE:
+        {
+            if ( med->ring_page )
+                rc = mem_event_disable(d, med);
+        }
+        break;
+
+        default:
+            rc = -ENOSYS;
+            break;
+        }
+    }
+    break;
+
+    case XEN_DOMCTL_MEM_EVENT_OP_SHARING: 
+    {
+        struct mem_event_domain *med = &d->mem_event->share;
+        rc = -EINVAL;
+
+        switch( mec->op )
+        {
+        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_ENABLE:
+        {
+            rc = -ENODEV;
+            /* Only HAP is supported */
+            if ( !hap_enabled(d) )
+                break;
+
+            rc = mem_event_enable(d, mec, med, _VPF_mem_sharing, 
+                                    HVM_PARAM_SHARING_RING_PFN,
+                                    mem_sharing_notification);
+        }
+        break;
+
+        case XEN_DOMCTL_MEM_EVENT_OP_SHARING_DISABLE:
         {
             if ( med->ring_page )
                 rc = mem_event_disable(d, med);

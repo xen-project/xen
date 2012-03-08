@@ -711,7 +711,7 @@ struct xen_domctl_gdbsx_domstatus {
 /* XEN_DOMCTL_mem_event_op */
 
 /*
-* Domain memory paging
+ * Domain memory paging
  * Page memory in and out.
  * Domctl interface to set up and tear down the 
  * pager<->hypervisor interface. Use XENMEM_paging_op*
@@ -740,6 +740,24 @@ struct xen_domctl_gdbsx_domstatus {
 
 #define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE     0
 #define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_DISABLE    1
+
+/*
+ * Sharing ENOMEM helper.
+ *
+ * As with paging, use the domctl for teardown/setup of the
+ * helper<->hypervisor interface.
+ *
+ * If setup, this ring is used to communicate failed allocations
+ * in the unshare path. XENMEM_sharing_op_resume is used to wake up
+ * vcpus that could not unshare.
+ *
+ * Note that shring can be turned on (as per the domctl below)
+ * *without* this ring being setup.
+ */
+#define XEN_DOMCTL_MEM_EVENT_OP_SHARING           3
+
+#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_ENABLE    0
+#define XEN_DOMCTL_MEM_EVENT_OP_SHARING_DISABLE   1
 
 /* Use for teardown/setup of helper<->hypervisor interface for paging, 
  * access and sharing.*/
