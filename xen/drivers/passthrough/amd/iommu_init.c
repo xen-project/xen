@@ -33,6 +33,8 @@ static int nr_amd_iommus;
 static long amd_iommu_cmd_buffer_entries = IOMMU_CMD_BUFFER_DEFAULT_ENTRIES;
 static long amd_iommu_event_log_entries = IOMMU_EVENT_LOG_DEFAULT_ENTRIES;
 
+static struct tasklet amd_iommu_irq_tasklet;
+
 unsigned short ivrs_bdf_entries;
 struct ivrs_mappings *ivrs_mappings;
 struct list_head amd_iommu_head;
@@ -517,34 +519,70 @@ static void parse_event_log_entry(u32 entry[])
     }
 }
 
+static void do_amd_iommu_irq(unsigned long data)
+{
+    struct amd_iommu *iommu;
+
+    if ( !iommu_found() )
+    {
+        AMD_IOMMU_DEBUG("no device found, something must be very wrong!\n");
+        return;
+   }
+
+    /*
+     * No matter from where the interrupt came from, check all the
+     * IOMMUs present in the system. This allows for having just one
+     * tasklet (instead of one per each IOMMUs).
+     */
+    for_each_amd_iommu ( iommu )
+    {
+        u32 entry;
+        unsigned long flags;
+        int of;
+
+        spin_lock_irqsave(&iommu->lock, flags);
+        amd_iommu_read_event_log(iommu);
+
+        /* check event overflow */
+        entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+        of = get_field_from_reg_u32(entry,
+                                   IOMMU_STATUS_EVENT_OVERFLOW_MASK,
+                                   IOMMU_STATUS_EVENT_OVERFLOW_SHIFT);
+
+        /* reset event log if event overflow */
+        if ( of )
+            amd_iommu_reset_event_log(iommu);
+
+        /* reset interrupt status bit */
+        entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+        set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+                             IOMMU_STATUS_EVENT_LOG_INT_MASK,
+                             IOMMU_STATUS_EVENT_LOG_INT_SHIFT, &entry);
+        writel(entry, iommu->mmio_base+IOMMU_STATUS_MMIO_OFFSET);
+        spin_unlock_irqrestore(&iommu->lock, flags);
+    }
+}
+
 static void amd_iommu_page_fault(int irq, void *dev_id,
                              struct cpu_user_regs *regs)
 {
     u32 entry;
     unsigned long flags;
-    int of;
     struct amd_iommu *iommu = dev_id;
 
     spin_lock_irqsave(&iommu->lock, flags);
-    amd_iommu_read_event_log(iommu);
 
-    /*check event overflow */
+    /* Silence interrupts from both event logging */
     entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
-    of = get_field_from_reg_u32(entry,
-                               IOMMU_STATUS_EVENT_OVERFLOW_MASK,
-                               IOMMU_STATUS_EVENT_OVERFLOW_SHIFT);
-
-    /* reset event log if event overflow */
-    if ( of )
-        amd_iommu_reset_event_log(iommu);
-
-    /* reset interrupt status bit */
-    entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
-    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
+    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
                          IOMMU_STATUS_EVENT_LOG_INT_MASK,
                          IOMMU_STATUS_EVENT_LOG_INT_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_STATUS_MMIO_OFFSET);
+
     spin_unlock_irqrestore(&iommu->lock, flags);
+
+    /* It is the tasklet that will clear the logs and re-enable interrupts */
+    tasklet_schedule(&amd_iommu_irq_tasklet);
 }
 
 static int set_iommu_interrupt_handler(struct amd_iommu *iommu)
@@ -688,6 +726,8 @@ static int __init amd_iommu_init_one(struct amd_iommu *iommu)
     enable_iommu(iommu);
     printk("AMD-Vi: IOMMU %d Enabled.\n", nr_amd_iommus );
     nr_amd_iommus++;
+
+    softirq_tasklet_init(&amd_iommu_irq_tasklet, do_amd_iommu_irq, 0);
 
     return 0;
 
