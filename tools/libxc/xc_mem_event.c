@@ -24,7 +24,7 @@
 #include "xc_private.h"
 
 int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
-                         unsigned int mode, uint32_t *port, void *ring_page)
+                         unsigned int mode, uint32_t *port)
 {
     DECLARE_DOMCTL;
     int rc;
@@ -33,7 +33,6 @@ int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
     domctl.domain = domain_id;
     domctl.u.mem_event_op.op = op;
     domctl.u.mem_event_op.mode = mode;
-    domctl.u.mem_event_op.ring_addr = (unsigned long) ring_page;
     
     rc = do_domctl(xch, &domctl);
     if ( !rc && port )

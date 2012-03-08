@@ -1639,6 +1639,42 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             goto out;
         }
 
+        chunk.id = XC_SAVE_ID_HVM_PAGING_RING_PFN;
+        chunk.data = 0;
+        xc_get_hvm_param(xch, dom, HVM_PARAM_PAGING_RING_PFN,
+                         (unsigned long *)&chunk.data);
+
+        if ( (chunk.data != 0) &&
+             wrexact(io_fd, &chunk, sizeof(chunk)) )
+        {
+            PERROR("Error when writing the paging ring pfn for guest");
+            goto out;
+        }
+
+        chunk.id = XC_SAVE_ID_HVM_ACCESS_RING_PFN;
+        chunk.data = 0;
+        xc_get_hvm_param(xch, dom, HVM_PARAM_ACCESS_RING_PFN,
+                         (unsigned long *)&chunk.data);
+
+        if ( (chunk.data != 0) &&
+             wrexact(io_fd, &chunk, sizeof(chunk)) )
+        {
+            PERROR("Error when writing the access ring pfn for guest");
+            goto out;
+        }
+
+        chunk.id = XC_SAVE_ID_HVM_SHARING_RING_PFN;
+        chunk.data = 0;
+        xc_get_hvm_param(xch, dom, HVM_PARAM_SHARING_RING_PFN,
+                         (unsigned long *)&chunk.data);
+
+        if ( (chunk.data != 0) &&
+             wrexact(io_fd, &chunk, sizeof(chunk)) )
+        {
+            PERROR("Error when writing the sharing ring pfn for guest");
+            goto out;
+        }
+
         chunk.id = XC_SAVE_ID_HVM_VM86_TSS;
         chunk.data = 0;
         xc_get_hvm_param(xch, dom, HVM_PARAM_VM86_TSS,

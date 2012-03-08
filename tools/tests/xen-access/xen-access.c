@@ -166,36 +166,13 @@ int xc_wait_for_event_or_timeout(xc_interface *xch, xc_evtchn *xce, unsigned lon
  err:
     return -errno;
 }
- 
-static void *init_page(void)
-{
-    void *buffer;
-    int ret;
-
-    /* Allocated page memory */
-    ret = posix_memalign(&buffer, PAGE_SIZE, PAGE_SIZE);
-    if ( ret != 0 )
-        goto out_alloc;
-
-    /* Lock buffer in memory so it can't be paged out */
-    ret = mlock(buffer, PAGE_SIZE);
-    if ( ret != 0 )
-        goto out_lock;
-
-    return buffer;
-
-    munlock(buffer, PAGE_SIZE);
- out_lock:
-    free(buffer);
- out_alloc:
-    return NULL;
-}
 
 xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
 {
     xenaccess_t *xenaccess;
     xc_interface *xch;
     int rc;
+    unsigned long ring_pfn, mmap_pfn;
 
     xch = xc_interface_open(NULL, NULL, 0);
     if ( !xch )
@@ -214,28 +191,42 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     /* Set domain id */
     xenaccess->mem_event.domain_id = domain_id;
 
-    /* Initialise ring page */
-    xenaccess->mem_event.ring_page = init_page();
-    if ( xenaccess->mem_event.ring_page == NULL )
-    {
-        ERROR("Error initialising ring page");
-        goto err;
-    }
-
-
-    /* Initialise ring */
-    SHARED_RING_INIT((mem_event_sring_t *)xenaccess->mem_event.ring_page);
-    BACK_RING_INIT(&xenaccess->mem_event.back_ring,
-                   (mem_event_sring_t *)xenaccess->mem_event.ring_page,
-                   PAGE_SIZE);
-
     /* Initialise lock */
     mem_event_ring_lock_init(&xenaccess->mem_event);
 
+    /* Map the ring page */
+    xc_get_hvm_param(xch, xenaccess->mem_event.domain_id, 
+                        HVM_PARAM_ACCESS_RING_PFN, &ring_pfn);
+    mmap_pfn = ring_pfn;
+    xenaccess->mem_event.ring_page = 
+        xc_map_foreign_batch(xch, xenaccess->mem_event.domain_id, 
+                                PROT_READ | PROT_WRITE, &mmap_pfn, 1);
+    if ( mmap_pfn & XEN_DOMCTL_PFINFO_XTAB )
+    {
+        /* Map failed, populate ring page */
+        rc = xc_domain_populate_physmap_exact(xenaccess->xc_handle, 
+                                              xenaccess->mem_event.domain_id,
+                                              1, 0, 0, &ring_pfn);
+        if ( rc != 0 )
+        {
+            PERROR("Failed to populate ring gfn\n");
+            goto err;
+        }
+
+        mmap_pfn = ring_pfn;
+        xenaccess->mem_event.ring_page = 
+            xc_map_foreign_batch(xch, xenaccess->mem_event.domain_id, 
+                                    PROT_READ | PROT_WRITE, &mmap_pfn, 1);
+        if ( mmap_pfn & XEN_DOMCTL_PFINFO_XTAB )
+        {
+            PERROR("Could not map the ring page\n");
+            goto err;
+        }
+    }
+
     /* Initialise Xen */
     rc = xc_mem_access_enable(xenaccess->xc_handle, xenaccess->mem_event.domain_id,
-                             &xenaccess->mem_event.evtchn_port,
-                             xenaccess->mem_event.ring_page);
+                             &xenaccess->mem_event.evtchn_port);
     if ( rc != 0 )
     {
         switch ( errno ) {
@@ -271,6 +262,12 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     }
 
     xenaccess->mem_event.port = rc;
+
+    /* Initialise ring */
+    SHARED_RING_INIT((mem_event_sring_t *)xenaccess->mem_event.ring_page);
+    BACK_RING_INIT(&xenaccess->mem_event.back_ring,
+                   (mem_event_sring_t *)xenaccess->mem_event.ring_page,
+                   PAGE_SIZE);
 
     /* Get platform info */
     xenaccess->platform_info = malloc(sizeof(xc_platform_info_t));
@@ -316,8 +313,7 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     {
         if ( xenaccess->mem_event.ring_page )
         {
-            munlock(xenaccess->mem_event.ring_page, PAGE_SIZE);
-            free(xenaccess->mem_event.ring_page);
+            munmap(xenaccess->mem_event.ring_page, PAGE_SIZE);
         }
 
         free(xenaccess->platform_info);
@@ -337,6 +333,7 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
         return 0;
 
     /* Tear down domain xenaccess in Xen */
+    munmap(xenaccess->mem_event.ring_page, PAGE_SIZE);
     rc = xc_mem_access_disable(xenaccess->xc_handle, xenaccess->mem_event.domain_id);
     if ( rc != 0 )
     {

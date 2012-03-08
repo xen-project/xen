@@ -254,6 +254,10 @@
 #define XC_SAVE_ID_COMPRESSED_DATA    -12 /* Marker to indicate arrival of compressed data */
 #define XC_SAVE_ID_ENABLE_COMPRESSION -13 /* Marker to enable compression logic at receiver side */
 #define XC_SAVE_ID_HVM_GENERATION_ID_ADDR -14
+/* Markers for the pfn's hosting these mem event rings */
+#define XC_SAVE_ID_HVM_PAGING_RING_PFN  -15
+#define XC_SAVE_ID_HVM_ACCESS_RING_PFN  -16
+#define XC_SAVE_ID_HVM_SHARING_RING_PFN -17
 
 /*
 ** We process save/restore/migrate in batches of pages; the below

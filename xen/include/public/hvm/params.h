@@ -142,6 +142,11 @@
 /* Boolean: Enable nestedhvm (hvm only) */
 #define HVM_PARAM_NESTEDHVM    24
 
-#define HVM_NR_PARAMS          27
+/* Params for the mem event rings */
+#define HVM_PARAM_PAGING_RING_PFN   27
+#define HVM_PARAM_ACCESS_RING_PFN   28
+#define HVM_PARAM_SHARING_RING_PFN  29
+
+#define HVM_NR_PARAMS          30
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

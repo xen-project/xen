@@ -192,6 +192,7 @@ struct mem_event_domain
     unsigned char target_producers;
     /* shared ring page */
     void *ring_page;
+    struct page_info *ring_pg_struct;
     /* front-end ring */
     mem_event_front_ring_t front_ring;
     /* event channel port (vcpu0 only) */

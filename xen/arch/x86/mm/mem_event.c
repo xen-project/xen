@@ -44,16 +44,11 @@ static int mem_event_enable(
     xen_domctl_mem_event_op_t *mec,
     struct mem_event_domain *med,
     int pause_flag,
+    int param,
     xen_event_channel_notification_t notification_fn)
 {
     int rc;
-    struct domain *dom_mem_event = current->domain;
-    struct vcpu *v = current;
-    unsigned long ring_addr = mec->ring_addr;
-    l1_pgentry_t l1e;
-    unsigned long ring_gfn = 0; /* gcc ... */
-    p2m_type_t p2mt;
-    mfn_t ring_mfn;
+    unsigned long ring_gfn = d->arch.hvm_domain.params[param];
 
     /* Only one helper at a time. If the helper crashed,
      * the ring is in an undefined state and so is the guest.
@@ -61,22 +56,18 @@ static int mem_event_enable(
     if ( med->ring_page )
         return -EBUSY;
 
-    /* Get MFN of ring page */
-    guest_get_eff_l1e(v, ring_addr, &l1e);
-    ring_gfn = l1e_get_pfn(l1e);
-    ring_mfn = get_gfn(dom_mem_event, ring_gfn, &p2mt);
-
-    if ( unlikely(!mfn_valid(mfn_x(ring_mfn))) )
-    {
-        put_gfn(dom_mem_event, ring_gfn);
-        return -EINVAL;
-    }
+    /* The parameter defaults to zero, and it should be 
+     * set to something */
+    if ( ring_gfn == 0 )
+        return -ENOSYS;
 
     mem_event_ring_lock_init(med);
+    mem_event_ring_lock(med);
 
-    /* Map ring page */
-    med->ring_page = map_domain_page(mfn_x(ring_mfn));
-    put_gfn(dom_mem_event, ring_gfn);
+    rc = prepare_ring_for_helper(d, ring_gfn, &med->ring_pg_struct, 
+                                    &med->ring_page);
+    if ( rc < 0 )
+        goto err;
 
     /* Set the number of currently blocked vCPUs to 0. */
     med->blocked = 0;
@@ -101,11 +92,13 @@ static int mem_event_enable(
     /* Initialize the last-chance wait queue. */
     init_waitqueue_head(&med->wq);
 
+    mem_event_ring_unlock(med);
     return 0;
 
  err:
-    unmap_domain_page(med->ring_page);
-    med->ring_page = NULL;
+    destroy_ring_for_helper(&med->ring_page, 
+                            med->ring_pg_struct);
+    mem_event_ring_unlock(med);
 
     return rc;
 }
@@ -221,9 +214,6 @@ static int mem_event_disable(struct domain *d, struct mem_event_domain *med)
 
         /* Free domU's event channel and leave the other one unbound */
         free_xen_event_channel(d->vcpu[0], med->xen_port);
-        
-        unmap_domain_page(med->ring_page);
-        med->ring_page = NULL;
 
         /* Unblock all vCPUs */
         for_each_vcpu ( d, v )
@@ -235,6 +225,8 @@ static int mem_event_disable(struct domain *d, struct mem_event_domain *med)
             }
         }
 
+        destroy_ring_for_helper(&med->ring_page, 
+                                med->ring_pg_struct);
         mem_event_ring_unlock(med);
     }
 
@@ -548,7 +540,9 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             if ( p2m->pod.entry_count )
                 break;
 
-            rc = mem_event_enable(d, mec, med, _VPF_mem_paging, mem_paging_notification);
+            rc = mem_event_enable(d, mec, med, _VPF_mem_paging, 
+                                    HVM_PARAM_PAGING_RING_PFN,
+                                    mem_paging_notification);
         }
         break;
 
@@ -584,7 +578,9 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 break;
 
-            rc = mem_event_enable(d, mec, med, _VPF_mem_access, mem_access_notification);
+            rc = mem_event_enable(d, mec, med, _VPF_mem_access, 
+                                    HVM_PARAM_ACCESS_RING_PFN,
+                                    mem_access_notification);
         }
         break;
 

@@ -1892,13 +1892,12 @@ int xc_tmem_restore_extra(xc_interface *xch, int dom, int fd);
  * mem_event operations
  */
 int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
-                         unsigned int mode, uint32_t *port, void *ring_page);
+                         unsigned int mode, uint32_t *port);
 int xc_mem_event_memop(xc_interface *xch, domid_t domain_id, 
                         unsigned int op, unsigned int mode,
                         uint64_t gfn, void *buffer);
 
-int xc_mem_paging_enable(xc_interface *xch, domid_t domain_id,
-                         uint32_t *port, void *ring_page);
+int xc_mem_paging_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
 int xc_mem_paging_disable(xc_interface *xch, domid_t domain_id);
 int xc_mem_paging_nominate(xc_interface *xch, domid_t domain_id,
                            unsigned long gfn);
@@ -1907,8 +1906,7 @@ int xc_mem_paging_prep(xc_interface *xch, domid_t domain_id, unsigned long gfn);
 int xc_mem_paging_load(xc_interface *xch, domid_t domain_id, 
                         unsigned long gfn, void *buffer);
 
-int xc_mem_access_enable(xc_interface *xch, domid_t domain_id,
-                         uint32_t *port, void *ring_page);
+int xc_mem_access_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
 int xc_mem_access_disable(xc_interface *xch, domid_t domain_id);
 int xc_mem_access_resume(xc_interface *xch, domid_t domain_id,
                          unsigned long gfn);

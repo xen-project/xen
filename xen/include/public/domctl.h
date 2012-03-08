@@ -748,7 +748,6 @@ struct xen_domctl_mem_event_op {
     uint32_t       mode;         /* XEN_DOMCTL_MEM_EVENT_OP_* */
 
     uint32_t port;              /* OUT: event channel for ring */
-    uint64_aligned_t ring_addr; /* IN:  Virtual address of ring page */
 };
 typedef struct xen_domctl_mem_event_op xen_domctl_mem_event_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_event_op_t);

@@ -677,6 +677,9 @@ typedef struct {
     int max_vcpu_id;
     uint64_t vcpumap;
     uint64_t identpt;
+    uint64_t paging_ring_pfn;
+    uint64_t access_ring_pfn;
+    uint64_t sharing_ring_pfn;
     uint64_t vm86_tss;
     uint64_t console_pfn;
     uint64_t acpi_ioport_location;
@@ -748,6 +751,39 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
             return -1;
         }
         // DPRINTF("EPT identity map address: %llx\n", buf->identpt);
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
+
+    case XC_SAVE_ID_HVM_PAGING_RING_PFN:
+        /* Skip padding 4 bytes then read the paging ring location. */
+        if ( RDEXACT(fd, &buf->paging_ring_pfn, sizeof(uint32_t)) ||
+             RDEXACT(fd, &buf->paging_ring_pfn, sizeof(uint64_t)) )
+        {
+            PERROR("error read the paging ring pfn");
+            return -1;
+        }
+        // DPRINTF("paging ring pfn address: %llx\n", buf->paging_ring_pfn);
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
+
+    case XC_SAVE_ID_HVM_ACCESS_RING_PFN:
+        /* Skip padding 4 bytes then read the mem access ring location. */
+        if ( RDEXACT(fd, &buf->access_ring_pfn, sizeof(uint32_t)) ||
+             RDEXACT(fd, &buf->access_ring_pfn, sizeof(uint64_t)) )
+        {
+            PERROR("error read the access ring pfn");
+            return -1;
+        }
+        // DPRINTF("access ring pfn address: %llx\n", buf->access_ring_pfn);
+        return pagebuf_get_one(xch, ctx, buf, fd, dom);
+
+    case XC_SAVE_ID_HVM_SHARING_RING_PFN:
+        /* Skip padding 4 bytes then read the sharing ring location. */
+        if ( RDEXACT(fd, &buf->sharing_ring_pfn, sizeof(uint32_t)) ||
+             RDEXACT(fd, &buf->sharing_ring_pfn, sizeof(uint64_t)) )
+        {
+            PERROR("error read the sharing ring pfn");
+            return -1;
+        }
+        // DPRINTF("sharing ring pfn address: %llx\n", buf->sharing_ring_pfn);
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
 
     case XC_SAVE_ID_HVM_VM86_TSS:
@@ -1460,6 +1496,12 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
             /* should this be deferred? does it change? */
             if ( pagebuf.identpt )
                 xc_set_hvm_param(xch, dom, HVM_PARAM_IDENT_PT, pagebuf.identpt);
+            if ( pagebuf.paging_ring_pfn )
+                xc_set_hvm_param(xch, dom, HVM_PARAM_PAGING_RING_PFN, pagebuf.paging_ring_pfn);
+            if ( pagebuf.access_ring_pfn )
+                xc_set_hvm_param(xch, dom, HVM_PARAM_ACCESS_RING_PFN, pagebuf.access_ring_pfn);
+            if ( pagebuf.sharing_ring_pfn )
+                xc_set_hvm_param(xch, dom, HVM_PARAM_SHARING_RING_PFN, pagebuf.sharing_ring_pfn);
             if ( pagebuf.vm86_tss )
                 xc_set_hvm_param(xch, dom, HVM_PARAM_VM86_TSS, pagebuf.vm86_tss);
             if ( pagebuf.console_pfn )

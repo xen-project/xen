@@ -38,12 +38,15 @@
 #define SUPERPAGE_1GB_SHIFT   18
 #define SUPERPAGE_1GB_NR_PFNS (1UL << SUPERPAGE_1GB_SHIFT)
 
-#define SPECIALPAGE_BUFIOREQ 0
-#define SPECIALPAGE_XENSTORE 1
-#define SPECIALPAGE_IOREQ    2
-#define SPECIALPAGE_IDENT_PT 3
-#define SPECIALPAGE_CONSOLE  4
-#define NR_SPECIAL_PAGES     5
+#define SPECIALPAGE_PAGING   0
+#define SPECIALPAGE_ACCESS   1
+#define SPECIALPAGE_SHARING  2
+#define SPECIALPAGE_BUFIOREQ 3
+#define SPECIALPAGE_XENSTORE 4
+#define SPECIALPAGE_IOREQ    5
+#define SPECIALPAGE_IDENT_PT 6
+#define SPECIALPAGE_CONSOLE  7
+#define NR_SPECIAL_PAGES     8
 #define special_pfn(x) (0xff000u - NR_SPECIAL_PAGES + (x))
 
 static void build_hvm_info(void *hvm_info_page, uint64_t mem_size,
@@ -356,6 +359,12 @@ static int setup_guest(xc_interface *xch,
                      special_pfn(SPECIALPAGE_IOREQ));
     xc_set_hvm_param(xch, dom, HVM_PARAM_CONSOLE_PFN,
                      special_pfn(SPECIALPAGE_CONSOLE));
+    xc_set_hvm_param(xch, dom, HVM_PARAM_PAGING_RING_PFN,
+                     special_pfn(SPECIALPAGE_PAGING));
+    xc_set_hvm_param(xch, dom, HVM_PARAM_ACCESS_RING_PFN,
+                     special_pfn(SPECIALPAGE_ACCESS));
+    xc_set_hvm_param(xch, dom, HVM_PARAM_SHARING_RING_PFN,
+                     special_pfn(SPECIALPAGE_SHARING));
 
     /*
      * Identity-map page table is required for running with CR0.PG=0 when
