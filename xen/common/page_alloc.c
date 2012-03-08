@@ -373,7 +373,10 @@ static void __init setup_low_mem_virq(void)
 
 static void check_low_mem_virq(void)
 {
-    if ( unlikely(total_avail_pages <= low_mem_virq_th) )
+    unsigned long avail_pages = total_avail_pages +
+        opt_tmem ? tmem_freeable_pages() : 0;
+
+    if ( unlikely(avail_pages <= low_mem_virq_th) )
     {
         send_global_virq(VIRQ_ENOMEM);
 
@@ -387,7 +390,7 @@ static void check_low_mem_virq(void)
         return;
     }
 
-    if ( unlikely(total_avail_pages >= low_mem_virq_high) )
+    if ( unlikely(avail_pages >= low_mem_virq_high) )
     {
         /* Reset hysteresis. Bring threshold up one order.
          * If we are back where originally set, set high

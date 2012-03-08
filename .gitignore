@@ -203,6 +203,7 @@ tools/misc/xen-hvmctx
 tools/misc/gtraceview
 tools/misc/gtracestat
 tools/misc/xenlockprof
+tools/misc/lowmemd
 tools/pygrub/build/*
 tools/python/build/*
 tools/python/xen/util/path.py
