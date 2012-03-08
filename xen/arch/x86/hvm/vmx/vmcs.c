@@ -93,11 +93,6 @@ static void __init vmx_display_features(void)
 
     if ( !printed )
         printk(" - none\n");
-
-    if ( cpu_has_vmx_ept_1gb )
-        printk("EPT supports 1GB super page.\n");
-    if ( cpu_has_vmx_ept_2mb )
-        printk("EPT supports 2MB super page.\n");
 }
 
 static u32 adjust_vmx_controls(

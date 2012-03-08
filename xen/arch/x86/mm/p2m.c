@@ -40,10 +40,10 @@
 #include "mm-locks.h"
 
 /* turn on/off 1GB host page table support for hap, default on */
-static bool_t __read_mostly opt_hap_1gb = 1;
+bool_t __read_mostly opt_hap_1gb = 1;
 boolean_param("hap_1gb", opt_hap_1gb);
 
-static bool_t __read_mostly opt_hap_2mb = 1;
+bool_t __read_mostly opt_hap_2mb = 1;
 boolean_param("hap_2mb", opt_hap_2mb);
 
 /* Printouts */

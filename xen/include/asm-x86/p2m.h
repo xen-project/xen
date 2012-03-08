@@ -32,6 +32,8 @@
 #include <asm/mem_sharing.h>
 #include <asm/page.h>    /* for pagetable_t */
 
+extern bool_t opt_hap_1gb, opt_hap_2mb;
+
 /*
  * The phys_to_machine_mapping maps guest physical frame numbers 
  * to machine frame numbers.  It only exists for paging_mode_translate 

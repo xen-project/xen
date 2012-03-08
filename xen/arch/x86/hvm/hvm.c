@@ -131,7 +131,15 @@ static int __init hvm_enable(void)
 
     printk("HVM: %s enabled\n", hvm_funcs.name);
     if ( hvm_funcs.hap_supported )
-        printk("HVM: Hardware Assisted Paging detected.\n");
+    {
+        printk("HVM: Hardware Assisted Paging (HAP) detected\n");
+        printk("HVM: HAP page sizes: 4kB");
+        if ( hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_2MB )
+            printk(", 2MB%s", opt_hap_2mb ? "" : " [disabled]");
+        if ( hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_1GB )
+            printk(", 1GB%s", opt_hap_1gb ? "" : " [disabled]");
+        printk("\n");
+    }
 
     /*
      * Allow direct access to the PC debug ports 0x80 and 0xed (they are
