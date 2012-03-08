@@ -40,7 +40,6 @@
 struct acpi_processor_cx
 {
     u8 idx;
-    u8 valid;
     u8 type;
     u32 address;
     u8 entry_method; /* ACPI_CSTATE_EM_xxx */

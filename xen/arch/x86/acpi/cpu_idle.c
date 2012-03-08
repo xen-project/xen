@@ -73,10 +73,8 @@ static void lapic_timer_nop(void) { }
 static void (*lapic_timer_off)(void);
 static void (*lapic_timer_on)(void);
 
-static uint64_t (*get_tick)(void);
-static uint64_t (*ticks_elapsed)(uint64_t t1, uint64_t t2);
-static uint64_t (*tick_to_ns)(uint64_t ticks);
-static uint64_t (*ns_to_tick)(uint64_t ticks);
+static uint64_t (*__read_mostly tick_to_ns)(uint64_t) = acpi_pm_tick_to_ns;
+static uint64_t (*__read_mostly ns_to_tick)(uint64_t) = ns_to_acpi_pm_tick;
 
 static void (*pm_idle_save) (void) __read_mostly;
 unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER - 1;
@@ -233,6 +231,10 @@ static uint64_t acpi_pm_ticks_elapsed(uint64_t t1, uint64_t t2)
     else
         return ((0xFFFFFFFF - t1) + t2 +1);
 }
+
+static uint64_t (*__read_mostly get_tick)(void) = get_acpi_pm_tick;
+static uint64_t (*__read_mostly ticks_elapsed)(uint64_t, uint64_t)
+    = acpi_pm_ticks_elapsed;
 
 #define MWAIT_ECX_INTERRUPT_BREAK   (0x1)
 
@@ -632,43 +634,31 @@ static int cpuidle_init_cpu(int cpu)
     acpi_power = processor_powers[cpu];
     if ( !acpi_power )
     {
-        int i;
-        acpi_power = xzalloc(struct acpi_processor_power);
-        if ( !acpi_power )
-            return -ENOMEM;
+        unsigned int i;
 
-        for ( i = 0; i < ACPI_PROCESSOR_MAX_POWER; i++ )
-            acpi_power->states[i].idx = i;
-     
-        acpi_power->states[ACPI_STATE_C1].type = ACPI_STATE_C1;
-        acpi_power->states[ACPI_STATE_C1].entry_method = ACPI_CSTATE_EM_HALT;
-     
-        acpi_power->states[ACPI_STATE_C0].valid = 1;
-        acpi_power->states[ACPI_STATE_C1].valid = 1;
-     
-        acpi_power->count = 2;
-        acpi_power->safe_state = &acpi_power->states[ACPI_STATE_C1];
-        acpi_power->cpu = cpu;
-        processor_powers[cpu] = acpi_power;
-    }
-
-    if ( cpu == 0 )
-    {
-        if ( boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
+        if ( cpu == 0 && boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
         {
             get_tick = get_stime_tick;
             ticks_elapsed = stime_ticks_elapsed;
             tick_to_ns = stime_tick_to_ns;
             ns_to_tick = ns_to_stime_tick;
         }
-        else
-        {
-            get_tick = get_acpi_pm_tick;
-            ticks_elapsed = acpi_pm_ticks_elapsed;
-            tick_to_ns = acpi_pm_tick_to_ns;
-            ns_to_tick = ns_to_acpi_pm_tick;
-        }
+
+        acpi_power = xzalloc(struct acpi_processor_power);
+        if ( !acpi_power )
+            return -ENOMEM;
+
+        for ( i = 0; i < ACPI_PROCESSOR_MAX_POWER; i++ )
+            acpi_power->states[i].idx = i;
+
+        acpi_power->cpu = cpu;
+        processor_powers[cpu] = acpi_power;
     }
+
+    acpi_power->count = 2;
+    acpi_power->states[1].type = ACPI_STATE_C1;
+    acpi_power->states[1].entry_method = ACPI_CSTATE_EM_HALT;
+    acpi_power->safe_state = &acpi_power->states[1];
 
     return 0;
 }
@@ -885,17 +875,25 @@ static void set_cx(
     if ( check_cx(acpi_power, xen_cx) != 0 )
         return;
 
-    if ( xen_cx->type == ACPI_STATE_C1 )
+    switch ( xen_cx->type )
+    {
+    case ACPI_STATE_C1:
         cx = &acpi_power->states[1];
-    else
-        cx = &acpi_power->states[acpi_power->count];
+        break;
+    default:
+        if ( acpi_power->count >= ACPI_PROCESSOR_MAX_POWER )
+        {
+    case ACPI_STATE_C0:
+            printk(XENLOG_WARNING "CPU%u: C%d data ignored\n",
+                   acpi_power->cpu, xen_cx->type);
+            return;
+        }
+        cx = &acpi_power->states[acpi_power->count++];
+        cx->type = xen_cx->type;
+        break;
+    }
 
-    if ( !cx->valid )
-        acpi_power->count++;
-
-    cx->valid    = 1;
-    cx->type     = xen_cx->type;
-    cx->address  = xen_cx->reg.address;
+    cx->address = xen_cx->reg.address;
 
     switch ( xen_cx->reg.space_id )
     {
