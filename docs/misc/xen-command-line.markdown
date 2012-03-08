@@ -391,7 +391,17 @@ The optional `keep` parameter causes Xen to continue using the vga console even 
 ### watchdog
 > `= <boolean>`
 
-Run an NMI watchdog on each processor.  Defaults to disabled.
+> Default: `false`
+
+Run an NMI watchdog on each processor.  If a processor is stuck for longer than the watchdog\_timeout, a panic occurs.
+
+### watchdog\_timeout
+> `= <integer>`
+
+> Default: `5`
+
+Set the NMI watchdog timeout in seconds.  Specifying `0` will turn off the watchdog.
+
 ### x2apic
 ### x2apic\_phys
 ### xencons

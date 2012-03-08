@@ -45,6 +45,7 @@
 #include <asm/mach-generic/mach_apic.h> /* for generic_apic_probe */
 #include <asm/setup.h>
 #include <xen/cpu.h>
+#include <asm/nmi.h>
 
 /* opt_nosmp: If true, secondary processors are ignored. */
 static bool_t __initdata opt_nosmp;
@@ -53,10 +54,6 @@ boolean_param("nosmp", opt_nosmp);
 /* maxcpus: maximum number of CPUs to activate. */
 static unsigned int __initdata max_cpus;
 integer_param("maxcpus", max_cpus);
-
-/* opt_watchdog: If true, run a watchdog NMI on each processor. */
-static bool_t __initdata opt_watchdog;
-boolean_param("watchdog", opt_watchdog);
 
 /* smep: Enable/disable Supervisor Mode Execution Protection (default on). */
 static bool_t __initdata disable_smep;

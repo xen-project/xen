@@ -40,6 +40,19 @@ static unsigned int nmi_p4_cccr_val;
 static DEFINE_PER_CPU(struct timer, nmi_timer);
 static DEFINE_PER_CPU(unsigned int, nmi_timer_ticks);
 
+/* opt_watchdog: If true, run a watchdog NMI on each processor. */
+bool_t __initdata opt_watchdog = 0;
+boolean_param("watchdog", opt_watchdog);
+
+/* opt_watchdog_timeout: Number of seconds to wait before panic. */
+static unsigned int opt_watchdog_timeout = 5;
+static void parse_watchdog_timeout(char * s)
+{
+    opt_watchdog_timeout = simple_strtoull(s, NULL, 0);
+    opt_watchdog = !!opt_watchdog_timeout;
+}
+custom_param("watchdog_timeout", parse_watchdog_timeout);
+
 /*
  * lapic_nmi_owner tracks the ownership of the lapic NMI hardware:
  * - it may be reserved by some other driver, or not
@@ -425,11 +438,11 @@ void nmi_watchdog_tick(struct cpu_user_regs * regs)
          !atomic_read(&watchdog_disable_count) )
     {
         /*
-         * Ayiee, looks like this CPU is stuck ... wait a few IRQs (5 seconds) 
+         * Ayiee, looks like this CPU is stuck ... wait for the timeout
          * before doing the oops ...
          */
         this_cpu(alert_counter)++;
-        if ( this_cpu(alert_counter) == 5*nmi_hz )
+        if ( this_cpu(alert_counter) == opt_watchdog_timeout*nmi_hz )
         {
             console_force_unlock();
             printk("Watchdog timer detects that CPU%d is stuck!\n",
