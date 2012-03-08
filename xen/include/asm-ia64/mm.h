@@ -551,7 +551,8 @@ extern u64 translate_domain_pte(u64 pteval, u64 address, u64 itir__,
     gmfn_to_mfn_foreign((_d), (gpfn))
 
 #define get_gfn_untyped(d, gpfn) gmfn_to_mfn(d, gpfn)
-#define put_gfn(d, g)   ((void)0)
+static inline void put_gfn(struct domain *d, unsigned long gfn) {}
+static inline void mem_event_cleanup(struct domain *d) {}
 
 #define __gpfn_invalid(_d, gpfn)			\
 	(lookup_domain_mpa((_d), ((gpfn)<<PAGE_SHIFT), NULL) == INVALID_MFN)

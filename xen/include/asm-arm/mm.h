@@ -247,7 +247,8 @@ int  get_page(struct page_info *page, struct domain *domain);
         machine_to_phys_mapping[(mfn)] = (pfn);                \
     })
 
-#define put_gfn(d, g)   ((void)0)
+static inline void put_gfn(struct domain *d, unsigned long gfn) {}
+static inline void mem_event_cleanup(struct domain *d) {}
 
 #define INVALID_MFN             (~0UL)
 

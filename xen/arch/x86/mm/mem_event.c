@@ -486,6 +486,17 @@ int do_mem_event_op(int op, uint32_t domain, void *arg)
     return ret;
 }
 
+/* Clean up on domain destruction */
+void mem_event_cleanup(struct domain *d)
+{
+    if ( d->mem_event->paging.ring_page )
+        (void)mem_event_disable(d, &d->mem_event->paging);
+    if ( d->mem_event->access.ring_page )
+        (void)mem_event_disable(d, &d->mem_event->access);
+    if ( d->mem_event->share.ring_page )
+        (void)mem_event_disable(d, &d->mem_event->share);
+}
+
 int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
                      XEN_GUEST_HANDLE(void) u_domctl)
 {

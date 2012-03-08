@@ -479,6 +479,9 @@ int domain_kill(struct domain *d)
             break;
         }
         d->is_dying = DOMDYING_dead;
+        /* Mem event cleanup has to go here because the rings 
+         * have to be put before we call put_domain. */
+        mem_event_cleanup(d);
         put_domain(d);
         send_global_virq(VIRQ_DOM_EXC);
         /* fallthrough */
