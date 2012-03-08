@@ -46,10 +46,6 @@
 #define MEM_EVENT_REASON_INT3        5    /* int3 was hit: gla/gfn are RIP */
 #define MEM_EVENT_REASON_SINGLESTEP  6    /* single step was invoked: gla/gfn are RIP */
 
-typedef struct mem_event_shared_page {
-    uint32_t port;
-} mem_event_shared_page_t;
-
 typedef struct mem_event_st {
     uint32_t flags;
     uint32_t vcpu_id;

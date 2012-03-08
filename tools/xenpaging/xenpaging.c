@@ -337,14 +337,6 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
         goto err;
     }
 
-    /* Initialise shared page */
-    paging->mem_event.shared_page = init_page();
-    if ( paging->mem_event.shared_page == NULL )
-    {
-        PERROR("Error initialising shared page");
-        goto err;
-    }
-
     /* Initialise ring page */
     paging->mem_event.ring_page = init_page();
     if ( paging->mem_event.ring_page == NULL )
@@ -361,7 +353,7 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     
     /* Initialise Xen */
     rc = xc_mem_paging_enable(xch, paging->mem_event.domain_id,
-                             paging->mem_event.shared_page,
+                             &paging->mem_event.evtchn_port, 
                              paging->mem_event.ring_page);
     if ( rc != 0 )
     {
@@ -393,7 +385,7 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
     /* Bind event notification */
     rc = xc_evtchn_bind_interdomain(paging->mem_event.xce_handle,
                                     paging->mem_event.domain_id,
-                                    paging->mem_event.shared_page->port);
+                                    paging->mem_event.evtchn_port);
     if ( rc < 0 )
     {
         PERROR("Failed to bind event channel");
@@ -473,11 +465,6 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
         {
             munlock(paging->paging_buffer, PAGE_SIZE);
             free(paging->paging_buffer);
-        }
-        if ( paging->mem_event.shared_page )
-        {
-            munlock(paging->mem_event.shared_page, PAGE_SIZE);
-            free(paging->mem_event.shared_page);
         }
 
         if ( paging->mem_event.ring_page )

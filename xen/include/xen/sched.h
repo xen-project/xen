@@ -190,8 +190,6 @@ struct mem_event_domain
     /* The ring has 64 entries */
     unsigned char foreign_producers;
     unsigned char target_producers;
-    /* shared page */
-    mem_event_shared_page_t *shared_page;
     /* shared ring page */
     void *ring_page;
     /* front-end ring */

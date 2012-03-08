@@ -98,7 +98,7 @@ typedef struct mem_event {
     xc_evtchn *xce_handle;
     int port;
     mem_event_back_ring_t back_ring;
-    mem_event_shared_page_t *shared_page;
+    uint32_t evtchn_port;
     void *ring_page;
     spinlock_t ring_lock;
 } mem_event_t;
@@ -166,7 +166,7 @@ int xc_wait_for_event_or_timeout(xc_interface *xch, xc_evtchn *xce, unsigned lon
  err:
     return -errno;
 }
-
+ 
 static void *init_page(void)
 {
     void *buffer;
@@ -214,14 +214,6 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     /* Set domain id */
     xenaccess->mem_event.domain_id = domain_id;
 
-    /* Initialise shared page */
-    xenaccess->mem_event.shared_page = init_page();
-    if ( xenaccess->mem_event.shared_page == NULL )
-    {
-        ERROR("Error initialising shared page");
-        goto err;
-    }
-
     /* Initialise ring page */
     xenaccess->mem_event.ring_page = init_page();
     if ( xenaccess->mem_event.ring_page == NULL )
@@ -242,7 +234,7 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
 
     /* Initialise Xen */
     rc = xc_mem_access_enable(xenaccess->xc_handle, xenaccess->mem_event.domain_id,
-                             xenaccess->mem_event.shared_page,
+                             &xenaccess->mem_event.evtchn_port,
                              xenaccess->mem_event.ring_page);
     if ( rc != 0 )
     {
@@ -271,7 +263,7 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     /* Bind event notification */
     rc = xc_evtchn_bind_interdomain(xenaccess->mem_event.xce_handle,
                                     xenaccess->mem_event.domain_id,
-                                    xenaccess->mem_event.shared_page->port);
+                                    xenaccess->mem_event.evtchn_port);
     if ( rc < 0 )
     {
         ERROR("Failed to bind event channel");
@@ -322,12 +314,6 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
  err:
     if ( xenaccess )
     {
-        if ( xenaccess->mem_event.shared_page )
-        {
-            munlock(xenaccess->mem_event.shared_page, PAGE_SIZE);
-            free(xenaccess->mem_event.shared_page);
-        }
-
         if ( xenaccess->mem_event.ring_page )
         {
             munlock(xenaccess->mem_event.ring_page, PAGE_SIZE);

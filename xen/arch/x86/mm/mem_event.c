@@ -50,12 +50,10 @@ static int mem_event_enable(
     struct domain *dom_mem_event = current->domain;
     struct vcpu *v = current;
     unsigned long ring_addr = mec->ring_addr;
-    unsigned long shared_addr = mec->shared_addr;
     l1_pgentry_t l1e;
-    unsigned long shared_gfn = 0, ring_gfn = 0; /* gcc ... */
+    unsigned long ring_gfn = 0; /* gcc ... */
     p2m_type_t p2mt;
     mfn_t ring_mfn;
-    mfn_t shared_mfn;
 
     /* Only one helper at a time. If the helper crashed,
      * the ring is in an undefined state and so is the guest.
@@ -66,10 +64,6 @@ static int mem_event_enable(
     /* Get MFN of ring page */
     guest_get_eff_l1e(v, ring_addr, &l1e);
     ring_gfn = l1e_get_pfn(l1e);
-    /* We're grabbing these two in an order that could deadlock
-     * dom0 if 1. it were an hvm 2. there were two concurrent
-     * enables 3. the two gfn's in each enable criss-crossed
-     * 2MB regions. Duly noted.... */
     ring_mfn = get_gfn(dom_mem_event, ring_gfn, &p2mt);
 
     if ( unlikely(!mfn_valid(mfn_x(ring_mfn))) )
@@ -80,23 +74,9 @@ static int mem_event_enable(
 
     mem_event_ring_lock_init(med);
 
-    /* Get MFN of shared page */
-    guest_get_eff_l1e(v, shared_addr, &l1e);
-    shared_gfn = l1e_get_pfn(l1e);
-    shared_mfn = get_gfn(dom_mem_event, shared_gfn, &p2mt);
-
-    if ( unlikely(!mfn_valid(mfn_x(shared_mfn))) )
-    {
-        put_gfn(dom_mem_event, ring_gfn);
-        put_gfn(dom_mem_event, shared_gfn);
-        return -EINVAL;
-    }
-
-    /* Map ring and shared pages */
+    /* Map ring page */
     med->ring_page = map_domain_page(mfn_x(ring_mfn));
-    med->shared_page = map_domain_page(mfn_x(shared_mfn));
     put_gfn(dom_mem_event, ring_gfn);
-    put_gfn(dom_mem_event, shared_gfn); 
 
     /* Set the number of currently blocked vCPUs to 0. */
     med->blocked = 0;
@@ -108,8 +88,7 @@ static int mem_event_enable(
     if ( rc < 0 )
         goto err;
 
-    ((mem_event_shared_page_t *)med->shared_page)->port = rc;
-    med->xen_port = rc;
+    med->xen_port = mec->port = rc;
 
     /* Prepare ring buffer */
     FRONT_RING_INIT(&med->front_ring,
@@ -125,9 +104,6 @@ static int mem_event_enable(
     return 0;
 
  err:
-    unmap_domain_page(med->shared_page);
-    med->shared_page = NULL;
-
     unmap_domain_page(med->ring_page);
     med->ring_page = NULL;
 
@@ -248,9 +224,6 @@ static int mem_event_disable(struct domain *d, struct mem_event_domain *med)
         
         unmap_domain_page(med->ring_page);
         med->ring_page = NULL;
-
-        unmap_domain_page(med->shared_page);
-        med->shared_page = NULL;
 
         /* Unblock all vCPUs */
         for_each_vcpu ( d, v )

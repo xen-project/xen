@@ -25,12 +25,18 @@
 
 
 int xc_mem_paging_enable(xc_interface *xch, domid_t domain_id,
-                        void *shared_page, void *ring_page)
+                         uint32_t *port, void *ring_page)
 {
+    if ( !port )
+    {
+        errno = EINVAL;
+        return -1;
+    }
+        
     return xc_mem_event_control(xch, domain_id,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING_ENABLE,
                                 XEN_DOMCTL_MEM_EVENT_OP_PAGING,
-                                shared_page, ring_page);
+                                port, ring_page);
 }
 
 int xc_mem_paging_disable(xc_interface *xch, domid_t domain_id)

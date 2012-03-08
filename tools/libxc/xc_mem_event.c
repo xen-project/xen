@@ -24,19 +24,21 @@
 #include "xc_private.h"
 
 int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
-                         unsigned int mode, void *page, void *ring_page)
+                         unsigned int mode, uint32_t *port, void *ring_page)
 {
     DECLARE_DOMCTL;
+    int rc;
 
     domctl.cmd = XEN_DOMCTL_mem_event_op;
     domctl.domain = domain_id;
     domctl.u.mem_event_op.op = op;
     domctl.u.mem_event_op.mode = mode;
-
-    domctl.u.mem_event_op.shared_addr = (unsigned long)page;
-    domctl.u.mem_event_op.ring_addr = (unsigned long)ring_page;
+    domctl.u.mem_event_op.ring_addr = (unsigned long) ring_page;
     
-    return do_domctl(xch, &domctl);
+    rc = do_domctl(xch, &domctl);
+    if ( !rc && port )
+        *port = domctl.u.mem_event_op.port;
+    return rc;
 }
 
 int xc_mem_event_memop(xc_interface *xch, domid_t domain_id, 
