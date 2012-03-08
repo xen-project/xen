@@ -40,9 +40,9 @@
 struct acpi_processor_cx
 {
     u8 idx;
-    u8 type;
-    u32 address;
+    u8 type;         /* ACPI_STATE_Cn */
     u8 entry_method; /* ACPI_CSTATE_EM_xxx */
+    u32 address;
     u32 latency;
     u32 latency_ticks;
     u32 power;
@@ -66,8 +66,8 @@ struct acpi_processor_power
     struct acpi_processor_flags flags;
     struct acpi_processor_cx *last_state;
     struct acpi_processor_cx *safe_state;
-    u32 last_residency;
     void *gdata; /* governor specific data */
+    u32 last_residency;
     u32 count;
     struct acpi_processor_cx states[ACPI_PROCESSOR_MAX_POWER];
 };
