@@ -1324,10 +1324,11 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
     if ( (p2mt == p2m_mmio_dm) || 
          (access_w && (p2mt == p2m_ram_ro)) )
     {
+        put_gfn(p2m->domain, gfn);
         if ( !handle_mmio() )
             hvm_inject_exception(TRAP_gp_fault, 0, 0);
         rc = 1;
-        goto out_put_gfn;
+        goto out;
     }
 
 #ifdef __x86_64__
@@ -1379,6 +1380,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
 
 out_put_gfn:
     put_gfn(p2m->domain, gfn);
+out:
     if ( paged )
         p2m_mem_paging_populate(v->domain, gfn);
     if ( req_ptr )
