@@ -374,7 +374,7 @@ static void __init setup_low_mem_virq(void)
 static void check_low_mem_virq(void)
 {
     unsigned long avail_pages = total_avail_pages +
-        opt_tmem ? tmem_freeable_pages() : 0;
+        (opt_tmem ? tmem_freeable_pages() : 0);
 
     if ( unlikely(avail_pages <= low_mem_virq_th) )
     {
