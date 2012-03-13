@@ -58,6 +58,7 @@ do_start () {
 	modprobe xen-gntdev 2>/dev/null
 	modprobe evtchn 2>/dev/null
 	modprobe gntdev 2>/dev/null
+	mkdir -p /var/run/xen
 
 	if ! `xenstore-read -s / >/dev/null 2>&1`
 	then
