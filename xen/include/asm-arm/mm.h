@@ -278,6 +278,10 @@ extern struct domain *dom_xen, *dom_io, *dom_cow;
 #define memguard_guard_stack(_p)       ((void)0)
 #define memguard_guard_range(_p,_l)    ((void)0)
 #define memguard_unguard_range(_p,_l)  ((void)0)
+
+/* Release all __init and __initdata ranges to be reused */
+void free_init_memory(void);
+
 int guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
                                           unsigned int order);
 

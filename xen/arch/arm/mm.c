@@ -48,6 +48,8 @@ unsigned long frametable_virt_end;
 
 unsigned long max_page;
 
+extern char __init_begin[], __init_end[];
+
 /* Map a 4k page in a fixmap entry */
 void set_fixmap(unsigned map, unsigned long mfn, unsigned attributes)
 {
@@ -205,17 +207,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     /* Undo the temporary map */
     pte.bits = 0;
     write_pte(xen_second + second_table_offset(dest_va), pte);
-    /*
-     * Have removed a mapping previously used for .text. Flush everything
-     * for safety.
-     */
-    asm volatile (
-        "dsb;"                        /* Ensure visibility of PTE write */
-        STORE_CP32(0, TLBIALLH)       /* Flush hypervisor TLB */
-        STORE_CP32(0, BPIALL)         /* Flush branch predictor */
-        "dsb;"                        /* Ensure completion of TLB+BP flush */
-        "isb;"
-        : : "r" (i /*dummy*/) : "memory");
+    flush_xen_text_tlb();
 
     /* Link in the fixmap pagetable */
     pte = mfn_to_xen_entry((((unsigned long) xen_fixmap) + phys_offset)
@@ -251,13 +243,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     pte.pt.table = 1;
     write_pte(xen_second + second_linear_offset(XEN_VIRT_START), pte);
     /* Have changed a mapping used for .text. Flush everything for safety. */
-    asm volatile (
-        "dsb;"                        /* Ensure visibility of PTE write */
-        STORE_CP32(0, TLBIALLH)       /* Flush hypervisor TLB */
-        STORE_CP32(0, BPIALL)         /* Flush branch predictor */
-        "dsb;"                        /* Ensure completion of TLB+BP flush */
-        "isb;"
-        : : "r" (i /*dummy*/) : "memory");
+    flush_xen_text_tlb();
 
     /* From now on, no mapping may be both writable and executable. */
     WRITE_CP32(READ_CP32(HSCTLR) | SCTLR_WXN, HSCTLR);
@@ -326,6 +312,64 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
            frametable_size - (nr_pages * sizeof(struct page_info)));
 
     frametable_virt_end = FRAMETABLE_VIRT_START + (nr_pages * sizeof(struct page_info));
+}
+
+enum mg { mg_clear, mg_ro, mg_rw, mg_rx };
+static void set_pte_flags_on_range(const char *p, unsigned long l, enum mg mg)
+{
+    lpae_t pte;
+    int i;
+
+    ASSERT(is_kernel(p) && is_kernel(p + l));
+
+    /* Can only guard in page granularity */
+    ASSERT(!((unsigned long) p & ~PAGE_MASK));
+    ASSERT(!(l & ~PAGE_MASK));
+
+    for ( i = (p - _start) / PAGE_SIZE; 
+          i < (p + l - _start) / PAGE_SIZE; 
+          i++ )
+    {
+        pte = xen_xenmap[i];
+        switch ( mg )
+        {
+        case mg_clear:
+            pte.pt.valid = 0;
+            break;
+        case mg_ro:
+            pte.pt.valid = 1;
+            pte.pt.pxn = 1;
+            pte.pt.xn = 1;
+            pte.pt.ro = 1;
+            break;
+        case mg_rw:
+            pte.pt.valid = 1;
+            pte.pt.pxn = 1;
+            pte.pt.xn = 1;
+            pte.pt.ro = 0;
+            break;
+        case mg_rx:
+            pte.pt.valid = 1;
+            pte.pt.pxn = 0;
+            pte.pt.xn = 0;
+            pte.pt.ro = 1;
+            break;
+        }
+        write_pte(xen_xenmap + i, pte);
+    }
+    flush_xen_text_tlb();
+}
+
+/* Release all __init and __initdata ranges to be reused */
+void free_init_memory(void)
+{
+    paddr_t pa = virt_to_maddr(__init_begin);
+    unsigned long len = __init_end - __init_begin;
+    set_pte_flags_on_range(__init_begin, len, mg_rw);
+    memset(__init_begin, 0xcc, len);
+    set_pte_flags_on_range(__init_begin, len, mg_clear);
+    init_domheap_pages(pa, pa + len);
+    printk("Freed %ldkB init memory.\n", (long)(__init_end-__init_begin)>>10);
 }
 
 void arch_dump_shared_mem_info(void)

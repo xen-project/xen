@@ -38,8 +38,6 @@
 #include <asm/setup.h>
 #include "gic.h"
 
-extern const char __init_begin[], __init_end[], __bss_start[];
-
 /* Spinlock for serializing CPU bringup */
 unsigned long __initdata boot_gate = 1;
 /* Number of non-boot CPUs ready to enter C */
@@ -47,12 +45,7 @@ unsigned long __initdata ready_cpus = 0;
 
 static __attribute_used__ void init_done(void)
 {
-    /* TODO: free (or page-protect) the init areas.
-       memset(__init_begin, 0xcc, __init_end - __init_begin);
-       free_xen_data(__init_begin, __init_end);
-    */
-    printk("Freed %ldkB init memory.\n", (long)(__init_end-__init_begin)>>10);
-
+    free_init_memory();
     startup_cpu_idle_loop();
 }
 

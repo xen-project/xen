@@ -203,6 +203,22 @@ static inline void write_pte(lpae_t *p, lpae_t pte)
 }
 
 /*
+ * Flush all hypervisor mappings from the TLB and branch predictor.
+ * This is needed after changing Xen code mappings. 
+ */
+static inline void flush_xen_text_tlb(void)
+{
+    register unsigned long r0 asm ("r0");
+    asm volatile (
+        "dsb;"                        /* Ensure visibility of PTE writes */
+        STORE_CP32(0, TLBIALLH)       /* Flush hypervisor TLB */
+        STORE_CP32(0, BPIALL)         /* Flush branch predictor */
+        "dsb;"                        /* Ensure completion of TLB+BP flush */
+        "isb;"
+        : : "r" (r0) /*dummy*/ : "memory");
+}
+
+/*
  * Flush all hypervisor mappings from the data TLB. This is not
  * sufficient when changing code mappings or for self modifying code.
  */
