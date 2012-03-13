@@ -119,6 +119,9 @@ extern unsigned long frametable_virt_end;
 #define GIC_CR_OFFSET 0x2000
 #define GIC_HR_OFFSET 0x4000 /* Guess work http://lists.infradead.org/pipermail/linux-arm-kernel/2011-September/064219.html */
 #define GIC_VR_OFFSET 0x6000 /* Virtual Machine CPU interface) */
+/* Board-specific: base address of system controller */
+#define SP810_ADDRESS 0x1C020000
+
 
 #endif /* __ARM_CONFIG_H__ */
 /*
