@@ -2873,7 +2873,7 @@ libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nr)
         goto fail;
     }
 
-    for (i = 0; i <= max_cpus; i++) {
+    for (i = 0; i < max_cpus; i++) {
 #define V(map, i) (map[i] == INVALID_TOPOLOGY_ID) ? \
     LIBXL_CPUTOPOLOGY_INVALID_ENTRY : map[i]
         ret[i].core = V(coremap, i);
