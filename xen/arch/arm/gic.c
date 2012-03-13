@@ -224,7 +224,9 @@ static void __cpuinit gic_cpu_init(void)
 {
     int i;
 
-    /* Disable all PPI and enable all SGI */
+    /* The first 32 interrupts (PPI and SGI) are banked per-cpu, so 
+     * even though they are controlled with GICD registers, they must 
+     * be set up here with the other per-cpu state. */
     GICD[GICD_ICENABLER] = 0xffff0000; /* Disable all PPI */
     GICD[GICD_ISENABLER] = 0x0000ffff; /* Enable all SGI */
     /* Set PPI and SGI priorities */
