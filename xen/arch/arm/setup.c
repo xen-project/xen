@@ -38,9 +38,6 @@
 #include <asm/setup.h>
 #include "gic.h"
 
-/* maxcpus: maximum number of CPUs to activate. */
-static unsigned int __initdata max_cpus = NR_CPUS;
-
 /* Xen stack for bringing up the first CPU. */
 unsigned char __initdata init_stack[STACK_SIZE] __attribute__((__aligned__(STACK_SIZE)));
 
@@ -204,7 +201,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     __set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
 
-    smp_prepare_cpus(max_cpus);
+    smp_prepare_cpus(cpus);
 
     init_xen_time();
 
@@ -251,7 +248,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     for_each_present_cpu ( i )
     {
-        if ( (num_online_cpus() < max_cpus) && !cpu_online(i) )
+        if ( (num_online_cpus() < cpus) && !cpu_online(i) )
         {
             int ret = cpu_up(i);
             if ( ret != 0 )

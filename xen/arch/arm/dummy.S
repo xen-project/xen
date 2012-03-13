@@ -7,9 +7,6 @@ x:	.word 0xe7f000f0 /* Undefined instruction */
 x:	mov pc, lr
 	
 /* SMP support */
-DUMMY(__cpu_die);
-DUMMY(__cpu_disable);
-DUMMY(__cpu_up);
 DUMMY(per_cpu__cpu_core_mask);
 DUMMY(per_cpu__cpu_sibling_mask);
 DUMMY(node_online_map);
