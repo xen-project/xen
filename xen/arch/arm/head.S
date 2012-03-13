@@ -307,17 +307,23 @@ paging:
 	 * and brought up the memory allocator, non-boot CPUs can get their
 	 * own stacks and enter C. */
 1:	wfe
-	b 1b
+	dsb
+	ldr   r0, =smp_up_cpu
+	ldr   r1, [r0]               /* Which CPU is being booted? */
+	teq   r1, r12                /* Is it us? */
+	bne   1b
 
 launch:	
-	ldr   sp, =init_stack        /* Supply a stack */
+	ldr   r0, =init_stack        /* Find the boot-time stack */
+	ldr   sp, [r0]
 	add   sp, #STACK_SIZE        /* (which grows down from the top). */
 	sub   sp, #CPUINFO_sizeof    /* Make room for CPU save record */
 	mov   r0, r10                /* Marshal args: - phys_offset */
 	mov   r1, r7                 /*               - machine type */
 	mov   r2, r8                 /*               - ATAG address */
-	mov   r3, r12                /*               - CPU ID */
-	b     start_xen              /* and disappear into the land of C */
+	movs  r3, r12                /*               - CPU ID */
+	beq   start_xen              /* and disappear into the land of C */
+	b     start_secondary        /* (to the appropriate entry point) */
 
 /* Fail-stop
  * r0: string explaining why */

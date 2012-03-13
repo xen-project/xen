@@ -38,9 +38,6 @@
 #include <asm/setup.h>
 #include "gic.h"
 
-/* Xen stack for bringing up the first CPU. */
-unsigned char __initdata init_stack[STACK_SIZE] __attribute__((__aligned__(STACK_SIZE)));
-
 extern const char __init_begin[], __init_end[], __bss_start[];
 
 /* Spinlock for serializing CPU bringup */
@@ -286,7 +283,11 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     domain_unpause_by_systemcontroller(dom0);
 
-    reset_stack_and_jump(init_done);
+    /* Switch on to the dynamically allocated stack for the idle vcpu
+     * since the static one we're running on is about to be freed. */
+    memcpy(idle_vcpu[0]->arch.cpu_info, get_cpu_info(), 
+           sizeof(struct cpu_info));
+    switch_stack_and_jump(idle_vcpu[0]->arch.cpu_info, init_done);
 }
 
 void arch_get_xen_caps(xen_capabilities_info_t *info)

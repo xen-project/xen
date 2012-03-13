@@ -245,7 +245,6 @@ static void __cpuinit gic_hyp_init(void)
 
     vtr = GICH[GICH_VTR];
     nr_lrs  = (vtr & GICH_VTR_NRLRGS) + 1;
-    printk("GICH: %d list registers available\n", nr_lrs);
 
     GICH[GICH_HCR] = GICH_HCR_EN;
     GICH[GICH_MISR] = GICH_MISR_EOI;
@@ -276,6 +275,15 @@ int __init gic_init(void)
     spin_unlock(&gic.lock);
 
     return gic.cpus;
+}
+
+/* Set up the per-CPU parts of the GIC for a secondary CPU */
+void __cpuinit gic_init_secondary_cpu(void)
+{
+    spin_lock(&gic.lock);
+    gic_cpu_init();
+    gic_hyp_init();
+    spin_unlock(&gic.lock);
 }
 
 void gic_route_irqs(void)
