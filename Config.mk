@@ -198,9 +198,9 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-unstable.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 QEMU_UPSTREAM_REVISION ?= master
-SEABIOS_UPSTREAM_TAG ?= c69e288adfe6c273df4b1f3d9c223d8a4fb613cd
-# Wed Feb 8 20:23:36 2012 -0500
-# Permit .rodata.__PRETTY_FUNCTION__. sections in roms.
+SEABIOS_UPSTREAM_TAG ?= rel-1.6.3.2
+# Sun Mar 11 09:27:07 2012 -0400
+# Update version to 1.6.3.2
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
