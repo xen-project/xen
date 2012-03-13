@@ -76,6 +76,7 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
 
     dprintk(XENLOG_DEBUG, "CPU %li awake.\n", cpuid);
 
+    mmu_init_secondary_cpu();
     gic_init_secondary_cpu();
 
     set_current(idle_vcpu[cpuid]);

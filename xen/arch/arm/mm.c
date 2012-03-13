@@ -263,6 +263,13 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     WRITE_CP32(READ_CP32(HSCTLR) | SCTLR_WXN, HSCTLR);
 }
 
+/* MMU setup for secondary CPUS (which already have paging enabled) */
+void __cpuinit mmu_init_secondary_cpu(void)
+{
+    /* From now on, no mapping may be both writable and executable. */
+    WRITE_CP32(READ_CP32(HSCTLR) | SCTLR_WXN, HSCTLR);
+}
+
 /* Create Xen's mappings of memory.
  * Base and virt must be 32MB aligned and size a multiple of 32MB. */
 static void __init create_mappings(unsigned long virt,
