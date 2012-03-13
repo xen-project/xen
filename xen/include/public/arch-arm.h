@@ -27,6 +27,29 @@
 #ifndef __XEN_PUBLIC_ARCH_ARM_H__
 #define __XEN_PUBLIC_ARCH_ARM_H__
 
+/* hypercall calling convention
+ * ----------------------------
+ *
+ * A hypercall is issued using the ARM HVC instruction.
+ *
+ * A hypercall can take up to 5 arguments. These are passed in
+ * registers, the first argument in r0, the second argument in r1, the
+ * third in r2, the forth in r3 and the fifth in r4.
+ *
+ * The hypercall number is passed in r12.
+ *
+ * The HVC ISS must contain a Xen specific TAG: XEN_HYPERCALL_TAG.
+ *
+ * The return value is in r0.
+ *
+ * The hypercall will always clobber r0, r1, r2, r3, r4 and r12,
+ * regardless of how many arguments the particular hypercall takes.
+ *
+ */
+
+#define XEN_HYPERCALL_TAG   0XEA1
+
+
 #ifndef __ASSEMBLY__
 #define ___DEFINE_XEN_GUEST_HANDLE(name, type) \
     typedef struct { type *p; } __guest_handle_ ## name

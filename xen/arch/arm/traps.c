@@ -367,7 +367,6 @@ unsigned long do_arch_0(unsigned int cmd, unsigned long long value)
 }
 
 typedef unsigned long arm_hypercall_t(
-    unsigned int, unsigned int, unsigned int, unsigned int, unsigned int,
     unsigned int, unsigned int, unsigned int, unsigned int, unsigned int);
 
 #define HYPERCALL(x)                                        \
@@ -407,18 +406,30 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 
 static void do_trap_hypercall(struct cpu_user_regs *regs, unsigned long iss)
 {
+    arm_hypercall_t *call = NULL;
     local_irq_enable();
 
-    regs->r0 = arm_hypercall_table[iss](regs->r0,
-                             regs->r1,
-                             regs->r2,
-                             regs->r3,
-                             regs->r4,
-                             regs->r5,
-                             regs->r6,
-                             regs->r7,
-                             regs->r8,
-                             regs->r9);
+    if ( iss != XEN_HYPERCALL_TAG )
+    {
+        printk("%s %d: received an alien hypercall iss=%lx\n", __func__ ,
+                __LINE__ , iss);
+        regs->r0 = -EINVAL;
+        return;
+    }
+
+    call = arm_hypercall_table[regs->r12];
+    if ( call == NULL )
+    {
+        regs->r0 = -ENOSYS;
+        return;
+    }
+
+    regs->r0 = call(regs->r0, regs->r1, regs->r2, regs->r3, regs->r4);
+
+#ifndef NDEBUG
+    /* clobber registers */
+    regs->r1 = regs->r2 = regs->r3 = regs->r4 = regs->r12 = 0xDEADBEEF;
+#endif
 }
 
 static void do_cp15_32(struct cpu_user_regs *regs,
