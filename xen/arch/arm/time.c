@@ -171,6 +171,16 @@ void __cpuinit init_timer_interrupt(void)
     request_irq(30, timer_interrupt, 0, "phytimer", NULL);
 }
 
+/* Wait a set number of microseconds */
+void udelay(unsigned long usecs)
+{
+    s_time_t deadline = get_s_time() + 1000 * (s_time_t) usecs;
+    while ( get_s_time() - deadline < 0 )
+        ;
+    dsb();
+    isb();
+}
+
 /*
  * Local variables:
  * mode: C

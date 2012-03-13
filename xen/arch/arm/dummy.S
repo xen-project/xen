@@ -62,5 +62,4 @@ DUMMY(gmfn_to_mfn);
 DUMMY(hypercall_create_continuation);
 DUMMY(send_timer_event);
 DUMMY(share_xen_page_with_privileged_guests);
-DUMMY(__udelay);
 DUMMY(wallclock_time);

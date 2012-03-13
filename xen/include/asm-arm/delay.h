@@ -1,8 +1,7 @@
 #ifndef _ARM_DELAY_H
 #define _ARM_DELAY_H
 
-extern void __udelay(unsigned long usecs);
-#define udelay(n) __udelay(n)
+extern void udelay(unsigned long usecs);
 
 #endif /* defined(_ARM_DELAY_H) */
 /*
