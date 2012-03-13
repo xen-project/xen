@@ -1476,12 +1476,16 @@ static void libxl__device_disk_from_xs_be(libxl__gc *gc,
     disk->format = LIBXL_DISK_FORMAT_UNKNOWN;
 }
 
-int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid,
-                               int devid, libxl_device_disk *disk)
+int libxl_vdev_to_device_disk(libxl_ctx *ctx, uint32_t domid,
+                              const char *vdev, libxl_device_disk *disk)
 {
     GC_INIT(ctx);
     char *dompath, *path;
+    int devid = libxl__device_disk_dev_number(vdev, NULL, NULL);
     int rc = ERROR_FAIL;
+
+    if (devid < 0)
+        return ERROR_INVAL;
 
     libxl_device_disk_init(disk);
 

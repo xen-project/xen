@@ -61,7 +61,7 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
 int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid, int devid,
                               libxl_device_nic *nic);
 
-int libxl_devid_to_device_disk(libxl_ctx *ctx, uint32_t domid, int devid,
+int libxl_vdev_to_device_disk(libxl_ctx *ctx, uint32_t domid, const char *vdev,
                                libxl_device_disk *disk);
 
 int libxl_cpumap_alloc(libxl_ctx *ctx, libxl_cpumap *cpumap);

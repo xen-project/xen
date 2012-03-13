@@ -4804,7 +4804,7 @@ int main_blockdetach(int argc, char **argv)
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
-    if (libxl_devid_to_device_disk(ctx, domid, atoi(argv[optind+1]), &disk)) {
+    if (libxl_vdev_to_device_disk(ctx, domid, argv[optind+1], &disk)) {
         fprintf(stderr, "Error: Device %s not connected.\n", argv[optind+1]);
         return 1;
     }
