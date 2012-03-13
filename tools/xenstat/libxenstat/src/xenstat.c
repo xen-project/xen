@@ -739,17 +739,9 @@ unsigned long long xenstat_tmem_succ_pers_gets(xenstat_tmem *tmem)
 
 static char *xenstat_get_domain_name(xenstat_handle *handle, unsigned int domain_id)
 {
-	char path[80], *vmpath;
+	char path[80];
 
-	snprintf(path, sizeof(path),"/local/domain/%i/vm", domain_id);
-
-	vmpath = xs_read(handle->xshandle, XBT_NULL, path, NULL);
-
-	if (vmpath == NULL)
-		return NULL;
-
-	snprintf(path, sizeof(path),"%s/name", vmpath);
-	free(vmpath);
+	snprintf(path, sizeof(path),"/local/domain/%i/name", domain_id);
 
 	return xs_read(handle->xshandle, XBT_NULL, path, NULL);
 }
