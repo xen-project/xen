@@ -408,6 +408,8 @@ static PyObject *pyxl_domid_to_name(XlObject *self, PyObject *args)
     domname = libxl_domid_to_name(self->ctx, domid);
     if (domname)
         ret = PyString_FromString(domname);
+	else
+		Py_INCREF(Py_None);
     free(domname);
 
     return ret;
