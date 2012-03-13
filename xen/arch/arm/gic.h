@@ -138,8 +138,8 @@ extern int gic_route_irq_to_guest(struct domain *d, unsigned int irq,
 
 /* Accept an interrupt from the GIC and dispatch its handler */
 extern void gic_interrupt(struct cpu_user_regs *regs, int is_fiq);
-/* Bring up the interrupt controller */
-extern void gic_init(void);
+/* Bring up the interrupt controller, and report # cpus attached */
+extern int gic_init(void);
 /* setup the gic virtual interface for a guest */
 extern void gicv_setup(struct domain *d);
 #endif

@@ -62,22 +62,36 @@ start:
 #endif
 
 	/* Are we the boot CPU? */
+	mov   r12, #0                /* r12 := CPU ID */
 	mrc   CP32(r0, MPIDR)
 	tst   r0, #(1<<31)           /* Multiprocessor extension supported? */
 	beq   boot_cpu
 	tst   r0, #(1<<30)           /* Uniprocessor system? */
 	bne   boot_cpu
-	bics  r0, r0, #(0xff << 24)  /* Ignore flags */
-	beq   boot_cpu               /* If all other fields are 0, we win */
+	bics  r12, r0, #(0xff << 24) /* Mask out flags to get CPU ID */
+	beq   boot_cpu               /* If we're CPU 0, boot now */
 
-1:	wfi
-	b     1b
-	
+	/* Non-boot CPUs wait here to be woken up one at a time.
+	 * This is basically an open-coded spin-lock to serialize. */
+	ldr   r0, =boot_gate         /* VA of gate */
+	add   r0, r0, r10            /* PA of gate */
+	mov   r1, #1                 /* (1 == locked) */
+1:	wfe
+	ldrex r2, [r0]               /* Linked read of current value */
+	teq   r2, #0                 /* (0 == unlocked) */
+	strexeq r2, r1, [r0]         /* Matching update -> locked */
+	teq   r2, #0                 /* (0 == succeeded) */
+	bne   1b
+
 boot_cpu:
 #ifdef EARLY_UART_ADDRESS
-	/* Say hello */
 	ldr   r11, =EARLY_UART_ADDRESS  /* r11 := UART base address */
-	bl    init_uart
+	teq   r12, #0                   /* CPU 0 sets up the UART too */
+	bleq  init_uart
+	PRINT("- CPU ")
+	mov   r0, r12
+	bl    putn
+	PRINT(" booting -\r\n")
 #endif
 
 	/* Check that this CPU has Hyp mode */
@@ -85,7 +99,6 @@ boot_cpu:
 	and   r0, r0, #0xf000        /* Bits 12-15 define virt extensions */
 	teq   r0, #0x1000            /* Must == 0x1 or may be incompatible */
 	beq   1f
-	bl    putn
 	PRINT("- CPU doesn't support the virtualization extensions -\r\n")
 	b     fail
 1:
@@ -185,6 +198,10 @@ hyp:
 	mov   r5, #0                 /* r4:r5 is paddr (xen_pagetable) */
 	mcrr  CP64(r4, r5, HTTBR)
 
+	/* Non-boot CPUs don't need to rebuild the pagetable */
+	teq   r12, #0
+	bne   pt_ready
+	
 	/* Build the baseline idle pagetable's first-level entries */
 	ldr   r1, =xen_second
 	add   r1, r1, r10            /* r1 := paddr (xen_second) */
@@ -226,6 +243,7 @@ hyp:
 	add   r4, r4, #8
 	strd  r2, r3, [r1, r4]       /* Map it in the early boot slot */
 
+pt_ready:
 	PRINT("- Turning on paging -\r\n")
 
 	ldr   r1, =paging            /* Explicit vaddr, not RIP-relative */
@@ -238,7 +256,7 @@ hyp:
 paging:
 
 #ifdef EARLY_UART_ADDRESS
-	/* Recover the UART address in the new address space */
+	/* Recover the UART address in the new address space. */
 	lsl   r11, #11
 	lsr   r11, #11               /* UART base's offset from 2MB base */
 	adr   r0, start
@@ -246,14 +264,59 @@ paging:
 	add   r11, r11, r0           /* r11 := vaddr (UART base address) */
 #endif
 
-	PRINT("- Entering C -\r\n")
+	PRINT("- Ready -\r\n")
 
+	/* The boot CPU should go straight into C now */
+	teq   r12, #0
+	beq   launch
+
+	/* Signal the next non-boot CPU to come and join us here */
+	ldr   r0, =boot_gate         /* VA of gate */
+	add   r0, r0, r10            /* PA of gate */
+	mov   r1, #0                 /* (0 == unlocked) */
+	str   r1, [r0]
+	dsb
+	isb
+	sev
+
+	/* Move on to the relocated pagetables */
+	mov   r0, #0
+	ldr   r4, =boot_httbr        /* VA of HTTBR value stashed by CPU 0 */
+	add   r4, r4, r10            /* PA of it */
+	ldrd  r4, r5, [r4]           /* Actual value */
+	mcrr  CP64(r4, r5, HTTBR)
+	mcr   CP32(r0, TLBIALLH)     /* Flush hypervisor TLB */
+	mcr   CP32(r0, BPIALL)       /* Flush branch predictor */
+	dsb                          /* Ensure completion of TLB+BP flush */
+	isb
+ 	/* Now, the UART is in its proper fixmap address */
+	ldrne r11, =FIXMAP_ADDR(FIXMAP_CONSOLE)
+
+	/* Non-boot CPUs report that they've got this far */
+	ldr   r0, =ready_cpus
+1:	ldrex r1, [r0]               /*            { read # of ready CPUs } */
+	add   r1, r1, #1             /* Atomically { ++                   } */
+	strex r2, r1, [r0]           /*            { writeback            } */
+	teq   r2, #0
+	bne   1b
+	dsb
+
+	/* Here, the non-boot CPUs must wait again -- they're now running on
+	 * the boot CPU's pagetables so it's safe for the boot CPU to
+	 * overwrite the non-relocated copy of Xen.  Once it's done that,
+	 * and brought up the memory allocator, non-boot CPUs can get their
+	 * own stacks and enter C. */
+1:	wfe
+	b 1b
+
+launch:	
 	ldr   sp, =init_stack        /* Supply a stack */
 	add   sp, #STACK_SIZE        /* (which grows down from the top). */
 	sub   sp, #CPUINFO_sizeof    /* Make room for CPU save record */
 	mov   r0, r10                /* Marshal args: - phys_offset */
 	mov   r1, r7                 /*               - machine type */
 	mov   r2, r8                 /*               - ATAG address */
+	mov   r3, r12                /*               - CPU ID */
 	b     start_xen              /* and disappear into the land of C */
 
 /* Fail-stop
@@ -288,7 +351,7 @@ puts:
 	tst   r2, #0x8               /* Check BUSY bit */
 	bne   puts                   /* Wait for the UART to be ready */
 	ldrb  r2, [r0], #1           /* Load next char */
-	teq   r2, #0                 /* Exit on nul*/
+	teq   r2, #0                 /* Exit on nul */
 	moveq pc, lr
 	str   r2, [r11]              /* -> UARTDR (Data Register) */
 	b     puts
@@ -308,10 +371,8 @@ putn:
 	lsl   r0, #4                 /* Roll it through one nybble at a time */
 	subs  r3, r3, #1
 	bne   1b
-	adr   r0, crlf               /* Finish with a newline */
-	b     puts
+	mov   pc, lr
 
-crlf:	.asciz "\r\n"
 hex:	.ascii "0123456789abcdef"
 	.align 2
 

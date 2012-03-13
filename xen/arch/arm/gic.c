@@ -252,7 +252,7 @@ static void __cpuinit gic_hyp_init(void)
 }
 
 /* Set up the GIC */
-void gic_init(void)
+int __init gic_init(void)
 {
     /* XXX FIXME get this from devicetree */
     gic.dbase = GIC_BASE_ADDRESS + GIC_DR_OFFSET;
@@ -274,6 +274,8 @@ void gic_init(void)
     gic_hyp_init();
 
     spin_unlock(&gic.lock);
+
+    return gic.cpus;
 }
 
 void gic_route_irqs(void)

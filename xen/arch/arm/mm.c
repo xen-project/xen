@@ -36,6 +36,9 @@ lpae_t xen_second[LPAE_ENTRIES*4] __attribute__((__aligned__(4096*4)));
 static lpae_t xen_fixmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 static lpae_t xen_xenmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 
+/* Non-boot CPUs use this to find the correct pagetables. */
+uint64_t boot_httbr;
+
 /* Limits of the Xen heap */
 unsigned long xenheap_mfn_start, xenheap_mfn_end;
 unsigned long xenheap_virt_end;
@@ -156,14 +159,6 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     lpae_t pte, *p;
     int i;
 
-    if ( boot_phys_offset != 0 )
-    {
-        /* Remove the old identity mapping of the boot paddr */
-        pte.bits = 0;
-        dest_va = (unsigned long)_start + boot_phys_offset;
-        write_pte(xen_second + second_linear_offset(dest_va), pte);
-    }
-
     xen_paddr = device_tree_get_xen_paddr();
 
     /* Map the destination in the boot misc area. */
@@ -186,11 +181,18 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     for ( i = 0; i < 4; i++)
         p[i].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
     p = (void *) xen_second + dest_va - (unsigned long) _start;
+    if ( boot_phys_offset != 0 )
+    {
+        /* Remove the old identity mapping of the boot paddr */
+        unsigned long va = (unsigned long)_start + boot_phys_offset;
+        p[second_linear_offset(va)].bits = 0;
+    }
     for ( i = 0; i < 4 * LPAE_ENTRIES; i++)
         if ( p[i].pt.valid )
                 p[i].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
 
     /* Change pagetables to the copy in the relocated Xen */
+    boot_httbr = (unsigned long) xen_pgtable + phys_offset;
     asm volatile (
         STORE_CP64(0, HTTBR)          /* Change translation base */
         "dsb;"                        /* Ensure visibility of HTTBR update */
@@ -198,7 +200,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
         STORE_CP32(0, BPIALL)         /* Flush branch predictor */
         "dsb;"                        /* Ensure completion of TLB+BP flush */
         "isb;"
-        : : "r" ((unsigned long) xen_pgtable + phys_offset) : "memory");
+        : : "r" (boot_httbr) : "memory");
 
     /* Undo the temporary map */
     pte.bits = 0;
