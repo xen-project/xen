@@ -175,6 +175,7 @@ libxl_dominfo = Struct("dominfo",[
     ("shutdown_reason", libxl_shutdown_reason),
     ("current_memkb",   MemKB),
     ("shared_memkb", MemKB),
+    ("paged_memkb", MemKB),
     ("max_memkb",   MemKB),
     ("cpu_time",    uint64),
     ("vcpu_max_id", uint32),

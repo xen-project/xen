@@ -460,6 +460,7 @@ static void xcinfo2xlinfo(const xc_domaininfo_t *xcinfo,
 
     xlinfo->current_memkb = PAGE_TO_MEMKB(xcinfo->tot_pages);
     xlinfo->shared_memkb = PAGE_TO_MEMKB(xcinfo->shr_pages);
+    xlinfo->paged_memkb = PAGE_TO_MEMKB(xcinfo->paged_pages);
     xlinfo->max_memkb = PAGE_TO_MEMKB(xcinfo->max_pages);
     xlinfo->cpu_time = xcinfo->cpu_time;
     xlinfo->vcpu_max_id = xcinfo->max_vcpu_id;
