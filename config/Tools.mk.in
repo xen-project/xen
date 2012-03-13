@@ -43,3 +43,4 @@ CONFIG_SYSTEM_LIBAIO:= @system_aio@
 CONFIG_LIBICONV     := @libiconv@
 CONFIG_GCRYPT       := @libgcrypt@
 CONFIG_EXT2FS       := @libext2fs@
+CURSES_LIBS         := @CURSES_LIBS@

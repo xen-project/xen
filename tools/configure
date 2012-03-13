@@ -611,6 +611,7 @@ glib_CFLAGS
 PKG_CONFIG_LIBDIR
 PKG_CONFIG_PATH
 PKG_CONFIG
+CURSES_LIBS
 PYTHONPATH
 OCAMLBUILD
 OCAMLDOC
@@ -3904,6 +3905,8 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 # PKG_CHECK_MODULES
 
 
+
+
 # Enable/disable options
 # Check whether --enable-githttp was given.
 if test "${enable_githttp+set}" = set; then :
@@ -6225,6 +6228,132 @@ fi
 
 
 fi
+
+
+ac_fn_c_check_header_mongrel "$LINENO" "curses.h" "ac_cv_header_curses_h" "$ac_includes_default"
+if test "x$ac_cv_header_curses_h" = x""yes; then :
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for clear in -lcurses" >&5
+$as_echo_n "checking for clear in -lcurses... " >&6; }
+if test "${ac_cv_lib_curses_clear+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lcurses  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char clear ();
+int
+main ()
+{
+return clear ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_curses_clear=yes
+else
+  ac_cv_lib_curses_clear=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_curses_clear" >&5
+$as_echo "$ac_cv_lib_curses_clear" >&6; }
+if test "x$ac_cv_lib_curses_clear" = x""yes; then :
+  curses="y"
+else
+  curses="n"
+fi
+
+
+else
+  curses="n"
+fi
+
+
+ac_fn_c_check_header_mongrel "$LINENO" "ncurses.h" "ac_cv_header_ncurses_h" "$ac_includes_default"
+if test "x$ac_cv_header_ncurses_h" = x""yes; then :
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for clear in -lncurses" >&5
+$as_echo_n "checking for clear in -lncurses... " >&6; }
+if test "${ac_cv_lib_ncurses_clear+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lncurses  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char clear ();
+int
+main ()
+{
+return clear ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_ncurses_clear=yes
+else
+  ac_cv_lib_ncurses_clear=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ncurses_clear" >&5
+$as_echo "$ac_cv_lib_ncurses_clear" >&6; }
+if test "x$ac_cv_lib_ncurses_clear" = x""yes; then :
+  ncurses="y"
+else
+  ncurses="n"
+fi
+
+
+else
+  ncurses="n"
+fi
+
+
+if test "$curses" = "n" && test "$ncurses" = "n"; then :
+
+    as_fn_error $? "Unable to find a suitable curses library" "$LINENO" 5
+
+fi
+# Prefer ncurses over curses if both are present
+if test "$ncurses" = "y"; then :
+
+    CURSES_LIBS="-lncurses"
+
+$as_echo "#define INCLUDE_CURSES_H <ncurses.h>" >>confdefs.h
+
+
+else
+
+    CURSES_LIBS="-lcurses"
+
+$as_echo "#define INCLUDE_CURSES_H <curses.h>" >>confdefs.h
+
+
+fi
+
 
 
 

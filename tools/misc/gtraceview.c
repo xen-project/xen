@@ -16,6 +16,9 @@
  * Place - Suite 330, Boston, MA 02111-1307 USA.
  */
 
+/* Include output from configure */
+#include <config.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,12 +33,8 @@
 #include <xenctrl.h>
 #include <xen/trace.h>
 
-#ifdef __linux__
-#include <ncurses.h>
-#endif
-#ifdef __NetBSD__
-#include <curses.h>
-#endif
+/* get curses header from configure */
+#include INCLUDE_CURSES_H
 
 /********** MACROS **********/
 #define MAX_CPU_NR  32

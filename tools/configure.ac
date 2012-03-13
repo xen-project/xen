@@ -33,6 +33,7 @@ m4_include([m4/default_lib.m4])
 m4_include([m4/set_cflags_ldflags.m4])
 m4_include([m4/uuid.m4])
 m4_include([m4/pkg.m4])
+m4_include([m4/curses.m4])
 
 # Enable/disable options
 AX_ARG_ENABLE_AND_EXPORT([githttp], [Download GIT repositories via HTTP])
@@ -98,6 +99,7 @@ AS_IF([test "x$pythontools" = "xy"], [
 ])
 AX_PATH_PROG_OR_FAIL([XGETTEXT], [xgettext])
 AX_CHECK_UUID
+AX_CHECK_CURSES
 PKG_CHECK_MODULES(glib, glib-2.0)
 
 # Check library path

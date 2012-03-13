@@ -14,3 +14,6 @@
 
 /* Define to 1 if you have the <yajl/yajl_version.h> header file. */
 #undef HAVE_YAJL_YAJL_VERSION_H
+
+/* Define curses header to include. */
+#undef INCLUDE_CURSES_H

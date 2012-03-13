@@ -22,6 +22,9 @@ CFLAGS += -DGCC_PRINTF -Wall -Werror $(CFLAGS_libxenstat)
 LDLIBS += $(LDLIBS_libxenstat) $(CURSES_LIBS) $(SOCKET_LIBS)
 CFLAGS += -DHOST_$(XEN_OS)
 
+# Include configure output (config.h) to headers search path
+CFLAGS += -I$(XEN_ROOT)/tools
+
 .PHONY: all
 all: xentop
 

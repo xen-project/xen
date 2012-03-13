@@ -27,6 +27,9 @@ INSTALL_SBIN-$(CONFIG_X86) += xen-hvmctx xen-hvmcrash
 INSTALL_SBIN-$(CONFIG_MIGRATE) += xen-hptool
 INSTALL_SBIN := $(INSTALL_SBIN-y)
 
+# Include configure output (config.h) to headers search path
+CFLAGS += -I$(XEN_ROOT)/tools
+
 .PHONY: all
 all: build
 
