@@ -31,12 +31,10 @@ void idle_loop(void)
 {
     for ( ; ; )
     {
-        /* TODO
-           if ( cpu_is_offline(smp_processor_id()) )
-           play_dead();
-           (*pm_idle)();
-           BUG();
-        */
+        if ( cpu_is_offline(smp_processor_id()) )
+            stop_cpu();
+
+        /* TODO: (*pm_idle)(); */
         do_tasklet();
         do_softirq();
     }

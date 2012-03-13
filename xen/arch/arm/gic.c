@@ -239,6 +239,11 @@ static void __cpuinit gic_cpu_init(void)
     GICC[GICC_CTLR] = GICC_CTL_ENABLE|GICC_CTL_EOI;    /* Turn on delivery */
 }
 
+static void gic_cpu_disable(void)
+{
+    GICC[GICC_CTLR] = 0;
+}
+
 static void __cpuinit gic_hyp_init(void)
 {
     uint32_t vtr;
@@ -248,6 +253,11 @@ static void __cpuinit gic_hyp_init(void)
 
     GICH[GICH_HCR] = GICH_HCR_EN;
     GICH[GICH_MISR] = GICH_MISR_EOI;
+}
+
+static void __cpuinit gic_hyp_disable(void)
+{
+    GICH[GICH_HCR] = 0;
 }
 
 /* Set up the GIC */
@@ -283,6 +293,15 @@ void __cpuinit gic_init_secondary_cpu(void)
     spin_lock(&gic.lock);
     gic_cpu_init();
     gic_hyp_init();
+    spin_unlock(&gic.lock);
+}
+
+/* Shut down the per-CPU GIC interface */
+void gic_disable_cpu(void)
+{
+    spin_lock(&gic.lock);
+    gic_cpu_disable();
+    gic_hyp_disable();
     spin_unlock(&gic.lock);
 }
 

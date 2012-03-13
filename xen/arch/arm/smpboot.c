@@ -18,6 +18,7 @@
 
 #include <xen/cpu.h>
 #include <xen/cpumask.h>
+#include <xen/delay.h>
 #include <xen/errno.h>
 #include <xen/init.h>
 #include <xen/mm.h>
@@ -57,6 +58,7 @@ smp_prepare_cpus (unsigned int max_cpus)
 
 /* Shared state for coordinating CPU bringup */
 unsigned long smp_up_cpu = 0;
+static bool_t cpu_is_dead = 0;
 
 /* Boot the current CPU */
 void __cpuinit start_secondary(unsigned long boot_phys_offset,
@@ -97,8 +99,35 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
 /* Shut down the current CPU */
 void __cpu_disable(void)
 {
-    /* TODO: take down timers, GIC, &c. */
-    BUG();
+    unsigned int cpu = get_processor_id();
+
+    local_irq_disable();
+    gic_disable_cpu();
+    /* Allow any queued timer interrupts to get serviced */
+    local_irq_enable();
+    mdelay(1);
+    local_irq_disable();
+
+    /* It's now safe to remove this processor from the online map */
+    cpumask_clear_cpu(cpu, &cpu_online_map);
+
+    if ( cpu_disable_scheduler(cpu) )
+        BUG();
+    mb();
+
+    /* Return to caller; eventually the IPI mechanism will unwind and the 
+     * scheduler will drop to the idle loop, which will call stop_cpu(). */
+}
+
+void stop_cpu(void)
+{
+    local_irq_disable();
+    cpu_is_dead = 1;
+    /* Make sure the write happens before we sleep forever */
+    dsb();
+    isb();
+    while ( 1 ) 
+        asm volatile("wfi");
 }
 
 /* Bring up a remote CPU */
@@ -124,8 +153,19 @@ int __cpu_up(unsigned int cpu)
 /* Wait for a remote CPU to die */
 void __cpu_die(unsigned int cpu)
 {
-    /* TODO: interlock with __cpu_disable */
-    BUG();
+    unsigned int i = 0;
+
+    while ( !cpu_is_dead )
+    {
+        mdelay(100);
+        cpu_relax();
+        process_pending_softirqs();
+        if ( (++i % 10) == 0 )
+            printk(KERN_ERR "CPU %u still not dead...\n", cpu);
+        mb();
+    }
+    cpu_is_dead = 0;
+    mb();
 }
 
 
