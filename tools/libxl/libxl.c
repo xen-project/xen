@@ -2256,9 +2256,7 @@ int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb)
     }
 
     libxl_defbool_setdefault(&vfb->sdl.enable, false);
-    if (libxl_defbool_val(vfb->sdl.enable)) {
-        libxl_defbool_setdefault(&vfb->sdl.opengl, false);
-    }
+    libxl_defbool_setdefault(&vfb->sdl.opengl, false);
 
     return 0;
 }
