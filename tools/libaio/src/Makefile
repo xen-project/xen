@@ -54,11 +54,11 @@ $(libname): $(libaio_sobjs) libaio.map
 	$(CC) $(SO_CFLAGS) -Wl,--version-script=libaio.map -Wl,-soname=$(soname) -o $@ $(libaio_sobjs) $(LINK_FLAGS)
 
 install: $(all_targets)
-	install -D -m 644 libaio.h $(includedir)/libaio.h
-	install -D -m 644 libaio.a $(libdir)/libaio.a
-	install -D -m 755 $(libname) $(libdir)/$(libname)
-	ln -sf $(libname) $(libdir)/$(soname)
-	ln -sf $(libname) $(libdir)/libaio.so
+	install -D -m 644 libaio.h $(DESTDIR)$(includedir)/libaio.h
+	install -D -m 644 libaio.a $(DESTDIR)$(libdir)/libaio.a
+	install -D -m 755 $(libname) $(DESTDIR)$(libdir)/$(libname)
+	ln -sf $(libname) $(DESTDIR)$(libdir)/$(soname)
+	ln -sf $(libname) $(DESTDIR)$(libdir)/libaio.so
 
 $(libaio_objs): libaio.h
 
