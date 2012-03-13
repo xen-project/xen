@@ -12,8 +12,11 @@ void percpu_init_areas(void);
     __attribute__((__section__(".bss.percpu" #suffix)))         \
     __typeof__(type) per_cpu_##name
 
-#define per_cpu(var, cpu) ((&per_cpu__##var)[cpu?0:0])
-#define __get_cpu_var(var) per_cpu__##var
+
+#define per_cpu(var, cpu)  \
+    (*RELOC_HIDE(&per_cpu__##var, __per_cpu_offset[cpu]))
+#define __get_cpu_var(var) \
+    (*RELOC_HIDE(&per_cpu__##var, get_cpu_info()->per_cpu_offset))
 
 #define DECLARE_PER_CPU(type, name) extern __typeof__(type) per_cpu__##name
 

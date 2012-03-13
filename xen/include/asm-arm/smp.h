@@ -14,6 +14,8 @@ DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
 
 #define raw_smp_processor_id() (get_processor_id())
 
+extern void stop_cpu(void);
+
 #endif
 /*
  * Local variables:

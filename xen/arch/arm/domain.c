@@ -31,12 +31,14 @@ void idle_loop(void)
 {
     for ( ; ; )
     {
-        /* TODO
-           if ( cpu_is_offline(smp_processor_id()) )
-           play_dead();
-           (*pm_idle)();
-           BUG();
-        */
+        if ( cpu_is_offline(smp_processor_id()) )
+            stop_cpu();
+
+        local_irq_disable();
+        if ( cpu_is_haltable(smp_processor_id()) )
+            asm volatile ("dsb; wfi");
+        local_irq_enable();
+
         do_tasklet();
         do_softirq();
     }

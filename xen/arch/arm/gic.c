@@ -224,7 +224,9 @@ static void __cpuinit gic_cpu_init(void)
 {
     int i;
 
-    /* Disable all PPI and enable all SGI */
+    /* The first 32 interrupts (PPI and SGI) are banked per-cpu, so 
+     * even though they are controlled with GICD registers, they must 
+     * be set up here with the other per-cpu state. */
     GICD[GICD_ICENABLER] = 0xffff0000; /* Disable all PPI */
     GICD[GICD_ISENABLER] = 0x0000ffff; /* Enable all SGI */
     /* Set PPI and SGI priorities */
@@ -237,20 +239,29 @@ static void __cpuinit gic_cpu_init(void)
     GICC[GICC_CTLR] = GICC_CTL_ENABLE|GICC_CTL_EOI;    /* Turn on delivery */
 }
 
+static void gic_cpu_disable(void)
+{
+    GICC[GICC_CTLR] = 0;
+}
+
 static void __cpuinit gic_hyp_init(void)
 {
     uint32_t vtr;
 
     vtr = GICH[GICH_VTR];
     nr_lrs  = (vtr & GICH_VTR_NRLRGS) + 1;
-    printk("GICH: %d list registers available\n", nr_lrs);
 
     GICH[GICH_HCR] = GICH_HCR_EN;
     GICH[GICH_MISR] = GICH_MISR_EOI;
 }
 
+static void __cpuinit gic_hyp_disable(void)
+{
+    GICH[GICH_HCR] = 0;
+}
+
 /* Set up the GIC */
-void gic_init(void)
+int __init gic_init(void)
 {
     /* XXX FIXME get this from devicetree */
     gic.dbase = GIC_BASE_ADDRESS + GIC_DR_OFFSET;
@@ -271,6 +282,26 @@ void gic_init(void)
     gic_cpu_init();
     gic_hyp_init();
 
+    spin_unlock(&gic.lock);
+
+    return gic.cpus;
+}
+
+/* Set up the per-CPU parts of the GIC for a secondary CPU */
+void __cpuinit gic_init_secondary_cpu(void)
+{
+    spin_lock(&gic.lock);
+    gic_cpu_init();
+    gic_hyp_init();
+    spin_unlock(&gic.lock);
+}
+
+/* Shut down the per-CPU GIC interface */
+void gic_disable_cpu(void)
+{
+    spin_lock(&gic.lock);
+    gic_cpu_disable();
+    gic_hyp_disable();
     spin_unlock(&gic.lock);
 }
 

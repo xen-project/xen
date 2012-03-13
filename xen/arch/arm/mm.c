@@ -36,6 +36,9 @@ lpae_t xen_second[LPAE_ENTRIES*4] __attribute__((__aligned__(4096*4)));
 static lpae_t xen_fixmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 static lpae_t xen_xenmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 
+/* Non-boot CPUs use this to find the correct pagetables. */
+uint64_t boot_httbr;
+
 /* Limits of the Xen heap */
 unsigned long xenheap_mfn_start, xenheap_mfn_end;
 unsigned long xenheap_virt_end;
@@ -44,6 +47,8 @@ unsigned long frametable_base_mfn;
 unsigned long frametable_virt_end;
 
 unsigned long max_page;
+
+extern char __init_begin[], __init_end[];
 
 /* Map a 4k page in a fixmap entry */
 void set_fixmap(unsigned map, unsigned long mfn, unsigned attributes)
@@ -156,14 +161,6 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     lpae_t pte, *p;
     int i;
 
-    if ( boot_phys_offset != 0 )
-    {
-        /* Remove the old identity mapping of the boot paddr */
-        pte.bits = 0;
-        dest_va = (unsigned long)_start + boot_phys_offset;
-        write_pte(xen_second + second_linear_offset(dest_va), pte);
-    }
-
     xen_paddr = device_tree_get_xen_paddr();
 
     /* Map the destination in the boot misc area. */
@@ -186,11 +183,18 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     for ( i = 0; i < 4; i++)
         p[i].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
     p = (void *) xen_second + dest_va - (unsigned long) _start;
+    if ( boot_phys_offset != 0 )
+    {
+        /* Remove the old identity mapping of the boot paddr */
+        unsigned long va = (unsigned long)_start + boot_phys_offset;
+        p[second_linear_offset(va)].bits = 0;
+    }
     for ( i = 0; i < 4 * LPAE_ENTRIES; i++)
         if ( p[i].pt.valid )
                 p[i].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
 
     /* Change pagetables to the copy in the relocated Xen */
+    boot_httbr = (unsigned long) xen_pgtable + phys_offset;
     asm volatile (
         STORE_CP64(0, HTTBR)          /* Change translation base */
         "dsb;"                        /* Ensure visibility of HTTBR update */
@@ -198,22 +202,12 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
         STORE_CP32(0, BPIALL)         /* Flush branch predictor */
         "dsb;"                        /* Ensure completion of TLB+BP flush */
         "isb;"
-        : : "r" ((unsigned long) xen_pgtable + phys_offset) : "memory");
+        : : "r" (boot_httbr) : "memory");
 
     /* Undo the temporary map */
     pte.bits = 0;
     write_pte(xen_second + second_table_offset(dest_va), pte);
-    /*
-     * Have removed a mapping previously used for .text. Flush everything
-     * for safety.
-     */
-    asm volatile (
-        "dsb;"                        /* Ensure visibility of PTE write */
-        STORE_CP32(0, TLBIALLH)       /* Flush hypervisor TLB */
-        STORE_CP32(0, BPIALL)         /* Flush branch predictor */
-        "dsb;"                        /* Ensure completion of TLB+BP flush */
-        "isb;"
-        : : "r" (i /*dummy*/) : "memory");
+    flush_xen_text_tlb();
 
     /* Link in the fixmap pagetable */
     pte = mfn_to_xen_entry((((unsigned long) xen_fixmap) + phys_offset)
@@ -249,14 +243,15 @@ void __init setup_pagetables(unsigned long boot_phys_offset)
     pte.pt.table = 1;
     write_pte(xen_second + second_linear_offset(XEN_VIRT_START), pte);
     /* Have changed a mapping used for .text. Flush everything for safety. */
-    asm volatile (
-        "dsb;"                        /* Ensure visibility of PTE write */
-        STORE_CP32(0, TLBIALLH)       /* Flush hypervisor TLB */
-        STORE_CP32(0, BPIALL)         /* Flush branch predictor */
-        "dsb;"                        /* Ensure completion of TLB+BP flush */
-        "isb;"
-        : : "r" (i /*dummy*/) : "memory");
+    flush_xen_text_tlb();
 
+    /* From now on, no mapping may be both writable and executable. */
+    WRITE_CP32(READ_CP32(HSCTLR) | SCTLR_WXN, HSCTLR);
+}
+
+/* MMU setup for secondary CPUS (which already have paging enabled) */
+void __cpuinit mmu_init_secondary_cpu(void)
+{
     /* From now on, no mapping may be both writable and executable. */
     WRITE_CP32(READ_CP32(HSCTLR) | SCTLR_WXN, HSCTLR);
 }
@@ -317,6 +312,64 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
            frametable_size - (nr_pages * sizeof(struct page_info)));
 
     frametable_virt_end = FRAMETABLE_VIRT_START + (nr_pages * sizeof(struct page_info));
+}
+
+enum mg { mg_clear, mg_ro, mg_rw, mg_rx };
+static void set_pte_flags_on_range(const char *p, unsigned long l, enum mg mg)
+{
+    lpae_t pte;
+    int i;
+
+    ASSERT(is_kernel(p) && is_kernel(p + l));
+
+    /* Can only guard in page granularity */
+    ASSERT(!((unsigned long) p & ~PAGE_MASK));
+    ASSERT(!(l & ~PAGE_MASK));
+
+    for ( i = (p - _start) / PAGE_SIZE; 
+          i < (p + l - _start) / PAGE_SIZE; 
+          i++ )
+    {
+        pte = xen_xenmap[i];
+        switch ( mg )
+        {
+        case mg_clear:
+            pte.pt.valid = 0;
+            break;
+        case mg_ro:
+            pte.pt.valid = 1;
+            pte.pt.pxn = 1;
+            pte.pt.xn = 1;
+            pte.pt.ro = 1;
+            break;
+        case mg_rw:
+            pte.pt.valid = 1;
+            pte.pt.pxn = 1;
+            pte.pt.xn = 1;
+            pte.pt.ro = 0;
+            break;
+        case mg_rx:
+            pte.pt.valid = 1;
+            pte.pt.pxn = 0;
+            pte.pt.xn = 0;
+            pte.pt.ro = 1;
+            break;
+        }
+        write_pte(xen_xenmap + i, pte);
+    }
+    flush_xen_text_tlb();
+}
+
+/* Release all __init and __initdata ranges to be reused */
+void free_init_memory(void)
+{
+    paddr_t pa = virt_to_maddr(__init_begin);
+    unsigned long len = __init_end - __init_begin;
+    set_pte_flags_on_range(__init_begin, len, mg_rw);
+    memset(__init_begin, 0xcc, len);
+    set_pte_flags_on_range(__init_begin, len, mg_clear);
+    init_domheap_pages(pa, pa + len);
+    printk("Freed %ldkB init memory.\n", (long)(__init_end-__init_begin)>>10);
 }
 
 void arch_dump_shared_mem_info(void)

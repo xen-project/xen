@@ -38,22 +38,14 @@
 #include <asm/setup.h>
 #include "gic.h"
 
-/* maxcpus: maximum number of CPUs to activate. */
-static unsigned int __initdata max_cpus = NR_CPUS;
-
-/* Xen stack for bringing up the first CPU. */
-unsigned char __initdata init_stack[STACK_SIZE] __attribute__((__aligned__(STACK_SIZE)));
-
-extern char __init_begin[], __init_end[], __bss_start[];
+/* Spinlock for serializing CPU bringup */
+unsigned long __initdata boot_gate = 1;
+/* Number of non-boot CPUs ready to enter C */
+unsigned long __initdata ready_cpus = 0;
 
 static __attribute_used__ void init_done(void)
 {
-    /* TODO: free (or page-protect) the init areas.
-       memset(__init_begin, 0xcc, __init_end - __init_begin);
-       free_xen_data(__init_begin, __init_end);
-    */
-    printk("Freed %ldkB init memory.\n", (long)(__init_end-__init_begin)>>10);
-
+    free_init_memory();
     startup_cpu_idle_loop();
 }
 
@@ -151,14 +143,17 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     end_boot_allocator();
 }
 
+/* C entry point for boot CPU */
 void __init start_xen(unsigned long boot_phys_offset,
                       unsigned long arm_type,
-                      unsigned long atag_paddr)
-
+                      unsigned long atag_paddr,
+                      unsigned long cpuid)
 {
     void *fdt;
     size_t fdt_size;
-    int i;
+    int cpus, i;
+    paddr_t gate_pa;
+    unsigned long *gate;
 
     fdt = (void *)BOOT_MISC_VIRT_START
         + (atag_paddr & ((1 << SECOND_SHIFT) - 1));
@@ -174,15 +169,29 @@ void __init start_xen(unsigned long boot_phys_offset,
     console_init_preirq();
 #endif
 
-    __set_current((struct vcpu *)0xfffff000); /* debug sanity */
-    idle_vcpu[0] = current;
+    percpu_init_areas();
     set_processor_id(0); /* needed early, for smp_processor_id() */
 
-    /* TODO: smp_prepare_boot_cpu(void) */
-    cpumask_set_cpu(smp_processor_id(), &cpu_online_map);
-    cpumask_set_cpu(smp_processor_id(), &cpu_present_map);
+    cpus = gic_init();
 
-    smp_prepare_cpus(max_cpus);
+    printk("Waiting for %i other CPUs to be ready\n", cpus - 1);
+    /* Bring the other CPUs up to paging before the original
+     * copy of .text gets overwritten.  We need to use the unrelocated
+     * copy of boot_gate as that's the one the others can see. */ 
+    gate_pa = ((unsigned long) &boot_gate) + boot_phys_offset;
+    gate = map_domain_page(gate_pa >> PAGE_SHIFT) + (gate_pa & ~PAGE_MASK); 
+    *gate = 0;
+    unmap_domain_page(gate);
+    /* Now send an event to wake the first non-boot CPU */
+    asm volatile("dsb; isb; sev");
+    /* And wait for them all to be ready. */
+    while ( ready_cpus + 1 < cpus )
+        smp_rmb();
+
+    __set_current((struct vcpu *)0xfffff000); /* debug sanity */
+    idle_vcpu[0] = current;
+
+    smp_prepare_cpus(cpus);
 
     init_xen_time();
 
@@ -208,8 +217,6 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     init_IRQ();
 
-    gic_init();
-
     gic_route_irqs();
 
     init_maintenance_interrupt();
@@ -231,7 +238,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     for_each_present_cpu ( i )
     {
-        if ( (num_online_cpus() < max_cpus) && !cpu_online(i) )
+        if ( (num_online_cpus() < cpus) && !cpu_online(i) )
         {
             int ret = cpu_up(i);
             if ( ret != 0 )
@@ -269,7 +276,11 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     domain_unpause_by_systemcontroller(dom0);
 
-    reset_stack_and_jump(init_done);
+    /* Switch on to the dynamically allocated stack for the idle vcpu
+     * since the static one we're running on is about to be freed. */
+    memcpy(idle_vcpu[0]->arch.cpu_info, get_cpu_info(), 
+           sizeof(struct cpu_info));
+    switch_stack_and_jump(idle_vcpu[0]->arch.cpu_info, init_done);
 }
 
 void arch_get_xen_caps(xen_capabilities_info_t *info)

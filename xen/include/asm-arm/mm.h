@@ -136,6 +136,8 @@ extern unsigned long total_pages;
 
 /* Boot-time pagetable setup */
 extern void setup_pagetables(unsigned long boot_phys_offset);
+/* MMU setup for seccondary CPUS (which already have paging enabled) */
+extern void __cpuinit mmu_init_secondary_cpu(void);
 /* Set up the xenheap: up to 1GB of contiguous, always-mapped memory.
  * Base must be 32MB aligned and size a multiple of 32MB. */
 extern void setup_xenheap_mappings(unsigned long base_mfn, unsigned long nr_mfns);
@@ -276,6 +278,10 @@ extern struct domain *dom_xen, *dom_io, *dom_cow;
 #define memguard_guard_stack(_p)       ((void)0)
 #define memguard_guard_range(_p,_l)    ((void)0)
 #define memguard_unguard_range(_p,_l)  ((void)0)
+
+/* Release all __init and __initdata ranges to be reused */
+void free_init_memory(void);
+
 int guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
                                           unsigned int order);
 

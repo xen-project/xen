@@ -40,17 +40,19 @@ static inline struct cpu_info *get_cpu_info(void)
 #define get_current()         (this_cpu(curr_vcpu))
 #define __set_current(vcpu)   (this_cpu(curr_vcpu) = (vcpu))
 #define set_current(vcpu)     do {                                      \
-    vcpu->arch.cpu_info->processor_id = get_processor_id();             \
+    int cpu = get_processor_id();                                       \
+    vcpu->arch.cpu_info->processor_id = cpu;                            \
+    vcpu->arch.cpu_info->per_cpu_offset = __per_cpu_offset[cpu];        \
     __set_current(vcpu);                                                \
 } while (0)
 #define current               (get_current())
 
 #define guest_cpu_user_regs() (&get_cpu_info()->guest_cpu_user_regs)
 
-#define reset_stack_and_jump(__fn)              \
-    __asm__ __volatile__ (                      \
-        "mov sp,%0; b "STR(__fn)      \
-        : : "r" (guest_cpu_user_regs()) : "memory" )
+#define switch_stack_and_jump(stack, fn)                                \
+    asm volatile ("mov sp,%0; b " STR(fn) : : "r" (stack) : "memory" )
+
+#define reset_stack_and_jump(fn) switch_stack_and_jump(get_cpu_info(), fn)
 
 #endif
 

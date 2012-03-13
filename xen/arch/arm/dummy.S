@@ -7,14 +7,10 @@ x:	.word 0xe7f000f0 /* Undefined instruction */
 x:	mov pc, lr
 	
 /* SMP support */
-DUMMY(__cpu_die);
-DUMMY(__cpu_disable);
-DUMMY(__cpu_up);
 DUMMY(per_cpu__cpu_core_mask);
 DUMMY(per_cpu__cpu_sibling_mask);
 DUMMY(node_online_map);
 DUMMY(smp_send_state_dump);
-DUMMY(__per_cpu_offset);
 
 /* PIRQ support */
 DUMMY(alloc_pirq_struct);
@@ -62,5 +58,4 @@ DUMMY(gmfn_to_mfn);
 DUMMY(hypercall_create_continuation);
 DUMMY(send_timer_event);
 DUMMY(share_xen_page_with_privileged_guests);
-DUMMY(__udelay);
 DUMMY(wallclock_time);
