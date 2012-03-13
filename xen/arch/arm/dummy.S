@@ -14,7 +14,6 @@ DUMMY(per_cpu__cpu_core_mask);
 DUMMY(per_cpu__cpu_sibling_mask);
 DUMMY(node_online_map);
 DUMMY(smp_send_state_dump);
-DUMMY(__per_cpu_offset);
 
 /* PIRQ support */
 DUMMY(alloc_pirq_struct);

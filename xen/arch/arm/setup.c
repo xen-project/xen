@@ -182,6 +182,9 @@ void __init start_xen(unsigned long boot_phys_offset,
     console_init_preirq();
 #endif
 
+    percpu_init_areas();
+    set_processor_id(0); /* needed early, for smp_processor_id() */
+
     cpus = gic_init();
 
     printk("Waiting for %i other CPUs to be ready\n", cpus - 1);
@@ -200,7 +203,6 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     __set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
-    set_processor_id(0); /* needed early, for smp_processor_id() */
 
     smp_prepare_cpus(max_cpus);
 

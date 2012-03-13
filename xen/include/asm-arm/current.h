@@ -40,7 +40,9 @@ static inline struct cpu_info *get_cpu_info(void)
 #define get_current()         (this_cpu(curr_vcpu))
 #define __set_current(vcpu)   (this_cpu(curr_vcpu) = (vcpu))
 #define set_current(vcpu)     do {                                      \
-    vcpu->arch.cpu_info->processor_id = get_processor_id();             \
+    int cpu = get_processor_id();                                       \
+    vcpu->arch.cpu_info->processor_id = cpu;                            \
+    vcpu->arch.cpu_info->per_cpu_offset = __per_cpu_offset[cpu];        \
     __set_current(vcpu);                                                \
 } while (0)
 #define current               (get_current())
