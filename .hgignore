@@ -314,6 +314,8 @@
 ^xen/\.banner.*$
 ^xen/BLOG$
 ^xen/System.map$
+^xen/arch/arm/asm-offsets\.s$
+^xen/arch/arm/xen\.lds$
 ^xen/arch/x86/asm-offsets\.s$
 ^xen/arch/x86/boot/mkelf32$
 ^xen/arch/x86/xen\.lds$
