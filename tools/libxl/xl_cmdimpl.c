@@ -4056,13 +4056,23 @@ static int sched_sedf_domain_output(
     return 0;
 }
 
-static int sched_domain_output(
-    libxl_scheduler sched, int (*output)(int), const char *cpupool)
+static int sched_default_pool_output(uint32_t poolid)
+{
+    char *poolname;
+
+    poolname = libxl_cpupoolid_to_name(ctx, poolid);
+    printf("Cpupool %s:\n",
+           poolname);
+    free(poolname);
+    return 0;
+}
+
+static int sched_domain_output(libxl_scheduler sched, int (*output)(int),
+                               int (*pooloutput)(uint32_t), const char *cpupool)
 {
     libxl_dominfo *info;
     libxl_cpupoolinfo *poolinfo = NULL;
     uint32_t poolid;
-    char *poolname;
     int nb_domain, n_pools = 0, i, p;
     int rc = 0;
 
@@ -4090,9 +4100,7 @@ static int sched_domain_output(
             (cpupool && (poolid != poolinfo[p].poolid)))
             continue;
 
-        poolname = libxl_cpupoolid_to_name(ctx, poolinfo[p].poolid);
-        printf("Cpupool %s:\n", poolname);
-        free(poolname);
+        pooloutput(poolinfo[p].poolid);
 
         output(-1);
         for (i = 0; i < nb_domain; i++) {
@@ -4168,7 +4176,9 @@ int main_sched_credit(int argc, char **argv)
 
     if (!dom) { /* list all domain's credit scheduler info */
         return -sched_domain_output(LIBXL_SCHEDULER_CREDIT,
-                                    sched_credit_domain_output, cpupool);
+                                    sched_credit_domain_output,
+                                    sched_default_pool_output,
+                                    cpupool);
     } else {
         find_domain(dom);
 
@@ -4245,7 +4255,9 @@ int main_sched_credit2(int argc, char **argv)
 
     if (!dom) { /* list all domain's credit scheduler info */
         return -sched_domain_output(LIBXL_SCHEDULER_CREDIT2,
-                                    sched_credit2_domain_output, cpupool);
+                                    sched_credit2_domain_output,
+                                    sched_default_pool_output,
+                                    cpupool);
     } else {
         find_domain(dom);
 
@@ -4348,7 +4360,9 @@ int main_sched_sedf(int argc, char **argv)
 
     if (!dom) { /* list all domain's credit scheduler info */
         return -sched_domain_output(LIBXL_SCHEDULER_SEDF,
-                                    sched_sedf_domain_output, cpupool);
+                                    sched_sedf_domain_output,
+                                    sched_default_pool_output,
+                                    cpupool);
     } else {
         find_domain(dom);
 
