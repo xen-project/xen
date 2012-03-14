@@ -127,7 +127,6 @@ subdir-all-qemu-xen-traditional-dir subdir-install-qemu-xen-traditional-dir: qem
 
 subdir-clean-qemu-xen-traditional-dir:
 	set -e; if test -d qemu-xen-traditional-dir/.; then \
-		$(buildmakevars2shellvars); \
 		$(MAKE) -C qemu-xen-traditional-dir clean; \
 	fi
 
@@ -162,7 +161,6 @@ subdir-all-qemu-xen-dir subdir-install-qemu-xen-dir: qemu-xen-dir-find
 
 subdir-clean-qemu-xen-dir:
 	set -e; if test -d qemu-xen-dir/.; then \
-		$(buildmakevars2shellvars); \
 		$(MAKE) -C qemu-xen-dir clean; \
 	fi
 

@@ -55,3 +55,8 @@ seabios-dir-force-update:
 		$(GIT) fetch origin; \
 		$(GIT) reset --hard $(SEABIOS_UPSTREAM_TAG); \
 	fi
+
+subdir-clean-seabios-dir:
+	set -e; if test -d seabios-dir/.; then \
+		$(MAKE) -C seabios-dir clean; \
+	fi
