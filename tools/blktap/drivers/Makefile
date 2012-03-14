@@ -3,14 +3,12 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 IBIN         = blktapctrl tapdisk
 QCOW_UTIL    = img2qcow qcow2raw qcow-create
-MEMSHR_DIR   = ../../memshr
 
 CFLAGS   += -Werror
 CFLAGS   += -Wno-unused
 CFLAGS   += -I../lib
 CFLAGS   += $(CFLAGS_libxenctrl)
 CFLAGS   += $(CFLAGS_libxenstore)
-CFLAGS   += -I $(MEMSHR_DIR)
 CFLAGS   += -D_GNU_SOURCE
 
 ifeq ($CONFIG_GCRYPT,y)
@@ -23,7 +21,9 @@ endif
 
 MEMSHRLIBS :=
 ifeq ($(CONFIG_Linux), y)
+MEMSHR_DIR   = ../../memshr
 CFLAGS += -DMEMSHR
+CFLAGS += -I $(MEMSHR_DIR)
 MEMSHRLIBS += $(MEMSHR_DIR)/libmemshr.a
 endif
 

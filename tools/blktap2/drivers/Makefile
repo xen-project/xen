@@ -14,7 +14,6 @@ CFLAGS    += -Wno-unused
 CFLAGS    += -fno-strict-aliasing
 CFLAGS    += -I$(BLKTAP_ROOT)/include -I$(BLKTAP_ROOT)/drivers
 CFLAGS    += $(CFLAGS_libxenctrl)
-CFLAGS    += -I $(MEMSHR_DIR)
 CFLAGS    += -D_GNU_SOURCE
 CFLAGS    += -DUSE_NFS_LOCKS
 
@@ -38,11 +37,11 @@ else
 tapdisk2 tapdisk-stream tapdisk-diff $(QCOW_UTIL): AIOLIBS := -laio
 endif
 
-MEMSHR_DIR = $(XEN_ROOT)/tools/memshr
-
 MEMSHRLIBS :=
 ifeq ($(CONFIG_Linux), __fixme__)
+MEMSHR_DIR = $(XEN_ROOT)/tools/memshr
 CFLAGS += -DMEMSHR
+CFLAGS += -I $(MEMSHR_DIR)
 MEMSHRLIBS += -L$(XEN_ROOT)/tools/libxc -lxenctrl $(MEMSHR_DIR)/libmemshr.a
 endif
 
