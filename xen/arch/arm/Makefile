@@ -15,6 +15,7 @@ obj-y += mm.o
 obj-y += p2m.o
 obj-y += percpu.o
 obj-y += guestcopy.o
+obj-y += physdev.o
 obj-y += setup.o
 obj-y += time.o
 obj-y += smpboot.o
