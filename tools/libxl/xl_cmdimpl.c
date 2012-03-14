@@ -3734,6 +3734,7 @@ static void output_physinfo(void)
     }
 
     printf("nr_cpus                : %d\n", info.nr_cpus);
+    printf("max_cpu_id             : %d\n", info.max_cpu_id);
     printf("nr_nodes               : %d\n", info.nr_nodes);
     printf("cores_per_socket       : %d\n", info.cores_per_socket);
     printf("threads_per_core       : %d\n", info.threads_per_core);
