@@ -61,7 +61,7 @@ do_start () {
 
 	if ! `xenstore-read -s / >/dev/null 2>&1`
 	then
-		test -z "$XENSTORED_ROOTDIR" || XENSTORED_ROOTDIR="/var/lib/xenstored"
+		test -z "$XENSTORED_ROOTDIR" && XENSTORED_ROOTDIR="/var/lib/xenstored"
 		rm -f "$XENSTORED_ROOTDIR"/tdb* &>/dev/null
 		test -z "$XENSTORED_TRACE" || XENSTORED_ARGS=" -T /var/log/xen/xenstored-trace.log"
 
