@@ -462,6 +462,7 @@ tapdisk_control_open_image(struct tapdisk_control_connection *connection,
 
 	params.capacity = image.size;
 	params.sector_size = image.secsize;
+	strncpy(params.name, vbd->name, BLKTAP2_MAX_MESSAGE_LEN);
 
 	err = ioctl(vbd->ring.fd, BLKTAP2_IOCTL_CREATE_DEVICE, &params);
 	if (err && errno != EEXIST) {
