@@ -116,8 +116,6 @@ AC_SUBST(libgcrypt)
 AC_CHECK_LIB([pthread], [pthread_create], [] ,
     [AC_MSG_ERROR([Could not find libpthread])])
 AC_CHECK_LIB([rt], [clock_gettime])
-AC_CHECK_LIB([uuid], [uuid_clear], [],
-    [AC_MSG_ERROR([Could not find libuuid])])
 AC_CHECK_LIB([yajl], [yajl_alloc], [],
     [AC_MSG_ERROR([Could not find yajl])])
 AC_CHECK_LIB([z], [deflateCopy], [], [AC_MSG_ERROR([Could not find zlib])])

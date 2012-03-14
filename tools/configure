@@ -6270,24 +6270,63 @@ if test x"${XGETTEXT}" == x"no"
 then
     as_fn_error $? "Unable to find xgettext, please install xgettext" "$LINENO" 5
 fi
-if test "x$host_os" == "xlinux-gnu"
-then
-    ac_fn_c_check_header_mongrel "$LINENO" "uuid/uuid.h" "ac_cv_header_uuid_uuid_h" "$ac_includes_default"
+
+ac_fn_c_check_header_mongrel "$LINENO" "uuid/uuid.h" "ac_cv_header_uuid_uuid_h" "$ac_includes_default"
 if test "x$ac_cv_header_uuid_uuid_h" = x""yes; then :
 
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for uuid_clear in -luuid" >&5
+$as_echo_n "checking for uuid_clear in -luuid... " >&6; }
+if test "${ac_cv_lib_uuid_uuid_clear+set}" = set; then :
+  $as_echo_n "(cached) " >&6
 else
-  as_fn_error $? "cannot find uuid headers" "$LINENO" 5
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-luuid  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char uuid_clear ();
+int
+main ()
+{
+return uuid_clear ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_uuid_uuid_clear=yes
+else
+  ac_cv_lib_uuid_uuid_clear=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_uuid_uuid_clear" >&5
+$as_echo "$ac_cv_lib_uuid_uuid_clear" >&6; }
+if test "x$ac_cv_lib_uuid_uuid_clear" = x""yes; then :
+  libuuid="y"
 fi
 
 
-else
-    ac_fn_c_check_header_mongrel "$LINENO" "uuid.h" "ac_cv_header_uuid_h" "$ac_includes_default"
+fi
+
+
+ac_fn_c_check_header_mongrel "$LINENO" "uuid.h" "ac_cv_header_uuid_h" "$ac_includes_default"
 if test "x$ac_cv_header_uuid_h" = x""yes; then :
-
-else
-  as_fn_error $? "cannot find uuid headers" "$LINENO" 5
+  libuuid="y"
 fi
 
+
+if test "$libuuid" != "y"; then :
+
+    as_fn_error $? "cannot find a valid uuid library" "$LINENO" 5
 
 fi
 
@@ -6913,53 +6952,6 @@ _ACEOF
 
   LIBS="-lrt $LIBS"
 
-fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for uuid_clear in -luuid" >&5
-$as_echo_n "checking for uuid_clear in -luuid... " >&6; }
-if test "${ac_cv_lib_uuid_uuid_clear+set}" = set; then :
-  $as_echo_n "(cached) " >&6
-else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-luuid  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char uuid_clear ();
-int
-main ()
-{
-return uuid_clear ();
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_uuid_uuid_clear=yes
-else
-  ac_cv_lib_uuid_uuid_clear=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_uuid_uuid_clear" >&5
-$as_echo "$ac_cv_lib_uuid_uuid_clear" >&6; }
-if test "x$ac_cv_lib_uuid_uuid_clear" = x""yes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBUUID 1
-_ACEOF
-
-  LIBS="-luuid $LIBS"
-
-else
-  as_fn_error $? "Could not find libuuid" "$LINENO" 5
 fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for yajl_alloc in -lyajl" >&5
