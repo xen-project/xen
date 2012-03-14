@@ -204,11 +204,14 @@ struct cmd_spec cmd_table[] = {
     { "sched-credit",
       &main_sched_credit, 0,
       "Get/set credit scheduler parameters",
-      "[-d <Domain> [-w[=WEIGHT]|-c[=CAP]]] [-p CPUPOOL]",
-      "-d DOMAIN, --domain=DOMAIN     Domain to modify\n"
-      "-w WEIGHT, --weight=WEIGHT     Weight (int)\n"
-      "-c CAP, --cap=CAP              Cap (int)\n"
-      "-p CPUPOOL, --cpupool=CPUPOOL  Restrict output to CPUPOOL"
+      "[-d <Domain> [-w[=WEIGHT]|-c[=CAP]]] [-s [-t TSLICE] [-r RATELIMIT]] [-p CPUPOOL]",
+      "-d DOMAIN, --domain=DOMAIN        Domain to modify\n"
+      "-w WEIGHT, --weight=WEIGHT        Weight (int)\n"
+      "-c CAP, --cap=CAP                 Cap (int)\n"
+      "-s         --schedparam           Query / modify scheduler parameters\n"
+      "-t TSLICE, --tslice_ms=TSLICE     Set the timeslice, in milliseconds\n"
+      "-r RLIMIT, --ratelimit_us=RLIMIT  Set the scheduling rate limit, in microseconds\n"
+      "-p CPUPOOL, --cpupool=CPUPOOL     Restrict output to CPUPOOL"
     },
     { "sched-credit2",
       &main_sched_credit2, 0,

@@ -714,6 +714,53 @@ no upper cap.
 
 Restrict output to domains in the specified cpupool.
 
+=item B<-s>, B<--schedparam>
+
+Specify to list or set pool-wide scheduler parameters.
+
+=item B<-t TSLICE>, B<--tslice_ms=TSLICE>
+
+Timeslice tells the scheduler how long to allow VMs to run before
+pre-empting.  The default is 30ms.  Valid ranges are 1ms to 1000ms.
+The length of the timeslice (in ms) must be higher than the length of
+the ratelimit (see below).
+
+=item B<-r RLIMIT>, B<--ratelimit_us=RLIMIT>
+
+Ratelimit attempts to limit the number of schedules per second.  It
+sets a minimum amount of time (in microseconds) a VM must run before
+we will allow a higher-prioirty VM to pre-empt it.  The default value
+is 1000 microseconds (1ms).  Valid range is 100 to 500000 (500ms).
+The ratelimit length must be lower than the timeslice length.
+
+=back
+
+B<COMBINATION>
+
+The following is the effect of combining the above options:
+
+=over 4
+
+=item B<E<lt>nothingE<gt>>             : List all domain params and sched params from all pools
+
+=item B<-d [domid]>            : List domain params for domain [domid]
+
+=item B<-d [domid] [params]>   : Set domain params for domain [domid]
+
+=item B<-p [pool]>             : list all domains and sched params for [pool]
+
+=item B<-s>                    : List sched params for poolid 0
+
+=item B<-s [params]>           : Set sched params for poolid 0
+
+=item B<-p [pool] -s>          : List sched params for [pool]
+
+=item B<-p [pool] -s [params]> : Set sched params for [pool]
+
+=item B<-p [pool] -d>...       : Illegal
+
+=item
+
 =back
 
 =item B<sched-credit2> [I<OPTIONS>]

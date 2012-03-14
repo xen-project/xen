@@ -3906,8 +3906,7 @@ int main_sharing(int argc, char **argv)
     return 0;
 }
 
-static int sched_credit_domain_get(
-    int domid, libxl_sched_credit_domain *scinfo)
+static int sched_credit_domain_get(int domid, libxl_sched_credit_domain *scinfo)
 {
     int rc;
 
@@ -3918,8 +3917,7 @@ static int sched_credit_domain_get(
     return rc;
 }
 
-static int sched_credit_domain_set(
-    int domid, libxl_sched_credit_domain *scinfo)
+static int sched_credit_domain_set(int domid, libxl_sched_credit_domain *scinfo)
 {
     int rc;
 
@@ -3931,8 +3929,29 @@ static int sched_credit_domain_set(
     return rc;
 }
 
-static int sched_credit_domain_output(
-    int domid)
+static int sched_credit_params_set(int poolid, libxl_sched_credit_params *scinfo)
+{
+    int rc;
+
+    rc = libxl_sched_credit_params_set(ctx, poolid, scinfo);
+    if (rc)
+        fprintf(stderr, "libxl_sched_credit_params_set failed.\n");
+
+    return rc;
+}
+
+static int sched_credit_params_get(int poolid, libxl_sched_credit_params *scinfo)
+{
+    int rc;
+
+    rc = libxl_sched_credit_params_get(ctx, poolid, scinfo);
+    if (rc)
+        fprintf(stderr, "libxl_sched_credit_params_get failed.\n");
+
+    return rc;
+}
+
+static int sched_credit_domain_output(int domid)
 {
     char *domname;
     libxl_sched_credit_domain scinfo;
@@ -3953,6 +3972,27 @@ static int sched_credit_domain_output(
         scinfo.cap);
     free(domname);
     libxl_sched_credit_domain_dispose(&scinfo);
+    return 0;
+}
+
+static int sched_credit_pool_output(uint32_t poolid)
+{
+    libxl_sched_credit_params scparam;
+    char *poolname;
+    int rc;
+
+    poolname = libxl_cpupoolid_to_name(ctx, poolid);
+    rc = sched_credit_params_get(poolid, &scparam);
+    if (rc) {
+        printf("Cpupool %s: [sched params unavailable]\n",
+               poolname);
+    } else {
+        printf("Cpupool %s: tslice=%dms ratelimit=%dus\n",
+               poolname,
+               scparam.tslice_ms,
+               scparam.ratelimit_us);
+    }
+    free(poolname);
     return 0;
 }
 
@@ -4119,25 +4159,41 @@ static int sched_domain_output(libxl_scheduler sched, int (*output)(int),
     return 0;
 }
 
+/* 
+ * <nothing>             : List all domain params and sched params from all pools
+ * -d [domid]            : List domain params for domain
+ * -d [domid] [params]   : Set domain params for domain
+ * -p [pool]             : list all domains and sched params for pool
+ * -s                    : List sched params for poolid 0
+ * -s [params]           : Set sched params for poolid 0
+ * -p [pool] -s          : List sched params for pool
+ * -p [pool] -s [params] : Set sched params for pool
+ * -p [pool] -d...       : Illegal
+ */
 int main_sched_credit(int argc, char **argv)
 {
     libxl_sched_credit_domain scinfo;
     const char *dom = NULL;
     const char *cpupool = NULL;
     int weight = 256, cap = 0, opt_w = 0, opt_c = 0;
+    int opt_s = 0;
+    int tslice = 0, opt_t = 0, ratelimit = 0, opt_r = 0;
     int opt, rc;
     int option_index = 0;
     static struct option long_options[] = {
         {"domain", 1, 0, 'd'},
         {"weight", 1, 0, 'w'},
         {"cap", 1, 0, 'c'},
+        {"schedparam", 0, 0, 's'},
+        {"tslice_ms", 1, 0, 't'},
+        {"ratelimit_us", 1, 0, 'r'},
         {"cpupool", 1, 0, 'p'},
         {"help", 0, 0, 'h'},
         {0, 0, 0, 0}
     };
 
     while (1) {
-        opt = getopt_long(argc, argv, "d:w:c:p:h", long_options,
+        opt = getopt_long(argc, argv, "d:w:c:p:t:r:hs", long_options,
                           &option_index);
         if (opt == -1)
             break;
@@ -4155,6 +4211,17 @@ int main_sched_credit(int argc, char **argv)
             cap = strtol(optarg, NULL, 10);
             opt_c = 1;
             break;
+        case 't':
+            tslice = strtol(optarg, NULL, 10);
+            opt_t = 1;
+            break;
+        case 'r':
+            ratelimit = strtol(optarg, NULL, 10);
+            opt_r = 1;
+            break;
+        case 's':
+            opt_s = 1;
+            break;
         case 'p':
             cpupool = optarg;
             break;
@@ -4164,20 +4231,54 @@ int main_sched_credit(int argc, char **argv)
         }
     }
 
-    if (cpupool && (dom || opt_w || opt_c)) {
-        fprintf(stderr, "Specifying a cpupool is not allowed with other "
-                "options.\n");
+    if ((cpupool || opt_s) && (dom || opt_w || opt_c)) {
+        fprintf(stderr, "Specifying a cpupool or schedparam is not "
+                "allowed with domain options.\n");
         return 1;
     }
     if (!dom && (opt_w || opt_c)) {
         fprintf(stderr, "Must specify a domain.\n");
         return 1;
     }
+    if (!opt_s && (opt_t || opt_r)) {
+        fprintf(stderr, "Must specify schedparam to set schedule "
+                "parameter values.\n");
+        return 1;
+    }
 
-    if (!dom) { /* list all domain's credit scheduler info */
+    if (opt_s) {
+        libxl_sched_credit_params  scparam;
+        uint32_t poolid = 0;
+
+        if (cpupool) {
+            if (cpupool_qualifier_to_cpupoolid(cpupool, &poolid, NULL) ||
+                !libxl_cpupoolid_to_name(ctx, poolid)) {
+                fprintf(stderr, "unknown cpupool \'%s\'\n", cpupool);
+                return -ERROR_FAIL;
+            }
+        }
+
+        if (!opt_t && !opt_r) { /* Output scheduling parameters */
+            return -sched_credit_pool_output(poolid);
+        } else { /* Set scheduling parameters*/
+            rc = sched_credit_params_get(poolid, &scparam);
+            if (rc)
+                return -rc;
+
+            if (opt_t)
+                scparam.tslice_ms = tslice;
+
+            if (opt_r)
+                scparam.ratelimit_us = ratelimit;
+
+            rc = sched_credit_params_set(poolid, &scparam);
+            if (rc)
+                return -rc;
+        }
+    } else if (!dom) { /* list all domain's credit scheduler info */
         return -sched_domain_output(LIBXL_SCHEDULER_CREDIT,
                                     sched_credit_domain_output,
-                                    sched_default_pool_output,
+                                    sched_credit_pool_output,
                                     cpupool);
     } else {
         find_domain(dom);
