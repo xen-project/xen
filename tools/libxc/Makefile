@@ -172,20 +172,7 @@ libxenguest.so.$(MAJOR): libxenguest.so.$(MAJOR).$(MINOR)
 ifeq ($(CONFIG_MiniOS),y)
 zlib-options =
 else
-zlib-options = $(shell					\
-	(. ../check/funcs.sh;				\
-	 if has_header bzlib.h; then			\
-           echo "-DHAVE_BZLIB";				\
-	   echo "-lbz2";				\
-	 fi;						\
-	 if has_header lzma.h; then			\
-	   echo "-DHAVE_LZMA";				\
-	   echo "-llzma";				\
-	 fi;						\
-	 if has_header lzo/lzo1x.h; then		\
-	   echo "-DHAVE_LZO1X";				\
-	   echo "-llzo2";				\
-	 fi) | grep $(1))
+zlib-options = $(ZLIB)
 endif
 
 xc_dom_bzimageloader.o: CFLAGS += $(call zlib-options,D)

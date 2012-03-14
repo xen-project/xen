@@ -605,6 +605,7 @@ libiconv
 libgcrypt
 libext2fs
 system_aio
+zlib
 LIB_PATH
 glib_LIBS
 glib_CFLAGS
@@ -6691,6 +6692,148 @@ fi
 
 
 # Checks for libraries.
+ac_fn_c_check_header_mongrel "$LINENO" "bzlib.h" "ac_cv_header_bzlib_h" "$ac_includes_default"
+if test "x$ac_cv_header_bzlib_h" = x""yes; then :
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for BZ2_bzDecompressInit in -lbz2" >&5
+$as_echo_n "checking for BZ2_bzDecompressInit in -lbz2... " >&6; }
+if test "${ac_cv_lib_bz2_BZ2_bzDecompressInit+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lbz2  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char BZ2_bzDecompressInit ();
+int
+main ()
+{
+return BZ2_bzDecompressInit ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_bz2_BZ2_bzDecompressInit=yes
+else
+  ac_cv_lib_bz2_BZ2_bzDecompressInit=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_bz2_BZ2_bzDecompressInit" >&5
+$as_echo "$ac_cv_lib_bz2_BZ2_bzDecompressInit" >&6; }
+if test "x$ac_cv_lib_bz2_BZ2_bzDecompressInit" = x""yes; then :
+  zlib="$zlib -DHAVE_BZLIB -lbz2"
+fi
+
+
+fi
+
+
+ac_fn_c_check_header_mongrel "$LINENO" "lzma.h" "ac_cv_header_lzma_h" "$ac_includes_default"
+if test "x$ac_cv_header_lzma_h" = x""yes; then :
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for lzma_stream_decoder in -llzma" >&5
+$as_echo_n "checking for lzma_stream_decoder in -llzma... " >&6; }
+if test "${ac_cv_lib_lzma_lzma_stream_decoder+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-llzma  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char lzma_stream_decoder ();
+int
+main ()
+{
+return lzma_stream_decoder ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_lzma_lzma_stream_decoder=yes
+else
+  ac_cv_lib_lzma_lzma_stream_decoder=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_lzma_lzma_stream_decoder" >&5
+$as_echo "$ac_cv_lib_lzma_lzma_stream_decoder" >&6; }
+if test "x$ac_cv_lib_lzma_lzma_stream_decoder" = x""yes; then :
+  zlib="$zlib -DHAVE_LZMA -llzma"
+fi
+
+
+fi
+
+
+ac_fn_c_check_header_mongrel "$LINENO" "lzo/lzo1x.h" "ac_cv_header_lzo_lzo1x_h" "$ac_includes_default"
+if test "x$ac_cv_header_lzo_lzo1x_h" = x""yes; then :
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for lzo1x_decompress in -llzo2" >&5
+$as_echo_n "checking for lzo1x_decompress in -llzo2... " >&6; }
+if test "${ac_cv_lib_lzo2_lzo1x_decompress+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-llzo2  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char lzo1x_decompress ();
+int
+main ()
+{
+return lzo1x_decompress ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_lzo2_lzo1x_decompress=yes
+else
+  ac_cv_lib_lzo2_lzo1x_decompress=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_lzo2_lzo1x_decompress" >&5
+$as_echo "$ac_cv_lib_lzo2_lzo1x_decompress" >&6; }
+if test "x$ac_cv_lib_lzo2_lzo1x_decompress" = x""yes; then :
+  zlib="$zlib -DHAVE_LZO1X -llzo2"
+fi
+
+
+fi
+
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for io_setup in -laio" >&5
 $as_echo_n "checking for io_setup in -laio... " >&6; }
 if test "${ac_cv_lib_aio_io_setup+set}" = set; then :

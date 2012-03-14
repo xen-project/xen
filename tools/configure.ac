@@ -106,6 +106,16 @@ PKG_CHECK_MODULES(glib, glib-2.0)
 AX_DEFAULT_LIB
 
 # Checks for libraries.
+AC_CHECK_HEADER([bzlib.h], [
+AC_CHECK_LIB([bz2], [BZ2_bzDecompressInit], [zlib="$zlib -DHAVE_BZLIB -lbz2"])
+])
+AC_CHECK_HEADER([lzma.h], [
+AC_CHECK_LIB([lzma], [lzma_stream_decoder], [zlib="$zlib -DHAVE_LZMA -llzma"])
+])
+AC_CHECK_HEADER([lzo/lzo1x.h], [
+AC_CHECK_LIB([lzo2], [lzo1x_decompress], [zlib="$zlib -DHAVE_LZO1X -llzo2"])
+])
+AC_SUBST(zlib)
 AC_CHECK_LIB([aio], [io_setup], [system_aio="y"], [system_aio="n"])
 AC_SUBST(system_aio)
 AC_CHECK_LIB([crypto], [MD5], [], [AC_MSG_ERROR([Could not find libcrypto])])

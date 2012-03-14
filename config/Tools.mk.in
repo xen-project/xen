@@ -40,6 +40,7 @@ CONFIG_LOMOUNT      := @lomount@
 
 #System options
 CONFIG_SYSTEM_LIBAIO:= @system_aio@
+ZLIB                := @zlib@
 CONFIG_LIBICONV     := @libiconv@
 CONFIG_GCRYPT       := @libgcrypt@
 CONFIG_EXT2FS       := @libext2fs@
