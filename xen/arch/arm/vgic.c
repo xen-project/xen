@@ -567,14 +567,14 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
     spin_lock(&v->arch.vgic.lock);
     list_for_each_entry ( iter, &v->arch.vgic.inflight_irqs, inflight )
     {
-        if ( iter->priority < priority )
+        if ( iter->priority > priority )
         {
             list_add_tail(&n->inflight, &iter->inflight);
             spin_unlock(&v->arch.vgic.lock);
             return;
         }
     }
-    list_add(&n->inflight, &v->arch.vgic.inflight_irqs);
+    list_add_tail(&n->inflight, &v->arch.vgic.inflight_irqs);
     spin_unlock(&v->arch.vgic.lock);
     /* we have a new higher priority irq, inject it into the guest */
     cpu_raise_softirq(v->processor, VGIC_SOFTIRQ);
