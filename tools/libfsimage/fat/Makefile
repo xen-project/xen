@@ -1,4 +1,5 @@
 XEN_ROOT = $(CURDIR)/../../..
+include $(XEN_ROOT)/tools/libfsimage/Rules.mk
 
 LIB_SRCS-y = fsys_fat.c
 
@@ -9,5 +10,3 @@ all: fs-all
 
 .PHONY: install
 install: fs-install
-
-include $(XEN_ROOT)/tools/libfsimage/Rules.mk
