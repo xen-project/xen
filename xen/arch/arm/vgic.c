@@ -85,7 +85,7 @@ int domain_vgic_init(struct domain *d)
         xmalloc_array(struct pending_irq,
                 d->arch.vgic.nr_lines + (32 * d->max_vcpus));
     for (i=0; i<d->arch.vgic.nr_lines + (32 * d->max_vcpus); i++)
-        INIT_LIST_HEAD(&d->arch.vgic.pending_irqs[i].link);
+        INIT_LIST_HEAD(&d->arch.vgic.pending_irqs[i].inflight);
     for (i=0; i<DOMAIN_NR_RANKS(d); i++)
         spin_lock_init(&d->arch.vgic.shared_irqs[i].lock);
     return 0;
@@ -550,7 +550,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
     struct pending_irq *iter, *n = irq_to_pending(v, irq);
 
     /* irq still pending */
-    if (!list_empty(&n->link))
+    if (!list_empty(&n->inflight))
         return;
 
     priority = byte_read(rank->ipriority[REG_RANK_INDEX(8, idx)], 0, byte);
@@ -565,16 +565,16 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
     gic_set_guest_irq(irq, GICH_LR_PENDING, priority);
 
     spin_lock(&v->arch.vgic.lock);
-    list_for_each_entry ( iter, &v->arch.vgic.inflight_irqs, link )
+    list_for_each_entry ( iter, &v->arch.vgic.inflight_irqs, inflight )
     {
         if ( iter->priority < priority )
         {
-            list_add_tail(&n->link, &iter->link);
+            list_add_tail(&n->inflight, &iter->inflight);
             spin_unlock(&v->arch.vgic.lock);
             return;
         }
     }
-    list_add(&n->link, &v->arch.vgic.inflight_irqs);
+    list_add(&n->inflight, &v->arch.vgic.inflight_irqs);
     spin_unlock(&v->arch.vgic.lock);
     /* we have a new higher priority irq, inject it into the guest */
     cpu_raise_softirq(v->processor, VGIC_SOFTIRQ);

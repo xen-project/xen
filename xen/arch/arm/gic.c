@@ -481,8 +481,8 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
                 GICC[GICC_DIR] = virq;
             }
             gic_inject_irq_stop();
-            list_del(&p->link);
-            INIT_LIST_HEAD(&p->link);
+            list_del(&p->inflight);
+            INIT_LIST_HEAD(&p->inflight);
             cpu_raise_softirq(current->processor, VGIC_SOFTIRQ);
             spin_unlock(&current->arch.vgic.lock);
         }

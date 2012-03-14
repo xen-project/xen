@@ -20,7 +20,9 @@ struct pending_irq
     int irq;
     struct irq_desc *desc; /* only set it the irq corresponds to a physical irq */
     uint8_t priority;
-    struct list_head link;
+    /* inflight is used to append instances of pending_irq to
+     * vgic.inflight_irqs */
+    struct list_head inflight;
 };
 
 struct arch_domain
