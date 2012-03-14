@@ -6141,26 +6141,88 @@ else
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 fi
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for python devel" >&5
-$as_echo_n "checking for python devel... " >&6; }
 
-`$PYTHON -c '
-import os.path, sys
-for p in sys.path:
-    if os.path.exists(p + "/config/Makefile"):
-        sys.exit(0)
-sys.exit(1)
-' > /dev/null 2>&1`
+ac_previous_cppflags=$CPPFLAGS
+CPPFLAGS="$CFLAGS `$PYTHON-config --includes`"
+ac_previous_ldflags=$LDFLAGS
+for flag in `$PYTHON-config --ldflags`
+do
+    case $flag in
+    -L*)
+        LDFLAGS="$LDLFAGS $flag"
+        ;;
+    -lpython*)
+        python_lib=`echo $flag | sed 's/^-l//'`
+        ;;
+    -l*)
+        # Ignore other libraries, we are only interested in testing python-dev
+        ;;
+    *)
+        { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Strange ldflag found in $PYTHON-config output: $flag" >&5
+$as_echo "$as_me: WARNING: Strange ldflag found in $PYTHON-config output: $flag" >&2;}
+        ;;
+    esac
+done
+ac_fn_c_check_header_mongrel "$LINENO" "Python.h" "ac_cv_header_Python_h" "$ac_includes_default"
+if test "x$ac_cv_header_Python_h" = x""yes; then :
 
-if test "$?" != "0"
-then
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-    as_fn_error $? "Python devel package not found" "$LINENO" 5
 else
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
+  as_fn_error $? "Unable to find Python development headers" "$LINENO" 5
 fi
+
+
+as_ac_Lib=`$as_echo "ac_cv_lib_$python_lib''_PyArg_ParseTuple" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for PyArg_ParseTuple in -l$python_lib" >&5
+$as_echo_n "checking for PyArg_ParseTuple in -l$python_lib... " >&6; }
+if eval "test \"\${$as_ac_Lib+set}\"" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-l$python_lib  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char PyArg_ParseTuple ();
+int
+main ()
+{
+return PyArg_ParseTuple ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  eval "$as_ac_Lib=yes"
+else
+  eval "$as_ac_Lib=no"
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+eval ac_res=\$$as_ac_Lib
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_Lib"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_LIB$python_lib" | $as_tr_cpp` 1
+_ACEOF
+
+  LIBS="-l$python_lib $LIBS"
+
+else
+  as_fn_error $? "Unable to find a suitable python development library" "$LINENO" 5
+fi
+
+CPPFLAGS=$ac_previous_cppflags
+LDLFAGS=$ac_previous_ldflags
+
 
 fi
 # Extract the first word of "xgettext", so it can be a program name with args.
