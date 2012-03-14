@@ -77,6 +77,17 @@ static int hvmemul_do_io(
         return X86EMUL_RETRY;
     }
 
+    /* Maintain a ref on the mfn to ensure liveness. Put the gfn
+     * to avoid potential deadlock wrt event channel lock, later. */
+    if ( mfn_valid(mfn_x(ram_mfn)) )
+        if ( !get_page(mfn_to_page(mfn_x(ram_mfn)),
+             curr->domain) )
+        {
+            put_gfn(curr->domain, ram_gfn);
+            return X86EMUL_RETRY;
+        }
+    put_gfn(curr->domain, ram_gfn);
+
     /*
      * Weird-sized accesses have undefined behaviour: we discard writes
      * and read all-ones.
@@ -87,7 +98,8 @@ static int hvmemul_do_io(
         ASSERT(p_data != NULL); /* cannot happen with a REP prefix */
         if ( dir == IOREQ_READ )
             memset(p_data, ~0, size);
-        put_gfn(curr->domain, ram_gfn); 
+        if ( mfn_valid(mfn_x(ram_mfn)) )
+            put_page(mfn_to_page(mfn_x(ram_mfn)));
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -108,7 +120,8 @@ static int hvmemul_do_io(
             unsigned int bytes = vio->mmio_large_write_bytes;
             if ( (addr >= pa) && ((addr + size) <= (pa + bytes)) )
             {
-                put_gfn(curr->domain, ram_gfn); 
+                if ( mfn_valid(mfn_x(ram_mfn)) )
+                    put_page(mfn_to_page(mfn_x(ram_mfn)));
                 return X86EMUL_OKAY;
             }
         }
@@ -120,7 +133,8 @@ static int hvmemul_do_io(
             {
                 memcpy(p_data, &vio->mmio_large_read[addr - pa],
                        size);
-                put_gfn(curr->domain, ram_gfn); 
+                if ( mfn_valid(mfn_x(ram_mfn)) )
+                    put_page(mfn_to_page(mfn_x(ram_mfn)));
                 return X86EMUL_OKAY;
             }
         }
@@ -134,7 +148,8 @@ static int hvmemul_do_io(
         vio->io_state = HVMIO_none;
         if ( p_data == NULL )
         {
-            put_gfn(curr->domain, ram_gfn);
+            if ( mfn_valid(mfn_x(ram_mfn)) )
+                put_page(mfn_to_page(mfn_x(ram_mfn)));
             return X86EMUL_UNHANDLEABLE;
         }
         goto finish_access;
@@ -144,11 +159,13 @@ static int hvmemul_do_io(
              (addr == (vio->mmio_large_write_pa +
                        vio->mmio_large_write_bytes)) )
         {
-            put_gfn(curr->domain, ram_gfn);
+            if ( mfn_valid(mfn_x(ram_mfn)) )
+                put_page(mfn_to_page(mfn_x(ram_mfn)));
             return X86EMUL_RETRY;
         }
     default:
-        put_gfn(curr->domain, ram_gfn);
+        if ( mfn_valid(mfn_x(ram_mfn)) )
+            put_page(mfn_to_page(mfn_x(ram_mfn)));
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -156,7 +173,8 @@ static int hvmemul_do_io(
     {
         gdprintk(XENLOG_WARNING, "WARNING: io already pending (%d)?\n",
                  p->state);
-        put_gfn(curr->domain, ram_gfn); 
+        if ( mfn_valid(mfn_x(ram_mfn)) )
+            put_page(mfn_to_page(mfn_x(ram_mfn)));
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -208,7 +226,8 @@ static int hvmemul_do_io(
 
     if ( rc != X86EMUL_OKAY )
     {
-        put_gfn(curr->domain, ram_gfn); 
+        if ( mfn_valid(mfn_x(ram_mfn)) )
+            put_page(mfn_to_page(mfn_x(ram_mfn)));
         return rc;
     }
 
@@ -244,7 +263,8 @@ static int hvmemul_do_io(
         }
     }
 
-    put_gfn(curr->domain, ram_gfn); 
+    if ( mfn_valid(mfn_x(ram_mfn)) )
+        put_page(mfn_to_page(mfn_x(ram_mfn)));
     return X86EMUL_OKAY;
 }
 
