@@ -489,12 +489,25 @@ int do_mem_event_op(int op, uint32_t domain, void *arg)
 /* Clean up on domain destruction */
 void mem_event_cleanup(struct domain *d)
 {
-    if ( d->mem_event->paging.ring_page )
+    if ( d->mem_event->paging.ring_page ) {
+        /* Destroying the wait queue head means waking up all
+         * queued vcpus. This will drain the list, allowing
+         * the disable routine to complete. It will also drop
+         * all domain refs the wait-queued vcpus are holding.
+         * Finally, because this code path involves previously
+         * pausing the domain (domain_kill), unpausing the 
+         * vcpus causes no harm. */
+        destroy_waitqueue_head(&d->mem_event->paging.wq);
         (void)mem_event_disable(d, &d->mem_event->paging);
-    if ( d->mem_event->access.ring_page )
+    }
+    if ( d->mem_event->access.ring_page ) {
+        destroy_waitqueue_head(&d->mem_event->access.wq);
         (void)mem_event_disable(d, &d->mem_event->access);
-    if ( d->mem_event->share.ring_page )
+    }
+    if ( d->mem_event->share.ring_page ) {
+        destroy_waitqueue_head(&d->mem_event->share.wq);
         (void)mem_event_disable(d, &d->mem_event->share);
+    }
 }
 
 int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
