@@ -52,10 +52,35 @@ int mem_sharing_nominate_page(struct domain *d,
                               unsigned long gfn,
                               int expected_refcnt,
                               shr_handle_t *phandle);
+
 #define MEM_SHARING_DESTROY_GFN       (1<<1)
-int mem_sharing_unshare_page(struct domain *d, 
+/* Only fails with -ENOMEM. Enforce it with a BUG_ON wrapper. */
+int __mem_sharing_unshare_page(struct domain *d,
                              unsigned long gfn, 
                              uint16_t flags);
+static inline int mem_sharing_unshare_page(struct domain *d,
+                                           unsigned long gfn,
+                                           uint16_t flags)
+{
+    int rc = __mem_sharing_unshare_page(d, gfn, flags);
+    BUG_ON( rc && (rc != -ENOMEM) );
+    return rc;
+}
+
+/* If called by a foreign domain, possible errors are
+ *   -EBUSY -> ring full
+ *   -ENOSYS -> no ring to begin with
+ * and the foreign mapper is responsible for retrying.
+ *
+ * If called by the guest vcpu itself and allow_sleep is set, may 
+ * sleep on a wait queue, so the caller is responsible for not 
+ * holding locks on entry. It may only fail with ENOSYS 
+ *
+ * If called by the guest vcpu itself and allow_sleep is not set,
+ * then it's the same as a foreign domain.
+ */
+int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
+                                bool_t allow_sleep);
 int mem_sharing_sharing_resume(struct domain *d);
 int mem_sharing_memop(struct domain *d, 
                        xen_mem_sharing_op_t *mec);

@@ -170,7 +170,10 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
     if ( q == p2m_unshare && p2m_is_shared(*t) )
     {
         ASSERT(!p2m_is_nestedp2m(p2m));
-        mem_sharing_unshare_page(p2m->domain, gfn, 0);
+        /* Try to unshare. If we fail, communicate ENOMEM without
+         * sleeping. */
+        if ( mem_sharing_unshare_page(p2m->domain, gfn, 0) < 0 )
+            (void)mem_sharing_notify_enomem(p2m->domain, gfn, 0);
         mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order);
     }
 #endif
@@ -371,6 +374,7 @@ void p2m_teardown(struct p2m_domain *p2m)
         if ( mfn_valid(mfn) && (t == p2m_ram_shared) )
         {
             ASSERT(!p2m_is_nestedp2m(p2m));
+            /* Does not fail with ENOMEM given the DESTROY flag */
             BUG_ON(mem_sharing_unshare_page(d, gfn, MEM_SHARING_DESTROY_GFN));
         }
     }
@@ -510,6 +514,18 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
             if ( rc )
             {
                 p2m_unlock(p2m);
+                /* NOTE: Should a guest domain bring this upon itself,
+                 * there is not a whole lot we can do. We are buried
+                 * deep in locks from most code paths by now. So, fail
+                 * the call and don't try to sleep on a wait queue
+                 * while placing the mem event.
+                 *
+                 * However, all current (changeset 3432abcf9380) code
+                 * paths avoid this unsavoury situation. For now.
+                 *
+                 * Foreign domains are okay to place an event as they 
+                 * won't go to sleep. */
+                (void)mem_sharing_notify_enomem(p2m->domain, gfn + i, 0);
                 return rc;
             }
             omfn = p2m->get_entry(p2m, gfn + i, &ot, &a, p2m_query, NULL);

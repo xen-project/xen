@@ -344,34 +344,29 @@ int mem_sharing_audit(void)
 #endif
 
 
-static void mem_sharing_notify_helper(struct domain *d, unsigned long gfn)
+int mem_sharing_notify_enomem(struct domain *d, unsigned long gfn,
+                                bool_t allow_sleep) 
 {
     struct vcpu *v = current;
+    int rc;
     mem_event_request_t req = { .gfn = gfn };
 
-    if ( v->domain != d )
-    {
-        /* XXX This path needs some attention.  For now, just fail foreign 
-         * XXX requests to unshare if there's no memory.  This replaces 
-         * XXX old code that BUG()ed here; the callers now BUG()
-         * XXX elewhere. */
-        gdprintk(XENLOG_ERR, 
-                 "Failed alloc on unshare path for foreign (%d) lookup\n",
-                 d->domain_id);
-        return;
-    }
+    if ( (rc = __mem_event_claim_slot(d, 
+                        &d->mem_event->share, allow_sleep)) < 0 )
+        return rc;
 
-    if (mem_event_claim_slot(d, &d->mem_event->share) < 0)
+    if ( v->domain == d )
     {
-        return;
+        req.flags = MEM_EVENT_FLAG_VCPU_PAUSED;
+        vcpu_pause_nosync(v);
     }
-
-    req.flags = MEM_EVENT_FLAG_VCPU_PAUSED;
-    vcpu_pause_nosync(v);
 
     req.p2mt = p2m_ram_shared;
     req.vcpu_id = v->vcpu_id;
+
     mem_event_put_request(d, &d->mem_event->share, &req);
+
+    return 0;
 }
 
 unsigned int mem_sharing_get_nr_saved_mfns(void)
@@ -903,7 +898,21 @@ err_out:
     return ret;
 }
 
-int mem_sharing_unshare_page(struct domain *d,
+
+/* A note on the rationale for unshare error handling:
+ *  1. Unshare can only fail with ENOMEM. Any other error conditions BUG_ON()'s
+ *  2. We notify a potential dom0 helper through a mem_event ring. But we
+ *     allow the notification to not go to sleep. If the event ring is full 
+ *     of ENOMEM warnings, then it's on the ball.
+ *  3. We cannot go to sleep until the unshare is resolved, because we might
+ *     be buried deep into locks (e.g. something -> copy_to_user -> __hvm_copy) 
+ *  4. So, we make sure we:
+ *     4.1. return an error
+ *     4.2. do not corrupt shared memory
+ *     4.3. do not corrupt guest memory
+ *     4.4. let the guest deal with it if the error propagation will reach it
+ */
+int __mem_sharing_unshare_page(struct domain *d,
                              unsigned long gfn, 
                              uint16_t flags)
 {
@@ -945,7 +954,6 @@ gfn_found:
     /* Do the accounting first. If anything fails below, we have bigger
      * bigger fish to fry. First, remove the gfn from the list. */ 
     last_gfn = list_has_one_entry(&page->sharing->gfns);
-    mem_sharing_gfn_destroy(d, gfn_info);
     if ( last_gfn )
     {
         /* Clean up shared state */
@@ -959,6 +967,7 @@ gfn_found:
      * (possibly freeing the page), and exit early */
     if ( flags & MEM_SHARING_DESTROY_GFN )
     {
+        mem_sharing_gfn_destroy(d, gfn_info);
         put_page_and_type(page);
         mem_sharing_page_unlock(page);
         if ( last_gfn && 
@@ -971,6 +980,7 @@ gfn_found:
  
     if ( last_gfn )
     {
+        mem_sharing_gfn_destroy(d, gfn_info);
         /* Making a page private atomically unlocks it */
         BUG_ON(page_make_private(d, page) != 0);
         goto private_page_found;
@@ -982,7 +992,8 @@ gfn_found:
     {
         mem_sharing_page_unlock(old_page);
         put_gfn(d, gfn);
-        mem_sharing_notify_helper(d, gfn);
+        /* Caller is responsible for placing an event
+         * in the ring */
         return -ENOMEM;
     }
 
@@ -993,6 +1004,7 @@ gfn_found:
     unmap_domain_page(t);
 
     BUG_ON(set_shared_p2m_entry(d, gfn, page_to_mfn(page)) == 0);
+    mem_sharing_gfn_destroy(d, gfn_info);
     mem_sharing_page_unlock(old_page);
     put_page_and_type(old_page);
 

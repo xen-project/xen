@@ -112,8 +112,7 @@ static unsigned inline int max_nr_maptrack_frames(void)
     p2m_type_t __p2mt;                                      \
     unsigned long __x;                                      \
     __x = mfn_x(get_gfn_unshare((_d), (_gfn), &__p2mt));    \
-    BUG_ON(p2m_is_shared(__p2mt)); /* XXX fixme */          \
-    if ( !p2m_is_valid(__p2mt) )                            \
+    if ( p2m_is_shared(__p2mt) || !p2m_is_valid(__p2mt) )   \
         __x = INVALID_MFN;                                  \
     __x; })
 #else
@@ -155,9 +154,11 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readon
     else
     {
         mfn = get_gfn_unshare(rd, gfn, &p2mt);
-        BUG_ON(p2m_is_shared(p2mt));
-        /* XXX Here, and above in gfn_to_mfn_private, need to handle
-         * XXX failure to unshare. */
+        if ( p2m_is_shared(p2mt) )
+        {
+            put_gfn(rd, gfn);
+            return GNTST_eagain;
+        }
     }
 
     if ( p2m_is_valid(p2mt) ) {

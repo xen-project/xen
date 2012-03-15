@@ -1231,6 +1231,9 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
     struct vcpu *v = current;
     struct p2m_domain *p2m;
     int rc, fall_through = 0, paged = 0;
+#ifdef __x86_64__
+    int sharing_enomem = 0;
+#endif
     mem_event_request_t *req_ptr = NULL;
 
     /* On Nested Virtualization, walk the guest page table.
@@ -1340,7 +1343,8 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
     if ( access_w && (p2mt == p2m_ram_shared) )
     {
         ASSERT(!p2m_is_nestedp2m(p2m));
-        mem_sharing_unshare_page(p2m->domain, gfn, 0);
+        sharing_enomem = 
+            (mem_sharing_unshare_page(p2m->domain, gfn, 0) < 0);
         rc = 1;
         goto out_put_gfn;
     }
@@ -1381,8 +1385,25 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
 out_put_gfn:
     put_gfn(p2m->domain, gfn);
 out:
+    /* All of these are delayed until we exit, since we might 
+     * sleep on event ring wait queues, and we must not hold
+     * locks in such circumstance */
     if ( paged )
         p2m_mem_paging_populate(v->domain, gfn);
+#ifdef __x86_64__
+    if ( sharing_enomem )
+    {
+        int rv;
+        if ( (rv = mem_sharing_notify_enomem(v->domain, gfn, 1)) < 0 )
+        {
+            gdprintk(XENLOG_ERR, "Domain %hu attempt to unshare "
+                     "gfn %lx, ENOMEM and no helper (rc %d)\n",
+                        v->domain->domain_id, gfn, rv);
+            /* Crash the domain */
+            rc = 0;
+        }
+    }
+#endif
     if ( req_ptr )
     {
         mem_access_send_req(v->domain, req_ptr);

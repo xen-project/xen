@@ -3597,12 +3597,14 @@ int do_mmu_update(
                         /* Unshare the page for RW foreign mappings */
                         if ( l1e_get_flags(l1e) & _PAGE_RW )
                         {
-                            rc = mem_sharing_unshare_page(pg_owner, 
-                                                          l1e_get_pfn(l1e), 
-                                                          0);
+                            unsigned long gfn = l1e_get_pfn(l1e);
+                            rc = mem_sharing_unshare_page(pg_owner, gfn, 0); 
                             if ( rc )
                             {
                                 put_gfn(pg_owner, l1egfn);
+                                /* Notify helper, don't care about errors, will not
+                                 * sleep on wq, since we're a foreign domain. */
+                                (void)mem_sharing_notify_enomem(pg_owner, gfn, 0);
                                 break; 
                             }
                         }
