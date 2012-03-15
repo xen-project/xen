@@ -162,7 +162,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     unsigned long mfn;
 
 #ifdef CONFIG_X86
-    mfn = mfn_x(get_gfn(d, gmfn, &p2mt)); 
+    mfn = mfn_x(get_gfn_query(d, gmfn, &p2mt)); 
     if ( unlikely(p2m_is_paging(p2mt)) )
     {
         guest_physmap_remove_page(d, gmfn, mfn, 0);
