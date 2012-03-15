@@ -62,6 +62,16 @@ int vpmu_do_interrupt(struct cpu_user_regs *regs)
     return 0;
 }
 
+void vpmu_do_cpuid(unsigned int input,
+                   unsigned int *eax, unsigned int *ebx,
+                   unsigned int *ecx, unsigned int *edx)
+{
+    struct vpmu_struct *vpmu = vcpu_vpmu(current);
+
+    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->do_cpuid )
+        vpmu->arch_vpmu_ops->do_cpuid(input, eax, ebx, ecx, edx);
+}
+
 void vpmu_save(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);

@@ -547,6 +547,12 @@ static int core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
     return 1;
 }
 
+static void core2_vpmu_do_cpuid(unsigned int input,
+                                unsigned int *eax, unsigned int *ebx,
+                                unsigned int *ecx, unsigned int *edx)
+{
+}
+
 static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -608,6 +614,7 @@ struct arch_vpmu_ops core2_vpmu_ops = {
     .do_wrmsr = core2_vpmu_do_wrmsr,
     .do_rdmsr = core2_vpmu_do_rdmsr,
     .do_interrupt = core2_vpmu_do_interrupt,
+    .do_cpuid = core2_vpmu_do_cpuid,
     .arch_vpmu_destroy = core2_vpmu_destroy,
     .arch_vpmu_save = core2_vpmu_save,
     .arch_vpmu_load = core2_vpmu_load
