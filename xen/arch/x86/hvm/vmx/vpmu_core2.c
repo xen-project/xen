@@ -406,7 +406,27 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
     struct core2_vpmu_context *core2_vpmu_cxt = NULL;
 
     if ( !core2_vpmu_msr_common_check(msr, &type, &index) )
+    {
+        /* Special handling for BTS */
+        if ( msr == MSR_IA32_DEBUGCTLMSR )
+        {
+            uint64_t supported = IA32_DEBUGCTLMSR_TR | IA32_DEBUGCTLMSR_BTS |
+                                 IA32_DEBUGCTLMSR_BTINT;
+
+            if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
+                supported |= IA32_DEBUGCTLMSR_BTS_OFF_OS |
+                             IA32_DEBUGCTLMSR_BTS_OFF_USR;
+            if ( msr_content & supported )
+            {
+                if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
+                    return 1;
+                gdprintk(XENLOG_WARNING, "Debug Store is not supported on this cpu\n");
+                vmx_inject_hw_exception(TRAP_gp_fault, 0);
+                return 0;
+            }
+        }
         return 0;
+    }
 
     core2_vpmu_cxt = vpmu->context;
     switch ( msr )
@@ -425,6 +445,19 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
                      "which is not supported.\n");
         return 1;
     case MSR_IA32_DS_AREA:
+        if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_DS) )
+        {
+            if ( !is_canonical_address(msr_content) )
+            {
+                gdprintk(XENLOG_WARNING,
+                         "Illegal address for IA32_DS_AREA: %#" PRIx64 "x\n",
+                         msr_content);
+                vmx_inject_hw_exception(TRAP_gp_fault, 0);
+                return 1;
+            }
+            core2_vpmu_cxt->pmu_enable->ds_area_enable = msr_content ? 1 : 0;
+            break;
+        }
         gdprintk(XENLOG_WARNING, "Guest setting of DTS is ignored.\n");
         return 1;
     case MSR_CORE_PERF_GLOBAL_CTRL:
@@ -471,6 +504,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
         pmu_enable |= core2_vpmu_cxt->pmu_enable->fixed_ctr_enable[i];
     for ( i = 0; i < core2_get_pmc_count(); i++ )
         pmu_enable |= core2_vpmu_cxt->pmu_enable->arch_pmc_enable[i];
+    pmu_enable |= core2_vpmu_cxt->pmu_enable->ds_area_enable;
     if ( pmu_enable )
         vpmu_set(vpmu, VPMU_RUNNING);
     else
@@ -496,6 +530,8 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
                 inject_gp = 1;
             break;
         case MSR_TYPE_CTRL:           /* IA32_FIXED_CTR_CTRL */
+            if  ( msr == MSR_IA32_DS_AREA )
+                break;
             /* 4 bits per counter, currently 3 fixed counters implemented. */
             mask = ~((1ull << (3 * 4)) - 1);
             if (msr_content & mask)
@@ -525,25 +561,35 @@ static int core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct core2_vpmu_context *core2_vpmu_cxt = NULL;
 
-    if ( !core2_vpmu_msr_common_check(msr, &type, &index) )
-        return 0;
-
-    core2_vpmu_cxt = vpmu->context;
-    switch ( msr )
+    if ( core2_vpmu_msr_common_check(msr, &type, &index) )
     {
-    case MSR_CORE_PERF_GLOBAL_OVF_CTRL:
-        *msr_content = 0;
-        break;
-    case MSR_CORE_PERF_GLOBAL_STATUS:
-        *msr_content = core2_vpmu_cxt->global_ovf_status;
-        break;
-    case MSR_CORE_PERF_GLOBAL_CTRL:
-        vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
-        break;
-    default:
-        rdmsrl(msr, *msr_content);
+        core2_vpmu_cxt = vpmu->context;
+        switch ( msr )
+        {
+        case MSR_CORE_PERF_GLOBAL_OVF_CTRL:
+            *msr_content = 0;
+            break;
+        case MSR_CORE_PERF_GLOBAL_STATUS:
+            *msr_content = core2_vpmu_cxt->global_ovf_status;
+            break;
+        case MSR_CORE_PERF_GLOBAL_CTRL:
+            vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, msr_content);
+            break;
+        default:
+            rdmsrl(msr, *msr_content);
+        }
     }
-
+    else
+    {
+        /* Extension for BTS */
+        if ( msr == MSR_IA32_MISC_ENABLE )
+        {
+            if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
+                *msr_content &= ~MSR_IA32_MISC_ENABLE_BTS_UNAVAIL;
+        }
+        else
+            return 0;
+    }
     return 1;
 }
 
@@ -551,6 +597,16 @@ static void core2_vpmu_do_cpuid(unsigned int input,
                                 unsigned int *eax, unsigned int *ebx,
                                 unsigned int *ecx, unsigned int *edx)
 {
+    if (input == 0x1)
+    {
+        struct vpmu_struct *vpmu = vcpu_vpmu(current);
+
+        if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_DS) )
+        {
+            /* Switch on the 'Debug Store' feature in CPUID.EAX[1]:EDX[21] */
+            *edx |= cpufeat_mask(X86_FEATURE_DS);
+        }
+    }
 }
 
 static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
@@ -564,15 +620,21 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
     struct vlapic *vlapic = vcpu_vlapic(v);
 
     rdmsrl(MSR_CORE_PERF_GLOBAL_STATUS, msr_content);
-    if ( !msr_content )
-        return 0;
-
-    if ( is_pmc_quirk )
-        handle_pmc_quirk(msr_content);
-
-    core2_vpmu_cxt->global_ovf_status |= msr_content;
-    msr_content = 0xC000000700000000 | ((1 << core2_get_pmc_count()) - 1);
-    wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, msr_content);
+    if ( msr_content )
+    {
+        if ( is_pmc_quirk )
+            handle_pmc_quirk(msr_content);
+        core2_vpmu_cxt->global_ovf_status |= msr_content;
+        msr_content = 0xC000000700000000 | ((1 << core2_get_pmc_count()) - 1);
+        wrmsrl(MSR_CORE_PERF_GLOBAL_OVF_CTRL, msr_content);
+    }
+    else
+    {
+        /* No PMC overflow but perhaps a Trace Message interrupt. */
+        msr_content = __vmread(GUEST_IA32_DEBUGCTL);
+        if ( !(msr_content & IA32_DEBUGCTLMSR_TR) )
+            return 0;
+    }
 
     apic_write_around(APIC_LVTPC, apic_read(APIC_LVTPC) & ~APIC_LVT_MASKED);
 
@@ -589,8 +651,53 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
     return 1;
 }
 
-static int core2_vpmu_initialise(struct vcpu *v)
+static int core2_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
 {
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    u64 msr_content;
+    struct cpuinfo_x86 *c = &current_cpu_data;
+
+    if ( !(vpmu_flags & VPMU_BOOT_BTS) )
+        goto func_out;
+    /* Check the 'Debug Store' feature in the CPUID.EAX[1]:EDX[21] */
+    if ( cpu_has(c, X86_FEATURE_DS) )
+    {
+#ifdef __x86_64__
+        if ( !cpu_has(c, X86_FEATURE_DTES64) )
+        {
+            printk(XENLOG_G_WARNING "CPU doesn't support 64-bit DS Area"
+                   " - Debug Store disabled for d%d:v%d\n",
+                   v->domain->domain_id, v->vcpu_id);
+            goto func_out;
+        }
+#endif
+        vpmu_set(vpmu, VPMU_CPU_HAS_DS);
+        rdmsrl(MSR_IA32_MISC_ENABLE, msr_content);
+        if ( msr_content & MSR_IA32_MISC_ENABLE_BTS_UNAVAIL )
+        {
+            /* If BTS_UNAVAIL is set reset the DS feature. */
+            vpmu_reset(vpmu, VPMU_CPU_HAS_DS);
+            printk(XENLOG_G_WARNING "CPU has set BTS_UNAVAIL"
+                   " - Debug Store disabled for d%d:v%d\n",
+                   v->domain->domain_id, v->vcpu_id);
+        }
+        else
+        {
+            vpmu_set(vpmu, VPMU_CPU_HAS_BTS);
+            if ( !cpu_has(c, X86_FEATURE_DSCPL) )
+                printk(XENLOG_G_INFO
+                       "vpmu: CPU doesn't support CPL-Qualified BTS\n");
+            printk("******************************************************\n");
+            printk("** WARNING: Emulation of BTS Feature is switched on **\n");
+            printk("** Using this processor feature in a virtualized    **\n");
+            printk("** environment is not 100%% safe.                   **\n");
+            printk("** Setting the DS buffer address with wrong values  **\n");
+            printk("** may lead to hypervisor hangs or crashes.         **\n");
+            printk("** It is NOT recommended for production use!        **\n");
+            printk("******************************************************\n");
+        }
+    }
+func_out:
     check_pmc_quirk();
     return 0;
 }
@@ -620,11 +727,12 @@ struct arch_vpmu_ops core2_vpmu_ops = {
     .arch_vpmu_load = core2_vpmu_load
 };
 
-int vmx_vpmu_initialise(struct vcpu *v)
+int vmx_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t family = current_cpu_data.x86;
     uint8_t cpu_model = current_cpu_data.x86_model;
+    int ret = 0;
 
     if ( family == 6 )
     {
@@ -639,8 +747,10 @@ int vmx_vpmu_initialise(struct vcpu *v)
         case 46:
         case 47:
         case 58:
-            vpmu->arch_vpmu_ops = &core2_vpmu_ops;
-            return core2_vpmu_initialise(v);
+            ret = core2_vpmu_initialise(v, vpmu_flags);
+            if ( !ret )
+                vpmu->arch_vpmu_ops = &core2_vpmu_ops;
+            return ret;
         }
     }
 

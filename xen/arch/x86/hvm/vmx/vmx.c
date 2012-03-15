@@ -1833,6 +1833,9 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         /* Debug Trace Store is not supported. */
         *msr_content |= MSR_IA32_MISC_ENABLE_BTS_UNAVAIL |
                        MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
+        /* Perhaps vpmu will change some bits. */
+        if ( vpmu_do_rdmsr(msr, msr_content) )
+            goto done;
         break;
     default:
         if ( vpmu_do_rdmsr(msr, msr_content) )
@@ -1960,9 +1963,14 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         int i, rc = 0;
         uint64_t supported = IA32_DEBUGCTLMSR_LBR | IA32_DEBUGCTLMSR_BTF;
 
-        if ( !msr_content || (msr_content & ~supported) )
+        if ( !msr_content )
             break;
-
+        if ( msr_content & ~supported )
+        {
+            /* Perhaps some other bits are supported in vpmu. */
+            if ( !vpmu_do_wrmsr(msr, msr_content) )
+                break;
+        }
         if ( msr_content & IA32_DEBUGCTLMSR_LBR )
         {
             const struct lbr_info *lbr = last_branch_msr_get();

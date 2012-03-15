@@ -363,10 +363,11 @@ struct arch_vpmu_ops amd_vpmu_ops = {
     .arch_vpmu_load = amd_vpmu_restore
 };
 
-int svm_vpmu_initialise(struct vcpu *v)
+int svm_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t family = current_cpu_data.x86;
+    int ret = 0;
 
     switch ( family )
     {
@@ -374,8 +375,10 @@ int svm_vpmu_initialise(struct vcpu *v)
     case 0x12:
     case 0x14:
     case 0x15:
-        vpmu->arch_vpmu_ops = &amd_vpmu_ops;
-        return amd_vpmu_initialise(v);
+        ret = amd_vpmu_initialise(v);
+        if ( !ret )
+            vpmu->arch_vpmu_ops = &amd_vpmu_ops;
+        return ret;
     }
 
     printk("VPMU: Initialization failed. "

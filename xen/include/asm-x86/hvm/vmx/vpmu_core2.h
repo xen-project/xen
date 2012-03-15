@@ -29,6 +29,7 @@ struct arch_msr_pair {
 };
 
 struct core2_pmu_enable {
+    char ds_area_enable;
     char fixed_ctr_enable[3];
     char arch_pmc_enable[1];
 };

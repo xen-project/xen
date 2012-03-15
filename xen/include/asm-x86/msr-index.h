@@ -67,6 +67,11 @@
 #define MSR_IA32_DEBUGCTLMSR		0x000001d9
 #define IA32_DEBUGCTLMSR_LBR		(1<<0) /* Last Branch Record */
 #define IA32_DEBUGCTLMSR_BTF		(1<<1) /* Single Step on Branches */
+#define IA32_DEBUGCTLMSR_TR		(1<<6) /* Trace Message Enable */
+#define IA32_DEBUGCTLMSR_BTS		(1<<7) /* Branch Trace Store */
+#define IA32_DEBUGCTLMSR_BTINT		(1<<8) /* Branch Trace Interrupt */
+#define IA32_DEBUGCTLMSR_BTS_OFF_OS	(1<<9)  /* BTS off if CPL 0 */
+#define IA32_DEBUGCTLMSR_BTS_OFF_USR	(1<<10) /* BTS off if CPL > 0 */
 
 #define MSR_IA32_LASTBRANCHFROMIP	0x000001db
 #define MSR_IA32_LASTBRANCHTOIP		0x000001dc

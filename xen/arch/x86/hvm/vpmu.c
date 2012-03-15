@@ -32,8 +32,36 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
 
-static bool_t __read_mostly opt_vpmu_enabled;
-boolean_param("vpmu", opt_vpmu_enabled);
+
+/*
+ * "vpmu" :     vpmu generally enabled
+ * "vpmu=off" : vpmu generally disabled
+ * "vpmu=bts" : vpmu enabled and Intel BTS feature switched on.
+ */
+static unsigned int __read_mostly opt_vpmu_enabled;
+static void parse_vpmu_param(char *s);
+custom_param("vpmu", parse_vpmu_param);
+
+static void __init parse_vpmu_param(char *s)
+{
+    switch ( parse_bool(s) )
+    {
+    case 0:
+        break;
+    default:
+        if ( !strcmp(s, "bts") )
+            opt_vpmu_enabled |= VPMU_BOOT_BTS;
+        else if ( *s )
+        {
+            printk("VPMU: unknown flag: %s - vpmu disabled!\n", s);
+            break;
+        }
+        /* fall through */
+    case 1:
+        opt_vpmu_enabled |= VPMU_BOOT_ENABLED;
+        break;
+    }
+}
 
 int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
 {
@@ -104,12 +132,12 @@ void vpmu_initialise(struct vcpu *v)
     switch ( vendor )
     {
     case X86_VENDOR_AMD:
-        if ( svm_vpmu_initialise(v) != 0 )
+        if ( svm_vpmu_initialise(v, opt_vpmu_enabled) != 0 )
             opt_vpmu_enabled = 0;
         break;
 
     case X86_VENDOR_INTEL:
-        if ( vmx_vpmu_initialise(v) != 0 )
+        if ( vmx_vpmu_initialise(v, opt_vpmu_enabled) != 0 )
             opt_vpmu_enabled = 0;
         break;
 

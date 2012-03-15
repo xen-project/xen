@@ -22,6 +22,14 @@
 #ifndef __ASM_X86_HVM_VPMU_H_
 #define __ASM_X86_HVM_VPMU_H_
 
+/*
+ * Flag bits given as a string on the hypervisor boot parameter 'vpmu'.
+ * See arch/x86/hvm/vpmu.c.
+ */
+#define VPMU_BOOT_ENABLED 0x1    /* vpmu generally enabled. */
+#define VPMU_BOOT_BTS     0x2    /* Intel BTS feature wanted. */
+
+
 #define msraddr_to_bitpos(x) (((x)&0xffff) + ((x)>>31)*0x2000)
 #define vcpu_vpmu(vcpu)   (&((vcpu)->arch.hvm_vcpu.vpmu))
 #define vpmu_vcpu(vpmu)   (container_of((vpmu), struct vcpu, \
@@ -48,8 +56,8 @@ struct arch_vpmu_ops {
     void (*arch_vpmu_load)(struct vcpu *v);
 };
 
-int vmx_vpmu_initialise(struct vcpu *v);
-int svm_vpmu_initialise(struct vcpu *v);
+int vmx_vpmu_initialise(struct vcpu *, unsigned int flags);
+int svm_vpmu_initialise(struct vcpu *, unsigned int flags);
 
 struct vpmu_struct {
     u32 flags;
@@ -61,6 +69,9 @@ struct vpmu_struct {
 #define VPMU_CONTEXT_LOADED                 0x2
 #define VPMU_RUNNING                        0x4
 #define VPMU_PASSIVE_DOMAIN_ALLOCATED       0x8
+#define VPMU_CPU_HAS_DS                     0x10 /* Has Debug Store */
+#define VPMU_CPU_HAS_BTS                    0x20 /* Has Branch Trace Store */
+
 
 #define vpmu_set(_vpmu, _x)    ((_vpmu)->flags |= (_x))
 #define vpmu_reset(_vpmu, _x)  ((_vpmu)->flags &= ~(_x))
