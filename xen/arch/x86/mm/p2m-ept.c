@@ -514,7 +514,7 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
             goto out;
         else if ( ret == GUEST_TABLE_POD_PAGE )
         {
-            if ( q == p2m_query )
+            if ( !(q & P2M_ALLOC) )
             {
                 *t = p2m_populate_on_demand;
                 goto out;
@@ -541,7 +541,7 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
 
     if ( ept_entry->sa_p2mt == p2m_populate_on_demand )
     {
-        if ( q == p2m_query )
+        if ( !(q & P2M_ALLOC) )
         {
             *t = p2m_populate_on_demand;
             goto out;

@@ -529,7 +529,7 @@ p2m_pod_decrease_reservation(struct domain *d,
         p2m_access_t a;
         p2m_type_t t;
 
-        (void)p2m->get_entry(p2m, gpfn + i, &t, &a, p2m_query, NULL);
+        (void)p2m->get_entry(p2m, gpfn + i, &t, &a, 0, NULL);
 
         if ( t == p2m_populate_on_demand )
             pod++;
@@ -570,7 +570,7 @@ p2m_pod_decrease_reservation(struct domain *d,
         p2m_type_t t;
         p2m_access_t a;
 
-        mfn = p2m->get_entry(p2m, gpfn + i, &t, &a, p2m_query, NULL);
+        mfn = p2m->get_entry(p2m, gpfn + i, &t, &a, 0, NULL);
         if ( t == p2m_populate_on_demand )
         {
             set_p2m_entry(p2m, gpfn + i, _mfn(INVALID_MFN), 0, p2m_invalid, p2m->default_access);
@@ -656,7 +656,7 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
     for ( i=0; i<SUPERPAGE_PAGES; i++ )
     {
         p2m_access_t a; 
-        mfn = p2m->get_entry(p2m, gfn + i, &type, &a, p2m_query, NULL);
+        mfn = p2m->get_entry(p2m, gfn + i, &type, &a, 0, NULL);
 
         if ( i == 0 )
         {
@@ -786,7 +786,7 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
     for ( i=0; i<count; i++ )
     {
         p2m_access_t a;
-        mfns[i] = p2m->get_entry(p2m, gfns[i], types + i, &a, p2m_query, NULL);
+        mfns[i] = p2m->get_entry(p2m, gfns[i], types + i, &a, 0, NULL);
         /* If this is ram, and not a pagetable or from the xen heap, and probably not mapped
            elsewhere, map it; otherwise, skip. */
         if ( p2m_is_ram(types[i])
@@ -932,7 +932,7 @@ p2m_pod_emergency_sweep(struct p2m_domain *p2m)
     for ( i=p2m->pod.reclaim_single; i > 0 ; i-- )
     {
         p2m_access_t a;
-        (void)p2m->get_entry(p2m, i, &t, &a, p2m_query, NULL);
+        (void)p2m->get_entry(p2m, i, &t, &a, 0, NULL);
         if ( p2m_is_ram(t) )
         {
             gfns[j] = i;
@@ -1130,7 +1130,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     for ( i = 0; i < (1UL << order); i++ )
     {
         p2m_access_t a;
-        omfn = p2m->get_entry(p2m, gfn + i, &ot, &a, p2m_query, NULL);
+        omfn = p2m->get_entry(p2m, gfn + i, &ot, &a, 0, NULL);
         if ( p2m_is_ram(ot) )
         {
             printk("%s: gfn_to_mfn returned type %d!\n",

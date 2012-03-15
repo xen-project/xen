@@ -513,7 +513,7 @@ pod_retry_l3:
              (p2m_flags_to_type(l3e_get_flags(l3e)) == p2m_populate_on_demand) )
         {
             /* The read has succeeded, so we know that mapping exists */
-            if ( q != p2m_query )
+            if ( q & P2M_ALLOC )
             {
                 if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_1G, q) )
                     goto pod_retry_l3;
@@ -565,7 +565,7 @@ pod_retry_l2:
         {
             /* The read has succeeded, so we know that the mapping
              * exits at this point.  */
-            if ( q != p2m_query )
+            if ( q & P2M_ALLOC )
             {
                 if ( !p2m_pod_demand_populate(p2m, gfn, 
                                                 PAGE_ORDER_2M, q) )
@@ -623,7 +623,7 @@ pod_retry_l1:
         {
             /* The read has succeeded, so we know that the mapping
              * exits at this point.  */
-            if ( q != p2m_query )
+            if ( q & P2M_ALLOC )
             {
                 if ( !p2m_pod_demand_populate(p2m, gfn, 
                                                 PAGE_ORDER_4K, q) )
@@ -714,7 +714,7 @@ pod_retry_l3:
         {
             if ( p2m_flags_to_type(l3e_get_flags(*l3e)) == p2m_populate_on_demand )
             {
-                if ( q != p2m_query )
+                if ( q & P2M_ALLOC )
                 {
                     if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_1G, q) )
                         goto pod_retry_l3;
@@ -753,7 +753,7 @@ pod_retry_l2:
         /* PoD: Try to populate a 2-meg chunk */
         if ( p2m_flags_to_type(l2e_get_flags(*l2e)) == p2m_populate_on_demand )
         {
-            if ( q != p2m_query ) {
+            if ( q & P2M_ALLOC ) {
                 if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_2M, q) )
                     goto pod_retry_l2;
             } else
@@ -786,7 +786,7 @@ pod_retry_l1:
         /* PoD: Try to populate */
         if ( p2m_flags_to_type(l1e_get_flags(*l1e)) == p2m_populate_on_demand )
         {
-            if ( q != p2m_query ) {
+            if ( q & P2M_ALLOC ) {
                 if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_4K, q) )
                     goto pod_retry_l1;
             } else

@@ -117,11 +117,9 @@ typedef enum {
 } p2m_access_t;
 
 /* Modifiers to the query */
-typedef enum {
-    p2m_query,              /* Do not populate a PoD entries      */
-    p2m_alloc,              /* Automatically populate PoD entries */
-    p2m_unshare,            /* Break c-o-w sharing; implies alloc */
-} p2m_query_t;
+typedef unsigned int p2m_query_t;
+#define P2M_ALLOC    (1u<<0)   /* Populate PoD and paged-out entries */
+#define P2M_UNSHARE  (1u<<1)   /* Break CoW sharing */
 
 /* We use bitmaps and maks to handle groups of types */
 #define p2m_to_mask(_t) (1UL << (_t))
@@ -332,9 +330,10 @@ static inline mfn_t get_gfn_type(struct domain *d,
  * N.B. get_gfn_query() is the _only_ one guaranteed not to take the
  * p2m lock; none of the others can be called with the p2m or paging
  * lock held. */
-#define get_gfn(d, g, t)         get_gfn_type((d), (g), (t), p2m_alloc)
-#define get_gfn_query(d, g, t)   get_gfn_type((d), (g), (t), p2m_query)
-#define get_gfn_unshare(d, g, t) get_gfn_type((d), (g), (t), p2m_unshare)
+#define get_gfn(d, g, t)         get_gfn_type((d), (g), (t), P2M_ALLOC)
+#define get_gfn_query(d, g, t)   get_gfn_type((d), (g), (t), 0)
+#define get_gfn_unshare(d, g, t) get_gfn_type((d), (g), (t), \
+                                              P2M_ALLOC | P2M_UNSHARE)
 
 /* Compatibility function exporting the old untyped interface */
 static inline unsigned long get_gfn_untyped(struct domain *d, unsigned long gpfn)
@@ -366,8 +365,7 @@ static inline mfn_t get_gfn_query_unlocked(struct domain *d,
                                            p2m_type_t *t)
 {
     p2m_access_t a;
-    return __get_gfn_type_access(p2m_get_hostp2m(d), gfn, t, &a, 
-                                    p2m_query, NULL, 0);
+    return __get_gfn_type_access(p2m_get_hostp2m(d), gfn, t, &a, 0, NULL, 0);
 }
 
 /* General conversion function from mfn to gfn */

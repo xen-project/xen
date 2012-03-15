@@ -53,7 +53,7 @@ gfn_to_paddr(gfn_t gfn)
 
 /* Override get_gfn to work with gfn_t */
 #undef get_gfn
-#define get_gfn(d, g, t) get_gfn_type((d), gfn_x(g), (t), p2m_alloc)
+#define get_gfn(d, g, t) get_gfn_type((d), gfn_x(g), (t), P2M_ALLOC)
 
 
 /* Types of the guest's page tables and access functions for them */

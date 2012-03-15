@@ -1270,7 +1270,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
 
     p2m = p2m_get_hostp2m(v->domain);
     mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, 
-                              access_w ? p2m_unshare : p2m_alloc, NULL);
+                              P2M_ALLOC | (access_w ? P2M_UNSHARE : 0), NULL);
 
     /* Check access permissions first, then handle faults */
     if ( mfn_x(mfn) != INVALID_MFN )

@@ -98,7 +98,8 @@ static inline void *map_domain_gfn(struct p2m_domain *p2m,
     void *map;
 
     /* Translate the gfn, unsharing if shared */
-    *mfn = get_gfn_type_access(p2m, gfn_x(gfn), p2mt, &p2ma, p2m_unshare, NULL);
+    *mfn = get_gfn_type_access(p2m, gfn_x(gfn), p2mt, &p2ma, 
+                               P2M_ALLOC | P2M_UNSHARE, NULL);
     if ( p2m_is_paging(*p2mt) )
     {
         ASSERT(!p2m_is_nestedp2m(p2m));
