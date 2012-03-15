@@ -385,13 +385,6 @@ struct two_gfns {
     unsigned long   second_gfn;
 };
 
-#define assign_pointers(dest, source)                                        \
-do {                                                                         \
-    dest ## _mfn = (source ## mfn) ? (source ## mfn) : &__ ## dest ## _mfn;  \
-    dest ## _a   = (source ## a)   ? (source ## a)   : &__ ## dest ## _a;    \
-    dest ## _t   = (source ## t)   ? (source ## t)   : &__ ## dest ## _t;    \
-} while(0)
-
 /* Returns mfn, type and access for potential caller consumption, but any
  * of those can be NULL */
 static inline void get_two_gfns(struct domain *rd, unsigned long rgfn,
@@ -399,27 +392,31 @@ static inline void get_two_gfns(struct domain *rd, unsigned long rgfn,
         unsigned long lgfn, p2m_type_t *lt, p2m_access_t *la, mfn_t *lmfn,
         p2m_query_t q, struct two_gfns *rval)
 {
-    mfn_t           *first_mfn, *second_mfn, __first_mfn, __second_mfn;
-    p2m_access_t    *first_a, *second_a, __first_a, __second_a;
-    p2m_type_t      *first_t, *second_t, __first_t, __second_t;
+    mfn_t           *first_mfn, *second_mfn, scratch_mfn;
+    p2m_access_t    *first_a, *second_a, scratch_a;
+    p2m_type_t      *first_t, *second_t, scratch_t;
 
     /* Sort by domain, if same domain by gfn */
+
+#define assign_pointers(dest, source)                   \
+do {                                                    \
+    rval-> dest ## _domain = source ## d;               \
+    rval-> dest ## _gfn = source ## gfn;                \
+    dest ## _mfn = (source ## mfn) ?: &scratch_mfn;     \
+    dest ## _a   = (source ## a)   ?: &scratch_a;       \
+    dest ## _t   = (source ## t)   ?: &scratch_t;       \
+} while (0)
+
     if ( (rd->domain_id <= ld->domain_id) || ((rd == ld) && (rgfn <= lgfn)) )
     {
-        rval->first_domain  = rd;
-        rval->first_gfn     = rgfn;
-        rval->second_domain = ld;
-        rval->second_gfn    = lgfn;
         assign_pointers(first, r);
         assign_pointers(second, l);
     } else {
-        rval->first_domain  = ld;
-        rval->first_gfn     = lgfn;
-        rval->second_domain = rd;
-        rval->second_gfn    = rgfn;
         assign_pointers(first, l);
         assign_pointers(second, r);
     }
+
+#undef assign_pointers
 
     /* Now do the gets */
     *first_mfn  = get_gfn_type_access(p2m_get_hostp2m(rval->first_domain), 
