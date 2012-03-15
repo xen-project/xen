@@ -238,7 +238,7 @@ hyp:
 	mov   r3, #0x0
 	lsr   r2, r8, #21
 	lsl   r2, r2, #21            /* 2MB-aligned paddr of DTB */
-	orr   r2, r2, #0xf00
+	orr   r2, r2, #0xe00
 	orr   r2, r2, #0x07d         /* r2:r3 := 2MB RAM incl. DTB */
 	add   r4, r4, #8
 	strd  r2, r3, [r1, r4]       /* Map it in the early boot slot */
