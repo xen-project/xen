@@ -28,11 +28,31 @@
 bool_t mem_event_check_ring(struct mem_event_domain *med);
 
 /* Returns 0 on success, -ENOSYS if there is no ring, -EBUSY if there is no
- * available space. For success or -EBUSY, the vCPU may be left blocked
- * temporarily to ensure that the ring does not lose future events.  In
- * general, you must follow a claim_slot() call with either put_request() or
- * cancel_slot(), both of which are guaranteed to succeed. */
-int mem_event_claim_slot(struct domain *d, struct mem_event_domain *med);
+ * available space and the caller is a foreign domain. If the guest itself
+ * is the caller, -EBUSY is avoided by sleeping on a wait queue to ensure
+ * that the ring does not lose future events. 
+ *
+ * However, the allow_sleep flag can be set to false in cases in which it is ok
+ * to lose future events, and thus -EBUSY can be returned to guest vcpus
+ * (handle with care!). 
+ *
+ * In general, you must follow a claim_slot() call with either put_request() or
+ * cancel_slot(), both of which are guaranteed to
+ * succeed. 
+ */
+int __mem_event_claim_slot(struct domain *d, struct mem_event_domain *med,
+                            bool_t allow_sleep);
+static inline int mem_event_claim_slot(struct domain *d, 
+                                        struct mem_event_domain *med)
+{
+    return __mem_event_claim_slot(d, med, 1);
+}
+
+static inline int mem_event_claim_slot_nosleep(struct domain *d,
+                                        struct mem_event_domain *med)
+{
+    return __mem_event_claim_slot(d, med, 0);
+}
 
 void mem_event_cancel_slot(struct domain *d, struct mem_event_domain *med);
 

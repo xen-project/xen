@@ -409,9 +409,10 @@ bool_t mem_event_check_ring(struct mem_event_domain *med)
  *               0: a spot has been reserved
  *
  */
-int mem_event_claim_slot(struct domain *d, struct mem_event_domain *med)
+int __mem_event_claim_slot(struct domain *d, struct mem_event_domain *med,
+                            bool_t allow_sleep)
 {
-    if ( current->domain == d )
+    if ( (current->domain == d) && allow_sleep )
         return mem_event_wait_slot(med);
     else
         return mem_event_grab_slot(med, 1);
