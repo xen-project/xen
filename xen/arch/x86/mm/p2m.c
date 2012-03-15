@@ -988,6 +988,9 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
     {
         gdprintk(XENLOG_ERR, "Domain %hu paging gfn %lx yet no ring "
                              "in place\n", d->domain_id, gfn);
+        /* Prevent the vcpu from faulting repeatedly on the same gfn */
+        if ( v->domain == d )
+            vcpu_pause_nosync(v);
         domain_crash(d);
         return;
     }
