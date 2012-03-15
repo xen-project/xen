@@ -1023,7 +1023,7 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
     }
 
     /* Keep track of the highest gfn demand-populated by a guest fault */
-    if ( q == p2m_guest && gfn > p2m->pod.max_guest )
+    if ( gfn > p2m->pod.max_guest )
         p2m->pod.max_guest = gfn;
 
     if ( p2m->pod.count == 0 )

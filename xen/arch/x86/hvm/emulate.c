@@ -716,7 +716,7 @@ static int hvmemul_rep_movs(
 
     get_two_gfns(current->domain, sgpa >> PAGE_SHIFT, &sp2mt, NULL, NULL,
                  current->domain, dgpa >> PAGE_SHIFT, &dp2mt, NULL, NULL,
-                 p2m_guest, &tg);
+                 p2m_alloc, &tg);
 
     if ( !p2m_is_ram(sp2mt) && !p2m_is_grant(sp2mt) )
     {

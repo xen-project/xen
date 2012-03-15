@@ -183,7 +183,7 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
     {
         /* Return invalid_mfn to avoid caller's access */
         mfn = _mfn(INVALID_MFN);
-        if (q == p2m_guest)
+        if (q != p2m_query)
             domain_crash(p2m->domain);
     }
 #endif

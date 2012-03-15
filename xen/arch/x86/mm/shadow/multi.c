@@ -3189,7 +3189,7 @@ static int sh_page_fault(struct vcpu *v,
 
     /* What mfn is the guest trying to access? */
     gfn = guest_l1e_get_gfn(gw.l1e);
-    gmfn = get_gfn_guest(d, gfn, &p2mt);
+    gmfn = get_gfn(d, gfn, &p2mt);
 
     if ( shadow_mode_refcounts(d) && 
          ((!p2m_is_valid(p2mt) && !p2m_is_grant(p2mt)) ||
@@ -4840,7 +4840,7 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v,
 
     /* Translate the GFN to an MFN */
     ASSERT(!paging_locked_by_me(v->domain));
-    mfn = get_gfn_guest(v->domain, _gfn(gfn), &p2mt);
+    mfn = get_gfn(v->domain, _gfn(gfn), &p2mt);
         
     if ( p2m_is_readonly(p2mt) )
     {

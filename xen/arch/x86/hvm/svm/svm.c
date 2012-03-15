@@ -1287,7 +1287,7 @@ static void svm_do_nested_pgfault(struct vcpu *v,
     if ( p2m == NULL )
         p2m = p2m_get_p2m(v);
     /* Everything else is an error. */
-    mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, p2m_guest, NULL);
+    mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, p2m_query, NULL);
     __put_gfn(p2m, gfn);
     gdprintk(XENLOG_ERR,
          "SVM violation gpa %#"PRIpaddr", mfn %#lx, type %i\n",

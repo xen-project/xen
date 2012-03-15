@@ -116,11 +116,11 @@ typedef enum {
     /* NOTE: Assumed to be only 4 bits right now */
 } p2m_access_t;
 
+/* Modifiers to the query */
 typedef enum {
     p2m_query,              /* Do not populate a PoD entries      */
     p2m_alloc,              /* Automatically populate PoD entries */
     p2m_unshare,            /* Break c-o-w sharing; implies alloc */
-    p2m_guest,              /* Guest demand-fault; implies alloc  */
 } p2m_query_t;
 
 /* We use bitmaps and maks to handle groups of types */
@@ -334,7 +334,6 @@ static inline mfn_t get_gfn_type(struct domain *d,
  * lock held. */
 #define get_gfn(d, g, t)         get_gfn_type((d), (g), (t), p2m_alloc)
 #define get_gfn_query(d, g, t)   get_gfn_type((d), (g), (t), p2m_query)
-#define get_gfn_guest(d, g, t)   get_gfn_type((d), (g), (t), p2m_guest)
 #define get_gfn_unshare(d, g, t) get_gfn_type((d), (g), (t), p2m_unshare)
 
 /* Compatibility function exporting the old untyped interface */
