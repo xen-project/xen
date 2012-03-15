@@ -38,11 +38,6 @@
 #include <asm/setup.h>
 #include "gic.h"
 
-/* Spinlock for serializing CPU bringup */
-unsigned long __initdata boot_gate = 1;
-/* Number of non-boot CPUs ready to enter C */
-unsigned long __initdata ready_cpus = 0;
-
 static __attribute_used__ void init_done(void)
 {
     free_init_memory();
@@ -152,8 +147,6 @@ void __init start_xen(unsigned long boot_phys_offset,
     void *fdt;
     size_t fdt_size;
     int cpus, i;
-    paddr_t gate_pa;
-    unsigned long *gate;
 
     fdt = (void *)BOOT_MISC_VIRT_START
         + (atag_paddr & ((1 << SECOND_SHIFT) - 1));
@@ -169,25 +162,11 @@ void __init start_xen(unsigned long boot_phys_offset,
     console_init_preirq();
 #endif
 
+    cpus = gic_init();
+    make_cpus_ready(cpus, boot_phys_offset);
+
     percpu_init_areas();
     set_processor_id(0); /* needed early, for smp_processor_id() */
-
-    cpus = gic_init();
-
-    printk("Waiting for %i other CPUs to be ready\n", cpus - 1);
-    /* Bring the other CPUs up to paging before the original
-     * copy of .text gets overwritten.  We need to use the unrelocated
-     * copy of boot_gate as that's the one the others can see. */ 
-    gate_pa = ((unsigned long) &boot_gate) + boot_phys_offset;
-    gate = map_domain_page(gate_pa >> PAGE_SHIFT) + (gate_pa & ~PAGE_MASK); 
-    *gate = 0;
-    unmap_domain_page(gate);
-    /* Now send an event to wake the first non-boot CPU */
-    asm volatile("dsb; isb; sev");
-    /* And wait for them all to be ready. */
-    while ( ready_cpus + 1 < cpus )
-        smp_rmb();
-
     __set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
 

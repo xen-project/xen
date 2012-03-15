@@ -71,16 +71,13 @@ start:
 	bics  r12, r0, #(0xff << 24) /* Mask out flags to get CPU ID */
 	beq   boot_cpu               /* If we're CPU 0, boot now */
 
-	/* Non-boot CPUs wait here to be woken up one at a time.
-	 * This is basically an open-coded spin-lock to serialize. */
-	ldr   r0, =boot_gate         /* VA of gate */
-	add   r0, r0, r10            /* PA of gate */
-	mov   r1, #1                 /* (1 == locked) */
+	/* Non-boot CPUs wait here to be woken up one at a time. */
 1:	wfe
-	ldrex r2, [r0]               /* Linked read of current value */
-	teq   r2, #0                 /* (0 == unlocked) */
-	strexeq r2, r1, [r0]         /* Matching update -> locked */
-	teq   r2, #0                 /* (0 == succeeded) */
+	dsb
+	ldr   r0, =smp_up_cpu        /* VA of gate */
+	add   r0, r0, r10            /* PA of gate */
+	ldr   r1, [r0]               /* Which CPU is being booted? */
+	teq   r1, r12                /* Is it us? */
 	bne   1b
 
 boot_cpu:
@@ -270,16 +267,7 @@ paging:
 	teq   r12, #0
 	beq   launch
 
-	/* Signal the next non-boot CPU to come and join us here */
-	ldr   r0, =boot_gate         /* VA of gate */
-	add   r0, r0, r10            /* PA of gate */
-	mov   r1, #0                 /* (0 == unlocked) */
-	str   r1, [r0]
-	dsb
-	isb
-	sev
-
-	/* Move on to the relocated pagetables */
+	/* Non-boot CPUs need to move on to the relocated pagetables */
 	mov   r0, #0
 	ldr   r4, =boot_httbr        /* VA of HTTBR value stashed by CPU 0 */
 	add   r4, r4, r10            /* PA of it */

@@ -19,6 +19,7 @@
 #include <xen/cpu.h>
 #include <xen/cpumask.h>
 #include <xen/delay.h>
+#include <xen/domain_page.h>
 #include <xen/errno.h>
 #include <xen/init.h>
 #include <xen/mm.h>
@@ -41,11 +42,17 @@ static unsigned char __initdata cpu0_boot_stack[STACK_SIZE]
 /* Pointer to the stack, used by head.S when entering C */
 unsigned char *init_stack = cpu0_boot_stack;
 
+/* Shared state for coordinating CPU bringup */
+unsigned long smp_up_cpu = 0;
+static bool_t cpu_is_dead = 0;
+
+/* Number of non-boot CPUs ready to enter C */
+unsigned long __initdata ready_cpus = 0;
+
 void __init
 smp_prepare_cpus (unsigned int max_cpus)
 {
     int i;
-    set_processor_id(0); /* needed early, for smp_processor_id() */
 
     cpumask_clear(&cpu_online_map);
     cpumask_set_cpu(0, &cpu_online_map);
@@ -56,9 +63,30 @@ smp_prepare_cpus (unsigned int max_cpus)
     cpumask_copy(&cpu_present_map, &cpu_possible_map);
 }
 
-/* Shared state for coordinating CPU bringup */
-unsigned long smp_up_cpu = 0;
-static bool_t cpu_is_dead = 0;
+void __init
+make_cpus_ready(unsigned int max_cpus, unsigned long boot_phys_offset)
+{
+    unsigned long *gate;
+    paddr_t gate_pa;
+    int i;
+
+    printk("Waiting for %i other CPUs to be ready\n", max_cpus - 1);
+    /* We use the unrelocated copy of smp_up_cpu as that's the one the
+     * others can see. */ 
+    gate_pa = ((paddr_t) (unsigned long) &smp_up_cpu) + boot_phys_offset;
+    gate = map_domain_page(gate_pa >> PAGE_SHIFT) + (gate_pa & ~PAGE_MASK); 
+    for ( i = 1; i < max_cpus; i++ )
+    {
+        /* Tell the next CPU to get ready */
+        /* TODO: handle boards where CPUIDs are not contiguous */
+        *gate = i;
+        asm volatile("dsb; isb; sev");
+        /* And wait for it to respond */
+        while ( ready_cpus < i )
+            smp_rmb();
+    }
+    unmap_domain_page(gate);
+}
 
 /* Boot the current CPU */
 void __cpuinit start_secondary(unsigned long boot_phys_offset,
