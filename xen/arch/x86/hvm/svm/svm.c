@@ -1505,7 +1505,7 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         if ( rdmsr_safe(msr, *msr_content) == 0 )
             break;
 
-        if ( msr == MSR_F10_BU_CFG )
+        if ( boot_cpu_data.x86 == 0xf && msr == MSR_F10_BU_CFG )
         {
             /* Win2k8 x64 reads this MSR on revF chips, where it
              * wasn't publically available; it uses a magic constant
