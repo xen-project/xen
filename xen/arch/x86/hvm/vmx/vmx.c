@@ -2720,7 +2720,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     /* fall through */
     default:
     exit_and_crash:
-        gdprintk(XENLOG_ERR, "Bad vmexit (reason %x)\n", exit_reason);
+        gdprintk(XENLOG_ERR, "Bad vmexit (reason %#x)\n", exit_reason);
         domain_crash(v->domain);
         break;
     }
