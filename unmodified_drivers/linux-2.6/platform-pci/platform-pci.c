@@ -351,6 +351,32 @@ static int check_platform_magic(struct device *dev, long ioaddr, long iolen)
 	return -ENODEV;
 }
 
+#ifdef HAVE_OLDMEM_PFN_IS_RAM
+static int xen_oldmem_pfn_is_ram(unsigned long pfn)
+{
+	struct xen_hvm_get_mem_type a;
+	int ret;
+
+	a.domid = DOMID_SELF;
+	a.pfn = pfn;
+	if (HYPERVISOR_hvm_op(HVMOP_get_mem_type, &a))
+		return -ENXIO;
+
+	switch (a.mem_type) {
+		case HVMMEM_mmio_dm:
+			ret = 0;
+			break;
+		case HVMMEM_ram_rw:
+		case HVMMEM_ram_ro:
+		default:
+			ret = 1;
+			break;
+	}
+
+	return ret;
+}
+#endif
+
 static int __devinit platform_pci_init(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
 {
@@ -419,6 +445,9 @@ static int __devinit platform_pci_init(struct pci_dev *pdev,
 	if ((ret = xen_panic_handler_init()))
 		goto out;
 
+#ifdef HAVE_OLDMEM_PFN_IS_RAM
+	register_oldmem_pfn_is_ram(&xen_oldmem_pfn_is_ram);
+#endif
  out:
 	if (ret) {
 		pci_release_region(pdev, 0);
