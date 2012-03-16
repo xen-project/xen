@@ -118,6 +118,7 @@ unsigned long alloc_xen_mmio(unsigned long len)
 
 #ifndef __ia64__
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38)
 static uint32_t xen_cpuid_base(void)
 {
 	uint32_t base, eax, ebx, ecx, edx;
@@ -136,6 +137,7 @@ static uint32_t xen_cpuid_base(void)
 
 	return 0;
 }
+#endif
 
 static int init_hypercall_stubs(void)
 {
