@@ -583,6 +583,10 @@ void __init __start_xen(unsigned long mbi_p)
     }
     cmdline_parse(cmdline);
 
+    /* Must be after command line argument parsing and before
+     * allocing any xenheap structures wanted in lower memory. */
+    kexec_early_calculations();
+
     parse_video_info();
 
     set_current((struct vcpu *)0xfffff000); /* debug sanity */

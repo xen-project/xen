@@ -596,7 +596,7 @@ void __init console_init_postirq(void)
         opt_conring_size = num_present_cpus() << (9 + xenlog_lower_thresh);
 
     order = get_order_from_bytes(max(opt_conring_size, conring_size));
-    while ( (ring = alloc_xenheap_pages(order, 0)) == NULL )
+    while ( (ring = alloc_xenheap_pages(order, MEMF_bits(crashinfo_maxaddr_bits))) == NULL )
     {
         BUG_ON(order == 0);
         order--;

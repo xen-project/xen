@@ -36,7 +36,9 @@ bool_t kexecing = FALSE;
 typedef struct { Elf_Note * start; size_t size; } crash_note_range_t;
 static crash_note_range_t * crash_notes;
 
-/* Lock to prevent race conditions when allocating the crash note buffers. */
+/* Lock to prevent race conditions when allocating the crash note buffers.
+ * It also serves to protect calls to alloc_from_crash_heap when allocating
+ * crash note buffers in lower memory. */
 static DEFINE_SPINLOCK(crash_notes_lock);
 
 static Elf_Note *xen_crash_note;
@@ -61,6 +63,24 @@ static struct {
     u64 start, end;
     unsigned long size;
 } ranges[16] __initdata;
+
+/* Low crashinfo mode.  Start as INVALID so serveral codepaths can set up
+ * defaults without needing to know the state of the others. */
+enum low_crashinfo low_crashinfo_mode = LOW_CRASHINFO_INVALID;
+
+/* This value is only considered if low_crash_mode is set to MIN or ALL, so
+ * setting a default here is safe. Default to 4GB.  This is because the current
+ * KEXEC_CMD_get_range compat hypercall trucates 64bit pointers to 32 bits. The
+ * typical usecase for crashinfo_maxaddr will be for 64bit Xen with 32bit dom0
+ * and 32bit crash kernel. */
+static paddr_t __initdata crashinfo_maxaddr = 4ULL << 30;
+
+/* = log base 2 of crashinfo_maxaddr after checking for sanity. Default to
+ * larger than the entire physical address space. */
+paddr_t crashinfo_maxaddr_bits = 64;
+
+/* Pointers to keep track of the crash heap region. */
+static void *crash_heap_current = NULL, *crash_heap_end = NULL;
 
 /*
  * Parse command lines in the format
@@ -139,6 +159,58 @@ static void __init parse_crashkernel(const char *str)
         printk(XENLOG_WARNING "crashkernel: memory value expected\n");
 }
 custom_param("crashkernel", parse_crashkernel);
+
+/* Parse command lines in the format:
+ *
+ *   low_crashinfo=[none,min,all]
+ *
+ * - none disables the low allocation of crash info.
+ * - min will allocate enough low information for the crash kernel to be able
+ *       to extract the hypervisor and dom0 message ring buffers.
+ * - all will allocate additional structures such as domain and vcpu structs
+ *       low so the crash kernel can perform an extended analysis of state.
+ */
+static void __init parse_low_crashinfo(const char * str)
+{
+
+    if ( !strlen(str) )
+        /* default to min if user just specifies "low_crashinfo" */
+        low_crashinfo_mode = LOW_CRASHINFO_MIN;
+    else if ( !strcmp(str, "none" ) )
+        low_crashinfo_mode = LOW_CRASHINFO_NONE;
+    else if ( !strcmp(str, "min" ) )
+        low_crashinfo_mode = LOW_CRASHINFO_MIN;
+    else if ( !strcmp(str, "all" ) )
+        low_crashinfo_mode = LOW_CRASHINFO_ALL;
+    else
+    {
+        printk("Unknown low_crashinfo parameter '%s'.  Defaulting to min.\n", str);
+        low_crashinfo_mode = LOW_CRASHINFO_MIN;
+    }
+}
+custom_param("low_crashinfo", parse_low_crashinfo);
+
+/* Parse command lines in the format:
+ *
+ *   crashinfo_maxaddr=<addr>
+ *
+ * <addr> will be rounded down to the nearest power of two.  Defaults to 64G
+ */
+static void __init parse_crashinfo_maxaddr(const char * str)
+{
+    u64 addr;
+
+    /* if low_crashinfo_mode is unset, default to min. */
+    if ( low_crashinfo_mode == LOW_CRASHINFO_INVALID )
+        low_crashinfo_mode = LOW_CRASHINFO_MIN;
+
+    if ( (addr = parse_size_and_unit(str, NULL)) )
+        crashinfo_maxaddr = addr;
+    else
+        printk("Unable to parse crashinfo_maxaddr. Defaulting to %p\n",
+               (void*)crashinfo_maxaddr);
+}
+custom_param("crashinfo_maxaddr", parse_crashinfo_maxaddr);
 
 void __init set_kexec_crash_area_size(u64 system_ram)
 {
@@ -298,6 +370,20 @@ static size_t sizeof_cpu_notes(const unsigned long cpu)
     return bytes;
 }
 
+/* Allocate size_t bytes of space from the previously allocated
+ * crash heap if the user has requested that crash notes be allocated
+ * in lower memory.  There is currently no case where the crash notes
+ * should be free()'d. */
+static void * alloc_from_crash_heap(const size_t bytes)
+{
+    void * ret;
+    if ( crash_heap_current + bytes > crash_heap_end )
+        return NULL;
+    ret = (void*)crash_heap_current;
+    crash_heap_current += bytes;
+    return ret;
+}
+
 /* Allocate a crash note buffer for a newly onlined cpu. */
 static int kexec_init_cpu_notes(const unsigned long cpu)
 {
@@ -312,7 +398,10 @@ static int kexec_init_cpu_notes(const unsigned long cpu)
         return ret;
 
     nr_bytes = sizeof_cpu_notes(cpu);
-    note = xmalloc_bytes(nr_bytes);
+
+    /* If we dont care about the position of allocation, malloc. */
+    if ( low_crashinfo_mode == LOW_CRASHINFO_NONE )
+        note = xmalloc_bytes(nr_bytes);
 
     /* Protect the write into crash_notes[] with a spinlock, as this function
      * is on a hotplug path and a hypercall path. */
@@ -330,6 +419,11 @@ static int kexec_init_cpu_notes(const unsigned long cpu)
     }
     else
     {
+        /* If we care about memory possition, alloc from the crash heap,
+         * also protected by the crash_notes_lock. */
+        if ( low_crashinfo_mode > LOW_CRASHINFO_NONE )
+            note = alloc_from_crash_heap(nr_bytes);
+
         crash_notes[cpu].start = note;
         crash_notes[cpu].size = nr_bytes;
         spin_unlock(&crash_notes_lock);
@@ -389,6 +483,18 @@ static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback
 };
 
+void __init kexec_early_calculations(void)
+{
+    /* If low_crashinfo_mode is still INVALID, neither "low_crashinfo" nor
+     * "crashinfo_maxaddr" have been specified on the command line, so
+     * explicitly set to NONE. */
+    if ( low_crashinfo_mode == LOW_CRASHINFO_INVALID )
+        low_crashinfo_mode = LOW_CRASHINFO_NONE;
+
+    if ( low_crashinfo_mode > LOW_CRASHINFO_NONE )
+        crashinfo_maxaddr_bits = fls(crashinfo_maxaddr) - 1;
+}
+
 static int __init kexec_init(void)
 {
     void *cpu = (void *)(unsigned long)smp_processor_id();
@@ -397,6 +503,29 @@ static int __init kexec_init(void)
     if ( !kexec_crash_area.size )
         return 0;
 
+    if ( low_crashinfo_mode > LOW_CRASHINFO_NONE )
+    {
+        size_t crash_heap_size;
+
+        /* This calculation is safe even if the machine is booted in
+         * uniprocessor mode. */
+        crash_heap_size = sizeof_cpu_notes(0) +
+            sizeof_cpu_notes(1) * (nr_cpu_ids - 1);
+        crash_heap_size = PAGE_ALIGN(crash_heap_size);
+
+        crash_heap_current = alloc_xenheap_pages(
+            get_order_from_bytes(crash_heap_size),
+            MEMF_bits(crashinfo_maxaddr_bits) );
+
+        if ( ! crash_heap_current )
+            return -ENOMEM;
+
+        crash_heap_end = crash_heap_current + crash_heap_size;
+    }
+
+    /* crash_notes may be allocated anywhere Xen can reach in memory.
+       Only the individual CPU crash notes themselves must be allocated
+       in lower memory if requested. */
     crash_notes = xzalloc_array(crash_note_range_t, nr_cpu_ids);
     if ( ! crash_notes )
         return -ENOMEM;

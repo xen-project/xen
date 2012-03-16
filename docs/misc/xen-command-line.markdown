@@ -188,6 +188,13 @@ The optional trailing `x` indicates that Xen should not automatically switch the
 ### cpuid\_mask\_xsave\_eax
 ### cpuidle
 ### cpuinfo
+### crashinfo_maxaddr
+> `= <size>`
+
+> Default: `4G`
+
+Specify the maximum address to allocate certain strucutres, if used in combination with the `low_crashinfo` command line option.
+
 ### crashkernel
 ### credit2\_balance\_over
 ### credit2\_balance\_under
@@ -272,6 +279,13 @@ Force the use of use of the local APIC on a uniprocessor system, even if left di
 Set the logging level for Xen.  Any log message with equal more more importance will be printed.
 
 The optional `<rate-limited level>` options instructs which severities should be rate limited.
+
+### low\_crashinfo
+> `= none | min | all`
+
+> Default: `none` if not specified at all, or to `min` if `low\_crashinfo` is present without qualification.
+
+This option is only useful for hosts with a 32bit dom0 kernel, wishing to use kexec functionality in the case of a crash.  It represents which data structures should be deliberatly allocated in low memory, so the crash kernel may find find them.  Should be used in combination with `crashinfo_maxaddr`.
 
 ### max\_cstate
 ### max\_gsi\_irqs

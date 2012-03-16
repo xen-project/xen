@@ -25,6 +25,19 @@ void set_kexec_crash_area_size(u64 system_ram);
 #define KEXEC_IMAGE_CRASH_BASE   2
 #define KEXEC_IMAGE_NR           4
 
+enum low_crashinfo {
+    LOW_CRASHINFO_INVALID = 0,
+    LOW_CRASHINFO_NONE = 1,
+    LOW_CRASHINFO_MIN = 2,
+    LOW_CRASHINFO_ALL = 3
+};
+
+/* Low crashinfo mode.  Start as INVALID so serveral codepaths can set up
+ * defaults without needing to know the state of the others. */
+extern enum low_crashinfo low_crashinfo_mode;
+extern paddr_t crashinfo_maxaddr_bits;
+void kexec_early_calculations(void);
+
 int machine_kexec_load(int type, int slot, xen_kexec_image_t *image);
 void machine_kexec_unload(int type, int slot, xen_kexec_image_t *image);
 void machine_kexec_reserved(xen_kexec_reserve_t *reservation);
