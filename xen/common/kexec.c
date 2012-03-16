@@ -25,13 +25,19 @@
 #include <xen/kexec.h>
 #include <public/elfnote.h>
 #include <xsm/xsm.h>
+#include <xen/cpu.h>
 #ifdef CONFIG_COMPAT
 #include <compat/kexec.h>
 #endif
 
 bool_t kexecing = FALSE;
 
-static DEFINE_PER_CPU_READ_MOSTLY(void *, crash_notes);
+/* Memory regions to store the per cpu register state etc. on a crash. */
+typedef struct { Elf_Note * start; size_t size; } crash_note_range_t;
+static crash_note_range_t * crash_notes;
+
+/* Lock to prevent race conditions when allocating the crash note buffers. */
+static DEFINE_SPINLOCK(crash_notes_lock);
 
 static Elf_Note *xen_crash_note;
 
@@ -165,12 +171,16 @@ static void one_cpu_only(void)
 void kexec_crash_save_cpu(void)
 {
     int cpu = smp_processor_id();
-    Elf_Note *note = per_cpu(crash_notes, cpu);
+    Elf_Note *note;
     ELF_Prstatus *prstatus;
     crash_xen_core_t *xencore;
 
+    BUG_ON ( ! crash_notes );
+
     if ( cpumask_test_and_set_cpu(cpu, &crash_saved_cpus) )
         return;
+
+    note = crash_notes[cpu].start;
 
     prstatus = (ELF_Prstatus *)ELFNOTE_DESC(note);
 
@@ -257,13 +267,6 @@ static struct keyhandler crashdump_trigger_keyhandler = {
     .desc = "trigger a crashdump"
 };
 
-static __init int register_crashdump_trigger(void)
-{
-    register_keyhandler('C', &crashdump_trigger_keyhandler);
-    return 0;
-}
-__initcall(register_crashdump_trigger);
-
 static void setup_note(Elf_Note *n, const char *name, int type, int descsz)
 {
     int l = strlen(name) + 1;
@@ -273,12 +276,141 @@ static void setup_note(Elf_Note *n, const char *name, int type, int descsz)
     n->type = type;
 }
 
-static int sizeof_note(const char *name, int descsz)
+static size_t sizeof_note(const char *name, int descsz)
 {
     return (sizeof(Elf_Note) +
             ELFNOTE_ALIGN(strlen(name)+1) +
             ELFNOTE_ALIGN(descsz));
 }
+
+static size_t sizeof_cpu_notes(const unsigned long cpu)
+{
+    /* All CPUs present a PRSTATUS and crash_xen_core note. */
+    size_t bytes =
+        + sizeof_note("CORE", sizeof(ELF_Prstatus)) +
+        + sizeof_note("Xen", sizeof(crash_xen_core_t));
+
+    /* CPU0 also presents the crash_xen_info note. */
+    if ( ! cpu )
+        bytes = bytes +
+            sizeof_note("Xen", sizeof(crash_xen_info_t));
+
+    return bytes;
+}
+
+/* Allocate a crash note buffer for a newly onlined cpu. */
+static int kexec_init_cpu_notes(const unsigned long cpu)
+{
+    Elf_Note * note = NULL;
+    int ret = 0;
+    int nr_bytes = 0;
+
+    BUG_ON( cpu >= nr_cpu_ids || ! crash_notes );
+
+    /* If already allocated, nothing to do. */
+    if ( crash_notes[cpu].start )
+        return ret;
+
+    nr_bytes = sizeof_cpu_notes(cpu);
+    note = xmalloc_bytes(nr_bytes);
+
+    /* Protect the write into crash_notes[] with a spinlock, as this function
+     * is on a hotplug path and a hypercall path. */
+    spin_lock(&crash_notes_lock);
+
+    /* If we are racing with another CPU and it has beaten us, give up
+     * gracefully. */
+    if ( crash_notes[cpu].start )
+    {
+        spin_unlock(&crash_notes_lock);
+        /* Always return ok, because whether we successfully allocated or not,
+         * another CPU has successfully allocated. */
+        if ( note )
+            xfree(note);
+    }
+    else
+    {
+        crash_notes[cpu].start = note;
+        crash_notes[cpu].size = nr_bytes;
+        spin_unlock(&crash_notes_lock);
+
+        /* If the allocation failed, and another CPU did not beat us, give
+         * up with ENOMEM. */
+        if ( ! note )
+            ret = -ENOMEM;
+        /* else all is good so lets set up the notes. */
+        else
+        {
+            /* Set up CORE note. */
+            setup_note(note, "CORE", NT_PRSTATUS, sizeof(ELF_Prstatus));
+            note = ELFNOTE_NEXT(note);
+
+            /* Set up Xen CORE note. */
+            setup_note(note, "Xen", XEN_ELFNOTE_CRASH_REGS,
+                       sizeof(crash_xen_core_t));
+
+            if ( ! cpu )
+            {
+                /* Set up Xen Crash Info note. */
+                xen_crash_note = note = ELFNOTE_NEXT(note);
+                setup_note(note, "Xen", XEN_ELFNOTE_CRASH_INFO,
+                           sizeof(crash_xen_info_t));
+            }
+        }
+    }
+
+    return ret;
+}
+
+static int cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned long cpu = (unsigned long)hcpu;
+
+    /* Only hook on CPU_UP_PREPARE because once a crash_note has been reported
+     * to dom0, it must keep it around in case of a crash, as the crash kernel
+     * will be hard coded to the original physical address reported. */
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        /* Ignore return value.  If this boot time, -ENOMEM will cause all
+         * manner of problems elsewhere very soon, and if it is during runtime,
+         * then failing to allocate crash notes is not a good enough reason to
+         * fail the CPU_UP_PREPARE */
+        kexec_init_cpu_notes(cpu);
+        break;
+    default:
+        break;
+    }
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block cpu_nfb = {
+    .notifier_call = cpu_callback
+};
+
+static int __init kexec_init(void)
+{
+    void *cpu = (void *)(unsigned long)smp_processor_id();
+
+    /* If no crash area, no need to allocate space for notes. */
+    if ( !kexec_crash_area.size )
+        return 0;
+
+    crash_notes = xzalloc_array(crash_note_range_t, nr_cpu_ids);
+    if ( ! crash_notes )
+        return -ENOMEM;
+
+    register_keyhandler('C', &crashdump_trigger_keyhandler);
+
+    cpu_callback(&cpu_nfb, CPU_UP_PREPARE, cpu);
+    register_cpu_notifier(&cpu_nfb);
+    return 0;
+}
+/* The reason for this to be a presmp_initcall as opposed to a regular
+ * __initcall is to allow the setup of the cpu hotplug handler before APs are
+ * brought up. */
+presmp_initcall(kexec_init);
 
 static int kexec_get_reserve(xen_kexec_range_t *range)
 {
@@ -294,44 +426,29 @@ static int kexec_get_reserve(xen_kexec_range_t *range)
 static int kexec_get_cpu(xen_kexec_range_t *range)
 {
     int nr = range->nr;
-    int nr_bytes = 0;
 
-    if ( nr < 0 || nr >= nr_cpu_ids || !cpu_online(nr) )
+    if ( nr < 0 || nr >= nr_cpu_ids )
+        return -ERANGE;
+
+    if ( ! crash_notes )
         return -EINVAL;
 
-    nr_bytes += sizeof_note("CORE", sizeof(ELF_Prstatus));
-    nr_bytes += sizeof_note("Xen", sizeof(crash_xen_core_t));
+    /* Try once again to allocate room for the crash notes.  It is just possible
+     * that more space has become available since we last tried.  If space has
+     * already been allocated, kexec_init_cpu_notes() will return early with 0.
+     */
+    kexec_init_cpu_notes(nr);
 
-    /* The Xen info note is included in CPU0's range. */
-    if ( nr == 0 )
-        nr_bytes += sizeof_note("Xen", sizeof(crash_xen_info_t));
-
-    if ( per_cpu(crash_notes, nr) == NULL )
+    /* In the case of still not having enough memory to allocate buffer room,
+     * returning a range of 0,0 is still valid. */
+    if ( crash_notes[nr].start )
     {
-        Elf_Note *note;
-
-        note = per_cpu(crash_notes, nr) = xmalloc_bytes(nr_bytes);
-
-        if ( note == NULL )
-            return -ENOMEM;
-
-        /* Setup CORE note. */
-        setup_note(note, "CORE", NT_PRSTATUS, sizeof(ELF_Prstatus));
-
-        /* Setup Xen CORE note. */
-        note = ELFNOTE_NEXT(note);
-        setup_note(note, "Xen", XEN_ELFNOTE_CRASH_REGS, sizeof(crash_xen_core_t));
-
-        if (nr == 0)
-        {
-            /* Setup system wide Xen info note. */
-            xen_crash_note = note = ELFNOTE_NEXT(note);
-            setup_note(note, "Xen", XEN_ELFNOTE_CRASH_INFO, sizeof(crash_xen_info_t));
-        }
+        range->start = __pa(crash_notes[nr].start);
+        range->size = crash_notes[nr].size;
     }
+    else
+        range->start = range->size = 0;
 
-    range->start = __pa((unsigned long)per_cpu(crash_notes, nr));
-    range->size = nr_bytes;
     return 0;
 }
 
