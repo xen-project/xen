@@ -207,8 +207,8 @@ static void __init parse_crashinfo_maxaddr(const char * str)
     if ( (addr = parse_size_and_unit(str, NULL)) )
         crashinfo_maxaddr = addr;
     else
-        printk("Unable to parse crashinfo_maxaddr. Defaulting to %p\n",
-               (void*)crashinfo_maxaddr);
+        printk("Unable to parse crashinfo_maxaddr. Defaulting to %"PRIpaddr"\n",
+               crashinfo_maxaddr);
 }
 custom_param("crashinfo_maxaddr", parse_crashinfo_maxaddr);
 
