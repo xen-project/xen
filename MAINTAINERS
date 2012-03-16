@@ -228,6 +228,13 @@ F:	xen/common/tmem*
 F:	xen/include/xen/tmem*
 F:	docs/misc/tmem*
 
+UNMODIFIED LINUX PV DRIVERS
+M:	Keir Fraser <keir@xen.org>
+M:	Jan Beulich <jbeulich@suse.com>
+S:	Obsolete
+L:	xen-devel@lists.xen.org
+F:	unmodified_drivers/linux-2.6/
+
 USB PV DRIVERS
 M:	Noboru Iwamatsu <n_iwamatsu@jp.fujitsu.com>
 S:	Supported
