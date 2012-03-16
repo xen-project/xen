@@ -690,7 +690,7 @@ static int core2_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
             printk("******************************************************\n");
             printk("** WARNING: Emulation of BTS Feature is switched on **\n");
             printk("** Using this processor feature in a virtualized    **\n");
-            printk("** environment is not 100%% safe.                   **\n");
+            printk("** environment is not 100%% safe.                    **\n");
             printk("** Setting the DS buffer address with wrong values  **\n");
             printk("** may lead to hypervisor hangs or crashes.         **\n");
             printk("** It is NOT recommended for production use!        **\n");
