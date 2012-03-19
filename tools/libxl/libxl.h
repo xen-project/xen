@@ -14,6 +14,77 @@
  */
 
 /*
+ * libxl API compatibility
+ *
+ * From Xen 4.2 onwards the API of libxl will be maintained in a
+ * stable manner. This means that it should be possible to write an
+ * application against the API provided by libxl in Xen 4.2 and expect
+ * that it will continue to compile against future versions of Xen
+ * without source modification.
+ *
+ * In order to make such compatibility possible it is required that
+ * application which want to be exposed to a particular API #define
+ * LIBXL_API_VERSION before including libxl.h or any other libxl
+ * header. The syntax of the LIBXL_API_VERSION is:
+ *    0xVVSSEE
+ * where ($(XEN_xxx) from xen/Makefile):
+ *   VV is the Xen major release number, $(XEN_VERSION)
+ *   SS is the Xen sub version number, $(XEN_SUBVERSION)
+ *   EE is the Xen extra version digit, first numeric part of
+ *     $(XEN_EXTRAVERSION) not including the leading "."
+ * For example the first stable API version, supported by Xen 4.2.0,
+ * is 0x040200.
+ *
+ * Lack of LIBXL_API_VERSION means "the latest" which will
+ * change. Specifying an unknown LIBXL_API_VERSION will result in a
+ * compile time error.
+ *
+ * Identical versions of the libxl API will represented by the version
+ * containing the earliest instance of that API. e.g. if 4.2.0 and
+ * 4.3.0 contain an identical libxl API then only LIBXL_API_VERSION
+ * 0x040200 will be valid.
+ *
+ * We will try especially hard to avoid changing the API during a
+ * stable series, i.e. it should be unusual for the last byte of
+ * LIBXL_API_VERSION to be non-zero.
+ *
+ * In the event that a change is required which cannot be made
+ * backwards compatible in this manner a #define of the form
+ * LIBXL_HAVE_<interface> will always be added in order to make it
+ * possible to write applciations which build against any version of
+ * libxl. Such changes are expected to be exceptional and used as a
+ * last resort. The barrier for backporting such a change to a stable
+ * branch will be very high.
+ *
+ * These guarantees apply only to stable releases of Xen. When an
+ * incompatible change is made in the unstable tree then
+ * LIBXL_API_VERSION will be bumped to the next expected stable
+ * release number on the first such change only. Applications which
+ * want to support building against Xen unstable are expected to track
+ * API changes in that tree until it is released as a stable release.
+ *
+ * API compatibility will be maintained for all versions of Xen using
+ * the same $(XEN_VERSION) (e.g. throughout a major release).
+ */
+
+/*
+ * libxl ABI compatibility
+ *
+ * The only guarantee which libxl makes regarding ABI compatibility
+ * across releases is that the SONAME will always be bumped whenever
+ * the ABI is changed in an incompatible way.
+ *
+ * This applies within stable branches as well as
+ * development branches. It is possible that a new stable release of
+ * Xen may require a rebuild of applications using the
+ * library. However per the API compatibility gaurantees such a
+ * rebuild should not normally require any source level changes.
+ *
+ * As with the API compatiblity the SONAME will only be bumped for the
+ * first ABI incompatible change in a development branch.
+ */
+
+/*
  * libxl memory management
  *
  * From the point of view of the application (ie, libxl's caller),
@@ -183,6 +254,13 @@
 
 #include <libxl_uuid.h>
 #include <_libxl_list.h>
+
+/* API compatibility. Only 0x040200 is supported at this time. */
+#ifdef LIBXL_API_VERSION
+#if LIBXL_API_VERSION != 0x040200
+#error Unknown LIBXL_API_VERSION
+#endif
+#endif
 
 typedef uint8_t libxl_mac[6];
 #define LIBXL_MAC_FMT "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx"
