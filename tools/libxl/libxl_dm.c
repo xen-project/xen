@@ -893,7 +893,7 @@ int libxl__create_device_model(libxl__gc *gc,
     char *path, *logfile;
     int logfile_w, null;
     int rc;
-    char **args;
+    char **args, **arg;
     libxl__spawner_starting buf_starting, *p;
     xs_transaction_t t;
     char *vm_path;
@@ -984,6 +984,10 @@ retry_transaction:
                     goto retry_transaction;
         }
     }
+
+    LIBXL__LOG(CTX, XTL_DEBUG, "Spawning device-model %s with arguments:", dm);
+    for (arg = args; *arg; arg++)
+        LIBXL__LOG(CTX, XTL_DEBUG, "  %s", *arg);
 
     rc = libxl__spawn_spawn(gc, p->for_spawn, "device model",
                             libxl_spawner_record_pid, p);
