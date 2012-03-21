@@ -73,6 +73,7 @@ typedef int pid_t;
 // now needed for xen/include/mm.h
 typedef unsigned long paddr_t;
 #define INVALID_PADDR (~0UL)
+#define PRIpaddr "016lx"
 // from include/linux/kernel.h
 #define ALIGN(x,a) (((x)+(a)-1)&~((a)-1))
 
