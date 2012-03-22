@@ -13,7 +13,7 @@
 long arch_do_domctl(struct xen_domctl *domctl,
                     XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 {
-	return -ENOSYS;
+    return -ENOSYS;
 }
 
 /*

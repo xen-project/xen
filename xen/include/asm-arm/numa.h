@@ -3,11 +3,11 @@
 
 /* Fake one node for now... */
 #define cpu_to_node(cpu) 0
-#define node_to_cpumask(node)	(cpu_online_map)
+#define node_to_cpumask(node)   (cpu_online_map)
 
 static inline __attribute__((pure)) int phys_to_nid(paddr_t addr)
 {
-        return 0;
+    return 0;
 }
 
 #endif /* __ARCH_ARM_NUMA_H */
