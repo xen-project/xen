@@ -91,7 +91,6 @@ static void kernel_zimage_load(struct kernel_info *info)
 
 /**
  * Check the image is a zImage and return the load address and length
- * (FIXME: including any appended DTB).
  */
 static int kernel_try_zimage_prepare(struct kernel_info *info)
 {
@@ -116,8 +115,6 @@ static int kernel_try_zimage_prepare(struct kernel_info *info)
     if (be32_to_cpu(dtb_hdr.magic) == DTB_MAGIC) {
         end += be32_to_cpu(dtb_hdr.total_size);
     }
-
-    /* FIXME: get RAM location from appended DTB (if there is one)? */
 
     /*
      * If start is zero, the zImage is position independent -- load it
@@ -166,13 +163,9 @@ static int kernel_try_elf_prepare(struct kernel_info *info)
         return rc;
 
     /*
-     * FIXME: can the ELF header be used to find the physical address
-     * to load the image to?  Instead of making virt == phys by
-     * relocating the guest's RAM.
+     * TODO: can the ELF header be used to find the physical address
+     * to load the image to?  Instead of assuming virt == phys.
      */
-    info->ram_start = 0xc0000000;
-    info->ram_end   = 0xc8000000;
-
     info->entry = info->elf.parms.virt_entry;
     info->load = kernel_elf_load;
 
