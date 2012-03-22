@@ -2,4 +2,4 @@ include Makefile.libfdt
 
 obj-y += $(LIBFDT_OBJS)
 
-CFLAGS += -I.
+CFLAGS += -I$(BASEDIR)/include/xen/libfdt/

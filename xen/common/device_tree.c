@@ -14,12 +14,11 @@
 #include <xen/device_tree.h>
 #include <xen/kernel.h>
 #include <xen/lib.h>
+#include <xen/libfdt/libfdt.h>
 #include <xen/mm.h>
 #include <xen/stdarg.h>
 #include <xen/string.h>
 #include <asm/early_printk.h>
-
-#include <libfdt.h>
 
 struct dt_early_info __initdata early_info;
 void *device_tree_flattened;

@@ -61,5 +61,3 @@ subdir-$(ia64) += hvm
 
 subdir-y += libelf
 subdir-$(HAS_DEVICE_TREE) += libfdt
-
-CFLAGS += -Ilibfdt
