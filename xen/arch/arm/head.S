@@ -21,12 +21,12 @@
 #include <asm/page.h>
 #include <asm/asm_defns.h>
 
-#define XEN_PT_PT  0xe7f /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=111, T=1, P=1 */
-#define XEN_PT_MEM 0xe7d /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=111, T=0, P=1 */
-#define XEN_PT_DEV 0xe71 /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=100, T=0, P=1 */
+#define PT_PT  0xe7f /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=111, T=1, P=1 */
+#define PT_MEM 0xe7d /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=111, T=0, P=1 */
+#define PT_DEV 0xe71 /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=100, T=0, P=1 */
 
-#define PT_UPPER(x) (XEN_PT_##x & 0xf00)
-#define PT_LOWER(x) (XEN_PT_##x & 0x0ff)
+#define PT_UPPER(x) (PT_##x & 0xf00)
+#define PT_LOWER(x) (PT_##x & 0x0ff)
 
 /* Macro to print a string to the UART, if there is one.
  * Clobbers r0-r3. */
