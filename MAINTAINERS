@@ -111,6 +111,14 @@ M:	Juergen Gross <juergen.gross@ts.fujitsu.com>
 S:	Supported
 F:	xen/common/cpupool.c
 
+DEVICE TREE
+M:	David Vrabel <david.vrabel@citrix.com>
+S:	Supported
+F:	xen/common/libfdt/
+F:	xen/common/device_tree.c
+F:	xen/include/xen/libfdt/
+F:	xen/include/xen/device_tree.h
+
 EFI
 M:     Jan Beulich <jbeulich@suse.com>
 S:     Supported
