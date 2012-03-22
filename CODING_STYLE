@@ -1,0 +1,120 @@
+Coding Style for the Xen Hypervisor
+===================================
+
+The Xen coding style described below is the coding style used by the
+Xen hypervisor itself (xen/*) as well as various associated low-level
+libraries (e.g. tools/libxc/*).
+        
+An exception is made for files which are imported from an external
+source. In these cases the prevailing coding style of the upstream
+source is generally used (commonly the Linux coding style).
+        
+Other parts of the code base may use other coding styles, sometimes
+explicitly (e.g. tools/libxl/CODING_STYLE) but often implicitly (Linux
+coding style is fairly common). In general you should copy the style
+of the surrounding code. If you are unsure please ask.
+
+Indentation
+-----------
+
+Indenting uses spaces, not tabs - in contrast to Linux.  An indent
+level consists of four spaces.  Code within blocks is indented by one
+extra indent level.  The enclosing braces of a block are indented the
+same as the code _outside_ the block.  e.g.
+
+void fun(void)
+{
+    /* One level of indent. */
+
+    {
+        /* A second level of indent. */
+    }
+}
+
+White space
+-----------
+
+Space characters are used to spread out logical statements, such as in
+the condition of an if or while.  Spaces are placed between the
+keyword and the brackets surrounding the condition, between the
+brackets and the condition itself, and around binary operators (except
+the structure access operators, '.' and '->'). e.g.
+
+if ( (wibble & wombat) == 42 )
+{
+    ...
+
+There should be no trailing white space at the end of lines (including
+after the opening /* of a comment block).
+
+Line Length
+-----------
+
+Lines should be less than 80 characters in length.  Long lines should
+be split at sensible places and the trailing portions indented.
+
+User visible strings (e.g., printk() messages) should not be split so
+they can searched for more easily.
+
+Bracing
+-------
+
+Braces ('{' and '}') are usually placed on a line of their own, except
+for the do/while loop.  This is unlike the Linux coding style and
+unlike K&R.  do/while loops are an exception. e.g.:
+
+if ( condition )
+{
+    /* Do stuff. */
+}
+else
+{
+    /* Other stuff. */
+}
+
+while ( condition )
+{
+    /* Do stuff. */
+}
+
+do {
+    /* Do stuff. */
+} while ( condition );
+
+etc.
+
+Braces should be omitted for blocks with a single statement. e.g.,
+
+if ( condition )
+    single_statement();
+
+Comments
+--------
+
+Only C style /* ... */ comments are to be used.  C++ style // comments
+should not be used.  Multi-word comments should begin with a capital
+letter and end with a full stop.
+
+Multi-line comment blocks should start and end with comment markers on
+separate lines and each line should begin with a leading '*'.
+
+/*
+ * Example, multi-line comment block.
+ *
+ * Note beginning and end markers on separate lines and leading '*'.
+ */
+
+Emacs local variables
+---------------------
+
+A comment block containing local variables for emacs is permitted at
+the end of files.  It should be:
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
