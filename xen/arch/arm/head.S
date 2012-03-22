@@ -21,6 +21,12 @@
 #include <asm/page.h>
 #include <asm/asm_defns.h>
 
+#define XEN_PT_PT  0xe7f /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=111, T=1, P=1 */
+#define XEN_PT_MEM 0xe7d /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=111, T=0, P=1 */
+#define XEN_PT_DEV 0xe71 /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=100, T=0, P=1 */
+
+#define PT_UPPER(x) (XEN_PT_##x & 0xf00)
+#define PT_LOWER(x) (XEN_PT_##x & 0x0ff)
 
 /* Macro to print a string to the UART, if there is one.
  * Clobbers r0-r3. */
@@ -203,8 +209,8 @@ hyp:
 	ldr   r1, =xen_second
 	add   r1, r1, r10            /* r1 := paddr (xen_second) */
 	mov   r3, #0x0
-	orr   r2, r1, #0xe00         /* r2:r3 := table map of xen_second */
-	orr   r2, r2, #0x07f         /* (+ rights for linear PT) */
+	orr   r2, r1, #PT_UPPER(PT)  /* r2:r3 := table map of xen_second */
+	orr   r2, r2, #PT_LOWER(PT)  /* (+ rights for linear PT) */
 	strd  r2, r3, [r4, #0]       /* Map it in slot 0 */
 	add   r2, r2, #0x1000
 	strd  r2, r3, [r4, #8]       /* Map 2nd page in slot 1 */
@@ -214,8 +220,8 @@ hyp:
 	strd  r2, r3, [r4, #24]      /* Map 4th page in slot 3 */
 
 	/* Now set up the second-level entries */
-	orr   r2, r9, #0xe00
-	orr   r2, r2, #0x07d         /* r2:r3 := 2MB normal map of Xen */
+	orr   r2, r9, #PT_UPPER(MEM)
+	orr   r2, r2, #PT_LOWER(MEM) /* r2:r3 := 2MB normal map of Xen */
 	mov   r4, r9, lsr #18        /* Slot for paddr(start) */
 	strd  r2, r3, [r1, r4]       /* Map Xen there */
 	ldr   r4, =start
@@ -225,8 +231,8 @@ hyp:
 	ldr   r3, =(1<<(54-32))      /* NS for device mapping */
 	lsr   r2, r11, #21
 	lsl   r2, r2, #21            /* 2MB-aligned paddr of UART */
-	orr   r2, r2, #0xe00
-	orr   r2, r2, #0x071         /* r2:r3 := 2MB dev map including UART */
+	orr   r2, r2, #PT_UPPER(DEV)
+	orr   r2, r2, #PT_LOWER(DEV) /* r2:r3 := 2MB dev map including UART */
 	add   r4, r4, #8
 	strd  r2, r3, [r1, r4]       /* Map it in the fixmap's slot */
 #else
@@ -235,8 +241,8 @@ hyp:
 	mov   r3, #0x0
 	lsr   r2, r8, #21
 	lsl   r2, r2, #21            /* 2MB-aligned paddr of DTB */
-	orr   r2, r2, #0xe00
-	orr   r2, r2, #0x07d         /* r2:r3 := 2MB RAM incl. DTB */
+	orr   r2, r2, #PT_UPPER(MEM)
+	orr   r2, r2, #PT_LOWER(MEM) /* r2:r3 := 2MB RAM incl. DTB */
 	add   r4, r4, #8
 	strd  r2, r3, [r1, r4]       /* Map it in the early boot slot */
 
