@@ -87,5 +87,13 @@ extern char _sinittext[], _einittext[];
     (__p >= _sinittext) && (__p < _einittext);  \
 })
 
+extern enum system_state {
+    SYS_STATE_early_boot,
+    SYS_STATE_boot,
+    SYS_STATE_active,
+    SYS_STATE_suspend,
+    SYS_STATE_resume
+} system_state;
+
 #endif /* _LINUX_KERNEL_H */
 

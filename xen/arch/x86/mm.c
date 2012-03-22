@@ -5316,7 +5316,7 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
 
 void free_xen_pagetable(void *v)
 {
-    if ( early_boot )
+    if ( system_state == SYS_STATE_early_boot )
         return;
 
     if ( is_xen_heap_page(virt_to_page(v)) )

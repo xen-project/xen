@@ -538,7 +538,7 @@ int cpu_disable_scheduler(unsigned int cpu)
     int    ret = 0;
 
     c = per_cpu(cpupool, cpu);
-    if ( c == NULL )
+    if ( (c == NULL) || (system_state == SYS_STATE_suspend) )
         return ret;
 
     for_each_domain_in_cpupool ( d, c )

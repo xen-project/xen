@@ -43,7 +43,7 @@ void *alloc_xen_pagetable(void)
 {
     unsigned long mfn;
 
-    if ( !early_boot )
+    if ( system_state != SYS_STATE_early_boot )
     {
         void *v = alloc_xenheap_page();
 

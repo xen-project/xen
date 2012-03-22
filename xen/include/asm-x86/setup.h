@@ -3,7 +3,6 @@
 
 #include <xen/multiboot.h>
 
-extern bool_t early_boot;
 extern unsigned long xenheap_initial_phys_start;
 
 void early_cpu_init(void);

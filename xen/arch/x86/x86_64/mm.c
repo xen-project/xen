@@ -85,7 +85,7 @@ void *alloc_xen_pagetable(void)
 {
     unsigned long mfn;
 
-    if ( !early_boot )
+    if ( system_state != SYS_STATE_early_boot )
     {
         struct page_info *pg = alloc_domheap_page(NULL, 0);
 
