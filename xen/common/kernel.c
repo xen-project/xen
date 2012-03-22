@@ -48,7 +48,7 @@ static void __init assign_integer_param(
     }
 }
 
-void __init cmdline_parse(char *cmdline)
+void __init cmdline_parse(const char *cmdline)
 {
     char opt[100], *optval, *optkey, *q;
     const char *p = cmdline;
