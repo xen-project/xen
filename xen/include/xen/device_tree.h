@@ -28,10 +28,18 @@ struct dt_early_info {
     struct dt_mem_info mem;
 };
 
+typedef int (*device_tree_node_func)(const void *fdt,
+                                     int node, const char *name, int depth,
+                                     u32 address_cells, u32 size_cells,
+                                     void *data);
+
 extern struct dt_early_info early_info;
 extern void *device_tree_flattened;
 
 size_t device_tree_early_init(const void *fdt);
 paddr_t device_tree_get_xen_paddr(void);
+
+int device_tree_for_each_node(const void *fdt,
+                              device_tree_node_func func, void *data);
 
 #endif

@@ -68,7 +68,43 @@ static u32 __init prop_by_name_u32(const void *fdt, int node,
     return fdt32_to_cpu(*(uint32_t*)prop->data);
 }
 
+#define MAX_DEPTH 16
+
+/**
+ * device_tree_for_each_node - iterate over all device tree nodes
+ * @fdt: flat device tree.
+ * @func: function to call for each node.
+ * @data: data to pass to @func.
+ */
+int device_tree_for_each_node(const void *fdt,
+                              device_tree_node_func func, void *data)
+{
+    int node;
+    int depth;
+    u32 address_cells[MAX_DEPTH];
+    u32 size_cells[MAX_DEPTH];
+    int ret;
+
+    for ( node = 0, depth = 0;
+          node >=0 && depth >= 0;
+          node = fdt_next_node(fdt, node, &depth) )
+    {
+        if ( depth >= MAX_DEPTH )
+            continue;
+
+        address_cells[depth] = prop_by_name_u32(fdt, node, "#address-cells");
+        size_cells[depth] = prop_by_name_u32(fdt, node, "#size-cells");
+
+        ret = func(fdt, node, fdt_get_name(fdt, node, NULL), depth,
+                   address_cells[depth-1], size_cells[depth-1], data);
+        if ( ret < 0 )
+            return ret;
+    }
+    return 0;
+}
+
 static void __init process_memory_node(const void *fdt, int node,
+                                       const char *name,
                                        u32 address_cells, u32 size_cells)
 {
     const struct fdt_property *prop;
@@ -81,15 +117,14 @@ static void __init process_memory_node(const void *fdt, int node,
     if ( address_cells < 1 || size_cells < 1 )
     {
         early_printk("fdt: node `%s': invalid #address-cells or #size-cells",
-                     fdt_get_name(fdt, node, NULL));
+                     name);
         return;
     }
 
     prop = fdt_get_property(fdt, node, "reg", NULL);
     if ( !prop )
     {
-        early_printk("fdt: node `%s': missing `reg' property\n",
-                     fdt_get_name(fdt, node, NULL));
+        early_printk("fdt: node `%s': missing `reg' property\n", name);
         return;
     }
 
@@ -106,30 +141,15 @@ static void __init process_memory_node(const void *fdt, int node,
     }
 }
 
-#define MAX_DEPTH 16
-
-static void __init early_scan(const void *fdt)
+static int __init early_scan_node(const void *fdt,
+                                  int node, const char *name, int depth,
+                                  u32 address_cells, u32 size_cells,
+                                  void *data)
 {
-    int node;
-    int depth;
-    u32 address_cells[MAX_DEPTH];
-    u32 size_cells[MAX_DEPTH];
+    if ( node_matches(fdt, node, "memory") )
+        process_memory_node(fdt, node, name, address_cells, size_cells);
 
-    for ( node = 0; depth >= 0; node = fdt_next_node(fdt, node, &depth) )
-    {
-        if ( depth >= MAX_DEPTH )
-        {
-            early_printk("fdt: node '%s': nested too deep\n",
-                         fdt_get_name(fdt, node, NULL));
-            continue;
-        }
-
-        address_cells[depth] = prop_by_name_u32(fdt, node, "#address-cells");
-        size_cells[depth] = prop_by_name_u32(fdt, node, "#size-cells");
-
-        if ( node_matches(fdt, node, "memory") )
-            process_memory_node(fdt, node, address_cells[depth-1], size_cells[depth-1]);
-    }
+    return 0;
 }
 
 static void __init early_print_info(void)
@@ -157,7 +177,7 @@ size_t __init device_tree_early_init(const void *fdt)
     if ( ret < 0 )
         early_panic("No valid device tree\n");
 
-    early_scan(fdt);
+    device_tree_for_each_node((void *)fdt, early_scan_node, NULL);
     early_print_info();
 
     return fdt_totalsize(fdt);
