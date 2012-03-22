@@ -237,8 +237,8 @@ long arch_do_domctl(
                     else
                         type = XEN_DOMCTL_PFINFO_XTAB;
 
-                    arr[j] = type;
                     put_gfn(d, arr[j]);
+                    arr[j] = type;
                 }
 
                 if ( copy_to_guest_offset(domctl->u.getpageframeinfo3.array,
