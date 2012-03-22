@@ -2920,7 +2920,7 @@ static void sh_update_paging_modes(struct vcpu *v)
         if ( v->arch.paging.mode != old_mode )
         {
             SHADOW_PRINTK("new paging mode: d=%u v=%u pe=%d gl=%u "
-                          "(was g=%u s=%u)\n",
+                          "sl=%u (was g=%u s=%u)\n",
                           d->domain_id, v->vcpu_id,
                           is_hvm_domain(d) ? hvm_paging_enabled(v) : 1,
                           v->arch.paging.mode->guest_levels,
