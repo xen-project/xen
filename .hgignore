@@ -289,6 +289,8 @@
 ^tools/xm-test/lib/XmTestLib/config.py$
 ^tools/xm-test/lib/XmTestReport/xmtest.py$
 ^tools/xm-test/tests/.*\.test$
+^tools/firmware/ovmf-remote
+^tools/firmware/ovmf$
 ^tools/qemu-xen-traditional-dir-remote
 ^tools/qemu-xen-traditional-dir$
 ^tools/qemu-xen-dir-remote
