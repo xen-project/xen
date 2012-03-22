@@ -8,7 +8,7 @@ This document coveres the command line options which the Xen Hypervisor.
 
 Most parameters take the form `option=value`.  Different options on the command line should be space delimited.
 
-### Boolean
+### Boolean (`<boolean>`)
 
 All boolean option may be explicitly enabled using a `value` of
 > `yes`, `on`, `true`, `enable` or `1`
@@ -29,11 +29,11 @@ Disable x2apic support (if present)
 Enable synchronous console mode
 > `sync_console`
 
-### Integer
+### Integer (`<integer>`)
 
 An integer parameter will default to decimal and may be prefixed with a `-` for negative numbers.  Alternativly, a hexidecimal number may be used by prefixing the number with `0x`, or an octal number may be used if a leading `0` is present.
 
-### Size
+### Size (`<size>`)
 
 A size parameter may be any integer, with a size suffix
 
@@ -96,7 +96,7 @@ Increase the verbosity of the APIC code from the default value.
 ### ats
 ### availmem
 ### badpage
-> `= List of [ <integer> | <ingeter>-<integer> ]`
+> `= List of [ <integer> | <integer>-<integer> ]`
 
 Specify that certain pages, or certain ranges of pages contain bad bytes and should not be used.  For example, if your memory tester says that byte `0x12345678` is bad, you would place `badpage=0x12345` on Xen's command line.
 
@@ -219,13 +219,22 @@ Specifiy the maximum number of vcpus to give to dom0.  This defaults to the numb
 Specify the total size for dom0.
 
 ### dom0\_mem (x86)
-> `= List of ( min:<value> | max: <value> | <value> )`
+> `= List of ( min:<size> | max:<size> | <size> )`
 
-each `<value>` is a size parameter.  If the size is positive, it represents an absolute value.  If the size is negative, the size specified is subtracted from the total available memory.
+Set the amount of memory for the initial domain (dom0). If a size is
+positive, it represents an absolute value.  If a size is negative, the
+size specified is subtracted from the total available memory.
 
-* `min:<value>` specifies the minimum amount of memory allocated to dom0.
-* `max:<value>` specifies the maximum amount of memory allocated to dom0.
-* `<value>` specified the exact amount of memory allocated to dom0.
+* `min:<size>` specifies the minimum amount of memory allocated to dom0.
+* `max:<size>` specifies the maximum amount of memory allocated to dom0.
+* `<size>` specified the exact amount of memory allocated to dom0.
+
+`max:<size>` also sets the maximum reservation (the maximum amount of
+memory dom0 can balloon up to).  If this is omitted then the maximum
+reservation is unlimited.
+
+For example, to set dom0's memory to 512 MB but no more than 1 GB use
+`dom0_mem=512M,max:1G`.
 
 ### dom0\_shadow
 ### dom0\_vcpus\_pin
