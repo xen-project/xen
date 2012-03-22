@@ -1,6 +1,8 @@
 #ifndef __XEN_KEXEC_H__
 #define __XEN_KEXEC_H__
 
+#ifdef CONFIG_KEXEC
+
 #include <public/kexec.h>
 #include <asm/percpu.h>
 #include <xen/elfcore.h>
@@ -75,6 +77,12 @@ void vmcoreinfo_append_str(const char *fmt, ...)
 #define VMCOREINFO_OFFSET_SUB(name, sub, field) \
        vmcoreinfo_append_str("OFFSET(%s.%s)=%lu\n", #name, #field, \
                              (unsigned long)offsetof(struct name, sub.field))
+
+#else /* !CONFIG_KEXEC */
+
+#define crashinfo_maxaddr_bits 0
+
+#endif
 
 #endif /* __XEN_KEXEC_H__ */
 
