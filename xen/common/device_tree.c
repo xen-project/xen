@@ -27,25 +27,28 @@ static void __init get_val(const u32 **cell, u32 cells, u64 *val)
 {
     *val = 0;
 
-    while (cells--) {
+    while ( cells-- )
+    {
         *val <<= 32;
         *val |= fdt32_to_cpu(*(*cell)++);
     }
 }
 
-static void __init get_register(const u32 **cell, u32 address_cells, u32 size_cells,
+static void __init get_register(const u32 **cell,
+                                u32 address_cells, u32 size_cells,
                                 u64 *start, u64 *size)
 {
     get_val(cell, address_cells, start);
     get_val(cell, size_cells, size);
 }
 
-static u32 __init prop_by_name_u32(const void *fdt, int node, const char *prop_name)
+static u32 __init prop_by_name_u32(const void *fdt, int node,
+                                   const char *prop_name)
 {
     const struct fdt_property *prop;
 
     prop = fdt_get_property(fdt, node, prop_name, NULL);
-    if (!prop || prop->len < sizeof(u32))
+    if ( !prop || prop->len < sizeof(u32) )
         return 0; /* default to 0 */
 
     return fdt32_to_cpu(*(uint32_t*)prop->data);
@@ -61,14 +64,16 @@ static void __init process_memory_node(const void *fdt, int node,
     const u32 *cell;
     paddr_t start, size;
 
-    if (address_cells < 1 || size_cells < 1) {
+    if ( address_cells < 1 || size_cells < 1 )
+    {
         early_printk("fdt: node `%s': invalid #address-cells or #size-cells",
                      fdt_get_name(fdt, node, NULL));
         return;
     }
 
     prop = fdt_get_property(fdt, node, "reg", NULL);
-    if (!prop) {
+    if ( !prop )
+    {
         early_printk("fdt: node `%s': missing `reg' property\n",
                      fdt_get_name(fdt, node, NULL));
         return;
@@ -78,7 +83,8 @@ static void __init process_memory_node(const void *fdt, int node,
     reg_cells = address_cells + size_cells;
     banks = fdt32_to_cpu(prop->len) / (reg_cells * sizeof(u32));
 
-    for (i = 0; i < banks && early_info.mem.nr_banks < NR_MEM_BANKS; i++) {
+    for ( i = 0; i < banks && early_info.mem.nr_banks < NR_MEM_BANKS; i++ )
+    {
         get_register(&cell, address_cells, size_cells, &start, &size);
         early_info.mem.bank[early_info.mem.nr_banks].start = start;
         early_info.mem.bank[early_info.mem.nr_banks].size = size;
@@ -96,10 +102,12 @@ static void __init early_scan(const void *fdt)
     u32 address_cells[MAX_DEPTH];
     u32 size_cells[MAX_DEPTH];
 
-    for (node = 0; depth >= 0; node = fdt_next_node(fdt, node, &depth)) {
+    for ( node = 0; depth >= 0; node = fdt_next_node(fdt, node, &depth) )
+    {
         name = fdt_get_name(fdt, node, NULL);
 
-        if (depth >= MAX_DEPTH) {
+        if ( depth >= MAX_DEPTH )
+        {
             early_printk("fdt: node '%s': nested too deep\n",
                          fdt_get_name(fdt, node, NULL));
             continue;
@@ -108,8 +116,9 @@ static void __init early_scan(const void *fdt)
         address_cells[depth] = prop_by_name_u32(fdt, node, "#address-cells");
         size_cells[depth] = prop_by_name_u32(fdt, node, "#size-cells");
 
-        if (strncmp(name, "memory", 6) == 0)
-            process_memory_node(fdt, node, address_cells[depth-1], size_cells[depth-1]);
+        if ( strncmp(name, "memory", 6) == 0 )
+            process_memory_node(fdt, node,
+                                address_cells[depth-1], size_cells[depth-1]);
     }
 }
 
@@ -118,9 +127,10 @@ static void __init early_print_info(void)
     struct dt_mem_info *mi = &early_info.mem;
     int i;
 
-    for (i = 0; i < mi->nr_banks; i++)
+    for ( i = 0; i < mi->nr_banks; i++ )
         early_printk("RAM: %016llx - %016llx\n",
-                     mi->bank[i].start, mi->bank[i].start + mi->bank[i].size - 1);
+                     mi->bank[i].start,
+                     mi->bank[i].start + mi->bank[i].size - 1);
 }
 
 /**
@@ -134,7 +144,7 @@ size_t __init device_tree_early_init(const void *fdt)
     int ret;
 
     ret = fdt_check_header(fdt);
-    if (ret < 0)
+    if ( ret < 0 )
         early_panic("No valid device tree\n");
 
     early_scan(fdt);
@@ -159,15 +169,17 @@ paddr_t __init device_tree_get_xen_paddr(void)
     min_size = (_end - _start + (XEN_PADDR_ALIGN-1)) & ~(XEN_PADDR_ALIGN-1);
 
     /* Find the highest bank with enough space. */
-    for (i = 0; i < mi->nr_banks; i++) {
-        if (mi->bank[i].size >= min_size) {
+    for ( i = 0; i < mi->nr_banks; i++ )
+    {
+        if ( mi->bank[i].size >= min_size )
+        {
             t = mi->bank[i].start + mi->bank[i].size - min_size;
-            if (t > paddr)
+            if ( t > paddr )
                 paddr = t;
         }
     }
 
-    if (!paddr)
+    if ( !paddr )
         early_panic("Not enough memory to relocate Xen\n");
 
     return paddr;
