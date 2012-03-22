@@ -23,6 +23,20 @@
 struct dt_early_info __initdata early_info;
 void *device_tree_flattened;
 
+static bool_t __init node_matches(const void *fdt, int node, const char *match)
+{
+    const char *name;
+    size_t match_len;
+
+    name = fdt_get_name(fdt, node, NULL);
+    match_len = strlen(match);
+
+    /* Match both "match" and "match@..." patterns but not
+       "match-foo". */
+    return strncmp(name, match, match_len) == 0
+        && (name[match_len] == '@' || name[match_len] == '\0');
+}
+
 static void __init get_val(const u32 **cell, u32 cells, u64 *val)
 {
     *val = 0;
@@ -98,14 +112,11 @@ static void __init early_scan(const void *fdt)
 {
     int node;
     int depth;
-    const char *name;
     u32 address_cells[MAX_DEPTH];
     u32 size_cells[MAX_DEPTH];
 
     for ( node = 0; depth >= 0; node = fdt_next_node(fdt, node, &depth) )
     {
-        name = fdt_get_name(fdt, node, NULL);
-
         if ( depth >= MAX_DEPTH )
         {
             early_printk("fdt: node '%s': nested too deep\n",
@@ -116,9 +127,8 @@ static void __init early_scan(const void *fdt)
         address_cells[depth] = prop_by_name_u32(fdt, node, "#address-cells");
         size_cells[depth] = prop_by_name_u32(fdt, node, "#size-cells");
 
-        if ( strncmp(name, "memory", 6) == 0 )
-            process_memory_node(fdt, node,
-                                address_cells[depth-1], size_cells[depth-1]);
+        if ( node_matches(fdt, node, "memory") )
+            process_memory_node(fdt, node, address_cells[depth-1], size_cells[depth-1]);
     }
 }
 
