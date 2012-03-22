@@ -41,5 +41,6 @@ paddr_t device_tree_get_xen_paddr(void);
 
 int device_tree_for_each_node(const void *fdt,
                               device_tree_node_func func, void *data);
+void device_tree_dump(const void *fdt);
 
 #endif

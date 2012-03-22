@@ -103,6 +103,44 @@ int device_tree_for_each_node(const void *fdt,
     return 0;
 }
 
+static int dump_node(const void *fdt, int node, const char *name, int depth,
+                     u32 address_cells, u32 size_cells, void *data)
+{
+    char prefix[2*MAX_DEPTH + 1] = "";
+    int i;
+    int prop;
+
+    for ( i = 0; i < depth; i++ )
+        safe_strcat(prefix, "  ");
+
+    if ( name[0] == '\0' )
+        name = "/";
+    printk("%s%s:\n", prefix, name);
+
+    for ( prop = fdt_first_property_offset(fdt, node);
+          prop >= 0;
+          prop = fdt_next_property_offset(fdt, prop) )
+    {
+        const struct fdt_property *p;
+
+        p = fdt_get_property_by_offset(fdt, prop, NULL);
+
+        printk("%s  %s\n", prefix, fdt_string(fdt, fdt32_to_cpu(p->nameoff)));
+    }
+
+    return 0;
+}
+
+/**
+ * device_tree_dump - print a text representation of a device tree
+ * @fdt: flat device tree to print
+ */
+void device_tree_dump(const void *fdt)
+{
+    device_tree_for_each_node(fdt, dump_node, NULL);
+}
+
+
 static void __init process_memory_node(const void *fdt, int node,
                                        const char *name,
                                        u32 address_cells, u32 size_cells)
