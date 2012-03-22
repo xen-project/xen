@@ -78,18 +78,20 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         if (!b_info->u.hvm.bios)
             switch (b_info->device_model_version) {
-            case 1: b_info->u.hvm.bios = LIBXL_BIOS_TYPE_ROMBIOS; break;
-            case 2: b_info->u.hvm.bios = LIBXL_BIOS_TYPE_SEABIOS; break;
+            case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+                b_info->u.hvm.bios = LIBXL_BIOS_TYPE_ROMBIOS; break;
+            case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+                b_info->u.hvm.bios = LIBXL_BIOS_TYPE_SEABIOS; break;
             default:return ERROR_INVAL;
             }
 
         /* Enforce BIOS<->Device Model version relationship */
         switch (b_info->device_model_version) {
-        case 1:
+        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
             if (b_info->u.hvm.bios != LIBXL_BIOS_TYPE_ROMBIOS)
                 return ERROR_INVAL;
             break;
-        case 2:
+        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
             if (b_info->u.hvm.bios == LIBXL_BIOS_TYPE_ROMBIOS)
                 return ERROR_INVAL;
             break;
