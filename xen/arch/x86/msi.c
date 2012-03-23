@@ -17,6 +17,7 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/keyhandler.h>
+#include <xen/pfn.h>
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/desc.h>

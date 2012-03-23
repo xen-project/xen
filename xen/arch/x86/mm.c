@@ -99,6 +99,7 @@
 #include <xen/event.h>
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
+#include <xen/pfn.h>
 #include <asm/paging.h>
 #include <asm/shadow.h>
 #include <asm/page.h>

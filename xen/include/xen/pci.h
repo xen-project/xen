@@ -12,6 +12,7 @@
 #include <xen/list.h>
 #include <xen/spinlock.h>
 #include <xen/pci_regs.h>
+#include <xen/pfn.h>
 #include <asm/page.h>
 
 /*

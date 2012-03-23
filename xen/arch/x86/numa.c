@@ -13,6 +13,7 @@
 #include <xen/keyhandler.h>
 #include <xen/time.h>
 #include <xen/smp.h>
+#include <xen/pfn.h>
 #include <asm/acpi.h>
 #include <xen/sched.h>
 
