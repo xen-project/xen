@@ -43,7 +43,11 @@ struct hw_interrupt_type {
     void (*enable)(unsigned int irq);
     void (*disable)(unsigned int irq);
     void (*ack)(unsigned int irq);
+#ifdef CONFIG_X86
     void (*end)(unsigned int irq, u8 vector);
+#else
+    void (*end)(struct irq_desc *);
+#endif
     void (*set_affinity)(unsigned int irq, cpumask_t mask);
 };
 
