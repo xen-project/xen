@@ -402,16 +402,17 @@ static void __init hpet_fsb_cap_lookup(void)
 static struct hpet_event_channel *hpet_get_channel(unsigned int cpu)
 {
     static unsigned int next_channel;
-    static spinlock_t next_lock = SPIN_LOCK_UNLOCKED;
     unsigned int i, next;
     struct hpet_event_channel *ch;
 
     if ( num_hpets_used == 0 )
         return hpet_events;
 
-    spin_lock(&next_lock);
-    next = next_channel = (next_channel + 1) % num_hpets_used;
-    spin_unlock(&next_lock);
+    do {
+        next = next_channel;
+        if ( (i = next + 1) == num_hpets_used )
+            i = 0;
+    } while ( cmpxchg(&next_channel, next, i) != next );
 
     /* try unused channel first */
     for ( i = next; i < next + num_hpets_used; i++ )
