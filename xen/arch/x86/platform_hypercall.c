@@ -56,6 +56,10 @@ static long cpu_frequency_change_helper(void *data)
 long cpu_up_helper(void *data);
 long cpu_down_helper(void *data);
 
+/* from core_parking.c */
+long core_parking_helper(void *data);
+uint32_t get_cur_idle_nums(void);
+
 ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
 {
     ret_t ret = 0;
@@ -609,6 +613,32 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
                       op->u.mem_add.epfn,
                       op->u.mem_add.pxm);
         break;
+
+    case XENPF_core_parking:
+    {
+        uint32_t idle_nums;
+
+        switch(op->u.core_parking.type)
+        {
+        case XEN_CORE_PARKING_SET:
+            idle_nums = min_t(uint32_t,
+                    op->u.core_parking.idle_nums, num_present_cpus() - 1);
+            ret = continue_hypercall_on_cpu(
+                    0, core_parking_helper, (void *)(unsigned long)idle_nums);
+            break;
+
+        case XEN_CORE_PARKING_GET:
+            op->u.core_parking.idle_nums = get_cur_idle_nums();
+            ret = copy_to_guest(u_xenpf_op, op, 1) ? -EFAULT : 0;
+            break;
+
+        default:
+            ret = -EINVAL;
+            break;
+        }
+    }
+    break;
+
     default:
         ret = -ENOSYS;
         break;

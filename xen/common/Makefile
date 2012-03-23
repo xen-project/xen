@@ -1,4 +1,5 @@
 obj-y += bitmap.o
+obj-y += core_parking.o
 obj-y += cpu.o
 obj-y += cpupool.o
 obj-$(HAS_DEVICE_TREE) += device_tree.o
