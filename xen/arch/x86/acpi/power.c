@@ -135,6 +135,9 @@ static int enter_state(u32 state)
     if ( !spin_trylock(&pm_lock) )
         return -EBUSY;
 
+    BUG_ON(system_state != SYS_STATE_active);
+    system_state = SYS_STATE_suspend;
+
     printk(XENLOG_INFO "Preparing system for ACPI S%d state.\n", state);
 
     freeze_domains();
@@ -142,7 +145,10 @@ static int enter_state(u32 state)
     acpi_dmar_reinstate();
 
     if ( (error = disable_nonboot_cpus()) )
+    {
+        system_state = SYS_STATE_resume;
         goto enable_cpu;
+    }
 
     cpufreq_del_cpu(0);
 
@@ -159,6 +165,7 @@ static int enter_state(u32 state)
     if ( (error = device_power_down()) )
     {
         printk(XENLOG_ERR "Some devices failed to power down.");
+        system_state = SYS_STATE_resume;
         goto done;
     }
 
@@ -178,6 +185,8 @@ static int enter_state(u32 state)
         error = -EINVAL;
         break;
     }
+
+    system_state = SYS_STATE_resume;
 
     /* Restore CR4 and EFER from cached values. */
     cr4 = read_cr4();
@@ -212,6 +221,7 @@ static int enter_state(u32 state)
     mtrr_aps_sync_end();
     acpi_dmar_zap();
     thaw_domains();
+    system_state = SYS_STATE_active;
     spin_unlock(&pm_lock);
     return error;
 }

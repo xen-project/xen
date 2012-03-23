@@ -87,8 +87,6 @@ boolean_param("noapic", skip_ioapic_setup);
 s8 __read_mostly xen_cpuidle = -1;
 boolean_param("cpuidle", xen_cpuidle);
 
-bool_t __read_mostly early_boot = 1;
-
 cpumask_t __read_mostly cpu_present_map;
 
 unsigned long __read_mostly xen_phys_start;
@@ -275,7 +273,7 @@ static void *__init bootstrap_map(const module_t *mod)
     void *ret;
 
 #ifdef __x86_64__
-    if ( !early_boot )
+    if ( system_state != SYS_STATE_early_boot )
         return mod ? mfn_to_virt(mod->mod_start) : NULL;
 #endif
 
@@ -1142,7 +1140,7 @@ void __init __start_xen(unsigned long mbi_p)
 #endif
 
     end_boot_allocator();
-    early_boot = 0;
+    system_state = SYS_STATE_boot;
 
 #if defined(CONFIG_X86_64)
     vesa_init();
@@ -1340,6 +1338,8 @@ void __init __start_xen(unsigned long mbi_p)
 
     /* Hide UART from DOM0 if we're using it */
     serial_endboot();
+
+    system_state = SYS_STATE_active;
 
     domain_unpause_by_systemcontroller(dom0);
 

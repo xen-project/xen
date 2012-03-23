@@ -616,6 +616,10 @@ static int cpu_callback(
     unsigned int cpu = (unsigned long)hcpu;
     int rc = 0;
 
+    if ( (system_state == SYS_STATE_suspend) ||
+         (system_state == SYS_STATE_resume) )
+        goto out;
+
     switch ( action )
     {
     case CPU_DOWN_FAILED:
@@ -629,6 +633,7 @@ static int cpu_callback(
         break;
     }
 
+out:
     return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
 }
 

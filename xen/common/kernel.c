@@ -22,6 +22,8 @@
 
 #ifndef COMPAT
 
+enum system_state system_state = SYS_STATE_early_boot;
+
 int tainted;
 
 xen_commandline_t saved_cmdline;
