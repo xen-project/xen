@@ -54,7 +54,7 @@ static inline void gnttab_clear_flag(unsigned int nr, uint16_t *st)
      * Note that this cannot be clear_bit(), as the access must be
      * confined to the specified 2 bytes.
      */
-    asm volatile ("lock btrw %1,%0" : "=m" (*st) : "Ir" (nr), "m" (*st));
+    asm volatile ("lock btrw %w1,%0" : "=m" (*st) : "Ir" (nr), "m" (*st));
 }
 
 /* Foreign mappings of HHVM-guest pages do not modify the type count. */
