@@ -1429,7 +1429,7 @@ x86_emulate(
     }
 
     /* Lock prefix is allowed only on RMW instructions. */
-    generate_exception_if((d & Mov) && lock_prefix, EXC_GP, 0);
+    generate_exception_if((d & Mov) && lock_prefix, EXC_UD, 0);
 
     /* ModRM and SIB bytes. */
     if ( d & ModRM )
@@ -1712,12 +1712,12 @@ x86_emulate(
             lock_prefix &&
             ((b < 0x20) || (b > 0x23)) && /* MOV CRn/DRn */
             (b != 0xc7),                  /* CMPXCHG{8,16}B */
-            EXC_GP, 0);
+            EXC_UD, 0);
         dst.type = OP_NONE;
         break;
 
     case DstReg:
-        generate_exception_if(lock_prefix, EXC_GP, 0);
+        generate_exception_if(lock_prefix, EXC_UD, 0);
         dst.type = OP_REG;
         if ( d & ByteOp )
         {
@@ -1773,7 +1773,7 @@ x86_emulate(
         dst = ea;
         if ( dst.type == OP_REG )
         {
-            generate_exception_if(lock_prefix, EXC_GP, 0);
+            generate_exception_if(lock_prefix, EXC_UD, 0);
             switch ( dst.bytes )
             {
             case 1: dst.val = *(uint8_t  *)dst.reg; break;
