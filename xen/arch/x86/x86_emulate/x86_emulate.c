@@ -1429,7 +1429,7 @@ x86_emulate(
     }
 
     /* Lock prefix is allowed only on RMW instructions. */
-    generate_exception_if((d & Mov) && lock_prefix, EXC_UD, 0);
+    generate_exception_if((d & Mov) && lock_prefix, EXC_UD, -1);
 
     /* ModRM and SIB bytes. */
     if ( d & ModRM )
@@ -1712,12 +1712,12 @@ x86_emulate(
             lock_prefix &&
             ((b < 0x20) || (b > 0x23)) && /* MOV CRn/DRn */
             (b != 0xc7),                  /* CMPXCHG{8,16}B */
-            EXC_UD, 0);
+            EXC_UD, -1);
         dst.type = OP_NONE;
         break;
 
     case DstReg:
-        generate_exception_if(lock_prefix, EXC_UD, 0);
+        generate_exception_if(lock_prefix, EXC_UD, -1);
         dst.type = OP_REG;
         if ( d & ByteOp )
         {
@@ -1773,7 +1773,7 @@ x86_emulate(
         dst = ea;
         if ( dst.type == OP_REG )
         {
-            generate_exception_if(lock_prefix, EXC_UD, 0);
+            generate_exception_if(lock_prefix, EXC_UD, -1);
             switch ( dst.bytes )
             {
             case 1: dst.val = *(uint8_t  *)dst.reg; break;
@@ -3785,14 +3785,14 @@ x86_emulate(
         struct segment_register cs = { 0 }, ss = { 0 };
         int rc;
 
-        generate_exception_if(in_realmode(ctxt, ops), EXC_UD, 0);
-        generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, 0);
+        generate_exception_if(in_realmode(ctxt, ops), EXC_UD, -1);
+        generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
 
         /* Inject #UD if syscall/sysret are disabled. */
         fail_if(ops->read_msr == NULL);
         if ( (rc = ops->read_msr(MSR_EFER, &msr_content, ctxt)) != 0 )
             goto done;
-        generate_exception_if((msr_content & EFER_SCE) == 0, EXC_UD, 0);
+        generate_exception_if((msr_content & EFER_SCE) == 0, EXC_UD, -1);
 
         if ( (rc = ops->read_msr(MSR_STAR, &msr_content, ctxt)) != 0 )
             goto done;
