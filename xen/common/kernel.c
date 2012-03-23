@@ -55,10 +55,10 @@ void __init cmdline_parse(const char *cmdline)
     struct kernel_param *param;
     int bool_assert;
 
-    safe_strcpy(saved_cmdline, cmdline);
-
-    if ( p == NULL )
+    if ( cmdline == NULL )
         return;
+
+    safe_strcpy(saved_cmdline, cmdline);
 
     for ( ; ; )
     {
