@@ -1,12 +1,17 @@
 # Xen Hypervisor Command Line Options
 
-**This document is still a work in progress.  There are currently some command line options listed twice, and they are defined in separate arch trees, and some options are currently separate from their legacy versions.  Please remove this notice when complete.**
+**This document is still a work in progress.  There are currently some
+  command line options listed twice, and they are defined in separate
+  arch trees, and some options are currently separate from their
+  legacy versions.  Please remove this notice when complete.**
 
-This document coveres the command line options which the Xen Hypervisor.
+This document coveres the command line options which the Xen
+Hypervisor.
 
 ## Types of parameter
 
-Most parameters take the form `option=value`.  Different options on the command line should be space delimited.
+Most parameters take the form `option=value`.  Different options on
+the command line should be space delimited.
 
 ### Boolean (`<boolean>`)
 
@@ -16,7 +21,8 @@ All boolean option may be explicitly enabled using a `value` of
 They may be explicitly disabled using a `value` of
 > `no`, `off`, `false`, `disable` or `0`
 
-In addition, a boolean option may be enabled by simply stating its name, and may be disabled by prefixing its name with `no-`.
+In addition, a boolean option may be enabled by simply stating its
+name, and may be disabled by prefixing its name with `no-`.
 
 ####Examples
 
@@ -31,7 +37,10 @@ Enable synchronous console mode
 
 ### Integer (`<integer>`)
 
-An integer parameter will default to decimal and may be prefixed with a `-` for negative numbers.  Alternativly, a hexidecimal number may be used by prefixing the number with `0x`, or an octal number may be used if a leading `0` is present.
+An integer parameter will default to decimal and may be prefixed with
+a `-` for negative numbers.  Alternativly, a hexidecimal number may be
+used by prefixing the number with `0x`, or an octal number may be used
+if a leading `0` is present.
 
 ### Size (`<size>`)
 
@@ -46,7 +55,9 @@ Without a size suffix, the default will be kilo.
 
 ### String
 
-Many parameters are more complicated and require more intricate configuration.  The detailed description of each individual paramter specify which values are valid.
+Many parameters are more complicated and require more intricate
+configuration.  The detailed description of each individual paramter
+specify which values are valid.
 
 ### List
 
@@ -54,7 +65,8 @@ Some options take a comma separated list of values.
 
 ### Combination
 
-Some parameters act as combinations of the above, most commonly a mix of Boolean and String.  These are noted in the relevant sections.
+Some parameters act as combinations of the above, most commonly a mix
+of Boolean and String.  These are noted in the relevant sections.
 
 ## Parameter details
 
@@ -63,20 +75,32 @@ Some parameters act as combinations of the above, most commonly a mix of Boolean
 
 **String**, or **Boolean** to disable.
 
-The `acpi` option is used to control a set of four related boolean flags; `acpi_force`, `acpi_ht`, `acpi_noirq` and `acpi_disabled`.
+The `acpi` option is used to control a set of four related boolean
+flags; `acpi_force`, `acpi_ht`, `acpi_noirq` and `acpi_disabled`.
 
-By default, Xen will scan the DMI data and blacklist certain systems which are known to have broken ACPI setups.  Providing `acpi=force` will cause Xen to ignore the blacklist and attempt to use all ACPI features.
+By default, Xen will scan the DMI data and blacklist certain systems
+which are known to have broken ACPI setups.  Providing `acpi=force`
+will cause Xen to ignore the blacklist and attempt to use all ACPI
+features.
 
-Using `acpi=ht` causes Xen to parse the ACPI tables enough to enumerate all CPUs, but will not use other ACPI features.  This is not common, and only has an effect if your system is blacklisted.
+Using `acpi=ht` causes Xen to parse the ACPI tables enough to
+enumerate all CPUs, but will not use other ACPI features.  This is not
+common, and only has an effect if your system is blacklisted.
 
-The `acpi=noirq` option causes Xen to not parse the ACPI MADT table looking for IO-APIC entries.  This is also not common, and any system which requries this option to function should be blacklisted.  Additionally, this will not prevent Xen from finding IO-APIC entries from the MP tables.
+The `acpi=noirq` option causes Xen to not parse the ACPI MADT table
+looking for IO-APIC entries.  This is also not common, and any system
+which requries this option to function should be blacklisted.
+Additionally, this will not prevent Xen from finding IO-APIC entries
+from the MP tables.
 
-Finally, any of the boolean false options can be used to disable ACPI usage entirely.
+Finally, any of the boolean false options can be used to disable ACPI
+usage entirely.
 
 ### acpi\_apic\_instance
 > `= <integer>`
 
-Specify which ACPI MADT table to parse for APIC information, if more than one is present.
+Specify which ACPI MADT table to parse for APIC information, if more
+than one is present.
 
 ### acpi\_pstate\_strict
 ### acpi\_skip\_timer\_override
@@ -86,7 +110,9 @@ Specify which ACPI MADT table to parse for APIC information, if more than one is
 ### apic
 > `= summit | bigsmp | default`
 
-Override Xen's logic for choosing the APIC driver.  By default, if there are more than 8 CPUs, Xen will switch to `bigsmp` over `default`.
+Override Xen's logic for choosing the APIC driver.  By default, if
+there are more than 8 CPUs, Xen will switch to `bigsmp` over
+`default`.
 
 ### apic\_verbosity
 > `= verbose | debug`
@@ -98,7 +124,10 @@ Increase the verbosity of the APIC code from the default value.
 ### badpage
 > `= List of [ <integer> | <integer>-<integer> ]`
 
-Specify that certain pages, or certain ranges of pages contain bad bytes and should not be used.  For example, if your memory tester says that byte `0x12345678` is bad, you would place `badpage=0x12345` on Xen's command line.
+Specify that certain pages, or certain ranges of pages contain bad
+bytes and should not be used.  For example, if your memory tester says
+that byte `0x12345678` is bad, you would place `badpage=0x12345` on
+Xen's command line.
 
 ### bootscrub
 ### cachesize
@@ -108,9 +137,11 @@ Specify that certain pages, or certain ranges of pages contain bad bytes and sho
 
 Both option `com1` and `com2` follow the same format.
 
-* `<baud>` may be either an integer baud rate, or the string `auto` if the bootloader or other earlier firmware has already set it up.
+* `<baud>` may be either an integer baud rate, or the string `auto` if
+  the bootloader or other earlier firmware has already set it up.
 * Optionally, a clock speed measured in hz can be specified.
-* `DPS` represents the number of data bits, the parity, and the number of stop bits.
+* `DPS` represents the number of data bits, the parity, and the number
+  of stop bits.
 
   `D` is an integer between 5 and 8 for the number of data bits.
 
@@ -124,12 +155,18 @@ Both option `com1` and `com2` follow the same format.
 
   `S` is an integer 1 or 2 for the number of stop bits.
 
-* `<io-base>` is an integer which specifies the IO base port for UART registers.
-* `<irq> ` is the IRQ number to use, or `0` to use the UART in poll mode only.
-* `<port-bdf>` is the PCI location of the UART, in `<bus>:<device>.<function>` notation.
-* `<bridge-bdf>` is the PCI bridge behind which is the UART, in `<bus>:<device>.<function>` notation.
-* `pci` indicates that Xen should scan the PCI bus for the UART, avoiding Intel AMT devices.
-* `amt` indicated that Xen should scan the PCI bus for the UART, including Intel AMT devices if presetn.
+* `<io-base>` is an integer which specifies the IO base port for UART
+  registers.
+* `<irq>` is the IRQ number to use, or `0` to use the UART in poll
+  mode only.
+* `<port-bdf>` is the PCI location of the UART, in
+  `<bus>:<device>.<function>` notation.
+* `<bridge-bdf>` is the PCI bridge behind which is the UART, in
+  `<bus>:<device>.<function>` notation.
+* `pci` indicates that Xen should scan the PCI bus for the UART,
+  avoiding Intel AMT devices.
+* `amt` indicated that Xen should scan the PCI bus for the UART,
+  including Intel AMT devices if presetn.
 
 A typical setup for most situations might be `com1=115200,8n1`
 
@@ -150,9 +187,16 @@ Specify which console(s) Xen should use.
 
 `vga` indicates that Xen should try and use the vga graphics adapter.
 
-`com1` and `com2` indicates that Xen should use serial ports 1 and 2 respectivly.  Optionally, these arguments may be followed by an `H` or `L`.  `H` indicates that transmitted characters will have their MSB set, while recieved characters must have their MSB set.  `L` indicates the converse; transmitted and recieved characters will have their MSB cleared.  This allows a single port to be shared by two subsystems (e.g. console and debugger).
+`com1` and `com2` indicates that Xen should use serial ports 1 and 2
+respectivly.  Optionally, these arguments may be followed by an `H` or
+`L`.  `H` indicates that transmitted characters will have their MSB
+set, while recieved characters must have their MSB set.  `L` indicates
+the converse; transmitted and recieved characters will have their MSB
+cleared.  This allows a single port to be shared by two subsystems
+(e.g. console and debugger).
 
-`none` indicates that Xen should not use a console.  This option only makes sense on its own.
+`none` indicates that Xen should not use a console.  This option only
+makes sense on its own.
 
 ### console\_timestamps
 > `= <boolean>`
@@ -166,16 +210,22 @@ Flag to indicate whether include a timestamp with each console line.
 
 > Default: `false`
 
-Flag to indicate whether all guest console output should be copied into the console ring buffer.
+Flag to indicate whether all guest console output should be copied
+into the console ring buffer.
 
 ### conswitch
 > `= <switch char>[,x]`
 
 > Default `conswitch=a`
 
-Specify which character should be used to switch serial input between Xen and dom0.  The required sequence is CTRL-&lt;switch char&gt; three times.
+Specify which character should be used to switch serial input between
+Xen and dom0.  The required sequence is CTRL-&lt;switch char&gt; three
+times.
 
-The optional trailing `x` indicates that Xen should not automatically switch the console input to dom0 during boot.  Any other value, including omission, causes Xen to automatically switch to the dom0 console during dom0 boot.
+The optional trailing `x` indicates that Xen should not automatically
+switch the console input to dom0 during boot.  Any other value,
+including omission, causes Xen to automatically switch to the dom0
+console during dom0 boot.
 
 ### contig\_mem
 ### cpu\_type
@@ -193,7 +243,8 @@ The optional trailing `x` indicates that Xen should not automatically switch the
 
 > Default: `4G`
 
-Specify the maximum address to allocate certain strucutres, if used in combination with the `low_crashinfo` command line option.
+Specify the maximum address to allocate certain strucutres, if used in
+combination with the `low_crashinfo` command line option.
 
 ### crashkernel
 ### credit2\_balance\_over
@@ -211,7 +262,8 @@ Specify the bit width of the DMA heap.
 ### dom0\_max\_vcpus
 > `= <integer>`
 
-Specifiy the maximum number of vcpus to give to dom0.  This defaults to the number of pcpus on the host.
+Specifiy the maximum number of vcpus to give to dom0.  This defaults
+to the number of pcpus on the host.
 
 ### dom0\_mem (ia64)
 > `= <size>`
@@ -260,7 +312,8 @@ Pin dom0 vcpus to their respective pcpus
 
 > Default: `guest_loglvl=none/warning`
 
-Set the logging level for Xen guests.  Any log message with equal more more importance will be printed.
+Set the logging level for Xen guests.  Any log message with equal more
+more importance will be printed.
 
 The optional `<rate-limited level>` options instructs which severities should be rate limited.
 ### hap\_1gb
@@ -276,7 +329,9 @@ The optional `<rate-limited level>` options instructs which severities should be
 ### irq\_vector\_map
 ### lapic
 
-Force the use of use of the local APIC on a uniprocessor system, even if left disabled by the BIOS.  This option will accept any value at all.
+Force the use of use of the local APIC on a uniprocessor system, even
+if left disabled by the BIOS.  This option will accept any value at
+all.
 
 ### lapic\_timer\_c2\_ok
 ### ler
@@ -285,16 +340,22 @@ Force the use of use of the local APIC on a uniprocessor system, even if left di
 
 > Default: `loglvl=warning`
 
-Set the logging level for Xen.  Any log message with equal more more importance will be printed.
+Set the logging level for Xen.  Any log message with equal more more
+importance will be printed.
 
-The optional `<rate-limited level>` options instructs which severities should be rate limited.
+The optional `<rate-limited level>` options instructs which severities
+should be rate limited.
 
 ### low\_crashinfo
 > `= none | min | all`
 
 > Default: `none` if not specified at all, or to `min` if `low\_crashinfo` is present without qualification.
 
-This option is only useful for hosts with a 32bit dom0 kernel, wishing to use kexec functionality in the case of a crash.  It represents which data structures should be deliberatly allocated in low memory, so the crash kernel may find find them.  Should be used in combination with `crashinfo_maxaddr`.
+This option is only useful for hosts with a 32bit dom0 kernel, wishing
+to use kexec functionality in the case of a crash.  It represents
+which data structures should be deliberatly allocated in low memory,
+so the crash kernel may find find them.  Should be used in combination
+with `crashinfo_maxaddr`.
 
 ### max\_cstate
 ### max\_gsi\_irqs
@@ -306,7 +367,8 @@ This option is only useful for hosts with a 32bit dom0 kernel, wishing to use ke
 ### mem
 > `= <size>`
 
-Specifies the maximum address of physical RAM.  Any RAM beyond this limit is ignored by Xen.
+Specifies the maximum address of physical RAM.  Any RAM beyond this
+limit is ignored by Xen.
 
 ### mmcfg
 ### nmi
@@ -314,29 +376,37 @@ Specifies the maximum address of physical RAM.  Any RAM beyond this limit is ign
 
 > Default: `nmi=fatal`
 
-Specify what Xen should do in the event of an NMI parity or I/O error.  `ignore` discards the error; `dom0` causes Xen to report the error to dom0, while 'fatal' causes Xen to print diagnostics and then hang.
+Specify what Xen should do in the event of an NMI parity or I/O error.
+`ignore` discards the error; `dom0` causes Xen to report the error to
+dom0, while 'fatal' causes Xen to print diagnostics and then hang.
 
 ### noapic
 ### nofxsr
 ### noirqbalance
 > `= <boolean>`
 
-Disable software IRQ balancing and affinity. This can be used on systems such as Dell 1850/2850 that have workarounds in hardware for IRQ routing issues.
+Disable software IRQ balancing and affinity. This can be used on
+systems such as Dell 1850/2850 that have workarounds in hardware for
+IRQ routing issues.
 
 ### nolapic
 
-Ignore the local APIC on a uniprocessor system, even if enabled by the BIOS.  This option will accept value.
+Ignore the local APIC on a uniprocessor system, even if enabled by the
+BIOS.  This option will accept value.
 
 ### noreboot
 > `= <boolean>`
 
-Do not automatically reboot after an error.  This is useful for catching debug output.  Defaults to automatically reboot after 5 seconds.
+Do not automatically reboot after an error.  This is useful for
+catching debug output.  Defaults to automatically reboot after 5
+seconds.
 
 ### noserialnumber
 ### nosmp
 > `= <boolean>`
 
-Disable SMP support.  No secondary processors will be booted.  Defaults to booting secondary processors.
+Disable SMP support.  No secondary processors will be booted.
+Defaults to booting secondary processors.
 
 ### nr\_irqs
 ### numa
@@ -360,6 +430,7 @@ Choose the default scheduler.
 > `= <size>`
 
 Set the serial tramsit buffer size.  Defaults to 16kB.
+
 ### smep
 ### snb\_igd\_quirk
 ### sync\_console
@@ -367,7 +438,8 @@ Set the serial tramsit buffer size.  Defaults to 16kB.
 
 > Default: `false`
 
-Flag to force synchronous console output.  Useful for debugging, but not suitable for production environments due to incurred overhead.
+Flag to force synchronous console output.  Useful for debugging, but
+not suitable for production environments due to incurred overhead.
 
 ### tboot
 ### tbuf\_size
@@ -395,17 +467,25 @@ Specify the per-cpu trace buffer size in pages.
 ### vga
 > `= ( ask | current | text-80x<rows> | gfx-<width>x<height>x<depth> | mode-<mode> )[,keep]`
 
-`ask` causes Xen to display a menu of available modes and request the user to choose one of them.
+`ask` causes Xen to display a menu of available modes and request the
+user to choose one of them.
 
-`current` causes Xen to use the graphics adapter in its current state, without further setup.
+`current` causes Xen to use the graphics adapter in its current state,
+without further setup.
 
-`text-80x<rows>` instructs Xen to set up text mode.  Valid values for `<rows>` are `25, 28, 30, 34, 43, 50, 80`
+`text-80x<rows>` instructs Xen to set up text mode.  Valid values for
+`<rows>` are `25, 28, 30, 34, 43, 50, 80`
 
-`gfx-<width>x<height>x<depth>` instructs Xen to set up graphics mode with the specified width, height and depth.
+`gfx-<width>x<height>x<depth>` instructs Xen to set up graphics mode
+with the specified width, height and depth.
 
-`mode-<mode>` instructs Xen to use a specific mode, as shown with the `ask` option.  (N.B menu modes are displayed in hex, so `<mode>` should be a hexidecimal number)
+`mode-<mode>` instructs Xen to use a specific mode, as shown with the
+`ask` option.  (N.B menu modes are displayed in hex, so `<mode>`
+should be a hexidecimal number)
 
-The optional `keep` parameter causes Xen to continue using the vga console even after dom0 has been started.  The default behaviour is to relinquish control to dom0.
+The optional `keep` parameter causes Xen to continue using the vga
+console even after dom0 has been started.  The default behaviour is to
+relinquish control to dom0.
 
 ### vpid
 ### vpmu
@@ -416,14 +496,16 @@ The optional `keep` parameter causes Xen to continue using the vga console even 
 
 > Default: `false`
 
-Run an NMI watchdog on each processor.  If a processor is stuck for longer than the watchdog\_timeout, a panic occurs.
+Run an NMI watchdog on each processor.  If a processor is stuck for
+longer than the watchdog\_timeout, a panic occurs.
 
 ### watchdog\_timeout
 > `= <integer>`
 
 > Default: `5`
 
-Set the NMI watchdog timeout in seconds.  Specifying `0` will turn off the watchdog.
+Set the NMI watchdog timeout in seconds.  Specifying `0` will turn off
+the watchdog.
 
 ### x2apic
 ### x2apic\_phys
