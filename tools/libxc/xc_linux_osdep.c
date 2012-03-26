@@ -191,6 +191,59 @@ static void *linux_privcmd_map_foreign_batch(xc_interface *xch, xc_osdep_handle 
     return addr;
 }
 
+/*
+ * Retry mmap of all paged gfns in batches
+ * retuns < 0 on fatal error
+ * returns 0 if all gfns left paging state
+ * returns > 0 if some gfns are still in paging state
+ *
+ * Walk all gfns and try to assemble blocks of gfns in paging state.
+ * This will keep the request ring full and avoids delays.
+ */
+static int retry_paged(int fd, uint32_t dom, void *addr,
+                       const xen_pfn_t *arr, int *err, unsigned int num)
+{
+    privcmd_mmapbatch_v2_t ioctlx;
+    int rc, paged = 0, i = 0;
+    
+    do
+    {
+        /* Skip gfns not in paging state */
+        if ( err[i] != -ENOENT )
+        {
+            i++;
+            continue;
+        }
+
+        paged++;
+
+        /* At least one gfn is still in paging state */
+        ioctlx.num = 1;
+        ioctlx.dom = dom;
+        ioctlx.addr = (unsigned long)addr + ((unsigned long)i<<XC_PAGE_SHIFT);
+        ioctlx.arr = arr + i;
+        ioctlx.err = err + i;
+        
+        /* Assemble a batch of requests */
+        while ( ++i < num )
+        {
+            if ( err[i] != -ENOENT )
+                break;
+            ioctlx.num++;
+        }
+        
+        /* Send request and abort on fatal error */
+        rc = ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH_V2, &ioctlx);
+        if ( rc < 0 && errno != ENOENT )
+            goto out;
+
+    } while ( i < num );
+    
+    rc = paged;
+out:
+    return rc;
+}
+
 static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h,
                                             uint32_t dom, int prot,
                                             const xen_pfn_t *arr, int *err, unsigned int num)
@@ -220,21 +273,10 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
     /* Command was recognized, some gfn in arr are in paging state */
     if ( rc < 0 && errno == ENOENT )
     {
-        for ( i = rc = 0; rc == 0 && i < num; i++ )
-        {
-            if ( err[i] != -ENOENT )
-                continue;
-
-            ioctlx.num = 1;
-            ioctlx.dom = dom;
-            ioctlx.addr = (unsigned long)addr + ((unsigned long)i<<XC_PAGE_SHIFT);
-            ioctlx.arr = arr + i;
-            ioctlx.err = err + i;
-            do {
-                usleep(100);
-                rc = ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH_V2, &ioctlx);
-            } while ( rc < 0 && errno == ENOENT && err[i] == -ENOENT );
-        }
+        do {
+            usleep(100);
+            rc = retry_paged(fd, dom, addr, arr, err, num);
+        } while ( rc > 0 );
     }
     /* Command was not recognized, use fall back */
     else if ( rc < 0 && errno == EINVAL && (int)num > 0 )
