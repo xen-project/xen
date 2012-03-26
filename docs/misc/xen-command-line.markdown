@@ -96,6 +96,10 @@ from the MP tables.
 Finally, any of the boolean false options can be used to disable ACPI
 usage entirely.
 
+Because responsiblity for ACPI processing is shared between Xen and
+the domain 0 kernel this option is automatically propagated to the
+domain 0 command line
+
 ### acpi\_apic\_instance
 > `= <integer>`
 
@@ -103,7 +107,15 @@ Specify which ACPI MADT table to parse for APIC information, if more
 than one is present.
 
 ### acpi\_pstate\_strict
+
 ### acpi\_skip\_timer\_override
+
+Instruct Xen to ignore timer-interrupt override.
+
+Because responsiblity for ACPI processing is shared between Xen and
+the domain 0 kernel this option is automatically propagated to the
+domain 0 command line
+
 ### acpi\_sleep
 ### additional\_cpus
 ### allowsuperpage
@@ -300,8 +312,26 @@ Pin dom0 vcpus to their respective pcpus
 ### dom\_rid\_bits
 ### e820-mtrr-clip
 ### e820-verbose
+
+### edd (x86)
+> `= off | on | skipmbr`
+
+Control retrieval of Extended Disc Data (EDD) from the BIOS during
+boot.
+
+### edid (x86)
+> `= no | force`
+
+Either force retrieval of monitor EDID information via VESA DDC, or
+disable it (edid=no). This option should not normally be required
+except for debugging purposes.
+
 ### efi\_print
 ### extra\_guest\_irqs
+> `= <number>`
+
+Increase the number of PIRQs available for the guest. The default is 32. 
+
 ### flask\_enabled
 ### flask\_enforcing
 ### font
@@ -381,6 +411,15 @@ Specify what Xen should do in the event of an NMI parity or I/O error.
 dom0, while 'fatal' causes Xen to print diagnostics and then hang.
 
 ### noapic
+
+Instruct Xen to ignore any IOAPICs that are present in the system, and
+instead continue to use the legacy PIC. This is _not_ recommended with
+pvops type kernels.
+
+Because responsiblity for APIC setup is shared between Xen and the
+domain 0 kernel this option is automatically propagated to the domain
+0 command line.
+
 ### nofxsr
 ### noirqbalance
 > `= <boolean>`
@@ -393,6 +432,12 @@ IRQ routing issues.
 
 Ignore the local APIC on a uniprocessor system, even if enabled by the
 BIOS.  This option will accept value.
+
+### no-real-mode (x86)
+
+Do not execute real-mode bootstrap code when booting Xen. This option
+should not be used except for debugging. It will effectively disable
+the vga option, which relies on real mode to set the video mode.
 
 ### noreboot
 > `= <boolean>`
