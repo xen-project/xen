@@ -5,7 +5,7 @@
   arch trees, and some options are currently separate from their
   legacy versions.  Please remove this notice when complete.**
 
-This document coveres the command line options which the Xen
+This document covers the command line options which the Xen
 Hypervisor.
 
 ## Types of parameter
@@ -38,7 +38,7 @@ Enable synchronous console mode
 ### Integer (`<integer>`)
 
 An integer parameter will default to decimal and may be prefixed with
-a `-` for negative numbers.  Alternativly, a hexidecimal number may be
+a `-` for negative numbers.  Alternatively, a hexadecimal number may be
 used by prefixing the number with `0x`, or an octal number may be used
 if a leading `0` is present.
 
@@ -56,7 +56,7 @@ Without a size suffix, the default will be kilo.
 ### String
 
 Many parameters are more complicated and require more intricate
-configuration.  The detailed description of each individual paramter
+configuration.  The detailed description of each individual parameter
 specify which values are valid.
 
 ### List
@@ -96,7 +96,7 @@ from the MP tables.
 Finally, any of the boolean false options can be used to disable ACPI
 usage entirely.
 
-Because responsiblity for ACPI processing is shared between Xen and
+Because responsibility for ACPI processing is shared between Xen and
 the domain 0 kernel this option is automatically propagated to the
 domain 0 command line
 
@@ -112,7 +112,7 @@ than one is present.
 
 Instruct Xen to ignore timer-interrupt override.
 
-Because responsiblity for ACPI processing is shared between Xen and
+Because responsibility for ACPI processing is shared between Xen and
 the domain 0 kernel this option is automatically propagated to the
 domain 0 command line
 
@@ -178,7 +178,7 @@ Both option `com1` and `com2` follow the same format.
 * `pci` indicates that Xen should scan the PCI bus for the UART,
   avoiding Intel AMT devices.
 * `amt` indicated that Xen should scan the PCI bus for the UART,
-  including Intel AMT devices if presetn.
+  including Intel AMT devices if present.
 
 A typical setup for most situations might be `com1=115200,8n1`
 
@@ -200,10 +200,10 @@ Specify which console(s) Xen should use.
 `vga` indicates that Xen should try and use the vga graphics adapter.
 
 `com1` and `com2` indicates that Xen should use serial ports 1 and 2
-respectivly.  Optionally, these arguments may be followed by an `H` or
+respectively.  Optionally, these arguments may be followed by an `H` or
 `L`.  `H` indicates that transmitted characters will have their MSB
-set, while recieved characters must have their MSB set.  `L` indicates
-the converse; transmitted and recieved characters will have their MSB
+set, while received characters must have their MSB set.  `L` indicates
+the converse; transmitted and received characters will have their MSB
 cleared.  This allows a single port to be shared by two subsystems
 (e.g. console and debugger).
 
@@ -255,7 +255,7 @@ console during dom0 boot.
 
 > Default: `4G`
 
-Specify the maximum address to allocate certain strucutres, if used in
+Specify the maximum address to allocate certain structures, if used in
 combination with the `low_crashinfo` command line option.
 
 ### crashkernel
@@ -274,7 +274,7 @@ Specify the bit width of the DMA heap.
 ### dom0\_max\_vcpus
 > `= <integer>`
 
-Specifiy the maximum number of vcpus to give to dom0.  This defaults
+Specify the maximum number of vcpus to give to dom0.  This defaults
 to the number of pcpus on the host.
 
 ### dom0\_mem (ia64)
@@ -345,7 +345,9 @@ Increase the number of PIRQs available for the guest. The default is 32.
 Set the logging level for Xen guests.  Any log message with equal more
 more importance will be printed.
 
-The optional `<rate-limited level>` options instructs which severities should be rate limited.
+The optional `<rate-limited level>` option instructs which severities
+should be rate limited.
+
 ### hap\_1gb
 ### hap\_2mb
 ### hpetbroadcast
@@ -373,7 +375,7 @@ all.
 Set the logging level for Xen.  Any log message with equal more more
 importance will be printed.
 
-The optional `<rate-limited level>` options instructs which severities
+The optional `<rate-limited level>` option instructs which severities
 should be rate limited.
 
 ### low\_crashinfo
@@ -383,7 +385,7 @@ should be rate limited.
 
 This option is only useful for hosts with a 32bit dom0 kernel, wishing
 to use kexec functionality in the case of a crash.  It represents
-which data structures should be deliberatly allocated in low memory,
+which data structures should be deliberately allocated in low memory,
 so the crash kernel may find find them.  Should be used in combination
 with `crashinfo_maxaddr`.
 
@@ -416,7 +418,7 @@ Instruct Xen to ignore any IOAPICs that are present in the system, and
 instead continue to use the legacy PIC. This is _not_ recommended with
 pvops type kernels.
 
-Because responsiblity for APIC setup is shared between Xen and the
+Because responsibility for APIC setup is shared between Xen and the
 domain 0 kernel this option is automatically propagated to the domain
 0 command line.
 
@@ -474,7 +476,7 @@ Choose the default scheduler.
 ### serial\_tx\_buffer
 > `= <size>`
 
-Set the serial tramsit buffer size.  Defaults to 16kB.
+Set the serial transmit buffer size.  Defaults to 16kB.
 
 ### smep
 ### snb\_igd\_quirk
@@ -526,7 +528,7 @@ with the specified width, height and depth.
 
 `mode-<mode>` instructs Xen to use a specific mode, as shown with the
 `ask` option.  (N.B menu modes are displayed in hex, so `<mode>`
-should be a hexidecimal number)
+should be a hexadecimal number)
 
 The optional `keep` parameter causes Xen to continue using the vga
 console even after dom0 has been started.  The default behaviour is to
