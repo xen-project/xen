@@ -5,3 +5,20 @@ man				Man Pages
 misc				Miscellaneous Documentation
 misc/hvm-emulated-unplug	Xen HVM emulated device unplug protocol
 misc/console			Xen PV Console notes
+misc/xen-command-line		Xen Hypervisor Command Line Options
+misc/crashdb			Xen crash debugger notes
+misc/grant-tables		A Rough Introduction to Using Grant Tables
+misc/kexec_and_kdump		Kexec and Kdump for Xen
+misc/tscmode			TSC Mode HOWTO
+misc/vbd-interface		Xen Guest Disk (VBD) Interface
+misc/xenstore			Xenstore protocol specification
+misc/xl-disk-configuration	XL Disk Configuration
+misc/xl-network-configuration	XL Network Configuration
+misc/distro_mapping		Distro Directory Layouts
+misc/dump-core-format		Xen Core Dump Format
+misc/sedf_scheduler_mini-HOWTO	sEDF Mini HOWTO
+misc/vtd			VT-d HOWTO
+misc/vtpm			Virtual TPM
+misc/xen-error-handling		Xen Error Handling
+misc/xenpaging			Xen Paging
+misc/xsm-flask			XSM/FLASK Configuration

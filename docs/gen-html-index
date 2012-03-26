@@ -79,7 +79,7 @@ sub make_link ($$) {
 sub make_links ($$@) {
     my ($dir,$base,@docs) = @_;
     my $idx = '';
-    foreach my $of (sort { $a cmp $b } @docs) {
+    foreach my $of (sort { make_linktext($a) cmp make_linktext($b) } @docs) {
         $idx .= make_link($of,$base);
     }
     return $idx;
