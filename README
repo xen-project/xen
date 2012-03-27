@@ -61,6 +61,13 @@ provided by your OS distributor:
     * ACPI ASL compiler (iasl)
     * markdown
 
+In addition to the above there are a number of optional build
+prerequisites. Omitting these will cause the related features to be
+disabled at compile time:
+    * Development install of Ocaml (e.g. ocaml-nox and
+      ocaml-findlib). Required to build ocaml components which
+      includes the alternative ocaml xenstored.
+
 Second, you need to acquire a suitable kernel for use in domain 0. If
 possible you should use a kernel provided by your OS distributor. If
 no suitable kernel is available from your OS distributor then refer to
