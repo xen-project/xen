@@ -21,6 +21,7 @@
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
 #include <asm/current.h>
+#include <asm/hpet.h>
 #include <xen/sched.h>
 #include <xen/event.h>
 
@@ -40,34 +41,6 @@
 #define guest_time_hpet(hpet) \
     (hvm_get_guest_time(vhpet_vcpu(hpet)) / STIME_PER_HPET_TICK)
 
-#define HPET_ID         0x000
-#define HPET_PERIOD     0x004
-#define HPET_CFG        0x010
-#define HPET_STATUS     0x020
-#define HPET_COUNTER    0x0f0
-#define HPET_T0_CFG     0x100
-#define HPET_T0_CMP     0x108
-#define HPET_T0_ROUTE   0x110
-#define HPET_T1_CFG     0x120
-#define HPET_T1_CMP     0x128
-#define HPET_T1_ROUTE   0x130
-#define HPET_T2_CFG     0x140
-#define HPET_T2_CMP     0x148
-#define HPET_T2_ROUTE   0x150
-#define HPET_T3_CFG     0x160
-
-#define HPET_CFG_ENABLE          0x001
-#define HPET_CFG_LEGACY          0x002
-
-#define HPET_TN_INT_TYPE_LEVEL   0x002
-#define HPET_TN_ENABLE           0x004
-#define HPET_TN_PERIODIC         0x008
-#define HPET_TN_PERIODIC_CAP     0x010
-#define HPET_TN_SIZE_CAP         0x020
-#define HPET_TN_SETVAL           0x040
-#define HPET_TN_32BIT            0x100
-#define HPET_TN_INT_ROUTE_MASK  0x3e00
-#define HPET_TN_INT_ROUTE_SHIFT      9
 #define HPET_TN_INT_ROUTE_CAP_SHIFT 32
 #define HPET_TN_CFG_BITS_READONLY_OR_RESERVED 0xffff80b1U
 
@@ -78,6 +51,9 @@
 #define HPET_TN_INT_ROUTE_CAP_MASK (0xffffffffULL \
                     << HPET_TN_INT_ROUTE_CAP_SHIFT)
 
+#define HPET_TN(reg, addr) (((addr) - HPET_Tn_##reg(0)) / \
+                            (HPET_Tn_##reg(1) - HPET_Tn_##reg(0)))
+
 #define hpet_tick_to_ns(h, tick)                        \
     ((s_time_t)((((tick) > (h)->hpet_to_ns_limit) ?     \
         ~0ULL : (tick) * (h)->hpet_to_ns_scale) >> 10))
@@ -87,10 +63,10 @@
 #define timer_is_periodic(h, n)  (timer_config(h, n) & HPET_TN_PERIODIC)
 #define timer_is_32bit(h, n)     (timer_config(h, n) & HPET_TN_32BIT)
 #define hpet_enabled(h)          (h->hpet.config & HPET_CFG_ENABLE)
-#define timer_level(h, n)        (timer_config(h, n) & HPET_TN_INT_TYPE_LEVEL)
+#define timer_level(h, n)        (timer_config(h, n) & HPET_TN_LEVEL)
 
 #define timer_int_route(h, n)   \
-    ((timer_config(h, n) & HPET_TN_INT_ROUTE_MASK) >> HPET_TN_INT_ROUTE_SHIFT)
+    ((timer_config(h, n) & HPET_TN_ROUTE) >> HPET_TN_ROUTE_SHIFT)
 
 #define timer_int_route_cap(h, n)   \
     ((timer_config(h, n) & HPET_TN_INT_ROUTE_CAP_MASK) \
@@ -144,18 +120,18 @@ static inline uint64_t hpet_read64(HPETState *h, unsigned long addr)
         return h->hpet.isr;
     case HPET_COUNTER:
         return hpet_read_maincounter(h);
-    case HPET_T0_CFG:
-    case HPET_T1_CFG:
-    case HPET_T2_CFG:
-        return h->hpet.timers[(addr - HPET_T0_CFG) >> 5].config;
-    case HPET_T0_CMP:
-    case HPET_T1_CMP:
-    case HPET_T2_CMP:
-        return hpet_get_comparator(h, (addr - HPET_T0_CMP) >> 5);
-    case HPET_T0_ROUTE:
-    case HPET_T1_ROUTE:
-    case HPET_T2_ROUTE:
-        return h->hpet.timers[(addr - HPET_T0_ROUTE) >> 5].fsb;
+    case HPET_Tn_CFG(0):
+    case HPET_Tn_CFG(1):
+    case HPET_Tn_CFG(2):
+        return h->hpet.timers[HPET_TN(CFG, addr)].config;
+    case HPET_Tn_CMP(0):
+    case HPET_Tn_CMP(1):
+    case HPET_Tn_CMP(2):
+        return hpet_get_comparator(h, HPET_TN(CMP, addr));
+    case HPET_Tn_ROUTE(0):
+    case HPET_Tn_ROUTE(1):
+    case HPET_Tn_ROUTE(2):
+        return h->hpet.timers[HPET_TN(ROUTE, addr)].fsb;
     }
 
     return 0;
@@ -362,10 +338,10 @@ static int hpet_write(
         }
         break;
 
-    case HPET_T0_CFG:
-    case HPET_T1_CFG:
-    case HPET_T2_CFG:
-        tn = (addr - HPET_T0_CFG) >> 5;
+    case HPET_Tn_CFG(0):
+    case HPET_Tn_CFG(1):
+    case HPET_Tn_CFG(2):
+        tn = HPET_TN(CFG, addr);
 
         h->hpet.timers[tn].config = hpet_fixup_reg(new_val, old_val, 0x3f4e);
 
@@ -406,10 +382,10 @@ static int hpet_write(
         }
         break;
 
-    case HPET_T0_CMP:
-    case HPET_T1_CMP:
-    case HPET_T2_CMP:
-        tn = (addr - HPET_T0_CMP) >> 5;
+    case HPET_Tn_CMP(0):
+    case HPET_Tn_CMP(1):
+    case HPET_Tn_CMP(2):
+        tn = HPET_TN(CMP, addr);
         if ( timer_is_32bit(h, tn) )
             new_val = (uint32_t)new_val;
         h->hpet.timers[tn].cmp = new_val;
@@ -440,10 +416,10 @@ static int hpet_write(
             set_restart_timer(tn);
         break;
 
-    case HPET_T0_ROUTE:
-    case HPET_T1_ROUTE:
-    case HPET_T2_ROUTE:
-        tn = (addr - HPET_T0_ROUTE) >> 5;
+    case HPET_Tn_ROUTE(0):
+    case HPET_Tn_ROUTE(1):
+    case HPET_Tn_ROUTE(2):
+        tn = HPET_TN(ROUTE, addr);
         h->hpet.timers[tn].fsb = new_val;
         break;
 
@@ -608,8 +584,9 @@ void hpet_init(struct vcpu *v)
     h->hpet_to_ns_scale = ((S_TO_NS * STIME_PER_HPET_TICK) << 10) / h->stime_freq;
     h->hpet_to_ns_limit = ~0ULL / h->hpet_to_ns_scale;
 
-    /* 64-bit main counter; 3 timers supported; LegacyReplacementRoute. */
-    h->hpet.capability = 0x8086A201ULL;
+    h->hpet.capability = 0x80860001ULL |
+                         ((HPET_TIMER_NUM - 1) << HPET_ID_NUMBER_SHIFT) |
+                         HPET_ID_64BIT | HPET_ID_LEGSUP;
 
     /* This is the number of femptoseconds per HPET tick. */
     /* Here we define HPET's frequency to be 1/16 of Xen system time */
@@ -618,7 +595,7 @@ void hpet_init(struct vcpu *v)
     for ( i = 0; i < HPET_TIMER_NUM; i++ )
     {
         h->hpet.timers[i].config = 
-            HPET_TN_INT_ROUTE_CAP | HPET_TN_SIZE_CAP | HPET_TN_PERIODIC_CAP;
+            HPET_TN_INT_ROUTE_CAP | HPET_TN_64BIT_CAP | HPET_TN_PERIODIC_CAP;
         h->hpet.timers[i].cmp = ~0ULL;
         h->pt[i].source = PTSRC_isa;
     }
