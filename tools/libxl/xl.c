@@ -26,7 +26,6 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <inttypes.h>
-#include <xenctrl.h>
 
 #include "libxl.h"
 #include "libxl_utils.h"
