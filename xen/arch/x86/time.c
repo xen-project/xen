@@ -377,7 +377,7 @@ static int __init init_hpet(struct platform_timesource *pts)
 
 static void resume_hpet(struct platform_timesource *pts)
 {
-    hpet_resume();
+    hpet_resume(NULL);
 }
 
 static struct platform_timesource __initdata plt_hpet =

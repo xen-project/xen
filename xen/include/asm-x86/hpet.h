@@ -55,7 +55,12 @@ extern unsigned long hpet_address;
  * Return value is zero if HPET is unavailable.
  */
 u64 hpet_setup(void);
-void hpet_resume(void);
+void hpet_resume(u32 *);
+
+/*
+ * Disable HPET hardware: restore it to boot time state.
+ */
+void hpet_disable(void);
 
 /*
  * Callback from legacy timer (PIT channel 0) IRQ handler.

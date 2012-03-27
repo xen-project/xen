@@ -562,7 +562,7 @@ void hpet_broadcast_resume(void)
     if ( !hpet_events )
         return;
 
-    hpet_resume();
+    hpet_resume(NULL);
 
     cfg = hpet_read32(HPET_CFG);
 
@@ -700,10 +700,13 @@ int hpet_legacy_irq_tick(void)
     return 1;
 }
 
+static u32 *hpet_boot_cfg;
+
 u64 __init hpet_setup(void)
 {
     static u64 __initdata hpet_rate;
     u32 hpet_id, hpet_period;
+    unsigned int last;
 
     if ( hpet_rate )
         return hpet_rate;
@@ -728,7 +731,9 @@ u64 __init hpet_setup(void)
         return 0;
     }
 
-    hpet_resume();
+    last = (hpet_id & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT;
+    hpet_boot_cfg = xmalloc_array(u32, 2 + last);
+    hpet_resume(hpet_boot_cfg);
 
     hpet_rate = 1000000000000000ULL; /* 10^15 */
     (void)do_div(hpet_rate, hpet_period);
@@ -736,24 +741,29 @@ u64 __init hpet_setup(void)
     return hpet_rate;
 }
 
-void hpet_resume(void)
+void hpet_resume(u32 *boot_cfg)
 {
     static u32 system_reset_latch;
     u32 hpet_id, cfg;
-    unsigned int i;
+    unsigned int i, last;
 
     if ( system_reset_latch == system_reset_counter )
         return;
     system_reset_latch = system_reset_counter;
 
     cfg = hpet_read32(HPET_CFG);
+    if ( boot_cfg )
+        *boot_cfg = cfg;
     cfg &= ~(HPET_CFG_ENABLE | HPET_CFG_LEGACY);
     hpet_write32(cfg, HPET_CFG);
 
     hpet_id = hpet_read32(HPET_ID);
-    for ( i = 0; i <= ((hpet_id >> 8) & 31); i++ )
+    last = (hpet_id & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT;
+    for ( i = 0; i <= last; ++i )
     {
         cfg = hpet_read32(HPET_Tn_CFG(i));
+        if ( boot_cfg )
+            boot_cfg[i + 1] = cfg;
         cfg &= ~HPET_TN_ENABLE;
         hpet_write32(cfg, HPET_Tn_CFG(i));
     }
@@ -761,4 +771,22 @@ void hpet_resume(void)
     cfg = hpet_read32(HPET_CFG);
     cfg |= HPET_CFG_ENABLE;
     hpet_write32(cfg, HPET_CFG);
+}
+
+void hpet_disable(void)
+{
+    unsigned int i;
+    u32 id;
+
+    if ( !hpet_boot_cfg )
+        return;
+
+    hpet_write32(*hpet_boot_cfg & ~HPET_CFG_ENABLE, HPET_CFG);
+
+    id = hpet_read32(HPET_ID);
+    for ( i = 0; i <= ((id & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT); ++i )
+        hpet_write32(hpet_boot_cfg[i + 1], HPET_Tn_CFG(i));
+
+    if ( *hpet_boot_cfg & HPET_CFG_ENABLE )
+        hpet_write32(*hpet_boot_cfg, HPET_CFG);
 }
