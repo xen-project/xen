@@ -349,12 +349,13 @@ void __stop_this_cpu(void)
      */
     clts();
     asm volatile ( "fninit" );
+
+    cpumask_clear_cpu(smp_processor_id(), &cpu_online_map);
 }
 
 static void stop_this_cpu(void *dummy)
 {
     __stop_this_cpu();
-    cpumask_clear_cpu(smp_processor_id(), &cpu_online_map);
     for ( ; ; )
         halt();
 }

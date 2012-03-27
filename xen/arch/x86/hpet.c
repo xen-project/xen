@@ -779,7 +779,11 @@ void hpet_disable(void)
     u32 id;
 
     if ( !hpet_boot_cfg )
+    {
+        if ( hpet_broadcast_is_available() )
+            hpet_disable_legacy_broadcast();
         return;
+    }
 
     hpet_write32(*hpet_boot_cfg & ~HPET_CFG_ENABLE, HPET_CFG);
 
