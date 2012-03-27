@@ -533,7 +533,7 @@ void __init hpet_broadcast_init(void)
     {
         /* set HPET Tn as oneshot */
         cfg = hpet_read32(HPET_Tn_CFG(hpet_events[i].idx));
-        cfg &= ~HPET_TN_PERIODIC;
+        cfg &= ~(HPET_TN_LEVEL | HPET_TN_PERIODIC | HPET_TN_FSB);
         cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
         hpet_write32(cfg, HPET_Tn_CFG(hpet_events[i].idx));
 
@@ -590,7 +590,7 @@ void hpet_broadcast_resume(void)
 
         /* set HPET Tn as oneshot */
         cfg = hpet_read32(HPET_Tn_CFG(hpet_events[i].idx));
-        cfg &= ~HPET_TN_PERIODIC;
+        cfg &= ~(HPET_TN_LEVEL | HPET_TN_PERIODIC | HPET_TN_FSB);
         cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
         hpet_write32(cfg, HPET_Tn_CFG(hpet_events[i].idx));
 
