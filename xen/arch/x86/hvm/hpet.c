@@ -42,7 +42,8 @@
     (hvm_get_guest_time(vhpet_vcpu(hpet)) / STIME_PER_HPET_TICK)
 
 #define HPET_TN_INT_ROUTE_CAP_SHIFT 32
-#define HPET_TN_CFG_BITS_READONLY_OR_RESERVED 0xffff80b1U
+#define HPET_TN_CFG_BITS_READONLY_OR_RESERVED (HPET_TN_RESERVED | \
+    HPET_TN_PERIODIC_CAP | HPET_TN_64BIT_CAP | HPET_TN_FSB_CAP)
 
 /* can be routed to IOAPIC.redirect_table[23..20] */
 #define HPET_TN_INT_ROUTE_CAP      (0x00f00000ULL \

@@ -43,6 +43,7 @@
 #define HPET_TN_ROUTE		0x3e00
 #define HPET_TN_FSB		0x4000
 #define HPET_TN_FSB_CAP		0x8000
+#define HPET_TN_RESERVED	0xffff0081
 #define HPET_TN_ROUTE_SHIFT	9
 
 

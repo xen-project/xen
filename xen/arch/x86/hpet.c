@@ -755,6 +755,13 @@ void hpet_resume(u32 *boot_cfg)
     if ( boot_cfg )
         *boot_cfg = cfg;
     cfg &= ~(HPET_CFG_ENABLE | HPET_CFG_LEGACY);
+    if ( cfg )
+    {
+        printk(XENLOG_WARNING
+               "HPET: reserved bits %#x set in global config register\n",
+               cfg);
+        cfg = 0;
+    }
     hpet_write32(cfg, HPET_CFG);
 
     hpet_id = hpet_read32(HPET_ID);
@@ -765,6 +772,13 @@ void hpet_resume(u32 *boot_cfg)
         if ( boot_cfg )
             boot_cfg[i + 1] = cfg;
         cfg &= ~HPET_TN_ENABLE;
+        if ( cfg & HPET_TN_RESERVED )
+        {
+            printk(XENLOG_WARNING
+                   "HPET: reserved bits %#x set in channel %u config register\n",
+                   cfg & HPET_TN_RESERVED, i);
+            cfg &= ~HPET_TN_RESERVED;
+        }
         hpet_write32(cfg, HPET_Tn_CFG(i));
     }
 
