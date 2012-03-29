@@ -84,6 +84,9 @@ static unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
     case p2m_invalid:
     case p2m_mmio_dm:
     case p2m_populate_on_demand:
+    case p2m_ram_paging_out:
+    case p2m_ram_paged:
+    case p2m_ram_paging_in:
     default:
         return flags;
     case p2m_ram_ro:
@@ -175,7 +178,7 @@ p2m_next_level(struct p2m_domain *p2m, mfn_t *table_mfn, void **table,
                                       shift, max)) )
         return 0;
 
-    /* PoD: Not present doesn't imply empty. */
+    /* PoD/paging: Not present doesn't imply empty. */
     if ( !l1e_get_flags(*p2m_entry) )
     {
         struct page_info *pg;
@@ -391,7 +394,8 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
                                    0, L1_PAGETABLE_ENTRIES);
         ASSERT(p2m_entry);
         
-        if ( mfn_valid(mfn) || (p2mt == p2m_mmio_direct) )
+        if ( mfn_valid(mfn) || (p2mt == p2m_mmio_direct)
+                            || p2m_is_paging(p2mt) )
             entry_content = p2m_l1e_from_pfn(mfn_x(mfn),
                                              p2m_type_to_flags(p2mt, mfn));
         else
@@ -622,11 +626,12 @@ pod_retry_l1:
                            sizeof(l1e));
             
     if ( ret == 0 ) {
+        unsigned long l1e_mfn = l1e_get_pfn(l1e);
         p2mt = p2m_flags_to_type(l1e_get_flags(l1e));
-        ASSERT(l1e_get_pfn(l1e) != INVALID_MFN || !p2m_is_ram(p2mt));
+        ASSERT( mfn_valid(_mfn(l1e_mfn)) || !p2m_is_ram(p2mt) ||
+                p2m_is_paging(p2mt) );
 
-        if ( p2m_flags_to_type(l1e_get_flags(l1e))
-             == p2m_populate_on_demand )
+        if ( p2mt == p2m_populate_on_demand )
         {
             /* The read has succeeded, so we know that the mapping
              * exits at this point.  */
@@ -648,7 +653,7 @@ pod_retry_l1:
         }
 
         if ( p2m_is_valid(p2mt) || p2m_is_grant(p2mt) )
-            mfn = _mfn(l1e_get_pfn(l1e));
+            mfn = _mfn(l1e_mfn);
         else 
             /* XXX see above */
             p2mt = p2m_mmio_dm;
@@ -670,6 +675,8 @@ p2m_gfn_to_mfn(struct p2m_domain *p2m, unsigned long gfn,
     paddr_t addr = ((paddr_t)gfn) << PAGE_SHIFT;
     l2_pgentry_t *l2e;
     l1_pgentry_t *l1e;
+    unsigned long l1e_flags;
+    p2m_type_t l1t;
 
     ASSERT(paging_mode_translate(p2m->domain));
 
@@ -788,10 +795,12 @@ pod_retry_l2:
     l1e = map_domain_page(mfn_x(mfn));
     l1e += l1_table_offset(addr);
 pod_retry_l1:
-    if ( (l1e_get_flags(*l1e) & _PAGE_PRESENT) == 0 )
+    l1e_flags = l1e_get_flags(*l1e);
+    l1t = p2m_flags_to_type(l1e_flags);
+    if ( ((l1e_flags & _PAGE_PRESENT) == 0) && (!p2m_is_paging(l1t)) )
     {
         /* PoD: Try to populate */
-        if ( p2m_flags_to_type(l1e_get_flags(*l1e)) == p2m_populate_on_demand )
+        if ( l1t == p2m_populate_on_demand )
         {
             if ( q & P2M_ALLOC ) {
                 if ( !p2m_pod_demand_populate(p2m, gfn, PAGE_ORDER_4K, q) )
@@ -804,10 +813,10 @@ pod_retry_l1:
         return _mfn(INVALID_MFN);
     }
     mfn = _mfn(l1e_get_pfn(*l1e));
-    *t = p2m_flags_to_type(l1e_get_flags(*l1e));
+    *t = l1t;
     unmap_domain_page(l1e);
 
-    ASSERT(mfn_valid(mfn) || !p2m_is_ram(*t));
+    ASSERT(mfn_valid(mfn) || !p2m_is_ram(*t) || p2m_is_paging(*t));
     if ( page_order )
         *page_order = PAGE_ORDER_4K;
     return (p2m_is_valid(*t) || p2m_is_grant(*t)) ? mfn : _mfn(INVALID_MFN);
