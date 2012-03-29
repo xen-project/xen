@@ -563,10 +563,6 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             if ( !hap_enabled(d) )
                 break;
 
-            /* Currently only EPT is supported */
-            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
-                break;
-
             /* No paging if iommu is used */
             rc = -EXDEV;
             if ( unlikely(need_iommu(d)) )
