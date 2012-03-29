@@ -48,6 +48,13 @@
 #undef page_to_mfn
 #define page_to_mfn(_pg) _mfn(__page_to_mfn(_pg))
 
+/* We may store INVALID_MFN in l1 PTEs. We need to clip this
+ * to avoid trampling over higher-order bits (NX, p2m type, IOMMU flags).  We
+ * seem to not need to unclip on the return path, as callers are concerned only
+ * with p2m type in such cases. 
+ */
+#define p2m_l1e_from_pfn(pfn, flags)    \
+    l1e_from_pfn((pfn) & (PADDR_MASK >> PAGE_SHIFT), (flags))
 
 /* PTE flags for the various types of p2m entry */
 #define P2M_BASE_FLAGS \
@@ -385,8 +392,8 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         ASSERT(p2m_entry);
         
         if ( mfn_valid(mfn) || (p2mt == p2m_mmio_direct) )
-            entry_content = l1e_from_pfn(mfn_x(mfn),
-                                         p2m_type_to_flags(p2mt, mfn));
+            entry_content = p2m_l1e_from_pfn(mfn_x(mfn),
+                                             p2m_type_to_flags(p2mt, mfn));
         else
             entry_content = l1e_empty();
 
@@ -923,7 +930,7 @@ static void p2m_change_type_global(struct p2m_domain *p2m,
                            * L2_PAGETABLE_ENTRIES) * L1_PAGETABLE_ENTRIES; 
                     /* create a new 1le entry with the new type */
                     flags = p2m_type_to_flags(nt, _mfn(mfn));
-                    l1e_content = l1e_from_pfn(mfn, flags);
+                    l1e_content = p2m_l1e_from_pfn(mfn, flags);
                     p2m->write_p2m_entry(p2m, gfn, &l1e[i1],
                                          l1mfn, l1e_content, 1);
                 }
