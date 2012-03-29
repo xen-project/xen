@@ -270,7 +270,8 @@ struct arch_domain
     unsigned long pirq_eoi_map_mfn;
 
     /* Pseudophysical e820 map (XENMEM_memory_map).  */
-    struct e820entry e820[3];
+    spinlock_t e820_lock;
+    struct e820entry *e820;
     unsigned int nr_e820;
 
     /* Maximum physical-address bitwidth supported by this guest. */
