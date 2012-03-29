@@ -57,8 +57,13 @@ DEFINE_PER_CPU(bool_t, iommu_dont_flush_iotlb);
 static void __init parse_iommu_param(char *s)
 {
     char *ss;
+    int val;
 
     do {
+        val = !!strncmp(s, "no-", 3);
+        if ( !val )
+            s += 3;
+
         ss = strchr(s, ',');
         if ( ss )
             *ss = '\0';
@@ -66,27 +71,27 @@ static void __init parse_iommu_param(char *s)
         if ( !parse_bool(s) )
             iommu_enabled = 0;
         else if ( !strcmp(s, "force") || !strcmp(s, "required") )
-            force_iommu = 1;
+            force_iommu = val;
         else if ( !strcmp(s, "workaround_bios_bug") )
-            iommu_workaround_bios_bug = 1;
+            iommu_workaround_bios_bug = val;
         else if ( !strcmp(s, "verbose") )
-            iommu_verbose = 1;
-        else if ( !strcmp(s, "no-snoop") )
-            iommu_snoop = 0;
-        else if ( !strcmp(s, "no-qinval") )
-            iommu_qinval = 0;
-        else if ( !strcmp(s, "no-intremap") )
-            iommu_intremap = 0;
+            iommu_verbose = val;
+        else if ( !strcmp(s, "snoop") )
+            iommu_snoop = val;
+        else if ( !strcmp(s, "qinval") )
+            iommu_qinval = val;
+        else if ( !strcmp(s, "intremap") )
+            iommu_intremap = val;
         else if ( !strcmp(s, "debug") )
-            iommu_debug = 1;
+            iommu_debug = val;
         else if ( !strcmp(s, "amd-iommu-perdev-intremap") )
-            amd_iommu_perdev_intremap = 1;
+            amd_iommu_perdev_intremap = val;
         else if ( !strcmp(s, "dom0-passthrough") )
-            iommu_passthrough = 1;
+            iommu_passthrough = val;
         else if ( !strcmp(s, "dom0-strict") )
-            iommu_dom0_strict = 1;
+            iommu_dom0_strict = val;
         else if ( !strcmp(s, "sharept") )
-            iommu_hap_pt_share = 1;
+            iommu_hap_pt_share = val;
 
         s = ss + 1;
     } while ( ss );
