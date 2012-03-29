@@ -567,7 +567,11 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
             if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
                 break;
 
+            /* No paging if iommu is used */
             rc = -EXDEV;
+            if ( unlikely(need_iommu(d)) )
+                break;
+
             /* Disallow paging in a PoD guest */
             if ( p2m->pod.entry_count )
                 break;

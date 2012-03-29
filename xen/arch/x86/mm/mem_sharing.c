@@ -1205,8 +1205,11 @@ int mem_sharing_domctl(struct domain *d, xen_domctl_mem_sharing_op_t *mec)
     {
         case XEN_DOMCTL_MEM_SHARING_CONTROL:
         {
-            d->arch.hvm_domain.mem_sharing_enabled = mec->u.enable;
             rc = 0;
+            if ( unlikely(need_iommu(d) && mec->u.enable) )
+                rc = -EXDEV;
+            else
+                d->arch.hvm_domain.mem_sharing_enabled = mec->u.enable;
         }
         break;
 

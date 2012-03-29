@@ -205,6 +205,13 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
+    /* Prevent device assign if mem paging or mem sharing have been 
+     * enabled for this domain */
+    if ( unlikely(!need_iommu(d) &&
+            (d->arch.hvm_domain.mem_sharing_enabled ||
+             d->mem_event->paging.ring_page)) )
+        return -EXDEV;
+
     spin_lock(&pcidevs_lock);
     if ( (rc = hd->platform_ops->assign_device(d, seg, bus, devfn)) )
         goto done;
