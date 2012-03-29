@@ -558,9 +558,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo =
             (CONFIG_PAGING_LEVELS != 4);
 
-        spin_lock_init(&d->arch.e820_lock);
     }
 
+    spin_lock_init(&d->arch.e820_lock);
     memset(d->arch.cpuids, 0, sizeof(d->arch.cpuids));
     for ( i = 0; i < MAX_CPUID_INPUT; i++ )
     {
@@ -605,8 +605,8 @@ void arch_domain_destroy(struct domain *d)
 
     if ( is_hvm_domain(d) )
         hvm_domain_destroy(d);
-    else
-        xfree(d->arch.e820);
+
+    xfree(d->arch.e820);
 
     vmce_destroy_msr(d);
     free_domain_pirqs(d);
