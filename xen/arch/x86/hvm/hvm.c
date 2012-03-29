@@ -2586,6 +2586,7 @@ static long hvm_vcpu_op(
     case VCPUOP_stop_periodic_timer:
     case VCPUOP_set_singleshot_timer:
     case VCPUOP_stop_singleshot_timer:
+    case VCPUOP_register_vcpu_info:
         rc = do_vcpu_op(cmd, vcpuid, arg);
         break;
     default:
@@ -2651,6 +2652,7 @@ static long hvm_vcpu_op_compat32(
     case VCPUOP_stop_periodic_timer:
     case VCPUOP_set_singleshot_timer:
     case VCPUOP_stop_singleshot_timer:
+    case VCPUOP_register_vcpu_info:
         rc = compat_vcpu_op(cmd, vcpuid, arg);
         break;
     default:
