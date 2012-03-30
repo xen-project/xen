@@ -378,7 +378,10 @@ static struct xenpaging *xenpaging_init(int argc, char *argv[])
                 ERROR("xenpaging is (or was) active on this domain");
                 break;
             case ENODEV:
-                ERROR("EPT not supported for this guest");
+                ERROR("xenpaging requires Hardware Assisted Paging");
+                break;
+            case EMLINK:
+                ERROR("xenpaging not supported while iommu passthrough is enabled");
                 break;
             case EXDEV:
                 ERROR("xenpaging not supported in a PoD guest");

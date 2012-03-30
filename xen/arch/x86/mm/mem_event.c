@@ -564,10 +564,11 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
                 break;
 
             /* No paging if iommu is used */
-            rc = -EXDEV;
+            rc = -EMLINK;
             if ( unlikely(need_iommu(d)) )
                 break;
 
+            rc = -EXDEV;
             /* Disallow paging in a PoD guest */
             if ( p2m->pod.entry_count )
                 break;
