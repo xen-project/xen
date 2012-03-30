@@ -764,6 +764,14 @@ void pirq_set_affinity(struct domain *d, int pirq, const cpumask_t *mask)
 
 DEFINE_PER_CPU(unsigned int, irq_count);
 
+uint8_t alloc_hipriority_vector(void)
+{
+    static uint8_t next = FIRST_HIPRIORITY_VECTOR;
+    BUG_ON(next < FIRST_HIPRIORITY_VECTOR);
+    BUG_ON(next > LAST_HIPRIORITY_VECTOR);
+    return next++;
+}
+
 static void (*direct_apic_vector[NR_VECTORS])(struct cpu_user_regs *);
 void set_direct_apic_vector(
     uint8_t vector, void (*handler)(struct cpu_user_regs *))
@@ -775,14 +783,12 @@ void set_direct_apic_vector(
 void alloc_direct_apic_vector(
     uint8_t *vector, void (*handler)(struct cpu_user_regs *))
 {
-    static uint8_t next = LAST_HIPRIORITY_VECTOR;
     static DEFINE_SPINLOCK(lock);
 
     spin_lock(&lock);
     if (*vector == 0) {
-        BUG_ON(next == FIRST_HIPRIORITY_VECTOR);
-        set_direct_apic_vector(next, handler);
-        *vector = next--;
+        *vector = alloc_hipriority_vector();
+        set_direct_apic_vector(*vector, handler);
     }
     spin_unlock(&lock);
 }

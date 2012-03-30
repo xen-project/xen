@@ -1005,13 +1005,13 @@ void __init smp_cpus_done(void)
 
 void __init smp_intr_init(void)
 {
-    int irq, seridx, cpu = smp_processor_id();
+    int irq, vector, seridx, cpu = smp_processor_id();
 
     /*
      * IRQ0 must be given a fixed assignment and initialized,
      * because it's used before the IO-APIC is set up.
      */
-    irq_to_desc(0)->arch.vector = FIRST_HIPRIORITY_VECTOR;
+    irq_to_desc(0)->arch.vector = IRQ0_VECTOR;
 
     /*
      * Also ensure serial interrupts are high priority. We do not
@@ -1021,8 +1021,9 @@ void __init smp_intr_init(void)
     {
         if ( (irq = serial_irq(seridx)) < 0 )
             continue;
-        per_cpu(vector_irq, cpu)[FIRST_HIPRIORITY_VECTOR + seridx + 1] = irq;
-        irq_to_desc(irq)->arch.vector = FIRST_HIPRIORITY_VECTOR + seridx + 1;
+        vector = alloc_hipriority_vector();
+        per_cpu(vector_irq, cpu)[vector] = irq;
+        irq_to_desc(irq)->arch.vector = vector;
         cpumask_copy(irq_to_desc(irq)->arch.cpu_mask, &cpu_online_map);
     }
 

@@ -1856,7 +1856,7 @@ static void __init check_timer(void)
      * get/set the timer IRQ vector:
      */
     disable_8259A_irq(irq_to_desc(0));
-    vector = FIRST_HIPRIORITY_VECTOR;
+    vector = IRQ0_VECTOR;
     clear_irq_vector(0);
 
     cpumask_setall(&mask_all);

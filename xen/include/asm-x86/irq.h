@@ -88,6 +88,8 @@ void pmu_apic_interrupt(struct cpu_user_regs *regs);
 void spurious_interrupt(struct cpu_user_regs *regs);
 void irq_move_cleanup_interrupt(struct cpu_user_regs *regs);
 
+uint8_t alloc_hipriority_vector(void);
+
 void set_direct_apic_vector(
     uint8_t vector, void (*handler)(struct cpu_user_regs *));
 void alloc_direct_apic_vector(

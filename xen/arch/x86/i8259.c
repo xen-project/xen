@@ -402,7 +402,7 @@ void __init init_IRQ(void)
         desc->arch.vector = FIRST_LEGACY_VECTOR + irq;
     }
     
-    per_cpu(vector_irq, cpu)[FIRST_HIPRIORITY_VECTOR] = 0;
+    per_cpu(vector_irq, cpu)[IRQ0_VECTOR] = 0;
 
     apic_intr_init();
 

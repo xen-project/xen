@@ -13,8 +13,10 @@
  * High-priority dynamically-allocated vectors. For interrupts that
  * must be higher priority than any guest-bound interrupt.
  */
-#define FIRST_HIPRIORITY_VECTOR	0xf0
+#define FIRST_HIPRIORITY_VECTOR	0xf1
 #define LAST_HIPRIORITY_VECTOR  0xf8
+/* IRQ0 (timer) is statically allocated but must be high priority. */
+#define IRQ0_VECTOR             0xf0
 
 /* Legacy PIC uses vectors 0xe0-0xef. */
 #define FIRST_LEGACY_VECTOR	0xe0
