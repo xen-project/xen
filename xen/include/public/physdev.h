@@ -49,7 +49,15 @@ DEFINE_XEN_GUEST_HANDLE(physdev_eoi_t);
  * will automatically get unmasked. The page registered is used as a bit
  * array indexed by Xen's PIRQ value.
  */
-#define PHYSDEVOP_pirq_eoi_gmfn         17
+#define PHYSDEVOP_pirq_eoi_gmfn_v1       17
+/*
+ * Register a shared page for the hypervisor to indicate whether the
+ * guest must issue PHYSDEVOP_eoi. This hypercall is very similar to
+ * PHYSDEVOP_pirq_eoi_gmfn_v1 but it doesn't change the semantics of
+ * PHYSDEVOP_eoi. The page registered is used as a bit array indexed by
+ * Xen's PIRQ value.
+ */
+#define PHYSDEVOP_pirq_eoi_gmfn_v2       28
 struct physdev_pirq_eoi_gmfn {
     /* IN */
     xen_pfn_t gmfn;
@@ -275,6 +283,8 @@ DEFINE_XEN_GUEST_HANDLE(physdev_get_free_pirq_t);
 #define PHYSDEVOP_FREE_VECTOR            PHYSDEVOP_free_irq_vector
 #define PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY XENIRQSTAT_needs_eoi
 #define PHYSDEVOP_IRQ_SHARED             XENIRQSTAT_shared
+
+#define PHYSDEVOP_pirq_eoi_gmfn PHYSDEVOP_pirq_eoi_gmfn_v1
 
 #endif /* __XEN_PUBLIC_PHYSDEV_H__ */
 

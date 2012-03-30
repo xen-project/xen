@@ -65,7 +65,7 @@ static long __do_pirq_guest_eoi(struct domain *d, int pirq)
 {
 	if ( pirq < 0 || pirq >= NR_IRQS )
 		return -EINVAL;
-	if ( d->arch.pirq_eoi_map )
+	if ( d->arch.auto_unmask ) {
 		evtchn_unmask(d->pirq_to_evtchn[pirq]);
 	return pirq_guest_eoi(d, pirq);
 }
@@ -504,7 +504,8 @@ long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
-    case PHYSDEVOP_pirq_eoi_gmfn: {
+    case PHYSDEVOP_pirq_eoi_gmfn_v1:
+    case PHYSDEVOP_pirq_eoi_gmfn_v2: {
         struct physdev_pirq_eoi_gmfn info;
         unsigned long mfn;
 
@@ -527,6 +528,8 @@ long do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         }
 
         current->domain->arch.pirq_eoi_map = mfn_to_virt(mfn);
+        if ( cmd == PHYSDEVOP_pirq_eoi_gmfn_v1 )
+            current->domain->arch.auto_unmask = 1;
         ret = 0;
         break;
     }

@@ -1981,6 +1981,7 @@ int domain_relinquish_resources(struct domain *d)
             unmap_domain_page_global(d->arch.pirq_eoi_map);
             put_page_and_type(mfn_to_page(d->arch.pirq_eoi_map_mfn));
             d->arch.pirq_eoi_map = NULL;
+            d->arch.auto_unmask = 0;
         }
 
         d->arch.relmem = RELMEM_xen;
