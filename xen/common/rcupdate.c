@@ -175,8 +175,8 @@ static void force_quiescent_state(struct rcu_data *rdp,
  * sections are delimited by rcu_read_lock() and rcu_read_unlock(),
  * and may be nested.
  */
-void fastcall call_rcu(struct rcu_head *head,
-                       void (*func)(struct rcu_head *rcu))
+void call_rcu(struct rcu_head *head,
+              void (*func)(struct rcu_head *rcu))
 {
     unsigned long flags;
     struct rcu_data *rdp;

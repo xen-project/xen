@@ -142,8 +142,8 @@ void rcu_init(void);
 void rcu_check_callbacks(int cpu);
 
 /* Exported interfaces */
-void fastcall call_rcu(struct rcu_head *head, 
-                       void (*func)(struct rcu_head *head));
+void call_rcu(struct rcu_head *head, 
+              void (*func)(struct rcu_head *head));
 
 int rcu_barrier(void);
 
