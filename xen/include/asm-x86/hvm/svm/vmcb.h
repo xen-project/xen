@@ -515,7 +515,8 @@ struct arch_svm_struct {
     uint64_t guest_sysenter_eip;
     
     /* AMD lightweight profiling MSR */
-    uint64_t guest_lwp_cfg;
+    uint64_t guest_lwp_cfg;      /* guest version */
+    uint64_t cpu_lwp_cfg;        /* CPU version */
 
     /* OSVW MSRs */
     struct {

@@ -745,6 +745,17 @@ static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
     *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
 }
 
+static void svm_lwp_interrupt(struct cpu_user_regs *regs)
+{
+    struct vcpu *curr = current;
+
+    ack_APIC_irq();
+    vlapic_set_irq(
+        vcpu_vlapic(curr),
+        (curr->arch.hvm_svm.guest_lwp_cfg >> 40) && 0xff,
+        0);
+}
+
 static inline void svm_lwp_save(struct vcpu *v)
 {
     /* Don't mess up with other guests. Disable LWP for next VCPU. */
@@ -759,7 +770,7 @@ static inline void svm_lwp_load(struct vcpu *v)
 {
     /* Only LWP_CFG is reloaded. LWP_CBADDR will be reloaded via xrstor. */
    if ( v->arch.hvm_svm.guest_lwp_cfg ) 
-       wrmsrl(MSR_AMD64_LWP_CFG, v->arch.hvm_svm.guest_lwp_cfg);
+       wrmsrl(MSR_AMD64_LWP_CFG, v->arch.hvm_svm.cpu_lwp_cfg);
 }
 
 /* Update LWP_CFG MSR (0xc0000105). Return -1 if error; otherwise returns 0. */
@@ -767,7 +778,8 @@ static int svm_update_lwp_cfg(struct vcpu *v, uint64_t msr_content)
 {
     unsigned int eax, ebx, ecx, edx;
     uint32_t msr_low;
-    
+    static uint8_t lwp_intr_vector;
+
     if ( xsave_enabled(v) && cpu_has_lwp )
     {
         hvm_cpuid(0x8000001c, &eax, &ebx, &ecx, &edx);
@@ -776,11 +788,23 @@ static int svm_update_lwp_cfg(struct vcpu *v, uint64_t msr_content)
         /* generate #GP if guest tries to turn on unsupported features. */
         if ( msr_low & ~edx)
             return -1;
-        
-        wrmsrl(MSR_AMD64_LWP_CFG, msr_content);
-        /* CPU might automatically correct reserved bits. So read it back. */
-        rdmsrl(MSR_AMD64_LWP_CFG, msr_content);
+
         v->arch.hvm_svm.guest_lwp_cfg = msr_content;
+
+        /* setup interrupt handler if needed */
+        if ( (msr_content & 0x80000000) && ((msr_content >> 40) & 0xff) )
+        {
+            alloc_direct_apic_vector(&lwp_intr_vector, svm_lwp_interrupt);
+            v->arch.hvm_svm.cpu_lwp_cfg = (msr_content & 0xffff00ffffffffffULL)
+                | ((uint64_t)lwp_intr_vector << 40);
+        }
+        else
+        {
+            /* otherwise disable it */
+            v->arch.hvm_svm.cpu_lwp_cfg = msr_content & 0xffff00ff7fffffffULL;
+        }
+        
+        wrmsrl(MSR_AMD64_LWP_CFG, v->arch.hvm_svm.cpu_lwp_cfg);
 
         /* track nonalzy state if LWP_CFG is non-zero. */
         v->arch.nonlazy_xstate_used = !!(msr_content);
