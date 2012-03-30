@@ -46,21 +46,14 @@ static int __read_mostly nr_intel_ext_msrs;
 #define INTEL_SRAR_DATA_LOAD	0x134
 #define INTEL_SRAR_INSTR_FETCH	0x150
 
-/* Thermal Hanlding */
 #ifdef CONFIG_X86_MCE_THERMAL
-static void unexpected_thermal_interrupt(struct cpu_user_regs *regs)
-{
-    printk(KERN_ERR "Thermal: CPU%d: Unexpected LVT TMR interrupt!\n",
-                smp_processor_id());
-    add_taint(TAINT_MACHINE_CHECK);
-}
-
-/* P4/Xeon Thermal transition interrupt handler */
 static void intel_thermal_interrupt(struct cpu_user_regs *regs)
 {
     uint64_t msr_content;
     unsigned int cpu = smp_processor_id();
     static DEFINE_PER_CPU(s_time_t, next);
+
+    ack_APIC_irq();
 
     if (NOW() < per_cpu(next, cpu))
         return;
@@ -75,16 +68,6 @@ static void intel_thermal_interrupt(struct cpu_user_regs *regs)
     } else {
         printk(KERN_INFO "CPU%d: Temperature/speed normal\n", cpu);
     }
-}
-
-/* Thermal interrupt handler for this CPU setup */
-static void (*__read_mostly vendor_thermal_interrupt)(
-    struct cpu_user_regs *regs) = unexpected_thermal_interrupt;
-
-void thermal_interrupt(struct cpu_user_regs *regs)
-{
-    ack_APIC_irq();
-    vendor_thermal_interrupt(regs);
 }
 
 /* Thermal monitoring depends on APIC, ACPI and clock modulation */
@@ -117,6 +100,7 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
     uint32_t val;
     int tm2 = 0;
     unsigned int cpu = smp_processor_id();
+    static uint8_t thermal_apic_vector;
 
     if (!intel_thermal_supported(c))
         return; /* -ENODEV */
@@ -159,16 +143,15 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
         return; /* -EBUSY */
     }
 
+    alloc_direct_apic_vector(&thermal_apic_vector, intel_thermal_interrupt);
+
     /* The temperature transition interrupt handler setup */
-    val = THERMAL_APIC_VECTOR;    /* our delivery vector */
+    val = thermal_apic_vector;    /* our delivery vector */
     val |= (APIC_DM_FIXED | APIC_LVT_MASKED);  /* we'll mask till we're ready */
     apic_write_around(APIC_LVTTHMR, val);
 
     rdmsrl(MSR_IA32_THERM_INTERRUPT, msr_content);
     wrmsrl(MSR_IA32_THERM_INTERRUPT, msr_content | 0x03);
-
-    /* ok we're good to go... */
-    vendor_thermal_interrupt = intel_thermal_interrupt;
 
     rdmsrl(MSR_IA32_MISC_ENABLE, msr_content);
     wrmsrl(MSR_IA32_MISC_ENABLE, msr_content | (1ULL<<3));
@@ -1154,36 +1137,7 @@ static void cpu_mcheck_disable(void)
         clear_cmci();
 }
 
-static void intel_init_cmci(struct cpuinfo_x86 *c)
-{
-    u32 l, apic;
-    int cpu = smp_processor_id();
-
-    if (!mce_available(c) || !cmci_support) {
-        if (opt_cpu_info)
-            mce_printk(MCE_QUIET, "CMCI: CPU%d has no CMCI support\n", cpu);
-        return;
-    }
-
-    apic = apic_read(APIC_CMCI);
-    if ( apic & APIC_VECTOR_MASK )
-    {
-        mce_printk(MCE_QUIET, "CPU%d CMCI LVT vector (%#x) already installed\n",
-            cpu, ( apic & APIC_VECTOR_MASK ));
-        return;
-    }
-
-    apic = CMCI_APIC_VECTOR;
-    apic |= (APIC_DM_FIXED | APIC_LVT_MASKED);
-    apic_write_around(APIC_CMCI, apic);
-
-    l = apic_read(APIC_CMCI);
-    apic_write_around(APIC_CMCI, l & ~APIC_LVT_MASKED);
-
-    mce_set_owner();
-}
-
-void cmci_interrupt(struct cpu_user_regs *regs)
+static void cmci_interrupt(struct cpu_user_regs *regs)
 {
     mctelem_cookie_t mctc;
     struct mca_summary bs;
@@ -1204,6 +1158,38 @@ void cmci_interrupt(struct cpu_user_regs *regs)
        }
     } else if (mctc != NULL)
         mctelem_dismiss(mctc);
+}
+
+static void intel_init_cmci(struct cpuinfo_x86 *c)
+{
+    u32 l, apic;
+    int cpu = smp_processor_id();
+    static uint8_t cmci_apic_vector;
+
+    if (!mce_available(c) || !cmci_support) {
+        if (opt_cpu_info)
+            mce_printk(MCE_QUIET, "CMCI: CPU%d has no CMCI support\n", cpu);
+        return;
+    }
+
+    apic = apic_read(APIC_CMCI);
+    if ( apic & APIC_VECTOR_MASK )
+    {
+        mce_printk(MCE_QUIET, "CPU%d CMCI LVT vector (%#x) already installed\n",
+            cpu, ( apic & APIC_VECTOR_MASK ));
+        return;
+    }
+
+    alloc_direct_apic_vector(&cmci_apic_vector, cmci_interrupt);
+
+    apic = cmci_apic_vector;
+    apic |= (APIC_DM_FIXED | APIC_LVT_MASKED);
+    apic_write_around(APIC_CMCI, apic);
+
+    l = apic_read(APIC_CMCI);
+    apic_write_around(APIC_CMCI, l & ~APIC_LVT_MASKED);
+
+    mce_set_owner();
 }
 
 /* MCA */

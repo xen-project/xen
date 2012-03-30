@@ -128,14 +128,6 @@ void __init apic_intr_init(void)
 
     /* Performance Counters Interrupt */
     set_direct_apic_vector(PMU_APIC_VECTOR, pmu_apic_interrupt);
-
-    /* CMCI Correctable Machine Check Interrupt */
-    set_direct_apic_vector(CMCI_APIC_VECTOR, cmci_interrupt);
-
-    /* thermal monitor LVT interrupt, for P4 and latest Intel CPU*/
-#ifdef CONFIG_X86_MCE_THERMAL
-    set_direct_apic_vector(THERMAL_APIC_VECTOR, thermal_interrupt);
-#endif
 }
 
 /* Using APIC to generate smp_local_timer_interrupt? */

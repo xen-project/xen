@@ -772,6 +772,21 @@ void set_direct_apic_vector(
     direct_apic_vector[vector] = handler;
 }
 
+void alloc_direct_apic_vector(
+    uint8_t *vector, void (*handler)(struct cpu_user_regs *))
+{
+    static uint8_t next = LAST_HIPRIORITY_VECTOR;
+    static DEFINE_SPINLOCK(lock);
+
+    spin_lock(&lock);
+    if (*vector == 0) {
+        BUG_ON(next == FIRST_HIPRIORITY_VECTOR);
+        set_direct_apic_vector(next, handler);
+        *vector = next--;
+    }
+    spin_unlock(&lock);
+}
+
 void do_IRQ(struct cpu_user_regs *regs)
 {
     struct irqaction *action;

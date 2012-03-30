@@ -86,12 +86,12 @@ void apic_timer_interrupt(struct cpu_user_regs *regs);
 void error_interrupt(struct cpu_user_regs *regs);
 void pmu_apic_interrupt(struct cpu_user_regs *regs);
 void spurious_interrupt(struct cpu_user_regs *regs);
-void thermal_interrupt(struct cpu_user_regs *regs);
-void cmci_interrupt(struct cpu_user_regs *regs);
 void irq_move_cleanup_interrupt(struct cpu_user_regs *regs);
 
 void set_direct_apic_vector(
     uint8_t vector, void (*handler)(struct cpu_user_regs *));
+void alloc_direct_apic_vector(
+    uint8_t *vector, void (*handler)(struct cpu_user_regs *));
 
 void do_IRQ(struct cpu_user_regs *regs);
 
