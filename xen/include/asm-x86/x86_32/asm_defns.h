@@ -107,21 +107,6 @@
 #define FIXUP_RING0_GUEST_STACK
 #endif
 
-#define BUILD_SMP_INTERRUPT(x,v) XBUILD_SMP_INTERRUPT(x,v)
-#define XBUILD_SMP_INTERRUPT(x,v)               \
-__asm__(                                        \
-    "\n"__ALIGN_STR"\n"                         \
-    ".globl " STR(x) "\n\t"                     \
-    STR(x) ":\n\t"                              \
-    "pushl $"#v"<<16\n\t"                       \
-    STR(FIXUP_RING0_GUEST_STACK)                \
-    STR(SAVE_ALL(1f,1f)) "\n\t"                 \
-    "1:movl %esp,%eax\n\t"                      \
-    "pushl %eax\n\t"                            \
-    "call "STR(smp_##x)"\n\t"                   \
-    "addl $4,%esp\n\t"                          \
-    "jmp ret_from_intr\n");
-
 #define BUILD_COMMON_IRQ()                      \
 __asm__(                                        \
     "\n" __ALIGN_STR"\n"                        \

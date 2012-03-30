@@ -34,7 +34,6 @@
 #include <asm/hardirq.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>
-#include <asm/asm_defns.h> /* for BUILD_SMP_INTERRUPT */
 #include <mach_apic.h>
 #include <io_ports.h>
 #include <xen/kexec.h>
@@ -84,33 +83,6 @@ static enum apic_mode apic_boot_mode = APIC_MODE_INVALID;
 bool_t __read_mostly x2apic_enabled = 0;
 bool_t __read_mostly directed_eoi_enabled = 0;
 
-/*
- * The following vectors are part of the Linux architecture, there
- * is no hardware IRQ pin equivalent for them, they are triggered
- * through the ICC by us (IPIs)
- */
-__asm__(".section .text");
-BUILD_SMP_INTERRUPT(irq_move_cleanup_interrupt,IRQ_MOVE_CLEANUP_VECTOR)
-BUILD_SMP_INTERRUPT(event_check_interrupt,EVENT_CHECK_VECTOR)
-BUILD_SMP_INTERRUPT(invalidate_interrupt,INVALIDATE_TLB_VECTOR)
-BUILD_SMP_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
-
-/*
- * Every pentium local APIC has two 'local interrupts', with a
- * soft-definable vector attached to both interrupts, one of
- * which is a timer interrupt, the other one is error counter
- * overflow. Linux uses the local APIC timer interrupt to get
- * a much simpler SMP time architecture:
- */
-BUILD_SMP_INTERRUPT(apic_timer_interrupt,LOCAL_TIMER_VECTOR)
-BUILD_SMP_INTERRUPT(error_interrupt,ERROR_APIC_VECTOR)
-BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
-BUILD_SMP_INTERRUPT(pmu_apic_interrupt,PMU_APIC_VECTOR)
-BUILD_SMP_INTERRUPT(cmci_interrupt, CMCI_APIC_VECTOR)
-#ifdef CONFIG_X86_MCE_THERMAL
-BUILD_SMP_INTERRUPT(thermal_interrupt,THERMAL_APIC_VECTOR)
-#endif
-
 static int modern_apic(void)
 {
     unsigned int lvr, version;
@@ -148,21 +120,21 @@ void __init apic_intr_init(void)
     smp_intr_init();
 
     /* self generated IPI for local APIC timer */
-    set_intr_gate(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
+    set_direct_apic_vector(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
 
     /* IPI vectors for APIC spurious and error interrupts */
-    set_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
-    set_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
+    set_direct_apic_vector(SPURIOUS_APIC_VECTOR, spurious_interrupt);
+    set_direct_apic_vector(ERROR_APIC_VECTOR, error_interrupt);
 
     /* Performance Counters Interrupt */
-    set_intr_gate(PMU_APIC_VECTOR, pmu_apic_interrupt);
+    set_direct_apic_vector(PMU_APIC_VECTOR, pmu_apic_interrupt);
 
     /* CMCI Correctable Machine Check Interrupt */
-    set_intr_gate(CMCI_APIC_VECTOR, cmci_interrupt);
+    set_direct_apic_vector(CMCI_APIC_VECTOR, cmci_interrupt);
 
     /* thermal monitor LVT interrupt, for P4 and latest Intel CPU*/
 #ifdef CONFIG_X86_MCE_THERMAL
-    set_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
+    set_direct_apic_vector(THERMAL_APIC_VECTOR, thermal_interrupt);
 #endif
 }
 
@@ -1332,14 +1304,11 @@ int reprogram_timer(s_time_t timeout)
     return apic_tmict || !timeout;
 }
 
-fastcall void smp_apic_timer_interrupt(struct cpu_user_regs * regs)
+void apic_timer_interrupt(struct cpu_user_regs * regs)
 {
-    struct cpu_user_regs *old_regs = set_irq_regs(regs);
     ack_APIC_irq();
     perfc_incr(apic_timer);
-    this_cpu(irq_count)++;
     raise_softirq(TIMER_SOFTIRQ);
-    set_irq_regs(old_regs);
 }
 
 static DEFINE_PER_CPU(bool_t, state_dump_pending);
@@ -1354,13 +1323,9 @@ void smp_send_state_dump(unsigned int cpu)
 /*
  * Spurious interrupts should _never_ happen with our APIC/SMP architecture.
  */
-fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs)
+void spurious_interrupt(struct cpu_user_regs *regs)
 {
     unsigned long v;
-    struct cpu_user_regs *old_regs = set_irq_regs(regs);
-
-    this_cpu(irq_count)++;
-    irq_enter();
 
     /*
      * Check if this is a vectored interrupt (most likely, as this is probably
@@ -1381,22 +1346,17 @@ fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs)
     printk(KERN_INFO "spurious APIC interrupt on CPU#%d, should "
            "never happen.\n", smp_processor_id());
 
- out:
-    irq_exit();
-    set_irq_regs(old_regs);
+out: ;
 }
 
 /*
  * This interrupt should never happen with our APIC/SMP architecture
  */
 
-fastcall void smp_error_interrupt(struct cpu_user_regs *regs)
+void error_interrupt(struct cpu_user_regs *regs)
 {
     unsigned long v, v1;
-    struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
-    this_cpu(irq_count)++;
-    irq_enter();
     /* First tickle the hardware, only then report what went on. -- REW */
     v = apic_read(APIC_ESR);
     apic_write(APIC_ESR, 0);
@@ -1415,21 +1375,16 @@ fastcall void smp_error_interrupt(struct cpu_user_regs *regs)
     */
     printk (KERN_DEBUG "APIC error on CPU%d: %02lx(%02lx)\n",
             smp_processor_id(), v , v1);
-    irq_exit();
-    set_irq_regs(old_regs);
 }
 
 /*
  * This interrupt handles performance counters interrupt
  */
 
-fastcall void smp_pmu_apic_interrupt(struct cpu_user_regs *regs)
+void pmu_apic_interrupt(struct cpu_user_regs *regs)
 {
-    struct cpu_user_regs *old_regs = set_irq_regs(regs);
     ack_APIC_irq();
-    this_cpu(irq_count)++;
     hvm_do_pmu_interrupt(regs);
-    set_irq_regs(old_regs);
 }
 
 /*

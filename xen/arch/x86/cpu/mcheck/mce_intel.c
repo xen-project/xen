@@ -62,7 +62,6 @@ static void intel_thermal_interrupt(struct cpu_user_regs *regs)
     unsigned int cpu = smp_processor_id();
     static DEFINE_PER_CPU(s_time_t, next);
 
-    ack_APIC_irq();
     if (NOW() < per_cpu(next, cpu))
         return;
 
@@ -79,17 +78,13 @@ static void intel_thermal_interrupt(struct cpu_user_regs *regs)
 }
 
 /* Thermal interrupt handler for this CPU setup */
-static void (*__read_mostly vendor_thermal_interrupt)(struct cpu_user_regs *regs)
-        = unexpected_thermal_interrupt;
+static void (*__read_mostly vendor_thermal_interrupt)(
+    struct cpu_user_regs *regs) = unexpected_thermal_interrupt;
 
-fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs)
+void thermal_interrupt(struct cpu_user_regs *regs)
 {
-    struct cpu_user_regs *old_regs = set_irq_regs(regs);
-    this_cpu(irq_count)++;
-    irq_enter();
+    ack_APIC_irq();
     vendor_thermal_interrupt(regs);
-    irq_exit();
-    set_irq_regs(old_regs);
 }
 
 /* Thermal monitoring depends on APIC, ACPI and clock modulation */
@@ -1188,15 +1183,12 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
     mce_set_owner();
 }
 
-fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
+void cmci_interrupt(struct cpu_user_regs *regs)
 {
     mctelem_cookie_t mctc;
     struct mca_summary bs;
-    struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
     ack_APIC_irq();
-    this_cpu(irq_count)++;
-    irq_enter();
 
     mctc = mcheck_mca_logout(
         MCA_CMCI_HANDLER, __get_cpu_var(mce_banks_owned), &bs, NULL);
@@ -1212,9 +1204,6 @@ fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs)
        }
     } else if (mctc != NULL)
         mctelem_dismiss(mctc);
-
-    irq_exit();
-    set_irq_regs(old_regs);
 }
 
 /* MCA */

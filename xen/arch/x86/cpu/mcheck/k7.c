@@ -17,7 +17,7 @@
 #include "x86_mca.h"
 
 /* Machine Check Handler For AMD Athlon/Duron */
-static fastcall void k7_machine_check(struct cpu_user_regs * regs, long error_code)
+static void k7_machine_check(struct cpu_user_regs * regs, long error_code)
 {
 	int recover = 1;
 	uint64_t msr_content, mcgst;

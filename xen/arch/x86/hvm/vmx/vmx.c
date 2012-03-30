@@ -2042,45 +2042,8 @@ static void vmx_do_extint(struct cpu_user_regs *regs)
     vector &= INTR_INFO_VECTOR_MASK;
     HVMTRACE_1D(INTR, vector);
 
-    switch ( vector )
-    {
-    case IRQ_MOVE_CLEANUP_VECTOR:
-        smp_irq_move_cleanup_interrupt(regs);
-        break;
-    case LOCAL_TIMER_VECTOR:
-        smp_apic_timer_interrupt(regs);
-        break;
-    case EVENT_CHECK_VECTOR:
-        smp_event_check_interrupt(regs);
-        break;
-    case INVALIDATE_TLB_VECTOR:
-        smp_invalidate_interrupt();
-        break;
-    case CALL_FUNCTION_VECTOR:
-        smp_call_function_interrupt(regs);
-        break;
-    case SPURIOUS_APIC_VECTOR:
-        smp_spurious_interrupt(regs);
-        break;
-    case ERROR_APIC_VECTOR:
-        smp_error_interrupt(regs);
-        break;
-    case CMCI_APIC_VECTOR:
-        smp_cmci_interrupt(regs);
-        break;
-    case PMU_APIC_VECTOR:
-        smp_pmu_apic_interrupt(regs);
-        break;
-#ifdef CONFIG_X86_MCE_THERMAL
-    case THERMAL_APIC_VECTOR:
-        smp_thermal_interrupt(regs);
-        break;
-#endif
-    default:
-        regs->entry_vector = vector;
-        do_IRQ(regs);
-        break;
-    }
+    regs->entry_vector = vector;
+    do_IRQ(regs);
 }
 
 static void wbinvd_ipi(void *info)

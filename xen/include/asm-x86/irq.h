@@ -79,27 +79,19 @@ static inline struct cpu_user_regs *set_irq_regs(struct cpu_user_regs *new_regs)
 
 #define platform_legacy_irq(irq)	((irq) < 16)
 
-fastcall void event_check_interrupt(void);
-fastcall void invalidate_interrupt(void);
-fastcall void call_function_interrupt(void);
-fastcall void apic_timer_interrupt(void);
-fastcall void error_interrupt(void);
-fastcall void pmu_apic_interrupt(void);
-fastcall void spurious_interrupt(void);
-fastcall void thermal_interrupt(void);
-fastcall void cmci_interrupt(void);
-fastcall void irq_move_cleanup_interrupt(void);
+void event_check_interrupt(struct cpu_user_regs *regs);
+void invalidate_interrupt(struct cpu_user_regs *regs);
+void call_function_interrupt(struct cpu_user_regs *regs);
+void apic_timer_interrupt(struct cpu_user_regs *regs);
+void error_interrupt(struct cpu_user_regs *regs);
+void pmu_apic_interrupt(struct cpu_user_regs *regs);
+void spurious_interrupt(struct cpu_user_regs *regs);
+void thermal_interrupt(struct cpu_user_regs *regs);
+void cmci_interrupt(struct cpu_user_regs *regs);
+void irq_move_cleanup_interrupt(struct cpu_user_regs *regs);
 
-fastcall void smp_event_check_interrupt(struct cpu_user_regs *regs);
-fastcall void smp_invalidate_interrupt(void);
-fastcall void smp_call_function_interrupt(struct cpu_user_regs *regs);
-fastcall void smp_apic_timer_interrupt(struct cpu_user_regs *regs);
-fastcall void smp_error_interrupt(struct cpu_user_regs *regs);
-fastcall void smp_pmu_apic_interrupt(struct cpu_user_regs *regs);
-fastcall void smp_spurious_interrupt(struct cpu_user_regs *regs);
-fastcall void smp_thermal_interrupt(struct cpu_user_regs *regs);
-fastcall void smp_cmci_interrupt(struct cpu_user_regs *regs);
-fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs);
+void set_direct_apic_vector(
+    uint8_t vector, void (*handler)(struct cpu_user_regs *));
 
 void do_IRQ(struct cpu_user_regs *regs);
 

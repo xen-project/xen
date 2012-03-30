@@ -610,14 +610,11 @@ void move_native_irq(struct irq_desc *desc)
 
 static void dump_irqs(unsigned char key);
 
-fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
+void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
 {
     unsigned vector, me;
-    struct cpu_user_regs *old_regs = set_irq_regs(regs);
 
     ack_APIC_irq();
-    this_cpu(irq_count)++;
-    irq_enter();
 
     me = smp_processor_id();
     for (vector = FIRST_DYNAMIC_VECTOR; vector < NR_VECTORS; vector++) {
@@ -687,9 +684,6 @@ fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
 unlock:
         spin_unlock(&desc->lock);
     }
-
-    irq_exit();
-    set_irq_regs(old_regs);
 }
 
 static void send_cleanup_vector(struct irq_desc *desc)
@@ -770,6 +764,14 @@ void pirq_set_affinity(struct domain *d, int pirq, const cpumask_t *mask)
 
 DEFINE_PER_CPU(unsigned int, irq_count);
 
+static void (*direct_apic_vector[NR_VECTORS])(struct cpu_user_regs *);
+void set_direct_apic_vector(
+    uint8_t vector, void (*handler)(struct cpu_user_regs *))
+{
+    BUG_ON(direct_apic_vector[vector] != NULL);
+    direct_apic_vector[vector] = handler;
+}
+
 void do_IRQ(struct cpu_user_regs *regs)
 {
     struct irqaction *action;
@@ -780,19 +782,20 @@ void do_IRQ(struct cpu_user_regs *regs)
     struct cpu_user_regs *old_regs = set_irq_regs(regs);
     
     perfc_incr(irqs);
-
     this_cpu(irq_count)++;
+    irq_enter();
 
     if (irq < 0) {
-        ack_APIC_irq();
-        printk("%s: %d.%d No irq handler for vector (irq %d)\n",
-                __func__, smp_processor_id(), vector, irq);
-        set_irq_regs(old_regs);
-        TRACE_1D(TRC_HW_IRQ_UNMAPPED_VECTOR, vector);
-        return;
+        if (direct_apic_vector[vector] != NULL) {
+            (*direct_apic_vector[vector])(regs);
+        } else {
+            ack_APIC_irq();
+            printk("%s: %d.%d No irq handler for vector (irq %d)\n",
+                   __func__, smp_processor_id(), vector, irq);
+            TRACE_1D(TRC_HW_IRQ_UNMAPPED_VECTOR, vector);
+        }
+        goto out_no_unlock;
     }
-
-    irq_enter();
 
     desc = irq_to_desc(irq);
 
@@ -863,6 +866,7 @@ void do_IRQ(struct cpu_user_regs *regs)
         desc->handler->end(desc, regs->entry_vector);
  out_no_end:
     spin_unlock(&desc->lock);
+ out_no_unlock:
     irq_exit();
     set_irq_regs(old_regs);
 }

@@ -1026,15 +1026,9 @@ void __init smp_intr_init(void)
         cpumask_copy(irq_to_desc(irq)->arch.cpu_mask, &cpu_online_map);
     }
 
-    /* IPI for cleanuping vectors after irq move */
-    set_intr_gate(IRQ_MOVE_CLEANUP_VECTOR, irq_move_cleanup_interrupt);
-
-    /* IPI for event checking. */
-    set_intr_gate(EVENT_CHECK_VECTOR, event_check_interrupt);
-
-    /* IPI for invalidation */
-    set_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
-
-    /* IPI for generic function call */
-    set_intr_gate(CALL_FUNCTION_VECTOR, call_function_interrupt);
+    /* Direct IPI vectors. */
+    set_direct_apic_vector(IRQ_MOVE_CLEANUP_VECTOR, irq_move_cleanup_interrupt);
+    set_direct_apic_vector(EVENT_CHECK_VECTOR, event_check_interrupt);
+    set_direct_apic_vector(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
+    set_direct_apic_vector(CALL_FUNCTION_VECTOR, call_function_interrupt);
 }
