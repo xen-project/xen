@@ -697,6 +697,11 @@ static void parse_config_data(const char *configfile_filename_report,
         }
     }
 
+    if (!xlu_cfg_get_long(config, "rtc_timeoffset", &l, 0))
+        b_info->rtc_timeoffset = l;
+
+    xlu_cfg_get_defbool(config, "localtime", &b_info->localtime, 0);
+
     if (!xlu_cfg_get_long (config, "videoram", &l, 0))
         b_info->video_memkb = l * 1024;
 

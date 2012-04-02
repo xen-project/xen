@@ -238,6 +238,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("target_memkb",    MemKB),
     ("video_memkb",     MemKB),
     ("shadow_memkb",    MemKB),
+    ("rtc_timeoffset",  uint32),
+    ("localtime",       libxl_defbool),
     ("disable_migrate", libxl_defbool),
     ("cpuid",           libxl_cpuid_policy_list),
     

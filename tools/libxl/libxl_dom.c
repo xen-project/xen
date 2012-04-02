@@ -91,6 +91,9 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     if (libxl_defbool_val(info->disable_migrate))
         xc_domain_disable_migrate(ctx->xch, domid);
 
+    if (info->rtc_timeoffset)
+        xc_domain_set_time_offset(ctx->xch, domid, info->rtc_timeoffset);
+
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         unsigned long shadow;
         shadow = (info->shadow_memkb + 1023) / 1024;
