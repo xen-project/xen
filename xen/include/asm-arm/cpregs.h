@@ -198,6 +198,7 @@
 /* CP15 CR13:  */
 #define FCSEIDR         p15,0,c13,c0,0  /* FCSE Process ID Register */
 #define CONTEXTIDR      p15,0,c13,c0,1  /* Context ID Register */
+#define HTPIDR          p15,4,c13,c0,2  /* Hyp. Software Thread ID Register */
 
 /* CP15 CR14:  */
 #define CNTPCT          p15,0,c14       /* Time counter value */

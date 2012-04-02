@@ -49,6 +49,9 @@ static bool_t cpu_is_dead = 0;
 /* Number of non-boot CPUs ready to enter C */
 unsigned long __initdata ready_cpus = 0;
 
+/* ID of the PCPU we're running on */
+DEFINE_PER_CPU(unsigned int, cpu_id);
+
 void __init
 smp_prepare_cpus (unsigned int max_cpus)
 {
@@ -102,8 +105,6 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
     /* Setup Hyp vector base */
     WRITE_CP32((uint32_t) hyp_traps_vector, HVBAR);
 
-    dprintk(XENLOG_DEBUG, "CPU %li awake.\n", cpuid);
-
     mmu_init_secondary_cpu();
     gic_init_secondary_cpu();
 
@@ -119,7 +120,7 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
 
     local_irq_enable();
 
-    dprintk(XENLOG_DEBUG, "CPU %li booted.\n", cpuid);
+    dprintk(XENLOG_DEBUG, "CPU %u booted.\n", smp_processor_id());
 
     startup_cpu_idle_loop();
 }

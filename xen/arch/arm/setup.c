@@ -167,7 +167,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     percpu_init_areas();
     set_processor_id(0); /* needed early, for smp_processor_id() */
-    __set_current((struct vcpu *)0xfffff000); /* debug sanity */
+    set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
 
     smp_prepare_cpus(cpus);
