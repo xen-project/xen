@@ -65,6 +65,11 @@ typedef unsigned long xen_pfn_t;
  * SEGMENT DESCRIPTOR TABLES
  */
 /*
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_set_gdt(const xen_pfn_t frames[], unsigned int entries);
+ * `
+ */
+/*
  * A number of GDT entries are reserved by Xen. These are not situated at the
  * start of the GDT because some stupid OSes export hard-coded selector values
  * in their ABI. These hard-coded values are always near the start of the GDT,
@@ -80,6 +85,13 @@ typedef unsigned long xen_pfn_t;
 #ifndef __ASSEMBLY__
 
 typedef unsigned long xen_ulong_t;
+
+/*
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_stack_switch(unsigned long ss, unsigned long esp);
+ * `
+ * Sets the stack segment and pointer for the current vcpu.
+ */
 
 /*
  * ` enum neg_errnoval
@@ -181,6 +193,24 @@ struct arch_shared_info {
 typedef struct arch_shared_info arch_shared_info_t;
 
 #endif /* !__ASSEMBLY__ */
+
+/*
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_fpu_taskswitch(int set);
+ * `
+ * Sets (if set!=0) or clears (if set==0) CR0.TS.
+ */
+
+/*
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_set_debugreg(int regno, unsigned long value);
+ *
+ * ` unsigned long
+ * ` HYPERVISOR_get_debugreg(int regno);
+ * For 0<=reg<=7, returns the debug register value.
+ * For other values of reg, returns ((unsigned long)-EINVAL).
+ * (Unfortunately, this interface is defective.)
+ */
 
 /*
  * Prefix forces emulation of some non-trapping instructions.

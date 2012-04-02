@@ -504,6 +504,10 @@ struct xenpf_core_parking {
 typedef struct xenpf_core_parking xenpf_core_parking_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_core_parking_t);
 
+/*
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_platform_op(const struct xen_platform_op*);
+ */
 struct xen_platform_op {
     uint32_t cmd;
     uint32_t interface_version; /* XENPF_INTERFACE_VERSION */
