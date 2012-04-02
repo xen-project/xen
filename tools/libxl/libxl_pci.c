@@ -1177,7 +1177,7 @@ static int e820_sanitize(libxl_ctx *ctx, struct e820entry src[],
     uint32_t i, idx = 0, nr;
     struct e820entry e820[E820MAX];
 
-    if (!src || !map_limitkb || !balloon_kb || !nr_entries)
+    if (!src || !map_limitkb || !nr_entries)
         return ERROR_INVAL;
 
     nr = *nr_entries;
