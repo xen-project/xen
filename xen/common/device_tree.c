@@ -23,7 +23,7 @@
 struct dt_early_info __initdata early_info;
 void *device_tree_flattened;
 
-static bool_t __init node_matches(const void *fdt, int node, const char *match)
+bool_t device_tree_node_matches(const void *fdt, int node, const char *match)
 {
     const char *name;
     size_t match_len;
@@ -48,16 +48,33 @@ static void __init get_val(const u32 **cell, u32 cells, u64 *val)
     }
 }
 
-static void __init get_register(const u32 **cell,
-                                u32 address_cells, u32 size_cells,
-                                u64 *start, u64 *size)
+void device_tree_get_reg(const u32 **cell, u32 address_cells, u32 size_cells,
+                         u64 *start, u64 *size)
 {
     get_val(cell, address_cells, start);
     get_val(cell, size_cells, size);
 }
 
-static u32 __init prop_by_name_u32(const void *fdt, int node,
-                                   const char *prop_name)
+static void set_val(u32 **cell, u32 cells, u64 val)
+{
+    u32 c = cells;
+
+    while ( c-- )
+    {
+        (*cell)[c] = cpu_to_fdt32(val);
+        val >>= 32;
+    }
+    (*cell) += cells;
+}
+
+void device_tree_set_reg(u32 **cell, u32 address_cells, u32 size_cells,
+                         u64 start, u64 size)
+{
+    set_val(cell, address_cells, start);
+    set_val(cell, size_cells, size);
+}
+
+u32 device_tree_get_u32(const void *fdt, int node, const char *prop_name)
 {
     const struct fdt_property *prop;
 
@@ -67,8 +84,6 @@ static u32 __init prop_by_name_u32(const void *fdt, int node,
 
     return fdt32_to_cpu(*(uint32_t*)prop->data);
 }
-
-#define MAX_DEPTH 16
 
 /**
  * device_tree_for_each_node - iterate over all device tree nodes
@@ -81,19 +96,19 @@ int device_tree_for_each_node(const void *fdt,
 {
     int node;
     int depth;
-    u32 address_cells[MAX_DEPTH];
-    u32 size_cells[MAX_DEPTH];
+    u32 address_cells[DEVICE_TREE_MAX_DEPTH];
+    u32 size_cells[DEVICE_TREE_MAX_DEPTH];
     int ret;
 
     for ( node = 0, depth = 0;
           node >=0 && depth >= 0;
           node = fdt_next_node(fdt, node, &depth) )
     {
-        if ( depth >= MAX_DEPTH )
+        if ( depth >= DEVICE_TREE_MAX_DEPTH )
             continue;
 
-        address_cells[depth] = prop_by_name_u32(fdt, node, "#address-cells");
-        size_cells[depth] = prop_by_name_u32(fdt, node, "#size-cells");
+        address_cells[depth] = device_tree_get_u32(fdt, node, "#address-cells");
+        size_cells[depth] = device_tree_get_u32(fdt, node, "#size-cells");
 
         ret = func(fdt, node, fdt_get_name(fdt, node, NULL), depth,
                    address_cells[depth-1], size_cells[depth-1], data);
@@ -106,7 +121,7 @@ int device_tree_for_each_node(const void *fdt,
 static int dump_node(const void *fdt, int node, const char *name, int depth,
                      u32 address_cells, u32 size_cells, void *data)
 {
-    char prefix[2*MAX_DEPTH + 1] = "";
+    char prefix[2*DEVICE_TREE_MAX_DEPTH + 1] = "";
     int i;
     int prop;
 
@@ -172,7 +187,7 @@ static void __init process_memory_node(const void *fdt, int node,
 
     for ( i = 0; i < banks && early_info.mem.nr_banks < NR_MEM_BANKS; i++ )
     {
-        get_register(&cell, address_cells, size_cells, &start, &size);
+        device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
         early_info.mem.bank[early_info.mem.nr_banks].start = start;
         early_info.mem.bank[early_info.mem.nr_banks].size = size;
         early_info.mem.nr_banks++;
@@ -184,7 +199,7 @@ static int __init early_scan_node(const void *fdt,
                                   u32 address_cells, u32 size_cells,
                                   void *data)
 {
-    if ( node_matches(fdt, node, "memory") )
+    if ( device_tree_node_matches(fdt, node, "memory") )
         process_memory_node(fdt, node, name, address_cells, size_cells);
 
     return 0;

@@ -7,11 +7,15 @@
 #define __ARCH_ARM_KERNEL_H__
 
 #include <xen/libelf.h>
+#include <xen/device_tree.h>
 
 struct kernel_info {
+    void *fdt; /* flat device tree */
+    paddr_t unassigned_mem; /* RAM not (yet) assigned to a bank */
+    struct dt_mem_info mem;
+
+    paddr_t dtb_paddr;
     paddr_t entry;
-    paddr_t ram_start;
-    paddr_t ram_end;
 
     void *kernel_img;
     unsigned kernel_order;

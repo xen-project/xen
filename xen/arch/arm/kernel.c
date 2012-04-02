@@ -121,7 +121,7 @@ static int kernel_try_zimage_prepare(struct kernel_info *info)
      * at 32k from start of RAM.
      */
     if (start == 0)
-        info->zimage.load_addr = info->ram_start + 0x8000;
+        info->zimage.load_addr = info->mem.bank[0].start + 0x8000;
     else
         info->zimage.load_addr = start;
     info->zimage.len = end - start;
