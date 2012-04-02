@@ -105,6 +105,13 @@ Allow the guest to bring up a maximum of M vcpus. At start of day if
 `vcpus=N` is less than `maxvcpus=M` then the first `N` vcpus will be
 created online and the remainder will be offline.
 
+=item B<cpus="CPU-LIST">
+
+List of which cpus the guest is allowed to use. Default behavior is
+`all cpus`. A list of cpus may be specified as follows: `cpus="0-3,5,^1"`
+(all vcpus will run on cpus 0,2,3,5), or `cpus=["2", "3"]` (all vcpus
+will run on cpus 2 and 3).
+
 =item B<memory=MBYTES>
 
 Start the guest with MBYTES megabytes of RAM.
