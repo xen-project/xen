@@ -108,7 +108,6 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
     gic_init_secondary_cpu();
 
     set_current(idle_vcpu[cpuid]);
-    this_cpu(curr_vcpu) = current;
 
     /* Run local notifiers */
     notify_cpu_starting(cpuid);
