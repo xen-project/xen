@@ -216,9 +216,9 @@ CONFIG_SEABIOS ?= y
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 2503d4d5a29e7af8dffd1e11229e11c1917d2ccf
-# Thu Mar 1 18:58:27 2012 +0000
-# qemu-xen: ignore console disconnect events for console/0
+QEMU_TAG ?= f0fad5549f8103fc0130d3121eb5f7913c5bc2a9
+# Mon Apr 2 17:55:05 2012 +0100
+# qemu-xen-traditional: QDISK fixes
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
