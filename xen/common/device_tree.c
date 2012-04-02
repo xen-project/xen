@@ -23,6 +23,10 @@
 struct dt_early_info __initdata early_info;
 void *device_tree_flattened;
 
+/* Some device tree functions may be called both before and after the
+   console is initialized. */
+static void (*dt_printk)(const char *fmt, ...) = early_printk;
+
 bool_t device_tree_node_matches(const void *fdt, int node, const char *match)
 {
     const char *name;
@@ -90,6 +94,11 @@ u32 device_tree_get_u32(const void *fdt, int node, const char *prop_name)
  * @fdt: flat device tree.
  * @func: function to call for each node.
  * @data: data to pass to @func.
+ *
+ * Any nodes nested at DEVICE_TREE_MAX_DEPTH or deeper are ignored.
+ *
+ * Returns 0 if all nodes were iterated over successfully.  If @func
+ * returns a negative value, that value is returned immediately.
  */
 int device_tree_for_each_node(const void *fdt,
                               device_tree_node_func func, void *data)
@@ -104,13 +113,19 @@ int device_tree_for_each_node(const void *fdt,
           node >=0 && depth >= 0;
           node = fdt_next_node(fdt, node, &depth) )
     {
+        const char *name = fdt_get_name(fdt, node, NULL);
+
         if ( depth >= DEVICE_TREE_MAX_DEPTH )
+        {
+            dt_printk("Warning: device tree node `%s' is nested too deep\n",
+                      name);
             continue;
+        }
 
         address_cells[depth] = device_tree_get_u32(fdt, node, "#address-cells");
         size_cells[depth] = device_tree_get_u32(fdt, node, "#size-cells");
 
-        ret = func(fdt, node, fdt_get_name(fdt, node, NULL), depth,
+        ret = func(fdt, node, name, depth,
                    address_cells[depth-1], size_cells[depth-1], data);
         if ( ret < 0 )
             return ret;
@@ -252,6 +267,8 @@ size_t __init device_tree_early_init(const void *fdt)
 
     device_tree_for_each_node((void *)fdt, early_scan_node, NULL);
     early_print_info();
+
+    dt_printk = printk;
 
     return fdt_totalsize(fdt);
 }
