@@ -17,6 +17,17 @@
 static unsigned int __initdata opt_dom0_max_vcpus;
 integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
 
+#define DOM0_MEM_DEFAULT 0x8000000 /* 128 MiB */
+static u64 __initdata dom0_mem = DOM0_MEM_DEFAULT;
+
+static void __init parse_dom0_mem(const char *s)
+{
+    dom0_mem = parse_size_and_unit(s, &s);
+    if ( dom0_mem == 0 )
+        dom0_mem = DOM0_MEM_DEFAULT;
+}
+custom_param("dom0_mem", parse_dom0_mem);
+
 /*
  * Amount of extra space required to dom0's device tree.  No new nodes
  * are added (yet) but one terminating reserve map entry (16 bytes) is
@@ -191,6 +202,8 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
     int new_size;
     int ret;
 
+    kinfo->unassigned_mem = dom0_mem;
+
     fdt = device_tree_flattened;
 
     new_size = fdt_totalsize(fdt) + DOM0_FDT_EXTRA_SIZE;
@@ -259,8 +272,6 @@ int construct_dom0(struct domain *d)
 
     if ( (rc = p2m_alloc_table(d)) != 0 )
         return rc;
-
-    kinfo.unassigned_mem = 0x08000000; /* XXX */
 
     rc = prepare_dtb(d, &kinfo);
     if ( rc < 0 )
