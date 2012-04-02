@@ -1206,11 +1206,31 @@ skip_vfb:
     xlu_cfg_destroy(config);
 }
 
+static void reload_domain_config(libxl_ctx *ctx, uint32_t domid,
+                                 uint8_t **config_data, int *config_len)
+{
+    uint8_t *t_data;
+    int ret, t_len;
+
+    ret = libxl_userdata_retrieve(ctx, domid, "xl", &t_data, &t_len);
+    if (ret) {
+        LOG("failed to retrieve guest configuration (rc=%d). "
+            "reusing old configuration", ret);
+        return;
+    }
+
+    free(*config_data);
+    *config_data = t_data;
+    *config_len = t_len;
+}
+
 /* Returns 1 if domain should be restarted,
  * 2 if domain should be renamed then restarted, or 0 */
 static int handle_domain_death(libxl_ctx *ctx, uint32_t domid,
                                libxl_event *event,
+                               uint8_t **config_data, int *config_len,
                                libxl_domain_config *d_config)
+
 {
     int restart = 0;
     libxl_action_on_shutdown action;
@@ -1265,10 +1285,13 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid,
         break;
 
     case LIBXL_ACTION_ON_SHUTDOWN_RESTART_RENAME:
+        reload_domain_config(ctx, domid, config_data, config_len);
         restart = 2;
         break;
 
     case LIBXL_ACTION_ON_SHUTDOWN_RESTART:
+        reload_domain_config(ctx, domid, config_data, config_len);
+
         restart = 1;
         /* fall-through */
     case LIBXL_ACTION_ON_SHUTDOWN_DESTROY:
@@ -1753,7 +1776,9 @@ start:
             LOG("Domain %d has shut down, reason code %d 0x%x", domid,
                 event->u.domain_shutdown.shutdown_reason,
                 event->u.domain_shutdown.shutdown_reason);
-            switch (handle_domain_death(ctx, domid, event, &d_config)) {
+            switch (handle_domain_death(ctx, domid, event,
+                                        (uint8_t **)&config_data, &config_len,
+                                        &d_config)) {
             case 2:
                 if (!preserve_domain(ctx, domid, event, &d_config)) {
                     /* If we fail then exit leaving the old domain in place. */
@@ -1789,6 +1814,12 @@ start:
                     && strcmp(d_config.c_info.name, common_domname)) {
                     d_config.c_info.name = strdup(common_domname);
                 }
+
+                /* Reparse the configuration in case it has changed */
+                libxl_domain_config_dispose(&d_config);
+                memset(&d_config, 0, sizeof(d_config));
+                parse_config_data(config_file, config_data, config_len,
+                                  &d_config);
 
                 /*
                  * XXX FIXME: If this sleep is not there then domain
@@ -3399,6 +3430,120 @@ int main_create(int argc, char **argv)
     return 0;
 }
 
+int main_config_update(int argc, char **argv)
+{
+    const char *filename = NULL;
+    char *p;
+    char extra_config[1024];
+    void *config_data = 0;
+    int config_len = 0;
+    libxl_domain_config d_config;
+    int opt, rc;
+    int option_index = 0;
+    int debug = 0;
+    static struct option long_options[] = {
+        {"help", 0, 0, 'h'},
+        {"defconfig", 1, 0, 'f'},
+        {0, 0, 0, 0}
+    };
+
+    if (argc < 2) {
+        fprintf(stderr, "xl config-update requires a domain argument\n");
+        help("config-update");
+        exit(1);
+    }
+
+    find_domain(argv[1]);
+    argc--; argv++;
+
+    if (argv[1] && argv[1][0] != '-' && !strchr(argv[1], '=')) {
+        filename = argv[1];
+        argc--; argv++;
+    }
+
+    while (1) {
+        opt = getopt_long(argc, argv, "dhqf:", long_options, &option_index);
+        if (opt == -1)
+            break;
+
+        switch (opt) {
+        case 'd':
+            debug = 1;
+            break;
+        case 'f':
+            filename = optarg;
+            break;
+        case 'h':
+            help("create");
+            return 0;
+        default:
+            fprintf(stderr, "option `%c' not supported.\n", optopt);
+            break;
+        }
+    }
+
+    extra_config[0] = '\0';
+    for (p = extra_config; optind < argc; optind++) {
+        if (strchr(argv[optind], '=') != NULL) {
+            p += snprintf(p, sizeof(extra_config) - (p - extra_config),
+                "%s\n", argv[optind]);
+        } else if (!filename) {
+            filename = argv[optind];
+        } else {
+            help("create");
+            return 2;
+        }
+    }
+    if (filename) {
+        free(config_data);  config_data = 0;
+        rc = libxl_read_file_contents(ctx, filename,
+                                      &config_data, &config_len);
+        if (rc) { fprintf(stderr, "Failed to read config file: %s: %s\n",
+                           filename, strerror(errno)); return ERROR_FAIL; }
+        if (strlen(extra_config)) {
+            if (config_len > INT_MAX - (strlen(extra_config) + 2 + 1)) {
+                fprintf(stderr, "Failed to attach extra configration\n");
+                exit(1);
+            }
+            /* allocate space for the extra config plus two EOLs plus \0 */
+            config_data = realloc(config_data, config_len
+                + strlen(extra_config) + 2 + 1);
+            if (!config_data) {
+                fprintf(stderr, "Failed to realloc config_data\n");
+                exit(1);
+            }
+            config_len += sprintf(config_data + config_len, "\n%s\n",
+                extra_config);
+        }
+    } else {
+        fprintf(stderr, "Config file not specified\n");
+        exit(1);
+    }
+
+    memset(&d_config, 0x00, sizeof(d_config));
+
+    parse_config_data(filename, config_data, config_len, &d_config);
+
+    if (debug || dryrun_only)
+        printf_info(default_output_format, -1, &d_config);
+
+    if (!dryrun_only) {
+        fprintf(stderr, "setting dom%d configuration\n", domid);
+        rc = libxl_userdata_store(ctx, domid, "xl",
+                                   config_data, config_len);
+        if (rc) {
+            fprintf(stderr, "failed to update configuration\n");
+            exit(1);
+        }
+    }
+
+    libxl_domain_config_dispose(&d_config);
+
+    free(config_data);
+
+    return 0;
+}
+
 static void button_press(const char *p, const char *b)
 {
     libxl_trigger trigger;
@@ -3921,7 +4066,6 @@ static int sched_credit_domain_set(int domid, libxl_sched_credit_domain *scinfo)
 {
     int rc;
 
-    
     rc = libxl_sched_credit_domain_set(ctx, domid, scinfo);
     if (rc)
         fprintf(stderr, "libxl_sched_credit_domain_set failed.\n");

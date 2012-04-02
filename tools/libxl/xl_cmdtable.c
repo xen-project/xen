@@ -32,6 +32,15 @@ struct cmd_spec cmd_table[] = {
       "-d                      Enable debug messages.\n"
       "-e                      Do not wait in the background for the death of the domain."
     },
+    { "config-update",
+      &main_config_update, 1,
+      "Update a running domain's saved configuration, used when rebuilding "
+      "the domain after reboot",
+      "<Domain> <ConfigFile> [options] [vars]",
+      "-h                      Print this help.\n"
+      "-f FILE, --defconfig=FILE\n                     Use the given configuration file.\n"
+      "-d                      Enable debug messages.\n"
+    },
     { "list",
       &main_list, 0,
       "List information about all/some domains",

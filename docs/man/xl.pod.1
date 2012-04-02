@@ -148,6 +148,31 @@ soon as it is run.
 
 =back
 
+=item B<config-update> B<domid> [I<configfile>] [I<OPTIONS>]
+
+Update the saved configuration for a running domain. This has no
+immediate effect but will be applied when the guest is next
+restarted. This command is useful to ensure that runtime modifications
+made to the guest will be preserved when the guest is restarted.
+
+I<configfile> has to be an absolute path to a file.
+
+B<OPTIONS>
+
+=over 4 
+
+=item B<-f=FILE>, B<--defconfig=FILE>
+
+Use the given configuration file.
+
+=item B<key=value>
+
+It is possible to pass I<key=value> pairs on the command line to provide
+options as if they were written in the configuration file; these override
+whatever is in the I<configfile>.
+
+=back
+
 =item B<console> [I<OPTIONS>] I<domain-id>
 
 Attach to domain I<domain-id>'s console.  If you've set up your domains to
