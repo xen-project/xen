@@ -149,6 +149,7 @@ static int gic_route_irq(unsigned int irq, bool_t level,
 
     if ( desc->action != NULL )
     {
+        spin_unlock(&gic.lock);
         spin_unlock(&desc->lock);
         return -EBUSY;
     }
