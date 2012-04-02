@@ -152,6 +152,8 @@ void __init start_xen(unsigned long boot_phys_offset,
         + (atag_paddr & ((1 << SECOND_SHIFT) - 1));
     fdt_size = device_tree_early_init(fdt);
 
+    cmdline_parse(device_tree_bootargs(fdt));
+
     setup_pagetables(boot_phys_offset);
 
 #ifdef EARLY_UART_ADDRESS

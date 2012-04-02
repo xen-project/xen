@@ -49,6 +49,7 @@ u32 device_tree_get_u32(const void *fdt, int node, const char *prop_name);
 bool_t device_tree_node_matches(const void *fdt, int node, const char *match);
 int device_tree_for_each_node(const void *fdt,
                               device_tree_node_func func, void *data);
+const char *device_tree_bootargs(const void *fdt);
 void device_tree_dump(const void *fdt);
 
 #endif

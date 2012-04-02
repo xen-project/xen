@@ -118,6 +118,26 @@ int device_tree_for_each_node(const void *fdt,
     return 0;
 }
 
+/**
+ * device_tree_bootargs - return the bootargs (the Xen command line)
+ * @fdt flat device tree.
+ */
+const char *device_tree_bootargs(const void *fdt)
+{
+    int node; 
+    const struct fdt_property *prop;
+
+    node = fdt_path_offset(fdt, "/chosen");
+    if ( node < 0 )
+        return NULL;
+
+    prop = fdt_get_property(fdt, node, "bootargs", NULL);
+    if ( prop == NULL )
+        return NULL;
+
+    return prop->data;
+}
+
 static int dump_node(const void *fdt, int node, const char *name, int depth,
                      u32 address_cells, u32 size_cells, void *data)
 {
