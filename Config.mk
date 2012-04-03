@@ -216,9 +216,9 @@ CONFIG_SEABIOS ?= y
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= f0fad5549f8103fc0130d3121eb5f7913c5bc2a9
-# Mon Apr 2 17:55:05 2012 +0100
-# qemu-xen-traditional: QDISK fixes
+QEMU_TAG ?= 82db8de16530f016809264d3179823999d702849
+# Tue Apr 3 15:44:48 2012 +0100
+# timers: use INT64_MAX as max expiration
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
