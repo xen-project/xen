@@ -286,19 +286,27 @@ Specify the total size for dom0.
 > `= List of ( min:<size> | max:<size> | <size> )`
 
 Set the amount of memory for the initial domain (dom0). If a size is
-positive, it represents an absolute value.  If a size is negative, the
-size specified is subtracted from the total available memory.
+positive, it represents an absolute value.  If a size is negative, it
+is subtracted from the total available memory.
 
-* `min:<size>` specifies the minimum amount of memory allocated to dom0.
-* `max:<size>` specifies the maximum amount of memory allocated to dom0.
-* `<size>` specified the exact amount of memory allocated to dom0.
+* `<size>` specifies the exact amount of memory.
+* `min:<size>` specifies the minimum amount of memory.
+* `max:<size>` specifies the maximum amount of memory.
+
+If `<size>` is not specified, the default is all the available memory
+minus some reserve.  The reserve is 1/16 of the available memory or
+128 MB (whichever is smaller).
+
+The amount of memory will be at least the minimum but never more than
+the maximum (i.e., `max` overrides the `min` option).  If there isn't
+enough memory then as much as possible is allocated.
 
 `max:<size>` also sets the maximum reservation (the maximum amount of
 memory dom0 can balloon up to).  If this is omitted then the maximum
 reservation is unlimited.
 
-For example, to set dom0's memory to 512 MB but no more than 1 GB use
-`dom0_mem=512M,max:1G`.
+For example, to set dom0's initial memory allocation to 512MB but
+allow it to balloon up as far as 1GB use `dom0_mem=512M,max:1G`
 
 ### dom0\_shadow
 ### dom0\_vcpus\_pin
