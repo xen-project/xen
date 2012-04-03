@@ -74,7 +74,7 @@ diff -Naurp tpm_emulator-0.5.1/tpmd/Makefile tpm5-test/tpmd/Makefile
             #WFLAGS  += -Wextra -Wcast-qual -Wmissing-prototypes -Wmissing-declarations -Wstrict-aliasing
  CFLAGS  += $(WFLAGS) -g -I.. -I. -O2 -fno-strict-aliasing
 +CFLAGS  += -I../../../../tools/vtpm_manager/manager
- LDFLAGS += -lgmp
+ LDLIBS  += -lgmp
  
 -BINDIR  := /usr/sbin/
 +BINDIR  := /usr/bin/
