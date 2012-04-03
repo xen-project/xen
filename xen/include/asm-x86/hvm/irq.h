@@ -104,11 +104,4 @@ struct hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v);
 struct hvm_intack hvm_vcpu_ack_pending_irq(struct vcpu *v,
                                            struct hvm_intack intack);
 
-/*
- * Currently IA64 Xen doesn't support MSI. So for x86, we define this macro
- * to control the conditional compilation of some MSI-related functions.
- * This macro will be removed once IA64 has MSI support.
- */
-#define SUPPORT_MSI_REMAPPING 1
-
 #endif /* __ASM_X86_HVM_IRQ_H__ */

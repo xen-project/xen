@@ -38,7 +38,7 @@ suffix-$(CONFIG_X86)      := \#pragma pack()
 endif
 
 public-$(CONFIG_X86) := $(wildcard public/arch-x86/*.h public/arch-x86/*/*.h)
-public-$(CONFIG_IA64) := $(wildcard public/arch-ia64/*.h public/arch-ia64/*/*.h)
+public-$(CONFIG_ARM) := $(wildcard public/arch-arm/*.h public/arch-arm/*/*.h)
 
 .PHONY: all
 all: $(headers-y)
@@ -74,8 +74,6 @@ compat/xlat.h: xlat.lst $(filter-out compat/xlat.h,$(headers-y)) $(BASEDIR)/tool
 	mv -f $@.new $@
 
 ifeq ($(XEN_TARGET_ARCH),$(XEN_COMPILE_ARCH))
-# public/arch-ia64.h explicitly bails on __STRICT_ANSI__
-ifeq ($(CONFIG_IA64),)
 
 all: headers.chk
 
@@ -83,7 +81,6 @@ headers.chk: $(filter-out public/arch-% public/%ctl.h public/xsm/% public/%hvm/s
 	for i in $(filter %.h,$^); do $(CC) -ansi -include stdint.h -Wall -W -Werror -S -o /dev/null -xc $$i || exit 1; echo $$i; done >$@.new
 	mv $@.new $@
 
-endif
 endif
 
 clean::

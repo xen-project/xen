@@ -1141,7 +1141,7 @@ void __init scrub_heap_pages(void)
  * XEN-HEAP SUB-ALLOCATOR
  */
 
-#if !defined(__x86_64__) && !defined(__ia64__)
+#if !defined(__x86_64__)
 
 void init_xenheap_pages(paddr_t ps, paddr_t pe)
 {

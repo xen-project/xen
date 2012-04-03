@@ -41,7 +41,7 @@
 /* Direct registers. */
 #define VIOAPIC_REG_SELECT  0x00
 #define VIOAPIC_REG_WINDOW  0x10
-#define VIOAPIC_REG_EOI     0x40 /* IA64 IOSAPIC only */
+#define VIOAPIC_REG_EOI     0x40
 
 /* Indirect registers. */
 #define VIOAPIC_REG_APIC_ID 0x00 /* x86 IOAPIC only */

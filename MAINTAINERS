@@ -138,14 +138,6 @@ M:	Tim Deegan <tim@xen.org>
 S:	Supported
 F:	tools/debugger/kdd/
 
-IA64 ARCHITECTURE
-M:	KUWAMURA Shin'ya <kuwa@jp.fujitsu.com>
-S:	Supported
-L:	xen-ia64-devel@lists.xensource.com
-F:	xen/arch/ia64/*
-F:	xen/include/asm-ia64/*
-F:	tools/libxc/ia64/*
-
 INTEL(R) TRUSTED EXECUTION TECHNOLOGY (TXT)
 M:	Joseph Cihula <joseph.cihula@intel.com>
 M:	Gang Wei <gang.wei@intel.com>

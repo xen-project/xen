@@ -35,11 +35,7 @@ extern bool_t iommu_debug;
 extern bool_t amd_iommu_perdev_intremap;
 
 /* Does this domain have a P2M table we can use as its IOMMU pagetable? */
-#ifndef __ia64__
 #define iommu_use_hap_pt(d) (hap_enabled(d) && iommu_hap_pt_share)
-#else
-#define iommu_use_hap_pt(d) 0
-#endif
 
 extern struct rangeset *mmio_ro_ranges;
 

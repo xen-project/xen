@@ -82,7 +82,7 @@ typedef struct cpumask{ DECLARE_BITMAP(bits, NR_CPUS); } cpumask_t;
 
 extern unsigned int nr_cpu_ids;
 
-#if NR_CPUS > 4 * BITS_PER_LONG && !defined(__ia64__)
+#if NR_CPUS > 4 * BITS_PER_LONG
 /* Assuming NR_CPUS is huge, a runtime limit is more efficient.  Also,
  * not all bits may be allocated. */
 extern unsigned int nr_cpumask_bits;
@@ -262,37 +262,6 @@ static inline const cpumask_t *cpumask_of(unsigned int cpu)
 	const unsigned long *p = cpu_bit_bitmap[1 + cpu % BITS_PER_LONG];
 	return (const cpumask_t *)(p - cpu / BITS_PER_LONG);
 }
-
-#if defined(__ia64__) /* XXX needs cleanup */
-#define CPU_MASK_LAST_WORD BITMAP_LAST_WORD_MASK(NR_CPUS)
-
-#if NR_CPUS <= BITS_PER_LONG
-
-#define CPU_MASK_ALL							\
-/*(cpumask_t)*/ { {							\
-	[BITS_TO_LONGS(NR_CPUS)-1] = CPU_MASK_LAST_WORD			\
-} }
-
-#else
-
-#define CPU_MASK_ALL							\
-/*(cpumask_t)*/ { {							\
-	[0 ... BITS_TO_LONGS(NR_CPUS)-2] = ~0UL,			\
-	[BITS_TO_LONGS(NR_CPUS)-1] = CPU_MASK_LAST_WORD			\
-} }
-
-#endif
-
-#define CPU_MASK_NONE							\
-/*(cpumask_t)*/ { {							\
-	0UL								\
-} }
-
-#define CPU_MASK_CPU0							\
-/*(cpumask_t)*/ { {							\
-	[0] =  1UL							\
-} }
-#endif /* __ia64__ */
 
 #define cpumask_bits(maskp) ((maskp)->bits)
 

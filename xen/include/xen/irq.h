@@ -95,37 +95,19 @@ int arch_init_one_irq_desc(struct irq_desc *);
 
 #define irq_desc_initialized(desc) ((desc)->handler != NULL)
 
-#if defined(__ia64__)
-extern irq_desc_t irq_desc[NR_VECTORS];
-
-#define setup_irq(irq, action) \
-    setup_irq_vector(irq_to_vector(irq), action)
-
-#define release_irq(irq) \
-    release_irq_vector(irq_to_vector(irq))
-
-#define request_irq(irq, handler, irqflags, devname, devid) \
-    request_irq_vector(irq_to_vector(irq), handler, irqflags, devname, devid)
-
-#elif defined(__arm__)
+#if defined(__arm__)
 
 #define NR_IRQS		1024
 #define nr_irqs NR_IRQS
 extern irq_desc_t irq_desc[NR_IRQS];
 
-extern int setup_irq(unsigned int irq, struct irqaction *);
-extern void release_irq(unsigned int irq);
-extern int request_irq(unsigned int irq,
-               void (*handler)(int, void *, struct cpu_user_regs *),
-               unsigned long irqflags, const char * devname, void *dev_id);
-
-#else
-extern int setup_irq(unsigned int irq, struct irqaction *);
-extern void release_irq(unsigned int irq);
-extern int request_irq(unsigned int irq,
-               void (*handler)(int, void *, struct cpu_user_regs *),
-               unsigned long irqflags, const char * devname, void *dev_id);
 #endif
+
+extern int setup_irq(unsigned int irq, struct irqaction *);
+extern void release_irq(unsigned int irq);
+extern int request_irq(unsigned int irq,
+               void (*handler)(int, void *, struct cpu_user_regs *),
+               unsigned long irqflags, const char * devname, void *dev_id);
 
 extern hw_irq_controller no_irq_type;
 extern void no_action(int cpl, void *dev_id, struct cpu_user_regs *regs);

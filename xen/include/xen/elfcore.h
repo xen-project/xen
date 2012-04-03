@@ -69,9 +69,6 @@ typedef struct {
     unsigned long xen_phys_start;
     unsigned long dom0_pfn_to_mfn_frame_list_list;
 #endif
-#if defined(__ia64__)
-    unsigned long dom0_mm_pgd_mfn;
-#endif
 } crash_xen_info_t;
 
 #endif /* __ELFCOREC_H__ */

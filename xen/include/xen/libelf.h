@@ -23,7 +23,7 @@
 #ifndef __XEN_LIBELF_H__
 #define __XEN_LIBELF_H__
 
-#if defined(__i386__) || defined(__x86_64__) || defined(__ia64__) || defined(__arm__)
+#if defined(__i386__) || defined(__x86_64__) || defined(__arm__)
 #define XEN_ELF_LITTLE_ENDIAN
 #else
 #error define architectural endianness

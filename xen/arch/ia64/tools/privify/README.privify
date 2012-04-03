@@ -1,8 +1,0 @@
-In this directory, just "make".
-
-Run the resulting program on a vmlinux that has been adjusted
-to run on Xen (see arch/ia64/tools/README.xenia64linux):
-
-	./privify vmlinux xenlinux
-
-Use the resulting xenlinux file as domain0

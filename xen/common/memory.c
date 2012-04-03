@@ -23,9 +23,7 @@
 #include <xen/tmem_xen.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
-#ifndef __ia64__
 #include <asm/p2m.h>
-#endif
 #include <xen/numa.h>
 #include <public/memory.h>
 #include <xsm/xsm.h>

@@ -301,8 +301,7 @@ static void dump_iommu_info(unsigned char key)
         }
     }
 #else
-    printk("%s: not implemnted on IA64 for now.\n", __func__);
-    /* ia64: TODO */
+    printk("%s: not implemented for now\n", __func__);
 #endif
 }
 

@@ -26,44 +26,8 @@
 #define MAP_ME_PHANTOM_FUNC      1
 #define UNMAP_ME_PHANTOM_FUNC    0
 
-/* Accomodate both IOAPIC and IOSAPIC. */
-#ifndef __ia64__
+/* Allow for both IOAPIC and IOSAPIC. */
 #define IO_xAPIC_route_entry IO_APIC_route_entry
-#else
-struct IO_xAPIC_route_entry {
-    __u32   vector      :  8,
-        delivery_mode   :  3,   /* 000: FIXED
-                                 * 001: lowest prio
-                                 * 111: ExtINT
-                                 */
-        dest_mode       :  1,   /* 0: physical, 1: logical */
-        delivery_status :  1,
-        polarity        :  1,
-        irr             :  1,
-        trigger         :  1,   /* 0: edge, 1: level */
-        mask            :  1,   /* 0: enabled, 1: disabled */
-        __reserved_2    : 15;
-
-    union {
-        struct { __u32
-            __reserved_1    : 24,
-            physical_dest   :  4,
-            __reserved_2    :  4;
-        } physical;
-
-        struct { __u32
-            __reserved_1    : 24,
-            logical_dest    :  8;
-        } logical;
-
-        struct { __u32
-            __reserved_1    : 16,
-            dest_id         : 16;
-        };
-    } dest;
-
-} __attribute__ ((packed));
-#endif
 
 struct IO_APIC_route_remap_entry {
     union {

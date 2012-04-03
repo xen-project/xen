@@ -88,7 +88,7 @@ void tmh_copy_page(char *to, char*from)
 #endif
 }
 
-#if defined(__ia64__) || defined (CONFIG_ARM)
+#if defined(CONFIG_ARM)
 static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
                                  pfp_t **pcli_pfp, bool_t cli_write)
 {

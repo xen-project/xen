@@ -721,11 +721,7 @@ static void crash_save_vmcoreinfo(void)
     VMCOREINFO_STRUCT_SIZE(domain);
 
     VMCOREINFO_OFFSET(page_info, count_info);
-#ifdef __ia64__
-    VMCOREINFO_OFFSET_SUB(page_info, u.inuse, _domain);
-#else
     VMCOREINFO_OFFSET_SUB(page_info, v.inuse, _domain);
-#endif
     VMCOREINFO_OFFSET(domain, domain_id);
     VMCOREINFO_OFFSET(domain, next_in_list);
 

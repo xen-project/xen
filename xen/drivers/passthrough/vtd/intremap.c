@@ -31,26 +31,7 @@
 #include "vtd.h"
 #include "extern.h"
 
-#ifdef __ia64__
-#define nr_ioapics              iosapic_get_nr_iosapics()
-#define nr_ioapic_entries(i)  iosapic_get_nr_pins(i)
-#define __io_apic_read(apic, reg) \
-    (*IO_APIC_BASE(apic) = reg, *(IO_APIC_BASE(apic)+4))
-#define __io_apic_write(apic, reg, val) \
-    (*IO_APIC_BASE(apic) = reg, *(IO_APIC_BASE(apic)+4) = (val))
-#define __ioapic_read_entry(apic, pin, raw) ({ \
-    struct IO_xAPIC_route_entry _e_; \
-    ASSERT(raw); \
-    ((u32 *)&_e_)[0] = __io_apic_read(apic, 0x10 + 2 * (pin)); \
-    ((u32 *)&_e_)[1] = __io_apic_read(apic, 0x11 + 2 * (pin)); \
-    _e_; \
-})
-#define __ioapic_write_entry(apic, pin, raw, ent) ({ \
-    ASSERT(raw); \
-    __io_apic_write(apic, 0x10 + 2 * (pin), ((u32 *)&(ent))[0]); \
-    __io_apic_write(apic, 0x11 + 2 * (pin), ((u32 *)&(ent))[1]); \
-})
-#else
+#if defined(__i386__) || defined(__x86_64__)
 #include <asm/apic.h>
 #include <asm/io_apic.h>
 #define nr_ioapic_entries(i)  nr_ioapic_entries[i]
@@ -326,8 +307,6 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
             new_ire.lo.dst = value;
         else
             new_ire.lo.dst = (value >> 24) << 8;
-#else /* __ia64__ */
-        new_ire.lo.dst = value >> 16;
 #endif
     }
     else
@@ -625,12 +604,8 @@ static int msi_msg_to_remap_entry(
     new_ire.lo.dm = (msg->address_lo >> MSI_ADDR_DESTMODE_SHIFT) & 0x1;
     new_ire.lo.tm = (msg->data >> MSI_DATA_TRIGGER_SHIFT) & 0x1;
     new_ire.lo.dlm = (msg->data >> MSI_DATA_DELIVERY_MODE_SHIFT) & 0x1;
-#ifdef CONFIG_X86
     /* Hardware require RH = 1 for LPR delivery mode */
     new_ire.lo.rh = (new_ire.lo.dlm == dest_LowestPrio);
-#else
-    new_ire.lo.rh = 0;
-#endif
     new_ire.lo.avail = 0;
     new_ire.lo.res_1 = 0;
     new_ire.lo.vector = (msg->data >> MSI_DATA_VECTOR_SHIFT) &
@@ -702,18 +677,6 @@ void msi_msg_write_remap_rte(
         return;
 
     msi_msg_to_remap_entry(iommu, pdev, msi_desc, msg);
-}
-#elif defined(__ia64__)
-void msi_msg_read_remap_rte(
-    struct msi_desc *msi_desc, struct msi_msg *msg)
-{
-    /* TODO. */
-}
-
-void msi_msg_write_remap_rte(
-    struct msi_desc *msi_desc, struct msi_msg *msg)
-{
-    /* TODO. */
 }
 #endif
 
@@ -838,8 +801,6 @@ out:
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
-#ifndef __ia64__
-
 /*
  * This function is used to enable Interrupt remapping when
  * enable x2apic
@@ -914,5 +875,3 @@ void iommu_disable_x2apic_IR(void)
     for_each_drhd_unit ( drhd )
         disable_qinval(drhd->iommu);
 }
-
-#endif /* !__ia64__ */

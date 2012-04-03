@@ -696,7 +696,6 @@ void __init setup_dom0_pci_devices(
     spin_unlock(&pcidevs_lock);
 }
 
-#ifdef SUPPORT_MSI_REMAPPING
 static int _dump_pci_devices(struct pci_seg *pseg, void *arg)
 {
     struct pci_dev *pdev;
@@ -738,8 +737,6 @@ static int __init setup_dump_pcidevs(void)
     return 0;
 }
 __initcall(setup_dump_pcidevs);
-#endif
-
 
 /*
  * Local variables:

@@ -419,7 +419,6 @@ int hvm_do_IRQ_dpci(struct domain *d, struct pirq *pirq)
     return 1;
 }
 
-#ifdef SUPPORT_MSI_REMAPPING
 /* called with d->event_lock held */
 static void __msi_pirq_eoi(struct hvm_pirq_dpci *pirq_dpci)
 {
@@ -479,7 +478,6 @@ static int hvm_pci_msi_assert(struct domain *d,
             ? send_guest_pirq(d, pirq)
             : vmsi_deliver_pirq(d, pirq_dpci));
 }
-#endif
 
 static int _hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
                             void *arg)
@@ -489,13 +487,12 @@ static int _hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
 
     if ( test_and_clear_bool(pirq_dpci->masked) )
     {
-#ifdef SUPPORT_MSI_REMAPPING
         if ( pirq_dpci->flags & HVM_IRQ_DPCI_GUEST_MSI )
         {
             hvm_pci_msi_assert(d, pirq_dpci);
             return 0;
         }
-#endif
+
         list_for_each_entry ( digl, &pirq_dpci->digl_list, list )
         {
             struct pirq *info = dpci_pirq(pirq_dpci);
@@ -508,13 +505,11 @@ static int _hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,
                 hvm_pci_intx_assert(d, device, intx);
             pirq_dpci->pending++;
 
-#ifdef SUPPORT_MSI_REMAPPING
             if ( pirq_dpci->flags & HVM_IRQ_DPCI_TRANSLATE )
             {
                 /* for translated MSI to INTx interrupt, eoi as early as possible */
                 __msi_pirq_eoi(pirq_dpci);
             }
-#endif
         }
 
         /*

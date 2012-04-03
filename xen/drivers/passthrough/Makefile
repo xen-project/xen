@@ -1,5 +1,4 @@
 subdir-$(x86) += vtd
-subdir-$(ia64) += vtd
 subdir-$(x86) += amd
 subdir-$(x86_64) += x86
 

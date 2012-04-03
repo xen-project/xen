@@ -442,16 +442,6 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
             goto out;
         }
 
-#ifdef CONFIG_IA64
-        /* for IA64, currently it only supports FFH */
-        if (dom0_px_info->control_register.space_id !=
-            ACPI_ADR_SPACE_FIXED_HARDWARE)
-        {
-            ret = -EINVAL;
-            goto out;
-        }
-#endif
-
         memcpy ((void *)&pxpt->control_register,
                 (void *)&dom0_px_info->control_register,
                 sizeof(struct xen_pct_register));
@@ -493,7 +483,6 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
     {
 #ifdef CONFIG_X86
         /* for X86, check domain coordination */
-        /* for IA64, _PSD is optional for current IA64 cpufreq algorithm */
         if (dom0_px_info->shared_type != CPUFREQ_SHARED_TYPE_ALL &&
             dom0_px_info->shared_type != CPUFREQ_SHARED_TYPE_ANY &&
             dom0_px_info->shared_type != CPUFREQ_SHARED_TYPE_HW)

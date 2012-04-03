@@ -78,8 +78,6 @@ struct hvm_girq_dpci_mapping {
 #define NR_LINK     4
 #if defined(__i386__) || defined(__x86_64__)
 # define NR_HVM_IRQS VIOAPIC_NUM_PINS
-#elif defined(__ia64__)
-# define NR_HVM_IRQS VIOSAPIC_NUM_PINS
 #endif
 
 /* Protected by domain's event_lock */

@@ -5,15 +5,11 @@
 #include <xen/types.h>
 #endif
 
-#if defined(__ia64__)
-# include_next <linux/efi.h>
+#if defined(__i386__)
+# define efi_enabled 0
 #else
-
-# if defined(__i386__)
-#  define efi_enabled 0
-# else
 extern const bool_t efi_enabled;
-# endif
+#endif
 
 #define EFI_INVALID_TABLE_ADDR (~0UL)
 
@@ -26,8 +22,6 @@ struct efi {
 };
 
 extern struct efi efi;
-
-#endif
 
 #ifndef __ASSEMBLY__
 

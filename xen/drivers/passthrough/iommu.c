@@ -605,17 +605,6 @@ int iommu_do_domctl(
         bus = (domctl->u.assign_device.machine_sbdf >> 8) & 0xff;
         devfn = domctl->u.assign_device.machine_sbdf & 0xff;
 
-#ifdef __ia64__ /* XXX Is this really needed? */
-        if ( device_assigned(seg, bus, devfn) )
-        {
-            printk(XENLOG_G_ERR "XEN_DOMCTL_assign_device: "
-                   "%04x:%02x:%02x.%u already assigned, or non-existent\n",
-                   seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
-            ret = -EINVAL;
-            goto assign_device_out;
-        }
-#endif
-
         ret = assign_device(d, seg, bus, devfn);
         if ( ret )
             printk(XENLOG_G_ERR "XEN_DOMCTL_assign_device: "
@@ -643,14 +632,6 @@ int iommu_do_domctl(
         seg = domctl->u.get_device_group.machine_sbdf >> 16;
         bus = (domctl->u.assign_device.machine_sbdf >> 8) & 0xff;
         devfn = domctl->u.assign_device.machine_sbdf & 0xff;
-
-#ifdef __ia64__ /* XXX Is this really needed? */
-        if ( !device_assigned(seg, bus, devfn) )
-        {
-            ret = -EINVAL;
-            goto deassign_device_out;
-        }
-#endif
 
         spin_lock(&pcidevs_lock);
         ret = deassign_device(d, seg, bus, devfn);
