@@ -11,7 +11,6 @@ FLEX                := @FLEX@
 PYTHON              := @PYTHON@
 PYTHON_PATH         := @PYTHONPATH@
 PERL                := @PERL@
-IP                  := @IP@
 CURL_CONFIG         := @CURL@
 XML2_CONFIG         := @XML@
 BASH                := @BASH@
