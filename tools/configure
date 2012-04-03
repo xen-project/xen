@@ -650,7 +650,7 @@ lomount
 miniterm
 ocamltools
 pythontools
-xapi
+xenapi
 vtpm
 monitors
 githttp
@@ -716,7 +716,7 @@ enable_option_checking
 enable_githttp
 enable_monitors
 enable_vtpm
-enable_xapi
+enable_xenapi
 enable_pythontools
 enable_ocamltools
 enable_miniterm
@@ -1364,15 +1364,18 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --enable-githttp        Download GIT repositories via HTTP
-  --disable-monitors      Disable xenstat and xentop monitoring tools
-  --enable-vtpm           Enable Virtual Trusted Platform Module
-  --enable-xapi           Enable Xen API Bindings
-  --disable-pythontools   Disable Python tools
-  --disable-ocamltools    Disable Ocaml tools
-  --enable-miniterm       Enable miniterm
-  --enable-lomount        Enable lomount
-  --disable-debug         Disable debug build of tools
+  --enable-githttp        Download GIT repositories via HTTP (default is
+                          DISABLED)
+  --disable-monitors      Disable xenstat and xentop monitoring tools (default
+                          is ENABLED)
+  --enable-vtpm           Enable Virtual Trusted Platform Module (default is
+                          DISABLED)
+  --enable-xenapi         Enable Xen API Bindings (default is DISABLED)
+  --disable-pythontools   Disable Python tools (default is ENABLED)
+  --disable-ocamltools    Disable Ocaml tools (default is ENABLED)
+  --enable-miniterm       Enable miniterm (default is DISABLED)
+  --enable-lomount        Enable lomount (default is DISABLED)
+  --disable-debug         Disable debug build of tools (default is ENABLED)
 
 Some influential environment variables:
   CC          C compiler command
@@ -3844,6 +3847,8 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 
+
+
 # pkg.m4 - Macros to locate and utilise pkg-config.            -*- Autoconf -*-
 # serial 1 (pkg-config-0.24)
 #
@@ -3909,19 +3914,20 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 # Enable/disable options
+
 # Check whether --enable-githttp was given.
 if test "${enable_githttp+set}" = set; then :
   enableval=$enable_githttp;
 fi
 
 
-if test "x$enable_githttp" = "xyes"; then :
-
-    ax_cv_githttp="y"
-
-elif test "x$enable_githttp" = "xno"; then :
+if test "x$enable_githttp" = "xno"; then :
 
     ax_cv_githttp="n"
+
+elif test "x$enable_githttp" = "xyes"; then :
+
+    ax_cv_githttp="y"
 
 elif test -z $ax_cv_githttp; then :
 
@@ -3929,6 +3935,8 @@ elif test -z $ax_cv_githttp; then :
 
 fi
 githttp=$ax_cv_githttp
+
+
 
 # Check whether --enable-monitors was given.
 if test "${enable_monitors+set}" = set; then :
@@ -3951,19 +3959,21 @@ elif test -z $ax_cv_monitors; then :
 fi
 monitors=$ax_cv_monitors
 
+
+
 # Check whether --enable-vtpm was given.
 if test "${enable_vtpm+set}" = set; then :
   enableval=$enable_vtpm;
 fi
 
 
-if test "x$enable_vtpm" = "xyes"; then :
-
-    ax_cv_vtpm="y"
-
-elif test "x$enable_vtpm" = "xno"; then :
+if test "x$enable_vtpm" = "xno"; then :
 
     ax_cv_vtpm="n"
+
+elif test "x$enable_vtpm" = "xyes"; then :
+
+    ax_cv_vtpm="y"
 
 elif test -z $ax_cv_vtpm; then :
 
@@ -3972,26 +3982,30 @@ elif test -z $ax_cv_vtpm; then :
 fi
 vtpm=$ax_cv_vtpm
 
-# Check whether --enable-xapi was given.
-if test "${enable_xapi+set}" = set; then :
-  enableval=$enable_xapi;
+
+
+# Check whether --enable-xenapi was given.
+if test "${enable_xenapi+set}" = set; then :
+  enableval=$enable_xenapi;
 fi
 
 
-if test "x$enable_xapi" = "xyes"; then :
+if test "x$enable_xenapi" = "xno"; then :
 
-    ax_cv_xapi="y"
+    ax_cv_xenapi="n"
 
-elif test "x$enable_xapi" = "xno"; then :
+elif test "x$enable_xenapi" = "xyes"; then :
 
-    ax_cv_xapi="n"
+    ax_cv_xenapi="y"
 
-elif test -z $ax_cv_xapi; then :
+elif test -z $ax_cv_xenapi; then :
 
-    ax_cv_xapi="n"
+    ax_cv_xenapi="n"
 
 fi
-xapi=$ax_cv_xapi
+xenapi=$ax_cv_xenapi
+
+
 
 # Check whether --enable-pythontools was given.
 if test "${enable_pythontools+set}" = set; then :
@@ -4014,6 +4028,8 @@ elif test -z $ax_cv_pythontools; then :
 fi
 pythontools=$ax_cv_pythontools
 
+
+
 # Check whether --enable-ocamltools was given.
 if test "${enable_ocamltools+set}" = set; then :
   enableval=$enable_ocamltools;
@@ -4035,19 +4051,21 @@ elif test -z $ax_cv_ocamltools; then :
 fi
 ocamltools=$ax_cv_ocamltools
 
+
+
 # Check whether --enable-miniterm was given.
 if test "${enable_miniterm+set}" = set; then :
   enableval=$enable_miniterm;
 fi
 
 
-if test "x$enable_miniterm" = "xyes"; then :
-
-    ax_cv_miniterm="y"
-
-elif test "x$enable_miniterm" = "xno"; then :
+if test "x$enable_miniterm" = "xno"; then :
 
     ax_cv_miniterm="n"
+
+elif test "x$enable_miniterm" = "xyes"; then :
+
+    ax_cv_miniterm="y"
 
 elif test -z $ax_cv_miniterm; then :
 
@@ -4056,19 +4074,21 @@ elif test -z $ax_cv_miniterm; then :
 fi
 miniterm=$ax_cv_miniterm
 
+
+
 # Check whether --enable-lomount was given.
 if test "${enable_lomount+set}" = set; then :
   enableval=$enable_lomount;
 fi
 
 
-if test "x$enable_lomount" = "xyes"; then :
-
-    ax_cv_lomount="y"
-
-elif test "x$enable_lomount" = "xno"; then :
+if test "x$enable_lomount" = "xno"; then :
 
     ax_cv_lomount="n"
+
+elif test "x$enable_lomount" = "xyes"; then :
+
+    ax_cv_lomount="y"
 
 elif test -z $ax_cv_lomount; then :
 
@@ -4076,6 +4096,8 @@ elif test -z $ax_cv_lomount; then :
 
 fi
 lomount=$ax_cv_lomount
+
+
 
 # Check whether --enable-debug was given.
 if test "${enable_debug+set}" = set; then :
@@ -4097,6 +4119,7 @@ elif test -z $ax_cv_debug; then :
 
 fi
 debug=$ax_cv_debug
+
 
 
 

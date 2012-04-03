@@ -23,8 +23,7 @@ AC_USE_SYSTEM_EXTENSIONS
 AC_CANONICAL_HOST
 
 # M4 Macro includes
-m4_include([m4/enable_feature.m4])
-m4_include([m4/disable_feature.m4])
+m4_include([m4/features.m4])
 m4_include([m4/path_or_fail.m4])
 m4_include([m4/python_version.m4])
 m4_include([m4/python_devel.m4])
@@ -36,16 +35,15 @@ m4_include([m4/pkg.m4])
 m4_include([m4/curses.m4])
 
 # Enable/disable options
-AX_ARG_ENABLE_AND_EXPORT([githttp], [Download GIT repositories via HTTP])
-AX_ARG_DISABLE_AND_EXPORT([monitors],
-    [Disable xenstat and xentop monitoring tools])
-AX_ARG_ENABLE_AND_EXPORT([vtpm], [Enable Virtual Trusted Platform Module])
-AX_ARG_ENABLE_AND_EXPORT([xapi], [Enable Xen API Bindings])
-AX_ARG_DISABLE_AND_EXPORT([pythontools], [Disable Python tools])
-AX_ARG_DISABLE_AND_EXPORT([ocamltools], [Disable Ocaml tools])
-AX_ARG_ENABLE_AND_EXPORT([miniterm], [Enable miniterm])
-AX_ARG_ENABLE_AND_EXPORT([lomount], [Enable lomount])
-AX_ARG_DISABLE_AND_EXPORT([debug], [Disable debug build of tools])
+AX_ARG_DEFAULT_DISABLE([githttp], [Download GIT repositories via HTTP])
+AX_ARG_DEFAULT_ENABLE([monitors], [Disable xenstat and xentop monitoring tools])
+AX_ARG_DEFAULT_DISABLE([vtpm], [Enable Virtual Trusted Platform Module])
+AX_ARG_DEFAULT_DISABLE([xenapi], [Enable Xen API Bindings])
+AX_ARG_DEFAULT_ENABLE([pythontools], [Disable Python tools])
+AX_ARG_DEFAULT_ENABLE([ocamltools], [Disable Ocaml tools])
+AX_ARG_DEFAULT_DISABLE([miniterm], [Enable miniterm])
+AX_ARG_DEFAULT_DISABLE([lomount], [Enable lomount])
+AX_ARG_DEFAULT_ENABLE([debug], [Disable debug build of tools])
 
 AC_ARG_VAR([PREPEND_INCLUDES],
     [List of include folders to prepend to CFLAGS (without -I)])
