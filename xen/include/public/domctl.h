@@ -716,6 +716,13 @@ struct xen_domctl_gdbsx_domstatus {
  * Domctl interface to set up and tear down the 
  * pager<->hypervisor interface. Use XENMEM_paging_op*
  * to perform per-page operations.
+ *
+ * The XEN_DOMCTL_MEM_EVENT_OP_PAGING_ENABLE domctl returns several
+ * non-standard error codes to indicate why paging could not be enabled:
+ * ENODEV - host lacks HAP support (EPT/NPT) or HAP is disabled in guest
+ * EMLINK - guest has iommu passthrough enabled
+ * EXDEV  - guest has PoD enabled
+ * EBUSY  - guest has or had paging enabled, ring buffer still active
  */
 #define XEN_DOMCTL_MEM_EVENT_OP_PAGING            1
 
@@ -735,6 +742,11 @@ struct xen_domctl_gdbsx_domstatus {
  *
  * The memory event handler can then resume the VCPU and redo the access 
  * with a XENMEM_access_op_resume hypercall.
+ *
+ * The XEN_DOMCTL_MEM_EVENT_OP_ACCESS_ENABLE domctl returns several
+ * non-standard error codes to indicate why access could not be enabled:
+ * ENODEV - host lacks HAP support (EPT/NPT) or HAP is disabled in guest
+ * EBUSY  - guest has or had access enabled, ring buffer still active
  */
 #define XEN_DOMCTL_MEM_EVENT_OP_ACCESS            2
 
