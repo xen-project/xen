@@ -323,6 +323,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     const char *keymap = dm_keymap(guest_config);
     flexarray_t *dm_args;
     int i;
+    uint64_t ram_size;
 
     dm_args = flexarray_make(16, 1);
     if (!dm_args)
@@ -504,11 +505,9 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         break;
     }
 
-    /* RAM Size */
+    ram_size = libxl__sizekb_to_mb(b_info->max_memkb - b_info->video_memkb);
     flexarray_append(dm_args, "-m");
-    flexarray_append(dm_args,
-                     libxl__sprintf(gc, "%d",
-                                    libxl__sizekb_to_mb(b_info->target_memkb)));
+    flexarray_append(dm_args, libxl__sprintf(gc, "%"PRId64, ram_size));
 
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         for (i = 0; i < num_disks; i++) {
