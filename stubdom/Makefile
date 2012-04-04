@@ -331,7 +331,7 @@ grub-upstream: grub-$(GRUB_VERSION).tar.gz
 	tar xzf $<
 	mv grub-$(GRUB_VERSION) $@
 	for i in grub.patches/* ; do \
-		patch -d $@ -p1 < $$i ; \
+		patch -d $@ -p1 < $$i || exit 1; \
 	done
 
 .PHONY: grub
