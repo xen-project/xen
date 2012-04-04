@@ -88,6 +88,11 @@ int xlu_disk_parse(XLU_Config *cfg, int nspecs, const char *const *specs,
    * resulting disk struct is used with libxl.
    */
 
+/*
+ * PCI specification parsing
+ */
+int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str);
+
 
 #endif /* LIBXLUTIL_H */
 

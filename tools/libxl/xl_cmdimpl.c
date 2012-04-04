@@ -1010,7 +1010,7 @@ skip_vfb:
 
             pcidev->msitranslate = pci_msitranslate;
             pcidev->power_mgmt = pci_power_mgmt;
-            if (!libxl_device_pci_parse_bdf(ctx, pcidev, buf))
+            if (!xlu_pci_parse_bdf(config, pcidev, buf))
                 d_config->num_pcidevs++;
         }
         if (d_config->num_pcidevs && c_info->type == LIBXL_DOMAIN_TYPE_PV)
@@ -2253,11 +2253,16 @@ int main_pcilist(int argc, char **argv)
 static void pcidetach(const char *dom, const char *bdf, int force)
 {
     libxl_device_pci pcidev;
+    XLU_Config *config;
 
     find_domain(dom);
 
     memset(&pcidev, 0x00, sizeof(pcidev));
-    if (libxl_device_pci_parse_bdf(ctx, &pcidev, bdf)) {
+    
+    config = xlu_cfg_init(stderr, "command line");
+    if (!config) { perror("xlu_cfg_inig"); exit(-1); }
+
+    if (xlu_pci_parse_bdf(config, &pcidev, bdf)) {
         fprintf(stderr, "pci-detach: malformed BDF specification \"%s\"\n", bdf);
         exit(2);
     }
@@ -2293,11 +2298,16 @@ int main_pcidetach(int argc, char **argv)
 static void pciattach(const char *dom, const char *bdf, const char *vs)
 {
     libxl_device_pci pcidev;
+    XLU_Config *config;
 
     find_domain(dom);
 
     memset(&pcidev, 0x00, sizeof(pcidev));
-    if (libxl_device_pci_parse_bdf(ctx, &pcidev, bdf)) {
+
+    config = xlu_cfg_init(stderr, "command line");
+    if (!config) { perror("xlu_cfg_inig"); exit(-1); }
+
+    if (xlu_pci_parse_bdf(config, &pcidev, bdf)) {
         fprintf(stderr, "pci-attach: malformed BDF specification \"%s\"\n", bdf);
         exit(2);
     }

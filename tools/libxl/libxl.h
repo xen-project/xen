@@ -653,13 +653,6 @@ int libxl_device_pci_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *p
 libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num);
 
 /*
- * Parse a PCI BDF into a PCI device structure.
- */
-int libxl_device_pci_parse_bdf(libxl_ctx *ctx,
-                               libxl_device_pci *pcidev,
-                               const char *str);
-
-/*
  * Similar to libxl_device_pci_list but returns all devices which
  * could be assigned to a domain (i.e. are bound to the backend
  * driver) but are not currently.

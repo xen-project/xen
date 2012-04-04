@@ -40,6 +40,7 @@
 
 #include <libxl.h>
 #include <libxl_utils.h>
+#include <libxlutil.h>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
@@ -556,7 +557,7 @@ static PyObject *pyxl_pci_parse(XlObject *self, PyObject *args)
         return NULL;
     }
 
-    if ( libxl_device_pci_parse_bdf(self->ctx, &pci->obj, str) ) {
+    if ( xlu_pci_parse_bdf(NULL, &pci->obj, str) ) {
         PyErr_SetString(xl_error_obj, "cannot parse pci device spec (BDF)");
         Py_DECREF(pci);
         return NULL;

@@ -57,7 +57,7 @@ $(LIBXL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_lib
 AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h
 AUTOSRCS= libxlu_cfg_y.c libxlu_cfg_l.c
 LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o \
-	libxlu_disk_l.o libxlu_disk.o
+	libxlu_disk_l.o libxlu_disk.o libxlu_pci.o
 $(LIBXLU_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 
 CLIENTS = xl testidl
