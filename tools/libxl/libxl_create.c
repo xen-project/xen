@@ -22,6 +22,13 @@
 #include <xc_dom.h>
 #include <xenguest.h>
 
+void libxl_domain_config_init(libxl_domain_config *d_config)
+{
+    memset(d_config, 0, sizeof(*d_config));
+    libxl_domain_create_info_init(&d_config->c_info);
+    libxl_domain_build_info_init(&d_config->b_info);
+}
+
 void libxl_domain_config_dispose(libxl_domain_config *d_config)
 {
     int i;

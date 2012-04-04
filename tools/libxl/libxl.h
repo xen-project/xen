@@ -466,6 +466,7 @@ int libxl_ctx_free(libxl_ctx *ctx /* 0 is OK */);
 typedef int (*libxl_console_ready)(libxl_ctx *ctx, uint32_t domid, void *priv);
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid);
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid, int restore_fd);
+void libxl_domain_config_init(libxl_domain_config *d_config);
 void libxl_domain_config_dispose(libxl_domain_config *d_config);
 int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
                           uint32_t domid, int fd);

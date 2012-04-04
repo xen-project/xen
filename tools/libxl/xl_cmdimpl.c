@@ -549,8 +549,6 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
     }
 
-    libxl_domain_create_info_init(c_info);
-
     if (!xlu_cfg_get_string (config, "seclabel", &buf, 0)) {
         e = libxl_flask_context_to_sid(ctx, (char *)buf, strlen(buf),
                                     &c_info->ssidref);
@@ -596,7 +594,6 @@ static void parse_config_data(const char *configfile_filename_report,
         exit(1);
     }
 
-    libxl_domain_build_info_init(b_info);
     libxl_domain_build_info_init_type(b_info, c_info->type);
 
     /* the following is the actual config parsing with overriding values in the structures */
@@ -1523,7 +1520,7 @@ static int create_domain(struct domain_create *dom_info)
     pid_t child_console_pid = -1;
     struct save_file_header hdr;
 
-    memset(&d_config, 0x00, sizeof(d_config));
+    libxl_domain_config_init(&d_config);
 
     if (restore_file) {
         uint8_t *optdata_begin = 0;
@@ -1836,7 +1833,7 @@ start:
 
                 /* Reparse the configuration in case it has changed */
                 libxl_domain_config_dispose(&d_config);
-                memset(&d_config, 0, sizeof(d_config));
+                libxl_domain_config_init(&d_config);
                 parse_config_data(config_file, config_data, config_len,
                                   &d_config);
 
