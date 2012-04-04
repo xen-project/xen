@@ -737,6 +737,20 @@ static void parse_config_data(const char *configfile_filename_report,
     if (!xlu_cfg_get_long(config, "tsc_mode", &l))
         b_info->tsc_mode = l;
 
+    b_info->rtc_timeoffset = !xlu_cfg_get_long(config, "rtc_timeoffset", &l)
+        ? l : 0;
+
+    b_info->localtime = !xlu_cfg_get_long(config, "localtime", &l) ? l : 0;
+    if (b_info->localtime) {
+        time_t t;
+        struct tm *tm;
+
+        t = time(NULL);
+        tm = localtime(&t);
+
+        b_info->rtc_timeoffset += tm->tm_gmtoff;
+    }
+
     if (!xlu_cfg_get_long (config, "videoram", &l))
         b_info->video_memkb = l * 1024;
 
