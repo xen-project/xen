@@ -3309,18 +3309,19 @@ int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
         rc = 0;
         break;
     default:
-        rc = EINVAL;
+        rc = -1;
+        errno = EINVAL;
         break;
     }
 
     if (rc != 0) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
-                            "Send trigger '%s' failed",
-                            libxl_trigger_to_string(trigger));
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                         "Send trigger '%s' failed",
+                         libxl_trigger_to_string(trigger));
         rc = ERROR_FAIL;
     }
 
-    return 0;
+    return rc;
 }
 
 int libxl_send_sysrq(libxl_ctx *ctx, uint32_t domid, char sysrq)
