@@ -301,9 +301,30 @@ XXX
 
 XXX
 
+=item B<permissive=BOOLEAN>
+
+(PV only) By default pciback only allows PV guests to write "known
+safe" values into PCI config space.  But many devices require writes
+to other areas of config space in order to operate properly.  This
+tells the pciback driver to allow all writes to PCI config space of
+this device by this domain.  This option should be enabled with
+caution: it gives the guest much more control over the device, which
+may have security or stability implications.  It is recommended to
+enable this option only for trusted VMs under administrator control.
+
 =back
 
 =back
+
+=item B<pci_permissive=BOOLEAN>
+
+(PV only) Changes the default value of 'permissive' for all PCI
+devices for this VM.  This can still be overriden on a per-device
+basis. This option should be enabled with caution: it gives the guest
+much more control over the device, which may have security or
+stability implications.  It is recommended to enable this option only
+for trusted VMs under administrator control.  See the "pci=" section
+for more information on the "permissive" flag.
 
 =back
 

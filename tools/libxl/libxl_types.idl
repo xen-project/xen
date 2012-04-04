@@ -354,6 +354,7 @@ libxl_device_pci = Struct("device_pci", [
     ("vfunc_mask", uint32),
     ("msitranslate", bool),
     ("power_mgmt", bool),
+    ("permissive", bool),
     ])
 
 libxl_diskinfo = Struct("diskinfo", [

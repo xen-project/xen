@@ -55,7 +55,10 @@ static void libxl_create_pci_backend_device(libxl__gc *gc, flexarray_t *back, in
     if (pcidev->vdevfn)
         flexarray_append_pair(back, libxl__sprintf(gc, "vdevfn-%d", num), libxl__sprintf(gc, "%x", pcidev->vdevfn));
     flexarray_append(back, libxl__sprintf(gc, "opts-%d", num));
-    flexarray_append(back, libxl__sprintf(gc, "msitranslate=%d,power_mgmt=%d", pcidev->msitranslate, pcidev->power_mgmt));
+    flexarray_append(back,
+              libxl__sprintf(gc, "msitranslate=%d,power_mgmt=%d,permissive=%d",
+                             pcidev->msitranslate, pcidev->power_mgmt,
+                             pcidev->permissive));
     flexarray_append_pair(back, libxl__sprintf(gc, "state-%d", num), libxl__sprintf(gc, "%d", 1));
 }
 
@@ -565,6 +568,31 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
             }
         }
         fclose(f);
+
+        /* Don't restrict writes to the PCI config space from this VM */
+        if (pcidev->permissive) {
+            int fd;
+            char *buf;
+            
+            sysfs_path = libxl__sprintf(gc, SYSFS_PCIBACK_DRIVER"/permissive");
+            fd = open(sysfs_path, O_WRONLY);
+            if (fd < 0) {
+                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Couldn't open %s",
+                                 sysfs_path);
+                return ERROR_FAIL;
+            }
+ 
+            buf = libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus,
+                                 pcidev->dev, pcidev->func);
+            rc = write(fd, buf, strlen(buf));
+            /* Annoying to have two if's, but we need the errno */
+            if (rc < 0)
+                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                                 "write to %s returned %d", sysfs_path, rc);
+            close(fd);
+            if (rc < 0)
+                return ERROR_FAIL;
+        }
         break;
     }
     default:
@@ -958,6 +986,9 @@ static void libxl__device_pci_from_xs_be(libxl__gc *gc,
             } else if (!strcmp(p, "power_mgmt")) {
                 p = strtok_r(NULL, ",=", &saveptr);
                 pci->power_mgmt = atoi(p);
+            } else if (!strcmp(p, "permissive")) {
+                p = strtok_r(NULL, ",=", &saveptr);
+                pci->permissive = atoi(p);
             }
         } while ((p = strtok_r(NULL, ",=", &saveptr)) != NULL);
     }
