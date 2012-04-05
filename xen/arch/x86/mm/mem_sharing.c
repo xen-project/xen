@@ -401,6 +401,7 @@ static int page_make_sharable(struct domain *d,
                        struct page_info *page, 
                        int expected_refcnt)
 {
+    int drop_dom_ref;
     spin_lock(&d->page_alloc_lock);
 
     /* Change page type and count atomically */
@@ -430,8 +431,12 @@ static int page_make_sharable(struct domain *d,
 
     page_set_owner(page, dom_cow);
     d->tot_pages--;
+    drop_dom_ref = (d->tot_pages == 0);
     page_list_del(page, &d->page_list);
     spin_unlock(&d->page_alloc_lock);
+
+    if ( drop_dom_ref )
+        put_domain(d);
     return 0;
 }
 
@@ -466,7 +471,8 @@ static int page_make_private(struct domain *d, struct page_info *page)
     ASSERT(page_get_owner(page) == dom_cow);
     page_set_owner(page, d);
 
-    d->tot_pages++;
+    if ( d->tot_pages++ == 0 )
+        get_domain(d);
     page_list_add_tail(page, &d->page_list);
     spin_unlock(&d->page_alloc_lock);
 
