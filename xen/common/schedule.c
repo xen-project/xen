@@ -261,15 +261,24 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
 
     domain_pause(d);
 
+    for_each_vcpu ( d, v )
+    {
+        SCHED_OP(VCPU2OP(v), remove_vcpu, v);
+        SCHED_OP(VCPU2OP(v), free_vdata, v->sched_priv);
+        v->sched_priv = NULL;
+    }
+
+    SCHED_OP(DOM2OP(d), free_domdata, d->sched_priv);
+
+    d->cpupool = c;
+    d->sched_priv = domdata;
+
     new_p = cpumask_first(c->cpu_valid);
     for_each_vcpu ( d, v )
     {
         migrate_timer(&v->periodic_timer, new_p);
         migrate_timer(&v->singleshot_timer, new_p);
         migrate_timer(&v->poll_timer, new_p);
-
-        SCHED_OP(VCPU2OP(v), remove_vcpu, v);
-        SCHED_OP(VCPU2OP(v), free_vdata, v->sched_priv);
 
         cpumask_setall(v->cpu_affinity);
         v->processor = new_p;
@@ -278,12 +287,8 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
 
         new_p = cpumask_cycle(new_p, c->cpu_valid);
 
-        SCHED_OP(VCPU2OP(v), insert_vcpu, v);
+        SCHED_OP(c->sched, insert_vcpu, v);
     }
-
-    d->cpupool = c;
-    SCHED_OP(DOM2OP(d), free_domdata, d->sched_priv);
-    d->sched_priv = domdata;
 
     domain_update_node_affinity(d);
 
