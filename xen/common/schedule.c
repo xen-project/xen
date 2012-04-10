@@ -1075,6 +1075,7 @@ static void schedule(void)
     bool_t                tasklet_work_scheduled = 0;
     struct schedule_data *sd;
     struct task_slice     next_slice;
+    int cpu = smp_processor_id();
 
     ASSERT(!in_atomic());
 
@@ -1099,7 +1100,7 @@ static void schedule(void)
         BUG();
     }
 
-    spin_lock_irq(sd->schedule_lock);
+    pcpu_schedule_lock_irq(cpu);
 
     stop_timer(&sd->s_timer);
     
@@ -1116,7 +1117,7 @@ static void schedule(void)
 
     if ( unlikely(prev == next) )
     {
-        spin_unlock_irq(sd->schedule_lock);
+        pcpu_schedule_unlock_irq(cpu);
         trace_continue_running(next);
         return continue_running(prev);
     }
@@ -1154,7 +1155,7 @@ static void schedule(void)
     ASSERT(!next->is_running);
     next->is_running = 1;
 
-    spin_unlock_irq(sd->schedule_lock);
+    pcpu_schedule_unlock_irq(cpu);
 
     perfc_incr(sched_ctx);
 
