@@ -1952,6 +1952,7 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
     unsigned long flags;
     struct csched_private *prv = CSCHED_PRIV(ops);
     struct csched_runqueue_data *rqd;
+    struct schedule_data *sd = &per_cpu(schedule_data, cpu);
     int rqi;
 
     spin_lock_irqsave(&prv->lock, flags);
@@ -1978,6 +1979,11 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
         printk(" No cpus left on runqueue, disabling\n");
         deactivate_runqueue(prv, rqi);
     }
+
+    /* Move spinlock to the original lock.  */
+    ASSERT(sd->schedule_lock == &rqd->lock);
+    ASSERT(!spin_is_locked(&sd->_lock));
+    sd->schedule_lock = &sd->_lock;
 
     spin_unlock(&rqd->lock);
 
