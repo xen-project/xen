@@ -68,6 +68,9 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
 
     /* Now ctx is safe for ctx_free; failures simply set rc and "goto out" */
 
+    rc = libxl__atfork_init(ctx);
+    if (rc) goto out;
+
     rc = libxl__poller_init(ctx, &ctx->poller_app);
     if (rc) goto out;
 

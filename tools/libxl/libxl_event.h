@@ -371,6 +371,19 @@ void libxl_osevent_occurred_fd(libxl_ctx *ctx, void *for_libxl,
  */
 void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl);
 
+
+/*
+ * An application which initialises a libxl_ctx in a parent process
+ * and then forks a child which does not quickly exec, must
+ * instead libxl_postfork_child_noexec in the child.  One call
+ * on any existing (or specially made) ctx is sufficient; after
+ * this all previously existing libxl_ctx's are invalidated and
+ * must not be used - or even freed.  It is harmless to call this
+ * postfork function and then exec anyway.
+ */
+void libxl_postfork_child_noexec(libxl_ctx *ctx);
+
+
 #endif
 
 /*

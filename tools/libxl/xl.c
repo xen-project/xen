@@ -96,6 +96,9 @@ static void parse_global_config(const char *configfile,
 
 void postfork(void)
 {
+    libxl_postfork_child_noexec(ctx); /* in case we don't exit/exec */
+    ctx = 0;
+
     if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, (xentoollog_logger*)logger)) {
         fprintf(stderr, "cannot reinit xl context after fork\n");
         exit(-1);

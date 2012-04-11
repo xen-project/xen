@@ -611,6 +611,9 @@ void libxl__poller_put(libxl_ctx *ctx, libxl__poller *p);
 void libxl__poller_wakeup(libxl__egc *egc, libxl__poller *p);
 
 
+int libxl__atfork_init(libxl_ctx *ctx);
+
+
 /* from xl_dom */
 _hidden libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid);
@@ -1306,6 +1309,66 @@ _hidden void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc);
 
 /* For use by ao machinery ONLY */
 _hidden void libxl__ao__destroy(libxl_ctx*, libxl__ao *ao);
+
+
+/*
+ * File descriptors and CLOEXEC
+ */
+
+/*
+ * For libxl functions which create file descriptors, at least one
+ * of the following must be true:
+ *  (a) libxl does not care if copies of this open-file are inherited
+ *      by random children and might remain open indefinitely
+ *  (b) libxl must take extra care for the fd (the actual descriptor,
+ *      not the open-file) as below.  We call this a "carefd".
+ *
+ * The rules for opening a carefd are:
+ *  (i)   Before bringing any carefds into existence,
+ *        libxl code must call libxl__carefd_begin.
+ *  (ii)  Then for each carefd brought into existence,
+ *        libxl code must call libxl__carefd_record
+ *        and remember the libxl__carefd_record*.
+ *  (iii) Then it must call libxl__carefd_unlock.
+ *  (iv)  When in a child process the fd is to be passed across
+ *        exec by libxl, the libxl code must unset FD_CLOEXEC
+ *        on the fd eg by using libxl_fd_set_cloexec.
+ *  (v)   Later, when the fd is to be closed in the same process,
+ *        libxl code must not call close.  Instead, it must call
+ *        libxl__carefd_close.
+ * Steps (ii) and (iii) can be combined by calling the convenience
+ * function libxl__carefd_opened.
+ */
+/* libxl__carefd_begin and _unlock (or _opened) must be called always
+ * in pairs.  They may be called with the CTX lock held.  In between
+ * _begin and _unlock, the following are prohibited:
+ *   - anything which might block
+ *   - any callbacks to the application
+ *   - nested calls to libxl__carefd_begin
+ *   - fork (libxl__fork)
+ * In general nothing should be done before _unlock that could be done
+ * afterwards.
+ */
+typedef struct libxl__carefd libxl__carefd;
+
+void libxl__carefd_begin(void);
+void libxl__carefd_unlock(void);
+
+/* fd may be -1, in which case this returns a dummy libxl__fd_record
+ * on which it _carefd_close is a no-op.  Cannot fail. */
+libxl__carefd *libxl__carefd_record(libxl_ctx *ctx, int fd);
+
+/* Combines _record and _unlock in a single call.  If fd==-1,
+ * still does the unlock, but returns 0.  Cannot fail. */
+libxl__carefd *libxl__carefd_opened(libxl_ctx *ctx, int fd);
+
+/* Works just like close(2).  You may pass NULL, in which case it's
+ * a successful no-op. */
+int libxl__carefd_close(libxl__carefd*);
+
+/* You may pass NULL in which case the answer is -1. */
+int libxl__carefd_fd(const libxl__carefd*);
+
 
 /*
  * Convenience macros.
