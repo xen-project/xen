@@ -365,13 +365,6 @@ READ_WRITE_EXACTLY(read, 1, /* */)
 READ_WRITE_EXACTLY(write, 0, const)
 
 
-int libxl_ctx_postfork(libxl_ctx *ctx) {
-    if (ctx->xsh) xs_daemon_destroy_postfork(ctx->xsh);
-    ctx->xsh = xs_daemon_open();
-    if (!ctx->xsh) return ERROR_FAIL;
-    return 0;
-}
-
 pid_t libxl_fork(libxl_ctx *ctx)
 {
     pid_t pid;

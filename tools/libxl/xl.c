@@ -94,6 +94,14 @@ static void parse_global_config(const char *configfile,
     xlu_cfg_destroy(config);
 }
 
+void postfork(void)
+{
+    if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, (xentoollog_logger*)logger)) {
+        fprintf(stderr, "cannot reinit xl context after fork\n");
+        exit(-1);
+    }
+}
+
 int main(int argc, char **argv)
 {
     int opt = 0;

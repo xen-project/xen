@@ -105,6 +105,7 @@ struct cmd_spec *cmdtable_lookup(const char *s);
 
 extern libxl_ctx *ctx;
 extern xentoollog_logger_stdiostream *logger;
+void postfork(void);
 
 /* global options */
 extern int autoballoon;

@@ -461,7 +461,6 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
                     unsigned flags /* none currently defined */,
                     xentoollog_logger *lg);
 int libxl_ctx_free(libxl_ctx *ctx /* 0 is OK */);
-int libxl_ctx_postfork(libxl_ctx *ctx);
 
 /* domain related functions */
 typedef int (*libxl_console_ready)(libxl_ctx *ctx, uint32_t domid, void *priv);

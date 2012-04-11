@@ -1441,7 +1441,7 @@ static int autoconnect_console(libxl_ctx *ctx, uint32_t domid, void *priv)
     } else if (*pid > 0)
         return 0;
 
-    libxl_ctx_postfork(ctx);
+    postfork();
 
     sleep(1);
     libxl_primary_console_exec(ctx, domid);
@@ -1728,11 +1728,7 @@ start:
             goto out;
         }
 
-        rc = libxl_ctx_postfork(ctx);
-        if (rc) {
-            LOG("failed to reinitialise context after fork");
-            exit(-1);
-        }
+        postfork();
 
         if (asprintf(&name, "xl-%s", d_config.c_info.name) < 0) {
             LOG("Failed to allocate memory in asprintf");
