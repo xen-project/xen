@@ -273,6 +273,7 @@ typedef uint8_t libxl_mac[6];
 
 typedef char **libxl_string_list;
 void libxl_string_list_dispose(libxl_string_list *sl);
+int libxl_string_list_length(const libxl_string_list *sl);
 
 typedef char **libxl_key_value_list;
 void libxl_key_value_list_dispose(libxl_key_value_list *kvl);

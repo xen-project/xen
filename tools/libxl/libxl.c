@@ -177,6 +177,14 @@ void libxl_string_list_dispose(libxl_string_list *psl)
     free(sl);
 }
 
+int libxl_string_list_length(const libxl_string_list *psl)
+{
+    if (!psl) return 0;
+    int i = 0;
+    while (*psl++) i++;
+    return i;
+}
+
 void libxl_key_value_list_dispose(libxl_key_value_list *pkvl)
 {
     int i;
