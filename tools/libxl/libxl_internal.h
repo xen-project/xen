@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #include <sys/mman.h>
 #include <sys/poll.h>
@@ -1467,6 +1468,25 @@ static inline void libxl__ctx_unlock(libxl_ctx *ctx) {
         else                                                            \
             LIBXL_TAILQ_INSERT_TAIL((head), (elm_new), entry);          \
     } while(0)
+
+
+/*
+ * int CTYPE(ISFOO, char c);
+ * int CTYPE(toupper, char c);
+ * int CTYPE(tolower, char c);
+ *
+ * This is necessary because passing a simple char to a ctype.h
+ * is forbidden.  ctype.h macros take ints derived from _unsigned_ chars.
+ *
+ * If you have a char which might be EOF then you should already have
+ * it in an int representing an unsigned char, and you can use the
+ * <ctype.h> macros directly.  This generally happens only with values
+ * from fgetc et al.
+ *
+ * For any value known to be a character (eg, anything that came from
+ * a char[]), use CTYPE.
+ */
+#define CTYPE(isfoo,c) (isfoo((unsigned char)(c)))
 
 
 #endif
