@@ -1058,8 +1058,6 @@ static int eventloop_iteration(libxl__egc *egc, libxl__poller *poller) {
     int rc;
     struct timeval now;
     
-    CTX_LOCK;
-
     rc = libxl__gettimeofday(gc, &now);
     if (rc) goto out;
 
@@ -1101,8 +1099,6 @@ static int eventloop_iteration(libxl__egc *egc, libxl__poller *poller) {
 
     afterpoll_internal(egc, poller,
                        poller->fd_polls_allocd, poller->fd_polls, now);
-
-    CTX_UNLOCK;
 
     rc = 0;
  out:

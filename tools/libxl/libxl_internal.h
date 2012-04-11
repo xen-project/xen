@@ -1191,7 +1191,7 @@ libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
 _hidden void libxl__egc_cleanup(libxl__egc *egc);
   /* Frees memory allocated within this egc's gc, and and report all
    * occurred events via callback, if applicable.  May reenter the
-   * application; see restrictions above. */
+   * application; see restrictions above.  The ctx must be UNLOCKED. */
 
 /* convenience macros: */
 
@@ -1287,7 +1287,7 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
  * libxl__ao_inprogress MUST be called with the ctx locked exactly once. */
 _hidden libxl__ao *libxl__ao_create(libxl_ctx*, uint32_t domid,
                                     const libxl_asyncop_how*);
-_hidden int libxl__ao_inprogress(libxl__ao *ao);
+_hidden int libxl__ao_inprogress(libxl__ao *ao); /* temporarily unlocks */
 _hidden void libxl__ao_abort(libxl__ao *ao);
 _hidden void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc);
 
