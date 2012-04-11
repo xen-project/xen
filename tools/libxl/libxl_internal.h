@@ -116,6 +116,12 @@ typedef struct libxl__gc libxl__gc;
 typedef struct libxl__egc libxl__egc;
 typedef struct libxl__ao libxl__ao;
 
+void libxl__alloc_failed(libxl_ctx *, const char *func,
+                         size_t nmemb, size_t size) __attribute__((noreturn));
+  /* func, size and nmemb are used only in the log message.
+   * You may pass size==0 if size and nmemb are not meaningful
+   * and should not be printed. */
+
 typedef struct libxl__ev_fd libxl__ev_fd;
 typedef void libxl__ev_fd_callback(libxl__egc *egc, libxl__ev_fd *ev,
                                    int fd, short events, short revents);
@@ -380,7 +386,7 @@ static inline libxl_ctx *libxl__gc_owner(libxl__gc *gc)
  * collection on exit from the outermost libxl callframe.
  */
 /* register @ptr in @gc for free on exit from outermost libxl callframe. */
-_hidden int libxl__ptr_add(libxl__gc *gc, void *ptr);
+_hidden void libxl__ptr_add(libxl__gc *gc, void *ptr);
 /* if this is the outermost libxl callframe then free all pointers in @gc */
 _hidden void libxl__free_all(libxl__gc *gc);
 /* allocate and zero @bytes. (similar to a gc'd malloc(3)+memzero()) */

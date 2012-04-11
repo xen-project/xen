@@ -194,6 +194,10 @@
  * No temporary objects allocated from the pool may be explicitly freed.
  * Therefore public functions which initialize a libxl__gc MUST call
  * libxl__free_all() before returning.
+ *
+ * Memory allocation failures are not handled gracefully.  If malloc
+ * (or realloc) fails, libxl will cause the entire process to print
+ * a message to stderr and exit with status 255.
  */
 /*
  * libxl types

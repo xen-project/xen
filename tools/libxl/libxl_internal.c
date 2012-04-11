@@ -17,40 +17,45 @@
 
 #include "libxl_internal.h"
 
-int libxl__error_set(libxl__gc *gc, int code)
-{
-    return 0;
+void libxl__alloc_failed(libxl_ctx *ctx, const char *func,
+                         size_t nmemb, size_t size) {
+#define M "libxl: FATAL ERROR: memory allocation failure"
+#define L (size ? M " (%s, %lu x %lu)\n" : M " (%s)\n"), \
+          func, (unsigned long)nmemb, (unsigned long)size
+    libxl__log(ctx, XTL_CRITICAL, ENOMEM, 0,0, func, L);
+    fprintf(stderr, L);
+    fflush(stderr);
+    _exit(-1);
+#undef M
+#undef L
 }
 
-int libxl__ptr_add(libxl__gc *gc, void *ptr)
+void libxl__ptr_add(libxl__gc *gc, void *ptr)
 {
     int i;
-    void **re;
 
     if (!ptr)
-        return 0;
+        return;
 
     /* fast case: we have space in the array for storing the pointer */
     for (i = 0; i < gc->alloc_maxsize; i++) {
         if (!gc->alloc_ptrs[i]) {
             gc->alloc_ptrs[i] = ptr;
-            return 0;
+            return;
         }
     }
-    /* realloc alloc_ptrs manually with calloc/free/replace */
-    re = calloc(gc->alloc_maxsize + 25, sizeof(void *));
-    if (!re)
-        return -1;
-    for (i = 0; i < gc->alloc_maxsize; i++)
-        re[i] = gc->alloc_ptrs[i];
-    /* assign the next pointer */
-    re[i] = ptr;
+    int new_maxsize = gc->alloc_maxsize * 2 + 25;
+    assert(new_maxsize < INT_MAX / sizeof(void*) / 2);
+    gc->alloc_ptrs = realloc(gc->alloc_ptrs, new_maxsize * sizeof(void *));
+    if (!gc->alloc_ptrs)
+        libxl__alloc_failed(CTX, __func__, new_maxsize, sizeof(void*));
 
-    /* replace the old alloc_ptr */
-    free(gc->alloc_ptrs);
-    gc->alloc_ptrs = re;
-    gc->alloc_maxsize += 25;
-    return 0;
+    gc->alloc_ptrs[gc->alloc_maxsize++] = ptr;
+
+    while (gc->alloc_maxsize < new_maxsize)
+        gc->alloc_ptrs[gc->alloc_maxsize++] = 0;
+
+    return;
 }
 
 void libxl__free_all(libxl__gc *gc)
@@ -71,10 +76,7 @@ void libxl__free_all(libxl__gc *gc)
 void *libxl__zalloc(libxl__gc *gc, int bytes)
 {
     void *ptr = calloc(bytes, 1);
-    if (!ptr) {
-        libxl__error_set(gc, ENOMEM);
-        return NULL;
-    }
+    if (!ptr) libxl__alloc_failed(CTX, __func__, bytes, 1);
 
     libxl__ptr_add(gc, ptr);
     return ptr;
@@ -83,10 +85,7 @@ void *libxl__zalloc(libxl__gc *gc, int bytes)
 void *libxl__calloc(libxl__gc *gc, size_t nmemb, size_t size)
 {
     void *ptr = calloc(nmemb, size);
-    if (!ptr) {
-        libxl__error_set(gc, ENOMEM);
-        return NULL;
-    }
+    if (!ptr) libxl__alloc_failed(CTX, __func__, nmemb, size);
 
     libxl__ptr_add(gc, ptr);
     return ptr;
@@ -97,9 +96,8 @@ void *libxl__realloc(libxl__gc *gc, void *ptr, size_t new_size)
     void *new_ptr = realloc(ptr, new_size);
     int i = 0;
 
-    if (new_ptr == NULL && new_size != 0) {
-        return NULL;
-    }
+    if (new_ptr == NULL && new_size != 0)
+        libxl__alloc_failed(CTX, __func__, new_size, 1);
 
     if (ptr == NULL) {
         libxl__ptr_add(gc, new_ptr);
@@ -111,7 +109,6 @@ void *libxl__realloc(libxl__gc *gc, void *ptr, size_t new_size)
             }
         }
     }
-
 
     return new_ptr;
 }
@@ -126,16 +123,13 @@ char *libxl__sprintf(libxl__gc *gc, const char *fmt, ...)
     ret = vsnprintf(NULL, 0, fmt, ap);
     va_end(ap);
 
-    if (ret < 0) {
-        return NULL;
-    }
+    assert(ret >= 0);
 
     s = libxl__zalloc(gc, ret + 1);
-    if (s) {
-        va_start(ap, fmt);
-        ret = vsnprintf(s, ret + 1, fmt, ap);
-        va_end(ap);
-    }
+    va_start(ap, fmt);
+    ret = vsnprintf(s, ret + 1, fmt, ap);
+    va_end(ap);
+
     return s;
 }
 
@@ -143,8 +137,9 @@ char *libxl__strdup(libxl__gc *gc, const char *c)
 {
     char *s = strdup(c);
 
-    if (s)
-        libxl__ptr_add(gc, s);
+    if (!s) libxl__alloc_failed(CTX, __func__, strlen(c), 1);
+
+    libxl__ptr_add(gc, s);
 
     return s;
 }
@@ -153,8 +148,7 @@ char *libxl__strndup(libxl__gc *gc, const char *c, size_t n)
 {
     char *s = strndup(c, n);
 
-    if (s)
-        libxl__ptr_add(gc, s);
+    if (!s) libxl__alloc_failed(CTX, __func__, n, 1);
 
     return s;
 }
@@ -175,6 +169,9 @@ void libxl__logv(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
              const char *file, int line, const char *func,
              const char *fmt, va_list ap)
 {
+    /* WARNING this function may not call any libxl-provided
+     * memory allocation function, as those may
+     * call libxl__alloc_failed which calls libxl__logv. */
     char *enomem = "[out of memory formatting log message]";
     char *base = NULL;
     int rc, esave;
