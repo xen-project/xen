@@ -14,7 +14,13 @@
 #define always_inline __inline__ __attribute__ ((always_inline))
 #define noinline      __attribute__((noinline))
 
+#ifdef __clang__
+/* Clang can replace some vars with new automatic ones that go in .data;
+ * mark all explicit-segment vars 'used' to prevent that. */
+#define __section(s)      __attribute_used__ __attribute__((__section__(s)))
+#else
 #define __section(s)      __attribute__((__section__(s)))
+#endif
 #define __used_section(s) __attribute_used__ __attribute__((__section__(s)))
 #define __text_section(s) __attribute__((__section__(s)))
 

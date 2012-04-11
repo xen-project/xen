@@ -53,6 +53,6 @@ extern struct op_x86_model_spec const op_amd_fam15h_spec;
 void arch_perfmon_setup_counters(void);
 
 extern int ppro_has_global_ctrl;
-extern struct op_x86_model_spec const *__read_mostly model;
+extern struct op_x86_model_spec const *model;
 
 #endif /* OP_X86_MODEL_H */
