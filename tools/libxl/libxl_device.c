@@ -376,7 +376,8 @@ static void device_remove_callback(libxl__egc *egc, libxl__ev_devstate *ds,
     device_remove_cleanup(gc, aorm);
 }
 
-int libxl__initiate_device_remove(libxl__ao *ao, libxl__device *dev)
+int libxl__initiate_device_remove(libxl__egc *egc, libxl__ao *ao,
+                                  libxl__device *dev)
 {
     AO_GC;
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -388,11 +389,11 @@ int libxl__initiate_device_remove(libxl__ao *ao, libxl__device *dev)
     libxl__ao_device_remove *aorm = 0;
 
     if (!state)
-        goto out;
+        goto out_ok;
     if (atoi(state) != 4) {
         libxl__device_destroy_tapdisk(gc, be_path);
         xs_rm(ctx->xsh, XBT_NULL, be_path);
-        goto out;
+        goto out_ok;
     }
 
 retry_transaction:
@@ -404,7 +405,7 @@ retry_transaction:
             goto retry_transaction;
         else {
             rc = ERROR_FAIL;
-            goto out;
+            goto out_fail;
         }
     }
 
@@ -417,13 +418,18 @@ retry_transaction:
     rc = libxl__ev_devstate_wait(gc, &aorm->ds, device_remove_callback,
                                  state_path, XenbusStateClosed,
                                  LIBXL_DESTROY_TIMEOUT * 1000);
-    if (rc) goto out;
+    if (rc) goto out_fail;
 
     return 0;
 
- out:
+ out_fail:
+    assert(rc);
     device_remove_cleanup(gc, aorm);
     return rc;
+
+ out_ok:
+    libxl__ao_complete(egc, ao, 0);
+    return 0;
 }
 
 int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)

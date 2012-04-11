@@ -692,7 +692,8 @@ _hidden int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state);
  * this is done, the ao will be completed.  An error
  * return from libxl__initiate_device_remove means that the ao
  * will _not_ be completed and the caller must do so. */
-_hidden int libxl__initiate_device_remove(libxl__ao*, libxl__device *dev);
+_hidden int libxl__initiate_device_remove(libxl__egc*, libxl__ao*,
+                                          libxl__device *dev);
 
 /*
  * libxl__ev_devstate - waits a given time for a device to

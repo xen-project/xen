@@ -1406,7 +1406,7 @@ int libxl_device_disk_remove(libxl_ctx *ctx, uint32_t domid,
     rc = libxl__device_from_disk(gc, domid, disk, &device);
     if (rc != 0) goto out;
 
-    rc = libxl__initiate_device_remove(ao, &device);
+    rc = libxl__initiate_device_remove(egc, ao, &device);
     if (rc) goto out;
 
     return AO_INPROGRESS;
@@ -1873,7 +1873,7 @@ int libxl_device_nic_remove(libxl_ctx *ctx, uint32_t domid,
     rc = libxl__device_from_nic(gc, domid, nic, &device);
     if (rc != 0) goto out;
 
-    rc = libxl__initiate_device_remove(ao, &device);
+    rc = libxl__initiate_device_remove(egc, ao, &device);
     if (rc) goto out;
 
     return AO_INPROGRESS;
@@ -2220,7 +2220,7 @@ int libxl_device_vkb_remove(libxl_ctx *ctx, uint32_t domid,
     rc = libxl__device_from_vkb(gc, domid, vkb, &device);
     if (rc != 0) goto out;
 
-    rc = libxl__initiate_device_remove(ao, &device);
+    rc = libxl__initiate_device_remove(egc, ao, &device);
     if (rc) goto out;
 
     return AO_INPROGRESS;
@@ -2353,7 +2353,7 @@ int libxl_device_vfb_remove(libxl_ctx *ctx, uint32_t domid,
     rc = libxl__device_from_vfb(gc, domid, vfb, &device);
     if (rc != 0) goto out;
 
-    rc = libxl__initiate_device_remove(ao, &device);
+    rc = libxl__initiate_device_remove(egc, ao, &device);
     if (rc) goto out;
 
     return AO_INPROGRESS;
