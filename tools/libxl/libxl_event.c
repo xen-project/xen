@@ -1010,8 +1010,10 @@ libxl__poller *libxl__poller_get(libxl_ctx *ctx)
     int rc;
 
     libxl__poller *p = LIBXL_LIST_FIRST(&ctx->pollers_idle);
-    if (p)
+    if (p) {
+        LIBXL_LIST_REMOVE(p, entry);
         return p;
+    }
 
     p = malloc(sizeof(*p));
     if (!p) {
