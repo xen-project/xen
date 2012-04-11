@@ -67,7 +67,6 @@ XEN_CONFIG_DIR = $(CONFIG_DIR)/xen
 XEN_SCRIPT_DIR = $(XEN_CONFIG_DIR)/scripts
 
 SOCKET_LIBS =
-PTHREAD_LIBS = -lpthread
 UTIL_LIBS = -lutil
 DLOPEN_LIBS = -ldl
 

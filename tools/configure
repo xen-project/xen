@@ -602,6 +602,9 @@ POW_LIB
 LIBOBJS
 ALLOCA
 libiconv
+PTHREAD_LIBS
+PTHREAD_LDFLAGS
+PTHREAD_CFLAGS
 libgcrypt
 libext2fs
 system_aio
@@ -3861,6 +3864,9 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 
+
+
+
 # pkg.m4 - Macros to locate and utilise pkg-config.            -*- Autoconf -*-
 # serial 1 (pkg-config-0.24)
 #
@@ -3921,6 +3927,22 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 #
 # --------------------------------------------------------------
 # PKG_CHECK_MODULES
+
+
+
+# We define, separately, PTHREAD_CFLAGS, _LDFLAGS and _LIBS
+# even though currently we don't set them very separately.
+# This means that the makefiles will not need to change in
+# the future if we make the test more sophisticated.
+
+
+
+# We invoke AX_PTHREAD_VARS with the name of another macro
+# which is then expanded once for each variable.
+
+
+
+
 
 
 
@@ -7228,47 +7250,70 @@ else
 fi
 
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for pthread_create in -lpthread" >&5
-$as_echo_n "checking for pthread_create in -lpthread... " >&6; }
-if test "${ac_cv_lib_pthread_pthread_create+set}" = set; then :
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for pthread flag" >&5
+$as_echo_n "checking for pthread flag... " >&6; }
+if test "${ax_cv_pthread_flags+set}" = set; then :
   $as_echo_n "(cached) " >&6
 else
-  ac_check_lib_save_LIBS=$LIBS
-LIBS="-lpthread  $LIBS"
-cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+
+        ax_cv_pthread_flags=-pthread
+
+    PTHREAD_CFLAGS="$ax_cv_pthread_flags"
+    PTHREAD_LDFLAGS="$ax_cv_pthread_flags"
+    PTHREAD_LIBS=""
+
+
+    saved_CFLAGS="$CFLAGS"
+
+    saved_LDFLAGS="$LDFLAGS"
+
+    saved_LIBS="$LIBS"
+
+
+    CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
+
+    LDFLAGS="$LDFLAGS $PTHREAD_LDFLAGS"
+
+    LIBS="$LIBS $PTHREAD_LIBS"
+
+        cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
-/* Override any GCC internal prototype to avoid an error.
-   Use char because int might match the return type of a GCC
-   builtin and then its argument prototype would still apply.  */
-#ifdef __cplusplus
-extern "C"
-#endif
-char pthread_create ();
-int
-main ()
-{
-return pthread_create ();
-  ;
-  return 0;
+#include <pthread.h>
+int main(void) {
+  pthread_atfork(0,0,0);
+  pthread_create(0,0,0,0);
 }
+
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_pthread_pthread_create=yes
+
 else
-  ac_cv_lib_pthread_pthread_create=no
+  ax_cv_pthread_flags=failed
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
-LIBS=$ac_check_lib_save_LIBS
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pthread_pthread_create" >&5
-$as_echo "$ac_cv_lib_pthread_pthread_create" >&6; }
-if test "x$ac_cv_lib_pthread_pthread_create" = x""yes; then :
 
-else
-  as_fn_error $? "Could not find libpthread" "$LINENO" 5
+    CFLAGS="$saved_CFLAGS"
+
+    LDFLAGS="$saved_LDFLAGS"
+
+    LIBS="$saved_LIBS"
+
+
 fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_pthread_flags" >&5
+$as_echo "$ax_cv_pthread_flags" >&6; }
+    if test "x$ax_cv_pthread_flags" = xfailed; then
+        as_fn_error $? "-pthread does not work" "$LINENO" 5
+    fi
+
+    PTHREAD_CFLAGS="$ax_cv_pthread_flags"
+    PTHREAD_LDFLAGS="$ax_cv_pthread_flags"
+    PTHREAD_LIBS=""
+
+
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for clock_gettime in -lrt" >&5
 $as_echo_n "checking for clock_gettime in -lrt... " >&6; }

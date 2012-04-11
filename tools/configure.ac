@@ -23,6 +23,7 @@ AC_USE_SYSTEM_EXTENSIONS
 AC_CANONICAL_HOST
 
 # M4 Macro includes
+m4_include([m4/savevar.m4])
 m4_include([m4/features.m4])
 m4_include([m4/path_or_fail.m4])
 m4_include([m4/python_version.m4])
@@ -33,6 +34,7 @@ m4_include([m4/set_cflags_ldflags.m4])
 m4_include([m4/uuid.m4])
 m4_include([m4/pkg.m4])
 m4_include([m4/curses.m4])
+m4_include([m4/pthread.m4])
 
 # Enable/disable options
 AX_ARG_DEFAULT_DISABLE([githttp], [Download GIT repositories via HTTP])
@@ -129,8 +131,7 @@ AC_CHECK_LIB([ext2fs], [ext2fs_open2], [libext2fs="y"], [libext2fs="n"])
 AC_SUBST(libext2fs)
 AC_CHECK_LIB([gcrypt], [gcry_md_hash_buffer], [libgcrypt="y"], [libgcrypt="n"])
 AC_SUBST(libgcrypt)
-AC_CHECK_LIB([pthread], [pthread_create], [] ,
-    [AC_MSG_ERROR([Could not find libpthread])])
+AX_CHECK_PTHREAD
 AC_CHECK_LIB([rt], [clock_gettime])
 AC_CHECK_LIB([yajl], [yajl_alloc], [],
     [AC_MSG_ERROR([Could not find yajl])])
