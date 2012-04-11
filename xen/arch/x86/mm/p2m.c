@@ -1232,11 +1232,10 @@ bool_t p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long g
     }
 
     *req_ptr = NULL;
-    req = xmalloc(mem_event_request_t);
+    req = xzalloc(mem_event_request_t);
     if ( req )
     {
         *req_ptr = req;
-        memset(req, 0, sizeof(req));
         req->reason = MEM_EVENT_REASON_VIOLATION;
 
         /* Pause the current VCPU */

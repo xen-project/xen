@@ -73,9 +73,9 @@ amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
 		return NULL;
 	}
 
-	memset(mc_ext, 0, sizeof(mc_ext));
+	memset(mc_ext, 0, sizeof(*mc_ext));
 	mc_ext->common.type = MC_TYPE_EXTENDED;
-	mc_ext->common.size = sizeof(mc_ext);
+	mc_ext->common.size = sizeof(*mc_ext);
 	mc_ext->mc_msrs = 3;
 
 	mc_ext->mc_msr[0].reg = MSR_F10_MC4_MISC1;
