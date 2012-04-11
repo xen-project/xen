@@ -35,8 +35,11 @@ else
 AIOLIBS     := -laio
 endif
 
-LDLIBS_blktapctrl := $(MEMSHRLIBS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore) -L../lib -lblktap -lrt -lm -lpthread
-LDLIBS_img := $(AIOLIBS) $(CRYPT_LIB) -lpthread -lz
+CFLAGS += $(PTHREAD_CFLAGS)
+LDFLAGS += $(PTHREAD_LDFLAGS)
+
+LDLIBS_blktapctrl := $(MEMSHRLIBS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenstore) -L../lib -lblktap -lrt -lm $(PTHREAD_LIBS)
+LDLIBS_img := $(AIOLIBS) $(CRYPT_LIB) $(PTHREAD_LIBS) -lz
 
 BLK-OBJS-y  := block-aio.o
 BLK-OBJS-y  += block-sync.o

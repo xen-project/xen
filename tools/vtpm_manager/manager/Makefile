@@ -33,4 +33,6 @@ $(BIN): $(OBJS)
 
 # libraries
 LIBS += ../tcs/libTCS.a ../util/libTCGUtils.a ../crypto/libtcpaCrypto.a
-LIBS += -lcrypto -lpthread -lm
+LIBS += -lcrypto $(PTHREAD_LIBS) -lm
+CFLAGS += $(PTHREAD_CFLAGS)
+LDFLAGS += $(PTHREAD_LDFLAGS)

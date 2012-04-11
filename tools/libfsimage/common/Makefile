@@ -8,6 +8,9 @@ LDFLAGS-$(CONFIG_SunOS) = -Wl,-M -Wl,mapfile-SunOS
 LDFLAGS-$(CONFIG_Linux) = -Wl,mapfile-GNU
 LDFLAGS = $(LDFLAGS-y)
 
+CFLAGS += $(PTHREAD_CFLAGS)
+LDFLAGS += $(PTHREAD_LDFLAGS)
+
 LIB_SRCS-y = fsimage.c fsimage_plugin.c fsimage_grub.c
 
 PIC_OBJS := $(patsubst %.c,%.opic,$(LIB_SRCS-y))
@@ -37,7 +40,7 @@ libfsimage.so.$(MAJOR): libfsimage.so.$(MAJOR).$(MINOR)
 	ln -sf $< $@
 
 libfsimage.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
-	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libfsimage.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ -lpthread
+	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libfsimage.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(PTHREAD_LIBS)
 
 -include $(DEPS)
 
