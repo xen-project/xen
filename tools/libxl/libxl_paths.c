@@ -14,7 +14,6 @@
 
 #include "libxl_osdeps.h" /* must come before any other headers */
 #include "libxl_internal.h"
-#include "_libxl_paths.h"
 
 const char *libxl_sbindir_path(void)
 {

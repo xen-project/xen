@@ -102,11 +102,9 @@ _libxl_list.h: $(XEN_INCLUDE)/xen-external/bsd-sys-queue-h-seddery $(XEN_INCLUDE
 	perl $^ --prefix=libxl >$@.new
 	$(call move-if-changed,$@.new,$@)
 
-libxl_paths.c: _libxl_paths.h
-
 libxl.h: _libxl_types.h
 libxl_json.h: _libxl_types_json.h
-libxl_internal.h: _libxl_types_internal.h
+libxl_internal.h: _libxl_types_internal.h _libxl_paths.h
 libxl_internal_json.h: _libxl_types_internal_json.h
 
 $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): libxl.h
