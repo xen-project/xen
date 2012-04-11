@@ -9,7 +9,7 @@ void percpu_init_areas(void);
 
 /* Separate out the type, so (int[3], foo) works. */
 #define __DEFINE_PER_CPU(type, name, suffix)                    \
-    __attribute__((__section__(".bss.percpu" #suffix)))         \
+    __section(".bss.percpu" #suffix)                            \
     __typeof__(type) per_cpu_##name
 
 /* var is in discarded region: offset to particular copy we want */

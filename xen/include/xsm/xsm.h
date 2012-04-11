@@ -44,7 +44,7 @@ extern xsm_initcall_t __xsm_initcall_start[], __xsm_initcall_end[];
 
 #define xsm_initcall(fn) \
     static xsm_initcall_t __initcall_##fn \
-    __attribute_used__ __attribute__((__section__(".xsm_initcall.init"))) = fn
+    __used_section(".xsm_initcall.init") = fn
 
 struct xsm_operations {
     void (*security_domaininfo) (struct domain *d,

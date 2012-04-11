@@ -7,20 +7,13 @@
  * Mark functions and data as being only used at initialization
  * or exit time.
  */
-#define __init       \
-    __attribute__ ((__section__ (".init.text")))
-#define __exit       \
-    __attribute_used__ __attribute__ ((__section__(".exit.text")))
-#define __initdata   \
-    __attribute__ ((__section__ (".init.data")))
-#define __exitdata   \
-    __attribute_used__ __attribute__ ((__section__ (".exit.data")))
-#define __initsetup  \
-    __attribute_used__ __attribute__ ((__section__ (".init.setup")))
-#define __init_call(lvl)  \
-    __attribute_used__ __attribute__ ((__section__ (".initcall" lvl ".init")))
-#define __exit_call  \
-    __attribute_used__ __attribute__ ((__section__ (".exitcall.exit")))
+#define __init            __text_section(".init.text")
+#define __exit            __text_section(".exit.text")
+#define __initdata        __section(".init.data")
+#define __exitdata        __used_section(".exit.data")
+#define __initsetup       __used_section(".init.setup")
+#define __init_call(lvl)  __used_section(".initcall" lvl ".init")
+#define __exit_call       __used_section(".exitcall.exit")
 
 /* These macros are used to mark some functions or 
  * initialized data (doesn't apply to uninitialized data)
@@ -95,7 +88,7 @@ struct kernel_param {
 extern struct kernel_param __setup_start, __setup_end;
 
 #define __setup_str static __initdata __attribute__((__aligned__(1))) char
-#define __kparam static __attribute_used__ __initsetup struct kernel_param
+#define __kparam static __initsetup struct kernel_param
 
 #define custom_param(_name, _var) \
     __setup_str __setup_str_##_var[] = _name; \

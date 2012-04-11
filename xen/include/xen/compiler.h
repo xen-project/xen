@@ -14,6 +14,10 @@
 #define always_inline __inline__ __attribute__ ((always_inline))
 #define noinline      __attribute__((noinline))
 
+#define __section(s)      __attribute__((__section__(s)))
+#define __used_section(s) __attribute_used__ __attribute__((__section__(s)))
+#define __text_section(s) __attribute__((__section__(s)))
+
 #ifdef INIT_SECTIONS_ONLY
 /*
  * For sources indicated to have only init code, make sure even
