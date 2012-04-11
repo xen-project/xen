@@ -1305,7 +1305,7 @@ int p2m_set_mem_access(struct domain *d, unsigned long start_pfn,
         p2m->default_access,
     };
 
-    if ( access >= HVMMEM_access_default || access < 0 )
+    if ( (unsigned) access >= HVMMEM_access_default )
         return -EINVAL;
 
     a = memaccess[access];
@@ -1367,7 +1367,7 @@ int p2m_get_mem_access(struct domain *d, unsigned long pfn,
     if ( mfn_x(mfn) == INVALID_MFN )
         return -ESRCH;
     
-    if ( a >= ARRAY_SIZE(memaccess) || a < 0 )
+    if ( (unsigned) a >= ARRAY_SIZE(memaccess) )
         return -ERANGE;
 
     *access =  memaccess[a];
