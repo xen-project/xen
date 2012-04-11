@@ -45,11 +45,19 @@ static always_inline int _raw_read_trylock(raw_rwlock_t *rw)
     asm volatile (
         "    lock; decl %0         \n"
         "    jns 2f                \n"
+#ifdef __clang__ /* clang's builtin assember can't do .subsection */
+        "1:  .pushsection .fixup,\"ax\"\n"
+#else
         "1:  .subsection 1         \n"
+#endif
         "2:  lock; incl %0         \n"
         "    decl %1               \n"
         "    jmp 1b                \n"
+#ifdef __clang__
+        "    .popsection           \n"
+#else
         "    .subsection 0         \n"
+#endif
         : "=m" (rw->lock), "=r" (acquired) : "1" (1) : "memory" );
 
     return acquired;
