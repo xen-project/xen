@@ -898,7 +898,6 @@ uint64_t  vlapic_tdt_msr_get(struct vlapic *vlapic)
 void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value)
 {
     uint64_t guest_tsc;
-    uint64_t guest_time;
     struct vcpu *v = vlapic_vcpu(vlapic);
 
     /* may need to exclude some other conditions like vlapic->hw.disabled */
@@ -910,12 +909,10 @@ void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value)
     
     /* new_value = 0, >0 && <= now, > now */
     guest_tsc = hvm_get_guest_tsc(v);
-    guest_time = hvm_get_guest_time(v);
     if ( value > guest_tsc )
     {
-        uint64_t delta = value - v->arch.hvm_vcpu.cache_tsc_offset;
-        delta = gtsc_to_gtime(v->domain, delta);
-        delta = max_t(s64, delta - guest_time, 0);
+        uint64_t delta = gtsc_to_gtime(v->domain, value - guest_tsc);
+        delta = max_t(s64, delta, 0);
 
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER, "delta[0x%016"PRIx64"]", delta);
 
@@ -949,9 +946,8 @@ void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value)
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER,
                 "tdt_msr[0x%016"PRIx64"],"
-                " gtsc[0x%016"PRIx64"],"
-                " gtime[0x%016"PRIx64"]",
-                vlapic->hw.tdt_msr, guest_tsc, guest_time);
+                " gtsc[0x%016"PRIx64"]",
+                vlapic->hw.tdt_msr, guest_tsc);
 }
 
 static int __vlapic_accept_pic_intr(struct vcpu *v)
