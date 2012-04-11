@@ -752,7 +752,7 @@ static void svm_lwp_interrupt(struct cpu_user_regs *regs)
     ack_APIC_irq();
     vlapic_set_irq(
         vcpu_vlapic(curr),
-        (curr->arch.hvm_svm.guest_lwp_cfg >> 40) && 0xff,
+        (curr->arch.hvm_svm.guest_lwp_cfg >> 40) & 0xff,
         0);
 }
 
