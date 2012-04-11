@@ -357,6 +357,7 @@ tools/firmware/etherboot/eb-roms.h
 tools/firmware/etherboot/gpxe-git-snapshot.tar.gz
 tools/misc/xenwatchdogd
 tools/misc/xen-hvmcrash
+tools/misc/xen-lowmemd
 tools/libvchan/vchan-node[12]
 tools/ocaml/*/.ocamldep.make
 tools/ocaml/*/*.cm[ixao]
