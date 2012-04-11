@@ -1225,7 +1225,9 @@ void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc)
 
     if (ao->poller) {
         assert(ao->in_initiator);
-        libxl__poller_wakeup(egc, ao->poller);
+        if (!ao->constructing)
+            /* don't bother with this if we're not in the event loop */
+            libxl__poller_wakeup(egc, ao->poller);
     } else if (ao->how.callback) {
         LIBXL_TAILQ_INSERT_TAIL(&egc->aos_for_callback, ao, entry_for_callback);
     } else {
@@ -1251,6 +1253,7 @@ libxl__ao *libxl__ao_create(libxl_ctx *ctx, uint32_t domid,
     if (!ao) goto out;
 
     ao->magic = LIBXL__AO_MAGIC;
+    ao->constructing = 1;
     ao->in_initiator = 1;
     ao->poller = 0;
     ao->domid = domid;
@@ -1275,7 +1278,9 @@ int libxl__ao_inprogress(libxl__ao *ao)
     int rc;
 
     assert(ao->magic == LIBXL__AO_MAGIC);
+    assert(ao->constructing);
     assert(ao->in_initiator);
+    ao->constructing = 0;
 
     if (ao->poller) {
         /* Caller wants it done synchronously. */

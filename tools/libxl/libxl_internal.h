@@ -347,7 +347,7 @@ struct libxl__egc {
 
 struct libxl__ao {
     uint32_t magic;
-    unsigned in_initiator:1, complete:1, notified:1;
+    unsigned constructing:1, in_initiator:1, complete:1, notified:1;
     int rc;
     libxl__gc gc;
     libxl_asyncop_how how;
@@ -1209,7 +1209,11 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
  * operation ("ao") machinery.  The function should take a parameter
  * const libxl_asyncop_how *ao_how and must start with a call to
  * AO_INITIATOR_ENTRY.  These functions MAY NOT be called from
- * outside libxl, because they can cause reentrancy callbacks.
+ * inside libxl, because they can cause reentrancy callbacks.
+ *
+ * For the same reason functions taking an ao_how may make themselves
+ * an egc with EGC_INIT (and they will generally want to, to be able
+ * to immediately complete an ao during its setup).
  *
  * Lifecycle of an ao:
  *
@@ -1240,8 +1244,7 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
  *   directly or indirectly, should call libxl__ao_complete (with the
  *   ctx locked, as it will generally already be in any event callback
  *   function).  This must happen exactly once for each ao (and not if
- *   the ao has been destroyed, obviously), and it may not happen
- *   until libxl__ao_inprogress has been called on the ao.
+ *   the ao has been destroyed, obviously).
  *
  * - Note that during callback functions, two gcs are available:
  *    - The one in egc, whose lifetime is only this callback
@@ -1255,12 +1258,14 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
     libxl__ctx_lock(ctx);                                       \
     libxl__ao *ao = libxl__ao_create(ctx, domid, ao_how);       \
     if (!ao) { libxl__ctx_unlock(ctx); return ERROR_NOMEM; }    \
+    libxl__egc egc[1]; LIBXL_INIT_EGC(egc[0],ctx);              \
     AO_GC;
 
 #define AO_INPROGRESS ({                                        \
         libxl_ctx *ao__ctx = libxl__gc_owner(&ao->gc);          \
         int ao__rc = libxl__ao_inprogress(ao);                  \
         libxl__ctx_unlock(ao__ctx); /* gc is now invalid */     \
+        EGC_FREE;                                               \
         (ao__rc);                                               \
    })
 
@@ -1269,6 +1274,7 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
         assert(rc);                                             \
         libxl__ao_abort(ao);                                    \
         libxl__ctx_unlock(ao__ctx); /* gc is now invalid */     \
+        EGC_FREE;                                               \
         (rc);                                                   \
     })
 
