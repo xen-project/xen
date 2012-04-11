@@ -39,10 +39,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     memset(ctx, 0, sizeof(libxl_ctx));
     ctx->lg = lg;
 
-    if (libxl__init_recursive_mutex(ctx, &ctx->lock) < 0) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Failed to initialize mutex");
-        return ERROR_FAIL;
-    }
+    /* First initialise pointers (cannot fail) */
 
     LIBXL_TAILQ_INIT(&ctx->occurred);
 
@@ -60,6 +57,16 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
 
     LIBXL_TAILQ_INIT(&ctx->death_list);
     libxl__ev_xswatch_init(&ctx->death_watch);
+
+    /* The mutex is special because we can't idempotently destroy it */
+
+    if (libxl__init_recursive_mutex(ctx, &ctx->lock) < 0) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Failed to initialize mutex");
+        free(ctx);
+        ctx = 0;
+    }
+
+    /* Now ctx is safe for ctx_free; failures simply set rc and "goto out" */
 
     rc = libxl__poller_init(ctx, &ctx->poller_app);
     if (rc) goto out;
@@ -149,6 +156,8 @@ int libxl_ctx_free(libxl_ctx *ctx)
     free(ctx->watch_slots);
 
     discard_events(&ctx->occurred);
+
+    pthread_mutex_destroy(&ctx->lock);
 
     GC_FREE;
     free(ctx);
