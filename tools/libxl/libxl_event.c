@@ -593,6 +593,45 @@ static int beforepoll_internal(libxl__gc *gc, libxl__poller *poller,
     int rc;
 
     /*
+     * We need to look at the fds we want twice: firstly, to count
+     * them so we can make the rindex array big enough, and secondly
+     * to actually fill the arrays in.
+     *
+     * To ensure correctness and avoid repeating the logic for
+     * deciding which fds are relevant, we define a macro
+     *    REQUIRE_FDS( BODY )
+     * which calls
+     *    do{
+     *        int req_fd;
+     *        int req_events;
+     *        BODY;
+     *    }while(0)
+     * for each fd with a nonzero events.  This is invoked twice.
+     *
+     * The definition of REQUIRE_FDS is simplified with the helper
+     * macro
+     *    void REQUIRE_FD(int req_fd, int req_events, BODY);
+     */
+
+#define REQUIRE_FDS(BODY) do{                                          \
+                                                                       \
+        LIBXL_LIST_FOREACH(efd, &CTX->efds, entry)                     \
+            REQUIRE_FD(efd->fd, efd->events, BODY);                    \
+                                                                       \
+        REQUIRE_FD(poller->wakeup_pipe[0], POLLIN, BODY);              \
+                                                                       \
+    }while(0)
+
+#define REQUIRE_FD(req_fd_, req_events_, BODY) do{      \
+        int req_events = (req_events_);                 \
+        int req_fd = (req_fd_);                         \
+        if (req_events) {                               \
+            BODY;                                       \
+        }                                               \
+    }while(0)
+
+
+    /*
      * In order to be able to efficiently find the libxl__ev_fd
      * for a struct poll during _afterpoll, we maintain a shadow
      * data structure in CTX->fd_beforepolled: each slot in
@@ -609,13 +648,13 @@ static int beforepoll_internal(libxl__gc *gc, libxl__poller *poller,
          * not to mess with fd_rindex.
          */
 
-        int maxfd = poller->wakeup_pipe[0] + 1;
-        LIBXL_LIST_FOREACH(efd, &CTX->efds, entry) {
-            if (!efd->events)
-                continue;
-            if (efd->fd >= maxfd)
-                maxfd = efd->fd + 1;
-        }
+        int maxfd = 0;
+
+        REQUIRE_FDS({
+            if (req_fd >= maxfd)
+                maxfd = req_fd + 1;
+        });
+
         /* make sure our array is as big as *nfds_io */
         if (poller->fd_rindex_allocd < maxfd) {
             assert(maxfd < INT_MAX / sizeof(int) / 2);
@@ -630,25 +669,16 @@ static int beforepoll_internal(libxl__gc *gc, libxl__poller *poller,
 
     int used = 0;
 
-#define REQUIRE_FD(req_fd, req_events, efd) do{                 \
-        if ((req_events)) {                                     \
-            if (used < *nfds_io) {                              \
-                fds[used].fd = (req_fd);                        \
-                fds[used].events = (req_events);                \
-                fds[used].revents = 0;                          \
-                assert((req_fd) < poller->fd_rindex_allocd);    \
-                poller->fd_rindex[(req_fd)] = used;             \
-            }                                                   \
-            used++;                                             \
-        }                                                       \
-    }while(0)
-
-    LIBXL_LIST_FOREACH(efd, &CTX->efds, entry)
-        REQUIRE_FD(efd->fd, efd->events, efd);
-
-    REQUIRE_FD(poller->wakeup_pipe[0], POLLIN, 0);
-
-#undef REQUIRE_FD
+    REQUIRE_FDS({
+        if (used < *nfds_io) {
+            fds[used].fd = req_fd;
+            fds[used].events = req_events;
+            fds[used].revents = 0;
+            assert(req_fd < poller->fd_rindex_allocd);
+            poller->fd_rindex[req_fd] = used;
+        }
+        used++;
+    });
 
     rc = used <= *nfds_io ? 0 : ERROR_BUFFERFULL;
 
