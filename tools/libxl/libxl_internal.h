@@ -1349,6 +1349,78 @@ _hidden void libxl__ao__destroy(libxl_ctx*, libxl__ao *ao);
 #define GC_FREE       libxl__free_all(gc)
 #define CTX           libxl__gc_owner(gc)
 
+/* Allocation macros all of which use the gc. */
+
+#define ARRAY_SIZE_OK(ptr, nmemb) ((nmemb) < INT_MAX / (sizeof(*(ptr)) * 2))
+
+/*
+ * Expression statement  <type> *GCNEW(<type> *var);
+ * Uses                  libxl__gc *gc;
+ *
+ * Allocates a new object of type <type> from the gc and zeroes it
+ * with memset.  Sets var to point to the new object or zero (setting
+ * errno).  Returns the new value of var.
+ */
+#define GCNEW(var)                                      \
+    (((var) = libxl__zalloc((gc),sizeof(*(var)))))
+
+/*
+ * Expression statement  <type> *GCNEW_ARRAY(<type> *var, ssize_t nmemb);
+ * Uses                  libxl__gc *gc;
+ *
+ * Like GCNEW but allocates an array of nmemb elements, as if from
+ * calloc.  Does check for integer overflow due to large nmemb.  If
+ * nmemb is 0 may succeed by returning 0.
+ */
+#define GCNEW_ARRAY(var, nmemb)                                 \
+    ((var) = libxl__calloc((gc), (nmemb), sizeof(*(var))))
+    
+/*
+ * Expression statement  <type> *GCREALLOC_ARRAY(<type> *var, size_t nmemb);
+ * Uses                  libxl__gc *gc;
+ *
+ * Reallocates the array var to be of size nmemb elements.  Updates
+ * var and returns the new value of var.  Does check for integer
+ * overflow due to large nmemb.
+ *
+ * Do not pass nmemb==0.  old may be 0 on entry.
+ */
+#define GCREALLOC_ARRAY(var, nmemb)                                     \
+    (assert(nmemb > 0),                                                 \
+     assert(ARRAY_SIZE_OK((var), (nmemb))),                             \
+     (var) = libxl__realloc((gc), (var), (nmemb)*sizeof(*(var)))))
+
+
+/*
+ * Expression            char *GCSPRINTF(const char *fmt, ...);
+ * Uses                  libxl__gc *gc;
+ *
+ * Trivial convenience wrapper for libxl__sprintf.
+ */
+#define GCSPRINTF(fmt, ...) (libxl__sprintf((gc), (fmt), __VA_ARGS__))
+
+
+/*
+ * Expression statements
+ *    void LOG(<xtl_level_suffix>, const char *fmt, ...);
+ *    void LOGE(<xtl_level_suffix>, const char *fmt, ...);
+ *    void LOGEV(<xtl_level_suffix>, int errnoval, const char *fmt, ...);
+ * Use
+ *    libxl__gc *gc;
+ *
+ * Trivial convenience wrappers for LIBXL__LOG, LIBXL__LOG_ERRNO and
+ * LIBXL__LOG_ERRNOVAL, respectively (and thus for libxl__log).
+ *
+ * XTL_<xtl_level_suffix> should exist and be an xentoollog.h log level
+ * So <xtl_level_suffix> should be one of
+ *   DEBUG VERBOSE DETAIL PROGRESS INFO NOTICE WARN ERROR ERROR CRITICAL
+ * Of these, most of libxl uses
+ *   DEBUG INFO WARN ERROR
+ */
+#define LOG(l,f, ...)     LIBXL__LOG(CTX,XTL_##l,(f),##__VA_ARGS__)
+#define LOGE(l,f, ...)    LIBXL__LOG_ERRNO(CTX,XTL_##l,(f),##__VA_ARGS__)
+#define LOGEV(l,e,f, ...) LIBXL__LOG_ERRNOVAL(CTX,XTL_##l,(e),(f),##__VA_ARGS__)
+
 
 /* Locking functions.  See comment for "lock" member of libxl__ctx. */
 
