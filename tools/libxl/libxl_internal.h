@@ -1266,9 +1266,10 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
  * - Note that during callback functions, two gcs are available:
  *    - The one in egc, whose lifetime is only this callback
  *    - The one in ao, whose lifetime is the asynchronous operation
- *   Usually callback function should use CONTAINER_OF
- *   to obtain its own structure, containing a pointer to the ao,
- *   and then use the gc from that ao.
+ *   Usually callback function should use CONTAINER_OF to obtain its
+ *   own state structure, containing a pointer to the ao.  It should
+ *   then obtain the ao and use the ao's gc; this is most easily done
+ *   using the convenience macro STATE_AO_GC.
  */
 
 #define AO_CREATE(ctx, domid, ao_how)                           \
@@ -1297,6 +1298,10 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
 
 #define AO_GC                                   \
     libxl__gc *const gc = &ao->gc
+
+#define STATE_AO_GC(op_ao)                      \
+    libxl__ao *const ao = (op_ao);              \
+    AO_GC
 
 
 /* All of these MUST be called with the ctx locked.
