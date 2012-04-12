@@ -588,6 +588,22 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
 static void svm_set_tsc_offset(struct vcpu *v, u64 offset)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    struct domain *d = v->domain;
+
+    /* Re-adjust the offset value when TSC_RATIO is available */
+    if ( cpu_has_tsc_ratio && d->arch.vtsc )
+    {
+        uint64_t host_tsc, guest_tsc;
+
+        rdtscll(host_tsc);
+        guest_tsc = hvm_get_guest_tsc(v);
+            
+        /* calculate hi,lo parts in 64bits to prevent overflow */
+        offset = (((host_tsc >> 32) * d->arch.tsc_khz / cpu_khz) << 32) +
+            (host_tsc & 0xffffffffULL) * d->arch.tsc_khz / cpu_khz;
+        offset = guest_tsc - offset;
+    }
+
     vmcb_set_tsc_offset(vmcb, offset);
 }
 
@@ -638,6 +654,19 @@ static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
     *(u16 *)(hypercall_page + (__HYPERVISOR_iret * 32)) = 0x0b0f; /* ud2 */
 }
 
+static inline void svm_tsc_ratio_save(struct vcpu *v)
+{
+    /* Other vcpus might not have vtsc enabled. So disable TSC_RATIO here. */
+    if ( cpu_has_tsc_ratio && v->domain->arch.vtsc )
+        wrmsrl(MSR_AMD64_TSC_RATIO, DEFAULT_TSC_RATIO);
+}
+
+static inline void svm_tsc_ratio_load(struct vcpu *v)
+{
+    if ( cpu_has_tsc_ratio && v->domain->arch.vtsc ) 
+        wrmsrl(MSR_AMD64_TSC_RATIO, vcpu_tsc_ratio(v));
+}
+
 static void svm_ctxt_switch_from(struct vcpu *v)
 {
     int cpu = smp_processor_id();
@@ -646,6 +675,7 @@ static void svm_ctxt_switch_from(struct vcpu *v)
 
     svm_save_dr(v);
     vpmu_save(v);
+    svm_tsc_ratio_save(v);
 
     svm_sync_vmcb(v);
     svm_vmload(per_cpu(root_vmcb, cpu));
@@ -689,6 +719,7 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     svm_vmload(vmcb);
     vmcb->cleanbits.bytes = 0;
     vpmu_load(v);
+    svm_tsc_ratio_load(v);
 
     if ( cpu_has_rdtscp )
         wrmsrl(MSR_TSC_AUX, hvm_msr_tsc_aux(v));
