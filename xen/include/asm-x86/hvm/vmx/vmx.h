@@ -144,31 +144,15 @@ void vmx_update_cpu_exec_control(struct vcpu *v);
  * Exit Qualifications for MOV for Control Register Access
  */
  /* 3:0 - control register number (CRn) */
-#define VMX_CONTROL_REG_ACCESS_NUM      0xf
+#define VMX_CONTROL_REG_ACCESS_NUM(eq)  ((eq) & 0xf)
  /* 5:4 - access type (CR write, CR read, CLTS, LMSW) */
-#define VMX_CONTROL_REG_ACCESS_TYPE     0x30
+#define VMX_CONTROL_REG_ACCESS_TYPE(eq) (((eq) >> 4) & 0x3)
+# define VMX_CONTROL_REG_ACCESS_TYPE_MOV_TO_CR   0
+# define VMX_CONTROL_REG_ACCESS_TYPE_MOV_FROM_CR 1
+# define VMX_CONTROL_REG_ACCESS_TYPE_CLTS        2
+# define VMX_CONTROL_REG_ACCESS_TYPE_LMSW        3
  /* 10:8 - general purpose register operand */
-#define VMX_CONTROL_REG_ACCESS_GPR      0xf00
-#define VMX_CONTROL_REG_ACCESS_TYPE_MOV_TO_CR   (0 << 4)
-#define VMX_CONTROL_REG_ACCESS_TYPE_MOV_FROM_CR (1 << 4)
-#define VMX_CONTROL_REG_ACCESS_TYPE_CLTS        (2 << 4)
-#define VMX_CONTROL_REG_ACCESS_TYPE_LMSW        (3 << 4)
-#define VMX_CONTROL_REG_ACCESS_GPR_EAX  (0 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_ECX  (1 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_EDX  (2 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_EBX  (3 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_ESP  (4 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_EBP  (5 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_ESI  (6 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_EDI  (7 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_R8   (8 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_R9   (9 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_R10  (10 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_R11  (11 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_R12  (12 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_R13  (13 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_R14  (14 << 8)
-#define VMX_CONTROL_REG_ACCESS_GPR_R15  (15 << 8)
+#define VMX_CONTROL_REG_ACCESS_GPR(eq)  (((eq) >> 8) & 0xf)
 
 /*
  * Access Rights

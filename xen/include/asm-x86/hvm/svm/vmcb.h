@@ -432,7 +432,9 @@ struct vmcb_struct {
     vmcbcleanbits_t cleanbits;  /* offset 0xC0 */
     u32 res09;                  /* offset 0xC4 */
     u64 nextrip;                /* offset 0xC8 */
-    u64 res10a[102];            /* offset 0xD0 pad to save area */
+    u8  guest_ins_len;          /* offset 0xD0 */
+    u8  guest_ins[15];          /* offset 0xD1 */
+    u64 res10a[100];            /* offset 0xE0 pad to save area */
 
     svm_segment_register_t es;  /* offset 1024 - cleanbit 8 */
     svm_segment_register_t cs;  /* cleanbit 8 */
@@ -495,6 +497,9 @@ struct arch_svm_struct {
     unsigned long *msrpm;
     int    launch_core;
     bool_t vmcb_in_sync;    /* VMCB sync'ed with VMSAVE? */
+
+    /* VMCB has a cached instruction from #PF/#NPF Decode Assist? */
+    uint8_t cached_insn_len; /* Zero if no cached instruction. */
 
     /* Upper four bytes are undefined in the VMCB, therefore we can't
      * use the fields in the VMCB. Write a 64bit value and then read a 64bit

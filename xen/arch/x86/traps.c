@@ -368,6 +368,36 @@ void vcpu_show_execution_state(struct vcpu *v)
     vcpu_unpause(v);
 }
 
+unsigned long *get_x86_gpr(struct cpu_user_regs *regs, unsigned int modrm_reg)
+{
+    void *p;
+
+    switch ( modrm_reg )
+    {
+    case  0: p = &regs->eax; break;
+    case  1: p = &regs->ecx; break;
+    case  2: p = &regs->edx; break;
+    case  3: p = &regs->ebx; break;
+    case  4: p = &regs->esp; break;
+    case  5: p = &regs->ebp; break;
+    case  6: p = &regs->esi; break;
+    case  7: p = &regs->edi; break;
+#if defined(__x86_64__)
+    case  8: p = &regs->r8;  break;
+    case  9: p = &regs->r9;  break;
+    case 10: p = &regs->r10; break;
+    case 11: p = &regs->r11; break;
+    case 12: p = &regs->r12; break;
+    case 13: p = &regs->r13; break;
+    case 14: p = &regs->r14; break;
+    case 15: p = &regs->r15; break;
+#endif
+    default: p = NULL; break;
+    }
+
+    return p;
+}
+
 static char *trapstr(int trapnr)
 {
     static char *strings[] = { 

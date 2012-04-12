@@ -603,6 +603,21 @@ static void svm_set_rdtsc_exiting(struct vcpu *v, bool_t enable)
     vmcb_set_general1_intercepts(vmcb, general1_intercepts);
 }
 
+static unsigned int svm_get_insn_bytes(struct vcpu *v, uint8_t *buf)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+    unsigned int len = v->arch.hvm_svm.cached_insn_len;
+
+    if ( len != 0 )
+    {
+        /* Latch and clear the cached instruction. */
+        memcpy(buf, vmcb->guest_ins, 15);
+        v->arch.hvm_svm.cached_insn_len = 0;
+    }
+
+    return len;
+}
+
 static void svm_init_hypercall_page(struct domain *d, void *hypercall_page)
 {
     char *p;
@@ -928,11 +943,16 @@ struct hvm_function_table * __init start_svm(void)
 
     printk("SVM: Supported advanced features:\n");
 
+    /* DecodeAssists fast paths assume nextrip is valid for fast rIP update. */
+    if ( !cpu_has_svm_nrips )
+        clear_bit(SVM_FEATURE_DECODEASSISTS, &svm_feature_flags);
+
 #define P(p,s) if ( p ) { printk(" - %s\n", s); printed = 1; }
     P(cpu_has_svm_npt, "Nested Page Tables (NPT)");
     P(cpu_has_svm_lbrv, "Last Branch Record (LBR) Virtualisation");
     P(cpu_has_svm_nrips, "Next-RIP Saved on #VMEXIT");
     P(cpu_has_svm_cleanbits, "VMCB Clean Bits");
+    P(cpu_has_svm_decode, "DecodeAssists");
     P(cpu_has_pause_filter, "Pause-Intercept Filter");
 #undef P
 
@@ -1032,6 +1052,22 @@ static void svm_vmexit_do_cpuid(struct cpu_user_regs *regs)
     regs->edx = edx;
 
     __update_guest_eip(regs, inst_len);
+}
+
+static void svm_vmexit_do_cr_access(
+    struct vmcb_struct *vmcb, struct cpu_user_regs *regs)
+{
+    int gp, cr, dir, rc;
+
+    cr = vmcb->exitcode - VMEXIT_CR0_READ;
+    dir = (cr > 15);
+    cr &= 0xf;
+    gp = vmcb->exitinfo1 & 0xf;
+
+    rc = dir ? hvm_mov_to_cr(cr, gp) : hvm_mov_from_cr(cr, gp);
+
+    if ( rc == X86EMUL_OKAY )
+        __update_guest_eip(regs, vmcb->nextrip - vmcb->rip);
 }
 
 static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
@@ -1427,7 +1463,8 @@ static struct hvm_function_table __read_mostly svm_function_table = {
     .msr_read_intercept   = svm_msr_read_intercept,
     .msr_write_intercept  = svm_msr_write_intercept,
     .invlpg_intercept     = svm_invlpg_intercept,
-    .set_rdtsc_exiting    = svm_set_rdtsc_exiting
+    .set_rdtsc_exiting    = svm_set_rdtsc_exiting,
+    .get_insn_bytes       = svm_get_insn_bytes,
 };
 
 asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
@@ -1533,7 +1570,12 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
                     (unsigned long)regs->ecx, (unsigned long)regs->edx,
                     (unsigned long)regs->esi, (unsigned long)regs->edi);
 
-        if ( paging_fault(va, regs) )
+        if ( cpu_has_svm_decode )
+            v->arch.hvm_svm.cached_insn_len = vmcb->guest_ins_len & 0xf;
+        rc = paging_fault(va, regs);
+        v->arch.hvm_svm.cached_insn_len = 0;
+
+        if ( rc )
         {
             if ( trace_will_trace_event(TRC_SHADOW) )
                 break;
@@ -1615,12 +1657,29 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
             int dir = (vmcb->exitinfo1 & 1) ? IOREQ_READ : IOREQ_WRITE;
             if ( handle_pio(port, bytes, dir) )
                 __update_guest_eip(regs, vmcb->exitinfo2 - vmcb->rip);
-            break;
         }
-        /* fallthrough to emulation if a string instruction */
+        else if ( !handle_mmio() )
+            hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        break;
+
     case VMEXIT_CR0_READ ... VMEXIT_CR15_READ:
     case VMEXIT_CR0_WRITE ... VMEXIT_CR15_WRITE:
+        if ( cpu_has_svm_decode && (vmcb->exitinfo1 & (1ULL << 63)) )
+            svm_vmexit_do_cr_access(vmcb, regs);
+        else if ( !handle_mmio() ) 
+            hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        break;
+
     case VMEXIT_INVLPG:
+        if ( cpu_has_svm_decode )
+        {
+            svm_invlpg_intercept(vmcb->exitinfo1);
+            __update_guest_eip(regs, vmcb->nextrip - vmcb->rip);
+        }
+        else if ( !handle_mmio() )
+            hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        break;
+
     case VMEXIT_INVLPGA:
         if ( !handle_mmio() )
             hvm_inject_exception(TRAP_gp_fault, 0, 0);
@@ -1680,7 +1739,10 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_NPF:
         perfc_incra(svmexits, VMEXIT_NPF_PERFC);
         regs->error_code = vmcb->exitinfo1;
+        if ( cpu_has_svm_decode )
+            v->arch.hvm_svm.cached_insn_len = vmcb->guest_ins_len & 0xf;
         svm_do_nested_pgfault(vmcb->exitinfo2);
+        v->arch.hvm_svm.cached_insn_len = 0;
         break;
 
     case VMEXIT_IRET: {

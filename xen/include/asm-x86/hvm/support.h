@@ -137,5 +137,7 @@ int hvm_set_cr3(unsigned long value);
 int hvm_set_cr4(unsigned long value);
 int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
 int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content);
+int hvm_mov_to_cr(unsigned int cr, unsigned int gpr);
+int hvm_mov_from_cr(unsigned int cr, unsigned int gpr);
 
 #endif /* __ASM_X86_HVM_SUPPORT_H__ */
