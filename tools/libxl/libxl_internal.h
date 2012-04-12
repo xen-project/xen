@@ -1375,6 +1375,14 @@ _hidden int libxl__carefd_close(libxl__carefd*);
 /* You may pass NULL in which case the answer is -1. */
 _hidden int libxl__carefd_fd(const libxl__carefd*);
 
+/* common paths */
+_hidden const char *libxl__libexec_path(void);
+_hidden const char *libxl__private_bindir_path(void);
+_hidden const char *libxl__xenfirmwaredir_path(void);
+_hidden const char *libxl__xen_config_dir_path(void);
+_hidden const char *libxl__xen_script_dir_path(void);
+_hidden const char *libxl__lock_dir_path(void);
+_hidden const char *libxl__run_dir_path(void);
 
 /*
  * Convenience macros.

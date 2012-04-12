@@ -1126,7 +1126,7 @@ out:
 int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_type type)
 {
     GC_INIT(ctx);
-    char *p = libxl__sprintf(gc, "%s/xenconsole", libxl_private_bindir_path());
+    char *p = libxl__sprintf(gc, "%s/xenconsole", libxl__private_bindir_path());
     char *domid_s = libxl__sprintf(gc, "%d", domid);
     char *cons_num_s = libxl__sprintf(gc, "%d", cons_num);
     char *cons_type_s;
@@ -1767,7 +1767,7 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic)
         if (!nic->bridge) return ERROR_NOMEM;
     }
     if ( !nic->script && asprintf(&nic->script, "%s/vif-bridge",
-                                  libxl_xen_script_dir_path()) < 0 )
+                                  libxl__xen_script_dir_path()) < 0 )
         return ERROR_FAIL;
     if (!nic->nictype)
         nic->nictype = LIBXL_NIC_TYPE_IOEMU;
@@ -1837,7 +1837,7 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
         flexarray_append(back, "script");
         flexarray_append(back, nic->script[0]=='/' ? nic->script
                          : libxl__sprintf(gc, "%s/%s",
-                                          libxl_xen_script_dir_path(),
+                                          libxl__xen_script_dir_path(),
                                           nic->script));
     }
 

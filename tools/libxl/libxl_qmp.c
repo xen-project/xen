@@ -682,7 +682,7 @@ libxl__qmp_handler *libxl__qmp_initialize(libxl__gc *gc, uint32_t domid)
     qmp = qmp_init_handler(gc, domid);
 
     qmp_socket = libxl__sprintf(gc, "%s/qmp-libxl-%d",
-                                libxl_run_dir_path(), domid);
+                                libxl__run_dir_path(), domid);
     if ((ret = qmp_open(qmp, qmp_socket, QMP_SOCKET_CONNECT_TIMEOUT)) < 0) {
         LIBXL__LOG_ERRNO(qmp->ctx, LIBXL__LOG_ERROR, "Connection error");
         qmp_free_handler(qmp);
@@ -720,7 +720,7 @@ void libxl__qmp_cleanup(libxl__gc *gc, uint32_t domid)
     char *qmp_socket;
 
     qmp_socket = libxl__sprintf(gc, "%s/qmp-libxl-%d",
-                                libxl_run_dir_path(), domid);
+                                libxl__run_dir_path(), domid);
     if (unlink(qmp_socket) == -1) {
         if (errno != ENOENT) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,

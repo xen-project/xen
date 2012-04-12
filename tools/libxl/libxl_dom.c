@@ -362,7 +362,7 @@ static const char *libxl__domain_firmware(libxl__gc *gc,
             break;
         }
     }
-    return libxl__abs_path(gc, firmware, libxl_xenfirmwaredir_path());
+    return libxl__abs_path(gc, firmware, libxl__xenfirmwaredir_path());
 }
 
 int libxl__build_hvm(libxl__gc *gc, uint32_t domid,

@@ -15,37 +15,17 @@
 #include "libxl_osdeps.h" /* must come before any other headers */
 #include "libxl_internal.h"
 
-const char *libxl_sbindir_path(void)
-{
-    return SBINDIR;
-}
-
-const char *libxl_bindir_path(void)
-{
-    return BINDIR;
-}
-
-const char *libxl_libexec_path(void)
+const char *libxl__libexec_path(void)
 {
     return LIBEXEC;
 }
 
-const char *libxl_libdir_path(void)
-{
-    return LIBDIR;
-}
-
-const char *libxl_sharedir_path(void)
-{
-    return SHAREDIR;
-}
-
-const char *libxl_private_bindir_path(void)
+const char *libxl__private_bindir_path(void)
 {
     return PRIVATE_BINDIR;
 }
 
-const char *libxl_xenfirmwaredir_path(void)
+const char *libxl__xenfirmwaredir_path(void)
 {
     return XENFIRMWAREDIR;
 }
@@ -55,7 +35,7 @@ const char *libxl_xen_config_dir_path(void)
     return XEN_CONFIG_DIR;
 }
 
-const char *libxl_xen_script_dir_path(void)
+const char *libxl__xen_script_dir_path(void)
 {
     return XEN_SCRIPT_DIR;
 }
@@ -65,14 +45,9 @@ const char *libxl_lock_dir_path(void)
     return XEN_LOCK_DIR;
 }
 
-const char *libxl_run_dir_path(void)
+const char *libxl__run_dir_path(void)
 {
     return XEN_RUN_DIR;
-}
-
-const char *libxl_xenpaging_dir_path(void)
-{
-    return XEN_PAGING_DIR;
 }
 
 /*

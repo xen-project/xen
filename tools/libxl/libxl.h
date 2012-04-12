@@ -785,18 +785,8 @@ int libxl_flask_setenforce(libxl_ctx *ctx, int mode);
 int libxl_flask_loadpolicy(libxl_ctx *ctx, void *policy, uint32_t size);
 
 /* common paths */
-const char *libxl_sbindir_path(void);
-const char *libxl_bindir_path(void);
-const char *libxl_libexec_path(void);
-const char *libxl_libdir_path(void);
-const char *libxl_sharedir_path(void);
-const char *libxl_private_bindir_path(void);
-const char *libxl_xenfirmwaredir_path(void);
 const char *libxl_xen_config_dir_path(void);
-const char *libxl_xen_script_dir_path(void);
 const char *libxl_lock_dir_path(void);
-const char *libxl_run_dir_path(void);
-const char *libxl_xenpaging_dir_path(void);
 
 /* misc */
 

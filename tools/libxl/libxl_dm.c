@@ -24,7 +24,7 @@ static const char *libxl_tapif_script(libxl__gc *gc)
 #ifdef __linux__
     return libxl__strdup(gc, "no");
 #else
-    return libxl__sprintf(gc, "%s/qemu-ifup", libxl_xen_script_dir_path());
+    return libxl__sprintf(gc, "%s/qemu-ifup", libxl__xen_script_dir_path());
 #endif
 }
 
@@ -47,10 +47,10 @@ const char *libxl__domain_device_model(libxl__gc *gc,
     } else {
         switch (info->device_model_version) {
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
-            dm = libxl__abs_path(gc, "qemu-dm", libxl_libexec_path());
+            dm = libxl__abs_path(gc, "qemu-dm", libxl__libexec_path());
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-            dm = libxl__abs_path(gc, "qemu-system-i386", libxl_libexec_path());
+            dm = libxl__abs_path(gc, "qemu-system-i386", libxl__libexec_path());
             break;
         default:
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
@@ -337,7 +337,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_append(dm_args,
                      libxl__sprintf(gc, "socket,id=libxl-cmd,"
                                     "path=%s/qmp-libxl-%d,server,nowait",
-                                    libxl_run_dir_path(), guest_domid));
+                                    libxl__run_dir_path(), guest_domid));
 
     flexarray_append(dm_args, "-mon");
     flexarray_append(dm_args, "chardev=libxl-cmd,mode=control");
@@ -708,7 +708,7 @@ static int libxl__create_stubdom(libxl__gc *gc,
     dm_config.b_info.target_memkb = dm_config.b_info.max_memkb;
 
     dm_config.b_info.u.pv.kernel.path = libxl__abs_path(gc, "ioemu-stubdom.gz",
-                                              libxl_xenfirmwaredir_path());
+                                              libxl__xenfirmwaredir_path());
     dm_config.b_info.u.pv.cmdline = libxl__sprintf(gc, " -d %d", guest_domid);
     dm_config.b_info.u.pv.ramdisk.path = "";
     dm_config.b_info.u.pv.features = "";
