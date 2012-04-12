@@ -187,13 +187,11 @@ static int alloc_trace_bufs(unsigned int pages)
 
     t_info = alloc_xenheap_pages(get_order_from_pages(t_info_pages), 0);
     if ( t_info == NULL )
-        goto out_dealloc_t_info;
+        goto out_fail;
+
+    memset(t_info, 0, t_info_pages*PAGE_SIZE);
 
     t_info_mfn_list = (uint32_t *)t_info;
-
-    for(i = 0; i < t_info_pages; i++)
-        share_xen_page_with_privileged_guests(
-            virt_to_page(t_info) + i, XENSHARE_readonly);
 
     t_info->tbuf_size = pages;
 
@@ -247,6 +245,11 @@ static int alloc_trace_bufs(unsigned int pages)
         }
     }
 
+    /* Finally, share the t_info page */
+    for(i = 0; i < t_info_pages; i++)
+        share_xen_page_with_privileged_guests(
+            virt_to_page(t_info) + i, XENSHARE_readonly);
+
     data_size  = (pages * PAGE_SIZE - sizeof(struct t_buf));
     t_buf_highwater = data_size >> 1; /* 50% high water */
     opt_tbuf_size = pages;
@@ -272,9 +275,9 @@ out_dealloc:
             free_xenheap_pages(mfn_to_virt(mfn), 0);
         }
     }
-out_dealloc_t_info:
     free_xenheap_pages(t_info, get_order_from_pages(t_info_pages));
     t_info = NULL;
+out_fail:
     printk(XENLOG_WARNING "xentrace: allocation failed! Tracing disabled.\n");
     return -ENOMEM;
 }
