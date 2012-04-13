@@ -1,5 +1,4 @@
 XEN_ROOT = $(CURDIR)/../../..
-include $(XEN_ROOT)/tools/libfsimage/Rules.mk
 
 LIB_SRCS-y = ext2fs-lib.c
 
@@ -12,3 +11,5 @@ all: fs-all
 
 .PHONY: install
 install: fs-install
+
+include $(XEN_ROOT)/tools/libfsimage/Rules.mk

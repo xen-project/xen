@@ -1,5 +1,4 @@
 XEN_ROOT = $(CURDIR)/../../..
-include $(XEN_ROOT)/tools/libfsimage/Rules.mk
 
 LIB_SRCS-y = fsys_iso9660.c
 
@@ -12,3 +11,5 @@ all: fs-all
 install: fs-install
 
 fsys_iso9660.c: iso9660.h
+
+include $(XEN_ROOT)/tools/libfsimage/Rules.mk
