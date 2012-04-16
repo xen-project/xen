@@ -493,7 +493,9 @@ static void acpi_processor_idle(void)
          * not set. In that case we cannot do much, we enter C3
          * without doing anything.
          */
-        if ( power->flags.bm_check && power->flags.bm_control )
+        if ( cx->type != ACPI_STATE_C3 )
+            /* nothing to be done here */;
+        else if ( power->flags.bm_check && power->flags.bm_control )
         {
             spin_lock(&c3_cpu_status.lock);
             if ( ++c3_cpu_status.count == num_online_cpus() )
@@ -515,7 +517,8 @@ static void acpi_processor_idle(void)
         /* Invoke C3 */
         acpi_idle_do_entry(cx);
 
-        if ( power->flags.bm_check && power->flags.bm_control )
+        if ( (cx->type == ACPI_STATE_C3) &&
+             power->flags.bm_check && power->flags.bm_control )
         {
             /* Enable bus master arbitration */
             spin_lock(&c3_cpu_status.lock);
