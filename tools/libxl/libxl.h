@@ -754,7 +754,6 @@ uint32_t libxl_vm_get_start_time(libxl_ctx *ctx, uint32_t domid);
 
 char *libxl_tmem_list(libxl_ctx *ctx, uint32_t domid, int use_long);
 int libxl_tmem_freeze(libxl_ctx *ctx, uint32_t domid);
-int libxl_tmem_destroy(libxl_ctx *ctx, uint32_t domid);
 int libxl_tmem_thaw(libxl_ctx *ctx, uint32_t domid);
 int libxl_tmem_set(libxl_ctx *ctx, uint32_t domid, char* name,
                    uint32_t set);

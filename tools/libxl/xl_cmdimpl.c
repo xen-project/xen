@@ -5384,38 +5384,6 @@ int main_tmem_freeze(int argc, char **argv)
     return 0;
 }
 
-int main_tmem_destroy(int argc, char **argv)
-{
-    const char *dom = NULL;
-    int all = 0;
-    int opt;
-
-    while ((opt = def_getopt(argc, argv, "a", "tmem-destroy", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'a':
-            all = 1;
-            break;
-        }
-    }
-
-    dom = argv[optind];
-    if (!dom && all == 0) {
-        fprintf(stderr, "You must specify -a or a domain id.\n\n");
-        help("tmem-destroy");
-        return 1;
-    }
-
-    if (all)
-        domid = -1;
-    else
-        find_domain(dom);
-
-    libxl_tmem_destroy(ctx, domid);
-    return 0;
-}
-
 int main_tmem_thaw(int argc, char **argv)
 {
     const char *dom = NULL;

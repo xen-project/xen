@@ -3496,21 +3496,6 @@ int libxl_tmem_freeze(libxl_ctx *ctx, uint32_t domid)
     return rc;
 }
 
-int libxl_tmem_destroy(libxl_ctx *ctx, uint32_t domid)
-{
-    int rc;
-
-    rc = xc_tmem_control(ctx->xch, -1, TMEMC_DESTROY, domid, 0, 0,
-                         0, NULL);
-    if (rc < 0) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
-            "Can not destroy tmem pools");
-        return ERROR_FAIL;
-    }
-
-    return rc;
-}
-
 int libxl_tmem_thaw(libxl_ctx *ctx, uint32_t domid)
 {
     int rc;
