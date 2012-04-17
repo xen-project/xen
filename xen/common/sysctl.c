@@ -156,7 +156,6 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         if ( ret )
             break;
 
-        ret = perfc_control(&op->u.perfc_op);
         ret = spinlock_profile_control(&op->u.lockprof_op);
         if ( copy_to_guest(u_sysctl, op, 1) )
             ret = -EFAULT;
