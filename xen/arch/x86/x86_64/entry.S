@@ -277,20 +277,22 @@ sysenter_eflags_saved:
         leaq  VCPU_trap_bounce(%rbx),%rdx
         testq %rax,%rax
         leal  (,%rcx,TBF_INTERRUPT),%ecx
-        jz    2f
-1:      movq  VCPU_domain(%rbx),%rdi
+UNLIKELY_START(z, sysenter_gpf)
+        movq  VCPU_trap_ctxt(%rbx),%rsi
+        movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
+        subl  $2,UREGS_rip(%rsp)
+        movl  %eax,TRAPBOUNCE_error_code(%rdx)
+        movq  TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_eip(%rsi),%rax
+        testb $4,TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_flags(%rsi)
+        setnz %cl
+        leal  TBF_EXCEPTION|TBF_EXCEPTION_ERRCODE(,%rcx,TBF_INTERRUPT),%ecx
+UNLIKELY_END(sysenter_gpf)
+        movq  VCPU_domain(%rbx),%rdi
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movb  %cl,TRAPBOUNCE_flags(%rdx)
         testb $1,DOMAIN_is_32bit_pv(%rdi)
         jnz   compat_sysenter
-        call  create_bounce_frame
-        jmp   test_all_events
-2:      movq  VCPU_trap_ctxt(%rbx),%rcx
-        movl  %eax,TRAPBOUNCE_error_code(%rdx)
-        movq  TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_eip(%rcx),%rax
-        movb  $(TBF_EXCEPTION|TBF_EXCEPTION_ERRCODE|TBF_INTERRUPT),%cl
-        movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
-        jmp   1b
+        jmp   .Lbounce_exception
 
 ENTRY(int80_direct_trap)
         pushq $0
@@ -483,6 +485,7 @@ handle_exception_saved:
         jnz   compat_post_handle_exception
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    test_all_events
+.Lbounce_exception:
         call  create_bounce_frame
         movb  $0,TRAPBOUNCE_flags(%rdx)
         jmp   test_all_events

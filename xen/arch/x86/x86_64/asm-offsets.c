@@ -145,6 +145,7 @@ void __dummy__(void)
 
     OFFSET(TRAPINFO_eip, struct trap_info, address);
     OFFSET(TRAPINFO_cs, struct trap_info, cs);
+    OFFSET(TRAPINFO_flags, struct trap_info, flags);
     DEFINE(TRAPINFO_sizeof, sizeof(struct trap_info));
     BLANK();
 
