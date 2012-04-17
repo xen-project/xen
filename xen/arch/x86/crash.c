@@ -25,6 +25,7 @@
 #include <public/xen.h>
 #include <asm/shared.h>
 #include <asm/hvm/support.h>
+#include <asm/hpet.h>
 
 static atomic_t waiting_for_crash_ipi;
 static unsigned int crashing_cpu;
@@ -77,6 +78,7 @@ static void nmi_shootdown_cpus(void)
 
     __stop_this_cpu();
     disable_IO_APIC();
+    hpet_disable();
 
     local_irq_enable();
 }
