@@ -2183,8 +2183,8 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
     int vector;
 
     if (!IO_APIC_IRQ(irq)) {
-        printk(KERN_ERR "IOAPIC[%d]: Invalid reference to IRQ 0\n",
-               ioapic);
+        printk(KERN_ERR "IOAPIC[%d]: Invalid reference to IRQ %d\n",
+               ioapic, irq);
         return -EINVAL;
     }
 
