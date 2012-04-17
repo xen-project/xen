@@ -288,7 +288,7 @@ struct cmd_spec cmd_table[] = {
       "",
     },
     { "network-attach",
-      &main_networkattach, 0,
+      &main_networkattach, 1,
       "Create a new virtual network device",
       "<Domain> [type=<type>] [mac=<mac>] [bridge=<bridge>] "
       "[ip=<ip>] [script=<script>] [backend=<BackDomain>] [vifname=<name>] "

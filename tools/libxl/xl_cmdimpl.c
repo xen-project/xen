@@ -4916,6 +4916,16 @@ int main_networkattach(int argc, char **argv)
             return 1;
         }
     }
+
+    if (dryrun_only) {
+        char *json = libxl_device_nic_to_json(ctx, &nic);
+        printf("vif: %s\n", json);
+        free(json);
+        libxl_device_nic_dispose(&nic);
+        if (ferror(stdout) || fflush(stdout)) { perror("stdout"); exit(-1); }
+        return 0;
+    }
+
     if (libxl_device_nic_add(ctx, domid, &nic)) {
         fprintf(stderr, "libxl_device_nic_add failed.\n");
         return 1;
