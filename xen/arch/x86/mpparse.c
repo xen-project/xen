@@ -1034,6 +1034,21 @@ int mp_register_gsi (u32 gsi, int triggering, int polarity)
 		return gsi;
 #endif
 
+	if (!nr_ioapics) {
+		unsigned int port = 0x4d0 + (gsi >> 3);
+		u8 val;
+
+		if (!platform_legacy_irq(gsi))
+			return -EINVAL;
+		val = inb(port);
+		if (triggering)
+			val |= 1 << (gsi & 7);
+		else
+			val &= ~(1 << (gsi & 7));
+		outb(val, port);
+		return 0;
+	}
+
 	ioapic = mp_find_ioapic(gsi);
 	if (ioapic < 0) {
 		printk(KERN_WARNING "No IOAPIC for GSI %u\n", gsi);
