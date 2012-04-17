@@ -185,7 +185,7 @@ struct IO_APIC_route_entry **alloc_ioapic_entries(void)
         ioapic_entries[apic] =
             xmalloc_array(struct IO_APIC_route_entry,
                           nr_ioapic_entries[apic]);
-        if (!ioapic_entries[apic])
+        if (!ioapic_entries[apic] && nr_ioapic_entries[apic])
             goto nomem;
     }
 
@@ -310,6 +310,9 @@ int save_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
         return -ENOMEM;
 
     for (apic = 0; apic < nr_ioapics; apic++) {
+        if (!nr_ioapic_entries[apic])
+            continue;
+
         if (!ioapic_entries[apic])
             return -ENOMEM;
 
@@ -331,6 +334,9 @@ void mask_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
         return;
 
     for (apic = 0; apic < nr_ioapics; apic++) {
+        if (!nr_ioapic_entries[apic])
+            continue;
+
         if (!ioapic_entries[apic])
             break;
 
@@ -358,6 +364,9 @@ int restore_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
         return -ENOMEM;
 
     for (apic = 0; apic < nr_ioapics; apic++) {
+        if (!nr_ioapic_entries[apic])
+            continue;
+
         if (!ioapic_entries[apic])
             return -ENOMEM;
 
@@ -610,6 +619,8 @@ static int __init find_isa_irq_apic(int irq, int type)
     if (i < mp_irq_entries) {
         int apic;
         for(apic = 0; apic < nr_ioapics; apic++) {
+            if (!nr_ioapic_entries[apic])
+                continue;
             if (mp_ioapics[apic].mpc_apicid == mp_irqs[i].mpc_dstapic)
                 return apic;
         }
@@ -1080,6 +1091,8 @@ static void /*__init*/ __print_IO_APIC(void)
     printk(KERN_INFO "testing the IO APIC.......................\n");
 
     for (apic = 0; apic < nr_ioapics; apic++) {
+        if (!nr_ioapic_entries[apic])
+            continue;
 
 	spin_lock_irqsave(&ioapic_lock, flags);
 	reg_00.raw = io_apic_read(apic, 0);
@@ -1229,6 +1242,8 @@ static void __init enable_IO_APIC(void)
 
     if (directed_eoi_enabled) {
         for (apic = 0; apic < nr_ioapics; apic++) {
+            if (!nr_ioapic_entries[apic])
+                continue;
             vector_map[apic] = xzalloc(vmask_t);
             BUG_ON(!vector_map[apic]);
         }
@@ -1354,6 +1369,8 @@ static void __init setup_ioapic_ids_from_mpc(void)
      * Set the IOAPIC ID to the value stored in the MPC table.
      */
     for (apic = 0; apic < nr_ioapics; apic++) {
+        if (!nr_ioapic_entries[apic])
+            continue;
 
         /* Read the register 0 value */
         spin_lock_irqsave(&ioapic_lock, flags);
@@ -2038,6 +2055,8 @@ void ioapic_resume(void)
 
     spin_lock_irqsave(&ioapic_lock, flags);
     for (apic = 0; apic < nr_ioapics; apic++){
+        if (!nr_ioapic_entries[apic])
+            continue;
         reg_00.raw = __io_apic_read(apic, 0);
         if (reg_00.bits.ID != mp_ioapics[apic].mpc_apicid) {
             reg_00.bits.ID = mp_ioapics[apic].mpc_apicid;
@@ -2225,8 +2244,12 @@ static int ioapic_physbase_to_id(unsigned long physbase)
 {
     int apic;
     for ( apic = 0; apic < nr_ioapics; apic++ )
+    {
+        if ( !nr_ioapic_entries[apic] )
+            continue;
         if ( mp_ioapics[apic].mpc_apicaddr == physbase )
             return apic;
+    }
     return -EINVAL;
 }
 
@@ -2444,6 +2467,22 @@ void dump_ioapic_irq_info(void)
 static unsigned int __initdata max_gsi_irqs;
 integer_param("max_gsi_irqs", max_gsi_irqs);
 
+static __init bool_t bad_ioapic_register(unsigned int idx)
+{
+    union IO_APIC_reg_00 reg_00 = { .raw = io_apic_read(idx, 0) };
+    union IO_APIC_reg_01 reg_01 = { .raw = io_apic_read(idx, 1) };
+    union IO_APIC_reg_02 reg_02 = { .raw = io_apic_read(idx, 2) };
+
+    if ( reg_00.raw == -1 && reg_01.raw == -1 && reg_02.raw == -1 )
+    {
+        printk(KERN_WARNING "I/O APIC %#x registers return all ones, skipping!\n",
+               mp_ioapics[idx].mpc_apicaddr);
+        return 1;
+    }
+
+    return 0;
+}
+
 void __init init_ioapic_mappings(void)
 {
     unsigned long ioapic_phys;
@@ -2476,6 +2515,12 @@ void __init init_ioapic_mappings(void)
         apic_printk(APIC_VERBOSE, "mapped IOAPIC to %08lx (%08lx)\n",
                     __fix_to_virt(idx), ioapic_phys);
         idx++;
+
+        if ( bad_ioapic_register(i) )
+        {
+            __set_fixmap(idx, 0, 0);
+            continue;
+        }
 
         if ( smp_found_config )
         {
