@@ -1390,16 +1390,10 @@ static int
 gnttab_prepare_for_transfer(
     struct domain *rd, struct domain *ld, grant_ref_t ref)
 {
-    struct grant_table *rgt;
+    struct grant_table *rgt = rd->grant_table;
     grant_entry_header_t *sha;
     union grant_combo   scombo, prev_scombo, new_scombo;
     int                 retries = 0;
-
-    if ( unlikely((rgt = rd->grant_table) == NULL) )
-    {
-        gdprintk(XENLOG_INFO, "Dom %d has no grant table.\n", rd->domain_id);
-        return 0;
-    }
 
     spin_lock(&rgt->lock);
 
