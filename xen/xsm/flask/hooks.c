@@ -186,6 +186,10 @@ static int flask_evtchn_interdomain(struct domain *d1, struct evtchn *chn1,
     int rc;
     struct domain_security_struct *dsec, *dsec1, *dsec2;
     struct evtchn_security_struct *esec1, *esec2;
+    struct avc_audit_data ad;
+    AVC_AUDIT_DATA_INIT(&ad, NONE);
+    ad.sdom = d1;
+    ad.tdom = d2;
 
     dsec = current->domain->ssid;
     dsec1 = d1->ssid;
@@ -203,15 +207,15 @@ static int flask_evtchn_interdomain(struct domain *d1, struct evtchn *chn1,
         return rc;
     }
 
-    rc = avc_has_perm(dsec->sid, newsid, SECCLASS_EVENT, EVENT__CREATE, NULL);
+    rc = avc_has_perm(dsec->sid, newsid, SECCLASS_EVENT, EVENT__CREATE, &ad);
     if ( rc )
         return rc;
 
-    rc = avc_has_perm(newsid, dsec2->sid, SECCLASS_EVENT, EVENT__BIND, NULL);
+    rc = avc_has_perm(newsid, dsec2->sid, SECCLASS_EVENT, EVENT__BIND, &ad);
     if ( rc )
         return rc;
 
-    rc = avc_has_perm(esec2->sid, dsec1->sid, SECCLASS_EVENT, EVENT__BIND, NULL);
+    rc = avc_has_perm(esec2->sid, dsec1->sid, SECCLASS_EVENT, EVENT__BIND, &ad);
     if ( rc )
         return rc;
 
@@ -1328,13 +1332,13 @@ static int flask_mmu_normal_update(struct domain *d, struct domain *t,
     if ( l1e_get_flags(l1e_from_intpte(fpte)) & _PAGE_RW )
         map_perms |= MMU__MAP_WRITE;
 
-    AVC_AUDIT_DATA_INIT(&ad, RANGE);
+    AVC_AUDIT_DATA_INIT(&ad, MEMORY);
     fmfn = get_gfn_untyped(f, l1e_get_pfn(l1e_from_intpte(fpte)));
 
     ad.sdom = d;
     ad.tdom = f;
-    ad.range.start = fpte;
-    ad.range.end = fmfn;
+    ad.memory.pte = fpte;
+    ad.memory.mfn = fmfn;
 
     rc = get_mfn_sid(fmfn, &fsid);
 

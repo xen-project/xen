@@ -639,6 +639,9 @@ void avc_audit(u32 ssid, u32 tsid, u16 tclass, u32 requested,
     case AVC_AUDIT_DATA_RANGE:
         avc_printk(&buf, "range=0x%lx-0x%lx ", a->range.start, a->range.end);
         break;
+    case AVC_AUDIT_DATA_MEMORY:
+        avc_printk(&buf, "pte=0x%lx mfn=0x%lx", a->memory.pte, a->memory.mfn);
+        break;
     }
 
     avc_dump_query(&buf, ssid, tsid, tclass);

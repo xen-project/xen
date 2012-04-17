@@ -42,6 +42,7 @@ struct avc_audit_data {
 #define AVC_AUDIT_DATA_DEV   1
 #define AVC_AUDIT_DATA_IRQ   2
 #define AVC_AUDIT_DATA_RANGE 3
+#define AVC_AUDIT_DATA_MEMORY 4
     struct domain *sdom;
     struct domain *tdom;
     union {
@@ -51,11 +52,12 @@ struct avc_audit_data {
             unsigned long start;
             unsigned long end;
         } range;
+        struct {
+            unsigned long pte;
+            unsigned long mfn;
+        } memory;
     };
 };
-
-#define v4info fam.v4
-#define v6info fam.v6
 
 /* Initialize an AVC audit data structure. */
 #define AVC_AUDIT_DATA_INIT(_d,_t) \
