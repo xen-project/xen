@@ -94,6 +94,7 @@ static void nmi_shootdown_cpus(void)
     x2apic_enabled = (current_local_apic_mode() == APIC_MODE_X2APIC);
 
     disable_IO_APIC();
+    hpet_disable();
 }
 
 void machine_crash_shutdown(void)

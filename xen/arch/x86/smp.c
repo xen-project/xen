@@ -19,6 +19,7 @@
 #include <asm/mc146818rtc.h>
 #include <asm/flushtlb.h>
 #include <asm/hardirq.h>
+#include <asm/hpet.h>
 #include <asm/hvm/support.h>
 #include <mach_apic.h>
 
@@ -372,6 +373,7 @@ void smp_send_stop(void)
     local_irq_disable();
     __stop_this_cpu();
     disable_IO_APIC();
+    hpet_disable();
     local_irq_enable();
 }
 

@@ -744,12 +744,14 @@ int hpet_legacy_irq_tick(void)
     return 1;
 }
 
+static u32 *hpet_boot_cfg;
+
 u64 hpet_setup(void)
 {
     static u64 hpet_rate;
     static u32 system_reset_latch;
     u32 hpet_id, hpet_period, cfg;
-    int i;
+    unsigned int i, last;
 
     if ( system_reset_latch == system_reset_counter )
         return hpet_rate;
@@ -775,13 +777,20 @@ u64 hpet_setup(void)
         return 0;
     }
 
+    last = (hpet_id & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT;
+    hpet_boot_cfg = xmalloc_array(u32, 2 + last);
+
     cfg = hpet_read32(HPET_CFG);
+    if ( hpet_boot_cfg )
+        *hpet_boot_cfg = cfg;
     cfg &= ~(HPET_CFG_ENABLE | HPET_CFG_LEGACY);
     hpet_write32(cfg, HPET_CFG);
 
-    for ( i = 0; i <= ((hpet_id >> 8) & 31); i++ )
+    for ( i = 0; i <= last; ++i )
     {
         cfg = hpet_read32(HPET_Tn_CFG(i));
+        if ( hpet_boot_cfg )
+            hpet_boot_cfg[i + 1] = cfg;
         cfg &= ~HPET_TN_ENABLE;
         hpet_write32(cfg, HPET_Tn_CFG(i));
     }
@@ -794,4 +803,22 @@ u64 hpet_setup(void)
     (void)do_div(hpet_rate, hpet_period);
 
     return hpet_rate;
+}
+
+void hpet_disable(void)
+{
+    unsigned int i;
+    u32 id;
+
+    if ( !hpet_boot_cfg )
+        return;
+
+    hpet_write32(*hpet_boot_cfg & ~HPET_CFG_ENABLE, HPET_CFG);
+
+    id = hpet_read32(HPET_ID);
+    for ( i = 0; i <= ((id & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT); ++i )
+        hpet_write32(hpet_boot_cfg[i + 1], HPET_Tn_CFG(i));
+
+    if ( *hpet_boot_cfg & HPET_CFG_ENABLE )
+        hpet_write32(*hpet_boot_cfg, HPET_CFG);
 }
