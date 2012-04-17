@@ -49,11 +49,6 @@
 #define PAGE_SIZE 4096
 #endif
 
-// allow vchan data to be easily observed in strace by doing a
-// writev() to FD -1 with the data being read/written.
-#ifndef VCHAN_DEBUG
-#define VCHAN_DEBUG 0
-#endif
 
 static inline uint32_t rd_prod(struct libxenvchan *ctrl)
 {
@@ -186,15 +181,6 @@ static int do_send(struct libxenvchan *ctrl, const void *data, size_t size)
 {
 	int real_idx = wr_prod(ctrl) & (wr_ring_size(ctrl) - 1);
 	int avail_contig = wr_ring_size(ctrl) - real_idx;
-	if (VCHAN_DEBUG) {
-		char metainfo[32];
-		struct iovec iov[2];
-		iov[0].iov_base = metainfo;
-		iov[0].iov_len = snprintf(metainfo, 32, "vchan@%p wr", ctrl);
-		iov[1].iov_base = (void *)data;
-		iov[1].iov_len = size;
-		writev(-1, iov, 2);
-	}
 	if (avail_contig > size)
 		avail_contig = size;
 	xen_mb(); /* read indexes /then/ write data */
@@ -277,15 +263,6 @@ static int do_recv(struct libxenvchan *ctrl, void *data, size_t size)
 	}
 	xen_mb(); /* consume /then/ notify */
 	rd_cons(ctrl) += size;
-	if (VCHAN_DEBUG) {
-		char metainfo[32];
-		struct iovec iov[2];
-		iov[0].iov_base = metainfo;
-		iov[0].iov_len = snprintf(metainfo, 32, "vchan@%p rd", ctrl);
-		iov[1].iov_base = data;
-		iov[1].iov_len = size;
-		writev(-1, iov, 2);
-	}
 	if (send_notify(ctrl, VCHAN_NOTIFY_READ))
 		return -1;
 	return size;
