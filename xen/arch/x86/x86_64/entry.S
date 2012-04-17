@@ -280,7 +280,7 @@ sysenter_eflags_saved:
 UNLIKELY_START(z, sysenter_gpf)
         movq  VCPU_trap_ctxt(%rbx),%rsi
         movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
-        subl  $2,UREGS_rip(%rsp)
+        subq  $2,UREGS_rip(%rsp)
         movl  %eax,TRAPBOUNCE_error_code(%rdx)
         movq  TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_eip(%rsi),%rax
         testb $4,TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_flags(%rsi)
