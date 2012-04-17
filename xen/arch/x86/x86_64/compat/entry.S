@@ -213,6 +213,7 @@ compat_failsafe_callback:
 ENTRY(compat_post_handle_exception)
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    compat_test_all_events
+.Lcompat_bounce_exception:
         call  compat_create_bounce_frame
         movb  $0,TRAPBOUNCE_flags(%rdx)
         jmp   compat_test_all_events
@@ -225,20 +226,21 @@ ENTRY(compat_syscall)
         leaq  VCPU_trap_bounce(%rbx),%rdx
         testl $~3,%esi
         leal  (,%rcx,TBF_INTERRUPT),%ecx
-        jz    2f
-1:      movq  %rax,TRAPBOUNCE_eip(%rdx)
-        movw  %si,TRAPBOUNCE_cs(%rdx)
-        movb  %cl,TRAPBOUNCE_flags(%rdx)
-        call  compat_create_bounce_frame
-        jmp   compat_test_all_events
-2:      movq  VCPU_trap_ctxt(%rbx),%rsi
+UNLIKELY_START(z, compat_syscall_gpf)
+        movq  VCPU_trap_ctxt(%rbx),%rdi
         movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
         subl  $2,UREGS_rip(%rsp)
-        movl  TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_eip(%rsi),%eax
-        movzwl TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_cs(%rsi),%esi
-        movb  $(TBF_EXCEPTION|TBF_EXCEPTION_ERRCODE|TBF_INTERRUPT),%cl
         movl  $0,TRAPBOUNCE_error_code(%rdx)
-        jmp   1b
+        movl  TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_eip(%rdi),%eax
+        movzwl TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_cs(%rdi),%esi
+        testb $4,TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_flags(%rdi)
+        setnz %cl
+        leal  TBF_EXCEPTION|TBF_EXCEPTION_ERRCODE(,%rcx,TBF_INTERRUPT),%ecx
+UNLIKELY_END(compat_syscall_gpf)
+        movq  %rax,TRAPBOUNCE_eip(%rdx)
+        movw  %si,TRAPBOUNCE_cs(%rdx)
+        movb  %cl,TRAPBOUNCE_flags(%rdx)
+        jmp   .Lcompat_bounce_exception
 
 ENTRY(compat_sysenter)
         movq  VCPU_trap_ctxt(%rbx),%rcx
