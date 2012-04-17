@@ -154,6 +154,55 @@ static int register_serials_chardev_callback(libxl__qmp_handler *qmp,
     return ret;
 }
 
+static int qmp_write_domain_console_item(libxl__gc *gc, int domid,
+                                         const char *item, const char *value)
+{
+    char *path;
+
+    path = libxl__xs_get_dompath(gc, domid);
+    path = libxl__sprintf(gc, "%s/console/%s", path, item);
+
+    return libxl__xs_write(gc, XBT_NULL, path, "%s", value);
+}
+
+static int qmp_register_vnc_callback(libxl__qmp_handler *qmp,
+                                     const libxl__json_object *o,
+                                     void *unused)
+{
+    GC_INIT(qmp->ctx);
+    const libxl__json_object *obj;
+    const char *listen, *port;
+    int rc = -1;
+
+    if (!libxl__json_object_is_map(o)) {
+        goto out;
+    }
+
+    if (libxl__json_map_get("enabled", o, JSON_FALSE)) {
+        rc = 0;
+        goto out;
+    }
+
+    obj = libxl__json_map_get("host", o, JSON_STRING);
+    listen = libxl__json_object_get_string(obj);
+    obj = libxl__json_map_get("service", o, JSON_STRING);
+    port = libxl__json_object_get_string(obj);
+
+    if (!listen || !port) {
+        LIBXL__LOG(qmp->ctx, LIBXL__LOG_ERROR,
+                   "Failed to retreive VNC connect information.");
+        goto out;
+    }
+
+    rc = qmp_write_domain_console_item(gc, qmp->domid, "vnc-listen", listen);
+    if (!rc)
+        rc = qmp_write_domain_console_item(gc, qmp->domid, "vnc-port", port);
+
+out:
+    GC_FREE;
+    return rc;
+}
+
 static int qmp_capabilities_callback(libxl__qmp_handler *qmp,
                                      const libxl__json_object *o, void *unused)
 {
@@ -688,6 +737,13 @@ int libxl__qmp_query_serial(libxl__qmp_handler *qmp)
                                 NULL, qmp->timeout);
 }
 
+static int qmp_query_vnc(libxl__qmp_handler *qmp)
+{
+    return qmp_synchronous_send(qmp, "query-vnc", NULL,
+                                qmp_register_vnc_callback,
+                                NULL, qmp->timeout);
+}
+
 static int pci_add_callback(libxl__qmp_handler *qmp,
                             const libxl__json_object *response, void *opaque)
 {
@@ -916,6 +972,9 @@ int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
     ret = libxl__qmp_query_serial(qmp);
     if (!ret && vnc && vnc->passwd) {
         ret = qmp_change(gc, qmp, "vnc", "password", vnc->passwd);
+    }
+    if (!ret) {
+        ret = qmp_query_vnc(qmp);
     }
     libxl__qmp_close(qmp);
     return ret;
