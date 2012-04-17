@@ -847,10 +847,10 @@ static void parse_config_data(const char *configfile_filename_report,
                 nic->script = strdup(default_vifscript);
             }
 
-	    if (default_bridge) {
-		free(nic->bridge);
-		nic->bridge = strdup(default_bridge);
-	    }
+            if (default_bridge) {
+                free(nic->bridge);
+                nic->bridge = strdup(default_bridge);
+            }
 
             p = strtok(buf2, ",");
             if (!p)
