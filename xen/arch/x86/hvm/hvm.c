@@ -216,6 +216,31 @@ void hvm_set_rdtsc_exiting(struct domain *d, bool_t enable)
         hvm_funcs.set_rdtsc_exiting(v, enable);
 }
 
+void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat)
+{
+    if ( !hvm_funcs.get_guest_pat(v, guest_pat) )
+        *guest_pat = v->arch.hvm_vcpu.pat_cr;
+}
+
+int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat)
+{
+    int i;
+    uint8_t *value = (uint8_t *)&guest_pat;
+
+    for ( i = 0; i < 8; i++ )
+        if ( unlikely(!(value[i] == 0 || value[i] == 1 ||
+                        value[i] == 4 || value[i] == 5 ||
+                        value[i] == 6 || value[i] == 7)) ) {
+            HVM_DBG_LOG(DBG_LEVEL_MSR, "invalid guest PAT: %"PRIx64"\n",
+                        guest_pat); 
+            return 0;
+        }
+
+    if ( !hvm_funcs.set_guest_pat(v, guest_pat) )
+        v->arch.hvm_vcpu.pat_cr = guest_pat;
+    return 1;
+}
+
 void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
 {
     uint64_t tsc;
@@ -2796,7 +2821,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
 
     case MSR_IA32_CR_PAT:
-        *msr_content = v->arch.hvm_vcpu.pat_cr;
+        hvm_get_guest_pat(v, msr_content);
         break;
 
     case MSR_MTRRcap:
@@ -2912,7 +2937,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         break;
 
     case MSR_IA32_CR_PAT:
-        if ( !pat_msr_set(&v->arch.hvm_vcpu.pat_cr, msr_content) )
+        if ( !hvm_set_guest_pat(v, msr_content) )
            goto gp_fault;
         break;
 

@@ -403,26 +403,6 @@ uint32_t get_pat_flags(struct vcpu *v,
     return pat_type_2_pte_flags(pat_entry_value);
 }
 
-/* Helper funtions for seting mtrr/pat */
-bool_t pat_msr_set(uint64_t *pat, uint64_t msr_content)
-{
-    uint8_t *value = (uint8_t*)&msr_content;
-    int32_t i;
-
-    if ( *pat != msr_content )
-    {
-        for ( i = 0; i < 8; i++ )
-            if ( unlikely(!(value[i] == 0 || value[i] == 1 ||
-                            value[i] == 4 || value[i] == 5 ||
-                            value[i] == 6 || value[i] == 7)) )
-                return 0;
-
-        *pat = msr_content;
-    }
-
-    return 1;
-}
-
 bool_t mtrr_def_type_msr_set(struct mtrr_state *m, uint64_t msr_content)
 {
     uint8_t def_type = msr_content & 0xff;
@@ -631,7 +611,7 @@ static int hvm_save_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
     {
         mtrr_state = &v->arch.hvm_vcpu.mtrr;
 
-        hw_mtrr.msr_pat_cr = v->arch.hvm_vcpu.pat_cr;
+        hvm_get_guest_pat(v, &hw_mtrr.msr_pat_cr);
 
         hw_mtrr.msr_mtrr_def_type = mtrr_state->def_type
                                 | (mtrr_state->enabled << 10);
@@ -677,7 +657,7 @@ static int hvm_load_mtrr_msr(struct domain *d, hvm_domain_context_t *h)
 
     mtrr_state = &v->arch.hvm_vcpu.mtrr;
 
-    pat_msr_set(&v->arch.hvm_vcpu.pat_cr, hw_mtrr.msr_pat_cr);
+    hvm_set_guest_pat(v, hw_mtrr.msr_pat_cr);
 
     mtrr_state->mtrr_cap = hw_mtrr.msr_mtrr_cap;
 

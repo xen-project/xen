@@ -645,6 +645,28 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         svm_vmload(vmcb);
 }
 
+static int svm_set_guest_pat(struct vcpu *v, u64 gpat)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    if ( !paging_mode_hap(v->domain) )
+        return 0;
+
+    vmcb_set_g_pat(vmcb, gpat);
+    return 1;
+}
+
+static int svm_get_guest_pat(struct vcpu *v, u64 *gpat)
+{
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
+
+    if ( !paging_mode_hap(v->domain) )
+        return 0;
+
+    *gpat = vmcb_get_g_pat(vmcb);
+    return 1;
+}
+
 static uint64_t svm_get_tsc_offset(uint64_t host_tsc, uint64_t guest_tsc,
     uint64_t ratio)
 {
@@ -1964,6 +1986,8 @@ static struct hvm_function_table __read_mostly svm_function_table = {
     .update_host_cr3      = svm_update_host_cr3,
     .update_guest_cr      = svm_update_guest_cr,
     .update_guest_efer    = svm_update_guest_efer,
+    .set_guest_pat        = svm_set_guest_pat,
+    .get_guest_pat        = svm_get_guest_pat,
     .set_tsc_offset       = svm_set_tsc_offset,
     .inject_exception     = svm_inject_exception,
     .init_hypercall_page  = svm_init_hypercall_page,

@@ -942,6 +942,34 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
     vmx_vmcs_exit(v);
 }
 
+static int vmx_set_guest_pat(struct vcpu *v, u64 gpat)
+{
+    if ( !cpu_has_vmx_pat || !paging_mode_hap(v->domain) )
+        return 0;
+
+    vmx_vmcs_enter(v);
+    __vmwrite(GUEST_PAT, gpat);
+#ifdef __i386__
+    __vmwrite(GUEST_PAT_HIGH, gpat >> 32);
+#endif
+    vmx_vmcs_exit(v);
+    return 1;
+}
+
+static int vmx_get_guest_pat(struct vcpu *v, u64 *gpat)
+{
+    if ( !cpu_has_vmx_pat || !paging_mode_hap(v->domain) )
+        return 0;
+
+    vmx_vmcs_enter(v);
+    *gpat = __vmread(GUEST_PAT);
+#ifdef __i386__
+    *gpat |= (u64)__vmread(GUEST_PAT_HIGH) << 32;
+#endif
+    vmx_vmcs_exit(v);
+    return 1;
+}
+
 static void vmx_set_tsc_offset(struct vcpu *v, u64 offset)
 {
     vmx_vmcs_enter(v);
@@ -1486,6 +1514,8 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .update_host_cr3      = vmx_update_host_cr3,
     .update_guest_cr      = vmx_update_guest_cr,
     .update_guest_efer    = vmx_update_guest_efer,
+    .set_guest_pat        = vmx_set_guest_pat,
+    .get_guest_pat        = vmx_get_guest_pat,
     .set_tsc_offset       = vmx_set_tsc_offset,
     .inject_exception     = vmx_inject_exception,
     .init_hypercall_page  = vmx_init_hypercall_page,
