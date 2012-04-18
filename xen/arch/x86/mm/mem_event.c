@@ -415,7 +415,7 @@ int __mem_event_claim_slot(struct domain *d, struct mem_event_domain *med,
     if ( (current->domain == d) && allow_sleep )
         return mem_event_wait_slot(med);
     else
-        return mem_event_grab_slot(med, 1);
+        return mem_event_grab_slot(med, (current->domain != d));
 }
 
 /* Registered with Xen-bound event channel for incoming notifications. */
