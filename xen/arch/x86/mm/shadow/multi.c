@@ -248,6 +248,7 @@ shadow_check_gwalk(struct vcpu *v, unsigned long va, walk_t *gw, int version)
     return !mismatch;
 }
 
+#if (SHADOW_OPTIMIZATIONS & SHOPT_OUT_OF_SYNC)
 static int
 shadow_check_gl1e(struct vcpu *v, walk_t *gw)
 {
@@ -263,7 +264,7 @@ shadow_check_gl1e(struct vcpu *v, walk_t *gw)
 
     return gw->l1e.l1 != nl1e.l1;
 }
-
+#endif
 
 /* Remove write access permissions from a gwalk_t in a batch, and
  * return OR-ed result for TLB flush hint and need to rewalk the guest
