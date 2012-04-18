@@ -4195,9 +4195,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             goto param_fail5;
 
         rc = -EINVAL;
-        if ( (a.first_pfn > domain_get_maximum_gpfn(d)) ||
+        if ( (a.first_pfn != ~0ull) &&
+             ((a.first_pfn > domain_get_maximum_gpfn(d)) ||
              ((a.first_pfn + a.nr - 1) < a.first_pfn) ||
-             ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d)) )
+             ((a.first_pfn + a.nr - 1) > domain_get_maximum_gpfn(d))) )
             goto param_fail5;
             
         rc = p2m_set_mem_access(d, a.first_pfn, a.nr, a.hvmmem_access);
