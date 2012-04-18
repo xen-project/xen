@@ -585,13 +585,14 @@ int hap_enable(struct domain *d, u32 mode)
         unsigned int r;
         paging_lock(d);
         r = hap_set_allocation(d, 256, NULL);
-        paging_unlock(d);
         if ( r != 0 )
         {
             hap_set_allocation(d, 0, NULL);
+            paging_unlock(d);
             rv = -ENOMEM;
             goto out;
         }
+        paging_unlock(d);
     }
 
     /* Allow p2m and log-dirty code to borrow our memory */
