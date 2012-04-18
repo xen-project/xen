@@ -296,6 +296,7 @@ struct arch_domain
     /* Continuable domain_relinquish_resources(). */
     enum {
         RELMEM_not_started,
+        RELMEM_shared,
         RELMEM_xen,
         RELMEM_l4,
         RELMEM_l3,

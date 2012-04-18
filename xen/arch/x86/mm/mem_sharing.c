@@ -33,6 +33,7 @@
 #include <asm/mem_event.h>
 #include <asm/atomic.h>
 #include <xen/rcupdate.h>
+#include <asm/event.h>
 
 #include "mm-locks.h"
 
@@ -1032,6 +1033,50 @@ private_page_found:
     /* We do not need to unlock a private page */
     put_gfn(d, gfn);
     return 0;
+}
+
+int relinquish_shared_pages(struct domain *d)
+{
+    int rc = 0;
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    unsigned long gfn, count = 0;
+
+    if ( p2m == NULL )
+        return 0;
+
+    p2m_lock(p2m);
+    for (gfn = p2m->next_shared_gfn_to_relinquish; 
+         gfn < p2m->max_mapped_pfn; gfn++ )
+    {
+        p2m_access_t a;
+        p2m_type_t t;
+        mfn_t mfn;
+        if ( atomic_read(&d->shr_pages) == 0 )
+            break;
+        mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, NULL);
+        if ( mfn_valid(mfn) && (t == p2m_ram_shared) )
+        {
+            /* Does not fail with ENOMEM given the DESTROY flag */
+            BUG_ON(__mem_sharing_unshare_page(d, gfn, 
+                    MEM_SHARING_DESTROY_GFN));
+            /* Clear out the p2m entry so no one else may try to 
+             * unshare */
+            p2m->set_entry(p2m, gfn, _mfn(0), PAGE_ORDER_4K,
+                            p2m_invalid, p2m_access_rwx);
+            count++;
+        }
+
+        /* Preempt every 2MiB. Arbitrary */
+        if ( (count == 512) && hypercall_preempt_check() )
+        {
+            p2m->next_shared_gfn_to_relinquish = gfn + 1;
+            rc = -EAGAIN;
+            break;
+        }
+    }
+
+    p2m_unlock(p2m);
+    return rc;
 }
 
 int mem_sharing_memop(struct domain *d, xen_mem_sharing_op_t *mec)

@@ -260,6 +260,10 @@ struct p2m_domain {
     /* Highest guest frame that's ever been mapped in the p2m */
     unsigned long max_mapped_pfn;
 
+    /* When releasing shared gfn's in a preemptible manner, recall where
+     * to resume the search */
+    unsigned long next_shared_gfn_to_relinquish;
+
     /* Populate-on-demand variables
      * All variables are protected with the pod lock. We cannot rely on
      * the p2m lock if it's turned into a fine-grained lock.

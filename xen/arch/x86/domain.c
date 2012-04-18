@@ -2132,10 +2132,22 @@ int domain_relinquish_resources(struct domain *d)
             }
         }
 
-        d->arch.relmem = RELMEM_xen;
+        d->arch.relmem = RELMEM_shared;
         /* fallthrough */
 
-        /* Relinquish every page of memory. */
+    case RELMEM_shared:
+
+        if ( is_hvm_domain(d) )
+        {
+            /* If the domain has shared pages, relinquish them allowing
+             * for preemption. */
+            ret = relinquish_shared_pages(d);
+            if ( ret )
+                return ret;
+        }
+
+        d->arch.relmem = RELMEM_xen;
+        /* Fallthrough. Relinquish every page of memory. */
     case RELMEM_xen:
         ret = relinquish_memory(d, &d->xenpage_list, ~0UL);
         if ( ret )

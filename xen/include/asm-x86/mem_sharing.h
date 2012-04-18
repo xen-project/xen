@@ -89,9 +89,19 @@ int mem_sharing_domctl(struct domain *d,
 int mem_sharing_audit(void);
 void mem_sharing_init(void);
 
+/* Scans the p2m and relinquishes any shared pages, destroying 
+ * those for which this domain holds the final reference.
+ * Preemptible.
+ */
+int relinquish_shared_pages(struct domain *d);
+
 #else 
 
 #define mem_sharing_init()  do { } while (0)
+static inline int relinquish_shared_pages(struct domain *d)
+{
+    return 0;
+}
 
 #endif /* __x86_64__ */
 

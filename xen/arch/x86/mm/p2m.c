@@ -371,9 +371,13 @@ void p2m_teardown(struct p2m_domain *p2m)
     p2m_lock(p2m);
 
 #ifdef __x86_64__
+    /* Try to unshare any remaining shared p2m entries. Safeguard
+     * Since relinquish_shared_pages should have done the work. */ 
     for ( gfn=0; gfn < p2m->max_mapped_pfn; gfn++ )
     {
         p2m_access_t a;
+        if ( atomic_read(&d->shr_pages) == 0 )
+            break;
         mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, NULL);
         if ( mfn_valid(mfn) && (t == p2m_ram_shared) )
         {
