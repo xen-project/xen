@@ -50,8 +50,11 @@ static inline int mm_locked_by_me(mm_lock_t *l)
 #define __check_lock_level(l)                           \
 do {                                                    \
     if ( unlikely(__get_lock_level()) > (l) )           \
-        panic("mm locking order violation: %i > %i\n",  \
-              __get_lock_level(), (l));                 \
+    {                                                   \
+        printk("mm locking order violation: %i > %i\n", \
+               __get_lock_level(), (l));                \
+        BUG();                                          \
+    }                                                   \
 } while(0)
 
 #define __set_lock_level(l)         \
