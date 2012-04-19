@@ -49,7 +49,7 @@ static inline int mm_locked_by_me(mm_lock_t *l)
  * where the offending locks are declared. */
 #define __check_lock_level(l)                           \
 do {                                                    \
-    if ( unlikely(__get_lock_level()) > (l) )           \
+    if ( unlikely(__get_lock_level() > (l)) )           \
     {                                                   \
         printk("mm locking order violation: %i > %i\n", \
                __get_lock_level(), (l));                \
