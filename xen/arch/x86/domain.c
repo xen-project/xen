@@ -2105,13 +2105,14 @@ int domain_relinquish_resources(struct domain *d)
         /* Tear down paging-assistance stuff. */
         paging_teardown(d);
 
+        /* Drop the in-use references to page-table bases. */
+        for_each_vcpu ( d, v )
+            vcpu_destroy_pagetables(v);
+
         if ( !is_hvm_domain(d) )
         {
             for_each_vcpu ( d, v )
             {
-                /* Drop the in-use references to page-table bases. */
-                vcpu_destroy_pagetables(v);
-
                 /*
                  * Relinquish GDT mappings. No need for explicit unmapping of
                  * the LDT as it automatically gets squashed with the guest
