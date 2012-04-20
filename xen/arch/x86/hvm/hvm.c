@@ -1203,30 +1203,19 @@ void hvm_triple_fault(void)
 
 void hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
 {
-    struct vcpu *v = current;
+    struct vcpu *curr = current;
 
-    if ( !nestedhvm_enabled(v->domain) ) {
-        hvm_funcs.inject_exception(trapnr, errcode, cr2);
-        return;
-    }
-
-    if ( nestedhvm_vmswitch_in_progress(v) ) {
-        hvm_funcs.inject_exception(trapnr, errcode, cr2);
-        return;
-    }
-
-    if ( !nestedhvm_vcpu_in_guestmode(v) ) {
-        hvm_funcs.inject_exception(trapnr, errcode, cr2);
-        return;
-    }
-
-    if ( nhvm_vmcx_guest_intercepts_trap(v, trapnr, errcode) )
+    if ( nestedhvm_enabled(curr->domain) &&
+         !nestedhvm_vmswitch_in_progress(curr) &&
+         nestedhvm_vcpu_in_guestmode(curr) &&
+         nhvm_vmcx_guest_intercepts_trap(curr, trapnr, errcode) )
     {
         enum nestedhvm_vmexits nsret;
 
-        nsret = nhvm_vcpu_vmexit_trap(v, trapnr, errcode, cr2);
+        nsret = nhvm_vcpu_vmexit_trap(curr, trapnr, errcode, cr2);
 
-        switch (nsret) {
+        switch ( nsret )
+        {
         case NESTEDHVM_VMEXIT_DONE:
         case NESTEDHVM_VMEXIT_ERROR: /* L1 guest will crash L2 guest */
             return;
