@@ -1364,6 +1364,8 @@ void vmx_inject_hw_exception(int trap, int error_code)
         }
         if ( cpu_has_monitor_trap_flag )
             break;
+        /* fall through */
+
     case TRAP_int3:
         if ( curr->domain->debugger_attached )
         {
@@ -1374,6 +1376,15 @@ void vmx_inject_hw_exception(int trap, int error_code)
 
         type = X86_EVENTTYPE_SW_EXCEPTION;
         __vmwrite(VM_ENTRY_INSTRUCTION_LEN, 1); /* int3 */
+        break;
+
+    default:
+        if ( trap > TRAP_last_reserved )
+        {
+            type = X86_EVENTTYPE_SW_EXCEPTION;
+            __vmwrite(VM_ENTRY_INSTRUCTION_LEN, 2); /* int imm8 */
+        }
+        break;
     }
 
     if ( unlikely(intr_info & INTR_INFO_VALID_MASK) &&
