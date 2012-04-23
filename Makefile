@@ -220,13 +220,13 @@ help:
 uninstall: D=$(DESTDIR)
 uninstall:
 	[ -d $(D)$(XEN_CONFIG_DIR) ] && mv -f $(D)$(XEN_CONFIG_DIR) $(D)$(XEN_CONFIG_DIR).old-`date +%s` || true
-	rm -rf $(D)$(CONFIG_DIR)/init.d/xend*
+	rm -rf $(D)$(CONFIG_DIR)/init.d/xendomains $(D)$(CONFIG_DIR)/init.d/xend
+	rm -rf $(D)$(CONFIG_DIR)/init.d/xencommons $(D)$(CONFIG_DIR)/init.d/xen-watchdog
 	rm -rf $(D)$(CONFIG_DIR)/hotplug/xen-backend.agent
 	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xen-backend.rules
-	rm -f  $(D)$(CONFIG_DIR)/udev/xen-backend.rules
 	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xend.rules
-	rm -f  $(D)$(CONFIG_DIR)/udev/xend.rules
 	rm -f  $(D)$(SYSCONFIG_DIR)/xendomains
+	rm -f  $(D)$(SYSCONFIG_DIR)/xencommons
 	rm -rf $(D)/var/run/xen* $(D)/var/lib/xen*
 	rm -rf $(D)/boot/*xen*
 	rm -rf $(D)/lib/modules/*xen*
@@ -236,11 +236,16 @@ uninstall:
 	rm -rf $(D)$(BINDIR)/pygrub
 	rm -rf $(D)$(BINDIR)/setsize $(D)$(BINDIR)/tbctl
 	rm -rf $(D)$(BINDIR)/xsls
-	rm -rf $(D)$(INCLUDEDIR)/xenctrl.h $(D)$(INCLUDEDIR)/xenguest.h
+	rm -rf $(D)$(BINDIR)/xenstore* $(D)$(BINDIR)/xentrace*
+	rm -rf $(D)$(BINDIR)/xen-detect $(D)$(BINDIR)/xencons
+	rm -rf $(D)$(BINDIR)/xenpvnetboot $(D)$(BINDIR)/qemu-*-xen
+	rm -rf $(D)$(INCLUDEDIR)/xenctrl* $(D)$(INCLUDEDIR)/xenguest.h
 	rm -rf $(D)$(INCLUDEDIR)/xs_lib.h $(D)$(INCLUDEDIR)/xs.h
 	rm -rf $(D)$(INCLUDEDIR)/xen
+	rm -rf $(D)$(INCLUDEDIR)/_libxl* $(D)$(INCLUDEDIR)/libxl*
+	rm -rf $(D)$(INCLUDEDIR)/xenstat.h $(D)$(INCLUDEDIR)/xentoollog.h
 	rm -rf $(D)$(LIBDIR)/libxenctrl* $(D)$(LIBDIR)/libxenguest*
-	rm -rf $(D)$(LIBDIR)/libxenstore*
+	rm -rf $(D)$(LIBDIR)/libxenstore* $(D)$(LIBDIR)/libxlutil*
 	rm -rf $(D)$(LIBDIR)/python/xen $(D)$(LIBDIR)/python/grub
 	rm -rf $(D)$(LIBDIR)/xen/
 	rm -rf $(D)$(LIBEXEC)/xen*
@@ -248,6 +253,7 @@ uninstall:
 	rm -rf $(D)$(SBINDIR)/xen* $(D)$(SBINDIR)/netfix $(D)$(SBINDIR)/xm
 	rm -rf $(D)$(SHAREDIR)/doc/xen
 	rm -rf $(D)$(SHAREDIR)/xen
+	rm -rf $(D)$(SHAREDIR)/qemu-xen
 	rm -rf $(D)$(MAN1DIR)/xen*
 	rm -rf $(D)$(MAN8DIR)/xen*
 	rm -rf $(D)/boot/tboot*
