@@ -512,7 +512,7 @@ int mem_sharing_debug_mfn(mfn_t mfn)
     if ( (page = __grab_shared_page(mfn)) == NULL)
     {
         gdprintk(XENLOG_ERR, "Invalid MFN=%lx\n", mfn_x(mfn));
-        return -1;
+        return -EINVAL;
     }
 
     MEM_SHARING_DEBUG( 
@@ -599,7 +599,7 @@ int mem_sharing_debug_gref(struct domain *d, grant_ref_t ref)
         MEM_SHARING_DEBUG( 
                 "Asked to debug [dom=%d,gref=%d], but not yet inited.\n",
                 d->domain_id, ref);
-        return -1;
+        return -EINVAL;
     }
     (void)mem_sharing_gref_to_gfn(d, ref, &gfn); 
     shah = shared_entry_header(d->grant_table, ref);
@@ -1219,13 +1219,6 @@ int mem_sharing_memop(struct domain *d, xen_mem_sharing_op_t *mec)
         {
             unsigned long gfn = mec->u.debug.u.gfn;
             rc = mem_sharing_debug_gfn(d, gfn);
-        }
-        break;
-
-        case XENMEM_sharing_op_debug_mfn:
-        {
-            unsigned long mfn = mec->u.debug.u.mfn;
-            rc = mem_sharing_debug_mfn(_mfn(mfn));
         }
         break;
 

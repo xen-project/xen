@@ -208,20 +208,6 @@ int xc_memshr_debug_gfn(xc_interface *xch,
     return xc_memshr_memop(xch, domid, &mso);
 }
 
-int xc_memshr_debug_mfn(xc_interface *xch,
-                        domid_t domid,
-                        unsigned long mfn)
-{
-    xen_mem_sharing_op_t mso;
-
-    memset(&mso, 0, sizeof(mso));
-
-    mso.op = XENMEM_sharing_op_debug_mfn;
-    mso.u.debug.u.mfn = mfn; 
-
-    return xc_memshr_memop(xch, domid, &mso);
-}
-
 int xc_memshr_debug_gref(xc_interface *xch,
                          domid_t domid,
                          grant_ref_t gref)

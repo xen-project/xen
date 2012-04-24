@@ -1955,9 +1955,6 @@ int xc_memshr_domain_resume(xc_interface *xch,
 int xc_memshr_debug_gfn(xc_interface *xch,
                         domid_t domid,
                         unsigned long gfn);
-int xc_memshr_debug_mfn(xc_interface *xch,
-                        domid_t domid,
-                        unsigned long mfn);
 int xc_memshr_debug_gref(xc_interface *xch,
                          domid_t domid,
                          grant_ref_t gref);
