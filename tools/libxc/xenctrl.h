@@ -1246,23 +1246,6 @@ int xc_mmuext_op(xc_interface *xch, struct mmuext_op *op, unsigned int nr_ops,
 /* System wide memory properties */
 long xc_maximum_ram_page(xc_interface *xch);
 
-/**
- * This function returns the total number of pages freed by using sharing
- * on the system.  For example, if two domains contain a single entry in
- * their p2m map that points to the same shared page (and no other pages
- * in the system are shared), then this function should return 1.
- */
-long xc_sharing_freed_pages(xc_interface *xch);
-
-/**
- * This function returns the total number of frames occupied by shared
- * pages on the system.  This is independent of the number of domains
- * pointing at these frames.  For example, in the above scenario this
- * should return 1. The following should hold:
- *  memory usage without sharing = freed_pages + used_frames
- */
-long xc_sharing_used_frames(xc_interface *xch);
-
 /* Get current total pages allocated to a domain. */
 long xc_get_tot_pages(xc_interface *xch, uint32_t domid);
 
@@ -1889,7 +1872,7 @@ int xc_tmem_restore(xc_interface *xch, int dom, int fd);
 int xc_tmem_restore_extra(xc_interface *xch, int dom, int fd);
 
 /**
- * mem_event operations
+ * mem_event operations. Internal use only.
  */
 int xc_mem_event_control(xc_interface *xch, domid_t domain_id, unsigned int op,
                          unsigned int mode, uint32_t *port);
@@ -1897,6 +1880,12 @@ int xc_mem_event_memop(xc_interface *xch, domid_t domain_id,
                         unsigned int op, unsigned int mode,
                         uint64_t gfn, void *buffer);
 
+/** 
+ * Mem paging operations.
+ * Paging is supported only on the x86 architecture in 64 bit mode, with
+ * Hardware-Assisted Paging (i.e. Intel EPT, AMD NPT). Moreover, AMD NPT
+ * support is considered experimental.
+ */
 int xc_mem_paging_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
 int xc_mem_paging_disable(xc_interface *xch, domid_t domain_id);
 int xc_mem_paging_nominate(xc_interface *xch, domid_t domain_id,
@@ -1906,30 +1895,133 @@ int xc_mem_paging_prep(xc_interface *xch, domid_t domain_id, unsigned long gfn);
 int xc_mem_paging_load(xc_interface *xch, domid_t domain_id, 
                         unsigned long gfn, void *buffer);
 
+/** 
+ * Access tracking operations.
+ * Supported only on Intel EPT 64 bit processors.
+ */
 int xc_mem_access_enable(xc_interface *xch, domid_t domain_id, uint32_t *port);
 int xc_mem_access_disable(xc_interface *xch, domid_t domain_id);
 int xc_mem_access_resume(xc_interface *xch, domid_t domain_id,
                          unsigned long gfn);
 
-/**
- * memshr operations
+/***
+ * Memory sharing operations.
+ *
+ * Unles otherwise noted, these calls return 0 on succes, -1 and errno on
+ * failure.
+ *
+ * Sharing is supported only on the x86 architecture in 64 bit mode, with
+ * Hardware-Assisted Paging (i.e. Intel EPT, AMD NPT). Moreover, AMD NPT
+ * support is considered experimental. 
+
+ * Calls below return ENOSYS if not in the x86_64 architecture.
+ * Calls below return ENODEV if the domain does not support HAP.
+ * Calls below return ESRCH if the specified domain does not exist.
+ * Calls below return EPERM if the caller is unprivileged for this domain.
  */
+
+/* Turn on/off sharing for the domid, depending on the enable flag.
+ *
+ * Returns EXDEV if trying to enable and the domain has had a PCI device
+ * assigned for passthrough (these two features are mutually exclusive).
+ *
+ * When sharing for a domain is turned off, the domain may still reference
+ * shared pages. Unsharing happens lazily. */
 int xc_memshr_control(xc_interface *xch,
                       domid_t domid,
                       int enable);
+
+/* Create a communication ring in which the hypervisor will place ENOMEM
+ * notifications.
+ *
+ * ENOMEM happens when unsharing pages: a Copy-on-Write duplicate needs to be
+ * allocated, and thus the out-of-memory error occurr.
+ *
+ * For complete examples on how to plumb a notification ring, look into
+ * xenpaging or xen-access.
+ *
+ * On receipt of a notification, the helper should ensure there is memory
+ * available to the domain before retrying.
+ *
+ * If a domain encounters an ENOMEM condition when sharing and this ring
+ * has not been set up, the hypervisor will crash the domain.
+ *
+ * Fails with:
+ *  EINVAL if port is NULL
+ *  EINVAL if the sharing ring has already been enabled
+ *  ENOSYS if no guest gfn has been specified to host the ring via an hvm param
+ *  EINVAL if the gfn for the ring has not been populated
+ *  ENOENT if the gfn for the ring is paged out, or cannot be unshared
+ *  EINVAL if the gfn for the ring cannot be written to
+ *  EINVAL if the domain is dying
+ *  ENOSPC if an event channel cannot be allocated for the ring
+ *  ENOMEM if memory cannot be allocated for internal data structures
+ *  EINVAL or EACCESS if the request is denied by the security policy
+ */
+
 int xc_memshr_ring_enable(xc_interface *xch, 
                           domid_t domid, 
                           uint32_t *port);
+/* Disable the ring for ENOMEM communication.
+ * May fail with EINVAL if the ring was not enabled in the first place.
+ */
 int xc_memshr_ring_disable(xc_interface *xch, 
                            domid_t domid);
+
+/*
+ * Calls below return EINVAL if sharing has not been enabled for the domain
+ * Calls below return EINVAL if the domain is dying
+ */
+/* Once a reponse to an ENOMEM notification is prepared, the tool can
+ * notify the hypervisor to re-schedule the faulting vcpu of the domain with an
+ * event channel kick and/or this call. */
+int xc_memshr_domain_resume(xc_interface *xch,
+                            domid_t domid);
+
+/* Select a page for sharing. 
+ *
+ * A 64 bit opaque handle will be stored in handle.  The hypervisor ensures
+ * that if the page is modified, the handle will be invalidated, and future
+ * users of it will fail. If the page has already been selected and is still
+ * associated to a valid handle, the existing handle will be returned.
+ *
+ * May fail with:
+ *  EINVAL if the gfn is not populated or not sharable (mmio, etc)
+ *  ENOMEM if internal data structures cannot be allocated
+ *  E2BIG if the page is being referenced by other subsytems (e.g. qemu)
+ *  ENOENT or EEXIST if there are internal hypervisor errors.
+ */
 int xc_memshr_nominate_gfn(xc_interface *xch,
                            domid_t domid,
                            unsigned long gfn,
                            uint64_t *handle);
+/* Same as above, but instead of a guest frame number, the input is a grant
+ * reference provided by the guest.
+ *
+ * May fail with EINVAL if the grant reference is invalid.
+ */
 int xc_memshr_nominate_gref(xc_interface *xch,
                             domid_t domid,
                             grant_ref_t gref,
                             uint64_t *handle);
+
+/* The three calls below may fail with
+ * 10 (or -XENMEM_SHARING_OP_S_HANDLE_INVALID) if the handle passed as source
+ * is invalid.  
+ * 9 (or -XENMEM_SHARING_OP_C_HANDLE_INVALID) if the handle passed as client is
+ * invalid.
+ */
+/* Share two nominated guest pages.
+ *
+ * If the call succeeds, both pages will point to the same backing frame (or
+ * mfn). The hypervisor will verify the handles are still valid, but it will
+ * not perform any sanity checking on the contens of the pages (the selection
+ * mechanism for sharing candidates is entirely up to the user-space tool).
+ *
+ * After successful sharing, the client handle becomes invalid. Both <domain,
+ * gfn> tuples point to the same mfn with the same handle, the one specified as
+ * source. Either 3-tuple can be specified later for further re-sharing. 
+ */
 int xc_memshr_share_gfns(xc_interface *xch,
                     domid_t source_domain,
                     unsigned long source_gfn,
@@ -1937,6 +2029,11 @@ int xc_memshr_share_gfns(xc_interface *xch,
                     domid_t client_domain,
                     unsigned long client_gfn,
                     uint64_t client_handle);
+
+/* Same as above, but share two grant references instead.
+ *
+ * May fail with EINVAL if either grant reference is invalid.
+ */
 int xc_memshr_share_grefs(xc_interface *xch,
                     domid_t source_domain,
                     grant_ref_t source_gref,
@@ -1944,21 +2041,81 @@ int xc_memshr_share_grefs(xc_interface *xch,
                     domid_t client_domain,
                     grant_ref_t client_gref,
                     uint64_t client_handle);
+
+/* Allows to add to the guest physmap of the client domain a shared frame
+ * directly.
+ *
+ * May additionally fail with 
+ *  9 (-XENMEM_SHARING_OP_C_HANDLE_INVALID) if the physmap entry for the gfn is
+ *  not suitable.
+ *  ENOMEM if internal data structures cannot be allocated.
+ *  ENOENT if there is an internal hypervisor error.
+ */
 int xc_memshr_add_to_physmap(xc_interface *xch,
                     domid_t source_domain,
                     unsigned long source_gfn,
                     uint64_t source_handle,
                     domid_t client_domain,
                     unsigned long client_gfn);
-int xc_memshr_domain_resume(xc_interface *xch,
-                            domid_t domid);
+
+/* Debug calls: return the number of pages referencing the shared frame backing
+ * the input argument. Should be one or greater. 
+ *
+ * May fail with EINVAL if there is no backing shared frame for the input
+ * argument.
+ */
 int xc_memshr_debug_gfn(xc_interface *xch,
                         domid_t domid,
                         unsigned long gfn);
+/* May additionally fail with EINVAL if the grant reference is invalid. */
 int xc_memshr_debug_gref(xc_interface *xch,
                          domid_t domid,
                          grant_ref_t gref);
+
+/* Audits the share subsystem. 
+ * 
+ * Returns ENOSYS if not supported (may not be compiled into the hypervisor). 
+ *
+ * Returns the number of errors found during auditing otherwise. May be (should
+ * be!) zero.
+ *
+ * If debugtrace support has been compiled into the hypervisor and is enabled,
+ * verbose descriptions for the errors are available in the hypervisor console.
+ */
 int xc_memshr_audit(xc_interface *xch);
+
+/* Stats reporting.
+ *
+ * At any point in time, the following equality should hold for a host:
+ *
+ *  Let dominfo(d) be the xc_dominfo_t struct filled by a call to
+ *  xc_domain_getinfo(d)
+ *
+ *  The summation of dominfo(d)->shr_pages for all domains in the system
+ *      should be equal to
+ *  xc_sharing_freed_pages + xc_sharing_used_frames
+ */
+/*
+ * This function returns the total number of pages freed by using sharing
+ * on the system.  For example, if two domains contain a single entry in
+ * their p2m table that points to the same shared page (and no other pages
+ * in the system are shared), then this function should return 1.
+ */
+long xc_sharing_freed_pages(xc_interface *xch);
+
+/*
+ * This function returns the total number of frames occupied by shared
+ * pages on the system.  This is independent of the number of domains
+ * pointing at these frames.  For example, in the above scenario this
+ * should return 1. (And dominfo(d) for each of the two domains should return 1
+ * as well).
+ *
+ * Note that some of these sharing_used_frames may be referenced by 
+ * a single domain page, and thus not realize any savings. The same
+ * applies to some of the pages counted in dominfo(d)->shr_pages.
+ */
+long xc_sharing_used_frames(xc_interface *xch);
+/*** End sharing interface ***/
 
 int xc_flask_load(xc_interface *xc_handle, char *buf, uint32_t size);
 int xc_flask_context_to_sid(xc_interface *xc_handle, char *buf, uint32_t size, uint32_t *sid);
