@@ -44,6 +44,9 @@ PYTHON_TOOLS        := @pythontools@
 OCAML_TOOLS         := @ocamltools@
 CONFIG_MINITERM     := @miniterm@
 CONFIG_LOMOUNT      := @lomount@
+CONFIG_OVMF         := @ovmf@
+CONFIG_ROMBIOS      := @rombios@
+CONFIG_SEABIOS      := @seabios@
 
 #System options
 CONFIG_SYSTEM_LIBAIO:= @system_aio@

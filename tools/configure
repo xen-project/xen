@@ -653,6 +653,9 @@ APPEND_INCLUDES
 PREPEND_LIB
 PREPEND_INCLUDES
 debug
+seabios
+rombios
+ovmf
 lomount
 miniterm
 ocamltools
@@ -728,6 +731,9 @@ enable_pythontools
 enable_ocamltools
 enable_miniterm
 enable_lomount
+enable_ovmf
+enable_rombios
+enable_seabios
 enable_debug
 '
       ac_precious_vars='build_alias
@@ -1386,6 +1392,9 @@ Optional Features:
   --disable-ocamltools    Disable Ocaml tools (default is ENABLED)
   --enable-miniterm       Enable miniterm (default is DISABLED)
   --enable-lomount        Enable lomount (default is DISABLED)
+  --enable-ovmf           Enable OVMF (default is DISABLED)
+  --disable-rombios       Disable ROM BIOS (default is ENABLED)
+  --disable-seabios       Disable SeaBIOS (default is ENABLED)
   --disable-debug         Disable debug build of tools (default is ENABLED)
 
 Some influential environment variables:
@@ -4130,6 +4139,75 @@ elif test -z $ax_cv_lomount; then :
 
 fi
 lomount=$ax_cv_lomount
+
+
+
+# Check whether --enable-ovmf was given.
+if test "${enable_ovmf+set}" = set; then :
+  enableval=$enable_ovmf;
+fi
+
+
+if test "x$enable_ovmf" = "xno"; then :
+
+    ax_cv_ovmf="n"
+
+elif test "x$enable_ovmf" = "xyes"; then :
+
+    ax_cv_ovmf="y"
+
+elif test -z $ax_cv_ovmf; then :
+
+    ax_cv_ovmf="n"
+
+fi
+ovmf=$ax_cv_ovmf
+
+
+
+# Check whether --enable-rombios was given.
+if test "${enable_rombios+set}" = set; then :
+  enableval=$enable_rombios;
+fi
+
+
+if test "x$enable_rombios" = "xno"; then :
+
+    ax_cv_rombios="n"
+
+elif test "x$enable_rombios" = "xyes"; then :
+
+    ax_cv_rombios="y"
+
+elif test -z $ax_cv_rombios; then :
+
+    ax_cv_rombios="y"
+
+fi
+rombios=$ax_cv_rombios
+
+
+
+# Check whether --enable-seabios was given.
+if test "${enable_seabios+set}" = set; then :
+  enableval=$enable_seabios;
+fi
+
+
+if test "x$enable_seabios" = "xno"; then :
+
+    ax_cv_seabios="n"
+
+elif test "x$enable_seabios" = "xyes"; then :
+
+    ax_cv_seabios="y"
+
+elif test -z $ax_cv_seabios; then :
+
+    ax_cv_seabios="y"
+
+fi
+seabios=$ax_cv_seabios
 
 
 

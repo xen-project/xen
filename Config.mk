@@ -208,10 +208,6 @@ SEABIOS_UPSTREAM_TAG ?= rel-1.6.3.2
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
-CONFIG_OVMF ?= n
-CONFIG_ROMBIOS ?= y
-CONFIG_SEABIOS ?= y
-
 # Specify which qemu-dm to use. This may be `ioemu' to use the old
 # Mercurial in-tree version, or a local directory, or a git URL.
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git

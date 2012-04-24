@@ -45,6 +45,9 @@ AX_ARG_DEFAULT_ENABLE([pythontools], [Disable Python tools])
 AX_ARG_DEFAULT_ENABLE([ocamltools], [Disable Ocaml tools])
 AX_ARG_DEFAULT_DISABLE([miniterm], [Enable miniterm])
 AX_ARG_DEFAULT_DISABLE([lomount], [Enable lomount])
+AX_ARG_DEFAULT_DISABLE([ovmf], [Enable OVMF])
+AX_ARG_DEFAULT_ENABLE([rombios], [Disable ROM BIOS])
+AX_ARG_DEFAULT_ENABLE([seabios], [Disable SeaBIOS])
 AX_ARG_DEFAULT_ENABLE([debug], [Disable debug build of tools])
 
 AC_ARG_VAR([PREPEND_INCLUDES],
