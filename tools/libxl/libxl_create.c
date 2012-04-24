@@ -71,9 +71,34 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         b_info->type != LIBXL_DOMAIN_TYPE_PV)
         return ERROR_INVAL;
 
-    if (!b_info->device_model_version)
-        b_info->device_model_version =
-            LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
+    libxl_defbool_setdefault(&b_info->device_model_stubdomain, false);
+
+    if (!b_info->device_model_version) {
+        if (b_info->type == LIBXL_DOMAIN_TYPE_HVM)
+            b_info->device_model_version =
+                LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
+        else {
+            const char *dm;
+            int rc;
+
+            b_info->device_model_version =
+                LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
+            dm = libxl__domain_device_model(gc, b_info);
+            rc = access(dm, X_OK);
+            if (rc < 0) {
+                /* qemu-xen unavailable, use qemu-xen-traditional */
+                if (errno == ENOENT) {
+                    LIBXL__LOG_ERRNO(CTX, XTL_VERBOSE, "qemu-xen is unavailable"
+                            ", use qemu-xen-traditional instead");
+                    b_info->device_model_version =
+                        LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
+                } else {
+                    LIBXL__LOG_ERRNO(CTX, XTL_ERROR, "qemu-xen access error");
+                    return ERROR_FAIL;
+                }
+            }
+        }
+    }
 
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         if (!b_info->u.hvm.bios)
@@ -98,8 +123,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         default:abort();
         }
     }
-
-    libxl_defbool_setdefault(&b_info->device_model_stubdomain, false);
 
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM &&
         b_info->device_model_version !=
