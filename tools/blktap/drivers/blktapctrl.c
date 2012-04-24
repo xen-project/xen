@@ -50,7 +50,9 @@
 #include <xs.h>
 #include <sys/time.h>
 #include <syslog.h>
+#ifdef MEMSHR
 #include <memshr.h>
+#endif
 #include <sys/stat.h>
                                                                      
 #include "blktaplib.h"
