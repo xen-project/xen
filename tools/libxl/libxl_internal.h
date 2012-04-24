@@ -118,7 +118,7 @@ typedef struct libxl__gc libxl__gc;
 typedef struct libxl__egc libxl__egc;
 typedef struct libxl__ao libxl__ao;
 
-void libxl__alloc_failed(libxl_ctx *, const char *func,
+_hidden void libxl__alloc_failed(libxl_ctx *, const char *func,
                          size_t nmemb, size_t size) __attribute__((noreturn));
   /* func, size and nmemb are used only in the log message.
    * You may pass size==0 if size and nmemb are not meaningful
@@ -184,7 +184,8 @@ typedef struct libxl__ev_watch_slot {
     LIBXL_SLIST_ENTRY(struct libxl__ev_watch_slot) empty;
 } libxl__ev_watch_slot;
     
-libxl__ev_xswatch *libxl__watch_slot_contents(libxl__gc *gc, int slotnum);
+_hidden libxl__ev_xswatch *libxl__watch_slot_contents(libxl__gc *gc,
+                                                      int slotnum);
 
 
 /*
@@ -597,21 +598,21 @@ _hidden void libxl__event_disaster(libxl__egc*, const char *msg, int errnoval,
 
 /* Fills in, or disposes of, the resources held by, a poller whose
  * space the caller has allocated.  ctx must be locked. */
-int libxl__poller_init(libxl_ctx *ctx, libxl__poller *p);
-void libxl__poller_dispose(libxl__poller *p);
+_hidden int libxl__poller_init(libxl_ctx *ctx, libxl__poller *p);
+_hidden void libxl__poller_dispose(libxl__poller *p);
 
 /* Obtain a fresh poller from malloc or the idle list, and put it
  * away again afterwards.  _get can fail, returning NULL.
  * ctx must be locked. */
-libxl__poller *libxl__poller_get(libxl_ctx *ctx);
-void libxl__poller_put(libxl_ctx *ctx, libxl__poller *p);
+_hidden libxl__poller *libxl__poller_get(libxl_ctx *ctx);
+_hidden void libxl__poller_put(libxl_ctx *ctx, libxl__poller *p);
 
 /* Notifies whoever is polling using p that they should wake up.
  * ctx must be locked. */
-void libxl__poller_wakeup(libxl__egc *egc, libxl__poller *p);
+_hidden void libxl__poller_wakeup(libxl__egc *egc, libxl__poller *p);
 
 
-int libxl__atfork_init(libxl_ctx *ctx);
+_hidden int libxl__atfork_init(libxl_ctx *ctx);
 
 
 /* from xl_dom */
@@ -1356,23 +1357,23 @@ _hidden void libxl__ao__destroy(libxl_ctx*, libxl__ao *ao);
  */
 typedef struct libxl__carefd libxl__carefd;
 
-void libxl__carefd_begin(void);
-void libxl__carefd_unlock(void);
+_hidden void libxl__carefd_begin(void);
+_hidden void libxl__carefd_unlock(void);
 
 /* fd may be -1, in which case this returns a dummy libxl__fd_record
  * on which it _carefd_close is a no-op.  Cannot fail. */
-libxl__carefd *libxl__carefd_record(libxl_ctx *ctx, int fd);
+_hidden libxl__carefd *libxl__carefd_record(libxl_ctx *ctx, int fd);
 
 /* Combines _record and _unlock in a single call.  If fd==-1,
  * still does the unlock, but returns 0.  Cannot fail. */
-libxl__carefd *libxl__carefd_opened(libxl_ctx *ctx, int fd);
+_hidden libxl__carefd *libxl__carefd_opened(libxl_ctx *ctx, int fd);
 
 /* Works just like close(2).  You may pass NULL, in which case it's
  * a successful no-op. */
-int libxl__carefd_close(libxl__carefd*);
+_hidden int libxl__carefd_close(libxl__carefd*);
 
 /* You may pass NULL in which case the answer is -1. */
-int libxl__carefd_fd(const libxl__carefd*);
+_hidden int libxl__carefd_fd(const libxl__carefd*);
 
 
 /*

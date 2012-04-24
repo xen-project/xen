@@ -1,4 +1,5 @@
 namespace("libxl__")
+hidden(True)
 
 libxl_domid = Builtin("domid", namespace="libxl_", json_fn = "yajl_gen_integer")
 

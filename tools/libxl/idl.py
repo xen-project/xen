@@ -19,11 +19,20 @@ def _get_default_namespace():
     global _default_namespace
     return _default_namespace
 
+_default_hidden = False
+def hidden(b):
+    global _default_hidden
+    _default_hidden = b
+
+def _get_default_hidden():
+    global _default_hidden
+    return _default_hidden
 
 class Type(object):
     def __init__(self, typename, **kwargs):
         self.namespace = kwargs.setdefault('namespace',
                 _get_default_namespace())
+        self._hidden = kwargs.setdefault('hidden', _get_default_hidden())
         self.dir = kwargs.setdefault('dir', DIR_BOTH)
         if self.dir not in [DIR_NONE, DIR_IN, DIR_OUT, DIR_BOTH]:
             raise ValueError
@@ -66,6 +75,12 @@ class Type(object):
         return self.dir in [DIR_IN, DIR_BOTH]
     def marshal_out(self):
         return self.dir in [DIR_OUT, DIR_BOTH]
+
+    def hidden(self):
+        if self._hidden:
+            return "_hidden "
+        else:
+            return ""
 
     def make_arg(self, n, passby=None):
         if passby is None: passby = self.passby
@@ -289,7 +304,7 @@ def parse(f):
             globs[n] = t
         elif n in ['PASS_BY_REFERENCE', 'PASS_BY_VALUE',
                    'DIR_NONE', 'DIR_IN', 'DIR_OUT', 'DIR_BOTH',
-                   'namespace']:
+                   'namespace', 'hidden']:
             globs[n] = t
 
     try:

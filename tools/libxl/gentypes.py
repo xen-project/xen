@@ -280,22 +280,22 @@ if __name__ == '__main__':
     for ty in types:
         f.write(libxl_C_type_define(ty) + ";\n")
         if ty.dispose_fn is not None:
-            f.write("void %s(%s);\n" % (ty.dispose_fn, ty.make_arg("p")))
+            f.write("%svoid %s(%s);\n" % (ty.hidden(), ty.dispose_fn, ty.make_arg("p")))
         if ty.init_fn is not None:
-            f.write("void %s(%s);\n" % (ty.init_fn, ty.make_arg("p")))
+            f.write("%svoid %s(%s);\n" % (ty.hidden(), ty.init_fn, ty.make_arg("p")))
             for field in libxl_init_members(ty):
                 if not isinstance(field.type, idl.KeyedUnion):
                     raise Exception("Only KeyedUnion is supported for member init")
                 ku = field.type
-                f.write("void %s(%s, %s);\n" % (ty.init_fn + "_" + ku.keyvar.name,
+                f.write("%svoid %s(%s, %s);\n" % (ty.hidden(), ty.init_fn + "_" + ku.keyvar.name,
                                                ty.make_arg("p"),
                                                ku.keyvar.type.make_arg(ku.keyvar.name)))
         if ty.json_fn is not None:
-            f.write("char *%s_to_json(libxl_ctx *ctx, %s);\n" % (ty.typename, ty.make_arg("p")))
+            f.write("%schar *%s_to_json(libxl_ctx *ctx, %s);\n" % (ty.hidden(), ty.typename, ty.make_arg("p")))
         if isinstance(ty, idl.Enumeration):
-            f.write("const char *%s_to_string(%s);\n" % (ty.typename, ty.make_arg("p")))
-            f.write("int %s_from_string(const char *s, %s);\n" % (ty.typename, ty.make_arg("e", passby=idl.PASS_BY_REFERENCE)))
-            f.write("extern libxl_enum_string_table %s_string_table[];\n" % (ty.typename))
+            f.write("%sconst char *%s_to_string(%s);\n" % (ty.hidden(), ty.typename, ty.make_arg("p")))
+            f.write("%sint %s_from_string(const char *s, %s);\n" % (ty.hidden(), ty.typename, ty.make_arg("e", passby=idl.PASS_BY_REFERENCE)))
+            f.write("%sextern libxl_enum_string_table %s_string_table[];\n" % (ty.hidden(), ty.typename))
         f.write("\n")
 
     f.write("""#endif /* %s */\n""" % (header_define))
@@ -319,7 +319,7 @@ if __name__ == '__main__':
 """ % (header_json_define, header_json_define, " ".join(sys.argv)))
 
     for ty in [ty for ty in types if ty.json_fn is not None]:
-        f.write("yajl_gen_status %s_gen_json(yajl_gen hand, %s);\n" % (ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
+        f.write("%syajl_gen_status %s_gen_json(yajl_gen hand, %s);\n" % (ty.hidden(), ty.typename, ty.make_arg("p", passby=idl.PASS_BY_REFERENCE)))
 
     f.write("\n")
     f.write("""#endif /* %s */\n""" % header_json_define)
