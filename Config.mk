@@ -179,9 +179,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 06d2e688405932841e9a1c27e2eaaef315298a66
-# Thu Mar 1 18:58:27 2012 +0000
-# qemu-xen: ignore console disconnect events for console/0
+QEMU_TAG ?= a2d2123a7dfc4d116011d51f48df786a3b853537
+# Mon Apr 2 17:55:05 2012 +0100
+# qemu-xen-traditional: QDISK fixes
 
 # Optional components
 XENSTAT_XENTOP     ?= y
