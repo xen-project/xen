@@ -186,6 +186,7 @@ tools/libxl/libxlu_cfg_y.output
 tools/libxl/xl
 tools/libxl/testenum
 tools/libxl/testenum.c
+tools/libxl/tmp.*
 tools/libaio/src/*.ol
 tools/libaio/src/*.os
 tools/misc/cpuperf/cpuperf-perfcntr

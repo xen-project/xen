@@ -182,6 +182,7 @@
 ^tools/libxl/xl$
 ^tools/libxl/testidl$
 ^tools/libxl/testidl\.c$
+^tools/libxl/tmp\..*$
 ^tools/libvchan/vchan-node[12]$
 ^tools/libaio/src/.*\.ol$
 ^tools/libaio/src/.*\.os$

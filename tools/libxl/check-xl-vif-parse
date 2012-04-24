@@ -1,0 +1,209 @@
+#!/bin/bash
+
+set -e
+
+if [ -x ./xl ] ; then
+    export LD_LIBRARY_PATH=.
+    XL=./xl
+else
+    XL=xl
+fi
+
+fprefix=tmp.check-xl-vif-parse
+
+expected () {
+    cat >$fprefix.expected
+}
+
+failures=0
+
+one () {
+    expected_rc=$1; shift
+    printf "test case %s...\n" "$*"
+    set +e
+    ${XL} -N network-attach 0 "$@" </dev/null >$fprefix.actual 2>/dev/null
+    actual_rc=$?
+    diff -u $fprefix.expected $fprefix.actual
+    diff_rc=$?
+    set -e
+    if [ $actual_rc != $expected_rc ] || [ $diff_rc != 0 ]; then
+        echo >&2 "test case \`$*' failed ($actual_rc $diff_rc)"
+        failures=$(( $failures + 1 ))
+    fi
+}
+
+complete () {
+    if [ "$failures" = 0 ]; then
+        echo all ok.; exit 0
+    else
+        echo "$failures tests failed."; exit 1
+    fi
+}
+
+e=255
+
+
+#---------- test data ----------
+
+# test invalid vif config
+expected </dev/null
+one 1 foo
+
+# test invalid rate units
+expected </dev/null
+one $e rate=foo
+one $e rate=foo
+one $e rate=10MB
+one $e rate=10MB/m
+one $e rate=10ZB
+one $e rate=10ZB/s
+one $e rate=10ZB/m
+
+# test b/s and B/s rate units
+expected <<END
+vif: {
+    "backend_domid": 0,
+    "devid": 0,
+    "mtu": 0,
+    "model": null,
+    "mac": "00:00:00:00:00:00",
+    "ip": null,
+    "bridge": null,
+    "ifname": null,
+    "script": null,
+    "nictype": null,
+    "rate_bytes_per_interval": 100000,
+    "rate_interval_usecs": 50000
+}
+
+END
+
+one 0 rate=16000000b/s
+one 0 rate=16000000b/s@50ms
+one 0 rate=2000000B/s
+one 0 rate=2000000B/s@50ms
+
+# test Kb/s and KB/s rate units
+expected <<END
+vif: {
+    "backend_domid": 0,
+    "devid": 0,
+    "mtu": 0,
+    "model": null,
+    "mac": "00:00:00:00:00:00",
+    "ip": null,
+    "bridge": null,
+    "ifname": null,
+    "script": null,
+    "nictype": null,
+    "rate_bytes_per_interval": 100,
+    "rate_interval_usecs": 50000
+}
+
+END
+one 0 rate=16Kb/s
+one 0 rate=16Kb/s@50ms
+one 0 rate=2KB/s
+one 0 rate=2KB/s@50ms
+
+# test Mb/s and MB/s rate units
+expected <<END
+vif: {
+    "backend_domid": 0,
+    "devid": 0,
+    "mtu": 0,
+    "model": null,
+    "mac": "00:00:00:00:00:00",
+    "ip": null,
+    "bridge": null,
+    "ifname": null,
+    "script": null,
+    "nictype": null,
+    "rate_bytes_per_interval": 100000,
+    "rate_interval_usecs": 50000
+}
+
+END
+one 0 rate=16Mb/s
+one 0 rate=16Mb/s@50ms
+one 0 rate=2MB/s
+one 0 rate=2MB/s@50ms
+
+# test Gb/s and GB/s rate units
+expected <<END
+vif: {
+    "backend_domid": 0,
+    "devid": 0,
+    "mtu": 0,
+    "model": null,
+    "mac": "00:00:00:00:00:00",
+    "ip": null,
+    "bridge": null,
+    "ifname": null,
+    "script": null,
+    "nictype": null,
+    "rate_bytes_per_interval": 50000000,
+    "rate_interval_usecs": 50000
+}
+
+END
+one 0 rate=8Gb/s
+one 0 rate=8Gb/s@50ms
+one 0 rate=1GB/s
+one 0 rate=1GB/s@50ms
+
+# test rate overflow
+expected </dev/null
+one $e rate=4294967296b/s
+one $e rate=4294967296Kb/s
+one $e rate=4294967296Mb/s
+one $e rate=4294967296Gb/s
+
+# test rate underflow
+expected </dev/null
+one $e rate=0B/s
+
+# test invalid replenishment interval
+expected </dev/null
+one $e rate=10Mb/s@foo
+one $e rate=10Mb/s@10h
+one $e rate=10MB/s@foo
+one $e rate=10MB/s@10h
+
+# test replenishment interval in seconds
+expected <<END
+vif: {
+    "backend_domid": 0,
+    "devid": 0,
+    "mtu": 0,
+    "model": null,
+    "mac": "00:00:00:00:00:00",
+    "ip": null,
+    "bridge": null,
+    "ifname": null,
+    "script": null,
+    "nictype": null,
+    "rate_bytes_per_interval": 10000000,
+    "rate_interval_usecs": 1000000
+}
+
+END
+one 0 rate=80Mb/s@1s
+one 0 rate=10MB/s@1s
+
+# test replenishment interval overflow
+expected </dev/null
+one $e rate=1B/s@4294967296us
+one $e rate=1B/s@4294968ms
+one $e rate=1B/s@4295s
+
+# test replenishment interval underflow
+expected </dev/null
+one $e rate=1B/s@0us
+
+# test rate limiting resulting in overflow
+expected </dev/null
+one $e rate=4294967295GB/s@5us
+one $e rate=4296MB/s@4294s
+
+complete
