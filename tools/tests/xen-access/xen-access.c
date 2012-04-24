@@ -29,6 +29,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <time.h>
 #include <signal.h>
 #include <unistd.h>
@@ -120,6 +121,7 @@ typedef struct xenaccess {
 } xenaccess_t;
 
 static int interrupted;
+bool evtchn_bind = 0, evtchn_open = 0, mem_access_enable = 0;
 
 static void close_handler(int sig)
 {
@@ -167,9 +169,68 @@ int xc_wait_for_event_or_timeout(xc_interface *xch, xc_evtchn *xce, unsigned lon
     return -errno;
 }
 
+int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
+{
+    int rc;
+
+    if ( xenaccess == NULL )
+        return 0;
+
+    /* Tear down domain xenaccess in Xen */
+    if ( xenaccess->mem_event.ring_page )
+        munmap(xenaccess->mem_event.ring_page, PAGE_SIZE);
+
+    if ( mem_access_enable )
+    {
+        rc = xc_mem_access_disable(xenaccess->xc_handle,
+                                   xenaccess->mem_event.domain_id);
+        if ( rc != 0 )
+        {
+            ERROR("Error tearing down domain xenaccess in xen");
+        }
+    }
+
+    /* Unbind VIRQ */
+    if ( evtchn_bind )
+    {
+        rc = xc_evtchn_unbind(xenaccess->mem_event.xce_handle,
+                              xenaccess->mem_event.port);
+        if ( rc != 0 )
+        {
+            ERROR("Error unbinding event port");
+        }
+    }
+
+    /* Close event channel */
+    if ( evtchn_open )
+    {
+        rc = xc_evtchn_close(xenaccess->mem_event.xce_handle);
+        if ( rc != 0 )
+        {
+            ERROR("Error closing event channel");
+        }
+    }
+
+    /* Close connection to Xen */
+    rc = xc_interface_close(xenaccess->xc_handle);
+    if ( rc != 0 )
+    {
+        ERROR("Error closing connection to xen");
+    }
+    xenaccess->xc_handle = NULL;
+
+    if ( xenaccess->platform_info )
+        free(xenaccess->platform_info);
+    if ( xenaccess->domain_info )
+        free(xenaccess->domain_info);
+    free(xenaccess);
+
+    return 0;
+}
+
 xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
 {
-    xenaccess_t *xenaccess;
+    xenaccess_t *xenaccess = 0;
     xc_interface *xch;
     int rc;
     unsigned long ring_pfn, mmap_pfn;
@@ -242,6 +303,7 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
         }
         goto err;
     }
+    mem_access_enable = 1;
 
     /* Open event channel */
     xenaccess->mem_event.xce_handle = xc_evtchn_open(NULL, 0);
@@ -250,6 +312,7 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
         ERROR("Failed to open event channel");
         goto err;
     }
+    evtchn_open = 1;
 
     /* Bind event notification */
     rc = xc_evtchn_bind_interdomain(xenaccess->mem_event.xce_handle,
@@ -260,7 +323,7 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
         ERROR("Failed to bind event channel");
         goto err;
     }
-
+    evtchn_bind = 1;
     xenaccess->mem_event.port = rc;
 
     /* Initialise ring */
@@ -314,62 +377,10 @@ xenaccess_t *xenaccess_init(xc_interface **xch_r, domid_t domain_id)
     return xenaccess;
 
  err:
-    if ( xenaccess )
-    {
-        if ( xenaccess->mem_event.ring_page )
-        {
-            munmap(xenaccess->mem_event.ring_page, PAGE_SIZE);
-        }
-
-        free(xenaccess->platform_info);
-        free(xenaccess->domain_info);
-        free(xenaccess);
-    }
+    xenaccess_teardown(xch, xenaccess);
 
  err_iface:
     return NULL;
-}
-
-int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
-{
-    int rc;
-
-    if ( xenaccess == NULL )
-        return 0;
-
-    /* Tear down domain xenaccess in Xen */
-    munmap(xenaccess->mem_event.ring_page, PAGE_SIZE);
-    rc = xc_mem_access_disable(xenaccess->xc_handle, xenaccess->mem_event.domain_id);
-    if ( rc != 0 )
-    {
-        ERROR("Error tearing down domain xenaccess in xen");
-    }
-
-    /* Unbind VIRQ */
-    rc = xc_evtchn_unbind(xenaccess->mem_event.xce_handle, xenaccess->mem_event.port);
-    if ( rc != 0 )
-    {
-        ERROR("Error unbinding event port");
-    }
-    xenaccess->mem_event.port = -1;
-
-    /* Close event channel */
-    rc = xc_evtchn_close(xenaccess->mem_event.xce_handle);
-    if ( rc != 0 )
-    {
-        ERROR("Error closing event channel");
-    }
-    xenaccess->mem_event.xce_handle = NULL;
-
-    /* Close connection to Xen */
-    rc = xc_interface_close(xenaccess->xc_handle);
-    if ( rc != 0 )
-    {
-        ERROR("Error closing connection to xen");
-    }
-    xenaccess->xc_handle = NULL;
-
-    return 0;
 }
 
 int get_request(mem_event_t *mem_event, mem_event_request_t *req)
@@ -530,16 +541,39 @@ int main(int argc, char *argv[])
     sigaction(SIGALRM, &act, NULL);
 
     /* Set whether the access listener is required */
-    xc_domain_set_access_required(xch, domain_id, required);
+    rc = xc_domain_set_access_required(xch, domain_id, required);
+    if ( rc < 0 )
+    {
+        ERROR("Error %d setting mem_access listener required\n", rc);
+        goto exit;
+    }
 
     /* Set the default access type and convert all pages to it */
     rc = xc_hvm_set_mem_access(xch, domain_id, default_access, ~0ull, 0);
-    rc = xc_hvm_set_mem_access(xch, domain_id, default_access, 0, xenaccess->domain_info->max_pages);
+    if ( rc < 0 )
+    {
+        ERROR("Error %d setting default mem access type\n", rc);
+        goto exit;
+    }
+
+    rc = xc_hvm_set_mem_access(xch, domain_id, default_access, 0,
+                               xenaccess->domain_info->max_pages);
+    if ( rc < 0 )
+    {
+        ERROR("Error %d setting all memory to access type %d\n", rc,
+              default_access);
+        goto exit;
+    }
 
     if ( int3 )
         rc = xc_set_hvm_param(xch, domain_id, HVM_PARAM_MEMORY_EVENT_INT3, HVMPME_mode_sync);
     else
         rc = xc_set_hvm_param(xch, domain_id, HVM_PARAM_MEMORY_EVENT_INT3, HVMPME_mode_disabled);
+    if ( rc < 0 )
+    {
+        ERROR("Error %d setting int3 mem_event\n", rc);
+        goto exit;
+    }
 
     /* Wait for access */
     for (;;)
@@ -587,6 +621,12 @@ int main(int argc, char *argv[])
             switch (req.reason) {
             case MEM_EVENT_REASON_VIOLATION:
                 rc = xc_hvm_get_mem_access(xch, domain_id, req.gfn, &access);
+                if (rc < 0)
+                {
+                    ERROR("Error %d getting mem_access event\n", rc);
+                    interrupted = -1;
+                    continue;
+                }
 
                 printf("PAGE ACCESS: %c%c%c for GFN %"PRIx64" (offset %06"
                        PRIx64") gla %016"PRIx64" (vcpu %d)\n",
@@ -599,7 +639,17 @@ int main(int argc, char *argv[])
                        req.vcpu_id);
 
                 if ( default_access != after_first_access )
-                    rc = xc_hvm_set_mem_access(xch, domain_id, after_first_access, req.gfn, 1);
+                {
+                    rc = xc_hvm_set_mem_access(xch, domain_id,
+                                               after_first_access, req.gfn, 1);
+                    if (rc < 0)
+                    {
+                        ERROR("Error %d setting gfn to access_type %d\n", rc,
+                              after_first_access);
+                        interrupted = -1;
+                        continue;
+                    }
+                }
 
 
                 rsp.gfn = req.gfn;
@@ -613,6 +663,12 @@ int main(int argc, char *argv[])
 
                 /* Reinject */
                 rc = xc_hvm_inject_trap(xch, domain_id, req.vcpu_id, 3, -1, 0);
+                if (rc < 0)
+                {
+                    ERROR("Error %d injecting int3\n", rc);
+                    interrupted = -1;
+                    continue;
+                }
 
                 break;
             default:
@@ -633,6 +689,7 @@ int main(int argc, char *argv[])
     }
     DPRINTF("xenaccess shut down on signal %d\n", interrupted);
 
+exit:
     /* Tear down domain xenaccess */
     rc1 = xenaccess_teardown(xch, xenaccess);
     if ( rc1 != 0 )
