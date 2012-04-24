@@ -150,15 +150,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         b_info->target_memkb = b_info->max_memkb;
 
     libxl_defbool_setdefault(&b_info->localtime, false);
-    if (libxl_defbool_val(b_info->localtime)) {
-        time_t t;
-        struct tm *tm;
-
-        t = time(NULL);
-        tm = localtime(&t);
-
-        b_info->rtc_timeoffset += tm->tm_gmtoff;
-    }
 
     libxl_defbool_setdefault(&b_info->disable_migrate, false);
 

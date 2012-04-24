@@ -65,6 +65,8 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int tsc_mode;
     char *xs_domid, *con_domid;
+    uint32_t rtc_timeoffset;
+
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
     libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus, &info->cpumap);
     xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + LIBXL_MAXMEM_CONSTANT);
@@ -91,8 +93,19 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     if (libxl_defbool_val(info->disable_migrate))
         xc_domain_disable_migrate(ctx->xch, domid);
 
-    if (info->rtc_timeoffset)
-        xc_domain_set_time_offset(ctx->xch, domid, info->rtc_timeoffset);
+    rtc_timeoffset = info->rtc_timeoffset;
+    if (libxl_defbool_val(info->localtime)) {
+        time_t t;
+        struct tm *tm;
+
+        t = time(NULL);
+        tm = localtime(&t);
+
+        rtc_timeoffset += tm->tm_gmtoff;
+    }
+
+    if (rtc_timeoffset)
+        xc_domain_set_time_offset(ctx->xch, domid, rtc_timeoffset);
 
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         unsigned long shadow;
