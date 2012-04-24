@@ -39,6 +39,7 @@
 #include "xenctrl.h"
 #include "xenctrlosdep.h"
 
+#define ROUNDUP(_x,_w) (((unsigned long)(_x)+(1UL<<(_w))-1) & ~((1UL<<(_w))-1))
 #define ERROR(_m, _a...)  xc_osdep_log(xch,XTL_ERROR,XC_INTERNAL_ERROR,_m , ## _a )
 #define PERROR(_m, _a...) xc_osdep_log(xch,XTL_ERROR,XC_INTERNAL_ERROR,_m \
                   " (%d = %s)", ## _a , errno, xc_strerror(xch, errno))
@@ -258,7 +259,7 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
                 fd, 0);
     if ( addr == MAP_FAILED )
     {
-        PERROR("xc_map_foreign_batch: mmap failed");
+        PERROR("xc_map_foreign_bulk: mmap failed");
         return NULL;
     }
 
@@ -286,7 +287,21 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
          * IOCTL_PRIVCMD_MMAPBATCH.
          */
         privcmd_mmapbatch_t ioctlx;
-        xen_pfn_t *pfn = alloca(num * sizeof(*pfn));
+        xen_pfn_t *pfn;
+        unsigned int pfn_arr_size = ROUNDUP((num * sizeof(*pfn)), XC_PAGE_SHIFT);
+
+        if ( pfn_arr_size <= XC_PAGE_SIZE )
+            pfn = alloca(num * sizeof(*pfn));
+        else
+        {
+            pfn = mmap(NULL, pfn_arr_size, PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANON | MAP_POPULATE, -1, 0);
+            if ( pfn == MAP_FAILED )
+            {
+                PERROR("xc_map_foreign_bulk: mmap of pfn array failed");
+                return NULL;
+            }
+        }
 
         memcpy(pfn, arr, num * sizeof(*arr));
 
@@ -327,6 +342,9 @@ static void *linux_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle h
             }
             break;
         }
+
+        if ( pfn_arr_size > XC_PAGE_SIZE )
+            munmap(pfn, pfn_arr_size);
 
         if ( rc == -ENOENT && i == num )
             rc = 0;
@@ -549,6 +567,9 @@ static void *linux_gnttab_grant_map(xc_gnttab *xch, xc_osdep_handle h,
 {
     int fd = (int)h;
     struct ioctl_gntdev_map_grant_ref *map;
+    unsigned int map_size = ROUNDUP((sizeof(*map) + (count - 1) *
+                                    sizeof(struct ioctl_gntdev_map_grant_ref)),
+                                    XC_PAGE_SHIFT);
     void *addr = NULL;
     int domids_stride = 1;
     int i;
@@ -556,8 +577,19 @@ static void *linux_gnttab_grant_map(xc_gnttab *xch, xc_osdep_handle h,
     if (flags & XC_GRANT_MAP_SINGLE_DOMAIN)
         domids_stride = 0;
 
-    map = alloca(sizeof(*map) +
-                 (count - 1) * sizeof(struct ioctl_gntdev_map_grant_ref));
+    if ( map_size <= XC_PAGE_SIZE )
+        map = alloca(sizeof(*map) +
+                     (count - 1) * sizeof(struct ioctl_gntdev_map_grant_ref));
+    else
+    {
+        map = mmap(NULL, map_size, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANON | MAP_POPULATE, -1, 0);
+        if ( map == MAP_FAILED )
+        {
+            PERROR("linux_gnttab_grant_map: mmap of map failed");
+            return NULL;
+        }
+    }
 
     for ( i = 0; i < count; i++ )
     {
@@ -628,6 +660,8 @@ static void *linux_gnttab_grant_map(xc_gnttab *xch, xc_osdep_handle h,
     }
 
  out:
+    if ( map_size > XC_PAGE_SIZE )
+        munmap(map, map_size);
 
     return addr;
 }
