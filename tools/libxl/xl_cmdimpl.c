@@ -5718,20 +5718,8 @@ int main_cpupoolcreate(int argc, char **argv)
             libxl_cpumap_set(&cpumap, i);
             n_cpus++;
         }
-    } else {
-        n_cpus = 1;
-        n = 0;
-        libxl_for_each_cpu(i, freemap)
-            if (libxl_cpumap_test(&freemap, i)) {
-                n++;
-                libxl_cpumap_set(&cpumap, i);
-                break;
-            }
-        if (n < n_cpus) {
-            fprintf(stderr, "no free cpu found\n");
-            return -ERROR_FAIL;
-        }
-    }
+    } else
+        n_cpus = 0;
 
     libxl_uuid_generate(&uuid);
 
