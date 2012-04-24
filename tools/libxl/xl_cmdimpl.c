@@ -403,6 +403,19 @@ static void parse_disk_config(XLU_Config **config, const char *spec,
     parse_disk_config_multistring(config, 1, &spec, disk);
 }
 
+static void parse_vif_rate(XLU_Config **config, const char *rate,
+                           libxl_device_nic *nic)
+{
+    int e;
+
+    e = xlu_vif_parse_rate(*config, rate, nic);
+    if (e == EINVAL || e == EOVERFLOW) exit(-1);
+    if (e) {
+        fprintf(stderr,"xlu_vif_parse_rate failed: %s\n",strerror(errno));
+        exit(-1);
+    }
+}
+
 static void split_string_into_string_list(const char *str,
                                           const char *delim,
                                           libxl_string_list *psl)
@@ -906,7 +919,7 @@ static void parse_config_data(const char *configfile_filename_report,
                         nic->backend_domid = 0;
                     }
                 } else if (!strcmp(p, "rate")) {
-                    fprintf(stderr, "the rate parameter for vifs is currently not supported\n");
+                    parse_vif_rate(&config, (p2 + 1), nic);
                 } else if (!strcmp(p, "accel")) {
                     fprintf(stderr, "the accel parameter for vifs is currently not supported\n");
                 }
@@ -4855,6 +4868,7 @@ int main_networkattach(int argc, char **argv)
 {
     int opt;
     libxl_device_nic nic;
+    XLU_Config *config = 0;
     char *endptr, *oparg;
     const char *tok;
     int i;
@@ -4872,6 +4886,13 @@ int main_networkattach(int argc, char **argv)
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
+
+    config= xlu_cfg_init(stderr, "command line");
+    if (!config) {
+        fprintf(stderr, "Failed to allocate for configuration\n");
+        return 1;
+    }
+
     libxl_device_nic_init(&nic);
     for (argv += optind+1, argc -= optind+1; argc > 0; ++argv, --argc) {
         if (MATCH_OPTION("type", *argv, oparg)) {
@@ -4910,6 +4931,7 @@ int main_networkattach(int argc, char **argv)
         } else if (MATCH_OPTION("model", *argv, oparg)) {
             replace_string(&nic.model, oparg);
         } else if (MATCH_OPTION("rate", *argv, oparg)) {
+            parse_vif_rate(&config, oparg, &nic);
         } else if (MATCH_OPTION("accel", *argv, oparg)) {
         } else {
             fprintf(stderr, "unrecognized argument `%s'\n", *argv);
@@ -4931,6 +4953,7 @@ int main_networkattach(int argc, char **argv)
         return 1;
     }
     libxl_device_nic_dispose(&nic);
+    xlu_cfg_destroy(config);
     return 0;
 }
 

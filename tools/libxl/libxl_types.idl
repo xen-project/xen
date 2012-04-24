@@ -343,6 +343,8 @@ libxl_device_nic = Struct("device_nic", [
     ("ifname", string),
     ("script", string),
     ("nictype", libxl_nic_type),
+    ("rate_bytes_per_interval", uint64),
+    ("rate_interval_usecs", uint32),
     ])
 
 libxl_device_pci = Struct("device_pci", [

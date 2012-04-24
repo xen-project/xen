@@ -17,9 +17,11 @@
 #define LIBXLU_INTERNAL_H
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
+#include <regex.h>
 
 #define XLU_ConfigList XLU_ConfigSetting
 

@@ -1854,6 +1854,13 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
         flexarray_append(back, libxl__strdup(gc, nic->ip));
     }
 
+    if (nic->rate_interval_usecs > 0) {
+        flexarray_append(back, "rate");
+        flexarray_append(back, libxl__sprintf(gc, "%"PRIu64",%"PRIu32"",
+                            nic->rate_bytes_per_interval,
+                            nic->rate_interval_usecs));
+    }
+
     flexarray_append(back, "bridge");
     flexarray_append(back, libxl__strdup(gc, nic->bridge));
     flexarray_append(back, "handle");

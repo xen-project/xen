@@ -122,5 +122,34 @@ Specifies the backend domain which this device should attach to. This
 defaults to domain 0. Specifying another domain requires setting up a
 driver domain which is outside the scope of this document.
 
+### rate
+
+Specifies the rate at which the outgoing traffic will be limited to.
+The default if this keyword is not specified is unlimited.
+
+The rate may be specified as "<RATE>/s" or optionally "<RATE>/s@<INTERVAL>".
+
+  * `RATE` is in bytes and can accept suffixes:
+      * GB, MB, KB, B for bytes.
+      * Gb, Mb, Kb, b for bits.
+  * `INTERVAL` is in microseconds and can accept suffixes: ms, us, s.
+    It determines the frequency at which the vif transmission credit
+    is replenished. The default is 50ms.
+
+Vif rate limiting is credit-based. It means that for "1MB/s@20ms", the
+available credit will be equivalent of the traffic you would have done
+at "1MB/s" during 20ms. This will results in a credit of 20,000 bytes
+replenished every 20,000 us.
+
+For example:
+
+        'rate=10Mb/s' -- meaning up to 10 megabits every second
+        'rate=250KB/s' -- meaning up to 250 kilobytes every second
+        'rate=1MB/s@20ms' -- meaning 20,000 bytes in every 20 millisecond period
+
+NOTE: The actual underlying limits of rate limiting are dependent
+on the underlying netback implementation.
+
+
 [oui]: http://en.wikipedia.org/wiki/Organizationally_Unique_Identifier
 [net]: http://wiki.xen.org/wiki/HostConfiguration/Networking

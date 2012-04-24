@@ -94,6 +94,13 @@ int xlu_disk_parse(XLU_Config *cfg, int nspecs, const char *const *specs,
 int xlu_pci_parse_bdf(XLU_Config *cfg, libxl_device_pci *pcidev, const char *str);
 
 
+/*
+ * Vif rate parsing.
+ */
+
+int xlu_vif_parse_rate(XLU_Config *cfg, const char *rate,
+                       libxl_device_nic *nic);
+
 #endif /* LIBXLUTIL_H */
 
 /*
