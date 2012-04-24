@@ -873,11 +873,13 @@ Cpu-pools can be specified either by name or by id.
 
 =over 4
 
-=item B<cpupool-create> [I<OPTIONS>] I<ConfigFile> [I<Variable=Value> ...]
+=item B<cpupool-create> [I<OPTIONS>] [I<ConfigFile>] [I<Variable=Value> ...]
 
-Create a cpu pool based an I<ConfigFile>.
-Variable settings from the I<ConfigFile> may be altered by specifying new
-or additional assignments on the command line.
+Create a cpu pool based an config from a I<ConfigFile> or command-line
+parameters.  Variable settings from the I<ConfigFile> may be altered
+by specifying new or additional assignments on the command line.
+
+See the L<xlcpupool.cfg(5)> manpage for more information.
 
 B<OPTIONS>
 

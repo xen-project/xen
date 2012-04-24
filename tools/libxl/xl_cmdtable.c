@@ -367,12 +367,14 @@ struct cmd_spec cmd_table[] = {
     },
     { "cpupool-create",
       &main_cpupoolcreate, 1,
-      "Create a CPU pool based an ConfigFile",
-      "[options] <ConfigFile> [vars]",
+      "Create a new CPU pool",
+      "[options] [<ConfigFile>] [Variable=value ...]",
       "-h, --help                   Print this help.\n"
       "-f FILE, --defconfig=FILE    Use the given configuration file.\n"
       "-n, --dryrun                 Dry run - prints the resulting configuration.\n"
-      "                              (deprecated in favour of global -N option)."
+      "                              (deprecated in favour of global -N option).\n"
+      "\nSee the xlcpupool.cfg(5) manpage for more information.",
+
     },
     { "cpupool-list",
       &main_cpupoollist, 0,

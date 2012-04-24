@@ -5547,7 +5547,7 @@ int main_tmem_freeable(int argc, char **argv)
 
 int main_cpupoolcreate(int argc, char **argv)
 {
-    const char *filename = NULL;
+    const char *filename = NULL, *config_src=NULL;
     const char *p;
     char extra_config[1024];
     int opt;
@@ -5611,23 +5611,26 @@ int main_cpupoolcreate(int argc, char **argv)
         optind++;
     }
 
-    if (!filename) {
-        help("cpupool-create");
-        return -ERROR_FAIL;
+    if (filename)
+    {
+        if (libxl_read_file_contents(ctx, filename, (void **)&config_data,
+                                     &config_len)) {
+            fprintf(stderr, "Failed to read config file: %s: %s\n",
+                    filename, strerror(errno));
+            return -ERROR_FAIL;
+        }
+        config_src=filename;
     }
+    else
+        config_src="command line";
 
-    if (libxl_read_file_contents(ctx, filename, (void **)&config_data, &config_len)) {
-        fprintf(stderr, "Failed to read config file: %s: %s\n",
-                filename, strerror(errno));
-        return -ERROR_FAIL;
-    }
     if (strlen(extra_config)) {
         if (config_len > INT_MAX - (strlen(extra_config) + 2)) {
             fprintf(stderr, "Failed to attach extra configration\n");
             return -ERROR_FAIL;
         }
         config_data = xrealloc(config_data,
-                              config_len + strlen(extra_config) + 2);
+                               config_len + strlen(extra_config) + 2);
         if (!config_data) {
             fprintf(stderr, "Failed to realloc config_data\n");
             return -ERROR_FAIL;
@@ -5638,7 +5641,7 @@ int main_cpupoolcreate(int argc, char **argv)
         config_len += strlen(extra_config) + 1;
     }
 
-    config = xlu_cfg_init(stderr, filename);
+    config = xlu_cfg_init(stderr, config_src);
     if (!config) {
         fprintf(stderr, "Failed to allocate for configuration\n");
         return -ERROR_FAIL;
@@ -5652,8 +5655,12 @@ int main_cpupoolcreate(int argc, char **argv)
 
     if (!xlu_cfg_get_string (config, "name", &buf, 0))
         name = strdup(buf);
-    else
+    else if (filename)
         name = libxl_basename(filename);
+    else {
+        fprintf(stderr, "Missing cpupool name!\n");
+        return -ERROR_FAIL;
+    }
     if (!libxl_name_to_cpupoolid(ctx, name, &poolid)) {
         fprintf(stderr, "Pool name \"%s\" already exists\n", name);
         return -ERROR_FAIL;
@@ -5723,7 +5730,7 @@ int main_cpupoolcreate(int argc, char **argv)
 
     libxl_uuid_generate(&uuid);
 
-    printf("Using config file \"%s\"\n", filename);
+    printf("Using config file \"%s\"\n", config_src);
     printf("cpupool name:   %s\n", name);
     printf("scheduler:      %s\n", libxl_scheduler_to_string(sched));
     printf("number of cpus: %d\n", n_cpus);
