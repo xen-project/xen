@@ -4,7 +4,7 @@
 all:
 
 include $(XEN_ROOT)/Config.mk
-include $(XEN_ROOT)/config/Tools.mk
+-include $(XEN_ROOT)/config/Tools.mk
 
 export _INSTALL := $(INSTALL)
 INSTALL = $(XEN_ROOT)/tools/cross-install
@@ -109,6 +109,7 @@ subdir-all-% subdir-clean-% subdir-install-%: .phony
 subdir-distclean-%: .phony
 	$(MAKE) -C $* clean
 
+ifeq (,$(findstring clean,$(MAKECMDGOALS)))
 $(XEN_ROOT)/config/Tools.mk:
-	@echo "You have to run ./configure before building or installing the tools"
-	@exit 1
+	$(error You have to run ./configure before building or installing the tools)
+endif
