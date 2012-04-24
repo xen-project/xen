@@ -98,7 +98,7 @@ struct fpu_regs {
     uint32_t mxcsr;
     uint32_t mxcsr_mask;
     struct fpu_mm mm[8];
-    struct fpu_xmm xmm[15];
+    struct fpu_xmm xmm[16];
     uint64_t res1[12];
 } __attribute__((packed));
 
