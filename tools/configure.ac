@@ -80,6 +80,8 @@ AC_PROG_CC
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
+AC_PATH_PROG([BISON], [bison])
+AC_PATH_PROG([FLEX], [flex])
 AX_PATH_PROG_OR_FAIL([PERL], [perl])
 AS_IF([test "x$xapi" = "xy"], [
     AX_PATH_PROG_OR_FAIL([CURL], [curl-config])

@@ -48,6 +48,18 @@ please check libxl_linux.c and libxl_netbsd.c to see how to get it ported)
 endif
 endif
 
+ifeq ($(FLEX),)
+%.c %.h:: %.l
+	$(warning Flex is needed to rebuild some libxl parsers and \
+		  scanners, please install it and rerun configure)
+endif
+
+ifeq ($(BISON),)
+%.c %.h:: %.y
+	$(warning Bison is needed to rebuild some libxl parsers and \
+		  scanners, please install it an rerun configure)
+endif
+
 LIBXL_LIBS += -lyajl
 
 LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
@@ -82,11 +94,11 @@ all: $(CLIENTS) libxenlight.so libxenlight.a libxlutil.so libxlutil.a \
 
 $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): $(AUTOINCS)
 
-%.c %.h: %.y
+%.c %.h:: %.y
 	@rm -f $*.[ch]
 	$(BISON) --output=$*.c $<
 
-%.c %.h: %.l
+%.c %.h:: %.l
 	@rm -f $*.[ch]
 	$(FLEX) --header-file=$*.h --outfile=$*.c $<
 
