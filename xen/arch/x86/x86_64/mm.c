@@ -454,7 +454,7 @@ static int setup_compat_m2p_table(struct mem_hotadd_info *info)
     if   ((smap > ((RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2)) )
         return 0;
 
-    if (epfn > (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START))
+    if ( epfn > ((RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2) )
         epfn = (RDWR_COMPAT_MPT_VIRT_END - RDWR_COMPAT_MPT_VIRT_START) >> 2;
 
     emap = ( (epfn + ((1UL << (L2_PAGETABLE_SHIFT - 2)) - 1 )) &
