@@ -336,8 +336,17 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
     }
     else
     {
+        bool_t mode_64bit = 0;
+
         decode->type = VMX_INST_MEMREG_TYPE_MEMORY;
-        if ( info.fields.segment > 5 )
+
+        if ( hvm_long_mode_enabled(v) )
+        {
+            hvm_get_segment_register(v, x86_seg_cs, &seg);
+            mode_64bit = seg.attr.fields.l;
+        }
+
+        if ( info.fields.segment > VMX_SREG_GS )
             goto gp_fault;
         hvm_get_segment_register(v, sreg_to_index[info.fields.segment], &seg);
         seg_base = seg.base;
@@ -355,15 +364,20 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
         size = 1 << (info.fields.addr_size + 1);
 
         offset = base + index * scale + disp;
-        if ( (offset > seg.limit || offset + size > seg.limit) &&
-            (!hvm_long_mode_enabled(v) || info.fields.segment == VMX_SREG_GS) )
+        base = !mode_64bit || info.fields.segment >= VMX_SREG_FS ?
+               seg_base + offset : offset;
+        if ( offset + size - 1 < offset ||
+             (mode_64bit ?
+              !is_canonical_address((long)base < 0 ? base :
+                                    base + size - 1) :
+              offset + size - 1 > seg.limit) )
             goto gp_fault;
 
         if ( poperandS != NULL &&
-             hvm_copy_from_guest_virt(poperandS, seg_base + offset, size, 0)
+             hvm_copy_from_guest_virt(poperandS, base, size, 0)
                   != HVMCOPY_okay )
             return X86EMUL_EXCEPTION;
-        decode->mem = seg_base + offset;
+        decode->mem = base;
         decode->len = size;
     }
 
