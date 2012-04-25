@@ -112,6 +112,44 @@ List of which cpus the guest is allowed to use. Default behavior is
 (all vcpus will run on cpus 0,2,3,5), or `cpus=["2", "3"]` (all vcpus
 will run on cpus 2 and 3).
 
+=item B<cpu_weight=WEIGHT>
+
+A domain with a weight of 512 will get twice as much CPU as a domain
+with a weight of 256 on a contended host.
+Legal weights range from 1 to 65535 and the default is 256.
+Honoured by the credit, credit2 and sedf schedulers.
+
+=item B<cap=N>
+
+The cap optionally fixes the maximum amount of CPU a domain will be
+able to consume, even if the host system has idle CPU cycles.
+The cap is expressed in percentage of one physical CPU:
+100 is 1 physical CPU, 50 is half a CPU, 400 is 4 CPUs, etc.
+The default, 0, means there is no upper cap.
+Honoured by the credit and credit2 schedulers.
+
+=item B<period=NANOSECONDS>
+
+The normal EDF scheduling usage in nanoseconds. This means every period
+the domain gets cpu time defined in slice.
+Honoured by the sedf scheduler.
+
+=item B<slice=NANOSECONDS>
+
+The normal EDF scheduling usage in nanoseconds. it defines the time 
+a domain get every period time.
+Honoured by the sedf scheduler.
+
+=item B<latency=N>
+
+Scaled period if domain is doing heavy I/O.
+Honoured by the sedf scheduler.
+
+=item B<extratime=BOOLEAN>
+
+Flag for allowing domain to run in extra time.
+Honoured by the sedf scheduler.
+
 =item B<memory=MBYTES>
 
 Start the guest with MBYTES megabytes of RAM.

@@ -42,6 +42,40 @@ libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
         return LIBXL_DOMAIN_TYPE_PV;
 }
 
+int libxl__sched_set_params(libxl__gc *gc, uint32_t domid, libxl_sched_params *scparams)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    libxl_scheduler sched;
+    libxl_sched_sedf_domain sedf_info;
+    libxl_sched_credit_domain credit_info;
+    libxl_sched_credit2_domain credit2_info;
+    int ret;
+
+    sched = libxl_get_scheduler (ctx);
+    switch (sched) {
+    case LIBXL_SCHEDULER_SEDF:
+      sedf_info.period = scparams->period;
+      sedf_info.slice = scparams->slice;
+      sedf_info.latency = scparams->latency;
+      sedf_info.extratime = scparams->extratime;
+      sedf_info.weight = scparams->weight;
+      ret=libxl_sched_sedf_domain_set(ctx, domid, &sedf_info);
+      break;
+    case LIBXL_SCHEDULER_CREDIT:
+      credit_info.weight = scparams->weight;
+      credit_info.cap = scparams->cap;
+      ret=libxl_sched_credit_domain_set(ctx, domid, &credit_info);
+      break;
+    case LIBXL_SCHEDULER_CREDIT2:
+      credit2_info.weight = scparams->weight;
+      ret=libxl_sched_credit2_domain_set(ctx, domid, &credit2_info);
+      break;
+    default:
+      ret=-1;
+    }
+    return ret;
+}
+
 int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -138,6 +172,8 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     xs_transaction_t t;
     char **ents, **hvm_ents;
     int i;
+
+    libxl__sched_set_params (gc, domid, &(info->sched_params));
 
     libxl_cpuid_apply_policy(ctx, domid);
     if (info->cpuid != NULL)

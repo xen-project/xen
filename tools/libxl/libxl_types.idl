@@ -224,6 +224,17 @@ libxl_domain_create_info = Struct("domain_create_info",[
 
 MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT")
 
+libxl_sched_params = Struct("sched_params",[
+    ("weight",       integer),
+    ("cap",          integer),
+    ("tslice_ms",    integer),
+    ("ratelimit_us", integer),
+    ("period",       integer),
+    ("slice",        integer),
+    ("latency",      integer),
+    ("extratime",    integer),
+    ], dir=DIR_IN)
+
 # Instances of libxl_file_reference contained in this struct which
 # have been mapped (with libxl_file_reference_map) will be unmapped
 # by libxl_domain_build/restore. If either of these are never called
@@ -255,6 +266,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("extra_pv",         libxl_string_list),
     # extra parameters pass directly to qemu for HVM guest, NULL terminated
     ("extra_hvm",        libxl_string_list),
+    #  parameters for all type of scheduler
+    ("sched_params",     libxl_sched_params),
 
     ("u", KeyedUnion(None, libxl_domain_type, "type",
                 [("hvm", Struct(None, [("firmware",         string),
