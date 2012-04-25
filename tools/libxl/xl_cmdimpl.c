@@ -2464,7 +2464,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         if (rc)
             continue;
         CHK_ERRNO(asprintf(&config_file, "<domid %d data>", info[i].domid));
-        memset(&d_config, 0x00, sizeof(d_config));
+        libxl_domain_config_init(&d_config);
         parse_config_data(config_file, (char *)data, len, &d_config);
         printf_info(default_output_format, info[i].domid, &d_config);
         libxl_domain_config_dispose(&d_config);
@@ -3546,7 +3546,7 @@ int main_config_update(int argc, char **argv)
         exit(1);
     }
 
-    memset(&d_config, 0x00, sizeof(d_config));
+    libxl_domain_config_init(&d_config);
 
     parse_config_data(filename, config_data, config_len, &d_config);
 
