@@ -724,12 +724,19 @@ static void svm_set_rdtsc_exiting(struct vcpu *v, bool_t enable)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     u32 general1_intercepts = vmcb_get_general1_intercepts(vmcb);
+    u32 general2_intercepts = vmcb_get_general2_intercepts(vmcb);
 
     general1_intercepts &= ~GENERAL1_INTERCEPT_RDTSC;
-    if ( enable )
+    general2_intercepts &= ~GENERAL2_INTERCEPT_RDTSCP;
+
+    if ( enable && !cpu_has_tsc_ratio )
+    {
         general1_intercepts |= GENERAL1_INTERCEPT_RDTSC;
+        general2_intercepts |= GENERAL2_INTERCEPT_RDTSCP;
+    }
 
     vmcb_set_general1_intercepts(vmcb, general1_intercepts);
+    vmcb_set_general2_intercepts(vmcb, general2_intercepts);
 }
 
 static unsigned int svm_get_insn_bytes(struct vcpu *v, uint8_t *buf)
