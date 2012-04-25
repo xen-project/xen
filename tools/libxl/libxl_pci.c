@@ -664,6 +664,24 @@ int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcide
     return rc;
 }
 
+static int libxl_pcidev_assignable(libxl_ctx *ctx, libxl_device_pci *pcidev)
+{
+    libxl_device_pci *pcidevs;
+    int num, i;
+
+    pcidevs = libxl_device_pci_list_assignable(ctx, &num);
+    for (i = 0; i < num; i++) {
+        if (pcidevs[i].domain == pcidev->domain &&
+            pcidevs[i].bus == pcidev->bus &&
+            pcidevs[i].dev == pcidev->dev &&
+            pcidevs[i].func == pcidev->func)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -674,6 +692,13 @@ int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcide
 
     rc = libxl__device_pci_setdefault(gc, pcidev);
     if (rc) goto out;
+
+    if (!libxl_pcidev_assignable(ctx, pcidev)) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "PCI device %x:%x:%x.%x is not assignable",
+                   pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
+        rc = ERROR_FAIL;
+        goto out;
+    }
 
     rc = get_all_assigned_devices(gc, &assigned, &num_assigned);
     if ( rc ) {
