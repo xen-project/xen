@@ -93,11 +93,14 @@ are:
 
 ### vifname
 
-This keyword is valid for HVM guest devices with `type=ioemu` only.
+Specifies the backend device name for the virtual device.
 
-Specifies the backend device name for an emulated device. The default
-is `tapDOMID.DEVID` where `DOMID` is the guest domain ID and `DEVID`
-is the device number.
+If the domain is an HVM domain then the associated emulated (tap)
+device will have a "-emu" suffice added.
+
+The default name for the virtual device is `vifDOMID.DEVID` where
+`DOMID` is the guest domain ID and `DEVID` is the device
+number. Likewise the default tap name is `vifDOMID.DEVID-emu`.
 
 ### script
 

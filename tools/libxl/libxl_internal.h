@@ -83,6 +83,7 @@
 #define STUBDOM_CONSOLE_RESTORE 2
 #define STUBDOM_CONSOLE_SERIAL 3
 #define STUBDOM_SPECIAL_CONSOLES 3
+#define TAP_DEVICE_SUFFIX "-emu"
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
@@ -196,17 +197,6 @@ _hidden libxl__ev_xswatch *libxl__watch_slot_contents(libxl__gc *gc,
  * version of the _evdisable_FOO function; the internal one is
  * used during cleanup.
  */
-_hidden int libxl__domain_create_info_setdefault(libxl__gc *gc,
-                                        libxl_domain_create_info *c_info);
-_hidden int libxl__domain_build_info_setdefault(libxl__gc *gc,
-                                        libxl_domain_build_info *b_info);
-_hidden int libxl__device_disk_setdefault(libxl__gc *gc,
-                                          libxl_device_disk *disk);
-_hidden int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic);
-_hidden int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb);
-_hidden int libxl__device_vkb_setdefault(libxl__gc *gc, libxl_device_vkb *vkb);
-_hidden int libxl__device_pci_setdefault(libxl__gc *gc, libxl_device_pci *pci);
-
 struct libxl__evgen_domain_death {
     uint32_t domid;
     unsigned shutdown_reported:1, death_reported:1;
@@ -705,6 +695,21 @@ _hidden int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state);
  *     All libxl API functions are expected to have arranged for this
  *     to be called before using any values within these structures.
  */
+_hidden int libxl__domain_create_info_setdefault(libxl__gc *gc,
+                                        libxl_domain_create_info *c_info);
+_hidden int libxl__domain_build_info_setdefault(libxl__gc *gc,
+                                        libxl_domain_build_info *b_info);
+_hidden int libxl__device_disk_setdefault(libxl__gc *gc,
+                                          libxl_device_disk *disk);
+_hidden int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic);
+_hidden int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb);
+_hidden int libxl__device_vkb_setdefault(libxl__gc *gc, libxl_device_vkb *vkb);
+_hidden int libxl__device_pci_setdefault(libxl__gc *gc, libxl_device_pci *pci);
+
+_hidden const char *libxl__device_nic_devname(libxl__gc *gc,
+                                              uint32_t domid,
+                                              uint32_t devid,
+                                              libxl_nic_type type);
 
 /* Arranges that dev will be removed from its guest.  When
  * this is done, the ao will be completed.  An error

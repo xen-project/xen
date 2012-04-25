@@ -85,12 +85,23 @@ elif [ "$type_if" = tap ]; then
     : ${INTERFACE:?}
 
     # Get xenbus_path from device name.
-    # The name is built like that: "tap${domid}.${devid}".
-    dev_=${dev#tap}
+    # The name is built like that: "vif${domid}.${devid}-emu".
+    dev_=${dev#vif}
+    dev_=${dev_%-emu}
     domid=${dev_%.*}
     devid=${dev_#*.}
 
     XENBUS_PATH="/local/domain/0/backend/vif/$domid/$devid"
+    vifname=$(xenstore_read_default "$XENBUS_PATH/vifname" "")
+    if [ "$vifname" ]
+    then
+        vifname="${vifname}-emu"
+        if [ "$command" == "add" ] && ! ip link show "$vifname" >&/dev/null
+        then
+            do_or_die ip link set "$dev" name "$vifname"
+        fi
+        dev="$vifname"
+    fi
 fi
 
 ip=${ip:-}

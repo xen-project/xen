@@ -209,12 +209,9 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             if (vifs[i].nictype == LIBXL_NIC_TYPE_IOEMU) {
                 char *smac = libxl__sprintf(gc,
                                    LIBXL_MAC_FMT, LIBXL_MAC_BYTES(vifs[i].mac));
-                char *ifname;
-                if (!vifs[i].ifname)
-                    ifname = libxl__sprintf(gc,
-                                            "tap%d.%d", domid, vifs[i].devid);
-                else
-                    ifname = vifs[i].ifname;
+                const char *ifname = libxl__device_nic_devname(gc,
+                                                domid, vifs[i].devid,
+                                                LIBXL_NIC_TYPE_IOEMU);
                 flexarray_vappend(dm_args,
                                   "-net",
                                   GCSPRINTF(
@@ -456,13 +453,9 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             if (vifs[i].nictype == LIBXL_NIC_TYPE_IOEMU) {
                 char *smac = libxl__sprintf(gc,
                                 LIBXL_MAC_FMT, LIBXL_MAC_BYTES(vifs[i].mac));
-                char *ifname;
-                if (!vifs[i].ifname) {
-                    ifname = libxl__sprintf(gc, "tap%d.%d",
-                                            guest_domid, vifs[i].devid);
-                } else {
-                    ifname = vifs[i].ifname;
-                }
+                const char *ifname = libxl__device_nic_devname(gc,
+                                                guest_domid, vifs[i].devid,
+                                                LIBXL_NIC_TYPE_IOEMU);
                 flexarray_append(dm_args, "-device");
                 flexarray_append(dm_args,
                    libxl__sprintf(gc, "%s,id=nic%d,netdev=net%d,mac=%s",

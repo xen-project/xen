@@ -917,11 +917,7 @@ class HVMImageHandler(ImageHandler):
             ret.append("-net")
             ret.append("nic,vlan=%d,macaddr=%s,model=%s" %
                        (nics, mac, model))
-            vifname = devinfo.get('vifname')
-            if vifname:
-                vifname = "tap-" + vifname
-            else:
-                vifname = "tap%d.%d" % (self.vm.getDomid(), nics-1)
+            vifname = "vif%d.%d-emu" % (self.vm.getDomid(), nics-1)
             ret.append("-net")
             ret.append("tap,vlan=%d,ifname=%s,bridge=%s" %
                        (nics, vifname, bridge))

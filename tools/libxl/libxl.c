@@ -2087,6 +2087,21 @@ int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
+const char *libxl__device_nic_devname(libxl__gc *gc,
+                                      uint32_t domid,
+                                      uint32_t devid,
+                                      libxl_nic_type type)
+{
+    switch (type) {
+    case LIBXL_NIC_TYPE_VIF:
+        return GCSPRINTF("vif%u.%d", domid, devid);
+    case LIBXL_NIC_TYPE_IOEMU:
+        return GCSPRINTF("vif%u.%d" TAP_DEVICE_SUFFIX, domid, devid);
+    default:
+        abort();
+    }
+}
+
 /******************************************************************************/
 int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
                               libxl__device_console *console,
