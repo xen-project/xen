@@ -997,6 +997,8 @@ gfn_found:
     page = alloc_domheap_page(d, 0);
     if ( !page ) 
     {
+        /* Undo dec of nr_saved_mfns, as the retry will decrease again. */
+        atomic_inc(&nr_saved_mfns);
         mem_sharing_page_unlock(old_page);
         put_gfn(d, gfn);
         /* Caller is responsible for placing an event
