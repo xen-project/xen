@@ -49,6 +49,17 @@ DEFINE_PER_CPU(pg_lock_data_t, __pld);
 #define MEM_SHARING_DEBUG(_f, _a...)                                  \
     debugtrace_printk("mem_sharing_debug: %s(): " _f, __func__, ##_a)
 
+/* Reverse map defines */
+#define RMAP_HASHTAB_ORDER  0
+#define RMAP_HASHTAB_SIZE   \
+        ((PAGE_SIZE << RMAP_HASHTAB_ORDER) / sizeof(struct list_head))
+#define RMAP_USES_HASHTAB(page) \
+        ((page)->sharing->hash_table.flag == NULL)
+#define RMAP_HEAVY_SHARED_PAGE   RMAP_HASHTAB_SIZE
+/* A bit of hysteresis. We don't want to be mutating between list and hash
+ * table constantly. */
+#define RMAP_LIGHT_SHARED_PAGE   (RMAP_HEAVY_SHARED_PAGE >> 2)
+
 #if MEM_SHARING_AUDIT
 
 static struct list_head shr_audit_list;
@@ -72,6 +83,11 @@ static inline void audit_add_list(struct page_info *page)
 /* Removes from the audit list and cleans up the page sharing metadata. */
 static inline void page_sharing_dispose(struct page_info *page)
 {
+    /* Unlikely given our thresholds, but we should be careful. */
+    if ( unlikely(RMAP_USES_HASHTAB(page)) )
+        free_xenheap_pages(page->sharing->hash_table.bucket, 
+                            RMAP_HASHTAB_ORDER);
+
     spin_lock(&shr_audit_lock);
     list_del_rcu(&page->sharing->entry);
     spin_unlock(&shr_audit_lock);
@@ -89,6 +105,10 @@ int mem_sharing_audit(void)
 #define audit_add_list(p)  ((void)0)
 static inline void page_sharing_dispose(struct page_info *page)
 {
+    /* Unlikely given our thresholds, but we should be careful. */
+    if ( unlikely(RMAP_USES_HASHTAB(page)) )
+        free_xenheap_pages(page->sharing->hash_table.bucket, 
+                            RMAP_HASHTAB_ORDER);
     xfree(page->sharing);
 }
 
@@ -145,6 +165,11 @@ static atomic_t nr_saved_mfns   = ATOMIC_INIT(0);
 static atomic_t nr_shared_mfns  = ATOMIC_INIT(0);
 
 /** Reverse map **/
+/* Every shared frame keeps a reverse map (rmap) of <domain, gfn> tuples that
+ * this shared frame backs. For pages with a low degree of sharing, a O(n)
+ * search linked list is good enough. For pages with higher degree of sharing,
+ * we use a hash table instead. */
+
 typedef struct gfn_info
 {
     unsigned long gfn;
@@ -155,20 +180,109 @@ typedef struct gfn_info
 static inline void
 rmap_init(struct page_info *page)
 {
+    /* We always start off as a doubly linked list. */
     INIT_LIST_HEAD(&page->sharing->gfns);
 }
 
-static inline void
-rmap_del(gfn_info_t *gfn_info, struct page_info *page)
+/* Exceedingly simple "hash function" */
+#define HASH(domain, gfn)       \
+    (((gfn) + (domain)) % RMAP_HASHTAB_SIZE)
+
+/* Conversions. Tuned by the thresholds. Should only happen twice 
+ * (once each) during the lifetime of a shared page */
+static inline int
+rmap_list_to_hash_table(struct page_info *page)
 {
-    list_del(&gfn_info->list);
+    unsigned int i;
+    struct list_head *pos, *tmp, *b =
+        alloc_xenheap_pages(RMAP_HASHTAB_ORDER, 0);
+
+    if ( b == NULL )
+        return -ENOMEM;
+
+    for ( i = 0; i < RMAP_HASHTAB_SIZE; i++ )
+        INIT_LIST_HEAD(b + i);
+
+    list_for_each_safe(pos, tmp, &page->sharing->gfns)
+    {
+        gfn_info_t *gfn_info = list_entry(pos, gfn_info_t, list);
+        struct list_head *bucket = b + HASH(gfn_info->domain, gfn_info->gfn);
+        list_del(pos);
+        list_add(pos, bucket);
+    }
+
+    page->sharing->hash_table.bucket = b;
+    page->sharing->hash_table.flag   = NULL;
+
+    return 0;
 }
 
 static inline void
+rmap_hash_table_to_list(struct page_info *page)
+{
+    unsigned int i;
+    struct list_head *bucket = page->sharing->hash_table.bucket;
+
+    INIT_LIST_HEAD(&page->sharing->gfns);
+
+    for ( i = 0; i < RMAP_HASHTAB_SIZE; i++ )
+    {
+        struct list_head *pos, *tmp, *head = bucket + i;
+        list_for_each_safe(pos, tmp, head)
+        {
+            list_del(pos);
+            list_add(pos, &page->sharing->gfns);
+        }
+    }
+
+    free_xenheap_pages(bucket, RMAP_HASHTAB_ORDER);
+}
+
+/* Generic accessors to the rmap */
+static inline unsigned long
+rmap_count(struct page_info *pg)
+{
+    unsigned long count;
+    unsigned long t = read_atomic(&pg->u.inuse.type_info);
+    count = t & PGT_count_mask;
+    if ( t & PGT_locked )
+        count--;
+    return count;
+}
+
+/* The page type count is always decreased after removing from the rmap.
+ * Use a convert flag to avoid mutating the rmap if in the middle of an 
+ * iterator, or if the page will be soon destroyed anyways. */
+static inline void
+rmap_del(gfn_info_t *gfn_info, struct page_info *page, int convert)
+{
+    if ( RMAP_USES_HASHTAB(page) && convert &&
+         (rmap_count(page) <= RMAP_LIGHT_SHARED_PAGE) )
+        rmap_hash_table_to_list(page);
+
+    /* Regardless of rmap type, same removal operation */
+    list_del(&gfn_info->list);
+}
+
+/* The page type count is always increased before adding to the rmap. */
+static inline void
 rmap_add(gfn_info_t *gfn_info, struct page_info *page)
 {
+    struct list_head *head;
+
+    if ( !RMAP_USES_HASHTAB(page) &&
+         (rmap_count(page) >= RMAP_HEAVY_SHARED_PAGE) )
+        /* The conversion may fail with ENOMEM. We'll be less efficient,
+         * but no reason to panic. */
+        (void)rmap_list_to_hash_table(page);
+
+    head = (RMAP_USES_HASHTAB(page)) ?
+        page->sharing->hash_table.bucket + 
+                            HASH(gfn_info->domain, gfn_info->gfn) :
+        &page->sharing->gfns;
+
     INIT_LIST_HEAD(&gfn_info->list);
-    list_add(&gfn_info->list, &page->sharing->gfns);
+    list_add(&gfn_info->list, head);
 }
 
 static inline gfn_info_t *
@@ -176,27 +290,33 @@ rmap_retrieve(uint16_t domain_id, unsigned long gfn,
                             struct page_info *page)
 {
     gfn_info_t *gfn_info;
-    struct list_head *le;
-    list_for_each(le, &page->sharing->gfns)
+    struct list_head *le, *head;
+
+    head = (RMAP_USES_HASHTAB(page)) ?
+        page->sharing->hash_table.bucket + HASH(domain_id, gfn) :
+        &page->sharing->gfns;
+
+    list_for_each(le, head)
     {
         gfn_info = list_entry(le, gfn_info_t, list);
         if ( (gfn_info->gfn == gfn) && (gfn_info->domain == domain_id) )
             return gfn_info;
     }
+
+    /* Nothing was found */
     return NULL;
 }
 
 /* Returns true if the rmap has only one entry. O(1) complexity. */
 static inline int rmap_has_one_entry(struct page_info *page)
 {
-    struct list_head *head = &page->sharing->gfns;
-    return (head->next != head) && (head->next->next == head);
+    return (rmap_count(page) == 1);
 }
 
 /* Returns true if the rmap has any entries. O(1) complexity. */
 static inline int rmap_has_entries(struct page_info *page)
 {
-    return (!list_empty(&page->sharing->gfns));
+    return (rmap_count(page) != 0);
 }
 
 /* The iterator hides the details of how the rmap is implemented. This
@@ -204,20 +324,43 @@ static inline int rmap_has_entries(struct page_info *page)
 struct rmap_iterator {
     struct list_head *curr;
     struct list_head *next;
+    unsigned int bucket;
 };
 
 static inline void
 rmap_seed_iterator(struct page_info *page, struct rmap_iterator *ri)
 {
-    ri->curr = &page->sharing->gfns;
+    ri->curr = (RMAP_USES_HASHTAB(page)) ?
+                page->sharing->hash_table.bucket :
+                &page->sharing->gfns;
     ri->next = ri->curr->next; 
+    ri->bucket = 0;
 }
 
 static inline gfn_info_t *
 rmap_iterate(struct page_info *page, struct rmap_iterator *ri)
 {
-    if ( ri->next == &page->sharing->gfns)
-        return NULL;
+    struct list_head *head = (RMAP_USES_HASHTAB(page)) ?
+                page->sharing->hash_table.bucket + ri->bucket :
+                &page->sharing->gfns;
+
+retry:
+    if ( ri->next == head)
+    {
+        if ( RMAP_USES_HASHTAB(page) )
+        {
+            ri->bucket++;
+            if ( ri->bucket >= RMAP_HASHTAB_SIZE )
+                /* No more hash table buckets */
+                return NULL;
+            head = page->sharing->hash_table.bucket + ri->bucket;
+            ri->curr = head;
+            ri->next = ri->curr->next;
+            goto retry;
+        } else
+            /* List exhausted */
+            return NULL;
+    }
 
     ri->curr = ri->next;
     ri->next = ri->curr->next;
@@ -253,7 +396,7 @@ static inline void mem_sharing_gfn_destroy(struct page_info *page,
     atomic_dec(&d->shr_pages);
 
     /* Free the gfn_info structure. */
-    rmap_del(gfn_info, page);
+    rmap_del(gfn_info, page, 1);
     xfree(gfn_info);
 }
 
@@ -870,8 +1013,9 @@ int mem_sharing_share_pages(struct domain *sd, unsigned long sgfn, shr_handle_t 
         /* Get the source page and type, this should never fail: 
          * we are under shr lock, and got a successful lookup */
         BUG_ON(!get_page_and_type(spage, dom_cow, PGT_shared_page));
-        /* Move the gfn_info from client list to source list */
-        rmap_del(gfn, cpage);
+        /* Move the gfn_info from client list to source list.
+         * Don't change the type of rmap for the client page. */
+        rmap_del(gfn, cpage, 0);
         rmap_add(gfn, spage);
         put_page_and_type(cpage);
         d = get_domain_by_id(gfn->domain);

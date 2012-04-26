@@ -30,6 +30,13 @@
 
 typedef uint64_t shr_handle_t; 
 
+typedef struct rmap_hashtab {
+    struct list_head *bucket;
+    /* Overlaps with prev pointer of list_head in union below.
+     * Unlike the prev pointer, this can be NULL. */
+    void *flag;
+} rmap_hashtab_t;
+
 struct page_sharing_info
 {
     struct page_info *pg;   /* Back pointer to the page. */
@@ -38,7 +45,11 @@ struct page_sharing_info
     struct list_head entry; /* List of all shared pages (entry). */
     struct rcu_head rcu_head; /* List of all shared pages (entry). */
 #endif
-    struct list_head gfns;  /* List of domains and gfns for this page (head). */
+    /* Reverse map of <domain,gfn> tuples for this shared frame. */
+    union {
+        struct list_head    gfns;
+        rmap_hashtab_t      hash_table;
+    };
 };
 
 #ifdef __x86_64__
