@@ -963,7 +963,9 @@ gfn_found:
     last_gfn = list_has_one_entry(&page->sharing->gfns);
     if ( last_gfn )
     {
-        /* Clean up shared state */
+        /* Clean up shared state. Get rid of the <domid, gfn> tuple
+         * before destroying the rmap. */
+        mem_sharing_gfn_destroy(d, gfn_info);
         audit_del_list(page);
         page->sharing = NULL;
         atomic_dec(&nr_shared_mfns);
@@ -974,7 +976,8 @@ gfn_found:
      * (possibly freeing the page), and exit early */
     if ( flags & MEM_SHARING_DESTROY_GFN )
     {
-        mem_sharing_gfn_destroy(d, gfn_info);
+        if ( !last_gfn )
+            mem_sharing_gfn_destroy(d, gfn_info);
         put_page_and_type(page);
         mem_sharing_page_unlock(page);
         if ( last_gfn && 
@@ -987,7 +990,6 @@ gfn_found:
  
     if ( last_gfn )
     {
-        mem_sharing_gfn_destroy(d, gfn_info);
         /* Making a page private atomically unlocks it */
         BUG_ON(page_make_private(d, page) != 0);
         goto private_page_found;
