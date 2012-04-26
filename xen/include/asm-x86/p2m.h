@@ -360,6 +360,11 @@ void __put_gfn(struct p2m_domain *p2m, unsigned long gfn);
  * during a domain crash, or to peek at a p2m entry/type. Caller is not 
  * holding the p2m entry exclusively during or after calling this. 
  *
+ * This is also used in the shadow code whenever the paging lock is
+ * held -- in those cases, the caller is protected against concurrent
+ * p2m updates by the fact that shadow_write_p2m_entry() also takes
+ * the paging lock.
+ *
  * Note that an unlocked accessor only makes sense for a "query" lookup.
  * Any other type of query can cause a change in the p2m and may need to
  * perform locking.
