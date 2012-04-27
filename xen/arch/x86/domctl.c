@@ -1590,8 +1590,23 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         c.nat->user_regs.es = sreg.sel;
         hvm_get_segment_register(v, x86_seg_fs, &sreg);
         c.nat->user_regs.fs = sreg.sel;
+#ifdef __x86_64__
+        c.nat->fs_base = sreg.base;
+#endif
         hvm_get_segment_register(v, x86_seg_gs, &sreg);
         c.nat->user_regs.gs = sreg.sel;
+#ifdef __x86_64__
+        if ( ring_0(&c.nat->user_regs) )
+        {
+            c.nat->gs_base_kernel = sreg.base;
+            c.nat->gs_base_user = hvm_get_shadow_gs_base(v);
+        }
+        else
+        {
+            c.nat->gs_base_user = sreg.base;
+            c.nat->gs_base_kernel = hvm_get_shadow_gs_base(v);
+        }
+#endif
     }
     else
     {
