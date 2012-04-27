@@ -543,7 +543,28 @@ console even after dom0 has been started.  The default behaviour is to
 relinquish control to dom0.
 
 ### vpid
+
 ### vpmu
+> `= ( bts )`
+
+> Default: `off`
+
+Switch on the virtualized performance monitoring unit for HVM guests.
+
+If the current cpu isn't supported a message like  
+'VPMU: Initialization failed. ...'  
+is printed on the hypervisor serial log.
+
+For some Intel Nehalem processors a quirk handling exist for an unknown
+wrong behaviour (see handle_pmc_quirk()).
+
+If 'vpmu=bts' is specified the virtualisation of the Branch Trace Store (BTS)
+feature is switched on on Intel processors supporting this feature.
+
+*Warning:*
+As the BTS virtualisation is not 100% safe and because of the nehalem quirk
+don't use the vpmu flag on production systems with Intel cpus!
+
 ### vti\_vhpt\_size
 ### vti\_vtlb\_size
 ### watchdog
