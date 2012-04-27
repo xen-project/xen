@@ -106,6 +106,7 @@ struct hvm_function_table {
                                  struct segment_register *reg);
     void (*set_segment_register)(struct vcpu *v, enum x86_segment seg,
                                  struct segment_register *reg);
+    unsigned long (*get_shadow_gs_base)(struct vcpu *v);
 
     /* 
      * Re-set the value of CR3 that Xen runs on when handling VM exits.
@@ -303,6 +304,11 @@ hvm_set_segment_register(struct vcpu *v, enum x86_segment seg,
                          struct segment_register *reg)
 {
     hvm_funcs.set_segment_register(v, seg, reg);
+}
+
+static inline unsigned long hvm_get_shadow_gs_base(struct vcpu *v)
+{
+    return hvm_funcs.get_shadow_gs_base(v);
 }
 
 #define is_viridian_domain(_d)                                             \

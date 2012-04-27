@@ -942,6 +942,15 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
     vmx_vmcs_exit(v);
 }
 
+static unsigned long vmx_get_shadow_gs_base(struct vcpu *v)
+{
+#ifdef __x86_64__
+    return v->arch.hvm_vmx.shadow_gs;
+#else
+    return 0;
+#endif
+}
+
 static int vmx_set_guest_pat(struct vcpu *v, u64 gpat)
 {
     if ( !cpu_has_vmx_pat || !paging_mode_hap(v->domain) )
@@ -1522,6 +1531,7 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .guest_x86_mode       = vmx_guest_x86_mode,
     .get_segment_register = vmx_get_segment_register,
     .set_segment_register = vmx_set_segment_register,
+    .get_shadow_gs_base   = vmx_get_shadow_gs_base,
     .update_host_cr3      = vmx_update_host_cr3,
     .update_guest_cr      = vmx_update_guest_cr,
     .update_guest_efer    = vmx_update_guest_efer,

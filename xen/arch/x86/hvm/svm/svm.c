@@ -645,6 +645,11 @@ static void svm_set_segment_register(struct vcpu *v, enum x86_segment seg,
         svm_vmload(vmcb);
 }
 
+static unsigned long svm_get_shadow_gs_base(struct vcpu *v)
+{
+    return v->arch.hvm_svm.vmcb->kerngsbase;
+}
+
 static int svm_set_guest_pat(struct vcpu *v, u64 gpat)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
@@ -1990,6 +1995,7 @@ static struct hvm_function_table __read_mostly svm_function_table = {
     .guest_x86_mode       = svm_guest_x86_mode,
     .get_segment_register = svm_get_segment_register,
     .set_segment_register = svm_set_segment_register,
+    .get_shadow_gs_base   = svm_get_shadow_gs_base,
     .update_host_cr3      = svm_update_host_cr3,
     .update_guest_cr      = svm_update_guest_cr,
     .update_guest_efer    = svm_update_guest_efer,
