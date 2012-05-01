@@ -1070,6 +1070,18 @@ static int svm_msr_read_intercept(struct cpu_user_regs *regs)
             break;
         }
 
+        if ( boot_cpu_data.x86 == 0xf && ecx == MSR_F10_BU_CFG )
+        {
+            /* Win2k8 x64 reads this MSR on revF chips, where it
+             * wasn't publically available; it uses a magic constant
+             * in %rdi as a password, which we don't have in
+             * rdmsr_safe().  Since we'll ignore the later writes,
+             * just use a plausible value here (the reset value from
+             * rev10h chips) if the real CPU didn't provide one. */
+            msr_content = 0x0000000010200020ull;
+            break;
+        }
+
         goto gpf;
     }
 
