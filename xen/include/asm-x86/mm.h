@@ -331,7 +331,6 @@ static inline void *__page_to_virt(const struct page_info *pg)
 
 int free_page_type(struct page_info *page, unsigned long type,
                    int preemptible);
-int _shadow_mode_refcounts(struct domain *d);
 
 int is_iomem_page(unsigned long mfn);
 

@@ -2165,7 +2165,7 @@ int get_page(struct page_info *page, struct domain *domain)
     if ( owner != NULL )
         put_page(page);
 
-    if ( !_shadow_mode_refcounts(domain) && !domain->is_dying )
+    if ( !paging_mode_refcounts(domain) && !domain->is_dying )
         gdprintk(XENLOG_INFO,
                  "Error pfn %lx: rd=%p, od=%p, caf=%08lx, taf=%"
                  PRtype_info "\n",

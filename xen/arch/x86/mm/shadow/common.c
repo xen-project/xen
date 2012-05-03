@@ -105,11 +105,6 @@ static int __init shadow_audit_key_init(void)
 __initcall(shadow_audit_key_init);
 #endif /* SHADOW_AUDIT */
 
-int _shadow_mode_refcounts(struct domain *d)
-{
-    return shadow_mode_refcounts(d);
-}
-
 
 /**************************************************************************/
 /* x86 emulator support for the shadow code
