@@ -1,0 +1,12 @@
+diff -Naurp tpm_emulator-0.5.1/tpmd/Makefile tpm_emulator-0.5.1/tpmd/Makefile
+--- tpm_emulator-0.5.1/tpmd/Makefile
++++ tpm_emulator-0.5.1/tpmd/Makefile
+@@ -8,7 +8,7 @@ WFLAGS  := -Wall -Wno-unused -Wpointer-a
+            #WFLAGS  += -Wextra -Wcast-qual -Wmissing-prototypes -Wmissing-declarations -Wstrict-aliasing
+ CFLAGS  += $(WFLAGS) -g -I.. -I. -O2 -fno-strict-aliasing
+ CFLAGS  += -I../../../../tools/vtpm_manager/manager
+-LDFLAGS += -lgmp
++LDLIBS  += -lgmp
+ 
+ BINDIR  := /usr/bin/
+ 

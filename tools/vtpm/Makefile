@@ -50,7 +50,8 @@ $(VTPM_DIR)/tpmd/tpmd: $(TPM_EMULATOR_TARFILE) vtpm-0.5.1.patch
 	mv $(TPM_EMULATOR_NAME) $(VTPM_DIR)
 
 	set -e; cd $(VTPM_DIR); \
-	patch -p1 < ../vtpm-0.5.1.patch
+	patch -p1 < ../vtpm-0.5.1.patch; \
+	patch -p1 < ../vtpm-0.5.1-LDLIBS.patch
 
 orig: $(TPM_EMULATOR_TARFILE)
 	mkdir $(ORIG_DIR);
