@@ -17,7 +17,7 @@ install: build
 	if [ ! -d "$(DESTDIR)/var/vtpm/socks" ]; \
 		then mkdir -p $(DESTDIR)/var/vtpm/socks; \
 	fi
-	$(INSTALL_PROG) $(BIN) $(BINDIR)
+	$(INSTALL_PROG) $(BIN) $(DESTDIR)$(BINDIR)
 
 .PHONY: clean
 clean:

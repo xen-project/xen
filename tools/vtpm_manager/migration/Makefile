@@ -20,8 +20,8 @@ build: $(BIND) $(BINC)
 
 .PHONY: install
 install: build
-	$(INSTALL_PROG) $(BIND) $(BINDIR)
-	$(INSTALL_PROG) $(BINC) $(BINDIR)
+	$(INSTALL_PROG) $(BIND) $(DESTDIR)$(BINDIR)
+	$(INSTALL_PROG) $(BINC) $(DESTDIR)$(BINDIR)
 
 .PHONY: clean
 clean:
