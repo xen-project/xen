@@ -944,9 +944,9 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
                     (size_64k > totalMemory))
                   info.ModeAttributes &= ~VBE_MODE_ATTRIBUTE_SUPPORTED;
 
-                if (using_lfb) {
-                  info.NumberOfBanks = 1;
-                }
+                /* Windows 8 require this to be 1! */
+                info.NumberOfBanks = 1;
+
                 if (info.WinAAttributes & VBE_WINDOW_ATTRIBUTE_RELOCATABLE) {
                   info.WinFuncPtr = 0xC0000000UL;
                   *(Bit16u *)&(info.WinFuncPtr) = (Bit16u)(dispi_set_bank_farcall);
