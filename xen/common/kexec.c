@@ -401,7 +401,7 @@ static int kexec_init_cpu_notes(const unsigned long cpu)
 
     /* If we dont care about the position of allocation, malloc. */
     if ( low_crashinfo_mode == LOW_CRASHINFO_NONE )
-        note = xmalloc_bytes(nr_bytes);
+        note = xzalloc_bytes(nr_bytes);
 
     /* Protect the write into crash_notes[] with a spinlock, as this function
      * is on a hotplug path and a hypercall path. */
@@ -519,6 +519,8 @@ static int __init kexec_init(void)
 
         if ( ! crash_heap_current )
             return -ENOMEM;
+
+        memset(crash_heap_current, 0, crash_heap_size);
 
         crash_heap_end = crash_heap_current + crash_heap_size;
     }
