@@ -928,10 +928,22 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
 
         if (cur_info != 0)
         {
+                Bit16u max_bpp = dispi_get_max_bpp();
+                Bit16u size_64k;
+                Bit16u totalMemory;
+
+                outw(VBE_DISPI_IOPORT_INDEX, VBE_DISPI_INDEX_VIDEO_MEMORY_64K);
+                totalMemory = inw(VBE_DISPI_IOPORT_DATA);
 #ifdef DEBUG
                 printf("VBE found mode %x\n",CX);
 #endif        
                 memcpyb(ss, &info, 0xc000, &(cur_info->info), sizeof(ModeInfoBlockCompact));
+                size_64k = size64(info.XResolution, info.YResolution, info.BitsPerPixel);
+                if ((info.XResolution > dispi_get_max_xres()) ||
+                    (info.BitsPerPixel > max_bpp) ||
+                    (size_64k > totalMemory))
+                  info.ModeAttributes &= ~VBE_MODE_ATTRIBUTE_SUPPORTED;
+
                 if (using_lfb) {
                   info.NumberOfBanks = 1;
                 }
