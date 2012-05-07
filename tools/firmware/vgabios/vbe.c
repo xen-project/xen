@@ -742,6 +742,29 @@ no_vbe_flag:
   jmp  _display_string
 ASM_END  
 
+ASM_START
+_size64:
+  push bp
+  mov  bp, sp
+  push dx
+
+; multiply bbp by yres first as results fit in 16bits
+; then multiply by xres
+  mov  ax, 8[bp]
+  mul  word 6[bp]
+  mul  word 4[bp]
+; divide by 2^19 ceiling result
+  add  ax, #0xffff
+  adc  dx, #7
+  mov  ax, dx
+  shr  ax, #3
+
+  pop  dx
+  pop  bp
+  ret
+ASM_END
+
+
 /** Function 00h - Return VBE Controller Information
  * 
  * Input:
@@ -844,9 +867,12 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
                 
         do
         {
+                Bit16u size_64k = size64(cur_info->info.XResolution, cur_info->info.YResolution, cur_info->info.BitsPerPixel);
+                Bit16u max_bpp = dispi_get_max_bpp();
+
                 if ((cur_info->info.XResolution <= dispi_get_max_xres()) &&
-                    (cur_info->info.BitsPerPixel <= dispi_get_max_bpp()) &&
-                    (cur_info->info.XResolution * cur_info->info.XResolution * cur_info->info.BitsPerPixel <= vbe_info_block.TotalMemory << 19 )) {
+                    (cur_info->info.BitsPerPixel <= max_bpp) &&
+                    (size_64k <= vbe_info_block.TotalMemory)) {
 #ifdef DEBUG
                   printf("VBE found mode %x => %x\n", cur_info->mode,cur_mode);
 #endif
