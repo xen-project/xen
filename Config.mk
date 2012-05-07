@@ -179,7 +179,7 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= a2d2123a7dfc4d116011d51f48df786a3b853537
+QEMU_TAG ?= xen-4.1.3-rc1
 # Mon Apr 2 17:55:05 2012 +0100
 # qemu-xen-traditional: QDISK fixes
 
