@@ -909,7 +909,8 @@ Bit16u *AX;Bit16u ES;Bit16u DI;
 void vbe_biosfn_return_mode_information(AX, CX, ES, DI)
 Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
 {
-        Bit16u            result=0x0100;
+        // error by default is 0x014f which means supported but error
+        Bit16u                 result=0x014f;
         Bit16u            ss=get_SS();
         ModeInfoBlock     info;
         ModeInfoListItem  *cur_info;
@@ -953,7 +954,6 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
 #ifdef DEBUG
                 printf("VBE *NOT* found mode %x\n",CX);
 #endif
-                result = 0x100;
         }
         
         if (result == 0x4f)
