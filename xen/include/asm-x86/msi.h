@@ -3,6 +3,7 @@
 
 #include <xen/cpumask.h>
 #include <xen/pci.h>
+#include <asm/byteorder.h>
 
 /*
  * Constants for Intel APIC based MSI messages.
@@ -164,8 +165,6 @@ int msi_free_irq(struct msi_desc *entry);
 #define MSI_PHYSICAL_MODE		0
 #define MSI_LOGICAL_MODE		1
 #define MSI_REDIRECTION_HINT_MODE	0
-
-#define __LITTLE_ENDIAN_BITFIELD	1
 
 struct msg_data {
 #if defined(__LITTLE_ENDIAN_BITFIELD)
