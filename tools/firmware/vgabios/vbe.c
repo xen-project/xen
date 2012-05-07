@@ -912,9 +912,9 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
         // error by default is 0x014f which means supported but error
         Bit16u                 result=0x014f;
         Bit16u            ss=get_SS();
-        ModeInfoBlock     info;
         ModeInfoListItem  *cur_info;
         Boolean           using_lfb;
+        ModeInfoBlockCompact   info;
 
 #ifdef DEBUG
         printf("VBE vbe_biosfn_return_mode_information ES%x DI%x CX%x\n",ES,DI,CX);
@@ -931,7 +931,6 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
 #ifdef DEBUG
                 printf("VBE found mode %x\n",CX);
 #endif        
-                memsetb(ss, &info, 0, sizeof(ModeInfoBlock));
                 memcpyb(ss, &info, 0xc000, &(cur_info->info), sizeof(ModeInfoBlockCompact));
                 if (using_lfb) {
                   info.NumberOfBanks = 1;
@@ -948,18 +947,16 @@ Bit16u *AX;Bit16u CX; Bit16u ES;Bit16u DI;
                 info.PhysBasePtr |= inw(VBE_DISPI_IOPORT_DATA);
 #endif 							
                 result = 0x4f;
+
+                // copy updates in mode_info_block back
+                memsetb(ES, DI, 0, sizeof(ModeInfoBlock));
+                memcpyb(ES, DI, ss, &info, sizeof(info));
         }
         else
         {
 #ifdef DEBUG
                 printf("VBE *NOT* found mode %x\n",CX);
 #endif
-        }
-        
-        if (result == 0x4f)
-        {
-                // copy updates in mode_info_block back
-                memcpyb(ES, DI, ss, &info, sizeof(info));
         }
 
         write_word(ss, AX, result);
