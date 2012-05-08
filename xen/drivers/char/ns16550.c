@@ -49,7 +49,9 @@ static struct ns16550 {
     unsigned int ps_bdf[3]; /* pci serial port BDF */
     bool_t pb_bdf_enable;   /* if =1, pb-bdf effective, port behind bridge */
     bool_t ps_bdf_enable;   /* if =1, ps_bdf effective, port on pci card */
-    int bar, cr, bar_idx;
+    u32 bar;
+    u16 cr;
+    u8 bar_idx;
 } ns16550_com[2] = { { 0 } };
 
 /* Register offsets */
@@ -324,30 +326,24 @@ static void ns16550_suspend(struct serial_port *port)
     stop_timer(&uart->timer);
 
     if ( uart->bar )
-    {
-       uart->bar = pci_conf_read32(
-           0, uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
-           PCI_BASE_ADDRESS_0 + uart->bar_idx*4);
-       uart->cr = pci_conf_read32(
-           0, uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
-           PCI_COMMAND);
-    }
+       uart->cr = pci_conf_read16(0, uart->ps_bdf[0], uart->ps_bdf[1],
+                                  uart->ps_bdf[2], PCI_COMMAND);
 }
 
 static void ns16550_resume(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
 
-    ns16550_setup_preirq(port->uart);
-    ns16550_setup_postirq(port->uart);
-
     if ( uart->bar )
     {
-       pci_conf_write32(0, uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+       pci_conf_write32(0, uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
                         PCI_BASE_ADDRESS_0 + uart->bar_idx*4, uart->bar);
-       pci_conf_write32(0, uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
+       pci_conf_write16(0, uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
                         PCI_COMMAND, uart->cr);
     }
+
+    ns16550_setup_preirq(port->uart);
+    ns16550_setup_postirq(port->uart);
 }
 
 #ifdef CONFIG_X86
@@ -483,9 +479,9 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
                 if ( (len & 0xffff) != 0xfff9 )
                     continue;
 
-                uart->pb_bdf[0] = b;
-                uart->pb_bdf[1] = d;
-                uart->pb_bdf[2] = f;
+                uart->ps_bdf[0] = b;
+                uart->ps_bdf[1] = d;
+                uart->ps_bdf[2] = f;
                 uart->bar = bar;
                 uart->bar_idx = bar_idx;
                 uart->io_base = bar & 0xfffe;
