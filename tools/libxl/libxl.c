@@ -1351,6 +1351,8 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
         case LIBXL_DISK_BACKEND_TAP:
             dev = libxl__blktap_devpath(gc, disk->pdev_path, disk->format);
             if (!dev) {
+                LOG(ERROR, "failed to get blktap devpath for %p\n",
+                    disk->pdev_path);
                 rc = ERROR_FAIL;
                 goto out_free;
             }
