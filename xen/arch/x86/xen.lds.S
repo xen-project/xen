@@ -47,6 +47,8 @@ SECTIONS
   .text : {
         _stext = .;            /* Text and read-only data */
        *(.text)
+       *(.text.cold)
+       *(.text.unlikely)
        *(.fixup)
        *(.gnu.warning)
        _etext = .;             /* End of text section */
