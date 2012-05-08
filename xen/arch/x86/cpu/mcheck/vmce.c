@@ -209,6 +209,14 @@ static int bank_mce_wrmsr(struct vcpu *v, u32 msr, u64 val)
     struct domain_mca_msrs *vmce = dom_vmce(v->domain);
     struct bank_entry *entry = NULL;
 
+    /* Give the first entry of the list, it corresponds to current
+     * vMCE# injection. When vMCE# is finished processing by the
+     * the guest, this node will be deleted.
+     * Only error bank is written. Non-error banks simply return.
+     */
+    if ( !list_empty(&vmce->impact_header) )
+        entry = list_entry(vmce->impact_header.next, struct bank_entry, list);
+
     switch ( msr & (MSR_IA32_MC0_CTL | 3) )
     {
     case MSR_IA32_MC0_CTL:
@@ -216,17 +224,9 @@ static int bank_mce_wrmsr(struct vcpu *v, u32 msr, u64 val)
             vmce->mci_ctl[bank] = val;
         break;
     case MSR_IA32_MC0_STATUS:
-        /* Give the first entry of the list, it corresponds to current
-         * vMCE# injection. When vMCE# is finished processing by the
-         * the guest, this node will be deleted.
-         * Only error bank is written. Non-error banks simply return.
-         */
-        if ( !list_empty(&vmce->impact_header) )
+        if ( entry && (entry->bank == bank) )
         {
-            entry = list_entry(vmce->impact_header.next,
-                               struct bank_entry, list);
-            if ( entry->bank == bank )
-                entry->mci_status = val;
+            entry->mci_status = val;
             mce_printk(MCE_VERBOSE,
                        "MCE: wr MC%u_STATUS %"PRIx64" in vMCE#\n",
                        bank, val);
@@ -236,12 +236,38 @@ static int bank_mce_wrmsr(struct vcpu *v, u32 msr, u64 val)
                        "MCE: wr MC%u_STATUS %"PRIx64"\n", bank, val);
         break;
     case MSR_IA32_MC0_ADDR:
-        mce_printk(MCE_QUIET, "MCE: MC%u_ADDR is read-only\n", bank);
-        ret = -1;
+        if ( !~val )
+        {
+            mce_printk(MCE_QUIET,
+                       "MCE: wr MC%u_ADDR with all 1s will cause #GP\n", bank);
+            ret = -1;
+        }
+        else if ( entry && (entry->bank == bank) )
+        {
+            entry->mci_addr = val;
+            mce_printk(MCE_VERBOSE,
+                       "MCE: wr MC%u_ADDR %"PRIx64" in vMCE#\n", bank, val);
+        }
+        else
+            mce_printk(MCE_VERBOSE,
+                       "MCE: wr MC%u_ADDR %"PRIx64"\n", bank, val);
         break;
     case MSR_IA32_MC0_MISC:
-        mce_printk(MCE_QUIET, "MCE: MC%u_MISC is read-only\n", bank);
-        ret = -1;
+        if ( !~val )
+        {
+            mce_printk(MCE_QUIET,
+                       "MCE: wr MC%u_MISC with all 1s will cause #GP\n", bank);
+            ret = -1;
+        }
+        else if ( entry && (entry->bank == bank) )
+        {
+            entry->mci_misc = val;
+            mce_printk(MCE_VERBOSE,
+                       "MCE: wr MC%u_MISC %"PRIx64" in vMCE#\n", bank, val);
+        }
+        else
+            mce_printk(MCE_VERBOSE,
+                       "MCE: wr MC%u_MISC %"PRIx64"\n", bank, val);
         break;
     default:
         switch ( boot_cpu_data.x86_vendor )
