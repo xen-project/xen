@@ -469,14 +469,15 @@ void hvm_dpci_msi_eoi(struct domain *d, int vector)
     spin_unlock(&d->event_lock);
 }
 
-static int hvm_pci_msi_assert(struct domain *d,
-                              struct hvm_pirq_dpci *pirq_dpci)
+static void hvm_pci_msi_assert(
+    struct domain *d, struct hvm_pirq_dpci *pirq_dpci)
 {
     struct pirq *pirq = dpci_pirq(pirq_dpci);
 
-    return (hvm_domain_use_pirq(d, pirq)
-            ? send_guest_pirq(d, pirq)
-            : vmsi_deliver_pirq(d, pirq_dpci));
+    if ( hvm_domain_use_pirq(d, pirq) )
+        send_guest_pirq(d, pirq);
+    else
+        vmsi_deliver_pirq(d, pirq_dpci);
 }
 
 static int _hvm_dirq_assist(struct domain *d, struct hvm_pirq_dpci *pirq_dpci,

@@ -94,7 +94,7 @@ static uint8_t get_xen_consumer(xen_event_channel_notification_t fn)
 /* Get the notification function for a given Xen-bound event channel. */
 #define xen_notification_fn(e) (xen_consumers[(e)->xen_consumer-1])
 
-static int evtchn_set_pending(struct vcpu *v, int port);
+static void evtchn_set_pending(struct vcpu *v, int port);
 
 static int virq_is_global(uint32_t virq)
 {
@@ -594,9 +594,7 @@ int evtchn_send(struct domain *d, unsigned int lport)
         if ( consumer_is_xen(rchn) )
             (*xen_notification_fn(rchn))(rvcpu, rport);
         else
-        {
             evtchn_set_pending(rvcpu, rport);
-        }
         break;
     case ECS_IPI:
         evtchn_set_pending(ld->vcpu[lchn->notify_vcpu_id], lport);
@@ -614,7 +612,7 @@ out:
     return ret;
 }
 
-static int evtchn_set_pending(struct vcpu *v, int port)
+static void evtchn_set_pending(struct vcpu *v, int port)
 {
     struct domain *d = v->domain;
     int vcpuid;
@@ -627,7 +625,7 @@ static int evtchn_set_pending(struct vcpu *v, int port)
      */
 
     if ( test_and_set_bit(port, &shared_info(d, evtchn_pending)) )
-        return 1;
+        return;
 
     if ( !test_bit        (port, &shared_info(d, evtchn_mask)) &&
          !test_and_set_bit(port / BITS_PER_EVTCHN_WORD(d),
@@ -638,7 +636,7 @@ static int evtchn_set_pending(struct vcpu *v, int port)
     
     /* Check if some VCPU might be polling for this event. */
     if ( likely(bitmap_empty(d->poll_mask, d->max_vcpus)) )
-        return 0;
+        return;
 
     /* Wake any interested (or potentially interested) pollers. */
     for ( vcpuid = find_first_bit(d->poll_mask, d->max_vcpus);
@@ -653,8 +651,6 @@ static int evtchn_set_pending(struct vcpu *v, int port)
             vcpu_unblock(v);
         }
     }
-
-    return 0;
 }
 
 int guest_enabled_event(struct vcpu *v, uint32_t virq)
@@ -710,7 +706,7 @@ static void send_guest_global_virq(struct domain *d, uint32_t virq)
     spin_unlock_irqrestore(&v->virq_lock, flags);
 }
 
-int send_guest_pirq(struct domain *d, const struct pirq *pirq)
+void send_guest_pirq(struct domain *d, const struct pirq *pirq)
 {
     int port;
     struct evtchn *chn;
@@ -724,11 +720,11 @@ int send_guest_pirq(struct domain *d, const struct pirq *pirq)
     if ( pirq == NULL || (port = pirq->evtchn) == 0 )
     {
         BUG_ON(!is_hvm_domain(d));
-        return 0;
+        return;
     }
 
     chn = evtchn_from_port(d, port);
-    return evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
+    evtchn_set_pending(d->vcpu[chn->notify_vcpu_id], port);
 }
 
 static struct domain *global_virq_handlers[NR_VIRQS] __read_mostly;

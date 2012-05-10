@@ -111,7 +111,7 @@ int vmsi_deliver(
     return 1;
 }
 
-int vmsi_deliver_pirq(struct domain *d, const struct hvm_pirq_dpci *pirq_dpci)
+void vmsi_deliver_pirq(struct domain *d, const struct hvm_pirq_dpci *pirq_dpci)
 {
     uint32_t flags = pirq_dpci->gmsi.gflags;
     int vector = pirq_dpci->gmsi.gvec;
@@ -129,7 +129,6 @@ int vmsi_deliver_pirq(struct domain *d, const struct hvm_pirq_dpci *pirq_dpci)
     ASSERT(pirq_dpci->flags & HVM_IRQ_DPCI_GUEST_MSI);
 
     vmsi_deliver(d, vector, dest, dest_mode, delivery_mode, trig_mode);
-    return 1;
 }
 
 /* Return value, -1 : multi-dests, non-negative value: dest_vcpu_id */

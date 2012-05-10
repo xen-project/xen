@@ -39,9 +39,8 @@ int set_global_virq_handler(struct domain *d, uint32_t virq);
  * send_guest_pirq:
  *  @d:        Domain to which physical IRQ should be sent
  *  @pirq:     Physical IRQ number
- * Returns TRUE if the delivery port was already pending.
  */
-int send_guest_pirq(struct domain *, const struct pirq *);
+void send_guest_pirq(struct domain *, const struct pirq *);
 
 /* Send a notification from a given domain's event-channel port. */
 int evtchn_send(struct domain *d, unsigned int lport);
