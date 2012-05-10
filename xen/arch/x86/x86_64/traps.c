@@ -386,13 +386,13 @@ void __devinit subarch_percpu_traps_init(void)
     BUILD_BUG_ON((IST_MAX + 2) * PAGE_SIZE + PRIMARY_STACK_SIZE > STACK_SIZE);
 
     /* Machine Check handler has its own per-CPU 4kB stack. */
-    this_cpu(init_tss).ist[IST_MCE] = (unsigned long)&stack[IST_MCE * PAGE_SIZE];
+    this_cpu(init_tss).ist[IST_MCE-1] = (unsigned long)&stack[IST_MCE * PAGE_SIZE];
 
     /* Double-fault handler has its own per-CPU 4kB stack. */
-    this_cpu(init_tss).ist[IST_DF] = (unsigned long)&stack[IST_DF * PAGE_SIZE];
+    this_cpu(init_tss).ist[IST_DF-1] = (unsigned long)&stack[IST_DF * PAGE_SIZE];
 
     /* NMI handler has its own per-CPU 4kB stack. */
-    this_cpu(init_tss).ist[IST_NMI] = (unsigned long)&stack[IST_NMI * PAGE_SIZE];
+    this_cpu(init_tss).ist[IST_NMI-1] = (unsigned long)&stack[IST_NMI * PAGE_SIZE];
 
     /* Trampoline for SYSCALL entry from long mode. */
     stack = &stack[IST_MAX * PAGE_SIZE]; /* Skip the IST stacks. */

@@ -424,7 +424,9 @@ struct tss_struct {
     union { u64 rsp1, esp1; };
     union { u64 rsp2, esp2; };
     u64 reserved1;
-    u64 ist[7];
+    u64 ist[7]; /* Interrupt Stack Table is 1-based so tss->ist[0]
+                 * corresponds to an IST value of 1 in an Interrupt
+                 * Descriptor */
     u64 reserved2;
     u16 reserved3;
 #else
