@@ -27,18 +27,22 @@
  * these macros, with the ctx locked.  Likewise all the "occurred"
  * entrypoints from the application should assert(!in_hook);
  */
-#define OSEVENT_HOOK_INTERN(defval, hookname, ...)                      \
-    (CTX->osevent_hooks                                                 \
-     ? (CTX->osevent_in_hook++,                                         \
-        CTX->osevent_hooks->hookname(CTX->osevent_user, __VA_ARGS__),   \
-        CTX->osevent_in_hook--)                                         \
-     : defval)
+#define OSEVENT_HOOK_INTERN(retval, hookname, ...) do {                      \
+    if (CTX->osevent_hooks) {                                                \
+        CTX->osevent_in_hook++;                                              \
+        retval CTX->osevent_hooks->hookname(CTX->osevent_user, __VA_ARGS__); \
+        CTX->osevent_in_hook--;                                              \
+    }                                                                        \
+} while (0)
 
-#define OSEVENT_HOOK(hookname,...)                      \
-    OSEVENT_HOOK_INTERN(0, hookname, __VA_ARGS__)
+#define OSEVENT_HOOK(hookname, ...) ({                                       \
+    int osevent_hook_rc = 0;                                                 \
+    OSEVENT_HOOK_INTERN(osevent_hook_rc = , hookname, __VA_ARGS__);          \
+    osevent_hook_rc;                                                         \
+})
 
-#define OSEVENT_HOOK_VOID(hookname,...)                 \
-    OSEVENT_HOOK_INTERN((void)0, hookname, __VA_ARGS__)
+#define OSEVENT_HOOK_VOID(hookname, ...) \
+    OSEVENT_HOOK_INTERN(/* void */, hookname, __VA_ARGS__)
 
 /*
  * fd events
