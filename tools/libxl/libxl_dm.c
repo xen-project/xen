@@ -216,8 +216,10 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
                 else
                     ifname = vifs[i].ifname;
                 flexarray_vappend(dm_args,
-                                "-net", libxl__sprintf(gc, "nic,vlan=%d,macaddr=%s,model=%s",
-                                                       vifs[i].devid, smac, vifs[i].model),
+                                  "-net",
+                                  GCSPRINTF(
+                                      "nic,vlan=%d,macaddr=%s,model=%s",
+                                      vifs[i].devid, smac, vifs[i].model),
                                   "-net",
                                   GCSPRINTF(
                                       "tap,vlan=%d,ifname=%s,bridge=%s,"
