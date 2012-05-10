@@ -20,7 +20,7 @@ typedef struct {
     unsigned long orig_rax;
     unsigned long rip;
     unsigned long cs;
-    unsigned long eflags;
+    unsigned long rflags;
     unsigned long rsp;
     unsigned long ss;
     unsigned long thread_fs;
@@ -54,7 +54,7 @@ static inline void elf_core_save_regs(ELF_Gregset *core_regs,
     /* orig_rax not filled in for now */
     core_regs->rip = (unsigned long)elf_core_save_regs;
     asm volatile("movl %%cs, %%eax;" :"=a"(core_regs->cs));
-    asm volatile("pushfq; popq %0" :"=m"(core_regs->eflags));
+    asm volatile("pushfq; popq %0" :"=m"(core_regs->rflags));
     asm volatile("movq %%rsp,%0" : "=m"(core_regs->rsp));
     asm volatile("movl %%ss, %%eax;" :"=a"(core_regs->ss));
     /* thread_fs not filled in for now */
