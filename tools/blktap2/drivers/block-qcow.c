@@ -1428,7 +1428,7 @@ int tdqcow_get_parent_id(td_driver_t *driver, td_disk_id_t *id)
 {
 	off_t off;
 	char *buf, *filename;
-	int len, secs, type, err = -EINVAL;
+	int len, secs, type = 0, err = -EINVAL;
 	struct tdqcow_state *child  = (struct tdqcow_state *)driver->data;
 
 	if (!child->backing_file_offset)
