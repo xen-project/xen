@@ -218,9 +218,14 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
                 flexarray_vappend(dm_args,
                                 "-net", libxl__sprintf(gc, "nic,vlan=%d,macaddr=%s,model=%s",
                                                        vifs[i].devid, smac, vifs[i].model),
-                                "-net", libxl__sprintf(gc, "tap,vlan=%d,ifname=%s,bridge=%s,script=%s",
-                                                       vifs[i].devid, ifname, vifs[i].bridge, libxl_tapif_script(gc)),
-                                NULL);
+                                  "-net",
+                                  GCSPRINTF(
+                                      "tap,vlan=%d,ifname=%s,bridge=%s,"
+                                      "script=%s,downscript=%s",
+                                      vifs[i].devid, ifname, vifs[i].bridge,
+                                      libxl_tapif_script(gc),
+                                      libxl_tapif_script(gc)),
+                                  NULL);
                 ioemu_vifs++;
             }
         }
@@ -462,10 +467,12 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                                                 vifs[i].model, vifs[i].devid,
                                                 vifs[i].devid, smac));
                 flexarray_append(dm_args, "-netdev");
-                flexarray_append(dm_args,
-                   libxl__sprintf(gc, "type=tap,id=net%d,ifname=%s,script=%s",
-                                                vifs[i].devid, ifname,
-                                                libxl_tapif_script(gc)));
+                flexarray_append(dm_args, GCSPRINTF(
+                                          "type=tap,id=net%d,ifname=%s,"
+                                          "script=%s,downscript=%s",
+                                          vifs[i].devid, ifname,
+                                          libxl_tapif_script(gc),
+                                          libxl_tapif_script(gc)));
                 ioemu_vifs++;
             }
         }
