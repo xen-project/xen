@@ -324,11 +324,11 @@ static int ctl_open(struct tdlog_state* s, const char* name)
 static int ctl_close(struct tdlog_state* s)
 {
   while (s->connected) {
+    s->connected--;
     tapdisk_server_unregister_event(s->connections[s->connected].id);
     close(s->connections[s->connected].fd);
     s->connections[s->connected].fd = -1;
     s->connections[s->connected].id = 0;
-    s->connected--;
   }
 
   if (s->ctl.fd >= 0) {
@@ -359,7 +359,7 @@ static int ctl_close_sock(struct tdlog_state* s, int fd)
 {
   int i;
 
-  for (i = 0; i <= s->connected; i++) {
+  for (i = 0; i < s->connected; i++) {
     if (s->connections[i].fd == fd) {
       tapdisk_server_unregister_event(s->connections[i].id);
       close(s->connections[i].fd);
