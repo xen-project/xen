@@ -1287,7 +1287,7 @@ libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
 /* useful for all functions which take an egc: */
 
 #define EGC_GC                                  \
-    libxl__gc *const gc = &egc->gc
+    libxl__gc *const gc __attribute__((unused)) = &egc->gc
 
 /* egc initialisation and destruction: */
 
@@ -1390,7 +1390,7 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
     })
 
 #define AO_GC                                   \
-    libxl__gc *const gc = &ao->gc
+    libxl__gc *const gc __attribute__((unused)) = &ao->gc
 
 #define STATE_AO_GC(op_ao)                      \
     libxl__ao *const ao = (op_ao);              \
