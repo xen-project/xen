@@ -2298,7 +2298,9 @@ static void pcidetach(const char *dom, const char *bdf, int force)
         libxl_device_pci_destroy(ctx, domid, &pcidev);
     else
         libxl_device_pci_remove(ctx, domid, &pcidev);
+
     libxl_device_pci_dispose(&pcidev);
+    xlu_cfg_destroy(config);
 }
 
 int main_pcidetach(int argc, char **argv)
@@ -2340,7 +2342,9 @@ static void pciattach(const char *dom, const char *bdf, const char *vs)
         exit(2);
     }
     libxl_device_pci_add(ctx, domid, &pcidev);
+
     libxl_device_pci_dispose(&pcidev);
+    xlu_cfg_destroy(config);
 }
 
 int main_pciattach(int argc, char **argv)
