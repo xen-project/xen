@@ -840,6 +840,7 @@ _hidden int libxl__ev_devstate_wait(libxl__gc *gc, libxl__ev_devstate *ds,
  */
 _hidden int libxl__try_phy_backend(mode_t st_mode);
 
+
 /* from libxl_pci */
 
 _hidden int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting);
@@ -1472,6 +1473,45 @@ _hidden const char *libxl__xen_config_dir_path(void);
 _hidden const char *libxl__xen_script_dir_path(void);
 _hidden const char *libxl__lock_dir_path(void);
 _hidden const char *libxl__run_dir_path(void);
+
+/*----- datacopier: copies data from one fd to another -----*/
+
+typedef struct libxl__datacopier_state libxl__datacopier_state;
+typedef struct libxl__datacopier_buf libxl__datacopier_buf;
+
+/* onwrite==1 means failure happened when writing, logged, errnoval is valid
+ * onwrite==0 means failure happened when reading
+ *     errnoval==0 means we got eof and all data was written
+ *     errnoval!=0 means we had a read error, logged
+ * onwrite==-1 means some other internal failure, errnoval not valid, logged
+ * in all cases copier is killed before calling this callback */
+typedef void libxl__datacopier_callback(libxl__egc *egc,
+     libxl__datacopier_state *dc, int onwrite, int errnoval);
+
+struct libxl__datacopier_buf {
+    /* private to datacopier */
+    LIBXL_TAILQ_ENTRY(libxl__datacopier_buf) entry;
+    int used;
+    char buf[1000];
+};
+
+struct libxl__datacopier_state {
+    /* caller must fill these in, and they must all remain valid */
+    libxl__ao *ao;
+    int readfd, writefd;
+    ssize_t maxsz;
+    const char *copywhat, *readwhat, *writewhat; /* for error msgs */
+    libxl__datacopier_callback *callback;
+    /* remaining fields are private to datacopier */
+    libxl__ev_fd toread, towrite;
+    ssize_t used;
+    LIBXL_TAILQ_HEAD(libxl__datacopier_bufs, libxl__datacopier_buf) bufs;
+};
+
+_hidden void libxl__datacopier_init(libxl__datacopier_state *dc);
+_hidden void libxl__datacopier_kill(libxl__datacopier_state *dc);
+_hidden int libxl__datacopier_start(libxl__datacopier_state *dc);
+
 
 /*
  * Convenience macros.
