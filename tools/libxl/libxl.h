@@ -495,7 +495,8 @@ int libxl_get_max_cpus(libxl_ctx *ctx);
 int libxl_run_bootloader(libxl_ctx *ctx,
                          libxl_domain_build_info *info,
                          libxl_device_disk *disk,
-                         uint32_t domid);
+                         uint32_t domid,
+                         libxl_asyncop_how *ao_how);
 
   /* 0 means ERROR_ENOMEM, which we have logged */
 

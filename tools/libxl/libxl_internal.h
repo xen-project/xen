@@ -42,6 +42,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/socket.h>
 
 #include <xs.h>
 #include <xenctrl.h>
@@ -439,6 +440,7 @@ _hidden char *libxl__dirname(libxl__gc *gc_opt, const char *s);
 _hidden int libxl__remove_file(libxl__gc *gc, const char *path);
 _hidden int libxl__remove_directory(libxl__gc *gc, const char *path);
 _hidden int libxl__remove_file_or_directory(libxl__gc *gc, const char *path);
+
 
 _hidden char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int length);
 
@@ -1547,6 +1549,38 @@ struct libxl__openpty_result {
 int libxl__openptys(libxl__openpty_state *op,
                     const struct termios *termp,
                     const struct winsize *winp);
+
+
+/*----- bootloader -----*/
+
+typedef struct libxl__bootloader_state libxl__bootloader_state;
+typedef void libxl__run_bootloader_callback(libxl__egc*,
+                                libxl__bootloader_state*, int rc);
+
+struct libxl__bootloader_state {
+    /* caller must fill these in, and they must all remain valid */
+    libxl__ao *ao;
+    libxl__run_bootloader_callback *callback;
+    libxl_domain_build_info *info; /* u.pv.{kernel,ramdisk,cmdline} updated */
+    libxl_device_disk *disk;
+    uint32_t domid;
+    /* private to libxl__run_bootloader */
+    char *outputpath, *outputdir;
+    char *diskpath; /* not from gc, represents actually attached disk */
+    libxl__openpty_state openpty;
+    libxl__openpty_result ptys[2];  /* [0] is for bootloader */
+    libxl__ev_child child;
+    int nargs, argsspace;
+    const char **args;
+    libxl__datacopier_state keystrokes, display;
+    int rc;
+};
+
+_hidden void libxl__bootloader_init(libxl__bootloader_state *bl);
+
+/* Will definitely call st->callback, perhaps reentrantly.
+ * If callback is passed rc==0, will have updated st->info appropriately */
+_hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
 
 
 /*

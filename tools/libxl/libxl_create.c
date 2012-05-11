@@ -593,8 +593,12 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         if (ret) goto error_out;
     }
 
-    if ( restore_fd < 0 ) {
-        ret = libxl_run_bootloader(ctx, &d_config->b_info, d_config->num_disks > 0 ? &d_config->disks[0] : NULL, domid);
+    libxl_device_disk *bootdisk =
+        d_config->num_disks > 0 ? &d_config->disks[0] : NULL;
+
+    if (restore_fd < 0 && bootdisk) {
+        ret = libxl_run_bootloader(ctx, &d_config->b_info, bootdisk, domid,
+                                   0 /* fixme-ao */);
         if (ret) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
                        "failed to run bootloader: %d", ret);

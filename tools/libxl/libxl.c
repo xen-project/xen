@@ -1750,6 +1750,10 @@ int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk)
      * For other device types assume that the blktap2 process is
      * needed by the soon to be started domain and do nothing.
      */
+    /*
+     * FIXME
+     * This appears to leak the disk in failure paths
+     */
 
     return 0;
 }
