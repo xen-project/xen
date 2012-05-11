@@ -213,9 +213,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 82db8de16530f016809264d3179823999d702849
-# Tue Apr 3 15:44:48 2012 +0100
-# timers: use INT64_MAX as max expiration
+QEMU_TAG ?= b7469189669c4de0a5161a869f443738d84539ec
+# Fri May 11 12:40:42 2012 +0100
+# passthrough: Intel GPU passthrough, fix OpRegion mapping
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
