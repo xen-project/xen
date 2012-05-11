@@ -682,9 +682,6 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
                 d_config->num_vfbs, d_config->vfbs,
                 d_config->num_disks, &d_config->disks[0]);
 
-        if (need_qemu)
-             console.consback = LIBXL__CONSOLE_BACKEND_IOEMU;
-
         libxl__device_console_add(gc, domid, &console, &state);
         libxl__device_console_dispose(&console);
 

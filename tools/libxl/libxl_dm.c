@@ -1095,7 +1095,13 @@ int libxl__need_xenpv_qemu(libxl__gc *gc,
 {
     int i, ret = 0;
 
+    /*
+     * qemu is required in order to support 2 or more consoles. So switch all
+     * backends to qemu if this is the case
+     */
     if (nr_consoles > 1) {
+        for (i = 0; i < nr_consoles; i++)
+            consoles[i].consback = LIBXL__CONSOLE_BACKEND_IOEMU;
         ret = 1;
         goto out;
     }
