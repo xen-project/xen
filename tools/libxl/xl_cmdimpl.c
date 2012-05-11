@@ -5591,6 +5591,7 @@ int main_cpupoolcreate(int argc, char **argv)
     libxl_cpumap cpumap;
     libxl_uuid uuid;
     libxl_cputopology *topology;
+    int rc = -ERROR_FAIL; 
 
     while (1) {
         opt = getopt_long(argc, argv, "hnf:", long_options, &option_index);
@@ -5624,7 +5625,7 @@ int main_cpupoolcreate(int argc, char **argv)
             filename = argv[optind];
         } else {
             help("cpupool-create");
-            return -ERROR_FAIL;
+            goto out;
         }
         optind++;
     }
@@ -5635,7 +5636,7 @@ int main_cpupoolcreate(int argc, char **argv)
                                      &config_len)) {
             fprintf(stderr, "Failed to read config file: %s: %s\n",
                     filename, strerror(errno));
-            return -ERROR_FAIL;
+            goto out;
         }
         config_src=filename;
     }
@@ -5645,13 +5646,13 @@ int main_cpupoolcreate(int argc, char **argv)
     if (strlen(extra_config)) {
         if (config_len > INT_MAX - (strlen(extra_config) + 2)) {
             fprintf(stderr, "Failed to attach extra configration\n");
-            return -ERROR_FAIL;
+            goto out;
         }
         config_data = xrealloc(config_data,
                                config_len + strlen(extra_config) + 2);
         if (!config_data) {
             fprintf(stderr, "Failed to realloc config_data\n");
-            return -ERROR_FAIL;
+            goto out;
         }
         config_data[config_len] = 0;
         strcat(config_data, extra_config);
@@ -5662,13 +5663,13 @@ int main_cpupoolcreate(int argc, char **argv)
     config = xlu_cfg_init(stderr, config_src);
     if (!config) {
         fprintf(stderr, "Failed to allocate for configuration\n");
-        return -ERROR_FAIL;
+        goto out;
     }
 
     ret = xlu_cfg_readdata(config, config_data, config_len);
     if (ret) {
         fprintf(stderr, "Failed to parse config file: %s\n", strerror(ret));
-        return -ERROR_FAIL;
+        goto out_cfg;
     }
 
     if (!xlu_cfg_get_string (config, "name", &buf, 0))
@@ -5677,32 +5678,32 @@ int main_cpupoolcreate(int argc, char **argv)
         name = libxl_basename(filename);
     else {
         fprintf(stderr, "Missing cpupool name!\n");
-        return -ERROR_FAIL;
+        goto out_cfg;
     }
     if (!libxl_name_to_cpupoolid(ctx, name, &poolid)) {
         fprintf(stderr, "Pool name \"%s\" already exists\n", name);
-        return -ERROR_FAIL;
+        goto out_cfg;
     }
 
     if (!xlu_cfg_get_string (config, "sched", &buf, 0)) {
         if ((libxl_scheduler_from_string(buf, &sched)) < 0) {
             fprintf(stderr, "Unknown scheduler\n");
-            return -ERROR_FAIL;
+            goto out_cfg;
         }
     } else {
         if ((sched = libxl_get_scheduler(ctx)) < 0) {
             fprintf(stderr, "get_scheduler sysctl failed.\n");
-            return -ERROR_FAIL;
+            goto out_cfg;
         }
     }
 
     if (libxl_get_freecpus(ctx, &freemap)) {
         fprintf(stderr, "libxl_get_freecpus failed\n");
-        return -ERROR_FAIL;
+        goto out_cfg;
     }
     if (libxl_cpumap_alloc(ctx, &cpumap)) {
         fprintf(stderr, "Failed to allocate cpumap\n");
-        return -ERROR_FAIL;
+        goto out_cfg;
     }
     if (!xlu_cfg_get_list(config, "nodes", &nodes, 0, 0)) {
         int nr;
@@ -5711,7 +5712,7 @@ int main_cpupoolcreate(int argc, char **argv)
         topology = libxl_get_cpu_topology(ctx, &nr);
         if (topology == NULL) {
             fprintf(stderr, "libxl_get_topologyinfo failed\n");
-            return -ERROR_FAIL;
+            goto out_cfg;
         }
         while ((buf = xlu_cfg_get_listitem(nodes, n_nodes)) != NULL) {
             n = atoi(buf);
@@ -5729,7 +5730,7 @@ int main_cpupoolcreate(int argc, char **argv)
 
         if (n_cpus == 0) {
             fprintf(stderr, "no free cpu found\n");
-            return -ERROR_FAIL;
+            goto out_cfg;
         }
     } else if (!xlu_cfg_get_list(config, "cpus", &cpus, 0, 0)) {
         n_cpus = 0;
@@ -5738,7 +5739,7 @@ int main_cpupoolcreate(int argc, char **argv)
             if ((i < 0) || (i >= freemap.size * 8) ||
                 !libxl_cpumap_test(&freemap, i)) {
                 fprintf(stderr, "cpu %d illegal or not free\n", i);
-                return -ERROR_FAIL;
+                goto out_cfg;
             }
             libxl_cpumap_set(&cpumap, i);
             n_cpus++;
@@ -5753,16 +5754,20 @@ int main_cpupoolcreate(int argc, char **argv)
     printf("scheduler:      %s\n", libxl_scheduler_to_string(sched));
     printf("number of cpus: %d\n", n_cpus);
 
-    if (dryrun_only)
-        return 0;
-
-    poolid = 0;
-    if (libxl_cpupool_create(ctx, name, sched, cpumap, &uuid, &poolid)) {
-        fprintf(stderr, "error on creating cpupool\n");
-        return -ERROR_FAIL;
+    if (!dryrun_only) {
+        poolid = 0;
+        if (libxl_cpupool_create(ctx, name, sched, cpumap, &uuid, &poolid)) {
+            fprintf(stderr, "error on creating cpupool\n");
+            goto out_cfg;
+        }
     }
-
-    return 0;
+    /* We made it! */
+    rc = 0;
+   
+out_cfg:
+    xlu_cfg_destroy(config);
+out:
+    return rc;
 }
 
 int main_cpupoollist(int argc, char **argv)
