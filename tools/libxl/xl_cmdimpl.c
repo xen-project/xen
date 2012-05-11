@@ -2285,7 +2285,7 @@ static void pcidetach(const char *dom, const char *bdf, int force)
 
     find_domain(dom);
 
-    memset(&pcidev, 0x00, sizeof(pcidev));
+    libxl_device_pci_init(&pcidev);
     
     config = xlu_cfg_init(stderr, "command line");
     if (!config) { perror("xlu_cfg_inig"); exit(-1); }
@@ -2330,7 +2330,7 @@ static void pciattach(const char *dom, const char *bdf, const char *vs)
 
     find_domain(dom);
 
-    memset(&pcidev, 0x00, sizeof(pcidev));
+    libxl_device_pci_init(&pcidev);
 
     config = xlu_cfg_init(stderr, "command line");
     if (!config) { perror("xlu_cfg_inig"); exit(-1); }
