@@ -2897,6 +2897,9 @@ libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nr)
         goto fail;
     }
 
+    if (tinfo.max_cpu_index < max_cpus - 1)
+        max_cpus = tinfo.max_cpu_index + 1;
+
     ret = malloc(sizeof(libxl_cputopology) * max_cpus);
     if (ret == NULL) {
         LIBXL__LOG_ERRNOVAL(ctx, XTL_ERROR, ENOMEM,
