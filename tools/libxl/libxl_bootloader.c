@@ -16,6 +16,10 @@
 
 #include <termios.h>
 
+#ifdef INCLUDE_LIBUTIL_H
+#include INCLUDE_LIBUTIL_H
+#endif
+
 #include "libxl_internal.h"
 
 #define XENCONSOLED_BUF_SIZE 16

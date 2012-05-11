@@ -32,6 +32,7 @@ m4_include([m4/uuid.m4])
 m4_include([m4/pkg.m4])
 m4_include([m4/curses.m4])
 m4_include([m4/pthread.m4])
+m4_include([m4/ptyfuncs.m4])
 
 # Enable/disable options
 AX_ARG_DEFAULT_DISABLE([githttp], [Download GIT repositories via HTTP])
@@ -132,6 +133,7 @@ AC_SUBST(libext2fs)
 AC_CHECK_LIB([gcrypt], [gcry_md_hash_buffer], [libgcrypt="y"], [libgcrypt="n"])
 AC_SUBST(libgcrypt)
 AX_CHECK_PTHREAD
+AX_CHECK_PTYFUNCS
 AC_CHECK_LIB([yajl], [yajl_alloc], [],
     [AC_MSG_ERROR([Could not find yajl])])
 AC_CHECK_LIB([z], [deflateCopy], [], [AC_MSG_ERROR([Could not find zlib])])

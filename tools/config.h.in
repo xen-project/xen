@@ -42,6 +42,9 @@
 /* Define curses header to use */
 #undef INCLUDE_CURSES_H
 
+/* libutil header file name */
+#undef INCLUDE_LIBUTIL_H
+
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
 

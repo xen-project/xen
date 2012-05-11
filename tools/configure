@@ -598,6 +598,7 @@ ac_includes_default="\
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 libiconv
+PTYFUNCS_LIBS
 PTHREAD_LIBS
 PTHREAD_LDFLAGS
 PTHREAD_CFLAGS
@@ -2300,6 +2301,8 @@ fi
 
 # We invoke AX_PTHREAD_VARS with the name of another macro
 # which is then expanded once for each variable.
+
+
 
 
 
@@ -6441,6 +6444,64 @@ $as_echo "$ax_cv_pthread_flags" >&6; }
     PTHREAD_LDFLAGS="$ax_cv_pthread_flags"
     PTHREAD_LIBS=""
 
+
+
+
+    ac_fn_c_check_header_mongrel "$LINENO" "libutil.h" "ac_cv_header_libutil_h" "$ac_includes_default"
+if test "x$ac_cv_header_libutil_h" = x""yes; then :
+
+
+$as_echo "#define INCLUDE_LIBUTIL_H <libutil.h>" >>confdefs.h
+
+
+fi
+
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for openpty et al" >&5
+$as_echo_n "checking for openpty et al... " >&6; }
+if test "${ax_cv_ptyfuncs_libs+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+
+        for ax_cv_ptyfuncs_libs in -lutil "" NOT_FOUND; do
+            if test "x$ax_cv_ptyfuncs_libs" = "xNOT_FOUND"; then
+                { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "Unable to find library for openpty and login_tty
+See \`config.log' for more details" "$LINENO" 5 ; }
+            fi
+
+    saved_LIBS="$LIBS"
+
+            LIBS="$LIBS $ax_cv_ptyfuncs_libs"
+            cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#ifdef INCLUDE_LIBUTIL_H
+#include INCLUDE_LIBUTIL_H
+#endif
+int main(void) {
+  openpty(0,0,0,0,0);
+  login_tty(0);
+}
+
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+
+                break
+
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+
+    LIBS="$saved_LIBS"
+
+        done
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_ptyfuncs_libs" >&5
+$as_echo "$ax_cv_ptyfuncs_libs" >&6; }
+    PTYFUNCS_LIBS="$ax_cv_ptyfuncs_libs"
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for yajl_alloc in -lyajl" >&5

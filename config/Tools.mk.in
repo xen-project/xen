@@ -30,6 +30,8 @@ PTHREAD_CFLAGS      := @PTHREAD_CFLAGS@
 PTHREAD_LDFLAGS     := @PTHREAD_LDFLAGS@
 PTHREAD_LIBS        := @PTHREAD_LIBS@
 
+PTYFUNCS_LIBS       := @PTYFUNCS_LIBS@
+
 # Download GIT repositories via HTTP or GIT's own protocol?
 # GIT's protocol is faster and more robust, when it works at all (firewalls
 # may block it). We make it the default, but if your GIT repository downloads
