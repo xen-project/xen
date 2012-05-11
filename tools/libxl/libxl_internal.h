@@ -1439,16 +1439,33 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
 /*
  * Machinery for asynchronous operations ("ao")
  *
- * All "slow" functions (includes anything that might block on a
- * guest or an external script) need to use the asynchronous
- * operation ("ao") machinery.  The function should take a parameter
- * const libxl_asyncop_how *ao_how and must start with a call to
- * AO_INITIATOR_ENTRY.  These functions MAY NOT be called from
- * inside libxl, because they can cause reentrancy callbacks.
+ * All "slow" functions (see below for the exact definition) need to
+ * use the asynchronous operation ("ao") machinery.  The function
+ * should take a parameter const libxl_asyncop_how *ao_how and must
+ * start with a call to AO_INITIATOR_ENTRY.  These functions MAY NOT
+ * be called from inside libxl, because they can cause reentrancy
+ * callbacks.
  *
  * For the same reason functions taking an ao_how may make themselves
  * an egc with EGC_INIT (and they will generally want to, to be able
  * to immediately complete an ao during its setup).
+ *
+ *
+ * "Slow" functions includes any that might block on a guest or an
+ * external script.  More broadly, it includes any operations which
+ * are sufficiently slow that an application might reasonably want to
+ * initiate them, and then carry on doing something else, while the
+ * operation completes.  That is, a "fast" function must be fast
+ * enough that we do not mind blocking all other management operations
+ * on the same host while it completes.
+ *
+ * There are certain primitive functions which make a libxl operation
+ * necessarily "slow" for API reasons.  These are:
+ *  - awaiting xenstore watches (although read-modify-write xenstore
+ *    transactions are OK for fast functions)
+ *  - spawning subprocesses
+ *  - anything with a timeout
+ *
  *
  * Lifecycle of an ao:
  *
