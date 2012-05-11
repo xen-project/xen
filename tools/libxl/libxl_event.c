@@ -639,10 +639,11 @@ static int beforepoll_internal(libxl__gc *gc, libxl__poller *poller,
 
 
     /*
-     * In order to be able to efficiently find the libxl__ev_fd
-     * for a struct poll during _afterpoll, we maintain a shadow
-     * data structure in CTX->fd_beforepolled: each slot in
-     * the fds array corresponds to a slot in fd_beforepolled.
+     * In order to be able to efficiently find the libxl__ev_fd for a
+     * struct poll during _afterpoll, we maintain a shadow data
+     * structure in CTX->fd_rindices: each fd corresponds to a slot in
+     * fd_rindices, and each element in the rindices is three indices
+     * into the fd array (for POLLIN, POLLPRI and POLLOUT).
      */
 
     if (*nfds_io) {
@@ -663,14 +664,16 @@ static int beforepoll_internal(libxl__gc *gc, libxl__poller *poller,
         });
 
         /* make sure our array is as big as *nfds_io */
-        if (poller->fd_rindex_allocd < maxfd) {
-            assert(maxfd < INT_MAX / sizeof(int) / 2);
-            int *newarray = realloc(poller->fd_rindex, sizeof(int) * maxfd);
-            if (!newarray) { rc = ERROR_NOMEM; goto out; }
-            memset(newarray + poller->fd_rindex_allocd, 0,
-                   sizeof(int) * (maxfd - poller->fd_rindex_allocd));
-            poller->fd_rindex = newarray;
-            poller->fd_rindex_allocd = maxfd;
+        if (poller->fd_rindices_allocd < maxfd) {
+            assert(ARRAY_SIZE_OK(poller->fd_rindices, maxfd));
+            poller->fd_rindices =
+                libxl__realloc(0, poller->fd_rindices,
+                               maxfd * sizeof(*poller->fd_rindices));
+            memset(poller->fd_rindices + poller->fd_rindices_allocd,
+                   0,
+                   (maxfd - poller->fd_rindices_allocd)
+                     * sizeof(*poller->fd_rindices));
+            poller->fd_rindices_allocd = maxfd;
         }
     }
 
@@ -681,8 +684,10 @@ static int beforepoll_internal(libxl__gc *gc, libxl__poller *poller,
             fds[used].fd = req_fd;
             fds[used].events = req_events;
             fds[used].revents = 0;
-            assert(req_fd < poller->fd_rindex_allocd);
-            poller->fd_rindex[req_fd] = used;
+            assert(req_fd < poller->fd_rindices_allocd);
+            if (req_events & POLLIN)  poller->fd_rindices[req_fd][0] = used;
+            if (req_events & POLLPRI) poller->fd_rindices[req_fd][1] = used;
+            if (req_events & POLLOUT) poller->fd_rindices[req_fd][2] = used;
         }
         used++;
     });
@@ -710,7 +715,6 @@ static int beforepoll_internal(libxl__gc *gc, libxl__poller *poller,
             *timeout_upd = our_timeout;
     }
 
- out:
     return rc;
 }
 
@@ -732,24 +736,28 @@ static int afterpoll_check_fd(libxl__poller *poller,
                               int fd, int events)
     /* returns mask of events which were requested and occurred */
 {
-    if (fd >= poller->fd_rindex_allocd)
+    if (fd >= poller->fd_rindices_allocd)
         /* added after we went into poll, have to try again */
         return 0;
 
-    int slot = poller->fd_rindex[fd];
+    int i, revents = 0;
+    for (i=0; i<3; i++) {
+        int slot = poller->fd_rindices[fd][i];
 
-    if (slot >= nfds)
-        /* stale slot entry; again, added afterwards */
-        return 0;
+        if (slot >= nfds)
+            /* stale slot entry; again, added afterwards */
+            continue;
 
-    if (fds[slot].fd != fd)
-        /* again, stale slot entry */
-        return 0;
+        if (fds[slot].fd != fd)
+            /* again, stale slot entry */
+            continue;
 
-    assert(!(fds[slot].revents & POLLNVAL));
+        assert(!(fds[slot].revents & POLLNVAL));
+        revents |= fds[slot].revents;
+    }
 
-    int revents = fds[slot].revents & (events | POLLERR | POLLHUP);
     /* we mask in case requested events have changed */
+    revents &= (events | POLLERR | POLLHUP);
 
     return revents;
 }
@@ -1013,7 +1021,7 @@ int libxl__poller_init(libxl_ctx *ctx, libxl__poller *p)
 {
     int r, rc;
     p->fd_polls = 0;
-    p->fd_rindex = 0;
+    p->fd_rindices = 0;
 
     r = pipe(p->wakeup_pipe);
     if (r) {
@@ -1040,7 +1048,7 @@ void libxl__poller_dispose(libxl__poller *p)
     if (p->wakeup_pipe[1] > 0) close(p->wakeup_pipe[1]);
     if (p->wakeup_pipe[0] > 0) close(p->wakeup_pipe[0]);
     free(p->fd_polls);
-    free(p->fd_rindex);
+    free(p->fd_rindices);
 }
 
 libxl__poller *libxl__poller_get(libxl_ctx *ctx)

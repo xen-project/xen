@@ -132,7 +132,11 @@ typedef void libxl__ev_fd_callback(libxl__egc *egc, libxl__ev_fd *ev,
    * events; otherwise revents contains only bits in events.  Contrary
    * to the documentation for poll(2), POLLERR and POLLHUP can occur
    * even if only POLLIN was set in events.  (POLLNVAL is a fatal
-   * error and will cause libxl event machinery to fail an assertion.) */
+   * error and will cause libxl event machinery to fail an assertion.)
+   *
+   * It is not permitted to listen for the same or overlapping events
+   * on the same fd using multiple different libxl__ev_fd's.
+   */
 struct libxl__ev_fd {
     /* caller should include this in their own struct */
     /* read-only for caller, who may read only when registered: */
@@ -248,8 +252,8 @@ struct libxl__poller {
     struct pollfd *fd_polls;
     int fd_polls_allocd;
 
-    int fd_rindex_allocd;
-    int *fd_rindex; /* see libxl_osevent_beforepoll */
+    int fd_rindices_allocd;
+    int (*fd_rindices)[3]; /* see libxl_osevent_beforepoll */
 
     int wakeup_pipe[2]; /* 0 means no fd allocated */
 };
