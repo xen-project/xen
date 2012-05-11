@@ -119,6 +119,7 @@ _hidden void libxl__log(libxl_ctx *ctx, xentoollog_level msglevel, int errnoval,
 typedef struct libxl__gc libxl__gc;
 typedef struct libxl__egc libxl__egc;
 typedef struct libxl__ao libxl__ao;
+typedef struct libxl__aop_occurred libxl__aop_occurred;
 
 _hidden void libxl__alloc_failed(libxl_ctx *, const char *func,
                          size_t nmemb, size_t size) __attribute__((noreturn));
@@ -364,6 +365,21 @@ struct libxl__egc {
     struct libxl__gc gc;
     struct libxl__event_list occurred_for_callback;
     LIBXL_TAILQ_HEAD(, libxl__ao) aos_for_callback;
+    LIBXL_TAILQ_HEAD(, libxl__aop_occurred) aops_for_callback;
+};
+
+struct libxl__aop_occurred {
+    /*
+     * An aop belongs to, and may be accessed only on, the thread
+     * which created it.  It normally lives in that thread's egc.
+     *
+     * While an aop exists, it corresponds to one refcount in
+     * ao->progress_reports_outstanding, preventing ao destruction.
+     */
+    LIBXL_TAILQ_ENTRY(libxl__aop_occurred) entry;
+    libxl__ao *ao;
+    libxl_event *ev;
+    const libxl_asyncprogress_how *how;
 };
 
 #define LIBXL__AO_MAGIC              0xA0FACE00ul
@@ -386,6 +402,7 @@ struct libxl__ao {
      */
     uint32_t magic;
     unsigned constructing:1, in_initiator:1, complete:1, notified:1;
+    int progress_reports_outstanding;
     int rc;
     libxl__gc gc;
     libxl_asyncop_how how;
@@ -1402,6 +1419,7 @@ libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
         LIBXL_INIT_GC((egc).gc,ctx);                    \
         LIBXL_TAILQ_INIT(&(egc).occurred_for_callback); \
         LIBXL_TAILQ_INIT(&(egc).aos_for_callback);      \
+        LIBXL_TAILQ_INIT(&(egc).aops_for_callback);     \
     } while(0)
 
 _hidden void libxl__egc_cleanup(libxl__egc *egc);
@@ -1448,6 +1466,9 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
  *        pointer to the internal event generation request routines
  *        libxl__evgen_FOO, so that at some point a CALLBACK will be
  *        made when the operation is complete.
+ *      - if the operation provides progress reports, the aop_how(s)
+ *        must be copied into the per-operation structure using
+ *        libxl__ao_progress_gethow.
  *
  * - If initiation is successful, the initiating function needs
  *   to run libxl__ao_inprogress right before unlocking and
@@ -1456,6 +1477,10 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
  * - If the initiation is unsuccessful, the initiating function must
  *   call libxl__ao_abort before unlocking and returning whatever
  *   error code is appropriate (AO_ABORT macro).
+ *
+ * - If the operation supports progress reports, it may generate
+ *   suitable events with NEW_EVENT and report them with
+ *   libxl__ao_progress_report (with the ctx locked).
  *
  * - Later, some callback function, whose callback has been requested
  *   directly or indirectly, should call libxl__ao_complete (with the
@@ -1512,8 +1537,18 @@ _hidden int libxl__ao_inprogress(libxl__ao *ao); /* temporarily unlocks */
 _hidden void libxl__ao_abort(libxl__ao *ao);
 _hidden void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc);
 
+/* Can be called at any time.  Use is essential for any aop user. */
+_hidden void libxl__ao_progress_gethow(libxl_asyncprogress_how *in_state,
+                                       const libxl_asyncprogress_how *from_app);
+
+/* Must be called with the ctx locked.  Will fill in ev->for_user,
+ * so caller need not do that. */
+_hidden void libxl__ao_progress_report(libxl__egc *egc, libxl__ao *ao,
+   const libxl_asyncprogress_how *how, libxl_event *ev /* consumed */);
+
 /* For use by ao machinery ONLY */
 _hidden void libxl__ao__destroy(libxl_ctx*, libxl__ao *ao);
+_hidden void libxl__ao_complete_check_progress_reports(libxl__egc*, libxl__ao*);
 
 
 /*

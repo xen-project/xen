@@ -902,16 +902,27 @@ void libxl__event_disaster(libxl__egc *egc, const char *msg, int errnoval,
 static void egc_run_callbacks(libxl__egc *egc)
 {
     /*
-     * The callbacks must happen with the ctx unlocked.
-     * See the comment near #define EGC_GC in libxl_internal.h and
-     * those in the definitions of libxl__egc and libxl__ao.
+     * The callbacks must happen with the ctx unlocked.  See the
+     * comment near #define EGC_GC in libxl_internal.h and those in
+     * the definitions of libxl__egc, libxl__ao and libxl__aop.
      */
     EGC_GC;
     libxl_event *ev, *ev_tmp;
+    libxl__aop_occurred *aop, *aop_tmp;
 
     LIBXL_TAILQ_FOREACH_SAFE(ev, &egc->occurred_for_callback, link, ev_tmp) {
         LIBXL_TAILQ_REMOVE(&egc->occurred_for_callback, ev, link);
         CTX->event_hooks->event_occurs(CTX->event_hooks_user, ev);
+    }
+
+    LIBXL_TAILQ_FOREACH_SAFE(aop, &egc->aops_for_callback, entry, aop_tmp) {
+        LIBXL_TAILQ_REMOVE(&egc->aops_for_callback, aop, entry);
+        aop->how->callback(CTX, aop->ev, aop->how->for_callback);
+
+        CTX_LOCK;
+        aop->ao->progress_reports_outstanding--;
+        libxl__ao_complete_check_progress_reports(egc, aop->ao);
+        CTX_UNLOCK;
     }
 
     libxl__ao *ao, *ao_tmp;
@@ -1296,6 +1307,7 @@ void libxl__ao_abort(libxl__ao *ao)
     assert(ao->magic == LIBXL__AO_MAGIC);
     assert(ao->in_initiator);
     assert(!ao->complete);
+    assert(!ao->progress_reports_outstanding);
     libxl__ao__destroy(CTX, ao);
 }
 
@@ -1305,6 +1317,24 @@ void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc)
     assert(!ao->complete);
     ao->complete = 1;
     ao->rc = rc;
+
+    libxl__ao_complete_check_progress_reports(egc, ao);
+}
+
+void libxl__ao_complete_check_progress_reports(libxl__egc *egc, libxl__ao *ao)
+{
+    /*
+     * We don't consider an ao complete if it has any outstanding
+     * callbacks.  These callbacks might be outstanding on other
+     * threads, queued up in the other threads' egc's.  Those threads
+     * will, after making the callback, take out the lock again,
+     * decrement progress_reports_outstanding, and call us again.
+     */
+
+    assert(ao->progress_reports_outstanding >= 0);
+
+    if (!ao->complete || ao->progress_reports_outstanding)
+        return;
 
     if (ao->poller) {
         assert(ao->in_initiator);
@@ -1354,6 +1384,7 @@ libxl__ao *libxl__ao_create(libxl_ctx *ctx, uint32_t domid,
     if (ao) libxl__ao__destroy(ctx, ao);
     return NULL;
 }
+
 
 int libxl__ao_inprogress(libxl__ao *ao)
 {
@@ -1409,6 +1440,41 @@ int libxl__ao_inprogress(libxl__ao *ao)
     }
 
     return rc;
+}
+
+
+/* progress reporting */
+
+/* The application indicates a desire to ignore events by passing NULL
+ * for how.  But we want to copy *how.  So we have this dummy function
+ * whose address is stored in callback if the app passed how==NULL. */
+static void dummy_asyncprogress_callback_ignore
+  (libxl_ctx *ctx, libxl_event *ev, void *for_callback) { }
+
+void libxl__ao_progress_gethow(libxl_asyncprogress_how *in_state,
+                               const libxl_asyncprogress_how *from_app) {
+    if (from_app)
+        *in_state = *from_app;
+    else
+        in_state->callback = dummy_asyncprogress_callback_ignore;
+}
+
+void libxl__ao_progress_report(libxl__egc *egc, libxl__ao *ao,
+        const libxl_asyncprogress_how *how, libxl_event *ev)
+{
+    ev->for_user = how->for_event;
+    if (how->callback == dummy_asyncprogress_callback_ignore) {
+        /* ignore */
+    } else if (how->callback) {
+        libxl__aop_occurred *aop = libxl__zalloc(&egc->gc, sizeof(*aop));
+        ao->progress_reports_outstanding++;
+        aop->ao = ao;
+        aop->ev = ev;
+        aop->how = how;
+        LIBXL_TAILQ_INSERT_TAIL(&egc->aops_for_callback, aop, entry);
+    } else {
+        libxl__event_occurred(egc, ev);
+    }
 }
 
 

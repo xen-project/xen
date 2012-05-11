@@ -435,6 +435,51 @@ typedef struct {
     } u;
 } libxl_asyncop_how;
 
+/*
+ * Some more complex asynchronous operations can report intermediate
+ * progress.  How this is to be reported is controlled, for each
+ * function, by a parameter
+ *    libxl_asyncprogress_how *aop_FOO_how;
+ * for each kind of progress FOO supported by that function.  Each
+ * such kind of progress is associated with an event type.
+ *
+ * The function description will document whether, when, and how
+ * many times, the intermediate progress will be reported, and
+ * what the corresponding event type(s) are.
+ *
+ * If aop_FOO_how==NULL, intermediate progress reports are discarded.
+ *
+ * If aop_FOO_how->callback==NULL, intermediate progress reports
+ * generate libxl events which can be obtained from libxl_event_wait
+ * or libxl_event_check.
+ *
+ * If aop_FOO_how->callback!=NULL, libxl will report intermediate
+ * progress by calling callback(ctx, &event, for_callback).
+ *
+ * The rules for these events are otherwise the same as those for
+ * ordinary events.  The reentrancy and threading rules for the
+ * callback are the same as those for ao completion callbacks.
+ *
+ * Note that the callback, if provided, is responsible for freeing
+ * the event.
+ *
+ * If callbacks are requested, they will be made, and returned, before
+ * the long-running libxl operation is considered finished (so if the
+ * long-running libxl operation was invoked with ao_how==NULL then any
+ * callbacks will occur strictly before the long-running operation
+ * returns).  However, the callbacks may occur on any thread.
+ *
+ * In general, otherwise, no promises are made about the relative
+ * order of callbacks in a multithreaded program.  In particular
+ * different callbacks relating to the same long-running operation may
+ * be delivered out of order.
+ */
+
+typedef struct {
+    void (*callback)(libxl_ctx *ctx, libxl_event*, void *for_callback);
+    libxl_ev_user for_event; /* always used */
+    void *for_callback; /* passed to callback */
+} libxl_asyncprogress_how;
 
 #define LIBXL_VERSION 0
 
