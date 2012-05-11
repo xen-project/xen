@@ -1078,9 +1078,13 @@ _hidden void libxl__exec(int stdinfd, int stdoutfd, int stderrfd,
                const char *arg0, char **args); // logs errors, never returns
 
 /* from xl_create */
+
+ /* on entry, libxl_domid_valid_guest(domid) must be false;
+  * on exit (even error exit), domid may be valid and refer to a domain */
 _hidden int libxl__domain_make(libxl__gc *gc,
                                libxl_domain_create_info *info,
                                uint32_t *domid);
+
 _hidden int libxl__domain_build(libxl__gc *gc,
                                 libxl_domain_build_info *info,
                                 uint32_t domid,

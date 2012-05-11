@@ -396,8 +396,6 @@ out:
 
 int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
                        uint32_t *domid)
- /* on entry, libxl_domid_valid_guest(domid) must be false;
-  * on exit (even error exit), domid may be valid and refer to a domain */
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int flags, ret, rc;
@@ -600,6 +598,7 @@ static void initiate_domain_create(libxl__egc *egc,
     ret = libxl__domain_make(gc, &d_config->c_info, &domid);
     if (ret) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot make domain: %d", ret);
+        dcs->guest_domid = domid;
         ret = ERROR_FAIL;
         goto error_out;
     }
