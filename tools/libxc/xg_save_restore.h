@@ -258,6 +258,7 @@
 #define XC_SAVE_ID_HVM_PAGING_RING_PFN  -15
 #define XC_SAVE_ID_HVM_ACCESS_RING_PFN  -16
 #define XC_SAVE_ID_HVM_SHARING_RING_PFN -17
+#define XC_SAVE_ID_TOOLSTACK          -18 /* Optional toolstack specific info */
 
 /*
 ** We process save/restore/migrate in batches of pages; the below

@@ -47,7 +47,7 @@ main(int argc, char **argv)
 
     ret = xc_domain_restore(xch, io_fd, domid, store_evtchn, &store_mfn, 0,
                             console_evtchn, &console_mfn, 0, hvm, pae, superpages,
-                            0, NULL);
+                            0, NULL, NULL);
 
     if ( ret == 0 )
     {

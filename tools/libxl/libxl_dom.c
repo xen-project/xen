@@ -474,7 +474,7 @@ int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
                            state->store_domid, state->console_port,
                            &state->console_mfn, state->console_domid,
                            hvm, pae, superpages, no_incr_generationid,
-                           &state->vm_generationid_addr);
+                           &state->vm_generationid_addr, NULL);
     if ( rc ) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "restoring domain");
         return ERROR_FAIL;

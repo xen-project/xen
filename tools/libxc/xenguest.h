@@ -44,6 +44,14 @@ struct save_callbacks {
     /* Enable qemu-dm logging dirty pages to xen */
     int (*switch_qemu_logdirty)(int domid, unsigned enable, void *data); /* HVM only */
 
+    /* Save toolstack specific data
+     * @param buf the buffer with the data to be saved
+     * @param len the length of the buffer
+     * The callee allocates the buffer, the caller frees it (buffer must
+     * be free'able).
+     */
+    int (*toolstack_save)(uint32_t domid, uint8_t **buf, uint32_t *len, void *data);
+
     /* to be provided as the last argument to each callback function */
     void* data;
 };
@@ -62,6 +70,16 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                    unsigned long vm_generationid_addr);
 
 
+/* callbacks provided by xc_domain_restore */
+struct restore_callbacks {
+    /* callback to restore toolstack specific data */
+    int (*toolstack_restore)(uint32_t domid, uint8_t *buf,
+            uint32_t size, void* data);
+
+    /* to be provided as the last argument to each callback function */
+    void* data;
+};
+
 /**
  * This function will restore a saved domain.
  *
@@ -75,6 +93,8 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
  * @parm superpages non-zero to allocate guest memory with superpages
  * @parm no_incr_generationid non-zero if generation id is NOT to be incremented
  * @parm vm_generationid_addr returned with the address of the generation id buffer
+ * @parm callbacks non-NULL to receive a callback to restore toolstack
+ *       specific data
  * @return 0 on success, -1 on failure
  */
 int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
@@ -83,7 +103,8 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned long *console_mfn, domid_t console_domid,
                       unsigned int hvm, unsigned int pae, int superpages,
                       int no_incr_generationid,
-		      unsigned long *vm_generationid_addr);
+                      unsigned long *vm_generationid_addr,
+                      struct restore_callbacks *callbacks);
 /**
  * xc_domain_restore writes a file to disk that contains the device
  * model saved state.

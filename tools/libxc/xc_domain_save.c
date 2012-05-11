@@ -1723,6 +1723,23 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         }
     }
 
+    if ( callbacks != NULL && callbacks->toolstack_save != NULL )
+    {
+        int id = XC_SAVE_ID_TOOLSTACK;
+        uint8_t *buf;
+        uint32_t len;
+
+        if ( callbacks->toolstack_save(dom, &buf, &len, callbacks->data) < 0 )
+        {
+            PERROR("Error calling toolstack_save");
+            goto out;
+        }
+        wrexact(io_fd, &id, sizeof(id));
+        wrexact(io_fd, &len, sizeof(len));
+        wrexact(io_fd, buf, len);
+        free(buf);
+    }
+
     if ( !callbacks->checkpoint )
     {
         /*

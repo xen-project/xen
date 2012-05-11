@@ -659,6 +659,11 @@ static void tailbuf_free(tailbuf_t *buf)
         tailbuf_free_pv(&buf->u.pv);
 }
 
+struct toolstack_data_t {
+    uint8_t *data;
+    uint32_t len;
+};
+
 typedef struct {
     void* pages;
     /* pages is of length nr_physpages, pfn_types is of length nr_pages */
@@ -685,6 +690,8 @@ typedef struct {
     uint64_t acpi_ioport_location;
     uint64_t viridian;
     uint64_t vm_generationid_addr;
+
+    struct toolstack_data_t tdata;
 } pagebuf_t;
 
 static int pagebuf_init(pagebuf_t* buf)
@@ -695,6 +702,10 @@ static int pagebuf_init(pagebuf_t* buf)
 
 static void pagebuf_free(pagebuf_t* buf)
 {
+    if (buf->tdata.data != NULL) {
+        free(buf->tdata.data);
+        buf->tdata.data = NULL;
+    }
     if (buf->pages) {
         free(buf->pages);
         buf->pages = NULL;
@@ -862,6 +873,19 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
             return -1;
         }
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
+
+    case XC_SAVE_ID_TOOLSTACK:
+        {
+            RDEXACT(fd, &buf->tdata.len, sizeof(buf->tdata.len));
+            buf->tdata.data = (uint8_t*) realloc(buf->tdata.data, buf->tdata.len);
+            if ( buf->tdata.data == NULL )
+            {
+                PERROR("error memory allocation");
+                return -1;
+            }
+            RDEXACT(fd, buf->tdata.data, buf->tdata.len);
+            return pagebuf_get_one(xch, ctx, buf, fd, dom);
+        }
 
     case XC_SAVE_ID_ENABLE_COMPRESSION:
         /* We cannot set compression flag directly in pagebuf structure,
@@ -1299,7 +1323,8 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       unsigned long *console_mfn, domid_t console_domid,
                       unsigned int hvm, unsigned int pae, int superpages,
                       int no_incr_generationid,
-                      unsigned long *vm_generationid_addr)
+                      unsigned long *vm_generationid_addr,
+                      struct restore_callbacks *callbacks)
 {
     DECLARE_DOMCTL;
     int rc = 1, frc, i, j, n, m, pae_extended_cr3 = 0, ext_vcpucontext = 0;
@@ -1347,6 +1372,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
     pagebuf_t pagebuf;
     tailbuf_t tailbuf, tmptail;
+    struct toolstack_data_t tdata, tdatatmp;
     void* vcpup;
     uint64_t console_pfn = 0;
 
@@ -1359,6 +1385,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     pagebuf_init(&pagebuf);
     memset(&tailbuf, 0, sizeof(tailbuf));
     tailbuf.ishvm = hvm;
+    memset(&tdata, 0, sizeof(tdata));
 
     memset(ctx, 0, sizeof(*ctx));
 
@@ -1623,6 +1650,10 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     } else {
         ERROR("Error, unknow acpi ioport location (%i)", pagebuf.acpi_ioport_location);
     }
+
+    tdatatmp = tdata;
+    tdata = pagebuf.tdata;
+    pagebuf.tdata = tdatatmp;
 
     if ( ctx->last_checkpoint )
     {
@@ -2074,6 +2105,26 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     goto out;
 
   finish_hvm:
+    if ( tdata.data != NULL )
+    {
+        if ( callbacks != NULL && callbacks->toolstack_restore != NULL )
+        {
+            rc = callbacks->toolstack_restore(dom, tdata.data, tdata.len,
+                        callbacks->data);
+            free(tdata.data);
+            if ( rc < 0 )
+            {
+                PERROR("error calling toolstack_restore");
+                goto out;
+            }
+        } else {
+            rc = -1;
+            ERROR("toolstack data available but no callback provided\n");
+            free(tdata.data);
+            goto out;
+        }
+    }
+
     /* Dump the QEMU state to a state file for QEMU to load */
     if ( dump_qemu(xch, dom, &tailbuf.u.hvm) ) {
         PERROR("Error dumping QEMU state to file");
