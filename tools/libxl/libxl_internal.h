@@ -1513,6 +1513,42 @@ _hidden void libxl__datacopier_kill(libxl__datacopier_state *dc);
 _hidden int libxl__datacopier_start(libxl__datacopier_state *dc);
 
 
+/*----- openpty -----*/
+
+/*
+ * opens count (>0) ptys like count calls to openpty, and then
+ * calls back.  On entry, all op[].master and op[].slave must be
+ * 0.  On callback, either rc==0 and master and slave are non-0,
+ * or rc is a libxl error and they are both 0.  If libxl__openpty
+ * returns non-0 no callback will happen and everything is left
+ * cleaned up.
+ */
+
+typedef struct libxl__openpty_state libxl__openpty_state;
+typedef struct libxl__openpty_result libxl__openpty_result;
+typedef void libxl__openpty_callback(libxl__egc *egc, libxl__openpty_state *op);
+
+struct libxl__openpty_state {
+    /* caller must fill these in, and they must all remain valid */
+    libxl__ao *ao;
+    libxl__openpty_callback *callback;
+    int count;
+    libxl__openpty_result *results; /* actual size is count, out parameter */
+    /* public, result, caller may only read in callback */
+    int rc;
+    /* private for implementation */
+    libxl__ev_child child;
+};
+
+struct libxl__openpty_result {
+    libxl__carefd *master, *slave;
+};
+
+int libxl__openptys(libxl__openpty_state *op,
+                    const struct termios *termp,
+                    const struct winsize *winp);
+
+
 /*
  * Convenience macros.
  */

@@ -187,3 +187,130 @@ int libxl__datacopier_start(libxl__datacopier_state *dc)
     return rc;
 }
 
+/*----- openpty -----*/
+
+/* implementation */
+    
+static void openpty_cleanup(libxl__openpty_state *op)
+{
+    int i;
+
+    for (i=0; i<op->count; i++) {
+        libxl__openpty_result *res = &op->results[i];
+        libxl__carefd_close(res->master);  res->master = 0;
+        libxl__carefd_close(res->slave);   res->slave = 0;
+    }
+}
+
+static void openpty_exited(libxl__egc *egc, libxl__ev_child *child,
+                           pid_t pid, int status) {
+    libxl__openpty_state *op = CONTAINER_OF(child, *op, child);
+    STATE_AO_GC(op->ao);
+
+    if (status) {
+        /* Perhaps the child gave us the fds and then exited nonzero.
+         * Well that would be odd but we don't really care. */
+        libxl_report_child_exitstatus(CTX, op->rc ? LIBXL__LOG_ERROR
+                                                  : LIBXL__LOG_WARNING,
+                                      "openpty child", pid, status);
+    }
+    if (op->rc)
+        openpty_cleanup(op);
+    op->callback(egc, op);
+}
+
+int libxl__openptys(libxl__openpty_state *op,
+                    const struct termios *termp,
+                    const struct winsize *winp) {
+    /*
+     * This is completely crazy.  openpty calls grantpt which the spec
+     * says may fork, and may not be called with a SIGCHLD handler.
+     * Now our application may have a SIGCHLD handler so that's bad.
+     * We could perhaps block it but we'd need to block it on all
+     * threads.  This is just Too Hard.
+     *
+     * So instead, we run openpty in a child process.  That child
+     * process then of course has only our own thread and our own
+     * signal handlers.  We pass the fds back.
+     *
+     * Since our only current caller actually wants two ptys, we
+     * support calling openpty multiple times for a single fork.
+     */
+    STATE_AO_GC(op->ao);
+    int count = op->count;
+    int r, i, rc, sockets[2], ptyfds[count][2];
+    libxl__carefd *for_child = 0;
+    pid_t pid = -1;
+
+    for (i=0; i<count; i++) {
+        ptyfds[i][0] = ptyfds[i][1] = -1;
+        libxl__openpty_result *res = &op->results[i];
+        assert(!res->master);
+        assert(!res->slave);
+    }
+    sockets[0] = sockets[1] = -1; /* 0 is for us, 1 for our child */
+
+    libxl__carefd_begin();
+    r = socketpair(AF_UNIX, SOCK_STREAM, 0, sockets);
+    if (r) { sockets[0] = sockets[1] = -1; }
+    for_child = libxl__carefd_opened(CTX, sockets[1]);
+    if (r) { LOGE(ERROR,"socketpair failed"); rc = ERROR_FAIL; goto out; }
+
+    pid = libxl__ev_child_fork(gc, &op->child, openpty_exited);
+    if (pid == -1) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    if (!pid) {
+        /* child */
+        close(sockets[0]);
+        signal(SIGCHLD, SIG_DFL);
+
+        for (i=0; i<count; i++) {
+            r = openpty(&ptyfds[i][0], &ptyfds[i][1], NULL, termp, winp);
+            if (r) { LOGE(ERROR,"openpty failed"); _exit(-1); }
+        }
+        rc = libxl__sendmsg_fds(gc, sockets[1], "",1,
+                                2*count, &ptyfds[0][0], "ptys");
+        if (rc) { LOGE(ERROR,"sendmsg to parent failed"); _exit(-1); }
+        _exit(0);
+    }
+
+    libxl__carefd_close(for_child);
+    for_child = 0;
+
+    /* this should be fast so do it synchronously */
+
+    libxl__carefd_begin();
+    char buf[1];
+    rc = libxl__recvmsg_fds(gc, sockets[0], buf,1,
+                            2*count, &ptyfds[0][0], "ptys");
+    if (!rc) {
+        for (i=0; i<count; i++) {
+            libxl__openpty_result *res = &op->results[i];
+            res->master = libxl__carefd_record(CTX, ptyfds[i][0]);
+            res->slave =  libxl__carefd_record(CTX, ptyfds[i][1]);
+        }
+    }
+    /* now the pty fds are in the carefds, if they were ever open */
+    libxl__carefd_unlock();
+    if (rc)
+        goto out;
+
+    rc = 0;
+
+ out:
+    if (sockets[0] >= 0) close(sockets[0]);
+    libxl__carefd_close(for_child);
+    if (libxl__ev_child_inuse(&op->child)) {
+        op->rc = rc;
+        /* we will get a callback when the child dies */
+        return 0;
+    }
+
+    assert(rc);
+    openpty_cleanup(op);
+    return rc;
+}
+
