@@ -193,7 +193,7 @@ static int logrename(libxl__gc *gc, const char *old, const char *new)
     return 0;
 }
 
-int libxl_create_logfile(libxl_ctx *ctx, char *name, char **full_name)
+int libxl_create_logfile(libxl_ctx *ctx, const char *name, char **full_name)
 {
     GC_INIT(ctx);
     struct stat stat_buf;
