@@ -339,6 +339,9 @@ static void watchfd_callback(libxl__egc *egc, libxl__ev_fd *ev,
 {
     EGC_GC;
 
+    if (revents & (POLLERR|POLLHUP))
+        LIBXL__EVENT_DISASTER(egc, "unexpected poll event on watch fd", 0, 0);
+
     for (;;) {
         char **event = xs_check_watch(CTX->xsh);
         if (!event) {
@@ -743,7 +746,9 @@ static int afterpoll_check_fd(libxl__poller *poller,
         /* again, stale slot entry */
         return 0;
 
-    int revents = fds[slot].revents & events;
+    assert(!(fds[slot].revents & POLLNVAL));
+
+    int revents = fds[slot].revents & (events | POLLERR | POLLHUP);
     /* we mask in case requested events have changed */
 
     return revents;

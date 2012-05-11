@@ -128,6 +128,11 @@ _hidden void libxl__alloc_failed(libxl_ctx *, const char *func,
 typedef struct libxl__ev_fd libxl__ev_fd;
 typedef void libxl__ev_fd_callback(libxl__egc *egc, libxl__ev_fd *ev,
                                    int fd, short events, short revents);
+  /* Note that revents may contain POLLERR or POLLHUP regardless of
+   * events; otherwise revents contains only bits in events.  Contrary
+   * to the documentation for poll(2), POLLERR and POLLHUP can occur
+   * even if only POLLIN was set in events.  (POLLNVAL is a fatal
+   * error and will cause libxl event machinery to fail an assertion.) */
 struct libxl__ev_fd {
     /* caller should include this in their own struct */
     /* read-only for caller, who may read only when registered: */
