@@ -443,6 +443,79 @@ int libxl__qemu_traditional_cmd(libxl__gc *gc, uint32_t domid,
     return libxl__xs_write(gc, XBT_NULL, path, "%s", cmd);
 }
 
+struct libxl__physmap_info {
+    uint64_t phys_offset;
+    uint64_t start_addr;
+    uint64_t size;
+    uint32_t namelen;
+    char name[];
+};
+
+#define TOOLSTACK_SAVE_VERSION 1
+
+static inline char *restore_helper(libxl__gc *gc, uint32_t domid,
+        uint64_t phys_offset, char *node)
+{
+    return libxl__sprintf(gc,
+            "/local/domain/0/device-model/%d/physmap/%"PRIx64"/%s",
+            domid, phys_offset, node);
+}
+
+static int libxl__toolstack_restore(uint32_t domid, uint8_t *buf,
+        uint32_t size, void *data)
+{
+    libxl__gc *gc = (libxl__gc *) data;
+    libxl_ctx *ctx = gc->owner;
+    int i, ret;
+    uint8_t *ptr = buf;
+    uint32_t count = 0, version = 0;
+    struct libxl__physmap_info* pi;
+    char *xs_path;
+
+    if (size < sizeof(version) + sizeof(count)) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "wrong size");
+        return -1;
+    }
+
+    memcpy(&version, ptr, sizeof(version));
+    ptr += sizeof(version);
+
+    if (version != TOOLSTACK_SAVE_VERSION) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "wrong version");
+        return -1;
+    }
+
+    memcpy(&count, ptr, sizeof(count));
+    ptr += sizeof(count);
+ 
+    if (size < sizeof(version) + sizeof(count) +
+            count * (sizeof(struct libxl__physmap_info))) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "wrong size");
+        return -1;
+    }
+
+    for (i = 0; i < count; i++) {
+        pi = (struct libxl__physmap_info*) ptr;
+        ptr += sizeof(struct libxl__physmap_info) + pi->namelen;
+
+        xs_path = restore_helper(gc, domid, pi->phys_offset, "start_addr");
+        ret = libxl__xs_write(gc, 0, xs_path, "%"PRIx64, pi->start_addr);
+        if (ret)
+            return -1;
+        xs_path = restore_helper(gc, domid, pi->phys_offset, "size");
+        ret = libxl__xs_write(gc, 0, xs_path, "%"PRIx64, pi->size);
+        if (ret)
+            return -1;
+        if (pi->namelen > 0) {
+            xs_path = restore_helper(gc, domid, pi->phys_offset, "name");
+            ret = libxl__xs_write(gc, 0, xs_path, "%s", pi->name);
+            if (ret)
+                return -1;
+        }
+    }
+    return 0;
+}
+
 int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
                                  libxl_domain_build_info *info,
                                  libxl__domain_build_state *state,
@@ -452,6 +525,7 @@ int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
     /* read signature */
     int rc;
     int hvm, pae, superpages;
+    struct restore_callbacks callbacks;
     int no_incr_generationid;
     switch (info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
@@ -459,6 +533,8 @@ int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
         superpages = 1;
         pae = libxl_defbool_val(info->u.hvm.pae);
         no_incr_generationid = !libxl_defbool_val(info->u.hvm.incr_generationid);
+        callbacks.toolstack_restore = libxl__toolstack_restore;
+        callbacks.data = gc;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         hvm = 0;
@@ -474,7 +550,7 @@ int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
                            state->store_domid, state->console_port,
                            &state->console_mfn, state->console_domid,
                            hvm, pae, superpages, no_incr_generationid,
-                           &state->vm_generationid_addr, NULL);
+                           &state->vm_generationid_addr, &callbacks);
     if ( rc ) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "restoring domain");
         return ERROR_FAIL;
@@ -629,6 +705,90 @@ static int libxl__domain_suspend_common_callback(void *data)
     return 0;
 }
 
+static inline char *save_helper(libxl__gc *gc, uint32_t domid,
+        char *phys_offset, char *node)
+{
+    return libxl__sprintf(gc,
+            "/local/domain/0/device-model/%d/physmap/%s/%s",
+            domid, phys_offset, node);
+}
+
+static int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
+        uint32_t *len, void *data)
+{
+    struct suspendinfo *si = (struct suspendinfo *) data;
+    libxl__gc *gc = (libxl__gc *) si->gc;
+    libxl_ctx *ctx = gc->owner;
+    int i = 0;
+    char *start_addr = NULL, *size = NULL, *phys_offset = NULL, *name = NULL;
+    unsigned int num = 0;
+    uint32_t count = 0, version = TOOLSTACK_SAVE_VERSION, namelen = 0;
+    uint8_t *ptr = NULL;
+    char **entries = NULL;
+    struct libxl__physmap_info *pi;
+
+    entries = libxl__xs_directory(gc, 0, libxl__sprintf(gc,
+                "/local/domain/0/device-model/%d/physmap", domid), &num);
+    count = num;
+
+    *len = sizeof(version) + sizeof(count);
+    *buf = calloc(1, *len);
+    ptr = *buf;
+    if (*buf == NULL)
+        return -1;
+
+    memcpy(ptr, &version, sizeof(version));
+    ptr += sizeof(version);
+    memcpy(ptr, &count, sizeof(count));
+    ptr += sizeof(count);
+
+    for (i = 0; i < count; i++) {
+        unsigned long offset;
+        char *xs_path;
+        phys_offset = entries[i];
+        if (phys_offset == NULL) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "phys_offset %d is NULL", i);
+            return -1;
+        }
+
+        xs_path = save_helper(gc, domid, phys_offset, "start_addr");
+        start_addr = libxl__xs_read(gc, 0, xs_path);
+        if (start_addr == NULL) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "%s is NULL", xs_path);
+            return -1;
+        }
+
+        xs_path = save_helper(gc, domid, phys_offset, "size");
+        size = libxl__xs_read(gc, 0, xs_path);
+        if (size == NULL) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "%s is NULL", xs_path);
+            return -1;
+        }
+
+        xs_path = save_helper(gc, domid, phys_offset, "name");
+        name = libxl__xs_read(gc, 0, xs_path);
+        if (name == NULL)
+            namelen = 0;
+        else
+            namelen = strlen(name) + 1;
+        *len += namelen + sizeof(struct libxl__physmap_info);
+        offset = ptr - (*buf);
+        *buf = realloc(*buf, *len);
+        if (*buf == NULL)
+            return -1;
+        ptr = (*buf) + offset;
+        pi = (struct libxl__physmap_info *) ptr;
+        pi->phys_offset = strtoll(phys_offset, NULL, 16);
+        pi->start_addr = strtoll(start_addr, NULL, 16);
+        pi->size = strtoll(size, NULL, 16);
+        pi->namelen = namelen;
+        memcpy(pi->name, name, namelen);
+        ptr += sizeof(struct libxl__physmap_info) + namelen;
+    }
+
+    return 0;
+}
+
 int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
                                  libxl_domain_type type,
                                  int live, int debug)
@@ -691,6 +851,7 @@ int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
     memset(&callbacks, 0, sizeof(callbacks));
     callbacks.suspend = libxl__domain_suspend_common_callback;
     callbacks.switch_qemu_logdirty = libxl__domain_suspend_common_switch_qemu_logdirty;
+    callbacks.toolstack_save = libxl__toolstack_save;
     callbacks.data = &si;
 
     rc = xc_domain_save(ctx->xch, fd, domid, 0, 0, flags, &callbacks,
