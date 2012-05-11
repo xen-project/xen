@@ -236,6 +236,10 @@ static void bootloader_cleanup(libxl__egc *egc, libxl__bootloader_state *bl)
         libxl__carefd_close(bl->ptys[i].master);
         libxl__carefd_close(bl->ptys[i].slave);
     }
+    if (bl->display.log) {
+        fclose(bl->display.log);
+        bl->display.log = NULL;
+    }
 }
 
 static void bootloader_setpaths(libxl__gc *gc, libxl__bootloader_state *bl)
@@ -258,6 +262,8 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
 {
     STATE_AO_GC(bl->ao);
     libxl_domain_build_info *info = bl->info;
+    uint32_t domid = bl->domid;
+    char *logfile_tmp = NULL;
     int rc, r;
 
     libxl__bootloader_init(bl);
@@ -268,6 +274,22 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
     }
 
     bootloader_setpaths(gc, bl);
+
+    const char *logfile_leaf = GCSPRINTF("bootloader.%"PRIu32, domid);
+    rc = libxl_create_logfile(CTX, logfile_leaf, &logfile_tmp);
+    if (rc) goto out;
+
+    /* Transfer ownership of log filename to bl and the gc */
+    bl->logfile = logfile_tmp;
+    libxl__ptr_add(gc, logfile_tmp);
+    logfile_tmp = NULL;
+
+    bl->display.log = fopen(bl->logfile, "a");
+    if (!bl->display.log) {
+        LOGE(ERROR, "failed to create bootloader logfile %s", bl->logfile);
+        rc = ERROR_FAIL;
+        goto out;
+    }
 
     for (;;) {
         r = mkdir(bl->outputdir, 0600);
@@ -308,6 +330,7 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
  out:
     assert(rc);
  out_ok:
+    free(logfile_tmp);
     bootloader_callback(egc, bl, rc);
 }
 
@@ -465,6 +488,7 @@ static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,
     libxl__datacopier_kill(&bl->display);
 
     if (status) {
+        LOG(ERROR, "bootloader failed - consult logfile %s", bl->logfile);
         libxl_report_child_exitstatus(CTX, XTL_ERROR, "bootloader",
                                       pid, status);
         rc = ERROR_FAIL;

@@ -118,6 +118,16 @@ static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
             libxl__ev_fd_deregister(gc, &dc->toread);
             break;
         }
+        if (dc->log) {
+            int wrote = fwrite(buf->buf + buf->used, 1, r, dc->log);
+            if (wrote != r) {
+                assert(ferror(dc->log));
+                assert(errno);
+                LOGE(ERROR, "error logging %s", dc->copywhat);
+                datacopier_callback(egc, dc, 0, errno);
+                return;
+            }
+        }
         buf->used += r;
         dc->used += r;
         assert(buf->used <= sizeof(buf->buf));

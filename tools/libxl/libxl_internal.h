@@ -1503,6 +1503,7 @@ struct libxl__datacopier_state {
     int readfd, writefd;
     ssize_t maxsz;
     const char *copywhat, *readwhat, *writewhat; /* for error msgs */
+    FILE *log; /* gets a copy of everything */
     libxl__datacopier_callback *callback;
     /* remaining fields are private to datacopier */
     libxl__ev_fd toread, towrite;
@@ -1565,7 +1566,7 @@ struct libxl__bootloader_state {
     libxl_device_disk *disk;
     uint32_t domid;
     /* private to libxl__run_bootloader */
-    char *outputpath, *outputdir;
+    char *outputpath, *outputdir, *logfile;
     char *diskpath; /* not from gc, represents actually attached disk */
     libxl__openpty_state openpty;
     libxl__openpty_result ptys[2];  /* [0] is for bootloader */
