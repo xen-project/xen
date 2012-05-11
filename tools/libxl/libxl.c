@@ -642,16 +642,26 @@ int libxl_domain_pause(libxl_ctx *ctx, uint32_t domid)
 }
 
 int libxl_domain_core_dump(libxl_ctx *ctx, uint32_t domid,
-                           const char *filename)
+                           const char *filename,
+                           const libxl_asyncop_how *ao_how)
 {
-    int ret;
+    AO_CREATE(ctx, domid, ao_how);
+    int ret, rc;
+
     ret = xc_domain_dumpcore(ctx->xch, domid, filename);
     if (ret<0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "core dumping domain %d to %s",
                      domid, filename);
-        return ERROR_FAIL;
+        rc = ERROR_FAIL;
+        goto out;
     }
-    return 0;
+
+    rc = 0;
+out:
+
+    libxl__ao_complete(egc, ao, rc);
+
+    return AO_INPROGRESS;
 }
 
 int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid)

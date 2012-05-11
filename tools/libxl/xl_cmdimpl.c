@@ -1306,7 +1306,7 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid,
             LOG("failed to construct core dump path");
         } else {
             LOG("dumping core to %s", corefile);
-            rc=libxl_domain_core_dump(ctx, domid, corefile);
+            rc=libxl_domain_core_dump(ctx, domid, corefile, NULL);
             if (rc) LOG("core dump failed (rc=%d).", rc);
         }
         /* No point crying over spilled milk, continue on failure. */
@@ -2927,7 +2927,7 @@ static void core_dump_domain(const char *domain_spec, const char *filename)
 {
     int rc;
     find_domain(domain_spec);
-    rc=libxl_domain_core_dump(ctx, domid, filename);
+    rc=libxl_domain_core_dump(ctx, domid, filename, NULL);
     if (rc) { fprintf(stderr,"core dump failed (rc=%d)\n",rc);exit(-1); }
 }
 

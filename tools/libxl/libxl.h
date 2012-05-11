@@ -511,7 +511,9 @@ int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
 int libxl_domain_pause(libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid);
 
-int libxl_domain_core_dump(libxl_ctx *ctx, uint32_t domid, const char *filename);
+int libxl_domain_core_dump(libxl_ctx *ctx, uint32_t domid,
+                           const char *filename,
+                           const libxl_asyncop_how *ao_how);
 
 int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb);
 int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, int32_t target_memkb, int relative, int enforce);
