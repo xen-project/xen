@@ -359,7 +359,8 @@ struct libxl__gc {
 };
 
 struct libxl__egc {
-    /* for event-generating functions only */
+    /* For event-generating functions only.
+     * The egc and its gc may be accessed only on the creating thread. */
     struct libxl__gc gc;
     struct libxl__event_list occurred_for_callback;
     LIBXL_TAILQ_HEAD(, libxl__ao) aos_for_callback;
@@ -369,6 +370,20 @@ struct libxl__egc {
 #define LIBXL__AO_MAGIC_DESTROYED    0xA0DEAD00ul
 
 struct libxl__ao {
+    /*
+     * An ao and its gc may be accessed only with the ctx lock held.
+     *
+     * Special exception: If an ao has been added to
+     * egc->aos_for_callback, the thread owning the egc may remove the
+     * ao from that list and make the callback without holding the
+     * lock.
+     *
+     * Corresponding restriction: An ao may be added only to one
+     * egc->aos_for_callback, once; rc and how must already have been
+     * set and may not be subsequently modified.  (This restriction is
+     * easily and obviously met since the ao is queued for callback
+     * only in libxl__ao_complete.)
+     */
     uint32_t magic;
     unsigned constructing:1, in_initiator:1, complete:1, notified:1;
     int rc;
@@ -1364,6 +1379,12 @@ libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
  * prototype(s) for callers of LIBXL__INIT_EGC and EGC_INIT.  You
  * should in any case not find it necessary to call egc-creators from
  * within libxl.
+ *
+ * The callbacks must all take place with the ctx unlocked because
+ * the application is entitled to reenter libxl from them.  This
+ * would be bad not because the lock is not recursive (it is) but
+ * because the application might make blocking libxl calls which
+ * would hold the lock unreasonably long.
  *
  * For the same reason libxl__egc_cleanup (or EGC_FREE) must be called
  * with the ctx *unlocked*.  So the right pattern has the EGC_...

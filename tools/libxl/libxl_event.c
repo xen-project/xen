@@ -901,6 +901,11 @@ void libxl__event_disaster(libxl__egc *egc, const char *msg, int errnoval,
 
 static void egc_run_callbacks(libxl__egc *egc)
 {
+    /*
+     * The callbacks must happen with the ctx unlocked.
+     * See the comment near #define EGC_GC in libxl_internal.h and
+     * those in the definitions of libxl__egc and libxl__ao.
+     */
     EGC_GC;
     libxl_event *ev, *ev_tmp;
 
@@ -914,9 +919,11 @@ static void egc_run_callbacks(libxl__egc *egc)
                              entry_for_callback, ao_tmp) {
         LIBXL_TAILQ_REMOVE(&egc->aos_for_callback, ao, entry_for_callback);
         ao->how.callback(CTX, ao->rc, ao->how.u.for_callback);
+        CTX_LOCK;
         ao->notified = 1;
         if (!ao->in_initiator)
             libxl__ao__destroy(CTX, ao);
+        CTX_UNLOCK;
     }
 }
 
