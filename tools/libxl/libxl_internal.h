@@ -1135,6 +1135,17 @@ _hidden void libxl__qmp_cleanup(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
                                        const libxl_domain_config *guest_config);
 
+/* on failure, logs */
+int libxl__sendmsg_fds(libxl__gc *gc, int carrier,
+                       const void *data, size_t datalen,
+                       int nfds, const int fds[], const char *what);
+
+/* Insists on receiving exactly nfds and datalen.  On failure, logs
+ * and leaves *fds untouched. */
+int libxl__recvmsg_fds(libxl__gc *gc, int carrier,
+                       void *databuf, size_t datalen,
+                       int nfds, int fds[], const char *what);
+
 /* from libxl_json */
 #include <yajl/yajl_gen.h>
 

@@ -579,6 +579,110 @@ void libxl_cputopology_list_free(libxl_cputopology *list, int nr)
     free(list);
 }
 
+int libxl__sendmsg_fds(libxl__gc *gc, int carrier,
+                       const void *data, size_t datalen,
+                       int nfds, const int fds[], const char *what) {
+    struct msghdr msg = { 0 };
+    struct cmsghdr *cmsg;
+    size_t spaceneeded = nfds * sizeof(fds[0]);
+    char control[CMSG_SPACE(spaceneeded)];
+    struct iovec iov;
+    int r;
+
+    iov.iov_base = (void*)data;
+    iov.iov_len  = datalen;
+
+    /* compose the message */
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = control;
+    msg.msg_controllen = sizeof(control);
+
+    /* attach open fd */
+    cmsg = CMSG_FIRSTHDR(&msg);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    cmsg->cmsg_len = CMSG_LEN(spaceneeded);
+    memcpy(CMSG_DATA(cmsg), fds, spaceneeded);
+
+    msg.msg_controllen = cmsg->cmsg_len;
+
+    r = sendmsg(carrier, &msg, 0);
+    if (r < 0) {
+        LOGE(ERROR, "failed to send fd-carrying message (%s)", what);
+        return ERROR_FAIL;
+    }
+
+    return 0;
+}
+
+int libxl__recvmsg_fds(libxl__gc *gc, int carrier,
+                       void *databuf, size_t datalen,
+                       int nfds, int fds[], const char *what)
+{
+    struct msghdr msg = { 0 };
+    struct cmsghdr *cmsg;
+    size_t spaceneeded = nfds * sizeof(fds[0]);
+    char control[CMSG_SPACE(spaceneeded)];
+    struct iovec iov;
+    int r;
+
+    iov.iov_base = databuf;
+    iov.iov_len  = datalen;
+
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = control;
+    msg.msg_controllen = sizeof(control);
+
+    for (;;) {
+        r = recvmsg(carrier, &msg, 0);
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            if (errno == EWOULDBLOCK) return -1;
+            LOGE(ERROR,"recvmsg failed (%s)", what);
+            return ERROR_FAIL;
+        }
+        if (r == 0) {
+            LOG(ERROR,"recvmsg got EOF (%s)", what);
+            return ERROR_FAIL;
+        }
+        cmsg = CMSG_FIRSTHDR(&msg);
+        if (cmsg->cmsg_len <= CMSG_LEN(0)) {
+            LOG(ERROR,"recvmsg got no control msg"
+                " when expecting fds (%s)", what);
+            return ERROR_FAIL;
+        }
+        if (cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS) {
+            LOG(ERROR, "recvmsg got unexpected"
+                " cmsg_level %d (!=%d) or _type %d (!=%d) (%s)",
+                cmsg->cmsg_level, SOL_SOCKET,
+                cmsg->cmsg_type, SCM_RIGHTS,
+                what);
+            return ERROR_FAIL;
+        }
+        if (cmsg->cmsg_len != CMSG_LEN(spaceneeded) ||
+            msg.msg_controllen != cmsg->cmsg_len) {
+            LOG(ERROR, "recvmsg got unexpected"
+                " number of fds or extra control data"
+                " (%ld bytes' worth, expected %ld) (%s)",
+                (long)CMSG_LEN(spaceneeded), (long)cmsg->cmsg_len,
+                what);
+            int i, fd;
+            unsigned char *p;
+            for (i=0, p=CMSG_DATA(cmsg);
+                 CMSG_SPACE(i * sizeof(fds[0]));
+                 i++, i+=sizeof(fd)) {
+                memcpy(&fd, p, sizeof(fd));
+                close(fd);
+            }
+            return ERROR_FAIL;
+        }
+        memcpy(fds, CMSG_DATA(cmsg), spaceneeded);
+        return 0;
+    }
+}         
+
 void libxl_dominfo_list_free(libxl_dominfo *list, int nr)
 {
     int i;
