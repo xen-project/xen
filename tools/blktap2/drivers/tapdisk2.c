@@ -79,7 +79,12 @@ main(int argc, char *argv[])
 	if (optind != argc)
 		usage(argv[0], EINVAL);
 
-	chdir("/");
+	if (chdir("/")) {
+		DPRINTF("failed to chdir(/): %d\n", errno);
+		err = 1;
+		goto out;
+	}
+
 	tapdisk_start_logging("tapdisk2");
 
 	err = tapdisk_server_init();
