@@ -465,8 +465,18 @@ int libxl_ctx_free(libxl_ctx *ctx /* 0 is OK */);
 
 /* domain related functions */
 typedef int (*libxl_console_ready)(libxl_ctx *ctx, uint32_t domid, void *priv);
-int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid);
-int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config, libxl_console_ready cb, void *priv, uint32_t *domid, int restore_fd);
+  /* fixme-ao   Need to review this API.  If we keep it, the reentrancy
+   * properties need to be documented but they may turn out to be too
+   * awkward */
+
+int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config,
+                            libxl_console_ready cb, void *priv, uint32_t *domid,
+                            const libxl_asyncop_how *ao_how);
+int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
+                                libxl_console_ready cb, void *priv,
+                                uint32_t *domid, int restore_fd,
+                                const libxl_asyncop_how *ao_how);
+
 void libxl_domain_config_init(libxl_domain_config *d_config);
 void libxl_domain_config_dispose(libxl_domain_config *d_config);
 int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,

@@ -558,15 +558,39 @@ static int store_libxl_entry(libxl__gc *gc, uint32_t domid,
         libxl_device_model_version_to_string(b_info->device_model_version));
 }
 
-static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
-                            libxl_console_ready cb, void *priv,
-                            uint32_t *domid_out, int restore_fd)
+/*----- main domain creation -----*/
+
+/* We have a linear control flow; only one event callback is
+ * outstanding at any time.  Each initiation and callback function
+ * arranges for the next to be called, as the very last thing it
+ * does.  (If that particular sub-operation is not needed, a
+ * function will call the next event callback directly.)
+ */
+
+/* Event callbacks, in this order: */
+static void domcreate_devmodel_started(libxl__egc *egc,
+                                       libxl__dm_spawn_state *dmss,
+                                       int rc);
+
+/* Our own function to clean up and call the user's callback.
+ * The final call in the sequence. */
+static void domcreate_complete(libxl__egc *egc,
+                               libxl__domain_create_state *dcs,
+                               int rc);
+
+static void initiate_domain_create(libxl__egc *egc,
+                                   libxl__domain_create_state *dcs)
 {
+    STATE_AO_GC(dcs->ao);
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    libxl__spawner_starting *dm_starting = 0;
-    libxl__domain_build_state state[1];
     uint32_t domid;
     int i, ret;
+
+    /* convenience aliases */
+    libxl_domain_config *const d_config = dcs->guest_config;
+    const int restore_fd = dcs->restore_fd;
+    const libxl_console_ready cb = dcs->console_cb;
+    void *const priv = dcs->console_cb_priv;
 
     domid = 0;
 
@@ -580,9 +604,12 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         goto error_out;
     }
 
+    dcs->guest_domid = domid;
+    dcs->dmss.dm.guest_domid = 0; /* means we haven't spawned */
+
     if ( d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV && cb ) {
-        if ( (*cb)(ctx, domid, priv) )
-            goto error_out;
+        ret = (*cb)(ctx, domid, priv);
+        if (ret) goto error_out;
     }
 
     ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
@@ -606,7 +633,17 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         }
     }
 
-    memset(state, 0, sizeof(*state));
+    memset(&dcs->build_state, 0, sizeof(dcs->build_state));
+    libxl__domain_build_state *state = &dcs->build_state;
+
+    /* We might be going to call libxl__spawn_local_dm, or _spawn_stub_dm.
+     * Fill in any field required by either, including both relevant
+     * callbacks (_spawn_stub_dm will overwrite our trespass if needed). */
+    dcs->dmss.dm.spawn.ao = ao;
+    dcs->dmss.dm.guest_config = dcs->guest_config;
+    dcs->dmss.dm.build_state = &dcs->build_state;
+    dcs->dmss.dm.callback = domcreate_devmodel_started;
+    dcs->dmss.callback = domcreate_devmodel_started;
 
     if ( restore_fd >= 0 ) {
         ret = domain_restore(gc, &d_config->b_info, domid, restore_fd, state);
@@ -656,14 +693,12 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         libxl_device_vkb_add(ctx, domid, &vkb);
         libxl_device_vkb_dispose(&vkb);
 
-        ret = libxl__create_device_model(gc, domid, d_config,
-                                         state, &dm_starting);
-        if (ret < 0) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                       "failed to create device model: %d", ret);
-            goto error_out;
-        }
-        break;
+        dcs->dmss.dm.guest_domid = domid;
+        if (libxl_defbool_val(d_config->b_info.device_model_stubdomain))
+            libxl__spawn_stub_dm(egc, &dcs->dmss);
+        else
+            libxl__spawn_local_dm(egc, &dcs->dmss.dm);
+        return;
     }
     case LIBXL_DOMAIN_TYPE_PV:
     {
@@ -687,25 +722,51 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         libxl__device_console_dispose(&console);
 
         if (need_qemu) {
-            libxl__create_xenpv_qemu(gc, domid, d_config, state, &dm_starting);
+            dcs->dmss.dm.guest_domid = domid;
+            libxl__spawn_local_dm(egc, &dcs->dmss.dm);
+            return;
+        } else {
+            assert(!dcs->dmss.dm.guest_domid);
+            domcreate_devmodel_started(egc, &dcs->dmss.dm, 0);
+            return;
         }
-        break;
     }
     default:
         ret = ERROR_INVAL;
         goto error_out;
     }
+    abort(); /* not reached */
 
-    if (dm_starting) {
+ error_out:
+    assert(ret);
+    domcreate_complete(egc, dcs, ret);
+}
+
+static void domcreate_devmodel_started(libxl__egc *egc,
+                                       libxl__dm_spawn_state *dmss,
+                                       int ret)
+{
+    libxl__domain_create_state *dcs = CONTAINER_OF(dmss, *dcs, dmss.dm);
+    STATE_AO_GC(dmss->spawn.ao);
+    int i;
+    libxl_ctx *ctx = CTX;
+    int domid = dcs->guest_domid;
+
+    /* convenience aliases */
+    libxl_domain_config *const d_config = dcs->guest_config;
+    const libxl_console_ready cb = dcs->console_cb;
+    void *const priv = dcs->console_cb_priv;
+
+    if (ret) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                   "device model did not start: %d", ret);
+        goto error_out;
+    }
+
+    if (dcs->dmss.dm.guest_domid) {
         if (d_config->b_info.device_model_version
             == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
             libxl__qmp_initializations(gc, domid, d_config);
-        }
-        ret = libxl__confirm_device_model_startup(gc, state, dm_starting);
-        if (ret < 0) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                       "device model did not start: %d", ret);
-            goto error_out;
         }
     }
 
@@ -734,38 +795,95 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     if ( cb && (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM ||
                 (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
                  d_config->b_info.u.pv.bootloader ))) {
-        if ( (*cb)(ctx, domid, priv) )
-            goto error_out;
+        ret = (*cb)(ctx, domid, priv);
+        if (ret) goto error_out;
     }
 
-    *domid_out = domid;
-    return 0;
+    domcreate_complete(egc, dcs, 0);
+    return;
 
 error_out:
-    if (domid)
-        libxl_domain_destroy(ctx, domid);
-
-    return ret;
+    assert(ret);
+    domcreate_complete(egc, dcs, ret);
 }
 
-int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config,
-                            libxl_console_ready cb, void *priv, uint32_t *domid)
+static void domcreate_complete(libxl__egc *egc,
+                               libxl__domain_create_state *dcs,
+                               int rc)
 {
-    GC_INIT(ctx);
-    int rc;
-    rc = do_domain_create(gc, d_config, cb, priv, domid, -1);
-    GC_FREE;
-    return rc;
+    STATE_AO_GC(dcs->ao);
+
+    if (rc) {
+        if (dcs->guest_domid) {
+            int rc2 = libxl_domain_destroy(CTX, dcs->guest_domid);
+            if (rc2)
+                LOG(ERROR, "unable to destroy domain %d following"
+                    " failed creation", dcs->guest_domid);
+        }
+        dcs->guest_domid = -1;
+    }
+    dcs->callback(egc, dcs, rc, dcs->guest_domid);
+}
+
+/*----- application-facing domain creation interface -----*/
+
+typedef struct {
+    libxl__domain_create_state dcs;
+    uint32_t *domid_out;
+} libxl__app_domain_create_state;
+
+static void domain_create_cb(libxl__egc *egc,
+                             libxl__domain_create_state *dcs,
+                             int rc, uint32_t domid);
+
+static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
+                            libxl_console_ready cb, void *priv, uint32_t *domid,
+                            int restore_fd, const libxl_asyncop_how *ao_how)
+{
+    AO_CREATE(ctx, 0, ao_how);
+    libxl__app_domain_create_state *cdcs;
+
+    GCNEW(cdcs);
+    cdcs->dcs.ao = ao;
+    cdcs->dcs.guest_config = d_config;
+    cdcs->dcs.restore_fd = restore_fd;
+    cdcs->dcs.console_cb = cb;
+    cdcs->dcs.console_cb_priv = priv;
+    cdcs->dcs.callback = domain_create_cb;
+    cdcs->domid_out = domid;
+
+    initiate_domain_create(egc, &cdcs->dcs);
+
+    return AO_INPROGRESS;
+}
+
+static void domain_create_cb(libxl__egc *egc,
+                             libxl__domain_create_state *dcs,
+                             int rc, uint32_t domid)
+{
+    libxl__app_domain_create_state *cdcs = CONTAINER_OF(dcs, *cdcs, dcs);
+    STATE_AO_GC(cdcs->dcs.ao);
+
+    if (!rc)
+        *cdcs->domid_out = domid;
+
+    libxl__ao_complete(egc, ao, rc);
+}
+    
+int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config,
+                            libxl_console_ready cb, void *priv,
+                            uint32_t *domid,
+                            const libxl_asyncop_how *ao_how)
+{
+    return do_domain_create(ctx, d_config, cb, priv, domid, -1, ao_how);
 }
 
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
-                                libxl_console_ready cb, void *priv, uint32_t *domid, int restore_fd)
+                                libxl_console_ready cb, void *priv,
+                                uint32_t *domid, int restore_fd,
+                                const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
-    int rc;
-    rc = do_domain_create(gc, d_config, cb, priv, domid, restore_fd);
-    GC_FREE;
-    return rc;
+    return do_domain_create(ctx, d_config, cb, priv, domid, restore_fd, ao_how);
 }
 
 /*

@@ -669,30 +669,36 @@ retry_transaction:
     return 0;
 }
 
-static int libxl__create_stubdom(libxl__gc *gc,
-                                 int guest_domid,
-                                 libxl_domain_config *guest_config,
-                                 libxl__domain_build_state *d_state,
-                                 libxl__spawner_starting **starting_r)
+static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
+                                libxl__dm_spawn_state *stubdom_dmss,
+                                int rc);
+
+void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
 {
+    STATE_AO_GC(sdss->dm.spawn.ao);
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int i, num_console = STUBDOM_SPECIAL_CONSOLES, ret;
     libxl__device_console *console;
-    libxl_domain_config dm_config[1];
     libxl_device_vfb vfb;
     libxl_device_vkb vkb;
-    libxl__domain_build_state stubdom_state[1];
-    uint32_t dm_domid;
     char **args;
     struct xs_permissions perm[2];
     xs_transaction_t t;
-    libxl__spawner_starting *dm_starting = 0;
+
+    /* convenience aliases */
+    libxl_domain_config *const dm_config = &sdss->dm_config;
+    libxl_domain_config *const guest_config = sdss->dm.guest_config;
+    const int guest_domid = sdss->dm.guest_domid;
+    libxl__domain_build_state *const d_state = sdss->dm.build_state;
+    libxl__domain_build_state *const stubdom_state = &sdss->dm_state;
 
     if (guest_config->b_info.device_model_version !=
         LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL) {
         ret = ERROR_INVAL;
         goto out;
     }
+
+    sdss->pvqemu.guest_domid = 0;
 
     libxl_domain_create_info_init(&dm_config->c_info);
     dm_config->c_info.type = LIBXL_DOMAIN_TYPE_PV;
@@ -741,10 +747,10 @@ static int libxl__create_stubdom(libxl__gc *gc,
     dm_config->num_vkbs = 1;
 
     /* fixme: this function can leak the stubdom if it fails */
-    dm_domid = 0;
-    ret = libxl__domain_make(gc, &dm_config->c_info, &dm_domid);
+    ret = libxl__domain_make(gc, &dm_config->c_info, &sdss->pvqemu.guest_domid);
     if (ret)
         goto out;
+    uint32_t dm_domid = sdss->pvqemu.guest_domid;
     ret = libxl__domain_build(gc, &dm_config->b_info, dm_domid, stubdom_state);
     if (ret)
         goto out;
@@ -852,42 +858,67 @@ retry_transaction:
             goto out_free;
     }
 
-    if (libxl__create_xenpv_qemu(gc, dm_domid,
-                                 dm_config,
-                                 stubdom_state,
-                                 &dm_starting) < 0) {
-        ret = ERROR_FAIL;
-        goto out_free;
-    }
-    if (libxl__confirm_device_model_startup(gc, d_state, dm_starting) < 0) {
-        ret = ERROR_FAIL;
-        goto out_free;
-    }
+    sdss->pvqemu.guest_domid = dm_domid;
+    sdss->pvqemu.guest_config = &sdss->dm_config;
+    sdss->pvqemu.build_state = &sdss->dm_state;
+    sdss->pvqemu.callback = spawn_stubdom_pvqemu_cb;
 
-    libxl_domain_unpause(ctx, dm_domid);
+    libxl__spawn_local_dm(egc, &sdss->pvqemu);
 
-    if (starting_r) {
-        *starting_r = calloc(1, sizeof(libxl__spawner_starting));
-        (*starting_r)->domid = guest_domid;
-        (*starting_r)->dom_path = libxl__xs_get_dompath(gc, guest_domid);
-        (*starting_r)->for_spawn = NULL;
-    }
-
-    ret = 0;
+    free(args);
+    return;
 
 out_free:
     free(args);
 out:
-    return ret;
+    assert(ret);
+    spawn_stubdom_pvqemu_cb(egc, &sdss->pvqemu, ret);
 }
 
-int libxl__create_device_model(libxl__gc *gc,
-                              int domid,
-                              libxl_domain_config *guest_config,
-                              libxl__domain_build_state *state,
-                              libxl__spawner_starting **starting_r)
+static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
+                                libxl__dm_spawn_state *stubdom_dmss,
+                                int rc)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
+    libxl__stub_dm_spawn_state *sdss =
+        CONTAINER_OF(stubdom_dmss, *sdss, pvqemu);
+    STATE_AO_GC(sdss->dm.spawn.ao);
+    uint32_t dm_domid = sdss->pvqemu.guest_domid;
+
+    if (rc) goto out;
+
+    rc = libxl_domain_unpause(CTX, dm_domid);
+    if (rc) goto out;
+
+ out:
+    if (rc) {
+        if (dm_domid)
+            libxl_domain_destroy(CTX, dm_domid);
+    }
+    sdss->callback(egc, &sdss->dm, rc);
+}
+
+/* callbacks passed to libxl__spawn_spawn */
+static void device_model_confirm(libxl__egc *egc, libxl__spawn_state *spawn,
+                                 const char *xsdata);
+static void device_model_startup_failed(libxl__egc *egc,
+                                        libxl__spawn_state *spawn);
+
+/* our "next step" function, called from those callbacks and elsewhere */
+static void device_model_spawn_outcome(libxl__egc *egc,
+                                       libxl__dm_spawn_state *dmss,
+                                       int rc);
+
+void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
+{
+    /* convenience aliases */
+    const int domid = dmss->guest_domid;
+    libxl__domain_build_state *const state = dmss->build_state;
+    libxl__spawn_state *const spawn = &dmss->spawn;
+
+    STATE_AO_GC(dmss->spawn.ao);
+
+    libxl_ctx *ctx = CTX;
+    libxl_domain_config *guest_config = dmss->guest_config;
     const libxl_domain_create_info *c_info = &guest_config->c_info;
     const libxl_domain_build_info *b_info = &guest_config->b_info;
     const libxl_vnc_info *vnc = libxl__dm_vnc(guest_config);
@@ -895,15 +926,13 @@ int libxl__create_device_model(libxl__gc *gc,
     int logfile_w, null;
     int rc;
     char **args, **arg;
-    libxl__spawner_starting buf_starting, *p;
     xs_transaction_t t;
     char *vm_path;
     char **pass_stuff;
     const char *dm;
 
     if (libxl_defbool_val(b_info->device_model_stubdomain)) {
-        rc = libxl__create_stubdom(gc, domid, guest_config, state, starting_r);
-        goto out;
+        abort();
     }
 
     dm = libxl__domain_device_model(gc, b_info);
@@ -947,25 +976,8 @@ int libxl__create_device_model(libxl__gc *gc,
     free(logfile);
     null = open("/dev/null", O_RDONLY);
 
-    if (starting_r) {
-        rc = ERROR_NOMEM;
-        *starting_r = calloc(1, sizeof(libxl__spawner_starting));
-        if (!*starting_r)
-            goto out_close;
-        p = *starting_r;
-        p->for_spawn = calloc(1, sizeof(libxl__spawn_starting));
-    } else {
-        p = &buf_starting;
-        p->for_spawn = NULL;
-    }
-
-    p->domid = domid;
-    p->dom_path = libxl__xs_get_dompath(gc, domid);
-    p->pid_path = "image/device-model-pid";
-    if (!p->dom_path) {
-        rc = ERROR_FAIL;
-        goto out_close;
-    }
+    const char *dom_path = libxl__xs_get_dompath(gc, domid);
+    spawn->pidpath = GCSPRINTF("%s/%s", dom_path, "image/device-model-pid");
 
     if (vnc && vnc->passwd) {
         /* This xenstore key will only be used by qemu-xen-traditionnal.
@@ -973,7 +985,7 @@ int libxl__create_device_model(libxl__gc *gc,
 retry_transaction:
         /* Find uuid and the write the vnc password to xenstore for qemu. */
         t = xs_transaction_start(ctx->xsh);
-        vm_path = libxl__xs_read(gc,t,libxl__sprintf(gc, "%s/vm", p->dom_path));
+        vm_path = libxl__xs_read(gc,t,libxl__sprintf(gc, "%s/vm", dom_path));
         if (vm_path) {
             /* Now write the vncpassword into it. */
             pass_stuff = libxl__calloc(gc, 3, sizeof(char *));
@@ -990,8 +1002,15 @@ retry_transaction:
     for (arg = args; *arg; arg++)
         LIBXL__LOG(CTX, XTL_DEBUG, "  %s", *arg);
 
-    rc = libxl__spawn_spawn(gc, p->for_spawn, "device model",
-                            libxl_spawner_record_pid, p);
+    spawn->what = GCSPRINTF("domain %d device model", domid);
+    spawn->xspath = GCSPRINTF("/local/domain/0/device-model/%d/state", domid);
+    spawn->timeout_ms = LIBXL_DEVICE_MODEL_START_TIMEOUT * 1000;
+    spawn->pidpath = GCSPRINTF("%s/image/device-model-pid", dom_path);
+    spawn->midproc_cb = libxl__spawn_record_pid;
+    spawn->confirm_cb = device_model_confirm;
+    spawn->failure_cb = device_model_startup_failed;
+
+    rc = libxl__spawn_spawn(egc, spawn);
     if (rc < 0)
         goto out_close;
     if (!rc) { /* inner child */
@@ -1006,30 +1025,61 @@ out_close:
     close(logfile_w);
     free(args);
 out:
-    return rc;
+    if (rc)
+        device_model_spawn_outcome(egc, dmss, rc);
 }
 
 
-int libxl__confirm_device_model_startup(libxl__gc *gc,
-                                libxl__domain_build_state *state,
-                                libxl__spawner_starting *starting)
+static void device_model_confirm(libxl__egc *egc, libxl__spawn_state *spawn,
+                                 const char *xsdata)
 {
-    char *path;
-    int domid = starting->domid;
-    int ret, ret2;
-    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
-    ret = libxl__spawn_confirm_offspring_startup(gc,
-                                     LIBXL_DEVICE_MODEL_START_TIMEOUT,
-                                     "Device Model", path, "running", starting);
+    libxl__dm_spawn_state *dmss = CONTAINER_OF(spawn, *dmss, spawn);
+    STATE_AO_GC(spawn->ao);
+
+    if (!xsdata)
+        return;
+
+    if (strcmp(xsdata, "running"))
+        return;
+
+    libxl__spawn_detach(gc, spawn);
+
+    device_model_spawn_outcome(egc, dmss, 0);
+}
+
+static void device_model_startup_failed(libxl__egc *egc,
+                                        libxl__spawn_state *spawn)
+{
+    libxl__dm_spawn_state *dmss = CONTAINER_OF(spawn, *dmss, spawn);
+    device_model_spawn_outcome(egc, dmss, ERROR_FAIL);
+}
+
+static void device_model_spawn_outcome(libxl__egc *egc,
+                                       libxl__dm_spawn_state *dmss,
+                                       int rc)
+{
+    STATE_AO_GC(dmss->spawn.ao);
+    int ret2;
+
+    if (rc)
+        LOG(ERROR, "%s: spawn failed (rc=%d)", dmss->spawn.what, rc);
+
+    libxl__domain_build_state *state = dmss->build_state;
+
     if (state->saved_state) {
         ret2 = unlink(state->saved_state);
-        if (ret2) LIBXL__LOG_ERRNO(CTX, XTL_ERROR,
-                                   "failed to remove device-model state %s\n",
-                                   state->saved_state);
-        /* Do not clobber spawn_confirm error code with unlink error code. */
-        if (!ret) ret = ret2;
+        if (ret2) {
+            LOGE(ERROR, "%s: failed to remove device-model state %s",
+                 dmss->spawn.what, state->saved_state);
+            rc = ERROR_FAIL;
+            goto out;
+        }
     }
-    return ret;
+
+    rc = 0;
+
+ out:
+    dmss->callback(egc, dmss, rc);
 }
 
 int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)
@@ -1129,15 +1179,6 @@ int libxl__need_xenpv_qemu(libxl__gc *gc,
 
 out:
     return ret;
-}
-
-int libxl__create_xenpv_qemu(libxl__gc *gc, uint32_t domid,
-                             libxl_domain_config *guest_config,
-                             libxl__domain_build_state *state,
-                             libxl__spawner_starting **starting_r)
-{
-    libxl__create_device_model(gc, domid, guest_config, state, starting_r);
-    return 0;
 }
 
 /*

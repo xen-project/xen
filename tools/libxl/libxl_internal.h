@@ -847,75 +847,198 @@ _hidden int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
                                       libxl_device_pci *pcidev, int num);
 _hidden int libxl__device_pci_destroy_all(libxl__gc *gc, uint32_t domid);
 
-/* xl_exec */
+/*
+ *----- spawn -----
+ *
+ * Higher-level double-fork and separate detach eg as for device models
+ *
+ * Each libxl__spawn_state is in one of the conventional states
+ *    Undefined, Idle, Active
+ */
 
- /* higher-level double-fork and separate detach eg as for device models */
+typedef struct libxl__obsolete_spawn_starting libxl__spawn_starting;
+/* this type is never defined, so no objects of this type exist
+ * fixme-ao  This should go away completely.  */
 
-typedef struct {
-    /* put this in your own status structure as returned to application */
-    /* all fields are private to libxl_spawn_... */
-    pid_t intermediate;
-    int fd;
-    char *what; /* malloc'd in spawn_spawn */
-} libxl__spawn_starting;
+typedef struct libxl__spawn_state libxl__spawn_state;
 
-typedef struct {
-    char *dom_path; /* from libxl_malloc, only for libxl_spawner_record_pid */
-    const char *pid_path; /* only for libxl_spawner_record_pid */
-    int domid;
-    libxl__spawn_starting *for_spawn;
-} libxl__spawner_starting;
+/* Clears out a spawn state; idempotent. */
+_hidden void libxl__spawn_init(libxl__spawn_state*);
 
 /*
- * libxl__spawn_spawn - Create a new process
- * gc: allocation pool
- * for_spawn: malloc'd pointer to libxl__spawn_starting (optional)
- * what: string describing the spawned process
- * intermediate_hook: helper to record pid, such as libxl_spawner_record_pid
- * hook_data: data to pass to the hook function
+ * libxl__spawn_spawn - Create a new process which will become daemonic
+ * Forks twice, to allow the child to detach entirely from the parent.
+ *
+ * We call the two generated processes the "middle child" (result of
+ * the first fork) and the "inner child" (result of the second fork
+ * which takes place in the middle child).
+ *
+ * The inner child must soon exit or exec.  It must also soon exit or
+ * notify the parent of its successful startup by writing to the
+ * xenstore path xspath.
+ *
+ * The user (in the parent) will be called back (confirm_cb) every
+ * time that xenstore path is modified.
+ *
+ * In both children, the ctx is not fully usable: gc and logging
+ * operations are OK, but operations on Xen and xenstore are not.
+ * (The restrictions are the same as those which apply to children
+ * made with libxl__ev_child_fork.)
+ *
+ * midproc_cb will be called in the middle child, with the pid of the
+ * inner child; this could for example record the pid.  midproc_cb
+ * should be fast, and should return.  It will be called (reentrantly)
+ * within libxl__spawn_init.
+ *
+ * failure_cb will be called in the parent on failure of the
+ * intermediate or final child; an error message will have been
+ * logged.
+ *
+ * confirm_cb and failure_cb will not be called reentrantly from
+ * within libxl__spawn_spawn.
+ *
+ * what: string describing the spawned process, used for logging
  *
  * Logs errors.  A copy of "what" is taken. 
  * Return values:
- *  < 0   error, for_spawn need not be detached
- *   +1   caller is the parent, must call detach on *for_spawn eventually
+ *  < 0   error, *spawn is now Idle and need not be detached
+ *   +1   caller is the parent, *spawn is Active and must eventually be detached
  *    0   caller is now the inner child, should probably call libxl__exec
- * Caller, may pass 0 for for_spawn, in which case no need to detach.
+ *
+ * The spawn state must be Undefined or Idle on entry.
  */
-_hidden int libxl__spawn_spawn(libxl__gc *gc,
-                      libxl__spawn_starting *for_spawn,
-                      const char *what,
-                      void (*intermediate_hook)(void *for_spawn, pid_t innerchild),
-                      void *hook_data);
+_hidden int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *spawn);
+
+/*
+ * libxl__spawn_detach - Detaches the daemonic child.
+ *
+ * Works by killing the intermediate process from spawn_spawn.
+ * After this function returns, failures of either child are no
+ * longer reported via failure_cb.
+ *
+ * If called before the inner child has been created, this may prevent
+ * it from running at all.  Thus this should be called only when the
+ * inner child has notified that it is ready.  Normally it will be
+ * called from within confirm_cb.
+ *
+ * Logs errors.
+ *
+ * The spawn state must be Active or Idle on entry and will be Idle
+ * on return.
+ */
+_hidden void libxl__spawn_detach(libxl__gc *gc, libxl__spawn_state*);
+
+/*
+ * If successful, this should return 0.
+ *
+ * Otherwise it should return a signal number, which will be
+ * sent to the inner child; the overall spawn will then fail.
+ */
+typedef int /* signal number */
+libxl__spawn_midproc_cb(libxl__gc*, libxl__spawn_state*, pid_t inner);
+
+/*
+ * Called if the spawn failed.  The reason will have been logged.
+ * The spawn state will be Idle on entry to the callback (and
+ * it may be reused immediately if desired).
+ */
+typedef void libxl__spawn_failure_cb(libxl__egc*, libxl__spawn_state*);
+
+/*
+ * Called when the xspath watch triggers.  xspath will have been read
+ * and the result placed in xsdata; if that failed because the key
+ * didn't exist, xspath==0.  (If it failed for some other reason,
+ * the spawn machinery calls failure_cb instead.)
+ *
+ * If the child has indicated its successful startup, or a failure
+ * has occurred, this should call libxl__spawn_detach.
+ *
+ * If the child is still starting up, should simply return, doing
+ * nothing.
+ *
+ * The spawn state will be Active on entry to the callback; there
+ * are no restrictions on the state on return; it may even have
+ * been detached and reused.
+ */
+typedef void libxl__spawn_confirm_cb(libxl__egc*, libxl__spawn_state*,
+                                     const char *xsdata);
+
+typedef struct {
+    /* Private to the spawn implementation.
+     */
+    /* This separate struct, from malloc, allows us to "detach"
+     * the child and reap it later, when our user has gone
+     * away and freed its libxl__spawn_state */
+    struct libxl__spawn_state *ss;
+    libxl__ev_child mid;
+} libxl__spawn_state_detachable;
+
+struct libxl__spawn_state {
+    /* must be filled in by user and remain valid */
+    libxl__ao *ao;
+    const char *what;
+    const char *xspath;
+    const char *pidpath; /* only used by libxl__spawn_midproc_record_pid */
+    int timeout_ms; /* -1 means forever */
+    libxl__spawn_midproc_cb *midproc_cb;
+    libxl__spawn_failure_cb *failure_cb;
+    libxl__spawn_confirm_cb *confirm_cb;
+
+    /* remaining fields are private to libxl_spawn_... */
+    libxl__ev_time timeout;
+    libxl__ev_xswatch xswatch;
+    libxl__spawn_state_detachable *ssd;
+};
+
+static inline int libxl__spawn_inuse(libxl__spawn_state *ss)
+    { return !!ss->ssd; }
 
 /*
  * libxl_spawner_record_pid - Record given pid in xenstore
- * for_spawn: malloc'd pointer to libxl__spawn_starting (optional)
- * innerchild: pid of the child
  *
- * This function is passed as intermediate_hook to libxl__spawn_spawn.
+ * This function can be passed directly as an intermediate_hook to
+ * libxl__spawn_spawn.  On failure, returns the value SIGTERM.
  */
-_hidden void libxl_spawner_record_pid(void *for_spawn, pid_t innerchild);
+_hidden int libxl__spawn_record_pid(libxl__gc*, libxl__spawn_state*,
+                                    pid_t innerchild);
 
-/*
- * libxl__spawn_confirm_offspring_startup - Wait for child state
- * gc: allocation pool
- * timeout: how many seconds to wait for the child
- * what: string describing the spawned process
- * path: path to the state file in xenstore
- * state: expected string to wait for in path (optional)
- * starting: malloc'd pointer to libxl__spawner_starting
- *
- * Returns 0 on success, and < 0 on error.
- *
- * This function waits the given timeout for the given path to appear
- * in xenstore, and optionally for state in path.
- * The intermediate process created in libxl__spawn_spawn is killed.
- * The memory referenced by starting->for_spawn and starting is free'd.
- */
-_hidden int libxl__spawn_confirm_offspring_startup(libxl__gc *gc,
-                                       uint32_t timeout, char *what,
-                                       char *path, char *state,
-                                       libxl__spawner_starting *starting);
+/*----- device model creation -----*/
+
+/* First layer; wraps libxl__spawn_spawn. */
+
+typedef struct libxl__dm_spawn_state libxl__dm_spawn_state;
+
+typedef void libxl__dm_spawn_cb(libxl__egc *egc, libxl__dm_spawn_state*,
+                                int rc /* if !0, error was logged */);
+
+struct libxl__dm_spawn_state {
+    /* mixed - spawn.ao must be initialised by user; rest is private: */
+    libxl__spawn_state spawn;
+    /* filled in by user, must remain valid: */
+    uint32_t guest_domid; /* domain being served */
+    libxl_domain_config *guest_config;
+    libxl__domain_build_state *build_state; /* relates to guest_domid */
+    libxl__dm_spawn_cb *callback;
+};
+
+_hidden void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state*);
+
+/* Stubdom device models. */
+
+typedef struct {
+    /* Mixed - user must fill in public parts EXCEPT callback,
+     * which may be undefined on entry.  (See above for details) */
+    libxl__dm_spawn_state dm; /* the stub domain device model */
+    /* filled in by user, must remain valid: */
+    libxl__dm_spawn_cb *callback; /* called as callback(,&sdss->dm,) */
+    /* private to libxl__spawn_stub_dm: */
+    libxl_domain_config dm_config;
+    libxl__domain_build_state dm_state;
+    libxl__dm_spawn_state pvqemu;
+} libxl__stub_dm_spawn_state;
+
+_hidden void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state*);
+
 
 /*
  * libxl__wait_for_offspring - Wait for child state
@@ -948,31 +1071,6 @@ _hidden int libxl__wait_for_offspring(libxl__gc *gc,
                                                        void *userdata),
                                  void *check_callback_userdata);
 
-/*
- * libxl__spawn_detach - Kill intermediate process from spawn_spawn
- * gc: allocation pool
- * for_spawn: malloc'd pointer to libxl__spawn_starting (optional)
- *
- * Returns 0 on success, and < 0 on error.
- *
- * Logs errors.  Idempotent, but only permitted after successful
- * call to libxl__spawn_spawn, and no point calling it again if it fails.
- */
-_hidden int libxl__spawn_detach(libxl__gc *gc,
-                       libxl__spawn_starting *for_spawn);
-
-/*
- * libxl__spawn_check - Check intermediate child process
- * gc: allocation pool
- * for_spawn: malloc'd pointer to libxl__spawn_starting (optional)
- *
- * Returns 0 on success, and < 0 on error.
- *
- * Logs errors but also returns them.
- * Caller must still call detach.
- */
-_hidden int libxl__spawn_check(libxl__gc *gc,
-                       libxl__spawn_starting *for_spawn);
 
  /* low-level stuff, for synchronous subprocesses etc. */
 
@@ -991,15 +1089,6 @@ _hidden int libxl__domain_build(libxl__gc *gc,
 /* for device model creation */
 _hidden const char *libxl__domain_device_model(libxl__gc *gc,
                                         const libxl_domain_build_info *info);
-_hidden int libxl__create_device_model(libxl__gc *gc,
-                              int domid,
-                              libxl_domain_config *guest_config,
-                              libxl__domain_build_state *state,
-                              libxl__spawner_starting **starting_r);
-_hidden int libxl__create_xenpv_qemu(libxl__gc *gc, uint32_t domid,
-                              libxl_domain_config *guest_config,
-                              libxl__domain_build_state *state,
-                              libxl__spawner_starting **starting_r);
 _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
         int nr_consoles, libxl__device_console *consoles,
         int nr_vfbs, libxl_device_vfb *vfbs,
@@ -1007,10 +1096,6 @@ _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
   /* Caller must either: pass starting_r==0, or on successful
    * return pass *starting_r (which will be non-0) to
    * libxl__confirm_device_model_startup or libxl__detach_device_model. */
-_hidden int libxl__confirm_device_model_startup(libxl__gc *gc,
-                              libxl__domain_build_state *state,
-                              libxl__spawner_starting *starting);
-_hidden int libxl__detach_device_model(libxl__gc *gc, libxl__spawner_starting *starting);
 _hidden int libxl__wait_for_device_model(libxl__gc *gc,
                                 uint32_t domid, char *state,
                                 libxl__spawn_starting *spawning,
@@ -1579,6 +1664,31 @@ _hidden void libxl__bootloader_init(libxl__bootloader_state *bl);
 /* Will definitely call st->callback, perhaps reentrantly.
  * If callback is passed rc==0, will have updated st->info appropriately */
 _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
+
+
+/*----- Domain creation -----*/
+
+typedef struct libxl__domain_create_state libxl__domain_create_state;
+
+typedef void libxl__domain_create_cb(libxl__egc *egc,
+                                     libxl__domain_create_state*,
+                                     int rc, uint32_t domid);
+
+struct libxl__domain_create_state {
+    /* filled in by user */
+    libxl__ao *ao;
+    libxl_domain_config *guest_config;
+    int restore_fd;
+    libxl_console_ready console_cb;
+    void *console_cb_priv;
+    libxl__domain_create_cb *callback;
+    /* private to domain_create */
+    int guest_domid;
+    libxl__domain_build_state build_state;
+    libxl__stub_dm_spawn_state dmss;
+        /* If we're not doing stubdom, we use only dmss.dm,
+         * for the non-stubdom device model. */
+};
 
 
 /*
