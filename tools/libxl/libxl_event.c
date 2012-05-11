@@ -627,6 +627,10 @@ static int beforepoll_internal(libxl__gc *gc, libxl__poller *poller,
                                                                        \
         REQUIRE_FD(poller->wakeup_pipe[0], POLLIN, BODY);              \
                                                                        \
+        int selfpipe = libxl__fork_selfpipe_active(CTX);               \
+        if (selfpipe >= 0)                                             \
+            REQUIRE_FD(selfpipe, POLLIN, BODY);                        \
+                                                                       \
     }while(0)
 
 #define REQUIRE_FD(req_fd_, req_events_, BODY) do{      \
@@ -766,9 +770,10 @@ static void afterpoll_internal(libxl__egc *egc, libxl__poller *poller,
                                int nfds, const struct pollfd *fds,
                                struct timeval now)
 {
+    /* May make callbacks into the application for child processes.
+     * ctx must be locked exactly once */
     EGC_GC;
     libxl__ev_fd *efd;
-
 
     LIBXL_LIST_FOREACH(efd, &CTX->efds, entry) {
         if (!efd->events)
@@ -780,11 +785,16 @@ static void afterpoll_internal(libxl__egc *egc, libxl__poller *poller,
     }
 
     if (afterpoll_check_fd(poller,fds,nfds, poller->wakeup_pipe[0],POLLIN)) {
-        char buf[256];
-        int r = read(poller->wakeup_pipe[0], buf, sizeof(buf));
-        if (r < 0)
-            if (errno != EINTR && errno != EWOULDBLOCK)
-                LIBXL__EVENT_DISASTER(egc, "read wakeup", errno, 0);
+        int e = libxl__self_pipe_eatall(poller->wakeup_pipe[0]);
+        if (e) LIBXL__EVENT_DISASTER(egc, "read wakeup", e, 0);
+    }
+
+    int selfpipe = libxl__fork_selfpipe_active(CTX);
+    if (selfpipe >= 0 &&
+        afterpoll_check_fd(poller,fds,nfds, selfpipe, POLLIN)) {
+        int e = libxl__self_pipe_eatall(selfpipe);
+        if (e) LIBXL__EVENT_DISASTER(egc, "read sigchld pipe", e, 0);
+        libxl__fork_selfpipe_woken(egc);
     }
 
     for (;;) {
@@ -1082,16 +1092,37 @@ void libxl__poller_put(libxl_ctx *ctx, libxl__poller *p)
 
 void libxl__poller_wakeup(libxl__egc *egc, libxl__poller *p)
 {
+    int e = libxl__self_pipe_wakeup(p->wakeup_pipe[1]);
+    if (e) LIBXL__EVENT_DISASTER(egc, "cannot poke watch pipe", e, 0);
+}
+
+int libxl__self_pipe_wakeup(int fd)
+{
     static const char buf[1] = "";
 
     for (;;) {
-        int r = write(p->wakeup_pipe[1], buf, 1);
-        if (r==1) return;
+        int r = write(fd, buf, 1);
+        if (r==1) return 0;
         assert(r==-1);
         if (errno == EINTR) continue;
-        if (errno == EWOULDBLOCK) return;
-        LIBXL__EVENT_DISASTER(egc, "cannot poke watch pipe", errno, 0);
-        return;
+        if (errno == EWOULDBLOCK) return 0;
+        assert(errno);
+        return errno;
+    }
+}
+
+int libxl__self_pipe_eatall(int fd)
+{
+    char buf[256];
+    for (;;) {
+        int r = read(fd, buf, sizeof(buf));
+        if (r == sizeof(buf)) continue;
+        if (r >= 0) return 0;
+        assert(r == -1);
+        if (errno == EINTR) continue;
+        if (errno == EWOULDBLOCK) return 0;
+        assert(errno);
+        return errno;
     }
 }
 

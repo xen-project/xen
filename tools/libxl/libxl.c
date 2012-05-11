@@ -39,7 +39,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     memset(ctx, 0, sizeof(libxl_ctx));
     ctx->lg = lg;
 
-    /* First initialise pointers (cannot fail) */
+    /* First initialise pointers etc. (cannot fail) */
 
     LIBXL_TAILQ_INIT(&ctx->occurred);
 
@@ -57,6 +57,11 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
 
     LIBXL_TAILQ_INIT(&ctx->death_list);
     libxl__ev_xswatch_init(&ctx->death_watch);
+
+    ctx->childproc_hooks = &libxl__childproc_default_hooks;
+    ctx->childproc_user = 0;
+        
+    ctx->sigchld_selfpipe[0] = -1;
 
     /* The mutex is special because we can't idempotently destroy it */
 
@@ -159,6 +164,16 @@ int libxl_ctx_free(libxl_ctx *ctx)
     free(ctx->watch_slots);
 
     discard_events(&ctx->occurred);
+
+    /* If we have outstanding children, then the application inherits
+     * them; we wish the application good luck with understanding
+     * this if and when it reaps them. */
+    libxl__sigchld_removehandler(ctx);
+
+    if (ctx->sigchld_selfpipe[0] >= 0) {
+        close(ctx->sigchld_selfpipe[0]);
+        close(ctx->sigchld_selfpipe[1]);
+    }
 
     pthread_mutex_destroy(&ctx->lock);
 

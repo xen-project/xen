@@ -163,11 +163,6 @@ void libxl_event_register_callbacks(libxl_ctx *ctx,
  * After libxl_ctx_free, all corresponding evgen handles become
  * invalid and must no longer be passed to evdisable.
  *
- * Events enabled with evenable prior to a fork and libxl_ctx_postfork
- * are no longer generated after the fork/postfork; however the evgen
- * structures are still valid and must be passed to evdisable if the
- * memory they use should not be leaked.
- *
  * Applications should ensure that they eventually retrieve every
  * event using libxl_event_check or libxl_event_wait, since events
  * which occur but are not retreived by the application will be queued
@@ -370,6 +365,148 @@ void libxl_osevent_occurred_fd(libxl_ctx *ctx, void *for_libxl,
  * will call timeout_register again.
  */
 void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl);
+
+
+/*======================================================================*/
+
+/*
+ * Subprocess handling.
+ *
+ * Unfortunately the POSIX interface makes this very awkward.
+ *
+ * There are two possible arrangements for collecting statuses from
+ * wait/waitpid.
+ *
+ * For naive programs:
+ *
+ *     libxl will keep a SIGCHLD handler installed whenever it has an
+ *     active (unreaped) child.  It will reap all children with
+ *     wait(); any children it does not recognise will be passed to
+ *     the application via an optional callback (and will result in
+ *     logged warnings if no callback is provided or the callback
+ *     denies responsibility for the child).
+ *
+ *     libxl may have children whenever:
+ *
+ *       - libxl is performing an operation which can be made
+ *         asynchronous; ie one taking a libxl_asyncop_how, even
+ *         if NULL is passed indicating that the operation is
+ *         synchronous; or
+ *
+ *       - events of any kind are being generated, as requested
+ *         by libxl_evenable_....
+ *
+ *     A multithreaded application which is naive in this sense may
+ *     block SIGCHLD on some of its threads, but there must be at
+ *     least one thread that has SIGCHLD unblocked.  libxl will not
+ *     modify the blocking flag for SIGCHLD (except that it may create
+ *     internal service threads with all signals blocked).
+ *
+ *     A naive program must only have at any one time only
+ *     one libxl context which might have children.
+ *
+ * For programs which run their own children alongside libxl's:
+ *
+ *     A program which does this must call libxl_childproc_setmode.
+ *     There are two options:
+ * 
+ *     libxl_sigchld_owner_mainloop:
+ *       The application must install a SIGCHLD handler and reap (at
+ *       least) all of libxl's children and pass their exit status
+ *       to libxl by calling libxl_childproc_exited.
+ *
+ *     libxl_sigchld_owner_libxl_always:
+ *       The application expects libxl to reap all of its children,
+ *       and provides a callback to be notified of their exit
+ *       statues.
+ *
+ * An application which fails to call setmode, or which passes 0 for
+ * hooks, while it uses any libxl operation which might
+ * create or use child processes (see above):
+ *   - Must not have any child processes running.
+ *   - Must not install a SIGCHLD handler.
+ *   - Must not reap any children.
+ */
+
+
+typedef enum {
+    /* libxl owns SIGCHLD whenever it has a child. */
+    libxl_sigchld_owner_libxl,
+
+    /* Application promises to call libxl_childproc_exited but NOT
+     * from within a signal handler.  libxl will not itself arrange to
+     * (un)block or catch SIGCHLD. */
+    libxl_sigchld_owner_mainloop,
+
+    /* libxl owns SIGCHLD all the time, and the application is
+     * relying on libxl's event loop for reaping its own children. */
+    libxl_sigchld_owner_libxl_always,
+} libxl_sigchld_owner;
+
+typedef struct {
+    libxl_sigchld_owner chldowner;
+
+    /* All of these are optional: */
+
+    /* Called by libxl instead of fork.  Should behave exactly like
+     * fork, including setting errno etc.  May NOT reenter into libxl.
+     * Application may use this to discover pids of libxl's children,
+     * for example.
+     */
+    pid_t (*fork_replacement)(void *user);
+
+    /* With libxl_sigchld_owner_libxl, called by libxl when it has
+     * reaped a pid.  (Not permitted with _owner_mainloop.)
+     *
+     * Should return 0 if the child was recognised by the application
+     * (or if the application does not keep those kind of records),
+     * ERROR_UNKNOWN_CHILD if the application knows that the child is not
+     * the application's; if it returns another error code it is a
+     * disaster as described for libxl_event_register_callbacks.
+     * (libxl will report unexpected children to its error log.)
+     *
+     * If not supplied, the application is assumed not to start
+     * any children of its own.
+     *
+     * This function is NOT called from within the signal handler.
+     * Rather it will be called from inside a libxl's event handling
+     * code and thus only when libxl is running, for example from
+     * within libxl_event_wait.  (libxl uses the self-pipe trick
+     * to implement this.)
+     *
+     * childproc_exited_callback may call back into libxl, but it
+     * is best to avoid making long-running libxl calls as that might
+     * stall the calling event loop while the nested operation
+     * completes.
+     */
+    int (*reaped_callback)(pid_t, int status, void *user);
+} libxl_childproc_hooks;
+
+/* hooks may be 0 in which is equivalent to &{ libxl_sigchld_owner_libxl, 0, 0 }
+ *
+ * May not be called when libxl might have any child processes, or the
+ * behaviour is undefined.  So it is best to call this at
+ * initialisation.
+ */
+void libxl_childproc_setmode(libxl_ctx *ctx, const libxl_childproc_hooks *hooks,
+                             void *user);
+
+/*
+ * This function is for an application which owns SIGCHLD and which
+ * therefore reaps all of the process's children.
+ *
+ * May be called only by an application which has called setmode with
+ * chldowner == libxl_sigchld_owner_mainloop.  If pid was a process started
+ * by this instance of libxl, returns 0 after doing whatever
+ * processing is appropriate.  Otherwise silently returns
+ * ERROR_UNKNOWN_CHILD.  No other error returns are possible.
+ *
+ * May NOT be called from within a signal handler which might
+ * interrupt any libxl operation.  The application will almost
+ * certainly need to use the self-pipe trick (or a working pselect or
+ * ppoll) to implement this.
+ */
+int libxl_childproc_reaped(libxl_ctx *ctx, pid_t, int status);
 
 
 /*

@@ -198,6 +198,19 @@ _hidden libxl__ev_xswatch *libxl__watch_slot_contents(libxl__gc *gc,
                                                       int slotnum);
 
 
+typedef struct libxl__ev_child libxl__ev_child;
+typedef void libxl__ev_child_callback(libxl__egc *egc, libxl__ev_child*,
+                                      pid_t pid, int status);
+struct libxl__ev_child {
+    /* caller should include this in their own struct */
+    /* read-only for caller: */
+    pid_t pid; /* -1 means unused ("unregistered", ie Idle) */
+    libxl__ev_child_callback *callback;
+    /* remainder is private for libxl__ev_... */
+    LIBXL_LIST_ENTRY(struct libxl__ev_child) entry;
+};
+
+
 /*
  * evgen structures, which are the state we use for generating
  * events for the caller.
@@ -306,10 +319,14 @@ struct libxl__ctx {
     
     LIBXL_LIST_HEAD(, libxl_evgen_disk_eject) disk_eject_evgens;
 
-    /* for callers who reap children willy-nilly; caller must only
-     * set this after libxl_init and before any other call - or
-     * may leave them untouched */
+    const libxl_childproc_hooks *childproc_hooks;
+    void *childproc_user;
+    int sigchld_selfpipe[2]; /* [0]==-1 means handler not installed */
+    LIBXL_LIST_HEAD(, libxl__ev_child) children;
+
+    /* This is obsolete and must be removed: */
     int (*waitpid_instead)(pid_t pid, int *status, int flags);
+
     libxl_version_info version_info;
 };
 
@@ -557,6 +574,36 @@ static inline int libxl__ev_xswatch_isregistered(const libxl__ev_xswatch *xw)
 
 
 /*
+ * For making subprocesses.  This is the only permitted mechanism for
+ * code in libxl to do so.
+ *
+ * In the parent, returns the pid, filling in childw_out.
+ * In the child, returns 0.
+ * If it fails, returns a libxl error (all of which are -ve).
+ *
+ * The child should go on to exec (or exit) soon.  The child may not
+ * make any further calls to libxl infrastructure, except for memory
+ * allocation and logging.  If the child needs to use xenstore it
+ * must open its own xs handle and use it directly, rather than via
+ * the libxl event machinery.
+ *
+ * The parent may signal the child but it must not reap it.  That will
+ * be done by the event machinery.  death may be NULL in which case
+ * the child is still reaped but its death is ignored.
+ *
+ * It is not possible to "deregister" the child death event source.
+ * It will generate exactly one event callback; until then the childw
+ * is Active and may not be reused.
+ */
+_hidden pid_t libxl__ev_child_fork(libxl__gc *gc, libxl__ev_child *childw_out,
+                                 libxl__ev_child_callback *death);
+static inline void libxl__ev_child_init(libxl__ev_child *childw_out)
+                { childw_out->pid = -1; }
+static inline int libxl__ev_child_inuse(libxl__ev_child *childw_out)
+                { return childw_out->pid >= 0; }
+
+
+/*
  * Other event-handling support provided by the libxl event core to
  * the rest of libxl.
  */
@@ -609,6 +656,15 @@ _hidden void libxl__poller_put(libxl_ctx *ctx, libxl__poller *p);
 /* Notifies whoever is polling using p that they should wake up.
  * ctx must be locked. */
 _hidden void libxl__poller_wakeup(libxl__egc *egc, libxl__poller *p);
+
+/* Internal to fork and child reaping machinery */
+extern const libxl_childproc_hooks libxl__childproc_default_hooks;
+int libxl__sigchld_installhandler(libxl_ctx *ctx); /* non-reentrant;logs errs */
+void libxl__sigchld_removehandler(libxl_ctx *ctx); /* non-reentrant */
+int libxl__fork_selfpipe_active(libxl_ctx *ctx); /* returns read fd or -1 */
+void libxl__fork_selfpipe_woken(libxl__egc *egc);
+int libxl__self_pipe_wakeup(int fd); /* returns 0 or -1 setting errno */
+int libxl__self_pipe_eatall(int fd); /* returns 0 or -1 setting errno */
 
 
 _hidden int libxl__atfork_init(libxl_ctx *ctx);
