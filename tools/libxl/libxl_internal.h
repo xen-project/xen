@@ -1052,7 +1052,7 @@ _hidden int libxl__qmp_pci_add(libxl__gc *gc, int d, libxl_device_pci *pcidev);
 _hidden int libxl__qmp_pci_del(libxl__gc *gc, int domid,
                                libxl_device_pci *pcidev);
 /* Save current QEMU state into fd. */
-_hidden int libxl__qmp_migrate(libxl__gc *gc, int domid, int fd);
+_hidden int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename);
 /* close and free the QMP handler */
 _hidden void libxl__qmp_close(libxl__qmp_handler *qmp);
 /* remove the socket file, if the file has already been removed,

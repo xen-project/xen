@@ -894,18 +894,9 @@ int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd)
         break;
     }
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-        fd2 = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-        if (fd2 < 0) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                             "Unable to create a QEMU save file\n");
-            return ERROR_FAIL;
-        }
-        /* Save DM state into fd2 */
-        ret = libxl__qmp_migrate(gc, domid, fd2);
+        ret = libxl__qmp_save(gc, domid, (char *)filename);
         if (ret)
             goto out;
-        close(fd2);
-        fd2 = -1;
         break;
     default:
         return ERROR_INVAL;

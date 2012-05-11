@@ -587,52 +587,6 @@ out:
     return rc;
 }
 
-static int qmp_send_fd(libxl__gc *gc, libxl__qmp_handler *qmp,
-                       libxl_key_value_list *args,
-                       qmp_callback_t callback, void *opaque,
-                       qmp_request_context *context,
-                       int fd)
-{
-    struct msghdr msg = { 0 };
-    struct cmsghdr *cmsg;
-    char control[CMSG_SPACE(sizeof (fd))];
-    struct iovec iov;
-    char *buf = NULL;
-
-    buf = qmp_send_prepare(gc, qmp, "getfd", args, callback, opaque, context);
-
-    /* Response data */
-    iov.iov_base = buf;
-    iov.iov_len  = strlen(buf);
-
-    /* compose the message */
-    msg.msg_iov = &iov;
-    msg.msg_iovlen = 1;
-    msg.msg_control = control;
-    msg.msg_controllen = sizeof (control);
-
-    /* attach open fd */
-    cmsg = CMSG_FIRSTHDR(&msg);
-    cmsg->cmsg_level = SOL_SOCKET;
-    cmsg->cmsg_type = SCM_RIGHTS;
-    cmsg->cmsg_len = CMSG_LEN(sizeof (fd));
-    *(int *)CMSG_DATA(cmsg) = fd;
-
-    msg.msg_controllen = cmsg->cmsg_len;
-
-    if (sendmsg(qmp->qmp_fd, &msg, 0) < 0) {
-        LIBXL__LOG_ERRNO(qmp->ctx, LIBXL__LOG_ERROR,
-                         "Failed to send a QMP message to QEMU.");
-        return ERROR_FAIL;
-    }
-    if (libxl_write_exactly(qmp->ctx, qmp->qmp_fd, "\r\n", 2,
-                            "CRLF", "QMP socket")) {
-        return ERROR_FAIL;
-    }
-
-    return qmp->last_id_used;
-}
-
 static int qmp_synchronous_send(libxl__qmp_handler *qmp, const char *cmd,
                                 libxl_key_value_list *args,
                                 qmp_callback_t callback, void *opaque,
@@ -873,34 +827,8 @@ int libxl__qmp_pci_del(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
     return qmp_device_del(gc, domid, id);
 }
 
-static int qmp_getfd(libxl__gc *gc, libxl__qmp_handler *qmp,
-                     int fd, const char *name)
+int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename)
 {
-    flexarray_t *parameters = NULL;
-    libxl_key_value_list args = NULL;
-    int rc = 0;
-
-    parameters = flexarray_make(2, 1);
-    if (!parameters)
-        return ERROR_NOMEM;
-    flexarray_append_pair(parameters, "fdname", (char*)name);
-    args = libxl__xs_kvs_of_flexarray(gc, parameters, parameters->count);
-    if (!args) {
-        rc = ERROR_NOMEM;
-        goto out;
-    }
-
-    if (qmp_send_fd(gc, qmp, &args, NULL, NULL, NULL, fd) < 0) {
-        rc = ERROR_FAIL;
-    }
-out:
-    flexarray_free(parameters);
-    return rc;
-}
-
-int libxl__qmp_migrate(libxl__gc *gc, int domid, int fd)
-{
-#define MIGRATE_FD_NAME "dm-migrate"
     libxl__qmp_handler *qmp = NULL;
     flexarray_t *parameters = NULL;
     libxl_key_value_list args = NULL;
@@ -910,23 +838,19 @@ int libxl__qmp_migrate(libxl__gc *gc, int domid, int fd)
     if (!qmp)
         return ERROR_FAIL;
 
-    rc = qmp_getfd(gc, qmp, fd, MIGRATE_FD_NAME);
-    if (rc)
-        goto out;
-
     parameters = flexarray_make(2, 1);
     if (!parameters) {
         rc = ERROR_NOMEM;
         goto out;
     }
-    flexarray_append_pair(parameters, "uri", "fd:" MIGRATE_FD_NAME);
+    flexarray_append_pair(parameters, "filename", (char *)filename);
     args = libxl__xs_kvs_of_flexarray(gc, parameters, parameters->count);
     if (!args) {
         rc = ERROR_NOMEM;
         goto out2;
     }
 
-    rc = qmp_synchronous_send(qmp, "migrate", &args,
+    rc = qmp_synchronous_send(qmp, "xen-save-devices-state", &args,
                               NULL, NULL, qmp->timeout);
 
 out2:
