@@ -364,6 +364,85 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
 READ_WRITE_EXACTLY(read, 1, /* */)
 READ_WRITE_EXACTLY(write, 0, const)
 
+int libxl__remove_file(libxl__gc *gc, const char *path)
+{
+    for (;;) {
+        int r = unlink(path);
+        if (!r) return 0;
+        if (errno == ENOENT) return 0;
+        if (errno == EINTR) continue;
+        LOGE(ERROR, "failed to remove file %s", path);
+        return ERROR_FAIL;
+     }
+}
+
+int libxl__remove_file_or_directory(libxl__gc *gc, const char *path)
+{
+    for (;;) {
+        int r = rmdir(path);
+        if (!r) return 0;
+        if (errno == ENOENT) return 0;
+        if (errno == ENOTEMPTY) return libxl__remove_directory(gc, path);
+        if (errno == ENOTDIR) return libxl__remove_file(gc, path);
+        if (errno == EINTR) continue;
+        LOGE(ERROR, "failed to remove %s", path);
+        return ERROR_FAIL;
+     }
+}
+
+int libxl__remove_directory(libxl__gc *gc, const char *dirpath)
+{
+    int rc = 0;
+    DIR *d = 0;
+
+    d = opendir(dirpath);
+    if (!d) {
+        if (errno == ENOENT)
+            goto out;
+
+        LOGE(ERROR, "failed to opendir %s for removal", dirpath);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    size_t need = offsetof(struct dirent, d_name) +
+        pathconf(dirpath, _PC_NAME_MAX) + 1;
+    struct dirent *de_buf = libxl__zalloc(gc, need);
+    struct dirent *de;
+
+    for (;;) {
+        int r = readdir_r(d, de_buf, &de);
+        if (r) {
+            LOGE(ERROR, "failed to readdir %s for removal", dirpath);
+            rc = ERROR_FAIL;
+            break;
+        }
+        if (!de)
+            break;
+
+        if (!strcmp(de->d_name, ".") ||
+            !strcmp(de->d_name, ".."))
+            continue;
+
+        const char *subpath = GCSPRINTF("%s/%s", dirpath, de->d_name);
+        if (libxl__remove_file_or_directory(gc, subpath))
+            rc = ERROR_FAIL;
+    }
+
+    for (;;) {
+        int r = rmdir(dirpath);
+        if (!r) break;
+        if (errno == ENOENT) goto out;
+        if (errno == EINTR) continue;
+        LOGE(ERROR, "failed to remove emptied directory %s", dirpath);
+        rc = ERROR_FAIL;
+    }
+
+ out:
+    if (d) closedir(d);
+
+    return rc;
+}
 
 pid_t libxl_fork(libxl_ctx *ctx)
 {

@@ -433,6 +433,13 @@ _hidden char *libxl__strndup(libxl__gc *gc_opt, const char *c, size_t n);
  * string. (similar to a gc'd dirname(3)). */
 _hidden char *libxl__dirname(libxl__gc *gc_opt, const char *s);
 
+/* Each of these logs errors and returns a libxl error code.
+ * They do not mind if path is already removed.
+ * For _file, path must not be a directory; for _directory it must be. */
+_hidden int libxl__remove_file(libxl__gc *gc, const char *path);
+_hidden int libxl__remove_directory(libxl__gc *gc, const char *path);
+_hidden int libxl__remove_file_or_directory(libxl__gc *gc, const char *path);
+
 _hidden char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int length);
 
 _hidden int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
