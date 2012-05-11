@@ -459,6 +459,7 @@ libxl_event_type = Enumeration("event_type", [
     (2, "DOMAIN_DEATH"),
     (3, "DISK_EJECT"),
     (4, "OPERATION_COMPLETE"),
+    (5, "DOMAIN_CREATE_CONSOLE_AVAILABLE"),
     ])
 
 libxl_ev_user = UInt(64)
@@ -484,4 +485,5 @@ libxl_event = Struct("event",[
            ("operation_complete", Struct(None, [
                                         ("rc", integer),
                                  ])),
+           ("domain_create_console_available", Struct(None, [])),
            ]))])

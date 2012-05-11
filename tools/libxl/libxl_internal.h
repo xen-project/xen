@@ -1699,11 +1699,14 @@ int libxl__openptys(libxl__openpty_state *op,
 typedef struct libxl__bootloader_state libxl__bootloader_state;
 typedef void libxl__run_bootloader_callback(libxl__egc*,
                                 libxl__bootloader_state*, int rc);
+typedef void libxl__bootloader_console_callback(libxl__egc*,
+                                libxl__bootloader_state*);
 
 struct libxl__bootloader_state {
     /* caller must fill these in, and they must all remain valid */
     libxl__ao *ao;
     libxl__run_bootloader_callback *callback;
+    libxl__bootloader_console_callback *console_available;
     libxl_domain_build_info *info; /* u.pv.{kernel,ramdisk,cmdline} updated */
     libxl_device_disk *disk;
     uint32_t domid;
@@ -1739,9 +1742,8 @@ struct libxl__domain_create_state {
     libxl__ao *ao;
     libxl_domain_config *guest_config;
     int restore_fd;
-    libxl_console_ready console_cb;
-    void *console_cb_priv;
     libxl__domain_create_cb *callback;
+    libxl_asyncprogress_how aop_console_how;
     /* private to domain_create */
     int guest_domid;
     libxl__domain_build_state build_state;

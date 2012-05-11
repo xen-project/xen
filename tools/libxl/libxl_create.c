@@ -569,9 +569,14 @@ static int store_libxl_entry(libxl__gc *gc, uint32_t domid,
 static void domcreate_devmodel_started(libxl__egc *egc,
                                        libxl__dm_spawn_state *dmss,
                                        int rc);
+static void domcreate_bootloader_console_available(libxl__egc *egc,
+                                                   libxl__bootloader_state *bl);
 static void domcreate_bootloader_done(libxl__egc *egc,
                                       libxl__bootloader_state *bl,
                                       int rc);
+
+static void domcreate_console_available(libxl__egc *egc,
+                                        libxl__domain_create_state *dcs);
 
 /* Our own function to clean up and call the user's callback.
  * The final call in the sequence. */
@@ -590,8 +595,6 @@ static void initiate_domain_create(libxl__egc *egc,
     /* convenience aliases */
     libxl_domain_config *const d_config = dcs->guest_config;
     const int restore_fd = dcs->restore_fd;
-    const libxl_console_ready cb = dcs->console_cb;
-    void *const priv = dcs->console_cb_priv;
     memset(&dcs->build_state, 0, sizeof(dcs->build_state));
 
     domid = 0;
@@ -610,11 +613,6 @@ static void initiate_domain_create(libxl__egc *egc,
     dcs->guest_domid = domid;
     dcs->dmss.dm.guest_domid = 0; /* means we haven't spawned */
 
-    if ( d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV && cb ) {
-        ret = (*cb)(ctx, domid, priv);
-        if (ret) goto error_out;
-    }
-
     ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
     if (ret) goto error_out;
 
@@ -629,6 +627,7 @@ static void initiate_domain_create(libxl__egc *egc,
 
     if (restore_fd < 0 && bootdisk) {
         dcs->bl.callback = domcreate_bootloader_done;
+        dcs->bl.console_available = domcreate_bootloader_console_available;
         dcs->bl.info = &d_config->b_info,
         dcs->bl.disk = bootdisk;
         dcs->bl.domid = dcs->guest_domid;
@@ -642,6 +641,21 @@ static void initiate_domain_create(libxl__egc *egc,
 error_out:
     assert(ret);
     domcreate_complete(egc, dcs, ret);
+}
+
+static void domcreate_bootloader_console_available(libxl__egc *egc,
+                                                   libxl__bootloader_state *bl)
+{
+    libxl__domain_create_state *dcs = CONTAINER_OF(bl, *dcs, bl);
+    STATE_AO_GC(bl->ao);
+    domcreate_console_available(egc, dcs);
+}
+
+static void domcreate_console_available(libxl__egc *egc,
+                                        libxl__domain_create_state *dcs) {
+    libxl__ao_progress_report(egc, dcs->ao, &dcs->aop_console_how,
+                              NEW_EVENT(egc, DOMAIN_CREATE_CONSOLE_AVAILABLE,
+                                        dcs->guest_domid));
 }
 
 static void domcreate_bootloader_done(libxl__egc *egc,
@@ -779,8 +793,6 @@ static void domcreate_devmodel_started(libxl__egc *egc,
 
     /* convenience aliases */
     libxl_domain_config *const d_config = dcs->guest_config;
-    const libxl_console_ready cb = dcs->console_cb;
-    void *const priv = dcs->console_cb_priv;
 
     if (ret) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
@@ -818,12 +830,7 @@ static void domcreate_devmodel_started(libxl__egc *egc,
             goto error_out;
         }
     }
-    if ( cb && (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM ||
-                (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
-                 d_config->b_info.u.pv.bootloader ))) {
-        ret = (*cb)(ctx, domid, priv);
-        if (ret) goto error_out;
-    }
+    domcreate_console_available(egc, dcs);
 
     domcreate_complete(egc, dcs, 0);
     return;
@@ -863,8 +870,9 @@ static void domain_create_cb(libxl__egc *egc,
                              int rc, uint32_t domid);
 
 static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
-                            libxl_console_ready cb, void *priv, uint32_t *domid,
-                            int restore_fd, const libxl_asyncop_how *ao_how)
+                            uint32_t *domid,
+                            int restore_fd, const libxl_asyncop_how *ao_how,
+                            const libxl_asyncprogress_how *aop_console_how)
 {
     AO_CREATE(ctx, 0, ao_how);
     libxl__app_domain_create_state *cdcs;
@@ -873,9 +881,8 @@ static int do_domain_create(libxl_ctx *ctx, libxl_domain_config *d_config,
     cdcs->dcs.ao = ao;
     cdcs->dcs.guest_config = d_config;
     cdcs->dcs.restore_fd = restore_fd;
-    cdcs->dcs.console_cb = cb;
-    cdcs->dcs.console_cb_priv = priv;
     cdcs->dcs.callback = domain_create_cb;
+    libxl__ao_progress_gethow(&cdcs->dcs.aop_console_how, aop_console_how);
     cdcs->domid_out = domid;
 
     initiate_domain_create(egc, &cdcs->dcs);
@@ -897,19 +904,21 @@ static void domain_create_cb(libxl__egc *egc,
 }
     
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config,
-                            libxl_console_ready cb, void *priv,
                             uint32_t *domid,
-                            const libxl_asyncop_how *ao_how)
+                            const libxl_asyncop_how *ao_how,
+                            const libxl_asyncprogress_how *aop_console_how)
 {
-    return do_domain_create(ctx, d_config, cb, priv, domid, -1, ao_how);
+    return do_domain_create(ctx, d_config, domid, -1,
+                            ao_how, aop_console_how);
 }
 
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
-                                libxl_console_ready cb, void *priv,
                                 uint32_t *domid, int restore_fd,
-                                const libxl_asyncop_how *ao_how)
+                                const libxl_asyncop_how *ao_how,
+                            const libxl_asyncprogress_how *aop_console_how)
 {
-    return do_domain_create(ctx, d_config, cb, priv, domid, restore_fd, ao_how);
+    return do_domain_create(ctx, d_config, domid, restore_fd,
+                            ao_how, aop_console_how);
 }
 
 /*

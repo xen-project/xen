@@ -377,6 +377,9 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
         goto out;
     }
 
+    if (bl->console_available)
+        bl->console_available(egc, bl);
+
     int bootloader_master = libxl__carefd_fd(bl->ptys[0].master);
     int xenconsole_master = libxl__carefd_fd(bl->ptys[1].master);
 

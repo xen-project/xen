@@ -509,18 +509,19 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
 int libxl_ctx_free(libxl_ctx *ctx /* 0 is OK */);
 
 /* domain related functions */
-typedef int (*libxl_console_ready)(libxl_ctx *ctx, uint32_t domid, void *priv);
-  /* fixme-ao   Need to review this API.  If we keep it, the reentrancy
-   * properties need to be documented but they may turn out to be too
-   * awkward */
 
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config,
-                            libxl_console_ready cb, void *priv, uint32_t *domid,
-                            const libxl_asyncop_how *ao_how);
+                            uint32_t *domid,
+                            const libxl_asyncop_how *ao_how,
+                            const libxl_asyncprogress_how *aop_console_how);
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
-                                libxl_console_ready cb, void *priv,
                                 uint32_t *domid, int restore_fd,
-                                const libxl_asyncop_how *ao_how);
+                                const libxl_asyncop_how *ao_how,
+                                const libxl_asyncprogress_how *aop_console_how);
+  /* A progress report will be made via ao_console_how, of type
+   * domain_create_console_available, when the domain's primary
+   * console is available and can be connected to.
+   */
 
 void libxl_domain_config_init(libxl_domain_config *d_config);
 void libxl_domain_config_dispose(libxl_domain_config *d_config);

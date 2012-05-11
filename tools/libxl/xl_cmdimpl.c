@@ -1457,16 +1457,18 @@ static int freemem(libxl_domain_build_info *b_info)
     return ERROR_NOMEM;
 }
 
-static int autoconnect_console(libxl_ctx *ctx, uint32_t domid, void *priv)
+static void autoconnect_console(libxl_ctx *ctx, libxl_event *ev, void *priv)
 {
     pid_t *pid = priv;
+
+    libxl_event_free(ctx, ev);
 
     *pid = fork();
     if (*pid < 0) {
         perror("unable to fork xenconsole");
-        return ERROR_FAIL;
+        return;
     } else if (*pid > 0)
-        return 0;
+        return;
 
     postfork();
 
@@ -1533,7 +1535,7 @@ static int create_domain(struct domain_create *dom_info)
     int config_len = 0;
     int restore_fd = -1;
     int status = 0;
-    libxl_console_ready cb;
+    const libxl_asyncprogress_how *autoconnect_console_how;
     pid_t child_console_pid = -1;
     struct save_file_header hdr;
 
@@ -1687,24 +1689,27 @@ start:
         goto error_out;
     }
 
+    libxl_asyncprogress_how autoconnect_console_how_buf;
     if ( dom_info->console_autoconnect ) {
-        cb = autoconnect_console;
+        autoconnect_console_how_buf.callback = autoconnect_console;
+        autoconnect_console_how_buf.for_callback = &child_console_pid;
+        autoconnect_console_how = &autoconnect_console_how_buf;
     }else{
-        cb = NULL;
+        autoconnect_console_how = 0;
     }
 
     if ( restore_file ) {
         ret = libxl_domain_create_restore(ctx, &d_config,
-                                          cb, &child_console_pid,
-                                          &domid, restore_fd, 0);
+                                          &domid, restore_fd,
+                                          0, autoconnect_console_how);
         /*
          * On subsequent reboot etc we should create the domain, not
          * restore/migrate-receive it again.
          */
         restore_file = NULL;
     }else{
-        ret = libxl_domain_create_new(ctx, &d_config,
-                                      cb, &child_console_pid, &domid, 0);
+        ret = libxl_domain_create_new(ctx, &d_config, &domid,
+                                      0, autoconnect_console_how);
     }
     if ( ret )
         goto error_out;
