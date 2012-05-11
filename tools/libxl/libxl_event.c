@@ -989,13 +989,7 @@ libxl_event *libxl__event_new(libxl__egc *egc,
 {
     libxl_event *ev;
 
-    ev = malloc(sizeof(*ev));
-    if (!ev) {
-        LIBXL__EVENT_DISASTER(egc, "allocate new event", errno, type);
-        return NULL;
-    }
-
-    memset(ev, 0, sizeof(*ev));
+    ev = libxl__zalloc(0,sizeof(*ev));
     ev->type = type;
     ev->domid = domid;
 

@@ -789,7 +789,6 @@ static void domain_death_occurred(libxl__egc *egc,
     *evg_upd = evg_next;
 
     libxl_event *ev = NEW_EVENT(egc, DOMAIN_DEATH, evg->domid);
-    if (!ev) return;
 
     libxl__event_occurred(egc, ev);
 
@@ -876,7 +875,6 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
             if (!evg->shutdown_reported &&
                 (got->flags & XEN_DOMINF_shutdown)) {
                 libxl_event *ev = NEW_EVENT(egc, DOMAIN_SHUTDOWN, got->domain);
-                if (!ev) goto out;
                 
                 LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, " shutdown reporting");
 

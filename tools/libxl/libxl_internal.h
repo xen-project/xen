@@ -654,10 +654,10 @@ _hidden libxl_event *libxl__event_new(libxl__egc*, libxl_event_type,
                                       uint32_t domid);
   /* Convenience function.
    * Allocates a new libxl_event, fills in domid and type.
-   * If allocation fails, calls _disaster, and returns NULL. */
+   * Cannot fail. */
 
 #define NEW_EVENT(egc, type, domid)                              \
-    libxl__event_new((egc), LIBXL_EVENT_TYPE_##type, (domid));
+    libxl__event_new((egc), LIBXL_EVENT_TYPE_##type, (domid))
     /* Convenience macro. */
 
 /*
