@@ -19,11 +19,6 @@
 
 #include "libxl_internal.h"
 
-static int call_waitpid(pid_t (*waitpid_cb)(pid_t, int *, int), pid_t pid, int *status, int options)
-{
-    return (waitpid_cb) ? waitpid_cb(pid, status, options) : waitpid(pid, status, options);
-}
-
 static void check_open_fds(const char *what)
 {
     const char *env_debug;
@@ -344,7 +339,7 @@ int libxl__spawn_spawn(libxl__gc *gc,
 
     if (!for_spawn) _exit(0); /* just detach then */
 
-    got = call_waitpid(ctx->waitpid_instead, child, &status, 0);
+    got = waitpid(child, &status, 0);
     assert(got == child);
 
     rc = (WIFEXITED(status) ? WEXITSTATUS(status) :
@@ -404,7 +399,7 @@ int libxl__spawn_detach(libxl__gc *gc,
                          (unsigned long)for_spawn->intermediate);
             abort(); /* things are very wrong */
         }
-        got = call_waitpid(ctx->waitpid_instead, for_spawn->intermediate, &status, 0);
+        got = waitpid(for_spawn->intermediate, &status, 0);
         assert(got == for_spawn->intermediate);
         if (!(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL)) {
             report_spawn_intermediate_status(gc, for_spawn, status);
@@ -421,14 +416,13 @@ int libxl__spawn_detach(libxl__gc *gc,
 
 int libxl__spawn_check(libxl__gc *gc, libxl__spawn_starting *for_spawn)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     pid_t got;
     int status;
 
     if (!for_spawn) return 0;
 
     assert(for_spawn->intermediate);
-    got = call_waitpid(ctx->waitpid_instead, for_spawn->intermediate, &status, WNOHANG);
+    got = waitpid(for_spawn->intermediate, &status, WNOHANG);
     if (!got) return 0;
 
     assert(got == for_spawn->intermediate);

@@ -325,9 +325,6 @@ struct libxl__ctx {
     int sigchld_selfpipe[2]; /* [0]==-1 means handler not installed */
     LIBXL_LIST_HEAD(, libxl__ev_child) children;
 
-    /* This is obsolete and must be removed: */
-    int (*waitpid_instead)(pid_t pid, int *status, int flags);
-
     libxl_version_info version_info;
 };
 
