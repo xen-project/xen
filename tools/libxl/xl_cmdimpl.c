@@ -6107,7 +6107,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
         fprintf(stderr, "failed to offline vcpus\n");
         goto out;
     }
-    memset(cpumap.map, 0, cpumap.size);
+    libxl_cpumap_set_none(&cpumap);
 
     for (c = 0; c < n_cpus; c++) {
         if (topology[c].node == LIBXL_CPUTOPOLOGY_INVALID_ENTRY) {
