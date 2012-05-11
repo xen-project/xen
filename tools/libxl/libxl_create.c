@@ -564,7 +564,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl__spawner_starting *dm_starting = 0;
-    libxl__domain_build_state state;
+    libxl__domain_build_state state[1];
     uint32_t domid;
     int i, ret;
 
@@ -606,12 +606,12 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         }
     }
 
-    memset(&state, 0, sizeof(state));
+    memset(state, 0, sizeof(*state));
 
     if ( restore_fd >= 0 ) {
-        ret = domain_restore(gc, &d_config->b_info, domid, restore_fd, &state);
+        ret = domain_restore(gc, &d_config->b_info, domid, restore_fd, state);
     } else {
-        ret = libxl__domain_build(gc, &d_config->b_info, domid, &state);
+        ret = libxl__domain_build(gc, &d_config->b_info, domid, state);
     }
 
     if (ret) {
@@ -649,7 +649,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         ret = init_console_info(&console, 0);
         if ( ret )
             goto error_out;
-        libxl__device_console_add(gc, domid, &console, &state);
+        libxl__device_console_add(gc, domid, &console, state);
         libxl__device_console_dispose(&console);
 
         libxl_device_vkb_init(&vkb);
@@ -657,7 +657,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
         libxl_device_vkb_dispose(&vkb);
 
         ret = libxl__create_device_model(gc, domid, d_config,
-                                         &state, &dm_starting);
+                                         state, &dm_starting);
         if (ret < 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
                        "failed to create device model: %d", ret);
@@ -683,11 +683,11 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
                 d_config->num_vfbs, d_config->vfbs,
                 d_config->num_disks, &d_config->disks[0]);
 
-        libxl__device_console_add(gc, domid, &console, &state);
+        libxl__device_console_add(gc, domid, &console, state);
         libxl__device_console_dispose(&console);
 
         if (need_qemu) {
-            libxl__create_xenpv_qemu(gc, domid, d_config, &state, &dm_starting);
+            libxl__create_xenpv_qemu(gc, domid, d_config, state, &dm_starting);
         }
         break;
     }
@@ -701,7 +701,7 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
             == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
             libxl__qmp_initializations(gc, domid, d_config);
         }
-        ret = libxl__confirm_device_model_startup(gc, &state, dm_starting);
+        ret = libxl__confirm_device_model_startup(gc, state, dm_starting);
         if (ret < 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
                        "device model did not start: %d", ret);

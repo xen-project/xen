@@ -678,10 +678,10 @@ static int libxl__create_stubdom(libxl__gc *gc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int i, num_console = STUBDOM_SPECIAL_CONSOLES, ret;
     libxl__device_console *console;
-    libxl_domain_config dm_config;
+    libxl_domain_config dm_config[1];
     libxl_device_vfb vfb;
     libxl_device_vkb vkb;
-    libxl__domain_build_state stubdom_state;
+    libxl__domain_build_state stubdom_state[1];
     uint32_t dm_domid;
     char **args;
     struct xs_permissions perm[2];
@@ -694,58 +694,58 @@ static int libxl__create_stubdom(libxl__gc *gc,
         goto out;
     }
 
-    libxl_domain_create_info_init(&dm_config.c_info);
-    dm_config.c_info.type = LIBXL_DOMAIN_TYPE_PV;
-    dm_config.c_info.name = libxl__sprintf(gc, "%s-dm",
+    libxl_domain_create_info_init(&dm_config->c_info);
+    dm_config->c_info.type = LIBXL_DOMAIN_TYPE_PV;
+    dm_config->c_info.name = libxl__sprintf(gc, "%s-dm",
                                     libxl__domid_to_name(gc, guest_domid));
-    dm_config.c_info.ssidref = guest_config->b_info.device_model_ssidref;
+    dm_config->c_info.ssidref = guest_config->b_info.device_model_ssidref;
 
-    libxl_uuid_generate(&dm_config.c_info.uuid);
+    libxl_uuid_generate(&dm_config->c_info.uuid);
 
-    libxl_domain_build_info_init(&dm_config.b_info);
-    libxl_domain_build_info_init_type(&dm_config.b_info, LIBXL_DOMAIN_TYPE_PV);
+    libxl_domain_build_info_init(&dm_config->b_info);
+    libxl_domain_build_info_init_type(&dm_config->b_info, LIBXL_DOMAIN_TYPE_PV);
 
-    dm_config.b_info.max_vcpus = 1;
-    dm_config.b_info.max_memkb = 32 * 1024;
-    dm_config.b_info.target_memkb = dm_config.b_info.max_memkb;
+    dm_config->b_info.max_vcpus = 1;
+    dm_config->b_info.max_memkb = 32 * 1024;
+    dm_config->b_info.target_memkb = dm_config->b_info.max_memkb;
 
-    dm_config.b_info.u.pv.kernel.path = libxl__abs_path(gc, "ioemu-stubdom.gz",
+    dm_config->b_info.u.pv.kernel.path = libxl__abs_path(gc, "ioemu-stubdom.gz",
                                               libxl__xenfirmwaredir_path());
-    dm_config.b_info.u.pv.cmdline = libxl__sprintf(gc, " -d %d", guest_domid);
-    dm_config.b_info.u.pv.ramdisk.path = "";
-    dm_config.b_info.u.pv.features = "";
+    dm_config->b_info.u.pv.cmdline = libxl__sprintf(gc, " -d %d", guest_domid);
+    dm_config->b_info.u.pv.ramdisk.path = "";
+    dm_config->b_info.u.pv.features = "";
 
-    dm_config.b_info.device_model_version =
+    dm_config->b_info.device_model_version =
         guest_config->b_info.device_model_version;
-    dm_config.b_info.device_model =
+    dm_config->b_info.device_model =
         guest_config->b_info.device_model;
-    dm_config.b_info.extra = guest_config->b_info.extra;
-    dm_config.b_info.extra_pv = guest_config->b_info.extra_pv;
-    dm_config.b_info.extra_hvm = guest_config->b_info.extra_hvm;
+    dm_config->b_info.extra = guest_config->b_info.extra;
+    dm_config->b_info.extra_pv = guest_config->b_info.extra_pv;
+    dm_config->b_info.extra_hvm = guest_config->b_info.extra_hvm;
 
-    dm_config.disks = guest_config->disks;
-    dm_config.num_disks = guest_config->num_disks;
+    dm_config->disks = guest_config->disks;
+    dm_config->num_disks = guest_config->num_disks;
 
-    dm_config.vifs = guest_config->vifs;
-    dm_config.num_vifs = guest_config->num_vifs;
+    dm_config->vifs = guest_config->vifs;
+    dm_config->num_vifs = guest_config->num_vifs;
 
-    ret = libxl__domain_create_info_setdefault(gc, &dm_config.c_info);
+    ret = libxl__domain_create_info_setdefault(gc, &dm_config->c_info);
     if (ret) goto out;
-    ret = libxl__domain_build_info_setdefault(gc, &dm_config.b_info);
+    ret = libxl__domain_build_info_setdefault(gc, &dm_config->b_info);
     if (ret) goto out;
 
     libxl__vfb_and_vkb_from_hvm_guest_config(gc, guest_config, &vfb, &vkb);
-    dm_config.vfbs = &vfb;
-    dm_config.num_vfbs = 1;
-    dm_config.vkbs = &vkb;
-    dm_config.num_vkbs = 1;
+    dm_config->vfbs = &vfb;
+    dm_config->num_vfbs = 1;
+    dm_config->vkbs = &vkb;
+    dm_config->num_vkbs = 1;
 
     /* fixme: this function can leak the stubdom if it fails */
     dm_domid = 0;
-    ret = libxl__domain_make(gc, &dm_config.c_info, &dm_domid);
+    ret = libxl__domain_make(gc, &dm_config->c_info, &dm_domid);
     if (ret)
         goto out;
-    ret = libxl__domain_build(gc, &dm_config.b_info, dm_domid, &stubdom_state);
+    ret = libxl__domain_build(gc, &dm_config->b_info, dm_domid, stubdom_state);
     if (ret)
         goto out;
 
@@ -790,20 +790,20 @@ retry_transaction:
         if (errno == EAGAIN)
             goto retry_transaction;
 
-    for (i = 0; i < dm_config.num_disks; i++) {
-        ret = libxl_device_disk_add(ctx, dm_domid, &dm_config.disks[i]);
+    for (i = 0; i < dm_config->num_disks; i++) {
+        ret = libxl_device_disk_add(ctx, dm_domid, &dm_config->disks[i]);
         if (ret)
             goto out_free;
     }
-    for (i = 0; i < dm_config.num_vifs; i++) {
-        ret = libxl_device_nic_add(ctx, dm_domid, &dm_config.vifs[i]);
+    for (i = 0; i < dm_config->num_vifs; i++) {
+        ret = libxl_device_nic_add(ctx, dm_domid, &dm_config->vifs[i]);
         if (ret)
             goto out_free;
     }
-    ret = libxl_device_vfb_add(ctx, dm_domid, &dm_config.vfbs[0]);
+    ret = libxl_device_vfb_add(ctx, dm_domid, &dm_config->vfbs[0]);
     if (ret)
         goto out_free;
-    ret = libxl_device_vkb_add(ctx, dm_domid, &dm_config.vkbs[0]);
+    ret = libxl_device_vkb_add(ctx, dm_domid, &dm_config->vkbs[0]);
     if (ret)
         goto out_free;
 
@@ -847,14 +847,14 @@ retry_transaction:
                 break;
         }
         ret = libxl__device_console_add(gc, dm_domid, &console[i],
-                        i == STUBDOM_CONSOLE_LOGGING ? &stubdom_state : NULL);
+                        i == STUBDOM_CONSOLE_LOGGING ? stubdom_state : NULL);
         if (ret)
             goto out_free;
     }
 
     if (libxl__create_xenpv_qemu(gc, dm_domid,
-                                 &dm_config,
-                                 &stubdom_state,
+                                 dm_config,
+                                 stubdom_state,
                                  &dm_starting) < 0) {
         ret = ERROR_FAIL;
         goto out_free;
