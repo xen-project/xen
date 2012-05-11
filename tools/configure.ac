@@ -19,9 +19,6 @@ recommended, use PREPEND_INCLUDES, PREPEND_LIB, \
 APPEND_INCLUDES and APPEND_LIB instead when possible.])
 ])
 
-AC_USE_SYSTEM_EXTENSIONS
-AC_CANONICAL_HOST
-
 # M4 Macro includes
 m4_include([m4/savevar.m4])
 m4_include([m4/features.m4])
@@ -75,9 +72,7 @@ AC_ARG_VAR([BCC], [Path to bcc tool])
 AC_ARG_VAR([IASL], [Path to iasl tool])
 
 # Checks for programs.
-AC_PROG_SED
 AC_PROG_CC
-AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 AC_PATH_PROG([BISON], [bison])
@@ -137,7 +132,6 @@ AC_SUBST(libext2fs)
 AC_CHECK_LIB([gcrypt], [gcry_md_hash_buffer], [libgcrypt="y"], [libgcrypt="n"])
 AC_SUBST(libgcrypt)
 AX_CHECK_PTHREAD
-AC_CHECK_LIB([rt], [clock_gettime])
 AC_CHECK_LIB([yajl], [yajl_alloc], [],
     [AC_MSG_ERROR([Could not find yajl])])
 AC_CHECK_LIB([z], [deflateCopy], [], [AC_MSG_ERROR([Could not find zlib])])
@@ -145,58 +139,6 @@ AC_CHECK_LIB([iconv], [libiconv_open], [libiconv="y"], [libiconv="n"])
 AC_SUBST(libiconv)
 
 # Checks for header files.
-AC_FUNC_ALLOCA
-AC_CHECK_HEADERS([ \
-                arpa/inet.h fcntl.h inttypes.h libintl.h limits.h malloc.h \
-                netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h \
-                strings.h sys/file.h sys/ioctl.h sys/mount.h sys/param.h \
-                sys/socket.h sys/statvfs.h sys/time.h syslog.h termios.h \
-                unistd.h yajl/yajl_version.h \
-                ])
-
-# Checks for typedefs, structures, and compiler characteristics.
-AC_HEADER_STDBOOL
-AC_TYPE_UID_T
-AC_C_INLINE
-AC_TYPE_INT16_T
-AC_TYPE_INT32_T
-AC_TYPE_INT64_T
-AC_TYPE_INT8_T
-AC_TYPE_MODE_T
-AC_TYPE_OFF_T
-AC_TYPE_PID_T
-AC_C_RESTRICT
-AC_TYPE_SIZE_T
-AC_TYPE_SSIZE_T
-AC_CHECK_MEMBERS([struct stat.st_blksize])
-AC_STRUCT_ST_BLOCKS
-AC_CHECK_MEMBERS([struct stat.st_rdev])
-AC_TYPE_UINT16_T
-AC_TYPE_UINT32_T
-AC_TYPE_UINT64_T
-AC_TYPE_UINT8_T
-AC_CHECK_TYPES([ptrdiff_t])
-
-# Checks for library functions.
-AC_FUNC_ERROR_AT_LINE
-AC_FUNC_FORK
-AC_FUNC_FSEEKO
-AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
-AC_HEADER_MAJOR
-AC_FUNC_MALLOC
-AC_FUNC_MKTIME
-AC_FUNC_MMAP
-AC_FUNC_REALLOC
-AC_FUNC_STRNLEN
-AC_FUNC_STRTOD
-AC_CHECK_FUNCS([ \
-                alarm atexit bzero clock_gettime dup2 fdatasync ftruncate \
-                getcwd gethostbyname gethostname getpagesize gettimeofday \
-                inet_ntoa isascii localtime_r memchr memmove memset mkdir \
-                mkfifo munmap pathconf realpath regcomp rmdir select setenv \
-                socket strcasecmp strchr strcspn strdup strerror strndup \
-                strpbrk strrchr strspn strstr strtol strtoul strtoull tzset \
-                uname \
-                ])
+AC_CHECK_HEADERS([yajl/yajl_version.h])
 
 AC_OUTPUT()
