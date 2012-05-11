@@ -104,6 +104,7 @@ struct cmd_spec *cmdtable_lookup(const char *s);
 
 extern libxl_ctx *ctx;
 extern xentoollog_logger_stdiostream *logger;
+pid_t xl_fork(libxl_ctx *ctx); /* like fork, but prints and dies if it fails */
 void postfork(void);
 
 /* global options */

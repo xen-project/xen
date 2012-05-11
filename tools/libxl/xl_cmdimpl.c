@@ -1736,7 +1736,7 @@ start:
         pid_t child1, got_child;
         int nullfd;
 
-        child1 = libxl_fork(ctx);
+        child1 = xl_fork(ctx);
         if (child1) {
             printf("Daemon running with PID %d\n", child1);
 
@@ -2779,8 +2779,7 @@ static void migrate_domain(const char *domain_spec, const char *rune,
     MUST( libxl_pipe(ctx, sendpipe) );
     MUST( libxl_pipe(ctx, recvpipe) );
 
-    child = libxl_fork(ctx);
-    if (child==-1) exit(1);
+    child = xl_fork(ctx);
 
     if (!child) {
         dup2(sendpipe[0], 0);

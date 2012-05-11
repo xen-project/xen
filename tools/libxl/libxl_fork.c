@@ -347,7 +347,12 @@ pid_t libxl__ev_child_fork(libxl__gc *gc, libxl__ev_child *ch,
 
     if (!pid) {
         /* woohoo! */
-        return 0; /* Yes, CTX is left locked in the child. */
+        if (CTX->xsh) {
+            xs_daemon_destroy_postfork(CTX->xsh);
+            CTX->xsh = NULL; /* turns mistakes into crashes */
+        }
+        /* Yes, CTX is left locked in the child. */
+        return 0;
     }
 
     ch->pid = pid;
@@ -394,6 +399,24 @@ void libxl_childproc_setmode(libxl_ctx *ctx, const libxl_childproc_hooks *hooks,
 const libxl_childproc_hooks libxl__childproc_default_hooks = {
     libxl_sigchld_owner_libxl, 0, 0
 };
+
+int libxl__ev_child_xenstore_reopen(libxl__gc *gc, const char *what) {
+    int rc;
+
+    assert(!CTX->xsh);
+    CTX->xsh = xs_daemon_open();
+    if (!CTX->xsh) {
+        LOGE(ERROR, "%s: xenstore reopen failed", what);
+        rc = ERROR_FAIL;  goto out;
+    }
+
+    libxl_fd_set_cloexec(CTX, xs_fileno(CTX->xsh), 1);
+
+    return 0;
+
+ out:
+    return rc;
+}
 
 /*
  * Local variables:

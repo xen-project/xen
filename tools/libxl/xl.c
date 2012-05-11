@@ -105,6 +105,18 @@ void postfork(void)
     }
 }
 
+pid_t xl_fork(libxl_ctx *ctx) {
+    pid_t pid;
+
+    pid = fork();
+    if (pid == -1) {
+        perror("fork failed");
+        exit(-1);
+    }
+
+    return pid;
+}
+
 int main(int argc, char **argv)
 {
     int opt = 0;

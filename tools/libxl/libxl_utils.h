@@ -47,9 +47,8 @@ int libxl_write_exactly(libxl_ctx *ctx, int fd, const void *data,
    * logged using filename (which is only used for logging) and what
    * (which may be 0). */
 
-pid_t libxl_fork(libxl_ctx *ctx);
 int libxl_pipe(libxl_ctx *ctx, int pipes[2]);
-  /* Just like fork(2), pipe(2), but log errors. */
+  /* Just like pipe(2), but log errors. */
 
 void libxl_report_child_exitstatus(libxl_ctx *ctx, xentoollog_level,
                                    const char *what, pid_t pid, int status);

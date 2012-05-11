@@ -127,34 +127,23 @@ void libxl_report_child_exitstatus(libxl_ctx *ctx,
     }
 }
 
-int libxl__spawn_record_pid(libxl__gc *gc, libxl__spawn_state *spawn,
-                            pid_t innerchild)
+int libxl__spawn_record_pid(libxl__gc *gc, libxl__spawn_state *spawn, pid_t pid)
 {
-    struct xs_handle *xsh = NULL;
-    const char *pid = NULL;
-    int rc, xsok;
+    int r, rc;
 
-    pid = GCSPRINTF("%d", innerchild);
+    rc = libxl__ev_child_xenstore_reopen(gc, spawn->what);
+    if (rc) goto out;
 
-    /* we mustn't use the parent's handle in the child */
-    xsh = xs_daemon_open();
-    if (!xsh) {
-        LOGE(ERROR, "write %s = %s: xenstore reopen failed",
-             spawn->pidpath, pid);
-        rc = ERROR_FAIL;  goto out;
-    }
-
-    xsok = xs_write(xsh, XBT_NULL, spawn->pidpath, pid, strlen(pid));
-    if (!xsok) {
+    r = libxl__xs_write(gc, XBT_NULL, spawn->pidpath, "%d", pid);
+    if (r) {
         LOGE(ERROR,
-             "write %s = %s: xenstore write failed", spawn->pidpath, pid);
+             "write %s = %d: xenstore write failed", spawn->pidpath, pid);
         rc = ERROR_FAIL;  goto out;
     }
 
     rc = 0;
 
 out:
-    if (xsh) xs_daemon_close(xsh);
     return rc ? SIGTERM : 0;
 }
 
@@ -302,7 +291,15 @@ int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *ss)
 
     /* we are now the middle process */
 
-    child = fork();
+    pid_t (*fork_replacement)(void*) =
+        CTX->childproc_hooks
+        ? CTX->childproc_hooks->fork_replacement
+        : 0;
+    child =
+        fork_replacement
+        ? fork_replacement(CTX->childproc_user)
+        : fork();
+
     if (child == -1)
         exit(255);
     if (!child) {

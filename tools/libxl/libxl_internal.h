@@ -640,6 +640,11 @@ static inline void libxl__ev_child_init(libxl__ev_child *childw_out)
 static inline int libxl__ev_child_inuse(libxl__ev_child *childw_out)
                 { return childw_out->pid >= 0; }
 
+/* Useable (only) in the child to once more make the ctx useable for
+ * xenstore operations.  logs failure in the form "what: <error
+ * message>". */
+_hidden int libxl__ev_child_xenstore_reopen(libxl__gc *gc, const char *what);
+
 
 /*
  * Other event-handling support provided by the libxl event core to

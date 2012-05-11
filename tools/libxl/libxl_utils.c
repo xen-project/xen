@@ -444,27 +444,6 @@ int libxl__remove_directory(libxl__gc *gc, const char *dirpath)
     return rc;
 }
 
-pid_t libxl_fork(libxl_ctx *ctx)
-{
-    pid_t pid;
-
-    pid = fork();
-    if (pid == -1) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "fork failed");
-        return -1;
-    }
-
-    if (!pid) {
-        if (ctx->xsh) xs_daemon_destroy_postfork(ctx->xsh);
-        ctx->xsh = 0;
-        /* This ensures that anyone who forks but doesn't exec,
-         * and doesn't reinitialise the libxl_ctx, is OK.
-         * It also means they can safely call libxl_ctx_free. */
-    }
-
-    return pid;
-}
-
 int libxl_pipe(libxl_ctx *ctx, int pipes[2])
 {
     if (pipe(pipes) < 0) {
