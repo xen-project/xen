@@ -569,6 +569,9 @@ static int store_libxl_entry(libxl__gc *gc, uint32_t domid,
 static void domcreate_devmodel_started(libxl__egc *egc,
                                        libxl__dm_spawn_state *dmss,
                                        int rc);
+static void domcreate_bootloader_done(libxl__egc *egc,
+                                      libxl__bootloader_state *bl,
+                                      int rc);
 
 /* Our own function to clean up and call the user's callback.
  * The final call in the sequence. */
@@ -589,6 +592,7 @@ static void initiate_domain_create(libxl__egc *egc,
     const int restore_fd = dcs->restore_fd;
     const libxl_console_ready cb = dcs->console_cb;
     void *const priv = dcs->console_cb_priv;
+    memset(&dcs->build_state, 0, sizeof(dcs->build_state));
 
     domid = 0;
 
@@ -619,21 +623,43 @@ static void initiate_domain_create(libxl__egc *egc,
         if (ret) goto error_out;
     }
 
+    dcs->bl.ao = ao;
     libxl_device_disk *bootdisk =
         d_config->num_disks > 0 ? &d_config->disks[0] : NULL;
 
     if (restore_fd < 0 && bootdisk) {
-        ret = libxl_run_bootloader(ctx, &d_config->b_info, bootdisk, domid,
-                                   0 /* fixme-ao */);
-        if (ret) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                       "failed to run bootloader: %d", ret);
-            goto error_out;
-        }
+        dcs->bl.callback = domcreate_bootloader_done;
+        dcs->bl.info = &d_config->b_info,
+        dcs->bl.disk = bootdisk;
+        dcs->bl.domid = dcs->guest_domid;
+            
+        libxl__bootloader_run(egc, &dcs->bl);
+    } else {
+        domcreate_bootloader_done(egc, &dcs->bl, 0);
     }
+    return;
 
-    memset(&dcs->build_state, 0, sizeof(dcs->build_state));
-    libxl__domain_build_state *state = &dcs->build_state;
+error_out:
+    assert(ret);
+    domcreate_complete(egc, dcs, ret);
+}
+
+static void domcreate_bootloader_done(libxl__egc *egc,
+                                      libxl__bootloader_state *bl,
+                                      int ret)
+{
+    libxl__domain_create_state *dcs = CONTAINER_OF(bl, *dcs, bl);
+    STATE_AO_GC(bl->ao);
+    int i;
+
+    /* convenience aliases */
+    const uint32_t domid = dcs->guest_domid;
+    libxl_domain_config *const d_config = dcs->guest_config;
+    const int restore_fd = dcs->restore_fd;
+    libxl__domain_build_state *const state = &dcs->build_state;
+    libxl_ctx *const ctx = CTX;
+
+    if (ret) goto error_out;
 
     /* We might be going to call libxl__spawn_local_dm, or _spawn_stub_dm.
      * Fill in any field required by either, including both relevant
@@ -784,12 +810,13 @@ static void domcreate_devmodel_started(libxl__egc *egc,
 
     if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
         libxl_defbool_val(d_config->b_info.u.pv.e820_host)) {
-        int rc;
-        rc = libxl__e820_alloc(gc, domid, d_config);
-        if (rc)
+        ret = libxl__e820_alloc(gc, domid, d_config);
+        if (ret) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                       "Failed while collecting E820 with: %d (errno:%d)\n",
-                      rc, errno);
+                      ret, errno);
+            goto error_out;
+        }
     }
     if ( cb && (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM ||
                 (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
