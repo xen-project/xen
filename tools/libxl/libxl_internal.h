@@ -866,6 +866,33 @@ _hidden int libxl__ev_devstate_wait(libxl__gc *gc, libxl__ev_devstate *ds,
                                     const char *state_path,
                                     int state, int milliseconds);
 
+/*
+ * libxl__ev_domaindeathcheck_register - arranges to call back (once)
+ * if the domain is destroyed.  If the domain dies, we log a message
+ * of the form "<what>: <explanation of the situation, including the domid>".
+ */
+
+typedef struct libxl__domaindeathcheck libxl__domaindeathcheck;
+typedef void libxl___domaindeathcheck_callback(libxl__egc *egc,
+                                         libxl__domaindeathcheck*);
+
+struct libxl__domaindeathcheck {
+    /* must be filled in by caller, and remain valid: */
+    const char *what;
+    uint32_t domid;
+    libxl___domaindeathcheck_callback *callback;
+    /* private */
+    libxl__ev_xswatch watch;
+};
+
+_hidden int libxl__domaindeathcheck_start(libxl__gc *gc,
+                                          libxl__domaindeathcheck *dc);
+
+static inline void libxl__domaindeathcheck_init
+ (libxl__domaindeathcheck *dc) { libxl__ev_xswatch_init(&dc->watch); }
+static inline void libxl__domaindeathcheck_stop(libxl__gc *gc,
+  libxl__domaindeathcheck *dc) { libxl__ev_xswatch_deregister(gc,&dc->watch); }
+
 
 /*
  * libxl__try_phy_backend - Check if there's support for the passed
@@ -1738,6 +1765,7 @@ struct libxl__bootloader_state {
     libxl__openpty_state openpty;
     libxl__openpty_result ptys[2];  /* [0] is for bootloader */
     libxl__ev_child child;
+    libxl__domaindeathcheck deathcheck;
     int nargs, argsspace;
     const char **args;
     libxl__datacopier_state keystrokes, display;
@@ -1749,7 +1777,6 @@ _hidden void libxl__bootloader_init(libxl__bootloader_state *bl);
 /* Will definitely call st->callback, perhaps reentrantly.
  * If callback is passed rc==0, will have updated st->info appropriately */
 _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
-
 
 /*----- Domain creation -----*/
 

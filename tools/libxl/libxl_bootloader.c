@@ -31,6 +31,7 @@ static void bootloader_keystrokes_copyfail(libxl__egc *egc,
        libxl__datacopier_state *dc, int onwrite, int errnoval);
 static void bootloader_display_copyfail(libxl__egc *egc,
        libxl__datacopier_state *dc, int onwrite, int errnoval);
+static void bootloader_domaindeath(libxl__egc*, libxl__domaindeathcheck *dc);
 static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,
                                 pid_t pid, int status);
 
@@ -213,6 +214,7 @@ void libxl__bootloader_init(libxl__bootloader_state *bl)
     bl->ptys[0].master = bl->ptys[0].slave = 0;
     bl->ptys[1].master = bl->ptys[1].slave = 0;
     libxl__ev_child_init(&bl->child);
+    libxl__domaindeathcheck_init(&bl->deathcheck);
     bl->keystrokes.ao = bl->ao;  libxl__datacopier_init(&bl->keystrokes);
     bl->display.ao = bl->ao;     libxl__datacopier_init(&bl->display);
 }
@@ -230,6 +232,7 @@ static void bootloader_cleanup(libxl__egc *egc, libxl__bootloader_state *bl)
         free(bl->diskpath);
         bl->diskpath = 0;
     }
+    libxl__domaindeathcheck_stop(gc,&bl->deathcheck);
     libxl__datacopier_kill(&bl->keystrokes);
     libxl__datacopier_kill(&bl->display);
     for (i=0; i<2; i++) {
@@ -254,6 +257,23 @@ static void bootloader_callback(libxl__egc *egc, libxl__bootloader_state *bl,
 {
     bootloader_cleanup(egc, bl);
     bl->callback(egc, bl, rc);
+}
+
+/* might be called at any time, provided it's init'd */
+static void bootloader_abort(libxl__egc *egc,
+                             libxl__bootloader_state *bl, int rc)
+{
+    STATE_AO_GC(bl->ao);
+    int r;
+
+    libxl__datacopier_kill(&bl->keystrokes);
+    libxl__datacopier_kill(&bl->display);
+    if (libxl__ev_child_inuse(&bl->child)) {
+        r = kill(bl->child.pid, SIGTERM);
+        if (r) LOGE(WARN, "after failure, failed to kill bootloader [%lu]",
+                    (unsigned long)bl->child.pid);
+    }
+    bl->rc = rc;
 }
 
 /*----- main flow of control -----*/
@@ -377,6 +397,12 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
         goto out;
     }
 
+    bl->deathcheck.what = "stopping bootloader";
+    bl->deathcheck.domid = bl->domid;
+    bl->deathcheck.callback = bootloader_domaindeath;
+    rc = libxl__domaindeathcheck_start(gc, &bl->deathcheck);
+    if (rc) goto out;
+
     if (bl->console_available)
         bl->console_available(egc, bl);
 
@@ -454,18 +480,9 @@ static void bootloader_copyfail(libxl__egc *egc, const char *which,
        libxl__bootloader_state *bl, int onwrite, int errnoval)
 {
     STATE_AO_GC(bl->ao);
-    int r;
-
     if (!onwrite && !errnoval)
         LOG(ERROR, "unexpected eof copying %s", which);
-    libxl__datacopier_kill(&bl->keystrokes);
-    libxl__datacopier_kill(&bl->display);
-    if (libxl__ev_child_inuse(&bl->child)) {
-        r = kill(bl->child.pid, SIGTERM);
-        if (r) LOGE(WARN, "after failure, failed to kill bootloader [%lu]",
-                    (unsigned long)bl->child.pid);
-    }
-    bl->rc = ERROR_FAIL;
+    bootloader_abort(egc, bl, ERROR_FAIL);
 }
 static void bootloader_keystrokes_copyfail(libxl__egc *egc,
        libxl__datacopier_state *dc, int onwrite, int errnoval)
@@ -478,6 +495,12 @@ static void bootloader_display_copyfail(libxl__egc *egc,
 {
     libxl__bootloader_state *bl = CONTAINER_OF(dc, *bl, display);
     bootloader_copyfail(egc, "bootloader output", bl, onwrite, errnoval);
+}
+
+static void bootloader_domaindeath(libxl__egc *egc, libxl__domaindeathcheck *dc)
+{
+    libxl__bootloader_state *bl = CONTAINER_OF(dc, *bl, deathcheck);
+    bootloader_abort(egc, bl, ERROR_FAIL);
 }
 
 static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,

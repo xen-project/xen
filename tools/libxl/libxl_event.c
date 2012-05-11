@@ -589,6 +589,53 @@ int libxl__ev_devstate_wait(libxl__gc *gc, libxl__ev_devstate *ds,
 }
 
 /*
+ * domain death/destruction
+ */
+
+/*
+ * We use a xenstore watch on the domain's path, rather than using an
+ * @releaseDomain watch and asking the hypervisor.  This is simpler
+ * because turning @releaseDomain into domain-specific information is
+ * complicated.
+ *
+ * It is also sufficient for our callers, which are generally trying
+ * to do cleanup of their own execution state on domain death, for the
+ * following reason: if the domain is destroyed then either (a) the
+ * entries in xenstore have already been deleted, in which case the
+ * test here works or (b) they have not in which case something has
+ * gone very badly wrong and we are going to leak those xenstore
+ * entries, in which case trying to avoid leaking other stuff is
+ * futile.
+ */
+
+static void domaindeathcheck_callback(libxl__egc *egc, libxl__ev_xswatch *w,
+                            const char *watch_path, const char *event_path)
+{
+    libxl__domaindeathcheck *dc = CONTAINER_OF(w, *dc, watch);
+    EGC_GC;
+    const char *p = libxl__xs_read(gc, XBT_NULL, watch_path);
+    if (p) return;
+
+    if (errno!=ENOENT) {
+        LIBXL__EVENT_DISASTER(egc,"failed to read xenstore"
+                              " for domain detach check", errno, 0);
+        return;
+    }
+
+    LOG(ERROR,"%s: domain %"PRIu32" removed (%s no longer in xenstore)",
+        dc->what, dc->domid, watch_path);
+    dc->callback(egc, dc);
+}
+
+int libxl__domaindeathcheck_start(libxl__gc *gc,
+                                  libxl__domaindeathcheck *dc)
+{
+    const char *path = GCSPRINTF("/local/domain/%"PRIu32, dc->domid);
+    return libxl__ev_xswatch_register(gc, &dc->watch,
+                                      domaindeathcheck_callback, path);
+}
+
+/*
  * osevent poll
  */
 
