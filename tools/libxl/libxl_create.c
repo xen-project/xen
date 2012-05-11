@@ -573,9 +573,6 @@ static int do_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
     if (ret) goto error_out;
 
-    ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
-    if (ret) goto error_out;
-
     ret = libxl__domain_make(gc, &d_config->c_info, &domid);
     if (ret) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot make domain: %d", ret);
