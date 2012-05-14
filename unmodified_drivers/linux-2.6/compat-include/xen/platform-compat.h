@@ -161,4 +161,14 @@ typedef irqreturn_t (*irq_handler_t)(int, void *, struct pt_regs *);
 #define atomic_cmpxchg(v, old, new) (cmpxchg(&((v)->counter), (old), (new)))
 #endif
 
+#ifdef sync_test_bit
+#define synch_change_bit		sync_change_bit
+#define synch_clear_bit			sync_clear_bit
+#define synch_set_bit			sync_set_bit
+#define synch_test_and_change_bit	sync_test_and_change_bit
+#define synch_test_and_clear_bit	sync_test_and_clear_bit
+#define synch_test_and_set_bit		sync_test_and_set_bit
+#define synch_test_bit			sync_test_bit
+#endif
+
 #endif
