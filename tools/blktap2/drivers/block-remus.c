@@ -505,7 +505,7 @@ fail:
 static int ramdisk_flush(td_driver_t *driver, struct tdremus_state* s)
 {
 	uint64_t* sectors;
-	char* buf;
+	char* buf = NULL;
 	uint64_t base, batchlen;
 	int i, j, count = 0;
 

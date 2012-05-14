@@ -38,6 +38,7 @@
 #include "tapdisk-vbd.h"
 #include "tapdisk-server.h"
 #include "tapdisk-disktype.h"
+#include "tapdisk-utils.h"
 
 #define POLL_READ                        0
 #define POLL_WRITE                       1
@@ -145,7 +146,7 @@ tapdisk_stream_poll_clear(struct tapdisk_stream_poll *p)
 {
 	int dummy;
 
-	read(p->pipe[POLL_READ], &dummy, sizeof(dummy));
+	read_exact(p->pipe[POLL_READ], &dummy, sizeof(dummy));
 	p->set = 0;
 }
 
@@ -155,7 +156,7 @@ tapdisk_stream_poll_set(struct tapdisk_stream_poll *p)
 	int dummy = 0;
 
 	if (!p->set) {
-		write(p->pipe[POLL_WRITE], &dummy, sizeof(dummy));
+		write_exact(p->pipe[POLL_WRITE], &dummy, sizeof(dummy));
 		p->set = 1;
 	}
 }
@@ -203,7 +204,7 @@ tapdisk_stream_print_request(struct tapdisk_stream *s,
 {
 	unsigned long idx = (unsigned long)tapdisk_stream_request_idx(s, sreq);
 	char *buf = (char *)MMAP_VADDR(s->vbd->ring.vstart, idx, 0);
-	write(s->out_fd, buf, sreq->secs << SECTOR_SHIFT);
+	write_exact(s->out_fd, buf, sreq->secs << SECTOR_SHIFT);
 }
 
 static void

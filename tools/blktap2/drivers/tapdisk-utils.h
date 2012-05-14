@@ -39,4 +39,7 @@ int tapdisk_namedup(char **, const char *);
 int tapdisk_get_image_size(int, uint64_t *, uint32_t *);
 int tapdisk_linux_version(void);
 
+int read_exact(int fd, void *data, size_t size); /* EOF => -1, errno=0 */
+int write_exact(int fd, const void *data, size_t size);
+
 #endif

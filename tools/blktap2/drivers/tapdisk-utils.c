@@ -175,3 +175,40 @@ int tapdisk_linux_version(void)
 }
 
 #endif
+int read_exact(int fd, void *data, size_t size)
+{
+    size_t offset = 0;
+    ssize_t len;
+
+    while ( offset < size )
+    {
+        len = read(fd, (char *)data + offset, size - offset);
+        if ( (len == -1) && (errno == EINTR) )
+            continue;
+        if ( len == 0 )
+            errno = 0;
+        if ( len <= 0 )
+            return -1;
+        offset += len;
+    }
+
+    return 0;
+}
+
+int write_exact(int fd, const void *data, size_t size)
+{
+    size_t offset = 0;
+    ssize_t len;
+
+    while ( offset < size )
+    {
+        len = write(fd, (const char *)data + offset, size - offset);
+        if ( (len == -1) && (errno == EINTR) )
+            continue;
+        if ( len <= 0 )
+            return -1;
+        offset += len;
+    }
+
+    return 0;
+}

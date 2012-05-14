@@ -435,7 +435,7 @@ tapdisk_lio_ack_event(struct tqueue *queue)
 	uint64_t val;
 
 	if (lio->flags & LIO_FLAG_EVENTFD)
-		read(lio->event_fd, &val, sizeof(val));
+		read_exact(lio->event_fd, &val, sizeof(val));
 }
 
 static void
