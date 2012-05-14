@@ -169,7 +169,7 @@ tapdisk_stream_poll_clear(struct tapdisk_stream_poll *p)
 {
 	int dummy;
 
-	read(p->pipe[POLL_READ], &dummy, sizeof(dummy));
+	read_exact(p->pipe[POLL_READ], &dummy, sizeof(dummy));
 	p->set = 0;
 }
 
@@ -179,7 +179,7 @@ tapdisk_stream_poll_set(struct tapdisk_stream_poll *p)
 	int dummy = 0;
 
 	if (!p->set) {
-		write(p->pipe[POLL_WRITE], &dummy, sizeof(dummy));
+		write_exact(p->pipe[POLL_WRITE], &dummy, sizeof(dummy));
 		p->set = 1;
 	}
 }

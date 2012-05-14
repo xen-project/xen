@@ -332,7 +332,7 @@ vhd_journal_write_entry(vhd_journal_t *j, vhd_journal_entry_t *entry)
 
 	err = vhd_journal_write(j, &e, sizeof(vhd_journal_entry_t));
 	if (err)
-		err;
+		return err;
 
 	return 0;
 }

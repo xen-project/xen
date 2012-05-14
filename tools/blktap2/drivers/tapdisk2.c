@@ -330,7 +330,12 @@ tapdisk2_create_device(const char *params)
 	char *path;
 	int err, type;
 
-	chdir("/");
+	if (chdir("/")) {
+		DPRINTF("failed to chdir(/): %d\n", errno);
+		err = 1;
+		goto out;
+	}
+
 	tapdisk_start_logging("tapdisk2");
 
 	err = tapdisk2_set_child_fds();

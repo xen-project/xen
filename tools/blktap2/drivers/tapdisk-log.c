@@ -37,6 +37,7 @@
 #include <sys/time.h>
 
 #include "tapdisk-log.h"
+#include "tapdisk-utils.h"
 
 #define MAX_ENTRY_LEN      512
 #define MAX_ERROR_MESSAGES 16
@@ -247,7 +248,7 @@ tlog_flush(void)
 	wsize = ((size + 511) & (~511));
 
 	memset(tapdisk_log.buf + size, '\n', wsize - size);
-	write(fd, tapdisk_log.buf, wsize);
+	write_exact(fd, tapdisk_log.buf, wsize);
 
 	tapdisk_log.p = tapdisk_log.buf;
 
