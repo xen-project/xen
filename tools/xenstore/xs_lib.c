@@ -23,7 +23,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <assert.h>
-#include "xs_lib.h"
+#include "xenstore_lib.h"
 
 /* Common routines for the Xen store daemon and client library. */
 

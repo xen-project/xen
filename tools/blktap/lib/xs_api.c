@@ -38,7 +38,7 @@
 #include <err.h>
 #include <stdarg.h>
 #include <errno.h>
-#include <xs.h>
+#include <xenstore.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>

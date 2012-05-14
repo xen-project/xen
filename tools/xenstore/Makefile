@@ -109,6 +109,7 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xenstore-compat
 	$(INSTALL_DIR) $(DESTDIR)/var/run/xenstored
 	$(INSTALL_DIR) $(DESTDIR)/var/lib/xenstored
 	$(INSTALL_PROG) xenstored $(DESTDIR)$(SBINDIR)
@@ -122,8 +123,12 @@ install: all
 	ln -sf libxenstore.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenstore.so.$(MAJOR)
 	ln -sf libxenstore.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenstore.so
 	$(INSTALL_DATA) libxenstore.a $(DESTDIR)$(LIBDIR)
-	$(INSTALL_DATA) xs.h $(DESTDIR)$(INCLUDEDIR)
-	$(INSTALL_DATA) xs_lib.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) xenstore.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) xenstore_lib.h $(DESTDIR)$(INCLUDEDIR)
+	$(INSTALL_DATA) compat/xs.h $(DESTDIR)$(INCLUDEDIR)/xenstore-compat/xs.h
+	$(INSTALL_DATA) compat/xs_lib.h $(DESTDIR)$(INCLUDEDIR)/xenstore-compat/xs_lib.h
+	ln -sf xenstore-compat/xs.h  $(DESTDIR)$(INCLUDEDIR)/xs.h
+	ln -sf xenstore-compat/xs_lib.h $(DESTDIR)$(INCLUDEDIR)/xs_lib.h
 
 -include $(DEPS)
 

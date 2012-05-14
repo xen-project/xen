@@ -29,7 +29,7 @@
 #include <unistd.h>
 #include <poll.h>
 #include <xc_private.h>
-#include <xs.h>
+#include <xenstore.h>
 #include <getopt.h>
 
 #include "xc_bitops.h"

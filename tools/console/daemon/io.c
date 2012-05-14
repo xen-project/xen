@@ -22,7 +22,7 @@
 
 #include "utils.h"
 #include "io.h"
-#include <xs.h>
+#include <xenstore.h>
 #include <xen/io/console.h>
 
 #include <stdlib.h>

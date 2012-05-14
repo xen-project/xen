@@ -28,7 +28,7 @@
 #include <blkfront.h>
 #include <fbfront.h>
 #include <xenbus.h>
-#include <xs.h>
+#include <xenstore.h>
 
 #include <sys/types.h>
 #include <sys/unistd.h>

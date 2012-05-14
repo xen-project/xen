@@ -24,7 +24,7 @@
 #define XENSTAT_PRIV_H
 
 #include <sys/types.h>
-#include <xs.h>
+#include <xenstore.h>
 #include "xenstat.h"
 
 #include "xenctrl.h"

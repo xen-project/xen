@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "xs.h"
+#include "xenstore.h"
 
 
 int main(int argc, char **argv)

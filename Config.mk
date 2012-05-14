@@ -213,9 +213,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= b7469189669c4de0a5161a869f443738d84539ec
-# Fri May 11 12:40:42 2012 +0100
-# passthrough: Intel GPU passthrough, fix OpRegion mapping
+QEMU_TAG ?= 7bde54662d45b0bbc2ee78c7a8bf2c97c6655445
+# Mon May 14 17:05:48 2012 +0100
+# xenstore: Use <xenstore.h>
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.

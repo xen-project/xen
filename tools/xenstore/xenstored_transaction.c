@@ -33,7 +33,7 @@
 #include "xenstored_transaction.h"
 #include "xenstored_watch.h"
 #include "xenstored_domain.h"
-#include "xs_lib.h"
+#include "xenstore_lib.h"
 #include "utils.h"
 
 struct changed_node

@@ -2,7 +2,7 @@
 
 #include <Python.h>
 
-#include <xs.h>
+#include <xenstore.h>
 #include <xenctrl.h>
 
 #include "checkpoint.h"

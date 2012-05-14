@@ -5,7 +5,7 @@
 
 #include <stdio.h>
 #include <xenctrl.h>
-#include <xs.h>
+#include <xenstore.h>
 #include <stdlib.h>
 #include <string.h>
 

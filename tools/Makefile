@@ -150,7 +150,8 @@ subdir-all-qemu-xen-dir subdir-install-qemu-xen-dir: qemu-xen-dir-find
 		--source-path=$$source \
 		--extra-cflags="-I$(XEN_ROOT)/tools/include \
 		-I$(XEN_ROOT)/tools/libxc \
-		-I$(XEN_ROOT)/tools/xenstore" \
+		-I$(XEN_ROOT)/tools/xenstore \
+		-I$(XEN_ROOT)/tools/xenstore/compat" \
 		--extra-ldflags="-L$(XEN_ROOT)/tools/libxc \
 		-L$(XEN_ROOT)/tools/xenstore" \
 		--bindir=$(LIBEXEC) \

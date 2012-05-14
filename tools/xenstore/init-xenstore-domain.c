@@ -7,7 +7,7 @@
 #include <sys/mman.h>
 #include <xenctrl.h>
 #include <xc_dom.h>
-#include <xs.h>
+#include <xenstore.h>
 #include <xen/sys/xenbus_dev.h>
 
 static uint32_t domid = -1;

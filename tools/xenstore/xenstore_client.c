@@ -18,7 +18,7 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
-#include <xs.h>
+#include <xenstore.h>
 
 #include <sys/ioctl.h>
 

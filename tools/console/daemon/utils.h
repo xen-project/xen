@@ -26,7 +26,7 @@
 #include <stdio.h>
 #include <xenctrl.h>
 
-#include "xs.h"
+#include <xenstore.h>
 
 void daemonize(const char *pidfile);
 bool xen_setup(void);

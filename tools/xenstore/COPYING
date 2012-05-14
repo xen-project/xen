@@ -1,6 +1,6 @@
 This license (LGPL) applies to the xenstore library which interfaces
-with the xenstore daemon (as stated in xs.c, xs.h, xs_lib.c and
-xs_lib.h).  The remaining files in the directory are licensed as
+with the xenstore daemon (as stated in xs.c, xenstore.h, xs_lib.c and
+xenstore_lib.h).  The remaining files in the directory are licensed as
 stated in the comments (as of this writing, GPL, see ../../COPYING).
 
 

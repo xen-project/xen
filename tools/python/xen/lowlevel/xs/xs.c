@@ -30,7 +30,7 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include "xs.h"
+#include <xenstore.h>
 
 /** @file
  * Python interface to the Xen Store Daemon (xs).

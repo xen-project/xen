@@ -11,7 +11,7 @@
 
 #include <xenctrl.h>
 #include <xenguest.h>
-#include <xs.h>
+#include <xenstore.h>
 
 #include "checkpoint.h"
 

@@ -32,7 +32,7 @@
 #include <signal.h>
 #include <stdint.h>
 #include <errno.h>
-#include "xs.h"
+#include "xenstore.h"
 #include "list.h"
 #include "utils.h"
 

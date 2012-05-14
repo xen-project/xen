@@ -9,7 +9,7 @@
 #ifdef HAVE_LIBC
 #include <os.h>
 #include <lib.h>
-#include <xs.h>
+#include <xenstore.h>
 #include <xenbus.h>
 #include <stdlib.h>
 #include <unistd.h>

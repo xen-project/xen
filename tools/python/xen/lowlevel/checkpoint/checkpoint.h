@@ -8,7 +8,7 @@
 #include <time.h>
 
 #include <xenguest.h>
-#include <xs.h>
+#include <xenstore.h>
 
 typedef enum {
     dt_unknown,

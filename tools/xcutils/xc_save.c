@@ -19,7 +19,7 @@
 #include <fcntl.h>
 #include <err.h>
 
-#include <xs.h>
+#include <xenstore.h>
 #include <xenctrl.h>
 #include <xenguest.h>
 

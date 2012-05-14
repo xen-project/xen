@@ -47,7 +47,7 @@
 #include <sys/ioctl.h>
 #include <string.h>
 #include <unistd.h>
-#include <xs.h>
+#include <xenstore.h>
 #include <sys/time.h>
 #include <syslog.h>
 #ifdef MEMSHR

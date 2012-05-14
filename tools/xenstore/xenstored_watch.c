@@ -27,7 +27,7 @@
 #include "talloc.h"
 #include "list.h"
 #include "xenstored_watch.h"
-#include "xs_lib.h"
+#include "xenstore_lib.h"
 #include "utils.h"
 #include "xenstored_domain.h"
 

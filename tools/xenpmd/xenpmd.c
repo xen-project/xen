@@ -40,7 +40,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/stat.h>
-#include <xs.h>
+#include <xenstore.h>
 
 /* #define RUN_STANDALONE */
 #define RUN_IN_SIMULATE_MODE

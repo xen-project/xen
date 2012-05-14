@@ -38,7 +38,7 @@
 #include <xen/xen.h>
 #include <xen/io/blkif.h>
 #include <xen/io/ring.h>
-#include <xs.h>
+#include <xenstore.h>
 #include <sys/types.h>
 #include <unistd.h>
 

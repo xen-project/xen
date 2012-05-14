@@ -44,7 +44,7 @@
 #include <sys/wait.h>
 #include <sys/socket.h>
 
-#include <xs.h>
+#include <xenstore.h>
 #include <xenctrl.h>
 
 #include "xentoollog.h"

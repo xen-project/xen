@@ -28,7 +28,7 @@
 #include <string.h>
 #include <syslog.h>
 
-#include <xs.h>
+#include <xenstore.h>
 
 #define DEVTYPE_UNKNOWN 0
 #define DEVTYPE_VIF 1

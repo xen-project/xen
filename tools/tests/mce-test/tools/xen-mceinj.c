@@ -38,7 +38,7 @@
 #include <sys/time.h>
 #include <xen/arch-x86/xen-mca.h>
 #include <xg_save_restore.h>
-#include <xs.h>
+#include <xenstore.h>
 
 #define MCi_type_CTL        0x0
 #define MCi_type_STATUS     0x1

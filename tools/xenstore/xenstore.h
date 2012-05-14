@@ -17,10 +17,10 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#ifndef _XS_H
-#define _XS_H
+#ifndef XENSTORE_H
+#define XENSTORE_H
 
-#include <xs_lib.h>
+#include <xenstore_lib.h>
 
 #define XBT_NULL 0
 
@@ -223,7 +223,7 @@ char *xs_debug_command(struct xs_handle *h, const char *cmd,
 		       void *data, unsigned int len);
 
 int xs_suspend_evtchn_port(int domid);
-#endif /* _XS_H */
+#endif /* XENSTORE_H */
 
 /*
  * Local variables:

@@ -27,7 +27,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <errno.h>
-#include "xs_lib.h"
+#include "xenstore_lib.h"
 #include "list.h"
 #include "tdb.h"
 

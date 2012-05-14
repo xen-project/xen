@@ -17,8 +17,8 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#ifndef _XS_LIB_H
-#define _XS_LIB_H
+#ifndef XENSTORE_LIB_H
+#define XENSTORE_LIB_H
 
 #include <stdbool.h>
 #include <limits.h>
@@ -82,4 +82,4 @@ char *sanitise_value(struct expanding_buffer *, const char *val, unsigned len);
 /* *out_len_r on entry is ignored; out must be at least strlen(in)+1 bytes. */
 void unsanitise_value(char *out, unsigned *out_len_r, const char *in);
 
-#endif /* _XS_LIB_H */
+#endif /* XENSTORE_LIB_H */

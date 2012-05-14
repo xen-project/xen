@@ -39,7 +39,7 @@
 #include <sys/stropts.h>
 #endif
 
-#include "xs.h"
+#include <xenstore.h>
 #include "xenctrl.h"
 
 #define ESCAPE_CHARACTER 0x1d
