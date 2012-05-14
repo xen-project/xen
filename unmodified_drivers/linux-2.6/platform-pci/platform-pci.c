@@ -30,7 +30,6 @@
 #include <linux/interrupt.h>
 #include <linux/vmalloc.h>
 #include <linux/mm.h>
-#include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
