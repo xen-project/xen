@@ -559,6 +559,27 @@ static int linux_gnttab_close(xc_gnttab *xcg, xc_osdep_handle h)
     return close(fd);
 }
 
+static int linux_gnttab_set_max_grants(xc_gnttab *xch, xc_osdep_handle h,
+                                       uint32_t count)
+{
+    int fd = (int)h, rc;
+    struct ioctl_gntdev_set_max_grants max_grants = { .count = count };
+
+    rc = ioctl(fd, IOCTL_GNTDEV_SET_MAX_GRANTS, &max_grants);
+    if (rc) {
+        /*
+         * Newer (e.g. pv-ops) kernels don't implement this IOCTL,
+         * so ignore the resulting specific failure.
+         */
+        if (errno == ENOTTY)
+            rc = 0;
+        else
+            PERROR("linux_gnttab_set_max_grants: ioctl SET_MAX_GRANTS failed");
+    }
+
+    return rc;
+}
+
 static void *linux_gnttab_grant_map(xc_gnttab *xch, xc_osdep_handle h,
                                     uint32_t count, int flags, int prot,
                                     uint32_t *domids, uint32_t *refs,
@@ -714,6 +735,7 @@ static struct xc_osdep_ops linux_gnttab_ops = {
     .close = &linux_gnttab_close,
 
     .u.gnttab = {
+        .set_max_grants = linux_gnttab_set_max_grants,
         .grant_map = &linux_gnttab_grant_map,
         .munmap = &linux_gnttab_munmap,
     },
