@@ -668,6 +668,7 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
             {
                 if ( unlikely(!test_bit(vector, desc->arch.used_vectors)) )
                 {
+                    spin_unlock(&desc->lock);
                     bitmap_scnlistprintf(keyhandler_scratch,
                                          sizeof(keyhandler_scratch),
                                          desc->arch.used_vectors->_bits,
