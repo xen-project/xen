@@ -2622,9 +2622,14 @@ LDFLAGS="$PREPEND_LDFLAGS $LDFLAGS $APPEND_LDFLAGS"
 
 
 
+case "$host_cpu" in
+i[3456]86|x86_64)
 
 
 
+
+    ;;
+esac
 
 # Checks for programs.
 ac_ext=c
