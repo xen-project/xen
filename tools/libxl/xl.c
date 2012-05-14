@@ -32,8 +32,11 @@
 #include "libxlutil.h"
 #include "xl.h"
 
+#define XEND_LOCK { "/var/lock/subsys/xend", "/var/lock/xend" }
+
 xentoollog_logger_stdiostream *logger;
 int dryrun_only;
+int force_execution;
 int autoballoon = 1;
 char *lockfile;
 char *default_vifscript = NULL;
@@ -126,14 +129,18 @@ int main(int argc, char **argv)
     char *config_file;
     void *config_data = 0;
     int config_len = 0;
+    const char *locks[] = XEND_LOCK;
 
-    while ((opt = getopt(argc, argv, "+vN")) >= 0) {
+    while ((opt = getopt(argc, argv, "+vfN")) >= 0) {
         switch (opt) {
         case 'v':
             if (minmsglevel > 0) minmsglevel--;
             break;
         case 'N':
             dryrun_only = 1;
+            break;
+        case 'f':
+            force_execution = 1;
             break;
         default:
             fprintf(stderr, "unknown global option\n");
@@ -184,6 +191,19 @@ int main(int argc, char **argv)
             fprintf(stderr, "command does not implement -N (dryrun) option\n");
             ret = 1;
             goto xit;
+        }
+        if (cspec->modifies && !dryrun_only) {
+            for (int i = 0; i < sizeof(locks)/sizeof(locks[0]); i++) {
+                if (!access(locks[i], F_OK) && !force_execution) {
+                    fprintf(stderr,
+"xend is running, which prevents xl from working correctly.\n"
+"If you still want to force the execution of xl please use the -f\n"
+"option.\n"
+                            );
+                    ret = 1;
+                    goto xit;
+                }
+            }
         }
         ret = cspec->cmd_impl(argc, argv);
     } else if (!strcmp(cmd, "help")) {
