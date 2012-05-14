@@ -191,7 +191,8 @@ static int hvmemul_do_io(
     p->df = df;
     p->data = value;
 
-    hvmtrace_io_assist(is_mmio, p);
+    if ( dir == IOREQ_WRITE )
+        hvmtrace_io_assist(is_mmio, p);
 
     if ( is_mmio )
     {
@@ -232,6 +233,9 @@ static int hvmemul_do_io(
     }
 
  finish_access:
+    if ( dir == IOREQ_READ )
+        hvmtrace_io_assist(is_mmio, p);
+
     if ( p_data != NULL )
         memcpy(p_data, &vio->io_data, size);
 
