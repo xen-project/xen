@@ -25,15 +25,15 @@
 #include "libxlu_cfg_l.h"
 #include "libxlu_cfg_i.h"
 
-XLU_Config *xlu_cfg_init(FILE *report, const char *report_filename) {
+XLU_Config *xlu_cfg_init(FILE *report, const char *report_source) {
     XLU_Config *cfg;
 
     cfg= malloc(sizeof(*cfg));
     if (!cfg) return 0;
 
     cfg->report= report;
-    cfg->filename= strdup(report_filename);
-    if (!cfg->filename) { free(cfg); return 0; }
+    cfg->config_source= strdup(report_source);
+    if (!cfg->config_source) { free(cfg); return 0; }
 
     cfg->settings= 0;
     return cfg;
@@ -51,7 +51,7 @@ static int ctx_prep(CfgParseContext *ctx, XLU_Config *cfg) {
     e= xlu__cfg_yylex_init_extra(ctx, &ctx->scanner);
     if (e) {
         fprintf(cfg->report,"%s: unable to create scanner: %s\n",
-                cfg->filename, strerror(e));
+                cfg->config_source, strerror(e));
         return e;
     }
     return 0;
@@ -117,7 +117,7 @@ int xlu_cfg_readdata(XLU_Config *cfg, const char *data, int length) {
     buf = xlu__cfg_yy_scan_bytes(data, length, ctx.scanner);
     if (!buf) {
         fprintf(cfg->report,"%s: unable to allocate scanner buffer\n",
-                cfg->filename);
+                cfg->config_source);
         ctx.err= ENOMEM;
         goto xe;
     }
@@ -151,7 +151,7 @@ void xlu_cfg_destroy(XLU_Config *cfg) {
         set_next= set->next;
         xlu__cfg_set_free(set);
     }
-    free(cfg->filename);
+    free(cfg->config_source);
     free(cfg);
 }
 
@@ -178,7 +178,7 @@ static int find_atom(const XLU_Config *cfg, const char *n,
             fprintf(cfg->report,
                     "%s:%d: warning: parameter `%s' is"
                     " a list but should be a single value\n",
-                    cfg->filename, set->lineno, n);
+                    cfg->config_source, set->lineno, n);
         return EINVAL;
     }
     *set_r= set;
@@ -223,14 +223,14 @@ int xlu_cfg_get_long(const XLU_Config *cfg, const char *n,
             fprintf(cfg->report,
                     "%s:%d: warning: parameter `%s' could not be parsed"
                     " as a number: %s\n",
-                    cfg->filename, set->lineno, n, strerror(e));
+                    cfg->config_source, set->lineno, n, strerror(e));
         return e;
     }
     if (*ep || ep==set->values[0]) {
         if (!dont_warn)
             fprintf(cfg->report,
                     "%s:%d: warning: parameter `%s' is not a valid number\n",
-                    cfg->filename, set->lineno, n);
+                    cfg->config_source, set->lineno, n);
         return EINVAL;
     }
     *value_r= l;
@@ -258,7 +258,7 @@ int xlu_cfg_get_list(const XLU_Config *cfg, const char *n,
             fprintf(cfg->report,
                     "%s:%d: warning: parameter `%s' is a single value"
                     " but should be a list\n",
-                    cfg->filename, set->lineno, n);
+                    cfg->config_source, set->lineno, n);
         }
         return EINVAL;
     }
@@ -467,7 +467,7 @@ void xlu__cfg_yyerror(YYLTYPE *loc, CfgParseContext *ctx, char const *msg) {
 
     fprintf(ctx->cfg->report,
             "%s:%d: config parsing error near %s%.*s%s%s: %s\n",
-            ctx->cfg->filename, lineno,
+            ctx->cfg->config_source, lineno,
             len?"`":"", len, text, len?"'":"", newline,
             msg);
     if (!ctx->err) ctx->err= EINVAL;

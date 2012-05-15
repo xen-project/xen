@@ -38,7 +38,7 @@ struct XLU_ConfigSetting { /* transparent */
 struct XLU_Config {
     XLU_ConfigSetting *settings;
     FILE *report;
-    char *filename;
+    char *config_source;
 };
 
 typedef struct {

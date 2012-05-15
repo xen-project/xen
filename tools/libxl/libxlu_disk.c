@@ -10,7 +10,7 @@ void xlu__disk_err(DiskParseContext *dpc, const char *erroneous,
             "%s: config parsing error in disk specification: %s"
             "%s%s%s"
             " in `%s'\n",
-            dpc->cfg->filename, message,
+            dpc->cfg->config_source, message,
             erroneous?": near `":"", erroneous?erroneous:"", erroneous?"'":"",
             dpc->spec);
     if (!dpc->err) dpc->err= EINVAL;

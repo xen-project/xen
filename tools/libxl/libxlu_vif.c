@@ -7,7 +7,7 @@ static const char *vif_internal_usec_re = "^[0-9]+[mu]?s?$";
 static void xlu__vif_err(XLU_Config *cfg, const char *msg, const char *rate) {
     fprintf(cfg->report,
             "%s: config parsing error in vif: %s in `%s'\n",
-            cfg->filename, msg, rate);
+            cfg->config_source, msg, rate);
 }
 
 static int vif_parse_rate_bytes_per_sec(XLU_Config *cfg, const char *bytes,
