@@ -336,6 +336,26 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
         goto out;
     }
 
+    LOG(DEBUG, "Config bootloader value: %s", info->u.pv.bootloader);
+
+    /* If the full path is not specified, check in the libexec path */
+    if ( info->u.pv.bootloader[0] != '/' ) {
+        char *bootloader;
+        struct stat st;
+
+        bootloader = libxl__abs_path(gc, info->u.pv.bootloader,
+                                     libxl__libexec_path());
+        /* Check to see if the file exists in this location; if not,
+         * fall back to checking the path */
+        LOG(DEBUG, "Checking for bootloader in libexec path: %s", bootloader);
+
+        if ( lstat(bootloader, &st) )
+            LOG(DEBUG, "%s doesn't exist, falling back to config path",
+                bootloader);
+        else
+            info->u.pv.bootloader = bootloader;
+    }
+
     make_bootloader_args(gc, bl);
 
     bl->openpty.ao = ao;
