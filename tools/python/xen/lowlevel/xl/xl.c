@@ -566,13 +566,13 @@ static PyObject *pyxl_pci_parse(XlObject *self, PyObject *args)
     return (PyObject *)pci;
 }
 
-static PyObject *pyxl_pci_list_assignable(XlObject *self, PyObject *args)
+static PyObject *pyxl_pci_assignable_list(XlObject *self, PyObject *args)
 {
     libxl_device_pci *dev;
     PyObject *list;
     int nr_dev, i;
 
-    dev = libxl_device_pci_list_assignable(self->ctx, &nr_dev);
+    dev = libxl_device_pci_assignable_list(self->ctx, &nr_dev);
     if ( dev == NULL ) {
         PyErr_SetString(xl_error_obj, "Cannot list assignable devices");
         return NULL;
@@ -662,8 +662,8 @@ static PyMethodDef pyxl_methods[] = {
          "Parse pass-through PCI device spec (BDF)"},
     {"device_pci_list", (PyCFunction)pyxl_pci_list, METH_VARARGS,
         "List PCI devices assigned to a domain"},
-    {"device_pci_list_assignable",
-        (PyCFunction)pyxl_pci_list_assignable, METH_NOARGS,
+    {"device_pci_assignable_list",
+        (PyCFunction)pyxl_pci_assignable_list, METH_NOARGS,
         "List assignable PCI devices"},
     { NULL, NULL, 0, NULL }
 };

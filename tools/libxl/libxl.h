@@ -722,7 +722,7 @@ libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num
  * could be assigned to a domain (i.e. are bound to the backend
  * driver) but are not currently.
  */
-libxl_device_pci *libxl_device_pci_list_assignable(libxl_ctx *ctx, int *num);
+libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num);
 
 /* CPUID handling */
 int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str);

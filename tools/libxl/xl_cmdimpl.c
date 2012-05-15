@@ -2291,34 +2291,6 @@ int main_vncviewer(int argc, char **argv)
     return 0;
 }
 
-static void pcilist_assignable(void)
-{
-    libxl_device_pci *pcidevs;
-    int num, i;
-
-    pcidevs = libxl_device_pci_list_assignable(ctx, &num);
-
-    if ( pcidevs == NULL )
-        return;
-    for (i = 0; i < num; i++) {
-        printf("%04x:%02x:%02x.%01x\n",
-               pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func);
-        libxl_device_pci_dispose(&pcidevs[i]);
-    }
-    free(pcidevs);
-}
-
-int main_pcilist_assignable(int argc, char **argv)
-{
-    int opt;
-
-    if ((opt = def_getopt(argc, argv, "", "pci-list-assignable-devices", 0)) != -1)
-        return opt;
-
-    pcilist_assignable();
-    return 0;
-}
-
 static void pcilist(const char *dom)
 {
     libxl_device_pci *pcidevs;
@@ -2437,6 +2409,34 @@ int main_pciattach(int argc, char **argv)
         vs = argv[optind + 2];
 
     pciattach(domname, bdf, vs);
+    return 0;
+}
+
+static void pciassignable_list(void)
+{
+    libxl_device_pci *pcidevs;
+    int num, i;
+
+    pcidevs = libxl_device_pci_assignable_list(ctx, &num);
+
+    if ( pcidevs == NULL )
+        return;
+    for (i = 0; i < num; i++) {
+        printf("%04x:%02x:%02x.%01x\n",
+               pcidevs[i].domain, pcidevs[i].bus, pcidevs[i].dev, pcidevs[i].func);
+        libxl_device_pci_dispose(&pcidevs[i]);
+    }
+    free(pcidevs);
+}
+
+int main_pciassignable_list(int argc, char **argv)
+{
+    int opt;
+
+    if ((opt = def_getopt(argc, argv, "", "pci-assignable-list", 0)) != -1)
+        return opt;
+
+    pciassignable_list();
     return 0;
 }
 

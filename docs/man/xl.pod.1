@@ -711,13 +711,6 @@ explanatory.
 
 Prints the current uptime of the domains running.
 
-=item B<pci-list-assignable-devices>
-
-List all the assignable PCI devices.
-These are devices in the system which are configured to be
-available for passthrough and are bound to a suitable PCI
-backend driver in domain 0 rather than a real driver.
-
 =back
 
 =head1 SCHEDULER SUBCOMMANDS
@@ -1049,6 +1042,13 @@ List virtual network interfaces for a domain.
 =head1 PCI PASS-THROUGH
 
 =over 4
+
+=item B<pci-assignable-list>
+
+List all the assignable PCI devices.
+These are devices in the system which are configured to be
+available for passthrough and are bound to a suitable PCI
+backend driver in domain 0 rather than a real driver.
 
 =item B<pci-attach> I<domain-id> I<BDF>
 

@@ -357,7 +357,7 @@ static int sysfs_write_bdf(libxl__gc *gc, const char * sysfs_path,
     return 0;
 }
 
-libxl_device_pci *libxl_device_pci_list_assignable(libxl_ctx *ctx, int *num)
+libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num)
 {
     GC_INIT(ctx);
     libxl_device_pci *pcidevs = NULL, *new, *assigned;
@@ -684,7 +684,7 @@ static int libxl_pcidev_assignable(libxl_ctx *ctx, libxl_device_pci *pcidev)
     libxl_device_pci *pcidevs;
     int num, i;
 
-    pcidevs = libxl_device_pci_list_assignable(ctx, &num);
+    pcidevs = libxl_device_pci_assignable_list(ctx, &num);
     for (i = 0; i < num; i++) {
         if (pcidevs[i].domain == pcidev->domain &&
             pcidevs[i].bus == pcidev->bus &&
