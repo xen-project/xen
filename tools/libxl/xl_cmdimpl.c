@@ -71,6 +71,8 @@ static uint32_t domid;
 static const char *common_domname;
 static int fd_lock = -1;
 
+/* Stash for specific vcpu to pcpu mappping */
+static int *vcpu_to_pcpu;
 
 static const char savefileheader_magic[32]=
     "Xen saved domain, xl format\n \0 \r";
@@ -630,6 +632,21 @@ static void parse_config_data(const char *configfile_filename_report,
             exit(1);
         }
 
+        /* Prepare the array for single vcpu to pcpu mappings */
+        vcpu_to_pcpu = xmalloc(sizeof(int) * b_info->max_vcpus);
+        memset(vcpu_to_pcpu, -1, sizeof(int) * b_info->max_vcpus);
+
+        /*
+         * Idea here is to let libxl think all the domain's vcpus
+         * have cpu affinity with all the pcpus on the list.
+         * It is then us, here in xl, that matches each single vcpu
+         * to its pcpu (and that's why we need to stash such info in
+         * the vcpu_to_pcpu array now) after the domain has been created.
+         * Doing it like this saves the burden of passing to libxl
+         * some big array hosting the single mappings. Also, using
+         * the cpumap derived from the list ensures memory is being
+         * allocated on the proper nodes anyway.
+         */
         libxl_cpumap_set_none(&b_info->cpumap);
         while ((buf = xlu_cfg_get_listitem(cpus, n_cpus)) != NULL) {
             i = atoi(buf);
@@ -638,6 +655,8 @@ static void parse_config_data(const char *configfile_filename_report,
                 exit(1);
             }
             libxl_cpumap_set(&b_info->cpumap, i);
+            if (n_cpus < b_info->max_vcpus)
+                vcpu_to_pcpu[n_cpus] = i;
             n_cpus++;
         }
     }
@@ -1713,6 +1732,31 @@ start:
     }
     if ( ret )
         goto error_out;
+
+    /* If single vcpu to pcpu mapping was requested, honour it */
+    if (vcpu_to_pcpu) {
+        libxl_cpumap vcpu_cpumap;
+
+        libxl_cpumap_alloc(ctx, &vcpu_cpumap);
+        for (i = 0; i < d_config.b_info.max_vcpus; i++) {
+
+            if (vcpu_to_pcpu[i] != -1) {
+                libxl_cpumap_set_none(&vcpu_cpumap);
+                libxl_cpumap_set(&vcpu_cpumap, vcpu_to_pcpu[i]);
+            } else {
+                libxl_cpumap_set_any(&vcpu_cpumap);
+            }
+            if (libxl_set_vcpuaffinity(ctx, domid, i, &vcpu_cpumap)) {
+                fprintf(stderr, "setting affinity failed on vcpu `%d'.\n", i);
+                libxl_cpumap_dispose(&vcpu_cpumap);
+                free(vcpu_to_pcpu);
+                ret = ERROR_FAIL;
+                goto error_out;
+            }
+        }
+        libxl_cpumap_dispose(&vcpu_cpumap);
+        free(vcpu_to_pcpu); vcpu_to_pcpu = NULL;
+    }
 
     ret = libxl_userdata_store(ctx, domid, "xl",
                                     config_data, config_len);

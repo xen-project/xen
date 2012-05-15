@@ -108,9 +108,25 @@ created online and the remainder will be offline.
 =item B<cpus="CPU-LIST">
 
 List of which cpus the guest is allowed to use. Default behavior is
-`all cpus`. A list of cpus may be specified as follows: `cpus="0-3,5,^1"`
-(all vcpus will run on cpus 0,2,3,5), or `cpus=["2", "3"]` (all vcpus
-will run on cpus 2 and 3).
+`all cpus`. A C<CPU-LIST> may be specified as follows:
+
+=over 4
+
+=item "all"
+
+To allow all the vcpus of the guest to run on all the cpus on the host.
+
+=item "0-3,5,^1"
+
+To allow all the vcpus of the guest to run on cpus 0,2,3,5.
+
+=item ["2", "3"] (or [2, 3])
+
+To ask for specific vcpu mapping. That means (in this example), vcpu #0
+of the guest will run on cpu #2 of the host and vcpu #1 of the guest will
+run on cpu #3 of the host.
+
+=back
 
 =item B<cpu_weight=WEIGHT>
 
@@ -948,10 +964,6 @@ XXX
 XXX
 
 =item B<acpi_s3=BOOLEAN>
-
-XXX
-
-=item B<cpus=XXX>
 
 XXX
 
