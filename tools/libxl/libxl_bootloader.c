@@ -338,6 +338,10 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
 
     LOG(DEBUG, "Config bootloader value: %s", info->u.pv.bootloader);
 
+    if ( !strcmp(info->u.pv.bootloader, "/usr/bin/pygrub") )
+        LOG(WARN, "bootloader='/usr/bin/pygrub' is deprecated; use " \
+            "bootloader='pygrub' instead");
+
     /* If the full path is not specified, check in the libexec path */
     if ( info->u.pv.bootloader[0] != '/' ) {
         char *bootloader;
