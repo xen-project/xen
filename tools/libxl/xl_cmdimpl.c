@@ -549,9 +549,9 @@ vcpp_out:
     return rc;
 }
 
-static void parse_config_data(const char *configfile_filename_report,
-                              const char *configfile_data,
-                              int configfile_len,
+static void parse_config_data(const char *config_source,
+                              const char *config_data,
+                              int config_len,
                               libxl_domain_config *d_config,
                               struct domain_create *dom_info)
 
@@ -568,15 +568,15 @@ static void parse_config_data(const char *configfile_filename_report,
     libxl_domain_create_info *c_info = &d_config->c_info;
     libxl_domain_build_info *b_info = &d_config->b_info;
 
-    config= xlu_cfg_init(stderr, configfile_filename_report);
+    config= xlu_cfg_init(stderr, config_source);
     if (!config) {
         fprintf(stderr, "Failed to allocate for configuration\n");
         exit(1);
     }
 
-    e= xlu_cfg_readdata(config, configfile_data, configfile_len);
+    e= xlu_cfg_readdata(config, config_data, config_len);
     if (e) {
-        fprintf(stderr, "Failed to parse config file: %s\n", strerror(e));
+        fprintf(stderr, "Failed to parse config: %s\n", strerror(e));
         exit(1);
     }
 
@@ -1564,6 +1564,8 @@ static int create_domain(struct domain_create *dom_info)
     const char *config_file = dom_info->config_file;
     const char *extra_config = dom_info->extra_config;
     const char *restore_file = dom_info->restore_file;
+    const char *config_source = NULL;
+    const char *restore_source = NULL;
     int migrate_fd = dom_info->migrate_fd;
 
     int i;
@@ -1579,24 +1581,28 @@ static int create_domain(struct domain_create *dom_info)
     pid_t child_console_pid = -1;
     struct save_file_header hdr;
 
+    int restoring = (restore_file || (migrate_fd >= 0));
+
     libxl_domain_config_init(&d_config);
 
-    if (restore_file) {
+    if (restoring) {
         uint8_t *optdata_begin = 0;
         const uint8_t *optdata_here = 0;
         union { uint32_t u32; char b[4]; } u32buf;
         uint32_t badflags;
 
         if (migrate_fd >= 0) {
+            restore_source = "<incoming migration stream>";
             restore_fd = migrate_fd;
         } else {
+            restore_source = restore_file;
             restore_fd = open(restore_file, O_RDONLY);
             rc = libxl_fd_set_cloexec(ctx, restore_fd, 1);
             if (rc) return rc;
         }
 
         CHK_ERRNO( libxl_read_exactly(ctx, restore_fd, &hdr,
-                   sizeof(hdr), restore_file, "header") );
+                   sizeof(hdr), restore_source, "header") );
         if (memcmp(hdr.magic, savefileheader_magic, sizeof(hdr.magic))) {
             fprintf(stderr, "File has wrong magic number -"
                     " corrupt or for a different tool?\n");
@@ -1609,7 +1615,7 @@ static int create_domain(struct domain_create *dom_info)
         fprintf(stderr, "Loading new save file %s"
                 " (new xl fmt info"
                 " 0x%"PRIx32"/0x%"PRIx32"/%"PRIu32")\n",
-                restore_file, hdr.mandatory_flags, hdr.optional_flags,
+                restore_source, hdr.mandatory_flags, hdr.optional_flags,
                 hdr.optional_data_len);
 
         badflags = hdr.mandatory_flags & ~( 0 /* none understood yet */ );
@@ -1622,7 +1628,7 @@ static int create_domain(struct domain_create *dom_info)
         if (hdr.optional_data_len) {
             optdata_begin = xmalloc(hdr.optional_data_len);
             CHK_ERRNO( libxl_read_exactly(ctx, restore_fd, optdata_begin,
-                   hdr.optional_data_len, restore_file, "optdata") );
+                   hdr.optional_data_len, restore_source, "optdata") );
         }
 
 #define OPTDATA_LEFT  (hdr.optional_data_len - (optdata_here - optdata_begin))
@@ -1657,7 +1663,7 @@ static int create_domain(struct domain_create *dom_info)
                                        &config_data, &config_len);
         if (ret) { fprintf(stderr, "Failed to read config file: %s: %s\n",
                            config_file, strerror(errno)); return ERROR_FAIL; }
-        if (!restore_file && extra_config && strlen(extra_config)) {
+        if (!restoring && extra_config && strlen(extra_config)) {
             if (config_len > INT_MAX - (strlen(extra_config) + 2 + 1)) {
                 fprintf(stderr, "Failed to attach extra configration\n");
                 return ERROR_FAIL;
@@ -1672,19 +1678,20 @@ static int create_domain(struct domain_create *dom_info)
             config_len += sprintf(config_data + config_len, "\n%s\n",
                 extra_config);
         }
+        config_source=config_file;
     } else {
         if (!config_data) {
             fprintf(stderr, "Config file not specified and"
                     " none in save file\n");
             return ERROR_INVAL;
         }
-        config_file = "<saved>";
+        config_source = "<saved>";
     }
 
     if (!dom_info->quiet)
-        printf("Parsing config file %s\n", config_file);
+        printf("Parsing config from %s\n", config_source);
 
-    parse_config_data(config_file, config_data, config_len, &d_config, dom_info);
+    parse_config_data(config_source, config_data, config_len, &d_config, dom_info);
 
     if (migrate_fd >= 0) {
         if (d_config.c_info.name) {
@@ -1738,7 +1745,7 @@ start:
         autoconnect_console_how = 0;
     }
 
-    if ( restore_file ) {
+    if ( restoring ) {
         ret = libxl_domain_create_restore(ctx, &d_config,
                                           &domid, restore_fd,
                                           0, autoconnect_console_how);
@@ -2541,7 +2548,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
 {
     libxl_domain_config d_config;
 
-    char *config_file;
+    char *config_source;
     uint8_t *data;
     int i, len, rc;
 
@@ -2552,13 +2559,13 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         rc = libxl_userdata_retrieve(ctx, info[i].domid, "xl", &data, &len);
         if (rc)
             continue;
-        CHK_ERRNO(asprintf(&config_file, "<domid %d data>", info[i].domid));
+        CHK_ERRNO(asprintf(&config_source, "<domid %d data>", info[i].domid));
         libxl_domain_config_init(&d_config);
-        parse_config_data(config_file, (char *)data, len, &d_config, NULL);
+        parse_config_data(config_source, (char *)data, len, &d_config, NULL);
         printf_info(default_output_format, info[i].domid, &d_config);
         libxl_domain_config_dispose(&d_config);
         free(data);
-        free(config_file);
+        free(config_source);
     }
 }
 
@@ -2661,7 +2668,7 @@ static void save_domain_core_begin(const char *domain_spec,
     }
 }
 
-static void save_domain_core_writeconfig(int fd, const char *filename,
+static void save_domain_core_writeconfig(int fd, const char *source,
                                   const uint8_t *config_data, int config_len)
 {
     struct save_file_header hdr;
@@ -2690,13 +2697,13 @@ static void save_domain_core_writeconfig(int fd, const char *filename,
     /* that's the optional data */
 
     CHK_ERRNO( libxl_write_exactly(ctx, fd,
-        &hdr, sizeof(hdr), filename, "header") );
+        &hdr, sizeof(hdr), source, "header") );
     CHK_ERRNO( libxl_write_exactly(ctx, fd,
-        optdata_begin, hdr.optional_data_len, filename, "header") );
+        optdata_begin, hdr.optional_data_len, source, "header") );
 
     fprintf(stderr, "Saving to %s new xl format (info"
             " 0x%"PRIx32"/0x%"PRIx32"/%"PRIu32")\n",
-            filename, hdr.mandatory_flags, hdr.optional_flags,
+            source, hdr.mandatory_flags, hdr.optional_flags,
             hdr.optional_data_len);
 }
 
@@ -3021,7 +3028,6 @@ static void migrate_receive(int debug, int daemonize, int monitor)
     dom_info.daemonize = daemonize;
     dom_info.monitor = monitor;
     dom_info.paused = 1;
-    dom_info.restore_file = "incoming migration stream";
     dom_info.migrate_fd = 0; /* stdin */
     dom_info.migration_domname_r = &migration_domname;
     dom_info.incr_generationid = 0;

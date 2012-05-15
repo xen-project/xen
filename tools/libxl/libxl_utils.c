@@ -334,7 +334,7 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
                                                                           \
   int libxl_##rw##_exactly(libxl_ctx *ctx, int fd,                 \
                            constdata void *data, ssize_t sz,              \
-                           const char *filename, const char *what) {      \
+                           const char *source, const char *what) {        \
       ssize_t got;                                                        \
                                                                           \
       while (sz > 0) {                                                    \
@@ -343,7 +343,7 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
               if (errno == EINTR) continue;                               \
               if (!ctx) return errno;                                     \
               LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to " #rw " %s%s%s", \
-                           what?what:"", what?" from ":"", filename);     \
+                           what?what:"", what?" from ":"", source);       \
               return errno;                                               \
           }                                                               \
           if (got == 0) {                                                 \
@@ -352,7 +352,7 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
                      zero_is_eof                                          \
                      ? "file/stream truncated reading %s%s%s"             \
                      : "file/stream write returned 0! writing %s%s%s",    \
-                     what?what:"", what?" from ":"", filename);           \
+                     what?what:"", what?" from ":"", source);             \
               return EPROTO;                                              \
           }                                                               \
           sz -= got;                                                      \
