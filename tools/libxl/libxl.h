@@ -718,10 +718,29 @@ int libxl_device_pci_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *p
 libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num);
 
 /*
- * Similar to libxl_device_pci_list but returns all devices which
- * could be assigned to a domain (i.e. are bound to the backend
- * driver) but are not currently.
+ * Functions related to making devices assignable -- that is, bound to
+ * the pciback driver, ready to be given to a guest via
+ * libxl_pci_device_add.
+ *
+ * - ..._add() will unbind the device from its current driver (if
+ * already bound) and re-bind it to pciback; at that point it will be
+ * ready to be assigned to a VM.  If rebind is set, it will store the
+ * path to the old driver in xenstore so that it can be handed back to
+ * dom0 on restore.
+ *
+ * - ..._remove() will unbind the device from pciback, and if
+ * rebind is non-zero, attempt to assign it back to the driver
+ * from whence it came.
+ *
+ * - ..._list() will return a list of the PCI devices available to be
+ * assigned.
+ *
+ * add and remove are idempotent: if the device in question is already
+ * added or is not bound, the functions will emit a warning but return
+ * SUCCESS.
  */
+int libxl_device_pci_assignable_add(libxl_ctx *ctx, libxl_device_pci *pcidev, int rebind);
+int libxl_device_pci_assignable_remove(libxl_ctx *ctx, libxl_device_pci *pcidev, int rebind);
 libxl_device_pci *libxl_device_pci_assignable_list(libxl_ctx *ctx, int *num);
 
 /* CPUID handling */
