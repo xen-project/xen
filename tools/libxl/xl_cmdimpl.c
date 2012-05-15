@@ -122,6 +122,24 @@ static const char *action_on_shutdown_names[] = {
 
 #define SAVEFILE_BYTEORDER_VALUE ((uint32_t)0x01020304UL)
 
+struct domain_create {
+    int debug;
+    int daemonize;
+    int monitor; /* handle guest reboots etc */
+    int paused;
+    int dryrun;
+    int quiet;
+    int console_autoconnect;
+    const char *config_file;
+    const char *extra_config; /* extra config string */
+    const char *restore_file;
+    int migrate_fd; /* -1 means none */
+    char **migration_domname_r; /* from malloc */
+    int incr_generationid;
+};
+
+
+
 static int qualifier_to_id(const char *p, uint32_t *id_r)
 {
     int i, alldigit;
@@ -186,6 +204,14 @@ static void find_domain(const char *p)
         exit(2);
     }
     common_domname = was_name ? p : libxl_domid_to_name(ctx, domid);
+}
+
+static int vncviewer(const char *domain_spec, int autopass)
+{
+    find_domain(domain_spec);
+    libxl_vncviewer_exec(ctx, domid, autopass);
+    fprintf(stderr, "Unable to execute vncviewer\n");
+    return 1;
 }
 
 static int acquire_lock(void)
@@ -1418,22 +1444,6 @@ static int preserve_domain(libxl_ctx *ctx, uint32_t domid, libxl_event *event,
     return rc == 0 ? 1 : 0;
 }
 
-struct domain_create {
-    int debug;
-    int daemonize;
-    int monitor; /* handle guest reboots etc */
-    int paused;
-    int dryrun;
-    int quiet;
-    int console_autoconnect;
-    const char *config_file;
-    const char *extra_config; /* extra config string */
-    const char *restore_file;
-    int migrate_fd; /* -1 means none */
-    char **migration_domname_r; /* from malloc */
-    int incr_generationid;
-};
-
 static int freemem(libxl_domain_build_info *b_info)
 {
     int rc, retries = 3;
@@ -2217,14 +2227,6 @@ int main_console(int argc, char **argv)
     else
         libxl_console_exec(ctx, domid, num, type);
     fprintf(stderr, "Unable to attach console\n");
-    return 1;
-}
-
-static int vncviewer(const char *domain_spec, int autopass)
-{
-    find_domain(domain_spec);
-    libxl_vncviewer_exec(ctx, domid, autopass);
-    fprintf(stderr, "Unable to execute vncviewer\n");
     return 1;
 }
 
