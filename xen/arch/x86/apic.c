@@ -1317,15 +1317,12 @@ void smp_send_state_dump(unsigned int cpu)
  */
 void spurious_interrupt(struct cpu_user_regs *regs)
 {
-    unsigned long v;
-
     /*
      * Check if this is a vectored interrupt (most likely, as this is probably
      * a request to dump local CPU state). Vectored interrupts are ACKed;
      * spurious interrupts are not.
      */
-    v = apic_read(APIC_ISR + ((SPURIOUS_APIC_VECTOR & ~0x1f) >> 1));
-    if (v & (1 << (SPURIOUS_APIC_VECTOR & 0x1f))) {
+    if (apic_isr_read(SPURIOUS_APIC_VECTOR)) {
         ack_APIC_irq();
         if (this_cpu(state_dump_pending)) {
             this_cpu(state_dump_pending) = 0;
@@ -1491,6 +1488,5 @@ enum apic_mode current_local_apic_mode(void)
 
 void check_for_unexpected_msi(unsigned int vector)
 {
-    unsigned long v = apic_read(APIC_ISR + ((vector & ~0x1f) >> 1));
-    BUG_ON(v & (1 << (vector & 0x1f)));
+    BUG_ON(apic_isr_read(vector));
 }

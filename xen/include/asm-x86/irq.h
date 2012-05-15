@@ -104,6 +104,7 @@ void mask_8259A(void);
 void unmask_8259A(void);
 void init_8259A(int aeoi);
 void make_8259A_irq(unsigned int irq);
+extern void (*bogus_8259A_irq)(unsigned int irq);
 int i8259A_suspend(void);
 int i8259A_resume(void);
 

@@ -146,6 +146,12 @@ static __inline void apic_icr_write(u32 low, u32 dest)
     }
 }
 
+static __inline bool_t apic_isr_read(u8 vector)
+{
+    return (apic_read(APIC_ISR + ((vector & ~0x1f) >> 1)) >>
+            (vector & 0x1f)) & 1;
+}
+
 static __inline u32 get_apic_id(void) /* Get the physical APIC id */
 {
     u32 id = apic_read(APIC_ID);

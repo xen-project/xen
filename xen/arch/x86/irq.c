@@ -811,9 +811,17 @@ void do_IRQ(struct cpu_user_regs *regs)
         if (direct_apic_vector[vector] != NULL) {
             (*direct_apic_vector[vector])(regs);
         } else {
-            ack_APIC_irq();
-            printk("%s: %d.%d No irq handler for vector (irq %d)\n",
-                   __func__, smp_processor_id(), vector, irq);
+            const char *kind = ", LAPIC";
+
+            if ( apic_isr_read(vector) )
+                ack_APIC_irq();
+            else
+                kind = "";
+            if ( vector >= FIRST_LEGACY_VECTOR &&
+                 vector <= LAST_LEGACY_VECTOR )
+                bogus_8259A_irq(vector - FIRST_LEGACY_VECTOR);
+            printk("CPU%u: No irq handler for vector %02x (IRQ %d%s)\n",
+                   smp_processor_id(), vector, irq, kind);
             TRACE_1D(TRC_HW_IRQ_UNMAPPED_VECTOR, vector);
         }
         goto out_no_unlock;
