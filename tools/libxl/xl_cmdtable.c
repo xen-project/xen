@@ -89,6 +89,20 @@ struct cmd_spec cmd_table[] = {
       "List pass-through pci devices for a domain",
       "<Domain>",
     },
+    { "pci-assignable-add",
+      &main_pciassignable_add, 0, 1,
+      "Make a device assignable for pci-passthru",
+      "<BDF>",
+      "-h                      Print this help.\n"
+    },
+    { "pci-assignable-remove",
+      &main_pciassignable_remove, 0, 1,
+      "Remove a device from being assignable",
+      "[options] <BDF>",
+      "-h                      Print this help.\n"
+      "-r                      Attempt to re-assign the device to the\n"
+      "                        original driver"
+    },
     { "pci-assignable-list",
       &main_pciassignable_list, 0, 0,
       "List all the assignable pci devices",

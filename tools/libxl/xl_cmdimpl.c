@@ -2440,6 +2440,86 @@ int main_pciassignable_list(int argc, char **argv)
     return 0;
 }
 
+static void pciassignable_add(const char *bdf, int rebind)
+{
+    libxl_device_pci pcidev;
+    XLU_Config *config;
+
+    libxl_device_pci_init(&pcidev);
+
+    config = xlu_cfg_init(stderr, "command line");
+    if (!config) { perror("xlu_cfg_init"); exit(-1); }
+
+    if (xlu_pci_parse_bdf(config, &pcidev, bdf)) {
+        fprintf(stderr, "pci-assignable-add: malformed BDF specification \"%s\"\n", bdf);
+        exit(2);
+    }
+    libxl_device_pci_assignable_add(ctx, &pcidev, rebind);
+
+    libxl_device_pci_dispose(&pcidev);
+    xlu_cfg_destroy(config);
+}
+
+int main_pciassignable_add(int argc, char **argv)
+{
+    int opt;
+    const char *bdf = NULL;
+
+    while ((opt = def_getopt(argc, argv, "", "pci-assignable-add", 1)) != -1) {
+        switch (opt) {
+        case 0: case 2:
+            return opt;
+        }
+    }
+
+    bdf = argv[optind];
+
+    pciassignable_add(bdf, 1);
+    return 0;
+}
+
+static void pciassignable_remove(const char *bdf, int rebind)
+{
+    libxl_device_pci pcidev;
+    XLU_Config *config;
+
+    libxl_device_pci_init(&pcidev);
+
+    config = xlu_cfg_init(stderr, "command line");
+    if (!config) { perror("xlu_cfg_init"); exit(-1); }
+
+    if (xlu_pci_parse_bdf(config, &pcidev, bdf)) {
+        fprintf(stderr, "pci-assignable-remove: malformed BDF specification \"%s\"\n", bdf);
+        exit(2);
+    }
+    libxl_device_pci_assignable_remove(ctx, &pcidev, rebind);
+
+    libxl_device_pci_dispose(&pcidev);
+    xlu_cfg_destroy(config);
+}
+
+int main_pciassignable_remove(int argc, char **argv)
+{
+    int opt;
+    const char *bdf = NULL;
+    int rebind = 0;
+
+    while ((opt = def_getopt(argc, argv, "r", "pci-assignable-remove", 1)) != -1) {
+        switch (opt) {
+        case 0: case 2:
+            return opt;
+        case 'r':
+            rebind=1;
+            break;
+        }
+    }
+
+    bdf = argv[optind];
+
+    pciassignable_remove(bdf, rebind);
+    return 0;
+}
+
 static void pause_domain(const char *p)
 {
     find_domain(p);

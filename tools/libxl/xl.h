@@ -37,6 +37,8 @@ int main_vncviewer(int argc, char **argv);
 int main_pcilist(int argc, char **argv);
 int main_pcidetach(int argc, char **argv);
 int main_pciattach(int argc, char **argv);
+int main_pciassignable_add(int argc, char **argv);
+int main_pciassignable_remove(int argc, char **argv);
 int main_pciassignable_list(int argc, char **argv);
 int main_restore(int argc, char **argv);
 int main_migrate_receive(int argc, char **argv);
