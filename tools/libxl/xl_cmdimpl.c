@@ -1931,7 +1931,7 @@ start:
                 /* Reparse the configuration in case it has changed */
                 libxl_domain_config_dispose(&d_config);
                 libxl_domain_config_init(&d_config);
-                parse_config_data(config_file, config_data, config_len,
+                parse_config_data(config_source, config_data, config_len,
                                   &d_config, dom_info);
 
                 /*
