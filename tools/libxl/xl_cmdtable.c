@@ -30,7 +30,10 @@ struct cmd_spec cmd_table[] = {
       "-n, --dryrun            Dry run - prints the resulting configuration\n"
       "                         (deprecated in favour of global -N option).\n"
       "-d                      Enable debug messages.\n"
-      "-e                      Do not wait in the background for the death of the domain."
+      "-e                      Do not wait in the background for the death of the domain.\n"
+      "-V, --vncviewer         Connect to the VNC display after the domain is created.\n"
+      "-A, --vncviewer-autopass\n"
+      "                        Pass VNC password to viewer via stdin."
     },
     { "config-update",
       &main_config_update, 1, 1,
@@ -144,10 +147,12 @@ struct cmd_spec cmd_table[] = {
       &main_restore, 0, 1,
       "Restore a domain from a saved state",
       "[options] [<ConfigFile>] <CheckpointFile>",
-      "-h  Print this help.\n"
-      "-p  Do not unpause domain after restoring it.\n"
-      "-e  Do not wait in the background for the death of the domain.\n"
-      "-d  Enable debug messages."
+      "-h                       Print this help.\n"
+      "-p                       Do not unpause domain after restoring it.\n"
+      "-e                       Do not wait in the background for the death of the domain.\n"
+      "-d                       Enable debug messages.\n"
+      "-V, --vncviewer          Connect to the VNC display after the domain is created.\n"
+      "-A, --vncviewer-autopass Pass VNC password to viewer via stdin."
     },
     { "migrate-receive",
       &main_migrate_receive, 0, 1,

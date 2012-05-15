@@ -129,6 +129,8 @@ struct domain_create {
     int paused;
     int dryrun;
     int quiet;
+    int vnc;
+    int vncautopass;
     int console_autoconnect;
     const char *config_file;
     const char *extra_config; /* extra config string */
@@ -206,9 +208,8 @@ static void find_domain(const char *p)
     common_domname = was_name ? p : libxl_domid_to_name(ctx, domid);
 }
 
-static int vncviewer(const char *domain_spec, int autopass)
+static int vncviewer(uint32_t domid, int autopass)
 {
-    find_domain(domain_spec);
     libxl_vncviewer_exec(ctx, domid, autopass);
     fprintf(stderr, "Unable to execute vncviewer\n");
     return 1;
@@ -551,7 +552,9 @@ vcpp_out:
 static void parse_config_data(const char *configfile_filename_report,
                               const char *configfile_data,
                               int configfile_len,
-                              libxl_domain_config *d_config)
+                              libxl_domain_config *d_config,
+                              struct domain_create *dom_info)
+
 {
     const char *buf;
     long l;
@@ -772,6 +775,13 @@ static void parse_config_data(const char *configfile_filename_report,
 
     if (!xlu_cfg_get_long(config, "rtc_timeoffset", &l, 0))
         b_info->rtc_timeoffset = l;
+
+    if (dom_info && !xlu_cfg_get_long(config, "vncviewer", &l, 0)) {
+        /* Command line arguments must take precedence over what's
+         * specified in the configuration file. */
+        if (!dom_info->vnc)
+            dom_info->vnc = l;
+    }
 
     xlu_cfg_get_defbool(config, "localtime", &b_info->localtime, 0);
 
@@ -1550,6 +1560,7 @@ static int create_domain(struct domain_create *dom_info)
     int daemonize = dom_info->daemonize;
     int monitor = dom_info->monitor;
     int paused = dom_info->paused;
+    int vncautopass = dom_info->vncautopass;
     const char *config_file = dom_info->config_file;
     const char *extra_config = dom_info->extra_config;
     const char *restore_file = dom_info->restore_file;
@@ -1673,7 +1684,7 @@ static int create_domain(struct domain_create *dom_info)
     if (!dom_info->quiet)
         printf("Parsing config file %s\n", config_file);
 
-    parse_config_data(config_file, config_data, config_len, &d_config);
+    parse_config_data(config_file, config_data, config_len, &d_config, dom_info);
 
     if (migrate_fd >= 0) {
         if (d_config.c_info.name) {
@@ -1784,6 +1795,9 @@ start:
     ret = domid; /* caller gets success in parent */
     if (!daemonize && !monitor)
         goto out;
+
+    if (dom_info->vnc)
+        vncviewer(domid, vncautopass);
 
     if (need_daemon) {
         char *fullname, *name;
@@ -1911,7 +1925,7 @@ start:
                 libxl_domain_config_dispose(&d_config);
                 libxl_domain_config_init(&d_config);
                 parse_config_data(config_file, config_data, config_len,
-                                  &d_config);
+                                  &d_config, dom_info);
 
                 /*
                  * XXX FIXME: If this sleep is not there then domain
@@ -2263,7 +2277,9 @@ int main_vncviewer(int argc, char **argv)
         return 2;
     }
 
-    if (vncviewer(argv[optind], autopass))
+    find_domain(argv[optind]);
+
+    if (vncviewer(domid, autopass))
         return 1;
     return 0;
 }
@@ -2538,7 +2554,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
             continue;
         CHK_ERRNO(asprintf(&config_file, "<domid %d data>", info[i].domid));
         libxl_domain_config_init(&d_config);
-        parse_config_data(config_file, (char *)data, len, &d_config);
+        parse_config_data(config_file, (char *)data, len, &d_config, NULL);
         printf_info(default_output_format, info[i].domid, &d_config);
         libxl_domain_config_dispose(&d_config);
         free(data);
@@ -3088,13 +3104,26 @@ int main_restore(int argc, char **argv)
     const char *config_file = NULL;
     struct domain_create dom_info;
     int paused = 0, debug = 0, daemonize = 1, monitor = 1,
-        console_autoconnect = 0;
+        console_autoconnect = 0, vnc = 0, vncautopass = 0;
     int opt, rc;
+    int option_index = 0;
+    static struct option long_options[] = {
+        {"vncviewer", 0, 0, 'V'},
+        {"vncviewer-autopass", 0, 0, 'A'},
+        {0, 0, 0, 0}
+    };
 
-    while ((opt = def_getopt(argc, argv, "Fcpde", "restore", 1)) != -1) {
+    while (1) {
+        opt = getopt_long(argc, argv, "FhcpdeVA", long_options, &option_index);
+        if (opt == -1)
+            break;
+
         switch (opt) {
         case 0: case 2:
             return opt;
+        case 'h':
+            help("restore");
+            return 2;
         case 'c':
             console_autoconnect = 1;
             break;
@@ -3110,6 +3139,12 @@ int main_restore(int argc, char **argv)
         case 'e':
             daemonize = 0;
             monitor = 0;
+            break;
+        case 'V':
+            vnc = 1;
+            break;
+        case 'A':
+            vnc = vncautopass = 1;
             break;
         }
     }
@@ -3132,6 +3167,8 @@ int main_restore(int argc, char **argv)
     dom_info.config_file = config_file;
     dom_info.restore_file = checkpoint_file;
     dom_info.migrate_fd = -1;
+    dom_info.vnc = vnc;
+    dom_info.vncautopass = vncautopass;
     dom_info.console_autoconnect = console_autoconnect;
     dom_info.incr_generationid = 1;
 
@@ -3439,7 +3476,7 @@ int main_create(int argc, char **argv)
     char extra_config[1024];
     struct domain_create dom_info;
     int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0,
-        quiet = 0, monitor = 1;
+        quiet = 0, monitor = 1, vnc = 0, vncautopass = 0;
     int opt, rc;
     int option_index = 0;
     static struct option long_options[] = {
@@ -3447,6 +3484,8 @@ int main_create(int argc, char **argv)
         {"quiet", 0, 0, 'q'},
         {"help", 0, 0, 'h'},
         {"defconfig", 1, 0, 'f'},
+        {"vncviewer", 0, 0, 'V'},
+        {"vncviewer-autopass", 0, 0, 'A'},
         {0, 0, 0, 0}
     };
 
@@ -3456,7 +3495,7 @@ int main_create(int argc, char **argv)
     }
 
     while (1) {
-        opt = getopt_long(argc, argv, "Fhnqf:pcde", long_options, &option_index);
+        opt = getopt_long(argc, argv, "Fhnqf:pcdeVA", long_options, &option_index);
         if (opt == -1)
             break;
 
@@ -3489,6 +3528,12 @@ int main_create(int argc, char **argv)
         case 'q':
             quiet = 1;
             break;
+        case 'V':
+            vnc = 1;
+            break;
+        case 'A':
+            vnc = vncautopass = 1;
+            break;
         default:
             fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
@@ -3518,6 +3563,8 @@ int main_create(int argc, char **argv)
     dom_info.config_file = filename;
     dom_info.extra_config = extra_config;
     dom_info.migrate_fd = -1;
+    dom_info.vnc = vnc;
+    dom_info.vncautopass = vncautopass;
     dom_info.console_autoconnect = console_autoconnect;
     dom_info.incr_generationid = 0;
 
@@ -3620,7 +3667,7 @@ int main_config_update(int argc, char **argv)
 
     libxl_domain_config_init(&d_config);
 
-    parse_config_data(filename, config_data, config_len, &d_config);
+    parse_config_data(filename, config_data, config_len, &d_config, NULL);
 
     if (debug || dryrun_only)
         printf_info(default_output_format, -1, &d_config);

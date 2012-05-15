@@ -126,6 +126,14 @@ Use the given configuration file.
 
 Leave the domain paused after it is created.
 
+=item B<-V>, B<--vncviewer>
+
+Attach to domain's VNC server, forking a vncviewer process.
+
+=item B<-A>, B<--vncviewer-autopass>
+
+Pass VNC password to vncviewer via stdin.
+
 =item B<-c>
 
 Attach console to the domain as soon as it has started.  This is
@@ -438,6 +446,16 @@ See the corresponding option of the I<create> subcommand.
 =item B<-d>
 
 Enable debug messages.
+
+=item B<-V>, B<--vncviewer>
+
+Attach to domain's VNC server, forking a vncviewer process.
+
+=item B<-A>, B<--vncviewer-autopass>
+
+Pass VNC password to vncviewer via stdin.
+
+
 
 =back
 
