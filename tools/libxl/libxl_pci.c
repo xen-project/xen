@@ -327,6 +327,36 @@ static int is_pcidev_in_array(libxl_device_pci *assigned, int num_assigned,
     return 0;
 }
 
+/* Write the standard BDF into the sysfs path given by sysfs_path. */
+static int sysfs_write_bdf(libxl__gc *gc, const char * sysfs_path,
+                           libxl_device_pci *pcidev)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    int rc, fd;
+    char *buf;
+
+    fd = open(sysfs_path, O_WRONLY);
+    if (fd < 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Couldn't open %s",
+                         sysfs_path);
+        return ERROR_FAIL;
+    }
+
+    buf = libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus,
+                         pcidev->dev, pcidev->func);
+    rc = write(fd, buf, strlen(buf));
+    /* Annoying to have two if's, but we need the errno */
+    if (rc < 0)
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                         "write to %s returned %d", sysfs_path, rc);
+    close(fd);
+
+    if (rc < 0)
+        return ERROR_FAIL;
+
+    return 0;
+}
+
 libxl_device_pci *libxl_device_pci_list_assignable(libxl_ctx *ctx, int *num)
 {
     GC_INIT(ctx);
@@ -571,27 +601,12 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
 
         /* Don't restrict writes to the PCI config space from this VM */
         if (pcidev->permissive) {
-            int fd;
-            char *buf;
-            
-            sysfs_path = libxl__sprintf(gc, SYSFS_PCIBACK_DRIVER"/permissive");
-            fd = open(sysfs_path, O_WRONLY);
-            if (fd < 0) {
-                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Couldn't open %s",
-                                 sysfs_path);
+            if ( sysfs_write_bdf(gc, SYSFS_PCIBACK_DRIVER"/permissive",
+                                 pcidev) < 0 ) {
+                LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                           "Setting permissive for device");
                 return ERROR_FAIL;
             }
- 
-            buf = libxl__sprintf(gc, PCI_BDF, pcidev->domain, pcidev->bus,
-                                 pcidev->dev, pcidev->func);
-            rc = write(fd, buf, strlen(buf));
-            /* Annoying to have two if's, but we need the errno */
-            if (rc < 0)
-                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                                 "write to %s returned %d", sysfs_path, rc);
-            close(fd);
-            if (rc < 0)
-                return ERROR_FAIL;
         }
         break;
     }
