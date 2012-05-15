@@ -314,7 +314,7 @@ static void save_ELCR(char *trigger)
 
 int i8259A_resume(void)
 {
-    init_8259A(0);
+    init_8259A(i8259A_irq_type.ack == disable_8259A_irq);
     restore_ELCR(irq_trigger);
     return 0;
 }
