@@ -18,7 +18,7 @@ SUBDIRS-$(CONFIG_LOMOUNT) += lomount
 SUBDIRS-$(CONFIG_MINITERM) += miniterm
 SUBDIRS := $(SUBDIRS-y)
 
-INSTALL_BIN-y := xencons xenpvnetboot
+INSTALL_BIN-y := xencons
 INSTALL_BIN-$(CONFIG_X86) += xen-detect
 INSTALL_BIN := $(INSTALL_BIN-y)
 
@@ -26,6 +26,9 @@ INSTALL_SBIN-y := xm xen-bugtool xen-python-path xend xenperf xsview xenpm xen-t
 INSTALL_SBIN-$(CONFIG_X86) += xen-hvmctx xen-hvmcrash xen-lowmemd
 INSTALL_SBIN-$(CONFIG_MIGRATE) += xen-hptool
 INSTALL_SBIN := $(INSTALL_SBIN-y)
+
+INSTALL_PRIVBIN-y := xenpvnetboot
+INSTALL_PRIVBIN := $(INSTALL_PRIVBIN-y)
 
 # Include configure output (config.h) to headers search path
 CFLAGS += -I$(XEN_ROOT)/tools
@@ -41,8 +44,10 @@ build: $(TARGETS)
 install: build
 	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_DIR) $(DESTDIR)$(PRIVATE_BINDIR)
 	$(INSTALL_PYTHON_PROG) $(INSTALL_BIN) $(DESTDIR)$(BINDIR)
 	$(INSTALL_PYTHON_PROG) $(INSTALL_SBIN) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PYTHON_PROG) $(INSTALL_PRIVBIN) $(DESTDIR)$(PRIVATE_BINDIR)
 	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d install-recurse; done
 
 .PHONY: clean

@@ -11,9 +11,11 @@ build:
 .PHONY: install
 install: all
 	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py install \
-		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" --force
-	$(INSTALL_PYTHON_PROG) src/pygrub $(DESTDIR)/$(BINDIR)/pygrub
+		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" \
+		--install-scripts=$(DESTDIR)/$(PRIVATE_BINDIR) --force
+	$(INSTALL_PYTHON_PROG) src/pygrub $(DESTDIR)/$(PRIVATE_BINDIR)/pygrub
 	$(INSTALL_DIR) $(DESTDIR)/var/run/xend/boot
+	ln -sf $(PRIVATE_BINDIR)/pygrub $(DESTDIR)/$(BINDIR)
 
 .PHONY: clean
 clean:
