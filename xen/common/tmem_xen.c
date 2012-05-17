@@ -107,30 +107,25 @@ static inline void cli_put_page(tmem_cli_mfn_t cmfn, void *cli_va, pfp_t *cli_pf
 static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
                                  pfp_t **pcli_pfp, bool_t cli_write)
 {
-    unsigned long cli_mfn;
     p2m_type_t t;
     struct page_info *page;
-    int ret;
 
-    cli_mfn = mfn_x(get_gfn(current->domain, cmfn, &t));
-    if ( t != p2m_ram_rw || !mfn_valid(cli_mfn) )
+    page = get_page_from_gfn(current->domain, cmfn, &t, P2M_ALLOC);
+    if ( !page || t != p2m_ram_rw )
     {
-            put_gfn(current->domain, (unsigned long) cmfn);
-            return NULL;
+        if ( page )
+            put_page(page);
     }
-    page = mfn_to_page(cli_mfn);
-    if ( cli_write )
-        ret = get_page_and_type(page, current->domain, PGT_writable_page);
-    else
-        ret = get_page(page, current->domain);
-    if ( !ret )
+
+    if ( cli_write && !get_page_type(page, PGT_writable_page) )
     {
-        put_gfn(current->domain, (unsigned long) cmfn);
+        put_page(page);
         return NULL;
     }
-    *pcli_mfn = cli_mfn;
+
+    *pcli_mfn = page_to_mfn(page);
     *pcli_pfp = (pfp_t *)page;
-    return map_domain_page(cli_mfn);
+    return map_domain_page(*pcli_mfn);
 }
 
 static inline void cli_put_page(tmem_cli_mfn_t cmfn, void *cli_va, pfp_t *cli_pfp,
@@ -144,7 +139,6 @@ static inline void cli_put_page(tmem_cli_mfn_t cmfn, void *cli_va, pfp_t *cli_pf
     else
         put_page((struct page_info *)cli_pfp);
     unmap_domain_page(cli_va);
-    put_gfn(current->domain, (unsigned long) cmfn);
 }
 #endif
 

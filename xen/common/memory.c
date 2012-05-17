@@ -676,7 +676,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
     case XENMEM_remove_from_physmap:
     {
         struct xen_remove_from_physmap xrfp;
-        unsigned long mfn;
+        struct page_info *page;
         struct domain *d;
 
         if ( copy_from_guest(&xrfp, arg, 1) )
@@ -694,14 +694,14 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
 
         domain_lock(d);
 
-        mfn = get_gfn_untyped(d, xrfp.gpfn);
-
-        if ( mfn_valid(mfn) )
-            guest_physmap_remove_page(d, xrfp.gpfn, mfn, 0);
+        page = get_page_from_gfn(d, xrfp.gpfn, NULL, P2M_ALLOC);
+        if ( page )
+        {
+            guest_physmap_remove_page(d, xrfp.gpfn, page_to_mfn(page), 0);
+            put_page(page);
+        }
         else
             rc = -ENOENT;
-
-        put_gfn(d, xrfp.gpfn);
 
         domain_unlock(d);
 

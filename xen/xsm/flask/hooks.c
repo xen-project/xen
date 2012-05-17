@@ -1318,6 +1318,7 @@ static int flask_mmu_normal_update(struct domain *d, struct domain *t,
     struct domain_security_struct *dsec;
     u32 fsid;
     struct avc_audit_data ad;
+    struct page_info *page = NULL;
 
     if (d != t)
         rc = domain_has_perm(d, t, SECCLASS_MMU, MMU__REMOTE_REMAP);
@@ -1333,8 +1334,9 @@ static int flask_mmu_normal_update(struct domain *d, struct domain *t,
         map_perms |= MMU__MAP_WRITE;
 
     AVC_AUDIT_DATA_INIT(&ad, MEMORY);
-    fmfn = get_gfn_untyped(f, l1e_get_pfn(l1e_from_intpte(fpte)));
-
+    page = get_page_from_gfn(f, l1e_get_pfn(l1e_from_intpte(fpte)),
+                             NULL, P2M_ALLOC);
+    fmfn = page ? page_to_mfn(page) : INVALID_MFN;
     ad.sdom = d;
     ad.tdom = f;
     ad.memory.pte = fpte;
@@ -1342,7 +1344,8 @@ static int flask_mmu_normal_update(struct domain *d, struct domain *t,
 
     rc = get_mfn_sid(fmfn, &fsid);
 
-    put_gfn(f, fmfn);
+    if ( page )
+        put_page(page);
 
     if ( rc )
         return rc;
@@ -1370,7 +1373,7 @@ static int flask_update_va_mapping(struct domain *d, struct domain *f,
     int rc = 0;
     u32 psid;
     u32 map_perms = MMU__MAP_READ;
-    unsigned long mfn;
+    struct page_info *page = NULL;
     struct domain_security_struct *dsec;
 
     if ( !(l1e_get_flags(pte) & _PAGE_PRESENT) )
@@ -1381,8 +1384,10 @@ static int flask_update_va_mapping(struct domain *d, struct domain *f,
 
     dsec = d->ssid;
 
-    mfn = get_gfn_untyped(f, l1e_get_pfn(pte));
-    rc = get_mfn_sid(mfn, &psid);
+    page = get_page_from_gfn(f, l1e_get_pfn(pte), NULL, P2M_ALLOC);
+    rc = get_mfn_sid(page ? page_to_mfn(page) : INVALID_MFN, &psid);
+    if ( page )
+        put_page(page);
     if ( rc )
         return rc;
 
