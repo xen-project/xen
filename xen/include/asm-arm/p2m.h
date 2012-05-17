@@ -53,6 +53,28 @@ p2m_pod_decrease_reservation(struct domain *d,
                              xen_pfn_t gpfn,
                              unsigned int order);
 
+/* Look up a GFN and take a reference count on the backing page. */
+typedef int p2m_type_t;
+typedef unsigned int p2m_query_t;
+#define P2M_ALLOC    (1u<<0)   /* Populate PoD and paged-out entries */
+#define P2M_UNSHARE  (1u<<1)   /* Break CoW sharing */
+
+static inline struct page_info *get_page_from_gfn(
+    struct domain *d, unsigned long gfn, p2m_type_t *t, p2m_query_t q)
+{
+    struct page_info *page;
+    unsigned long mfn = gmfn_to_mfn(d, gfn);
+
+    ASSERT(t == NULL);
+
+    if (!mfn_valid(mfn))
+        return NULL;
+    page = mfn_to_page(mfn);
+    if ( !get_page(page, d) )
+        return NULL;
+    return page;
+}
+
 /* Compatibility function exporting the old untyped interface */
 static inline unsigned long get_gfn_untyped(struct domain *d, unsigned long gpfn)
 {
