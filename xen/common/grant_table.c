@@ -107,18 +107,6 @@ static unsigned inline int max_nr_maptrack_frames(void)
     return (max_nr_grant_frames * MAX_MAPTRACK_TO_GRANTS_RATIO);
 }
 
-#ifdef CONFIG_X86
-#define gfn_to_mfn_private(_d, _gfn) ({                     \
-    p2m_type_t __p2mt;                                      \
-    unsigned long __x;                                      \
-    __x = mfn_x(get_gfn_unshare((_d), (_gfn), &__p2mt));    \
-    if ( p2m_is_shared(__p2mt) || !p2m_is_valid(__p2mt) )   \
-        __x = INVALID_MFN;                                  \
-    __x; })
-#else
-#define gfn_to_mfn_private(_d, _gfn) gmfn_to_mfn(_d, _gfn)
-#endif
-
 #define SHGNT_PER_PAGE_V1 (PAGE_SIZE / sizeof(grant_entry_v1_t))
 #define shared_entry_v1(t, e) \
     ((t)->shared_v1[(e)/SHGNT_PER_PAGE_V1][(e)%SHGNT_PER_PAGE_V1])
@@ -141,41 +129,41 @@ shared_entry_header(struct grant_table *t, grant_ref_t ref)
 #define active_entry(t, e) \
     ((t)->active[(e)/ACGNT_PER_PAGE][(e)%ACGNT_PER_PAGE])
 
-/* Check if the page has been paged out. If rc == GNTST_okay, caller must do put_gfn(rd, gfn) */
-static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readonly, struct domain *rd)
+/* Check if the page has been paged out, or needs unsharing. 
+   If rc == GNTST_okay, *page contains the page struct with a ref taken.
+   Caller must do put_page(*page).
+   If any error, *page = NULL, *frame = INVALID_MFN, no ref taken. */
+static int __get_paged_frame(unsigned long gfn, unsigned long *frame, struct page_info **page,
+                                int readonly, struct domain *rd)
 {
     int rc = GNTST_okay;
 #if defined(P2M_PAGED_TYPES) || defined(P2M_SHARED_TYPES)
     p2m_type_t p2mt;
-    mfn_t mfn;
 
-    if ( readonly )
-        mfn = get_gfn(rd, gfn, &p2mt);
-    else
+    *page = get_page_from_gfn(rd, gfn, &p2mt, 
+                              (readonly) ? P2M_ALLOC : P2M_UNSHARE);
+    if ( !(*page) )
     {
-        mfn = get_gfn_unshare(rd, gfn, &p2mt);
+        *frame = INVALID_MFN;
         if ( p2m_is_shared(p2mt) )
-        {
-            put_gfn(rd, gfn);
             return GNTST_eagain;
-        }
-    }
-
-    if ( p2m_is_valid(p2mt) ) {
-        *frame = mfn_x(mfn);
         if ( p2m_is_paging(p2mt) )
         {
-            put_gfn(rd, gfn);
             p2m_mem_paging_populate(rd, gfn);
-            rc = GNTST_eagain;
+            return GNTST_eagain;
         }
-    } else {
-       put_gfn(rd, gfn);
-       *frame = INVALID_MFN;
-       rc = GNTST_bad_page;
+        return GNTST_bad_page;
     }
+    *frame = page_to_mfn(*page);
 #else
-    *frame = readonly ? gmfn_to_mfn(rd, gfn) : gfn_to_mfn_private(rd, gfn);
+    *frame = gmfn_to_mfn(rd, gfn);
+    *page = mfn_valid(*frame) ? mfn_to_page(*frame) : NULL;
+    if ( (!(*page)) || (!get_page(*page, rd)) )
+    {
+        *frame = INVALID_MFN;
+        *page = NULL;
+        rc = GNTST_bad_page;
+    }
 #endif
 
     return rc;
@@ -470,12 +458,11 @@ static void
 __gnttab_map_grant_ref(
     struct gnttab_map_grant_ref *op)
 {
-    struct domain *ld, *rd, *owner;
+    struct domain *ld, *rd, *owner = NULL;
     struct vcpu   *led;
     int            handle;
-    unsigned long  gfn = INVALID_GFN;
     unsigned long  frame = 0, nr_gets = 0;
-    struct page_info *pg;
+    struct page_info *pg = NULL;
     int            rc = GNTST_okay;
     u32            old_pin;
     u32            act_pin;
@@ -573,13 +560,11 @@ __gnttab_map_grant_ref(
         {
             unsigned long frame;
 
-            gfn = sha1 ? sha1->frame : sha2->full_page.frame;
-            rc = __get_paged_frame(gfn, &frame, !!(op->flags & GNTMAP_readonly), rd);
+            unsigned long gfn = sha1 ? sha1->frame : sha2->full_page.frame;
+            rc = __get_paged_frame(gfn, &frame, &pg, 
+                                    !!(op->flags & GNTMAP_readonly), rd);
             if ( rc != GNTST_okay )
-            {
-                gfn = INVALID_GFN;
                 goto unlock_out_clear;
-            }
             act->gfn = gfn;
             act->domid = ld->domain_id;
             act->frame = frame;
@@ -606,9 +591,17 @@ __gnttab_map_grant_ref(
 
     spin_unlock(&rd->grant_table->lock);
 
-    pg = mfn_valid(frame) ? mfn_to_page(frame) : NULL;
+    /* pg may be set, with a refcount included, from __get_paged_frame */
+    if ( !pg )
+    {
+        pg = mfn_valid(frame) ? mfn_to_page(frame) : NULL;
+        if ( pg )
+            owner = page_get_owner_and_reference(pg);
+    }
+    else
+        owner = page_get_owner(pg);
 
-    if ( !pg || (owner = page_get_owner_and_reference(pg)) == dom_io )
+    if ( !pg || (owner == dom_io) )
     {
         /* Only needed the reference to confirm dom_io ownership. */
         if ( pg )
@@ -708,8 +701,6 @@ __gnttab_map_grant_ref(
     op->handle       = handle;
     op->status       = GNTST_okay;
 
-    if ( gfn != INVALID_GFN )
-        put_gfn(rd, gfn);
     rcu_unlock_domain(rd);
     return;
 
@@ -748,8 +739,6 @@ __gnttab_map_grant_ref(
         gnttab_clear_flag(_GTF_reading, status);
 
  unlock_out:
-    if ( gfn != INVALID_GFN )
-        put_gfn(rd, gfn);
     spin_unlock(&rd->grant_table->lock);
     op->status = rc;
     put_maptrack_handle(ld->grant_table, handle);
@@ -1479,7 +1468,16 @@ gnttab_transfer(
             return -EFAULT;
         }
 
-        mfn = gfn_to_mfn_private(d, gop.mfn);
+#ifdef CONFIG_X86
+        {
+            p2m_type_t __p2mt;
+            mfn = mfn_x(get_gfn_unshare(d, gop.mfn, &__p2mt));
+            if ( p2m_is_shared(__p2mt) || !p2m_is_valid(__p2mt) )
+                mfn = INVALID_MFN;
+        }
+#else
+        mfn = gmfn_to_mfn(d, gop.mfn);
+#endif
 
         /* Check the passed page frame for basic validity. */
         if ( unlikely(!mfn_valid(mfn)) )
@@ -1723,15 +1721,14 @@ static void __fixup_status_for_pin(const struct active_grant_entry *act,
 }
 
 /* Grab a frame number from a grant entry and update the flags and pin
-   count as appropriate.  Note that this does *not* update the page
-   type or reference counts, and does not check that the mfn is
-   actually valid. If *gfn != INVALID_GFN, and rc == GNTST_okay, then
-   we leave this function holding the p2m entry for *gfn in *owning_domain */
+   count as appropriate. If rc == GNTST_okay, note that this *does* 
+   take one ref count on the target page, stored in *page.
+   If there is any error, *page = NULL, no ref taken. */
 static int
 __acquire_grant_for_copy(
     struct domain *rd, unsigned long gref, struct domain *ld, int readonly,
-    unsigned long *frame, unsigned long *gfn, unsigned *page_off, unsigned *length,
-    unsigned allow_transitive, struct domain **owning_domain)
+    unsigned long *frame, struct page_info **page, 
+    unsigned *page_off, unsigned *length, unsigned allow_transitive)
 {
     grant_entry_v1_t *sha1;
     grant_entry_v2_t *sha2;
@@ -1746,11 +1743,9 @@ __acquire_grant_for_copy(
     unsigned trans_page_off;
     unsigned trans_length;
     int is_sub_page;
-    struct domain *ignore;
     s16 rc = GNTST_okay;
 
-    *owning_domain = NULL;
-    *gfn = INVALID_GFN;
+    *page = NULL;
 
     spin_lock(&rd->grant_table->lock);
 
@@ -1827,14 +1822,13 @@ __acquire_grant_for_copy(
             spin_unlock(&rd->grant_table->lock);
 
             rc = __acquire_grant_for_copy(td, trans_gref, rd,
-                                          readonly, &grant_frame, gfn,
-                                          &trans_page_off, &trans_length,
-                                          0, &ignore);
+                                          readonly, &grant_frame, page,
+                                          &trans_page_off, &trans_length, 0);
 
             spin_lock(&rd->grant_table->lock);
             if ( rc != GNTST_okay ) {
                 __fixup_status_for_pin(act, status);
-	        rcu_unlock_domain(td);
+                rcu_unlock_domain(td);
                 spin_unlock(&rd->grant_table->lock);
                 return rc;
             }
@@ -1846,56 +1840,49 @@ __acquire_grant_for_copy(
             if ( act->pin != old_pin )
             {
                 __fixup_status_for_pin(act, status);
-	        rcu_unlock_domain(td);
+                rcu_unlock_domain(td);
                 spin_unlock(&rd->grant_table->lock);
+                put_page(*page);
                 return __acquire_grant_for_copy(rd, gref, ld, readonly,
-                                                frame, gfn, page_off, length,
-                                                allow_transitive,
-                                                owning_domain);
+                                                frame, page, page_off, length,
+                                                allow_transitive);
             }
 
             /* The actual remote remote grant may or may not be a
                sub-page, but we always treat it as one because that
                blocks mappings of transitive grants. */
             is_sub_page = 1;
-            *owning_domain = td;
             act->gfn = -1ul;
         }
         else if ( sha1 )
         {
-            *gfn = sha1->frame;
-            rc = __get_paged_frame(*gfn, &grant_frame, readonly, rd);
+            rc = __get_paged_frame(sha1->frame, &grant_frame, page, readonly, rd);
             if ( rc != GNTST_okay )
                 goto unlock_out;
-            act->gfn = *gfn;
+            act->gfn = sha1->frame;
             is_sub_page = 0;
             trans_page_off = 0;
             trans_length = PAGE_SIZE;
-            *owning_domain = rd;
         }
         else if ( !(sha2->hdr.flags & GTF_sub_page) )
         {
-            *gfn = sha2->full_page.frame;
-            rc = __get_paged_frame(*gfn, &grant_frame, readonly, rd);
+            rc = __get_paged_frame(sha2->full_page.frame, &grant_frame, page, readonly, rd);
             if ( rc != GNTST_okay )
                 goto unlock_out;
-            act->gfn = *gfn;
+            act->gfn = sha2->full_page.frame;
             is_sub_page = 0;
             trans_page_off = 0;
             trans_length = PAGE_SIZE;
-            *owning_domain = rd;
         }
         else
         {
-            *gfn = sha2->sub_page.frame;
-            rc = __get_paged_frame(*gfn, &grant_frame, readonly, rd);
+            rc = __get_paged_frame(sha2->sub_page.frame, &grant_frame, page, readonly, rd);
             if ( rc != GNTST_okay )
                 goto unlock_out;
-            act->gfn = *gfn;
+            act->gfn = sha2->sub_page.frame;
             is_sub_page = 1;
             trans_page_off = sha2->sub_page.page_off;
             trans_length = sha2->sub_page.length;
-            *owning_domain = rd;
         }
 
         if ( !act->pin )
@@ -1911,7 +1898,9 @@ __acquire_grant_for_copy(
     }
     else
     {
-        *owning_domain = rd;
+        ASSERT(mfn_valid(act->frame));
+        *page = mfn_to_page(act->frame);
+        (void)page_get_owner_and_reference(*page);
     }
 
     act->pin += readonly ? GNTPIN_hstr_inc : GNTPIN_hstw_inc;
@@ -1930,11 +1919,11 @@ __gnttab_copy(
     struct gnttab_copy *op)
 {
     struct domain *sd = NULL, *dd = NULL;
-    struct domain *source_domain = NULL, *dest_domain = NULL;
-    unsigned long s_frame, d_frame, s_gfn = INVALID_GFN, d_gfn = INVALID_GFN;
+    unsigned long s_frame, d_frame;
+    struct page_info *s_pg = NULL, *d_pg = NULL;
     char *sp, *dp;
     s16 rc = GNTST_okay;
-    int have_d_grant = 0, have_s_grant = 0, have_s_ref = 0;
+    int have_d_grant = 0, have_s_grant = 0;
     int src_is_gref, dest_is_gref;
 
     if ( ((op->source.offset + op->len) > PAGE_SIZE) ||
@@ -1972,82 +1961,54 @@ __gnttab_copy(
     {
         unsigned source_off, source_len;
         rc = __acquire_grant_for_copy(sd, op->source.u.ref, current->domain, 1,
-                                      &s_frame, &s_gfn, &source_off, &source_len, 1,
-                                      &source_domain);
+                                      &s_frame, &s_pg, &source_off, &source_len, 1);
         if ( rc != GNTST_okay )
             goto error_out;
         have_s_grant = 1;
         if ( op->source.offset < source_off ||
              op->len > source_len )
-            PIN_FAIL(error_put_s_gfn, GNTST_general_error,
+            PIN_FAIL(error_out, GNTST_general_error,
                      "copy source out of bounds: %d < %d || %d > %d\n",
                      op->source.offset, source_off,
                      op->len, source_len);
     }
     else
     {
-#ifdef CONFIG_X86
-        s_gfn = op->source.u.gmfn;
-        rc = __get_paged_frame(op->source.u.gmfn, &s_frame, 1, sd);
+        rc = __get_paged_frame(op->source.u.gmfn, &s_frame, &s_pg, 1, sd);
         if ( rc != GNTST_okay )
-            goto error_out;
-#else
-        s_frame = gmfn_to_mfn(sd, op->source.u.gmfn);        
-#endif
-        source_domain = sd;
+            PIN_FAIL(error_out, rc,
+                     "source frame %lx invalid.\n", s_frame);
     }
-    if ( unlikely(!mfn_valid(s_frame)) )
-        PIN_FAIL(error_put_s_gfn, GNTST_general_error,
-                 "source frame %lx invalid.\n", s_frame);
-    /* For the source frame, the page could still be shared, so
-     * don't assume ownership by source_domain */
-    if ( !page_get_owner_and_reference(mfn_to_page(s_frame)) )
-    {
-        if ( !sd->is_dying )
-            gdprintk(XENLOG_WARNING, "Could not get src frame %lx\n", s_frame);
-        rc = GNTST_general_error;
-        goto error_put_s_gfn;
-    }
-    have_s_ref = 1;
 
     if ( dest_is_gref )
     {
         unsigned dest_off, dest_len;
         rc = __acquire_grant_for_copy(dd, op->dest.u.ref, current->domain, 0,
-                                      &d_frame, &d_gfn, &dest_off, &dest_len, 1,
-                                      &dest_domain);
+                                      &d_frame, &d_pg, &dest_off, &dest_len, 1);
         if ( rc != GNTST_okay )
-            goto error_put_s_gfn;
+            goto error_out;
         have_d_grant = 1;
         if ( op->dest.offset < dest_off ||
              op->len > dest_len )
-            PIN_FAIL(error_put_d_gfn, GNTST_general_error,
+            PIN_FAIL(error_out, GNTST_general_error,
                      "copy dest out of bounds: %d < %d || %d > %d\n",
                      op->dest.offset, dest_off,
                      op->len, dest_len);
     }
     else
     {
-#ifdef CONFIG_X86
-        d_gfn = op->dest.u.gmfn;
-        rc = __get_paged_frame(op->dest.u.gmfn, &d_frame, 0, dd);
+        rc = __get_paged_frame(op->dest.u.gmfn, &d_frame, &d_pg, 0, dd);
         if ( rc != GNTST_okay )
-            goto error_put_s_gfn;
-#else
-        d_frame = gmfn_to_mfn(dd, op->dest.u.gmfn);
-#endif
-        dest_domain = dd;
+            PIN_FAIL(error_out, rc,
+                     "destination frame %lx invalid.\n", d_frame);
     }
-    if ( unlikely(!mfn_valid(d_frame)) )
-        PIN_FAIL(error_put_d_gfn, GNTST_general_error,
-                 "destination frame %lx invalid.\n", d_frame);
-    if ( !get_page_and_type(mfn_to_page(d_frame), dest_domain,
-                            PGT_writable_page) )
+
+    if ( !get_page_type(d_pg, PGT_writable_page) )
     {
         if ( !dd->is_dying )
             gdprintk(XENLOG_WARNING, "Could not get dst frame %lx\n", d_frame);
         rc = GNTST_general_error;
-        goto error_put_d_gfn;
+        goto error_out;
     }
 
     sp = map_domain_page(s_frame);
@@ -2060,16 +2021,12 @@ __gnttab_copy(
 
     gnttab_mark_dirty(dd, d_frame);
 
-    put_page_and_type(mfn_to_page(d_frame));
- error_put_d_gfn:
-    if ( (d_gfn != INVALID_GFN) && (dest_domain) )
-        put_gfn(dest_domain, d_gfn);
- error_put_s_gfn:
-    if ( (s_gfn != INVALID_GFN) && (source_domain) )
-        put_gfn(source_domain, s_gfn);
+    put_page_type(d_pg);
  error_out:
-    if ( have_s_ref )
-        put_page(mfn_to_page(s_frame));
+    if ( d_pg )
+        put_page(d_pg);
+    if ( s_pg )
+        put_page(s_pg);
     if ( have_s_grant )
         __release_grant_for_copy(sd, op->source.u.ref, 1);
     if ( have_d_grant )
