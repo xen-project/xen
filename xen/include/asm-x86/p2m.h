@@ -377,6 +377,33 @@ static inline mfn_t get_gfn_query_unlocked(struct domain *d,
     return __get_gfn_type_access(p2m_get_hostp2m(d), gfn, t, &a, 0, NULL, 0);
 }
 
+/* Atomically look up a GFN and take a reference count on the backing page.
+ * This makes sure the page doesn't get freed (or shared) underfoot,
+ * and should be used by any path that intends to write to the backing page.
+ * Returns NULL if the page is not backed by RAM.
+ * The caller is responsible for calling put_page() afterwards. */
+struct page_info *get_page_from_gfn_p2m(struct domain *d,
+                                        struct p2m_domain *p2m,
+                                        unsigned long gfn,
+                                        p2m_type_t *t, p2m_access_t *a,
+                                        p2m_query_t q);
+
+static inline struct page_info *get_page_from_gfn(
+    struct domain *d, unsigned long gfn, p2m_type_t *t, p2m_query_t q)
+{
+    struct page_info *page;
+
+    if ( paging_mode_translate(d) )
+        return get_page_from_gfn_p2m(d, p2m_get_hostp2m(d), gfn, t, NULL, q);
+
+    /* Non-translated guests see 1-1 RAM mappings everywhere */
+    if (t)
+        *t = p2m_ram_rw;
+    page = __mfn_to_page(gfn);
+    return get_page(page, d) ? page : NULL;
+}
+
+
 /* General conversion function from mfn to gfn */
 static inline unsigned long mfn_to_gfn(struct domain *d, mfn_t mfn)
 {

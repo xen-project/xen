@@ -207,6 +207,59 @@ void __put_gfn(struct p2m_domain *p2m, unsigned long gfn)
     gfn_unlock(p2m, gfn, 0);
 }
 
+/* Atomically look up a GFN and take a reference count on the backing page. */
+struct page_info *get_page_from_gfn_p2m(
+    struct domain *d, struct p2m_domain *p2m, unsigned long gfn,
+    p2m_type_t *t, p2m_access_t *a, p2m_query_t q)
+{
+    struct page_info *page = NULL;
+    p2m_access_t _a;
+    p2m_type_t _t;
+    mfn_t mfn;
+
+    /* Allow t or a to be NULL */
+    t = t ?: &_t;
+    a = a ?: &_a;
+
+    if ( likely(!p2m_locked_by_me(p2m)) )
+    {
+        /* Fast path: look up and get out */
+        p2m_read_lock(p2m);
+        mfn = __get_gfn_type_access(p2m, gfn, t, a, 0, NULL, 0);
+        if ( (p2m_is_ram(*t) || p2m_is_grant(*t))
+             && mfn_valid(mfn)
+             && !((q & P2M_UNSHARE) && p2m_is_shared(*t)) )
+        {
+            page = mfn_to_page(mfn);
+            if ( !get_page(page, d)
+                 /* Page could be shared */
+                 && !get_page(page, dom_cow) )
+                page = NULL;
+        }
+        p2m_read_unlock(p2m);
+
+        if ( page )
+            return page;
+
+        /* Error path: not a suitable GFN at all */
+        if ( !p2m_is_ram(*t) && !p2m_is_paging(*t) && !p2m_is_magic(*t) )
+            return NULL;
+    }
+
+    /* Slow path: take the write lock and do fixups */
+    mfn = get_gfn_type_access(p2m, gfn, t, a, q, NULL);
+    if ( p2m_is_ram(*t) && mfn_valid(mfn) )
+    {
+        page = mfn_to_page(mfn);
+        if ( !get_page(page, d) )
+            page = NULL;
+    }
+    put_gfn(d, gfn);
+
+    return page;
+}
+
+
 int set_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn, 
                   unsigned int page_order, p2m_type_t p2mt, p2m_access_t p2ma)
 {
