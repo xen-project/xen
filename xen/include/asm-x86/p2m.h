@@ -192,7 +192,7 @@ typedef unsigned int p2m_query_t;
 /* Per-p2m-table state */
 struct p2m_domain {
     /* Lock that protects updates to the p2m */
-    mm_lock_t          lock;
+    mm_rwlock_t           lock;
 
     /* Shadow translated domain: p2m mapping */
     pagetable_t        phys_table;

@@ -71,7 +71,7 @@ boolean_param("hap_2mb", opt_hap_2mb);
 /* Init the datastructures for later use by the p2m code */
 static void p2m_initialise(struct domain *d, struct p2m_domain *p2m)
 {
-    mm_lock_init(&p2m->lock);
+    mm_rwlock_init(&p2m->lock);
     mm_lock_init(&p2m->pod.lock);
     INIT_LIST_HEAD(&p2m->np2m_list);
     INIT_PAGE_LIST_HEAD(&p2m->pages);

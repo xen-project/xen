@@ -649,4 +649,12 @@ typedef struct mm_lock {
     const char        *locker_function; /* func that took it */
 } mm_lock_t;
 
+typedef struct mm_rwlock {
+    rwlock_t           lock;
+    int                unlock_level;
+    int                recurse_count;
+    int                locker; /* CPU that holds the write lock */
+    const char        *locker_function; /* func that took it */
+} mm_rwlock_t;
+
 #endif /* __ASM_X86_MM_H__ */

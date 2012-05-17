@@ -97,13 +97,71 @@ static inline void _mm_enforce_order_lock_post(int level, int *unlock_level,
     __set_lock_level(level);
 }
 
+
+static inline void mm_rwlock_init(mm_rwlock_t *l)
+{
+    rwlock_init(&l->lock);
+    l->locker = -1;
+    l->locker_function = "nobody";
+    l->unlock_level = 0;
+}
+
+static inline int mm_write_locked_by_me(mm_rwlock_t *l)
+{
+    return (l->locker == get_processor_id());
+}
+
+static inline void _mm_write_lock(mm_rwlock_t *l, const char *func, int level)
+{
+    if ( !mm_write_locked_by_me(l) )
+    {
+        __check_lock_level(level);
+        write_lock(&l->lock);
+        l->locker = get_processor_id();
+        l->locker_function = func;
+        l->unlock_level = __get_lock_level();
+        __set_lock_level(level);
+    }
+    l->recurse_count++;
+}
+
+static inline void mm_write_unlock(mm_rwlock_t *l)
+{
+    if ( --(l->recurse_count) != 0 )
+        return;
+    l->locker = -1;
+    l->locker_function = "nobody";
+    __set_lock_level(l->unlock_level);
+    write_unlock(&l->lock);
+}
+
+static inline void _mm_read_lock(mm_rwlock_t *l, int level)
+{
+    __check_lock_level(level);
+    read_lock(&l->lock);
+    /* There's nowhere to store the per-CPU unlock level so we can't
+     * set the lock level. */
+}
+
+static inline void mm_read_unlock(mm_rwlock_t *l)
+{
+    read_unlock(&l->lock);
+}
+
 /* This wrapper uses the line number to express the locking order below */
 #define declare_mm_lock(name)                                                 \
     static inline void mm_lock_##name(mm_lock_t *l, const char *func, int rec)\
     { _mm_lock(l, func, __LINE__, rec); }
+#define declare_mm_rwlock(name)                                               \
+    static inline void mm_write_lock_##name(mm_rwlock_t *l, const char *func) \
+    { _mm_write_lock(l, func, __LINE__); }                                    \
+    static inline void mm_read_lock_##name(mm_rwlock_t *l)                    \
+    { _mm_read_lock(l, __LINE__); }
 /* These capture the name of the calling function */
 #define mm_lock(name, l) mm_lock_##name(l, __func__, 0)
 #define mm_lock_recursive(name, l) mm_lock_##name(l, __func__, 1)
+#define mm_write_lock(name, l) mm_write_lock_##name(l, __func__)
+#define mm_read_lock(name, l) mm_read_lock_##name(l)
 
 /* This wrapper is intended for "external" locks which do not use
  * the mm_lock_t types. Such locks inside the mm code are also subject
@@ -152,27 +210,24 @@ declare_mm_lock(nestedp2m)
 #define nestedp2m_unlock(d) mm_unlock(&(d)->arch.nested_p2m_lock)
 
 /* P2M lock (per-p2m-table)
- * 
- * This protects all queries and updates to the p2m table. 
  *
- * A note about ordering:
- *   The order established here is enforced on all mutations of a p2m.
- *   For lookups, the order established here is enforced only for hap
- *   domains (1. shadow domains present a few nasty inversions; 
- *            2. shadow domains do not support paging and sharing, 
- *               the main sources of dynamic p2m mutations)
- * 
- * The lock is recursive as it is common for a code path to look up a gfn
- * and later mutate it.
+ * This protects all queries and updates to the p2m table.
+ * Queries may be made under the read lock but all modifications
+ * need the main (write) lock.
+ *
+ * The write lock is recursive as it is common for a code path to look
+ * up a gfn and later mutate it.
  */
 
-declare_mm_lock(p2m)
-#define p2m_lock(p)           mm_lock_recursive(p2m, &(p)->lock)
-#define gfn_lock(p,g,o)       mm_lock_recursive(p2m, &(p)->lock)
-#define p2m_unlock(p)         mm_unlock(&(p)->lock)
-#define gfn_unlock(p,g,o)     mm_unlock(&(p)->lock)
-#define p2m_locked_by_me(p)   mm_locked_by_me(&(p)->lock)
-#define gfn_locked_by_me(p,g) mm_locked_by_me(&(p)->lock)
+declare_mm_rwlock(p2m);
+#define p2m_lock(p)           mm_write_lock(p2m, &(p)->lock);
+#define p2m_unlock(p)         mm_write_unlock(&(p)->lock);
+#define gfn_lock(p,g,o)       p2m_lock(p)
+#define gfn_unlock(p,g,o)     p2m_unlock(p)
+#define p2m_read_lock(p)      mm_read_lock(p2m, &(p)->lock)
+#define p2m_read_unlock(p)    mm_read_unlock(&(p)->lock)
+#define p2m_locked_by_me(p)   mm_write_locked_by_me(&(p)->lock)
+#define gfn_locked_by_me(p,g) p2m_locked_by_me(p)
 
 /* Sharing per page lock
  *
