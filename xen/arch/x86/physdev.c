@@ -306,26 +306,27 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     case PHYSDEVOP_pirq_eoi_gmfn_v1: {
         struct physdev_pirq_eoi_gmfn info;
         unsigned long mfn;
+        struct page_info *page;
 
         ret = -EFAULT;
         if ( copy_from_guest(&info, arg, 1) != 0 )
             break;
 
         ret = -EINVAL;
-        mfn = get_gfn_untyped(current->domain, info.gmfn);
-        if ( !mfn_valid(mfn) ||
-             !get_page_and_type(mfn_to_page(mfn), v->domain,
-                                PGT_writable_page) )
+        page = get_page_from_gfn(current->domain, info.gmfn, NULL, P2M_ALLOC);
+        if ( !page )
+            break;
+        if ( !get_page_type(page, PGT_writable_page) )
         {
-            put_gfn(current->domain, info.gmfn);
+            put_page(page);
             break;
         }
+        mfn = page_to_mfn(page);
 
         if ( cmpxchg(&v->domain->arch.pv_domain.pirq_eoi_map_mfn,
                      0, mfn) != 0 )
         {
             put_page_and_type(mfn_to_page(mfn));
-            put_gfn(current->domain, info.gmfn);
             ret = -EBUSY;
             break;
         }
@@ -335,14 +336,12 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         {
             v->domain->arch.pv_domain.pirq_eoi_map_mfn = 0;
             put_page_and_type(mfn_to_page(mfn));
-            put_gfn(current->domain, info.gmfn);
             ret = -ENOSPC;
             break;
         }
         if ( cmd == PHYSDEVOP_pirq_eoi_gmfn_v1 )
             v->domain->arch.pv_domain.auto_unmask = 1;
 
-        put_gfn(current->domain, info.gmfn);
         ret = 0;
         break;
     }

@@ -202,16 +202,16 @@ long arch_do_domctl(
 
                 for ( j = 0; j < k; j++ )
                 {
-                    unsigned long type = 0, mfn = get_gfn_untyped(d, arr[j]);
+                    unsigned long type = 0;
 
-                    page = mfn_to_page(mfn);
+                    page = get_page_from_gfn(d, arr[j], NULL, P2M_ALLOC);
 
-                    if ( unlikely(!mfn_valid(mfn)) ||
-                         unlikely(is_xen_heap_mfn(mfn)) )
+                    if ( unlikely(!page) ||
+                         unlikely(is_xen_heap_page(page)) )
                         type = XEN_DOMCTL_PFINFO_XTAB;
                     else if ( xsm_getpageframeinfo(page) != 0 )
                         ;
-                    else if ( likely(get_page(page, d)) )
+                    else
                     {
                         switch( page->u.inuse.type_info & PGT_type_mask )
                         {
@@ -231,13 +231,10 @@ long arch_do_domctl(
 
                         if ( page->u.inuse.type_info & PGT_pinned )
                             type |= XEN_DOMCTL_PFINFO_LPINTAB;
-
-                        put_page(page);
                     }
-                    else
-                        type = XEN_DOMCTL_PFINFO_XTAB;
 
-                    put_gfn(d, arr[j]);
+                    if ( page )
+                        put_page(page);
                     arr[j] = type;
                 }
 
@@ -304,21 +301,21 @@ long arch_do_domctl(
             {      
                 struct page_info *page;
                 unsigned long gfn = arr32[j];
-                unsigned long mfn = get_gfn_untyped(d, gfn);
 
-                page = mfn_to_page(mfn);
+                page = get_page_from_gfn(d, gfn, NULL, P2M_ALLOC);
 
                 if ( domctl->cmd == XEN_DOMCTL_getpageframeinfo3)
                     arr32[j] = 0;
 
-                if ( unlikely(!mfn_valid(mfn)) ||
-                     unlikely(is_xen_heap_mfn(mfn)) )
+                if ( unlikely(!page) ||
+                     unlikely(is_xen_heap_page(page)) )
                     arr32[j] |= XEN_DOMCTL_PFINFO_XTAB;
                 else if ( xsm_getpageframeinfo(page) != 0 )
                 {
-                    put_gfn(d, gfn); 
+                    put_page(page);
                     continue;
-                } else if ( likely(get_page(page, d)) )
+                }
+                else
                 {
                     unsigned long type = 0;
 
@@ -341,12 +338,10 @@ long arch_do_domctl(
                     if ( page->u.inuse.type_info & PGT_pinned )
                         type |= XEN_DOMCTL_PFINFO_LPINTAB;
                     arr32[j] |= type;
-                    put_page(page);
                 }
-                else
-                    arr32[j] |= XEN_DOMCTL_PFINFO_XTAB;
 
-                put_gfn(d, gfn); 
+                if ( page )
+                    put_page(page);
             }
 
             if ( copy_to_guest_offset(domctl->u.getpageframeinfo2.array,
@@ -419,7 +414,7 @@ long arch_do_domctl(
     {
         struct domain *d = rcu_lock_domain_by_id(domctl->domain);
         unsigned long gmfn = domctl->u.hypercall_init.gmfn;
-        unsigned long mfn;
+        struct page_info *page;
         void *hypercall_page;
 
         ret = -ESRCH;
@@ -433,26 +428,25 @@ long arch_do_domctl(
             break;
         }
 
-        mfn = get_gfn_untyped(d, gmfn);
+        page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
 
         ret = -EACCES;
-        if ( !mfn_valid(mfn) ||
-             !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
+        if ( !page || !get_page_type(page, PGT_writable_page) )
         {
-            put_gfn(d, gmfn); 
+            if ( page )
+                put_page(page);
             rcu_unlock_domain(d);
             break;
         }
 
         ret = 0;
 
-        hypercall_page = map_domain_page(mfn);
+        hypercall_page = __map_domain_page(page);
         hypercall_page_initialise(d, hypercall_page);
         unmap_domain_page(hypercall_page);
 
-        put_page_and_type(mfn_to_page(mfn));
+        put_page_and_type(page);
 
-        put_gfn(d, gmfn); 
         rcu_unlock_domain(d);
     }
     break;

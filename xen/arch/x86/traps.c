@@ -662,9 +662,9 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
     case 0:
     {
         void *hypercall_page;
-        unsigned long mfn;
         unsigned long gmfn = val >> 12;
         unsigned int idx  = val & 0xfff;
+        struct page_info *page;
 
         if ( idx > 0 )
         {
@@ -674,24 +674,23 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
             return 0;
         }
 
-        mfn = get_gfn_untyped(d, gmfn);
+        page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
 
-        if ( !mfn_valid(mfn) ||
-             !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
+        if ( !page || !get_page_type(page, PGT_writable_page) )
         {
-            put_gfn(d, gmfn);
+            if ( page )
+                put_page(page);
             gdprintk(XENLOG_WARNING,
                      "Bad GMFN %lx (MFN %lx) to MSR %08x\n",
-                     gmfn, mfn, base + idx);
+                     gmfn, page_to_mfn(page), base + idx);
             return 0;
         }
 
-        hypercall_page = map_domain_page(mfn);
+        hypercall_page = __map_domain_page(page);
         hypercall_page_initialise(d, hypercall_page);
         unmap_domain_page(hypercall_page);
 
-        put_page_and_type(mfn_to_page(mfn));
-        put_gfn(d, gmfn);
+        put_page_and_type(page);
         break;
     }
 
@@ -2374,7 +2373,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             break;
 
         case 3: {/* Write CR3 */
-            unsigned long mfn, gfn;
+            unsigned long gfn;
+            struct page_info *page;
             domain_lock(v->domain);
             if ( !is_pv_32on64_vcpu(v) )
             {
@@ -2384,9 +2384,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 gfn = compat_cr3_to_pfn(*reg);
 #endif
             }
-            mfn = get_gfn_untyped(v->domain, gfn);
-            rc = new_guest_cr3(mfn);
-            put_gfn(v->domain, gfn);
+            page = get_page_from_gfn(v->domain, gfn, NULL, P2M_ALLOC);
+            rc = page ? new_guest_cr3(page_to_mfn(page)) : 0;
+            if ( page )
+                put_page(page);
             domain_unlock(v->domain);
             if ( rc == 0 ) /* not okay */
                 goto fail;
