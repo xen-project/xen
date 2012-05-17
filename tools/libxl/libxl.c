@@ -1188,6 +1188,10 @@ int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm)
         case LIBXL_DOMAIN_TYPE_PV:
             rc = libxl_console_exec(ctx, domid_vm, 0, LIBXL_CONSOLE_TYPE_PV);
             break;
+        case -1:
+            LOG(ERROR,"unable to get domain type for domid=%"PRIu32,domid_vm);
+            rc = ERROR_FAIL;
+            break;
         default:
             abort();
         }

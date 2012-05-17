@@ -1496,9 +1496,11 @@ static int freemem(libxl_domain_build_info *b_info)
     return ERROR_NOMEM;
 }
 
-static void autoconnect_console(libxl_ctx *ctx, libxl_event *ev, void *priv)
+static void autoconnect_console(libxl_ctx *ctx_ignored,
+                                libxl_event *ev, void *priv)
 {
     pid_t *pid = priv;
+    uint32_t bldomid = ev->domid;
 
     libxl_event_free(ctx, ev);
 
@@ -1512,7 +1514,7 @@ static void autoconnect_console(libxl_ctx *ctx, libxl_event *ev, void *priv)
     postfork();
 
     sleep(1);
-    libxl_primary_console_exec(ctx, domid);
+    libxl_primary_console_exec(ctx, bldomid);
     /* Do not return. xl continued in child process */
     fprintf(stderr, "Unable to attach console\n");
     _exit(1);
