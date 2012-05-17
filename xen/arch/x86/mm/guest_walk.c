@@ -94,39 +94,37 @@ static inline void *map_domain_gfn(struct p2m_domain *p2m,
                                    p2m_type_t *p2mt,
                                    uint32_t *rc) 
 {
-    p2m_access_t p2ma;
+    struct page_info *page;
     void *map;
 
     /* Translate the gfn, unsharing if shared */
-    *mfn = get_gfn_type_access(p2m, gfn_x(gfn), p2mt, &p2ma, 
-                               P2M_ALLOC | P2M_UNSHARE, NULL);
+    page = get_page_from_gfn_p2m(p2m->domain, p2m, gfn_x(gfn), p2mt, NULL,
+                                  P2M_ALLOC | P2M_UNSHARE);
     if ( p2m_is_paging(*p2mt) )
     {
         ASSERT(!p2m_is_nestedp2m(p2m));
-        __put_gfn(p2m, gfn_x(gfn));
+        if ( page )
+            put_page(page);
         p2m_mem_paging_populate(p2m->domain, gfn_x(gfn));
         *rc = _PAGE_PAGED;
         return NULL;
     }
     if ( p2m_is_shared(*p2mt) )
     {
-        __put_gfn(p2m, gfn_x(gfn));
+        if ( page )
+            put_page(page);
         *rc = _PAGE_SHARED;
         return NULL;
     }
-    if ( !p2m_is_ram(*p2mt) ) 
+    if ( !page )
     {
-        __put_gfn(p2m, gfn_x(gfn));
         *rc |= _PAGE_PRESENT;
         return NULL;
     }
+    *mfn = _mfn(page_to_mfn(page));
     ASSERT(mfn_valid(mfn_x(*mfn)));
-    
-    /* Get an extra ref to the page to ensure liveness of the map.
-     * Then we can safely put gfn */
-    page_get_owner_and_reference(mfn_to_page(mfn_x(*mfn)));
+
     map = map_domain_page(mfn_x(*mfn));
-    __put_gfn(p2m, gfn_x(gfn));
     return map;
 }
 

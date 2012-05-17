@@ -651,7 +651,8 @@ int map_ldt_shadow_page(unsigned int off)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    unsigned long gmfn, mfn;
+    unsigned long gmfn;
+    struct page_info *page;
     l1_pgentry_t l1e, nl1e;
     unsigned long gva = v->arch.pv_vcpu.ldt_base + (off << PAGE_SHIFT);
     int okay;
@@ -663,28 +664,24 @@ int map_ldt_shadow_page(unsigned int off)
         return 0;
 
     gmfn = l1e_get_pfn(l1e);
-    mfn = get_gfn_untyped(d, gmfn);
-    if ( unlikely(!mfn_valid(mfn)) )
-    {
-        put_gfn(d, gmfn); 
+    page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
+    if ( unlikely(!page) )
         return 0;
-    }
 
-    okay = get_page_and_type(mfn_to_page(mfn), d, PGT_seg_desc_page);
+    okay = get_page_type(page, PGT_seg_desc_page);
     if ( unlikely(!okay) )
     {
-        put_gfn(d, gmfn); 
+        put_page(page);
         return 0;
     }
 
-    nl1e = l1e_from_pfn(mfn, l1e_get_flags(l1e) | _PAGE_RW);
+    nl1e = l1e_from_pfn(page_to_mfn(page), l1e_get_flags(l1e) | _PAGE_RW);
 
     spin_lock(&v->arch.pv_vcpu.shadow_ldt_lock);
     l1e_write(&v->arch.perdomain_ptes[off + 16], nl1e);
     v->arch.pv_vcpu.shadow_ldt_mapcnt++;
     spin_unlock(&v->arch.pv_vcpu.shadow_ldt_lock);
 
-    put_gfn(d, gmfn); 
     return 1;
 }
 
@@ -1819,7 +1816,6 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
 {
     l1_pgentry_t ol1e;
     struct domain *pt_dom = pt_vcpu->domain;
-    p2m_type_t p2mt;
     int rc = 0;
 
     if ( unlikely(__copy_from_user(&ol1e, pl1e, sizeof(ol1e)) != 0) )
@@ -1835,22 +1831,21 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
     if ( l1e_get_flags(nl1e) & _PAGE_PRESENT )
     {
         /* Translate foreign guest addresses. */
-        unsigned long mfn, gfn;
-        gfn = l1e_get_pfn(nl1e);
-        mfn = mfn_x(get_gfn(pg_dom, gfn, &p2mt));
-        if ( !p2m_is_ram(p2mt) || unlikely(mfn == INVALID_MFN) )
+        struct page_info *page = NULL;
+        if ( paging_mode_translate(pg_dom) )
         {
-            put_gfn(pg_dom, gfn);
-            return -EINVAL;
+            page = get_page_from_gfn(pg_dom, l1e_get_pfn(nl1e), NULL, P2M_ALLOC);
+            if ( !page )
+                return -EINVAL;
+            nl1e = l1e_from_pfn(page_to_mfn(page), l1e_get_flags(nl1e));
         }
-        ASSERT((mfn & ~(PADDR_MASK >> PAGE_SHIFT)) == 0);
-        nl1e = l1e_from_pfn(mfn, l1e_get_flags(nl1e));
 
         if ( unlikely(l1e_get_flags(nl1e) & l1_disallow_mask(pt_dom)) )
         {
             MEM_LOG("Bad L1 flags %x",
                     l1e_get_flags(nl1e) & l1_disallow_mask(pt_dom));
-            put_gfn(pg_dom, gfn);
+            if ( page )
+                put_page(page);
             return -EINVAL;
         }
 
@@ -1860,15 +1855,21 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             adjust_guest_l1e(nl1e, pt_dom);
             if ( UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
                               preserve_ad) )
+            {
+                if ( page )
+                    put_page(page);
                 return 0;
-            put_gfn(pg_dom, gfn);
+            }
+            if ( page )
+                put_page(page);
             return -EBUSY;
         }
 
         switch ( rc = get_page_from_l1e(nl1e, pt_dom, pg_dom) )
         {
         default:
-            put_gfn(pg_dom, gfn);
+            if ( page )
+                put_page(page);
             return rc;
         case 0:
             break;
@@ -1876,7 +1877,9 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             l1e_remove_flags(nl1e, _PAGE_RW);
             break;
         }
-        
+        if ( page )
+            put_page(page);
+
         adjust_guest_l1e(nl1e, pt_dom);
         if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
                                     preserve_ad)) )
@@ -1884,7 +1887,6 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e,
             ol1e = nl1e;
             rc = -EBUSY;
         }
-        put_gfn(pg_dom, gfn);
     }
     else if ( unlikely(!UPDATE_ENTRY(l1, pl1e, ol1e, nl1e, gl1mfn, pt_vcpu,
                                      preserve_ad)) )
@@ -3042,7 +3044,6 @@ int do_mmuext_op(
             type = PGT_l4_page_table;
 
         pin_page: {
-            unsigned long mfn;
             struct page_info *page;
 
             /* Ignore pinning of invalid paging levels. */
@@ -3052,25 +3053,28 @@ int do_mmuext_op(
             if ( paging_mode_refcounts(pg_owner) )
                 break;
 
-            mfn = get_gfn_untyped(pg_owner, op.arg1.mfn);
-            rc = get_page_and_type_from_pagenr(mfn, type, pg_owner, 0, 1);
+            page = get_page_from_gfn(pg_owner, op.arg1.mfn, NULL, P2M_ALLOC);
+            if ( unlikely(!page) )
+            {
+                rc = -EINVAL;
+                break;
+            }
+
+            rc = get_page_type_preemptible(page, type);
             okay = !rc;
             if ( unlikely(!okay) )
             {
                 if ( rc == -EINTR )
                     rc = -EAGAIN;
                 else if ( rc != -EAGAIN )
-                    MEM_LOG("Error while pinning mfn %lx", mfn);
-                put_gfn(pg_owner, op.arg1.mfn);
+                    MEM_LOG("Error while pinning mfn %lx", page_to_mfn(page));
+                put_page(page);
                 break;
             }
-
-            page = mfn_to_page(mfn);
 
             if ( (rc = xsm_memory_pin_page(d, page)) != 0 )
             {
                 put_page_and_type(page);
-                put_gfn(pg_owner, op.arg1.mfn);
                 okay = 0;
                 break;
             }
@@ -3078,16 +3082,15 @@ int do_mmuext_op(
             if ( unlikely(test_and_set_bit(_PGT_pinned,
                                            &page->u.inuse.type_info)) )
             {
-                MEM_LOG("Mfn %lx already pinned", mfn);
+                MEM_LOG("Mfn %lx already pinned", page_to_mfn(page));
                 put_page_and_type(page);
-                put_gfn(pg_owner, op.arg1.mfn);
                 okay = 0;
                 break;
             }
 
             /* A page is dirtied when its pin status is set. */
-            paging_mark_dirty(pg_owner, mfn);
-           
+            paging_mark_dirty(pg_owner, page_to_mfn(page));
+
             /* We can race domain destruction (domain_relinquish_resources). */
             if ( unlikely(pg_owner != d) )
             {
@@ -3099,35 +3102,29 @@ int do_mmuext_op(
                 spin_unlock(&pg_owner->page_alloc_lock);
                 if ( drop_ref )
                     put_page_and_type(page);
-                put_gfn(pg_owner, op.arg1.mfn);
             }
 
             break;
         }
 
         case MMUEXT_UNPIN_TABLE: {
-            unsigned long mfn;
             struct page_info *page;
 
             if ( paging_mode_refcounts(pg_owner) )
                 break;
 
-            mfn = get_gfn_untyped(pg_owner, op.arg1.mfn);
-            if ( unlikely(!(okay = get_page_from_pagenr(mfn, pg_owner))) )
+            page = get_page_from_gfn(pg_owner, op.arg1.mfn, NULL, P2M_ALLOC);
+            if ( unlikely(!page) )
             {
-                put_gfn(pg_owner, op.arg1.mfn);
-                MEM_LOG("Mfn %lx bad domain", mfn);
+                MEM_LOG("Mfn %lx bad domain", op.arg1.mfn);
                 break;
             }
-
-            page = mfn_to_page(mfn);
 
             if ( !test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
             {
                 okay = 0;
                 put_page(page);
-                put_gfn(pg_owner, op.arg1.mfn);
-                MEM_LOG("Mfn %lx not pinned", mfn);
+                MEM_LOG("Mfn %lx not pinned", op.arg1.mfn);
                 break;
             }
 
@@ -3135,40 +3132,43 @@ int do_mmuext_op(
             put_page(page);
 
             /* A page is dirtied when its pin status is cleared. */
-            paging_mark_dirty(pg_owner, mfn);
+            paging_mark_dirty(pg_owner, page_to_mfn(page));
 
-            put_gfn(pg_owner, op.arg1.mfn);
             break;
         }
 
         case MMUEXT_NEW_BASEPTR:
-            okay = new_guest_cr3(get_gfn_untyped(d, op.arg1.mfn));
-            put_gfn(d, op.arg1.mfn);
+            okay = (!paging_mode_translate(d)
+                    && new_guest_cr3(op.arg1.mfn));
             break;
+
         
 #ifdef __x86_64__
         case MMUEXT_NEW_USER_BASEPTR: {
-            unsigned long old_mfn, mfn;
+            unsigned long old_mfn;
 
-            mfn = get_gfn_untyped(d, op.arg1.mfn);
-            if ( mfn != 0 )
+            if ( paging_mode_translate(current->domain) )
+            {
+                okay = 0;
+                break;
+            }
+
+            if ( op.arg1.mfn != 0 )
             {
                 if ( paging_mode_refcounts(d) )
-                    okay = get_page_from_pagenr(mfn, d);
+                    okay = get_page_from_pagenr(op.arg1.mfn, d);
                 else
                     okay = !get_page_and_type_from_pagenr(
-                        mfn, PGT_root_page_table, d, 0, 0);
+                        op.arg1.mfn, PGT_root_page_table, d, 0, 0);
                 if ( unlikely(!okay) )
                 {
-                    put_gfn(d, op.arg1.mfn);
-                    MEM_LOG("Error while installing new mfn %lx", mfn);
+                    MEM_LOG("Error while installing new mfn %lx", op.arg1.mfn);
                     break;
                 }
             }
 
             old_mfn = pagetable_get_pfn(curr->arch.guest_table_user);
-            curr->arch.guest_table_user = pagetable_from_pfn(mfn);
-            put_gfn(d, op.arg1.mfn);
+            curr->arch.guest_table_user = pagetable_from_pfn(op.arg1.mfn);
 
             if ( old_mfn != 0 )
             {
@@ -3283,28 +3283,27 @@ int do_mmuext_op(
         }
 
         case MMUEXT_CLEAR_PAGE: {
-            unsigned long mfn;
+            struct page_info *page;
             unsigned char *ptr;
 
-            mfn = get_gfn_untyped(d, op.arg1.mfn);
-            okay = !get_page_and_type_from_pagenr(
-                mfn, PGT_writable_page, d, 0, 0);
-            if ( unlikely(!okay) )
+            page = get_page_from_gfn(d, op.arg1.mfn, NULL, P2M_ALLOC);
+            if ( !page || !get_page_type(page, PGT_writable_page) )
             {
-                put_gfn(d, op.arg1.mfn);
-                MEM_LOG("Error while clearing mfn %lx", mfn);
+                if ( page )
+                    put_page(page);
+                MEM_LOG("Error while clearing mfn %lx", op.arg1.mfn);
+                okay = 0;
                 break;
             }
 
             /* A page is dirtied when it's being cleared. */
-            paging_mark_dirty(d, mfn);
+            paging_mark_dirty(d, page_to_mfn(page));
 
-            ptr = fixmap_domain_page(mfn);
+            ptr = fixmap_domain_page(page_to_mfn(page));
             clear_page(ptr);
             fixunmap_domain_page(ptr);
 
-            put_page_and_type(mfn_to_page(mfn));
-            put_gfn(d, op.arg1.mfn);
+            put_page_and_type(page);
             break;
         }
 
@@ -3312,42 +3311,38 @@ int do_mmuext_op(
         {
             const unsigned char *src;
             unsigned char *dst;
-            unsigned long src_mfn, mfn;
+            struct page_info *src_page, *dst_page;
 
-            src_mfn = get_gfn_untyped(d, op.arg2.src_mfn);
-            okay = get_page_from_pagenr(src_mfn, d);
-            if ( unlikely(!okay) )
+            src_page = get_page_from_gfn(d, op.arg2.src_mfn, NULL, P2M_ALLOC);
+            if ( unlikely(!src_page) )
             {
-                put_gfn(d, op.arg2.src_mfn);
-                MEM_LOG("Error while copying from mfn %lx", src_mfn);
+                okay = 0;
+                MEM_LOG("Error while copying from mfn %lx", op.arg2.src_mfn);
                 break;
             }
 
-            mfn = get_gfn_untyped(d, op.arg1.mfn);
-            okay = !get_page_and_type_from_pagenr(
-                mfn, PGT_writable_page, d, 0, 0);
+            dst_page = get_page_from_gfn(d, op.arg1.mfn, NULL, P2M_ALLOC);
+            okay = (dst_page && get_page_type(dst_page, PGT_writable_page));
             if ( unlikely(!okay) )
             {
-                put_gfn(d, op.arg1.mfn);
-                put_page(mfn_to_page(src_mfn));
-                put_gfn(d, op.arg2.src_mfn);
-                MEM_LOG("Error while copying to mfn %lx", mfn);
+                put_page(src_page);
+                if ( dst_page )
+                    put_page(dst_page);
+                MEM_LOG("Error while copying to mfn %lx", op.arg1.mfn);
                 break;
             }
 
             /* A page is dirtied when it's being copied to. */
-            paging_mark_dirty(d, mfn);
+            paging_mark_dirty(d, page_to_mfn(dst_page));
 
-            src = map_domain_page(src_mfn);
-            dst = fixmap_domain_page(mfn);
+            src = __map_domain_page(src_page);
+            dst = fixmap_domain_page(page_to_mfn(dst_page));
             copy_page(dst, src);
             fixunmap_domain_page(dst);
             unmap_domain_page(src);
 
-            put_page_and_type(mfn_to_page(mfn));
-            put_gfn(d, op.arg1.mfn);
-            put_page(mfn_to_page(src_mfn));
-            put_gfn(d, op.arg2.src_mfn);
+            put_page_and_type(dst_page);
+            put_page(src_page);
             break;
         }
 
@@ -3538,29 +3533,26 @@ int do_mmu_update(
 
             req.ptr -= cmd;
             gmfn = req.ptr >> PAGE_SHIFT;
-            mfn = mfn_x(get_gfn(pt_owner, gmfn, &p2mt));
-            if ( !p2m_is_valid(p2mt) )
-                mfn = INVALID_MFN;
+            page = get_page_from_gfn(pt_owner, gmfn, &p2mt, P2M_ALLOC);
 
             if ( p2m_is_paged(p2mt) )
             {
-                put_gfn(pt_owner, gmfn);
+                ASSERT(!page);
                 p2m_mem_paging_populate(pg_owner, gmfn);
                 rc = -ENOENT;
                 break;
             }
 
-            if ( unlikely(!get_page_from_pagenr(mfn, pt_owner)) )
+            if ( unlikely(!page) )
             {
                 MEM_LOG("Could not get page for normal update");
-                put_gfn(pt_owner, gmfn);
                 break;
             }
 
+            mfn = page_to_mfn(page);
             va = map_domain_page_with_cache(mfn, &mapcache);
             va = (void *)((unsigned long)va +
                           (unsigned long)(req.ptr & ~PAGE_MASK));
-            page = mfn_to_page(mfn);
 
             if ( page_lock(page) )
             {
@@ -3569,22 +3561,23 @@ int do_mmu_update(
                 case PGT_l1_page_table:
                 {
                     l1_pgentry_t l1e = l1e_from_intpte(req.val);
-                    p2m_type_t l1e_p2mt;
-                    unsigned long l1egfn = l1e_get_pfn(l1e), l1emfn;
-    
-                    l1emfn = mfn_x(get_gfn(pg_owner, l1egfn, &l1e_p2mt));
+                    p2m_type_t l1e_p2mt = p2m_ram_rw;
+                    struct page_info *target = NULL;
+
+                    if ( paging_mode_translate(pg_owner) )
+                        target = get_page_from_gfn(pg_owner, l1e_get_pfn(l1e),
+                                                   &l1e_p2mt, P2M_ALLOC);
 
                     if ( p2m_is_paged(l1e_p2mt) )
                     {
-                        put_gfn(pg_owner, l1egfn);
+                        if ( target )
+                            put_page(target);
                         p2m_mem_paging_populate(pg_owner, l1e_get_pfn(l1e));
                         rc = -ENOENT;
                         break;
                     }
-                    else if ( p2m_ram_paging_in == l1e_p2mt && 
-                                !mfn_valid(l1emfn) )
+                    else if ( p2m_ram_paging_in == l1e_p2mt && !target )
                     {
-                        put_gfn(pg_owner, l1egfn);
                         rc = -ENOENT;
                         break;
                     }
@@ -3601,7 +3594,8 @@ int do_mmu_update(
                             rc = mem_sharing_unshare_page(pg_owner, gfn, 0); 
                             if ( rc )
                             {
-                                put_gfn(pg_owner, l1egfn);
+                                if ( target )
+                                    put_page(target);
                                 /* Notify helper, don't care about errors, will not
                                  * sleep on wq, since we're a foreign domain. */
                                 (void)mem_sharing_notify_enomem(pg_owner, gfn, 0);
@@ -3614,112 +3608,22 @@ int do_mmu_update(
                     rc = mod_l1_entry(va, l1e, mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v,
                                       pg_owner);
-                    put_gfn(pg_owner, l1egfn);
+                    if ( target )
+                        put_page(target);
                 }
                 break;
                 case PGT_l2_page_table:
-                {
-                    l2_pgentry_t l2e = l2e_from_intpte(req.val);
-                    p2m_type_t l2e_p2mt;
-                    unsigned long l2egfn = l2e_get_pfn(l2e), l2emfn;
-
-                    l2emfn = mfn_x(get_gfn(pg_owner, l2egfn, &l2e_p2mt));
-
-                    if ( p2m_is_paged(l2e_p2mt) )
-                    {
-                        put_gfn(pg_owner, l2egfn);
-                        p2m_mem_paging_populate(pg_owner, l2egfn);
-                        rc = -ENOENT;
-                        break;
-                    }
-                    else if ( p2m_ram_paging_in == l2e_p2mt && 
-                                !mfn_valid(l2emfn) )
-                    {
-                        put_gfn(pg_owner, l2egfn);
-                        rc = -ENOENT;
-                        break;
-                    }
-                    else if ( p2m_ram_shared == l2e_p2mt )
-                    {
-                        put_gfn(pg_owner, l2egfn);
-                        MEM_LOG("Unexpected attempt to map shared page.\n");
-                        break;
-                    }
-
-
-                    rc = mod_l2_entry(va, l2e, mfn,
+                    rc = mod_l2_entry(va, l2e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v);
-                    put_gfn(pg_owner, l2egfn);
-                }
-                break;
+                    break;
                 case PGT_l3_page_table:
-                {
-                    l3_pgentry_t l3e = l3e_from_intpte(req.val);
-                    p2m_type_t l3e_p2mt;
-                    unsigned long l3egfn = l3e_get_pfn(l3e), l3emfn;
-
-                    l3emfn = mfn_x(get_gfn(pg_owner, l3egfn, &l3e_p2mt));
-
-                    if ( p2m_is_paged(l3e_p2mt) )
-                    {
-                        put_gfn(pg_owner, l3egfn);
-                        p2m_mem_paging_populate(pg_owner, l3egfn);
-                        rc = -ENOENT;
-                        break;
-                    }
-                    else if ( p2m_ram_paging_in == l3e_p2mt && 
-                                !mfn_valid(l3emfn) )
-                    {
-                        put_gfn(pg_owner, l3egfn);
-                        rc = -ENOENT;
-                        break;
-                    }
-                    else if ( p2m_ram_shared == l3e_p2mt )
-                    {
-                        put_gfn(pg_owner, l3egfn);
-                        MEM_LOG("Unexpected attempt to map shared page.\n");
-                        break;
-                    }
-
-                    rc = mod_l3_entry(va, l3e, mfn,
+                    rc = mod_l3_entry(va, l3e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, 1, v);
-                    put_gfn(pg_owner, l3egfn);
-                }
-                break;
+                    break;
 #if CONFIG_PAGING_LEVELS >= 4
                 case PGT_l4_page_table:
-                {
-                    l4_pgentry_t l4e = l4e_from_intpte(req.val);
-                    p2m_type_t l4e_p2mt;
-                    unsigned long l4egfn = l4e_get_pfn(l4e), l4emfn;
-
-                    l4emfn = mfn_x(get_gfn(pg_owner, l4egfn, &l4e_p2mt));
-
-                    if ( p2m_is_paged(l4e_p2mt) )
-                    {
-                        put_gfn(pg_owner, l4egfn);
-                        p2m_mem_paging_populate(pg_owner, l4egfn);
-                        rc = -ENOENT;
-                        break;
-                    }
-                    else if ( p2m_ram_paging_in == l4e_p2mt && 
-                                !mfn_valid(l4emfn) )
-                    {
-                        put_gfn(pg_owner, l4egfn);
-                        rc = -ENOENT;
-                        break;
-                    }
-                    else if ( p2m_ram_shared == l4e_p2mt )
-                    {
-                        put_gfn(pg_owner, l4egfn);
-                        MEM_LOG("Unexpected attempt to map shared page.\n");
-                        break;
-                    }
-
-                    rc = mod_l4_entry(va, l4e, mfn,
+                    rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, 1, v);
-                    put_gfn(pg_owner, l4egfn);
-                }
                 break;
 #endif
                 case PGT_writable_page:
@@ -3742,7 +3646,6 @@ int do_mmu_update(
 
             unmap_domain_page_with_cache(va, &mapcache);
             put_page(page);
-            put_gfn(pt_owner, gmfn);
         }
         break;
 
@@ -3829,18 +3732,17 @@ static int create_grant_pte_mapping(
     adjust_guest_l1e(nl1e, d);
 
     gmfn = pte_addr >> PAGE_SHIFT;
-    mfn = get_gfn_untyped(d, gmfn);
+    page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
 
-    if ( unlikely(!get_page_from_pagenr(mfn, current->domain)) )
+    if ( unlikely(!page) )
     {
-        put_gfn(d, gmfn);
         MEM_LOG("Could not get page for normal update");
         return GNTST_general_error;
     }
     
+    mfn = page_to_mfn(page);
     va = map_domain_page(mfn);
     va = (void *)((unsigned long)va + ((unsigned long)pte_addr & ~PAGE_MASK));
-    page = mfn_to_page(mfn);
 
     if ( !page_lock(page) )
     {
@@ -3871,7 +3773,6 @@ static int create_grant_pte_mapping(
  failed:
     unmap_domain_page(va);
     put_page(page);
-    put_gfn(d, gmfn);
 
     return rc;
 }
@@ -3886,18 +3787,17 @@ static int destroy_grant_pte_mapping(
     l1_pgentry_t ol1e;
 
     gmfn = addr >> PAGE_SHIFT;
-    mfn = get_gfn_untyped(d, gmfn);
+    page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
 
-    if ( unlikely(!get_page_from_pagenr(mfn, current->domain)) )
+    if ( unlikely(!page) )
     {
-        put_gfn(d, gmfn);
         MEM_LOG("Could not get page for normal update");
         return GNTST_general_error;
     }
     
+    mfn = page_to_mfn(page);
     va = map_domain_page(mfn);
     va = (void *)((unsigned long)va + ((unsigned long)addr & ~PAGE_MASK));
-    page = mfn_to_page(mfn);
 
     if ( !page_lock(page) )
     {
@@ -3942,7 +3842,6 @@ static int destroy_grant_pte_mapping(
  failed:
     unmap_domain_page(va);
     put_page(page);
-    put_gfn(d, gmfn);
     return rc;
 }
 
@@ -4465,11 +4364,17 @@ long set_gdt(struct vcpu *v,
     /* Check the pages in the new GDT. */
     for ( i = 0; i < nr_pages; i++ )
     {
+        struct page_info *page;
         pfns[i] = frames[i];
-        mfn = frames[i] = get_gfn_untyped(d, frames[i]);
-        if ( !mfn_valid(mfn) ||
-             !get_page_and_type(mfn_to_page(mfn), d, PGT_seg_desc_page) )
+        page = get_page_from_gfn(d, frames[i], NULL, P2M_ALLOC);
+        if ( !page )
             goto fail;
+        if ( !get_page_type(page, PGT_seg_desc_page) )
+        {
+            put_page(page);
+            goto fail;
+        }
+        mfn = frames[i] = page_to_mfn(page);
     }
 
     /* Tear down the old GDT. */
@@ -4482,7 +4387,6 @@ long set_gdt(struct vcpu *v,
         v->arch.pv_vcpu.gdt_frames[i] = frames[i];
         l1e_write(&v->arch.perdomain_ptes[i],
                   l1e_from_pfn(frames[i], __PAGE_HYPERVISOR));
-        put_gfn(d, pfns[i]);
     }
 
     xfree(pfns);
@@ -4492,7 +4396,6 @@ long set_gdt(struct vcpu *v,
     while ( i-- > 0 )
     {
         put_page_and_type(mfn_to_page(frames[i]));
-        put_gfn(d, pfns[i]);
     }
     xfree(pfns);
     return -EINVAL;
@@ -4538,21 +4441,16 @@ long do_update_descriptor(u64 pa, u64 desc)
 
     *(u64 *)&d = desc;
 
-    mfn = get_gfn_untyped(dom, gmfn);
+    page = get_page_from_gfn(dom, gmfn, NULL, P2M_ALLOC);
     if ( (((unsigned int)pa % sizeof(struct desc_struct)) != 0) ||
-         !mfn_valid(mfn) ||
+         !page ||
          !check_descriptor(dom, &d) )
     {
-        put_gfn(dom, gmfn);
+        if ( page )
+            put_page(page);
         return -EINVAL;
     }
-
-    page = mfn_to_page(mfn);
-    if ( unlikely(!get_page(page, dom)) )
-    {
-        put_gfn(dom, gmfn);
-        return -EINVAL;
-    }
+    mfn = page_to_mfn(page);
 
     /* Check if the given frame is in use in an unsafe context. */
     switch ( page->u.inuse.type_info & PGT_type_mask )
@@ -4580,7 +4478,6 @@ long do_update_descriptor(u64 pa, u64 desc)
 
  out:
     put_page(page);
-    put_gfn(dom, gmfn);
 
     return ret;
 }

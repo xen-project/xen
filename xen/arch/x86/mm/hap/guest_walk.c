@@ -54,34 +54,36 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
     mfn_t top_mfn;
     void *top_map;
     p2m_type_t p2mt;
-    p2m_access_t p2ma;
     walk_t gw;
     unsigned long top_gfn;
+    struct page_info *top_page;
 
     /* Get the top-level table's MFN */
     top_gfn = cr3 >> PAGE_SHIFT;
-    top_mfn = get_gfn_type_access(p2m, top_gfn, &p2mt, &p2ma, 
-                                  P2M_ALLOC | P2M_UNSHARE, NULL);
+    top_page = get_page_from_gfn_p2m(p2m->domain, p2m, top_gfn,
+                                     &p2mt, NULL, P2M_ALLOC | P2M_UNSHARE);
     if ( p2m_is_paging(p2mt) )
     {
         ASSERT(!p2m_is_nestedp2m(p2m));
         pfec[0] = PFEC_page_paged;
-        __put_gfn(p2m, top_gfn);
+        if ( top_page )
+            put_page(top_page);
         p2m_mem_paging_populate(p2m->domain, cr3 >> PAGE_SHIFT);
         return INVALID_GFN;
     }
     if ( p2m_is_shared(p2mt) )
     {
         pfec[0] = PFEC_page_shared;
-        __put_gfn(p2m, top_gfn);
+        if ( top_page )
+            put_page(top_page);
         return INVALID_GFN;
     }
-    if ( !p2m_is_ram(p2mt) )
+    if ( !top_page )
     {
         pfec[0] &= ~PFEC_page_present;
-        __put_gfn(p2m, top_gfn);
         return INVALID_GFN;
     }
+    top_mfn = _mfn(page_to_mfn(top_page));
 
     /* Map the top-level table and call the tree-walker */
     ASSERT(mfn_valid(mfn_x(top_mfn)));
@@ -91,30 +93,29 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
 #endif
     missing = guest_walk_tables(v, p2m, ga, &gw, pfec[0], top_mfn, top_map);
     unmap_domain_page(top_map);
-    __put_gfn(p2m, top_gfn);
+    put_page(top_page);
 
     /* Interpret the answer */
     if ( missing == 0 )
     {
         gfn_t gfn = guest_l1e_get_gfn(gw.l1e);
-        (void)get_gfn_type_access(p2m, gfn_x(gfn), &p2mt, &p2ma,
-                                  P2M_ALLOC | P2M_UNSHARE, NULL); 
+        struct page_info *page;
+        page = get_page_from_gfn_p2m(p2m->domain, p2m, gfn_x(gfn), &p2mt,
+                                     NULL, P2M_ALLOC | P2M_UNSHARE);
+        if ( page )
+            put_page(page);
         if ( p2m_is_paging(p2mt) )
         {
             ASSERT(!p2m_is_nestedp2m(p2m));
             pfec[0] = PFEC_page_paged;
-            __put_gfn(p2m, gfn_x(gfn));
             p2m_mem_paging_populate(p2m->domain, gfn_x(gfn));
             return INVALID_GFN;
         }
         if ( p2m_is_shared(p2mt) )
         {
             pfec[0] = PFEC_page_shared;
-            __put_gfn(p2m, gfn_x(gfn));
             return INVALID_GFN;
         }
-
-        __put_gfn(p2m, gfn_x(gfn));
 
         if ( page_order )
             *page_order = guest_walk_to_page_order(&gw);
