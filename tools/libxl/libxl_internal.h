@@ -1575,7 +1575,7 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
 
 #define STATE_AO_GC(op_ao)                      \
     libxl__ao *const ao = (op_ao);              \
-    AO_GC
+    libxl__gc *const gc __attribute__((unused)) = libxl__ao_inprogress_gc(ao)
 
 
 /* All of these MUST be called with the ctx locked.
@@ -1585,6 +1585,7 @@ _hidden libxl__ao *libxl__ao_create(libxl_ctx*, uint32_t domid,
 _hidden int libxl__ao_inprogress(libxl__ao *ao); /* temporarily unlocks */
 _hidden void libxl__ao_abort(libxl__ao *ao);
 _hidden void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc);
+_hidden libxl__gc *libxl__ao_inprogress_gc(libxl__ao *ao);
 
 /* Can be called at any time.  Use is essential for any aop user. */
 _hidden void libxl__ao_progress_gethow(libxl_asyncprogress_how *in_state,

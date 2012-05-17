@@ -1352,6 +1352,13 @@ void libxl__ao_abort(libxl__ao *ao)
     libxl__ao__destroy(CTX, ao);
 }
 
+libxl__gc *libxl__ao_inprogress_gc(libxl__ao *ao)
+{
+    assert(ao->magic == LIBXL__AO_MAGIC);
+    assert(!ao->complete);
+    return &ao->gc;
+}
+
 void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc)
 {
     assert(ao->magic == LIBXL__AO_MAGIC);
