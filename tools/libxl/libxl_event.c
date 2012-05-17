@@ -988,9 +988,9 @@ static void egc_run_callbacks(libxl__egc *egc)
 void libxl__egc_cleanup(libxl__egc *egc)
 {
     EGC_GC;
-    libxl__free_all(gc);
-
     egc_run_callbacks(egc);
+
+    libxl__free_all(gc);
 }
 
 /*
