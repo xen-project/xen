@@ -681,7 +681,6 @@ static int hvmemul_rep_movs(
     p2m_type_t sp2mt, dp2mt;
     int rc, df = !!(ctxt->regs->eflags & X86_EFLAGS_DF);
     char *buf;
-    struct two_gfns tg;
 
     rc = hvmemul_virtual_to_linear(
         src_seg, src_offset, bytes_per_rep, reps, hvm_access_read,
@@ -709,25 +708,17 @@ static int hvmemul_rep_movs(
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    get_two_gfns(current->domain, sgpa >> PAGE_SHIFT, &sp2mt, NULL, NULL,
-                 current->domain, dgpa >> PAGE_SHIFT, &dp2mt, NULL, NULL,
-                 P2M_ALLOC, &tg);
+    /* Check for MMIO ops */
+    (void) get_gfn_query_unlocked(current->domain, sgpa >> PAGE_SHIFT, &sp2mt);
+    (void) get_gfn_query_unlocked(current->domain, dgpa >> PAGE_SHIFT, &dp2mt);
 
-    if ( !p2m_is_ram(sp2mt) && !p2m_is_grant(sp2mt) )
-    {
-        rc = hvmemul_do_mmio(
+    if ( sp2mt == p2m_mmio_dm )
+        return hvmemul_do_mmio(
             sgpa, reps, bytes_per_rep, dgpa, IOREQ_READ, df, NULL);
-        put_two_gfns(&tg);
-        return rc;
-    }
 
-    if ( !p2m_is_ram(dp2mt) && !p2m_is_grant(dp2mt) )
-    {
-        rc = hvmemul_do_mmio(
+    if ( dp2mt == p2m_mmio_dm )
+        return hvmemul_do_mmio(
             dgpa, reps, bytes_per_rep, sgpa, IOREQ_WRITE, df, NULL);
-        put_two_gfns(&tg);
-        return rc;
-    }
 
     /* RAM-to-RAM copy: emulate as equivalent of memmove(dgpa, sgpa, bytes). */
     bytes = *reps * bytes_per_rep;
@@ -742,10 +733,7 @@ static int hvmemul_rep_movs(
      * can be emulated by a source-to-buffer-to-destination block copy.
      */
     if ( ((dgpa + bytes_per_rep) > sgpa) && (dgpa < (sgpa + bytes)) )
-    {
-        put_two_gfns(&tg);
         return X86EMUL_UNHANDLEABLE;
-    }
 
     /* Adjust destination address for reverse copy. */
     if ( df )
@@ -754,10 +742,7 @@ static int hvmemul_rep_movs(
     /* Allocate temporary buffer. Fall back to slow emulation if this fails. */
     buf = xmalloc_bytes(bytes);
     if ( buf == NULL )
-    {
-        put_two_gfns(&tg);
         return X86EMUL_UNHANDLEABLE;
-    }
 
     /*
      * We do a modicum of checking here, just for paranoia's sake and to
@@ -768,7 +753,6 @@ static int hvmemul_rep_movs(
         rc = hvm_copy_to_guest_phys(dgpa, buf, bytes);
 
     xfree(buf);
-    put_two_gfns(&tg);
 
     if ( rc == HVMCOPY_gfn_paged_out )
         return X86EMUL_RETRY;
