@@ -1073,9 +1073,10 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
     if ( spage->sharing->handle != sh )
         goto err_unlock;
 
-    /* Make sure the target page is a hole in the physmap */
-    if ( mfn_valid(cmfn) ||
-         (!(p2m_is_ram(cmfn_type))) )
+    /* Make sure the target page is a hole in the physmap. These are typically
+     * p2m_mmio_dm, but also accept p2m_invalid and paged out pages. See the
+     * definition of p2m_is_hole in p2m.h. */
+    if ( !p2m_is_hole(cmfn_type) )
     {
         ret = XENMEM_SHARING_OP_C_HANDLE_INVALID;
         goto err_unlock;
