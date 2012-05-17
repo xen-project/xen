@@ -230,8 +230,8 @@ static void openpty_exited(libxl__egc *egc, libxl__ev_child *child,
 }
 
 int libxl__openptys(libxl__openpty_state *op,
-                    const struct termios *termp,
-                    const struct winsize *winp) {
+                    struct termios *termp,
+                    struct winsize *winp) {
     /*
      * This is completely crazy.  openpty calls grantpt which the spec
      * says may fork, and may not be called with a SIGCHLD handler.

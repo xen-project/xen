@@ -1740,8 +1740,8 @@ struct libxl__openpty_result {
 };
 
 int libxl__openptys(libxl__openpty_state *op,
-                    const struct termios *termp,
-                    const struct winsize *winp);
+                    struct termios *termp,
+                    struct winsize *winp);
 
 
 /*----- bootloader -----*/
