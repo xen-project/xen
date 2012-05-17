@@ -395,47 +395,40 @@ int prepare_ring_for_helper(
 {
     struct page_info *page;
     p2m_type_t p2mt;
-    unsigned long mfn;
     void *va;
 
-    mfn = mfn_x(get_gfn_unshare(d, gmfn, &p2mt));
-    if ( !p2m_is_ram(p2mt) )
-    {
-        put_gfn(d, gmfn);
-        return -EINVAL;
-    }
+    page = get_page_from_gfn(d, gmfn, &p2mt, P2M_UNSHARE);
     if ( p2m_is_paging(p2mt) )
     {
-        put_gfn(d, gmfn);
+        if ( page )
+            put_page(page);
         p2m_mem_paging_populate(d, gmfn);
         return -ENOENT;
     }
     if ( p2m_is_shared(p2mt) )
     {
-        put_gfn(d, gmfn);
+        if ( page )
+            put_page(page);
         return -ENOENT;
     }
-    ASSERT(mfn_valid(mfn));
+    if ( !page )
+        return -EINVAL;
 
-    page = mfn_to_page(mfn);
-    if ( !get_page_and_type(page, d, PGT_writable_page) )
+    if ( !get_page_type(page, PGT_writable_page) )
     {
-        put_gfn(d, gmfn);
+        put_page(page);
         return -EINVAL;
     }
 
-    va = map_domain_page_global(mfn);
+    va = __map_domain_page_global(page);
     if ( va == NULL )
     {
         put_page_and_type(page);
-        put_gfn(d, gmfn);
         return -ENOMEM;
     }
 
     *_va = va;
     *_page = page;
-
-    put_gfn(d, gmfn);
 
     return 0;
 }
@@ -1607,8 +1600,8 @@ int hvm_mov_from_cr(unsigned int cr, unsigned int gpr)
 int hvm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
-    p2m_type_t p2mt;
-    unsigned long gfn, mfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
+    unsigned long gfn, old_value = v->arch.hvm_vcpu.guest_cr[0];
+    struct page_info *page;
 
     HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR0 value = %lx", value);
 
@@ -1647,23 +1640,20 @@ int hvm_set_cr0(unsigned long value)
         {
             /* The guest CR3 must be pointing to the guest physical. */
             gfn = v->arch.hvm_vcpu.guest_cr[3]>>PAGE_SHIFT;
-            mfn = mfn_x(get_gfn(v->domain, gfn, &p2mt));
-            if ( !p2m_is_ram(p2mt) || !mfn_valid(mfn) ||
-                 !get_page(mfn_to_page(mfn), v->domain))
+            page = get_page_from_gfn(v->domain, gfn, NULL, P2M_ALLOC);
+            if ( !page )
             {
-                put_gfn(v->domain, gfn);
-                gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx (mfn=%lx)\n",
-                         v->arch.hvm_vcpu.guest_cr[3], mfn);
+                gdprintk(XENLOG_ERR, "Invalid CR3 value = %lx\n",
+                         v->arch.hvm_vcpu.guest_cr[3]);
                 domain_crash(v->domain);
                 return X86EMUL_UNHANDLEABLE;
             }
 
             /* Now arch.guest_table points to machine physical. */
-            v->arch.guest_table = pagetable_from_pfn(mfn);
+            v->arch.guest_table = pagetable_from_page(page);
 
             HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx",
-                        v->arch.hvm_vcpu.guest_cr[3], mfn);
-            put_gfn(v->domain, gfn);
+                        v->arch.hvm_vcpu.guest_cr[3], page_to_mfn(page));
         }
     }
     else if ( !(value & X86_CR0_PG) && (old_value & X86_CR0_PG) )
@@ -1738,26 +1728,21 @@ int hvm_set_cr0(unsigned long value)
 
 int hvm_set_cr3(unsigned long value)
 {
-    unsigned long mfn;
-    p2m_type_t p2mt;
     struct vcpu *v = current;
+    struct page_info *page;
 
     if ( hvm_paging_enabled(v) && !paging_mode_hap(v->domain) &&
          (value != v->arch.hvm_vcpu.guest_cr[3]) )
     {
         /* Shadow-mode CR3 change. Check PDBR and update refcounts. */
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
-        mfn = mfn_x(get_gfn(v->domain, value >> PAGE_SHIFT, &p2mt));
-        if ( !p2m_is_ram(p2mt) || !mfn_valid(mfn) ||
-             !get_page(mfn_to_page(mfn), v->domain) )
-        {
-              put_gfn(v->domain, value >> PAGE_SHIFT);
-              goto bad_cr3;
-        }
+        page = get_page_from_gfn(v->domain, value >> PAGE_SHIFT,
+                                 NULL, P2M_ALLOC);
+        if ( !page )
+            goto bad_cr3;
 
         put_page(pagetable_get_page(v->arch.guest_table));
-        v->arch.guest_table = pagetable_from_pfn(mfn);
-        put_gfn(v->domain, value >> PAGE_SHIFT);
+        v->arch.guest_table = pagetable_from_page(page);
 
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
     }
@@ -1914,46 +1899,29 @@ int hvm_virtual_to_linear_addr(
 static void *__hvm_map_guest_frame(unsigned long gfn, bool_t writable)
 {
     void *map;
-    unsigned long mfn;
     p2m_type_t p2mt;
-    struct page_info *pg;
+    struct page_info *page;
     struct domain *d = current->domain;
-    int rc;
 
-    mfn = mfn_x(writable
-                ? get_gfn_unshare(d, gfn, &p2mt)
-                : get_gfn(d, gfn, &p2mt));
-    if ( (p2m_is_shared(p2mt) && writable) || !p2m_is_ram(p2mt) )
+    page = get_page_from_gfn(d, gfn, &p2mt,
+                             writable ? P2M_UNSHARE : P2M_ALLOC);
+    if ( (p2m_is_shared(p2mt) && writable) || !page )
     {
-        put_gfn(d, gfn);
+        if ( page )
+            put_page(page);
         return NULL;
     }
     if ( p2m_is_paging(p2mt) )
     {
-        put_gfn(d, gfn);
+        put_page(page);
         p2m_mem_paging_populate(d, gfn);
         return NULL;
     }
 
-    ASSERT(mfn_valid(mfn));
-
     if ( writable )
-        paging_mark_dirty(d, mfn);
+        paging_mark_dirty(d, page_to_mfn(page));
 
-    /* Get a ref on the page, considering that it could be shared */
-    pg = mfn_to_page(mfn);
-    rc = get_page(pg, d);
-    if ( !rc && !writable )
-        /* Page could be shared */
-        rc = get_page(pg, dom_cow);
-    if ( !rc )
-    {
-        put_gfn(d, gfn);
-        return NULL;
-    }
-
-    map = map_domain_page(mfn);
-    put_gfn(d, gfn);
+    map = __map_domain_page(page);
     return map;
 }
 
@@ -2358,7 +2326,8 @@ static enum hvm_copy_result __hvm_copy(
     void *buf, paddr_t addr, int size, unsigned int flags, uint32_t pfec)
 {
     struct vcpu *curr = current;
-    unsigned long gfn, mfn;
+    unsigned long gfn;
+    struct page_info *page;
     p2m_type_t p2mt;
     char *p;
     int count, todo = size;
@@ -2402,32 +2371,33 @@ static enum hvm_copy_result __hvm_copy(
             gfn = addr >> PAGE_SHIFT;
         }
 
-        mfn = mfn_x(get_gfn_unshare(curr->domain, gfn, &p2mt));
+        page = get_page_from_gfn(curr->domain, gfn, &p2mt, P2M_UNSHARE);
 
         if ( p2m_is_paging(p2mt) )
         {
-            put_gfn(curr->domain, gfn);
+            if ( page )
+                put_page(page);
             p2m_mem_paging_populate(curr->domain, gfn);
             return HVMCOPY_gfn_paged_out;
         }
         if ( p2m_is_shared(p2mt) )
         {
-            put_gfn(curr->domain, gfn);
+            if ( page )
+                put_page(page);
             return HVMCOPY_gfn_shared;
         }
         if ( p2m_is_grant(p2mt) )
         {
-            put_gfn(curr->domain, gfn);
+            if ( page )
+                put_page(page);
             return HVMCOPY_unhandleable;
         }
-        if ( !p2m_is_ram(p2mt) )
+        if ( !page )
         {
-            put_gfn(curr->domain, gfn);
             return HVMCOPY_bad_gfn_to_mfn;
         }
-        ASSERT(mfn_valid(mfn));
 
-        p = (char *)map_domain_page(mfn) + (addr & ~PAGE_MASK);
+        p = (char *)__map_domain_page(page) + (addr & ~PAGE_MASK);
 
         if ( flags & HVMCOPY_to_guest )
         {
@@ -2437,12 +2407,12 @@ static enum hvm_copy_result __hvm_copy(
                 if ( xchg(&lastpage, gfn) != gfn )
                     gdprintk(XENLOG_DEBUG, "guest attempted write to read-only"
                              " memory page. gfn=%#lx, mfn=%#lx\n",
-                             gfn, mfn);
+                             gfn, page_to_mfn(page));
             }
             else
             {
                 memcpy(p, buf, count);
-                paging_mark_dirty(curr->domain, mfn);
+                paging_mark_dirty(curr->domain, page_to_mfn(page));
             }
         }
         else
@@ -2455,7 +2425,7 @@ static enum hvm_copy_result __hvm_copy(
         addr += count;
         buf  += count;
         todo -= count;
-        put_gfn(curr->domain, gfn);
+        put_page(page);
     }
 
     return HVMCOPY_okay;
@@ -2464,7 +2434,8 @@ static enum hvm_copy_result __hvm_copy(
 static enum hvm_copy_result __hvm_clear(paddr_t addr, int size)
 {
     struct vcpu *curr = current;
-    unsigned long gfn, mfn;
+    unsigned long gfn;
+    struct page_info *page;
     p2m_type_t p2mt;
     char *p;
     int count, todo = size;
@@ -2500,32 +2471,35 @@ static enum hvm_copy_result __hvm_clear(paddr_t addr, int size)
             return HVMCOPY_bad_gva_to_gfn;
         }
 
-        mfn = mfn_x(get_gfn_unshare(curr->domain, gfn, &p2mt));
+        page = get_page_from_gfn(curr->domain, gfn, &p2mt, P2M_UNSHARE);
 
         if ( p2m_is_paging(p2mt) )
         {
+            if ( page )
+                put_page(page);
             p2m_mem_paging_populate(curr->domain, gfn);
-            put_gfn(curr->domain, gfn);
             return HVMCOPY_gfn_paged_out;
         }
         if ( p2m_is_shared(p2mt) )
         {
-            put_gfn(curr->domain, gfn);
+            if ( page )
+                put_page(page);
             return HVMCOPY_gfn_shared;
         }
         if ( p2m_is_grant(p2mt) )
         {
-            put_gfn(curr->domain, gfn);
+            if ( page )
+                put_page(page);
             return HVMCOPY_unhandleable;
         }
-        if ( !p2m_is_ram(p2mt) )
+        if ( !page )
         {
-            put_gfn(curr->domain, gfn);
+            if ( page )
+                put_page(page);
             return HVMCOPY_bad_gfn_to_mfn;
         }
-        ASSERT(mfn_valid(mfn));
 
-        p = (char *)map_domain_page(mfn) + (addr & ~PAGE_MASK);
+        p = (char *)__map_domain_page(page) + (addr & ~PAGE_MASK);
 
         if ( p2mt == p2m_ram_ro )
         {
@@ -2533,19 +2507,19 @@ static enum hvm_copy_result __hvm_clear(paddr_t addr, int size)
             if ( xchg(&lastpage, gfn) != gfn )
                 gdprintk(XENLOG_DEBUG, "guest attempted write to read-only"
                         " memory page. gfn=%#lx, mfn=%#lx\n",
-                        gfn, mfn);
+                         gfn, page_to_mfn(page));
         }
         else
         {
             memset(p, 0x00, count);
-            paging_mark_dirty(curr->domain, mfn);
+            paging_mark_dirty(curr->domain, page_to_mfn(page));
         }
 
         unmap_domain_page(p);
 
         addr += count;
         todo -= count;
-        put_gfn(curr->domain, gfn);
+        put_page(page);
     }
 
     return HVMCOPY_okay;
@@ -4000,35 +3974,16 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
         for ( pfn = a.first_pfn; pfn < a.first_pfn + a.nr; pfn++ )
         {
-            p2m_type_t t;
-            mfn_t mfn = get_gfn_unshare(d, pfn, &t);
-            if ( p2m_is_paging(t) )
+            struct page_info *page;
+            page = get_page_from_gfn(d, pfn, NULL, P2M_UNSHARE);
+            if ( page )
             {
-                put_gfn(d, pfn);
-                p2m_mem_paging_populate(d, pfn);
-                rc = -EINVAL;
-                goto param_fail3;
-            }
-            if( p2m_is_shared(t) )
-            {
-                /* If it insists on not unsharing itself, crash the domain 
-                 * rather than crashing the host down in mark dirty */
-                gdprintk(XENLOG_WARNING,
-                         "shared pfn 0x%lx modified?\n", pfn);
-                domain_crash(d);
-                put_gfn(d, pfn);
-                rc = -EINVAL;
-                goto param_fail3;
-            }
-            
-            if ( mfn_x(mfn) != INVALID_MFN )
-            {
-                paging_mark_dirty(d, mfn_x(mfn));
+                paging_mark_dirty(d, page_to_mfn(page));
                 /* These are most probably not page tables any more */
                 /* don't take a long time and don't die either */
-                sh_remove_shadows(d->vcpu[0], mfn, 1, 0);
+                sh_remove_shadows(d->vcpu[0], _mfn(page_to_mfn(page)), 1, 0);
+                put_page(page);
             }
-            put_gfn(d, pfn);
         }
 
     param_fail3:

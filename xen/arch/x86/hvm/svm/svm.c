@@ -232,8 +232,7 @@ static int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
 
 static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 {
-    unsigned long mfn = 0;
-    p2m_type_t p2mt;
+    struct page_info *page = NULL;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     struct p2m_domain *p2m = p2m_get_hostp2m(v->domain);
 
@@ -250,10 +249,10 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     {
         if ( c->cr0 & X86_CR0_PG )
         {
-            mfn = mfn_x(get_gfn(v->domain, c->cr3 >> PAGE_SHIFT, &p2mt));
-            if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
+            page = get_page_from_gfn(v->domain, c->cr3 >> PAGE_SHIFT,
+                                     NULL, P2M_ALLOC);
+            if ( !page )
             {
-                put_gfn(v->domain, c->cr3 >> PAGE_SHIFT);
                 gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n",
                          c->cr3);
                 return -EINVAL;
@@ -263,9 +262,8 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
         if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PG )
             put_page(pagetable_get_page(v->arch.guest_table));
 
-        v->arch.guest_table = pagetable_from_pfn(mfn);
-        if ( c->cr0 & X86_CR0_PG )
-            put_gfn(v->domain, c->cr3 >> PAGE_SHIFT);
+        v->arch.guest_table =
+            page ? pagetable_from_page(page) : pagetable_null();
     }
 
     v->arch.hvm_vcpu.guest_cr[0] = c->cr0 | X86_CR0_ET;

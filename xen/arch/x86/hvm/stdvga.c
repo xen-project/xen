@@ -482,7 +482,8 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
                 if ( hvm_copy_to_guest_phys(data, &tmp, p->size) !=
                      HVMCOPY_okay )
                 {
-                    (void)get_gfn(d, data >> PAGE_SHIFT, &p2mt);
+                    struct page_info *dp = get_page_from_gfn(
+                            d, data >> PAGE_SHIFT, &p2mt, P2M_ALLOC);
                     /*
                      * The only case we handle is vga_mem <-> vga_mem.
                      * Anything else disables caching and leaves it to qemu-dm.
@@ -490,11 +491,12 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
                     if ( (p2mt != p2m_mmio_dm) || (data < VGA_MEM_BASE) ||
                          ((data + p->size) > (VGA_MEM_BASE + VGA_MEM_SIZE)) )
                     {
-                        put_gfn(d, data >> PAGE_SHIFT);
+                        if ( dp )
+                            put_page(dp);
                         return 0;
                     }
+                    ASSERT(!dp);
                     stdvga_mem_write(data, tmp, p->size);
-                    put_gfn(d, data >> PAGE_SHIFT);
                 }
                 data += sign * p->size;
                 addr += sign * p->size;
@@ -508,15 +510,16 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
                 if ( hvm_copy_from_guest_phys(&tmp, data, p->size) !=
                      HVMCOPY_okay )
                 {
-                    (void)get_gfn(d, data >> PAGE_SHIFT, &p2mt);
+                    struct page_info *dp = get_page_from_gfn(
+                        d, data >> PAGE_SHIFT, &p2mt, P2M_ALLOC);
                     if ( (p2mt != p2m_mmio_dm) || (data < VGA_MEM_BASE) ||
                          ((data + p->size) > (VGA_MEM_BASE + VGA_MEM_SIZE)) )
                     {
-                        put_gfn(d, data >> PAGE_SHIFT);
+                        if ( dp )
+                            put_page(dp);
                         return 0;
                     }
                     tmp = stdvga_mem_read(data, p->size);
-                    put_gfn(d, data >> PAGE_SHIFT);
                 }
                 stdvga_mem_write(addr, tmp, p->size);
                 data += sign * p->size;

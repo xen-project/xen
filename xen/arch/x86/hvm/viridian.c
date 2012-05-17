@@ -134,18 +134,19 @@ void dump_apic_assist(struct vcpu *v)
 static void enable_hypercall_page(struct domain *d)
 {
     unsigned long gmfn = d->arch.hvm_domain.viridian.hypercall_gpa.fields.pfn;
-    unsigned long mfn = get_gfn_untyped(d, gmfn);
+    struct page_info *page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
     uint8_t *p;
 
-    if ( !mfn_valid(mfn) ||
-         !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
+    if ( !page || !get_page_type(page, PGT_writable_page) )
     {
-        put_gfn(d, gmfn); 
-        gdprintk(XENLOG_WARNING, "Bad GMFN %lx (MFN %lx)\n", gmfn, mfn);
+        if ( page )
+            put_page(page);
+        gdprintk(XENLOG_WARNING, "Bad GMFN %lx (MFN %lx)\n", gmfn,
+                 page_to_mfn(page));
         return;
     }
 
-    p = map_domain_page(mfn);
+    p = __map_domain_page(page);
 
     /*
      * We set the bit 31 in %eax (reserved field in the Viridian hypercall
@@ -162,15 +163,14 @@ static void enable_hypercall_page(struct domain *d)
 
     unmap_domain_page(p);
 
-    put_page_and_type(mfn_to_page(mfn));
-    put_gfn(d, gmfn); 
+    put_page_and_type(page);
 }
 
 void initialize_apic_assist(struct vcpu *v)
 {
     struct domain *d = v->domain;
     unsigned long gmfn = v->arch.hvm_vcpu.viridian.apic_assist.fields.pfn;
-    unsigned long mfn = get_gfn_untyped(d, gmfn);
+    struct page_info *page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
     uint8_t *p;
 
     /*
@@ -183,22 +183,22 @@ void initialize_apic_assist(struct vcpu *v)
      * details of how Windows uses the page.
      */
 
-    if ( !mfn_valid(mfn) ||
-         !get_page_and_type(mfn_to_page(mfn), d, PGT_writable_page) )
+    if ( !page || !get_page_type(page, PGT_writable_page) )
     {
-        put_gfn(d, gmfn); 
-        gdprintk(XENLOG_WARNING, "Bad GMFN %lx (MFN %lx)\n", gmfn, mfn);
+        if ( page )
+            put_page(page);
+        gdprintk(XENLOG_WARNING, "Bad GMFN %lx (MFN %lx)\n", gmfn,
+                 page_to_mfn(page));
         return;
     }
 
-    p = map_domain_page(mfn);
+    p = __map_domain_page(page);
 
     *(u32 *)p = 0;
 
     unmap_domain_page(p);
 
-    put_page_and_type(mfn_to_page(mfn));
-    put_gfn(d, gmfn); 
+    put_page_and_type(page);
 }
 
 int wrmsr_viridian_regs(uint32_t idx, uint64_t val)

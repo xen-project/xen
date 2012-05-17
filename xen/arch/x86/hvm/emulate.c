@@ -60,33 +60,24 @@ static int hvmemul_do_io(
     ioreq_t *p = get_ioreq(curr);
     unsigned long ram_gfn = paddr_to_pfn(ram_gpa);
     p2m_type_t p2mt;
-    mfn_t ram_mfn;
+    struct page_info *ram_page;
     int rc;
 
     /* Check for paged out page */
-    ram_mfn = get_gfn_unshare(curr->domain, ram_gfn, &p2mt);
+    ram_page = get_page_from_gfn(curr->domain, ram_gfn, &p2mt, P2M_UNSHARE);
     if ( p2m_is_paging(p2mt) )
     {
-        put_gfn(curr->domain, ram_gfn); 
+        if ( ram_page )
+            put_page(ram_page);
         p2m_mem_paging_populate(curr->domain, ram_gfn);
         return X86EMUL_RETRY;
     }
     if ( p2m_is_shared(p2mt) )
     {
-        put_gfn(curr->domain, ram_gfn); 
+        if ( ram_page )
+            put_page(ram_page);
         return X86EMUL_RETRY;
     }
-
-    /* Maintain a ref on the mfn to ensure liveness. Put the gfn
-     * to avoid potential deadlock wrt event channel lock, later. */
-    if ( mfn_valid(mfn_x(ram_mfn)) )
-        if ( !get_page(mfn_to_page(mfn_x(ram_mfn)),
-             curr->domain) )
-        {
-            put_gfn(curr->domain, ram_gfn);
-            return X86EMUL_RETRY;
-        }
-    put_gfn(curr->domain, ram_gfn);
 
     /*
      * Weird-sized accesses have undefined behaviour: we discard writes
@@ -98,8 +89,8 @@ static int hvmemul_do_io(
         ASSERT(p_data != NULL); /* cannot happen with a REP prefix */
         if ( dir == IOREQ_READ )
             memset(p_data, ~0, size);
-        if ( mfn_valid(mfn_x(ram_mfn)) )
-            put_page(mfn_to_page(mfn_x(ram_mfn)));
+        if ( ram_page )
+            put_page(ram_page);
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -120,8 +111,8 @@ static int hvmemul_do_io(
             unsigned int bytes = vio->mmio_large_write_bytes;
             if ( (addr >= pa) && ((addr + size) <= (pa + bytes)) )
             {
-                if ( mfn_valid(mfn_x(ram_mfn)) )
-                    put_page(mfn_to_page(mfn_x(ram_mfn)));
+                if ( ram_page )
+                    put_page(ram_page);
                 return X86EMUL_OKAY;
             }
         }
@@ -133,8 +124,8 @@ static int hvmemul_do_io(
             {
                 memcpy(p_data, &vio->mmio_large_read[addr - pa],
                        size);
-                if ( mfn_valid(mfn_x(ram_mfn)) )
-                    put_page(mfn_to_page(mfn_x(ram_mfn)));
+                if ( ram_page )
+                    put_page(ram_page);
                 return X86EMUL_OKAY;
             }
         }
@@ -148,8 +139,8 @@ static int hvmemul_do_io(
         vio->io_state = HVMIO_none;
         if ( p_data == NULL )
         {
-            if ( mfn_valid(mfn_x(ram_mfn)) )
-                put_page(mfn_to_page(mfn_x(ram_mfn)));
+            if ( ram_page )
+                put_page(ram_page);
             return X86EMUL_UNHANDLEABLE;
         }
         goto finish_access;
@@ -159,13 +150,13 @@ static int hvmemul_do_io(
              (addr == (vio->mmio_large_write_pa +
                        vio->mmio_large_write_bytes)) )
         {
-            if ( mfn_valid(mfn_x(ram_mfn)) )
-                put_page(mfn_to_page(mfn_x(ram_mfn)));
+            if ( ram_page )
+                put_page(ram_page);
             return X86EMUL_RETRY;
         }
     default:
-        if ( mfn_valid(mfn_x(ram_mfn)) )
-            put_page(mfn_to_page(mfn_x(ram_mfn)));
+        if ( ram_page )
+            put_page(ram_page);
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -173,8 +164,8 @@ static int hvmemul_do_io(
     {
         gdprintk(XENLOG_WARNING, "WARNING: io already pending (%d)?\n",
                  p->state);
-        if ( mfn_valid(mfn_x(ram_mfn)) )
-            put_page(mfn_to_page(mfn_x(ram_mfn)));
+        if ( ram_page )
+            put_page(ram_page);
         return X86EMUL_UNHANDLEABLE;
     }
 
@@ -227,8 +218,8 @@ static int hvmemul_do_io(
 
     if ( rc != X86EMUL_OKAY )
     {
-        if ( mfn_valid(mfn_x(ram_mfn)) )
-            put_page(mfn_to_page(mfn_x(ram_mfn)));
+        if ( ram_page )
+            put_page(ram_page);
         return rc;
     }
 
@@ -267,8 +258,8 @@ static int hvmemul_do_io(
         }
     }
 
-    if ( mfn_valid(mfn_x(ram_mfn)) )
-        put_page(mfn_to_page(mfn_x(ram_mfn)));
+    if ( ram_page )
+        put_page(ram_page);
     return X86EMUL_OKAY;
 }
 

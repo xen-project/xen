@@ -480,17 +480,16 @@ static void vmx_vmcs_save(struct vcpu *v, struct hvm_hw_cpu *c)
 static int vmx_restore_cr0_cr3(
     struct vcpu *v, unsigned long cr0, unsigned long cr3)
 {
-    unsigned long mfn = 0;
-    p2m_type_t p2mt;
+    struct page_info *page = NULL;
 
     if ( paging_mode_shadow(v->domain) )
     {
         if ( cr0 & X86_CR0_PG )
         {
-            mfn = mfn_x(get_gfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
-            if ( !p2m_is_ram(p2mt) || !get_page(mfn_to_page(mfn), v->domain) )
+            page = get_page_from_gfn(v->domain, cr3 >> PAGE_SHIFT,
+                                     NULL, P2M_ALLOC);
+            if ( !page )
             {
-                put_gfn(v->domain, cr3 >> PAGE_SHIFT);
                 gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%lx\n", cr3);
                 return -EINVAL;
             }
@@ -499,9 +498,8 @@ static int vmx_restore_cr0_cr3(
         if ( hvm_paging_enabled(v) )
             put_page(pagetable_get_page(v->arch.guest_table));
 
-        v->arch.guest_table = pagetable_from_pfn(mfn);
-        if ( cr0 & X86_CR0_PG )
-            put_gfn(v->domain, cr3 >> PAGE_SHIFT);
+        v->arch.guest_table =
+            page ? pagetable_from_page(page) : pagetable_null();
     }
 
     v->arch.hvm_vcpu.guest_cr[0] = cr0 | X86_CR0_ET;
@@ -1035,8 +1033,9 @@ static void vmx_set_interrupt_shadow(struct vcpu *v, unsigned int intr_shadow)
 
 static void vmx_load_pdptrs(struct vcpu *v)
 {
-    unsigned long cr3 = v->arch.hvm_vcpu.guest_cr[3], mfn;
+    unsigned long cr3 = v->arch.hvm_vcpu.guest_cr[3];
     uint64_t *guest_pdptrs;
+    struct page_info *page;
     p2m_type_t p2mt;
     char *p;
 
@@ -1047,24 +1046,19 @@ static void vmx_load_pdptrs(struct vcpu *v)
     if ( (cr3 & 0x1fUL) && !hvm_pcid_enabled(v) )
         goto crash;
 
-    mfn = mfn_x(get_gfn_unshare(v->domain, cr3 >> PAGE_SHIFT, &p2mt));
-    if ( !p2m_is_ram(p2mt) || !mfn_valid(mfn) || 
-         /* If we didn't succeed in unsharing, get_page will fail
-          * (page still belongs to dom_cow) */
-         !get_page(mfn_to_page(mfn), v->domain) )
+    page = get_page_from_gfn(v->domain, cr3 >> PAGE_SHIFT, &p2mt, P2M_UNSHARE);
+    if ( !page )
     {
         /* Ideally you don't want to crash but rather go into a wait 
          * queue, but this is the wrong place. We're holding at least
          * the paging lock */
         gdprintk(XENLOG_ERR,
-                 "Bad cr3 on load pdptrs gfn %lx mfn %lx type %d\n",
-                 cr3 >> PAGE_SHIFT, mfn, (int) p2mt);
-        put_gfn(v->domain, cr3 >> PAGE_SHIFT);
+                 "Bad cr3 on load pdptrs gfn %lx type %d\n",
+                 cr3 >> PAGE_SHIFT, (int) p2mt);
         goto crash;
     }
-    put_gfn(v->domain, cr3 >> PAGE_SHIFT);
 
-    p = map_domain_page(mfn);
+    p = __map_domain_page(page);
 
     guest_pdptrs = (uint64_t *)(p + (cr3 & ~PAGE_MASK));
 
@@ -1090,7 +1084,7 @@ static void vmx_load_pdptrs(struct vcpu *v)
     vmx_vmcs_exit(v);
 
     unmap_domain_page(p);
-    put_page(mfn_to_page(mfn));
+    put_page(page);
     return;
 
  crash:
