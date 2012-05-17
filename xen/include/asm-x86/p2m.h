@@ -339,17 +339,6 @@ static inline mfn_t get_gfn_type(struct domain *d,
 #define get_gfn_unshare(d, g, t) get_gfn_type((d), (g), (t), \
                                               P2M_ALLOC | P2M_UNSHARE)
 
-/* Compatibility function exporting the old untyped interface */
-static inline unsigned long get_gfn_untyped(struct domain *d, unsigned long gpfn)
-{
-    mfn_t mfn;
-    p2m_type_t t;
-    mfn = get_gfn(d, gpfn, &t);
-    if ( p2m_is_valid(t) )
-        return mfn_x(mfn);
-    return INVALID_MFN;
-}
-
 /* Will release the p2m_lock for this gfn entry. */
 void __put_gfn(struct p2m_domain *p2m, unsigned long gfn);
 

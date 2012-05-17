@@ -4524,6 +4524,7 @@ static int xenmem_add_to_physmap_once(
     unsigned long gfn = 0; /* gcc ... */
     unsigned long prev_mfn, mfn = 0, gpfn, idx;
     int rc;
+    p2m_type_t p2mt;
 
     switch ( xatp->space )
     {
@@ -4596,7 +4597,7 @@ static int xenmem_add_to_physmap_once(
         put_page(page);
 
     /* Remove previously mapped page if it was present. */
-    prev_mfn = get_gfn_untyped(d, xatp->gpfn);
+    prev_mfn = mfn_x(get_gfn(d, xatp->gpfn, &p2mt));
     if ( mfn_valid(prev_mfn) )
     {
         if ( is_xen_heap_mfn(prev_mfn) )

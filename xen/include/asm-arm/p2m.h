@@ -75,12 +75,6 @@ static inline struct page_info *get_page_from_gfn(
     return page;
 }
 
-/* Compatibility function exporting the old untyped interface */
-static inline unsigned long get_gfn_untyped(struct domain *d, unsigned long gpfn)
-{
-    return gmfn_to_mfn(d, gpfn);
-}
-
 int get_page_type(struct page_info *page, unsigned long type);
 int is_iomem_page(unsigned long mfn);
 static inline int get_page_and_type(struct page_info *page,
