@@ -446,6 +446,20 @@ struct cmd_spec cmd_table[] = {
       "Loads a new policy int the Flask Xen security module",
       "<policy file>",
     },
+    { "remus",
+      &main_remus, 0, 1,
+      "Enable Remus HA for domain",
+      "[options] <Domain> [<host>]",
+      "-i MS                   Checkpoint domain memory every MS milliseconds (def. 200ms).\n"
+      "-b                      Replicate memory checkpoints to /dev/null (blackhole)\n"
+      "-u                      Disable memory checkpoint compression.\n"
+      "-s <sshcommand>         Use <sshcommand> instead of ssh.  String will be passed\n"
+      "                        to sh. If empty, run <host> instead of \n"
+      "                        ssh <host> xl migrate-receive -r [-e]\n"
+      "-e                      Do not wait in the background (on <host>) for the death\n"
+      "                        of the domain."
+
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

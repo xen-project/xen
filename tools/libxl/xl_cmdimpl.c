@@ -3117,7 +3117,7 @@ static void core_dump_domain(const char *domain_spec, const char *filename)
 }
 
 static void migrate_receive(int debug, int daemonize, int monitor,
-                            int send_fd, int recv_fd)
+                            int send_fd, int recv_fd, int remus)
 {
     int rc, rc2;
     char rc_buf;
@@ -3149,6 +3149,41 @@ static void migrate_receive(int debug, int daemonize, int monitor,
         fprintf(stderr, "migration target: Domain creation failed"
                 " (code %d).\n", rc);
         exit(-rc);
+    }
+
+    if (remus) {
+        /* If we are here, it means that the sender (primary) has crashed.
+         * TODO: Split-Brain Check.
+         */
+        fprintf(stderr, "migration target: Remus Failover for domain %u\n",
+                domid);
+
+        /*
+         * If domain renaming fails, lets just continue (as we need the domain
+         * to be up & dom names may not matter much, as long as its reachable
+         * over network).
+         *
+         * If domain unpausing fails, destroy domain ? Or is it better to have
+         * a consistent copy of the domain (memory, cpu state, disk)
+         * on atleast one physical host ? Right now, lets just leave the domain
+         * as is and let the Administrator decide (or troubleshoot).
+         */
+        if (migration_domname) {
+            rc = libxl_domain_rename(ctx, domid, migration_domname,
+                                     common_domname);
+            if (rc)
+                fprintf(stderr, "migration target (Remus): "
+                        "Failed to rename domain from %s to %s:%d\n",
+                        migration_domname, common_domname, rc);
+        }
+
+        rc = libxl_domain_unpause(ctx, domid);
+        if (rc)
+            fprintf(stderr, "migration target (Remus): "
+                    "Failed to unpause domain %s (id: %u):%d\n",
+                    common_domname, domid, rc);
+
+        exit(rc ? -ERROR_FAIL: 0);
     }
 
     fprintf(stderr, "migration target: Transfer complete,"
@@ -3299,10 +3334,10 @@ int main_restore(int argc, char **argv)
 
 int main_migrate_receive(int argc, char **argv)
 {
-    int debug = 0, daemonize = 1, monitor = 1;
+    int debug = 0, daemonize = 1, monitor = 1, remus = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "Fed", "migrate-receive", 0)) != -1) {
+    while ((opt = def_getopt(argc, argv, "Fedr", "migrate-receive", 0)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -3316,6 +3351,9 @@ int main_migrate_receive(int argc, char **argv)
         case 'd':
             debug = 1;
             break;
+        case 'r':
+            remus = 1;
+            break;
         }
     }
 
@@ -3324,7 +3362,8 @@ int main_migrate_receive(int argc, char **argv)
         return 2;
     }
     migrate_receive(debug, daemonize, monitor,
-                    STDOUT_FILENO, STDIN_FILENO);
+                    STDOUT_FILENO, STDIN_FILENO,
+                    remus);
 
     return 0;
 }
@@ -6494,6 +6533,102 @@ done:
         close(polFd);
 
     return ret;
+}
+
+int main_remus(int argc, char **argv)
+{
+    int opt, rc, daemonize = 1;
+    const char *ssh_command = "ssh";
+    char *host = NULL, *rune = NULL, *domain = NULL;
+    libxl_domain_remus_info r_info;
+    int send_fd = -1, recv_fd = -1;
+    pid_t child = -1;
+    uint8_t *config_data;
+    int config_len;
+
+    memset(&r_info, 0, sizeof(libxl_domain_remus_info));
+    /* Defaults */
+    r_info.interval = 200;
+    r_info.blackhole = 0;
+    r_info.compression = 1;
+
+    while ((opt = def_getopt(argc, argv, "bui:s:e", "remus", 2)) != -1) {
+        switch (opt) {
+        case 0: case 2:
+            return opt;
+
+        case 'i':
+	    r_info.interval = atoi(optarg);
+            break;
+        case 'b':
+            r_info.blackhole = 1;
+            break;
+        case 'u':
+	    r_info.compression = 0;
+            break;
+        case 's':
+            ssh_command = optarg;
+            break;
+        case 'e':
+            daemonize = 0;
+            break;
+        }
+    }
+
+    domain = argv[optind];
+    host = argv[optind + 1];
+
+    if (r_info.blackhole) {
+        find_domain(domain);
+        send_fd = open("/dev/null", O_RDWR, 0644);
+        if (send_fd < 0) {
+            perror("failed to open /dev/null");
+            exit(-1);
+        }
+    } else {
+
+        if (!ssh_command[0]) {
+            rune = host;
+        } else {
+            if (asprintf(&rune, "exec %s %s xl migrate-receive -r %s",
+                         ssh_command, host,
+                         daemonize ? "" : " -e") < 0)
+                return 1;
+        }
+
+        save_domain_core_begin(domain, NULL, &config_data, &config_len);
+
+        if (!config_len) {
+            fprintf(stderr, "No config file stored for running domain and "
+                    "none supplied - cannot start remus.\n");
+            exit(1);
+        }
+
+        child = create_migration_child(rune, &send_fd, &recv_fd);
+
+        migrate_do_preamble(send_fd, recv_fd, child, config_data, config_len,
+                            rune);
+    }
+
+    /* Point of no return */
+    rc = libxl_domain_remus_start(ctx, &r_info, domid, send_fd, recv_fd);
+
+    /* If we are here, it means backup has failed/domain suspend failed.
+     * Try to resume the domain and exit gracefully.
+     * TODO: Split-Brain check.
+     */
+    fprintf(stderr, "remus sender: libxl_domain_suspend failed"
+            " (rc=%d)\n", rc);
+
+    if (rc == ERROR_GUEST_TIMEDOUT)
+        fprintf(stderr, "Failed to suspend domain at primary.\n");
+    else {
+        fprintf(stderr, "Remus: Backup failed? resuming domain at primary.\n");
+        libxl_domain_resume(ctx, domid, 1);
+    }
+
+    close(send_fd);
+    return -ERROR_FAIL;
 }
 
 /*

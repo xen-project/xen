@@ -389,6 +389,41 @@ Send <config> instead of config file from creation.
 
 =back
 
+=item B<remus> [I<OPTIONS>] I<domain-id> I<host>
+
+Enable Remus HA for domain. By default B<xl> relies on ssh as a transport
+mechanism between the two hosts.
+
+B<OPTIONS>
+
+=over 4
+
+=item B<-i> I<MS>
+
+Checkpoint domain memory every MS milliseconds (default 200ms).
+
+=item B<-b>
+
+Do not checkpoint the disk. Replicate memory checkpoints to /dev/null
+(blackhole).  Network output buffering remains enabled (unless --no-net is
+supplied).  Generally useful for debugging.
+
+=item B<-u>
+
+Disable memory checkpoint compression.
+
+=item B<-s> I<sshcommand>
+
+Use <sshcommand> instead of ssh.  String will be passed to sh.
+If empty, run <host> instead of ssh <host> xl migrate-receive -r [-e].
+
+=item B<-e>
+
+On the new host, do not wait in the background (on <host>) for the death
+of the domain. See the corresponding option of the I<create> subcommand.
+
+=back
+
 =item B<pause> I<domain-id>
 
 Pause a domain.  When in a paused state the domain will still consume
