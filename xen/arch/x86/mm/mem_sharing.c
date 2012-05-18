@@ -1103,7 +1103,17 @@ int mem_sharing_add_to_physmap(struct domain *sd, unsigned long sgfn, shr_handle
         ret = 0;
         /* There is a chance we're plugging a hole where a paged out page was */
         if ( p2m_is_paging(cmfn_type) && (cmfn_type != p2m_ram_paging_out) )
+        {
             atomic_dec(&cd->paged_pages);
+            /* Further, there is a chance this was a valid page. Don't leak it. */
+            if ( mfn_valid(cmfn) )
+            {
+                struct page_info *cpage = mfn_to_page(cmfn);
+                ASSERT(cpage != NULL);
+                if ( test_and_clear_bit(_PGC_allocated, &cpage->count_info) )
+                    put_page(cpage);
+            }
+        }
     }
 
     atomic_inc(&nr_saved_mfns);

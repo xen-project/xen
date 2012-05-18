@@ -137,6 +137,7 @@ typedef unsigned int p2m_query_t;
  * entry */
 #define P2M_HOLE_TYPES (p2m_to_mask(p2m_mmio_dm)        \
                        | p2m_to_mask(p2m_invalid)       \
+                       | p2m_to_mask(p2m_ram_paging_in) \
                        | p2m_to_mask(p2m_ram_paged))
 
 /* Grant mapping types, which map to a real machine frame in another
