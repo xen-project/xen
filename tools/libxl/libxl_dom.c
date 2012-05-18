@@ -587,6 +587,54 @@ static int libxl__domain_suspend_common_switch_qemu_logdirty(int domid, unsigned
     return rc ? 0 : 1;
 }
 
+int libxl__domain_suspend_device_model(libxl__gc *gc, uint32_t domid)
+{
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    int ret = 0;
+    const char *filename = libxl__device_model_savefile(gc, domid);
+
+    switch (libxl__device_model_version_running(gc, domid)) {
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
+        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG,
+                   "Saving device model state to %s", filename);
+        libxl__qemu_traditional_cmd(gc, domid, "save");
+        libxl__wait_for_device_model(gc, domid, "paused", NULL, NULL, NULL);
+        break;
+    }
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+        if (libxl__qmp_stop(gc, domid))
+            return ERROR_FAIL;
+        /* Save DM state into filename */
+        ret = libxl__qmp_save(gc, domid, filename);
+        if (ret)
+            unlink(filename);
+        break;
+    default:
+        return ERROR_INVAL;
+    }
+
+    return ret;
+}
+
+int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid)
+{
+
+    switch (libxl__device_model_version_running(gc, domid)) {
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
+        libxl__qemu_traditional_cmd(gc, domid, "continue");
+        libxl__wait_for_device_model(gc, domid, "running", NULL, NULL, NULL);
+        break;
+    }
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+        if (libxl__qmp_resume(gc, domid))
+            return ERROR_FAIL;
+    default:
+        return ERROR_INVAL;
+    }
+
+    return 0;
+}
+
 static int libxl__domain_suspend_common_callback(void *data)
 {
     struct suspendinfo *si = data;
@@ -616,7 +664,7 @@ static int libxl__domain_suspend_common_callback(void *data)
             return 0;
         }
         si->guest_responded = 1;
-        return 1;
+        goto guest_suspended;
     }
 
     if (si->hvm && (!hvm_pvdrv || hvm_s_state)) {
@@ -694,7 +742,7 @@ static int libxl__domain_suspend_common_callback(void *data)
             shutdown_reason = (info.flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask;
             if (shutdown_reason == SHUTDOWN_suspend) {
                 LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "guest has suspended");
-                return 1;
+                goto guest_suspended;
             }
         }
 
@@ -703,6 +751,17 @@ static int libxl__domain_suspend_common_callback(void *data)
 
     LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "guest did not suspend");
     return 0;
+
+ guest_suspended:
+    if (si->hvm) {
+        ret = libxl__domain_suspend_device_model(si->gc, si->domid);
+        if (ret) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "libxl__domain_suspend_device_model failed ret=%d", ret);
+            return 0;
+        }
+    }
+    return 1;
 }
 
 static inline char *save_helper(libxl__gc *gc, uint32_t domid,
@@ -884,23 +943,6 @@ int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd)
     const char *filename = libxl__device_model_savefile(gc, domid);
     struct stat st;
     uint32_t qemu_state_len;
-
-    switch (libxl__device_model_version_running(gc, domid)) {
-    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
-        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG,
-                   "Saving device model state to %s", filename);
-        libxl__qemu_traditional_cmd(gc, domid, "save");
-        libxl__wait_for_device_model(gc, domid, "paused", NULL, NULL, NULL);
-        break;
-    }
-    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-        ret = libxl__qmp_save(gc, domid, (char *)filename);
-        if (ret)
-            goto out;
-        break;
-    default:
-        return ERROR_INVAL;
-    }
 
     if (stat(filename, &st) < 0)
     {

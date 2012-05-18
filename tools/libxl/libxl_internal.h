@@ -759,6 +759,8 @@ _hidden int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
                                          libxl_domain_type type,
                                          int live, int debug);
 _hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
+_hidden int libxl__domain_suspend_device_model(libxl__gc *gc, uint32_t domid);
+_hidden int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd);
 _hidden void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid);
 
@@ -1276,6 +1278,10 @@ _hidden int libxl__qmp_query_serial(libxl__qmp_handler *qmp);
 _hidden int libxl__qmp_pci_add(libxl__gc *gc, int d, libxl_device_pci *pcidev);
 _hidden int libxl__qmp_pci_del(libxl__gc *gc, int domid,
                                libxl_device_pci *pcidev);
+/* Suspend QEMU. */
+_hidden int libxl__qmp_stop(libxl__gc *gc, int domid);
+/* Resume QEMU. */
+_hidden int libxl__qmp_resume(libxl__gc *gc, int domid);
 /* Save current QEMU state into fd. */
 _hidden int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename);
 /* close and free the QMP handler */

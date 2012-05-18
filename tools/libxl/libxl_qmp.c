@@ -883,6 +883,38 @@ static int qmp_change(libxl__gc *gc, libxl__qmp_handler *qmp,
     return rc;
 }
 
+int libxl__qmp_stop(libxl__gc *gc, int domid)
+{
+    libxl__qmp_handler *qmp = NULL;
+    int rc = 0;
+
+    qmp = libxl__qmp_initialize(gc, domid);
+    if (!qmp)
+        return ERROR_FAIL;
+
+    rc = qmp_synchronous_send(qmp, "stop", NULL,
+                              NULL, NULL, qmp->timeout);
+
+    libxl__qmp_close(qmp);
+    return rc;
+}
+
+int libxl__qmp_resume(libxl__gc *gc, int domid)
+{
+    libxl__qmp_handler *qmp = NULL;
+    int rc = 0;
+
+    qmp = libxl__qmp_initialize(gc, domid);
+    if (!qmp)
+        return ERROR_FAIL;
+
+    rc = qmp_synchronous_send(qmp, "cont", NULL,
+                              NULL, NULL, qmp->timeout);
+
+    libxl__qmp_close(qmp);
+    return rc;
+}
+
 int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
                                const libxl_domain_config *guest_config)
 {
