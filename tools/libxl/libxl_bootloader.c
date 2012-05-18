@@ -356,8 +356,10 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
         if ( lstat(bootloader, &st) )
             LOG(DEBUG, "%s doesn't exist, falling back to config path",
                 bootloader);
-        else
-            info->u.pv.bootloader = bootloader;
+        else {
+            free(info->u.pv.bootloader);
+            info->u.pv.bootloader = libxl__strdup(NULL, bootloader);
+        }
     }
 
     make_bootloader_args(gc, bl);
