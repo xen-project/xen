@@ -757,7 +757,8 @@ _hidden int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
                                          int fd);
 _hidden int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
                                          libxl_domain_type type,
-                                         int live, int debug);
+                                         int live, int debug,
+                                         const libxl_domain_remus_info *r_info);
 _hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_suspend_device_model(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid);

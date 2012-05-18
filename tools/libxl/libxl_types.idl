@@ -454,6 +454,12 @@ libxl_sched_sedf_domain = Struct("sched_sedf_domain", [
     ("weight", integer),
     ])
 
+libxl_domain_remus_info = Struct("domain_remus_info",[
+    ("interval",     integer),
+    ("blackhole",    bool),
+    ("compression",  bool),
+    ])
+
 libxl_event_type = Enumeration("event_type", [
     (1, "DOMAIN_SHUTDOWN"),
     (2, "DOMAIN_DEATH"),

@@ -33,10 +33,29 @@
 
 /* callbacks provided by xc_domain_save */
 struct save_callbacks {
+    /* Called after expiration of checkpoint interval,
+     * to suspend the guest.
+     */
     int (*suspend)(void* data);
-    /* callback to rendezvous with external checkpoint functions */
+
+    /* Called after the guest's dirty pages have been
+     *  copied into an output buffer.
+     * Callback function resumes the guest & the device model,
+     *  returns to xc_domain_save.
+     * xc_domain_save then flushes the output buffer, while the
+     *  guest continues to run.
+     */
     int (*postcopy)(void* data);
-    /* returns:
+
+    /* Called after the memory checkpoint has been flushed
+     * out into the network. Typical actions performed in this
+     * callback include:
+     *   (a) send the saved device model state (for HVM guests),
+     *   (b) wait for checkpoint ack
+     *   (c) release the network output buffer pertaining to the acked checkpoint.
+     *   (c) sleep for the checkpoint interval.
+     *
+     * returns:
      * 0: terminate checkpointing gracefully
      * 1: take another checkpoint */
     int (*checkpoint)(void* data);

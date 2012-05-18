@@ -619,6 +619,41 @@ libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm)
     return ptr;
 }
 
+/* TODO: Explicit Checkpoint acknowledgements via recv_fd. */
+int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
+                             uint32_t domid, int send_fd, int recv_fd)
+{
+    GC_INIT(ctx);
+    libxl_domain_type type = libxl__domain_type(gc, domid);
+    int rc = 0;
+
+    if (info == NULL) {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                   "No remus_info structure supplied for domain %d", domid);
+        rc = ERROR_INVAL;
+        goto remus_fail;
+    }
+
+    /* TBD: Remus setup - i.e. attach qdisc, enable disk buffering, etc */
+
+    /* Point of no return */
+    rc = libxl__domain_suspend_common(gc, domid, send_fd, type, /* live */ 1,
+                                      /* debug */ 0, info);
+
+    /*
+     * With Remus, if we reach this point, it means either
+     * backup died or some network error occurred preventing us
+     * from sending checkpoints.
+     */
+
+    /* TBD: Remus cleanup - i.e. detach qdisc, release other
+     * resources.
+     */
+ remus_fail:
+    GC_FREE;
+    return rc;
+}
+
 int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
                          uint32_t domid, int fd)
 {
@@ -628,7 +663,9 @@ int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
     int debug = info != NULL && info->flags & XL_SUSPEND_DEBUG;
     int rc = 0;
 
-    rc = libxl__domain_suspend_common(gc, domid, fd, type, live, debug);
+    rc = libxl__domain_suspend_common(gc, domid, fd, type, live, debug,
+                                      /* No Remus */ NULL);
+
     if (!rc && type == LIBXL_DOMAIN_TYPE_HVM)
         rc = libxl__domain_save_device_model(gc, domid, fd);
     GC_FREE;

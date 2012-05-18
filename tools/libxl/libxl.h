@@ -525,6 +525,8 @@ int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
 
 void libxl_domain_config_init(libxl_domain_config *d_config);
 void libxl_domain_config_dispose(libxl_domain_config *d_config);
+int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
+                             uint32_t domid, int send_fd, int recv_fd);
 int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
                           uint32_t domid, int fd);
 

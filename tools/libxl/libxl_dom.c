@@ -566,6 +566,8 @@ struct suspendinfo {
     int hvm;
     unsigned int flags;
     int guest_responded;
+    int save_fd; /* Migration stream fd (for Remus) */
+    int interval; /* checkpoint interval (for Remus) */
 };
 
 static int libxl__domain_suspend_common_switch_qemu_logdirty(int domid, unsigned int enable, void *data)
@@ -848,9 +850,43 @@ static int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
     return 0;
 }
 
+static int libxl__remus_domain_suspend_callback(void *data)
+{
+    /* TODO: Issue disk and network checkpoint reqs. */
+    return libxl__domain_suspend_common_callback(data);
+}
+
+static int libxl__remus_domain_resume_callback(void *data)
+{
+    struct suspendinfo *si = data;
+    libxl_ctx *ctx = libxl__gc_owner(si->gc);
+
+    /* Resumes the domain and the device model */
+    if (libxl_domain_resume(ctx, si->domid, /* Fast Suspend */1))
+        return 0;
+
+    /* TODO: Deal with disk. Start a new network output buffer */
+    return 1;
+}
+
+static int libxl__remus_domain_checkpoint_callback(void *data)
+{
+    struct suspendinfo *si = data;
+
+    /* This would go into tailbuf. */
+    if (si->hvm &&
+        libxl__domain_save_device_model(si->gc, si->domid, si->save_fd))
+        return 0;
+
+    /* TODO: Wait for disk and memory ack, release network buffer */
+    usleep(si->interval * 1000);
+    return 1;
+}
+
 int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
                                  libxl_domain_type type,
-                                 int live, int debug)
+                                 int live, int debug,
+                                 const libxl_domain_remus_info *r_info)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int flags;
@@ -881,9 +917,19 @@ int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
         return ERROR_INVAL;
     }
 
+    memset(&si, 0, sizeof(si));
     flags = (live) ? XCFLAGS_LIVE : 0
           | (debug) ? XCFLAGS_DEBUG : 0
           | (hvm) ? XCFLAGS_HVM : 0;
+
+    if (r_info != NULL) {
+        si.interval = r_info->interval;
+        if (r_info->compression)
+            flags |= XCFLAGS_CHECKPOINT_COMPRESS;
+        si.save_fd = fd;
+    }
+    else
+        si.save_fd = -1;
 
     si.domid = domid;
     si.flags = flags;
@@ -908,7 +954,13 @@ int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
     }
 
     memset(&callbacks, 0, sizeof(callbacks));
-    callbacks.suspend = libxl__domain_suspend_common_callback;
+    if (r_info != NULL) {
+        callbacks.suspend = libxl__remus_domain_suspend_callback;
+        callbacks.postcopy = libxl__remus_domain_resume_callback;
+        callbacks.checkpoint = libxl__remus_domain_checkpoint_callback;
+    } else
+        callbacks.suspend = libxl__domain_suspend_common_callback;
+
     callbacks.switch_qemu_logdirty = libxl__domain_suspend_common_switch_qemu_logdirty;
     callbacks.toolstack_save = libxl__toolstack_save;
     callbacks.data = &si;
