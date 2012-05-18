@@ -858,6 +858,7 @@ retry_transaction:
             goto out_free;
     }
 
+    sdss->pvqemu.spawn.ao = ao;
     sdss->pvqemu.guest_domid = dm_domid;
     sdss->pvqemu.guest_config = &sdss->dm_config;
     sdss->pvqemu.build_state = &sdss->dm_state;
