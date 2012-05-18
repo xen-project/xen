@@ -3040,7 +3040,7 @@ static void migrate_domain(const char *domain_spec, const char *rune,
         if (common_domname) {
             libxl_domain_rename(ctx, domid, away_domname, common_domname);
         }
-        rc = libxl_domain_resume(ctx, domid);
+        rc = libxl_domain_resume(ctx, domid, 0);
         if (!rc) fprintf(stderr, "migration sender: Resumed OK.\n");
 
         fprintf(stderr, "Migration failed due to problems at target.\n");
@@ -3062,7 +3062,7 @@ static void migrate_domain(const char *domain_spec, const char *rune,
     close(send_fd);
     migration_child_report(child, recv_fd);
     fprintf(stderr, "Migration failed, resuming at sender.\n");
-    libxl_domain_resume(ctx, domid);
+    libxl_domain_resume(ctx, domid, 0);
     exit(-ERROR_FAIL);
 
  failed_badly:

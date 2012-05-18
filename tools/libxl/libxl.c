@@ -374,24 +374,29 @@ int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
-int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid)
+int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid, int suspend_cancel)
 {
     GC_INIT(ctx);
     int rc = 0;
 
-    if (LIBXL__DOMAIN_IS_TYPE(gc,  domid, HVM)) {
-        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Called domain_resume on "
-                "non-cooperative hvm domain %u", domid);
-        rc = ERROR_NI;
-        goto out;
-    }
-    if (xc_domain_resume(ctx->xch, domid, 0)) {
+    if (xc_domain_resume(ctx->xch, domid, suspend_cancel)) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                         "xc_domain_resume failed for domain %u",
                         domid);
         rc = ERROR_FAIL;
         goto out;
     }
+
+    if (LIBXL__DOMAIN_IS_TYPE(gc,  domid, HVM)) {
+        rc = libxl__domain_resume_device_model(gc, domid);
+        if (rc) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "failed to resume device model for domain %u:%d",
+                       domid, rc);
+            goto out;
+        }
+    }
+
     if (!xs_resume_domain(ctx->xsh, domid)) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                         "xs_resume_domain failed for domain %u",
