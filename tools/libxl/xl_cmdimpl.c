@@ -2814,7 +2814,7 @@ static int save_domain(const char *p, const char *filename, int checkpoint,
     close(fd);
 
     if (checkpoint)
-        libxl_domain_unpause(ctx, domid);
+        libxl_domain_resume(ctx, domid, 1);
     else
         libxl_domain_destroy(ctx, domid);
 
