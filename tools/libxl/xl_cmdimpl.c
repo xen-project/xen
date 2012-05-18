@@ -2821,6 +2821,42 @@ static int save_domain(const char *p, const char *filename, int checkpoint,
     exit(0);
 }
 
+static pid_t create_migration_child(const char *rune, int *send_fd,
+                                        int *recv_fd)
+{
+    int sendpipe[2], recvpipe[2];
+    pid_t child = -1;
+
+    if (!rune || !send_fd || !recv_fd)
+        return -1;
+
+    MUST( libxl_pipe(ctx, sendpipe) );
+    MUST( libxl_pipe(ctx, recvpipe) );
+
+    child = xl_fork(ctx);
+
+    if (!child) {
+        dup2(sendpipe[0], 0);
+        dup2(recvpipe[1], 1);
+        close(sendpipe[0]); close(sendpipe[1]);
+        close(recvpipe[0]); close(recvpipe[1]);
+        execlp("sh","sh","-c",rune,(char*)0);
+        perror("failed to exec sh");
+        exit(-1);
+    }
+
+    close(sendpipe[0]);
+    close(recvpipe[1]);
+    *send_fd = sendpipe[1];
+    *recv_fd = recvpipe[0];
+
+    /* if receiver dies, we get an error and can clean up
+       rather than just dying */
+    signal(SIGPIPE, SIG_IGN);
+
+    return child;
+}
+
 static int migrate_read_fixedmessage(int fd, const void *msg, int msgsz,
                                      const char *what, const char *rune) {
     char buf[msgsz];
@@ -2906,13 +2942,37 @@ static void migration_child_report(pid_t migration_child, int recv_fd) {
     migration_child = 0;
 }
 
+static void migrate_do_preamble(int send_fd, int recv_fd, pid_t child,
+                                uint8_t *config_data, int config_len,
+                                const char *rune)
+{
+    int rc = 0;
+
+    if (send_fd < 0 || recv_fd < 0) {
+        fprintf(stderr, "migrate_do_preamble: invalid file descriptors\n");
+        exit(1);
+    }
+
+    rc = migrate_read_fixedmessage(recv_fd, migrate_receiver_banner,
+                                   sizeof(migrate_receiver_banner)-1,
+                                   "banner", rune);
+    if (rc) {
+        close(send_fd);
+        migration_child_report(child, recv_fd);
+        exit(-rc);
+    }
+
+    save_domain_core_writeconfig(send_fd, "migration stream",
+                                 config_data, config_len);
+
+}
+
 static void migrate_domain(const char *domain_spec, const char *rune,
                            const char *override_config_file)
 {
     pid_t child = -1;
     int rc;
-    int sendpipe[2], recvpipe[2];
-    int send_fd, recv_fd;
+    int send_fd = -1, recv_fd = -1;
     libxl_domain_suspend_info suspinfo;
     char *away_domname;
     char rc_buf;
@@ -2928,41 +2988,10 @@ static void migrate_domain(const char *domain_spec, const char *rune,
         exit(1);
     }
 
-    MUST( libxl_pipe(ctx, sendpipe) );
-    MUST( libxl_pipe(ctx, recvpipe) );
+    child = create_migration_child(rune, &send_fd, &recv_fd);
 
-    child = xl_fork(ctx);
-
-    if (!child) {
-        dup2(sendpipe[0], 0);
-        dup2(recvpipe[1], 1);
-        close(sendpipe[0]); close(sendpipe[1]);
-        close(recvpipe[0]); close(recvpipe[1]);
-        execlp("sh","sh","-c",rune,(char*)0);
-        perror("failed to exec sh");
-        exit(-1);
-    }
-
-    close(sendpipe[0]);
-    close(recvpipe[1]);
-    send_fd = sendpipe[1];
-    recv_fd = recvpipe[0];
-
-    signal(SIGPIPE, SIG_IGN);
-    /* if receiver dies, we get an error and can clean up
-       rather than just dying */
-
-    rc = migrate_read_fixedmessage(recv_fd, migrate_receiver_banner,
-                                   sizeof(migrate_receiver_banner)-1,
-                                   "banner", rune);
-    if (rc) {
-        close(send_fd);
-        migration_child_report(child, recv_fd);
-        exit(-rc);
-    }
-
-    save_domain_core_writeconfig(send_fd, "migration stream",
-                                 config_data, config_len);
+    migrate_do_preamble(send_fd, recv_fd, child, config_data, config_len,
+                        rune);
 
     xtl_stdiostream_adjust_flags(logger, XTL_STDIOSTREAM_HIDE_PROGRESS, 0);
 
@@ -3087,7 +3116,8 @@ static void core_dump_domain(const char *domain_spec, const char *filename)
     if (rc) { fprintf(stderr,"core dump failed (rc=%d)\n",rc);exit(-1); }
 }
 
-static void migrate_receive(int debug, int daemonize, int monitor)
+static void migrate_receive(int debug, int daemonize, int monitor,
+                            int send_fd, int recv_fd)
 {
     int rc, rc2;
     char rc_buf;
@@ -3099,7 +3129,7 @@ static void migrate_receive(int debug, int daemonize, int monitor)
 
     fprintf(stderr, "migration target: Ready to receive domain.\n");
 
-    CHK_ERRNO( libxl_write_exactly(ctx, 1,
+    CHK_ERRNO( libxl_write_exactly(ctx, send_fd,
                                    migrate_receiver_banner,
                                    sizeof(migrate_receiver_banner)-1,
                                    "migration ack stream",
@@ -3110,7 +3140,7 @@ static void migrate_receive(int debug, int daemonize, int monitor)
     dom_info.daemonize = daemonize;
     dom_info.monitor = monitor;
     dom_info.paused = 1;
-    dom_info.migrate_fd = 0; /* stdin */
+    dom_info.migrate_fd = recv_fd;
     dom_info.migration_domname_r = &migration_domname;
     dom_info.incr_generationid = 0;
 
@@ -3124,13 +3154,13 @@ static void migrate_receive(int debug, int daemonize, int monitor)
     fprintf(stderr, "migration target: Transfer complete,"
             " requesting permission to start domain.\n");
 
-    rc = libxl_write_exactly(ctx, 1,
+    rc = libxl_write_exactly(ctx, send_fd,
                              migrate_receiver_ready,
                              sizeof(migrate_receiver_ready),
                              "migration ack stream", "ready message");
     if (rc) exit(-rc);
 
-    rc = migrate_read_fixedmessage(0, migrate_permission_to_go,
+    rc = migrate_read_fixedmessage(recv_fd, migrate_permission_to_go,
                                    sizeof(migrate_permission_to_go),
                                    "GO message", 0);
     if (rc) goto perhaps_destroy_notify_rc;
@@ -3149,7 +3179,7 @@ static void migrate_receive(int debug, int daemonize, int monitor)
     rc = 0;
 
  perhaps_destroy_notify_rc:
-    rc2 = libxl_write_exactly(ctx, 1,
+    rc2 = libxl_write_exactly(ctx, send_fd,
                               migrate_report, sizeof(migrate_report),
                               "migration ack stream",
                               "success/failure report");
@@ -3157,7 +3187,7 @@ static void migrate_receive(int debug, int daemonize, int monitor)
 
     rc_buf = -rc;
     assert(!!rc_buf == !!rc);
-    rc2 = libxl_write_exactly(ctx, 1, &rc_buf, 1,
+    rc2 = libxl_write_exactly(ctx, send_fd, &rc_buf, 1,
                               "migration ack stream",
                               "success/failure code");
     if (rc2) exit(-ERROR_BADFAIL);
@@ -3175,7 +3205,7 @@ static void migrate_receive(int debug, int daemonize, int monitor)
         fprintf(stderr, "migration target: Cleanup OK, granting sender"
                 " permission to resume.\n");
 
-        rc2 = libxl_write_exactly(ctx, 1,
+        rc2 = libxl_write_exactly(ctx, send_fd,
                                   migrate_permission_to_go,
                                   sizeof(migrate_permission_to_go),
                                   "migration ack stream",
@@ -3293,7 +3323,9 @@ int main_migrate_receive(int argc, char **argv)
         help("migrate-receive");
         return 2;
     }
-    migrate_receive(debug, daemonize, monitor);
+    migrate_receive(debug, daemonize, monitor,
+                    STDOUT_FILENO, STDIN_FILENO);
+
     return 0;
 }
 
