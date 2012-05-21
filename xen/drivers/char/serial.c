@@ -442,7 +442,7 @@ void __init serial_endboot(void)
             com[i].driver->endboot(&com[i]);
 }
 
-int serial_irq(int idx)
+int __init serial_irq(int idx)
 {
     if ( (idx >= 0) && (idx < ARRAY_SIZE(com)) &&
          com[idx].driver && com[idx].driver->irq )

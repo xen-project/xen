@@ -215,7 +215,7 @@ static int pl011_getc(struct serial_port *port, char *pc)
     return 1;
 }
 
-static int pl011_irq(struct serial_port *port)
+static int __init pl011_irq(struct serial_port *port)
 {
     struct pl011 *uart = port->uart;
     return ((uart->irq > 0) ? uart->irq : -1);

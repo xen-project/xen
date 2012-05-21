@@ -357,7 +357,7 @@ static void __init ns16550_endboot(struct serial_port *port)
 #define ns16550_endboot NULL
 #endif
 
-static int ns16550_irq(struct serial_port *port)
+static int __init ns16550_irq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     return ((uart->irq > 0) ? uart->irq : -1);
