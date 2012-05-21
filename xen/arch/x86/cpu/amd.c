@@ -516,7 +516,6 @@ static struct cpu_dev amd_cpu_dev __cpuinitdata = {
 	.c_vendor	= "AMD",
 	.c_ident 	= { "AuthenticAMD" },
 	.c_init		= init_amd,
-	.c_identify	= generic_identify,
 };
 
 int __init amd_init_cpu(void)

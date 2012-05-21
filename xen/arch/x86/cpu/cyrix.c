@@ -288,7 +288,6 @@ static struct cpu_dev cyrix_cpu_dev __cpuinitdata = {
 	.c_vendor	= "Cyrix",
 	.c_ident 	= { "CyrixInstead" },
 	.c_init		= init_cyrix,
-	.c_identify	= generic_identify,
 };
 
 int __init cyrix_init_cpu(void)
@@ -303,7 +302,6 @@ static struct cpu_dev nsc_cpu_dev __cpuinitdata = {
 	.c_vendor	= "NSC",
 	.c_ident 	= { "Geode by NSC" },
 	.c_init		= init_cyrix,
-	.c_identify	= generic_identify,
 };
 
 int __init nsc_init_cpu(void)

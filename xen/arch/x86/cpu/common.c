@@ -227,7 +227,7 @@ static void __init early_cpu_detect(void)
 	c->x86_capability[4] = cap4;
 }
 
-void __cpuinit generic_identify(struct cpuinfo_x86 * c)
+static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 {
 	u32 tfms, xlvl, capability, excap, ebx;
 
