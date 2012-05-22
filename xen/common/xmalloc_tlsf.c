@@ -604,10 +604,10 @@ void xfree(void *p)
 {
     struct bhdr *b;
 
-    ASSERT(!in_irq());
-
     if ( p == NULL )
         return;
+
+    ASSERT(!in_irq());
 
     /* Strip alignment padding. */
     b = (struct bhdr *)((char *) p - BHDR_OVERHEAD);

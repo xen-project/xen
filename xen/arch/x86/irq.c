@@ -2060,7 +2060,7 @@ static void dump_irqs(unsigned char key)
         if ( !irq_desc_initialized(desc) || desc->handler == &no_irq_type )
             continue;
 
-        ssid = xsm_show_irq_sid(irq);
+        ssid = in_irq() ? NULL : xsm_show_irq_sid(irq);
 
         spin_lock_irqsave(&desc->lock, flags);
 
