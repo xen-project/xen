@@ -214,6 +214,7 @@ test_all_events:
         jnz  process_softirqs
         testb $1,VCPU_mce_pending(%ebx)
         jnz  process_mce
+.Ltest_guest_nmi:
         testb $1,VCPU_nmi_pending(%ebx)
         jnz  process_nmi
 test_guest_events:
@@ -243,7 +244,7 @@ process_softirqs:
 /* %ebx: struct vcpu */
 process_mce:
         testb $1 << VCPU_TRAP_MCE,VCPU_async_exception_mask(%ebx)
-        jnz  test_guest_events
+        jnz  .Ltest_guest_nmi
         sti
         movb $0,VCPU_mce_pending(%ebx)
         call set_guest_machinecheck_trapbounce
