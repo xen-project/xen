@@ -70,6 +70,8 @@ int libxl__ev_fd_register(libxl__gc *gc, libxl__ev_fd *ev,
 
     CTX_LOCK;
 
+    DBG("ev_fd=%p register fd=%d events=%x", ev, fd, events);
+
     rc = OSEVENT_HOOK(fd_register, fd, &ev->for_app_reg, events, ev);
     if (rc) goto out;
 
@@ -93,6 +95,8 @@ int libxl__ev_fd_modify(libxl__gc *gc, libxl__ev_fd *ev, short events)
     CTX_LOCK;
     assert(libxl__ev_fd_isregistered(ev));
 
+    DBG("ev_fd=%p modify fd=%d events=%x", ev, ev->fd, events);
+
     rc = OSEVENT_HOOK(fd_modify, ev->fd, &ev->for_app_reg, events);
     if (rc) goto out;
 
@@ -108,8 +112,12 @@ void libxl__ev_fd_deregister(libxl__gc *gc, libxl__ev_fd *ev)
 {
     CTX_LOCK;
 
-    if (!libxl__ev_fd_isregistered(ev))
+    if (!libxl__ev_fd_isregistered(ev)) {
+        DBG("ev_fd=%p deregister unregistered",ev);
         goto out;
+    }
+
+    DBG("ev_fd=%p deregister fd=%d", ev, ev->fd);
 
     OSEVENT_HOOK_VOID(fd_deregister, ev->fd, ev->for_app_reg);
     LIBXL_LIST_REMOVE(ev, entry);
@@ -873,8 +881,11 @@ static void afterpoll_internal(libxl__egc *egc, libxl__poller *poller,
             continue;
 
         int revents = afterpoll_check_fd(poller,fds,nfds, efd->fd,efd->events);
-        if (revents)
+        if (revents) {
+            DBG("ev_fd=%p occurs fd=%d events=%x revents=%x",
+                efd, efd->fd, efd->events, revents);
             efd->func(egc, efd, efd->fd, efd->events, revents);
+        }
     }
 
     if (afterpoll_check_fd(poller,fds,nfds, poller->wakeup_pipe[0],POLLIN)) {
