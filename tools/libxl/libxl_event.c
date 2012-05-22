@@ -420,9 +420,8 @@ static void watchfd_callback(libxl__egc *egc, libxl__ev_fd *ev,
         }
 
         if (w->counterval != counterval) {
-            LIBXL__LOG(CTX, LIBXL__LOG_DEBUG,
-                       "watch epath=%s token=%s: counter != %"PRIx32,
-                       epath, token, w->counterval);
+            LOG(DEBUG, "watch w=%p epath=%s token=%s: counter != %"PRIx32,
+                w, epath, token, w->counterval);
             goto ignore;
         }
 
@@ -440,16 +439,14 @@ static void watchfd_callback(libxl__egc *egc, libxl__ev_fd *ev,
          * See also docs/misc/xenstore.txt.
          */
         if (!xs_path_is_subpath(w->path, epath)) {
-            LIBXL__LOG(CTX, LIBXL__LOG_DEBUG,
-                       "watch epath=%s token=%s: not child of wpath=%s",
-                       epath, token, w->path);
+            LOG(DEBUG, "watch w=%p wpath=%s token=%s: unexpected epath=%s",
+                w, w->path, token, epath);
             goto ignore;
         }
 
         /* At last, we have checked everything! */
-        LIBXL__LOG(CTX, LIBXL__LOG_DEBUG,
-                   "watch event: epath=%s token=%s wpath=%s w=%p",
-                   epath, token, w->path, w);
+        LOG(DEBUG, "watch w=%p wpath=%s token=%s: event epath=%s",
+            w, w->path, token, epath);
         w->callback(egc, w, w->path, epath);
 
     ignore:
@@ -502,7 +499,11 @@ int libxl__ev_xswatch_register(libxl__gc *gc, libxl__ev_xswatch *w,
     int slotnum = use - CTX->watch_slots;
     w->counterval = CTX->watch_counter++;
 
-    if (!xs_watch(CTX->xsh, path, watch_token(gc, slotnum, w->counterval))) {
+    const char *token = watch_token(gc, slotnum, w->counterval);
+    LOG(DEBUG, "watch w=%p wpath=%s token=%s: register slotnum=%d",
+        w, path, token, slotnum);
+
+    if (!xs_watch(CTX->xsh, path, token)) {
         LIBXL__LOG_ERRNOVAL(CTX, LIBXL__LOG_ERROR, errno,
                             "create watch for path %s", path);
         rc = ERROR_FAIL;
@@ -534,7 +535,11 @@ void libxl__ev_xswatch_deregister(libxl__gc *gc, libxl__ev_xswatch *w)
     CTX_LOCK;
 
     if (w->slotnum >= 0) {
-        char *token = watch_token(gc, w->slotnum, w->counterval);
+        const char *token = watch_token(gc, w->slotnum, w->counterval);
+
+        LOG(DEBUG, "watch w=%p wpath=%s token=%s: deregister slotnum=%d",
+            w, w->path, token, w->slotnum);
+
         if (!xs_unwatch(CTX->xsh, w->path, token))
             /* Oh well, we will just get watch events forever more
              * and ignore them.  But we should complain to the log. */
@@ -544,6 +549,8 @@ void libxl__ev_xswatch_deregister(libxl__gc *gc, libxl__ev_xswatch *w)
         libxl__ev_watch_slot *slot = &CTX->watch_slots[w->slotnum];
         LIBXL_SLIST_INSERT_HEAD(&CTX->watch_freeslots, slot, empty);
         w->slotnum = -1;
+    } else {
+        LOG(DEBUG, "watch w=%p: deregister unregistered", w);
     }
 
     free(w->path);
