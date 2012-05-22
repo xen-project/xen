@@ -1020,11 +1020,14 @@ static void egc_run_callbacks(libxl__egc *egc)
 
     LIBXL_TAILQ_FOREACH_SAFE(ev, &egc->occurred_for_callback, link, ev_tmp) {
         LIBXL_TAILQ_REMOVE(&egc->occurred_for_callback, ev, link);
+        LOG(DEBUG,"event %p callback type=%s",
+            ev, libxl_event_type_to_string(ev->type));
         CTX->event_hooks->event_occurs(CTX->event_hooks_user, ev);
     }
 
     LIBXL_TAILQ_FOREACH_SAFE(aop, &egc->aops_for_callback, entry, aop_tmp) {
         LIBXL_TAILQ_REMOVE(&egc->aops_for_callback, aop, entry);
+        LOG(DEBUG,"ao %p: progress report: callback aop=%p", aop->ao, aop);
         aop->how->callback(CTX, aop->ev, aop->how->for_callback);
 
         CTX_LOCK;
@@ -1037,6 +1040,7 @@ static void egc_run_callbacks(libxl__egc *egc)
     LIBXL_TAILQ_FOREACH_SAFE(ao, &egc->aos_for_callback,
                              entry_for_callback, ao_tmp) {
         LIBXL_TAILQ_REMOVE(&egc->aos_for_callback, ao, entry_for_callback);
+        LOG(DEBUG,"ao %p: completion callback", ao);
         ao->how.callback(CTX, ao->rc, ao->how.u.for_callback);
         CTX_LOCK;
         ao->notified = 1;
@@ -1396,7 +1400,9 @@ int libxl_event_wait(libxl_ctx *ctx, libxl_event **event_r,
 
 void libxl__ao__destroy(libxl_ctx *ctx, libxl__ao *ao)
 {
+    AO_GC;
     if (!ao) return;
+    LOG(DEBUG,"ao %p: destroy",ao);
     if (ao->poller) libxl__poller_put(ctx, ao->poller);
     ao->magic = LIBXL__AO_MAGIC_DESTROYED;
     libxl__free_all(&ao->gc);
@@ -1406,6 +1412,7 @@ void libxl__ao__destroy(libxl_ctx *ctx, libxl__ao *ao)
 void libxl__ao_abort(libxl__ao *ao)
 {
     AO_GC;
+    LOG(DEBUG,"ao %p: abort",ao);
     assert(ao->magic == LIBXL__AO_MAGIC);
     assert(ao->in_initiator);
     assert(!ao->complete);
@@ -1422,6 +1429,8 @@ libxl__gc *libxl__ao_inprogress_gc(libxl__ao *ao)
 
 void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc)
 {
+    AO_GC;
+    LOG(DEBUG,"ao %p: complete, rc=%d",ao,rc);
     assert(ao->magic == LIBXL__AO_MAGIC);
     assert(!ao->complete);
     ao->complete = 1;
@@ -1439,7 +1448,7 @@ void libxl__ao_complete_check_progress_reports(libxl__egc *egc, libxl__ao *ao)
      * will, after making the callback, take out the lock again,
      * decrement progress_reports_outstanding, and call us again.
      */
-
+    libxl_ctx *ctx = libxl__gc_owner(&egc->gc);
     assert(ao->progress_reports_outstanding >= 0);
 
     if (!ao->complete || ao->progress_reports_outstanding)
@@ -1451,6 +1460,7 @@ void libxl__ao_complete_check_progress_reports(libxl__egc *egc, libxl__ao *ao)
             /* don't bother with this if we're not in the event loop */
             libxl__poller_wakeup(egc, ao->poller);
     } else if (ao->how.callback) {
+        LIBXL__LOG(ctx, XTL_DEBUG, "ao %p: complete for callback",ao);
         LIBXL_TAILQ_INSERT_TAIL(&egc->aos_for_callback, ao, entry_for_callback);
     } else {
         libxl_event *ev;
@@ -1463,11 +1473,12 @@ void libxl__ao_complete_check_progress_reports(libxl__egc *egc, libxl__ao *ao)
         ao->notified = 1;
     }
     if (!ao->in_initiator && ao->notified)
-        libxl__ao__destroy(libxl__gc_owner(&egc->gc), ao);
+        libxl__ao__destroy(ctx, ao);
 }
 
 libxl__ao *libxl__ao_create(libxl_ctx *ctx, uint32_t domid,
-                            const libxl_asyncop_how *how)
+                            const libxl_asyncop_how *how,
+                            const char *file, int line, const char *func)
 {
     libxl__ao *ao;
 
@@ -1487,6 +1498,10 @@ libxl__ao *libxl__ao_create(libxl_ctx *ctx, uint32_t domid,
         ao->poller = libxl__poller_get(ctx);
         if (!ao->poller) goto out;
     }
+    libxl__log(ctx,XTL_DEBUG,-1,file,line,func,
+               "ao %p: create: how=%p callback=%p poller=%p",
+               ao, how, ao->how.callback, ao->poller);
+
     return ao;
 
  out:
@@ -1495,7 +1510,8 @@ libxl__ao *libxl__ao_create(libxl_ctx *ctx, uint32_t domid,
 }
 
 
-int libxl__ao_inprogress(libxl__ao *ao)
+int libxl__ao_inprogress(libxl__ao *ao,
+                         const char *file, int line, const char *func)
 {
     AO_GC;
     int rc;
@@ -1504,6 +1520,14 @@ int libxl__ao_inprogress(libxl__ao *ao)
     assert(ao->constructing);
     assert(ao->in_initiator);
     ao->constructing = 0;
+
+    libxl__log(CTX,XTL_DEBUG,-1,file,line,func,
+               "ao %p: inprogress: poller=%p, flags=%s%s%s%s",
+               ao, ao->poller,
+               ao->constructing ? "o" : "",
+               ao->in_initiator ? "i" : "",
+               ao->complete ? "c" : "",
+               ao->notified ? "n" : "");
 
     if (ao->poller) {
         /* Caller wants it done synchronously. */
@@ -1520,6 +1544,8 @@ int libxl__ao_inprogress(libxl__ao *ao)
                 ao->notified = 1;
                 break;
             }
+
+            DBG("ao %p: not ready, waiting",ao);
 
             rc = eventloop_iteration(&egc,ao->poller);
             if (rc) {
@@ -1571,8 +1597,10 @@ void libxl__ao_progress_gethow(libxl_asyncprogress_how *in_state,
 void libxl__ao_progress_report(libxl__egc *egc, libxl__ao *ao,
         const libxl_asyncprogress_how *how, libxl_event *ev)
 {
+    AO_GC;
     ev->for_user = how->for_event;
     if (how->callback == dummy_asyncprogress_callback_ignore) {
+        LOG(DEBUG,"ao %p: progress report: ignored",ao);
         /* ignore */
     } else if (how->callback) {
         libxl__aop_occurred *aop = libxl__zalloc(&egc->gc, sizeof(*aop));
@@ -1581,7 +1609,10 @@ void libxl__ao_progress_report(libxl__egc *egc, libxl__ao *ao,
         aop->ev = ev;
         aop->how = how;
         LIBXL_TAILQ_INSERT_TAIL(&egc->aops_for_callback, aop, entry);
+        LOG(DEBUG,"ao %p: progress report: callback queued aop=%p",ao,aop);
     } else {
+        LOG(DEBUG,"ao %p: progress report: event queued ev=%p type=%s",
+            ao, ev, libxl_event_type_to_string(ev->type));
         libxl__event_occurred(egc, ev);
     }
 }

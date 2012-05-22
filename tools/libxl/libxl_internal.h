@@ -1555,14 +1555,16 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
 
 #define AO_CREATE(ctx, domid, ao_how)                           \
     libxl__ctx_lock(ctx);                                       \
-    libxl__ao *ao = libxl__ao_create(ctx, domid, ao_how);       \
+    libxl__ao *ao = libxl__ao_create(ctx, domid, ao_how,        \
+                               __FILE__, __LINE__, __func__);   \
     if (!ao) { libxl__ctx_unlock(ctx); return ERROR_NOMEM; }    \
     libxl__egc egc[1]; LIBXL_INIT_EGC(egc[0],ctx);              \
     AO_GC;
 
 #define AO_INPROGRESS ({                                        \
         libxl_ctx *ao__ctx = libxl__gc_owner(&ao->gc);          \
-        int ao__rc = libxl__ao_inprogress(ao);                  \
+        int ao__rc = libxl__ao_inprogress(ao,                   \
+                               __FILE__, __LINE__, __func__);   \
         libxl__ctx_unlock(ao__ctx); /* gc is now invalid */     \
         EGC_FREE;                                               \
         (ao__rc);                                               \
@@ -1588,8 +1590,10 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
 /* All of these MUST be called with the ctx locked.
  * libxl__ao_inprogress MUST be called with the ctx locked exactly once. */
 _hidden libxl__ao *libxl__ao_create(libxl_ctx*, uint32_t domid,
-                                    const libxl_asyncop_how*);
-_hidden int libxl__ao_inprogress(libxl__ao *ao); /* temporarily unlocks */
+                                    const libxl_asyncop_how*,
+       const char *file, int line, const char *func);
+_hidden int libxl__ao_inprogress(libxl__ao *ao,
+       const char *file, int line, const char *func); /* temporarily unlocks */
 _hidden void libxl__ao_abort(libxl__ao *ao);
 _hidden void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc);
 _hidden libxl__gc *libxl__ao_inprogress_gc(libxl__ao *ao);
