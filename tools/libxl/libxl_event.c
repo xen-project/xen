@@ -19,6 +19,18 @@
 
 #include "libxl_internal.h"
 
+
+//#define DEBUG 1
+
+#ifdef DEBUG
+# define LIBXL__DBG_LOG(ctx, args, ...) \
+    LIBXL__LOG((ctx), XTL_DEBUG, args, __VA_ARGS__)
+#else
+# define LIBXL__DBG_LOG(ctx, args, ...) ((void)0)
+#endif
+#define DBG(args, ...) LIBXL__DBG_LOG(CTX, args, __VA_ARGS__)
+
+
 /*
  * The counter osevent_in_hook is used to ensure that the application
  * honours the reentrancy restriction documented in libxl_event.h.
@@ -169,6 +181,16 @@ static void time_deregister(libxl__gc *gc, libxl__ev_time *ev)
     }
 }
 
+static void time_done_debug(libxl__gc *gc, const char *func,
+                            libxl__ev_time *ev, int rc)
+{
+#ifdef DEBUG
+    libxl__log(CTX, XTL_DEBUG, -1,__FILE__,0,func,
+               "ev_time=%p done rc=%d .func=%p infinite=%d abs=%lu.%06lu",
+               ev, rc, ev->func, ev->infinite,
+               (unsigned long)ev->abs.tv_sec, (unsigned long)ev->abs.tv_usec);
+#endif
+}
 
 int libxl__ev_time_register_abs(libxl__gc *gc, libxl__ev_time *ev,
                                 libxl__ev_time_callback *func,
@@ -178,6 +200,9 @@ int libxl__ev_time_register_abs(libxl__gc *gc, libxl__ev_time *ev,
 
     CTX_LOCK;
 
+    DBG("ev_time=%p register abs=%lu.%06lu",
+        ev, (unsigned long)abs.tv_sec, (unsigned long)abs.tv_usec);
+
     rc = time_register_finite(gc, ev, abs);
     if (rc) goto out;
 
@@ -185,6 +210,7 @@ int libxl__ev_time_register_abs(libxl__gc *gc, libxl__ev_time *ev,
 
     rc = 0;
  out:
+    time_done_debug(gc,__func__,ev,rc);
     CTX_UNLOCK;
     return rc;
 }
@@ -198,6 +224,8 @@ int libxl__ev_time_register_rel(libxl__gc *gc, libxl__ev_time *ev,
     int rc;
 
     CTX_LOCK;
+
+    DBG("ev_time=%p register ms=%d", ev, milliseconds);
 
     if (milliseconds < 0) {
         ev->infinite = 1;
@@ -213,6 +241,7 @@ int libxl__ev_time_register_rel(libxl__gc *gc, libxl__ev_time *ev,
     rc = 0;
 
  out:
+    time_done_debug(gc,__func__,ev,rc);
     CTX_UNLOCK;
     return rc;
 }
@@ -223,6 +252,9 @@ int libxl__ev_time_modify_abs(libxl__gc *gc, libxl__ev_time *ev,
     int rc;
 
     CTX_LOCK;
+
+    DBG("ev_time=%p modify abs==%lu.%06lu",
+        ev, (unsigned long)abs.tv_sec, (unsigned long)abs.tv_usec);
 
     assert(libxl__ev_time_isregistered(ev));
 
@@ -240,6 +272,7 @@ int libxl__ev_time_modify_abs(libxl__gc *gc, libxl__ev_time *ev,
 
     rc = 0;
  out:
+    time_done_debug(gc,__func__,ev,rc);
     CTX_UNLOCK;
     return rc;
 }
@@ -251,6 +284,8 @@ int libxl__ev_time_modify_rel(libxl__gc *gc, libxl__ev_time *ev,
     int rc;
 
     CTX_LOCK;
+
+    DBG("ev_time=%p modify ms=%d", ev, milliseconds);
 
     assert(libxl__ev_time_isregistered(ev));
 
@@ -269,6 +304,7 @@ int libxl__ev_time_modify_rel(libxl__gc *gc, libxl__ev_time *ev,
 
     rc = 0;
  out:
+    time_done_debug(gc,__func__,ev,rc);
     CTX_UNLOCK;
     return rc;
 }
@@ -277,6 +313,8 @@ void libxl__ev_time_deregister(libxl__gc *gc, libxl__ev_time *ev)
 {
     CTX_LOCK;
 
+    DBG("ev_time=%p deregister", ev);
+
     if (!libxl__ev_time_isregistered(ev))
         goto out;
 
@@ -284,6 +322,7 @@ void libxl__ev_time_deregister(libxl__gc *gc, libxl__ev_time *ev)
     ev->func = 0;
 
  out:
+    time_done_debug(gc,__func__,ev,0);
     CTX_UNLOCK;
     return;
 }
@@ -855,6 +894,10 @@ static void afterpoll_internal(libxl__egc *egc, libxl__poller *poller,
             break;
 
         time_deregister(gc, etime);
+
+        DBG("ev_time=%p occurs abs=%lu.%06lu",
+            etime, (unsigned long)etime->abs.tv_sec,
+            (unsigned long)etime->abs.tv_usec);
 
         etime->func(egc, etime, &etime->abs);
     }
