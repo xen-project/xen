@@ -1307,7 +1307,7 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
         args[2] = "-autopass";
     }
 
-    libxl__exec(autopass_fd, -1, -1, args[0], args);
+    libxl__exec(gc, autopass_fd, -1, -1, args[0], args, NULL);
     abort();
 
  x_fail:

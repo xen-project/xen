@@ -1141,8 +1141,24 @@ _hidden int libxl__wait_for_offspring(libxl__gc *gc,
 
  /* low-level stuff, for synchronous subprocesses etc. */
 
-_hidden void libxl__exec(int stdinfd, int stdoutfd, int stderrfd,
-               const char *arg0, char **args); // logs errors, never returns
+/*
+ * env should be passed using the following format,
+ *
+ * env[0]: name of env variable
+ * env[1]: value of env variable
+ * env[n]: ...
+ *
+ * So it efectively becomes something like:
+ * export env[n]=env[n+1]
+ * (where n%2 = 0)
+ *
+ * The last entry of the array always has to be NULL.
+ *
+ * Logs errors, never returns.
+ */
+_hidden  void libxl__exec(libxl__gc *gc, int stdinfd, int stdoutfd,
+                          int stderrfd, const char *arg0, char *const args[],
+                          char *const env[]);
 
 /* from xl_create */
 

@@ -1016,7 +1016,7 @@ retry_transaction:
         goto out_close;
     if (!rc) { /* inner child */
         setsid();
-        libxl__exec(null, logfile_w, logfile_w, dm, args);
+        libxl__exec(gc, null, logfile_w, logfile_w, dm, args, NULL);
     }
 
     rc = 0;

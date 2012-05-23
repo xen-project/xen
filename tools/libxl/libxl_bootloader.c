@@ -385,6 +385,7 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
     libxl__bootloader_state *bl = CONTAINER_OF(op, *bl, openpty);
     STATE_AO_GC(bl->ao);
     int rc, r;
+    char *const env[] = { "TERM", "vt100", NULL };
 
     if (bl->openpty.rc) {
         rc = bl->openpty.rc;
@@ -478,8 +479,7 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
         /* child */
         r = login_tty(libxl__carefd_fd(bl->ptys[0].slave));
         if (r) { LOGE(ERROR, "login_tty failed"); exit(-1); }
-        setenv("TERM", "vt100", 1);
-        libxl__exec(-1, -1, -1, bl->args[0], (char**)bl->args);
+        libxl__exec(gc, -1, -1, -1, bl->args[0], (char **) bl->args, env);
         exit(-1);
     }
 

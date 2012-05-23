@@ -66,8 +66,8 @@ static void check_open_fds(const char *what)
     if (badness) abort();
 }
 
-void libxl__exec(int stdinfd, int stdoutfd, int stderrfd, const char *arg0,
-                char **args)
+void libxl__exec(libxl__gc *gc, int stdinfd, int stdoutfd, int stderrfd,
+                 const char *arg0, char *const args[], char *const env[])
      /* call this in the child */
 {
     if (stdinfd != -1)
@@ -90,8 +90,18 @@ void libxl__exec(int stdinfd, int stdoutfd, int stderrfd, const char *arg0,
     /* in case our caller set it to IGN.  subprocesses are entitled
      * to assume they got DFL. */
 
+    if (env != NULL) {
+        for (int i = 0; env[i] != NULL && env[i+1] != NULL; i += 2) {
+            if (setenv(env[i], env[i+1], 1) < 0) {
+                LOGEV(ERROR, errno, "setting env vars (%s = %s)",
+                                    env[i], env[i+1]);
+                goto out;
+            }
+        }
+    }
     execvp(arg0, args);
 
+out:
     fprintf(stderr, "libxl: cannot execute %s: %s\n", arg0, strerror(errno));
     _exit(-1);
 }
