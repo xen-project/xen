@@ -135,6 +135,44 @@ char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid)
     return s;
 }
 
+int libxl__xs_path_cleanup(libxl__gc *gc, xs_transaction_t t, char *user_path)
+{
+    unsigned int nb = 0;
+    char *path, *last, *val;
+    int rc;
+
+    /* A path and transaction must be provided by the caller */
+    assert(user_path && t);
+
+    path = libxl__strdup(gc, user_path);
+    if (!xs_rm(CTX->xsh, t, path)) {
+        LOGE(DEBUG, "unable to remove path %s", path);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    for (last = strrchr(path, '/'); last != NULL; last = strrchr(path, '/')) {
+        *last = '\0';
+
+        if (!strlen(path)) break;
+
+        val = libxl__xs_read(gc, t, path);
+        if (!val || strlen(val) != 0) break;
+
+        if (!libxl__xs_directory(gc, t, path, &nb) || nb != 0) break;
+
+        if (!xs_rm(CTX->xsh, t, path)) {
+            LOGE(DEBUG, "unable to remove path %s", path);
+            rc = ERROR_FAIL;
+            goto out;
+        }
+    }
+    rc = 0;
+
+out:
+    return rc;
+}
+
 /*
  * Local variables:
  * mode: C

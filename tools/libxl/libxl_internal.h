@@ -494,6 +494,14 @@ _hidden bool libxl__xs_mkdir(libxl__gc *gc, xs_transaction_t t,
 
 _hidden char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid);
 
+/*
+ * This is a recursive delete, from top to bottom. What this function does
+ * is remove empty folders that contained the deleted entry.
+ *
+ * It mimics xenstore-rm -t behaviour.
+ */
+_hidden int libxl__xs_path_cleanup(libxl__gc *gc, xs_transaction_t t,
+                                   char *user_path);
 
 /*
  * Event generation functions provided by the libxl event core to the
