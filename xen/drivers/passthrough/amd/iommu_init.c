@@ -568,14 +568,18 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
     u32 code;
     u64 *addr;
     int count = 0;
-    char * event_str[] = {"ILLEGAL_DEV_TABLE_ENTRY",
-                          "IO_PAGE_FAULT",
-                          "DEV_TABLE_HW_ERROR",
-                          "PAGE_TABLE_HW_ERROR",
-                          "ILLEGAL_COMMAND_ERROR",
-                          "COMMAND_HW_ERROR",
-                          "IOTLB_INV_TIMEOUT",
-                          "INVALID_DEV_REQUEST"};
+    static const char *const event_str[] = {
+#define EVENT_STR(name) [IOMMU_EVENT_##name - 1] = #name
+        EVENT_STR(ILLEGAL_DEV_TABLE_ENTRY),
+        EVENT_STR(IO_PAGE_FAULT),
+        EVENT_STR(DEV_TABLE_HW_ERROR),
+        EVENT_STR(PAGE_TABLE_HW_ERROR),
+        EVENT_STR(ILLEGAL_COMMAND_ERROR),
+        EVENT_STR(COMMAND_HW_ERROR),
+        EVENT_STR(IOTLB_INV_TIMEOUT),
+        EVENT_STR(INVALID_DEV_REQUEST)
+#undef EVENT_STR
+    };
 
     code = get_field_from_reg_u32(entry[1], IOMMU_EVENT_CODE_MASK,
                                             IOMMU_EVENT_CODE_SHIFT);
@@ -597,13 +601,6 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
         rmb();
         code = get_field_from_reg_u32(entry[1], IOMMU_EVENT_CODE_MASK,
                                       IOMMU_EVENT_CODE_SHIFT);
-    }
-
-    if ( (code > IOMMU_EVENT_INVALID_DEV_REQUEST) ||
-        (code < IOMMU_EVENT_ILLEGAL_DEV_TABLE_ENTRY) )
-    {
-        AMD_IOMMU_DEBUG("Invalid event log entry!\n");
-        return;
     }
 
     if ( code == IOMMU_EVENT_IO_PAGE_FAULT )
@@ -633,8 +630,10 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
     }
     else
     {
-        AMD_IOMMU_DEBUG("event 0x%08x 0x%08x 0x%08x 0x%08x\n", entry[0],
-                        entry[1], entry[2], entry[3]);
+        AMD_IOMMU_DEBUG("%s %08x %08x %08x %08x\n",
+                        code <= ARRAY_SIZE(event_str) ? event_str[code - 1]
+                                                      : "event",
+                        entry[0], entry[1], entry[2], entry[3]);
     }
 
     memset(entry, 0, IOMMU_EVENT_LOG_ENTRY_SIZE);
