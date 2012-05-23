@@ -111,7 +111,7 @@ char **libxl__xs_directory(libxl__gc *gc, xs_transaction_t t,
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char **ret = NULL;
-    ret = xs_directory(ctx->xsh, XBT_NULL, path, nb);
+    ret = xs_directory(ctx->xsh, t, path, nb);
     libxl__ptr_add(gc, ret);
     return ret;
 }
