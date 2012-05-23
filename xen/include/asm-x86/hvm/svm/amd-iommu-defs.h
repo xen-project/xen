@@ -301,6 +301,10 @@
 #define IOMMU_PPR_LOG_TAIL_OFFSET                       0x2038
 #define IOMMU_PPR_LOG_DEVICE_ID_MASK                    0x0000FFFF
 #define IOMMU_PPR_LOG_DEVICE_ID_SHIFT                   0
+#define IOMMU_PPR_LOG_CODE_MASK                         0xF0000000
+#define IOMMU_PPR_LOG_CODE_SHIFT                        28
+
+#define IOMMU_LOG_ENTRY_TIMEOUT                         1000
 
 /* Control Register */
 #define IOMMU_CONTROL_MMIO_OFFSET			0x18

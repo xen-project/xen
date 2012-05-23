@@ -29,6 +29,7 @@
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm-x86/fixmap.h>
 #include <mach_apic.h>
+#include <xen/delay.h>
 
 static int __initdata nr_amd_iommus;
 
@@ -566,6 +567,7 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
     u16 domain_id, device_id, bdf, cword;
     u32 code;
     u64 *addr;
+    int count = 0;
     char * event_str[] = {"ILLEGAL_DEV_TABLE_ENTRY",
                           "IO_PAGE_FAULT",
                           "DEV_TABLE_HW_ERROR",
@@ -577,6 +579,25 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
 
     code = get_field_from_reg_u32(entry[1], IOMMU_EVENT_CODE_MASK,
                                             IOMMU_EVENT_CODE_SHIFT);
+
+    /*
+     * Workaround for erratum 732:
+     * It can happen that the tail pointer is updated before the actual entry
+     * got written. As suggested by RevGuide, we initialize the event log
+     * buffer to all zeros and clear event log entries after processing them.
+     */
+    while ( code == 0 )
+    {
+        if ( unlikely(++count == IOMMU_LOG_ENTRY_TIMEOUT) )
+        {
+            AMD_IOMMU_DEBUG("AMD-Vi: No event written to log\n");
+            return;
+        }
+        udelay(1);
+        rmb();
+        code = get_field_from_reg_u32(entry[1], IOMMU_EVENT_CODE_MASK,
+                                      IOMMU_EVENT_CODE_SHIFT);
+    }
 
     if ( (code > IOMMU_EVENT_INVALID_DEV_REQUEST) ||
         (code < IOMMU_EVENT_ILLEGAL_DEV_TABLE_ENTRY) )
@@ -615,6 +636,8 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
         AMD_IOMMU_DEBUG("event 0x%08x 0x%08x 0x%08x 0x%08x\n", entry[0],
                         entry[1], entry[2], entry[3]);
     }
+
+    memset(entry, 0, IOMMU_EVENT_LOG_ENTRY_SIZE);
 }
 
 static void iommu_check_event_log(struct amd_iommu *iommu)
@@ -646,9 +669,31 @@ void parse_ppr_log_entry(struct amd_iommu *iommu, u32 entry[])
 {
 
     u16 device_id;
-    u8 bus, devfn;
+    u8 bus, devfn, code;
     struct pci_dev *pdev;
-    struct domain *d;
+    int count = 0;
+
+    code = get_field_from_reg_u32(entry[1], IOMMU_PPR_LOG_CODE_MASK,
+                                  IOMMU_PPR_LOG_CODE_SHIFT);
+
+    /*
+     * Workaround for erratum 733:
+     * It can happen that the tail pointer is updated before the actual entry
+     * got written. As suggested by RevGuide, we initialize the event log
+     * buffer to all zeros and clear ppr log entries after processing them.
+     */
+    while ( code == 0 )
+    {
+        if ( unlikely(++count == IOMMU_LOG_ENTRY_TIMEOUT) )
+        {
+            AMD_IOMMU_DEBUG("AMD-Vi: No ppr written to log\n");
+            return;
+        }
+        udelay(1);
+        rmb();
+        code = get_field_from_reg_u32(entry[1], IOMMU_PPR_LOG_CODE_MASK,
+                                      IOMMU_PPR_LOG_CODE_SHIFT);
+    }
 
     /* here device_id is physical value */
     device_id = iommu_get_devid_from_cmd(entry[0]);
@@ -659,12 +704,10 @@ void parse_ppr_log_entry(struct amd_iommu *iommu, u32 entry[])
     pdev = pci_get_pdev(iommu->seg, bus, devfn);
     spin_unlock(&pcidevs_lock);
 
-    if ( pdev == NULL )
-        return;
+    if ( pdev )
+        guest_iommu_add_ppr_log(pdev->domain, entry);
 
-    d = pdev->domain;
-
-    guest_iommu_add_ppr_log(d, entry);
+    memset(entry, 0, IOMMU_PPR_LOG_ENTRY_SIZE);
 }
 
 static void iommu_check_ppr_log(struct amd_iommu *iommu)
