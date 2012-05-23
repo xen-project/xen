@@ -362,76 +362,6 @@ typedef struct {
     libxl__ev_devstate ds;
 } libxl__ao_device_remove;
 
-static void device_remove_cleanup(libxl__gc *gc,
-                                  libxl__ao_device_remove *aorm) {
-    if (!aorm) return;
-    libxl__ev_devstate_cancel(gc, &aorm->ds);
-}
-
-static void device_remove_callback(libxl__egc *egc, libxl__ev_devstate *ds,
-                                   int rc) {
-    libxl__ao_device_remove *aorm = CONTAINER_OF(ds, *aorm, ds);
-    libxl__gc *gc = &aorm->ao->gc;
-    libxl__ao_complete(egc, aorm->ao, rc);
-    device_remove_cleanup(gc, aorm);
-}
-
-int libxl__initiate_device_remove(libxl__egc *egc, libxl__ao *ao,
-                                  libxl__device *dev)
-{
-    AO_GC;
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-    xs_transaction_t t;
-    char *be_path = libxl__device_backend_path(gc, dev);
-    char *state_path = libxl__sprintf(gc, "%s/state", be_path);
-    char *state = libxl__xs_read(gc, XBT_NULL, state_path);
-    int rc = 0;
-    libxl__ao_device_remove *aorm = 0;
-
-    if (!state)
-        goto out_ok;
-    if (atoi(state) != 4) {
-        libxl__device_destroy_tapdisk(gc, be_path);
-        xs_rm(ctx->xsh, XBT_NULL, be_path);
-        goto out_ok;
-    }
-
-retry_transaction:
-    t = xs_transaction_start(ctx->xsh);
-    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/online", be_path), "0", strlen("0"));
-    xs_write(ctx->xsh, t, state_path, "5", strlen("5"));
-    if (!xs_transaction_end(ctx->xsh, t, 0)) {
-        if (errno == EAGAIN)
-            goto retry_transaction;
-        else {
-            rc = ERROR_FAIL;
-            goto out_fail;
-        }
-    }
-
-    libxl__device_destroy_tapdisk(gc, be_path);
-
-    aorm = libxl__zalloc(gc, sizeof(*aorm));
-    aorm->ao = ao;
-    libxl__ev_devstate_init(&aorm->ds);
-
-    rc = libxl__ev_devstate_wait(gc, &aorm->ds, device_remove_callback,
-                                 state_path, XenbusStateClosed,
-                                 LIBXL_DESTROY_TIMEOUT * 1000);
-    if (rc) goto out_fail;
-
-    return 0;
-
- out_fail:
-    assert(rc);
-    device_remove_cleanup(gc, aorm);
-    return rc;
-
- out_ok:
-    libxl__ao_complete(egc, ao, 0);
-    return 0;
-}
-
 int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
@@ -502,6 +432,84 @@ int libxl__devices_destroy(libxl__gc *gc, uint32_t domid)
 
 out:
     return 0;
+}
+
+/* Callbacks for device related operations */
+
+static void device_remove_callback(libxl__egc *egc, libxl__ev_devstate *ds,
+                                   int rc);
+
+static void device_remove_cleanup(libxl__gc *gc,
+                                  libxl__ao_device_remove *aorm);
+
+int libxl__initiate_device_remove(libxl__egc *egc, libxl__ao *ao,
+                                  libxl__device *dev)
+{
+    AO_GC;
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    xs_transaction_t t;
+    char *be_path = libxl__device_backend_path(gc, dev);
+    char *state_path = libxl__sprintf(gc, "%s/state", be_path);
+    char *state = libxl__xs_read(gc, XBT_NULL, state_path);
+    int rc = 0;
+    libxl__ao_device_remove *aorm = 0;
+
+    if (!state)
+        goto out_ok;
+    if (atoi(state) != 4) {
+        libxl__device_destroy_tapdisk(gc, be_path);
+        xs_rm(ctx->xsh, XBT_NULL, be_path);
+        goto out_ok;
+    }
+
+retry_transaction:
+    t = xs_transaction_start(ctx->xsh);
+    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/online", be_path), "0", strlen("0"));
+    xs_write(ctx->xsh, t, state_path, "5", strlen("5"));
+    if (!xs_transaction_end(ctx->xsh, t, 0)) {
+        if (errno == EAGAIN)
+            goto retry_transaction;
+        else {
+            rc = ERROR_FAIL;
+            goto out_fail;
+        }
+    }
+
+    libxl__device_destroy_tapdisk(gc, be_path);
+
+    aorm = libxl__zalloc(gc, sizeof(*aorm));
+    aorm->ao = ao;
+    libxl__ev_devstate_init(&aorm->ds);
+
+    rc = libxl__ev_devstate_wait(gc, &aorm->ds, device_remove_callback,
+                                 state_path, XenbusStateClosed,
+                                 LIBXL_DESTROY_TIMEOUT * 1000);
+    if (rc) goto out_fail;
+
+    return 0;
+
+ out_fail:
+    assert(rc);
+    device_remove_cleanup(gc, aorm);
+    return rc;
+
+ out_ok:
+    libxl__ao_complete(egc, ao, 0);
+    return 0;
+}
+
+static void device_remove_callback(libxl__egc *egc, libxl__ev_devstate *ds,
+                                   int rc) {
+    libxl__ao_device_remove *aorm = CONTAINER_OF(ds, *aorm, ds);
+    libxl__gc *gc = &aorm->ao->gc;
+    libxl__ao_complete(egc, aorm->ao, rc);
+    device_remove_cleanup(gc, aorm);
+}
+
+static void device_remove_cleanup(libxl__gc *gc,
+                                  libxl__ao_device_remove *aorm) {
+    if (!aorm) return;
+    libxl__ev_devstate_cancel(gc, &aorm->ds);
 }
 
 int libxl__wait_for_device_model(libxl__gc *gc,
