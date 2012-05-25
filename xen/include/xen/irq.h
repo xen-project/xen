@@ -133,12 +133,12 @@ struct pirq {
 /* Use this instead of pirq_info() if the structure may need allocating. */
 extern struct pirq *pirq_get_info(struct domain *, int pirq);
 
-#define pirq_field(d, p, f) ({ \
+#define pirq_field(d, p, f, def) ({ \
     const struct pirq *__pi = pirq_info(d, p); \
-    __pi ? __pi->f : 0; \
+    __pi ? __pi->f : def; \
 })
-#define pirq_to_evtchn(d, pirq) pirq_field(d, pirq, evtchn)
-#define pirq_masked(d, pirq) pirq_field(d, pirq, masked)
+#define pirq_to_evtchn(d, pirq) pirq_field(d, pirq, evtchn, 0)
+#define pirq_masked(d, pirq) pirq_field(d, pirq, masked, 0)
 
 void pirq_cleanup_check(struct pirq *, struct domain *);
 
