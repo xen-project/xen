@@ -595,6 +595,7 @@ ENTRY(spurious_interrupt_bug)
         jmp   handle_exception
 
 ENTRY(double_fault)
+        movl  $TRAP_double_fault,4(%rsp)
         SAVE_ALL
         movq  %rsp,%rdi
         call  do_double_fault
