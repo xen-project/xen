@@ -12,3 +12,6 @@
 
 # Running xenbackendd in debug mode
 #XENBACKENDD_DEBUG=[yes|on|1]
+
+# qemu path
+#QEMU_XEN=/usr/lib/xen/bin/qemu-system-i386

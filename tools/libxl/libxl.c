@@ -1783,7 +1783,8 @@ char * libxl__device_disk_local_attach(libxl__gc *gc,
     libxl_ctx *ctx = gc->owner;
     char *dev = NULL;
     char *ret = NULL;
-    int rc;
+    int rc, xs_ret;
+    xs_transaction_t t = XBT_NULL;
 
     if (in_disk->pdev_path == NULL)
         return NULL;
@@ -1827,12 +1828,34 @@ char * libxl__device_disk_local_attach(libxl__gc *gc,
             break;
         case LIBXL_DISK_BACKEND_QDISK:
             if (disk->format != LIBXL_DISK_FORMAT_RAW) {
-                LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot locally"
-                           " attach a qdisk image if the format is not raw");
-                break;
+                do {
+                    t = xs_transaction_start(ctx->xsh);
+                    if (t == XBT_NULL) {
+                        LOG(ERROR, "failed to start a xenstore transaction");
+                        goto out;
+                    }
+                    disk->vdev = libxl__alloc_vdev(gc, blkdev_start, t);
+                    if (disk->vdev == NULL) {
+                        LOG(ERROR, "libxl__alloc_vdev failed");
+                        goto out;
+                    }
+                    if (libxl__device_disk_add(gc, LIBXL_TOOLSTACK_DOMID,
+                                t, disk)) {
+                        LOG(ERROR, "libxl_device_disk_add failed");
+                        goto out;
+                    }
+                    xs_ret = xs_transaction_end(ctx->xsh, t, 0);
+                } while (xs_ret == 0 && errno == EAGAIN);
+                t = XBT_NULL;
+                if (xs_ret == 0) {
+                    LOGE(ERROR, "xenstore transaction failed");
+                    goto out;
+                }
+                dev = GCSPRINTF("/dev/%s", disk->vdev);
+            } else {
+                dev = disk->pdev_path;
             }
-            LOG(DEBUG, "locally attaching qdisk %s", in_disk->pdev_path);
-            dev = disk->pdev_path;
+            LOG(DEBUG, "locally attaching qdisk %s", dev);
             break;
         default:
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend "
@@ -1841,6 +1864,8 @@ char * libxl__device_disk_local_attach(libxl__gc *gc,
     }
 
  out:
+    if (t != XBT_NULL)
+        xs_transaction_end(ctx->xsh, t, 1);
     if (dev != NULL)
         ret = strdup(dev);
     return ret;
@@ -1848,14 +1873,28 @@ char * libxl__device_disk_local_attach(libxl__gc *gc,
 
 int libxl__device_disk_local_detach(libxl__gc *gc, libxl_device_disk *disk)
 {
-    /* Nothing to do for PHYSTYPE_PHY. */
+    int rc = 0;
 
-    /*
-     * For other device types assume that the blktap2 process is
-     * needed by the soon to be started domain and do nothing.
-     */
+    switch (disk->backend) {
+        case LIBXL_DISK_BACKEND_QDISK:
+            if (disk->vdev != NULL) {
+                libxl_device_disk_remove(gc->owner, LIBXL_TOOLSTACK_DOMID,
+                        disk, 0);
+                rc = libxl_device_disk_destroy(gc->owner,
+                        LIBXL_TOOLSTACK_DOMID, disk);
+            }
+            break;
+        default:
+            /*
+             * Nothing to do for PHYSTYPE_PHY.
+             * For other device types assume that the blktap2 process is
+             * needed by the soon to be started domain and do nothing.
+             */
+            break;
+    }
 
-    return 0;
+
+    return rc;
 }
 
 /******************************************************************************/

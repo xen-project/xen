@@ -104,6 +104,9 @@ do_start () {
 	xenconsoled --pid-file=$XENCONSOLED_PIDFILE $XENCONSOLED_ARGS
 	test -z "$XENBACKENDD_DEBUG" || XENBACKENDD_ARGS="-d"
 	test "`uname`" != "NetBSD" || xenbackendd $XENBACKENDD_ARGS
+	echo Starting QEMU as disk backend for dom0
+	test -z "$QEMU_XEN" && QEMU_XEN=/usr/lib/xen/bin/qemu-system-i386
+	$QEMU_XEN -xen-domid 0 -xen-attach -name dom0 -nographic -M xenpv -daemonize -monitor /dev/null
 }
 do_stop () {
         echo Stopping xenconsoled
