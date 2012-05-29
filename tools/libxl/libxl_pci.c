@@ -480,7 +480,7 @@ static int pciback_dev_has_slot(libxl__gc *gc, libxl_device_pci *pcidev)
         return ERROR_FAIL;
     }
 
-    while(fscanf(f, "%x:%x:%x.%x\n", &dom, &bus, &dev, &func)==4) {
+    while(fscanf(f, "%x:%x:%x.%d\n", &dom, &bus, &dev, &func)==4) {
         if(dom == pcidev->domain
            && bus == pcidev->bus
            && dev == pcidev->dev
