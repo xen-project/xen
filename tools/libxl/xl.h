@@ -15,6 +15,8 @@
 #ifndef XL_H
 #define XL_H
 
+#include <assert.h>
+
 #include "xentoollog.h"
 
 struct cmd_spec {
@@ -108,8 +110,32 @@ struct cmd_spec *cmdtable_lookup(const char *s);
 
 extern libxl_ctx *ctx;
 extern xentoollog_logger_stdiostream *logger;
-pid_t xl_fork(libxl_ctx *ctx); /* like fork, but prints and dies if it fails */
-void postfork(void);
+
+void xl_ctx_alloc(void);
+
+/* child processes */
+
+typedef struct {
+    /* every struct like this must be in XLCHILD_LIST */
+    pid_t pid; /* 0: not in use */
+    int reaped; /* valid iff pid!=0 */
+    int status; /* valid iff reaped */
+} xlchild;
+
+typedef enum {
+    child_console, child_waitdaemon, child_migration,
+    child_max
+} xlchildnum;
+
+extern xlchild children[child_max];
+
+pid_t xl_fork(xlchildnum); /* like fork, but prints and dies if it fails */
+void postfork(void); /* needed only if we aren't going to exec right away */
+
+/* Handles EINTR.  Clears out the xlchild so it can be reused. */
+pid_t xl_waitpid(xlchildnum, int *status, int flags);
+
+int xl_child_pid(xlchildnum); /* returns 0 if child struct is not in use */
 
 /* global options */
 extern int autoballoon;

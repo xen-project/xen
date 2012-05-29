@@ -17,7 +17,6 @@
 #include "libxl_osdeps.h"
 
 #include <stdio.h>
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -65,6 +64,8 @@ int logfile = 2;
 
 /* every libxl action in xl uses this same libxl context */
 libxl_ctx *ctx;
+
+xlchild children[child_max];
 
 /* when we operate on a domain, it is this one: */
 static uint32_t domid;
@@ -1496,19 +1497,33 @@ static int freemem(libxl_domain_build_info *b_info)
     return ERROR_NOMEM;
 }
 
+static void console_child_report(void)
+{
+    if (xl_child_pid(child_console)) {
+        int status;
+        pid_t got = xl_waitpid(child_console, &status, 0);
+        if (got < 0)
+            perror("xl: warning, failed to waitpid for console child");
+        else if (status)
+            libxl_report_child_exitstatus(ctx, XTL_ERROR, "console child",
+                                          xl_child_pid(child_console), status);
+    }
+}
+
 static void autoconnect_console(libxl_ctx *ctx_ignored,
                                 libxl_event *ev, void *priv)
 {
-    pid_t *pid = priv;
     uint32_t bldomid = ev->domid;
 
     libxl_event_free(ctx, ev);
 
-    *pid = fork();
-    if (*pid < 0) {
+    console_child_report();
+
+    pid_t pid = xl_fork(child_console);
+    if (pid < 0) {
         perror("unable to fork xenconsole");
         return;
-    } else if (*pid > 0)
+    } else if (pid > 0)
         return;
 
     postfork();
@@ -1580,7 +1595,6 @@ static int create_domain(struct domain_create *dom_info)
     int restore_fd = -1;
     int status = 0;
     const libxl_asyncprogress_how *autoconnect_console_how;
-    pid_t child_console_pid = -1;
     struct save_file_header hdr;
 
     int restoring = (restore_file || (migrate_fd >= 0));
@@ -1741,7 +1755,6 @@ start:
     libxl_asyncprogress_how autoconnect_console_how_buf;
     if ( dom_info->console_autoconnect ) {
         autoconnect_console_how_buf.callback = autoconnect_console;
-        autoconnect_console_how_buf.for_callback = &child_console_pid;
         autoconnect_console_how = &autoconnect_console_how_buf;
     }else{
         autoconnect_console_how = 0;
@@ -1813,19 +1826,17 @@ start:
         pid_t child1, got_child;
         int nullfd;
 
-        child1 = xl_fork(ctx);
+        child1 = xl_fork(child_waitdaemon);
         if (child1) {
             printf("Daemon running with PID %d\n", child1);
 
             for (;;) {
-                got_child = waitpid(child1, &status, 0);
+                got_child = xl_waitpid(child_waitdaemon, &status, 0);
                 if (got_child == child1) break;
                 assert(got_child == -1);
-                if (errno != EINTR) {
-                    perror("failed to wait for daemonizing child");
-                    ret = ERROR_FAIL;
-                    goto out;
-                }
+                perror("failed to wait for daemonizing child");
+                ret = ERROR_FAIL;
+                goto out;
             }
             if (status) {
                 libxl_report_child_exitstatus(ctx, XTL_ERROR,
@@ -1986,10 +1997,7 @@ out:
 
     free(config_data);
 
-waitpid_out:
-    if (child_console_pid > 0 &&
-            waitpid(child_console_pid, &status, 0) < 0 && errno == EINTR)
-        goto waitpid_out;
+    console_child_report();
 
     if (deathw)
         libxl_evdisable_domain_death(ctx, deathw);
@@ -2833,7 +2841,7 @@ static pid_t create_migration_child(const char *rune, int *send_fd,
     MUST( libxl_pipe(ctx, sendpipe) );
     MUST( libxl_pipe(ctx, recvpipe) );
 
-    child = xl_fork(ctx);
+    child = xl_fork(child_migration);
 
     if (!child) {
         dup2(sendpipe[0], 0);
@@ -2877,19 +2885,20 @@ static int migrate_read_fixedmessage(int fd, const void *msg, int msgsz,
     return 0;
 }
 
-static void migration_child_report(pid_t migration_child, int recv_fd) {
+static void migration_child_report(int recv_fd) {
     pid_t child;
     int status, sr;
     struct timeval now, waituntil, timeout;
     static const struct timeval pollinterval = { 0, 1000 }; /* 1ms */
 
-    if (!migration_child) return;
+    if (!xl_child_pid(child_migration)) return;
 
     CHK_ERRNO( gettimeofday(&waituntil, 0) );
     waituntil.tv_sec += 2;
 
     for (;;) {
-        child = waitpid(migration_child, &status, WNOHANG);
+        pid_t migration_child = xl_child_pid(child_migration);
+        child = xl_waitpid(child_migration, &status, WNOHANG);
 
         if (child == migration_child) {
             if (status)
@@ -2899,7 +2908,6 @@ static void migration_child_report(pid_t migration_child, int recv_fd) {
             break;
         }
         if (child == -1) {
-            if (errno == EINTR) continue;
             fprintf(stderr, "wait for migration child [%ld] failed: %s\n",
                     (long)migration_child, strerror(errno));
             break;
@@ -2939,7 +2947,6 @@ static void migration_child_report(pid_t migration_child, int recv_fd) {
             }
         }
     }
-    migration_child = 0;
 }
 
 static void migrate_do_preamble(int send_fd, int recv_fd, pid_t child,
@@ -2958,7 +2965,7 @@ static void migrate_do_preamble(int send_fd, int recv_fd, pid_t child,
                                    "banner", rune);
     if (rc) {
         close(send_fd);
-        migration_child_report(child, recv_fd);
+        migration_child_report(recv_fd);
         exit(-rc);
     }
 
@@ -3083,13 +3090,13 @@ static void migrate_domain(const char *domain_spec, const char *rune,
 
  failed_suspend:
     close(send_fd);
-    migration_child_report(child, recv_fd);
+    migration_child_report(recv_fd);
     fprintf(stderr, "Migration failed, failed to suspend at sender.\n");
     exit(-ERROR_FAIL);
 
  failed_resume:
     close(send_fd);
-    migration_child_report(child, recv_fd);
+    migration_child_report(recv_fd);
     fprintf(stderr, "Migration failed, resuming at sender.\n");
     libxl_domain_resume(ctx, domid, 0);
     exit(-ERROR_FAIL);
@@ -3104,7 +3111,7 @@ static void migrate_domain(const char *domain_spec, const char *rune,
  " responsibility to avoid that.  Sorry.\n");
 
     close(send_fd);
-    migration_child_report(child, recv_fd);
+    migration_child_report(recv_fd);
     exit(-ERROR_BADFAIL);
 }
 

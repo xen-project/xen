@@ -102,22 +102,85 @@ void postfork(void)
     libxl_postfork_child_noexec(ctx); /* in case we don't exit/exec */
     ctx = 0;
 
-    if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, (xentoollog_logger*)logger)) {
-        fprintf(stderr, "cannot reinit xl context after fork\n");
-        exit(-1);
-    }
+    xl_ctx_alloc();
 }
 
-pid_t xl_fork(libxl_ctx *ctx) {
-    pid_t pid;
+pid_t xl_fork(xlchildnum child) {
+    xlchild *ch = &children[child];
+    int i;
 
-    pid = fork();
-    if (pid == -1) {
+    assert(!ch->pid);
+    ch->reaped = 0;
+
+    ch->pid = fork();
+    if (ch->pid == -1) {
         perror("fork failed");
         exit(-1);
     }
 
-    return pid;
+    if (!ch->pid) {
+        /* We are in the child now.  So all these children are not ours. */
+        for (i=0; i<child_max; i++)
+            children[i].pid = 0;
+    }
+
+    return ch->pid;
+}
+
+pid_t xl_waitpid(xlchildnum child, int *status, int flags)
+{
+    xlchild *ch = &children[child];
+    pid_t got = ch->pid;
+    assert(got);
+    if (ch->reaped) {
+        *status = ch->status;
+        ch->pid = 0;
+        return got;
+    }
+    for (;;) {
+        got = waitpid(ch->pid, status, flags);
+        if (got < 0 && errno == EINTR) continue;
+        if (got > 0) {
+            assert(got == ch->pid);
+            ch->pid = 0;
+        }
+        return got;
+    }
+}
+
+int xl_child_pid(xlchildnum child)
+{
+    xlchild *ch = &children[child];
+    return ch->pid;
+}
+
+static int xl_reaped_callback(pid_t got, int status, void *user)
+{
+    int i;
+    assert(got);
+    for (i=0; i<child_max; i++) {
+        xlchild *ch = &children[i];
+        if (ch->pid == got) {
+            ch->reaped = 1;
+            ch->status = status;
+            return 0;
+        }
+    }
+    return ERROR_UNKNOWN_CHILD;
+}
+
+static const libxl_childproc_hooks childproc_hooks = {
+    .chldowner = libxl_sigchld_owner_libxl,
+    .reaped_callback = xl_reaped_callback,
+};
+
+void xl_ctx_alloc(void) {
+    if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, (xentoollog_logger*)logger)) {
+        fprintf(stderr, "cannot init xl context\n");
+        exit(1);
+    }
+
+    libxl_childproc_setmode(ctx, &childproc_hooks, 0);
 }
 
 int main(int argc, char **argv)
@@ -159,10 +222,7 @@ int main(int argc, char **argv)
     logger = xtl_createlogger_stdiostream(stderr, minmsglevel,  0);
     if (!logger) exit(1);
 
-    if (libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, (xentoollog_logger*)logger)) {
-        fprintf(stderr, "cannot init xl context\n");
-        exit(1);
-    }
+    xl_ctx_alloc();
 
     /* Read global config file options */
     ret = asprintf(&config_file, "%s/xl.conf", libxl_xen_config_dir_path());
