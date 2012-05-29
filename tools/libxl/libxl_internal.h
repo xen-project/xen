@@ -1283,7 +1283,8 @@ _hidden void libxl__device_destroy_tapdisk(libxl__gc *gc, char *be_path);
  * a device.
  */
 _hidden char * libxl__device_disk_local_attach(libxl__gc *gc,
-        libxl_device_disk *disk);
+        const libxl_device_disk *in_disk,
+        libxl_device_disk *new_disk);
 _hidden int libxl__device_disk_local_detach(libxl__gc *gc,
         libxl_device_disk *disk);
 
@@ -1818,6 +1819,13 @@ struct libxl__bootloader_state {
     libxl__bootloader_console_callback *console_available;
     const libxl_domain_build_info *info;
     libxl_device_disk *disk;
+    /* Should be zeroed by caller on entry.  Will be filled in by
+     * bootloader machinery; represents the local attachment of the
+     * disk for the benefit of the bootloader.  Must be detached by
+     * the caller using libxl__device_disk_local_detach, but only
+     * after the domain's kernel and initramfs have been loaded into
+     * memory and the file references disposed of. */
+    libxl_device_disk localdisk;
     uint32_t domid;
     /* outputs:
      *  - caller must initialise kernel and ramdisk to point to file

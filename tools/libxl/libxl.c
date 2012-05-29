@@ -1735,12 +1735,23 @@ out:
     return ret;
 }
 
-char * libxl__device_disk_local_attach(libxl__gc *gc, libxl_device_disk *disk)
+char * libxl__device_disk_local_attach(libxl__gc *gc,
+        const libxl_device_disk *in_disk,
+        libxl_device_disk *disk)
 {
     libxl_ctx *ctx = gc->owner;
     char *dev = NULL;
     char *ret = NULL;
     int rc;
+
+    if (in_disk->pdev_path == NULL)
+        return NULL;
+
+    memcpy(disk, in_disk, sizeof(libxl_device_disk));
+    disk->pdev_path = libxl__strdup(gc, in_disk->pdev_path);
+    if (in_disk->script != NULL)
+        disk->script = libxl__strdup(gc, in_disk->script);
+    disk->vdev = NULL;
 
     rc = libxl__device_disk_setdefault(gc, disk);
     if (rc) goto out;
@@ -1779,8 +1790,7 @@ char * libxl__device_disk_local_attach(libxl__gc *gc, libxl_device_disk *disk)
                            " attach a qdisk image if the format is not raw");
                 break;
             }
-            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "locally attaching qdisk %s\n",
-                       disk->pdev_path);
+            LOG(DEBUG, "locally attaching qdisk %s", in_disk->pdev_path);
             dev = disk->pdev_path;
             break;
         default:
