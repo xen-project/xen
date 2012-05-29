@@ -3979,10 +3979,9 @@ static void print_domain_vcpuinfo(uint32_t domid, uint32_t nr_cpus)
 
     for (i = 0; i < nb_vcpu; i++) {
         print_vcpuinfo(domid, &vcpuinfo[i], nr_cpus);
-        libxl_vcpuinfo_dispose(&vcpuinfo[i]);
     }
 
-    free(vcpuinfo);
+    libxl_vcpuinfo_list_free(vcpuinfo, nb_vcpu);
 }
 
 static void vcpulist(int argc, char **argv)
@@ -4070,11 +4069,14 @@ static void vcpupin(const char *d, const char *vcpu, char *cpu)
             fprintf(stderr, "libxl_list_vcpu failed.\n");
             goto vcpupin_out1;
         }
-        for (; nb_vcpu > 0; --nb_vcpu, ++vcpuinfo) {
-            if (libxl_set_vcpuaffinity(ctx, domid, vcpuinfo->vcpuid, &cpumap) == -1) {
-                fprintf(stderr, "libxl_set_vcpuaffinity failed on vcpu `%u'.\n", vcpuinfo->vcpuid);
+        for (i = 0; i < nb_vcpu; i++) {
+            if (libxl_set_vcpuaffinity(ctx, domid, vcpuinfo[i].vcpuid,
+                                       &cpumap) == -1) {
+                fprintf(stderr, "libxl_set_vcpuaffinity failed"
+                                " on vcpu `%u'.\n", vcpuinfo[i].vcpuid);
             }
         }
+        libxl_vcpuinfo_list_free(vcpuinfo, nb_vcpu);
     }
   vcpupin_out1:
     libxl_cpumap_dispose(&cpumap);

@@ -765,6 +765,7 @@ libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nr);
 void libxl_cputopology_list_free(libxl_cputopology *, int nr);
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
                                        int *nb_vcpu, int *nrcpus);
+void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr);
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
                            libxl_cpumap *cpumap);
 int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,

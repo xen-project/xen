@@ -558,6 +558,14 @@ void libxl_cputopology_list_free(libxl_cputopology *list, int nr)
     free(list);
 }
 
+void libxl_vcpuinfo_list_free(libxl_vcpuinfo *list, int nr)
+{
+    int i;
+    for (i = 0; i < nr; i++)
+        libxl_vcpuinfo_dispose(&list[i]);
+    free(list);
+}
+
 int libxl__sendmsg_fds(libxl__gc *gc, int carrier,
                        const void *data, size_t datalen,
                        int nfds, const int fds[], const char *what) {
