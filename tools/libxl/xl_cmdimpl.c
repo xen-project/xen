@@ -1299,7 +1299,7 @@ skip_vfb:
     xlu_cfg_destroy(config);
 }
 
-static void reload_domain_config(libxl_ctx *ctx, uint32_t domid,
+static void reload_domain_config(uint32_t domid,
                                  uint8_t **config_data, int *config_len)
 {
     uint8_t *t_data;
@@ -1319,7 +1319,7 @@ static void reload_domain_config(libxl_ctx *ctx, uint32_t domid,
 
 /* Returns 1 if domain should be restarted,
  * 2 if domain should be renamed then restarted, or 0 */
-static int handle_domain_death(libxl_ctx *ctx, uint32_t domid,
+static int handle_domain_death(uint32_t domid,
                                libxl_event *event,
                                uint8_t **config_data, int *config_len,
                                libxl_domain_config *d_config)
@@ -1378,12 +1378,12 @@ static int handle_domain_death(libxl_ctx *ctx, uint32_t domid,
         break;
 
     case LIBXL_ACTION_ON_SHUTDOWN_RESTART_RENAME:
-        reload_domain_config(ctx, domid, config_data, config_len);
+        reload_domain_config(domid, config_data, config_len);
         restart = 2;
         break;
 
     case LIBXL_ACTION_ON_SHUTDOWN_RESTART:
-        reload_domain_config(ctx, domid, config_data, config_len);
+        reload_domain_config(domid, config_data, config_len);
 
         restart = 1;
         /* fall-through */
@@ -1419,7 +1419,7 @@ static void replace_string(char **str, const char *val)
 }
 
 
-static int preserve_domain(libxl_ctx *ctx, uint32_t domid, libxl_event *event,
+static int preserve_domain(uint32_t domid, libxl_event *event,
                            libxl_domain_config *d_config)
 {
     time_t now;
@@ -1902,11 +1902,11 @@ start:
             LOG("Domain %d has shut down, reason code %d 0x%x", domid,
                 event->u.domain_shutdown.shutdown_reason,
                 event->u.domain_shutdown.shutdown_reason);
-            switch (handle_domain_death(ctx, domid, event,
+            switch (handle_domain_death(domid, event,
                                         (uint8_t **)&config_data, &config_len,
                                         &d_config)) {
             case 2:
-                if (!preserve_domain(ctx, domid, event, &d_config)) {
+                if (!preserve_domain(domid, event, &d_config)) {
                     /* If we fail then exit leaving the old domain in place. */
                     ret = -1;
                     goto out;
