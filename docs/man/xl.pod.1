@@ -394,6 +394,9 @@ Send <config> instead of config file from creation.
 Enable Remus HA for domain. By default B<xl> relies on ssh as a transport
 mechanism between the two hosts.
 
+N.B: Remus support in xl is still in experimental (proof-of-concept) phase.
+     There is no support for network or disk buffering at the moment.
+
 B<OPTIONS>
 
 =over 4
@@ -404,9 +407,8 @@ Checkpoint domain memory every MS milliseconds (default 200ms).
 
 =item B<-b>
 
-Do not checkpoint the disk. Replicate memory checkpoints to /dev/null
-(blackhole).  Network output buffering remains enabled (unless --no-net is
-supplied).  Generally useful for debugging.
+Replicate memory checkpoints to /dev/null (blackhole).
+Generally useful for debugging.
 
 =item B<-u>
 
