@@ -1743,6 +1743,38 @@ out:
     return ret;
 }
 
+/* libxl__alloc_vdev only works on the local domain, that is the domain
+ * where the toolstack is running */
+static char * libxl__alloc_vdev(libxl__gc *gc, const char *blkdev_start,
+        xs_transaction_t t)
+{
+    int devid = 0, disk = 0, part = 0;
+    char *dompath = libxl__xs_get_dompath(gc, LIBXL_TOOLSTACK_DOMID);
+
+    libxl__device_disk_dev_number(blkdev_start, &disk, &part);
+    if (part != 0) {
+        LOG(ERROR, "blkdev_start is invalid");
+        return NULL;
+    }
+
+    do {
+        devid = libxl__device_disk_dev_number(GCSPRINTF("d%dp0", disk),
+                NULL, NULL);
+        if (devid < 0)
+            return NULL;
+        if (libxl__xs_read(gc, t,
+                    libxl__sprintf(gc, "%s/device/vbd/%d/backend",
+                        dompath, devid)) == NULL) {
+            if (errno == ENOENT)
+                return libxl__devid_to_localdev(gc, devid);
+            else
+                return NULL;
+        }
+        disk++;
+    } while (1);
+    return NULL;
+}
+
 char * libxl__device_disk_local_attach(libxl__gc *gc,
         const libxl_device_disk *in_disk,
         libxl_device_disk *disk,

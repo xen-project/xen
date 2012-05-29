@@ -24,3 +24,9 @@ int libxl__try_phy_backend(mode_t st_mode)
 
     return 0;
 }
+
+char *libxl__devid_to_localdev(libxl__gc *gc, int devid)
+{
+    /* TODO */
+    return NULL;
+}

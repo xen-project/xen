@@ -78,6 +78,8 @@
 #define LIBXL_PV_EXTRA_MEMORY 1024
 #define LIBXL_HVM_EXTRA_MEMORY 2048
 #define LIBXL_MIN_DOM0_MEM (128*1024)
+/* use 0 as the domid of the toolstack domain for now */
+#define LIBXL_TOOLSTACK_DOMID 0
 #define QEMU_SIGNATURE "DeviceModelRecord0002"
 #define STUBDOM_CONSOLE_LOGGING 0
 #define STUBDOM_CONSOLE_SAVE 1
@@ -932,6 +934,8 @@ static inline void libxl__domaindeathcheck_stop(libxl__gc *gc,
  */
 _hidden int libxl__try_phy_backend(mode_t st_mode);
 
+
+_hidden char *libxl__devid_to_localdev(libxl__gc *gc, int devid);
 
 /* from libxl_pci */
 
