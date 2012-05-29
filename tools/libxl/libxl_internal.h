@@ -1278,6 +1278,10 @@ _hidden char *libxl__blktap_devpath(libxl__gc *gc,
  */
 _hidden void libxl__device_destroy_tapdisk(libxl__gc *gc, char *be_path);
 
+_hidden int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
+                                   libxl_device_disk *disk,
+                                   libxl__device *device);
+
 /*
  * Make a disk available in this (the control) domain. Returns path to
  * a device.

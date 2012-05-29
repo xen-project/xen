@@ -1327,7 +1327,7 @@ int libxl__device_disk_setdefault(libxl__gc *gc, libxl_device_disk *disk)
     return rc;
 }
 
-static int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
+int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
                                    libxl_device_disk *disk,
                                    libxl__device *device)
 {
