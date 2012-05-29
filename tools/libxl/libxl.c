@@ -1781,9 +1781,10 @@ char * libxl__device_disk_local_attach(libxl__gc *gc,
         const char *blkdev_start)
 {
     libxl_ctx *ctx = gc->owner;
-    char *dev = NULL;
+    char *dev = NULL, *be_path = NULL;
     char *ret = NULL;
     int rc, xs_ret;
+    libxl__device device;
     xs_transaction_t t = XBT_NULL;
 
     if (in_disk->pdev_path == NULL)
@@ -1863,12 +1864,25 @@ char * libxl__device_disk_local_attach(libxl__gc *gc,
             break;
     }
 
- out:
-    if (t != XBT_NULL)
-        xs_transaction_end(ctx->xsh, t, 1);
+    if (disk->vdev != NULL) {
+        rc = libxl__device_from_disk(gc, LIBXL_TOOLSTACK_DOMID, disk, &device);
+        if (rc < 0)
+            goto out;
+        be_path = libxl__device_backend_path(gc, &device);
+        rc = libxl__wait_for_backend(gc, be_path, "4");
+        if (rc < 0)
+            goto out;
+    }
     if (dev != NULL)
         ret = strdup(dev);
     return ret;
+
+ out:
+    if (t != XBT_NULL)
+        xs_transaction_end(ctx->xsh, t, 1);
+    else
+        libxl__device_disk_local_detach(gc, disk);
+    return NULL;
 }
 
 int libxl__device_disk_local_detach(libxl__gc *gc, libxl_device_disk *disk)
