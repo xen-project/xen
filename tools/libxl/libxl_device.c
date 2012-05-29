@@ -58,14 +58,14 @@ int libxl__parse_backend_path(libxl__gc *gc,
     return libxl__device_kind_from_string(strkind, &dev->backend_kind);
 }
 
-int libxl__device_generic_add(libxl__gc *gc, libxl__device *device,
-                             char **bents, char **fents)
+int libxl__device_generic_add(libxl__gc *gc, xs_transaction_t t,
+        libxl__device *device, char **bents, char **fents)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *frontend_path, *backend_path;
-    xs_transaction_t t;
     struct xs_permissions frontend_perms[2];
     struct xs_permissions backend_perms[2];
+    int create_transaction = t == XBT_NULL;
 
     frontend_path = libxl__device_frontend_path(gc, device);
     backend_path = libxl__device_backend_path(gc, device);
@@ -81,7 +81,8 @@ int libxl__device_generic_add(libxl__gc *gc, libxl__device *device,
     backend_perms[1].perms = XS_PERM_READ;
 
 retry_transaction:
-    t = xs_transaction_start(ctx->xsh);
+    if (create_transaction)
+        t = xs_transaction_start(ctx->xsh);
     /* FIXME: read frontend_path and check state before removing stuff */
 
     if (fents) {
@@ -100,13 +101,17 @@ retry_transaction:
         libxl__xs_writev(gc, t, backend_path, bents);
     }
 
+    if (!create_transaction)
+        return 0;
+
     if (!xs_transaction_end(ctx->xsh, t, 0)) {
         if (errno == EAGAIN)
             goto retry_transaction;
-        else
+        else {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xs transaction failed");
+            return ERROR_FAIL;
+        }
     }
-
     return 0;
 }
 

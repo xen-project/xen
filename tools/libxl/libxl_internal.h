@@ -810,8 +810,8 @@ _hidden int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
                                       libxl__device_console *console,
                                       libxl__domain_build_state *state);
 
-_hidden int libxl__device_generic_add(libxl__gc *gc, libxl__device *device,
-                             char **bents, char **fents);
+_hidden int libxl__device_generic_add(libxl__gc *gc, xs_transaction_t t,
+        libxl__device *device, char **bents, char **fents);
 _hidden char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device);
 _hidden char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device);
 _hidden int libxl__parse_backend_path(libxl__gc *gc, const char *path,
