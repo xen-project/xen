@@ -38,6 +38,7 @@ xentoollog_logger_stdiostream *logger;
 int dryrun_only;
 int force_execution;
 int autoballoon = 1;
+char *blkdev_start;
 char *lockfile;
 char *default_vifscript = NULL;
 char *default_bridge = NULL;
@@ -94,6 +95,8 @@ static void parse_global_config(const char *configfile,
             fprintf(stderr, "invalid default output format \"%s\"\n", buf);
         }
     }
+    if (!xlu_cfg_get_string (config, "blkdev_start", &buf, 0))
+        blkdev_start = strdup(buf);
     xlu_cfg_destroy(config);
 }
 

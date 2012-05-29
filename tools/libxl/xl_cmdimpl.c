@@ -627,6 +627,8 @@ static void parse_config_data(const char *config_source,
     }
 
     libxl_domain_build_info_init_type(b_info, c_info->type);
+    if (blkdev_start)
+        b_info->blkdev_start = strdup(blkdev_start);
 
     /* the following is the actual config parsing with overriding values in the structures */
     if (!xlu_cfg_get_long (config, "cpu_weight", &l, 0))

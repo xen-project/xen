@@ -344,7 +344,8 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
         goto out;
     }
 
-    bl->diskpath = libxl__device_disk_local_attach(gc, bl->disk, &bl->localdisk);
+    bl->diskpath = libxl__device_disk_local_attach(gc, bl->disk, &bl->localdisk,
+            info->blkdev_start);
     if (!bl->diskpath) {
         rc = ERROR_FAIL;
         goto out;

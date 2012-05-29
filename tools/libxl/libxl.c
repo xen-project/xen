@@ -1745,7 +1745,8 @@ out:
 
 char * libxl__device_disk_local_attach(libxl__gc *gc,
         const libxl_device_disk *in_disk,
-        libxl_device_disk *disk)
+        libxl_device_disk *disk,
+        const char *blkdev_start)
 {
     libxl_ctx *ctx = gc->owner;
     char *dev = NULL;

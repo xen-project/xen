@@ -246,6 +246,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("localtime",       libxl_defbool),
     ("disable_migrate", libxl_defbool),
     ("cpuid",           libxl_cpuid_policy_list),
+    ("blkdev_start",    string),
     
     ("device_model_version", libxl_device_model_version),
     ("device_model_stubdomain", libxl_defbool),

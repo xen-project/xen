@@ -1290,7 +1290,8 @@ _hidden int libxl__device_disk_add(libxl__gc *gc, uint32_t domid,
  */
 _hidden char * libxl__device_disk_local_attach(libxl__gc *gc,
         const libxl_device_disk *in_disk,
-        libxl_device_disk *new_disk);
+        libxl_device_disk *new_disk,
+        const char *blkdev_start);
 _hidden int libxl__device_disk_local_detach(libxl__gc *gc,
         libxl_device_disk *disk);
 
