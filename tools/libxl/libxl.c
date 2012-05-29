@@ -1735,9 +1735,9 @@ out:
     return ret;
 }
 
-char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
+char * libxl__device_disk_local_attach(libxl__gc *gc, libxl_device_disk *disk)
 {
-    GC_INIT(ctx);
+    libxl_ctx *ctx = gc->owner;
     char *dev = NULL;
     char *ret = NULL;
     int rc;
@@ -1792,21 +1792,16 @@ char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk)
  out:
     if (dev != NULL)
         ret = strdup(dev);
-    GC_FREE;
     return ret;
 }
 
-int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk)
+int libxl__device_disk_local_detach(libxl__gc *gc, libxl_device_disk *disk)
 {
     /* Nothing to do for PHYSTYPE_PHY. */
 
     /*
      * For other device types assume that the blktap2 process is
      * needed by the soon to be started domain and do nothing.
-     */
-    /*
-     * FIXME
-     * This appears to leak the disk in failure paths
      */
 
     return 0;

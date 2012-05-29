@@ -225,7 +225,7 @@ static void bootloader_cleanup(libxl__egc *egc, libxl__bootloader_state *bl)
     if (bl->outputdir) libxl__remove_directory(gc, bl->outputdir);
 
     if (bl->diskpath) {
-        libxl_device_disk_local_detach(CTX, bl->disk);
+        libxl__device_disk_local_detach(gc, bl->disk);
         free(bl->diskpath);
         bl->diskpath = 0;
     }
@@ -344,7 +344,7 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
         goto out;
     }
 
-    bl->diskpath = libxl_device_disk_local_attach(CTX, bl->disk);
+    bl->diskpath = libxl__device_disk_local_attach(gc, bl->disk);
     if (!bl->diskpath) {
         rc = ERROR_FAIL;
         goto out;

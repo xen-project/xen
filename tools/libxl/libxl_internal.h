@@ -1278,6 +1278,15 @@ _hidden char *libxl__blktap_devpath(libxl__gc *gc,
  */
 _hidden void libxl__device_destroy_tapdisk(libxl__gc *gc, char *be_path);
 
+/*
+ * Make a disk available in this (the control) domain. Returns path to
+ * a device.
+ */
+_hidden char * libxl__device_disk_local_attach(libxl__gc *gc,
+        libxl_device_disk *disk);
+_hidden int libxl__device_disk_local_detach(libxl__gc *gc,
+        libxl_device_disk *disk);
+
 _hidden char *libxl__uuid2string(libxl__gc *gc, const libxl_uuid uuid);
 
 struct libxl__xen_console_reader {

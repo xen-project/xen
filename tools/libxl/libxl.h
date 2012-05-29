@@ -654,13 +654,6 @@ int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
  */
 int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
 
-/*
- * Make a disk available in this (the control) domain. Returns path to
- * a device.
- */
-char * libxl_device_disk_local_attach(libxl_ctx *ctx, libxl_device_disk *disk);
-int libxl_device_disk_local_detach(libxl_ctx *ctx, libxl_device_disk *disk);
-
 /* Network Interfaces */
 int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
 int libxl_device_nic_remove(libxl_ctx *ctx, uint32_t domid,
