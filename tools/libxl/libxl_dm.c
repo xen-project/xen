@@ -715,10 +715,6 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     dm_config->b_info.max_memkb = 32 * 1024;
     dm_config->b_info.target_memkb = dm_config->b_info.max_memkb;
 
-    dm_config->b_info.u.pv.kernel.path = libxl__abs_path(gc, "ioemu-stubdom.gz",
-                                              libxl__xenfirmwaredir_path());
-    dm_config->b_info.u.pv.cmdline = libxl__sprintf(gc, " -d %d", guest_domid);
-    dm_config->b_info.u.pv.ramdisk.path = "";
     dm_config->b_info.u.pv.features = "";
 
     dm_config->b_info.device_model_version =
@@ -745,6 +741,11 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     dm_config->num_vfbs = 1;
     dm_config->vkbs = &vkb;
     dm_config->num_vkbs = 1;
+
+    stubdom_state->pv_kernel.path
+        = libxl__abs_path(gc, "ioemu-stubdom.gz", libxl__xenfirmwaredir_path());
+    stubdom_state->pv_cmdline = libxl__sprintf(gc, " -d %d", guest_domid);
+    stubdom_state->pv_ramdisk.path = "";
 
     /* fixme: this function can leak the stubdom if it fails */
     ret = libxl__domain_make(gc, &dm_config->c_info, &sdss->pvqemu.guest_domid);

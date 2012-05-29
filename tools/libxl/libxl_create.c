@@ -242,6 +242,7 @@ static int init_console_info(libxl__device_console *console, int dev_num)
         return ERROR_NOMEM;
     return 0;
 }
+
 int libxl__domain_build(libxl__gc *gc,
                         libxl_domain_build_info *info,
                         uint32_t domid,
@@ -290,17 +291,18 @@ int libxl__domain_build(libxl__gc *gc,
         vments[i++] = "image/ostype";
         vments[i++] = "linux";
         vments[i++] = "image/kernel";
-        vments[i++] = (char*) info->u.pv.kernel.path;
+        vments[i++] = (char *) state->pv_kernel.path;
         vments[i++] = "start_time";
         vments[i++] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
-        if (info->u.pv.ramdisk.path) {
+        if (state->pv_ramdisk.path) {
             vments[i++] = "image/ramdisk";
-            vments[i++] = (char*) info->u.pv.ramdisk.path;
+            vments[i++] = (char *) state->pv_ramdisk.path;
         }
-        if (info->u.pv.cmdline) {
+        if (state->pv_cmdline) {
             vments[i++] = "image/cmdline";
-            vments[i++] = (char*) info->u.pv.cmdline;
+            vments[i++] = (char *) state->pv_cmdline;
         }
+
         break;
     default:
         ret = ERROR_INVAL;
@@ -346,16 +348,16 @@ static int domain_restore(libxl__gc *gc, libxl_domain_build_info *info,
         vments[i++] = "image/ostype";
         vments[i++] = "linux";
         vments[i++] = "image/kernel";
-        vments[i++] = (char*) info->u.pv.kernel.path;
+        vments[i++] = (char *) state->pv_kernel.path;
         vments[i++] = "start_time";
         vments[i++] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
-        if (info->u.pv.ramdisk.path) {
+        if (state->pv_ramdisk.path) {
             vments[i++] = "image/ramdisk";
-            vments[i++] = (char*) info->u.pv.ramdisk.path;
+            vments[i++] = (char *) state->pv_ramdisk.path;
         }
-        if (info->u.pv.cmdline) {
+        if (state->pv_cmdline) {
             vments[i++] = "image/cmdline";
-            vments[i++] = (char*) info->u.pv.cmdline;
+            vments[i++] = (char *) state->pv_cmdline;
         }
         break;
     default:
@@ -374,8 +376,8 @@ static int domain_restore(libxl__gc *gc, libxl_domain_build_info *info,
 
 out:
     if (info->type == LIBXL_DOMAIN_TYPE_PV) {
-        libxl__file_reference_unmap(&info->u.pv.kernel);
-        libxl__file_reference_unmap(&info->u.pv.ramdisk);
+        libxl__file_reference_unmap(&state->pv_kernel);
+        libxl__file_reference_unmap(&state->pv_ramdisk);
     }
 
     esave = errno;
@@ -625,16 +627,21 @@ static void initiate_domain_create(libxl__egc *egc,
     libxl_device_disk *bootdisk =
         d_config->num_disks > 0 ? &d_config->disks[0] : NULL;
 
-    if (restore_fd < 0 && bootdisk) {
+    if (restore_fd >= 0) {
+        LOG(DEBUG, "restoring, not running bootloader\n");
+        domcreate_bootloader_done(egc, &dcs->bl, 0);
+    } else  {
+        LOG(DEBUG, "running bootloader");
         dcs->bl.callback = domcreate_bootloader_done;
         dcs->bl.console_available = domcreate_bootloader_console_available;
-        dcs->bl.info = &d_config->b_info,
+        dcs->bl.info = &d_config->b_info;
         dcs->bl.disk = bootdisk;
         dcs->bl.domid = dcs->guest_domid;
-            
+
+        dcs->bl.kernel = &dcs->build_state.pv_kernel;
+        dcs->bl.ramdisk = &dcs->build_state.pv_ramdisk;
+
         libxl__bootloader_run(egc, &dcs->bl);
-    } else {
-        domcreate_bootloader_done(egc, &dcs->bl, 0);
     }
     return;
 
@@ -674,6 +681,11 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     libxl_ctx *const ctx = CTX;
 
     if (ret) goto error_out;
+
+    /* consume bootloader outputs. state->pv_{kernel,ramdisk} have
+     * been initialised by the bootloader already.
+     */
+    state->pv_cmdline = bl->cmdline;
 
     /* We might be going to call libxl__spawn_local_dm, or _spawn_stub_dm.
      * Fill in any field required by either, including both relevant

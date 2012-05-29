@@ -146,9 +146,9 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         printf("\t\t(linux %d)\n", 0);
-        printf("\t\t\t(kernel %s)\n", b_info->u.pv.kernel.path);
+        printf("\t\t\t(kernel %s)\n", b_info->u.pv.kernel);
         printf("\t\t\t(cmdline %s)\n", b_info->u.pv.cmdline);
-        printf("\t\t\t(ramdisk %s)\n", b_info->u.pv.ramdisk.path);
+        printf("\t\t\t(ramdisk %s)\n", b_info->u.pv.ramdisk);
         printf("\t\t\t(e820_host %s)\n",
                libxl_defbool_to_string(b_info->u.pv.e820_host));
         printf("\t\t)\n");

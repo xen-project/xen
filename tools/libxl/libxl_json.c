@@ -252,15 +252,6 @@ out:
     return s;
 }
 
-yajl_gen_status libxl_file_reference_gen_json(yajl_gen hand,
-                                              libxl_file_reference *p)
-{
-    if (p->path)
-        return libxl__yajl_gen_asciiz(hand, p->path);
-    else
-        return yajl_gen_null(hand);
-}
-
 yajl_gen_status libxl__string_gen_json(yajl_gen hand,
                                        const char *p)
 {

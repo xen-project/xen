@@ -43,7 +43,8 @@ static void bootloader_arg(libxl__bootloader_state *bl, const char *arg)
     bl->args[bl->nargs++] = arg;
 }
 
-static void make_bootloader_args(libxl__gc *gc, libxl__bootloader_state *bl)
+static void make_bootloader_args(libxl__gc *gc, libxl__bootloader_state *bl,
+                                 const char *bootloader_path)
 {
     const libxl_domain_build_info *info = bl->info;
 
@@ -53,12 +54,12 @@ static void make_bootloader_args(libxl__gc *gc, libxl__bootloader_state *bl)
 
 #define ARG(arg) bootloader_arg(bl, (arg))
 
-    ARG(info->u.pv.bootloader);
+    ARG(bootloader_path);
 
-    if (info->u.pv.kernel.path)
-        ARG(libxl__sprintf(gc, "--kernel=%s", info->u.pv.kernel.path));
-    if (info->u.pv.ramdisk.path)
-        ARG(libxl__sprintf(gc, "--ramdisk=%s", info->u.pv.ramdisk.path));
+    if (info->u.pv.kernel)
+        ARG(libxl__sprintf(gc, "--kernel=%s", info->u.pv.kernel));
+    if (info->u.pv.ramdisk)
+        ARG(libxl__sprintf(gc, "--ramdisk=%s", info->u.pv.ramdisk));
     if (info->u.pv.cmdline && *info->u.pv.cmdline != '\0')
         ARG(libxl__sprintf(gc, "--args=%s", info->u.pv.cmdline));
 
@@ -144,7 +145,6 @@ static int parse_bootloader_result(libxl__egc *egc,
     char buf[PATH_MAX*2];
     FILE *f = 0;
     int rc = ERROR_FAIL;
-    libxl_domain_build_info *info = bl->info;
 
     f = fopen(bl->outputpath, "r");
     if (!f) {
@@ -180,18 +180,15 @@ static int parse_bootloader_result(libxl__egc *egc,
 #define COMMAND(s) ((rhs = bootloader_result_command(gc, buf, s, sizeof(s)-1)))
 
         if (COMMAND("kernel")) {
-            free(info->u.pv.kernel.path);
-            info->u.pv.kernel.path = libxl__strdup(NULL, rhs);
-            libxl__file_reference_map(&info->u.pv.kernel);
-            unlink(info->u.pv.kernel.path);
+            bl->kernel->path = libxl__strdup(gc, rhs);
+            libxl__file_reference_map(bl->kernel);
+            unlink(bl->kernel->path);
         } else if (COMMAND("ramdisk")) {
-            free(info->u.pv.ramdisk.path);
-            info->u.pv.ramdisk.path = libxl__strdup(NULL, rhs);
-            libxl__file_reference_map(&info->u.pv.ramdisk);
-            unlink(info->u.pv.ramdisk.path);
+            bl->ramdisk->path = libxl__strdup(gc, rhs);
+            libxl__file_reference_map(bl->ramdisk);
+            unlink(bl->ramdisk->path);
         } else if (COMMAND("args")) {
-            free(info->u.pv.cmdline);
-            info->u.pv.cmdline = libxl__strdup(NULL, rhs);
+            bl->cmdline = libxl__strdup(gc, rhs);
         } else if (l) {
             LOG(WARN, "unexpected output from bootloader: `%s'", buf);
         }
@@ -281,16 +278,33 @@ static void bootloader_abort(libxl__egc *egc,
 void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
 {
     STATE_AO_GC(bl->ao);
-    libxl_domain_build_info *info = bl->info;
+    const libxl_domain_build_info *info = bl->info;
     uint32_t domid = bl->domid;
     char *logfile_tmp = NULL;
     int rc, r;
+    const char *bootloader;
 
     libxl__bootloader_init(bl);
 
-    if (info->type != LIBXL_DOMAIN_TYPE_PV || !info->u.pv.bootloader) {
+    if (info->type != LIBXL_DOMAIN_TYPE_PV) {
+        LOG(DEBUG, "not a PV domain, skipping bootloader");
         rc = 0;
         goto out_ok;
+    }
+
+    if (!info->u.pv.bootloader) {
+        LOG(DEBUG, "no bootloader configured, using user supplied kernel");
+        bl->kernel->path = bl->info->u.pv.kernel;
+        bl->ramdisk->path = bl->info->u.pv.ramdisk;
+        bl->cmdline = bl->info->u.pv.cmdline;
+        rc = 0;
+        goto out_ok;
+    }
+
+    if (!bl->disk) {
+        LOG(ERROR, "cannot run bootloader with no boot disk");
+        rc = ERROR_FAIL;
+        goto out;
     }
 
     bootloader_setpaths(gc, bl);
@@ -342,27 +356,26 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
         LOG(WARN, "bootloader='/usr/bin/pygrub' is deprecated; use " \
             "bootloader='pygrub' instead");
 
+    bootloader = info->u.pv.bootloader;
+
     /* If the full path is not specified, check in the libexec path */
-    if ( info->u.pv.bootloader[0] != '/' ) {
-        char *bootloader;
+    if ( bootloader[0] != '/' ) {
+        const char *bltmp;
         struct stat st;
 
-        bootloader = libxl__abs_path(gc, info->u.pv.bootloader,
-                                     libxl__libexec_path());
+        bltmp = libxl__abs_path(gc, bootloader, libxl__libexec_path());
         /* Check to see if the file exists in this location; if not,
          * fall back to checking the path */
-        LOG(DEBUG, "Checking for bootloader in libexec path: %s", bootloader);
+        LOG(DEBUG, "Checking for bootloader in libexec path: %s", bltmp);
 
-        if ( lstat(bootloader, &st) )
+        if ( lstat(bltmp, &st) )
             LOG(DEBUG, "%s doesn't exist, falling back to config path",
-                bootloader);
-        else {
-            free(info->u.pv.bootloader);
-            info->u.pv.bootloader = libxl__strdup(NULL, bootloader);
-        }
+                bltmp);
+        else
+            bootloader = bltmp;
     }
 
-    make_bootloader_args(gc, bl);
+    make_bootloader_args(gc, bl, bootloader);
 
     bl->openpty.ao = ao;
     bl->openpty.callback = bootloader_gotptys;
@@ -563,33 +576,6 @@ static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,
 
  out:
     bootloader_callback(egc, bl, rc);
-}
-
-/*----- entrypoint for external callers -----*/
-
-static void run_bootloader_done(libxl__egc *egc,
-                                libxl__bootloader_state *st, int rc)
-{
-    libxl__ao_complete(egc, st->ao, rc);
-}
-
-int libxl_run_bootloader(libxl_ctx *ctx,
-                         libxl_domain_build_info *info,
-                         libxl_device_disk *disk,
-                         uint32_t domid,
-                         libxl_asyncop_how *ao_how)
-{
-    AO_CREATE(ctx,domid,ao_how);
-    libxl__bootloader_state *bl;
-
-    GCNEW(bl);
-    bl->ao = ao;
-    bl->callback = run_bootloader_done;
-    bl->info = info;
-    bl->disk = disk;
-    bl->domid = domid;
-    libxl__bootloader_run(egc, bl);
-    return AO_INPROGRESS;
 }
 
 /*

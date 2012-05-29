@@ -32,8 +32,6 @@ yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
 yajl_gen_status libxl_string_list_gen_json(yajl_gen hand, libxl_string_list *p);
 yajl_gen_status libxl_key_value_list_gen_json(yajl_gen hand,
                                               libxl_key_value_list *p);
-yajl_gen_status libxl_file_reference_gen_json(yajl_gen hand,
-                                              libxl_file_reference *p);
 yajl_gen_status libxl_hwcap_gen_json(yajl_gen hand, libxl_hwcap *p);
 
 #include <_libxl_types_json.h>

@@ -15,8 +15,6 @@ libxl_cpuid_policy_list = Builtin("cpuid_policy_list", dispose_fn="libxl_cpuid_d
 
 libxl_string_list = Builtin("string_list", dispose_fn="libxl_string_list_dispose", passby=PASS_BY_REFERENCE)
 libxl_key_value_list = Builtin("key_value_list", dispose_fn="libxl_key_value_list_dispose", passby=PASS_BY_REFERENCE)
-libxl_file_reference = Builtin("file_reference", dispose_fn="libxl_file_reference_dispose", passby=PASS_BY_REFERENCE)
-
 libxl_hwcap = Builtin("hwcap", passby=PASS_BY_REFERENCE)
 
 #
@@ -235,11 +233,6 @@ libxl_sched_params = Struct("sched_params",[
     ("extratime",    integer),
     ], dir=DIR_IN)
 
-# Instances of libxl_file_reference contained in this struct which
-# have been mapped (with libxl_file_reference_map) will be unmapped
-# by libxl_domain_build/restore. If either of these are never called
-# then the user is responsible for calling
-# libxl_file_reference_unmap.
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),
     ("cur_vcpus",       integer),
@@ -305,12 +298,12 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("soundhw",          string),
                                        ("xen_platform_pci", libxl_defbool),
                                        ])),
-                 ("pv", Struct(None, [("kernel", libxl_file_reference),
+                 ("pv", Struct(None, [("kernel", string),
                                       ("slack_memkb", MemKB),
                                       ("bootloader", string),
                                       ("bootloader_args", libxl_string_list),
                                       ("cmdline", string),
-                                      ("ramdisk", libxl_file_reference),
+                                      ("ramdisk", string),
                                       ("features", string, {'const': True}),
                                       # Use host's E820 for PCI passthrough.
                                       ("e820_host", libxl_defbool),

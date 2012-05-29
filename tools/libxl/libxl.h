@@ -288,18 +288,6 @@ typedef struct {
 } libxl_cpumap;
 void libxl_cpumap_dispose(libxl_cpumap *map);
 
-typedef struct {
-    /*
-     * Path is always set if the file reference is valid. However if
-     * mapped is true then the actual file may already be unlinked.
-     */
-    char * path;
-    int mapped;
-    void * data;
-    size_t size;
-} libxl_file_reference;
-void libxl_file_reference_dispose(libxl_file_reference *p);
-
 /* libxl_cpuid_policy_list is a dynamic array storing CPUID policies
  * for multiple leafs. It is terminated with an entry holding
  * XEN_CPUID_INPUT_UNUSED in input[0]
@@ -421,7 +409,8 @@ enum {
  * of course check the rc value for errors.
  *
  * *ao_how does not need to remain valid after the initiating function
- * returns.
+ * returns. All other parameters must remain valid for the lifetime of
+ * the asynchronous operation, unless otherwise specified.
  *
  * Callbacks may occur on any thread in which the application calls
  * libxl.
@@ -542,27 +531,6 @@ int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid, libxl_domain_create_in
 
 /* get max. number of cpus supported by hypervisor */
 int libxl_get_max_cpus(libxl_ctx *ctx);
-
-/*
- * Run the configured bootloader for a PV domain and update
- * info->kernel, info->u.pv.ramdisk and info->u.pv.cmdline as
- * appropriate (any initial values present in these fields must have
- * been allocated with malloc).
- *
- * Is a NOP on non-PV domains or those with no bootloader configured.
- *
- * Users should call libxl_file_reference_unmap on the kernel and
- * ramdisk to cleanup or rely on libxl_domain_{build,restore} to do
- * it.
- */
-int libxl_run_bootloader(libxl_ctx *ctx,
-                         libxl_domain_build_info *info,
-                         libxl_device_disk *disk,
-                         uint32_t domid,
-                         libxl_asyncop_how *ao_how);
-
-  /* 0 means ERROR_ENOMEM, which we have logged */
-
 
 int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
                         const char *old_name, const char *new_name);

@@ -243,11 +243,6 @@ int attrib__libxl_cpumap_set(PyObject *v, libxl_cpumap *pptr)
     return 0;
 }
 
-int attrib__libxl_file_reference_set(PyObject *v, libxl_file_reference *pptr)
-{
-    return genwrap__string_set(v, &pptr->path);
-}
-
 int attrib__libxl_hwcap_set(PyObject *v, libxl_hwcap *pptr)
 {
     PyErr_SetString(PyExc_NotImplementedError, "Setting hwcap");
@@ -313,11 +308,6 @@ PyObject *attrib__libxl_cpumap_get(libxl_cpumap *pptr)
         }
     }
     return cpulist;
-}
-
-PyObject *attrib__libxl_file_reference_get(libxl_file_reference *pptr)
-{
-    return genwrap__string_get(&pptr->path);
 }
 
 PyObject *attrib__libxl_hwcap_get(libxl_hwcap *pptr)

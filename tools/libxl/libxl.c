@@ -3665,12 +3665,6 @@ int libxl_tmem_freeable(libxl_ctx *ctx)
     return rc;
 }
 
-void libxl_file_reference_dispose(libxl_file_reference *f)
-{
-    libxl__file_reference_unmap(f);
-    free(f->path);
-}
-
 int libxl_get_freecpus(libxl_ctx *ctx, libxl_cpumap *cpumap)
 {
     int ncpus;

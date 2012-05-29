@@ -721,6 +721,20 @@ int libxl__self_pipe_eatall(int fd); /* returns 0 or -1 setting errno */
 _hidden int libxl__atfork_init(libxl_ctx *ctx);
 
 
+/* File references */
+typedef struct {
+    /*
+     * Path is always set if the file reference is valid. However if
+     * mapped is true then the actual file may already be unlinked.
+     */
+    const char * path;
+    int mapped;
+    void * data;
+    size_t size;
+} libxl__file_reference;
+_hidden int libxl__file_reference_map(libxl__file_reference *f);
+_hidden int libxl__file_reference_unmap(libxl__file_reference *f);
+
 /* from xl_dom */
 _hidden libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid);
@@ -739,6 +753,10 @@ typedef struct {
     unsigned long vm_generationid_addr;
 
     char *saved_state;
+
+    libxl__file_reference pv_kernel;
+    libxl__file_reference pv_ramdisk;
+    const char * pv_cmdline;
 } libxl__domain_build_state;
 
 _hidden int libxl__build_pre(libxl__gc *gc, uint32_t domid,
@@ -1273,9 +1291,6 @@ struct libxl__xen_console_reader {
 
 _hidden int libxl__error_set(libxl__gc *gc, int code);
 
-_hidden int libxl__file_reference_map(libxl_file_reference *f);
-_hidden int libxl__file_reference_unmap(libxl_file_reference *f);
-
 _hidden int libxl__e820_alloc(libxl__gc *gc, uint32_t domid, libxl_domain_config *d_config);
 
 /* parse the string @s as a sequence of 6 colon separated bytes in to @mac */
@@ -1792,9 +1807,17 @@ struct libxl__bootloader_state {
     libxl__ao *ao;
     libxl__run_bootloader_callback *callback;
     libxl__bootloader_console_callback *console_available;
-    libxl_domain_build_info *info; /* u.pv.{kernel,ramdisk,cmdline} updated */
+    const libxl_domain_build_info *info;
     libxl_device_disk *disk;
     uint32_t domid;
+    /* outputs:
+     *  - caller must initialise kernel and ramdisk to point to file
+     *    references, these will be updated and mapped;
+     *  - caller must initialise cmdline to NULL, it will be updated with a
+     *    string allocated from the gc;
+     */
+    libxl__file_reference *kernel, *ramdisk;
+    const char *cmdline;
     /* private to libxl__run_bootloader */
     char *outputpath, *outputdir, *logfile;
     char *diskpath; /* not from gc, represents actually attached disk */
@@ -1837,7 +1860,6 @@ struct libxl__domain_create_state {
         /* If we're not doing stubdom, we use only dmss.dm,
          * for the non-stubdom device model. */
 };
-
 
 /*
  * Convenience macros.

@@ -216,7 +216,7 @@ char *libxl__abs_path(libxl__gc *gc, const char *s, const char *path)
 }
 
 
-int libxl__file_reference_map(libxl_file_reference *f)
+int libxl__file_reference_map(libxl__file_reference *f)
 {
     struct stat st_buf;
     int ret, fd;
@@ -249,7 +249,7 @@ out:
     return ret == 0 ? 0 : ERROR_FAIL;
 }
 
-int libxl__file_reference_unmap(libxl_file_reference *f)
+int libxl__file_reference_unmap(libxl__file_reference *f)
 {
     int ret;
 

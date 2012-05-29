@@ -21,8 +21,7 @@ def randomize_enum(e):
     return random.choice([v.name for v in e.values])
 
 handcoded = ["libxl_cpumap", "libxl_key_value_list",
-             "libxl_cpuid_policy_list", "libxl_file_reference",
-             "libxl_string_list"]
+             "libxl_cpuid_policy_list", "libxl_string_list"]
 
 def gen_rand_init(ty, v, indent = "    ", parent = None):
     s = ""
@@ -177,13 +176,6 @@ static void libxl_cpuid_policy_list_rand_init(libxl_cpuid_policy_list *pp)
         libxl_cpuid_parse_config(&p, buf);
     }
     *pp = p;
-}
-
-static void libxl_file_reference_rand_init(libxl_file_reference *p)
-{
-    memset(p, 0, sizeof(*p));
-    if (rand() % 8)
-        p->path = rand_str();
 }
 
 static void libxl_string_list_rand_init(libxl_string_list *p)

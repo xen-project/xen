@@ -240,36 +240,37 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
 
     xc_dom_loginit(ctx->xch);
 
-    dom = xc_dom_allocate(ctx->xch, info->u.pv.cmdline, info->u.pv.features);
+    dom = xc_dom_allocate(ctx->xch, state->pv_cmdline, info->u.pv.features);
     if (!dom) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_allocate failed");
         return ERROR_FAIL;
     }
 
-    if (info->u.pv.kernel.mapped) {
+    LOG(DEBUG, "pv kernel mapped %d path %s\n", state->pv_kernel.mapped, state->pv_kernel.path);
+    if (state->pv_kernel.mapped) {
         ret = xc_dom_kernel_mem(dom,
-                                info->u.pv.kernel.data,
-                                info->u.pv.kernel.size);
+                                state->pv_kernel.data,
+                                state->pv_kernel.size);
         if ( ret != 0) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_kernel_mem failed");
             goto out;
         }
     } else {
-        ret = xc_dom_kernel_file(dom, info->u.pv.kernel.path);
+        ret = xc_dom_kernel_file(dom, state->pv_kernel.path);
         if ( ret != 0) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_kernel_file failed");
             goto out;
         }
     }
 
-    if ( info->u.pv.ramdisk.path && strlen(info->u.pv.ramdisk.path) ) {
-        if (info->u.pv.ramdisk.mapped) {
-            if ( (ret = xc_dom_ramdisk_mem(dom, info->u.pv.ramdisk.data, info->u.pv.ramdisk.size)) != 0 ) {
+    if ( state->pv_ramdisk.path && strlen(state->pv_ramdisk.path) ) {
+        if (state->pv_ramdisk.mapped) {
+            if ( (ret = xc_dom_ramdisk_mem(dom, state->pv_ramdisk.data, state->pv_ramdisk.size)) != 0 ) {
                 LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_ramdisk_mem failed");
                 goto out;
             }
         } else {
-            if ( (ret = xc_dom_ramdisk_file(dom, info->u.pv.ramdisk.path)) != 0 ) {
+            if ( (ret = xc_dom_ramdisk_file(dom, state->pv_ramdisk.path)) != 0 ) {
                 LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_ramdisk_file failed");
                 goto out;
             }
@@ -313,6 +314,9 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
 
     state->console_mfn = xc_dom_p2m_host(dom, dom->console_pfn);
     state->store_mfn = xc_dom_p2m_host(dom, dom->xenstore_pfn);
+
+    libxl__file_reference_unmap(&state->pv_kernel);
+    libxl__file_reference_unmap(&state->pv_ramdisk);
 
     ret = 0;
 out:

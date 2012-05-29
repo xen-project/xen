@@ -844,7 +844,7 @@ static void parse_config_data(const char *config_source,
         char *cmdline = NULL;
         const char *root = NULL, *extra = "";
 
-        xlu_cfg_replace_string (config, "kernel", &b_info->u.pv.kernel.path, 0);
+        xlu_cfg_replace_string (config, "kernel", &b_info->u.pv.kernel, 0);
 
         xlu_cfg_get_string (config, "root", &root, 0);
         xlu_cfg_get_string (config, "extra", &extra, 0);
@@ -883,13 +883,13 @@ static void parse_config_data(const char *config_source,
             exit(-ERROR_FAIL);
         }
 
-        if (!b_info->u.pv.bootloader && !b_info->u.pv.kernel.path) {
+        if (!b_info->u.pv.bootloader && !b_info->u.pv.kernel) {
             fprintf(stderr, "Neither kernel nor bootloader specified\n");
             exit(1);
         }
 
         b_info->u.pv.cmdline = cmdline;
-        xlu_cfg_replace_string (config, "ramdisk", &b_info->u.pv.ramdisk.path, 0);
+        xlu_cfg_replace_string (config, "ramdisk", &b_info->u.pv.ramdisk, 0);
         break;
     }
     default:
