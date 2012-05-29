@@ -1367,14 +1367,15 @@ int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
-int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
+int libxl__device_disk_add(libxl__gc *gc, uint32_t domid,
+        xs_transaction_t t, libxl_device_disk *disk)
 {
-    GC_INIT(ctx);
     flexarray_t *front;
     flexarray_t *back;
     char *dev;
     libxl__device device;
     int major, minor, rc;
+    libxl_ctx *ctx = gc->owner;
 
     rc = libxl__device_disk_setdefault(gc, disk);
     if (rc) goto out;
@@ -1472,7 +1473,7 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     flexarray_append(front, "device-type");
     flexarray_append(front, disk->is_cdrom ? "cdrom" : "disk");
 
-    libxl__device_generic_add(gc, XBT_NULL, &device,
+    libxl__device_generic_add(gc, t, &device,
                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
                              libxl__xs_kvs_of_flexarray(gc, front, front->count));
 
@@ -1482,6 +1483,13 @@ out_free:
     flexarray_free(back);
     flexarray_free(front);
 out:
+    return rc;
+}
+
+int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
+{
+    GC_INIT(ctx);
+    int rc = libxl__device_disk_add(gc, domid, XBT_NULL, disk);
     GC_FREE;
     return rc;
 }
