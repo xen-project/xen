@@ -73,11 +73,12 @@ static void parse_global_config(const char *configfile,
     if (!xlu_cfg_get_string (config, "lockfile", &buf, 0))
         lockfile = strdup(buf);
     else {
-        e = asprintf(&lockfile, "%s/xl", (char *)libxl_lock_dir_path());
-        if (e < 0) {
-            fprintf(stderr, "asprintf memory allocation failed\n");
-            exit(1);
-        }
+        lockfile = strdup(XL_LOCK_FILE);
+    }
+
+    if (!lockfile < 0) {
+        fprintf(stderr, "failed to allocate lockdir \n");
+        exit(1);
     }
 
     if (!xlu_cfg_get_string (config, "vifscript", &buf, 0))
@@ -192,7 +193,6 @@ int main(int argc, char **argv)
     char *cmd = 0;
     struct cmd_spec *cspec;
     int ret;
-    char *config_file;
     void *config_data = 0;
     int config_len = 0;
     const char *locks[] = XEND_LOCK;
@@ -227,20 +227,12 @@ int main(int argc, char **argv)
 
     xl_ctx_alloc();
 
-    /* Read global config file options */
-    ret = asprintf(&config_file, "%s/xl.conf", libxl_xen_config_dir_path());
-    if (ret < 0) {
-        fprintf(stderr, "memory allocation failed ret=%d, errno=%d\n", ret, errno);
-        exit(1);
-    }
-
-    ret = libxl_read_file_contents(ctx, config_file,
+    ret = libxl_read_file_contents(ctx, XL_GLOBAL_CONFIG,
             &config_data, &config_len);
     if (ret)
         fprintf(stderr, "Failed to read config file: %s: %s\n",
-                config_file, strerror(errno));
-    parse_global_config(config_file, config_data, config_len);
-    free(config_file);
+                XL_GLOBAL_CONFIG, strerror(errno));
+    parse_global_config(XL_GLOBAL_CONFIG, config_data, config_len);
     free(config_data);
 
     /* Reset options for per-command use of getopt. */

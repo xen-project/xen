@@ -833,10 +833,6 @@ int libxl_flask_getenforce(libxl_ctx *ctx);
 int libxl_flask_setenforce(libxl_ctx *ctx, int mode);
 int libxl_flask_loadpolicy(libxl_ctx *ctx, void *policy, uint32_t size);
 
-/* common paths */
-const char *libxl_xen_config_dir_path(void);
-const char *libxl_lock_dir_path(void);
-
 /* misc */
 
 /* Each of these sets or clears the flag according to whether the

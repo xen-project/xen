@@ -52,7 +52,7 @@
 #include <xen/io/xenbus.h>
 
 #include "libxl.h"
-#include "_libxl_paths.h"
+#include "_paths.h"
 
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
 #define _hidden __attribute__((visibility("hidden")))

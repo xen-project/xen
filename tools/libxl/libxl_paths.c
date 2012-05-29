@@ -30,19 +30,9 @@ const char *libxl__xenfirmwaredir_path(void)
     return XENFIRMWAREDIR;
 }
 
-const char *libxl_xen_config_dir_path(void)
-{
-    return XEN_CONFIG_DIR;
-}
-
 const char *libxl__xen_script_dir_path(void)
 {
     return XEN_SCRIPT_DIR;
-}
-
-const char *libxl_lock_dir_path(void)
-{
-    return XEN_LOCK_DIR;
 }
 
 const char *libxl__run_dir_path(void)

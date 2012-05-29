@@ -17,6 +17,7 @@
 
 #include <assert.h>
 
+#include "_paths.h"
 #include "xentoollog.h"
 
 struct cmd_spec {
@@ -152,6 +153,9 @@ enum output_format {
 extern enum output_format default_output_format;
 
 extern void printf_info_sexp(int domid, libxl_domain_config *d_config);
+
+#define XL_GLOBAL_CONFIG XEN_CONFIG_DIR "/xl.conf"
+#define XL_LOCK_FILE XEN_LOCK_DIR "/xl"
 
 #endif /* XL_H */
 

@@ -103,10 +103,10 @@ $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): $(AUTOINCS)
 	@rm -f $*.[ch]
 	$(FLEX) --header-file=$*.h --outfile=$*.c $<
 
-genpath-target = $(call buildmakevars2file,_libxl_paths.h.tmp)
+genpath-target = $(call buildmakevars2file,_paths.h.tmp)
 $(eval $(genpath-target))
 
-_libxl_paths.h: genpath
+_paths.h: genpath
 	sed -e "s/\([^=]*\)=\(.*\)/#define \1 \2/g" $@.tmp >$@.2.tmp
 	rm -f $@.tmp
 	$(call move-if-changed,$@.2.tmp,$@)
@@ -117,7 +117,7 @@ _libxl_list.h: $(XEN_INCLUDE)/xen-external/bsd-sys-queue-h-seddery $(XEN_INCLUDE
 
 libxl.h: _libxl_types.h
 libxl_json.h: _libxl_types_json.h
-libxl_internal.h: _libxl_types_internal.h _libxl_paths.h
+libxl_internal.h: _libxl_types_internal.h _paths.h
 libxl_internal_json.h: _libxl_types_internal_json.h
 
 $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): libxl.h
@@ -181,7 +181,7 @@ install: all
 .PHONY: clean
 clean:
 	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)
-	$(RM) -f _*.c *.pyc _libxl_paths.*.tmp
+	$(RM) -f _*.c *.pyc _paths.*.tmp
 	$(RM) -f testidl.c.new testidl.c
 #	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 
