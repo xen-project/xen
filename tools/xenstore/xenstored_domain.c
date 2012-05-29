@@ -167,7 +167,7 @@ static int readchn(struct connection *conn, void *data, unsigned int len)
 
 static void *map_interface(domid_t domid, unsigned long mfn)
 {
-	if (*xcg_handle >= 0) {
+	if (*xcg_handle != NULL) {
 		/* this is the preferred method */
 		return xc_gnttab_map_grant_ref(*xcg_handle, domid,
 			GNTTAB_RESERVED_XENSTORE, PROT_READ|PROT_WRITE);
@@ -179,7 +179,7 @@ static void *map_interface(domid_t domid, unsigned long mfn)
 
 static void unmap_interface(void *interface)
 {
-	if (*xcg_handle >= 0)
+	if (*xcg_handle != NULL)
 		xc_gnttab_munmap(*xcg_handle, interface, 1);
 	else
 		munmap(interface, getpagesize());
