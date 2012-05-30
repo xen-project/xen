@@ -217,10 +217,21 @@ struct xen_hvm_inject_trap {
     domid_t domid;
     /* VCPU */
     uint32_t vcpuid;
-    /* Trap number */
-    uint32_t trap;
-    /* Error code, or -1 to skip */
+    /* Vector number */
+    uint32_t vector;
+    /* Trap type (HVMOP_TRAP_*) */
+    uint32_t type;
+/* NB. This enumeration precisely matches hvm.h:X86_EVENTTYPE_* */
+# define HVMOP_TRAP_ext_int    0 /* external interrupt */
+# define HVMOP_TRAP_nmi        2 /* nmi */
+# define HVMOP_TRAP_hw_exc     3 /* hardware exception */
+# define HVMOP_TRAP_sw_int     4 /* software interrupt (CD nn) */
+# define HVMOP_TRAP_pri_sw_exc 5 /* ICEBP (F1) */
+# define HVMOP_TRAP_sw_exc     6 /* INT3 (CC), INTO (CE) */
+    /* Error code, or ~0u to skip */
     uint32_t error_code;
+    /* Intruction length */
+    uint32_t inslen;
     /* CR2 for page faults */
     uint64_aligned_t cr2;
 };

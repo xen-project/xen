@@ -4289,8 +4289,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             rc = -EBUSY;
         else 
         {
-            v->arch.hvm_vcpu.inject_trap.vector = tr.trap;
+            v->arch.hvm_vcpu.inject_trap.vector = tr.vector;
+            v->arch.hvm_vcpu.inject_trap.type = tr.type;
             v->arch.hvm_vcpu.inject_trap.error_code = tr.error_code;
+            v->arch.hvm_vcpu.inject_trap.inslen = tr.inslen;
             v->arch.hvm_vcpu.inject_trap.cr2 = tr.cr2;
         }
 

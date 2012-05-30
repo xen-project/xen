@@ -662,7 +662,9 @@ int main(int argc, char *argv[])
                        req.vcpu_id);
 
                 /* Reinject */
-                rc = xc_hvm_inject_trap(xch, domain_id, req.vcpu_id, 3, -1, 0);
+                rc = xc_hvm_inject_trap(
+                    xch, domain_id, req.vcpu_id, 3,
+                    HVMOP_TRAP_hw_exc, -1, 0, 0);
                 if (rc < 0)
                 {
                     ERROR("Error %d injecting int3\n", rc);

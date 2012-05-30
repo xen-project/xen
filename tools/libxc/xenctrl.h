@@ -1578,7 +1578,8 @@ int xc_hvm_get_mem_access(
  * resumes. 
  */
 int xc_hvm_inject_trap(
-    xc_interface *xch, domid_t dom, int vcpu, uint32_t trap, uint32_t error_code, 
+    xc_interface *xch, domid_t dom, int vcpu, uint32_t vector,
+    uint32_t type, uint32_t error_code, uint32_t inslen,
     uint64_t cr2);
 
 /*
