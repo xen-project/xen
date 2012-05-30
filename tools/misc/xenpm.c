@@ -351,8 +351,12 @@ static void signal_int_handler(int signo)
         for ( i = 0; i < max_cpu_nr; i++ )
             if ( !get_cxstat_by_cpuid(xc_handle, i, &cxstat_end[i]) )
                 for ( j = 0; j < cxstat_end[i].nr; j++ )
-                    sum_cx[i] += cxstat_end[i].residencies[j] -
-                                 cxstat_start[i].residencies[j];
+                {
+                    int64_t diff = (int64_t)cxstat_end[i].residencies[j] -
+                        (int64_t)cxstat_start[i].residencies[j];
+                    if ( diff >=0 )
+                        sum_cx[i] += diff;
+                }
     }
 
     if ( get_pxstat_by_cpuid(xc_handle, 0, NULL) != -ENODEV )
@@ -379,8 +383,10 @@ static void signal_int_handler(int signo)
         {
             for ( j = 0; j < cxstat_end[i].nr; j++ )
             {
-                res = cxstat_end[i].residencies[j] -
-                    cxstat_start[i].residencies[j];
+                int64_t diff = (int64_t)cxstat_end[i].residencies[j] -
+                    (int64_t)cxstat_start[i].residencies[j];
+
+                res = ( diff >= 0 ) ? diff : 0;
                 triggers = cxstat_end[i].triggers[j] -
                     cxstat_start[i].triggers[j];
                 avg_res = (triggers==0) ? 0: (double)res/triggers/1000000.0;
