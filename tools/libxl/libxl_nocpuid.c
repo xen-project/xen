@@ -14,7 +14,7 @@
 
 #include "libxl_internal.h"
 
-void libxl_cpuid_destroy(libxl_cpuid_policy_list *p_cpuid_list)
+void libxl_cpuid_dispose(libxl_cpuid_policy_list *p_cpuid_list)
 {
 }
 
@@ -36,6 +36,12 @@ void libxl_cpuid_apply_policy(libxl_ctx *ctx, uint32_t domid)
 void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,
                      libxl_cpuid_policy_list cpuid)
 {
+}
+
+yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
+                                libxl_cpuid_policy_list *pcpuid)
+{
+    return 0;
 }
 
 /*

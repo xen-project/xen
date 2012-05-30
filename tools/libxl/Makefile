@@ -36,6 +36,7 @@ LIBXL_OBJS-y += libxl_noblktap2.o
 endif
 LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o
 LIBXL_OBJS-$(CONFIG_IA64) += libxl_nocpuid.o
+LIBXL_OBJS-$(CONFIG_ARM) += libxl_nocpuid.o
 
 ifeq ($(CONFIG_NetBSD),y)
 LIBXL_OBJS-y += libxl_netbsd.o

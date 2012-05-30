@@ -146,66 +146,6 @@ out:
     return s;
 }
 
-yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
-                                libxl_cpuid_policy_list *pcpuid)
-{
-    libxl_cpuid_policy_list cpuid = *pcpuid;
-    yajl_gen_status s;
-    const char *input_names[2] = { "leaf", "subleaf" };
-    const char *policy_names[4] = { "eax", "ebx", "ecx", "edx" };
-    int i, j;
-
-    /*
-     * Aiming for:
-     * [
-     *     { 'leaf':    'val-eax',
-     *       'subleaf': 'val-ecx',
-     *       'eax':     'filter',
-     *       'ebx':     'filter',
-     *       'ecx':     'filter',
-     *       'edx':     'filter' },
-     *     { 'leaf':    'val-eax', ..., 'eax': 'filter', ... },
-     *     ... etc ...
-     * ]
-     */
-
-    s = yajl_gen_array_open(hand);
-    if (s != yajl_gen_status_ok) goto out;
-
-    if (cpuid == NULL) goto empty;
-
-    for (i = 0; cpuid[i].input[0] != XEN_CPUID_INPUT_UNUSED; i++) {
-        s = yajl_gen_map_open(hand);
-        if (s != yajl_gen_status_ok) goto out;
-
-        for (j = 0; j < 2; j++) {
-            if (cpuid[i].input[j] != XEN_CPUID_INPUT_UNUSED) {
-                s = libxl__yajl_gen_asciiz(hand, input_names[j]);
-                if (s != yajl_gen_status_ok) goto out;
-                s = yajl_gen_integer(hand, cpuid[i].input[j]);
-                if (s != yajl_gen_status_ok) goto out;
-            }
-        }
-
-        for (j = 0; j < 4; j++) {
-            if (cpuid[i].policy[j] != NULL) {
-                s = libxl__yajl_gen_asciiz(hand, policy_names[j]);
-                if (s != yajl_gen_status_ok) goto out;
-                s = yajl_gen_string(hand,
-                               (const unsigned char *)cpuid[i].policy[j], 32);
-                if (s != yajl_gen_status_ok) goto out;
-            }
-        }
-        s = yajl_gen_map_close(hand);
-        if (s != yajl_gen_status_ok) goto out;
-    }
-
-empty:
-    s = yajl_gen_array_close(hand);
-out:
-    return s;
-}
-
 yajl_gen_status libxl_string_list_gen_json(yajl_gen hand, libxl_string_list *pl)
 {
     libxl_string_list l = *pl;
