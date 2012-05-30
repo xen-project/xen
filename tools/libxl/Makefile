@@ -120,6 +120,7 @@ libxl.h: _libxl_types.h
 libxl_json.h: _libxl_types_json.h
 libxl_internal.h: _libxl_types_internal.h _paths.h
 libxl_internal_json.h: _libxl_types_internal_json.h
+xl.h: _paths.h
 
 $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): libxl.h
 $(LIBXL_OBJS): libxl_internal.h
