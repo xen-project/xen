@@ -231,7 +231,7 @@ struct xen_hvm_inject_trap {
     /* Error code, or ~0u to skip */
     uint32_t error_code;
     /* Intruction length */
-    uint32_t inslen;
+    uint32_t insn_len;
     /* CR2 for page faults */
     uint64_aligned_t cr2;
 };

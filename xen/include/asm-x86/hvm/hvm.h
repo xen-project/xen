@@ -75,7 +75,7 @@ struct hvm_trap {
     int           vector;
     unsigned int  type;         /* X86_EVENTTYPE_* */
     int           error_code;   /* HVM_DELIVER_NO_ERROR_CODE if n/a */
-    int           inslen;       /* Instruction length */ 
+    int           insn_len;     /* Instruction length */ 
     unsigned long cr2;          /* Only for TRAP_page_fault h/w exception */
 };
 

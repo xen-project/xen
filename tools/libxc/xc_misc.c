@@ -603,7 +603,7 @@ int xc_hvm_get_mem_access(
 
 int xc_hvm_inject_trap(
     xc_interface *xch, domid_t dom, int vcpu, uint32_t vector,
-    uint32_t type, uint32_t error_code, uint32_t inslen,
+    uint32_t type, uint32_t error_code, uint32_t insn_len,
     uint64_t cr2)
 {
     DECLARE_HYPERCALL;
@@ -622,7 +622,7 @@ int xc_hvm_inject_trap(
     arg->vector      = vector;
     arg->type        = type;
     arg->error_code  = error_code;
-    arg->inslen      = inslen;
+    arg->insn_len    = insn_len;
     arg->cr2         = cr2;
 
     hypercall.op     = __HYPERVISOR_hvm_op;

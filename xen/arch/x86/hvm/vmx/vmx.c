@@ -1434,7 +1434,7 @@ static void vmx_inject_trap(struct hvm_trap *trap)
     }
 
     if ( _trap.type >= X86_EVENTTYPE_SW_INTERRUPT )
-        __vmwrite(VM_ENTRY_INSTRUCTION_LEN, _trap.inslen);
+        __vmwrite(VM_ENTRY_INSTRUCTION_LEN, _trap.insn_len);
 
     if ( nestedhvm_vcpu_in_guestmode(curr) &&
          nvmx_intercepts_exception(curr, _trap.vector, _trap.error_code) )
@@ -2436,7 +2436,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
                         .vector = TRAP_int3,
                         .type = X86_EVENTTYPE_SW_EXCEPTION,
                         .error_code = HVM_DELIVER_NO_ERROR_CODE,
-                        .inslen = __vmread(VM_EXIT_INSTRUCTION_LEN)
+                        .insn_len = __vmread(VM_EXIT_INSTRUCTION_LEN)
                     };
                     hvm_inject_trap(&trap);
                     break;
