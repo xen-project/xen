@@ -18,6 +18,7 @@
 #include "libxl_osdeps.h" /* must come before any other headers */
 
 #include "libxl_internal.h"
+#include "libxl_arch.h"
 
 #include <xc_dom.h>
 #include <xenguest.h>
@@ -835,16 +836,7 @@ static void domcreate_devmodel_started(libxl__egc *egc,
         }
     }
 
-    if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_PV &&
-        libxl_defbool_val(d_config->b_info.u.pv.e820_host)) {
-        ret = libxl__e820_alloc(gc, domid, d_config);
-        if (ret) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                      "Failed while collecting E820 with: %d (errno:%d)\n",
-                      ret, errno);
-            goto error_out;
-        }
-    }
+    libxl__arch_domain_create(gc, d_config, domid);
     domcreate_console_available(egc, dcs);
 
     domcreate_complete(egc, dcs, 0);

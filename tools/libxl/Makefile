@@ -34,7 +34,7 @@ LIBXL_OBJS-y += libxl_blktap2.o
 else
 LIBXL_OBJS-y += libxl_noblktap2.o
 endif
-LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o libxl_noarch.o
+LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o libxl_x86.o
 LIBXL_OBJS-$(CONFIG_IA64) += libxl_nocpuid.o libxl_noarch.o
 LIBXL_OBJS-$(CONFIG_ARM) += libxl_nocpuid.o libxl_noarch.o
 
