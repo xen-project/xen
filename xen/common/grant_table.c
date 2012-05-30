@@ -107,6 +107,8 @@ static unsigned inline int max_nr_maptrack_frames(void)
     return (max_nr_grant_frames * MAX_MAPTRACK_TO_GRANTS_RATIO);
 }
 
+#define MAPTRACK_TAIL (~0u)
+
 #define SHGNT_PER_PAGE_V1 (PAGE_SIZE / sizeof(grant_entry_v1_t))
 #define shared_entry_v1(t, e) \
     ((t)->shared_v1[(e)/SHGNT_PER_PAGE_V1][(e)%SHGNT_PER_PAGE_V1])
@@ -198,7 +200,7 @@ __get_maptrack_handle(
     struct grant_table *t)
 {
     unsigned int h;
-    if ( unlikely((h = t->maptrack_head) == (t->maptrack_limit - 1)) )
+    if ( unlikely((h = t->maptrack_head) == MAPTRACK_TAIL) )
         return -1;
     t->maptrack_head = maptrack_entry(t, h).ref;
     return h;
@@ -239,8 +241,10 @@ get_maptrack_handle(
 
         new_mt_limit = lgt->maptrack_limit + MAPTRACK_PER_PAGE;
 
-        for ( i = lgt->maptrack_limit; i < new_mt_limit; i++ )
-            new_mt[i % MAPTRACK_PER_PAGE].ref = i + 1;
+        for ( i = 1; i < MAPTRACK_PER_PAGE; i++ )
+            new_mt[i - 1].ref = lgt->maptrack_limit + i;
+        new_mt[i - 1].ref = lgt->maptrack_head;
+        lgt->maptrack_head = lgt->maptrack_limit;
 
         lgt->maptrack[nr_frames] = new_mt;
         smp_wmb();
@@ -2577,9 +2581,10 @@ grant_table_create(
     if ( (t->maptrack[0] = alloc_xenheap_page()) == NULL )
         goto no_mem_3;
     clear_page(t->maptrack[0]);
-    t->maptrack_limit = PAGE_SIZE / sizeof(struct grant_mapping);
-    for ( i = 0; i < t->maptrack_limit; i++ )
-        t->maptrack[0][i].ref = i+1;
+    t->maptrack_limit = MAPTRACK_PER_PAGE;
+    for ( i = 1; i < MAPTRACK_PER_PAGE; i++ )
+        t->maptrack[0][i - 1].ref = i;
+    t->maptrack[0][i - 1].ref = MAPTRACK_TAIL;
 
     /* Shared grant table. */
     if ( (t->shared_raw = xzalloc_array(void *, max_nr_grant_frames)) == NULL )
