@@ -29,7 +29,7 @@
 
 /*
  * Hypercall interface:
- *  Input:  %ebx, %ecx, %edx, %esi, %edi (arguments 1-5)
+ *  Input:  %ebx, %ecx, %edx, %esi, %edi, %ebp (arguments 1-6)
  *  Output: %eax
  * Access is via hypercall page (set up by guest loader or via a Xen MSR):
  *  call hypercall_page + hypercall-number * 32

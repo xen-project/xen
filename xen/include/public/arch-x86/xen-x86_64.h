@@ -29,7 +29,7 @@
 
 /*
  * Hypercall interface:
- *  Input:  %rdi, %rsi, %rdx, %r10, %r8 (arguments 1-5)
+ *  Input:  %rdi, %rsi, %rdx, %r10, %r8, %r9 (arguments 1-6)
  *  Output: %rax
  * Access is via hypercall page (set up by guest loader or via a Xen MSR):
  *  call hypercall_page + hypercall-number * 32
