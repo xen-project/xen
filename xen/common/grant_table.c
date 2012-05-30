@@ -169,6 +169,30 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, struct pag
     return rc;
 }
 
+static inline void
+double_gt_lock(struct grant_table *lgt, struct grant_table *rgt)
+{
+    if ( lgt < rgt )
+    {
+        spin_lock(&lgt->lock);
+        spin_lock(&rgt->lock);
+    }
+    else
+    {
+        if ( lgt != rgt )
+            spin_lock(&rgt->lock);
+        spin_lock(&lgt->lock);
+    }
+}
+
+static inline void
+double_gt_unlock(struct grant_table *lgt, struct grant_table *rgt)
+{
+    spin_unlock(&lgt->lock);
+    if ( lgt != rgt )
+        spin_unlock(&rgt->lock);
+}
+
 static inline int
 __get_maptrack_handle(
     struct grant_table *t)
@@ -184,8 +208,10 @@ static inline void
 put_maptrack_handle(
     struct grant_table *t, int handle)
 {
+    spin_lock(&t->lock);
     maptrack_entry(t, handle).ref = t->maptrack_head;
     t->maptrack_head = handle;
+    spin_unlock(&t->lock);
 }
 
 static inline int
@@ -197,46 +223,35 @@ get_maptrack_handle(
     struct grant_mapping *new_mt;
     unsigned int          new_mt_limit, nr_frames;
 
-    if ( unlikely((handle = __get_maptrack_handle(lgt)) == -1) )
+    spin_lock(&lgt->lock);
+
+    while ( unlikely((handle = __get_maptrack_handle(lgt)) == -1) )
     {
-        spin_lock(&lgt->lock);
+        nr_frames = nr_maptrack_frames(lgt);
+        if ( nr_frames >= max_nr_maptrack_frames() )
+            break;
 
-        if ( unlikely((handle = __get_maptrack_handle(lgt)) == -1) )
-        {
-            nr_frames = nr_maptrack_frames(lgt);
-            if ( nr_frames >= max_nr_maptrack_frames() )
-            {
-                spin_unlock(&lgt->lock);
-                return -1;
-            }
+        new_mt = alloc_xenheap_page();
+        if ( !new_mt )
+            break;
 
-            new_mt = alloc_xenheap_page();
-            if ( new_mt == NULL )
-            {
-                spin_unlock(&lgt->lock);
-                return -1;
-            }
+        clear_page(new_mt);
 
-            clear_page(new_mt);
+        new_mt_limit = lgt->maptrack_limit + MAPTRACK_PER_PAGE;
 
-            new_mt_limit = lgt->maptrack_limit + MAPTRACK_PER_PAGE;
+        for ( i = lgt->maptrack_limit; i < new_mt_limit; i++ )
+            new_mt[i % MAPTRACK_PER_PAGE].ref = i + 1;
 
-            for ( i = lgt->maptrack_limit; i < new_mt_limit; i++ )
-            {
-                new_mt[i % MAPTRACK_PER_PAGE].ref = i+1;
-                new_mt[i % MAPTRACK_PER_PAGE].flags = 0;
-            }
+        lgt->maptrack[nr_frames] = new_mt;
+        smp_wmb();
+        lgt->maptrack_limit      = new_mt_limit;
 
-            lgt->maptrack[nr_frames] = new_mt;
-            lgt->maptrack_limit      = new_mt_limit;
-
-            gdprintk(XENLOG_INFO,
-                    "Increased maptrack size to %u frames.\n", nr_frames + 1);
-            handle = __get_maptrack_handle(lgt);
-        }
-
-        spin_unlock(&lgt->lock);
+        gdprintk(XENLOG_INFO, "Increased maptrack size to %u frames\n",
+                 nr_frames + 1);
     }
+
+    spin_unlock(&lgt->lock);
+
     return handle;
 }
 
@@ -425,25 +440,23 @@ static int _set_status(unsigned gt_version,
 }
 
 static void mapcount(
-    struct domain *ld, unsigned long mfn,
+    struct domain *ld, struct domain *rd, unsigned long mfn,
     unsigned int *wrc, unsigned int *rdc)
 {
     struct grant_table *gt = ld->grant_table;
     struct grant_mapping *map;
     grant_handle_t handle;
-    struct domain *rd;
 
     *wrc = *rdc = 0;
 
     for ( handle = 0; handle < gt->maptrack_limit; handle++ )
     {
         map = &maptrack_entry(gt, handle);
-        if ( !(map->flags & (GNTMAP_device_map|GNTMAP_host_map)) )
+        if ( !(map->flags & (GNTMAP_device_map|GNTMAP_host_map)) ||
+             map->domid != rd->domain_id )
             continue;
-        rd = rcu_lock_domain_by_id(map->domid);
         if ( active_entry(rd->grant_table, map->ref).frame == mfn )
             (map->flags & GNTMAP_readonly) ? (*rdc)++ : (*wrc)++;
-        rcu_unlock_domain(rd);
     }
 }
 
@@ -662,6 +675,8 @@ __gnttab_map_grant_ref(
         goto undo_out;
     }
 
+    double_gt_lock(ld->grant_table, rd->grant_table);
+
     if ( !is_hvm_domain(ld) && need_iommu(ld) )
     {
         unsigned int wrc, rdc;
@@ -670,7 +685,7 @@ __gnttab_map_grant_ref(
         BUG_ON(paging_mode_translate(ld));
         /* We're not translated, so we know that gmfns and mfns are
            the same things, so the IOMMU entry is always 1-to-1. */
-        mapcount(ld, frame, &wrc, &rdc);
+        mapcount(ld, rd, frame, &wrc, &rdc);
         if ( (act_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) &&
              !(old_pin & (GNTPIN_hstw_mask|GNTPIN_devw_mask)) )
         {
@@ -685,6 +700,7 @@ __gnttab_map_grant_ref(
         }
         if ( err )
         {
+            double_gt_unlock(ld->grant_table, rd->grant_table);
             rc = GNTST_general_error;
             goto undo_out;
         }
@@ -696,6 +712,8 @@ __gnttab_map_grant_ref(
     mt->domid = op->dom;
     mt->ref   = op->ref;
     mt->flags = op->flags;
+
+    double_gt_unlock(ld->grant_table, rd->grant_table);
 
     op->dev_bus_addr = (u64)frame << PAGE_SHIFT;
     op->handle       = handle;
@@ -787,18 +805,20 @@ __gnttab_unmap_common(
     }
 
     op->map = &maptrack_entry(ld->grant_table, op->handle);
+    spin_lock(&ld->grant_table->lock);
 
     if ( unlikely(!op->map->flags) )
     {
+        spin_unlock(&ld->grant_table->lock);
         gdprintk(XENLOG_INFO, "Zero flags for handle (%d).\n", op->handle);
         op->status = GNTST_bad_handle;
         return;
     }
 
-    dom   = op->map->domid;
-    op->flags = op->map->flags;
+    dom = op->map->domid;
+    spin_unlock(&ld->grant_table->lock);
 
-    if ( unlikely((op->rd = rd = rcu_lock_domain_by_id(dom)) == NULL) )
+    if ( unlikely((rd = rcu_lock_domain_by_id(dom)) == NULL) )
     {
         /* This can happen when a grant is implicitly unmapped. */
         gdprintk(XENLOG_INFO, "Could not find domain %d\n", dom);
@@ -816,8 +836,17 @@ __gnttab_unmap_common(
 
     TRACE_1D(TRC_MEM_PAGE_GRANT_UNMAP, dom);
 
-    spin_lock(&rd->grant_table->lock);
+    double_gt_lock(ld->grant_table, rd->grant_table);
 
+    op->flags = op->map->flags;
+    if ( unlikely(!op->flags) || unlikely(op->map->domid != dom) )
+    {
+        gdprintk(XENLOG_WARNING, "Unstable handle %u\n", op->handle);
+        rc = GNTST_bad_handle;
+        goto unmap_out;
+    }
+
+    op->rd = rd;
     act = &active_entry(rd->grant_table, op->map->ref);
 
     if ( op->frame == 0 )
@@ -861,7 +890,7 @@ __gnttab_unmap_common(
         unsigned int wrc, rdc;
         int err = 0;
         BUG_ON(paging_mode_translate(ld));
-        mapcount(ld, op->frame, &wrc, &rdc);
+        mapcount(ld, rd, op->frame, &wrc, &rdc);
         if ( (wrc + rdc) == 0 )
             err = iommu_unmap_page(ld, op->frame);
         else if ( wrc == 0 )
@@ -878,8 +907,8 @@ __gnttab_unmap_common(
          gnttab_mark_dirty(rd, op->frame);
 
  unmap_out:
+    double_gt_unlock(ld->grant_table, rd->grant_table);
     op->status = rc;
-    spin_unlock(&rd->grant_table->lock);
     rcu_unlock_domain(rd);
 }
 
@@ -891,6 +920,7 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
     grant_entry_header_t *sha;
     struct page_info *pg;
     uint16_t *status;
+    bool_t put_handle = 0;
 
     rd = op->rd;
 
@@ -962,10 +992,7 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
     }
 
     if ( (op->map->flags & (GNTMAP_device_map|GNTMAP_host_map)) == 0 )
-    {
-        op->map->flags = 0;
-        put_maptrack_handle(ld->grant_table, op->handle);
-    }
+        put_handle = 1;
 
     if ( ((act->pin & (GNTPIN_devw_mask|GNTPIN_hstw_mask)) == 0) &&
          !(op->flags & GNTMAP_readonly) )
@@ -976,6 +1003,11 @@ __gnttab_unmap_common_complete(struct gnttab_unmap_common *op)
 
  unmap_out:
     spin_unlock(&rd->grant_table->lock);
+    if ( put_handle )
+    {
+        op->map->flags = 0;
+        put_maptrack_handle(ld->grant_table, op->handle);
+    }
     rcu_unlock_domain(rd);
 }
 
@@ -2361,12 +2393,9 @@ do_grant_table_op(
     unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
 {
     long rc;
-    struct domain *d = current->domain;
     
     if ( (int)count < 0 )
         return -EINVAL;
-    
-    domain_lock(d);
     
     rc = -EFAULT;
     switch ( cmd )
@@ -2494,8 +2523,6 @@ do_grant_table_op(
     }
     
   out:
-    domain_unlock(d);
-
     if ( rc > 0 )
     {
         ASSERT(rc < count);

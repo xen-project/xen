@@ -3727,8 +3727,6 @@ static int create_grant_pte_mapping(
     l1_pgentry_t ol1e;
     struct domain *d = v->domain;
 
-    ASSERT(domain_is_locked(d));
-
     adjust_guest_l1e(nl1e, d);
 
     gmfn = pte_addr >> PAGE_SHIFT;
@@ -3855,8 +3853,6 @@ static int create_grant_va_mapping(
     struct page_info *l1pg;
     int okay;
     
-    ASSERT(domain_is_locked(d));
-
     adjust_guest_l1e(nl1e, d);
 
     pl1e = guest_map_l1e(v, va, &gl1mfn);
