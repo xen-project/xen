@@ -76,6 +76,7 @@ struct hvm_trap {
     unsigned int  type;         /* X86_EVENTTYPE_* */
     int           error_code;   /* HVM_DELIVER_NO_ERROR_CODE if n/a */
     unsigned long cr2;          /* Only for TRAP_page_fault h/w exception */
+    int           inslen;       /* Instruction length */ 
 };
 
 /*
@@ -375,6 +376,7 @@ static inline int hvm_do_pmu_interrupt(struct cpu_user_regs *regs)
 #define X86_EVENTTYPE_NMI                   2    /* NMI                */
 #define X86_EVENTTYPE_HW_EXCEPTION          3    /* hardware exception */
 #define X86_EVENTTYPE_SW_INTERRUPT          4    /* software interrupt */
+#define X86_EVENTTYPE_PRI_SW_EXCEPTION      5    /* privileged software exception */
 #define X86_EVENTTYPE_SW_EXCEPTION          6    /* software exception */
 
 int hvm_event_needs_reinjection(uint8_t type, uint8_t vector);
