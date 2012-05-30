@@ -109,7 +109,7 @@ void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len)
     curr->arch.hvm_svm.vmcb->interrupt_shadow = 0;
 
     if ( regs->eflags & X86_EFLAGS_TF )
-        hvm_inject_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE, 0);
+        hvm_inject_hw_exception(TRAP_debug, HVM_DELIVER_NO_ERROR_CODE);
 }
 
 static void svm_cpu_down(void)
@@ -1066,14 +1066,14 @@ static void svm_vcpu_destroy(struct vcpu *v)
     passive_domain_destroy(v);
 }
 
-static void svm_inject_exception(
-    unsigned int trapnr, int errcode, unsigned long cr2)
+static void svm_inject_trap(struct hvm_trap *trap)
 {
     struct vcpu *curr = current;
     struct vmcb_struct *vmcb = curr->arch.hvm_svm.vmcb;
     eventinj_t event = vmcb->eventinj;
+    struct hvm_trap _trap = *trap;
 
-    switch ( trapnr )
+    switch ( _trap.vector )
     {
     case TRAP_debug:
         if ( guest_cpu_user_regs()->eflags & X86_EFLAGS_TF )
@@ -1081,6 +1081,9 @@ static void svm_inject_exception(
             __restore_debug_registers(curr);
             vmcb_set_dr6(vmcb, vmcb_get_dr6(vmcb) | 0x4000);
         }
+        if ( cpu_has_monitor_trap_flag )
+            break;
+        /* fall through */
     case TRAP_int3:
         if ( curr->domain->debugger_attached )
         {
@@ -1093,29 +1096,30 @@ static void svm_inject_exception(
     if ( unlikely(event.fields.v) &&
          (event.fields.type == X86_EVENTTYPE_HW_EXCEPTION) )
     {
-        trapnr = hvm_combine_hw_exceptions(event.fields.vector, trapnr);
-        if ( trapnr == TRAP_double_fault )
-            errcode = 0;
+        _trap.vector = hvm_combine_hw_exceptions(
+            event.fields.vector, _trap.vector);
+        if ( _trap.vector == TRAP_double_fault )
+            _trap.error_code = 0;
     }
 
     event.bytes = 0;
     event.fields.v = 1;
     event.fields.type = X86_EVENTTYPE_HW_EXCEPTION;
-    event.fields.vector = trapnr;
-    event.fields.ev = (errcode != HVM_DELIVER_NO_ERROR_CODE);
-    event.fields.errorcode = errcode;
+    event.fields.vector = _trap.vector;
+    event.fields.ev = (_trap.error_code != HVM_DELIVER_NO_ERROR_CODE);
+    event.fields.errorcode = _trap.error_code;
 
     vmcb->eventinj = event;
 
-    if ( trapnr == TRAP_page_fault )
+    if ( _trap.vector == TRAP_page_fault )
     {
-        curr->arch.hvm_vcpu.guest_cr[2] = cr2;
-        vmcb_set_cr2(vmcb, cr2);
-        HVMTRACE_LONG_2D(PF_INJECT, errcode, TRC_PAR_LONG(cr2));
+        curr->arch.hvm_vcpu.guest_cr[2] = _trap.cr2;
+        vmcb_set_cr2(vmcb, _trap.cr2);
+        HVMTRACE_LONG_2D(PF_INJECT, _trap.error_code, TRC_PAR_LONG(_trap.cr2));
     }
     else
     {
-        HVMTRACE_2D(INJ_EXC, trapnr, errcode);
+        HVMTRACE_2D(INJ_EXC, _trap.vector, _trap.error_code);
     }
 }
 
@@ -1361,7 +1365,7 @@ static void svm_fpu_dirty_intercept(void)
     {
        /* Check if l1 guest must make FPU ready for the l2 guest */
        if ( v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS )
-           hvm_inject_exception(TRAP_no_device, HVM_DELIVER_NO_ERROR_CODE, 0);
+           hvm_inject_hw_exception(TRAP_no_device, HVM_DELIVER_NO_ERROR_CODE);
        else
            vmcb_set_cr0(n1vmcb, vmcb_get_cr0(n1vmcb) & ~X86_CR0_TS);
        return;
@@ -1579,7 +1583,7 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     return X86EMUL_OKAY;
 
  gpf:
-    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -1708,7 +1712,7 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     return X86EMUL_OKAY;
 
  gpf:
-    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -1784,13 +1788,13 @@ svm_vmexit_do_vmrun(struct cpu_user_regs *regs,
 {
     if (!nestedhvm_enabled(v->domain)) {
         gdprintk(XENLOG_ERR, "VMRUN: nestedhvm disabled, injecting #UD\n");
-        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
         return;
     }
 
     if (!nestedsvm_vmcb_map(v, vmcbaddr)) {
         gdprintk(XENLOG_ERR, "VMRUN: mapping vmcb failed, injecting #UD\n");
-        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
         return;
     }
 
@@ -1830,7 +1834,7 @@ svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
     return;
 
  inject:
-    hvm_inject_exception(ret, HVM_DELIVER_NO_ERROR_CODE, 0);
+    hvm_inject_hw_exception(ret, HVM_DELIVER_NO_ERROR_CODE);
     return;
 }
 
@@ -1864,7 +1868,7 @@ svm_vmexit_do_vmsave(struct vmcb_struct *vmcb,
     return;
 
  inject:
-    hvm_inject_exception(ret, HVM_DELIVER_NO_ERROR_CODE, 0);
+    hvm_inject_hw_exception(ret, HVM_DELIVER_NO_ERROR_CODE);
     return;
 }
 
@@ -1880,11 +1884,11 @@ static void svm_vmexit_ud_intercept(struct cpu_user_regs *regs)
     switch ( rc )
     {
     case X86EMUL_UNHANDLEABLE:
-        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
         break;
     case X86EMUL_EXCEPTION:
         if ( ctxt.exn_pending )
-            hvm_inject_exception(ctxt.exn_vector, ctxt.exn_error_code, 0);
+            hvm_inject_hw_exception(ctxt.exn_vector, ctxt.exn_error_code);
         /* fall through */
     default:
         hvm_emulate_writeback(&ctxt);
@@ -1998,7 +2002,7 @@ static struct hvm_function_table __read_mostly svm_function_table = {
     .set_guest_pat        = svm_set_guest_pat,
     .get_guest_pat        = svm_get_guest_pat,
     .set_tsc_offset       = svm_set_tsc_offset,
-    .inject_exception     = svm_inject_exception,
+    .inject_trap          = svm_inject_trap,
     .init_hypercall_page  = svm_init_hypercall_page,
     .event_pending        = svm_event_pending,
     .do_pmu_interrupt     = svm_do_pmu_interrupt,
@@ -2212,7 +2216,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
             break;
         }
 
-        hvm_inject_exception(TRAP_page_fault, regs->error_code, va);
+        hvm_inject_page_fault(regs->error_code, va);
         break;
     }
 
@@ -2285,7 +2289,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
                 __update_guest_eip(regs, vmcb->exitinfo2 - vmcb->rip);
         }
         else if ( !handle_mmio() )
-            hvm_inject_exception(TRAP_gp_fault, 0, 0);
+            hvm_inject_hw_exception(TRAP_gp_fault, 0);
         break;
 
     case VMEXIT_CR0_READ ... VMEXIT_CR15_READ:
@@ -2293,7 +2297,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         if ( cpu_has_svm_decode && (vmcb->exitinfo1 & (1ULL << 63)) )
             svm_vmexit_do_cr_access(vmcb, regs);
         else if ( !handle_mmio() ) 
-            hvm_inject_exception(TRAP_gp_fault, 0, 0);
+            hvm_inject_hw_exception(TRAP_gp_fault, 0);
         break;
 
     case VMEXIT_INVLPG:
@@ -2303,7 +2307,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
             __update_guest_eip(regs, vmcb->nextrip - vmcb->rip);
         }
         else if ( !handle_mmio() )
-            hvm_inject_exception(TRAP_gp_fault, 0, 0);
+            hvm_inject_hw_exception(TRAP_gp_fault, 0);
         break;
 
     case VMEXIT_INVLPGA:
@@ -2349,7 +2353,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_MONITOR:
     case VMEXIT_MWAIT:
-        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
         break;
 
     case VMEXIT_VMRUN:
@@ -2368,7 +2372,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
         svm_vmexit_do_clgi(regs, v);
         break;
     case VMEXIT_SKINIT:
-        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
         break;
 
     case VMEXIT_XSETBV:

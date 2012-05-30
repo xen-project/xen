@@ -735,8 +735,8 @@ nsvm_vcpu_vmrun(struct vcpu *v, struct cpu_user_regs *regs)
     default:
         gdprintk(XENLOG_ERR,
             "nsvm_vcpu_vmentry failed, injecting #UD\n");
-        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
-        /* Must happen after hvm_inject_exception or it doesn't work right. */
+        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+        /* Must happen after hvm_inject_hw_exception or it doesn't work right. */
         nv->nv_vmswitch_in_progress = 0;
         return 1;
     }
@@ -796,12 +796,12 @@ nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
 }
 
 int
-nsvm_vcpu_vmexit_trap(struct vcpu *v, unsigned int trapnr,
-                      int errcode, unsigned long cr2)
+nsvm_vcpu_vmexit_trap(struct vcpu *v, struct hvm_trap *trap)
 {
     ASSERT(vcpu_nestedhvm(v).nv_vvmcx != NULL);
 
-    nestedsvm_vmexit_defer(v, VMEXIT_EXCEPTION_DE + trapnr, errcode, cr2);
+    nestedsvm_vmexit_defer(v, VMEXIT_EXCEPTION_DE + trap->vector,
+                           trap->error_code, trap->cr2);
     return NESTEDHVM_VMEXIT_DONE;
 }
 
@@ -1176,7 +1176,7 @@ enum hvm_intblk nsvm_intr_blocked(struct vcpu *v)
     }
 
     if ( nv->nv_vmexit_pending ) {
-        /* hvm_inject_exception() must have run before.
+        /* hvm_inject_hw_exception() must have run before.
          * exceptions have higher priority than interrupts.
          */
         return hvm_intblk_rflags_ie;
@@ -1509,7 +1509,7 @@ void svm_vmexit_do_stgi(struct cpu_user_regs *regs, struct vcpu *v)
     unsigned int inst_len;
 
     if ( !nestedhvm_enabled(v->domain) ) {
-        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
         return;
     }
 
@@ -1529,7 +1529,7 @@ void svm_vmexit_do_clgi(struct cpu_user_regs *regs, struct vcpu *v)
     vintr_t intr;
 
     if ( !nestedhvm_enabled(v->domain) ) {
-        hvm_inject_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE, 0);
+        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
         return;
     }
 

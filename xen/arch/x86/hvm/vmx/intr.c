@@ -251,7 +251,7 @@ void vmx_intr_assist(void)
     }
     else if ( intack.source == hvm_intsrc_mce )
     {
-        vmx_inject_hw_exception(TRAP_machine_check, HVM_DELIVER_NO_ERROR_CODE);
+        hvm_inject_hw_exception(TRAP_machine_check, HVM_DELIVER_NO_ERROR_CODE);
     }
     else
     {

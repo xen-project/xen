@@ -4825,7 +4825,7 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v,
     if ( gfn == INVALID_GFN ) 
     {
         if ( is_hvm_vcpu(v) )
-            hvm_inject_exception(TRAP_page_fault, pfec, vaddr);
+            hvm_inject_page_fault(pfec, vaddr);
         else
             propagate_page_fault(vaddr, pfec);
         return _mfn(BAD_GVA_TO_GFN);

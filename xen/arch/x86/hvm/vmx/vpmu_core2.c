@@ -421,7 +421,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
                 if ( vpmu_is_set(vpmu, VPMU_CPU_HAS_BTS) )
                     return 1;
                 gdprintk(XENLOG_WARNING, "Debug Store is not supported on this cpu\n");
-                vmx_inject_hw_exception(TRAP_gp_fault, 0);
+                hvm_inject_hw_exception(TRAP_gp_fault, 0);
                 return 0;
             }
         }
@@ -437,7 +437,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
     case MSR_CORE_PERF_GLOBAL_STATUS:
         gdprintk(XENLOG_INFO, "Can not write readonly MSR: "
                  "MSR_PERF_GLOBAL_STATUS(0x38E)!\n");
-        vmx_inject_hw_exception(TRAP_gp_fault, 0);
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
         return 1;
     case MSR_IA32_PEBS_ENABLE:
         if ( msr_content & 1 )
@@ -452,7 +452,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
                 gdprintk(XENLOG_WARNING,
                          "Illegal address for IA32_DS_AREA: %#" PRIx64 "x\n",
                          msr_content);
-                vmx_inject_hw_exception(TRAP_gp_fault, 0);
+                hvm_inject_hw_exception(TRAP_gp_fault, 0);
                 return 1;
             }
             core2_vpmu_cxt->pmu_enable->ds_area_enable = msr_content ? 1 : 0;
@@ -544,7 +544,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
             break;
         }
         if (inject_gp)
-            vmx_inject_hw_exception(TRAP_gp_fault, 0);
+            hvm_inject_hw_exception(TRAP_gp_fault, 0);
         else
             wrmsrl(msr, msr_content);
     }

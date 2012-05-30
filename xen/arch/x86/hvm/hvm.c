@@ -347,12 +347,10 @@ void hvm_do_resume(struct vcpu *v)
     }
 
     /* Inject pending hw/sw trap */
-    if (v->arch.hvm_vcpu.inject_trap != -1) 
+    if ( v->arch.hvm_vcpu.inject_trap.vector != -1 ) 
     {
-        hvm_inject_exception(v->arch.hvm_vcpu.inject_trap, 
-                             v->arch.hvm_vcpu.inject_error_code, 
-                             v->arch.hvm_vcpu.inject_cr2);
-        v->arch.hvm_vcpu.inject_trap = -1;
+        hvm_inject_trap(&v->arch.hvm_vcpu.inject_trap);
+        v->arch.hvm_vcpu.inject_trap.vector = -1;
     }
 }
 
@@ -1047,7 +1045,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
     spin_lock_init(&v->arch.hvm_vcpu.tm_lock);
     INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
 
-    v->arch.hvm_vcpu.inject_trap = -1;
+    v->arch.hvm_vcpu.inject_trap.vector = -1;
 
 #ifdef CONFIG_COMPAT
     rc = setup_compat_arg_xlat(v);
@@ -1194,18 +1192,19 @@ void hvm_triple_fault(void)
     domain_shutdown(v->domain, SHUTDOWN_reboot);
 }
 
-void hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
+void hvm_inject_trap(struct hvm_trap *trap)
 {
     struct vcpu *curr = current;
 
     if ( nestedhvm_enabled(curr->domain) &&
          !nestedhvm_vmswitch_in_progress(curr) &&
          nestedhvm_vcpu_in_guestmode(curr) &&
-         nhvm_vmcx_guest_intercepts_trap(curr, trapnr, errcode) )
+         nhvm_vmcx_guest_intercepts_trap(
+             curr, trap->vector, trap->error_code) )
     {
         enum nestedhvm_vmexits nsret;
 
-        nsret = nhvm_vcpu_vmexit_trap(curr, trapnr, errcode, cr2);
+        nsret = nhvm_vcpu_vmexit_trap(curr, trap);
 
         switch ( nsret )
         {
@@ -1221,7 +1220,26 @@ void hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2)
         }
     }
 
-    hvm_funcs.inject_exception(trapnr, errcode, cr2);
+    hvm_funcs.inject_trap(trap);
+}
+
+void hvm_inject_hw_exception(unsigned int trapnr, int errcode)
+{
+    struct hvm_trap trap = {
+        .vector = trapnr,
+        .type = X86_EVENTTYPE_HW_EXCEPTION,
+        .error_code = errcode };
+    hvm_inject_trap(&trap);
+}
+
+void hvm_inject_page_fault(int errcode, unsigned long cr2)
+{
+    struct hvm_trap trap = {
+        .vector = TRAP_page_fault,
+        .type = X86_EVENTTYPE_HW_EXCEPTION,
+        .error_code = errcode,
+        .cr2 = cr2 };
+    hvm_inject_trap(&trap);
 }
 
 int hvm_hap_nested_page_fault(unsigned long gpa,
@@ -1270,7 +1288,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
             return -1;
         case NESTEDHVM_PAGEFAULT_MMIO:
             if ( !handle_mmio() )
-                hvm_inject_exception(TRAP_gp_fault, 0, 0);
+                hvm_inject_hw_exception(TRAP_gp_fault, 0);
             return 1;
         }
     }
@@ -1337,7 +1355,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
     {
         put_gfn(p2m->domain, gfn);
         if ( !handle_mmio() )
-            hvm_inject_exception(TRAP_gp_fault, 0, 0);
+            hvm_inject_hw_exception(TRAP_gp_fault, 0);
         rc = 1;
         goto out;
     }
@@ -1380,7 +1398,7 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
     {
         gdprintk(XENLOG_WARNING,
                  "trying to write to read-only grant mapping\n");
-        hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
         rc = 1;
         goto out_put_gfn;
     }
@@ -1441,7 +1459,7 @@ int hvm_handle_xsetbv(u64 new_bv)
 
     return 0;
 err:
-    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return -1;
 }
 
@@ -1457,7 +1475,7 @@ int hvm_set_efer(uint64_t value)
     {
         gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
                  "EFER: 0x%"PRIx64"\n", value);
-        hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
         return X86EMUL_EXCEPTION;
     }
 
@@ -1466,7 +1484,7 @@ int hvm_set_efer(uint64_t value)
     {
         gdprintk(XENLOG_WARNING,
                  "Trying to change EFER.LME with paging enabled\n");
-        hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
         return X86EMUL_EXCEPTION;
     }
 
@@ -1722,7 +1740,7 @@ int hvm_set_cr0(unsigned long value)
     return X86EMUL_OKAY;
 
  gpf:
-    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -1808,7 +1826,7 @@ int hvm_set_cr4(unsigned long value)
     return X86EMUL_OKAY;
 
  gpf:
-    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -2104,7 +2122,7 @@ static int hvm_load_segment_selector(
  unmap_and_fail:
     hvm_unmap_entry(pdesc);
  fail:
-    hvm_inject_exception(fault_type, sel & 0xfffc, 0);
+    hvm_inject_hw_exception(fault_type, sel & 0xfffc);
  hvm_map_fail:
     return 1;
 }
@@ -2137,9 +2155,9 @@ void hvm_task_switch(
 
     if ( ((tss_sel & 0xfff8) + 7) > gdt.limit )
     {
-        hvm_inject_exception((taskswitch_reason == TSW_iret) ?
+        hvm_inject_hw_exception((taskswitch_reason == TSW_iret) ?
                              TRAP_invalid_tss : TRAP_gp_fault,
-                             tss_sel & 0xfff8, 0);
+                             tss_sel & 0xfff8);
         goto out;
     }
 
@@ -2164,21 +2182,21 @@ void hvm_task_switch(
 
     if ( !tr.attr.fields.p )
     {
-        hvm_inject_exception(TRAP_no_segment, tss_sel & 0xfff8, 0);
+        hvm_inject_hw_exception(TRAP_no_segment, tss_sel & 0xfff8);
         goto out;
     }
 
     if ( tr.attr.fields.type != ((taskswitch_reason == TSW_iret) ? 0xb : 0x9) )
     {
-        hvm_inject_exception(
+        hvm_inject_hw_exception(
             (taskswitch_reason == TSW_iret) ? TRAP_invalid_tss : TRAP_gp_fault,
-            tss_sel & 0xfff8, 0);
+            tss_sel & 0xfff8);
         goto out;
     }
 
     if ( tr.limit < (sizeof(tss)-1) )
     {
-        hvm_inject_exception(TRAP_invalid_tss, tss_sel & 0xfff8, 0);
+        hvm_inject_hw_exception(TRAP_invalid_tss, tss_sel & 0xfff8);
         goto out;
     }
 
@@ -2283,7 +2301,7 @@ void hvm_task_switch(
         goto out;
 
     if ( (tss.trace & 1) && !exn_raised )
-        hvm_inject_exception(TRAP_debug, tss_sel & 0xfff8, 0);
+        hvm_inject_hw_exception(TRAP_debug, tss_sel & 0xfff8);
 
     tr.attr.fields.type = 0xb; /* busy 32-bit tss */
     hvm_set_segment_register(v, x86_seg_tr, &tr);
@@ -2362,7 +2380,7 @@ static enum hvm_copy_result __hvm_copy(
                 if ( pfec == PFEC_page_shared )
                     return HVMCOPY_gfn_shared;
                 if ( flags & HVMCOPY_fault )
-                    hvm_inject_exception(TRAP_page_fault, pfec, addr);
+                    hvm_inject_page_fault(pfec, addr);
                 return HVMCOPY_bad_gva_to_gfn;
             }
         }
@@ -2849,7 +2867,7 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     return ret;
 
  gp_fault:
-    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     ret = X86EMUL_EXCEPTION;
     *msr_content = -1ull;
     goto out;
@@ -2962,7 +2980,7 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     return ret;
 
 gp_fault:
-    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -4267,13 +4285,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
         if ( tr.vcpuid >= d->max_vcpus || (v = d->vcpu[tr.vcpuid]) == NULL )
             goto param_fail8;
         
-        if ( v->arch.hvm_vcpu.inject_trap != -1 )
+        if ( v->arch.hvm_vcpu.inject_trap.vector != -1 )
             rc = -EBUSY;
         else 
         {
-            v->arch.hvm_vcpu.inject_trap       = tr.trap;
-            v->arch.hvm_vcpu.inject_error_code = tr.error_code;
-            v->arch.hvm_vcpu.inject_cr2        = tr.cr2;
+            v->arch.hvm_vcpu.inject_trap.vector = tr.trap;
+            v->arch.hvm_vcpu.inject_trap.error_code = tr.error_code;
+            v->arch.hvm_vcpu.inject_trap.cr2 = tr.cr2;
         }
 
     param_fail8:
@@ -4431,11 +4449,9 @@ int nhvm_vcpu_vmexit(struct vcpu *v, struct cpu_user_regs *regs,
     return -EOPNOTSUPP;
 }
 
-int
-nhvm_vcpu_vmexit_trap(struct vcpu *v, unsigned int trapnr,
-                       int errcode, unsigned long cr2)
+int nhvm_vcpu_vmexit_trap(struct vcpu *v, struct hvm_trap *trap)
 {
-    return hvm_funcs.nhvm_vcpu_vmexit_trap(v, trapnr, errcode, cr2);
+    return hvm_funcs.nhvm_vcpu_vmexit_trap(v, trap);
 }
 
 uint64_t nhvm_vcpu_guestcr3(struct vcpu *v)

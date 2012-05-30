@@ -164,10 +164,9 @@ struct hvm_vcpu {
     /* Callback into x86_emulate when emulating FPU/MMX/XMM instructions. */
     void (*fpu_exception_callback)(void *, struct cpu_user_regs *);
     void *fpu_exception_callback_arg;
-    /* Pending hw/sw interrupt */
-    int           inject_trap;       /* -1 for nothing to inject */
-    int           inject_error_code;
-    unsigned long inject_cr2;
+
+    /* Pending hw/sw interrupt (.vector = -1 means nothing pending). */
+    struct hvm_trap     inject_trap;
 
     struct viridian_vcpu viridian;
 };

@@ -304,12 +304,12 @@ vmexit:
     
 invalid_op:
     gdprintk(XENLOG_ERR, "vmx_inst_check_privilege: invalid_op\n");
-    hvm_inject_exception(TRAP_invalid_op, 0, 0);
+    hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
     return X86EMUL_EXCEPTION;
 
 gp_fault:
     gdprintk(XENLOG_ERR, "vmx_inst_check_privilege: gp_fault\n");
-    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 
@@ -386,7 +386,7 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
     return X86EMUL_OKAY;
 
 gp_fault:
-    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return X86EMUL_EXCEPTION;
 }
 

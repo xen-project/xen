@@ -114,8 +114,7 @@ int nsvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs);
 int nsvm_vcpu_vmrun(struct vcpu *v, struct cpu_user_regs *regs);
 int nsvm_vcpu_vmexit_inject(struct vcpu *v, struct cpu_user_regs *regs,
     uint64_t exitcode);
-int nsvm_vcpu_vmexit_trap(struct vcpu *v, unsigned int trapnr,
-                      int errcode, unsigned long cr2);
+int nsvm_vcpu_vmexit_trap(struct vcpu *v, struct hvm_trap *trap);
 uint64_t nsvm_vcpu_guestcr3(struct vcpu *v);
 uint64_t nsvm_vcpu_hostcr3(struct vcpu *v);
 uint32_t nsvm_vcpu_asid(struct vcpu *v);

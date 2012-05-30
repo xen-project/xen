@@ -147,7 +147,7 @@ static int fetch(struct vcpu *v, u8 *buf, unsigned long addr, int len)
         /* Not OK: fetches from non-RAM pages are not supportable. */
         gdprintk(XENLOG_WARNING, "Bad instruction fetch at %#lx (%#lx)\n",
                  (unsigned long) guest_cpu_user_regs()->eip, addr);
-        hvm_inject_exception(TRAP_gp_fault, 0, 0);
+        hvm_inject_hw_exception(TRAP_gp_fault, 0);
         return 0;
     }
     return 1;
@@ -216,7 +216,7 @@ int __get_instruction_length_from_list(struct vcpu *v,
     gdprintk(XENLOG_WARNING,
              "%s: Mismatch between expected and actual instruction bytes: "
              "eip = %lx\n",  __func__, (unsigned long)vmcb->rip);
-    hvm_inject_exception(TRAP_gp_fault, 0, 0);
+    hvm_inject_hw_exception(TRAP_gp_fault, 0);
     return 0;
 
  done:

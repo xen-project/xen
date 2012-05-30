@@ -71,6 +71,13 @@ enum hvm_intblk {
 #define HVM_HAP_SUPERPAGE_2MB   0x00000001
 #define HVM_HAP_SUPERPAGE_1GB   0x00000002
 
+struct hvm_trap {
+    int           vector;
+    unsigned int  type;         /* X86_EVENTTYPE_* */
+    int           error_code;   /* HVM_DELIVER_NO_ERROR_CODE if n/a */
+    unsigned long cr2;          /* Only for TRAP_page_fault h/w exception */
+};
+
 /*
  * The hardware virtual machine (HVM) interface abstracts away from the
  * x86/x86_64 CPU virtualization assist specifics. Currently this interface
@@ -124,8 +131,7 @@ struct hvm_function_table {
 
     void (*set_tsc_offset)(struct vcpu *v, u64 offset);
 
-    void (*inject_exception)(unsigned int trapnr, int errcode,
-                             unsigned long cr2);
+    void (*inject_trap)(struct hvm_trap *trap);
 
     void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
 
@@ -162,10 +168,7 @@ struct hvm_function_table {
                                 struct cpu_user_regs *regs);
     int (*nhvm_vcpu_vmexit)(struct vcpu *v, struct cpu_user_regs *regs,
                                 uint64_t exitcode);
-    int (*nhvm_vcpu_vmexit_trap)(struct vcpu *v,
-                                unsigned int trapnr,
-                                int errcode,
-                                unsigned long cr2);
+    int (*nhvm_vcpu_vmexit_trap)(struct vcpu *v, struct hvm_trap *trap);
     uint64_t (*nhvm_vcpu_guestcr3)(struct vcpu *v);
     uint64_t (*nhvm_vcpu_hostcr3)(struct vcpu *v);
     uint32_t (*nhvm_vcpu_asid)(struct vcpu *v);
@@ -320,7 +323,9 @@ void hvm_migrate_timers(struct vcpu *v);
 void hvm_do_resume(struct vcpu *v);
 void hvm_migrate_pirqs(struct vcpu *v);
 
-void hvm_inject_exception(unsigned int trapnr, int errcode, unsigned long cr2);
+void hvm_inject_trap(struct hvm_trap *trap);
+void hvm_inject_hw_exception(unsigned int trapnr, int errcode);
+void hvm_inject_page_fault(int errcode, unsigned long cr2);
 
 static inline int hvm_event_pending(struct vcpu *v)
 {
@@ -479,8 +484,7 @@ int nhvm_vcpu_vmexit(struct vcpu *v, struct cpu_user_regs *regs,
 /* inject vmexit into l1 guest. l1 guest will see a VMEXIT due to
  * 'trapnr' exception.
  */ 
-int nhvm_vcpu_vmexit_trap(struct vcpu *v,
-    unsigned int trapnr, int errcode, unsigned long cr2);
+int nhvm_vcpu_vmexit_trap(struct vcpu *v, struct hvm_trap *trap);
 
 /* returns l2 guest cr3 in l2 guest physical address space. */
 uint64_t nhvm_vcpu_guestcr3(struct vcpu *v);
