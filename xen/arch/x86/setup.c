@@ -1312,8 +1312,6 @@ void __init __start_xen(unsigned long mbi_p)
     if ( opt_watchdog ) 
         watchdog_setup();
 
-    nestedhvm_setup();
-    
     if ( !tboot_protect_mem_regions() )
         panic("Could not protect TXT memory regions\n");
 

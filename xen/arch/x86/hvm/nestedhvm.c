@@ -25,16 +25,14 @@
 #include <asm/event.h>  /* for local_event_delivery_(en|dis)able */
 #include <asm/paging.h> /* for paging_mode_hap() */
 
+static unsigned long *shadow_io_bitmap[3];
+
 /* Nested HVM on/off per domain */
 bool_t
 nestedhvm_enabled(struct domain *d)
 {
-    bool_t enabled;
-
-    enabled = !!(d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM]);
-    BUG_ON(enabled && !is_hvm_domain(d));
-    
-    return enabled;
+    return is_hvm_domain(d) &&
+           d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM];
 }
 
 /* Nested VCPU */
@@ -75,6 +73,9 @@ int
 nestedhvm_vcpu_initialise(struct vcpu *v)
 {
     int rc = -EOPNOTSUPP;
+
+    if ( !shadow_io_bitmap[0] )
+        return -ENOMEM;
 
     if ( !hvm_funcs.nhvm_vcpu_initialise ||
          ((rc = hvm_funcs.nhvm_vcpu_initialise(v)) != 0) )
@@ -147,15 +148,15 @@ nestedhvm_is_n2(struct vcpu *v)
  * iomap[2]      set        set
  */
 
-static unsigned long *shadow_io_bitmap[3];
-
-void
+static int __init
 nestedhvm_setup(void)
 {
     /* Same format and size as hvm_io_bitmap (Intel needs only 2 pages). */
-    unsigned int sz = (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
-        ? 2*PAGE_SIZE : 3*PAGE_SIZE;
-    unsigned int i;
+    unsigned int nr = (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) ? 2 : 3;
+    unsigned int i, order = get_order_from_pages(nr);
+
+    if ( !hvm_funcs.name )
+        return 0;
 
     /* shadow_io_bitmaps can't be declared static because
      *   they must fulfill hw requirements (page aligned section)
@@ -169,13 +170,25 @@ nestedhvm_setup(void)
 
     for ( i = 0; i < ARRAY_SIZE(shadow_io_bitmap); i++ )
     {
-        shadow_io_bitmap[i] = _xmalloc(sz, PAGE_SIZE);
-        memset(shadow_io_bitmap[i], ~0U, sz);
+        shadow_io_bitmap[i] = alloc_xenheap_pages(order, 0);
+        if ( !shadow_io_bitmap[i] )
+        {
+            while ( i-- )
+            {
+                free_xenheap_pages(shadow_io_bitmap[i], order);
+                shadow_io_bitmap[i] = NULL;
+            }
+            return -ENOMEM;
+        }
+        memset(shadow_io_bitmap[i], ~0U, nr << PAGE_SHIFT);
     }
 
     __clear_bit(0x80, shadow_io_bitmap[0]);
     __clear_bit(0xed, shadow_io_bitmap[1]);
+
+    return 0;
 }
+__initcall(nestedhvm_setup);
 
 unsigned long *
 nestedhvm_vcpu_iomap_get(bool_t port_80, bool_t port_ed)
