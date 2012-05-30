@@ -60,6 +60,12 @@ int disp_ar_regs;
 int disp_br_regs;
 int disp_bank_regs;
 int disp_tlb;
+
+#elif defined(__arm__)
+#define NO_TRANSLATION
+typedef uint64_t guest_word_t;
+#define FMT_32B_WORD "%08llx"
+#define FMT_64B_WORD "%016llx"
 #endif
 
 struct symbol {
@@ -677,6 +683,12 @@ void print_ctx(vcpu_guest_context_any_t *ctx)
         for (i = 0; i < 8; i++)
             print_tr(i, &tr->dtrs[i]);
     }
+}
+#elif defined(__arm__)
+static void print_ctx(vcpu_guest_context_any_t *ctx)
+{
+    /* XXX: properly implement this */
+    print_symbol(0);
 }
 #endif
 
