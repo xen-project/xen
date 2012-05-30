@@ -109,6 +109,37 @@ static void      hash_resize(struct __hash *h);
 } while (0)
 static inline void atomic_inc(uint32_t *v) { ia64_fetchadd4_rel(v, 1); }
 static inline void atomic_dec(uint32_t *v) { ia64_fetchadd4_rel(v, -1); }
+#elif defined(__arm__)
+static inline void atomic_inc(uint32_t *v)
+{
+        unsigned long tmp;
+        int result;
+
+        __asm__ __volatile__("@ atomic_add\n"
+"1:     ldrex   %0, [%3]\n"
+"       add     %0, %0, #1\n"
+"       strex   %1, %0, [%3]\n"
+"       teq     %1, #0\n"
+"       bne     1b"
+        : "=&r" (result), "=&r" (tmp), "+Qo" (*v)
+        : "r" (v)
+        : "cc");
+}
+static inline void atomic_dec(uint32_t *v)
+{
+        unsigned long tmp;
+        int result;
+
+        __asm__ __volatile__("@ atomic_sub\n"
+"1:     ldrex   %0, [%3]\n"
+"       sub     %0, %0, #1\n"
+"       strex   %1, %0, [%3]\n"
+"       teq     %1, #0\n"
+"       bne     1b"
+        : "=&r" (result), "=&r" (tmp), "+Qo" (*v)
+        : "r" (v)
+        : "cc");
+}
 #else /* __x86__ */
 static inline void atomic_inc(uint32_t *v)
 {
