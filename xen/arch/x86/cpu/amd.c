@@ -471,6 +471,21 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		}
 	}
 
+	/* re-enable TopologyExtensions if switched off by BIOS */
+	if ((c->x86 == 0x15) &&
+	    (c->x86_model >= 0x10) && (c->x86_model <= 0x1f) &&
+	    !cpu_has(c, X86_FEATURE_TOPOEXT) &&
+	    !rdmsr_safe(MSR_K8_EXT_FEATURE_MASK, value)) {
+		value |= 1ULL << 54;
+		wrmsr_safe(MSR_K8_EXT_FEATURE_MASK, value);
+		rdmsrl(MSR_K8_EXT_FEATURE_MASK, value);
+		if (value & (1ULL << 54)) {
+			set_bit(X86_FEATURE_TOPOEXT, c->x86_capability);
+			printk(KERN_INFO "CPU: Re-enabling disabled "
+			       "Topology Extensions Support\n");
+		}
+	}
+
         amd_get_topology(c);
 
 	/* Pointless to use MWAIT on Family10 as it does not deep sleep. */
