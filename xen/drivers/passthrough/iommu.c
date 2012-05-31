@@ -625,7 +625,7 @@ int iommu_do_domctl(
             break;
         }
 
-        ret = xsm_assign_device(d, domctl->u.assign_device.machine_sbdf);
+        ret = xsm_deassign_device(d, domctl->u.assign_device.machine_sbdf);
         if ( ret )
             goto deassign_device_out;
 
