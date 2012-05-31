@@ -53,12 +53,16 @@ edd_mbr_sig_read:
         jc      edd_mbr_sig_done                # on failure, we're done.
         cmpb    $0, %ah                         # some BIOSes do not set CF
         jne     edd_mbr_sig_done                # on failure, we're done.
+        cmpw    $0xaa55, bootsym(boot_edd_info)+0x1fe
+        jne     .Ledd_mbr_sig_next
         movl    bootsym(boot_edd_info)+EDD_MBR_SIG_OFFSET,%eax
         movb    %dl, (%bx)                      # store BIOS drive number
         movl    %eax, 4(%bx)                    # store signature from MBR
         incb    bootsym(boot_mbr_signature_nr)  # note that we stored something
-        incb    %dl                             # increment to next device
         addw    $8, %bx                         # increment sig buffer ptr
+.Ledd_mbr_sig_next:
+        incb    %dl                             # increment to next device
+        jz      edd_mbr_sig_done
         cmpb    $EDD_MBR_SIG_MAX,bootsym(boot_mbr_signature_nr)
         jb      edd_mbr_sig_read
 edd_mbr_sig_done:
