@@ -23,6 +23,9 @@ struct pending_irq
     /* inflight is used to append instances of pending_irq to
      * vgic.inflight_irqs */
     struct list_head inflight;
+    /* lr_queue is used to append instances of pending_irq to
+     * gic.lr_pending */
+    struct list_head lr_queue;
 };
 
 struct arch_domain
@@ -75,6 +78,13 @@ struct arch_vcpu
 
     struct {
         struct vgic_irq_rank private_irqs;
+        /* This list is ordered by IRQ priority and it is used to keep
+         * track of the IRQs that the VGIC injected into the guest.
+         * Depending on the availability of LR registers, the IRQs might
+         * actually be in an LR, and therefore injected into the guest,
+         * or queued in gic.lr_pending.
+         * As soon as an IRQ is EOI'd by the guest and removed from the
+         * corresponding LR it is also removed from this list. */
         struct list_head inflight_irqs;
         spinlock_t lock;
     } vgic;
