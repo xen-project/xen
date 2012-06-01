@@ -3,6 +3,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/domain_page.h>
+#include <asm/flushtlb.h>
 
 void p2m_load_VTTBR(struct domain *d)
 {
@@ -123,6 +124,7 @@ static int create_p2m_entries(struct domain *d,
             /* p2m entry already present */
             free_domheap_page(
                     mfn_to_page(third[third_table_offset(addr)].p2m.base));
+            flush_tlb_all_local();
         }
 
         /* Allocate a new RAM page and attach */
