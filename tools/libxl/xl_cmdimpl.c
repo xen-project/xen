@@ -630,7 +630,8 @@ static void parse_config_data(const char *config_source,
     if (blkdev_start)
         b_info->blkdev_start = strdup(blkdev_start);
 
-    /* the following is the actual config parsing with overriding values in the structures */
+    /* the following is the actual config parsing with overriding
+     * values in the structures */
     if (!xlu_cfg_get_long (config, "cpu_weight", &l, 0))
         b_info->sched_params.weight = l;
     if (!xlu_cfg_get_long (config, "cap", &l, 0))
@@ -638,11 +639,11 @@ static void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_long (config, "period", &l, 0))
         b_info->sched_params.period = l;
     if (!xlu_cfg_get_long (config, "slice", &l, 0))
-        b_info->sched_params.period = l;
+        b_info->sched_params.slice = l;
     if (!xlu_cfg_get_long (config, "latency", &l, 0))
-        b_info->sched_params.period = l;
+        b_info->sched_params.latency = l;
     if (!xlu_cfg_get_long (config, "extratime", &l, 0))
-        b_info->sched_params.period = l;
+        b_info->sched_params.extratime = l;
 
     if (!xlu_cfg_get_long (config, "vcpus", &l, 0)) {
         b_info->max_vcpus = l;
@@ -4362,7 +4363,7 @@ int main_sharing(int argc, char **argv)
     return 0;
 }
 
-static int sched_credit_domain_get(int domid, libxl_sched_credit_domain *scinfo)
+static int sched_credit_domain_get(int domid, libxl_domain_sched_params *scinfo)
 {
     int rc;
 
@@ -4373,7 +4374,7 @@ static int sched_credit_domain_get(int domid, libxl_sched_credit_domain *scinfo)
     return rc;
 }
 
-static int sched_credit_domain_set(int domid, libxl_sched_credit_domain *scinfo)
+static int sched_credit_domain_set(int domid, libxl_domain_sched_params *scinfo)
 {
     int rc;
 
@@ -4409,7 +4410,7 @@ static int sched_credit_params_get(int poolid, libxl_sched_credit_params *scinfo
 static int sched_credit_domain_output(int domid)
 {
     char *domname;
-    libxl_sched_credit_domain scinfo;
+    libxl_domain_sched_params scinfo;
     int rc;
 
     if (domid < 0) {
@@ -4426,7 +4427,7 @@ static int sched_credit_domain_output(int domid)
         scinfo.weight,
         scinfo.cap);
     free(domname);
-    libxl_sched_credit_domain_dispose(&scinfo);
+    libxl_domain_sched_params_dispose(&scinfo);
     return 0;
 }
 
@@ -4452,7 +4453,7 @@ static int sched_credit_pool_output(uint32_t poolid)
 }
 
 static int sched_credit2_domain_get(
-    int domid, libxl_sched_credit2_domain *scinfo)
+    int domid, libxl_domain_sched_params *scinfo)
 {
     int rc;
 
@@ -4464,7 +4465,7 @@ static int sched_credit2_domain_get(
 }
 
 static int sched_credit2_domain_set(
-    int domid, libxl_sched_credit2_domain *scinfo)
+    int domid, libxl_domain_sched_params *scinfo)
 {
     int rc;
 
@@ -4479,7 +4480,7 @@ static int sched_credit2_domain_output(
     int domid)
 {
     char *domname;
-    libxl_sched_credit2_domain scinfo;
+    libxl_domain_sched_params scinfo;
     int rc;
 
     if (domid < 0) {
@@ -4495,12 +4496,12 @@ static int sched_credit2_domain_output(
         domid,
         scinfo.weight);
     free(domname);
-    libxl_sched_credit2_domain_dispose(&scinfo);
+    libxl_domain_sched_params_dispose(&scinfo);
     return 0;
 }
 
 static int sched_sedf_domain_get(
-    int domid, libxl_sched_sedf_domain *scinfo)
+    int domid, libxl_domain_sched_params *scinfo)
 {
     int rc;
 
@@ -4512,7 +4513,7 @@ static int sched_sedf_domain_get(
 }
 
 static int sched_sedf_domain_set(
-    int domid, libxl_sched_sedf_domain *scinfo)
+    int domid, libxl_domain_sched_params *scinfo)
 {
     int rc;
 
@@ -4526,7 +4527,7 @@ static int sched_sedf_domain_output(
     int domid)
 {
     char *domname;
-    libxl_sched_sedf_domain scinfo;
+    libxl_domain_sched_params scinfo;
     int rc;
 
     if (domid < 0) {
@@ -4547,7 +4548,7 @@ static int sched_sedf_domain_output(
         scinfo.extratime,
         scinfo.weight);
     free(domname);
-    libxl_sched_sedf_domain_dispose(&scinfo);
+    libxl_domain_sched_params_dispose(&scinfo);
     return 0;
 }
 
@@ -4624,7 +4625,6 @@ static int sched_domain_output(libxl_scheduler sched, int (*output)(int),
  */
 int main_sched_credit(int argc, char **argv)
 {
-    libxl_sched_credit_domain scinfo;
     const char *dom = NULL;
     const char *cpupool = NULL;
     int weight = 256, cap = 0, opt_w = 0, opt_c = 0;
@@ -4699,7 +4699,7 @@ int main_sched_credit(int argc, char **argv)
     }
 
     if (opt_s) {
-        libxl_sched_credit_params  scparam;
+        libxl_sched_credit_params scparam;
         uint32_t poolid = 0;
 
         if (cpupool) {
@@ -4735,20 +4735,19 @@ int main_sched_credit(int argc, char **argv)
     } else {
         find_domain(dom);
 
-        rc = sched_credit_domain_get(domid, &scinfo);
-        if (rc)
-            return -rc;
-
         if (!opt_w && !opt_c) { /* output credit scheduler info */
             sched_credit_domain_output(-1);
             return -sched_credit_domain_output(domid);
         } else { /* set credit scheduler paramaters */
+            libxl_domain_sched_params scinfo;
+            libxl_domain_sched_params_init(&scinfo);
+            scinfo.sched = LIBXL_SCHEDULER_CREDIT;
             if (opt_w)
                 scinfo.weight = weight;
             if (opt_c)
                 scinfo.cap = cap;
             rc = sched_credit_domain_set(domid, &scinfo);
-            libxl_sched_credit_domain_dispose(&scinfo);
+            libxl_domain_sched_params_dispose(&scinfo);
             if (rc)
                 return -rc;
         }
@@ -4759,7 +4758,6 @@ int main_sched_credit(int argc, char **argv)
 
 int main_sched_credit2(int argc, char **argv)
 {
-    libxl_sched_credit2_domain scinfo;
     const char *dom = NULL;
     const char *cpupool = NULL;
     int weight = 256, opt_w = 0;
@@ -4814,18 +4812,17 @@ int main_sched_credit2(int argc, char **argv)
     } else {
         find_domain(dom);
 
-        rc = sched_credit2_domain_get(domid, &scinfo);
-        if (rc)
-            return -rc;
-
         if (!opt_w) { /* output credit2 scheduler info */
             sched_credit2_domain_output(-1);
             return -sched_credit2_domain_output(domid);
         } else { /* set credit2 scheduler paramaters */
+            libxl_domain_sched_params scinfo;
+            libxl_domain_sched_params_init(&scinfo);
+            scinfo.sched = LIBXL_SCHEDULER_CREDIT2;
             if (opt_w)
                 scinfo.weight = weight;
             rc = sched_credit2_domain_set(domid, &scinfo);
-            libxl_sched_credit2_domain_dispose(&scinfo);
+            libxl_domain_sched_params_dispose(&scinfo);
             if (rc)
                 return -rc;
         }
@@ -4836,7 +4833,6 @@ int main_sched_credit2(int argc, char **argv)
 
 int main_sched_sedf(int argc, char **argv)
 {
-    libxl_sched_sedf_domain scinfo;
     const char *dom = NULL;
     const char *cpupool = NULL;
     int period = 0, opt_p = 0;
@@ -4919,15 +4915,15 @@ int main_sched_sedf(int argc, char **argv)
     } else {
         find_domain(dom);
 
-        rc = sched_sedf_domain_get(domid, &scinfo);
-        if (rc)
-            return -rc;
-
         if (!opt_p && !opt_s && !opt_l && !opt_e && !opt_w) {
             /* output sedf scheduler info */
             sched_sedf_domain_output(-1);
             return -sched_sedf_domain_output(domid);
         } else { /* set sedf scheduler paramaters */
+            libxl_domain_sched_params scinfo;
+            libxl_domain_sched_params_init(&scinfo);
+            scinfo.sched = LIBXL_SCHEDULER_SEDF;
+
             if (opt_p) {
                 scinfo.period = period;
                 scinfo.weight = 0;
@@ -4946,7 +4942,7 @@ int main_sched_sedf(int argc, char **argv)
                 scinfo.slice = 0;
             }
             rc = sched_sedf_domain_set(domid, &scinfo);
-            libxl_sched_sedf_domain_dispose(&scinfo);
+            libxl_domain_sched_params_dispose(&scinfo);
             if (rc)
                 return -rc;
         }

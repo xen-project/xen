@@ -225,12 +225,13 @@ libxl_domain_create_info = Struct("domain_create_info",[
 MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT")
 
 libxl_domain_sched_params = Struct("domain_sched_params",[
-    ("weight",       integer),
-    ("cap",          integer),
-    ("period",       integer),
-    ("slice",        integer),
-    ("latency",      integer),
-    ("extratime",    integer),
+    ("sched",        libxl_scheduler),
+    ("weight",       integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT'}),
+    ("cap",          integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_CAP_DEFAULT'}),
+    ("period",       integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_PERIOD_DEFAULT'}),
+    ("slice",        integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_SLICE_DEFAULT'}),
+    ("latency",      integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_LATENCY_DEFAULT'}),
+    ("extratime",    integer, {'init_val': 'LIBXL_DOMAIN_SCHED_PARAM_EXTRATIME_DEFAULT'}),
     ], dir=DIR_IN)
 
 libxl_domain_build_info = Struct("domain_build_info",[
@@ -426,27 +427,10 @@ libxl_cputopology = Struct("cputopology", [
     ("node", uint32),
     ], dir=DIR_OUT)
 
-libxl_sched_credit_domain = Struct("sched_credit_domain", [
-    ("weight", integer),
-    ("cap", integer),
-    ])
-
 libxl_sched_credit_params = Struct("sched_credit_params", [
     ("tslice_ms", integer),
     ("ratelimit_us", integer),
     ], dispose_fn=None)
-
-libxl_sched_credit2_domain = Struct("sched_credit2_domain", [
-    ("weight", integer),
-    ])
-
-libxl_sched_sedf_domain = Struct("sched_sedf_domain", [
-    ("period", integer),
-    ("slice", integer),
-    ("latency", integer),
-    ("extratime", integer),
-    ("weight", integer),
-    ])
 
 libxl_domain_remus_info = Struct("domain_remus_info",[
     ("interval",     integer),

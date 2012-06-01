@@ -45,34 +45,26 @@ libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
 int libxl__sched_set_params(libxl__gc *gc, uint32_t domid,
                             libxl_domain_sched_params *scparams)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-    libxl_scheduler sched;
-    libxl_sched_sedf_domain sedf_info;
-    libxl_sched_credit_domain credit_info;
-    libxl_sched_credit2_domain credit2_info;
+    libxl_scheduler sched = scparams->sched;
     int ret;
 
-    sched = libxl_get_scheduler (ctx);
+    if (sched == LIBXL_SCHEDULER_UNKNOWN)
+        sched = libxl__domain_scheduler(gc, domid);
+
     switch (sched) {
     case LIBXL_SCHEDULER_SEDF:
-      sedf_info.period = scparams->period;
-      sedf_info.slice = scparams->slice;
-      sedf_info.latency = scparams->latency;
-      sedf_info.extratime = scparams->extratime;
-      sedf_info.weight = scparams->weight;
-      ret=libxl_sched_sedf_domain_set(ctx, domid, &sedf_info);
-      break;
+        ret=libxl_sched_sedf_domain_set(CTX, domid, scparams);
+        break;
     case LIBXL_SCHEDULER_CREDIT:
-      credit_info.weight = scparams->weight;
-      credit_info.cap = scparams->cap;
-      ret=libxl_sched_credit_domain_set(ctx, domid, &credit_info);
-      break;
+        ret=libxl_sched_credit_domain_set(CTX, domid, scparams);
+        break;
     case LIBXL_SCHEDULER_CREDIT2:
-      credit2_info.weight = scparams->weight;
-      ret=libxl_sched_credit2_domain_set(ctx, domid, &credit2_info);
-      break;
+        ret=libxl_sched_credit2_domain_set(CTX, domid, scparams);
+        break;
     default:
-      ret=-1;
+        LOG(ERROR, "Unknown scheduler");
+        ret=ERROR_INVAL;
+        break;
     }
     return ret;
 }

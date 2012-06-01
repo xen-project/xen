@@ -3296,12 +3296,10 @@ libxl_scheduler libxl_get_scheduler(libxl_ctx *ctx)
 }
 
 int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                  libxl_sched_credit_domain *scinfo)
+                                  libxl_domain_sched_params *scinfo)
 {
     struct xen_domctl_sched_credit sdom;
     int rc;
-
-    libxl_sched_credit_domain_init(scinfo);
 
     rc = xc_sched_credit_domain_get(ctx->xch, domid, &sdom);
     if (rc != 0) {
@@ -3309,6 +3307,8 @@ int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
         return ERROR_FAIL;
     }
 
+    libxl_domain_sched_params_init(scinfo);
+    scinfo->sched = LIBXL_SCHEDULER_CREDIT;
     scinfo->weight = sdom.weight;
     scinfo->cap = sdom.cap;
 
@@ -3316,7 +3316,7 @@ int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
 }
 
 int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                  libxl_sched_credit_domain *scinfo)
+                                  libxl_domain_sched_params *scinfo)
 {
     struct xen_domctl_sched_credit sdom;
     xc_domaininfo_t domaininfo;
@@ -3330,22 +3330,33 @@ int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid,
     if (rc != 1 || domaininfo.domain != domid)
         return ERROR_INVAL;
 
-
-    if (scinfo->weight < 1 || scinfo->weight > 65535) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-            "Cpu weight out of range, valid values are within range from 1 to 65535");
-        return ERROR_INVAL;
+    rc = xc_sched_credit_domain_get(ctx->xch, domid, &sdom);
+    if (rc != 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain sched credit");
+        return ERROR_FAIL;
     }
 
-    if (scinfo->cap < 0 || scinfo->cap > (domaininfo.max_vcpu_id + 1) * 100) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-            "Cpu cap out of range, valid range is from 0 to %d for specified number of vcpus",
-            ((domaininfo.max_vcpu_id + 1) * 100));
-        return ERROR_INVAL;
+    if (scinfo->weight != LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT) {
+        if (scinfo->weight < 1 || scinfo->weight > 65535) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "Cpu weight out of range, "
+                       "valid values are within range from 1 to 65535");
+            return ERROR_INVAL;
+        }
+        sdom.weight = scinfo->weight;
     }
 
-    sdom.weight = scinfo->weight;
-    sdom.cap = scinfo->cap;
+    if (scinfo->cap != LIBXL_DOMAIN_SCHED_PARAM_CAP_DEFAULT) {
+        if (scinfo->cap < 0
+            || scinfo->cap > (domaininfo.max_vcpu_id + 1) * 100) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                "Cpu cap out of range, "
+                "valid range is from 0 to %d for specified number of vcpus",
+                       ((domaininfo.max_vcpu_id + 1) * 100));
+            return ERROR_INVAL;
+        }
+        sdom.cap = scinfo->cap;
+    }
 
     rc = xc_sched_credit_domain_set(ctx->xch, domid, &sdom);
     if ( rc < 0 ) {
@@ -3418,12 +3429,10 @@ int libxl_sched_credit_params_set(libxl_ctx *ctx, uint32_t poolid,
 }
 
 int libxl_sched_credit2_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                   libxl_sched_credit2_domain *scinfo)
+                                   libxl_domain_sched_params *scinfo)
 {
     struct xen_domctl_sched_credit2 sdom;
     int rc;
-
-    libxl_sched_credit2_domain_init(scinfo);
 
     rc = xc_sched_credit2_domain_get(ctx->xch, domid, &sdom);
     if (rc != 0) {
@@ -3432,35 +3441,36 @@ int libxl_sched_credit2_domain_get(libxl_ctx *ctx, uint32_t domid,
         return ERROR_FAIL;
     }
 
+    libxl_domain_sched_params_init(scinfo);
+    scinfo->sched = LIBXL_SCHEDULER_CREDIT2;
     scinfo->weight = sdom.weight;
 
     return 0;
 }
 
 int libxl_sched_credit2_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                   libxl_sched_credit2_domain *scinfo)
+                                   libxl_domain_sched_params *scinfo)
 {
     struct xen_domctl_sched_credit2 sdom;
-    xc_domaininfo_t domaininfo;
     int rc;
 
-    rc = xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo);
-    if (rc < 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain info list");
+    rc = xc_sched_credit2_domain_get(ctx->xch, domid, &sdom);
+    if (rc != 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                         "getting domain sched credit2");
         return ERROR_FAIL;
     }
-    if (rc != 1 || domaininfo.domain != domid)
-        return ERROR_INVAL;
 
-
-    if (scinfo->weight < 1 || scinfo->weight > 65535) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
-            "Cpu weight out of range, valid values are within range from "
-            "1 to 65535");
-        return ERROR_INVAL;
+    if (scinfo->weight != LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT) {
+        if (scinfo->weight < 1 || scinfo->weight > 65535) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "Cpu weight out of range, "
+                       "valid values are within range from "
+                       "1 to 65535");
+            return ERROR_INVAL;
+        }
+        sdom.weight = scinfo->weight;
     }
-
-    sdom.weight = scinfo->weight;
 
     rc = xc_sched_credit2_domain_set(ctx->xch, domid, &sdom);
     if ( rc < 0 ) {
@@ -3473,7 +3483,7 @@ int libxl_sched_credit2_domain_set(libxl_ctx *ctx, uint32_t domid,
 }
 
 int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                libxl_sched_sedf_domain *scinfo)
+                                libxl_domain_sched_params *scinfo)
 {
     uint64_t period;
     uint64_t slice;
@@ -3482,8 +3492,6 @@ int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
     uint16_t weight;
     int rc;
 
-    libxl_sched_sedf_domain_init(scinfo);
-
     rc = xc_sedf_domain_get(ctx->xch, domid, &period, &slice, &latency,
                             &extratime, &weight);
     if (rc != 0) {
@@ -3491,6 +3499,8 @@ int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
         return ERROR_FAIL;
     }
 
+    libxl_domain_sched_params_init(scinfo);
+    scinfo->sched = LIBXL_SCHEDULER_SEDF;
     scinfo->period = period / 1000000;
     scinfo->slice = slice / 1000000;
     scinfo->latency = latency / 1000000;
@@ -3501,24 +3511,37 @@ int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
 }
 
 int libxl_sched_sedf_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                libxl_sched_sedf_domain *scinfo)
+                                libxl_domain_sched_params *scinfo)
 {
-    xc_domaininfo_t domaininfo;
-    int rc;
+    uint64_t period;
+    uint64_t slice;
+    uint64_t latency;
+    uint16_t extratime;
+    uint16_t weight;
 
-    rc = xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo);
-    if (rc < 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain info list");
+    int ret;
+
+    ret = xc_sedf_domain_get(ctx->xch, domid, &period, &slice, &latency,
+                            &extratime, &weight);
+    if (ret != 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain sched sedf");
         return ERROR_FAIL;
     }
-    if (rc != 1 || domaininfo.domain != domid)
-        return ERROR_INVAL;
 
+    if (scinfo->period != LIBXL_DOMAIN_SCHED_PARAM_PERIOD_DEFAULT)
+        period = scinfo->period * 1000000;
+    if (scinfo->slice != LIBXL_DOMAIN_SCHED_PARAM_SLICE_DEFAULT)
+        slice = scinfo->slice * 1000000;
+    if (scinfo->latency != LIBXL_DOMAIN_SCHED_PARAM_LATENCY_DEFAULT)
+        latency = scinfo->latency * 1000000;
+    if (scinfo->extratime != LIBXL_DOMAIN_SCHED_PARAM_EXTRATIME_DEFAULT)
+        extratime = scinfo->extratime;
+    if (scinfo->weight != LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT)
+        weight = scinfo->weight;
 
-    rc = xc_sedf_domain_set(ctx->xch, domid, scinfo->period * 1000000,
-                            scinfo->slice * 1000000, scinfo->latency * 1000000,
-                            scinfo->extratime, scinfo->weight);
-    if ( rc < 0 ) {
+    ret = xc_sedf_domain_set(ctx->xch, domid, period, slice, latency,
+                            extratime, weight);
+    if ( ret < 0 ) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "setting domain sched sedf");
         return ERROR_FAIL;
     }

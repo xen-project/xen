@@ -768,23 +768,33 @@ int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_cpumap *cpumap);
 
 libxl_scheduler libxl_get_scheduler(libxl_ctx *ctx);
 
-
-int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                  libxl_sched_credit_domain *scinfo);
-int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                  libxl_sched_credit_domain *scinfo);
+/* Per-scheduler parameters */
 int libxl_sched_credit_params_get(libxl_ctx *ctx, uint32_t poolid,
                                   libxl_sched_credit_params *scinfo);
 int libxl_sched_credit_params_set(libxl_ctx *ctx, uint32_t poolid,
                                   libxl_sched_credit_params *scinfo);
+
+/* Scheduler Per-domain parameters */
+
+#define LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT    -1
+#define LIBXL_DOMAIN_SCHED_PARAM_CAP_DEFAULT       -1
+#define LIBXL_DOMAIN_SCHED_PARAM_PERIOD_DEFAULT    -1
+#define LIBXL_DOMAIN_SCHED_PARAM_SLICE_DEFAULT     -1
+#define LIBXL_DOMAIN_SCHED_PARAM_LATENCY_DEFAULT   -1
+#define LIBXL_DOMAIN_SCHED_PARAM_EXTRATIME_DEFAULT -1
+
+int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_domain_sched_params *scinfo);
+int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_domain_sched_params *scinfo);
 int libxl_sched_credit2_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                   libxl_sched_credit2_domain *scinfo);
+                                   libxl_domain_sched_params *scinfo);
 int libxl_sched_credit2_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                   libxl_sched_credit2_domain *scinfo);
+                                   libxl_domain_sched_params *scinfo);
 int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                libxl_sched_sedf_domain *scinfo);
+                                libxl_domain_sched_params *scinfo);
 int libxl_sched_sedf_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                libxl_sched_sedf_domain *scinfo);
+                                libxl_domain_sched_params *scinfo);
 int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
                        libxl_trigger trigger, uint32_t vcpuid);
 int libxl_send_sysrq(libxl_ctx *ctx, uint32_t domid, char sysrq);
