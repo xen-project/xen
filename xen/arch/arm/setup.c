@@ -51,7 +51,7 @@ static void __init init_idle_domain(void)
         /* TODO: setup_idle_pagetable(); */
 }
 
-static void processor_id(void)
+static void __init processor_id(void)
 {
     printk("Processor Features: %08x %08x\n",
            READ_CP32(ID_PFR0), READ_CP32(ID_PFR0));
