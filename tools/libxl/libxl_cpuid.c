@@ -185,7 +185,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"svm_decode",   0x8000000a, NA, CPUID_REG_EDX,  7,  1},
         {"svm_pausefilt",0x8000000a, NA, CPUID_REG_EDX, 10,  1},
 
-        {NULL, 0, CPUID_REG_INV, 0, 0}
+        {NULL, 0, NA, CPUID_REG_INV, 0, 0}
     };
 #undef NA
     char *sep, *val, *endptr;
@@ -216,7 +216,7 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
     num = strtoull(val, &endptr, 0);
     flags[flag->length] = 0;
     if (endptr != val) {
-        /* is this was a valid number, write the binary form into the string */
+        /* if this was a valid number, write the binary form into the string */
         for (i = 0; i < flag->length; i++) {
             flags[flag->length - 1 - i] = "01"[!!(num & (1 << i))];
         }
