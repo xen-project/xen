@@ -740,6 +740,8 @@ _hidden int libxl__file_reference_unmap(libxl__file_reference *f);
 /* from xl_dom */
 _hidden libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid);
+_hidden int libxl__domain_cpupool(libxl__gc *gc, uint32_t domid);
+_hidden libxl_scheduler libxl__domain_scheduler(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__sched_set_params(libxl__gc *gc, uint32_t domid, libxl_sched_params *scparams);
 #define LIBXL__DOMAIN_IS_TYPE(gc, domid, type) \
     libxl__domain_type((gc), (domid)) == LIBXL_DOMAIN_TYPE_##type

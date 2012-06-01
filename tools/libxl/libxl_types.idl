@@ -107,7 +107,9 @@ libxl_bios_type = Enumeration("bios_type", [
     ])
 
 # Consistent with values defined in domctl.h
+# Except unknown which we have made up
 libxl_scheduler = Enumeration("scheduler", [
+    (0, "unknown"),
     (4, "sedf"),
     (5, "credit"),
     (6, "credit2"),

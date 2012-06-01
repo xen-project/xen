@@ -133,9 +133,8 @@ int libxl_name_to_cpupoolid(libxl_ctx *ctx, const char *name,
             }
             free(poolname);
         }
-        libxl_cpupoolinfo_dispose(poolinfo + i);
     }
-    free(poolinfo);
+    libxl_cpupoolinfo_list_free(poolinfo, nb_pools);
     return ret;
 }
 
@@ -685,6 +684,14 @@ void libxl_vminfo_list_free(libxl_vminfo *list, int nr)
     int i;
     for (i = 0; i < nr; i++)
         libxl_vminfo_dispose(&list[i]);
+    free(list);
+}
+
+void libxl_cpupoolinfo_list_free(libxl_cpupoolinfo *list, int nr)
+{
+    int i;
+    for (i = 0; i < nr; i++)
+        libxl_cpupoolinfo_dispose(&list[i]);
     free(list);
 }
 

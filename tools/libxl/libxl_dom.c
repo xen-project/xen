@@ -93,6 +93,41 @@ int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid)
     return (info.flags >> XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask;
 }
 
+int libxl__domain_cpupool(libxl__gc *gc, uint32_t domid)
+{
+    xc_domaininfo_t info;
+    int ret;
+
+    ret = xc_domain_getinfolist(CTX->xch, domid, 1, &info);
+    if (ret != 1)
+        return ERROR_FAIL;
+    if (info.domain != domid)
+        return ERROR_FAIL;
+
+    return info.cpupool;
+}
+
+libxl_scheduler libxl__domain_scheduler(libxl__gc *gc, uint32_t domid)
+{
+    uint32_t cpupool = libxl__domain_cpupool(gc, domid);
+    libxl_cpupoolinfo poolinfo;
+    libxl_scheduler sched = LIBXL_SCHEDULER_UNKNOWN;
+    int rc;
+
+    if (cpupool < 0)
+        return sched;
+
+    rc = libxl_cpupool_info(CTX, &poolinfo, cpupool);
+    if (rc < 0)
+        goto out;
+
+    sched = poolinfo.sched;
+
+out:
+    libxl_cpupoolinfo_dispose(&poolinfo);
+    return sched;
+}
+
 int libxl__build_pre(libxl__gc *gc, uint32_t domid,
               libxl_domain_build_info *info, libxl__domain_build_state *state)
 {

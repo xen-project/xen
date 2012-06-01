@@ -4610,11 +4610,8 @@ static int sched_domain_output(libxl_scheduler sched, int (*output)(int),
                 break;
         }
     }
-    if (poolinfo) {
-        for (p = 0; p < n_pools; p++) {
-            libxl_cpupoolinfo_dispose(poolinfo + p);
-        }
-    }
+    if (poolinfo)
+        libxl_cpupoolinfo_list_free(poolinfo, n_pools);
     return 0;
 }
 
@@ -6122,8 +6119,9 @@ int main_cpupoollist(int argc, char **argv)
                 printf("\n");
             }
         }
-        libxl_cpupoolinfo_dispose(poolinfo + p);
     }
+
+    libxl_cpupoolinfo_list_free(poolinfo, n_pools);
 
     return ret;
 }

@@ -552,41 +552,70 @@ int libxl_domain_info(libxl_ctx *ctx, libxl_dominfo *info_r,
     return 0;
 }
 
+static int cpupool_info(libxl__gc *gc,
+                        libxl_cpupoolinfo *info,
+                        uint32_t poolid,
+                        bool exact /* exactly poolid or >= poolid */)
+{
+    xc_cpupoolinfo_t *xcinfo;
+    int rc = ERROR_FAIL;
+
+    xcinfo = xc_cpupool_getinfo(CTX->xch, poolid);
+    if (xcinfo == NULL)
+        return ERROR_FAIL;
+
+    if (exact && xcinfo->cpupool_id != poolid)
+        goto out;
+
+    info->poolid = xcinfo->cpupool_id;
+    info->sched = xcinfo->sched_id;
+    info->n_dom = xcinfo->n_dom;
+    if (libxl_cpumap_alloc(CTX, &info->cpumap))
+        goto out;
+    memcpy(info->cpumap.map, xcinfo->cpumap, info->cpumap.size);
+
+    rc = 0;
+out:
+    xc_cpupool_infofree(CTX->xch, xcinfo);
+    return rc;
+}
+
+int libxl_cpupool_info(libxl_ctx *ctx,
+                       libxl_cpupoolinfo *info, uint32_t poolid)
+{
+    GC_INIT(ctx);
+    int rc = cpupool_info(gc, info, poolid, true);
+    GC_FREE;
+    return rc;
+}
+
 libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx *ctx, int *nb_pool)
 {
-    libxl_cpupoolinfo *ptr, *tmp;
+    GC_INIT(ctx);
+    libxl_cpupoolinfo info, *ptr, *tmp;
     int i;
-    xc_cpupoolinfo_t *info;
     uint32_t poolid;
 
     ptr = NULL;
 
     poolid = 0;
     for (i = 0;; i++) {
-        info = xc_cpupool_getinfo(ctx->xch, poolid);
-        if (info == NULL)
+        if (cpupool_info(gc, &info, poolid, false))
             break;
         tmp = realloc(ptr, (i + 1) * sizeof(libxl_cpupoolinfo));
         if (!tmp) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "allocating cpupool info");
-            free(ptr);
-            xc_cpupool_infofree(ctx->xch, info);
-            return NULL;
+            libxl_cpupoolinfo_list_free(ptr, i);
+            goto out;
         }
         ptr = tmp;
-        ptr[i].poolid = info->cpupool_id;
-        ptr[i].sched = info->sched_id;
-        ptr[i].n_dom = info->n_dom;
-        if (libxl_cpumap_alloc(ctx, &ptr[i].cpumap)) {
-            xc_cpupool_infofree(ctx->xch, info);
-            break;
-        }
-        memcpy(ptr[i].cpumap.map, info->cpumap, ptr[i].cpumap.size);
-        poolid = info->cpupool_id + 1;
-        xc_cpupool_infofree(ctx->xch, info);
+        ptr[i] = info;
+        poolid = info.poolid + 1;
     }
 
     *nb_pool = i;
+out:
+    GC_FREE;
     return ptr;
 }
 
@@ -4031,14 +4060,10 @@ int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int 
         }
     }
 
-    for (cpu = 0; cpu < nr_cpus; cpu++)
-        libxl_cputopology_dispose(&topology[cpu]);
-    free(topology);
+    libxl_cputopology_list_free(topology, nr_cpus);
 
 out:
-    for (p = 0; p < n_pools; p++) {
-        libxl_cpupoolinfo_dispose(poolinfo + p);
-    }
+    libxl_cpupoolinfo_list_free(poolinfo, n_pools);
 
     return ret;
 }
