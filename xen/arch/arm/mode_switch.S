@@ -65,7 +65,10 @@ enter_hyp_mode:
 	mov   r0, #0
 	mcr   CP32(r0, FCSEIDR)
 	mcr   CP32(r0, CONTEXTIDR)
-	/* FIXME: ought to reset some other NS control regs here */
+	/* Allow non-secure access to coprocessors, FIQs, VFP and NEON */
+	ldr   r1, =0x3fff            /* 14 CP bits set, all others clear */
+	mcr   CP32(r1, NSACR)
+
 	mrs   r0, cpsr               /* Copy the CPSR */
 	add   r0, r0, #0x4           /* 0x16 (Monitor) -> 0x1a (Hyp) */
 	msr   spsr_cxsf, r0          /* into the SPSR */
