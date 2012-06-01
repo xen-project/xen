@@ -12,6 +12,7 @@ obj-y += io.o
 obj-y += irq.o
 obj-y += kernel.o
 obj-y += mm.o
+obj-y += mode_switch.o
 obj-y += p2m.o
 obj-y += percpu.o
 obj-y += guestcopy.o
