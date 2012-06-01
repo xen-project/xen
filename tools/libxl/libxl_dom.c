@@ -42,33 +42,6 @@ libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
         return LIBXL_DOMAIN_TYPE_PV;
 }
 
-int libxl__sched_set_params(libxl__gc *gc, uint32_t domid,
-                            libxl_domain_sched_params *scparams)
-{
-    libxl_scheduler sched = scparams->sched;
-    int ret;
-
-    if (sched == LIBXL_SCHEDULER_UNKNOWN)
-        sched = libxl__domain_scheduler(gc, domid);
-
-    switch (sched) {
-    case LIBXL_SCHEDULER_SEDF:
-        ret=libxl_sched_sedf_domain_set(CTX, domid, scparams);
-        break;
-    case LIBXL_SCHEDULER_CREDIT:
-        ret=libxl_sched_credit_domain_set(CTX, domid, scparams);
-        break;
-    case LIBXL_SCHEDULER_CREDIT2:
-        ret=libxl_sched_credit2_domain_set(CTX, domid, scparams);
-        break;
-    default:
-        LOG(ERROR, "Unknown scheduler");
-        ret=ERROR_INVAL;
-        break;
-    }
-    return ret;
-}
-
 int libxl__domain_shutdown_reason(libxl__gc *gc, uint32_t domid)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);

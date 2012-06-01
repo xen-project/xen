@@ -3549,6 +3549,33 @@ int libxl_sched_sedf_domain_set(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
+int libxl__sched_set_params(libxl__gc *gc, uint32_t domid,
+                            libxl_domain_sched_params *scparams)
+{
+    libxl_scheduler sched = scparams->sched;
+    int ret;
+
+    if (sched == LIBXL_SCHEDULER_UNKNOWN)
+        sched = libxl__domain_scheduler(gc, domid);
+
+    switch (sched) {
+    case LIBXL_SCHEDULER_SEDF:
+        ret=libxl_sched_sedf_domain_set(CTX, domid, scparams);
+        break;
+    case LIBXL_SCHEDULER_CREDIT:
+        ret=libxl_sched_credit_domain_set(CTX, domid, scparams);
+        break;
+    case LIBXL_SCHEDULER_CREDIT2:
+        ret=libxl_sched_credit2_domain_set(CTX, domid, scparams);
+        break;
+    default:
+        LOG(ERROR, "Unknown scheduler");
+        ret=ERROR_INVAL;
+        break;
+    }
+    return ret;
+}
+
 int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
                        libxl_trigger trigger, uint32_t vcpuid)
 {
