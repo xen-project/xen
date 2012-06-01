@@ -72,7 +72,7 @@ LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
 
 $(LIBXL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl) -include $(XEN_ROOT)/tools/config.h
 
-AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h
+AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h _paths.h
 AUTOSRCS= libxlu_cfg_y.c libxlu_cfg_l.c
 LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o \
 	libxlu_disk_l.o libxlu_disk.o libxlu_vif.o libxlu_pci.o
