@@ -27,7 +27,6 @@ DUMMY(arch_vcpu_reset);
 DUMMY(free_vcpu_guest_context);
 DUMMY(sync_vcpu_execstate);
 NOP(update_vcpu_system_time);
-DUMMY(vcpu_mark_events_pending);
 DUMMY(vcpu_show_execution_state);
 
 /* Page Reference & Type Maintenance */

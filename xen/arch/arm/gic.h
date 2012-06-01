@@ -121,6 +121,9 @@
 #define GICH_LR_CPUID_SHIFT     9
 #define GICH_VTR_NRLRGS         0x3f
 
+/* XXX: write this into the DT */
+#define VGIC_IRQ_EVTCHN_CALLBACK 31
+
 extern int domain_vgic_init(struct domain *d);
 extern int vcpu_vgic_init(struct vcpu *v);
 extern void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq,int virtual);

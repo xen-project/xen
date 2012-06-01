@@ -232,6 +232,17 @@ void arch_dump_vcpu_info(struct vcpu *v)
 {
 }
 
+void vcpu_mark_events_pending(struct vcpu *v)
+{
+    int already_pending = test_and_set_bit(
+        0, (unsigned long *)&vcpu_info(v, evtchn_upcall_pending));
+
+    if ( already_pending )
+        return;
+
+    vgic_vcpu_inject_irq(v, VGIC_IRQ_EVTCHN_CALLBACK, 1);
+}
+
 /*
  * Local variables:
  * mode: C
