@@ -635,10 +635,6 @@ static void parse_config_data(const char *config_source,
         b_info->sched_params.weight = l;
     if (!xlu_cfg_get_long (config, "cap", &l, 0))
         b_info->sched_params.cap = l;
-    if (!xlu_cfg_get_long (config, "tslice_ms", &l, 0))
-        b_info->sched_params.tslice_ms = l;
-    if (!xlu_cfg_get_long (config, "ratelimit_us", &l, 0))
-        b_info->sched_params.ratelimit_us = l;
     if (!xlu_cfg_get_long (config, "period", &l, 0))
         b_info->sched_params.period = l;
     if (!xlu_cfg_get_long (config, "slice", &l, 0))

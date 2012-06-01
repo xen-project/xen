@@ -42,7 +42,8 @@ libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
         return LIBXL_DOMAIN_TYPE_PV;
 }
 
-int libxl__sched_set_params(libxl__gc *gc, uint32_t domid, libxl_sched_params *scparams)
+int libxl__sched_set_params(libxl__gc *gc, uint32_t domid,
+                            libxl_domain_sched_params *scparams)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl_scheduler sched;
