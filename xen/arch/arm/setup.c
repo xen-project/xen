@@ -36,6 +36,7 @@
 #include <asm/page.h>
 #include <asm/current.h>
 #include <asm/setup.h>
+#include <asm/vfp.h>
 #include "gic.h"
 
 static __attribute_used__ void init_done(void)
@@ -191,6 +192,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     WRITE_CP32(0x80002558, VTCR); isb();
 
     processor_id();
+
+    enable_vfp();
 
     softirq_init();
 

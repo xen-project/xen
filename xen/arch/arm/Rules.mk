@@ -24,7 +24,7 @@ ifneq ($(call cc-option,$(CC),-fvisibility=hidden,n),n)
 CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
 endif
 
-CFLAGS += -march=armv7-a -mcpu=cortex-a15
+CFLAGS += -march=armv7-a -mcpu=cortex-a15 -mfpu=vfpv3 -mfloat-abi=softfp
 
 # Require GCC v3.4+ (to avoid issues with alignment constraints in Xen headers)
 check-$(gcc) = $(call cc-ver-check,CC,0x030400,"Xen requires at least gcc-3.4")

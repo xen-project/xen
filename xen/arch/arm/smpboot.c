@@ -26,6 +26,7 @@
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/softirq.h>
+#include <asm/vfp.h>
 #include "gic.h"
 
 cpumask_t cpu_online_map;
@@ -106,6 +107,8 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
     WRITE_CP32((uint32_t) hyp_traps_vector, HVBAR);
 
     mmu_init_secondary_cpu();
+    enable_vfp();
+
     gic_init_secondary_cpu();
     init_timer_interrupt();
     gic_route_irqs();
