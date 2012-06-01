@@ -107,6 +107,8 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
 
     mmu_init_secondary_cpu();
     gic_init_secondary_cpu();
+    init_timer_interrupt();
+    gic_route_irqs();
 
     set_current(idle_vcpu[cpuid]);
 
