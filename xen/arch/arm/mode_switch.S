@@ -66,11 +66,7 @@ enter_hyp_mode:
 	mcr   CP32(r0, FCSEIDR)
 	mcr   CP32(r0, CONTEXTIDR)
 	/* FIXME: ought to reset some other NS control regs here */
-	adr   r1, 1f                 /* Store return address */
-	str   r3, [r1]               /* where we can use it for RFE */
-	isb                          /* Ensure we see the stored address */
-	rfeia r1                     /* Enter Hyp mode */
-
-1:	.word 0                      /* PC to enter Hyp mode at */
-	.word 0x000001da             /* CPSR: LE, Abort/IRQ/FIQ off, Hyp */
-
+	mrs   r0, cpsr               /* Copy the CPSR */
+	add   r0, r0, #0x4           /* 0x16 (Monitor) -> 0x1a (Hyp) */
+	msr   spsr_cxsf, r0          /* into the SPSR */
+	movs  pc, r3                 /* Exception-return into Hyp mode */
