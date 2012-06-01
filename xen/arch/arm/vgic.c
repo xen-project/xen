@@ -577,23 +577,8 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
     list_add_tail(&n->inflight, &v->arch.vgic.inflight_irqs);
     spin_unlock(&v->arch.vgic.lock);
     /* we have a new higher priority irq, inject it into the guest */
-    cpu_raise_softirq(v->processor, VGIC_SOFTIRQ);
 }
 
-static void vgic_softirq(void)
-{
-    if (list_empty(&current->arch.vgic.inflight_irqs))
-        return;
-
-    gic_inject_irq_start();
-}
-
-static int __init init_vgic_softirq(void)
-{
-    open_softirq(VGIC_SOFTIRQ, vgic_softirq);
-    return 0;
-}
-__initcall(init_vgic_softirq);
 /*
  * Local variables:
  * mode: C

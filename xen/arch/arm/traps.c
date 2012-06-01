@@ -608,8 +608,10 @@ asmlinkage void leave_hypervisor_tail(void)
     while (1)
     {
         local_irq_disable();
-        if (!softirq_pending(smp_processor_id()))
+        if (!softirq_pending(smp_processor_id())) {
+            gic_inject();
             return;
+        }
         local_irq_enable();
         do_softirq();
     }

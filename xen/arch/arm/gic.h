@@ -128,11 +128,11 @@ extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
 
 extern void gic_route_irqs(void);
 
+extern void gic_inject(void);
+
 extern void __cpuinit init_maintenance_interrupt(void);
 extern void gic_set_guest_irq(unsigned int irq,
         unsigned int state, unsigned int priority);
-extern void gic_inject_irq_start(void);
-extern void gic_inject_irq_stop(void);
 extern int gic_route_irq_to_guest(struct domain *d, unsigned int irq,
                                   const char * devname);
 

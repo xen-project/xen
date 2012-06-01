@@ -433,7 +433,7 @@ out:
     return;
 }
 
-void gic_inject_irq_start(void)
+static void gic_inject_irq_start(void)
 {
     uint32_t hcr;
     hcr = READ_CP32(HCR);
@@ -441,7 +441,7 @@ void gic_inject_irq_start(void)
     isb();
 }
 
-void gic_inject_irq_stop(void)
+static void gic_inject_irq_stop(void)
 {
     uint32_t hcr;
     hcr = READ_CP32(HCR);
@@ -449,6 +449,14 @@ void gic_inject_irq_stop(void)
         WRITE_CP32(hcr & ~HCR_VI, HCR);
         isb();
     }
+}
+
+void gic_inject(void)
+{
+    if (!gic.lr_mask)
+        gic_inject_irq_stop();
+    else
+        gic_inject_irq_start();
 }
 
 int gic_route_irq_to_guest(struct domain *d, unsigned int irq,
@@ -540,7 +548,6 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
             GICC[GICC_DIR] = virq;
         }
         list_del_init(&p->inflight);
-        cpu_raise_softirq(current->processor, VGIC_SOFTIRQ);
         spin_unlock(&current->arch.vgic.lock);
 
         i++;
