@@ -78,6 +78,10 @@ struct page_info
 #define _PGT_pinned       PG_shift(5)
 #define PGT_pinned        PG_mask(1, 5)
 
+ /* Has this page been validated for use as its current type? */
+#define _PGT_validated    PG_shift(6)
+#define PGT_validated     PG_mask(1, 6)
+
  /* Count of uses of this frame as its current type. */
 #define PGT_count_width   PG_shift(9)
 #define PGT_count_mask    ((1UL<<PGT_count_width)-1)

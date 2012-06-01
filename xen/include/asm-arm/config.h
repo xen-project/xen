@@ -7,6 +7,8 @@
 #ifndef __ARM_CONFIG_H__
 #define __ARM_CONFIG_H__
 
+#define CONFIG_PAGING_ASSISTANCE 1
+
 #define CONFIG_PAGING_LEVELS 3
 
 #define CONFIG_ARM 1

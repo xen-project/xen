@@ -192,6 +192,17 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     if ( (rc = p2m_init(d)) != 0 )
         goto fail;
 
+    if ( !is_idle_domain(d) )
+    {
+        rc = -ENOMEM;
+        if ( (d->shared_info = alloc_xenheap_pages(0, 0)) == NULL )
+            goto fail;
+
+        clear_page(d->shared_info);
+        share_xen_page_with_guest(
+                virt_to_page(d->shared_info), d, XENSHARE_writable);
+    }
+
     d->max_vcpus = 8;
 
     if ( (rc = domain_vgic_init(d)) != 0 )

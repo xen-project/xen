@@ -118,7 +118,12 @@ static int create_p2m_entries(struct domain *d,
         }
         /* else: third already valid */
 
-        BUG_ON(third[third_table_offset(addr)].p2m.valid);
+        if ( third[third_table_offset(addr)].p2m.valid )
+        {
+            /* p2m entry already present */
+            free_domheap_page(
+                    mfn_to_page(third[third_table_offset(addr)].p2m.base));
+        }
 
         /* Allocate a new RAM page and attach */
         if (alloc)
@@ -170,6 +175,23 @@ int map_mmio_regions(struct domain *d,
                      paddr_t maddr)
 {
     return create_p2m_entries(d, 0, start_gaddr, end_gaddr, maddr);
+}
+
+int guest_physmap_add_page(struct domain *d,
+                           unsigned long gpfn,
+                           unsigned long mfn,
+                           unsigned int page_order)
+{
+    return create_p2m_entries(d, 0, gpfn << PAGE_SHIFT,
+                              (gpfn + (1<<page_order)) << PAGE_SHIFT,
+                              mfn << PAGE_SHIFT);
+}
+
+void guest_physmap_remove_page(struct domain *d,
+                               unsigned long gpfn,
+                               unsigned long mfn, unsigned int page_order)
+{
+    ASSERT(0);
 }
 
 int p2m_alloc_table(struct domain *d)

@@ -25,8 +25,11 @@
 #include <xen/mm.h>
 #include <xen/preempt.h>
 #include <xen/errno.h>
+#include <xen/guest_access.h>
 #include <asm/page.h>
 #include <asm/current.h>
+#include <public/memory.h>
+#include <xen/sched.h>
 
 struct domain *dom_xen, *dom_io;
 
@@ -376,17 +379,104 @@ void arch_dump_shared_mem_info(void)
 {
 }
 
-long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
-{
-    return -ENOSYS;
-}
-
 int donate_page(struct domain *d, struct page_info *page, unsigned int memflags)
 {
     ASSERT(0);
     return -ENOSYS;
 }
 
+void share_xen_page_with_guest(struct page_info *page,
+                          struct domain *d, int readonly)
+{
+    if ( page_get_owner(page) == d )
+        return;
+
+    spin_lock(&d->page_alloc_lock);
+
+    /* The incremented type count pins as writable or read-only. */
+    page->u.inuse.type_info  = (readonly ? PGT_none : PGT_writable_page);
+    page->u.inuse.type_info |= PGT_validated | 1;
+
+    page_set_owner(page, d);
+    wmb(); /* install valid domain ptr before updating refcnt. */
+    ASSERT((page->count_info & ~PGC_xen_heap) == 0);
+
+    /* Only add to the allocation list if the domain isn't dying. */
+    if ( !d->is_dying )
+    {
+        page->count_info |= PGC_allocated | 1;
+        if ( unlikely(d->xenheap_pages++ == 0) )
+            get_knownalive_domain(d);
+        page_list_add_tail(page, &d->xenpage_list);
+    }
+
+    spin_unlock(&d->page_alloc_lock);
+}
+
+static int xenmem_add_to_physmap_once(
+    struct domain *d,
+    const struct xen_add_to_physmap *xatp)
+{
+    unsigned long mfn = 0;
+    int rc;
+
+    switch ( xatp->space )
+    {
+        case XENMAPSPACE_shared_info:
+            if ( xatp->idx == 0 )
+                mfn = virt_to_mfn(d->shared_info);
+            break;
+        default:
+            return -ENOSYS;
+    }
+
+    domain_lock(d);
+
+    /* Map at new location. */
+    rc = guest_physmap_add_page(d, xatp->gpfn, mfn, 0);
+
+    domain_unlock(d);
+
+    return rc;
+}
+
+static int xenmem_add_to_physmap(struct domain *d,
+                                 struct xen_add_to_physmap *xatp)
+{
+    return xenmem_add_to_physmap_once(d, xatp);
+}
+
+long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
+{
+    int rc;
+
+    switch ( op )
+    {
+    case XENMEM_add_to_physmap:
+    {
+        struct xen_add_to_physmap xatp;
+        struct domain *d;
+
+        if ( copy_from_guest(&xatp, arg, 1) )
+            return -EFAULT;
+
+        rc = rcu_lock_target_domain_by_id(xatp.domid, &d);
+        if ( rc != 0 )
+            return rc;
+
+        rc = xenmem_add_to_physmap(d, &xatp);
+
+        rcu_unlock_domain(d);
+
+        return rc;
+    }
+
+    default:
+        return -ENOSYS;
+    }
+
+    return 0;
+}
 /*
  * Local variables:
  * mode: C
