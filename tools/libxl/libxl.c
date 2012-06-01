@@ -3295,15 +3295,15 @@ libxl_scheduler libxl_get_scheduler(libxl_ctx *ctx)
     return sched;
 }
 
-int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                  libxl_domain_sched_params *scinfo)
+static int sched_credit_domain_get(libxl__gc *gc, uint32_t domid,
+                                   libxl_domain_sched_params *scinfo)
 {
     struct xen_domctl_sched_credit sdom;
     int rc;
 
-    rc = xc_sched_credit_domain_get(ctx->xch, domid, &sdom);
+    rc = xc_sched_credit_domain_get(CTX->xch, domid, &sdom);
     if (rc != 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain sched credit");
+        LOGE(ERROR, "getting domain sched credit");
         return ERROR_FAIL;
     }
 
@@ -3315,32 +3315,31 @@ int libxl_sched_credit_domain_get(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                  libxl_domain_sched_params *scinfo)
+static int sched_credit_domain_set(libxl__gc *gc, uint32_t domid,
+                                   const libxl_domain_sched_params *scinfo)
 {
     struct xen_domctl_sched_credit sdom;
     xc_domaininfo_t domaininfo;
     int rc;
 
-    rc = xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo);
+    rc = xc_domain_getinfolist(CTX->xch, domid, 1, &domaininfo);
     if (rc < 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain info list");
+        LOGE(ERROR, "getting domain info list");
         return ERROR_FAIL;
     }
     if (rc != 1 || domaininfo.domain != domid)
         return ERROR_INVAL;
 
-    rc = xc_sched_credit_domain_get(ctx->xch, domid, &sdom);
+    rc = xc_sched_credit_domain_get(CTX->xch, domid, &sdom);
     if (rc != 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain sched credit");
+        LOGE(ERROR, "getting domain sched credit");
         return ERROR_FAIL;
     }
 
     if (scinfo->weight != LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT) {
         if (scinfo->weight < 1 || scinfo->weight > 65535) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                       "Cpu weight out of range, "
-                       "valid values are within range from 1 to 65535");
+            LOG(ERROR, "Cpu weight out of range, "
+                "valid values are within range from 1 to 65535");
             return ERROR_INVAL;
         }
         sdom.weight = scinfo->weight;
@@ -3349,18 +3348,17 @@ int libxl_sched_credit_domain_set(libxl_ctx *ctx, uint32_t domid,
     if (scinfo->cap != LIBXL_DOMAIN_SCHED_PARAM_CAP_DEFAULT) {
         if (scinfo->cap < 0
             || scinfo->cap > (domaininfo.max_vcpu_id + 1) * 100) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                "Cpu cap out of range, "
+            LOG(ERROR, "Cpu cap out of range, "
                 "valid range is from 0 to %d for specified number of vcpus",
-                       ((domaininfo.max_vcpu_id + 1) * 100));
+                ((domaininfo.max_vcpu_id + 1) * 100));
             return ERROR_INVAL;
         }
         sdom.cap = scinfo->cap;
     }
 
-    rc = xc_sched_credit_domain_set(ctx->xch, domid, &sdom);
+    rc = xc_sched_credit_domain_set(CTX->xch, domid, &sdom);
     if ( rc < 0 ) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "setting domain sched credit");
+        LOGE(ERROR, "setting domain sched credit");
         return ERROR_FAIL;
     }
 
@@ -3428,16 +3426,15 @@ int libxl_sched_credit_params_set(libxl_ctx *ctx, uint32_t poolid,
     return 0;
 }
 
-int libxl_sched_credit2_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                   libxl_domain_sched_params *scinfo)
+static int sched_credit2_domain_get(libxl__gc *gc, uint32_t domid,
+                                    libxl_domain_sched_params *scinfo)
 {
     struct xen_domctl_sched_credit2 sdom;
     int rc;
 
-    rc = xc_sched_credit2_domain_get(ctx->xch, domid, &sdom);
+    rc = xc_sched_credit2_domain_get(CTX->xch, domid, &sdom);
     if (rc != 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                         "getting domain sched credit2");
+        LOGE(ERROR, "getting domain sched credit2");
         return ERROR_FAIL;
     }
 
@@ -3448,42 +3445,38 @@ int libxl_sched_credit2_domain_get(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-int libxl_sched_credit2_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                   libxl_domain_sched_params *scinfo)
+static int sched_credit2_domain_set(libxl__gc *gc, uint32_t domid,
+                                    const libxl_domain_sched_params *scinfo)
 {
     struct xen_domctl_sched_credit2 sdom;
     int rc;
 
-    rc = xc_sched_credit2_domain_get(ctx->xch, domid, &sdom);
+    rc = xc_sched_credit2_domain_get(CTX->xch, domid, &sdom);
     if (rc != 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                         "getting domain sched credit2");
+        LOGE(ERROR, "getting domain sched credit2");
         return ERROR_FAIL;
     }
 
     if (scinfo->weight != LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT) {
         if (scinfo->weight < 1 || scinfo->weight > 65535) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                       "Cpu weight out of range, "
-                       "valid values are within range from "
-                       "1 to 65535");
+            LOG(ERROR, "Cpu weight out of range, "
+                       "valid values are within range from 1 to 65535");
             return ERROR_INVAL;
         }
         sdom.weight = scinfo->weight;
     }
 
-    rc = xc_sched_credit2_domain_set(ctx->xch, domid, &sdom);
+    rc = xc_sched_credit2_domain_set(CTX->xch, domid, &sdom);
     if ( rc < 0 ) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                         "setting domain sched credit2");
+        LOGE(ERROR, "setting domain sched credit2");
         return ERROR_FAIL;
     }
 
     return 0;
 }
 
-int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
-                                libxl_domain_sched_params *scinfo)
+static int sched_sedf_domain_get(libxl__gc *gc, uint32_t domid,
+                                 libxl_domain_sched_params *scinfo)
 {
     uint64_t period;
     uint64_t slice;
@@ -3492,10 +3485,10 @@ int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
     uint16_t weight;
     int rc;
 
-    rc = xc_sedf_domain_get(ctx->xch, domid, &period, &slice, &latency,
+    rc = xc_sedf_domain_get(CTX->xch, domid, &period, &slice, &latency,
                             &extratime, &weight);
     if (rc != 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain sched sedf");
+        LOGE(ERROR, "getting domain sched sedf");
         return ERROR_FAIL;
     }
 
@@ -3510,8 +3503,8 @@ int libxl_sched_sedf_domain_get(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-int libxl_sched_sedf_domain_set(libxl_ctx *ctx, uint32_t domid,
-                                libxl_domain_sched_params *scinfo)
+static int sched_sedf_domain_set(libxl__gc *gc, uint32_t domid,
+                                 const libxl_domain_sched_params *scinfo)
 {
     uint64_t period;
     uint64_t slice;
@@ -3521,10 +3514,10 @@ int libxl_sched_sedf_domain_set(libxl_ctx *ctx, uint32_t domid,
 
     int ret;
 
-    ret = xc_sedf_domain_get(ctx->xch, domid, &period, &slice, &latency,
+    ret = xc_sedf_domain_get(CTX->xch, domid, &period, &slice, &latency,
                             &extratime, &weight);
     if (ret != 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain sched sedf");
+        LOGE(ERROR, "getting domain sched sedf");
         return ERROR_FAIL;
     }
 
@@ -3539,20 +3532,21 @@ int libxl_sched_sedf_domain_set(libxl_ctx *ctx, uint32_t domid,
     if (scinfo->weight != LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT)
         weight = scinfo->weight;
 
-    ret = xc_sedf_domain_set(ctx->xch, domid, period, slice, latency,
+    ret = xc_sedf_domain_set(CTX->xch, domid, period, slice, latency,
                             extratime, weight);
     if ( ret < 0 ) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "setting domain sched sedf");
+        LOGE(ERROR, "setting domain sched sedf");
         return ERROR_FAIL;
     }
 
     return 0;
 }
 
-int libxl__sched_set_params(libxl__gc *gc, uint32_t domid,
-                            libxl_domain_sched_params *scparams)
+int libxl_domain_sched_params_set(libxl_ctx *ctx, uint32_t domid,
+                                  const libxl_domain_sched_params *scinfo)
 {
-    libxl_scheduler sched = scparams->sched;
+    GC_INIT(ctx);
+    libxl_scheduler sched = scinfo->sched;
     int ret;
 
     if (sched == LIBXL_SCHEDULER_UNKNOWN)
@@ -3560,19 +3554,51 @@ int libxl__sched_set_params(libxl__gc *gc, uint32_t domid,
 
     switch (sched) {
     case LIBXL_SCHEDULER_SEDF:
-        ret=libxl_sched_sedf_domain_set(CTX, domid, scparams);
+        ret=sched_sedf_domain_set(gc, domid, scinfo);
         break;
     case LIBXL_SCHEDULER_CREDIT:
-        ret=libxl_sched_credit_domain_set(CTX, domid, scparams);
+        ret=sched_credit_domain_set(gc, domid, scinfo);
         break;
     case LIBXL_SCHEDULER_CREDIT2:
-        ret=libxl_sched_credit2_domain_set(CTX, domid, scparams);
+        ret=sched_credit2_domain_set(gc, domid, scinfo);
         break;
     default:
         LOG(ERROR, "Unknown scheduler");
         ret=ERROR_INVAL;
         break;
     }
+
+    GC_FREE;
+    return ret;
+}
+
+int libxl_domain_sched_params_get(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_domain_sched_params *scinfo)
+{
+    GC_INIT(ctx);
+    int ret;
+
+    libxl_domain_sched_params_init(scinfo);
+
+    scinfo->sched = libxl__domain_scheduler(gc, domid);
+
+    switch (scinfo->sched) {
+    case LIBXL_SCHEDULER_SEDF:
+        ret=sched_sedf_domain_get(gc, domid, scinfo);
+        break;
+    case LIBXL_SCHEDULER_CREDIT:
+        ret=sched_credit_domain_get(gc, domid, scinfo);
+        break;
+    case LIBXL_SCHEDULER_CREDIT2:
+        ret=sched_credit2_domain_get(gc, domid, scinfo);
+        break;
+    default:
+        LOG(ERROR, "Unknown scheduler");
+        ret=ERROR_INVAL;
+        break;
+    }
+
+    GC_FREE;
     return ret;
 }
 

@@ -174,7 +174,7 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     char **ents, **hvm_ents;
     int i;
 
-    libxl__sched_set_params (gc, domid, &(info->sched_params));
+    libxl_domain_sched_params_set(CTX, domid, &info->sched_params);
 
     libxl_cpuid_apply_policy(ctx, domid);
     if (info->cpuid != NULL)
