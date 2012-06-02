@@ -32,8 +32,9 @@ functions = { # ( name , [type1,type2,....] )
                       ],
     "cputopology":    [ ("get",            ["unit", "t array"]),
                       ],
-    "sched_credit":   [ ("domain_get",     ["domid", "t"]),
-                        ("domain_set",     ["domid", "t", "unit"]),
+    "domain_sched_params":
+                      [ ("get",            ["domid", "t"]),
+                        ("set",            ["domid", "t", "unit"]),
                       ],
 }
 def stub_fn_name(ty, name):

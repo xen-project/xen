@@ -496,37 +496,37 @@ value stub_xl_cputopology_get(value unit)
 	CAMLreturn(topology);
 }
 
-value stub_xl_sched_credit_domain_get(value domid)
+value stub_xl_domain_sched_params_get(value domid)
 {
 	CAMLparam1(domid);
 	CAMLlocal1(scinfo);
-	libxl_sched_credit_domain c_scinfo;
+	libxl_domain_sched_params c_scinfo;
 	int ret;
 	INIT_STRUCT();
 
 	INIT_CTX();
-	ret = libxl_sched_credit_domain_get(ctx, Int_val(domid), &c_scinfo);
+	ret = libxl_domain_sched_params_get(ctx, Int_val(domid), &c_scinfo);
 	if (ret != 0)
-		failwith_xl("sched_credit_domain_get", &lg);
+		failwith_xl("domain_sched_params_get", &lg);
 	FREE_CTX();
 
-	scinfo = Val_sched_credit_domain(&gc, &lg, &c_scinfo);
+	scinfo = Val_domain_sched_params(&gc, &lg, &c_scinfo);
 	CAMLreturn(scinfo);
 }
 
-value stub_xl_sched_credit_domain_set(value domid, value scinfo)
+value stub_xl_domain_sched_params_set(value domid, value scinfo)
 {
 	CAMLparam2(domid, scinfo);
-	libxl_sched_credit_domain c_scinfo;
+	libxl_domain_sched_params c_scinfo;
 	int ret;
 	INIT_STRUCT();
 
-	sched_credit_domain_val(&gc, &lg, &c_scinfo, scinfo);
+	domain_sched_params_val(&gc, &lg, &c_scinfo, scinfo);
 
 	INIT_CTX();
-	ret = libxl_sched_credit_domain_set(ctx, Int_val(domid), &c_scinfo);
+	ret = libxl_domain_sched_params_set(ctx, Int_val(domid), &c_scinfo);
 	if (ret != 0)
-		failwith_xl("sched_credit_domain_set", &lg);
+		failwith_xl("domain_sched_params_set", &lg);
 	FREE_CTX();
 
 	CAMLreturn(Val_unit);
