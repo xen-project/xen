@@ -28,6 +28,7 @@
 #define _XEN_CPUIDLE_H
 
 #include <xen/cpumask.h>
+#include <xen/spinlock.h>
 
 #define ACPI_PROCESSOR_MAX_POWER        8
 #define CPUIDLE_NAME_LEN                16
@@ -69,6 +70,7 @@ struct acpi_processor_power
     void *gdata; /* governor specific data */
     u32 last_residency;
     u32 count;
+    spinlock_t stat_lock;
     struct acpi_processor_cx states[ACPI_PROCESSOR_MAX_POWER];
 };
 

@@ -389,7 +389,14 @@ static void signal_int_handler(int signo)
                 res = ( diff >= 0 ) ? diff : 0;
                 triggers = cxstat_end[i].triggers[j] -
                     cxstat_start[i].triggers[j];
-                avg_res = (triggers==0) ? 0: (double)res/triggers/1000000.0;
+                /* 
+                 * triggers may be zero if the CPU has been in this state for
+                 * the whole sample or if it never entered the state
+                 */
+                if ( triggers == 0 && cxstat_end[i].last == j )
+                    avg_res =  (double)sum_cx[i]/1000000.0;
+                else
+                    avg_res = (triggers==0) ? 0: (double)res/triggers/1000000.0;
                 printf("  C%d\t%"PRIu64"\t(%5.2f%%)\t%.2f\n", j, res/1000000UL,
                         100 * res / (double)sum_cx[i], avg_res );
             }
