@@ -174,6 +174,16 @@ Honoured by the sedf scheduler.
 
 Start the guest with MBYTES megabytes of RAM.
 
+=item B<maxmem=MBYTES>
+
+Specifies the maximum amount of memory a guest can ever see.
+The value of B<maxmem=> must be equal or greater than B<memory=>.
+
+In combination with B<memory=> it will start the guest "pre-ballooned",
+if the values of B<memory=> and B<maxmem=> differ.
+A "pre-ballooned" HVM guest needs a balloon driver, without a balloon driver
+it will crash.
+
 =item B<on_poweroff="ACTION">
 
 Specifies what should be done with the domain if it shuts itself down.
@@ -968,10 +978,6 @@ XXX
 XXX
 
 =item B<acpi_s3=BOOLEAN>
-
-XXX
-
-=item B<maxmem=NUMBER>
 
 XXX
 
