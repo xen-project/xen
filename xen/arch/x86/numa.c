@@ -365,10 +365,11 @@ static void dump_numa(unsigned char key)
 
 	for_each_online_node(i) {
 		paddr_t pa = (paddr_t)(NODE_DATA(i)->node_start_pfn + 1)<< PAGE_SHIFT;
-		printk("idx%d -> NODE%d start->%lu size->%lu\n",
+		printk("idx%d -> NODE%d start->%lu size->%lu free->%lu\n",
 			  i, NODE_DATA(i)->node_id,
 			  NODE_DATA(i)->node_start_pfn,
-			  NODE_DATA(i)->node_spanned_pages);
+			  NODE_DATA(i)->node_spanned_pages,
+			  avail_node_heap_pages(i));
 		/* sanity check phys_to_nid() */
 		printk("phys_to_nid(%"PRIpaddr") -> %d should be %d\n", pa, phys_to_nid(pa),
 			  NODE_DATA(i)->node_id);
