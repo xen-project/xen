@@ -656,6 +656,11 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
     libxl_domain_type type = libxl__domain_type(gc, domid);
     int rc = 0;
 
+    if (type == LIBXL_DOMAIN_TYPE_INVALID) {
+        rc = ERROR_FAIL;
+        goto remus_fail;
+    }
+
     if (info == NULL) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
                    "No remus_info structure supplied for domain %d", domid);
@@ -1313,11 +1318,9 @@ static int libxl__primary_console_find(libxl_ctx *ctx, uint32_t domid_vm,
             *cons_num = 0;
             *type = LIBXL_CONSOLE_TYPE_PV;
             break;
-        case -1:
-            LOG(ERROR,"unable to get domain type for domid=%"PRIu32, domid_vm);
+        case LIBXL_DOMAIN_TYPE_INVALID:
             rc = ERROR_INVAL;
             goto out;
-            break;
         default:
             abort();
         }

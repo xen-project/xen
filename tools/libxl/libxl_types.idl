@@ -28,6 +28,7 @@ MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT")
 #
 
 libxl_domain_type = Enumeration("domain_type", [
+    (-1, "INVALID"),
     (1, "HVM"),
     (2, "PV"),
     ])
@@ -310,7 +311,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                       # Use host's E820 for PCI passthrough.
                                       ("e820_host", libxl_defbool),
                                       ])),
-                 ], keyvar_init_val = "-1")),
+                 ("invalid", Struct(None, [])),
+                 ], keyvar_init_val = "LIBXL_DOMAIN_TYPE_INVALID")),
     ], dir=DIR_IN
 )
 

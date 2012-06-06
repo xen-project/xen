@@ -32,10 +32,11 @@ libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
     int ret;
 
     ret = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
-    if (ret != 1)
-        return -1;
-    if (info.domain != domid)
-        return -1;
+    if (ret != 1 || info.domain != domid) {
+        LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
+                   "unable to get domain type for domid=%"PRIu32, domid);
+        return LIBXL_DOMAIN_TYPE_INVALID;
+    }
     if (info.flags & XEN_DOMINF_hvm_guest)
         return LIBXL_DOMAIN_TYPE_HVM;
     else

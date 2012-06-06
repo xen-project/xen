@@ -257,6 +257,8 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         for (i = 0; b_info->extra_hvm && b_info->extra_hvm[i] != NULL; i++)
             flexarray_append(dm_args, b_info->extra_hvm[i]);
         break;
+    default:
+        abort();
     }
     flexarray_append(dm_args, NULL);
     return (char **) flexarray_contents(dm_args);
@@ -505,6 +507,8 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         for (i = 0; b_info->extra_hvm && b_info->extra_hvm[i] != NULL; i++)
             flexarray_append(dm_args, b_info->extra_hvm[i]);
         break;
+    default:
+        abort();
     }
 
     ram_size = libxl__sizekb_to_mb(b_info->max_memkb - b_info->video_memkb);
