@@ -570,6 +570,18 @@ int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_conso
  * guests using pygrub. */
 int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm);
 
+/* libxl_console_get_tty retrieves the specified domain's console tty path
+ * and stores it in path. Caller is responsible for freeing the memory.
+ */
+int libxl_console_get_tty(libxl_ctx *ctx, uint32_t domid, int cons_num,
+                          libxl_console_type type, char **path);
+
+/* libxl_primary_console_get_tty retrieves the specified domain's primary
+ * console tty path and stores it in path. Caller is responsible for freeing
+ * the memory.
+ */
+int libxl_primary_console_get_tty(libxl_ctx *ctx, uint32_t domid_vm, char **path);
+
 /* May be called with info_r == NULL to check for domain's existance */
 int libxl_domain_info(libxl_ctx*, libxl_dominfo *info_r,
                       uint32_t domid);

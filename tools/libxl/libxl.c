@@ -1217,7 +1217,8 @@ out:
     return rc;
 }
 
-int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_type type)
+int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num,
+                       libxl_console_type type)
 {
     GC_INIT(ctx);
     char *p = libxl__sprintf(gc, "%s/xenconsole", libxl__private_bindir_path());
@@ -1243,32 +1244,114 @@ out:
     return ERROR_FAIL;
 }
 
-int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm)
+int libxl_console_get_tty(libxl_ctx *ctx, uint32_t domid, int cons_num,
+                          libxl_console_type type, char **path)
+{
+    GC_INIT(ctx);
+    char *dom_path;
+    char *tty_path;
+    char *tty;
+    int rc;
+
+    dom_path = libxl__xs_get_dompath(gc, domid);
+    if (!dom_path) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    switch (type) {
+    case LIBXL_CONSOLE_TYPE_SERIAL:
+        tty_path = GCSPRINTF("%s/serial/0/tty", dom_path);
+        break;
+    case LIBXL_CONSOLE_TYPE_PV:
+        if (cons_num == 0)
+            tty_path = GCSPRINTF("%s/console/tty", dom_path);
+        else
+            tty_path = GCSPRINTF("%s/device/console/%d/tty", dom_path,
+                                cons_num);
+        break;
+    default:
+        rc = ERROR_INVAL;
+        goto out;
+    }
+
+    tty = libxl__xs_read(gc, XBT_NULL, tty_path);
+    if (!tty) {
+       LOGE(ERROR,"unable to read console tty path `%s'",tty_path);
+       rc = ERROR_FAIL;
+       goto out;
+    }
+
+    *path = libxl__strdup(NOGC, tty);
+    rc = 0;
+out:
+    GC_FREE;
+    return rc;
+}
+
+static int libxl__primary_console_find(libxl_ctx *ctx, uint32_t domid_vm,
+                                       uint32_t *domid, int *cons_num,
+                                       libxl_console_type *type)
 {
     GC_INIT(ctx);
     uint32_t stubdomid = libxl_get_stubdom_id(ctx, domid_vm);
     int rc;
-    if (stubdomid)
-        rc = libxl_console_exec(ctx, stubdomid,
-                                STUBDOM_CONSOLE_SERIAL, LIBXL_CONSOLE_TYPE_PV);
-    else {
+
+    if (stubdomid) {
+        *domid = stubdomid;
+        *cons_num = STUBDOM_CONSOLE_SERIAL;
+        *type = LIBXL_CONSOLE_TYPE_PV;
+    } else {
         switch (libxl__domain_type(gc, domid_vm)) {
         case LIBXL_DOMAIN_TYPE_HVM:
-            rc = libxl_console_exec(ctx, domid_vm, 0, LIBXL_CONSOLE_TYPE_SERIAL);
+            *domid = domid_vm;
+            *cons_num = 0;
+            *type = LIBXL_CONSOLE_TYPE_SERIAL;
             break;
         case LIBXL_DOMAIN_TYPE_PV:
-            rc = libxl_console_exec(ctx, domid_vm, 0, LIBXL_CONSOLE_TYPE_PV);
+            *domid = domid_vm;
+            *cons_num = 0;
+            *type = LIBXL_CONSOLE_TYPE_PV;
             break;
         case -1:
-            LOG(ERROR,"unable to get domain type for domid=%"PRIu32,domid_vm);
-            rc = ERROR_FAIL;
+            LOG(ERROR,"unable to get domain type for domid=%"PRIu32, domid_vm);
+            rc = ERROR_INVAL;
+            goto out;
             break;
         default:
             abort();
         }
     }
+
+    rc = 0;
+out:
     GC_FREE;
     return rc;
+}
+
+int libxl_primary_console_exec(libxl_ctx *ctx, uint32_t domid_vm)
+{
+    uint32_t domid;
+    int cons_num;
+    libxl_console_type type;
+    int rc;
+
+    rc = libxl__primary_console_find(ctx, domid_vm, &domid, &cons_num, &type);
+    if ( rc ) return rc;
+    return libxl_console_exec(ctx, domid, cons_num, type);
+}
+
+int libxl_primary_console_get_tty(libxl_ctx *ctx, uint32_t domid_vm,
+                                  char **path)
+{
+    uint32_t domid;
+    int cons_num;
+    libxl_console_type type;
+    int rc;
+
+    rc = libxl__primary_console_find(ctx, domid_vm, &domid, &cons_num, &type);
+    if ( rc ) return rc;
+    return libxl_console_get_tty(ctx, domid, cons_num, type, path);
 }
 
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
