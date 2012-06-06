@@ -270,7 +270,8 @@ page_list_splice(struct page_list_head *list, struct page_list_head *head)
     last = list->tail;
     at = head->next;
 
-    first->list.prev = page_to_pdx(head->next);
+    ASSERT(first->list.prev == PAGE_LIST_NULL);
+    ASSERT(first->list.prev == at->list.prev);
     head->next = first;
 
     last->list.next = page_to_pdx(at);
