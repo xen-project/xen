@@ -1933,6 +1933,7 @@ struct libxl__domain_create_state {
 #define GC_INIT(ctx)  libxl__gc gc[1]; LIBXL_INIT_GC(gc[0],ctx)
 #define GC_FREE       libxl__free_all(gc)
 #define CTX           libxl__gc_owner(gc)
+#define NOGC          NULL
 
 /* Allocation macros all of which use the gc. */
 

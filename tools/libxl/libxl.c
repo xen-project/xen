@@ -3116,12 +3116,7 @@ libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nr)
     if (tinfo.max_cpu_index < max_cpus - 1)
         max_cpus = tinfo.max_cpu_index + 1;
 
-    ret = malloc(sizeof(libxl_cputopology) * max_cpus);
-    if (ret == NULL) {
-        LIBXL__LOG_ERRNOVAL(ctx, XTL_ERROR, ENOMEM,
-                            "Unable to allocate return value");
-        goto fail;
-    }
+    ret = libxl__zalloc(NOGC, sizeof(libxl_cputopology) * max_cpus);
 
     for (i = 0; i < max_cpus; i++) {
 #define V(map, i) (map[i] == INVALID_TOPOLOGY_ID) ? \
