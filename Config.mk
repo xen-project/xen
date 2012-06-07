@@ -213,9 +213,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= cbf0f291d4f1d40c59f56b8bd73292b8ad4f84b5
-# Thu Jun 7 19:36:26 2012 +0100
-# qemu-xen-trad/block: get right partition size
+QEMU_TAG ?= 50c553be472c9f4b05a0526c0aae98709ca9ffff
+# Thu Jun 7 19:44:01 2012 +0100
+# qemu-xen-trad: fix sys-queue.h usage on BSD systems
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
