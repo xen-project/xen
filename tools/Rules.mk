@@ -76,6 +76,8 @@ endif
 CFLAGS-$(CONFIG_X86_32) += $(call cc-option,$(CC),-mno-tls-direct-seg-refs)
 CFLAGS += $(CFLAGS-y)
 
+CFLAGS += $(EXTRA_CFLAGS_XEN_TOOLS)
+
 # Require GCC v3.4+ (to avoid issues with alignment constraints in Xen headers)
 check-$(CONFIG_X86) = $(call cc-ver-check,CC,0x030400,\
                         "Xen requires at least gcc-3.4")

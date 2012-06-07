@@ -122,7 +122,9 @@ subdir-all-qemu-xen-traditional-dir subdir-install-qemu-xen-traditional-dir: qem
 	set -e; \
 		$(buildmakevars2shellvars); \
 		cd qemu-xen-traditional-dir; \
-		$(QEMU_ROOT)/xen-setup $(IOEMU_CONFIGURE_CROSS); \
+		$(QEMU_ROOT)/xen-setup \
+		--extra-cflags="$(EXTRA_CFLAGS_QEMU_TRADITIONAL)" \
+		$(IOEMU_CONFIGURE_CROSS); \
 		$(MAKE) install
 
 subdir-clean-qemu-xen-traditional-dir:
@@ -151,7 +153,8 @@ subdir-all-qemu-xen-dir subdir-install-qemu-xen-dir: qemu-xen-dir-find
 		--extra-cflags="-I$(XEN_ROOT)/tools/include \
 		-I$(XEN_ROOT)/tools/libxc \
 		-I$(XEN_ROOT)/tools/xenstore \
-		-I$(XEN_ROOT)/tools/xenstore/compat" \
+		-I$(XEN_ROOT)/tools/xenstore/compat \
+		$(EXTRA_CFLAGS_QEMU_XEN)" \
 		--extra-ldflags="-L$(XEN_ROOT)/tools/libxc \
 		-L$(XEN_ROOT)/tools/xenstore" \
 		--bindir=$(LIBEXEC) \
