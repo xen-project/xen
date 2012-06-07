@@ -213,9 +213,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 7bde54662d45b0bbc2ee78c7a8bf2c97c6655445
-# Mon May 14 17:05:48 2012 +0100
-# xenstore: Use <xenstore.h>
+QEMU_TAG ?= cbf0f291d4f1d40c59f56b8bd73292b8ad4f84b5
+# Thu Jun 7 19:36:26 2012 +0100
+# qemu-xen-trad/block: get right partition size
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
