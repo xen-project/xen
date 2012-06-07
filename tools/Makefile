@@ -118,7 +118,14 @@ qemu-xen-traditional-dir-force-update:
 		$(GIT) reset --hard $(QEMU_TAG); \
 	fi
 
-subdir-all-qemu-xen-traditional-dir subdir-install-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
+subdir-all-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
+	set -e; \
+		$(buildmakevars2shellvars); \
+		cd qemu-xen-traditional-dir; \
+		$(QEMU_ROOT)/xen-setup $(IOEMU_CONFIGURE_CROSS); \
+		$(MAKE) all
+
+subdir-install-qemu-xen-traditional-dir: qemu-xen-traditional-dir-find
 	set -e; \
 		$(buildmakevars2shellvars); \
 		cd qemu-xen-traditional-dir; \
@@ -141,7 +148,7 @@ qemu-xen-dir-force-update:
 		$(GIT) reset --hard $(QEMU_UPSTREAM_REVISION); \
 	fi
 
-subdir-all-qemu-xen-dir subdir-install-qemu-xen-dir: qemu-xen-dir-find
+subdir-all-qemu-xen-dir: qemu-xen-dir-find
 	if test -d $(QEMU_UPSTREAM_URL) ; then \
 		source=$(QEMU_UPSTREAM_URL); \
 	else \
@@ -162,6 +169,10 @@ subdir-all-qemu-xen-dir subdir-install-qemu-xen-dir: qemu-xen-dir-find
 		--disable-kvm \
 		--python=$(PYTHON) \
 		$(IOEMU_CONFIGURE_CROSS); \
+	$(MAKE) all
+
+subdir-install-qemu-xen-dir: subdir-all-qemu-xen-dir
+	cd qemu-xen-dir; \
 	$(MAKE) install
 
 subdir-clean-qemu-xen-dir:
