@@ -30,6 +30,10 @@ _vif_script = {
     "SunOS": "vif-vnic"
 }
 
+_tapif_script = {
+    "Linux": "no",
+}
+
 PROC_XEN_BALLOON = '/proc/xen/balloon'
 SYSFS_XEN_MEMORY = '/sys/devices/system/xen_memory/xen_memory0'
 
@@ -257,6 +261,7 @@ def _get(var, default=None):
 
 xend_autorestart = _get(_xend_autorestart)
 vif_script = _get(_vif_script, "vif-bridge")
+tapif_script = _get(_tapif_script)
 lookup_balloon_stat = _get(_balloon_stat, _linux_balloon_stat)
 get_cpuinfo = _get(_get_cpuinfo, _linux_get_cpuinfo)
 prefork = _get(_get_prefork, _default_prefork)

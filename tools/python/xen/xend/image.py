@@ -919,8 +919,13 @@ class HVMImageHandler(ImageHandler):
                        (nics, mac, model))
             vifname = "vif%d.%d-emu" % (self.vm.getDomid(), nics-1)
             ret.append("-net")
-            ret.append("tap,vlan=%d,ifname=%s,bridge=%s" %
-                       (nics, vifname, bridge))
+            if osdep.tapif_script is not None:
+                script=",script=%s,downscript=%s" % \
+                        (osdep.tapif_script, osdep.tapif_script)
+            else:
+                script=""
+            ret.append("tap,vlan=%d,ifname=%s,bridge=%s%s" %
+                       (nics, vifname, bridge, script))
 
         if nics == 0:
             ret.append("-net")
