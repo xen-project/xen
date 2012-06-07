@@ -702,21 +702,36 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 	struct iovec iov[2];
 
 #ifdef USE_PTHREAD
+#define READ_THREAD_STACKSIZE (16 * 1024)
+
 	/* We dynamically create a reader thread on demand. */
 	mutex_lock(&h->request_mutex);
 	if (!h->read_thr_exists) {
 		sigset_t set, old_set;
+		pthread_attr_t attr;
+
+		if (pthread_attr_init(&attr) != 0) {
+			mutex_unlock(&h->request_mutex);
+			return false;
+		}
+		if (pthread_attr_setstacksize(&attr, READ_THREAD_STACKSIZE) != 0) {
+			pthread_attr_destroy(&attr);
+			mutex_unlock(&h->request_mutex);
+			return false;
+		}
 
 		sigfillset(&set);
 		pthread_sigmask(SIG_SETMASK, &set, &old_set);
 
-		if (pthread_create(&h->read_thr, NULL, read_thread, h) != 0) {
+		if (pthread_create(&h->read_thr, &attr, read_thread, h) != 0) {
 			pthread_sigmask(SIG_SETMASK, &old_set, NULL);
+			pthread_attr_destroy(&attr);
 			mutex_unlock(&h->request_mutex);
 			return false;
 		}
 		h->read_thr_exists = 1;
 		pthread_sigmask(SIG_SETMASK, &old_set, NULL);
+		pthread_attr_destroy(&attr);
 	}
 	mutex_unlock(&h->request_mutex);
 #endif
