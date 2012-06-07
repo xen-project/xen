@@ -1313,8 +1313,6 @@ struct libxl__xen_console_reader {
     unsigned int index;
 };
 
-_hidden int libxl__error_set(libxl__gc *gc, int code);
-
 /* parse the string @s as a sequence of 6 colon separated bytes in to @mac */
 _hidden int libxl__parse_mac(const char *s, libxl_mac mac);
 /* compare mac address @a and @b. 0 if the same, -ve if a<b and +ve if a>b */
