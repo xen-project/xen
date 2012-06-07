@@ -705,11 +705,18 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 	/* We dynamically create a reader thread on demand. */
 	mutex_lock(&h->request_mutex);
 	if (!h->read_thr_exists) {
+		sigset_t set, old_set;
+
+		sigfillset(&set);
+		pthread_sigmask(SIG_SETMASK, &set, &old_set);
+
 		if (pthread_create(&h->read_thr, NULL, read_thread, h) != 0) {
+			pthread_sigmask(SIG_SETMASK, &old_set, NULL);
 			mutex_unlock(&h->request_mutex);
 			return false;
 		}
 		h->read_thr_exists = 1;
+		pthread_sigmask(SIG_SETMASK, &old_set, NULL);
 	}
 	mutex_unlock(&h->request_mutex);
 #endif
