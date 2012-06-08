@@ -928,6 +928,7 @@ int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
     ret = libxl__qmp_query_serial(qmp);
     if (!ret && vnc && vnc->passwd) {
         ret = qmp_change(gc, qmp, "vnc", "password", vnc->passwd);
+        qmp_write_domain_console_item(gc, domid, "vnc-pass", vnc->passwd);
     }
     if (!ret) {
         ret = qmp_query_vnc(qmp);
