@@ -575,8 +575,7 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
 
     if ( dom->kernel_size < sizeof(struct setup_header) )
     {
-        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "%s: kernel image too small", __FUNCTION__);
+        xc_dom_printf(dom->xch, "%s: kernel image too small", __FUNCTION__);
         return -EINVAL;
     }
 
@@ -584,8 +583,7 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
 
     if ( memcmp(&hdr->header, HDR_MAGIC, HDR_MAGIC_SZ) != 0 )
     {
-        xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
-                     "%s: kernel is not a bzImage", __FUNCTION__);
+        xc_dom_printf(dom->xch, "%s: kernel is not a bzImage", __FUNCTION__);
         return -EINVAL;
     }
 
