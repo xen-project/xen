@@ -969,9 +969,53 @@ XXX
 
 XXX
 
-=item B<cpuid=XXX>
+=item B<cpuid="LIBXL_STRING"> or B<cpuid=[ "XEND_STRING", "XEND_STRING" ]>
 
-XXX
+Configure the value returned when a guest executes CPUID instruction.
+Two versions of config syntax are recognized: libxl and xend.
+
+The libxl syntax is a comma separated list of key=value pairs, preceded by the
+word "host". A few keys take a numerical value, all others take a single
+character which describes what to do with the feature bit.
+
+Possible values for a single feature bit:
+  '1' -> force the corresponding bit to 1
+  '0' -> force to 0
+  'x' -> Get a safe value (pass through and mask with the default policy)
+  'k' -> pass through the host bit value
+  's' -> as 'k' but preserve across save/restore and migration (not implemented)
+
+List of keys taking a value:
+apicidsize brandid clflush family localapicid maxleaf model nc proccount procpkg
+stepping
+
+List of keys taking a character:
+3dnow 3dnowext 3dnowprefetch abm acpi aes altmovcr8 apic avx clfsh cmov
+cmplegacy cmpxchg16 cmpxchg8 cntxid dca de ds dscpl dtes64 est extapic f16c
+ffxsr fma4 fpu fxsr htt hypervisor ia64 ibs lahfsahf lm lwp mca mce misalignsse
+mmx mmxext monitor movbe msr mtrr nodeid nx osvw osxsave pae page1gb pat pbe
+pclmulqdq pdcm pge popcnt pse pse36 psn rdtscp skinit smx ss sse sse2 sse3
+sse4.1 sse4.2 sse4a ssse3 svm svm_decode svm_lbrv svm_npt svm_nrips
+svm_pausefilt svm_tscrate svm_vmcbclean syscall sysenter tbm tm tm2 topoext tsc
+vme vmx wdt x2apic xop xsave xtpr
+
+The xend syntax is a list of values in the form of
+'leafnum:register=bitstring,register=bitstring'
+  "leafnum" is the requested function,
+  "register" is the response register to modify
+  "bitstring" represents all bits in the register, its length must be 32 chars.
+  Each successive character represent a lesser-significant bit, possible values
+  are listed above in the libxl section.
+
+Example to hide two features from the guest: 'tm', which is bit #29 in EDX, and
+'pni' (SSE3), which is bit #0 in ECX:
+
+xend: [ '1:ecx=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx0,edx=xx0xxxxxxxxxxxxxxxxxxxxxxxxxxxxx' ]
+
+libxl: 'host,tm=0,sse3=0'
+
+More info about the CPUID instruction can be found in the processor manuals, and
+in Wikipedia: L<http://en.wikipedia.org/wiki/CPUID>
 
 =item B<acpi_s3=BOOLEAN>
 
