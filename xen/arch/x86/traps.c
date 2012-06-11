@@ -3293,7 +3293,7 @@ static void io_check_error(struct cpu_user_regs *regs)
     outb((inb(0x61) & 0x07) | 0x00, 0x61); /* enable IOCK */
 }
 
-static void unknown_nmi_error(unsigned char reason)
+static void unknown_nmi_error(struct cpu_user_regs *regs, unsigned char reason)
 {
     switch ( opt_nmi[0] )
     {
@@ -3302,10 +3302,10 @@ static void unknown_nmi_error(unsigned char reason)
     case 'i': /* 'ignore' */
         break;
     default:  /* 'fatal' */
+        console_force_unlock();
         printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
-        printk("Dazed and confused, but trying to continue\n");
         printk("Do you have a strange power saving mode enabled?\n");
-        kexec_crash();
+        fatal_trap(TRAP_nmi, regs);
     }
 }
 
@@ -3338,7 +3338,7 @@ void do_nmi(struct cpu_user_regs *regs)
         else if ( reason & 0x40 )
             io_check_error(regs);
         else if ( !nmi_watchdog )
-            unknown_nmi_error((unsigned char)(reason&0xff));
+            unknown_nmi_error(regs, (unsigned char)(reason&0xff));
     }
 }
 
