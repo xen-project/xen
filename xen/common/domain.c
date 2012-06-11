@@ -624,7 +624,9 @@ void domain_pause_for_debugger(void)
     for_each_vcpu ( d, v )
         vcpu_sleep_nosync(v);
 
-    send_global_virq(VIRQ_DEBUGGER);
+    /* if gdbsx active, we just need to pause the domain */
+    if (current->arch.gdbsx_vcpu_event == 0)
+        send_global_virq(VIRQ_DEBUGGER);
 }
 
 /* Complete domain destroy after RCU readers are not holding old references. */
