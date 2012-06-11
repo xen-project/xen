@@ -10,42 +10,49 @@
  *    Keir Fraser <keir@xen.org>
  */
 
+/* entered with %eax = BOOT_TRAMPOLINE */
 asm (
     "    .text                         \n"
     "    .globl _start                 \n"
     "_start:                           \n"
-    "    mov  $_start,%edi             \n"
     "    call 1f                       \n"
-    "1:  pop  %esi                     \n"
-    "    sub  $1b-_start,%esi          \n"
-    "    mov  $__bss_start-_start,%ecx \n"
-    "    rep  movsb                    \n"
-    "    xor  %eax,%eax                \n"
-    "    mov  $_end,%ecx               \n"
-    "    sub  %edi,%ecx                \n"
-    "    rep  stosb                    \n"
-    "    mov  $reloc,%eax              \n"
-    "    jmp  *%eax                    \n"
+    "1:  pop  %ebx                     \n"
+    "    mov  %eax,alloc-1b(%ebx)      \n"
+    "    mov  $_end,%ecx               \n"  /* check that BSS is empty! */
+    "    sub  $__bss_start,%ecx        \n"
+    "    jz reloc                      \n"
+    "1:  jmp 1b                        \n"
+    );
+
+/* This is our data.  Because the code must be relocatable, no BSS is
+ * allowed.  All data is accessed PC-relative with inline assembly.
+ */
+asm (
+    "alloc:                            \n"
+    "    .long 0                       \n"
+    "    .subsection 1                 \n"
+    "    .p2align 4, 0xcc              \n"
+    "    .subsection 0                 \n"
     );
 
 typedef unsigned int u32;
 #include "../../../include/xen/multiboot.h"
 
-extern char _start[];
-
-static void *memcpy(void *dest, const void *src, unsigned int n)
-{
-    char *s = (char *)src, *d = dest;
-    while ( n-- )
-        *d++ = *s++;
-    return dest;
-}
-
 static void *reloc_mbi_struct(void *old, unsigned int bytes)
 {
-    static void *alloc = &_start;
-    alloc = (void *)(((unsigned long)alloc - bytes) & ~15ul);
-    return memcpy(alloc, old, bytes);
+    void *new;
+    asm(
+    "    call 1f                      \n"
+    "1:  pop  %%edx                   \n"
+    "    mov  alloc-1b(%%edx),%0      \n"
+    "    sub  %1,%0                   \n"
+    "    and  $~15,%0                 \n"
+    "    mov  %0,alloc-1b(%%edx)      \n"
+    "    mov  %0,%%edi                \n"
+    "    rep  movsb                   \n"
+       : "=&r" (new), "+c" (bytes), "+S" (old)
+	: : "edx", "edi");
+    return new;
 }
 
 static char *reloc_mbi_string(char *old)

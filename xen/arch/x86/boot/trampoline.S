@@ -11,6 +11,13 @@
         .long 111b - (off) - .;            \
         .popsection
 
+#define bootsym_segrel(sym, off)           \
+        $0,$bootsym(sym);                  \
+111:;                                      \
+        .pushsection .trampoline_seg, "a"; \
+        .long 111b - (off) - .;            \
+        .popsection
+
         .globl trampoline_realmode_entry
 trampoline_realmode_entry:
         mov     %cs,%ax
@@ -151,14 +158,14 @@ trampoline_boot_cpu_entry:
 1:      mov     %eax,%cr0                 # CR0.PE = 0 (leave protected mode)
 
         /* Load proper real-mode values into %cs, %ds, %es and %ss. */
-        ljmp    $(BOOT_TRAMPOLINE>>4),$bootsym(1f)
+        ljmp    bootsym_segrel(1f,2)
 1:      mov     %cs,%ax
         mov     %ax,%ds
         mov     %ax,%es
         mov     %ax,%ss
 
         /* Initialise stack pointer and IDT, and enable irqs. */
-        mov     $bootsym(early_stack),%sp
+        xor     %sp,%sp
         lidt    bootsym(rm_idt)
         sti
 
@@ -220,7 +227,3 @@ rm_idt: .word   256*4-1, 0, 0
 #include "edd.S"
 #include "video.S"
 #include "wakeup.S"
-
-        .align  16
-        .fill   PAGE_SIZE,1,0
-early_stack:

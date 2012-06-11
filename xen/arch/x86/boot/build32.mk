@@ -16,9 +16,10 @@ CFLAGS := $(filter-out -flto,$(CFLAGS))
 	$(OBJCOPY) -O binary $< $@
 
 %.lnk: %.o
-	$(LD) $(LDFLAGS_DIRECT) -N -Ttext $(RELOC) -o $@ $<
+	$(LD) $(LDFLAGS_DIRECT) -N -Ttext 0 -o $@ $<
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c -fpic $< -o $@
 
 reloc.o: $(BASEDIR)/include/asm-x86/config.h
+.PRECIOUS: %.bin %.lnk

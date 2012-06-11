@@ -9,9 +9,7 @@
         .text
         .code32
 
-#define BOOT_TRAMPOLINE   0x7c000
 #define sym_phys(sym)     ((sym) - __XEN_VIRT_START)
-#define bootsym_phys(sym) ((sym) - trampoline_start + BOOT_TRAMPOLINE)
 
 #define BOOT_CS32        0x0008
 #define BOOT_CS64        0x0010
@@ -78,6 +76,23 @@ __start:
         /* Check for Multiboot bootloader */
         cmp     $0x2BADB002,%eax
         jne     not_multiboot
+
+        /* Set up trampoline segment 64k below EBDA */
+        movzwl  0x40e,%eax          /* EBDA segment */
+        cmp     $0xa000,%eax        /* sanity check (high) */
+        jae     0f
+        cmp     $0x4000,%eax        /* sanity check (low) */
+        jae     1f
+0:
+        movzwl  0x413,%eax          /* use base memory size on failure */
+        shl     $10-4,%eax
+1:
+        sub     $0x1000,%eax
+
+        /* From arch/x86/smpboot.c: start_eip had better be page-aligned! */
+        xor     %al, %al
+        shl     $4, %eax
+        mov     %eax,sym_phys(trampoline_phys)
 
         /* Save the Multiboot info struct (after relocation) for later use. */
         mov     $sym_phys(cpu0_stack)+1024,%esp
@@ -190,7 +205,7 @@ __start:
 #endif
 
         /* Apply relocations to bootstrap trampoline. */
-        mov     $BOOT_TRAMPOLINE,%edx
+        mov     sym_phys(trampoline_phys),%edx
         mov     $sym_phys(__trampoline_rel_start),%edi
         mov     %edx,sym_phys(trampoline_phys)
 1:
@@ -200,21 +215,34 @@ __start:
         cmp     $sym_phys(__trampoline_rel_stop),%edi
         jb      1b
 
+        /* Patch in the trampoline segment. */
+        shr     $4,%edx
+        mov     $sym_phys(__trampoline_seg_start),%edi
+1:
+        mov     (%edi),%eax
+        mov     %dx,(%edi,%eax)
+        add     $4,%edi
+        cmp     $sym_phys(__trampoline_seg_stop),%edi
+        jb      1b
+
+        call    cmdline_parse_early
+
+        /* Switch to low-memory stack.  */
+        mov     sym_phys(trampoline_phys),%edi
+        lea     0x10000(%edi),%esp
+        lea     trampoline_boot_cpu_entry-trampoline_start(%edi),%eax
+        pushl   $BOOT_CS32
+        push    %eax
+
         /* Copy bootstrap trampoline to low memory, below 1MB. */
         mov     $sym_phys(trampoline_start),%esi
-        mov     %edx,%edi
         mov     $trampoline_end - trampoline_start,%ecx
         rep     movsb
 
-        lea     early_stack-trampoline_start(%edx),%esp
-        call    cmdline_parse_early
-
         /* Jump into the relocated trampoline. */
-        jmp     $BOOT_CS32,$bootsym_phys(trampoline_boot_cpu_entry)
+        lret
 
 #include "cmdline.S"
-
-#undef bootsym_phys
 
 reloc:
 #include "reloc.S"

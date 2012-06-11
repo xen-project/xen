@@ -11,7 +11,7 @@ ENTRY(wakeup_start)
         movw    %cs, %ax
         movw    %ax, %ds
         movw    %ax, %ss        # A stack required for BIOS call
-        movw    $wakesym(early_stack), %sp
+        movw    $wakesym(wakeup_stack), %sp
 
         pushl   $0              # Kill dangerous flag early
         popfl
@@ -101,7 +101,7 @@ real_magic:     .long 0x12345678
          .globl video_mode, video_flags
 video_mode:     .long 0
 video_flags:    .long 0
-trampoline_seg: .word BOOT_TRAMPOLINE >> 4
+trampoline_seg: .word 0
         .pushsection .trampoline_seg, "a"
         .long   trampoline_seg - .
         .popsection
@@ -116,7 +116,7 @@ wakeup_32:
         mov     $BOOT_DS, %eax
         mov     %eax, %ds
         mov     %eax, %ss
-        mov     $bootsym_rel(early_stack, 4, %esp)
+        mov     $bootsym_rel(wakeup_stack, 4, %esp)
 
         # check saved magic again
         mov     $sym_phys(saved_magic), %eax
@@ -188,3 +188,7 @@ ret_point:
 bogus_saved_magic:
         movw    $0x0e00 + 'S', 0xb8014
         jmp     bogus_saved_magic
+
+        .align  16
+        .fill   PAGE_SIZE,1,0
+wakeup_stack:

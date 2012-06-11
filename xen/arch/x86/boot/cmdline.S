@@ -164,13 +164,13 @@ cmdline_parse_early:
         pushl   MB_cmdline(%ebx)
         call    .Lfind_option
         test    %eax,%eax
-        setnz   bootsym_phys(skip_realmode)
+        setnz   sym_phys(skip_realmode)
 
         /* Check for 'tboot=' command-line option. */
         movl    $sym_phys(.Ltboot_opt),4(%esp)
         call    .Lfind_option
         test    %eax,%eax
-        setnz   bootsym_phys(skip_realmode) /* tboot= implies no-real-mode */
+        setnz   sym_phys(skip_realmode) /* tboot= implies no-real-mode */
 
 .Lparse_edd:
         /* Check for 'edd=' command-line option. */
@@ -181,13 +181,13 @@ cmdline_parse_early:
         cmpb    $'=',3(%eax)
         jne     .Lparse_edid
         add     $4,%eax
-        movb    $2,bootsym_phys(opt_edd)  /* opt_edd=2: edd=off */
+        movb    $2,sym_phys(opt_edd)  /* opt_edd=2: edd=off */
         cmpw    $0x666f,(%eax)            /* 0x666f == "of" */
         je      .Lparse_edid
-        decb    bootsym_phys(opt_edd)     /* opt_edd=1: edd=skipmbr */
+        decb    sym_phys(opt_edd)     /* opt_edd=1: edd=skipmbr */
         cmpw    $0x6b73,(%eax)            /* 0x6b73 == "sk" */
         je      .Lparse_edid
-        decb    bootsym_phys(opt_edd)     /* opt_edd=0: edd=on (default) */
+        decb    sym_phys(opt_edd)     /* opt_edd=0: edd=on (default) */
 
 .Lparse_edid:
         /* Check for 'edid=' command-line option. */
@@ -203,17 +203,17 @@ cmdline_parse_early:
         pushl   $sym_phys(.Ledid_force)
         call    .Lstr_prefix
         add     $8,%esp
-        movb    $2,bootsym_phys(opt_edid) /* opt_edid=2: edid=force */
+        movb    $2,sym_phys(opt_edid) /* opt_edid=2: edid=force */
         test    %eax,%eax
         jz      .Lparse_vga
         push    %ebx
         pushl   $sym_phys(.Ledid_no)
         call    .Lstr_prefix
         add     $8,%esp
-        decb    bootsym_phys(opt_edid)    /* opt_edid=1: edid=no */
+        decb    sym_phys(opt_edid)    /* opt_edid=1: edid=no */
         test    %eax,%eax
         jz      .Lparse_vga
-        decb    bootsym_phys(opt_edid)    /* opt_edid=0: default */
+        decb    sym_phys(opt_edid)    /* opt_edid=0: default */
 
 .Lparse_vga:
         /* Check for 'vga=' command-line option. */
@@ -227,7 +227,7 @@ cmdline_parse_early:
         add     $4,%eax
 
         /* Found the 'vga=' option. Default option is to display vga menu. */
-        movw    $ASK_VGA,bootsym_phys(boot_vid_mode)
+        movw    $ASK_VGA,sym_phys(boot_vid_mode)
 
         /* Check for 'vga=text-80x<rows>. */
         mov     %eax,%ebx
@@ -251,7 +251,7 @@ cmdline_parse_early:
         cmp     %ax,%bx
         lodsw
         jne     1b
-        mov     %ax,bootsym_phys(boot_vid_mode)
+        mov     %ax,sym_phys(boot_vid_mode)
         jmp     .Lcmdline_exit
 
 .Lparse_vga_gfx:
@@ -270,7 +270,7 @@ cmdline_parse_early:
         push    %ebx
         call    .Latoi
         pop     %esi
-        mov     %ax,bootsym_phys(vesa_size)+0
+        mov     %ax,sym_phys(vesa_size)+0
         /* skip 'x' */
         lodsb
         cmpb    $'x',%al
@@ -279,7 +279,7 @@ cmdline_parse_early:
         push    %esi
         call    .Latoi
         pop     %esi
-        mov     %ax,bootsym_phys(vesa_size)+2
+        mov     %ax,sym_phys(vesa_size)+2
         /* skip 'x' */
         lodsb
         cmpb    $'x',%al
@@ -288,9 +288,9 @@ cmdline_parse_early:
         push    %esi
         call    .Latoi
         pop     %esi
-        mov     %ax,bootsym_phys(vesa_size)+4
+        mov     %ax,sym_phys(vesa_size)+4
         /* commit to vesa mode */
-        movw    $VIDEO_VESA_BY_SIZE,bootsym_phys(boot_vid_mode)
+        movw    $VIDEO_VESA_BY_SIZE,sym_phys(boot_vid_mode)
         jmp     .Lcmdline_exit
 
 .Lparse_vga_mode:
@@ -307,7 +307,7 @@ cmdline_parse_early:
         push    %ebx
         call    .Latoi
         add     $4,%esp
-        mov     %ax,bootsym_phys(boot_vid_mode)
+        mov     %ax,sym_phys(boot_vid_mode)
         jmp     .Lcmdline_exit
 
 .Lparse_vga_current:
@@ -320,7 +320,7 @@ cmdline_parse_early:
         jnz     .Lcmdline_exit
 
         /* We have 'vga=current'. */
-        movw    $VIDEO_CURRENT_MODE,bootsym_phys(boot_vid_mode)
+        movw    $VIDEO_CURRENT_MODE,sym_phys(boot_vid_mode)
 
 .Lcmdline_exit:
         popa
