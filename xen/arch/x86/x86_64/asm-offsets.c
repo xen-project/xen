@@ -90,6 +90,8 @@ void __dummy__(void)
            arch.guest_context.trap_ctxt[TRAP_gp_fault].address);
     OFFSET(VCPU_gp_fault_sel, struct vcpu,
            arch.guest_context.trap_ctxt[TRAP_gp_fault].cs);
+    OFFSET(VCPU_gp_fault_flags, struct vcpu,
+           arch.guest_context.trap_ctxt[TRAP_gp_fault].flags);
     OFFSET(VCPU_kernel_sp, struct vcpu, arch.guest_context.kernel_sp);
     OFFSET(VCPU_kernel_ss, struct vcpu, arch.guest_context.kernel_ss);
     OFFSET(VCPU_guest_context_flags, struct vcpu, arch.guest_context.flags);
