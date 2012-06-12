@@ -127,6 +127,9 @@
 #define AMD_MODEL_RANGE_START(range)    (((range) >> 12) & 0xfff)
 #define AMD_MODEL_RANGE_END(range)      ((range) & 0xfff)
 
+#define AMD_ERRATUM_121                                                 \
+    AMD_LEGACY_ERRATUM(AMD_MODEL_RANGE(0x0f, 0x0, 0x0, 0x3f, 0xf))
+
 #define AMD_ERRATUM_170                                                 \
     AMD_LEGACY_ERRATUM(AMD_MODEL_RANGE(0x0f, 0x0, 0x0, 0x67, 0xf))
 
