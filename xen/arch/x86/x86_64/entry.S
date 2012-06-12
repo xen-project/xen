@@ -40,6 +40,13 @@ restore_all_guest:
         testw $TRAP_syscall,4(%rsp)
         jz    iret_exit_to_guest
 
+        /* Don't use SYSRET path if the return address is not canonical. */
+        movq  8(%rsp),%rcx
+        sarq  $47,%rcx
+        incl  %ecx
+        cmpl  $1,%ecx
+        ja    .Lforce_iret
+
         addq  $8,%rsp
         popq  %rcx                    # RIP
         popq  %r11                    # CS
@@ -50,6 +57,10 @@ restore_all_guest:
         sysretq
 1:      sysretl
 
+.Lforce_iret:
+        /* Mimic SYSRET behavior. */
+        movq  8(%rsp),%rcx            # RIP
+        movq  24(%rsp),%r11           # RFLAGS
         ALIGN
 /* No special register assumptions. */
 iret_exit_to_guest:
