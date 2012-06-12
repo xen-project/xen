@@ -126,6 +126,16 @@ Override Xen's logic for choosing the APIC driver.  By default, if
 there are more than 8 CPUs, Xen will switch to `bigsmp` over
 `default`.
 
+### allow\_unsafe
+> `= <boolean>`
+
+Force boot on potentially unsafe systems. By default Xen will refuse to boot on
+systems with the following errata:
+
+* AMD Erratum 121. Processors with this erratum are subject to a guest
+  triggerable Denial of Service. Override only if you trust all of your PV
+  guests.
+
 ### apic\_verbosity
 > `= verbose | debug`
 

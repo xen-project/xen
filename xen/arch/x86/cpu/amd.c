@@ -32,6 +32,9 @@
 static char opt_famrev[14];
 string_param("cpuid_mask_cpu", opt_famrev);
 
+static bool_t opt_allow_unsafe;
+boolean_param("allow_unsafe", opt_allow_unsafe);
+
 static inline void wrmsr_amd(unsigned int index, unsigned int lo, 
 		unsigned int hi)
 {
@@ -493,6 +496,11 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		clear_bit(X86_FEATURE_MWAIT, c->x86_capability);
 
 #ifdef __x86_64__
+	if (cpu_has_amd_erratum(c, AMD_ERRATUM_121) && !opt_allow_unsafe)
+		panic("Xen will not boot on this CPU for security reasons.\n"
+		      "Pass \"allow_unsafe\" if you're trusting all your"
+		      " (PV) guest kernels.\n");
+
 	/* AMD CPUs do not support SYSENTER outside of legacy mode. */
 	clear_bit(X86_FEATURE_SEP, c->x86_capability);
 
