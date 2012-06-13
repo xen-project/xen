@@ -56,7 +56,8 @@ void svm_asid_handle_vmrun(void)
         return;
     }
 
-    vmcb_set_guest_asid(vmcb, p_asid->asid);
+    if (vmcb_get_guest_asid(vmcb) != p_asid->asid)
+        vmcb_set_guest_asid(vmcb, p_asid->asid);
     vmcb->tlb_control = need_flush;
 }
 
