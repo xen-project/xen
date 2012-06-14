@@ -173,9 +173,11 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     char *dom_path, *vm_path;
     xs_transaction_t t;
     char **ents, **hvm_ents;
-    int i;
+    int i, rc;
 
-    libxl_domain_sched_params_set(CTX, domid, &info->sched_params);
+    rc = libxl_domain_sched_params_set(CTX, domid, &info->sched_params);
+    if (rc)
+        return rc;
 
     libxl_cpuid_apply_policy(ctx, domid);
     if (info->cpuid != NULL)
