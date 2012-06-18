@@ -68,16 +68,37 @@ static void transition_pstate(void *drvcmd)
     struct drv_cmd *cmd;
     cmd = (struct drv_cmd *) drvcmd;
 
-    if (cmd->turbo != CPUFREQ_TURBO_UNSUPPORTED) {
+
+    wrmsrl(MSR_PSTATE_CTRL, cmd->val);
+}
+
+static void update_cpb(void *data)
+{
+    struct cpufreq_policy *policy = (struct cpufreq_policy *)data;
+
+    if (policy->turbo != CPUFREQ_TURBO_UNSUPPORTED) {
         uint64_t msr_content;
+ 
         rdmsrl(MSR_K8_HWCR, msr_content);
-        if (cmd->turbo == CPUFREQ_TURBO_ENABLED)
+
+        if (policy->turbo == CPUFREQ_TURBO_ENABLED)
             msr_content &= ~MSR_HWCR_CPBDIS_MASK;
         else
             msr_content |= MSR_HWCR_CPBDIS_MASK; 
+
         wrmsrl(MSR_K8_HWCR, msr_content);
     }
-    wrmsrl(MSR_PSTATE_CTRL, cmd->val);
+}
+
+static int powernow_cpufreq_update (int cpuid,
+				     struct cpufreq_policy *policy)
+{
+    if (!cpumask_test_cpu(cpuid, &cpu_online_map))
+        return -EINVAL;
+
+    on_selected_cpus(cpumask_of(cpuid), update_cpb, policy, 1);
+
+    return 0;
 }
 
 static int powernow_cpufreq_target(struct cpufreq_policy *policy,
@@ -300,7 +321,8 @@ static struct cpufreq_driver powernow_cpufreq_driver = {
     .verify = powernow_cpufreq_verify,
     .target = powernow_cpufreq_target,
     .init   = powernow_cpufreq_cpu_init,
-    .exit   = powernow_cpufreq_cpu_exit
+    .exit   = powernow_cpufreq_cpu_exit,
+    .update = powernow_cpufreq_update
 };
 
 unsigned int __init powernow_register_driver()

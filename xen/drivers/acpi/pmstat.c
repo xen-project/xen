@@ -494,13 +494,13 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
 
     case XEN_SYSCTL_pm_op_enable_turbo:
     {
-        cpufreq_enable_turbo(op->cpuid);
+        ret = cpufreq_update_turbo(op->cpuid, CPUFREQ_TURBO_ENABLED);
         break;
     }
 
     case XEN_SYSCTL_pm_op_disable_turbo:
     {
-        cpufreq_disable_turbo(op->cpuid);
+        ret = cpufreq_update_turbo(op->cpuid, CPUFREQ_TURBO_DISABLED);
         break;
     }
 

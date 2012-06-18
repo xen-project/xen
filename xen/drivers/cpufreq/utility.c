@@ -390,23 +390,38 @@ int cpufreq_driver_getavg(unsigned int cpu, unsigned int flag)
     return policy->cur;
 }
 
-void cpufreq_enable_turbo(int cpuid)
+int cpufreq_update_turbo(int cpuid, int new_state)
 {
     struct cpufreq_policy *policy;
+    int curr_state;
+    int ret = 0;
+
+    if (new_state != CPUFREQ_TURBO_ENABLED &&
+        new_state != CPUFREQ_TURBO_DISABLED)
+        return -EINVAL;
 
     policy = per_cpu(cpufreq_cpu_policy, cpuid);
-    if (policy && policy->turbo != CPUFREQ_TURBO_UNSUPPORTED)
-        policy->turbo = CPUFREQ_TURBO_ENABLED;
+    if (!policy)
+        return -EACCES;
+
+    if (policy->turbo == CPUFREQ_TURBO_UNSUPPORTED)
+        return -EOPNOTSUPP;
+
+    curr_state = policy->turbo;
+    if (curr_state == new_state)
+        return 0;
+
+    policy->turbo = new_state;
+    if (cpufreq_driver->update)
+    {
+        ret = cpufreq_driver->update(cpuid, policy);
+        if (ret)
+            policy->turbo = curr_state;
+    }
+
+    return ret;
 }
 
-void cpufreq_disable_turbo(int cpuid)
-{
-    struct cpufreq_policy *policy;
-
-    policy = per_cpu(cpufreq_cpu_policy, cpuid);
-    if (policy && policy->turbo != CPUFREQ_TURBO_UNSUPPORTED)
-        policy->turbo = CPUFREQ_TURBO_DISABLED;
-}
 
 int cpufreq_get_turbo_status(int cpuid)
 {

@@ -124,8 +124,7 @@ extern int cpufreq_driver_getavg(unsigned int cpu, unsigned int flag);
 #define CPUFREQ_TURBO_UNSUPPORTED   0
 #define CPUFREQ_TURBO_ENABLED       1
 
-extern void cpufreq_enable_turbo(int cpuid);
-extern void cpufreq_disable_turbo(int cpuid);
+extern int cpufreq_update_turbo(int cpuid, int new_state);
 extern int cpufreq_get_turbo_status(int cpuid);
 
 static __inline__ int 
@@ -146,6 +145,7 @@ struct cpufreq_driver {
     char   name[CPUFREQ_NAME_LEN];
     int    (*init)(struct cpufreq_policy *policy);
     int    (*verify)(struct cpufreq_policy *policy);
+    int    (*update)(int cpuid, struct cpufreq_policy *policy);
     int    (*target)(struct cpufreq_policy *policy,
                      unsigned int target_freq,
                      unsigned int relation);
