@@ -736,6 +736,14 @@ int arch_set_info_guest(
     {
         if ( !compat )
         {
+#ifdef __x86_64__
+            if ( !is_canonical_address(c.nat->user_regs.eip) ||
+                 !is_canonical_address(c.nat->event_callback_eip) ||
+                 !is_canonical_address(c.nat->syscall_callback_eip) ||
+                 !is_canonical_address(c.nat->failsafe_callback_eip) )
+                return -EINVAL;
+#endif
+
             fixup_guest_stack_selector(d, c.nat->user_regs.ss);
             fixup_guest_stack_selector(d, c.nat->kernel_ss);
             fixup_guest_code_selector(d, c.nat->user_regs.cs);
@@ -745,7 +753,11 @@ int arch_set_info_guest(
 #endif
 
             for ( i = 0; i < 256; i++ )
+            {
+                if ( !is_canonical_address(c.nat->trap_ctxt[i].address) )
+                    return -EINVAL;
                 fixup_guest_code_selector(d, c.nat->trap_ctxt[i].cs);
+            }
 
             /* LDT safety checks. */
             if ( ((c.nat->ldt_base & (PAGE_SIZE-1)) != 0) ||
