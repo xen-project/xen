@@ -109,7 +109,7 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
     }
 }
 
-asmlinkage void vmx_intr_assist(void)
+void vmx_intr_assist(void)
 {
     struct hvm_intack intack;
     struct vcpu *v = current;

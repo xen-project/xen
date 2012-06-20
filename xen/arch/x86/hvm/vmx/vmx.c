@@ -2035,7 +2035,7 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
     domain_crash(curr->domain);
 }
 
-asmlinkage void vmx_enter_realmode(struct cpu_user_regs *regs)
+void vmx_enter_realmode(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
 
@@ -2089,7 +2089,7 @@ static int vmx_handle_eoi_write(void)
     return 0;
 }
 
-asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
+void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason, idtv_info, intr_info = 0, vector = 0;
     unsigned long exit_qualification, inst_len = 0;
@@ -2518,7 +2518,7 @@ asmlinkage void vmx_vmexit_handler(struct cpu_user_regs *regs)
     }
 }
 
-asmlinkage void vmx_vmenter_helper(void)
+void vmx_vmenter_helper(void)
 {
     struct vcpu *curr = current;
     u32 new_asid, old_asid;

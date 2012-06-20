@@ -20,7 +20,7 @@
 
 #include <public/callback.h>
 
-extern asmlinkage int hypercall(void);
+extern int hypercall(void);
 
 static void print_xen_info(void)
 {
@@ -229,7 +229,7 @@ static struct notifier_block cpu_doublefault_tss_nfb = {
     .notifier_call = cpu_doublefault_tss_callback
 };
 
-asmlinkage void do_double_fault(void)
+void do_double_fault(void)
 {
     struct tss_struct *tss;
     unsigned int cpu;

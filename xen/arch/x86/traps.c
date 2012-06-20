@@ -420,7 +420,7 @@ static char *trapstr(int trapnr)
  * are disabled). In such situations we can't do much that is safe. We try to
  * print out some tracing and then we just spin.
  */
-asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs)
+void fatal_trap(int trapnr, struct cpu_user_regs *regs)
 {
     static DEFINE_PER_CPU(char, depth);
 
@@ -534,7 +534,7 @@ static unsigned int check_guest_io_breakpoint(struct vcpu *v,
  * Called from asm to set up the MCE trapbounce info.
  * Returns 0 if no callback is set up, else 1.
  */
-asmlinkage int set_guest_machinecheck_trapbounce(void)
+int set_guest_machinecheck_trapbounce(void)
 {
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.trap_bounce;
@@ -548,7 +548,7 @@ asmlinkage int set_guest_machinecheck_trapbounce(void)
  * Called from asm to set up the NMI trapbounce info.
  * Returns 0 if no callback is set up, else 1.
  */
-asmlinkage int set_guest_nmi_trapbounce(void)
+int set_guest_nmi_trapbounce(void)
 {
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.trap_bounce;
@@ -596,13 +596,13 @@ static inline void do_trap(
 }
 
 #define DO_ERROR_NOCODE(trapnr, name)                   \
-asmlinkage void do_##name(struct cpu_user_regs *regs)   \
+void do_##name(struct cpu_user_regs *regs)   \
 {                                                       \
     do_trap(trapnr, regs, 0);                           \
 }
 
 #define DO_ERROR(trapnr, name)                          \
-asmlinkage void do_##name(struct cpu_user_regs *regs)   \
+void do_##name(struct cpu_user_regs *regs)   \
 {                                                       \
     do_trap(trapnr, regs, 1);                           \
 }
@@ -959,7 +959,7 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
     return EXCRET_fault_fixed;
 }
 
-asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
+void do_invalid_op(struct cpu_user_regs *regs)
 {
     struct bug_frame bug;
     struct bug_frame_str bug_str;
@@ -1053,7 +1053,7 @@ asmlinkage void do_invalid_op(struct cpu_user_regs *regs)
     panic("FATAL TRAP: vector = %d (invalid opcode)\n", TRAP_invalid_op);
 }
 
-asmlinkage void do_int3(struct cpu_user_regs *regs)
+void do_int3(struct cpu_user_regs *regs)
 {
     DEBUGGER_trap_entry(TRAP_int3, regs);
 
@@ -1066,7 +1066,7 @@ asmlinkage void do_int3(struct cpu_user_regs *regs)
     do_guest_trap(TRAP_int3, regs, 0);
 }
 
-asmlinkage void do_machine_check(struct cpu_user_regs *regs)
+void do_machine_check(struct cpu_user_regs *regs)
 {
     machine_check_vector(regs, regs->error_code);
 }
@@ -1367,7 +1367,7 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
  *  Bit 3: Reserved bit violation
  *  Bit 4: Instruction fetch
  */
-asmlinkage void do_page_fault(struct cpu_user_regs *regs)
+void do_page_fault(struct cpu_user_regs *regs)
 {
     unsigned long addr, fixup;
     unsigned int error_code;
@@ -1433,7 +1433,7 @@ asmlinkage void do_page_fault(struct cpu_user_regs *regs)
  * during early boot (an issue was seen once, but was most likely a hardware 
  * problem).
  */
-asmlinkage void __init do_early_page_fault(struct cpu_user_regs *regs)
+void __init do_early_page_fault(struct cpu_user_regs *regs)
 {
     static int stuck;
     static unsigned long prev_eip, prev_cr2;
@@ -2978,7 +2978,7 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
 #endif
 }
 
-asmlinkage void do_general_protection(struct cpu_user_regs *regs)
+void do_general_protection(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     unsigned long fixup;
@@ -3248,7 +3248,7 @@ static int dummy_nmi_callback(struct cpu_user_regs *regs, int cpu)
  
 static nmi_callback_t nmi_callback = dummy_nmi_callback;
 
-asmlinkage void do_nmi(struct cpu_user_regs *regs)
+void do_nmi(struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();
     unsigned char reason;
@@ -3284,7 +3284,7 @@ void unset_nmi_callback(void)
     nmi_callback = dummy_nmi_callback;
 }
 
-asmlinkage void do_device_not_available(struct cpu_user_regs *regs)
+void do_device_not_available(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
 
@@ -3325,7 +3325,7 @@ static void ler_enable(void)
     wrmsrl(MSR_IA32_DEBUGCTLMSR, debugctl | 1);
 }
 
-asmlinkage void do_debug(struct cpu_user_regs *regs)
+void do_debug(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
 
@@ -3378,7 +3378,7 @@ asmlinkage void do_debug(struct cpu_user_regs *regs)
     return;
 }
 
-asmlinkage void do_spurious_interrupt_bug(struct cpu_user_regs *regs)
+void do_spurious_interrupt_bug(struct cpu_user_regs *regs)
 {
 }
 

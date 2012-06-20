@@ -110,12 +110,12 @@ extern char wakeup_start[];
 extern unsigned int video_mode, video_flags;
 #endif
 
+#define asmlinkage
+
 #if defined(__x86_64__)
 
 #define CONFIG_X86_64 1
 #define CONFIG_COMPAT 1
-
-#define asmlinkage
 
 #define PML4_ENTRY_BITS  39
 #ifndef __ASSEMBLY__
@@ -279,8 +279,6 @@ extern unsigned int video_mode, video_flags;
 
 #define CONFIG_X86_32      1
 #define CONFIG_DOMAIN_PAGE 1
-
-#define asmlinkage __attribute__((regparm(0)))
 
 /*
  * Memory layout (high to low):                          PAE-SIZE
