@@ -515,7 +515,7 @@ void irq_set_affinity(int irq, cpumask_t mask)
 
 DEFINE_PER_CPU(unsigned int, irq_count);
 
-asmlinkage void do_IRQ(struct cpu_user_regs *regs)
+void do_IRQ(struct cpu_user_regs *regs)
 {
     struct irqaction *action;
     uint32_t          tsc_in;

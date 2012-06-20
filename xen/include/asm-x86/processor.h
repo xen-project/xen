@@ -538,7 +538,7 @@ void show_registers(struct cpu_user_regs *regs);
 void show_execution_state(struct cpu_user_regs *regs);
 #define dump_execution_state() run_in_exception_handler(show_execution_state)
 void show_page_walk(unsigned long addr);
-asmlinkage void fatal_trap(int trapnr, struct cpu_user_regs *regs);
+void fatal_trap(int trapnr, struct cpu_user_regs *regs);
 
 #ifdef CONFIG_COMPAT
 void compat_show_guest_stack(struct vcpu *, struct cpu_user_regs *, int lines);
@@ -550,7 +550,7 @@ extern void mtrr_ap_init(void);
 extern void mtrr_bp_init(void);
 
 void mcheck_init(struct cpuinfo_x86 *c);
-asmlinkage void do_machine_check(struct cpu_user_regs *regs);
+void do_machine_check(struct cpu_user_regs *regs);
 void cpu_mcheck_distribute_cmci(void);
 void cpu_mcheck_disable(void);
 

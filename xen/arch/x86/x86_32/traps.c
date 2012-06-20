@@ -195,7 +195,7 @@ DEFINE_PER_CPU_READ_MOSTLY(struct tss_struct *, doublefault_tss);
 static unsigned char __attribute__ ((__section__ (".bss.page_aligned")))
     boot_cpu_doublefault_space[PAGE_SIZE];
 
-asmlinkage void do_double_fault(void)
+void do_double_fault(void)
 {
     struct tss_struct *tss;
     unsigned int cpu;
@@ -301,7 +301,7 @@ static void set_task_gate(unsigned int n, unsigned int sel)
 void __devinit subarch_percpu_traps_init(void)
 {
     struct tss_struct *tss = this_cpu(doublefault_tss);
-    asmlinkage int hypercall(void);
+    int hypercall(void);
 
     if ( !tss )
     {
@@ -512,7 +512,7 @@ long do_set_callbacks(unsigned long event_selector,
 
 static void hypercall_page_initialise_ring0_kernel(void *hypercall_page)
 {
-    extern asmlinkage int hypercall(void);
+    extern int hypercall(void);
     char *p;
     int i;
 

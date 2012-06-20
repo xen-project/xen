@@ -1387,7 +1387,7 @@ static struct hvm_function_table __read_mostly svm_function_table = {
     .set_rdtsc_exiting    = svm_set_rdtsc_exiting
 };
 
-asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
+void svm_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason;
     struct vcpu *v = current;
@@ -1643,7 +1643,7 @@ asmlinkage void svm_vmexit_handler(struct cpu_user_regs *regs)
         (vlapic_get_reg(vcpu_vlapic(v), APIC_TASKPRI) & 0xFF) >> 4;
 }
 
-asmlinkage void svm_trace_vmentry(void)
+void svm_trace_vmentry(void)
 {
     HVMTRACE_ND (VMENTRY, 1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
 }

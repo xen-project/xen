@@ -23,10 +23,10 @@
 #include <asm/hvm/support.h>
 #include <public/callback.h>
 
-asmlinkage void syscall_enter(void);
-asmlinkage void sysenter_entry(void);
-asmlinkage void compat_hypercall(void);
-asmlinkage void int80_direct_trap(void);
+void syscall_enter(void);
+void sysenter_entry(void);
+void compat_hypercall(void);
+void int80_direct_trap(void);
 
 static void print_xen_info(void)
 {
@@ -215,8 +215,8 @@ void show_page_walk(unsigned long addr)
            l1_table_offset(addr), l1e_get_intpte(l1e), pfn);
 }
 
-asmlinkage void double_fault(void);
-asmlinkage void do_double_fault(struct cpu_user_regs *regs)
+void double_fault(void);
+void do_double_fault(struct cpu_user_regs *regs)
 {
     unsigned int cpu;
 
