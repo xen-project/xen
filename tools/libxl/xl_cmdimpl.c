@@ -555,6 +555,8 @@ static int sched_params_valid(libxl_domain_sched_params *scp)
     int has_weight = scp->weight != LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT;
     int has_period = scp->period != LIBXL_DOMAIN_SCHED_PARAM_PERIOD_DEFAULT;
     int has_slice = scp->slice != LIBXL_DOMAIN_SCHED_PARAM_SLICE_DEFAULT;
+    int has_extratime =
+                scp->extratime != LIBXL_DOMAIN_SCHED_PARAM_EXTRATIME_DEFAULT;
     libxl_domain_sched_params sci;
 
     libxl_domain_sched_params_get(ctx, domid, &sci);
@@ -563,12 +565,27 @@ static int sched_params_valid(libxl_domain_sched_params *scp)
     if (sci.sched == LIBXL_SCHEDULER_SEDF) {
         if (has_weight && (has_period || has_slice))
             return 0;
+        if (has_period != has_slice)
+            return 0;
 
+        /*
+         * Idea is, if we specify a weight, then both period and
+         * slice has to be zero. OTOH, if we do not specify a weight,
+         * that means we want a pure best effort domain or an actual
+         * real-time one. In the former case, it is period that needs
+         * to be zero, in the latter, weight should be.
+         */
         if (has_weight) {
             scp->slice = 0;
             scp->period = 0;
         }
-        if (has_period || has_slice)
+        else if (!has_period) {
+            /* We can setup a proper best effort domain (extra time only)
+             * iff we either already have or are asking for some extra time. */
+            scp->weight = has_extratime ? scp->extratime : sci.extratime;
+            scp->period = 0;
+        }
+        if (has_period && has_slice)
             scp->weight = 0;
     }
 
