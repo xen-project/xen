@@ -1717,7 +1717,7 @@ static uint32_t guest_io_read(
     while ( bytes != 0 )
     {
         unsigned int size = 1;
-        uint32_t sub_data = 0xff;
+        uint32_t sub_data = ~0;
 
         if ( (port == 0x42) || (port == 0x43) || (port == 0x61) )
         {
