@@ -6,6 +6,7 @@
 
 #include <xen/spinlock.h>
 #include <xen/pci.h>
+#include <xen/init.h>
 #include <asm/io.h>
 
 #define PCI_CONF_ADDRESS(bus, dev, func, reg) \
@@ -69,4 +70,8 @@ void pci_conf_write32(
         return;
     BUG_ON((bus > 255) || (dev > 31) || (func > 7) || (reg > 255));
     pci_conf_write(PCI_CONF_ADDRESS(bus, dev, func, reg), 0, 4, data);
+}
+
+void __init arch_pci_ro_device(int seg, int bdf)
+{
 }

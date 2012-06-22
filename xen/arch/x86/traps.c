@@ -1349,20 +1349,23 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         return 0;
     }
 
-    if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
-         guest_kernel_mode(v, regs) )
+    if ( guest_kernel_mode(v, regs) &&
+         !(regs->error_code & (PFEC_reserved_bit | PFEC_insn_fetch)) &&
+         (regs->error_code & PFEC_write_access) )
     {
-        unsigned int mbs = PFEC_write_access;
-        unsigned int mbz = PFEC_reserved_bit | PFEC_insn_fetch;
-
-        /* Do not check if access-protection fault since the page may 
-           legitimately be not present in shadow page tables */
-        if ( !paging_mode_enabled(d) )
-            mbs |= PFEC_page_present;
-
-        if ( ((regs->error_code & (mbs | mbz)) == mbs) &&
+        if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) &&
+             /* Do not check if access-protection fault since the page may
+                legitimately be not present in shadow page tables */
+             (paging_mode_enabled(d) ||
+              (regs->error_code & PFEC_page_present)) &&
              ptwr_do_page_fault(v, addr, regs) )
             return EXCRET_fault_fixed;
+
+#ifdef __x86_64__
+        if ( IS_PRIV(d) && (regs->error_code & PFEC_page_present) &&
+             mmio_ro_do_page_fault(v, addr, regs) )
+            return EXCRET_fault_fixed;
+#endif
     }
 
     /* For non-external shadowed guests, we fix up both their own 
@@ -1690,6 +1693,13 @@ static int pci_cfg_ok(struct domain *d, int write, int size)
         return 0;
 
     machine_bdf = (d->arch.pci_cf8 >> 8) & 0xFFFF;
+    if ( write )
+    {
+        const unsigned long *ro_map = pci_get_ro_map(0);
+
+        if ( ro_map && test_bit(machine_bdf, ro_map) )
+            return 0;
+    }
     start = d->arch.pci_cf8 & 0xFF;
     end = start + size - 1;
     if (xsm_pci_config_permission(d, machine_bdf, start, end, write))

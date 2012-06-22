@@ -36,6 +36,7 @@
 struct pci_seg {
     struct list_head alldevs_list;
     u16 nr;
+    unsigned long *ro_map;
     /* bus2bridge_lock protects bus2bridge array */
     spinlock_t bus2bridge_lock;
 #define MAX_BUSES 256
@@ -106,11 +107,20 @@ void __init pt_pci_init(void)
     radix_tree_init(&pci_segments);
     if ( !alloc_pseg(0) )
         panic("Could not initialize PCI segment 0\n");
+    mmio_ro_ranges = rangeset_new(NULL, "r/o mmio ranges",
+                                  RANGESETF_prettyprint_hex);
 }
 
 int __init pci_add_segment(u16 seg)
 {
     return alloc_pseg(seg) ? 0 : -ENOMEM;
+}
+
+const unsigned long *pci_get_ro_map(u16 seg)
+{
+    struct pci_seg *pseg = get_pseg(seg);
+
+    return pseg ? pseg->ro_map : NULL;
 }
 
 static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
@@ -196,6 +206,33 @@ static void free_pdev(struct pci_seg *pseg, struct pci_dev *pdev)
 
     list_del(&pdev->alldevs_list);
     xfree(pdev);
+}
+
+int __init pci_ro_device(int seg, int bus, int devfn)
+{
+    struct pci_seg *pseg = alloc_pseg(seg);
+    struct pci_dev *pdev;
+
+    if ( !pseg )
+        return -ENOMEM;
+    pdev = alloc_pdev(pseg, bus, devfn);
+    if ( !pdev )
+        return -ENOMEM;
+
+    if ( !pseg->ro_map )
+    {
+        size_t sz = BITS_TO_LONGS(PCI_BDF(-1, -1, -1) + 1) * sizeof(long);
+
+        pseg->ro_map = alloc_xenheap_pages(get_order_from_bytes(sz), 0);
+        if ( !pseg->ro_map )
+            return -ENOMEM;
+        memset(pseg->ro_map, 0, sz);
+    }
+
+    __set_bit(PCI_BDF2(bus, devfn), pseg->ro_map);
+    arch_pci_ro_device(seg, PCI_BDF2(bus, devfn));
+
+    return 0;
 }
 
 struct pci_dev *pci_get_pdev(int seg, int bus, int devfn)

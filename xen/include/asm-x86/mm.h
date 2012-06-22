@@ -555,6 +555,8 @@ void memguard_unguard_stack(void *p);
 
 int  ptwr_do_page_fault(struct vcpu *, unsigned long,
                         struct cpu_user_regs *);
+int  mmio_ro_do_page_fault(struct vcpu *, unsigned long,
+                           struct cpu_user_regs *);
 
 int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 

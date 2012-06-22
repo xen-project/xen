@@ -14,6 +14,8 @@
 #include <xen/xmalloc.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
+#include <xen/iommu.h>
+#include <xen/rangeset.h>
 
 #include "mmconfig.h"
 
@@ -132,9 +134,30 @@ static void __iomem *mcfg_ioremap(const struct acpi_mcfg_allocation *cfg,
     return (void __iomem *) virt;
 }
 
+void arch_pci_ro_device(int seg, int bdf)
+{
+    unsigned int idx, bus = PCI_BUS(bdf);
+
+    for (idx = 0; idx < pci_mmcfg_config_num; ++idx) {
+        const struct acpi_mcfg_allocation *cfg = pci_mmcfg_virt[idx].cfg;
+        unsigned long mfn = (cfg->address >> PAGE_SHIFT) + bdf;
+
+        if (!pci_mmcfg_virt[idx].virt || cfg->pci_segment != seg ||
+            cfg->start_bus_number > bus || cfg->end_bus_number < bus)
+            continue;
+
+        if (rangeset_add_singleton(mmio_ro_ranges, mfn))
+            printk(XENLOG_ERR
+                   "%04x:%02x:%02x.%u: could not mark MCFG (mfn %#lx) read-only\n",
+                   cfg->pci_segment, bus, PCI_SLOT(bdf), PCI_FUNC(bdf),
+                   mfn);
+    }
+}
+
 int pci_mmcfg_arch_enable(unsigned int idx)
 {
     const typeof(pci_mmcfg_config[0]) *cfg = pci_mmcfg_virt[idx].cfg;
+    const unsigned long *ro_map = pci_get_ro_map(cfg->pci_segment);
 
     if (pci_mmcfg_virt[idx].virt)
         return 0;
@@ -146,6 +169,16 @@ int pci_mmcfg_arch_enable(unsigned int idx)
     }
     printk(KERN_INFO "PCI: Using MCFG for segment %04x bus %02x-%02x\n",
            cfg->pci_segment, cfg->start_bus_number, cfg->end_bus_number);
+    if (ro_map) {
+        unsigned int bdf = PCI_BDF(cfg->start_bus_number, 0, 0);
+        unsigned int end = PCI_BDF(cfg->end_bus_number, -1, -1);
+
+        while ((bdf = find_next_bit(ro_map, end + 1, bdf)) <= end) {
+            arch_pci_ro_device(cfg->pci_segment, bdf);
+            if (bdf++ == end)
+                break;
+        }
+    }
     return 0;
 }
 

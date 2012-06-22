@@ -5209,6 +5209,97 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     return 0;
 }
 
+#ifdef __x86_64__
+/*************************
+ * fault handling for read-only MMIO pages
+ */
+
+struct mmio_ro_emulate_ctxt {
+    struct x86_emulate_ctxt ctxt;
+    unsigned long cr2;
+};
+
+static int mmio_ro_emulated_read(
+    enum x86_segment seg,
+    unsigned long offset,
+    void *p_data,
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
+{
+    return X86EMUL_UNHANDLEABLE;
+}
+
+static int mmio_ro_emulated_write(
+    enum x86_segment seg,
+    unsigned long offset,
+    void *p_data,
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
+{
+    struct mmio_ro_emulate_ctxt *mmio_ro_ctxt =
+        container_of(ctxt, struct mmio_ro_emulate_ctxt, ctxt);
+
+    /* Only allow naturally-aligned stores at the original %cr2 address. */
+    if ( ((bytes | offset) & (bytes - 1)) || offset != mmio_ro_ctxt->cr2 )
+    {
+        MEM_LOG("mmio_ro_emulate: bad access (cr2=%lx, addr=%lx, bytes=%u)",
+                mmio_ro_ctxt->cr2, offset, bytes);
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    return X86EMUL_OKAY;
+}
+
+static const struct x86_emulate_ops mmio_ro_emulate_ops = {
+    .read       = mmio_ro_emulated_read,
+    .insn_fetch = ptwr_emulated_read,
+    .write      = mmio_ro_emulated_write,
+};
+
+/* Check if guest is trying to modify a r/o MMIO page. */
+int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
+                          struct cpu_user_regs *regs)
+{
+    l1_pgentry_t      pte;
+    unsigned long     mfn;
+    unsigned int      addr_size = is_pv_32on64_domain(v->domain) ?
+                                  32 : BITS_PER_LONG;
+    struct mmio_ro_emulate_ctxt mmio_ro_ctxt = {
+        .ctxt.regs = regs,
+        .ctxt.addr_size = addr_size,
+        .ctxt.sp_size = addr_size,
+        .cr2 = addr
+    };
+    int rc;
+
+    /* Attempt to read the PTE that maps the VA being accessed. */
+    guest_get_eff_l1e(v, addr, &pte);
+
+    /* We are looking only for read-only mappings of MMIO pages. */
+    if ( ((l1e_get_flags(pte) & (_PAGE_PRESENT|_PAGE_RW)) != _PAGE_PRESENT) )
+        return 0;
+
+    mfn = l1e_get_pfn(pte);
+    if ( mfn_valid(mfn) )
+    {
+        struct page_info *page = mfn_to_page(mfn);
+        struct domain *owner = page_get_owner_and_reference(page);
+
+        if ( owner )
+            put_page(page);
+        if ( owner != dom_io )
+            return 0;
+    }
+
+    if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
+        return 0;
+
+    rc = x86_emulate(&mmio_ro_ctxt.ctxt, &mmio_ro_emulate_ops);
+
+    return rc != X86EMUL_UNHANDLEABLE ? EXCRET_fault_fixed : 0;
+}
+#endif /* __x86_64__ */
+
 void free_xen_pagetable(void *v)
 {
     if ( system_state == SYS_STATE_early_boot )
