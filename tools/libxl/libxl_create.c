@@ -72,6 +72,49 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
     return 0;
 }
 
+static int sched_params_valid(libxl__gc *gc,
+                              uint32_t domid, libxl_domain_sched_params *scp)
+{
+    int has_weight = scp->weight != LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT;
+    int has_period = scp->period != LIBXL_DOMAIN_SCHED_PARAM_PERIOD_DEFAULT;
+    int has_slice = scp->slice != LIBXL_DOMAIN_SCHED_PARAM_SLICE_DEFAULT;
+    int has_extratime =
+                scp->extratime != LIBXL_DOMAIN_SCHED_PARAM_EXTRATIME_DEFAULT;
+    libxl_domain_sched_params sci;
+
+    libxl_domain_sched_params_get(CTX, domid, &sci);
+
+    /* The sedf scheduler needs some more consistency checking */
+    if (sci.sched == LIBXL_SCHEDULER_SEDF) {
+        if (has_weight && (has_period || has_slice))
+            return 0;
+        if (has_period != has_slice)
+            return 0;
+
+        /*
+         * Idea is, if we specify a weight, then both period and
+         * slice has to be zero. OTOH, if we do not specify a weight,
+         * that means we want a pure best effort domain or an actual
+         * real-time one. In the former case, it is period that needs
+         * to be zero, in the latter, weight should be.
+         */
+        if (has_weight) {
+            scp->slice = 0;
+            scp->period = 0;
+        }
+        else if (!has_period) {
+            /* We can setup a proper best effort domain (extra time only)
+             * iff we either already have or are asking for some extra time. */
+            scp->weight = has_extratime ? scp->extratime : sci.extratime;
+            scp->period = 0;
+        }
+        if (has_period && has_slice)
+            scp->weight = 0;
+    }
+
+    return 1;
+}
+
 int libxl__domain_build_info_setdefault(libxl__gc *gc,
                                         libxl_domain_build_info *b_info)
 {
@@ -621,6 +664,12 @@ static void initiate_domain_create(libxl__egc *egc,
 
     ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
     if (ret) goto error_out;
+
+    if (!sched_params_valid(gc, domid, &d_config->b_info.sched_params)) {
+        LOG(ERROR, "Invalid scheduling parameters\n");
+        ret = ERROR_INVAL;
+        goto error_out;
+    }
 
     for (i = 0; i < d_config->num_disks; i++) {
         ret = libxl__device_disk_setdefault(gc, &d_config->disks[i]);

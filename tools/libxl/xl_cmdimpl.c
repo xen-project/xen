@@ -550,48 +550,6 @@ vcpp_out:
     return rc;
 }
 
-static int sched_params_valid(libxl_domain_sched_params *scp)
-{
-    int has_weight = scp->weight != LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT;
-    int has_period = scp->period != LIBXL_DOMAIN_SCHED_PARAM_PERIOD_DEFAULT;
-    int has_slice = scp->slice != LIBXL_DOMAIN_SCHED_PARAM_SLICE_DEFAULT;
-    int has_extratime =
-                scp->extratime != LIBXL_DOMAIN_SCHED_PARAM_EXTRATIME_DEFAULT;
-    libxl_domain_sched_params sci;
-
-    libxl_domain_sched_params_get(ctx, domid, &sci);
-
-    /* The sedf scheduler needs some more consistency checking */
-    if (sci.sched == LIBXL_SCHEDULER_SEDF) {
-        if (has_weight && (has_period || has_slice))
-            return 0;
-        if (has_period != has_slice)
-            return 0;
-
-        /*
-         * Idea is, if we specify a weight, then both period and
-         * slice has to be zero. OTOH, if we do not specify a weight,
-         * that means we want a pure best effort domain or an actual
-         * real-time one. In the former case, it is period that needs
-         * to be zero, in the latter, weight should be.
-         */
-        if (has_weight) {
-            scp->slice = 0;
-            scp->period = 0;
-        }
-        else if (!has_period) {
-            /* We can setup a proper best effort domain (extra time only)
-             * iff we either already have or are asking for some extra time. */
-            scp->weight = has_extratime ? scp->extratime : sci.extratime;
-            scp->period = 0;
-        }
-        if (has_period && has_slice)
-            scp->weight = 0;
-    }
-
-    return 1;
-}
-
 static void parse_config_data(const char *config_source,
                               const char *config_data,
                               int config_len,
@@ -686,10 +644,6 @@ static void parse_config_data(const char *config_source,
         b_info->sched_params.latency = l;
     if (!xlu_cfg_get_long (config, "extratime", &l, 0))
         b_info->sched_params.extratime = l;
-    if (!sched_params_valid(&b_info->sched_params)) {
-        fprintf(stderr, "Invalid scheduling parameters\n");
-        exit(1);
-    }
 
     if (!xlu_cfg_get_long (config, "vcpus", &l, 0)) {
         b_info->max_vcpus = l;
