@@ -1701,6 +1701,18 @@ static int pci_cfg_ok(struct domain *d, int write, int size)
             return 0;
     }
     start = d->arch.pci_cf8 & 0xFF;
+    /* AMD extended configuration space access? */
+    if ( (d->arch.pci_cf8 & 0x0F000000) &&
+         boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
+         boot_cpu_data.x86 >= 0x10 && boot_cpu_data.x86 <= 0x17 )
+    {
+        uint64_t msr_val;
+
+        if ( rdmsr_safe(MSR_AMD64_NB_CFG, msr_val) )
+            return 0;
+        if ( msr_val & (1ULL << AMD64_NB_CFG_CF8_EXT_ENABLE_BIT) )
+            start |= (d->arch.pci_cf8 >> 16) & 0xF00;
+    }
     end = start + size - 1;
     if (xsm_pci_config_permission(d, machine_bdf, start, end, write))
         return 0;
