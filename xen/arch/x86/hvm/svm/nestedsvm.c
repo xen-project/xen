@@ -935,6 +935,9 @@ nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
         return 0;
 
     case VMEXIT_NPF:
+        if (nestedhvm_paging_mode_hap(v))
+            break;
+        return 0;
     case VMEXIT_INVALID:
         /* Always intercepted */
         break;
