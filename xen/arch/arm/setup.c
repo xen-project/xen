@@ -173,8 +173,6 @@ void __init start_xen(unsigned long boot_phys_offset,
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
 
-    smp_prepare_cpus(cpus);
-
     init_xen_time();
 
     setup_mm(atag_paddr, fdt_size);
@@ -213,6 +211,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     rcu_init();
 
     local_irq_enable();
+
+    smp_prepare_cpus(cpus);
 
     initialize_keytable();
 

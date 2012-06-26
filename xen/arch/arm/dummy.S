@@ -7,8 +7,6 @@ x:	.word 0xe7f000f0 /* Undefined instruction */
 x:	mov pc, lr
 	
 /* SMP support */
-DUMMY(per_cpu__cpu_core_mask);
-DUMMY(per_cpu__cpu_sibling_mask);
 DUMMY(node_online_map);
 DUMMY(smp_send_state_dump);
 

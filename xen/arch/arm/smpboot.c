@@ -52,6 +52,23 @@ unsigned long __initdata ready_cpus = 0;
 
 /* ID of the PCPU we're running on */
 DEFINE_PER_CPU(unsigned int, cpu_id);
+/* XXX these seem awfully x86ish... */
+/* representing HT siblings of each logical CPU */
+DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_sibling_mask);
+/* representing HT and core siblings of each logical CPU */
+DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_core_mask);
+
+static void setup_cpu_sibling_map(int cpu)
+{
+    if ( !zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) ||
+         !zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) )
+        panic("No memory for CPU sibling/core maps\n");
+
+    /* A CPU is a sibling with itself and is always on its own core. */
+    cpumask_set_cpu(cpu, per_cpu(cpu_sibling_mask, cpu));
+    cpumask_set_cpu(cpu, per_cpu(cpu_core_mask, cpu));
+}
+
 
 void __init
 smp_prepare_cpus (unsigned int max_cpus)
@@ -65,6 +82,8 @@ smp_prepare_cpus (unsigned int max_cpus)
     for ( i = 0; i < max_cpus; i++ )
         cpumask_set_cpu(i, &cpu_possible_map);
     cpumask_copy(&cpu_present_map, &cpu_possible_map);
+
+    setup_cpu_sibling_map(0);
 }
 
 void __init
@@ -114,6 +133,8 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
     gic_route_irqs();
 
     set_current(idle_vcpu[cpuid]);
+
+    setup_cpu_sibling_map(cpuid);
 
     /* Run local notifiers */
     notify_cpu_starting(cpuid);
