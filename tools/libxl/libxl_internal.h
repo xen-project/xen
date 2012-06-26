@@ -1972,7 +1972,7 @@ struct libxl__domain_create_state {
 #define GCREALLOC_ARRAY(var, nmemb)                                     \
     (assert(nmemb > 0),                                                 \
      assert(ARRAY_SIZE_OK((var), (nmemb))),                             \
-     (var) = libxl__realloc((gc), (var), (nmemb)*sizeof(*(var)))))
+     (var) = libxl__realloc((gc), (var), (nmemb)*sizeof(*(var))))
 
 
 /*
