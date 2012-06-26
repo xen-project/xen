@@ -48,7 +48,6 @@ DUMMY(domain_get_maximum_gpfn);
 DUMMY(domain_relinquish_resources);
 DUMMY(domain_set_time_offset);
 DUMMY(dom_cow);
-DUMMY(flush_tlb_mask);
 DUMMY(gmfn_to_mfn);
 DUMMY(hypercall_create_continuation);
 DUMMY(send_timer_event);

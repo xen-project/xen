@@ -1,5 +1,14 @@
 #include <xen/config.h>
+#include <asm/system.h>
 #include <asm/smp.h>
+#include <asm/cpregs.h>
+#include <asm/page.h>
+
+void flush_tlb_mask(const cpumask_t *mask)
+{
+    /* XXX IPI other processors */
+    flush_xen_data_tlb();
+}
 
 void smp_call_function(
     void (*func) (void *info),
