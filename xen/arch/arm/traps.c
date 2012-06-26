@@ -373,6 +373,8 @@ typedef unsigned long arm_hypercall_t(
     [ __HYPERVISOR_ ## x ] = (arm_hypercall_t *) do_ ## x
 
 static arm_hypercall_t *arm_hypercall_table[] = {
+    HYPERCALL(memory_op),
+    HYPERCALL(domctl),
     HYPERCALL(arch_0),
     HYPERCALL(sched_op),
     HYPERCALL(console_io),
