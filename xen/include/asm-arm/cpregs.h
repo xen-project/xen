@@ -172,12 +172,19 @@
 #define TLBIMVAIS       p15,0,c8,c3,1   /* Invalidate unified TLB entry by MVA inner shareable */
 #define TLBIASIDIS      p15,0,c8,c3,2   /* Invalidate unified TLB by ASID match inner shareable */
 #define TLBIMVAAIS      p15,0,c8,c3,3   /* Invalidate unified TLB entry by MVA all ASID inner shareable */
+#define ITLBIALL        p15,0,c8,c5,0   /* Invalidate instruction TLB */
+#define ITLBIMVA        p15,0,c8,c5,1   /* Invalidate instruction TLB entry by MVA */
+#define ITLBIASID       p15,0,c8,c5,2   /* Invalidate instruction TLB by ASID match */
 #define DTLBIALL        p15,0,c8,c6,0   /* Invalidate data TLB */
 #define DTLBIMVA        p15,0,c8,c6,1   /* Invalidate data TLB entry by MVA */
 #define DTLBIASID       p15,0,c8,c6,2   /* Invalidate data TLB by ASID match */
-#define TLBILLHIS       p15,4,c8,c3,0   /* Invalidate Entire Hyp. Unified TLB inner shareable */
+#define TLBIALL         p15,0,c8,c7,0   /* invalidate unified TLB */
+#define TLBIMVA         p15,0,c8,c7,1   /* invalidate unified TLB entry by MVA */
+#define TLBIASID        p15,0,c8,c7,2   /* invalid unified TLB by ASID match */
+#define TLBIMVAA        p15,0,c8,c7,3   /* invalidate unified TLB entries by MVA all ASID */
+#define TLBIALLHIS      p15,4,c8,c3,0   /* Invalidate Entire Hyp. Unified TLB inner shareable */
 #define TLBIMVAHIS      p15,4,c8,c3,1   /* Invalidate Unified Hyp. TLB by MVA inner shareable */
-#define TLBIALLNSNHIS   p15,4,c8,c7,4   /* Invalidate Entire Non-Secure Non-Hyp. Unified TLB inner shareable */
+#define TLBIALLNSNHIS   p15,4,c8,c3,4   /* Invalidate Entire Non-Secure Non-Hyp. Unified TLB inner shareable */
 #define TLBIALLH        p15,4,c8,c7,0   /* Invalidate Entire Hyp. Unified TLB */
 #define TLBIMVAH        p15,4,c8,c7,1   /* Invalidate Unified Hyp. TLB by MVA */
 #define TLBIALLNSNH     p15,4,c8,c7,4   /* Invalidate Entire Non-Secure Non-Hyp. Unified TLB */
