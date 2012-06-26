@@ -294,7 +294,11 @@ static inline uint64_t va_to_par(uint32_t va)
 {
     uint64_t par = __va_to_par(va);
     /* It is not OK to call this with an invalid VA */
-    if ( par & PAR_F ) panic_PAR(par, "Hypervisor");
+    if ( par & PAR_F )
+    {
+        dump_hyp_walk(va);
+        panic_PAR(par, "Hypervisor");
+    }
     return par;
 }
 
