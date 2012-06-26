@@ -201,6 +201,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         clear_page(d->shared_info);
         share_xen_page_with_guest(
                 virt_to_page(d->shared_info), d, XENSHARE_writable);
+
+        if ( (rc = p2m_alloc_table(d)) != 0 )
+            goto fail;
     }
 
     d->max_vcpus = 8;

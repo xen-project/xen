@@ -203,7 +203,7 @@ int p2m_alloc_table(struct domain *d)
     void *p;
 
     /* First level P2M is 2 consecutive pages */
-    page = alloc_domheap_pages(d, 1, 0);
+    page = alloc_domheap_pages(NULL, 1, 0);
     if ( page == NULL )
         return -ENOMEM;
 
