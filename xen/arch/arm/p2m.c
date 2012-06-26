@@ -28,8 +28,6 @@ void p2m_load_VTTBR(struct domain *d)
 
     vttbr |= ((uint64_t)p2m->vmid&0xff)<<48;
 
-    printk("VTTBR dom%d = %"PRIx64"\n", d->domain_id, vttbr);
-
     WRITE_CP64(vttbr, VTTBR);
     isb(); /* Ensure update is visible */
 }
