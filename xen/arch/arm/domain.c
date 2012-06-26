@@ -212,8 +212,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
             goto fail;
     }
 
-    d->max_vcpus = 8;
-
     if ( (rc = domain_vgic_init(d)) != 0 )
         goto fail;
 

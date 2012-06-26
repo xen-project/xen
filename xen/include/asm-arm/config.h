@@ -27,7 +27,7 @@
 #define NR_CPUS 128
 #endif
 
-#define MAX_VIRT_CPUS 128 /* XXX */
+#define MAX_VIRT_CPUS 8
 #define MAX_HVM_VCPUS MAX_VIRT_CPUS
 
 #define asmlinkage /* Nothing needed */
