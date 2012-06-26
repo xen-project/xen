@@ -32,6 +32,51 @@ void p2m_load_VTTBR(struct domain *d)
     isb(); /* Ensure update is visible */
 }
 
+/*
+ * Lookup the MFN corresponding to a domain's PFN.
+ *
+ * There are no processor functions to do a stage 2 only lookup therefore we
+ * do a a software walk.
+ */
+paddr_t p2m_lookup(struct domain *d, paddr_t paddr)
+{
+    struct p2m_domain *p2m = &d->arch.p2m;
+    lpae_t pte, *first = NULL, *second = NULL, *third = NULL;
+    paddr_t maddr = INVALID_PADDR;
+
+    spin_lock(&p2m->lock);
+
+    first = __map_domain_page(p2m->first_level);
+
+    pte = first[first_table_offset(paddr)];
+    if ( !pte.p2m.valid || !pte.p2m.table )
+        goto done;
+
+    second = map_domain_page(pte.p2m.base);
+    pte = second[second_table_offset(paddr)];
+    if ( !pte.p2m.valid || !pte.p2m.table )
+        goto done;
+
+    third = map_domain_page(pte.p2m.base);
+    pte = third[third_table_offset(paddr)];
+
+    /* This bit must be one in the level 3 entry */
+    if ( !pte.p2m.table )
+        pte.bits = 0;
+
+done:
+    if ( pte.p2m.valid )
+        maddr = (pte.bits & PADDR_MASK & PAGE_MASK) | (paddr & ~PAGE_MASK);
+
+    if (third) unmap_domain_page(third);
+    if (second) unmap_domain_page(second);
+    if (first) unmap_domain_page(first);
+
+    spin_unlock(&p2m->lock);
+
+    return maddr;
+}
+
 int guest_physmap_mark_populate_on_demand(struct domain *d,
                                           unsigned long gfn,
                                           unsigned int order)
