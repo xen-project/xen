@@ -130,6 +130,8 @@ static int create_p2m_entries(struct domain *d,
     paddr_t addr;
     unsigned long cur_first_offset = ~0, cur_second_offset = ~0;
 
+    spin_lock(&p2m->lock);
+
     /* XXX Don't actually handle 40 bit guest physical addresses */
     BUG_ON(start_gpaddr & 0x8000000000ULL);
     BUG_ON(end_gpaddr   & 0x8000000000ULL);
@@ -211,8 +213,6 @@ static int create_p2m_entries(struct domain *d,
     rc = 0;
 
 out:
-    spin_lock(&p2m->lock);
-
     if (third) unmap_domain_page(third);
     if (second) unmap_domain_page(second);
     if (first) unmap_domain_page(first);
