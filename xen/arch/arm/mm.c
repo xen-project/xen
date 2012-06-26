@@ -106,6 +106,7 @@ void set_fixmap(unsigned map, unsigned long mfn, unsigned attributes)
     lpae_t pte = mfn_to_xen_entry(mfn);
     pte.pt.table = 1; /* 4k mappings always have this bit set */
     pte.pt.ai = attributes;
+    pte.pt.xn = 1;
     write_pte(xen_fixmap + third_table_offset(FIXMAP_ADDR(map)), pte);
     flush_xen_data_tlb_va(FIXMAP_ADDR(map));
 }
