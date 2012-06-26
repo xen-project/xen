@@ -26,6 +26,7 @@
 #include <xen/preempt.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
+#include <xen/domain_page.h>
 #include <asm/page.h>
 #include <asm/current.h>
 #include <public/memory.h>
@@ -42,6 +43,8 @@ static lpae_t xen_xenmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 /* Non-boot CPUs use this to find the correct pagetables. */
 uint64_t boot_httbr;
 
+static paddr_t phys_offset;
+
 /* Limits of the Xen heap */
 unsigned long xenheap_mfn_start, xenheap_mfn_end;
 unsigned long xenheap_virt_end;
@@ -52,6 +55,50 @@ unsigned long frametable_virt_end;
 unsigned long max_page;
 
 extern char __init_begin[], __init_end[];
+
+void dump_pt_walk(lpae_t *first, paddr_t addr)
+{
+    lpae_t *second = NULL, *third = NULL;
+
+    if ( first_table_offset(addr) >= LPAE_ENTRIES )
+        return;
+
+    printk("1ST[0x%llx] = 0x%"PRIpaddr"\n",
+           first_table_offset(addr),
+           first[first_table_offset(addr)].bits);
+    if ( !first[first_table_offset(addr)].walk.valid ||
+         !first[first_table_offset(addr)].walk.table )
+        goto done;
+
+    second = map_domain_page(first[first_table_offset(addr)].walk.base);
+    printk("2ND[0x%llx] = 0x%"PRIpaddr"\n",
+           second_table_offset(addr),
+           second[second_table_offset(addr)].bits);
+    if ( !second[second_table_offset(addr)].walk.valid ||
+         !second[second_table_offset(addr)].walk.table )
+        goto done;
+
+    third = map_domain_page(second[second_table_offset(addr)].walk.base);
+    printk("3RD[0x%llx] = 0x%"PRIpaddr"\n",
+           third_table_offset(addr),
+           third[third_table_offset(addr)].bits);
+
+done:
+    if (third) unmap_domain_page(third);
+    if (second) unmap_domain_page(second);
+
+}
+
+void dump_hyp_walk(uint32_t addr)
+{
+    uint64_t httbr = READ_CP64(HTTBR);
+
+    printk("Walking Hypervisor VA 0x%08"PRIx32" via HTTBR 0x%016"PRIx64"\n",
+           addr, httbr);
+
+    BUG_ON( (lpae_t *)(unsigned long)(httbr - phys_offset) != xen_pgtable );
+    dump_pt_walk(xen_pgtable, addr);
+}
 
 /* Map a 4k page in a fixmap entry */
 void set_fixmap(unsigned map, unsigned long mfn, unsigned attributes)
@@ -159,7 +206,7 @@ void unmap_domain_page(const void *va)
  * Changes here may need matching changes in head.S */
 void __init setup_pagetables(unsigned long boot_phys_offset)
 {
-    paddr_t xen_paddr, phys_offset;
+    paddr_t xen_paddr;
     unsigned long dest_va;
     lpae_t pte, *p;
     int i;

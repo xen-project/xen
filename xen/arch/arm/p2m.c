@@ -5,6 +5,21 @@
 #include <xen/domain_page.h>
 #include <asm/flushtlb.h>
 
+void dump_p2m_lookup(struct domain *d, paddr_t addr)
+{
+    struct p2m_domain *p2m = &d->arch.p2m;
+    lpae_t *first;
+
+    printk("dom%d IPA 0x%"PRIpaddr"\n", d->domain_id, addr);
+
+    printk("P2M @ %p mfn:0x%lx\n",
+           p2m->first_level, page_to_mfn(p2m->first_level));
+
+    first = __map_domain_page(p2m->first_level);
+    dump_pt_walk(first, addr);
+    unmap_domain_page(first);
+}
+
 void p2m_load_VTTBR(struct domain *d)
 {
     struct p2m_domain *p2m = &d->arch.p2m;

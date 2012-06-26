@@ -132,10 +132,28 @@ typedef struct {
     unsigned long sbz1:5;
 } __attribute__((__packed__)) lpae_p2m_t;
 
+/*
+ * Walk is the common bits of p2m and pt entries which are needed to
+ * simply walk the table (e.g. for debug).
+ */
+typedef struct {
+    /* These are used in all kinds of entry. */
+    unsigned long valid:1;      /* Valid mapping */
+    unsigned long table:1;      /* == 1 in 4k map entries too */
+
+    unsigned long pad2:10;
+
+    /* The base address must be approprately aligned for Block entries */
+    unsigned long base:28;      /* Base address of block or next table */
+
+    unsigned long pad1:24;
+} __attribute__((__packed__)) lpae_walk_t;
+
 typedef union {
     uint64_t bits;
     lpae_pt_t pt;
     lpae_p2m_t p2m;
+    lpae_walk_t walk;
 } lpae_t;
 
 /* Standard entry type that we'll use to build Xen's own pagetables.
@@ -251,6 +269,14 @@ static inline void flush_guest_tlb(void)
     register unsigned long r0 asm ("r0");
     WRITE_CP32(r0 /* dummy */, TLBIALLNSNH);
 }
+
+/* Print a walk of an arbitrary page table */
+void dump_pt_walk(lpae_t *table, paddr_t addr);
+
+/* Print a walk of the hypervisor's page tables for a virtual addr. */
+extern void dump_hyp_walk(uint32_t addr);
+/* Print a walk of the p2m for a domain for a physical address. */
+extern void dump_p2m_lookup(struct domain *d, paddr_t addr);
 
 /* Ask the MMU to translate a VA for us */
 static inline uint64_t __va_to_par(uint32_t va)
