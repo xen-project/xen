@@ -96,6 +96,11 @@ void sync_local_execstate(void)
     /* Nothing to do -- no lazy switching */
 }
 
+void sync_vcpu_execstate(struct vcpu *v)
+{
+    /* Nothing to do -- no lazy switching */
+}
+
 void startup_cpu_idle_loop(void)
 {
     struct vcpu *v = current;
