@@ -28,6 +28,7 @@
 #include <xen/errno.h>
 #include <xen/hypercall.h>
 #include <xen/softirq.h>
+#include <xen/domain_page.h>
 #include <public/xen.h>
 #include <asm/regs.h>
 #include <asm/cpregs.h>
@@ -528,6 +529,62 @@ static void do_cp15_64(struct cpu_user_regs *regs,
 
 }
 
+void dump_guest_s1_walk(struct domain *d, uint32_t addr)
+{
+    uint32_t ttbcr = READ_CP32(TTBCR);
+    uint32_t ttbr0 = READ_CP32(TTBR0);
+    paddr_t paddr;
+    uint32_t offset;
+    uint32_t *first = NULL, *second = NULL;
+
+    printk("dom%d VA 0x%08"PRIx32"\n", d->domain_id, addr);
+    printk("    TTBCR: 0x%08"PRIx32"\n", ttbcr);
+    printk("    TTBR0: 0x%08"PRIx32" = 0x%"PRIpaddr"\n",
+           ttbr0, p2m_lookup(d, ttbr0 & PAGE_MASK));
+
+    if ( ttbcr & TTBCR_EAE )
+    {
+        printk("Cannot handle LPAE guest PT walk\n");
+        return;
+    }
+    if ( (ttbcr & TTBCR_N_MASK) != 0 )
+    {
+        printk("Cannot handle TTBR1 guest walks\n");
+        return;
+    }
+
+    paddr = p2m_lookup(d, ttbr0 & PAGE_MASK);
+    if ( paddr == INVALID_PADDR )
+    {
+        printk("Failed TTBR0 maddr lookup\n");
+        goto done;
+    }
+    first = map_domain_page(paddr>>PAGE_SHIFT);
+
+    offset = addr >> (12+10);
+    printk("1ST[0x%"PRIx32"] (0x%"PRIpaddr") = 0x%08"PRIx32"\n",
+           offset, paddr, first[offset]);
+    if ( !(first[offset] & 0x1) ||
+         !(first[offset] & 0x2) )
+        goto done;
+
+    paddr = p2m_lookup(d, first[offset] & PAGE_MASK);
+
+    if ( paddr == INVALID_PADDR )
+    {
+        printk("Failed L1 entry maddr lookup\n");
+        goto done;
+    }
+    second = map_domain_page(paddr>>PAGE_SHIFT);
+    offset = (addr >> 12) & 0x3FF;
+    printk("2ND[0x%"PRIx32"] (0x%"PRIpaddr") = 0x%08"PRIx32"\n",
+           offset, paddr, second[offset]);
+
+done:
+    if (second) unmap_domain_page(second);
+    if (first) unmap_domain_page(first);
+}
+
 static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
                                      struct hsr_dabt dabt)
 {
@@ -535,11 +592,12 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     int level = -1;
     mmio_info_t info;
 
+    info.dabt = dabt;
+    info.gva = READ_CP32(HDFAR);
+
     if (dabt.s1ptw)
         goto bad_data_abort;
 
-    info.dabt = dabt;
-    info.gva = READ_CP32(HDFAR);
     info.gpa = gva_to_ipa(info.gva);
 
     if (handle_mmio(&info))
@@ -553,18 +611,23 @@ bad_data_abort:
     msg = decode_fsc( dabt.dfsc, &level);
 
     printk("Guest data abort: %s%s%s\n"
-           "    gva=%"PRIx32" gpa=%"PRIpaddr"\n",
+           "    gva=%"PRIx32"\n",
            msg, dabt.s1ptw ? " S2 during S1" : "",
            fsc_level_str(level),
-           info.gva, info.gpa);
-    if (dabt.valid)
+           info.gva);
+    if ( !dabt.s1ptw )
+        printk("    gpa=%"PRIpaddr"\n", info.gpa);
+    if ( dabt.valid )
         printk("    size=%d sign=%d write=%d reg=%d\n",
                dabt.size, dabt.sign, dabt.write, dabt.reg);
     else
         printk("    instruction syndrome invalid\n");
     printk("    eat=%d cm=%d s1ptw=%d dfsc=%d\n",
            dabt.eat, dabt.cache, dabt.s1ptw, dabt.dfsc);
-
+    if ( !dabt.s1ptw )
+        dump_p2m_lookup(current->domain, info.gpa);
+    else
+        dump_guest_s1_walk(current->domain, info.gva);
     show_execution_state(regs);
     panic("Unhandled guest data abort\n");
 }
