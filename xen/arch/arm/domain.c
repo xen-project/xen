@@ -16,17 +16,6 @@
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 
-static void continue_idle_domain(struct vcpu *v)
-{
-    reset_stack_and_jump(idle_loop);
-}
-
-static void continue_nonidle_domain(struct vcpu *v)
-{
-    /* check_wakeup_from_wait(); */
-    reset_stack_and_jump(return_from_trap);
-}
-
 void idle_loop(void)
 {
     for ( ; ; )
@@ -72,9 +61,10 @@ static void continue_new_vcpu(struct vcpu *prev)
     schedule_tail(prev);
 
     if ( is_idle_vcpu(current) )
-        continue_idle_domain(current);
+        reset_stack_and_jump(idle_loop);
     else
-        continue_nonidle_domain(current);
+        /* check_wakeup_from_wait(); */
+        reset_stack_and_jump(return_to_new_vcpu);
 }
 
 void context_switch(struct vcpu *prev, struct vcpu *next)

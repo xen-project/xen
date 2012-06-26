@@ -72,7 +72,9 @@ DEFINE_TRAP_ENTRY(hypervisor)
 DEFINE_TRAP_ENTRY(irq)
 DEFINE_TRAP_ENTRY(fiq)
 
-ENTRY(return_from_trap)
+return_from_trap:
+	mov sp, r11
+ENTRY(return_to_new_vcpu)
 	ldr r11, [sp, #UREGS_cpsr]
 	and r11, #PSR_MODE_MASK
 	cmp r11, #PSR_MODE_HYP
@@ -82,6 +84,7 @@ ENTRY(return_to_guest)
 	mov r11, sp
 	bic sp, #7 /* Align the stack pointer */
 	bl leave_hypervisor_tail
+	mov sp, r11
 	RESTORE_ONE_BANKED(SP_usr)
 	/* LR_usr is the same physical register as lr and is restored below */
 	RESTORE_BANKED(svc)
