@@ -88,6 +88,19 @@
  * arguments, which are cp,opc1,crn,crm,opc2.
  */
 
+/* Coprocessor 14 */
+
+/* CP14 CR0: */
+#define TEECR           p14,6,c0,c0,0   /* ThumbEE Configuration Register */
+
+/* CP14 CR1: */
+#define TEEHBR          p14,6,c1,c0,0   /* ThumbEE Handler Base Register */
+#define JOSCR           p14,7,c1,c0,0   /* Jazelle OS Control Register */
+
+/* CP14 CR2: */
+#define JMCR            p14,7,c2,c0,0   /* Jazelle Main Configuration Register */
+
+
 /* Coprocessor 15 */
 
 /* CP15 CR0: CPUID and Cache Type Registers */
@@ -112,6 +125,8 @@
 
 /* CP15 CR1: System Control Registers */
 #define SCTLR           p15,0,c1,c0,0   /* System Control Register */
+#define ACTLR           p15,0,c1,c0,1   /* Auxiliary Control Register */
+#define CPACR           p15,0,c1,c0,2   /* Coprocessor Access Control Register */
 #define SCR             p15,0,c1,c1,0   /* Secure Configuration Register */
 #define NSACR           p15,0,c1,c1,2   /* Non-Secure Access Control Register */
 #define HSCTLR          p15,4,c1,c0,0   /* Hyp. System Control Register */
@@ -127,12 +142,15 @@
 #define VTTBR           p15,6,c2        /* Virtualization Translation Table Base Register */
 
 /* CP15 CR3: Domain Access Control Register */
+#define DACR            p15,0,c3,c0,0   /* Domain Access Control Register */
 
 /* CP15 CR4: */
 
 /* CP15 CR5: Fault Status Registers */
 #define DFSR            p15,0,c5,c0,0   /* Data Fault Status Register */
 #define IFSR            p15,0,c5,c0,1   /* Instruction Fault Status Register */
+#define ADFSR           p15,0,c5,c1,0   /* Auxiliary Data Fault Status Register */
+#define AIFSR           p15,0,c5,c1,1   /* Auxiliary Instruction Fault Status Register */
 #define HSR             p15,4,c5,c2,0   /* Hyp. Syndrome Register */
 
 /* CP15 CR6: Fault Address Registers */
@@ -144,6 +162,7 @@
 
 /* CP15 CR7: Cache and address translation operations */
 #define PAR             p15,0,c7        /* Physical Address Register */
+
 #define ICIALLUIS       p15,0,c7,c1,0   /* Invalidate all instruction caches to PoU inner shareable */
 #define BPIALLIS        p15,0,c7,c1,6   /* Invalidate entire branch predictor array inner shareable */
 #define ICIALLU         p15,0,c7,c5,0   /* Invalidate all instruction caches to PoU */
@@ -192,20 +211,24 @@
 /* CP15 CR9: */
 
 /* CP15 CR10: */
-#define MAIR0           p15,0,c10,c2,0  /* Memory Attribute Indirection Register 0 */
-#define MAIR1           p15,0,c10,c2,1  /* Memory Attribute Indirection Register 1 */
+#define MAIR0           p15,0,c10,c2,0  /* Memory Attribute Indirection Register 0 AKA PRRR */
+#define MAIR1           p15,0,c10,c2,1  /* Memory Attribute Indirection Register 1 AKA NMRR */
 #define HMAIR0          p15,4,c10,c2,0  /* Hyp. Memory Attribute Indirection Register 0 */
 #define HMAIR1          p15,4,c10,c2,1  /* Hyp. Memory Attribute Indirection Register 1 */
 
 /* CP15 CR11: DMA Operations for TCM Access */
 
 /* CP15 CR12:  */
+#define VBAR            p15,0,c12,c0,0  /* Vector Base Address Register */
 #define HVBAR           p15,4,c12,c0,0  /* Hyp. Vector Base Address Register */
 
 /* CP15 CR13:  */
 #define FCSEIDR         p15,0,c13,c0,0  /* FCSE Process ID Register */
 #define CONTEXTIDR      p15,0,c13,c0,1  /* Context ID Register */
-#define HTPIDR          p15,4,c13,c0,2  /* Hyp. Software Thread ID Register */
+#define TPIDRURW        p15,0,c13,c0,2  /* Software Thread ID, User, R/W */
+#define TPIDRURO        p15,0,c13,c0,3  /* Software Thread ID, User, R/O */
+#define TPIDRPRW        p15,0,c13,c0,4  /* Software Thread ID, Priveleged */
+#define HTPIDR          p15,4,c13,c0,2  /* HYp Software Thread Id Register */
 
 /* CP15 CR14:  */
 #define CNTPCT          p15,0,c14       /* Time counter value */

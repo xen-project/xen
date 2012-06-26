@@ -61,6 +61,30 @@ static struct {
 irq_desc_t irq_desc[NR_IRQS];
 unsigned nr_lrs;
 
+void gic_save_state(struct vcpu *v)
+{
+    int i;
+
+    for ( i=0; i<nr_lrs; i++)
+        v->arch.gic_lr[i] = GICH[GICH_LR + i];
+    /* Disable until next VCPU scheduled */
+    GICH[GICH_HCR] = 0;
+    isb();
+}
+
+void gic_restore_state(struct vcpu *v)
+{
+    int i;
+
+    if ( is_idle_vcpu(v) )
+        return;
+
+    for ( i=0; i<nr_lrs; i++)
+        GICH[GICH_LR + i] = v->arch.gic_lr[i];
+    GICH[GICH_HCR] = GICH_HCR_EN;
+    isb();
+}
+
 static unsigned int gic_irq_startup(struct irq_desc *desc)
 {
     uint32_t enabler;
@@ -263,7 +287,6 @@ static void __cpuinit gic_hyp_init(void)
     vtr = GICH[GICH_VTR];
     nr_lrs  = (vtr & GICH_VTR_NRLRGS) + 1;
 
-    GICH[GICH_HCR] = GICH_HCR_EN;
     GICH[GICH_MISR] = GICH_MISR_EOI;
 }
 

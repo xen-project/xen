@@ -73,8 +73,37 @@ struct arch_vcpu
      */
     struct cpu_info *cpu_info;
 
-    uint32_t sctlr;
-    uint32_t ttbr0, ttbr1, ttbcr;
+    /* Fault Status */
+    uint32_t dfar, ifar;
+    uint32_t dfsr, ifsr;
+    uint32_t adfsr, aifsr;
+
+    /* MMU */
+    uint32_t vbar;
+    uint32_t ttbcr;
+    uint32_t ttbr0, ttbr1;
+
+    uint32_t dacr;
+    uint64_t par;
+    uint32_t mair0, mair1;
+
+    /* Control Registers */
+    uint32_t actlr, sctlr;
+    uint32_t cpacr;
+
+    uint32_t contextidr;
+    uint32_t tpidrurw;
+    uint32_t tpidruro;
+    uint32_t tpidrprw;
+
+    uint32_t teecr, teehbr;
+    uint32_t joscr, jmcr;
+
+    /* CP 15 */
+    uint32_t csselr;
+
+    uint32_t gic_hcr, gic_vmcr, gic_apr;
+    uint32_t gic_lr[64];
 
     struct {
         struct vgic_irq_rank private_irqs;

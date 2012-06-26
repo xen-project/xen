@@ -70,8 +70,8 @@
 #define GICH_MISR       (0x10/4)
 #define GICH_EISR0      (0x20/4)
 #define GICH_EISR1      (0x24/4)
-#define GICH_ELRSR0     (0x30/4)
-#define GICH_ELRSR1     (0x34/4)
+#define GICH_ELSR0      (0x30/4)
+#define GICH_ELSR1      (0x34/4)
 #define GICH_APR        (0xF0/4)
 #define GICH_LR         (0x100/4)
 
@@ -149,6 +149,11 @@ extern void gic_init_secondary_cpu(void);
 extern void gic_disable_cpu(void);
 /* setup the gic virtual interface for a guest */
 extern void gicv_setup(struct domain *d);
+
+/* Context switch */
+extern void gic_save_state(struct vcpu *v);
+extern void gic_restore_state(struct vcpu *v);
+
 #endif
 
 /*

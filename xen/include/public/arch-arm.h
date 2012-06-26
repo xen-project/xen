@@ -124,6 +124,9 @@ typedef uint32_t xen_ulong_t;
 
 struct vcpu_guest_context {
     struct cpu_user_regs user_regs;         /* User-level CPU registers     */
+
+    uint32_t sctlr;
+    uint32_t ttbr0, ttbr1, ttbcr;
 };
 typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);

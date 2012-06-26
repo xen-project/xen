@@ -35,12 +35,124 @@ void idle_loop(void)
 
 static void ctxt_switch_from(struct vcpu *p)
 {
+    /* CP 15 */
+    p->arch.csselr = READ_CP32(CSSELR);
+
+    /* Control Registers */
+    p->arch.actlr = READ_CP32(ACTLR);
+    p->arch.sctlr = READ_CP32(SCTLR);
+    p->arch.cpacr = READ_CP32(CPACR);
+
+    p->arch.contextidr = READ_CP32(CONTEXTIDR);
+    p->arch.tpidrurw = READ_CP32(TPIDRURW);
+    p->arch.tpidruro = READ_CP32(TPIDRURO);
+    p->arch.tpidrprw = READ_CP32(TPIDRPRW);
+
+    /* XXX only save these if ThumbEE e.g. ID_PFR0.THUMB_EE_SUPPORT */
+    p->arch.teecr = READ_CP32(TEECR);
+    p->arch.teehbr = READ_CP32(TEEHBR);
+
+    p->arch.joscr = READ_CP32(JOSCR);
+    p->arch.jmcr = READ_CP32(JMCR);
+
+    isb();
+
+    /* MMU */
+    p->arch.vbar = READ_CP32(VBAR);
+    p->arch.ttbcr = READ_CP32(TTBCR);
+    /* XXX save 64 bit TTBR if guest is LPAE */
+    p->arch.ttbr0 = READ_CP32(TTBR0);
+    p->arch.ttbr1 = READ_CP32(TTBR1);
+
+    p->arch.dacr = READ_CP32(DACR);
+    p->arch.par = READ_CP64(PAR);
+    p->arch.mair0 = READ_CP32(MAIR0);
+    p->arch.mair1 = READ_CP32(MAIR1);
+
+    /* Fault Status */
+    p->arch.dfar = READ_CP32(DFAR);
+    p->arch.ifar = READ_CP32(IFAR);
+    p->arch.dfsr = READ_CP32(DFSR);
+    p->arch.ifsr = READ_CP32(IFSR);
+    p->arch.adfsr = READ_CP32(ADFSR);
+    p->arch.aifsr = READ_CP32(AIFSR);
+
+    /* XXX MPU */
+
+    /* XXX VFP */
+
+    /* XXX VGIC */
+    gic_save_state(p);
+
+    isb();
     context_saved(p);
 }
 
 static void ctxt_switch_to(struct vcpu *n)
 {
+    uint32_t hcr;
+
+    hcr = READ_CP32(HCR);
+    WRITE_CP32(hcr & ~HCR_VM, HCR);
+    isb();
+
     p2m_load_VTTBR(n->domain);
+    isb();
+
+    /* XXX VGIC */
+    gic_restore_state(n);
+
+    /* XXX VFP */
+
+    /* XXX MPU */
+
+    /* Fault Status */
+    WRITE_CP32(n->arch.dfar, DFAR);
+    WRITE_CP32(n->arch.ifar, IFAR);
+    WRITE_CP32(n->arch.dfsr, DFSR);
+    WRITE_CP32(n->arch.ifsr, IFSR);
+    WRITE_CP32(n->arch.adfsr, ADFSR);
+    WRITE_CP32(n->arch.aifsr, AIFSR);
+
+    /* MMU */
+    WRITE_CP32(n->arch.vbar, VBAR);
+    WRITE_CP32(n->arch.ttbcr, TTBCR);
+    /* XXX restore 64 bit TTBR if guest is LPAE */
+    WRITE_CP32(n->arch.ttbr0, TTBR0);
+    WRITE_CP32(n->arch.ttbr1, TTBR1);
+
+    WRITE_CP32(n->arch.dacr, DACR);
+    WRITE_CP64(n->arch.par, PAR);
+    WRITE_CP32(n->arch.mair0, MAIR0);
+    WRITE_CP32(n->arch.mair1, MAIR1);
+    isb();
+
+    /* Control Registers */
+    WRITE_CP32(n->arch.actlr, ACTLR);
+    WRITE_CP32(n->arch.sctlr, SCTLR);
+    WRITE_CP32(n->arch.cpacr, CPACR);
+
+    WRITE_CP32(n->arch.contextidr, CONTEXTIDR);
+    WRITE_CP32(n->arch.tpidrurw, TPIDRURW);
+    WRITE_CP32(n->arch.tpidruro, TPIDRURO);
+    WRITE_CP32(n->arch.tpidrprw, TPIDRPRW);
+
+    /* XXX only restore these if ThumbEE e.g. ID_PFR0.THUMB_EE_SUPPORT */
+    WRITE_CP32(n->arch.teecr, TEECR);
+    WRITE_CP32(n->arch.teehbr, TEEHBR);
+
+    WRITE_CP32(n->arch.joscr, JOSCR);
+    WRITE_CP32(n->arch.jmcr, JMCR);
+
+    isb();
+
+    /* CP 15 */
+    WRITE_CP32(n->arch.csselr, CSSELR);
+
+    isb();
+
+    WRITE_CP32(hcr, HCR);
+    isb();
 }
 
 static void schedule_tail(struct vcpu *prev)
@@ -253,6 +365,7 @@ static int is_guest_psr(uint32_t psr)
 int arch_set_info_guest(
     struct vcpu *v, vcpu_guest_context_u c)
 {
+    struct vcpu_guest_context *ctxt = c.nat;
     struct cpu_user_regs *regs = &c.nat->user_regs;
 
     if ( !is_guest_psr(regs->cpsr) )
@@ -271,11 +384,10 @@ int arch_set_info_guest(
 
     v->arch.cpu_info->guest_cpu_user_regs = *regs;
 
-    /* XXX other state:
-     * - SCTLR
-     * - TTBR0/1
-     * - TTBCR
-     */
+    v->arch.sctlr = ctxt->sctlr;
+    v->arch.ttbr0 = ctxt->ttbr0;
+    v->arch.ttbr1 = ctxt->ttbr1;
+    v->arch.ttbcr = ctxt->ttbcr;
 
     clear_bit(_VPF_down, &v->pause_flags);
 
