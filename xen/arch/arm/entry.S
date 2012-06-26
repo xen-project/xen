@@ -46,6 +46,17 @@ save_guest_regs:
 	ALIGN;												\
 trap_##trap:												\
 	SAVE_ALL;											\
+	cpsie i; 	/* local_irq_enable */								\
+	adr lr, return_from_trap;									\
+	mov r0, sp;											\
+	mov r11, sp;											\
+	bic sp, #7; /* Align the stack pointer (noop on guest trap) */					\
+	b do_trap_##trap
+
+#define DEFINE_TRAP_ENTRY_NOIRQ(trap)									\
+	ALIGN;												\
+trap_##trap:												\
+	SAVE_ALL;											\
 	adr lr, return_from_trap;									\
 	mov r0, sp;											\
 	mov r11, sp;											\
@@ -69,8 +80,8 @@ DEFINE_TRAP_ENTRY(supervisor_call)
 DEFINE_TRAP_ENTRY(prefetch_abort)
 DEFINE_TRAP_ENTRY(data_abort)
 DEFINE_TRAP_ENTRY(hypervisor)
-DEFINE_TRAP_ENTRY(irq)
-DEFINE_TRAP_ENTRY(fiq)
+DEFINE_TRAP_ENTRY_NOIRQ(irq)
+DEFINE_TRAP_ENTRY_NOIRQ(fiq)
 
 return_from_trap:
 	mov sp, r11
@@ -83,7 +94,7 @@ ENTRY(return_to_new_vcpu)
 ENTRY(return_to_guest)
 	mov r11, sp
 	bic sp, #7 /* Align the stack pointer */
-	bl leave_hypervisor_tail
+	bl leave_hypervisor_tail /* Disables interrupts on return */
 	mov sp, r11
 	RESTORE_ONE_BANKED(SP_usr)
 	/* LR_usr is the same physical register as lr and is restored below */

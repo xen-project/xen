@@ -412,7 +412,6 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 static void do_trap_hypercall(struct cpu_user_regs *regs, unsigned long iss)
 {
     arm_hypercall_t *call = NULL;
-    local_irq_enable();
 
     if ( iss != XEN_HYPERCALL_TAG )
     {

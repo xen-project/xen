@@ -509,6 +509,8 @@ void gic_interrupt(struct cpu_user_regs *regs, int is_fiq)
     uint32_t intack = GICC[GICC_IAR];
     unsigned int irq = intack & GICC_IA_IRQ;
 
+    local_irq_enable();
+
     if ( irq == 1023 )
         /* Spurious interrupt */
         return;
