@@ -47,9 +47,9 @@ static __attribute_used__ void init_done(void)
 
 static void __init init_idle_domain(void)
 {
-        scheduler_init();
-        set_current(idle_vcpu[0]);
-        /* TODO: setup_idle_pagetable(); */
+    scheduler_init();
+    set_current(idle_vcpu[0]);
+    /* TODO: setup_idle_pagetable(); */
 }
 
 static void __init processor_id(void)
