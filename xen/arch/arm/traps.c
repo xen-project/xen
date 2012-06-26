@@ -388,25 +388,26 @@ static arm_hypercall_t *arm_hypercall_table[] = {
 static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 {
     uint32_t reg, *r;
-
+    uint32_t domid = current->domain->domain_id;
     switch ( code ) {
     case 0xe0 ... 0xef:
         reg = code - 0xe0;
         r = &regs->r0 + reg;
-        printk("R%d = %#010"PRIx32" at %#010"PRIx32"\n", reg, *r, regs->pc);
+        printk("DOM%d: R%d = %#010"PRIx32" at %#010"PRIx32"\n",
+               domid, reg, *r, regs->pc);
         break;
     case 0xfd:
-        printk("Reached %08"PRIx32"\n", regs->pc);
+        printk("DOM%d: Reached %#010"PRIx32"\n", domid, regs->pc);
         break;
     case 0xfe:
         printk("%c", (char)(regs->r0 & 0xff));
         break;
     case 0xff:
-        printk("DEBUG\n");
+        printk("DOM%d: DEBUG\n", domid);
         show_execution_state(regs);
         break;
     default:
-        panic("Unhandled debug trap %#x\n", code);
+        panic("DOM%d: Unhandled debug trap %#x\n", domid, code);
         break;
     }
 }
