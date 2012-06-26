@@ -144,6 +144,17 @@ void free_vcpu_struct(struct vcpu *v)
     free_xenheap_page(v);
 }
 
+struct vcpu_guest_context *alloc_vcpu_guest_context(void)
+{
+    return xmalloc(struct vcpu_guest_context);
+
+}
+
+void free_vcpu_guest_context(struct vcpu_guest_context *vgc)
+{
+    xfree(vgc);
+}
+
 int vcpu_initialise(struct vcpu *v)
 {
     int rc = 0;
@@ -210,6 +221,62 @@ void arch_domain_destroy(struct domain *d)
 {
     /* p2m_destroy */
     /* domain_vgic_destroy */
+}
+
+static int is_guest_psr(uint32_t psr)
+{
+    switch (psr & PSR_MODE_MASK)
+    {
+    case PSR_MODE_USR:
+    case PSR_MODE_FIQ:
+    case PSR_MODE_IRQ:
+    case PSR_MODE_SVC:
+    case PSR_MODE_ABT:
+    case PSR_MODE_UND:
+    case PSR_MODE_SYS:
+        return 1;
+    case PSR_MODE_MON:
+    case PSR_MODE_HYP:
+    default:
+        return 0;
+    }
+}
+
+/*
+ * Initialise VCPU state. The context can be supplied by either the
+ * toolstack (XEN_DOMCTL_setvcpucontext) or the guest
+ * (VCPUOP_initialise) and therefore must be properly validated.
+ */
+int arch_set_info_guest(
+    struct vcpu *v, vcpu_guest_context_u c)
+{
+    struct cpu_user_regs *regs = &c.nat->user_regs;
+
+    if ( !is_guest_psr(regs->cpsr) )
+        return -EINVAL;
+
+    if ( regs->spsr_svc && !is_guest_psr(regs->spsr_svc) )
+        return -EINVAL;
+    if ( regs->spsr_abt && !is_guest_psr(regs->spsr_abt) )
+        return -EINVAL;
+    if ( regs->spsr_und && !is_guest_psr(regs->spsr_und) )
+        return -EINVAL;
+    if ( regs->spsr_irq && !is_guest_psr(regs->spsr_irq) )
+        return -EINVAL;
+    if ( regs->spsr_fiq && !is_guest_psr(regs->spsr_fiq) )
+        return -EINVAL;
+
+    v->arch.cpu_info->guest_cpu_user_regs = *regs;
+
+    /* XXX other state:
+     * - SCTLR
+     * - TTBR0/1
+     * - TTBCR
+     */
+
+    clear_bit(_VPF_down, &v->pause_flags);
+
+    return 0;
 }
 
 void arch_dump_domain_info(struct domain *d)

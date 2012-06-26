@@ -20,11 +20,8 @@ DUMMY(pirq_guest_unbind);
 DUMMY(pirq_set_affinity);
 
 /* VCPU */
-DUMMY(alloc_vcpu_guest_context);
 DUMMY(arch_get_info_guest);
-DUMMY(arch_set_info_guest);
 DUMMY(arch_vcpu_reset);
-DUMMY(free_vcpu_guest_context);
 DUMMY(sync_vcpu_execstate);
 NOP(update_vcpu_system_time);
 DUMMY(vcpu_show_execution_state);
