@@ -1022,12 +1022,12 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
             p2m_pod_emergency_sweep(p2m);
     }
 
+    if ( p2m->pod.count == 0 )
+        goto out_of_memory;
+
     /* Keep track of the highest gfn demand-populated by a guest fault */
     if ( gfn > p2m->pod.max_guest )
         p2m->pod.max_guest = gfn;
-
-    if ( p2m->pod.count == 0 )
-        goto out_of_memory;
 
     /* Get a page f/ the cache.  A NULL return value indicates that the
      * 2-meg range should be marked singleton PoD, and retried */
