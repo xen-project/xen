@@ -368,7 +368,7 @@ foreach $pass (qw(1 2)) {
     find({ wanted => 
                sub {
                    return unless m/\.h$/;
-                   lstat $File::Find::name or die "$File::Find::name $!";
+                   stat $File::Find::name or die "$File::Find::name $!";
                    -f _ or die "$File::Find::name";
                    substr($File::Find::name, 0, 1+length $basedir) 
                        eq "$basedir/"
