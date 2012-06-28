@@ -19,7 +19,6 @@
 
 #include <xenctrl.h>
 #include <xc_dom.h>
-#include <xenguest.h>
 
 #include <xen/hvm/hvm_info_table.h>
 
@@ -469,7 +468,7 @@ static inline char *restore_helper(libxl__gc *gc, uint32_t domid,
             domid, phys_offset, node);
 }
 
-static int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
+int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
         uint32_t size, void *data)
 {
     libxl__gc *gc = data;
@@ -520,48 +519,6 @@ static int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
             if (ret)
                 return -1;
         }
-    }
-    return 0;
-}
-
-int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
-                                 libxl_domain_build_info *info,
-                                 libxl__domain_build_state *state,
-                                 int fd)
-{
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-    /* read signature */
-    int rc;
-    int hvm, pae, superpages;
-    struct restore_callbacks callbacks[1];
-    int no_incr_generationid;
-    switch (info->type) {
-    case LIBXL_DOMAIN_TYPE_HVM:
-        hvm = 1;
-        superpages = 1;
-        pae = libxl_defbool_val(info->u.hvm.pae);
-        no_incr_generationid = !libxl_defbool_val(info->u.hvm.incr_generationid);
-        callbacks->toolstack_restore = libxl__toolstack_restore;
-        callbacks->data = gc;
-        break;
-    case LIBXL_DOMAIN_TYPE_PV:
-        hvm = 0;
-        superpages = 0;
-        pae = 1;
-        no_incr_generationid = 0;
-        break;
-    default:
-        return ERROR_INVAL;
-    }
-    rc = xc_domain_restore(ctx->xch, fd, domid,
-                           state->store_port, &state->store_mfn,
-                           state->store_domid, state->console_port,
-                           &state->console_mfn, state->console_domid,
-                           hvm, pae, superpages, no_incr_generationid,
-                           &state->vm_generationid_addr, callbacks);
-    if ( rc ) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "restoring domain");
-        return ERROR_FAIL;
     }
     return 0;
 }

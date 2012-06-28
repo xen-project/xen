@@ -46,6 +46,7 @@
 
 #include <xenstore.h>
 #include <xenctrl.h>
+#include <xenguest.h>
 
 #include "xentoollog.h"
 
@@ -782,10 +783,8 @@ _hidden int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
                                  const char *old_name, const char *new_name,
                                  xs_transaction_t trans);
 
-_hidden int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
-                                         libxl_domain_build_info *info,
-                                         libxl__domain_build_state *state,
-                                         int fd);
+_hidden int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
+                                     uint32_t size, void *data);
 _hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_suspend_device_model(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid);
@@ -1899,6 +1898,7 @@ struct libxl__domain_create_state {
     libxl__stub_dm_spawn_state dmss;
         /* If we're not doing stubdom, we use only dmss.dm,
          * for the non-stubdom device model. */
+    struct restore_callbacks callbacks;
 };
 
 /*----- Domain suspend (save) functions -----*/
@@ -1908,6 +1908,17 @@ _hidden int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
                                          int live, int debug,
                                          const libxl_domain_remus_info *r_info);
 
+/* calls libxl__xc_domain_restore_done when done */
+_hidden void libxl__xc_domain_restore(libxl__egc *egc,
+                                      libxl__domain_create_state *dcs,
+                                      int hvm, int pae, int superpages,
+                                      int no_incr_generationid);
+/* If rc==0 then retval is the return value from xc_domain_save
+ * and errnoval is the errno value it provided.
+ * If rc!=0, retval and errnoval are undefined. */
+_hidden void libxl__xc_domain_restore_done(libxl__egc *egc,
+                                           libxl__domain_create_state *dcs,
+                                           int rc, int retval, int errnoval);
 
 
 /*

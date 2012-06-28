@@ -377,89 +377,6 @@ out:
     return ret;
 }
 
-static int domain_restore(libxl__gc *gc, libxl_domain_build_info *info,
-                          uint32_t domid, int fd,
-                          libxl__domain_build_state *state)
-{
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-    char **vments = NULL, **localents = NULL;
-    struct timeval start_time;
-    int i, ret, esave, flags;
-
-    ret = libxl__build_pre(gc, domid, info, state);
-    if (ret)
-        goto out;
-
-    ret = libxl__domain_restore_common(gc, domid, info, state, fd);
-    if (ret)
-        goto out;
-
-    gettimeofday(&start_time, NULL);
-
-    switch (info->type) {
-    case LIBXL_DOMAIN_TYPE_HVM:
-        vments = libxl__calloc(gc, 7, sizeof(char *));
-        vments[0] = "rtc/timeoffset";
-        vments[1] = (info->u.hvm.timeoffset) ? info->u.hvm.timeoffset : "";
-        vments[2] = "image/ostype";
-        vments[3] = "hvm";
-        vments[4] = "start_time";
-        vments[5] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
-        break;
-    case LIBXL_DOMAIN_TYPE_PV:
-        vments = libxl__calloc(gc, 11, sizeof(char *));
-        i = 0;
-        vments[i++] = "image/ostype";
-        vments[i++] = "linux";
-        vments[i++] = "image/kernel";
-        vments[i++] = (char *) state->pv_kernel.path;
-        vments[i++] = "start_time";
-        vments[i++] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
-        if (state->pv_ramdisk.path) {
-            vments[i++] = "image/ramdisk";
-            vments[i++] = (char *) state->pv_ramdisk.path;
-        }
-        if (state->pv_cmdline) {
-            vments[i++] = "image/cmdline";
-            vments[i++] = (char *) state->pv_cmdline;
-        }
-        break;
-    default:
-        ret = ERROR_INVAL;
-        goto out;
-    }
-    ret = libxl__build_post(gc, domid, info, state, vments, localents);
-    if (ret)
-        goto out;
-
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        ret = asprintf(&state->saved_state,
-                       XC_DEVICE_MODEL_RESTORE_FILE".%d", domid);
-        ret = (ret < 0) ? ERROR_FAIL : 0;
-    }
-
-out:
-    if (info->type == LIBXL_DOMAIN_TYPE_PV) {
-        libxl__file_reference_unmap(&state->pv_kernel);
-        libxl__file_reference_unmap(&state->pv_ramdisk);
-    }
-
-    esave = errno;
-
-    flags = fcntl(fd, F_GETFL);
-    if (flags == -1) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unable to get flags on restore fd");
-    } else {
-        flags &= ~O_NONBLOCK;
-        if (fcntl(fd, F_SETFL, flags) == -1)
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unable to put restore fd"
-                         " back to blocking mode");
-    }
-
-    errno = esave;
-    return ret;
-}
-
 int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
                        uint32_t *domid)
 {
@@ -640,9 +557,12 @@ static void domcreate_bootloader_console_available(libxl__egc *egc,
 static void domcreate_bootloader_done(libxl__egc *egc,
                                       libxl__bootloader_state *bl,
                                       int rc);
-
 static void domcreate_console_available(libxl__egc *egc,
                                         libxl__domain_create_state *dcs);
+
+static void domcreate_rebuild_done(libxl__egc *egc,
+                                   libxl__domain_create_state *dcs,
+                                   int ret);
 
 /* Our own function to clean up and call the user's callback.
  * The final call in the sequence. */
@@ -737,20 +657,20 @@ static void domcreate_console_available(libxl__egc *egc,
 
 static void domcreate_bootloader_done(libxl__egc *egc,
                                       libxl__bootloader_state *bl,
-                                      int ret)
+                                      int rc)
 {
     libxl__domain_create_state *dcs = CONTAINER_OF(bl, *dcs, bl);
     STATE_AO_GC(bl->ao);
-    int i;
 
     /* convenience aliases */
     const uint32_t domid = dcs->guest_domid;
     libxl_domain_config *const d_config = dcs->guest_config;
+    libxl_domain_build_info *const info = &d_config->b_info;
     const int restore_fd = dcs->restore_fd;
     libxl__domain_build_state *const state = &dcs->build_state;
-    libxl_ctx *const ctx = CTX;
+    struct restore_callbacks *const callbacks = &dcs->callbacks;
 
-    if (ret) goto error_out;
+    if (rc) domcreate_rebuild_done(egc, dcs, rc);
 
     /* consume bootloader outputs. state->pv_{kernel,ramdisk} have
      * been initialised by the bootloader already.
@@ -766,11 +686,152 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     dcs->dmss.dm.callback = domcreate_devmodel_started;
     dcs->dmss.callback = domcreate_devmodel_started;
 
-    if ( restore_fd >= 0 ) {
-        ret = domain_restore(gc, &d_config->b_info, domid, restore_fd, state);
-    } else {
-        ret = libxl__domain_build(gc, &d_config->b_info, domid, state);
+    if ( restore_fd < 0 ) {
+        rc = libxl__domain_build(gc, &d_config->b_info, domid, state);
+        domcreate_rebuild_done(egc, dcs, rc);
+        return;
     }
+
+    /* Restore */
+
+    rc = libxl__build_pre(gc, domid, info, state);
+    if (rc)
+        goto out;
+
+    /* read signature */
+    int hvm, pae, superpages;
+    int no_incr_generationid;
+    switch (info->type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
+        hvm = 1;
+        superpages = 1;
+        pae = libxl_defbool_val(info->u.hvm.pae);
+        no_incr_generationid = !libxl_defbool_val(info->u.hvm.incr_generationid);
+        callbacks->toolstack_restore = libxl__toolstack_restore;
+        callbacks->data = gc;
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
+        hvm = 0;
+        superpages = 0;
+        pae = 1;
+        no_incr_generationid = 0;
+        break;
+    default:
+        rc = ERROR_INVAL;
+        goto out;
+    }
+    libxl__xc_domain_restore(egc, dcs,
+                             hvm, pae, superpages, no_incr_generationid);
+    return;
+
+ out:
+    libxl__xc_domain_restore_done(egc, dcs, rc, 0, 0);
+}
+
+void libxl__xc_domain_restore_done(libxl__egc *egc,
+                                   libxl__domain_create_state *dcs,
+                                   int ret, int retval, int errnoval)
+{
+    STATE_AO_GC(dcs->ao);
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    char **vments = NULL, **localents = NULL;
+    struct timeval start_time;
+    int i, esave, flags;
+
+    /* convenience aliases */
+    const uint32_t domid = dcs->guest_domid;
+    libxl_domain_config *const d_config = dcs->guest_config;
+    libxl_domain_build_info *const info = &d_config->b_info;
+    libxl__domain_build_state *const state = &dcs->build_state;
+    const int fd = dcs->restore_fd;
+
+    if (ret)
+        goto out;
+
+    if (retval) {
+        LOGEV(ERROR, errnoval, "restoring domain");
+        ret = ERROR_FAIL;
+        goto out;
+    }
+
+    gettimeofday(&start_time, NULL);
+
+    switch (info->type) {
+    case LIBXL_DOMAIN_TYPE_HVM:
+        vments = libxl__calloc(gc, 7, sizeof(char *));
+        vments[0] = "rtc/timeoffset";
+        vments[1] = (info->u.hvm.timeoffset) ? info->u.hvm.timeoffset : "";
+        vments[2] = "image/ostype";
+        vments[3] = "hvm";
+        vments[4] = "start_time";
+        vments[5] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        break;
+    case LIBXL_DOMAIN_TYPE_PV:
+        vments = libxl__calloc(gc, 11, sizeof(char *));
+        i = 0;
+        vments[i++] = "image/ostype";
+        vments[i++] = "linux";
+        vments[i++] = "image/kernel";
+        vments[i++] = (char *) state->pv_kernel.path;
+        vments[i++] = "start_time";
+        vments[i++] = libxl__sprintf(gc, "%lu.%02d", start_time.tv_sec,(int)start_time.tv_usec/10000);
+        if (state->pv_ramdisk.path) {
+            vments[i++] = "image/ramdisk";
+            vments[i++] = (char *) state->pv_ramdisk.path;
+        }
+        if (state->pv_cmdline) {
+            vments[i++] = "image/cmdline";
+            vments[i++] = (char *) state->pv_cmdline;
+        }
+        break;
+    default:
+        ret = ERROR_INVAL;
+        goto out;
+    }
+    ret = libxl__build_post(gc, domid, info, state, vments, localents);
+    if (ret)
+        goto out;
+
+    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
+        ret = asprintf(&state->saved_state,
+                       XC_DEVICE_MODEL_RESTORE_FILE".%d", domid);
+        ret = (ret < 0) ? ERROR_FAIL : 0;
+    }
+
+out:
+    if (info->type == LIBXL_DOMAIN_TYPE_PV) {
+        libxl__file_reference_unmap(&state->pv_kernel);
+        libxl__file_reference_unmap(&state->pv_ramdisk);
+    }
+
+    esave = errno;
+
+    flags = fcntl(fd, F_GETFL);
+    if (flags == -1) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unable to get flags on restore fd");
+    } else {
+        flags &= ~O_NONBLOCK;
+        if (fcntl(fd, F_SETFL, flags) == -1)
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unable to put restore fd"
+                         " back to blocking mode");
+    }
+
+    errno = esave;
+    domcreate_rebuild_done(egc, dcs, ret);
+}
+
+static void domcreate_rebuild_done(libxl__egc *egc,
+                                   libxl__domain_create_state *dcs,
+                                   int ret)
+{
+    STATE_AO_GC(dcs->ao);
+    int i;
+
+    /* convenience aliases */
+    const uint32_t domid = dcs->guest_domid;
+    libxl_domain_config *const d_config = dcs->guest_config;
+    libxl__domain_build_state *const state = &dcs->build_state;
+    libxl_ctx *const ctx = CTX;
 
     if (ret) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "cannot (re-)build domain: %d", ret);
