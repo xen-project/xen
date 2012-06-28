@@ -807,9 +807,8 @@ void libxl__xc_domain_restore_done(libxl__egc *egc, void *dcs_void,
         goto out;
 
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        ret = asprintf(&state->saved_state,
+        state->saved_state = GCSPRINTF(
                        XC_DEVICE_MODEL_RESTORE_FILE".%d", domid);
-        ret = (ret < 0) ? ERROR_FAIL : 0;
     }
 
 out:
