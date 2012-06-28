@@ -1864,6 +1864,14 @@ typedef struct libxl__domain_suspend_state libxl__domain_suspend_state;
 typedef void libxl__domain_suspend_cb(libxl__egc*,
                                       libxl__domain_suspend_state*, int rc);
 
+typedef struct libxl__logdirty_switch {
+    const char *cmd;
+    const char *cmd_path;
+    const char *ret_path;
+    libxl__ev_xswatch watch;
+    libxl__ev_time timeout;
+} libxl__logdirty_switch;
+
 struct libxl__domain_suspend_state {
     /* set by caller of libxl__domain_suspend */
     libxl__ao *ao;
@@ -1883,6 +1891,7 @@ struct libxl__domain_suspend_state {
     int guest_responded;
     int interval; /* checkpoint interval (for Remus) */
     libxl__save_helper_state shs;
+    libxl__logdirty_switch logdirty;
 };
 
 
@@ -2013,8 +2022,15 @@ _hidden void libxl__xc_domain_save(libxl__egc*, libxl__domain_suspend_state*,
 _hidden void libxl__xc_domain_save_done(libxl__egc*, void *dss_void,
                                         int rc, int retval, int errnoval);
 
+/* Used by asynchronous callbacks: ie ones which xc regards as
+ * returning a value, but which we want to handle asynchronously.
+ * Such functions' actual callback function return void in libxl
+ * When they are ready to indicate completion, they call this. */
+void libxl__xc_domain_saverestore_async_callback_done(libxl__egc *egc,
+                           libxl__save_helper_state *shs, int return_value);
+
 _hidden int libxl__domain_suspend_common_callback(void *data);
-_hidden int libxl__domain_suspend_common_switch_qemu_logdirty
+_hidden void libxl__domain_suspend_common_switch_qemu_logdirty
                                (int domid, unsigned int enable, void *data);
 _hidden int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
         uint32_t *len, void *data);

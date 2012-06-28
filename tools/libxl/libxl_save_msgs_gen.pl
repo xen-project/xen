@@ -14,6 +14,7 @@ our @msgs = (
     #   x  - function pointer is in struct {save,restore}_callbacks
     #         and its null-ness needs to be passed through to the helper's xc
     #   W  - needs a return value; callback is synchronous
+    #   A  - needs a return value; callback is asynchronous
     [  1, 'sr',     "log",                   [qw(uint32_t level
                                                  uint32_t errnoval
                                                  STRING context
@@ -25,7 +26,7 @@ our @msgs = (
     [  3, 'scxW',   "suspend", [] ],         
     [  4, 'scxW',   "postcopy", [] ],        
     [  5, 'scxW',   "checkpoint", [] ],      
-    [  6, 'scxW',   "switch_qemu_logdirty",  [qw(int domid
+    [  6, 'scxA',   "switch_qemu_logdirty",  [qw(int domid
                                               unsigned enable)] ],
     #                toolstack_save          done entirely `by hand'
     [  7, 'rcxW',   "toolstack_restore",     [qw(uint32_t domid
@@ -262,7 +263,7 @@ foreach my $msginfo (@msgs) {
         $f_more_sr->("        int r;\n");
     }
 
-    my $c_rtype_helper = $flags =~ m/W/ ? 'int' : 'void';
+    my $c_rtype_helper = $flags =~ m/[WA]/ ? 'int' : 'void';
     my $c_rtype_callout = $flags =~ m/W/ ? 'int' : 'void';
     my $c_decl = '(';
     my $c_callback_args = '';
@@ -351,7 +352,7 @@ END_ALWAYS
     assert(len == allocd);
     ${transmit}(buf, len, user);
 ");
-    if ($flags =~ m/W/) {
+    if ($flags =~ m/[WA]/) {
 	f_more("${encode}_$name",
                (<<END_ALWAYS.($debug ? <<END_DEBUG : '').<<END_ALWAYS));
     int r = ${helper}_getreply(user);

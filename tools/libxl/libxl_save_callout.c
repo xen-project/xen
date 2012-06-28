@@ -135,6 +135,14 @@ void libxl__xc_domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss,
 }
 
 
+void libxl__xc_domain_saverestore_async_callback_done(libxl__egc *egc,
+                           libxl__save_helper_state *shs, int return_value)
+{
+    shs->egc = egc;
+    libxl__srm_callout_sendreply(return_value, shs);
+    shs->egc = 0;
+}
+
 /*----- helper execution -----*/
 
 static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
