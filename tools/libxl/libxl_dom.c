@@ -736,7 +736,7 @@ int libxl__domain_suspend_common_callback(void *user)
     return 1;
 }
 
-static inline char *save_helper(libxl__gc *gc, uint32_t domid,
+static inline char *physmap_path(libxl__gc *gc, uint32_t domid,
         char *phys_offset, char *node)
 {
     return libxl__sprintf(gc,
@@ -781,21 +781,21 @@ int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
             return -1;
         }
 
-        xs_path = save_helper(gc, domid, phys_offset, "start_addr");
+        xs_path = physmap_path(gc, domid, phys_offset, "start_addr");
         start_addr = libxl__xs_read(gc, 0, xs_path);
         if (start_addr == NULL) {
             LOG(ERROR, "%s is NULL", xs_path);
             return -1;
         }
 
-        xs_path = save_helper(gc, domid, phys_offset, "size");
+        xs_path = physmap_path(gc, domid, phys_offset, "size");
         size = libxl__xs_read(gc, 0, xs_path);
         if (size == NULL) {
             LOG(ERROR, "%s is NULL", xs_path);
             return -1;
         }
 
-        xs_path = save_helper(gc, domid, phys_offset, "name");
+        xs_path = physmap_path(gc, domid, phys_offset, "name");
         name = libxl__xs_read(gc, 0, xs_path);
         if (name == NULL)
             namelen = 0;
