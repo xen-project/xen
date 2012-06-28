@@ -562,7 +562,7 @@ static void parse_config_data(const char *config_source,
     XLU_Config *config;
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids;
     int pci_power_mgmt = 0;
-    int pci_msitranslate = 1;
+    int pci_msitranslate = 0;
     int pci_permissive = 0;
     int e;
 
