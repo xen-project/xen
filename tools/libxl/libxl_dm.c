@@ -204,7 +204,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         }
 
         nr_set_cpus = libxl_cpumap_count_set(&b_info->avail_vcpus);
-        s = libxl_cpumap_to_hex_string(&b_info->avail_vcpus);
+        s = libxl_cpumap_to_hex_string(CTX, &b_info->avail_vcpus);
         flexarray_vappend(dm_args, "-vcpu_avail",
                               libxl__sprintf(gc, "%s", s), NULL);
         free(s);

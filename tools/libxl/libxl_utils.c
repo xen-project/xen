@@ -491,19 +491,29 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
 
 int libxl_cpumap_alloc(libxl_ctx *ctx, libxl_cpumap *cpumap, int max_cpus)
 {
+    GC_INIT(ctx);
     int sz;
+    int rc;
 
-    if (max_cpus < 0)
-        return ERROR_INVAL;
+    if (max_cpus < 0) {
+        rc = ERROR_INVAL;
+        goto out;
+    }
     if (max_cpus == 0)
         max_cpus = libxl_get_max_cpus(ctx);
-    if (max_cpus == 0)
-        return ERROR_FAIL;
+    if (max_cpus == 0) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
 
     sz = (max_cpus + 7) / 8;
-    cpumap->map = libxl__calloc(NULL, sizeof(*cpumap->map), sz);
+    cpumap->map = libxl__calloc(NOGC, sizeof(*cpumap->map), sz);
     cpumap->size = sz;
-    return 0;
+
+    rc = 0;
+ out:
+    GC_FREE;
+    return rc;
 }
 
 void libxl_cpumap_dispose(libxl_cpumap *map)
@@ -542,10 +552,11 @@ int libxl_cpumap_count_set(const libxl_cpumap *cpumap)
 }
 
 /* NB. caller is responsible for freeing the memory */
-char *libxl_cpumap_to_hex_string(const libxl_cpumap *cpumap)
+char *libxl_cpumap_to_hex_string(libxl_ctx *ctx, const libxl_cpumap *cpumap)
 {
+    GC_INIT(ctx);
     int i = cpumap->size;
-    char *p = libxl__zalloc(NULL, cpumap->size * 2 + 3);
+    char *p = libxl__zalloc(NOGC, cpumap->size * 2 + 3);
     char *q = p;
     strncpy(p, "0x", 2);
     p += 2;
@@ -554,6 +565,7 @@ char *libxl_cpumap_to_hex_string(const libxl_cpumap *cpumap)
         p += 2;
     }
     *p = '\0';
+    GC_FREE;
     return q;
 }
 
