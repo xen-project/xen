@@ -21,6 +21,7 @@
 #define PCI_BDF                "%04x:%02x:%02x.%01x"
 #define PCI_BDF_SHORT          "%02x:%02x.%01x"
 #define PCI_BDF_VDEVFN         "%04x:%02x:%02x.%01x@%02x"
+#define PCI_OPTIONS            "msitranslate=%d,power_mgmt=%d"
 #define PCI_BDF_XSPATH         "%04x-%02x-%02x-%01x"
 
 static unsigned int pcidev_encode_bdf(libxl_device_pci *pcidev)
@@ -814,12 +815,14 @@ static int qemu_pci_add_xenstore(libxl__gc *gc, uint32_t domid,
     path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/parameter",
                           domid);
     if (pcidev->vdevfn) {
-        libxl__xs_write(gc, XBT_NULL, path, PCI_BDF_VDEVFN,
+        libxl__xs_write(gc, XBT_NULL, path, PCI_BDF_VDEVFN","PCI_OPTIONS,
                         pcidev->domain, pcidev->bus, pcidev->dev,
-                        pcidev->func, pcidev->vdevfn);
+                        pcidev->func, pcidev->vdevfn, pcidev->msitranslate,
+                        pcidev->power_mgmt);
     } else {
-        libxl__xs_write(gc, XBT_NULL, path, PCI_BDF, pcidev->domain,
-                        pcidev->bus, pcidev->dev, pcidev->func);
+        libxl__xs_write(gc, XBT_NULL, path, PCI_BDF","PCI_OPTIONS,
+                        pcidev->domain,  pcidev->bus, pcidev->dev,
+                        pcidev->func, pcidev->msitranslate, pcidev->power_mgmt);
     }
 
     libxl__qemu_traditional_cmd(gc, domid, "pci-ins");
