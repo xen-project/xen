@@ -797,8 +797,7 @@ _hidden int libxl__domain_cpupool(libxl__gc *gc, uint32_t domid);
 _hidden libxl_scheduler libxl__domain_scheduler(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__sched_set_params(libxl__gc *gc, uint32_t domid,
                                     libxl_domain_sched_params *scparams);
-#define LIBXL__DOMAIN_IS_TYPE(gc, domid, type) \
-    libxl__domain_type((gc), (domid)) == LIBXL_DOMAIN_TYPE_##type
+
 typedef struct {
     uint32_t store_port;
     uint32_t store_domid;
@@ -841,7 +840,9 @@ _hidden int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid);
 
 _hidden void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid);
 
+/* returns 0 or 1, or a libxl error code */
 _hidden int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid);
+
 _hidden char * libxl__domain_pvcontrol_read(libxl__gc *gc,
                                             xs_transaction_t t, uint32_t domid);
 _hidden int libxl__domain_pvcontrol_write(libxl__gc *gc, xs_transaction_t t,

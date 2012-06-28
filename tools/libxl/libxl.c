@@ -390,7 +390,13 @@ int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid, int suspend_cancel)
         goto out;
     }
 
-    if (LIBXL__DOMAIN_IS_TYPE(gc,  domid, HVM)) {
+    libxl_domain_type type = libxl__domain_type(gc, domid);
+    if (type == LIBXL_DOMAIN_TYPE_INVALID) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    if (type == LIBXL_DOMAIN_TYPE_HVM) {
         rc = libxl__domain_resume_device_model(gc, domid);
         if (rc) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
@@ -789,7 +795,13 @@ int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid)
     char *state;
     int ret, rc = 0;
 
-    if (LIBXL__DOMAIN_IS_TYPE(gc,  domid, HVM)) {
+    libxl_domain_type type = libxl__domain_type(gc, domid);
+    if (type == LIBXL_DOMAIN_TYPE_INVALID) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    if (type == LIBXL_DOMAIN_TYPE_HVM) {
         path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
         state = libxl__xs_read(gc, XBT_NULL, path);
         if (state != NULL && !strcmp(state, "paused")) {
@@ -803,6 +815,7 @@ int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid)
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unpausing domain %d", domid);
         rc = ERROR_FAIL;
     }
+ out:
     GC_FREE;
     return rc;
 }
@@ -814,7 +827,11 @@ int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid)
     unsigned long pvdriver = 0;
     int ret;
 
-    if (LIBXL__DOMAIN_IS_TYPE(gc, domid, PV))
+    libxl_domain_type domtype = libxl__domain_type(gc, domid);
+    if (domtype == LIBXL_DOMAIN_TYPE_INVALID)
+        return ERROR_FAIL;
+
+    if (domtype == LIBXL_DOMAIN_TYPE_PV)
         return 1;
 
     ret = xc_get_hvm_param(ctx->xch, domid, HVM_PARAM_CALLBACK_IRQ, &pvdriver);
@@ -1214,6 +1231,9 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid)
         pid = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "/local/domain/%d/image/device-model-pid", domid));
         dm_present = (pid != NULL);
         break;
+    case LIBXL_DOMAIN_TYPE_INVALID:
+        rc = ERROR_FAIL;
+        goto out;
     default:
         abort();
     }
@@ -1363,8 +1383,6 @@ static int libxl__primary_console_find(libxl_ctx *ctx, uint32_t domid_vm,
         case LIBXL_DOMAIN_TYPE_INVALID:
             rc = ERROR_INVAL;
             goto out;
-        default:
-            abort();
         }
     }
 

@@ -129,7 +129,11 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_d
     if (!num_devs)
         return libxl__create_pci_backend(gc, domid, pcidev, 1);
 
-    if (!starting && LIBXL__DOMAIN_IS_TYPE(gc, domid, PV)) {
+    libxl_domain_type domtype = libxl__domain_type(gc, domid);
+    if (domtype == LIBXL_DOMAIN_TYPE_INVALID)
+        return ERROR_FAIL;
+
+    if (!starting && domtype == LIBXL_DOMAIN_TYPE_PV) {
         if (libxl__wait_for_backend(gc, be_path, "4") < 0)
             return ERROR_FAIL;
     }
@@ -172,7 +176,11 @@ static int libxl__device_pci_remove_xenstore(libxl__gc *gc, uint32_t domid, libx
         return ERROR_INVAL;
     num = atoi(num_devs);
 
-    if (LIBXL__DOMAIN_IS_TYPE(gc, domid, PV)) {
+    libxl_domain_type domtype = libxl__domain_type(gc, domid);
+    if (domtype == LIBXL_DOMAIN_TYPE_INVALID)
+        return ERROR_FAIL;
+
+    if (domtype == LIBXL_DOMAIN_TYPE_PV) {
         if (libxl__wait_for_backend(gc, be_path, "4") < 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "pci backend at %s is not ready", be_path);
             return ERROR_FAIL;
@@ -200,7 +208,7 @@ retry_transaction:
         if (errno == EAGAIN)
             goto retry_transaction;
 
-    if (LIBXL__DOMAIN_IS_TYPE(gc, domid, PV)) {
+    if (domtype == LIBXL_DOMAIN_TYPE_PV) {
         if (libxl__wait_for_backend(gc, be_path, "4") < 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "pci backend at %s is not ready", be_path);
             return ERROR_FAIL;
@@ -942,8 +950,8 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
         }
         break;
     }
-    default:
-        abort();
+    case LIBXL_DOMAIN_TYPE_INVALID:
+        return ERROR_FAIL;
     }
 out:
     if (!libxl_is_stubdom(ctx, domid, NULL)) {
