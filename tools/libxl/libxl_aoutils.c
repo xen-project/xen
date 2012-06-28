@@ -74,6 +74,28 @@ static void datacopier_check_state(libxl__egc *egc, libxl__datacopier_state *dc)
     }
 }
 
+void libxl__datacopier_prefixdata(libxl__egc *egc, libxl__datacopier_state *dc,
+                                  const void *data, size_t len)
+{
+    libxl__datacopier_buf *buf;
+    /*
+     * It is safe for this to be called immediately after _start, as
+     * is documented in the public comment.  _start's caller must have
+     * the ctx locked, so other threads don't get to mess with the
+     * contents, and the fd events cannot happen reentrantly.  So we
+     * are guaranteed to beat the first data from the read fd.
+     */
+
+    assert(len < dc->maxsz - dc->used);
+
+    buf = libxl__zalloc(0, sizeof(*buf) - sizeof(buf->buf) + len);
+    buf->used = len;
+    memcpy(buf->buf, data, len);
+
+    dc->used += len;
+    LIBXL_TAILQ_INSERT_TAIL(&dc->bufs, buf, entry);
+}
+
 static void datacopier_readable(libxl__egc *egc, libxl__ev_fd *ev,
                                 int fd, short events, short revents) {
     libxl__datacopier_state *dc = CONTAINER_OF(ev, *dc, toread);

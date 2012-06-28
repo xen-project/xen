@@ -1811,6 +1811,12 @@ _hidden void libxl__datacopier_init(libxl__datacopier_state *dc);
 _hidden void libxl__datacopier_kill(libxl__datacopier_state *dc);
 _hidden int libxl__datacopier_start(libxl__datacopier_state *dc);
 
+/* Inserts literal data into the output stream.  The data is copied.
+ * May safely be used only immediately after libxl__datacopier_start
+ * (before the ctx is unlocked).  But may be called multiple times.
+ * NB exceeding maxsz will fail an assertion! */
+_hidden void libxl__datacopier_prefixdata(libxl__egc*, libxl__datacopier_state*,
+                                          const void *data, size_t len);
 
 /*----- Save/restore helper (used by creation and suspend) -----*/
 
