@@ -488,6 +488,10 @@ p2m_pod_offline_or_broken_replace(struct page_info *p)
     return;
 }
 
+static int
+p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn);
+
+
 /* This function is needed for two reasons:
  * + To properly handle clearing of PoD entries
  * + To "steal back" memory being freed for the PoD cache, rather than
@@ -505,8 +509,8 @@ p2m_pod_decrease_reservation(struct domain *d,
     int i;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
-    int steal_for_cache = 0;
-    int pod = 0, nonpod = 0, ram = 0;
+    int steal_for_cache;
+    int pod, nonpod, ram;
 
     gfn_lock(p2m, gpfn, order);
     pod_lock(p2m);    
@@ -516,13 +520,15 @@ p2m_pod_decrease_reservation(struct domain *d,
     if ( p2m->pod.entry_count == 0 )
         goto out_unlock;
 
-    /* Figure out if we need to steal some freed memory for our cache */
-    steal_for_cache =  ( p2m->pod.entry_count > p2m->pod.count );
-
     if ( unlikely(d->is_dying) )
         goto out_unlock;
 
-    /* See what's in here. */
+recount:
+    pod = nonpod = ram = 0;
+
+    /* Figure out if we need to steal some freed memory for our cache */
+    steal_for_cache =  ( p2m->pod.entry_count > p2m->pod.count );
+
     /* FIXME: Add contiguous; query for PSE entries? */
     for ( i=0; i<(1<<order); i++)
     {
@@ -556,7 +562,16 @@ p2m_pod_decrease_reservation(struct domain *d,
         goto out_entry_check;
     }
 
-    /* FIXME: Steal contig 2-meg regions for cache */
+    /* Try to grab entire superpages if possible.  Since the common case is for drivers
+     * to pass back singleton pages, see if we can take the whole page back and mark the
+     * rest PoD. */
+    if ( steal_for_cache
+         && p2m_pod_zero_check_superpage(p2m, gpfn & ~(SUPERPAGE_PAGES-1)))
+    {
+        /* Since order may be arbitrary, we may have taken more or less
+         * than we were actually asked to; so just re-count from scratch */
+        goto recount;
+    }
 
     /* Process as long as:
      * + There are PoD entries to handle, or
@@ -757,6 +772,8 @@ p2m_pod_zero_check_superpage(struct p2m_domain *p2m, unsigned long gfn)
      * back on the PoD cache, and account for the new p2m PoD entries */
     p2m_pod_cache_add(p2m, mfn_to_page(mfn0), PAGE_ORDER_2M);
     p2m->pod.entry_count += SUPERPAGE_PAGES;
+
+    ret = SUPERPAGE_PAGES;
 
 out_reset:
     if ( reset )
