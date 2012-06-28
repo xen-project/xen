@@ -59,13 +59,13 @@ struct hvm_vcpu_io {
     unsigned long       mmio_gva;
     unsigned long       mmio_gpfn;
 
-    /* We may read up to m128 as a number of device-model transactions. */
+    /* We may read up to m256 as a number of device-model transactions. */
     paddr_t mmio_large_read_pa;
-    uint8_t mmio_large_read[16];
+    uint8_t mmio_large_read[32];
     unsigned int mmio_large_read_bytes;
-    /* We may write up to m128 as a number of device-model transactions. */
-    paddr_t mmio_large_write_pa;
+    /* We may write up to m256 as a number of device-model transactions. */
     unsigned int mmio_large_write_bytes;
+    paddr_t mmio_large_write_pa;
 };
 
 #define VMCX_EADDR    (~0ULL)
