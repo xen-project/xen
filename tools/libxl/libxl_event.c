@@ -1602,6 +1602,7 @@ void libxl__ao_progress_report(libxl__egc *egc, libxl__ao *ao,
     ev->for_user = how->for_event;
     if (how->callback == dummy_asyncprogress_callback_ignore) {
         LOG(DEBUG,"ao %p: progress report: ignored",ao);
+        libxl_event_free(CTX,ev);
         /* ignore */
     } else if (how->callback) {
         libxl__aop_occurred *aop = libxl__zalloc(&egc->gc, sizeof(*aop));
