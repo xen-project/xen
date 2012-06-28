@@ -3202,6 +3202,7 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
 
 libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nb_cpu_out)
 {
+    GC_INIT(ctx);
     xc_topologyinfo_t tinfo;
     DECLARE_HYPERCALL_BUFFER(xc_cpu_to_core_t, coremap);
     DECLARE_HYPERCALL_BUFFER(xc_cpu_to_socket_t, socketmap);
@@ -3214,7 +3215,8 @@ libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nb_cpu_out)
     if (max_cpus == 0)
     {
         LIBXL__LOG(ctx, XTL_ERROR, "Unable to determine number of CPUS");
-        return NULL;
+        ret = NULL;
+        goto out;
     }
 
     coremap = xc_hypercall_buffer_alloc
@@ -3259,6 +3261,8 @@ fail:
 
     if (ret)
         *nb_cpu_out = max_cpus;
+ out:
+    GC_FREE;
     return ret;
 }
 
