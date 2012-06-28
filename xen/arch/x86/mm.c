@@ -3564,10 +3564,12 @@ int do_mmu_update(
                     l1_pgentry_t l1e = l1e_from_intpte(req.val);
                     p2m_type_t l1e_p2mt = p2m_ram_rw;
                     struct page_info *target = NULL;
+                    p2m_query_t q = (l1e_get_flags(l1e) & _PAGE_RW) ?
+                                        P2M_UNSHARE : P2M_ALLOC;
 
                     if ( paging_mode_translate(pg_owner) )
                         target = get_page_from_gfn(pg_owner, l1e_get_pfn(l1e),
-                                                   &l1e_p2mt, P2M_ALLOC);
+                                                   &l1e_p2mt, q);
 
                     if ( p2m_is_paged(l1e_p2mt) )
                     {
@@ -3582,29 +3584,15 @@ int do_mmu_update(
                         rc = -ENOENT;
                         break;
                     }
-#ifdef __x86_64__
-                    /* XXX: Ugly: pull all the checks into a separate function. 
-                     * Don't want to do it now, not to interfere with mem_paging
-                     * patches */
-                    else if ( p2m_ram_shared == l1e_p2mt )
+                    /* If we tried to unshare and failed */
+                    else if ( (q & P2M_UNSHARE) && p2m_is_shared(l1e_p2mt) )
                     {
-                        /* Unshare the page for RW foreign mappings */
-                        if ( l1e_get_flags(l1e) & _PAGE_RW )
-                        {
-                            unsigned long gfn = l1e_get_pfn(l1e);
-                            rc = mem_sharing_unshare_page(pg_owner, gfn, 0); 
-                            if ( rc )
-                            {
-                                if ( target )
-                                    put_page(target);
-                                /* Notify helper, don't care about errors, will not
-                                 * sleep on wq, since we're a foreign domain. */
-                                (void)mem_sharing_notify_enomem(pg_owner, gfn, 0);
-                                break; 
-                            }
-                        }
-                    } 
-#endif
+                        /* We could not have obtained a page ref. */
+                        ASSERT(target == NULL);
+                        /* And mem_sharing_notify has already been called. */
+                        rc = -ENOMEM;
+                        break;
+                    }
 
                     rc = mod_l1_entry(va, l1e, mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, v,
