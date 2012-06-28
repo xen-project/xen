@@ -213,9 +213,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 50c553be472c9f4b05a0526c0aae98709ca9ffff
-# Thu Jun 7 19:44:01 2012 +0100
-# qemu-xen-trad: fix sys-queue.h usage on BSD systems
+QEMU_TAG ?= ce6d9b1b2f9c6a5ca2500e03d0ef8b453bc4bf53
+# Thu Jun 28 15:44:50 2012 +0100
+# qemu-traditional: disable msitranslate by default
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
