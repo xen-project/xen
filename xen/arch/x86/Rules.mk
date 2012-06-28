@@ -8,6 +8,7 @@ HAS_PCI := y
 HAS_PASSTHROUGH := y
 HAS_NS16550 := y
 HAS_KEXEC := y
+HAS_GDBSX := y
 xenoprof := y
 
 #

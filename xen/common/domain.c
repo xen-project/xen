@@ -612,6 +612,7 @@ void vcpu_end_shutdown_deferral(struct vcpu *v)
         vcpu_check_shutdown(v);
 }
 
+#ifdef HAS_GDBSX
 void domain_pause_for_debugger(void)
 {
     struct domain *d = current->domain;
@@ -628,6 +629,7 @@ void domain_pause_for_debugger(void)
     if (current->arch.gdbsx_vcpu_event == 0)
         send_global_virq(VIRQ_DEBUGGER);
 }
+#endif
 
 /* Complete domain destroy after RCU readers are not holding old references. */
 static void complete_domain_destroy(struct rcu_head *head)
