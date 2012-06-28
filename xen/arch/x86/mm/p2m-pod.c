@@ -926,6 +926,27 @@ p2m_pod_emergency_sweep_super(struct p2m_domain *p2m)
     p2m->pod.reclaim_super = i ? i - SUPERPAGE_PAGES : 0;
 }
 
+/* When populating a new superpage, look at recently populated superpages
+ * hoping that they've been zeroed.  This will snap up zeroed pages as soon as 
+ * the guest OS is done with them. */
+static void
+p2m_pod_check_last_super(struct p2m_domain *p2m, unsigned long gfn_aligned)
+{
+    unsigned long check_gfn;
+
+    ASSERT(p2m->pod.last_populated_index < POD_HISTORY_MAX);
+
+    check_gfn = p2m->pod.last_populated[p2m->pod.last_populated_index];
+
+    p2m->pod.last_populated[p2m->pod.last_populated_index] = gfn_aligned;
+
+    p2m->pod.last_populated_index =
+        ( p2m->pod.last_populated_index + 1 ) % POD_HISTORY_MAX;
+
+    p2m_pod_zero_check_superpage(p2m, check_gfn);
+}
+
+
 #define POD_SWEEP_STRIDE  16
 static void
 p2m_pod_emergency_sweep(struct p2m_domain *p2m)
@@ -1082,6 +1103,12 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
         
         __trace_var(TRC_MEM_POD_POPULATE, 0, sizeof(t), &t);
     }
+
+    /* Check the last guest demand-populate */
+    if ( p2m->pod.entry_count > p2m->pod.count 
+         && (order == PAGE_ORDER_2M)
+         && (q & P2M_ALLOC) )
+        p2m_pod_check_last_super(p2m, gfn_aligned);
 
     pod_unlock(p2m);
     return 0;

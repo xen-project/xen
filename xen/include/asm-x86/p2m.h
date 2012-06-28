@@ -287,6 +287,10 @@ struct p2m_domain {
         unsigned         reclaim_super; /* Last gpfn of a scan */
         unsigned         reclaim_single; /* Last gpfn of a scan */
         unsigned         max_guest;    /* gpfn of max guest demand-populate */
+#define POD_HISTORY_MAX 128
+        /* gpfn of last guest superpage demand-populated */
+        unsigned long    last_populated[POD_HISTORY_MAX]; 
+        unsigned int     last_populated_index;
         mm_lock_t        lock;         /* Locking of private pod structs,   *
                                         * not relying on the p2m lock.      */
     } pod;
