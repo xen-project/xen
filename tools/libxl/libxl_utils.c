@@ -511,7 +511,7 @@ void libxl_cpumap_dispose(libxl_cpumap *map)
     free(map->map);
 }
 
-int libxl_cpumap_test(libxl_cpumap *cpumap, int cpu)
+int libxl_cpumap_test(const libxl_cpumap *cpumap, int cpu)
 {
     if (cpu >= cpumap->size * 8)
         return 0;
@@ -530,6 +530,31 @@ void libxl_cpumap_reset(libxl_cpumap *cpumap, int cpu)
     if (cpu >= cpumap->size * 8)
         return;
     cpumap->map[cpu / 8] &= ~(1 << (cpu & 7));
+}
+
+int libxl_cpumap_count_set(const libxl_cpumap *cpumap)
+{
+    int i, nr_set_cpus = 0;
+    libxl_for_each_set_cpu(i, *cpumap)
+        nr_set_cpus++;
+
+    return nr_set_cpus;
+}
+
+/* NB. caller is responsible for freeing the memory */
+char *libxl_cpumap_to_hex_string(const libxl_cpumap *cpumap)
+{
+    int i = cpumap->size;
+    char *p = libxl__zalloc(NULL, cpumap->size * 2 + 3);
+    char *q = p;
+    strncpy(p, "0x", 2);
+    p += 2;
+    while(--i >= 0) {
+        sprintf(p, "%02x", cpumap->map[i]);
+        p += 2;
+    }
+    *p = '\0';
+    return q;
 }
 
 int libxl_get_max_cpus(libxl_ctx *ctx)

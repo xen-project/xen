@@ -237,7 +237,7 @@ libxl_domain_sched_params = Struct("domain_sched_params",[
 
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),
-    ("cur_vcpus",       integer),
+    ("avail_vcpus",     libxl_cpumap),
     ("cpumap",          libxl_cpumap),
     ("tsc_mode",        libxl_tsc_mode),
     ("max_memkb",       MemKB),

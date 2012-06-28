@@ -160,6 +160,8 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     }
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         int ioemu_vifs = 0;
+        int nr_set_cpus = 0;
+        char *s;
 
         if (b_info->u.hvm.serial) {
             flexarray_vappend(dm_args, "-serial", b_info->u.hvm.serial, NULL);
@@ -200,11 +202,13 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
                               libxl__sprintf(gc, "%d", b_info->max_vcpus),
                               NULL);
         }
-        if (b_info->cur_vcpus) {
-            flexarray_vappend(dm_args, "-vcpu_avail",
-                              libxl__sprintf(gc, "0x%x", b_info->cur_vcpus),
-                              NULL);
-        }
+
+        nr_set_cpus = libxl_cpumap_count_set(&b_info->avail_vcpus);
+        s = libxl_cpumap_to_hex_string(&b_info->avail_vcpus);
+        flexarray_vappend(dm_args, "-vcpu_avail",
+                              libxl__sprintf(gc, "%s", s), NULL);
+        free(s);
+
         for (i = 0; i < num_vifs; i++) {
             if (vifs[i].nictype == LIBXL_NIC_TYPE_IOEMU) {
                 char *smac = libxl__sprintf(gc,
@@ -443,11 +447,14 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         }
         if (b_info->max_vcpus > 1) {
             flexarray_append(dm_args, "-smp");
-            if (b_info->cur_vcpus)
+            if (b_info->avail_vcpus.size) {
+                int nr_set_cpus = 0;
+                nr_set_cpus = libxl_cpumap_count_set(&b_info->avail_vcpus);
+
                 flexarray_append(dm_args, libxl__sprintf(gc, "%d,maxcpus=%d",
                                                          b_info->max_vcpus,
-                                                         b_info->cur_vcpus));
-            else
+                                                         nr_set_cpus));
+            } else
                 flexarray_append(dm_args, libxl__sprintf(gc, "%d",
                                                          b_info->max_vcpus));
         }

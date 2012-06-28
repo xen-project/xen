@@ -64,9 +64,11 @@ int libxl_vdev_to_device_disk(libxl_ctx *ctx, uint32_t domid, const char *vdev,
                                libxl_device_disk *disk);
 
 int libxl_cpumap_alloc(libxl_ctx *ctx, libxl_cpumap *cpumap, int max_cpus);
-int libxl_cpumap_test(libxl_cpumap *cpumap, int cpu);
+int libxl_cpumap_test(const libxl_cpumap *cpumap, int cpu);
 void libxl_cpumap_set(libxl_cpumap *cpumap, int cpu);
 void libxl_cpumap_reset(libxl_cpumap *cpumap, int cpu);
+int libxl_cpumap_count_set(const libxl_cpumap *cpumap);
+char *libxl_cpumap_to_hex_string(const libxl_cpumap *cpumap);
 static inline void libxl_cpumap_set_any(libxl_cpumap *cpumap)
 {
     memset(cpumap->map, -1, cpumap->size);

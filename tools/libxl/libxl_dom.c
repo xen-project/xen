@@ -199,8 +199,8 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     ents[11] = libxl__sprintf(gc, "%lu", state->store_mfn);
     for (i = 0; i < info->max_vcpus; i++) {
         ents[12+(i*2)]   = libxl__sprintf(gc, "cpu/%d/availability", i);
-        ents[12+(i*2)+1] = (i && info->cur_vcpus && !(info->cur_vcpus & (1 << i)))
-                            ? "offline" : "online";
+        ents[12+(i*2)+1] = libxl_cpumap_test(&info->avail_vcpus, i)
+                            ? "online" : "offline";
     }
 
     hvm_ents = NULL;
@@ -354,7 +354,7 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
     va_hvm->apic_mode = libxl_defbool_val(info->u.hvm.apic);
     va_hvm->nr_vcpus = info->max_vcpus;
-    memcpy(va_hvm->vcpu_online, &info->cur_vcpus, sizeof(info->cur_vcpus));
+    memcpy(va_hvm->vcpu_online, info->avail_vcpus.map, info->avail_vcpus.size);
     for (i = 0, sum = 0; i < va_hvm->length; i++)
         sum += ((uint8_t *) va_hvm)[i];
     va_hvm->checksum -= sum;

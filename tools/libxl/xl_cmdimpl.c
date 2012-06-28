@@ -647,7 +647,14 @@ static void parse_config_data(const char *config_source,
 
     if (!xlu_cfg_get_long (config, "vcpus", &l, 0)) {
         b_info->max_vcpus = l;
-        b_info->cur_vcpus = (1 << l) - 1;
+
+        if (libxl_cpumap_alloc(ctx, &b_info->avail_vcpus, l)) {
+            fprintf(stderr, "Unable to allocate cpumap\n");
+            exit(1);
+        }
+        libxl_cpumap_set_none(&b_info->avail_vcpus);
+        while (l-- > 0)
+            libxl_cpumap_set((&b_info->avail_vcpus), l);
     }
 
     if (!xlu_cfg_get_long (config, "maxvcpus", &l, 0))
