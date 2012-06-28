@@ -1152,15 +1152,17 @@ out:
     domain_suspend_done(egc, dss, rc);
 }
 
+static void save_device_model_datacopier_done(libxl__egc *egc,
+     libxl__datacopier_state *dc, int onwrite, int errnoval);
+
 void libxl__domain_save_device_model(libxl__egc *egc,
                                      libxl__domain_suspend_state *dss,
                                      libxl__save_device_model_cb *callback)
 {
     STATE_AO_GC(dss->ao);
-    int rc, fd2 = -1, c;
-    char buf[1024];
     struct stat st;
     uint32_t qemu_state_len;
+    int rc;
 
     dss->save_dm_callback = callback;
 
@@ -1168,49 +1170,77 @@ void libxl__domain_save_device_model(libxl__egc *egc,
     const char *const filename = dss->dm_savefile;
     const int fd = dss->fd;
 
-    if (stat(filename, &st) < 0)
+    libxl__datacopier_state *dc = &dss->save_dm_datacopier;
+    memset(dc, 0, sizeof(*dc));
+    dc->readwhat = GCSPRINTF("qemu save file %s", filename);
+    dc->ao = ao;
+    dc->readfd = -1;
+    dc->writefd = fd;
+    dc->maxsz = INT_MAX;
+    dc->copywhat = GCSPRINTF("qemu save file for domain %"PRIu32, dss->domid);
+    dc->writewhat = "save/migration stream";
+    dc->callback = save_device_model_datacopier_done;
+
+    dc->readfd = open(filename, O_RDONLY);
+    if (dc->readfd < 0) {
+        LOGE(ERROR, "unable to open %s", dc->readwhat);
+        goto out;
+    }
+
+    if (fstat(dc->readfd, &st))
     {
-        LOG(ERROR, "Unable to stat qemu save file\n");
-        rc = ERROR_FAIL;
+        LOGE(ERROR, "unable to fstat %s", dc->readwhat);
+        goto out;
+    }
+
+    if (!S_ISREG(st.st_mode)) {
+        LOG(ERROR, "%s is not a plain file!", dc->readwhat);
         goto out;
     }
 
     qemu_state_len = st.st_size;
-    LOG(DEBUG, "Qemu state is %d bytes\n", qemu_state_len);
+    LOG(DEBUG, "%s is %d bytes", dc->readwhat, qemu_state_len);
 
-    rc = libxl_write_exactly(CTX, fd, QEMU_SIGNATURE, strlen(QEMU_SIGNATURE),
-                              "saved-state file", "qemu signature");
-    if (rc)
-        goto out;
+    rc = libxl__datacopier_start(dc);
+    if (rc) goto out;
 
-    rc = libxl_write_exactly(CTX, fd, &qemu_state_len, sizeof(qemu_state_len),
-                            "saved-state file", "saved-state length");
-    if (rc)
-        goto out;
+    libxl__datacopier_prefixdata(egc, dc,
+                                 QEMU_SIGNATURE, strlen(QEMU_SIGNATURE));
 
-    fd2 = open(filename, O_RDONLY);
-    if (fd2 < 0) {
-        LOGE(ERROR, "Unable to open qemu save file\n");
-        goto out;
+    libxl__datacopier_prefixdata(egc, dc,
+                                 &qemu_state_len, sizeof(qemu_state_len));
+    return;
+
+ out:
+    save_device_model_datacopier_done(egc, dc, -1, 0);
+}
+
+static void save_device_model_datacopier_done(libxl__egc *egc,
+     libxl__datacopier_state *dc, int onwrite, int errnoval)
+{
+    libxl__domain_suspend_state *dss =
+        CONTAINER_OF(dc, *dss, save_dm_datacopier);
+    STATE_AO_GC(dss->ao);
+
+    /* Convenience aliases */
+    const char *const filename = dss->dm_savefile;
+    int our_rc = 0;
+    int rc;
+
+    libxl__datacopier_kill(dc);
+
+    if (onwrite || errnoval)
+        our_rc = ERROR_FAIL;
+
+    if (dc->readfd >= 0) {
+        close(dc->readfd);
+        dc->readfd = -1;
     }
-    while ((c = read(fd2, buf, sizeof(buf))) != 0) {
-        if (c < 0) {
-            if (errno == EINTR)
-                continue;
-            rc = errno;
-            goto out;
-        }
-        rc = libxl_write_exactly(
-            CTX, fd, buf, c, "saved-state file", "qemu state");
-        if (rc)
-            goto out;
-    }
-    rc = 0;
-out:
-    if (fd2 >= 0) close(fd2);
-    unlink(filename);
 
-    dss->save_dm_callback(egc, dss, rc);
+    rc = libxl__remove_file(gc, filename);
+    if (!our_rc) our_rc = rc;
+
+    dss->save_dm_callback(egc, dss, our_rc);
 }
 
 static void domain_suspend_done(libxl__egc *egc,

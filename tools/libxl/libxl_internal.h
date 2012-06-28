@@ -1901,6 +1901,7 @@ struct libxl__domain_suspend_state {
     libxl__logdirty_switch logdirty;
     /* private for libxl__domain_save_device_model */
     libxl__save_device_model_cb *save_dm_callback;
+    libxl__datacopier_state save_dm_datacopier;
 };
 
 
