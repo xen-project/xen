@@ -92,7 +92,7 @@ libxl__carefd *libxl__carefd_record(libxl_ctx *ctx, int fd)
     libxl__carefd *cf = 0;
 
     libxl_fd_set_cloexec(ctx, fd, 1);
-    cf = libxl__zalloc(NULL, sizeof(*cf));
+    cf = libxl__zalloc(&ctx->nogc_gc, sizeof(*cf));
     cf->fd = fd;
     LIBXL_LIST_INSERT_HEAD(&carefds, cf, entry);
     return cf;

@@ -77,6 +77,7 @@ static void datacopier_check_state(libxl__egc *egc, libxl__datacopier_state *dc)
 void libxl__datacopier_prefixdata(libxl__egc *egc, libxl__datacopier_state *dc,
                                   const void *data, size_t len)
 {
+    EGC_GC;
     libxl__datacopier_buf *buf;
     /*
      * It is safe for this to be called immediately after _start, as
@@ -88,7 +89,7 @@ void libxl__datacopier_prefixdata(libxl__egc *egc, libxl__datacopier_state *dc,
 
     assert(len < dc->maxsz - dc->used);
 
-    buf = libxl__zalloc(0, sizeof(*buf) - sizeof(buf->buf) + len);
+    buf = libxl__zalloc(NOGC, sizeof(*buf) - sizeof(buf->buf) + len);
     buf->used = len;
     memcpy(buf->buf, data, len);
 

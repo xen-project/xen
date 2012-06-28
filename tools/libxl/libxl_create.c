@@ -165,7 +165,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     }
 
     if (b_info->blkdev_start == NULL)
-        b_info->blkdev_start = libxl__strdup(0, "xvda");
+        b_info->blkdev_start = libxl__strdup(NOGC, "xvda");
 
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         if (!b_info->u.hvm.bios)

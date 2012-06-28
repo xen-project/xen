@@ -277,10 +277,18 @@ struct libxl__poller {
     int wakeup_pipe[2]; /* 0 means no fd allocated */
 };
 
+struct libxl__gc {
+    /* mini-GC */
+    int alloc_maxsize; /* -1 means this is the dummy non-gc gc */
+    void **alloc_ptrs;
+    libxl_ctx *owner;
+};
+
 struct libxl__ctx {
     xentoollog_logger *lg;
     xc_interface *xch;
     struct xs_handle *xsh;
+    libxl__gc nogc_gc;
 
     const libxl_event_hooks *event_hooks;
     void *event_hooks_user;
@@ -356,13 +364,6 @@ typedef struct {
 
 #define PRINTF_ATTRIBUTE(x, y) __attribute__((format(printf, x, y)))
 
-struct libxl__gc {
-    /* mini-GC */
-    int alloc_maxsize;
-    void **alloc_ptrs;
-    libxl_ctx *owner;
-};
-
 struct libxl__egc {
     /* For event-generating functions only.
      * The egc and its gc may be accessed only on the creating thread. */
@@ -420,6 +421,7 @@ struct libxl__ao {
         (gc).alloc_ptrs = 0;                    \
         (gc).owner = (ctx);                     \
     } while(0)
+    /* NB, also, a gc struct ctx->nogc_gc is initialised in libxl_ctx_alloc */
 
 static inline libxl_ctx *libxl__gc_owner(libxl__gc *gc)
 {
@@ -438,13 +440,20 @@ static inline libxl_ctx *libxl__gc_owner(libxl__gc *gc)
  * All pointers returned by these functions are registered for garbage
  * collection on exit from the outermost libxl callframe.
  *
- * However, where the argument is stated to be "gc_opt", NULL may be
- * passed instead, in which case no garbage collection will occur; the
- * pointer must later be freed with free().  This is for memory
- * allocations of types (b) and (c).
+ * However, where the argument is stated to be "gc_opt", &ctx->nogc_gc
+ * may be passed instead, in which case no garbage collection will
+ * occur; the pointer must later be freed with free().  (Passing NULL
+ * for gc_opt is not permitted.)  This is for memory allocations of
+ * types (b) and (c).  The convenience macro NOGC should be used where
+ * possible.
+ *
+ * NOGC (and ctx->nogc_gc) may ONLY be used with functions which
+ * explicitly declare that it's OK.  Use with nonconsenting functions
+ * may result in leaks of those functions' internal allocations on the
+ * psuedo-gc.
  */
-/* register @ptr in @gc for free on exit from outermost libxl callframe. */
-_hidden void libxl__ptr_add(libxl__gc *gc_opt, void *ptr);
+/* register ptr in gc for free on exit from outermost libxl callframe. */
+_hidden void libxl__ptr_add(libxl__gc *gc_opt, void *ptr /* may be NULL */);
 /* if this is the outermost libxl callframe then free all pointers in @gc */
 _hidden void libxl__free_all(libxl__gc *gc);
 /* allocate and zero @bytes. (similar to a gc'd malloc(3)+memzero()) */
@@ -2110,7 +2119,7 @@ _hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
 #define GC_INIT(ctx)  libxl__gc gc[1]; LIBXL_INIT_GC(gc[0],ctx)
 #define GC_FREE       libxl__free_all(gc)
 #define CTX           libxl__gc_owner(gc)
-#define NOGC          NULL
+#define NOGC          (&CTX->nogc_gc) /* pass only to consenting functions */
 
 /* Allocation macros all of which use the gc. */
 

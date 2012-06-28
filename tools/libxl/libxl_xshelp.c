@@ -86,11 +86,8 @@ char * libxl__xs_read(libxl__gc *gc, xs_transaction_t t, const char *path)
     char *ptr;
 
     ptr = xs_read(ctx->xsh, t, path, NULL);
-    if (ptr != NULL) {
-        libxl__ptr_add(gc, ptr);
-        return ptr;
-    }
-    return 0;
+    libxl__ptr_add(gc, ptr);
+    return ptr;
 }
 
 char *libxl__xs_get_dompath(libxl__gc *gc, uint32_t domid)

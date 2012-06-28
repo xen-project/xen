@@ -280,7 +280,7 @@ int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *ss)
     int status, rc;
 
     libxl__spawn_init(ss);
-    ss->ssd = libxl__zalloc(0, sizeof(*ss->ssd));
+    ss->ssd = libxl__zalloc(NOGC, sizeof(*ss->ssd));
     libxl__ev_child_init(&ss->ssd->mid);
 
     rc = libxl__ev_time_register_rel(gc, &ss->timeout,

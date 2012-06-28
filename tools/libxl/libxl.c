@@ -41,6 +41,9 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
 
     /* First initialise pointers etc. (cannot fail) */
 
+    ctx->nogc_gc.alloc_maxsize = -1;
+    ctx->nogc_gc.owner = ctx;
+
     LIBXL_TAILQ_INIT(&ctx->occurred);
 
     ctx->osevent_hooks = 0;

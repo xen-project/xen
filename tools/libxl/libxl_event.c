@@ -772,7 +772,7 @@ static int beforepoll_internal(libxl__gc *gc, libxl__poller *poller,
         if (poller->fd_rindices_allocd < maxfd) {
             assert(ARRAY_SIZE_OK(poller->fd_rindices, maxfd));
             poller->fd_rindices =
-                libxl__realloc(0, poller->fd_rindices,
+                libxl__realloc(NOGC, poller->fd_rindices,
                                maxfd * sizeof(*poller->fd_rindices));
             memset(poller->fd_rindices + poller->fd_rindices_allocd,
                    0,
@@ -1099,9 +1099,10 @@ void libxl_event_free(libxl_ctx *ctx, libxl_event *event)
 libxl_event *libxl__event_new(libxl__egc *egc,
                               libxl_event_type type, uint32_t domid)
 {
+    EGC_GC;
     libxl_event *ev;
 
-    ev = libxl__zalloc(0,sizeof(*ev));
+    ev = libxl__zalloc(NOGC,sizeof(*ev));
     ev->type = type;
     ev->domid = domid;
 

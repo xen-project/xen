@@ -30,11 +30,16 @@ void libxl__alloc_failed(libxl_ctx *ctx, const char *func,
 #undef L
 }
 
+static int gc_is_real(const libxl__gc *gc)
+{
+    return gc->alloc_maxsize >= 0;
+}
+
 void libxl__ptr_add(libxl__gc *gc, void *ptr)
 {
     int i;
 
-    if (!gc)
+    if (!gc_is_real(gc))
         return;
 
     if (!ptr)
@@ -65,6 +70,8 @@ void libxl__free_all(libxl__gc *gc)
 {
     void *ptr;
     int i;
+
+    assert(gc_is_real(gc));
 
     for (i = 0; i < gc->alloc_maxsize; i++) {
         ptr = gc->alloc_ptrs[i];
@@ -104,7 +111,7 @@ void *libxl__realloc(libxl__gc *gc, void *ptr, size_t new_size)
 
     if (ptr == NULL) {
         libxl__ptr_add(gc, new_ptr);
-    } else if (new_ptr != ptr && gc != NULL) {
+    } else if (new_ptr != ptr && gc_is_real(gc)) {
         for (i = 0; i < gc->alloc_maxsize; i++) {
             if (gc->alloc_ptrs[i] == ptr) {
                 gc->alloc_ptrs[i] = new_ptr;
