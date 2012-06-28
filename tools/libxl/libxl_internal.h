@@ -498,6 +498,44 @@ _hidden bool libxl__xs_mkdir(libxl__gc *gc, xs_transaction_t t,
 
 _hidden char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid);
 
+
+/*----- "checked" xenstore access functions -----*/
+/* Each of these functions will check that it succeeded; if it
+ * fails it logs and returns ERROR_FAIL.
+ */
+
+/* On success, *result_out came from the gc.
+ * On error, *result_out is undefined.
+ * ENOENT counts as success but sets *result_out=0
+ */
+int libxl__xs_read_checked(libxl__gc *gc, xs_transaction_t t,
+                           const char *path, const char **result_out);
+
+/* Does not include a trailing null.
+ * May usefully be combined with GCSPRINTF if the format string
+ * behaviour of libxl__xs_write is desirable. */
+int libxl__xs_write_checked(libxl__gc *gc, xs_transaction_t t,
+                            const char *path, const char *string);
+
+/* ENOENT is not an error (even if the parent directories don't exist) */
+int libxl__xs_rm_checked(libxl__gc *gc, xs_transaction_t t, const char *path);
+
+/* Transaction functions, best used together.
+ * The caller should initialise *t to 0 (XBT_NULL) before calling start.
+ * Each function leaves *t!=0 iff the transaction needs cleaning up.
+ *
+ * libxl__xs_transaction_commit returns:
+ *   <0  failure - a libxl error code
+ *   +1  commit conflict; transaction has been destroyed and caller
+ *        must go round again (call _start again and retry)
+ *    0  committed successfully
+ */
+int libxl__xs_transaction_start(libxl__gc *gc, xs_transaction_t *t);
+int libxl__xs_transaction_commit(libxl__gc *gc, xs_transaction_t *t);
+void libxl__xs_transaction_abort(libxl__gc *gc, xs_transaction_t *t);
+
+
+
 /*
  * This is a recursive delete, from top to bottom. What this function does
  * is remove empty folders that contained the deleted entry.

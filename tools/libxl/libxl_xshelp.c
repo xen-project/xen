@@ -135,6 +135,82 @@ char *libxl__xs_libxl_path(libxl__gc *gc, uint32_t domid)
     return s;
 }
 
+int libxl__xs_read_checked(libxl__gc *gc, xs_transaction_t t,
+                           const char *path, const char **result_out)
+{
+    char *result = libxl__xs_read(gc, t, path);
+    if (!result) {
+        if (errno != ENOENT) {
+            LOGE(ERROR, "xenstore read failed: `%s'", path);
+            return ERROR_FAIL;
+        }
+    }
+    *result_out = result;
+    return 0;
+}
+
+int libxl__xs_write_checked(libxl__gc *gc, xs_transaction_t t,
+                            const char *path, const char *string)
+{
+    size_t length = strlen(string);
+    if (!xs_write(CTX->xsh, t, path, string, length)) {
+        LOGE(ERROR, "xenstore write failed: `%s' = `%s'", path, string);
+        return ERROR_FAIL;
+    }
+    return 0;
+}
+
+int libxl__xs_rm_checked(libxl__gc *gc, xs_transaction_t t, const char *path)
+{
+    if (!xs_rm(CTX->xsh, t, path)) {
+        if (errno == ENOENT)
+            return 0;
+
+        LOGE(ERROR, "xenstore rm failed: `%s'", path);
+        return ERROR_FAIL;
+    }
+    return 0;
+}
+
+int libxl__xs_transaction_start(libxl__gc *gc, xs_transaction_t *t)
+{
+    assert(!*t);
+    *t = xs_transaction_start(CTX->xsh);
+    if (!*t) {
+        LOGE(ERROR, "could not create xenstore transaction");
+        return ERROR_FAIL;
+    }
+    return 0;
+}
+
+int libxl__xs_transaction_commit(libxl__gc *gc, xs_transaction_t *t)
+{
+    assert(*t);
+
+    if (!xs_transaction_end(CTX->xsh, *t, 0)) {
+        if (errno == EAGAIN)
+            return +1;
+
+        *t = 0;
+        LOGE(ERROR, "could not commit xenstore transaction");
+        return ERROR_FAIL;
+    }
+
+    *t = 0;
+    return 0;
+}
+
+void libxl__xs_transaction_abort(libxl__gc *gc, xs_transaction_t *t)
+{
+    if (!*t)
+        return;
+
+    if (!xs_transaction_end(CTX->xsh, *t, 1))
+        LOGE(ERROR, "could not abort xenstore transaction");
+
+    *t = 0;
+}
+
 int libxl__xs_path_cleanup(libxl__gc *gc, xs_transaction_t t, char *user_path)
 {
     unsigned int nb = 0;
