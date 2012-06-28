@@ -2826,7 +2826,7 @@ static int save_domain(const char *p, const char *filename, int checkpoint,
 
     save_domain_core_writeconfig(fd, filename, config_data, config_len);
 
-    CHK_ERRNO(libxl_domain_suspend(ctx, NULL, domid, fd));
+    CHK_ERRNO(libxl_domain_suspend(ctx, domid, fd, 0, NULL));
     close(fd);
 
     if (checkpoint)
@@ -2988,7 +2988,6 @@ static void migrate_domain(const char *domain_spec, const char *rune,
     pid_t child = -1;
     int rc;
     int send_fd = -1, recv_fd = -1;
-    libxl_domain_suspend_info suspinfo;
     char *away_domname;
     char rc_buf;
     uint8_t *config_data;
@@ -3010,9 +3009,7 @@ static void migrate_domain(const char *domain_spec, const char *rune,
 
     xtl_stdiostream_adjust_flags(logger, XTL_STDIOSTREAM_HIDE_PROGRESS, 0);
 
-    memset(&suspinfo, 0, sizeof(suspinfo));
-    suspinfo.flags |= XL_SUSPEND_LIVE;
-    rc = libxl_domain_suspend(ctx, &suspinfo, domid, send_fd);
+    rc = libxl_domain_suspend(ctx, domid, send_fd, LIBXL_SUSPEND_LIVE, NULL);
     if (rc) {
         fprintf(stderr, "migration sender: libxl_domain_suspend failed"
                 " (rc=%d)\n", rc);
@@ -6584,7 +6581,7 @@ int main_remus(int argc, char **argv)
     }
 
     /* Point of no return */
-    rc = libxl_domain_remus_start(ctx, &r_info, domid, send_fd, recv_fd);
+    rc = libxl_domain_remus_start(ctx, &r_info, domid, send_fd, recv_fd, 0);
 
     /* If we are here, it means backup has failed/domain suspend failed.
      * Try to resume the domain and exit gracefully.

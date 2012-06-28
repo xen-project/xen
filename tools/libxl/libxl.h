@@ -347,13 +347,6 @@ typedef struct libxl__ctx libxl_ctx;
 
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx);
 
-typedef struct {
-#define XL_SUSPEND_DEBUG 1
-#define XL_SUSPEND_LIVE 2
-    int flags;
-    int (*suspend_callback)(void *, int);
-} libxl_domain_suspend_info;
-
 enum {
     ERROR_NONSPECIFIC = -1,
     ERROR_VERSION = -2,
@@ -514,16 +507,23 @@ int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
 
 void libxl_domain_config_init(libxl_domain_config *d_config);
 void libxl_domain_config_dispose(libxl_domain_config *d_config);
-int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
-                             uint32_t domid, int send_fd, int recv_fd);
-int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
-                          uint32_t domid, int fd);
+
+int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd,
+                         int flags, /* LIBXL_SUSPEND_* */
+                         const libxl_asyncop_how *ao_how);
+#define LIBXL_SUSPEND_DEBUG 1
+#define LIBXL_SUSPEND_LIVE 2
 
 /* @param suspend_cancel [from xenctrl.h:xc_domain_resume( @param fast )]
  *   If this parameter is true, use co-operative resume. The guest
  *   must support this.
  */
 int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid, int suspend_cancel);
+
+int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
+                             uint32_t domid, int send_fd, int recv_fd,
+                             const libxl_asyncop_how *ao_how);
+
 int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_reboot(libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid);

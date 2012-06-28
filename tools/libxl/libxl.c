@@ -649,32 +649,51 @@ libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm_out)
     return ptr;
 }
 
+static void remus_failover_cb(libxl__egc *egc,
+                              libxl__domain_suspend_state *dss, int rc);
+
 /* TODO: Explicit Checkpoint acknowledgements via recv_fd. */
 int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
-                             uint32_t domid, int send_fd, int recv_fd)
+                             uint32_t domid, int send_fd, int recv_fd,
+                             const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
-    libxl_domain_type type = libxl__domain_type(gc, domid);
-    int rc = 0;
+    AO_CREATE(ctx, domid, ao_how);
+    libxl__domain_suspend_state *dss;
+    int rc;
 
+    libxl_domain_type type = libxl__domain_type(gc, domid);
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
         rc = ERROR_FAIL;
-        goto remus_fail;
+        goto out;
     }
 
-    if (info == NULL) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                   "No remus_info structure supplied for domain %d", domid);
-        rc = ERROR_INVAL;
-        goto remus_fail;
-    }
+    GCNEW(dss);
+    dss->ao = ao;
+    dss->callback = remus_failover_cb;
+    dss->domid = domid;
+    dss->fd = send_fd;
+    /* TODO do something with recv_fd */
+    dss->type = type;
+    dss->live = 1;
+    dss->debug = 0;
+    dss->remus = info;
+
+    assert(info);
 
     /* TBD: Remus setup - i.e. attach qdisc, enable disk buffering, etc */
 
     /* Point of no return */
-    rc = libxl__domain_suspend_common(gc, domid, send_fd, type, /* live */ 1,
-                                      /* debug */ 0, info);
+    libxl__domain_suspend(egc, dss);
+    return AO_INPROGRESS;
 
+ out:
+    return AO_ABORT(rc);
+}
+
+static void remus_failover_cb(libxl__egc *egc,
+                              libxl__domain_suspend_state *dss, int rc)
+{
+    STATE_AO_GC(dss->ao);
     /*
      * With Remus, if we reach this point, it means either
      * backup died or some network error occurred preventing us
@@ -684,27 +703,46 @@ int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
     /* TBD: Remus cleanup - i.e. detach qdisc, release other
      * resources.
      */
- remus_fail:
-    GC_FREE;
-    return rc;
+    libxl__ao_complete(egc, ao, rc);
 }
 
-int libxl_domain_suspend(libxl_ctx *ctx, libxl_domain_suspend_info *info,
-                         uint32_t domid, int fd)
+static void domain_suspend_cb(libxl__egc *egc,
+                              libxl__domain_suspend_state *dss, int rc)
 {
-    GC_INIT(ctx);
+    STATE_AO_GC(dss->ao);
+    libxl__ao_complete(egc,ao,rc);
+
+}
+
+int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd, int flags,
+                         const libxl_asyncop_how *ao_how)
+{
+    AO_CREATE(ctx, domid, ao_how);
+    int rc;
+
     libxl_domain_type type = libxl__domain_type(gc, domid);
-    int live = info != NULL && info->flags & XL_SUSPEND_LIVE;
-    int debug = info != NULL && info->flags & XL_SUSPEND_DEBUG;
-    int rc = 0;
+    if (type == LIBXL_DOMAIN_TYPE_INVALID) {
+        rc = ERROR_FAIL;
+        goto out_err;
+    }
 
-    rc = libxl__domain_suspend_common(gc, domid, fd, type, live, debug,
-                                      /* No Remus */ NULL);
+    libxl__domain_suspend_state *dss;
+    GCNEW(dss);
 
-    if (!rc && type == LIBXL_DOMAIN_TYPE_HVM)
-        rc = libxl__domain_save_device_model(gc, domid, fd);
-    GC_FREE;
-    return rc;
+    dss->ao = ao;
+    dss->callback = domain_suspend_cb;
+
+    dss->domid = domid;
+    dss->fd = fd;
+    dss->type = type;
+    dss->live = flags & LIBXL_SUSPEND_LIVE;
+    dss->debug = flags & LIBXL_SUSPEND_DEBUG;
+
+    libxl__domain_suspend(egc, dss);
+    return AO_INPROGRESS;
+
+ out_err:
+    return AO_ABORT(rc);
 }
 
 int libxl_domain_pause(libxl_ctx *ctx, uint32_t domid)

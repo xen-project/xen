@@ -1777,16 +1777,28 @@ _hidden int libxl__datacopier_start(libxl__datacopier_state *dc);
 
 typedef struct libxl__domain_suspend_state libxl__domain_suspend_state;
 
+typedef void libxl__domain_suspend_cb(libxl__egc*,
+                                      libxl__domain_suspend_state*, int rc);
+
 struct libxl__domain_suspend_state {
-    libxl__gc *gc;
+    /* set by caller of libxl__domain_suspend */
+    libxl__ao *ao;
+    libxl__domain_suspend_cb *callback;
+
+    uint32_t domid;
+    int fd;
+    libxl_domain_type type;
+    int live;
+    int debug;
+    const libxl_domain_remus_info *remus;
+    /* private */
     xc_evtchn *xce; /* event channel handle */
     int suspend_eventchn;
-    int domid;
     int hvm;
-    unsigned int xcflags;
+    int xcflags;
     int guest_responded;
-    int save_fd; /* Migration stream fd (for Remus) */
     int interval; /* checkpoint interval (for Remus) */
+    struct save_callbacks callbacks;
 };
 
 
@@ -1903,10 +1915,27 @@ struct libxl__domain_create_state {
 
 /*----- Domain suspend (save) functions -----*/
 
-_hidden int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
-                                         libxl_domain_type type,
-                                         int live, int debug,
-                                         const libxl_domain_remus_info *r_info);
+/* calls dss->callback when done */
+_hidden void libxl__domain_suspend(libxl__egc *egc,
+                                   libxl__domain_suspend_state *dss);
+
+
+/* calls libxl__xc_domain_suspend_done when done */
+_hidden void libxl__xc_domain_save(libxl__egc*, libxl__domain_suspend_state*,
+                                   unsigned long vm_generationid_addr);
+/* If rc==0 then retval is the return value from xc_domain_save
+ * and errnoval is the errno value it provided.
+ * If rc!=0, retval and errnoval are undefined. */
+_hidden void libxl__xc_domain_save_done(libxl__egc*,
+                                        libxl__domain_suspend_state*,
+                                        int rc, int retval, int errnoval);
+
+_hidden int libxl__domain_suspend_common_callback(void *data);
+_hidden int libxl__domain_suspend_common_switch_qemu_logdirty
+                               (int domid, unsigned int enable, void *data);
+_hidden int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
+        uint32_t *len, void *data);
+
 
 /* calls libxl__xc_domain_restore_done when done */
 _hidden void libxl__xc_domain_restore(libxl__egc *egc,

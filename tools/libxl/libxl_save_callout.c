@@ -35,3 +35,14 @@ void libxl__xc_domain_restore(libxl__egc *egc, libxl__domain_create_state *dcs,
                               &state->vm_generationid_addr, &dcs->callbacks);
     libxl__xc_domain_restore_done(egc, dcs, 0, r, errno);
 }
+
+void libxl__xc_domain_save(libxl__egc *egc, libxl__domain_suspend_state *dss,
+                           unsigned long vm_generationid_addr)
+{
+    STATE_AO_GC(dss->ao);
+    int r;
+
+    r = xc_domain_save(CTX->xch, dss->fd, dss->domid, 0, 0, dss->xcflags,
+                       &dss->callbacks, dss->hvm, vm_generationid_addr);
+    libxl__xc_domain_save_done(egc, dss, 0, r, errno);
+}
