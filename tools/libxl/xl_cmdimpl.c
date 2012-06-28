@@ -2826,7 +2826,7 @@ static int save_domain(const char *p, const char *filename, int checkpoint,
 
     save_domain_core_writeconfig(fd, filename, config_data, config_len);
 
-    CHK_ERRNO(libxl_domain_suspend(ctx, domid, fd, 0, NULL));
+    MUST(libxl_domain_suspend(ctx, domid, fd, 0, NULL));
     close(fd);
 
     if (checkpoint)
