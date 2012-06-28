@@ -78,7 +78,7 @@ ramdisk = "/xen/initrd_domU/U1_ramdisk.img"
 memory = 32
 name = "TPMUserDomain0"
 vtpm = ['instance=1,backend=0']
-root = "/dev/ram0 cosole=tty ro"
+root = "/dev/ram0 console=tty ro"
 vif = ['backend=0']
 
 In the above configuration file the line 'vtpm = ...' provides

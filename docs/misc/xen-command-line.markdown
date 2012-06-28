@@ -89,7 +89,7 @@ common, and only has an effect if your system is blacklisted.
 
 The `acpi=noirq` option causes Xen to not parse the ACPI MADT table
 looking for IO-APIC entries.  This is also not common, and any system
-which requries this option to function should be blacklisted.
+which requires this option to function should be blacklisted.
 Additionally, this will not prevent Xen from finding IO-APIC entries
 from the MP tables.
 

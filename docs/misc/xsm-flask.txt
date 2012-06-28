@@ -226,7 +226,7 @@ Additional notes on XSM:FLASK
 	To boot the platform into enforcing mode, which means that the policy is
 	loaded and enforced, append 'flask_enforcing=1' on the grub line.
 	
-	This parameter may also be changed through the flask hyercall.
+	This parameter may also be changed through the flask hypercall.
 	
 	b) flask_enabled
 	

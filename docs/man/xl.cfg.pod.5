@@ -202,7 +202,7 @@ configuration
         
 =item B<rename-restart>
 
-rename the domain which terminated, and thenimmediately create a new
+rename the domain which terminated, and then immediately create a new
 domain with the same configuration as the original
 
 =item B<preserve>
@@ -357,7 +357,7 @@ guest B<DDDD> and B<BB> are C<0000:00>. XXX how does this really work?
 
 =item B<KEY=VALUE>
 
-Posible B<KEY>s are:
+Possible B<KEY>s are:
 
 =over 4
 
@@ -387,7 +387,7 @@ enable this option only for trusted VMs under administrator control.
 =item B<pci_permissive=BOOLEAN>
 
 (PV only) Changes the default value of 'permissive' for all PCI
-devices for this VM.  This can still be overriden on a per-device
+devices for this VM.  This can still be overridden on a per-device
 basis. This option should be enabled with caution: it gives the guest
 much more control over the device, which may have security or
 stability implications.  It is recommended to enable this option only
@@ -436,7 +436,7 @@ specific what meaning this has).
 =item B<e820_host=BOOLEAN>
 
 Selects whether to expose the host e820 (memory map) to the guest via
-the virtual e820. When this option is false the guest psuedo-physical
+the virtual e820. When this option is false the guest pseudo-physical
 address space consists of a single contiguous RAM region. When this
 option is specified the virtual e820 instead reflects the host e820
 and contains the same PCI holes. The total amount of RAM represented
@@ -446,10 +446,10 @@ it is layed out.
 Exposing the host e820 to the guest gives the guest kernel the
 opportunity to set aside the required part of its pseudo-physical
 address space in order to provide address space to map passedthrough
-PCI devices. It is guest Operaring System dependant whether this
+PCI devices. It is guest Operating System dependant whether this
 option is required, specifically it is required when using a mainline
 Linux ("pvops") kernel. This option defaults to true if any PCI
-passthrough devices are configued and false otherwise. If you do not
+passthrough devices are configured and false otherwise. If you do not
 configure any passthrough devices at domain creation time but expect
 to hotplug devices later then you should set this option. Conversely
 if your particular guest kernel does not require this behaviour then
@@ -580,7 +580,7 @@ has no effect on a guest with multiple virtual CPUS as they must
 always include these tables. This option is enabled by default and you
 should usually omit it but it may be necessary to disable these
 firmware tables when using certain older guest Operating
-Systems. These tables have been superceded by newer constructs within
+Systems. These tables have been superseded by newer constructs within
 the ACPI tables. (X86 only)
 
 =item B<nx=BOOLEAN>
@@ -763,7 +763,7 @@ Simple DirectMedia Layer). The default is not to enable this mode.
 =item B<opengl=BOOLEAN>
 
 Enable OpenGL acceleration of the SDL display. Only effects machines
-using B<device_model_version="qemu-xen-traditonal"> and only if the
+using B<device_model_version="qemu-xen-traditional"> and only if the
 device-model was compiled with OpenGL support. Disabled by default.
 
 =item B<nographic=BOOLEAN>
@@ -903,7 +903,7 @@ device-model will become the default in a future version of Xen.
 =back
 
 It is recommended to accept the default value for new guests.  If
-you have existing guests then, depeending on the nature of the guest
+you have existing guests then, depending on the nature of the guest
 Operating System, you may wish to force them to use the device
 model which they were installed with.
 
@@ -926,19 +926,19 @@ Assign an XSM security label to the device-model stubdomain.
 
 =item B<device_model_args=[ "ARG", "ARG", ...]>
 
-Pass additional arbitrary options on the devide-model command
+Pass additional arbitrary options on the device-model command
 line. Each element in the list is passed as an option to the
 device-model.
 
 =item B<device_model_args_pv=[ "ARG", "ARG", ...]>
 
-Pass additional arbitrary options on the devide-model command line for
+Pass additional arbitrary options on the device-model command line for
 a PV device model only. Each element in the list is passed as an
 option to the device-model.
 
 =item B<device_model_args_hvm=[ "ARG", "ARG", ...]>
 
-Pass additional arbitrary options on the devide-model command line for
+Pass additional arbitrary options on the device-model command line for
 an HVM device model only. Each element in the list is passed as an
 option to the device-model.
 

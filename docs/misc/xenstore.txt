@@ -202,7 +202,7 @@ WATCH			<wpath>|<token>|?
 	readable, some notifications may have been lost).
 
 WATCH_EVENT					<epath>|<token>|
-	Unsolicited `reply' generated for matching modfication events
+	Unsolicited `reply' generated for matching modification events
 	as described above.  req_id and tx_id are both 0.
 
 	<epath> is the event's path, ie the actual path that was

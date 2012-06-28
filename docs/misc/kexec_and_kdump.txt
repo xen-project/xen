@@ -3,8 +3,8 @@
 Kexec and Kdump for Xen
 =======================
 
-This is a breif guide to using Kexec and Kdump in conjunction with Xen.
-This functionaly works at the level of the hypervisor and dom0 kernel.
+This is a brief guide to using Kexec and Kdump in conjunction with Xen.
+This functionally works at the level of the hypervisor and dom0 kernel.
 And will thus affect all guests running on a machine.
 
 At this stage it does not work in conjunction with domU kernels.
@@ -33,7 +33,7 @@ Linux -> Xen   | first kernel       | second hypervisor &
 ---------------+--------------------+--------------------
 Linux -> Linux | first kernel       | second kernel
 
-If you are kexecing to Xen then you will also need to preapare the second
+If you are kexecing to Xen then you will also need to prepare the second
 hypervisor and dom0 kernel that will run after kexec. These may be the same
 as the first hypervisor and dom0 kernel that are used before kexec if you
 are kexecing from Xen to Xen.
@@ -176,7 +176,7 @@ running kernel.
 On x86 systems the crash kernel may be either
 - A uncompressed vmlinux image if the kernel is not relocatable
 - A compressed bzImage or vmlinuz image if the kernel is relocatable
-- Relocatability is crontroled by the CONFIG_RELOCATABLE kernel
+- Relocatability is controlled by the CONFIG_RELOCATABLE kernel
   compile configuration parameter. This option may not be available
   depending on the kernel version
 On ia64

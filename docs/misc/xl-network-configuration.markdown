@@ -89,7 +89,7 @@ are:
 
   * `rtl8139` (default) -- Realtek RTL8139
   * `e1000` -- Intel E1000 
-  * in principal any device supported by your device model
+  * in principle any device supported by your device model
 
 ### vifname
 

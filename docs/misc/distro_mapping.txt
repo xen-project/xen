@@ -22,6 +22,6 @@ one must grep for the above elements and add appropriate checks.
 
 For example if a new distro uses /etc/bork as its config dir, it's not
 sufficient to set CONFIG_LEAF_DIR=bork; one must also add tests for the
-existance of the bork dir in every context where config files are read.
+existence of the bork dir in every context where config files are read.
 
 
