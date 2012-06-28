@@ -690,8 +690,7 @@ static inline int libxl__ev_xswatch_isregistered(const libxl__ev_xswatch *xw)
  * the libxl event machinery.
  *
  * The parent may signal the child but it must not reap it.  That will
- * be done by the event machinery.  death may be NULL in which case
- * the child is still reaped but its death is ignored.
+ * be done by the event machinery.
  *
  * It is not possible to "deregister" the child death event source.
  * It will generate exactly one event callback; until then the childw
@@ -998,8 +997,8 @@ _hidden int libxl__device_pci_destroy_all(libxl__gc *gc, uint32_t domid);
  *
  * Higher-level double-fork and separate detach eg as for device models
  *
- * Each libxl__spawn_state is in one of the conventional states
- *    Undefined, Idle, Active
+ * Each libxl__spawn_state is in one of these states
+ *    Undefined, Idle, Attached, Detaching
  */
 
 typedef struct libxl__obsolete_spawn_starting libxl__spawn_starting;
@@ -1040,15 +1039,15 @@ _hidden void libxl__spawn_init(libxl__spawn_state*);
  * intermediate or final child; an error message will have been
  * logged.
  *
- * confirm_cb and failure_cb will not be called reentrantly from
- * within libxl__spawn_spawn.
+ * confirm_cb, failure_cb and detached_cb will not be called
+ * reentrantly from within libxl__spawn_spawn.
  *
  * what: string describing the spawned process, used for logging
  *
  * Logs errors.  A copy of "what" is taken. 
  * Return values:
  *  < 0   error, *spawn is now Idle and need not be detached
- *   +1   caller is the parent, *spawn is Active and must eventually be detached
+ *   +1   caller is the parent, *spawn is Attached and must be detached
  *    0   caller is now the inner child, should probably call libxl__exec
  *
  * The spawn state must be Undefined or Idle on entry.
@@ -1056,11 +1055,14 @@ _hidden void libxl__spawn_init(libxl__spawn_state*);
 _hidden int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *spawn);
 
 /*
- * libxl__spawn_detach - Detaches the daemonic child.
+ * libxl__spawn_request_detach - Detaches the daemonic child.
  *
  * Works by killing the intermediate process from spawn_spawn.
  * After this function returns, failures of either child are no
  * longer reported via failure_cb.
+ *
+ * This is not synchronous: there will be a further callback when
+ * the detach is complete.
  *
  * If called before the inner child has been created, this may prevent
  * it from running at all.  Thus this should be called only when the
@@ -1069,10 +1071,10 @@ _hidden int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *spawn);
  *
  * Logs errors.
  *
- * The spawn state must be Active or Idle on entry and will be Idle
+ * The spawn state must be Attached entry and will be Detaching
  * on return.
  */
-_hidden void libxl__spawn_detach(libxl__gc *gc, libxl__spawn_state*);
+_hidden void libxl__spawn_initiate_detach(libxl__gc *gc, libxl__spawn_state*);
 
 /*
  * If successful, this should return 0.
@@ -1109,15 +1111,11 @@ typedef void libxl__spawn_failure_cb(libxl__egc*, libxl__spawn_state*);
 typedef void libxl__spawn_confirm_cb(libxl__egc*, libxl__spawn_state*,
                                      const char *xsdata);
 
-typedef struct {
-    /* Private to the spawn implementation.
-     */
-    /* This separate struct, from malloc, allows us to "detach"
-     * the child and reap it later, when our user has gone
-     * away and freed its libxl__spawn_state */
-    struct libxl__spawn_state *ss;
-    libxl__ev_child mid;
-} libxl__spawn_state_detachable;
+/*
+ * Called when the detach (requested by libxl__spawn_initiate_detach) has
+ * completed.  On entry to the callback the spawn state is Idle.
+ */
+typedef void libxl__spawn_detached_cb(libxl__egc*, libxl__spawn_state*);
 
 struct libxl__spawn_state {
     /* must be filled in by user and remain valid */
@@ -1129,15 +1127,18 @@ struct libxl__spawn_state {
     libxl__spawn_midproc_cb *midproc_cb;
     libxl__spawn_failure_cb *failure_cb;
     libxl__spawn_confirm_cb *confirm_cb;
+    libxl__spawn_detached_cb *detached_cb;
 
     /* remaining fields are private to libxl_spawn_... */
+    int detaching; /* we are in Detaching */
+    int failed; /* might be true whenever we are not Idle */
+    libxl__ev_child mid; /* always in use whenever we are not Idle */
     libxl__ev_time timeout;
     libxl__ev_xswatch xswatch;
-    libxl__spawn_state_detachable *ssd;
 };
 
 static inline int libxl__spawn_inuse(libxl__spawn_state *ss)
-    { return !!ss->ssd; }
+    { return libxl__ev_child_inuse(&ss->mid); }
 
 /*
  * libxl_spawner_record_pid - Record given pid in xenstore

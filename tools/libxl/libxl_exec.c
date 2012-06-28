@@ -238,15 +238,22 @@ err:
 /*
  * Full set of possible states of a libxl__spawn_state and its _detachable:
  *
- *               ss->        ss->        ss->    | ssd->       ssd->
- *               timeout     xswatch     ssd     |  mid         ss
- *  - Undefined   undef       undef       no     |  -           -
- *  - Idle        Idle        Idle        no     |  -           -
- *  - Active      Active      Active      yes    |  Active      yes
- *  - Partial     Active/Idle Active/Idle maybe  |  Active/Idle yes  (if exists)
- *  - Detached    -           -           -      |  Active      no
+ *                   detaching failed  mid     timeout      xswatch          
+ *  - Undefined         undef   undef   -        undef        undef
+ *  - Idle              any     any     Idle     Idle         Idle
+ *  - Attached OK       0       0       Active   Active       Active
+ *  - Attached Failed   0       1       Active   Idle         Idle
+ *  - Detaching         1       maybe   Active   Idle         Idle
+ *  - Partial           any     any     Idle     Active/Idle  Active/Idle
  *
- * When in state Detached, the middle process has been sent a SIGKILL.
+ * When in states Detaching or Attached Failed, the middle process has
+ * been sent a SIGKILL.
+ *
+ * The difference between Attached OK and Attached Failed is not
+ * directly visible to callers - callers see these two the same,
+ * although of course Attached OK will hopefully eventually result in
+ * a call to detached_cb, whereas Attached Failed will end up
+ * in a call to failure_cb.
  */
 
 /* Event callbacks. */
@@ -257,19 +264,18 @@ static void spawn_timeout(libxl__egc *egc, libxl__ev_time *ev,
 static void spawn_middle_death(libxl__egc *egc, libxl__ev_child *childw,
                                pid_t pid, int status);
 
-/* Precondition: Partial.  Results: Detached. */
+/* Precondition: Partial.  Results: Idle. */
 static void spawn_cleanup(libxl__gc *gc, libxl__spawn_state *ss);
 
-/* Precondition: Partial; caller has logged failure reason.
- * Results: Caller notified of failure;
- *  after return, ss may be completely invalid as caller may reuse it */
-static void spawn_failed(libxl__egc *egc, libxl__spawn_state *ss);
+/* Precondition: Attached or Detaching; caller has logged failure reason.
+ * Results: Detaching, or Attached Failed */
+static void spawn_fail(libxl__egc *egc, libxl__spawn_state *ss);
 
 void libxl__spawn_init(libxl__spawn_state *ss)
 {
+    libxl__ev_child_init(&ss->mid);
     libxl__ev_time_init(&ss->timeout);
     libxl__ev_xswatch_init(&ss->xswatch);
-    ss->ssd = 0;
 }
 
 int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *ss)
@@ -280,8 +286,7 @@ int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *ss)
     int status, rc;
 
     libxl__spawn_init(ss);
-    ss->ssd = libxl__zalloc(NOGC, sizeof(*ss->ssd));
-    libxl__ev_child_init(&ss->ssd->mid);
+    ss->failed = ss->detaching = 0;
 
     rc = libxl__ev_time_register_rel(gc, &ss->timeout,
                                      spawn_timeout, ss->timeout_ms);
@@ -291,7 +296,7 @@ int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *ss)
                                     spawn_watch_event, ss->xspath);
     if (rc) goto out_err;
 
-    pid_t middle = libxl__ev_child_fork(gc, &ss->ssd->mid, spawn_middle_death);
+    pid_t middle = libxl__ev_child_fork(gc, &ss->mid, spawn_middle_death);
     if (middle ==-1) { rc = ERROR_FAIL; goto out_err; }
 
     if (middle) {
@@ -344,54 +349,64 @@ int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *ss)
 
 static void spawn_cleanup(libxl__gc *gc, libxl__spawn_state *ss)
 {
+    assert(!libxl__ev_child_inuse(&ss->mid));
+    libxl__ev_time_deregister(gc, &ss->timeout);
+    libxl__ev_xswatch_deregister(gc, &ss->xswatch);
+}
+
+static void spawn_detach(libxl__gc *gc, libxl__spawn_state *ss)
+/* Precondition: Attached or Detaching, but caller must have just set
+ * at least one of detaching or failed.
+ * Results: Detaching or Attached Failed */
+{
     int r;
 
+    assert(libxl__ev_child_inuse(&ss->mid));
     libxl__ev_time_deregister(gc, &ss->timeout);
     libxl__ev_xswatch_deregister(gc, &ss->xswatch);
 
-    libxl__spawn_state_detachable *ssd = ss->ssd;
-    if (ssd) {
-        if (libxl__ev_child_inuse(&ssd->mid)) {
-            pid_t child = ssd->mid.pid;
-            r = kill(child, SIGKILL);
-            if (r && errno != ESRCH)
-                LOGE(WARN, "%s: failed to kill intermediate child (pid=%lu)",
-                     ss->what, (unsigned long)child);
-        }
-
-        /* disconnect the ss and ssd from each other */
-        ssd->ss = 0;
-        ss->ssd = 0;
-    }
+    pid_t child = ss->mid.pid;
+    r = kill(child, SIGKILL);
+    if (r && errno != ESRCH)
+        LOGE(WARN, "%s: failed to kill intermediate child (pid=%lu)",
+             ss->what, (unsigned long)child);
 }
 
-static void spawn_failed(libxl__egc *egc, libxl__spawn_state *ss)
+void libxl__spawn_initiate_detach(libxl__gc *gc, libxl__spawn_state *ss)
+{
+    ss->detaching = 1;
+    spawn_detach(gc, ss);
+}
+
+static void spawn_fail(libxl__egc *egc, libxl__spawn_state *ss)
+/* Caller must have logged.  Must be last thing in calling function,
+ * as it may make the callback.  Precondition: Attached or Detaching. */
 {
     EGC_GC;
-    spawn_cleanup(gc, ss);
-    ss->failure_cb(egc, ss); /* must be last; callback may do anything to ss */
+    ss->failed = 1;
+    spawn_detach(gc, ss);
 }
 
 static void spawn_timeout(libxl__egc *egc, libxl__ev_time *ev,
                           const struct timeval *requested_abs)
 {
-    /* Before event, was Active; is now Partial. */
+    /* Before event, was Attached. */
     EGC_GC;
     libxl__spawn_state *ss = CONTAINER_OF(ev, *ss, timeout);
     LOG(ERROR, "%s: startup timed out", ss->what);
-    spawn_failed(egc, ss); /* must be last */
+    spawn_fail(egc, ss); /* must be last */
 }
 
 static void spawn_watch_event(libxl__egc *egc, libxl__ev_xswatch *xsw,
                               const char *watch_path, const char *event_path)
 {
-    /* On entry, is Active. */
+    /* On entry, is Attached. */
     EGC_GC;
     libxl__spawn_state *ss = CONTAINER_OF(xsw, *ss, xswatch);
     char *p = libxl__xs_read(gc, 0, ss->xspath);
     if (!p && errno != ENOENT) {
         LOG(ERROR, "%s: xenstore read of %s failed", ss->what, ss->xspath);
-        spawn_failed(egc, ss); /* must be last */
+        spawn_fail(egc, ss); /* must be last */
         return;
     }
     ss->confirm_cb(egc, ss, p); /* must be last */
@@ -399,20 +414,22 @@ static void spawn_watch_event(libxl__egc *egc, libxl__ev_xswatch *xsw,
 
 static void spawn_middle_death(libxl__egc *egc, libxl__ev_child *childw,
                                pid_t pid, int status)
-    /* Before event, was Active or Detached;
-     * is now Active or Detached except that ssd->mid is Idle */
+    /* On entry, is Attached or Detaching */
 {
     EGC_GC;
-    libxl__spawn_state_detachable *ssd = CONTAINER_OF(childw, *ssd, mid);
-    libxl__spawn_state *ss = ssd->ss;
+    libxl__spawn_state *ss = CONTAINER_OF(childw, *ss, mid);
 
-    if (!WIFEXITED(status)) {
+    if ((ss->failed || ss->detaching) &&
+        ((WIFEXITED(status) && WEXITSTATUS(status)==0) ||
+         (WIFSIGNALED(status) && WTERMSIG(status)==SIGKILL))) {
+        /* as expected */
+    } else if (!WIFEXITED(status)) {
+        int loglevel = ss->detaching ? XTL_WARN : XTL_ERROR;
         const char *what =
-            GCSPRINTF("%s intermediate process (startup monitor)",
-                      ss ? ss->what : "(detached)");
-        int loglevel = ss ? XTL_ERROR : XTL_WARN;
+            GCSPRINTF("%s intermediate process (startup monitor)", ss->what);
         libxl_report_child_exitstatus(CTX, loglevel, what, pid, status);
-    } else if (ss) { /* otherwise it was supposed to be a daemon by now */
+        ss->failed = 1;
+    } else {
         if (!status)
             LOG(ERROR, "%s [%ld]: unexpectedly exited with exit status 0,"
                 " when we were waiting for it to confirm startup",
@@ -430,15 +447,22 @@ static void spawn_middle_death(libxl__egc *egc, libxl__ev_child *childw,
                 LOG(ERROR, "%s [%ld]: died during startup due to unknown fatal"
                     " signal number %d", ss->what, (unsigned long)pid, sig);
         }
-        ss->ssd = 0; /* detatch the ssd to make the ss be in state Partial */
-        spawn_failed(egc, ss); /* must be last use of ss */
+        ss->failed = 1;
     }
-    free(ssd);
-}
 
-void libxl__spawn_detach(libxl__gc *gc, libxl__spawn_state *ss)
-{
     spawn_cleanup(gc, ss);
+
+    if (ss->failed && !ss->detaching) {
+        ss->failure_cb(egc, ss); /* must be last */
+        return;
+    }
+    
+    if (ss->failed && ss->detaching)
+        LOG(WARN,"%s underlying machinery seemed to fail,"
+            " but its function seems to have been successful", ss->what);
+
+    assert(ss->detaching);
+    ss->detached_cb(egc, ss);
 }
 
 /*

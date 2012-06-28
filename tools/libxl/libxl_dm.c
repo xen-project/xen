@@ -915,6 +915,8 @@ static void device_model_confirm(libxl__egc *egc, libxl__spawn_state *spawn,
                                  const char *xsdata);
 static void device_model_startup_failed(libxl__egc *egc,
                                         libxl__spawn_state *spawn);
+static void device_model_detached(libxl__egc *egc,
+                                  libxl__spawn_state *spawn);
 
 /* our "next step" function, called from those callbacks and elsewhere */
 static void device_model_spawn_outcome(libxl__egc *egc,
@@ -1022,6 +1024,7 @@ retry_transaction:
     spawn->midproc_cb = libxl__spawn_record_pid;
     spawn->confirm_cb = device_model_confirm;
     spawn->failure_cb = device_model_startup_failed;
+    spawn->detached_cb = device_model_detached;
 
     rc = libxl__spawn_spawn(egc, spawn);
     if (rc < 0)
@@ -1055,9 +1058,7 @@ static void device_model_confirm(libxl__egc *egc, libxl__spawn_state *spawn,
     if (strcmp(xsdata, "running"))
         return;
 
-    libxl__spawn_detach(gc, spawn);
-
-    device_model_spawn_outcome(egc, dmss, 0);
+    libxl__spawn_initiate_detach(gc, spawn);
 }
 
 static void device_model_startup_failed(libxl__egc *egc,
@@ -1065,6 +1066,13 @@ static void device_model_startup_failed(libxl__egc *egc,
 {
     libxl__dm_spawn_state *dmss = CONTAINER_OF(spawn, *dmss, spawn);
     device_model_spawn_outcome(egc, dmss, ERROR_FAIL);
+}
+
+static void device_model_detached(libxl__egc *egc,
+                                  libxl__spawn_state *spawn)
+{
+    libxl__dm_spawn_state *dmss = CONTAINER_OF(spawn, *dmss, spawn);
+    device_model_spawn_outcome(egc, dmss, 0);
 }
 
 static void device_model_spawn_outcome(libxl__egc *egc,
