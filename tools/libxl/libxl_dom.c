@@ -469,13 +469,13 @@ static inline char *restore_helper(libxl__gc *gc, uint32_t domid,
             domid, phys_offset, node);
 }
 
-static int libxl__toolstack_restore(uint32_t domid, uint8_t *buf,
+static int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
         uint32_t size, void *data)
 {
     libxl__gc *gc = (libxl__gc *) data;
     libxl_ctx *ctx = gc->owner;
     int i, ret;
-    uint8_t *ptr = buf;
+    const uint8_t *ptr = buf;
     uint32_t count = 0, version = 0;
     struct libxl__physmap_info* pi;
     char *xs_path;

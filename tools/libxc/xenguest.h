@@ -92,7 +92,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 /* callbacks provided by xc_domain_restore */
 struct restore_callbacks {
     /* callback to restore toolstack specific data */
-    int (*toolstack_restore)(uint32_t domid, uint8_t *buf,
+    int (*toolstack_restore)(uint32_t domid, const uint8_t *buf,
             uint32_t size, void* data);
 
     /* to be provided as the last argument to each callback function */
