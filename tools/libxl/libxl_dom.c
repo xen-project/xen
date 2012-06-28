@@ -705,11 +705,13 @@ static void switch_logdirty_done(libxl__egc *egc,
 
 /*----- callbacks, called by xc_domain_save -----*/
 
-int libxl__domain_suspend_device_model(libxl__gc *gc, uint32_t domid)
+int libxl__domain_suspend_device_model(libxl__gc *gc,
+                                       libxl__domain_suspend_state *dss)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int ret = 0;
-    const char *filename = libxl__device_model_savefile(gc, domid);
+    uint32_t const domid = dss->domid;
+    const char *const filename = dss->dm_savefile;
 
     switch (libxl__device_model_version_running(gc, domid)) {
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
@@ -878,7 +880,7 @@ int libxl__domain_suspend_common_callback(void *user)
 
  guest_suspended:
     if (dss->hvm) {
-        ret = libxl__domain_suspend_device_model(gc, dss->domid);
+        ret = libxl__domain_suspend_device_model(gc, dss);
         if (ret) {
             LOG(ERROR, "libxl__domain_suspend_device_model failed ret=%d", ret);
             return 0;
@@ -994,20 +996,33 @@ static int libxl__remus_domain_resume_callback(void *data)
     return 1;
 }
 
-static int libxl__remus_domain_checkpoint_callback(void *data)
+/*----- remus asynchronous checkpoint callback -----*/
+
+static void remus_checkpoint_dm_saved(libxl__egc *egc,
+                                      libxl__domain_suspend_state *dss, int rc);
+
+static void libxl__remus_domain_checkpoint_callback(void *data)
 {
     libxl__save_helper_state *shs = data;
     libxl__domain_suspend_state *dss = CONTAINER_OF(shs, *dss, shs);
+    libxl__egc *egc = dss->shs.egc;
     STATE_AO_GC(dss->ao);
 
     /* This would go into tailbuf. */
-    if (dss->hvm &&
-        libxl__domain_save_device_model(gc, dss->domid, dss->fd))
-        return 0;
+    if (dss->hvm) {
+        libxl__domain_save_device_model(egc, dss, remus_checkpoint_dm_saved);
+    } else {
+        remus_checkpoint_dm_saved(egc, dss, 0);
+    }
+}
 
+static void remus_checkpoint_dm_saved(libxl__egc *egc,
+                                      libxl__domain_suspend_state *dss, int rc)
+{
     /* TODO: Wait for disk and memory ack, release network buffer */
+    /* TODO: make this asynchronous */
     usleep(dss->interval * 1000);
-    return 1;
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, 1);
 }
 
 /*----- main code for suspending, in order of execution -----*/
@@ -1057,6 +1072,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
 
     dss->suspend_eventchn = -1;
     dss->guest_responded = 0;
+    dss->dm_savefile = libxl__device_model_savefile(gc, domid);
 
     if (r_info != NULL) {
         dss->interval = r_info->interval;
@@ -1106,7 +1122,6 @@ void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
 
     /* Convenience aliases */
     const libxl_domain_type type = dss->type;
-    const uint32_t domid = dss->domid;
 
     if (rc)
         goto out;
@@ -1124,11 +1139,11 @@ void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
     }
 
     if (type == LIBXL_DOMAIN_TYPE_HVM) {
-        rc = libxl__domain_suspend_device_model(gc, domid);
+        rc = libxl__domain_suspend_device_model(gc, dss);
         if (rc) goto out;
         
-        rc = libxl__domain_save_device_model(gc, domid, dss->fd);
-        if (rc) goto out;
+        libxl__domain_save_device_model(egc, dss, domain_suspend_done);
+        return;
     }
 
     rc = 0;
@@ -1137,13 +1152,21 @@ out:
     domain_suspend_done(egc, dss, rc);
 }
 
-int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd)
+void libxl__domain_save_device_model(libxl__egc *egc,
+                                     libxl__domain_suspend_state *dss,
+                                     libxl__save_device_model_cb *callback)
 {
+    STATE_AO_GC(dss->ao);
     int rc, fd2 = -1, c;
     char buf[1024];
-    const char *filename = libxl__device_model_savefile(gc, domid);
     struct stat st;
     uint32_t qemu_state_len;
+
+    dss->save_dm_callback = callback;
+
+    /* Convenience aliases */
+    const char *const filename = dss->dm_savefile;
+    const int fd = dss->fd;
 
     if (stat(filename, &st) < 0)
     {
@@ -1186,7 +1209,8 @@ int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd)
 out:
     if (fd2 >= 0) close(fd2);
     unlink(filename);
-    return rc;
+
+    dss->save_dm_callback(egc, dss, rc);
 }
 
 static void domain_suspend_done(libxl__egc *egc,

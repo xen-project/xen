@@ -824,10 +824,8 @@ _hidden int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
 
 _hidden int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
                                      uint32_t size, void *data);
-_hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
-_hidden int libxl__domain_suspend_device_model(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid);
-_hidden int libxl__domain_save_device_model(libxl__gc *gc, uint32_t domid, int fd);
+
 _hidden void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid);
 
 _hidden int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid);
@@ -1869,6 +1867,8 @@ typedef struct libxl__domain_suspend_state libxl__domain_suspend_state;
 
 typedef void libxl__domain_suspend_cb(libxl__egc*,
                                       libxl__domain_suspend_state*, int rc);
+typedef void libxl__save_device_model_cb(libxl__egc*,
+                                         libxl__domain_suspend_state*, int rc);
 
 typedef struct libxl__logdirty_switch {
     const char *cmd;
@@ -1895,9 +1895,12 @@ struct libxl__domain_suspend_state {
     int hvm;
     int xcflags;
     int guest_responded;
+    const char *dm_savefile;
     int interval; /* checkpoint interval (for Remus) */
     libxl__save_helper_state shs;
     libxl__logdirty_switch logdirty;
+    /* private for libxl__domain_save_device_model */
+    libxl__save_device_model_cb *save_dm_callback;
 };
 
 
@@ -2052,6 +2055,15 @@ _hidden void libxl__xc_domain_restore(libxl__egc *egc,
  * If rc!=0, retval and errnoval are undefined. */
 _hidden void libxl__xc_domain_restore_done(libxl__egc *egc, void *dcs_void,
                                            int rc, int retval, int errnoval);
+
+/* Each time the dm needs to be saved, we must call suspend and then save */
+_hidden int libxl__domain_suspend_device_model(libxl__gc *gc,
+                                           libxl__domain_suspend_state *dss);
+_hidden void libxl__domain_save_device_model(libxl__egc *egc,
+                                     libxl__domain_suspend_state *dss,
+                                     libxl__save_device_model_cb *callback);
+
+_hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
 
 
 /*
