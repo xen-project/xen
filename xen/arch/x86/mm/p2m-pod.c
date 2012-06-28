@@ -897,34 +897,6 @@ p2m_pod_zero_check(struct p2m_domain *p2m, unsigned long *gfns, int count)
 }
 
 #define POD_SWEEP_LIMIT 1024
-static void
-p2m_pod_emergency_sweep_super(struct p2m_domain *p2m)
-{
-    unsigned long i, start, limit;
-
-    if ( p2m->pod.reclaim_super == 0 )
-    {
-        p2m->pod.reclaim_super = (p2m->pod.max_guest>>PAGE_ORDER_2M)<<PAGE_ORDER_2M;
-        p2m->pod.reclaim_super -= SUPERPAGE_PAGES;
-    }
-    
-    start = p2m->pod.reclaim_super;
-    limit = (start > POD_SWEEP_LIMIT) ? (start - POD_SWEEP_LIMIT) : 0;
-
-    for ( i=p2m->pod.reclaim_super ; i > 0 ; i -= SUPERPAGE_PAGES )
-    {
-        p2m_pod_zero_check_superpage(p2m, i);
-        /* Stop if we're past our limit and we have found *something*.
-         *
-         * NB that this is a zero-sum game; we're increasing our cache size
-         * by increasing our 'debt'.  Since we hold the p2m lock,
-         * (entry_count - count) must remain the same. */
-        if ( !page_list_empty(&p2m->pod.super) &&  i < limit )
-            break;
-    }
-
-    p2m->pod.reclaim_super = i ? i - SUPERPAGE_PAGES : 0;
-}
 
 /* When populating a new superpage, look at recently populated superpages
  * hoping that they've been zeroed.  This will snap up zeroed pages as soon as 
@@ -1039,27 +1011,12 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
         return 0;
     }
 
-    /* Once we've ballooned down enough that we can fill the remaining
-     * PoD entries from the cache, don't sweep even if the particular
-     * list we want to use is empty: that can lead to thrashing zero pages 
-     * through the cache for no good reason.  */
-    if ( p2m->pod.entry_count > p2m->pod.count )
-    {
+    /* Only sweep if we're actually out of memory.  Doing anything else
+     * causes unnecessary time and fragmentation of superpages in the p2m. */
+    if ( p2m->pod.count == 0 )
+        p2m_pod_emergency_sweep(p2m);
 
-        /* If we're low, start a sweep */
-        if ( order == PAGE_ORDER_2M && page_list_empty(&p2m->pod.super) )
-            /* Note that sweeps scan other ranges in the p2m. In an scenario
-             * in which p2m locks are fine-grained, this may result in deadlock.
-             * Using trylock on the gfn's as we sweep would avoid it. */
-            p2m_pod_emergency_sweep_super(p2m);
-
-        if ( page_list_empty(&p2m->pod.single) &&
-             ( ( order == PAGE_ORDER_4K )
-               || (order == PAGE_ORDER_2M && page_list_empty(&p2m->pod.super) ) ) )
-            /* Same comment regarding deadlock applies */
-            p2m_pod_emergency_sweep(p2m);
-    }
-
+    /* If the sweep failed, give up. */
     if ( p2m->pod.count == 0 )
         goto out_of_memory;
 

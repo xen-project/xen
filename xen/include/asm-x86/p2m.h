@@ -284,7 +284,6 @@ struct p2m_domain {
                          single;       /* Non-super lists                   */
         int              count,        /* # of pages in cache lists         */
                          entry_count;  /* # of pages in p2m marked pod      */
-        unsigned         reclaim_super; /* Last gpfn of a scan */
         unsigned         reclaim_single; /* Last gpfn of a scan */
         unsigned         max_guest;    /* gpfn of max guest demand-populate */
 #define POD_HISTORY_MAX 128
