@@ -453,28 +453,33 @@ static inline libxl_ctx *libxl__gc_owner(libxl__gc *gc)
  * psuedo-gc.
  */
 /* register ptr in gc for free on exit from outermost libxl callframe. */
-_hidden void libxl__ptr_add(libxl__gc *gc_opt, void *ptr /* may be NULL */);
+
+#define NN1 __attribute__((nonnull(1)))
+ /* It used to be legal to pass NULL for gc_opt.  Get the compiler to
+  * warn about this if any slip through. */
+
+_hidden void libxl__ptr_add(libxl__gc *gc_opt, void *ptr /* may be NULL */) NN1;
 /* if this is the outermost libxl callframe then free all pointers in @gc */
 _hidden void libxl__free_all(libxl__gc *gc);
 /* allocate and zero @bytes. (similar to a gc'd malloc(3)+memzero()) */
-_hidden void *libxl__zalloc(libxl__gc *gc_opt, int bytes);
+_hidden void *libxl__zalloc(libxl__gc *gc_opt, int bytes) NN1;
 /* allocate and zero memory for an array of @nmemb members of @size each.
  * (similar to a gc'd calloc(3)). */
-_hidden void *libxl__calloc(libxl__gc *gc_opt, size_t nmemb, size_t size);
+_hidden void *libxl__calloc(libxl__gc *gc_opt, size_t nmemb, size_t size) NN1;
 /* change the size of the memory block pointed to by @ptr to @new_size bytes.
  * unlike other allocation functions here any additional space between the
  * oldsize and @new_size is not initialised (similar to a gc'd realloc(3)). */
-_hidden void *libxl__realloc(libxl__gc *gc_opt, void *ptr, size_t new_size);
+_hidden void *libxl__realloc(libxl__gc *gc_opt, void *ptr, size_t new_size) NN1;
 /* print @fmt into an allocated string large enoughto contain the result.
  * (similar to gc'd asprintf(3)). */
-_hidden char *libxl__sprintf(libxl__gc *gc_opt, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3);
+_hidden char *libxl__sprintf(libxl__gc *gc_opt, const char *fmt, ...) PRINTF_ATTRIBUTE(2, 3) NN1;
 /* duplicate the string @c (similar to a gc'd strdup(3)). */
-_hidden char *libxl__strdup(libxl__gc *gc_opt, const char *c);
+_hidden char *libxl__strdup(libxl__gc *gc_opt, const char *c) NN1;
 /* duplicate at most @n bytes of string @c (similar to a gc'd strndup(3)). */
-_hidden char *libxl__strndup(libxl__gc *gc_opt, const char *c, size_t n);
+_hidden char *libxl__strndup(libxl__gc *gc_opt, const char *c, size_t n) NN1;
 /* strip the last path component from @s and return as a newly allocated
  * string. (similar to a gc'd dirname(3)). */
-_hidden char *libxl__dirname(libxl__gc *gc_opt, const char *s);
+_hidden char *libxl__dirname(libxl__gc *gc_opt, const char *s) NN1;
 
 /* Each of these logs errors and returns a libxl error code.
  * They do not mind if path is already removed.
