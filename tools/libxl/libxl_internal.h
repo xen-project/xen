@@ -786,10 +786,6 @@ _hidden int libxl__domain_restore_common(libxl__gc *gc, uint32_t domid,
                                          libxl_domain_build_info *info,
                                          libxl__domain_build_state *state,
                                          int fd);
-_hidden int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
-                                         libxl_domain_type type,
-                                         int live, int debug,
-                                         const libxl_domain_remus_info *r_info);
 _hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_suspend_device_model(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid);
@@ -1778,6 +1774,23 @@ _hidden void libxl__datacopier_kill(libxl__datacopier_state *dc);
 _hidden int libxl__datacopier_start(libxl__datacopier_state *dc);
 
 
+/*----- Domain suspend (save) state structure -----*/
+
+typedef struct libxl__domain_suspend_state libxl__domain_suspend_state;
+
+struct libxl__domain_suspend_state {
+    libxl__gc *gc;
+    xc_evtchn *xce; /* event channel handle */
+    int suspend_eventchn;
+    int domid;
+    int hvm;
+    unsigned int xcflags;
+    int guest_responded;
+    int save_fd; /* Migration stream fd (for Remus) */
+    int interval; /* checkpoint interval (for Remus) */
+};
+
+
 /*----- openpty -----*/
 
 /*
@@ -1887,6 +1900,15 @@ struct libxl__domain_create_state {
         /* If we're not doing stubdom, we use only dmss.dm,
          * for the non-stubdom device model. */
 };
+
+/*----- Domain suspend (save) functions -----*/
+
+_hidden int libxl__domain_suspend_common(libxl__gc *gc, uint32_t domid, int fd,
+                                         libxl_domain_type type,
+                                         int live, int debug,
+                                         const libxl_domain_remus_info *r_info);
+
+
 
 /*
  * Convenience macros.
