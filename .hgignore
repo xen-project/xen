@@ -180,9 +180,11 @@
 ^tools/libxl/_.*\.c$
 ^tools/libxl/libxlu_cfg_y\.output$
 ^tools/libxl/xl$
+^tools/libxl/libxl-save-helper$
 ^tools/libxl/testidl$
 ^tools/libxl/testidl\.c$
 ^tools/libxl/tmp\..*$
+^tools/libxl/.*\.new$
 ^tools/libvchan/vchan-node[12]$
 ^tools/libaio/src/.*\.ol$
 ^tools/libaio/src/.*\.os$

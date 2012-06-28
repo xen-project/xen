@@ -54,6 +54,7 @@
 
 #include "libxl.h"
 #include "_paths.h"
+#include "_libxl_save_msgs_callout.h"
 
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1)
 #define _hidden __attribute__((visibility("hidden")))
@@ -1773,6 +1774,51 @@ _hidden void libxl__datacopier_kill(libxl__datacopier_state *dc);
 _hidden int libxl__datacopier_start(libxl__datacopier_state *dc);
 
 
+/*----- Save/restore helper (used by creation and suspend) -----*/
+
+typedef struct libxl__srm_save_callbacks {
+    libxl__srm_save_autogen_callbacks a;
+    int (*toolstack_save)(uint32_t domid, uint8_t **buf,
+                          uint32_t *len, void *data);
+} libxl__srm_save_callbacks;
+
+typedef struct libxl__srm_restore_callbacks {
+    libxl__srm_restore_autogen_callbacks a;
+} libxl__srm_restore_callbacks;
+
+/* a pointer to this struct is also passed as "user" to the
+ * save callout helper callback functions */
+typedef struct libxl__save_helper_state {
+    /* public, caller of run_helper initialises */
+    libxl__ao *ao;
+    uint32_t domid;
+    union {
+        libxl__srm_save_callbacks save;
+        libxl__srm_restore_callbacks restore;
+    } callbacks;
+    int (*recv_callback)(const unsigned char *msg, uint32_t len, void *user);
+    void (*completion_callback)(libxl__egc *egc, void *caller_state,
+                                int rc, int retval, int errnoval);
+    void *caller_state;
+    int need_results; /* set to 0 or 1 by caller of run_helper;
+                       * if set to 1 then the ultimate caller's
+                       * results function must set it to 0 */
+    /* private */
+    int rc;
+    int completed; /* retval/errnoval valid iff completed */
+    int retval, errnoval; /* from xc_domain_save / xc_domain_restore */
+    libxl__carefd *pipes[2]; /* 0 = helper's stdin, 1 = helper's stdout */
+    libxl__ev_fd readable;
+    libxl__ev_child child;
+    const char *stdin_what, *stdout_what;
+    FILE *toolstack_data_file;
+
+    libxl__egc *egc; /* valid only for duration of each event callback;
+                      * is here in this struct for the benefit of the
+                      * marshalling and xc callback functions */
+} libxl__save_helper_state;
+
+
 /*----- Domain suspend (save) state structure -----*/
 
 typedef struct libxl__domain_suspend_state libxl__domain_suspend_state;
@@ -1798,7 +1844,7 @@ struct libxl__domain_suspend_state {
     int xcflags;
     int guest_responded;
     int interval; /* checkpoint interval (for Remus) */
-    struct save_callbacks callbacks;
+    libxl__save_helper_state shs;
 };
 
 
@@ -1910,7 +1956,7 @@ struct libxl__domain_create_state {
     libxl__stub_dm_spawn_state dmss;
         /* If we're not doing stubdom, we use only dmss.dm,
          * for the non-stubdom device model. */
-    struct restore_callbacks callbacks;
+    libxl__save_helper_state shs;
 };
 
 /*----- Domain suspend (save) functions -----*/
@@ -1926,8 +1972,7 @@ _hidden void libxl__xc_domain_save(libxl__egc*, libxl__domain_suspend_state*,
 /* If rc==0 then retval is the return value from xc_domain_save
  * and errnoval is the errno value it provided.
  * If rc!=0, retval and errnoval are undefined. */
-_hidden void libxl__xc_domain_save_done(libxl__egc*,
-                                        libxl__domain_suspend_state*,
+_hidden void libxl__xc_domain_save_done(libxl__egc*, void *dss_void,
                                         int rc, int retval, int errnoval);
 
 _hidden int libxl__domain_suspend_common_callback(void *data);
@@ -1945,8 +1990,7 @@ _hidden void libxl__xc_domain_restore(libxl__egc *egc,
 /* If rc==0 then retval is the return value from xc_domain_save
  * and errnoval is the errno value it provided.
  * If rc!=0, retval and errnoval are undefined. */
-_hidden void libxl__xc_domain_restore_done(libxl__egc *egc,
-                                           libxl__domain_create_state *dcs,
+_hidden void libxl__xc_domain_restore_done(libxl__egc *egc, void *dcs_void,
                                            int rc, int retval, int errnoval);
 
 

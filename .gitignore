@@ -355,6 +355,7 @@ tools/libxl/_*.[ch]
 tools/libxl/testidl
 tools/libxl/testidl.c
 tools/libxl/*.pyc
+tools/libxl/libxl-save-helper
 tools/blktap2/control/tap-ctl
 tools/firmware/etherboot/eb-roms.h
 tools/firmware/etherboot/gpxe-git-snapshot.tar.gz

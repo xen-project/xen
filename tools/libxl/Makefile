@@ -67,24 +67,29 @@ LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o \
 			libxl_internal.o libxl_utils.o libxl_uuid.o \
 			libxl_json.o libxl_aoutils.o \
-			libxl_save_callout.o \
+			libxl_save_callout.o _libxl_save_msgs_callout.o \
 			libxl_qmp.o libxl_event.o libxl_fork.o $(LIBXL_OBJS-y)
 LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
 
 $(LIBXL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl) -include $(XEN_ROOT)/tools/config.h
 
-AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h _paths.h
+AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h _paths.h \
+	_libxl_save_msgs_callout.h _libxl_save_msgs_helper.h
 AUTOSRCS= libxlu_cfg_y.c libxlu_cfg_l.c
+AUTOSRCS += _libxl_save_msgs_callout.c _libxl_save_msgs_helper.c
 LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o \
 	libxlu_disk_l.o libxlu_disk.o libxlu_vif.o libxlu_pci.o
 $(LIBXLU_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 
-CLIENTS = xl testidl
+CLIENTS = xl testidl libxl-save-helper
 
 XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o xl_sxp.o
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenlight)
 $(XL_OBJS): CFLAGS += -include $(XEN_ROOT)/tools/config.h # libxl_json.h needs it.
+
+SAVE_HELPER_OBJS = libxl_save_helper.o _libxl_save_msgs_helper.o
+$(SAVE_HELPER_OBJS): CFLAGS += $(CFLAGS_libxenctrl)
 
 testidl.o: CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenlight)
 testidl.c: libxl_types.idl gentest.py libxl.h $(AUTOINCS)
@@ -115,6 +120,12 @@ _paths.h: genpath
 
 _libxl_list.h: $(XEN_INCLUDE)/xen-external/bsd-sys-queue-h-seddery $(XEN_INCLUDE)/xen-external/bsd-sys-queue.h
 	perl $^ --prefix=libxl >$@.new
+	$(call move-if-changed,$@.new,$@)
+
+_libxl_save_msgs_helper.c _libxl_save_msgs_callout.c \
+_libxl_save_msgs_helper.h _libxl_save_msgs_callout.h: \
+		libxl_save_msgs_gen.pl
+	$(PERL) -w $< $@ >$@.new
 	$(call move-if-changed,$@.new,$@)
 
 libxl.h: _libxl_types.h
@@ -159,6 +170,9 @@ libxlutil.a: $(LIBXLU_OBJS)
 xl: $(XL_OBJS) libxlutil.so libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ $(XL_OBJS) libxlutil.so $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl) -lyajl $(APPEND_LDFLAGS)
 
+libxl-save-helper: $(SAVE_HELPER_OBJS) libxenlight.so
+	$(CC) $(LDFLAGS) -o $@ $(SAVE_HELPER_OBJS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(APPEND_LDFLAGS)
+
 testidl: testidl.o libxlutil.so libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ testidl.o libxlutil.so $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
@@ -169,7 +183,9 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(BASH_COMPLETION_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_RUN_DIR)
+	$(INSTALL_DIR) $(DESTDIR)$(PRIVATE_BINDIR)
 	$(INSTALL_PROG) xl $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PROG) libxl-save-helper $(DESTDIR)$(PRIVATE_BINDIR)
 	$(INSTALL_PROG) libxenlight.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)
 	ln -sf libxenlight.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libxenlight.so.$(MAJOR)
 	ln -sf libxenlight.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libxenlight.so

@@ -467,15 +467,19 @@ static inline char *restore_helper(libxl__gc *gc, uint32_t domid,
 }
 
 int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
-        uint32_t size, void *data)
+                             uint32_t size, void *user)
 {
-    libxl__gc *gc = data;
-    libxl_ctx *ctx = gc->owner;
+    libxl__save_helper_state *shs = user;
+    libxl__domain_create_state *dcs = CONTAINER_OF(shs, *dcs, shs);
+    STATE_AO_GC(dcs->ao);
+    libxl_ctx *ctx = CTX;
     int i, ret;
     const uint8_t *ptr = buf;
     uint32_t count = 0, version = 0;
     struct libxl__physmap_info* pi;
     char *xs_path;
+
+    LOG(DEBUG,"domain=%"PRIu32" toolstack data size=%"PRIu32, domid, size);
 
     if (size < sizeof(version) + sizeof(count)) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "wrong size");
@@ -529,9 +533,10 @@ static void domain_suspend_done(libxl__egc *egc,
 /*----- callbacks, called by xc_domain_save -----*/
 
 int libxl__domain_suspend_common_switch_qemu_logdirty
-                               (int domid, unsigned int enable, void *data)
+                               (int domid, unsigned enable, void *user)
 {
-    libxl__domain_suspend_state *dss = data;
+    libxl__save_helper_state *shs = user;
+    libxl__domain_suspend_state *dss = CONTAINER_OF(shs, *dss, shs);
     STATE_AO_GC(dss->ao);
     char *path;
     bool rc;
@@ -597,9 +602,10 @@ int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid)
     return 0;
 }
 
-int libxl__domain_suspend_common_callback(void *data)
+int libxl__domain_suspend_common_callback(void *user)
 {
-    libxl__domain_suspend_state *dss = data;
+    libxl__save_helper_state *shs = user;
+    libxl__domain_suspend_state *dss = CONTAINER_OF(shs, *dss, shs);
     STATE_AO_GC(dss->ao);
     unsigned long hvm_s_state = 0, hvm_pvdrv = 0;
     int ret;
@@ -739,9 +745,9 @@ static inline char *save_helper(libxl__gc *gc, uint32_t domid,
 }
 
 int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
-        uint32_t *len, void *data)
+        uint32_t *len, void *dss_void)
 {
-    libxl__domain_suspend_state *dss = data;
+    libxl__domain_suspend_state *dss = dss_void;
     STATE_AO_GC(dss->ao);
     int i = 0;
     char *start_addr = NULL, *size = NULL, *phys_offset = NULL, *name = NULL;
@@ -810,6 +816,8 @@ int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
         ptr += sizeof(struct libxl__physmap_info) + namelen;
     }
 
+    LOG(DEBUG,"domain=%"PRIu32" toolstack data size=%"PRIu32, domid, *len);
+
     return 0;
 }
 
@@ -823,7 +831,8 @@ static int libxl__remus_domain_suspend_callback(void *data)
 
 static int libxl__remus_domain_resume_callback(void *data)
 {
-    libxl__domain_suspend_state *dss = data;
+    libxl__save_helper_state *shs = data;
+    libxl__domain_suspend_state *dss = CONTAINER_OF(shs, *dss, shs);
     STATE_AO_GC(dss->ao);
 
     /* Resumes the domain and the device model */
@@ -836,7 +845,8 @@ static int libxl__remus_domain_resume_callback(void *data)
 
 static int libxl__remus_domain_checkpoint_callback(void *data)
 {
-    libxl__domain_suspend_state *dss = data;
+    libxl__save_helper_state *shs = data;
+    libxl__domain_suspend_state *dss = CONTAINER_OF(shs, *dss, shs);
     STATE_AO_GC(dss->ao);
 
     /* This would go into tailbuf. */
@@ -864,7 +874,8 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
     const int live = dss->live;
     const int debug = dss->debug;
     const libxl_domain_remus_info *const r_info = dss->remus;
-    struct save_callbacks *const callbacks = &dss->callbacks;
+    libxl__srm_save_autogen_callbacks *const callbacks =
+        &dss->shs.callbacks.save.a;
 
     switch (type) {
     case LIBXL_DOMAIN_TYPE_HVM: {
@@ -925,8 +936,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
         callbacks->suspend = libxl__domain_suspend_common_callback;
 
     callbacks->switch_qemu_logdirty = libxl__domain_suspend_common_switch_qemu_logdirty;
-    callbacks->toolstack_save = libxl__toolstack_save;
-    callbacks->data = dss;
+    dss->shs.callbacks.save.toolstack_save = libxl__toolstack_save;
 
     libxl__xc_domain_save(egc, dss, vm_generationid_addr);
     return;
@@ -935,10 +945,10 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
     domain_suspend_done(egc, dss, rc);
 }
 
-void libxl__xc_domain_save_done(libxl__egc *egc,
-                                libxl__domain_suspend_state *dss,
+void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
                                 int rc, int retval, int errnoval)
 {
+    libxl__domain_suspend_state *dss = dss_void;
     STATE_AO_GC(dss->ao);
 
     /* Convenience aliases */

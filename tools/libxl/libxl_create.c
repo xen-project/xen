@@ -668,7 +668,8 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     libxl_domain_build_info *const info = &d_config->b_info;
     const int restore_fd = dcs->restore_fd;
     libxl__domain_build_state *const state = &dcs->build_state;
-    struct restore_callbacks *const callbacks = &dcs->callbacks;
+    libxl__srm_restore_autogen_callbacks *const callbacks =
+        &dcs->shs.callbacks.restore.a;
 
     if (rc) domcreate_rebuild_done(egc, dcs, rc);
 
@@ -708,7 +709,6 @@ static void domcreate_bootloader_done(libxl__egc *egc,
         pae = libxl_defbool_val(info->u.hvm.pae);
         no_incr_generationid = !libxl_defbool_val(info->u.hvm.incr_generationid);
         callbacks->toolstack_restore = libxl__toolstack_restore;
-        callbacks->data = gc;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         hvm = 0;
@@ -728,10 +728,24 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     libxl__xc_domain_restore_done(egc, dcs, rc, 0, 0);
 }
 
-void libxl__xc_domain_restore_done(libxl__egc *egc,
-                                   libxl__domain_create_state *dcs,
+void libxl__srm_callout_callback_restore_results(unsigned long store_mfn,
+          unsigned long console_mfn, unsigned long genidad, void *user)
+{
+    libxl__save_helper_state *shs = user;
+    libxl__domain_create_state *dcs = CONTAINER_OF(shs, *dcs, shs);
+    STATE_AO_GC(dcs->ao);
+    libxl__domain_build_state *const state = &dcs->build_state;
+
+    state->store_mfn =            store_mfn;
+    state->console_mfn =          console_mfn;
+    state->vm_generationid_addr = genidad;
+    shs->need_results =           0;
+}
+
+void libxl__xc_domain_restore_done(libxl__egc *egc, void *dcs_void,
                                    int ret, int retval, int errnoval)
 {
+    libxl__domain_create_state *dcs = dcs_void;
     STATE_AO_GC(dcs->ao);
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char **vments = NULL, **localents = NULL;
