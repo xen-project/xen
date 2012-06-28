@@ -508,7 +508,7 @@ static void xcinfo2xlinfo(const xc_domaininfo_t *xcinfo,
     xlinfo->cpupool = xcinfo->cpupool;
 }
 
-libxl_dominfo * libxl_list_domain(libxl_ctx *ctx, int *nb_domain)
+libxl_dominfo * libxl_list_domain(libxl_ctx *ctx, int *nb_domain_out)
 {
     libxl_dominfo *ptr;
     int i, ret;
@@ -531,7 +531,7 @@ libxl_dominfo * libxl_list_domain(libxl_ctx *ctx, int *nb_domain)
     for (i = 0; i < ret; i++) {
         xcinfo2xlinfo(&info[i], &ptr[i]);
     }
-    *nb_domain = ret;
+    *nb_domain_out = ret;
     return ptr;
 }
 
@@ -589,7 +589,7 @@ int libxl_cpupool_info(libxl_ctx *ctx,
     return rc;
 }
 
-libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx *ctx, int *nb_pool)
+libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx *ctx, int *nb_pool_out)
 {
     GC_INIT(ctx);
     libxl_cpupoolinfo info, *ptr, *tmp;
@@ -613,14 +613,15 @@ libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx *ctx, int *nb_pool)
         poolid = info.poolid + 1;
     }
 
-    *nb_pool = i;
+    *nb_pool_out = i;
 out:
     GC_FREE;
     return ptr;
 }
 
-/* this API call only list VM running on this host. a VM can be an aggregate of multiple domains. */
-libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm)
+/* this API call only list VM running on this host. A VM can
+ * be an aggregate of multiple domains. */
+libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm_out)
 {
     libxl_vminfo *ptr;
     int index, i, ret;
@@ -644,7 +645,7 @@ libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm)
 
         index++;
     }
-    *nb_vm = index;
+    *nb_vm_out = index;
     return ptr;
 }
 
@@ -3161,7 +3162,7 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     return 0;
 }
 
-libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nr)
+libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nb_cpu_out)
 {
     xc_topologyinfo_t tinfo;
     DECLARE_HYPERCALL_BUFFER(xc_cpu_to_core_t, coremap);
@@ -3219,7 +3220,7 @@ fail:
     xc_hypercall_buffer_free(ctx->xch, nodemap);
 
     if (ret)
-        *nr = max_cpus;
+        *nb_cpu_out = max_cpus;
     return ret;
 }
 
@@ -3270,7 +3271,7 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
 }
 
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
-                                       int *nb_vcpu, int *nrcpus)
+                                       int *nb_vcpu, int *nr_vcpus_out)
 {
     libxl_vcpuinfo *ptr, *ret;
     xc_domaininfo_t domaininfo;
@@ -3280,7 +3281,7 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting infolist");
         return NULL;
     }
-    *nrcpus = libxl_get_max_cpus(ctx);
+    *nr_vcpus_out = libxl_get_max_cpus(ctx);
     ret = ptr = calloc(domaininfo.max_vcpu_id + 1, sizeof (libxl_vcpuinfo));
     if (!ptr) {
         return NULL;

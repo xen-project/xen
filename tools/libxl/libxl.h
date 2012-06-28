@@ -585,12 +585,28 @@ int libxl_primary_console_get_tty(libxl_ctx *ctx, uint32_t domid_vm, char **path
 /* May be called with info_r == NULL to check for domain's existance */
 int libxl_domain_info(libxl_ctx*, libxl_dominfo *info_r,
                       uint32_t domid);
-libxl_dominfo * libxl_list_domain(libxl_ctx*, int *nb_domain);
-void libxl_dominfo_list_free(libxl_dominfo *list, int nr);
-libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool);
-void libxl_cpupoolinfo_list_free(libxl_cpupoolinfo *list, int nr);
-libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm);
-void libxl_vminfo_list_free(libxl_vminfo *list, int nr);
+
+/* These functions each return (on success) an array of elements,
+ * and the length via the int* out parameter.  These arrays and
+ * their contents come from malloc, and must be freed with the
+ * corresponding libxl_THING_list_free function.
+ */
+libxl_dominfo * libxl_list_domain(libxl_ctx*, int *nb_domain_out);
+void libxl_dominfo_list_free(libxl_dominfo *list, int nb_domain);
+
+libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx*, int *nb_pool_out);
+void libxl_cpupoolinfo_list_free(libxl_cpupoolinfo *list, int nb_pool);
+
+libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm_out);
+void libxl_vminfo_list_free(libxl_vminfo *list, int nb_vm);
+
+#define LIBXL_CPUTOPOLOGY_INVALID_ENTRY (~(uint32_t)0)
+libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nb_cpu_out);
+void libxl_cputopology_list_free(libxl_cputopology *, int nb_cpu);
+
+libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
+                                int *nb_vcpu, int *nr_vcpus_out);
+void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr_vcpus);
 
 /*
  * Devices
@@ -766,12 +782,6 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
    */
 
 int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo);
-#define LIBXL_CPUTOPOLOGY_INVALID_ENTRY (~(uint32_t)0)
-libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nr);
-void libxl_cputopology_list_free(libxl_cputopology *, int nr);
-libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
-                                       int *nb_vcpu, int *nrcpus);
-void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr);
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
                            libxl_cpumap *cpumap);
 int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,
