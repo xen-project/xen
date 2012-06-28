@@ -489,19 +489,19 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
-int libxl_cpumap_alloc(libxl_ctx *ctx, libxl_cpumap *cpumap)
+int libxl_cpumap_alloc(libxl_ctx *ctx, libxl_cpumap *cpumap, int max_cpus)
 {
-    int max_cpus;
     int sz;
 
-    max_cpus = libxl_get_max_cpus(ctx);
+    if (max_cpus < 0)
+        return ERROR_INVAL;
+    if (max_cpus == 0)
+        max_cpus = libxl_get_max_cpus(ctx);
     if (max_cpus == 0)
         return ERROR_FAIL;
 
     sz = (max_cpus + 7) / 8;
-    cpumap->map = calloc(sz, sizeof(*cpumap->map));
-    if (!cpumap->map)
-        return ERROR_NOMEM;
+    cpumap->map = libxl__calloc(NULL, sizeof(*cpumap->map), sz);
     cpumap->size = sz;
     return 0;
 }

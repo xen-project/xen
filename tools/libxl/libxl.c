@@ -570,7 +570,7 @@ static int cpupool_info(libxl__gc *gc,
     info->poolid = xcinfo->cpupool_id;
     info->sched = xcinfo->sched_id;
     info->n_dom = xcinfo->n_dom;
-    if (libxl_cpumap_alloc(CTX, &info->cpumap))
+    if (libxl_cpumap_alloc(CTX, &info->cpumap, 0))
         goto out;
     memcpy(info->cpumap.map, xcinfo->cpumap, info->cpumap.size);
 
@@ -3288,7 +3288,7 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
     }
 
     for (*nb_vcpu = 0; *nb_vcpu <= domaininfo.max_vcpu_id; ++*nb_vcpu, ++ptr) {
-        if (libxl_cpumap_alloc(ctx, &ptr->cpumap)) {
+        if (libxl_cpumap_alloc(ctx, &ptr->cpumap, 0)) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "allocating cpumap");
             return NULL;
         }
@@ -4041,8 +4041,8 @@ int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid)
     if ((info->cpupool_id != poolid) || (info->n_dom))
         goto out;
 
-    rc = ERROR_NOMEM;
-    if (libxl_cpumap_alloc(ctx, &cpumap))
+    rc = libxl_cpumap_alloc(ctx, &cpumap, 0);
+    if (rc)
         goto out;
 
     memcpy(cpumap.map, info->cpumap, cpumap.size);

@@ -503,7 +503,7 @@ static int vcpupin_parse(char *cpu, libxl_cpumap *cpumap)
         return 0;
     }
 
-    if (libxl_cpumap_alloc(ctx, &exclude_cpumap)) {
+    if (libxl_cpumap_alloc(ctx, &exclude_cpumap, 0)) {
         fprintf(stderr, "Error: Failed to allocate cpumap.\n");
         return ENOMEM;
     }
@@ -656,7 +656,7 @@ static void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_list (config, "cpus", &cpus, 0, 1)) {
         int i, n_cpus = 0;
 
-        if (libxl_cpumap_alloc(ctx, &b_info->cpumap)) {
+        if (libxl_cpumap_alloc(ctx, &b_info->cpumap, 0)) {
             fprintf(stderr, "Unable to allocate cpumap\n");
             exit(1);
         }
@@ -692,7 +692,7 @@ static void parse_config_data(const char *config_source,
     else if (!xlu_cfg_get_string (config, "cpus", &buf, 0)) {
         char *buf2 = strdup(buf);
 
-        if (libxl_cpumap_alloc(ctx, &b_info->cpumap)) {
+        if (libxl_cpumap_alloc(ctx, &b_info->cpumap, 0)) {
             fprintf(stderr, "Unable to allocate cpumap\n");
             exit(1);
         }
@@ -1779,7 +1779,9 @@ start:
     if (vcpu_to_pcpu) {
         libxl_cpumap vcpu_cpumap;
 
-        libxl_cpumap_alloc(ctx, &vcpu_cpumap);
+        ret = libxl_cpumap_alloc(ctx, &vcpu_cpumap, 0);
+        if (ret)
+            goto error_out;
         for (i = 0; i < d_config.b_info.max_vcpus; i++) {
 
             if (vcpu_to_pcpu[i] != -1) {
@@ -4051,7 +4053,7 @@ static void vcpupin(const char *d, const char *vcpu, char *cpu)
 
     find_domain(d);
 
-    if (libxl_cpumap_alloc(ctx, &cpumap)) {
+    if (libxl_cpumap_alloc(ctx, &cpumap, 0)) {
         goto vcpupin_out;
     }
 
@@ -4108,7 +4110,7 @@ static void vcpuset(const char *d, const char* nr_vcpus)
 
     find_domain(d);
 
-    if (libxl_cpumap_alloc(ctx, &cpumap)) {
+    if (libxl_cpumap_alloc(ctx, &cpumap, 0)) {
         fprintf(stderr, "libxl_cpumap_alloc failed\n");
         return;
     }
@@ -5921,7 +5923,7 @@ int main_cpupoolcreate(int argc, char **argv)
         fprintf(stderr, "libxl_get_freecpus failed\n");
         goto out_cfg;
     }
-    if (libxl_cpumap_alloc(ctx, &cpumap)) {
+    if (libxl_cpumap_alloc(ctx, &cpumap, 0)) {
         fprintf(stderr, "Failed to allocate cpumap\n");
         goto out_cfg;
     }
@@ -6289,7 +6291,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
         return -ERROR_FAIL;
     }
 
-    if (libxl_cpumap_alloc(ctx, &cpumap)) {
+    if (libxl_cpumap_alloc(ctx, &cpumap, 0)) {
         fprintf(stderr, "Failed to allocate cpumap\n");
         libxl_cputopology_list_free(topology, n_cpus);
         return -ERROR_FAIL;

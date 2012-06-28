@@ -205,8 +205,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         b_info->cur_vcpus = 1;
 
     if (!b_info->cpumap.size) {
-        if (libxl_cpumap_alloc(CTX, &b_info->cpumap))
-            return ERROR_NOMEM;
+        if (libxl_cpumap_alloc(CTX, &b_info->cpumap, 0))
+            return ERROR_FAIL;
         libxl_cpumap_set_any(&b_info->cpumap);
     }
 
