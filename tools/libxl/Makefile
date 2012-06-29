@@ -100,7 +100,7 @@ testidl.c: libxl_types.idl gentest.py libxl.h $(AUTOINCS)
 all: $(CLIENTS) libxenlight.so libxenlight.a libxlutil.so libxlutil.a \
 	$(AUTOSRCS) $(AUTOINCS)
 
-$(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): $(AUTOINCS)
+$(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS) $(SAVE_HELPER_OBJS): $(AUTOINCS)
 
 %.c %.h:: %.y
 	@rm -f $*.[ch]
@@ -134,7 +134,7 @@ libxl_internal.h: _libxl_types_internal.h _paths.h
 libxl_internal_json.h: _libxl_types_internal_json.h
 xl.h: _paths.h
 
-$(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS): libxl.h
+$(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS) $(SAVE_HELPER_OBJS): libxl.h
 $(LIBXL_OBJS): libxl_internal.h
 
 _libxl_type%.h _libxl_type%_json.h _libxl_type%.c: libxl_type%.idl gentypes.py idl.py
