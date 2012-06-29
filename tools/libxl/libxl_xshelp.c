@@ -185,10 +185,10 @@ int libxl__xs_transaction_commit(libxl__gc *gc, xs_transaction_t *t)
     assert(*t);
 
     if (!xs_transaction_end(CTX->xsh, *t, 0)) {
+        *t = 0;
         if (errno == EAGAIN)
             return +1;
 
-        *t = 0;
         LOGE(ERROR, "could not commit xenstore transaction");
         return ERROR_FAIL;
     }
