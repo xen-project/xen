@@ -253,7 +253,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             if (!b_info->u.hvm.boot) return ERROR_NOMEM;
         }
 
-        libxl_defbool_setdefault(&b_info->u.hvm.stdvga, false);
+        if (!b_info->u.hvm.vga.kind)
+            b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
         libxl_defbool_setdefault(&b_info->u.hvm.vnc.enable, true);
         if (libxl_defbool_val(b_info->u.hvm.vnc.enable)) {
             libxl_defbool_setdefault(&b_info->u.hvm.vnc.findunused, true);

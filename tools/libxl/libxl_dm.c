@@ -177,8 +177,13 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
                                    libxl__sizekb_to_mb(b_info->video_memkb)),
                     NULL);
         }
-        if (libxl_defbool_val(b_info->u.hvm.stdvga)) {
+
+        switch (b_info->u.hvm.vga.kind) {
+        case LIBXL_VGA_INTERFACE_TYPE_STD:
             flexarray_append(dm_args, "-std-vga");
+            break;
+        case LIBXL_VGA_INTERFACE_TYPE_CIRRUS:
+            break;
         }
 
         if (b_info->u.hvm.boot) {
@@ -424,8 +429,13 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append(dm_args, spiceoptions);
         }
 
-        if (libxl_defbool_val(b_info->u.hvm.stdvga)) {
-                flexarray_vappend(dm_args, "-vga", "std", NULL);
+        switch (b_info->u.hvm.vga.kind) {
+        case LIBXL_VGA_INTERFACE_TYPE_STD:
+            flexarray_vappend(dm_args, "-vga", "std", NULL);
+            break;
+        case LIBXL_VGA_INTERFACE_TYPE_CIRRUS:
+            flexarray_vappend(dm_args, "-vga", "cirrus", NULL);
+            break;
         }
 
         if (b_info->u.hvm.boot) {

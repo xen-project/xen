@@ -1264,7 +1264,10 @@ skip_vfb:
 #undef parse_extra_args
 
     if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        xlu_cfg_get_defbool(config, "stdvga", &b_info->u.hvm.stdvga, 0);
+        if (!xlu_cfg_get_long(config, "stdvga", &l, 0))
+            b_info->u.hvm.vga.kind = l ? LIBXL_VGA_INTERFACE_TYPE_STD :
+                                         LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
+
         xlu_cfg_get_defbool(config, "vnc", &b_info->u.hvm.vnc.enable, 0);
         xlu_cfg_replace_string (config, "vnclisten",
                                 &b_info->u.hvm.vnc.listen, 0);

@@ -126,9 +126,19 @@ libxl_shutdown_reason = Enumeration("shutdown_reason", [
     (4, "watchdog"),
     ])
 
+libxl_vga_interface_type = Enumeration("vga_interface_type", [
+    (1, "CIRRUS"),
+    (2, "STD"),
+    ], init_val = 0)
+
 #
 # Complex libxl types
 #
+
+libxl_vga_interface_info = Struct("vga_interface_info", [
+    ("kind",    libxl_vga_interface_type),
+    ])
+
 libxl_vnc_info = Struct("vnc_info", [
     ("enable",        libxl_defbool),
     # "address:port" that should be listened on
@@ -282,7 +292,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("nested_hvm",       libxl_defbool),
                                        ("incr_generationid",libxl_defbool),
                                        ("nographic",        libxl_defbool),
-                                       ("stdvga",           libxl_defbool),
+                                       ("vga",              libxl_vga_interface_info),
                                        ("vnc",              libxl_vnc_info),
                                        # keyboard layout, default is en-us keyboard
                                        ("keymap",           string),
