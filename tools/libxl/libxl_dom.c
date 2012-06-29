@@ -73,7 +73,7 @@ int libxl__domain_cpupool(libxl__gc *gc, uint32_t domid)
 
 libxl_scheduler libxl__domain_scheduler(libxl__gc *gc, uint32_t domid)
 {
-    uint32_t cpupool = libxl__domain_cpupool(gc, domid);
+    int cpupool = libxl__domain_cpupool(gc, domid);
     libxl_cpupoolinfo poolinfo;
     libxl_scheduler sched = LIBXL_SCHEDULER_UNKNOWN;
     int rc;
