@@ -64,10 +64,15 @@ int libxl__domain_cpupool(libxl__gc *gc, uint32_t domid)
 
     ret = xc_domain_getinfolist(CTX->xch, domid, 1, &info);
     if (ret != 1)
+    {
+        LOGE(ERROR, "getinfolist failed %d\n", ret);
         return ERROR_FAIL;
+    }
     if (info.domain != domid)
+    {
+        LOGE(ERROR, "got info for dom%d, wanted dom%d\n", info.domain, domid);
         return ERROR_FAIL;
-
+    }
     return info.cpupool;
 }
 

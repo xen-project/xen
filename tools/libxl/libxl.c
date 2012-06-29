@@ -571,16 +571,27 @@ static int cpupool_info(libxl__gc *gc,
 
     xcinfo = xc_cpupool_getinfo(CTX->xch, poolid);
     if (xcinfo == NULL)
+    {
+        LOGE(ERROR, "failed to get info for cpupool%d\n", poolid);
         return ERROR_FAIL;
+    }
 
     if (exact && xcinfo->cpupool_id != poolid)
+    {
+        LOG(ERROR, "got info for cpupool%d, wanted cpupool%d\n",
+            xcinfo->cpupool_id, poolid);
         goto out;
+    }
 
     info->poolid = xcinfo->cpupool_id;
     info->sched = xcinfo->sched_id;
     info->n_dom = xcinfo->n_dom;
-    if (libxl_cpumap_alloc(CTX, &info->cpumap, 0))
+    rc = libxl_cpumap_alloc(CTX, &info->cpumap, 0);
+    if (rc)
+    {
+        LOG(ERROR, "unable to allocate cpumap %d\n", rc);
         goto out;
+    }
     memcpy(info->cpumap.map, xcinfo->cpumap, info->cpumap.size);
 
     rc = 0;
