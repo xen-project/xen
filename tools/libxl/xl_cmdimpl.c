@@ -3629,11 +3629,11 @@ int main_list(int argc, char **argv)
     return 0;
 }
 
-int main_list_vm(int argc, char **argv)
+int main_vm_list(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", "list-vm", 0)) != -1)
+    if ((opt = def_getopt(argc, argv, "", "vm-list", 0)) != -1)
         return opt;
 
     list_vm();
