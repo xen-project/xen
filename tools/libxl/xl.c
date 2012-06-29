@@ -251,9 +251,9 @@ int main(int argc, char **argv)
             for (int i = 0; i < sizeof(locks)/sizeof(locks[0]); i++) {
                 if (!access(locks[i], F_OK) && !force_execution) {
                     fprintf(stderr,
-"xend is running, which prevents xl from working correctly.\n"
-"If you still want to force the execution of xl please use the -f\n"
-"option.\n"
+"xend is running, which may cause unpredictable results when using\n"
+"this xl command.  Please shut down xend before continuing.\n\n"
+"(This check can be overridden with the -f option.)\n"
                             );
                     ret = 1;
                     goto xit;
