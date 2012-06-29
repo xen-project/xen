@@ -68,7 +68,8 @@ libxl_ctx *ctx;
 xlchild children[child_max];
 
 /* when we operate on a domain, it is this one: */
-static uint32_t domid;
+#define INVALID_DOMID ~0
+static uint32_t domid = INVALID_DOMID;
 static const char *common_domname;
 static int fd_lock = -1;
 
@@ -1396,6 +1397,7 @@ static int handle_domain_death(uint32_t domid,
     case LIBXL_ACTION_ON_SHUTDOWN_DESTROY:
         LOG("Domain %d needs to be cleaned up: destroying the domain", domid);
         libxl_domain_destroy(ctx, domid);
+        domid = INVALID_DOMID;
         break;
 
     case LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY:
@@ -1457,6 +1459,12 @@ static int preserve_domain(uint32_t domid, libxl_event *event,
 
     LOG("Preserving domain %d %s with suffix%s", domid, d_config->c_info.name, stime);
     rc = libxl_domain_preserve(ctx, domid, &d_config->c_info, stime, new_uuid);
+
+    /*
+     * Although domid still exists it is no longer the one we are concerned
+     * with.
+     */
+    domid = INVALID_DOMID;
 
     return rc == 0 ? 1 : 0;
 }
@@ -1745,7 +1753,7 @@ static int create_domain(struct domain_create *dom_info)
         goto out;
 
 start:
-    domid = -1;
+    assert(domid == INVALID_DOMID);
 
     rc = acquire_lock();
     if (rc < 0)
@@ -1994,8 +2002,10 @@ start:
 
 error_out:
     release_lock();
-    if (libxl_domid_valid_guest(domid))
+    if (libxl_domid_valid_guest(domid)) {
         libxl_domain_destroy(ctx, domid);
+        domid = INVALID_DOMID;
+    }
 
 out:
     if (logfile != 2)
