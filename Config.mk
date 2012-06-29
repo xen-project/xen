@@ -213,9 +213,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 94a7bdc2e7797df2dab1c26216349f66e0f3490a
-# Fri Jun 29 16:58:05 2012 +0100
-# xendisk: set maximum number of grants to be used
+QEMU_TAG ?= fa2e8e3bc869c04d4a4d9b8f70c1cab7e53778d6
+# Fri Jun 29 17:06:25 2012 +0100
+# passthrough: fix off-by-one in PCI config space register index check
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
