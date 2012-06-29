@@ -81,6 +81,7 @@ libxl_scheduler libxl__domain_scheduler(libxl__gc *gc, uint32_t domid)
     if (cpupool < 0)
         return sched;
 
+    libxl_cpupoolinfo_init(&poolinfo);
     rc = libxl_cpupool_info(CTX, &poolinfo, cpupool);
     if (rc < 0)
         goto out;
