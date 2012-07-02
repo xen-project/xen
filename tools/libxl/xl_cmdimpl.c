@@ -1328,8 +1328,9 @@ static void reload_domain_config(uint32_t domid,
 }
 
 /* Returns 1 if domain should be restarted,
- * 2 if domain should be renamed then restarted, or 0 */
-static int handle_domain_death(uint32_t domid,
+ * 2 if domain should be renamed then restarted, or 0
+ * Can update r_domid if domain is destroyed etc */
+static int handle_domain_death(uint32_t *r_domid,
                                libxl_event *event,
                                uint8_t **config_data, int *config_len,
                                libxl_domain_config *d_config)
@@ -1372,7 +1373,7 @@ static int handle_domain_death(uint32_t domid,
             LOG("failed to construct core dump path");
         } else {
             LOG("dumping core to %s", corefile);
-            rc=libxl_domain_core_dump(ctx, domid, corefile, NULL);
+            rc=libxl_domain_core_dump(ctx, *r_domid, corefile, NULL);
             if (rc) LOG("core dump failed (rc=%d).", rc);
         }
         /* No point crying over spilled milk, continue on failure. */
@@ -1388,19 +1389,20 @@ static int handle_domain_death(uint32_t domid,
         break;
 
     case LIBXL_ACTION_ON_SHUTDOWN_RESTART_RENAME:
-        reload_domain_config(domid, config_data, config_len);
+        reload_domain_config(*r_domid, config_data, config_len);
         restart = 2;
         break;
 
     case LIBXL_ACTION_ON_SHUTDOWN_RESTART:
-        reload_domain_config(domid, config_data, config_len);
+        reload_domain_config(*r_domid, config_data, config_len);
 
         restart = 1;
         /* fall-through */
     case LIBXL_ACTION_ON_SHUTDOWN_DESTROY:
-        LOG("Domain %d needs to be cleaned up: destroying the domain", domid);
-        libxl_domain_destroy(ctx, domid);
-        domid = INVALID_DOMID;
+        LOG("Domain %d needs to be cleaned up: destroying the domain",
+            *r_domid);
+        libxl_domain_destroy(ctx, *r_domid);
+        *r_domid = INVALID_DOMID;
         break;
 
     case LIBXL_ACTION_ON_SHUTDOWN_COREDUMP_DESTROY:
@@ -1430,7 +1432,8 @@ static void replace_string(char **str, const char *val)
 }
 
 
-static int preserve_domain(uint32_t domid, libxl_event *event,
+/* Preserve a copy of a domain under a new name. Updates *r_domid */
+static int preserve_domain(uint32_t *r_domid, libxl_event *event,
                            libxl_domain_config *d_config)
 {
     time_t now;
@@ -1460,14 +1463,16 @@ static int preserve_domain(uint32_t domid, libxl_event *event,
 
     libxl_uuid_generate(&new_uuid);
 
-    LOG("Preserving domain %d %s with suffix%s", domid, d_config->c_info.name, stime);
-    rc = libxl_domain_preserve(ctx, domid, &d_config->c_info, stime, new_uuid);
+    LOG("Preserving domain %d %s with suffix%s",
+        *r_domid, d_config->c_info.name, stime);
+    rc = libxl_domain_preserve(ctx, *r_domid, &d_config->c_info,
+                               stime, new_uuid);
 
     /*
-     * Although domid still exists it is no longer the one we are concerned
-     * with.
+     * Although the domain still exists it is no longer the one we are
+     * concerned with.
      */
-    domid = INVALID_DOMID;
+    *r_domid = INVALID_DOMID;
 
     return rc == 0 ? 1 : 0;
 }
@@ -1921,11 +1926,11 @@ start:
             LOG("Domain %d has shut down, reason code %d 0x%x", domid,
                 event->u.domain_shutdown.shutdown_reason,
                 event->u.domain_shutdown.shutdown_reason);
-            switch (handle_domain_death(domid, event,
+            switch (handle_domain_death(&domid, event,
                                         (uint8_t **)&config_data, &config_len,
                                         &d_config)) {
             case 2:
-                if (!preserve_domain(domid, event, &d_config)) {
+                if (!preserve_domain(&domid, event, &d_config)) {
                     /* If we fail then exit leaving the old domain in place. */
                     ret = -1;
                     goto out;
