@@ -4,6 +4,7 @@
 #include <xen/errno.h>
 #include <xen/domain_page.h>
 #include <asm/flushtlb.h>
+#include "gic.h"
 
 void dump_p2m_lookup(struct domain *d, paddr_t addr)
 {
@@ -102,7 +103,7 @@ static int p2m_create_table(struct domain *d,
 
     BUG_ON(entry->p2m.valid);
 
-    page = alloc_domheap_page(d, 0);
+    page = alloc_domheap_page(NULL, 0);
     if ( page == NULL )
         return -ENOMEM;
 

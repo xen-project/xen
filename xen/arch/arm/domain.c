@@ -323,10 +323,13 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
         if ( (rc = p2m_alloc_table(d)) != 0 )
             goto fail;
-    }
 
-    if ( (rc = domain_vgic_init(d)) != 0 )
-        goto fail;
+        if ( (rc = gicv_setup(d)) != 0 )
+            goto fail;
+
+        if ( (rc = domain_vgic_init(d)) != 0 )
+            goto fail;
+    }
 
     /* Domain 0 gets a real UART not an emulated one */
     if ( d->domain_id && (rc = domain_uart0_init(d)) != 0 )
@@ -334,6 +337,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
     rc = 0;
 fail:
+    /*XXX unwind allocations etc */
     return rc;
 }
 

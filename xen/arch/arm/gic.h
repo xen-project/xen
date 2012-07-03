@@ -148,7 +148,7 @@ extern void gic_init_secondary_cpu(void);
 /* Take down a CPU's per-CPU GIC interface */
 extern void gic_disable_cpu(void);
 /* setup the gic virtual interface for a guest */
-extern void gicv_setup(struct domain *d);
+extern int gicv_setup(struct domain *d);
 
 /* Context switch */
 extern void gic_save_state(struct vcpu *v);

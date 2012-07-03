@@ -270,9 +270,6 @@ int construct_dom0(struct domain *d)
 
     d->max_pages = ~0U;
 
-    if ( (rc = p2m_alloc_table(d)) != 0 )
-        return rc;
-
     rc = prepare_dtb(d, &kinfo);
     if ( rc < 0 )
         return rc;
@@ -287,8 +284,6 @@ int construct_dom0(struct domain *d)
     map_mmio_regions(d, 0x1C000000, 0x1FFFFFFF, 0x1C000000);
     printk("Map VGIC MMIO regions 1:1 in the P2M %#llx->%#llx\n", 0x2C008000ULL, 0x2DFFFFFFULL);
     map_mmio_regions(d, 0x2C008000, 0x2DFFFFFF, 0x2C008000);
-
-    gicv_setup(d);
 
     printk("Routing peripheral interrupts to guest\n");
     /* TODO Get from device tree */

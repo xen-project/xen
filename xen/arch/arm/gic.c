@@ -541,14 +541,11 @@ void gic_interrupt(struct cpu_user_regs *regs, int is_fiq)
     do_IRQ(regs, irq, is_fiq);
 }
 
-void gicv_setup(struct domain *d)
+int gicv_setup(struct domain *d)
 {
     /* map the gic virtual cpu interface in the gic cpu interface region of
      * the guest */
-    printk("mapping GICC at %#"PRIx32" to %#"PRIx32"\n",
-           GIC_BASE_ADDRESS + GIC_CR_OFFSET,
-           GIC_BASE_ADDRESS + GIC_VR_OFFSET);
-    map_mmio_regions(d, GIC_BASE_ADDRESS + GIC_CR_OFFSET,
+    return map_mmio_regions(d, GIC_BASE_ADDRESS + GIC_CR_OFFSET,
                         GIC_BASE_ADDRESS + GIC_CR_OFFSET + (2 * PAGE_SIZE) - 1,
                         GIC_BASE_ADDRESS + GIC_VR_OFFSET);
 }
