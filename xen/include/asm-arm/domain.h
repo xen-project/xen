@@ -48,6 +48,14 @@ struct arch_domain
         struct vgic_irq_rank *shared_irqs;
         struct pending_irq *pending_irqs;
     } vgic;
+
+    struct vpl011 {
+#define VPL011_BUF_SIZE 128
+        char                  *buf;
+        int                    idx;
+        spinlock_t             lock;
+    } uart0;
+
 }  __cacheline_aligned;
 
 struct arch_vcpu
