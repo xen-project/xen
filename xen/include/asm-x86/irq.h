@@ -188,6 +188,7 @@ void cleanup_domain_irq_mapping(struct domain *);
 })
 #define IRQ_UNBOUND -1
 #define IRQ_PT -2
+#define IRQ_MSI_EMU -3
 
 bool_t cpu_has_pending_apic_eoi(void);
 
