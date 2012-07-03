@@ -114,8 +114,8 @@ int vcpu_vgic_init(struct vcpu *v)
     return 0;
 }
 
-#define vgic_lock(v)   spin_lock(&(v)->domain->arch.vgic.lock)
-#define vgic_unlock(v) spin_unlock(&(v)->domain->arch.vgic.lock)
+#define vgic_lock(v)   spin_lock_irq(&(v)->domain->arch.vgic.lock)
+#define vgic_unlock(v) spin_unlock_irq(&(v)->domain->arch.vgic.lock)
 
 #define vgic_lock_rank(v, r) spin_lock(&(r)->lock)
 #define vgic_unlock_rank(v, r) spin_unlock(&(r)->lock)
@@ -550,6 +550,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
     uint8_t priority;
     struct vgic_irq_rank *rank = vgic_irq_rank(v, 8, idx);
     struct pending_irq *iter, *n = irq_to_pending(v, irq);
+    unsigned long flags;
 
     /* irq still pending */
     if (!list_empty(&n->inflight))
@@ -566,18 +567,18 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
 
     gic_set_guest_irq(irq, GICH_LR_PENDING, priority);
 
-    spin_lock(&v->arch.vgic.lock);
+    spin_lock_irqsave(&v->arch.vgic.lock, flags);
     list_for_each_entry ( iter, &v->arch.vgic.inflight_irqs, inflight )
     {
         if ( iter->priority > priority )
         {
             list_add_tail(&n->inflight, &iter->inflight);
-            spin_unlock(&v->arch.vgic.lock);
+            spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
             return;
         }
     }
     list_add_tail(&n->inflight, &v->arch.vgic.inflight_irqs);
-    spin_unlock(&v->arch.vgic.lock);
+    spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
     /* we have a new higher priority irq, inject it into the guest */
 }
 

@@ -604,14 +604,14 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
         }
         spin_unlock(&gic.lock);
 
-        spin_lock(&current->arch.vgic.lock);
+        spin_lock_irq(&current->arch.vgic.lock);
         p = irq_to_pending(current, virq);
         if ( p->desc != NULL ) {
             p->desc->status &= ~IRQ_INPROGRESS;
             GICC[GICC_DIR] = virq;
         }
         list_del_init(&p->inflight);
-        spin_unlock(&current->arch.vgic.lock);
+        spin_unlock_irq(&current->arch.vgic.lock);
 
         i++;
     }
