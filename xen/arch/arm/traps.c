@@ -170,7 +170,13 @@ void panic_PAR(uint64_t par, const char *when)
     panic("Error during %s-to-physical address translation\n", when);
 }
 
-void show_registers(struct cpu_user_regs *regs)
+struct reg_ctxt {
+    uint32_t sctlr;
+    uint32_t ttbr0, ttbr1, ttbcr;
+};
+static void _show_registers(struct cpu_user_regs *regs,
+                            struct reg_ctxt *ctxt,
+                            int guest_mode)
 {
     static const char *mode_strings[] = {
        [PSR_MODE_USR] = "USR",
@@ -187,7 +193,7 @@ void show_registers(struct cpu_user_regs *regs)
     print_xen_info();
     printk("CPU:    %d\n", smp_processor_id());
     printk("PC:     %08"PRIx32, regs->pc);
-    if ( !guest_mode(regs) )
+    if ( !guest_mode )
             print_symbol(" %s", regs->pc);
     printk("\n");
     printk("CPSR:   %08"PRIx32" MODE:%s\n", regs->cpsr,
@@ -199,7 +205,7 @@ void show_registers(struct cpu_user_regs *regs)
     printk("     R8: %08"PRIx32" R9: %08"PRIx32" R10:%08"PRIx32" R11:%08"PRIx32" R12:%08"PRIx32"\n",
            regs->r8, regs->r9, regs->r10, regs->r11, regs->r12);
 
-    if ( guest_mode(regs) )
+    if ( guest_mode )
     {
         printk("USR: SP: %08"PRIx32" LR: %08"PRIx32" CPSR:%08"PRIx32"\n",
                regs->sp_usr, regs->lr_usr, regs->cpsr);
@@ -217,8 +223,8 @@ void show_registers(struct cpu_user_regs *regs)
                regs->r8_fiq, regs->r9_fiq, regs->r10_fiq, regs->r11_fiq, regs->r11_fiq);
         printk("\n");
         printk("TTBR0 %08"PRIx32" TTBR1 %08"PRIx32" TTBCR %08"PRIx32"\n",
-               READ_CP32(TTBR0), READ_CP32(TTBR1), READ_CP32(TTBCR));
-        printk("SCTLR %08"PRIx32"\n", READ_CP32(SCTLR));
+               ctxt->ttbr0, ctxt->ttbr1, ctxt->ttbcr);
+        printk("SCTLR %08"PRIx32"\n", ctxt->sctlr);
         printk("VTTBR %010"PRIx64"\n", READ_CP64(VTTBR));
         printk("\n");
     }
@@ -239,6 +245,26 @@ void show_registers(struct cpu_user_regs *regs)
     printk("DFSR %"PRIx32" DFAR %"PRIx32"\n", READ_CP32(DFSR), READ_CP32(DFAR));
     printk("IFSR %"PRIx32" IFAR %"PRIx32"\n", READ_CP32(IFSR), READ_CP32(IFAR));
     printk("\n");
+}
+
+void show_registers(struct cpu_user_regs *regs)
+{
+    struct reg_ctxt ctxt;
+    ctxt.sctlr = READ_CP32(SCTLR);
+    ctxt.ttbcr = READ_CP32(TTBCR);
+    ctxt.ttbr0 = READ_CP32(TTBR0);
+    ctxt.ttbr1 = READ_CP32(TTBR1);
+    _show_registers(regs, &ctxt, guest_mode(regs));
+}
+
+void vcpu_show_registers(const struct vcpu *v)
+{
+    struct reg_ctxt ctxt;
+    ctxt.sctlr = v->arch.sctlr;
+    ctxt.ttbcr = v->arch.ttbcr;
+    ctxt.ttbr0 = v->arch.ttbr0;
+    ctxt.ttbr1 = v->arch.ttbr1;
+    _show_registers(&v->arch.cpu_info->guest_cpu_user_regs, &ctxt, 1);
 }
 
 static void show_guest_stack(struct cpu_user_regs *regs)
@@ -332,6 +358,26 @@ void show_execution_state(struct cpu_user_regs *regs)
 {
     show_registers(regs);
     show_stack(regs);
+}
+
+void vcpu_show_execution_state(struct vcpu *v)
+{
+    printk("*** Dumping Dom%d vcpu#%d state: ***\n",
+           v->domain->domain_id, v->vcpu_id);
+
+    if ( v == current )
+    {
+        show_execution_state(guest_cpu_user_regs());
+        return;
+    }
+
+    vcpu_pause(v); /* acceptably dangerous */
+
+    vcpu_show_registers(v);
+    if ( !usr_mode(&v->arch.cpu_info->guest_cpu_user_regs) )
+        show_guest_stack(&v->arch.cpu_info->guest_cpu_user_regs);
+
+    vcpu_unpause(v);
 }
 
 static void do_unexpected_trap(const char *msg, struct cpu_user_regs *regs)

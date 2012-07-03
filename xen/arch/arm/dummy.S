@@ -21,7 +21,6 @@ DUMMY(pirq_set_affinity);
 DUMMY(arch_get_info_guest);
 DUMMY(arch_vcpu_reset);
 NOP(update_vcpu_system_time);
-DUMMY(vcpu_show_execution_state);
 
 /* Page Reference & Type Maintenance */
 DUMMY(get_page);
