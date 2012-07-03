@@ -49,6 +49,11 @@ static void ctxt_switch_from(struct vcpu *p)
     p->arch.tpidruro = READ_CP32(TPIDRURO);
     p->arch.tpidrprw = READ_CP32(TPIDRPRW);
 
+    /* Arch timer */
+    p->arch.cntvoff = READ_CP64(CNTVOFF);
+    p->arch.cntv_cval = READ_CP64(CNTV_CVAL);
+    p->arch.cntv_ctl = READ_CP32(CNTV_CTL);
+
     /* XXX only save these if ThumbEE e.g. ID_PFR0.THUMB_EE_SUPPORT */
     p->arch.teecr = READ_CP32(TEECR);
     p->arch.teehbr = READ_CP32(TEEHBR);
@@ -127,6 +132,11 @@ static void ctxt_switch_to(struct vcpu *n)
     WRITE_CP32(n->arch.mair0, MAIR0);
     WRITE_CP32(n->arch.mair1, MAIR1);
     isb();
+
+    /* Arch timer */
+    WRITE_CP64(n->arch.cntvoff, CNTVOFF);
+    WRITE_CP64(n->arch.cntv_cval, CNTV_CVAL);
+    WRITE_CP32(n->arch.cntv_ctl, CNTV_CTL);
 
     /* Control Registers */
     WRITE_CP32(n->arch.actlr, ACTLR);

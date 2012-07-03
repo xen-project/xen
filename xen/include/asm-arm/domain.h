@@ -111,6 +111,11 @@ struct arch_vcpu
     uint32_t teecr, teehbr;
     uint32_t joscr, jmcr;
 
+    /* Arch timers */
+    uint64_t cntvoff;
+    uint64_t cntv_cval;
+    uint32_t cntv_ctl;
+
     /* CP 15 */
     uint32_t csselr;
 

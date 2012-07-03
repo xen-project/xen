@@ -238,10 +238,13 @@
 #define CNTP_CTL        p15,0,c14,c2,1  /* Physical Timer control register */
 #define CNTVCT          p15,1,c14       /* Time counter value + offset */
 #define CNTP_CVAL       p15,2,c14       /* Physical Timer comparator */
+#define CNTV_CVAL       p15,3,c14       /* Virt. Timer comparator */
 #define CNTVOFF         p15,4,c14       /* Time counter offset */
 #define CNTHCTL         p15,4,c14,c1,0  /* Time counter hyp. control */
 #define CNTHP_TVAL      p15,4,c14,c2,0  /* Hyp. Timer value */
 #define CNTHP_CTL       p15,4,c14,c2,1  /* Hyp. Timer control register */
+#define CNTV_TVAL       p15,0,c14,c3,0  /* Virt. Timer value */
+#define CNTV_CTL        p15,0,c14,c3,1  /* Virt. TImer control register */
 #define CNTHP_CVAL      p15,6,c14       /* Hyp. Timer comparator */
 
 /* CP15 CR15: Implementation Defined Registers */
