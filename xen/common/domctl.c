@@ -192,6 +192,7 @@ static unsigned int default_vcpu0_location(cpumask_t *online)
     cpu = cpumask_first(&cpu_exclude_map);
     if ( cpumask_weight(&cpu_exclude_map) > 1 )
         cpu = cpumask_next(cpu, &cpu_exclude_map);
+    ASSERT(cpu < nr_cpu_ids);
     for_each_cpu(i, online)
     {
         if ( cpumask_test_cpu(i, &cpu_exclude_map) )
