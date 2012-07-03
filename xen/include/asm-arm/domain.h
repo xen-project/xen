@@ -46,6 +46,10 @@ struct arch_domain
         int ctlr;
         int nr_lines;
         struct vgic_irq_rank *shared_irqs;
+        /*
+         * SPIs are domain global, SGIs and PPIs are per-VCPU and stored in
+         * struct arch_vcpu.
+         */
         struct pending_irq *pending_irqs;
     } vgic;
 
@@ -114,7 +118,13 @@ struct arch_vcpu
     uint32_t gic_lr[64];
 
     struct {
+        /*
+         * SGIs and PPIs are per-VCPU, SPIs are domain global and in
+         * struct arch_domain.
+         */
+        struct pending_irq pending_irqs[32];
         struct vgic_irq_rank private_irqs;
+
         /* This list is ordered by IRQ priority and it is used to keep
          * track of the IRQs that the VGIC injected into the guest.
          * Depending on the availability of LR registers, the IRQs might

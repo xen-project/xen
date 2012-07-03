@@ -82,9 +82,8 @@ int domain_vgic_init(struct domain *d)
     d->arch.vgic.shared_irqs =
         xmalloc_array(struct vgic_irq_rank, DOMAIN_NR_RANKS(d));
     d->arch.vgic.pending_irqs =
-        xmalloc_array(struct pending_irq,
-                d->arch.vgic.nr_lines + (32 * d->max_vcpus));
-    for (i=0; i<d->arch.vgic.nr_lines + (32 * d->max_vcpus); i++)
+        xzalloc_array(struct pending_irq, d->arch.vgic.nr_lines);
+    for (i=0; i<d->arch.vgic.nr_lines; i++)
         INIT_LIST_HEAD(&d->arch.vgic.pending_irqs[i].inflight);
     for (i=0; i<DOMAIN_NR_RANKS(d); i++)
         spin_lock_init(&d->arch.vgic.shared_irqs[i].lock);
@@ -97,6 +96,10 @@ int vcpu_vgic_init(struct vcpu *v)
     memset(&v->arch.vgic.private_irqs, 0, sizeof(v->arch.vgic.private_irqs));
 
     spin_lock_init(&v->arch.vgic.private_irqs.lock);
+
+    memset(&v->arch.vgic.pending_irqs, 0, sizeof(v->arch.vgic.pending_irqs));
+    for (i = 0; i < 32; i++)
+        INIT_LIST_HEAD(&v->arch.vgic.pending_irqs[i].inflight);
 
     /* For SGI and PPI the target is always this CPU */
     for ( i = 0 ; i < 8 ; i++ )
@@ -535,8 +538,7 @@ struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq)
     /* Pending irqs allocation strategy: the first vgic.nr_lines irqs
      * are used for SPIs; the rests are used for per cpu irqs */
     if ( irq < 32 )
-        n = &v->domain->arch.vgic.pending_irqs[irq + (v->vcpu_id * 32)
-            + v->domain->arch.vgic.nr_lines];
+        n = &v->arch.vgic.pending_irqs[irq];
     else
         n = &v->domain->arch.vgic.pending_irqs[irq - 32];
     return n;
