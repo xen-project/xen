@@ -102,7 +102,7 @@ typedef struct {
     unsigned long af:1;         /* Access Flag */
     unsigned long ng:1;         /* Not-Global */
 
-    /* The base address must be approprately aligned for Block entries */
+    /* The base address must be appropriately aligned for Block entries */
     unsigned long base:28;      /* Base address of block or next table */
     unsigned long sbz:12;       /* Must be zero */
 
@@ -137,7 +137,7 @@ typedef struct {
     unsigned long af:1;         /* Access Flag */
     unsigned long sbz4:1;
 
-    /* The base address must be approprately aligned for Block entries */
+    /* The base address must be appropriately aligned for Block entries */
     unsigned long base:28;      /* Base address of block or next table */
     unsigned long sbz3:12;
 
@@ -162,7 +162,7 @@ typedef struct {
 
     unsigned long pad2:10;
 
-    /* The base address must be approprately aligned for Block entries */
+    /* The base address must be appropriately aligned for Block entries */
     unsigned long base:28;      /* Base address of block or next table */
 
     unsigned long pad1:24;
