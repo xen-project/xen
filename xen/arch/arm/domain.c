@@ -317,37 +317,45 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
     int rc;
 
+    /* Idle domains do not need this setup */
+    if ( is_idle_domain(d) )
+        return 0;
+
     rc = -ENOMEM;
     if ( (rc = p2m_init(d)) != 0 )
         goto fail;
 
-    if ( !is_idle_domain(d) )
-    {
-        rc = -ENOMEM;
-        if ( (d->shared_info = alloc_xenheap_pages(0, 0)) == NULL )
-            goto fail;
+    if ( (d->shared_info = alloc_xenheap_pages(0, 0)) == NULL )
+        goto fail;
 
-        clear_page(d->shared_info);
-        share_xen_page_with_guest(
-                virt_to_page(d->shared_info), d, XENSHARE_writable);
+    clear_page(d->shared_info);
+    share_xen_page_with_guest(
+        virt_to_page(d->shared_info), d, XENSHARE_writable);
 
-        if ( (rc = p2m_alloc_table(d)) != 0 )
-            goto fail;
+    if ( (rc = p2m_alloc_table(d)) != 0 )
+        goto fail;
 
-        if ( (rc = gicv_setup(d)) != 0 )
-            goto fail;
+    if ( (rc = gicv_setup(d)) != 0 )
+        goto fail;
 
-        if ( (rc = domain_vgic_init(d)) != 0 )
-            goto fail;
-    }
+    if ( (rc = domain_vgic_init(d)) != 0 )
+        goto fail;
 
     /* Domain 0 gets a real UART not an emulated one */
     if ( d->domain_id && (rc = domain_uart0_init(d)) != 0 )
         goto fail;
 
-    rc = 0;
+    return 0;
+
 fail:
-    /*XXX unwind allocations etc */
+    d->is_dying = DOMDYING_dead;
+    free_xenheap_page(d->shared_info);
+
+    p2m_teardown(d);
+
+    domain_vgic_free(d);
+    domain_uart0_free(d);
+
     return rc;
 }
 

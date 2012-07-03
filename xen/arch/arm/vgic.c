@@ -90,6 +90,12 @@ int domain_vgic_init(struct domain *d)
     return 0;
 }
 
+void domain_vgic_free(struct domain *d)
+{
+    xfree(d->arch.vgic.shared_irqs);
+    xfree(d->arch.vgic.pending_irqs);
+}
+
 int vcpu_vgic_init(struct vcpu *v)
 {
     int i;

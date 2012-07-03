@@ -23,6 +23,9 @@ struct p2m_domain {
 /* Init the datastructures for later use by the p2m code */
 int p2m_init(struct domain *d);
 
+/* Return all the p2m resources to Xen. */
+void p2m_teardown(struct domain *d);
+
 /* Allocate a new p2m table for a domain.
  *
  * Returns 0 for success or -errno.

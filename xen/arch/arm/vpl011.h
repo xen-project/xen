@@ -21,6 +21,7 @@
 #define __ARCH_ARM_VPL011_H__
 
 extern int domain_uart0_init(struct domain *d);
+extern void domain_uart0_free(struct domain *d);
 
 #endif
 

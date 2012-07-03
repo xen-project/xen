@@ -56,6 +56,11 @@ int domain_uart0_init(struct domain *d)
 
 }
 
+void domain_uart0_free(struct domain *d)
+{
+    xfree(d->arch.uart0.buf);
+}
+
 static void uart0_print_char(char c)
 {
     struct vpl011 *uart = &current->domain->arch.uart0;

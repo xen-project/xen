@@ -288,6 +288,21 @@ int p2m_alloc_table(struct domain *d)
     return 0;
 }
 
+void p2m_teardown(struct domain *d)
+{
+    struct p2m_domain *p2m = &d->arch.p2m;
+    struct page_info *pg;
+
+    spin_lock(&p2m->lock);
+
+    while ( (pg = page_list_remove_head(&p2m->pages)) )
+        free_domheap_page(pg);
+
+    p2m->first_level = NULL;
+
+    spin_unlock(&p2m->lock);
+}
+
 int p2m_init(struct domain *d)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
