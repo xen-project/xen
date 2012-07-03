@@ -333,7 +333,7 @@ int construct_dom0(struct domain *d)
 
     WRITE_CP32(SCTLR_BASE, SCTLR);
 
-    WRITE_CP32(HCR_AMO|HCR_IMO|HCR_VM, HCR);
+    WRITE_CP32(HCR_PTW|HCR_BSU_OUTER|HCR_AMO|HCR_IMO|HCR_VM, HCR);
     isb();
 
     local_abort_enable();
