@@ -27,8 +27,12 @@
 #include <xen/time.h>
 #include <asm/system.h>
 
-/* Unfortunately the hypervisor timer interrupt appears to be buggy */
-#define USE_HYP_TIMER 0
+/*
+ * Unfortunately the hypervisor timer interrupt appears to be buggy in
+ * some versions of the model. Disable this to use the physical timer
+ * instead.
+ */
+#define USE_HYP_TIMER 1
 
 /* For fine-grained timekeeping, we use the ARM "Generic Timer", a
  * register-mapped time source in the SoC. */
