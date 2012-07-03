@@ -36,6 +36,14 @@
 #define MAIR0VAL 0xeeaa4400
 #define MAIR1VAL 0xff000004
 
+/*
+ * Attribute Indexes.
+ *
+ * These are valid in the AttrIndx[2:0] field of an LPAE stage 1 page
+ * table entry. They are indexes into the bytes of the MAIR*
+ * registers, as defined above.
+ *
+ */
 #define UNCACHED      0x0
 #define BUFFERABLE    0x1
 #define WRITETHROUGH  0x2
@@ -46,6 +54,15 @@
 #define DEV_WC        BUFFERABLE
 #define DEV_CACHED    WRITEBACK
 
+/*
+ * Stage 2 Memory Type.
+ *
+ * These are valid in the MemAttr[3:0] field of an LPAE stage 2 page
+ * table entry.
+ *
+ */
+#define MATTR_DEV     0x1
+#define MATTR_MEM     0xf
 
 #ifndef __ASSEMBLY__
 
@@ -187,7 +204,7 @@ static inline lpae_t mfn_to_xen_entry(unsigned long mfn)
     return e;
 }
 
-static inline lpae_t mfn_to_p2m_entry(unsigned long mfn)
+static inline lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr)
 {
     paddr_t pa = ((paddr_t) mfn) << PAGE_SHIFT;
     lpae_t e = (lpae_t) {
@@ -196,7 +213,7 @@ static inline lpae_t mfn_to_p2m_entry(unsigned long mfn)
         .p2m.sh = LPAE_SH_OUTER,
         .p2m.write = 1,
         .p2m.read = 1,
-        .p2m.mattr = 0xf,
+        .p2m.mattr = mattr,
         .p2m.table = 1,
         .p2m.valid = 1,
     };

@@ -91,7 +91,8 @@ int p2m_pod_decrease_reservation(struct domain *d,
     return -ENOSYS;
 }
 
-static int p2m_create_entry(struct domain *d,
+/* Allocate a new page table page and hook it in via the given entry */
+static int p2m_create_table(struct domain *d,
                             lpae_t *entry)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
@@ -111,7 +112,7 @@ static int p2m_create_entry(struct domain *d,
     clear_page(p);
     unmap_domain_page(p);
 
-    pte = mfn_to_p2m_entry(page_to_mfn(page));
+    pte = mfn_to_p2m_entry(page_to_mfn(page), MATTR_MEM);
 
     write_pte(entry, pte);
 
@@ -122,7 +123,8 @@ static int create_p2m_entries(struct domain *d,
                      int alloc,
                      paddr_t start_gpaddr,
                      paddr_t end_gpaddr,
-                     paddr_t maddr)
+                     paddr_t maddr,
+                     int mattr)
 {
     int rc;
     struct p2m_domain *p2m = &d->arch.p2m;
@@ -142,7 +144,7 @@ static int create_p2m_entries(struct domain *d,
     {
         if ( !first[first_table_offset(addr)].p2m.valid )
         {
-            rc = p2m_create_entry(d, &first[first_table_offset(addr)]);
+            rc = p2m_create_table(d, &first[first_table_offset(addr)]);
             if ( rc < 0 ) {
                 printk("p2m_populate_ram: L1 failed\n");
                 goto out;
@@ -161,7 +163,7 @@ static int create_p2m_entries(struct domain *d,
 
         if ( !second[second_table_offset(addr)].p2m.valid )
         {
-            rc = p2m_create_entry(d, &second[second_table_offset(addr)]);
+            rc = p2m_create_table(d, &second[second_table_offset(addr)]);
             if ( rc < 0 ) {
                 printk("p2m_populate_ram: L2 failed\n");
                 goto out;
@@ -200,11 +202,11 @@ static int create_p2m_entries(struct domain *d,
                 goto out;
             }
 
-            pte = mfn_to_p2m_entry(page_to_mfn(page));
+            pte = mfn_to_p2m_entry(page_to_mfn(page), mattr);
 
             write_pte(&third[third_table_offset(addr)], pte);
         } else {
-            lpae_t pte = mfn_to_p2m_entry(maddr >> PAGE_SHIFT);
+            lpae_t pte = mfn_to_p2m_entry(maddr >> PAGE_SHIFT, mattr);
             write_pte(&third[third_table_offset(addr)], pte);
             maddr += PAGE_SIZE;
         }
@@ -226,7 +228,7 @@ int p2m_populate_ram(struct domain *d,
                      paddr_t start,
                      paddr_t end)
 {
-    return create_p2m_entries(d, 1, start, end, 0);
+    return create_p2m_entries(d, 1, start, end, 0, MATTR_MEM);
 }
 
 int map_mmio_regions(struct domain *d,
@@ -234,7 +236,7 @@ int map_mmio_regions(struct domain *d,
                      paddr_t end_gaddr,
                      paddr_t maddr)
 {
-    return create_p2m_entries(d, 0, start_gaddr, end_gaddr, maddr);
+    return create_p2m_entries(d, 0, start_gaddr, end_gaddr, maddr, MATTR_DEV);
 }
 
 int guest_physmap_add_page(struct domain *d,
@@ -244,7 +246,7 @@ int guest_physmap_add_page(struct domain *d,
 {
     return create_p2m_entries(d, 0, gpfn << PAGE_SHIFT,
                               (gpfn + (1<<page_order)) << PAGE_SHIFT,
-                              mfn << PAGE_SHIFT);
+                              mfn << PAGE_SHIFT, MATTR_MEM);
 }
 
 void guest_physmap_remove_page(struct domain *d,
