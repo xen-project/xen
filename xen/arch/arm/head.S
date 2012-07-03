@@ -148,10 +148,11 @@ hyp:
 	 * Exceptions in LE ARM,
 	 * Low-latency IRQs disabled,
 	 * Write-implies-XN disabled (for now),
-	 * I-cache and d-cache enabled,
+	 * D-cache disabled (for now),
+	 * I-cache enabled,
 	 * Alignment checking enabled,
 	 * MMU translation disabled (for now). */
-	ldr   r0, =(HSCTLR_BASE|SCTLR_A|SCTLR_C)
+	ldr   r0, =(HSCTLR_BASE|SCTLR_A)
 	mcr   CP32(r0, HSCTLR)
 
 	/* Write Xen's PT's paddr into the HTTBR */
@@ -210,7 +211,7 @@ pt_ready:
 
 	ldr   r1, =paging            /* Explicit vaddr, not RIP-relative */
 	mrc   CP32(r0, HSCTLR)
-	orr   r0, r0, #0x1           /* Add in the MMU enable bit */
+	orr   r0, r0, #(SCTLR_M|SCTLR_C) /* Enable MMU and D-cache */
 	dsb                          /* Flush PTE writes and finish reads */
 	mcr   CP32(r0, HSCTLR)       /* now paging is enabled */
 	isb                          /* Now, flush the icache */
