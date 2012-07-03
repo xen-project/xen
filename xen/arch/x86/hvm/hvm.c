@@ -3664,6 +3664,21 @@ static int hvmop_flush_tlb_all(void)
     return 0;
 }
 
+static int hvm_replace_event_channel(struct vcpu *v, domid_t remote_domid,
+                                     int *p_port)
+{
+    int old_port, new_port;
+
+    new_port = alloc_unbound_xen_event_channel(v, remote_domid, NULL);
+    if ( new_port < 0 )
+        return new_port;
+
+    /* xchg() ensures that only we call free_xen_event_channel(). */
+    old_port = xchg(p_port, new_port);
+    free_xen_event_channel(v, old_port);
+    return 0;
+}
+
 long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
 {
@@ -3774,20 +3789,23 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
 
                 rc = 0;
                 domain_pause(d); /* safe to change per-vcpu xen_port */
+                if ( d->vcpu[0] )
+                    rc = hvm_replace_event_channel(d->vcpu[0], a.value,
+                             (int *)&d->vcpu[0]->domain->arch.hvm_domain.params
+                                     [HVM_PARAM_BUFIOREQ_EVTCHN]);
+                if ( rc )
+                {
+                    domain_unpause(d);
+                    break;
+                }
                 iorp = &d->arch.hvm_domain.ioreq;
                 for_each_vcpu ( d, v )
                 {
-                    int old_port, new_port;
-                    new_port = alloc_unbound_xen_event_channel(
-                        v, a.value, NULL);
-                    if ( new_port < 0 )
-                    {
-                        rc = new_port;
+                    rc = hvm_replace_event_channel(v, a.value,
+                                                   &v->arch.hvm_vcpu.xen_port);
+                    if ( rc )
                         break;
-                    }
-                    /* xchg() ensures that only we free_xen_event_channel() */
-                    old_port = xchg(&v->arch.hvm_vcpu.xen_port, new_port);
-                    free_xen_event_channel(v, old_port);
+
                     spin_lock(&iorp->lock);
                     if ( iorp->va != NULL )
                         get_ioreq(v)->vp_eport = v->arch.hvm_vcpu.xen_port;
