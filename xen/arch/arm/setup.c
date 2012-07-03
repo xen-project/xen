@@ -122,7 +122,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
      * TODO: handle other payloads too.
      */
     device_tree_flattened = mfn_to_virt(alloc_boot_pages(dtb_pages, 1));
-    copy_from_paddr(device_tree_flattened, dtb_paddr, dtb_size);
+    copy_from_paddr(device_tree_flattened, dtb_paddr, dtb_size, BUFFERABLE);
 
     /* Add non-xenheap memory */
     init_boot_pages(pfn_to_paddr(xenheap_mfn_start + xenheap_pages),

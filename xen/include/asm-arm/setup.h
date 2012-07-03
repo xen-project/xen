@@ -3,7 +3,7 @@
 
 #include <public/version.h>
 
-void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len);
+void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len, int attrindx);
 
 void arch_get_xen_caps(xen_capabilities_info_t *info);
 
