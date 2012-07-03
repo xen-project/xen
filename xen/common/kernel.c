@@ -90,7 +90,7 @@ void __init cmdline_parse(const char *cmdline)
         if ( !bool_assert )
             optkey += 3;
 
-        for ( param = &__setup_start; param <= &__setup_end; param++ )
+        for ( param = &__setup_start; param < &__setup_end; param++ )
         {
             if ( strcmp(param->name, optkey) )
                 continue;
