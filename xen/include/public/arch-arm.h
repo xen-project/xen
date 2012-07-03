@@ -138,7 +138,28 @@ struct arch_shared_info { };
 typedef struct arch_shared_info arch_shared_info_t;
 typedef uint64_t xen_callback_t;
 
-#endif
+#endif /* ifndef __ASSEMBLY __ */
+
+/* PSR bits (CPSR, SPSR)*/
+
+/* 0-4: Mode */
+#define PSR_MODE_MASK 0x1f
+#define PSR_MODE_USR 0x10
+#define PSR_MODE_FIQ 0x11
+#define PSR_MODE_IRQ 0x12
+#define PSR_MODE_SVC 0x13
+#define PSR_MODE_MON 0x16
+#define PSR_MODE_ABT 0x17
+#define PSR_MODE_HYP 0x1a
+#define PSR_MODE_UND 0x1b
+#define PSR_MODE_SYS 0x1f
+
+#define PSR_THUMB       (1<<5)        /* Thumb Mode enable */
+#define PSR_FIQ_MASK    (1<<6)        /* Fast Interrupt mask */
+#define PSR_IRQ_MASK    (1<<7)        /* Interrupt mask */
+#define PSR_ABT_MASK    (1<<8)        /* Asynchronous Abort mask */
+#define PSR_BIG_ENDIAN  (1<<9)        /* Big Endian Mode */
+#define PSR_JAZELLE     (1<<24)       /* Jazelle Mode */
 
 #endif /*  __XEN_PUBLIC_ARCH_ARM_H__ */
 

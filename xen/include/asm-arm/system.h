@@ -3,7 +3,7 @@
 #define __ASM_SYSTEM_H
 
 #include <xen/lib.h>
-#include <asm/processor.h>
+#include <public/arch-arm.h>
 
 #define nop() \
     asm volatile ( "nop" )

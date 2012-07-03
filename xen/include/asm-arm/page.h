@@ -2,6 +2,8 @@
 #define __ARM_PAGE_H__
 
 #include <xen/config.h>
+#include <public/xen.h>
+#include <asm/processor.h>
 
 #define PADDR_BITS              40
 #define PADDR_MASK              ((1ULL << PADDR_BITS)-1)
