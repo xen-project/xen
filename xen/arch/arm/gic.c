@@ -329,19 +329,19 @@ int __init gic_init(void)
 /* Set up the per-CPU parts of the GIC for a secondary CPU */
 void __cpuinit gic_init_secondary_cpu(void)
 {
-    spin_lock(&gic.lock);
+    spin_lock_irq(&gic.lock);
     gic_cpu_init();
     gic_hyp_init();
-    spin_unlock(&gic.lock);
+    spin_unlock_irq(&gic.lock);
 }
 
 /* Shut down the per-CPU GIC interface */
 void gic_disable_cpu(void)
 {
-    spin_lock(&gic.lock);
+    spin_lock_irq(&gic.lock);
     gic_cpu_disable();
     gic_hyp_disable();
-    spin_unlock(&gic.lock);
+    spin_unlock_irq(&gic.lock);
 }
 
 void gic_route_irqs(void)
@@ -439,7 +439,7 @@ void gic_set_guest_irq(unsigned int virtual_irq,
 
     events_maintenance(current);
 
-    spin_lock(&gic.lock);
+    spin_lock_irq(&gic.lock);
 
     if ( list_empty(&gic.lr_pending) )
     {
@@ -465,7 +465,7 @@ void gic_set_guest_irq(unsigned int virtual_irq,
     list_add_tail(&n->lr_queue, &gic.lr_pending);
 
 out:
-    spin_unlock(&gic.lock);
+    spin_unlock_irq(&gic.lock);
     return;
 }
 
@@ -557,7 +557,7 @@ static void events_maintenance(struct vcpu *v)
             (unsigned long *)&vcpu_info(v, evtchn_upcall_pending));
 
     if (!already_pending && gic.event_mask != 0) {
-        spin_lock(&gic.lock);
+        spin_lock_irq(&gic.lock);
         while ((i = find_next_bit((const long unsigned int *) &gic.event_mask,
                         sizeof(uint64_t), i)) < sizeof(uint64_t)) {
 
@@ -567,7 +567,7 @@ static void events_maintenance(struct vcpu *v)
 
             i++;
         }
-        spin_unlock(&gic.lock);
+        spin_unlock_irq(&gic.lock);
     }
 }
 
@@ -583,7 +583,7 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
                               sizeof(eisr), i)) < sizeof(eisr)) {
         struct pending_irq *p;
 
-        spin_lock(&gic.lock);
+        spin_lock_irq(&gic.lock);
         lr = GICH[GICH_LR + i];
         virq = lr & GICH_LR_VIRTUAL_MASK;
         GICH[GICH_LR + i] = 0;
@@ -599,7 +599,7 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
         } else {
             gic_inject_irq_stop();
         }
-        spin_unlock(&gic.lock);
+        spin_unlock_irq(&gic.lock);
 
         spin_lock_irq(&current->arch.vgic.lock);
         p = irq_to_pending(current, virq);
