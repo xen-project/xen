@@ -115,7 +115,7 @@ AX_PATH_PROG_OR_FAIL([BCC], [bcc])
 AX_PATH_PROG_OR_FAIL([IASL], [iasl])
 AX_CHECK_UUID
 AX_CHECK_CURSES
-PKG_CHECK_MODULES(glib, glib-2.0)
+PKG_CHECK_MODULES(glib, [glib-2.0 >= 2.12])
 
 # Check library path
 AX_DEFAULT_LIB
