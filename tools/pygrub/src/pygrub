@@ -28,6 +28,7 @@ import grub.LiloConf
 import grub.ExtLinuxConf
 
 PYGRUB_VER = 0.6
+FS_READ_MAX = 1024 * 1024
 
 def enable_cursor(ison):
     if ison:
@@ -448,7 +449,8 @@ class Grub:
         if self.__dict__.get('cf', None) is None:
             raise RuntimeError, "couldn't find bootloader config file in the image provided."
         f = fs.open_file(self.cf.filename)
-        buf = f.read()
+        # limit read size to avoid pathological cases
+        buf = f.read(FS_READ_MAX)
         del f
         self.cf.parse(buf)
 
@@ -697,6 +699,37 @@ if __name__ == "__main__":
     def usage():
         print >> sys.stderr, "Usage: %s [-q|--quiet] [-i|--interactive] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] [--output-directory=] [--output-format=sxp|simple|simple0] <image>" %(sys.argv[0],)
 
+    def copy_from_image(fs, file_to_read, file_type, output_directory,
+                        not_really):
+        if not_really:
+            if fs.file_exists(file_to_read):
+                return "<%s:%s>" % (file_type, file_to_read)
+            else:
+                sys.exit("The requested %s file does not exist" % file_type)
+        try:
+            datafile = fs.open_file(file_to_read)
+        except Exception, e:
+            print >>sys.stderr, e
+            sys.exit("Error opening %s in guest" % file_to_read)
+        (tfd, ret) = tempfile.mkstemp(prefix="boot_"+file_type+".",
+                                      dir=output_directory)
+        dataoff = 0
+        while True:
+            data = datafile.read(FS_READ_MAX, dataoff)
+            if len(data) == 0:
+                os.close(tfd)
+                del datafile
+                return ret
+            try:
+                os.write(tfd, data)
+            except Exception, e:
+                print >>sys.stderr, e
+                os.close(tfd)
+                os.unlink(ret)
+                del datafile
+                sys.exit("Error writing temporary copy of "+file_type)
+            dataoff += len(data)
+
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'qinh::',
                                    ["quiet", "interactive", "not-really", "help", 
@@ -821,24 +854,18 @@ if __name__ == "__main__":
     if not fs:
         raise RuntimeError, "Unable to find partition containing kernel"
 
-    if not_really:
-        bootcfg["kernel"] = "<kernel:%s>" % chosencfg["kernel"]
-    else:
-        data = fs.open_file(chosencfg["kernel"]).read()
-        (tfd, bootcfg["kernel"]) = tempfile.mkstemp(prefix="boot_kernel.",
-                                                    dir=output_directory)
-        os.write(tfd, data)
-        os.close(tfd)
+    bootcfg["kernel"] = copy_from_image(fs, chosencfg["kernel"], "kernel",
+                                        output_directory, not_really)
 
     if chosencfg["ramdisk"]:
-        if not_really:
-            bootcfg["ramdisk"] = "<ramdisk:%s>" % chosencfg["ramdisk"]
-        else:
-            data = fs.open_file(chosencfg["ramdisk"],).read()
-            (tfd, bootcfg["ramdisk"]) = tempfile.mkstemp(
-                prefix="boot_ramdisk.", dir=output_directory)
-            os.write(tfd, data)
-            os.close(tfd)
+        try:
+            bootcfg["ramdisk"] = copy_from_image(fs, chosencfg["ramdisk"],
+                                                 "ramdisk", output_directory,
+                                                 not_really)
+        except:
+            if not not_really:
+                os.unlink(bootcfg["kernel"])
+            raise
     else:
         initrd = None
 
