@@ -1697,10 +1697,15 @@ static int create_domain(struct domain_create *dom_info)
 
     if (config_file) {
         free(config_data);  config_data = 0;
-        ret = libxl_read_file_contents(ctx, config_file,
-                                       &config_data, &config_len);
-        if (ret) { fprintf(stderr, "Failed to read config file: %s: %s\n",
-                           config_file, strerror(errno)); return ERROR_FAIL; }
+        /* /dev/null represents special case (read config. from command line) */
+        if (!strcmp(config_file, "/dev/null")) {
+            config_len = 0;
+        } else {
+            ret = libxl_read_file_contents(ctx, config_file,
+                                           &config_data, &config_len);
+            if (ret) { fprintf(stderr, "Failed to read config file: %s: %s\n",
+                               config_file, strerror(errno)); return ERROR_FAIL; }
+        }
         if (!restoring && extra_config && strlen(extra_config)) {
             if (config_len > INT_MAX - (strlen(extra_config) + 2 + 1)) {
                 fprintf(stderr, "Failed to attach extra configration\n");
