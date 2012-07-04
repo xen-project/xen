@@ -9,7 +9,7 @@ AC_DEFUN([AX_CHECK_PTYFUNCS], [
             fi
             AX_SAVEVAR_SAVE(LIBS)
             LIBS="$LIBS $ax_cv_ptyfuncs_libs"
-            AC_LINK_IFELSE([
+            AC_LINK_IFELSE([AC_LANG_SOURCE([
 #ifdef INCLUDE_LIBUTIL_H
 #include INCLUDE_LIBUTIL_H
 #endif
@@ -17,7 +17,7 @@ int main(void) {
   openpty(0,0,0,0,0);
   login_tty(0);
 }
-],[
+])],[
                 break
             ],[])
             AX_SAVEVAR_RESTORE(LIBS)

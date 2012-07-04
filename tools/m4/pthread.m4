@@ -24,13 +24,13 @@ AC_DEFUN([AX_CHECK_PTHREAD],[
         AX_PTHREAD_CV2VARS
         AX_PTHREAD_VARS([AX_SAVEVAR_SAVE])
         AX_PTHREAD_VARS([AX_PTHREAD_VAR_APPLY])
-        AC_LINK_IFELSE([
+        AC_LINK_IFELSE([AC_LANG_SOURCE([
 #include <pthread.h>
 int main(void) {
   pthread_atfork(0,0,0);
   pthread_create(0,0,0,0);
 }
-],[],[ax_cv_pthread_flags=failed])
+])],[],[ax_cv_pthread_flags=failed])
         AX_PTHREAD_VARS([AX_SAVEVAR_RESTORE])
     ])
     if test "x$ax_cv_pthread_flags" = xfailed; then
