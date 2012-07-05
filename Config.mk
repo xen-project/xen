@@ -67,7 +67,7 @@ $(eval $(call setvar_dir,INITD_DIR,/etc,/rc.d/init.d,/rc.d/init.d,/init.d))
 
 ifneq ($(EXTRA_PREFIX),)
 EXTRA_INCLUDES += $(EXTRA_PREFIX)/include
-EXTRA_LIB += $(EXTRA_PREFIX)/$(LIBLEAFDIR)
+EXTRA_LIB += $(EXTRA_PREFIX)/lib
 endif
 
 PYTHON      ?= python

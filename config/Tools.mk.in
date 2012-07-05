@@ -1,6 +1,7 @@
 # Prefix and install folder
 PREFIX              := @prefix@
-LIBLEAFDIR_x86_64   := @LIB_PATH@
+exec_prefix         := @exec_prefix@
+LIBDIR              := @libdir@
 
 # A debug build of tools?
 debug               := @debug@

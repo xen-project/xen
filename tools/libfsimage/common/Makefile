@@ -1,5 +1,5 @@
 XEN_ROOT = $(CURDIR)/../../..
-include $(XEN_ROOT)/tools/Rules.mk
+include $(XEN_ROOT)/tools/libfsimage/Rules.mk
 
 MAJOR = 1.0
 MINOR = 0
