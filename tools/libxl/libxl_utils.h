@@ -66,6 +66,10 @@ int libxl_vdev_to_device_disk(libxl_ctx *ctx, uint32_t domid, const char *vdev,
 int libxl_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *bitmap, int n_bits);
     /* Allocated bimap is from malloc, libxl_bitmap_dispose() to be
      * called by the application when done. */
+void libxl_bitmap_copy(libxl_ctx *ctx, libxl_bitmap *dptr,
+                       const libxl_bitmap *sptr);
+int libxl_bitmap_is_full(const libxl_bitmap *bitmap);
+int libxl_bitmap_is_empty(const libxl_bitmap *bitmap);
 int libxl_bitmap_test(const libxl_bitmap *bitmap, int bit);
 void libxl_bitmap_set(libxl_bitmap *bitmap, int bit);
 void libxl_bitmap_reset(libxl_bitmap *bitmap, int bit);

@@ -510,6 +510,36 @@ void libxl_bitmap_dispose(libxl_bitmap *map)
     free(map->map);
 }
 
+void libxl_bitmap_copy(libxl_ctx *ctx, libxl_bitmap *dptr,
+                       const libxl_bitmap *sptr)
+{
+    int sz;
+
+    assert(dptr->size == sptr->size);
+    sz = dptr->size = sptr->size;
+    memcpy(dptr->map, sptr->map, sz * sizeof(*dptr->map));
+}
+
+int libxl_bitmap_is_full(const libxl_bitmap *bitmap)
+{
+    int i;
+
+    for (i = 0; i < bitmap->size; i++)
+        if (bitmap->map[i] != (uint8_t)-1)
+            return 0;
+   return 1;
+}
+
+int libxl_bitmap_is_empty(const libxl_bitmap *bitmap)
+{
+    int i;
+
+    for (i = 0; i < bitmap->size; i++)
+        if (bitmap->map[i])
+            return 0;
+    return 1;
+}
+
 int libxl_bitmap_test(const libxl_bitmap *bitmap, int bit)
 {
     if (bit >= bitmap->size * 8)
