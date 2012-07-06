@@ -588,6 +588,50 @@ char *libxl_bitmap_to_hex_string(libxl_ctx *ctx, const libxl_bitmap *bitmap)
     return q;
 }
 
+int libxl_nodemap_to_cpumap(libxl_ctx *ctx,
+                            const libxl_bitmap *nodemap,
+                            libxl_bitmap *cpumap)
+{
+    libxl_cputopology *tinfo = NULL;
+    int nr_cpus, i, rc = 0;
+
+    tinfo = libxl_get_cpu_topology(ctx, &nr_cpus);
+    if (tinfo == NULL) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    libxl_bitmap_set_none(cpumap);
+    for (i = 0; i < nr_cpus; i++) {
+        if (libxl_bitmap_test(nodemap, tinfo[i].node))
+            libxl_bitmap_set(cpumap, i);
+    }
+ out:
+    libxl_cputopology_list_free(tinfo, nr_cpus);
+    return rc;
+}
+
+int libxl_cpumap_to_nodemap(libxl_ctx *ctx,
+                            const libxl_bitmap *cpumap,
+                            libxl_bitmap *nodemap)
+{
+    libxl_cputopology *tinfo = NULL;
+    int nr_cpus, i, rc = 0;
+
+    tinfo = libxl_get_cpu_topology(ctx, &nr_cpus);
+    if (tinfo == NULL) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    libxl_bitmap_set_none(nodemap);
+    libxl_for_each_set_bit(i, *cpumap)
+        libxl_bitmap_set(nodemap, tinfo[i].node);
+ out:
+    libxl_cputopology_list_free(tinfo, nr_cpus);
+    return rc;
+}
+
 int libxl_get_max_cpus(libxl_ctx *ctx)
 {
     return xc_get_max_cpus(ctx->xch);

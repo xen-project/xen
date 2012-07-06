@@ -104,6 +104,29 @@ static inline int libxl_cpu_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *cpumap,
     return libxl_bitmap_alloc(ctx, cpumap, max_cpus);
 }
 
+static inline int libxl_node_bitmap_alloc(libxl_ctx *ctx,
+                                          libxl_bitmap *nodemap,
+                                          int max_nodes)
+{
+    if (max_nodes < 0)
+        return ERROR_INVAL;
+    if (max_nodes == 0)
+        max_nodes = libxl_get_max_nodes(ctx);
+    if (max_nodes == 0)
+        return ERROR_FAIL;
+
+    return libxl_bitmap_alloc(ctx, nodemap, max_nodes);
+}
+
+/* Populate cpumap with the cpus spanned by the nodes in nodemap */
+int libxl_nodemap_to_cpumap(libxl_ctx *ctx,
+                            const libxl_bitmap *nodemap,
+                            libxl_bitmap *cpumap);
+/* Populate nodemap with the nodes of the cpus in cpumap */
+int libxl_cpumap_to_nodemap(libxl_ctx *ctx,
+                            const libxl_bitmap *cpuemap,
+                            libxl_bitmap *nodemap);
+
  static inline uint32_t libxl__sizekb_to_mb(uint32_t s) {
     return (s + 1023) / 1024;
 }
