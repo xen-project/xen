@@ -145,11 +145,24 @@ idl.KeyedUnion
 
  A subclass of idl.Aggregate which represents the C union type
  where the currently valid member of the union can be determined based
- upon another member in the containing type.
+ upon another member in the containing type. An idl.KeyedUnion must
+ always be a member of a containing idl.Aggregate type.
 
- The KeyedUnion.keyvar contains an idl.type the member of the
- containing type which determines the valid member of the union. The
- must be an instance of the Enumeration type.
+ The KeyedUnion.keyvar contains an idl.Field, this is the member of
+ the containing type which determines the valid member of the
+ union. The idl.Field.type of the keyvar must be an Enumeration type.
+
+idl.Array
+
+  A class representing an array of similar elements. An idl.Array must
+  always be an idl.Field of a containing idl.Aggregate.
+
+  idl.Array.elem_type contains an idl.Type which is the type of each
+  element of the array.
+
+  idl.Array.len_var contains an idl.Field which is added to the parent
+  idl.Aggregate and will contain the length of the array. The field
+  MUST be named num_ARRAYNAME.
 
 Standard Types
 --------------

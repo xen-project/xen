@@ -266,6 +266,17 @@ string = Builtin("char *", namespace = None, dispose_fn = "free",
                  json_fn = "libxl__string_gen_json",
                  autogenerate_json = False)
 
+class Array(Type):
+    """An array of the same type"""
+    def __init__(self, elem_type, lenvar_name, **kwargs):
+        kwargs.setdefault('dispose_fn', 'free')
+        Type.__init__(self, namespace=elem_type.namespace, typename=elem_type.rawname + " *", **kwargs)
+
+        lv_kwargs = dict([(x.lstrip('lenvar_'),y) for (x,y) in kwargs.items() if x.startswith('lenvar_')])
+
+        self.lenvar = Field(integer, lenvar_name, **lv_kwargs)
+        self.elem_type = elem_type
+
 class OrderedDict(dict):
     """A dictionary which remembers insertion order.
 

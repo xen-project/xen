@@ -4,7 +4,7 @@ import sys,os
 
 import idl
 
-(TYPE_DEFBOOL, TYPE_BOOL, TYPE_INT, TYPE_UINT, TYPE_STRING, TYPE_AGGREGATE) = range(6)
+(TYPE_DEFBOOL, TYPE_BOOL, TYPE_INT, TYPE_UINT, TYPE_STRING, TYPE_ARRAY, TYPE_AGGREGATE) = range(7)
 
 def py_type(ty):
     if ty == idl.bool:
@@ -18,6 +18,8 @@ def py_type(ty):
             return TYPE_INT
         else:
             return TYPE_UINT
+    if isinstance(ty, idl.Array):
+        return TYPE_ARRAY
     if isinstance(ty, idl.Aggregate):
         return TYPE_AGGREGATE
     if ty == idl.string:
@@ -74,7 +76,7 @@ def py_attrib_get(ty, f):
         l.append('    return genwrap__ull_get(self->obj.%s);'%f.name)
     elif t == TYPE_STRING:
         l.append('    return genwrap__string_get(&self->obj.%s);'%f.name)
-    elif t == TYPE_AGGREGATE:
+    elif t == TYPE_AGGREGATE or t == TYPE_ARRAY:
         l.append('    PyErr_SetString(PyExc_NotImplementedError, "Getting %s");'%ty.typename)
         l.append('    return NULL;')
     else:
@@ -105,7 +107,7 @@ def py_attrib_set(ty, f):
         l.append('    return ret;')
     elif t == TYPE_STRING:
         l.append('    return genwrap__string_set(v, &self->obj.%s);'%f.name)
-    elif t == TYPE_AGGREGATE:
+    elif t == TYPE_AGGREGATE or t == TYPE_ARRAY:
         l.append('    PyErr_SetString(PyExc_NotImplementedError, "Setting %s");'%ty.typename)
         l.append('    return -1;')
     else:

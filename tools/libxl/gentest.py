@@ -27,6 +27,18 @@ def gen_rand_init(ty, v, indent = "    ", parent = None):
     s = ""
     if isinstance(ty, idl.Enumeration):
         s += "%s = %s;\n" % (ty.pass_arg(v, parent is None), randomize_enum(ty))
+    elif isinstance(ty, idl.Array):
+        if parent is None:
+            raise Exception("Array type must have a parent")
+        s += "%s = rand()%%8;\n" % (parent + ty.lenvar.name)
+        s += "%s = calloc(%s, sizeof(*%s));\n" % \
+            (v, parent + ty.lenvar.name, v)
+        s += "{\n"
+        s += "    int i;\n"
+        s += "    for (i=0; i<%s; i++)\n" % (parent + ty.lenvar.name)
+        s += gen_rand_init(ty.elem_type, v+"[i]",
+                           indent + "        ", parent)
+        s += "}\n"
     elif isinstance(ty, idl.KeyedUnion):
         if parent is None:
             raise Exception("KeyedUnion type must have a parent")

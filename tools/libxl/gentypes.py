@@ -11,8 +11,12 @@ def libxl_C_instance_of(ty, instancename):
             return libxl_C_type_define(ty)
         else:
             return libxl_C_type_define(ty) + " " + instancename
-    else:
-        return ty.typename + " " + instancename
+
+    s = ""
+    if isinstance(ty, idl.Array):
+        s += libxl_C_instance_of(ty.lenvar.type, ty.lenvar.name) + ";\n"
+
+    return s + ty.typename + " " + instancename
 
 def libxl_C_type_define(ty, indent = ""):
     s = ""
@@ -66,6 +70,21 @@ def libxl_C_type_dispose(ty, v, indent = "    ", parent = None):
             s += libxl_C_type_dispose(f.type, fexpr, indent + "    ", nparent)
             s += "    break;\n"
         s += "}\n"
+    elif isinstance(ty, idl.Array):
+        if parent is None:
+            raise Exception("Array type must have a parent")
+        if ty.elem_type.dispose_fn is not None:
+            s += "{\n"
+            s += "    int i;\n"
+            s += "    for (i=0; i<%s; i++)\n" % (parent + ty.lenvar.name)
+            s += libxl_C_type_dispose(ty.elem_type, v+"[i]",
+                                      indent + "        ", parent)
+        if ty.dispose_fn is not None:
+            if ty.elem_type.dispose_fn is not None:
+                s += "    "
+            s += "%s(%s);\n" % (ty.dispose_fn, ty.pass_arg(v, parent is None))
+        if ty.elem_type.dispose_fn is not None:
+            s += "}\n"
     elif isinstance(ty, idl.Struct) and (parent is None or ty.dispose_fn is None):
         for f in [f for f in ty.fields if not f.const]:
             (nparent,fexpr) = ty.member(v, f, parent is None)
@@ -164,7 +183,24 @@ def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
     s = ""
     if parent is None:
         s += "yajl_gen_status s;\n"
-    if isinstance(ty, idl.Enumeration):
+
+    if isinstance(ty, idl.Array):
+        if parent is None:
+            raise Exception("Array type must have a parent")
+        s += "{\n"
+        s += "    int i;\n"
+        s += "    s = yajl_gen_array_open(hand);\n"
+        s += "    if (s != yajl_gen_status_ok)\n"
+        s += "        goto out;\n"
+        s += "    for (i=0; i<%s; i++) {\n" % (parent + ty.lenvar.name)
+        s += libxl_C_type_gen_json(ty.elem_type, v+"[i]",
+                                   indent + "        ", parent)
+        s += "    }\n"
+        s += "    s = yajl_gen_array_close(hand);\n"
+        s += "    if (s != yajl_gen_status_ok)\n"
+        s += "        goto out;\n"
+        s += "}\n"
+    elif isinstance(ty, idl.Enumeration):
         s += "s = libxl__yajl_gen_enum(hand, %s_to_string(%s));\n" % (ty.typename, ty.pass_arg(v, parent is None))
         s += "if (s != yajl_gen_status_ok)\n"
         s += "    goto out;\n"
