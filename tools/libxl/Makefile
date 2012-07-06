@@ -61,7 +61,7 @@ ifeq ($(BISON),)
 		  scanners, please install it an rerun configure)
 endif
 
-LIBXL_LIBS += -lyajl
+LIBXL_LIBS += -lyajl -lm
 
 LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_dom.o libxl_exec.o libxl_xshelp.o libxl_device.o \
