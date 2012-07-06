@@ -433,6 +433,15 @@ libxl_physinfo = Struct("physinfo", [
     ("cap_hvm_directio", bool),
     ], dir=DIR_OUT)
 
+# NUMA node characteristics: size and free are how much memory it has, and how
+# much of it is free, respectively. dists is an array of distances from this
+# node to each other node.
+libxl_numainfo = Struct("numainfo", [
+    ("size", uint64),
+    ("free", uint64),
+    ("dists", Array(uint32, "num_dists")),
+    ], dir=DIR_OUT)
+
 libxl_cputopology = Struct("cputopology", [
     ("core", uint32),
     ("socket", uint32),

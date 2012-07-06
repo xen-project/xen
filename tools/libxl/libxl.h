@@ -532,6 +532,9 @@ int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid, libxl_domain_create_in
 /* get max. number of cpus supported by hypervisor */
 int libxl_get_max_cpus(libxl_ctx *ctx);
 
+/* get max. number of NUMA nodes supported by hypervisor */
+int libxl_get_max_nodes(libxl_ctx *ctx);
+
 int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
                         const char *old_name, const char *new_name);
 
@@ -603,6 +606,10 @@ void libxl_vminfo_list_free(libxl_vminfo *list, int nb_vm);
 #define LIBXL_CPUTOPOLOGY_INVALID_ENTRY (~(uint32_t)0)
 libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nb_cpu_out);
 void libxl_cputopology_list_free(libxl_cputopology *, int nb_cpu);
+
+#define LIBXL_NUMAINFO_INVALID_ENTRY (~(uint32_t)0)
+libxl_numainfo *libxl_get_numainfo(libxl_ctx *ctx, int *nr);
+void libxl_numainfo_list_free(libxl_numainfo *, int nr);
 
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
                                 int *nb_vcpu, int *nr_vcpus_out);

@@ -329,6 +329,12 @@ int xc_get_cpumap_size(xc_interface *xch);
 /* allocate a cpumap */
 xc_cpumap_t xc_cpumap_alloc(xc_interface *xch);
 
+ /*
+ * NODEMAP handling
+ */
+/* return maximum number of NUMA nodes the hypervisor supports */
+int xc_get_max_nodes(xc_interface *xch);
+
 /*
  * DOMAIN DEBUGGING FUNCTIONS
  */

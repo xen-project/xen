@@ -35,6 +35,20 @@ int xc_get_max_cpus(xc_interface *xch)
     return max_cpus;
 }
 
+int xc_get_max_nodes(xc_interface *xch)
+{
+    static int max_nodes = 0;
+    xc_physinfo_t physinfo;
+
+    if ( max_nodes )
+        return max_nodes;
+
+    if ( !xc_physinfo(xch, &physinfo) )
+        max_nodes = physinfo.max_node_id + 1;
+
+    return max_nodes;
+}
+
 int xc_get_cpumap_size(xc_interface *xch)
 {
     return (xc_get_max_cpus(xch) + 7) / 8;

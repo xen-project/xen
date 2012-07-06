@@ -3298,6 +3298,75 @@ fail:
     return ret;
 }
 
+libxl_numainfo *libxl_get_numainfo(libxl_ctx *ctx, int *nr)
+{
+    GC_INIT(ctx);
+    xc_numainfo_t ninfo;
+    DECLARE_HYPERCALL_BUFFER(xc_node_to_memsize_t, memsize);
+    DECLARE_HYPERCALL_BUFFER(xc_node_to_memfree_t, memfree);
+    DECLARE_HYPERCALL_BUFFER(uint32_t, node_dists);
+    libxl_numainfo *ret = NULL;
+    int i, j, max_nodes;
+
+    max_nodes = libxl_get_max_nodes(ctx);
+    if (max_nodes == 0)
+    {
+        LIBXL__LOG(ctx, XTL_ERROR, "Unable to determine number of NODES");
+        ret = NULL;
+        goto out;
+    }
+
+    memsize = xc_hypercall_buffer_alloc
+        (ctx->xch, memsize, sizeof(*memsize) * max_nodes);
+    memfree = xc_hypercall_buffer_alloc
+        (ctx->xch, memfree, sizeof(*memfree) * max_nodes);
+    node_dists = xc_hypercall_buffer_alloc
+        (ctx->xch, node_dists, sizeof(*node_dists) * max_nodes * max_nodes);
+    if ((memsize == NULL) || (memfree == NULL) || (node_dists == NULL)) {
+        LIBXL__LOG_ERRNOVAL(ctx, XTL_ERROR, ENOMEM,
+                            "Unable to allocate hypercall arguments");
+        goto fail;
+    }
+
+    set_xen_guest_handle(ninfo.node_to_memsize, memsize);
+    set_xen_guest_handle(ninfo.node_to_memfree, memfree);
+    set_xen_guest_handle(ninfo.node_to_node_distance, node_dists);
+    ninfo.max_node_index = max_nodes - 1;
+    if (xc_numainfo(ctx->xch, &ninfo) != 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting numainfo");
+        goto fail;
+    }
+
+    if (ninfo.max_node_index < max_nodes - 1)
+        max_nodes = ninfo.max_node_index + 1;
+
+    *nr = max_nodes;
+
+    ret = libxl__zalloc(NOGC, sizeof(libxl_numainfo) * max_nodes);
+    for (i = 0; i < max_nodes; i++)
+        ret[i].dists = libxl__calloc(NOGC, max_nodes, sizeof(*node_dists));
+
+    for (i = 0; i < max_nodes; i++) {
+#define V(mem, i) (mem[i] == INVALID_NUMAINFO_ID) ? \
+    LIBXL_NUMAINFO_INVALID_ENTRY : mem[i]
+        ret[i].size = V(memsize, i);
+        ret[i].free = V(memfree, i);
+        ret[i].num_dists = max_nodes;
+        for (j = 0; j < ret[i].num_dists; j++)
+            ret[i].dists[j] = V(node_dists, i * max_nodes + j);
+#undef V
+    }
+
+ fail:
+    xc_hypercall_buffer_free(ctx->xch, memsize);
+    xc_hypercall_buffer_free(ctx->xch, memfree);
+    xc_hypercall_buffer_free(ctx->xch, node_dists);
+
+ out:
+    GC_FREE;
+    return ret;
+}
+
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
 {
     union {

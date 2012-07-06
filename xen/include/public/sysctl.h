@@ -484,6 +484,7 @@ typedef struct xen_sysctl_topologyinfo xen_sysctl_topologyinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_topologyinfo_t);
 
 /* XEN_SYSCTL_numainfo */
+#define INVALID_NUMAINFO_ID (~0U)
 struct xen_sysctl_numainfo {
     /*
      * IN: maximum addressable entry in the caller-provided arrays.
