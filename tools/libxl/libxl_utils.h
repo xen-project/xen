@@ -63,29 +63,44 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid, int devid,
 int libxl_vdev_to_device_disk(libxl_ctx *ctx, uint32_t domid, const char *vdev,
                                libxl_device_disk *disk);
 
-int libxl_cpumap_alloc(libxl_ctx *ctx, libxl_cpumap *cpumap, int max_cpus);
-int libxl_cpumap_test(const libxl_cpumap *cpumap, int cpu);
-void libxl_cpumap_set(libxl_cpumap *cpumap, int cpu);
-void libxl_cpumap_reset(libxl_cpumap *cpumap, int cpu);
-int libxl_cpumap_count_set(const libxl_cpumap *cpumap);
-char *libxl_cpumap_to_hex_string(libxl_ctx *ctx, const libxl_cpumap *cpumap);
-static inline void libxl_cpumap_set_any(libxl_cpumap *cpumap)
+int libxl_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *bitmap, int n_bits);
+    /* Allocated bimap is from malloc, libxl_bitmap_dispose() to be
+     * called by the application when done. */
+int libxl_bitmap_test(const libxl_bitmap *bitmap, int bit);
+void libxl_bitmap_set(libxl_bitmap *bitmap, int bit);
+void libxl_bitmap_reset(libxl_bitmap *bitmap, int bit);
+int libxl_bitmap_count_set(const libxl_bitmap *cpumap);
+char *libxl_bitmap_to_hex_string(libxl_ctx *ctx, const libxl_bitmap *cpumap);
+static inline void libxl_bitmap_set_any(libxl_bitmap *bitmap)
 {
-    memset(cpumap->map, -1, cpumap->size);
+    memset(bitmap->map, -1, bitmap->size);
 }
-static inline void libxl_cpumap_set_none(libxl_cpumap *cpumap)
+static inline void libxl_bitmap_set_none(libxl_bitmap *bitmap)
 {
-    memset(cpumap->map, 0, cpumap->size);
+    memset(bitmap->map, 0, bitmap->size);
 }
-static inline int libxl_cpumap_cpu_valid(libxl_cpumap *cpumap, int cpu)
+static inline int libxl_bitmap_cpu_valid(libxl_bitmap *bitmap, int bit)
 {
-    return cpu >= 0 && cpu < (cpumap->size * 8);
+    return bit >= 0 && bit < (bitmap->size * 8);
 }
-#define libxl_for_each_cpu(var, map) for (var = 0; var < (map).size * 8; var++)
-#define libxl_for_each_set_cpu(v, m) for (v = 0; v < (m).size * 8; v++) \
-                                             if (libxl_cpumap_test(&(m), v))
+#define libxl_for_each_bit(var, map) for (var = 0; var < (map).size * 8; var++)
+#define libxl_for_each_set_bit(v, m) for (v = 0; v < (m).size * 8; v++) \
+                                             if (libxl_bitmap_test(&(m), v))
 
-static inline uint32_t libxl__sizekb_to_mb(uint32_t s) {
+static inline int libxl_cpu_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *cpumap,
+                                         int max_cpus)
+{
+    if (max_cpus < 0)
+        return ERROR_INVAL;
+    if (max_cpus == 0)
+        max_cpus = libxl_get_max_cpus(ctx);
+    if (max_cpus == 0)
+        return ERROR_FAIL;
+
+    return libxl_bitmap_alloc(ctx, cpumap, max_cpus);
+}
+
+ static inline uint32_t libxl__sizekb_to_mb(uint32_t s) {
     return (s + 1023) / 1024;
 }
 

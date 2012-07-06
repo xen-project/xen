@@ -26,7 +26,7 @@ yajl_gen_status libxl_defbool_gen_json(yajl_gen hand, libxl_defbool *p);
 yajl_gen_status libxl_domid_gen_json(yajl_gen hand, libxl_domid *p);
 yajl_gen_status libxl_uuid_gen_json(yajl_gen hand, libxl_uuid *p);
 yajl_gen_status libxl_mac_gen_json(yajl_gen hand, libxl_mac *p);
-yajl_gen_status libxl_cpumap_gen_json(yajl_gen hand, libxl_cpumap *p);
+yajl_gen_status libxl_bitmap_gen_json(yajl_gen hand, libxl_bitmap *p);
 yajl_gen_status libxl_cpuid_policy_list_gen_json(yajl_gen hand,
                                                  libxl_cpuid_policy_list *p);
 yajl_gen_status libxl_string_list_gen_json(yajl_gen hand, libxl_string_list *p);

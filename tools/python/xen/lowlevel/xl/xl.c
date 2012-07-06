@@ -231,14 +231,14 @@ int attrib__libxl_cpuid_policy_list_set(PyObject *v, libxl_cpuid_policy_list *pp
     return -1;
 }
 
-int attrib__libxl_cpumap_set(PyObject *v, libxl_cpumap *pptr)
+int attrib__libxl_bitmap_set(PyObject *v, libxl_bitmap *pptr)
 {
     int i;
     long cpu;
 
     for (i = 0; i < PyList_Size(v); i++) {
         cpu = PyInt_AsLong(PyList_GetItem(v, i));
-        libxl_cpumap_set(pptr, cpu);
+        libxl_bitmap_set(pptr, cpu);
     }
     return 0;
 }
@@ -293,14 +293,14 @@ PyObject *attrib__libxl_cpuid_policy_list_get(libxl_cpuid_policy_list *pptr)
     return NULL;
 }
 
-PyObject *attrib__libxl_cpumap_get(libxl_cpumap *pptr)
+PyObject *attrib__libxl_bitmap_get(libxl_bitmap *pptr)
 {
     PyObject *cpulist = NULL;
     int i;
 
     cpulist = PyList_New(0);
-    libxl_for_each_cpu(i, *pptr) {
-        if ( libxl_cpumap_test(pptr, i) ) {
+    libxl_for_each_bit(i, *pptr) {
+        if ( libxl_bitmap_test(pptr, i) ) {
             PyObject* pyint = PyInt_FromLong(i);
 
             PyList_Append(cpulist, pyint);

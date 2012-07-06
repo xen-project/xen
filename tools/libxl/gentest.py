@@ -20,7 +20,7 @@ def randomize_case(s):
 def randomize_enum(e):
     return random.choice([v.name for v in e.values])
 
-handcoded = ["libxl_cpumap", "libxl_key_value_list",
+handcoded = ["libxl_bitmap", "libxl_key_value_list",
              "libxl_cpuid_policy_list", "libxl_string_list"]
 
 def gen_rand_init(ty, v, indent = "    ", parent = None):
@@ -117,16 +117,16 @@ static void rand_bytes(uint8_t *p, size_t sz)
         p[i] = rand() % 256;
 }
 
-static void libxl_cpumap_rand_init(libxl_cpumap *cpumap)
+static void libxl_bitmap_rand_init(libxl_bitmap *bitmap)
 {
     int i;
-    cpumap->size = rand() % 16;
-    cpumap->map = calloc(cpumap->size, sizeof(*cpumap->map));
-    libxl_for_each_cpu(i, *cpumap) {
+    bitmap->size = rand() % 16;
+    bitmap->map = calloc(bitmap->size, sizeof(*bitmap->map));
+    libxl_for_each_bit(i, *bitmap) {
         if (rand() % 2)
-            libxl_cpumap_set(cpumap, i);
+            libxl_bitmap_set(bitmap, i);
         else
-            libxl_cpumap_reset(cpumap, i);
+            libxl_bitmap_reset(bitmap, i);
     }
 }
 

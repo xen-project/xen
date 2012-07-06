@@ -487,79 +487,70 @@ int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
-int libxl_cpumap_alloc(libxl_ctx *ctx, libxl_cpumap *cpumap, int max_cpus)
+int libxl_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *bitmap, int n_bits)
 {
     GC_INIT(ctx);
     int sz;
-    int rc;
 
-    if (max_cpus < 0) {
-        rc = ERROR_INVAL;
-        goto out;
-    }
-    if (max_cpus == 0)
-        max_cpus = libxl_get_max_cpus(ctx);
-    if (max_cpus == 0) {
-        rc = ERROR_FAIL;
-        goto out;
-    }
+    sz = (n_bits + 7) / 8;
+    bitmap->map = libxl__calloc(NOGC, sizeof(*bitmap->map), sz);
+    bitmap->size = sz;
 
-    sz = (max_cpus + 7) / 8;
-    cpumap->map = libxl__calloc(NOGC, sizeof(*cpumap->map), sz);
-    cpumap->size = sz;
-
-    rc = 0;
- out:
     GC_FREE;
-    return rc;
+    return 0;
 }
 
-void libxl_cpumap_dispose(libxl_cpumap *map)
+void libxl_bitmap_init(libxl_bitmap *map)
+{
+    memset(map, '\0', sizeof(*map));
+}
+
+void libxl_bitmap_dispose(libxl_bitmap *map)
 {
     free(map->map);
 }
 
-int libxl_cpumap_test(const libxl_cpumap *cpumap, int cpu)
+int libxl_bitmap_test(const libxl_bitmap *bitmap, int bit)
 {
-    if (cpu >= cpumap->size * 8)
+    if (bit >= bitmap->size * 8)
         return 0;
-    return (cpumap->map[cpu / 8] & (1 << (cpu & 7))) ? 1 : 0;
+    return (bitmap->map[bit / 8] & (1 << (bit & 7))) ? 1 : 0;
 }
 
-void libxl_cpumap_set(libxl_cpumap *cpumap, int cpu)
+void libxl_bitmap_set(libxl_bitmap *bitmap, int bit)
 {
-    if (cpu >= cpumap->size * 8)
+    if (bit >= bitmap->size * 8)
         return;
-    cpumap->map[cpu / 8] |= 1 << (cpu & 7);
+    bitmap->map[bit / 8] |= 1 << (bit & 7);
 }
 
-void libxl_cpumap_reset(libxl_cpumap *cpumap, int cpu)
+void libxl_bitmap_reset(libxl_bitmap *bitmap, int bit)
 {
-    if (cpu >= cpumap->size * 8)
+    if (bit >= bitmap->size * 8)
         return;
-    cpumap->map[cpu / 8] &= ~(1 << (cpu & 7));
+    bitmap->map[bit / 8] &= ~(1 << (bit & 7));
 }
 
-int libxl_cpumap_count_set(const libxl_cpumap *cpumap)
+int libxl_bitmap_count_set(const libxl_bitmap *bitmap)
 {
-    int i, nr_set_cpus = 0;
-    libxl_for_each_set_cpu(i, *cpumap)
-        nr_set_cpus++;
+    int i, nr_set_bits = 0;
+    libxl_for_each_set_bit(i, *bitmap)
+        nr_set_bits++;
 
-    return nr_set_cpus;
+    return nr_set_bits;
 }
 
 /* NB. caller is responsible for freeing the memory */
-char *libxl_cpumap_to_hex_string(libxl_ctx *ctx, const libxl_cpumap *cpumap)
+char *libxl_bitmap_to_hex_string(libxl_ctx *ctx, const libxl_bitmap *bitmap)
 {
     GC_INIT(ctx);
-    int i = cpumap->size;
-    char *p = libxl__zalloc(NOGC, cpumap->size * 2 + 3);
+    int i = bitmap->size;
+    char *p = libxl__zalloc(NOGC, bitmap->size * 2 + 3);
     char *q = p;
     strncpy(p, "0x", 2);
     p += 2;
     while(--i >= 0) {
-        sprintf(p, "%02x", cpumap->map[i]);
+        sprintf(p, "%02x", bitmap->map[i]);
         p += 2;
     }
     *p = '\0';

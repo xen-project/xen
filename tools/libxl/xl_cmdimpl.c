@@ -492,19 +492,19 @@ static void split_string_into_string_list(const char *str,
     free(s);
 }
 
-static int vcpupin_parse(char *cpu, libxl_cpumap *cpumap)
+static int vcpupin_parse(char *cpu, libxl_bitmap *cpumap)
 {
-    libxl_cpumap exclude_cpumap;
+    libxl_bitmap exclude_cpumap;
     uint32_t cpuida, cpuidb;
     char *endptr, *toka, *tokb, *saveptr = NULL;
     int i, rc = 0, rmcpu;
 
     if (!strcmp(cpu, "all")) {
-        libxl_cpumap_set_any(cpumap);
+        libxl_bitmap_set_any(cpumap);
         return 0;
     }
 
-    if (libxl_cpumap_alloc(ctx, &exclude_cpumap, 0)) {
+    if (libxl_cpu_bitmap_alloc(ctx, &exclude_cpumap, 0)) {
         fprintf(stderr, "Error: Failed to allocate cpumap.\n");
         return ENOMEM;
     }
@@ -534,19 +534,19 @@ static int vcpupin_parse(char *cpu, libxl_cpumap *cpumap)
             }
         }
         while (cpuida <= cpuidb) {
-            rmcpu == 0 ? libxl_cpumap_set(cpumap, cpuida) :
-                         libxl_cpumap_set(&exclude_cpumap, cpuida);
+            rmcpu == 0 ? libxl_bitmap_set(cpumap, cpuida) :
+                         libxl_bitmap_set(&exclude_cpumap, cpuida);
             cpuida++;
         }
     }
 
     /* Clear all the cpus from the removal list */
-    libxl_for_each_set_cpu(i, exclude_cpumap) {
-        libxl_cpumap_reset(cpumap, i);
+    libxl_for_each_set_bit(i, exclude_cpumap) {
+        libxl_bitmap_reset(cpumap, i);
     }
 
 vcpp_out:
-    libxl_cpumap_dispose(&exclude_cpumap);
+    libxl_bitmap_dispose(&exclude_cpumap);
 
     return rc;
 }
@@ -649,13 +649,13 @@ static void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_long (config, "vcpus", &l, 0)) {
         b_info->max_vcpus = l;
 
-        if (libxl_cpumap_alloc(ctx, &b_info->avail_vcpus, l)) {
+        if (libxl_cpu_bitmap_alloc(ctx, &b_info->avail_vcpus, l)) {
             fprintf(stderr, "Unable to allocate cpumap\n");
             exit(1);
         }
-        libxl_cpumap_set_none(&b_info->avail_vcpus);
+        libxl_bitmap_set_none(&b_info->avail_vcpus);
         while (l-- > 0)
-            libxl_cpumap_set((&b_info->avail_vcpus), l);
+            libxl_bitmap_set((&b_info->avail_vcpus), l);
     }
 
     if (!xlu_cfg_get_long (config, "maxvcpus", &l, 0))
@@ -664,7 +664,7 @@ static void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_list (config, "cpus", &cpus, 0, 1)) {
         int i, n_cpus = 0;
 
-        if (libxl_cpumap_alloc(ctx, &b_info->cpumap, 0)) {
+        if (libxl_cpu_bitmap_alloc(ctx, &b_info->cpumap, 0)) {
             fprintf(stderr, "Unable to allocate cpumap\n");
             exit(1);
         }
@@ -684,14 +684,14 @@ static void parse_config_data(const char *config_source,
          * the cpumap derived from the list ensures memory is being
          * allocated on the proper nodes anyway.
          */
-        libxl_cpumap_set_none(&b_info->cpumap);
+        libxl_bitmap_set_none(&b_info->cpumap);
         while ((buf = xlu_cfg_get_listitem(cpus, n_cpus)) != NULL) {
             i = atoi(buf);
-            if (!libxl_cpumap_cpu_valid(&b_info->cpumap, i)) {
+            if (!libxl_bitmap_cpu_valid(&b_info->cpumap, i)) {
                 fprintf(stderr, "cpu %d illegal\n", i);
                 exit(1);
             }
-            libxl_cpumap_set(&b_info->cpumap, i);
+            libxl_bitmap_set(&b_info->cpumap, i);
             if (n_cpus < b_info->max_vcpus)
                 vcpu_to_pcpu[n_cpus] = i;
             n_cpus++;
@@ -700,12 +700,12 @@ static void parse_config_data(const char *config_source,
     else if (!xlu_cfg_get_string (config, "cpus", &buf, 0)) {
         char *buf2 = strdup(buf);
 
-        if (libxl_cpumap_alloc(ctx, &b_info->cpumap, 0)) {
+        if (libxl_cpu_bitmap_alloc(ctx, &b_info->cpumap, 0)) {
             fprintf(stderr, "Unable to allocate cpumap\n");
             exit(1);
         }
 
-        libxl_cpumap_set_none(&b_info->cpumap);
+        libxl_bitmap_set_none(&b_info->cpumap);
         if (vcpupin_parse(buf2, &b_info->cpumap))
             exit(1);
         free(buf2);
@@ -1805,28 +1805,28 @@ start:
 
     /* If single vcpu to pcpu mapping was requested, honour it */
     if (vcpu_to_pcpu) {
-        libxl_cpumap vcpu_cpumap;
+        libxl_bitmap vcpu_cpumap;
 
-        ret = libxl_cpumap_alloc(ctx, &vcpu_cpumap, 0);
+        ret = libxl_cpu_bitmap_alloc(ctx, &vcpu_cpumap, 0);
         if (ret)
             goto error_out;
         for (i = 0; i < d_config.b_info.max_vcpus; i++) {
 
             if (vcpu_to_pcpu[i] != -1) {
-                libxl_cpumap_set_none(&vcpu_cpumap);
-                libxl_cpumap_set(&vcpu_cpumap, vcpu_to_pcpu[i]);
+                libxl_bitmap_set_none(&vcpu_cpumap);
+                libxl_bitmap_set(&vcpu_cpumap, vcpu_to_pcpu[i]);
             } else {
-                libxl_cpumap_set_any(&vcpu_cpumap);
+                libxl_bitmap_set_any(&vcpu_cpumap);
             }
             if (libxl_set_vcpuaffinity(ctx, domid, i, &vcpu_cpumap)) {
                 fprintf(stderr, "setting affinity failed on vcpu `%d'.\n", i);
-                libxl_cpumap_dispose(&vcpu_cpumap);
+                libxl_bitmap_dispose(&vcpu_cpumap);
                 free(vcpu_to_pcpu);
                 ret = ERROR_FAIL;
                 goto error_out;
             }
         }
-        libxl_cpumap_dispose(&vcpu_cpumap);
+        libxl_bitmap_dispose(&vcpu_cpumap);
         free(vcpu_to_pcpu); vcpu_to_pcpu = NULL;
     }
 
@@ -4063,7 +4063,7 @@ int main_vcpulist(int argc, char **argv)
 static void vcpupin(const char *d, const char *vcpu, char *cpu)
 {
     libxl_vcpuinfo *vcpuinfo;
-    libxl_cpumap cpumap;
+    libxl_bitmap cpumap;
 
     uint32_t vcpuid;
     char *endptr;
@@ -4080,7 +4080,7 @@ static void vcpupin(const char *d, const char *vcpu, char *cpu)
 
     find_domain(d);
 
-    if (libxl_cpumap_alloc(ctx, &cpumap, 0)) {
+    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
         goto vcpupin_out;
     }
 
@@ -4107,7 +4107,7 @@ static void vcpupin(const char *d, const char *vcpu, char *cpu)
         libxl_vcpuinfo_list_free(vcpuinfo, nb_vcpu);
     }
   vcpupin_out1:
-    libxl_cpumap_dispose(&cpumap);
+    libxl_bitmap_dispose(&cpumap);
   vcpupin_out:
     ;
 }
@@ -4127,7 +4127,7 @@ static void vcpuset(const char *d, const char* nr_vcpus)
 {
     char *endptr;
     unsigned int max_vcpus, i;
-    libxl_cpumap cpumap;
+    libxl_bitmap cpumap;
 
     max_vcpus = strtoul(nr_vcpus, &endptr, 10);
     if (nr_vcpus == endptr) {
@@ -4137,17 +4137,17 @@ static void vcpuset(const char *d, const char* nr_vcpus)
 
     find_domain(d);
 
-    if (libxl_cpumap_alloc(ctx, &cpumap, 0)) {
-        fprintf(stderr, "libxl_cpumap_alloc failed\n");
+    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
+        fprintf(stderr, "libxl_cpu_bitmap_alloc failed\n");
         return;
     }
     for (i = 0; i < max_vcpus; i++)
-        libxl_cpumap_set(&cpumap, i);
+        libxl_bitmap_set(&cpumap, i);
 
     if (libxl_set_vcpuonline(ctx, domid, &cpumap) < 0)
         fprintf(stderr, "libxl_set_vcpuonline failed domid=%d max_vcpus=%d\n", domid, max_vcpus);
 
-    libxl_cpumap_dispose(&cpumap);
+    libxl_bitmap_dispose(&cpumap);
 }
 
 int main_vcpuset(int argc, char **argv)
@@ -4211,7 +4211,7 @@ static void output_physinfo(void)
     libxl_physinfo info;
     const libxl_version_info *vinfo;
     unsigned int i;
-    libxl_cpumap cpumap;
+    libxl_bitmap cpumap;
     int n = 0;
 
     if (libxl_get_physinfo(ctx, &info) != 0) {
@@ -4243,8 +4243,8 @@ static void output_physinfo(void)
         printf("sharing_used_memory    : %"PRIu64"\n", info.sharing_used_frames / i);
     }
     if (!libxl_get_freecpus(ctx, &cpumap)) {
-        libxl_for_each_cpu(i, cpumap)
-            if (libxl_cpumap_test(&cpumap, i))
+        libxl_for_each_bit(i, cpumap)
+            if (libxl_bitmap_test(&cpumap, i))
                 n++;
         printf("free_cpus              : %d\n", n);
         free(cpumap.map);
@@ -5866,8 +5866,8 @@ int main_cpupoolcreate(int argc, char **argv)
     XLU_ConfigList *cpus;
     XLU_ConfigList *nodes;
     int n_cpus, n_nodes, i, n;
-    libxl_cpumap freemap;
-    libxl_cpumap cpumap;
+    libxl_bitmap freemap;
+    libxl_bitmap cpumap;
     libxl_uuid uuid;
     libxl_cputopology *topology;
     int rc = -ERROR_FAIL; 
@@ -5980,7 +5980,7 @@ int main_cpupoolcreate(int argc, char **argv)
         fprintf(stderr, "libxl_get_freecpus failed\n");
         goto out_cfg;
     }
-    if (libxl_cpumap_alloc(ctx, &cpumap, 0)) {
+    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
         fprintf(stderr, "Failed to allocate cpumap\n");
         goto out_cfg;
     }
@@ -5997,8 +5997,8 @@ int main_cpupoolcreate(int argc, char **argv)
             n = atoi(buf);
             for (i = 0; i < nr; i++) {
                 if ((topology[i].node == n) &&
-                    libxl_cpumap_test(&freemap, i)) {
-                    libxl_cpumap_set(&cpumap, i);
+                    libxl_bitmap_test(&freemap, i)) {
+                    libxl_bitmap_set(&cpumap, i);
                     n_cpus++;
                 }
             }
@@ -6016,11 +6016,11 @@ int main_cpupoolcreate(int argc, char **argv)
         while ((buf = xlu_cfg_get_listitem(cpus, n_cpus)) != NULL) {
             i = atoi(buf);
             if ((i < 0) || (i >= freemap.size * 8) ||
-                !libxl_cpumap_test(&freemap, i)) {
+                !libxl_bitmap_test(&freemap, i)) {
                 fprintf(stderr, "cpu %d illegal or not free\n", i);
                 goto out_cfg;
             }
-            libxl_cpumap_set(&cpumap, i);
+            libxl_bitmap_set(&cpumap, i);
             n_cpus++;
         }
     } else
@@ -6118,8 +6118,8 @@ int main_cpupoollist(int argc, char **argv)
                 printf("%-19s", name);
                 free(name);
                 n = 0;
-                libxl_for_each_cpu(c, poolinfo[p].cpumap)
-                    if (libxl_cpumap_test(&poolinfo[p].cpumap, c)) {
+                libxl_for_each_bit(c, poolinfo[p].cpumap)
+                    if (libxl_bitmap_test(&poolinfo[p].cpumap, c)) {
                         if (n && opt_cpus) printf(",");
                         if (opt_cpus) printf("%d", c);
                         n++;
@@ -6318,7 +6318,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
     int n_cpus;
     char name[16];
     libxl_uuid uuid;
-    libxl_cpumap cpumap;
+    libxl_bitmap cpumap;
     libxl_cpupoolinfo *poolinfo;
     libxl_cputopology *topology;
     libxl_dominfo info;
@@ -6348,7 +6348,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
         return -ERROR_FAIL;
     }
 
-    if (libxl_cpumap_alloc(ctx, &cpumap, 0)) {
+    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
         fprintf(stderr, "Failed to allocate cpumap\n");
         libxl_cputopology_list_free(topology, n_cpus);
         return -ERROR_FAIL;
@@ -6374,7 +6374,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
     for (c = 0; c < n_cpus; c++) {
         if (topology[c].node == node) {
             topology[c].node = LIBXL_CPUTOPOLOGY_INVALID_ENTRY;
-            libxl_cpumap_set(&cpumap, n);
+            libxl_bitmap_set(&cpumap, n);
             n++;
         }
     }
@@ -6396,7 +6396,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
         fprintf(stderr, "failed to offline vcpus\n");
         goto out;
     }
-    libxl_cpumap_set_none(&cpumap);
+    libxl_bitmap_set_none(&cpumap);
 
     for (c = 0; c < n_cpus; c++) {
         if (topology[c].node == LIBXL_CPUTOPOLOGY_INVALID_ENTRY) {
@@ -6434,7 +6434,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
 
 out:
     libxl_cputopology_list_free(topology, n_cpus);
-    libxl_cpumap_dispose(&cpumap);
+    libxl_bitmap_dispose(&cpumap);
 
     return ret;
 }

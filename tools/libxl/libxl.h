@@ -285,8 +285,9 @@ typedef uint64_t libxl_ev_user;
 typedef struct {
     uint32_t size;          /* number of bytes in map */
     uint8_t *map;
-} libxl_cpumap;
-void libxl_cpumap_dispose(libxl_cpumap *map);
+} libxl_bitmap;
+void libxl_bitmap_init(libxl_bitmap *map);
+void libxl_bitmap_dispose(libxl_bitmap *map);
 
 /* libxl_cpuid_policy_list is a dynamic array storing CPUID policies
  * for multiple leafs. It is terminated with an entry holding
@@ -790,10 +791,10 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
 
 int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo);
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
-                           libxl_cpumap *cpumap);
+                           libxl_bitmap *cpumap);
 int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,
-                               unsigned int max_vcpus, libxl_cpumap *cpumap);
-int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_cpumap *cpumap);
+                               unsigned int max_vcpus, libxl_bitmap *cpumap);
+int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap);
 
 libxl_scheduler libxl_get_scheduler(libxl_ctx *ctx);
 
@@ -843,10 +844,10 @@ int libxl_tmem_shared_auth(libxl_ctx *ctx, uint32_t domid, char* uuid,
                            int auth);
 int libxl_tmem_freeable(libxl_ctx *ctx);
 
-int libxl_get_freecpus(libxl_ctx *ctx, libxl_cpumap *cpumap);
+int libxl_get_freecpus(libxl_ctx *ctx, libxl_bitmap *cpumap);
 int libxl_cpupool_create(libxl_ctx *ctx, const char *name,
                          libxl_scheduler sched,
-                         libxl_cpumap cpumap, libxl_uuid *uuid,
+                         libxl_bitmap cpumap, libxl_uuid *uuid,
                          uint32_t *poolid);
 int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid);
 int libxl_cpupool_rename(libxl_ctx *ctx, const char *name, uint32_t poolid);

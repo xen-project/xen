@@ -586,7 +586,7 @@ static int cpupool_info(libxl__gc *gc,
     info->poolid = xcinfo->cpupool_id;
     info->sched = xcinfo->sched_id;
     info->n_dom = xcinfo->n_dom;
-    rc = libxl_cpumap_alloc(CTX, &info->cpumap, 0);
+    rc = libxl_cpu_bitmap_alloc(CTX, &info->cpumap, 0);
     if (rc)
     {
         LOG(ERROR, "unable to allocate cpumap %d\n", rc);
@@ -3431,7 +3431,7 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
     }
 
     for (*nb_vcpu = 0; *nb_vcpu <= domaininfo.max_vcpu_id; ++*nb_vcpu, ++ptr) {
-        if (libxl_cpumap_alloc(ctx, &ptr->cpumap, 0)) {
+        if (libxl_cpu_bitmap_alloc(ctx, &ptr->cpumap, 0)) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "allocating cpumap");
             return NULL;
         }
@@ -3454,7 +3454,7 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
 }
 
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
-                           libxl_cpumap *cpumap)
+                           libxl_bitmap *cpumap)
 {
     if (xc_vcpu_setaffinity(ctx->xch, domid, vcpuid, cpumap->map)) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "setting vcpu affinity");
@@ -3464,7 +3464,7 @@ int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
 }
 
 int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,
-                               unsigned int max_vcpus, libxl_cpumap *cpumap)
+                               unsigned int max_vcpus, libxl_bitmap *cpumap)
 {
     int i, rc = 0;
 
@@ -3478,7 +3478,7 @@ int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
-int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_cpumap *cpumap)
+int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap)
 {
     GC_INIT(ctx);
     libxl_dominfo info;
@@ -3498,7 +3498,7 @@ retry_transaction:
     for (i = 0; i <= info.vcpu_max_id; i++)
         libxl__xs_write(gc, t,
                        libxl__sprintf(gc, "%s/cpu/%u/availability", dompath, i),
-                       "%s", libxl_cpumap_test(cpumap, i) ? "online" : "offline");
+                       "%s", libxl_bitmap_test(cpumap, i) ? "online" : "offline");
     if (!xs_transaction_end(ctx->xsh, t, 0)) {
         if (errno == EAGAIN)
             goto retry_transaction;
@@ -4094,7 +4094,7 @@ int libxl_tmem_freeable(libxl_ctx *ctx)
     return rc;
 }
 
-int libxl_get_freecpus(libxl_ctx *ctx, libxl_cpumap *cpumap)
+int libxl_get_freecpus(libxl_ctx *ctx, libxl_bitmap *cpumap)
 {
     int ncpus;
 
@@ -4113,7 +4113,7 @@ int libxl_get_freecpus(libxl_ctx *ctx, libxl_cpumap *cpumap)
 
 int libxl_cpupool_create(libxl_ctx *ctx, const char *name,
                          libxl_scheduler sched,
-                         libxl_cpumap cpumap, libxl_uuid *uuid,
+                         libxl_bitmap cpumap, libxl_uuid *uuid,
                          uint32_t *poolid)
 {
     GC_INIT(ctx);
@@ -4136,8 +4136,8 @@ int libxl_cpupool_create(libxl_ctx *ctx, const char *name,
         return ERROR_FAIL;
     }
 
-    libxl_for_each_cpu(i, cpumap)
-        if (libxl_cpumap_test(&cpumap, i)) {
+    libxl_for_each_bit(i, cpumap)
+        if (libxl_bitmap_test(&cpumap, i)) {
             rc = xc_cpupool_addcpu(ctx->xch, *poolid, i);
             if (rc) {
                 LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
@@ -4172,7 +4172,7 @@ int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid)
     int rc, i;
     xc_cpupoolinfo_t *info;
     xs_transaction_t t;
-    libxl_cpumap cpumap;
+    libxl_bitmap cpumap;
 
     info = xc_cpupool_getinfo(ctx->xch, poolid);
     if (info == NULL) {
@@ -4184,13 +4184,13 @@ int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid)
     if ((info->cpupool_id != poolid) || (info->n_dom))
         goto out;
 
-    rc = libxl_cpumap_alloc(ctx, &cpumap, 0);
+    rc = libxl_cpu_bitmap_alloc(ctx, &cpumap, 0);
     if (rc)
         goto out;
 
     memcpy(cpumap.map, info->cpumap, cpumap.size);
-    libxl_for_each_cpu(i, cpumap)
-        if (libxl_cpumap_test(&cpumap, i)) {
+    libxl_for_each_bit(i, cpumap)
+        if (libxl_bitmap_test(&cpumap, i)) {
             rc = xc_cpupool_removecpu(ctx->xch, poolid, i);
             if (rc) {
                 LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, rc,
@@ -4219,7 +4219,7 @@ int libxl_cpupool_destroy(libxl_ctx *ctx, uint32_t poolid)
     rc = 0;
 
 out1:
-    libxl_cpumap_dispose(&cpumap);
+    libxl_bitmap_dispose(&cpumap);
 out:
     xc_cpupool_infofree(ctx->xch, info);
     GC_FREE;
@@ -4287,7 +4287,7 @@ int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cp
 {
     int rc = 0;
     int cpu, nr;
-    libxl_cpumap freemap;
+    libxl_bitmap freemap;
     libxl_cputopology *topology;
 
     if (libxl_get_freecpus(ctx, &freemap)) {
@@ -4302,7 +4302,7 @@ int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cp
 
     *cpus = 0;
     for (cpu = 0; cpu < nr; cpu++) {
-        if (libxl_cpumap_test(&freemap, cpu) && (topology[cpu].node == node) &&
+        if (libxl_bitmap_test(&freemap, cpu) && (topology[cpu].node == node) &&
             !libxl_cpupool_cpuadd(ctx, poolid, cpu)) {
                 (*cpus)++;
         }
@@ -4311,7 +4311,7 @@ int libxl_cpupool_cpuadd_node(libxl_ctx *ctx, uint32_t poolid, int node, int *cp
 
     free(topology);
 out:
-    libxl_cpumap_dispose(&freemap);
+    libxl_bitmap_dispose(&freemap);
     return rc;
 }
 
@@ -4353,7 +4353,7 @@ int libxl_cpupool_cpuremove_node(libxl_ctx *ctx, uint32_t poolid, int node, int 
         if (poolinfo[p].poolid == poolid) {
             for (cpu = 0; cpu < nr_cpus; cpu++) {
                 if ((topology[cpu].node == node) &&
-                    libxl_cpumap_test(&poolinfo[p].cpumap, cpu) &&
+                    libxl_bitmap_test(&poolinfo[p].cpumap, cpu) &&
                     !libxl_cpupool_cpuremove(ctx, poolid, cpu)) {
                         (*cpus)++;
                 }

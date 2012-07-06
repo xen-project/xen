@@ -10,7 +10,7 @@ libxl_defbool = Builtin("defbool", passby=PASS_BY_REFERENCE)
 libxl_domid = Builtin("domid", json_fn = "yajl_gen_integer", autogenerate_json = False)
 libxl_uuid = Builtin("uuid", passby=PASS_BY_REFERENCE)
 libxl_mac = Builtin("mac", passby=PASS_BY_REFERENCE)
-libxl_cpumap = Builtin("cpumap", dispose_fn="libxl_cpumap_dispose", passby=PASS_BY_REFERENCE)
+libxl_bitmap = Builtin("bitmap", dispose_fn="libxl_bitmap_dispose", passby=PASS_BY_REFERENCE)
 libxl_cpuid_policy_list = Builtin("cpuid_policy_list", dispose_fn="libxl_cpuid_dispose", passby=PASS_BY_REFERENCE)
 
 libxl_string_list = Builtin("string_list", dispose_fn="libxl_string_list_dispose", passby=PASS_BY_REFERENCE)
@@ -198,7 +198,7 @@ libxl_cpupoolinfo = Struct("cpupoolinfo", [
     ("poolid",      uint32),
     ("sched",       libxl_scheduler),
     ("n_dom",       uint32),
-    ("cpumap",      libxl_cpumap)
+    ("cpumap",      libxl_bitmap)
     ], dir=DIR_OUT)
 
 libxl_vminfo = Struct("vminfo", [
@@ -247,8 +247,8 @@ libxl_domain_sched_params = Struct("domain_sched_params",[
 
 libxl_domain_build_info = Struct("domain_build_info",[
     ("max_vcpus",       integer),
-    ("avail_vcpus",     libxl_cpumap),
-    ("cpumap",          libxl_cpumap),
+    ("avail_vcpus",     libxl_bitmap),
+    ("cpumap",          libxl_bitmap),
     ("tsc_mode",        libxl_tsc_mode),
     ("max_memkb",       MemKB),
     ("target_memkb",    MemKB),
@@ -409,7 +409,7 @@ libxl_vcpuinfo = Struct("vcpuinfo", [
     ("blocked", bool),
     ("running", bool),
     ("vcpu_time", uint64), # total vcpu time ran (ns)
-    ("cpumap", libxl_cpumap), # current cpu's affinities
+    ("cpumap", libxl_bitmap), # current cpu's affinities
     ], dir=DIR_OUT)
 
 libxl_physinfo = Struct("physinfo", [

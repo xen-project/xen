@@ -203,16 +203,16 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     if (!b_info->max_vcpus)
         b_info->max_vcpus = 1;
     if (!b_info->avail_vcpus.size) {
-        if (libxl_cpumap_alloc(CTX, &b_info->avail_vcpus, 1))
+        if (libxl_cpu_bitmap_alloc(CTX, &b_info->avail_vcpus, 1))
             return ERROR_FAIL;
-        libxl_cpumap_set(&b_info->avail_vcpus, 0);
+        libxl_bitmap_set(&b_info->avail_vcpus, 0);
     } else if (b_info->avail_vcpus.size > HVM_MAX_VCPUS)
         return ERROR_FAIL;
 
     if (!b_info->cpumap.size) {
-        if (libxl_cpumap_alloc(CTX, &b_info->cpumap, 0))
+        if (libxl_cpu_bitmap_alloc(CTX, &b_info->cpumap, 0))
             return ERROR_FAIL;
-        libxl_cpumap_set_any(&b_info->cpumap);
+        libxl_bitmap_set_any(&b_info->cpumap);
     }
 
     if (b_info->max_memkb == LIBXL_MEMKB_DEFAULT)

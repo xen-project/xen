@@ -208,8 +208,8 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
                               NULL);
         }
 
-        nr_set_cpus = libxl_cpumap_count_set(&b_info->avail_vcpus);
-        s = libxl_cpumap_to_hex_string(CTX, &b_info->avail_vcpus);
+        nr_set_cpus = libxl_bitmap_count_set(&b_info->avail_vcpus);
+        s = libxl_bitmap_to_hex_string(CTX, &b_info->avail_vcpus);
         flexarray_vappend(dm_args, "-vcpu_avail",
                               libxl__sprintf(gc, "%s", s), NULL);
         free(s);
@@ -459,7 +459,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append(dm_args, "-smp");
             if (b_info->avail_vcpus.size) {
                 int nr_set_cpus = 0;
-                nr_set_cpus = libxl_cpumap_count_set(&b_info->avail_vcpus);
+                nr_set_cpus = libxl_bitmap_count_set(&b_info->avail_vcpus);
 
                 flexarray_append(dm_args, libxl__sprintf(gc, "%d,maxcpus=%d",
                                                          b_info->max_vcpus,

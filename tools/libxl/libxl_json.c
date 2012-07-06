@@ -99,8 +99,8 @@ yajl_gen_status libxl_uuid_gen_json(yajl_gen hand,
     return yajl_gen_string(hand, (const unsigned char *)buf, LIBXL_UUID_FMTLEN);
 }
 
-yajl_gen_status libxl_cpumap_gen_json(yajl_gen hand,
-                                      libxl_cpumap *cpumap)
+yajl_gen_status libxl_bitmap_gen_json(yajl_gen hand,
+                                      libxl_bitmap *bitmap)
 {
     yajl_gen_status s;
     int i;
@@ -108,8 +108,8 @@ yajl_gen_status libxl_cpumap_gen_json(yajl_gen hand,
     s = yajl_gen_array_open(hand);
     if (s != yajl_gen_status_ok) goto out;
 
-    libxl_for_each_cpu(i, *cpumap) {
-        if (libxl_cpumap_test(cpumap, i)) {
+    libxl_for_each_bit(i, *bitmap) {
+        if (libxl_bitmap_test(bitmap, i)) {
             s = yajl_gen_integer(hand, i);
             if (s != yajl_gen_status_ok) goto out;
         }

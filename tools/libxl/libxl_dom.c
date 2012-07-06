@@ -202,7 +202,7 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     ents[11] = libxl__sprintf(gc, "%lu", state->store_mfn);
     for (i = 0; i < info->max_vcpus; i++) {
         ents[12+(i*2)]   = libxl__sprintf(gc, "cpu/%d/availability", i);
-        ents[12+(i*2)+1] = libxl_cpumap_test(&info->avail_vcpus, i)
+        ents[12+(i*2)+1] = libxl_bitmap_test(&info->avail_vcpus, i)
                             ? "online" : "offline";
     }
 
