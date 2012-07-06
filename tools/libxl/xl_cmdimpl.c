@@ -4254,6 +4254,36 @@ static void output_physinfo(void)
     return;
 }
 
+static void output_numainfo(void)
+{
+    libxl_numainfo *info;
+    int i, j, nr;
+
+    info = libxl_get_numainfo(ctx, &nr);
+    if (info == NULL) {
+        fprintf(stderr, "libxl_get_numainfo failed.\n");
+        return;
+    }
+
+    printf("numa_info              :\n");
+    printf("node:    memsize    memfree    distances\n");
+
+    for (i = 0; i < nr; i++) {
+        if (info[i].size != LIBXL_NUMAINFO_INVALID_ENTRY) {
+            printf("%4d:    %6"PRIu64"     %6"PRIu64"      %d", i,
+                   info[i].size >> 20, info[i].free >> 20,
+                   info[i].dists[0]);
+            for (j = 1; j < info[i].num_dists; j++)
+                printf(",%d", info[i].dists[j]);
+            printf("\n");
+        }
+    }
+
+    libxl_numainfo_list_free(info, nr);
+
+    return;
+}
+
 static void output_topologyinfo(void)
 {
     libxl_cputopology *info;
@@ -4276,8 +4306,6 @@ static void output_topologyinfo(void)
 
     libxl_cputopology_list_free(info, nr);
 
-    printf("numa_info              : none\n");
-
     return;
 }
 
@@ -4287,8 +4315,10 @@ static void info(int numa)
 
     output_physinfo();
 
-    if (numa)
+    if (numa) {
         output_topologyinfo();
+        output_numainfo();
+    }
 
     output_xeninfo();
 
