@@ -174,10 +174,8 @@ static void svm_save_dr(struct vcpu *v)
     v->arch.debugreg[7] = vmcb_get_dr7(vmcb);
 }
 
-static void __restore_debug_registers(struct vcpu *v)
+static void __restore_debug_registers(struct vmcb_struct *vmcb, struct vcpu *v)
 {
-    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
-
     if ( v->arch.hvm_vcpu.flag_dr_dirty )
         return;
 
@@ -200,8 +198,9 @@ static void __restore_debug_registers(struct vcpu *v)
  */
 static void svm_restore_dr(struct vcpu *v)
 {
+    struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     if ( unlikely(v->arch.debugreg[7] & DR7_ACTIVE_MASK) )
-        __restore_debug_registers(v);
+        __restore_debug_registers(vmcb, v);
 }
 
 static int svm_vmcb_save(struct vcpu *v, struct hvm_hw_cpu *c)
@@ -1078,7 +1077,7 @@ static void svm_inject_trap(struct hvm_trap *trap)
     case TRAP_debug:
         if ( guest_cpu_user_regs()->eflags & X86_EFLAGS_TF )
         {
-            __restore_debug_registers(curr);
+            __restore_debug_registers(vmcb, curr);
             vmcb_set_dr6(vmcb, vmcb_get_dr6(vmcb) | 0x4000);
         }
         if ( cpu_has_monitor_trap_flag )
@@ -1455,8 +1454,10 @@ static void svm_vmexit_do_cr_access(
 
 static void svm_dr_access(struct vcpu *v, struct cpu_user_regs *regs)
 {
+    struct vmcb_struct *vmcb = vcpu_nestedhvm(v).nv_n1vmcx;
+
     HVMTRACE_0D(DR_WRITE);
-    __restore_debug_registers(v);
+    __restore_debug_registers(vmcb, v);
 }
 
 static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
