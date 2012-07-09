@@ -44,6 +44,7 @@
 #include <xen/sched-if.h>
 #include <asm/cache.h>
 #include <asm/io.h>
+#include <asm/iocap.h>
 #include <asm/hpet.h>
 #include <asm/processor.h>
 #include <xen/pmstat.h>
@@ -888,6 +889,9 @@ static void set_cx(
             cx->entry_method = ACPI_CSTATE_EM_HALT;
         break;
     case ACPI_ADR_SPACE_SYSTEM_IO:
+        if ( ioports_deny_access(dom0, cx->address, cx->address) )
+            printk(XENLOG_WARNING "Could not deny access to port %04x\n",
+                   cx->address);
         cx->entry_method = ACPI_CSTATE_EM_SYSIO;
         break;
     default:
