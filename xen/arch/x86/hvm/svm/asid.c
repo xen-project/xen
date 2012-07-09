@@ -52,7 +52,8 @@ void svm_asid_handle_vmrun(void)
         return;
     }
 
-    vmcb_set_guest_asid(vmcb, curr->arch.hvm_vcpu.asid);
+    if (vmcb_get_guest_asid(vmcb) != curr->arch.hvm_vcpu.asid)
+        vmcb_set_guest_asid(vmcb, curr->arch.hvm_vcpu.asid);
     vmcb->tlb_control = need_flush;
 }
 
