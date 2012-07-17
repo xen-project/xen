@@ -477,9 +477,9 @@ out:
 static void gic_restore_pending_irqs(struct vcpu *v)
 {
     int i;
-    struct pending_irq *p;
+    struct pending_irq *p, *t;
 
-    list_for_each_entry ( p, &v->arch.vgic.lr_pending, lr_queue )
+    list_for_each_entry_safe ( p, t, &v->arch.vgic.lr_pending, lr_queue )
     {
         i = find_first_zero_bit(&gic.lr_mask, nr_lrs);
         if ( i >= nr_lrs ) return;
@@ -583,7 +583,7 @@ static void events_maintenance(struct vcpu *v)
     if (!already_pending && gic.event_mask != 0) {
         spin_lock_irq(&gic.lock);
         while ((i = find_next_bit((const long unsigned int *) &gic.event_mask,
-                        sizeof(uint64_t), i)) < sizeof(uint64_t)) {
+                        64, i)) < 64) {
 
             GICH[GICH_LR + i] = 0;
             clear_bit(i, &gic.lr_mask);
@@ -605,7 +605,7 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
     events_maintenance(v);
 
     while ((i = find_next_bit((const long unsigned int *) &eisr,
-                              sizeof(eisr), i)) < sizeof(eisr)) {
+                              64, i)) < 64) {
         struct pending_irq *p;
 
         spin_lock_irq(&gic.lock);

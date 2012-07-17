@@ -355,8 +355,7 @@ static void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
     unsigned int irq;
     int i = 0;
 
-    while ( (i = find_next_bit((const long unsigned int *) &r,
-                        sizeof(uint32_t), i)) < sizeof(uint32_t) ) {
+    while ( (i = find_next_bit((const long unsigned int *) &r, 32, i)) < 32 ) {
         irq = i + (32 * n);
         p = irq_to_pending(v, irq);
         if ( !list_empty(&p->inflight) )
