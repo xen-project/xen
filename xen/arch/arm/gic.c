@@ -67,6 +67,8 @@ void gic_save_state(struct vcpu *v)
 
     for ( i=0; i<nr_lrs; i++)
         v->arch.gic_lr[i] = GICH[GICH_LR + i];
+    v->arch.lr_mask = gic.lr_mask;
+    v->arch.event_mask = gic.event_mask;
     /* Disable until next VCPU scheduled */
     GICH[GICH_HCR] = 0;
     isb();
@@ -79,6 +81,8 @@ void gic_restore_state(struct vcpu *v)
     if ( is_idle_vcpu(v) )
         return;
 
+    gic.lr_mask = v->arch.lr_mask;
+    gic.event_mask = v->arch.event_mask;
     for ( i=0; i<nr_lrs; i++)
         GICH[GICH_LR + i] = v->arch.gic_lr[i];
     GICH[GICH_HCR] = GICH_HCR_EN;
