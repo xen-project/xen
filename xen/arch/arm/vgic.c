@@ -115,6 +115,7 @@ int vcpu_vgic_init(struct vcpu *v)
             | (1<<(v->vcpu_id+16))
             | (1<<(v->vcpu_id+24));
     INIT_LIST_HEAD(&v->arch.vgic.inflight_irqs);
+    INIT_LIST_HEAD(&v->arch.vgic.lr_pending);
     spin_lock_init(&v->arch.vgic.lock);
 
     return 0;
@@ -571,7 +572,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
     else
         n->desc = NULL;
 
-    gic_set_guest_irq(irq, GICH_LR_PENDING, priority);
+    gic_set_guest_irq(v, irq, GICH_LR_PENDING, priority);
 
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
     list_for_each_entry ( iter, &v->arch.vgic.inflight_irqs, inflight )

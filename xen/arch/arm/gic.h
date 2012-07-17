@@ -137,7 +137,7 @@ extern void gic_route_irqs(void);
 extern void gic_inject(void);
 
 extern void __cpuinit init_maintenance_interrupt(void);
-extern void gic_set_guest_irq(unsigned int irq,
+extern void gic_set_guest_irq(struct vcpu *v, unsigned int irq,
         unsigned int state, unsigned int priority);
 extern int gic_route_irq_to_guest(struct domain *d, unsigned int irq,
                                   const char * devname);
