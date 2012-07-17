@@ -37,7 +37,6 @@
                                      + (GIC_CR_OFFSET & 0xfff)))
 #define GICH ((volatile uint32_t *) (FIXMAP_ADDR(FIXMAP_GICH)  \
                                      + (GIC_HR_OFFSET & 0xfff)))
-static void events_maintenance(struct vcpu *v);
 static void gic_restore_pending_irqs(struct vcpu *v);
 
 /* Global state */
@@ -48,7 +47,6 @@ static struct {
     unsigned int lines;
     unsigned int cpus;
     spinlock_t lock;
-    uint64_t event_mask;
     uint64_t lr_mask;
 } gic;
 
@@ -62,7 +60,6 @@ void gic_save_state(struct vcpu *v)
     for ( i=0; i<nr_lrs; i++)
         v->arch.gic_lr[i] = GICH[GICH_LR + i];
     v->arch.lr_mask = gic.lr_mask;
-    v->arch.event_mask = gic.event_mask;
     /* Disable until next VCPU scheduled */
     GICH[GICH_HCR] = 0;
     isb();
@@ -76,7 +73,6 @@ void gic_restore_state(struct vcpu *v)
         return;
 
     gic.lr_mask = v->arch.lr_mask;
-    gic.event_mask = v->arch.event_mask;
     for ( i=0; i<nr_lrs; i++)
         GICH[GICH_LR + i] = v->arch.gic_lr[i];
     GICH[GICH_HCR] = GICH_HCR_EN;
@@ -318,7 +314,6 @@ int __init gic_init(void)
     gic_hyp_init();
 
     gic.lr_mask = 0ULL;
-    gic.event_mask = 0ULL;
 
     spin_unlock(&gic.lock);
 
@@ -421,9 +416,6 @@ static inline void gic_set_lr(int lr, unsigned int virtual_irq,
 
     BUG_ON(lr > nr_lrs);
 
-    if (virtual_irq == VGIC_IRQ_EVTCHN_CALLBACK && nr_lrs > 1)
-        maintenance_int = 0;
-
     GICH[GICH_LR + lr] = state |
         maintenance_int |
         ((priority >> 3) << GICH_LR_PRIORITY_SHIFT) |
@@ -436,11 +428,6 @@ void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
     int i;
     struct pending_irq *iter, *n;
 
-    if ( v->is_running )
-    {
-        events_maintenance(v);
-    }
-
     spin_lock_irq(&gic.lock);
 
     if ( v->is_running && list_empty(&v->arch.vgic.lr_pending) )
@@ -448,8 +435,6 @@ void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
         i = find_first_zero_bit(&gic.lr_mask, nr_lrs);
         if (i < nr_lrs) {
             set_bit(i, &gic.lr_mask);
-            if ( virtual_irq == VGIC_IRQ_EVTCHN_CALLBACK )
-                set_bit(i, &gic.event_mask);
             gic_set_lr(i, virtual_irq, state, priority);
             goto out;
         }
@@ -487,8 +472,6 @@ static void gic_restore_pending_irqs(struct vcpu *v)
         gic_set_lr(i, p->irq, GICH_LR_PENDING, p->priority);
         list_del_init(&p->lr_queue);
         set_bit(i, &gic.lr_mask);
-        if ( p->irq == VGIC_IRQ_EVTCHN_CALLBACK )
-            set_bit(i, &gic.event_mask);
     }
 
 }
@@ -574,35 +557,12 @@ int gicv_setup(struct domain *d)
                         GIC_BASE_ADDRESS + GIC_VR_OFFSET);
 }
 
-static void events_maintenance(struct vcpu *v)
-{
-    int i = 0;
-    int already_pending = test_bit(0,
-            (unsigned long *)&vcpu_info(v, evtchn_upcall_pending));
-
-    if (!already_pending && gic.event_mask != 0) {
-        spin_lock_irq(&gic.lock);
-        while ((i = find_next_bit((const long unsigned int *) &gic.event_mask,
-                        64, i)) < 64) {
-
-            GICH[GICH_LR + i] = 0;
-            clear_bit(i, &gic.lr_mask);
-            clear_bit(i, &gic.event_mask);
-
-            i++;
-        }
-        spin_unlock_irq(&gic.lock);
-    }
-}
-
 static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
     int i = 0, virq;
     uint32_t lr;
     struct vcpu *v = current;
     uint64_t eisr = GICH[GICH_EISR0] | (((uint64_t) GICH[GICH_EISR1]) << 32);
-
-    events_maintenance(v);
 
     while ((i = find_next_bit((const long unsigned int *) &eisr,
                               64, i)) < 64) {
@@ -619,8 +579,6 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
             gic_set_lr(i, p->irq, GICH_LR_PENDING, p->priority);
             list_del_init(&p->lr_queue);
             set_bit(i, &gic.lr_mask);
-            if ( p->irq == VGIC_IRQ_EVTCHN_CALLBACK )
-                set_bit(i, &gic.event_mask);
         } else {
             gic_inject_irq_stop();
         }
