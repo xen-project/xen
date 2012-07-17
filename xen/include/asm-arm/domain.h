@@ -5,6 +5,7 @@
 #include <xen/cache.h>
 #include <asm/page.h>
 #include <asm/p2m.h>
+#include <public/hvm/params.h>
 
 /* Represents state corresponding to a block of 32 interrupts */
 struct vgic_irq_rank {
@@ -28,9 +29,15 @@ struct pending_irq
     struct list_head lr_queue;
 };
 
+struct hvm_domain
+{
+    uint64_t              params[HVM_NR_PARAMS];
+}  __cacheline_aligned;
+
 struct arch_domain
 {
     struct p2m_domain p2m;
+    struct hvm_domain hvm_domain;
 
     struct {
         /*

@@ -430,6 +430,7 @@ static arm_hypercall_t *arm_hypercall_table[] = {
     HYPERCALL(memory_op),
     HYPERCALL(physdev_op),
     HYPERCALL(sysctl),
+    HYPERCALL(hvm_op),
 };
 
 static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)

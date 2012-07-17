@@ -26,6 +26,7 @@ obj-y += traps.o
 obj-y += vgic.o
 obj-y += vtimer.o
 obj-y += vpl011.o
+obj-y += hvm.o
 
 #obj-bin-y += ....o
 
