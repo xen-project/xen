@@ -160,8 +160,8 @@ void __cpuinit init_timer_interrupt(void)
     WRITE_CP64(0, CNTVOFF);     /* No VM-specific offset */
     WRITE_CP32(0, CNTKCTL);     /* No user-mode access */
 #if USE_HYP_TIMER
-    /* Let the VMs read the physical counter and timer so they can tell time */
-    WRITE_CP32(CNTHCTL_PA|CNTHCTL_TA, CNTHCTL);
+    /* Do not let the VMs program the physical timer, only read the physical counter */
+    WRITE_CP32(CNTHCTL_PA, CNTHCTL);
 #else
     /* Cannot let VMs access physical counter if we are using it */
     WRITE_CP32(0, CNTHCTL);
