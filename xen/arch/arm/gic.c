@@ -456,6 +456,9 @@ void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
     }
 
     n = irq_to_pending(v, virtual_irq);
+    if ( !list_empty(&n->lr_queue) )
+        goto out;
+
     list_for_each_entry ( iter, &v->arch.vgic.lr_pending, lr_queue )
     {
         if ( iter->priority > priority )

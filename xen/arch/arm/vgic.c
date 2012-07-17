@@ -84,7 +84,10 @@ int domain_vgic_init(struct domain *d)
     d->arch.vgic.pending_irqs =
         xzalloc_array(struct pending_irq, d->arch.vgic.nr_lines);
     for (i=0; i<d->arch.vgic.nr_lines; i++)
+    {
         INIT_LIST_HEAD(&d->arch.vgic.pending_irqs[i].inflight);
+        INIT_LIST_HEAD(&d->arch.vgic.pending_irqs[i].lr_queue);
+    }
     for (i=0; i<DOMAIN_NR_RANKS(d); i++)
         spin_lock_init(&d->arch.vgic.shared_irqs[i].lock);
     return 0;
