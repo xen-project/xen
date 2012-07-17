@@ -346,6 +346,22 @@ read_as_zero:
     return 1;
 }
 
+static void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
+{
+    struct pending_irq *p;
+    unsigned int irq;
+    int i = 0;
+
+    while ( (i = find_next_bit((const long unsigned int *) &r,
+                        sizeof(uint32_t), i)) < sizeof(uint32_t) ) {
+        irq = i + (32 * n);
+        p = irq_to_pending(v, irq);
+        if ( !list_empty(&p->inflight) )
+            gic_set_guest_irq(v, irq, GICH_LR_PENDING, p->priority);
+        i++;
+    }
+}
+
 static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
 {
     struct hsr_dabt dabt = info->dabt;
@@ -354,6 +370,7 @@ static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
     struct vgic_irq_rank *rank;
     int offset = (int)(info->gpa - VGIC_DISTR_BASE_ADDRESS);
     int gicd_reg = REG(offset);
+    uint32_t tr;
 
     switch ( gicd_reg )
     {
@@ -381,8 +398,10 @@ static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         rank = vgic_irq_rank(v, 8, gicd_reg - GICD_ISENABLER);
         if ( rank == NULL) goto write_ignore;
         vgic_lock_rank(v, rank);
+        tr = rank->ienable;
         rank->ienable |= *r;
         vgic_unlock_rank(v, rank);
+        vgic_enable_irqs(v, (*r) & (~tr), gicd_reg - GICD_ISENABLER);
         return 1;
 
     case GICD_ICENABLER ... GICD_ICENABLERN:
@@ -572,7 +591,9 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
     else
         n->desc = NULL;
 
-    gic_set_guest_irq(v, irq, GICH_LR_PENDING, priority);
+    /* the irq is enabled */
+    if ( rank->ienable & (1 << (irq % 32)) )
+        gic_set_guest_irq(v, irq, GICH_LR_PENDING, priority);
 
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
     list_for_each_entry ( iter, &v->arch.vgic.inflight_irqs, inflight )
