@@ -140,7 +140,7 @@ static int gen_iotlb_inv_dsc(struct iommu *iommu, int index,
     qinval_entry->q.iotlb_inv_dsc.hi.am = am;
     qinval_entry->q.iotlb_inv_dsc.hi.ih = ih;
     qinval_entry->q.iotlb_inv_dsc.hi.res_1 = 0;
-    qinval_entry->q.iotlb_inv_dsc.hi.addr = addr;
+    qinval_entry->q.iotlb_inv_dsc.hi.addr = addr >> PAGE_SHIFT_4K;
 
     unmap_vtd_domain_page(qinval_entries);
     spin_unlock_irqrestore(&qi_ctrl->qinval_lock, flags);
