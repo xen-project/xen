@@ -195,8 +195,10 @@ void __devinit srat_detect_node(int cpu)
     u32 apicid = x86_cpu_to_apicid[cpu];
 
     node = apicid_to_node[apicid];
-    if ( node == NUMA_NO_NODE || !node_online(node) )
+    if ( node == NUMA_NO_NODE )
         node = 0;
+
+    node_set_online(node);
     numa_set_node(cpu, node);
 
     if ( opt_cpu_info && acpi_numa > 0 )

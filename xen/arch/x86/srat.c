@@ -23,7 +23,8 @@
 
 static struct acpi_table_slit *__read_mostly acpi_slit;
 
-static nodemask_t nodes_parsed __initdata;
+static nodemask_t memory_nodes_parsed __initdata;
+static nodemask_t processor_nodes_parsed __initdata;
 static nodemask_t nodes_found __initdata;
 static struct node nodes[MAX_NUMNODES] __initdata;
 static u8 __read_mostly pxm2node[256] = { [0 ... 255] = NUMA_NO_NODE };
@@ -221,6 +222,7 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
 		return;
 	}
 	apicid_to_node[pa->apic_id] = node;
+	node_set(node, processor_nodes_parsed);
 	acpi_numa = 1;
 	printk(KERN_INFO "SRAT: PXM %u -> APIC %u -> Node %u\n",
 	       pxm, pa->apic_id, node);
@@ -287,7 +289,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 		return;
 	}
 	nd = &nodes[node];
-	if (!node_test_and_set(node, nodes_parsed)) {
+	if (!node_test_and_set(node, memory_nodes_parsed)) {
 		nd->start = start;
 		nd->end = end;
 	} else {
@@ -324,7 +326,7 @@ static int nodes_cover_memory(void)
 
 		do {
 			found = 0;
-			for_each_node_mask(j, nodes_parsed)
+			for_each_node_mask(j, memory_nodes_parsed)
 				if (start < nodes[j].end
 				    && end > nodes[j].start) {
 					if (start >= nodes[j].start) {
@@ -418,6 +420,7 @@ void __init srat_parse_regions(u64 addr)
 int __init acpi_scan_nodes(u64 start, u64 end)
 {
 	int i;
+	nodemask_t all_nodes_parsed;
 
 	/* First clean up the node list */
 	for (i = 0; i < MAX_NUMNODES; i++)
@@ -441,17 +444,26 @@ int __init acpi_scan_nodes(u64 start, u64 end)
 		return -1;
 	}
 
+	nodes_or(all_nodes_parsed, memory_nodes_parsed, processor_nodes_parsed);
+
 	/* Finally register nodes */
-	for_each_node_mask(i, nodes_parsed)
+	for_each_node_mask(i, all_nodes_parsed)
 	{
-		if ((nodes[i].end - nodes[i].start) < NODE_MIN_SIZE)
-			continue;
+		u64 size = nodes[i].end - nodes[i].start;
+		if ( size == 0 )
+			printk(KERN_WARNING "SRAT: Node %u has no memory. "
+			       "BIOS Bug or mis-configured hardware?\n", i);
+
+		else if (size < NODE_MIN_SIZE)
+			printk(KERN_WARNING "SRAT: Node %u has only %"PRIu64
+			       " bytes of memory. BIOS Bug?\n", i, size);
+
 		setup_node_bootmem(i, nodes[i].start, nodes[i].end);
 	}
 	for (i = 0; i < nr_cpu_ids; i++) {
 		if (cpu_to_node[i] == NUMA_NO_NODE)
 			continue;
-		if (!node_isset(cpu_to_node[i], nodes_parsed))
+		if (!node_isset(cpu_to_node[i], processor_nodes_parsed))
 			numa_set_node(i, NUMA_NO_NODE);
 	}
 	numa_init_array();
