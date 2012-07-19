@@ -18,7 +18,6 @@ struct domain_mca_msrs
     /* Guest should not change below values after DOM boot up */
     uint64_t mcg_ctl;
     uint64_t mcg_status;
-    uint64_t *mci_ctl;
     uint16_t nr_injection;
     struct list_head impact_header;
     spinlock_t lock;

@@ -25,22 +25,12 @@ static uint64_t __read_mostly g_mcg_cap;
 
 /* Real value in physical CTL MSR */
 static uint64_t __read_mostly h_mcg_ctl;
-static uint64_t *__read_mostly h_mci_ctrl;
 
 int vmce_init_msr(struct domain *d)
 {
     dom_vmce(d) = xmalloc(struct domain_mca_msrs);
     if ( !dom_vmce(d) )
         return -ENOMEM;
-
-    dom_vmce(d)->mci_ctl = xmalloc_array(uint64_t, nr_mce_banks);
-    if ( !dom_vmce(d)->mci_ctl )
-    {
-        xfree(dom_vmce(d));
-        return -ENOMEM;
-    }
-    memset(dom_vmce(d)->mci_ctl, ~0,
-           nr_mce_banks * sizeof(*dom_vmce(d)->mci_ctl));
 
     dom_vmce(d)->mcg_status = 0x0;
     dom_vmce(d)->mcg_ctl = ~(uint64_t)0x0;
@@ -56,7 +46,6 @@ void vmce_destroy_msr(struct domain *d)
 {
     if ( !dom_vmce(d) )
         return;
-    xfree(dom_vmce(d)->mci_ctl);
     xfree(dom_vmce(d));
     dom_vmce(d) = NULL;
 }
@@ -93,9 +82,8 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
     switch ( msr & (MSR_IA32_MC0_CTL | 3) )
     {
     case MSR_IA32_MC0_CTL:
-        if ( bank < nr_mce_banks )
-            *val = vmce->mci_ctl[bank] &
-                   (h_mci_ctrl ? h_mci_ctrl[bank] : ~0UL);
+        /* stick all 1's to MCi_CTL */
+        *val = ~0UL;
         mce_printk(MCE_VERBOSE, "MCE: rdmsr MC%u_CTL 0x%"PRIx64"\n",
                    bank, *val);
         break;
@@ -220,8 +208,10 @@ static int bank_mce_wrmsr(struct vcpu *v, u32 msr, u64 val)
     switch ( msr & (MSR_IA32_MC0_CTL | 3) )
     {
     case MSR_IA32_MC0_CTL:
-        if ( bank < nr_mce_banks )
-            vmce->mci_ctl[bank] = val;
+        /*
+         * if guest crazy clear any bit of MCi_CTL,
+         * treat it as not implement and ignore write change it.
+         */
         break;
     case MSR_IA32_MC0_STATUS:
         if ( entry && (entry->bank == bank) )
@@ -523,22 +513,6 @@ int vmce_domain_inject(
 int vmce_init(struct cpuinfo_x86 *c)
 {
     u64 value;
-    unsigned int i;
-
-    if ( !h_mci_ctrl )
-    {
-        h_mci_ctrl = xmalloc_array(uint64_t, nr_mce_banks);
-        if (!h_mci_ctrl)
-        {
-            dprintk(XENLOG_INFO, "Failed to alloc h_mci_ctrl\n");
-            return -ENOMEM;
-        }
-        /* Don't care banks before firstbank */
-        memset(h_mci_ctrl, ~0,
-               min(firstbank, nr_mce_banks) * sizeof(*h_mci_ctrl));
-        for (i = firstbank; i < nr_mce_banks; i++)
-            rdmsrl(MSR_IA32_MCx_CTL(i), h_mci_ctrl[i]);
-    }
 
     rdmsrl(MSR_IA32_MCG_CAP, value);
     /* For Guest vMCE usage */
@@ -551,18 +525,13 @@ int vmce_init(struct cpuinfo_x86 *c)
 
 static int mca_ctl_conflict(struct mcinfo_bank *bank, struct domain *d)
 {
-    int bank_nr;
-
-    if ( !bank || !d || !h_mci_ctrl )
+    if ( !bank || !d )
         return 1;
 
     /* Will MCE happen in host if If host mcg_ctl is 0? */
     if ( ~d->arch.vmca_msrs->mcg_ctl & h_mcg_ctl )
         return 1;
 
-    bank_nr = bank->mc_bank;
-    if (~d->arch.vmca_msrs->mci_ctl[bank_nr] & h_mci_ctrl[bank_nr] )
-        return 1;
     return 0;
 }
 
