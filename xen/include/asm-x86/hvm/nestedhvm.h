@@ -51,7 +51,8 @@ bool_t nestedhvm_vcpu_in_guestmode(struct vcpu *v);
 #define NESTEDHVM_PAGEFAULT_INJECT 1
 #define NESTEDHVM_PAGEFAULT_ERROR  2
 #define NESTEDHVM_PAGEFAULT_MMIO   3
-int nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t L2_gpa);
+int nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t L2_gpa,
+    bool_t access_r, bool_t access_w, bool_t access_x);
 
 /* IO permission map */
 unsigned long *nestedhvm_vcpu_iomap_get(bool_t ioport_80, bool_t ioport_ed);

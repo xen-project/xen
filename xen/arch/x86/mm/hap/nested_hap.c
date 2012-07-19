@@ -177,12 +177,19 @@ out:
  */
 static int
 nestedhap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
-                      unsigned int *page_order)
+                      unsigned int *page_order,
+                      bool_t access_r, bool_t access_w, bool_t access_x)
 {
     uint32_t pfec;
     unsigned long nested_cr3, gfn;
     
     nested_cr3 = nhvm_vcpu_hostcr3(v);
+
+    pfec = PFEC_user_mode | PFEC_page_present;
+    if (access_w)
+        pfec |= PFEC_write_access;
+    if (access_x)
+        pfec |= PFEC_insn_fetch;
 
     /* Walk the guest-supplied NPT table, just as if it were a pagetable */
     gfn = paging_ga_to_gfn_cr3(v, nested_cr3, L2_gpa, &pfec, page_order);
@@ -200,7 +207,8 @@ nestedhap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
  * Returns:
  */
 int
-nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t L2_gpa)
+nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t L2_gpa,
+    bool_t access_r, bool_t access_w, bool_t access_x)
 {
     int rv;
     paddr_t L1_gpa, L0_gpa;
@@ -212,7 +220,8 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t L2_gpa)
     nested_p2m = p2m_get_nestedp2m(v, nhvm_vcpu_hostcr3(v));
 
     /* walk the L1 P2M table */
-    rv = nestedhap_walk_L1_p2m(v, L2_gpa, &L1_gpa, &page_order_21);
+    rv = nestedhap_walk_L1_p2m(v, L2_gpa, &L1_gpa, &page_order_21,
+        access_r, access_w, access_x);
 
     /* let caller to handle these two cases */
     switch (rv) {
