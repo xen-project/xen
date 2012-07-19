@@ -34,9 +34,6 @@ static int num_node_memblks;
 static struct node node_memblk_range[NR_NODE_MEMBLKS];
 static int memblk_nodeid[NR_NODE_MEMBLKS];
 
-/* Too small nodes confuse the VM badly. Usually they result
-   from BIOS bugs. */
-#define NODE_MIN_SIZE (4*1024*1024)
 
 static int node_to_pxm(int n);
 
@@ -453,10 +450,6 @@ int __init acpi_scan_nodes(u64 start, u64 end)
 		if ( size == 0 )
 			printk(KERN_WARNING "SRAT: Node %u has no memory. "
 			       "BIOS Bug or mis-configured hardware?\n", i);
-
-		else if (size < NODE_MIN_SIZE)
-			printk(KERN_WARNING "SRAT: Node %u has only %"PRIu64
-			       " bytes of memory. BIOS Bug?\n", i, size);
 
 		setup_node_bootmem(i, nodes[i].start, nodes[i].end);
 	}
