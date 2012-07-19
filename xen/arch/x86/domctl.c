@@ -873,7 +873,7 @@ long arch_do_domctl(
             break;
         }
 
-        ret = xsm_assign_device(d, domctl->u.assign_device.machine_bdf);
+        ret = xsm_deassign_device(d, domctl->u.assign_device.machine_bdf);
         if ( ret )
             goto deassign_device_out;
 
