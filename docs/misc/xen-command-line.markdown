@@ -75,7 +75,7 @@ of Boolean and String.  These are noted in the relevant sections.
 
 **String**, or **Boolean** to disable.
 
-The `acpi` option is used to control a set of four related boolean
+The **acpi** option is used to control a set of four related boolean
 flags; `acpi_force`, `acpi_ht`, `acpi_noirq` and `acpi_disabled`.
 
 By default, Xen will scan the DMI data and blacklist certain systems
@@ -399,13 +399,13 @@ should be rate limited.
 ### low\_crashinfo
 > `= none | min | all`
 
-> Default: `none` if not specified at all, or to `min` if `low\_crashinfo` is present without qualification.
+> Default: `none` if not specified at all, or to `min` if **low_crashinfo** is present without qualification.
 
 This option is only useful for hosts with a 32bit dom0 kernel, wishing
 to use kexec functionality in the case of a crash.  It represents
 which data structures should be deliberately allocated in low memory,
 so the crash kernel may find find them.  Should be used in combination
-with `crashinfo_maxaddr`.
+with **crashinfo_maxaddr**.
 
 ### max\_cstate
 ### max\_gsi\_irqs
@@ -457,7 +457,7 @@ BIOS.  This option will accept value.
 
 Do not execute real-mode bootstrap code when booting Xen. This option
 should not be used except for debugging. It will effectively disable
-the vga option, which relies on real mode to set the video mode.
+the **vga** option, which relies on real mode to set the video mode.
 
 ### noreboot
 > `= <boolean>`
@@ -566,7 +566,7 @@ If the current cpu isn't supported a message like
 is printed on the hypervisor serial log.
 
 For some Intel Nehalem processors a quirk handling exist for an unknown
-wrong behaviour (see handle_pmc_quirk()).
+wrong behaviour (see handle\_pmc\_quirk()).
 
 If 'vpmu=bts' is specified the virtualisation of the Branch Trace Store (BTS)
 feature is switched on on Intel processors supporting this feature.
@@ -583,7 +583,7 @@ don't use the vpmu flag on production systems with Intel cpus!
 > Default: `false`
 
 Run an NMI watchdog on each processor.  If a processor is stuck for
-longer than the watchdog\_timeout, a panic occurs.
+longer than the **watchdog\_timeout**, a panic occurs.
 
 ### watchdog\_timeout
 > `= <integer>`
