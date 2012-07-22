@@ -118,6 +118,12 @@ domain 0 command line
 
 ### acpi\_sleep
 ### allowsuperpage
+> `= <boolean>`
+
+> Default: `true`
+
+Permit Xen to use superpages when performing memory management.
+
 ### apic
 > `= summit | bigsmp | default`
 
@@ -127,6 +133,8 @@ there are more than 8 CPUs, Xen will switch to `bigsmp` over
 
 ### allow\_unsafe
 > `= <boolean>`
+
+> Default: `false`
 
 Force boot on potentially unsafe systems. By default Xen will refuse to boot on
 systems with the following errata:
@@ -141,7 +149,20 @@ systems with the following errata:
 Increase the verbosity of the APIC code from the default value.
 
 ### ats
+> `= <boolean>`
+
+> Default: `true`
+
+Permits Xen to set up and use PCI Address Translation Services, which is required
+for PCI Passthrough.
+
 ### availmem
+> `= <size>`
+
+> Default: `0` (no limit)
+
+Specify a maximum amount of available memory, to which Xen will clamp the e820 table.
+
 ### badpage
 > `= List of [ <integer> | <integer>-<integer> ]`
 
@@ -151,8 +172,23 @@ that byte `0x12345678` is bad, you would place `badpage=0x12345` on
 Xen's command line.
 
 ### bootscrub
+> `= <boolean>`
+
+> Default: `true`
+
+Scrub free RAM during boot.  This is a safety feature to prevent accidentally leaking
+sensitive VM data into other VMs if Xen crashes and reboots.
+
 ### cachesize
+> `= <size>`
+
+If set, override Xen's calculation of the level 2 cache line size.
+
 ### clocksource
+> `= pit | hpet | cyclone | acpi`
+
+If set, override Xen's default choice for the platform timer.
+
 ### com1,com2
 > `= <baud>[/<clock_hz>][,DPS[,<io-base>[,<irq>[,<port-bdf>[,<bridge-bdf>]]]] | pci | amt ] `
 
@@ -249,13 +285,38 @@ including omission, causes Xen to automatically switch to the dom0
 console during dom0 boot.
 
 ### cpu\_type
+> `= arch_perfmon`
+
+If set, force use of the performance counters for oprofile, rather than detecting
+available support.
+
 ### cpufreq
-### cpuid\_mask\_cpu
-### cpuid\_mask\_ecx
-### cpuid\_mask\_edx
-### cpuid\_mask\_ext\_ecx
-### cpuid\_mask\_ext\_edx
-### cpuid\_mask\_xsave\_eax
+> `= dom0-kernel | none | xen`
+
+> Default: `xen`
+
+Indicate where the responsibility for driving power states lies.
+
+### cpuid\_mask\_cpu (AMD only)
+> `= fam_0f_rev_c | fam_0f_rev_d | fam_0f_rev_e | fam_0f_rev_f | fam_0f_rev_g | fam_10_rev_b | fam_10_rev_c | fam_11_rev_b`
+
+If the other **cpuid\_mask\_{,ext\_}e{c,d}x** options are fully set (unspecified
+on the command line), specify a pre-canned cpuid mask to mask the current
+processor down to appear as the specified processor.  It is important to ensure
+that all hosts in a pool appear the same to guests to allow successful live
+migration.
+
+### cpuid\_mask\_ ecx,edx,ext\_ecx,ext\_edx,xsave_eax
+> `= <integer>`
+
+> Default: `~0` (all bits set)
+
+These five command line parameters are used to specify cpuid masks to help with
+cpuid levelling across a pool of hosts.  Setting a bit in the mask indicates that
+the feature should be enabled, while clearing a bit in the mask indicates that
+the feature should be disabled.  It is important to ensure that all hosts in a
+pool appear the same to guests to allow successful live migration.
+
 ### cpuidle
 ### cpuinfo
 ### crashinfo_maxaddr
@@ -485,7 +546,9 @@ Choose the default scheduler.
 ### serial\_tx\_buffer
 > `= <size>`
 
-Set the serial transmit buffer size.  Defaults to 16kB.
+> Default: `16kB`
+
+Set the serial transmit buffer size.
 
 ### smep
 ### snb\_igd\_quirk
@@ -543,7 +606,13 @@ The optional `keep` parameter causes Xen to continue using the vga
 console even after dom0 has been started.  The default behaviour is to
 relinquish control to dom0.
 
-### vpid
+### vpid (Intel)
+> `= <boolean>`
+
+> Default: `true`
+
+Use Virtual Processor ID support if available.  This prevents the need for TLB
+flushes on VM entry and exit, increasing performance.
 
 ### vpmu
 > `= ( bts )`
@@ -583,5 +652,22 @@ Set the NMI watchdog timeout in seconds.  Specifying `0` will turn off
 the watchdog.
 
 ### x2apic
+> `= <boolean>`
+
+> Default: `true`
+
+Permit use of x2apic setup for SMP environments.
+
 ### x2apic\_phys
+> `= <boolean>`
+
+> Default: `true`
+
+Use the x2apic physical apic driver.  The alternative is the x2apic cluster driver.
+
 ### xsave
+> `= <boolean>`
+
+> Default: `true`
+
+Permit use of the `xsave/xrstor` instructions.
