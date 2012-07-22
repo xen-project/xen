@@ -178,7 +178,7 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.0.4-rc2
+QEMU_TAG := xen-4.0.4-rc3
 # Thu Feb 2 13:47:06 2012 +0000
 # e1000: bounds packet size against buffer size
 
