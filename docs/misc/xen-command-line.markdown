@@ -117,7 +117,6 @@ the domain 0 kernel this option is automatically propagated to the
 domain 0 command line
 
 ### acpi\_sleep
-### additional\_cpus
 ### allowsuperpage
 ### apic
 > `= summit | bigsmp | default`
@@ -249,7 +248,6 @@ switch the console input to dom0 during boot.  Any other value,
 including omission, causes Xen to automatically switch to the dom0
 console during dom0 boot.
 
-### contig\_mem
 ### cpu\_type
 ### cpufreq
 ### cpuid\_mask\_cpu
@@ -273,7 +271,6 @@ combination with the `low_crashinfo` command line option.
 ### credit2\_balance\_under
 ### credit2\_load\_window\_shift
 ### debug\_stack\_lines
-### debug\_stack\_lines
 ### debugtrace
 ### dma\_bits
 > `= <integer>`
@@ -287,12 +284,7 @@ Specify the bit width of the DMA heap.
 Specify the maximum number of vcpus to give to dom0.  This defaults
 to the number of pcpus on the host.
 
-### dom0\_mem (ia64)
-> `= <size>`
-
-Specify the total size for dom0.
-
-### dom0\_mem (x86)
+### dom0\_mem
 > `= List of ( min:<size> | max:<size> | <size> )`
 
 Set the amount of memory for the initial domain (dom0). If a size is
@@ -409,7 +401,6 @@ with **crashinfo_maxaddr**.
 
 ### max\_cstate
 ### max\_gsi\_irqs
-### maxcpus
 ### maxcpus
 ### mce
 ### mce\_fb
@@ -575,8 +566,6 @@ feature is switched on on Intel processors supporting this feature.
 As the BTS virtualisation is not 100% safe and because of the nehalem quirk
 don't use the vpmu flag on production systems with Intel cpus!
 
-### vti\_vhpt\_size
-### vti\_vtlb\_size
 ### watchdog
 > `= <boolean>`
 
@@ -595,6 +584,4 @@ the watchdog.
 
 ### x2apic
 ### x2apic\_phys
-### xencons
-### xencons\_poll
 ### xsave
