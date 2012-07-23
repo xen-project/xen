@@ -361,11 +361,16 @@ int libxl__device_disk_dev_number(const char *virtpath, int *pdisk,
     return -1;
 }
 
+/* Device AO operations */
 
-typedef struct {
-    libxl__ao *ao;
-    libxl__ev_devstate ds;
-} libxl__ao_device_remove;
+void libxl__prepare_ao_device(libxl__ao *ao, libxl__ao_device *aodev)
+{
+    aodev->ao = ao;
+    aodev->rc = 0;
+    aodev->dev = NULL;
+    /* Initialize timer for QEMU Bodge */
+    libxl__ev_time_init(&aodev->timeout);
+}
 
 int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
 {
@@ -441,36 +446,81 @@ out:
 
 /* Callbacks for device related operations */
 
-static void device_remove_callback(libxl__egc *egc, libxl__ev_devstate *ds,
+/*
+ * device_backend_callback is the main callback entry point, for both device
+ * addition and removal. It gets called if we reach the desired state
+ * (XenbusStateClosed or XenbusStateInitWait). After that, all this
+ * functions get called in the order displayed below.
+ *
+ * If new device types are added, they should only need to modify the
+ * specific hotplug scripts call, which can be found in each OS specific
+ * file. If this new devices don't need a hotplug script, no modification
+ * should be needed.
+ */
+
+/* This callback is part of the Qemu devices Badge */
+static void device_qemu_timeout(libxl__egc *egc, libxl__ev_time *ev,
+                                const struct timeval *requested_abs);
+
+static void device_backend_callback(libxl__egc *egc, libxl__ev_devstate *ds,
                                    int rc);
 
-static void device_remove_cleanup(libxl__gc *gc,
-                                  libxl__ao_device_remove *aorm);
+static void device_backend_cleanup(libxl__gc *gc,
+                                   libxl__ao_device *aodev);
 
-int libxl__initiate_device_remove(libxl__egc *egc, libxl__ao *ao,
-                                  libxl__device *dev)
+static void device_hotplug_done(libxl__egc *egc, libxl__ao_device *aodev);
+
+void libxl__initiate_device_remove(libxl__egc *egc,
+                                   libxl__ao_device *aodev)
 {
-    AO_GC;
+    STATE_AO_GC(aodev->ao);
     xs_transaction_t t = 0;
-    char *be_path = libxl__device_backend_path(gc, dev);
+    char *be_path = libxl__device_backend_path(gc, aodev->dev);
     char *state_path = libxl__sprintf(gc, "%s/state", be_path);
     char *online_path = GCSPRINTF("%s/online", be_path);
     const char *state;
-
+    libxl_dominfo info;
+    uint32_t domid = aodev->dev->domid;
     int rc = 0;
-    libxl__ao_device_remove *aorm = 0;
+
+    libxl_dominfo_init(&info);
+    rc = libxl_domain_info(CTX, &info, domid);
+    if (rc) {
+        LOG(ERROR, "unable to get info for domain %d", domid);
+        goto out;
+    }
+    if (QEMU_BACKEND(aodev->dev) &&
+        (info.paused || info.dying || info.shutdown)) {
+        /*
+         * TODO: 4.2 Bodge due to QEMU, see comment on top of
+         * libxl__initiate_device_remove in libxl_internal.h
+         */
+        rc = libxl__ev_time_register_rel(gc, &aodev->timeout,
+                                         device_qemu_timeout,
+                                         LIBXL_QEMU_BODGE_TIMEOUT * 1000);
+        if (rc) {
+            LOG(ERROR, "unable to register timeout for Qemu device %s",
+                       be_path);
+            goto out;
+        }
+        return;
+    }
 
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
         if (rc) {
             LOG(ERROR, "unable to start transaction");
-            goto out_fail;
+            goto out;
         }
+
+        if (aodev->force)
+            libxl__xs_path_cleanup(gc, t,
+                                   libxl__device_frontend_path(gc, aodev->dev));
 
         rc = libxl__xs_read_checked(gc, t, state_path, &state);
         if (rc) {
             LOG(ERROR, "unable to read device state from path %s", state_path);
-            goto out_fail;
+            goto out;
         }
 
         /*
@@ -481,53 +531,118 @@ int libxl__initiate_device_remove(libxl__egc *egc, libxl__ao *ao,
             rc = libxl__xs_write_checked(gc, t, online_path, "0");
             if (rc) {
                 LOG(ERROR, "unable to write to xenstore path %s", online_path);
-                goto out_fail;
+                goto out;
             }
             rc = libxl__xs_write_checked(gc, t, state_path, "5");
             if (rc) {
                 LOG(ERROR, "unable to write to xenstore path %s", state_path);
-                goto out_fail;
+                goto out;
             }
         }
 
         rc = libxl__xs_transaction_commit(gc, &t);
         if (!rc) break;
-        if (rc < 0) goto out_fail;
+        if (rc < 0) goto out;
     }
 
     libxl__device_destroy_tapdisk(gc, be_path);
 
-    aorm = libxl__zalloc(gc, sizeof(*aorm));
-    aorm->ao = ao;
-    libxl__ev_devstate_init(&aorm->ds);
-
-    rc = libxl__ev_devstate_wait(gc, &aorm->ds, device_remove_callback,
+    rc = libxl__ev_devstate_wait(gc, &aodev->backend_ds,
+                                 device_backend_callback,
                                  state_path, XenbusStateClosed,
                                  LIBXL_DESTROY_TIMEOUT * 1000);
-    if (rc) goto out_fail;
+    if (rc) {
+        LOG(ERROR, "unable to remove device %s", be_path);
+        goto out;
+    }
 
-    libxl__ao_complete(egc, ao, 0);
-    return 0;
+    libxl_dominfo_dispose(&info);
+    return;
 
- out_fail:
-    assert(rc);
+out:
+    aodev->rc = rc;
+    libxl_dominfo_dispose(&info);
     libxl__xs_transaction_abort(gc, &t);
-    device_remove_cleanup(gc, aorm);
-    return rc;
+    device_hotplug_done(egc, aodev);
+    return;
 }
 
-static void device_remove_callback(libxl__egc *egc, libxl__ev_devstate *ds,
+static void device_qemu_timeout(libxl__egc *egc, libxl__ev_time *ev,
+                                const struct timeval *requested_abs)
+{
+    libxl__ao_device *aodev = CONTAINER_OF(ev, *aodev, timeout);
+    STATE_AO_GC(aodev->ao);
+    char *be_path = libxl__device_backend_path(gc, aodev->dev);
+    char *state_path = GCSPRINTF("%s/state", be_path);
+    int rc = 0;
+
+    libxl__ev_time_deregister(gc, &aodev->timeout);
+
+    rc = libxl__xs_write_checked(gc, XBT_NULL, state_path, "6");
+    if (rc) goto out;
+
+out:
+    aodev->rc = rc;
+    device_hotplug_done(egc, aodev);
+}
+
+static void device_backend_callback(libxl__egc *egc, libxl__ev_devstate *ds,
                                    int rc) {
-    libxl__ao_device_remove *aorm = CONTAINER_OF(ds, *aorm, ds);
-    libxl__gc *gc = &aorm->ao->gc;
-    libxl__ao_complete(egc, aorm->ao, rc);
-    device_remove_cleanup(gc, aorm);
+    libxl__ao_device *aodev = CONTAINER_OF(ds, *aodev, backend_ds);
+    STATE_AO_GC(aodev->ao);
+
+    device_backend_cleanup(gc, aodev);
+
+    if (rc == ERROR_TIMEDOUT && aodev->action == DEVICE_DISCONNECT &&
+        !aodev->force) {
+        aodev->force = 1;
+        libxl__initiate_device_remove(egc, aodev);
+        return;
+    }
+
+    if (rc) {
+        LOG(ERROR, "unable to disconnect device with path %s",
+                   libxl__device_backend_path(gc, aodev->dev));
+        goto out;
+    }
+
+out:
+    aodev->rc = rc;
+    device_hotplug_done(egc, aodev);
+    return;
 }
 
-static void device_remove_cleanup(libxl__gc *gc,
-                                  libxl__ao_device_remove *aorm) {
-    if (!aorm) return;
-    libxl__ev_devstate_cancel(gc, &aorm->ds);
+static void device_backend_cleanup(libxl__gc *gc, libxl__ao_device *aodev)
+{
+    if (!aodev) return;
+    libxl__ev_devstate_cancel(gc, &aodev->backend_ds);
+}
+
+static void device_hotplug_done(libxl__egc *egc, libxl__ao_device *aodev)
+{
+    STATE_AO_GC(aodev->ao);
+    char *be_path = libxl__device_backend_path(gc, aodev->dev);
+    char *fe_path = libxl__device_frontend_path(gc, aodev->dev);
+    xs_transaction_t t = 0;
+    int rc;
+
+    if (aodev->action == DEVICE_DISCONNECT) {
+        for (;;) {
+            rc = libxl__xs_transaction_start(gc, &t);
+            if (rc) goto out;
+
+            libxl__xs_path_cleanup(gc, t, fe_path);
+            libxl__xs_path_cleanup(gc, t, be_path);
+
+            rc = libxl__xs_transaction_commit(gc, &t);
+            if (!rc) break;
+            if (rc < 0) goto out;
+        }
+    }
+
+out:
+    aodev->callback(egc, aodev);
+    return;
 }
 
 int libxl__wait_for_device_model(libxl__gc *gc,

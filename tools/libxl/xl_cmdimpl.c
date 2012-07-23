@@ -5415,7 +5415,7 @@ int main_blockdetach(int argc, char **argv)
     if (libxl_device_disk_remove(ctx, domid, &disk, 0)) {
         fprintf(stderr, "libxl_device_disk_remove failed.\n");
     } else
-        libxl_device_disk_destroy(ctx, domid, &disk);
+        libxl_device_disk_destroy(ctx, domid, &disk, 0);
     return 0;
 }
 

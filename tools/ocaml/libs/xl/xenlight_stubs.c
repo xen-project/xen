@@ -351,7 +351,7 @@ value stub_xl_device_vkb_destroy(value info, value domid)
 	device_vkb_val(&gc, &lg, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_vkb_destroy(ctx, Int_val(domid), &c_info);
+	ret = libxl_device_vkb_destroy(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
 		failwith_xl("vkb_hard_shutdown", &lg);
 	FREE_CTX();
@@ -405,7 +405,7 @@ value stub_xl_device_vfb_destroy(value info, value domid)
 	device_vfb_val(&gc, &lg, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_vfb_destroy(ctx, Int_val(domid), &c_info);
+	ret = libxl_device_vfb_destroy(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
 		failwith_xl("vfb_hard_shutdown", &lg);
 	FREE_CTX();

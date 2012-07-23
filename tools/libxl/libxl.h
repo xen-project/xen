@@ -679,7 +679,8 @@ int libxl_device_disk_remove(libxl_ctx *ctx, uint32_t domid,
                              libxl_device_disk *disk,
                              const libxl_asyncop_how *ao_how);
 int libxl_device_disk_destroy(libxl_ctx *ctx, uint32_t domid,
-                              libxl_device_disk *disk);
+                              libxl_device_disk *disk,
+                              const libxl_asyncop_how *ao_how);
 
 libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *num);
 int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
@@ -696,7 +697,9 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
 int libxl_device_nic_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_nic *nic,
                             const libxl_asyncop_how *ao_how);
-int libxl_device_nic_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
+int libxl_device_nic_destroy(libxl_ctx *ctx, uint32_t domid,
+                             libxl_device_nic *nic,
+                             const libxl_asyncop_how *ao_how);
 
 libxl_device_nic *libxl_device_nic_list(libxl_ctx *ctx, uint32_t domid, int *num);
 int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
@@ -707,14 +710,18 @@ int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb);
 int libxl_device_vkb_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_vkb *vkb,
                             const libxl_asyncop_how *ao_how);
-int libxl_device_vkb_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb);
+int libxl_device_vkb_destroy(libxl_ctx *ctx, uint32_t domid,
+                             libxl_device_vkb *vkb,
+                             const libxl_asyncop_how *ao_how);
 
 /* Framebuffer */
 int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
 int libxl_device_vfb_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_vfb *vfb,
                             const libxl_asyncop_how *ao_how);
-int libxl_device_vfb_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
+int libxl_device_vfb_destroy(libxl_ctx *ctx, uint32_t domid,
+                             libxl_device_vfb *vfb,
+                             const libxl_asyncop_how *ao_how);
 
 /* PCI Passthrough */
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);

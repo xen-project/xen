@@ -1503,6 +1503,31 @@ int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass)
 
 /******************************************************************************/
 
+/* generic callback for devices that only need to set ao_complete */
+static void device_addrm_aocomplete(libxl__egc *egc, libxl__ao_device *aodev)
+{
+    STATE_AO_GC(aodev->ao);
+
+    if (aodev->rc) {
+        if (aodev->dev) {
+            LOG(ERROR, "unable to %s %s with id %u",
+                        aodev->action == DEVICE_CONNECT ? "add" : "remove",
+                        libxl__device_kind_to_string(aodev->dev->kind),
+                        aodev->dev->devid);
+        } else {
+            LOG(ERROR, "unable to %s device",
+                       aodev->action == DEVICE_CONNECT ? "add" : "remove");
+        }
+        goto out;
+    }
+
+out:
+    libxl__ao_complete(egc, ao, aodev->rc);
+    return;
+}
+
+/******************************************************************************/
+
 int libxl__device_disk_setdefault(libxl__gc *gc, libxl_device_disk *disk)
 {
     int rc;
@@ -1676,42 +1701,6 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
 {
     GC_INIT(ctx);
     int rc = libxl__device_disk_add(gc, domid, XBT_NULL, disk);
-    GC_FREE;
-    return rc;
-}
-
-int libxl_device_disk_remove(libxl_ctx *ctx, uint32_t domid,
-                             libxl_device_disk *disk,
-                             const libxl_asyncop_how *ao_how)
-{
-    AO_CREATE(ctx, domid, ao_how);
-    libxl__device device;
-    int rc;
-
-    rc = libxl__device_from_disk(gc, domid, disk, &device);
-    if (rc != 0) goto out;
-
-    rc = libxl__initiate_device_remove(egc, ao, &device);
-    if (rc) goto out;
-
-    return AO_INPROGRESS;
-
-out:
-    return AO_ABORT(rc);
-}
-
-int libxl_device_disk_destroy(libxl_ctx *ctx, uint32_t domid,
-                              libxl_device_disk *disk)
-{
-    GC_INIT(ctx);
-    libxl__device device;
-    int rc;
-
-    rc = libxl__device_from_disk(gc, domid, disk, &device);
-    if (rc != 0) goto out;
-
-    rc = libxl__device_destroy(gc, &device);
-out:
     GC_FREE;
     return rc;
 }
@@ -2080,8 +2069,9 @@ int libxl__device_disk_local_detach(libxl__gc *gc, libxl_device_disk *disk)
             if (disk->vdev != NULL) {
                 libxl_device_disk_remove(gc->owner, LIBXL_TOOLSTACK_DOMID,
                         disk, 0);
+                /* fixme-ao */
                 rc = libxl_device_disk_destroy(gc->owner,
-                        LIBXL_TOOLSTACK_DOMID, disk);
+                        LIBXL_TOOLSTACK_DOMID, disk, 0);
             }
             break;
         default:
@@ -2244,42 +2234,6 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
 out_free:
     flexarray_free(back);
     flexarray_free(front);
-out:
-    GC_FREE;
-    return rc;
-}
-
-int libxl_device_nic_remove(libxl_ctx *ctx, uint32_t domid,
-                            libxl_device_nic *nic,
-                            const libxl_asyncop_how *ao_how)
-{
-    AO_CREATE(ctx, domid, ao_how);
-    libxl__device device;
-    int rc;
-
-    rc = libxl__device_from_nic(gc, domid, nic, &device);
-    if (rc != 0) goto out;
-
-    rc = libxl__initiate_device_remove(egc, ao, &device);
-    if (rc) goto out;
-
-    return AO_INPROGRESS;
-
-out:
-    return AO_ABORT(rc);
-}
-
-int libxl_device_nic_destroy(libxl_ctx *ctx, uint32_t domid,
-                                  libxl_device_nic *nic)
-{
-    GC_INIT(ctx);
-    libxl__device device;
-    int rc;
-
-    rc = libxl__device_from_nic(gc, domid, nic, &device);
-    if (rc != 0) goto out;
-
-    rc = libxl__device_destroy(gc, &device);
 out:
     GC_FREE;
     return rc;
@@ -2611,42 +2565,6 @@ out:
     return rc;
 }
 
-int libxl_device_vkb_remove(libxl_ctx *ctx, uint32_t domid,
-                            libxl_device_vkb *vkb,
-                            const libxl_asyncop_how *ao_how)
-{
-    AO_CREATE(ctx, domid, ao_how);
-    libxl__device device;
-    int rc;
-
-    rc = libxl__device_from_vkb(gc, domid, vkb, &device);
-    if (rc != 0) goto out;
-
-    rc = libxl__initiate_device_remove(egc, ao, &device);
-    if (rc) goto out;
-
-    return AO_INPROGRESS;
-
-out:
-    return AO_ABORT(rc);
-}
-
-int libxl_device_vkb_destroy(libxl_ctx *ctx, uint32_t domid,
-                                  libxl_device_vkb *vkb)
-{
-    GC_INIT(ctx);
-    libxl__device device;
-    int rc;
-
-    rc = libxl__device_from_vkb(gc, domid, vkb, &device);
-    if (rc != 0) goto out;
-
-    rc = libxl__device_destroy(gc, &device);
-out:
-    GC_FREE;
-    return rc;
-}
-
 /******************************************************************************/
 
 int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb)
@@ -2744,41 +2662,66 @@ out:
     return rc;
 }
 
-int libxl_device_vfb_remove(libxl_ctx *ctx, uint32_t domid,
-                            libxl_device_vfb *vfb,
-                            const libxl_asyncop_how *ao_how)
-{
-    AO_CREATE(ctx, domid, ao_how);
-    libxl__device device;
-    int rc;
+/******************************************************************************/
 
-    rc = libxl__device_from_vfb(gc, domid, vfb, &device);
-    if (rc != 0) goto out;
+/* Macro for defining device remove/destroy functions in a compact way */
+/* The following functions are defined:
+ * libxl_device_disk_remove
+ * libxl_device_disk_destroy
+ * libxl_device_nic_remove
+ * libxl_device_nic_destroy
+ * libxl_device_vkb_remove
+ * libxl_device_vkb_destroy
+ * libxl_device_vfb_remove
+ * libxl_device_vfb_destroy
+ */
+#define DEFINE_DEVICE_REMOVE(type, removedestroy, f)                    \
+    int libxl_device_##type##_##removedestroy(libxl_ctx *ctx,           \
+        uint32_t domid, libxl_device_##type *type,                      \
+        const libxl_asyncop_how *ao_how)                                \
+    {                                                                   \
+        AO_CREATE(ctx, domid, ao_how);                                  \
+        libxl__device *device;                                          \
+        libxl__ao_device *aodev;                                        \
+        int rc;                                                         \
+                                                                        \
+        GCNEW(device);                                                  \
+        rc = libxl__device_from_##type(gc, domid, type, device);        \
+        if (rc != 0) goto out;                                          \
+                                                                        \
+        GCNEW(aodev);                                                   \
+        libxl__prepare_ao_device(ao, aodev);                            \
+        aodev->action = DEVICE_DISCONNECT;                              \
+        aodev->dev = device;                                            \
+        aodev->callback = device_addrm_aocomplete;                      \
+        aodev->force = f;                                               \
+        libxl__initiate_device_remove(egc, aodev);                      \
+                                                                        \
+    out:                                                                \
+        if (rc) return AO_ABORT(rc);                                    \
+        return AO_INPROGRESS;                                           \
+    }
 
-    rc = libxl__initiate_device_remove(egc, ao, &device);
-    if (rc) goto out;
+/* Define all remove/destroy functions and undef the macro */
 
-    return AO_INPROGRESS;
+/* disk */
+DEFINE_DEVICE_REMOVE(disk, remove, 0)
+DEFINE_DEVICE_REMOVE(disk, destroy, 1)
 
-out:
-    return AO_ABORT(rc);
-}
+/* nic */
+DEFINE_DEVICE_REMOVE(nic, remove, 0)
+DEFINE_DEVICE_REMOVE(nic, destroy, 1)
 
-int libxl_device_vfb_destroy(libxl_ctx *ctx, uint32_t domid,
-                                  libxl_device_vfb *vfb)
-{
-    GC_INIT(ctx);
-    libxl__device device;
-    int rc;
+/* vkb */
+DEFINE_DEVICE_REMOVE(vkb, remove, 0)
+DEFINE_DEVICE_REMOVE(vkb, destroy, 1)
 
-    rc = libxl__device_from_vfb(gc, domid, vfb, &device);
-    if (rc != 0) goto out;
+/* vfb */
 
-    rc = libxl__device_destroy(gc, &device);
-out:
-    GC_FREE;
-    return rc;
-}
+DEFINE_DEVICE_REMOVE(vfb, remove, 0)
+DEFINE_DEVICE_REMOVE(vfb, destroy, 1)
+
+#undef DEFINE_DEVICE_REMOVE
 
 /******************************************************************************/
 
