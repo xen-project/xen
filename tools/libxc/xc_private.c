@@ -174,7 +174,7 @@ static struct xc_interface_core *xc_interface_open_common(xentoollog_logger *log
         xch->ops = xch->osdep.init(xch, type);
         if ( xch->ops == NULL )
         {
-            ERROR("OSDEP: interface %d (%s) not supported on this platform",
+            DPRINTF("OSDEP: interface %d (%s) not supported on this platform",
                   type, xc_osdep_type_name(type));
             goto err_put_iface;
         }
