@@ -67,6 +67,7 @@ def get_solaris_slice(file, offset):
     fd = os.open(file, os.O_RDONLY)
     os.lseek(fd, offset + (DK_LABEL_LOC * SECTOR_SIZE), 0)
     buf = os.read(fd, 512)
+    os.close(fd)
     if struct.unpack("<H", buf[508:510])[0] != DKL_MAGIC:
         raise RuntimeError, "Invalid disklabel magic"
 
@@ -93,6 +94,7 @@ def get_fs_offset_gpt(file):
         buf = os.read(fd, partsize)
         offsets.append(struct.unpack("<Q", buf[32:40])[0] * SECTOR_SIZE)
         i -= 1
+    os.close(fd)
     return offsets
 
 FDISK_PART_SOLARIS=0xbf
@@ -116,6 +118,7 @@ def get_partition_offsets(file):
 
     fd = os.open(file, os.O_RDONLY)
     buf = os.read(fd, 512)
+    os.close(fd)
     for poff in (446, 462, 478, 494): # partition offsets
 
         # MBR contains a 16 byte descriptor per partition
