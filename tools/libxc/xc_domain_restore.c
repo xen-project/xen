@@ -1912,9 +1912,21 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
             SET_FIELD(start_info, nr_pages, dinfo->p2m_size);
             SET_FIELD(start_info, shared_info, shared_info_frame<<PAGE_SHIFT);
             SET_FIELD(start_info, flags, 0);
+            if ( GET_FIELD(start_info, store_mfn) > dinfo->p2m_size )
+            {
+                ERROR("Suspend record xenstore frame number is bad");
+                munmap(start_info, PAGE_SIZE);
+                goto out;
+            }
             *store_mfn = ctx->p2m[GET_FIELD(start_info, store_mfn)];
             SET_FIELD(start_info, store_mfn, *store_mfn);
             SET_FIELD(start_info, store_evtchn, store_evtchn);
+            if ( GET_FIELD(start_info, console.domU.mfn) > dinfo->p2m_size )
+            {
+                ERROR("Suspend record console frame number is bad");
+                munmap(start_info, PAGE_SIZE);
+                goto out;
+            }
             *console_mfn = ctx->p2m[GET_FIELD(start_info, console.domU.mfn)];
             SET_FIELD(start_info, console.domU.mfn, *console_mfn);
             SET_FIELD(start_info, console.domU.evtchn, console_evtchn);
