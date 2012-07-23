@@ -2247,6 +2247,8 @@ typedef struct {
 
 _hidden void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state*);
 
+_hidden char *libxl__stub_dm_name(libxl__gc *gc, const char * guest_name);
+
 /*----- Domain creation -----*/
 
 typedef struct libxl__domain_create_state libxl__domain_create_state;

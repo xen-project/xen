@@ -276,6 +276,8 @@ int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
     char *got_old_name;
     unsigned int got_old_len;
     xs_transaction_t our_trans = 0;
+    uint32_t stub_dm_domid;
+    const char *stub_dm_old_name = NULL, *stub_dm_new_name = NULL;
     int rc;
 
     dom_path = libxl__xs_get_dompath(gc, domid);
@@ -283,6 +285,12 @@ int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
 
     name_path= libxl__sprintf(gc, "%s/name", dom_path);
     if (!name_path) goto x_nomem;
+
+    stub_dm_domid = libxl_get_stubdom_id(CTX, domid);
+    if (stub_dm_domid) {
+        stub_dm_old_name = libxl__stub_dm_name(gc, old_name);
+        stub_dm_new_name = libxl__stub_dm_name(gc, new_name);
+    }
 
  retry_transaction:
     if (!trans) {
@@ -339,6 +347,17 @@ int libxl__domain_rename(libxl__gc *gc, uint32_t domid,
                " for domain %"PRIu32" previously named `%s'",
                new_name, domid, old_name);
         goto x_fail;
+    }
+
+    if (stub_dm_domid) {
+        rc = libxl__domain_rename(gc, stub_dm_domid,
+                                  stub_dm_old_name,
+                                  stub_dm_new_name,
+                                  trans);
+        if (rc) {
+            LOGE(ERROR, "unable to rename stub-domain");
+            goto x_rc;
+        }
     }
 
     if (our_trans) {

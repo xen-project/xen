@@ -698,6 +698,11 @@ static void spaw_stubdom_pvqemu_destroy_cb(libxl__egc *egc,
                                            libxl__destroy_domid_state *dis,
                                            int rc);
 
+char *libxl__stub_dm_name(libxl__gc *gc, const char *guest_name)
+{
+    return libxl__sprintf(gc, "%s-dm", guest_name);
+}
+
 void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
 {
     STATE_AO_GC(sdss->dm.spawn.ao);
@@ -727,7 +732,7 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
 
     libxl_domain_create_info_init(&dm_config->c_info);
     dm_config->c_info.type = LIBXL_DOMAIN_TYPE_PV;
-    dm_config->c_info.name = libxl__sprintf(gc, "%s-dm",
+    dm_config->c_info.name = libxl__stub_dm_name(gc,
                                     libxl__domid_to_name(gc, guest_domid));
     dm_config->c_info.ssidref = guest_config->b_info.device_model_ssidref;
 
