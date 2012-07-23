@@ -875,7 +875,6 @@ _hidden char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device);
 _hidden int libxl__parse_backend_path(libxl__gc *gc, const char *path,
                                       libxl__device *dev);
 _hidden int libxl__device_destroy(libxl__gc *gc, libxl__device *dev);
-_hidden int libxl__devices_destroy(libxl__gc *gc, uint32_t domid);
 _hidden int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state);
 
 /*
@@ -1978,6 +1977,7 @@ typedef enum {
 } libxl__device_action;
 
 typedef struct libxl__ao_device libxl__ao_device;
+typedef struct libxl__ao_devices libxl__ao_devices;
 typedef void libxl__device_callback(libxl__egc*, libxl__ao_device*);
 
 /* This functions sets the necessary libxl__ao_device struct values to use
@@ -1996,6 +1996,20 @@ typedef void libxl__device_callback(libxl__egc*, libxl__ao_device*);
  */
 _hidden void libxl__prepare_ao_device(libxl__ao *ao, libxl__ao_device *aodev);
 
+/* Prepare a bunch of devices for addition/removal. Every ao_device in
+ * ao_devices is set to 'active', and the ao_device 'base' field is set to
+ * the one pointed by aodevs.
+ */
+_hidden void libxl__prepare_ao_devices(libxl__ao *ao,
+                                       libxl__ao_devices *aodevs);
+
+/* Generic callback to use when adding/removing several devices, this will
+ * check if the given aodev is the last one, and call the callback in the
+ * parent libxl__ao_devices struct, passing the appropriate error if found.
+ */
+_hidden void libxl__ao_devices_callback(libxl__egc *egc,
+                                        libxl__ao_device *aodev);
+
 struct libxl__ao_device {
     /* filled in by user */
     libxl__ao *ao;
@@ -2004,10 +2018,27 @@ struct libxl__ao_device {
     int force;
     libxl__device_callback *callback;
     /* private for implementation */
+    int active;
     int rc;
     libxl__ev_devstate backend_ds;
     /* Bodge for Qemu devices */
     libxl__ev_time timeout;
+    /* Used internally to have a reference to the upper libxl__ao_devices
+     * struct when present */
+    libxl__ao_devices *aodevs;
+};
+
+/* Helper struct to simply the plug/unplug of multiple devices at the same
+ * time.
+ *
+ * This structure holds several devices, and the callback is only called
+ * when all the devices inside of the array have finished.
+ */
+typedef void libxl__devices_callback(libxl__egc*, libxl__ao_devices*, int rc);
+struct libxl__ao_devices {
+    libxl__ao_device *array;
+    int size;
+    libxl__devices_callback *callback;
 };
 
 /*
@@ -2098,6 +2129,86 @@ struct libxl__ao_device {
 _hidden void libxl__initiate_device_remove(libxl__egc *egc,
                                            libxl__ao_device *aodev);
 
+/*----- Domain destruction -----*/
+
+/* Domain destruction has been split into two functions:
+ *
+ * libxl__domain_destroy is the main destroy function, which detects
+ * stubdoms and calls libxl__destroy_domid on the domain and its
+ * stubdom if present, creating a different libxl__destroy_domid_state
+ * for each one of them.
+ *
+ * libxl__destroy_domid actually destroys the domain, but it
+ * doesn't check for stubdomains, since that would involve
+ * recursion, which we want to avoid.
+ */
+
+typedef struct libxl__domain_destroy_state libxl__domain_destroy_state;
+typedef struct libxl__destroy_domid_state libxl__destroy_domid_state;
+typedef struct libxl__devices_remove_state libxl__devices_remove_state;
+
+typedef void libxl__domain_destroy_cb(libxl__egc *egc,
+                                      libxl__domain_destroy_state *dds,
+                                      int rc);
+
+typedef void libxl__domid_destroy_cb(libxl__egc *egc,
+                                     libxl__destroy_domid_state *dis,
+                                     int rc);
+
+typedef void libxl__devices_remove_callback(libxl__egc *egc,
+                                            libxl__devices_remove_state *drs,
+                                            int rc);
+
+struct libxl__devices_remove_state {
+    /* filled in by user */
+    libxl__ao *ao;
+    uint32_t domid;
+    libxl__devices_remove_callback *callback;
+    int force; /* libxl_device_TYPE_destroy rather than _remove */
+    /* private */
+    libxl__ao_devices aodevs;
+    int num_devices;
+};
+
+struct libxl__destroy_domid_state {
+    /* filled in by user */
+    libxl__ao *ao;
+    uint32_t domid;
+    libxl__domid_destroy_cb *callback;
+    /* private to implementation */
+    libxl__devices_remove_state drs;
+};
+
+struct libxl__domain_destroy_state {
+    /* filled by the user */
+    libxl__ao *ao;
+    uint32_t domid;
+    libxl__domain_destroy_cb *callback;
+    /* Private */
+    int rc;
+    uint32_t stubdomid;
+    libxl__destroy_domid_state stubdom;
+    int stubdom_finished;
+    libxl__destroy_domid_state domain;
+    int domain_finished;
+};
+
+/*
+ * Entry point for domain destruction
+ * This function checks for stubdom presence and then calls
+ * libxl__destroy_domid on the passed domain and its stubdom if found.
+ */
+_hidden void libxl__domain_destroy(libxl__egc *egc,
+                                   libxl__domain_destroy_state *dds);
+
+/* Used to destroy a domain with the passed id (it doesn't check for stubs) */
+_hidden void libxl__destroy_domid(libxl__egc *egc,
+                                  libxl__destroy_domid_state *dis);
+
+/* Entry point for devices destruction */
+_hidden void libxl__devices_destroy(libxl__egc *egc,
+                                    libxl__devices_remove_state *drs);
+
 /*----- device model creation -----*/
 
 /* First layer; wraps libxl__spawn_spawn. */
@@ -2131,6 +2242,7 @@ typedef struct {
     libxl_domain_config dm_config;
     libxl__domain_build_state dm_state;
     libxl__dm_spawn_state pvqemu;
+    libxl__destroy_domid_state dis;
 } libxl__stub_dm_spawn_state;
 
 _hidden void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state*);
@@ -2158,6 +2270,8 @@ struct libxl__domain_create_state {
         /* If we're not doing stubdom, we use only dmss.dm,
          * for the non-stubdom device model. */
     libxl__save_helper_state shs;
+    /* necessary if the domain creation failed and we have to destroy it */
+    libxl__domain_destroy_state dds;
 };
 
 /*----- Domain suspend (save) functions -----*/

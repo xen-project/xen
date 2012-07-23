@@ -1216,11 +1216,133 @@ void libxl_evdisable_disk_eject(libxl_ctx *ctx, libxl_evgen_disk_eject *evg) {
     GC_FREE;
 }    
 
-int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid)
+/* Callbacks for libxl_domain_destroy */
+
+static void domain_destroy_cb(libxl__egc *egc, libxl__domain_destroy_state *dds,
+                              int rc);
+
+int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid,
+                         const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
+    AO_CREATE(ctx, domid, ao_how);
+    libxl__domain_destroy_state *dds;
+
+    GCNEW(dds);
+    dds->ao = ao;
+    dds->domid = domid;
+    dds->callback = domain_destroy_cb;
+    libxl__domain_destroy(egc, dds);
+
+    return AO_INPROGRESS;
+}
+
+static void domain_destroy_cb(libxl__egc *egc, libxl__domain_destroy_state *dds,
+                              int rc)
+{
+    STATE_AO_GC(dds->ao);
+
+    if (rc)
+        LOG(ERROR, "destruction of domain %u failed", dds->domid);
+
+    libxl__ao_complete(egc, ao, rc);
+}
+
+/* Callbacks for libxl__domain_destroy */
+
+static void stubdom_destroy_callback(libxl__egc *egc,
+                                     libxl__destroy_domid_state *dis,
+                                     int rc);
+
+static void domain_destroy_callback(libxl__egc *egc,
+                                    libxl__destroy_domid_state *dis,
+                                    int rc);
+
+static void destroy_finish_check(libxl__egc *egc,
+                                 libxl__domain_destroy_state *dds);
+
+void libxl__domain_destroy(libxl__egc *egc, libxl__domain_destroy_state *dds)
+{
+    STATE_AO_GC(dds->ao);
+    uint32_t stubdomid = libxl_get_stubdom_id(CTX, dds->domid);
+
+    if (stubdomid) {
+        dds->stubdom.ao = ao;
+        dds->stubdom.domid = stubdomid;
+        dds->stubdom.callback = stubdom_destroy_callback;
+        libxl__destroy_domid(egc, &dds->stubdom);
+    } else {
+        dds->stubdom_finished = 1;
+    }
+
+    dds->domain.ao = ao;
+    dds->domain.domid = dds->domid;
+    dds->domain.callback = domain_destroy_callback;
+    libxl__destroy_domid(egc, &dds->domain);
+}
+
+static void stubdom_destroy_callback(libxl__egc *egc,
+                                     libxl__destroy_domid_state *dis,
+                                     int rc)
+{
+    STATE_AO_GC(dis->ao);
+    libxl__domain_destroy_state *dds = CONTAINER_OF(dis, *dds, stubdom);
+    const char *savefile;
+
+    if (rc) {
+        LOG(ERROR, "unable to destroy stubdom with domid %u", dis->domid);
+        dds->rc = rc;
+    }
+
+    dds->stubdom_finished = 1;
+    savefile = libxl__device_model_savefile(gc, dis->domid);
+    rc = libxl__remove_file(gc, savefile);
+    /*
+     * On suspend libxl__domain_save_device_model will have already
+     * unlinked the save file.
+     */
+    if (rc) {
+        LOG(ERROR, "failed to remove device-model savefile %s", savefile);
+    }
+
+    destroy_finish_check(egc, dds);
+}
+
+static void domain_destroy_callback(libxl__egc *egc,
+                                    libxl__destroy_domid_state *dis,
+                                    int rc)
+{
+    STATE_AO_GC(dis->ao);
+    libxl__domain_destroy_state *dds = CONTAINER_OF(dis, *dds, domain);
+
+    if (rc) {
+        LOG(ERROR, "unable to destroy guest with domid %u", dis->domid);
+        dds->rc = rc;
+    }
+
+    dds->domain_finished = 1;
+    destroy_finish_check(egc, dds);
+}
+
+static void destroy_finish_check(libxl__egc *egc,
+                                 libxl__domain_destroy_state *dds)
+{
+    if (!(dds->domain_finished && dds->stubdom_finished))
+        return;
+
+    dds->callback(egc, dds, dds->rc);
+}
+
+/* Callbacks for libxl__destroy_domid */
+static void devices_destroy_cb(libxl__egc *egc,
+                               libxl__devices_remove_state *drs,
+                               int rc);
+
+void libxl__destroy_domid(libxl__egc *egc, libxl__destroy_domid_state *dis)
+{
+    STATE_AO_GC(dis->ao);
+    libxl_ctx *ctx = CTX;
+    uint32_t domid = dis->domid;
     char *dom_path;
-    char *vm_path;
     char *pid;
     int rc, dm_present;
 
@@ -1231,12 +1353,15 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid)
     case ERROR_INVAL:
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "non-existant domain %d", domid);
     default:
-        return rc;
+        goto out;
     }
 
     switch (libxl__domain_type(gc, domid)) {
     case LIBXL_DOMAIN_TYPE_HVM:
-        dm_present = 1;
+        if (!libxl_get_stubdom_id(CTX, domid))
+            dm_present = 1;
+        else
+            dm_present = 0;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         pid = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "/local/domain/%d/image/device-model-pid", domid));
@@ -1267,7 +1392,37 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid)
 
         libxl__qmp_cleanup(gc, domid);
     }
-    if (libxl__devices_destroy(gc, domid) < 0)
+    dis->drs.ao = ao;
+    dis->drs.domid = domid;
+    dis->drs.callback = devices_destroy_cb;
+    dis->drs.force = 1;
+    libxl__devices_destroy(egc, &dis->drs);
+    return;
+
+out:
+    assert(rc);
+    dis->callback(egc, dis, rc);
+    return;
+}
+
+static void devices_destroy_cb(libxl__egc *egc,
+                               libxl__devices_remove_state *drs,
+                               int rc)
+{
+    STATE_AO_GC(drs->ao);
+    libxl__destroy_domid_state *dis = CONTAINER_OF(drs, *dis, drs);
+    libxl_ctx *ctx = CTX;
+    uint32_t domid = dis->domid;
+    char *dom_path;
+    char *vm_path;
+
+    dom_path = libxl__xs_get_dompath(gc, domid);
+    if (!dom_path) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    if (rc < 0)
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, 
                    "libxl__devices_destroy failed for %d", domid);
 
@@ -1280,6 +1435,10 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid)
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xs_rm failed for %s", dom_path);
 
     xs_rm(ctx->xsh, XBT_NULL, libxl__xs_libxl_path(gc, domid));
+    xs_rm(ctx->xsh, XBT_NULL, libxl__sprintf(gc,
+                                "/local/domain/0/device-model/%d", domid));
+    xs_rm(ctx->xsh, XBT_NULL, libxl__sprintf(gc,
+                                "/local/domain/%d/hvmloader", domid));
 
     libxl__userdata_destroyall(gc, domid);
 
@@ -1290,9 +1449,10 @@ int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid)
         goto out;
     }
     rc = 0;
+
 out:
-    GC_FREE;
-    return rc;
+    dis->callback(egc, dis, rc);
+    return;
 }
 
 int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num,

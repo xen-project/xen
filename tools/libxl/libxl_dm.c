@@ -694,6 +694,10 @@ static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
                                 libxl__dm_spawn_state *stubdom_dmss,
                                 int rc);
 
+static void spaw_stubdom_pvqemu_destroy_cb(libxl__egc *egc,
+                                           libxl__destroy_domid_state *dis,
+                                           int rc);
+
 void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
 {
     STATE_AO_GC(sdss->dm.spawn.ao);
@@ -914,9 +918,28 @@ static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
 
  out:
     if (rc) {
-        if (dm_domid)
-            libxl_domain_destroy(CTX, dm_domid);
+        if (dm_domid) {
+            sdss->dis.ao = ao;
+            sdss->dis.domid = dm_domid;
+            sdss->dis.callback = spaw_stubdom_pvqemu_destroy_cb;
+            libxl__destroy_domid(egc, &sdss->dis);
+            return;
+        }
     }
+    sdss->callback(egc, &sdss->dm, rc);
+}
+
+static void spaw_stubdom_pvqemu_destroy_cb(libxl__egc *egc,
+                                           libxl__destroy_domid_state *dis,
+                                           int rc)
+{
+    libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(dis, *sdss, dis);
+    STATE_AO_GC(sdss->dis.ao);
+
+    if (rc)
+        LOG(ERROR, "destruction of domain %u after failed creation failed",
+                   sdss->pvqemu.guest_domid);
+
     sdss->callback(egc, &sdss->dm, rc);
 }
 
@@ -1115,55 +1138,27 @@ static void device_model_spawn_outcome(libxl__egc *egc,
 
 int libxl__destroy_device_model(libxl__gc *gc, uint32_t domid)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     char *pid;
     int ret;
 
     pid = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "/local/domain/%d/image/device-model-pid", domid));
-    if (!pid) {
-        int stubdomid = libxl_get_stubdom_id(ctx, domid);
-        const char *savefile;
-
-        if (!stubdomid) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Couldn't find device model's pid");
-            ret = ERROR_INVAL;
-            goto out;
-        }
-        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Device model is a stubdom, domid=%d", stubdomid);
-        ret = libxl_domain_destroy(ctx, stubdomid);
-        if (ret)
-            goto out;
-
-        savefile = libxl__device_model_savefile(gc, domid);
-        ret = unlink(savefile);
-        /*
-         * On suspend libxl__domain_save_device_model will have already
-         * unlinked the save file.
-         */
-        if (ret && errno == ENOENT) ret = 0;
-        if (ret) {
-            LIBXL__LOG_ERRNO(ctx, XTL_ERROR,
-                             "failed to remove device-model savefile %s\n",
-                             savefile);
-            goto out;
-        }
-    } else {
-        ret = kill(atoi(pid), SIGHUP);
-        if (ret < 0 && errno == ESRCH) {
-            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Device Model already exited");
-            ret = 0;
-        } else if (ret == 0) {
-            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Device Model signaled");
-            ret = 0;
-        } else {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to kill Device Model [%d]",
-                    atoi(pid));
-            ret = ERROR_FAIL;
-            goto out;
-        }
+    if (!pid || !atoi(pid)) {
+        LOG(ERROR, "could not find device-model's pid for dom %u", domid);
+        ret = ERROR_FAIL;
+        goto out;
     }
-    xs_rm(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "/local/domain/0/device-model/%d", domid));
-    xs_rm(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "/local/domain/%d/hvmloader", domid));
+    ret = kill(atoi(pid), SIGHUP);
+    if (ret < 0 && errno == ESRCH) {
+        LOG(ERROR, "Device Model already exited");
+        ret = 0;
+    } else if (ret == 0) {
+        LOG(DEBUG, "Device Model signaled");
+        ret = 0;
+    } else {
+        LOGE(ERROR, "failed to kill Device Model [%d]", atoi(pid));
+        ret = ERROR_FAIL;
+        goto out;
+    }
 
 out:
     return ret;

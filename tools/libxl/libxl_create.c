@@ -571,6 +571,12 @@ static void domcreate_complete(libxl__egc *egc,
                                libxl__domain_create_state *dcs,
                                int rc);
 
+/* If creation is not successful, this callback will be executed
+ * when domain destruction is finished */
+static void domcreate_destruction_cb(libxl__egc *egc,
+                                     libxl__domain_destroy_state *dds,
+                                     int rc);
+
 static void initiate_domain_create(libxl__egc *egc,
                                    libxl__domain_create_state *dcs)
 {
@@ -999,14 +1005,29 @@ static void domcreate_complete(libxl__egc *egc,
 
     if (rc) {
         if (dcs->guest_domid) {
-            int rc2 = libxl_domain_destroy(CTX, dcs->guest_domid);
-            if (rc2)
-                LOG(ERROR, "unable to destroy domain %d following"
-                    " failed creation", dcs->guest_domid);
+            dcs->dds.ao = ao;
+            dcs->dds.domid = dcs->guest_domid;
+            dcs->dds.callback = domcreate_destruction_cb;
+            libxl__domain_destroy(egc, &dcs->dds);
+            return;
         }
         dcs->guest_domid = -1;
     }
     dcs->callback(egc, dcs, rc, dcs->guest_domid);
+}
+
+static void domcreate_destruction_cb(libxl__egc *egc,
+                                     libxl__domain_destroy_state *dds,
+                                     int rc)
+{
+    STATE_AO_GC(dds->ao);
+    libxl__domain_create_state *dcs = CONTAINER_OF(dds, *dcs, dds);
+
+    if (rc)
+        LOG(ERROR, "unable to destroy domain %u following failed creation",
+                   dds->domid);
+
+    dcs->callback(egc, dcs, ERROR_FAIL, dcs->guest_domid);
 }
 
 /*----- application-facing domain creation interface -----*/
