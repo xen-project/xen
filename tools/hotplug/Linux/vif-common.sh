@@ -65,6 +65,20 @@ case "$command" in
         ;;
 esac
 
+rename_vif() {
+    local dev=$1
+    local vifname=$2
+
+    # if a custom vifname was chosen and a link with that desired name
+    # already exists, then stop, before messing up whatever is using
+    # that interface (e.g. another running domU) because it's likely a
+    # configuration error
+    if ip link show "$vifname" >&/dev/null
+    then
+        fatal "Cannot rename interface $dev. An interface with name $vifname already exists."
+    fi
+    do_or_die ip link set "$dev" name "$vifname"
+}
 
 if [ "$type_if" = vif ]; then
     # Check presence of compulsory args.
@@ -74,9 +88,9 @@ if [ "$type_if" = vif ]; then
     vifname=$(xenstore_read_default "$XENBUS_PATH/vifname" "")
     if [ "$vifname" ]
     then
-        if [ "$command" == "online" ] && ! ip link show "$vifname" >&/dev/null
+        if [ "$command" == "online" ]
         then
-            do_or_die ip link set "$dev" name "$vifname"
+            rename_vif "$dev" "$vifname"
         fi
         dev="$vifname"
     fi
@@ -96,9 +110,9 @@ elif [ "$type_if" = tap ]; then
     if [ "$vifname" ]
     then
         vifname="${vifname}-emu"
-        if [ "$command" == "add" ] && ! ip link show "$vifname" >&/dev/null
+        if [ "$command" == "add" ]
         then
-            do_or_die ip link set "$dev" name "$vifname"
+            rename_vif "$dev" "$vifname"
         fi
         dev="$vifname"
     fi
