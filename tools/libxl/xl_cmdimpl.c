@@ -836,7 +836,6 @@ static void parse_config_data(const char *config_source,
             }
             b_info->u.hvm.timer_mode = l;
         } else if (!xlu_cfg_get_string(config, "timer_mode", &buf, 0)) {
-            fprintf(stderr, "got a timer mode string: \"%s\"\n", buf);
             if (libxl_timer_mode_from_string(buf, &b_info->u.hvm.timer_mode)) {
                 fprintf(stderr, "ERROR: invalid value \"%s\" for \"timer_mode\"\n",
                         buf);
