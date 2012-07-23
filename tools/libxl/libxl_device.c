@@ -451,33 +451,48 @@ int libxl__initiate_device_remove(libxl__egc *egc, libxl__ao *ao,
                                   libxl__device *dev)
 {
     AO_GC;
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-    xs_transaction_t t;
+    xs_transaction_t t = 0;
     char *be_path = libxl__device_backend_path(gc, dev);
     char *state_path = libxl__sprintf(gc, "%s/state", be_path);
-    char *state = libxl__xs_read(gc, XBT_NULL, state_path);
+    char *online_path = GCSPRINTF("%s/online", be_path);
+    const char *state;
+
     int rc = 0;
     libxl__ao_device_remove *aorm = 0;
 
-    if (!state)
-        goto out_ok;
-    if (atoi(state) != 4) {
-        libxl__device_destroy_tapdisk(gc, be_path);
-        xs_rm(ctx->xsh, XBT_NULL, be_path);
-        goto out_ok;
-    }
-
-retry_transaction:
-    t = xs_transaction_start(ctx->xsh);
-    xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/online", be_path), "0", strlen("0"));
-    xs_write(ctx->xsh, t, state_path, "5", strlen("5"));
-    if (!xs_transaction_end(ctx->xsh, t, 0)) {
-        if (errno == EAGAIN)
-            goto retry_transaction;
-        else {
-            rc = ERROR_FAIL;
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) {
+            LOG(ERROR, "unable to start transaction");
             goto out_fail;
         }
+
+        rc = libxl__xs_read_checked(gc, t, state_path, &state);
+        if (rc) {
+            LOG(ERROR, "unable to read device state from path %s", state_path);
+            goto out_fail;
+        }
+
+        /*
+         * Check if device is already in "closed" state, in which case
+         * it should not be changed.
+         */
+         if (state && atoi(state) != XenbusStateClosed) {
+            rc = libxl__xs_write_checked(gc, t, online_path, "0");
+            if (rc) {
+                LOG(ERROR, "unable to write to xenstore path %s", online_path);
+                goto out_fail;
+            }
+            rc = libxl__xs_write_checked(gc, t, state_path, "5");
+            if (rc) {
+                LOG(ERROR, "unable to write to xenstore path %s", state_path);
+                goto out_fail;
+            }
+        }
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc < 0) goto out_fail;
     }
 
     libxl__device_destroy_tapdisk(gc, be_path);
@@ -491,16 +506,14 @@ retry_transaction:
                                  LIBXL_DESTROY_TIMEOUT * 1000);
     if (rc) goto out_fail;
 
+    libxl__ao_complete(egc, ao, 0);
     return 0;
 
  out_fail:
     assert(rc);
+    libxl__xs_transaction_abort(gc, &t);
     device_remove_cleanup(gc, aorm);
     return rc;
-
- out_ok:
-    libxl__ao_complete(egc, ao, 0);
-    return 0;
 }
 
 static void device_remove_callback(libxl__egc *egc, libxl__ev_devstate *ds,
