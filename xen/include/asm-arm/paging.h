@@ -1,8 +1,8 @@
 #ifndef _XEN_PAGING_H
 #define _XEN_PAGING_H
 
-#define paging_mode_translate(d)              (0)
-#define paging_mode_external(d)               (0)
+#define paging_mode_translate(d)              (1)
+#define paging_mode_external(d)               (1)
 
 #endif /* XEN_PAGING_H */
 
