@@ -108,7 +108,10 @@ int vcpu_vgic_init(struct vcpu *v)
 
     memset(&v->arch.vgic.pending_irqs, 0, sizeof(v->arch.vgic.pending_irqs));
     for (i = 0; i < 32; i++)
+    {
         INIT_LIST_HEAD(&v->arch.vgic.pending_irqs[i].inflight);
+        INIT_LIST_HEAD(&v->arch.vgic.pending_irqs[i].lr_queue);
+    }
 
     /* For SGI and PPI the target is always this CPU */
     for ( i = 0 ; i < 8 ; i++ )
