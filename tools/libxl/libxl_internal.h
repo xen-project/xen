@@ -1747,6 +1747,167 @@ _hidden const char *libxl__xen_script_dir_path(void);
 _hidden const char *libxl__lock_dir_path(void);
 _hidden const char *libxl__run_dir_path(void);
 
+/*----- device addition/removal -----*/
+
+/* Action to perform (either connect or disconnect) */
+typedef enum {
+    DEVICE_CONNECT,
+    DEVICE_DISCONNECT
+} libxl__device_action;
+
+typedef struct libxl__ao_device libxl__ao_device;
+typedef struct libxl__ao_devices libxl__ao_devices;
+typedef void libxl__device_callback(libxl__egc*, libxl__ao_device*);
+
+/* This functions sets the necessary libxl__ao_device struct values to use
+ * safely inside functions. It marks the operation as "active"
+ * since we need to be sure that all device status structs are set
+ * to active before start queueing events, or we might call
+ * ao_complete before all devices had finished
+ *
+ * libxl__initiate_device_{remove/addition} should not be called without
+ * calling libxl__prepare_ao_device first, since it initializes the private
+ * fields of the struct libxl__ao_device to what this functions expect.
+ *
+ * Once _prepare has been called on a libxl__ao_device, it is safe to just
+ * discard this struct, there's no need to call any destroy function.
+ * _prepare can also be called multiple times with the same libxl__ao_device.
+ */
+_hidden void libxl__prepare_ao_device(libxl__ao *ao, libxl__ao_device *aodev);
+
+/* Prepare a bunch of devices for addition/removal. Every ao_device in
+ * ao_devices is set to 'active', and the ao_device 'base' field is set to
+ * the one pointed by aodevs.
+ */
+_hidden void libxl__prepare_ao_devices(libxl__ao *ao,
+                                       libxl__ao_devices *aodevs);
+
+/* Generic callback to use when adding/removing several devices, this will
+ * check if the given aodev is the last one, and call the callback in the
+ * parent libxl__ao_devices struct, passing the appropriate error if found.
+ */
+_hidden void libxl__ao_devices_callback(libxl__egc *egc,
+                                        libxl__ao_device *aodev);
+
+struct libxl__ao_device {
+    /* filled in by user */
+    libxl__ao *ao;
+    libxl__device_action action;
+    libxl__device *dev;
+    int force;
+    libxl__device_callback *callback;
+    /* private for implementation */
+    int active;
+    int rc;
+    libxl__ev_devstate backend_ds;
+    /* Bodge for Qemu devices */
+    libxl__ev_time timeout;
+    /* Used internally to have a reference to the upper libxl__ao_devices
+     * struct when present */
+    libxl__ao_devices *aodevs;
+};
+
+/* Helper struct to simply the plug/unplug of multiple devices at the same
+ * time.
+ *
+ * This structure holds several devices, and the callback is only called
+ * when all the devices inside of the array have finished.
+ */
+typedef void libxl__devices_callback(libxl__egc*, libxl__ao_devices*, int rc);
+struct libxl__ao_devices {
+    libxl__ao_device *array;
+    int size;
+    libxl__devices_callback *callback;
+};
+
+/*
+ * Algorithm for handling device removal (including domain
+ * destruction).  This is somewhat subtle because we may already have
+ * killed the domain and caused the death of qemu.
+ *
+ * In current versions of qemu there is no mechanism for ensuring that
+ * the resources used by its devices (both emulated and any PV devices
+ * provided by qemu) are freed (eg, fds closed) before it shuts down,
+ * and no confirmation from a terminating qemu back to the toolstack.
+ *
+ * This will need to be fixed in Xen 4.3.  In the meantime (Xen 4.2)
+ * we implement a bodge.
+ *
+ *      WE WANT TO UNPLUG         WE WANT TO SHUT DOWN OR DESTROY
+ *                    |                           |
+ *                    |             LIBXL SENDS SIGHUP TO QEMU
+ *                    |      .....................|........................
+ *                    |      : XEN 4.3+ PLANNED   |                       :
+ *                    |      :      QEMU TEARS DOWN ALL DEVICES           :
+ *                    |      :      FREES RESOURCES (closing fds)         :
+ *                    |      :      SETS PV BACKENDS TO STATE 5,          :
+ *                    |      :       waits for PV frontends to shut down  :
+ *                    |      :       SETS PV BACKENDS TO STATE 6          :
+ *                    |      :                    |                       :
+ *                    |      :      QEMU NOTIFIES TOOLSTACK (via          :
+ *                    |      :       xenstore) that it is exiting         :
+ *                    |      :      QEMU EXITS (parent may be init)       :
+ *                    |      :                    |                       :
+ *                    |      :        TOOLSTACK WAITS FOR QEMU            :
+ *                    |      :        notices qemu has finished           :
+ *                    |      :....................|.......................:
+ *                    |      .--------------------'
+ *                    V      V
+ *                  for each device
+ *                 we want to unplug/remove
+ *       ..................|...........................................
+ *       :                 V                       XEN 4.2 RACY BODGE :
+ *       :      device is provided by    qemu                         :
+ *       :            |            `-----------.                      :
+ *       :   something|                        V                      :
+ *       :    else, eg|             domain (that is domain for which  :
+ *       :     blkback|              this PV device is the backend,   :
+ *       :            |              which might be the stub dm)      :
+ *       :            |                is still alive?                :
+ *       :            |                  |        |                   :
+ *       :            |                  |alive   |dead               :
+ *       :            |<-----------------'        |                   :
+ *       :            |    hopefully qemu is      |                   :
+ *       :            |       still running       |                   :
+ *       :............|.................          |                   :
+ *             ,----->|                :     we may be racing         :
+ *             |    backend state?     :      with qemu's death       :
+ *             ^      |         |      :          |                   :
+ *     xenstore|      |other    |6     :      WAIT 2.0s               :
+ *     conflict|      |         |      :       TIMEOUT                :
+ *             |   WRITE B.E.   |      :          |                   :
+ *             |    STATE:=5    |      :     hopefully qemu has       :
+ *             `---'  |         |      :      gone by now and         :
+ *                    |ok       |      :      freed its resources     :
+ *                    |         |      :          |                   :
+ *              WAIT FOR        |      :     SET B.E.                 :
+ *              STATE==6        |      :      STATE:=6                :
+ *              /     |         |      :..........|...................:
+ *      timeout/    ok|         |                 |
+ *            /       |         |                 |
+ *           |    RUN HOTPLUG <-'<----------------'
+ *           |      SCRIPT
+ *           |        |
+ *           `---> NUKE
+ *                  BACKEND
+ *                    |
+ *                   DONE.
+ */
+
+/* Arranges that dev will be removed to the guest, and the
+ * hotplug scripts will be executed (if necessary). When
+ * this is done (or an error happens), the callback in
+ * aodev->callback will be called.
+ *
+ * The libxl__ao_device passed to this function should be
+ * prepared using libxl__prepare_ao_device prior to calling
+ * this function.
+ *
+ * Once finished, aodev->callback will be executed.
+ */
+_hidden void libxl__initiate_device_remove(libxl__egc *egc,
+                                           libxl__ao_device *aodev);
+
 /*----- datacopier: copies data from one fd to another -----*/
 
 typedef struct libxl__datacopier_state libxl__datacopier_state;
@@ -1967,167 +2128,6 @@ _hidden void libxl__bootloader_init(libxl__bootloader_state *bl);
 /* Will definitely call st->callback, perhaps reentrantly.
  * If callback is passed rc==0, will have updated st->info appropriately */
 _hidden void libxl__bootloader_run(libxl__egc*, libxl__bootloader_state *st);
-
-/*----- device addition/removal -----*/
-
-/* Action to perform (either connect or disconnect) */
-typedef enum {
-    DEVICE_CONNECT,
-    DEVICE_DISCONNECT
-} libxl__device_action;
-
-typedef struct libxl__ao_device libxl__ao_device;
-typedef struct libxl__ao_devices libxl__ao_devices;
-typedef void libxl__device_callback(libxl__egc*, libxl__ao_device*);
-
-/* This functions sets the necessary libxl__ao_device struct values to use
- * safely inside functions. It marks the operation as "active"
- * since we need to be sure that all device status structs are set
- * to active before start queueing events, or we might call
- * ao_complete before all devices had finished
- *
- * libxl__initiate_device_{remove/addition} should not be called without
- * calling libxl__prepare_ao_device first, since it initializes the private
- * fields of the struct libxl__ao_device to what this functions expect.
- *
- * Once _prepare has been called on a libxl__ao_device, it is safe to just
- * discard this struct, there's no need to call any destroy function.
- * _prepare can also be called multiple times with the same libxl__ao_device.
- */
-_hidden void libxl__prepare_ao_device(libxl__ao *ao, libxl__ao_device *aodev);
-
-/* Prepare a bunch of devices for addition/removal. Every ao_device in
- * ao_devices is set to 'active', and the ao_device 'base' field is set to
- * the one pointed by aodevs.
- */
-_hidden void libxl__prepare_ao_devices(libxl__ao *ao,
-                                       libxl__ao_devices *aodevs);
-
-/* Generic callback to use when adding/removing several devices, this will
- * check if the given aodev is the last one, and call the callback in the
- * parent libxl__ao_devices struct, passing the appropriate error if found.
- */
-_hidden void libxl__ao_devices_callback(libxl__egc *egc,
-                                        libxl__ao_device *aodev);
-
-struct libxl__ao_device {
-    /* filled in by user */
-    libxl__ao *ao;
-    libxl__device_action action;
-    libxl__device *dev;
-    int force;
-    libxl__device_callback *callback;
-    /* private for implementation */
-    int active;
-    int rc;
-    libxl__ev_devstate backend_ds;
-    /* Bodge for Qemu devices */
-    libxl__ev_time timeout;
-    /* Used internally to have a reference to the upper libxl__ao_devices
-     * struct when present */
-    libxl__ao_devices *aodevs;
-};
-
-/* Helper struct to simply the plug/unplug of multiple devices at the same
- * time.
- *
- * This structure holds several devices, and the callback is only called
- * when all the devices inside of the array have finished.
- */
-typedef void libxl__devices_callback(libxl__egc*, libxl__ao_devices*, int rc);
-struct libxl__ao_devices {
-    libxl__ao_device *array;
-    int size;
-    libxl__devices_callback *callback;
-};
-
-/*
- * Algorithm for handling device removal (including domain
- * destruction).  This is somewhat subtle because we may already have
- * killed the domain and caused the death of qemu.
- *
- * In current versions of qemu there is no mechanism for ensuring that
- * the resources used by its devices (both emulated and any PV devices
- * provided by qemu) are freed (eg, fds closed) before it shuts down,
- * and no confirmation from a terminating qemu back to the toolstack.
- *
- * This will need to be fixed in Xen 4.3.  In the meantime (Xen 4.2)
- * we implement a bodge.
- *
- *      WE WANT TO UNPLUG         WE WANT TO SHUT DOWN OR DESTROY
- *                    |                           |
- *                    |             LIBXL SENDS SIGHUP TO QEMU
- *                    |      .....................|........................
- *                    |      : XEN 4.3+ PLANNED   |                       :
- *                    |      :      QEMU TEARS DOWN ALL DEVICES           :
- *                    |      :      FREES RESOURCES (closing fds)         :
- *                    |      :      SETS PV BACKENDS TO STATE 5,          :
- *                    |      :       waits for PV frontends to shut down  :
- *                    |      :       SETS PV BACKENDS TO STATE 6          :
- *                    |      :                    |                       :
- *                    |      :      QEMU NOTIFIES TOOLSTACK (via          :
- *                    |      :       xenstore) that it is exiting         :
- *                    |      :      QEMU EXITS (parent may be init)       :
- *                    |      :                    |                       :
- *                    |      :        TOOLSTACK WAITS FOR QEMU            :
- *                    |      :        notices qemu has finished           :
- *                    |      :....................|.......................:
- *                    |      .--------------------'
- *                    V      V
- *                  for each device
- *                 we want to unplug/remove
- *       ..................|...........................................
- *       :                 V                       XEN 4.2 RACY BODGE :
- *       :      device is provided by    qemu                         :
- *       :            |            `-----------.                      :
- *       :   something|                        V                      :
- *       :    else, eg|             domain (that is domain for which  :
- *       :     blkback|              this PV device is the backend,   :
- *       :            |              which might be the stub dm)      :
- *       :            |                is still alive?                :
- *       :            |                  |        |                   :
- *       :            |                  |alive   |dead               :
- *       :            |<-----------------'        |                   :
- *       :            |    hopefully qemu is      |                   :
- *       :            |       still running       |                   :
- *       :............|.................          |                   :
- *             ,----->|                :     we may be racing         :
- *             |    backend state?     :      with qemu's death       :
- *             ^      |         |      :          |                   :
- *     xenstore|      |other    |6     :      WAIT 2.0s               :
- *     conflict|      |         |      :       TIMEOUT                :
- *             |   WRITE B.E.   |      :          |                   :
- *             |    STATE:=5    |      :     hopefully qemu has       :
- *             `---'  |         |      :      gone by now and         :
- *                    |ok       |      :      freed its resources     :
- *                    |         |      :          |                   :
- *              WAIT FOR        |      :     SET B.E.                 :
- *              STATE==6        |      :      STATE:=6                :
- *              /     |         |      :..........|...................:
- *      timeout/    ok|         |                 |
- *            /       |         |                 |
- *           |    RUN HOTPLUG <-'<----------------'
- *           |      SCRIPT
- *           |        |
- *           `---> NUKE
- *                  BACKEND
- *                    |
- *                   DONE.
- */
-
-/* Arranges that dev will be removed to the guest, and the
- * hotplug scripts will be executed (if necessary). When
- * this is done (or an error happens), the callback in
- * aodev->callback will be called.
- *
- * The libxl__ao_device passed to this function should be
- * prepared using libxl__prepare_ao_device prior to calling
- * this function.
- *
- * Once finished, aodev->callback will be executed.
- */
-_hidden void libxl__initiate_device_remove(libxl__egc *egc,
-                                           libxl__ao_device *aodev);
 
 /*----- Domain destruction -----*/
 
