@@ -672,7 +672,10 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     libxl__srm_restore_autogen_callbacks *const callbacks =
         &dcs->shs.callbacks.restore.a;
 
-    if (rc) domcreate_rebuild_done(egc, dcs, rc);
+    if (rc) {
+        domcreate_rebuild_done(egc, dcs, rc);
+        return;
+    }
 
     /* consume bootloader outputs. state->pv_{kernel,ramdisk} have
      * been initialised by the bootloader already.
