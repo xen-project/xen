@@ -1150,44 +1150,6 @@ static inline int libxl__spawn_inuse(libxl__spawn_state *ss)
 _hidden int libxl__spawn_record_pid(libxl__gc*, libxl__spawn_state*,
                                     pid_t innerchild);
 
-/*----- device model creation -----*/
-
-/* First layer; wraps libxl__spawn_spawn. */
-
-typedef struct libxl__dm_spawn_state libxl__dm_spawn_state;
-
-typedef void libxl__dm_spawn_cb(libxl__egc *egc, libxl__dm_spawn_state*,
-                                int rc /* if !0, error was logged */);
-
-struct libxl__dm_spawn_state {
-    /* mixed - spawn.ao must be initialised by user; rest is private: */
-    libxl__spawn_state spawn;
-    /* filled in by user, must remain valid: */
-    uint32_t guest_domid; /* domain being served */
-    libxl_domain_config *guest_config;
-    libxl__domain_build_state *build_state; /* relates to guest_domid */
-    libxl__dm_spawn_cb *callback;
-};
-
-_hidden void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state*);
-
-/* Stubdom device models. */
-
-typedef struct {
-    /* Mixed - user must fill in public parts EXCEPT callback,
-     * which may be undefined on entry.  (See above for details) */
-    libxl__dm_spawn_state dm; /* the stub domain device model */
-    /* filled in by user, must remain valid: */
-    libxl__dm_spawn_cb *callback; /* called as callback(,&sdss->dm,) */
-    /* private to libxl__spawn_stub_dm: */
-    libxl_domain_config dm_config;
-    libxl__domain_build_state dm_state;
-    libxl__dm_spawn_state pvqemu;
-} libxl__stub_dm_spawn_state;
-
-_hidden void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state*);
-
-
 /*
  * libxl__wait_for_offspring - Wait for child state
  * gc: allocation pool
@@ -2135,6 +2097,43 @@ struct libxl__ao_device {
  */
 _hidden void libxl__initiate_device_remove(libxl__egc *egc,
                                            libxl__ao_device *aodev);
+
+/*----- device model creation -----*/
+
+/* First layer; wraps libxl__spawn_spawn. */
+
+typedef struct libxl__dm_spawn_state libxl__dm_spawn_state;
+
+typedef void libxl__dm_spawn_cb(libxl__egc *egc, libxl__dm_spawn_state*,
+                                int rc /* if !0, error was logged */);
+
+struct libxl__dm_spawn_state {
+    /* mixed - spawn.ao must be initialised by user; rest is private: */
+    libxl__spawn_state spawn;
+    /* filled in by user, must remain valid: */
+    uint32_t guest_domid; /* domain being served */
+    libxl_domain_config *guest_config;
+    libxl__domain_build_state *build_state; /* relates to guest_domid */
+    libxl__dm_spawn_cb *callback;
+};
+
+_hidden void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state*);
+
+/* Stubdom device models. */
+
+typedef struct {
+    /* Mixed - user must fill in public parts EXCEPT callback,
+     * which may be undefined on entry.  (See above for details) */
+    libxl__dm_spawn_state dm; /* the stub domain device model */
+    /* filled in by user, must remain valid: */
+    libxl__dm_spawn_cb *callback; /* called as callback(,&sdss->dm,) */
+    /* private to libxl__spawn_stub_dm: */
+    libxl_domain_config dm_config;
+    libxl__domain_build_state dm_state;
+    libxl__dm_spawn_state pvqemu;
+} libxl__stub_dm_spawn_state;
+
+_hidden void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state*);
 
 /*----- Domain creation -----*/
 
