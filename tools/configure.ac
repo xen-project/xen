@@ -19,6 +19,8 @@ recommended, use PREPEND_INCLUDES, PREPEND_LIB, \
 APPEND_INCLUDES and APPEND_LIB instead when possible.])
 ])
 
+AC_CANONICAL_HOST
+
 # M4 Macro includes
 m4_include([m4/savevar.m4])
 m4_include([m4/features.m4])
@@ -100,15 +102,23 @@ AS_IF([test "x$pythontools" = "xy"], [
     [AC_MSG_ERROR([PYTHON specified, but is not an absolute path])])
     AX_PATH_PROG_OR_FAIL([PYTHONPATH], [$PYTHON])
     AX_CHECK_PYTHON_VERSION([2], [3])
-    AX_CHECK_PYTHON_DEVEL()
-])
-AX_PATH_PROG_OR_FAIL([XGETTEXT], [xgettext])
-AX_PATH_PROG_OR_FAIL([AS86], [as86])
-AX_PATH_PROG_OR_FAIL([LD86], [ld86])
-AX_PATH_PROG_OR_FAIL([BCC], [bcc])
-AX_PATH_PROG_OR_FAIL([IASL], [iasl])
-AX_CHECK_UUID
-AX_CHECK_CURSES
+     AX_CHECK_PYTHON_DEVEL()
+ ])
+ AX_PATH_PROG_OR_FAIL([XGETTEXT], [xgettext])
+dnl as86, ld86, bcc and iasl are only required when the host system is x86*.
+dnl "host" here means the platform on which the hypervisor and tools is
+dnl going to run, not the platform on which we are building (known as
+dnl "build" in gnu speak).
+case "$host_cpu" in
+i[[3456]]86|x86_64)
+    AX_PATH_PROG_OR_FAIL([AS86], [as86])
+    AX_PATH_PROG_OR_FAIL([LD86], [ld86])
+    AX_PATH_PROG_OR_FAIL([BCC], [bcc])
+    AX_PATH_PROG_OR_FAIL([IASL], [iasl])
+    ;;
+esac
+ AX_CHECK_UUID
+ AX_CHECK_CURSES
 PKG_CHECK_MODULES(glib, [glib-2.0 >= 2.12])
 
 # Check library path
