@@ -1,8 +1,8 @@
 Using Upstream QEMU with Xen
 ============================
 
-If you want to build with the QEMU unstable tree, follow the wiki page:
-  [http://wiki.xen.org/wiki/QEMU_Upstream]()
+If you want to build with the QEMU unstable tree, follow the [QEMU
+Upstream](http://wiki.xen.org/wiki/QEMU_Upstream) wiki page.
 
 Otherwise, QEMU/SeaBIOS is now integrated into the build system, so you just
 have to specify the device model version in an `xl` config file:
