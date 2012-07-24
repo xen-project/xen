@@ -12,6 +12,8 @@ CFLAGS += -m64
 
 SunOS_LIBDIR = $(SunOS_LIBDIR_x86_64)
 
+EFI_DIR ?= /usr/lib64/efi
+
 # Use only if calling $(LD) directly.
 ifeq ($(XEN_OS),OpenBSD)
 LDFLAGS_DIRECT += -melf_x86_64_obsd
