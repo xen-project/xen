@@ -357,6 +357,7 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     va_hvm = (struct hvm_info_table *)(va_map + HVM_INFO_OFFSET);
     va_hvm->apic_mode = libxl_defbool_val(info->u.hvm.apic);
     va_hvm->nr_vcpus = info->max_vcpus;
+    memset(va_hvm->vcpu_online, 0, sizeof(va_hvm->vcpu_online));
     memcpy(va_hvm->vcpu_online, info->avail_vcpus.map, info->avail_vcpus.size);
     for (i = 0, sum = 0; i < va_hvm->length; i++)
         sum += ((uint8_t *) va_hvm)[i];
