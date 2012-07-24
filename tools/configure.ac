@@ -67,16 +67,10 @@ AC_ARG_VAR([CURL], [Path to curl-config tool])
 AC_ARG_VAR([XML], [Path to xml2-config tool])
 AC_ARG_VAR([BASH], [Path to bash shell])
 AC_ARG_VAR([XGETTEXT], [Path to xgetttext tool])
-
-dnl as86, ld86, bcc and iasl are only present in x86* systems
-case "$host_cpu" in
-i[[3456]]86|x86_64)
-    AC_ARG_VAR([AS86], [Path to as86 tool])
-    AC_ARG_VAR([LD86], [Path to ld86 tool])
-    AC_ARG_VAR([BCC], [Path to bcc tool])
-    AC_ARG_VAR([IASL], [Path to iasl tool])
-    ;;
-esac
+AC_ARG_VAR([AS86], [Path to as86 tool])
+AC_ARG_VAR([LD86], [Path to ld86 tool])
+AC_ARG_VAR([BCC], [Path to bcc tool])
+AC_ARG_VAR([IASL], [Path to iasl tool])
 
 # Checks for programs.
 AC_PROG_CC
