@@ -616,6 +616,24 @@ static char ** libxl__build_device_model_args(libxl__gc *gc,
     }
 }
 
+static void libxl__dm_vifs_from_hvm_guest_config(libxl__gc *gc,
+                                    libxl_domain_config * const guest_config,
+                                    libxl_domain_config *dm_config)
+{
+    int i, nr = guest_config->num_vifs;
+
+    GCNEW_ARRAY(dm_config->vifs, nr);
+
+    for (i=0; i<nr; i++) {
+        dm_config->vifs[i] = guest_config->vifs[i];
+        if (dm_config->vifs[i].ifname)
+            dm_config->vifs[i].ifname = GCSPRINTF("%s" TAP_DEVICE_SUFFIX,
+                                                  dm_config->vifs[i].ifname);
+    }
+
+    dm_config->num_vifs = nr;
+}
+
 static int libxl__vfb_and_vkb_from_hvm_guest_config(libxl__gc *gc,
                                         const libxl_domain_config *guest_config,
                                         libxl_device_vfb *vfb,
@@ -758,8 +776,7 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     dm_config->disks = guest_config->disks;
     dm_config->num_disks = guest_config->num_disks;
 
-    dm_config->vifs = guest_config->vifs;
-    dm_config->num_vifs = guest_config->num_vifs;
+    libxl__dm_vifs_from_hvm_guest_config(gc, guest_config, dm_config);
 
     ret = libxl__domain_create_info_setdefault(gc, &dm_config->c_info);
     if (ret) goto out;
