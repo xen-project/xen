@@ -42,8 +42,10 @@
  *
  * The return value is in r0.
  *
- * The hypercall will always clobber r0, r1, r2, r3, r4 and r12,
- * regardless of how many arguments the particular hypercall takes.
+ * The hypercall will clobber r12 and the argument registers used by
+ * that hypercall (except r0 which is the return value) i.e. a 2
+ * argument hypercall will clobber r1 and a 4 argument hypercall will
+ * clobber r1, r2 and r3.
  *
  */
 

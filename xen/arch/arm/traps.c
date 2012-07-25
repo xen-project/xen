@@ -413,24 +413,31 @@ unsigned long do_arch_0(unsigned int cmd, unsigned long long value)
         return 0;
 }
 
-typedef unsigned long arm_hypercall_t(
+typedef unsigned long (*arm_hypercall_fn_t)(
     unsigned int, unsigned int, unsigned int, unsigned int, unsigned int);
 
-#define HYPERCALL(x)                                        \
-    [ __HYPERVISOR_ ## x ] = (arm_hypercall_t *) do_ ## x
+typedef struct {
+    arm_hypercall_fn_t fn;
+    int nr_args;
+} arm_hypercall_t;
 
-static arm_hypercall_t *arm_hypercall_table[] = {
-    HYPERCALL(memory_op),
-    HYPERCALL(domctl),
-    HYPERCALL(arch_0),
-    HYPERCALL(sched_op),
-    HYPERCALL(console_io),
-    HYPERCALL(xen_version),
-    HYPERCALL(event_channel_op),
-    HYPERCALL(memory_op),
-    HYPERCALL(physdev_op),
-    HYPERCALL(sysctl),
-    HYPERCALL(hvm_op),
+#define HYPERCALL(_name, _nr_args)                                   \
+    [ __HYPERVISOR_ ## _name ] =  {                                  \
+        .fn = (arm_hypercall_fn_t) &do_ ## _name,                    \
+        .nr_args = _nr_args,                                         \
+    }
+
+static arm_hypercall_t arm_hypercall_table[] = {
+    HYPERCALL(memory_op, 2),
+    HYPERCALL(domctl, 1),
+    HYPERCALL(arch_0, 2),
+    HYPERCALL(sched_op, 2),
+    HYPERCALL(console_io, 3),
+    HYPERCALL(xen_version, 2),
+    HYPERCALL(event_channel_op, 2),
+    HYPERCALL(physdev_op, 2),
+    HYPERCALL(sysctl, 2),
+    HYPERCALL(hvm_op, 2),
 };
 
 static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
@@ -462,7 +469,7 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 
 static void do_trap_hypercall(struct cpu_user_regs *regs, unsigned long iss)
 {
-    arm_hypercall_t *call = NULL;
+    arm_hypercall_fn_t call = NULL;
 
     if ( iss != XEN_HYPERCALL_TAG )
     {
@@ -472,7 +479,7 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, unsigned long iss)
         return;
     }
 
-    call = arm_hypercall_table[regs->r12];
+    call = arm_hypercall_table[regs->r12].fn;
     if ( call == NULL )
     {
         regs->r0 = -ENOSYS;
@@ -482,8 +489,17 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, unsigned long iss)
     regs->r0 = call(regs->r0, regs->r1, regs->r2, regs->r3, regs->r4);
 
 #ifndef NDEBUG
-    /* clobber registers */
-    regs->r1 = regs->r2 = regs->r3 = regs->r4 = regs->r12 = 0xDEADBEEF;
+    /* Clobber argument registers */
+    switch ( arm_hypercall_table[regs->r12].nr_args ) {
+    case 5: regs->r4 = 0xDEADBEEF;
+    case 4: regs->r3 = 0xDEADBEEF;
+    case 3: regs->r2 = 0xDEADBEEF;
+    case 2: regs->r1 = 0xDEADBEEF;
+    case 1: /* Don't clobber r0 -- it's the return value */
+        break;
+    default: BUG();
+    }
+    regs->r12 = 0xDEADBEEF;
 #endif
 }
 
