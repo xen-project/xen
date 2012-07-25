@@ -88,7 +88,8 @@ xl = Extension("xl",
                sources            = [ "xen/lowlevel/xl/xl.c", "xen/lowlevel/xl/_pyxl_types.c" ])
 
 plat = os.uname()[0]
-modules = [ xc, xs, ptsname, flask, xl ]
+modules = [ xc, xs, ptsname, flask ]
+#modules.extend([ xl ])
 if plat == 'SunOS':
     modules.extend([ scf, process ])
 if plat == 'Linux':
