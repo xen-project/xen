@@ -4,10 +4,12 @@ newer. Additionally, the binutils build must be configured to include support
 for the x86_64-pep emulation (i.e. `--enable-targets=x86_64-pep` or an option
 of equivalent effect should be passed to the configure script).
 
-Once built, `make install-xen` can place the resulting binary directly into
+Once built, `make install-xen` will place the resulting binary directly into
 the EFI boot partition, provided `EFI_VENDOR` is set in the environment (and
 `EFI_MOUNTPOINT` is overridden as needed, should the default of `/boot/efi` not
-match your system).
+match your system). The xen.efi binary will also be installed in
+`/usr/lib64/efi/`, unless `EFI_DIR` is set in the environment to override this
+default.
 
 The binary itself will require a configuration file (names with the `.efi`
 extension of the binary's name replaced by `.cfg`, and - until an existing
