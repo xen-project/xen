@@ -46,7 +46,6 @@ DUMMY(domain_relinquish_resources);
 DUMMY(domain_set_time_offset);
 DUMMY(dom_cow);
 DUMMY(gmfn_to_mfn);
-DUMMY(hypercall_create_continuation);
 DUMMY(send_timer_event);
 DUMMY(share_xen_page_with_privileged_guests);
 DUMMY(wallclock_time);

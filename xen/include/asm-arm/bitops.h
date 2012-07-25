@@ -23,6 +23,15 @@ extern int _test_and_change_bit(int nr, volatile void * p);
 #define test_and_clear_bit(n,p)   _test_and_clear_bit(n,p)
 #define test_and_change_bit(n,p)  _test_and_change_bit(n,p)
 
+/*
+ * Non-atomic bit manipulation.
+ *
+ * Implemented using atomics to be interrupt safe. Could alternatively
+ * implement with local interrupt masking.
+ */
+#define __set_bit(n,p)            _set_bit(n,p)
+#define __clear_bit(n,p)          _clear_bit(n,p)
+
 #define BIT(nr)                 (1UL << (nr))
 #define BIT_MASK(nr)            (1UL << ((nr) % BITS_PER_LONG))
 #define BIT_WORD(nr)            ((nr) / BITS_PER_LONG)

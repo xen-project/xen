@@ -5,6 +5,7 @@
 #include <xen/softirq.h>
 #include <xen/wait.h>
 #include <xen/errno.h>
+#include <xen/bitops.h>
 
 #include <asm/current.h>
 #include <asm/regs.h>
@@ -222,6 +223,92 @@ void sync_local_execstate(void)
 void sync_vcpu_execstate(struct vcpu *v)
 {
     /* Nothing to do -- no lazy switching */
+}
+
+#define next_arg(fmt, args) ({                                              \
+    unsigned long __arg;                                                    \
+    switch ( *(fmt)++ )                                                     \
+    {                                                                       \
+    case 'i': __arg = (unsigned long)va_arg(args, unsigned int);  break;    \
+    case 'l': __arg = (unsigned long)va_arg(args, unsigned long); break;    \
+    case 'h': __arg = (unsigned long)va_arg(args, void *);        break;    \
+    default:  __arg = 0; BUG();                                             \
+    }                                                                       \
+    __arg;                                                                  \
+})
+
+void hypercall_cancel_continuation(void)
+{
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    struct mc_state *mcs = &current->mc_state;
+
+    if ( test_bit(_MCSF_in_multicall, &mcs->flags) )
+    {
+        __clear_bit(_MCSF_call_preempted, &mcs->flags);
+    }
+    else
+    {
+        regs->pc += 4; /* undo re-execute 'hvc #XEN_HYPERCALL_TAG' */
+    }
+}
+
+unsigned long hypercall_create_continuation(
+    unsigned int op, const char *format, ...)
+{
+    struct mc_state *mcs = &current->mc_state;
+    struct cpu_user_regs *regs;
+    const char *p = format;
+    unsigned long arg, rc;
+    unsigned int i;
+    va_list args;
+
+    /* All hypercalls take at least one argument */
+    BUG_ON( !p || *p == '\0' );
+
+    va_start(args, format);
+
+    if ( test_bit(_MCSF_in_multicall, &mcs->flags) )
+    {
+        BUG(); /* XXX multicalls not implemented yet. */
+
+        __set_bit(_MCSF_call_preempted, &mcs->flags);
+
+        for ( i = 0; *p != '\0'; i++ )
+            mcs->call.args[i] = next_arg(p, args);
+
+        /* Return value gets written back to mcs->call.result */
+        rc = mcs->call.result;
+    }
+    else
+    {
+        regs      = guest_cpu_user_regs();
+        regs->r12 = op;
+
+        /* Ensure the hypercall trap instruction is re-executed. */
+        regs->pc -= 4;  /* re-execute 'hvc #XEN_HYPERCALL_TAG' */
+
+        for ( i = 0; *p != '\0'; i++ )
+        {
+            arg = next_arg(p, args);
+
+            switch ( i )
+            {
+            case 0: regs->r0 = arg; break;
+            case 1: regs->r1 = arg; break;
+            case 2: regs->r2 = arg; break;
+            case 3: regs->r3 = arg; break;
+            case 4: regs->r4 = arg; break;
+            case 5: regs->r5 = arg; break;
+            }
+        }
+
+        /* Return value gets written back to r0 */
+        rc = regs->r0;
+    }
+
+    va_end(args);
+
+    return rc;
 }
 
 void startup_cpu_idle_loop(void)

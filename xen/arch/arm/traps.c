@@ -470,6 +470,9 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 static void do_trap_hypercall(struct cpu_user_regs *regs, unsigned long iss)
 {
     arm_hypercall_fn_t call = NULL;
+#ifndef NDEBUG
+    uint32_t orig_pc = regs->pc;
+#endif
 
     if ( iss != XEN_HYPERCALL_TAG )
     {
@@ -495,17 +498,23 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, unsigned long iss)
     regs->r0 = call(regs->r0, regs->r1, regs->r2, regs->r3, regs->r4);
 
 #ifndef NDEBUG
-    /* Clobber argument registers */
-    switch ( arm_hypercall_table[regs->r12].nr_args ) {
-    case 5: regs->r4 = 0xDEADBEEF;
-    case 4: regs->r3 = 0xDEADBEEF;
-    case 3: regs->r2 = 0xDEADBEEF;
-    case 2: regs->r1 = 0xDEADBEEF;
-    case 1: /* Don't clobber r0 -- it's the return value */
-        break;
-    default: BUG();
+    /*
+     * Clobber argument registers only if pc is unchanged, otherwise
+     * this is a hypercall continuation.
+     */
+    if ( orig_pc == regs->pc )
+    {
+        switch ( arm_hypercall_table[regs->r12].nr_args ) {
+        case 5: regs->r4 = 0xDEADBEEF;
+        case 4: regs->r3 = 0xDEADBEEF;
+        case 3: regs->r2 = 0xDEADBEEF;
+        case 2: regs->r1 = 0xDEADBEEF;
+        case 1: /* Don't clobber r0 -- it's the return value */
+            break;
+        default: BUG();
+        }
+        regs->r12 = 0xDEADBEEF;
     }
-    regs->r12 = 0xDEADBEEF;
 #endif
 }
 
