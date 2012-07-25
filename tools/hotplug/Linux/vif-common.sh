@@ -189,7 +189,7 @@ handle_iptable()
 #
 ip_of()
 {
-  ip addr show "$1" | awk "/^.*inet.*$1\$/{print \$2}" | sed -n '1 s,/.*,,p'
+  ip -4 -o addr show primary dev "$1" | awk '$3 == "inet" {split($4,i,"/"); print i[1]; exit}'
 }
 
 
