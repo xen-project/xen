@@ -479,6 +479,12 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, unsigned long iss)
         return;
     }
 
+    if ( regs->r12 >= ARRAY_SIZE(arm_hypercall_table) )
+    {
+        regs->r0 = -ENOSYS;
+        return;
+    }
+
     call = arm_hypercall_table[regs->r12].fn;
     if ( call == NULL )
     {
