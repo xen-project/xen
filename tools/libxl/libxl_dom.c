@@ -628,6 +628,7 @@ void libxl__domain_suspend_common_switch_qemu_logdirty
 
  out:
     LOG(ERROR,"logdirty switch failed (rc=%d), aborting suspend",rc);
+    libxl__xs_transaction_abort(gc, &t);
     switch_logdirty_done(egc,dss,-1);
 }
 

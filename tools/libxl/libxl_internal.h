@@ -550,6 +550,42 @@ int libxl__xs_rm_checked(libxl__gc *gc, xs_transaction_t t, const char *path);
  *   +1  commit conflict; transaction has been destroyed and caller
  *        must go round again (call _start again and retry)
  *    0  committed successfully
+ *
+ * The intended usage pattern looks like this:
+ *    int some_function()
+ *    {
+ *        int rc;
+ *        xs_transaction_t t = 0;
+ *        // other initialisations
+ *
+ *        // do whatever you need to do before the xenstore stuff
+ *        // errors?  set rc and goto out.
+ *
+ *        for (;;) {
+ *            rc = libxl__xs_transaction_start(gc, &t);
+ *            if (rc) goto out;
+ *
+ *            // do your work here, including all xenstore reads and writes
+ *            // libxl__xs_*_checked are useful; pass them t.
+ *            // errors?  set rc and goto out.
+ *
+ *            rc = libxl__xs_transaction_commit(gc, &t);
+ *            if (!rc) break;
+ *            if (rc<0) goto out;
+ *        }
+ *
+ *        // now the xenstore transaction succeeded
+ *        // do whatever else you need to do
+ *        // errors?  set rc and goto out.
+ *
+ *        return something;
+ *
+ *     out:
+ *        // other cleanups
+ *        libxl__xs_transaction_abort(gc, &t);
+ *        // other cleanups
+ *        return rc;
+ *    }
  */
 int libxl__xs_transaction_start(libxl__gc *gc, xs_transaction_t *t);
 int libxl__xs_transaction_commit(libxl__gc *gc, xs_transaction_t *t);
