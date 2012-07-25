@@ -2133,9 +2133,11 @@ struct libxl__bootloader_state {
     /* Should be zeroed by caller on entry.  Will be filled in by
      * bootloader machinery; represents the local attachment of the
      * disk for the benefit of the bootloader.  Must be detached by
-     * the caller using libxl__device_disk_local_detach, but only
-     * after the domain's kernel and initramfs have been loaded into
-     * memory and the file references disposed of. */
+     * the caller using libxl__device_disk_local_detach.
+     * (This is safe to do after ->callback() has happened since
+     * the domain's kernel and initramfs will have been copied
+     * out of the guest's disk into a temporary directory, mapped
+     * as file references, and deleted. */
     libxl_device_disk localdisk;
     uint32_t domid;
     /* outputs:
