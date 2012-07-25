@@ -115,7 +115,9 @@ do_ifup() {
             ip addr add ${addr_pfx} dev $1
         fi
         ip link set dev $1 up
-        [ -n "$gateway" ] && ip route add default via ${gateway}
+        if [ -n "$gateway" ] ; then
+            ip route add default via ${gateway}
+        fi
     fi
 }
 
