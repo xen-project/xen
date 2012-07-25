@@ -330,8 +330,7 @@ out:
     return rc;
 }
 
-libxl_device_model_version libxl__device_model_version_running(libxl__gc *gc,
-                                                               uint32_t domid)
+int libxl__device_model_version_running(libxl__gc *gc, uint32_t domid)
 {
     char *path = NULL;
     char *dm_version = NULL;
