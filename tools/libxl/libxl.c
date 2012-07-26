@@ -1774,115 +1774,152 @@ int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
-int libxl__device_disk_add(libxl__gc *gc, uint32_t domid,
-        xs_transaction_t t, libxl_device_disk *disk)
+/* Specific function called directly only by local disk attach,
+ * all other users should instead use the regular
+ * libxl__device_disk_add wrapper
+ *
+ * The (optionally) passed function get_vdev will be used to
+ * set the vdev the disk should be attached to. When it is set the caller
+ * must also pass get_vdev_user, which will be passed to get_vdev.
+ *
+ * The passed get_vdev function is also in charge of printing
+ * the corresponding error message when appropiate.
+ */
+static int device_disk_add(libxl__gc *gc, uint32_t domid,
+                           libxl_device_disk *disk,
+                           char *get_vdev(libxl__gc *, void *,
+                                          xs_transaction_t),
+                           void *get_vdev_user)
 {
-    flexarray_t *front;
-    flexarray_t *back;
+    flexarray_t *front = NULL;
+    flexarray_t *back = NULL;
     char *dev;
     libxl__device device;
     int major, minor, rc;
     libxl_ctx *ctx = gc->owner;
+    xs_transaction_t t = XBT_NULL;
 
-    rc = libxl__device_disk_setdefault(gc, disk);
-    if (rc) goto out;
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) goto out;
 
-    front = flexarray_make(16, 1);
-    if (!front) {
-        rc = ERROR_NOMEM;
-        goto out;
-    }
-    back = flexarray_make(16, 1);
-    if (!back) {
-        rc = ERROR_NOMEM;
-        goto out_free;
-    }
-
-    if (disk->script) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "External block scripts"
-                   " not yet supported, sorry");
-        rc = ERROR_INVAL;
-        goto out_free;
-    }
-
-    rc = libxl__device_from_disk(gc, domid, disk, &device);
-    if (rc != 0) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Invalid or unsupported"
-               " virtual disk identifier %s", disk->vdev);
-        goto out_free;
-    }
-
-    switch (disk->backend) {
-        case LIBXL_DISK_BACKEND_PHY:
-            dev = disk->pdev_path;
-    do_backend_phy:
-            libxl__device_physdisk_major_minor(dev, &major, &minor);
-            flexarray_append(back, "physical-device");
-            flexarray_append(back, libxl__sprintf(gc, "%x:%x", major, minor));
-
-            flexarray_append(back, "params");
-            flexarray_append(back, dev);
-
-            assert(device.backend_kind == LIBXL__DEVICE_KIND_VBD);
-            break;
-        case LIBXL_DISK_BACKEND_TAP:
-            dev = libxl__blktap_devpath(gc, disk->pdev_path, disk->format);
-            if (!dev) {
-                LOG(ERROR, "failed to get blktap devpath for %p\n",
-                    disk->pdev_path);
+        if (get_vdev) {
+            assert(get_vdev_user);
+            disk->vdev = get_vdev(gc, get_vdev_user, t);
+            if (disk->vdev == NULL) {
                 rc = ERROR_FAIL;
-                goto out_free;
+                goto out;
             }
-            flexarray_append(back, "tapdisk-params");
-            flexarray_append(back, libxl__sprintf(gc, "%s:%s",
-                libxl__device_disk_string_of_format(disk->format),
-                disk->pdev_path));
+        }
 
-            /* now create a phy device to export the device to the guest */
-            goto do_backend_phy;
-        case LIBXL_DISK_BACKEND_QDISK:
-            flexarray_append(back, "params");
-            flexarray_append(back, libxl__sprintf(gc, "%s:%s",
-                          libxl__device_disk_string_of_format(disk->format), disk->pdev_path));
-            assert(device.backend_kind == LIBXL__DEVICE_KIND_QDISK);
-            break;
-        default:
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend type: %d\n", disk->backend);
+        rc = libxl__device_disk_setdefault(gc, disk);
+        if (rc) goto out;
+
+        if (front)
+            flexarray_free(front);
+        front = flexarray_make(16, 1);
+        if (!front) {
+            rc = ERROR_NOMEM;
+            goto out;
+        }
+        if (back)
+            flexarray_free(back);
+        back = flexarray_make(16, 1);
+        if (!back) {
+            rc = ERROR_NOMEM;
+            goto out_free;
+        }
+
+        if (disk->script) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "External block scripts"
+                       " not yet supported, sorry");
             rc = ERROR_INVAL;
             goto out_free;
+        }
+
+        rc = libxl__device_from_disk(gc, domid, disk, &device);
+        if (rc != 0) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Invalid or unsupported"
+                   " virtual disk identifier %s", disk->vdev);
+            goto out_free;
+        }
+
+        switch (disk->backend) {
+            case LIBXL_DISK_BACKEND_PHY:
+                dev = disk->pdev_path;
+        do_backend_phy:
+                libxl__device_physdisk_major_minor(dev, &major, &minor);
+                flexarray_append(back, "physical-device");
+                flexarray_append(back, libxl__sprintf(gc, "%x:%x", major, minor));
+
+                flexarray_append(back, "params");
+                flexarray_append(back, dev);
+
+                assert(device.backend_kind == LIBXL__DEVICE_KIND_VBD);
+                break;
+            case LIBXL_DISK_BACKEND_TAP:
+                dev = libxl__blktap_devpath(gc, disk->pdev_path, disk->format);
+                if (!dev) {
+                    LOG(ERROR, "failed to get blktap devpath for %p\n",
+                        disk->pdev_path);
+                    rc = ERROR_FAIL;
+                    goto out_free;
+                }
+                flexarray_append(back, "tapdisk-params");
+                flexarray_append(back, libxl__sprintf(gc, "%s:%s",
+                    libxl__device_disk_string_of_format(disk->format),
+                    disk->pdev_path));
+
+                /* now create a phy device to export the device to the guest */
+                goto do_backend_phy;
+            case LIBXL_DISK_BACKEND_QDISK:
+                flexarray_append(back, "params");
+                flexarray_append(back, libxl__sprintf(gc, "%s:%s",
+                              libxl__device_disk_string_of_format(disk->format), disk->pdev_path));
+                assert(device.backend_kind == LIBXL__DEVICE_KIND_QDISK);
+                break;
+            default:
+                LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend type: %d\n", disk->backend);
+                rc = ERROR_INVAL;
+                goto out_free;
+        }
+
+        flexarray_append(back, "frontend-id");
+        flexarray_append(back, libxl__sprintf(gc, "%d", domid));
+        flexarray_append(back, "online");
+        flexarray_append(back, "1");
+        flexarray_append(back, "removable");
+        flexarray_append(back, libxl__sprintf(gc, "%d", (disk->removable) ? 1 : 0));
+        flexarray_append(back, "bootable");
+        flexarray_append(back, libxl__sprintf(gc, "%d", 1));
+        flexarray_append(back, "state");
+        flexarray_append(back, libxl__sprintf(gc, "%d", 1));
+        flexarray_append(back, "dev");
+        flexarray_append(back, disk->vdev);
+        flexarray_append(back, "type");
+        flexarray_append(back, libxl__device_disk_string_of_backend(disk->backend));
+        flexarray_append(back, "mode");
+        flexarray_append(back, disk->readwrite ? "w" : "r");
+        flexarray_append(back, "device-type");
+        flexarray_append(back, disk->is_cdrom ? "cdrom" : "disk");
+
+        flexarray_append(front, "backend-id");
+        flexarray_append(front, libxl__sprintf(gc, "%d", disk->backend_domid));
+        flexarray_append(front, "state");
+        flexarray_append(front, libxl__sprintf(gc, "%d", 1));
+        flexarray_append(front, "virtual-device");
+        flexarray_append(front, libxl__sprintf(gc, "%d", device.devid));
+        flexarray_append(front, "device-type");
+        flexarray_append(front, disk->is_cdrom ? "cdrom" : "disk");
+
+        libxl__device_generic_add(gc, t, &device,
+                            libxl__xs_kvs_of_flexarray(gc, back, back->count),
+                            libxl__xs_kvs_of_flexarray(gc, front, front->count));
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc < 0) goto out_free;
     }
-
-    flexarray_append(back, "frontend-id");
-    flexarray_append(back, libxl__sprintf(gc, "%d", domid));
-    flexarray_append(back, "online");
-    flexarray_append(back, "1");
-    flexarray_append(back, "removable");
-    flexarray_append(back, libxl__sprintf(gc, "%d", (disk->removable) ? 1 : 0));
-    flexarray_append(back, "bootable");
-    flexarray_append(back, libxl__sprintf(gc, "%d", 1));
-    flexarray_append(back, "state");
-    flexarray_append(back, libxl__sprintf(gc, "%d", 1));
-    flexarray_append(back, "dev");
-    flexarray_append(back, disk->vdev);
-    flexarray_append(back, "type");
-    flexarray_append(back, libxl__device_disk_string_of_backend(disk->backend));
-    flexarray_append(back, "mode");
-    flexarray_append(back, disk->readwrite ? "w" : "r");
-    flexarray_append(back, "device-type");
-    flexarray_append(back, disk->is_cdrom ? "cdrom" : "disk");
-
-    flexarray_append(front, "backend-id");
-    flexarray_append(front, libxl__sprintf(gc, "%d", disk->backend_domid));
-    flexarray_append(front, "state");
-    flexarray_append(front, libxl__sprintf(gc, "%d", 1));
-    flexarray_append(front, "virtual-device");
-    flexarray_append(front, libxl__sprintf(gc, "%d", device.devid));
-    flexarray_append(front, "device-type");
-    flexarray_append(front, disk->is_cdrom ? "cdrom" : "disk");
-
-    libxl__device_generic_add(gc, t, &device,
-                             libxl__xs_kvs_of_flexarray(gc, back, back->count),
-                             libxl__xs_kvs_of_flexarray(gc, front, front->count));
 
     rc = 0;
 
@@ -1890,13 +1927,20 @@ out_free:
     flexarray_free(back);
     flexarray_free(front);
 out:
+    libxl__xs_transaction_abort(gc, &t);
     return rc;
+}
+
+int libxl__device_disk_add(libxl__gc *gc, uint32_t domid,
+                           libxl_device_disk *disk)
+{
+    return device_disk_add(gc, domid, disk, NULL, NULL);
 }
 
 int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
 {
     GC_INIT(ctx);
-    int rc = libxl__device_disk_add(gc, domid, XBT_NULL, disk);
+    int rc = libxl__device_disk_add(gc, domid, disk);
     GC_FREE;
     return rc;
 }
@@ -2177,9 +2221,10 @@ out:
 
 /* libxl__alloc_vdev only works on the local domain, that is the domain
  * where the toolstack is running */
-static char * libxl__alloc_vdev(libxl__gc *gc, const char *blkdev_start,
+static char * libxl__alloc_vdev(libxl__gc *gc, void *get_vdev_user,
         xs_transaction_t t)
 {
+    const char *blkdev_start = (const char *) get_vdev_user;
     int devid = 0, disk = 0, part = 0;
     char *dompath = libxl__xs_get_dompath(gc, LIBXL_TOOLSTACK_DOMID);
 
@@ -2215,9 +2260,8 @@ char * libxl__device_disk_local_attach(libxl__gc *gc,
     libxl_ctx *ctx = gc->owner;
     char *dev = NULL, *be_path = NULL;
     char *ret = NULL;
-    int rc, xs_ret;
+    int rc;
     libxl__device device;
-    xs_transaction_t t = XBT_NULL;
 
     if (in_disk->pdev_path == NULL)
         return NULL;
@@ -2261,27 +2305,10 @@ char * libxl__device_disk_local_attach(libxl__gc *gc,
             break;
         case LIBXL_DISK_BACKEND_QDISK:
             if (disk->format != LIBXL_DISK_FORMAT_RAW) {
-                do {
-                    t = xs_transaction_start(ctx->xsh);
-                    if (t == XBT_NULL) {
-                        LOG(ERROR, "failed to start a xenstore transaction");
-                        goto out;
-                    }
-                    disk->vdev = libxl__alloc_vdev(gc, blkdev_start, t);
-                    if (disk->vdev == NULL) {
-                        LOG(ERROR, "libxl__alloc_vdev failed");
-                        goto out;
-                    }
-                    if (libxl__device_disk_add(gc, LIBXL_TOOLSTACK_DOMID,
-                                t, disk)) {
-                        LOG(ERROR, "libxl_device_disk_add failed");
-                        goto out;
-                    }
-                    xs_ret = xs_transaction_end(ctx->xsh, t, 0);
-                } while (xs_ret == 0 && errno == EAGAIN);
-                t = XBT_NULL;
-                if (xs_ret == 0) {
-                    LOGE(ERROR, "xenstore transaction failed");
+                if (device_disk_add(gc, LIBXL_TOOLSTACK_DOMID, disk,
+                                    libxl__alloc_vdev,
+                                    (void *) blkdev_start)) {
+                    LOG(ERROR, "libxl_device_disk_add failed");
                     goto out;
                 }
                 dev = GCSPRINTF("/dev/%s", disk->vdev);
@@ -2310,10 +2337,7 @@ char * libxl__device_disk_local_attach(libxl__gc *gc,
     return ret;
 
  out:
-    if (t != XBT_NULL)
-        xs_transaction_end(ctx->xsh, t, 1);
-    else
-        libxl__device_disk_local_detach(gc, disk);
+    libxl__device_disk_local_detach(gc, disk);
     return NULL;
 }
 
