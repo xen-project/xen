@@ -1037,9 +1037,12 @@ in the domain.
 
 List virtual block devices for a domain.
 
-=item B<cd-insert> I<domain-id> I<VirtualDevice> I<be-dev>
+=item B<cd-insert> I<domain-id> I<VirtualDevice> I<target>
 
-Insert a cdrom into a guest domain's cd drive. Only works with HVM domains.
+Insert a cdrom into a guest domain's existing virtial cd drive. The
+virtual drive must already exist but can be current empty.
+
+Only works with HVM domains.
 
 B<OPTIONS>
 
@@ -1047,20 +1050,29 @@ B<OPTIONS>
 
 =item I<VirtualDevice>
 
-How the device should be presented to the guest domain; for example /dev/hdc.
+How the device should be presented to the guest domain; for example "hdc".
 
-=item I<be-dev>
+=item I<target>
 
-the device in the backend domain (usually domain 0) to be exported; it
-can be a path to a file (file://path/to/file.iso). See B<disk> in
-L<xl.cfg(5)> for the details.
+the target path in the backend domain (usually domain 0) to be
+exported; Can be a block device or a file etc. See B<target> in
+F<docs/misc/xl-disk-configuration.txt>.
 
 =back
 
 =item B<cd-eject> I<domain-id> I<VirtualDevice>
 
-Eject a cdrom from a guest's cd drive. Only works with HVM domains.
-I<VirtualDevice> is the cdrom device in the guest to eject.
+Eject a cdrom from a guest's virtual cd drive. Only works with HVM domains.
+
+B<OPTIONS>
+
+=over 4
+
+=item I<VirtualDevice>
+
+How the device should be presented to the guest domain; for example "hdc".
+
+=back
 
 =back
 

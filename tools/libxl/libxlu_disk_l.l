@@ -92,11 +92,12 @@ static void setaccess(DiskParseContext *dpc, const char *str) {
 
 /* Sets ->format from the string.  IDL should provide something for this. */
 static void setformat(DiskParseContext *dpc, const char *str) {
-    if (!strcmp(str,"") ||
-             !strcmp(str,"raw"))    DSET(dpc,format,FORMAT,str,RAW);
+    if      (!strcmp(str,""))       DSET(dpc,format,FORMAT,str,RAW);
+    else if (!strcmp(str,"raw"))    DSET(dpc,format,FORMAT,str,RAW);
     else if (!strcmp(str,"qcow"))   DSET(dpc,format,FORMAT,str,QCOW);
     else if (!strcmp(str,"qcow2"))  DSET(dpc,format,FORMAT,str,QCOW2);
     else if (!strcmp(str,"vhd"))    DSET(dpc,format,FORMAT,str,VHD);
+    else if (!strcmp(str,"empty"))  DSET(dpc,format,FORMAT,str,EMPTY);
     else xlu__disk_err(dpc,str,"unknown value for format");
 }
 

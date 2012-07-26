@@ -841,11 +841,12 @@ static void setaccess(DiskParseContext *dpc, const char *str) {
 
 /* Sets ->format from the string.  IDL should provide something for this. */
 static void setformat(DiskParseContext *dpc, const char *str) {
-    if (!strcmp(str,"") ||
-             !strcmp(str,"raw"))    DSET(dpc,format,FORMAT,str,RAW);
+    if      (!strcmp(str,""))       DSET(dpc,format,FORMAT,str,RAW);
+    else if (!strcmp(str,"raw"))    DSET(dpc,format,FORMAT,str,RAW);
     else if (!strcmp(str,"qcow"))   DSET(dpc,format,FORMAT,str,QCOW);
     else if (!strcmp(str,"qcow2"))  DSET(dpc,format,FORMAT,str,QCOW2);
     else if (!strcmp(str,"vhd"))    DSET(dpc,format,FORMAT,str,VHD);
+    else if (!strcmp(str,"empty"))  DSET(dpc,format,FORMAT,str,EMPTY);
     else xlu__disk_err(dpc,str,"unknown value for format");
 }
 
@@ -860,7 +861,7 @@ static void setbackendtype(DiskParseContext *dpc, const char *str) {
 #define DEPRECATE(usewhatinstead) /* not currently reported */
 
 
-#line 864 "libxlu_disk_l.c"
+#line 865 "libxlu_disk_l.c"
 
 #define INITIAL 0
 #define LEXERR 1
@@ -1096,12 +1097,12 @@ YY_DECL
 	register int yy_act;
     struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
 
-#line 126 "libxlu_disk_l.l"
+#line 127 "libxlu_disk_l.l"
 
 
  /*----- the scanner rules which do the parsing -----*/
 
-#line 1105 "libxlu_disk_l.c"
+#line 1106 "libxlu_disk_l.c"
 
 	if ( !yyg->yy_init )
 		{
@@ -1295,7 +1296,7 @@ YY_RULE_SETUP
    * matched the whole string, so these patterns take precedence */
 case 13:
 YY_RULE_SETUP
-#line 160 "libxlu_disk_l.l"
+#line 161 "libxlu_disk_l.l"
 {
                     STRIP(':');
                     DPC->had_depr_prefix=1; DEPRECATE("use `[format=]...,'");
@@ -1304,7 +1305,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 166 "libxlu_disk_l.l"
+#line 167 "libxlu_disk_l.l"
 {
 		    STRIP(':');
                     DPC->had_depr_prefix=1; DEPRECATE("use `script=...'");
@@ -1329,7 +1330,7 @@ case 17:
 yyg->yy_c_buf_p = yy_cp = yy_bp + 4;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 174 "libxlu_disk_l.l"
+#line 175 "libxlu_disk_l.l"
 { DPC->had_depr_prefix=1; DEPRECATE(0); }
 	YY_BREAK
 case 18:
@@ -1337,7 +1338,7 @@ case 18:
 yyg->yy_c_buf_p = yy_cp = yy_bp + 6;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 175 "libxlu_disk_l.l"
+#line 176 "libxlu_disk_l.l"
 { DPC->had_depr_prefix=1; DEPRECATE(0); }
 	YY_BREAK
 case 19:
@@ -1345,7 +1346,7 @@ case 19:
 yyg->yy_c_buf_p = yy_cp = yy_bp + 5;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 176 "libxlu_disk_l.l"
+#line 177 "libxlu_disk_l.l"
 { DPC->had_depr_prefix=1; DEPRECATE(0); }
 	YY_BREAK
 case 20:
@@ -1369,7 +1370,7 @@ YY_RULE_SETUP
 case 22:
 /* rule 22 can match eol */
 YY_RULE_SETUP
-#line 186 "libxlu_disk_l.l"
+#line 187 "libxlu_disk_l.l"
 {
     char *colon;
     STRIP(',');
@@ -1406,7 +1407,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 220 "libxlu_disk_l.l"
+#line 221 "libxlu_disk_l.l"
 {
     BEGIN(LEXERR);
     yymore();
@@ -2516,12 +2517,4 @@ void xlu__disk_yyfree (void * ptr , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 227 "libxlu_disk_l.l"
-
-/*
- * Local variables:
- * mode: C
- * c-basic-offset: 4
- * indent-tabs-mode: nil
- * End:
- */
+#line 228 "libxlu_disk_l.l"

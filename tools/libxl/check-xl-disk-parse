@@ -107,4 +107,39 @@ disk: {
 EOF
 one 0 backendtype=phy,vdev=xvdb,access=w,target=/dev/vg/guest-volume
 
+expected <<EOF
+disk: {
+    "backend_domid": 0,
+    "pdev_path": "",
+    "vdev": "hdc",
+    "backend": "unknown",
+    "format": "empty",
+    "script": null,
+    "removable": 1,
+    "readwrite": 0,
+    "is_cdrom": 1
+}
+
+EOF
+one 0 devtype=cdrom,,,hdc
+one 0 ,,hdc:cdrom,r
+one 0 vdev=hdc,access=r,devtype=cdrom,target=
+one 0 ,empty,hdc:cdrom,r
+
+expected <<EOF
+disk: {
+    "backend_domid": 0,
+    "pdev_path": null,
+    "vdev": "hdc",
+    "backend": "unknown",
+    "format": "empty",
+    "script": null,
+    "removable": 1,
+    "readwrite": 0,
+    "is_cdrom": 1
+}
+
+EOF
+one 0 vdev=hdc,access=r,devtype=cdrom,format=empty
+
 complete

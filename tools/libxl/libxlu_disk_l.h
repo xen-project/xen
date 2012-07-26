@@ -340,16 +340,8 @@ extern int xlu__disk_yylex (yyscan_t yyscanner);
 #undef YY_DECL
 #endif
 
-#line 227 "libxlu_disk_l.l"
+#line 228 "libxlu_disk_l.l"
 
 #line 346 "libxlu_disk_l.h"
 #undef xlu__disk_yyIN_HEADER
 #endif /* xlu__disk_yyHEADER_H */
-
-/*
- * Local variables:
- * mode: C
- * c-basic-offset: 4
- * indent-tabs-mode: nil
- * End:
- */

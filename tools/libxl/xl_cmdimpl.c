@@ -2210,7 +2210,8 @@ static void cd_insert(const char *dom, const char *virtdev, char *phys)
 
     find_domain(dom);
 
-    if (asprintf(&buf, "%s,%s:cdrom,r", phys ? phys : "", virtdev) < 0) {
+    if (asprintf(&buf, "vdev=%s,access=r,devtype=cdrom,target=%s",
+                 virtdev, phys ? phys : "") < 0) {
         fprintf(stderr, "out of memory\n");
         return;
     }
