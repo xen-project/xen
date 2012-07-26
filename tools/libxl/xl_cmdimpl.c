@@ -696,6 +696,9 @@ static void parse_config_data(const char *config_source,
                 vcpu_to_pcpu[n_cpus] = i;
             n_cpus++;
         }
+
+        /* We have a cpumap, disable automatic placement */
+        libxl_defbool_set(&b_info->numa_placement, false);
     }
     else if (!xlu_cfg_get_string (config, "cpus", &buf, 0)) {
         char *buf2 = strdup(buf);
@@ -709,6 +712,8 @@ static void parse_config_data(const char *config_source,
         if (vcpupin_parse(buf2, &b_info->cpumap))
             exit(1);
         free(buf2);
+
+        libxl_defbool_set(&b_info->numa_placement, false);
     }
 
     if (!xlu_cfg_get_long (config, "memory", &l, 0)) {

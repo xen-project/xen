@@ -2497,6 +2497,123 @@ static inline void libxl__ctx_unlock(libxl_ctx *ctx) {
 #define CTX_LOCK (libxl__ctx_lock(CTX))
 #define CTX_UNLOCK (libxl__ctx_unlock(CTX))
 
+/*
+ * Automatic NUMA placement
+ *
+ * These functions and data structures deal with the initial placement of a
+ * domain onto the host NUMA nodes.
+ *
+ * The key concept here is the one of "NUMA placement candidate", which is
+ * basically a set of nodes whose characteristics have been successfully
+ * checked against some specific requirements. More precisely, a candidate
+ * is the nodemap associated with one of the possible subset of the host
+ * NUMA nodes providing a certain amount of free memory, or a given number
+ * of cpus, or even both (depending in what the caller wants). For
+ * convenience of use, some of this information are stored within the
+ * candidate itself, instead of always being dynamically computed. A single
+ * node can be valid placement candidate, as well as it is possible for a
+ * candidate to contain all the nodes of the host. The fewer nodes there
+ * are in a candidate, the better performance a domain placed onto it
+ * should get (at least from a NUMA point of view). For instance, looking
+ * for a numa candidates with 2GB of free memory means we want the subsets
+ * of the host NUMA nodes with, cumulatively, at least 2GB of free memory.
+ * This condition can be satisfied by just one particular node, or it may
+ * require more nodes, depending on the characteristics of the host, on how
+ * many domains have been created already, on how big they are, etc.
+ *
+ * The intended usage is as follows:
+ *  1. first of all, call libxl__get_numa_candidates(), and specify the
+ *     proper constraints to it (e.g., the amount of memory a domain need
+ *     as the minimum amount of free memory for the candidates). If a
+ *     candidate comparison function is provided, the candidate with fewer
+ *     nodes that is found to be best according to what such fucntion says
+ *     is returned. If no comparison function is passed, the very first
+ *     candidate is.
+ *  2. The chosen candidate's nodemap should be utilized for computing the
+ *     actual affinity of the domain which, given the current NUMA support
+ *     in the hypervisor, is what determines the placement of the domain's
+ *     vcpus and memory.
+ */
+
+typedef struct {
+    int nr_cpus, nr_nodes;
+    int nr_vcpus;
+    uint32_t free_memkb;
+    libxl_bitmap nodemap;
+} libxl__numa_candidate;
+
+/* Signature for the comparison function between two candidates */
+typedef int (*libxl__numa_candidate_cmpf)(const libxl__numa_candidate *c1,
+                                          const libxl__numa_candidate *c2);
+
+/*
+ * This looks for the best NUMA placement candidate satisfying some
+ * specific conditions. If min_nodes and/or max_nodes are not 0, their
+ * value is used to determine the minimum and maximum number of nodes the
+ * candidate can have. If they are 0, it means the candidate can contain
+ * from 1 node (min_nodes=0) to the total number of nodes of the host
+ * (max_ndoes=0). If min_free_memkb and/or min_cpus are not 0, the caller
+ * only wants candidates with at least the amount of free memory and the
+ * number of cpus they specify, respectively. If they are 0, the
+ * candidates' free memory and/or number of cpus won't be checked at all.
+ *
+ * Candidates are compared among each others by calling numa_cmpf(), which
+ * is where the heuristics for determining which candidate is the best
+ * one is actually implemented. The only bit of it that is hardcoded in
+ * this function is the fact that candidates with fewer nodes are always
+ * preferrable.
+ *
+ * If at least one suitable candidate is found, it is returned in cndt_out,
+ * cndt_found is set to one, and the function returns successfully. On the
+ * other hand, if not even one single candidate can be found, the function
+ * still returns successfully but cndt_found will be zero.
+ *
+ * It is up to the function to properly allocate cndt_out (by calling
+ * libxl__numa_candidate_alloc()), while it is the caller that should init
+ * (libxl__numa_candidate_init()) and free (libxl__numa_candidate_dispose())
+ * it.
+ */
+_hidden int libxl__get_numa_candidate(libxl__gc *gc,
+                                      uint32_t min_free_memkb, int min_cpus,
+                                      int min_nodes, int max_nodes,
+                                      libxl__numa_candidate_cmpf numa_cmpf,
+                                      libxl__numa_candidate *cndt_out,
+                                      int *cndt_found);
+
+/* Initialization, allocation and deallocation for placement candidates */
+static inline void libxl__numa_candidate_init(libxl__numa_candidate *cndt)
+{
+    cndt->free_memkb = 0;
+    cndt->nr_cpus = cndt->nr_nodes = cndt->nr_vcpus = 0;
+    libxl_bitmap_init(&cndt->nodemap);
+}
+
+static inline int libxl__numa_candidate_alloc(libxl__gc *gc,
+                                              libxl__numa_candidate *cndt)
+{
+    return libxl_node_bitmap_alloc(CTX, &cndt->nodemap, 0);
+}
+static inline void libxl__numa_candidate_dispose(libxl__numa_candidate *cndt)
+{
+    libxl_bitmap_dispose(&cndt->nodemap);
+}
+
+/* Retrieve (in nodemap) the node map associated to placement candidate cndt */
+static inline
+void libxl__numa_candidate_get_nodemap(libxl__gc *gc,
+                                       const libxl__numa_candidate *cndt,
+                                       libxl_bitmap *nodemap)
+{
+    libxl_bitmap_copy(CTX, nodemap, &cndt->nodemap);
+}
+/* Set the node map of placement candidate cndt to match nodemap */
+static inline
+void libxl__numa_candidate_put_nodemap(libxl__gc *gc,
+                                       libxl__numa_candidate *cndt,
+                                       const libxl_bitmap *nodemap)
+{
+    libxl_bitmap_copy(CTX, &cndt->nodemap, nodemap);
+}
 
 /*
  * Inserts "elm_new" into the sorted list "head".

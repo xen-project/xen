@@ -215,6 +215,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_bitmap_set_any(&b_info->cpumap);
     }
 
+    libxl_defbool_setdefault(&b_info->numa_placement, true);
+
     if (b_info->max_memkb == LIBXL_MEMKB_DEFAULT)
         b_info->max_memkb = 32 * 1024;
     if (b_info->target_memkb == LIBXL_MEMKB_DEFAULT)

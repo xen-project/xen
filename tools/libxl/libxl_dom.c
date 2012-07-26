@@ -98,6 +98,94 @@ out:
     return sched;
 }
 
+/*
+ * Two NUMA placement candidates are compared by means of the following
+ * heuristics:
+
+ *  - the number of vcpus runnable on the candidates is considered, and
+ *    candidates with fewer of them are preferred. If two candidate have
+ *    the same number of runnable vcpus,
+ *  - the amount of free memory in the candidates is considered, and the
+ *    candidate with greater amount of it is preferred.
+ *
+ * In fact, leaving larger memory holes, maximizes the probability of being
+ * able to put other domains on the node. That hopefully means many domains
+ * will benefit from local memory accesses, but also introduces the risk of
+ * overloading large (from a memory POV) nodes. That's right the effect
+ * that counting the vcpus able to run on the nodes tries to prevent.
+ *
+ * Note that this completely ignore the number of nodes each candidate span,
+ * as the fact that fewer nodes is better is already accounted for in the
+ * algorithm.
+ */
+static int numa_cmpf(const libxl__numa_candidate *c1,
+                     const libxl__numa_candidate *c2)
+{
+    if (c1->nr_vcpus != c2->nr_vcpus)
+        return c1->nr_vcpus - c2->nr_vcpus;
+
+    return c2->free_memkb - c1->free_memkb;
+}
+
+/* The actual automatic NUMA placement routine */
+static int numa_place_domain(libxl__gc *gc, libxl_domain_build_info *info)
+{
+    int found;
+    libxl__numa_candidate candidate;
+    libxl_bitmap candidate_nodemap;
+    libxl_cpupoolinfo *pinfo;
+    int nr_pools, rc = 0;
+    uint32_t memkb;
+
+    libxl__numa_candidate_init(&candidate);
+    libxl_bitmap_init(&candidate_nodemap);
+
+    /* First of all, if cpupools are in use, better not to mess with them */
+    pinfo = libxl_list_cpupool(CTX, &nr_pools);
+    if (!pinfo)
+        return ERROR_FAIL;
+    if (nr_pools > 1) {
+        LOG(NOTICE, "Skipping NUMA placement as cpupools are in use");
+        goto out;
+    }
+
+    rc = libxl_domain_need_memory(CTX, info, &memkb);
+    if (rc)
+        goto out;
+    if (libxl_node_bitmap_alloc(CTX, &candidate_nodemap, 0)) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    /* Find the best candidate with enough free memory and at least
+     * as much pcpus as the domain has vcpus.  */
+    rc = libxl__get_numa_candidate(gc, memkb, info->max_vcpus, 0, 0,
+                                   numa_cmpf, &candidate, &found);
+    if (rc)
+        goto out;
+
+    /* Not even a suitable placement candidate! Let's just don't touch the
+     * domain's info->cpumap. It will have affinity with all nodes/cpus. */
+    if (found == 0)
+        goto out;
+
+    /* Map the candidate's node map to the domain's info->cpumap */
+    libxl__numa_candidate_get_nodemap(gc, &candidate, &candidate_nodemap);
+    rc = libxl_nodemap_to_cpumap(CTX, &candidate_nodemap, &info->cpumap);
+    if (rc)
+        goto out;
+
+    LOG(DETAIL, "NUMA placement candidate with %d nodes, %d cpus and "
+                "%"PRIu32" KB free selected", candidate.nr_nodes,
+                candidate.nr_cpus, candidate.free_memkb / 1024);
+
+ out:
+    libxl__numa_candidate_dispose(&candidate);
+    libxl_bitmap_dispose(&candidate_nodemap);
+    libxl_cpupoolinfo_list_free(pinfo, nr_pools);
+    return rc;
+}
+
 int libxl__build_pre(libxl__gc *gc, uint32_t domid,
               libxl_domain_build_info *info, libxl__domain_build_state *state)
 {
@@ -107,7 +195,31 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     uint32_t rtc_timeoffset;
 
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
+
+    /*
+     * Check if the domain has any CPU affinity. If not, try to build
+     * up one. In case numa_place_domain() find at least a suitable
+     * candidate, it will affect info->cpumap accordingly; if it
+     * does not, it just leaves it as it is. This means (unless
+     * some weird error manifests) the subsequent call to
+     * libxl_set_vcpuaffinity_all() will do the actual placement,
+     * whatever that turns out to be.
+     */
+    if (libxl_defbool_val(info->numa_placement)) {
+        int rc;
+
+        if (!libxl_bitmap_is_full(&info->cpumap)) {
+            LOG(ERROR, "Can run NUMA placement only if no vcpu "
+                       "affinity is specified");
+            return ERROR_INVAL;
+        }
+
+        rc = numa_place_domain(gc, info);
+        if (rc)
+            return rc;
+    }
     libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus, &info->cpumap);
+
     xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + LIBXL_MAXMEM_CONSTANT);
     if (info->type == LIBXL_DOMAIN_TYPE_PV)
         xc_domain_set_memmap_limit(ctx->xch, domid,

@@ -111,8 +111,8 @@ created online and the remainder will be offline.
 
 =item B<cpus="CPU-LIST">
 
-List of which cpus the guest is allowed to use. Default behavior is
-`all cpus`. A C<CPU-LIST> may be specified as follows:
+List of which cpus the guest is allowed to use. By default xl will pick
+some cpus on its own (see below). A C<CPU-LIST> may be specified as follows:
 
 =over 4
 
@@ -131,6 +131,12 @@ of the guest will run on cpu #2 of the host and vcpu #1 of the guest will
 run on cpu #3 of the host.
 
 =back
+
+If this option is not specified, libxl automatically tries to place the new
+domain on the host's NUMA nodes (provided the host has more than one NUMA
+node) by pinning it to the cpus of those nodes. A heuristic approach is
+utilized with the goals of maximizing performance for the domain and, at
+the same time, achieving efficient utilization of the host's CPUs and RAM.
 
 =item B<cpu_weight=WEIGHT>
 
