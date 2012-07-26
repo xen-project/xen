@@ -164,16 +164,17 @@ information to be interpreted by /etc/xen/scripts/block-<script>.
 
 
 
-==================================
-DEPRECATED PARAMETERS AND PREFIXES
-==================================
+============================================
+DEPRECATED PARAMETERS, PREFIXES AND SYNTAXES
+============================================
 
-Deprecated values are acceptable and are intended work compatibly with
+Deprecated forms are acceptable and are intended work compatibly with
 xend and xl from xen 4.1.  In future they may print a warning.
 Support for deprecated parameters and syntaxes are likely to be
 dropped in future versions of xl.
 
-There is also support for a deprecated old syntax for <diskspec>:
+
+There is support for a deprecated old syntax for <diskspec>:
 
   [<format>:][<target>],<vdev>[:<devtype>],<access>   (deprecated)
 

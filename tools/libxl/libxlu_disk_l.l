@@ -45,8 +45,6 @@ void xlu__disk_yyset_column(int  column_no, yyscan_t yyscanner);
  * and particularly to avoid repeating boilerplate values such as
  * DPC->disk, yytext, etc. */
 
-#define DPC ((DiskParseContext*)yyextra)
-
 /* Sets an enum, checking it hasn't already been set to a different value  */
 #define DSET(dpc,member,enumname,str,valname) do{			\
 	if (dpc->disk->member != LIBXL_DISK_##enumname##_UNKNOWN &&	\
@@ -79,6 +77,8 @@ static void savestring(DiskParseContext *dpc, const char *what_respecified,
     *update = strdup(value);
 }
 
+#define DPC dpc /* our convention in lexer helper functions */
+
 /* Sets ->readwrite from the string.  This ought to be an enum, perhaps. */
 static void setaccess(DiskParseContext *dpc, const char *str) {
     if (!strcmp(str, "r") || !strcmp(str, "ro")) {
@@ -110,6 +110,30 @@ static void setbackendtype(DiskParseContext *dpc, const char *str) {
 }
 
 #define DEPRECATE(usewhatinstead) /* not currently reported */
+
+/* Handles a vdev positional parameter which includes a devtype. */
+static int vdev_and_devtype(DiskParseContext *dpc, char *str) {
+    /* returns 1 if it was <vdev>:<devtype>, 0 (doing nothing) otherwise */
+    char *colon = strrchr(str, ':');
+    if (!colon)
+        return 0;
+
+    DEPRECATE("use `devtype=...'");
+    *colon++ = 0;
+    SAVESTRING("vdev", vdev, str);
+
+    if (!strcmp(colon,"cdrom")) {
+        DPC->disk->is_cdrom = 1;
+    } else if (!strcmp(colon,"disk")) {
+        DPC->disk->is_cdrom = 0;
+    } else {
+        xlu__disk_err(DPC,colon,"unknown deprecated type");
+    }
+    return 1;
+}
+
+#undef DPC /* needs to be defined differently the actual lexer */
+#define DPC ((DiskParseContext*)yyextra)
 
 %}
 
@@ -185,7 +209,6 @@ phy:/.*		{ DPC->had_depr_prefix=1; DEPRECATE(0); }
  /* positional parameters */
 
 [^=,]*,|[^=,]+,?  {
-    char *colon;
     STRIP(',');
 
     if (DPC->err) {
@@ -196,19 +219,8 @@ phy:/.*		{ DPC->had_depr_prefix=1; DEPRECATE(0); }
                DPC->disk->format == LIBXL_DISK_FORMAT_UNKNOWN) {
         setformat(DPC,yytext);
     } else if (!DPC->disk->vdev) {
-        colon = strrchr(yytext, ':');
-        if (colon) {
-            DEPRECATE("use `devtype=...'");
-            *colon++ = 0;
-            if (!strcmp(colon,"cdrom")) {
-                DPC->disk->is_cdrom = 1;
-            } else if (!strcmp(colon,"disk")) {
-                DPC->disk->is_cdrom = 0;
-            } else {
-                xlu__disk_err(DPC,colon,"unknown deprecated type");
-            }
-        }
-        SAVESTRING("vdev", vdev, yytext);
+        if (!vdev_and_devtype(DPC,yytext))
+            SAVESTRING("vdev", vdev, yytext);
     } else if (!DPC->access_set) {
         DPC->access_set = 1;
         setaccess(DPC,yytext);
