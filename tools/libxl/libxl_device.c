@@ -447,16 +447,26 @@ void libxl__ao_devices_callback(libxl__egc *egc, libxl__ao_device *aodev)
 
 int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     char *be_path = libxl__device_backend_path(gc, dev);
     char *fe_path = libxl__device_frontend_path(gc, dev);
+    xs_transaction_t t = 0;
+    int rc = 0;
 
-    xs_rm(ctx->xsh, XBT_NULL, be_path);
-    xs_rm(ctx->xsh, XBT_NULL, fe_path);
+    do {
+        t = xs_transaction_start(CTX->xsh);
+        libxl__xs_path_cleanup(gc, t, fe_path);
+        libxl__xs_path_cleanup(gc, t, be_path);
+        rc = !xs_transaction_end(CTX->xsh, t, 0);
+    } while (rc && errno == EAGAIN);
+    if (rc) {
+        LOGE(ERROR, "unable to finish transaction");
+        goto out;
+    }
 
     libxl__device_destroy_tapdisk(gc, be_path);
 
-    return 0;
+out:
+    return rc;
 }
 
 /* Callback for device destruction */
