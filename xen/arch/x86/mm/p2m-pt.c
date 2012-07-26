@@ -88,7 +88,7 @@ static unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
     case p2m_ram_paged:
     case p2m_ram_paging_in:
     default:
-        return flags;
+        return flags | _PAGE_NX_BIT;
     case p2m_grant_map_ro:
         return flags | P2M_BASE_FLAGS | _PAGE_NX_BIT;
     case p2m_ram_ro:
