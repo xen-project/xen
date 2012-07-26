@@ -2316,7 +2316,7 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic)
                                   libxl__xen_script_dir_path()) < 0 )
         return ERROR_FAIL;
     if (!nic->nictype)
-        nic->nictype = LIBXL_NIC_TYPE_IOEMU;
+        nic->nictype = LIBXL_NIC_TYPE_VIF_IOEMU;
     return 0;
 }
 
@@ -2470,7 +2470,7 @@ static void libxl__device_nic_from_xs_be(libxl__gc *gc,
     nic->script = xs_read(ctx->xsh, XBT_NULL,
                       libxl__sprintf(gc, "%s/script", be_path), &len);
 
-    /* XXX ioemu nics are not in xenstore at all? */
+    /* vif_ioemu nics use the same xenstore entries as vif interfaces */
     nic->nictype = LIBXL_NIC_TYPE_VIF;
     nic->model = NULL; /* XXX Only for TYPE_IOEMU */
     nic->ifname = NULL; /* XXX Only for TYPE_IOEMU */
@@ -2603,7 +2603,7 @@ const char *libxl__device_nic_devname(libxl__gc *gc,
     switch (type) {
     case LIBXL_NIC_TYPE_VIF:
         return GCSPRINTF("vif%u.%d", domid, devid);
-    case LIBXL_NIC_TYPE_IOEMU:
+    case LIBXL_NIC_TYPE_VIF_IOEMU:
         return GCSPRINTF("vif%u.%d" TAP_DEVICE_SUFFIX, domid, devid);
     default:
         abort();

@@ -977,7 +977,7 @@ static void parse_config_data(const char *config_source,
                     nic->bridge = strdup(p2 + 1);
                 } else if (!strcmp(p, "type")) {
                     if (!strcmp(p2 + 1, "ioemu"))
-                        nic->nictype = LIBXL_NIC_TYPE_IOEMU;
+                        nic->nictype = LIBXL_NIC_TYPE_VIF_IOEMU;
                     else
                         nic->nictype = LIBXL_NIC_TYPE_VIF;
                 } else if (!strcmp(p, "ip")) {
@@ -5194,7 +5194,7 @@ int main_networkattach(int argc, char **argv)
             if (!strcmp("vif", oparg)) {
                 nic.nictype = LIBXL_NIC_TYPE_VIF;
             } else if (!strcmp("ioemu", oparg)) {
-                nic.nictype = LIBXL_NIC_TYPE_IOEMU;
+                nic.nictype = LIBXL_NIC_TYPE_VIF_IOEMU;
             } else {
                 fprintf(stderr, "Invalid parameter `type'.\n");
                 return 1;

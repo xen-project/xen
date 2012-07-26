@@ -60,7 +60,7 @@ libxl_disk_backend = Enumeration("disk_backend", [
     ])
 
 libxl_nic_type = Enumeration("nic_type", [
-    (1, "IOEMU"),
+    (1, "VIF_IOEMU"),
     (2, "VIF"),
     ])
 

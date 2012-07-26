@@ -215,12 +215,12 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         free(s);
 
         for (i = 0; i < num_nics; i++) {
-            if (nics[i].nictype == LIBXL_NIC_TYPE_IOEMU) {
+            if (nics[i].nictype == LIBXL_NIC_TYPE_VIF_IOEMU) {
                 char *smac = libxl__sprintf(gc,
                                    LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nics[i].mac));
                 const char *ifname = libxl__device_nic_devname(gc,
                                                 domid, nics[i].devid,
-                                                LIBXL_NIC_TYPE_IOEMU);
+                                                LIBXL_NIC_TYPE_VIF_IOEMU);
                 flexarray_vappend(dm_args,
                                   "-net",
                                   GCSPRINTF(
@@ -469,12 +469,12 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                                                          b_info->max_vcpus));
         }
         for (i = 0; i < num_nics; i++) {
-            if (nics[i].nictype == LIBXL_NIC_TYPE_IOEMU) {
+            if (nics[i].nictype == LIBXL_NIC_TYPE_VIF_IOEMU) {
                 char *smac = libxl__sprintf(gc,
                                 LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nics[i].mac));
                 const char *ifname = libxl__device_nic_devname(gc,
                                                 guest_domid, nics[i].devid,
-                                                LIBXL_NIC_TYPE_IOEMU);
+                                                LIBXL_NIC_TYPE_VIF_IOEMU);
                 flexarray_append(dm_args, "-device");
                 flexarray_append(dm_args,
                    libxl__sprintf(gc, "%s,id=nic%d,netdev=net%d,mac=%s",
