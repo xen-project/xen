@@ -87,6 +87,7 @@ static char **get_hotplug_env(libxl__gc *gc, libxl__device *dev)
     const char *type = libxl__device_kind_to_string(dev->backend_kind);
     char **env;
     int nr = 0;
+    libxl_nic_type nictype;
 
     script = libxl__xs_read(gc, XBT_NULL,
                             GCSPRINTF("%s/%s", be_path, "script"));
@@ -95,23 +96,105 @@ static char **get_hotplug_env(libxl__gc *gc, libxl__device *dev)
         return NULL;
     }
 
-    const int arraysize = 9;
+    const int arraysize = 13;
     GCNEW_ARRAY(env, arraysize);
     env[nr++] = "script";
     env[nr++] = script;
     env[nr++] = "XENBUS_TYPE";
-    env[nr++] = libxl__strdup(gc, type);
+    env[nr++] = (char *) type;
     env[nr++] = "XENBUS_PATH";
     env[nr++] = GCSPRINTF("backend/%s/%u/%d", type, dev->domid, dev->devid);
     env[nr++] = "XENBUS_BASE_PATH";
     env[nr++] = "backend";
+    if (dev->backend_kind == LIBXL__DEVICE_KIND_VIF) {
+        if (libxl__nic_type(gc, dev, &nictype)) {
+            LOG(ERROR, "unable to get nictype");
+            return NULL;
+        }
+        switch (nictype) {
+        case LIBXL_NIC_TYPE_VIF_IOEMU:
+            env[nr++] = "INTERFACE";
+            env[nr++] = (char *) libxl__device_nic_devname(gc, dev->domid,
+                                                    dev->devid,
+                                                    LIBXL_NIC_TYPE_VIF_IOEMU);
+            /*
+             * We need to fall through because for PV_IOEMU nic types we need
+             * to execute both the vif and the tap hotplug script, and we
+             * don't know which one we are executing in this call, so provide
+             * both env variables.
+             */
+        case LIBXL_NIC_TYPE_VIF:
+            env[nr++] = "vif";
+            env[nr++] = (char *) libxl__device_nic_devname(gc, dev->domid,
+                                                    dev->devid,
+                                                    LIBXL_NIC_TYPE_VIF);
+            break;
+        default:
+            return NULL;
+        }
+    }
+
     env[nr++] = NULL;
-    assert(nr == arraysize);
+    assert(nr <= arraysize);
 
     return env;
 }
 
 /* Hotplug scripts caller functions */
+
+static int libxl__hotplug_nic(libxl__gc *gc, libxl__device *dev,
+                               char ***args, char ***env,
+                               libxl__device_action action, int num_exec)
+{
+    char *be_path = libxl__device_backend_path(gc, dev);
+    char *script;
+    int nr = 0, rc = 0;
+    libxl_nic_type nictype;
+
+    script = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/%s", be_path,
+                                                             "script"));
+    if (!script) {
+        LOGE(ERROR, "unable to read script from %s", be_path);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    rc = libxl__nic_type(gc, dev, &nictype);
+    if (rc) {
+        LOG(ERROR, "error when fetching nic type");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    if (nictype == LIBXL_NIC_TYPE_VIF && num_exec != 0) {
+        rc = 0;
+        goto out;
+    }
+
+    *env = get_hotplug_env(gc, dev);
+    if (!env) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    const int arraysize = 4;
+    GCNEW_ARRAY(*args, arraysize);
+    (*args)[nr++] = script;
+
+    if (nictype == LIBXL_NIC_TYPE_VIF_IOEMU && num_exec) {
+        (*args)[nr++] = action == DEVICE_CONNECT ? "add" : "remove";
+        (*args)[nr++] = "type_if=tap";
+        (*args)[nr++] = NULL;
+    } else {
+        (*args)[nr++] = action == DEVICE_CONNECT ? "online" : "offline";
+        (*args)[nr++] = "type_if=vif";
+        (*args)[nr++] = NULL;
+    }
+    assert(nr == arraysize);
+    rc = 1;
+
+out:
+    return rc;
+}
 
 static int libxl__hotplug_disk(libxl__gc *gc, libxl__device *dev,
                                char ***args, char ***env,
@@ -150,7 +233,8 @@ error:
 
 int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
                                    char ***args, char ***env,
-                                   libxl__device_action action)
+                                   libxl__device_action action,
+                                   int num_exec)
 {
     char *disable_udev = libxl__xs_read(gc, XBT_NULL, DISABLE_UDEV_PATH);
     int rc;
@@ -163,7 +247,23 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
 
     switch (dev->backend_kind) {
     case LIBXL__DEVICE_KIND_VBD:
+        if (num_exec != 0) {
+            rc = 0;
+            goto out;
+        }
         rc = libxl__hotplug_disk(gc, dev, args, env, action);
+        break;
+    case LIBXL__DEVICE_KIND_VIF:
+        /*
+         * If domain has a stubdom we don't have to execute hotplug scripts
+         * for emulated interfaces
+         */
+        if ((num_exec > 1) ||
+            (libxl_get_stubdom_id(CTX, dev->domid) && num_exec)) {
+            rc = 0;
+            goto out;
+        }
+        rc = libxl__hotplug_nic(gc, dev, args, env, action, num_exec);
         break;
     default:
         /* No need to execute any hotplug scripts */

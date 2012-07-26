@@ -102,6 +102,31 @@ out:
     return numdevs;
 }
 
+int libxl__nic_type(libxl__gc *gc, libxl__device *dev, libxl_nic_type *nictype)
+{
+    char *snictype, *be_path;
+    int rc = 0;
+
+    be_path = libxl__device_backend_path(gc, dev);
+    snictype = libxl__xs_read(gc, XBT_NULL,
+                              GCSPRINTF("%s/%s", be_path, "type"));
+    if (!snictype) {
+        LOGE(ERROR, "unable to read nictype from %s", be_path);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    rc = libxl_nic_type_from_string(snictype, nictype);
+    if (rc) {
+        LOGE(ERROR, "unable to parse nictype from %s", be_path);
+        goto out;
+    }
+
+    rc = 0;
+
+out:
+    return rc;
+}
+
 int libxl__device_generic_add(libxl__gc *gc, xs_transaction_t t,
         libxl__device *device, char **bents, char **fents)
 {
@@ -638,6 +663,8 @@ static void device_hotplug_child_death_cb(libxl__egc *egc,
 
 static void device_hotplug_done(libxl__egc *egc, libxl__ao_device *aodev);
 
+static void device_hotplug_clean(libxl__gc *gc, libxl__ao_device *aodev);
+
 void libxl__wait_device_connection(libxl__egc *egc, libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
@@ -850,7 +877,8 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
     /* Check if we have to execute hotplug scripts for this device
      * and return the necessary args/env vars for execution */
     hotplug = libxl__get_hotplug_script_info(gc, aodev->dev, &args, &env,
-                                             aodev->action);
+                                             aodev->action,
+                                             aodev->num_exec);
     switch (hotplug) {
     case 0:
         /* no hotplug script to execute */
@@ -930,6 +958,8 @@ static void device_hotplug_child_death_cb(libxl__egc *egc,
     char *be_path = libxl__device_backend_path(gc, aodev->dev);
     char *hotplug_error;
 
+    device_hotplug_clean(gc, aodev);
+
     if (status) {
         libxl_report_child_exitstatus(CTX, LIBXL__LOG_ERROR,
                                       aodev->what, pid, status);
@@ -938,8 +968,25 @@ static void device_hotplug_child_death_cb(libxl__egc *egc,
         if (hotplug_error)
             LOG(ERROR, "script: %s", hotplug_error);
         aodev->rc = ERROR_FAIL;
+        if (aodev->action == DEVICE_CONNECT)
+            /*
+             * Only fail on device connection, on disconnection
+             * ignore error, and continue with the remove process
+             */
+             goto error;
     }
 
+    /* Increase num_exec and call hotplug scripts again if necessary
+     * If no more executions are needed, device_hotplug will call
+     * device_hotplug_done breaking the loop.
+     */
+    aodev->num_exec++;
+    device_hotplug(egc, aodev);
+
+    return;
+
+error:
+    assert(aodev->rc);
     device_hotplug_done(egc, aodev);
 }
 
@@ -951,9 +998,7 @@ static void device_hotplug_done(libxl__egc *egc, libxl__ao_device *aodev)
     xs_transaction_t t = 0;
     int rc;
 
-    /* Clean events and check reentrancy */
-    libxl__ev_time_deregister(gc, &aodev->timeout);
-    assert(!libxl__ev_child_inuse(&aodev->child));
+    device_hotplug_clean(gc, aodev);
 
     /* Clean xenstore if it's a disconnection */
     if (aodev->action == DEVICE_DISCONNECT) {
@@ -973,6 +1018,13 @@ static void device_hotplug_done(libxl__egc *egc, libxl__ao_device *aodev)
 out:
     aodev->callback(egc, aodev);
     return;
+}
+
+static void device_hotplug_clean(libxl__gc *gc, libxl__ao_device *aodev)
+{
+    /* Clean events and check reentrancy */
+    libxl__ev_time_deregister(gc, &aodev->timeout);
+    assert(!libxl__ev_child_inuse(&aodev->child));
 }
 
 static void devices_remove_callback(libxl__egc *egc, libxl__ao_devices *aodevs,

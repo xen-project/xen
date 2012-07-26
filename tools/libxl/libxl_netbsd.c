@@ -34,7 +34,8 @@ char *libxl__devid_to_localdev(libxl__gc *gc, int devid)
 /* Hotplug scripts caller functions */
 int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
                                    char ***args, char ***env,
-                                   libxl__device_action action)
+                                   libxl__device_action action,
+                                   int num_exec)
 {
     return 0;
 }

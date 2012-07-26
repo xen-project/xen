@@ -920,6 +920,8 @@ _hidden int libxl__parse_backend_path(libxl__gc *gc, const char *path,
                                       libxl__device *dev);
 _hidden int libxl__device_destroy(libxl__gc *gc, libxl__device *dev);
 _hidden int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state);
+_hidden int libxl__nic_type(libxl__gc *gc, libxl__device *dev,
+                            libxl_nic_type *nictype);
 
 /*
  * For each aggregate type which can be used as an input we provide:
@@ -1840,6 +1842,7 @@ struct libxl__ao_device {
     libxl__ao_devices *aodevs;
     /* device hotplug execution */
     const char *what;
+    int num_exec;
     libxl__ev_child child;
 };
 
@@ -1979,10 +1982,19 @@ _hidden void libxl__initiate_device_remove(libxl__egc *egc,
  * < 0: Error
  * 0: No need to execute hotplug script
  * 1: Execute hotplug script
+ *
+ * The last parameter, "num_exec" refeers to the number of times hotplug
+ * scripts have been called for this device.
+ *
+ * The main body of libxl will, for each device, keep calling
+ * libxl__get_hotplug_script_info, with incrementing values of
+ * num_exec, and executing the resulting script accordingly,
+ * until libxl__get_hotplug_script_info returns<=0.
  */
 _hidden int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
                                            char ***args, char ***env,
-                                           libxl__device_action action);
+                                           libxl__device_action action,
+                                           int num_exec);
 
 /*----- local disk attach: attach a disk locally to run the bootloader -----*/
 
