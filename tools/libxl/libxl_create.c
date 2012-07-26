@@ -960,7 +960,7 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__ao_devices *aodevs,
         libxl__device_console_dispose(&console);
 
         libxl_device_vkb_init(&vkb);
-        libxl_device_vkb_add(ctx, domid, &vkb);
+        libxl__device_vkb_add(gc, domid, &vkb);
         libxl_device_vkb_dispose(&vkb);
 
         dcs->dmss.dm.guest_domid = domid;
@@ -977,7 +977,7 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__ao_devices *aodevs,
 
         for (i = 0; i < d_config->num_vfbs; i++) {
             libxl_device_vfb_add(ctx, domid, &d_config->vfbs[i]);
-            libxl_device_vkb_add(ctx, domid, &d_config->vkbs[i]);
+            libxl__device_vkb_add(gc, domid, &d_config->vkbs[i]);
         }
 
         ret = init_console_info(&console, 0);

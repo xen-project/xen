@@ -2919,9 +2919,26 @@ static int libxl__device_from_vkb(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
-int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
+int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb,
+                         const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
+    AO_CREATE(ctx, domid, ao_how);
+    int rc;
+
+    rc = libxl__device_vkb_add(gc, domid, vkb);
+    if (rc) {
+        LOG(ERROR, "unable to add vkb device");
+        goto out;
+    }
+
+out:
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
+}
+
+int libxl__device_vkb_add(libxl__gc *gc, uint32_t domid,
+                          libxl_device_vkb *vkb)
+{
     flexarray_t *front;
     flexarray_t *back;
     libxl__device device;
@@ -2966,7 +2983,6 @@ out_free:
     flexarray_free(back);
     flexarray_free(front);
 out:
-    GC_FREE;
     return rc;
 }
 

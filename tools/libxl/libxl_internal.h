@@ -1949,6 +1949,10 @@ _hidden void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
                                    libxl_device_nic *nic,
                                    libxl__ao_device *aodev);
 
+/* Internal function to connect a vkb device */
+_hidden int libxl__device_vkb_add(libxl__gc *gc, uint32_t domid,
+                                  libxl_device_vkb *vkb);
+
 /* Waits for the passed device to reach state XenbusStateInitWait.
  * This is not really useful by itself, but is important when executing
  * hotplug scripts, since we need to be sure the device is in the correct
