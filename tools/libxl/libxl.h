@@ -470,10 +470,10 @@ typedef struct {
     libxl_domain_create_info c_info;
     libxl_domain_build_info b_info;
 
-    int num_disks, num_vifs, num_pcidevs, num_vfbs, num_vkbs;
+    int num_disks, num_nics, num_pcidevs, num_vfbs, num_vkbs;
 
     libxl_device_disk *disks;
-    libxl_device_nic *vifs;
+    libxl_device_nic *nics;
     libxl_device_pci *pcidevs;
     libxl_device_vfb *vfbs;
     libxl_device_vkb *vkbs;

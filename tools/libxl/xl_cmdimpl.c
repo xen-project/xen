@@ -919,17 +919,17 @@ static void parse_config_data(const char *config_source,
     }
 
     if (!xlu_cfg_get_list (config, "vif", &nics, 0, 0)) {
-        d_config->num_vifs = 0;
-        d_config->vifs = NULL;
-        while ((buf = xlu_cfg_get_listitem (nics, d_config->num_vifs)) != NULL) {
+        d_config->num_nics = 0;
+        d_config->nics = NULL;
+        while ((buf = xlu_cfg_get_listitem (nics, d_config->num_nics)) != NULL) {
             libxl_device_nic *nic;
             char *buf2 = strdup(buf);
             char *p, *p2;
 
-            d_config->vifs = (libxl_device_nic *) realloc(d_config->vifs, sizeof (libxl_device_nic) * (d_config->num_vifs+1));
-            nic = d_config->vifs + d_config->num_vifs;
+            d_config->nics = (libxl_device_nic *) realloc(d_config->nics, sizeof (libxl_device_nic) * (d_config->num_nics+1));
+            nic = d_config->nics + d_config->num_nics;
             libxl_device_nic_init(nic);
-            nic->devid = d_config->num_vifs;
+            nic->devid = d_config->num_nics;
 
             if (default_vifscript) {
                 free(nic->script);
@@ -1002,7 +1002,7 @@ static void parse_config_data(const char *config_source,
             } while ((p = strtok(NULL, ",")) != NULL);
 skip:
             free(buf2);
-            d_config->num_vifs++;
+            d_config->num_nics++;
         }
     }
 

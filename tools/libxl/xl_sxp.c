@@ -175,20 +175,20 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
         printf("\t)\n");
     }
 
-    for (i = 0; i < d_config->num_vifs; i++) {
+    for (i = 0; i < d_config->num_nics; i++) {
         printf("\t(device\n");
         printf("\t\t(vif\n");
-        if (d_config->vifs[i].ifname)
-            printf("\t\t\t(vifname %s)\n", d_config->vifs[i].ifname);
-        printf("\t\t\t(backend_domid %d)\n", d_config->vifs[i].backend_domid);
+        if (d_config->nics[i].ifname)
+            printf("\t\t\t(vifname %s)\n", d_config->nics[i].ifname);
+        printf("\t\t\t(backend_domid %d)\n", d_config->nics[i].backend_domid);
         printf("\t\t\t(frontend_domid %d)\n", domid);
-        printf("\t\t\t(devid %d)\n", d_config->vifs[i].devid);
-        printf("\t\t\t(mtu %d)\n", d_config->vifs[i].mtu);
-        printf("\t\t\t(model %s)\n", d_config->vifs[i].model);
+        printf("\t\t\t(devid %d)\n", d_config->nics[i].devid);
+        printf("\t\t\t(mtu %d)\n", d_config->nics[i].mtu);
+        printf("\t\t\t(model %s)\n", d_config->nics[i].model);
         printf("\t\t\t(mac %02x%02x%02x%02x%02x%02x)\n",
-               d_config->vifs[i].mac[0], d_config->vifs[i].mac[1],
-               d_config->vifs[i].mac[2], d_config->vifs[i].mac[3],
-               d_config->vifs[i].mac[4], d_config->vifs[i].mac[5]);
+               d_config->nics[i].mac[0], d_config->nics[i].mac[1],
+               d_config->nics[i].mac[2], d_config->nics[i].mac[3],
+               d_config->nics[i].mac[4], d_config->nics[i].mac[5]);
         printf("\t\t)\n");
         printf("\t)\n");
     }

@@ -822,15 +822,15 @@ yajl_gen_status libxl_domain_config_gen_json(yajl_gen hand,
     if (s != yajl_gen_status_ok)
         goto out;
 
-    s = yajl_gen_string(hand, (const unsigned char *)"vifs",
-                        sizeof("vifs")-1);
+    s = yajl_gen_string(hand, (const unsigned char *)"nics",
+                        sizeof("nics")-1);
     if (s != yajl_gen_status_ok)
         goto out;
     s = yajl_gen_array_open(hand);
     if (s != yajl_gen_status_ok)
         goto out;
-    for (i = 0; i < p->num_vifs; i++) {
-        s = libxl_device_nic_gen_json(hand, &p->vifs[i]);
+    for (i = 0; i < p->num_nics; i++) {
+        s = libxl_device_nic_gen_json(hand, &p->nics[i]);
         if (s != yajl_gen_status_ok)
             goto out;
     }

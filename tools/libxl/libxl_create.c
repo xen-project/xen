@@ -39,9 +39,9 @@ void libxl_domain_config_dispose(libxl_domain_config *d_config)
         libxl_device_disk_dispose(&d_config->disks[i]);
     free(d_config->disks);
 
-    for (i=0; i<d_config->num_vifs; i++)
-        libxl_device_nic_dispose(&d_config->vifs[i]);
-    free(d_config->vifs);
+    for (i=0; i<d_config->num_nics; i++)
+        libxl_device_nic_dispose(&d_config->nics[i]);
+    free(d_config->nics);
 
     for (i=0; i<d_config->num_pcidevs; i++)
         libxl_device_pci_dispose(&d_config->pcidevs[i]);
@@ -873,8 +873,8 @@ static void domcreate_rebuild_done(libxl__egc *egc,
             goto error_out;
         }
     }
-    for (i = 0; i < d_config->num_vifs; i++) {
-        ret = libxl_device_nic_add(ctx, domid, &d_config->vifs[i]);
+    for (i = 0; i < d_config->num_nics; i++) {
+        ret = libxl_device_nic_add(ctx, domid, &d_config->nics[i]);
         if (ret) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
                        "cannot add nic %d to domain: %d", i, ret);
