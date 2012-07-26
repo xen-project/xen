@@ -352,6 +352,25 @@ int libxl__device_model_version_running(libxl__gc *gc, uint32_t domid)
     return value;
 }
 
+int libxl__hotplug_settings(libxl__gc *gc, xs_transaction_t t)
+{
+    int rc = 0;
+    char *val;
+
+    val = libxl__xs_read(gc, t, DISABLE_UDEV_PATH);
+    if (!val && errno != ENOENT) {
+        LOGE(ERROR, "cannot read %s from xenstore", DISABLE_UDEV_PATH);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    if (!val) val = "0";
+
+    rc = !!atoi(val);
+
+out:
+    return rc;
+}
+
 /*
  * Local variables:
  * mode: C

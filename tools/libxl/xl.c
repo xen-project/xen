@@ -39,6 +39,7 @@ int dryrun_only;
 int force_execution;
 int autoballoon = 1;
 char *blkdev_start;
+int run_hotplug_scripts = 1;
 char *lockfile;
 char *default_vifscript = NULL;
 char *default_bridge = NULL;
@@ -69,6 +70,9 @@ static void parse_global_config(const char *configfile,
 
     if (!xlu_cfg_get_long (config, "autoballoon", &l, 0))
         autoballoon = l;
+
+    if (!xlu_cfg_get_long (config, "run_hotplug_scripts", &l, 0))
+        run_hotplug_scripts = l;
 
     if (!xlu_cfg_get_string (config, "lockfile", &buf, 0))
         lockfile = strdup(buf);

@@ -595,6 +595,7 @@ static void parse_config_data(const char *config_source,
         }
     }
 
+    libxl_defbool_set(&c_info->run_hotplug_scripts, run_hotplug_scripts);
     c_info->type = LIBXL_DOMAIN_TYPE_PV;
     if (!xlu_cfg_get_string (config, "builder", &buf, 0) &&
         !strncmp(buf, "hvm", strlen(buf)))

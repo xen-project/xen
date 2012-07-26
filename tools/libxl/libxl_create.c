@@ -70,6 +70,8 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
         libxl_defbool_setdefault(&c_info->oos, true);
     }
 
+    libxl_defbool_setdefault(&c_info->run_hotplug_scripts, true);
+
     return 0;
 }
 
@@ -384,7 +386,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
                        uint32_t *domid)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    int flags, ret, rc;
+    int flags, ret, rc, nb_vm;
     char *uuid_string;
     char *dom_path, *vm_path, *libxl_path;
     struct xs_permissions roperm[2];
@@ -392,6 +394,7 @@ int libxl__domain_make(libxl__gc *gc, libxl_domain_create_info *info,
     struct xs_permissions noperm[1];
     xs_transaction_t t = 0;
     xen_domain_handle_t handle;
+    libxl_vminfo *vm_list;
 
 
     assert(!libxl_domid_valid_guest(*domid));
@@ -504,6 +507,41 @@ retry_transaction:
         libxl__xs_mkdir(gc, t,
             libxl__sprintf(gc, "%s/hvmloader/generation-id-address", dom_path),
                         rwperm, ARRAY_SIZE(rwperm));
+
+                    vm_list = libxl_list_vm(ctx, &nb_vm);
+    if (!vm_list) {
+        LOG(ERROR, "cannot get number of running guests");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    libxl_vminfo_list_free(vm_list, nb_vm);
+    int hotplug_setting = libxl__hotplug_settings(gc, t);
+    if (hotplug_setting < 0) {
+        LOG(ERROR, "unable to get current hotplug scripts execution setting");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    if (libxl_defbool_val(info->run_hotplug_scripts) != hotplug_setting &&
+        (nb_vm - 1)) {
+        LOG(ERROR, "cannot change hotplug execution option once set, "
+                    "please shutdown all guests before changing it");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    if (libxl_defbool_val(info->run_hotplug_scripts)) {
+        rc = libxl__xs_write_checked(gc, t, DISABLE_UDEV_PATH, "1");
+        if (rc) {
+            LOGE(ERROR, "unable to write %s = 1", DISABLE_UDEV_PATH);
+            goto out;
+        }
+    } else {
+        rc = libxl__xs_rm_checked(gc, t, DISABLE_UDEV_PATH);
+        if (rc) {
+            LOGE(ERROR, "unable to delete %s", DISABLE_UDEV_PATH);
+            goto out;
+        }
+    }
 
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/uuid", vm_path), uuid_string, strlen(uuid_string));
     xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/name", vm_path), info->name, strlen(info->name));

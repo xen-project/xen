@@ -140,6 +140,7 @@ int xl_child_pid(xlchildnum); /* returns 0 if child struct is not in use */
 
 /* global options */
 extern int autoballoon;
+extern int run_hotplug_scripts;
 extern int dryrun_only;
 extern char *lockfile;
 extern char *default_vifscript;

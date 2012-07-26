@@ -91,6 +91,7 @@
 #define STUBDOM_CONSOLE_SERIAL 3
 #define STUBDOM_SPECIAL_CONSOLES 3
 #define TAP_DEVICE_SUFFIX "-emu"
+#define DISABLE_UDEV_PATH "libxl/disable_udev"
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
@@ -1510,6 +1511,8 @@ _hidden libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s);
    * default is qemu xen traditional */
 _hidden int libxl__device_model_version_running(libxl__gc *gc, uint32_t domid);
 
+/* Check how executes hotplug script currently */
+int libxl__hotplug_settings(libxl__gc *gc, xs_transaction_t t);
 
 /*
  * Calling context and GC for event-generating functions:

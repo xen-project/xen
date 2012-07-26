@@ -785,6 +785,9 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
 
     libxl__dm_vifs_from_hvm_guest_config(gc, guest_config, dm_config);
 
+    dm_config->c_info.run_hotplug_scripts =
+        guest_config->c_info.run_hotplug_scripts;
+
     ret = libxl__domain_create_info_setdefault(gc, &dm_config->c_info);
     if (ret) goto out;
     ret = libxl__domain_build_info_setdefault(gc, &dm_config->b_info);

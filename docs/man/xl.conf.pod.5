@@ -55,6 +55,14 @@ default.
 
 Default: C<1>
 
+=item B<run_hotplug_scripts=BOOLEAN>
+
+If disabled hotplug scripts will be called from udev, as it used to
+be in the previous releases. With the default option, hotplug scripts
+will be launched by xl directly.
+
+Default: C<1>
+
 =item B<lockfile="PATH">
 
 Sets the path to the lock file used by xl to serialise certain
