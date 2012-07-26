@@ -1404,7 +1404,11 @@ YY_RULE_SETUP
         SAVESTRING("target", pdev_path, yytext);
     } else if (!DPC->had_depr_prefix &&
                DPC->disk->format == LIBXL_DISK_FORMAT_UNKNOWN) {
-        setformat(DPC,yytext);
+        if (!*DPC->disk->pdev_path && vdev_and_devtype(DPC,yytext)) {
+            DPC->disk->format = LIBXL_DISK_FORMAT_EMPTY;
+        } else {
+            setformat(DPC,yytext);
+        }
     } else if (!DPC->disk->vdev) {
         if (!vdev_and_devtype(DPC,yytext))
             SAVESTRING("vdev", vdev, yytext);
@@ -1419,7 +1423,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 233 "libxlu_disk_l.l"
+#line 237 "libxlu_disk_l.l"
 {
     BEGIN(LEXERR);
     yymore();
@@ -1427,17 +1431,17 @@ YY_RULE_SETUP
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 237 "libxlu_disk_l.l"
+#line 241 "libxlu_disk_l.l"
 {
     xlu__disk_err(DPC,yytext,"bad disk syntax"); return 0;
 }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 240 "libxlu_disk_l.l"
+#line 244 "libxlu_disk_l.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 1441 "libxlu_disk_l.c"
+#line 1445 "libxlu_disk_l.c"
 			case YY_STATE_EOF(INITIAL):
 			case YY_STATE_EOF(LEXERR):
 				yyterminate();
@@ -2529,4 +2533,4 @@ void xlu__disk_yyfree (void * ptr , yyscan_t yyscanner)
 
 #define YYTABLES_NAME "yytables"
 
-#line 240 "libxlu_disk_l.l"
+#line 244 "libxlu_disk_l.l"

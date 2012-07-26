@@ -221,3 +221,14 @@ to specify several of these, for example:
   "tap:aio:/some/path..."
 
 All of these prefixes are now stripped and ignored.
+
+
+Missing format and empty target
+-------------------------------
+
+The following syntax is also supported:
+
+  ,<vdev>:<devtype>,<access>   (deprecated)
+
+This is soley for compatibility with xend's syntax for empty cdroms,
+which is (for example) ",hdc:cdrom,r".

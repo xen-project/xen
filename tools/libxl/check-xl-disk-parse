@@ -123,6 +123,7 @@ disk: {
 EOF
 one 0 devtype=cdrom,,,hdc
 one 0 ,,hdc:cdrom,r
+one 0 ,hdc:cdrom,r
 one 0 vdev=hdc,access=r,devtype=cdrom,target=
 one 0 ,empty,hdc:cdrom,r
 

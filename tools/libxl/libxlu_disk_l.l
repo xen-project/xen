@@ -217,7 +217,11 @@ phy:/.*		{ DPC->had_depr_prefix=1; DEPRECATE(0); }
         SAVESTRING("target", pdev_path, yytext);
     } else if (!DPC->had_depr_prefix &&
                DPC->disk->format == LIBXL_DISK_FORMAT_UNKNOWN) {
-        setformat(DPC,yytext);
+        if (!*DPC->disk->pdev_path && vdev_and_devtype(DPC,yytext)) {
+            DPC->disk->format = LIBXL_DISK_FORMAT_EMPTY;
+        } else {
+            setformat(DPC,yytext);
+        }
     } else if (!DPC->disk->vdev) {
         if (!vdev_and_devtype(DPC,yytext))
             SAVESTRING("vdev", vdev, yytext);
