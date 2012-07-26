@@ -74,6 +74,7 @@
 
 #define LIBXL_INIT_TIMEOUT 10
 #define LIBXL_DESTROY_TIMEOUT 10
+#define LIBXL_HOTPLUG_TIMEOUT 10
 #define LIBXL_DEVICE_MODEL_START_TIMEOUT 10
 #define LIBXL_QEMU_BODGE_TIMEOUT 2
 #define LIBXL_XENCONSOLE_LIMIT 1048576
@@ -1832,11 +1833,14 @@ struct libxl__ao_device {
     int active;
     int rc;
     libxl__ev_devstate backend_ds;
-    /* Bodge for Qemu devices */
+    /* Bodge for Qemu devices, also used for timeout of hotplug execution */
     libxl__ev_time timeout;
     /* Used internally to have a reference to the upper libxl__ao_devices
      * struct when present */
     libxl__ao_devices *aodevs;
+    /* device hotplug execution */
+    const char *what;
+    libxl__ev_child child;
 };
 
 /* Helper struct to simply the plug/unplug of multiple devices at the same
@@ -1965,6 +1969,20 @@ _hidden void libxl__wait_device_connection(libxl__egc*,
  */
 _hidden void libxl__initiate_device_remove(libxl__egc *egc,
                                            libxl__ao_device *aodev);
+
+/*
+ * libxl__get_hotplug_script_info returns the args and env that should
+ * be passed to the hotplug script for the requested device.
+ *
+ * Since a device might not need to execute any hotplug script, this function
+ * can return the following values:
+ * < 0: Error
+ * 0: No need to execute hotplug script
+ * 1: Execute hotplug script
+ */
+_hidden int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
+                                           char ***args, char ***env,
+                                           libxl__device_action action);
 
 /*----- local disk attach: attach a disk locally to run the bootloader -----*/
 

@@ -15,6 +15,12 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
+# Hack to prevent the execution of hotplug scripts from udev if the domain
+# has been launched from libxl
+if [ -n "${UDEV_CALL}" ] && \
+   xenstore-read "libxl/disable_udev" >/dev/null 2>&1; then
+    exit 0
+fi
 
 dir=$(dirname "$0")
 . "$dir/hotplugpath.sh"

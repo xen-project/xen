@@ -77,3 +77,100 @@ char *libxl__devid_to_localdev(libxl__gc *gc, int devid)
                 "%d", minor & (nr_parts - 1));
     return ret;
 }
+
+/* Hotplug scripts helpers */
+
+static char **get_hotplug_env(libxl__gc *gc, libxl__device *dev)
+{
+    char *be_path = libxl__device_backend_path(gc, dev);
+    char *script;
+    const char *type = libxl__device_kind_to_string(dev->backend_kind);
+    char **env;
+    int nr = 0;
+
+    script = libxl__xs_read(gc, XBT_NULL,
+                            GCSPRINTF("%s/%s", be_path, "script"));
+    if (!script) {
+        LOGEV(ERROR, errno, "unable to read script from %s", be_path);
+        return NULL;
+    }
+
+    const int arraysize = 9;
+    GCNEW_ARRAY(env, arraysize);
+    env[nr++] = "script";
+    env[nr++] = script;
+    env[nr++] = "XENBUS_TYPE";
+    env[nr++] = libxl__strdup(gc, type);
+    env[nr++] = "XENBUS_PATH";
+    env[nr++] = GCSPRINTF("backend/%s/%u/%d", type, dev->domid, dev->devid);
+    env[nr++] = "XENBUS_BASE_PATH";
+    env[nr++] = "backend";
+    env[nr++] = NULL;
+    assert(nr == arraysize);
+
+    return env;
+}
+
+/* Hotplug scripts caller functions */
+
+static int libxl__hotplug_disk(libxl__gc *gc, libxl__device *dev,
+                               char ***args, char ***env,
+                               libxl__device_action action)
+{
+    char *be_path = libxl__device_backend_path(gc, dev);
+    char *script;
+    int nr = 0, rc = 0;
+
+    script = libxl__xs_read(gc, XBT_NULL,
+                            GCSPRINTF("%s/%s", be_path, "script"));
+    if (!script) {
+        LOGEV(ERROR, errno, "unable to read script from %s", be_path);
+        rc = ERROR_FAIL;
+        goto error;
+    }
+
+    *env = get_hotplug_env(gc, dev);
+    if (!*env) {
+        rc = ERROR_FAIL;
+        goto error;
+    }
+
+    const int arraysize = 3;
+    GCNEW_ARRAY(*args, arraysize);
+    (*args)[nr++] = script;
+    (*args)[nr++] = action == DEVICE_CONNECT ? "add" : "remove";
+    (*args)[nr++] = NULL;
+    assert(nr == arraysize);
+
+    rc = 1;
+
+error:
+    return rc;
+}
+
+int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
+                                   char ***args, char ***env,
+                                   libxl__device_action action)
+{
+    char *disable_udev = libxl__xs_read(gc, XBT_NULL, DISABLE_UDEV_PATH);
+    int rc;
+
+    /* Check if we have to run hotplug scripts */
+    if (!disable_udev) {
+        rc = 0;
+        goto out;
+    }
+
+    switch (dev->backend_kind) {
+    case LIBXL__DEVICE_KIND_VBD:
+        rc = libxl__hotplug_disk(gc, dev, args, env, action);
+        break;
+    default:
+        /* No need to execute any hotplug scripts */
+        rc = 0;
+        break;
+    }
+
+out:
+    return rc;
+}

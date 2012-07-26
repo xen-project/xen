@@ -1858,6 +1858,11 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
                 flexarray_append(back, "params");
                 flexarray_append(back, dev);
 
+                flexarray_append(back, "script");
+                flexarray_append(back, GCSPRINTF("%s/%s",
+                                                 libxl__xen_script_dir_path(),
+                                                 "block"));
+
                 assert(device->backend_kind == LIBXL__DEVICE_KIND_VBD);
                 break;
             case LIBXL_DISK_BACKEND_TAP:
@@ -1872,6 +1877,11 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
                 flexarray_append(back, libxl__sprintf(gc, "%s:%s",
                     libxl__device_disk_string_of_format(disk->format),
                     disk->pdev_path));
+
+                flexarray_append(back, "script");
+                flexarray_append(back, GCSPRINTF("%s/%s",
+                                                 libxl__xen_script_dir_path(),
+                                                 "blktap"));
 
                 /* now create a phy device to export the device to the guest */
                 goto do_backend_phy;
