@@ -5398,7 +5398,7 @@ int main_blocklist(int argc, char **argv)
 
 int main_blockdetach(int argc, char **argv)
 {
-    int opt;
+    int opt, rc = 0;
     libxl_device_disk disk;
 
     if ((opt = def_getopt(argc, argv, "", "block-detach", 2)) != -1)
@@ -5412,11 +5412,12 @@ int main_blockdetach(int argc, char **argv)
         fprintf(stderr, "Error: Device %s not connected.\n", argv[optind+1]);
         return 1;
     }
-    if (libxl_device_disk_remove(ctx, domid, &disk, 0)) {
+    rc = libxl_device_disk_remove(ctx, domid, &disk, 0);
+    if (rc) {
         fprintf(stderr, "libxl_device_disk_remove failed.\n");
-    } else
-        libxl_device_disk_destroy(ctx, domid, &disk, 0);
-    return 0;
+    }
+    libxl_device_disk_dispose(&disk);
+    return rc;
 }
 
 static char *uptime_to_string(unsigned long time, int short_mode)
