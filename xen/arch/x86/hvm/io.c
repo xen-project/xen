@@ -176,6 +176,8 @@ int handle_mmio(void)
 
     rc = hvm_emulate_one(&ctxt);
 
+    if ( rc != X86EMUL_RETRY )
+        curr->arch.hvm_vcpu.io_state = HVMIO_none;
     if ( curr->arch.hvm_vcpu.io_state == HVMIO_awaiting_completion )
         curr->arch.hvm_vcpu.io_state = HVMIO_handle_mmio_awaiting_completion;
     else
