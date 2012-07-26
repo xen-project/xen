@@ -1341,17 +1341,6 @@ _hidden int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
 _hidden int libxl__device_disk_add(libxl__gc *gc, uint32_t domid,
                                    libxl_device_disk *disk);
 
-/*
- * Make a disk available in this (the control) domain. Returns path to
- * a device.
- */
-_hidden char * libxl__device_disk_local_attach(libxl__gc *gc,
-        const libxl_device_disk *in_disk,
-        libxl_device_disk *new_disk,
-        const char *blkdev_start);
-_hidden int libxl__device_disk_local_detach(libxl__gc *gc,
-        libxl_device_disk *disk);
-
 _hidden char *libxl__uuid2string(libxl__gc *gc, const libxl_uuid uuid);
 
 struct libxl__xen_console_reader {
@@ -1948,6 +1937,62 @@ struct libxl__ao_devices {
 _hidden void libxl__initiate_device_remove(libxl__egc *egc,
                                            libxl__ao_device *aodev);
 
+/*----- local disk attach: attach a disk locally to run the bootloader -----*/
+
+typedef struct libxl__disk_local_state libxl__disk_local_state;
+typedef void libxl__disk_local_state_callback(libxl__egc*,
+                                              libxl__disk_local_state*,
+                                              int rc);
+
+/* A libxl__disk_local_state may be in the following states:
+ * Undefined, Idle, Attaching, Attached, Detaching.
+ */
+struct libxl__disk_local_state {
+    /* filled by the user */
+    libxl__ao *ao;
+    const libxl_device_disk *in_disk;
+    libxl_device_disk disk;
+    const char *blkdev_start;
+    libxl__disk_local_state_callback *callback;
+    /* filled by libxl__device_disk_local_initiate_attach */
+    char *diskpath;
+    /* private for implementation of local detach */
+    libxl__ao_device aodev;
+    int rc;
+};
+
+/*
+ * Prepares a dls for use.
+ * State Undefined -> Idle
+ */
+static inline void libxl__device_disk_local_init(libxl__disk_local_state *dls)
+{
+    dls->rc = 0;
+}
+
+/* Make a disk available in this (the control) domain. Always calls
+ * dls->callback when finished.
+ * State Idle -> Attaching
+ *
+ * The state of dls on entry to the callback depends on the value
+ * of rc passed to the callback:
+ *     rc == 0: Attached if rc == 0
+ *     rc != 0: Idle
+ */
+_hidden void libxl__device_disk_local_initiate_attach(libxl__egc *egc,
+                                                libxl__disk_local_state *dls);
+
+/* Disconnects a disk device form the control domain. If the passed
+ * dls is not attached (or has already been detached),
+ * libxl__device_disk_local_initiate_detach will just call the callback
+ * directly.
+ * State Idle/Attached -> Detaching
+ *
+ * The state of dls on entry to the callback is Idle.
+ */
+_hidden void libxl__device_disk_local_initiate_detach(libxl__egc *egc,
+                                                libxl__disk_local_state *dls);
+
 /*----- datacopier: copies data from one fd to another -----*/
 
 typedef struct libxl__datacopier_state libxl__datacopier_state;
@@ -2137,12 +2182,12 @@ struct libxl__bootloader_state {
     /* Should be zeroed by caller on entry.  Will be filled in by
      * bootloader machinery; represents the local attachment of the
      * disk for the benefit of the bootloader.  Must be detached by
-     * the caller using libxl__device_disk_local_detach.
+     * the caller using libxl__device_disk_local_initiate_detach.
      * (This is safe to do after ->callback() has happened since
      * the domain's kernel and initramfs will have been copied
      * out of the guest's disk into a temporary directory, mapped
      * as file references, and deleted. */
-    libxl_device_disk localdisk;
+    libxl__disk_local_state dls;
     uint32_t domid;
     /* outputs:
      *  - caller must initialise kernel and ramdisk to point to file
@@ -2154,7 +2199,6 @@ struct libxl__bootloader_state {
     const char *cmdline;
     /* private to libxl__run_bootloader */
     char *outputpath, *outputdir, *logfile;
-    char *diskpath; /* not from gc, represents actually attached disk */
     libxl__openpty_state openpty;
     libxl__openpty_result ptys[2];  /* [0] is for bootloader */
     libxl__ev_child child;

@@ -75,7 +75,7 @@ static void make_bootloader_args(libxl__gc *gc, libxl__bootloader_state *bl,
         }
     }
 
-    ARG(bl->diskpath);
+    ARG(bl->dls.diskpath);
 
     /* Sentinel for execv */
     ARG(NULL);
@@ -206,8 +206,9 @@ static int parse_bootloader_result(libxl__egc *egc,
 void libxl__bootloader_init(libxl__bootloader_state *bl)
 {
     assert(bl->ao);
-    bl->diskpath = NULL;
+    bl->dls.diskpath = NULL;
     bl->openpty.ao = bl->ao;
+    bl->dls.ao = bl->ao;
     bl->ptys[0].master = bl->ptys[0].slave = 0;
     bl->ptys[1].master = bl->ptys[1].slave = 0;
     libxl__ev_child_init(&bl->child);
@@ -224,11 +225,6 @@ static void bootloader_cleanup(libxl__egc *egc, libxl__bootloader_state *bl)
     if (bl->outputpath) libxl__remove_file(gc, bl->outputpath);
     if (bl->outputdir) libxl__remove_directory(gc, bl->outputdir);
 
-    if (bl->diskpath) {
-        libxl__device_disk_local_detach(gc, &bl->localdisk);
-        free(bl->diskpath);
-        bl->diskpath = 0;
-    }
     libxl__domaindeathcheck_stop(gc,&bl->deathcheck);
     libxl__datacopier_kill(&bl->keystrokes);
     libxl__datacopier_kill(&bl->display);
@@ -249,10 +245,32 @@ static void bootloader_setpaths(libxl__gc *gc, libxl__bootloader_state *bl)
     bl->outputpath = GCSPRINTF(XEN_RUN_DIR "/bootloader.%"PRIu32".out", domid);
 }
 
+/* Callbacks */
+
+static void bootloader_local_detached_cb(libxl__egc *egc,
+                                         libxl__disk_local_state *dls,
+                                         int rc);
+
 static void bootloader_callback(libxl__egc *egc, libxl__bootloader_state *bl,
                                 int rc)
 {
     bootloader_cleanup(egc, bl);
+
+    bl->dls.callback = bootloader_local_detached_cb;
+    libxl__device_disk_local_initiate_detach(egc, &bl->dls);
+}
+
+static void bootloader_local_detached_cb(libxl__egc *egc,
+                                         libxl__disk_local_state *dls,
+                                         int rc)
+{
+    STATE_AO_GC(dls->ao);
+    libxl__bootloader_state *bl = CONTAINER_OF(dls, *bl, dls);
+
+    if (rc) {
+        LOG(ERROR, "unable to detach locally attached disk");
+    }
+
     bl->callback(egc, bl, rc);
 }
 
@@ -275,6 +293,12 @@ static void bootloader_abort(libxl__egc *egc,
 
 /*----- main flow of control -----*/
 
+/* Callbacks */
+
+static void bootloader_disk_attached_cb(libxl__egc *egc,
+                                        libxl__disk_local_state *dls,
+                                        int rc);
+
 void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
 {
     STATE_AO_GC(bl->ao);
@@ -282,7 +306,6 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
     uint32_t domid = bl->domid;
     char *logfile_tmp = NULL;
     int rc, r;
-    const char *bootloader;
 
     libxl__bootloader_init(bl);
 
@@ -344,10 +367,34 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
         goto out;
     }
 
-    bl->diskpath = libxl__device_disk_local_attach(gc, bl->disk, &bl->localdisk,
-            info->blkdev_start);
-    if (!bl->diskpath) {
-        rc = ERROR_FAIL;
+
+    /* This sets the state of the dls struct from Undefined to Idle */
+    libxl__device_disk_local_init(&bl->dls);
+    bl->dls.ao = ao;
+    bl->dls.in_disk = bl->disk;
+    bl->dls.blkdev_start = info->blkdev_start;
+    bl->dls.callback = bootloader_disk_attached_cb;
+    libxl__device_disk_local_initiate_attach(egc, &bl->dls);
+    return;
+
+ out:
+    assert(rc);
+ out_ok:
+    free(logfile_tmp);
+    bootloader_callback(egc, bl, rc);
+}
+
+static void bootloader_disk_attached_cb(libxl__egc *egc,
+                                        libxl__disk_local_state *dls,
+                                        int rc)
+{
+    STATE_AO_GC(dls->ao);
+    libxl__bootloader_state *bl = CONTAINER_OF(dls, *bl, dls);
+    const libxl_domain_build_info *info = bl->info;
+    const char *bootloader;
+
+    if (rc) {
+        LOG(ERROR, "failed to attach local disk for bootloader execution");
         goto out;
     }
 
@@ -389,8 +436,6 @@ void libxl__bootloader_run(libxl__egc *egc, libxl__bootloader_state *bl)
 
  out:
     assert(rc);
- out_ok:
-    free(logfile_tmp);
     bootloader_callback(egc, bl, rc);
 }
 
