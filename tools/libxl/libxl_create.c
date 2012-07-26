@@ -564,6 +564,9 @@ static void domcreate_bootloader_done(libxl__egc *egc,
 static void domcreate_launch_dm(libxl__egc *egc, libxl__ao_devices *aodevs,
                                 int ret);
 
+static void domcreate_attach_pci(libxl__egc *egc, libxl__ao_devices *aodevs,
+                                 int ret);
+
 static void domcreate_console_available(libxl__egc *egc,
                                         libxl__domain_create_state *dcs);
 
@@ -898,13 +901,11 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__ao_devices *aodevs,
         goto error_out;
     }
     for (i = 0; i < d_config->num_nics; i++) {
-        ret = libxl_device_nic_add(ctx, domid, &d_config->nics[i]);
-        if (ret) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                       "cannot add nic %d to domain: %d", i, ret);
-            ret = ERROR_FAIL;
-            goto error_out;
-        }
+        /* We have to init the nic here, because we still haven't
+         * called libxl_device_nic_add at this point, but qemu needs
+         * the nic information to be complete.
+         */
+        libxl__device_nic_setdefault(gc, &d_config->nics[i]);
     }
     switch (d_config->c_info.type) {
     case LIBXL_DOMAIN_TYPE_HVM:
@@ -977,7 +978,6 @@ static void domcreate_devmodel_started(libxl__egc *egc,
 {
     libxl__domain_create_state *dcs = CONTAINER_OF(dmss, *dcs, dmss.dm);
     STATE_AO_GC(dmss->spawn.ao);
-    int i;
     libxl_ctx *ctx = CTX;
     int domid = dcs->guest_domid;
 
@@ -995,6 +995,41 @@ static void domcreate_devmodel_started(libxl__egc *egc,
             == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
             libxl__qmp_initializations(gc, domid, d_config);
         }
+    }
+
+    /* Plug nic interfaces */
+    if (d_config->num_nics > 0) {
+        /* Attach nics */
+        dcs->aodevs.size = d_config->num_nics;
+        dcs->aodevs.callback = domcreate_attach_pci;
+        libxl__prepare_ao_devices(ao, &dcs->aodevs);
+        libxl__add_nics(egc, ao, domid, 0, d_config, &dcs->aodevs);
+        return;
+    }
+
+    domcreate_attach_pci(egc, &dcs->aodevs, 0);
+    return;
+
+error_out:
+    assert(ret);
+    domcreate_complete(egc, dcs, ret);
+}
+
+static void domcreate_attach_pci(libxl__egc *egc, libxl__ao_devices *aodevs,
+                                 int ret)
+{
+    libxl__domain_create_state *dcs = CONTAINER_OF(aodevs, *dcs, aodevs);
+    STATE_AO_GC(dcs->ao);
+    int i;
+    libxl_ctx *ctx = CTX;
+    int domid = dcs->guest_domid;
+
+    /* convenience aliases */
+    libxl_domain_config *const d_config = dcs->guest_config;
+
+    if (ret) {
+        LOG(ERROR, "unable to add nic devices");
+        goto error_out;
     }
 
     for (i = 0; i < d_config->num_pcidevs; i++)

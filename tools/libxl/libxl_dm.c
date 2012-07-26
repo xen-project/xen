@@ -716,6 +716,10 @@ static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
 static void spawn_stub_launch_dm(libxl__egc *egc,
                                  libxl__ao_devices *aodevs, int ret);
 
+static void stubdom_pvqemu_cb(libxl__egc *egc,
+                              libxl__ao_devices *aodevs,
+                              int rc);
+
 static void spaw_stubdom_pvqemu_destroy_cb(libxl__egc *egc,
                                            libxl__destroy_domid_state *dis,
                                            int rc);
@@ -887,9 +891,11 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
      }
 
     for (i = 0; i < dm_config->num_nics; i++) {
-        ret = libxl_device_nic_add(ctx, dm_domid, &dm_config->nics[i]);
-        if (ret)
-            goto out;
+         /* We have to init the nic here, because we still haven't
+         * called libxl_device_nic_add at this point, but qemu needs
+         * the nic information to be complete.
+         */
+        libxl__device_nic_setdefault(gc, &dm_config->nics[i]);
     }
     ret = libxl_device_vfb_add(ctx, dm_domid, &dm_config->vfbs[0]);
     if (ret)
@@ -966,8 +972,34 @@ static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
         CONTAINER_OF(stubdom_dmss, *sdss, pvqemu);
     STATE_AO_GC(sdss->dm.spawn.ao);
     uint32_t dm_domid = sdss->pvqemu.guest_domid;
+    libxl_domain_config *d_config = stubdom_dmss->guest_config;
 
     if (rc) goto out;
+
+    if (d_config->num_nics > 0) {
+        sdss->aodevs.size = d_config->num_nics;
+        sdss->aodevs.callback = stubdom_pvqemu_cb;
+        libxl__prepare_ao_devices(ao, &sdss->aodevs);
+        libxl__add_nics(egc, ao, dm_domid, 0, d_config, &sdss->aodevs);
+        return;
+    }
+
+out:
+    stubdom_pvqemu_cb(egc, &sdss->aodevs, rc);
+}
+
+static void stubdom_pvqemu_cb(libxl__egc *egc,
+                              libxl__ao_devices *aodevs,
+                              int rc)
+{
+    libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(aodevs, *sdss, aodevs);
+    STATE_AO_GC(sdss->dm.spawn.ao);
+    uint32_t dm_domid = sdss->pvqemu.guest_domid;
+
+    if (rc) {
+        LOGE(ERROR, "error connecting nics devices");
+        goto out;
+    }
 
     rc = libxl_domain_unpause(CTX, dm_domid);
     if (rc) goto out;

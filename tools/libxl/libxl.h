@@ -697,7 +697,8 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
                        const libxl_asyncop_how *ao_how);
 
 /* Network Interfaces */
-int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);
+int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic,
+                         const libxl_asyncop_how *ao_how);
 int libxl_device_nic_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_nic *nic,
                             const libxl_asyncop_how *ao_how);

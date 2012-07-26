@@ -2506,12 +2506,13 @@ static int libxl__device_from_nic(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
-int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
+void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
+                           libxl_device_nic *nic, libxl__ao_device *aodev)
 {
-    GC_INIT(ctx);
+    STATE_AO_GC(aodev->ao);
     flexarray_t *front;
     flexarray_t *back;
-    libxl__device device;
+    libxl__device *device;
     char *dompath, **l;
     unsigned int nb, rc;
 
@@ -2542,7 +2543,8 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
         }
     }
 
-    rc = libxl__device_from_nic(gc, domid, nic, &device);
+    GCNEW(device);
+    rc = libxl__device_from_nic(gc, domid, nic, device);
     if ( rc != 0 ) goto out_free;
 
     flexarray_append(back, "frontend-id");
@@ -2583,6 +2585,9 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
     flexarray_append(back, libxl__strdup(gc, nic->bridge));
     flexarray_append(back, "handle");
     flexarray_append(back, libxl__sprintf(gc, "%d", nic->devid));
+    flexarray_append(back, "type");
+    flexarray_append(back, libxl__strdup(gc,
+                                     libxl_nic_type_to_string(nic->nictype)));
 
     flexarray_append(front, "backend-id");
     flexarray_append(front, libxl__sprintf(gc, "%d", nic->backend_domid));
@@ -2593,18 +2598,22 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
     flexarray_append(front, "mac");
     flexarray_append(front, libxl__sprintf(gc,
                                     LIBXL_MAC_FMT, LIBXL_MAC_BYTES(nic->mac)));
-    libxl__device_generic_add(gc, XBT_NULL, &device,
+    libxl__device_generic_add(gc, XBT_NULL, device,
                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
                              libxl__xs_kvs_of_flexarray(gc, front, front->count));
 
-    /* FIXME: wait for plug */
+    aodev->dev = device;
+    aodev->action = DEVICE_CONNECT;
+    libxl__wait_device_connection(egc, aodev);
+
     rc = 0;
 out_free:
     flexarray_free(back);
     flexarray_free(front);
 out:
-    GC_FREE;
-    return rc;
+    aodev->rc = rc;
+    if (rc) aodev->callback(egc, aodev);
+    return;
 }
 
 static void libxl__device_nic_from_xs_be(libxl__gc *gc,
@@ -3096,6 +3105,7 @@ DEFINE_DEVICE_REMOVE(vfb, destroy, 1)
 /* Macro for defining device addition functions in a compact way */
 /* The following functions are defined:
  * libxl_device_disk_add
+ * libxl_device_nic_add
  */
 
 #define DEFINE_DEVICE_ADD(type)                                         \
@@ -3118,6 +3128,9 @@ DEFINE_DEVICE_REMOVE(vfb, destroy, 1)
 
 /* disk */
 DEFINE_DEVICE_ADD(disk)
+
+/* nic */
+DEFINE_DEVICE_ADD(nic)
 
 #undef DEFINE_DEVICE_ADD
 
