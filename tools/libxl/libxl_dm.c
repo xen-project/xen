@@ -626,6 +626,7 @@ static void libxl__dm_vifs_from_hvm_guest_config(libxl__gc *gc,
 
     for (i=0; i<nr; i++) {
         dm_config->nics[i] = guest_config->nics[i];
+        dm_config->nics[i].nictype = LIBXL_NIC_TYPE_VIF;
         if (dm_config->nics[i].ifname)
             dm_config->nics[i].ifname = GCSPRINTF("%s" TAP_DEVICE_SUFFIX,
                                                   dm_config->nics[i].ifname);
