@@ -4058,7 +4058,7 @@ def _run_cmd(cmd, cmd_name, args):
                return False, 1
         print "Unexpected error:", sys.exc_info()[0]
         print
-        print "Please report to xen-devel@lists.xensource.com"
+        print "Please report to xen-devel@lists.xen.org"
         raise
 
     return False, 1

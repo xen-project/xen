@@ -63,7 +63,7 @@ if [ -d ${XEN_ROOT}/.hgxxx ] ; then
 else
     echo "Unable to determine path to Linux source tree." 1>&2
     echo "Falling back to linux-2.6.18-xen Mercurial repository." 1>&2
-    echo http://xenbits.xensource.com/linux-2.6.18-xen.hg
+    echo http://xenbits.xen.org/linux-2.6.18-xen.hg
 fi
 
 exit 0

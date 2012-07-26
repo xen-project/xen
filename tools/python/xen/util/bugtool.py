@@ -34,7 +34,7 @@ import xen.lowlevel.xc
 from xen.xend import encode
 
 
-SERVER = 'bugzilla.xensource.com'
+SERVER = 'bugzilla.xen.org'
 SHOW_BUG_PATTERN = 'http://%s/bugzilla/show_bug.cgi?id=%%d' % SERVER
 ATTACH_PATTERN = \
  'http://%s/bugzilla/attachment.cgi?bugid=%%d&action=enter' % SERVER

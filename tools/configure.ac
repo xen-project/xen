@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.67])
 AC_INIT([Xen Hypervisor], m4_esyscmd([../version.sh ../xen/Makefile]),
-    [xen-devel@lists.xensource.com])
+    [xen-devel@lists.xen.org])
 AC_CONFIG_SRCDIR([libxl/libxl.c])
 AC_CONFIG_FILES([../config/Tools.mk])
 AC_CONFIG_HEADERS([config.h])

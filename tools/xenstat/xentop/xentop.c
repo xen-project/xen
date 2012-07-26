@@ -47,7 +47,7 @@
 "Copyright (C) 2005  International Business Machines  Corp\n"\
 "This is free software; see the source for copying conditions.There is NO\n"\
 "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n"
-#define XENTOP_BUGSTO "Report bugs to <xen-tools@lists.xensource.com>.\n"
+#define XENTOP_BUGSTO "Report bugs to <xen-devel@lists.xen.org>.\n"
 
 #define _GNU_SOURCE
 #include <getopt.h>

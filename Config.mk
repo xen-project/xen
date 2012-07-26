@@ -180,15 +180,15 @@ EMBEDDED_EXTRA_CFLAGS += -fno-exceptions
 XSM_ENABLE ?= n
 FLASK_ENABLE ?= $(XSM_ENABLE)
 
-XEN_EXTFILES_URL=http://xenbits.xensource.com/xen-extfiles
+XEN_EXTFILES_URL=http://xenbits.xen.org/xen-extfiles
 # All the files at that location were downloaded from elsewhere on
 # the internet.  The original download URL is preserved as a comment
 # near the place in the Xen Makefiles where the file is used.
 
 ifeq ($(GIT_HTTP),y)
-QEMU_REMOTE=http://xenbits.xensource.com/git-http/qemu-xen-unstable.git
+QEMU_REMOTE=http://xenbits.xen.org/git-http/qemu-xen-unstable.git
 else
-QEMU_REMOTE=git://xenbits.xensource.com/qemu-xen-unstable.git
+QEMU_REMOTE=git://xenbits.xen.org/qemu-xen-unstable.git
 endif
 
 ifeq ($(GIT_HTTP),y)
