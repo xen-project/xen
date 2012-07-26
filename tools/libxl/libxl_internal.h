@@ -2568,6 +2568,10 @@ typedef int (*libxl__numa_candidate_cmpf)(const libxl__numa_candidate *c1,
  * other hand, if not even one single candidate can be found, the function
  * still returns successfully but cndt_found will be zero.
  *
+ * Finally, suitable_cpumap is useful for telling that only the cpus in that
+ * mask should be considered when generating placement candidates (for
+ * example because of cpupools).
+ *
  * It is up to the function to properly allocate cndt_out (by calling
  * libxl__numa_candidate_alloc()), while it is the caller that should init
  * (libxl__numa_candidate_init()) and free (libxl__numa_candidate_dispose())
@@ -2576,6 +2580,7 @@ typedef int (*libxl__numa_candidate_cmpf)(const libxl__numa_candidate *c1,
 _hidden int libxl__get_numa_candidate(libxl__gc *gc,
                                       uint32_t min_free_memkb, int min_cpus,
                                       int min_nodes, int max_nodes,
+                                      const libxl_bitmap *suitable_cpumap,
                                       libxl__numa_candidate_cmpf numa_cmpf,
                                       libxl__numa_candidate *cndt_out,
                                       int *cndt_found);

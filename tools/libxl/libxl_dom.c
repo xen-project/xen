@@ -128,26 +128,30 @@ static int numa_cmpf(const libxl__numa_candidate *c1,
 }
 
 /* The actual automatic NUMA placement routine */
-static int numa_place_domain(libxl__gc *gc, libxl_domain_build_info *info)
+static int numa_place_domain(libxl__gc *gc, uint32_t domid,
+                             libxl_domain_build_info *info)
 {
     int found;
     libxl__numa_candidate candidate;
     libxl_bitmap candidate_nodemap;
-    libxl_cpupoolinfo *pinfo;
-    int nr_pools, rc = 0;
+    libxl_cpupoolinfo cpupool_info;
+    int i, cpupool, rc = 0;
     uint32_t memkb;
 
     libxl__numa_candidate_init(&candidate);
     libxl_bitmap_init(&candidate_nodemap);
 
-    /* First of all, if cpupools are in use, better not to mess with them */
-    pinfo = libxl_list_cpupool(CTX, &nr_pools);
-    if (!pinfo)
-        return ERROR_FAIL;
-    if (nr_pools > 1) {
-        LOG(NOTICE, "Skipping NUMA placement as cpupools are in use");
-        goto out;
-    }
+    /*
+     * Extract the cpumap from the cpupool the domain belong to. In fact,
+     * it only makes sense to consider the cpus/nodes that are in there
+     * for placement.
+     */
+    rc = cpupool = libxl__domain_cpupool(gc, domid);
+    if (rc < 0)
+        return rc;
+    rc = libxl_cpupool_info(CTX, &cpupool_info, cpupool);
+    if (rc)
+        return rc;
 
     rc = libxl_domain_need_memory(CTX, info, &memkb);
     if (rc)
@@ -159,7 +163,8 @@ static int numa_place_domain(libxl__gc *gc, libxl_domain_build_info *info)
 
     /* Find the best candidate with enough free memory and at least
      * as much pcpus as the domain has vcpus.  */
-    rc = libxl__get_numa_candidate(gc, memkb, info->max_vcpus, 0, 0,
+    rc = libxl__get_numa_candidate(gc, memkb, info->max_vcpus,
+                                   0, 0, &cpupool_info.cpumap,
                                    numa_cmpf, &candidate, &found);
     if (rc)
         goto out;
@@ -175,6 +180,13 @@ static int numa_place_domain(libxl__gc *gc, libxl_domain_build_info *info)
     if (rc)
         goto out;
 
+    /* Avoid trying to set the affinity to cpus that might be in the
+     * nodemap but not in our cpupool. */
+    libxl_for_each_set_bit(i, info->cpumap) {
+        if (!libxl_bitmap_test(&cpupool_info.cpumap, i))
+            libxl_bitmap_reset(&info->cpumap, i);
+    }
+
     LOG(DETAIL, "NUMA placement candidate with %d nodes, %d cpus and "
                 "%"PRIu32" KB free selected", candidate.nr_nodes,
                 candidate.nr_cpus, candidate.free_memkb / 1024);
@@ -182,7 +194,7 @@ static int numa_place_domain(libxl__gc *gc, libxl_domain_build_info *info)
  out:
     libxl__numa_candidate_dispose(&candidate);
     libxl_bitmap_dispose(&candidate_nodemap);
-    libxl_cpupoolinfo_list_free(pinfo, nr_pools);
+    libxl_cpupoolinfo_dispose(&cpupool_info);
     return rc;
 }
 
@@ -214,7 +226,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
             return ERROR_INVAL;
         }
 
-        rc = numa_place_domain(gc, info);
+        rc = numa_place_domain(gc, domid, info);
         if (rc)
             return rc;
     }

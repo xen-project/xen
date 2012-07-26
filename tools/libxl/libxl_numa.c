@@ -105,30 +105,48 @@ static int comb_next(comb_iter_t it, int n, int k)
 /* NUMA automatic placement (see libxl_internal.h for details) */
 
 /*
- * This function turns a k-combination iterator into a node map.
- * This means the bits in the node map corresponding to the indexes
- * of the given combination are the ones that will be set.
- * For example, if the iterator represents the combination { 0, 2, 4},
- * the node map will have bits #0, #2 and #4 set.
+ * This function turns a k-combination iterator into a node map,
+ * given another map, telling us which nodes should be considered.
+ *
+ * This means the bits that are set in suitable_nodemap and that
+ * corresponds to the indexes of the given combination are the ones
+ * that will be set in nodemap.
+ *
+ * For example, given a fully set suitable_nodemap, if the iterator
+ * represents the combination { 0, 2, 4}, nodmeap will have bits #0,
+ * #2 and #4 set.
+ * On the other hand, if, say,  suitable_nodemap=01011011, the same
+ * iterator will cause bits #1, #4 and #7 of nodemap to be set.
  */
-static void comb_get_nodemap(comb_iter_t it, libxl_bitmap *nodemap, int k)
+static void comb_get_nodemap(comb_iter_t it, libxl_bitmap *suitable_nodemap,
+                             libxl_bitmap *nodemap, int k)
 {
-    int i;
+    int i, m = 0, n = 0;
 
     libxl_bitmap_set_none(nodemap);
-    for (i = 0; i < k; i++)
-        libxl_bitmap_set(nodemap, it[i]);
+    libxl_for_each_set_bit(i, *suitable_nodemap) {
+        /* Check wether the n-th set bit of suitable_nodemap
+         * matches with the m-th element of the iterator (and,
+         * only if it does, advance to the next one) */
+        if (m < k && n == it[m]) {
+            libxl_bitmap_set(nodemap, i);
+            m++;
+        }
+        n++;
+    }
 }
 
 /* Retrieve the number of cpus that the nodes that are part of the nodemap
- * span. */
+ * span and are also set in suitable_cpumap. */
 static int nodemap_to_nr_cpus(libxl_cputopology *tinfo, int nr_cpus,
+                              const libxl_bitmap *suitable_cpumap,
                               const libxl_bitmap *nodemap)
 {
     int i, nodes_cpus = 0;
 
     for (i = 0; i < nr_cpus; i++) {
-        if (libxl_bitmap_test(nodemap, tinfo[i].node))
+        if (libxl_bitmap_test(suitable_cpumap, i) &&
+            libxl_bitmap_test(nodemap, tinfo[i].node))
             nodes_cpus++;
     }
     return nodes_cpus;
@@ -242,6 +260,7 @@ static int count_cpus_per_node(libxl_cputopology *tinfo, int nr_cpus,
 int libxl__get_numa_candidate(libxl__gc *gc,
                               uint32_t min_free_memkb, int min_cpus,
                               int min_nodes, int max_nodes,
+                              const libxl_bitmap *suitable_cpumap,
                               libxl__numa_candidate_cmpf numa_cmpf,
                               libxl__numa_candidate *cndt_out,
                               int *cndt_found)
@@ -249,11 +268,12 @@ int libxl__get_numa_candidate(libxl__gc *gc,
     libxl__numa_candidate new_cndt;
     libxl_cputopology *tinfo = NULL;
     libxl_numainfo *ninfo = NULL;
-    int nr_nodes = 0, nr_cpus = 0;
-    libxl_bitmap nodemap;
+    int nr_nodes = 0, nr_suit_nodes, nr_cpus = 0;
+    libxl_bitmap suitable_nodemap, nodemap;
     int rc = 0;
 
     libxl_bitmap_init(&nodemap);
+    libxl_bitmap_init(&suitable_nodemap);
     libxl__numa_candidate_init(&new_cndt);
 
     /* Get platform info and prepare the map for testing the combinations */
@@ -300,6 +320,15 @@ int libxl__get_numa_candidate(libxl__gc *gc,
     if (rc)
         goto out;
 
+    /* Allocate and prepare the map of the node that can be utilized for
+     * placement, basing on the map of suitable cpus. */
+    rc = libxl_node_bitmap_alloc(CTX, &suitable_nodemap, 0);
+    if (rc)
+        goto out;
+    rc = libxl_cpumap_to_nodemap(CTX, suitable_cpumap, &suitable_nodemap);
+    if (rc)
+        goto out;
+
     /*
      * If the minimum number of NUMA nodes is not explicitly specified
      * (i.e., min_nodes == 0), we try to figure out a sensible number of nodes
@@ -317,10 +346,14 @@ int libxl__get_numa_candidate(libxl__gc *gc,
         else
             min_nodes = (min_cpus + cpus_per_node - 1) / cpus_per_node;
     }
-    if (min_nodes > nr_nodes)
-        min_nodes = nr_nodes;
-    if (!max_nodes || max_nodes > nr_nodes)
-        max_nodes = nr_nodes;
+    /* We also need to be sure we do not exceed the number of
+     * nodes we are allowed to use. */
+    nr_suit_nodes = libxl_bitmap_count_set(&suitable_nodemap);
+
+    if (min_nodes > nr_suit_nodes)
+        min_nodes = nr_suit_nodes;
+    if (!max_nodes || max_nodes > nr_suit_nodes)
+        max_nodes = nr_suit_nodes;
     if (min_nodes > max_nodes) {
         LOG(ERROR, "Inconsistent minimum or maximum number of guest nodes");
         rc = ERROR_INVAL;
@@ -353,12 +386,16 @@ int libxl__get_numa_candidate(libxl__gc *gc,
          * amount of free memory and number of cpus) and it can concur to
          * become our best placement iff it passes the check.
          */
-        for (comb_ok = comb_init(gc, &comb_iter, nr_nodes, min_nodes); comb_ok;
-             comb_ok = comb_next(comb_iter, nr_nodes, min_nodes)) {
+        for (comb_ok = comb_init(gc, &comb_iter, nr_suit_nodes, min_nodes);
+             comb_ok;
+             comb_ok = comb_next(comb_iter, nr_suit_nodes, min_nodes)) {
             uint32_t nodes_free_memkb;
             int nodes_cpus;
 
-            comb_get_nodemap(comb_iter, &nodemap, min_nodes);
+            /* Get the nodemap for the combination, only considering
+             * suitable nodes. */
+            comb_get_nodemap(comb_iter, &suitable_nodemap,
+                             &nodemap, min_nodes);
 
             /* If there is not enough memory in this combination, skip it
              * and go generating the next one... */
@@ -367,7 +404,8 @@ int libxl__get_numa_candidate(libxl__gc *gc,
                 continue;
 
             /* And the same applies if this combination is short in cpus */
-            nodes_cpus = nodemap_to_nr_cpus(tinfo, nr_cpus, &nodemap);
+            nodes_cpus = nodemap_to_nr_cpus(tinfo, nr_cpus, suitable_cpumap,
+                                            &nodemap);
             if (min_cpus && nodes_cpus < min_cpus)
                 continue;
 
@@ -378,7 +416,7 @@ int libxl__get_numa_candidate(libxl__gc *gc,
             libxl__numa_candidate_put_nodemap(gc, &new_cndt, &nodemap);
             new_cndt.nr_vcpus = nodemap_to_nr_vcpus(gc, tinfo, &nodemap);
             new_cndt.free_memkb = nodes_free_memkb;
-            new_cndt.nr_nodes = min_nodes;
+            new_cndt.nr_nodes = libxl_bitmap_count_set(&nodemap);
             new_cndt.nr_cpus = nodes_cpus;
 
             /*
@@ -392,8 +430,9 @@ int libxl__get_numa_candidate(libxl__gc *gc,
 
                 LOG(DEBUG, "New best NUMA placement candidate found: "
                            "nr_nodes=%d, nr_cpus=%d, nr_vcpus=%d, "
-                           "free_memkb=%"PRIu32"", min_nodes, new_cndt.nr_cpus,
-                           new_cndt.nr_vcpus, new_cndt.free_memkb / 1024);
+                           "free_memkb=%"PRIu32"", new_cndt.nr_nodes,
+                           new_cndt.nr_cpus, new_cndt.nr_vcpus,
+                           new_cndt.free_memkb / 1024);
 
                 libxl__numa_candidate_put_nodemap(gc, cndt_out, &nodemap);
                 cndt_out->nr_vcpus = new_cndt.nr_vcpus;
@@ -413,6 +452,7 @@ int libxl__get_numa_candidate(libxl__gc *gc,
 
  out:
     libxl_bitmap_dispose(&nodemap);
+    libxl_bitmap_dispose(&suitable_nodemap);
     libxl__numa_candidate_dispose(&new_cndt);
     libxl_numainfo_list_free(ninfo, nr_nodes);
     libxl_cputopology_list_free(tinfo, nr_cpus);
