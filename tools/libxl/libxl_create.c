@@ -943,7 +943,9 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__ao_devices *aodevs,
          * called libxl_device_nic_add at this point, but qemu needs
          * the nic information to be complete.
          */
-        libxl__device_nic_setdefault(gc, &d_config->nics[i]);
+        ret = libxl__device_nic_setdefault(gc, &d_config->nics[i], domid);
+        if (ret)
+            goto error_out;
     }
     switch (d_config->c_info.type) {
     case LIBXL_DOMAIN_TYPE_HVM:
