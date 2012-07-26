@@ -5360,7 +5360,7 @@ int main_blockattach(int argc, char **argv)
         return 0;
     }
 
-    if (libxl_device_disk_add(ctx, fe_domid, &disk)) {
+    if (libxl_device_disk_add(ctx, fe_domid, &disk, 0)) {
         fprintf(stderr, "libxl_device_disk_add failed.\n");
     }
     return 0;

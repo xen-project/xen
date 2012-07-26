@@ -560,6 +560,10 @@ static void domcreate_bootloader_console_available(libxl__egc *egc,
 static void domcreate_bootloader_done(libxl__egc *egc,
                                       libxl__bootloader_state *bl,
                                       int rc);
+
+static void domcreate_launch_dm(libxl__egc *egc, libxl__ao_devices *aodevs,
+                                int ret);
+
 static void domcreate_console_available(libxl__egc *egc,
                                         libxl__domain_create_state *dcs);
 
@@ -850,12 +854,10 @@ static void domcreate_rebuild_done(libxl__egc *egc,
                                    int ret)
 {
     STATE_AO_GC(dcs->ao);
-    int i;
 
     /* convenience aliases */
     const uint32_t domid = dcs->guest_domid;
     libxl_domain_config *const d_config = dcs->guest_config;
-    libxl__domain_build_state *const state = &dcs->build_state;
     libxl_ctx *const ctx = CTX;
 
     if (ret) {
@@ -866,14 +868,34 @@ static void domcreate_rebuild_done(libxl__egc *egc,
 
     store_libxl_entry(gc, domid, &d_config->b_info);
 
-    for (i = 0; i < d_config->num_disks; i++) {
-        ret = libxl_device_disk_add(ctx, domid, &d_config->disks[i]);
-        if (ret) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                       "cannot add disk %d to domain: %d", i, ret);
-            ret = ERROR_FAIL;
-            goto error_out;
-        }
+    dcs->aodevs.size = d_config->num_disks;
+    dcs->aodevs.callback = domcreate_launch_dm;
+    libxl__prepare_ao_devices(ao, &dcs->aodevs);
+    libxl__add_disks(egc, ao, domid, 0, d_config, &dcs->aodevs);
+
+    return;
+
+ error_out:
+    assert(ret);
+    domcreate_complete(egc, dcs, ret);
+}
+
+static void domcreate_launch_dm(libxl__egc *egc, libxl__ao_devices *aodevs,
+                                int ret)
+{
+    libxl__domain_create_state *dcs = CONTAINER_OF(aodevs, *dcs, aodevs);
+    STATE_AO_GC(dcs->ao);
+    int i;
+
+    /* convenience aliases */
+    const uint32_t domid = dcs->guest_domid;
+    libxl_domain_config *const d_config = dcs->guest_config;
+    libxl__domain_build_state *const state = &dcs->build_state;
+    libxl_ctx *const ctx = CTX;
+
+    if (ret) {
+        LOG(ERROR, "unable to add disk devices");
+        goto error_out;
     }
     for (i = 0; i < d_config->num_nics; i++) {
         ret = libxl_device_nic_add(ctx, domid, &d_config->nics[i]);

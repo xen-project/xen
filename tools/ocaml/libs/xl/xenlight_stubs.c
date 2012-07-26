@@ -247,7 +247,7 @@ value stub_xl_device_disk_add(value info, value domid)
 	device_disk_val(&gc, &lg, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_disk_add(ctx, Int_val(domid), &c_info);
+	ret = libxl_device_disk_add(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
 		failwith_xl("disk_add", &lg);
 	FREE_CTX();

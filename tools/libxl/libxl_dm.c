@@ -713,6 +713,9 @@ static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
                                 libxl__dm_spawn_state *stubdom_dmss,
                                 int rc);
 
+static void spawn_stub_launch_dm(libxl__egc *egc,
+                                 libxl__ao_devices *aodevs, int ret);
+
 static void spaw_stubdom_pvqemu_destroy_cb(libxl__egc *egc,
                                            libxl__destroy_domid_state *dis,
                                            int rc);
@@ -726,10 +729,9 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
 {
     STATE_AO_GC(sdss->dm.spawn.ao);
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    int i, num_console = STUBDOM_SPECIAL_CONSOLES, ret;
-    libxl__device_console *console;
-    libxl_device_vfb vfb;
-    libxl_device_vkb vkb;
+    int ret;
+    libxl_device_vfb *vfb;
+    libxl_device_vkb *vkb;
     char **args;
     struct xs_permissions perm[2];
     xs_transaction_t t;
@@ -784,10 +786,12 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     ret = libxl__domain_build_info_setdefault(gc, &dm_config->b_info);
     if (ret) goto out;
 
-    libxl__vfb_and_vkb_from_hvm_guest_config(gc, guest_config, &vfb, &vkb);
-    dm_config->vfbs = &vfb;
+    GCNEW(vfb);
+    GCNEW(vkb);
+    libxl__vfb_and_vkb_from_hvm_guest_config(gc, guest_config, vfb, vkb);
+    dm_config->vfbs = vfb;
     dm_config->num_vfbs = 1;
-    dm_config->vkbs = &vkb;
+    dm_config->vkbs = vkb;
     dm_config->num_vkbs = 1;
 
     stubdom_state->pv_kernel.path
@@ -845,22 +849,54 @@ retry_transaction:
         if (errno == EAGAIN)
             goto retry_transaction;
 
-    for (i = 0; i < dm_config->num_disks; i++) {
-        ret = libxl_device_disk_add(ctx, dm_domid, &dm_config->disks[i]);
-        if (ret)
-            goto out_free;
-    }
+    sdss->aodevs.size = dm_config->num_disks;
+    sdss->aodevs.callback = spawn_stub_launch_dm;
+    libxl__prepare_ao_devices(ao, &sdss->aodevs);
+    libxl__add_disks(egc, ao, dm_domid, 0, dm_config, &sdss->aodevs);
+
+    free(args);
+    return;
+
+out_free:
+    free(args);
+out:
+    assert(ret);
+    spawn_stubdom_pvqemu_cb(egc, &sdss->pvqemu, ret);
+}
+
+static void spawn_stub_launch_dm(libxl__egc *egc,
+                                 libxl__ao_devices *aodevs, int ret)
+{
+    libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(aodevs, *sdss, aodevs);
+    STATE_AO_GC(sdss->dm.spawn.ao);
+    libxl_ctx *ctx = libxl__gc_owner(gc);
+    int i, num_console = STUBDOM_SPECIAL_CONSOLES;
+    libxl__device_console *console;
+
+    /* convenience aliases */
+    libxl_domain_config *const dm_config = &sdss->dm_config;
+    libxl_domain_config *const guest_config = sdss->dm.guest_config;
+    const int guest_domid = sdss->dm.guest_domid;
+    libxl__domain_build_state *const d_state = sdss->dm.build_state;
+    libxl__domain_build_state *const stubdom_state = &sdss->dm_state;
+    uint32_t dm_domid = sdss->pvqemu.guest_domid;
+
+    if (ret) {
+        LOG(ERROR, "error connecting disk devices");
+        goto out;
+     }
+
     for (i = 0; i < dm_config->num_nics; i++) {
         ret = libxl_device_nic_add(ctx, dm_domid, &dm_config->nics[i]);
         if (ret)
-            goto out_free;
+            goto out;
     }
     ret = libxl_device_vfb_add(ctx, dm_domid, &dm_config->vfbs[0]);
     if (ret)
-        goto out_free;
+        goto out;
     ret = libxl_device_vkb_add(ctx, dm_domid, &dm_config->vkbs[0]);
     if (ret)
-        goto out_free;
+        goto out;
 
     if (guest_config->b_info.u.hvm.serial)
         num_console++;
@@ -868,7 +904,7 @@ retry_transaction:
     console = libxl__calloc(gc, num_console, sizeof(libxl__device_console));
     if (!console) {
         ret = ERROR_NOMEM;
-        goto out_free;
+        goto out;
     }
 
     for (i = 0; i < num_console; i++) {
@@ -904,7 +940,7 @@ retry_transaction:
         ret = libxl__device_console_add(gc, dm_domid, &console[i],
                         i == STUBDOM_CONSOLE_LOGGING ? stubdom_state : NULL);
         if (ret)
-            goto out_free;
+            goto out;
     }
 
     sdss->pvqemu.spawn.ao = ao;
@@ -915,11 +951,8 @@ retry_transaction:
 
     libxl__spawn_local_dm(egc, &sdss->pvqemu);
 
-    free(args);
     return;
 
-out_free:
-    free(args);
 out:
     assert(ret);
     spawn_stubdom_pvqemu_cb(egc, &sdss->pvqemu, ret);

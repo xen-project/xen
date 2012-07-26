@@ -447,6 +447,37 @@ void libxl__ao_devices_callback(libxl__egc *egc, libxl__ao_device *aodev)
     return;
 }
 
+/******************************************************************************/
+
+/* Macro for defining the functions that will add a bunch of disks when
+ * inside an async op.
+ * This macro is added to prevent repetition of code.
+ *
+ * The following functions are defined:
+ * libxl__add_disks
+ */
+
+#define DEFINE_DEVICES_ADD(type)                                               \
+    void libxl__add_##type##s(libxl__egc *egc, libxl__ao *ao, uint32_t domid,  \
+                              int start, libxl_domain_config *d_config,        \
+                              libxl__ao_devices *aodevs)                       \
+    {                                                                          \
+        AO_GC;                                                                 \
+        int i;                                                                 \
+        int end = start + d_config->num_##type##s;                             \
+        for (i = start; i < end; i++) {                                        \
+            aodevs->array[i].callback = libxl__ao_devices_callback;            \
+            libxl__device_##type##_add(egc, domid, &d_config->type##s[i-start],\
+                                       &aodevs->array[i]);                     \
+        }                                                                      \
+    }
+
+DEFINE_DEVICES_ADD(disk)
+
+#undef DEFINE_DEVICES_ADD
+
+/******************************************************************************/
+
 int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
 {
     char *be_path = libxl__device_backend_path(gc, dev);
@@ -592,6 +623,52 @@ static void device_backend_cleanup(libxl__gc *gc,
                                    libxl__ao_device *aodev);
 
 static void device_hotplug_done(libxl__egc *egc, libxl__ao_device *aodev);
+
+void libxl__wait_device_connection(libxl__egc *egc, libxl__ao_device *aodev)
+{
+    STATE_AO_GC(aodev->ao);
+    char *be_path = libxl__device_backend_path(gc, aodev->dev);
+    char *state_path = libxl__sprintf(gc, "%s/state", be_path);
+    libxl_dominfo info;
+    uint32_t domid = aodev->dev->domid;
+    int rc = 0;
+
+    libxl_dominfo_init(&info);
+    rc = libxl_domain_info(CTX, &info, domid);
+    if (rc) {
+        LOG(ERROR, "unable to get info for domain %d", domid);
+        goto out;
+    }
+    if (QEMU_BACKEND(aodev->dev)) {
+        /*
+         * If Qemu is not running, there's no point in waiting for
+         * it to change the state of the device.
+         *
+         * If Qemu is running, it will set the state of the device to
+         * 4 directly, without waiting in state 2 for any hotplug execution.
+         */
+        device_hotplug_done(egc, aodev);
+        return;
+    }
+
+    rc = libxl__ev_devstate_wait(gc, &aodev->backend_ds,
+                                 device_backend_callback,
+                                 state_path, XenbusStateInitWait,
+                                 LIBXL_INIT_TIMEOUT * 1000);
+    if (rc) {
+        LOG(ERROR, "unable to initialize device %s", be_path);
+        goto out;
+    }
+
+    libxl_dominfo_dispose(&info);
+    return;
+
+out:
+    aodev->rc = rc;
+    libxl_dominfo_dispose(&info);
+    device_hotplug_done(egc, aodev);
+    return;
+}
 
 void libxl__initiate_device_remove(libxl__egc *egc,
                                    libxl__ao_device *aodev)

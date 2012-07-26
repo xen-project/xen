@@ -675,7 +675,9 @@ void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr_vcpus);
  */
 
 /* Disks */
-int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
+int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid,
+                          libxl_device_disk *disk,
+                          const libxl_asyncop_how *ao_how);
 int libxl_device_disk_remove(libxl_ctx *ctx, uint32_t domid,
                              libxl_device_disk *disk,
                              const libxl_asyncop_how *ao_how);

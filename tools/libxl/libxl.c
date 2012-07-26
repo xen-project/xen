@@ -1785,16 +1785,18 @@ int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
  * The passed get_vdev function is also in charge of printing
  * the corresponding error message when appropiate.
  */
-static int device_disk_add(libxl__gc *gc, uint32_t domid,
+static void device_disk_add(libxl__egc *egc, uint32_t domid,
                            libxl_device_disk *disk,
+                           libxl__ao_device *aodev,
                            char *get_vdev(libxl__gc *, void *,
                                           xs_transaction_t),
                            void *get_vdev_user)
 {
+    STATE_AO_GC(aodev->ao);
     flexarray_t *front = NULL;
     flexarray_t *back = NULL;
     char *dev;
-    libxl__device device;
+    libxl__device *device;
     int major, minor, rc;
     libxl_ctx *ctx = gc->owner;
     xs_transaction_t t = XBT_NULL;
@@ -1837,7 +1839,8 @@ static int device_disk_add(libxl__gc *gc, uint32_t domid,
             goto out_free;
         }
 
-        rc = libxl__device_from_disk(gc, domid, disk, &device);
+        GCNEW(device);
+        rc = libxl__device_from_disk(gc, domid, disk, device);
         if (rc != 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Invalid or unsupported"
                    " virtual disk identifier %s", disk->vdev);
@@ -1855,7 +1858,7 @@ static int device_disk_add(libxl__gc *gc, uint32_t domid,
                 flexarray_append(back, "params");
                 flexarray_append(back, dev);
 
-                assert(device.backend_kind == LIBXL__DEVICE_KIND_VBD);
+                assert(device->backend_kind == LIBXL__DEVICE_KIND_VBD);
                 break;
             case LIBXL_DISK_BACKEND_TAP:
                 dev = libxl__blktap_devpath(gc, disk->pdev_path, disk->format);
@@ -1876,7 +1879,7 @@ static int device_disk_add(libxl__gc *gc, uint32_t domid,
                 flexarray_append(back, "params");
                 flexarray_append(back, libxl__sprintf(gc, "%s:%s",
                               libxl__device_disk_string_of_format(disk->format), disk->pdev_path));
-                assert(device.backend_kind == LIBXL__DEVICE_KIND_QDISK);
+                assert(device->backend_kind == LIBXL__DEVICE_KIND_QDISK);
                 break;
             default:
                 LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend type: %d\n", disk->backend);
@@ -1908,11 +1911,11 @@ static int device_disk_add(libxl__gc *gc, uint32_t domid,
         flexarray_append(front, "state");
         flexarray_append(front, libxl__sprintf(gc, "%d", 1));
         flexarray_append(front, "virtual-device");
-        flexarray_append(front, libxl__sprintf(gc, "%d", device.devid));
+        flexarray_append(front, libxl__sprintf(gc, "%d", device->devid));
         flexarray_append(front, "device-type");
         flexarray_append(front, disk->is_cdrom ? "cdrom" : "disk");
 
-        libxl__device_generic_add(gc, t, &device,
+        libxl__device_generic_add(gc, t, device,
                             libxl__xs_kvs_of_flexarray(gc, back, back->count),
                             libxl__xs_kvs_of_flexarray(gc, front, front->count));
 
@@ -1921,6 +1924,10 @@ static int device_disk_add(libxl__gc *gc, uint32_t domid,
         if (rc < 0) goto out_free;
     }
 
+    aodev->dev = device;
+    aodev->action = DEVICE_CONNECT;
+    libxl__wait_device_connection(egc, aodev);
+
     rc = 0;
 
 out_free:
@@ -1928,21 +1935,15 @@ out_free:
     flexarray_free(front);
 out:
     libxl__xs_transaction_abort(gc, &t);
-    return rc;
+    aodev->rc = rc;
+    if (rc) aodev->callback(egc, aodev);
+    return;
 }
 
-int libxl__device_disk_add(libxl__gc *gc, uint32_t domid,
-                           libxl_device_disk *disk)
+void libxl__device_disk_add(libxl__egc *egc, uint32_t domid,
+                           libxl_device_disk *disk, libxl__ao_device *aodev)
 {
-    return device_disk_add(gc, domid, disk, NULL, NULL);
-}
-
-int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
-{
-    GC_INIT(ctx);
-    int rc = libxl__device_disk_add(gc, domid, disk);
-    GC_FREE;
-    return rc;
+    device_disk_add(egc, domid, disk, aodev, NULL, NULL);
 }
 
 static void libxl__device_disk_from_xs_be(libxl__gc *gc,
@@ -2252,14 +2253,17 @@ static char * libxl__alloc_vdev(libxl__gc *gc, void *get_vdev_user,
     return NULL;
 }
 
+/* Callbacks */
+
+static void local_device_attach_cb(libxl__egc *egc, libxl__ao_device *aodev);
+
 void libxl__device_disk_local_initiate_attach(libxl__egc *egc,
                                      libxl__disk_local_state *dls)
 {
     STATE_AO_GC(dls->ao);
     libxl_ctx *ctx = CTX;
-    char *dev = NULL, *be_path = NULL;
+    char *dev = NULL;
     int rc;
-    libxl__device device;
     const libxl_device_disk *in_disk = dls->in_disk;
     libxl_device_disk *disk = &dls->disk;
     const char *blkdev_start = dls->blkdev_start;
@@ -2306,14 +2310,12 @@ void libxl__device_disk_local_initiate_attach(libxl__egc *egc,
             break;
         case LIBXL_DISK_BACKEND_QDISK:
             if (disk->format != LIBXL_DISK_FORMAT_RAW) {
-                if (device_disk_add(gc, LIBXL_TOOLSTACK_DOMID, disk,
-                                    libxl__alloc_vdev,
-                                    (void *) blkdev_start)) {
-                    LOG(ERROR, "libxl_device_disk_add failed");
-                    rc = ERROR_FAIL;
-                    goto out;
-                }
-                dev = GCSPRINTF("/dev/%s", disk->vdev);
+                libxl__prepare_ao_device(ao, &dls->aodev);
+                dls->aodev.callback = local_device_attach_cb;
+                device_disk_add(egc, LIBXL_TOOLSTACK_DOMID, disk,
+                                &dls->aodev, libxl__alloc_vdev,
+                                (void *) blkdev_start);
+                return;
             } else {
                 dev = disk->pdev_path;
             }
@@ -2326,15 +2328,48 @@ void libxl__device_disk_local_initiate_attach(libxl__egc *egc,
             goto out;
     }
 
-    if (disk->vdev != NULL) {
-        rc = libxl__device_from_disk(gc, LIBXL_TOOLSTACK_DOMID, disk, &device);
-        if (rc < 0)
-            goto out;
-        be_path = libxl__device_backend_path(gc, &device);
-        rc = libxl__wait_for_backend(gc, be_path, "4");
-        if (rc < 0)
-            goto out;
+    if (dev != NULL)
+        dls->diskpath = strdup(dev);
+
+    dls->callback(egc, dls, 0);
+    return;
+
+ out:
+    assert(rc);
+    dls->rc = rc;
+    libxl__device_disk_local_initiate_detach(egc, dls);
+    dls->callback(egc, dls, rc);
+}
+
+static void local_device_attach_cb(libxl__egc *egc, libxl__ao_device *aodev)
+{
+    STATE_AO_GC(aodev->ao);
+    libxl__disk_local_state *dls = CONTAINER_OF(aodev, *dls, aodev);
+    char *dev = NULL, *be_path = NULL;
+    int rc;
+    libxl__device device;
+    libxl_device_disk *disk = &dls->disk;
+
+    rc = aodev->rc;
+    if (rc) {
+        LOGE(ERROR, "unable to %s %s with id %u",
+                    aodev->action == DEVICE_CONNECT ? "add" : "remove",
+                    libxl__device_kind_to_string(aodev->dev->kind),
+                    aodev->dev->devid);
+        goto out;
     }
+
+    dev = GCSPRINTF("/dev/%s", disk->vdev);
+    LOG(DEBUG, "locally attaching qdisk %s", dev);
+
+    rc = libxl__device_from_disk(gc, LIBXL_TOOLSTACK_DOMID, disk, &device);
+    if (rc < 0)
+        goto out;
+    be_path = libxl__device_backend_path(gc, &device);
+    rc = libxl__wait_for_backend(gc, be_path, "4");
+    if (rc < 0)
+        goto out;
+
     if (dev != NULL)
         dls->diskpath = libxl__strdup(gc, dev);
 
@@ -3055,6 +3090,36 @@ DEFINE_DEVICE_REMOVE(vfb, remove, 0)
 DEFINE_DEVICE_REMOVE(vfb, destroy, 1)
 
 #undef DEFINE_DEVICE_REMOVE
+
+/******************************************************************************/
+
+/* Macro for defining device addition functions in a compact way */
+/* The following functions are defined:
+ * libxl_device_disk_add
+ */
+
+#define DEFINE_DEVICE_ADD(type)                                         \
+    int libxl_device_##type##_add(libxl_ctx *ctx,                       \
+        uint32_t domid, libxl_device_##type *type,                      \
+        const libxl_asyncop_how *ao_how)                                \
+    {                                                                   \
+        AO_CREATE(ctx, domid, ao_how);                                  \
+        libxl__ao_device *aodev;                                        \
+                                                                        \
+        GCNEW(aodev);                                                   \
+        libxl__prepare_ao_device(ao, aodev);                            \
+        aodev->callback = device_addrm_aocomplete;                      \
+        libxl__device_##type##_add(egc, domid, type, aodev);            \
+                                                                        \
+        return AO_INPROGRESS;                                           \
+    }
+
+/* Define alladd functions and undef the macro */
+
+/* disk */
+DEFINE_DEVICE_ADD(disk)
+
+#undef DEFINE_DEVICE_ADD
 
 /******************************************************************************/
 

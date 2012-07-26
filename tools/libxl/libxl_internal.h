@@ -72,6 +72,7 @@
 #include "_libxl_types_internal.h"
 #include "_libxl_types_internal_json.h"
 
+#define LIBXL_INIT_TIMEOUT 10
 #define LIBXL_DESTROY_TIMEOUT 10
 #define LIBXL_DEVICE_MODEL_START_TIMEOUT 10
 #define LIBXL_QEMU_BODGE_TIMEOUT 2
@@ -1338,8 +1339,6 @@ _hidden void libxl__device_destroy_tapdisk(libxl__gc *gc, char *be_path);
 _hidden int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
                                    libxl_device_disk *disk,
                                    libxl__device *device);
-_hidden int libxl__device_disk_add(libxl__gc *gc, uint32_t domid,
-                                   libxl_device_disk *disk);
 
 _hidden char *libxl__uuid2string(libxl__gc *gc, const libxl_uuid uuid);
 
@@ -1923,6 +1922,27 @@ struct libxl__ao_devices {
  *                   DONE.
  */
 
+/* AO operation to connect a disk device, called by
+ * libxl_device_disk_add and libxl__add_disks. This function calls
+ * libxl__wait_device_connection to wait for the device to
+ * finish the connection (might involve executing hotplug scripts).
+ *
+ * Once finished, aodev->callback will be executed.
+ */
+_hidden void libxl__device_disk_add(libxl__egc *egc, uint32_t domid,
+                                    libxl_device_disk *disk,
+                                    libxl__ao_device *aodev);
+
+/* Waits for the passed device to reach state XenbusStateInitWait.
+ * This is not really useful by itself, but is important when executing
+ * hotplug scripts, since we need to be sure the device is in the correct
+ * state before executing them.
+ *
+ * Once finished, aodev->callback will be executed.
+ */
+_hidden void libxl__wait_device_connection(libxl__egc*,
+                                           libxl__ao_device *aodev);
+
 /* Arranges that dev will be removed to the guest, and the
  * hotplug scripts will be executed (if necessary). When
  * this is done (or an error happens), the callback in
@@ -2295,6 +2315,19 @@ _hidden void libxl__destroy_domid(libxl__egc *egc,
 _hidden void libxl__devices_destroy(libxl__egc *egc,
                                     libxl__devices_remove_state *drs);
 
+/* Helper function to add a bunch of disks. This should be used when
+ * the caller is inside an async op. "devices" will NOT be prepared by this
+ * function, so the caller must make sure to call _prepare before calling this
+ * function. The start parameter contains the position inside the aodevs array
+ * that should be used to store the state of this devices.
+ *
+ * The "callback" will be called for each device, and the user is responsible
+ * for calling libxl__ao_device_check_last on the callback.
+ */
+_hidden void libxl__add_disks(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
+                              int start, libxl_domain_config *d_config,
+                              libxl__ao_devices *aodevs);
+
 /*----- device model creation -----*/
 
 /* First layer; wraps libxl__spawn_spawn. */
@@ -2329,6 +2362,7 @@ typedef struct {
     libxl__domain_build_state dm_state;
     libxl__dm_spawn_state pvqemu;
     libxl__destroy_domid_state dis;
+    libxl__ao_devices aodevs;
 } libxl__stub_dm_spawn_state;
 
 _hidden void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state*);
@@ -2360,6 +2394,7 @@ struct libxl__domain_create_state {
     libxl__save_helper_state shs;
     /* necessary if the domain creation failed and we have to destroy it */
     libxl__domain_destroy_state dds;
+    libxl__ao_devices aodevs;
 };
 
 /*----- Domain suspend (save) functions -----*/
