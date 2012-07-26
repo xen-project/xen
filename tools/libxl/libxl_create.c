@@ -932,7 +932,6 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__ao_devices *aodevs,
     const uint32_t domid = dcs->guest_domid;
     libxl_domain_config *const d_config = dcs->guest_config;
     libxl__domain_build_state *const state = &dcs->build_state;
-    libxl_ctx *const ctx = CTX;
 
     if (ret) {
         LOG(ERROR, "unable to add disk devices");
@@ -976,7 +975,7 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__ao_devices *aodevs,
         libxl__device_console console;
 
         for (i = 0; i < d_config->num_vfbs; i++) {
-            libxl_device_vfb_add(ctx, domid, &d_config->vfbs[i]);
+            libxl__device_vfb_add(gc, domid, &d_config->vfbs[i]);
             libxl__device_vkb_add(gc, domid, &d_config->vkbs[i]);
         }
 

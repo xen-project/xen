@@ -721,7 +721,8 @@ int libxl_device_vkb_destroy(libxl_ctx *ctx, uint32_t domid,
                              const libxl_asyncop_how *ao_how);
 
 /* Framebuffer */
-int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb);
+int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
+                         const libxl_asyncop_how *ao_how);
 int libxl_device_vfb_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_vfb *vfb,
                             const libxl_asyncop_how *ao_how);

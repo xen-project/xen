@@ -3019,9 +3019,25 @@ static int libxl__device_from_vfb(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
-int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
+int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
+                         const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
+    AO_CREATE(ctx, domid, ao_how);
+    int rc;
+
+    rc = libxl__device_vfb_add(gc, domid, vfb);
+    if (rc) {
+        LOG(ERROR, "unable to add vfb device");
+        goto out;
+    }
+
+out:
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
+}
+
+int libxl__device_vfb_add(libxl__gc *gc, uint32_t domid, libxl_device_vfb *vfb)
+{
     flexarray_t *front;
     flexarray_t *back;
     libxl__device device;
@@ -3079,7 +3095,6 @@ out_free:
     flexarray_free(front);
     flexarray_free(back);
 out:
-    GC_FREE;
     return rc;
 }
 
