@@ -219,7 +219,8 @@ int libxl__xs_path_cleanup(libxl__gc *gc, xs_transaction_t t, char *user_path)
 
     path = libxl__strdup(gc, user_path);
     if (!xs_rm(CTX->xsh, t, path)) {
-        LOGE(DEBUG, "unable to remove path %s", path);
+        if (errno != ENOENT)
+            LOGE(DEBUG, "unable to remove path %s", path);
         rc = ERROR_FAIL;
         goto out;
     }
@@ -235,7 +236,8 @@ int libxl__xs_path_cleanup(libxl__gc *gc, xs_transaction_t t, char *user_path)
         if (!libxl__xs_directory(gc, t, path, &nb) || nb != 0) break;
 
         if (!xs_rm(CTX->xsh, t, path)) {
-            LOGE(DEBUG, "unable to remove path %s", path);
+            if (errno != ENOENT)
+                LOGE(DEBUG, "unable to remove path %s", path);
             rc = ERROR_FAIL;
             goto out;
         }
