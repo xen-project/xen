@@ -839,18 +839,26 @@ int libxl_osevent_beforepoll(libxl_ctx *ctx, int *nfds_io,
 static int afterpoll_check_fd(libxl__poller *poller,
                               const struct pollfd *fds, int nfds,
                               int fd, int events)
-    /* returns mask of events which were requested and occurred */
+    /* Returns mask of events which were requested and occurred.  Will
+     * return nonzero only once for each (poller,fd,events)
+     * combination, until the next beforepoll.  If events from
+     * different combinations overlap, between one such combination
+     * and all distinct combinations will produce nonzero returns. */
 {
     if (fd >= poller->fd_rindices_allocd)
         /* added after we went into poll, have to try again */
         return 0;
 
+    events |= POLLERR | POLLHUP;
+
     int i, revents = 0;
     for (i=0; i<3; i++) {
-        int slot = poller->fd_rindices[fd][i];
+        int *slotp = &poller->fd_rindices[fd][i];
+        int slot = *slotp;
 
         if (slot >= nfds)
-            /* stale slot entry; again, added afterwards */
+            /* stale slot entry (again, added afterwards), */
+            /* or slot for which we have already returned nonzero */
             continue;
 
         if (fds[slot].fd != fd)
@@ -858,11 +866,16 @@ static int afterpoll_check_fd(libxl__poller *poller,
             continue;
 
         assert(!(fds[slot].revents & POLLNVAL));
-        revents |= fds[slot].revents;
-    }
 
-    /* we mask in case requested events have changed */
-    revents &= (events | POLLERR | POLLHUP);
+        /* we mask in case requested events have changed */
+        int slot_revents = fds[slot].revents & events;
+        if (!slot_revents)
+            /* this slot is for a different set of events */
+            continue;
+
+        revents |= slot_revents;
+        *slotp = INT_MAX; /* so that next time we'll see slot >= nfds */
+    }
 
     return revents;
 }
@@ -876,16 +889,63 @@ static void afterpoll_internal(libxl__egc *egc, libxl__poller *poller,
     EGC_GC;
     libxl__ev_fd *efd;
 
-    LIBXL_LIST_FOREACH(efd, &CTX->efds, entry) {
-        if (!efd->events)
-            continue;
+    /*
+     * Warning! Reentrancy hazards!
+     *
+     * Many parts of this function eventually call arbitrary callback
+     * functions which may modify the event handling data structures.
+     *
+     * Of the data structures used here:
+     *
+     *   egc, poller, now
+     *                are allocated by our caller and relate to the
+     *                current thread and its call stack down into the
+     *                event machinery; it is not freed until we return.
+     *                So it is safe.
+     *
+     *   fds          is either what application passed into
+     *                libxl_osevent_afterpoll (which, although this
+     *                isn't explicitly stated, clearly must remain
+     *                valid until libxl_osevent_afterpoll returns) or
+     *                it's poller->fd_polls which is modified only by
+     *                our (non-recursive) caller eventloop_iteration.
+     *
+     *   CTX          comes from our caller, and applications are
+     *                forbidden from destroying it while we are running.
+     *                So the ctx pointer itself is safe to use; now
+     *                for its contents:
+     *
+     *   CTX->etimes  is used in a simple reentrancy-safe manner.
+     *
+     *   CTX->efds    is more complicated; see below.
+     */
 
-        int revents = afterpoll_check_fd(poller,fds,nfds, efd->fd,efd->events);
-        if (revents) {
-            DBG("ev_fd=%p occurs fd=%d events=%x revents=%x",
-                efd, efd->fd, efd->events, revents);
-            efd->func(egc, efd, efd->fd, efd->events, revents);
+    for (;;) {
+        /* We restart our scan of fd events whenever we call a
+         * callback function.  This is necessary because such
+         * a callback might make arbitrary changes to CTX->efds.
+         * We invalidate the fd_rindices[] entries which were used
+         * so that we don't call the same function again. */
+        int revents;
+
+        LIBXL_LIST_FOREACH(efd, &CTX->efds, entry) {
+
+            if (!efd->events)
+                continue;
+
+            revents = afterpoll_check_fd(poller,fds,nfds,
+                                         efd->fd,efd->events);
+            if (revents)
+                goto found_fd_event;
         }
+        /* no ordinary fd events, then */
+        break;
+
+    found_fd_event:
+        DBG("ev_fd=%p occurs fd=%d events=%x revents=%x",
+            efd, efd->fd, efd->events, revents);
+
+        efd->func(egc, efd, efd->fd, efd->events, revents);
     }
 
     if (afterpoll_check_fd(poller,fds,nfds, poller->wakeup_pipe[0],POLLIN)) {
