@@ -498,8 +498,13 @@ _hidden int libxl__remove_file_or_directory(libxl__gc *gc, const char *path);
 
 _hidden char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int length);
 
+/* treats kvs as pairs of keys and values and writes each to dir. */
 _hidden int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
                              const char *dir, char **kvs);
+/* _atonce creates a transaction and writes all keys at once */
+_hidden int libxl__xs_writev_atonce(libxl__gc *gc,
+                             const char *dir, char **kvs);
+
 _hidden int libxl__xs_write(libxl__gc *gc, xs_transaction_t t,
                const char *path, const char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
    /* Each fn returns 0 on success.

@@ -61,6 +61,31 @@ int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
     return 0;
 }
 
+int libxl__xs_writev_atonce(libxl__gc *gc,
+                            const char *dir, char *kvs[])
+{
+    int rc;
+    xs_transaction_t t = XBT_NULL;
+
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) goto out;
+
+        rc = libxl__xs_writev(gc, t, dir, kvs);
+        if (rc) goto out;
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc<0) goto out;
+    }
+
+out:
+    libxl__xs_transaction_abort(gc, &t);
+
+    return rc;
+
+}
+
 int libxl__xs_write(libxl__gc *gc, xs_transaction_t t,
                     const char *path, const char *fmt, ...)
 {

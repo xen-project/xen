@@ -2076,17 +2076,49 @@ int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
+int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
+                       const libxl_asyncop_how *ao_how)
 {
-    int num, i;
-    uint32_t stubdomid;
-    libxl_device_disk *disks;
-    int ret = ERROR_FAIL;
+    AO_CREATE(ctx, domid, ao_how);
+    int num = 0, i;
+    libxl_device_disk *disks = NULL;
+    int rc, dm_ver;
 
-    if (!disk->pdev_path) {
-        disk->pdev_path = strdup("");
-        disk->format = LIBXL_DISK_FORMAT_EMPTY;
+    libxl__device device;
+    const char * path;
+
+    flexarray_t *insert = NULL;
+
+    libxl_domain_type type = libxl__domain_type(gc, domid);
+    if (type == LIBXL_DOMAIN_TYPE_INVALID) {
+        rc = ERROR_FAIL;
+        goto out;
     }
+    if (type != LIBXL_DOMAIN_TYPE_HVM) {
+        LOG(ERROR, "cdrom-insert requires an HVM domain");
+        rc = ERROR_INVAL;
+        goto out;
+    }
+
+    if (libxl_get_stubdom_id(ctx, domid) != 0) {
+        LOG(ERROR, "cdrom-insert doesn't work for stub domains");
+        rc = ERROR_INVAL;
+        goto out;
+    }
+
+    dm_ver = libxl__device_model_version_running(gc, domid);
+    if (dm_ver == -1) {
+        LOG(ERROR, "cannot determine device model version");
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    if (dm_ver != LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL) {
+        LOG(ERROR, "cdrom-insert does not work with %s",
+            libxl_device_model_version_to_string(dm_ver));
+        rc = ERROR_INVAL;
+        goto out;
+    }
+
     disks = libxl_device_disk_list(ctx, domid, &num);
     for (i = 0; i < num; i++) {
         if (disks[i].is_cdrom && !strcmp(disk->vdev, disks[i].vdev))
@@ -2095,23 +2127,52 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk)
     }
     if (i == num) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Virtual device not found");
+        rc = ERROR_FAIL;
         goto out;
     }
 
-    ret = 0;
+    rc = libxl__device_disk_setdefault(gc, disk);
+    if (rc) goto out;
 
-    libxl_device_disk_remove(ctx, domid, disks + i, 0);
-    libxl_device_disk_add(ctx, domid, disk);
-    stubdomid = libxl_get_stubdom_id(ctx, domid);
-    if (stubdomid) {
-        libxl_device_disk_remove(ctx, stubdomid, disks + i, 0);
-        libxl_device_disk_add(ctx, stubdomid, disk);
+    if (!disk->pdev_path) {
+        disk->pdev_path = libxl__strdup(NOGC, "");
+        disk->format = LIBXL_DISK_FORMAT_EMPTY;
     }
+
+    rc = libxl__device_from_disk(gc, domid, disk, &device);
+    if (rc) goto out;
+    path = libxl__device_backend_path(gc, &device);
+
+    insert = flexarray_make(4, 1);
+
+    flexarray_append_pair(insert, "type",
+                          libxl__device_disk_string_of_backend(disk->backend));
+    if (disk->format != LIBXL_DISK_FORMAT_EMPTY)
+        flexarray_append_pair(insert, "params",
+                        GCSPRINTF("%s:%s",
+                            libxl__device_disk_string_of_format(disk->format),
+                            disk->pdev_path));
+    else
+        flexarray_append_pair(insert, "params", "");
+
+    rc = libxl__xs_writev_atonce(gc, path,
+                        libxl__xs_kvs_of_flexarray(gc, insert, insert->count));
+    if (rc) goto out;
+
+    /* success, no actual async */
+    libxl__ao_complete(egc, ao, 0);
+
+    rc = 0;
+
 out:
     for (i = 0; i < num; i++)
         libxl_device_disk_dispose(&disks[i]);
     free(disks);
-    return ret;
+
+    if (insert) flexarray_free(insert);
+
+    if (rc) return AO_ABORT(rc);
+    return AO_INPROGRESS;
 }
 
 /* libxl__alloc_vdev only works on the local domain, that is the domain

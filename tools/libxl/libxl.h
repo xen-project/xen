@@ -691,7 +691,8 @@ int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
  * Insert a CD-ROM device. A device corresponding to disk must already
  * be attached to the guest.
  */
-int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk);
+int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
+                       const libxl_asyncop_how *ao_how);
 
 /* Network Interfaces */
 int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic);

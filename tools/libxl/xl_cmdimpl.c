@@ -2004,7 +2004,7 @@ start:
 
         case LIBXL_EVENT_TYPE_DISK_EJECT:
             /* XXX what is this for? */
-            libxl_cdrom_insert(ctx, domid, &event->u.disk_eject.disk);
+            libxl_cdrom_insert(ctx, domid, &event->u.disk_eject.disk, NULL);
             break;
 
         default:;
@@ -2225,7 +2225,7 @@ static void cd_insert(const char *dom, const char *virtdev, char *phys)
 
     disk.backend_domid = 0;
 
-    libxl_cdrom_insert(ctx, domid, &disk);
+    libxl_cdrom_insert(ctx, domid, &disk, NULL);
 
     libxl_device_disk_dispose(&disk);
     free(buf);
