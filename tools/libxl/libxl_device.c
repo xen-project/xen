@@ -81,6 +81,8 @@ static int libxl__num_devices(libxl__gc *gc, uint32_t domid)
     for (i = 0; i < num_kinds; i++) {
         if (libxl__device_kind_from_string(kinds[i], &kind))
             continue;
+        if (kind == LIBXL__DEVICE_KIND_CONSOLE)
+            continue;
 
         path = GCSPRINTF("/local/domain/%d/device/%s", domid, kinds[i]);
         devs = libxl__xs_directory(gc, XBT_NULL, path, &num_devs);
@@ -522,10 +524,18 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
             path = libxl__xs_read(gc, XBT_NULL, path);
             GCNEW(dev);
             if (path && libxl__parse_backend_path(gc, path, dev) == 0) {
-                aodev = &aodevs->array[numdev];
                 dev->domid = domid;
                 dev->kind = kind;
                 dev->devid = atoi(devs[j]);
+                if (dev->backend_kind == LIBXL__DEVICE_KIND_CONSOLE) {
+                    /* Currently console devices can be destroyed
+                     * synchronously by just removing xenstore entries,
+                     * this is what libxl__device_destroy does.
+                     */
+                    libxl__device_destroy(gc, dev);
+                    continue;
+                }
+                aodev = &aodevs->array[numdev];
                 aodev->action = DEVICE_DISCONNECT;
                 aodev->dev = dev;
                 aodev->callback = libxl__ao_devices_callback;
