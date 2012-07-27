@@ -2531,7 +2531,7 @@ void __init init_ioapic_mappings(void)
         }
     }
 
-    nr_irqs_gsi = max(nr_irqs_gsi, highest_gsi());
+    nr_irqs_gsi = max(nr_irqs_gsi, highest_gsi() + 1);
 
     if ( max_gsi_irqs == 0 )
         max_gsi_irqs = nr_irqs ? nr_irqs / 8 : PAGE_SIZE;
