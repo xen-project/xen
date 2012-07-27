@@ -483,8 +483,8 @@ void __init serial_async_transmit(struct serial_port *port)
     BUG_ON(!port->driver->tx_empty);
     if ( port->txbuf != NULL )
         return;
-    if ( serial_txbufsz < 512 )
-        serial_txbufsz = 512;
+    if ( serial_txbufsz < PAGE_SIZE )
+        serial_txbufsz = PAGE_SIZE;
     while ( serial_txbufsz & (serial_txbufsz - 1) )
         serial_txbufsz &= serial_txbufsz - 1;
     port->txbuf = alloc_xenheap_pages(
