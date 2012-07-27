@@ -275,15 +275,13 @@ ENTRY(sysenter_entry)
         pushfq
         .globl sysenter_eflags_saved
 sysenter_eflags_saved:
-        pushq $0
-        pushq $0
+        pushq $3 /* ring 3 null cs */
+        pushq $0 /* null rip */
         pushq $0
         movl  $TRAP_syscall,4(%rsp)
         SAVE_ALL
         GET_CURRENT(%rbx)
         cmpb  $0,VCPU_sysenter_disables_events(%rbx)
-        movq  $0,UREGS_rip(%rsp) /* null rip */
-        movl  $3,UREGS_cs(%rsp)  /* ring 3 null cs */
         movq  VCPU_sysenter_addr(%rbx),%rax
         setne %cl
         leaq  VCPU_trap_bounce(%rbx),%rdx
@@ -292,7 +290,6 @@ sysenter_eflags_saved:
 UNLIKELY_START(z, sysenter_gpf)
         movq  VCPU_trap_ctxt(%rbx),%rsi
         movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
-        subq  $2,UREGS_rip(%rsp)
         movl  %eax,TRAPBOUNCE_error_code(%rdx)
         movq  TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_eip(%rsi),%rax
         testb $4,TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_flags(%rsi)
