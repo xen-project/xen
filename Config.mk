@@ -213,7 +213,7 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 00fb2aae68e915b7f456fd5e3997ddf31339004a
+QEMU_TAG ?= xen-4.2.0-rc1
 # Mon Jul 23 17:56:13 2012 +0100
 # qemu-traditional: fix no-return-in-nonvoid-function
 
