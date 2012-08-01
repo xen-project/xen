@@ -1,0 +1,23 @@
+#!/usr/bin/perl -w
+use strict;
+our $needed=0;
+our $speclineoffset=0;
+our $specfile;
+while (<>) {
+    if (m/^\# (\d+) \"(.*)\"$/) {
+        $speclineoffset = $1 - $. -1;
+        $specfile = $2;
+    }
+    my $file = defined($specfile) ? $specfile : $ARGV;
+    my $line = $speclineoffset + $.;
+    if (m/libxl_asyncop_how[^;]/) {
+        $needed=1;
+    }
+    if (m/LIBXL_EXTERNAL_CALLERS_ONLY/) {
+        $needed=0;
+    }
+    next unless $needed;
+    if (m/\;/) {
+        die "$file:$line:missing LIBXL_EXTERNAL_CALLERS_ONLY";
+    }
+}

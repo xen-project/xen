@@ -37,7 +37,8 @@ typedef int libxl_event_predicate(const libxl_event*, void *user);
 
 int libxl_event_check(libxl_ctx *ctx, libxl_event **event_r,
                       uint64_t typemask,
-                      libxl_event_predicate *predicate, void *predicate_user);
+                      libxl_event_predicate *predicate, void *predicate_user)
+                      LIBXL_EXTERNAL_CALLERS_ONLY;
   /* Searches for an event, already-happened, which matches typemask
    * and predicate.  predicate==0 matches any event.
    * libxl_event_check returns the event, which must then later be
@@ -48,7 +49,8 @@ int libxl_event_check(libxl_ctx *ctx, libxl_event **event_r,
 
 int libxl_event_wait(libxl_ctx *ctx, libxl_event **event_r,
                      uint64_t typemask,
-                     libxl_event_predicate *predicate, void *predicate_user);
+                     libxl_event_predicate *predicate, void *predicate_user)
+                     LIBXL_EXTERNAL_CALLERS_ONLY;
   /* Like libxl_event_check but blocks if no suitable events are
    * available, until some are.  Uses libxl_osevent_beforepoll/
    * _afterpoll so may be inefficient if very many domains are being
@@ -256,7 +258,8 @@ struct pollfd;
  */
 int libxl_osevent_beforepoll(libxl_ctx *ctx, int *nfds_io,
                              struct pollfd *fds, int *timeout_upd,
-                             struct timeval now);
+                             struct timeval now)
+                             LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /* nfds and fds[0..nfds] must be from the most recent call to
  * _beforepoll, as modified by poll.  (It is therefore not possible
@@ -271,7 +274,8 @@ int libxl_osevent_beforepoll(libxl_ctx *ctx, int *nfds_io,
  * libxl_event_check.
  */
 void libxl_osevent_afterpoll(libxl_ctx *ctx, int nfds, const struct pollfd *fds,
-                             struct timeval now);
+                             struct timeval now)
+                             LIBXL_EXTERNAL_CALLERS_ONLY;
 
 
 typedef struct libxl_osevent_hooks {
@@ -357,14 +361,16 @@ void libxl_osevent_register_hooks(libxl_ctx *ctx,
  */
 
 void libxl_osevent_occurred_fd(libxl_ctx *ctx, void *for_libxl,
-                               int fd, short events, short revents);
+                               int fd, short events, short revents)
+                               LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /* Implicitly, on entry to this function the timeout has been
  * deregistered.  If _occurred_timeout is called, libxl will not
  * call timeout_deregister; if it wants to requeue the timeout it
  * will call timeout_register again.
  */
-void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl);
+void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl)
+                                    LIBXL_EXTERNAL_CALLERS_ONLY;
 
 
 /*======================================================================*/
@@ -506,7 +512,8 @@ void libxl_childproc_setmode(libxl_ctx *ctx, const libxl_childproc_hooks *hooks,
  * certainly need to use the self-pipe trick (or a working pselect or
  * ppoll) to implement this.
  */
-int libxl_childproc_reaped(libxl_ctx *ctx, pid_t, int status);
+int libxl_childproc_reaped(libxl_ctx *ctx, pid_t, int status)
+                           LIBXL_EXTERNAL_CALLERS_ONLY;
 
 
 /*

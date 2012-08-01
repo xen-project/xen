@@ -266,6 +266,13 @@
 #endif
 #endif
 
+/* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
+ * called from within libxl itself. Callers outside libxl, who
+ * do not #include libxl_internal.h, are fine. */
+#ifndef LIBXL_EXTERNAL_CALLERS_ONLY
+#define LIBXL_EXTERNAL_CALLERS_ONLY /* disappears for callers outside libxl */
+#endif
+
 typedef uint8_t libxl_mac[6];
 #define LIBXL_MAC_FMT "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx"
 #define LIBXL_MAC_FMTLEN ((2*6)+5) /* 6 hex bytes plus 5 colons */
@@ -496,11 +503,13 @@ int libxl_ctx_free(libxl_ctx *ctx /* 0 is OK */);
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config,
                             uint32_t *domid,
                             const libxl_asyncop_how *ao_how,
-                            const libxl_asyncprogress_how *aop_console_how);
+                            const libxl_asyncprogress_how *aop_console_how)
+                            LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
                                 uint32_t *domid, int restore_fd,
                                 const libxl_asyncop_how *ao_how,
-                                const libxl_asyncprogress_how *aop_console_how);
+                                const libxl_asyncprogress_how *aop_console_how)
+                                LIBXL_EXTERNAL_CALLERS_ONLY;
   /* A progress report will be made via ao_console_how, of type
    * domain_create_console_available, when the domain's primary
    * console is available and can be connected to.
@@ -511,7 +520,8 @@ void libxl_domain_config_dispose(libxl_domain_config *d_config);
 
 int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd,
                          int flags, /* LIBXL_SUSPEND_* */
-                         const libxl_asyncop_how *ao_how);
+                         const libxl_asyncop_how *ao_how)
+                         LIBXL_EXTERNAL_CALLERS_ONLY;
 #define LIBXL_SUSPEND_DEBUG 1
 #define LIBXL_SUSPEND_LIVE 2
 
@@ -523,12 +533,14 @@ int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid, int suspend_cancel);
 
 int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
                              uint32_t domid, int send_fd, int recv_fd,
-                             const libxl_asyncop_how *ao_how);
+                             const libxl_asyncop_how *ao_how)
+                             LIBXL_EXTERNAL_CALLERS_ONLY;
 
 int libxl_domain_shutdown(libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_reboot(libxl_ctx *ctx, uint32_t domid);
 int libxl_domain_destroy(libxl_ctx *ctx, uint32_t domid,
-                         const libxl_asyncop_how *ao_how);
+                         const libxl_asyncop_how *ao_how)
+                         LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid, libxl_domain_create_info *info, const char *name_suffix, libxl_uuid new_uuid);
 
 /* get max. number of cpus supported by hypervisor */
@@ -549,7 +561,8 @@ int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid);
 
 int libxl_domain_core_dump(libxl_ctx *ctx, uint32_t domid,
                            const char *filename,
-                           const libxl_asyncop_how *ao_how);
+                           const libxl_asyncop_how *ao_how)
+                           LIBXL_EXTERNAL_CALLERS_ONLY;
 
 int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb);
 int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, int32_t target_memkb, int relative, int enforce);
@@ -677,13 +690,16 @@ void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr_vcpus);
 /* Disks */
 int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid,
                           libxl_device_disk *disk,
-                          const libxl_asyncop_how *ao_how);
+                          const libxl_asyncop_how *ao_how)
+                          LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_disk_remove(libxl_ctx *ctx, uint32_t domid,
                              libxl_device_disk *disk,
-                             const libxl_asyncop_how *ao_how);
+                             const libxl_asyncop_how *ao_how)
+                             LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_disk_destroy(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_disk *disk,
-                              const libxl_asyncop_how *ao_how);
+                              const libxl_asyncop_how *ao_how)
+                              LIBXL_EXTERNAL_CALLERS_ONLY;
 
 libxl_device_disk *libxl_device_disk_list(libxl_ctx *ctx, uint32_t domid, int *num);
 int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
@@ -694,17 +710,21 @@ int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
  * be attached to the guest.
  */
 int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
-                       const libxl_asyncop_how *ao_how);
+                       const libxl_asyncop_how *ao_how)
+                       LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /* Network Interfaces */
 int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic,
-                         const libxl_asyncop_how *ao_how);
+                         const libxl_asyncop_how *ao_how)
+                         LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_nic_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_nic *nic,
-                            const libxl_asyncop_how *ao_how);
+                            const libxl_asyncop_how *ao_how)
+                            LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_nic_destroy(libxl_ctx *ctx, uint32_t domid,
                              libxl_device_nic *nic,
-                             const libxl_asyncop_how *ao_how);
+                             const libxl_asyncop_how *ao_how)
+                             LIBXL_EXTERNAL_CALLERS_ONLY;
 
 libxl_device_nic *libxl_device_nic_list(libxl_ctx *ctx, uint32_t domid, int *num);
 int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
@@ -712,23 +732,29 @@ int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
 
 /* Keyboard */
 int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb,
-                         const libxl_asyncop_how *ao_how);
+                         const libxl_asyncop_how *ao_how)
+                         LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_vkb_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_vkb *vkb,
-                            const libxl_asyncop_how *ao_how);
+                            const libxl_asyncop_how *ao_how)
+                            LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_vkb_destroy(libxl_ctx *ctx, uint32_t domid,
                              libxl_device_vkb *vkb,
-                             const libxl_asyncop_how *ao_how);
+                             const libxl_asyncop_how *ao_how)
+                            LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /* Framebuffer */
 int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb,
-                         const libxl_asyncop_how *ao_how);
+                         const libxl_asyncop_how *ao_how)
+                         LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_vfb_remove(libxl_ctx *ctx, uint32_t domid,
                             libxl_device_vfb *vfb,
-                            const libxl_asyncop_how *ao_how);
+                            const libxl_asyncop_how *ao_how)
+                             LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_device_vfb_destroy(libxl_ctx *ctx, uint32_t domid,
                              libxl_device_vfb *vfb,
-                             const libxl_asyncop_how *ao_how);
+                             const libxl_asyncop_how *ao_how)
+                             LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /* PCI Passthrough */
 int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);

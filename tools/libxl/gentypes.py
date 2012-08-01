@@ -377,7 +377,6 @@ if __name__ == '__main__':
 #include <stdlib.h>
 #include <string.h>
 
-#include "libxl.h"
 #include "libxl_internal.h"
 
 #define LIBXL_DTOR_POISON 0xa5

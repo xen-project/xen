@@ -52,6 +52,12 @@
 
 #include <xen/io/xenbus.h>
 
+#ifdef LIBXL_H
+# error libxl.h should be included via libxl_internal.h, not separately
+#endif
+#define LIBXL_EXTERNAL_CALLERS_ONLY \
+    __attribute__((warning("may not be called from within libxl")))
+
 #include "libxl.h"
 #include "_paths.h"
 #include "_libxl_save_msgs_callout.h"
@@ -1534,10 +1540,10 @@ int libxl__hotplug_settings(libxl__gc *gc, xs_transaction_t t);
  *
  * Functions using LIBXL__INIT_EGC may *not* generally be called from
  * within libxl, because libxl__egc_cleanup may call back into the
- * application.  This should be documented near the function
- * prototype(s) for callers of LIBXL__INIT_EGC and EGC_INIT.  You
- * should in any case not find it necessary to call egc-creators from
- * within libxl.
+ * application.  This should be enforced by declaring all such
+ * functions in libxl.h or libxl_event.h with
+ * LIBXL_EXTERNAL_CALLERS_ONLY.  You should in any case not find it
+ * necessary to call egc-creators from within libxl.
  *
  * The callbacks must all take place with the ctx unlocked because
  * the application is entitled to reenter libxl from them.  This

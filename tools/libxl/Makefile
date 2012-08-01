@@ -74,7 +74,8 @@ LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
 $(LIBXL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl) -include $(XEN_ROOT)/tools/config.h
 
 AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h _paths.h \
-	_libxl_save_msgs_callout.h _libxl_save_msgs_helper.h
+	_libxl_save_msgs_callout.h _libxl_save_msgs_helper.h \
+        libxl.api-ok
 AUTOSRCS= libxlu_cfg_y.c libxlu_cfg_l.c
 AUTOSRCS += _libxl_save_msgs_callout.c _libxl_save_msgs_helper.c
 LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o \
@@ -113,13 +114,22 @@ $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS) $(SAVE_HELPER_OBJS): $(AUTOINCS)
 genpath-target = $(call buildmakevars2file,_paths.h.tmp)
 $(eval $(genpath-target))
 
+libxl.api-ok: check-libxl-api-rules libxl.api-for-check
+	$(PERL) $^
+
+%.api-for-check: %.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_$*.o) -c -E $< $(APPEND_CFLAGS) \
+		-DLIBXL_EXTERNAL_CALLERS_ONLY=LIBXL_EXTERNAL_CALLERS_ONLY \
+		>$@.new
+	$(call move-if-changed,$@.new,$@)
+
 _paths.h: genpath
 	sed -e "s/\([^=]*\)=\(.*\)/#define \1 \2/g" $@.tmp >$@.2.tmp
 	rm -f $@.tmp
 	$(call move-if-changed,$@.2.tmp,$@)
 
 _libxl_list.h: $(XEN_INCLUDE)/xen-external/bsd-sys-queue-h-seddery $(XEN_INCLUDE)/xen-external/bsd-sys-queue.h
-	perl $^ --prefix=libxl >$@.new
+	$(PERL) $^ --prefix=libxl >$@.new
 	$(call move-if-changed,$@.new,$@)
 
 _libxl_save_msgs_helper.c _libxl_save_msgs_callout.c \
@@ -200,7 +210,7 @@ install: all
 .PHONY: clean
 clean:
 	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)
-	$(RM) -f _*.c *.pyc _paths.*.tmp
+	$(RM) -f _*.c *.pyc _paths.*.tmp *.api-for-check
 	$(RM) -f testidl.c.new testidl.c
 #	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 
