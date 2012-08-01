@@ -1590,6 +1590,7 @@ static int libxl__primary_console_find(libxl_ctx *ctx, uint32_t domid_vm,
         case LIBXL_DOMAIN_TYPE_INVALID:
             rc = ERROR_INVAL;
             goto out;
+        default: abort();
         }
     }
 
