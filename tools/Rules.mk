@@ -40,9 +40,9 @@ LDLIBS_libxenvchan = $(SHLIB_libxenctrl) $(SHLIB_libxenstore) -L$(XEN_LIBVCHAN) 
 SHLIB_libxenvchan  = -Wl,-rpath-link=$(XEN_LIBVCHAN)
 
 ifeq ($(CONFIG_Linux),y)
-LIBXL_BLKTAP = y
+LIBXL_BLKTAP ?= y
 else
-LIBXL_BLKTAP = n
+LIBXL_BLKTAP ?= n
 endif
 
 ifeq ($(LIBXL_BLKTAP),y)
