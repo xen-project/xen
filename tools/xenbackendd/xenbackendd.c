@@ -33,6 +33,7 @@
 #define DEVTYPE_UNKNOWN 0
 #define DEVTYPE_VIF 1
 #define DEVTYPE_VBD 2
+#define DISABLE_EXEC "libxl/disable_udev"
 
 #define DOMAIN_PATH "/local/domain/0"
 
@@ -149,7 +150,7 @@ main(int argc, char * const argv[])
 	unsigned int num;
 	char *s;
 	int state;
-	char *sstate;
+	char *sstate, *sdisable;
 	char *p;
 	char buf[80];
 	int type;
@@ -245,6 +246,10 @@ main(int argc, char * const argv[])
 			continue;
 		}
 
+		sdisable = xs_read(xs, XBT_NULL, DISABLE_EXEC, 0);
+		if (sdisable)
+			goto next1;
+
 		if (strlen(vec[XS_WATCH_PATH]) < sizeof("state"))
 			goto next1;
 
@@ -314,6 +319,7 @@ next2:
 		free(sstate);
 
 next1:
+		free(sdisable);
 		free(vec);
 	}
 
