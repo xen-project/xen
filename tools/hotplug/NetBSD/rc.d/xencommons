@@ -29,8 +29,6 @@ XENBACKENDD_PIDFILE="/var/run/xenbackendd.pid"
 
 xen_precmd()
 {
-	mkdir -p /var/run/xend || exit 1
-	mkdir -p /var/run/xend/boot || exit 1
 	mkdir -p /var/run/xenstored || exit 1
 }
 
@@ -46,7 +44,7 @@ xen_startcmd()
 			XENSTORED_ROOTDIR="/var/lib/xenstored"
 		fi
 		rm -f ${XENSTORED_ROOTDIR}/tdb* >/dev/null 2>&1
-		printf "Starting xenservices: xenstored, xenconsoled, xenbackendd."
+		printf "Starting xenservices: xenstored, xenconsoled."
 		XENSTORED_ARGS=" --pid-file ${XENSTORED_PIDFILE}"
 		if [ -n "${XENSTORED_TRACE}" ]; then
 			XENSTORED_ARGS="${XENSTORED_ARGS} -T /var/log/xen/xenstored-trace.log"
@@ -58,7 +56,7 @@ xen_startcmd()
 			sleep 1
 		done
 	else
-		printf "Starting xenservices: xenconsoled, xenbackendd."
+		printf "Starting xenservices: xenconsoled."
 	fi
 
 	XENCONSOLED_ARGS=""
@@ -67,13 +65,6 @@ xen_startcmd()
 	fi
 
 	${SBINDIR}/xenconsoled ${XENCONSOLED_ARGS}
-
-	XENBACKENDD_ARGS=""
-	if [ -n "${XENBACKENDD_DEBUG}" ]; then
-		XENBACKENDD_ARGS="${XENBACKENDD_ARGS} -d"
-	fi
-
-	${SBINDIR}/xenbackendd ${XENBACKENDD_ARGS}
 
 	printf "\n"
 
@@ -87,8 +78,6 @@ xen_stop()
 	printf "Stopping xencommons.\n"
 	printf "WARNING: Not stopping xenstored, as it cannot be restarted.\n"
 
-	rc_pid=$(check_pidfile ${XENBACKENDD_PIDFILE} ${SBINDIR}/xenbackendd)
-	pids="$pids $rc_pid"
 	rc_pid=$(check_pidfile ${XENCONSOLED_PIDFILE} ${SBINDIR}/xenconsoled)
 	pids="$pids $rc_pid"
 
@@ -108,17 +97,12 @@ xen_status()
 		pids="$pids $xenconsoled_pid"
 	fi
 
-	xenbackend_pid=$(check_pidfile ${XENBACKENDD_PIDFILE} ${SBINDIR}/xenbackendd)
-	if test -n ${xenbackend_pid}; then
-		pids="$pids $xenbackend_pid"
-	fi
-
-	if test -n "$xenbackend_pid" -a -n "$xenconsoled_pid" -a -n "$xenstored_pid";
+	if test -n "$xenconsoled_pid" -a -n "$xenstored_pid";
 	then
 		echo "xencommons are running as pids $pids."
 		return 0
 	fi
-	if test -z "$xenbackend_pid" -a -z "$xenconsoled_pid" -a -z "$xenstored_pid";
+	if test -z "$xenconsoled_pid" -a -z "$xenstored_pid";
 	then
 		echo "xencommons are not running."
 		return 0
@@ -133,11 +117,6 @@ xen_status()
 		echo "xenconsoled is running as pid $xenconsoled_pid."
 	else
 		echo "xenconsoled is not running."
-	fi
-	if test -n $xenbackend_pid; then
-		echo "xenbackendd is running as pid $xenbackend_pid."
-	else
-		echo "xenbackendd is not running."
 	fi
 }
 
