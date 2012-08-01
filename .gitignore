@@ -11,6 +11,8 @@
 *.bin
 *.bak
 *.tmp
+*.spot
+*.spit
 TAGS
 cscope.files
 cscope.in.out
