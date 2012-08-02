@@ -175,15 +175,9 @@ static void disable_lapic_nmi_watchdog(void)
     case X86_VENDOR_INTEL:
         switch (boot_cpu_data.x86) {
         case 6:
-            if (boot_cpu_data.x86_model > 0xd)
-                break;
-
             wrmsr(MSR_P6_EVNTSEL0, 0, 0);
             break;
         case 15:
-            if (boot_cpu_data.x86_model > 0x4)
-                break;
-
             wrmsr(MSR_P4_IQ_CCCR0, 0, 0);
             wrmsr(MSR_P4_CRU_ESCR0, 0, 0);
             break;
@@ -192,7 +186,7 @@ static void disable_lapic_nmi_watchdog(void)
     }
     nmi_active = -1;
     /* tell do_nmi() and others that we're not active any more */
-    nmi_watchdog = 0;
+    nmi_watchdog = NMI_NONE;
 }
 
 static void enable_lapic_nmi_watchdog(void)
