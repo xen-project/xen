@@ -1278,12 +1278,14 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
          * into l1 guest if not fixable. The algorithm is
          * the same as for shadow paging.
          */
-        rv = nestedhvm_hap_nested_page_fault(v, gpa,
+        rv = nestedhvm_hap_nested_page_fault(v, &gpa,
                                              access_r, access_w, access_x);
         switch (rv) {
         case NESTEDHVM_PAGEFAULT_DONE:
             return 1;
-        case NESTEDHVM_PAGEFAULT_ERROR:
+        case NESTEDHVM_PAGEFAULT_L1_ERROR:
+            /* An error occured while translating gpa from
+             * l2 guest address to l1 guest address. */
             return 0;
         case NESTEDHVM_PAGEFAULT_INJECT:
             return -1;
@@ -1291,6 +1293,10 @@ int hvm_hap_nested_page_fault(unsigned long gpa,
             if ( !handle_mmio() )
                 hvm_inject_hw_exception(TRAP_gp_fault, 0);
             return 1;
+        case NESTEDHVM_PAGEFAULT_L0_ERROR:
+            /* gpa is now translated to l1 guest address, update gfn. */
+            gfn = gpa >> PAGE_SHIFT;
+            break;
         }
     }
 
