@@ -1581,6 +1581,7 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
         unsigned long gfn;
         struct p2m_domain *p2m;
         const struct paging_mode *mode;
+        uint32_t pfec_21 = *pfec;
         uint64_t ncr3 = nhvm_vcpu_hostcr3(v);
 
         /* translate l2 guest va into l2 guest gfn */
@@ -1590,7 +1591,7 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
 
         /* translate l2 guest gfn into l1 guest gfn */
         return hostmode->p2m_ga_to_gfn(v, hostp2m, ncr3,
-                                       gfn << PAGE_SHIFT, pfec, NULL);
+                                       gfn << PAGE_SHIFT, &pfec_21, NULL);
     }
 
     return hostmode->gva_to_gfn(v, hostp2m, va, pfec);
