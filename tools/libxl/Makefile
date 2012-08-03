@@ -114,10 +114,10 @@ $(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS) $(SAVE_HELPER_OBJS): $(AUTOINCS)
 genpath-target = $(call buildmakevars2file,_paths.h.tmp)
 $(eval $(genpath-target))
 
-libxl.api-ok: check-libxl-api-rules libxl.api-for-check
+libxl.api-ok: check-libxl-api-rules _libxl.api-for-check
 	$(PERL) $^
 
-%.api-for-check: %.h
+_%.api-for-check: %.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_$*.o) -c -E $< $(APPEND_CFLAGS) \
 		-DLIBXL_EXTERNAL_CALLERS_ONLY=LIBXL_EXTERNAL_CALLERS_ONLY \
 		>$@.new
@@ -210,7 +210,7 @@ install: all
 .PHONY: clean
 clean:
 	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)
-	$(RM) -f _*.c *.pyc _paths.*.tmp *.api-for-check
+	$(RM) -f _*.c *.pyc _paths.*.tmp _*.api-for-check
 	$(RM) -f testidl.c.new testidl.c
 #	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 
