@@ -233,7 +233,8 @@ void libxl__xs_transaction_abort(libxl__gc *gc, xs_transaction_t *t)
     *t = 0;
 }
 
-int libxl__xs_path_cleanup(libxl__gc *gc, xs_transaction_t t, char *user_path)
+int libxl__xs_path_cleanup(libxl__gc *gc, xs_transaction_t t,
+                           const char *user_path)
 {
     unsigned int nb = 0;
     char *path, *last, *val;

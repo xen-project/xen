@@ -507,7 +507,7 @@ DEFINE_DEVICES_ADD(nic)
 int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
 {
     char *be_path = libxl__device_backend_path(gc, dev);
-    char *fe_path = libxl__device_frontend_path(gc, dev);
+    const char *fe_path = libxl__device_frontend_path(gc, dev);
     xs_transaction_t t = 0;
     int rc;
 

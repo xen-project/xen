@@ -614,7 +614,7 @@ void libxl__xs_transaction_abort(libxl__gc *gc, xs_transaction_t *t);
  * It mimics xenstore-rm -t behaviour.
  */
 _hidden int libxl__xs_path_cleanup(libxl__gc *gc, xs_transaction_t t,
-                                   char *user_path);
+                                   const char *user_path);
 
 /*
  * Event generation functions provided by the libxl event core to the
