@@ -513,22 +513,24 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
     char *be_path = libxl__device_backend_path(gc, dev);
     char *fe_path = libxl__device_frontend_path(gc, dev);
     xs_transaction_t t = 0;
-    int rc = 0;
+    int rc;
 
-    do {
-        t = xs_transaction_start(CTX->xsh);
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) goto out;
+
         libxl__xs_path_cleanup(gc, t, fe_path);
         libxl__xs_path_cleanup(gc, t, be_path);
-        rc = !xs_transaction_end(CTX->xsh, t, 0);
-    } while (rc && errno == EAGAIN);
-    if (rc) {
-        LOGE(ERROR, "unable to finish transaction");
-        goto out;
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc < 0) goto out;
     }
 
     libxl__device_destroy_tapdisk(gc, be_path);
 
 out:
+    libxl__xs_transaction_abort(gc, &t);
     return rc;
 }
 
@@ -993,29 +995,17 @@ error:
 static void device_hotplug_done(libxl__egc *egc, libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
-    char *be_path = libxl__device_backend_path(gc, aodev->dev);
-    char *fe_path = libxl__device_frontend_path(gc, aodev->dev);
-    xs_transaction_t t = 0;
     int rc;
 
     device_hotplug_clean(gc, aodev);
 
     /* Clean xenstore if it's a disconnection */
     if (aodev->action == DEVICE_DISCONNECT) {
-        for (;;) {
-            rc = libxl__xs_transaction_start(gc, &t);
-            if (rc) goto out;
-
-            libxl__xs_path_cleanup(gc, t, fe_path);
-            libxl__xs_path_cleanup(gc, t, be_path);
-
-            rc = libxl__xs_transaction_commit(gc, &t);
-            if (!rc) break;
-            if (rc < 0) goto out;
-        }
+        rc = libxl__device_destroy(gc, aodev->dev);
+        if (!aodev->rc)
+            aodev->rc = rc;
     }
 
-out:
     aodev->callback(egc, aodev);
     return;
 }
