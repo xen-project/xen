@@ -2389,9 +2389,9 @@ static void pcidetach(const char *dom, const char *bdf, int force)
         exit(2);
     }
     if (force)
-        libxl_device_pci_destroy(ctx, domid, &pcidev);
+        libxl_device_pci_destroy(ctx, domid, &pcidev, 0);
     else
-        libxl_device_pci_remove(ctx, domid, &pcidev);
+        libxl_device_pci_remove(ctx, domid, &pcidev, 0);
 
     libxl_device_pci_dispose(&pcidev);
     xlu_cfg_destroy(config);
@@ -2435,7 +2435,7 @@ static void pciattach(const char *dom, const char *bdf, const char *vs)
         fprintf(stderr, "pci-attach: malformed BDF specification \"%s\"\n", bdf);
         exit(2);
     }
-    libxl_device_pci_add(ctx, domid, &pcidev);
+    libxl_device_pci_add(ctx, domid, &pcidev, 0);
 
     libxl_device_pci_dispose(&pcidev);
     xlu_cfg_destroy(config);

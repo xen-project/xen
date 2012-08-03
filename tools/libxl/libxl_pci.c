@@ -1010,13 +1010,15 @@ int libxl__device_pci_setdefault(libxl__gc *gc, libxl_device_pci *pci)
     return 0;
 }
 
-int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
+int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid,
+                         libxl_device_pci *pcidev,
+                         const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
+    AO_CREATE(ctx, domid, ao_how);
     int rc;
     rc = libxl__device_pci_add(gc, domid, pcidev, 0);
-    GC_FREE;
-    return rc;
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
 }
 
 static int libxl_pcidev_assignable(libxl_ctx *ctx, libxl_device_pci *pcidev)
@@ -1150,6 +1152,9 @@ static int qemu_pci_remove_xenstore(libxl__gc *gc, uint32_t domid,
     return 0;
 }
 
+static int libxl__device_pci_remove_common(libxl__gc *gc, uint32_t domid,
+                                           libxl_device_pci *pcidev, int force);
+
 static int do_pci_remove(libxl__gc *gc, uint32_t domid,
                          libxl_device_pci *pcidev, int force)
 {
@@ -1263,10 +1268,7 @@ out:
     stubdomid = libxl_get_stubdom_id(ctx, domid);
     if (stubdomid != 0) {
         libxl_device_pci pcidev_s = *pcidev;
-        if (force)
-                libxl_device_pci_destroy(ctx, stubdomid, &pcidev_s);
-        else
-                libxl_device_pci_remove(ctx, stubdomid, &pcidev_s);
+        libxl__device_pci_remove_common(gc, stubdomid, &pcidev_s, force);
     }
 
     libxl__device_pci_remove_xenstore(gc, domid, pcidev);
@@ -1313,27 +1315,31 @@ out:
     return rc;
 }
 
-int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev)
+int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid,
+                            libxl_device_pci *pcidev,
+                            const libxl_asyncop_how *ao_how)
+
 {
-    GC_INIT(ctx);
+    AO_CREATE(ctx, domid, ao_how);
     int rc;
 
     rc = libxl__device_pci_remove_common(gc, domid, pcidev, 0);
 
-    GC_FREE;
-    return rc;
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
 }
 
 int libxl_device_pci_destroy(libxl_ctx *ctx, uint32_t domid,
-                                  libxl_device_pci *pcidev)
+                             libxl_device_pci *pcidev,
+                             const libxl_asyncop_how *ao_how)
 {
-    GC_INIT(ctx);
+    AO_CREATE(ctx, domid, ao_how);
     int rc;
 
     rc = libxl__device_pci_remove_common(gc, domid, pcidev, 1);
 
-    GC_FREE;
-    return rc;
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
 }
 
 static void libxl__device_pci_from_xs_be(libxl__gc *gc,
@@ -1415,7 +1421,7 @@ int libxl__device_pci_destroy_all(libxl__gc *gc, uint32_t domid)
          * respond to SCI interrupt because the guest kernel has shut down the
          * devices by the time we even get here!
          */
-        if (libxl_device_pci_destroy(ctx, domid, pcidevs + i) < 0)
+        if (libxl__device_pci_remove_common(gc, domid, pcidevs + i, 1) < 0)
             rc = ERROR_FAIL;
     }
 

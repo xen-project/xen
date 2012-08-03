@@ -757,10 +757,21 @@ int libxl_device_vfb_destroy(libxl_ctx *ctx, uint32_t domid,
                              LIBXL_EXTERNAL_CALLERS_ONLY;
 
 /* PCI Passthrough */
-int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
-int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
-int libxl_device_pci_destroy(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcidev);
-libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid, int *num);
+int libxl_device_pci_add(libxl_ctx *ctx, uint32_t domid,
+                         libxl_device_pci *pcidev,
+                         const libxl_asyncop_how *ao_how)
+                         LIBXL_EXTERNAL_CALLERS_ONLY;
+int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid,
+                            libxl_device_pci *pcidev,
+                            const libxl_asyncop_how *ao_how)
+                            LIBXL_EXTERNAL_CALLERS_ONLY;
+int libxl_device_pci_destroy(libxl_ctx *ctx, uint32_t domid,
+                             libxl_device_pci *pcidev,
+                             const libxl_asyncop_how *ao_how)
+                             LIBXL_EXTERNAL_CALLERS_ONLY;
+
+libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid,
+                                        int *num);
 
 /*
  * Functions related to making devices assignable -- that is, bound to

@@ -497,7 +497,7 @@ static PyObject *pyxl_pci_add(XlObject *self, PyObject *args)
         return NULL;
     }
     pci = (Py_device_pci *)obj;
-    if ( libxl_device_pci_add(self->ctx, domid, &pci->obj) ) {
+    if ( libxl_device_pci_add(self->ctx, domid, &pci->obj, 0) ) {
         PyErr_SetString(xl_error_obj, "cannot add pci device");
         return NULL;
     }
@@ -519,12 +519,12 @@ static PyObject *pyxl_pci_del(XlObject *self, PyObject *args)
     }
     pci = (Py_device_pci *)obj;
     if ( force ) {
-        if ( libxl_device_pci_destroy(self->ctx, domid, &pci->obj) ) {
+        if ( libxl_device_pci_destroy(self->ctx, domid, &pci->obj, 0) ) {
             PyErr_SetString(xl_error_obj, "cannot remove pci device");
             return NULL;
         }
     } else {
-        if ( libxl_device_pci_remove(self->ctx, domid, &pci->obj) ) {
+        if ( libxl_device_pci_remove(self->ctx, domid, &pci->obj, 0) ) {
             PyErr_SetString(xl_error_obj, "cannot remove pci device");
             return NULL;
         }

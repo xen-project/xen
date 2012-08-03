@@ -423,7 +423,7 @@ value stub_xl_device_pci_add(value info, value domid)
 	device_pci_val(&gc, &lg, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_pci_add(ctx, Int_val(domid), &c_info);
+	ret = libxl_device_pci_add(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
 		failwith_xl("pci_add", &lg);
 	FREE_CTX();
@@ -441,7 +441,7 @@ value stub_xl_device_pci_remove(value info, value domid)
 	device_pci_val(&gc, &lg, &c_info, info);
 
 	INIT_CTX();
-	ret = libxl_device_pci_remove(ctx, Int_val(domid), &c_info);
+	ret = libxl_device_pci_remove(ctx, Int_val(domid), &c_info, 0);
 	if (ret != 0)
 		failwith_xl("pci_remove", &lg);
 	FREE_CTX();
