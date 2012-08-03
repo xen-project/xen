@@ -80,21 +80,13 @@ char *libxl__devid_to_localdev(libxl__gc *gc, int devid)
 
 /* Hotplug scripts helpers */
 
-static char **get_hotplug_env(libxl__gc *gc, libxl__device *dev)
+static char **get_hotplug_env(libxl__gc *gc,
+                              char *script, libxl__device *dev)
 {
-    char *be_path = libxl__device_backend_path(gc, dev);
-    char *script;
     const char *type = libxl__device_kind_to_string(dev->backend_kind);
     char **env;
     int nr = 0;
     libxl_nic_type nictype;
-
-    script = libxl__xs_read(gc, XBT_NULL,
-                            GCSPRINTF("%s/%s", be_path, "script"));
-    if (!script) {
-        LOGEV(ERROR, errno, "unable to read script from %s", be_path);
-        return NULL;
-    }
 
     const int arraysize = 13;
     GCNEW_ARRAY(env, arraysize);
@@ -170,7 +162,7 @@ static int libxl__hotplug_nic(libxl__gc *gc, libxl__device *dev,
         goto out;
     }
 
-    *env = get_hotplug_env(gc, dev);
+    *env = get_hotplug_env(gc, script, dev);
     if (!env) {
         rc = ERROR_FAIL;
         goto out;
@@ -212,7 +204,7 @@ static int libxl__hotplug_disk(libxl__gc *gc, libxl__device *dev,
         goto error;
     }
 
-    *env = get_hotplug_env(gc, dev);
+    *env = get_hotplug_env(gc, script, dev);
     if (!*env) {
         rc = ERROR_FAIL;
         goto error;
