@@ -483,19 +483,19 @@ void libxl__multidev_prepared(libxl__egc *egc, libxl__ao_devices *aodevs,
  * libxl__add_nics
  */
 
-#define DEFINE_DEVICES_ADD(type)                                               \
-    void libxl__add_##type##s(libxl__egc *egc, libxl__ao *ao, uint32_t domid,  \
-                              int start, libxl_domain_config *d_config,        \
-                              libxl__ao_devices *aodevs)                       \
-    {                                                                          \
-        AO_GC;                                                                 \
-        int i;                                                                 \
-        int end = start + d_config->num_##type##s;                             \
-        for (i = start; i < end; i++) {                                        \
-            libxl__ao_device *aodev = libxl__multidev_prepare(aodevs);         \
-            libxl__device_##type##_add(egc, domid, &d_config->type##s[i-start],\
-                                       aodev);                                 \
-        }                                                                      \
+#define DEFINE_DEVICES_ADD(type)                                        \
+    void libxl__add_##type##s(libxl__egc *egc, libxl__ao *ao, uint32_t domid, \
+                              int start, libxl_domain_config *d_config, \
+                              libxl__ao_devices *aodevs)                \
+    {                                                                   \
+        AO_GC;                                                          \
+        int i;                                                          \
+        int end = start + d_config->num_##type##s;                      \
+        for (i = start; i < end; i++) {                                 \
+            libxl__ao_device *aodev = libxl__multidev_prepare(aodevs);  \
+            libxl__device_##type##_add(egc, domid, &d_config->type##s[i-start], \
+                                       aodev);                          \
+        }                                                               \
     }
 
 DEFINE_DEVICES_ADD(disk)
