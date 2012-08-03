@@ -403,13 +403,13 @@ void libxl__prepare_ao_device(libxl__ao *ao, libxl__ao_device *aodev)
 
 /* multidev */
 
-void libxl__multidev_begin(libxl__ao *ao, libxl__ao_devices *aodevs)
+void libxl__multidev_begin(libxl__ao *ao, libxl__multidev *multidev)
 {
     AO_GC;
 
-    aodevs->ao = ao;
-    aodevs->array = 0;
-    aodevs->used = aodevs->allocd = 0;
+    multidev->ao = ao;
+    multidev->array = 0;
+    multidev->used = multidev->allocd = 0;
 
     /* We allocate an aodev to represent the operation of preparing
      * all of the other operations.  This operation is completed when
@@ -422,25 +422,25 @@ void libxl__multidev_begin(libxl__ao *ao, libxl__ao_devices *aodevs)
      *  (iii) we have a nice consistent way to deal with any
      *      error that might occur while deciding what to initiate
      */
-    aodevs->preparation = libxl__multidev_prepare(aodevs);
+    multidev->preparation = libxl__multidev_prepare(multidev);
 }
 
 static void multidev_one_callback(libxl__egc *egc, libxl__ao_device *aodev);
 
-libxl__ao_device *libxl__multidev_prepare(libxl__ao_devices *aodevs) {
-    STATE_AO_GC(aodevs->ao);
+libxl__ao_device *libxl__multidev_prepare(libxl__multidev *multidev) {
+    STATE_AO_GC(multidev->ao);
     libxl__ao_device *aodev;
 
     GCNEW(aodev);
-    aodev->aodevs = aodevs;
+    aodev->multidev = multidev;
     aodev->callback = multidev_one_callback;
     libxl__prepare_ao_device(ao, aodev);
 
-    if (aodevs->used >= aodevs->allocd) {
-        aodevs->allocd = aodevs->used * 2 + 5;
-        GCREALLOC_ARRAY(aodevs->array, aodevs->allocd);
+    if (multidev->used >= multidev->allocd) {
+        multidev->allocd = multidev->used * 2 + 5;
+        GCREALLOC_ARRAY(multidev->array, multidev->allocd);
     }
-    aodevs->array[aodevs->used++] = aodev;
+    multidev->array[multidev->used++] = aodev;
 
     return aodev;
 }
@@ -448,28 +448,28 @@ libxl__ao_device *libxl__multidev_prepare(libxl__ao_devices *aodevs) {
 static void multidev_one_callback(libxl__egc *egc, libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
-    libxl__ao_devices *aodevs = aodev->aodevs;
+    libxl__multidev *multidev = aodev->multidev;
     int i, error = 0;
 
     aodev->active = 0;
 
-    for (i = 0; i < aodevs->used; i++) {
-        if (aodevs->array[i]->active)
+    for (i = 0; i < multidev->used; i++) {
+        if (multidev->array[i]->active)
             return;
 
-        if (aodevs->array[i]->rc)
-            error = aodevs->array[i]->rc;
+        if (multidev->array[i]->rc)
+            error = multidev->array[i]->rc;
     }
 
-    aodevs->callback(egc, aodevs, error);
+    multidev->callback(egc, multidev, error);
     return;
 }
 
-void libxl__multidev_prepared(libxl__egc *egc, libxl__ao_devices *aodevs,
-                              int rc)
+void libxl__multidev_prepared(libxl__egc *egc,
+                              libxl__multidev *multidev, int rc)
 {
-    aodevs->preparation->rc = rc;
-    multidev_one_callback(egc, aodevs->preparation);
+    multidev->preparation->rc = rc;
+    multidev_one_callback(egc, multidev->preparation);
 }
 
 /******************************************************************************/
@@ -486,12 +486,12 @@ void libxl__multidev_prepared(libxl__egc *egc, libxl__ao_devices *aodevs,
 #define DEFINE_DEVICES_ADD(type)                                        \
     void libxl__add_##type##s(libxl__egc *egc, libxl__ao *ao, uint32_t domid, \
                               libxl_domain_config *d_config,            \
-                              libxl__ao_devices *aodevs)                \
+                              libxl__multidev *multidev)                \
     {                                                                   \
         AO_GC;                                                          \
         int i;                                                          \
         for (i = 0; i < d_config->num_##type##s; i++) {                 \
-            libxl__ao_device *aodev = libxl__multidev_prepare(aodevs);  \
+            libxl__ao_device *aodev = libxl__multidev_prepare(multidev);  \
             libxl__device_##type##_add(egc, domid, &d_config->type##s[i], \
                                        aodev);                          \
         }                                                               \
@@ -532,8 +532,8 @@ out:
 
 /* Callback for device destruction */
 
-static void devices_remove_callback(libxl__egc *egc, libxl__ao_devices *aodevs,
-                                    int rc);
+static void devices_remove_callback(libxl__egc *egc,
+                                    libxl__multidev *multidev, int rc);
 
 void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
 {
@@ -545,12 +545,12 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
     char **kinds = NULL, **devs = NULL;
     int i, j, rc = 0;
     libxl__device *dev;
-    libxl__ao_devices *aodevs = &drs->aodevs;
+    libxl__multidev *multidev = &drs->multidev;
     libxl__ao_device *aodev;
     libxl__device_kind kind;
 
-    libxl__multidev_begin(ao, aodevs);
-    aodevs->callback = devices_remove_callback;
+    libxl__multidev_begin(ao, multidev);
+    multidev->callback = devices_remove_callback;
 
     path = libxl__sprintf(gc, "/local/domain/%d/device", domid);
     kinds = libxl__xs_directory(gc, XBT_NULL, path, &num_kinds);
@@ -587,7 +587,7 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
                     libxl__device_destroy(gc, dev);
                     continue;
                 }
-                aodev = libxl__multidev_prepare(aodevs);
+                aodev = libxl__multidev_prepare(multidev);
                 aodev->action = DEVICE_DISCONNECT;
                 aodev->dev = dev;
                 aodev->force = drs->force;
@@ -613,7 +613,7 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
     }
 
 out:
-    libxl__multidev_prepared(egc, aodevs, rc);
+    libxl__multidev_prepared(egc, multidev, rc);
 }
 
 /* Callbacks for device related operations */
@@ -1003,10 +1003,10 @@ static void device_hotplug_clean(libxl__gc *gc, libxl__ao_device *aodev)
     assert(!libxl__ev_child_inuse(&aodev->child));
 }
 
-static void devices_remove_callback(libxl__egc *egc, libxl__ao_devices *aodevs,
-                                    int rc)
+static void devices_remove_callback(libxl__egc *egc,
+                                    libxl__multidev *multidev, int rc)
 {
-    libxl__devices_remove_state *drs = CONTAINER_OF(aodevs, *drs, aodevs);
+    libxl__devices_remove_state *drs = CONTAINER_OF(multidev, *drs, multidev);
     STATE_AO_GC(drs->ao);
 
     drs->callback(egc, drs, rc);

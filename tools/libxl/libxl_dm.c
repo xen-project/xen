@@ -714,10 +714,10 @@ static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
                                 int rc);
 
 static void spawn_stub_launch_dm(libxl__egc *egc,
-                                 libxl__ao_devices *aodevs, int ret);
+                                 libxl__multidev *aodevs, int ret);
 
 static void stubdom_pvqemu_cb(libxl__egc *egc,
-                              libxl__ao_devices *aodevs,
+                              libxl__multidev *aodevs,
                               int rc);
 
 static void spaw_stubdom_pvqemu_destroy_cb(libxl__egc *egc,
@@ -856,10 +856,10 @@ retry_transaction:
         if (errno == EAGAIN)
             goto retry_transaction;
 
-    libxl__multidev_begin(ao, &sdss->aodevs);
-    sdss->aodevs.callback = spawn_stub_launch_dm;
-    libxl__add_disks(egc, ao, dm_domid, dm_config, &sdss->aodevs);
-    libxl__multidev_prepared(egc, &sdss->aodevs, 0);
+    libxl__multidev_begin(ao, &sdss->multidev);
+    sdss->multidev.callback = spawn_stub_launch_dm;
+    libxl__add_disks(egc, ao, dm_domid, dm_config, &sdss->multidev);
+    libxl__multidev_prepared(egc, &sdss->multidev, 0);
 
     free(args);
     return;
@@ -872,9 +872,9 @@ out:
 }
 
 static void spawn_stub_launch_dm(libxl__egc *egc,
-                                 libxl__ao_devices *aodevs, int ret)
+                                 libxl__multidev *multidev, int ret)
 {
-    libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(aodevs, *sdss, aodevs);
+    libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(multidev, *sdss, multidev);
     STATE_AO_GC(sdss->dm.spawn.ao);
     libxl_ctx *ctx = libxl__gc_owner(gc);
     int i, num_console = STUBDOM_SPECIAL_CONSOLES;
@@ -982,22 +982,22 @@ static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
     if (rc) goto out;
 
     if (d_config->num_nics > 0) {
-        libxl__multidev_begin(ao, &sdss->aodevs);
-        sdss->aodevs.callback = stubdom_pvqemu_cb;
-        libxl__add_nics(egc, ao, dm_domid, d_config, &sdss->aodevs);
-        libxl__multidev_prepared(egc, &sdss->aodevs, 0);
+        libxl__multidev_begin(ao, &sdss->multidev);
+        sdss->multidev.callback = stubdom_pvqemu_cb;
+        libxl__add_nics(egc, ao, dm_domid, d_config, &sdss->multidev);
+        libxl__multidev_prepared(egc, &sdss->multidev, 0);
         return;
     }
 
 out:
-    stubdom_pvqemu_cb(egc, &sdss->aodevs, rc);
+    stubdom_pvqemu_cb(egc, &sdss->multidev, rc);
 }
 
 static void stubdom_pvqemu_cb(libxl__egc *egc,
-                              libxl__ao_devices *aodevs,
+                              libxl__multidev *multidev,
                               int rc)
 {
-    libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(aodevs, *sdss, aodevs);
+    libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(multidev, *sdss, multidev);
     STATE_AO_GC(sdss->dm.spawn.ao);
     uint32_t dm_domid = sdss->pvqemu.guest_domid;
 

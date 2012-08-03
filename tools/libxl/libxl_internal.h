@@ -1797,7 +1797,7 @@ typedef enum {
 } libxl__device_action;
 
 typedef struct libxl__ao_device libxl__ao_device;
-typedef struct libxl__ao_devices libxl__ao_devices;
+typedef struct libxl__multidev libxl__multidev;
 typedef void libxl__device_callback(libxl__egc*, libxl__ao_device*);
 
 /* This functions sets the necessary libxl__ao_device struct values to use
@@ -1827,7 +1827,7 @@ struct libxl__ao_device {
     int rc;
     /* private for multidev */
     int active;
-    libxl__ao_devices *aodevs; /* reference to the containing multidev */
+    libxl__multidev *multidev; /* reference to the containing multidev */
     /* private for add/remove implementation */
     libxl__ev_devstate backend_ds;
     /* Bodge for Qemu devices, also used for timeout of hotplug execution */
@@ -1853,12 +1853,12 @@ struct libxl__ao_device {
  */
 
 /* Starts preparing to add/remove a bunch of devices. */
-_hidden void libxl__multidev_begin(libxl__ao *ao, libxl__ao_devices*);
+_hidden void libxl__multidev_begin(libxl__ao *ao, libxl__multidev*);
 
 /* Prepares to add/remove one of many devices.  Returns a libxl__ao_device
  * which has had libxl__prepare_ao_device called, and which has also
  * had ->callback set.  The user should not mess with aodev->callback. */
-_hidden libxl__ao_device *libxl__multidev_prepare(libxl__ao_devices*);
+_hidden libxl__ao_device *libxl__multidev_prepare(libxl__multidev*);
 
 /* Notifies the multidev machinery that we have now finished preparing
  * and initiating devices.  multidev->callback may then be called as
@@ -1866,10 +1866,10 @@ _hidden libxl__ao_device *libxl__multidev_prepare(libxl__ao_devices*);
  * outstanding, perhaps reentrantly.  If rc!=0 (error should have been
  * logged) multidev->callback will get a non-zero rc.
  * callback may be set by the user at any point before prepared. */
-_hidden void libxl__multidev_prepared(libxl__egc*, libxl__ao_devices*, int rc);
+_hidden void libxl__multidev_prepared(libxl__egc*, libxl__multidev*, int rc);
 
-typedef void libxl__devices_callback(libxl__egc*, libxl__ao_devices*, int rc);
-struct libxl__ao_devices {
+typedef void libxl__devices_callback(libxl__egc*, libxl__multidev*, int rc);
+struct libxl__multidev {
     /* set by user: */
     libxl__devices_callback *callback;
     /* for private use by libxl__...ao_devices... machinery: */
@@ -2342,7 +2342,7 @@ struct libxl__devices_remove_state {
     libxl__devices_remove_callback *callback;
     int force; /* libxl_device_TYPE_destroy rather than _remove */
     /* private */
-    libxl__ao_devices aodevs;
+    libxl__multidev multidev;
     int num_devices;
 };
 
@@ -2386,7 +2386,7 @@ _hidden void libxl__devices_destroy(libxl__egc *egc,
                                     libxl__devices_remove_state *drs);
 
 /* Helper function to add a bunch of disks. This should be used when
- * the caller is inside an async op. "devices" will NOT be prepared by
+ * the caller is inside an async op. "multidev" will NOT be prepared by
  * this function, so the caller must make sure to call
  * libxl__multidev_begin before calling this function.
  *
@@ -2395,11 +2395,11 @@ _hidden void libxl__devices_destroy(libxl__egc *egc,
  */
 _hidden void libxl__add_disks(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
                               libxl_domain_config *d_config,
-                              libxl__ao_devices *aodevs);
+                              libxl__multidev *multidev);
 
 _hidden void libxl__add_nics(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
                              libxl_domain_config *d_config,
-                             libxl__ao_devices *aodevs);
+                             libxl__multidev *multidev);
 
 /*----- device model creation -----*/
 
@@ -2435,7 +2435,7 @@ typedef struct {
     libxl__domain_build_state dm_state;
     libxl__dm_spawn_state pvqemu;
     libxl__destroy_domid_state dis;
-    libxl__ao_devices aodevs;
+    libxl__multidev multidev;
 } libxl__stub_dm_spawn_state;
 
 _hidden void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state*);
@@ -2467,7 +2467,7 @@ struct libxl__domain_create_state {
     libxl__save_helper_state shs;
     /* necessary if the domain creation failed and we have to destroy it */
     libxl__domain_destroy_state dds;
-    libxl__ao_devices aodevs;
+    libxl__multidev multidev;
 };
 
 /*----- Domain suspend (save) functions -----*/

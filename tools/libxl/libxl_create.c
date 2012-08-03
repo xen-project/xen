@@ -599,10 +599,10 @@ static void domcreate_bootloader_done(libxl__egc *egc,
                                       libxl__bootloader_state *bl,
                                       int rc);
 
-static void domcreate_launch_dm(libxl__egc *egc, libxl__ao_devices *aodevs,
+static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *aodevs,
                                 int ret);
 
-static void domcreate_attach_pci(libxl__egc *egc, libxl__ao_devices *aodevs,
+static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *aodevs,
                                  int ret);
 
 static void domcreate_console_available(libxl__egc *egc,
@@ -909,10 +909,10 @@ static void domcreate_rebuild_done(libxl__egc *egc,
 
     store_libxl_entry(gc, domid, &d_config->b_info);
 
-    libxl__multidev_begin(ao, &dcs->aodevs);
-    dcs->aodevs.callback = domcreate_launch_dm;
-    libxl__add_disks(egc, ao, domid, d_config, &dcs->aodevs);
-    libxl__multidev_prepared(egc, &dcs->aodevs, 0);
+    libxl__multidev_begin(ao, &dcs->multidev);
+    dcs->multidev.callback = domcreate_launch_dm;
+    libxl__add_disks(egc, ao, domid, d_config, &dcs->multidev);
+    libxl__multidev_prepared(egc, &dcs->multidev, 0);
 
     return;
 
@@ -921,10 +921,10 @@ static void domcreate_rebuild_done(libxl__egc *egc,
     domcreate_complete(egc, dcs, ret);
 }
 
-static void domcreate_launch_dm(libxl__egc *egc, libxl__ao_devices *aodevs,
+static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
                                 int ret)
 {
-    libxl__domain_create_state *dcs = CONTAINER_OF(aodevs, *dcs, aodevs);
+    libxl__domain_create_state *dcs = CONTAINER_OF(multidev, *dcs, multidev);
     STATE_AO_GC(dcs->ao);
     int i;
 
@@ -1039,14 +1039,14 @@ static void domcreate_devmodel_started(libxl__egc *egc,
     /* Plug nic interfaces */
     if (d_config->num_nics > 0) {
         /* Attach nics */
-        libxl__multidev_begin(ao, &dcs->aodevs);
-        dcs->aodevs.callback = domcreate_attach_pci;
-        libxl__add_nics(egc, ao, domid, d_config, &dcs->aodevs);
-        libxl__multidev_prepared(egc, &dcs->aodevs, 0);
+        libxl__multidev_begin(ao, &dcs->multidev);
+        dcs->multidev.callback = domcreate_attach_pci;
+        libxl__add_nics(egc, ao, domid, d_config, &dcs->multidev);
+        libxl__multidev_prepared(egc, &dcs->multidev, 0);
         return;
     }
 
-    domcreate_attach_pci(egc, &dcs->aodevs, 0);
+    domcreate_attach_pci(egc, &dcs->multidev, 0);
     return;
 
 error_out:
@@ -1054,10 +1054,10 @@ error_out:
     domcreate_complete(egc, dcs, ret);
 }
 
-static void domcreate_attach_pci(libxl__egc *egc, libxl__ao_devices *aodevs,
+static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *multidev,
                                  int ret)
 {
-    libxl__domain_create_state *dcs = CONTAINER_OF(aodevs, *dcs, aodevs);
+    libxl__domain_create_state *dcs = CONTAINER_OF(multidev, *dcs, multidev);
     STATE_AO_GC(dcs->ao);
     int i;
     libxl_ctx *ctx = CTX;
