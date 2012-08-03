@@ -23,7 +23,7 @@ build: build_sub
 
 .PHONY: install
 install: build
-	$(MAKE) -C $(VTPM_DIR) $@
+	$(MAKE) -C $(VTPM_DIR) install-recursive
 
 .PHONY: clean
 clean:
@@ -66,7 +66,8 @@ updatepatches: clean orig
 .PHONY: build_sub
 build_sub: $(VTPM_DIR)/tpmd/tpmd
 	set -e; if [ -e $(GMP_HEADER) ]; then \
-		$(MAKE) -C $(VTPM_DIR); \
+		$(MAKE) -C $(VTPM_DIR) version; \
+		$(MAKE) -C $(VTPM_DIR) all-recursive; \
 	else \
 		echo "=== Unable to build VTPMs. libgmp could not be found."; \
 	fi
