@@ -911,7 +911,7 @@ static void domcreate_rebuild_done(libxl__egc *egc,
 
     libxl__multidev_begin(ao, &dcs->aodevs);
     dcs->aodevs.callback = domcreate_launch_dm;
-    libxl__add_disks(egc, ao, domid, 0, d_config, &dcs->aodevs);
+    libxl__add_disks(egc, ao, domid, d_config, &dcs->aodevs);
     libxl__multidev_prepared(egc, &dcs->aodevs, 0);
 
     return;
@@ -1041,7 +1041,7 @@ static void domcreate_devmodel_started(libxl__egc *egc,
         /* Attach nics */
         libxl__multidev_begin(ao, &dcs->aodevs);
         dcs->aodevs.callback = domcreate_attach_pci;
-        libxl__add_nics(egc, ao, domid, 0, d_config, &dcs->aodevs);
+        libxl__add_nics(egc, ao, domid, d_config, &dcs->aodevs);
         libxl__multidev_prepared(egc, &dcs->aodevs, 0);
         return;
     }

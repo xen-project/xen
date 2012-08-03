@@ -858,7 +858,7 @@ retry_transaction:
 
     libxl__multidev_begin(ao, &sdss->aodevs);
     sdss->aodevs.callback = spawn_stub_launch_dm;
-    libxl__add_disks(egc, ao, dm_domid, 0, dm_config, &sdss->aodevs);
+    libxl__add_disks(egc, ao, dm_domid, dm_config, &sdss->aodevs);
     libxl__multidev_prepared(egc, &sdss->aodevs, 0);
 
     free(args);
@@ -984,7 +984,7 @@ static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
     if (d_config->num_nics > 0) {
         libxl__multidev_begin(ao, &sdss->aodevs);
         sdss->aodevs.callback = stubdom_pvqemu_cb;
-        libxl__add_nics(egc, ao, dm_domid, 0, d_config, &sdss->aodevs);
+        libxl__add_nics(egc, ao, dm_domid, d_config, &sdss->aodevs);
         libxl__multidev_prepared(egc, &sdss->aodevs, 0);
         return;
     }

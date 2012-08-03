@@ -2388,19 +2388,17 @@ _hidden void libxl__devices_destroy(libxl__egc *egc,
 /* Helper function to add a bunch of disks. This should be used when
  * the caller is inside an async op. "devices" will NOT be prepared by
  * this function, so the caller must make sure to call
- * libxl__multidev_begin before calling this function. The start
- * parameter contains the position inside the aodevs array that should
- * be used to store the state of this devices.
+ * libxl__multidev_begin before calling this function.
  *
  * The "callback" will be called for each device, and the user is responsible
  * for calling libxl__ao_device_check_last on the callback.
  */
 _hidden void libxl__add_disks(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
-                              int start, libxl_domain_config *d_config,
+                              libxl_domain_config *d_config,
                               libxl__ao_devices *aodevs);
 
 _hidden void libxl__add_nics(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
-                             int start, libxl_domain_config *d_config,
+                             libxl_domain_config *d_config,
                              libxl__ao_devices *aodevs);
 
 /*----- device model creation -----*/
