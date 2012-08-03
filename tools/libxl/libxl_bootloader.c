@@ -215,6 +215,7 @@ void libxl__bootloader_init(libxl__bootloader_state *bl)
     libxl__domaindeathcheck_init(&bl->deathcheck);
     bl->keystrokes.ao = bl->ao;  libxl__datacopier_init(&bl->keystrokes);
     bl->display.ao = bl->ao;     libxl__datacopier_init(&bl->display);
+    bl->got_pollhup = 0;
 }
 
 static void bootloader_cleanup(libxl__egc *egc, libxl__bootloader_state *bl)
@@ -275,7 +276,7 @@ static void bootloader_local_detached_cb(libxl__egc *egc,
 }
 
 /* might be called at any time, provided it's init'd */
-static void bootloader_abort(libxl__egc *egc,
+static void bootloader_stop(libxl__egc *egc,
                              libxl__bootloader_state *bl, int rc)
 {
     STATE_AO_GC(bl->ao);
@@ -285,8 +286,8 @@ static void bootloader_abort(libxl__egc *egc,
     libxl__datacopier_kill(&bl->display);
     if (libxl__ev_child_inuse(&bl->child)) {
         r = kill(bl->child.pid, SIGTERM);
-        if (r) LOGE(WARN, "after failure, failed to kill bootloader [%lu]",
-                    (unsigned long)bl->child.pid);
+        if (r) LOGE(WARN, "%sfailed to kill bootloader [%lu]",
+                    rc ? "after failure, " : "", (unsigned long)bl->child.pid);
     }
     bl->rc = rc;
 }
@@ -508,7 +509,10 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
     bl->keystrokes.maxsz = BOOTLOADER_BUF_OUT;
     bl->keystrokes.copywhat =
         GCSPRINTF("bootloader input for domain %"PRIu32, bl->domid);
-    bl->keystrokes.callback = bootloader_keystrokes_copyfail;
+    bl->keystrokes.callback =         bootloader_keystrokes_copyfail;
+    bl->keystrokes.callback_pollhup = bootloader_keystrokes_copyfail;
+        /* pollhup gets called with errnoval==-1 which is not otherwise
+         * possible since errnos are nonnegative, so it's unambiguous */
     rc = libxl__datacopier_start(&bl->keystrokes);
     if (rc) goto out;
 
@@ -516,7 +520,8 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
     bl->display.maxsz = BOOTLOADER_BUF_IN;
     bl->display.copywhat =
         GCSPRINTF("bootloader output for domain %"PRIu32, bl->domid);
-    bl->display.callback = bootloader_display_copyfail;
+    bl->display.callback =         bootloader_display_copyfail;
+    bl->display.callback_pollhup = bootloader_display_copyfail;
     rc = libxl__datacopier_start(&bl->display);
     if (rc) goto out;
 
@@ -562,30 +567,42 @@ static void bootloader_gotptys(libxl__egc *egc, libxl__openpty_state *op)
 
 /* perhaps one of these will be called, but perhaps not */
 static void bootloader_copyfail(libxl__egc *egc, const char *which,
-       libxl__bootloader_state *bl, int onwrite, int errnoval)
+        libxl__bootloader_state *bl, int ondisplay, int onwrite, int errnoval)
 {
     STATE_AO_GC(bl->ao);
+    int rc = ERROR_FAIL;
+
+    if (errnoval==-1) {
+        /* POLLHUP */
+        if (!!ondisplay != !!onwrite) {
+            rc = 0;
+            bl->got_pollhup = 1;
+        } else {
+            LOG(ERROR, "unexpected POLLHUP on %s", which);
+        }
+    }
     if (!onwrite && !errnoval)
         LOG(ERROR, "unexpected eof copying %s", which);
-    bootloader_abort(egc, bl, ERROR_FAIL);
+
+    bootloader_stop(egc, bl, rc);
 }
 static void bootloader_keystrokes_copyfail(libxl__egc *egc,
        libxl__datacopier_state *dc, int onwrite, int errnoval)
 {
     libxl__bootloader_state *bl = CONTAINER_OF(dc, *bl, keystrokes);
-    bootloader_copyfail(egc, "bootloader input", bl, onwrite, errnoval);
+    bootloader_copyfail(egc, "bootloader input", bl, 0, onwrite, errnoval);
 }
 static void bootloader_display_copyfail(libxl__egc *egc,
        libxl__datacopier_state *dc, int onwrite, int errnoval)
 {
     libxl__bootloader_state *bl = CONTAINER_OF(dc, *bl, display);
-    bootloader_copyfail(egc, "bootloader output", bl, onwrite, errnoval);
+    bootloader_copyfail(egc, "bootloader output", bl, 1, onwrite, errnoval);
 }
 
 static void bootloader_domaindeath(libxl__egc *egc, libxl__domaindeathcheck *dc)
 {
     libxl__bootloader_state *bl = CONTAINER_OF(dc, *bl, deathcheck);
-    bootloader_abort(egc, bl, ERROR_FAIL);
+    bootloader_stop(egc, bl, ERROR_FAIL);
 }
 
 static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,
@@ -599,6 +616,8 @@ static void bootloader_finished(libxl__egc *egc, libxl__ev_child *child,
     libxl__datacopier_kill(&bl->display);
 
     if (status) {
+        if (bl->got_pollhup && WIFSIGNALED(status) && WTERMSIG(status)==SIGTERM)
+            LOG(ERROR, "got POLLHUP, sent SIGTERM");
         LOG(ERROR, "bootloader failed - consult logfile %s", bl->logfile);
         libxl_report_child_exitstatus(CTX, XTL_ERROR, "bootloader",
                                       pid, status);

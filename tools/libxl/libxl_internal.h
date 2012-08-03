@@ -2076,7 +2076,9 @@ typedef struct libxl__datacopier_buf libxl__datacopier_buf;
  *     errnoval==0 means we got eof and all data was written
  *     errnoval!=0 means we had a read error, logged
  * onwrite==-1 means some other internal failure, errnoval not valid, logged
- * in all cases copier is killed before calling this callback */
+ * If we get POLLHUP, we call callback_pollhup(..., onwrite, -1);
+ * or if callback_pollhup==0 this is an internal failure, as above.
+ * In all cases copier is killed before calling this callback */
 typedef void libxl__datacopier_callback(libxl__egc *egc,
      libxl__datacopier_state *dc, int onwrite, int errnoval);
 
@@ -2095,6 +2097,7 @@ struct libxl__datacopier_state {
     const char *copywhat, *readwhat, *writewhat; /* for error msgs */
     FILE *log; /* gets a copy of everything */
     libxl__datacopier_callback *callback;
+    libxl__datacopier_callback *callback_pollhup;
     /* remaining fields are private to datacopier */
     libxl__ev_fd toread, towrite;
     ssize_t used;
@@ -2279,7 +2282,7 @@ struct libxl__bootloader_state {
     int nargs, argsspace;
     const char **args;
     libxl__datacopier_state keystrokes, display;
-    int rc;
+    int rc, got_pollhup;
 };
 
 _hidden void libxl__bootloader_init(libxl__bootloader_state *bl);
