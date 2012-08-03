@@ -206,6 +206,7 @@ static int parse_bootloader_result(libxl__egc *egc,
 void libxl__bootloader_init(libxl__bootloader_state *bl)
 {
     assert(bl->ao);
+    bl->rc = 0;
     bl->dls.diskpath = NULL;
     bl->openpty.ao = bl->ao;
     bl->dls.ao = bl->ao;
@@ -255,6 +256,9 @@ static void bootloader_local_detached_cb(libxl__egc *egc,
 static void bootloader_callback(libxl__egc *egc, libxl__bootloader_state *bl,
                                 int rc)
 {
+    if (!bl->rc)
+        bl->rc = rc;
+
     bootloader_cleanup(egc, bl);
 
     bl->dls.callback = bootloader_local_detached_cb;
@@ -270,9 +274,11 @@ static void bootloader_local_detached_cb(libxl__egc *egc,
 
     if (rc) {
         LOG(ERROR, "unable to detach locally attached disk");
+        if (!bl->rc)
+            bl->rc = rc;
     }
 
-    bl->callback(egc, bl, rc);
+    bl->callback(egc, bl, bl->rc);
 }
 
 /* might be called at any time, provided it's init'd */
@@ -289,7 +295,8 @@ static void bootloader_stop(libxl__egc *egc,
         if (r) LOGE(WARN, "%sfailed to kill bootloader [%lu]",
                     rc ? "after failure, " : "", (unsigned long)bl->child.pid);
     }
-    bl->rc = rc;
+    if (!bl->rc)
+        bl->rc = rc;
 }
 
 /*----- main flow of control -----*/
