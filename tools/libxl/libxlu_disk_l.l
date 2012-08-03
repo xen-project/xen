@@ -27,6 +27,10 @@
  * syntax's "target=" should be used.
  */
 
+%top{
+#include "libxl_osdeps.h" /* must come before any other headers */
+}
+
 %{
 #include "libxlu_disk_i.h"
 
