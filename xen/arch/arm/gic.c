@@ -323,10 +323,10 @@ int __init gic_init(void)
 /* Set up the per-CPU parts of the GIC for a secondary CPU */
 void __cpuinit gic_init_secondary_cpu(void)
 {
-    spin_lock_irq(&gic.lock);
+    spin_lock(&gic.lock);
     gic_cpu_init();
     gic_hyp_init();
-    spin_unlock_irq(&gic.lock);
+    spin_unlock(&gic.lock);
 }
 
 /* Shut down the per-CPU GIC interface */
