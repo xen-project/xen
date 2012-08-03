@@ -368,7 +368,7 @@ static inline void hvm_set_info_guest(struct vcpu *v)
 
 int hvm_debug_op(struct vcpu *v, int32_t op);
 
-bool_t hvm_hap_nested_page_fault(unsigned long gpa,
+bool_t hvm_hap_nested_page_fault(paddr_t gpa,
                                  bool_t gla_valid, unsigned long gla,
                                  bool_t access_valid, 
                                  bool_t access_r,

@@ -1109,7 +1109,7 @@ void hvm_triple_fault(void)
     domain_shutdown(v->domain, SHUTDOWN_reboot);
 }
 
-bool_t hvm_hap_nested_page_fault(unsigned long gpa,
+bool_t hvm_hap_nested_page_fault(paddr_t gpa,
                                  bool_t gla_valid,
                                  unsigned long gla,
                                  bool_t access_valid,

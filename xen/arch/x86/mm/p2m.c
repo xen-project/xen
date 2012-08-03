@@ -3032,7 +3032,7 @@ void p2m_mem_paging_resume(struct p2m_domain *p2m)
     mem_event_unpause_vcpus(d);
 }
 
-void p2m_mem_access_check(unsigned long gpa, bool_t gla_valid, unsigned long gla, 
+void p2m_mem_access_check(paddr_t gpa, bool_t gla_valid, unsigned long gla, 
                           bool_t access_r, bool_t access_w, bool_t access_x)
 {
     struct vcpu *v = current;
