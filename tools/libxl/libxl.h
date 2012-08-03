@@ -567,6 +567,17 @@ int libxl_domain_core_dump(libxl_ctx *ctx, uint32_t domid,
 int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t target_memkb);
 int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid, int32_t target_memkb, int relative, int enforce);
 int libxl_get_memory_target(libxl_ctx *ctx, uint32_t domid, uint32_t *out_target);
+
+
+/*
+ * WARNING
+ * This memory management API is unstable even in Xen 4.2.
+ * It has a numer of deficiencies and we intend to replace it.
+ *
+ * The semantics of these functions should not be relied on to be very
+ * coherent or stable.  We will however endeavour to keep working
+ * existing programs which use them in roughly the same way as libxl.
+ */
 /* how much free memory in the system a domain needs to be built */
 int libxl_domain_need_memory(libxl_ctx *ctx, libxl_domain_build_info *b_info,
                              uint32_t *need_memkb);
@@ -576,6 +587,7 @@ int libxl_get_free_memory(libxl_ctx *ctx, uint32_t *memkb);
 int libxl_wait_for_free_memory(libxl_ctx *ctx, uint32_t domid, uint32_t memory_kb, int wait_secs);
 /* wait for the memory target of a domain to be reached */
 int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs);
+
 
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass);
 int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_type type);
