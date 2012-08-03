@@ -231,7 +231,7 @@ static int nodemap_to_nr_vcpus(libxl__gc *gc, libxl_cputopology *tinfo,
  * candidates with just one node).
  */
 static int count_cpus_per_node(libxl_cputopology *tinfo, int nr_cpus,
-                               libxl_numainfo *ninfo, int nr_nodes)
+                               int nr_nodes)
 {
     int cpus_per_node = 0;
     int j, i;
@@ -340,7 +340,7 @@ int libxl__get_numa_candidate(libxl__gc *gc,
     if (!min_nodes) {
         int cpus_per_node;
 
-        cpus_per_node = count_cpus_per_node(tinfo, nr_cpus, ninfo, nr_nodes);
+        cpus_per_node = count_cpus_per_node(tinfo, nr_cpus, nr_nodes);
         if (cpus_per_node == 0)
             min_nodes = 1;
         else
