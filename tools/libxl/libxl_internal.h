@@ -1816,20 +1816,6 @@ typedef void libxl__device_callback(libxl__egc*, libxl__ao_device*);
  */
 _hidden void libxl__prepare_ao_device(libxl__ao *ao, libxl__ao_device *aodev);
 
-/* Prepare a bunch of devices for addition/removal. Every ao_device in
- * ao_devices is set to 'active', and the ao_device 'base' field is set to
- * the one pointed by aodevs.
- */
-_hidden void libxl__prepare_ao_devices(libxl__ao *ao,
-                                       libxl__ao_devices *aodevs);
-
-/* Generic callback to use when adding/removing several devices, this will
- * check if the given aodev is the last one, and call the callback in the
- * parent libxl__ao_devices struct, passing the appropriate error if found.
- */
-_hidden void libxl__ao_devices_callback(libxl__egc *egc,
-                                        libxl__ao_device *aodev);
-
 struct libxl__ao_device {
     /* filled in by user */
     libxl__ao *ao;
@@ -1837,32 +1823,60 @@ struct libxl__ao_device {
     libxl__device *dev;
     int force;
     libxl__device_callback *callback;
-    /* private for implementation */
-    int active;
+    /* return value, zeroed by user on entry, is valid on callback */
     int rc;
+    /* private for multidev */
+    int active;
+    libxl__ao_devices *aodevs; /* reference to the containing multidev */
+    /* private for add/remove implementation */
     libxl__ev_devstate backend_ds;
     /* Bodge for Qemu devices, also used for timeout of hotplug execution */
     libxl__ev_time timeout;
-    /* Used internally to have a reference to the upper libxl__ao_devices
-     * struct when present */
-    libxl__ao_devices *aodevs;
     /* device hotplug execution */
     const char *what;
     int num_exec;
     libxl__ev_child child;
 };
 
-/* Helper struct to simply the plug/unplug of multiple devices at the same
- * time.
+/*
+ * Multiple devices "multidev" handling.
  *
- * This structure holds several devices, and the callback is only called
- * when all the devices inside of the array have finished.
+ * Firstly, you should
+ *    libxl__multidev_begin
+ *    multidev->callback = ...
+ * Then zero or more times
+ *    libxl__multidev_prepare
+ *    libal__initiate_device_{remove/addition}.
+ * Finally, once
+ *    libxl__multidev_prepared
+ * which will result (perhaps reentrantly) in one call to callback().
  */
+
+/* Starts preparing to add/remove a bunch of devices. */
+_hidden void libxl__multidev_begin(libxl__ao *ao, libxl__ao_devices*);
+
+/* Prepares to add/remove one of many devices.  Returns a libxl__ao_device
+ * which has had libxl__prepare_ao_device called, and which has also
+ * had ->callback set.  The user should not mess with aodev->callback. */
+_hidden libxl__ao_device *libxl__multidev_prepare(libxl__ao_devices*);
+
+/* Notifies the multidev machinery that we have now finished preparing
+ * and initiating devices.  multidev->callback may then be called as
+ * soon as there are no prepared but not completed operations
+ * outstanding, perhaps reentrantly.  If rc!=0 (error should have been
+ * logged) multidev->callback will get a non-zero rc.
+ * callback may be set by the user at any point before prepared. */
+_hidden void libxl__multidev_prepared(libxl__egc*, libxl__ao_devices*, int rc);
+
 typedef void libxl__devices_callback(libxl__egc*, libxl__ao_devices*, int rc);
 struct libxl__ao_devices {
-    libxl__ao_device *array;
-    int size;
+    /* set by user: */
     libxl__devices_callback *callback;
+    /* for private use by libxl__...ao_devices... machinery: */
+    libxl__ao *ao;
+    libxl__ao_device **array;
+    int used, allocd;
+    libxl__ao_device *preparation;
 };
 
 /*
@@ -2372,10 +2386,11 @@ _hidden void libxl__devices_destroy(libxl__egc *egc,
                                     libxl__devices_remove_state *drs);
 
 /* Helper function to add a bunch of disks. This should be used when
- * the caller is inside an async op. "devices" will NOT be prepared by this
- * function, so the caller must make sure to call _prepare before calling this
- * function. The start parameter contains the position inside the aodevs array
- * that should be used to store the state of this devices.
+ * the caller is inside an async op. "devices" will NOT be prepared by
+ * this function, so the caller must make sure to call
+ * libxl__multidev_begin before calling this function. The start
+ * parameter contains the position inside the aodevs array that should
+ * be used to store the state of this devices.
  *
  * The "callback" will be called for each device, and the user is responsible
  * for calling libxl__ao_device_check_last on the callback.

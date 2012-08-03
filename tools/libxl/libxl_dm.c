@@ -856,10 +856,10 @@ retry_transaction:
         if (errno == EAGAIN)
             goto retry_transaction;
 
-    sdss->aodevs.size = dm_config->num_disks;
+    libxl__multidev_begin(ao, &sdss->aodevs);
     sdss->aodevs.callback = spawn_stub_launch_dm;
-    libxl__prepare_ao_devices(ao, &sdss->aodevs);
     libxl__add_disks(egc, ao, dm_domid, 0, dm_config, &sdss->aodevs);
+    libxl__multidev_prepared(egc, &sdss->aodevs, 0);
 
     free(args);
     return;
@@ -982,10 +982,10 @@ static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
     if (rc) goto out;
 
     if (d_config->num_nics > 0) {
-        sdss->aodevs.size = d_config->num_nics;
+        libxl__multidev_begin(ao, &sdss->aodevs);
         sdss->aodevs.callback = stubdom_pvqemu_cb;
-        libxl__prepare_ao_devices(ao, &sdss->aodevs);
         libxl__add_nics(egc, ao, dm_domid, 0, d_config, &sdss->aodevs);
+        libxl__multidev_prepared(egc, &sdss->aodevs, 0);
         return;
     }
 

@@ -58,50 +58,6 @@ int libxl__parse_backend_path(libxl__gc *gc,
     return libxl__device_kind_from_string(strkind, &dev->backend_kind);
 }
 
-static int libxl__num_devices(libxl__gc *gc, uint32_t domid)
-{
-    char *path;
-    unsigned int num_kinds, num_devs;
-    char **kinds = NULL, **devs = NULL;
-    int i, j, rc = 0;
-    libxl__device dev;
-    libxl__device_kind kind;
-    int numdevs = 0;
-
-    path = GCSPRINTF("/local/domain/%d/device", domid);
-    kinds = libxl__xs_directory(gc, XBT_NULL, path, &num_kinds);
-    if (!kinds) {
-        if (errno != ENOENT) {
-            LOGE(ERROR, "unable to get xenstore device listing %s", path);
-            rc = ERROR_FAIL;
-            goto out;
-        }
-        num_kinds = 0;
-    }
-    for (i = 0; i < num_kinds; i++) {
-        if (libxl__device_kind_from_string(kinds[i], &kind))
-            continue;
-        if (kind == LIBXL__DEVICE_KIND_CONSOLE)
-            continue;
-
-        path = GCSPRINTF("/local/domain/%d/device/%s", domid, kinds[i]);
-        devs = libxl__xs_directory(gc, XBT_NULL, path, &num_devs);
-        if (!devs)
-            continue;
-        for (j = 0; j < num_devs; j++) {
-            path = GCSPRINTF("/local/domain/%d/device/%s/%s/backend",
-                             domid, kinds[i], devs[j]);
-            path = libxl__xs_read(gc, XBT_NULL, path);
-            if (path && libxl__parse_backend_path(gc, path, &dev) == 0) {
-                numdevs++;
-            }
-        }
-    }
-out:
-    if (rc) return rc;
-    return numdevs;
-}
-
 int libxl__nic_type(libxl__gc *gc, libxl__device *dev, libxl_nic_type *nictype)
 {
     char *snictype, *be_path;
@@ -445,40 +401,81 @@ void libxl__prepare_ao_device(libxl__ao *ao, libxl__ao_device *aodev)
     libxl__ev_child_init(&aodev->child);
 }
 
-void libxl__prepare_ao_devices(libxl__ao *ao, libxl__ao_devices *aodevs)
+/* multidev */
+
+void libxl__multidev_begin(libxl__ao *ao, libxl__ao_devices *aodevs)
 {
     AO_GC;
 
-    GCNEW_ARRAY(aodevs->array, aodevs->size);
-    for (int i = 0; i < aodevs->size; i++) {
-        aodevs->array[i].aodevs = aodevs;
-        libxl__prepare_ao_device(ao, &aodevs->array[i]);
-    }
+    aodevs->ao = ao;
+    aodevs->array = 0;
+    aodevs->used = aodevs->allocd = 0;
+
+    /* We allocate an aodev to represent the operation of preparing
+     * all of the other operations.  This operation is completed when
+     * we have started all the others (ie, when the user calls
+     * _prepared).  That arranges automatically that
+     *  (i) we do not think we have finished even if one of the
+     *      operations completes while we are still preparing
+     *  (ii) if we are starting zero operations, we do still
+     *      make the callback as soon as we know this fact
+     *  (iii) we have a nice consistent way to deal with any
+     *      error that might occur while deciding what to initiate
+     */
+    aodevs->preparation = libxl__multidev_prepare(aodevs);
 }
 
-void libxl__ao_devices_callback(libxl__egc *egc, libxl__ao_device *aodev)
+static void multidev_one_callback(libxl__egc *egc, libxl__ao_device *aodev);
+
+libxl__ao_device *libxl__multidev_prepare(libxl__ao_devices *aodevs) {
+    STATE_AO_GC(aodevs->ao);
+    libxl__ao_device *aodev;
+
+    GCNEW(aodev);
+    aodev->aodevs = aodevs;
+    aodev->callback = multidev_one_callback;
+    libxl__prepare_ao_device(ao, aodev);
+
+    if (aodevs->used >= aodevs->allocd) {
+        aodevs->allocd = aodevs->used * 2 + 5;
+        GCREALLOC_ARRAY(aodevs->array, aodevs->allocd);
+    }
+    aodevs->array[aodevs->used++] = aodev;
+
+    return aodev;
+}
+
+static void multidev_one_callback(libxl__egc *egc, libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
     libxl__ao_devices *aodevs = aodev->aodevs;
     int i, error = 0;
 
     aodev->active = 0;
-    for (i = 0; i < aodevs->size; i++) {
-        if (aodevs->array[i].active)
+
+    for (i = 0; i < aodevs->used; i++) {
+        if (aodevs->array[i]->active)
             return;
 
-        if (aodevs->array[i].rc)
-            error = aodevs->array[i].rc;
+        if (aodevs->array[i]->rc)
+            error = aodevs->array[i]->rc;
     }
 
     aodevs->callback(egc, aodevs, error);
     return;
 }
 
+void libxl__multidev_prepared(libxl__egc *egc, libxl__ao_devices *aodevs,
+                              int rc)
+{
+    aodevs->preparation->rc = rc;
+    multidev_one_callback(egc, aodevs->preparation);
+}
+
 /******************************************************************************/
 
 /* Macro for defining the functions that will add a bunch of disks when
- * inside an async op.
+ * inside an async op with multidev.
  * This macro is added to prevent repetition of code.
  *
  * The following functions are defined:
@@ -495,9 +492,9 @@ void libxl__ao_devices_callback(libxl__egc *egc, libxl__ao_device *aodev)
         int i;                                                                 \
         int end = start + d_config->num_##type##s;                             \
         for (i = start; i < end; i++) {                                        \
-            aodevs->array[i].callback = libxl__ao_devices_callback;            \
+            libxl__ao_device *aodev = libxl__multidev_prepare(aodevs);         \
             libxl__device_##type##_add(egc, domid, &d_config->type##s[i-start],\
-                                       &aodevs->array[i]);                     \
+                                       aodev);                                 \
         }                                                                      \
     }
 
@@ -547,20 +544,13 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
     char *path;
     unsigned int num_kinds, num_dev_xsentries;
     char **kinds = NULL, **devs = NULL;
-    int i, j, numdev = 0, rc = 0;
+    int i, j, rc = 0;
     libxl__device *dev;
     libxl__ao_devices *aodevs = &drs->aodevs;
     libxl__ao_device *aodev;
     libxl__device_kind kind;
 
-    aodevs->size = libxl__num_devices(gc, drs->domid);
-    if (aodevs->size < 0) {
-        LOG(ERROR, "unable to get number of devices for domain %u", drs->domid);
-        rc = aodevs->size;
-        goto out;
-    }
-
-    libxl__prepare_ao_devices(drs->ao, aodevs);
+    libxl__multidev_begin(ao, aodevs);
     aodevs->callback = devices_remove_callback;
 
     path = libxl__sprintf(gc, "/local/domain/%d/device", domid);
@@ -598,13 +588,11 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
                     libxl__device_destroy(gc, dev);
                     continue;
                 }
-                aodev = &aodevs->array[numdev];
+                aodev = libxl__multidev_prepare(aodevs);
                 aodev->action = DEVICE_DISCONNECT;
                 aodev->dev = dev;
-                aodev->callback = libxl__ao_devices_callback;
                 aodev->force = drs->force;
                 libxl__initiate_device_remove(egc, aodev);
-                numdev++;
             }
         }
     }
@@ -626,8 +614,7 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
     }
 
 out:
-    if (!numdev) drs->callback(egc, drs, rc);
-    return;
+    libxl__multidev_prepared(egc, aodevs, rc);
 }
 
 /* Callbacks for device related operations */
