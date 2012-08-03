@@ -162,17 +162,20 @@ def libxl_C_type_member_init(ty, field):
                                 ku.keyvar.type.make_arg(ku.keyvar.name))
     s += "{\n"
     
-    if ku.keyvar.init_val:
+    if ku.keyvar.init_val is not None:
         init_val = ku.keyvar.init_val
-    elif ku.keyvar.type.init_val:
+    elif ku.keyvar.type.init_val is not None:
         init_val = ku.keyvar.type.init_val
     else:
         init_val = None
         
+    (nparent,fexpr) = ty.member(ty.pass_arg("p"), ku.keyvar, isref=True)
     if init_val is not None:
-        (nparent,fexpr) = ty.member(ty.pass_arg("p"), ku.keyvar, isref=True)
         s += "    assert(%s == %s);\n" % (fexpr, init_val)
-        s += "    %s = %s;\n" % (fexpr, ku.keyvar.name)
+    else:
+        s += "    assert(!%s);\n" % (fexpr)
+    s += "    %s = %s;\n" % (fexpr, ku.keyvar.name)
+
     (nparent,fexpr) = ty.member(ty.pass_arg("p"), field, isref=True)
     s += _libxl_C_type_init(ku, fexpr, parent=nparent, subinit=True)
     s += "}\n"

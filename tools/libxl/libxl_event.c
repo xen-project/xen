@@ -1163,7 +1163,10 @@ libxl_event *libxl__event_new(libxl__egc *egc,
     libxl_event *ev;
 
     ev = libxl__zalloc(NOGC,sizeof(*ev));
-    ev->type = type;
+
+    libxl_event_init(ev);
+    libxl_event_init_type(ev, type);
+
     ev->domid = domid;
 
     return ev;
