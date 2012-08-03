@@ -433,7 +433,7 @@ static inline void hvm_set_info_guest(struct vcpu *v)
 
 int hvm_debug_op(struct vcpu *v, int32_t op);
 
-int hvm_hap_nested_page_fault(unsigned long gpa,
+int hvm_hap_nested_page_fault(paddr_t gpa,
                               bool_t gla_valid, unsigned long gla,
                               bool_t access_r,
                               bool_t access_w,

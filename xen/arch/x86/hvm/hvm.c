@@ -1242,7 +1242,7 @@ void hvm_inject_page_fault(int errcode, unsigned long cr2)
     hvm_inject_trap(&trap);
 }
 
-int hvm_hap_nested_page_fault(unsigned long gpa,
+int hvm_hap_nested_page_fault(paddr_t gpa,
                               bool_t gla_valid,
                               unsigned long gla,
                               bool_t access_r,
