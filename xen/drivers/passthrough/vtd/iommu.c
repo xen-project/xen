@@ -2137,6 +2137,15 @@ int __init intel_vtd_setup(void)
     {
         iommu = drhd->iommu;
 
+        printk("Intel VT-d supported page sizes: 4kB");
+        if (cap_sps_2mb(iommu->cap))
+            printk(", 2MB");
+
+        if (cap_sps_1gb(iommu->cap))
+            printk(", 1GB");
+
+        printk(".\n");
+
         if ( iommu_snoop && !ecap_snp_ctl(iommu->ecap) )
             iommu_snoop = 0;
 
