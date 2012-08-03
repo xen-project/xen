@@ -56,6 +56,9 @@ do_start () {
 
 	modprobe xen-evtchn 2>/dev/null
 	modprobe xen-gntdev 2>/dev/null
+	modprobe xen-gntalloc 2>/dev/null
+	modprobe xen-blkback 2>/dev/null
+	modprobe xen-netback 2>/dev/null
 	modprobe evtchn 2>/dev/null
 	modprobe gntdev 2>/dev/null
 	modprobe xen-acpi-processor 2>/dev/null
