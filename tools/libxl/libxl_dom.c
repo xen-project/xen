@@ -1110,7 +1110,7 @@ int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
 
 static int libxl__remus_domain_suspend_callback(void *data)
 {
-    /* TODO: Issue disk and network checkpoint reqs. */
+    /* REMUS TODO: Issue disk and network checkpoint reqs. */
     return libxl__domain_suspend_common_callback(data);
 }
 
@@ -1124,7 +1124,7 @@ static int libxl__remus_domain_resume_callback(void *data)
     if (libxl_domain_resume(CTX, dss->domid, /* Fast Suspend */1))
         return 0;
 
-    /* TODO: Deal with disk. Start a new network output buffer */
+    /* REMUS TODO: Deal with disk. Start a new network output buffer */
     return 1;
 }
 
@@ -1151,8 +1151,9 @@ static void libxl__remus_domain_checkpoint_callback(void *data)
 static void remus_checkpoint_dm_saved(libxl__egc *egc,
                                       libxl__domain_suspend_state *dss, int rc)
 {
-    /* TODO: Wait for disk and memory ack, release network buffer */
-    /* TODO: make this asynchronous */
+    /* REMUS TODO: Wait for disk and memory ack, release network buffer */
+    /* REMUS TODO: make this asynchronous */
+    assert(!rc); /* REMUS TODO handle this error properly */
     usleep(dss->interval * 1000);
     libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, 1);
 }
