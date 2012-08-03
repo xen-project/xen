@@ -320,13 +320,24 @@ typedef struct libxl_osevent_hooks {
  * *for_registration_update is honoured by libxl and will be passed
  * to future modify or deregister calls.
  *
- * libxl will only attempt to register one callback for any one fd.
+ * libxl may want to register more than one callback for any one fd;
+ * in that case: (i) each such registration will have at least one bit
+ * set in revents which is unique to that registration; (ii) if an
+ * event occurs which is relevant for multiple registrations the
+ * application's event system may call libxl_osevent_occurred_fd
+ * for one, some, or all of those registrations.
+ *
+ * If fd_modify is used, it is permitted for the application's event
+ * system to still make calls to libxl_osevent_occurred_fd for the
+ * "old" set of requested events; these will be safely ignored by
+ * libxl.
+ *
  * libxl will remember the value stored in *for_app_registration_out
  * (or *for_app_registration_update) by a successful call to
  * register (or modify), and pass it to subsequent calls to modify
  * or deregister.
  *
- * register_fd_hooks may be called only once for each libxl_ctx.
+ * osevent_register_hooks may be called only once for each libxl_ctx.
  * libxl may make calls to register/modify/deregister from within
  * any libxl function (indeed, it will usually call register from
  * register_event_hooks).  Conversely, the application MUST NOT make
@@ -357,7 +368,7 @@ void libxl_osevent_register_hooks(libxl_ctx *ctx,
 /* It is NOT legal to call _occurred_ reentrantly within any libxl
  * function.  Specifically it is NOT legal to call it from within
  * a register callback.  Conversely, libxl MAY call register/deregister
- * from within libxl_event_registered_call_*.
+ * from within libxl_event_occurred_call_*.
  */
 
 void libxl_osevent_occurred_fd(libxl_ctx *ctx, void *for_libxl,
