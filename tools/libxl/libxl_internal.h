@@ -1344,8 +1344,9 @@ _hidden char *libxl__blktap_devpath(libxl__gc *gc,
 /* libxl__device_destroy_tapdisk:
  *   Destroys any tapdisk process associated with the backend represented
  *   by be_path.
+ *   Always logs on failure.
  */
-_hidden void libxl__device_destroy_tapdisk(libxl__gc *gc, char *be_path);
+_hidden int libxl__device_destroy_tapdisk(libxl__gc *gc, const char *params);
 
 _hidden int libxl__device_from_disk(libxl__gc *gc, uint32_t domid,
                                    libxl_device_disk *disk,

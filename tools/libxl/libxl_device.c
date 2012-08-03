@@ -522,13 +522,19 @@ DEFINE_DEVICES_ADD(nic)
 
 int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
 {
-    char *be_path = libxl__device_backend_path(gc, dev);
+    const char *be_path = libxl__device_backend_path(gc, dev);
     const char *fe_path = libxl__device_frontend_path(gc, dev);
+    const char *tapdisk_path = GCSPRINTF("%s/%s", be_path, "tapdisk-params");
+    const char *tapdisk_params;
     xs_transaction_t t = 0;
     int rc;
 
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) goto out;
+
+        /* May not exist if this is not a tap device */
+        rc = libxl__xs_read_checked(gc, t, tapdisk_path, &tapdisk_params);
         if (rc) goto out;
 
         libxl__xs_path_cleanup(gc, t, fe_path);
@@ -539,7 +545,8 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
         if (rc < 0) goto out;
     }
 
-    libxl__device_destroy_tapdisk(gc, be_path);
+    if (tapdisk_params)
+        rc = libxl__device_destroy_tapdisk(gc, tapdisk_params);
 
 out:
     libxl__xs_transaction_abort(gc, &t);
@@ -789,8 +796,6 @@ void libxl__initiate_device_remove(libxl__egc *egc,
         if (!rc) break;
         if (rc < 0) goto out;
     }
-
-    libxl__device_destroy_tapdisk(gc, be_path);
 
     rc = libxl__ev_devstate_wait(gc, &aodev->backend_ds,
                                  device_backend_callback,

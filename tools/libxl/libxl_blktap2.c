@@ -51,28 +51,37 @@ char *libxl__blktap_devpath(libxl__gc *gc,
 }
 
 
-void libxl__device_destroy_tapdisk(libxl__gc *gc, char *be_path)
+int libxl__device_destroy_tapdisk(libxl__gc *gc, const char *params)
 {
-    char *path, *params, *type, *disk;
+    char *type, *disk;
     int err;
     tap_list_t tap;
 
-    path = libxl__sprintf(gc, "%s/tapdisk-params", be_path);
-    if (!path) return;
+    type = libxl__strdup(gc, params);
 
-    params = libxl__xs_read(gc, XBT_NULL, path);
-    if (!params) return;
-
-    type = params;
-    disk = strchr(params, ':');
-    if (!disk) return;
+    disk = strchr(type, ':');
+    if (!disk) {
+        LOG(ERROR, "Unable to parse params %s", params);
+        return ERROR_INVAL;
+    }
 
     *disk++ = '\0';
 
     err = tap_ctl_find(type, disk, &tap);
-    if (err < 0) return;
+    if (err < 0) {
+        /* returns -errno */
+        LOGEV(ERROR, -err, "Unable to find type %s disk %s", type, disk);
+        return ERROR_FAIL;
+    }
 
-    tap_ctl_destroy(tap.id, tap.minor);
+    err = tap_ctl_destroy(tap.id, tap.minor);
+    if (err < 0) {
+        LOGEV(ERROR, -err, "Failed to destroy tap device id %d minor %d",
+              tap.id, tap.minor);
+        return ERROR_FAIL;
+    }
+
+    return 0;
 }
 
 /*
