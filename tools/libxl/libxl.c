@@ -1796,9 +1796,9 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
     STATE_AO_GC(aodev->ao);
     flexarray_t *front = NULL;
     flexarray_t *back = NULL;
-    char *dev;
+    char *dev, *script;
     libxl__device *device;
-    int major, minor, rc;
+    int rc;
     libxl_ctx *ctx = gc->owner;
     xs_transaction_t t = XBT_NULL;
 
@@ -1833,13 +1833,6 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
             goto out_free;
         }
 
-        if (disk->script) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "External block scripts"
-                       " not yet supported, sorry");
-            rc = ERROR_INVAL;
-            goto out_free;
-        }
-
         GCNEW(device);
         rc = libxl__device_from_disk(gc, domid, disk, device);
         if (rc != 0) {
@@ -1851,18 +1844,16 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
         switch (disk->backend) {
             case LIBXL_DISK_BACKEND_PHY:
                 dev = disk->pdev_path;
-        do_backend_phy:
-                libxl__device_physdisk_major_minor(dev, &major, &minor);
-                flexarray_append(back, "physical-device");
-                flexarray_append(back, libxl__sprintf(gc, "%x:%x", major, minor));
 
+                script = libxl__abs_path(gc, disk->script ?: "block",
+                                         libxl__xen_script_dir_path());
+
+        do_backend_phy:
                 flexarray_append(back, "params");
                 flexarray_append(back, dev);
 
-                flexarray_append(back, "script");
-                flexarray_append(back, GCSPRINTF("%s/%s",
-                                                 libxl__xen_script_dir_path(),
-                                                 "block"));
+                assert(script);
+                flexarray_append_pair(back, "script", script);
 
                 assert(device->backend_kind == LIBXL__DEVICE_KIND_VBD);
                 break;
@@ -1879,10 +1870,12 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
                     libxl__device_disk_string_of_format(disk->format),
                     disk->pdev_path));
 
-                flexarray_append(back, "script");
-                flexarray_append(back, GCSPRINTF("%s/%s",
-                                                 libxl__xen_script_dir_path(),
-                                                 "blktap"));
+                /*
+                 * tap devices do not support custom block scripts and
+                 * always use the plain block script.
+                 */
+                script = libxl__abs_path(gc, "block",
+                                         libxl__xen_script_dir_path());
 
                 /* now create a phy device to export the device to the guest */
                 goto do_backend_phy;
@@ -2582,13 +2575,10 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     flexarray_append(back, "1");
     flexarray_append(back, "state");
     flexarray_append(back, libxl__sprintf(gc, "%d", 1));
-    if (nic->script) {
-        flexarray_append(back, "script");
-        flexarray_append(back, nic->script[0]=='/' ? nic->script
-                         : libxl__sprintf(gc, "%s/%s",
-                                          libxl__xen_script_dir_path(),
-                                          nic->script));
-    }
+    if (nic->script)
+        flexarray_append_pair(back, "script",
+                              libxl__abs_path(gc, nic->script,
+                                              libxl__xen_script_dir_path()));
 
     if (nic->ifname) {
         flexarray_append(back, "vifname");

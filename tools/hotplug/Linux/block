@@ -342,4 +342,4 @@ esac
 
 # If we've reached here, $t is neither phy nor file, so fire a helper script.
 [ -x ${XEN_SCRIPT_DIR}/block-"$t" ] && \
-  ${XEN_SCRIPT_DIR}/block-"$t" "$command" $node
+  ${XEN_SCRIPT_DIR}/block-"$t" "$command"

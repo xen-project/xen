@@ -3,8 +3,12 @@
 #define xlu__disk_yyIN_HEADER 1
 
 #line 6 "libxlu_disk_l.h"
+#line 31 "libxlu_disk_l.l"
+#include "libxl_osdeps.h" /* must come before any other headers */
 
-#line 8 "libxlu_disk_l.h"
+
+
+#line 12 "libxlu_disk_l.h"
 
 #define  YY_INT_ALIGNED short int
 
@@ -340,8 +344,8 @@ extern int xlu__disk_yylex (yyscan_t yyscanner);
 #undef YY_DECL
 #endif
 
-#line 244 "libxlu_disk_l.l"
+#line 255 "libxlu_disk_l.l"
 
-#line 346 "libxlu_disk_l.h"
+#line 350 "libxlu_disk_l.h"
 #undef xlu__disk_yyIN_HEADER
 #endif /* xlu__disk_yyHEADER_H */

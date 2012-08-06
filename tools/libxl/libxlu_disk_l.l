@@ -27,6 +27,10 @@
  * syntax's "target=" should be used.
  */
 
+%top{
+#include "libxl_osdeps.h" /* must come before any other headers */
+}
+
 %{
 #include "libxlu_disk_i.h"
 
@@ -188,11 +192,18 @@ target=.*	{ STRIP(','); SAVESTRING("target", pdev_path, FROMEQUALS); }
                     setformat(DPC, yytext);
                  }
 
-iscsi:|e?nbd:drbd:/.* {
-		    STRIP(':');
+(iscsi|e?nbd|drbd):/.* {
+                    char *newscript;
+                    STRIP(':');
                     DPC->had_depr_prefix=1; DEPRECATE("use `script=...'");
-		    SAVESTRING("script", script, yytext);
-		}
+                    if (asprintf(&newscript, "block-%s", yytext) < 0) {
+                            xlu__disk_err(DPC,yytext,"unable to format script");
+                            return 0;
+                    }
+                    savestring(DPC, "script respecified",
+                               &DPC->disk->script, newscript);
+                    free(newscript);
+                }
 
 tapdisk:/.*	{ DPC->had_depr_prefix=1; DEPRECATE(0); }
 tap2?:/.*	{ DPC->had_depr_prefix=1; DEPRECATE(0); }
