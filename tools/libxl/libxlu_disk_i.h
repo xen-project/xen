@@ -1,6 +1,8 @@
 #ifndef LIBXLU_DISK_I_H
 #define LIBXLU_DISK_I_H
 
+#include "libxl_osdeps.h" /* must come before any other headers */
+
 #include "libxlu_internal.h"
 
 
