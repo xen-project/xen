@@ -147,24 +147,16 @@ typedef struct {
 } disk_try_backend_args;
 
 static int disk_try_backend(disk_try_backend_args *a,
-                            libxl_disk_backend backend)
- {
-    libxl__gc *gc = a->gc;
+                            libxl_disk_backend backend) {
     /* returns 0 (ie, DISK_BACKEND_UNKNOWN) on failure, or
      * backend on success */
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-
+    libxl_ctx *ctx = libxl__gc_owner(a->gc);
     switch (backend) {
+
     case LIBXL_DISK_BACKEND_PHY:
         if (!(a->disk->format == LIBXL_DISK_FORMAT_RAW ||
               a->disk->format == LIBXL_DISK_FORMAT_EMPTY)) {
             goto bad_format;
-        }
-
-        if (a->disk->script) {
-            LOG(DEBUG, "Disk vdev=%s, uses script=... assuming phy backend",
-                a->disk->vdev);
-            return backend;
         }
 
         if (libxl__try_phy_backend(a->stab.st_mode))
@@ -176,8 +168,6 @@ static int disk_try_backend(disk_try_backend_args *a,
         return 0;
 
     case LIBXL_DISK_BACKEND_TAP:
-        if (a->disk->script) goto bad_script;
-
         if (!libxl__blktap_enabled(a->gc)) {
             LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend tap"
                        " unsuitable because blktap not available",
@@ -191,7 +181,6 @@ static int disk_try_backend(disk_try_backend_args *a,
         return backend;
 
     case LIBXL_DISK_BACKEND_QDISK:
-        if (a->disk->script) goto bad_script;
         return backend;
 
     default:
@@ -208,11 +197,6 @@ static int disk_try_backend(disk_try_backend_args *a,
                a->disk->vdev,
                libxl_disk_backend_to_string(backend),
                libxl_disk_format_to_string(a->disk->format));
-    return 0;
-
- bad_script:
-    LOG(DEBUG, "Disk vdev=%s, backend %s not compatible with script=...",
-        a->disk->vdev, libxl_disk_backend_to_string(backend));
     return 0;
 }
 
@@ -236,7 +220,7 @@ int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
             return ERROR_INVAL;
         }
         memset(&a.stab, 0, sizeof(a.stab));
-    } else if (!disk->script) {
+    } else {
         if (stat(disk->pdev_path, &a.stab)) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Disk vdev=%s "
                              "failed to stat: %s",

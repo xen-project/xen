@@ -142,44 +142,5 @@ disk: {
 
 EOF
 one 0 vdev=hdc,access=r,devtype=cdrom,format=empty
-one 0 vdev=hdc,access=r,devtype=cdrom
-
-expected <<EOF
-disk: {
-    "backend_domid": 0,
-    "pdev_path": "iqn.2001-05.com.equallogic:0-8a0906-23fe93404-c82797962054a96d-examplehost",
-    "vdev": "xvda",
-    "backend": "unknown",
-    "format": "raw",
-    "script": "block-iscsi",
-    "removable": 0,
-    "readwrite": 1,
-    "is_cdrom": 0
-}
-
-EOF
-
-# http://backdrift.org/xen-block-iscsi-script-with-multipath-support
-one 0 iscsi:iqn.2001-05.com.equallogic:0-8a0906-23fe93404-c82797962054a96d-examplehost,xvda,w
-one 0 vdev=xvda,access=w,script=block-iscsi,target=iqn.2001-05.com.equallogic:0-8a0906-23fe93404-c82797962054a96d-examplehost
-
-expected <<EOF
-disk: {
-    "backend_domid": 0,
-    "pdev_path": "app01",
-    "vdev": "hda",
-    "backend": "unknown",
-    "format": "raw",
-    "script": "block-drbd",
-    "removable": 0,
-    "readwrite": 1,
-    "is_cdrom": 0
-}
-
-EOF
-
-# http://lists.linbit.com/pipermail/drbd-user/2008-September/010221.html
-# http://www.drbd.org/users-guide-emb/s-xen-configure-domu.html
-one 0 drbd:app01,hda,w
 
 complete

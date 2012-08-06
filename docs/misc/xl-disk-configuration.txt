@@ -160,10 +160,7 @@ script=<script>
 ---------------
 
 Specifies that <target> is not a normal host path, but rather
-information to be interpreted by the executable program <script>,
-(looked for in /etc/xen/scripts, if it doesn't contain a slash).
-
-These scripts are normally called "block-<script>".
+information to be interpreted by /etc/xen/scripts/block-<script>.
 
 
 
@@ -207,7 +204,7 @@ Supported values:      iscsi:  nbd:  enbd:  drbd:
 In xend and old versions of libxl it was necessary to specify the
 "script" (see above) with a prefix.  For compatibility, these four
 prefixes are recognised as specifying the corresponding script.  They
-are equivalent to "script=block-<script>".
+are equivalent to "script=<script>".
 
 
 <deprecated-prefix>:
