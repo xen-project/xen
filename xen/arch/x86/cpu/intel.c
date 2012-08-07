@@ -104,7 +104,7 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 			return;
 		extra = "xsave ";
 		break;
-	case 0x2a:
+	case 0x2a: case 0x2d:
 		wrmsr(MSR_INTEL_CPUID1_FEATURE_MASK_V2,
 		      opt_cpuid_mask_ecx,
 		      opt_cpuid_mask_edx);
