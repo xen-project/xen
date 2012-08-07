@@ -213,9 +213,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.2.0-rc1
-# Mon Jul 23 17:56:13 2012 +0100
-# qemu-traditional: fix no-return-in-nonvoid-function
+QEMU_TAG ?= d94efd9aa814f17f3243dae91476dc42b5ad052e
+# Tue Aug 7 18:17:27 2012 +0100
+# mapcache: Fix invalidate if memory requested was not bucket aligned
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
