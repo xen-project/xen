@@ -115,11 +115,10 @@ extern void spinlock_profile_reset(unsigned char key);
 
 #else
 
-struct lock_profile { };
 struct lock_profile_qhead { };
 
 #define SPIN_LOCK_UNLOCKED                                                    \
-    { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0, _LOCK_DEBUG, NULL }
+    { _RAW_SPIN_LOCK_UNLOCKED, 0xfffu, 0, _LOCK_DEBUG }
 #define DEFINE_SPINLOCK(l) spinlock_t l = SPIN_LOCK_UNLOCKED
 
 #define spin_lock_init_prof(s, l) spin_lock_init(&((s)->l))
@@ -133,7 +132,9 @@ typedef struct spinlock {
     u16 recurse_cpu:12;
     u16 recurse_cnt:4;
     struct lock_debug debug;
+#ifdef LOCK_PROFILE
     struct lock_profile *profile;
+#endif
 } spinlock_t;
 
 
