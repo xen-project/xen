@@ -1845,18 +1845,31 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
             case LIBXL_DISK_BACKEND_PHY:
                 dev = disk->pdev_path;
 
-                script = libxl__abs_path(gc, disk->script ?: "block",
-                                         libxl__xen_script_dir_path());
-
         do_backend_phy:
                 flexarray_append(back, "params");
                 flexarray_append(back, dev);
 
-                assert(script);
+                script = libxl__abs_path(gc, disk->script?: "block",
+                                         libxl__xen_script_dir_path());
                 flexarray_append_pair(back, "script", script);
+
+                /* If the user did not supply a block script then we
+                 * write the physical-device node ourselves.
+                 *
+                 * If the user did supply a script then that script is
+                 * responsible for this since the block device may not
+                 * exist yet.
+                 */
+                if (!disk->script) {
+                    int major, minor;
+                    libxl__device_physdisk_major_minor(dev, &major, &minor);
+                    flexarray_append_pair(back, "physical-device",
+                            libxl__sprintf(gc, "%x:%x", major, minor));
+                }
 
                 assert(device->backend_kind == LIBXL__DEVICE_KIND_VBD);
                 break;
+
             case LIBXL_DISK_BACKEND_TAP:
                 dev = libxl__blktap_devpath(gc, disk->pdev_path, disk->format);
                 if (!dev) {
@@ -1870,12 +1883,9 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
                     libxl__device_disk_string_of_format(disk->format),
                     disk->pdev_path));
 
-                /*
-                 * tap devices do not support custom block scripts and
-                 * always use the plain block script.
-                 */
-                script = libxl__abs_path(gc, "block",
-                                         libxl__xen_script_dir_path());
+                /* tap backends with scripts are rejected by
+                 * libxl__device_disk_set_backend */
+                assert(!disk->script);
 
                 /* now create a phy device to export the device to the guest */
                 goto do_backend_phy;
