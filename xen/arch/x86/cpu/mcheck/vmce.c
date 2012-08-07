@@ -19,12 +19,17 @@
 #include "mce.h"
 #include "x86_mca.h"
 
+/*
+ * Emulate 2 banks for guest
+ * Bank0: reserved for 'bank0 quirk' occur at some very old processors:
+ *   1). Intel cpu whose family-model value < 06-1A;
+ *   2). AMD K7
+ * Bank1: used to transfer error info to guest
+ */
+#define GUEST_BANK_NUM 2
+#define GUEST_MCG_CAP (MCG_TES_P | MCG_SER_P | GUEST_BANK_NUM)
+
 #define dom_vmce(x)   ((x)->arch.vmca_msrs)
-
-static uint64_t __read_mostly g_mcg_cap;
-
-/* Real value in physical CTL MSR */
-static uint64_t __read_mostly h_mcg_ctl;
 
 int vmce_init_msr(struct domain *d)
 {
@@ -33,7 +38,6 @@ int vmce_init_msr(struct domain *d)
         return -ENOMEM;
 
     dom_vmce(d)->mcg_status = 0x0;
-    dom_vmce(d)->mcg_ctl = ~(uint64_t)0x0;
     dom_vmce(d)->nr_injection = 0;
 
     INIT_LIST_HEAD(&dom_vmce(d)->impact_header);
@@ -52,17 +56,17 @@ void vmce_destroy_msr(struct domain *d)
 
 void vmce_init_vcpu(struct vcpu *v)
 {
-    v->arch.mcg_cap = g_mcg_cap;
+    v->arch.mcg_cap = GUEST_MCG_CAP;
 }
 
 int vmce_restore_vcpu(struct vcpu *v, uint64_t caps)
 {
-    if ( caps & ~g_mcg_cap & ~MCG_CAP_COUNT & ~MCG_CTL_P )
+    if ( caps & ~GUEST_MCG_CAP & ~MCG_CAP_COUNT & ~MCG_CTL_P )
     {
         dprintk(XENLOG_G_ERR, "%s restore: unsupported MCA capabilities"
                 " %#" PRIx64 " for d%d:v%u (supported: %#Lx)\n",
                 is_hvm_vcpu(v) ? "HVM" : "PV", caps, v->domain->domain_id,
-                v->vcpu_id, g_mcg_cap & ~MCG_CAP_COUNT);
+                v->vcpu_id, GUEST_MCG_CAP & ~MCG_CAP_COUNT);
         return -EPERM;
     }
 
@@ -175,11 +179,10 @@ int vmce_rdmsr(uint32_t msr, uint64_t *val)
                    *val);
         break;
     case MSR_IA32_MCG_CTL:
-        /* Always 0 if no CTL support */
+        /* Stick all 1's when CTL support, and 0's when no CTL support */
         if ( cur->arch.mcg_cap & MCG_CTL_P )
-            *val = vmce->mcg_ctl & h_mcg_ctl;
-        mce_printk(MCE_VERBOSE, "MCE: rdmsr MCG_CTL 0x%"PRIx64"\n",
-                   *val);
+            *val = ~0ULL;
+        mce_printk(MCE_VERBOSE, "MCE: rdmsr MCG_CTL 0x%"PRIx64"\n", *val);
         break;
     default:
         ret = mce_bank_msr(cur, msr) ? bank_mce_rdmsr(cur, msr, val) : 0;
@@ -287,15 +290,11 @@ int vmce_wrmsr(u32 msr, u64 val)
     struct domain_mca_msrs *vmce = dom_vmce(cur->domain);
     int ret = 1;
 
-    if ( !g_mcg_cap )
-        return 0;
-
     spin_lock(&vmce->lock);
 
     switch ( msr )
     {
     case MSR_IA32_MCG_CTL:
-        vmce->mcg_ctl = val;
         break;
     case MSR_IA32_MCG_STATUS:
         vmce->mcg_status = val;
@@ -510,31 +509,6 @@ int vmce_domain_inject(
 }
 #endif
 
-int vmce_init(struct cpuinfo_x86 *c)
-{
-    u64 value;
-
-    rdmsrl(MSR_IA32_MCG_CAP, value);
-    /* For Guest vMCE usage */
-    g_mcg_cap = value & (MCG_CAP_COUNT | MCG_CTL_P | MCG_TES_P | MCG_SER_P);
-    if (value & MCG_CTL_P)
-        rdmsrl(MSR_IA32_MCG_CTL, h_mcg_ctl);
-
-    return 0;
-}
-
-static int mca_ctl_conflict(struct mcinfo_bank *bank, struct domain *d)
-{
-    if ( !bank || !d )
-        return 1;
-
-    /* Will MCE happen in host if If host mcg_ctl is 0? */
-    if ( ~d->arch.vmca_msrs->mcg_ctl & h_mcg_ctl )
-        return 1;
-
-    return 0;
-}
-
 static int is_hvm_vmce_ready(struct mcinfo_bank *bank, struct domain *d)
 {
     struct vcpu *v;
@@ -587,14 +561,6 @@ static int is_hvm_vmce_ready(struct mcinfo_bank *bank, struct domain *d)
 
     if (no_vmce)
         return 0;
-
-    /* Guest has different MCE ctl value setting */
-    if (mca_ctl_conflict(bank, d))
-    {
-        dprintk(XENLOG_WARNING,
-          "No vmce, guest has different mca control setting\n");
-        return 0;
-    }
 
     return 1;
 }

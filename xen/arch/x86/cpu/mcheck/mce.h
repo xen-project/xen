@@ -170,8 +170,6 @@ int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
 int inject_vmce(struct domain *d);
 int vmce_domain_inject(struct mcinfo_bank *bank, struct domain *d, struct mcinfo_global *global);
 
-extern int vmce_init(struct cpuinfo_x86 *c);
-
 static inline int mce_vendor_bank_msr(const struct vcpu *v, uint32_t msr)
 {
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&

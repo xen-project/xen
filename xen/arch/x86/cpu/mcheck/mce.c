@@ -843,8 +843,6 @@ void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
 
     mctelem_init(sizeof(struct mc_info));
 
-    vmce_init(c);
-
     /* Turn on MCE now */
     set_in_cr4(X86_CR4_MCE);
 
