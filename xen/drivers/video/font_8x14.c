@@ -9,7 +9,7 @@
 
 #define FONTDATAMAX (256*14)
 
-static unsigned char fontdata_8x14[FONTDATAMAX] = {
+static const unsigned char fontdata_8x14[FONTDATAMAX] = {
 
     /* 0 0x00 '^@' */
     0x00, /* 00000000 */
