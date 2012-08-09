@@ -2044,6 +2044,8 @@ void p2m_teardown(struct p2m_domain *p2m)
 #ifdef __x86_64__
     for ( gfn=0; gfn < p2m->max_mapped_pfn; gfn++ )
     {
+        if ( atomic_read(&d->shr_pages) == 0 )
+            break;
         mfn = p2m->get_entry(p2m, gfn, &t, &a, p2m_query);
         if ( mfn_valid(mfn) && (t == p2m_ram_shared) )
             BUG_ON(mem_sharing_unshare_page(p2m, gfn, MEM_SHARING_DESTROY_GFN));
