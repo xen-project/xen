@@ -1100,36 +1100,23 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
     }
 
     stat->last = power->last_state ? power->last_state->idx : 0;
-    stat->nr = power->count;
     stat->idle_time = get_cpu_idle_time(cpuid);
 
     /* mimic the stat when detail info hasn't been registered by dom0 */
     if ( pm_idle_save == NULL )
     {
-        /* C1 */
-        usage[1] = 1;
-        res[1] = stat->idle_time;
+        stat->nr = 2;
 
-        /* C0 */
-        res[0] = NOW() - res[1];
+        usage[1] = idle_usage = 1;
+        res[1] = idle_res = stat->idle_time;
 
-        if ( copy_to_guest_offset(stat->triggers, 0, &usage[0], 2) ||
-            copy_to_guest_offset(stat->residencies, 0, &res[0], 2) )
-            return -EFAULT;
-
-        stat->pc2 = 0;
-        stat->pc3 = 0;
-        stat->pc6 = 0;
-        stat->pc7 = 0;
-        stat->cc3 = 0;
-        stat->cc6 = 0;
-        stat->cc7 = 0;
-        return 0;
+        memset(&hw_res, 0, sizeof(hw_res));
     }
-
-    for ( i = power->count - 1; i >= 0; i-- )
+    else
     {
-        if ( i != 0 )
+        stat->nr = power->count;
+
+        for ( i = 1; i < power->count; i++ )
         {
             spin_lock_irq(&power->stat_lock);
             usage[i] = power->states[i].usage;
@@ -1139,18 +1126,16 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
             idle_usage += usage[i];
             idle_res += res[i];
         }
-        else
-        {
-            usage[i] = idle_usage;
-            res[i] = NOW() - idle_res;
-        }
+
+        get_hw_residencies(cpuid, &hw_res);
     }
 
-    if ( copy_to_guest_offset(stat->triggers, 0, &usage[0], power->count) ||
-        copy_to_guest_offset(stat->residencies, 0, &res[0], power->count) )
-        return -EFAULT;
+    usage[0] = idle_usage;
+    res[0] = NOW() - idle_res;
 
-    get_hw_residencies(cpuid, &hw_res);
+    if ( copy_to_guest(stat->triggers, usage, stat->nr) ||
+         copy_to_guest(stat->residencies, res, stat->nr) )
+        return -EFAULT;
 
     stat->pc2 = hw_res.pc2;
     stat->pc3 = hw_res.pc3;
