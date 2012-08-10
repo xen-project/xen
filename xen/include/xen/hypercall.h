@@ -137,7 +137,7 @@ extern long
 do_tmem_op(
     XEN_GUEST_HANDLE(tmem_op_t) uops);
 
-extern int
+extern long
 do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg);
 
 #ifdef CONFIG_COMPAT

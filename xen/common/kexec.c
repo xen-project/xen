@@ -845,8 +845,8 @@ static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
     return -EINVAL; /* never reached */
 }
 
-int do_kexec_op_internal(unsigned long op, XEN_GUEST_HANDLE(void) uarg,
-                           int compat)
+static int do_kexec_op_internal(unsigned long op, XEN_GUEST_HANDLE(void) uarg,
+                                bool_t compat)
 {
     unsigned long flags;
     int ret = -EINVAL;

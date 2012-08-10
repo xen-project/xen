@@ -607,6 +607,8 @@ static int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
     return (copy_to_guest(arg, &xenoprof_init, 1) ? -EFAULT : 0);
 }
 
+#define ret_t long
+
 #endif /* !COMPAT */
 
 static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
@@ -660,7 +662,7 @@ static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
                       || (op == XENOPROF_disable_virq)  \
                       || (op == XENOPROF_get_buffer))
  
-int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
+ret_t do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
 {
     int ret = 0;
     
@@ -904,6 +906,7 @@ int do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
 }
 
 #if defined(CONFIG_COMPAT) && !defined(COMPAT)
+#undef ret_t
 #include "compat/xenoprof.c"
 #endif
 

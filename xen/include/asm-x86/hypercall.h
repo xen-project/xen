@@ -24,7 +24,7 @@ extern long
 do_set_trap_table(
     XEN_GUEST_HANDLE(const_trap_info_t) traps);
 
-extern int
+extern long
 do_mmu_update(
     XEN_GUEST_HANDLE(mmu_update_t) ureqs,
     unsigned int count,
@@ -62,7 +62,7 @@ do_update_descriptor(
 extern long
 do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc);
 
-extern int
+extern long
 do_update_va_mapping(
     unsigned long va,
     u64 val64,
@@ -72,14 +72,14 @@ extern long
 do_physdev_op(
     int cmd, XEN_GUEST_HANDLE(void) arg);
 
-extern int
+extern long
 do_update_va_mapping_otherdomain(
     unsigned long va,
     u64 val64,
     unsigned long flags,
     domid_t domid);
 
-extern int
+extern long
 do_mmuext_op(
     XEN_GUEST_HANDLE(mmuext_op_t) uops,
     unsigned int count,
@@ -89,10 +89,6 @@ do_mmuext_op(
 extern unsigned long
 do_iret(
     void);
-
-extern int
-do_kexec(
-    unsigned long op, unsigned arg1, XEN_GUEST_HANDLE(void) uarg);
 
 #ifdef __x86_64__
 

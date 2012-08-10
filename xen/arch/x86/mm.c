@@ -2973,7 +2973,7 @@ static inline void fixunmap_domain_page(const void *ptr)
 #define fixunmap_domain_page(ptr) ((void)(ptr))
 #endif
 
-int do_mmuext_op(
+long do_mmuext_op(
     XEN_GUEST_HANDLE(mmuext_op_t) uops,
     unsigned int count,
     XEN_GUEST_HANDLE(uint) pdone,
@@ -3437,7 +3437,7 @@ int do_mmuext_op(
     return rc;
 }
 
-int do_mmu_update(
+long do_mmu_update(
     XEN_GUEST_HANDLE(mmu_update_t) ureqs,
     unsigned int count,
     XEN_GUEST_HANDLE(uint) pdone,
@@ -4285,15 +4285,15 @@ static int __do_update_va_mapping(
     return rc;
 }
 
-int do_update_va_mapping(unsigned long va, u64 val64,
-                         unsigned long flags)
+long do_update_va_mapping(unsigned long va, u64 val64,
+                          unsigned long flags)
 {
     return __do_update_va_mapping(va, val64, flags, current->domain);
 }
 
-int do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
-                                     unsigned long flags,
-                                     domid_t domid)
+long do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
+                                      unsigned long flags,
+                                      domid_t domid)
 {
     struct domain *pg_owner;
     int rc;
