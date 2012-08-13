@@ -59,8 +59,14 @@ do_start () {
 	modprobe xen-gntalloc 2>/dev/null
 	modprobe xen-blkback 2>/dev/null
 	modprobe xen-netback 2>/dev/null
+	modprobe xen-pciback 2>/dev/null
 	modprobe evtchn 2>/dev/null
 	modprobe gntdev 2>/dev/null
+	modprobe netbk 2>/dev/null
+	modprobe blkbk 2>/dev/null
+	modprobe xen-scsibk 2>/dev/null
+	modprobe usbbk 2>/dev/null
+	modprobe pciback 2>/dev/null
 	modprobe xen-acpi-processor 2>/dev/null
 	mkdir -p /var/run/xen
 
