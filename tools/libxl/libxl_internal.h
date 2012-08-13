@@ -55,8 +55,10 @@
 #ifdef LIBXL_H
 # error libxl.h should be included via libxl_internal.h, not separately
 #endif
-#define LIBXL_EXTERNAL_CALLERS_ONLY \
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3)
+# define LIBXL_EXTERNAL_CALLERS_ONLY \
     __attribute__((warning("may not be called from within libxl")))
+#endif
 
 #include "libxl.h"
 #include "_paths.h"
