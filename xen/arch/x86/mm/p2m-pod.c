@@ -1075,6 +1075,7 @@ out_of_memory:
     printk("%s: Out of populate-on-demand memory! tot_pages %" PRIu32 " pod_entries %" PRIi32 "\n",
            __func__, d->tot_pages, p2m->pod.entry_count);
     domain_crash(d);
+    return -1;
 out_fail:
     pod_unlock(p2m);
     return -1;
