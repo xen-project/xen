@@ -214,9 +214,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.2.0-rc2
-# Tue Aug 7 18:17:27 2012 +0100
-# mapcache: Fix invalidate if memory requested was not bucket aligned
+QEMU_TAG ?= effd5676225761abdab90becac519716515c3be4
+# Tue Aug 14 15:57:49 2012 +0100
+# Revert "qemu-xen-traditional: use O_DIRECT to open disk images for IDE"
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
