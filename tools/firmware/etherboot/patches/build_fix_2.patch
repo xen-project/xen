@@ -1,0 +1,48 @@
+fix compile error in isabus_probe with gcc4.7
+
+The copy of ipxe used during Xen tools build fails to compile with gcc
+4.7:
+drivers/net/myri10ge.c: In function 'myri10ge_command':
+drivers/net/myri10ge.c:308:3: error: dereferencing type-punned pointer will break strict-aliasing rules [-Werror=strict-aliasing]
+drivers/net/myri10ge.c:310:2: error: dereferencing type-punned pointer will break strict-aliasing rules [-Werror=strict-aliasing]
+
+This patch simply turns the pad array into quantities of u32.
+If thats not the right fix due to hardware limitations, I can provide a
+different patch.
+
+---
+ src/drivers/net/myri10ge.c     |    6 +++---
+ src/drivers/net/myri10ge_mcp.h |    2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+Index: ipxe/src/drivers/net/myri10ge.c
+===================================================================
+--- ipxe.orig/src/drivers/net/myri10ge.c
++++ ipxe/src/drivers/net/myri10ge.c
+@@ -304,10 +304,10 @@ static int myri10ge_command ( struct myr
+ 	command->response_addr.high = 0;
+ 	command->response_addr.low
+ 		= htonl ( virt_to_bus ( &priv->dma->command_response ) );
+-	for ( i=0; i<36; i+=4 )
+-		* ( uint32 * ) &command->pad[i] = 0;
++	for ( i=0; i<9; i++ )
++		command->pad[i] = 0;
+ 	wmb();
+-	* ( uint32 * ) &command->pad[36] = 0;
++	command->pad[9] = 0;
+ 
+ 	/* Wait up to 2 seconds for a response. */
+ 
+Index: ipxe/src/drivers/net/myri10ge_mcp.h
+===================================================================
+--- ipxe.orig/src/drivers/net/myri10ge_mcp.h
++++ ipxe/src/drivers/net/myri10ge_mcp.h
+@@ -80,7 +80,7 @@ struct mcp_cmd {
+   /* 16 */
+   struct mcp_dma_addr response_addr;
+   /* 24 */
+-  uint8_t pad[40];
++  uint32_t pad[10];
+ };
+ typedef struct mcp_cmd mcp_cmd_t;
+ 

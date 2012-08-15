@@ -1,0 +1,28 @@
+Fix compile error in isabus_probe with gcc 4.7
+
+The copy of ipxe used during Xen tools build does not define
+ISA_PROBE_ADDRS. As a result isa_extra_probe_addrs[] has a size of 0.
+ISA_IOADDR() tries to access that empty array, which is detected by the
+newer gcc (or perhaps the warning was just turned into an error)
+
+drivers/bus/isa.c: In function 'isabus_probe':
+drivers/bus/isa.c:112:18: error: array subscript is above array bounds [-Werror=array-bounds]
+
+---
+ src/drivers/bus/isa.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+Index: ipxe/src/drivers/bus/isa.c
+===================================================================
+--- ipxe.orig/src/drivers/bus/isa.c
++++ ipxe/src/drivers/bus/isa.c
+@@ -97,6 +97,9 @@ static int isabus_probe ( struct root_de
+ 	int ioidx;
+ 	int rc;
+ 
++	if ( ISA_EXTRA_PROBE_ADDR_COUNT == 0 )
++		return 0;
++
+ 	for_each_table_entry ( driver, ISA_DRIVERS ) {
+ 		for ( ioidx = ISA_IOIDX_MIN ( driver ) ;
+ 		      ioidx <= ISA_IOIDX_MAX ( driver ) ; ioidx++ ) {

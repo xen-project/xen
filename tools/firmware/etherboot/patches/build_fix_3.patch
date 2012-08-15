@@ -1,0 +1,13 @@
+diff --git a/src/drivers/infiniband/qib7322.c b/src/drivers/infiniband/qib7322.c
+index b66f8ef..d8a54c9 100644
+--- a/src/drivers/infiniband/qib7322.c
++++ b/src/drivers/infiniband/qib7322.c
+@@ -2120,7 +2120,7 @@ static int qib7322_ahb_write ( struct qib7322 *qib7322, unsigned int location,
+  */
+ static int qib7322_ahb_mod_reg ( struct qib7322 *qib7322, unsigned int location,
+ 				 uint32_t value, uint32_t mask ) {
+-	uint32_t old_value;
++	uint32_t old_value = 0;
+ 	uint32_t new_value;
+ 	int rc;
+ 
