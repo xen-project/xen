@@ -282,10 +282,10 @@ struct p2m_domain {
     struct {
         struct page_list_head super,   /* List of superpages                */
                          single;       /* Non-super lists                   */
-        int              count,        /* # of pages in cache lists         */
+        long             count,        /* # of pages in cache lists         */
                          entry_count;  /* # of pages in p2m marked pod      */
-        unsigned         reclaim_single; /* Last gpfn of a scan */
-        unsigned         max_guest;    /* gpfn of max guest demand-populate */
+        unsigned long    reclaim_single; /* Last gpfn of a scan */
+        unsigned long    max_guest;    /* gpfn of max guest demand-populate */
 #define POD_HISTORY_MAX 128
         /* gpfn of last guest superpage demand-populated */
         unsigned long    last_populated[POD_HISTORY_MAX]; 

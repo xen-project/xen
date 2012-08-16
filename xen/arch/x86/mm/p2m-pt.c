@@ -965,8 +965,7 @@ static void p2m_change_type_global(struct p2m_domain *p2m,
 #if P2M_AUDIT
 long p2m_pt_audit_p2m(struct p2m_domain *p2m)
 {
-    int entry_count = 0;
-    unsigned long pmbad = 0;
+    unsigned long entry_count = 0, pmbad = 0;
     unsigned long mfn, gfn, m2pfn;
     int test_linear;
     struct domain *d = p2m->domain;
@@ -1126,7 +1125,7 @@ long p2m_pt_audit_p2m(struct p2m_domain *p2m)
 
     if ( entry_count != p2m->pod.entry_count )
     {
-        printk("%s: refcounted entry count %d, audit count %d!\n",
+        printk("%s: refcounted entry count %ld, audit count %lu!\n",
                __func__,
                p2m->pod.entry_count,
                entry_count);

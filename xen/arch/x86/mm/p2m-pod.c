@@ -66,7 +66,7 @@ static inline void unlock_page_alloc(struct p2m_domain *p2m)
 static int
 p2m_pod_cache_add(struct p2m_domain *p2m,
                   struct page_info *page,
-                  unsigned long order)
+                  unsigned int order)
 {
     int i;
     struct page_info *p;
@@ -80,7 +80,7 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
     /* Check to make sure this is a contiguous region */
     if( mfn_x(mfn) & ((1 << order) - 1) )
     {
-        printk("%s: mfn %lx not aligned order %lu! (mask %lx)\n",
+        printk("%s: mfn %lx not aligned order %u! (mask %lx)\n",
                __func__, mfn_x(mfn), order, ((1UL << order) - 1));
         return -1;
     }
@@ -146,7 +146,7 @@ p2m_pod_cache_add(struct p2m_domain *p2m,
  * down 2-meg pages into singleton pages automatically.  Returns null if
  * a superpage is requested and no superpages are available. */
 static struct page_info * p2m_pod_cache_get(struct p2m_domain *p2m,
-                                            unsigned long order)
+                                            unsigned int order)
 {
     struct page_info *p = NULL;
     int i;
@@ -234,7 +234,7 @@ p2m_pod_set_cache_target(struct p2m_domain *p2m, unsigned long pod_target, int p
                 goto retry;
             }   
             
-            printk("%s: Unable to allocate domheap page for pod cache.  target %lu cachesize %d\n",
+            printk("%s: Unable to allocate page for PoD cache (target=%lu cache=%ld)\n",
                    __func__, pod_target, p2m->pod.count);
             ret = -ENOMEM;
             goto out;
@@ -337,10 +337,9 @@ out:
 int
 p2m_pod_set_mem_target(struct domain *d, unsigned long target)
 {
-    unsigned pod_target;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int ret = 0;
-    unsigned long populated;
+    unsigned long populated, pod_target;
 
     pod_lock(p2m);
 
@@ -633,7 +632,8 @@ out_unlock:
 void p2m_pod_dump_data(struct domain *d)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    printk("    PoD entries=%d cachesize=%d\n",
+
+    printk("    PoD entries=%ld cachesize=%ld\n",
            p2m->pod.entry_count, p2m->pod.count);
 }
 
@@ -1071,8 +1071,9 @@ p2m_pod_demand_populate(struct p2m_domain *p2m, unsigned long gfn,
 out_of_memory:
     pod_unlock(p2m);
 
-    printk("%s: Out of populate-on-demand memory! tot_pages %" PRIu32 " pod_entries %" PRIi32 "\n",
-           __func__, d->tot_pages, p2m->pod.entry_count);
+    printk("%s: Dom%d out of PoD memory! (tot=%"PRIu32" ents=%ld dom%d)\n",
+           __func__, d->domain_id, d->tot_pages, p2m->pod.entry_count,
+           current->domain->domain_id);
     domain_crash(d);
     return -1;
 out_fail:
@@ -1111,10 +1112,9 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
                                       unsigned int order)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    unsigned long i;
+    unsigned long i, pod_count = 0;
     p2m_type_t ot;
     mfn_t omfn;
-    int pod_count = 0;
     int rc = 0;
 
     BUG_ON(!paging_mode_translate(d));
