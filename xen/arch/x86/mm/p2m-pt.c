@@ -454,7 +454,7 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     }
 
     /* Track the highest gfn for which we have ever had a valid mapping */
-    if ( mfn_valid(mfn) 
+    if ( p2mt != p2m_invalid
          && (gfn + (1UL << page_order) - 1 > p2m->max_mapped_pfn) )
         p2m->max_mapped_pfn = gfn + (1UL << page_order) - 1;
 
