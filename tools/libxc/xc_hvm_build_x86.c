@@ -160,7 +160,7 @@ static int setup_guest(xc_interface *xch,
     int pod_mode = 0;
 
     if ( nr_pages > target_pages )
-        pod_mode = 1;
+        pod_mode = XENMEMF_populate_on_demand;
 
     memset(&elf, 0, sizeof(elf));
     if ( elf_init(&elf, image, image_size) != 0 )
@@ -197,6 +197,22 @@ static int setup_guest(xc_interface *xch,
     for ( i = mmio_start >> PAGE_SHIFT; i < nr_pages; i++ )
         page_array[i] += mmio_size >> PAGE_SHIFT;
 
+    if ( pod_mode )
+    {
+        /*
+         * Subtract 0x20 from target_pages for the VGA "hole".  Xen will
+         * adjust the PoD cache size so that domain tot_pages will be
+         * target_pages - 0x20 after this call.
+         */
+        rc = xc_domain_set_pod_target(xch, dom, target_pages - 0x20,
+                                      NULL, NULL, NULL);
+        if ( rc != 0 )
+        {
+            PERROR("Could not set PoD target for HVM guest.\n");
+            goto error_out;
+        }
+    }
+
     /*
      * Allocate memory for HVM guest, skipping VGA hole 0xA0000-0xC0000.
      *
@@ -208,7 +224,7 @@ static int setup_guest(xc_interface *xch,
      * ensure that we can be preempted and hence dom0 remains responsive.
      */
     rc = xc_domain_populate_physmap_exact(
-        xch, dom, 0xa0, 0, 0, &page_array[0x00]);
+        xch, dom, 0xa0, 0, pod_mode, &page_array[0x00]);
     cur_pages = 0xc0;
     stat_normal_pages = 0xc0;
     while ( (rc == 0) && (nr_pages > cur_pages) )
@@ -247,8 +263,7 @@ static int setup_guest(xc_interface *xch,
                 sp_extents[i] = page_array[cur_pages+(i<<SUPERPAGE_1GB_SHIFT)];
 
             done = xc_domain_populate_physmap(xch, dom, nr_extents, SUPERPAGE_1GB_SHIFT,
-                                              pod_mode ? XENMEMF_populate_on_demand : 0,
-                                              sp_extents);
+                                              pod_mode, sp_extents);
 
             if ( done > 0 )
             {
@@ -285,8 +300,7 @@ static int setup_guest(xc_interface *xch,
                     sp_extents[i] = page_array[cur_pages+(i<<SUPERPAGE_2MB_SHIFT)];
 
                 done = xc_domain_populate_physmap(xch, dom, nr_extents, SUPERPAGE_2MB_SHIFT,
-                                                  pod_mode ? XENMEMF_populate_on_demand : 0,
-                                                  sp_extents);
+                                                  pod_mode, sp_extents);
 
                 if ( done > 0 )
                 {
@@ -302,18 +316,11 @@ static int setup_guest(xc_interface *xch,
         if ( count != 0 )
         {
             rc = xc_domain_populate_physmap_exact(
-                xch, dom, count, 0, 0, &page_array[cur_pages]);
+                xch, dom, count, 0, pod_mode, &page_array[cur_pages]);
             cur_pages += count;
             stat_normal_pages += count;
         }
     }
-
-    /* Subtract 0x20 from target_pages for the VGA "hole".  Xen will
-     * adjust the PoD cache size so that domain tot_pages will be
-     * target_pages - 0x20 after this call. */
-    if ( pod_mode )
-        rc = xc_domain_set_pod_target(xch, dom, target_pages - 0x20,
-                                      NULL, NULL, NULL);
 
     if ( rc != 0 )
     {

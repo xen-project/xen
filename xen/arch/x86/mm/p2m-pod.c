@@ -344,8 +344,9 @@ p2m_pod_set_mem_target(struct domain *d, unsigned long target)
 
     pod_lock(p2m);
 
-    /* P == B: Nothing to do. */
-    if ( p2m->pod.entry_count == 0 )
+    /* P == B: Nothing to do (unless the guest is being created). */
+    populated = d->tot_pages - p2m->pod.count;
+    if ( populated > 0 && p2m->pod.entry_count == 0 )
         goto out;
 
     /* Don't do anything if the domain is being torn down */
@@ -357,13 +358,11 @@ p2m_pod_set_mem_target(struct domain *d, unsigned long target)
     if ( target < d->tot_pages )
         goto out;
 
-    populated  = d->tot_pages - p2m->pod.count;
-
     pod_target = target - populated;
 
     /* B < T': Set the cache size equal to # of outstanding entries,
      * let the balloon driver fill in the rest. */
-    if ( pod_target > p2m->pod.entry_count )
+    if ( populated > 0 && pod_target > p2m->pod.entry_count )
         pod_target = p2m->pod.entry_count;
 
     ASSERT( pod_target >= p2m->pod.count );
