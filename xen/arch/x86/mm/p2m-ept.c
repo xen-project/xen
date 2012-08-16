@@ -521,13 +521,12 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
             }
 
             /* Populate this superpage */
-            ASSERT(i == 1);
+            ASSERT(i <= 2);
 
             index = gfn_remainder >> ( i * EPT_TABLE_ORDER);
             ept_entry = table + index;
 
-            if ( !p2m_pod_demand_populate(p2m, gfn, 
-                                            PAGE_ORDER_2M, q) )
+            if ( !p2m_pod_demand_populate(p2m, gfn, i * EPT_TABLE_ORDER, q) )
                 goto retry;
             else
                 goto out;
