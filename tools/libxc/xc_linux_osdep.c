@@ -93,22 +93,21 @@ static void *linux_privcmd_alloc_hypercall_buffer(xc_interface *xch, xc_osdep_ha
     size_t size = npages * XC_PAGE_SIZE;
     void *p;
 
-    p = xc_memalign(xch, XC_PAGE_SIZE, size);
-    if (!p)
-        return NULL;
+    /* Address returned by mmap is page aligned. */
+    p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_LOCKED, -1, 0);
 
-    if ( mlock(p, size) < 0 )
-    {
-        free(p);
-        return NULL;
-    }
+    /* Do not copy the VMA to child process on fork. Avoid the page being COW
+        on hypercall. */
+    madvise(p, npages * XC_PAGE_SIZE, MADV_DONTFORK);
     return p;
 }
 
 static void linux_privcmd_free_hypercall_buffer(xc_interface *xch, xc_osdep_handle h, void *ptr, int npages)
 {
-    munlock(ptr, npages * XC_PAGE_SIZE);
-    free(ptr);
+    /* Recover the VMA flags. Maybe it's not necessary */
+    madvise(ptr, npages * XC_PAGE_SIZE, MADV_DOFORK);
+    
+    munmap(ptr, npages * XC_PAGE_SIZE);
 }
 
 static int linux_privcmd_hypercall(xc_interface *xch, xc_osdep_handle h, privcmd_hypercall_t *hypercall)

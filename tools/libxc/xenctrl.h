@@ -134,6 +134,12 @@ typedef enum xc_error_code xc_error_code;
  * be called multiple times within a single process.  Multiple processes can
  * have an open hypervisor interface at the same time.
  *
+ * Note:
+ * Child processes must not use the opened xc interface handle that inherits
+ * from parents. They should reopen the handle if they want to interact with
+ * xc. Otherwise, it may cause segment fault to access hypercall buffer caches
+ * of the handle.
+ *
  * Each call to this function should have a corresponding call to
  * xc_interface_close().
  *
@@ -908,6 +914,12 @@ int xc_evtchn_status(xc_interface *xch, xc_evtchn_status_t *status);
  * Return a handle to the event channel driver, or -1 on failure, in which case
  * errno will be set appropriately.
  *
+ * Note:
+ * Child processes must not use the opened xc evtchn handle that inherits from
+ * parents. They should reopen the handle if they want to interact with xc.
+ * Otherwise, it may cause segment fault to access hypercall buffer caches of
+ * the handle.
+ *
  * Before Xen pre-4.1 this function would sometimes report errors with perror.
  */
 xc_evtchn *xc_evtchn_open(xentoollog_logger *logger,
@@ -1339,9 +1351,13 @@ int xc_domain_subscribe_for_suspend(
 
 /*
  * These functions sometimes log messages as above, but not always.
- */
-
-/*
+ *
+ * Note:
+ * Child processes must not use the opened xc gnttab handle that inherits from
+ * parents. They should reopen the handle if they want to interact with xc.
+ * Otherwise, it may cause segment fault to access hypercall buffer caches of
+ * the handle.
+ *
  * Return an fd onto the grant table driver.  Logs errors.
  */
 xc_gnttab *xc_gnttab_open(xentoollog_logger *logger,
@@ -1458,6 +1474,13 @@ grant_entry_v2_t *xc_gnttab_map_table_v2(xc_interface *xch, int domid, int *gnt_
 
 /*
  * Return an fd onto the grant sharing driver.  Logs errors.
+ *
+ * Note:
+ * Child processes must not use the opened xc gntshr handle that inherits from
+ * parents. They should reopen the handle if they want to interact with xc.
+ * Otherwise, it may cause segment fault to access hypercall buffer caches of
+ * the handle.
+ *
  */
 xc_gntshr *xc_gntshr_open(xentoollog_logger *logger,
 			  unsigned open_flags);
