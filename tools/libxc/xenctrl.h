@@ -135,10 +135,9 @@ typedef enum xc_error_code xc_error_code;
  * have an open hypervisor interface at the same time.
  *
  * Note:
- * Child processes must not use the opened xc interface handle that inherits
- * from parents. They should reopen the handle if they want to interact with
- * xc. Otherwise, it may cause segment fault to access hypercall buffer caches
- * of the handle.
+ * After fork a child process must not use any opened xc interface
+ * handle inherited from their parent. They must open a new handle if
+ * they want to interact with xc.
  *
  * Each call to this function should have a corresponding call to
  * xc_interface_close().
@@ -915,10 +914,9 @@ int xc_evtchn_status(xc_interface *xch, xc_evtchn_status_t *status);
  * errno will be set appropriately.
  *
  * Note:
- * Child processes must not use the opened xc evtchn handle that inherits from
- * parents. They should reopen the handle if they want to interact with xc.
- * Otherwise, it may cause segment fault to access hypercall buffer caches of
- * the handle.
+ * After fork a child process must not use any opened xc evtchn
+ * handle inherited from their parent. They must open a new handle if
+ * they want to interact with xc.
  *
  * Before Xen pre-4.1 this function would sometimes report errors with perror.
  */
@@ -1351,12 +1349,13 @@ int xc_domain_subscribe_for_suspend(
 
 /*
  * These functions sometimes log messages as above, but not always.
- *
+ */
+
+/*
  * Note:
- * Child processes must not use the opened xc gnttab handle that inherits from
- * parents. They should reopen the handle if they want to interact with xc.
- * Otherwise, it may cause segment fault to access hypercall buffer caches of
- * the handle.
+ * After fork a child process must not use any opened xc gnttab
+ * handle inherited from their parent. They must open a new handle if
+ * they want to interact with xc.
  *
  * Return an fd onto the grant table driver.  Logs errors.
  */
@@ -1476,10 +1475,9 @@ grant_entry_v2_t *xc_gnttab_map_table_v2(xc_interface *xch, int domid, int *gnt_
  * Return an fd onto the grant sharing driver.  Logs errors.
  *
  * Note:
- * Child processes must not use the opened xc gntshr handle that inherits from
- * parents. They should reopen the handle if they want to interact with xc.
- * Otherwise, it may cause segment fault to access hypercall buffer caches of
- * the handle.
+ * After fork a child process must not use any opened xc gntshr
+ * handle inherited from their parent. They must open a new handle if
+ * they want to interact with xc.
  *
  */
 xc_gntshr *xc_gntshr_open(xentoollog_logger *logger,

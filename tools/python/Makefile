@@ -34,7 +34,7 @@ test:
 .PHONY: clean
 clean:
 	rm -f $(XENPATH)
-	rm -rf *.pyc *.pyo *.o *.a *~ xen/util/auxbin.pyc
+	rm -rf build/ *.pyc *.pyo *.o *.a *~ xen/util/auxbin.pyc
 	rm -f xen/lowlevel/xl/_pyxl_types.h
 	rm -f xen/lowlevel/xl/_pyxl_types.c
 	rm -f $(DEPS)
