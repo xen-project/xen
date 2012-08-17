@@ -109,6 +109,9 @@ int microcode_resume_cpu(int cpu)
     struct cpu_signature nsig;
     unsigned int cpu2;
 
+    if ( !microcode_ops )
+        return 0;
+
     spin_lock(&microcode_mutex);
 
     err = microcode_ops->collect_cpu_info(cpu, &uci->cpu_sig);
