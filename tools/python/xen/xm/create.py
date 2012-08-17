@@ -1543,8 +1543,7 @@ def main(argv):
             SXPPrettyPrint.prettyprint(config)
 
         if opts.vals.xmldryrun and serverType == SERVER_XEN_API:
-            from xml.dom.ext import PrettyPrint as XMLPrettyPrint
-            XMLPrettyPrint(doc)
+            print doc.toprettyxml()
 
     if opts.vals.dryrun or opts.vals.xmldryrun:
         return                                               
