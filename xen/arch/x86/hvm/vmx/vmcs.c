@@ -109,7 +109,7 @@ static u32 adjust_vmx_controls(
     if ( ctl_min & ~ctl )
     {
         *mismatch = 1;
-        printk("VMX: CPU%d has insufficent %s (%08x but requires min %08x)\n",
+        printk("VMX: CPU%d has insufficient %s (%08x; requires %08x)\n",
                smp_processor_id(), name, ctl, ctl_min);
     }
 
@@ -227,7 +227,7 @@ static int vmx_init_vmcs_config(void)
     {
         /*
          * To use EPT we expect to be able to clear certain intercepts.
-         * We check VMX_BASIC_MSR[55] to correctly handle default1 controls.
+         * We check VMX_BASIC_MSR[55] to correctly handle default controls.
          */
         uint32_t must_be_one, must_be_zero, msr = MSR_IA32_VMX_PROCBASED_CTLS;
         if ( vmx_basic_msr_high & (1u << 23) )
