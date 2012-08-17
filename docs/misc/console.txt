@@ -36,7 +36,7 @@ toolstack in the "type" node on xenstore, under the relevant console
 section.
 For example:
 
-# xenstore-read /local/domain/26/console/type
+# xenstore-read /local/domain/26/console/1/type
 xenconsoled
 
 The supported values are only xenconsoled or ioemu; xenconsoled has
