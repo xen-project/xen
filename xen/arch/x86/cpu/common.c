@@ -55,6 +55,7 @@ static void default_init(struct cpuinfo_x86 * c)
 	/* Not much we can do here... */
 	/* Check if at least it has cpuid */
 	BUG_ON(c->cpuid_level == -1);
+	__clear_bit(X86_FEATURE_SEP, c->x86_capability);
 }
 
 static struct cpu_dev default_cpu = {
