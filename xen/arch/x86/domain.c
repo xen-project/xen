@@ -55,6 +55,7 @@
 #include <asm/traps.h>
 #include <asm/nmi.h>
 #include <asm/mce.h>
+#include <asm/amd.h>
 #include <xen/numa.h>
 #include <xen/iommu.h>
 #ifdef CONFIG_COMPAT
@@ -530,6 +531,20 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     mapcache_domain_init(d);
 
 #else /* __x86_64__ */
+
+    if ( d->domain_id && !is_idle_domain(d) &&
+         cpu_has_amd_erratum(&boot_cpu_data, AMD_ERRATUM_121) )
+    {
+        if ( !opt_allow_unsafe )
+        {
+            printk(XENLOG_G_ERR "Xen does not allow DomU creation on this CPU"
+                   " for security reasons.\n");
+            return -EPERM;
+        }
+        printk(XENLOG_G_WARNING
+               "Dom%d may compromise security on this CPU.\n",
+               d->domain_id);
+    }
 
     BUILD_BUG_ON(PDPT_L2_ENTRIES * sizeof(*d->arch.mm_perdomain_pt_pages)
                  != PAGE_SIZE);
