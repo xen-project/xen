@@ -19,10 +19,12 @@
 #include <xen/paging.h>
 #include <xen/guest_access.h>
 #include <xen/softirq.h>
+#include <xen/keyhandler.h>
 #include <xsm/xsm.h>
 
 static void parse_iommu_param(char *s);
 static int iommu_populate_page_table(struct domain *d);
+static void iommu_dump_p2m_table(unsigned char key);
 
 /*
  * The 'iommu' parameter enables the IOMMU.  Optional comma separated
@@ -53,6 +55,12 @@ bool_t __read_mostly iommu_debug;
 bool_t __read_mostly amd_iommu_perdev_intremap;
 
 DEFINE_PER_CPU(bool_t, iommu_dont_flush_iotlb);
+
+static struct keyhandler iommu_p2m_table = {
+    .diagnostic = 0,
+    .u.fn = iommu_dump_p2m_table,
+    .desc = "dump iommu p2m table"
+};
 
 static void __init parse_iommu_param(char *s)
 {
@@ -119,6 +127,7 @@ void __init iommu_dom0_init(struct domain *d)
     if ( !iommu_enabled )
         return;
 
+    register_keyhandler('o', &iommu_p2m_table);
     d->need_iommu = !!iommu_dom0_strict;
     if ( need_iommu(d) )
     {
@@ -652,6 +661,34 @@ int iommu_do_domctl(
     }
 
     return ret;
+}
+
+static void iommu_dump_p2m_table(unsigned char key)
+{
+    struct domain *d;
+    const struct iommu_ops *ops;
+
+    if ( !iommu_enabled )
+    {
+        printk("IOMMU not enabled!\n");
+        return;
+    }
+
+    ops = iommu_get_ops();
+    for_each_domain(d)
+    {
+        if ( !d->domain_id )
+            continue;
+
+        if ( iommu_use_hap_pt(d) )
+        {
+            printk("\ndomain%d IOMMU p2m table shared with MMU: \n", d->domain_id);
+            continue;
+        }
+
+        printk("\ndomain%d IOMMU p2m table: \n", d->domain_id);
+        ops->dump_p2m_table(d);
+    }
 }
 
 /*

@@ -22,6 +22,7 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/paging.h>
+#include <xen/softirq.h>
 #include <asm/hvm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
@@ -512,6 +513,80 @@ static int amd_iommu_group_id(u16 seg, u8 bus, u8 devfn)
 
 #include <asm/io_apic.h>
 
+static void amd_dump_p2m_table_level(struct page_info* pg, int level, 
+                                     paddr_t gpa, int indent)
+{
+    paddr_t address;
+    void *table_vaddr, *pde;
+    paddr_t next_table_maddr;
+    int index, next_level, present;
+    u32 *entry;
+
+    if ( level < 1 )
+        return;
+
+    table_vaddr = __map_domain_page(pg);
+    if ( table_vaddr == NULL )
+    {
+        printk("Failed to map IOMMU domain page %"PRIpaddr"\n", 
+                page_to_maddr(pg));
+        return;
+    }
+
+    for ( index = 0; index < PTE_PER_TABLE_SIZE; index++ )
+    {
+        if ( !(index % 2) )
+            process_pending_softirqs();
+
+        pde = table_vaddr + (index * IOMMU_PAGE_TABLE_ENTRY_SIZE);
+        next_table_maddr = amd_iommu_get_next_table_from_pte(pde);
+        entry = (u32*)pde;
+
+        present = get_field_from_reg_u32(entry[0],
+                                         IOMMU_PDE_PRESENT_MASK,
+                                         IOMMU_PDE_PRESENT_SHIFT);
+
+        if ( !present )
+            continue;
+
+        next_level = get_field_from_reg_u32(entry[0],
+                                            IOMMU_PDE_NEXT_LEVEL_MASK,
+                                            IOMMU_PDE_NEXT_LEVEL_SHIFT);
+
+        if ( next_level && (next_level != (level - 1)) )
+        {
+            printk("IOMMU p2m table error. next_level = %d, expected %d\n",
+                   next_level, level - 1);
+
+            continue;
+        }
+
+        address = gpa + amd_offset_level_address(index, level);
+        if ( next_level >= 1 )
+            amd_dump_p2m_table_level(
+                maddr_to_page(next_table_maddr), next_level,
+                address, indent + 1);
+        else
+            printk("%*sgfn: %08lx  mfn: %08lx\n",
+                   indent, "",
+                   (unsigned long)PFN_DOWN(address),
+                   (unsigned long)PFN_DOWN(next_table_maddr));
+    }
+
+    unmap_domain_page(table_vaddr);
+}
+
+static void amd_dump_p2m_table(struct domain *d)
+{
+    struct hvm_iommu *hd  = domain_hvm_iommu(d);
+
+    if ( !hd->root_table ) 
+        return;
+
+    printk("p2m table has %d levels\n", hd->paging_mode);
+    amd_dump_p2m_table_level(hd->root_table, hd->paging_mode, 0, 0);
+}
+
 const struct iommu_ops amd_iommu_ops = {
     .init = amd_iommu_domain_init,
     .dom0_init = amd_iommu_dom0_init,
@@ -531,4 +606,5 @@ const struct iommu_ops amd_iommu_ops = {
     .resume = amd_iommu_resume,
     .share_p2m = amd_iommu_share_p2m,
     .crash_shutdown = amd_iommu_suspend,
+    .dump_p2m_table = amd_dump_p2m_table,
 };

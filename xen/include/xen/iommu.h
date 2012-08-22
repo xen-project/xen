@@ -141,6 +141,7 @@ struct iommu_ops {
     void (*crash_shutdown)(void);
     void (*iotlb_flush)(struct domain *d, unsigned long gfn, unsigned int page_count);
     void (*iotlb_flush_all)(struct domain *d);
+    void (*dump_p2m_table)(struct domain *d);
 };
 
 void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned int value);

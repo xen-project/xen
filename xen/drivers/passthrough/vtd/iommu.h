@@ -248,6 +248,8 @@ struct context_entry {
 #define level_to_offset_bits(l) (12 + (l - 1) * LEVEL_STRIDE)
 #define address_level_offset(addr, level) \
             ((addr >> level_to_offset_bits(level)) & LEVEL_MASK)
+#define offset_level_address(offset, level) \
+            ((u64)(offset) << level_to_offset_bits(level))
 #define level_mask(l) (((u64)(-1)) << level_to_offset_bits(l))
 #define level_size(l) (1 << level_to_offset_bits(l))
 #define align_to_level(addr, l) ((addr + level_size(l) - 1) & level_mask(l))

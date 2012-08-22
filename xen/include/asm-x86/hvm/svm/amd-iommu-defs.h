@@ -38,6 +38,10 @@
 #define PTE_PER_TABLE_ALLOC(entries)	\
 	PAGE_SIZE * (PTE_PER_TABLE_ALIGN(entries) >> PTE_PER_TABLE_SHIFT)
 
+#define amd_offset_level_address(offset, level) \
+      	((u64)(offset) << (12 + (PTE_PER_TABLE_SHIFT * \
+                                (level - IOMMU_PAGING_MODE_LEVEL_1))))
+
 #define PCI_MIN_CAP_OFFSET	0x40
 #define PCI_MAX_CAP_BLOCKS	48
 #define PCI_CAP_PTR_MASK	0xFC

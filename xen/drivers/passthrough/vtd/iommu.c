@@ -31,6 +31,7 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <xen/keyhandler.h>
+#include <xen/softirq.h>
 #include <asm/msi.h>
 #include <asm/irq.h>
 #if defined(__i386__) || defined(__x86_64__)
@@ -2365,6 +2366,60 @@ static void vtd_resume(void)
     }
 }
 
+static void vtd_dump_p2m_table_level(paddr_t pt_maddr, int level, paddr_t gpa, 
+                                     int indent)
+{
+    paddr_t address;
+    int i;
+    struct dma_pte *pt_vaddr, *pte;
+    int next_level;
+
+    if ( level < 1 )
+        return;
+
+    pt_vaddr = map_vtd_domain_page(pt_maddr);
+    if ( pt_vaddr == NULL )
+    {
+        printk("Failed to map VT-D domain page %"PRIpaddr"\n", pt_maddr);
+        return;
+    }
+
+    next_level = level - 1;
+    for ( i = 0; i < PTE_NUM; i++ )
+    {
+        if ( !(i % 2) )
+            process_pending_softirqs();
+
+        pte = &pt_vaddr[i];
+        if ( !dma_pte_present(*pte) )
+            continue;
+
+        address = gpa + offset_level_address(i, level);
+        if ( next_level >= 1 ) 
+            vtd_dump_p2m_table_level(dma_pte_addr(*pte), next_level, 
+                                     address, indent + 1);
+        else
+            printk("%*sgfn: %08lx mfn: %08lx\n",
+                   indent, "",
+                   (unsigned long)(address >> PAGE_SHIFT_4K),
+                   (unsigned long)(pte->val >> PAGE_SHIFT_4K));
+    }
+
+    unmap_vtd_domain_page(pt_vaddr);
+}
+
+static void vtd_dump_p2m_table(struct domain *d)
+{
+    struct hvm_iommu *hd;
+
+    if ( list_empty(&acpi_drhd_units) )
+        return;
+
+    hd = domain_hvm_iommu(d);
+    printk("p2m table has %d levels\n", agaw_to_level(hd->agaw));
+    vtd_dump_p2m_table_level(hd->pgd_maddr, agaw_to_level(hd->agaw), 0, 0);
+}
+
 const struct iommu_ops intel_iommu_ops = {
     .init = intel_iommu_domain_init,
     .dom0_init = intel_iommu_dom0_init,
@@ -2387,6 +2442,7 @@ const struct iommu_ops intel_iommu_ops = {
     .crash_shutdown = vtd_crash_shutdown,
     .iotlb_flush = intel_iommu_iotlb_flush,
     .iotlb_flush_all = intel_iommu_iotlb_flush_all,
+    .dump_p2m_table = vtd_dump_p2m_table,
 };
 
 /*
