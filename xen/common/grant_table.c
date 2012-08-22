@@ -1751,14 +1751,14 @@ __release_grant_for_copy(
    under the domain's grant table lock. */
 /* Only safe on transitive grants.  Even then, note that we don't
    attempt to drop any pin on the referent grant. */
-static void __fixup_status_for_pin(const struct active_grant_entry *act,
+static void __fixup_status_for_copy_pin(const struct active_grant_entry *act,
                                    uint16_t *status)
 {
     if ( !(act->pin & GNTPIN_hstw_mask) )
-        *status &= ~GTF_writing;
+        gnttab_clear_flag(_GTF_writing, status);
 
     if ( !(act->pin & GNTPIN_hstr_mask) )
-        *status &= ~GTF_reading;
+        gnttab_clear_flag(_GTF_reading, status);
 }
 
 /* Grab a frame number from a grant entry and update the flags and pin
@@ -1834,7 +1834,7 @@ __acquire_grant_for_copy(
         if ( sha2 && (shah->flags & GTF_type_mask) == GTF_transitive )
         {
             if ( !allow_transitive )
-                PIN_FAIL(unlock_out, GNTST_general_error,
+                PIN_FAIL(unlock_out_clear, GNTST_general_error,
                          "transitive grant when transitivity not allowed\n");
 
             trans_domid = sha2->transitive.trans_domid;
@@ -1842,7 +1842,7 @@ __acquire_grant_for_copy(
             barrier(); /* Stop the compiler from re-loading
                           trans_domid from shared memory */
             if ( trans_domid == rd->domain_id )
-                PIN_FAIL(unlock_out, GNTST_general_error,
+                PIN_FAIL(unlock_out_clear, GNTST_general_error,
                          "transitive grants cannot be self-referential\n");
 
             /* We allow the trans_domid == ldom case, which
@@ -1855,7 +1855,7 @@ __acquire_grant_for_copy(
             /* We need to leave the rrd locked during the grant copy */
             td = rcu_lock_domain_by_id(trans_domid);
             if ( td == NULL )
-                PIN_FAIL(unlock_out, GNTST_general_error,
+                PIN_FAIL(unlock_out_clear, GNTST_general_error,
                          "transitive grant referenced bad domain %d\n",
                          trans_domid);
             spin_unlock(&rgt->lock);
@@ -1866,7 +1866,7 @@ __acquire_grant_for_copy(
 
             spin_lock(&rgt->lock);
             if ( rc != GNTST_okay ) {
-                __fixup_status_for_pin(act, status);
+                __fixup_status_for_copy_pin(act, status);
                 rcu_unlock_domain(td);
                 spin_unlock(&rgt->lock);
                 return rc;
@@ -1878,7 +1878,7 @@ __acquire_grant_for_copy(
                and try again. */
             if ( act->pin != old_pin )
             {
-                __fixup_status_for_pin(act, status);
+                __fixup_status_for_copy_pin(act, status);
                 rcu_unlock_domain(td);
                 spin_unlock(&rgt->lock);
                 put_page(*page);
@@ -1897,7 +1897,7 @@ __acquire_grant_for_copy(
         {
             rc = __get_paged_frame(sha1->frame, &grant_frame, page, readonly, rd);
             if ( rc != GNTST_okay )
-                goto unlock_out;
+                goto unlock_out_clear;
             act->gfn = sha1->frame;
             is_sub_page = 0;
             trans_page_off = 0;
@@ -1907,7 +1907,7 @@ __acquire_grant_for_copy(
         {
             rc = __get_paged_frame(sha2->full_page.frame, &grant_frame, page, readonly, rd);
             if ( rc != GNTST_okay )
-                goto unlock_out;
+                goto unlock_out_clear;
             act->gfn = sha2->full_page.frame;
             is_sub_page = 0;
             trans_page_off = 0;
@@ -1917,7 +1917,7 @@ __acquire_grant_for_copy(
         {
             rc = __get_paged_frame(sha2->sub_page.frame, &grant_frame, page, readonly, rd);
             if ( rc != GNTST_okay )
-                goto unlock_out;
+                goto unlock_out_clear;
             act->gfn = sha2->sub_page.frame;
             is_sub_page = 1;
             trans_page_off = sha2->sub_page.page_off;
@@ -1947,6 +1947,17 @@ __acquire_grant_for_copy(
     *page_off = act->start;
     *length = act->length;
     *frame = act->frame;
+
+    spin_unlock(&rgt->lock);
+    return rc;
+ 
+ unlock_out_clear:
+    if ( !(readonly) &&
+         !(act->pin & GNTPIN_hstw_mask) )
+        gnttab_clear_flag(_GTF_writing, status);
+
+    if ( !act->pin )
+        gnttab_clear_flag(_GTF_reading, status);
 
  unlock_out:
     spin_unlock(&rgt->lock);
