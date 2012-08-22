@@ -100,7 +100,7 @@ define(`use_device', `
 # admin_device(domain, device)
 #   Allow a device to be used and delegated by a domain
 define(`admin_device', `
-    allow $1 $2:resource { setup stat_device add_device add_irq add_iomem add_ioport remove_device remove_irq remove_iomem remove_ioport };
+    allow $1 $2:resource { setup stat_device add_device add_irq add_iomem add_ioport remove_device remove_irq remove_iomem remove_ioport plug unplug };
     allow $1 $2:hvm bind_irq;
     use_device($1, $2)
 ')
