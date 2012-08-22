@@ -243,7 +243,7 @@ static int dummy_schedop_shutdown (struct domain *d1, struct domain *d2)
     return 0;
 }
 
-static int dummy_memory_pin_page(struct domain *d, struct page_info *page)
+static int dummy_memory_pin_page(struct domain *d1, struct domain *d2, struct page_info *page)
 {
     return 0;
 }
@@ -418,7 +418,7 @@ static int dummy_shadow_control (struct domain *d, uint32_t op)
     return 0;
 }
 
-static int dummy_getpageframeinfo (struct page_info *page)
+static int dummy_getpageframeinfo (struct domain *d)
 {
     return 0;
 }
@@ -554,7 +554,7 @@ static int dummy_mmu_normal_update (struct domain *d, struct domain *t,
     return 0;
 }
 
-static int dummy_mmu_machphys_update (struct domain *d, unsigned long mfn)
+static int dummy_mmu_machphys_update (struct domain *d, struct domain *f, unsigned long mfn)
 {
     return 0;
 }

@@ -3073,7 +3073,7 @@ long do_mmuext_op(
                 break;
             }
 
-            if ( (rc = xsm_memory_pin_page(d, page)) != 0 )
+            if ( (rc = xsm_memory_pin_page(d, pg_owner, page)) != 0 )
             {
                 put_page_and_type(page);
                 okay = 0;
@@ -3643,7 +3643,7 @@ long do_mmu_update(
             mfn = req.ptr >> PAGE_SHIFT;
             gpfn = req.val;
 
-            rc = xsm_mmu_machphys_update(d, mfn);
+            rc = xsm_mmu_machphys_update(d, pg_owner, mfn);
             if ( rc )
                 break;
 

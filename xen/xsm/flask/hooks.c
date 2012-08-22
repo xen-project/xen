@@ -108,15 +108,21 @@ static int flask_domain_alloc_security(struct domain *d)
 
     memset(dsec, 0, sizeof(struct domain_security_struct));
 
-    if ( is_idle_domain(d) )
+    dsec->create_sid = SECSID_NULL;
+    switch ( d->domain_id )
     {
+    case DOMID_IDLE:
         dsec->sid = SECINITSID_XEN;
         dsec->create_sid = SECINITSID_DOM0;
-    }
-    else
-    {
+        break;
+    case DOMID_XEN:
+        dsec->sid = SECINITSID_DOMXEN;
+        break;
+    case DOMID_IO:
+        dsec->sid = SECINITSID_DOMIO;
+        break;
+    default:
         dsec->sid = SECINITSID_UNLABELED;
-        dsec->create_sid = SECSID_NULL;
     }
 
     d->ssid = dsec;
@@ -361,64 +367,6 @@ static int flask_grant_query_size(struct domain *d1, struct domain *d2)
     return domain_has_perm(d1, d2, SECCLASS_GRANT, GRANT__QUERY);
 }
 
-static int get_page_sid(struct page_info *page, u32 *sid)
-{
-    int rc = 0;
-    struct domain *d;
-    struct domain_security_struct *dsec;
-    unsigned long mfn;
-
-    d = page_get_owner(page);
-
-    if ( d == NULL )
-    {
-        mfn = page_to_mfn(page);
-        rc = security_iomem_sid(mfn, sid);
-        return rc;
-    }
-
-    switch ( d->domain_id )
-    {
-    case DOMID_IO:
-        /*A tracked IO page?*/
-        *sid = SECINITSID_DOMIO;
-        break;
-
-    case DOMID_XEN:
-        /*A page from Xen's private heap?*/
-        *sid = SECINITSID_DOMXEN;
-        break;
-
-    default:
-        /*Pages are implicitly labeled by domain ownership!*/
-        dsec = d->ssid;
-        *sid = dsec ? dsec->sid : SECINITSID_UNLABELED;
-        break;
-    }
-
-    return rc;
-}
-
-static int get_mfn_sid(unsigned long mfn, u32 *sid)
-{
-    int rc = 0;
-    struct page_info *page;
-
-    if ( mfn_valid(mfn) )
-    {
-        /*mfn is valid if this is a page that Xen is tracking!*/
-        page = mfn_to_page(mfn);
-        rc = get_page_sid(page, sid);
-    }
-    else
-    {
-        /*Possibly an untracked IO page?*/
-        rc = security_iomem_sid(mfn, sid);
-    }
-
-    return rc;    
-}
-
 static int flask_get_pod_target(struct domain *d)
 {
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, DOMAIN__GETPODTARGET);
@@ -439,18 +387,10 @@ static int flask_memory_stat_reservation(struct domain *d1, struct domain *d2)
     return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__STAT);
 }
 
-static int flask_memory_pin_page(struct domain *d, struct page_info *page)
+static int flask_memory_pin_page(struct domain *d1, struct domain *d2,
+                                 struct page_info *page)
 {
-    int rc = 0;
-    u32 sid;
-    struct domain_security_struct *dsec;
-    dsec = d->ssid;
-
-    rc = get_page_sid(page, &sid);
-    if ( rc )
-        return rc;
-
-    return avc_has_perm(dsec->sid, sid, SECCLASS_MMU, MMU__PINPAGE, NULL);
+    return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__PINPAGE);
 }
 
 static int flask_console_io(struct domain *d, int cmd)
@@ -1095,19 +1035,9 @@ static int flask_ioport_permission(struct domain *d, uint32_t start, uint32_t en
     return security_iterate_ioport_sids(start, end, _ioport_has_perm, &data);
 }
 
-static int flask_getpageframeinfo(struct page_info *page)
+static int flask_getpageframeinfo(struct domain *d)
 {
-    int rc = 0;
-    u32 tsid;
-    struct domain_security_struct *dsec;
-
-    dsec = current->domain->ssid;
-
-    rc = get_page_sid(page, &tsid);
-    if ( rc )
-        return rc;
-
-    return avc_has_perm(dsec->sid, tsid, SECCLASS_MMU, MMU__PAGEINFO, NULL);    
+    return domain_has_perm(current->domain, d, SECCLASS_MMU, MMU__PAGEINFO);
 }
 
 static int flask_getmemlist(struct domain *d)
@@ -1314,71 +1244,12 @@ static int flask_domain_memory_map(struct domain *d)
     return domain_has_perm(current->domain, d, SECCLASS_MMU, MMU__MEMORYMAP);
 }
 
-static int flask_mmu_normal_update(struct domain *d, struct domain *t,
-                                   struct domain *f, intpte_t fpte)
+static int domain_memory_perm(struct domain *d, struct domain *f, l1_pgentry_t pte)
 {
     int rc = 0;
     u32 map_perms = MMU__MAP_READ;
     unsigned long fgfn, fmfn;
-    struct domain_security_struct *dsec;
-    u32 fsid;
-    struct avc_audit_data ad;
     p2m_type_t p2mt;
-
-    if (d != t)
-        rc = domain_has_perm(d, t, SECCLASS_MMU, MMU__REMOTE_REMAP);
-    if ( rc )
-        return rc;
-
-    if ( !(l1e_get_flags(l1e_from_intpte(fpte)) & _PAGE_PRESENT) )
-        return 0;
-
-    dsec = d->ssid;
-
-    if ( l1e_get_flags(l1e_from_intpte(fpte)) & _PAGE_RW )
-        map_perms |= MMU__MAP_WRITE;
-
-    AVC_AUDIT_DATA_INIT(&ad, MEMORY);
-    fgfn = l1e_get_pfn(l1e_from_intpte(fpte));
-    fmfn = mfn_x(get_gfn_query(f, fgfn, &p2mt));
-
-    ad.sdom = d;
-    ad.tdom = f;
-    ad.memory.pte = fpte;
-    ad.memory.mfn = fmfn;
-
-    rc = get_mfn_sid(fmfn, &fsid);
-
-    put_gfn(f, fgfn);
-
-    if ( rc )
-        return rc;
-
-    return avc_has_perm(dsec->sid, fsid, SECCLASS_MMU, map_perms, &ad);
-}
-
-static int flask_mmu_machphys_update(struct domain *d, unsigned long mfn)
-{
-    int rc = 0;
-    u32 psid;
-    struct domain_security_struct *dsec;
-    dsec = d->ssid;
-
-    rc = get_mfn_sid(mfn, &psid);
-    if ( rc )
-        return rc;
-
-    return avc_has_perm(dsec->sid, psid, SECCLASS_MMU, MMU__UPDATEMP, NULL);
-}
-
-static int flask_update_va_mapping(struct domain *d, struct domain *f,
-                                   l1_pgentry_t pte)
-{
-    int rc = 0;
-    u32 psid;
-    u32 map_perms = MMU__MAP_READ;
-    struct page_info *page = NULL;
-    struct domain_security_struct *dsec;
 
     if ( !(l1e_get_flags(pte) & _PAGE_PRESENT) )
         return 0;
@@ -1386,16 +1257,52 @@ static int flask_update_va_mapping(struct domain *d, struct domain *f,
     if ( l1e_get_flags(pte) & _PAGE_RW )
         map_perms |= MMU__MAP_WRITE;
 
-    dsec = d->ssid;
+    fgfn = l1e_get_pfn(pte);
+    fmfn = mfn_x(get_gfn_query(f, fgfn, &p2mt));
+    put_gfn(f, fgfn);
 
-    page = get_page_from_gfn(f, l1e_get_pfn(pte), NULL, P2M_ALLOC);
-    rc = get_mfn_sid(page ? page_to_mfn(page) : INVALID_MFN, &psid);
-    if ( page )
-        put_page(page);
+    if ( f->domain_id == DOMID_IO || !mfn_valid(fmfn) )
+    {
+        struct avc_audit_data ad;
+        struct domain_security_struct *dsec = d->ssid;
+        u32 fsid;
+        AVC_AUDIT_DATA_INIT(&ad, MEMORY);
+        ad.sdom = d;
+        ad.tdom = f;
+        ad.memory.pte = pte.l1;
+        ad.memory.mfn = fmfn;
+        rc = security_iomem_sid(fmfn, &fsid);
+        if ( rc )
+            return rc;
+        return avc_has_perm(dsec->sid, fsid, SECCLASS_MMU, map_perms, &ad);
+    }
+
+    return domain_has_perm(d, f, SECCLASS_MMU, map_perms);
+}
+
+static int flask_mmu_normal_update(struct domain *d, struct domain *t,
+                                   struct domain *f, intpte_t fpte)
+{
+    int rc = 0;
+
+    if (d != t)
+        rc = domain_has_perm(d, t, SECCLASS_MMU, MMU__REMOTE_REMAP);
     if ( rc )
         return rc;
 
-    return avc_has_perm(dsec->sid, psid, SECCLASS_MMU, map_perms, NULL);
+    return domain_memory_perm(d, f, l1e_from_intpte(fpte));
+}
+
+static int flask_mmu_machphys_update(struct domain *d1, struct domain *d2,
+                                     unsigned long mfn)
+{
+    return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__UPDATEMP);
+}
+
+static int flask_update_va_mapping(struct domain *d, struct domain *f,
+                                   l1_pgentry_t pte)
+{
+    return domain_memory_perm(d, f, pte);
 }
 
 static int flask_add_to_physmap(struct domain *d1, struct domain *d2)

@@ -105,7 +105,7 @@ struct xsm_operations {
     int (*set_pod_target) (struct domain *d);
     int (*memory_adjust_reservation) (struct domain *d1, struct domain *d2);
     int (*memory_stat_reservation) (struct domain *d1, struct domain *d2);
-    int (*memory_pin_page) (struct domain *d, struct page_info *page);
+    int (*memory_pin_page) (struct domain *d1, struct domain *d2, struct page_info *page);
     int (*remove_from_physmap) (struct domain *d1, struct domain *d2);
 
     int (*console_io) (struct domain *d, int cmd);
@@ -143,7 +143,7 @@ struct xsm_operations {
 
 #ifdef CONFIG_X86
     int (*shadow_control) (struct domain *d, uint32_t op);
-    int (*getpageframeinfo) (struct page_info *page);
+    int (*getpageframeinfo) (struct domain *d);
     int (*getmemlist) (struct domain *d);
     int (*hypercall_init) (struct domain *d);
     int (*hvmcontext) (struct domain *d, uint32_t op);
@@ -171,9 +171,8 @@ struct xsm_operations {
     int (*domain_memory_map) (struct domain *d);
     int (*mmu_normal_update) (struct domain *d, struct domain *t,
                               struct domain *f, intpte_t fpte);
-    int (*mmu_machphys_update) (struct domain *d, unsigned long mfn);
-    int (*update_va_mapping) (struct domain *d, struct domain *f, 
-                                                            l1_pgentry_t pte);
+    int (*mmu_machphys_update) (struct domain *d1, struct domain *d2, unsigned long mfn);
+    int (*update_va_mapping) (struct domain *d, struct domain *f, l1_pgentry_t pte);
     int (*add_to_physmap) (struct domain *d1, struct domain *d2);
     int (*sendtrigger) (struct domain *d);
     int (*bind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
@@ -455,9 +454,10 @@ static inline int xsm_memory_stat_reservation (struct domain *d1,
     return xsm_call(memory_stat_reservation(d1, d2));
 }
 
-static inline int xsm_memory_pin_page(struct domain *d, struct page_info *page)
+static inline int xsm_memory_pin_page(struct domain *d1, struct domain *d2,
+                                      struct page_info *page)
 {
-    return xsm_call(memory_pin_page(d, page));
+    return xsm_call(memory_pin_page(d1, d2, page));
 }
 
 static inline int xsm_remove_from_physmap(struct domain *d1, struct domain *d2)
@@ -617,9 +617,9 @@ static inline int xsm_shadow_control (struct domain *d, uint32_t op)
     return xsm_call(shadow_control(d, op));
 }
 
-static inline int xsm_getpageframeinfo (struct page_info *page)
+static inline int xsm_getpageframeinfo (struct domain *d)
 {
-    return xsm_call(getpageframeinfo(page));
+    return xsm_call(getpageframeinfo(d));
 }
 
 static inline int xsm_getmemlist (struct domain *d)
@@ -753,9 +753,10 @@ static inline int xsm_mmu_normal_update (struct domain *d, struct domain *t,
     return xsm_call(mmu_normal_update(d, t, f, fpte));
 }
 
-static inline int xsm_mmu_machphys_update (struct domain *d, unsigned long mfn)
+static inline int xsm_mmu_machphys_update (struct domain *d1, struct domain *d2,
+                                           unsigned long mfn)
 {
-    return xsm_call(mmu_machphys_update(d, mfn));
+    return xsm_call(mmu_machphys_update(d1, d2, mfn));
 }
 
 static inline int xsm_update_va_mapping(struct domain *d, struct domain *f, 

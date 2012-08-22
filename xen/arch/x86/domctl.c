@@ -114,7 +114,7 @@ long arch_do_domctl(
 
         page = mfn_to_page(mfn);
 
-        ret = xsm_getpageframeinfo(page);
+        ret = xsm_getpageframeinfo(d);
         if ( ret )
         {
             rcu_unlock_domain(d);
@@ -170,6 +170,13 @@ long arch_do_domctl(
             if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
                 break;
 
+            ret = xsm_getpageframeinfo(d);
+            if ( ret )
+            {
+                rcu_unlock_domain(d);
+                break;
+            }
+
             if ( unlikely(num > 1024) ||
                  unlikely(num != domctl->u.getpageframeinfo3.num) )
             {
@@ -209,8 +216,6 @@ long arch_do_domctl(
                     if ( unlikely(!page) ||
                          unlikely(is_xen_heap_page(page)) )
                         type = XEN_DOMCTL_PFINFO_XTAB;
-                    else if ( xsm_getpageframeinfo(page) != 0 )
-                        ;
                     else
                     {
                         switch( page->u.inuse.type_info & PGT_type_mask )
@@ -267,6 +272,13 @@ long arch_do_domctl(
         if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
             break;
 
+        ret = xsm_getpageframeinfo(d);
+        if ( ret )
+        {
+            rcu_unlock_domain(d);
+            break;
+        }
+
         if ( unlikely(num > 1024) )
         {
             ret = -E2BIG;
@@ -310,11 +322,6 @@ long arch_do_domctl(
                 if ( unlikely(!page) ||
                      unlikely(is_xen_heap_page(page)) )
                     arr32[j] |= XEN_DOMCTL_PFINFO_XTAB;
-                else if ( xsm_getpageframeinfo(page) != 0 )
-                {
-                    put_page(page);
-                    continue;
-                }
                 else
                 {
                     unsigned long type = 0;
