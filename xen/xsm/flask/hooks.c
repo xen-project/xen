@@ -1280,6 +1280,11 @@ static int flask_firmware_info(void)
     return domain_has_xen(current->domain, XEN__FIRMWARE);
 }
 
+static int flask_efi_call(void)
+{
+    return domain_has_xen(current->domain, XEN__FIRMWARE);
+}
+
 static int flask_acpi_sleep(void)
 {
     return domain_has_xen(current->domain, XEN__SLEEP);
@@ -1663,6 +1668,7 @@ static struct xsm_operations flask_ops = {
     .physinfo = flask_physinfo,
     .platform_quirk = flask_platform_quirk,
     .firmware_info = flask_firmware_info,
+    .efi_call = flask_efi_call,
     .acpi_sleep = flask_acpi_sleep,
     .change_freq = flask_change_freq,
     .getidletime = flask_getidletime,

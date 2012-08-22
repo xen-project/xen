@@ -295,6 +295,21 @@ static char *dummy_show_security_evtchn (struct domain *d, const struct evtchn *
     return NULL;
 }
 
+static int dummy_get_pod_target(struct domain *d)
+{
+    return 0;
+}
+
+static int dummy_set_pod_target(struct domain *d)
+{
+    return 0;
+}
+
+static int dummy_get_device_group (uint32_t machine_bdf)
+{
+    return 0;
+}
+
 static int dummy_test_assign_device (uint32_t machine_bdf)
 {
     return 0;
@@ -503,6 +518,11 @@ static int dummy_firmware_info (void)
     return 0;
 }
 
+static int dummy_efi_call(void)
+{
+    return 0;
+}
+
 static int dummy_acpi_sleep (void)
 {
     return 0;
@@ -561,6 +581,11 @@ static int dummy_sendtrigger (struct domain *d)
 }
 
 static int dummy_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *bind)
+{
+    return 0;
+}
+
+static int dummy_unbind_pt_irq (struct domain *d)
 {
     return 0;
 }
@@ -652,6 +677,8 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, alloc_security_evtchn);
     set_to_dummy_if_null(ops, free_security_evtchn);
     set_to_dummy_if_null(ops, show_security_evtchn);
+    set_to_dummy_if_null(ops, get_pod_target);
+    set_to_dummy_if_null(ops, set_pod_target);
 
     set_to_dummy_if_null(ops, memory_adjust_reservation);
     set_to_dummy_if_null(ops, memory_stat_reservation);
@@ -670,6 +697,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, iomem_permission);
     set_to_dummy_if_null(ops, pci_config_permission);
 
+    set_to_dummy_if_null(ops, get_device_group);
     set_to_dummy_if_null(ops, test_assign_device);
     set_to_dummy_if_null(ops, assign_device);
     set_to_dummy_if_null(ops, deassign_device);
@@ -711,6 +739,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, physinfo);
     set_to_dummy_if_null(ops, platform_quirk);
     set_to_dummy_if_null(ops, firmware_info);
+    set_to_dummy_if_null(ops, efi_call);
     set_to_dummy_if_null(ops, acpi_sleep);
     set_to_dummy_if_null(ops, change_freq);
     set_to_dummy_if_null(ops, getidletime);
@@ -723,6 +752,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, remove_from_physmap);
     set_to_dummy_if_null(ops, sendtrigger);
     set_to_dummy_if_null(ops, bind_pt_irq);
+    set_to_dummy_if_null(ops, unbind_pt_irq);
     set_to_dummy_if_null(ops, pin_mem_cacheattr);
     set_to_dummy_if_null(ops, ext_vcpucontext);
     set_to_dummy_if_null(ops, vcpuextstate);
