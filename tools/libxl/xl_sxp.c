@@ -108,8 +108,6 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
                libxl_timer_mode_to_string(b_info->u.hvm.timer_mode));
         printf("\t\t\t(nestedhvm %s)\n",
                libxl_defbool_to_string(b_info->u.hvm.nested_hvm));
-        printf("\t\t\t(no_incr_generationid %s)\n",
-               libxl_defbool_to_string(b_info->u.hvm.incr_generationid));
         printf("\t\t\t(stdvga %s)\n", b_info->u.hvm.vga.kind ==
                                       LIBXL_VGA_INTERFACE_TYPE_STD ?
                                       "True" : "False");

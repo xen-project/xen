@@ -248,7 +248,6 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_defbool_setdefault(&b_info->u.hvm.hpet,               true);
         libxl_defbool_setdefault(&b_info->u.hvm.vpt_align,          true);
         libxl_defbool_setdefault(&b_info->u.hvm.nested_hvm,         false);
-        libxl_defbool_setdefault(&b_info->u.hvm.incr_generationid,  false);
         libxl_defbool_setdefault(&b_info->u.hvm.usb,                false);
         libxl_defbool_setdefault(&b_info->u.hvm.xen_platform_pci,   true);
 
@@ -758,27 +757,24 @@ static void domcreate_bootloader_done(libxl__egc *egc,
 
     /* read signature */
     int hvm, pae, superpages;
-    int no_incr_generationid;
     switch (info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         hvm = 1;
         superpages = 1;
         pae = libxl_defbool_val(info->u.hvm.pae);
-        no_incr_generationid = !libxl_defbool_val(info->u.hvm.incr_generationid);
         callbacks->toolstack_restore = libxl__toolstack_restore;
         break;
     case LIBXL_DOMAIN_TYPE_PV:
         hvm = 0;
         superpages = 0;
         pae = 1;
-        no_incr_generationid = 0;
         break;
     default:
         rc = ERROR_INVAL;
         goto out;
     }
     libxl__xc_domain_restore(egc, dcs,
-                             hvm, pae, superpages, no_incr_generationid);
+                             hvm, pae, superpages, 1);
     return;
 
  out:

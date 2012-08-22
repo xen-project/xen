@@ -292,7 +292,6 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("vpt_align",        libxl_defbool),
                                        ("timer_mode",       libxl_timer_mode),
                                        ("nested_hvm",       libxl_defbool),
-                                       ("incr_generationid",libxl_defbool),
                                        ("nographic",        libxl_defbool),
                                        ("vga",              libxl_vga_interface_info),
                                        ("vnc",              libxl_vnc_info),
