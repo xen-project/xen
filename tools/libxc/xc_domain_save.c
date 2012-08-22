@@ -855,7 +855,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     unsigned long needed_to_fix = 0;
     unsigned long total_sent    = 0;
 
-    uint64_t vcpumap = 1ULL;
+    uint64_t vcpumap[XC_SR_MAX_VCPUS/64] = { 1ULL };
 
     /* HVM: a buffer for holding HVM context */
     uint32_t hvm_buf_size = 0;
@@ -1581,13 +1581,13 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     }
 
     {
-        struct {
+        struct chunk {
             int id;
             int max_vcpu_id;
-            uint64_t vcpumap;
+            uint64_t vcpumap[XC_SR_MAX_VCPUS/64];
         } chunk = { XC_SAVE_ID_VCPU_INFO, info.max_vcpu_id };
 
-        if ( info.max_vcpu_id >= 64 )
+        if ( info.max_vcpu_id >= XC_SR_MAX_VCPUS )
         {
             ERROR("Too many VCPUS in guest!");
             goto out;
@@ -1598,11 +1598,12 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
             xc_vcpuinfo_t vinfo;
             if ( (xc_vcpu_getinfo(xch, dom, i, &vinfo) == 0) &&
                  vinfo.online )
-                vcpumap |= 1ULL << i;
+                vcpumap[i/64] |= 1ULL << (i%64);
         }
 
-        chunk.vcpumap = vcpumap;
-        if ( wrexact(io_fd, &chunk, sizeof(chunk)) )
+        memcpy(chunk.vcpumap, vcpumap, vcpumap_sz(info.max_vcpu_id));
+        if ( wrexact(io_fd, &chunk, offsetof(struct chunk, vcpumap)
+                     + vcpumap_sz(info.max_vcpu_id)) )
         {
             PERROR("Error when writing to state file");
             goto out;
@@ -1878,7 +1879,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     for ( i = 0; i <= info.max_vcpu_id; i++ )
     {
-        if ( !(vcpumap & (1ULL << i)) )
+        if ( !(vcpumap[i/64] & (1ULL << (i%64))) )
             continue;
 
         if ( (i != 0) && xc_vcpu_getcontext(xch, dom, i, &ctxt) )

@@ -269,6 +269,9 @@
 /* When pinning page tables at the end of restore, we also use batching. */
 #define MAX_PIN_BATCH  1024
 
+/* Maximum #VCPUs currently supported for save/restore. */
+#define XC_SR_MAX_VCPUS 4096
+#define vcpumap_sz(max_id) (((max_id)/64+1)*sizeof(uint64_t))
 
 
 /*

@@ -462,7 +462,7 @@ static int dump_qemu(xc_interface *xch, uint32_t dom, struct tailbuf_hvm *buf)
 
 static int buffer_tail_hvm(xc_interface *xch, struct restore_ctx *ctx,
                            struct tailbuf_hvm *buf, int fd,
-                           unsigned int max_vcpu_id, uint64_t vcpumap,
+                           unsigned int max_vcpu_id, uint64_t *vcpumap,
                            int ext_vcpucontext,
                            int vcpuextstate, uint32_t vcpuextstate_size)
 {
@@ -530,7 +530,7 @@ static int buffer_tail_hvm(xc_interface *xch, struct restore_ctx *ctx,
 
 static int buffer_tail_pv(xc_interface *xch, struct restore_ctx *ctx,
                           struct tailbuf_pv *buf, int fd,
-                          unsigned int max_vcpu_id, uint64_t vcpumap,
+                          unsigned int max_vcpu_id, uint64_t *vcpumap,
                           int ext_vcpucontext,
                           int vcpuextstate,
                           uint32_t vcpuextstate_size)
@@ -563,8 +563,8 @@ static int buffer_tail_pv(xc_interface *xch, struct restore_ctx *ctx,
     /* VCPU contexts */
     buf->vcpucount = 0;
     for (i = 0; i <= max_vcpu_id; i++) {
-        // DPRINTF("vcpumap: %llx, cpu: %d, bit: %llu\n", vcpumap, i, (vcpumap % (1ULL << i)));
-        if ( (!(vcpumap & (1ULL << i))) )
+        // DPRINTF("vcpumap: %llx, cpu: %d, bit: %llu\n", vcpumap[i/64], i, (vcpumap[i/64] & (1ULL << (i%64))));
+        if ( (!(vcpumap[i/64] & (1ULL << (i%64)))) )
             continue;
         buf->vcpucount++;
     }
@@ -614,7 +614,7 @@ static int buffer_tail_pv(xc_interface *xch, struct restore_ctx *ctx,
 
 static int buffer_tail(xc_interface *xch, struct restore_ctx *ctx,
                        tailbuf_t *buf, int fd, unsigned int max_vcpu_id,
-                       uint64_t vcpumap, int ext_vcpucontext,
+                       uint64_t *vcpumap, int ext_vcpucontext,
                        int vcpuextstate, uint32_t vcpuextstate_size)
 {
     if ( buf->ishvm )
@@ -680,7 +680,7 @@ typedef struct {
 
     int new_ctxt_format;
     int max_vcpu_id;
-    uint64_t vcpumap;
+    uint64_t vcpumap[XC_SR_MAX_VCPUS/64];
     uint64_t identpt;
     uint64_t paging_ring_pfn;
     uint64_t access_ring_pfn;
@@ -745,12 +745,12 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
     case XC_SAVE_ID_VCPU_INFO:
         buf->new_ctxt_format = 1;
         if ( RDEXACT(fd, &buf->max_vcpu_id, sizeof(buf->max_vcpu_id)) ||
-             buf->max_vcpu_id >= 64 || RDEXACT(fd, &buf->vcpumap,
-                                               sizeof(uint64_t)) ) {
+             buf->max_vcpu_id >= XC_SR_MAX_VCPUS ||
+             RDEXACT(fd, buf->vcpumap, vcpumap_sz(buf->max_vcpu_id)) ) {
             PERROR("Error when reading max_vcpu_id");
             return -1;
         }
-        // DPRINTF("Max VCPU ID: %d, vcpumap: %llx\n", buf->max_vcpu_id, buf->vcpumap);
+        // DPRINTF("Max VCPU ID: %d, vcpumap: %llx\n", buf->max_vcpu_id, buf->vcpumap[0]);
         return pagebuf_get_one(xch, ctx, buf, fd, dom);
 
     case XC_SAVE_ID_HVM_IDENT_PT:
@@ -1366,7 +1366,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     struct mmuext_op pin[MAX_PIN_BATCH];
     unsigned int nr_pins;
 
-    uint64_t vcpumap = 1ULL;
+    uint64_t vcpumap[XC_SR_MAX_VCPUS/64] = { 1ULL };
     unsigned int max_vcpu_id = 0;
     int new_ctxt_format = 0;
 
@@ -1517,8 +1517,8 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         if ( j == 0 ) {
             /* catch vcpu updates */
             if (pagebuf.new_ctxt_format) {
-                vcpumap = pagebuf.vcpumap;
                 max_vcpu_id = pagebuf.max_vcpu_id;
+                memcpy(vcpumap, pagebuf.vcpumap, vcpumap_sz(max_vcpu_id));
             }
             /* should this be deferred? does it change? */
             if ( pagebuf.identpt )
@@ -1880,7 +1880,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     vcpup = tailbuf.u.pv.vcpubuf;
     for ( i = 0; i <= max_vcpu_id; i++ )
     {
-        if ( !(vcpumap & (1ULL << i)) )
+        if ( !(vcpumap[i/64] & (1ULL << (i%64))) )
             continue;
 
         memcpy(ctxt, vcpup, ((dinfo->guest_width == 8) ? sizeof(ctxt->x64)
