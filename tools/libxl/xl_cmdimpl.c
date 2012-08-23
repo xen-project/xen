@@ -319,23 +319,10 @@ static void dolog(const char *file, int line, const char *func, char *fmt, ...)
     free(s);
 }
 
-static void printf_info(enum output_format output_format,
-                        int domid,
-                        libxl_domain_config *d_config)
+static yajl_gen_status printf_info_one_json(yajl_gen hand, int domid,
+                                            libxl_domain_config *d_config)
 {
-    if (output_format == OUTPUT_FORMAT_SXP)
-        return printf_info_sexp(domid, d_config);
-
-    const char *buf;
-    libxl_yajl_length len = 0;
     yajl_gen_status s;
-    yajl_gen hand;
-
-    hand = libxl_yajl_gen_alloc(NULL);
-    if (!hand) {
-        fprintf(stderr, "unable to allocate JSON generator\n");
-        return;
-    }
 
     s = yajl_gen_map_open(hand);
     if (s != yajl_gen_status_ok)
@@ -361,6 +348,31 @@ static void printf_info(enum output_format output_format,
         goto out;
 
     s = yajl_gen_map_close(hand);
+    if (s != yajl_gen_status_ok)
+        goto out;
+
+out:
+    return s;
+}
+static void printf_info(enum output_format output_format,
+                        int domid,
+                        libxl_domain_config *d_config)
+{
+    if (output_format == OUTPUT_FORMAT_SXP)
+        return printf_info_sexp(domid, d_config);
+
+    const char *buf;
+    libxl_yajl_length len = 0;
+    yajl_gen_status s;
+    yajl_gen hand;
+
+    hand = libxl_yajl_gen_alloc(NULL);
+    if (!hand) {
+        fprintf(stderr, "unable to allocate JSON generator\n");
+        return;
+    }
+
+    s = printf_info_one_json(hand, domid, d_config);
     if (s != yajl_gen_status_ok)
         goto out;
 
@@ -2674,6 +2686,24 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
     uint8_t *data;
     int i, len, rc;
 
+    yajl_gen hand;
+    yajl_gen_status s;
+    const char *buf;
+    libxl_yajl_length yajl_len = 0;
+
+    if (default_output_format == OUTPUT_FORMAT_JSON) {
+        hand = libxl_yajl_gen_alloc(NULL);
+        if (!hand) {
+            fprintf(stderr, "unable to allocate JSON generator\n");
+            return;
+        }
+
+        s = yajl_gen_array_open(hand);
+        if (s != yajl_gen_status_ok)
+            goto out;
+    } else
+        s = yajl_gen_status_ok;
+
     for (i = 0; i < nb_domain; i++) {
         /* no detailed info available on dom0 */
         if (info[i].domid == 0)
@@ -2684,10 +2714,35 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         CHK_ERRNO(asprintf(&config_source, "<domid %d data>", info[i].domid));
         libxl_domain_config_init(&d_config);
         parse_config_data(config_source, (char *)data, len, &d_config, NULL);
-        printf_info(default_output_format, info[i].domid, &d_config);
+        if (default_output_format == OUTPUT_FORMAT_SXP)
+            printf_info_sexp(domid, &d_config);
+        else
+            s = printf_info_one_json(hand, info[i].domid, &d_config);
         libxl_domain_config_dispose(&d_config);
         free(data);
         free(config_source);
+        if (s != yajl_gen_status_ok)
+            goto out;
+    }
+
+    if (default_output_format == OUTPUT_FORMAT_JSON) {
+        s = yajl_gen_array_close(hand);
+        if (s != yajl_gen_status_ok)
+            goto out;
+
+        s = yajl_gen_get_buf(hand, (const unsigned char **)&buf, &yajl_len);
+        if (s != yajl_gen_status_ok)
+            goto out;
+
+        puts(buf);
+    }
+
+out:
+    if (default_output_format == OUTPUT_FORMAT_JSON) {
+        yajl_gen_free(hand);
+        if (s != yajl_gen_status_ok)
+            fprintf(stderr,
+                    "unable to format domain config as JSON (YAJL:%d)\n", s);
     }
 }
 
