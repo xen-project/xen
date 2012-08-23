@@ -214,7 +214,7 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= effd5676225761abdab90becac519716515c3be4
+QEMU_TAG ?= xen-4.2.0-rc3
 # Tue Aug 14 15:57:49 2012 +0100
 # Revert "qemu-xen-traditional: use O_DIRECT to open disk images for IDE"
 
