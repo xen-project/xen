@@ -396,15 +396,12 @@ int libxl_domain_rename(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
-int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid, int suspend_cancel)
+int libxl__domain_resume(libxl__gc *gc, uint32_t domid, int suspend_cancel)
 {
-    GC_INIT(ctx);
     int rc = 0;
 
-    if (xc_domain_resume(ctx->xch, domid, suspend_cancel)) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                        "xc_domain_resume failed for domain %u",
-                        domid);
+    if (xc_domain_resume(CTX->xch, domid, suspend_cancel)) {
+        LOGE(ERROR, "xc_domain_resume failed for domain %u", domid);
         rc = ERROR_FAIL;
         goto out;
     }
@@ -418,22 +415,27 @@ int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid, int suspend_cancel)
     if (type == LIBXL_DOMAIN_TYPE_HVM) {
         rc = libxl__domain_resume_device_model(gc, domid);
         if (rc) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
-                       "failed to resume device model for domain %u:%d",
-                       domid, rc);
+            LOG(ERROR, "failed to resume device model for domain %u:%d",
+                domid, rc);
             goto out;
         }
     }
 
-    if (!xs_resume_domain(ctx->xsh, domid)) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                        "xs_resume_domain failed for domain %u",
-                        domid);
+    if (!xs_resume_domain(CTX->xsh, domid)) {
+        LOGE(ERROR, "xs_resume_domain failed for domain %u", domid);
         rc = ERROR_FAIL;
     }
 out:
-    GC_FREE;
     return rc;
+}
+
+int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid, int suspend_cancel,
+                        const libxl_asyncop_how *ao_how)
+{
+    AO_CREATE(ctx, domid, ao_how);
+    int rc = libxl__domain_resume(gc, domid, suspend_cancel);
+    libxl__ao_complete(egc, ao, rc);
+    return AO_INPROGRESS;
 }
 
 /*

@@ -1121,7 +1121,7 @@ static int libxl__remus_domain_resume_callback(void *data)
     STATE_AO_GC(dss->ao);
 
     /* Resumes the domain and the device model */
-    if (libxl_domain_resume(CTX, dss->domid, /* Fast Suspend */1))
+    if (libxl__domain_resume(gc, dss->domid, /* Fast Suspend */1))
         return 0;
 
     /* REMUS TODO: Deal with disk. Start a new network output buffer */

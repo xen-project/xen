@@ -529,7 +529,9 @@ int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd,
  *   If this parameter is true, use co-operative resume. The guest
  *   must support this.
  */
-int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid, int suspend_cancel);
+int libxl_domain_resume(libxl_ctx *ctx, uint32_t domid, int suspend_cancel,
+                        const libxl_asyncop_how *ao_how)
+                        LIBXL_EXTERNAL_CALLERS_ONLY;
 
 int libxl_domain_remus_start(libxl_ctx *ctx, libxl_domain_remus_info *info,
                              uint32_t domid, int send_fd, int recv_fd,

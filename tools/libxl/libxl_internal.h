@@ -899,6 +899,9 @@ _hidden int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid);
 
 _hidden void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid);
 
+_hidden int libxl__domain_resume(libxl__gc *gc, uint32_t domid,
+                                 int suspend_cancel);
+
 /* returns 0 or 1, or a libxl error code */
 _hidden int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid);
 
