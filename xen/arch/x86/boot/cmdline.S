@@ -164,13 +164,15 @@ cmdline_parse_early:
         pushl   MB_cmdline(%ebx)
         call    .Lfind_option
         test    %eax,%eax
-        setnz   sym_phys(skip_realmode)
+        setnz   %al
+        or      %al,sym_phys(skip_realmode)
 
         /* Check for 'tboot=' command-line option. */
         movl    $sym_phys(.Ltboot_opt),4(%esp)
         call    .Lfind_option
         test    %eax,%eax
-        setnz   sym_phys(skip_realmode) /* tboot= implies no-real-mode */
+        setnz   %al
+        or      %al,sym_phys(skip_realmode) /* tboot= implies no-real-mode */
 
 .Lparse_edd:
         /* Check for 'edd=' command-line option. */
