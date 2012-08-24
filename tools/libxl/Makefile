@@ -212,8 +212,10 @@ clean:
 	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)
 	$(RM) -f _*.c *.pyc _paths.*.tmp _*.api-for-check
 	$(RM) -f testidl.c.new testidl.c
-#	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 
 distclean: clean
+
+realclean: distclean
+	$(RM) -f $(AUTOSRCS) $(AUTOINCS)
 
 -include $(DEPS)
