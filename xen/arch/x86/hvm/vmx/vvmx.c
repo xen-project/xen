@@ -1334,7 +1334,6 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
     case MSR_IA32_VMX_ENTRY_CTLS:
         /* bit 0-8, and 12 must be 1 (refer G5 of SDM) */
         data = 0x11ff;
-        data |= VM_ENTRY_IA32E_MODE;
         data = (data << 32) | data;
         break;
 
