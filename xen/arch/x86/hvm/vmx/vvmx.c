@@ -1290,7 +1290,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
     switch (msr) {
     case MSR_IA32_VMX_BASIC:
         data = VVMCS_REVISION | ((u64)PAGE_SIZE) << 32 | 
-               ((u64)MTRR_TYPE_WRBACK) << 50 | (1ULL << 55);
+               ((u64)MTRR_TYPE_WRBACK) << 50;
         break;
     case MSR_IA32_VMX_PINBASED_CTLS:
         /* 1-seetings */
