@@ -690,17 +690,6 @@ void __init __start_xen(unsigned long mbi_p)
     {
         memmap_type = "Xen-e820";
     }
-    else if ( bootsym(lowmem_kb) )
-    {
-        memmap_type = "Xen-e801";
-        e820_raw[0].addr = 0;
-        e820_raw[0].size = bootsym(lowmem_kb) << 10;
-        e820_raw[0].type = E820_RAM;
-        e820_raw[1].addr = 0x100000;
-        e820_raw[1].size = bootsym(highmem_kb) << 10;
-        e820_raw[1].type = E820_RAM;
-        e820_raw_nr = 2;
-    }
     else if ( mbi->flags & MBI_MEMMAP )
     {
         memmap_type = "Multiboot-e820";
@@ -737,6 +726,17 @@ void __init __start_xen(unsigned long mbi_p)
 
             bytes += map->size + 4;
         }
+    }
+    else if ( bootsym(lowmem_kb) )
+    {
+        memmap_type = "Xen-e801";
+        e820_raw[0].addr = 0;
+        e820_raw[0].size = bootsym(lowmem_kb) << 10;
+        e820_raw[0].type = E820_RAM;
+        e820_raw[1].addr = 0x100000;
+        e820_raw[1].size = bootsym(highmem_kb) << 10;
+        e820_raw[1].type = E820_RAM;
+        e820_raw_nr = 2;
     }
     else if ( mbi->flags & MBI_MEMLIMITS )
     {
