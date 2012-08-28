@@ -2686,7 +2686,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
     uint8_t *data;
     int i, len, rc;
 
-    yajl_gen hand;
+    yajl_gen hand = NULL;
     yajl_gen_status s;
     const char *buf;
     libxl_yajl_length yajl_len = 0;
@@ -2714,10 +2714,10 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         CHK_ERRNO(asprintf(&config_source, "<domid %d data>", info[i].domid));
         libxl_domain_config_init(&d_config);
         parse_config_data(config_source, (char *)data, len, &d_config, NULL);
-        if (default_output_format == OUTPUT_FORMAT_SXP)
-            printf_info_sexp(domid, &d_config);
-        else
+        if (default_output_format == OUTPUT_FORMAT_JSON)
             s = printf_info_one_json(hand, info[i].domid, &d_config);
+        else
+            printf_info_sexp(domid, &d_config);
         libxl_domain_config_dispose(&d_config);
         free(data);
         free(config_source);
