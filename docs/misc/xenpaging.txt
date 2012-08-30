@@ -12,37 +12,34 @@ access the paged-out memory, the page is read from disk and placed into
 memory.  This allows the sum of all running guests to use more memory
 than physically available on the host.
 
+Requirements:
+
+xenpaging relies on Intel EPT or AMD RVI, other hardware is not
+supported. Only HVM guests are supported.  The dom0 kernel needs
+paging-aware backend drivers to handle paged granttable entries.
+Currently only dom0 kernels based on classic Xen Linux support this
+functionality.
+
 Usage:
 
-Once the guest is running, run xenpaging with the guest_id and the
-number of pages to page-out:
+Up to now xenpaging is not integrated into libxl/xend, so it has to be
+started manually for each guest.
 
-  chdir /var/lib/xen/xenpaging
-  xenpaging <guest_id>  <number_of_pages>
+Once the guest is running, run xenpaging with the guest_id and the path
+to the pagefile:
+ 
+ /usr/lib/xen/bin/xenpaging -f /path/to/page_file -d dom_id &
 
-To obtain the guest_id, run 'xm list'.
-xenpaging will write the pagefile to the current directory.
-Example with 128MB pagefile on guest 1:
+Once xenpaging runs it needs a memory target, which is the memory
+footprint of the guest. This value (in KiB) must be written manually to
+xenstore. The following example sets the target to 512MB:
 
-  xenpaging 1 32768
+ xenstore-write /local/domain/<dom_id>/memory/target-tot_pages $((1024*512))
 
-Caution: stopping xenpaging manually will cause the guest to stall or
-crash because the paged-out memory is not written back into the guest!
-
-After a reboot of a guest, its guest_id changes, the current xenpaging
-binary has no target anymore. To automate restarting of xenpaging after
-guest reboot, specify the number if pages in the guest configuration
-file /etc/xen/vm/<guest_name>:
-
-xenpaging=32768
-
-Redo the guest with 'xm create /etc/xen/vm/<guest_name>' to activate the
-changes.
-
+Now xenpaging tries to page-out as many pages to keep the overall memory
+footprint of the guest at 512MB.
 
 Todo:
-- implement stopping of xenpaging
-- implement/test live migration
-
+- integrate xenpaging into libxl
 
 # vim: tw=72
