@@ -123,6 +123,8 @@ static struct hw_interrupt_type __read_mostly i8259A_irq_type = {
  * 8259A PIC functions to handle ISA devices:
  */
 
+#define aeoi_mode (i8259A_irq_type.ack == disable_8259A_irq)
+
 /*
  * This contains the irq mask for both 8259A irq controllers,
  */
@@ -248,10 +250,10 @@ static bool_t _mask_and_ack_8259A_irq(unsigned int irq)
 {
     unsigned int irqmask = 1 << irq;
     unsigned long flags;
-    bool_t real_irq = 1; /* Assume real unless spurious */
-    bool_t need_eoi = i8259A_irq_type.ack != disable_8259A_irq;
+    bool_t is_real_irq = 1; /* Assume real unless spurious */
 
     spin_lock_irqsave(&i8259A_lock, flags);
+
     /*
      * Lightweight spurious IRQ detection. We do not want
      * to overdo spurious IRQ handling - it's usually a sign
@@ -267,46 +269,10 @@ static bool_t _mask_and_ack_8259A_irq(unsigned int irq)
      * but should be enough to warn the user that there
      * is something bad going on ...
      */
-    if (cached_irq_mask & irqmask)
-        goto spurious_8259A_irq;
-    cached_irq_mask |= irqmask;
-
- handle_real_irq:
-    if (irq & 8) {
-        inb(0xA1);              /* DUMMY - (do we need this?) */
-        outb(cached_A1,0xA1);
-        if ( need_eoi )
-        {
-            outb(0x60 + (irq & 7), 0xA0);/* 'Specific EOI' to slave */
-            outb(0x62,0x20);        /* 'Specific EOI' to master-IRQ2 */
-        }
-    } else {
-        inb(0x21);              /* DUMMY - (do we need this?) */
-        outb(cached_21,0x21);
-        if ( need_eoi )
-            outb(0x60 + irq, 0x20);/* 'Specific EOI' to master */
-    }
-    spin_unlock_irqrestore(&i8259A_lock, flags);
-    return real_irq;
-
- spurious_8259A_irq:
-    /*
-     * this is the slow path - should happen rarely.
-     */
-    if (i8259A_irq_real(irq))
-        /*
-         * oops, the IRQ _is_ in service according to the
-         * 8259A - not spurious, go handle it.
-         */
-        goto handle_real_irq;
-
-    {
+    if ((cached_irq_mask & irqmask) && !i8259A_irq_real(irq)) {
         static int spurious_irq_mask;
-        real_irq = 0;
-        /*
-         * At this point we can be sure the IRQ is spurious,
-         * lets ACK and report it. [once per IRQ]
-         */
+        is_real_irq = 0;
+        /* Report spurious IRQ, once per IRQ line. */
         if (!(spurious_irq_mask & irqmask)) {
             printk("spurious 8259A interrupt: IRQ%d.\n", irq);
             spurious_irq_mask |= irqmask;
@@ -316,8 +282,27 @@ static bool_t _mask_and_ack_8259A_irq(unsigned int irq)
          * but in Linux this does not cause problems and is
          * simpler for us.
          */
-        goto handle_real_irq;
     }
+
+    cached_irq_mask |= irqmask;
+
+    if (irq & 8) {
+        inb(0xA1);              /* DUMMY - (do we need this?) */
+        outb(cached_A1,0xA1);
+        if (!aeoi_mode) {
+            outb(0x60 + (irq & 7), 0xA0);/* 'Specific EOI' to slave */
+            outb(0x62,0x20);        /* 'Specific EOI' to master-IRQ2 */
+        }
+    } else {
+        inb(0x21);              /* DUMMY - (do we need this?) */
+        outb(cached_21,0x21);
+        if (!aeoi_mode)
+            outb(0x60 + irq, 0x20);/* 'Specific EOI' to master */
+    }
+
+    spin_unlock_irqrestore(&i8259A_lock, flags);
+
+    return is_real_irq;
 }
 
 static char irq_trigger[2];
@@ -339,7 +324,7 @@ static void save_ELCR(char *trigger)
 
 int i8259A_resume(void)
 {
-    init_8259A(i8259A_irq_type.ack == disable_8259A_irq);
+    init_8259A(aeoi_mode);
     restore_ELCR(irq_trigger);
     return 0;
 }
