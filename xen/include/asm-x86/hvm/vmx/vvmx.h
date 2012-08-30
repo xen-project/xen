@@ -96,6 +96,7 @@ uint32_t nvmx_vcpu_asid(struct vcpu *v);
 enum hvm_intblk nvmx_intr_blocked(struct vcpu *v);
 int nvmx_intercepts_exception(struct vcpu *v, 
                               unsigned int trap, int error_code);
+void nvmx_domain_relinquish_resources(struct domain *d);
 
 int nvmx_handle_vmxon(struct cpu_user_regs *regs);
 int nvmx_handle_vmxoff(struct cpu_user_regs *regs);

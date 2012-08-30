@@ -179,6 +179,7 @@ struct hvm_function_table {
     bool_t (*nhvm_vmcx_hap_enabled)(struct vcpu *v);
 
     enum hvm_intblk (*nhvm_intr_blocked)(struct vcpu *v);
+    void (*nhvm_domain_relinquish_resources)(struct domain *d);
 };
 
 extern struct hvm_function_table hvm_funcs;

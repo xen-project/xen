@@ -561,6 +561,9 @@ int hvm_domain_initialise(struct domain *d)
 
 void hvm_domain_relinquish_resources(struct domain *d)
 {
+    if ( hvm_funcs.nhvm_domain_relinquish_resources )
+        hvm_funcs.nhvm_domain_relinquish_resources(d);
+
     hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.ioreq);
     hvm_destroy_ioreq_page(d, &d->arch.hvm_domain.buf_ioreq);
 

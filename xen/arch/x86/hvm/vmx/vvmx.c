@@ -57,7 +57,15 @@ void nvmx_vcpu_destroy(struct vcpu *v)
 {
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
 
-    nvmx_purge_vvmcs(v);
+    /* 
+     * When destroying the vcpu, it may be running on behalf of L2 guest.
+     * Therefore we need to switch the VMCS pointer back to the L1 VMCS,
+     * in order to avoid double free of L2 VMCS and the possible memory
+     * leak of L1 VMCS page.
+     */
+    if ( nvcpu->nv_n1vmcx )
+        v->arch.hvm_vmx.vmcs = nvcpu->nv_n1vmcx;
+
     if ( nvcpu->nv_n2vmcx ) {
         __vmpclear(virt_to_maddr(nvcpu->nv_n2vmcx));
         free_xenheap_page(nvcpu->nv_n2vmcx);
@@ -65,6 +73,14 @@ void nvmx_vcpu_destroy(struct vcpu *v)
     }
 }
  
+void nvmx_domain_relinquish_resources(struct domain *d)
+{
+    struct vcpu *v;
+
+    for_each_vcpu ( d, v )
+        nvmx_purge_vvmcs(v);
+}
+
 int nvmx_vcpu_reset(struct vcpu *v)
 {
     return 0;

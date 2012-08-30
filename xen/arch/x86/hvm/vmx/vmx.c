@@ -1547,7 +1547,8 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .nhvm_vcpu_asid       = nvmx_vcpu_asid,
     .nhvm_vmcx_guest_intercepts_trap = nvmx_intercepts_exception,
     .nhvm_vcpu_vmexit_trap = nvmx_vmexit_trap,
-    .nhvm_intr_blocked    = nvmx_intr_blocked
+    .nhvm_intr_blocked    = nvmx_intr_blocked,
+    .nhvm_domain_relinquish_resources = nvmx_domain_relinquish_resources
 };
 
 struct hvm_function_table * __init start_vmx(void)
