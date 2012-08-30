@@ -1506,6 +1506,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_VMXOFF:
     case EXIT_REASON_VMXON:
     case EXIT_REASON_INVEPT:
+    case EXIT_REASON_XSETBV:
         /* inject to L1 */
         nvcpu->nv_vmexit_pending = 1;
         break;
