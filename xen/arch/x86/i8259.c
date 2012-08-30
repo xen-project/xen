@@ -85,10 +85,12 @@ BUILD_16_IRQS(0xc) BUILD_16_IRQS(0xd) BUILD_16_IRQS(0xe) BUILD_16_IRQS(0xf)
 
 static DEFINE_SPINLOCK(i8259A_lock);
 
-static void _mask_and_ack_8259A_irq(unsigned int irq);
+static bool_t _mask_and_ack_8259A_irq(unsigned int irq);
 
-void (*__read_mostly bogus_8259A_irq)(unsigned int irq) =
-    _mask_and_ack_8259A_irq;
+bool_t bogus_8259A_irq(unsigned int irq)
+{
+    return _mask_and_ack_8259A_irq(irq);
+}
 
 static void mask_and_ack_8259A_irq(struct irq_desc *desc)
 {
@@ -239,12 +241,15 @@ static inline int i8259A_irq_real(unsigned int irq)
  * Careful! The 8259A is a fragile beast, it pretty
  * much _has_ to be done exactly like this (mask it
  * first, _then_ send the EOI, and the order of EOI
- * to the two 8259s is important!
+ * to the two 8259s is important!  Return a boolean
+ * indicating whether the irq was genuine or spurious.
  */
-static void _mask_and_ack_8259A_irq(unsigned int irq)
+static bool_t _mask_and_ack_8259A_irq(unsigned int irq)
 {
     unsigned int irqmask = 1 << irq;
     unsigned long flags;
+    bool_t real_irq = 1; /* Assume real unless spurious */
+    bool_t need_eoi = i8259A_irq_type.ack != disable_8259A_irq;
 
     spin_lock_irqsave(&i8259A_lock, flags);
     /*
@@ -270,15 +275,19 @@ static void _mask_and_ack_8259A_irq(unsigned int irq)
     if (irq & 8) {
         inb(0xA1);              /* DUMMY - (do we need this?) */
         outb(cached_A1,0xA1);
-        outb(0x60 + (irq & 7), 0xA0);/* 'Specific EOI' to slave */
-        outb(0x62,0x20);        /* 'Specific EOI' to master-IRQ2 */
+        if ( need_eoi )
+        {
+            outb(0x60 + (irq & 7), 0xA0);/* 'Specific EOI' to slave */
+            outb(0x62,0x20);        /* 'Specific EOI' to master-IRQ2 */
+        }
     } else {
         inb(0x21);              /* DUMMY - (do we need this?) */
         outb(cached_21,0x21);
-        outb(0x60 + irq, 0x20);/* 'Specific EOI' to master */
+        if ( need_eoi )
+            outb(0x60 + irq, 0x20);/* 'Specific EOI' to master */
     }
     spin_unlock_irqrestore(&i8259A_lock, flags);
-    return;
+    return real_irq;
 
  spurious_8259A_irq:
     /*
@@ -293,6 +302,7 @@ static void _mask_and_ack_8259A_irq(unsigned int irq)
 
     {
         static int spurious_irq_mask;
+        real_irq = 0;
         /*
          * At this point we can be sure the IRQ is spurious,
          * lets ACK and report it. [once per IRQ]
@@ -367,19 +377,13 @@ void __devinit init_8259A(int auto_eoi)
                                is to be investigated) */
 
     if (auto_eoi)
-    {
         /*
          * in AEOI mode we just have to mask the interrupt
          * when acking.
          */
         i8259A_irq_type.ack = disable_8259A_irq;
-        bogus_8259A_irq = _disable_8259A_irq;
-    }
     else
-    {
         i8259A_irq_type.ack = mask_and_ack_8259A_irq;
-        bogus_8259A_irq = _mask_and_ack_8259A_irq;
-    }
 
     udelay(100);            /* wait for 8259A to initialize */
 
