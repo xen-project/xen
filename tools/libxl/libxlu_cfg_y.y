@@ -45,10 +45,10 @@
 %%
 
 file: /* empty */
- |     file setting
+ |     file assignment
 
-setting: IDENT '=' value      { xlu__cfg_set_store(ctx,$1,$3,@3.first_line); }
-                     endstmt
+assignment: IDENT '=' value endstmt
+                            { xlu__cfg_set_store(ctx,$1,$3,@3.first_line); }
  |      endstmt
  |      error NEWLINE
 
