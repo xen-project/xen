@@ -220,6 +220,7 @@ help:
 uninstall: D=$(DESTDIR)
 uninstall:
 	[ -d $(D)$(XEN_CONFIG_DIR) ] && mv -f $(D)$(XEN_CONFIG_DIR) $(D)$(XEN_CONFIG_DIR).old-`date +%s` || true
+	$(MAKE) -C xen uninstall
 	rm -rf $(D)$(CONFIG_DIR)/init.d/xendomains $(D)$(CONFIG_DIR)/init.d/xend
 	rm -rf $(D)$(CONFIG_DIR)/init.d/xencommons $(D)$(CONFIG_DIR)/init.d/xen-watchdog
 	rm -rf $(D)$(CONFIG_DIR)/hotplug/xen-backend.agent
@@ -228,8 +229,6 @@ uninstall:
 	rm -f  $(D)$(SYSCONFIG_DIR)/xendomains
 	rm -f  $(D)$(SYSCONFIG_DIR)/xencommons
 	rm -rf $(D)/var/run/xen* $(D)/var/lib/xen*
-	rm -rf $(D)/boot/*xen*
-	rm -rf $(D)/lib/modules/*xen*
 	rm -rf $(D)$(LIBDIR)/xen* $(D)$(BINDIR)/lomount
 	rm -rf $(D)$(BINDIR)/cpuperf-perfcntr $(D)$(BINDIR)/cpuperf-xen
 	rm -rf $(D)$(BINDIR)/xc_shadow

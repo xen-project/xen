@@ -20,8 +20,8 @@ default: build
 .PHONY: dist
 dist: install
 
-.PHONY: build install clean distclean cscope TAGS tags MAP gtags
-build install debug clean distclean cscope TAGS tags MAP gtags::
+.PHONY: build install uninstall clean distclean cscope TAGS tags MAP gtags
+build install uninstall debug clean distclean cscope TAGS tags MAP gtags::
 	$(MAKE) -f Rules.mk _$@
 
 .PHONY: _build
@@ -47,6 +47,21 @@ _install: $(TARGET).gz
 			echo 'EFI installation only partially done (EFI_VENDOR not set)' >&2; \
 		fi; \
 	fi
+
+.PHONY: _uninstall
+_uninstall: D=$(DESTDIR)
+_uninstall: T=$(notdir $(TARGET))
+_uninstall:
+	rm -f $(D)/boot/$(T)-$(XEN_FULLVERSION).gz
+	rm -f $(D)/boot/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION).gz
+	rm -f $(D)/boot/$(T)-$(XEN_VERSION).gz
+	rm -f $(D)/boot/$(T).gz
+	rm -f $(D)/boot/$(T)-syms-$(XEN_FULLVERSION)
+	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_FULLVERSION).efi
+	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION).efi
+	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).efi
+	rm -f $(D)$(EFI_DIR)/$(T).efi
+	rm -f $(D)$(EFI_MOUNTPOINT)/efi/$(EFI_VENDOR)/$(T)-$(XEN_FULLVERSION).efi
 
 .PHONY: _debug
 _debug:
