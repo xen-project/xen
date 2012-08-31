@@ -12,7 +12,8 @@ export PATH
 
 error() {
 	echo "$@" >&2
-	xenstore-write $xpath/hotplug-status error
+	xenstore-write $xpath/hotplug-status error \
+	               $xpath/hotplug-error "$@"
 	exit 1
 }
 	
