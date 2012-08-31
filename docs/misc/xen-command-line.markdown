@@ -46,9 +46,9 @@ if a leading `0` is present.
 
 A size parameter may be any integer, with a size suffix
 
-* `G` or `g`: Giga (2^30)
-* `M` or `m`: Mega (2^20)
-* `K` or `k`: Kilo (2^10)
+* `G` or `g`: GiB (2^30)
+* `M` or `m`: MiB (2^20)
+* `K` or `k`: KiB (2^10)
 * `B` or `b`: Bytes
 
 Without a size suffix, the default will be kilo.
@@ -107,8 +107,10 @@ Specify which ACPI MADT table to parse for APIC information, if more
 than one is present.
 
 ### acpi\_pstate\_strict
+> `= <integer>`
 
 ### acpi\_skip\_timer\_override
+> `= <boolean>`
 
 Instruct Xen to ignore timer-interrupt override.
 
@@ -117,6 +119,8 @@ the domain 0 kernel this option is automatically propagated to the
 domain 0 command line
 
 ### acpi\_sleep
+> `= s3_bios | s3_mode`
+
 ### allowsuperpage
 > `= <boolean>`
 
@@ -136,12 +140,12 @@ there are more than 8 CPUs, Xen will switch to `bigsmp` over
 
 > Default: `false`
 
-Force boot on potentially unsafe systems. By default Xen will refuse to boot on
-systems with the following errata:
+Force boot on potentially unsafe systems. By default Xen will refuse
+to boot on systems with the following errata:
 
 * AMD Erratum 121. Processors with this erratum are subject to a guest
-  triggerable Denial of Service. Override only if you trust all of your PV
-  guests.
+  triggerable Denial of Service. Override only if you trust all of
+  your PV guests.
 
 ### apic\_verbosity
 > `= verbose | debug`
@@ -153,15 +157,16 @@ Increase the verbosity of the APIC code from the default value.
 
 > Default: `true`
 
-Permits Xen to set up and use PCI Address Translation Services, which is required
-for PCI Passthrough.
+Permits Xen to set up and use PCI Address Translation Services, which
+is required for PCI Passthrough.
 
 ### availmem
 > `= <size>`
 
 > Default: `0` (no limit)
 
-Specify a maximum amount of available memory, to which Xen will clamp the e820 table.
+Specify a maximum amount of available memory, to which Xen will clamp
+the e820 table.
 
 ### badpage
 > `= List of [ <integer> | <integer>-<integer> ]`
@@ -176,8 +181,9 @@ Xen's command line.
 
 > Default: `true`
 
-Scrub free RAM during boot.  This is a safety feature to prevent accidentally leaking
-sensitive VM data into other VMs if Xen crashes and reboots.
+Scrub free RAM during boot.  This is a safety feature to prevent
+accidentally leaking sensitive VM data into other VMs if Xen crashes
+and reboots.
 
 ### cachesize
 > `= <size>`
@@ -226,7 +232,6 @@ Both option `com1` and `com2` follow the same format.
   including Intel AMT devices if present.
 
 A typical setup for most situations might be `com1=115200,8n1`
-
 
 ### conring\_size
 > `= <size>`
@@ -300,25 +305,30 @@ Indicate where the responsibility for driving power states lies.
 ### cpuid\_mask\_cpu (AMD only)
 > `= fam_0f_rev_c | fam_0f_rev_d | fam_0f_rev_e | fam_0f_rev_f | fam_0f_rev_g | fam_10_rev_b | fam_10_rev_c | fam_11_rev_b`
 
-If the other **cpuid\_mask\_{,ext\_}e{c,d}x** options are fully set (unspecified
-on the command line), specify a pre-canned cpuid mask to mask the current
-processor down to appear as the specified processor.  It is important to ensure
-that all hosts in a pool appear the same to guests to allow successful live
-migration.
+If the other **cpuid\_mask\_{,ext\_}e{c,d}x** options are fully set
+(unspecified on the command line), specify a pre-canned cpuid mask to
+mask the current processor down to appear as the specified processor.
+It is important to ensure that all hosts in a pool appear the same to
+guests to allow successful live migration.
 
 ### cpuid\_mask\_ ecx,edx,ext\_ecx,ext\_edx,xsave_eax
 > `= <integer>`
 
 > Default: `~0` (all bits set)
 
-These five command line parameters are used to specify cpuid masks to help with
-cpuid levelling across a pool of hosts.  Setting a bit in the mask indicates that
-the feature should be enabled, while clearing a bit in the mask indicates that
-the feature should be disabled.  It is important to ensure that all hosts in a
-pool appear the same to guests to allow successful live migration.
+These five command line parameters are used to specify cpuid masks to
+help with cpuid levelling across a pool of hosts.  Setting a bit in
+the mask indicates that the feature should be enabled, while clearing
+a bit in the mask indicates that the feature should be disabled.  It
+is important to ensure that all hosts in a pool appear the same to
+guests to allow successful live migration.
 
 ### cpuidle
+> `= <boolean>`
+
 ### cpuinfo
+> `= <boolean>`
+
 ### crashinfo_maxaddr
 > `= <size>`
 
@@ -328,17 +338,42 @@ Specify the maximum address to allocate certain structures, if used in
 combination with the `low_crashinfo` command line option.
 
 ### crashkernel
+> `= <ramsize-range>:<size>[,...][@<offset>]`
+
 ### credit2\_balance\_over
+> `= <integer>`
+
 ### credit2\_balance\_under
+> `= <integer>`
+
 ### credit2\_load\_window\_shift
+> `= <integer>`
+
 ### debug\_stack\_lines
+> `= <integer>`
+
+> Default: `20`
+
+Limits the number lines printed in Xen stack traces.
+
 ### debugtrace
+> `= <integer>`
+
+> Default: `128`
+
+Specify the size of the console debug trace buffer in KiB. The debug
+trace feature is only enabled in debugging builds of Xen.
+
 ### dma\_bits
 > `= <integer>`
 
 Specify the bit width of the DMA heap.
 
 ### dom0\_ioports\_disable
+> `= List of <hex>-<hex>`
+
+Specify a list of IO ports to be excluded from dom0 access.
+
 ### dom0\_max\_vcpus
 > `= <integer>`
 
@@ -372,6 +407,8 @@ For example, to set dom0's initial memory allocation to 512MB but
 allow it to balloon up as far as 1GB use `dom0_mem=512M,max:1G`
 
 ### dom0\_shadow
+> `= <boolean>`
+
 ### dom0\_vcpus\_pin
 > `= <boolean>`
 
@@ -379,10 +416,21 @@ allow it to balloon up as far as 1GB use `dom0_mem=512M,max:1G`
 
 Pin dom0 vcpus to their respective pcpus
 
-### dom0\_vhpt\_size\_log2
-### dom\_rid\_bits
 ### e820-mtrr-clip
+> `= <boolean>`
+
+Flag that specifies if RAM should be clipped to the highest cacheable
+MTRR.
+
+> Default: `true` on Intel CPUs, otherwise `false`
+
 ### e820-verbose
+> `= <boolean>`
+
+> Default: `false`
+
+Flag that enables verbose output when processing e820 information and
+applying clipping.
 
 ### edd (x86)
 > `= off | on | skipmbr`
@@ -397,17 +445,32 @@ Either force retrieval of monitor EDID information via VESA DDC, or
 disable it (edid=no). This option should not normally be required
 except for debugging purposes.
 
-### efi\_print
 ### extra\_guest\_irqs
 > `= <number>`
 
 Increase the number of PIRQs available for the guest. The default is 32. 
 
 ### flask\_enabled
+> `= <integer>`
+
 ### flask\_enforcing
+> `= <integer>`
+
 ### font
+> `= <height>` where height is `8x8 | 8x14 | 8x16 '`
+
+Specify the font size when using the VESA console driver.
+
 ### gdb
+> `= <baud>[/<clock_hz>][,DPS[,<io-base>[,<irq>[,<port-bdf>[,<bridge-bdf>]]]] | pci | amt ] `
+
+Specify the serial parameters for the GDB stub.
+
 ### gnttab\_max\_nr\_frames
+> `= <integer>`
+
+Specify the maximum number of frames per grant table operation.
+
 ### guest\_loglvl
 > `= <level>[/<rate-limited level>]` where level is `none | error | warning | info | debug | all`
 
@@ -420,15 +483,41 @@ The optional `<rate-limited level>` option instructs which severities
 should be rate limited.
 
 ### hap\_1gb
+> `= <boolean>`
+
+> Default: `true`
+
+Flag to enable 1 GB host page table support for Hardware Assisted
+Paging (HAP).
+
 ### hap\_2mb
+> `= <boolean>`
+
+> Default: `true`
+
+Flag to enable 1 GB host page table support for Hardware Assisted
+Paging (HAP).
+
 ### hpetbroadcast
+> `= <boolean>`
+
 ### hvm\_debug
+> `= <integer>`
+
 ### hvm\_port80
+> `= <boolean>`
+
 ### idle\_latency\_factor
+> `= <integer>`
+
 ### ioapic\_ack
 ### iommu
 ### iommu\_inclusive\_mapping
+> `= <boolean>`
+
 ### irq\_ratelimit
+> `= <integer>`
+
 ### irq\_vector\_map
 ### lapic
 
@@ -437,7 +526,11 @@ if left disabled by the BIOS.  This option will accept any value at
 all.
 
 ### lapic\_timer\_c2\_ok
+> `= <boolean>`
+
 ### ler
+> `= <boolean>`
+
 ### loglvl
 > `= <level>[/<rate-limited level>]` where level is `none | error | warning | info | debug | all`
 
@@ -461,18 +554,38 @@ so the crash kernel may find find them.  Should be used in combination
 with **crashinfo_maxaddr**.
 
 ### max\_cstate
+> `= <integer>`
+
 ### max\_gsi\_irqs
+> `= <integer>`
+
 ### maxcpus
+> `= <integer>`
+
 ### mce
+> `= <integer>`
+
 ### mce\_fb
+> `= <integer>`
+
 ### mce\_verbosity
+> `= verbose`
+
+Specify verbose machine check output.
+
 ### mem
 > `= <size>`
 
-Specifies the maximum address of physical RAM.  Any RAM beyond this
+Specify the maximum address of physical RAM.  Any RAM beyond this
 limit is ignored by Xen.
 
 ### mmcfg
+> `= <boolean>[,amd-fam10]`
+
+> Default: `1`
+
+Specify if the MMConfig space should be enabled.
+
 ### nmi
 > `= ignore | dom0 | fatal`
 
@@ -493,6 +606,8 @@ domain 0 kernel this option is automatically propagated to the domain
 0 command line.
 
 ### nofxsr
+> `= <boolean>`
+
 ### noirqbalance
 > `= <boolean>`
 
@@ -501,11 +616,15 @@ systems such as Dell 1850/2850 that have workarounds in hardware for
 IRQ routing issues.
 
 ### nolapic
+> `= <boolean>`
+
+> Default: `false`
 
 Ignore the local APIC on a uniprocessor system, even if enabled by the
 BIOS.  This option will accept value.
 
 ### no-real-mode (x86)
+> `= <boolean>`
 
 Do not execute real-mode bootstrap code when booting Xen. This option
 should not be used except for debugging. It will effectively disable
@@ -519,6 +638,10 @@ catching debug output.  Defaults to automatically reboot after 5
 seconds.
 
 ### noserialnumber
+> `= <boolean>`
+
+Disable CPU serial number reporting.
+
 ### nosmp
 > `= <boolean>`
 
@@ -526,11 +649,39 @@ Disable SMP support.  No secondary processors will be booted.
 Defaults to booting secondary processors.
 
 ### nr\_irqs
+> `= <integer>`
+
 ### numa
-### pervcpu\_vhpt
+> `= on | off | fake=<integer> | noacpi`
+
+Default: `on`
+
 ### ple\_gap
+> `= <integer>`
+
 ### ple\_window
+> `= <integer>`
+
 ### reboot
+> `= b[ios] | t[riple] | k[bd] | n[o] [, [w]arm | [c]old]`
+
+Default: `0`
+
+Specify the host reboot method.
+
+`warm` instructs Xen to not set the cold reboot flag.
+
+`cold` instructs Xen to set the cold reboot flag.
+
+`bios` instructs Xen to reboot the host by jumping to BIOS. This is
+only available on 32-bit x86 platforms.
+
+`triple` instructs Xen to reboot the host by causing a triple fault.
+
+`kbd` instructs Xen to reboot the host via the keyboard controller.
+
+`acpi` instructs Xen to reboot the host using RESET_REG in the ACPI FADT.
+
 ### sched
 > `= credit | credit2 | sedf | arinc653`
 
@@ -539,10 +690,20 @@ Defaults to booting secondary processors.
 Choose the default scheduler.
 
 ### sched\_credit2\_migrate\_resist
+> `= <integer>`
+
 ### sched\_credit\_default\_yield
+> `= <boolean>`
+
 ### sched\_credit\_tslice\_ms
+> `= <integer>`
+
 ### sched\_ratelimit\_us
+> `= <integer>`
+
 ### sched\_smt\_power\_savings
+> `= <boolean>`
+
 ### serial\_tx\_buffer
 > `= <size>`
 
@@ -551,7 +712,15 @@ Choose the default scheduler.
 Set the serial transmit buffer size.
 
 ### smep
+> `= <boolean>`
+
+> Default: `true`
+
+Flag to enable Supervisor Mode Execution Protection
+
 ### snb\_igd\_quirk
+> `= <boolean>`
+
 ### sync\_console
 > `= <boolean>`
 
@@ -561,28 +730,80 @@ Flag to force synchronous console output.  Useful for debugging, but
 not suitable for production environments due to incurred overhead.
 
 ### tboot
+> `= 0x<phys_addr>`
+
+Specify the physical address of the trusted boot shared page.
+
 ### tbuf\_size
 > `= <integer>`
 
 Specify the per-cpu trace buffer size in pages.
 
 ### tdt
+> `= <boolean>`
+
+> Default: `true`
+
+Flag to enable TSC deadline as the APIC timer mode.
+
 ### tevt\_mask
+> `= <integer>`
+
+Specify a mask for Xen event tracing. This allows Xen tracing to be
+enabled at boot. Refer to the xentrace(8) documentation for a list of
+valid event mask values. In order to enable tracing, a buffer size (in
+pages) must also be specified via the tbuf\_size parameter.
+
 ### tickle\_one\_idle\_cpu
+> `= <boolean>`
+
 ### timer\_slop
+> `= <integer>`
+
 ### tmem
+> `= <boolean>`
+
 ### tmem\_compress
+> `= <boolean>`
+
 ### tmem\_dedup
+> `= <boolean>`
+
 ### tmem\_lock
+> `= <integer>`
+
 ### tmem\_shared\_auth
+> `= <boolean>`
+
 ### tmem\_tze
+> `= <integer>`
+
 ### tsc
+> `= unstable | skewed`
+
 ### ucode
 ### unrestricted\_guest
+> `= <boolean>`
+
 ### vcpu\_migration\_delay
+> `= <integer>`
+
+> Default: `0`
+
+Specify a delay, in microseconds, between migrations of a VCPU between
+PCPUs when using the credit1 scheduler. This prevents rapid fluttering
+of a VCPU between CPUs, and reduces the implicit overheads such as
+cache-warming. 1ms (1000) has been measured as a good value.
+
 ### vesa-map
+> `= <integer>`
+
 ### vesa-mtrr
+> `= <integer>`
+
 ### vesa-ram
+> `= <integer>`
+
 ### vga
 > `= ( ask | current | text-80x<rows> | gfx-<width>x<height>x<depth> | mode-<mode> )[,keep]`
 
