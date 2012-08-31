@@ -952,6 +952,7 @@ static NOINLINE void obj_free(obj_t *obj, int no_rebalance)
     /* use no_rebalance only if all objects are being destroyed anyway */
     if ( !no_rebalance )
         rb_erase(&obj->rb_tree_node,&pool->obj_rb_root[oid_hash(&old_oid)]);
+    tmem_spin_unlock(&obj->obj_spinlock);
     tmem_free(obj,sizeof(obj_t),pool);
 }
 
