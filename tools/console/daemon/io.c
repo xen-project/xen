@@ -84,6 +84,7 @@ struct domain {
 	int slave_fd;
 	int log_fd;
 	bool is_dead;
+	unsigned last_seen;
 	struct buffer buffer;
 	struct domain *next;
 	char *conspath;
@@ -727,11 +728,15 @@ static void shutdown_domain(struct domain *d)
 	d->xce_handle = NULL;
 }
 
+static unsigned enum_pass = 0;
+
 void enum_domains(void)
 {
 	int domid = 1;
 	xc_dominfo_t dominfo;
 	struct domain *dom;
+
+	enum_pass++;
 
 	while (xc_domain_getinfo(xc, domid, 1, &dominfo) == 1) {
 		dom = lookup_domain(dominfo.domid);
@@ -740,8 +745,10 @@ void enum_domains(void)
 				shutdown_domain(dom);
 		} else {
 			if (dom == NULL)
-				create_domain(dominfo.domid);
+				dom = create_domain(dominfo.domid);
 		}
+		if (dom)
+			dom->last_seen = enum_pass;
 		domid = dominfo.domid + 1;
 	}
 }
@@ -1068,6 +1075,9 @@ void handle_io(void)
 			if (d->master_fd != -1 && FD_ISSET(d->master_fd,
 							   &writefds))
 				handle_tty_write(d);
+
+			if (d->last_seen != enum_pass)
+				shutdown_domain(d);
 
 			if (d->is_dead)
 				cleanup_domain(d);
