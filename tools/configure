@@ -606,7 +606,6 @@ libgcrypt
 libext2fs
 system_aio
 zlib
-LIB_PATH
 glib_LIBS
 glib_CFLAGS
 PKG_CONFIG_LIBDIR
@@ -2266,8 +2265,6 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 # M4 Macro includes
-
-
 
 
 
@@ -6124,31 +6121,6 @@ else
 $as_echo "yes" >&6; }
 
 fi
-
-# Check library path
-if test "\${exec_prefix}/lib" = "$libdir"; then :
-  if test "$exec_prefix" = "NONE" && test "$prefix" != "NONE"; then :
-  exec_prefix=$prefix
-fi
-    if test "$exec_prefix" = "NONE"; then :
-  exec_prefix=$ac_default_prefix
-fi
-    if test -d "${exec_prefix}/lib64"; then :
-
-        LIB_PATH="lib64"
-
-else
-
-        LIB_PATH="lib"
-
-fi
-
-else
-
-    LIB_PATH="${libdir:`expr length "$exec_prefix" + 1`}"
-
-fi
-
 
 # Checks for libraries.
 ac_fn_c_check_header_mongrel "$LINENO" "bzlib.h" "ac_cv_header_bzlib_h" "$ac_includes_default"

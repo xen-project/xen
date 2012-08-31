@@ -1,7 +1,9 @@
 # Prefix and install folder
-PREFIX              := @prefix@
+prefix              := @prefix@
+PREFIX              := $(prefix)
 exec_prefix         := @exec_prefix@
-LIBDIR              := @libdir@
+libdir              := @libdir@
+LIBDIR              := $(libdir)
 
 # A debug build of tools?
 debug               := @debug@

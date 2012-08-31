@@ -28,7 +28,6 @@ m4_include([m4/path_or_fail.m4])
 m4_include([m4/python_version.m4])
 m4_include([m4/python_devel.m4])
 m4_include([m4/ocaml.m4])
-m4_include([m4/default_lib.m4])
 m4_include([m4/set_cflags_ldflags.m4])
 m4_include([m4/uuid.m4])
 m4_include([m4/pkg.m4])
@@ -120,9 +119,6 @@ esac
  AX_CHECK_UUID
  AX_CHECK_CURSES
 PKG_CHECK_MODULES(glib, [glib-2.0 >= 2.12])
-
-# Check library path
-AX_DEFAULT_LIB
 
 # Checks for libraries.
 AC_CHECK_HEADER([bzlib.h], [
