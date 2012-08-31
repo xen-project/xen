@@ -71,6 +71,38 @@ install: subdirs-install
 	$(INSTALL_DIR) $(DESTDIR)/var/lib/xen
 	$(INSTALL_DIR) $(DESTDIR)/var/lock/subsys
 
+.PHONY: uninstall
+uninstall: D=$(DESTDIR)
+uninstall:
+	rm -rf $(D)$(LIBDIR)/xen* $(D)$(BINDIR)/lomount
+	rm -rf $(D)$(BINDIR)/cpuperf-perfcntr $(D)$(BINDIR)/cpuperf-xen
+	rm -rf $(D)$(BINDIR)/xc_shadow
+	rm -rf $(D)$(BINDIR)/pygrub
+	rm -rf $(D)$(BINDIR)/setsize $(D)$(BINDIR)/tbctl
+	rm -rf $(D)$(BINDIR)/xsls
+	rm -rf $(D)$(BINDIR)/xenstore* $(D)$(BINDIR)/xentrace*
+	rm -rf $(D)$(BINDIR)/xen-detect $(D)$(BINDIR)/xencons
+	rm -rf $(D)$(BINDIR)/xenpvnetboot $(D)$(BINDIR)/qemu-*-xen
+	rm -rf $(D)$(INCLUDEDIR)/xenctrl* $(D)$(INCLUDEDIR)/xenguest.h
+	rm -rf $(D)$(INCLUDEDIR)/xs_lib.h $(D)$(INCLUDEDIR)/xs.h
+	rm -rf $(D)$(INCLUDEDIR)/xenstore-compat/xs_lib.h $(D)$(INCLUDEDIR)/xenstore-compat/xs.h
+	rm -rf $(D)$(INCLUDEDIR)/xenstore_lib.h $(D)$(INCLUDEDIR)/xenstore.h
+	rm -rf $(D)$(INCLUDEDIR)/xen
+	rm -rf $(D)$(INCLUDEDIR)/_libxl* $(D)$(INCLUDEDIR)/libxl*
+	rm -rf $(D)$(INCLUDEDIR)/xenstat.h $(D)$(INCLUDEDIR)/xentoollog.h
+	rm -rf $(D)$(LIBDIR)/libxenctrl* $(D)$(LIBDIR)/libxenguest*
+	rm -rf $(D)$(LIBDIR)/libxenstore* $(D)$(LIBDIR)/libxlutil*
+	rm -rf $(D)$(LIBDIR)/python/xen $(D)$(LIBDIR)/python/grub
+	rm -rf $(D)$(LIBDIR)/xen/
+	rm -rf $(D)$(LIBEXEC)/xen*
+	rm -rf $(D)$(SBINDIR)/setmask
+	rm -rf $(D)$(SBINDIR)/xen* $(D)$(SBINDIR)/netfix $(D)$(SBINDIR)/xm
+	rm -rf $(D)$(SHAREDIR)/doc/xen
+	rm -rf $(D)$(SHAREDIR)/xen
+	rm -rf $(D)$(SHAREDIR)/qemu-xen
+	rm -rf $(D)$(MAN1DIR)/xen*
+	rm -rf $(D)$(MAN8DIR)/xen*
+
 .PHONY: clean
 clean: subdirs-clean
 
