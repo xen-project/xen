@@ -45,7 +45,6 @@ GIT_HTTP            := @githttp@
 XENSTAT_XENTOP      := @monitors@
 VTPM_TOOLS          := @vtpm@
 LIBXENAPI_BINDINGS  := @xenapi@
-PYTHON_TOOLS        := @pythontools@
 OCAML_TOOLS         := @ocamltools@
 CONFIG_MINITERM     := @miniterm@
 CONFIG_LOMOUNT      := @lomount@

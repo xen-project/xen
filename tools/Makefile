@@ -48,8 +48,8 @@ SUBDIRS-$(CONFIG_TESTS) += tests
 
 # These don't cross-compile
 ifeq ($(XEN_COMPILE_ARCH),$(XEN_TARGET_ARCH))
-SUBDIRS-$(PYTHON_TOOLS) += python
-SUBDIRS-$(PYTHON_TOOLS) += pygrub
+SUBDIRS-y += python
+SUBDIRS-y += pygrub
 SUBDIRS-$(OCAML_TOOLS) += ocaml
 endif
 

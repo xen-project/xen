@@ -664,7 +664,6 @@ ovmf
 lomount
 miniterm
 ocamltools
-pythontools
 xenapi
 vtpm
 monitors
@@ -722,7 +721,6 @@ enable_githttp
 enable_monitors
 enable_vtpm
 enable_xenapi
-enable_pythontools
 enable_ocamltools
 enable_miniterm
 enable_lomount
@@ -1383,7 +1381,6 @@ Optional Features:
   --enable-vtpm           Enable Virtual Trusted Platform Module (default is
                           DISABLED)
   --enable-xenapi         Enable Xen API Bindings (default is DISABLED)
-  --disable-pythontools   Disable Python tools (default is ENABLED)
   --disable-ocamltools    Disable Ocaml tools (default is ENABLED)
   --enable-miniterm       Enable miniterm (default is DISABLED)
   --enable-lomount        Enable lomount (default is DISABLED)
@@ -2483,29 +2480,6 @@ elif test -z $ax_cv_xenapi; then :
 
 fi
 xenapi=$ax_cv_xenapi
-
-
-
-# Check whether --enable-pythontools was given.
-if test "${enable_pythontools+set}" = set; then :
-  enableval=$enable_pythontools;
-fi
-
-
-if test "x$enable_pythontools" = "xno"; then :
-
-    ax_cv_pythontools="n"
-
-elif test "x$enable_pythontools" = "xyes"; then :
-
-    ax_cv_pythontools="y"
-
-elif test -z $ax_cv_pythontools; then :
-
-    ax_cv_pythontools="y"
-
-fi
-pythontools=$ax_cv_pythontools
 
 
 
@@ -4897,6 +4871,74 @@ if test x"${BASH}" == x"no"
 then
     as_fn_error $? "Unable to find bash, please install bash" "$LINENO" 5
 fi
+if echo "$PYTHON" | grep -q "^/"; then :
+
+    PYTHONPATH=$PYTHON
+    PYTHON=`basename $PYTHONPATH`
+
+elif test -z "$PYTHON"; then :
+  PYTHON="python"
+else
+  as_fn_error $? "PYTHON specified, but is not an absolute path" "$LINENO" 5
+fi
+# Extract the first word of "$PYTHON", so it can be a program name with args.
+set dummy $PYTHON; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if test "${ac_cv_path_PYTHONPATH+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $PYTHONPATH in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_PYTHONPATH="$PYTHONPATH" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_path_PYTHONPATH="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  test -z "$ac_cv_path_PYTHONPATH" && ac_cv_path_PYTHONPATH="no"
+  ;;
+esac
+fi
+PYTHONPATH=$ac_cv_path_PYTHONPATH
+if test -n "$PYTHONPATH"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PYTHONPATH" >&5
+$as_echo "$PYTHONPATH" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+if test x"${PYTHONPATH}" == x"no"
+then
+    as_fn_error $? "Unable to find $PYTHON, please install $PYTHON" "$LINENO" 5
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for python version >= 2.3 " >&5
+$as_echo_n "checking for python version >= 2.3 ... " >&6; }
+`$PYTHON -c 'import sys; sys.exit(eval("sys.version_info < (2, 3)"))'`
+if test "$?" != "0"
+then
+    python_version=`$PYTHON -V 2>&1`
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+    as_fn_error $? "$python_version is too old, minimum required version is 2.3" "$LINENO" 5
+else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+fi
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -5295,76 +5337,6 @@ fi
 done
 
 
-if test "x$pythontools" = "xy"; then :
-
-    if echo "$PYTHON" | grep -q "^/"; then :
-
-        PYTHONPATH=$PYTHON
-        PYTHON=`basename $PYTHONPATH`
-
-elif test -z "$PYTHON"; then :
-  PYTHON="python"
-else
-  as_fn_error $? "PYTHON specified, but is not an absolute path" "$LINENO" 5
-fi
-    # Extract the first word of "$PYTHON", so it can be a program name with args.
-set dummy $PYTHON; ac_word=$2
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-$as_echo_n "checking for $ac_word... " >&6; }
-if test "${ac_cv_path_PYTHONPATH+set}" = set; then :
-  $as_echo_n "(cached) " >&6
-else
-  case $PYTHONPATH in
-  [\\/]* | ?:[\\/]*)
-  ac_cv_path_PYTHONPATH="$PYTHONPATH" # Let the user override the test with a path.
-  ;;
-  *)
-  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
-do
-  IFS=$as_save_IFS
-  test -z "$as_dir" && as_dir=.
-    for ac_exec_ext in '' $ac_executable_extensions; do
-  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
-    ac_cv_path_PYTHONPATH="$as_dir/$ac_word$ac_exec_ext"
-    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
-    break 2
-  fi
-done
-  done
-IFS=$as_save_IFS
-
-  test -z "$ac_cv_path_PYTHONPATH" && ac_cv_path_PYTHONPATH="no"
-  ;;
-esac
-fi
-PYTHONPATH=$ac_cv_path_PYTHONPATH
-if test -n "$PYTHONPATH"; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $PYTHONPATH" >&5
-$as_echo "$PYTHONPATH" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-if test x"${PYTHONPATH}" == x"no"
-then
-    as_fn_error $? "Unable to find $PYTHON, please install $PYTHON" "$LINENO" 5
-fi
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for python version >= 2.3 " >&5
-$as_echo_n "checking for python version >= 2.3 ... " >&6; }
-`$PYTHON -c 'import sys; sys.exit(eval("sys.version_info < (2, 3)"))'`
-if test "$?" != "0"
-then
-    python_version=`$PYTHON -V 2>&1`
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-    as_fn_error $? "$python_version is too old, minimum required version is 2.3" "$LINENO" 5
-else
-    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-fi
 
 ac_previous_cppflags=$CPPFLAGS
 ac_previous_ldflags=$LDFLAGS
@@ -5496,9 +5468,7 @@ fi
 CPPFLAGS=$ac_previous_cppflags
 LDLFAGS=$ac_previous_ldflags
 
-
-fi
- # Extract the first word of "xgettext", so it can be a program name with args.
+# Extract the first word of "xgettext", so it can be a program name with args.
 set dummy xgettext; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }

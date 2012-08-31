@@ -40,7 +40,6 @@ AX_ARG_DEFAULT_DISABLE([githttp], [Download GIT repositories via HTTP])
 AX_ARG_DEFAULT_ENABLE([monitors], [Disable xenstat and xentop monitoring tools])
 AX_ARG_DEFAULT_DISABLE([vtpm], [Enable Virtual Trusted Platform Module])
 AX_ARG_DEFAULT_DISABLE([xenapi], [Enable Xen API Bindings])
-AX_ARG_DEFAULT_ENABLE([pythontools], [Disable Python tools])
 AX_ARG_DEFAULT_ENABLE([ocamltools], [Disable Ocaml tools])
 AX_ARG_DEFAULT_DISABLE([miniterm], [Enable miniterm])
 AX_ARG_DEFAULT_DISABLE([lomount], [Enable lomount])
@@ -93,17 +92,15 @@ AS_IF([test "x$ocamltools" = "xy"], [
     ])
 ])
 AX_PATH_PROG_OR_FAIL([BASH], [bash])
-AS_IF([test "x$pythontools" = "xy"], [
-    AS_IF([echo "$PYTHON" | grep -q "^/"], [
-        PYTHONPATH=$PYTHON
-        PYTHON=`basename $PYTHONPATH`
-    ],[test -z "$PYTHON"], [PYTHON="python"],
-    [AC_MSG_ERROR([PYTHON specified, but is not an absolute path])])
-    AX_PATH_PROG_OR_FAIL([PYTHONPATH], [$PYTHON])
-    AX_CHECK_PYTHON_VERSION([2], [3])
-     AX_CHECK_PYTHON_DEVEL()
- ])
- AX_PATH_PROG_OR_FAIL([XGETTEXT], [xgettext])
+AS_IF([echo "$PYTHON" | grep -q "^/"], [
+    PYTHONPATH=$PYTHON
+    PYTHON=`basename $PYTHONPATH`
+],[test -z "$PYTHON"], [PYTHON="python"],
+[AC_MSG_ERROR([PYTHON specified, but is not an absolute path])])
+AX_PATH_PROG_OR_FAIL([PYTHONPATH], [$PYTHON])
+AX_CHECK_PYTHON_VERSION([2], [3])
+ AX_CHECK_PYTHON_DEVEL()
+AX_PATH_PROG_OR_FAIL([XGETTEXT], [xgettext])
 dnl as86, ld86, bcc and iasl are only required when the host system is x86*.
 dnl "host" here means the platform on which the hypervisor and tools is
 dnl going to run, not the platform on which we are building (known as
