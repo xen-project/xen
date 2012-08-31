@@ -20,8 +20,17 @@ error() {
 
 xpath=$1
 xstatus=$2
-xtype=$(xenstore-read "$xpath/type")
 xparams=$(xenstore-read "$xpath/params")
+if [ -b "$xparams" ]; then
+	xtype="phy"
+elif [ -f "$xparams" ]; then
+	xtype="file"
+elif [ -z "$xparams" ]; then
+	error "$xpath/params is empty, unable to attach block device."
+else
+	error "$xparams is not a valid file type to use as block device." \
+	      "Only block and regular image files accepted."
+fi
 
 case $xstatus in
 6)
