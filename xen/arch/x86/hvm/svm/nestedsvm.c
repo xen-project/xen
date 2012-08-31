@@ -1164,6 +1164,8 @@ enum hvm_intblk nsvm_intr_blocked(struct vcpu *v)
         return hvm_intblk_svm_gif;
 
     if ( nestedhvm_vcpu_in_guestmode(v) ) {
+        struct vmcb_struct *n2vmcb = nv->nv_n2vmcx;
+
         if ( svm->ns_hostflags.fields.vintrmask )
             if ( !svm->ns_hostflags.fields.rflagsif )
                 return hvm_intblk_rflags_ie;
@@ -1176,6 +1178,14 @@ enum hvm_intblk nsvm_intr_blocked(struct vcpu *v)
          */
         if ( v->arch.hvm_vcpu.hvm_io.io_state != HVMIO_none )
             return hvm_intblk_shadow;
+
+        if ( !nv->nv_vmexit_pending && n2vmcb->exitintinfo.bytes != 0 ) {
+            /* Give the l2 guest a chance to finish the delivery of
+             * the last injected interrupt or exception before we
+             * emulate a VMEXIT (e.g. VMEXIT(INTR) ).
+             */
+            return hvm_intblk_shadow;
+        }
     }
 
     if ( nv->nv_vmexit_pending ) {
