@@ -370,14 +370,18 @@ out:
 int cpupool_add_domain(struct domain *d, int poolid)
 {
     struct cpupool *c;
-    int rc = 1;
+    int rc;
     int n_dom = 0;
 
     if ( poolid == CPUPOOLID_NONE )
         return 0;
     spin_lock(&cpupool_lock);
     c = cpupool_find_by_id(poolid);
-    if ( (c != NULL) && cpumask_weight(c->cpu_valid) )
+    if ( c == NULL )
+        rc = -ESRCH;
+    else if ( !cpumask_weight(c->cpu_valid) )
+        rc = -ENODEV;
+    else
     {
         c->n_dom++;
         n_dom = c->n_dom;

@@ -1,6 +1,7 @@
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
+#include <xen/err.h>
 #include <xen/sched.h>
 #include <xen/sched-if.h>
 #include <xen/domain.h>
@@ -1319,7 +1320,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     /* Create initial domain 0. */
     dom0 = domain_create(0, DOMCRF_s3_integrity, 0);
-    if ( (dom0 == NULL) || (alloc_dom0_vcpu0() == NULL) )
+    if ( IS_ERR(dom0) || (alloc_dom0_vcpu0() == NULL) )
         panic("Error creating domain 0\n");
 
     dom0->is_privileged = 1;

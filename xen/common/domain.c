@@ -9,7 +9,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/ctype.h>
-#include <xen/errno.h>
+#include <xen/err.h>
 #include <xen/sched.h>
 #include <xen/sched-if.h>
 #include <xen/domain.h>
@@ -196,17 +196,17 @@ struct domain *domain_create(
     struct domain *d, **pd;
     enum { INIT_xsm = 1u<<0, INIT_watchdog = 1u<<1, INIT_rangeset = 1u<<2,
            INIT_evtchn = 1u<<3, INIT_gnttab = 1u<<4, INIT_arch = 1u<<5 };
-    int init_status = 0;
+    int err, init_status = 0;
     int poolid = CPUPOOLID_NONE;
 
     if ( (d = alloc_domain_struct()) == NULL )
-        return NULL;
+        return ERR_PTR(-ENOMEM);
 
     d->domain_id = domid;
 
     lock_profile_register_struct(LOCKPROF_TYPE_PERDOM, d, domid, "Domain");
 
-    if ( xsm_alloc_security_domain(d) != 0 )
+    if ( (err = xsm_alloc_security_domain(d)) != 0 )
         goto fail;
     init_status |= INIT_xsm;
 
@@ -226,6 +226,7 @@ struct domain *domain_create(
     spin_lock_init(&d->shutdown_lock);
     d->shutdown_code = -1;
 
+    err = -ENOMEM;
     if ( !zalloc_cpumask_var(&d->domain_dirty_cpumask) )
         goto fail;
 
@@ -251,7 +252,7 @@ struct domain *domain_create(
 
     if ( !is_idle_domain(d) )
     {
-        if ( xsm_domain_create(d, ssidref) != 0 )
+        if ( (err = xsm_domain_create(d, ssidref)) != 0 )
             goto fail;
 
         d->is_paused_by_controller = 1;
@@ -266,29 +267,30 @@ struct domain *domain_create(
 
         radix_tree_init(&d->pirq_tree);
 
-        if ( evtchn_init(d) != 0 )
+        if ( (err = evtchn_init(d)) != 0 )
             goto fail;
         init_status |= INIT_evtchn;
 
-        if ( grant_table_create(d) != 0 )
+        if ( (err = grant_table_create(d)) != 0 )
             goto fail;
         init_status |= INIT_gnttab;
 
         poolid = 0;
 
+        err = -ENOMEM;
         d->mem_event = xzalloc(struct mem_event_per_domain);
         if ( !d->mem_event )
             goto fail;
     }
 
-    if ( arch_domain_create(d, domcr_flags) != 0 )
+    if ( (err = arch_domain_create(d, domcr_flags)) != 0 )
         goto fail;
     init_status |= INIT_arch;
 
-    if ( cpupool_add_domain(d, poolid) != 0 )
+    if ( (err = cpupool_add_domain(d, poolid)) != 0 )
         goto fail;
 
-    if ( sched_init_domain(d) != 0 )
+    if ( (err = sched_init_domain(d)) != 0 )
         goto fail;
 
     if ( !is_idle_domain(d) )
@@ -329,7 +331,7 @@ struct domain *domain_create(
         xsm_free_security_domain(d);
     free_cpumask_var(d->domain_dirty_cpumask);
     free_domain_struct(d);
-    return NULL;
+    return ERR_PTR(err);
 }
 
 

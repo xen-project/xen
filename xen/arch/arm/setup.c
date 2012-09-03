@@ -26,6 +26,7 @@
 #include <xen/serial.h>
 #include <xen/sched.h>
 #include <xen/console.h>
+#include <xen/err.h>
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/mm.h>
@@ -237,7 +238,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     /* Create initial domain 0. */
     dom0 = domain_create(0, 0, 0);
-    if ( dom0 == NULL )
+    if ( IS_ERR(dom0) )
             printk("domain_create failed\n");
     if ( (dom0 == NULL) || (alloc_dom0_vcpu0() == NULL) )
             panic("Error creating domain 0\n");

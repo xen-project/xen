@@ -9,6 +9,7 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
+#include <xen/err.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
 #include <xen/sched-if.h>
@@ -455,10 +456,12 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( op->u.createdomain.flags & XEN_DOMCTL_CDF_oos_off )
             domcr_flags |= DOMCRF_oos_off;
 
-        ret = -ENOMEM;
         d = domain_create(dom, domcr_flags, op->u.createdomain.ssidref);
-        if ( d == NULL )
+        if ( IS_ERR(d) )
+        {
+            ret = PTR_ERR(d);
             break;
+        }
 
         ret = 0;
 

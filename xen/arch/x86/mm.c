@@ -91,7 +91,7 @@
 #include <xen/mm.h>
 #include <xen/domain.h>
 #include <xen/sched.h>
-#include <xen/errno.h>
+#include <xen/err.h>
 #include <xen/perfc.h>
 #include <xen/irq.h>
 #include <xen/softirq.h>
@@ -309,7 +309,7 @@ void __init arch_init_memory(void)
      * their domain field set to dom_xen.
      */
     dom_xen = domain_create(DOMID_XEN, DOMCRF_dummy, 0);
-    BUG_ON(dom_xen == NULL);
+    BUG_ON(IS_ERR(dom_xen));
 
     /*
      * Initialise our DOMID_IO domain.
@@ -317,14 +317,14 @@ void __init arch_init_memory(void)
      * array. Mappings occur at the priv of the caller.
      */
     dom_io = domain_create(DOMID_IO, DOMCRF_dummy, 0);
-    BUG_ON(dom_io == NULL);
+    BUG_ON(IS_ERR(dom_io));
     
     /*
-     * Initialise our DOMID_IO domain.
+     * Initialise our COW domain.
      * This domain owns sharable pages.
      */
     dom_cow = domain_create(DOMID_COW, DOMCRF_dummy, 0);
-    BUG_ON(dom_cow == NULL);
+    BUG_ON(IS_ERR(dom_cow));
 
     /* First 1MB of RAM is historically marked as I/O. */
     for ( i = 0; i < 0x100; i++ )

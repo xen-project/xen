@@ -28,7 +28,7 @@
 #include <xen/softirq.h>
 #include <xen/trace.h>
 #include <xen/mm.h>
-#include <xen/errno.h>
+#include <xen/err.h>
 #include <xen/guest_access.h>
 #include <xen/multicall.h>
 #include <xen/cpu.h>
@@ -1323,7 +1323,7 @@ void __init scheduler_init(void)
         panic("scheduler returned error on init\n");
 
     idle_domain = domain_create(DOMID_IDLE, 0, 0);
-    BUG_ON(idle_domain == NULL);
+    BUG_ON(IS_ERR(idle_domain));
     idle_domain->vcpu = idle_vcpu;
     idle_domain->max_vcpus = nr_cpu_ids;
     if ( alloc_vcpu(idle_domain, 0, 0) == NULL )
