@@ -323,6 +323,12 @@ static inline struct page_info *__virt_to_page(const void *v)
 static inline void *__page_to_virt(const struct page_info *pg)
 {
     ASSERT((unsigned long)pg - FRAMETABLE_VIRT_START < FRAMETABLE_VIRT_END);
+    /*
+     * (sizeof(*pg) & -sizeof(*pg)) selects the LS bit of sizeof(*pg). The
+     * division and re-multiplication avoids one shift when sizeof(*pg) is a
+     * power of two (otherwise there would be a right shift followed by a
+     * left shift, which the compiler can't know it can fold into one).
+     */
     return (void *)(DIRECTMAP_VIRT_START +
                     ((unsigned long)pg - FRAMETABLE_VIRT_START) /
                     (sizeof(*pg) / (sizeof(*pg) & -sizeof(*pg))) *
