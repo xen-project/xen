@@ -365,6 +365,7 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
 {
     RTCState *s = opaque;
     struct domain *d = vrtc_domain(s);
+    uint32_t orig;
 
     spin_lock(&s->lock);
 
@@ -382,6 +383,7 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
         return 0;
     }
 
+    orig = s->hw.cmos_data[s->hw.cmos_index];
     switch ( s->hw.cmos_index )
     {
     case RTC_SECONDS_ALARM:
@@ -405,9 +407,9 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
         break;
     case RTC_REG_A:
         /* UIP bit is read only */
-        s->hw.cmos_data[RTC_REG_A] = (data & ~RTC_UIP) |
-            (s->hw.cmos_data[RTC_REG_A] & RTC_UIP);
-        rtc_timer_update(s);
+        s->hw.cmos_data[RTC_REG_A] = (data & ~RTC_UIP) | (orig & RTC_UIP);
+        if ( (data ^ orig) & ~RTC_UIP )
+            rtc_timer_update(s);
         break;
     case RTC_REG_B:
         if ( data & RTC_SET )
@@ -436,7 +438,8 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
                 hvm_isa_irq_assert(d, RTC_IRQ);
             }
         s->hw.cmos_data[RTC_REG_B] = data;
-        rtc_timer_update(s);
+        if ( (data ^ orig) & RTC_PIE )
+            rtc_timer_update(s);
         check_update_timer(s);
         alarm_timer_update(s);
         break;
