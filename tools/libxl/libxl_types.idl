@@ -135,6 +135,11 @@ libxl_vga_interface_type = Enumeration("vga_interface_type", [
 # Complex libxl types
 #
 
+libxl_ioport_range = Struct("ioport_range", [
+    ("first", uint32),
+    ("number", uint32),
+    ])
+
 libxl_vga_interface_info = Struct("vga_interface_info", [
     ("kind",    libxl_vga_interface_type),
     ])
@@ -276,6 +281,9 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("extra_hvm",        libxl_string_list),
     #  parameters for all type of scheduler
     ("sched_params",     libxl_domain_sched_params),
+
+    ("ioports",          Array(libxl_ioport_range, "num_ioports")),
+    ("irqs",             Array(uint32, "num_irqs")),
 
     ("u", KeyedUnion(None, libxl_domain_type, "type",
                 [("hvm", Struct(None, [("firmware",         string),

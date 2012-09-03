@@ -933,6 +933,36 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         LOG(ERROR, "unable to add disk devices");
         goto error_out;
     }
+
+    for (i = 0; i < d_config->b_info.num_ioports; i++) {
+        libxl_ioport_range *io = &d_config->b_info.ioports[i];
+
+        LOG(DEBUG, "dom%d ioports %"PRIx32"-%"PRIx32,
+            domid, io->first, io->first + io->number - 1);
+
+        ret = xc_domain_ioport_permission(CTX->xch, domid,
+                                          io->first, io->number, 1);
+        if ( ret<0 ){
+            LOGE(ERROR,
+                 "failed give dom%d access to ioports %"PRIx32"-%"PRIx32,
+                 domid, io->first, io->first + io->number - 1);
+            ret = ERROR_FAIL;
+        }
+    }
+
+    for (i = 0; i < d_config->b_info.num_irqs; i++) {
+        uint32_t irq = d_config->b_info.irqs[i];
+
+        LOG(DEBUG, "dom%d irq %"PRIx32, domid, irq);
+
+        ret = xc_domain_irq_permission(CTX->xch, domid, irq, 1);
+        if ( ret<0 ){
+            LOGE(ERROR,
+                 "failed give dom%d access to irq %"PRId32, domid, irq);
+            ret = ERROR_FAIL;
+        }
+    }
+
     for (i = 0; i < d_config->num_nics; i++) {
         /* We have to init the nic here, because we still haven't
          * called libxl_device_nic_add at this point, but qemu needs

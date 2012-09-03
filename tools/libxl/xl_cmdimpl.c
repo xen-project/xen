@@ -573,10 +573,12 @@ static void parse_config_data(const char *config_source,
     long l;
     XLU_Config *config;
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids;
+    XLU_ConfigList *ioports, *irqs;
+    int num_ioports, num_irqs;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 0;
     int pci_permissive = 0;
-    int e;
+    int i, e;
 
     libxl_domain_create_info *c_info = &d_config->c_info;
     libxl_domain_build_info *b_info = &d_config->b_info;
@@ -917,6 +919,89 @@ static void parse_config_data(const char *config_source,
     }
     default:
         abort();
+    }
+
+    if (!xlu_cfg_get_list(config, "ioports", &ioports, &num_ioports, 0)) {
+        b_info->num_ioports = num_ioports;
+        b_info->ioports = calloc(num_ioports, sizeof(*b_info->ioports));
+        if (b_info->ioports == NULL) {
+            fprintf(stderr, "unable to allocate memory for ioports\n");
+            exit(-1);
+        }
+
+        for (i = 0; i < num_ioports; i++) {
+            const char *buf2;
+            char *ep;
+            uint32_t start, end;
+            unsigned long ul;
+
+            buf = xlu_cfg_get_listitem (ioports, i);
+            if (!buf) {
+                fprintf(stderr,
+                        "xl: Unable to get element #%d in ioport list\n", i);
+                exit(1);
+            }
+            ul = strtoul(buf, &ep, 16);
+            if (ep == buf) {
+                fprintf(stderr, "xl: Invalid argument parsing ioport: %s\n",
+                        buf);
+                exit(1);
+            }
+            if (ul >= UINT32_MAX) {
+                fprintf(stderr, "xl: ioport %lx too big\n", ul);
+                exit(1);
+            }
+            start = end = ul;
+
+            if (*ep == '-') {
+                buf2 = ep + 1;
+                ul = strtoul(buf2, &ep, 16);
+                if (ep == buf2 || *ep != '\0' || start > end) {
+                    fprintf(stderr,
+                            "xl: Invalid argument parsing ioport: %s\n", buf);
+                    exit(1);
+                }
+                if (ul >= UINT32_MAX) {
+                    fprintf(stderr, "xl: ioport %lx too big\n", ul);
+                    exit(1);
+                }
+                end = ul;
+            } else if ( *ep != '\0' )
+                fprintf(stderr,
+                        "xl: Invalid argument parsing ioport: %s\n", buf);
+            b_info->ioports[i].first = start;
+            b_info->ioports[i].number = end - start + 1;
+        }
+    }
+
+    if (!xlu_cfg_get_list(config, "irqs", &irqs, &num_irqs, 0)) {
+        b_info->num_irqs = num_irqs;
+        b_info->irqs = calloc(num_irqs, sizeof(*b_info->irqs));
+        if (b_info->irqs == NULL) {
+            fprintf(stderr, "unable to allocate memory for ioports\n");
+            exit(-1);
+        }
+        for (i = 0; i < num_irqs; i++) {
+            char *ep;
+            unsigned long ul;
+            buf = xlu_cfg_get_listitem (irqs, i);
+            if (!buf) {
+                fprintf(stderr,
+                        "xl: Unable to get element %d in irq list\n", i);
+                exit(1);
+            }
+            ul = strtoul(buf, &ep, 10);
+            if (ep == buf) {
+                fprintf(stderr,
+                        "xl: Invalid argument parsing irq: %s\n", buf);
+                exit(1);
+            }
+            if (ul >= UINT32_MAX) {
+                fprintf(stderr, "xl: irq %lx too big\n", ul);
+                exit(1);
+            }
+            b_info->irqs[i] = ul;
+        }
     }
 
     if (!xlu_cfg_get_list (config, "disk", &vbds, 0, 0)) {

@@ -402,6 +402,30 @@ for more information on the "permissive" flag.
 
 =back
 
+=item B<ioports=[ "IOPORT_RANGE", "IOPORT_RANGE", ... ]>
+
+=over 4
+
+Allow guest to access specific legacy I/O ports. Each B<IOPORT_RANGE>
+is given in hexadecimal and may either a span e.g. C<2f8-2ff>
+(inclusive) or a single I/O port C<2f8>.
+
+It is recommended to use this option only for trusted VMs under
+administrator control.
+
+=back
+
+=item B<irqs=[ NUMBER, NUMBER, ... ]>
+
+=over 4
+
+Allow a guest to access specific physical IRQs.
+
+It is recommended to use this option only for trusted VMs under
+administrator control.
+
+=back
+
 =head2 Paravirtualised (PV) Guest Specific Options
 
 The following options apply only to Paravirtual guests.
