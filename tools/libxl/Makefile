@@ -85,7 +85,8 @@ $(LIBXLU_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 CLIENTS = xl testidl libxl-save-helper
 
 XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o xl_sxp.o
-$(XL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
+$(XL_OBJS) _libxl.api-for-check: \
+            CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 $(XL_OBJS): CFLAGS += $(CFLAGS_libxenlight)
 $(XL_OBJS): CFLAGS += -include $(XEN_ROOT)/tools/config.h # libxl_json.h needs it.
 
@@ -116,12 +117,13 @@ $(eval $(genpath-target))
 
 libxl.api-ok: check-libxl-api-rules _libxl.api-for-check
 	$(PERL) $^
+	touch $@
 
 _%.api-for-check: %.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_$*.o) -c -E $< $(APPEND_CFLAGS) \
 		-DLIBXL_EXTERNAL_CALLERS_ONLY=LIBXL_EXTERNAL_CALLERS_ONLY \
 		>$@.new
-	$(call move-if-changed,$@.new,$@)
+	mv -f $@.new $@
 
 _paths.h: genpath
 	sed -e "s/\([^=]*\)=\(.*\)/#define \1 \2/g" $@.tmp >$@.2.tmp
@@ -211,7 +213,7 @@ install: all
 clean:
 	$(RM) -f _*.h *.o *.so* *.a $(CLIENTS) $(DEPS)
 	$(RM) -f _*.c *.pyc _paths.*.tmp _*.api-for-check
-	$(RM) -f testidl.c.new testidl.c
+	$(RM) -f testidl.c.new testidl.c *.api-ok
 
 distclean: clean
 
