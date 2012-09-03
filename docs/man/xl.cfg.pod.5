@@ -740,10 +740,18 @@ in the B<VFB_SPEC_STRING> for configuring virtual frame buffer devices
 Sets the amount of RAM which the emulated video card will contain,
 which in turn limits the resolutions and bit depths which will be
 available. This option is only available when using the B<stdvga>
-option (see below). The default is 8MB which is sufficient for
-e.g. 1600x1200 at 32bpp. When not using the B<stdvga> option the
-amount of video ram is fixed at 4MB which is sufficient for 1024x768
-at 32 bpp.
+option (see below).
+The default amount of video ram for stdvga is 8MB which is sufficient
+for e.g. 1600x1200 at 32bpp.
+
+When using the emulated Cirrus graphics card (B<stdvga=0>)
+the amount of video ram is fixed at 4MB which is sufficient
+for 1024x768 at 32 bpp.
+
+videoram option is currently only available when using the
+qemu-xen-traditional device-model. Upstream qemu-xen device-model
+currently doesn't support changing the amount of video memory
+for the emulated graphics device.
 
 =item B<stdvga=BOOLEAN>
 
@@ -751,6 +759,7 @@ Select a standard VGA card with VBE (VESA BIOS Extensions) as the
 emulated graphics device. The default is false which means to emulate
 a Cirrus Logic GD5446 VGA card. If your guest supports VBE 2.0 or
 later (e.g. Windows XP onwards) then you should enable this.
+stdvga supports more video ram and bigger resolutions than Cirrus.
 
 =item B<vnc=BOOLEAN>
 
