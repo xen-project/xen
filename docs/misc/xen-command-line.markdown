@@ -11,7 +11,8 @@ Hypervisor.
 ## Types of parameter
 
 Most parameters take the form `option=value`.  Different options on
-the command line should be space delimited.
+the command line should be space delimited.  All options are case
+sensitive, as are all values unless explicitly noted.
 
 ### Boolean (`<boolean>`)
 
@@ -35,12 +36,18 @@ Disable x2apic support (if present)
 Enable synchronous console mode
 > `sync_console`
 
+Explicitly specifying any value other than those listed above is
+undefined, as is stacking a `no-` prefix with an explicit value.
+
 ### Integer (`<integer>`)
 
 An integer parameter will default to decimal and may be prefixed with
 a `-` for negative numbers.  Alternatively, a hexadecimal number may be
 used by prefixing the number with `0x`, or an octal number may be used
 if a leading `0` is present.
+
+Providing a string which does not validly convert to an integer is
+undefined.
 
 ### Size (`<size>`)
 
@@ -51,7 +58,8 @@ A size parameter may be any integer, with a size suffix
 * `K` or `k`: KiB (2^10)
 * `B` or `b`: Bytes
 
-Without a size suffix, the default will be kilo.
+Without a size suffix, the default will be kilo.  Providing a suffix
+other than those listed above is undefined.
 
 ### String
 
