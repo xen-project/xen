@@ -116,6 +116,9 @@ struct hvm_function_table {
     void (*update_guest_cr)(struct vcpu *v, unsigned int cr);
     void (*update_guest_efer)(struct vcpu *v);
 
+    int  (*get_guest_pat)(struct vcpu *v, u64 *);
+    int  (*set_guest_pat)(struct vcpu *v, u64);
+
     void (*set_tsc_offset)(struct vcpu *v, u64 offset);
 
     void (*inject_exception)(unsigned int trapnr, int errcode,
@@ -165,6 +168,9 @@ void hvm_vcpu_cacheattr_destroy(struct vcpu *v);
 void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip);
 
 bool_t hvm_send_assist_req(struct vcpu *v);
+
+void hvm_get_guest_pat(struct vcpu *v, u64 *guest_pat);
+int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat);
 
 void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc);
 u64 hvm_get_guest_tsc(struct vcpu *v);
