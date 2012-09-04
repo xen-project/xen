@@ -21,7 +21,7 @@ void free_compat_arg_xlat(struct vcpu *v);
  * non-canonical address (and thus fault) before ever reaching VIRT_START.
  */
 #define __addr_ok(addr) \
-    (((unsigned long)(addr) < (1UL<<48)) || \
+    (((unsigned long)(addr) < (1UL<<47)) || \
      ((unsigned long)(addr) >= HYPERVISOR_VIRT_END))
 
 #define access_ok(addr, size) \
