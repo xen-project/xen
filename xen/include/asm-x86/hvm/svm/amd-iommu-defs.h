@@ -269,6 +269,8 @@
 #define IOMMU_EVENT_DEVICE_ID_MASK           0x0000FFFF
 #define IOMMU_EVENT_DEVICE_ID_SHIFT          0
 
+#define IOMMU_LOG_ENTRY_TIMEOUT                         1000
+
 /* Control Register */
 #define IOMMU_CONTROL_MMIO_OFFSET			0x18
 #define IOMMU_CONTROL_TRANSLATION_ENABLE_MASK		0x00000001
