@@ -25,7 +25,7 @@ struct mmcfg_virt {
 static struct mmcfg_virt *pci_mmcfg_virt;
 static int __initdata mmcfg_pci_segment_shift;
 
-static char __iomem *get_virt(unsigned int seg, unsigned bus)
+static char __iomem *get_virt(unsigned int seg, unsigned int *bus)
 {
     struct acpi_mcfg_allocation *cfg;
     int cfg_num;
@@ -33,9 +33,11 @@ static char __iomem *get_virt(unsigned int seg, unsigned bus)
     for (cfg_num = 0; cfg_num < pci_mmcfg_config_num; cfg_num++) {
         cfg = pci_mmcfg_virt[cfg_num].cfg;
         if (cfg->pci_segment == seg &&
-            (cfg->start_bus_number <= bus) &&
-            (cfg->end_bus_number >= bus))
+            (cfg->start_bus_number <= *bus) &&
+            (cfg->end_bus_number >= *bus)) {
+            *bus -= cfg->start_bus_number;
             return pci_mmcfg_virt[cfg_num].virt;
+        }
     }
 
     /* Fall back to type 0 */
@@ -46,7 +48,7 @@ static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus, unsigned i
 {
     char __iomem *addr;
 
-    addr = get_virt(seg, bus);
+    addr = get_virt(seg, &bus);
     if (!addr)
         return NULL;
      return addr + ((bus << 20) | (devfn << 12));
@@ -121,8 +123,11 @@ static void __iomem * __init mcfg_ioremap(struct acpi_mcfg_allocation *cfg)
     if (virt + size < virt || virt + size > PCI_MCFG_VIRT_END)
         return NULL;
 
-    map_pages_to_xen(virt, cfg->address >> PAGE_SHIFT,
-                     size >> PAGE_SHIFT, PAGE_HYPERVISOR_NOCACHE);
+    if (map_pages_to_xen(virt,
+                         (cfg->address >> PAGE_SHIFT) +
+                         (cfg->start_bus_number << (20 - PAGE_SHIFT)),
+                         size >> PAGE_SHIFT, PAGE_HYPERVISOR_NOCACHE))
+        return NULL;
 
     return (void __iomem *) virt;
 }
