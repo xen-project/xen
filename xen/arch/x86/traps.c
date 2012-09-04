@@ -3516,6 +3516,9 @@ long register_guest_nmi_callback(unsigned long address)
     struct domain *d = v->domain;
     struct trap_info *t = &v->arch.guest_context.trap_ctxt[TRAP_nmi];
 
+    if ( !is_canonical_address(address) )
+        return -EINVAL;
+
     t->vector  = TRAP_nmi;
     t->flags   = 0;
     t->cs      = (is_pv_32on64_domain(d) ?
@@ -3642,6 +3645,9 @@ long do_set_trap_table(XEN_GUEST_HANDLE(const_trap_info_t) traps)
 
         if ( cur.address == 0 )
             break;
+
+        if ( !is_canonical_address(cur.address) )
+            return -EINVAL;
 
         fixup_guest_code_selector(curr->domain, cur.cs);
 

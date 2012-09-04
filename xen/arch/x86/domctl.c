@@ -1147,6 +1147,9 @@ long arch_do_domctl(
             if ( evc->size != sizeof(*evc) )
                 goto ext_vcpucontext_out;
 #ifdef __x86_64__
+            if ( !is_canonical_address(evc->sysenter_callback_eip) ||
+                 !is_canonical_address(evc->syscall32_callback_eip) )
+                goto ext_vcpucontext_out;
             fixup_guest_code_selector(d, evc->sysenter_callback_cs);
             v->arch.sysenter_callback_cs      = evc->sysenter_callback_cs;
             v->arch.sysenter_callback_eip     = evc->sysenter_callback_eip;
