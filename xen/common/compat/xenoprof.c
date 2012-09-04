@@ -5,6 +5,7 @@
 #include <compat/xenoprof.h>
 
 #define COMPAT
+#define ret_t int
 
 #define do_xenoprof_op compat_xenoprof_op
 
