@@ -587,11 +587,16 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
 
         spin_lock(&d->event_lock);
-        out.pirq = get_free_pirq(d, out.type, 0);
-        d->arch.pirq_irq[out.pirq] = PIRQ_ALLOCATED;
+        ret = get_free_pirq(d, out.type, 0);
+        if ( ret >= 0 )
+            d->arch.pirq_irq[ret] = PIRQ_ALLOCATED;
         spin_unlock(&d->event_lock);
 
-        ret = copy_to_guest(arg, &out, 1) ? -EFAULT : 0;
+        if ( ret >= 0 )
+        {
+            out.pirq = ret;
+            ret = copy_to_guest(arg, &out, 1) ? -EFAULT : 0;
+        }
 
         rcu_unlock_domain(d);
         break;
