@@ -58,7 +58,7 @@
    We can slow the instruction pipeline for instructions coming via the
    gdt or the ldt if we want to.  I am not sure why this is an advantage */
 
-#define DR_CONTROL_RESERVED_ZERO (0x0000d800ul) /* Reserved, read as zero */
+#define DR_CONTROL_RESERVED_ZERO (~0xffff27fful) /* Reserved, read as zero */
 #define DR_CONTROL_RESERVED_ONE  (0x00000400ul) /* Reserved, read as one */
 #define DR_LOCAL_EXACT_ENABLE    (0x00000100ul) /* Local exact enable */
 #define DR_GLOBAL_EXACT_ENABLE   (0x00000200ul) /* Global exact enable */
