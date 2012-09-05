@@ -178,9 +178,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := xen-4.0.4
-# Thu Feb 2 13:47:06 2012 +0000
-# e1000: bounds packet size against buffer size
+QEMU_TAG := 091149d364e893e643a5da3175c3f84d2163cb3e
+# Wed Sep 5 12:31:40 2012 +0100                                                
+# console: bounds check whenever changing the cursor due to an escape code     
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
