@@ -214,9 +214,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.2.0-rc3
-# Tue Aug 14 15:57:49 2012 +0100
-# Revert "qemu-xen-traditional: use O_DIRECT to open disk images for IDE"
+QEMU_TAG ?= a56ae4b5069c7b23ee657b15f08443a9b14a8e7b
+# Wed Sep 5 12:31:40 2012 +0100
+# console: bounds check whenever changing the cursor due to an escape code
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
