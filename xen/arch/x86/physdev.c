@@ -698,13 +698,13 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         struct physdev_get_free_pirq out;
         struct domain *d;
 
-        d = rcu_lock_current_domain();
-        
         ret = -EFAULT;
         if ( copy_from_guest(&out, arg, 1) != 0 )
             break;
 
+        d = rcu_lock_current_domain();
         spin_lock(&d->event_lock);
+
         ret = get_free_pirq(d, out.type);
         if ( ret >= 0 )
         {
@@ -715,7 +715,9 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             else
                 ret = -ENOMEM;
         }
+
         spin_unlock(&d->event_lock);
+        rcu_unlock_domain(d);
 
         if ( ret >= 0 )
         {
@@ -723,7 +725,6 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             ret = copy_to_guest(arg, &out, 1) ? -EFAULT : 0;
         }
 
-        rcu_unlock_domain(d);
         break;
     }
     default:
