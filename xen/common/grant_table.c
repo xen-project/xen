@@ -2339,6 +2339,12 @@ __gnttab_swap_grant_ref(grant_ref_t ref_a, grant_ref_t ref_b)
 
     spin_lock(&gt->lock);
 
+    /* Bounds check on the grant refs */
+    if ( unlikely(ref_a >= nr_grant_entries(d->grant_table)))
+        PIN_FAIL(out, GNTST_bad_gntref, "Bad ref-a (%d).\n", ref_a);
+    if ( unlikely(ref_b >= nr_grant_entries(d->grant_table)))
+        PIN_FAIL(out, GNTST_bad_gntref, "Bad ref-b (%d).\n", ref_b);
+
     act = &active_entry(gt, ref_a);
     if ( act->pin )
         PIN_FAIL(out, GNTST_eagain, "ref a %ld busy\n", (long)ref_a);
