@@ -1117,7 +1117,8 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     mfn_t omfn;
     int rc = 0;
 
-    BUG_ON(!paging_mode_translate(d));
+    if ( !paging_mode_translate(d) )
+        return -EINVAL;
 
     rc = p2m_gfn_check_limit(d, gfn, order);
     if ( rc != 0 )
