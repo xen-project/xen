@@ -42,11 +42,18 @@ static int physdev_hvm_map_pirq(
         struct hvm_girq_dpci_mapping *girq;
         uint32_t machine_gsi = 0;
 
+        if ( *index < 0 || *index >= NR_HVM_IRQS )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
         /* find the machine gsi corresponding to the
          * emulated gsi */
         hvm_irq_dpci = domain_get_irq_dpci(d);
         if ( hvm_irq_dpci )
         {
+            BUILD_BUG_ON(ARRAY_SIZE(hvm_irq_dpci->girq) < NR_HVM_IRQS);
             list_for_each_entry ( girq,
                                   &hvm_irq_dpci->girq[*index],
                                   list )
