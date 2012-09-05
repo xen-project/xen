@@ -136,7 +136,7 @@ int pirq_shared(struct domain *d , int irq);
 int map_domain_pirq(struct domain *d, int pirq, int irq, int type,
                            void *data);
 int unmap_domain_pirq(struct domain *d, int pirq);
-int get_free_pirq(struct domain *d, int type, int index);
+int get_free_pirq(struct domain *d, int type);
 void free_domain_pirqs(struct domain *d);
 int map_domain_emuirq_pirq(struct domain *d, int pirq, int irq);
 int unmap_domain_pirq_emuirq(struct domain *d, int pirq);

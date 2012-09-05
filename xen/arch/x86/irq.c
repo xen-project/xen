@@ -1816,7 +1816,7 @@ static inline bool_t is_free_pirq(const struct domain *d,
         pirq->arch.hvm.emuirq == IRQ_UNBOUND));
 }
 
-int get_free_pirq(struct domain *d, int type, int index)
+int get_free_pirq(struct domain *d, int type)
 {
     int i;
 

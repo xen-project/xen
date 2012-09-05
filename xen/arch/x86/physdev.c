@@ -71,7 +71,7 @@ static int physdev_hvm_map_pirq(
         else
         {
             if ( *pirq < 0 )
-                *pirq = get_free_pirq(d, type, *index);
+                *pirq = get_free_pirq(d, type);
             ret = map_domain_emuirq_pirq(d, *pirq, *index);
         }
         break;
@@ -187,7 +187,7 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
         }
         else
         {
-            pirq = get_free_pirq(d, type, *index);
+            pirq = get_free_pirq(d, type);
             if ( pirq < 0 )
             {
                 dprintk(XENLOG_G_ERR, "dom%d: no free pirq\n", d->domain_id);
@@ -705,7 +705,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
             break;
 
         spin_lock(&d->event_lock);
-        ret = get_free_pirq(d, out.type, 0);
+        ret = get_free_pirq(d, out.type);
         if ( ret >= 0 )
         {
             struct pirq *info = pirq_get_info(d, ret);
