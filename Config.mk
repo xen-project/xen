@@ -179,9 +179,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.1.3
-# Mon Apr 2 17:55:05 2012 +0100
-# qemu-xen-traditional: QDISK fixes
+QEMU_TAG ?= 3220480734832a148d26f7a81f90af61c2ecfdd9
+# Wed Sep 5 12:31:40 2012 +0100                                                
+# console: bounds check whenever changing the cursor due to an escape code     
 
 # Optional components
 XENSTAT_XENTOP     ?= y
