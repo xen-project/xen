@@ -587,7 +587,6 @@ static void migrate_timers_from_cpu(unsigned int old_cpu)
 
     spin_unlock(&old_ts->lock);
     spin_unlock_irq(&new_ts->lock);
-    local_irq_enable();
 
     if ( notify )
         cpu_raise_softirq(new_cpu, TIMER_SOFTIRQ);
