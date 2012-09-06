@@ -214,9 +214,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= a56ae4b5069c7b23ee657b15f08443a9b14a8e7b
-# Wed Sep 5 12:31:40 2012 +0100
-# console: bounds check whenever changing the cursor due to an escape code
+QEMU_TAG ?= bacc0d302445c75f18f4c826750fb5853b60e7ca
+# Thu Sep 6 17:05:30 2012 +0100
+# Disable qemu monitor by default.  The qemu monitor is an overly
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
