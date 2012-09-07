@@ -90,13 +90,9 @@ static int physdev_hvm_map_pirq(
 int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
                      struct msi_info *msi)
 {
-    struct domain *d;
+    struct domain *d = current->domain;
     int pirq, irq, ret = 0;
     void *map_data = NULL;
-
-    ret = rcu_lock_target_domain_by_id(domid, &d);
-    if ( ret )
-        return ret;
 
     if ( domid == DOMID_SELF && is_hvm_domain(d) )
     {
@@ -105,13 +101,14 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
          * calls back into itself and deadlocks on hvm_domain.irq_lock.
          */
         if ( !is_hvm_pv_evtchn_domain(d) )
-        {
-            ret = -EINVAL;
-            goto free_domain;
-        }
-        ret = physdev_hvm_map_pirq(d, type, index, pirq_p);
-        goto free_domain;
+            return -EINVAL;
+
+        return physdev_hvm_map_pirq(d, type, index, pirq_p);
     }
+
+    ret = rcu_lock_target_domain_by_id(domid, &d);
+    if ( ret )
+        return ret;
 
     if ( !IS_PRIV_FOR(current->domain, d) )
     {
@@ -696,13 +693,12 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     }
     case PHYSDEVOP_get_free_pirq: {
         struct physdev_get_free_pirq out;
-        struct domain *d;
+        struct domain *d = v->domain;
 
         ret = -EFAULT;
         if ( copy_from_guest(&out, arg, 1) != 0 )
             break;
 
-        d = rcu_lock_current_domain();
         spin_lock(&d->event_lock);
 
         ret = get_free_pirq(d, out.type);
@@ -717,7 +713,6 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         }
 
         spin_unlock(&d->event_lock);
-        rcu_unlock_domain(d);
 
         if ( ret >= 0 )
         {
