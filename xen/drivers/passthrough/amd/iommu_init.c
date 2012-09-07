@@ -564,7 +564,7 @@ static hw_irq_controller iommu_msi_type = {
 
 static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
 {
-    u16 domain_id, device_id, bdf, cword;
+    u16 domain_id, device_id, bdf, cword, flags;
     u32 code;
     u64 *addr;
     int count = 0;
@@ -609,11 +609,14 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
         domain_id = get_field_from_reg_u32(entry[1],
                                            IOMMU_EVENT_DOMAIN_ID_MASK,
                                            IOMMU_EVENT_DOMAIN_ID_SHIFT);
+        flags = get_field_from_reg_u32(entry[1],
+                                       IOMMU_EVENT_FLAGS_MASK,
+                                       IOMMU_EVENT_FLAGS_SHIFT);
         addr= (u64*) (entry + 2);
         printk(XENLOG_ERR "AMD-Vi: "
                "%s: domain = %d, device id = 0x%04x, "
-               "fault address = 0x%"PRIx64"\n",
-               event_str[code-1], domain_id, device_id, *addr);
+               "fault address = 0x%"PRIx64", flags = 0x%03x\n",
+               event_str[code-1], domain_id, device_id, *addr, flags);
 
         /* Tell the device to stop DMAing; we can't rely on the guest to
          * control it for us. */

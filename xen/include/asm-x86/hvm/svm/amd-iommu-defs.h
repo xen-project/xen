@@ -283,6 +283,8 @@
 #define IOMMU_EVENT_DOMAIN_ID_SHIFT          0
 #define IOMMU_EVENT_DEVICE_ID_MASK           0x0000FFFF
 #define IOMMU_EVENT_DEVICE_ID_SHIFT          0
+#define IOMMU_EVENT_FLAGS_SHIFT              16
+#define IOMMU_EVENT_FLAGS_MASK               0x0FFF0000
 
 /* PPR Log */
 #define IOMMU_PPR_LOG_ENTRY_SIZE                        16
