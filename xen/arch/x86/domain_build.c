@@ -510,7 +510,7 @@ int __init construct_dom0(
 #define NR(_l,_h,_s) \
     (((((_h) + ((1UL<<(_s))-1)) & ~((1UL<<(_s))-1)) - \
        ((_l) & ~((1UL<<(_s))-1))) >> (_s))
-        if ( (1 + /* # L4 */
+        if ( (!is_pv_32on64_domain(d) + /* # L4 */
               NR(v_start, v_end, L4_PAGETABLE_SHIFT) + /* # L3 */
               (!is_pv_32on64_domain(d) ?
                NR(v_start, v_end, L3_PAGETABLE_SHIFT) : /* # L2 */
@@ -756,6 +756,8 @@ int __init construct_dom0(
             panic("Not enough RAM for domain 0 PML4.\n");
         page->u.inuse.type_info = PGT_l4_page_table|PGT_validated|1;
         l4start = l4tab = page_to_virt(page);
+        maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l3_page_table;
+        l3start = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
     }
     copy_page(l4tab, idle_pg_table);
     l4tab[0] = l4e_empty(); /* zap trampoline mapping */
@@ -787,9 +789,13 @@ int __init construct_dom0(
                     l2tab += l2_table_offset(v_start);
                 if ( !((unsigned long)l3tab & (PAGE_SIZE-1)) )
                 {
-                    maddr_to_page(mpt_alloc)->u.inuse.type_info =
-                        PGT_l3_page_table;
-                    l3start = l3tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
+                    if ( count || !l3start )
+                    {
+                        maddr_to_page(mpt_alloc)->u.inuse.type_info =
+                            PGT_l3_page_table;
+                        l3start = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
+                    }
+                    l3tab = l3start;
                     clear_page(l3tab);
                     if ( count == 0 )
                         l3tab += l3_table_offset(v_start);
@@ -938,7 +944,7 @@ int __init construct_dom0(
     if ( !vinitrd_start && initrd_len )
         si->flags   |= SIF_MOD_START_PFN;
     si->flags       |= (xen_processor_pmbits << 8) & SIF_PM_MASK;
-    si->pt_base      = vpt_start + 2 * PAGE_SIZE * !!is_pv_32on64_domain(d);
+    si->pt_base      = vpt_start;
     si->nr_pt_frames = nr_pt_pages;
     si->mfn_list     = vphysmap_start;
     snprintf(si->magic, sizeof(si->magic), "xen-3.0-x86_%d%s",
