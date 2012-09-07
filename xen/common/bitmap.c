@@ -38,6 +38,21 @@
  * for the best explanations of this ordering.
  */
 
+/*
+ * If a bitmap has a number of bits which is not a multiple of 8 then
+ * the last few bits of the last byte of the bitmap can be
+ * unexpectedly set which can confuse consumers (e.g. in the tools)
+ * who also round up their loops to 8 bits. Ensure we clear those left
+ * over bits so as to prevent surprises.
+ */
+static void clamp_last_byte(uint8_t *bp, unsigned int nbits)
+{
+	unsigned int remainder = nbits % 8;
+
+	if (remainder)
+		bp[nbits/8] &= (1U << remainder) - 1;
+}
+
 int __bitmap_empty(const unsigned long *bitmap, int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
@@ -485,6 +500,7 @@ void bitmap_long_to_byte(uint8_t *bp, const unsigned long *lp, int nbits)
 			nbits -= 8;
 		}
 	}
+	clamp_last_byte(bp, nbits);
 }
 
 void bitmap_byte_to_long(unsigned long *lp, const uint8_t *bp, int nbits)
@@ -507,6 +523,7 @@ void bitmap_byte_to_long(unsigned long *lp, const uint8_t *bp, int nbits)
 void bitmap_long_to_byte(uint8_t *bp, const unsigned long *lp, int nbits)
 {
 	memcpy(bp, lp, (nbits+7)/8);
+	clamp_last_byte(bp, nbits);
 }
 
 void bitmap_byte_to_long(unsigned long *lp, const uint8_t *bp, int nbits)
