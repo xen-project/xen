@@ -1,10 +1,5 @@
 # Xen Hypervisor Command Line Options
 
-**This document is still a work in progress.  There are currently some
-  command line options listed twice, and they are defined in separate
-  arch trees, and some options are currently separate from their
-  legacy versions.  Please remove this notice when complete.**
-
 This document covers the command line options which the Xen
 Hypervisor.
 
