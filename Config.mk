@@ -214,9 +214,7 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= bacc0d302445c75f18f4c826750fb5853b60e7ca
-# Thu Sep 6 17:05:30 2012 +0100
-# Disable qemu monitor by default.  The qemu monitor is an overly
+QEMU_TAG ?= xen-4.2.0-rc4
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
