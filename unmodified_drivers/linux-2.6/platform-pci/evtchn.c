@@ -350,7 +350,11 @@ int xen_irq_init(struct pci_dev *pdev)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22)
 			   SA_SHIRQ | SA_SAMPLE_RANDOM | SA_INTERRUPT,
 #else
-			   IRQF_SHARED | IRQF_SAMPLE_RANDOM | IRQF_DISABLED,
+			   IRQF_SHARED |
+#ifdef IRQF_SAMPLE_RANDOM
+			   IRQF_SAMPLE_RANDOM |
+#endif
+			   IRQF_DISABLED,
 #endif
 			   "xen-platform-pci", pdev);
 }
