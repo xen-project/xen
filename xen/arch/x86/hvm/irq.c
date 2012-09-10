@@ -395,15 +395,15 @@ struct hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v)
     struct hvm_domain *plat = &v->domain->arch.hvm_domain;
     int vector;
 
-    if ( (plat->irq.callback_via_type == HVMIRQ_callback_vector)
-         && vcpu_info(v, evtchn_upcall_pending) )
-        return hvm_intack_vector(plat->irq.callback_via.vector);
-
     if ( unlikely(v->nmi_pending) )
         return hvm_intack_nmi;
 
     if ( unlikely(v->mce_pending) )
         return hvm_intack_mce;
+
+    if ( (plat->irq.callback_via_type == HVMIRQ_callback_vector)
+         && vcpu_info(v, evtchn_upcall_pending) )
+        return hvm_intack_vector(plat->irq.callback_via.vector);
 
     if ( vlapic_accept_pic_intr(v) && plat->vpic[0].int_output )
         return hvm_intack_pic(0);
