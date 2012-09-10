@@ -992,7 +992,44 @@ certainly belong in a more appropriate section.
 
 =item B<gfx_passthru=BOOLEAN>
 
-Enable graphics device PCI passthrough. XXX which device is passed through ?
+Enable graphics device PCI passthrough. This option makes the passthru
+graphics card become primary graphics card in the VM, so the Qemu emulated
+graphics adapter is disabled, and the VNC console for the VM won't have
+any graphics output. All graphics output, including boot time Qemu BIOS
+messages from the VM, will go to the physical outputs of the passed thru
+physical graphics card.
+
+Graphics card PCI device to passthru is chosen with B<pci> option,
+exactly in the same way as normal Xen PCI device passthru/assignment is done.
+Note that gfx_passthru doesn't do any kind of sharing
+of the GPU, so you can only assign the GPU to one single VM at a time.
+
+gfx_passthru also enables various legacy VGA memory ranges, BARs, MMIOs,
+and ioports to be passed thru to the VM, since those are required
+for correct operation of things like VGA BIOS, text mode, VBE, etc.
+
+Enabling gfx_passthru option also copies the physical graphics card
+video BIOS to the guest memory, and executes the VBIOS in the guest
+to get the graphics card initialized.
+
+Most graphics adapters require vendor specific tweaks for properly
+working graphics passthru. See the XenVGAPassthroughTestedAdapters
+L<http://wiki.xen.org/wiki/XenVGAPassthroughTestedAdapters>
+wiki page for currently supported graphics cards for gfx_passthru.
+
+gfx_passthru is currently only supported with the qemu-xen-traditional
+device-model. Upstream qemu-xen device-model currently doesn't have
+support for gfx_passthru.
+
+Note that some graphics adapters (AMD/ATI cards, for example) don't
+necessarily require gfx_passthru option, so you can use the normal
+Xen PCI passthru to assign the graphics card as a secondary graphics card
+to the VM. Qemu emulated graphics card stays as the primary graphics card,
+and you get VNC output from the Qemu-emulated primary adapter.
+
+More information about Xen gfx_passthru feature is available
+on the XenVGAPassthrough L<http://wiki.xen.org/wiki/XenVGAPassthrough>
+wiki page.
 
 =item B<nomigrate=BOOLEAN>
 
