@@ -854,7 +854,8 @@ static void device_backend_callback(libxl__egc *egc, libxl__ev_devstate *ds,
     }
 
     if (rc) {
-        LOG(ERROR, "unable to disconnect device with path %s",
+        LOG(ERROR, "unable to %s device with path %s",
+                   aodev->action == DEVICE_CONNECT ? "connect" : "disconnect",
                    libxl__device_backend_path(gc, aodev->dev));
         goto out;
     }
