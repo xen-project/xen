@@ -395,25 +395,27 @@ static void deallocate_next_page_table(struct page_info* pg, int level)
     u64 next_table_maddr;
     int index, next_level;
 
+    if ( level <= 1 )
+    {
+        free_amd_iommu_pgtable(pg);
+        return;
+    }
+
     table_vaddr = __map_domain_page(pg);
 
-    if ( level > 1 )
+    for ( index = 0; index < PTE_PER_TABLE_SIZE; index++ )
     {
-        for ( index = 0; index < PTE_PER_TABLE_SIZE; index++ )
+        pde = table_vaddr + (index * IOMMU_PAGE_TABLE_ENTRY_SIZE);
+        next_table_maddr = amd_iommu_get_next_table_from_pte(pde);
+        next_level = iommu_next_level((u32*)pde);
+
+        if ( (next_table_maddr != 0) && (next_level != 0) &&
+             iommu_is_pte_present((u32*)pde) )
         {
-            pde = table_vaddr + (index * IOMMU_PAGE_TABLE_ENTRY_SIZE);
-            next_table_maddr = amd_iommu_get_next_table_from_pte(pde);
-
-            next_level = iommu_next_level((u32*)pde);
-
-            if ( (next_table_maddr != 0) && (next_level != 0)
-                && iommu_is_pte_present((u32*)pde) )
-            {
-                /* We do not support skip level yet */
-                ASSERT(next_level == level - 1);
-                deallocate_next_page_table(
-                    maddr_to_page(next_table_maddr), next_level);
-            }
+            /* We do not support skip levels yet */
+            ASSERT(next_level == level - 1);
+            deallocate_next_page_table(maddr_to_page(next_table_maddr), 
+                                       next_level);
         }
     }
 
