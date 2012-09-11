@@ -210,7 +210,10 @@ static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
     entry->msg = *msg;
 
     if ( iommu_enabled )
+    {
+        ASSERT(msg != &entry->msg);
         iommu_update_ire_from_msi(entry, msg);
+    }
 
     switch ( entry->msi_attrib.type )
     {
@@ -996,6 +999,7 @@ int pci_restore_msi_state(struct pci_dev *pdev)
     int ret;
     struct msi_desc *entry, *tmp;
     struct irq_desc *desc;
+    struct msi_msg msg;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
 
@@ -1030,7 +1034,8 @@ int pci_restore_msi_state(struct pci_dev *pdev)
         else if ( entry->msi_attrib.type == PCI_CAP_ID_MSIX )
             msix_set_enable(pdev, 0);
 
-        write_msi_msg(entry, &entry->msg);
+        msg = entry->msg;
+        write_msi_msg(entry, &msg);
 
         msi_set_mask_bit(desc, entry->msi_attrib.masked);
 
