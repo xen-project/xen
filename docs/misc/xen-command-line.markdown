@@ -785,6 +785,19 @@ pages) must also be specified via the tbuf\_size parameter.
 > `= unstable | skewed`
 
 ### ucode
+> `= <integer>`
+
+Specify the CPU microcode update blob module index. When positive, this
+specifies the n-th module (in the GrUB entry, zero based) to be used
+for updating CPU micrcode. When negative, counting starts at the end of
+the modules in the GrUB entry (so with the blob commonly being last,
+one could specify `ucode=-1`). Note that the value of zero is not valid
+here (entry zero, i.e. the first module, is always the Dom0 kernel
+image). Note further that use of this option has an unspecified effect
+when used with xen.efi (there the concept of modules doesn't exist, and
+the blob gets specified via the `ucode=<filename>` config file/section
+entry; see [EFI configuration file description](efi.html)).
+
 ### unrestricted\_guest
 > `= <boolean>`
 
