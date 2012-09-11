@@ -82,20 +82,40 @@ static void __init parse_dom0_mem(const char *s)
 }
 custom_param("dom0_mem", parse_dom0_mem);
 
-static unsigned int __initdata opt_dom0_max_vcpus;
-integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
+static unsigned int __initdata opt_dom0_max_vcpus_min = 1;
+static unsigned int __initdata opt_dom0_max_vcpus_max = UINT_MAX;
+
+static void __init parse_dom0_max_vcpus(const char *s)
+{
+    if (*s == '-')              /* -M */
+        opt_dom0_max_vcpus_max = simple_strtoul(s + 1, &s, 0);
+    else                        /* N, N-, or N-M */
+    {
+        opt_dom0_max_vcpus_min = simple_strtoul(s, &s, 0);
+        if (*s++ == '\0')       /* N */
+            opt_dom0_max_vcpus_max = opt_dom0_max_vcpus_min;
+        else if (*s != '\0')    /* N-M */
+            opt_dom0_max_vcpus_max = simple_strtoul(s, &s, 0);
+    }
+}
+custom_param("dom0_max_vcpus", parse_dom0_max_vcpus);
 
 struct vcpu *__init alloc_dom0_vcpu0(void)
 {
-    if ( opt_dom0_max_vcpus == 0 )
-        opt_dom0_max_vcpus = num_cpupool_cpus(cpupool0);
-    if ( opt_dom0_max_vcpus > MAX_VIRT_CPUS )
-        opt_dom0_max_vcpus = MAX_VIRT_CPUS;
+    unsigned max_vcpus;
 
-    dom0->vcpu = xzalloc_array(struct vcpu *, opt_dom0_max_vcpus);
+    max_vcpus = num_cpupool_cpus(cpupool0);
+    if ( opt_dom0_max_vcpus_min > max_vcpus )
+        max_vcpus = opt_dom0_max_vcpus_min;
+    if ( opt_dom0_max_vcpus_max < max_vcpus )
+        max_vcpus = opt_dom0_max_vcpus_max;
+    if ( max_vcpus > MAX_VIRT_CPUS )
+        max_vcpus = MAX_VIRT_CPUS;
+
+    dom0->vcpu = xzalloc_array(struct vcpu *, max_vcpus);
     if ( !dom0->vcpu )
         return NULL;
-    dom0->max_vcpus = opt_dom0_max_vcpus;
+    dom0->max_vcpus = max_vcpus;
 
     return alloc_vcpu(dom0, 0, 0);
 }
@@ -185,11 +205,11 @@ static unsigned long __init compute_dom0_nr_pages(
     unsigned long max_pages = dom0_max_nrpages;
 
     /* Reserve memory for further dom0 vcpu-struct allocations... */
-    avail -= (opt_dom0_max_vcpus - 1UL)
+    avail -= (d->max_vcpus - 1UL)
              << get_order_from_bytes(sizeof(struct vcpu));
     /* ...and compat_l4's, if needed. */
     if ( is_pv_32on64_domain(d) )
-        avail -= opt_dom0_max_vcpus - 1;
+        avail -= d->max_vcpus - 1;
 
     /* Reserve memory for iommu_dom0_init() (rough estimate). */
     if ( iommu_enabled )
@@ -889,10 +909,10 @@ int __init construct_dom0(
     for ( i = 0; i < XEN_LEGACY_MAX_VCPUS; i++ )
         shared_info(d, vcpu_info[i].evtchn_upcall_mask) = 1;
 
-    printk("Dom0 has maximum %u VCPUs\n", opt_dom0_max_vcpus);
+    printk("Dom0 has maximum %u VCPUs\n", d->max_vcpus);
 
     cpu = cpumask_first(cpupool0->cpu_valid);
-    for ( i = 1; i < opt_dom0_max_vcpus; i++ )
+    for ( i = 1; i < d->max_vcpus; i++ )
     {
         cpu = cpumask_cycle(cpu, cpupool0->cpu_valid);
         (void)alloc_vcpu(d, i, cpu);

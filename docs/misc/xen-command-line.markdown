@@ -378,10 +378,33 @@ Specify the bit width of the DMA heap.
 Specify a list of IO ports to be excluded from dom0 access.
 
 ### dom0\_max\_vcpus
-> `= <integer>`
 
-Specify the maximum number of vcpus to give to dom0.  This defaults
-to the number of pcpus on the host.
+Either:
+
+> `= <integer>`.
+
+The number of VCPUs to give to dom0.  This number of VCPUs can be more
+than the number of PCPUs on the host.  The default is the number of
+PCPUs.
+
+Or:
+
+> `= <min>-<max>` where `<min>` and `<max>` are integers.
+
+Gives dom0 a number of VCPUs equal to the number of PCPUs, but always
+at least `<min>` and no more than `<max>`.  Using `<min>` may give
+more VCPUs than PCPUs.  `<min>` or `<max>` may be omitted and the
+defaults of 1 and unlimited respectively are used instead.
+
+For example, with `dom0_max_vcpus=4-8`:
+
+     Number of
+  PCPUs | Dom0 VCPUs
+   2    |  4
+   4    |  4
+   6    |  6
+   8    |  8
+  10    |  8
 
 ### dom0\_mem
 > `= List of ( min:<size> | max:<size> | <size> )`
