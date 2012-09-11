@@ -1468,7 +1468,7 @@ static NOINLINE int do_tmem_put_compress(pgp_t *pgp, tmem_cli_mfn_t cmfn,
         pgp_free_data(pgp, pgp->us.obj->pool);
     START_CYC_COUNTER(compress);
     ret = tmh_compress_from_client(cmfn, &dst, &size, clibuf);
-    if ( (ret == -EFAULT) || (ret == 0) )
+    if ( ret <= 0 )
         goto out;
     else if ( (size == 0) || (size >= tmem_subpage_maxsize()) ) {
         ret = 0;
