@@ -43,6 +43,8 @@ enum fixed_addresses {
      * must be among the first (L1_PAGETABLE_ENTRIES - 1) entries.
      * These are generally those needed by the various console drivers.
      */
+    FIX_COM_BEGIN,
+    FIX_COM_END,
     FIX_EHCI_DBGP,
     /* Everything else should go further down. */
 #ifdef __i386__

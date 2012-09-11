@@ -20,6 +20,9 @@
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 #include <asm/io.h>
+#ifdef CONFIG_X86
+#include <asm/fixmap.h>
+#endif
 
 /*
  * Configure serial port with a string:
@@ -37,7 +40,7 @@ string_param("com2", opt_com2);
 static struct ns16550 {
     int baud, clock_hz, data_bits, parity, stop_bits, irq;
     unsigned long io_base;   /* I/O port or memory-mapped I/O address. */
-    char *remapped_io_base;  /* Remapped virtual address of mmap I/O.  */ 
+    char __iomem *remapped_io_base;  /* Remapped virtual address of MMIO. */
     /* UART with IRQ line: interrupt-driven I/O. */
     struct irqaction irqaction;
     /* UART with no IRQ line: periodically-polled I/O. */
@@ -207,17 +210,20 @@ static int ns16550_getc(struct serial_port *port, char *pc)
 
 static void pci_serial_early_init(struct ns16550 *uart)
 {
-    if ( !uart->ps_bdf_enable )
+    if ( !uart->ps_bdf_enable || uart->io_base >= 0x10000 )
         return;
     
     if ( uart->pb_bdf_enable )
         pci_conf_write16(0, uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
-            0x1c, (uart->io_base & 0xF000) | ((uart->io_base & 0xF000) >> 8));
+                         PCI_IO_BASE,
+                         (uart->io_base & 0xF000) |
+                         ((uart->io_base & 0xF000) >> 8));
 
     pci_conf_write32(0, uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
-        0x10, uart->io_base | 0x1);
+                     PCI_BASE_ADDRESS_0,
+                     uart->io_base | PCI_BASE_ADDRESS_SPACE_IO);
     pci_conf_write16(0, uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
-        0x4, 0x1);
+                     PCI_COMMAND, PCI_COMMAND_IO);
 }
 
 static void ns16550_setup_preirq(struct ns16550 *uart)
@@ -265,7 +271,17 @@ static void __init ns16550_init_preirq(struct serial_port *port)
 
     /* I/O ports are distinguished by their size (16 bits). */
     if ( uart->io_base >= 0x10000 )
+    {
+#ifdef CONFIG_X86
+        enum fixed_addresses idx = FIX_COM_BEGIN + (uart - ns16550_com);
+
+        set_fixmap_nocache(idx, uart->io_base);
+        uart->remapped_io_base = (void __iomem *)fix_to_virt(idx);
+        uart->remapped_io_base += uart->io_base & ~PAGE_MASK;
+#else
         uart->remapped_io_base = (char *)ioremap(uart->io_base, 8);
+#endif
+    }
 
     ns16550_setup_preirq(uart);
 
@@ -350,6 +366,9 @@ static void ns16550_resume(struct serial_port *port)
 static void __init ns16550_endboot(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
+
+    if ( uart->remapped_io_base )
+        return;
     if ( ioports_deny_access(dom0, uart->io_base, uart->io_base + 7) != 0 )
         BUG();
 }
@@ -453,7 +472,7 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
     uint32_t bar, len;
     int b, d, f;
 
-    /* NB. Start at bus 1 to avoid AMT: a plug-in card cannot be on bus 1. */
+    /* NB. Start at bus 1 to avoid AMT: a plug-in card cannot be on bus 0. */
     for ( b = skip_amt ? 1 : 0; b < 0x100; b++ )
     {
         for ( d = 0; d < 0x20; d++ )
@@ -468,7 +487,7 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
                                       PCI_BASE_ADDRESS_0 + bar_idx*4);
 
                 /* Not IO */
-                if ( !(bar & 1) )
+                if ( !(bar & PCI_BASE_ADDRESS_SPACE_IO) )
                     continue;
 
                 pci_conf_write32(0, b, d, f, PCI_BASE_ADDRESS_0, ~0u);
@@ -484,7 +503,7 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
                 uart->ps_bdf[2] = f;
                 uart->bar = bar;
                 uart->bar_idx = bar_idx;
-                uart->io_base = bar & 0xfffe;
+                uart->io_base = bar & ~PCI_BASE_ADDRESS_SPACE_IO;
                 uart->irq = 0;
 
                 return 0;
