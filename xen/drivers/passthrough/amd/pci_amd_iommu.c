@@ -409,8 +409,10 @@ static void deallocate_next_page_table(struct page_info* pg, int level)
             if ( (next_table_maddr != 0) && (next_level != 0)
                 && iommu_is_pte_present((u32*)pde) )
             {
+                /* We do not support skip level yet */
+                ASSERT(next_level == level - 1);
                 deallocate_next_page_table(
-                    maddr_to_page(next_table_maddr), level - 1);
+                    maddr_to_page(next_table_maddr), next_level);
             }
         }
     }
