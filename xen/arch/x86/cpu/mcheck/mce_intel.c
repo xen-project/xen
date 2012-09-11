@@ -16,6 +16,8 @@
 #include <asm/apic.h>
 #include "mce.h"
 #include "x86_mca.h"
+#include "barrier.h"
+#include "util.h"
 
 DEFINE_PER_CPU(struct mca_banks *, mce_banks_owned);
 DEFINE_PER_CPU(struct mca_banks *, no_cmci_banks);
@@ -164,13 +166,6 @@ static void intel_init_thermal(struct cpuinfo_x86 *c)
 }
 #endif /* CONFIG_X86_MCE_THERMAL */
 
-/* MCE handling */
-struct mce_softirq_barrier {
-	atomic_t val;
-	atomic_t ingen;
-	atomic_t outgen;
-};
-
 static struct mce_softirq_barrier mce_inside_bar, mce_severity_bar;
 static struct mce_softirq_barrier mce_trap_bar;
 
@@ -185,9 +180,6 @@ static DEFINE_SPINLOCK(mce_logout_lock);
 static atomic_t severity_cpu = ATOMIC_INIT(-1);
 static atomic_t found_error = ATOMIC_INIT(0);
 static cpumask_t mce_fatal_cpus;
-
-static void mce_barrier_enter(struct mce_softirq_barrier *);
-static void mce_barrier_exit(struct mce_softirq_barrier *);
 
 static const struct mca_error_handler *__read_mostly mce_dhandlers;
 static const struct mca_error_handler *__read_mostly mce_uhandlers;
@@ -385,25 +377,6 @@ static int mce_urgent_action(struct cpu_user_regs *regs,
  * Round2: Do all MCE processing logic as normal.
  */
 
-static void mce_panic_check(void)
-{
-      if (is_mc_panic) {
-              local_irq_enable();
-              for ( ; ; )
-                      halt();
-      }
-}
-
-/*
- * Initialize a barrier. Just set it to 0.
- */
-static void mce_barrier_init(struct mce_softirq_barrier *bar)
-{
-      atomic_set(&bar->val, 0);
-      atomic_set(&bar->ingen, 0);
-      atomic_set(&bar->outgen, 0);
-}
-
 static void mce_handler_init(void)
 {
     if (smp_processor_id() != 0)
@@ -417,21 +390,6 @@ static void mce_handler_init(void)
     spin_lock_init(&mce_logout_lock);
     open_softirq(MACHINE_CHECK_SOFTIRQ, mce_softirq);
 }
-#if 0
-/*
- * This function will need to be used when offlining a CPU in the
- * recovery actions.
- *
- * Decrement a barrier only. Needed for cases where the CPU
- * in question can't do it itself (e.g. it is being offlined).
- */
-static void mce_barrier_dec(struct mce_softirq_barrier *bar)
-{
-      atomic_inc(&bar->outgen);
-      wmb();
-      atomic_dec(&bar->val);
-}
-#endif
 
 static void mce_spin_lock(spinlock_t *lk)
 {
@@ -445,60 +403,6 @@ static void mce_spin_unlock(spinlock_t *lk)
 {
       spin_unlock(lk);
 }
-
-/*
- * Increment the generation number and the value. The generation number
- * is incremented when entering a barrier. This way, it can be checked
- * on exit if a CPU is trying to re-enter the barrier. This can happen
- * if the first CPU to make it out immediately exits or re-enters, while
- * another CPU that is still in the loop becomes otherwise occupied
- * (e.g. it needs to service an interrupt, etc), missing the value
- * it's waiting for.
- *
- * These barrier functions should always be paired, so that the
- * counter value will reach 0 again after all CPUs have exited.
- */
-static void mce_barrier_enter(struct mce_softirq_barrier *bar)
-{
-      int gen;
-
-      if (!mce_broadcast)
-          return;
-      atomic_inc(&bar->ingen);
-      gen = atomic_read(&bar->outgen);
-      mb();
-      atomic_inc(&bar->val);
-      while ( atomic_read(&bar->val) != num_online_cpus() &&
-          atomic_read(&bar->outgen) == gen) {
-              mb();
-              mce_panic_check();
-      }
-}
-
-static void mce_barrier_exit(struct mce_softirq_barrier *bar)
-{
-      int gen;
-
-      if (!mce_broadcast)
-          return;
-      atomic_inc(&bar->outgen);
-      gen = atomic_read(&bar->ingen);
-      mb();
-      atomic_dec(&bar->val);
-      while ( atomic_read(&bar->val) != 0 &&
-          atomic_read(&bar->ingen) == gen ) {
-              mb();
-              mce_panic_check();
-      }
-}
-
-#if 0
-static void mce_barrier(struct mce_softirq_barrier *bar)
-{
-      mce_barrier_enter(bar);
-      mce_barrier_exit(bar);
-}
-#endif
 
 /* Intel MCE handler */
 static inline void intel_get_extended_msr(struct mcinfo_extended *ext, u32 msr)
