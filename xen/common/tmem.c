@@ -2419,6 +2419,7 @@ static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
              break;
         tmh_copy_to_client_buf(buf, pool->uuid, 2);
         rc = 0;
+        break;
     case TMEMC_SAVE_END:
         if ( client == NULL )
             break;
@@ -2429,6 +2430,7 @@ static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
                 pgp_free_from_inv_list(client,pgp);
         client->frozen = client->was_frozen;
         rc = 0;
+        break;
     }
     return rc;
 }
