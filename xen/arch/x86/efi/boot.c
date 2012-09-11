@@ -1119,8 +1119,6 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         unsigned int slot = (xen_phys_start >> L2_PAGETABLE_SHIFT) + i;
         paddr_t addr = slot << L2_PAGETABLE_SHIFT;
 
-        l2_identmap[i] = l2e_from_paddr(i << L2_PAGETABLE_SHIFT,
-                                        PAGE_HYPERVISOR|_PAGE_PSE);
         l2_identmap[slot] = l2e_from_paddr(addr, PAGE_HYPERVISOR|_PAGE_PSE);
         l2_xenmap[i] = l2e_from_paddr(addr, PAGE_HYPERVISOR|_PAGE_PSE);
         slot &= L2_PAGETABLE_ENTRIES - 1;
@@ -1150,16 +1148,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         l4e_from_paddr((UINTN)l3_identmap, __PAGE_HYPERVISOR);
     idle_pg_table[l4_table_offset(XEN_VIRT_START)] =
         l4e_from_paddr((UINTN)l3_xenmap, __PAGE_HYPERVISOR);
-    /* Initialize 4kB mappings of first 2MB of memory. */
-    for ( i = 0; i < L1_PAGETABLE_ENTRIES; ++i )
-    {
-        unsigned int attr = PAGE_HYPERVISOR|MAP_SMALL_PAGES;
-
-        /* VGA hole (0xa0000-0xc0000) should be mapped UC. */
-        if ( i >= 0xa0 && i < 0xc0 )
-            attr |= _PAGE_PCD;
-        l1_identmap[i] = l1e_from_pfn(i, attr);
-    }
+    /* Hook 4kB mappings of first 2MB of memory into L2. */
     l2_identmap[0] = l2e_from_paddr((UINTN)l1_identmap, __PAGE_HYPERVISOR);
 
     if ( gop )

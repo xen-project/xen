@@ -7,11 +7,7 @@
  * It is important that the masks are signed quantities. This ensures that
  * the compiler sign-extends a 32-bit mask to 64 bits if that is required.
  */
-#ifndef __ASSEMBLY__
-#define PAGE_SIZE           (1L << PAGE_SHIFT)
-#else
-#define PAGE_SIZE           (1 << PAGE_SHIFT)
-#endif
+#define PAGE_SIZE           (_AC(1,L) << PAGE_SHIFT)
 #define PAGE_MASK           (~(PAGE_SIZE-1))
 #define PAGE_FLAG_MASK      (~0)
 
@@ -321,21 +317,22 @@ void paging_init(void);
 void setup_idle_pagetable(void);
 #endif /* !defined(__ASSEMBLY__) */
 
-#define _PAGE_PRESENT  0x001U
-#define _PAGE_RW       0x002U
-#define _PAGE_USER     0x004U
-#define _PAGE_PWT      0x008U
-#define _PAGE_PCD      0x010U
-#define _PAGE_ACCESSED 0x020U
-#define _PAGE_DIRTY    0x040U
-#define _PAGE_PAT      0x080U
-#define _PAGE_PSE      0x080U
-#define _PAGE_GLOBAL   0x100U
-#define _PAGE_AVAIL0   0x200U
-#define _PAGE_AVAIL1   0x400U
-#define _PAGE_AVAIL2   0x800U
-#define _PAGE_AVAIL    0xE00U
-#define _PAGE_PSE_PAT 0x1000U
+#define _PAGE_PRESENT  _AC(0x001,U)
+#define _PAGE_RW       _AC(0x002,U)
+#define _PAGE_USER     _AC(0x004,U)
+#define _PAGE_PWT      _AC(0x008,U)
+#define _PAGE_PCD      _AC(0x010,U)
+#define _PAGE_ACCESSED _AC(0x020,U)
+#define _PAGE_DIRTY    _AC(0x040,U)
+#define _PAGE_PAT      _AC(0x080,U)
+#define _PAGE_PSE      _AC(0x080,U)
+#define _PAGE_GLOBAL   _AC(0x100,U)
+#define _PAGE_AVAIL0   _AC(0x200,U)
+#define _PAGE_AVAIL1   _AC(0x400,U)
+#define _PAGE_AVAIL2   _AC(0x800,U)
+#define _PAGE_AVAIL    _AC(0xE00,U)
+#define _PAGE_PSE_PAT _AC(0x1000,U)
+/* non-architectural flags */
 #define _PAGE_PAGED   0x2000U
 #define _PAGE_SHARED  0x4000U
 
@@ -356,6 +353,8 @@ void setup_idle_pagetable(void);
 #define __PAGE_HYPERVISOR_NOCACHE \
     (_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_PCD | _PAGE_ACCESSED)
 
+#define MAP_SMALL_PAGES _PAGE_AVAIL0 /* don't use superpages mappings */
+
 #ifndef __ASSEMBLY__
 
 /* Allocator functions for Xen pagetables. */
@@ -369,7 +368,6 @@ l3_pgentry_t *virt_to_xen_l3e(unsigned long v);
 extern void set_pdx_range(unsigned long smfn, unsigned long emfn);
 
 /* Map machine page range in Xen virtual address space. */
-#define MAP_SMALL_PAGES _PAGE_AVAIL0 /* don't use superpages for the mapping */
 int map_pages_to_xen(
     unsigned long virt,
     unsigned long mfn,

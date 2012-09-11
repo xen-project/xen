@@ -121,15 +121,6 @@
 #include <asm/setup.h>
 #include <asm/fixmap.h>
 
-/*
- * Mapping of first 2 or 4 megabytes of memory. This is mapped with 4kB
- * mappings to avoid type conflicts with fixed-range MTRRs covering the
- * lowest megabyte of physical memory. In any case the VGA hole should be
- * mapped with type UC.
- */
-l1_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
-    l1_identmap[L1_PAGETABLE_ENTRIES];
-
 /* Mapping of the fixmap space needed early. */
 l1_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     l1_fixmap[L1_PAGETABLE_ENTRIES];

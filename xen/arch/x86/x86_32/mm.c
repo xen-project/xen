@@ -31,9 +31,6 @@
 #include <asm/setup.h>
 #include <public/memory.h>
 
-l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
-    idle_pg_table_l2[4 * L2_PAGETABLE_ENTRIES];
-
 unsigned int __read_mostly PAGE_HYPERVISOR         = __PAGE_HYPERVISOR;
 unsigned int __read_mostly PAGE_HYPERVISOR_NOCACHE = __PAGE_HYPERVISOR_NOCACHE;
 

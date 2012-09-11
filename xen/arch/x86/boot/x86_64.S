@@ -127,3 +127,15 @@ ENTRY(boot_cpu_compat_gdt_table)
         .fill (PER_CPU_GDT_ENTRY - __HYPERVISOR_CS32 / 8 - 1), 8, 0
         .quad 0x0000910000000000     /* per-CPU entry (limit == cpu)      */
         .align PAGE_SIZE, 0
+
+/* Mapping of first 16 megabytes of memory. */
+        .globl l2_identmap
+l2_identmap:
+        .quad 0
+        pfn = 0
+        .rept 7
+        pfn = pfn + (1 << PAGETABLE_ORDER)
+        .quad (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR | _PAGE_PSE
+        .endr
+        .fill 4 * L2_PAGETABLE_ENTRIES - 8, 8, 0
+        .size l2_identmap, . - l2_identmap

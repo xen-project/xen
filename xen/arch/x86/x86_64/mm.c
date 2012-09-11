@@ -56,8 +56,6 @@ l4_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
 /* Enough page directories to map bottom 4GB of the memory map. */
 l3_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     l3_identmap[L3_PAGETABLE_ENTRIES];
-l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
-    l2_identmap[4*L2_PAGETABLE_ENTRIES];
 
 /* Enough page directories to map the Xen text and static data. */
 l3_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))

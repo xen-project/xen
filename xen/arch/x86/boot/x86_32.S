@@ -108,3 +108,24 @@ ENTRY(boot_cpu_gdt_table)
         .fill (PER_CPU_GDT_ENTRY - FLAT_RING3_DS / 8 - 1), 8, 0
         .quad 0x0000910000000000     /* per-CPU entry (limit == cpu) */
         .align PAGE_SIZE,0
+
+#define PAGE_HYPERVISOR         __PAGE_HYPERVISOR
+#define PAGE_HYPERVISOR_NOCACHE __PAGE_HYPERVISOR_NOCACHE
+
+/* Mapping of first 16 megabytes of memory. */
+        .globl idle_pg_table_l2
+idle_pg_table_l2:
+        range = 8
+        .irp count, l2_linear_offset(__PAGE_OFFSET), \
+                    (4 * L2_PAGETABLE_ENTRIES - l2_linear_offset(__PAGE_OFFSET) - 1)
+        .long sym_phys(l1_identmap) + PAGE_HYPERVISOR, 0
+        pfn = 1 << PAGETABLE_ORDER
+        .rept range - 1
+        .long (pfn << PAGE_SHIFT) | PAGE_HYPERVISOR | _PAGE_PSE, 0
+        pfn = pfn + (1 << PAGETABLE_ORDER)
+        .endr
+        .fill \count - range, 8, 0
+        range = DIRECTMAP_MBYTES / 2
+        .endr
+        .long sym_phys(l1_fixmap) + PAGE_HYPERVISOR, 0
+        .size idle_pg_table_l2, . - idle_pg_table_l2
