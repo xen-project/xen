@@ -65,6 +65,10 @@ l3_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
 l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     l2_xenmap[L2_PAGETABLE_ENTRIES];
 
+/* Enough page directories to map the early fixmap space. */
+l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
+    l2_fixmap[L2_PAGETABLE_ENTRIES];
+
 /* Enough page directories to map into the bottom 1GB. */
 l3_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     l3_bootmap[L3_PAGETABLE_ENTRIES];

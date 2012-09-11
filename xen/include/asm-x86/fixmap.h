@@ -13,12 +13,17 @@
 #define _ASM_FIXMAP_H
 
 #include <xen/config.h>
+#include <asm/page.h>
+
+#define FIXADDR_TOP (IOREMAP_VIRT_END - PAGE_SIZE)
+
+#ifndef __ASSEMBLY__
+
 #include <xen/pfn.h>
 #include <xen/kexec.h>
 #include <xen/iommu.h>
 #include <asm/apicdef.h>
 #include <asm/acpi.h>
-#include <asm/page.h>
 #include <asm/amd-iommu.h>
 #include <asm/msi.h>
 #include <acpi/apei.h>
@@ -66,7 +71,6 @@ enum fixed_addresses {
     __end_of_fixed_addresses
 };
 
-#define FIXADDR_TOP   (IOREMAP_VIRT_END - PAGE_SIZE)
 #define FIXADDR_SIZE  (__end_of_fixed_addresses << PAGE_SHIFT)
 #define FIXADDR_START (FIXADDR_TOP - FIXADDR_SIZE)
 
@@ -89,5 +93,7 @@ static inline unsigned long virt_to_fix(const unsigned long vaddr)
     BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
     return __virt_to_fix(vaddr);
 }
+
+#endif /* __ASSEMBLY__ */
 
 #endif

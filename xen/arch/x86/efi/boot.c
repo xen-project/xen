@@ -17,6 +17,9 @@
 #include <xen/vga.h>
 #include <asm/e820.h>
 #include <asm/edd.h>
+#define __ASSEMBLY__ /* avoid pulling in ACPI stuff (conflicts with EFI) */
+#include <asm/fixmap.h>
+#undef __ASSEMBLY__
 #include <asm/mm.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
@@ -1123,14 +1126,19 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         slot &= L2_PAGETABLE_ENTRIES - 1;
         l2_bootmap[slot] = l2e_from_paddr(addr, __PAGE_HYPERVISOR|_PAGE_PSE);
     }
+    /* Initialise L2 fixmap page directory entry. */
+    l2_fixmap[l2_table_offset(FIXADDR_TOP - 1)] =
+        l2e_from_paddr((UINTN)l1_fixmap, __PAGE_HYPERVISOR);
     /* Initialise L3 identity-map page directory entries. */
     for ( i = 0; i < ARRAY_SIZE(l2_identmap) / L2_PAGETABLE_ENTRIES; ++i )
         l3_identmap[i] = l3e_from_paddr((UINTN)(l2_identmap +
                                                 i * L2_PAGETABLE_ENTRIES),
                                         __PAGE_HYPERVISOR);
-    /* Initialise L3 xen-map page directory entry. */
+    /* Initialise L3 xen-map and fixmap page directory entries. */
     l3_xenmap[l3_table_offset(XEN_VIRT_START)] =
         l3e_from_paddr((UINTN)l2_xenmap, __PAGE_HYPERVISOR);
+    l3_xenmap[l3_table_offset(FIXADDR_TOP - 1)] =
+        l3e_from_paddr((UINTN)l2_fixmap, __PAGE_HYPERVISOR);
     /* Initialise L3 boot-map page directory entries. */
     l3_bootmap[l3_table_offset(xen_phys_start)] =
         l3e_from_paddr((UINTN)l2_bootmap, __PAGE_HYPERVISOR);

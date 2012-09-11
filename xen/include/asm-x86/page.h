@@ -1,6 +1,8 @@
 #ifndef __X86_PAGE_H__
 #define __X86_PAGE_H__
 
+#include <xen/const.h>
+
 /*
  * It is important that the masks are signed quantities. This ensures that
  * the compiler sign-extends a 32-bit mask to 64 bits if that is required.
@@ -306,13 +308,15 @@ extern l2_pgentry_t   idle_pg_table_l2[
 extern l2_pgentry_t  *compat_idle_pg_table_l2;
 extern unsigned int   m2p_compat_vstart;
 extern l2_pgentry_t l2_xenmap[L2_PAGETABLE_ENTRIES],
+    l2_fixmap[L2_PAGETABLE_ENTRIES],
     l2_bootmap[L2_PAGETABLE_ENTRIES];
 extern l3_pgentry_t l3_xenmap[L3_PAGETABLE_ENTRIES],
     l3_identmap[L3_PAGETABLE_ENTRIES],
     l3_bootmap[L3_PAGETABLE_ENTRIES];
 #endif
 extern l2_pgentry_t l2_identmap[4*L2_PAGETABLE_ENTRIES];
-extern l1_pgentry_t l1_identmap[L1_PAGETABLE_ENTRIES];
+extern l1_pgentry_t l1_identmap[L1_PAGETABLE_ENTRIES],
+    l1_fixmap[L1_PAGETABLE_ENTRIES];
 void paging_init(void);
 void setup_idle_pagetable(void);
 #endif /* !defined(__ASSEMBLY__) */

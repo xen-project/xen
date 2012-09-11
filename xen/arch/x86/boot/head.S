@@ -3,6 +3,7 @@
 #include <public/xen.h>
 #include <asm/asm_defns.h>
 #include <asm/desc.h>
+#include <asm/fixmap.h>
 #include <asm/page.h>
 #include <asm/msr.h>
 
@@ -136,6 +137,9 @@ __start:
         add     $8,%edx
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
         loop    1b
+        /* Initialise L2 fixmap page directory entry. */
+        mov     $(sym_phys(l1_fixmap)+7),%eax
+        mov     %eax,sym_phys(l2_fixmap) + l2_table_offset(FIXADDR_TOP-1)*8
         /* Initialise L3 identity-map page directory entries. */
         mov     $sym_phys(l3_identmap),%edi
         mov     $(sym_phys(l2_identmap)+7),%eax
@@ -144,9 +148,11 @@ __start:
         add     $8,%edi
         add     $PAGE_SIZE,%eax
         loop    1b
-        /* Initialise L3 xen-map page directory entry. */
+        /* Initialise L3 xen-map and fixmap page directory entries. */
         mov     $(sym_phys(l2_xenmap)+7),%eax
         mov     %eax,sym_phys(l3_xenmap) + l3_table_offset(XEN_VIRT_START)*8
+        mov     $(sym_phys(l2_fixmap)+7),%eax
+        mov     %eax,sym_phys(l3_xenmap) + l3_table_offset(FIXADDR_TOP-1)*8
         /* Initialise L3 boot-map page directory entry. */
         mov     $(sym_phys(l2_bootmap)+7),%eax
         mov     %eax,sym_phys(l3_bootmap) + 0*8
@@ -172,6 +178,9 @@ __start:
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
         cmp     $(16<<20)+0xe3,%eax
         jne     1b
+        /* Initialise L2 fixmap page directory entry. */
+        mov     $(sym_phys(l1_fixmap)+7),%eax
+        mov     %eax,sym_phys(idle_pg_table_l2) + l2_table_offset(FIXADDR_TOP-1)*8
 #endif
 
         /* Initialize 4kB mappings of first 2MB or 4MB of memory. */
