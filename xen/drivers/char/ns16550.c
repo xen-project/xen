@@ -555,26 +555,23 @@ static void __init ns16550_parse_port_config(
     else if ( (baud = simple_strtoul(conf, &conf, 10)) != 0 )
         uart->baud = baud;
 
-    if ( *conf == '/')
+    if ( *conf == '/' )
     {
         conf++;
         uart->clock_hz = simple_strtoul(conf, &conf, 0) << 4;
     }
 
-    if ( *conf != ',' )
-        goto config_parsed;
-    conf++;
-
-    uart->data_bits = simple_strtoul(conf, &conf, 10);
-
-    uart->parity = parse_parity_char(*conf);
-    conf++;
-
-    uart->stop_bits = simple_strtoul(conf, &conf, 10);
-
-    if ( *conf == ',' )
+    if ( *conf == ',' && *++conf != ',' )
     {
-        conf++;
+        uart->data_bits = simple_strtoul(conf, &conf, 10);
+
+        uart->parity = parse_parity_char(*conf);
+
+        uart->stop_bits = simple_strtoul(conf + 1, &conf, 10);
+    }
+
+    if ( *conf == ',' && *++conf != ',' )
+    {
         if ( strncmp(conf, "pci", 3) == 0 )
         {
             if ( pci_uart_config(uart, 1/* skip AMT */, uart - ns16550_com) )
@@ -591,24 +588,21 @@ static void __init ns16550_parse_port_config(
         {
             uart->io_base = simple_strtoul(conf, &conf, 0);
         }
+    }
 
-        if ( *conf == ',' )
-        {
-            conf++;
-            uart->irq = simple_strtoul(conf, &conf, 10);
-            if ( *conf == ',' )
-            {
-                conf++;
-                uart->ps_bdf_enable = 1;
-                parse_pci_bdf(&conf, &uart->ps_bdf[0]);
-                if ( *conf == ',' )
-                {
-                    conf++;
-                    uart->pb_bdf_enable = 1;
-                    parse_pci_bdf(&conf, &uart->pb_bdf[0]);
-                }
-            }
-        }
+    if ( *conf == ',' && *++conf != ',' )
+        uart->irq = simple_strtol(conf, &conf, 10);
+
+    if ( *conf == ',' && *++conf != ',' )
+    {
+        uart->ps_bdf_enable = 1;
+        parse_pci_bdf(&conf, &uart->ps_bdf[0]);
+    }
+
+    if ( *conf == ',' && *++conf != ',' )
+    {
+        uart->pb_bdf_enable = 1;
+        parse_pci_bdf(&conf, &uart->pb_bdf[0]);
     }
 
  config_parsed:

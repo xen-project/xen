@@ -199,7 +199,7 @@ If set, override Xen's calculation of the level 2 cache line size.
 If set, override Xen's default choice for the platform timer.
 
 ### com1,com2
-> `= <baud>[/<clock_hz>][,DPS[,<io-base>[,<irq>[,<port-bdf>[,<bridge-bdf>]]]] | pci | amt ] `
+> `= <baud>[/<clock_hz>][,[DPS][,[<io-base>|pci|amt][,[<irq>][,[<port-bdf>][,[<bridge-bdf>]]]]]]`
 
 Both option `com1` and `com2` follow the same format.
 
