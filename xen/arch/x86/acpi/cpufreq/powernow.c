@@ -56,20 +56,9 @@
 
 static struct cpufreq_driver powernow_cpufreq_driver;
 
-struct drv_cmd {
-    unsigned int type;
-    const cpumask_t *mask;
-    u32 val;
-    int turbo;
-};
-
-static void transition_pstate(void *drvcmd)
+static void transition_pstate(void *pstate)
 {
-    struct drv_cmd *cmd;
-    cmd = (struct drv_cmd *) drvcmd;
-
-
-    wrmsrl(MSR_PSTATE_CTRL, cmd->val);
+    wrmsrl(MSR_PSTATE_CTRL, *(unsigned int *)pstate);
 }
 
 static void update_cpb(void *data)
@@ -106,13 +95,9 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
 {
     struct acpi_cpufreq_data *data = cpufreq_drv_data[policy->cpu];
     struct processor_performance *perf;
-    struct cpufreq_freqs freqs;
-    cpumask_t online_policy_cpus;
-    struct drv_cmd cmd;
-    unsigned int next_state = 0; /* Index into freq_table */
-    unsigned int next_perf_state = 0; /* Index into perf table */
-    int result = 0;
-    int j = 0;
+    unsigned int next_state; /* Index into freq_table */
+    unsigned int next_perf_state; /* Index into perf table */
+    int result;
 
     if (unlikely(data == NULL ||
         data->acpi_data == NULL || data->freq_table == NULL)) {
@@ -125,9 +110,7 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
                                             target_freq,
                                             relation, &next_state);
     if (unlikely(result))
-        return -ENODEV;
-
-    cpumask_and(&online_policy_cpus, policy->cpus, &cpu_online_map);
+        return result;
 
     next_perf_state = data->freq_table[next_state].index;
     if (perf->state == next_perf_state) {
@@ -137,26 +120,31 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
             return 0;
     }
 
-    if (policy->shared_type != CPUFREQ_SHARED_TYPE_ANY)
-        cmd.mask = &online_policy_cpus;
-    else
-        cmd.mask = cpumask_of(policy->cpu);
+    if (policy->shared_type == CPUFREQ_SHARED_TYPE_HW &&
+        likely(policy->cpu == smp_processor_id())) {
+        transition_pstate(&next_perf_state);
+        cpufreq_statistic_update(policy->cpu, perf->state, next_perf_state);
+    } else {
+        cpumask_t online_policy_cpus;
+        unsigned int cpu;
 
-    freqs.old = perf->states[perf->state].core_frequency * 1000;
-    freqs.new = data->freq_table[next_state].frequency;
+        cpumask_and(&online_policy_cpus, policy->cpus, &cpu_online_map);
 
-    cmd.val = next_perf_state;
-    cmd.turbo = policy->turbo;
+        if (policy->shared_type == CPUFREQ_SHARED_TYPE_ALL ||
+            unlikely(policy->cpu != smp_processor_id()))
+            on_selected_cpus(&online_policy_cpus, transition_pstate,
+                             &next_perf_state, 1);
+        else
+            transition_pstate(&next_perf_state);
 
-    on_selected_cpus(cmd.mask, transition_pstate, &cmd, 1);
-
-    for_each_cpu(j, &online_policy_cpus)
-        cpufreq_statistic_update(j, perf->state, next_perf_state);
+        for_each_cpu(cpu, &online_policy_cpus)
+            cpufreq_statistic_update(cpu, perf->state, next_perf_state);
+    }
 
     perf->state = next_perf_state;
-    policy->cur = freqs.new;
+    policy->cur = data->freq_table[next_state].frequency;
 
-    return result;
+    return 0;
 }
 
 static int powernow_cpufreq_verify(struct cpufreq_policy *policy)
