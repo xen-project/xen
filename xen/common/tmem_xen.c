@@ -51,6 +51,7 @@ DECL_CYC_COUNTER(pg_copy);
 #define LZO_DSTMEM_PAGES 2
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, workmem);
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, dstmem);
+static DEFINE_PER_CPU_READ_MOSTLY(void *, scratch_page);
 
 #ifdef COMPARE_COPY_PAGE_SSE2
 #include <asm/flushtlb.h>  /* REMOVE ME AFTER TEST */
@@ -115,6 +116,7 @@ static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
     {
         if ( page )
             put_page(page);
+        return NULL;
     }
 
     if ( cli_write && !get_page_type(page, PGT_writable_page) )
@@ -144,12 +146,12 @@ static inline void cli_put_page(tmem_cli_mfn_t cmfn, void *cli_va, pfp_t *cli_pf
 
 EXPORT int tmh_copy_from_client(pfp_t *pfp,
     tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
-    pagesize_t pfn_offset, pagesize_t len, void *cli_va)
+    pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_t clibuf)
 {
     unsigned long tmem_mfn, cli_mfn = 0;
-    void *tmem_va;
+    char *tmem_va, *cli_va = NULL;
     pfp_t *cli_pfp = NULL;
-    bool_t tmemc = cli_va != NULL; /* if true, cli_va is control-op buffer */
+    int rc = 1;
 
     ASSERT(pfp != NULL);
     tmem_mfn = page_to_mfn(pfp);
@@ -160,62 +162,76 @@ EXPORT int tmh_copy_from_client(pfp_t *pfp,
         unmap_domain_page(tmem_va);
         return 1;
     }
-    if ( !tmemc )
+    if ( guest_handle_is_null(clibuf) )
     {
         cli_va = cli_get_page(cmfn, &cli_mfn, &cli_pfp, 0);
         if ( cli_va == NULL )
+        {
+            unmap_domain_page(tmem_va);
             return -EFAULT;
+        }
     }
     mb();
-    if (len == PAGE_SIZE && !tmem_offset && !pfn_offset)
+    if ( len == PAGE_SIZE && !tmem_offset && !pfn_offset && cli_va )
         tmh_copy_page(tmem_va, cli_va);
     else if ( (tmem_offset+len <= PAGE_SIZE) &&
               (pfn_offset+len <= PAGE_SIZE) )
-        memcpy((char *)tmem_va+tmem_offset,(char *)cli_va+pfn_offset,len);
-    if ( !tmemc )
+    {
+        if ( cli_va )
+            memcpy(tmem_va + tmem_offset, cli_va + pfn_offset, len);
+        else if ( copy_from_guest_offset(tmem_va + tmem_offset, clibuf,
+                                         pfn_offset, len) )
+            rc = -EFAULT;
+    }
+    if ( cli_va )
         cli_put_page(cmfn, cli_va, cli_pfp, cli_mfn, 0);
     unmap_domain_page(tmem_va);
-    return 1;
+    return rc;
 }
 
 EXPORT int tmh_compress_from_client(tmem_cli_mfn_t cmfn,
-    void **out_va, size_t *out_len, void *cli_va)
+    void **out_va, size_t *out_len, tmem_cli_va_t clibuf)
 {
     int ret = 0;
     unsigned char *dmem = this_cpu(dstmem);
     unsigned char *wmem = this_cpu(workmem);
+    char *scratch = this_cpu(scratch_page);
     pfp_t *cli_pfp = NULL;
     unsigned long cli_mfn = 0;
-    bool_t tmemc = cli_va != NULL; /* if true, cli_va is control-op buffer */
+    void *cli_va = NULL;
 
     if ( dmem == NULL || wmem == NULL )
         return 0;  /* no buffer, so can't compress */
-    if ( !tmemc )
+    if ( guest_handle_is_null(clibuf) )
     {
         cli_va = cli_get_page(cmfn, &cli_mfn, &cli_pfp, 0);
         if ( cli_va == NULL )
             return -EFAULT;
     }
+    else if ( !scratch )
+        return 0;
+    else if ( copy_from_guest(scratch, clibuf, PAGE_SIZE) )
+        return -EFAULT;
     mb();
-    ret = lzo1x_1_compress(cli_va, PAGE_SIZE, dmem, out_len, wmem);
+    ret = lzo1x_1_compress(cli_va ?: scratch, PAGE_SIZE, dmem, out_len, wmem);
     ASSERT(ret == LZO_E_OK);
     *out_va = dmem;
-    if ( !tmemc )
+    if ( cli_va )
         cli_put_page(cmfn, cli_va, cli_pfp, cli_mfn, 0);
-    unmap_domain_page(cli_va);
     return 1;
 }
 
 EXPORT int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
-    pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len, void *cli_va)
+    pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len,
+    tmem_cli_va_t clibuf)
 {
     unsigned long tmem_mfn, cli_mfn = 0;
-    void *tmem_va;
+    char *tmem_va, *cli_va = NULL;
     pfp_t *cli_pfp = NULL;
-    bool_t tmemc = cli_va != NULL; /* if true, cli_va is control-op buffer */
+    int rc = 1;
 
     ASSERT(pfp != NULL);
-    if ( !tmemc )
+    if ( guest_handle_is_null(clibuf) )
     {
         cli_va = cli_get_page(cmfn, &cli_mfn, &cli_pfp, 1);
         if ( cli_va == NULL )
@@ -223,37 +239,48 @@ EXPORT int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
     }
     tmem_mfn = page_to_mfn(pfp);
     tmem_va = map_domain_page(tmem_mfn);
-    if (len == PAGE_SIZE && !tmem_offset && !pfn_offset)
+    if ( len == PAGE_SIZE && !tmem_offset && !pfn_offset && cli_va )
         tmh_copy_page(cli_va, tmem_va);
     else if ( (tmem_offset+len <= PAGE_SIZE) && (pfn_offset+len <= PAGE_SIZE) )
-        memcpy((char *)cli_va+pfn_offset,(char *)tmem_va+tmem_offset,len);
+    {
+        if ( cli_va )
+            memcpy(cli_va + pfn_offset, tmem_va + tmem_offset, len);
+        else if ( copy_to_guest_offset(clibuf, pfn_offset,
+                                       tmem_va + tmem_offset, len) )
+            rc = -EFAULT;
+    }
     unmap_domain_page(tmem_va);
-    if ( !tmemc )
+    if ( cli_va )
         cli_put_page(cmfn, cli_va, cli_pfp, cli_mfn, 1);
     mb();
-    return 1;
+    return rc;
 }
 
 EXPORT int tmh_decompress_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
-                                    size_t size, void *cli_va)
+                                    size_t size, tmem_cli_va_t clibuf)
 {
     unsigned long cli_mfn = 0;
     pfp_t *cli_pfp = NULL;
+    void *cli_va = NULL;
+    char *scratch = this_cpu(scratch_page);
     size_t out_len = PAGE_SIZE;
-    bool_t tmemc = cli_va != NULL; /* if true, cli_va is control-op buffer */
     int ret;
 
-    if ( !tmemc )
+    if ( guest_handle_is_null(clibuf) )
     {
         cli_va = cli_get_page(cmfn, &cli_mfn, &cli_pfp, 1);
         if ( cli_va == NULL )
             return -EFAULT;
     }
-    ret = lzo1x_decompress_safe(tmem_va, size, cli_va, &out_len);
+    else if ( !scratch )
+        return 0;
+    ret = lzo1x_decompress_safe(tmem_va, size, cli_va ?: scratch, &out_len);
     ASSERT(ret == LZO_E_OK);
     ASSERT(out_len == PAGE_SIZE);
-    if ( !tmemc )
+    if ( cli_va )
         cli_put_page(cmfn, cli_va, cli_pfp, cli_mfn, 1);
+    else if ( copy_to_guest(clibuf, scratch, PAGE_SIZE) )
+        return -EFAULT;
     mb();
     return 1;
 }
@@ -423,6 +450,11 @@ static int cpu_callback(
             struct page_info *p = alloc_domheap_pages(0, workmem_order, 0);
             per_cpu(workmem, cpu) = p ? page_to_virt(p) : NULL;
         }
+        if ( per_cpu(scratch_page, cpu) == NULL )
+        {
+            struct page_info *p = alloc_domheap_page(NULL, 0);
+            per_cpu(scratch_page, cpu) = p ? page_to_virt(p) : NULL;
+        }
         break;
     }
     case CPU_DEAD:
@@ -438,6 +470,11 @@ static int cpu_callback(
             struct page_info *p = virt_to_page(per_cpu(workmem, cpu));
             free_domheap_pages(p, workmem_order);
             per_cpu(workmem, cpu) = NULL;
+        }
+        if ( per_cpu(scratch_page, cpu) != NULL )
+        {
+            free_domheap_page(virt_to_page(per_cpu(scratch_page, cpu)));
+            per_cpu(scratch_page, cpu) = NULL;
         }
         break;
     }

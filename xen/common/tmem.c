@@ -388,11 +388,13 @@ static NOINLINE int pcd_copy_to_client(tmem_cli_mfn_t cmfn, pgp_t *pgp)
     pcd = pgp->pcd;
     if ( pgp->size < PAGE_SIZE && pgp->size != 0 &&
          pcd->size < PAGE_SIZE && pcd->size != 0 )
-        ret = tmh_decompress_to_client(cmfn, pcd->cdata, pcd->size, NULL);
+        ret = tmh_decompress_to_client(cmfn, pcd->cdata, pcd->size,
+                                       tmh_cli_buf_null);
     else if ( tmh_tze_enabled() && pcd->size < PAGE_SIZE )
         ret = tmh_copy_tze_to_client(cmfn, pcd->tze, pcd->size);
     else
-        ret = tmh_copy_to_client(cmfn, pcd->pfp, 0, 0, PAGE_SIZE, NULL);
+        ret = tmh_copy_to_client(cmfn, pcd->pfp, 0, 0, PAGE_SIZE,
+                                 tmh_cli_buf_null);
     tmem_read_unlock(&pcd_tree_rwlocks[firstbyte]);
     return ret;
 }
@@ -1444,7 +1446,7 @@ static inline void tmem_ensure_avail_pages(void)
 /************ TMEM CORE OPERATIONS ************************************/
 
 static NOINLINE int do_tmem_put_compress(pgp_t *pgp, tmem_cli_mfn_t cmfn,
-                                         void *cva)
+                                         tmem_cli_va_t clibuf)
 {
     void *dst, *p;
     size_t size;
@@ -1463,7 +1465,7 @@ static NOINLINE int do_tmem_put_compress(pgp_t *pgp, tmem_cli_mfn_t cmfn,
     if ( pgp->pfp != NULL )
         pgp_free_data(pgp, pgp->us.obj->pool);
     START_CYC_COUNTER(compress);
-    ret = tmh_compress_from_client(cmfn, &dst, &size, cva);
+    ret = tmh_compress_from_client(cmfn, &dst, &size, clibuf);
     if ( (ret == -EFAULT) || (ret == 0) )
         goto out;
     else if ( (size == 0) || (size >= tmem_subpage_maxsize()) ) {
@@ -1490,7 +1492,8 @@ out:
 }
 
 static NOINLINE int do_tmem_dup_put(pgp_t *pgp, tmem_cli_mfn_t cmfn,
-       pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len, void *cva)
+       pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len,
+       tmem_cli_va_t clibuf)
 {
     pool_t *pool;
     obj_t *obj;
@@ -1512,7 +1515,7 @@ static NOINLINE int do_tmem_dup_put(pgp_t *pgp, tmem_cli_mfn_t cmfn,
     /* can we successfully manipulate pgp to change out the data? */
     if ( len != 0 && client->compress && pgp->size != 0 )
     {
-        ret = do_tmem_put_compress(pgp,cmfn,cva);
+        ret = do_tmem_put_compress(pgp, cmfn, clibuf);
         if ( ret == 1 )
             goto done;
         else if ( ret == 0 )
@@ -1530,7 +1533,8 @@ copy_uncompressed:
         goto failed_dup;
     pgp->size = 0;
     /* tmh_copy_from_client properly handles len==0 and offsets != 0 */
-    ret = tmh_copy_from_client(pgp->pfp,cmfn,tmem_offset,pfn_offset,len,0);
+    ret = tmh_copy_from_client(pgp->pfp, cmfn, tmem_offset, pfn_offset, len,
+                               tmh_cli_buf_null);
     if ( ret == -EFAULT )
         goto bad_copy;
     if ( tmh_dedup_enabled() && !is_persistent(pool) )
@@ -1582,7 +1586,7 @@ cleanup:
 static NOINLINE int do_tmem_put(pool_t *pool,
               OID *oidp, uint32_t index,
               tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
-              pagesize_t pfn_offset, pagesize_t len, void *cva)
+              pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_t clibuf)
 {
     obj_t *obj = NULL, *objfound = NULL, *objnew = NULL;
     pgp_t *pgp = NULL, *pgpdel = NULL;
@@ -1596,7 +1600,8 @@ static NOINLINE int do_tmem_put(pool_t *pool,
     {
         ASSERT_SPINLOCK(&objfound->obj_spinlock);
         if ((pgp = pgp_lookup_in_obj(objfound, index)) != NULL)
-            return do_tmem_dup_put(pgp,cmfn,tmem_offset,pfn_offset,len,cva);
+            return do_tmem_dup_put(pgp, cmfn, tmem_offset, pfn_offset, len,
+                                   clibuf);
     }
 
     /* no puts allowed into a frozen pool (except dup puts) */
@@ -1631,7 +1636,7 @@ static NOINLINE int do_tmem_put(pool_t *pool,
     if ( len != 0 && client->compress )
     {
         ASSERT(pgp->pfp == NULL);
-        ret = do_tmem_put_compress(pgp,cmfn,cva);
+        ret = do_tmem_put_compress(pgp, cmfn, clibuf);
         if ( ret == 1 )
             goto insert_page;
         if ( ret == -ENOMEM )
@@ -1655,7 +1660,8 @@ copy_uncompressed:
         goto delete_and_free;
     }
     /* tmh_copy_from_client properly handles len==0 (TMEM_NEW_PAGE) */
-    ret = tmh_copy_from_client(pgp->pfp,cmfn,tmem_offset,pfn_offset,len,cva);
+    ret = tmh_copy_from_client(pgp->pfp, cmfn, tmem_offset, pfn_offset, len,
+                               clibuf);
     if ( ret == -EFAULT )
         goto bad_copy;
     if ( tmh_dedup_enabled() && !is_persistent(pool) )
@@ -1725,12 +1731,13 @@ free:
 
 static NOINLINE int do_tmem_get(pool_t *pool, OID *oidp, uint32_t index,
               tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
-              pagesize_t pfn_offset, pagesize_t len, void *cva)
+              pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_t clibuf)
 {
     obj_t *obj;
     pgp_t *pgp;
     client_t *client = pool->client;
     DECL_LOCAL_CYC_COUNTER(decompress);
+    int rc = -EFAULT;
 
     if ( !_atomic_read(pool->pgp_count) )
         return -EEMPTY;
@@ -1755,16 +1762,18 @@ static NOINLINE int do_tmem_get(pool_t *pool, OID *oidp, uint32_t index,
     if ( tmh_dedup_enabled() && !is_persistent(pool) &&
               pgp->firstbyte != NOT_SHAREABLE )
     {
-        if ( pcd_copy_to_client(cmfn, pgp) == -EFAULT )
+        rc = pcd_copy_to_client(cmfn, pgp);
+        if ( rc <= 0 )
             goto bad_copy;
     } else if ( pgp->size != 0 ) {
         START_CYC_COUNTER(decompress);
-        if ( tmh_decompress_to_client(cmfn, pgp->cdata,
-                                      pgp->size, cva) == -EFAULT )
+        rc = tmh_decompress_to_client(cmfn, pgp->cdata,
+                                      pgp->size, clibuf);
+        if ( rc <= 0 )
             goto bad_copy;
         END_CYC_COUNTER(decompress);
     } else if ( tmh_copy_to_client(cmfn, pgp->pfp, tmem_offset,
-                                 pfn_offset, len, cva) == -EFAULT)
+                                 pfn_offset, len, clibuf) == -EFAULT)
         goto bad_copy;
     if ( is_ephemeral(pool) )
     {
@@ -1804,8 +1813,7 @@ static NOINLINE int do_tmem_get(pool_t *pool, OID *oidp, uint32_t index,
 bad_copy:
     /* this should only happen if the client passed a bad mfn */
     failed_copies++;
-    return -EFAULT;
-
+    return rc;
 }
 
 static NOINLINE int do_tmem_flush_page(pool_t *pool, OID *oidp, uint32_t index)
@@ -2345,7 +2353,6 @@ static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
     pool_t *pool = (client == NULL || pool_id >= MAX_POOLS_PER_DOMAIN)
                    ? NULL : client->pools[pool_id];
     uint32_t p;
-    uint64_t *uuid;
     pgp_t *pgp, *pgp2;
     int rc = -1;
 
@@ -2409,9 +2416,7 @@ static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
     case TMEMC_SAVE_GET_POOL_UUID:
          if ( pool == NULL )
              break;
-        uuid = (uint64_t *)buf.p;
-        *uuid++ = pool->uuid[0];
-        *uuid = pool->uuid[1];
+        tmh_copy_to_client_buf(buf, pool->uuid, 2);
         rc = 0;
     case TMEMC_SAVE_END:
         if ( client == NULL )
@@ -2436,7 +2441,7 @@ static NOINLINE int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
     pgp_t *pgp;
     OID oid;
     int ret = 0;
-    struct tmem_handle *h;
+    struct tmem_handle h;
     unsigned int pagesize = 1 << (pool->pageshift+12);
 
     if ( pool == NULL || is_ephemeral(pool) )
@@ -2467,11 +2472,13 @@ static NOINLINE int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
                          pgp_t,us.pool_pers_pages);
     pool->cur_pgp = pgp;
     oid = pgp->us.obj->oid;
-    h = (struct tmem_handle *)buf.p;
-    *(OID *)&h->oid[0] = oid;
-    h->index = pgp->index;
-    buf.p = (void *)(h+1);
-    ret = do_tmem_get(pool, &oid, h->index,0,0,0,pagesize,buf.p);
+    h.pool_id = pool_id;
+    BUILD_BUG_ON(sizeof(h.oid) != sizeof(oid));
+    memcpy(h.oid, oid.oid, sizeof(h.oid));
+    h.index = pgp->index;
+    tmh_copy_to_client_buf(buf, &h, 1);
+    tmh_client_buf_add(buf, sizeof(h));
+    ret = do_tmem_get(pool, &oid, pgp->index, 0, 0, 0, pagesize, buf);
 
 out:
     tmem_spin_unlock(&pers_lists_spinlock);
@@ -2483,7 +2490,7 @@ static NOINLINE int tmemc_save_get_next_inv(int cli_id, tmem_cli_va_t buf,
 {
     client_t *client = tmh_client_from_cli_id(cli_id);
     pgp_t *pgp;
-    struct tmem_handle *h;
+    struct tmem_handle h;
     int ret = 0;
 
     if ( client == NULL )
@@ -2509,10 +2516,11 @@ static NOINLINE int tmemc_save_get_next_inv(int cli_id, tmem_cli_va_t buf,
                          pgp_t,client_inv_pages);
         client->cur_pgp = pgp;
     }
-    h = (struct tmem_handle *)buf.p;
-    h->pool_id = pgp->pool_id;
-    *(OID *)&h->oid = pgp->inv_oid;
-    h->index = pgp->index;
+    h.pool_id = pgp->pool_id;
+    BUILD_BUG_ON(sizeof(h.oid) != sizeof(pgp->inv_oid));
+    memcpy(h.oid, pgp->inv_oid.oid, sizeof(h.oid));
+    h.index = pgp->index;
+    tmh_copy_to_client_buf(buf, &h, 1);
     ret = 1;
 out:
     tmem_spin_unlock(&pers_lists_spinlock);
@@ -2528,7 +2536,7 @@ static int tmemc_restore_put_page(int cli_id, uint32_t pool_id, OID *oidp,
 
     if ( pool == NULL )
         return -1;
-    return do_tmem_put(pool,oidp,index,0,0,0,bufsize,buf.p);
+    return do_tmem_put(pool, oidp, index, 0, 0, 0, bufsize, buf);
 }
 
 static int tmemc_restore_flush_page(int cli_id, uint32_t pool_id, OID *oidp,
@@ -2732,19 +2740,19 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
         break;
     case TMEM_NEW_PAGE:
         tmem_ensure_avail_pages();
-        rc = do_tmem_put(pool, oidp,
-                         op.u.gen.index, op.u.gen.cmfn, 0, 0, 0, NULL);
+        rc = do_tmem_put(pool, oidp, op.u.gen.index, op.u.gen.cmfn, 0, 0, 0,
+                         tmh_cli_buf_null);
         break;
     case TMEM_PUT_PAGE:
         tmem_ensure_avail_pages();
-        rc = do_tmem_put(pool, oidp,
-                    op.u.gen.index, op.u.gen.cmfn, 0, 0, PAGE_SIZE, NULL);
+        rc = do_tmem_put(pool, oidp, op.u.gen.index, op.u.gen.cmfn, 0, 0,
+                         PAGE_SIZE, tmh_cli_buf_null);
         if (rc == 1) succ_put = 1;
         else non_succ_put = 1;
         break;
     case TMEM_GET_PAGE:
         rc = do_tmem_get(pool, oidp, op.u.gen.index, op.u.gen.cmfn,
-                         0, 0, PAGE_SIZE, 0);
+                         0, 0, PAGE_SIZE, tmh_cli_buf_null);
         if (rc == 1) succ_get = 1;
         else non_succ_get = 1;
         break;
@@ -2763,13 +2771,13 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     case TMEM_READ:
         rc = do_tmem_get(pool, oidp, op.u.gen.index, op.u.gen.cmfn,
                          op.u.gen.tmem_offset, op.u.gen.pfn_offset,
-                         op.u.gen.len,0);
+                         op.u.gen.len, tmh_cli_buf_null);
         break;
     case TMEM_WRITE:
         rc = do_tmem_put(pool, oidp,
                          op.u.gen.index, op.u.gen.cmfn,
                          op.u.gen.tmem_offset, op.u.gen.pfn_offset,
-                         op.u.gen.len, NULL);
+                         op.u.gen.len, tmh_cli_buf_null);
         break;
     case TMEM_XCHG:
         /* need to hold global lock to ensure xchg is atomic */
