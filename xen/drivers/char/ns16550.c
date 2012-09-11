@@ -468,7 +468,6 @@ static int __init check_existence(struct ns16550 *uart)
 static int
 pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
 {
-    uint16_t class;
     uint32_t bar, len;
     int b, d, f;
 
@@ -479,9 +478,15 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
         {
             for ( f = 0; f < 0x8; f++ )
             {
-                class = pci_conf_read16(0, b, d, f, PCI_CLASS_DEVICE);
-                if ( class != 0x700 )
+                switch ( pci_conf_read16(0, b, d, f, PCI_CLASS_DEVICE) )
+                {
+                case 0x0700: /* single port serial */
+                case 0x0702: /* multi port serial */
+                case 0x0780: /* other (e.g serial+parallel) */
+                    break;
+                default:
                     continue;
+                }
 
                 bar = pci_conf_read32(0, b, d, f,
                                       PCI_BASE_ADDRESS_0 + bar_idx*4);
@@ -504,7 +509,8 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
                 uart->bar = bar;
                 uart->bar_idx = bar_idx;
                 uart->io_base = bar & ~PCI_BASE_ADDRESS_SPACE_IO;
-                uart->irq = 0;
+                uart->irq = pci_conf_read8(0, b, d, f, PCI_INTERRUPT_PIN) ?
+                    pci_conf_read8(0, b, d, f, PCI_INTERRUPT_LINE) : 0;
 
                 return 0;
             }
