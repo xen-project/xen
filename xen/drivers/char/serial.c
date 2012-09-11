@@ -59,7 +59,7 @@ void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
 
 void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
 {
-    int i;
+    unsigned int i, n;
     unsigned long flags;
 
     local_irq_save(flags);
@@ -71,23 +71,20 @@ void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
      */
     while ( !spin_trylock(&port->tx_lock) )
     {
-        if ( !port->driver->tx_empty(port) )
+        if ( !port->driver->tx_ready(port) )
             goto out;
         cpu_relax();
     }
 
-    if ( port->driver->tx_empty(port) )
+    for ( i = 0, n = port->driver->tx_ready(port); i < n; i++ )
     {
-        for ( i = 0; i < port->tx_fifo_size; i++ )
-        {
-            if ( port->txbufc == port->txbufp )
-                break;
-            port->driver->putc(
-                port, port->txbuf[mask_serial_txbuf_idx(port->txbufc++)]);
-        }
-        if ( i && port->driver->flush )
-            port->driver->flush(port);
+        if ( port->txbufc == port->txbufp )
+            break;
+        port->driver->putc(
+            port, port->txbuf[mask_serial_txbuf_idx(port->txbufc++)]);
     }
+    if ( i && port->driver->flush )
+        port->driver->flush(port);
 
     spin_unlock(&port->tx_lock);
 
@@ -114,10 +111,11 @@ static void __serial_putc(struct serial_port *port, char c)
             if ( port->tx_log_everything )
             {
                 /* Buffer is full: we spin waiting for space to appear. */
-                int i;
-                while ( !port->driver->tx_empty(port) )
+                unsigned int n;
+
+                while ( (n = port->driver->tx_ready(port)) == 0 )
                     cpu_relax();
-                for ( i = 0; i < port->tx_fifo_size; i++ )
+                while ( n-- )
                     port->driver->putc(
                         port,
                         port->txbuf[mask_serial_txbuf_idx(port->txbufc++)]);
@@ -132,7 +130,7 @@ static void __serial_putc(struct serial_port *port, char c)
         }
 
         if ( ((port->txbufp - port->txbufc) == 0) &&
-                  port->driver->tx_empty(port) )
+             port->driver->tx_ready(port) )
         {
             /* Buffer and UART FIFO are both empty. */
             port->driver->putc(port, c);
@@ -143,10 +141,10 @@ static void __serial_putc(struct serial_port *port, char c)
             port->txbuf[mask_serial_txbuf_idx(port->txbufp++)] = c;
         }
     }
-    else if ( port->driver->tx_empty )
+    else if ( port->driver->tx_ready )
     {
         /* Synchronous finite-capacity transmitter. */
-        while ( !port->driver->tx_empty(port) )
+        while ( !port->driver->tx_ready(port) )
             cpu_relax();
         port->driver->putc(port, c);
     }
@@ -386,7 +384,7 @@ void serial_start_sync(int handle)
     {
         while ( (port->txbufp - port->txbufc) != 0 )
         {
-            while ( !port->driver->tx_empty(port) )
+            while ( !port->driver->tx_ready(port) )
                 cpu_relax();
             port->driver->putc(
                 port, port->txbuf[mask_serial_txbuf_idx(port->txbufc++)]);
@@ -506,14 +504,11 @@ void __init serial_register_uart(int idx, struct uart_driver *driver,
     /* Store UART-specific info. */
     com[idx].driver = driver;
     com[idx].uart   = uart;
-
-    /* Default is no transmit FIFO. */
-    com[idx].tx_fifo_size = 1;
 }
 
 void __init serial_async_transmit(struct serial_port *port)
 {
-    BUG_ON(!port->driver->tx_empty);
+    BUG_ON(!port->driver->tx_ready);
     if ( port->txbuf != NULL )
         return;
     if ( serial_txbufsz < PAGE_SIZE )

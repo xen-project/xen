@@ -38,7 +38,7 @@ string_param("com1", opt_com1);
 string_param("com2", opt_com2);
 
 static struct ns16550 {
-    int baud, clock_hz, data_bits, parity, stop_bits, irq;
+    int baud, clock_hz, data_bits, parity, stop_bits, fifo_size, irq;
     unsigned long io_base;   /* I/O port or memory-mapped I/O address. */
     char __iomem *remapped_io_base;  /* Remapped virtual address of MMIO. */
     /* UART with IRQ line: interrupt-driven I/O. */
@@ -185,10 +185,11 @@ static void ns16550_poll(void *data)
 #endif
 }
 
-static int ns16550_tx_empty(struct serial_port *port)
+static unsigned int ns16550_tx_ready(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
-    return !!(ns_read_reg(uart, LSR) & LSR_THRE);
+
+    return ns_read_reg(uart, LSR) & LSR_THRE ? uart->fifo_size : 0;
 }
 
 static void ns16550_putc(struct serial_port *port, char c)
@@ -288,7 +289,7 @@ static void __init ns16550_init_preirq(struct serial_port *port)
     /* Check this really is a 16550+. Otherwise we have no FIFOs. */
     if ( ((ns_read_reg(uart, IIR) & 0xc0) == 0xc0) &&
          ((ns_read_reg(uart, FCR) & FCR_TRG14) == FCR_TRG14) )
-        port->tx_fifo_size = 16;
+        uart->fifo_size = 16;
 }
 
 static void ns16550_setup_postirq(struct ns16550 *uart)
@@ -321,7 +322,7 @@ static void __init ns16550_init_postirq(struct serial_port *port)
     /* Calculate time to fill RX FIFO and/or empty TX FIFO for polling. */
     bits = uart->data_bits + uart->stop_bits + !!uart->parity;
     uart->timeout_ms = max_t(
-        unsigned int, 1, (bits * port->tx_fifo_size * 1000) / uart->baud);
+        unsigned int, 1, (bits * uart->fifo_size * 1000) / uart->baud);
 
     if ( uart->irq > 0 )
     {
@@ -388,7 +389,7 @@ static struct uart_driver __read_mostly ns16550_driver = {
     .endboot      = ns16550_endboot,
     .suspend      = ns16550_suspend,
     .resume       = ns16550_resume,
-    .tx_empty     = ns16550_tx_empty,
+    .tx_ready     = ns16550_tx_ready,
     .putc         = ns16550_putc,
     .getc         = ns16550_getc,
     .irq          = ns16550_irq
@@ -641,6 +642,8 @@ void __init ns16550_init(int index, struct ns16550_defaults *defaults)
     uart->stop_bits = defaults->stop_bits;
     uart->irq       = defaults->irq;
     uart->io_base   = defaults->io_base;
+    /* Default is no transmit FIFO. */
+    uart->fifo_size = 1;
 
     ns16550_parse_port_config(uart, (index == 0) ? opt_com1 : opt_com2);
 }

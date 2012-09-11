@@ -156,9 +156,6 @@ static void __init pl011_init_preirq(struct serial_port *port)
 
     /* Enable the UART for RX and TX; no flow ctrl */
     uart->regs[CR] = RXE | TXE | UARTEN;
-
-    /* Tell the serial framework about our fine 156-character FIFO */
-    port->tx_fifo_size = 16;
 }
 
 static void __init pl011_init_postirq(struct serial_port *port)
@@ -192,10 +189,10 @@ static void pl011_resume(struct serial_port *port)
     BUG(); // XXX
 }
 
-static int pl011_tx_empty(struct serial_port *port)
+static unsigned int pl011_tx_ready(struct serial_port *port)
 {
     struct pl011 *uart = port->uart;
-    return !!(uart->regs[FR] & TXFE);
+    return uart->regs[FR] & TXFE ? 16 : 0;
 }
 
 static void pl011_putc(struct serial_port *port, char c)
@@ -227,7 +224,7 @@ static struct uart_driver __read_mostly pl011_driver = {
     .endboot      = NULL,
     .suspend      = pl011_suspend,
     .resume       = pl011_resume,
-    .tx_empty     = pl011_tx_empty,
+    .tx_ready     = pl011_tx_ready,
     .putc         = pl011_putc,
     .getc         = pl011_getc,
     .irq          = pl011_irq

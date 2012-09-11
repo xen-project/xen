@@ -36,8 +36,6 @@ struct serial_port {
     struct uart_driver *driver;
     void               *uart;
     enum serial_port_state state;
-    /* Number of characters the port can hold for transmit. */
-    int                 tx_fifo_size;
     /* Transmit data buffer (interrupt-driven uart). */
     char               *txbuf;
     unsigned int        txbufp, txbufc;
@@ -63,8 +61,8 @@ struct uart_driver {
     /* Driver suspend/resume. */
     void (*suspend)(struct serial_port *);
     void (*resume)(struct serial_port *);
-    /* Transmit FIFO ready to receive up to @tx_fifo_size characters? */
-    int  (*tx_empty)(struct serial_port *);
+    /* Return number of characters the port can hold for transmit. */
+    unsigned int (*tx_ready)(struct serial_port *);
     /* Put a character onto the serial line. */
     void (*putc)(struct serial_port *, char);
     /* Flush accumulated characters. */

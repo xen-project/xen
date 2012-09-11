@@ -1204,7 +1204,7 @@ static void ehci_dbgp_putc(struct serial_port *port, char c)
         ehci_dbgp_flush(port);
 }
 
-static int ehci_dbgp_tx_empty(struct serial_port *port)
+static unsigned int ehci_dbgp_tx_ready(struct serial_port *port)
 {
     struct ehci_dbgp *dbgp = port->uart;
 
@@ -1219,11 +1219,8 @@ static int ehci_dbgp_tx_empty(struct serial_port *port)
     if ( dbgp->state != dbgp_idle && dbgp->out.chunk >= DBGP_MAX_PACKET )
         return 0;
 
-    port->tx_fifo_size = DBGP_MAX_PACKET - dbgp->out.chunk;
-    if ( dbgp->state == dbgp_idle )
-        port->tx_fifo_size += DBGP_MAX_PACKET;
-
-    return 1;
+    return DBGP_MAX_PACKET - dbgp->out.chunk +
+           (dbgp->state == dbgp_idle) * DBGP_MAX_PACKET;
 }
 
 static int ehci_dbgp_getc(struct serial_port *port, char *pc)
@@ -1347,7 +1344,6 @@ static void __init ehci_dbgp_init_preirq(struct serial_port *port)
     if ( ehci_dbgp_setup_preirq(dbgp) )
         ehci_dbgp_status(dbgp, "ehci_dbgp_init_preirq complete");
 
-    port->tx_fifo_size = DBGP_MAX_PACKET;
     dbgp->lock = &port->tx_lock;
 }
 
@@ -1448,7 +1444,7 @@ static struct uart_driver __read_mostly ehci_dbgp_driver = {
     .endboot      = ehci_dbgp_endboot,
     .suspend      = ehci_dbgp_suspend,
     .resume       = ehci_dbgp_resume,
-    .tx_empty     = ehci_dbgp_tx_empty,
+    .tx_ready     = ehci_dbgp_tx_ready,
     .putc         = ehci_dbgp_putc,
     .flush        = ehci_dbgp_flush,
     .getc         = ehci_dbgp_getc
