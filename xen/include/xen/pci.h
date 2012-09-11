@@ -103,6 +103,7 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *);
 int pci_remove_device(u16 seg, u8 bus, u8 devfn);
 int pci_ro_device(int seg, int bus, int devfn);
 void arch_pci_ro_device(int seg, int bdf);
+int pci_hide_device(int bus, int devfn);
 struct pci_dev *pci_get_pdev(int seg, int bus, int devfn);
 struct pci_dev *pci_get_pdev_by_domain(
     struct domain *, int seg, int bus, int devfn);

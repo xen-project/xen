@@ -9,6 +9,7 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/vga.h>
+#include <xen/pci.h>
 #include <asm/io.h>
 
 /* Filled in by arch boot code. */
@@ -106,6 +107,61 @@ void __init vga_endboot(void)
 
     if ( !vgacon_keep )
         vga_puts = vga_noop_puts;
+    else
+    {
+        int bus, devfn;
+
+        for ( bus = 0; bus < 256; ++bus )
+            for ( devfn = 0; devfn < 256; ++devfn )
+            {
+                const struct pci_dev *pdev;
+                u8 b = bus, df = devfn, sb;
+
+                spin_lock(&pcidevs_lock);
+                pdev = pci_get_pdev(0, bus, devfn);
+                spin_unlock(&pcidevs_lock);
+
+                if ( !pdev ||
+                     pci_conf_read16(0, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                                     PCI_CLASS_DEVICE) != 0x0300 ||
+                     !(pci_conf_read16(0, bus, PCI_SLOT(devfn),
+                                       PCI_FUNC(devfn), PCI_COMMAND) &
+                       (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) )
+                    continue;
+
+                while ( b )
+                {
+                    switch ( find_upstream_bridge(0, &b, &df, &sb) )
+                    {
+                    case 0:
+                        b = 0;
+                        break;
+                    case 1:
+                        switch ( pci_conf_read8(0, b, PCI_SLOT(df),
+                                                PCI_FUNC(df),
+                                                PCI_HEADER_TYPE) )
+                        {
+                        case PCI_HEADER_TYPE_BRIDGE:
+                        case PCI_HEADER_TYPE_CARDBUS:
+                            if ( pci_conf_read16(0, b, PCI_SLOT(df),
+                                                 PCI_FUNC(df),
+                                                 PCI_BRIDGE_CONTROL) &
+                                 PCI_BRIDGE_CTL_VGA )
+                                continue;
+                            break;
+                        }
+                        break;
+                    }
+                    break;
+                }
+                if ( !b )
+                {
+                    printk(XENLOG_INFO "Boot video device %02x:%02x.%u\n",
+                           bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+                    pci_hide_device(bus, devfn);
+                }
+            }
+    }
 
     switch ( vga_console_info.video_type )
     {

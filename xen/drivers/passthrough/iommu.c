@@ -208,7 +208,7 @@ static int device_assigned(u16 seg, u8 bus, u8 devfn)
     pdev = pci_get_pdev_by_domain(dom0, seg, bus, devfn);
     spin_unlock(&pcidevs_lock);
 
-    return pdev ? 0 : -1;
+    return pdev ? 0 : -EBUSY;
 }
 
 static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
@@ -614,7 +614,8 @@ int iommu_do_domctl(
         bus = (domctl->u.assign_device.machine_sbdf >> 8) & 0xff;
         devfn = domctl->u.assign_device.machine_sbdf & 0xff;
 
-        ret = assign_device(d, seg, bus, devfn);
+        ret = device_assigned(seg, bus, devfn) ?:
+              assign_device(d, seg, bus, devfn);
         if ( ret )
             printk(XENLOG_G_ERR "XEN_DOMCTL_assign_device: "
                    "assign %04x:%02x:%02x.%u to dom%d failed (%d)\n",

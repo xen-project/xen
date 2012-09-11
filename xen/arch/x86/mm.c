@@ -311,9 +311,12 @@ void __init arch_init_memory(void)
      * Initialise our DOMID_XEN domain.
      * Any Xen-heap pages that we will allow to be mapped will have
      * their domain field set to dom_xen.
+     * Hidden PCI devices will also be associated with this domain
+     * (but be [partly] controlled by Dom0 nevertheless).
      */
     dom_xen = domain_create(DOMID_XEN, DOMCRF_dummy, 0);
     BUG_ON(IS_ERR(dom_xen));
+    INIT_LIST_HEAD(&dom_xen->arch.pdev_list);
 
     /*
      * Initialise our DOMID_IO domain.

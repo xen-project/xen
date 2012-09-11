@@ -334,6 +334,10 @@ static void __init ns16550_init_postirq(struct serial_port *port)
     }
 
     ns16550_setup_postirq(uart);
+
+    if ( uart->bar || uart->ps_bdf_enable )
+        pci_hide_device(uart->ps_bdf[0], PCI_DEVFN(uart->ps_bdf[1],
+                                                   uart->ps_bdf[2]));
 }
 
 static void ns16550_suspend(struct serial_port *port)

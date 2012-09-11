@@ -208,6 +208,31 @@ static void free_pdev(struct pci_seg *pseg, struct pci_dev *pdev)
     xfree(pdev);
 }
 
+static void _pci_hide_device(struct pci_dev *pdev)
+{
+    if ( pdev->domain )
+        return;
+    pdev->domain = dom_xen;
+    list_add(&pdev->domain_list, &dom_xen->arch.pdev_list);
+}
+
+int __init pci_hide_device(int bus, int devfn)
+{
+    struct pci_dev *pdev;
+    int rc = -ENOMEM;
+
+    spin_lock(&pcidevs_lock);
+    pdev = alloc_pdev(get_pseg(0), bus, devfn);
+    if ( pdev )
+    {
+        _pci_hide_device(pdev);
+        rc = 0;
+    }
+    spin_unlock(&pcidevs_lock);
+
+    return rc;
+}
+
 int __init pci_ro_device(int seg, int bus, int devfn)
 {
     struct pci_seg *pseg = alloc_pseg(seg);
@@ -231,6 +256,7 @@ int __init pci_ro_device(int seg, int bus, int devfn)
 
     __set_bit(PCI_BDF2(bus, devfn), pseg->ro_map);
     arch_pci_ro_device(seg, PCI_BDF2(bus, devfn));
+    _pci_hide_device(pdev);
 
     return 0;
 }
@@ -718,9 +744,22 @@ static int __init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
             if ( !pdev )
                 continue;
 
-            pdev->domain = ctxt->d;
-            list_add(&pdev->domain_list, &ctxt->d->arch.pdev_list);
-            ctxt->handler(pdev);
+            if ( !pdev->domain )
+            {
+                pdev->domain = ctxt->d;
+                list_add(&pdev->domain_list, &ctxt->d->arch.pdev_list);
+                ctxt->handler(pdev);
+            }
+            else if ( pdev->domain == dom_xen )
+            {
+                pdev->domain = ctxt->d;
+                ctxt->handler(pdev);
+                pdev->domain = dom_xen;
+            }
+            else if ( pdev->domain != ctxt->d )
+                printk(XENLOG_WARNING "Dom%d owning %04x:%02x:%02x.%u?\n",
+                       pdev->domain->domain_id, pseg->nr, bus,
+                       PCI_SLOT(devfn), PCI_FUNC(devfn));
         }
     }
 
