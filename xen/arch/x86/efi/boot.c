@@ -573,6 +573,10 @@ static int __init set_color(u32 mask, int bpp, u8 *pos, u8 *sz)
    return max(*pos + *sz, bpp);
 }
 
+extern const intpte_t __page_tables_start[], __page_tables_end[];
+#define in_page_tables(v) ((intpte_t *)(v) >= __page_tables_start && \
+                           (intpte_t *)(v) < __page_tables_end)
+
 #define PE_BASE_RELOC_ABS      0
 #define PE_BASE_RELOC_HIGHLOW  3
 #define PE_BASE_RELOC_DIR64   10
@@ -604,11 +608,19 @@ static void __init relocate_image(unsigned long delta)
                 break;
             case PE_BASE_RELOC_HIGHLOW:
                 if ( delta )
+                {
                     *(u32 *)addr += delta;
+                    if ( in_page_tables(addr) )
+                        *(u32 *)addr += xen_phys_start;
+                }
                 break;
             case PE_BASE_RELOC_DIR64:
                 if ( delta )
+                {
                     *(u64 *)addr += delta;
+                    if ( in_page_tables(addr) )
+                        *(intpte_t *)addr += xen_phys_start;
+                }
                 break;
             default:
                 blexit(L"Unsupported relocation type\r\n");
@@ -1113,43 +1125,21 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         *(u16 *)(*trampoline_ptr + (long)trampoline_ptr) =
             trampoline_phys >> 4;
 
-    /* Initialise L2 identity-map and xen page table entries (16MB). */
+    /* Initialise L2 identity-map and boot-map page table entries (16MB). */
     for ( i = 0; i < 8; ++i )
     {
         unsigned int slot = (xen_phys_start >> L2_PAGETABLE_SHIFT) + i;
         paddr_t addr = slot << L2_PAGETABLE_SHIFT;
 
         l2_identmap[slot] = l2e_from_paddr(addr, PAGE_HYPERVISOR|_PAGE_PSE);
-        l2_xenmap[i] = l2e_from_paddr(addr, PAGE_HYPERVISOR|_PAGE_PSE);
         slot &= L2_PAGETABLE_ENTRIES - 1;
         l2_bootmap[slot] = l2e_from_paddr(addr, __PAGE_HYPERVISOR|_PAGE_PSE);
     }
-    /* Initialise L2 fixmap page directory entry. */
-    l2_fixmap[l2_table_offset(FIXADDR_TOP - 1)] =
-        l2e_from_paddr((UINTN)l1_fixmap, __PAGE_HYPERVISOR);
-    /* Initialise L3 identity-map page directory entries. */
-    for ( i = 0; i < ARRAY_SIZE(l2_identmap) / L2_PAGETABLE_ENTRIES; ++i )
-        l3_identmap[i] = l3e_from_paddr((UINTN)(l2_identmap +
-                                                i * L2_PAGETABLE_ENTRIES),
-                                        __PAGE_HYPERVISOR);
-    /* Initialise L3 xen-map and fixmap page directory entries. */
-    l3_xenmap[l3_table_offset(XEN_VIRT_START)] =
-        l3e_from_paddr((UINTN)l2_xenmap, __PAGE_HYPERVISOR);
-    l3_xenmap[l3_table_offset(FIXADDR_TOP - 1)] =
-        l3e_from_paddr((UINTN)l2_fixmap, __PAGE_HYPERVISOR);
     /* Initialise L3 boot-map page directory entries. */
     l3_bootmap[l3_table_offset(xen_phys_start)] =
         l3e_from_paddr((UINTN)l2_bootmap, __PAGE_HYPERVISOR);
     l3_bootmap[l3_table_offset(xen_phys_start + (8 << L2_PAGETABLE_SHIFT) - 1)] =
         l3e_from_paddr((UINTN)l2_bootmap, __PAGE_HYPERVISOR);
-    /* Hook identity-map, xen-map, and boot-map L3 tables into PML4. */
-    idle_pg_table[0] = l4e_from_paddr((UINTN)l3_bootmap, __PAGE_HYPERVISOR);
-    idle_pg_table[l4_table_offset(DIRECTMAP_VIRT_START)] =
-        l4e_from_paddr((UINTN)l3_identmap, __PAGE_HYPERVISOR);
-    idle_pg_table[l4_table_offset(XEN_VIRT_START)] =
-        l4e_from_paddr((UINTN)l3_xenmap, __PAGE_HYPERVISOR);
-    /* Hook 4kB mappings of first 2MB of memory into L2. */
-    l2_identmap[0] = l2e_from_paddr((UINTN)l1_identmap, __PAGE_HYPERVISOR);
 
     if ( gop )
     {

@@ -42,6 +42,10 @@ PHDRS
 }
 SECTIONS
 {
+#if defined(__x86_64__) && !defined(EFI)
+  . = __XEN_VIRT_START;
+  __image_base__ = .;
+#endif
   . = __XEN_VIRT_START + 0x100000;
   _start = .;
   .text : {

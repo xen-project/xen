@@ -123,46 +123,19 @@ __start:
         /* Check for availability of long mode. */
         bt      $29,%edx
         jnc     bad_cpu
-        /* Initialise L2 identity-map and xen page table entries (16MB). */
-        mov     $sym_phys(l2_xenmap),%esi
+        /* Initialise L2 boot-map page table entries (16MB). */
         mov     $sym_phys(l2_bootmap),%edx
-        mov     $0x1e3,%eax                  /* PRESENT+RW+A+D+2MB+GLOBAL */
+        mov     $PAGE_HYPERVISOR|_PAGE_PSE,%eax
         mov     $8,%ecx
-1:      mov     %eax,(%esi)
-        add     $8,%esi
-        mov     %eax,(%edx)
+1:      mov     %eax,(%edx)
         add     $8,%edx
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
         loop    1b
-        /* Initialise L2 fixmap page directory entry. */
-        mov     $(sym_phys(l1_fixmap)+7),%eax
-        mov     %eax,sym_phys(l2_fixmap) + l2_table_offset(FIXADDR_TOP-1)*8
-        /* Initialise L3 identity-map page directory entries. */
-        mov     $sym_phys(l3_identmap),%edi
-        mov     $(sym_phys(l2_identmap)+7),%eax
-        mov     $4,%ecx
-1:      mov     %eax,(%edi)
-        add     $8,%edi
-        add     $PAGE_SIZE,%eax
-        loop    1b
-        /* Initialise L3 xen-map and fixmap page directory entries. */
-        mov     $(sym_phys(l2_xenmap)+7),%eax
-        mov     %eax,sym_phys(l3_xenmap) + l3_table_offset(XEN_VIRT_START)*8
-        mov     $(sym_phys(l2_fixmap)+7),%eax
-        mov     %eax,sym_phys(l3_xenmap) + l3_table_offset(FIXADDR_TOP-1)*8
         /* Initialise L3 boot-map page directory entry. */
-        mov     $(sym_phys(l2_bootmap)+7),%eax
+        mov     $sym_phys(l2_bootmap)+__PAGE_HYPERVISOR,%eax
         mov     %eax,sym_phys(l3_bootmap) + 0*8
-        /* Hook identity-map, xen-map, and boot-map L3 tables into PML4. */
-        mov     $(sym_phys(l3_bootmap)+7),%eax
-        mov     %eax,sym_phys(idle_pg_table) + 0*8
-        mov     $(sym_phys(l3_identmap)+7),%eax
-        mov     %eax,sym_phys(idle_pg_table) + l4_table_offset(DIRECTMAP_VIRT_START)*8
-        mov     $(sym_phys(l3_xenmap)+7),%eax
-        mov     %eax,sym_phys(idle_pg_table) + l4_table_offset(XEN_VIRT_START)*8
         /* Hook 4kB mappings of first 2MB of memory into L2. */
         mov     $sym_phys(l1_identmap)+__PAGE_HYPERVISOR,%edi
-        mov     %edi,sym_phys(l2_identmap)
         mov     %edi,sym_phys(l2_xenmap)
         mov     %edi,sym_phys(l2_bootmap)
 #endif

@@ -128,10 +128,13 @@ ENTRY(boot_cpu_compat_gdt_table)
         .quad 0x0000910000000000     /* per-CPU entry (limit == cpu)      */
         .align PAGE_SIZE, 0
 
+	.globl __page_tables_start, __page_tables_end
+__page_tables_start:
+
 /* Mapping of first 16 megabytes of memory. */
         .globl l2_identmap
 l2_identmap:
-        .quad 0
+        .quad sym_phys(l1_identmap) + __PAGE_HYPERVISOR
         pfn = 0
         .rept 7
         pfn = pfn + (1 << PAGETABLE_ORDER)
@@ -139,3 +142,68 @@ l2_identmap:
         .endr
         .fill 4 * L2_PAGETABLE_ENTRIES - 8, 8, 0
         .size l2_identmap, . - l2_identmap
+
+        .globl l2_xenmap
+l2_xenmap:
+        idx = 0
+        .rept 8
+        .quad sym_phys(__image_base__) + (idx << L2_PAGETABLE_SHIFT) + (PAGE_HYPERVISOR | _PAGE_PSE)
+        idx = idx + 1
+        .endr
+        .fill L2_PAGETABLE_ENTRIES - 8, 8, 0
+        .size l2_xenmap, . - l2_xenmap
+
+l2_fixmap:
+        idx = 0
+        .rept L2_PAGETABLE_ENTRIES
+        .if idx == l2_table_offset(FIXADDR_TOP - 1)
+        .quad sym_phys(l1_fixmap) + __PAGE_HYPERVISOR
+        .else
+        .quad 0
+        .endif
+        idx = idx + 1
+        .endr
+        .size l2_fixmap, . - l2_fixmap
+
+        .globl l3_identmap
+l3_identmap:
+        idx = 0
+        .rept 4
+        .quad sym_phys(l2_identmap) + (idx << PAGE_SHIFT) + __PAGE_HYPERVISOR
+        idx = idx + 1
+        .endr
+        .fill L3_PAGETABLE_ENTRIES - 4, 8, 0
+        .size l3_identmap, . - l3_identmap
+
+l3_xenmap:
+        idx = 0
+        .rept L3_PAGETABLE_ENTRIES
+        .if idx == l3_table_offset(XEN_VIRT_START)
+        .quad sym_phys(l2_xenmap) + __PAGE_HYPERVISOR
+        .elseif idx == l3_table_offset(FIXADDR_TOP - 1)
+        .quad sym_phys(l2_fixmap) + __PAGE_HYPERVISOR
+        .else
+        .quad 0
+        .endif
+        idx = idx + 1
+        .endr
+        .size l3_xenmap, . - l3_xenmap
+
+/* Top-level master (and idle-domain) page directory. */
+        .globl idle_pg_table
+idle_pg_table:
+        .quad sym_phys(l3_bootmap) + __PAGE_HYPERVISOR
+        idx = 1
+        .rept L4_PAGETABLE_ENTRIES - 1
+        .if idx == l4_table_offset(DIRECTMAP_VIRT_START)
+        .quad sym_phys(l3_identmap) + __PAGE_HYPERVISOR
+        .elseif idx == l4_table_offset(XEN_VIRT_START)
+        .quad sym_phys(l3_xenmap) + __PAGE_HYPERVISOR
+        .else
+        .quad 0
+        .endif
+        idx = idx + 1
+        .endr
+        .size idle_pg_table, . - idle_pg_table
+
+__page_tables_end:

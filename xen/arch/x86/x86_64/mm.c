@@ -49,24 +49,6 @@ unsigned int __read_mostly pfn_pdx_hole_shift = 0;
 
 unsigned int __read_mostly m2p_compat_vstart = __HYPERVISOR_COMPAT_VIRT_START;
 
-/* Top-level master (and idle-domain) page directory. */
-l4_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
-    idle_pg_table[L4_PAGETABLE_ENTRIES];
-
-/* Enough page directories to map bottom 4GB of the memory map. */
-l3_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
-    l3_identmap[L3_PAGETABLE_ENTRIES];
-
-/* Enough page directories to map the Xen text and static data. */
-l3_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
-    l3_xenmap[L3_PAGETABLE_ENTRIES];
-l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
-    l2_xenmap[L2_PAGETABLE_ENTRIES];
-
-/* Enough page directories to map the early fixmap space. */
-l2_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
-    l2_fixmap[L2_PAGETABLE_ENTRIES];
-
 /* Enough page directories to map into the bottom 1GB. */
 l3_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
     l3_bootmap[L3_PAGETABLE_ENTRIES];
