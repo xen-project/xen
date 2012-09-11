@@ -665,7 +665,11 @@ static int __init _scan_pci_devices(struct pci_seg *pseg, void *arg)
             for ( func = 0; func < 8; func++ )
             {
                 if ( pci_device_detect(pseg->nr, bus, dev, func) == 0 )
+                {
+                    if ( !func )
+                        break;
                     continue;
+                }
 
                 pdev = alloc_pdev(pseg, bus, PCI_DEVFN(dev, func));
                 if ( !pdev )

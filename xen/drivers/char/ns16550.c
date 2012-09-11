@@ -470,21 +470,28 @@ static int
 pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
 {
     uint32_t bar, len;
-    int b, d, f;
+    int b, d, f, nextf;
 
     /* NB. Start at bus 1 to avoid AMT: a plug-in card cannot be on bus 0. */
     for ( b = skip_amt ? 1 : 0; b < 0x100; b++ )
     {
         for ( d = 0; d < 0x20; d++ )
         {
-            for ( f = 0; f < 0x8; f++ )
+            for ( f = 0; f < 8; f = nextf )
             {
+                nextf = (f || (pci_conf_read16(0, b, d, f, PCI_HEADER_TYPE) &
+                               0x80)) ? f + 1 : 8;
+
                 switch ( pci_conf_read16(0, b, d, f, PCI_CLASS_DEVICE) )
                 {
                 case 0x0700: /* single port serial */
                 case 0x0702: /* multi port serial */
                 case 0x0780: /* other (e.g serial+parallel) */
                     break;
+                case 0xffff:
+                    if ( !f )
+                        nextf = 8;
+                    /* fall through */
                 default:
                     continue;
                 }
