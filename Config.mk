@@ -178,9 +178,9 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG := 091149d364e893e643a5da3175c3f84d2163cb3e
-# Wed Sep 5 12:31:40 2012 +0100                                                
-# console: bounds check whenever changing the cursor due to an escape code     
+QEMU_TAG ?= d7d453f51459b591faa96d1c123b5bfff7c5b6b6
+# Thu Sep 6 17:05:30 2012 +0100
+# Disable qemu monitor by default.  The qemu monitor is an overly
 
 OCAML_XENSTORED_REPO=http://xenbits.xensource.com/ext/xen-ocaml-tools.hg
 
