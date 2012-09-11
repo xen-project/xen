@@ -306,20 +306,6 @@ u64 amd_iommu_get_next_table_from_pte(u32 *entry)
     return ptr;
 }
 
-static unsigned int iommu_next_level(u32 *entry)
-{
-    return get_field_from_reg_u32(entry[0],
-                                  IOMMU_PDE_NEXT_LEVEL_MASK,
-                                  IOMMU_PDE_NEXT_LEVEL_SHIFT);
-}
-
-static int amd_iommu_is_pte_present(u32 *entry)
-{
-    return get_field_from_reg_u32(entry[0],
-                                  IOMMU_PDE_PRESENT_MASK,
-                                  IOMMU_PDE_PRESENT_SHIFT);
-}
-
 /* For each pde, We use ignored bits (bit 1 - bit 8 and bit 63)
  * to save pde count, pde count = 511 is a candidate of page coalescing.
  */
@@ -489,7 +475,7 @@ static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn,
                          >> PAGE_SHIFT;
 
         /* Split super page frame into smaller pieces.*/
-        if ( amd_iommu_is_pte_present((u32*)pde) &&
+        if ( iommu_is_pte_present((u32*)pde) &&
              (iommu_next_level((u32*)pde) == 0) &&
              next_table_mfn != 0 )
         {
@@ -526,7 +512,7 @@ static int iommu_pde_from_gfn(struct domain *d, unsigned long pfn,
         }
 
         /* Install lower level page table for non-present entries */
-        else if ( !amd_iommu_is_pte_present((u32*)pde) )
+        else if ( !iommu_is_pte_present((u32*)pde) )
         {
             if ( next_table_mfn == 0 )
             {

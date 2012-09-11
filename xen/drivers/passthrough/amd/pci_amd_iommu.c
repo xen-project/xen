@@ -393,8 +393,7 @@ static void deallocate_next_page_table(struct page_info* pg, int level)
 {
     void *table_vaddr, *pde;
     u64 next_table_maddr;
-    int index, next_level, present;
-    u32 *entry;
+    int index, next_level;
 
     table_vaddr = __map_domain_page(pg);
 
@@ -404,18 +403,11 @@ static void deallocate_next_page_table(struct page_info* pg, int level)
         {
             pde = table_vaddr + (index * IOMMU_PAGE_TABLE_ENTRY_SIZE);
             next_table_maddr = amd_iommu_get_next_table_from_pte(pde);
-            entry = (u32*)pde;
 
-            next_level = get_field_from_reg_u32(entry[0],
-                                                IOMMU_PDE_NEXT_LEVEL_MASK,
-                                                IOMMU_PDE_NEXT_LEVEL_SHIFT);
-
-            present = get_field_from_reg_u32(entry[0],
-                                             IOMMU_PDE_PRESENT_MASK,
-                                             IOMMU_PDE_PRESENT_SHIFT);
+            next_level = iommu_next_level((u32*)pde);
 
             if ( (next_table_maddr != 0) && (next_level != 0)
-                && present )
+                && iommu_is_pte_present((u32*)pde) )
             {
                 deallocate_next_page_table(
                     maddr_to_page(next_table_maddr), level - 1);

@@ -257,4 +257,18 @@ static inline void iommu_set_addr_hi_to_reg(uint32_t *reg, uint32_t addr)
                          IOMMU_REG_BASE_ADDR_HIGH_SHIFT, reg);
 }
 
+static inline int iommu_is_pte_present(const u32 *entry)
+{
+    return get_field_from_reg_u32(entry[0],
+                                  IOMMU_PDE_PRESENT_MASK,
+                                  IOMMU_PDE_PRESENT_SHIFT);
+}
+
+static inline unsigned int iommu_next_level(const u32 *entry)
+{
+    return get_field_from_reg_u32(entry[0],
+                                  IOMMU_PDE_NEXT_LEVEL_MASK,
+                                  IOMMU_PDE_NEXT_LEVEL_SHIFT);
+}
+
 #endif /* _ASM_X86_64_AMD_IOMMU_PROTO_H */
