@@ -29,6 +29,8 @@ static struct serial_port com[SERHND_IDX + 1] = {
     }
 };
 
+static bool_t __read_mostly post_irq;
+
 void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
 {
     char c;
@@ -263,14 +265,12 @@ char serial_getc(int handle)
 
 int __init serial_parse_handle(char *conf)
 {
-    int handle;
+    int handle, flags = 0;
 
     if ( !strncmp(conf, "dbgp", 4) && (!conf[4] || conf[4] == ',') )
     {
-        if ( !com[SERHND_DBGP].driver )
-            goto fail;
-
-        return SERHND_DBGP | SERHND_COOKED;
+        handle = SERHND_DBGP;
+        goto common;
     }
 
     if ( strncmp(conf, "com", 3) )
@@ -288,17 +288,25 @@ int __init serial_parse_handle(char *conf)
         goto fail;
     }
 
+    if ( conf[4] == 'H' )
+        flags |= SERHND_HI;
+    else if ( conf[4] == 'L' )
+        flags |= SERHND_LO;
+
+ common:
     if ( !com[handle].driver )
         goto fail;
 
-    if ( conf[4] == 'H' )
-        handle |= SERHND_HI;
-    else if ( conf[4] == 'L' )
-        handle |= SERHND_LO;
+    if ( !post_irq )
+        com[handle].state = serial_parsed;
+    else if ( com[handle].state != serial_initialized )
+    {
+        if ( com[handle].driver->init_postirq )
+            com[handle].driver->init_postirq(&com[handle]);
+        com[handle].state = serial_initialized;
+    }
 
-    handle |= SERHND_COOKED;
-
-    return handle;
+    return handle | flags | SERHND_COOKED;
 
  fail:
     return -1;
@@ -450,8 +458,13 @@ void __init serial_init_postirq(void)
 {
     int i;
     for ( i = 0; i < ARRAY_SIZE(com); i++ )
-        if ( com[i].driver && com[i].driver->init_postirq )
-            com[i].driver->init_postirq(&com[i]);
+        if ( com[i].state == serial_parsed )
+        {
+            if ( com[i].driver->init_postirq )
+                com[i].driver->init_postirq(&com[i]);
+            com[i].state = serial_initialized;
+        }
+    post_irq = 1;
 }
 
 void __init serial_endboot(void)
@@ -475,7 +488,7 @@ void serial_suspend(void)
 {
     int i;
     for ( i = 0; i < ARRAY_SIZE(com); i++ )
-        if ( com[i].driver && com[i].driver->suspend )
+        if ( com[i].state == serial_initialized && com[i].driver->suspend )
             com[i].driver->suspend(&com[i]);
 }
 
@@ -483,7 +496,7 @@ void serial_resume(void)
 {
     int i;
     for ( i = 0; i < ARRAY_SIZE(com); i++ )
-        if ( com[i].driver && com[i].driver->resume )
+        if ( com[i].state == serial_initialized && com[i].driver->resume )
             com[i].driver->resume(&com[i]);
 }
 

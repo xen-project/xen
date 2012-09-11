@@ -25,10 +25,17 @@ extern unsigned int serial_txbufsz;
 
 struct uart_driver;
 
+enum serial_port_state {
+    serial_unused,
+    serial_parsed,
+    serial_initialized
+};
+
 struct serial_port {
     /* Uart-driver parameters. */
     struct uart_driver *driver;
     void               *uart;
+    enum serial_port_state state;
     /* Number of characters the port can hold for transmit. */
     int                 tx_fifo_size;
     /* Transmit data buffer (interrupt-driven uart). */

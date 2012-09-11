@@ -1391,7 +1391,8 @@ static int ehci_dbgp_check_release(struct ehci_dbgp *dbgp)
     printk(XENLOG_INFO "Releasing EHCI debug port at %02x:%02x.%u\n",
            dbgp->bus, dbgp->slot, dbgp->func);
 
-    kill_timer(&dbgp->timer);
+    if ( dbgp->timer.function )
+        kill_timer(&dbgp->timer);
     dbgp->ehci_debug = NULL;
 
     ctrl = readl(&ehci_debug->control);
