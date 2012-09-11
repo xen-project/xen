@@ -2417,7 +2417,7 @@ static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
     return rc;
 }
 
-static NOINLINE int tmemc_save_get_next_page(int cli_id, int pool_id,
+static NOINLINE int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
                         tmem_cli_va_t buf, uint32_t bufsize)
 {
     client_t *client = tmh_client_from_cli_id(cli_id);
@@ -2509,7 +2509,7 @@ out:
     return ret;
 }
 
-static int tmemc_restore_put_page(int cli_id, int pool_id, OID *oidp,
+static int tmemc_restore_put_page(int cli_id, uint32_t pool_id, OID *oidp,
                       uint32_t index, tmem_cli_va_t buf, uint32_t bufsize)
 {
     client_t *client = tmh_client_from_cli_id(cli_id);
@@ -2521,7 +2521,7 @@ static int tmemc_restore_put_page(int cli_id, int pool_id, OID *oidp,
     return do_tmem_put(pool,oidp,index,0,0,0,bufsize,buf.p);
 }
 
-static int tmemc_restore_flush_page(int cli_id, int pool_id, OID *oidp,
+static int tmemc_restore_flush_page(int cli_id, uint32_t pool_id, OID *oidp,
                         uint32_t index)
 {
     client_t *client = tmh_client_from_cli_id(cli_id);
