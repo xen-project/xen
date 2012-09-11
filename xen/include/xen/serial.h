@@ -60,6 +60,8 @@ struct uart_driver {
     int  (*tx_empty)(struct serial_port *);
     /* Put a character onto the serial line. */
     void (*putc)(struct serial_port *, char);
+    /* Flush accumulated characters. */
+    void (*flush)(struct serial_port *);
     /* Get a character from the serial line: returns 0 if none available. */
     int  (*getc)(struct serial_port *, char *);
     /* Get IRQ number for this port's serial line: returns -1 if none. */
@@ -67,10 +69,12 @@ struct uart_driver {
 };
 
 /* 'Serial handles' are composed from the following fields. */
-#define SERHND_IDX      (1<<0) /* COM1 or COM2?                           */
-#define SERHND_HI       (1<<1) /* Mux/demux each transferred char by MSB. */
-#define SERHND_LO       (1<<2) /* Ditto, except that the MSB is cleared.  */
-#define SERHND_COOKED   (1<<3) /* Newline/carriage-return translation?    */
+#define SERHND_IDX      (3<<0) /* COM1 or COM2?                           */
+# define SERHND_COM1    (0<<0)
+# define SERHND_COM2    (1<<0)
+#define SERHND_HI       (1<<2) /* Mux/demux each transferred char by MSB. */
+#define SERHND_LO       (1<<3) /* Ditto, except that the MSB is cleared.  */
+#define SERHND_COOKED   (1<<4) /* Newline/carriage-return translation?    */
 
 /* Two-stage initialisation (before/after IRQ-subsystem initialisation). */
 void serial_init_preirq(void);

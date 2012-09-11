@@ -22,9 +22,11 @@ size_param("serial_tx_buffer", serial_txbufsz);
 #define mask_serial_rxbuf_idx(_i) ((_i)&(serial_rxbufsz-1))
 #define mask_serial_txbuf_idx(_i) ((_i)&(serial_txbufsz-1))
 
-static struct serial_port com[2] = {
-    { .rx_lock = SPIN_LOCK_UNLOCKED, .tx_lock = SPIN_LOCK_UNLOCKED }, 
-    { .rx_lock = SPIN_LOCK_UNLOCKED, .tx_lock = SPIN_LOCK_UNLOCKED }
+static struct serial_port com[SERHND_IDX + 1] = {
+    [0 ... SERHND_IDX] = {
+        .rx_lock = SPIN_LOCK_UNLOCKED,
+        .tx_lock = SPIN_LOCK_UNLOCKED
+    }
 };
 
 void serial_rx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
@@ -81,6 +83,8 @@ void serial_tx_interrupt(struct serial_port *port, struct cpu_user_regs *regs)
             port->driver->putc(
                 port, port->txbuf[mask_serial_txbuf_idx(port->txbufc++)]);
         }
+        if ( i && port->driver->flush )
+            port->driver->flush(port);
     }
 
     spin_unlock(&port->tx_lock);
@@ -175,6 +179,9 @@ void serial_putc(int handle, char c)
 
     __serial_putc(port, c);
 
+    if ( port->driver->flush )
+        port->driver->flush(port);
+
     spin_unlock_irqrestore(&port->tx_lock, flags);
 }
 
@@ -205,6 +212,9 @@ void serial_puts(int handle, const char *s)
 
         __serial_putc(port, c);
     }
+
+    if ( port->driver->flush )
+        port->driver->flush(port);
 
     spin_unlock_irqrestore(&port->tx_lock, flags);
 }
@@ -261,10 +271,10 @@ int __init serial_parse_handle(char *conf)
     switch ( conf[3] )
     {
     case '1':
-        handle = 0;
+        handle = SERHND_COM1;
         break;
     case '2':
-        handle = 1;
+        handle = SERHND_COM2;
         break;
     default:
         goto fail;
@@ -365,6 +375,8 @@ void serial_start_sync(int handle)
             port->driver->putc(
                 port, port->txbuf[mask_serial_txbuf_idx(port->txbufc++)]);
         }
+        if ( port->driver->flush )
+            port->driver->flush(port);
     }
 
     spin_unlock_irqrestore(&port->tx_lock, flags);

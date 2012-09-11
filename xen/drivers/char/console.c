@@ -539,6 +539,7 @@ void printk(const char *fmt, ...)
 void __init console_init_preirq(void)
 {
     char *p;
+    int sh;
 
     serial_init_preirq();
 
@@ -551,8 +552,9 @@ void __init console_init_preirq(void)
             vga_init();
         else if ( !strncmp(p, "none", 4) )
             continue;
-        else if ( strncmp(p, "com", 3) ||
-                  (sercon_handle = serial_parse_handle(p)) == -1 )
+        else if ( (sh = serial_parse_handle(p)) >= 0 )
+            sercon_handle = sh;
+        else
         {
             char *q = strchr(p, ',');
             if ( q != NULL )

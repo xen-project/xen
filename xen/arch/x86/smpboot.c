@@ -1017,7 +1017,7 @@ void __init smp_intr_init(void)
      * Also ensure serial interrupts are high priority. We do not
      * want them to be blocked by unacknowledged guest-bound interrupts.
      */
-    for ( seridx = 0; seridx < 2; seridx++ )
+    for ( seridx = 0; seridx <= SERHND_IDX; seridx++ )
     {
         if ( (irq = serial_irq(seridx)) < 0 )
             continue;
