@@ -36,7 +36,15 @@
  * from the end of virtual memory backwards.
  */
 enum fixed_addresses {
-    FIX_RESERVED, /* Index 0 is reserved since fix_to_virt(0) > FIXADDR_TOP. */
+    /* Index 0 is reserved since fix_to_virt(0) == FIXADDR_TOP. */
+    FIX_RESERVED,
+    /*
+     * Indexes using the page tables set up before entering __start_xen()
+     * must be among the first (L1_PAGETABLE_ENTRIES - 1) entries.
+     * These are generally those needed by the various console drivers.
+     */
+    FIX_EHCI_DBGP,
+    /* Everything else should go further down. */
 #ifdef __i386__
     FIX_PAE_HIGHMEM_0,
     FIX_PAE_HIGHMEM_END = FIX_PAE_HIGHMEM_0 + NR_CPUS-1,

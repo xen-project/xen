@@ -265,6 +265,14 @@ int __init serial_parse_handle(char *conf)
 {
     int handle;
 
+    if ( !strncmp(conf, "dbgp", 4) && (!conf[4] || conf[4] == ',') )
+    {
+        if ( !com[SERHND_DBGP].driver )
+            goto fail;
+
+        return SERHND_DBGP | SERHND_COOKED;
+    }
+
     if ( strncmp(conf, "com", 3) )
         goto fail;
 

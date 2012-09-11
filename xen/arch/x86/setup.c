@@ -606,6 +606,7 @@ void __init __start_xen(unsigned long mbi_p)
     ns16550.io_base = 0x2f8;
     ns16550.irq     = 3;
     ns16550_init(1, &ns16550);
+    ehci_dbgp_init();
     console_init_preirq();
 
     printk("Bootloader: %s\n", loader);

@@ -244,7 +244,7 @@ A typical setup for most situations might be `com1=115200,8n1`
 Specify the size of the console ring buffer.
 
 ### console
-> `= List of [ vga | com1[H,L] | com2[H,L] | none ]`
+> `= List of [ vga | com1[H,L] | com2[H,L] | dbgp | none ]`
 
 > Default: `console=com1,vga`
 
@@ -259,6 +259,8 @@ set, while received characters must have their MSB set.  `L` indicates
 the converse; transmitted and received characters will have their MSB
 cleared.  This allows a single port to be shared by two subsystems
 (e.g. console and debugger).
+
+`dbgp` indicates that Xen should use a USB debug port.
 
 `none` indicates that Xen should not use a console.  This option only
 makes sense on its own.
@@ -351,6 +353,12 @@ combination with the `low_crashinfo` command line option.
 
 ### credit2\_load\_window\_shift
 > `= <integer>`
+
+### dbgp
+> `= ehci[ <integer> | @pci<bus>:<slot>.<func> ]`
+
+Specify the USB controller to use, either by instance number (when going
+over the PCI busses sequentially) or by PCI device (must be on segment 0).
 
 ### debug\_stack\_lines
 > `= <integer>`

@@ -8,6 +8,7 @@
 #include <xen/event.h>
 #include <xen/guest_access.h>
 #include <xen/iocap.h>
+#include <xen/serial.h>
 #include <asm/current.h>
 #include <asm/io_apic.h>
 #include <asm/msi.h>
@@ -722,6 +723,19 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 
         break;
     }
+
+    case PHYSDEVOP_dbgp_op: {
+        struct physdev_dbgp_op op;
+
+        if ( !IS_PRIV(v->domain) )
+            ret = -EPERM;
+        else if ( copy_from_guest(&op, arg, 1) )
+            ret = -EFAULT;
+        else
+            ret = dbgp_op(&op);
+        break;
+    }
+
     default:
         ret = -ENOSYS;
         break;
