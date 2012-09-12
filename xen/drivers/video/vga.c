@@ -54,7 +54,7 @@ string_param("vga", opt_vga);
 static unsigned int columns, lines;
 #define ATTRIBUTE   7
 
-#ifdef CONFIG_X86_64
+#ifdef CONFIG_X86
 void vesa_early_init(void);
 void vesa_endboot(bool_t keep);
 #else

@@ -56,7 +56,7 @@ struct acpi_drhd_unit * ioapic_to_drhd(unsigned int apic_id);
 struct acpi_drhd_unit * iommu_to_drhd(struct iommu *iommu);
 struct acpi_rhsa_unit * drhd_to_rhsa(struct acpi_drhd_unit *drhd);
 
-#ifdef CONFIG_X86_64
+#ifdef CONFIG_X86
 struct acpi_drhd_unit * find_ats_dev_drhd(struct iommu *iommu);
 
 int ats_device(const struct pci_dev *, const struct acpi_drhd_unit *);

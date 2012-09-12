@@ -107,7 +107,6 @@ extern unsigned char boot_edid_info[128];
 
 #define asmlinkage
 
-#define CONFIG_X86_64 1
 #define CONFIG_COMPAT 1
 
 #define PML4_ENTRY_BITS  39

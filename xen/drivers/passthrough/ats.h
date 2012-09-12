@@ -26,7 +26,7 @@ struct pci_ats_dev {
     u16 ats_queue_depth;    /* ATS device invalidation queue depth */
 };
 
-#ifdef CONFIG_X86_64
+#ifdef CONFIG_X86
 
 #define ATS_REG_CAP    4
 #define ATS_REG_CTL    6
