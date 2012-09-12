@@ -22,7 +22,6 @@
 #include <asm/hvm/vpt.h>
 #include <asm/event.h>
 #include <asm/apic.h>
-#include <asm/mc146818rtc.h>
 
 #define mode_is(d, name) \
     ((d)->arch.hvm_domain.params[HVM_PARAM_TIMER_MODE] == HVMPTM_##name)
@@ -219,7 +218,6 @@ void pt_update_irq(struct vcpu *v)
     struct periodic_time *pt, *temp, *earliest_pt = NULL;
     uint64_t max_lag = -1ULL;
     int irq, is_lapic;
-    void *pt_priv;
 
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
@@ -253,14 +251,13 @@ void pt_update_irq(struct vcpu *v)
     earliest_pt->irq_issued = 1;
     irq = earliest_pt->irq;
     is_lapic = (earliest_pt->source == PTSRC_lapic);
-    pt_priv = earliest_pt->priv;
 
     spin_unlock(&v->arch.hvm_vcpu.tm_lock);
 
     if ( is_lapic )
+    {
         vlapic_set_irq(vcpu_vlapic(v), irq, 0);
-    else if ( irq == RTC_IRQ && pt_priv )
-        rtc_periodic_interrupt(pt_priv);
+    }
     else
     {
         hvm_isa_irq_deassert(v->domain, irq);

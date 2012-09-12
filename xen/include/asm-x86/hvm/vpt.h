@@ -181,7 +181,6 @@ void rtc_migrate_timers(struct vcpu *v);
 void rtc_deinit(struct domain *d);
 void rtc_reset(struct domain *d);
 void rtc_update_clock(struct domain *d);
-void rtc_periodic_interrupt(void *);
 
 void pmtimer_init(struct vcpu *v);
 void pmtimer_deinit(struct domain *d);
