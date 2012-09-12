@@ -151,8 +151,6 @@ void __init vesa_init(void)
     xfree(line_len);
 }
 
-#if defined(CONFIG_X86)
-
 #include <asm/mtrr.h>
 
 static unsigned int vesa_mtrr;
@@ -190,12 +188,6 @@ static void lfb_flush(void)
     if ( vesa_mtrr == 3 )
         __asm__ __volatile__ ("sfence" : : : "memory");
 }
-
-#else /* !defined(CONFIG_X86) */
-
-#define lfb_flush() ((void)0)
-
-#endif
 
 void __init vesa_endboot(bool_t keep)
 {

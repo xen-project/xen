@@ -26,8 +26,6 @@ struct pci_ats_dev {
     u16 ats_queue_depth;    /* ATS device invalidation queue depth */
 };
 
-#ifdef CONFIG_X86
-
 #define ATS_REG_CAP    4
 #define ATS_REG_CTL    6
 #define ATS_QUEUE_DEPTH_MASK     0xF
@@ -60,37 +58,6 @@ static inline int pci_ats_device(int seg, int bus, int devfn)
 
     return pci_find_ext_capability(seg, bus, devfn, PCI_EXT_CAP_ID_ATS);
 }
-
-#else
-
-#define ats_enabled 0
-static inline int enable_ats_device(int seg, int bus, int devfn)
-{
-    BUG();
-    return -ENOSYS;
-}
-
-static inline void disable_ats_device(int seg, int bus, int devfn)
-{
-    BUG();
-}
-
-static inline int pci_ats_enabled(int seg, int bus, int devfn)
-{
-    return 0;
-}
-
-static inline int pci_ats_device(int seg, int bus, int devfn)
-{
-    return 0;
-}
-
-static inline struct pci_ats_dev *get_ats_device(int seg, int bus, int devfn)
-{
-    return NULL;
-}
-
-#endif
 
 #endif /* _ATS_H_ */
 

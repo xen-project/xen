@@ -481,8 +481,7 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
 
     if ( dom0_px_info->flags & XEN_PX_PSD )
     {
-#ifdef CONFIG_X86
-        /* for X86, check domain coordination */
+        /* check domain coordination */
         if (dom0_px_info->shared_type != CPUFREQ_SHARED_TYPE_ALL &&
             dom0_px_info->shared_type != CPUFREQ_SHARED_TYPE_ANY &&
             dom0_px_info->shared_type != CPUFREQ_SHARED_TYPE_HW)
@@ -490,7 +489,6 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
             ret = -EINVAL;
             goto out;
         }
-#endif
 
         pxpt->shared_type = dom0_px_info->shared_type;
         memcpy ((void *)&pxpt->domain_info,

@@ -34,11 +34,9 @@
 #include <xen/softirq.h>
 #include <asm/msi.h>
 #include <asm/irq.h>
-#if defined(CONFIG_X86)
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/p2m.h>
 #include <mach_apic.h>
-#endif
 #include "iommu.h"
 #include "dmar.h"
 #include "extern.h"
@@ -1070,7 +1068,6 @@ static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     unsigned long flags;
     struct iommu *iommu = desc->action->dev_id;
 
-#ifdef CONFIG_X86
     dest = set_desc_affinity(desc, mask);
     if (dest == BAD_APICID){
         dprintk(XENLOG_ERR VTDPREFIX, "Set iommu interrupt affinity error!\n");
@@ -1094,16 +1091,6 @@ static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
                     MSI_ADDR_REDIRECTION_CPU:
                     MSI_ADDR_REDIRECTION_LOWPRI;
     msg.address_lo |= MSI_ADDR_DEST_ID(dest & 0xff);
-#else
-    memset(&msg, 0, sizeof(msg));
-    msg.data = desc->arch.vector & 0xff;
-    msg.data |= 1 << 14;
-    msg.address_lo = (MSI_ADDRESS_HEADER << (MSI_ADDRESS_HEADER_SHIFT + 8));
-    msg.address_lo |= MSI_PHYSICAL_MODE << 2;
-    msg.address_lo |= MSI_REDIRECTION_HINT_MODE << 3;
-    dest = cpu_physical_id(cpumask_first(mask));
-    msg.address_lo |= dest << MSI_TARGET_CPU_SHIFT;
-#endif
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writel(iommu->reg, DMAR_FEDATA_REG, msg.data);
@@ -1137,11 +1124,7 @@ static int __init iommu_set_interrupt(struct acpi_drhd_unit *drhd)
     }
 
     irq_desc[irq].handler = &dma_msi_type;
-#ifdef CONFIG_X86
     ret = request_irq(irq, iommu_page_fault, 0, "dmar", drhd->iommu);
-#else
-    ret = request_irq_vector(irq, iommu_page_fault, 0, "dmar", drhd->iommu);
-#endif
     if ( ret )
     {
         irq_desc[irq].handler = &no_irq_type;

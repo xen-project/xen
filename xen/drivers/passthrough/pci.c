@@ -29,9 +29,7 @@
 #include <xen/radix-tree.h>
 #include <xen/tasklet.h>
 #include <xsm/xsm.h>
-#ifdef CONFIG_X86
 #include <asm/msi.h>
-#endif
 
 struct pci_seg {
     struct list_head alldevs_list;

@@ -31,11 +31,9 @@
 #include "vtd.h"
 #include "extern.h"
 
-#if defined(CONFIG_X86)
 #include <asm/apic.h>
 #include <asm/io_apic.h>
 #define nr_ioapic_entries(i)  nr_ioapic_entries[i]
-#endif
 
 /*
  * source validation type (SVT)
@@ -302,12 +300,10 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
 
     if ( rte_upper )
     {
-#if defined(CONFIG_X86)
         if ( x2apic_enabled )
             new_ire.lo.dst = value;
         else
             new_ire.lo.dst = (value >> 24) << 8;
-#endif
     }
     else
     {
@@ -316,12 +312,8 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
         new_ire.lo.dm = new_rte.dest_mode;
         new_ire.lo.tm = new_rte.trigger;
         new_ire.lo.dlm = new_rte.delivery_mode;
-#ifdef CONFIG_X86
         /* Hardware require RH = 1 for LPR delivery mode */
         new_ire.lo.rh = (new_ire.lo.dlm == dest_LowestPrio);
-#else
-        new_ire.lo.rh = 0;
-#endif
         new_ire.lo.avail = 0;
         new_ire.lo.res_1 = 0;
         new_ire.lo.vector = new_rte.vector;
@@ -421,8 +413,6 @@ void io_apic_write_remap_rte(
     else
         __ioapic_write_entry(apic, ioapic_pin, 1, old_rte);
 }
-
-#if defined(CONFIG_X86)
 
 static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
 {
@@ -678,7 +668,6 @@ void msi_msg_write_remap_rte(
 
     msi_msg_to_remap_entry(iommu, pdev, msi_desc, msg);
 }
-#endif
 
 int enable_intremap(struct iommu *iommu, int eim)
 {
@@ -725,10 +714,9 @@ int enable_intremap(struct iommu *iommu, int eim)
         ir_ctrl->iremap_num = 0;
     }
 
-#ifdef CONFIG_X86
     /* set extended interrupt mode bit */
     ir_ctrl->iremap_maddr |= eim ? IRTA_EIME : 0;
-#endif
+
     spin_lock_irqsave(&iommu->register_lock, flags);
 
     /* set size of the interrupt remapping table */

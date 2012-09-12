@@ -520,7 +520,6 @@ acpi_parse_one_rmrr(struct acpi_dmar_header *header)
     if ( (ret = acpi_dmar_check_length(header, sizeof(*rmrr))) != 0 )
         return ret;
 
-#ifdef CONFIG_X86
     /* This check is here simply to detect when RMRR values are
      * not properly represented in the system memory map and
      * inform the user
@@ -534,7 +533,6 @@ acpi_parse_one_rmrr(struct acpi_dmar_header *header)
                 "iommu_inclusive_mapping=1 parameter may be needed.\n",
                 base_addr, end_addr);
     }
-#endif
 
     rmrru = xzalloc(struct acpi_rmrr_unit);
     if ( !rmrru )
@@ -775,14 +773,10 @@ out:
     return ret;
 }
 
-#ifdef CONFIG_X86
 #include <asm/tboot.h>
 /* ACPI tables may not be DMA protected by tboot, so use DMAR copy */
 /* SINIT saved in SinitMleData in TXT heap (which is DMA protected) */
 #define parse_dmar_table(h) tboot_parse_dmar_table(h)
-#else
-#define parse_dmar_table(h) acpi_table_parse(ACPI_SIG_DMAR, h)
-#endif
 
 int __init acpi_dmar_init(void)
 {
@@ -813,14 +807,8 @@ int platform_supports_intremap(void)
     return (dmar_flags & mask) == ACPI_DMAR_INTR_REMAP;
 }
 
-#ifdef CONFIG_X86
 int platform_supports_x2apic(void)
 {
     unsigned int mask = ACPI_DMAR_INTR_REMAP | ACPI_DMAR_X2APIC_OPT_OUT;
-
-    if (!cpu_has_x2apic)
-        return 0;
-
-    return (dmar_flags & mask) == ACPI_DMAR_INTR_REMAP;
+    return cpu_has_x2apic && ((dmar_flags & mask) == ACPI_DMAR_INTR_REMAP);
 }
-#endif

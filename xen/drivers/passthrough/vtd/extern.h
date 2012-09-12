@@ -56,32 +56,12 @@ struct acpi_drhd_unit * ioapic_to_drhd(unsigned int apic_id);
 struct acpi_drhd_unit * iommu_to_drhd(struct iommu *iommu);
 struct acpi_rhsa_unit * drhd_to_rhsa(struct acpi_drhd_unit *drhd);
 
-#ifdef CONFIG_X86
 struct acpi_drhd_unit * find_ats_dev_drhd(struct iommu *iommu);
 
 int ats_device(const struct pci_dev *, const struct acpi_drhd_unit *);
 
 int dev_invalidate_iotlb(struct iommu *iommu, u16 did,
                          u64 addr, unsigned int size_order, u64 type);
-#else
-
-static inline struct acpi_drhd_unit *find_ats_dev_drhd(struct iommu *iommu)
-{
-    return NULL;
-}
-
-static inline int ats_device(const struct pci_dev *pdev,
-                             const struct acpi_drhd_unit *drhd)
-{
-    return 0;
-}
-
-static inline int dev_invalidate_iotlb(struct iommu *iommu, u16 did, u64 addr,
-                                       unsigned int size_order, u64 type)
-{
-    return 0;
-}
-#endif
 
 int qinval_device_iotlb(struct iommu *iommu,
                         u32 max_invs_pend, u16 sid, u16 size, u64 addr);

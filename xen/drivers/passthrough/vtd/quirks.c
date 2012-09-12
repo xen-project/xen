@@ -132,12 +132,8 @@ static void __init map_igd_reg(void)
     igd_reg = (igd_mmio & IGD_BAR_MASK) + 0x2000;
 
     /* ioremap this physical page */
-#if defined(CONFIG_X86)
     set_fixmap_nocache(FIX_IGD_MMIO, igd_reg);
     igd_reg_va = (u8 *)fix_to_virt(FIX_IGD_MMIO);
-#else
-    igd_reg_va = ioremap_nocache(igd_reg, 0x1000);
-#endif
 }
 
 /*
@@ -363,7 +359,6 @@ void me_wifi_quirk(struct domain *domain, u8 bus, u8 devfn, int map)
  */
 void __init pci_vtd_quirk(struct pci_dev *pdev)
 {
-#ifdef CONFIG_X86
     int seg = pdev->seg;
     int bus = pdev->bus;
     int dev = PCI_SLOT(pdev->devfn);
@@ -376,5 +371,4 @@ void __init pci_vtd_quirk(struct pci_dev *pdev)
         val = pci_conf_read32(seg, bus, dev, func, 0x1AC);
         pci_conf_write32(seg, bus, dev, func, 0x1AC, val | (1 << 31));
     }
-#endif
 }

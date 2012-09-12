@@ -134,7 +134,6 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
         break;
     }
 
-#ifdef CONFIG_X86
     case PMSTAT_get_max_cx:
     {
         op->u.getcx.nr = pmstat_get_cx_nr(op->cpuid);
@@ -153,7 +152,6 @@ int do_get_pm_info(struct xen_sysctl_get_pmstat *op)
         ret = pmstat_reset_cx_stat(op->cpuid);
         break;
     }
-#endif
 
     default:
         printk("not defined sub-hypercall @ do_get_pm_info\n");

@@ -27,10 +27,7 @@
 #include "dmar.h"
 #include "vtd.h"
 #include "extern.h"
-
-#if defined(CONFIG_X86)
 #include <asm/io_apic.h>
-#endif
 
 int is_usb_device(u16 seg, u8 bus, u8 devfn)
 {
@@ -188,7 +185,6 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
 
 static void dump_iommu_info(unsigned char key)
 {
-#if defined(CONFIG_X86)
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     int i;
@@ -300,9 +296,6 @@ static void dump_iommu_info(unsigned char key)
             }
         }
     }
-#else
-    printk("%s: not implemented for now\n", __func__);
-#endif
 }
 
 struct keyhandler dump_iommu_info_keyhandler = {
