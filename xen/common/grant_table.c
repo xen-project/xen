@@ -127,9 +127,44 @@ shared_entry_header(struct grant_table *t, grant_ref_t ref)
     else
         return &shared_entry_v2(t, ref).hdr;
 }
+
+/* Active grant entry - used for shadowing GTF_permit_access grants. */
+struct active_grant_entry {
+    u32           pin;    /* Reference count information.             */
+    domid_t       domid;  /* Domain being granted access.             */
+    struct domain *trans_domain;
+    uint32_t      trans_gref;
+    unsigned long frame;  /* Frame being granted.                     */
+    unsigned long gfn;    /* Guest's idea of the frame being granted. */
+    unsigned      is_sub_page:1; /* True if this is a sub-page grant. */
+    unsigned      start:15; /* For sub-page grants, the start offset
+                               in the page.                           */
+    unsigned      length:16; /* For sub-page grants, the length of the
+                                grant.                                */
+};
+
 #define ACGNT_PER_PAGE (PAGE_SIZE / sizeof(struct active_grant_entry))
 #define active_entry(t, e) \
     ((t)->active[(e)/ACGNT_PER_PAGE][(e)%ACGNT_PER_PAGE])
+
+static inline unsigned int
+num_act_frames_from_sha_frames(const unsigned int num)
+{
+    /* How many frames are needed for the active grant table,
+     * given the size of the shared grant table? */
+    unsigned int sha_per_page = PAGE_SIZE / sizeof(grant_entry_v1_t);
+    unsigned int num_sha_entries = num * sha_per_page;
+    return (num_sha_entries + (ACGNT_PER_PAGE - 1)) / ACGNT_PER_PAGE;
+}
+
+#define max_nr_active_grant_frames \
+    num_act_frames_from_sha_frames(max_nr_grant_frames)
+
+static inline unsigned int
+nr_active_grant_frames(struct grant_table *gt)
+{
+    return num_act_frames_from_sha_frames(nr_grant_frames(gt));
+}
 
 /* Check if the page has been paged out, or needs unsharing. 
    If rc == GNTST_okay, *page contains the page struct with a ref taken.
@@ -2542,13 +2577,6 @@ do_grant_table_op(
 #include "compat/grant_table.c"
 #endif
 
-static unsigned int max_nr_active_grant_frames(void)
-{
-    return (((max_nr_grant_frames * (PAGE_SIZE / sizeof(grant_entry_v1_t))) + 
-                    ((PAGE_SIZE / sizeof(struct active_grant_entry))-1)) 
-                   / (PAGE_SIZE / sizeof(struct active_grant_entry)));
-}
-
 int 
 grant_table_create(
     struct domain *d)
@@ -2565,7 +2593,7 @@ grant_table_create(
 
     /* Active grant table. */
     if ( (t->active = xzalloc_array(struct active_grant_entry *,
-                                    max_nr_active_grant_frames())) == NULL )
+                                    max_nr_active_grant_frames)) == NULL )
         goto no_mem_1;
     for ( i = 0;
           i < num_act_frames_from_sha_frames(INITIAL_NR_GRANT_FRAMES); i++ )
