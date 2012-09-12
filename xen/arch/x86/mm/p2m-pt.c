@@ -150,10 +150,8 @@ p2m_free_entry(struct p2m_domain *p2m, l1_pgentry_t *p2m_entry, int page_order)
 static void p2m_add_iommu_flags(l1_pgentry_t *p2m_entry,
                                 unsigned int nlevel, unsigned int flags)
 {
-#if CONFIG_PAGING_LEVELS == 4
     if ( iommu_hap_pt_share )
         l1e_add_flags(*p2m_entry, iommu_nlevel_to_flags(nlevel, flags));
-#endif
 }
 
 static int
@@ -189,10 +187,6 @@ p2m_next_level(struct p2m_domain *p2m, mfn_t *table_mfn, void **table,
             p2m->write_p2m_entry(p2m, gfn, p2m_entry, *table_mfn, new_entry, 4);
             break;
         case PGT_l2_page_table:
-#if CONFIG_PAGING_LEVELS == 3
-            /* for PAE mode, PDPE only has PCD/PWT/P bits available */
-            new_entry = l1e_from_pfn(mfn_x(page_to_mfn(pg)), _PAGE_PRESENT);
-#endif
             p2m_add_iommu_flags(&new_entry, 2, IOMMUF_readable|IOMMUF_writable);
             p2m->write_p2m_entry(p2m, gfn, p2m_entry, *table_mfn, new_entry, 3);
             break;
@@ -317,12 +311,11 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         __trace_var(TRC_MEM_SET_P2M_ENTRY, 0, sizeof(t), &t);
     }
 
-#if CONFIG_PAGING_LEVELS >= 4
     if ( !p2m_next_level(p2m, &table_mfn, &table, &gfn_remainder, gfn,
                          L4_PAGETABLE_SHIFT - PAGE_SHIFT,
                          L4_PAGETABLE_ENTRIES, PGT_l3_page_table) )
         goto out;
-#endif
+
     /*
      * Try to allocate 1GB page table if this feature is supported.
      */
@@ -361,18 +354,9 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         if ( l1e_get_flags(old_entry) & _PAGE_PRESENT )
             p2m_free_entry(p2m, &old_entry, page_order);
     }
-    /*
-     * When using PAE Xen, we only allow 33 bits of pseudo-physical
-     * address in translated guests (i.e. 8 GBytes).  This restriction
-     * comes from wanting to map the P2M table into the 16MB RO_MPT hole
-     * in Xen's address space for translated PV guests.
-     * When using AMD's NPT on PAE Xen, we are restricted to 4GB.
-     */
     else if ( !p2m_next_level(p2m, &table_mfn, &table, &gfn_remainder, gfn,
                               L3_PAGETABLE_SHIFT - PAGE_SHIFT,
-                              ((CONFIG_PAGING_LEVELS == 3)
-                               ? (hap_enabled(p2m->domain) ? 4 : 8)
-                               : L3_PAGETABLE_ENTRIES),
+                              L3_PAGETABLE_ENTRIES,
                               PGT_l2_page_table) )
         goto out;
 
@@ -493,15 +477,12 @@ static mfn_t p2m_gfn_to_mfn_current(struct p2m_domain *p2m,
 
     l1_pgentry_t l1e = l1e_empty(), *p2m_entry;
     l2_pgentry_t l2e = l2e_empty();
-    int ret;
-#if CONFIG_PAGING_LEVELS >= 4
     l3_pgentry_t l3e = l3e_empty();
-#endif
+    int ret;
 
     ASSERT(gfn < (RO_MPT_VIRT_END - RO_MPT_VIRT_START) 
            / sizeof(l1_pgentry_t));
 
-#if CONFIG_PAGING_LEVELS >= 4
     /*
      * Read & process L3
      */
@@ -549,7 +530,7 @@ pod_retry_l3:
             *page_order = PAGE_ORDER_1G;
         goto out;
     }
-#endif
+
     /*
      * Read & process L2
      */
@@ -691,7 +672,6 @@ p2m_gfn_to_mfn(struct p2m_domain *p2m, unsigned long gfn,
 
     mfn = pagetable_get_mfn(p2m_get_pagetable(p2m));
 
-#if CONFIG_PAGING_LEVELS >= 4
     {
         l4_pgentry_t *l4e = map_domain_page(mfn_x(mfn));
         l4e += l4_table_offset(addr);
@@ -703,19 +683,9 @@ p2m_gfn_to_mfn(struct p2m_domain *p2m, unsigned long gfn,
         mfn = _mfn(l4e_get_pfn(*l4e));
         unmap_domain_page(l4e);
     }
-#endif
     {
         l3_pgentry_t *l3e = map_domain_page(mfn_x(mfn));
-#if CONFIG_PAGING_LEVELS == 3
-        /* On PAE hosts the p2m has eight l3 entries, not four (see
-         * shadow_set_p2m_entry()) so we can't use l3_table_offset.
-         * Instead, just count the number of l3es from zero.  It's safe
-         * to do this because we already checked that the gfn is within
-         * the bounds of the p2m. */
-        l3e += (addr >> L3_PAGETABLE_SHIFT);
-#else
         l3e += l3_table_offset(addr);
-#endif
 pod_retry_l3:
         if ( (l3e_get_flags(*l3e) & _PAGE_PRESENT) == 0 )
         {
@@ -828,10 +798,8 @@ static void p2m_change_type_global(struct p2m_domain *p2m,
     mfn_t l1mfn, l2mfn, l3mfn;
     unsigned long i1, i2, i3;
     l3_pgentry_t *l3e;
-#if CONFIG_PAGING_LEVELS == 4
     l4_pgentry_t *l4e;
     unsigned long i4;
-#endif /* CONFIG_PAGING_LEVELS == 4 */
 
     BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
     BUG_ON(ot != nt && (ot == p2m_mmio_direct || nt == p2m_mmio_direct));
@@ -844,14 +812,8 @@ static void p2m_change_type_global(struct p2m_domain *p2m,
 
     ASSERT(p2m_locked_by_me(p2m));
 
-#if CONFIG_PAGING_LEVELS == 4
     l4e = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
-#else /* CONFIG_PAGING_LEVELS == 3 */
-    l3mfn = _mfn(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
-    l3e = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
-#endif
 
-#if CONFIG_PAGING_LEVELS >= 4
     for ( i4 = 0; i4 < L4_PAGETABLE_ENTRIES; i4++ )
     {
         if ( !(l4e_get_flags(l4e[i4]) & _PAGE_PRESENT) )
@@ -860,9 +822,8 @@ static void p2m_change_type_global(struct p2m_domain *p2m,
         }
         l3mfn = _mfn(l4e_get_pfn(l4e[i4]));
         l3e = map_domain_page(l4e_get_pfn(l4e[i4]));
-#endif
         for ( i3 = 0;
-              i3 < ((CONFIG_PAGING_LEVELS==4) ? L3_PAGETABLE_ENTRIES : 8);
+              i3 < L3_PAGETABLE_ENTRIES;
               i3++ )
         {
             if ( !(l3e_get_flags(l3e[i3]) & _PAGE_PRESENT) )
@@ -901,11 +862,7 @@ static void p2m_change_type_global(struct p2m_domain *p2m,
                     mfn = l2e_get_pfn(l2e[i2]);
                     /* Do not use get_gpfn_from_mfn because it may return 
                        SHARED_M2P_ENTRY */
-                    gfn = (i2 + (i3
-#if CONFIG_PAGING_LEVELS >= 4
-				   + (i4 * L3_PAGETABLE_ENTRIES)
-#endif
-				)
+                    gfn = (i2 + (i3 + (i4 * L3_PAGETABLE_ENTRIES))
                            * L2_PAGETABLE_ENTRIES) * L1_PAGETABLE_ENTRIES; 
                     flags = p2m_type_to_flags(nt, _mfn(mfn));
                     l1e_content = l1e_from_pfn(mfn, flags | _PAGE_PSE);
@@ -924,12 +881,8 @@ static void p2m_change_type_global(struct p2m_domain *p2m,
                     if ( p2m_flags_to_type(flags) != ot )
                         continue;
                     mfn = l1e_get_pfn(l1e[i1]);
-                    gfn = i1 + (i2 + (i3
-#if CONFIG_PAGING_LEVELS >= 4
-					+ (i4 * L3_PAGETABLE_ENTRIES)
-#endif
-				     )
-                           * L2_PAGETABLE_ENTRIES) * L1_PAGETABLE_ENTRIES; 
+                    gfn = i1 + (i2 + (i3 + (i4 * L3_PAGETABLE_ENTRIES))
+                                * L2_PAGETABLE_ENTRIES) * L1_PAGETABLE_ENTRIES; 
                     /* create a new 1le entry with the new type */
                     flags = p2m_type_to_flags(nt, _mfn(mfn));
                     l1e_content = p2m_l1e_from_pfn(mfn, flags);
@@ -940,17 +893,10 @@ static void p2m_change_type_global(struct p2m_domain *p2m,
             }
             unmap_domain_page(l2e);
         }
-#if CONFIG_PAGING_LEVELS >= 4
         unmap_domain_page(l3e);
     }
-#endif
 
-#if CONFIG_PAGING_LEVELS == 4
     unmap_domain_page(l4e);
-#else /* CONFIG_PAGING_LEVELS == 3 */
-    unmap_domain_page(l3e);
-#endif
-
 }
 
 #if P2M_AUDIT
@@ -976,19 +922,12 @@ long p2m_pt_audit_p2m(struct p2m_domain *p2m)
         l1_pgentry_t *l1e;
         int i1, i2;
 
-#if CONFIG_PAGING_LEVELS == 4
         l4_pgentry_t *l4e;
         l3_pgentry_t *l3e;
         int i4, i3;
         l4e = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
-#else /* CONFIG_PAGING_LEVELS == 3 */
-        l3_pgentry_t *l3e;
-        int i3;
-        l3e = map_domain_page(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m))));
-#endif
 
         gfn = 0;
-#if CONFIG_PAGING_LEVELS >= 4
         for ( i4 = 0; i4 < L4_PAGETABLE_ENTRIES; i4++ )
         {
             if ( !(l4e_get_flags(l4e[i4]) & _PAGE_PRESENT) )
@@ -997,9 +936,8 @@ long p2m_pt_audit_p2m(struct p2m_domain *p2m)
                 continue;
             }
             l3e = map_domain_page(mfn_x(_mfn(l4e_get_pfn(l4e[i4]))));
-#endif
             for ( i3 = 0;
-                  i3 < ((CONFIG_PAGING_LEVELS==4) ? L3_PAGETABLE_ENTRIES : 8);
+                  i3 < L3_PAGETABLE_ENTRIES;
                   i3++ )
             {
                 if ( !(l3e_get_flags(l3e[i3]) & _PAGE_PRESENT) )
@@ -1101,17 +1039,10 @@ long p2m_pt_audit_p2m(struct p2m_domain *p2m)
                 }
                 unmap_domain_page(l2e);
             }
-#if CONFIG_PAGING_LEVELS >= 4
             unmap_domain_page(l3e);
         }
-#endif
 
-#if CONFIG_PAGING_LEVELS == 4
         unmap_domain_page(l4e);
-#else /* CONFIG_PAGING_LEVELS == 3 */
-        unmap_domain_page(l3e);
-#endif
-
     }
 
     if ( entry_count != p2m->pod.entry_count )

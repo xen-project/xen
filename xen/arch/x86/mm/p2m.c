@@ -343,14 +343,7 @@ int p2m_alloc_table(struct p2m_domain *p2m)
 
     P2M_PRINTK("allocating p2m table\n");
 
-    p2m_top = p2m_alloc_ptp(p2m,
-#if CONFIG_PAGING_LEVELS == 4
-        PGT_l4_page_table
-#else
-        PGT_l3_page_table
-#endif
-        );
-
+    p2m_top = p2m_alloc_ptp(p2m, PGT_l4_page_table);
     if ( p2m_top == NULL )
     {
         p2m_unlock(p2m);
@@ -544,10 +537,6 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
         }
         return 0;
     }
-
-    rc = p2m_gfn_check_limit(d, gfn, page_order);
-    if ( rc != 0 )
-        return rc;
 
     p2m_lock(p2m);
 

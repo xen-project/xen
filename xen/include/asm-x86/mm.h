@@ -398,16 +398,6 @@ static inline int get_page_and_type(struct page_info *page,
     ASSERT(((_p)->count_info & PGC_count_mask) != 0);          \
     ASSERT(page_get_owner(_p) == (_d))
 
-// Quick test for whether a given page can be represented directly in CR3.
-//
-#if CONFIG_PAGING_LEVELS == 3
-#define MFN_FITS_IN_CR3(_MFN) !(mfn_x(_MFN) >> 20)
-
-/* returns a lowmem machine address of the copied L3 root table */
-unsigned long
-pae_copy_root(struct vcpu *v, l3_pgentry_t *l3tab);
-#endif /* CONFIG_PAGING_LEVELS == 3 */
-
 int check_descriptor(const struct domain *, struct desc_struct *d);
 
 extern bool_t opt_allow_superpage;

@@ -327,17 +327,7 @@ static inline int paging_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
  * never sees a half-written entry that has _PAGE_PRESENT set */
 static inline void safe_write_pte(l1_pgentry_t *p, l1_pgentry_t new)
 {
-#if CONFIG_PAGING_LEVELS == 3
-    /* PAE machines write 64bit PTEs as two 32bit writes. */
-    volatile unsigned long *d = (unsigned long *) p;
-    unsigned long *s = (unsigned long *) &new;
-    BUILD_BUG_ON(sizeof (l1_pgentry_t) != 2 * sizeof (unsigned long));
-    d[0] = 0;
-    d[1] = s[1];
-    d[0] = s[0]; 
-#else
     *p = new;
-#endif
 }
 
 /* Atomically write a P2M entry and update the paging-assistance state 

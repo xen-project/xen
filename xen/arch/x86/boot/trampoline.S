@@ -94,10 +94,8 @@ trampoline_protmode_entry:
         jz      .Lskip_efer
         movl    $MSR_EFER,%ecx
         rdmsr
-#if CONFIG_PAGING_LEVELS == 4
         btsl    $_EFER_LME,%eax /* Long Mode      */
         btsl    $_EFER_SCE,%eax /* SYSCALL/SYSRET */
-#endif
         btl     $20,%edi        /* No Execute?    */
         jnc     1f
         btsl    $_EFER_NX,%eax  /* No Execute     */

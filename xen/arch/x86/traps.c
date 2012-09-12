@@ -1181,12 +1181,8 @@ static enum pf_type __page_fault_type(
     unsigned long addr, unsigned int error_code)
 {
     unsigned long mfn, cr3 = read_cr3();
-#if CONFIG_PAGING_LEVELS >= 4
     l4_pgentry_t l4e, *l4t;
-#endif
-#if CONFIG_PAGING_LEVELS >= 3
     l3_pgentry_t l3e, *l3t;
-#endif
     l2_pgentry_t l2e, *l2t;
     l1_pgentry_t l1e, *l1t;
     unsigned int required_flags, disallowed_flags, page_user;
@@ -1217,7 +1213,6 @@ static enum pf_type __page_fault_type(
 
     mfn = cr3 >> PAGE_SHIFT;
 
-#if CONFIG_PAGING_LEVELS >= 4
     l4t = map_domain_page(mfn);
     l4e = l4e_read_atomic(&l4t[l4_table_offset(addr)]);
     mfn = l4e_get_pfn(l4e);
@@ -1226,28 +1221,17 @@ static enum pf_type __page_fault_type(
          (l4e_get_flags(l4e) & disallowed_flags) )
         return real_fault;
     page_user &= l4e_get_flags(l4e);
-#endif
 
-#if CONFIG_PAGING_LEVELS >= 3
     l3t  = map_domain_page(mfn);
-#if CONFIG_PAGING_LEVELS == 3
-    l3t += (cr3 & 0xFE0UL) >> 3;
-#endif
     l3e = l3e_read_atomic(&l3t[l3_table_offset(addr)]);
     mfn = l3e_get_pfn(l3e);
     unmap_domain_page(l3t);
-#if CONFIG_PAGING_LEVELS == 3
-    if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
-        return real_fault;
-#else
     if ( ((l3e_get_flags(l3e) & required_flags) != required_flags) ||
          (l3e_get_flags(l3e) & disallowed_flags) )
         return real_fault;
     page_user &= l3e_get_flags(l3e);
     if ( l3e_get_flags(l3e) & _PAGE_PSE )
         goto leaf;
-#endif
-#endif
 
     l2t = map_domain_page(mfn);
     l2e = l2e_read_atomic(&l2t[l2_table_offset(addr)]);

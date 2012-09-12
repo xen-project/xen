@@ -788,22 +788,10 @@ static inline void safe_write_entry(void *dst, void *src)
     volatile unsigned long *d = dst;
     unsigned long *s = src;
     ASSERT(!((unsigned long) d & (sizeof (shadow_l1e_t) - 1)));
-#if CONFIG_PAGING_LEVELS == 3
-    /* In PAE mode, pagetable entries are larger
-     * than machine words, so won't get written atomically.  We need to make
-     * sure any other cpu running on these shadows doesn't see a
-     * half-written entry.  Do this by marking the entry not-present first,
-     * then writing the high word before the low word. */
-    BUILD_BUG_ON(sizeof (shadow_l1e_t) != 2 * sizeof (unsigned long));
-    d[0] = 0;
-    d[1] = s[1];
-    d[0] = s[0];
-#else
     /* In 64-bit, sizeof(pte) == sizeof(ulong) == 1 word,
      * which will be an atomic write, since the entry is aligned. */
     BUILD_BUG_ON(sizeof (shadow_l1e_t) != sizeof (unsigned long));
     *d = *s;
-#endif
 }
 
 
@@ -1444,7 +1432,7 @@ do {                                                                    \
 //        probably wants to wait until the shadow types have been moved from
 //        shadow-types.h to shadow-private.h
 //
-#if CONFIG_PAGING_LEVELS == 4 && GUEST_PAGING_LEVELS == 4
+#if GUEST_PAGING_LEVELS == 4
 void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
 {
     struct domain *d = v->domain;
@@ -1496,7 +1484,7 @@ void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
 }
 #endif
 
-#if CONFIG_PAGING_LEVELS >= 3 && GUEST_PAGING_LEVELS >= 3
+#if GUEST_PAGING_LEVELS >= 3
 // For 3-on-3 PV guests, we need to make sure the xen mappings are in
 // place, which means that we need to populate the l2h entry in the l3
 // table.
@@ -1505,62 +1493,13 @@ static void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn)
 {
     struct domain *d = v->domain;
     shadow_l2e_t *sl2e;
-#if CONFIG_PAGING_LEVELS == 3
-    int i;
-#else
 
     if ( !is_pv_32on64_vcpu(v) )
         return;
-#endif
 
     sl2e = sh_map_domain_page(sl2hmfn);
     ASSERT(sl2e != NULL);
     ASSERT(sizeof (l2_pgentry_t) == sizeof (shadow_l2e_t));
-    
-#if CONFIG_PAGING_LEVELS == 3
-
-    /* Copy the common Xen mappings from the idle domain */
-    memcpy(&sl2e[L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1)],
-           &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
-           L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
-
-    /* Install the per-domain mappings for this domain */
-    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
-        sl2e[shadow_l2_table_offset(PERDOMAIN_VIRT_START) + i] =
-            shadow_l2e_from_mfn(
-                page_to_mfn(perdomain_pt_page(d, i)),
-                __PAGE_HYPERVISOR);
-    
-    /* We don't set up a linear mapping here because we can't until this
-     * l2h is installed in an l3e.  sh_update_linear_entries() handles
-     * the linear mappings when CR3 (and so the fourth l3e) is loaded.  
-     * We zero them here, just as a safety measure.
-     */
-    for ( i = 0; i < SHADOW_L3_PAGETABLE_ENTRIES; i++ )
-        sl2e[shadow_l2_table_offset(LINEAR_PT_VIRT_START) + i] =
-            shadow_l2e_empty();
-    for ( i = 0; i < SHADOW_L3_PAGETABLE_ENTRIES; i++ )
-        sl2e[shadow_l2_table_offset(SH_LINEAR_PT_VIRT_START) + i] =
-            shadow_l2e_empty();
-
-    if ( shadow_mode_translate(d) )
-    {
-        /* Install the domain-specific p2m table */
-        l3_pgentry_t *p2m;
-        ASSERT(pagetable_get_pfn(p2m_get_pagetable(p2m_get_hostp2m(d))) != 0);
-        p2m = sh_map_domain_page(pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d))));
-        for ( i = 0; i < MACHPHYS_MBYTES>>1; i++ )
-        {
-            sl2e[shadow_l2_table_offset(RO_MPT_VIRT_START) + i] =
-                (l3e_get_flags(p2m[i]) & _PAGE_PRESENT)
-                ? shadow_l2e_from_mfn(_mfn(l3e_get_pfn(p2m[i])),
-                                      __PAGE_HYPERVISOR)
-                : shadow_l2e_empty();
-        }
-        sh_unmap_domain_page(p2m);
-    }
-
-#else
 
     /* Copy the common Xen mappings from the idle domain */
     memcpy(
@@ -1568,14 +1507,9 @@ static void sh_install_xen_entries_in_l2h(struct vcpu *v, mfn_t sl2hmfn)
         &compat_idle_pg_table_l2[l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
         COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*sl2e));
 
-#endif
-    
     sh_unmap_domain_page(sl2e);
 }
 #endif
-
-
-
 
 
 /**************************************************************************/
@@ -1633,11 +1567,11 @@ sh_make_shadow(struct vcpu *v, mfn_t gmfn, u32 shadow_type)
     {
         switch (shadow_type) 
         {
-#if CONFIG_PAGING_LEVELS == 4 && GUEST_PAGING_LEVELS == 4
+#if GUEST_PAGING_LEVELS == 4
         case SH_type_l4_shadow:
             sh_install_xen_entries_in_l4(v, gmfn, smfn); break;
 #endif
-#if CONFIG_PAGING_LEVELS >= 3 && GUEST_PAGING_LEVELS >= 3
+#if GUEST_PAGING_LEVELS >= 3
         case SH_type_l2h_shadow:
             sh_install_xen_entries_in_l2h(v, smfn); break;
 #endif
@@ -1677,7 +1611,6 @@ sh_make_monitor_table(struct vcpu *v)
     /* Guarantee we can get the memory we need */
     shadow_prealloc(d, SH_type_monitor_table, CONFIG_PAGING_LEVELS);
 
-#if CONFIG_PAGING_LEVELS == 4    
     {
         mfn_t m4mfn;
         m4mfn = shadow_alloc(d, SH_type_monitor_table, 0);
@@ -1726,43 +1659,6 @@ sh_make_monitor_table(struct vcpu *v)
 #endif /* SHADOW_PAGING_LEVELS < 4 */
         return m4mfn;
     }
-
-#elif CONFIG_PAGING_LEVELS == 3
-
-    {
-        mfn_t m3mfn, m2mfn; 
-        l3_pgentry_t *l3e;
-        l2_pgentry_t *l2e;
-        int i;
-
-        m3mfn = shadow_alloc(d, SH_type_monitor_table, 0);
-        /* Remember the level of this table */
-        mfn_to_page(m3mfn)->shadow_flags = 3;
-
-        // Install a monitor l2 table in slot 3 of the l3 table.
-        // This is used for all Xen entries, including linear maps
-        m2mfn = shadow_alloc(d, SH_type_monitor_table, 0);
-        mfn_to_page(m2mfn)->shadow_flags = 2;
-        l3e = sh_map_domain_page(m3mfn);
-        l3e[3] = l3e_from_pfn(mfn_x(m2mfn), _PAGE_PRESENT);
-        sh_install_xen_entries_in_l2h(v, m2mfn);
-        /* Install the monitor's own linear map */
-        l2e = sh_map_domain_page(m2mfn);
-        for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
-            l2e[l2_table_offset(LINEAR_PT_VIRT_START) + i] =
-                (l3e_get_flags(l3e[i]) & _PAGE_PRESENT) 
-                ? l2e_from_pfn(l3e_get_pfn(l3e[i]), __PAGE_HYPERVISOR) 
-                : l2e_empty();
-        sh_unmap_domain_page(l2e);
-        sh_unmap_domain_page(l3e);
-
-        SHADOW_PRINTK("new monitor table: %#lx\n", mfn_x(m3mfn));
-        return m3mfn;
-    }
-
-#else
-#error this should not happen
-#endif /* CONFIG_PAGING_LEVELS */
 }
 #endif /* SHADOW_PAGING_LEVELS == GUEST_PAGING_LEVELS */
 
@@ -2146,7 +2042,7 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
     struct domain *d = v->domain;
     ASSERT(mfn_to_page(mmfn)->u.sh.type == SH_type_monitor_table);
 
-#if (CONFIG_PAGING_LEVELS == 4) && (SHADOW_PAGING_LEVELS != 4)
+#if SHADOW_PAGING_LEVELS != 4
     {
         mfn_t m3mfn;
         l4_pgentry_t *l4e = sh_map_domain_page(mmfn);
@@ -2176,14 +2072,6 @@ void sh_destroy_monitor_table(struct vcpu *v, mfn_t mmfn)
             shadow_free(d, m3mfn);
         }
         sh_unmap_domain_page(l4e);
-    }
-#elif CONFIG_PAGING_LEVELS == 3
-    /* Need to destroy the l2 monitor page in slot 4 too */
-    {
-        l3_pgentry_t *l3e = sh_map_domain_page(mmfn);
-        ASSERT(l3e_get_flags(l3e[3]) & _PAGE_PRESENT);
-        shadow_free(d, _mfn(l3e_get_pfn(l3e[3])));
-        sh_unmap_domain_page(l3e);
     }
 #endif
 
@@ -2381,46 +2269,6 @@ static int validate_gl2e(struct vcpu *v, void *new_ge, mfn_t sl2mfn, void *se)
         }
     }
     l2e_propagate_from_guest(v, new_gl2e, sl1mfn, &new_sl2e, ft_prefetch);
-
-    // check for updates to xen reserved slots in PV guests...
-    // XXX -- need to revisit this for PV 3-on-4 guests.
-    //
-#if SHADOW_PAGING_LEVELS < 4
-#if CONFIG_PAGING_LEVELS == SHADOW_PAGING_LEVELS
-    if ( !shadow_mode_external(v->domain) )
-    {
-        int shadow_index = (((unsigned long)sl2p & ~PAGE_MASK) /
-                            sizeof(shadow_l2e_t));
-        int reserved_xen_slot;
-
-#if SHADOW_PAGING_LEVELS == 3
-        reserved_xen_slot = 
-            ((mfn_to_page(sl2mfn)->u.sh.type == SH_type_l2h_pae_shadow) &&
-             (shadow_index 
-              >= (L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1))));
-#else /* SHADOW_PAGING_LEVELS == 2 */
-        reserved_xen_slot = (shadow_index >= L2_PAGETABLE_FIRST_XEN_SLOT);
-#endif
-
-        if ( unlikely(reserved_xen_slot) )
-        {
-            // attempt by the guest to write to a xen reserved slot
-            //
-            SHADOW_PRINTK("%s out-of-range update "
-                           "sl2mfn=%05lx index=0x%x val=%" SH_PRI_pte "\n",
-                           __func__, mfn_x(sl2mfn), shadow_index, new_sl2e.l2);
-            if ( shadow_l2e_get_flags(new_sl2e) & _PAGE_PRESENT )
-            {
-                SHADOW_ERROR("out-of-range l2e update\n");
-                result |= SHADOW_SET_ERROR;
-            }
-
-            // do not call shadow_set_l2e...
-            return result;
-        }
-    }
-#endif /* CONFIG_PAGING_LEVELS == SHADOW_PAGING_LEVELS */
-#endif /* SHADOW_PAGING_LEVELS < 4 */
 
     result |= shadow_set_l2e(v, sl2p, new_sl2e, sl2mfn);
 
@@ -3836,7 +3684,7 @@ sh_update_linear_entries(struct vcpu *v)
          && pagetable_get_pfn(v->arch.monitor_table) == 0 ) 
         return;
 
-#if (CONFIG_PAGING_LEVELS == 4) && (SHADOW_PAGING_LEVELS == 4)
+#if SHADOW_PAGING_LEVELS == 4
     
     /* For PV, one l4e points at the guest l4, one points at the shadow
      * l4.  No maintenance required. 
@@ -3862,7 +3710,7 @@ sh_update_linear_entries(struct vcpu *v)
         }
     }
 
-#elif (CONFIG_PAGING_LEVELS == 4) && (SHADOW_PAGING_LEVELS == 3)
+#elif SHADOW_PAGING_LEVELS == 3
 
     /* PV: XXX
      *
@@ -3922,102 +3770,6 @@ sh_update_linear_entries(struct vcpu *v)
     }
     else
         domain_crash(d); /* XXX */
-
-#elif CONFIG_PAGING_LEVELS == 3
-
-    /* PV: need to copy the guest's l3 entries into the guest-linear-map l2
-     * entries in the shadow, and the shadow's l3 entries into the 
-     * shadow-linear-map l2 entries in the shadow.  This is safe to do 
-     * because Xen does not let guests share high-slot l2 tables between l3s,
-     * so we know we're not treading on anyone's toes. 
-     *
-     * HVM: need to copy the shadow's l3 entries into the
-     * shadow-linear-map l2 entries in the monitor table.  This is safe
-     * because we have one monitor table for each vcpu.  The monitor's
-     * own l3es don't need to be copied because they never change.  
-     * XXX That might change if we start stuffing things into the rest
-     * of the monitor's virtual address space. 
-     */ 
-    {
-        l2_pgentry_t *l2e, new_l2e;
-        shadow_l3e_t *guest_l3e = NULL, *shadow_l3e;
-        int i;
-        int unmap_l2e = 0;
-
-#if GUEST_PAGING_LEVELS == 2
-
-        /* Shadow l3 tables were built by sh_update_cr3 */
-        BUG_ON(!shadow_mode_external(d)); /* PV 2-on-3 is unsupported */
-        shadow_l3e = (shadow_l3e_t *)&v->arch.paging.shadow.l3table;
-        
-#else /* GUEST_PAGING_LEVELS == 3 */
-        
-        shadow_l3e = (shadow_l3e_t *)&v->arch.paging.shadow.l3table;
-        guest_l3e = (guest_l3e_t *)&v->arch.paging.shadow.gl3e;
-
-#endif /* GUEST_PAGING_LEVELS */
-        
-        /* Choose where to write the entries, using linear maps if possible */
-        if ( shadow_mode_external(d) )
-        {
-            if ( v == current )
-            {
-                /* From the monitor tables, it's safe to use linear maps
-                 * to update monitor l2s */
-                l2e = __linear_l2_table + (3 * L2_PAGETABLE_ENTRIES);
-            }
-            else
-            {
-                /* Map the monitor table's high l2 */
-                l3_pgentry_t *l3e;
-                l3e = sh_map_domain_page(
-                    pagetable_get_mfn(v->arch.monitor_table));
-                ASSERT(l3e_get_flags(l3e[3]) & _PAGE_PRESENT);
-                l2e = sh_map_domain_page(_mfn(l3e_get_pfn(l3e[3])));
-                unmap_l2e = 1;
-                sh_unmap_domain_page(l3e);
-            }
-        }
-        else 
-        {
-            /* Map the shadow table's high l2 */
-            ASSERT(shadow_l3e_get_flags(shadow_l3e[3]) & _PAGE_PRESENT);
-            l2e = sh_map_domain_page(shadow_l3e_get_mfn(shadow_l3e[3]));
-            unmap_l2e = 1;
-        }
-        
-        /* Write linear mapping of guest (only in PV, and only when 
-         * not translated). */
-        if ( !shadow_mode_translate(d) )
-        {
-            for ( i = 0; i < SHADOW_L3_PAGETABLE_ENTRIES; i++ )
-            {
-                new_l2e = 
-                    ((shadow_l3e_get_flags(guest_l3e[i]) & _PAGE_PRESENT)
-                     ? l2e_from_pfn(mfn_x(shadow_l3e_get_mfn(guest_l3e[i])),
-                                    __PAGE_HYPERVISOR) 
-                     : l2e_empty());
-                safe_write_entry(
-                    &l2e[l2_table_offset(LINEAR_PT_VIRT_START) + i],
-                    &new_l2e);
-            }
-        }
-        
-        /* Write linear mapping of shadow. */
-        for ( i = 0; i < SHADOW_L3_PAGETABLE_ENTRIES; i++ )
-        {
-            new_l2e = (shadow_l3e_get_flags(shadow_l3e[i]) & _PAGE_PRESENT) 
-                ? l2e_from_pfn(mfn_x(shadow_l3e_get_mfn(shadow_l3e[i])),
-                               __PAGE_HYPERVISOR) 
-                : l2e_empty();
-            safe_write_entry(
-                &l2e[l2_table_offset(SH_LINEAR_PT_VIRT_START) + i],
-                &new_l2e);
-        }
-        
-        if ( unmap_l2e )
-            sh_unmap_domain_page(l2e);
-    }
 
 #else
 #error this should not happen

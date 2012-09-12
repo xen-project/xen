@@ -119,12 +119,10 @@ struct shadow_domain {
 };
 
 struct shadow_vcpu {
-#if CONFIG_PAGING_LEVELS >= 3
     /* PAE guests: per-vcpu shadow top-level table */
     l3_pgentry_t l3table[4] __attribute__((__aligned__(32)));
     /* PAE guests: per-vcpu cache of the top-level *guest* entries */
     l3_pgentry_t gl3e[4] __attribute__((__aligned__(32)));
-#endif
     /* Non-PAE guests: pointer to guest top-level pagetable */
     void *guest_vtable;
     /* Last MFN that we emulated a write to as unshadow heuristics. */

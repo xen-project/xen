@@ -331,12 +331,7 @@ int __init construct_dom0(
     unsigned long image_len = image->mod_end;
     char *image_start = image_base + image_headroom;
     unsigned long initrd_len = initrd ? initrd->mod_end : 0;
-#if CONFIG_PAGING_LEVELS < 4
-    module_t mpt;
-    void *mpt_ptr;
-#else
     l4_pgentry_t *l4tab = NULL, *l4start = NULL;
-#endif
     l3_pgentry_t *l3tab = NULL, *l3start = NULL;
     l2_pgentry_t *l2tab = NULL, *l2start = NULL;
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
@@ -391,27 +386,16 @@ int __init construct_dom0(
     compatible = 0;
     compat32   = 0;
     machine = elf_uval(&elf, elf.ehdr, e_machine);
-    switch (CONFIG_PAGING_LEVELS) {
-    case 3: /* x86_32p */
-        if (parms.pae == PAEKERN_bimodal)
-            parms.pae = PAEKERN_extended_cr3;
-        printk(" Xen  kernel: 32-bit, PAE, lsb\n");
-        if (elf_32bit(&elf) && parms.pae && machine == EM_386)
-            compatible = 1;
-        break;
-    case 4: /* x86_64 */
-        printk(" Xen  kernel: 64-bit, lsb, compat32\n");
-        if (elf_32bit(&elf) && parms.pae == PAEKERN_bimodal)
-            parms.pae = PAEKERN_extended_cr3;
-        if (elf_32bit(&elf) && parms.pae && machine == EM_386)
-        {
-            compat32 = 1;
-            compatible = 1;
-        }
-        if (elf_64bit(&elf) && machine == EM_X86_64)
-            compatible = 1;
-        break;
+    printk(" Xen  kernel: 64-bit, lsb, compat32\n");
+    if (elf_32bit(&elf) && parms.pae == PAEKERN_bimodal)
+        parms.pae = PAEKERN_extended_cr3;
+    if (elf_32bit(&elf) && parms.pae && machine == EM_386)
+    {
+        compat32 = 1;
+        compatible = 1;
     }
+    if (elf_64bit(&elf) && machine == EM_X86_64)
+        compatible = 1;
     printk(" Dom0 kernel: %s%s, %s, paddr 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
            elf_64bit(&elf) ? "64-bit" : "32-bit",
            parms.pae       ? ", PAE"  : "",

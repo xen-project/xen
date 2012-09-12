@@ -165,11 +165,9 @@ extern void shadow_audit_tables(struct vcpu *v);
 #include "multi.h"
 #undef GUEST_LEVELS
 
-#if CONFIG_PAGING_LEVELS == 4
 #define GUEST_LEVELS  4
 #include "multi.h"
 #undef GUEST_LEVELS
-#endif /* CONFIG_PAGING_LEVELS == 4 */
 
 /* Shadow type codes */
 #define SH_type_none           (0U) /* on the shadow free list */
@@ -214,7 +212,6 @@ static inline int sh_type_is_pinnable(struct vcpu *v, unsigned int t)
      * shadows so they don't just evaporate on every context switch.
      * For all other guests, we'd rather use the up-pointer field in l3s. */ 
     if ( unlikely((v->domain->arch.paging.shadow.opt_flags & SHOPT_LINUX_L3_TOPLEVEL) 
-                  && CONFIG_PAGING_LEVELS >= 4
                   && t == SH_type_l3_64_shadow) )
         return 1;
 #endif

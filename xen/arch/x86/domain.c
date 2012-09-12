@@ -588,9 +588,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     }
     else
     {
-        /* 32-bit PV guest by default only if Xen is not 64-bit. */
-        d->arch.is_32bit_pv = d->arch.has_32bit_shinfo =
-            (CONFIG_PAGING_LEVELS != 4);
+        /* 64-bit PV guest by default. */
+        d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
 
         spin_lock_init(&d->arch.pv_domain.e820_lock);
     }
@@ -2096,7 +2095,6 @@ int domain_relinquish_resources(struct domain *d)
         ret = relinquish_memory(d, &d->xenpage_list, ~0UL);
         if ( ret )
             return ret;
-#if CONFIG_PAGING_LEVELS >= 4
         d->arch.relmem = RELMEM_l4;
         /* fallthrough */
 
@@ -2104,8 +2102,6 @@ int domain_relinquish_resources(struct domain *d)
         ret = relinquish_memory(d, &d->page_list, PGT_l4_page_table);
         if ( ret )
             return ret;
-#endif
-#if CONFIG_PAGING_LEVELS >= 3
         d->arch.relmem = RELMEM_l3;
         /* fallthrough */
 
@@ -2113,7 +2109,6 @@ int domain_relinquish_resources(struct domain *d)
         ret = relinquish_memory(d, &d->page_list, PGT_l3_page_table);
         if ( ret )
             return ret;
-#endif
         d->arch.relmem = RELMEM_l2;
         /* fallthrough */
 

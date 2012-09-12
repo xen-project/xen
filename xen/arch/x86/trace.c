@@ -185,8 +185,7 @@ void __trace_ptwr_emulation(unsigned long addr, l1_pgentry_t npte)
         d.eip = eip;
         d.pte = npte;
 
-        event = ((CONFIG_PAGING_LEVELS == 3) ?
-                 TRC_PV_PTWR_EMULATION_PAE : TRC_PV_PTWR_EMULATION);
+        event = TRC_PV_PTWR_EMULATION;
         event |= TRC_64_FLAG;
         __trace_var(event, 1/*tsc*/, sizeof(d), &d);
     }

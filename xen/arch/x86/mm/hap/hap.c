@@ -280,26 +280,6 @@ static struct page_info *hap_alloc_p2m_page(struct domain *d)
     paging_lock_recursive(d);
     pg = hap_alloc(d);
 
-#if CONFIG_PAGING_LEVELS == 3
-    /* Under PAE mode, top-level P2M table should be allocated below 4GB space
-     * because the size of h_cr3 is only 32-bit. We use alloc_domheap_pages to
-     * force this requirement, and exchange the guaranteed 32-bit-clean
-     * page for the one we just hap_alloc()ed. */
-    if ( d->arch.paging.hap.p2m_pages == 0
-         && mfn_x(page_to_mfn(pg)) >= (1UL << (32 - PAGE_SHIFT)) )
-    {
-        free_domheap_page(pg);
-        pg = alloc_domheap_page(
-            NULL, MEMF_bits(32) | MEMF_node(domain_to_node(d)));
-        if ( likely(pg != NULL) )
-        {
-            void *p = __map_domain_page(pg);
-            clear_page(p);
-            hap_unmap_domain_page(p);
-        }
-    }
-#endif
-
     if ( likely(pg != NULL) )
     {
         d->arch.paging.hap.total_pages--;
@@ -403,7 +383,6 @@ hap_set_allocation(struct domain *d, unsigned int pages, int *preempted)
     return 0;
 }
 
-#if CONFIG_PAGING_LEVELS == 4
 static void hap_install_xen_entries_in_l4(struct vcpu *v, mfn_t l4mfn)
 {
     struct domain *d = v->domain;
@@ -433,103 +412,20 @@ static void hap_install_xen_entries_in_l4(struct vcpu *v, mfn_t l4mfn)
 
     hap_unmap_domain_page(l4e);
 }
-#endif /* CONFIG_PAGING_LEVELS == 4 */
-
-#if CONFIG_PAGING_LEVELS == 3
-static void hap_install_xen_entries_in_l2h(struct vcpu *v, mfn_t l2hmfn)
-{
-    struct domain *d = v->domain;
-    struct p2m_domain *hostp2m = p2m_get_hostp2m(d);
-    l2_pgentry_t *l2e;
-    l3_pgentry_t *p2m;
-    int i;
-
-    l2e = hap_map_domain_page(l2hmfn);
-    ASSERT(l2e != NULL);
-
-    /* Copy the common Xen mappings from the idle domain */
-    memcpy(&l2e[L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1)],
-           &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
-           L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
-
-    /* Install the per-domain mappings for this domain */
-    for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
-        l2e[l2_table_offset(PERDOMAIN_VIRT_START) + i] =
-            l2e_from_pfn(
-                mfn_x(page_to_mfn(perdomain_pt_page(d, i))),
-                __PAGE_HYPERVISOR);
-
-    /* No linear mapping; will be set up by monitor-table contructor. */
-    for ( i = 0; i < 4; i++ )
-        l2e[l2_table_offset(LINEAR_PT_VIRT_START) + i] =
-            l2e_empty();
-
-    /* Install the domain-specific p2m table */
-    ASSERT(pagetable_get_pfn(p2m_get_pagetable(hostp2m)) != 0);
-    p2m = hap_map_domain_page(pagetable_get_mfn(p2m_get_pagetable(hostp2m)));
-    for ( i = 0; i < MACHPHYS_MBYTES>>1; i++ )
-    {
-        l2e[l2_table_offset(RO_MPT_VIRT_START) + i] =
-            (l3e_get_flags(p2m[i]) & _PAGE_PRESENT)
-            ? l2e_from_pfn(mfn_x(_mfn(l3e_get_pfn(p2m[i]))),
-                           __PAGE_HYPERVISOR)
-            : l2e_empty();
-    }
-    hap_unmap_domain_page(p2m);
-    hap_unmap_domain_page(l2e);
-}
-#endif
 
 static mfn_t hap_make_monitor_table(struct vcpu *v)
 {
     struct domain *d = v->domain;
     struct page_info *pg;
+    mfn_t m4mfn;
 
     ASSERT(pagetable_get_pfn(v->arch.monitor_table) == 0);
 
-#if CONFIG_PAGING_LEVELS == 4
-    {
-        mfn_t m4mfn;
-        if ( (pg = hap_alloc(d)) == NULL )
-            goto oom;
-        m4mfn = page_to_mfn(pg);
-        hap_install_xen_entries_in_l4(v, m4mfn);
-        return m4mfn;
-    }
-#elif CONFIG_PAGING_LEVELS == 3
-    {
-        mfn_t m3mfn, m2mfn;
-        l3_pgentry_t *l3e;
-        l2_pgentry_t *l2e;
-        int i;
-
-        if ( (pg = hap_alloc(d)) == NULL )
-            goto oom;
-        m3mfn = page_to_mfn(pg);
-
-        /* Install a monitor l2 table in slot 3 of the l3 table.
-         * This is used for all Xen entries, including linear maps
-         */
-        if ( (pg = hap_alloc(d)) == NULL )
-            goto oom;
-        m2mfn = page_to_mfn(pg);
-        l3e = hap_map_domain_page(m3mfn);
-        l3e[3] = l3e_from_pfn(mfn_x(m2mfn), _PAGE_PRESENT);
-        hap_install_xen_entries_in_l2h(v, m2mfn);
-        /* Install the monitor's own linear map */
-        l2e = hap_map_domain_page(m2mfn);
-        for ( i = 0; i < L3_PAGETABLE_ENTRIES; i++ )
-            l2e[l2_table_offset(LINEAR_PT_VIRT_START) + i] =
-                (l3e_get_flags(l3e[i]) & _PAGE_PRESENT)
-                ? l2e_from_pfn(l3e_get_pfn(l3e[i]), __PAGE_HYPERVISOR)
-                : l2e_empty();
-        hap_unmap_domain_page(l2e);
-        hap_unmap_domain_page(l3e);
-
-        HAP_PRINTK("new monitor table: %#lx\n", mfn_x(m3mfn));
-        return m3mfn;
-    }
-#endif
+    if ( (pg = hap_alloc(d)) == NULL )
+        goto oom;
+    m4mfn = page_to_mfn(pg);
+    hap_install_xen_entries_in_l4(v, m4mfn);
+    return m4mfn;
 
  oom:
     HAP_ERROR("out of memory building monitor pagetable\n");
@@ -540,16 +436,6 @@ static mfn_t hap_make_monitor_table(struct vcpu *v)
 static void hap_destroy_monitor_table(struct vcpu* v, mfn_t mmfn)
 {
     struct domain *d = v->domain;
-
-#if CONFIG_PAGING_LEVELS == 3
-    /* Need to destroy the l2 monitor page in slot 4 too */
-    {
-        l3_pgentry_t *l3e = hap_map_domain_page(mmfn);
-        ASSERT(l3e_get_flags(l3e[3]) & _PAGE_PRESENT);
-        hap_free(d, _mfn(l3e_get_pfn(l3e[3])));
-        hap_unmap_domain_page(l3e);
-    }
-#endif
 
     /* Put the memory back in the pool */
     hap_free(d, mmfn);
@@ -814,47 +700,6 @@ static void hap_update_paging_modes(struct vcpu *v)
     put_gfn(d, cr3_gfn);
 }
 
-#if CONFIG_PAGING_LEVELS == 3
-static void p2m_install_entry_in_monitors(struct domain *d, l3_pgentry_t *l3e)
-/* Special case, only used for PAE hosts: update the mapping of the p2m
- * table.  This is trivial in other paging modes (one top-level entry
- * points to the top-level p2m, no maintenance needed), but PAE makes
- * life difficult by needing a copy of the p2m table in eight l2h slots
- * in the monitor table.  This function makes fresh copies when a p2m
- * l3e changes. */
-{
-    l2_pgentry_t *ml2e;
-    struct vcpu *v;
-    unsigned int index;
-
-    index = ((unsigned long)l3e & ~PAGE_MASK) / sizeof(l3_pgentry_t);
-    ASSERT(index < MACHPHYS_MBYTES>>1);
-
-    for_each_vcpu ( d, v )
-    {
-        if ( pagetable_get_pfn(v->arch.monitor_table) == 0 )
-            continue;
-
-        ASSERT(paging_mode_external(v->domain));
-
-        if ( v == current ) /* OK to use linear map of monitor_table */
-            ml2e = __linear_l2_table + l2_linear_offset(RO_MPT_VIRT_START);
-        else {
-            l3_pgentry_t *ml3e;
-            ml3e = hap_map_domain_page(
-                pagetable_get_mfn(v->arch.monitor_table));
-            ASSERT(l3e_get_flags(ml3e[3]) & _PAGE_PRESENT);
-            ml2e = hap_map_domain_page(_mfn(l3e_get_pfn(ml3e[3])));
-            ml2e += l2_table_offset(RO_MPT_VIRT_START);
-            hap_unmap_domain_page(ml3e);
-        }
-        ml2e[index] = l2e_from_pfn(l3e_get_pfn(*l3e), __PAGE_HYPERVISOR);
-        if ( v != current )
-            hap_unmap_domain_page(ml2e);
-    }
-}
-#endif
-
 static void
 hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
                     mfn_t table_mfn, l1_pgentry_t new, unsigned int level)
@@ -885,14 +730,6 @@ hap_write_p2m_entry(struct vcpu *v, unsigned long gfn, l1_pgentry_t *p,
     if ( (old_flags & _PAGE_PRESENT)
          && (level == 1 || (level == 2 && (old_flags & _PAGE_PSE))) )
              flush_tlb_mask(d->domain_dirty_cpumask);
-
-#if CONFIG_PAGING_LEVELS == 3
-    /* install P2M in monitor table for PAE Xen */
-    if ( level == 3 )
-        /* We have written to the p2m l3: need to sync the per-vcpu
-         * copies of it in the monitor tables */
-        p2m_install_entry_in_monitors(d, (l3_pgentry_t *)p);
-#endif
 
     paging_unlock(d);
 

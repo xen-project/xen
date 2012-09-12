@@ -277,8 +277,7 @@ void __init arch_init_memory(void)
     if ( cpu_has_nx )
         base_disallow_mask &= ~_PAGE_NX_BIT;
     /* On x86/64, range [62:52] is available for guest software use. */
-    if ( CONFIG_PAGING_LEVELS == 4 )
-        base_disallow_mask &= ~get_pte_flags((intpte_t)0x7ff << 52);
+    base_disallow_mask &= ~get_pte_flags((intpte_t)0x7ff << 52);
 
     /*
      * Initialise our DOMID_XEN domain.
@@ -475,11 +474,9 @@ void update_cr3(struct vcpu *v)
         return;
     }
 
-#if CONFIG_PAGING_LEVELS == 4
     if ( !(v->arch.flags & TF_kernel_mode) )
         cr3_mfn = pagetable_get_pfn(v->arch.guest_table_user);
     else
-#endif
         cr3_mfn = pagetable_get_pfn(v->arch.guest_table);
 
     make_cr3(v, cr3_mfn);
@@ -925,7 +922,6 @@ get_page_from_l3e(
     return rc;
 }
 
-#if CONFIG_PAGING_LEVELS >= 4
 define_get_linear_pagetable(l4);
 static int
 get_page_from_l4e(
@@ -949,7 +945,6 @@ get_page_from_l4e(
 
     return rc;
 }
-#endif /* 4 level */
 
 #ifdef USER_MAPPINGS_ARE_GLOBAL
 #define adjust_guest_l1e(pl1e, d)                                            \
@@ -1107,7 +1102,6 @@ static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
     return put_page_and_type_preemptible(l3e_get_page(l3e), preemptible);
 }
 
-#if CONFIG_PAGING_LEVELS >= 4
 static int put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn,
                              int partial, int preemptible)
 {
@@ -1120,7 +1114,6 @@ static int put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn,
     }
     return 1;
 }
-#endif
 
 static int alloc_l1_table(struct page_info *page)
 {
@@ -1259,21 +1252,6 @@ static int alloc_l3_table(struct page_info *page, int preemptible)
     unsigned int   i;
     int            rc = 0, partial = page->partial_pte;
 
-#if CONFIG_PAGING_LEVELS == 3
-    /*
-     * PAE pgdirs above 4GB are unacceptable if the guest does not understand
-     * the weird 'extended cr3' format for dealing with high-order address
-     * bits. We cut some slack for control tools (before vcpu0 is initialised).
-     */
-    if ( (pfn >= 0x100000) &&
-         unlikely(!VM_ASSIST(d, VMASST_TYPE_pae_extended_cr3)) &&
-         d->vcpu && d->vcpu[0] && d->vcpu[0]->is_initialised )
-    {
-        MEM_LOG("PAE pgd must be below 4GB (0x%lx >= 0x100000)", pfn);
-        return -EINVAL;
-    }
-#endif
-
     pl3e = map_domain_page(pfn);
 
     /*
@@ -1340,7 +1318,6 @@ static int alloc_l3_table(struct page_info *page, int preemptible)
     return rc > 0 ? 0 : rc;
 }
 
-#if CONFIG_PAGING_LEVELS >= 4
 static int alloc_l4_table(struct page_info *page, int preemptible)
 {
     struct domain *d = page_get_owner(page);
@@ -1396,10 +1373,6 @@ static int alloc_l4_table(struct page_info *page, int preemptible)
 
     return rc > 0 ? 0 : rc;
 }
-#else
-#define alloc_l4_table(page, preemptible) (-EINVAL)
-#endif
-
 
 static void free_l1_table(struct page_info *page)
 {
@@ -1486,7 +1459,6 @@ static int free_l3_table(struct page_info *page, int preemptible)
     return rc > 0 ? 0 : rc;
 }
 
-#if CONFIG_PAGING_LEVELS >= 4
 static int free_l4_table(struct page_info *page, int preemptible)
 {
     struct domain *d = page_get_owner(page);
@@ -1516,9 +1488,6 @@ static int free_l4_table(struct page_info *page, int preemptible)
     }
     return rc > 0 ? 0 : rc;
 }
-#else
-#define free_l4_table(page, preemptible) (-EINVAL)
-#endif
 
 int page_lock(struct page_info *page)
 {
@@ -1823,8 +1792,6 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     return rc;
 }
 
-#if CONFIG_PAGING_LEVELS >= 4
-
 /* Update the L4 entry at pl4e to new value nl4e. pl4e is within frame pfn. */
 static int mod_l4_entry(l4_pgentry_t *pl4e, 
                         l4_pgentry_t nl4e, 
@@ -1885,8 +1852,6 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
     put_page_from_l4e(ol4e, pfn, 0, 0);
     return rc;
 }
-
-#endif
 
 static int cleanup_page_cacheattr(struct page_info *page)
 {
@@ -2089,10 +2054,6 @@ int free_page_type(struct page_info *page, unsigned long type,
         rc = free_l2_table(page, preemptible);
         break;
     case PGT_l3_page_table:
-#if CONFIG_PAGING_LEVELS == 3
-        if ( !(type & PGT_partial) )
-            page->nr_validated_ptes = L3_PAGETABLE_ENTRIES;
-#endif
         rc = free_l3_table(page, preemptible);
         break;
     case PGT_l4_page_table:
@@ -3348,12 +3309,10 @@ long do_mmu_update(
                     rc = mod_l3_entry(va, l3e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, 1, v);
                     break;
-#if CONFIG_PAGING_LEVELS >= 4
                 case PGT_l4_page_table:
                     rc = mod_l4_entry(va, l4e_from_intpte(req.val), mfn,
                                       cmd == MMU_PT_UPDATE_PRESERVE_AD, 1, v);
                 break;
-#endif
                 case PGT_writable_page:
                     perfc_incr(writable_mmu_updates);
                     if ( paging_write_guest_entry(v, va, req.val, _mfn(mfn)) )

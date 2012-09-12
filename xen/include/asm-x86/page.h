@@ -126,13 +126,11 @@ static inline l3_pgentry_t l3e_from_paddr(paddr_t pa, unsigned int flags)
     ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
     return (l3_pgentry_t) { pa | put_pte_flags(flags) };
 }
-#if CONFIG_PAGING_LEVELS >= 4
 static inline l4_pgentry_t l4e_from_paddr(paddr_t pa, unsigned int flags)
 {
     ASSERT((pa & ~(PADDR_MASK & PAGE_MASK)) == 0);
     return (l4_pgentry_t) { pa | put_pte_flags(flags) };
 }
-#endif
 #endif /* !__ASSEMBLY__ */
 
 /* Construct a pte from its direct integer representation. */
@@ -191,13 +189,7 @@ static inline l4_pgentry_t l4e_from_paddr(paddr_t pa, unsigned int flags)
 #ifndef __ASSEMBLY__
 
 /* Page-table type. */
-#if CONFIG_PAGING_LEVELS == 3
-/* x86_32 PAE */
-typedef struct { u32 pfn; } pagetable_t;
-#elif CONFIG_PAGING_LEVELS == 4
-/* x86_64 */
 typedef struct { u64 pfn; } pagetable_t;
-#endif
 #define pagetable_get_paddr(x)  ((paddr_t)(x).pfn << PAGE_SHIFT)
 #define pagetable_get_page(x)   mfn_to_page((x).pfn)
 #define pagetable_get_pfn(x)    ((x).pfn)
@@ -293,16 +285,11 @@ void copy_page_sse2(void *, const void *);
 
 #ifndef __ASSEMBLY__
 extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
-#if CONFIG_PAGING_LEVELS == 3
-extern l2_pgentry_t   idle_pg_table_l2[
-    ROOT_PAGETABLE_ENTRIES * L2_PAGETABLE_ENTRIES];
-#elif CONFIG_PAGING_LEVELS == 4
 extern l2_pgentry_t  *compat_idle_pg_table_l2;
 extern unsigned int   m2p_compat_vstart;
 extern l2_pgentry_t l2_xenmap[L2_PAGETABLE_ENTRIES],
     l2_bootmap[L2_PAGETABLE_ENTRIES];
 extern l3_pgentry_t l3_bootmap[L3_PAGETABLE_ENTRIES];
-#endif
 extern l2_pgentry_t l2_identmap[4*L2_PAGETABLE_ENTRIES];
 extern l1_pgentry_t l1_identmap[L1_PAGETABLE_ENTRIES],
     l1_fixmap[L1_PAGETABLE_ENTRIES];

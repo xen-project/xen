@@ -1120,10 +1120,6 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     if ( !paging_mode_translate(d) )
         return -EINVAL;
 
-    rc = p2m_gfn_check_limit(d, gfn, order);
-    if ( rc != 0 )
-        return rc;
-
     gfn_lock(p2m, gfn, order);
 
     P2M_DEBUG("mark pod gfn=%#lx\n", gfn);
