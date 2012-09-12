@@ -809,7 +809,26 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     else
         section.s = get_value(&cfg, "global", "default");
 
-    name.s = get_value(&cfg, section.s, "kernel");
+    for ( ; ; )
+    {
+        name.s = get_value(&cfg, section.s, "kernel");
+        if ( name.s )
+            break;
+        name.s = get_value(&cfg, "global", "chain");
+        if ( !name.s )
+            break;
+        efi_bs->FreePages(cfg.addr, PFN_UP(cfg.size));
+        cfg.addr = 0;
+        if ( !read_file(dir_handle, s2w(&name), &cfg) )
+        {
+            PrintStr(L"Chained configuration file '");
+            PrintStr(name.w);
+            efi_bs->FreePool(name.w);
+            blexit(L"'not found\r\n");
+        }
+        pre_parse(&cfg);
+        efi_bs->FreePool(name.w);
+    }
     if ( !name.s )
         blexit(L"No Dom0 kernel image specified\r\n");
     split_value(name.s);

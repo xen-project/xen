@@ -75,6 +75,13 @@ Specifies an XSM module to load.
 
 Specifies a CPU microcode blob to load.
 
+###`chain=<filename>`
+
+Specifies an alternate configuration file to use in case the specified section
+(and in particular its `kernel=` setting) can't be found in the default (or
+specified) configuration file. This is only meaningful in the [global] section
+and really not meant to be used together with the `-cfg=` command line option.
+
 Filenames must be specified relative to the location of the EFI binary.
 
 Extra options to be passed to Xen can also be specified on the command line,
