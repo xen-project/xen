@@ -108,10 +108,10 @@ ENTRY(compat_test_all_events)
         jnz   compat_process_nmi
 compat_test_guest_events:
         movq  VCPU_vcpu_info(%rbx),%rax
-        testb $0xFF,COMPAT_VCPUINFO_upcall_mask(%rax)
-        jnz   compat_restore_all_guest
-        testb $0xFF,COMPAT_VCPUINFO_upcall_pending(%rax)
-        jz    compat_restore_all_guest
+        movzwl COMPAT_VCPUINFO_upcall_pending(%rax),%eax
+        decl  %eax
+        cmpl  $0xfe,%eax
+        ja    compat_restore_all_guest
 /*compat_process_guest_events:*/
         sti
         leaq  VCPU_trap_bounce(%rbx),%rdx

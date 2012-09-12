@@ -199,8 +199,8 @@ test_all_events:
         movl  VCPU_processor(%rbx),%eax
         shl   $IRQSTAT_shift,%rax
         leaq  irq_stat(%rip),%rcx
-        testl $~0,(%rcx,%rax,1)
-        jnz   process_softirqs
+        cmpl  $0,(%rcx,%rax,1)
+        jne   process_softirqs
         testb $1,VCPU_mce_pending(%rbx)
         jnz   process_mce
 .Ltest_guest_nmi:
@@ -208,10 +208,10 @@ test_all_events:
         jnz   process_nmi
 test_guest_events:
         movq  VCPU_vcpu_info(%rbx),%rax
-        testb $0xFF,VCPUINFO_upcall_mask(%rax)
-        jnz   restore_all_guest
-        testb $0xFF,VCPUINFO_upcall_pending(%rax)
-        jz    restore_all_guest
+        movzwl VCPUINFO_upcall_pending(%rax),%eax
+        decl  %eax
+        cmpl  $0xfe,%eax
+        ja    restore_all_guest
 /*process_guest_events:*/
         sti
         leaq  VCPU_trap_bounce(%rbx),%rdx

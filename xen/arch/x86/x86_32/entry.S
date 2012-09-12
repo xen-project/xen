@@ -219,10 +219,10 @@ test_all_events:
         jnz  process_nmi
 test_guest_events:
         movl VCPU_vcpu_info(%ebx),%eax
-        testb $0xFF,VCPUINFO_upcall_mask(%eax)
-        jnz  restore_all_guest
-        testb $0xFF,VCPUINFO_upcall_pending(%eax)
-        jz   restore_all_guest
+        movzwl VCPUINFO_upcall_pending(%eax),%eax
+        decl %eax
+        cmpl $0xfe,%eax
+        ja   restore_all_guest
 /*process_guest_events:*/
         sti
         leal VCPU_trap_bounce(%ebx),%edx
