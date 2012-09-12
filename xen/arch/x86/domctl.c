@@ -156,7 +156,6 @@ long arch_do_domctl(
     break;
 
     case XEN_DOMCTL_getpageframeinfo3:
-#ifdef __x86_64__
         if (!has_32bit_shinfo(current->domain))
         {
             unsigned int n, j;
@@ -258,7 +257,6 @@ long arch_do_domctl(
             rcu_unlock_domain(d);
             break;
         }
-#endif
         /* fall thru */
     case XEN_DOMCTL_getpageframeinfo2:
     {
@@ -1004,7 +1002,6 @@ long arch_do_domctl(
         if ( domctl->cmd == XEN_DOMCTL_get_ext_vcpucontext )
         {
             evc->size = sizeof(*evc);
-#ifdef __x86_64__
             if ( !is_hvm_domain(d) )
             {
                 evc->sysenter_callback_cs      =
@@ -1021,7 +1018,6 @@ long arch_do_domctl(
                     v->arch.pv_vcpu.syscall32_disables_events;
             }
             else
-#endif
             {
                 evc->sysenter_callback_cs      = 0;
                 evc->sysenter_callback_eip     = 0;
@@ -1037,7 +1033,6 @@ long arch_do_domctl(
             ret = -EINVAL;
             if ( evc->size < offsetof(typeof(*evc), mcg_cap) )
                 goto ext_vcpucontext_out;
-#ifdef __x86_64__
             if ( !is_hvm_domain(d) )
             {
                 if ( !is_canonical_address(evc->sysenter_callback_eip) ||
@@ -1059,7 +1054,6 @@ long arch_do_domctl(
                     evc->syscall32_disables_events;
             }
             else
-#endif
             /* We do not support syscall/syscall32/sysenter on 32-bit Xen. */
             if ( (evc->sysenter_callback_cs & ~3) ||
                  evc->sysenter_callback_eip ||
@@ -1443,7 +1437,6 @@ long arch_do_domctl(
     }
     break;
 
-#ifdef __x86_64__
     case XEN_DOMCTL_mem_event_op:
     {
         struct domain *d;
@@ -1477,7 +1470,6 @@ long arch_do_domctl(
         } 
     }
     break;
-#endif /* __x86_64__ */
 
 #if P2M_AUDIT
     case XEN_DOMCTL_audit_p2m:
@@ -1594,12 +1586,9 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         c.nat->user_regs.es = sreg.sel;
         hvm_get_segment_register(v, x86_seg_fs, &sreg);
         c.nat->user_regs.fs = sreg.sel;
-#ifdef __x86_64__
         c.nat->fs_base = sreg.base;
-#endif
         hvm_get_segment_register(v, x86_seg_gs, &sreg);
         c.nat->user_regs.gs = sreg.sel;
-#ifdef __x86_64__
         if ( ring_0(&c.nat->user_regs) )
         {
             c.nat->gs_base_kernel = sreg.base;
@@ -1610,7 +1599,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
             c.nat->gs_base_user = sreg.base;
             c.nat->gs_base_kernel = hvm_get_shadow_gs_base(v);
         }
-#endif
     }
     else
     {
@@ -1631,7 +1619,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
             c(ctrlreg[i] = v->arch.pv_vcpu.ctrlreg[i]);
         c(event_callback_eip = v->arch.pv_vcpu.event_callback_eip);
         c(failsafe_callback_eip = v->arch.pv_vcpu.failsafe_callback_eip);
-#ifdef CONFIG_X86_64
         if ( !compat )
         {
             c.nat->syscall_callback_eip = v->arch.pv_vcpu.syscall_callback_eip;
@@ -1640,7 +1627,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
             c.nat->gs_base_user = v->arch.pv_vcpu.gs_base_user;
         }
         else
-#endif
         {
             c(event_callback_cs = v->arch.pv_vcpu.event_callback_cs);
             c(failsafe_callback_cs = v->arch.pv_vcpu.failsafe_callback_cs);
@@ -1655,11 +1641,9 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         {
             c.nat->ctrlreg[3] = xen_pfn_to_cr3(
                 pagetable_get_pfn(v->arch.guest_table));
-#ifdef __x86_64__
             c.nat->ctrlreg[1] =
                 pagetable_is_null(v->arch.guest_table_user) ? 0
                 : xen_pfn_to_cr3(pagetable_get_pfn(v->arch.guest_table_user));
-#endif
 
             /* Merge shadow DR7 bits into real DR7. */
             c.nat->debugreg[7] |= c.nat->debugreg[5];

@@ -12,11 +12,7 @@
 void ret_from_intr(void);
 #endif
 
-#ifdef __x86_64__
 #include <asm/x86_64/asm_defns.h>
-#else
-#include <asm/x86_32/asm_defns.h>
-#endif
 
 /* Exception table entry */
 #ifdef __ASSEMBLY__

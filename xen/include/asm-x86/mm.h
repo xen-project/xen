@@ -228,7 +228,6 @@ struct page_info
 #define PGC_count_width   PG_shift(9)
 #define PGC_count_mask    ((1UL<<PGC_count_width)-1)
 
-#ifdef __x86_64__
 struct spage_info
 {
        unsigned long type_info;
@@ -243,29 +242,15 @@ struct spage_info
  /* Count of uses of this superpage as its current type. */
 #define SGT_count_width   PG_shift(3)
 #define SGT_count_mask    ((1UL<<SGT_count_width)-1)
-#endif
 
-#if defined(__i386__)
-#define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
-#define is_xen_heap_mfn(mfn) ({                         \
-    unsigned long _mfn = (mfn);                         \
-    (_mfn < paddr_to_pfn(xenheap_phys_end));            \
-})
-#define is_xen_fixed_mfn(mfn) is_xen_heap_mfn(mfn)
-#else
 #define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
 #define is_xen_heap_mfn(mfn) \
     (__mfn_valid(mfn) && is_xen_heap_page(__mfn_to_page(mfn)))
 #define is_xen_fixed_mfn(mfn)                     \
     ((((mfn) << PAGE_SHIFT) >= __pa(&_start)) &&  \
      (((mfn) << PAGE_SHIFT) <= __pa(&_end)))
-#endif
 
-#if defined(__i386__)
-#define PRtype_info "08lx" /* should only be used for printk's */
-#elif defined(__x86_64__)
 #define PRtype_info "016lx"/* should only be used for printk's */
-#endif
 
 /* The number of out-of-sync shadows we allow per vcpu (prime, please) */
 #define SHADOW_OOS_PAGES 3
@@ -290,10 +275,8 @@ extern void share_xen_page_with_privileged_guests(
     struct page_info *page, int readonly);
 
 #define frame_table ((struct page_info *)FRAMETABLE_VIRT_START)
-#ifdef __x86_64__
 #define spage_table ((struct spage_info *)SPAGETABLE_VIRT_START)
 int get_superpage(unsigned long mfn, struct domain *d);
-#endif
 extern unsigned long max_page;
 extern unsigned long total_pages;
 void init_frametable(void);
@@ -307,16 +290,12 @@ static inline struct page_info *__virt_to_page(const void *v)
 {
     unsigned long va = (unsigned long)v;
 
-#ifdef __x86_64__
     ASSERT(va >= XEN_VIRT_START);
     ASSERT(va < DIRECTMAP_VIRT_END);
     if ( va < XEN_VIRT_END )
         va += DIRECTMAP_VIRT_START - XEN_VIRT_START + xen_phys_start;
     else
         ASSERT(va >= DIRECTMAP_VIRT_START);
-#else
-    ASSERT(va - DIRECTMAP_VIRT_START < DIRECTMAP_VIRT_END);
-#endif
     return frame_table + ((va - DIRECTMAP_VIRT_START) >> PAGE_SHIFT);
 }
 
@@ -566,22 +545,8 @@ int  mmio_ro_do_page_fault(struct vcpu *, unsigned long,
 
 int audit_adjust_pgtables(struct domain *d, int dir, int noisy);
 
-#ifdef CONFIG_X86_64
 extern int pagefault_by_memadd(unsigned long addr, struct cpu_user_regs *regs);
 extern int handle_memadd_fault(unsigned long addr, struct cpu_user_regs *regs);
-#else
-static inline int pagefault_by_memadd(unsigned long addr,
-                                      struct cpu_user_regs *regs)
-{
-    return 0;
-}
-
-static inline int handle_memadd_fault(unsigned long addr,
-                                      struct cpu_user_regs *regs)
-{
-    return 0;
-}
-#endif
 
 #ifndef NDEBUG
 
@@ -622,14 +587,7 @@ int donate_page(
 
 int map_ldt_shadow_page(unsigned int);
 
-#ifdef CONFIG_X86_64
 extern int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm);
-#else
-static inline int memory_add(uint64_t spfn, uint64_t epfn, uint32_t pxm)
-{
-    return -ENOSYS;
-}
-#endif
 
 #ifdef CONFIG_COMPAT
 void domain_set_alloc_bitsize(struct domain *d);
@@ -641,11 +599,7 @@ unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits);
 
 unsigned long domain_get_maximum_gpfn(struct domain *d);
 
-#ifdef CONFIG_X86_64
 void mem_event_cleanup(struct domain *d);
-#else
-static inline void mem_event_cleanup(struct domain *d) {}
-#endif
 
 extern struct domain *dom_xen, *dom_io, *dom_cow;	/* for vmcoreinfo */
 

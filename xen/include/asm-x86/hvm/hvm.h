@@ -250,12 +250,8 @@ int hvm_girq_dest_2_vcpu_id(struct domain *d, uint8_t dest, uint8_t dest_mode);
 #define hvm_pse1gb_supported(d) \
     (cpu_has_page1gb && paging_mode_hap(d))
 
-#ifdef __x86_64__
 #define hvm_long_mode_enabled(v) \
     ((v)->arch.hvm_vcpu.guest_efer & EFER_LMA)
-#else
-#define hvm_long_mode_enabled(v) ((void)(v),0)
-#endif
 
 enum hvm_intblk
 hvm_interrupt_blocked(struct vcpu *v, struct hvm_intack intack);
@@ -449,7 +445,6 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
 int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content);
 int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content);
 
-#ifdef __x86_64__
 /* Called for current VCPU on crX changes by guest */
 void hvm_memory_event_cr0(unsigned long value, unsigned long old);
 void hvm_memory_event_cr3(unsigned long value, unsigned long old);
@@ -459,19 +454,6 @@ int hvm_memory_event_int3(unsigned long gla);
 
 /* Called for current VCPU on single step: returns -1 if no listener */
 int hvm_memory_event_single_step(unsigned long gla);
-
-#else
-static inline void hvm_memory_event_cr0(unsigned long value, unsigned long old)
-{ }
-static inline void hvm_memory_event_cr3(unsigned long value, unsigned long old)
-{ }
-static inline void hvm_memory_event_cr4(unsigned long value, unsigned long old)
-{ }
-static inline int hvm_memory_event_int3(unsigned long gla)
-{ return 0; }
-static inline int hvm_memory_event_single_step(unsigned long gla)
-{ return 0; }
-#endif
 
 /*
  * Nested HVM

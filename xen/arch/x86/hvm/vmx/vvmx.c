@@ -234,7 +234,6 @@ static unsigned long reg_read(struct cpu_user_regs *regs,
     CASE_GET_REG(RSI, esi);
     CASE_GET_REG(RDI, edi);
     CASE_GET_REG(RSP, esp);
-#ifdef CONFIG_X86_64
     CASE_GET_REG(R8, r8);
     CASE_GET_REG(R9, r9);
     CASE_GET_REG(R10, r10);
@@ -243,7 +242,6 @@ static unsigned long reg_read(struct cpu_user_regs *regs,
     CASE_GET_REG(R13, r13);
     CASE_GET_REG(R14, r14);
     CASE_GET_REG(R15, r15);
-#endif
     default:
         break;
     }
@@ -264,7 +262,6 @@ static void reg_write(struct cpu_user_regs *regs,
     CASE_SET_REG(RSI, esi);
     CASE_SET_REG(RDI, edi);
     CASE_SET_REG(RSP, esp);
-#ifdef CONFIG_X86_64
     CASE_SET_REG(R8, r8);
     CASE_SET_REG(R9, r9);
     CASE_SET_REG(R10, r10);
@@ -273,7 +270,6 @@ static void reg_write(struct cpu_user_regs *regs,
     CASE_SET_REG(R13, r13);
     CASE_SET_REG(R14, r14);
     CASE_SET_REG(R15, r15);
-#endif
     default:
         break;
     }
@@ -646,10 +642,6 @@ static unsigned long vmcs_gstate_field[] = {
     /* 64 BITS */
     VMCS_LINK_POINTER,
     GUEST_IA32_DEBUGCTL,
-#ifndef CONFIG_X86_64
-    VMCS_LINK_POINTER_HIGH,
-    GUEST_IA32_DEBUGCTL_HIGH,
-#endif
     /* 32 BITS */
     GUEST_ES_LIMIT,
     GUEST_CS_LIMIT,
@@ -799,9 +791,7 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     void *vvmcs = nvcpu->nv_vvmcx;
-#ifdef __x86_64__
     unsigned long lm_l1, lm_l2;
-#endif
 
     vmx_vmcs_switch(v->arch.hvm_vmx.vmcs, nvcpu->nv_n2vmcx);
 
@@ -809,7 +799,6 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     nvcpu->nv_vmentry_pending = 0;
     nvcpu->nv_vmswitch_in_progress = 1;
 
-#ifdef __x86_64__
     /*
      * EFER handling:
      * hvm_set_efer won't work if CR0.PG = 1, so we change the value
@@ -827,15 +816,12 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
         v->arch.hvm_vcpu.guest_efer |= EFER_LMA | EFER_LME;
     else
         v->arch.hvm_vcpu.guest_efer &= ~(EFER_LMA | EFER_LME);
-#endif
 
     load_shadow_control(v);
     load_shadow_guest_state(v);
 
-#ifdef __x86_64__
     if ( lm_l1 != lm_l2 )
         paging_update_paging_modes(v);
-#endif
 
     regs->eip = __get_vvmcs(vvmcs, GUEST_RIP);
     regs->esp = __get_vvmcs(vvmcs, GUEST_RSP);
@@ -954,9 +940,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-#ifdef __x86_64__
     unsigned long lm_l1, lm_l2;
-#endif
 
     sync_vvmcs_ro(v);
     sync_vvmcs_guest_state(v, regs);
@@ -967,7 +951,6 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     nestedhvm_vcpu_exit_guestmode(v);
     nvcpu->nv_vmexit_pending = 0;
 
-#ifdef __x86_64__
     lm_l2 = !!hvm_long_mode_enabled(v);
     lm_l1 = !!(__get_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_CONTROLS) &
                            VM_EXIT_IA32E_MODE);
@@ -976,17 +959,14 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
         v->arch.hvm_vcpu.guest_efer |= EFER_LMA | EFER_LME;
     else
         v->arch.hvm_vcpu.guest_efer &= ~(EFER_LMA | EFER_LME);
-#endif
 
     vmx_update_cpu_exec_control(v);
     vmx_update_exception_bitmap(v);
 
     load_vvmcs_host_state(v);
 
-#ifdef __x86_64__
     if ( lm_l1 != lm_l2 )
         paging_update_paging_modes(v);
-#endif
 
     regs->eip = __get_vvmcs(nvcpu->nv_vvmcx, HOST_RIP);
     regs->esp = __get_vvmcs(nvcpu->nv_vvmcx, HOST_RSP);
@@ -1341,9 +1321,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         /* bit 0-8, 10,11,13,14,16,17 must be 1 (refer G4 of SDM) */
         tmp = 0x36dff;
         data = VM_EXIT_ACK_INTR_ON_EXIT;
-#ifdef __x86_64__
         data |= VM_EXIT_IA32E_MODE;
-#endif
 	/* 0-settings */
         data = ((data | tmp) << 32) | tmp;
         break;

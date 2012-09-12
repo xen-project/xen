@@ -19,9 +19,8 @@ struct cpu_info {
     unsigned int processor_id;
     struct vcpu *current_vcpu;
     unsigned long per_cpu_offset;
-#ifdef __x86_64__ /* get_stack_bottom() must be 16-byte aligned */
+    /* get_stack_bottom() must be 16-byte aligned */
     unsigned long __pad_for_stack_bottom;
-#endif
 };
 
 static inline struct cpu_info *get_cpu_info(void)

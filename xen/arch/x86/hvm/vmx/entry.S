@@ -38,28 +38,15 @@
 
 #define get_current(reg) GET_CURRENT(r(reg))
 
-#if defined(__x86_64__)
 #define r(reg) %r##reg
 #define addr_of(lbl) lbl(%rip)
 #define call_with_regs(fn)                      \
         mov  %rsp,%rdi;                         \
         call fn;
-#else /* defined(__i386__) */
-#define r(reg) %e##reg
-#define addr_of(lbl) lbl
-#define UREGS_rip UREGS_eip
-#define UREGS_rsp UREGS_esp
-#define call_with_regs(fn)                      \
-        mov  %esp,%eax;                         \
-        push %eax;                              \
-        call fn;                                \
-        add  $4,%esp;
-#endif
 
         ALIGN
 .globl vmx_asm_vmexit_handler
 vmx_asm_vmexit_handler:
-#if defined(__x86_64__)
         push %rdi
         push %rsi
         push %rdx
@@ -75,15 +62,6 @@ vmx_asm_vmexit_handler:
         push %r13
         push %r14
         push %r15
-#else /* defined(__i386__) */
-        push %eax
-        push %ebp
-        push %edi
-        push %esi
-        push %edx
-        push %ecx
-        push %ebx
-#endif
 
         get_current(bx)
 
@@ -153,7 +131,6 @@ UNLIKELY_END(realmode)
         VMWRITE(UREGS_eflags)
 
         cmpb $0,VCPU_vmx_launched(r(bx))
-#if defined(__x86_64__)
         pop  %r15
         pop  %r14
         pop  %r13
@@ -169,15 +146,6 @@ UNLIKELY_END(realmode)
         pop  %rdx
         pop  %rsi
         pop  %rdi
-#else /* defined(__i386__) */
-        pop  %ebx
-        pop  %ecx
-        pop  %edx
-        pop  %esi
-        pop  %edi
-        pop  %ebp
-        pop  %eax
-#endif
         je   .Lvmx_launch
 
 /*.Lvmx_resume:*/

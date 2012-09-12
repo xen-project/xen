@@ -161,8 +161,6 @@ wakeup_32:
         jmp     1f
 1:
 
-#if defined(__x86_64__)
-
         /* Now in compatibility mode. Long-jump to 64-bit mode */
         ljmp    $BOOT_CS64, $bootsym_rel(wakeup_64,6)
 
@@ -174,16 +172,6 @@ wakeup_64:
 
 ret_point:
         .quad   __ret_point
-
-#else /* !defined(__x86_64__) */
-
-        lgdt    gdt_descr
-        mov     $(__HYPERVISOR_DS), %eax
-        mov     %eax, %ds
-
-        ljmp    $(__HYPERVISOR_CS), $__ret_point
-
-#endif
 
 bogus_saved_magic:
         movw    $0x0e00 + 'S', 0xb8014

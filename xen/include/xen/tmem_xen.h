@@ -136,14 +136,10 @@ static inline void *_tmh_alloc_subpage_thispool(struct xmem_pool *cmem_mempool,
     if ( d->tot_pages >= d->max_pages )
         return NULL;
 #endif
-#ifdef __i386__
-    return _xmalloc(size,align);
-#else
     ASSERT( size < tmh_mempool_maxalloc );
     if ( cmem_mempool == NULL )
         return NULL;
     return xmem_pool_alloc(size, cmem_mempool);
-#endif
 }
 #define tmh_alloc_subpage_thispool(_pool, _s, _a) \
             _tmh_alloc_subpage_thispool(pool->client->tmh->persistent_pool, \
@@ -152,13 +148,9 @@ static inline void *_tmh_alloc_subpage_thispool(struct xmem_pool *cmem_mempool,
 static inline void _tmh_free_subpage_thispool(struct xmem_pool *cmem_mempool,
                                                void *ptr, size_t size)
 {
-#ifdef __i386__
-    xfree(ptr);
-#else
     ASSERT( size < tmh_mempool_maxalloc );
     ASSERT( cmem_mempool != NULL );
     xmem_pool_free(ptr,cmem_mempool);
-#endif
 }
 #define tmh_free_subpage_thispool(_pool, _p, _s) \
  _tmh_free_subpage_thispool(_pool->client->tmh->persistent_pool, _p, _s)
@@ -217,25 +209,15 @@ static inline void _tmh_free_page_thispool(struct page_info *pi)
 static inline void *tmh_alloc_subpage(void *pool, size_t size,
                                                  size_t align)
 {
-#ifdef __i386__
-    ASSERT( size < PAGE_SIZE );
-    return _xmalloc(size, align);
-#else
     ASSERT( size < tmh_mempool_maxalloc );
     ASSERT( tmh_mempool != NULL );
     return xmem_pool_alloc(size, tmh_mempool);
-#endif
 }
 
 static inline void tmh_free_subpage(void *ptr, size_t size)
 {
-#ifdef __i386__
-    ASSERT( size < PAGE_SIZE );
-    xfree(ptr);
-#else
     ASSERT( size < tmh_mempool_maxalloc );
     xmem_pool_free(ptr,tmh_mempool);
-#endif
 }
 
 static inline struct page_info *tmh_alloc_page(void *pool, int no_heap)

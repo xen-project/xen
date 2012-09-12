@@ -15,18 +15,15 @@
 #include <asm/i387.h>
 #include <xen/hypercall.h>
 
-#if defined(CONFIG_X86_64)
 static unsigned long saved_lstar, saved_cstar;
 static unsigned long saved_sysenter_esp, saved_sysenter_eip;
 static unsigned long saved_fs_base, saved_gs_base, saved_kernel_gs_base;
 static uint16_t saved_segs[4];
-#endif
 
 void save_rest_processor_state(void)
 {
     vcpu_save_fpu(current);
 
-#if defined(CONFIG_X86_64)
     asm volatile (
         "movw %%ds,(%0); movw %%es,2(%0); movw %%fs,4(%0); movw %%gs,6(%0)"
         : : "r" (saved_segs) : "memory" );
@@ -40,7 +37,6 @@ void save_rest_processor_state(void)
         rdmsrl(MSR_IA32_SYSENTER_ESP, saved_sysenter_esp);
         rdmsrl(MSR_IA32_SYSENTER_EIP, saved_sysenter_eip);
     }
-#endif
 }
 
 
@@ -50,7 +46,6 @@ void restore_rest_processor_state(void)
 
     load_TR();
 
-#if defined(CONFIG_X86_64)
     /* Recover syscall MSRs */
     wrmsrl(MSR_LSTAR, saved_lstar);
     wrmsrl(MSR_CSTAR, saved_cstar);
@@ -79,11 +74,6 @@ void restore_rest_processor_state(void)
             : : "r" (saved_segs) : "memory" );
         do_set_segment_base(SEGBASE_GS_USER_SEL, saved_segs[3]);
     }
-
-#else /* !defined(CONFIG_X86_64) */
-    if ( supervisor_mode_kernel && cpu_has_sep )
-        wrmsr(MSR_IA32_SYSENTER_ESP, &this_cpu(init_tss).esp1, 0);
-#endif
 
     /* Maybe load the debug registers. */
     BUG_ON(is_hvm_vcpu(curr));

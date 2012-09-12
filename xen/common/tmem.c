@@ -50,7 +50,7 @@
 #define INVERT_SENTINEL(_x,_y) _x->sentinel = ~_y##_SENTINEL
 #define ASSERT_SENTINEL(_x,_y) \
     ASSERT(_x->sentinel != ~_y##_SENTINEL);ASSERT(_x->sentinel == _y##_SENTINEL)
-#if defined(__i386__) || defined(CONFIG_ARM)
+#if defined(CONFIG_ARM)
 #define POOL_SENTINEL 0x87658765
 #define OBJ_SENTINEL 0x12345678
 #define OBJNODE_SENTINEL 0xfedcba09
@@ -1233,11 +1233,7 @@ static client_t *client_create(cli_id_t cli_id)
         goto fail;
     }
     client->cli_id = cli_id;
-#ifdef __i386__
-    client->compress = 0;
-#else
     client->compress = tmh_compression_enabled();
-#endif
     client->shared_auth_required = tmh_shared_auth();
     for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++)
         client->shared_auth_uuid[i][0] =
@@ -1460,9 +1456,6 @@ static NOINLINE int do_tmem_put_compress(pgp_t *pgp, tmem_cli_mfn_t cmfn,
     ASSERT_SPINLOCK(&pgp->us.obj->obj_spinlock);
     ASSERT(pgp->us.obj->pool != NULL);
     ASSERT(pgp->us.obj->pool->client != NULL);
-#ifdef __i386__
-    return -ENOMEM;
-#endif
 
     if ( pgp->pfp != NULL )
         pgp_free_data(pgp, pgp->us.obj->pool);
@@ -2275,9 +2268,6 @@ static int tmemc_set_var_one(client_t *client, uint32_t subop, uint32_t arg1)
                         arg1, cli_id_str, cli_id);
         break;
     case TMEMC_SET_COMPRESS:
-#ifdef __i386__
-        return -1;
-#endif
         if ( tmh_dedup_enabled() )
         {
             tmh_client_warn("tmem: compression %s for all %ss, cannot be changed when tmem_dedup is enabled\n",
@@ -2892,9 +2882,6 @@ EXPORT void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
 
     if (!tmh_enabled() || !tmh_freeable_pages())
         return NULL;
-#ifdef __i386__
-    return NULL;
-#endif
 
     relinq_attempts++;
     if ( order > 0 )

@@ -18,11 +18,7 @@ ENTRY(efi_start)
 
 #else /* !EFI */
 
-#ifdef __x86_64__
 #define FORMAT "elf64-x86-64"
-#else
-#define FORMAT "elf32-i386"
-#endif
 
 ENTRY(start)
 
@@ -30,11 +26,7 @@ ENTRY(start)
 
 OUTPUT_FORMAT(FORMAT, FORMAT, FORMAT)
 
-#ifdef __x86_64__
 OUTPUT_ARCH(i386:x86-64)
-#else
-OUTPUT_ARCH(i386)
-#endif
 
 PHDRS
 {
@@ -42,7 +34,7 @@ PHDRS
 }
 SECTIONS
 {
-#if defined(__x86_64__) && !defined(EFI)
+#if !defined(EFI)
   . = __XEN_VIRT_START;
   __image_base__ = .;
 #endif

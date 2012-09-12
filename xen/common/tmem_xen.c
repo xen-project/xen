@@ -348,7 +348,6 @@ EXPORT void tmh_scrub_page(struct page_info *pi, unsigned int memflags)
         scrub_one_page(pi);
 }
 
-#ifndef __i386__
 static noinline void *tmh_mempool_page_get(unsigned long size)
 {
     struct page_info *pi;
@@ -398,7 +397,6 @@ static void tmh_persistent_pool_page_put(void *page_va)
     ASSERT(IS_VALID_PAGE(pi));
     _tmh_free_page_thispool(pi);
 }
-#endif
 
 /******************  XEN-SPECIFIC CLIENT HANDLING ********************/
 
@@ -413,7 +411,6 @@ EXPORT tmh_client_t *tmh_client_init(cli_id_t cli_id)
     for (i = 0, shift = 12; i < 4; shift -=4, i++)
         name[i] = (((unsigned short)cli_id >> shift) & 0xf) + '0';
     name[4] = '\0';
-#ifndef __i386__
     tmh->persistent_pool = xmem_pool_create(name, tmh_persistent_pool_page_get,
         tmh_persistent_pool_page_put, PAGE_SIZE, 0, PAGE_SIZE);
     if ( tmh->persistent_pool == NULL )
@@ -421,22 +418,17 @@ EXPORT tmh_client_t *tmh_client_init(cli_id_t cli_id)
         xfree(tmh);
         return NULL;
     }
-#endif
     return tmh;
 }
 
 EXPORT void tmh_client_destroy(tmh_client_t *tmh)
 {
     ASSERT(tmh->domain->is_dying);
-#ifndef __i386__
     xmem_pool_destroy(tmh->persistent_pool);
-#endif
     tmh->domain = NULL;
 }
 
 /******************  XEN-SPECIFIC HOST INITIALIZATION ********************/
-
-#ifndef __i386__
 
 static int dstmem_order, workmem_order;
 
@@ -517,12 +509,3 @@ EXPORT int __init tmh_init(void)
 
     return 1;
 }
-
-#else
-
-EXPORT int __init tmh_init(void)
-{
-    return 1;
-}
-
-#endif

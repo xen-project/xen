@@ -7,8 +7,6 @@
 
 #include <xen/errno.h>
 
-#ifdef __x86_64__
-
 #define do_multicall_call(_call)                             \
     do {                                                     \
         __asm__ __volatile__ (                               \
@@ -68,36 +66,5 @@
               /* all the caller-saves registers */           \
             : "rax", "rcx", "rdx", "rsi", "rdi",             \
               "r8",  "r9",  "r10", "r11" )                   \
-
-#else
-
-#define do_multicall_call(_call)                             \
-        __asm__ __volatile__ (                               \
-            "    movl  %c1(%0),%%eax; "                      \
-            "    pushl %c2+5*%c3(%0); "                      \
-            "    pushl %c2+4*%c3(%0); "                      \
-            "    pushl %c2+3*%c3(%0); "                      \
-            "    pushl %c2+2*%c3(%0); "                      \
-            "    pushl %c2+1*%c3(%0); "                      \
-            "    pushl %c2+0*%c3(%0); "                      \
-            "    cmpl  $("STR(NR_hypercalls)"),%%eax; "      \
-            "    jae   2f; "                                 \
-            "    call  *hypercall_table(,%%eax,4); "         \
-            "1:  movl  %%eax,%c4(%0); "                      \
-            "    addl  $24,%%esp\n"                          \
-            ".section .fixup,\"ax\"\n"                       \
-            "2:  movl  $-"STR(ENOSYS)",%%eax\n"              \
-            "    jmp   1b\n"                                 \
-            ".previous\n"                                    \
-            :                                                \
-            : "bSD" (_call),                                 \
-              "i" (offsetof(__typeof__(*_call), op)),        \
-              "i" (offsetof(__typeof__(*_call), args)),      \
-              "i" (sizeof(*(_call)->args)),                  \
-              "i" (offsetof(__typeof__(*_call), result))     \
-              /* all the caller-saves registers */           \
-            : "eax", "ecx", "edx" )                          \
-
-#endif
 
 #endif /* __ASM_X86_MULTICALL_H__ */

@@ -111,13 +111,8 @@ integer_param("debug_stack_lines", debug_stack_lines);
 static bool_t __devinitdata opt_ler;
 boolean_param("ler", opt_ler);
 
-#ifdef CONFIG_X86_32
-#define stack_words_per_line 8
-#define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)&regs->esp)
-#else
 #define stack_words_per_line 4
 #define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
-#endif
 
 static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
 {
@@ -157,14 +152,7 @@ static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
         struct vcpu *vcpu;
 
         ASSERT(guest_kernel_mode(v, regs));
-#ifndef __x86_64__
-        addr = read_cr3();
-        for_each_vcpu( v->domain, vcpu )
-            if ( vcpu->arch.cr3 == addr )
-                break;
-#else
         vcpu = maddr_get_owner(read_cr3()) == v->domain ? v : NULL;
-#endif
         if ( !vcpu )
         {
             stack = do_page_walk(v, (unsigned long)stack);
@@ -387,7 +375,6 @@ unsigned long *get_x86_gpr(struct cpu_user_regs *regs, unsigned int modrm_reg)
     case  5: p = &regs->ebp; break;
     case  6: p = &regs->esi; break;
     case  7: p = &regs->edi; break;
-#if defined(__x86_64__)
     case  8: p = &regs->r8;  break;
     case  9: p = &regs->r9;  break;
     case 10: p = &regs->r10; break;
@@ -396,7 +383,6 @@ unsigned long *get_x86_gpr(struct cpu_user_regs *regs, unsigned int modrm_reg)
     case 13: p = &regs->r13; break;
     case 14: p = &regs->r14; break;
     case 15: p = &regs->r15; break;
-#endif
     default: p = NULL; break;
     }
 
@@ -823,10 +809,6 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         /* Modify Feature Information. */
         if ( !cpu_has_sep )
             __clear_bit(X86_FEATURE_SEP, &d);
-#ifdef __i386__
-        if ( !supervisor_mode_kernel )
-            __clear_bit(X86_FEATURE_SEP, &d);
-#endif
         __clear_bit(X86_FEATURE_DS, &d);
         __clear_bit(X86_FEATURE_ACC, &d);
         __clear_bit(X86_FEATURE_PBE, &d);
@@ -879,10 +861,8 @@ static void pv_cpuid(struct cpu_user_regs *regs)
             __clear_bit(X86_FEATURE_LM % 32, &d);
             __clear_bit(X86_FEATURE_LAHF_LM % 32, &c);
         }
-#ifndef __i386__
         if ( is_pv_32on64_vcpu(current) &&
              boot_cpu_data.x86_vendor != X86_VENDOR_AMD )
-#endif
             __clear_bit(X86_FEATURE_SYSCALL % 32, &d);
         __clear_bit(X86_FEATURE_PAGE1GB % 32, &d);
         __clear_bit(X86_FEATURE_RDTSCP % 32, &d);
@@ -1361,11 +1341,9 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
              ptwr_do_page_fault(v, addr, regs) )
             return EXCRET_fault_fixed;
 
-#ifdef __x86_64__
         if ( IS_PRIV(d) && (regs->error_code & PFEC_page_present) &&
              mmio_ro_do_page_fault(v, addr, regs) )
             return EXCRET_fault_fixed;
-#endif
     }
 
     /* For non-external shadowed guests, we fix up both their own 
@@ -1566,7 +1544,6 @@ static int read_descriptor(unsigned int sel,
     return 1;
 }
 
-#ifdef __x86_64__
 static int read_gate_descriptor(unsigned int gate_sel,
                                 const struct vcpu *v,
                                 unsigned int *sel,
@@ -1622,20 +1599,15 @@ static int read_gate_descriptor(unsigned int gate_sel,
 
     return 1;
 }
-#endif
 
 /* Has the guest requested sufficient permission for this I/O access? */
 static int guest_io_okay(
     unsigned int port, unsigned int bytes,
     struct vcpu *v, struct cpu_user_regs *regs)
 {
-#if defined(__x86_64__)
     /* If in user mode, switch to kernel mode just to read I/O bitmap. */
     int user_mode = !(v->arch.flags & TF_kernel_mode);
 #define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
-#elif defined(__i386__)
-#define TOGGLE_MODE() ((void)0)
-#endif
 
     if ( !vm86_mode(regs) &&
          (v->arch.pv_vcpu.iopl >= (guest_kernel_mode(v, regs) ? 1 : 3)) )
@@ -1889,11 +1861,7 @@ static inline uint64_t guest_misc_enable(uint64_t val)
     }                                                                       \
     (eip) += sizeof(_x); _x; })
 
-#if defined(CONFIG_X86_32)
-# define read_sreg(regs, sr) ((regs)->sr)
-#elif defined(CONFIG_X86_64)
-# define read_sreg(regs, sr) read_segment_register(sr)
-#endif
+#define read_sreg(regs, sr) read_segment_register(sr)
 
 static int is_cpufreq_controller(struct domain *d)
 {
@@ -1901,9 +1869,7 @@ static int is_cpufreq_controller(struct domain *d)
             (d->domain_id == 0));
 }
 
-#ifdef CONFIG_X86_64
 #include "x86_64/mmconfig.h"
-#endif
 
 static int emulate_privileged_op(struct cpu_user_regs *regs)
 {
@@ -2034,7 +2000,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                   (ar & _SEGMENT_CODE) || !(ar & _SEGMENT_WR)) )
                 goto fail;
         }
-#ifdef CONFIG_X86_64
         else
         {
             if ( lm_ovr == lm_seg_none || data_sel < 4 )
@@ -2062,7 +2027,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             data_limit = ~0UL;
             ar = _SEGMENT_WR|_SEGMENT_S|_SEGMENT_DPL|_SEGMENT_P;
         }
-#endif
 
         port = (u16)regs->edx;
 
@@ -2126,7 +2090,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
      * GPR context. This is needed for some systems which (ab)use IN/OUT
      * to communicate with BIOS code in system-management mode.
      */
-#ifdef __x86_64__
     /* movq $host_to_guest_gpr_switch,%rcx */
     io_emul_stub[0] = 0x48;
     io_emul_stub[1] = 0xb9;
@@ -2134,14 +2097,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     /* callq *%rcx */
     io_emul_stub[10] = 0xff;
     io_emul_stub[11] = 0xd1;
-#else
-    /* call host_to_guest_gpr_switch */
-    io_emul_stub[0] = 0xe8;
-    *(s32 *)&io_emul_stub[1] =
-        (char *)host_to_guest_gpr_switch - &io_emul_stub[5];
-    /* 7 x nop */
-    memset(&io_emul_stub[5], 0x90, 7);
-#endif
     /* data16 or nop */
     io_emul_stub[12] = (op_bytes != 2) ? 0x90 : 0x66;
     /* <io-access opcode> */
@@ -2443,7 +2398,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         msr_content = ((uint64_t)edx << 32) | eax;
         switch ( (u32)regs->ecx )
         {
-#ifdef CONFIG_X86_64
         case MSR_FS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
@@ -2465,7 +2419,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             v->arch.pv_vcpu.gs_base_user = msr_content;
             break;
-#endif
         case MSR_K7_FID_VID_STATUS:
         case MSR_K7_FID_VID_CTL:
         case MSR_K8_PSTATE_LIMIT:
@@ -2509,10 +2462,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( (rdmsr_safe(MSR_FAM10H_MMIO_CONF_BASE, val) != 0) )
                 goto fail;
             if (
-#ifdef CONFIG_X86_64
                  (pci_probe & PCI_PROBE_MASK) == PCI_PROBE_MMCONF ?
                  val != msr_content :
-#endif
                  ((val ^ msr_content) &
                   ~( FAM10H_MMIO_CONF_ENABLE |
                     (FAM10H_MMIO_CONF_BUSRANGE_MASK <<
@@ -2600,7 +2551,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
     case 0x32: /* RDMSR */
         switch ( (u32)regs->ecx )
         {
-#ifdef CONFIG_X86_64
         case MSR_FS_BASE:
             if ( is_pv_32on64_vcpu(v) )
                 goto fail;
@@ -2619,7 +2569,6 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             regs->eax = v->arch.pv_vcpu.gs_base_user & 0xFFFFFFFFUL;
             regs->edx = v->arch.pv_vcpu.gs_base_user >> 32;
             break;
-#endif
         case MSR_K7_FID_VID_CTL:
         case MSR_K7_FID_VID_STATUS:
         case MSR_K8_PSTATE_LIMIT:
@@ -2714,7 +2663,6 @@ static inline int check_stack_limit(unsigned int ar, unsigned int limit,
 
 static void emulate_gate_op(struct cpu_user_regs *regs)
 {
-#ifdef __x86_64__
     struct vcpu *v = current;
     unsigned int sel, ar, dpl, nparm, opnd_sel;
     unsigned int op_default, op_bytes, ad_default, ad_bytes;
@@ -3071,7 +3019,6 @@ static void emulate_gate_op(struct cpu_user_regs *regs)
 
     regs->cs = sel;
     instruction_done(regs, off, 0);
-#endif
 }
 
 void do_general_protection(struct cpu_user_regs *regs)
@@ -3133,16 +3080,6 @@ void do_general_protection(struct cpu_user_regs *regs)
         trace_trap_one_addr(TRC_PV_EMULATE_PRIVOP, regs->eip);
         return;
     }
-
-#if defined(__i386__)
-    if ( VM_ASSIST(v->domain, VMASST_TYPE_4gb_segments) && 
-         (regs->error_code == 0) && 
-         gpf_emulate_4gb(regs) )
-    {
-        TRACE_1D(TRC_PV_EMULATE_4GB, regs->eip);
-        return;
-    }
-#endif
 
     /* Pass on GPF as is. */
     do_guest_trap(TRAP_gp_fault, regs, 1);
@@ -3425,7 +3362,6 @@ void do_debug(struct cpu_user_regs *regs)
     {
         if ( regs->eflags & X86_EFLAGS_TF )
         {
-#ifdef __x86_64__
             /* In SYSENTER entry path we can't zap TF until EFLAGS is saved. */
             if ( (regs->rip >= (unsigned long)sysenter_entry) &&
                  (regs->rip <= (unsigned long)sysenter_eflags_saved) )
@@ -3434,7 +3370,6 @@ void do_debug(struct cpu_user_regs *regs)
                     regs->eflags &= ~X86_EFLAGS_TF;
                 goto out;
             }
-#endif
             if ( !debugger_trap_fatal(TRAP_debug, regs) )
             {
                 WARN_ON(1);
@@ -3816,12 +3751,6 @@ long set_debugreg(struct vcpu *v, int reg, unsigned long value)
                         return -EPERM;
                     io_enable |= value & (3 << ((i - 16) >> 1));
                 }
-#ifdef __i386__
-                if ( ((boot_cpu_data.x86_vendor != X86_VENDOR_INTEL) ||
-                      !boot_cpu_has(X86_FEATURE_LM)) &&
-                     (((value >> i) & 0xc) == DR_LEN_8) )
-                    return -EPERM;
-#endif
             }
 
             /* Guest DR5 is a handy stash for I/O intercept information. */

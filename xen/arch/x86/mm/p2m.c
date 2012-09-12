@@ -170,7 +170,6 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
 
     mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order);
 
-#ifdef __x86_64__
     if ( (q & P2M_UNSHARE) && p2m_is_shared(*t) )
     {
         ASSERT(!p2m_is_nestedp2m(p2m));
@@ -180,9 +179,7 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
             (void)mem_sharing_notify_enomem(p2m->domain, gfn, 0);
         mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order);
     }
-#endif
 
-#ifdef __x86_64__
     if (unlikely((p2m_is_broken(*t))))
     {
         /* Return invalid_mfn to avoid caller's access */
@@ -190,7 +187,6 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
         if ( q & P2M_ALLOC )
             domain_crash(p2m->domain);
     }
-#endif
 
     return mfn;
 }
@@ -412,18 +408,15 @@ void p2m_teardown(struct p2m_domain *p2m)
 {
     struct page_info *pg;
     struct domain *d = p2m->domain;
-#ifdef __x86_64__
     unsigned long gfn;
     p2m_type_t t;
     mfn_t mfn;
-#endif
 
     if (p2m == NULL)
         return;
 
     p2m_lock(p2m);
 
-#ifdef __x86_64__
     /* Try to unshare any remaining shared p2m entries. Safeguard
      * Since relinquish_shared_pages should have done the work. */ 
     for ( gfn=0; gfn < p2m->max_mapped_pfn; gfn++ )
@@ -439,7 +432,6 @@ void p2m_teardown(struct p2m_domain *p2m)
             BUG_ON(mem_sharing_unshare_page(d, gfn, MEM_SHARING_DESTROY_GFN));
         }
     }
-#endif
 
     p2m->phys_table = pagetable_null();
 
@@ -565,7 +557,6 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     for ( i = 0; i < (1UL << page_order); i++ )
     {
         omfn = p2m->get_entry(p2m, gfn + i, &ot, &a, 0, NULL);
-#ifdef __x86_64__
         if ( p2m_is_shared(ot) )
         {
             /* Do an unshare to cleanly take care of all corner 
@@ -592,7 +583,6 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
             omfn = p2m->get_entry(p2m, gfn + i, &ot, &a, 0, NULL);
             ASSERT(!p2m_is_shared(ot));
         }
-#endif /* __x86_64__ */
         if ( p2m_is_grant(ot) )
         {
             /* Really shouldn't be unmapping grant maps this way */
@@ -840,7 +830,6 @@ set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn)
     return rc;
 }
 
-#ifdef __x86_64__
 /**
  * p2m_mem_paging_nominate - Mark a guest page as to-be-paged-out
  * @d: guest domain
@@ -1429,9 +1418,6 @@ int p2m_get_mem_access(struct domain *d, unsigned long pfn,
     *access =  memaccess[a];
     return 0;
 }
-
-
-#endif /* __x86_64__ */
 
 static struct p2m_domain *
 p2m_getlru_nestedp2m(struct domain *d, struct p2m_domain *p2m)

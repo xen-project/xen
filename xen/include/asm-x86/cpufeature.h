@@ -165,33 +165,6 @@
 #define CPUID5_ECX_EXTENSIONS_SUPPORTED 0x1
 #define CPUID5_ECX_INTERRUPT_BREAK      0x2
 
-#ifdef __i386__
-#define cpu_has_vme		boot_cpu_has(X86_FEATURE_VME)
-#define cpu_has_de		boot_cpu_has(X86_FEATURE_DE)
-#define cpu_has_pse		boot_cpu_has(X86_FEATURE_PSE)
-#define cpu_has_tsc		boot_cpu_has(X86_FEATURE_TSC)
-#define cpu_has_pge		boot_cpu_has(X86_FEATURE_PGE)
-#define cpu_has_pat		boot_cpu_has(X86_FEATURE_PAT)
-#define cpu_has_apic		boot_cpu_has(X86_FEATURE_APIC)
-#define cpu_has_sep		boot_cpu_has(X86_FEATURE_SEP)
-#define cpu_has_mtrr		boot_cpu_has(X86_FEATURE_MTRR)
-#define cpu_has_mmx		boot_cpu_has(X86_FEATURE_MMX)
-#define cpu_has_fxsr		boot_cpu_has(X86_FEATURE_FXSR)
-#define cpu_has_xmm		boot_cpu_has(X86_FEATURE_XMM)
-#define cpu_has_xmm2		boot_cpu_has(X86_FEATURE_XMM2)
-#define cpu_has_xmm3		boot_cpu_has(X86_FEATURE_XMM3)
-#define cpu_has_ht		boot_cpu_has(X86_FEATURE_HT)
-#define cpu_has_syscall		boot_cpu_has(X86_FEATURE_SYSCALL)
-#define cpu_has_mp		boot_cpu_has(X86_FEATURE_MP)
-#define cpu_has_nx		boot_cpu_has(X86_FEATURE_NX)
-#define cpu_has_k6_mtrr		boot_cpu_has(X86_FEATURE_K6_MTRR)
-#define cpu_has_cyrix_arr	boot_cpu_has(X86_FEATURE_CYRIX_ARR)
-#define cpu_has_centaur_mcr	boot_cpu_has(X86_FEATURE_CENTAUR_MCR)
-#define cpu_has_clflush		boot_cpu_has(X86_FEATURE_CLFLSH)
-#define cpu_has_page1gb		0
-#define cpu_has_efer		(boot_cpu_data.x86_capability[1] & 0x20100800)
-#define cpu_has_fsgsbase	0
-#else /* __x86_64__ */
 #define cpu_has_vme		0
 #define cpu_has_de		1
 #define cpu_has_pse		1
@@ -217,7 +190,6 @@
 #define cpu_has_page1gb		boot_cpu_has(X86_FEATURE_PAGE1GB)
 #define cpu_has_efer		1
 #define cpu_has_fsgsbase	boot_cpu_has(X86_FEATURE_FSGSBASE)
-#endif
 
 #define cpu_has_smep            boot_cpu_has(X86_FEATURE_SMEP)
 

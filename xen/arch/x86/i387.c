@@ -56,12 +56,8 @@ static inline void fpu_fxrstor(struct vcpu *v)
      * tools, by silently clearing the block.
      */
     asm volatile (
-#ifdef __i386__
-        "1: fxrstor %0            \n"
-#else /* __x86_64__ */
         /* See above for why the operands/constraints are this way. */
         "1: " REX64_PREFIX "fxrstor (%2)\n"
-#endif
         ".section .fixup,\"ax\"   \n"
         "2: push %%"__OP"ax       \n"
         "   push %%"__OP"cx       \n"
@@ -79,9 +75,7 @@ static inline void fpu_fxrstor(struct vcpu *v)
         : 
         : "m" (*fpu_ctxt),
           "i" (sizeof(v->arch.xsave_area->fpu_sse)/4)
-#ifdef __x86_64__
           ,"cdaSDb" (fpu_ctxt)
-#endif
         );
 }
 
@@ -112,11 +106,6 @@ static inline void fpu_fxsave(struct vcpu *v)
 {
     char *fpu_ctxt = v->arch.fpu_ctxt;
 
-#ifdef __i386__
-    asm volatile (
-        "fxsave %0"
-        : "=m" (*fpu_ctxt) );
-#else /* __x86_64__ */
     /*
      * The only way to force fxsaveq on a wide range of gas versions. On 
      * older versions the rex64 prefix works only if we force an
@@ -125,7 +114,6 @@ static inline void fpu_fxsave(struct vcpu *v)
     asm volatile (
         REX64_PREFIX "fxsave (%1)"
         : "=m" (*fpu_ctxt) : "cdaSDb" (fpu_ctxt) );
-#endif
     
     /* Clear exception flags if FSW.ES is set. */
     if ( unlikely(fpu_ctxt[2] & 0x80) )

@@ -23,9 +23,7 @@ int physdev_map_pirq(domid_t, int type, int *index, int *pirq_p,
                      struct msi_info *);
 int physdev_unmap_pirq(domid_t, int pirq);
 
-#ifdef CONFIG_X86_64
 #include "x86_64/mmconfig.h"
-#endif
 
 #ifndef COMPAT
 typedef long ret_t;
@@ -609,7 +607,6 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
-#ifdef __x86_64__
     case PHYSDEVOP_pci_mmcfg_reserved: {
         struct physdev_pci_mmcfg_reserved info;
 
@@ -629,7 +626,6 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
                                  info.start_bus, info.end_bus, info.flags);
         break;
     }
-#endif
 
     case PHYSDEVOP_restore_msi: {
         struct physdev_restore_msi restore_msi;

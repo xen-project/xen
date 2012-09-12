@@ -98,11 +98,9 @@ struct arch_vmx_struct {
     u32                  secondary_exec_control;
     u32                  exception_bitmap;
 
-#ifdef __x86_64__
     struct vmx_msr_state msr_state;
     unsigned long        shadow_gs;
     unsigned long        cstar;
-#endif
 
     unsigned long       *msr_bitmap;
     unsigned int         msr_count;

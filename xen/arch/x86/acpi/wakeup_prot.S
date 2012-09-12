@@ -8,8 +8,6 @@
 #include <asm/page.h>
 #include <asm/msr.h>
 
-#if defined(__x86_64__)
-
         .code64
 
 #define GREG(x)         %r##x
@@ -19,20 +17,6 @@
 #define LOAD_GREG(x)    movq SAVED_GREG(x), GREG(x)
 
 #define REF(x)          x(%rip)
-
-#else /* !defined(__x86_64__) */
-
-        .code32
-
-#define GREG(x)         %e##x
-#define SAVED_GREG(x)   saved_e##x
-#define DECLARE_GREG(x) saved_e##x:     .long   0
-#define SAVE_GREG(x)    movl GREG(x), SAVED_GREG(x)
-#define LOAD_GREG(x)    movl SAVED_GREG(x), GREG(x)
-
-#define REF(x)          x
-
-#endif
 
 ENTRY(do_suspend_lowlevel)
 
@@ -44,8 +28,6 @@ ENTRY(do_suspend_lowlevel)
         SAVE_GREG(bp)
         SAVE_GREG(si)
         SAVE_GREG(di)
-
-#if defined(__x86_64__)
 
         SAVE_GREG(8)     # save r8...r15
         SAVE_GREG(9)
@@ -61,16 +43,6 @@ ENTRY(do_suspend_lowlevel)
         mov     %cr8, GREG(ax)
         mov     GREG(ax), REF(saved_cr8)
 
-#else /* !defined(__x86_64__) */
-
-        pushfl;
-        popl    SAVED_GREG(flags)
-
-        mov     %ds, REF(saved_ds)
-        mov     %es, REF(saved_es)
-
-#endif
-
         mov     %ss, REF(saved_ss)
 
         sgdt    REF(saved_gdt)
@@ -85,16 +57,8 @@ ENTRY(do_suspend_lowlevel)
 
         call    save_rest_processor_state
 
-#if defined(__x86_64__)
-
         mov     $3, %rdi
         xor     %eax, %eax
-
-#else /* !defined(__x86_64__) */
-
-        push    $3
-
-#endif
 
         /* enter sleep state physically */
         call    acpi_enter_sleep_state
@@ -121,7 +85,6 @@ __ret_point:
         mov     REF(saved_ss), %ss
         LOAD_GREG(sp)
 
-#if defined(__x86_64__)
         /* Reload code selector */
         pushq   $(__HYPERVISOR_CS64)
         leaq    1f(%rip),%rax
@@ -134,17 +97,6 @@ __ret_point:
         pushq   SAVED_GREG(flags)
         popfq
 
-#else /* !defined(__x86_64__) */
-
-        pushl   SAVED_GREG(flags)
-        popfl
-
-        /* No reload to fs/gs, which is saved in bottom stack already */
-        mov     REF(saved_ds), %ds
-        mov     REF(saved_es), %es
-
-#endif
-
         call restore_rest_processor_state
 
         LOAD_GREG(bp)
@@ -154,7 +106,6 @@ __ret_point:
         LOAD_GREG(dx)
         LOAD_GREG(si)
         LOAD_GREG(di)
-#if defined(__x86_64__)
         LOAD_GREG(8)     # save r8...r15
         LOAD_GREG(9)
         LOAD_GREG(10)
@@ -163,7 +114,6 @@ __ret_point:
         LOAD_GREG(13)
         LOAD_GREG(14)
         LOAD_GREG(15)
-#endif
         ret 
 
 .data
@@ -184,8 +134,6 @@ DECLARE_GREG(si)
 DECLARE_GREG(di)
 DECLARE_GREG(flags)
 
-#if defined(__x86_64__)
-
 DECLARE_GREG(8)
 DECLARE_GREG(9)
 DECLARE_GREG(10)
@@ -202,17 +150,3 @@ saved_ldt:      .quad   0,0
 saved_cr0:      .quad   0
 saved_cr3:      .quad   0
 saved_cr8:      .quad   0
-
-#else /* !defined(__x86_64__) */
-
-saved_gdt:      .long   0,0
-saved_idt:      .long   0,0
-saved_ldt:      .long   0
-
-saved_cr0:      .long   0
-saved_cr3:      .long   0
-
-saved_ds:       .word   0
-saved_es:       .word   0
-
-#endif 

@@ -145,10 +145,8 @@ static int vmx_init_vmcs_config(void)
 
     min = (CPU_BASED_HLT_EXITING |
            CPU_BASED_VIRTUAL_INTR_PENDING |
-#ifdef __x86_64__
            CPU_BASED_CR8_LOAD_EXITING |
            CPU_BASED_CR8_STORE_EXITING |
-#endif
            CPU_BASED_INVLPG_EXITING |
            CPU_BASED_CR3_LOAD_EXITING |
            CPU_BASED_CR3_STORE_EXITING |
@@ -166,11 +164,9 @@ static int vmx_init_vmcs_config(void)
         "CPU-Based Exec Control", min, opt,
         MSR_IA32_VMX_PROCBASED_CTLS, &mismatch);
     _vmx_cpu_based_exec_control &= ~CPU_BASED_RDTSC_EXITING;
-#ifdef __x86_64__
     if ( _vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW )
         _vmx_cpu_based_exec_control &=
             ~(CPU_BASED_CR8_LOAD_EXITING | CPU_BASED_CR8_STORE_EXITING);
-#endif
 
     if ( _vmx_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS )
     {
@@ -249,18 +245,9 @@ static int vmx_init_vmcs_config(void)
         _vmx_secondary_exec_control &= ~ SECONDARY_EXEC_PAUSE_LOOP_EXITING;
     }
 
-#if defined(__i386__)
-    /* If we can't virtualise APIC accesses, the TPR shadow is pointless. */
-    if ( !(_vmx_secondary_exec_control &
-           SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES) )
-        _vmx_cpu_based_exec_control &= ~CPU_BASED_TPR_SHADOW;
-#endif
-
     min = VM_EXIT_ACK_INTR_ON_EXIT;
     opt = VM_EXIT_SAVE_GUEST_PAT | VM_EXIT_LOAD_HOST_PAT;
-#ifdef __x86_64__
     min |= VM_EXIT_IA32E_MODE;
-#endif
     _vmx_vmexit_control = adjust_vmx_controls(
         "VMExit Control", min, opt, MSR_IA32_VMX_EXIT_CTLS, &mismatch);
 
@@ -333,7 +320,6 @@ static int vmx_init_vmcs_config(void)
         return -EINVAL;
     }
 
-#ifdef __x86_64__
     /* IA-32 SDM Vol 3B: 64-bit CPUs always have VMX_BASIC_MSR[48]==0. */
     if ( vmx_basic_msr_high & (1u<<16) )
     {
@@ -341,7 +327,6 @@ static int vmx_init_vmcs_config(void)
                smp_processor_id());
         return -EINVAL;
     }
-#endif
 
     /* Require Write-Back (WB) memory type for VMCS accesses. */
     if ( ((vmx_basic_msr_high >> 18) & 15) != 6 )
@@ -866,9 +851,6 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
     __vmwrite(GUEST_DR7, 0);
     __vmwrite(VMCS_LINK_POINTER, ~0UL);
-#if defined(__i386__)
-    __vmwrite(VMCS_LINK_POINTER_HIGH, ~0UL);
-#endif
 
     v->arch.hvm_vmx.exception_bitmap = HVM_TRAP_MASK
               | (paging_mode_hap(d) ? 0 : (1U << TRAP_page_fault))
@@ -889,13 +871,7 @@ static int construct_vmcs(struct vcpu *v)
     }
 
     if ( paging_mode_hap(d) )
-    {
         __vmwrite(EPT_POINTER, d->arch.hvm_domain.vmx.ept_control.eptp);
-#ifdef __i386__
-        __vmwrite(EPT_POINTER_HIGH,
-                  d->arch.hvm_domain.vmx.ept_control.eptp >> 32);
-#endif
-    }
 
     if ( cpu_has_vmx_pat && paging_mode_hap(d) )
     {
@@ -906,10 +882,6 @@ static int construct_vmcs(struct vcpu *v)
 
         __vmwrite(HOST_PAT, host_pat);
         __vmwrite(GUEST_PAT, guest_pat);
-#ifdef __i386__
-        __vmwrite(HOST_PAT_HIGH, host_pat >> 32);
-        __vmwrite(GUEST_PAT_HIGH, guest_pat >> 32);
-#endif
     }
 
     vmx_vmcs_exit(v);

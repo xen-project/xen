@@ -70,8 +70,6 @@ dbg_hvm_va2mfn(dbgva_t vaddr, struct domain *dp, int toaddr,
     return mfn;
 }
 
-#if defined(__x86_64__)
-
 /* 
  * pgd3val: this is the value of init_mm.pgd[3] in a PV guest. It is optional.
  *          This to assist debug of modules in the guest. The kernel address 
@@ -142,49 +140,6 @@ dbg_pv_va2mfn(dbgva_t vaddr, struct domain *dp, uint64_t pgd3val)
 
     return mfn_valid(mfn) ? mfn : INVALID_MFN;
 }
-
-#else
-
-/* Returns: mfn for the given (pv guest) vaddr */
-static unsigned long 
-dbg_pv_va2mfn(dbgva_t vaddr, struct domain *dp, uint64_t pgd3val)
-{
-    l3_pgentry_t l3e, *l3t;
-    l2_pgentry_t l2e, *l2t;
-    l1_pgentry_t l1e, *l1t;
-    unsigned long cr3 = (pgd3val ? pgd3val : dp->vcpu[0]->arch.cr3);
-    unsigned long mfn = cr3 >> PAGE_SHIFT;
-
-    DBGP2("vaddr:%lx domid:%d cr3:%lx pgd3:%lx\n", vaddr, dp->domain_id, 
-          cr3, pgd3val);
-
-    if ( pgd3val == 0 )
-    {
-        l3t  = map_domain_page(mfn);
-        l3t += (cr3 & 0xFE0UL) >> 3;
-        l3e = l3t[l3_table_offset(vaddr)];
-        mfn = l3e_get_pfn(l3e);
-        unmap_domain_page(l3t);
-        if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
-            return INVALID_MFN;
-    }
-
-    l2t = map_domain_page(mfn);
-    l2e = l2t[l2_table_offset(vaddr)];
-    mfn = l2e_get_pfn(l2e);
-    unmap_domain_page(l2t);
-    if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) || 
-         (l2e_get_flags(l2e) & _PAGE_PSE) )
-        return INVALID_MFN;
-
-    l1t = map_domain_page(mfn);
-    l1e = l1t[l1_table_offset(vaddr)];
-    mfn = l1e_get_pfn(l1e);
-    unmap_domain_page(l1t);
-
-    return mfn_valid(mfn) ? mfn : INVALID_MFN;
-}
-#endif  /* defined(__x86_64__) */
 
 /* Returns: number of bytes remaining to be copied */
 static int

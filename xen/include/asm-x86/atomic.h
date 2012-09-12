@@ -22,22 +22,8 @@ build_write_atomic(write_u8_atomic, "b", uint8_t, "q", )
 build_write_atomic(write_u16_atomic, "w", uint16_t, "r", )
 build_write_atomic(write_u32_atomic, "l", uint32_t, "r", )
 
-#ifdef __x86_64__
 build_read_atomic(read_u64_atomic, "q", uint64_t, "=r", )
 build_write_atomic(write_u64_atomic, "q", uint64_t, "r", )
-#else
-static inline uint64_t read_u64_atomic(const volatile uint64_t *addr)
-{
-    uint64_t *__addr = (uint64_t *)addr;
-    return __cmpxchg8b(__addr, 0, 0);
-}
-static inline void write_u64_atomic(volatile uint64_t *addr, uint64_t val)
-{
-    uint64_t old = *addr, new, *__addr = (uint64_t *)addr;
-    while ( (new = __cmpxchg8b(__addr, old, val)) != old )
-        old = new;
-}
-#endif
 
 #undef build_read_atomic
 #undef build_write_atomic

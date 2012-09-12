@@ -514,6 +514,7 @@ static void __init reserve_dmi_region(void)
 static void __init machine_specific_memory_setup(
     struct e820entry *raw, int *raw_nr)
 {
+    unsigned long mpt_limit, ro_mpt_limit;
     uint64_t top_of_ram, size;
     int i;
 
@@ -536,25 +537,15 @@ static void __init machine_specific_memory_setup(
                 NULL);
     }
 
-#ifdef __i386__
-    clip_to_limit((1ULL << 30) * MACHPHYS_MBYTES,
-                  "Only the first %lu GB of the physical memory map "
-                  "can be accessed by Xen in 32-bit mode.");
-#else
-    {
-        unsigned long mpt_limit, ro_mpt_limit;
-
-        mpt_limit = ((RDWR_MPT_VIRT_END - RDWR_MPT_VIRT_START)
-                     / sizeof(unsigned long)) << PAGE_SHIFT;
-        ro_mpt_limit = ((RO_MPT_VIRT_END - RO_MPT_VIRT_START)
-                        / sizeof(unsigned long)) << PAGE_SHIFT;
-        if ( mpt_limit > ro_mpt_limit )
-            mpt_limit = ro_mpt_limit;
-        clip_to_limit(mpt_limit,
-                      "Only the first %lu GB of the physical "
-                      "memory map can be accessed by Xen.");
-    }
-#endif
+    mpt_limit = ((RDWR_MPT_VIRT_END - RDWR_MPT_VIRT_START)
+                 / sizeof(unsigned long)) << PAGE_SHIFT;
+    ro_mpt_limit = ((RO_MPT_VIRT_END - RO_MPT_VIRT_START)
+                    / sizeof(unsigned long)) << PAGE_SHIFT;
+    if ( mpt_limit > ro_mpt_limit )
+        mpt_limit = ro_mpt_limit;
+    clip_to_limit(mpt_limit,
+                  "Only the first %lu GB of the physical "
+                  "memory map can be accessed by Xen.");
 
     reserve_dmi_region();
 

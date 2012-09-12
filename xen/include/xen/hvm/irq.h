@@ -76,7 +76,7 @@ struct hvm_girq_dpci_mapping {
 
 #define NR_ISAIRQS  16
 #define NR_LINK     4
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(__x86_64__)
 # define NR_HVM_IRQS VIOAPIC_NUM_PINS
 #endif
 

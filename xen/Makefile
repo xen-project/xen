@@ -22,7 +22,11 @@ dist: install
 
 .PHONY: build install uninstall clean distclean cscope TAGS tags MAP gtags
 build install uninstall debug clean distclean cscope TAGS tags MAP gtags::
+ifneq ($(XEN_TARGET_ARCH),x86_32)
 	$(MAKE) -f Rules.mk _$@
+else
+	echo "*** Xen x86/32 target no longer supported!"
+endif
 
 .PHONY: _build
 _build: $(TARGET).gz

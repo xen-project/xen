@@ -129,11 +129,7 @@
 /* It's only used in x2APIC mode of an x2APIC unit. */
 #define APIC_MSR_BASE 0x800
 
-#ifdef __i386__
- #define MAX_IO_APICS 64
-#else
- #define MAX_IO_APICS 128
-#endif
+#define MAX_IO_APICS 128
 
 /*
  * the local APIC register structure, memory mapped. Not terribly well

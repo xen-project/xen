@@ -53,11 +53,7 @@
 #define  MSI_ADDR_DEST_ID(dest)		(((dest) << MSI_ADDR_DEST_ID_SHIFT) & MSI_ADDR_DEST_ID_MASK)
 
 /* MAX fixed pages reserved for mapping MSIX tables. */
-#if defined(__x86_64__)
 #define FIX_MSIX_MAX_PAGES              512
-#else
-#define FIX_MSIX_MAX_PAGES              32
-#endif
 
 struct msi_info {
     u16 seg;

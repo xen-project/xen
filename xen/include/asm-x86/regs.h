@@ -2,11 +2,7 @@
 #ifndef __X86_REGS_H__
 #define __X86_REGS_H__
 
-#ifdef __x86_64__
 #include <asm/x86_64/regs.h>
-#else
-#include <asm/x86_32/regs.h>
-#endif
 
 #define guest_mode(r)                                                         \
 ({                                                                            \

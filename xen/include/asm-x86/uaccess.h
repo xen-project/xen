@@ -9,11 +9,7 @@
 #include <asm/asm_defns.h>
 #include <asm/page.h>
 
-#ifdef __x86_64__
 #include <asm/x86_64/uaccess.h>
-#else
-#include <asm/x86_32/uaccess.h>
-#endif
 
 unsigned long copy_to_user(void *to, const void *from, unsigned len);
 unsigned long clear_user(void *to, unsigned len);

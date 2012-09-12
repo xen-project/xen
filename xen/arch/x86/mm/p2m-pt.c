@@ -63,21 +63,12 @@
 static unsigned long p2m_type_to_flags(p2m_type_t t, mfn_t mfn)
 {
     unsigned long flags;
-#ifdef __x86_64__
     /*
      * AMD IOMMU: When we share p2m table with iommu, bit 9 - bit 11 will be
      * used for iommu hardware to encode next io page level. Bit 59 - bit 62
      * are used for iommu flags, We could not use these bits to store p2m types.
      */
     flags = (unsigned long)(t & 0x7f) << 12;
-#else
-    flags = (t & 0x7UL) << 9;
-#endif
-
-#ifndef __x86_64__
-    /* 32-bit builds don't support a lot of the p2m types */
-    BUG_ON(t > p2m_populate_on_demand);
-#endif
 
     switch(t)
     {

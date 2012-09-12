@@ -7,13 +7,8 @@
 #ifndef __X86_CONFIG_H__
 #define __X86_CONFIG_H__
 
-#if defined(__x86_64__)
-# define LONG_BYTEORDER 3
-# define CONFIG_PAGING_LEVELS 4
-#else
-# define LONG_BYTEORDER 2
-# define CONFIG_PAGING_LEVELS 3
-#endif
+#define LONG_BYTEORDER 3
+#define CONFIG_PAGING_LEVELS 4
 
 #define BYTES_PER_LONG (1 << LONG_BYTEORDER)
 #define BITS_PER_LONG (BYTES_PER_LONG << 3)
@@ -56,15 +51,8 @@
 
 #ifdef MAX_PHYS_CPUS
 #define NR_CPUS MAX_PHYS_CPUS
-#elif defined __i386__
-#define NR_CPUS 128
 #else
 #define NR_CPUS 256
-#endif
-
-#ifdef __i386__
-/* Maximum number of virtual CPUs in multi-processor guests. */
-#define MAX_VIRT_CPUS XEN_LEGACY_MAX_VCPUS
 #endif
 
 /* Maximum we can support with current vLAPIC ID mapping. */
@@ -94,11 +82,7 @@
 #define MEMORY_GUARD
 #endif
 
-#ifdef __i386__
-#define STACK_ORDER 2
-#else
 #define STACK_ORDER 3
-#endif
 #define STACK_SIZE  (PAGE_SIZE << STACK_ORDER)
 
 /* Primary stack is restricted to 8kB by guard pages. */
@@ -122,8 +106,6 @@ extern unsigned char boot_edid_info[128];
 #endif
 
 #define asmlinkage
-
-#if defined(__x86_64__)
 
 #define CONFIG_X86_64 1
 #define CONFIG_COMPAT 1
@@ -286,86 +268,8 @@ extern unsigned char boot_edid_info[128];
 #define __OS          "q"  /* Operation Suffix */
 #define __OP          "r"  /* Operand Prefix */
 
-#elif defined(__i386__)
-
-#define CONFIG_X86_32      1
-#define CONFIG_DOMAIN_PAGE 1
-
-/*
- * Memory layout (high to low):                          PAE-SIZE
- *                                                       ------
- *  I/O remapping area                                   ( 4MB)
- *  Direct-map (1:1) area [Xen code/data/heap]           (12MB)
- *  Per-domain mappings (inc. 4MB map_domain_page cache) ( 8MB)
- *  Shadow linear pagetable                              ( 8MB)
- *  Guest linear pagetable                               ( 8MB)
- *  Machine-to-physical translation table [writable]     (16MB)
- *  Frame-info table                                     (96MB)
- *   * Start of guest inaccessible area
- *  Machine-to-physical translation table [read-only]    (16MB)
- *   * Start of guest unmodifiable area
- */
-
-#define IOREMAP_MBYTES           4
-#define DIRECTMAP_MBYTES        12
-#define MAPCACHE_MBYTES          4
-#define PERDOMAIN_MBYTES         8
-
-#define LINEARPT_MBYTES          8
-#define MACHPHYS_MBYTES         16 /* 1 MB needed per 1 GB memory */
-#define FRAMETABLE_MBYTES       (MACHPHYS_MBYTES * 6)
-
-#define IOREMAP_VIRT_END	_AC(0,UL)
-#define IOREMAP_VIRT_START	(IOREMAP_VIRT_END - (IOREMAP_MBYTES<<20))
-#define DIRECTMAP_VIRT_END	IOREMAP_VIRT_START
-#define DIRECTMAP_VIRT_START	(DIRECTMAP_VIRT_END - (DIRECTMAP_MBYTES<<20))
-#define MAPCACHE_VIRT_END	DIRECTMAP_VIRT_START
-#define MAPCACHE_VIRT_START	(MAPCACHE_VIRT_END - (MAPCACHE_MBYTES<<20))
-#define PERDOMAIN_VIRT_END	DIRECTMAP_VIRT_START
-#define PERDOMAIN_VIRT_START	(PERDOMAIN_VIRT_END - (PERDOMAIN_MBYTES<<20))
-#define SH_LINEAR_PT_VIRT_END	PERDOMAIN_VIRT_START
-#define SH_LINEAR_PT_VIRT_START	(SH_LINEAR_PT_VIRT_END - (LINEARPT_MBYTES<<20))
-#define LINEAR_PT_VIRT_END	SH_LINEAR_PT_VIRT_START
-#define LINEAR_PT_VIRT_START	(LINEAR_PT_VIRT_END - (LINEARPT_MBYTES<<20))
-#define RDWR_MPT_VIRT_END	LINEAR_PT_VIRT_START
-#define RDWR_MPT_VIRT_START	(RDWR_MPT_VIRT_END - (MACHPHYS_MBYTES<<20))
-#define FRAMETABLE_VIRT_END	RDWR_MPT_VIRT_START
-#define FRAMETABLE_SIZE         (FRAMETABLE_MBYTES<<20)
-#define FRAMETABLE_VIRT_START	(FRAMETABLE_VIRT_END - FRAMETABLE_SIZE)
-#define RO_MPT_VIRT_END		FRAMETABLE_VIRT_START
-#define RO_MPT_VIRT_START	(RO_MPT_VIRT_END - (MACHPHYS_MBYTES<<20))
-
-#define DIRECTMAP_PHYS_END	(DIRECTMAP_MBYTES<<20)
-
-/* Maximum linear address accessible via guest memory segments. */
-#define GUEST_SEGMENT_MAX_ADDR  RO_MPT_VIRT_END
-
-/* Hypervisor owns top 168MB of virtual address space. */
-#define HYPERVISOR_VIRT_START   mk_unsigned_long(0xF5800000)
-
-#define L2_PAGETABLE_FIRST_XEN_SLOT \
-    (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
-#define L2_PAGETABLE_LAST_XEN_SLOT  \
-    (~0UL >> L2_PAGETABLE_SHIFT)
-#define L2_PAGETABLE_XEN_SLOTS \
-    (L2_PAGETABLE_LAST_XEN_SLOT - L2_PAGETABLE_FIRST_XEN_SLOT + 1)
-
-#define PGT_base_page_table     PGT_l3_page_table
-
-#define __HYPERVISOR_CS 0xe008
-#define __HYPERVISOR_DS 0xe010
-
-/* For generic assembly code: use macros to define operation/operand sizes. */
-#define __OS          "l"  /* Operation Suffix */
-#define __OP          "e"  /* Operand Prefix */
-
-#endif /* __i386__ */
-
 #ifndef __ASSEMBLY__
 extern unsigned long xen_phys_start;
-#if defined(__i386__)
-extern unsigned long xenheap_phys_end;
-#endif
 #endif
 
 /* GDT/LDT shadow mapping area. The first per-domain-mapping sub-area. */
@@ -391,11 +295,7 @@ extern unsigned long xenheap_phys_end;
 #define PDPT_L2_ENTRIES       \
     ((PDPT_L1_ENTRIES + (1 << PAGETABLE_ORDER) - 1) >> PAGETABLE_ORDER)
 
-#if defined(__x86_64__)
 #define ELFSIZE 64
-#else
-#define ELFSIZE 32
-#endif
 
 #define ARCH_CRASH_SAVE_VMCOREINFO
 

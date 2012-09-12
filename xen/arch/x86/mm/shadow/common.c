@@ -276,12 +276,6 @@ hvm_emulate_cmpxchg(enum x86_segment seg,
         return v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
             v, addr, old[0], new[0], bytes, sh_ctxt);
 
-#ifdef __i386__
-    if ( bytes == 8 )
-        return v->arch.paging.mode->shadow.x86_emulate_cmpxchg8b(
-            v, addr, old[0], old[1], new[0], new[1], sh_ctxt);
-#endif
-
     return X86EMUL_UNHANDLEABLE;
 }
 
@@ -352,12 +346,6 @@ pv_emulate_cmpxchg(enum x86_segment seg,
     if ( bytes <= sizeof(long) )
         return v->arch.paging.mode->shadow.x86_emulate_cmpxchg(
             v, offset, old[0], new[0], bytes, sh_ctxt);
-
-#ifdef __i386__
-    if ( bytes == 8 )
-        return v->arch.paging.mode->shadow.x86_emulate_cmpxchg8b(
-            v, offset, old[0], old[1], new[0], new[1], sh_ctxt);
-#endif
 
     return X86EMUL_UNHANDLEABLE;
 }
@@ -2879,29 +2867,23 @@ static void sh_update_paging_modes(struct vcpu *v)
             v->arch.guest_table = d->arch.paging.shadow.unpaged_pagetable;
             v->arch.paging.mode = &SHADOW_INTERNAL_NAME(sh_paging_mode, 2);
         }
+        else if ( hvm_long_mode_enabled(v) )
+        {
+            // long mode guest...
+            v->arch.paging.mode =
+                &SHADOW_INTERNAL_NAME(sh_paging_mode, 4);
+        }
+        else if ( hvm_pae_enabled(v) )
+        {
+            // 32-bit PAE mode guest...
+            v->arch.paging.mode =
+                &SHADOW_INTERNAL_NAME(sh_paging_mode, 3);
+        }
         else
         {
-#ifdef __x86_64__
-            if ( hvm_long_mode_enabled(v) )
-            {
-                // long mode guest...
-                v->arch.paging.mode =
-                    &SHADOW_INTERNAL_NAME(sh_paging_mode, 4);
-            }
-            else
-#endif
-                if ( hvm_pae_enabled(v) )
-                {
-                    // 32-bit PAE mode guest...
-                    v->arch.paging.mode =
-                        &SHADOW_INTERNAL_NAME(sh_paging_mode, 3);
-                }
-                else
-                {
-                    // 32-bit 2 level guest...
-                    v->arch.paging.mode =
-                        &SHADOW_INTERNAL_NAME(sh_paging_mode, 2);
-                }
+            // 32-bit 2 level guest...
+            v->arch.paging.mode =
+                &SHADOW_INTERNAL_NAME(sh_paging_mode, 2);
         }
 
         if ( pagetable_is_null(v->arch.monitor_table) )
@@ -3664,11 +3646,6 @@ int shadow_track_dirty_vram(struct domain *d,
     }
     else
     {
-#ifdef __i386__
-        unsigned long map_mfn = INVALID_MFN;
-        void *map_sl1p = NULL;
-#endif
-
         /* Iterate over VRAM to track dirty bits. */
         for ( i = 0; i < nr; i++ ) {
             mfn_t mfn = get_gfn_query_unlocked(d, begin_pfn + i, &t);
@@ -3702,21 +3679,7 @@ int shadow_track_dirty_vram(struct domain *d,
                     {
                         /* Hopefully the most common case: only one mapping,
                          * whose dirty bit we can use. */
-                        l1_pgentry_t *sl1e;
-#ifdef __i386__
-                        void *sl1p = map_sl1p;
-                        unsigned long sl1mfn = paddr_to_pfn(sl1ma);
-
-                        if ( sl1mfn != map_mfn ) {
-                            if ( map_sl1p )
-                                sh_unmap_domain_page(map_sl1p);
-                            map_sl1p = sl1p = sh_map_domain_page(_mfn(sl1mfn));
-                            map_mfn = sl1mfn;
-                        }
-                        sl1e = sl1p + (sl1ma & ~PAGE_MASK);
-#else
-                        sl1e = maddr_to_virt(sl1ma);
-#endif
+                        l1_pgentry_t *sl1e = maddr_to_virt(sl1ma);
 
                         if ( l1e_get_flags(*sl1e) & _PAGE_DIRTY )
                         {
@@ -3742,11 +3705,6 @@ int shadow_track_dirty_vram(struct domain *d,
                 dirty_vram->last_dirty = NOW();
             }
         }
-
-#ifdef __i386__
-        if ( map_sl1p )
-            sh_unmap_domain_page(map_sl1p);
-#endif
 
         rc = -EFAULT;
         if ( copy_to_guest(dirty_bitmap, dirty_vram->dirty_bitmap, dirty_size) == 0 ) {

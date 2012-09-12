@@ -79,16 +79,6 @@ static const char *mtrr_attrib_to_str(int x)
 	return (x <= 6) ? mtrr_strings[x] : "?";
 }
 
-#ifndef CONFIG_X86_64
-static const struct mtrr_ops *mtrr_ops[X86_VENDOR_NUM];
-
-void set_mtrr_ops(const struct mtrr_ops * ops)
-{
-	if (ops->vendor && ops->vendor < X86_VENDOR_NUM)
-		mtrr_ops[ops->vendor] = ops;
-}
-#endif
-
 /*  Returns non-zero if we have the write-combining memory type  */
 static int have_wrcomb(void)
 {
@@ -521,12 +511,6 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 		printk(KERN_WARNING "mtrr: register: %d too big\n", reg);
 		goto out;
 	}
-	if (is_cpu(CYRIX) && !use_intel()) {
-		if ((reg == 3) && arr3_protected) {
-			printk(KERN_WARNING "mtrr: ARR3 cannot be changed\n");
-			goto out;
-		}
-	}
 	mtrr_if->get(reg, &lbase, &lsize, &ltype);
 	if (lsize < 1) {
 		printk(KERN_WARNING "mtrr: MTRR %d not used\n", reg);
@@ -566,18 +550,6 @@ mtrr_del(int reg, unsigned long base, unsigned long size)
 	return mtrr_del_page(reg, base >> PAGE_SHIFT, size >> PAGE_SHIFT);
 }
 
-/* HACK ALERT!
- * These should be called implicitly, but we can't yet until all the initcall
- * stuff is done...
- */
-static void __init init_ifs(void)
-{
-#ifndef CONFIG_X86_64
-	amd_init_mtrr();
-	cyrix_init_mtrr();
-#endif
-}
-
 /* The suspend/resume methods are only for CPU without MTRR. CPU using generic
  * MTRR driver doesn't require this
  */
@@ -598,8 +570,6 @@ unsigned int paddr_bits __read_mostly = 36;
  */
 void __init mtrr_bp_init(void)
 {
-	init_ifs();
-
 	if (cpu_has_mtrr) {
 		mtrr_if = &generic_mtrr_ops;
 		size_or_mask = 0xff000000;	/* 36 bits */
@@ -627,28 +597,6 @@ void __init mtrr_bp_init(void)
 			size_or_mask = 0xfff00000;	/* 32 bits */
 			size_and_mask = 0;
 		}
-	} else {
-#ifndef CONFIG_X86_64
-		switch (boot_cpu_data.x86_vendor) {
-		case X86_VENDOR_AMD:
-			if (cpu_has_k6_mtrr) {
-				/* Pre-Athlon (K6) AMD CPU MTRRs */
-				mtrr_if = mtrr_ops[X86_VENDOR_AMD];
-				size_or_mask = 0xfff00000;	/* 32 bits */
-				size_and_mask = 0;
-			}
-			break;
-		case X86_VENDOR_CYRIX:
-			if (cpu_has_cyrix_arr) {
-				mtrr_if = mtrr_ops[X86_VENDOR_CYRIX];
-				size_or_mask = 0xfff00000;	/* 32 bits */
-				size_and_mask = 0;
-			}
-			break;
-		default:
-			break;
-		}
-#endif
 	}
 
 	if (mtrr_if) {

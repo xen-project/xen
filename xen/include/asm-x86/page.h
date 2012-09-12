@@ -20,11 +20,7 @@
 # include <xen/lib.h>
 #endif
 
-#if defined(__i386__)
-# include <asm/x86_32/page.h>
-#elif defined(__x86_64__)
-# include <asm/x86_64/page.h>
-#endif
+#include <asm/x86_64/page.h>
 
 /* Read a pte atomically from memory. */
 #define l1e_read_atomic(l1ep) \
@@ -358,9 +354,7 @@ void setup_idle_pagetable(void);
 void *alloc_xen_pagetable(void);
 void free_xen_pagetable(void *v);
 l2_pgentry_t *virt_to_xen_l2e(unsigned long v);
-#ifdef __x86_64__
 l3_pgentry_t *virt_to_xen_l3e(unsigned long v);
-#endif
 
 extern void set_pdx_range(unsigned long smfn, unsigned long emfn);
 

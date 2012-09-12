@@ -33,11 +33,7 @@ void  send_IPI_mask(const cpumask_t *mask, int vector);
 
 extern void (*mtrr_hook) (void);
 
-#ifdef CONFIG_X86_64
 extern void zap_low_mappings(void);
-#else
-extern void zap_low_mappings(l2_pgentry_t *base);
-#endif
 
 #define MAX_APICID 256
 extern u32 x86_cpu_to_apicid[];

@@ -44,9 +44,7 @@ static unsigned int is_prefix(u8 opc)
     case 0xF0:
     case 0xF3:
     case 0xF2:
-#if __x86_64__
     case 0x40 ... 0x4f:
-#endif /* __x86_64__ */
         return 1;
     }
     return 0;

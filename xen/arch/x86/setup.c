@@ -86,13 +86,7 @@ cpumask_t __read_mostly cpu_present_map;
 
 unsigned long __read_mostly xen_phys_start;
 
-#ifdef CONFIG_X86_32
-/* Limits of Xen heap, used to initialise the allocator. */
-unsigned long __initdata xenheap_initial_phys_start;
-unsigned long __read_mostly xenheap_phys_end;
-#else
 unsigned long __read_mostly xen_virt_end;
-#endif
 
 DEFINE_PER_CPU(struct tss_struct, init_tss);
 
@@ -174,10 +168,8 @@ static void free_xen_data(char *s, char *e)
     init_xenheap_pages(__pa(s), __pa(e));
 #endif
     memguard_guard_range(s, e-s);
-#if defined(CONFIG_X86_64)
     /* Also zap the mapping in the 1:1 area. */
     memguard_guard_range(__va(__pa(s)), e-s);
-#endif
 }
 
 extern char __init_begin[], __init_end[], __bss_start[];
@@ -271,10 +263,8 @@ static void *__init bootstrap_map(const module_t *mod)
     uint64_t start, end, mask = (1L << L2_PAGETABLE_SHIFT) - 1;
     void *ret;
 
-#ifdef __x86_64__
     if ( system_state != SYS_STATE_early_boot )
         return mod ? mfn_to_virt(mod->mod_start) : NULL;
-#endif
 
     if ( !mod )
     {
@@ -384,7 +374,6 @@ static uint64_t __init consider_modules(
 
 static void __init setup_max_pdx(void)
 {
-#ifdef __x86_64__
     max_pdx = pfn_to_pdx(max_page - 1) + 1;
 
     if ( max_pdx > (DIRECTMAP_SIZE >> PAGE_SHIFT) )
@@ -394,7 +383,6 @@ static void __init setup_max_pdx(void)
         max_pdx = FRAMETABLE_SIZE / sizeof(*frame_table);
 
     max_page = pdx_to_pfn(max_pdx - 1) + 1;
-#endif
 }
 
 void set_pdx_range(unsigned long smfn, unsigned long emfn)
@@ -680,11 +668,9 @@ void __init __start_xen(unsigned long mbi_p)
         destroy_xen_mappings(xen_phys_start,
                              xen_phys_start + BOOTSTRAP_MAP_BASE);
 
-#ifdef CONFIG_X86_64
         /* Make boot page tables match non-EFI boot. */
         l3_bootmap[l3_table_offset(BOOTSTRAP_MAP_BASE)] =
             l3e_from_paddr(__pa(l2_bootmap), __PAGE_HYPERVISOR);
-#endif
 
         memmap_type = loader;
     }
@@ -814,13 +800,10 @@ void __init __start_xen(unsigned long mbi_p)
         {
             end = min(e, limit);
             set_pdx_range(s >> PAGE_SHIFT, end >> PAGE_SHIFT);
-#ifdef CONFIG_X86_64
             map_pages_to_xen((unsigned long)__va(s), s >> PAGE_SHIFT,
                              (end - s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
-#endif
         }
 
-#if defined(CONFIG_X86_64)
         e = min_t(uint64_t, e, 1ULL << (PAGE_SHIFT + 32));
 #define reloc_size ((__pa(&_end) + mask) & ~mask)
         /* Is the region suitable for relocating Xen? */
@@ -916,7 +899,6 @@ void __init __start_xen(unsigned long mbi_p)
 
             bootstrap_map(NULL);
         }
-#endif
 
         /* Is the region suitable for relocating the multiboot modules? */
         for ( j = mbi->mods_count - 1; j >= 0; j-- )
@@ -943,10 +925,6 @@ void __init __start_xen(unsigned long mbi_p)
             }
         }
 
-#ifdef CONFIG_X86_32
-        /* Confine the kexec area to below 4Gb. */
-        e = min_t(uint64_t, e, 1ULL << 32);
-#endif
         /* Don't overlap with modules. */
         e = consider_modules(s, e, PAGE_ALIGN(kexec_crash_area.size),
                              mod, mbi->mods_count, -1);
@@ -966,17 +944,10 @@ void __init __start_xen(unsigned long mbi_p)
         reserve_e820_ram(&boot_e820, s, s + PAGE_ALIGN(mod[i].mod_end));
     }
 
-#if defined(CONFIG_X86_32)
-    xenheap_initial_phys_start = (PFN_UP(__pa(&_end)) + 1) << PAGE_SHIFT;
-    /* Must pass a single mapped page for populating bootmem_region_list. */
-    init_boot_pages(__pa(&_end), xenheap_initial_phys_start);
-    xenheap_phys_end = DIRECTMAP_MBYTES << 20;
-#else
     if ( !xen_phys_start )
         EARLY_FAIL("Not enough memory to relocate Xen.\n");
     reserve_e820_ram(&boot_e820, efi_enabled ? mbi->mem_upper : __pa(&_start),
                      __pa(&_end));
-#endif
 
     /* Late kexec reservation (dynamic start address). */
     kexec_reserve_area(&boot_e820);
@@ -990,22 +961,15 @@ void __init __start_xen(unsigned long mbi_p)
     for ( i = 0; i < boot_e820.nr_map; i++ )
     {
         uint64_t s, e, mask = PAGE_SIZE - 1;
-#ifdef CONFIG_X86_64
         uint64_t map_s, map_e;
-#endif
 
         /* Only page alignment required now. */
         s = (boot_e820.map[i].addr + mask) & ~mask;
         e = (boot_e820.map[i].addr + boot_e820.map[i].size) & ~mask;
-#if defined(CONFIG_X86_32)
-        s = max_t(uint64_t, s, xenheap_phys_end);
-#else
         s = max_t(uint64_t, s, 1<<20);
-#endif
         if ( (boot_e820.map[i].type != E820_RAM) || (s >= e) )
             continue;
 
-#ifdef __x86_64__
         if ( !acpi_boot_table_init_done &&
              s >= (1ULL << 32) &&
              !acpi_boot_table_init() )
@@ -1042,11 +1006,9 @@ void __init __start_xen(unsigned long mbi_p)
                                   " %013"PRIx64"-%013"PRIx64"\n",
                    e, map_e);
         }
-#endif
 
         set_pdx_range(s >> PAGE_SHIFT, e >> PAGE_SHIFT);
 
-#ifdef CONFIG_X86_64
         /* Need to create mappings above BOOTSTRAP_MAP_BASE. */
         map_s = max_t(uint64_t, s, BOOTSTRAP_MAP_BASE);
         map_e = min_t(uint64_t, e,
@@ -1080,29 +1042,22 @@ void __init __start_xen(unsigned long mbi_p)
                              (map_s - s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
             init_boot_pages(s, map_s);
         }
-#else
-        init_boot_pages(s, e);
-#endif
     }
 
     for ( i = 0; i < mbi->mods_count; ++i )
     {
         set_pdx_range(mod[i].mod_start,
                       mod[i].mod_start + PFN_UP(mod[i].mod_end));
-#ifdef CONFIG_X86_64
         map_pages_to_xen((unsigned long)mfn_to_virt(mod[i].mod_start),
                          mod[i].mod_start,
                          PFN_UP(mod[i].mod_end), PAGE_HYPERVISOR);
-#endif
     }
-#ifdef CONFIG_X86_64
     map_pages_to_xen((unsigned long)__va(kexec_crash_area.start),
                      kexec_crash_area.start >> PAGE_SHIFT,
                      PFN_UP(kexec_crash_area.size), PAGE_HYPERVISOR);
     xen_virt_end = ((unsigned long)_end + (1UL << L2_PAGETABLE_SHIFT) - 1) &
                    ~((1UL << L2_PAGETABLE_SHIFT) - 1);
     destroy_xen_mappings(xen_virt_end, XEN_VIRT_START + BOOTSTRAP_MAP_BASE);
-#endif
 
     memguard_init();
 
@@ -1151,30 +1106,10 @@ void __init __start_xen(unsigned long mbi_p)
 
     numa_initmem_init(0, max_page);
 
-#if defined(CONFIG_X86_32)
-    /* Initialise the Xen heap. */
-    for ( nr_pages = i = 0; i < boot_e820.nr_map; i++ )
-    {
-        uint64_t s = boot_e820.map[i].addr;
-        uint64_t e = s + boot_e820.map[i].size;
-        s = max_t(uint64_t, s, xenheap_initial_phys_start);
-        e = min_t(uint64_t, e, xenheap_phys_end);
-        if ( (boot_e820.map[i].type != E820_RAM) || (s >= e) )
-            continue;
-        init_xenheap_pages(s, e);
-        nr_pages += (e - s) >> PAGE_SHIFT;
-    }
-    printk("Xen heap: %luMB (%lukB)\n", 
-           nr_pages >> (20 - PAGE_SHIFT),
-           nr_pages << (PAGE_SHIFT - 10));
-#endif
-
     end_boot_allocator();
     system_state = SYS_STATE_boot;
 
-#if defined(CONFIG_X86_64)
     vesa_init();
-#endif
 
     softirq_init();
     tasklet_subsys_init();
@@ -1217,10 +1152,8 @@ void __init __start_xen(unsigned long mbi_p)
         max_cpus = nr_cpu_ids;
     }
 
-#ifdef CONFIG_X86_64
     /* Low mappings were only needed for some BIOS table parsing. */
     zap_low_mappings();
-#endif
 
     init_apic_mappings();
 
@@ -1268,11 +1201,9 @@ void __init __start_xen(unsigned long mbi_p)
 
     pt_pci_init();
 
-#ifdef CONFIG_X86_64
     vesa_mtrr_init();
 
     acpi_mmcfg_init();
-#endif
 
     iommu_setup();    /* setup iommu if available */
 
@@ -1406,10 +1337,8 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
 
     (*info)[0] = '\0';
 
-#ifdef CONFIG_X86_64
     snprintf(s, sizeof(s), "xen-%d.%d-x86_64 ", major, minor);
     safe_strcat(*info, s);
-#endif
     snprintf(s, sizeof(s), "xen-%d.%d-x86_32p ", major, minor);
     safe_strcat(*info, s);
     if ( hvm_enabled )
@@ -1418,10 +1347,8 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
         safe_strcat(*info, s);
         snprintf(s, sizeof(s), "hvm-%d.%d-x86_32p ", major, minor);
         safe_strcat(*info, s);
-#ifdef CONFIG_X86_64
         snprintf(s, sizeof(s), "hvm-%d.%d-x86_64 ", major, minor);
         safe_strcat(*info, s);
-#endif
     }
 }
 

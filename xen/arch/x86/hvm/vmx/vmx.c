@@ -145,8 +145,6 @@ static void vmx_vcpu_destroy(struct vcpu *v)
     passive_domain_destroy(v);
 }
 
-#ifdef __x86_64__
-
 static DEFINE_PER_CPU(struct vmx_msr_state, host_msr_state);
 
 static u32 msr_index[] =
@@ -337,28 +335,6 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
     if ( cpu_has_rdtscp )
         wrmsrl(MSR_TSC_AUX, hvm_msr_tsc_aux(v));
 }
-
-#else  /* __i386__ */
-
-void vmx_save_host_msrs(void) {}
-#define vmx_restore_host_msrs()     ((void)0)
-
-#define vmx_save_guest_msrs(v)      ((void)0)
-#define vmx_restore_guest_msrs(v)   ((void)0)
-
-static enum handler_return
-long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
-{
-    return HNDL_unhandled;
-}
-
-static enum handler_return
-long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
-{
-    return HNDL_unhandled;
-}
-
-#endif /* __i386__ */
 
 void vmx_update_cpu_exec_control(struct vcpu *v)
 {
@@ -565,7 +541,6 @@ static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
 static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
-#ifdef __x86_64__
     struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
     unsigned long guest_flags = guest_state->flags;
 
@@ -577,14 +552,12 @@ static void vmx_save_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     data->msr_lstar        = guest_state->msrs[VMX_INDEX_MSR_LSTAR];
     data->msr_star         = guest_state->msrs[VMX_INDEX_MSR_STAR];
     data->msr_syscall_mask = guest_state->msrs[VMX_INDEX_MSR_SYSCALL_MASK];
-#endif
 
     data->tsc = hvm_get_guest_tsc(v);
 }
 
 static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 {
-#ifdef __x86_64__
     struct vmx_msr_state *guest_state = &v->arch.hvm_vmx.msr_state;
 
     /* restore msrs */
@@ -595,7 +568,6 @@ static void vmx_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
 
     v->arch.hvm_vmx.cstar     = data->msr_cstar;
     v->arch.hvm_vmx.shadow_gs = data->shadow_gs;
-#endif
 
     hvm_set_guest_tsc(v, data->tsc);
 }
@@ -942,11 +914,7 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
 
 static unsigned long vmx_get_shadow_gs_base(struct vcpu *v)
 {
-#ifdef __x86_64__
     return v->arch.hvm_vmx.shadow_gs;
-#else
-    return 0;
-#endif
 }
 
 static int vmx_set_guest_pat(struct vcpu *v, u64 gpat)
@@ -956,9 +924,6 @@ static int vmx_set_guest_pat(struct vcpu *v, u64 gpat)
 
     vmx_vmcs_enter(v);
     __vmwrite(GUEST_PAT, gpat);
-#ifdef __i386__
-    __vmwrite(GUEST_PAT_HIGH, gpat >> 32);
-#endif
     vmx_vmcs_exit(v);
     return 1;
 }
@@ -970,9 +935,6 @@ static int vmx_get_guest_pat(struct vcpu *v, u64 *gpat)
 
     vmx_vmcs_enter(v);
     *gpat = __vmread(GUEST_PAT);
-#ifdef __i386__
-    *gpat |= (u64)__vmread(GUEST_PAT_HIGH) << 32;
-#endif
     vmx_vmcs_exit(v);
     return 1;
 }
@@ -985,9 +947,6 @@ static void vmx_set_tsc_offset(struct vcpu *v, u64 offset)
         offset += nvmx_get_tsc_offset(v);
 
     __vmwrite(TSC_OFFSET, offset);
-#if defined (__i386__)
-    __vmwrite(TSC_OFFSET_HIGH, offset >> 32);
-#endif
     vmx_vmcs_exit(v);
 }
 
@@ -1074,12 +1033,6 @@ static void vmx_load_pdptrs(struct vcpu *v)
     __vmwrite(GUEST_PDPTR1, guest_pdptrs[1]);
     __vmwrite(GUEST_PDPTR2, guest_pdptrs[2]);
     __vmwrite(GUEST_PDPTR3, guest_pdptrs[3]);
-#ifdef __i386__
-    __vmwrite(GUEST_PDPTR0_HIGH, guest_pdptrs[0] >> 32);
-    __vmwrite(GUEST_PDPTR1_HIGH, guest_pdptrs[1] >> 32);
-    __vmwrite(GUEST_PDPTR2_HIGH, guest_pdptrs[2] >> 32);
-    __vmwrite(GUEST_PDPTR3_HIGH, guest_pdptrs[3] >> 32);
-#endif
 
     vmx_vmcs_exit(v);
 
@@ -1245,7 +1198,6 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
 
 static void vmx_update_guest_efer(struct vcpu *v)
 {
-#ifdef __x86_64__
     unsigned long vm_entry_value;
 
     vmx_vmcs_enter(v);
@@ -1258,7 +1210,6 @@ static void vmx_update_guest_efer(struct vcpu *v)
     __vmwrite(VM_ENTRY_CONTROLS, vm_entry_value);
 
     vmx_vmcs_exit(v);
-#endif
 
     if ( v == current )
         write_efer((read_efer() & ~EFER_SCE) |
@@ -1764,14 +1715,6 @@ static const struct lbr_info {
     { MSR_C2_LASTBRANCH_0_FROM_IP,  NUM_MSR_ATOM_LASTBRANCH_FROM_TO },
     { MSR_C2_LASTBRANCH_0_TO_IP,    NUM_MSR_ATOM_LASTBRANCH_FROM_TO },
     { 0, 0 }
-#ifdef __i386__
-}, pm_lbr[] = {
-    { MSR_IA32_LASTINTFROMIP,       1 },
-    { MSR_IA32_LASTINTTOIP,         1 },
-    { MSR_PM_LASTBRANCH_TOS,        1 },
-    { MSR_PM_LASTBRANCH_0,          NUM_MSR_PM_LASTBRANCH },
-    { 0, 0 }
-#endif
 };
 
 static const struct lbr_info *last_branch_msr_get(void)
@@ -1781,14 +1724,6 @@ static const struct lbr_info *last_branch_msr_get(void)
     case 6:
         switch ( boot_cpu_data.x86_model )
         {
-#ifdef __i386__
-        /* PentiumM */
-        case 9: case 13:
-        /* Core Solo/Duo */
-        case 14:
-            return pm_lbr;
-            break;
-#endif
         /* Core2 Duo */
         case 15:
         /* Enhanced Core */
@@ -1857,9 +1792,6 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         break;
     case MSR_IA32_DEBUGCTLMSR:
         *msr_content = __vmread(GUEST_IA32_DEBUGCTL);
-#ifdef __i386__
-        *msr_content |= (u64)__vmread(GUEST_IA32_DEBUGCTL_HIGH) << 32;
-#endif
         break;
     case IA32_FEATURE_CONTROL_MSR:
     case MSR_IA32_VMX_BASIC...MSR_IA32_VMX_TRUE_ENTRY_CTLS:
@@ -2027,9 +1959,6 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         else
         {
             __vmwrite(GUEST_IA32_DEBUGCTL, msr_content);
-#ifdef __i386__
-            __vmwrite(GUEST_IA32_DEBUGCTL_HIGH, msr_content >> 32);
-#endif
         }
 
         break;
@@ -2697,9 +2626,6 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     case EXIT_REASON_EPT_VIOLATION:
     {
         paddr_t gpa = __vmread(GUEST_PHYSICAL_ADDRESS);
-#ifdef __i386__
-        gpa |= (paddr_t)__vmread(GUEST_PHYSICAL_ADDRESS_HIGH) << 32;
-#endif
         exit_qualification = __vmread(EXIT_QUALIFICATION);
         ept_handle_violation(exit_qualification, gpa);
         break;

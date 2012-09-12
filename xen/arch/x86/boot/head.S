@@ -119,7 +119,6 @@ __start:
 1:      mov     %edx,sym_phys(cpuid_ext_features)
         mov     %edx,sym_phys(boot_cpu_data)+CPUINFO86_ext_features
 
-#if defined(__x86_64__)
         /* Check for availability of long mode. */
         bt      $29,%edx
         jnc     bad_cpu
@@ -138,7 +137,6 @@ __start:
         mov     $sym_phys(l1_identmap)+__PAGE_HYPERVISOR,%edi
         mov     %edi,sym_phys(l2_xenmap)
         mov     %edi,sym_phys(l2_bootmap)
-#endif
 
         /* Apply relocations to bootstrap trampoline. */
         mov     sym_phys(trampoline_phys),%edx
@@ -191,11 +189,7 @@ trampoline_end:
 
         .text
 __high_start:
-#ifdef __x86_64__
 #include "x86_64.S"
-#else
-#include "x86_32.S"
-#endif
 
         .section .data.page_aligned, "aw", @progbits
         .p2align PAGE_SHIFT

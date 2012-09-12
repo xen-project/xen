@@ -662,7 +662,6 @@ static int core2_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
     /* Check the 'Debug Store' feature in the CPUID.EAX[1]:EDX[21] */
     if ( cpu_has(c, X86_FEATURE_DS) )
     {
-#ifdef __x86_64__
         if ( !cpu_has(c, X86_FEATURE_DTES64) )
         {
             printk(XENLOG_G_WARNING "CPU doesn't support 64-bit DS Area"
@@ -670,7 +669,6 @@ static int core2_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
                    v->domain->domain_id, v->vcpu_id);
             goto func_out;
         }
-#endif
         vpmu_set(vpmu, VPMU_CPU_HAS_DS);
         rdmsrl(MSR_IA32_MISC_ENABLE, msr_content);
         if ( msr_content & MSR_IA32_MISC_ENABLE_BTS_UNAVAIL )

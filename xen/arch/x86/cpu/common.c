@@ -281,31 +281,6 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 #endif
 }
 
-#ifdef __i386__
-
-static bool_t __cpuinitdata disable_x86_fxsr;
-boolean_param("nofxsr", disable_x86_fxsr);
-
-static bool_t __cpuinitdata disable_x86_serial_nr;
-boolean_param("noserialnumber", disable_x86_serial_nr);
-
-static void __cpuinit squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
-{
-	if (cpu_has(c, X86_FEATURE_PN) && disable_x86_serial_nr ) {
-		/* Disable processor serial number */
-		uint64_t msr_content;
-		rdmsrl(MSR_IA32_BBL_CR_CTL,msr_content);
-		wrmsrl(MSR_IA32_BBL_CR_CTL, msr_content | 0x200000);
-		printk(KERN_NOTICE "CPU serial number disabled.\n");
-		clear_bit(X86_FEATURE_PN, c->x86_capability);
-
-		/* Disabling the serial number may affect the cpuid level */
-		c->cpuid_level = cpuid_eax(0);
-	}
-}
-
-#endif
-
 /*
  * This does the hard work of actually picking apart the CPU stuff...
  */
@@ -371,20 +346,6 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	 * The vendor-specific functions might have changed features.  Now
 	 * we do "generic changes."
 	 */
-
-#ifdef __i386__
-	/* Disable the PN if appropriate */
-	squash_the_stupid_serial_number(c);
-
-	/* FXSR disabled? */
-	if (disable_x86_fxsr) {
-		clear_bit(X86_FEATURE_FXSR, c->x86_capability);
-		if (!cpu_has_xsave) {
-			clear_bit(X86_FEATURE_XMM, c->x86_capability);
-			clear_bit(X86_FEATURE_AES, c->x86_capability);
-		}
-	}
-#endif
 
 	for (i = 0 ; i < NCAPINTS ; ++i)
 		c->x86_capability[i] &= ~cleared_caps[i];
@@ -602,12 +563,6 @@ void __init early_cpu_init(void)
 {
 	intel_cpu_init();
 	amd_init_cpu();
-#ifdef CONFIG_X86_32
-	cyrix_init_cpu();
-	nsc_init_cpu();
-	centaur_init_cpu();
-	transmeta_init_cpu();
-#endif
 	early_cpu_detect();
 }
 /*
@@ -648,16 +603,9 @@ void __cpuinit cpu_init(void)
 
 	/* Set up and load the per-CPU TSS and LDT. */
 	t->bitmap = IOBMP_INVALID_OFFSET;
-#if defined(CONFIG_X86_32)
-	t->ss0  = __HYPERVISOR_DS;
-	t->esp0 = get_stack_bottom();
-	if ( supervisor_mode_kernel && cpu_has_sep )
-		wrmsr(MSR_IA32_SYSENTER_ESP, &t->esp1, 0);
-#elif defined(CONFIG_X86_64)
 	/* Bottom-of-stack must be 16-byte aligned! */
 	BUG_ON((get_stack_bottom() & 15) != 0);
 	t->rsp0 = get_stack_bottom();
-#endif
 	load_TR();
 	asm volatile ( "lldt %%ax" : : "a" (0) );
 

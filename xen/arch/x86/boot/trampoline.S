@@ -109,8 +109,6 @@ trampoline_protmode_entry:
         jmp     1f
 1:
 
-#if defined(__x86_64__)
-
         /* Now in compatibility mode. Long-jump into 64-bit mode. */
         ljmp    $BOOT_CS64,$bootsym_rel(start64,6)
 
@@ -122,20 +120,6 @@ start64:
 
 high_start:
         .quad   __high_start
-
-#else /* !defined(__x86_64__) */
-
-        /* Install relocated selectors. */
-        lgdt    gdt_descr
-        mov     $(__HYPERVISOR_DS),%eax
-        mov     %eax,%ds
-        mov     %eax,%es
-        mov     %eax,%fs
-        mov     %eax,%gs
-        mov     %eax,%ss
-        ljmp    $(__HYPERVISOR_CS),$__high_start
-
-#endif
 
         .code32
 trampoline_boot_cpu_entry:
@@ -169,7 +153,6 @@ trampoline_boot_cpu_entry:
         lidt    bootsym(rm_idt)
         sti
 
-#if defined(__x86_64__)
         /*
          * Declare that our target operating mode is long mode.
          * Initialise 32-bit registers since some buggy BIOSes depend on it.
@@ -177,7 +160,6 @@ trampoline_boot_cpu_entry:
         movl    $0xec00,%eax      # declare target operating mode
         movl    $0x0002,%ebx      # long mode
         int     $0x15
-#endif
 
         /*
          * Do real-mode work:

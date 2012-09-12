@@ -871,12 +871,10 @@ static void svm_ctxt_switch_from(struct vcpu *v)
     svm_sync_vmcb(v);
     svm_vmload(per_cpu(root_vmcb, cpu));
 
-#ifdef __x86_64__
     /* Resume use of ISTs now that the host TR is reinstated. */
     idt_tables[cpu][TRAP_double_fault].a  |= IST_DF << 32;
     idt_tables[cpu][TRAP_nmi].a           |= IST_NMI << 32;
     idt_tables[cpu][TRAP_machine_check].a |= IST_MCE << 32;
-#endif
 }
 
 static void svm_ctxt_switch_to(struct vcpu *v)
@@ -884,7 +882,6 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int cpu = smp_processor_id();
 
-#ifdef  __x86_64__
     /* 
      * This is required, because VMRUN does consistency check
      * and some of the DOM0 selectors are pointing to 
@@ -902,7 +899,6 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     idt_tables[cpu][TRAP_double_fault].a  &= ~(7UL << 32);
     idt_tables[cpu][TRAP_nmi].a           &= ~(7UL << 32);
     idt_tables[cpu][TRAP_machine_check].a &= ~(7UL << 32);
-#endif
 
     svm_restore_dr(v);
 
@@ -1222,7 +1218,6 @@ static int svm_cpu_up(void)
     /* Initialize core's ASID handling. */
     svm_asid_init(c);
 
-#ifdef __x86_64__
     /*
      * Check whether EFER.LMSLE can be written.
      * Unfortunately there's no feature bit defined for this.
@@ -1242,7 +1237,6 @@ static int svm_cpu_up(void)
             printk(XENLOG_WARNING "Inconsistent LMSLE support across CPUs!\n");
         cpu_has_lmsl = 0;
     }
-#endif
 
     /* Initialize OSVW bits to be used by guests */
     svm_host_osvw_init();

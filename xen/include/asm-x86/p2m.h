@@ -558,7 +558,6 @@ p2m_pod_offline_or_broken_replace(struct page_info *p);
  * Paging to disk and page-sharing
  */
 
-#ifdef __x86_64__
 /* Modify p2m table for shared gfn */
 int set_shared_p2m_entry(struct domain *d, unsigned long gfn, mfn_t mfn);
 
@@ -575,15 +574,7 @@ void p2m_mem_paging_populate(struct domain *d, unsigned long gfn);
 int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer);
 /* Resume normal operation (in case a domain was paused) */
 void p2m_mem_paging_resume(struct domain *d);
-#else
-static inline void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
-                                            p2m_type_t p2mt)
-{ }
-static inline void p2m_mem_paging_populate(struct domain *d, unsigned long gfn)
-{ }
-#endif
 
-#ifdef __x86_64__
 /* Send mem event based on the access (gla is -1ull if not available).  Handles
  * the rw2rx conversion. Boolean return value indicates if access rights have 
  * been promoted with no underlying vcpu pause. If the req_ptr has been populated, 
@@ -604,21 +595,6 @@ int p2m_set_mem_access(struct domain *d, unsigned long start_pfn,
  * If pfn == -1ul, gets the default access type */
 int p2m_get_mem_access(struct domain *d, unsigned long pfn, 
                        hvmmem_access_t *access);
-
-#else
-static inline bool_t p2m_mem_access_check(paddr_t gpa, bool_t gla_valid, 
-                                        unsigned long gla, bool_t access_r, 
-                                        bool_t access_w, bool_t access_x,
-                                        mem_event_request_t **req_ptr)
-{ return 1; }
-static inline int p2m_set_mem_access(struct domain *d, 
-                                     unsigned long start_pfn, 
-                                     uint32_t nr, hvmmem_access_t access)
-{ return -EINVAL; }
-static inline int p2m_get_mem_access(struct domain *d, unsigned long pfn, 
-                                     hvmmem_access_t *access)
-{ return -EINVAL; }
-#endif
 
 /* 
  * Internal functions, only called by other p2m code
@@ -699,13 +675,9 @@ static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
      * to make sure that an entirely empty PTE doesn't have RAM type */
     if ( flags == 0 ) 
         return p2m_invalid;
-#ifdef __x86_64__
     /* AMD IOMMUs use bits 9-11 to encode next io page level and bits
      * 59-62 for iommu flags so we can't use them to store p2m type info. */
     return (flags >> 12) & 0x7f;
-#else
-    return (flags >> 9) & 0x7;
-#endif
 }
 
 /*

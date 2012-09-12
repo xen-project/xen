@@ -5,11 +5,7 @@
 #include <xen/types.h>
 #endif
 
-#if defined(__i386__)
-# define efi_enabled 0
-#else
 extern const bool_t efi_enabled;
-#endif
 
 #define EFI_INVALID_TABLE_ADDR (~0UL)
 

@@ -880,11 +880,9 @@ static int iommu_page_fault_do_one(struct iommu *iommu, int type,
                 seg, (source_id >> 8), PCI_SLOT(source_id & 0xFF),
                 PCI_FUNC(source_id & 0xFF), addr, iommu->reg,
                 fault_reason, reason);
-#ifndef __i386__ /* map_domain_page() cannot be used in this context */
 	if (iommu_debug)
             print_vtd_entries(iommu, (source_id >> 8),
                           (source_id & 0xff), (addr >> PAGE_SHIFT));
-#endif
     }
     else
         INTEL_IOMMU_DEBUG(

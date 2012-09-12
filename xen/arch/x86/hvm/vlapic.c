@@ -1184,11 +1184,6 @@ int vlapic_init(struct vcpu *v)
 
     vlapic->pt.source = PTSRC_lapic;
 
-#ifdef __i386__
-    /* 32-bit VMX may be limited to 32-bit physical addresses. */
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
-        memflags |= MEMF_bits(32);
-#endif
     if (vlapic->regs_page == NULL)
     {
         vlapic->regs_page = alloc_domheap_page(NULL, memflags);

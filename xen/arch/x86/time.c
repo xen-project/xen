@@ -120,31 +120,15 @@ static inline u32 mul_frac(u32 multiplicand, u32 multiplier)
 static inline u64 scale_delta(u64 delta, struct time_scale *scale)
 {
     u64 product;
-#ifdef CONFIG_X86_32
-    u32 tmp1, tmp2;
-#endif
 
     if ( scale->shift < 0 )
         delta >>= -scale->shift;
     else
         delta <<= scale->shift;
 
-#ifdef CONFIG_X86_32
-    asm (
-        "mul  %5       ; "
-        "mov  %4,%%eax ; "
-        "mov  %%edx,%4 ; "
-        "mul  %5       ; "
-        "xor  %5,%5    ; "
-        "add  %4,%%eax ; "
-        "adc  %5,%%edx ; "
-        : "=A" (product), "=r" (tmp1), "=r" (tmp2)
-        : "a" ((u32)delta), "1" ((u32)(delta >> 32)), "2" (scale->mul_frac) );
-#else
     asm (
         "mul %%rdx ; shrd $32,%%rdx,%%rax"
         : "=a" (product) : "0" (delta), "d" ((u64)scale->mul_frac) );
-#endif
 
     return product;
 }

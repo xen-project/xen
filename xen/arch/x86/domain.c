@@ -184,11 +184,8 @@ struct domain *alloc_domain_struct(void)
      * We pack the PDX of the domain structure into a 32-bit field within
      * the page_info structure. Hence the MEMF_bits() restriction.
      */
-    unsigned int bits = 32 + PAGE_SHIFT;
+    unsigned int bits = 32 + PAGE_SHIFT + pfn_pdx_hole_shift;
 
-#ifdef __x86_64__
-    bits += pfn_pdx_hole_shift;
-#endif
     BUILD_BUG_ON(sizeof(*d) > PAGE_SIZE);
     d = alloc_xenheap_pages(0, MEMF_bits(bits));
     if ( d != NULL )
@@ -232,9 +229,6 @@ struct vcpu_guest_context *alloc_vcpu_guest_context(void)
     enum fixed_addresses idx = FIX_VGC_BEGIN -
         cpu * PFN_UP(sizeof(struct vcpu_guest_context));
 
-#ifdef __i386__
-    BUILD_BUG_ON(sizeof(struct vcpu_guest_context) > PAGE_SIZE);
-#endif
     BUG_ON(per_cpu(vgc_pages[0], cpu) != NULL);
 
     for ( i = 0; i < PFN_UP(sizeof(struct vcpu_guest_context)); ++i )
@@ -269,8 +263,6 @@ void free_vcpu_guest_context(struct vcpu_guest_context *vgc)
         per_cpu(vgc_pages[i], cpu) = NULL;
     }
 }
-
-#ifdef __x86_64__
 
 static int setup_compat_l4(struct vcpu *v)
 {
@@ -376,11 +368,6 @@ int switch_compat(struct domain *d)
     return -ENOMEM;
 }
 
-#else
-#define setup_compat_l4(v) 0
-#define release_compat_l4(v) ((void)0)
-#endif
-
 static inline bool_t standalone_trap_ctxt(struct vcpu *v)
 {
     BUILD_BUG_ON(256 * sizeof(*v->arch.pv_vcpu.trap_ctxt) > PAGE_SIZE);
@@ -390,31 +377,23 @@ static inline bool_t standalone_trap_ctxt(struct vcpu *v)
 int vcpu_initialise(struct vcpu *v)
 {
     struct domain *d = v->domain;
+    unsigned int idx;
     int rc;
 
     v->arch.flags = TF_kernel_mode;
 
-#if defined(__i386__)
-    mapcache_vcpu_init(v);
-#else
+    idx = perdomain_pt_pgidx(v);
+    if ( !perdomain_pt_page(d, idx) )
     {
-        unsigned int idx = perdomain_pt_pgidx(v);
         struct page_info *pg;
-
-        if ( !perdomain_pt_page(d, idx) )
-        {
-            pg = alloc_domheap_page(NULL, MEMF_node(vcpu_to_node(v)));
-            if ( !pg )
-                return -ENOMEM;
-            clear_page(page_to_virt(pg));
-            perdomain_pt_page(d, idx) = pg;
-            d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)+idx]
-                = l2e_from_page(pg, __PAGE_HYPERVISOR);
-        }
+        pg = alloc_domheap_page(NULL, MEMF_node(vcpu_to_node(v)));
+        if ( !pg )
+            return -ENOMEM;
+        clear_page(page_to_virt(pg));
+        perdomain_pt_page(d, idx) = pg;
+        d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)+idx]
+            = l2e_from_page(pg, __PAGE_HYPERVISOR);
     }
-#endif
-
-    pae_l3_cache_init(&v->arch.pae_l3_cache);
 
     paging_vcpu_init(v);
 
@@ -499,11 +478,7 @@ void vcpu_destroy(struct vcpu *v)
 
 int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
-#ifdef __x86_64__
     struct page_info *pg;
-#else
-    int pdpt_order;
-#endif
     int i, paging_initialised = 0;
     int rc = -ENOMEM;
 
@@ -519,18 +494,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
     d->arch.relmem = RELMEM_not_started;
     INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
-
-#if defined(__i386__)
-
-    pdpt_order = get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t));
-    d->arch.mm_perdomain_pt = alloc_xenheap_pages(pdpt_order, 0);
-    if ( d->arch.mm_perdomain_pt == NULL )
-        goto fail;
-    memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE << pdpt_order);
-
-    mapcache_domain_init(d);
-
-#else /* __x86_64__ */
 
     if ( d->domain_id && !is_idle_domain(d) &&
          cpu_has_amd_erratum(&boot_cpu_data, AMD_ERRATUM_121) )
@@ -571,8 +534,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
     HYPERVISOR_COMPAT_VIRT_START(d) =
         is_hvm_domain(d) ? ~0u : __HYPERVISOR_COMPAT_VIRT_START;
-
-#endif /* __x86_64__ */
 
     if ( (rc = paging_domain_init(d, domcr_flags)) != 0 )
         goto fail;
@@ -647,24 +608,18 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     free_xenheap_page(d->shared_info);
     if ( paging_initialised )
         paging_final_teardown(d);
-#ifdef __x86_64__
     if ( d->arch.mm_perdomain_l2 )
         free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
     if ( d->arch.mm_perdomain_l3 )
         free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
     if ( d->arch.mm_perdomain_pt_pages )
         free_domheap_page(virt_to_page(d->arch.mm_perdomain_pt_pages));
-#else
-    free_xenheap_pages(d->arch.mm_perdomain_pt, pdpt_order);
-#endif
     return rc;
 }
 
 void arch_domain_destroy(struct domain *d)
 {
-#ifdef __x86_64__
     unsigned int i;
-#endif
 
     if ( is_hvm_domain(d) )
         hvm_domain_destroy(d);
@@ -678,11 +633,6 @@ void arch_domain_destroy(struct domain *d)
 
     paging_final_teardown(d);
 
-#ifdef __i386__
-    free_xenheap_pages(
-        d->arch.mm_perdomain_pt,
-        get_order_from_bytes(PDPT_L1_ENTRIES * sizeof(l1_pgentry_t)));
-#else
     for ( i = 0; i < PDPT_L2_ENTRIES; ++i )
     {
         if ( perdomain_pt_page(d, i) )
@@ -691,7 +641,6 @@ void arch_domain_destroy(struct domain *d)
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_pt_pages));
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
-#endif
 
     free_xenheap_page(d->shared_info);
     cleanup_domain_irq_mapping(d);
@@ -751,21 +700,15 @@ int arch_set_info_guest(
     {
         if ( !compat )
         {
-#ifdef __x86_64__
             if ( !is_canonical_address(c.nat->user_regs.eip) ||
                  !is_canonical_address(c.nat->event_callback_eip) ||
                  !is_canonical_address(c.nat->syscall_callback_eip) ||
                  !is_canonical_address(c.nat->failsafe_callback_eip) )
                 return -EINVAL;
-#endif
 
             fixup_guest_stack_selector(d, c.nat->user_regs.ss);
             fixup_guest_stack_selector(d, c.nat->kernel_ss);
             fixup_guest_code_selector(d, c.nat->user_regs.cs);
-#ifdef __i386__
-            fixup_guest_code_selector(d, c.nat->event_callback_cs);
-            fixup_guest_code_selector(d, c.nat->failsafe_callback_cs);
-#endif
 
             for ( i = 0; i < 256; i++ )
             {
@@ -863,7 +806,6 @@ int arch_set_info_guest(
         if ( !compat )
         {
             fail = xen_pfn_to_cr3(pfn) != c.nat->ctrlreg[3];
-#ifdef CONFIG_X86_64
             if ( pagetable_is_null(v->arch.guest_table_user) )
                 fail |= c.nat->ctrlreg[1] || !(flags & VGCF_in_kernel);
             else
@@ -876,7 +818,6 @@ int arch_set_info_guest(
 
             pfn = l4e_get_pfn(*l4tab);
             fail = compat_pfn_to_cr3(pfn) != c.cmp->ctrlreg[3];
-#endif
         }
 
         for ( i = 0; i < ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames); ++i )
@@ -897,7 +838,6 @@ int arch_set_info_guest(
 
     v->arch.pv_vcpu.event_callback_eip = c(event_callback_eip);
     v->arch.pv_vcpu.failsafe_callback_eip = c(failsafe_callback_eip);
-#ifdef CONFIG_X86_64
     if ( !compat )
     {
         v->arch.pv_vcpu.syscall_callback_eip = c.nat->syscall_callback_eip;
@@ -906,7 +846,6 @@ int arch_set_info_guest(
         v->arch.pv_vcpu.gs_base_user = c.nat->gs_base_user;
     }
     else
-#endif
     {
         v->arch.pv_vcpu.event_callback_cs = c(event_callback_cs);
         v->arch.pv_vcpu.failsafe_callback_cs = c(failsafe_callback_cs);
@@ -968,7 +907,6 @@ int arch_set_info_guest(
         }
 
         v->arch.guest_table = pagetable_from_page(cr3_page);
-#ifdef __x86_64__
         if ( c.nat->ctrlreg[1] )
         {
             cr3_gfn = xen_cr3_to_pfn(c.nat->ctrlreg[1]);
@@ -1022,7 +960,6 @@ int arch_set_info_guest(
         l4tab = __va(pagetable_get_paddr(v->arch.guest_table));
         *l4tab = l4e_from_pfn(page_to_mfn(cr3_page),
             _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
-#endif
     }
 
     if ( v->vcpu_id == 0 )
@@ -1256,8 +1193,6 @@ arch_do_vcpu_op(
     return rc;
 }
 
-#ifdef __x86_64__
-
 #define loadsegment(seg,value) ({               \
     int __r = 1;                                \
     asm volatile (                              \
@@ -1482,20 +1417,6 @@ static void save_segments(struct vcpu *v)
 }
 
 #define switch_kernel_stack(v) ((void)0)
-
-#elif defined(__i386__)
-
-#define load_segments(n) ((void)0)
-#define save_segments(p) ((void)0)
-
-static inline void switch_kernel_stack(struct vcpu *v)
-{
-    struct tss_struct *tss = &this_cpu(init_tss);
-    tss->esp1 = v->arch.pv_vcpu.kernel_sp;
-    tss->ss1  = v->arch.pv_vcpu.kernel_ss;
-}
-
-#endif /* __i386__ */
 
 static void paravirt_ctxt_switch_from(struct vcpu *v)
 {
@@ -1812,7 +1733,6 @@ unsigned long hypercall_create_continuation(
         else
             current->arch.hvm_vcpu.hcall_preempted = 1;
 
-#ifdef __x86_64__
         if ( !is_hvm_vcpu(current) ?
              !is_pv_32on64_vcpu(current) :
              (hvm_guest_x86_mode(current) == 8) )
@@ -1832,7 +1752,6 @@ unsigned long hypercall_create_continuation(
             }
         }
         else
-#endif
         {
             if ( supervisor_mode_kernel )
                 regs->eip &= ~31; /* re-execute entire hypercall entry stub */
@@ -2066,7 +1985,6 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
     struct domain *d = v->domain;
     unsigned long pfn;
 
-#ifdef __x86_64__
     if ( is_pv_32on64_vcpu(v) )
     {
         pfn = l4e_get_pfn(*(l4_pgentry_t *)
@@ -2087,7 +2005,6 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
         v->arch.cr3 = 0;
         return;
     }
-#endif
 
     pfn = pagetable_get_pfn(v->arch.guest_table);
     if ( pfn != 0 )
@@ -2099,7 +2016,6 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
         v->arch.guest_table = pagetable_null();
     }
 
-#ifdef __x86_64__
     /* Drop ref to guest_table_user (from MMUEXT_NEW_USER_BASEPTR) */
     pfn = pagetable_get_pfn(v->arch.guest_table_user);
     if ( pfn != 0 )
@@ -2113,7 +2029,6 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
         }
         v->arch.guest_table_user = pagetable_null();
     }
-#endif
 
     v->arch.cr3 = 0;
 }

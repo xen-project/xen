@@ -48,7 +48,6 @@ enum vmx_regs_enc {
     VMX_REG_RBP,
     VMX_REG_RSI,
     VMX_REG_RDI,
-#ifdef CONFIG_X86_64
     VMX_REG_R8,
     VMX_REG_R9,
     VMX_REG_R10,
@@ -57,7 +56,6 @@ enum vmx_regs_enc {
     VMX_REG_R13,
     VMX_REG_R14,
     VMX_REG_R15,
-#endif
 };
 
 enum vmx_sregs_enc {

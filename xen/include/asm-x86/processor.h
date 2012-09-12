@@ -148,19 +148,11 @@ struct vcpu;
  * Default implementation of macro that returns current
  * instruction pointer ("program counter").
  */
-#ifdef __x86_64__
 #define current_text_addr() ({                      \
     void *pc;                                       \
     asm ( "leaq 1f(%%rip),%0\n1:" : "=r" (pc) );    \
     pc;                                             \
 })
-#else
-#define current_text_addr() ({                  \
-    void *pc;                                   \
-    asm ( "movl $1f,%0\n1:" : "=g" (pc) );      \
-    pc;                                         \
-})
-#endif
 
 struct cpuinfo_x86 {
     __u8 x86;            /* CPU family */
@@ -419,7 +411,6 @@ static always_inline void __mwait(unsigned long eax, unsigned long ecx)
 
 struct tss_struct {
     unsigned short	back_link,__blh;
-#ifdef __x86_64__
     union { u64 rsp0, esp0; };
     union { u64 rsp1, esp1; };
     union { u64 rsp2, esp2; };
@@ -429,41 +420,15 @@ struct tss_struct {
                  * Descriptor */
     u64 reserved2;
     u16 reserved3;
-#else
-    u32 esp0;
-    u16 ss0,__ss0h;
-    u32 esp1;
-    u16 ss1,__ss1h;
-    u32 esp2;
-    u16 ss2,__ss2h;
-    u32 __cr3;
-    u32 eip;
-    u32 eflags;
-    u32 eax,ecx,edx,ebx;
-    u32 esp;
-    u32 ebp;
-    u32 esi;
-    u32 edi;
-    u16 es, __esh;
-    u16 cs, __csh;
-    u16 ss, __ssh;
-    u16 ds, __dsh;
-    u16 fs, __fsh;
-    u16 gs, __gsh;
-    u16 ldt, __ldth;
-    u16 trace;
-#endif
     u16 bitmap;
     /* Pads the TSS to be cacheline-aligned (total size is 0x80). */
     u8 __cacheline_filler[24];
 } __cacheline_aligned __attribute__((packed));
 
-#ifdef __x86_64__
-# define IST_DF  1UL
-# define IST_NMI 2UL
-# define IST_MCE 3UL
-# define IST_MAX 3UL
-#endif
+#define IST_DF  1UL
+#define IST_NMI 2UL
+#define IST_MCE 3UL
+#define IST_MAX 3UL
 
 #define IDT_ENTRIES 256
 extern idt_entry_t idt_table[];
@@ -473,17 +438,7 @@ DECLARE_PER_CPU(struct tss_struct, init_tss);
 
 extern void init_int80_direct_trap(struct vcpu *v);
 
-#if defined(CONFIG_X86_32)
-
-#define set_int80_direct_trap(_ed)                  \
-    (memcpy(idt_tables[(_ed)->processor] + 0x80,    \
-            &((_ed)->arch.pv_vcpu.int80_desc), 8))
-
-#else
-
 #define set_int80_direct_trap(_ed)  ((void)0)
-
-#endif
 
 extern int gpf_emulate_4gb(struct cpu_user_regs *regs);
 

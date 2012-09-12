@@ -52,8 +52,6 @@ struct page_sharing_info
     };
 };
 
-#ifdef __x86_64__
-
 #define sharing_supported(_d) \
     (is_hvm_domain(_d) && paging_mode_hap(_d)) 
 
@@ -105,15 +103,5 @@ void mem_sharing_init(void);
  * Preemptible.
  */
 int relinquish_shared_pages(struct domain *d);
-
-#else 
-
-#define mem_sharing_init()  do { } while (0)
-static inline int relinquish_shared_pages(struct domain *d)
-{
-    return 0;
-}
-
-#endif /* __x86_64__ */
 
 #endif /* __MEM_SHARING_H__ */

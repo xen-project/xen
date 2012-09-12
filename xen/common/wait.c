@@ -140,7 +140,6 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
     }
 
     asm volatile (
-#ifdef CONFIG_X86_64
         "push %%rax; push %%rbx; push %%rdx; "
         "push %%rbp; push %%r8; push %%r9; push %%r10; push %%r11; "
         "push %%r12; push %%r13; push %%r14; push %%r15; call 1f; "
@@ -151,15 +150,6 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
         "pop %%r15; pop %%r14; pop %%r13; pop %%r12; "
         "pop %%r11; pop %%r10; pop %%r9; pop %%r8; "
         "pop %%rbp; pop %%rdx; pop %%rbx; pop %%rax"
-#else
-        "push %%eax; push %%ebx; push %%edx; "
-        "push %%ebp; call 1f; "
-        "1: mov %%esp,%%esi; addl $2f-1b,(%%esp); "
-        "sub %%esi,%%ecx; cmp %3,%%ecx; jbe 2f; "
-        "xor %%esi,%%esi; jmp 3f; "
-        "2: rep movsb; mov %%esp,%%esi; 3: pop %%eax; "
-        "pop %%ebp; pop %%edx; pop %%ebx; pop %%eax"
-#endif
         : "=&S" (wqv->esp), "=&c" (dummy), "=&D" (dummy)
         : "i" (PAGE_SIZE), "1" (cpu_info), "2" (wqv->stack)
         : "memory" );

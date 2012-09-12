@@ -56,7 +56,6 @@ obj-$(CONFIG_XENCOMM) += xencomm.o
 
 subdir-$(CONFIG_COMPAT) += compat
 
-subdir-$(x86_32) += hvm
 subdir-$(x86_64) += hvm
 
 subdir-y += libelf

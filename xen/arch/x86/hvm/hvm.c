@@ -681,7 +681,6 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         ctxt.rsp = v->arch.user_regs.esp;
         ctxt.rip = v->arch.user_regs.eip;
         ctxt.rflags = v->arch.user_regs.eflags;
-#ifdef __x86_64__
         ctxt.r8  = v->arch.user_regs.r8;
         ctxt.r9  = v->arch.user_regs.r9;
         ctxt.r10 = v->arch.user_regs.r10;
@@ -690,7 +689,6 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         ctxt.r13 = v->arch.user_regs.r13;
         ctxt.r14 = v->arch.user_regs.r14;
         ctxt.r15 = v->arch.user_regs.r15;
-#endif
         ctxt.dr0 = v->arch.debugreg[0];
         ctxt.dr1 = v->arch.debugreg[1];
         ctxt.dr2 = v->arch.debugreg[2];
@@ -867,7 +865,6 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     v->arch.user_regs.esp = ctxt.rsp;
     v->arch.user_regs.eip = ctxt.rip;
     v->arch.user_regs.eflags = ctxt.rflags | 2;
-#ifdef __x86_64__
     v->arch.user_regs.r8  = ctxt.r8;
     v->arch.user_regs.r9  = ctxt.r9;
     v->arch.user_regs.r10 = ctxt.r10;
@@ -876,7 +873,6 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     v->arch.user_regs.r13 = ctxt.r13;
     v->arch.user_regs.r14 = ctxt.r14;
     v->arch.user_regs.r15 = ctxt.r15;
-#endif
     v->arch.debugreg[0] = ctxt.dr0;
     v->arch.debugreg[1] = ctxt.dr1;
     v->arch.debugreg[2] = ctxt.dr2;
@@ -1259,9 +1255,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
     struct vcpu *v = current;
     struct p2m_domain *p2m;
     int rc, fall_through = 0, paged = 0;
-#ifdef __x86_64__
     int sharing_enomem = 0;
-#endif
     mem_event_request_t *req_ptr = NULL;
 
     /* On Nested Virtualization, walk the guest page table.
@@ -1370,7 +1364,6 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
         goto out;
     }
 
-#ifdef __x86_64__
     /* Check if the page has been paged out */
     if ( p2m_is_paged(p2mt) || (p2mt == p2m_ram_paging_out) )
         paged = 1;
@@ -1384,7 +1377,6 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
         rc = 1;
         goto out_put_gfn;
     }
-#endif
  
     /* Spurious fault? PoD and log-dirty also take this path. */
     if ( p2m_is_ram(p2mt) )
@@ -1426,7 +1418,6 @@ out:
      * locks in such circumstance */
     if ( paged )
         p2m_mem_paging_populate(v->domain, gfn);
-#ifdef __x86_64__
     if ( sharing_enomem )
     {
         int rv;
@@ -1439,7 +1430,6 @@ out:
             rc = 0;
         }
     }
-#endif
     if ( req_ptr )
     {
         mem_access_send_req(v->domain, req_ptr);
@@ -2625,14 +2615,12 @@ unsigned long copy_to_user_hvm(void *to, const void *from, unsigned int len)
 {
     int rc;
 
-#ifdef __x86_64__
     if ( !current->arch.hvm_vcpu.hcall_64bit &&
          is_compat_arg_xlat_range(to, len) )
     {
         memcpy(to, from, len);
         return 0;
     }
-#endif
 
     rc = hvm_copy_to_guest_virt_nofault((unsigned long)to, (void *)from,
                                         len, 0);
@@ -2643,14 +2631,12 @@ unsigned long clear_user_hvm(void *to, unsigned int len)
 {
     int rc;
 
-#ifdef __x86_64__
     if ( !current->arch.hvm_vcpu.hcall_64bit &&
          is_compat_arg_xlat_range(to, len) )
     {
         memset(to, 0x00, len);
         return 0;
     }
-#endif
 
     rc = __hvm_clear((unsigned long)to, len);
     return rc ? len : 0; /* fake a copy_to_user() return code */
@@ -2660,14 +2646,12 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
 {
     int rc;
 
-#ifdef __x86_64__
     if ( !current->arch.hvm_vcpu.hcall_64bit &&
          is_compat_arg_xlat_range(from, len) )
     {
         memcpy(to, from, len);
         return 0;
     }
-#endif
 
     rc = hvm_copy_from_guest_virt_nofault(to, (unsigned long)from, len, 0);
     return rc ? len : 0; /* fake a copy_from_user() return code */
@@ -3121,24 +3105,6 @@ typedef unsigned long hvm_hypercall_t(
 #define HYPERCALL(x)                                        \
     [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x
 
-#if defined(__i386__)
-
-static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
-    [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op,
-    [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
-    [ __HYPERVISOR_vcpu_op ] = (hvm_hypercall_t *)hvm_vcpu_op,
-    [ __HYPERVISOR_physdev_op ] = (hvm_hypercall_t *)hvm_physdev_op,
-    HYPERCALL(xen_version),
-    HYPERCALL(event_channel_op),
-    HYPERCALL(sched_op),
-    HYPERCALL(set_timer_op),
-    HYPERCALL(hvm_op),
-    HYPERCALL(sysctl),
-    HYPERCALL(tmem_op)
-};
-
-#else /* defined(__x86_64__) */
-
 static long hvm_grant_table_op_compat32(unsigned int cmd,
                                         XEN_GUEST_HANDLE(void) uop,
                                         unsigned int count)
@@ -3239,8 +3205,6 @@ static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(tmem_op)
 };
 
-#endif /* defined(__x86_64__) */
-
 int hvm_do_hypercall(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
@@ -3250,9 +3214,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 
     switch ( mode )
     {
-#ifdef __x86_64__
     case 8:        
-#endif
     case 4:
     case 2:
         hvm_get_segment_register(curr, x86_seg_ss, &sreg);
@@ -3277,7 +3239,6 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
 
     curr->arch.hvm_vcpu.hcall_preempted = 0;
 
-#ifdef __x86_64__
     if ( mode == 8 )
     {
         HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%lx, %lx, %lx, %lx, %lx, %lx)",
@@ -3294,7 +3255,6 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
         curr->arch.hvm_vcpu.hcall_64bit = 0;
     }
     else
-#endif
     {
         HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%x, %x, %x, %x, %x, %x)", eax,
                     (uint32_t)regs->ebx, (uint32_t)regs->ecx,
@@ -4369,7 +4329,6 @@ int hvm_debug_op(struct vcpu *v, int32_t op)
     return rc;
 }
 
-#ifdef __x86_64__
 static int hvm_memory_event_traps(long p, uint32_t reason,
                                   unsigned long value, unsigned long old, 
                                   bool_t gla_valid, unsigned long gla) 
@@ -4462,7 +4421,6 @@ int hvm_memory_event_single_step(unsigned long gla)
             MEM_EVENT_REASON_SINGLESTEP,
             gfn, 0, 1, gla);
 }
-#endif /* __x86_64__ */
 
 int nhvm_vcpu_hostrestore(struct vcpu *v, struct cpu_user_regs *regs)
 {

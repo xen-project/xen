@@ -34,11 +34,7 @@
 #define XSTATE_NONLAZY (XSTATE_LWP)
 #define XSTATE_LAZY    (XSTATE_ALL & ~XSTATE_NONLAZY)
 
-#ifdef CONFIG_X86_64
 #define REX_PREFIX     "0x48, "
-#else
-#define REX_PREFIX
-#endif
 
 /* extended state variables */
 DECLARE_PER_CPU(uint64_t, xcr0);
@@ -58,9 +54,7 @@ struct xsave_struct
             uint8_t rsvd1;
             uint16_t fop;
             union {
-#ifdef __x86_64__
                 uint64_t addr;
-#endif
                 struct {
                     uint32_t offs;
                     uint16_t sel;

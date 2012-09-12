@@ -56,11 +56,7 @@
 #define DO_TRC_HVM_VLAPIC           DEFAULT_HVM_MISC
 
 
-#ifdef __x86_64__
 #define TRC_PAR_LONG(par) ((par)&0xFFFFFFFF),((par)>>32)
-#else
-#define TRC_PAR_LONG(par) (par)
-#endif
 
 #define HVMTRACE_ND(evt, modifier, cycles, count, d1, d2, d3, d4, d5, d6) \
     do {                                                                  \
@@ -95,9 +91,6 @@
 #define HVMTRACE_0D(evt)                            \
     HVMTRACE_ND(evt, 0, 0, 0,  0,  0,  0,  0,  0,  0)
 
-
-
-#ifdef __x86_64__
 #define HVMTRACE_LONG_1D(evt, d1)                  \
                    HVMTRACE_2D(evt ## 64, (d1) & 0xFFFFFFFF, (d1) >> 32)
 #define HVMTRACE_LONG_2D(evt, d1, d2, ...)              \
@@ -106,12 +99,6 @@
                    HVMTRACE_4D(evt ## 64, d1, d2, d3)
 #define HVMTRACE_LONG_4D(evt, d1, d2, d3, d4, ...)  \
                    HVMTRACE_5D(evt ## 64, d1, d2, d3, d4)
-#else
-#define HVMTRACE_LONG_1D HVMTRACE_1D
-#define HVMTRACE_LONG_2D HVMTRACE_2D
-#define HVMTRACE_LONG_3D HVMTRACE_3D
-#define HVMTRACE_LONG_4D HVMTRACE_4D
-#endif
 
 #endif /* __ASM_X86_HVM_TRACE_H__ */
 

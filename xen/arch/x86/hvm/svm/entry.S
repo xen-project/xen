@@ -33,24 +33,11 @@
 
 #define get_current(reg) GET_CURRENT(r(reg))
         
-#if defined(__x86_64__)
 #define r(reg) %r##reg
 #define addr_of(lbl) lbl(%rip)
 #define call_with_regs(fn)                      \
         mov  %rsp,%rdi;                         \
         call fn;
-#else /* defined(__i386__) */
-#define r(reg) %e##reg
-#define addr_of(lbl) lbl
-#define UREGS_rax UREGS_eax
-#define UREGS_rip UREGS_eip
-#define UREGS_rsp UREGS_esp
-#define call_with_regs(fn)                      \
-        mov  %esp,%eax;                         \
-        push %eax;                              \
-        call fn;                                \
-        add  $4,%esp;
-#endif
 
 ENTRY(svm_asm_do_resume)
         call svm_intr_assist
@@ -93,7 +80,6 @@ UNLIKELY_END(svm_trace)
 
         mov  VCPU_svm_vmcb_pa(r(bx)),r(ax)
 
-#if defined(__x86_64__)
         pop  %r15
         pop  %r14
         pop  %r13
@@ -109,18 +95,9 @@ UNLIKELY_END(svm_trace)
         pop  %rdx
         pop  %rsi
         pop  %rdi
-#else /* defined(__i386__) */
-        pop  %ebx
-        pop  %ecx
-        pop  %edx
-        pop  %esi
-        pop  %edi
-        pop  %ebp
-#endif
 
         VMRUN
 
-#if defined(__x86_64__)
         push %rdi
         push %rsi
         push %rdx
@@ -136,14 +113,6 @@ UNLIKELY_END(svm_trace)
         push %r13
         push %r14
         push %r15
-#else /* defined(__i386__) */
-        push %ebp
-        push %edi
-        push %esi
-        push %edx
-        push %ecx
-        push %ebx
-#endif
 
         get_current(bx)
         movb $0,VCPU_svm_vmcb_in_sync(r(bx))

@@ -1,11 +1,7 @@
 #ifndef __X86_BUG_H__
 #define __X86_BUG_H__
 
-#ifdef __x86_64__
 #include <asm/x86_64/bug.h>
-#else
-#include <asm/x86_32/bug.h>
-#endif
 
 struct bug_frame {
     unsigned char ud2[2];

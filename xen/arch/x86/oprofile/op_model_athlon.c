@@ -53,12 +53,8 @@ static unsigned long reset_value[MAX_COUNTERS];
 
 extern char svm_stgi_label[];
 
-#ifdef CONFIG_X86_64
 u32 ibs_caps = 0;
 static u64 ibs_op_ctl;
-#else
-#define ibs_op_ctl 0
-#endif
 
 /* IBS cpuid feature detection */
 #define IBS_CPUID_FEATURES              0x8000001b
@@ -352,7 +348,6 @@ static int athlon_check_ctrs(unsigned int const cpu,
 
 static inline void start_ibs(void)
 {
-#ifdef CONFIG_X86_64
 	u64 val = 0;
 
 	if (!ibs_caps)
@@ -390,7 +385,6 @@ static inline void start_ibs(void)
 		val = op_amd_randomize_ibs_op(ibs_op_ctl);
 		wrmsrl(MSR_AMD64_IBSOPCTL, val);
 	}
-#endif
 }
  
 static void athlon_start(struct op_msrs const * const msrs)
@@ -438,8 +432,6 @@ static void athlon_stop(struct op_msrs const * const msrs)
 
 	stop_ibs();
 }
-
-#ifdef CONFIG_X86_64
 
 #define IBSCTL_LVTOFFSETVAL             (1 << 8)
 #define APIC_EILVT_MSG_NMI              0x4
@@ -534,8 +526,6 @@ void __init ibs_init(void)
 	printk("Xenoprofile: AMD IBS detected (0x%08x)\n",
 		(unsigned)ibs_caps);
 }
-
-#endif /* CONFIG_X86_64 */
 
 struct op_x86_model_spec const op_athlon_spec = {
 	.num_counters = K7_NUM_COUNTERS,

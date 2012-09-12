@@ -83,14 +83,6 @@ struct shadow_paging_mode {
                                             unsigned long new,
                                             unsigned int bytes,
                                             struct sh_emulate_ctxt *sh_ctxt);
-#ifdef __i386__
-    int           (*x86_emulate_cmpxchg8b )(struct vcpu *v, unsigned long va,
-                                            unsigned long old_lo, 
-                                            unsigned long old_hi, 
-                                            unsigned long new_lo,
-                                            unsigned long new_hi,
-                                            struct sh_emulate_ctxt *sh_ctxt);
-#endif
     mfn_t         (*make_monitor_table    )(struct vcpu *v);
     void          (*destroy_monitor_table )(struct vcpu *v, mfn_t mmfn);
     int           (*guess_wrmap           )(struct vcpu *v, 
@@ -423,12 +415,8 @@ guest_get_eff_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
 static inline void
 guest_get_eff_kern_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
 {
-#if defined(__x86_64__)
     int user_mode = !(v->arch.flags & TF_kernel_mode);
 #define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(v)
-#else
-#define TOGGLE_MODE() ((void)0)
-#endif
 
     TOGGLE_MODE();
     guest_get_eff_l1e(v, addr, eff_l1e);

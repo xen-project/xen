@@ -311,35 +311,6 @@ unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
     saved->aperf.whole = readin.aperf.whole;
     saved->mperf.whole = readin.mperf.whole;
 
-#ifdef __i386__
-    /*
-     * We dont want to do 64 bit divide with 32 bit kernel
-     * Get an approximate value. Return failure in case we cannot get
-     * an approximate value.
-     */
-    if (unlikely(cur.aperf.split.hi || cur.mperf.split.hi)) {
-        int shift_count;
-        uint32_t h;
-
-        h = max_t(uint32_t, cur.aperf.split.hi, cur.mperf.split.hi);
-        shift_count = fls(h);
-
-        cur.aperf.whole >>= shift_count;
-        cur.mperf.whole >>= shift_count;
-    }
-
-    if (((unsigned long)(-1) / 100) < cur.aperf.split.lo) {
-        int shift_count = 7;
-        cur.aperf.split.lo >>= shift_count;
-        cur.mperf.split.lo >>= shift_count;
-    }
-
-    if (cur.aperf.split.lo && cur.mperf.split.lo)
-        perf_percent = (cur.aperf.split.lo * 100) / cur.mperf.split.lo;
-    else
-        perf_percent = 0;
-
-#else
     if (unlikely(((unsigned long)(-1) / 100) < cur.aperf.whole)) {
         int shift_count = 7;
         cur.aperf.whole >>= shift_count;
@@ -350,8 +321,6 @@ unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
         perf_percent = (cur.aperf.whole * 100) / cur.mperf.whole;
     else
         perf_percent = 0;
-
-#endif
 
     retval = policy->cpuinfo.max_freq * perf_percent / 100;
 

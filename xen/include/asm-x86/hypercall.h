@@ -90,8 +90,6 @@ extern unsigned long
 do_iret(
     void);
 
-#ifdef __x86_64__
-
 extern long
 do_set_callbacks(
     unsigned long event_address,
@@ -111,16 +109,5 @@ compat_physdev_op(
 extern int
 arch_compat_vcpu_op(
     int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg);
-
-#else
-
-extern long
-do_set_callbacks(
-    unsigned long event_selector,
-    unsigned long event_address,
-    unsigned long failsafe_selector,
-    unsigned long failsafe_address);
-
-#endif
 
 #endif /* __ASM_X86_HYPERCALL_H__ */

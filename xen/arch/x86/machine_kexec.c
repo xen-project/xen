@@ -16,9 +16,6 @@ typedef void (*relocate_new_kernel_t)(
                 unsigned long indirection_page,
                 unsigned long *page_list,
                 unsigned long start_address,
-#ifdef __i386__
-                unsigned int cpu_has_pae,
-#endif
                 unsigned int preserve_context);
 
 int machine_kexec_load(int type, int slot, xen_kexec_image_t *image)
@@ -113,9 +110,6 @@ void machine_kexec(xen_kexec_image_t *image)
         rnk = (relocate_new_kernel_t) image->page_list[1];
         (*rnk)(image->indirection_page, image->page_list,
                image->start_address,
-#ifdef __i386__
-               1 /* cpu_has_pae */,
-#endif
                0 /* preserve_context */);
     }
 }
@@ -132,15 +126,7 @@ void arch_crash_save_vmcoreinfo(void)
 	VMCOREINFO_SYMBOL(dom_xen);
 	VMCOREINFO_SYMBOL(dom_io);
 
-#ifdef CONFIG_X86_32
-    VMCOREINFO_SYMBOL(xenheap_phys_end);
-#endif
-#ifdef CONFIG_X86_PAE
-	VMCOREINFO_SYMBOL_ALIAS(pgd_l3, idle_pg_table);
-#endif
-#ifdef CONFIG_X86_64
 	VMCOREINFO_SYMBOL_ALIAS(pgd_l4, idle_pg_table);
-#endif
 }
 
 /*

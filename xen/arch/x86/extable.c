@@ -6,12 +6,7 @@
 #include <xen/spinlock.h>
 #include <asm/uaccess.h>
 
-#ifdef __i386__
-#define EX_FIELD(ptr, field) (ptr)->field
-#define swap_ex NULL
-#else
 #define EX_FIELD(ptr, field) ((unsigned long)&(ptr)->field + (ptr)->field)
-#endif
 
 static inline unsigned long ex_addr(const struct exception_table_entry *x)
 {

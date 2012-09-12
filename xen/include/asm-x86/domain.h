@@ -13,11 +13,7 @@
 #define has_32bit_shinfo(d)    ((d)->arch.has_32bit_shinfo)
 #define is_pv_32bit_domain(d)  ((d)->arch.is_32bit_pv)
 #define is_pv_32bit_vcpu(v)    (is_pv_32bit_domain((v)->domain))
-#ifdef __x86_64__
 #define is_pv_32on64_domain(d) (is_pv_32bit_domain(d))
-#else
-#define is_pv_32on64_domain(d) (0)
-#endif
 #define is_pv_32on64_vcpu(v)   (is_pv_32on64_domain((v)->domain))
 
 #define is_hvm_pv_evtchn_domain(d) (is_hvm_domain(d) && \
@@ -243,18 +239,11 @@ struct pv_domain
 
 struct arch_domain
 {
-#ifdef CONFIG_X86_64
     struct page_info **mm_perdomain_pt_pages;
     l2_pgentry_t *mm_perdomain_l2;
     l3_pgentry_t *mm_perdomain_l3;
 
     unsigned int hv_compat_vstart;
-#else
-    l1_pgentry_t *mm_perdomain_pt;
-
-    /* map_domain_page() mapping cache. */
-    struct mapcache_domain mapcache;
-#endif
 
     bool_t s3_integrity;
 
@@ -330,7 +319,6 @@ struct arch_domain
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
 #define has_arch_mmios(d)    (!rangeset_is_empty((d)->iomem_caps))
 
-#ifdef CONFIG_X86_64
 #define perdomain_pt_pgidx(v) \
       ((v)->vcpu_id >> (PAGETABLE_ORDER - GDT_LDT_VCPU_SHIFT))
 #define perdomain_ptes(d, v) \
@@ -338,32 +326,6 @@ struct arch_domain
       [perdomain_pt_pgidx(v)]) + (((v)->vcpu_id << GDT_LDT_VCPU_SHIFT) & \
                                   (L1_PAGETABLE_ENTRIES - 1)))
 #define perdomain_pt_page(d, n) ((d)->arch.mm_perdomain_pt_pages[n])
-#else
-#define perdomain_ptes(d, v) \
-    ((d)->arch.mm_perdomain_pt + ((v)->vcpu_id << GDT_LDT_VCPU_SHIFT))
-#define perdomain_pt_page(d, n) \
-    (virt_to_page((d)->arch.mm_perdomain_pt) + (n))
-#endif
-
-
-#ifdef __i386__
-struct pae_l3_cache {
-    /*
-     * Two low-memory (<4GB) PAE L3 tables, used as fallback when the guest
-     * supplies a >=4GB PAE L3 table. We need two because we cannot set up
-     * an L3 table while we are currently running on it (without using
-     * expensive atomic 64-bit operations).
-     */
-    l3_pgentry_t  table[2][4] __attribute__((__aligned__(32)));
-    unsigned long high_mfn;  /* The >=4GB MFN being shadowed. */
-    unsigned int  inuse_idx; /* Which of the two cache slots is in use? */
-    spinlock_t    lock;
-};
-#define pae_l3_cache_init(c) spin_lock_init(&(c)->lock)
-#else /* !defined(__i386__) */
-struct pae_l3_cache { };
-#define pae_l3_cache_init(c) ((void)0)
-#endif
 
 struct pv_vcpu
 {
@@ -379,9 +341,7 @@ struct pv_vcpu
     unsigned long event_callback_eip;
     unsigned long failsafe_callback_eip;
     union {
-#ifdef CONFIG_X86_64
         unsigned long syscall_callback_eip;
-#endif
         struct {
             unsigned int event_callback_cs;
             unsigned int failsafe_callback_cs;
@@ -390,7 +350,6 @@ struct pv_vcpu
 
     unsigned long vm_assist;
 
-#ifdef CONFIG_X86_64
     unsigned long syscall32_callback_eip;
     unsigned long sysenter_callback_eip;
     unsigned short syscall32_callback_cs;
@@ -402,15 +361,10 @@ struct pv_vcpu
     unsigned long fs_base;
     unsigned long gs_base_kernel;
     unsigned long gs_base_user;
-#endif
 
     /* Bounce information for propagating an exception to guest OS. */
     struct trap_bounce trap_bounce;
-#ifdef CONFIG_X86_64
     struct trap_bounce int80_bounce;
-#else
-    struct desc_struct int80_desc;
-#endif
 
     /* I/O-port access bitmap. */
     XEN_GUEST_HANDLE(uint8) iobmp; /* Guest kernel vaddr of the bitmap. */
@@ -439,8 +393,6 @@ struct arch_vcpu
 
     /* other state */
 
-    struct pae_l3_cache pae_l3_cache;
-
     unsigned long      flags; /* TF_ */
 
     void (*schedule_tail) (struct vcpu *);
@@ -460,9 +412,7 @@ struct arch_vcpu
      */
     l1_pgentry_t *perdomain_ptes;
 
-#ifdef CONFIG_X86_64
     pagetable_t guest_table_user;       /* (MFN) x86/64 user-space pagetable */
-#endif
     pagetable_t guest_table;            /* (MFN) guest notion of cr3 */
     /* guest_table holds a ref to the page, and also a type-count unless
      * shadow refcounts are in use */
@@ -493,11 +443,6 @@ struct arch_vcpu
     uint64_t mcg_cap;
     
     struct paging_vcpu paging;
-
-#ifdef CONFIG_X86_32
-    /* map_domain_page() mapping cache. */
-    struct mapcache_vcpu mapcache;
-#endif
 
     uint32_t gdbsx_vcpu_event;
 

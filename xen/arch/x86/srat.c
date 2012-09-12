@@ -115,7 +115,6 @@ static __init void bad_srat(void)
 		pxm2node[i] = NUMA_NO_NODE;
 }
 
-#ifdef CONFIG_X86_64
 /*
  * A lot of BIOS fill in 10 (= no distance) everywhere. This messes
  * up the NUMA heuristics which wants the local node to have a smaller
@@ -157,11 +156,6 @@ void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
 	acpi_slit = mfn_to_virt(mfn);
 	memcpy(acpi_slit, slit, slit->header.length);
 }
-#else
-void __init acpi_numa_slit_init(struct acpi_table_slit *slit)
-{
-}
-#endif
 
 /* Callback for Proximity Domain -> x2APIC mapping */
 void __init
@@ -267,9 +261,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 	{
 		printk(KERN_INFO "SRAT: hot plug zone found %"PRIx64" - %"PRIx64" \n",
 				start, end);
-#ifdef CONFIG_X86_64
 		mem_hotplug = 1;
-#endif
 	}
 
 	i = conflicting_memblks(start, end);
@@ -348,8 +340,6 @@ static int nodes_cover_memory(void)
 
 void __init acpi_numa_arch_fixup(void) {}
 
-#ifdef __x86_64__
-
 static u64 __initdata srat_region_mask;
 
 static u64 __init fill_mask(u64 mask)
@@ -410,8 +400,6 @@ void __init srat_parse_regions(u64 addr)
 
 	pfn_pdx_hole_setup(mask >> PAGE_SHIFT);
 }
-
-#endif /* __x86_64__ */
 
 /* Use the information discovered above to actually set up the nodes. */
 int __init acpi_scan_nodes(u64 start, u64 end)

@@ -10,10 +10,10 @@
  *
  */
 
-#include<xen/types.h>
-#include<asm/page.h>
-#include<xen/xenoprof.h>
-#include<xen/guest_access.h>
+#include <xen/types.h>
+#include <asm/page.h>
+#include <xen/xenoprof.h>
+#include <xen/guest_access.h>
 
 struct frame_head {
     struct frame_head * ebp;
@@ -22,14 +22,12 @@ struct frame_head {
 typedef struct frame_head frame_head_t;
 DEFINE_XEN_GUEST_HANDLE(frame_head_t);
 
-#ifdef CONFIG_X86_64
 struct frame_head_32bit {
     uint32_t ebp;
     uint32_t ret;
 } __attribute__((packed));
 typedef struct frame_head_32bit frame_head32_t;
 DEFINE_COMPAT_HANDLE(frame_head32_t);
-#endif
 
 static struct frame_head *
 dump_hypervisor_backtrace(struct vcpu *vcpu, const struct frame_head *head,
@@ -46,7 +44,6 @@ dump_hypervisor_backtrace(struct vcpu *vcpu, const struct frame_head *head,
     return head->ebp;
 }
 
-#ifdef CONFIG_X86_64
 static inline int is_32bit_vcpu(struct vcpu *vcpu)
 {
     if (is_hvm_vcpu(vcpu))
@@ -54,7 +51,6 @@ static inline int is_32bit_vcpu(struct vcpu *vcpu)
     else
         return is_pv_32bit_vcpu(vcpu);
 }
-#endif
 
 static struct frame_head *
 dump_guest_backtrace(struct vcpu *vcpu, const struct frame_head *head,
@@ -62,7 +58,6 @@ dump_guest_backtrace(struct vcpu *vcpu, const struct frame_head *head,
 {
     frame_head_t bufhead;
 
-#ifdef CONFIG_X86_64
     if ( is_32bit_vcpu(vcpu) )
     {
         __compat_handle_const_frame_head32_t guest_head =
@@ -78,7 +73,6 @@ dump_guest_backtrace(struct vcpu *vcpu, const struct frame_head *head,
         bufhead.ret = bufhead32.ret;
     }
     else
-#endif
     {
         XEN_GUEST_HANDLE(const_frame_head_t) guest_head =
             const_guest_handle_from_ptr(head, frame_head_t);
@@ -136,11 +130,7 @@ static int valid_hypervisor_stack(const struct frame_head *head,
 				  const struct cpu_user_regs *regs)
 {
     unsigned long headaddr = (unsigned long)head;
-#ifdef CONFIG_X86_64
     unsigned long stack = (unsigned long)regs->rsp;
-#else
-    unsigned long stack = (unsigned long)regs;
-#endif
     unsigned long stack_base = (stack & ~(STACK_SIZE - 1)) + STACK_SIZE;
 
     return headaddr > stack && headaddr < stack_base;

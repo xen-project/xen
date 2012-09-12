@@ -130,9 +130,8 @@ l1_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
 /*
  * PTE updates can be done with ordinary writes except:
  *  1. Debug builds get extra checking by using CMPXCHG[8B].
- *  2. PAE builds perform an atomic 8-byte store with CMPXCHG8B.
  */
-#if !defined(NDEBUG) || defined(__i386__)
+#if !defined(NDEBUG)
 #define PTE_UPDATE_WITH_CMPXCHG
 #endif
 
@@ -156,16 +155,11 @@ bool_t __read_mostly machine_to_phys_mapping_valid = 0;
 bool_t __read_mostly opt_allow_superpage;
 boolean_param("allowsuperpage", opt_allow_superpage);
 
-#ifdef __i386__
-static int get_superpage(unsigned long mfn, struct domain *d);
-#endif
 static void put_superpage(unsigned long mfn);
 
 static uint32_t base_disallow_mask;
 #define L1_DISALLOW_MASK (base_disallow_mask | _PAGE_GNTTAB)
 #define L2_DISALLOW_MASK (base_disallow_mask & ~_PAGE_PSE)
-
-#if defined(__x86_64__)
 
 #define l3_disallow_mask(d) (!is_pv_32on64_domain(d) ?  \
                              base_disallow_mask :       \
@@ -179,12 +173,6 @@ static uint32_t base_disallow_mask;
 #define L1_DISALLOW_MASK ((base_disallow_mask | _PAGE_GNTTAB) & ~_PAGE_GLOBAL)
 #endif
 
-#elif defined (__i386__)
-
-#define l3_disallow_mask(d) 0xFFFFF1FEU /* must-be-zero */
-
-#endif
-
 #define l1_disallow_mask(d)                                     \
     ((d != dom_io) &&                                           \
      (rangeset_is_empty((d)->iomem_caps) &&                     \
@@ -193,7 +181,6 @@ static uint32_t base_disallow_mask;
       !is_hvm_domain(d)) ?                                      \
      L1_DISALLOW_MASK : (L1_DISALLOW_MASK & ~PAGE_CACHE_ATTRS))
 
-#ifdef __x86_64__
 static void __init init_spagetable(void)
 {
     unsigned long s, start = SPAGETABLE_VIRT_START;
@@ -215,7 +202,6 @@ static void __init init_spagetable(void)
     }
     memset((void *)start, 0, end - start);
 }
-#endif
 
 static void __init init_frametable_chunk(void *start, void *end)
 {
@@ -253,9 +239,7 @@ void __init init_frametable(void)
     unsigned int sidx, eidx, nidx;
     unsigned int max_idx = (max_pdx + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT;
 
-#ifdef __x86_64__
     BUILD_BUG_ON(XEN_VIRT_END > FRAMETABLE_VIRT_END);
-#endif
     BUILD_BUG_ON(FRAMETABLE_VIRT_START & ((1UL << L2_PAGETABLE_SHIFT) - 1));
 
     for ( sidx = 0; ; sidx = nidx )
@@ -278,10 +262,8 @@ void __init init_frametable(void)
                (unsigned long)pdx_to_page(max_idx * PDX_GROUP_COUNT) -
                (unsigned long)pdx_to_page(max_pdx));
     }
-#ifdef __x86_64__
     if (opt_allow_superpage)
         init_spagetable();
-#endif
 }
 
 void __init arch_init_memory(void)
@@ -356,12 +338,7 @@ void __init arch_init_memory(void)
          * the statically-initialised 1-16MB mapping area.
          */
         iostart_pfn = max_t(unsigned long, pfn, 1UL << (20 - PAGE_SHIFT));
-#if defined(CONFIG_X86_32)
-        ioend_pfn = min_t(unsigned long, rstart_pfn,
-                          DIRECTMAP_MBYTES << (20 - PAGE_SHIFT));
-#else
         ioend_pfn = min(rstart_pfn, 16UL << (20 - PAGE_SHIFT));
-#endif
         if ( iostart_pfn < ioend_pfn )            
             destroy_xen_mappings((unsigned long)mfn_to_virt(iostart_pfn),
                                  (unsigned long)mfn_to_virt(ioend_pfn));
@@ -470,90 +447,10 @@ void share_xen_page_with_privileged_guests(
     share_xen_page_with_guest(page, dom_xen, readonly);
 }
 
-#if defined(__i386__)
-
-#ifdef NDEBUG
-/* Only PDPTs above 4GB boundary need to be shadowed in low memory. */
-#define l3tab_needs_shadow(mfn) ((mfn) >= 0x100000)
-#else
-/*
- * In debug builds we shadow a selection of <4GB PDPTs to exercise code paths.
- * We cannot safely shadow the idle page table, nor shadow page tables
- * (detected by zero reference count). As required for correctness, we
- * always shadow PDPTs above 4GB.
- */
-#define l3tab_needs_shadow(mfn)                          \
-    (((((mfn) << PAGE_SHIFT) != __pa(idle_pg_table)) &&  \
-      (mfn_to_page(mfn)->count_info & PGC_count_mask) && \
-      ((mfn) & 1)) || /* odd MFNs are shadowed */        \
-     ((mfn) >= 0x100000))
-#endif
-
-static l1_pgentry_t *fix_pae_highmem_pl1e;
-
-/* Cache the address of PAE high-memory fixmap page tables. */
-static int __init cache_pae_fixmap_address(void)
-{
-    unsigned long fixmap_base = fix_to_virt(FIX_PAE_HIGHMEM_0);
-    l2_pgentry_t *pl2e = virt_to_xen_l2e(fixmap_base);
-    fix_pae_highmem_pl1e = l2e_to_l1e(*pl2e) + l1_table_offset(fixmap_base);
-    return 0;
-}
-__initcall(cache_pae_fixmap_address);
-
-static DEFINE_PER_CPU(u32, make_cr3_timestamp);
-
-void make_cr3(struct vcpu *v, unsigned long mfn)
-/* Takes the MFN of a PAE l3 table, copies the contents to below 4GB if
- * necessary, and sets v->arch.cr3 to the value to load in CR3. */
-{
-    l3_pgentry_t *highmem_l3tab, *lowmem_l3tab;
-    struct pae_l3_cache *cache = &v->arch.pae_l3_cache;
-    unsigned int cpu = smp_processor_id();
-
-    /* Fast path: does this mfn need a shadow at all? */
-    if ( !l3tab_needs_shadow(mfn) )
-    {
-        v->arch.cr3 = mfn << PAGE_SHIFT;
-        /* Cache is no longer in use or valid */
-        cache->high_mfn = 0;
-        return;
-    }
-
-    /* Caching logic is not interrupt safe. */
-    ASSERT(!in_irq());
-
-    /* Protects against pae_flush_pgd(). */
-    spin_lock(&cache->lock);
-
-    cache->inuse_idx ^= 1;
-    cache->high_mfn   = mfn;
-
-    /* Map the guest L3 table and copy to the chosen low-memory cache. */
-    l1e_write(fix_pae_highmem_pl1e-cpu, l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
-    /* First check the previous high mapping can't be in the TLB. 
-     * (i.e. have we loaded CR3 since we last did this?) */
-    if ( unlikely(this_cpu(make_cr3_timestamp) == this_cpu(tlbflush_time)) )
-        flush_tlb_one_local(fix_to_virt(FIX_PAE_HIGHMEM_0 + cpu));
-    highmem_l3tab = (l3_pgentry_t *)fix_to_virt(FIX_PAE_HIGHMEM_0 + cpu);
-    lowmem_l3tab  = cache->table[cache->inuse_idx];
-    memcpy(lowmem_l3tab, highmem_l3tab, sizeof(cache->table[0]));
-    l1e_write(fix_pae_highmem_pl1e-cpu, l1e_empty());
-    this_cpu(make_cr3_timestamp) = this_cpu(tlbflush_time);
-
-    v->arch.cr3 = __pa(lowmem_l3tab);
-
-    spin_unlock(&cache->lock);
-}
-
-#else /* !defined(__i386__) */
-
 void make_cr3(struct vcpu *v, unsigned long mfn)
 {
     v->arch.cr3 = mfn << PAGE_SHIFT;
 }
-
-#endif /* !defined(__i386__) */
 
 void write_ptbase(struct vcpu *v)
 {
@@ -721,7 +618,6 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
     return rc;
 }
 
-#ifdef __x86_64__
 static void put_data_page(
     struct page_info *page, int writeable)
 {
@@ -730,7 +626,6 @@ static void put_data_page(
     else
         put_page(page);
 }
-#endif
 
 /*
  * We allow root tables to map each other (a.k.a. linear page tables). It
@@ -805,7 +700,6 @@ int is_iomem_page(unsigned long mfn)
 static int update_xen_mappings(unsigned long mfn, unsigned long cacheattr)
 {
     int err = 0;
-#ifdef __x86_64__
     bool_t alias = mfn >= PFN_DOWN(xen_phys_start) &&
          mfn < PFN_UP(xen_phys_start + xen_virt_end - XEN_VIRT_START);
     unsigned long xen_va =
@@ -818,7 +712,6 @@ static int update_xen_mappings(unsigned long mfn, unsigned long cacheattr)
                      PAGE_HYPERVISOR | cacheattr_to_pte_flags(cacheattr));
     if ( unlikely(alias) && !cacheattr && !err )
         err = map_pages_to_xen(xen_va, mfn, 1, PAGE_HYPERVISOR);
-#endif
     return err;
 }
 
@@ -1058,8 +951,6 @@ get_page_from_l4e(
 }
 #endif /* 4 level */
 
-#ifdef __x86_64__
-
 #ifdef USER_MAPPINGS_ARE_GLOBAL
 #define adjust_guest_l1e(pl1e, d)                                            \
     do {                                                                     \
@@ -1108,24 +999,12 @@ get_page_from_l4e(
             l4e_add_flags((pl4e), _PAGE_USER);                  \
     } while ( 0 )
 
-#else /* !defined(__x86_64__) */
-
-#define adjust_guest_l1e(_p, _d) ((void)(_d))
-#define adjust_guest_l2e(_p, _d) ((void)(_d))
-#define adjust_guest_l3e(_p, _d) ((void)(_d))
-
-#endif
-
-#ifdef __x86_64__
 #define unadjust_guest_l3e(pl3e, d)                                         \
     do {                                                                    \
         if ( unlikely(is_pv_32on64_domain(d)) &&                            \
              likely(l3e_get_flags((pl3e)) & _PAGE_PRESENT) )                \
             l3e_remove_flags((pl3e), _PAGE_USER|_PAGE_RW|_PAGE_ACCESSED);   \
     } while ( 0 )
-#else
-#define unadjust_guest_l3e(_p, _d) ((void)(_d))
-#endif
 
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
 {
@@ -1209,7 +1088,6 @@ static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) || (l3e_get_pfn(l3e) == pfn) )
         return 1;
 
-#ifdef __x86_64__
     if ( unlikely(l3e_get_flags(l3e) & _PAGE_PSE) )
     {
         unsigned long mfn = l3e_get_pfn(l3e);
@@ -1222,7 +1100,6 @@ static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
 
         return 0;
     }
-#endif
 
     if ( unlikely(partial > 0) )
         return __put_page_type(l3e_get_page(l3e), preemptible);
@@ -1289,10 +1166,6 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
 {
     struct page_info *page;
     l3_pgentry_t     l3e3;
-#ifdef __i386__
-    l2_pgentry_t     *pl2e, l2e;
-    int              i;
-#endif
 
     if ( !is_pv_32bit_domain(d) )
         return 1;
@@ -1326,75 +1199,8 @@ static int create_pae_xen_mappings(struct domain *d, l3_pgentry_t *pl3e)
         return 0;
     }
 
-#ifdef __i386__
-    /* Xen linear pagetable mappings. */
-    pl2e = map_domain_page(l3e_get_pfn(l3e3));
-    for ( i = 0; i < (LINEARPT_MBYTES >> (L2_PAGETABLE_SHIFT - 20)); i++ )
-    {
-        l2e = l2e_empty();
-        if ( l3e_get_flags(pl3e[i]) & _PAGE_PRESENT )
-            l2e = l2e_from_pfn(l3e_get_pfn(pl3e[i]), __PAGE_HYPERVISOR);
-        l2e_write(&pl2e[l2_table_offset(LINEAR_PT_VIRT_START) + i], l2e);
-    }
-    unmap_domain_page(pl2e);
-#endif
-
     return 1;
 }
-
-#ifdef __i386__
-/* Flush a pgdir update into low-memory caches. */
-static void pae_flush_pgd(
-    unsigned long mfn, unsigned int idx, l3_pgentry_t nl3e)
-{
-    struct domain *d = page_get_owner(mfn_to_page(mfn));
-    struct vcpu   *v;
-    intpte_t       _ol3e, _nl3e, _pl3e;
-    l3_pgentry_t  *l3tab_ptr;
-    struct pae_l3_cache *cache;
-
-    if ( unlikely(shadow_mode_enabled(d)) )
-    {
-        cpumask_t m;
-
-        /* Re-shadow this l3 table on any vcpus that are using it */
-        cpumask_clear(&m);
-        for_each_vcpu ( d, v )
-            if ( pagetable_get_pfn(v->arch.guest_table) == mfn )
-            {
-                paging_update_cr3(v);
-                cpumask_or(&m, &m, v->vcpu_dirty_cpumask);
-            }
-        flush_tlb_mask(&m);
-    }
-
-    /* If below 4GB then the pgdir is not shadowed in low memory. */
-    if ( !l3tab_needs_shadow(mfn) )
-        return;
-
-    for_each_vcpu ( d, v )
-    {
-        cache = &v->arch.pae_l3_cache;
-
-        spin_lock(&cache->lock);
-
-        if ( cache->high_mfn == mfn )
-        {
-            l3tab_ptr = &cache->table[cache->inuse_idx][idx];
-            _ol3e = l3e_get_intpte(*l3tab_ptr);
-            _nl3e = l3e_get_intpte(nl3e);
-            _pl3e = cmpxchg(&l3e_get_intpte(*l3tab_ptr), _ol3e, _nl3e);
-            BUG_ON(_pl3e != _ol3e);
-        }
-
-        spin_unlock(&cache->lock);
-    }
-
-    flush_tlb_mask(d->domain_dirty_cpumask);
-}
-#else
-# define pae_flush_pgd(mfn, idx, nl3e) ((void)0)
-#endif
 
 static int alloc_l2_table(struct page_info *page, unsigned long type,
                           int preemptible)
@@ -1435,22 +1241,10 @@ static int alloc_l2_table(struct page_info *page, unsigned long type,
     if ( rc >= 0 && (type & PGT_pae_xen_l2) )
     {
         /* Xen private mappings. */
-#if defined(__i386__)
-        memcpy(&pl2e[L2_PAGETABLE_FIRST_XEN_SLOT & (L2_PAGETABLE_ENTRIES-1)],
-               &idle_pg_table_l2[L2_PAGETABLE_FIRST_XEN_SLOT],
-               L2_PAGETABLE_XEN_SLOTS * sizeof(l2_pgentry_t));
-        for ( i = 0; i < PDPT_L2_ENTRIES; i++ )
-            l2e_write(&pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i],
-                      l2e_from_page(perdomain_pt_page(d, i),
-                                    __PAGE_HYPERVISOR));
-        pl2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
-            l2e_from_pfn(pfn, __PAGE_HYPERVISOR);
-#else
         memcpy(&pl2e[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
                &compat_idle_pg_table_l2[
                    l2_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
                COMPAT_L2_PAGETABLE_XEN_SLOTS(d) * sizeof(*pl2e));
-#endif
     }
 
     unmap_domain_page(pl2e);
@@ -1626,9 +1420,7 @@ static void free_l1_table(struct page_info *page)
 
 static int free_l2_table(struct page_info *page, int preemptible)
 {
-#ifdef __x86_64__
     struct domain *d = page_get_owner(page);
-#endif
     unsigned long pfn = page_to_mfn(page);
     l2_pgentry_t *pl2e;
     unsigned int  i = page->nr_validated_ptes - 1;
@@ -2024,12 +1816,8 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
     }
 
     if ( likely(rc == 0) )
-    {
         if ( !create_pae_xen_mappings(d, pl3e) )
             BUG();
-
-        pae_flush_pgd(pfn, pgentry_ptr_to_slot(pl3e), nl3e);
-    }
 
     put_page_from_l3e(ol3e, pfn, 0, 0);
     return rc;
@@ -2612,8 +2400,6 @@ static void put_spage_pages(struct page_info *page)
     return;
 }
 
-#ifdef __x86_64__
-
 static int mark_superpage(struct spage_info *spage, struct domain *d)
 {
     unsigned long x, nx, y = spage->type_info;
@@ -2774,25 +2560,6 @@ static void put_superpage(unsigned long mfn)
     return;
 }
 
-#else /* __i386__ */
-
-void clear_superpage_mark(struct page_info *page)
-{
-}
-
-static int get_superpage(unsigned long mfn, struct domain *d)
-{
-    return get_spage_pages(mfn_to_page(mfn), d);
-}
-
-static void put_superpage(unsigned long mfn)
-{
-    put_spage_pages(mfn_to_page(mfn));
-}
-
-#endif
-
-
 int new_guest_cr3(unsigned long mfn)
 {
     struct vcpu *curr = current;
@@ -2800,7 +2567,6 @@ int new_guest_cr3(unsigned long mfn)
     int okay;
     unsigned long old_base_mfn;
 
-#ifdef __x86_64__
     if ( is_pv_32on64_domain(d) )
     {
         okay = paging_mode_refcounts(d)
@@ -2822,7 +2588,7 @@ int new_guest_cr3(unsigned long mfn)
 
         return 1;
     }
-#endif
+
     okay = paging_mode_refcounts(d)
         ? get_page_from_pagenr(mfn, d)
         : !get_page_and_type_from_pagenr(mfn, PGT_root_page_table, d, 0, 0);
@@ -2948,28 +2714,8 @@ static inline int vcpumask_to_pcpumask(
     }
 }
 
-#ifdef __i386__
-static inline void *fixmap_domain_page(unsigned long mfn)
-{
-    unsigned int cpu = smp_processor_id();
-    void *ptr = (void *)fix_to_virt(FIX_PAE_HIGHMEM_0 + cpu);
-
-    l1e_write(fix_pae_highmem_pl1e - cpu,
-              l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
-    flush_tlb_one_local(ptr);
-    return ptr;
-}
-static inline void fixunmap_domain_page(const void *ptr)
-{
-    unsigned int cpu = virt_to_fix((unsigned long)ptr) - FIX_PAE_HIGHMEM_0;
-
-    l1e_write(fix_pae_highmem_pl1e - cpu, l1e_empty());
-    this_cpu(make_cr3_timestamp) = this_cpu(tlbflush_time);
-}
-#else
 #define fixmap_domain_page(mfn) mfn_to_virt(mfn)
 #define fixunmap_domain_page(ptr) ((void)(ptr))
-#endif
 
 long do_mmuext_op(
     XEN_GUEST_HANDLE(mmuext_op_t) uops,
@@ -3141,8 +2887,6 @@ long do_mmuext_op(
                     && new_guest_cr3(op.arg1.mfn));
             break;
 
-        
-#ifdef __x86_64__
         case MMUEXT_NEW_USER_BASEPTR: {
             unsigned long old_mfn;
 
@@ -3179,7 +2923,6 @@ long do_mmuext_op(
 
             break;
         }
-#endif
         
         case MMUEXT_TLB_FLUSH_LOCAL:
             flush_tlb_local();
@@ -3345,7 +3088,6 @@ long do_mmuext_op(
             break;
         }
 
-#ifdef __x86_64__
         case MMUEXT_MARK_SUPER:
         {
             unsigned long mfn;
@@ -3397,7 +3139,6 @@ long do_mmuext_op(
             okay = (unmark_superpage(spage) >= 0);
             break;
         }
-#endif
 
         default:
             MEM_LOG("Invalid extended pt command 0x%x", op.cmd);
@@ -5195,7 +4936,6 @@ int ptwr_do_page_fault(struct vcpu *v, unsigned long addr,
     return 0;
 }
 
-#ifdef __x86_64__
 /*************************
  * fault handling for read-only MMIO pages
  */
@@ -5284,7 +5024,6 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
 
     return rc != X86EMUL_UNHANDLEABLE ? EXCRET_fault_fixed : 0;
 }
-#endif /* __x86_64__ */
 
 void free_xen_pagetable(void *v)
 {
@@ -5325,7 +5064,6 @@ int map_pages_to_xen(
 
     while ( nr_mfns != 0 )
     {
-#ifdef __x86_64__
         l3_pgentry_t ol3e, *pl3e = virt_to_xen_l3e(virt);
 
         if ( !pl3e )
@@ -5447,7 +5185,6 @@ int map_pages_to_xen(
                                                 __PAGE_HYPERVISOR));
             flush_area(virt, flush_flags);
         }
-#endif
 
         pl2e = virt_to_xen_l2e(virt);
         if ( !pl2e )
@@ -5588,8 +5325,7 @@ int map_pages_to_xen(
             }
         }
 
- check_l3: ;
-#ifdef __x86_64__
+ check_l3:
         if ( cpu_has_page1gb &&
              (flags == PAGE_HYPERVISOR) &&
              ((nr_mfns == 0) ||
@@ -5617,7 +5353,6 @@ int map_pages_to_xen(
                 free_xen_pagetable(l3e_to_l2e(ol3e));
             }
         }
-#endif
     }
 
     return 0;
@@ -5635,7 +5370,6 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
 
     while ( v < e )
     {
-#ifdef __x86_64__
         l3_pgentry_t *pl3e = virt_to_xen_l3e(v);
 
         if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
@@ -5667,7 +5401,6 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
             l3e_write_atomic(pl3e, l3e_from_pfn(virt_to_mfn(pl2e),
                                                 __PAGE_HYPERVISOR));
         }
-#endif
 
         pl2e = virt_to_xen_l2e(v);
 
@@ -5722,7 +5455,6 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
             }
         }
 
-#ifdef __x86_64__
         /* If we are done with the L3E, check if it is now empty. */
         if ( (v != e) && (l2_table_offset(v) + l1_table_offset(v) != 0) )
             continue;
@@ -5737,7 +5469,6 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
             flush_area(NULL, FLUSH_TLB_GLOBAL); /* flush before free */
             free_xen_pagetable(pl2e);
         }
-#endif
     }
 
     flush_area(NULL, FLUSH_TLB_GLOBAL);
@@ -5755,13 +5486,6 @@ void __set_fixmap(
 void memguard_init(void)
 {
     unsigned long start = max_t(unsigned long, xen_phys_start, 1UL << 20);
-#ifdef __i386__
-    map_pages_to_xen(
-        (unsigned long)__va(start),
-        start >> PAGE_SHIFT,
-        (xenheap_phys_end - start) >> PAGE_SHIFT,
-        __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
-#else
     map_pages_to_xen(
         (unsigned long)__va(start),
         start >> PAGE_SHIFT,
@@ -5773,7 +5497,6 @@ void memguard_init(void)
         start >> PAGE_SHIFT,
         (__pa(&_end) + PAGE_SIZE - 1 - start) >> PAGE_SHIFT,
         __PAGE_HYPERVISOR|MAP_SMALL_PAGES);
-#endif
 }
 
 static void __memguard_change_range(void *p, unsigned long l, int guard)
@@ -5820,18 +5543,12 @@ void memguard_unguard_stack(void *p)
     memguard_unguard_range(p, PAGE_SIZE);
 }
 
-#if defined(__x86_64__)
 void arch_dump_shared_mem_info(void)
 {
     printk("Shared frames %u -- Saved frames %u\n",
             mem_sharing_get_nr_shared_mfns(),
             mem_sharing_get_nr_saved_mfns());
 }
-#else
-void arch_dump_shared_mem_info(void)
-{
-}
-#endif
 
 /*
  * Local variables:

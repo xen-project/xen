@@ -445,10 +445,8 @@ intel_get_extended_msrs(struct mcinfo_global *mig, struct mc_info *mi)
     for (i = MSR_IA32_MCG_EAX; i <= MSR_IA32_MCG_MISC; i++)
         intel_get_extended_msr(mc_ext, i);
 
-#ifdef __x86_64__
     for (i = MSR_IA32_MCG_R8; i <= MSR_IA32_MCG_R15; i++)
         intel_get_extended_msr(mc_ext, i);
-#endif
 
     return mc_ext;
 }

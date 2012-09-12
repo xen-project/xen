@@ -5096,41 +5096,6 @@ sh_x86_emulate_cmpxchg(struct vcpu *v, unsigned long vaddr,
     return rv;
 }
 
-#ifdef __i386__
-static int
-sh_x86_emulate_cmpxchg8b(struct vcpu *v, unsigned long vaddr, 
-                          unsigned long old_lo, unsigned long old_hi,
-                          unsigned long new_lo, unsigned long new_hi,
-                          struct sh_emulate_ctxt *sh_ctxt)
-{
-    void *addr;
-    u64 old, new, prev;
-    int rv = X86EMUL_OKAY;
-
-    /* Unaligned writes are only acceptable on HVM */
-    if ( (vaddr & 7) && !is_hvm_vcpu(v) )
-        return X86EMUL_UNHANDLEABLE;
-
-    addr = emulate_map_dest(v, vaddr, 8, sh_ctxt);
-    if ( emulate_map_dest_failed(addr) )
-        return (long)addr;
-
-    old = (((u64) old_hi) << 32) | (u64) old_lo;
-    new = (((u64) new_hi) << 32) | (u64) new_lo;
-
-    paging_lock(v->domain);
-    prev = cmpxchg(((u64 *)addr), old, new);
-
-    if ( prev != old )
-        rv = X86EMUL_CMPXCHG_FAILED;
-
-    emulate_unmap_dest(v, addr, 8, sh_ctxt);
-    shadow_audit_tables(v);
-    paging_unlock(v->domain);
-    return rv;
-}
-#endif
-
 /**************************************************************************/
 /* Audit tools */
 
@@ -5455,9 +5420,6 @@ const struct paging_mode sh_paging_mode = {
     .shadow.detach_old_tables      = sh_detach_old_tables,
     .shadow.x86_emulate_write      = sh_x86_emulate_write,
     .shadow.x86_emulate_cmpxchg    = sh_x86_emulate_cmpxchg,
-#ifdef __i386__
-    .shadow.x86_emulate_cmpxchg8b  = sh_x86_emulate_cmpxchg8b,
-#endif
     .shadow.make_monitor_table     = sh_make_monitor_table,
     .shadow.destroy_monitor_table  = sh_destroy_monitor_table,
 #if SHADOW_OPTIMIZATIONS & SHOPT_WRITABLE_HEURISTIC

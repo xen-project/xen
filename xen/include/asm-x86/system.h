@@ -25,11 +25,7 @@
 struct __xchg_dummy { unsigned long a[100]; };
 #define __xg(x) ((volatile struct __xchg_dummy *)(x))
 
-#if defined(__i386__)
-# include <asm/x86_32/system.h>
-#elif defined(__x86_64__)
-# include <asm/x86_64/system.h>
-#endif
+#include <asm/x86_64/system.h>
 
 /*
  * Note: no "lock" prefix even on SMP: xchg always implies lock anyway
@@ -53,14 +49,6 @@ static always_inline unsigned long __xchg(
                        : "m" (*__xg((volatile void *)ptr)), "0" (x)
                        : "memory" );
         break;
-#if defined(__i386__)
-    case 4:
-        asm volatile ( "xchgl %0,%1"
-                       : "=r" (x)
-                       : "m" (*__xg((volatile void *)ptr)), "0" (x)
-                       : "memory" );
-        break;
-#elif defined(__x86_64__)
     case 4:
         asm volatile ( "xchgl %k0,%1"
                        : "=r" (x)
@@ -73,7 +61,6 @@ static always_inline unsigned long __xchg(
                        : "m" (*__xg((volatile void *)ptr)), "0" (x)
                        : "memory" );
         break;
-#endif
     }
     return x;
 }
@@ -104,15 +91,6 @@ static always_inline unsigned long __cmpxchg(
                        "0" (old)
                        : "memory" );
         return prev;
-#if defined(__i386__)
-    case 4:
-        asm volatile ( "lock; cmpxchgl %1,%2"
-                       : "=a" (prev)
-                       : "r" (new), "m" (*__xg((volatile void *)ptr)),
-                       "0" (old)
-                       : "memory" );
-        return prev;
-#elif defined(__x86_64__)
     case 4:
         asm volatile ( "lock; cmpxchgl %k1,%2"
                        : "=a" (prev)
@@ -127,7 +105,6 @@ static always_inline unsigned long __cmpxchg(
                        "0" (old)
                        : "memory" );
         return prev;
-#endif
     }
     return old;
 }

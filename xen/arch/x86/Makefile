@@ -5,7 +5,6 @@ subdir-y += hvm
 subdir-y += mm
 subdir-y += oprofile
 
-subdir-$(x86_32) += x86_32
 subdir-$(x86_64) += x86_64
 
 obj-y += apic.o

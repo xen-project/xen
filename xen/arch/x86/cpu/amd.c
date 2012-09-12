@@ -32,11 +32,9 @@
 static char opt_famrev[14];
 string_param("cpuid_mask_cpu", opt_famrev);
 
-#ifdef __x86_64__
 /* 1 = allow, 0 = don't allow guest creation, -1 = don't allow boot */
 s8 __read_mostly opt_allow_unsafe;
 boolean_param("allow_unsafe", opt_allow_unsafe);
-#endif
 
 static inline void wrmsr_amd(unsigned int index, unsigned int lo, 
 		unsigned int hi)
@@ -400,7 +398,6 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	   3DNow is IDd by bit 31 in extended CPUID (1*32+31) anyway */
 	clear_bit(0*32+31, c->x86_capability);
 	
-#ifdef CONFIG_X86_64
 	if (c->x86 == 0xf && c->x86_model < 0x14
 	    && cpu_has(c, X86_FEATURE_LAHF_LM)) {
 		/*
@@ -416,7 +413,6 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 			wrmsr_amd_safe(0xc001100d, lo, hi);
 		}
 	}
-#endif
 
 	switch(c->x86)
 	{
@@ -498,7 +494,6 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	if (c->x86 >= 0x10 && !force_mwait)
 		clear_bit(X86_FEATURE_MWAIT, c->x86_capability);
 
-#ifdef __x86_64__
 	if (!cpu_has_amd_erratum(c, AMD_ERRATUM_121))
 		opt_allow_unsafe = 1;
 	else if (opt_allow_unsafe < 0)
@@ -523,7 +518,6 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 
 		fam10h_check_enable_mmcfg();
 	}
-#endif
 
 	/*
 	 * Family 0x12 and above processors have APIC timer
