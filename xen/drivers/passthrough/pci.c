@@ -577,7 +577,6 @@ void pci_release_devices(struct domain *d)
     pci_clean_dpci_irqs(d);
     while ( (pdev = pci_get_pdev_by_domain(d, -1, -1, -1)) )
     {
-        pci_cleanup_msi(pdev);
         bus = pdev->bus;
         devfn = pdev->devfn;
         if ( deassign_device(d, pdev->seg, bus, devfn) )
