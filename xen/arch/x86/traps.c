@@ -1161,13 +1161,8 @@ static int handle_gdt_ldt_mapping_fault(
     return EXCRET_fault_fixed;
 }
 
-#ifdef HYPERVISOR_VIRT_END
 #define IN_HYPERVISOR_RANGE(va) \
     (((va) >= HYPERVISOR_VIRT_START) && ((va) < HYPERVISOR_VIRT_END))
-#else
-#define IN_HYPERVISOR_RANGE(va) \
-    (((va) >= HYPERVISOR_VIRT_START))
-#endif
 
 enum pf_type {
     real_fault,

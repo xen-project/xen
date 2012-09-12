@@ -1087,9 +1087,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     /* Check definitions in public headers match internal defs. */
     BUILD_BUG_ON(__HYPERVISOR_VIRT_START != HYPERVISOR_VIRT_START);
-#ifdef HYPERVISOR_VIRT_END
     BUILD_BUG_ON(__HYPERVISOR_VIRT_END   != HYPERVISOR_VIRT_END);
-#endif
     BUILD_BUG_ON(MACH2PHYS_VIRT_START != RO_MPT_VIRT_START);
     BUILD_BUG_ON(MACH2PHYS_VIRT_END   != RO_MPT_VIRT_END);
 
