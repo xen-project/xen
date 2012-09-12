@@ -26,10 +26,8 @@
 #include <xen/pfn.h>
 #include <xen/nodemask.h>
 #include <public/version.h>
-#ifdef CONFIG_COMPAT
 #include <compat/platform.h>
 #include <compat/xen.h>
-#endif
 #include <asm/bitops.h>
 #include <asm/smp.h>
 #include <asm/processor.h>
@@ -1082,12 +1080,10 @@ void __init __start_xen(unsigned long mbi_p)
     BUILD_BUG_ON(sizeof(shared_info_t) > PAGE_SIZE);
     BUILD_BUG_ON(sizeof(struct vcpu_info) != 64);
 
-#ifdef CONFIG_COMPAT
     BUILD_BUG_ON(sizeof(((struct compat_platform_op *)0)->u) !=
                  sizeof(((struct compat_platform_op *)0)->u.pad));
     BUILD_BUG_ON(sizeof(start_info_compat_t) > PAGE_SIZE);
     BUILD_BUG_ON(sizeof(struct compat_vcpu_info) != 64);
-#endif
 
     /* Check definitions in public headers match internal defs. */
     BUILD_BUG_ON(__HYPERVISOR_VIRT_START != HYPERVISOR_VIRT_START);

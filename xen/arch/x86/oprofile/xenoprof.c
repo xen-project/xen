@@ -12,9 +12,7 @@
 #include <xen/sched.h>
 #include <xen/xenoprof.h>
 #include <public/xenoprof.h>
-#ifdef CONFIG_COMPAT
 #include <compat/xenoprof.h>
-#endif
 #include <asm/hvm/support.h>
 
 #include "op_counter.h"
@@ -56,7 +54,6 @@ int xenoprof_arch_ibs_counter(XEN_GUEST_HANDLE(void) arg)
     return 0;
 }
 
-#ifdef CONFIG_COMPAT
 int compat_oprof_arch_counter(XEN_GUEST_HANDLE(void) arg)
 {
     struct compat_oprof_counter counter;
@@ -76,7 +73,6 @@ int compat_oprof_arch_counter(XEN_GUEST_HANDLE(void) arg)
 
     return 0;
 }
-#endif
 
 int xenoprofile_get_mode(const struct vcpu *v,
                          const struct cpu_user_regs *regs)

@@ -447,9 +447,7 @@ struct arch_vcpu
     /* A secondary copy of the vcpu time info. */
     XEN_GUEST_HANDLE(vcpu_time_info_t) time_info_guest;
 
-#ifdef CONFIG_COMPAT
     void *compat_arg_xlat;
-#endif
 
 } __cacheline_aligned;
 

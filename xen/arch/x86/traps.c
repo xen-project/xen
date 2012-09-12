@@ -92,9 +92,7 @@ DEFINE_PER_CPU(u64, efer);
 DEFINE_PER_CPU_READ_MOSTLY(u32, ler_msr);
 
 DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, gdt_table);
-#ifdef CONFIG_COMPAT
 DEFINE_PER_CPU_READ_MOSTLY(struct desc_struct *, compat_gdt_table);
-#endif
 
 /* Master table, used by CPU0. */
 idt_entry_t idt_table[IDT_ENTRIES];
@@ -2273,14 +2271,12 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 *reg = xen_pfn_to_cr3(mfn_to_gmfn(
                     v->domain, mfn));
             }
-#ifdef CONFIG_COMPAT
             else
             {
                 mfn = l4e_get_pfn(*(l4_pgentry_t *)__va(pagetable_get_paddr(v->arch.guest_table)));
                 *reg = compat_pfn_to_cr3(mfn_to_gmfn(
                     v->domain, mfn));
             }
-#endif
             /* PTs should not be shared */
             BUG_ON(page_get_owner(mfn_to_page(mfn)) == dom_cow);
         }
@@ -2337,14 +2333,8 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             unsigned long gfn;
             struct page_info *page;
             domain_lock(v->domain);
-            if ( !is_pv_32on64_vcpu(v) )
-            {
-                gfn = xen_cr3_to_pfn(*reg);
-#ifdef CONFIG_COMPAT
-            } else {
-                gfn = compat_cr3_to_pfn(*reg);
-#endif
-            }
+            gfn = !is_pv_32on64_vcpu(v)
+                ? xen_cr3_to_pfn(*reg) : compat_cr3_to_pfn(*reg);
             page = get_page_from_gfn(v->domain, gfn, NULL, P2M_ALLOC);
             rc = page ? new_guest_cr3(page_to_mfn(page)) : 0;
             if ( page )
@@ -3422,13 +3412,11 @@ void load_TR(void)
         (unsigned long)tss,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         9);
-#ifdef CONFIG_COMPAT
     _set_tssldt_desc(
         this_cpu(compat_gdt_table) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
         (unsigned long)tss,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         11);
-#endif
 
     /* Switch to non-compat GDT (which has B bit clear) to execute LTR. */
     asm volatile (
@@ -3504,9 +3492,7 @@ void __init trap_init(void)
     idt_tables[0] = idt_table;
 
     this_cpu(gdt_table) = boot_cpu_gdt_table;
-#ifdef CONFIG_COMPAT
     this_cpu(compat_gdt_table) = boot_cpu_compat_gdt_table;
-#endif
 
     percpu_traps_init();
 

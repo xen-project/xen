@@ -1299,7 +1299,6 @@ static void x86_cmci_inject(void *data)
 #error BITS_PER_LONG definition absent
 #endif
 
-#ifdef CONFIG_COMPAT
 # include <compat/arch-x86/xen-mca.h>
 
 # define xen_mcinfo_msr              mcinfo_msr
@@ -1349,12 +1348,6 @@ CHECK_mcinfo_recovery;
 # undef xen_cpu_offline_action
 # undef xen_page_offline_action
 # undef xen_mcinfo_recovery
-#else
-# define compat_mc_fetch xen_mc_fetch
-# define compat_mc_physcpuinfo xen_mc_physcpuinfo
-# define compat_handle_is_null guest_handle_is_null
-# define copy_to_compat copy_to_guest
-#endif
 
 /* Machine Check Architecture Hypercall */
 long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)

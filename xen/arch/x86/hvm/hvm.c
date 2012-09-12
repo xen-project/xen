@@ -1046,11 +1046,9 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     v->arch.hvm_vcpu.inject_trap.vector = -1;
 
-#ifdef CONFIG_COMPAT
     rc = setup_compat_arg_xlat(v);
     if ( rc != 0 )
         goto fail4;
-#endif
 
     rc = hvm_vcpu_cacheattr_init(v);
     if ( rc != 0 )
@@ -1081,9 +1079,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
     return 0;
 
  fail5:
-#ifdef CONFIG_COMPAT
     free_compat_arg_xlat(v);
-#endif
  fail4:
     nestedhvm_vcpu_destroy(v);
  fail3:
@@ -1098,9 +1094,7 @@ void hvm_vcpu_destroy(struct vcpu *v)
 {
     nestedhvm_vcpu_destroy(v);
 
-#ifdef CONFIG_COMPAT
     free_compat_arg_xlat(v);
-#endif
 
     tasklet_kill(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet);
     hvm_vcpu_cacheattr_destroy(v);

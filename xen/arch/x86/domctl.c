@@ -594,14 +594,12 @@ long arch_do_domctl(
 
         switch ( domctl->u.address_size.size )
         {
-#ifdef CONFIG_COMPAT
         case 32:
             ret = switch_compat(d);
             break;
         case 64:
             ret = switch_native(d);
             break;
-#endif
         default:
             ret = (domctl->u.address_size.size == BITS_PER_LONG) ? 0 : -EINVAL;
             break;
@@ -1522,23 +1520,17 @@ long arch_do_domctl(
     return ret;
 }
 
-#ifdef CONFIG_COMPAT
 #define xen_vcpu_guest_context vcpu_guest_context
 #define fpu_ctxt fpu_ctxt.x
 CHECK_FIELD_(struct, vcpu_guest_context, fpu_ctxt);
 #undef fpu_ctxt
 #undef xen_vcpu_guest_context
-#endif
 
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
     unsigned int i;
     bool_t compat = is_pv_32on64_domain(v->domain);
-#ifdef CONFIG_COMPAT
 #define c(fld) (!compat ? (c.nat->fld) : (c.cmp->fld))
-#else
-#define c(fld) (c.nat->fld)
-#endif
 
     if ( is_hvm_vcpu(v) )
         memset(c.nat, 0, sizeof(*c.nat));
@@ -1555,7 +1547,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
             memcpy(c.nat->trap_ctxt, v->arch.pv_vcpu.trap_ctxt,
                    sizeof(c.nat->trap_ctxt));
     }
-#ifdef CONFIG_COMPAT
     else
     {
         XLAT_cpu_user_regs(&c.cmp->user_regs, &v->arch.user_regs);
@@ -1563,7 +1554,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
             XLAT_trap_info(c.cmp->trap_ctxt + i,
                            v->arch.pv_vcpu.trap_ctxt + i);
     }
-#endif
 
     for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
         c(debugreg[i] = v->arch.debugreg[i]);
@@ -1606,10 +1596,8 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         c(ldt_ents = v->arch.pv_vcpu.ldt_ents);
         for ( i = 0; i < ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames); ++i )
             c(gdt_frames[i] = v->arch.pv_vcpu.gdt_frames[i]);
-#ifdef CONFIG_COMPAT
         BUILD_BUG_ON(ARRAY_SIZE(c.nat->gdt_frames) !=
                      ARRAY_SIZE(c.cmp->gdt_frames));
-#endif
         for ( ; i < ARRAY_SIZE(c.nat->gdt_frames); ++i )
             c(gdt_frames[i] = 0);
         c(gdt_ents = v->arch.pv_vcpu.gdt_ents);
@@ -1649,7 +1637,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
             c.nat->debugreg[7] |= c.nat->debugreg[5];
             c.nat->debugreg[5] = 0;
         }
-#ifdef CONFIG_COMPAT
         else
         {
             l4_pgentry_t *l4e = __va(pagetable_get_paddr(v->arch.guest_table));
@@ -1659,7 +1646,6 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
             c.cmp->debugreg[7] |= c.cmp->debugreg[5];
             c.cmp->debugreg[5] = 0;
         }
-#endif
 
         if ( guest_kernel_mode(v, &v->arch.user_regs) )
             c(flags |= VGCF_in_kernel);

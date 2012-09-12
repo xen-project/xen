@@ -473,7 +473,6 @@ TYPE_SAFE(unsigned long,mfn);
 #define SHARED_M2P_ENTRY         (~0UL - 1UL)
 #define SHARED_M2P(_e)           ((_e) == SHARED_M2P_ENTRY)
 
-#ifdef CONFIG_COMPAT
 #define compat_machine_to_phys_mapping ((unsigned int *)RDWR_COMPAT_MPT_VIRT_START)
 #define _set_gpfn_from_mfn(mfn, pfn) ({                        \
     struct domain *d = page_get_owner(__mfn_to_page(mfn));     \
@@ -483,15 +482,6 @@ TYPE_SAFE(unsigned long,mfn);
             (compat_machine_to_phys_mapping[(mfn)] = (unsigned int)(entry))), \
      machine_to_phys_mapping[(mfn)] = (entry));                \
     })
-#else
-#define _set_gpfn_from_mfn(mfn, pfn) ({                        \
-    struct domain *d = page_get_owner(__mfn_to_page(mfn));     \
-    if(d && (d == dom_cow))                                    \
-        machine_to_phys_mapping[(mfn)] = SHARED_M2P_ENTRY;     \
-    else                                                       \
-        machine_to_phys_mapping[(mfn)] = (pfn);                \
-    })
-#endif
 
 /*
  * Disable some users of set_gpfn_from_mfn() (e.g., free_heap_pages()) until
@@ -579,13 +569,8 @@ int map_ldt_shadow_page(unsigned int);
 
 extern int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm);
 
-#ifdef CONFIG_COMPAT
 void domain_set_alloc_bitsize(struct domain *d);
 unsigned int domain_clamp_alloc_bitsize(struct domain *d, unsigned int bits);
-#else
-# define domain_set_alloc_bitsize(d) ((void)0)
-# define domain_clamp_alloc_bitsize(d, b) (b)
-#endif
 
 unsigned long domain_get_maximum_gpfn(struct domain *d);
 

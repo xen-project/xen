@@ -143,13 +143,8 @@ struct desc_ptr {
 
 extern struct desc_struct boot_cpu_gdt_table[];
 DECLARE_PER_CPU(struct desc_struct *, gdt_table);
-#ifdef CONFIG_COMPAT
 extern struct desc_struct boot_cpu_compat_gdt_table[];
 DECLARE_PER_CPU(struct desc_struct *, compat_gdt_table);
-#else
-# define boot_cpu_compat_gdt_table boot_cpu_gdt_table
-# define per_cpu__compat_gdt_table per_cpu__gdt_table
-#endif
 
 extern void set_intr_gate(unsigned int irq, void * addr);
 extern void load_TR(void);

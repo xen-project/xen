@@ -94,7 +94,6 @@ void machine_kexec(xen_kexec_image_t *image)
      */
     asm volatile ( "lgdt %0" : : "m" (gdt_desc) );
 
-#ifdef CONFIG_COMPAT
     if ( is_pv_32on64_domain(dom0) )
     {
         compat_machine_kexec(image->page_list[1],
@@ -103,7 +102,6 @@ void machine_kexec(xen_kexec_image_t *image)
                              image->start_address);
     }
     else
-#endif
     {
         relocate_new_kernel_t rnk;
 

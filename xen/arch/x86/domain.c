@@ -58,9 +58,7 @@
 #include <asm/amd.h>
 #include <xen/numa.h>
 #include <xen/iommu.h>
-#ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>
-#endif
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 DEFINE_PER_CPU(unsigned long, cr4);
@@ -665,13 +663,11 @@ unsigned long pv_guest_cr4_fixup(const struct vcpu *v, unsigned long guest_cr4)
     return (hv_cr4 & hv_cr4_mask) | (guest_cr4 & ~hv_cr4_mask);
 }
 
-#ifdef CONFIG_COMPAT
 #define xen_vcpu_guest_context vcpu_guest_context
 #define fpu_ctxt fpu_ctxt.x
 CHECK_FIELD_(struct, vcpu_guest_context, fpu_ctxt);
 #undef fpu_ctxt
 #undef xen_vcpu_guest_context
-#endif
 
 /* Called by XEN_DOMCTL_setvcpucontext and VCPUOP_initialise. */
 int arch_set_info_guest(
@@ -688,11 +684,7 @@ int arch_set_info_guest(
      * we expect the tools to DTRT even in compat-mode callers. */
     compat = is_pv_32on64_domain(d);
 
-#ifdef CONFIG_COMPAT
 #define c(fld) (compat ? (c.cmp->fld) : (c.nat->fld))
-#else
-#define c(fld) (c.nat->fld)
-#endif
     flags = c(flags);
 
     if ( !is_hvm_vcpu(v) )
@@ -724,7 +716,6 @@ int arch_set_info_guest(
                                   LDT_ENTRY_SIZE) )
                 return -EINVAL;
         }
-#ifdef CONFIG_COMPAT
         else
         {
             fixup_guest_stack_selector(d, c.cmp->user_regs.ss);
@@ -744,7 +735,6 @@ int arch_set_info_guest(
                                          LDT_ENTRY_SIZE) )
                 return -EINVAL;
         }
-#endif
     }
 
     v->fpu_initialised = !!(flags & VGCF_I387_VALID);
@@ -763,7 +753,6 @@ int arch_set_info_guest(
             memcpy(v->arch.pv_vcpu.trap_ctxt, c.nat->trap_ctxt,
                    sizeof(c.nat->trap_ctxt));
     }
-#ifdef CONFIG_COMPAT
     else
     {
         XLAT_cpu_user_regs(&v->arch.user_regs, &c.cmp->user_regs);
@@ -771,7 +760,6 @@ int arch_set_info_guest(
             XLAT_trap_info(v->arch.pv_vcpu.trap_ctxt + i,
                            c.cmp->trap_ctxt + i);
     }
-#endif
     for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
         v->arch.debugreg[i] = c(debugreg[i]);
 
@@ -871,7 +859,6 @@ int arch_set_info_guest(
 
     if ( !compat )
         rc = (int)set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
-#ifdef CONFIG_COMPAT
     else
     {
         unsigned long gdt_frames[ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames)];
@@ -883,7 +870,6 @@ int arch_set_info_guest(
             gdt_frames[i] = c.cmp->gdt_frames[i];
         rc = (int)set_gdt(v, gdt_frames, c.cmp->gdt_ents);
     }
-#endif
     if ( rc != 0 )
         return rc;
 
@@ -1463,7 +1449,6 @@ static void update_runstate_area(struct vcpu *v)
     if ( guest_handle_is_null(runstate_guest(v)) )
         return;
 
-#ifdef CONFIG_COMPAT
     if ( has_32bit_shinfo(v->domain) )
     {
         struct compat_vcpu_runstate_info info;
@@ -1472,7 +1457,6 @@ static void update_runstate_area(struct vcpu *v)
         __copy_to_guest(v->runstate_guest.compat, &info, 1);
         return;
     }
-#endif
 
     __copy_to_guest(runstate_guest(v), &v->runstate, 1);
 }
@@ -1593,7 +1577,6 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     {
         __context_switch();
 
-#ifdef CONFIG_COMPAT
         if ( !is_hvm_vcpu(next) &&
              (is_idle_vcpu(prev) ||
               is_hvm_vcpu(prev) ||
@@ -1603,7 +1586,6 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
             if ( !(efer & EFER_SCE) )
                 write_efer(efer | EFER_SCE);
         }
-#endif
 
         /* Re-enable interrupts before restoring state which may fault. */
         local_irq_enable();
@@ -1776,7 +1758,6 @@ unsigned long hypercall_create_continuation(
     return op;
 }
 
-#ifdef CONFIG_COMPAT
 int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
 {
     int rc = 0;
@@ -1865,7 +1846,6 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
 
     return rc;
 }
-#endif
 
 static int relinquish_memory(
     struct domain *d, struct page_list_head *list, unsigned long type)
