@@ -178,7 +178,7 @@ endif
 # CONFIG_QEMU ?= ../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= d7d453f51459b591faa96d1c123b5bfff7c5b6b6
+QEMU_TAG ?= eaa1bd612f50d2f253738ed19e14981e4ede98a5
 # Thu Sep 6 17:05:30 2012 +0100
 # Disable qemu monitor by default.  The qemu monitor is an overly
 
