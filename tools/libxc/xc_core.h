@@ -33,8 +33,6 @@
 #define XEN_DUMPCORE_SEC_PFN                    ".xen_pfn"
 #define XEN_DUMPCORE_SEC_PAGES                  ".xen_pages"
 
-#define XEN_DUMPCORE_SEC_IA64_MAPPED_REGS       ".xen_ia64_mapped_regs"
-
 /* elf note name */
 #define XEN_DUMPCORE_ELFNOTE_NAME               "Xen"
 /* note numbers are defined in xen/elfnote.h */
@@ -153,8 +151,6 @@ int xc_core_arch_map_p2m_writable(xc_interface *xch, unsigned int guest_width,
 
 #if defined (__i386__) || defined (__x86_64__)
 # include "xc_core_x86.h"
-#elif defined (__ia64__)
-# include "xc_core_ia64.h"
 #elif defined (__arm__)
 # include "xc_core_arm.h"
 #else

@@ -97,9 +97,6 @@ typedef struct xen_kexec_image {
 #if defined(__i386__) || defined(__x86_64__)
     unsigned long page_list[KEXEC_XEN_NO_PAGES];
 #endif
-#if defined(__ia64__)
-    unsigned long reboot_code_buffer;
-#endif
     unsigned long indirection_page;
     unsigned long start_address;
 } xen_kexec_image_t;
@@ -134,7 +131,7 @@ typedef struct xen_kexec_load {
                                      * to Xen it exists in a separate EFI
                                      * region on ia64, and thus needs to be
                                      * inserted into iomem_machine separately */
-#define KEXEC_RANGE_MA_BOOT_PARAM 4 /* machine address and size of
+#define KEXEC_RANGE_MA_BOOT_PARAM 4 /* Obsolete: machine address and size of
                                      * the ia64_boot_param */
 #define KEXEC_RANGE_MA_EFI_MEMMAP 5 /* machine address and size of
                                      * of the EFI Memory Map */

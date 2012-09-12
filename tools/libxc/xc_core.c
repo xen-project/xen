@@ -31,7 +31,6 @@
  *  |    .shstrtab                                           |
  *  |    .note.Xen                                           |
  *  |    .xen_prstatus                                       |
- *  |    .xen_ia64_mmapped_regs if ia64                      |
  *  |    .xen_shared_info if present                         |
  *  |    .xen_pages                                          |
  *  |    .xen_p2m or .xen_pfn                                |
@@ -47,9 +46,6 @@
  *  +--------------------------------------------------------+
  *  |.xen_prstatus                                           |
  *  |       vcpu_guest_context_t[nr_vcpus]                   |
- *  +--------------------------------------------------------+
- *  |.xen_ia64_mmapped_regs if ia64 pv                       |
- *  |       mmapped_regs_t[nr_vcpus]                         |
  *  +--------------------------------------------------------+
  *  |.xen_shared_info if possible                            |
  *  +--------------------------------------------------------+

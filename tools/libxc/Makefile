@@ -7,7 +7,6 @@ MINOR    = 0
 CTRL_SRCS-y       :=
 CTRL_SRCS-y       += xc_core.c
 CTRL_SRCS-$(CONFIG_X86) += xc_core_x86.c
-CTRL_SRCS-$(CONFIG_IA64) += xc_core_ia64.c
 CTRL_SRCS-$(CONFIG_ARM) += xc_core_arm.c
 CTRL_SRCS-y       += xc_cpupool.c
 CTRL_SRCS-y       += xc_domain.c
@@ -65,7 +64,6 @@ GUEST_SRCS-y                 += xc_dom_compat_linux.c
 GUEST_SRCS-$(CONFIG_X86)     += xc_dom_x86.c
 GUEST_SRCS-$(CONFIG_X86)     += xc_cpuid_x86.c
 GUEST_SRCS-$(CONFIG_X86)     += xc_hvm_build_x86.c
-GUEST_SRCS-$(CONFIG_IA64)    += xc_dom_ia64.c
 GUEST_SRCS-$(CONFIG_ARM)     += xc_dom_arm.c
 GUEST_SRCS-$(CONFIG_ARM)     += xc_hvm_build_arm.c
 

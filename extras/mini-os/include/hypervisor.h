@@ -7,7 +7,6 @@
  * Copyright (c) 2002, K A Fraser
  * Copyright (c) 2005, Grzegorz Milos
  * Updates: Aravindh Puthiyaparambil <aravindh.puthiyaparambil@unisys.com>
- * Updates: Dietmar Hahn <dietmar.hahn@fujitsu-siemens.com> for ia64
  */
 
 #ifndef _HYPERVISOR_H_
@@ -19,8 +18,6 @@
 #include <hypercall-x86_32.h>
 #elif defined(__x86_64__)
 #include <hypercall-x86_64.h>
-#elif defined(__ia64__)
-#include <hypercall-ia64.h>
 #else
 #error "Unsupported architecture"
 #endif

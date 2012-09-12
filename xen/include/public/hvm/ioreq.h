@@ -82,24 +82,6 @@ struct buffered_iopage {
 }; /* NB. Size of this structure must be no greater than one page. */
 typedef struct buffered_iopage buffered_iopage_t;
 
-#if defined(__ia64__)
-struct pio_buffer {
-    uint32_t page_offset;
-    uint32_t pointer;
-    uint32_t data_end;
-    uint32_t buf_size;
-    void *opaque;
-};
-
-#define PIO_BUFFER_IDE_PRIMARY   0 /* I/O port = 0x1F0 */
-#define PIO_BUFFER_IDE_SECONDARY 1 /* I/O port = 0x170 */
-#define PIO_BUFFER_ENTRY_NUM     2
-struct buffered_piopage {
-    struct pio_buffer pio[PIO_BUFFER_ENTRY_NUM];
-    uint8_t buffer[1];
-};
-#endif /* defined(__ia64__) */
-
 /*
  * ACPI Control/Event register locations. Location is controlled by a 
  * version number in HVM_PARAM_ACPI_IOPORTS_LOCATION.

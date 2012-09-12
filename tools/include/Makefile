@@ -13,7 +13,7 @@ xen/.dir:
 	mkdir -p xen/libelf
 	ln -sf $(XEN_ROOT)/xen/include/public/COPYING xen
 	ln -sf $(wildcard $(XEN_ROOT)/xen/include/public/*.h) xen
-	ln -sf $(addprefix $(XEN_ROOT)/xen/include/public/,arch-ia64 arch-x86 hvm io xsm) xen
+	ln -sf $(addprefix $(XEN_ROOT)/xen/include/public/,arch-x86 hvm io xsm) xen
 	ln -sf ../xen-sys/$(XEN_OS) xen/sys
 	ln -sf $(addprefix $(XEN_ROOT)/xen/include/xen/,libelf.h elfstructs.h) xen/libelf/
 	ln -s ../xen-foreign xen/foreign
@@ -21,8 +21,6 @@ xen/.dir:
 
 .PHONY: install
 install: all
-	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/arch-ia64
-	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/arch-ia64/hvm
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/arch-x86
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/arch-x86/hvm
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/foreign
@@ -32,8 +30,6 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)/xen/xsm
 	$(INSTALL_DATA) xen/COPYING $(DESTDIR)$(INCLUDEDIR)/xen
 	$(INSTALL_DATA) xen/*.h $(DESTDIR)$(INCLUDEDIR)/xen
-	$(INSTALL_DATA) xen/arch-ia64/*.h $(DESTDIR)$(INCLUDEDIR)/xen/arch-ia64
-	$(INSTALL_DATA) xen/arch-ia64/hvm/*.h $(DESTDIR)$(INCLUDEDIR)/xen/arch-ia64/hvm
 	$(INSTALL_DATA) xen/arch-x86/*.h $(DESTDIR)$(INCLUDEDIR)/xen/arch-x86
 	$(INSTALL_DATA) xen/arch-x86/hvm/*.h $(DESTDIR)$(INCLUDEDIR)/xen/arch-x86/hvm
 	$(INSTALL_DATA) xen/foreign/*.h $(DESTDIR)$(INCLUDEDIR)/xen/foreign

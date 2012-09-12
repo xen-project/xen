@@ -109,14 +109,10 @@ static void *minios_privcmd_map_foreign_bulk(xc_interface *xch, xc_osdep_handle 
                                              const xen_pfn_t *arr, int *err, unsigned int num)
 {
     unsigned long pt_prot = 0;
-#ifdef __ia64__
-    /* TODO */
-#else
     if (prot & PROT_READ)
 	pt_prot = L1_PROT_RO;
     if (prot & PROT_WRITE)
 	pt_prot = L1_PROT;
-#endif
     return map_frames_ex(arr, num, 1, 0, 1, dom, err, pt_prot);    
 }
 
@@ -129,14 +125,11 @@ static void *minios_privcmd_map_foreign_batch(xc_interface *xch,  xc_osdep_handl
     int i;
     unsigned long addr;
 
-#ifdef __ia64__
-    /* TODO */
-#else
     if (prot & PROT_READ)
 	pt_prot = L1_PROT_RO;
     if (prot & PROT_WRITE)
 	pt_prot = L1_PROT;
-#endif
+
     addr = (unsigned long) map_frames_ex(arr, num, 1, 0, 1, dom, err, pt_prot);
     for (i = 0; i < num; i++) {
         if (err[i])
@@ -151,14 +144,12 @@ static void *minios_privcmd_map_foreign_range(xc_interface *xch, xc_osdep_handle
                                               unsigned long mfn)
 {
     unsigned long pt_prot = 0;
-#ifdef __ia64__
-    /* TODO */
-#else
+
     if (prot & PROT_READ)
 	pt_prot = L1_PROT_RO;
     if (prot & PROT_WRITE)
 	pt_prot = L1_PROT;
-#endif
+
     assert(!(size % getpagesize()));
     return map_frames_ex(&mfn, size / getpagesize(), 0, 1, 1, dom, NULL, pt_prot);
 }
@@ -172,14 +163,11 @@ static void *minios_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handl
     int i, j, n;
     unsigned long pt_prot = 0;
     void *ret;
-#ifdef __ia64__
-    /* TODO */
-#else
+
     if (prot & PROT_READ)
 	pt_prot = L1_PROT_RO;
     if (prot & PROT_WRITE)
 	pt_prot = L1_PROT;
-#endif
 
     mfns = malloc((size / XC_PAGE_SIZE) * sizeof(*mfns));
 

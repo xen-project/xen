@@ -392,13 +392,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_hypercall_init_t);
 #define XEN_DOMAINSETUP_sioemu_guest  (1UL<<_XEN_DOMAINSETUP_sioemu_guest)
 typedef struct xen_domctl_arch_setup {
     uint64_aligned_t flags;  /* XEN_DOMAINSETUP_* */
-#ifdef __ia64__
-    uint64_aligned_t bp;     /* mpaddr of boot param area */
-    uint64_aligned_t maxmem; /* Highest memory address for MDT.  */
-    uint64_aligned_t xsi_va; /* Xen shared_info area virtual address.  */
-    uint32_t hypercall_imm;  /* Break imm for Xen hypercalls.  */
-    int8_t vhpt_size_log2;   /* Log2 of VHPT size. */
-#endif
 } xen_domctl_arch_setup_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_arch_setup_t);
 
@@ -576,21 +569,6 @@ struct xen_domctl_ext_vcpucontext {
 };
 typedef struct xen_domctl_ext_vcpucontext xen_domctl_ext_vcpucontext_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_ext_vcpucontext_t);
-
-/*
- * Set optimizaton features for a domain
- */
-/* XEN_DOMCTL_set_opt_feature */
-struct xen_domctl_set_opt_feature {
-#if defined(__ia64__)
-    struct xen_ia64_opt_feature optf;
-#else
-    /* Make struct non-empty: do not depend on this field name! */
-    uint64_t dummy;
-#endif
-};
-typedef struct xen_domctl_set_opt_feature xen_domctl_set_opt_feature_t;
-DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_opt_feature_t);
 
 /*
  * Set the target domain for a domain
@@ -891,7 +869,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_pin_mem_cacheattr             41
 #define XEN_DOMCTL_set_ext_vcpucontext           42
 #define XEN_DOMCTL_get_ext_vcpucontext           43
-#define XEN_DOMCTL_set_opt_feature               44
+#define XEN_DOMCTL_set_opt_feature               44 /* Obsolete IA64 only */
 #define XEN_DOMCTL_test_assign_device            45
 #define XEN_DOMCTL_set_target                    46
 #define XEN_DOMCTL_deassign_device               47
@@ -956,7 +934,6 @@ struct xen_domctl {
         struct xen_domctl_ioport_mapping    ioport_mapping;
         struct xen_domctl_pin_mem_cacheattr pin_mem_cacheattr;
         struct xen_domctl_ext_vcpucontext   ext_vcpucontext;
-        struct xen_domctl_set_opt_feature   set_opt_feature;
         struct xen_domctl_set_target        set_target;
         struct xen_domctl_subscribe         subscribe;
         struct xen_domctl_debug_op          debug_op;

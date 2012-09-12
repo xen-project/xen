@@ -55,11 +55,7 @@
 #include <xen/arch-x86/xen-mca.h>
 #endif
 
-#ifdef __ia64__
-#define XC_PAGE_SHIFT           14
-#else
 #define XC_PAGE_SHIFT           12
-#endif
 #define XC_PAGE_SIZE            (1UL << XC_PAGE_SHIFT)
 #define XC_PAGE_MASK            (~(XC_PAGE_SIZE-1))
 
@@ -79,10 +75,6 @@
 #define xen_mb()  asm volatile ( "mfence" : : : "memory")
 #define xen_rmb() xen_barrier()
 #define xen_wmb() xen_barrier()
-#elif defined(__ia64__)
-#define xen_mb()   asm volatile ("mf" ::: "memory")
-#define xen_rmb()  asm volatile ("mf" ::: "memory")
-#define xen_wmb()  asm volatile ("mf" ::: "memory")
 #elif defined(__arm__)
 #define xen_mb()   asm volatile ("dmb" : : : "memory")
 #define xen_rmb()  asm volatile ("dmb" : : : "memory")
@@ -1248,8 +1240,6 @@ unsigned long xc_translate_foreign_address(xc_interface *xch, uint32_t dom,
 int xc_get_pfn_list(xc_interface *xch, uint32_t domid, uint64_t *pfn_buf,
                     unsigned long max_pfns);
 
-unsigned long xc_ia64_fpsr_default(void);
-
 int xc_copy_to_domain_page(xc_interface *xch, uint32_t domid,
                            unsigned long dst_pfn, const char *src_page);
 
@@ -1658,15 +1648,6 @@ void xc_clear_last_error(xc_interface *xch);
 
 int xc_set_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long value);
 int xc_get_hvm_param(xc_interface *handle, domid_t dom, int param, unsigned long *value);
-
-/* IA64 specific, nvram save */
-int xc_ia64_save_to_nvram(xc_interface *xch, uint32_t dom);
-
-/* IA64 specific, nvram init */
-int xc_ia64_nvram_init(xc_interface *xch, char *dom_name, uint32_t dom);
-
-/* IA64 specific, set guest OS type optimizations */
-int xc_ia64_set_os_type(xc_interface *xch, char *guest_os_type, uint32_t dom);
 
 /* HVM guest pass-through */
 int xc_assign_device(xc_interface *xch,

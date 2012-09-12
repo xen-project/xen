@@ -213,7 +213,7 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
 
     DOMPRINTF_CALLED(dom->xch);
 
-    /* misc ia64 stuff*/
+    /* misc stuff*/
     if ( (rc = arch_setup_bootearly(dom)) != 0 )
         return rc;
 

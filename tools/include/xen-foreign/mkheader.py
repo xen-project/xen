@@ -47,20 +47,6 @@ header["x86_64"] = """
 #define __x86_64___X86_64 1
 """;
 
-# ia64
-inttypes["ia64"] = {
-    "unsigned long" : "__align8__ uint64_t",
-    "long"          : "__align8__ uint64_t",
-    "xen_pfn_t"     : "__align8__ uint64_t",
-    "long double"   : "__align16__ ldouble_t",
-};
-header["ia64"] = """
-#define __align8__ __attribute__((aligned (8)))
-#define __align16__ __attribute__((aligned (16)))
-typedef unsigned char ldouble_t[16];
-""";
-
-
 ###########################################################################
 # main
 

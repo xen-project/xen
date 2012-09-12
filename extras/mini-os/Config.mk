@@ -9,7 +9,7 @@ export XEN_INTERFACE_VERSION
 
 # Try to find out the architecture family TARGET_ARCH_FAM.
 # First check whether x86_... is contained (for x86_32, x86_32y, x86_64).
-# If not x86 then use $(XEN_TARGET_ARCH) -> for ia64, ...
+# If not x86 then use $(XEN_TARGET_ARCH)
 ifeq ($(findstring x86_,$(XEN_TARGET_ARCH)),x86_)
 TARGET_ARCH_FAM = x86
 else
