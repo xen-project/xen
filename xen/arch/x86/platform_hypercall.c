@@ -207,17 +207,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             setup_ioapic_dest();
             break;
         case QUIRK_IOAPIC_BAD_REGSEL:
+            dprintk(XENLOG_WARNING,
+                    "Domain 0 thinks that IO-APIC REGSEL is bad\n");
+            break;
         case QUIRK_IOAPIC_GOOD_REGSEL:
-#ifndef sis_apic_bug
-            sis_apic_bug = (quirk_id == QUIRK_IOAPIC_BAD_REGSEL);
-            dprintk(XENLOG_INFO, "Domain 0 says that IO-APIC REGSEL is %s\n",
-                    sis_apic_bug ? "bad" : "good");
-#else
-            if ( sis_apic_bug != (quirk_id == QUIRK_IOAPIC_BAD_REGSEL) )
-                dprintk(XENLOG_WARNING,
-                        "Domain 0 thinks that IO-APIC REGSEL is %s\n",
-                        sis_apic_bug ? "good" : "bad");
-#endif
             break;
         default:
             ret = -EINVAL;

@@ -46,14 +46,6 @@ bool_t __read_mostly skip_ioapic_setup;
 bool_t __read_mostly ioapic_ack_new = 1;
 bool_t __read_mostly ioapic_ack_forced = 0;
 
-#ifndef sis_apic_bug
-/*
- * Is the SiS APIC rmw bug present?
- * -1 = don't know, 0 = no, 1 = yes
- */
-s8 __read_mostly sis_apic_bug = -1;
-#endif
-
 /*
  * # of IRQ routing registers
  */
