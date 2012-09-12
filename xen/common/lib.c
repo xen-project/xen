@@ -423,7 +423,7 @@ s64 __ldivmod_helper(s64 a, s64 b, s64 *r)
 /* Compute with 96 bit intermediate result: (a*b)/c */
 uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
 {
-#ifdef __x86_64__
+#ifdef CONFIG_X86
     asm ( "mul %%rdx; div %%rcx" : "=a" (a) : "0" (a), "d" (b), "c" (c) );
     return a;
 #else

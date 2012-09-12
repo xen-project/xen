@@ -43,7 +43,7 @@ struct tm gmtime(unsigned long t)
     const unsigned short int *ip;
 
     y = 1970;
-#ifdef __x86_64__
+#if BITS_PER_LONG >= 64
     /* Allow the concept of time before 1970.  64-bit only; for 32-bit
      * time after 2038 seems more important than time before 1970. */
     while ( t & (1UL<<39) )

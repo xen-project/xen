@@ -188,7 +188,7 @@ void print_vtd_entries(struct iommu *iommu, int bus, int devfn, u64 gmfn)
 
 static void dump_iommu_info(unsigned char key)
 {
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(CONFIG_X86)
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     int i;

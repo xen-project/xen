@@ -31,7 +31,7 @@
 #include "vtd.h"
 #include "extern.h"
 
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(CONFIG_X86)
 #include <asm/apic.h>
 #include <asm/io_apic.h>
 #define nr_ioapic_entries(i)  nr_ioapic_entries[i]
@@ -302,7 +302,7 @@ static int ioapic_rte_to_remap_entry(struct iommu *iommu,
 
     if ( rte_upper )
     {
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(CONFIG_X86)
         if ( x2apic_enabled )
             new_ire.lo.dst = value;
         else
@@ -422,7 +422,7 @@ void io_apic_write_remap_rte(
         __ioapic_write_entry(apic, ioapic_pin, 1, old_rte);
 }
 
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(CONFIG_X86)
 
 static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
 {

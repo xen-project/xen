@@ -34,7 +34,7 @@
 #include <xen/softirq.h>
 #include <asm/msi.h>
 #include <asm/irq.h>
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(CONFIG_X86)
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/p2m.h>
 #include <mach_apic.h>
