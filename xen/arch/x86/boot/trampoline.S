@@ -184,10 +184,15 @@ trampoline_boot_cpu_entry:
          *  1. Get memory map.
          *  2. Get Enhanced Disk Drive (EDD) information.
          *  3. Set video mode.
+         *  4. Get keyboard shift flags.
          */
         call    get_memory_map
         call    get_edd
         call    video
+
+        mov     $0x0200,%ax
+        int     $0x16
+        mov     %al,bootsym(kbd_shift_flags)
 
         /* Disable irqs before returning to protected mode. */
         cli
@@ -219,6 +224,10 @@ trampoline_boot_cpu_entry:
         jmp     trampoline_protmode_entry
 
 skip_realmode:
+        .byte   0
+
+        .globl kbd_shift_flags
+kbd_shift_flags:
         .byte   0
 
 rm_idt: .word   256*4-1, 0, 0

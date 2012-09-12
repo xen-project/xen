@@ -29,6 +29,7 @@
 #include <asm/edd.h>
 #include <asm/mtrr.h>
 #include <asm/io_apic.h>
+#include <asm/setup.h>
 #include "cpu/mtrr/mtrr.h"
 #include <xsm/xsm.h>
 
@@ -317,6 +318,18 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             if ( ret == 0 &&
                  copy_field_to_guest(u_xenpf_op, op,
                                      u.firmware_info.u.efi_info) )
+                ret = -EFAULT;
+            break;
+        case XEN_FW_KBD_SHIFT_FLAGS:
+            ret = -ESRCH;
+            if ( op->u.firmware_info.index != 0 )
+                break;
+
+            op->u.firmware_info.u.kbd_shift_flags = bootsym(kbd_shift_flags);
+
+            ret = 0;
+            if ( copy_field_to_guest(u_xenpf_op, op,
+                                     u.firmware_info.u.kbd_shift_flags) )
                 ret = -EFAULT;
             break;
         default:

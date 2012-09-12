@@ -41,4 +41,6 @@ int xen_in_range(unsigned long mfn);
 void microcode_grab_module(
     unsigned long *, const multiboot_info_t *, void *(*)(const module_t *));
 
+extern uint8_t kbd_shift_flags;
+
 #endif
