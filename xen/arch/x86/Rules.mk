@@ -50,7 +50,3 @@ CFLAGS += -fno-asynchronous-unwind-tables
 ifneq ($(call cc-option,$(CC),-fvisibility=hidden,n),n)
 CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
 endif
-
-# Require GCC v3.4+ (to avoid issues with alignment constraints in Xen headers)
-check-$(gcc) = $(call cc-ver-check,CC,0x030400,"Xen requires at least gcc-3.4")
-$(eval $(check-y))

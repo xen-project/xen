@@ -119,6 +119,10 @@ define cc-ver-check-closure
     endif
 endef
 
+# Require GCC v4.1+
+check-$(gcc) = $(call cc-ver-check,CC,0x040100,"Xen requires at least gcc-4.1")
+$(eval $(check-y))
+
 define buildmakevars2shellvars
     export PREFIX="$(PREFIX)";                                            \
     export XEN_SCRIPT_DIR="$(XEN_SCRIPT_DIR)";                            \
