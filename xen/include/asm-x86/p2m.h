@@ -35,22 +35,6 @@
 extern bool_t opt_hap_1gb, opt_hap_2mb;
 
 /*
- * The phys_to_machine_mapping maps guest physical frame numbers 
- * to machine frame numbers.  It only exists for paging_mode_translate 
- * guests. It is organised in page-table format, which:
- *
- * (1) allows us to use it directly as the second pagetable in hardware-
- *     assisted paging and (hopefully) iommu support; and 
- * (2) lets us map it directly into the guest vcpus' virtual address space 
- *     as a linear pagetable, so we can read and write it easily.
- *
- * For (2) we steal the address space that would have normally been used
- * by the read-only MPT map in a non-translated guest.  (For 
- * paging_mode_external() guests this mapping is in the monitor table.)
- */
-#define phys_to_machine_mapping ((l1_pgentry_t *)RO_MPT_VIRT_START)
-
-/*
  * The upper levels of the p2m pagetable always contain full rights; all 
  * variation in the access control bits is made in the level-1 PTEs.
  * 

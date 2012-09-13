@@ -405,11 +405,6 @@ static void hap_install_xen_entries_in_l4(struct vcpu *v, mfn_t l4mfn)
     l4e[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_pfn(mfn_x(l4mfn), __PAGE_HYPERVISOR);
 
-    /* Install the domain-specific P2M table */
-    l4e[l4_table_offset(RO_MPT_VIRT_START)] =
-        l4e_from_pfn(mfn_x(pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d)))),
-                     __PAGE_HYPERVISOR);
-
     hap_unmap_domain_page(l4e);
 }
 

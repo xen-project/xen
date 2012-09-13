@@ -1472,14 +1472,6 @@ void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
             shadow_l4e_from_mfn(gl4mfn, __PAGE_HYPERVISOR);
     }
 
-    if ( shadow_mode_translate(v->domain) )
-    {
-        /* install domain-specific P2M table */
-        sl4e[shadow_l4_table_offset(RO_MPT_VIRT_START)] =
-            shadow_l4e_from_mfn(pagetable_get_mfn(p2m_get_pagetable(p2m_get_hostp2m(d))),
-                                __PAGE_HYPERVISOR);
-    }
-
     sh_unmap_domain_page(sl4e);    
 }
 #endif
