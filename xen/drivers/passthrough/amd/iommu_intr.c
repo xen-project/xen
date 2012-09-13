@@ -272,7 +272,7 @@ static void update_intremap_entry_from_msi_msg(
     spinlock_t *lock;
     int offset;
 
-    bdf = (pdev->bus << 8) | pdev->devfn;
+    bdf = PCI_BDF2(pdev->bus, pdev->devfn);
     req_id = get_dma_requestor_id(pdev->seg, bdf);
     alias_id = get_intremap_requestor_id(pdev->seg, bdf);
 
@@ -340,17 +340,16 @@ void amd_iommu_msi_msg_update_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
     struct pci_dev *pdev = msi_desc->dev;
-    struct amd_iommu *iommu = NULL;
+    int bdf = PCI_BDF2(pdev->bus, pdev->devfn);
+    struct amd_iommu *iommu;
 
     if ( !iommu_intremap )
         return;
 
-    iommu = find_iommu_for_device(pdev->seg, (pdev->bus << 8) | pdev->devfn);
-
+    iommu = find_iommu_for_device(pdev->seg, bdf);
     if ( !iommu )
     {
-        AMD_IOMMU_DEBUG("Fail to find iommu for MSI device id = 0x%x\n",
-                       (pdev->bus << 8) | pdev->devfn);
+        AMD_IOMMU_DEBUG("Fail to find iommu for MSI device id = %#x\n", bdf);
         return;
     }
 

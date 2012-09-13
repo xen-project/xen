@@ -455,9 +455,9 @@ static void iommu_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     unsigned int dest;
     struct amd_iommu *iommu = desc->action->dev_id;
     u16 seg = iommu->seg;
-    u8 bus = (iommu->bdf >> 8) & 0xff;
-    u8 dev = PCI_SLOT(iommu->bdf & 0xff);
-    u8 func = PCI_FUNC(iommu->bdf & 0xff);
+    u8 bus = PCI_BUS(iommu->bdf);
+    u8 dev = PCI_SLOT(iommu->bdf);
+    u8 func = PCI_FUNC(iommu->bdf);
 
     dest = set_desc_affinity(desc, mask);
 
@@ -495,13 +495,13 @@ static void iommu_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
 static void amd_iommu_msi_enable(struct amd_iommu *iommu, int flag)
 {
     u16 control;
-    int bus = (iommu->bdf >> 8) & 0xff;
-    int dev = PCI_SLOT(iommu->bdf & 0xff);
-    int func = PCI_FUNC(iommu->bdf & 0xff);
+    int bus = PCI_BUS(iommu->bdf);
+    int dev = PCI_SLOT(iommu->bdf);
+    int func = PCI_FUNC(iommu->bdf);
 
     control = pci_conf_read16(iommu->seg, bus, dev, func,
         iommu->msi_cap + PCI_MSI_FLAGS);
-    control &= ~(1);
+    control &= ~PCI_MSI_FLAGS_ENABLE;
     if ( flag )
         control |= flag;
     pci_conf_write16(iommu->seg, bus, dev, func,

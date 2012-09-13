@@ -597,7 +597,7 @@ static int update_paging_mode(struct domain *d, unsigned long gfn)
         /* Update device table entries using new root table and paging mode */
         for_each_pdev( d, pdev )
         {
-            bdf = (pdev->bus << 8) | pdev->devfn;
+            bdf = PCI_BDF2(pdev->bus, pdev->devfn);
             req_id = get_dma_requestor_id(pdev->seg, bdf);
             iommu = find_iommu_for_device(pdev->seg, bdf);
             if ( !iommu )

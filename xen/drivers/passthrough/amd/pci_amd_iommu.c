@@ -373,7 +373,7 @@ static int reassign_device( struct domain *source, struct domain *target,
 static int amd_iommu_assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
 {
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(seg);
-    int bdf = (bus << 8) | devfn;
+    int bdf = PCI_BDF2(bus, devfn);
     int req_id = get_dma_requestor_id(seg, bdf);
 
     if ( ivrs_mappings[req_id].unity_map_enable )
@@ -499,12 +499,9 @@ static int amd_iommu_remove_device(struct pci_dev *pdev)
 
 static int amd_iommu_group_id(u16 seg, u8 bus, u8 devfn)
 {
-    int rt;
-    int bdf = (bus << 8) | devfn;
-    rt = ( bdf < ivrs_bdf_entries ) ?
-        get_dma_requestor_id(seg, bdf) :
-        bdf;
-    return rt;
+    int bdf = PCI_BDF2(bus, devfn);
+
+    return (bdf < ivrs_bdf_entries) ? get_dma_requestor_id(seg, bdf) : bdf;
 }
 
 #include <asm/io_apic.h>
