@@ -1178,19 +1178,19 @@ int shadow_cmpxchg_guest_entry(struct vcpu *v, intpte_t *p,
  *    
  * This table shows the allocation behaviour of the different modes:
  *
- * Xen paging      pae  pae  64b  64b  64b
- * Guest paging    32b  pae  32b  pae  64b
- * PV or HVM       HVM   *   HVM  HVM   * 
- * Shadow paging   pae  pae  pae  pae  64b
+ * Xen paging      64b  64b  64b
+ * Guest paging    32b  pae  64b
+ * PV or HVM       HVM  HVM   * 
+ * Shadow paging   pae  pae  64b
  *
- * sl1 size         8k   4k   8k   4k   4k
- * sl2 size        16k   4k  16k   4k   4k
- * sl3 size         -    -    -    -    4k
- * sl4 size         -    -    -    -    4k
+ * sl1 size         8k   4k   4k
+ * sl2 size        16k   4k   4k
+ * sl3 size         -    -    4k
+ * sl4 size         -    -    4k
  *
  * In HVM guests, the p2m table is built out of shadow pages, and we provide 
  * a function for the p2m management to steal pages, in max-order chunks, from 
- * the free pool.  We don't provide for giving them back, yet.
+ * the free pool.
  */
 
 /* Figure out the least acceptable quantity of shadow memory.
