@@ -20,6 +20,15 @@ CFLAGS := $(filter-out -flto,$(CFLAGS))
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -fpic $< -o $@
+	$(OBJDUMP) -h $@ | sed -n '/[0-9]/{s,00*,0,g;p}' |\
+		while read idx name sz rest; do \
+			case "$$name" in \
+			.data|.data.*|.rodata|.rodata.*|.bss|.bss.*) \
+				test $$sz != 0 || continue; \
+				echo "Error: non-empty $$name: 0x$$sz" >&2; \
+				exit $$(expr $$idx + 1);; \
+			esac; \
+		done
 
 reloc.o: $(BASEDIR)/include/asm-x86/config.h
 .PRECIOUS: %.bin %.lnk

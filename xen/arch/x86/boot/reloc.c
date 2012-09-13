@@ -18,10 +18,7 @@ asm (
     "    call 1f                       \n"
     "1:  pop  %ebx                     \n"
     "    mov  %eax,alloc-1b(%ebx)      \n"
-    "    mov  $_end,%ecx               \n"  /* check that BSS is empty! */
-    "    sub  $__bss_start,%ecx        \n"
-    "    jz reloc                      \n"
-    "1:  jmp 1b                        \n"
+    "    jmp  reloc                    \n"
     );
 
 /* This is our data.  Because the code must be relocatable, no BSS is
@@ -30,9 +27,6 @@ asm (
 asm (
     "alloc:                            \n"
     "    .long 0                       \n"
-    "    .subsection 1                 \n"
-    "    .p2align 4, 0xcc              \n"
-    "    .subsection 0                 \n"
     );
 
 typedef unsigned int u32;
