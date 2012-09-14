@@ -991,7 +991,7 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
 /* We need variable length data chunk for xsave area, hence customized
  * declaration other than HVM_REGISTER_SAVE_RESTORE.
  */
-static int __hvm_register_CPU_XSAVE_save_and_restore(void)
+static int __init __hvm_register_CPU_XSAVE_save_and_restore(void)
 {
     hvm_register_savevm(CPU_XSAVE_CODE,
                         "CPU_XSAVE",

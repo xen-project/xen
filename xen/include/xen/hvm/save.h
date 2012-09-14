@@ -19,6 +19,7 @@
 #define __XEN_HVM_SAVE_H__
 
 #include <xen/types.h>
+#include <xen/init.h>
 #include <public/xen.h>
 #include <public/hvm/save.h>
 
@@ -108,7 +109,7 @@ void hvm_register_savevm(uint16_t typecode,
 /* Syntactic sugar around that function: specify the max number of
  * saves, and this calculates the size of buffer needed */
 #define HVM_REGISTER_SAVE_RESTORE(_x, _save, _load, _num, _k)             \
-static int __hvm_register_##_x##_save_and_restore(void)                   \
+static int __init __hvm_register_##_x##_save_and_restore(void)            \
 {                                                                         \
     hvm_register_savevm(HVM_SAVE_CODE(_x),                                \
                         #_x,                                              \

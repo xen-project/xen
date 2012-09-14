@@ -40,11 +40,11 @@ static struct {
 } hvm_sr_handlers [HVM_SAVE_CODE_MAX + 1] = {{NULL, NULL, "<?>"},};
 
 /* Init-time function to add entries to that list */
-void hvm_register_savevm(uint16_t typecode, 
-                         const char *name,
-                         hvm_save_handler save_state,
-                         hvm_load_handler load_state,
-                         size_t size, int kind)
+void __init hvm_register_savevm(uint16_t typecode,
+                                const char *name,
+                                hvm_save_handler save_state,
+                                hvm_load_handler load_state,
+                                size_t size, int kind)
 {
     ASSERT(typecode <= HVM_SAVE_CODE_MAX);
     ASSERT(hvm_sr_handlers[typecode].save == NULL);
