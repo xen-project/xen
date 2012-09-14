@@ -44,13 +44,17 @@
 
 %%
 
-file: /* empty */
- |     file assignment
+file:  stmts
+ |     stmts assignment
 
-assignment: IDENT '=' value endstmt
-                            { xlu__cfg_set_store(ctx,$1,$3,@3.first_line); }
+stmts:  /* empty */
+ |      stmts stmt
+
+stmt:   assignment endstmt
  |      endstmt
  |      error NEWLINE
+
+assignment: IDENT '=' value { xlu__cfg_set_store(ctx,$1,$3,@3.first_line); }
 
 endstmt: NEWLINE
  |      ';'
