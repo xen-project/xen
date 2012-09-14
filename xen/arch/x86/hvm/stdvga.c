@@ -59,7 +59,7 @@ static const uint32_t mask16[16] = {
 };
 
 /* force some bits to zero */
-const uint8_t sr_mask[8] = {
+static const uint8_t sr_mask[8] = {
     (uint8_t)~0xfc,
     (uint8_t)~0xc2,
     (uint8_t)~0xf0,
@@ -70,7 +70,7 @@ const uint8_t sr_mask[8] = {
     (uint8_t)~0x00,
 };
 
-const uint8_t gr_mask[9] = {
+static const uint8_t gr_mask[9] = {
     (uint8_t)~0xf0, /* 0x00 */
     (uint8_t)~0xf0, /* 0x01 */
     (uint8_t)~0xf0, /* 0x02 */

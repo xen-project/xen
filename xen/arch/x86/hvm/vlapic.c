@@ -53,7 +53,7 @@
     LVT_MASK | APIC_MODE_MASK | APIC_INPUT_POLARITY |\
     APIC_LVT_REMOTE_IRR | APIC_LVT_LEVEL_TRIGGER
 
-static unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
+static const unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
 {
      /* LVTT */
      LVT_MASK | APIC_TIMER_MODE_MASK,

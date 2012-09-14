@@ -3168,7 +3168,7 @@ static long hvm_physdev_op_compat32(
     }
 }
 
-static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
+static hvm_hypercall_t *const hvm_hypercall64_table[NR_hypercalls] = {
     [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op,
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op,
     [ __HYPERVISOR_vcpu_op ] = (hvm_hypercall_t *)hvm_vcpu_op,
@@ -3185,7 +3185,7 @@ static hvm_hypercall_t *hvm_hypercall64_table[NR_hypercalls] = {
 #define COMPAT_CALL(x)                                        \
     [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) compat_ ## x
 
-static hvm_hypercall_t *hvm_hypercall32_table[NR_hypercalls] = {
+static hvm_hypercall_t *const hvm_hypercall32_table[NR_hypercalls] = {
     [ __HYPERVISOR_memory_op ] = (hvm_hypercall_t *)hvm_memory_op_compat32,
     [ __HYPERVISOR_grant_table_op ] = (hvm_hypercall_t *)hvm_grant_table_op_compat32,
     [ __HYPERVISOR_vcpu_op ] = (hvm_hypercall_t *)hvm_vcpu_op_compat32,

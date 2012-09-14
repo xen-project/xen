@@ -147,7 +147,7 @@ static void vmx_vcpu_destroy(struct vcpu *v)
 
 static DEFINE_PER_CPU(struct vmx_msr_state, host_msr_state);
 
-static u32 msr_index[] =
+static const u32 msr_index[] =
 {
     MSR_LSTAR, MSR_STAR, MSR_SYSCALL_MASK
 };

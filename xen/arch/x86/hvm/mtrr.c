@@ -34,14 +34,14 @@ static uint32_t size_or_mask;
 #define pat_cr_2_paf(pat_cr,n)  ((((uint64_t)pat_cr) >> ((n)<<3)) & 0xff)
 
 /* PAT entry to PTE flags (PAT, PCD, PWT bits). */
-static uint8_t pat_entry_2_pte_flags[8] = {
+static const uint8_t pat_entry_2_pte_flags[8] = {
     0,           _PAGE_PWT,
     _PAGE_PCD,   _PAGE_PCD | _PAGE_PWT,
     _PAGE_PAT,   _PAGE_PAT | _PAGE_PWT,
     _PAGE_PAT | _PAGE_PCD, _PAGE_PAT | _PAGE_PCD | _PAGE_PWT };
 
 /* Effective mm type lookup table, according to MTRR and PAT. */
-static uint8_t mm_type_tbl[MTRR_NUM_TYPES][PAT_TYPE_NUMS] = {
+static const uint8_t mm_type_tbl[MTRR_NUM_TYPES][PAT_TYPE_NUMS] = {
 /********PAT(UC,WC,RS,RS,WT,WP,WB,UC-)*/
 /* RS means reserved type(2,3), and type is hardcoded here */
  /*MTRR(UC):(UC,WC,RS,RS,UC,UC,UC,UC)*/

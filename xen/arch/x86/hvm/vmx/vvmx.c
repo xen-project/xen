@@ -107,7 +107,7 @@ uint32_t nvmx_vcpu_asid(struct vcpu *v)
     return 0;
 }
 
-enum x86_segment sreg_to_index[] = {
+static const enum x86_segment sreg_to_index[] = {
     [VMX_SREG_ES] = x86_seg_es,
     [VMX_SREG_CS] = x86_seg_cs,
     [VMX_SREG_SS] = x86_seg_ss,
@@ -629,7 +629,7 @@ u64 nvmx_get_tsc_offset(struct vcpu *v)
 /*
  * Context synchronized between shadow and virtual VMCS.
  */
-static unsigned long vmcs_gstate_field[] = {
+static const u16 vmcs_gstate_field[] = {
     /* 16 BITS */
     GUEST_ES_SELECTOR,
     GUEST_CS_SELECTOR,
@@ -690,7 +690,7 @@ static unsigned long vmcs_gstate_field[] = {
 /*
  * Context: shadow -> virtual VMCS
  */
-static unsigned long vmcs_ro_field[] = {
+static const u16 vmcs_ro_field[] = {
     GUEST_PHYSICAL_ADDRESS,
     VM_INSTRUCTION_ERROR,
     VM_EXIT_REASON,
@@ -705,9 +705,9 @@ static unsigned long vmcs_ro_field[] = {
 };
 
 static struct vmcs_host_to_guest {
-    unsigned long host_field;
-    unsigned long guest_field;
-} vmcs_h2g_field[] = {
+    u16 host_field;
+    u16 guest_field;
+} const vmcs_h2g_field[] = {
     {HOST_ES_SELECTOR, GUEST_ES_SELECTOR},
     {HOST_CS_SELECTOR, GUEST_CS_SELECTOR},
     {HOST_SS_SELECTOR, GUEST_SS_SELECTOR},

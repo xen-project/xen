@@ -44,13 +44,13 @@
 #define set_guest_mode(msr) (msr |= (1ULL << MSR_F10H_EVNTSEL_GO_SHIFT))
 #define is_overflowed(msr) (!((msr) & (1ULL << (MSR_F10H_COUNTER_LENGTH-1))))
 
-static int __read_mostly num_counters = 0;
-static u32 __read_mostly *counters = NULL;
-static u32 __read_mostly *ctrls = NULL;
-static bool_t __read_mostly k7_counters_mirrored = 0;
+static unsigned int __read_mostly num_counters;
+static const u32 __read_mostly *counters;
+static const u32 __read_mostly *ctrls;
+static bool_t __read_mostly k7_counters_mirrored;
 
 /* PMU Counter MSRs. */
-u32 AMD_F10H_COUNTERS[] = {
+static const u32 AMD_F10H_COUNTERS[] = {
     MSR_K7_PERFCTR0,
     MSR_K7_PERFCTR1,
     MSR_K7_PERFCTR2,
@@ -58,14 +58,14 @@ u32 AMD_F10H_COUNTERS[] = {
 };
 
 /* PMU Control MSRs. */
-u32 AMD_F10H_CTRLS[] = {
+static const u32 AMD_F10H_CTRLS[] = {
     MSR_K7_EVNTSEL0,
     MSR_K7_EVNTSEL1,
     MSR_K7_EVNTSEL2,
     MSR_K7_EVNTSEL3
 };
 
-u32 AMD_F15H_COUNTERS[] = {
+static const u32 AMD_F15H_COUNTERS[] = {
     MSR_AMD_FAM15H_PERFCTR0,
     MSR_AMD_FAM15H_PERFCTR1,
     MSR_AMD_FAM15H_PERFCTR2,
@@ -74,7 +74,7 @@ u32 AMD_F15H_COUNTERS[] = {
     MSR_AMD_FAM15H_PERFCTR5
 };
 
-u32 AMD_F15H_CTRLS[] = {
+static const u32 AMD_F15H_CTRLS[] = {
     MSR_AMD_FAM15H_EVNTSEL0,
     MSR_AMD_FAM15H_EVNTSEL1,
     MSR_AMD_FAM15H_EVNTSEL2,
@@ -161,7 +161,7 @@ static int amd_vpmu_do_interrupt(struct cpu_user_regs *regs)
 
 static inline void context_restore(struct vcpu *v)
 {
-    u64 i;
+    unsigned int i;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct amd_vpmu_context *ctxt = vpmu->context;
 
@@ -198,7 +198,7 @@ static void amd_vpmu_restore(struct vcpu *v)
 
 static inline void context_save(struct vcpu *v)
 {
-    int i;
+    unsigned int i;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct amd_vpmu_context *ctxt = vpmu->context;
 
@@ -225,7 +225,7 @@ static void amd_vpmu_save(struct vcpu *v)
 
 static void context_update(unsigned int msr, u64 msr_content)
 {
-    int i;
+    unsigned int i;
     struct vcpu *v = current;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct amd_vpmu_context *ctxt = vpmu->context;
@@ -294,7 +294,7 @@ static int amd_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 
 static int amd_vpmu_initialise(struct vcpu *v)
 {
-    struct amd_vpmu_context *ctxt = NULL;
+    struct amd_vpmu_context *ctxt;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t family = current_cpu_data.x86;
 
@@ -323,7 +323,7 @@ static int amd_vpmu_initialise(struct vcpu *v)
 	 }
     }
 
-    ctxt = xzalloc_bytes(sizeof(struct amd_vpmu_context));
+    ctxt = xzalloc(struct amd_vpmu_context);
     if ( !ctxt )
     {
         gdprintk(XENLOG_WARNING, "Insufficient memory for PMU, "
@@ -332,7 +332,7 @@ static int amd_vpmu_initialise(struct vcpu *v)
         return -ENOMEM;
     }
 
-    vpmu->context = (void *)ctxt;
+    vpmu->context = ctxt;
     vpmu_set(vpmu, VPMU_CONTEXT_ALLOCATED);
     return 0;
 }

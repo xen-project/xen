@@ -107,7 +107,7 @@ MAKE_INSTR(STGI,   3, 0x0f, 0x01, 0xdc);
 MAKE_INSTR(CLGI,   3, 0x0f, 0x01, 0xdd);
 MAKE_INSTR(INVLPGA,3, 0x0f, 0x01, 0xdf);
 
-static const u8 *opc_bytes[INSTR_MAX_COUNT] = 
+static const u8 *const opc_bytes[INSTR_MAX_COUNT] =
 {
     [INSTR_INVD]   = OPCODE_INVD,
     [INSTR_WBINVD] = OPCODE_WBINVD,

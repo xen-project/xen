@@ -101,28 +101,30 @@ static void handle_pmc_quirk(u64 msr_content)
     }
 }
 
-u32 core2_counters_msr[] =   {
+static const u32 core2_counters_msr[] = {
     MSR_CORE_PERF_FIXED_CTR0,
     MSR_CORE_PERF_FIXED_CTR1,
-    MSR_CORE_PERF_FIXED_CTR2};
+    MSR_CORE_PERF_FIXED_CTR2
+};
 
 /* Core 2 Non-architectual Performance Control MSRs. */
-u32 core2_ctrls_msr[] = {
+static const u32 core2_ctrls_msr[] = {
     MSR_CORE_PERF_FIXED_CTR_CTRL,
     MSR_IA32_PEBS_ENABLE,
-    MSR_IA32_DS_AREA};
+    MSR_IA32_DS_AREA
+};
 
 struct pmumsr {
     unsigned int num;
-    u32 *msr;
+    const u32 *msr;
 };
 
-struct pmumsr core2_counters = {
+static const struct pmumsr core2_counters = {
     3,
     core2_counters_msr
 };
 
-struct pmumsr core2_ctrls = {
+static const struct pmumsr core2_ctrls = {
     3,
     core2_ctrls_msr
 };
