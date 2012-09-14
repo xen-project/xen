@@ -83,6 +83,7 @@ struct amd_iommu {
     u16 seg;
     u16 bdf;
     u16 cap_offset;
+    u8 msi_cap;
     iommu_cap_t cap;
 
     u8 ht_flags;
@@ -100,9 +101,6 @@ struct amd_iommu {
     int exclusion_allow_all;
     uint64_t exclusion_base;
     uint64_t exclusion_limit;
-
-    int msi_cap;
-    int maskbit;
 
     int enabled;
     int irq;

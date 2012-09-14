@@ -33,6 +33,7 @@
 #include <asm/processor.h>
 #include <asm/mpspec.h>
 #include <asm/apic.h>
+#include <asm/msi.h>
 #include <asm/desc.h>
 #include <asm/paging.h>
 #include <asm/e820.h>
@@ -1198,6 +1199,8 @@ void __init __start_xen(unsigned long mbi_p)
     vesa_mtrr_init();
 
     acpi_mmcfg_init();
+
+    early_msi_init();
 
     iommu_setup();    /* setup iommu if available */
 

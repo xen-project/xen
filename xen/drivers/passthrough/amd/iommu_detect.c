@@ -31,7 +31,6 @@ static int __init get_iommu_msi_capabilities(
     u16 seg, u8 bus, u8 dev, u8 func, struct amd_iommu *iommu)
 {
     int pos;
-    u16 control;
 
     pos = pci_find_cap_offset(seg, bus, dev, func, PCI_CAP_ID_MSI);
 
@@ -41,9 +40,6 @@ static int __init get_iommu_msi_capabilities(
     AMD_IOMMU_DEBUG("Found MSI capability block at %#x\n", pos);
 
     iommu->msi_cap = pos;
-    control = pci_conf_read16(seg, bus, dev, func,
-                              iommu->msi_cap + PCI_MSI_FLAGS);
-    iommu->maskbit = control & PCI_MSI_FLAGS_MASKBIT;
     return 0;
 }
 

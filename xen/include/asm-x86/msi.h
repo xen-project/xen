@@ -208,6 +208,12 @@ struct msg_address {
 	__u32 	hi_address;
 } __attribute__ ((packed));
 
+void early_msi_init(void);
 void msi_compose_msg(struct irq_desc *, struct msi_msg *);
+void __msi_set_enable(u16 seg, u8 bus, u8 slot, u8 func, int pos, int enable);
+void mask_msi_irq(struct irq_desc *);
+void unmask_msi_irq(struct irq_desc *);
+void ack_nonmaskable_msi_irq(struct irq_desc *);
+void end_nonmaskable_msi_irq(struct irq_desc *, u8 vector);
 
 #endif /* __ASM_MSI_H */

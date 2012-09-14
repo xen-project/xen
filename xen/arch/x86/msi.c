@@ -13,6 +13,7 @@
 #include <xen/delay.h>
 #include <xen/sched.h>
 #include <xen/acpi.h>
+#include <xen/cpu.h>
 #include <xen/errno.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
@@ -32,8 +33,9 @@
 #include <xsm/xsm.h>
 
 /* bitmap indicate which fixed map is free */
-DEFINE_SPINLOCK(msix_fixmap_lock);
-DECLARE_BITMAP(msix_fixmap_pages, FIX_MSIX_MAX_PAGES);
+static DEFINE_SPINLOCK(msix_fixmap_lock);
+static DECLARE_BITMAP(msix_fixmap_pages, FIX_MSIX_MAX_PAGES);
+static DEFINE_PER_CPU(cpumask_var_t, scratch_mask);
 
 static int msix_fixmap_alloc(void)
 {
@@ -126,13 +128,17 @@ void msi_compose_msg(struct irq_desc *desc, struct msi_msg *msg)
     unsigned dest;
     int vector = desc->arch.vector;
 
-    if ( cpumask_empty(desc->arch.cpu_mask) ) {
+    memset(msg, 0, sizeof(*msg));
+    if ( !cpumask_intersects(desc->arch.cpu_mask, &cpu_online_map) ) {
         dprintk(XENLOG_ERR,"%s, compose msi message error!!\n", __func__);
         return;
     }
 
     if ( vector ) {
-        dest = cpu_mask_to_apicid(desc->arch.cpu_mask);
+        cpumask_t *mask = this_cpu(scratch_mask);
+
+        cpumask_and(mask, desc->arch.cpu_mask, &cpu_online_map);
+        dest = cpu_mask_to_apicid(mask);
 
         msg->address_hi = MSI_ADDR_BASE_HI;
         msg->address_lo =
@@ -281,23 +287,27 @@ static void set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
     write_msi_msg(msi_desc, &msg);
 }
 
+void __msi_set_enable(u16 seg, u8 bus, u8 slot, u8 func, int pos, int enable)
+{
+    u16 control = pci_conf_read16(seg, bus, slot, func, pos + PCI_MSI_FLAGS);
+
+    control &= ~PCI_MSI_FLAGS_ENABLE;
+    if ( enable )
+        control |= PCI_MSI_FLAGS_ENABLE;
+    pci_conf_write16(seg, bus, slot, func, pos + PCI_MSI_FLAGS, control);
+}
+
 static void msi_set_enable(struct pci_dev *dev, int enable)
 {
     int pos;
-    u16 control, seg = dev->seg;
+    u16 seg = dev->seg;
     u8 bus = dev->bus;
     u8 slot = PCI_SLOT(dev->devfn);
     u8 func = PCI_FUNC(dev->devfn);
 
     pos = pci_find_cap_offset(seg, bus, slot, func, PCI_CAP_ID_MSI);
     if ( pos )
-    {
-        control = pci_conf_read16(seg, bus, slot, func, pos + PCI_MSI_FLAGS);
-        control &= ~PCI_MSI_FLAGS_ENABLE;
-        if ( enable )
-            control |= PCI_MSI_FLAGS_ENABLE;
-        pci_conf_write16(seg, bus, slot, func, pos + PCI_MSI_FLAGS, control);
-    }
+        __msi_set_enable(seg, bus, slot, func, pos, enable);
 }
 
 static void msix_set_enable(struct pci_dev *dev, int enable)
@@ -379,12 +389,12 @@ static int msi_get_mask_bit(const struct msi_desc *entry)
     return -1;
 }
 
-static void mask_msi_irq(struct irq_desc *desc)
+void mask_msi_irq(struct irq_desc *desc)
 {
     msi_set_mask_bit(desc, 1);
 }
 
-static void unmask_msi_irq(struct irq_desc *desc)
+void unmask_msi_irq(struct irq_desc *desc)
 {
     msi_set_mask_bit(desc, 0);
 }
@@ -395,7 +405,7 @@ static unsigned int startup_msi_irq(struct irq_desc *desc)
     return 0;
 }
 
-static void ack_nonmaskable_msi_irq(struct irq_desc *desc)
+void ack_nonmaskable_msi_irq(struct irq_desc *desc)
 {
     irq_complete_move(desc);
     move_native_irq(desc);
@@ -407,7 +417,7 @@ static void ack_maskable_msi_irq(struct irq_desc *desc)
     ack_APIC_irq(); /* ACKTYPE_NONE */
 }
 
-static void end_nonmaskable_msi_irq(struct irq_desc *desc, u8 vector)
+void end_nonmaskable_msi_irq(struct irq_desc *desc, u8 vector)
 {
     ack_APIC_irq(); /* ACKTYPE_EOI */
 }
@@ -1069,6 +1079,40 @@ unsigned int pci_msix_get_table_len(struct pci_dev *pdev)
     len = msix_table_size(control) * PCI_MSIX_ENTRY_SIZE;
 
     return len;
+}
+
+static int msi_cpu_callback(
+    struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+    unsigned int cpu = (unsigned long)hcpu;
+
+    switch ( action )
+    {
+    case CPU_UP_PREPARE:
+        if ( !alloc_cpumask_var(&per_cpu(scratch_mask, cpu)) )
+            return notifier_from_errno(ENOMEM);
+        break;
+    case CPU_UP_CANCELED:
+    case CPU_DEAD:
+        free_cpumask_var(per_cpu(scratch_mask, cpu));
+        break;
+    default:
+        break;
+    }
+
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block msi_cpu_nfb = {
+    .notifier_call = msi_cpu_callback
+};
+
+void __init early_msi_init(void)
+{
+    register_cpu_notifier(&msi_cpu_nfb);
+    if ( msi_cpu_callback(&msi_cpu_nfb, CPU_UP_PREPARE, NULL) &
+         NOTIFY_STOP_MASK )
+        BUG();
 }
 
 static void dump_msi(unsigned char key)

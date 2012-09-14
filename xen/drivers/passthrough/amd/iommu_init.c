@@ -467,20 +467,9 @@ static void iommu_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
         return;
     }
 
-    memset(&msg, 0, sizeof(msg)); 
-    msg.data = MSI_DATA_VECTOR(desc->arch.vector) & 0xff;
-    msg.data |= 1 << 14;
-    msg.data |= (INT_DELIVERY_MODE != dest_LowestPrio) ?
-        MSI_DATA_DELIVERY_FIXED:
-        MSI_DATA_DELIVERY_LOWPRI;
-
-    msg.address_hi =0;
-    msg.address_lo = (MSI_ADDRESS_HEADER << (MSI_ADDRESS_HEADER_SHIFT + 8)); 
-    msg.address_lo |= INT_DEST_MODE ? MSI_ADDR_DESTMODE_LOGIC:
-                    MSI_ADDR_DESTMODE_PHYS;
-    msg.address_lo |= (INT_DELIVERY_MODE != dest_LowestPrio) ?
-                    MSI_ADDR_REDIRECTION_CPU:
-                    MSI_ADDR_REDIRECTION_LOWPRI;
+    msi_compose_msg(desc, &msg);
+    /* Is this override really needed? */
+    msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
     msg.address_lo |= MSI_ADDR_DEST_ID(dest & 0xff);
 
     pci_conf_write32(seg, bus, dev, func,
@@ -494,28 +483,14 @@ static void iommu_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
 
 static void amd_iommu_msi_enable(struct amd_iommu *iommu, int flag)
 {
-    u16 control;
-    int bus = PCI_BUS(iommu->bdf);
-    int dev = PCI_SLOT(iommu->bdf);
-    int func = PCI_FUNC(iommu->bdf);
-
-    control = pci_conf_read16(iommu->seg, bus, dev, func,
-        iommu->msi_cap + PCI_MSI_FLAGS);
-    control &= ~PCI_MSI_FLAGS_ENABLE;
-    if ( flag )
-        control |= flag;
-    pci_conf_write16(iommu->seg, bus, dev, func,
-        iommu->msi_cap + PCI_MSI_FLAGS, control);
+    __msi_set_enable(iommu->seg, PCI_BUS(iommu->bdf), PCI_SLOT(iommu->bdf),
+                     PCI_FUNC(iommu->bdf), iommu->msi_cap, flag);
 }
 
 static void iommu_msi_unmask(struct irq_desc *desc)
 {
     unsigned long flags;
     struct amd_iommu *iommu = desc->action->dev_id;
-
-    /* FIXME: do not support mask bits at the moment */
-    if ( iommu->maskbit )
-        return;
 
     spin_lock_irqsave(&iommu->lock, flags);
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
@@ -528,10 +503,6 @@ static void iommu_msi_mask(struct irq_desc *desc)
     struct amd_iommu *iommu = desc->action->dev_id;
 
     irq_complete_move(desc);
-
-    /* FIXME: do not support mask bits at the moment */
-    if ( iommu->maskbit )
-        return;
 
     spin_lock_irqsave(&iommu->lock, flags);
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_DISABLED);
@@ -559,6 +530,37 @@ static hw_irq_controller iommu_msi_type = {
     .disable = iommu_msi_mask,
     .ack = iommu_msi_mask,
     .end = iommu_msi_end,
+    .set_affinity = iommu_msi_set_affinity,
+};
+
+static unsigned int iommu_maskable_msi_startup(struct irq_desc *desc)
+{
+    iommu_msi_unmask(desc);
+    unmask_msi_irq(desc);
+    return 0;
+}
+
+static void iommu_maskable_msi_shutdown(struct irq_desc *desc)
+{
+    mask_msi_irq(desc);
+    iommu_msi_mask(desc);
+}
+
+/*
+ * While the names may appear mismatched, we indeed want to use the non-
+ * maskable flavors here, as we want the ACK to be issued in ->end().
+ */
+#define iommu_maskable_msi_ack ack_nonmaskable_msi_irq
+#define iommu_maskable_msi_end end_nonmaskable_msi_irq
+
+static hw_irq_controller iommu_maskable_msi_type = {
+    .typename = "IOMMU-M-MSI",
+    .startup = iommu_maskable_msi_startup,
+    .shutdown = iommu_maskable_msi_shutdown,
+    .enable = unmask_msi_irq,
+    .disable = mask_msi_irq,
+    .ack = iommu_maskable_msi_ack,
+    .end = iommu_maskable_msi_end,
     .set_affinity = iommu_msi_set_affinity,
 };
 
@@ -784,6 +786,7 @@ static void iommu_interrupt_handler(int irq, void *dev_id,
 static int __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
 {
     int irq, ret;
+    u16 control;
 
     irq = create_irq(NUMA_NO_NODE);
     if ( irq <= 0 )
@@ -792,7 +795,11 @@ static int __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
         return 0;
     }
     
-    irq_desc[irq].handler = &iommu_msi_type;
+    control = pci_conf_read16(iommu->seg, PCI_BUS(iommu->bdf),
+                              PCI_SLOT(iommu->bdf), PCI_FUNC(iommu->bdf),
+                              iommu->msi_cap + PCI_MSI_FLAGS);
+    irq_desc[irq].handler = control & PCI_MSI_FLAGS_MASKBIT ?
+                            &iommu_maskable_msi_type : &iommu_msi_type;
     ret = request_irq(irq, iommu_interrupt_handler, 0, "amd_iommu", iommu);
     if ( ret )
     {
