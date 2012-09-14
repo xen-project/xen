@@ -57,6 +57,7 @@
 #endif
 
 #define KEY_ESCAPE '\x1B'
+#define KEY_REPAINT '\x0C'
 
 #ifdef HOST_SunOS
 /* Old curses library on Solaris takes non-const strings. Also, ERR interferes
@@ -382,6 +383,9 @@ static int handle_key(int ch)
 			break;
 		case 'd': case 'D':
 			set_prompt("Delay(sec)", set_delay);
+			break;
+		case KEY_REPAINT:
+			clear();
 			break;
 		case 'q': case 'Q': case KEY_ESCAPE:
 			return 0;
@@ -1201,7 +1205,7 @@ int main(int argc, char **argv)
 		do {
 			gettimeofday(&curtime, NULL);
 			if(ch != ERR || (curtime.tv_sec - oldtime.tv_sec) >= delay) {
-				clear();
+				erase();
 				top();
 				oldtime = curtime;
 				refresh();
