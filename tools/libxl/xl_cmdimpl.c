@@ -1096,6 +1096,13 @@ static void parse_config_data(const char *config_source,
                         fprintf(stderr, "Specified backend domain does not exist, defaulting to Dom0\n");
                         nic->backend_domid = 0;
                     }
+                    if (nic->backend_domid != 0 && run_hotplug_scripts) {
+                        fprintf(stderr, "ERROR: the vif 'backend=' option "
+                                "cannot be used in conjunction with "
+                                "run_hotplug_scripts, please set "
+                                "run_hotplug_scripts to 0 in xl.conf\n");
+                        exit(EXIT_FAILURE);
+                    }
                 } else if (!strcmp(p, "rate")) {
                     parse_vif_rate(&config, (p2 + 1), nic);
                 } else if (!strcmp(p, "accel")) {
