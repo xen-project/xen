@@ -17,7 +17,7 @@ domain.
 
 A domain config file consists of a series of C<KEY=VALUE> pairs.
 
-Some C<KEY>s are mandatory, others are global options which apply to
+Some C<KEY>s are mandatory, others are general options which apply to
 any guest type while others relate only to specific guest types
 (e.g. PV or HVM guests).
 
@@ -80,20 +80,13 @@ operating systems.
 
 =back
 
-=head2 Global Options
+=head2 General Options
 
 The following options apply to guests of any type.
 
+=head3 CPU Allocation
+
 =over 4
-
-=item B<uuid="UUID">
-
-Specifies the UUID of the domain.  If not specified, a fresh unique
-UUID will be generated.
-
-=item B<vncviewer=BOOLEAN>
-
-Automatically spawn a vncviewer when creating/restoring a guest
 
 =item B<pool="CPUPOOLNAME">
 
@@ -138,6 +131,12 @@ node) by pinning it to the cpus of those nodes. A heuristic approach is
 utilized with the goals of maximizing performance for the domain and, at
 the same time, achieving efficient utilization of the host's CPUs and RAM.
 
+=back
+
+=head3 CPU Scheduling
+
+=over 4
+
 =item B<cpu_weight=WEIGHT>
 
 A domain with a weight of 512 will get twice as much CPU as a domain
@@ -176,6 +175,12 @@ Honoured by the sedf scheduler.
 Flag for allowing domain to run in extra time.
 Honoured by the sedf scheduler.
 
+=back
+
+=head3 Memory Allocation
+
+=over 4
+
 =item B<memory=MBYTES>
 
 Start the guest with MBYTES megabytes of RAM.
@@ -190,6 +195,12 @@ if the values of B<memory=> and B<maxmem=> differ.
 A "pre-ballooned" HVM guest needs a balloon driver, without a balloon driver
 it will crash.
 
+=back
+
+=head3 Event Actions
+
+=over 4
+
 =item B<on_poweroff="ACTION">
 
 Specifies what should be done with the domain if it shuts itself down.
@@ -200,12 +211,12 @@ The C<ACTION>s are:
 =item B<destroy>
 
 destroy the domain
-     
+
 =item B<restart>
 
 destroy the domain and immediately create a new domain with the same
 configuration
-        
+
 =item B<rename-restart>
 
 rename the domain which terminated, and then immediately create a new
@@ -244,9 +255,27 @@ Default is C<destroy>.
 
 Action to take if the domain crashes.  Default is C<destroy>.
 
+=back
+
+=head3 Other Options
+
+=over 4
+
+=item B<uuid="UUID">
+
+Specifies the UUID of the domain.  If not specified, a fresh unique
+UUID will be generated.
+
 =item B<seclabel="LABEL">
 
 Assign an XSM security label to this domain.
+
+=item B<nomigrate=BOOLEAN>
+
+Disable migration of this domain.  This enables certain other features
+which are incompatible with migration. Currently this is limited to
+enabling the invariant TSC feature flag in cpuid results when TSC is
+not emulated.
 
 =back
 
@@ -309,7 +338,20 @@ Specifies the password for the VNC server.
 =item C<sdl=BOOLEAN>
 
 Specifies that the display should be presented via an X window (using
-Simple DirectMedia Layer). The default is to not enable this mode
+Simple DirectMedia Layer). The default is to not enable this mode.
+
+=item C<display=DISPLAY>
+
+Specifies the X Window display that should be used when the sdl option
+is used. Note: passing this value to the device-model is not currently
+implemented, so providing this option will have no effect.
+
+=item C<xauthority=XAUTHORITY>
+
+Specifies the path to the X authority file that should be used to
+connect to the X server when the sdl option is used. Note: passing
+this value to the device-model is not currently implemented, so
+providing this option will have no effect.
 
 =item C<opengl=BOOLEAN>
 
@@ -324,18 +366,8 @@ display. If the input method does not easily support raw keycodes
 (e.g. this is often the case when using VNC) then this allows us to
 correctly map the input keys into keycodes seen by the guest. The
 specific values which are accepted are defined by the version of the
-device-model which you are using. See L<Keymaps> below or consult the
+device-model which you are using. See L</"Keymaps"> below or consult the
 L<qemu(1)> manpage. The default is B<en-us>.
-
-=item C<display=XXX>
-
-XXX written to xenstore backend for vfb but does not appear to be used
-anywhere?
-
-=item C<authority=XXX>
-
-XXX written to xenstore backend for vfb but does not appear to be used
-anywhere?
 
 =back
 
@@ -348,7 +380,7 @@ has the form C<[DDDD:]BB:DD.F[@VSLOT],KEY=VALUE,KEY=VALUE,...> where:
 
 =item B<DDDD:BB:DD.F>
 
-identifies the PCI device from the host perspective in domain
+Identifies the PCI device from the host perspective in domain
 (B<DDDD>), Bus (B<BB>), Device (B<DD>) and Function (B<F>) syntax. This is
 the same scheme as used in the output of C<lspci> for the device in
 question. Note: By default C<lspci> will omit the domain (B<DDDD>) if it
@@ -357,23 +389,15 @@ is zero and it is optional here also. You may specify the function
 
 =item B<@VSLOT>
 
-specifies the virtual device where the guest will see this
+Specifies the virtual device where the guest will see this
 device. This is equivalent to the B<DD> which the guest sees. In a
-guest B<DDDD> and B<BB> are C<0000:00>. XXX how does this really work?
+guest B<DDDD> and B<BB> are C<0000:00>.
 
 =item B<KEY=VALUE>
 
 Possible B<KEY>s are:
 
 =over 4
-
-=item B<msitranslate=BOOLEAN>
-
-XXX
-
-=item B<power_mgmt=BOOLEAN>
-
-XXX
 
 =item B<permissive=BOOLEAN>
 
@@ -386,6 +410,19 @@ caution: it gives the guest much more control over the device, which
 may have security or stability implications.  It is recommended to
 enable this option only for trusted VMs under administrator control.
 
+=item B<msitranslate=BOOLEAN>
+
+Specifies that MSI-INTx translation should be turned on for the PCI
+device. When enabled, MSI-INTx translation will always enable MSI on
+the PCI device regardless whether the guest uses INTx or MSI. Some
+device drivers, such as NVIDIA's, detect an inconsistency and do not
+function when this option is enabled. Therefore the default is 0.
+
+=item B<power_mgmt=BOOLEAN>
+
+(HVM only) Specifies that the VM should be able to program the
+D0-D3hot power management states for the PCI device. 0 by default.
+
 =back
 
 =back
@@ -393,18 +430,64 @@ enable this option only for trusted VMs under administrator control.
 =item B<pci_permissive=BOOLEAN>
 
 (PV only) Changes the default value of 'permissive' for all PCI
-devices for this VM.  This can still be overridden on a per-device
-basis. This option should be enabled with caution: it gives the guest
-much more control over the device, which may have security or
-stability implications.  It is recommended to enable this option only
-for trusted VMs under administrator control.  See the "pci=" section
-for more information on the "permissive" flag.
+devices passed through to this VM. See L<permissive|/"permissive_boolean">
+above.
 
-=back
+=item B<pci_msitranslate=BOOLEAN>
+
+Changes the default value of 'msitranslate' for all PCI devices passed
+through to this VM. See L<msitranslate|/"msitranslate_boolean"> above.
+
+=item B<pci_power_mgmt=BOOLEAN>
+
+(HVM only) Changes the default value of 'power_mgmt' for all PCI
+devices passed through to this VM. See L<power_mgt|/"power_mgmt_boolean">
+above.
+
+=item B<gfx_passthru=BOOLEAN>
+
+Enable graphics device PCI passthrough. This option makes an assigned
+PCI graphics card become primary graphics card in the VM. The QEMU
+emulated graphics adapter is disabled and the VNC console for the VM
+will not have any graphics output. All graphics output, including boot
+time QEMU BIOS messages from the VM, will go to the physical outputs
+of the passedthrough physical graphics card.
+
+The graphics card PCI device to passthrough is chosen with B<pci>
+option, exactly in the same way as normal Xen PCI device
+passthrough/assignment is done.  Note that gfx_passthru does not do
+any kind of sharing of the GPU, so you can only assign the GPU to one
+single VM at a time.
+
+gfx_passthru also enables various legacy VGA memory ranges, BARs, MMIOs,
+and ioports to be passed thru to the VM, since those are required
+for correct operation of things like VGA BIOS, text mode, VBE, etc.
+
+Enabling gfx_passthru option also copies the physical graphics card
+video BIOS to the guest memory, and executes the VBIOS in the guest
+to initialize the graphics card.
+
+Most graphics adapters require vendor specific tweaks for properly
+working graphics passthrough. See the XenVGAPassthroughTestedAdapters
+L<http://wiki.xen.org/wiki/XenVGAPassthroughTestedAdapters> wiki page
+for currently supported graphics cards for gfx_passthru.
+
+gfx_passthru is currently only supported with the qemu-xen-traditional
+device-model. Upstream qemu-xen device-model currently does not have
+support for gfx_passthru.
+
+Note that some graphics adapters (AMD/ATI cards, for example) do not
+necessarily require gfx_passthru option, so you can use the normal Xen
+PCI passthrough to assign the graphics card as a secondary graphics
+card to the VM. The QEMU-emulated graphics card remains the primary
+graphics card, and VNC output is available from the QEMU-emulated
+primary adapter.
+
+More information about Xen gfx_passthru feature is available
+on the XenVGAPassthrough L<http://wiki.xen.org/wiki/XenVGAPassthrough>
+wiki page.
 
 =item B<ioports=[ "IOPORT_RANGE", "IOPORT_RANGE", ... ]>
-
-=over 4
 
 Allow guest to access specific legacy I/O ports. Each B<IOPORT_RANGE>
 is given in hexadecimal and may either a span e.g. C<2f8-2ff>
@@ -413,11 +496,7 @@ is given in hexadecimal and may either a span e.g. C<2f8-2ff>
 It is recommended to use this option only for trusted VMs under
 administrator control.
 
-=back
-
 =item B<irqs=[ NUMBER, NUMBER, ... ]>
-
-=over 4
 
 Allow a guest to access specific physical IRQs.
 
@@ -471,12 +550,12 @@ address space consists of a single contiguous RAM region. When this
 option is specified the virtual e820 instead reflects the host e820
 and contains the same PCI holes. The total amount of RAM represented
 by the memory map is always the same, this option configures only how
-it is layed out.
+it is laid out.
 
 Exposing the host e820 to the guest gives the guest kernel the
 opportunity to set aside the required part of its pseudo-physical
 address space in order to provide address space to map passedthrough
-PCI devices. It is guest Operating System dependant whether this
+PCI devices. It is guest Operating System dependent whether this
 option is required, specifically it is required when using a mainline
 Linux ("pvops") kernel. This option defaults to true if any PCI
 passthrough devices are configured and false otherwise. If you do not
@@ -600,6 +679,16 @@ by most modern guest Operating Systems. This option is enabled by
 default and usually you should omit it. However it may be necessary to
 disable ACPI for compatibility with some guest Operating Systems.
 
+=item B<acpi_s3=BOOLEAN>
+
+Include the S3 (suspend-to-ram) power state in the virtual firmware
+ACPI table. 1 by default.
+
+=item B<acpi_s4=BOOLEAN>
+
+Include S4 (suspend-to-disk) power state in the virtual firmware ACPI
+table. 1 by default.
+
 =item B<apic=BOOLEAN>
 
 Include information regarding APIC (Advanced Programmable Interrupt
@@ -636,414 +725,6 @@ option if you want to run another hypervisor (including another copy
 of Xen) within a Xen guest or to support a guest Operating System
 which uses hardware virtualisation extensions (e.g. Windows XP
 compatibility mode on more modern Windows OS).
-
-=back 
-
-=head3 Guest Virtual Time Controls
-
-=over 4
-
-=item B<tsc_mode="MODE">
-
-
-Specifies how the TSC (Time Stamp Counter) should be provided to the
-guest (X86 only). Specifying this option as a number is
-deprecated. Options are:
-
-=over 4
-
-=item B<"default">
-
-Guest rdtsc/p executed natively when monotonicity can be guaranteed
-and emulated otherwise (with frequency scaled if necessary).
-
-=item B<"always_emulate">
-
-Guest rdtsc/p always emulated at 1GHz (kernel and user). Guest rdtsc/p
-always emulated and the virtual TSC will appear to increment (kernel
-and user) at a fixed 1GHz rate, regardless of the PCPU HZ rate or
-power state; Although there is an overhead associated with emulation
-this will NOT affect underlying CPU performance.
-
-=item B<"native">
-
-Guest rdtsc always executed natively (no monotonicity/frequency
-guarantees); guest rdtscp emulated at native frequency if unsupported
-by h/w, else executed natively.
-
-=item B<"native_paravirt">
-
-Same as B<native>, except xen manages TSC_AUX register so guest can
-determine when a restore/migration has occurred and assumes guest
-obtains/uses pvclock-like mechanism to adjust for monotonicity and
-frequency changes.
-
-=back
-
-=back
-
-Please see F<docs/misc/tscmode.txt> for more information on this option.
-
-=item B<localtime=BOOLEAN>
-
-Set the real time clock to local time or to UTC. 0 by default, i.e. set to UTC.
-
-=item B<rtc_timeoffset=SECONDS>
-
-Set the real time clock offset in seconds. 0 by default.
-
-=head3 Support for Paravirtualisation of HVM Guests
-
-The following options allow Paravirtualised features (such as devices)
-to be exposed to the guest Operating System in an HVM guest.
-Utilising these features requires specific guest support but when
-available they will result in improved performance.
-
-=over 4
-
-=item B<xen_platform_pci=BOOLEAN>
-
-Enable or disable the Xen platform PCI device.  The presence of this
-virtual device enables a guest Operating System (subject to the
-availability of suitable drivers) to make use of paravirtualisation
-features such as disk and network devices etc. Enabling these drivers
-improves performance and is strongly recommended when available. PV
-drivers are available for various Operating Systems including HVM
-Linux L<http://wiki.xen.org/wiki/XenLinuxPVonHVMdrivers> and Microsoft
-Windows L<http://wiki.xen.org/wiki/XenWindowsGplPv>.
-
-=item B<viridian=BOOLEAN>
-
-Turns on or off the exposure of MicroSoft Hyper-V (AKA viridian)
-compatible enlightenments to the guest.  These can improve performance
-of Microsoft Windows guests from Windows Vista and Windows 2008
-onwards and setting this option for such guests is strongly
-recommended. This option should be harmless for other versions of
-Windows (although it won't give any benefit) and the majority of other
-non-Windows OSes. However it is known to be incompatible with some
-other Operating Systems and in some circumstance can prevent Xen's own
-paravirtualisation interfaces for HVM guests from being used.
-
-=back
-
-=head3 Emulated VGA Graphics Device
-
-The following options control the features of the emulated graphics
-device.  Many of these options behave similarly to the equivalent key
-in the B<VFB_SPEC_STRING> for configuring virtual frame buffer devices
-(see above).
-
-=over 4
-
-=item B<videoram=MBYTES>
-
-Sets the amount of RAM which the emulated video card will contain,
-which in turn limits the resolutions and bit depths which will be
-available. This option is only available when using the B<stdvga>
-option (see below).
-The default amount of video ram for stdvga is 8MB which is sufficient
-for e.g. 1600x1200 at 32bpp.
-
-When using the emulated Cirrus graphics card (B<stdvga=0>)
-the amount of video ram is fixed at 4MB which is sufficient
-for 1024x768 at 32 bpp.
-
-videoram option is currently only available when using the
-qemu-xen-traditional device-model. Upstream qemu-xen device-model
-currently doesn't support changing the amount of video memory
-for the emulated graphics device.
-
-=item B<stdvga=BOOLEAN>
-
-Select a standard VGA card with VBE (VESA BIOS Extensions) as the
-emulated graphics device. The default is false which means to emulate
-a Cirrus Logic GD5446 VGA card. If your guest supports VBE 2.0 or
-later (e.g. Windows XP onwards) then you should enable this.
-stdvga supports more video ram and bigger resolutions than Cirrus.
-
-=item B<vnc=BOOLEAN>
-
-Allow access to the display via the VNC protocol.  This enables the
-other VNC-related settings.  The default is to enable this.
-
-=item B<vnclisten="ADDRESS[:DISPLAYNUM]">
-
-Specifies the IP address, and optionally VNC display number, to use.
-
-=item B<vncdisplay=DISPLAYNUM>
-
-Specifies the VNC display number to use. The actual TCP port number
-will be DISPLAYNUM+5900.
-
-=item B<vncunused=BOOLEAN>
-
-Requests that the VNC display setup search for a free TCP port to use.
-The actual display used can be accessed with C<xl vncviewer>.
-
-=item B<vncpasswd="PASSWORD">
-
-Specifies the password for the VNC server.
-
-=item B<keymap="LANG">
-
-Configure the keymap to use for the keyboard associated with this
-display. If the input method does not easily support raw keycodes
-(e.g. this is often the case when using VNC) then this allows us to
-correctly map the input keys into keycodes seen by the guest. The
-specific values which are accepted are defined by the version of the
-device-model which you are using. See L<Keymaps> below of consult the
-L<qemu(1)> manpage. The default is B<en-us>.
-
-=item B<sdl=BOOLEAN>
-
-Specifies that the display should be presented via an X window (using
-Simple DirectMedia Layer). The default is not to enable this mode.
-
-=item B<opengl=BOOLEAN>
-
-Enable OpenGL acceleration of the SDL display. Only effects machines
-using B<device_model_version="qemu-xen-traditional"> and only if the
-device-model was compiled with OpenGL support. Disabled by default.
-
-=item B<nographic=BOOLEAN>
-
-Enable or disable the virtual graphics device.  The default is to
-provide a VGA graphics device but this option can be used to disable
-it.
-
-=back
-
-=head3 Spice Graphics Support
-
-The following options control the features of SPICE.
-
-=over 4
-
-=item B<spice=BOOLEAN>
-
-Allow access to the display via the SPICE protocol.  This enables the
-other SPICE-related settings.
-
-=item B<spicehost="ADDRESS">
-
-Specify the interface address to listen on if given, otherwise any
-interface.
-
-=item B<spiceport=NUMBER>
-
-Specify the port to listen on by the SPICE server if the SPICE is
-enabled.
-
-=item B<spicetls_port=NUMBER>
-
-Specify the secure port to listen on by the SPICE server if the SPICE
-is enabled. At least one of the spiceport or spicetls_port must be
-given if SPICE is enabled.  NB. the options depending on spicetls_port
-have not been supported.
-
-=item B<spicedisable_ticketing=BOOLEAN>
-
-Enable client connection without password. The default is false. If
-it's false (set to 0), spicepasswd must be set.
-
-=item B<spicepasswd="PASSWORD">
-
-Specify the ticket password which is used by a client for connection.
-
-=item B<spiceagent_mouse=BOOLEAN>
-
-Whether SPICE agent is used for client mouse mode. The default is true
-(turn on)
-
-=back
-
-=head3 Miscellaneous Emulated Hardware
-
-=over 4
-
-=item B<serial=DEVICE>
-
-Redirect the virtual serial port to B<DEVICE>. Please see the
-B<-serial> option in the L<qemu(1)> manpage for details of the valid
-B<DEVICE> options. Default is B<vc> when in graphical mode and
-B<stdio> if B<nographics=1> is used.
-
-=item B<soundhw=DEVICE>
-
-Select the virtual sound card to expose to the guest. The valid
-devices are defined by the device model configuration, please see the
-L<qemu(1)> manpage for details. The default is not to export any sound
-device.
-
-=item B<usb=BOOLEAN>
-
-Enables or disables a USB bus in the guest.
-
-=item B<usbdevice=DEVICE>
-
-Adds B<DEVICE> to the USB bus. The USB bus must also be enabled using
-B<usb=1>. The most common use for this option is B<usbdevice=tablet>
-which adds pointer device using absolute coordinates. Such devices
-function better than relative coordinate devices (such as a standard
-mouse) since many methods of exporting guest graphics (such as VNC)
-work better in this mode. Note that this is independent of the actual
-pointer device you are using on the host/client side. XXX should/could
-be a list of devices.
-
-=back
-
-=head3 Unclassified HVM Specific Options
-
-These HVM specific options have not yet been documented or
-classified. They almost certainly belong in a more appropriate
-section.
-
-=over 4
-
-=item B<vpt_align=BOOLEAN>
-
-Align the Virtual Platform Timer ??? XXX Reduces interrupts?
-
-=item B<timer_mode=NUMBER>
-
-Set mode for Virtual Timers XXX ??? should be an enum of particular
-values. See C<HVM_PARAM_TIMER_MODE> in
-F<xen/include/public/hvm/params.h>.
-
-=back
-
-=head2 Device-Model Options
-
-The following options control the selection of the device-model.  This
-is the component which provides emulation of the virtual devices to an
-HVM guest.  For a PV guest a device-model is sometimes used to provide
-backends for certain PV devices (most usually a virtual framebuffer
-device).
-
-=over 4
-
-=item B<device_model_version="DEVICE-MODEL">
-
-Selects which variant of the device-model should be used for this
-guest. Valid values are:
-
-=over 4
-
-=item B<qemu-xen-traditional>
-
-Use the device-model based upon the historical Xen fork of Qemu.  This
-device-model is currently the default.
-
-=item B<qemu-xen>
-
-use the device-model merged into the upstream Qemu project.  This
-device-model will become the default in a future version of Xen.
-
-=back
-
-It is recommended to accept the default value for new guests.  If
-you have existing guests then, depending on the nature of the guest
-Operating System, you may wish to force them to use the device
-model which they were installed with.
-
-=item B<device_model_override="PATH">
-
-Override the path to the binary to be used as the device-model. The
-binary provided here MUST be consistent with the
-`device_model_version` which you have specified. You should not
-normally need to specify this option.
-
-=item B<device_model_stubdomain_override=BOOLEAN>
-
-Override the use of stubdomain based device-model.  Normally this will
-be automatically selected based upon the other features and options
-you have selected.
-
-=item B<device_model_stubdomain_seclabel="LABEL">
-
-Assign an XSM security label to the device-model stubdomain.
-
-=item B<device_model_args=[ "ARG", "ARG", ...]>
-
-Pass additional arbitrary options on the device-model command
-line. Each element in the list is passed as an option to the
-device-model.
-
-=item B<device_model_args_pv=[ "ARG", "ARG", ...]>
-
-Pass additional arbitrary options on the device-model command line for
-a PV device model only. Each element in the list is passed as an
-option to the device-model.
-
-=item B<device_model_args_hvm=[ "ARG", "ARG", ...]>
-
-Pass additional arbitrary options on the device-model command line for
-an HVM device model only. Each element in the list is passed as an
-option to the device-model.
-
-=back
-
-=head2 Unclassified General Options
-
-These have not yet been fully documented or classified. They almost
-certainly belong in a more appropriate section.
-
-=over 4
-
-=item B<gfx_passthru=BOOLEAN>
-
-Enable graphics device PCI passthrough. This option makes the passthru
-graphics card become primary graphics card in the VM, so the Qemu emulated
-graphics adapter is disabled, and the VNC console for the VM won't have
-any graphics output. All graphics output, including boot time Qemu BIOS
-messages from the VM, will go to the physical outputs of the passed thru
-physical graphics card.
-
-Graphics card PCI device to passthru is chosen with B<pci> option,
-exactly in the same way as normal Xen PCI device passthru/assignment is done.
-Note that gfx_passthru doesn't do any kind of sharing
-of the GPU, so you can only assign the GPU to one single VM at a time.
-
-gfx_passthru also enables various legacy VGA memory ranges, BARs, MMIOs,
-and ioports to be passed thru to the VM, since those are required
-for correct operation of things like VGA BIOS, text mode, VBE, etc.
-
-Enabling gfx_passthru option also copies the physical graphics card
-video BIOS to the guest memory, and executes the VBIOS in the guest
-to get the graphics card initialized.
-
-Most graphics adapters require vendor specific tweaks for properly
-working graphics passthru. See the XenVGAPassthroughTestedAdapters
-L<http://wiki.xen.org/wiki/XenVGAPassthroughTestedAdapters>
-wiki page for currently supported graphics cards for gfx_passthru.
-
-gfx_passthru is currently only supported with the qemu-xen-traditional
-device-model. Upstream qemu-xen device-model currently doesn't have
-support for gfx_passthru.
-
-Note that some graphics adapters (AMD/ATI cards, for example) don't
-necessarily require gfx_passthru option, so you can use the normal
-Xen PCI passthru to assign the graphics card as a secondary graphics card
-to the VM. Qemu emulated graphics card stays as the primary graphics card,
-and you get VNC output from the Qemu-emulated primary adapter.
-
-More information about Xen gfx_passthru feature is available
-on the XenVGAPassthrough L<http://wiki.xen.org/wiki/XenVGAPassthrough>
-wiki page.
-
-=item B<nomigrate=BOOLEAN>
-
-Disable migration of this domain.  This enables certain other features
-which are incompatible with migration (currently certain TSC modes XXX
-?).
-
-=item B<pci_msitranslate=BOOLEAN>
-
-XXX
-
-=item B<pci_power_mgmt=BOOLEAN>
-
-XXX
 
 =item B<cpuid="LIBXL_STRING"> or B<cpuid=[ "XEND_STRING", "XEND_STRING" ]>
 
@@ -1093,29 +774,375 @@ libxl: 'host,tm=0,sse3=0'
 More info about the CPUID instruction can be found in the processor manuals, and
 in Wikipedia: L<http://en.wikipedia.org/wiki/CPUID>
 
-=item B<acpi_s3=BOOLEAN>
+=back 
 
-XXX
+=head3 Guest Virtual Time Controls
 
-=item B<acpi_s3=BOOLEAN>
+=over 4
 
-XXX
+=item B<tsc_mode="MODE">
 
-=item B<nodes=XXX>
 
-XXX
+Specifies how the TSC (Time Stamp Counter) should be provided to the
+guest (X86 only). Specifying this option as a number is
+deprecated. Options are:
 
-=item B<sched=XXX>
+=over 4
 
-XXX
+=item B<"default">
 
-=item B<device_model=XXX>
+Guest rdtsc/p executed natively when monotonicity can be guaranteed
+and emulated otherwise (with frequency scaled if necessary).
 
-XXX deprecated
+=item B<"always_emulate">
 
-=item B<vif2=XXX>
+Guest rdtsc/p always emulated at 1GHz (kernel and user). Guest rdtsc/p
+always emulated and the virtual TSC will appear to increment (kernel
+and user) at a fixed 1GHz rate, regardless of the PCPU HZ rate or
+power state; Although there is an overhead associated with emulation
+this will NOT affect underlying CPU performance.
 
-XXX deprecated
+=item B<"native">
+
+Guest rdtsc always executed natively (no monotonicity/frequency
+guarantees); guest rdtscp emulated at native frequency if unsupported
+by h/w, else executed natively.
+
+=item B<"native_paravirt">
+
+Same as B<native>, except xen manages TSC_AUX register so guest can
+determine when a restore/migration has occurred and assumes guest
+obtains/uses pvclock-like mechanism to adjust for monotonicity and
+frequency changes.
+
+=back
+
+Please see F<docs/misc/tscmode.txt> for more information on this option.
+
+=item B<localtime=BOOLEAN>
+
+Set the real time clock to local time or to UTC. 0 by default, i.e. set to UTC.
+
+=item B<rtc_timeoffset=SECONDS>
+
+Set the real time clock offset in seconds. 0 by default.
+
+
+=item B<vpt_align=BOOLEAN>
+
+Specifies that periodic Virtual Platform Timers should be aligned to
+reduce guest interrupts. Enabling this option can reduce power
+consumption, especially when a guest uses a high timer interrupt
+frequency (HZ) values. The default is 1.
+
+=item B<timer_mode=MODE>
+
+Specifies the mode for Virtual Timers. The valid values are as follows:
+
+=over 4
+
+=item B<"delay_for_missed_ticks">
+
+Delay for missed ticks. Do not advance a vcpu's time beyond the
+correct delivery time for interrupts that have been missed due to
+preemption. Deliver missed interrupts when the vcpu is rescheduled and
+advance the vcpu's virtual time stepwise for each one.
+
+=item B<"no_delay_for_missed_ticks">
+
+No delay for missed ticks. As above, missed interrupts are delivered,
+but guest time always tracks wallclock (i.e., real) time while doing
+so.
+
+=item B<"no_missed_ticks_pending">
+
+No missed interrupts are held pending. Instead, to ensure ticks are
+delivered at some non-zero rate, if we detect missed ticks then the
+internal tick alarm is not disabled if the VCPU is preempted during
+the next tick period.
+
+=item B<"one_missed_tick_pending">
+
+One missed tick pending. Missed interrupts are collapsed
+together and delivered as one 'late tick'.  Guest time always tracks
+wallclock (i.e., real) time.
+
+=back
+
+=back
+
+=head3 Support for Paravirtualisation of HVM Guests
+
+The following options allow Paravirtualised features (such as devices)
+to be exposed to the guest Operating System in an HVM guest.
+Utilising these features requires specific guest support but when
+available they will result in improved performance.
+
+=over 4
+
+=item B<xen_platform_pci=BOOLEAN>
+
+Enable or disable the Xen platform PCI device.  The presence of this
+virtual device enables a guest Operating System (subject to the
+availability of suitable drivers) to make use of paravirtualisation
+features such as disk and network devices etc. Enabling these drivers
+improves performance and is strongly recommended when available. PV
+drivers are available for various Operating Systems including HVM
+Linux L<http://wiki.xen.org/wiki/XenLinuxPVonHVMdrivers> and Microsoft
+Windows L<http://wiki.xen.org/wiki/XenWindowsGplPv>.
+
+=item B<viridian=BOOLEAN>
+
+Turns on or off the exposure of MicroSoft Hyper-V (AKA viridian)
+compatible enlightenments to the guest.  These can improve performance
+of Microsoft Windows guests from Windows Vista and Windows 2008
+onwards and setting this option for such guests is strongly
+recommended. This option should be harmless for other versions of
+Windows (although it will not give any benefit) and the majority of
+other non-Windows OSes. However it is known to be incompatible with
+some other Operating Systems and in some circumstance can prevent
+Xen's own paravirtualisation interfaces for HVM guests from being
+used.
+
+=back
+
+=head3 Emulated VGA Graphics Device
+
+The following options control the features of the emulated graphics
+device.  Many of these options behave similarly to the equivalent key
+in the B<VFB_SPEC_STRING> for configuring virtual frame buffer devices
+(see above).
+
+=over 4
+
+=item B<videoram=MBYTES>
+
+Sets the amount of RAM which the emulated video card will contain,
+which in turn limits the resolutions and bit depths which will be
+available. This option is only available when using the B<stdvga>
+option (see below).
+The default amount of video ram for stdvga is 8MB which is sufficient
+for e.g. 1600x1200 at 32bpp.
+
+When using the emulated Cirrus graphics card (B<stdvga=0>)
+the amount of video ram is fixed at 4MB which is sufficient
+for 1024x768 at 32 bpp.
+
+videoram option is currently only available when using the
+qemu-xen-traditional device-model. Upstream qemu-xen device-model
+currently does not support changing the amount of video memory for the
+emulated graphics device.
+
+=item B<stdvga=BOOLEAN>
+
+Select a standard VGA card with VBE (VESA BIOS Extensions) as the
+emulated graphics device. The default is false which means to emulate
+a Cirrus Logic GD5446 VGA card. If your guest supports VBE 2.0 or
+later (e.g. Windows XP onwards) then you should enable this.
+stdvga supports more video ram and bigger resolutions than Cirrus.
+
+=item B<vnc=BOOLEAN>
+
+Allow access to the display via the VNC protocol.  This enables the
+other VNC-related settings.  The default is to enable this.
+
+=item B<vncviewer=BOOLEAN>
+
+Automatically spawn a vncviewer when creating/restoring a guest.
+
+=item B<vnclisten="ADDRESS[:DISPLAYNUM]">
+
+Specifies the IP address, and optionally VNC display number, to use.
+
+=item B<vncdisplay=DISPLAYNUM>
+
+Specifies the VNC display number to use. The actual TCP port number
+will be DISPLAYNUM+5900.
+
+=item B<vncunused=BOOLEAN>
+
+Requests that the VNC display setup search for a free TCP port to use.
+The actual display used can be accessed with C<xl vncviewer>.
+
+=item B<vncpasswd="PASSWORD">
+
+Specifies the password for the VNC server.
+
+=item B<keymap="LANG">
+
+Configure the keymap to use for the keyboard associated with this
+display. If the input method does not easily support raw keycodes
+(e.g. this is often the case when using VNC) then this allows us to
+correctly map the input keys into keycodes seen by the guest. The
+specific values which are accepted are defined by the version of the
+device-model which you are using. See L</"Keymaps"> below or consult the
+L<qemu(1)> manpage. The default is B<en-us>.
+
+=item B<sdl=BOOLEAN>
+
+Specifies that the display should be presented via an X window (using
+Simple DirectMedia Layer). The default is not to enable this mode.
+
+=item B<opengl=BOOLEAN>
+
+Enable OpenGL acceleration of the SDL display. Only effects machines
+using B<device_model_version="qemu-xen-traditional"> and only if the
+device-model was compiled with OpenGL support. 0 by default.
+
+=item B<nographic=BOOLEAN>
+
+Enable or disable the virtual graphics device.  The default is to
+provide a VGA graphics device but this option can be used to disable
+it.
+
+=back
+
+=head3 Spice Graphics Support
+
+The following options control the features of SPICE.
+
+=over 4
+
+=item B<spice=BOOLEAN>
+
+Allow access to the display via the SPICE protocol.  This enables the
+other SPICE-related settings.
+
+=item B<spicehost="ADDRESS">
+
+Specify the interface address to listen on if given, otherwise any
+interface.
+
+=item B<spiceport=NUMBER>
+
+Specify the port to listen on by the SPICE server if the SPICE is
+enabled.
+
+=item B<spicetls_port=NUMBER>
+
+Specify the secure port to listen on by the SPICE server if the SPICE
+is enabled. At least one of the spiceport or spicetls_port must be
+given if SPICE is enabled.  NB. the options depending on spicetls_port
+have not been supported.
+
+=item B<spicedisable_ticketing=BOOLEAN>
+
+Enable client connection without password. When disabled, spicepasswd
+must be set. The default is 0.
+
+=item B<spicepasswd="PASSWORD">
+
+Specify the ticket password which is used by a client for connection.
+
+=item B<spiceagent_mouse=BOOLEAN>
+
+Whether SPICE agent is used for client mouse mode. The default is true
+(turn on)
+
+=back
+
+=head3 Miscellaneous Emulated Hardware
+
+=over 4
+
+=item B<serial=DEVICE>
+
+Redirect the virtual serial port to B<DEVICE>. Please see the
+B<-serial> option in the L<qemu(1)> manpage for details of the valid
+B<DEVICE> options. Default is B<vc> when in graphical mode and
+B<stdio> if B<nographics=1> is used.
+
+=item B<soundhw=DEVICE>
+
+Select the virtual sound card to expose to the guest. The valid
+devices are defined by the device model configuration, please see the
+L<qemu(1)> manpage for details. The default is not to export any sound
+device.
+
+=item B<usb=BOOLEAN>
+
+Enables or disables a USB bus in the guest.
+
+=item B<usbdevice=DEVICE>
+
+Adds B<DEVICE> to the USB bus. The USB bus must also be enabled using
+B<usb=1>. The most common use for this option is B<usbdevice=tablet>
+which adds pointer device using absolute coordinates. Such devices
+function better than relative coordinate devices (such as a standard
+mouse) since many methods of exporting guest graphics (such as VNC)
+work better in this mode. Note that this is independent of the actual
+pointer device you are using on the host/client side.
+
+=back
+
+=head2 Device-Model Options
+
+The following options control the selection of the device-model.  This
+is the component which provides emulation of the virtual devices to an
+HVM guest.  For a PV guest a device-model is sometimes used to provide
+backends for certain PV devices (most usually a virtual framebuffer
+device).
+
+=over 4
+
+=item B<device_model_version="DEVICE-MODEL">
+
+Selects which variant of the device-model should be used for this
+guest. Valid values are:
+
+=over 4
+
+=item B<qemu-xen-traditional>
+
+Use the device-model based upon the historical Xen fork of Qemu.  This
+device-model is currently the default.
+
+=item B<qemu-xen>
+
+use the device-model merged into the upstream QEMU project.  This
+device-model will become the default in a future version of Xen.
+
+=back
+
+It is recommended to accept the default value for new guests.  If
+you have existing guests then, depending on the nature of the guest
+Operating System, you may wish to force them to use the device
+model which they were installed with.
+
+=item B<device_model_override="PATH">
+
+Override the path to the binary to be used as the device-model. The
+binary provided here MUST be consistent with the
+`device_model_version` which you have specified. You should not
+normally need to specify this option.
+
+=item B<device_model_stubdomain_override=BOOLEAN>
+
+Override the use of stubdomain based device-model.  Normally this will
+be automatically selected based upon the other features and options
+you have selected.
+
+=item B<device_model_stubdomain_seclabel="LABEL">
+
+Assign an XSM security label to the device-model stubdomain.
+
+=item B<device_model_args=[ "ARG", "ARG", ...]>
+
+Pass additional arbitrary options on the device-model command
+line. Each element in the list is passed as an option to the
+device-model.
+
+=item B<device_model_args_pv=[ "ARG", "ARG", ...]>
+
+Pass additional arbitrary options on the device-model command line for
+a PV device model only. Each element in the list is passed as an
+option to the device-model.
+
+=item B<device_model_args_hvm=[ "ARG", "ARG", ...]>
+
+Pass additional arbitrary options on the device-model command line for
+an HVM device model only. Each element in the list is passed as an
+option to the device-model.
 
 =back
 
@@ -1138,9 +1165,13 @@ See L<qemu(1)> for more information.
 
 =item L<xl(1)>
 
+=item L<xlcpupool.cfg(5)>
+
 =item F<xl-disk-configuration>
 
 =item F<xl-network-configuration>
+
+=item F<docs/misc/tscmode.txt>
 
 =back
 
@@ -1148,17 +1179,12 @@ See L<qemu(1)> for more information.
 
 F</etc/xen/NAME.cfg>
 F</var/xen/dump/NAME>
-F<docs/misc/tscmode.txt>
 
 =head1 BUGS
 
-This document is a work in progress and contains items which require
-further documentation and which are generally incomplete (marked with
-XXX).  However all options are included here whether or not they are
-fully documented.
-
-Patches to improve incomplete items (or any other item) would be
-gratefully received on the xen-devel@lists.xen.org mailing
+This document may contain items which require further
+documentation. Patches to improve incomplete items (or any other item)
+are gratefully received on the xen-devel@lists.xen.org mailing
 list. Please see L<http://wiki.xen.org/wiki/SubmittingXenPatches> for
 information on how to submit a patch to Xen.
 
