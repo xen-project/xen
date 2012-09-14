@@ -1074,22 +1074,11 @@ static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
         return;
     }
 
-    memset(&msg, 0, sizeof(msg)); 
-    msg.data = MSI_DATA_VECTOR(desc->arch.vector) & 0xff;
-    msg.data |= 1 << 14;
-    msg.data |= (INT_DELIVERY_MODE != dest_LowestPrio) ?
-        MSI_DATA_DELIVERY_FIXED:
-        MSI_DATA_DELIVERY_LOWPRI;
-
-    /* Follow MSI setting */
+    msi_compose_msg(desc, &msg);
+    /* Are these overrides really needed? */
     if (x2apic_enabled)
         msg.address_hi = dest & 0xFFFFFF00;
-    msg.address_lo = (MSI_ADDRESS_HEADER << (MSI_ADDRESS_HEADER_SHIFT + 8));
-    msg.address_lo |= INT_DEST_MODE ? MSI_ADDR_DESTMODE_LOGIC:
-                    MSI_ADDR_DESTMODE_PHYS;
-    msg.address_lo |= (INT_DELIVERY_MODE != dest_LowestPrio) ?
-                    MSI_ADDR_REDIRECTION_CPU:
-                    MSI_ADDR_REDIRECTION_LOWPRI;
+    msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
     msg.address_lo |= MSI_ADDR_DEST_ID(dest & 0xff);
 
     spin_lock_irqsave(&iommu->register_lock, flags);
