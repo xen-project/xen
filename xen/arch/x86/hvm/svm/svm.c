@@ -73,6 +73,8 @@ bool_t cpu_has_lmsl;
 #define set_segment_register(name, value)  \
     asm volatile ( "movw %%ax ,%%" STR(name) "" : : "a" (value) )
 
+static void svm_update_guest_efer(struct vcpu *);
+
 static struct hvm_function_table svm_function_table;
 
 /* va of hardware host save area     */
@@ -269,9 +271,9 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
     v->arch.hvm_vcpu.guest_cr[2] = c->cr2;
     v->arch.hvm_vcpu.guest_cr[3] = c->cr3;
     v->arch.hvm_vcpu.guest_cr[4] = c->cr4;
-    hvm_update_guest_cr(v, 0);
-    hvm_update_guest_cr(v, 2);
-    hvm_update_guest_cr(v, 4);
+    svm_update_guest_cr(v, 0);
+    svm_update_guest_cr(v, 2);
+    svm_update_guest_cr(v, 4);
 
     /* Load sysenter MSRs into both VMCB save area and VCPU fields. */
     vmcb->sysenter_cs = v->arch.hvm_svm.guest_sysenter_cs = c->sysenter_cs;
@@ -330,7 +332,7 @@ static void svm_load_cpu_state(struct vcpu *v, struct hvm_hw_cpu *data)
     vmcb->cstar      = data->msr_cstar;
     vmcb->sfmask     = data->msr_syscall_mask;
     v->arch.hvm_vcpu.guest_efer = data->msr_efer;
-    hvm_update_guest_efer(v);
+    svm_update_guest_efer(v);
 
     hvm_set_guest_tsc(v, data->tsc);
 }
@@ -426,12 +428,7 @@ static int svm_guest_x86_mode(struct vcpu *v)
     return (likely(vmcb->cs.attr.fields.db) ? 4 : 2);
 }
 
-static void svm_update_host_cr3(struct vcpu *v)
-{
-    /* SVM doesn't have a HOST_CR3 equivalent to update. */
-}
-
-static void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
+void svm_update_guest_cr(struct vcpu *v, unsigned int cr)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     uint64_t value;
@@ -1122,11 +1119,6 @@ static int svm_event_pending(struct vcpu *v)
 {
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     return vmcb->eventinj.fields.v;
-}
-
-static int svm_do_pmu_interrupt(struct cpu_user_regs *regs)
-{
-    return vpmu_do_interrupt(regs);
 }
 
 static void svm_cpu_dead(unsigned int cpu)
@@ -1990,7 +1982,6 @@ static struct hvm_function_table __read_mostly svm_function_table = {
     .get_segment_register = svm_get_segment_register,
     .set_segment_register = svm_set_segment_register,
     .get_shadow_gs_base   = svm_get_shadow_gs_base,
-    .update_host_cr3      = svm_update_host_cr3,
     .update_guest_cr      = svm_update_guest_cr,
     .update_guest_efer    = svm_update_guest_efer,
     .set_guest_pat        = svm_set_guest_pat,
@@ -1999,7 +1990,6 @@ static struct hvm_function_table __read_mostly svm_function_table = {
     .inject_trap          = svm_inject_trap,
     .init_hypercall_page  = svm_init_hypercall_page,
     .event_pending        = svm_event_pending,
-    .do_pmu_interrupt     = svm_do_pmu_interrupt,
     .cpuid_intercept      = svm_cpuid_intercept,
     .wbinvd_intercept     = svm_wbinvd_intercept,
     .fpu_dirty_intercept  = svm_fpu_dirty_intercept,

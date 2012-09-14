@@ -681,8 +681,8 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
         .fields = { .type = 0xb, .s = 0, .dpl = 0, .p = 1, .avl = 0,    \
                     .l = 0, .db = 0, .g = 0, .pad = 0 } }).bytes)
 
-static void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
-                                     struct segment_register *reg)
+void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
+                              struct segment_register *reg)
 {
     uint32_t attr = 0;
 
@@ -1412,11 +1412,6 @@ static int vmx_event_pending(struct vcpu *v)
     return (__vmread(VM_ENTRY_INTR_INFO) & INTR_INFO_VALID_MASK);
 }
 
-static int vmx_do_pmu_interrupt(struct cpu_user_regs *regs)
-{
-    return vpmu_do_interrupt(regs);
-}
-
 static void vmx_set_uc_mode(struct vcpu *v)
 {
     if ( paging_mode_hap(v->domain) )
@@ -1478,7 +1473,6 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .inject_trap          = vmx_inject_trap,
     .init_hypercall_page  = vmx_init_hypercall_page,
     .event_pending        = vmx_event_pending,
-    .do_pmu_interrupt     = vmx_do_pmu_interrupt,
     .cpu_up               = vmx_cpu_up,
     .cpu_down             = vmx_cpu_down,
     .cpuid_intercept      = vmx_cpuid_intercept,
@@ -1593,7 +1587,7 @@ static void vmx_cpuid_intercept(
     {
         case 0x80000001:
             /* SYSCALL is visible iff running in long mode. */
-            hvm_get_segment_register(v, x86_seg_cs, &cs);
+            vmx_get_segment_register(v, x86_seg_cs, &cs);
             if ( cs.attr.fields.l )
                 *edx |= cpufeat_mask(X86_FEATURE_SYSCALL);
             else

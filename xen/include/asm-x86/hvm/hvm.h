@@ -137,7 +137,6 @@ struct hvm_function_table {
     void (*init_hypercall_page)(struct domain *d, void *hypercall_page);
 
     int  (*event_pending)(struct vcpu *v);
-    int  (*do_pmu_interrupt)(struct cpu_user_regs *regs);
 
     int  (*cpu_up_prepare)(unsigned int cpu);
     void (*cpu_dead)(unsigned int cpu);
@@ -266,7 +265,8 @@ hvm_guest_x86_mode(struct vcpu *v)
 static inline void
 hvm_update_host_cr3(struct vcpu *v)
 {
-    hvm_funcs.update_host_cr3(v);
+    if ( hvm_funcs.update_host_cr3 )
+        hvm_funcs.update_host_cr3(v);
 }
 
 static inline void hvm_update_guest_cr(struct vcpu *v, unsigned int cr)
@@ -328,11 +328,6 @@ void hvm_inject_page_fault(int errcode, unsigned long cr2);
 static inline int hvm_event_pending(struct vcpu *v)
 {
     return hvm_funcs.event_pending(v);
-}
-
-static inline int hvm_do_pmu_interrupt(struct cpu_user_regs *regs)
-{
-    return hvm_funcs.do_pmu_interrupt(regs);
 }
 
 /* These reserved bits in lower 32 remain 0 after any load of CR0 */

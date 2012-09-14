@@ -287,8 +287,6 @@ static int vmx_inst_check_privilege(struct cpu_user_regs *regs, int vmxop_check)
     struct vcpu *v = current;
     struct segment_register cs;
 
-    hvm_get_segment_register(v, x86_seg_cs, &cs);
-
     if ( vmxop_check )
     {
         if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) ||
@@ -297,6 +295,8 @@ static int vmx_inst_check_privilege(struct cpu_user_regs *regs, int vmxop_check)
     }
     else if ( !vcpu_2_nvmx(v).vmxon_region_pa )
         goto invalid_op;
+
+    vmx_get_segment_register(v, x86_seg_cs, &cs);
 
     if ( (regs->eflags & X86_EFLAGS_VM) ||
          (hvm_long_mode_enabled(v) && cs.attr.fields.l == 0) )
@@ -354,13 +354,13 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
 
         if ( hvm_long_mode_enabled(v) )
         {
-            hvm_get_segment_register(v, x86_seg_cs, &seg);
+            vmx_get_segment_register(v, x86_seg_cs, &seg);
             mode_64bit = seg.attr.fields.l;
         }
 
         if ( info.fields.segment > VMX_SREG_GS )
             goto gp_fault;
-        hvm_get_segment_register(v, sreg_to_index[info.fields.segment], &seg);
+        vmx_get_segment_register(v, sreg_to_index[info.fields.segment], &seg);
         seg_base = seg.base;
 
         base = info.fields.base_reg_invalid ? 0 :

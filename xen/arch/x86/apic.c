@@ -1373,7 +1373,7 @@ void error_interrupt(struct cpu_user_regs *regs)
 void pmu_apic_interrupt(struct cpu_user_regs *regs)
 {
     ack_APIC_irq();
-    hvm_do_pmu_interrupt(regs);
+    vpmu_do_interrupt(regs);
 }
 
 /*

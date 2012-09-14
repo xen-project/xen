@@ -66,6 +66,7 @@ static inline void svm_invlpga(unsigned long vaddr, uint32_t asid)
 
 unsigned long *svm_msrbit(unsigned long *msr_bitmap, uint32_t msr);
 void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len);
+void svm_update_guest_cr(struct vcpu *, unsigned int cr);
 
 extern u32 svm_feature_flags;
 
