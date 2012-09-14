@@ -103,6 +103,17 @@ char *libxl_cpupoolid_to_name(libxl_ctx *ctx, uint32_t poolid)
     return s;
 }
 
+/* This is a bit horrid but without xs_exists it seems like the only way. */
+int libxl_cpupoolid_is_valid(libxl_ctx *ctx, uint32_t poolid)
+{
+    int ret;
+    char *s = libxl_cpupoolid_to_name(ctx, poolid);
+
+    ret = (s != NULL);
+    free(s);
+    return ret;
+}
+
 char *libxl__cpupoolid_to_name(libxl__gc *gc, uint32_t poolid)
 {
     char *s = libxl_cpupoolid_to_name(libxl__gc_owner(gc), poolid);
