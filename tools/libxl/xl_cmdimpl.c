@@ -676,7 +676,7 @@ static void parse_config_data(const char *config_source,
         b_info->max_vcpus = l;
 
     if (!xlu_cfg_get_list (config, "cpus", &cpus, 0, 1)) {
-        int i, n_cpus = 0;
+        int n_cpus = 0;
 
         if (libxl_cpu_bitmap_alloc(ctx, &b_info->cpumap, 0)) {
             fprintf(stderr, "Unable to allocate cpumap\n");
@@ -1200,7 +1200,6 @@ skip_vfb:
     }
 
     if (!xlu_cfg_get_list (config, "pci", &pcis, 0, 0)) {
-        int i;
         d_config->num_pcidevs = 0;
         d_config->pcidevs = NULL;
         for(i = 0; (buf = xlu_cfg_get_listitem (pcis, i)) != NULL; i++) {
@@ -1223,7 +1222,6 @@ skip_vfb:
     switch (xlu_cfg_get_list(config, "cpuid", &cpuids, 0, 1)) {
     case 0:
         {
-            int i;
             const char *errstr;
 
             for (i = 0; (buf = xlu_cfg_get_listitem(cpuids, i)) != NULL; i++) {
@@ -1546,7 +1544,7 @@ static int preserve_domain(uint32_t *r_domid, libxl_event *event,
 {
     time_t now;
     struct tm tm;
-    char stime[24];
+    char strtime[24];
 
     libxl_uuid new_uuid;
 
@@ -1564,7 +1562,7 @@ static int preserve_domain(uint32_t *r_domid, libxl_event *event,
         return 0;
     }
 
-    if (!strftime(&stime[0], sizeof(stime), "-%Y%m%dT%H%MZ", &tm)) {
+    if (!strftime(&strtime[0], sizeof(strtime), "-%Y%m%dT%H%MZ", &tm)) {
         LOG("Failed to format time as a string");
         return 0;
     }
@@ -1572,9 +1570,9 @@ static int preserve_domain(uint32_t *r_domid, libxl_event *event,
     libxl_uuid_generate(&new_uuid);
 
     LOG("Preserving domain %d %s with suffix%s",
-        *r_domid, d_config->c_info.name, stime);
+        *r_domid, d_config->c_info.name, strtime);
     rc = libxl_domain_preserve(ctx, *r_domid, &d_config->c_info,
-                               stime, new_uuid);
+                               strtime, new_uuid);
 
     /*
      * Although the domain still exists it is no longer the one we are
@@ -2690,7 +2688,8 @@ static void destroy_domain(const char *p)
     if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n",rc); exit(-1); }
 }
 
-static void shutdown_domain(const char *p, int wait, int fallback_trigger)
+static void shutdown_domain(const char *p, int wait_for_it,
+                            int fallback_trigger)
 {
     int rc;
     libxl_event *event;
@@ -2712,7 +2711,7 @@ static void shutdown_domain(const char *p, int wait, int fallback_trigger)
         fprintf(stderr,"shutdown failed (rc=%d)\n",rc);exit(-1);
     }
 
-    if (wait) {
+    if (wait_for_it) {
         libxl_evgen_domain_death *deathw;
 
         rc = libxl_evenable_domain_death(ctx, domid, 0, &deathw);
@@ -3678,7 +3677,7 @@ int main_destroy(int argc, char **argv)
 int main_shutdown(int argc, char **argv)
 {
     int opt;
-    int wait = 0;
+    int wait_for_it = 0;
     int fallback_trigger = 0;
 
     while ((opt = def_getopt(argc, argv, "wF", "shutdown", 1)) != -1) {
@@ -3686,7 +3685,7 @@ int main_shutdown(int argc, char **argv)
         case 0: case 2:
             return opt;
         case 'w':
-            wait = 1;
+            wait_for_it = 1;
             break;
         case 'F':
             fallback_trigger = 1;
@@ -3694,7 +3693,7 @@ int main_shutdown(int argc, char **argv)
         }
     }
 
-    shutdown_domain(argv[optind], wait, fallback_trigger);
+    shutdown_domain(argv[optind], wait_for_it, fallback_trigger);
     return 0;
 }
 
@@ -4454,7 +4453,7 @@ static void output_topologyinfo(void)
     return;
 }
 
-static void info(int numa)
+static void print_info(int numa)
 {
     output_nodeinfo();
 
@@ -4497,7 +4496,7 @@ int main_info(int argc, char **argv)
         }
     }
 
-    info(numa);
+    print_info(numa);
     return 0;
 }
 
@@ -5566,19 +5565,19 @@ int main_blockdetach(int argc, char **argv)
     return rc;
 }
 
-static char *uptime_to_string(unsigned long time, int short_mode)
+static char *uptime_to_string(unsigned long uptime, int short_mode)
 {
     int sec, min, hour, day;
     char *time_string;
     int ret;
 
-    day = (int)(time / 86400);
-    time -= (day * 86400);
-    hour = (int)(time / 3600);
-    time -= (hour * 3600);
-    min = (int)(time / 60);
-    time -= (min * 60);
-    sec = time;
+    day = (int)(uptime / 86400);
+    uptime -= (day * 86400);
+    hour = (int)(uptime / 3600);
+    uptime -= (hour * 3600);
+    min = (int)(uptime / 60);
+    uptime -= (min * 60);
+    sec = uptime;
 
     if (short_mode)
         if (day > 1)

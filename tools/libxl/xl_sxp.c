@@ -78,7 +78,6 @@ void printf_info_sexp(int domid, libxl_domain_config *d_config)
            libxl_defbool_to_string(b_info->disable_migrate));
 
     if (c_info->type == LIBXL_DOMAIN_TYPE_PV && b_info->u.pv.bootloader) {
-        int i;
         printf("\t(bootloader %s)\n", b_info->u.pv.bootloader);
         if (b_info->u.pv.bootloader_args) {
             printf("\t(bootloader_args");
