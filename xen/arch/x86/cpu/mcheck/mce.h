@@ -78,7 +78,8 @@ extern void x86_mce_vector_register(x86_mce_vector_t);
 
 /* Common generic MCE handler that implementations may nominate
  * via x86_mce_vector_register. */
-extern void mcheck_cmn_handler(struct cpu_user_regs *, long, struct mca_banks *);
+extern void mcheck_cmn_handler(struct cpu_user_regs *, long,
+    struct mca_banks *, struct mca_banks *);
 
 /* Register a handler for judging whether mce is recoverable. */
 typedef int (*mce_recoverable_t)(u64 status);
@@ -166,16 +167,28 @@ void *x86_mcinfo_reserve(struct mc_info *mi, int size);
 void x86_mcinfo_dump(struct mc_info *mi);
 
 int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
-        uint64_t gstatus);
+    uint64_t gstatus);
 int inject_vmce(struct domain *d);
-int vmce_domain_inject(struct mcinfo_bank *bank, struct domain *d, struct mcinfo_global *global);
+int vmce_domain_inject(struct mcinfo_bank *bank, struct domain *d,
+    struct mcinfo_global *global);
 
 static inline int mce_vendor_bank_msr(const struct vcpu *v, uint32_t msr)
 {
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
-         msr >= MSR_IA32_MC0_CTL2 &&
-         msr < MSR_IA32_MCx_CTL2(v->arch.mcg_cap & MCG_CAP_COUNT) )
-          return 1;
+    switch (boot_cpu_data.x86_vendor) {
+    case X86_VENDOR_INTEL:
+        if (msr >= MSR_IA32_MC0_CTL2 &&
+            msr < MSR_IA32_MCx_CTL2(v->arch.mcg_cap & MCG_CAP_COUNT) )
+            return 1;
+        break;
+    case X86_VENDOR_AMD:
+        switch (msr) {
+        case MSR_F10_MC4_MISC1:
+        case MSR_F10_MC4_MISC2:
+        case MSR_F10_MC4_MISC3:
+            return 1;
+        }
+        break;
+    }
     return 0;
 }
 
@@ -188,27 +201,35 @@ static inline int mce_bank_msr(const struct vcpu *v, uint32_t msr)
     return 0;
 }
 
+/* MC softirq */
+void mce_handler_init(void);
+
+extern const struct mca_error_handler *mce_dhandlers;
+extern const struct mca_error_handler *mce_uhandlers;
+extern unsigned int mce_dhandler_num;
+extern unsigned int mce_uhandler_num;
+
 /* Fields are zero when not available */
 struct mce {
-    __u64 status;
-    __u64 misc;
-    __u64 addr;
-    __u64 mcgstatus;
-    __u64 ip;
-    __u64 tsc;      /* cpu time stamp counter */
-    __u64 time;     /* wall time_t when error was detected */
-    __u8  cpuvendor;        /* cpu vendor as encoded in system.h */
-    __u8  inject_flags;     /* software inject flags */
-    __u16  pad;
-    __u32 cpuid;    /* CPUID 1 EAX */
-    __u8  cs;               /* code segment */
-    __u8  bank;     /* machine check bank */
-    __u8  cpu;      /* cpu number; obsolete; use extcpu now */
-    __u8  finished;   /* entry is valid */
-    __u32 extcpu;   /* linux cpu number that detected the error */
-    __u32 socketid; /* CPU socket ID */
-    __u32 apicid;   /* CPU initial apic ID */
-    __u64 mcgcap;   /* MCGCAP MSR: machine check capabilities of CPU */
+    uint64_t status;
+    uint64_t misc;
+    uint64_t addr;
+    uint64_t mcgstatus;
+    uint64_t ip;
+    uint64_t tsc;      /* cpu time stamp counter */
+    uint64_t time;     /* wall time_t when error was detected */
+    uint8_t  cpuvendor;        /* cpu vendor as encoded in system.h */
+    uint8_t  inject_flags;     /* software inject flags */
+    uint16_t pad;
+    uint32_t cpuid;    /* CPUID 1 EAX */
+    uint8_t  cs;       /* code segment */
+    uint8_t  bank;     /* machine check bank */
+    uint8_t  cpu;      /* cpu number; obsolete; use extcpu now */
+    uint8_t  finished; /* entry is valid */
+    uint32_t extcpu;   /* linux cpu number that detected the error */
+    uint32_t socketid; /* CPU socket ID */
+    uint32_t apicid;   /* CPU initial apic ID */
+    uint64_t mcgcap;   /* MCGCAP MSR: machine check capabilities of CPU */
 };
 
 extern int apei_write_mce(struct mce *m);

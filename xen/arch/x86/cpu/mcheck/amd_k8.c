@@ -72,7 +72,7 @@
 /* Machine Check Handler for AMD K8 family series */
 static void k8_machine_check(struct cpu_user_regs *regs, long error_code)
 {
-	mcheck_cmn_handler(regs, error_code, mca_allbanks);
+	mcheck_cmn_handler(regs, error_code, mca_allbanks, NULL);
 }
 
 /* AMD K8 machine check */
@@ -83,6 +83,7 @@ enum mcheck_type amd_k8_mcheck_init(struct cpuinfo_x86 *c)
 
 	quirkflag = mcequirk_lookup_amd_quirkdata(c);
 
+	mce_handler_init();
 	x86_mce_vector_register(k8_machine_check);
 
 	for (i = 0; i < nr_mce_banks; i++) {

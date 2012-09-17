@@ -32,11 +32,11 @@
 /* Bitfield of the MSR_IA32_MCG_CAP register */
 #define MCG_CAP_COUNT           0x00000000000000ffULL
 #define MCG_CTL_P               (1ULL<<8)
-#define MCG_EXT_P               (1ULL<<9)
-#define MCG_CMCI_P              (1ULL<<10)
-#define MCG_TES_P               (1ULL<<11)
-#define MCG_EXT_CNT             16
-#define MCG_SER_P               (1ULL<<24)
+#define MCG_EXT_P               (1ULL<<9)  /* Intel specific */
+#define MCG_CMCI_P              (1ULL<<10) /* Intel specific */
+#define MCG_TES_P               (1ULL<<11) /* Intel specific */
+#define MCG_EXT_CNT             16         /* Intel specific */
+#define MCG_SER_P               (1ULL<<24) /* Intel specific */
 /* Other bits are reserved */
 
 /* Bitfield of the MSR_IA32_MCG_STATUS register */
@@ -53,9 +53,9 @@
 /* Other information */
 #define MCi_STATUS_OTHER        0x01ffffff00000000ULL
 /* Action Required flag */
-#define MCi_STATUS_AR           0x0080000000000000ULL
+#define MCi_STATUS_AR           0x0080000000000000ULL  /* Intel specific */
 /* Signaling flag */
-#define MCi_STATUS_S            0x0100000000000000ULL
+#define MCi_STATUS_S            0x0100000000000000ULL  /* Intel specific */
 /* processor context corrupt */
 #define MCi_STATUS_PCC          0x0200000000000000ULL
 /* MSR_K8_MCi_ADDR register valid */
@@ -100,7 +100,7 @@ struct mca_banks
     unsigned long *bank_map;
 };
 
-static inline void mcabanks_clear(int bit, struct mca_banks *banks)    \
+static inline void mcabanks_clear(int bit, struct mca_banks *banks)
 {
     if (!banks || !banks->bank_map || bit >= banks->num)
         return ;
@@ -125,7 +125,7 @@ struct mca_banks *mcabanks_alloc(void);
 void mcabanks_free(struct mca_banks *banks);
 extern struct mca_banks *mca_allbanks;
 
-/*Keep bank so that we can get staus even if mib is NULL */
+/* Keep bank so that we can get status even if mib is NULL */
 struct mca_binfo {
     int bank;
     struct mcinfo_global *mig;
@@ -138,7 +138,7 @@ enum mce_result
 {
     MCER_NOERROR,
     MCER_RECOVERED,
-    /* Not recoverd, but can continue */
+    /* Not recovered, but can continue */
     MCER_CONTINUE,
     MCER_RESET,
 };
@@ -149,7 +149,7 @@ struct mca_error_handler
      * identified by mca_code. Otherwise, we might need to have
      * a seperate function to decode the corresponding actions
      * for the particular mca error later.
-    */
+     */
     int (*owned_error)(uint64_t status);
     void (*recovery_handler)(struct mca_binfo *binfo,
                     enum mce_result *result, struct cpu_user_regs *regs);

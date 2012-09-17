@@ -23,6 +23,8 @@
 #include <asm/msr.h>
 
 #include "mce.h"
+#include "barrier.h"
+#include "util.h"
 
 bool_t __read_mostly mce_disabled;
 invbool_param("mce", mce_disabled);
@@ -161,8 +163,30 @@ void mce_need_clearbank_register(mce_need_clearbank_t cbfunc)
     mc_need_clearbank_scan = cbfunc;
 }
 
+
+static struct mce_softirq_barrier mce_inside_bar, mce_severity_bar;
+static struct mce_softirq_barrier mce_trap_bar;
+
+/*
+ * mce_logout_lock should only be used in the trap handler,
+ * while MCIP has not been cleared yet in the global status
+ * register. Other use is not safe, since an MCE trap can
+ * happen at any moment, which would cause lock recursion.
+ */
+static DEFINE_SPINLOCK(mce_logout_lock);
+
+static atomic_t severity_cpu = ATOMIC_INIT(-1);
+static atomic_t found_error = ATOMIC_INIT(0);
+static cpumask_t mce_fatal_cpus;
+
+const struct mca_error_handler *__read_mostly mce_dhandlers;
+const struct mca_error_handler *__read_mostly mce_uhandlers;
+unsigned int __read_mostly mce_dhandler_num;
+unsigned int __read_mostly mce_uhandler_num;
+
+
 static void mca_init_bank(enum mca_source who,
-                                         struct mc_info *mi, int bank)
+    struct mc_info *mi, int bank)
 {
     struct mcinfo_bank *mib;
 
@@ -252,8 +276,9 @@ static int mca_init_global(uint32_t flags, struct mcinfo_global *mig)
  * For Intel latest CPU, whether to clear the error bank status needs to
  * be judged by the callback function defined above.
  */
-mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
-                                   struct mca_summary *sp, struct mca_banks* clear_bank)
+mctelem_cookie_t
+mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
+                  struct mca_summary *sp, struct mca_banks *clear_bank)
 {
     uint64_t gstatus, status;
     struct mcinfo_global *mig = NULL; /* on stack */
@@ -291,7 +316,7 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
     /* If no mc_recovery_scan callback handler registered,
      * this error is not recoverable
      */
-    recover = (mc_recoverable_scan)? 1: 0;
+    recover = (mc_recoverable_scan) ? 1 : 0;
 
     for (i = 0; i < nr_mce_banks; i++) {
         /* Skip bank if corresponding bit in bankmask is clear */
@@ -311,15 +336,14 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
 
         /* If this is the first bank with valid MCA DATA, then
          * try to reserve an entry from the urgent/nonurgent queue
-         * depending on whethere we are called from an exception or
+         * depending on whether we are called from an exception or
          * a poller;  this can fail (for example dom0 may not
          * yet have consumed past telemetry). */
         if (errcnt++ == 0) {
             if ( (mctc = mctelem_reserve(which)) != NULL ) {
                 mci = mctelem_dataptr(mctc);
                 mcinfo_clear(mci);
-                mig = (struct mcinfo_global*)x86_mcinfo_reserve
-                    (mci, sizeof(struct mcinfo_global));
+                mig = x86_mcinfo_reserve(mci, sizeof(struct mcinfo_global));
                 /* mc_info should at least hold up the global information */
                 ASSERT(mig);
                 mca_init_global(mc_flags, mig);
@@ -382,227 +406,141 @@ mctelem_cookie_t mcheck_mca_logout(enum mca_source who, struct mca_banks *bankma
     return mci != NULL ? mctc : NULL; /* may be NULL */
 }
 
-#define DOM_NORMAL 0
-#define DOM0_TRAP 1
-#define DOMU_TRAP 2
-#define DOMU_KILLED 4
+static void mce_spin_lock(spinlock_t *lk)
+{
+      while (!spin_trylock(lk)) {
+              cpu_relax();
+              mce_panic_check();
+      }
+}
+
+static void mce_spin_unlock(spinlock_t *lk)
+{
+      spin_unlock(lk);
+}
+
+static enum mce_result mce_action(struct cpu_user_regs *regs,
+    mctelem_cookie_t mctc);
+
+/*
+ * Return:
+ * -1: if system can't be recovered
+ * 0: Continue to next step
+ */
+static int mce_urgent_action(struct cpu_user_regs *regs,
+                              mctelem_cookie_t mctc)
+{
+    uint64_t gstatus;
+
+    if ( mctc == NULL)
+        return 0;
+
+    gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
+
+    /*
+     * FIXME: When RIPV = EIPV = 0, it's a little bit tricky. It may be an
+     * asynchronic error, currently we have no way to precisely locate
+     * whether the error occur at guest or hypervisor.
+     * To avoid handling error in wrong way, we treat it as unrecovered.
+     *
+     * Another unrecovered case is RIPV = 0 while in hypervisor
+     * since Xen is not pre-emptible.
+     */
+    if ( !(gstatus & MCG_STATUS_RIPV) &&
+         (!(gstatus & MCG_STATUS_EIPV) || !guest_mode(regs)) )
+        return -1;
+
+    return mce_action(regs, mctc) == MCER_RESET ? -1 : 0;
+}
 
 /* Shared #MC handler. */
 void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
-                        struct mca_banks *bankmask)
+    struct mca_banks *bankmask, struct mca_banks *clear_bank)
 {
-    int xen_state_lost, dom0_state_lost, domU_state_lost;
-    struct vcpu *v = current;
-    struct domain *curdom = v->domain;
-    domid_t domid = curdom->domain_id;
-    int ctx_xen, ctx_dom0, ctx_domU;
-    uint32_t dom_state = DOM_NORMAL;
+    uint64_t gstatus;
     mctelem_cookie_t mctc = NULL;
     struct mca_summary bs;
-    struct mc_info *mci = NULL;
-    int irqlocked = 0;
-    uint64_t gstatus;
-    int ripv;
 
-    /* This handler runs as interrupt gate. So IPIs from the
-     * polling service routine are defered until we're finished.
-     */
+    mce_spin_lock(&mce_logout_lock);
 
-    /* Disable interrupts for the _vcpu_. It may not re-scheduled to
-     * another physical CPU. */
-    vcpu_schedule_lock_irq(v);
-    irqlocked = 1;
-
-    /* Read global status;  if it does not indicate machine check
-     * in progress then bail as long as we have a valid ip to return to. */
-    gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
-    ripv = ((gstatus & MCG_STATUS_RIPV) != 0);
-    if (!(gstatus & MCG_STATUS_MCIP) && ripv) {
-        add_taint(TAINT_MACHINE_CHECK); /* questionable */
-        vcpu_schedule_unlock_irq(v);
-        irqlocked = 0;
-        goto cmn_handler_done;
+    if (clear_bank != NULL) {
+        memset( clear_bank->bank_map, 0x0,
+            sizeof(long) * BITS_TO_LONGS(clear_bank->num));
     }
-
-    /* Go and grab error telemetry.  We must choose whether to commit
-     * for logging or dismiss the cookie that is returned, and must not
-     * reference the cookie after that action.
-     */
-    mctc = mcheck_mca_logout(MCA_MCE_HANDLER, bankmask, &bs, NULL);
-    if (mctc != NULL)
-        mci = (struct mc_info *)mctelem_dataptr(mctc);
-
-    /* Clear MCIP or another #MC will enter shutdown state */
-    gstatus &= ~MCG_STATUS_MCIP;
-    mca_wrmsr(MSR_IA32_MCG_STATUS, gstatus);
-    wmb();
-
-    /* If no valid errors and our stack is intact, we're done */
-    if (ripv && bs.errcnt == 0) {
-        vcpu_schedule_unlock_irq(v);
-        irqlocked = 0;
-        goto cmn_handler_done;
-    }
-
-    if (bs.uc || bs.pcc)
-        add_taint(TAINT_MACHINE_CHECK);
-
-    /* Machine check exceptions will usually be for UC and/or PCC errors,
-     * but it is possible to configure machine check for some classes
-     * of corrected error.
-     *
-     * UC errors could compromise any domain or the hypervisor
-     * itself - for example a cache writeback of modified data that
-     * turned out to be bad could be for data belonging to anyone, not
-     * just the current domain.  In the absence of known data poisoning
-     * to prevent consumption of such bad data in the system we regard
-     * all UC errors as terminal.  It may be possible to attempt some
-     * heuristics based on the address affected, which guests have
-     * mappings to that mfn etc.
-     *
-     * PCC errors apply to the current context.
-     *
-     * If MCG_STATUS indicates !RIPV then even a #MC that is not UC
-     * and not PCC is terminal - the return instruction pointer
-     * pushed onto the stack is bogus.  If the interrupt context is
-     * the hypervisor or dom0 the game is over, otherwise we can
-     * limit the impact to a single domU but only if we trampoline
-     * somewhere safely - we can't return and unwind the stack.
-     * Since there is no trampoline in place we will treat !RIPV
-     * as terminal for any context.
-     */
-    ctx_xen = SEG_PL(regs->cs) == 0;
-    ctx_dom0 = !ctx_xen && (domid == 0);
-    ctx_domU = !ctx_xen && !ctx_dom0;
-
-    xen_state_lost = bs.uc != 0 || (ctx_xen && (bs.pcc || !ripv)) ||
-        !ripv;
-    dom0_state_lost = bs.uc != 0 || (ctx_dom0 && (bs.pcc || !ripv));
-    domU_state_lost = bs.uc != 0 || (ctx_domU && (bs.pcc || !ripv));
-
-    if (xen_state_lost) {
-        /* Now we are going to panic anyway. Allow interrupts, so that
-         * printk on serial console can work. */
-        vcpu_schedule_unlock_irq(v);
-        irqlocked = 0;
-
-        printk("Terminal machine check exception occurred in "
-               "hypervisor context.\n");
-
-        /* If MCG_STATUS_EIPV indicates, the IP on the stack is related
-         * to the error then it makes sense to print a stack trace.
-         * That can be useful for more detailed error analysis and/or
-         * error case studies to figure out, if we can clear
-         * xen_impacted and kill a DomU instead
-         * (i.e. if a guest only control structure is affected, but then
-         * we must ensure the bad pages are not re-used again).
-         */
-        if (bs.eipv & MCG_STATUS_EIPV) {
-            printk("MCE: Instruction Pointer is related to the "
-                   "error, therefore print the execution state.\n");
-            show_execution_state(regs);
-        }
-
-        /* Commit the telemetry so that panic flow can find it. */
-        if (mctc != NULL) {
-            x86_mcinfo_dump(mci);
-            mctelem_commit(mctc);
-        }
-        mc_panic("Hypervisor state lost due to machine check "
-                 "exception.\n");
-        /*NOTREACHED*/
-    }
-
-    /*
-     * Xen hypervisor state is intact.  If dom0 state is lost then
-     * give it a chance to decide what to do if it has registered
-     * a handler for this event, otherwise panic.
-     *
-     * XXFM Could add some Solaris dom0 contract kill here?
-     */
-    if (dom0_state_lost) {
-        if (dom0 && dom0->max_vcpus && dom0->vcpu[0] &&
-            guest_has_trap_callback(dom0, 0, TRAP_machine_check)) {
-            dom_state = DOM0_TRAP;
-            send_guest_trap(dom0, 0, TRAP_machine_check);
-            /* XXFM case of return with !ripv ??? */
-        } else {
-            /* Commit telemetry for panic flow. */
-            if (mctc != NULL) {
-                x86_mcinfo_dump(mci);
-                mctelem_commit(mctc);
-            }
-            mc_panic("Dom0 state lost due to machine check "
-                     "exception\n");
-            /*NOTREACHED*/
-        }
-    }
-
-    /*
-     * If a domU has lost state then send it a trap if it has registered
-     * a handler, otherwise crash the domain.
-     * XXFM Revisit this functionality.
-     */
-    if (domU_state_lost) {
-        if (guest_has_trap_callback(v->domain, v->vcpu_id,
-                                    TRAP_machine_check)) {
-            dom_state = DOMU_TRAP;
-            send_guest_trap(curdom, v->vcpu_id,
-                            TRAP_machine_check);
-        } else {
-            dom_state = DOMU_KILLED;
-            /* Enable interrupts. This basically results in
-             * calling sti on the *physical* cpu. But after
-             * domain_crash() the vcpu pointer is invalid.
-             * Therefore, we must unlock the irqs before killing
-             * it. */
-            vcpu_schedule_unlock_irq(v);
-            irqlocked = 0;
-
-            /* DomU is impacted. Kill it and continue. */
-            domain_crash(curdom);
-        }
-    }
-
-    switch (dom_state) {
-    case DOM0_TRAP:
-    case DOMU_TRAP:
-        /* Enable interrupts. */
-        vcpu_schedule_unlock_irq(v);
-        irqlocked = 0;
-
-        /* guest softirqs and event callbacks are scheduled
-         * immediately after this handler exits. */
-        break;
-    case DOMU_KILLED:
-        /* Nothing to do here. */
-        break;
-
-    case DOM_NORMAL:
-        vcpu_schedule_unlock_irq(v);
-        irqlocked = 0;
-        break;
-    }
-
- cmn_handler_done:
-    BUG_ON(irqlocked);
-    BUG_ON(!ripv);
+    mctc = mcheck_mca_logout(MCA_MCE_SCAN, bankmask, &bs, clear_bank);
 
     if (bs.errcnt) {
-        /* Not panicing, so forward telemetry to dom0 now if it
-         * is interested. */
-        if (dom0_vmce_enabled()) {
+        /*
+         * Uncorrected errors must be dealt with in softirq context.
+         */
+        if (bs.uc || bs.pcc) {
+            add_taint(TAINT_MACHINE_CHECK);
+            if (mctc != NULL)
+                mctelem_defer(mctc);
+            /*
+             * For PCC=1 and can't be recovered, context is lost, so
+             * reboot now without clearing the banks, and deal with
+             * the telemetry after reboot (the MSRs are sticky)
+             */
+            if (bs.pcc || !bs.recoverable)
+                cpumask_set_cpu(smp_processor_id(), &mce_fatal_cpus);
+        } else {
             if (mctc != NULL)
                 mctelem_commit(mctc);
-            send_global_virq(VIRQ_MCA);
-        } else {
-            x86_mcinfo_dump(mci);
-            if (mctc != NULL)
-                mctelem_dismiss(mctc);
         }
-    } else if (mctc != NULL) {
-        mctelem_dismiss(mctc);
+        atomic_set(&found_error, 1);
+
+        /* The last CPU will be take check/clean-up etc */
+        atomic_set(&severity_cpu, smp_processor_id());
+
+        mce_printk(MCE_CRITICAL, "MCE: clear_bank map %lx on CPU%d\n",
+                *((unsigned long*)clear_bank), smp_processor_id());
+        if (clear_bank != NULL)
+            mcheck_mca_clearbanks(clear_bank);
+    } else {
+        if (mctc != NULL)
+            mctelem_dismiss(mctc);
     }
+    mce_spin_unlock(&mce_logout_lock);
+
+    mce_barrier_enter(&mce_trap_bar);
+    if ( mctc != NULL && mce_urgent_action(regs, mctc))
+        cpumask_set_cpu(smp_processor_id(), &mce_fatal_cpus);
+    mce_barrier_exit(&mce_trap_bar);
+
+    /*
+     * Wait until everybody has processed the trap.
+     */
+    mce_barrier_enter(&mce_trap_bar);
+    if (atomic_read(&severity_cpu) == smp_processor_id())
+    {
+        /* According to SDM, if no error bank found on any cpus,
+         * something unexpected happening, we can't do any
+         * recovery job but to reset the system.
+         */
+        if (atomic_read(&found_error) == 0)
+            mc_panic("MCE: No CPU found valid MCE, need reset\n");
+        if (!cpumask_empty(&mce_fatal_cpus))
+        {
+            char *ebufp, ebuf[96] = "MCE: Fatal error happened on CPUs ";
+            ebufp = ebuf + strlen(ebuf);
+            cpumask_scnprintf(ebufp, 95 - strlen(ebuf), &mce_fatal_cpus);
+            mc_panic(ebuf);
+        }
+        atomic_set(&found_error, 0);
+    }
+    mce_barrier_exit(&mce_trap_bar); 
+
+    /* Clear flags after above fatal check */
+    mce_barrier_enter(&mce_trap_bar);
+    gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
+    if ((gstatus & MCG_STATUS_MCIP) != 0) {
+        mce_printk(MCE_CRITICAL, "MCE: Clear MCIP@ last step");
+        mca_wrmsr(MSR_IA32_MCG_STATUS, gstatus & ~MCG_STATUS_MCIP);
+    }
+    mce_barrier_exit(&mce_trap_bar);
+
+    raise_softirq(MACHINE_CHECK_SOFTIRQ);
 }
 
 void mcheck_mca_clearbanks(struct mca_banks *bankmask)
@@ -1620,4 +1558,192 @@ void mc_panic(char *s)
            "   be recovered from.  Xen will now reboot the machine.\n");
     mc_panic_dump();
     panic("HARDWARE ERROR");
+}
+
+/* Machine Check owner judge algorithm:
+ * When error happens, all cpus serially read its msr banks.
+ * The first CPU who fetches the error bank's info will clear
+ * this bank. Later readers can't get any information again.
+ * The first CPU is the actual mce_owner
+ *
+ * For Fatal (pcc=1) error, it might cause machine crash
+ * before we're able to log. For avoiding log missing, we adopt two
+ * round scanning:
+ * Round1: simply scan. If found pcc = 1 or ripv = 0, simply reset.
+ * All MCE banks are sticky, when boot up, MCE polling mechanism
+ * will help to collect and log those MCE errors.
+ * Round2: Do all MCE processing logic as normal.
+ */
+
+/* Maybe called in MCE context, no lock, no printk */
+static enum mce_result mce_action(struct cpu_user_regs *regs,
+                      mctelem_cookie_t mctc)
+{
+    struct mc_info *local_mi;
+    enum mce_result bank_result = MCER_NOERROR;
+    enum mce_result worst_result = MCER_NOERROR;
+    struct mcinfo_common *mic = NULL;
+    struct mca_binfo binfo;
+    const struct mca_error_handler *handlers = mce_dhandlers;
+    unsigned int i, handler_num = mce_dhandler_num;
+
+    /* When in mce context, regs is valid */
+    if (regs)
+    {
+        handler_num = mce_uhandler_num;
+        handlers = mce_uhandlers;
+    }
+
+    /* At least a default handler should be registerd */
+    ASSERT(handler_num);
+
+    local_mi = (struct mc_info*)mctelem_dataptr(mctc);
+    x86_mcinfo_lookup(mic, local_mi, MC_TYPE_GLOBAL);
+    if (mic == NULL) {
+        printk(KERN_ERR "MCE: get local buffer entry failed\n ");
+        return MCER_CONTINUE;
+    }
+
+    memset(&binfo, 0, sizeof(binfo));
+    binfo.mig = (struct mcinfo_global *)mic;
+    binfo.mi = local_mi;
+
+    /* Processing bank information */
+    x86_mcinfo_lookup(mic, local_mi, MC_TYPE_BANK);
+
+    for ( ; bank_result != MCER_RESET && mic && mic->size;
+          mic = x86_mcinfo_next(mic) )
+    {
+        if (mic->type != MC_TYPE_BANK) {
+            continue;
+        }
+        binfo.mib = (struct mcinfo_bank*)mic;
+        binfo.bank = binfo.mib->mc_bank;
+        bank_result = MCER_NOERROR;
+        for ( i = 0; i < handler_num; i++ ) {
+            if (handlers[i].owned_error(binfo.mib->mc_status))
+            {
+                handlers[i].recovery_handler(&binfo, &bank_result, regs);
+                if (worst_result < bank_result)
+                    worst_result = bank_result;
+                break;
+            }
+        }
+        ASSERT(i != handler_num);
+    }
+
+    return worst_result;
+}
+
+/*
+ * Called from mctelem_process_deferred. Return 1 if the telemetry
+ * should be committed for dom0 consumption, 0 if it should be
+ * dismissed.
+ */
+static int mce_delayed_action(mctelem_cookie_t mctc)
+{
+    enum mce_result result;
+    int ret = 0;
+
+    result = mce_action(NULL, mctc);
+
+    switch (result)
+    {
+    case MCER_RESET:
+        dprintk(XENLOG_ERR, "MCE delayed action failed\n");
+        is_mc_panic = 1;
+        x86_mcinfo_dump(mctelem_dataptr(mctc));
+        panic("MCE: Software recovery failed for the UCR\n");
+        break;
+    case MCER_RECOVERED:
+        dprintk(XENLOG_INFO, "MCE: Error is successfully recovered\n");
+        ret  = 1;
+        break;
+    case MCER_CONTINUE:
+        dprintk(XENLOG_INFO, "MCE: Error can't be recovered, "
+            "system is tainted\n");
+        x86_mcinfo_dump(mctelem_dataptr(mctc));
+        ret = 1;
+        break;
+    default:
+        ret = 0;
+        break;
+    }
+    return ret;
+}
+
+/* Softirq Handler for this MCE# processing */
+static void mce_softirq(void)
+{
+    int cpu = smp_processor_id();
+    unsigned int workcpu;
+
+    mce_printk(MCE_VERBOSE, "CPU%d enter softirq\n", cpu);
+
+    mce_barrier_enter(&mce_inside_bar);
+
+    /*
+     * Everybody is here. Now let's see who gets to do the
+     * recovery work. Right now we just see if there's a CPU
+     * that did not have any problems, and pick that one.
+     *
+     * First, just set a default value: the last CPU who reaches this
+     * will overwrite the value and become the default.
+     */
+
+    atomic_set(&severity_cpu, cpu);
+
+    mce_barrier_enter(&mce_severity_bar);
+    if (!mctelem_has_deferred(cpu))
+        atomic_set(&severity_cpu, cpu);
+    mce_barrier_exit(&mce_severity_bar);
+
+    /* We choose severity_cpu for further processing */
+    if (atomic_read(&severity_cpu) == cpu) {
+
+        mce_printk(MCE_VERBOSE, "CPU%d handling errors\n", cpu);
+
+        /* Step1: Fill DOM0 LOG buffer, vMCE injection buffer and
+         * vMCE MSRs virtualization buffer
+         */
+        for_each_online_cpu(workcpu) {
+            mctelem_process_deferred(workcpu, mce_delayed_action);
+        }
+
+        /* Step2: Send Log to DOM0 through vIRQ */
+        if (dom0_vmce_enabled()) {
+            mce_printk(MCE_VERBOSE, "MCE: send MCE# to DOM0 through virq\n");
+            send_global_virq(VIRQ_MCA);
+        }
+    }
+
+    mce_barrier_exit(&mce_inside_bar);
+}
+
+/* Machine Check owner judge algorithm:
+ * When error happens, all cpus serially read its msr banks.
+ * The first CPU who fetches the error bank's info will clear
+ * this bank. Later readers can't get any infor again.
+ * The first CPU is the actual mce_owner
+ *
+ * For Fatal (pcc=1) error, it might cause machine crash
+ * before we're able to log. For avoiding log missing, we adopt two
+ * round scanning:
+ * Round1: simply scan. If found pcc = 1 or ripv = 0, simply reset.
+ * All MCE banks are sticky, when boot up, MCE polling mechanism
+ * will help to collect and log those MCE errors.
+ * Round2: Do all MCE processing logic as normal.
+ */
+void mce_handler_init(void)
+{
+    if (smp_processor_id() != 0)
+        return;
+
+    /* callback register, do we really need so many callback? */
+    /* mce handler data initialization */
+    mce_barrier_init(&mce_inside_bar);
+    mce_barrier_init(&mce_severity_bar);
+    mce_barrier_init(&mce_trap_bar);
+    spin_lock_init(&mce_logout_lock);
+    open_softirq(MACHINE_CHECK_SOFTIRQ, mce_softirq);
 }
