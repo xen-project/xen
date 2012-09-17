@@ -64,11 +64,8 @@
 ^docs/xen-api/vm_lifecycle.eps$
 ^docs/xen-api/xenapi-datamodel-graph.eps$
 ^docs/xen-api/xenapi.out$
-^extras/mini-os/arch/ia64/gen_off.s$
 ^extras/mini-os/include/list\.h$
 ^extras/mini-os/include/mini-os$
-^extras/mini-os/include/ia64/mini-os$
-^extras/mini-os/include/ia64/offsets.h$
 ^extras/mini-os/include/x86/mini-os$
 ^extras/mini-os/include/xen$
 ^extras/mini-os/mini-os.*$
@@ -168,13 +165,6 @@
 ^tools/include/xen/.*$
 ^tools/include/xen-foreign/.*\.(c|h|size)$
 ^tools/include/xen-foreign/checker$
-^tools/libxc/ia64/asm/.*\.h$
-^tools/libxc/ia64/acpi/.*\.h$
-^tools/libxc/ia64/acpi/platform/.*\.h$
-^tools/libxc/ia64/dom_fw_asm.S$
-^tools/libxc/ia64/dom_fw_common\.c$
-^tools/libxc/ia64/dom_fw_domu\.c$
-^tools/libxc/ia64/xen/.*\.h$
 ^tools/libxen/libxenapi-
 ^tools/libxen/test/test_bindings$
 ^tools/libxen/test/test_event_handling$
@@ -338,9 +328,6 @@
 ^xen/include/headers\.chk$
 ^xen/include/asm$
 ^xen/include/asm-.*/asm-offsets\.h$
-^xen/include/asm-ia64/asm-xsi-offsets\.h$
-^xen/include/asm-ia64/.offsets.h.stamp$
-^xen/include/asm-ia64/xen$
 ^xen/include/compat/.*$
 ^xen/include/hypervisor-ifs/arch$
 ^xen/include/linux$
@@ -354,10 +341,6 @@
 ^xen/xen$
 ^xen/xen-syms$
 ^xen/xen\..*$
-^xen/arch/ia64/asm-offsets\.s$
-^xen/arch/ia64/asm-xsi-offsets\.s$
-^xen/arch/ia64/map\.out$
-^xen/arch/ia64/xen\.lds\.s$
 ^unmodified_drivers/linux-2.6/\.tmp_versions
 ^unmodified_drivers/linux-2.6/.*\.cmd$
 ^unmodified_drivers/linux-2.6/.*\.ko$
