@@ -2197,6 +2197,16 @@ static void vmx_idtv_reinject(unsigned long idtv_info)
     }
 }
 
+static int vmx_handle_apic_write(void)
+{
+    unsigned long exit_qualification = __vmread(EXIT_QUALIFICATION);
+    unsigned int offset = exit_qualification & 0xfff;
+
+    ASSERT(cpu_has_vmx_apic_reg_virt);
+
+    return vlapic_apicv_write(current, offset);
+}
+
 void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason, idtv_info, intr_info = 0, vector = 0;
@@ -2648,6 +2658,11 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             update_guest_eip(); /* Safe: XSETBV */
         break;
     }
+
+    case EXIT_REASON_APIC_WRITE:
+        if ( vmx_handle_apic_write() )
+            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        break;
 
     case EXIT_REASON_ACCESS_GDTR_OR_IDTR:
     case EXIT_REASON_ACCESS_LDTR_OR_TR:

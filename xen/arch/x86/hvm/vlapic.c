@@ -823,6 +823,14 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
     return rc;
 }
 
+int vlapic_apicv_write(struct vcpu *v, unsigned int offset)
+{
+    uint32_t val = vlapic_get_reg(vcpu_vlapic(v), offset);
+
+    vlapic_reg_write(v, offset, val);
+    return 0;
+}
+
 int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);

@@ -89,6 +89,7 @@ static void __init vmx_display_features(void)
     P(cpu_has_vmx_vnmi, "Virtual NMI");
     P(cpu_has_vmx_msr_bitmap, "MSR direct-access bitmap");
     P(cpu_has_vmx_unrestricted_guest, "Unrestricted Guest");
+    P(cpu_has_vmx_apic_reg_virt, "APIC Register Virtualization");
 #undef P
 
     if ( !printed )
@@ -181,6 +182,14 @@ static int vmx_init_vmcs_config(void)
             opt |= SECONDARY_EXEC_ENABLE_VPID;
         if ( opt_unrestricted_guest_enabled )
             opt |= SECONDARY_EXEC_UNRESTRICTED_GUEST;
+
+        /*
+         * "APIC Register Virtualization"
+         * can be set only when "use TPR shadow" is set
+         */
+        if ( _vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW )
+            opt |= SECONDARY_EXEC_APIC_REGISTER_VIRT;
+
 
         _vmx_secondary_exec_control = adjust_vmx_controls(
             "Secondary Exec Control", min, opt,
