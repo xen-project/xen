@@ -36,7 +36,7 @@
 #define CPUFREQ_TURBO_ENABLED       1
 
 static xc_interface *xc_handle;
-static int max_cpu_nr;
+static unsigned int max_cpu_nr;
 
 /* help message */
 void show_help(void)
@@ -75,6 +75,33 @@ void show_help(void)
 void help_func(int argc, char *argv[])
 {
     show_help();
+}
+
+static void parse_cpuid(const char *arg, int *cpuid)
+{
+    if ( sscanf(arg, "%d", cpuid) != 1 || *cpuid < 0 )
+    {
+        if ( strcasecmp(arg, "all") )
+        {
+            fprintf(stderr, "Invalid CPU identifier: '%s'\n", arg);
+            exit(EINVAL);
+        }
+        *cpuid = -1;
+    }
+}
+
+static void parse_cpuid_and_int(int argc, char *argv[],
+                                int *cpuid, int *val, const char *what)
+{
+    if ( argc > 1 )
+        parse_cpuid(argv[0], cpuid);
+
+    if ( argc == 0 || sscanf(argv[argc > 1], "%d", val) != 1 )
+    {
+        fprintf(stderr, argc ? "Invalid %s '%s'\n" : "Missing %s\n",
+                what, argv[argc > 1]);
+        exit(EINVAL);
+    }
 }
 
 static void print_cxstat(int cpuid, struct xc_cx_stat *cxstat)
@@ -166,7 +193,8 @@ static int show_cxstat_by_cpuid(xc_interface *xc_handle, int cpuid)
     if ( ret )
     {
         if ( ret == -ENODEV )
-            printf("Either xen cpuidle is disabled or no valid information is registered!\n");
+            fprintf(stderr,
+                    "Either Xen cpuidle is disabled or no valid information is registered!\n");
         return ret;
     }
 
@@ -181,11 +209,8 @@ void cxstat_func(int argc, char *argv[])
 {
     int cpuid = -1;
 
-    if ( argc > 0 && sscanf(argv[0], "%d", &cpuid) != 1 )
-        cpuid = -1;
-
-    if ( cpuid >= max_cpu_nr )
-        cpuid = -1;
+    if ( argc > 0 )
+        parse_cpuid(argv[0], &cpuid);
 
     show_max_cstate(xc_handle);
 
@@ -294,11 +319,8 @@ void pxstat_func(int argc, char *argv[])
 {
     int cpuid = -1;
 
-    if ( argc > 0 && sscanf(argv[0], "%d", &cpuid) != 1 )
-        cpuid = -1;
-
-    if ( cpuid >= max_cpu_nr )
-        cpuid = -1;
+    if ( argc > 0 )
+        parse_cpuid(argv[0], &cpuid);
 
     if ( cpuid < 0 )
     {
@@ -338,10 +360,10 @@ static void signal_int_handler(int signo)
 	goto out;
     }
 
-    if ( gettimeofday(&tv, NULL) == -1 )
+    if ( gettimeofday(&tv, NULL) )
     {
         fprintf(stderr, "failed to get timeofday\n");
-        goto out ;
+        goto out;
     }
     usec_end = tv.tv_sec * 1000000UL + tv.tv_usec;
 
@@ -541,7 +563,7 @@ void start_gather_func(int argc, char *argv[])
             printf("Timeout set to %d seconds\n", timeout);
     }
 
-    if ( gettimeofday(&tv, NULL) == -1 )
+    if ( gettimeofday(&tv, NULL) )
     {
         fprintf(stderr, "failed to get timeofday\n");
         return ;
@@ -766,11 +788,8 @@ void cpufreq_para_func(int argc, char *argv[])
 {
     int cpuid = -1;
 
-    if ( argc > 0 && sscanf(argv[0], "%d", &cpuid) != 1 )
-        cpuid = -1;
-
-    if ( cpuid >= max_cpu_nr )
-        cpuid = -1;
+    if ( argc > 0 )
+        parse_cpuid(argv[0], &cpuid);
 
     if ( cpuid < 0 )
     {
@@ -788,26 +807,22 @@ void scaling_max_freq_func(int argc, char *argv[])
 {
     int cpuid = -1, freq = -1;
 
-    if ( (argc >= 2 && (sscanf(argv[1], "%d", &freq) != 1 ||
-                        sscanf(argv[0], "%d", &cpuid) != 1)) ||
-         (argc == 1 && sscanf(argv[0], "%d", &freq) != 1 ) ||
-         argc == 0 )
-    {
-        fprintf(stderr, "failed to set scaling max freq\n");
-        return ;
-    }
+    parse_cpuid_and_int(argc, argv, &cpuid, &freq, "frequency");
 
     if ( cpuid < 0 )
     {
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
             if ( xc_set_cpufreq_para(xc_handle, i, SCALING_MAX_FREQ, freq) )
-                fprintf(stderr, "[CPU%d] failed to set scaling max freq\n", i);
+                fprintf(stderr,
+                        "[CPU%d] failed to set scaling max freq (%d - %s)\n",
+                        i, errno, strerror(errno));
     }
     else
     {
         if ( xc_set_cpufreq_para(xc_handle, cpuid, SCALING_MAX_FREQ, freq) )
-            fprintf(stderr, "failed to set scaling max freq\n");
+            fprintf(stderr, "failed to set scaling max freq (%d - %s)\n",
+                    errno, strerror(errno));
     }
 }
 
@@ -815,26 +830,22 @@ void scaling_min_freq_func(int argc, char *argv[])
 {
     int cpuid = -1, freq = -1;
 
-    if ( (argc >= 2 && (sscanf(argv[1], "%d", &freq) != 1 ||
-                        sscanf(argv[0], "%d", &cpuid) != 1) ) ||
-         (argc == 1 && sscanf(argv[0], "%d", &freq) != 1 ) ||
-         argc == 0 )
-    {
-        fprintf(stderr, "failed to set scaling min freq\n");
-        return ;
-    }
+    parse_cpuid_and_int(argc, argv, &cpuid, &freq, "frequency");
 
     if ( cpuid < 0 )
     {
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
             if ( xc_set_cpufreq_para(xc_handle, i, SCALING_MIN_FREQ, freq) )
-                fprintf(stderr, "[CPU%d] failed to set scaling min freq\n", i);
+                fprintf(stderr,
+                        "[CPU%d] failed to set scaling min freq (%d - %s)\n",
+                        i, errno, strerror(errno));
     }
     else
     {
         if ( xc_set_cpufreq_para(xc_handle, cpuid, SCALING_MIN_FREQ, freq) )
-            fprintf(stderr, "failed to set scaling min freq\n");
+            fprintf(stderr, "failed to set scaling min freq (%d - %s)\n",
+                    errno, strerror(errno));
     }
 }
 
@@ -842,26 +853,22 @@ void scaling_speed_func(int argc, char *argv[])
 {
     int cpuid = -1, speed = -1;
 
-    if ( (argc >= 2 && (sscanf(argv[1], "%d", &speed) != 1 ||
-                        sscanf(argv[0], "%d", &cpuid) != 1) ) ||
-         (argc == 1 && sscanf(argv[0], "%d", &speed) != 1 ) ||
-         argc == 0 )
-    {
-        fprintf(stderr, "failed to set scaling speed\n");
-        return ;
-    }
+    parse_cpuid_and_int(argc, argv, &cpuid, &speed, "speed");
 
     if ( cpuid < 0 )
     {
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
             if ( xc_set_cpufreq_para(xc_handle, i, SCALING_SETSPEED, speed) )
-                fprintf(stderr, "[CPU%d] failed to set scaling speed\n", i);
+                fprintf(stderr,
+                        "[CPU%d] failed to set scaling speed (%d - %s)\n",
+                        i, errno, strerror(errno));
     }
     else
     {
         if ( xc_set_cpufreq_para(xc_handle, cpuid, SCALING_SETSPEED, speed) )
-            fprintf(stderr, "failed to set scaling speed\n");
+            fprintf(stderr, "failed to set scaling speed (%d - %s)\n",
+                    errno, strerror(errno));
     }
 }
 
@@ -869,14 +876,7 @@ void scaling_sampling_rate_func(int argc, char *argv[])
 {
     int cpuid = -1, rate = -1;
 
-    if ( (argc >= 2 && (sscanf(argv[1], "%d", &rate) != 1 ||
-                        sscanf(argv[0], "%d", &cpuid) != 1) ) ||
-         (argc == 1 && sscanf(argv[0], "%d", &rate) != 1 ) ||
-         argc == 0 )
-    {
-        fprintf(stderr, "failed to set scaling sampling rate\n");
-        return ;
-    }
+    parse_cpuid_and_int(argc, argv, &cpuid, &rate, "rate");
 
     if ( cpuid < 0 )
     {
@@ -884,12 +884,14 @@ void scaling_sampling_rate_func(int argc, char *argv[])
         for ( i = 0; i < max_cpu_nr; i++ )
             if ( xc_set_cpufreq_para(xc_handle, i, SAMPLING_RATE, rate) )
                 fprintf(stderr,
-                        "[CPU%d] failed to set scaling sampling rate\n", i);
+                        "[CPU%d] failed to set scaling sampling rate (%d - %s)\n",
+                        i, errno, strerror(errno));
     }
     else
     {
         if ( xc_set_cpufreq_para(xc_handle, cpuid, SAMPLING_RATE, rate) )
-            fprintf(stderr, "failed to set scaling sampling rate\n");
+            fprintf(stderr, "failed to set scaling sampling rate (%d - %s)\n",
+                    errno, strerror(errno));
     }
 }
 
@@ -897,14 +899,7 @@ void scaling_up_threshold_func(int argc, char *argv[])
 {
     int cpuid = -1, threshold = -1;
 
-    if ( (argc >= 2 && (sscanf(argv[1], "%d", &threshold) != 1 ||
-                        sscanf(argv[0], "%d", &cpuid) != 1) ) ||
-         (argc == 1 && sscanf(argv[0], "%d", &threshold) != 1 ) ||
-         argc == 0 )
-    {
-        fprintf(stderr, "failed to set up scaling threshold\n");
-        return ;
-    }
+    parse_cpuid_and_int(argc, argv, &cpuid, &threshold, "threshold");
 
     if ( cpuid < 0 )
     {
@@ -912,57 +907,49 @@ void scaling_up_threshold_func(int argc, char *argv[])
         for ( i = 0; i < max_cpu_nr; i++ )
             if ( xc_set_cpufreq_para(xc_handle, i, UP_THRESHOLD, threshold) )
                 fprintf(stderr,
-                        "[CPU%d] failed to set up scaling threshold\n", i);
+                        "[CPU%d] failed to set up scaling threshold (%d - %s)\n",
+                        i, errno, strerror(errno));
     }
     else
     {
         if ( xc_set_cpufreq_para(xc_handle, cpuid, UP_THRESHOLD, threshold) )
-            fprintf(stderr, "failed to set up scaling threshold\n");
+            fprintf(stderr, "failed to set up scaling threshold (%d - %s)\n",
+                    errno, strerror(errno));
     }
 }
 
 void scaling_governor_func(int argc, char *argv[])
 {
     int cpuid = -1;
-    char *name = NULL;
+    char *name;
 
     if ( argc >= 2 )
     {
-        name = strdup(argv[1]);
-        if ( name == NULL )
-            goto out;
-        if ( sscanf(argv[0], "%d", &cpuid) != 1 )
-        {
-            free(name);
-            goto out;
-        }
+        parse_cpuid(argv[0], &cpuid);
+        name = argv[1];
     }
     else if ( argc > 0 )
-    {
-        name = strdup(argv[0]);
-        if ( name == NULL )
-            goto out;
-    }
+        name = argv[0];
     else
-        goto out;
+    {
+        fprintf(stderr, "Missing argument(s)\n");
+        exit(EINVAL);
+    }
 
     if ( cpuid < 0 )
     {
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
             if ( xc_set_cpufreq_gov(xc_handle, i, name) )
-                fprintf(stderr, "[CPU%d] failed to set governor name\n", i);
+                fprintf(stderr, "[CPU%d] failed to set governor name (%d - %s)\n",
+                        i, errno, strerror(errno));
     }
     else
     {
         if ( xc_set_cpufreq_gov(xc_handle, cpuid, name) )
-            fprintf(stderr, "failed to set governor name\n");
+            fprintf(stderr, "failed to set governor name (%d - %s)\n",
+                    errno, strerror(errno));
     }
-
-    free(name);
-    return ;
-out:
-    fprintf(stderr, "failed to set governor name\n");
 }
 
 void cpu_topology_func(int argc, char *argv[])
@@ -971,7 +958,7 @@ void cpu_topology_func(int argc, char *argv[])
     DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_socket);
     DECLARE_HYPERCALL_BUFFER(uint32_t, cpu_to_node);
     xc_topologyinfo_t info = { 0 };
-    int i;
+    int i, rc = ENOMEM;
 
     cpu_to_core = xc_hypercall_buffer_alloc(xc_handle, cpu_to_core, sizeof(*cpu_to_core) * MAX_NR_CPU);
     cpu_to_socket = xc_hypercall_buffer_alloc(xc_handle, cpu_to_socket, sizeof(*cpu_to_socket) * MAX_NR_CPU);
@@ -990,7 +977,9 @@ void cpu_topology_func(int argc, char *argv[])
 
     if ( xc_topologyinfo(xc_handle, &info) )
     {
-        printf("Can not get Xen CPU topology: %d\n", errno);
+        rc = errno;
+        fprintf(stderr, "Cannot get Xen CPU topology (%d - %s)\n",
+                errno, strerror(errno));
         goto out;
     }
 
@@ -1005,116 +994,95 @@ void cpu_topology_func(int argc, char *argv[])
         printf("CPU%d\t %d\t %d\t %d\n",
                i, cpu_to_core[i], cpu_to_socket[i], cpu_to_node[i]);
     }
+    rc = 0;
 out:
     xc_hypercall_buffer_free(xc_handle, cpu_to_core);
     xc_hypercall_buffer_free(xc_handle, cpu_to_socket);
     xc_hypercall_buffer_free(xc_handle, cpu_to_node);
+    if ( rc )
+        exit(rc);
 }
 
 void set_sched_smt_func(int argc, char *argv[])
 {
-    int value, rc;
+    int value;
 
-    if (argc != 1){
-        show_help();
-        exit(-1);
+    if ( argc != 1 ) {
+        fprintf(stderr, "Missing or invalid argument(s)\n");
+        exit(EINVAL);
     }
 
-    if ( !strncmp(argv[0], "disable", sizeof("disable")) )
-    {
+    if ( !strcasecmp(argv[0], "disable") )
         value = 0;
-    }
-    else if ( !strncmp(argv[0], "enable", sizeof("enable")) )
-    {
+    else if ( !strcasecmp(argv[0], "enable") )
         value = 1;
-    }
     else
     {
-        show_help();
-        exit(-1);
+        fprintf(stderr, "Invalid argument: %s\n", argv[0]);
+        exit(EINVAL);
     }
 
-    rc = xc_set_sched_opt_smt(xc_handle, value);
-    printf("%s sched_smt_power_savings %s\n", argv[0],
-                    rc? "failed":"succeeded" );
-
-    return;
+    if ( !xc_set_sched_opt_smt(xc_handle, value) )
+        printf("%s sched_smt_power_savings succeeded\n", argv[0]);
+    else
+        fprintf(stderr, "%s sched_smt_power_savings failed (%d - %s)\n",
+                argv[0], errno, strerror(errno));
 }
 
 void set_vcpu_migration_delay_func(int argc, char *argv[])
 {
     int value;
-    int rc;
 
-    if (argc != 1){
-        show_help();
-        exit(-1);
+    if ( argc != 1 || (value = atoi(argv[0])) < 0 ) {
+        fprintf(stderr, "Missing or invalid argument(s)\n");
+        exit(EINVAL);
     }
 
-    value = atoi(argv[0]);
-
-    if (value < 0)
-    {
-        printf("Please try non-negative vcpu migration delay\n");
-        exit(-1);
-    }
-
-    rc = xc_set_vcpu_migration_delay(xc_handle, value);
-    printf("%s to set vcpu migration delay to %d us\n",
-                    rc? "Fail":"Succeed", value );
-
-    return;
+    if ( !xc_set_vcpu_migration_delay(xc_handle, value) )
+        printf("set vcpu migration delay to %d us succeeded\n", value);
+    else
+        fprintf(stderr, "set vcpu migration delay failed (%d - %s)\n",
+                errno, strerror(errno));
 }
 
 void get_vcpu_migration_delay_func(int argc, char *argv[])
 {
     uint32_t value;
-    int rc;
 
-    if (argc != 0){
-        show_help();
-        exit(-1);
-    }
+    if ( argc )
+        fprintf(stderr, "Ignoring argument(s)\n");
 
-    rc = xc_get_vcpu_migration_delay(xc_handle, &value);
-    if (!rc)
-    {
-        printf("Schduler vcpu migration delay is %d us\n", value);
-    }
+    if ( !xc_get_vcpu_migration_delay(xc_handle, &value) )
+        printf("Scheduler vcpu migration delay is %d us\n", value);
     else
-    {
-        printf("Failed to get scheduler vcpu migration delay, errno=%d\n", errno);
-    }
-
-    return;
+        fprintf(stderr,
+                "Failed to get scheduler vcpu migration delay (%d - %s)\n",
+                errno, strerror(errno));
 }
 
 void set_max_cstate_func(int argc, char *argv[])
 {
-    int value, rc;
+    int value;
 
     if ( argc != 1 || sscanf(argv[0], "%d", &value) != 1 || value < 0 )
     {
-        show_help();
-        exit(-1);
+        fprintf(stderr, "Missing or invalid argument(s)\n");
+        exit(EINVAL);
     }
 
-    rc = xc_set_cpuidle_max_cstate(xc_handle, (uint32_t)value);
-    printf("set max_cstate to C%d %s\n", value,
-                    rc? "failed":"succeeded" );
-
-    return;
+    if ( !xc_set_cpuidle_max_cstate(xc_handle, (uint32_t)value) )
+        printf("set max_cstate to C%d succeeded\n", value);
+    else
+        fprintf(stderr, "set max_cstate to C%d failed (%d - %s)\n",
+                value, errno, strerror(errno));
 }
 
 void enable_turbo_mode(int argc, char *argv[])
 {
     int cpuid = -1;
 
-    if ( argc > 0 && sscanf(argv[0], "%d", &cpuid) != 1 )
-        cpuid = -1;
-
-    if ( cpuid >= max_cpu_nr )
-        cpuid = -1;
+    if ( argc > 0 )
+        parse_cpuid(argv[0], &cpuid);
 
     if ( cpuid < 0 )
     {
@@ -1122,21 +1090,22 @@ void enable_turbo_mode(int argc, char *argv[])
          * only make effects on dbs governor */
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            xc_enable_turbo(xc_handle, i);
+            if ( xc_enable_turbo(xc_handle, i) )
+                fprintf(stderr,
+                        "[CPU%d] failed to enable turbo mode (%d - %s)\n",
+                        i, errno, strerror(errno));
     }
-    else
-        xc_enable_turbo(xc_handle, cpuid);
+    else if ( xc_enable_turbo(xc_handle, cpuid) )
+        fprintf(stderr, "failed to enable turbo mode (%d - %s)\n",
+                errno, strerror(errno));
 }
 
 void disable_turbo_mode(int argc, char *argv[])
 {
     int cpuid = -1;
 
-    if ( argc > 0 && sscanf(argv[0], "%d", &cpuid) != 1 )
-        cpuid = -1;
-
-    if ( cpuid >= max_cpu_nr )
-        cpuid = -1;
+    if ( argc > 0 )
+        parse_cpuid(argv[0], &cpuid);
 
     if ( cpuid < 0 )
     {
@@ -1144,10 +1113,14 @@ void disable_turbo_mode(int argc, char *argv[])
          * only make effects on dbs governor */
         int i;
         for ( i = 0; i < max_cpu_nr; i++ )
-            xc_disable_turbo(xc_handle, i);
+            if ( xc_disable_turbo(xc_handle, i) )
+                fprintf(stderr,
+                        "[CPU%d] failed to disable turbo mode (%d - %s)\n",
+                        i, errno, strerror(errno));
     }
-    else
-        xc_disable_turbo(xc_handle, cpuid);
+    else if ( xc_disable_turbo(xc_handle, cpuid) )
+        fprintf(stderr, "failed to disable turbo mode (%d - %s)\n",
+                errno, strerror(errno));
 }
 
 struct {
@@ -1191,15 +1164,17 @@ int main(int argc, char *argv[])
     if ( !xc_handle )
     {
         fprintf(stderr, "failed to get the handler\n");
-        return 0;
+        return EIO;
     }
 
     ret = xc_physinfo(xc_handle, &physinfo);
     if ( ret )
     {
-        fprintf(stderr, "failed to get the processor information\n");
+        ret = errno;
+        fprintf(stderr, "failed to get processor information (%d - %s)\n",
+                ret, strerror(ret));
         xc_interface_close(xc_handle);
-        return 0;
+        return ret;
     }
     max_cpu_nr = physinfo.nr_cpus;
 
@@ -1214,14 +1189,18 @@ int main(int argc, char *argv[])
         for ( i = 0; i < nr_matches; i++ )
             fprintf(stderr, " %s", main_options[matches_main_options[i]].name);
         fprintf(stderr, "\n");
+        ret = EINVAL;
     }
     else if ( nr_matches == 1 )
         /* dispatch to the corresponding function handler */
         main_options[matches_main_options[0]].function(argc - 2, argv + 2);
     else
+    {
         show_help();
+        ret = EINVAL;
+    }
 
     xc_interface_close(xc_handle);
-    return 0;
+    return ret;
 }
 
