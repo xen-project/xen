@@ -179,6 +179,10 @@ struct hvm_function_table {
 
     enum hvm_intblk (*nhvm_intr_blocked)(struct vcpu *v);
     void (*nhvm_domain_relinquish_resources)(struct domain *d);
+
+    /* Virtual interrupt delivery */
+    void (*update_eoi_exit_bitmap)(struct vcpu *v, u8 vector, u8 trig);
+    int (*virtual_intr_delivery_enabled)(void);
 };
 
 extern struct hvm_function_table hvm_funcs;

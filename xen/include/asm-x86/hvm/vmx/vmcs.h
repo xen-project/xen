@@ -108,6 +108,9 @@ struct arch_vmx_struct {
     unsigned int         host_msr_count;
     struct vmx_msr_entry *host_msr_area;
 
+    uint32_t             eoi_exitmap_changed;
+    uint64_t             eoi_exit_bitmap[4];
+
     unsigned long        host_cr0;
 
     /* Is the guest in real mode? */
@@ -181,6 +184,7 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_WBINVD_EXITING           0x00000040
 #define SECONDARY_EXEC_UNRESTRICTED_GUEST       0x00000080
 #define SECONDARY_EXEC_APIC_REGISTER_VIRT       0x00000100
+#define SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY    0x00000200
 #define SECONDARY_EXEC_PAUSE_LOOP_EXITING       0x00000400
 #define SECONDARY_EXEC_ENABLE_INVPCID           0x00001000
 extern u32 vmx_secondary_exec_control;
@@ -231,6 +235,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_secondary_exec_control & SECONDARY_EXEC_PAUSE_LOOP_EXITING)
 #define cpu_has_vmx_apic_reg_virt \
     (vmx_secondary_exec_control & SECONDARY_EXEC_APIC_REGISTER_VIRT)
+#define cpu_has_vmx_virtual_intr_delivery \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY)
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define VMX_INTR_SHADOW_STI             0x00000001
@@ -249,6 +255,7 @@ enum vmcs_field {
     GUEST_GS_SELECTOR               = 0x0000080a,
     GUEST_LDTR_SELECTOR             = 0x0000080c,
     GUEST_TR_SELECTOR               = 0x0000080e,
+    GUEST_INTR_STATUS               = 0x00000810,
     HOST_ES_SELECTOR                = 0x00000c00,
     HOST_CS_SELECTOR                = 0x00000c02,
     HOST_SS_SELECTOR                = 0x00000c04,
@@ -276,6 +283,14 @@ enum vmcs_field {
     APIC_ACCESS_ADDR_HIGH           = 0x00002015,
     EPT_POINTER                     = 0x0000201a,
     EPT_POINTER_HIGH                = 0x0000201b,
+    EOI_EXIT_BITMAP0                = 0x0000201c,
+    EOI_EXIT_BITMAP0_HIGH           = 0x0000201d,
+    EOI_EXIT_BITMAP1                = 0x0000201e,
+    EOI_EXIT_BITMAP1_HIGH           = 0x0000201f,
+    EOI_EXIT_BITMAP2                = 0x00002020,
+    EOI_EXIT_BITMAP2_HIGH           = 0x00002021,
+    EOI_EXIT_BITMAP3                = 0x00002022,
+    EOI_EXIT_BITMAP3_HIGH           = 0x00002023,
     GUEST_PHYSICAL_ADDRESS          = 0x00002400,
     GUEST_PHYSICAL_ADDRESS_HIGH     = 0x00002401,
     VMCS_LINK_POINTER               = 0x00002800,
@@ -396,6 +411,8 @@ int vmx_write_guest_msr(u32 msr, u64 val);
 int vmx_add_guest_msr(u32 msr);
 int vmx_add_host_load_msr(u32 msr);
 void vmx_vmcs_switch(struct vmcs_struct *from, struct vmcs_struct *to);
+void vmx_set_eoi_exit_bitmap(struct vcpu *v, u8 vector);
+void vmx_clear_eoi_exit_bitmap(struct vcpu *v, u8 vector);
 
 #endif /* ASM_X86_HVM_VMX_VMCS_H__ */
 

@@ -212,7 +212,7 @@ static void pt_timer_fn(void *data)
     pt_unlock(pt);
 }
 
-void pt_update_irq(struct vcpu *v)
+int pt_update_irq(struct vcpu *v)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
     struct periodic_time *pt, *temp, *earliest_pt = NULL;
@@ -245,7 +245,7 @@ void pt_update_irq(struct vcpu *v)
     if ( earliest_pt == NULL )
     {
         spin_unlock(&v->arch.hvm_vcpu.tm_lock);
-        return;
+        return -1;
     }
 
     earliest_pt->irq_issued = 1;
@@ -263,6 +263,17 @@ void pt_update_irq(struct vcpu *v)
         hvm_isa_irq_deassert(v->domain, irq);
         hvm_isa_irq_assert(v->domain, irq);
     }
+
+    /*
+     * If periodic timer interrut is handled by lapic, its vector in
+     * IRR is returned and used to set eoi_exit_bitmap for virtual
+     * interrupt delivery case. Otherwise return -1 to do nothing.  
+     */ 
+    if ( vlapic_accept_pic_intr(v) &&
+         (&v->domain->arch.hvm_domain)->vpic[0].int_output )
+        return -1;
+    else 
+        return pt_irq_vector(earliest_pt, hvm_intsrc_lapic);
 }
 
 static struct periodic_time *is_pt_irq(

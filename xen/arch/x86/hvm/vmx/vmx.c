@@ -1448,6 +1448,22 @@ static void vmx_set_info_guest(struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
+static void vmx_update_eoi_exit_bitmap(struct vcpu *v, u8 vector, u8 trig)
+{
+    if ( cpu_has_vmx_virtual_intr_delivery )
+    {
+        if (trig)
+            vmx_set_eoi_exit_bitmap(v, vector);
+        else
+            vmx_clear_eoi_exit_bitmap(v, vector);
+    }
+}
+
+static int vmx_virtual_intr_delivery_enabled(void)
+{
+    return cpu_has_vmx_virtual_intr_delivery;
+}
+
 static struct hvm_function_table __read_mostly vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -1493,7 +1509,9 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .nhvm_vmcx_guest_intercepts_trap = nvmx_intercepts_exception,
     .nhvm_vcpu_vmexit_trap = nvmx_vmexit_trap,
     .nhvm_intr_blocked    = nvmx_intr_blocked,
-    .nhvm_domain_relinquish_resources = nvmx_domain_relinquish_resources
+    .nhvm_domain_relinquish_resources = nvmx_domain_relinquish_resources,
+    .update_eoi_exit_bitmap = vmx_update_eoi_exit_bitmap,
+    .virtual_intr_delivery_enabled = vmx_virtual_intr_delivery_enabled
 };
 
 struct hvm_function_table * __init start_vmx(void)
@@ -2207,6 +2225,17 @@ static int vmx_handle_apic_write(void)
     return vlapic_apicv_write(current, offset);
 }
 
+/*
+ * When "Virtual Interrupt Delivery" is enabled, this function is used
+ * to handle EOI-induced VM exit
+ */
+void vmx_handle_EOI_induced_exit(struct vlapic *vlapic, int vector)
+{
+    ASSERT(cpu_has_vmx_virtual_intr_delivery);
+
+    vlapic_handle_EOI_induced_exit(vlapic, vector);
+}
+
 void vmx_vmexit_handler(struct cpu_user_regs *regs)
 {
     unsigned int exit_reason, idtv_info, intr_info = 0, vector = 0;
@@ -2599,6 +2628,16 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         if ( !vmx_handle_eoi_write() && !handle_mmio() )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         break;
+
+    case EXIT_REASON_EOI_INDUCED:
+    {
+        int vector;
+        exit_qualification = __vmread(EXIT_QUALIFICATION);
+        vector = exit_qualification & 0xff;
+
+        vmx_handle_EOI_induced_exit(vcpu_vlapic(current), vector);
+        break;
+    }
 
     case EXIT_REASON_IO_INSTRUCTION:
         exit_qualification = __vmread(EXIT_QUALIFICATION);

@@ -119,6 +119,7 @@ void vmx_update_cpu_exec_control(struct vcpu *v);
 #define EXIT_REASON_MCE_DURING_VMENTRY  41
 #define EXIT_REASON_TPR_BELOW_THRESHOLD 43
 #define EXIT_REASON_APIC_ACCESS         44
+#define EXIT_REASON_EOI_INDUCED         45
 #define EXIT_REASON_ACCESS_GDTR_OR_IDTR 46
 #define EXIT_REASON_ACCESS_LDTR_OR_TR   47
 #define EXIT_REASON_EPT_VIOLATION       48

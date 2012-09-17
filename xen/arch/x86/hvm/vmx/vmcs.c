@@ -90,6 +90,7 @@ static void __init vmx_display_features(void)
     P(cpu_has_vmx_msr_bitmap, "MSR direct-access bitmap");
     P(cpu_has_vmx_unrestricted_guest, "Unrestricted Guest");
     P(cpu_has_vmx_apic_reg_virt, "APIC Register Virtualization");
+    P(cpu_has_vmx_virtual_intr_delivery, "Virtual Interrupt Delivery");
 #undef P
 
     if ( !printed )
@@ -184,11 +185,12 @@ static int vmx_init_vmcs_config(void)
             opt |= SECONDARY_EXEC_UNRESTRICTED_GUEST;
 
         /*
-         * "APIC Register Virtualization"
+         * "APIC Register Virtualization" and "Virtual Interrupt Delivery"
          * can be set only when "use TPR shadow" is set
          */
         if ( _vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW )
-            opt |= SECONDARY_EXEC_APIC_REGISTER_VIRT;
+            opt |= SECONDARY_EXEC_APIC_REGISTER_VIRT |
+                   SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY;
 
 
         _vmx_secondary_exec_control = adjust_vmx_controls(
@@ -772,6 +774,22 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(IO_BITMAP_A, virt_to_maddr((char *)hvm_io_bitmap + 0));
     __vmwrite(IO_BITMAP_B, virt_to_maddr((char *)hvm_io_bitmap + PAGE_SIZE));
 
+    if ( cpu_has_vmx_virtual_intr_delivery )
+    {
+        /* EOI-exit bitmap */
+        v->arch.hvm_vmx.eoi_exit_bitmap[0] = (uint64_t)0;
+        __vmwrite(EOI_EXIT_BITMAP0, v->arch.hvm_vmx.eoi_exit_bitmap[0]);
+        v->arch.hvm_vmx.eoi_exit_bitmap[1] = (uint64_t)0;
+        __vmwrite(EOI_EXIT_BITMAP1, v->arch.hvm_vmx.eoi_exit_bitmap[1]);
+        v->arch.hvm_vmx.eoi_exit_bitmap[2] = (uint64_t)0;
+        __vmwrite(EOI_EXIT_BITMAP2, v->arch.hvm_vmx.eoi_exit_bitmap[2]);
+        v->arch.hvm_vmx.eoi_exit_bitmap[3] = (uint64_t)0;
+        __vmwrite(EOI_EXIT_BITMAP3, v->arch.hvm_vmx.eoi_exit_bitmap[3]);
+
+        /* Initialise Guest Interrupt Status (RVI and SVI) to 0 */
+        __vmwrite(GUEST_INTR_STATUS, 0);
+    }
+
     /* Host data selectors. */
     __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);
     __vmwrite(HOST_DS_SELECTOR, __HYPERVISOR_DS);
@@ -998,6 +1016,30 @@ int vmx_add_host_load_msr(u32 msr)
     __vmwrite(VM_EXIT_MSR_LOAD_COUNT, msr_count);
 
     return 0;
+}
+
+void vmx_set_eoi_exit_bitmap(struct vcpu *v, u8 vector)
+{
+    int index, offset, changed;
+
+    index = vector >> 6; 
+    offset = vector & 63;
+    changed = !test_and_set_bit(offset,
+                  (uint64_t *)&v->arch.hvm_vmx.eoi_exit_bitmap[index]);
+    if (changed)
+        set_bit(index, &v->arch.hvm_vmx.eoi_exitmap_changed);
+}
+
+void vmx_clear_eoi_exit_bitmap(struct vcpu *v, u8 vector)
+{
+    int index, offset, changed;
+
+    index = vector >> 6; 
+    offset = vector & 63;
+    changed = test_and_clear_bit(offset,
+                  (uint64_t *)&v->arch.hvm_vmx.eoi_exit_bitmap[index]);
+    if (changed)
+        set_bit(index, &v->arch.hvm_vmx.eoi_exitmap_changed);
 }
 
 int vmx_create_vmcs(struct vcpu *v)

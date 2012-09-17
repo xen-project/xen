@@ -206,6 +206,7 @@ void vmx_intr_assist(void)
     struct vcpu *v = current;
     unsigned int tpr_threshold = 0;
     enum hvm_intblk intblk;
+    int pt_vector = -1;
 
     /* Block event injection when single step with MTF. */
     if ( unlikely(v->arch.hvm_vcpu.single_step) )
@@ -216,7 +217,7 @@ void vmx_intr_assist(void)
     }
 
     /* Crank the handle on interrupt state. */
-    pt_update_irq(v);
+    pt_vector = pt_update_irq(v);
 
     do {
         intack = hvm_vcpu_has_pending_irq(v);
@@ -227,16 +228,34 @@ void vmx_intr_assist(void)
             goto out;
 
         intblk = hvm_interrupt_blocked(v, intack);
-        if ( intblk == hvm_intblk_tpr )
+        if ( cpu_has_vmx_virtual_intr_delivery )
+        {
+            /* Set "Interrupt-window exiting" for ExtINT */
+            if ( (intblk != hvm_intblk_none) &&
+                 ( (intack.source == hvm_intsrc_pic) ||
+                 ( intack.source == hvm_intsrc_vector) ) )
+            {
+                enable_intr_window(v, intack);
+                goto out;
+            }
+
+            if ( __vmread(VM_ENTRY_INTR_INFO) & INTR_INFO_VALID_MASK )
+            {
+                if ( (intack.source == hvm_intsrc_pic) ||
+                     (intack.source == hvm_intsrc_nmi) ||
+                     (intack.source == hvm_intsrc_mce) )
+                    enable_intr_window(v, intack);
+
+                goto out;
+            }
+        } else if ( intblk == hvm_intblk_tpr )
         {
             ASSERT(vlapic_enabled(vcpu_vlapic(v)));
             ASSERT(intack.source == hvm_intsrc_lapic);
             tpr_threshold = intack.vector >> 4;
             goto out;
-        }
-
-        if ( (intblk != hvm_intblk_none) ||
-             (__vmread(VM_ENTRY_INTR_INFO) & INTR_INFO_VALID_MASK) )
+        } else if ( (intblk != hvm_intblk_none) ||
+                    (__vmread(VM_ENTRY_INTR_INFO) & INTR_INFO_VALID_MASK) )
         {
             enable_intr_window(v, intack);
             goto out;
@@ -253,6 +272,44 @@ void vmx_intr_assist(void)
     {
         hvm_inject_hw_exception(TRAP_machine_check, HVM_DELIVER_NO_ERROR_CODE);
     }
+    else if ( cpu_has_vmx_virtual_intr_delivery &&
+              intack.source != hvm_intsrc_pic &&
+              intack.source != hvm_intsrc_vector )
+    {
+        unsigned long status = __vmread(GUEST_INTR_STATUS);
+
+       /*
+        * Set eoi_exit_bitmap for periodic timer interrup to cause EOI-induced VM
+        * exit, then pending periodic time interrups have the chance to be injected
+        * for compensation
+        */
+        if (pt_vector != -1)
+            vmx_set_eoi_exit_bitmap(v, pt_vector);
+
+        /* we need update the RVI field */
+        status &= ~(unsigned long)0x0FF;
+        status |= (unsigned long)0x0FF & 
+                    intack.vector;
+        __vmwrite(GUEST_INTR_STATUS, status);
+        if (v->arch.hvm_vmx.eoi_exitmap_changed) {
+#ifdef __i386__
+#define UPDATE_EOI_EXITMAP(v, e) {                             \
+        if (test_and_clear_bit(e, &v->arch.hvm_vmx.eoi_exitmap_changed)) {      \
+                __vmwrite(EOI_EXIT_BITMAP##e, v->arch.hvm_vmx.eoi_exit_bitmap[e]);    \
+                __vmwrite(EOI_EXIT_BITMAP##e##_HIGH, v.arch.hvm_vmx.eoi_exit_bitmap[e] >> 32);}}
+#else
+#define UPDATE_EOI_EXITMAP(v, e) {                             \
+        if (test_and_clear_bit(e, &v->arch.hvm_vmx.eoi_exitmap_changed)) {      \
+                __vmwrite(EOI_EXIT_BITMAP##e, v->arch.hvm_vmx.eoi_exit_bitmap[e]);}}
+#endif
+                UPDATE_EOI_EXITMAP(v, 0);
+                UPDATE_EOI_EXITMAP(v, 1);
+                UPDATE_EOI_EXITMAP(v, 2);
+                UPDATE_EOI_EXITMAP(v, 3);
+        }
+
+        pt_intr_post(v, intack);
+    }
     else
     {
         HVMTRACE_2D(INJ_VIRQ, intack.vector, /*fake=*/ 0);
@@ -262,11 +319,16 @@ void vmx_intr_assist(void)
 
     /* Is there another IRQ to queue up behind this one? */
     intack = hvm_vcpu_has_pending_irq(v);
-    if ( unlikely(intack.source != hvm_intsrc_none) )
-        enable_intr_window(v, intack);
+    if ( !cpu_has_vmx_virtual_intr_delivery ||
+         intack.source == hvm_intsrc_pic ||
+         intack.source == hvm_intsrc_vector )
+    {
+        if ( unlikely(intack.source != hvm_intsrc_none) )
+            enable_intr_window(v, intack);
+    }
 
  out:
-    if ( cpu_has_vmx_tpr_shadow )
+    if ( !cpu_has_vmx_virtual_intr_delivery && cpu_has_vmx_tpr_shadow )
         __vmwrite(TPR_THRESHOLD, tpr_threshold);
 }
 

@@ -145,6 +145,9 @@ int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
     if ( trig )
         vlapic_set_vector(vec, &vlapic->regs->data[APIC_TMR]);
 
+    if ( hvm_funcs.update_eoi_exit_bitmap )
+        hvm_funcs.update_eoi_exit_bitmap(vlapic_vcpu(vlapic), vec ,trig);
+
     /* We may need to wake up target vcpu, besides set pending bit here */
     return !vlapic_test_and_set_irr(vec, vlapic);
 }
@@ -404,6 +407,14 @@ void vlapic_EOI_set(struct vlapic *vlapic)
 
     vlapic_clear_vector(vector, &vlapic->regs->data[APIC_ISR]);
 
+    if ( vlapic_test_and_clear_vector(vector, &vlapic->regs->data[APIC_TMR]) )
+        vioapic_update_EOI(vlapic_domain(vlapic), vector);
+
+    hvm_dpci_msi_eoi(current->domain, vector);
+}
+
+void vlapic_handle_EOI_induced_exit(struct vlapic *vlapic, int vector)
+{
     if ( vlapic_test_and_clear_vector(vector, &vlapic->regs->data[APIC_TMR]) )
         vioapic_update_EOI(vlapic_domain(vlapic), vector);
 
@@ -1000,6 +1011,14 @@ void vlapic_adjust_i8259_target(struct domain *d)
     pt_adjust_global_vcpu_target(v);
 }
 
+int vlapic_virtual_intr_delivery_enabled(void)
+{
+    if ( hvm_funcs.virtual_intr_delivery_enabled )
+        return hvm_funcs.virtual_intr_delivery_enabled();
+    else
+        return 0;
+}
+
 int vlapic_has_pending_irq(struct vcpu *v)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
@@ -1012,6 +1031,9 @@ int vlapic_has_pending_irq(struct vcpu *v)
     if ( irr == -1 )
         return -1;
 
+    if ( vlapic_virtual_intr_delivery_enabled() )
+        return irr;
+
     isr = vlapic_find_highest_isr(vlapic);
     isr = (isr != -1) ? isr : 0;
     if ( (isr & 0xf0) >= (irr & 0xf0) )
@@ -1023,6 +1045,9 @@ int vlapic_has_pending_irq(struct vcpu *v)
 int vlapic_ack_pending_irq(struct vcpu *v, int vector)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
+
+    if ( vlapic_virtual_intr_delivery_enabled() )
+        return 1;
 
     vlapic_set_vector(vector, &vlapic->regs->data[APIC_ISR]);
     vlapic_clear_irr(vector, vlapic);

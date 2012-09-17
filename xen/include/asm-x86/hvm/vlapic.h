@@ -100,6 +100,7 @@ int vlapic_accept_pic_intr(struct vcpu *v);
 void vlapic_adjust_i8259_target(struct domain *d);
 
 void vlapic_EOI_set(struct vlapic *vlapic);
+void vlapic_handle_EOI_induced_exit(struct vlapic *vlapic, int vector);
 
 int vlapic_ipi(struct vlapic *vlapic, uint32_t icr_low, uint32_t icr_high);
 
