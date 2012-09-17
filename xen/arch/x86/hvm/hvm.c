@@ -1742,6 +1742,7 @@ int hvm_set_cr3(unsigned long value)
 {
     struct vcpu *v = current;
     struct page_info *page;
+    unsigned long old;
 
     if ( hvm_paging_enabled(v) && !paging_mode_hap(v->domain) &&
          (value != v->arch.hvm_vcpu.guest_cr[3]) )
@@ -1759,8 +1760,10 @@ int hvm_set_cr3(unsigned long value)
         HVM_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx", value);
     }
 
+    old=v->arch.hvm_vcpu.guest_cr[3];
     v->arch.hvm_vcpu.guest_cr[3] = value;
     paging_update_cr3(v);
+    hvm_memory_event_cr3(value, old);
     return X86EMUL_OKAY;
 
  bad_cr3:
@@ -1802,6 +1805,7 @@ int hvm_set_cr4(unsigned long value)
 
     v->arch.hvm_vcpu.guest_cr[4] = value;
     hvm_update_guest_cr(v, 4);
+    hvm_memory_event_cr4(value, old_cr);
 
     /*
      * Modifying CR4.{PSE,PAE,PGE,SMEP}, or clearing CR4.PCIDE
