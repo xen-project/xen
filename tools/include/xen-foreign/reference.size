@@ -3,12 +3,7 @@ structs                   |  x86_32  x86_64
 
 start_info                |    1112    1168
 trap_info                 |       8      16
-pt_fpreg                  |       -       -
 cpu_user_regs             |      68     200
-xen_ia64_boot_param       |       -       -
-ia64_tr_entry             |       -       -
-vcpu_tr_regs              |       -       -
-vcpu_guest_context_regs   |       -       -
 vcpu_guest_context        |    2800    5168
 arch_vcpu_info            |      24      16
 vcpu_time_info            |      32      32
