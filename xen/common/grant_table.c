@@ -708,9 +708,12 @@ __gnttab_map_grant_ref(
     }
     else if ( owner == rd || owner == dom_cow )
     {
-        if ( gnttab_host_mapping_get_page_type(op, ld, rd) &&
-             !get_page_type(pg, PGT_writable_page) )
-            goto could_not_pin;
+        if ( gnttab_host_mapping_get_page_type(op, ld, rd) )
+        {
+            if ( (owner == dom_cow) ||
+                 !get_page_type(pg, PGT_writable_page) )
+                goto could_not_pin;
+        }
 
         nr_gets++;
         if ( op->flags & GNTMAP_host_map )
