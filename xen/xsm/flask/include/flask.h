@@ -7,13 +7,14 @@
  */
 #define SECCLASS_XEN                                     1
 #define SECCLASS_DOMAIN                                  2
-#define SECCLASS_HVM                                     3
-#define SECCLASS_MMU                                     4
-#define SECCLASS_RESOURCE                                5
-#define SECCLASS_SHADOW                                  6
-#define SECCLASS_EVENT                                   7
-#define SECCLASS_GRANT                                   8
-#define SECCLASS_SECURITY                                9
+#define SECCLASS_DOMAIN2                                 3
+#define SECCLASS_HVM                                     4
+#define SECCLASS_MMU                                     5
+#define SECCLASS_RESOURCE                                6
+#define SECCLASS_SHADOW                                  7
+#define SECCLASS_EVENT                                   8
+#define SECCLASS_GRANT                                   9
+#define SECCLASS_SECURITY                                10
 
 /*
  * Security identifier indices for initial entities

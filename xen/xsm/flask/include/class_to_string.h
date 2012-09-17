@@ -5,6 +5,7 @@
     S_("null")
     S_("xen")
     S_("domain")
+    S_("domain2")
     S_("hvm")
     S_("mmu")
     S_("resource")

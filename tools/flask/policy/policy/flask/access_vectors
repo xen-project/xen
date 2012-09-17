@@ -73,6 +73,13 @@ class domain
 	set_virq_handler
 }
 
+class domain2
+{
+	relabelfrom
+	relabelto
+	relabelself
+}
+
 class hvm
 {
     sethvmc

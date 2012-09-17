@@ -169,7 +169,7 @@ delegate_devices(dom0_t, domU_t)
 ################################################################################
 
 # Domains must be declared using domain_type
-neverallow * ~domain_type:domain create;
+neverallow * ~domain_type:domain { create transition };
 
 # Resources must be declared using resource_type
 neverallow * ~resource_type:resource use;

@@ -573,6 +573,51 @@ static int flask_get_peer_sid(struct xen_flask_peersid *arg)
     return rv;
 }
 
+static int flask_relabel_domain(struct xen_flask_relabel *arg)
+{
+    int rc;
+    struct domain *d;
+    struct domain_security_struct *csec = current->domain->ssid;
+    struct domain_security_struct *dsec;
+    struct avc_audit_data ad;
+    AVC_AUDIT_DATA_INIT(&ad, NONE);
+
+    d = rcu_lock_domain_by_any_id(arg->domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    ad.sdom = current->domain;
+    ad.tdom = d;
+    dsec = d->ssid;
+
+    if ( arg->domid == DOMID_SELF )
+    {
+        rc = avc_has_perm(dsec->sid, arg->sid, SECCLASS_DOMAIN2, DOMAIN2__RELABELSELF, &ad);
+        if ( rc )
+            goto out;
+    }
+    else
+    {
+        rc = avc_has_perm(csec->sid, dsec->sid, SECCLASS_DOMAIN2, DOMAIN2__RELABELFROM, &ad);
+        if ( rc )
+            goto out;
+
+        rc = avc_has_perm(csec->sid, arg->sid, SECCLASS_DOMAIN2, DOMAIN2__RELABELTO, &ad);
+        if ( rc )
+            goto out;
+    }
+
+    rc = avc_has_perm(dsec->sid, arg->sid, SECCLASS_DOMAIN, DOMAIN__TRANSITION, &ad);
+    if ( rc )
+        goto out;
+
+    dsec->sid = arg->sid;
+
+ out:
+    rcu_unlock_domain(d);
+    return rc;
+}
+
 long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
 {
     xen_flask_op_t op;
@@ -678,6 +723,10 @@ long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
 
     case FLASK_GET_PEER_SID:
         rv = flask_get_peer_sid(&op.u.peersid);
+        break;
+
+    case FLASK_RELABEL_DOMAIN:
+        rv = flask_relabel_domain(&op.u.relabel);
         break;
 
     default:

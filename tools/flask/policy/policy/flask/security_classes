@@ -9,6 +9,7 @@
 
 class xen
 class domain
+class domain2
 class hvm
 class mmu
 class resource

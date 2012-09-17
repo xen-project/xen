@@ -63,6 +63,10 @@
 #define DOMAIN__SET_MISC_INFO                     0x40000000UL
 #define DOMAIN__SET_VIRQ_HANDLER                  0x80000000UL
 
+#define DOMAIN2__RELABELFROM                      0x00000001UL
+#define DOMAIN2__RELABELTO                        0x00000002UL
+#define DOMAIN2__RELABELSELF                      0x00000004UL
+
 #define HVM__SETHVMC                              0x00000001UL
 #define HVM__GETHVMC                              0x00000002UL
 #define HVM__SETPARAM                             0x00000004UL
