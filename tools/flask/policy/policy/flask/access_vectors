@@ -1,22 +1,7 @@
 #
-# Define common prefixes for access vectors
-#
-# common common_name { permission_name ... }
-
-#
-# Define a common prefix for file access vectors.
-#
-
-
-#
 # Define the access vectors.
 #
-# class class_name [ inherits common_name ] { permission_name ... }
-
-
-#
-# Define the access vector interpretation for file-related objects.
-#
+# class class_name { permission_name ... }
 
 class xen
 {

@@ -254,14 +254,6 @@ out_free_symtab:
 
 static int common_index(void *key, void *datum, void *datap)
 {
-    struct policydb *p;
-    struct common_datum *comdatum;
-
-    comdatum = datum;
-    p = datap;
-    if ( !comdatum->value || comdatum->value > p->p_commons.nprim )
-        return -EINVAL;
-    p->p_common_val_to_name[comdatum->value - 1] = key;
     return 0;
 }
 
@@ -382,8 +374,7 @@ static int (*index_f[SYM_NUM]) (void *key, void *datum, void *datap) =
 };
 
 /*
- * Define the common val_to_name array and the class
- * val_to_name and val_to_struct arrays in a policy
+ * Define the class val_to_name and val_to_struct arrays in a policy
  * database structure.
  *
  * Caller must clean up upon failure.
@@ -391,18 +382,6 @@ static int (*index_f[SYM_NUM]) (void *key, void *datum, void *datap) =
 static int policydb_index_classes(struct policydb *p)
 {
     int rc;
-
-    p->p_common_val_to_name =
-        xmalloc_array(char *, p->p_commons.nprim);
-    if ( !p->p_common_val_to_name )
-    {
-        rc = -ENOMEM;
-        goto out;
-    }
-
-    rc = hashtab_map(p->p_commons.table, common_index, p);
-    if ( rc )
-        goto out;
 
     p->class_val_to_struct =
         xmalloc_array(struct class_datum *, p->p_classes.nprim);
@@ -1200,26 +1179,9 @@ static int class_read(struct policydb *p, struct hashtab *h, void *fp)
 
     if ( len2 )
     {
-        cladatum->comkey = xmalloc_array(char, len2 + 1);
-        if ( !cladatum->comkey )
-        {
-            rc = -ENOMEM;
-            goto bad;
-        }
-        rc = next_entry(cladatum->comkey, fp, len2);
-        if ( rc < 0 )
-            goto bad;
-        cladatum->comkey[len2] = 0;
-
-        cladatum->comdatum = hashtab_search(p->p_commons.table,
-                            cladatum->comkey);
-        if ( !cladatum->comdatum )
-        {
-            printk(KERN_ERR "Flask:  unknown common %s\n",
-                   cladatum->comkey);
-            rc = -EINVAL;
-            goto bad;
-        }
+        printk(KERN_ERR "Flask:  classes with common prefixes are not supported\n");
+        rc = -EINVAL;
+        goto bad;
     }
     for ( i = 0; i < nel; i++ )
     {

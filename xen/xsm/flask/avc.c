@@ -45,28 +45,11 @@ static const char *class_to_string[] = {
 #undef S_
 };
 
-#define TB_(s) static const char * s [] = {
-#define TE_(s) };
-#define S_(s) s,
-#include "common_perm_to_string.h"
-#undef TB_
-#undef TE_
-#undef S_
-
-static const struct av_inherit av_inherit[] = {
-#define S_(c, i, b) { .tclass = c, .common_pts = common_##i##_perm_to_string, \
-                      .common_base = b },
-#include "av_inherit.h"
-#undef S_
-};
-
 const struct selinux_class_perm selinux_class_perm = {
     .av_perm_to_string = av_perm_to_string,
     .av_pts_len = ARRAY_SIZE(av_perm_to_string),
     .class_to_string = class_to_string,
     .cts_len = ARRAY_SIZE(class_to_string),
-    .av_inherit = av_inherit,
-    .av_inherit_len = ARRAY_SIZE(av_inherit)
 };
 
 #define AVC_CACHE_SLOTS            512
@@ -181,8 +164,6 @@ static void avc_printk(struct avc_dump_buf *buf, const char *fmt, ...)
  */
 static void avc_dump_av(struct avc_dump_buf *buf, u16 tclass, u32 av)
 {
-    const char **common_pts = NULL;
-    u32 common_base = 0;
     int i, i2, perm;
 
     if ( av == 0 )
@@ -191,29 +172,9 @@ static void avc_dump_av(struct avc_dump_buf *buf, u16 tclass, u32 av)
         return;
     }
 
-    for ( i = 0; i < ARRAY_SIZE(av_inherit); i++ )
-    {
-        if (av_inherit[i].tclass == tclass)
-        {
-            common_pts = av_inherit[i].common_pts;
-            common_base = av_inherit[i].common_base;
-            break;
-        }
-    }
-
     avc_printk(buf, " {");
     i = 0;
     perm = 1;
-    while ( perm < common_base )
-    {
-        if (perm & av)
-        {
-            avc_printk(buf, " %s", common_pts[i]);
-            av &= ~perm;
-        }
-        i++;
-        perm <<= 1;
-    }
 
     while ( i < sizeof(av) * 8 )
     {

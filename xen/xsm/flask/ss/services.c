@@ -1167,10 +1167,10 @@ int security_change_sid(u32 ssid, u32 tsid, u16 tclass, u32 *out_sid)
  */
 static int validate_classes(struct policydb *p)
 {
-    int i, j;
+    int i;
     struct class_datum *cladatum;
     struct perm_datum *perdatum;
-    u32 nprim, tmp, common_pts_len, perm_val, pol_val;
+    u32 nprim, perm_val, pol_val;
     u16 class_val;
     const struct selinux_class_perm *kdefs = &selinux_class_perm;
     const char *def_class, *def_perm, *pol_class;
@@ -1231,56 +1231,6 @@ static int validate_classes(struct policydb *p)
                    "Flask:  permission %s in class %s has incorrect value\n",
                    def_perm, pol_class);
             return -EINVAL;
-        }
-    }
-    for ( i = 0; i < kdefs->av_inherit_len; i++ )
-    {
-        class_val = kdefs->av_inherit[i].tclass;
-        if ( class_val > p->p_classes.nprim )
-            continue;
-        pol_class = p->p_class_val_to_name[class_val-1];
-        cladatum = hashtab_search(p->p_classes.table, pol_class);
-        BUG_ON( !cladatum );
-        if ( !cladatum->comdatum )
-        {
-            printk(KERN_ERR
-            "Flask:  class %s should have an inherits clause but does not\n",
-                   pol_class);
-            return -EINVAL;
-        }
-        tmp = kdefs->av_inherit[i].common_base;
-        common_pts_len = 0;
-        while ( !(tmp & 0x01) )
-        {
-            common_pts_len++;
-            tmp >>= 1;
-        }
-        perms = &cladatum->comdatum->permissions;
-        for ( j = 0; j < common_pts_len; j++ )
-        {
-            def_perm = kdefs->av_inherit[i].common_pts[j];
-            if ( j >= perms->nprim )
-            {
-                printk(KERN_INFO
-                "Flask:  permission %s in class %s not defined in policy\n",
-                       def_perm, pol_class);
-                return -EINVAL;
-            }
-            perdatum = hashtab_search(perms->table, def_perm);
-            if ( perdatum == NULL )
-            {
-                printk(KERN_ERR
-                       "Flask:  permission %s in class %s not found in policy\n",
-                       def_perm, pol_class);
-                return -EINVAL;
-            }
-            if ( perdatum->value != j + 1 )
-            {
-                printk(KERN_ERR
-                      "Flask:  permission %s in class %s has incorrect value\n",
-                       def_perm, pol_class);
-                return -EINVAL;
-            }
         }
     }
     return 0;
