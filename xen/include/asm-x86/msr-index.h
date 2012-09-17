@@ -291,6 +291,9 @@
 #define MSR_IA32_APICBASE_ENABLE	(1<<11)
 #define MSR_IA32_APICBASE_BASE		(0xfffff<<12)
 #define MSR_IA32_APICBASE_MSR           0x800
+#define MSR_IA32_APICTPR_MSR            0x808
+#define MSR_IA32_APICEOI_MSR            0x80b
+#define MSR_IA32_APICSELF_MSR           0x83f
 
 #define MSR_IA32_UCODE_WRITE		0x00000079
 #define MSR_IA32_UCODE_REV		0x0000008b

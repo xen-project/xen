@@ -405,7 +405,9 @@ enum vmcs_field {
 
 #define VMCS_VPID_WIDTH 16
 
-void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr);
+#define MSR_TYPE_R 1
+#define MSR_TYPE_W 2
+void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
 int vmx_read_guest_msr(u32 msr, u64 *val);
 int vmx_write_guest_msr(u32 msr, u64 val);
 int vmx_add_guest_msr(u32 msr);

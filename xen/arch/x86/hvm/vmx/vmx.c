@@ -1962,7 +1962,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
             for ( ; (rc == 0) && lbr->count; lbr++ )
                 for ( i = 0; (rc == 0) && (i < lbr->count); i++ )
                     if ( (rc = vmx_add_guest_msr(lbr->base + i)) == 0 )
-                        vmx_disable_intercept_for_msr(v, lbr->base + i);
+                        vmx_disable_intercept_for_msr(v, lbr->base + i, MSR_TYPE_R | MSR_TYPE_W);
         }
 
         if ( (rc < 0) ||

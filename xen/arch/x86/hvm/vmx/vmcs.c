@@ -643,7 +643,7 @@ static void vmx_set_host_env(struct vcpu *v)
               (unsigned long)&get_cpu_info()->guest_cpu_user_regs.error_code);
 }
 
-void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr)
+void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
 {
     unsigned long *msr_bitmap = v->arch.hvm_vmx.msr_bitmap;
 
@@ -658,14 +658,18 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr)
      */
     if ( msr <= 0x1fff )
     {
-        __clear_bit(msr, msr_bitmap + 0x000/BYTES_PER_LONG); /* read-low */
-        __clear_bit(msr, msr_bitmap + 0x800/BYTES_PER_LONG); /* write-low */
+        if (type & MSR_TYPE_R)
+            __clear_bit(msr, msr_bitmap + 0x000/BYTES_PER_LONG); /* read-low */
+        if (type & MSR_TYPE_W)
+            __clear_bit(msr, msr_bitmap + 0x800/BYTES_PER_LONG); /* write-low */
     }
     else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
     {
         msr &= 0x1fff;
-        __clear_bit(msr, msr_bitmap + 0x400/BYTES_PER_LONG); /* read-high */
-        __clear_bit(msr, msr_bitmap + 0xc00/BYTES_PER_LONG); /* write-high */
+        if (type & MSR_TYPE_R)
+            __clear_bit(msr, msr_bitmap + 0x400/BYTES_PER_LONG); /* read-high */
+        if (type & MSR_TYPE_W)
+            __clear_bit(msr, msr_bitmap + 0xc00/BYTES_PER_LONG); /* write-high */
     }
 }
 
@@ -761,13 +765,25 @@ static int construct_vmcs(struct vcpu *v)
         v->arch.hvm_vmx.msr_bitmap = msr_bitmap;
         __vmwrite(MSR_BITMAP, virt_to_maddr(msr_bitmap));
 
-        vmx_disable_intercept_for_msr(v, MSR_FS_BASE);
-        vmx_disable_intercept_for_msr(v, MSR_GS_BASE);
-        vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_CS);
-        vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_ESP);
-        vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_EIP);
+        vmx_disable_intercept_for_msr(v, MSR_FS_BASE, MSR_TYPE_R | MSR_TYPE_W);
+        vmx_disable_intercept_for_msr(v, MSR_GS_BASE, MSR_TYPE_R | MSR_TYPE_W);
+        vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_CS, MSR_TYPE_R | MSR_TYPE_W);
+        vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_ESP, MSR_TYPE_R | MSR_TYPE_W);
+        vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_EIP, MSR_TYPE_R | MSR_TYPE_W);
         if ( cpu_has_vmx_pat && paging_mode_hap(d) )
-            vmx_disable_intercept_for_msr(v, MSR_IA32_CR_PAT);
+            vmx_disable_intercept_for_msr(v, MSR_IA32_CR_PAT, MSR_TYPE_R | MSR_TYPE_W);
+        if ( cpu_has_vmx_apic_reg_virt )
+        {
+            int msr;
+            for (msr = MSR_IA32_APICBASE_MSR; msr <= MSR_IA32_APICBASE_MSR + 0xff; msr++)
+                vmx_disable_intercept_for_msr(v, msr, MSR_TYPE_R);
+        }
+        if ( cpu_has_vmx_virtual_intr_delivery )
+        {
+            vmx_disable_intercept_for_msr(v, MSR_IA32_APICTPR_MSR, MSR_TYPE_W);
+            vmx_disable_intercept_for_msr(v, MSR_IA32_APICEOI_MSR, MSR_TYPE_W);
+            vmx_disable_intercept_for_msr(v, MSR_IA32_APICSELF_MSR, MSR_TYPE_W);
+        }
     }
 
     /* I/O access bitmap. */
