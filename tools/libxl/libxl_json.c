@@ -275,7 +275,7 @@ static int json_object_append_to(libxl__gc *gc,
 
 void libxl__json_object_free(libxl__gc *gc, libxl__json_object *obj)
 {
-    int index = 0;
+    int idx = 0;
 
     if (obj == NULL)
         return;
@@ -287,8 +287,8 @@ void libxl__json_object_free(libxl__gc *gc, libxl__json_object *obj)
     case JSON_MAP: {
         libxl__json_map_node *node = NULL;
 
-        for (index = 0; index < obj->u.map->count; index++) {
-            if (flexarray_get(obj->u.map, index, (void**)&node) != 0)
+        for (idx = 0; idx < obj->u.map->count; idx++) {
+            if (flexarray_get(obj->u.map, idx, (void**)&node) != 0)
                 break;
             libxl__json_object_free(gc, node->obj);
             free(node->map_key);
@@ -302,8 +302,8 @@ void libxl__json_object_free(libxl__gc *gc, libxl__json_object *obj)
         libxl__json_object *node = NULL;
         break;
 
-        for (index = 0; index < obj->u.array->count; index++) {
-            if (flexarray_get(obj->u.array, index, (void**)&node) != 0)
+        for (idx = 0; idx < obj->u.array->count; idx++) {
+            if (flexarray_get(obj->u.array, idx, (void**)&node) != 0)
                 break;
             libxl__json_object_free(gc, node);
             node = NULL;
@@ -359,14 +359,14 @@ const libxl__json_object *libxl__json_map_get(const char *key,
                                           libxl__json_node_type expected_type)
 {
     flexarray_t *maps = NULL;
-    int index = 0;
+    int idx = 0;
 
     if (libxl__json_object_is_map(o)) {
         libxl__json_map_node *node = NULL;
 
         maps = o->u.map;
-        for (index = 0; index < maps->count; index++) {
-            if (flexarray_get(maps, index, (void**)&node) != 0)
+        for (idx = 0; idx < maps->count; idx++) {
+            if (flexarray_get(maps, idx, (void**)&node) != 0)
                 return NULL;
             if (strcmp(key, node->map_key) == 0) {
                 if (expected_type == JSON_ANY

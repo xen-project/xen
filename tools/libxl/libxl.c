@@ -665,7 +665,7 @@ out:
 libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm_out)
 {
     libxl_vminfo *ptr;
-    int index, i, ret;
+    int idx, i, ret;
     xc_domaininfo_t info[1024];
     int size = 1024;
 
@@ -678,15 +678,15 @@ libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm_out)
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "geting domain info list");
         return NULL;
     }
-    for (index = i = 0; i < ret; i++) {
+    for (idx = i = 0; i < ret; i++) {
         if (libxl_is_stubdom(ctx, info[i].domain, NULL))
             continue;
-        memcpy(&(ptr[index].uuid), info[i].handle, sizeof(xen_domain_handle_t));
-        ptr[index].domid = info[i].domain;
+        memcpy(&(ptr[idx].uuid), info[i].handle, sizeof(xen_domain_handle_t));
+        ptr[idx].domid = info[i].domain;
 
-        index++;
+        idx++;
     }
-    *nb_vm_out = index;
+    *nb_vm_out = idx;
     return ptr;
 }
 
@@ -3354,7 +3354,7 @@ int libxl_set_memory_target(libxl_ctx *ctx, uint32_t domid,
         int32_t target_memkb, int relative, int enforce)
 {
     GC_INIT(ctx);
-    int rc = 1, abort = 0;
+    int rc = 1, abort_transaction = 0;
     uint32_t memorykb = 0, videoram = 0;
     uint32_t current_target_memkb = 0, new_target_memkb = 0;
     char *memmax, *endptr, *videoram_s = NULL, *target = NULL;
@@ -3373,7 +3373,7 @@ retry_transaction:
         xs_transaction_end(ctx->xsh, t, 1);
         rc = libxl__fill_dom0_memory_info(gc, &current_target_memkb);
         if (rc < 0) {
-            abort = 1;
+            abort_transaction = 1;
             goto out;
         }
         goto retry_transaction;
@@ -3381,7 +3381,7 @@ retry_transaction:
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                 "cannot get target memory info from %s/memory/target\n",
                 dompath);
-        abort = 1;
+        abort_transaction = 1;
         goto out;
     } else {
         current_target_memkb = strtoul(target, &endptr, 10);
@@ -3389,7 +3389,7 @@ retry_transaction:
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                     "invalid memory target %s from %s/memory/target\n",
                     target, dompath);
-            abort = 1;
+            abort_transaction = 1;
             goto out;
         }
     }
@@ -3399,7 +3399,7 @@ retry_transaction:
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                 "cannot get memory info from %s/memory/static-max\n",
                 dompath);
-        abort = 1;
+        abort_transaction = 1;
         goto out;
     }
     memorykb = strtoul(memmax, &endptr, 10);
@@ -3407,7 +3407,7 @@ retry_transaction:
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                 "invalid max memory %s from %s/memory/static-max\n",
                 memmax, dompath);
-        abort = 1;
+        abort_transaction = 1;
         goto out;
     }
 
@@ -3422,7 +3422,7 @@ retry_transaction:
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
                 "memory_dynamic_max must be less than or equal to"
                 " memory_static_max\n");
-        abort = 1;
+        abort_transaction = 1;
         goto out;
     }
 
@@ -3430,7 +3430,7 @@ retry_transaction:
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
                 "new target %d for dom0 is below the minimum threshold\n",
                  new_target_memkb);
-        abort = 1;
+        abort_transaction = 1;
         goto out;
     }
     videoram_s = libxl__xs_read(gc, t, libxl__sprintf(gc,
@@ -3445,7 +3445,7 @@ retry_transaction:
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
                     "xc_domain_setmaxmem domid=%d memkb=%d failed "
                     "rc=%d\n", domid, memorykb + LIBXL_MAXMEM_CONSTANT, rc);
-            abort = 1;
+            abort_transaction = 1;
             goto out;
         }
     }
@@ -3458,7 +3458,7 @@ retry_transaction:
                 "xc_domain_set_pod_target domid=%d, memkb=%d "
                 "failed rc=%d\n", domid, new_target_memkb / 4,
                 rc);
-        abort = 1;
+        abort_transaction = 1;
         goto out;
     }
 
@@ -3466,7 +3466,7 @@ retry_transaction:
                 dompath), "%"PRIu32, new_target_memkb);
     rc = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
     if (rc != 1 || info.domain != domid) {
-        abort = 1;
+        abort_transaction = 1;
         goto out;
     }
     xcinfo2xlinfo(&info, &ptr);
@@ -3475,7 +3475,8 @@ retry_transaction:
             "%"PRIu32, new_target_memkb / 1024);
 
 out:
-    if (!xs_transaction_end(ctx->xsh, t, abort) && !abort)
+    if (!xs_transaction_end(ctx->xsh, t, abort_transaction)
+        && !abort_transaction)
         if (errno == EAGAIN)
             goto retry_transaction;
 

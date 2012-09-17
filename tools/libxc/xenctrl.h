@@ -235,11 +235,13 @@ typedef struct xc_hypercall_buffer xc_hypercall_buffer_t;
 /*
  * Returns the hypercall_buffer associated with a variable.
  */
-#define HYPERCALL_BUFFER(_name)                                                              \
-    ({  xc_hypercall_buffer_t _val1;                                                         \
-        typeof(XC__HYPERCALL_BUFFER_NAME(_name)) *_val2 = &XC__HYPERCALL_BUFFER_NAME(_name); \
-        (void)(&_val1 == _val2);                                                             \
-        (_val2)->param_shadow ? (_val2)->param_shadow : (_val2);                             \
+#define HYPERCALL_BUFFER(_name)                                 \
+    ({  xc_hypercall_buffer_t _hcbuf_buf1;                      \
+        typeof(XC__HYPERCALL_BUFFER_NAME(_name)) *_hcbuf_buf2 = \
+                &XC__HYPERCALL_BUFFER_NAME(_name);              \
+        (void)(&_hcbuf_buf1 == _hcbuf_buf2);                    \
+        (_hcbuf_buf2)->param_shadow ?                           \
+                (_hcbuf_buf2)->param_shadow : (_hcbuf_buf2);    \
      })
 
 #define HYPERCALL_BUFFER_INIT_NO_BOUNCE .dir = 0, .sz = 0, .ubuf = (void *)-1
@@ -273,11 +275,12 @@ typedef struct xc_hypercall_buffer xc_hypercall_buffer_t;
  * Get the hypercall buffer data pointer in a form suitable for use
  * directly as a hypercall argument.
  */
-#define HYPERCALL_BUFFER_AS_ARG(_name)                                             \
-    ({  xc_hypercall_buffer_t _val1;                                               \
-        typeof(XC__HYPERCALL_BUFFER_NAME(_name)) *_val2 = HYPERCALL_BUFFER(_name); \
-        (void)(&_val1 == _val2);                                                   \
-        (unsigned long)(_val2)->hbuf;                                              \
+#define HYPERCALL_BUFFER_AS_ARG(_name)                          \
+    ({  xc_hypercall_buffer_t _hcbuf_arg1;                      \
+        typeof(XC__HYPERCALL_BUFFER_NAME(_name)) *_hcbuf_arg2 = \
+                HYPERCALL_BUFFER(_name);                        \
+        (void)(&_hcbuf_arg1 == _hcbuf_arg2);                    \
+        (unsigned long)(_hcbuf_arg2)->hbuf;                     \
      })
 
 /*
@@ -285,12 +288,13 @@ typedef struct xc_hypercall_buffer xc_hypercall_buffer_t;
  * data pointer has been correctly allocated.
  */
 #undef set_xen_guest_handle
-#define set_xen_guest_handle(_hnd, _val)                                         \
-    do {                                                                         \
-        xc_hypercall_buffer_t _val1;                                             \
-        typeof(XC__HYPERCALL_BUFFER_NAME(_val)) *_val2 = HYPERCALL_BUFFER(_val); \
-        (void) (&_val1 == _val2);                                                 \
-        set_xen_guest_handle_raw(_hnd, (_val2)->hbuf);                           \
+#define set_xen_guest_handle(_hnd, _val)                        \
+    do {                                                        \
+        xc_hypercall_buffer_t _hcbuf_hnd1;                      \
+        typeof(XC__HYPERCALL_BUFFER_NAME(_val)) *_hcbuf_hnd2 =  \
+                HYPERCALL_BUFFER(_val);                         \
+        (void) (&_hcbuf_hnd1 == _hcbuf_hnd2);                   \
+        set_xen_guest_handle_raw(_hnd, (_hcbuf_hnd2)->hbuf);    \
     } while (0)
 
 /* Use with set_xen_guest_handle in place of NULL */

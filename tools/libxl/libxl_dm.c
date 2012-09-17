@@ -366,7 +366,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     }
     if (vnc) {
         int display = 0;
-        const char *listen = "127.0.0.1";
+        const char *addr = "127.0.0.1";
         char *vncarg = NULL;
 
         flexarray_append(dm_args, "-vnc");
@@ -374,16 +374,16 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
         if (vnc->display) {
             display = vnc->display;
             if (vnc->listen && strchr(vnc->listen, ':') == NULL) {
-                listen = vnc->listen;
+                addr = vnc->listen;
             }
         } else if (vnc->listen) {
-            listen = vnc->listen;
+            addr = vnc->listen;
         }
 
-        if (strchr(listen, ':') != NULL)
-            vncarg = libxl__sprintf(gc, "%s", listen);
+        if (strchr(addr, ':') != NULL)
+            vncarg = libxl__sprintf(gc, "%s", addr);
         else
-            vncarg = libxl__sprintf(gc, "%s:%d", listen, display);
+            vncarg = libxl__sprintf(gc, "%s:%d", addr, display);
         if (vnc->passwd && vnc->passwd[0]) {
             vncarg = libxl__sprintf(gc, "%s,password", vncarg);
         }

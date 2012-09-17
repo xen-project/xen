@@ -35,7 +35,7 @@ static void check_open_fds(const char *what)
 #ifdef __linux__
         size_t len;
         char path[PATH_MAX];
-        char link[PATH_MAX+1];
+        char linkpath[PATH_MAX+1];
 #endif
         flags = fcntl(i, F_GETFD);
         if ( flags == -1 ) {
@@ -52,11 +52,11 @@ static void check_open_fds(const char *what)
 
 #ifdef __linux__
         snprintf(path, PATH_MAX, "/proc/%d/fd/%d", getpid(), i);
-        len = readlink(path, link, PATH_MAX);
+        len = readlink(path, linkpath, PATH_MAX);
         if (len > 0) {
-            link[len] = '\0';
+            linkpath[len] = '\0';
             fprintf(stderr, "libxl: execing %s: fd %d is open to %s with flags %#x\n",
-                    what, i, link, flags);
+                    what, i, linkpath, flags);
         } else
 #endif
             fprintf(stderr, "libxl: execing %s: fd %d is open with flags %#x\n",

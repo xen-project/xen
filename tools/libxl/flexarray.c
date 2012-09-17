@@ -48,19 +48,19 @@ int flexarray_grow(flexarray_t *array, int extents)
     return 0;
 }
 
-int flexarray_set(flexarray_t *array, unsigned int index, void *ptr)
+int flexarray_set(flexarray_t *array, unsigned int idx, void *ptr)
 {
-    if (index >= array->size) {
+    if (idx >= array->size) {
         int newsize;
         if (!array->autogrow)
             return 1;
-        newsize = (array->size * 2 < index) ? index + 1 : array->size * 2;
+        newsize = (array->size * 2 < idx) ? idx + 1 : array->size * 2;
         if (flexarray_grow(array, newsize - array->size))
             return 2;
     }
-    if ( index + 1 > array->count )
-        array->count = index + 1;
-    array->data[index] = ptr;
+    if ( idx + 1 > array->count )
+        array->count = idx + 1;
+    array->data[idx] = ptr;
     return 0;
 }
 
@@ -92,11 +92,11 @@ int flexarray_vappend(flexarray_t *array, ...)
     return ret;
 }
 
-int flexarray_get(flexarray_t *array, int index, void **ptr)
+int flexarray_get(flexarray_t *array, int idx, void **ptr)
 {
-    if (index >= array->size)
+    if (idx >= array->size)
         return 1;
-    *ptr = array->data[index];
+    *ptr = array->data[idx];
     return 0;
 }
 

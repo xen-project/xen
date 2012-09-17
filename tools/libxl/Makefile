@@ -22,6 +22,12 @@ endif
 LIBXL_LIBS =
 LIBXL_LIBS = $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(LDLIBS_libblktapctl) $(PTYFUNCS_LIBS) $(LIBUUID_LIBS)
 
+CFLAGS_LIBXL += $(CFLAGS_libxenctrl)
+CFLAGS_LIBXL += $(CFLAGS_libxenguest)
+CFLAGS_LIBXL += $(CFLAGS_libxenstore)
+CFLAGS_LIBXL += $(CFLAGS_libblktapctl) 
+CFLAGS_LIBXL += -Wshadow
+
 CFLAGS += $(PTHREAD_CFLAGS)
 LDFLAGS += $(PTHREAD_LDFLAGS)
 LIBXL_LIBS += $(PTHREAD_LIBS)
@@ -71,7 +77,7 @@ LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_qmp.o libxl_event.o libxl_fork.o $(LIBXL_OBJS-y)
 LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
 
-$(LIBXL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl) -include $(XEN_ROOT)/tools/config.h
+$(LIBXL_OBJS): CFLAGS += $(CFLAGS_LIBXL) -include $(XEN_ROOT)/tools/config.h
 
 AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h _paths.h \
 	_libxl_save_msgs_callout.h _libxl_save_msgs_helper.h

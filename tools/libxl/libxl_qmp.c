@@ -171,7 +171,7 @@ static int qmp_register_vnc_callback(libxl__qmp_handler *qmp,
 {
     GC_INIT(qmp->ctx);
     const libxl__json_object *obj;
-    const char *listen, *port;
+    const char *addr, *port;
     int rc = -1;
 
     if (!libxl__json_object_is_map(o)) {
@@ -184,17 +184,17 @@ static int qmp_register_vnc_callback(libxl__qmp_handler *qmp,
     }
 
     obj = libxl__json_map_get("host", o, JSON_STRING);
-    listen = libxl__json_object_get_string(obj);
+    addr = libxl__json_object_get_string(obj);
     obj = libxl__json_map_get("service", o, JSON_STRING);
     port = libxl__json_object_get_string(obj);
 
-    if (!listen || !port) {
+    if (!addr || !port) {
         LIBXL__LOG(qmp->ctx, LIBXL__LOG_ERROR,
                    "Failed to retreive VNC connect information.");
         goto out;
     }
 
-    rc = qmp_write_domain_console_item(gc, qmp->domid, "vnc-listen", listen);
+    rc = qmp_write_domain_console_item(gc, qmp->domid, "vnc-listen", addr);
     if (!rc)
         rc = qmp_write_domain_console_item(gc, qmp->domid, "vnc-port", port);
 

@@ -167,7 +167,6 @@ static int libxl__device_pci_remove_xenstore(libxl__gc *gc, uint32_t domid, libx
     char *be_path, *num_devs_path, *num_devs, *xsdev, *tmp, *tmppath;
     int num, i, j;
     xs_transaction_t t;
-    unsigned int domain = 0, bus = 0, dev = 0, func = 0;
 
     be_path = libxl__sprintf(gc, "%s/backend/pci/%d/0", libxl__xs_get_dompath(gc, 0), domid);
     num_devs_path = libxl__sprintf(gc, "%s/num_devs", be_path);
@@ -188,6 +187,7 @@ static int libxl__device_pci_remove_xenstore(libxl__gc *gc, uint32_t domid, libx
     }
 
     for (i = 0; i < num; i++) {
+        unsigned int domain = 0, bus = 0, dev = 0, func = 0;
         xsdev = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/dev-%d", be_path, i));
         sscanf(xsdev, PCI_BDF, &domain, &bus, &dev, &func);
         if (domain == pcidev->domain && bus == pcidev->bus &&
