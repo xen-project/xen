@@ -191,6 +191,22 @@ void xl_ctx_alloc(void) {
     libxl_childproc_setmode(ctx, &childproc_hooks, 0);
 }
 
+static void xl_ctx_free(void)
+{
+    if (ctx) {
+        libxl_ctx_free(ctx);
+        ctx = NULL;
+    }
+    if (logger) {
+        xtl_logger_destroy((xentoollog_logger*)logger);
+        logger = NULL;
+    }
+    if (lockfile) {
+        free(lockfile);
+        lockfile = NULL;
+    }
+}
+
 int main(int argc, char **argv)
 {
     int opt = 0;
@@ -228,6 +244,8 @@ int main(int argc, char **argv)
 
     logger = xtl_createlogger_stdiostream(stderr, minmsglevel,  0);
     if (!logger) exit(1);
+
+    atexit(xl_ctx_free);
 
     xl_ctx_alloc();
 
@@ -274,8 +292,6 @@ int main(int argc, char **argv)
     }
 
  xit:
-    libxl_ctx_free(ctx);
-    xtl_logger_destroy((xentoollog_logger*)logger);
     return ret;
 }
 
