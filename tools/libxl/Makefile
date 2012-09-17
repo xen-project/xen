@@ -89,10 +89,13 @@ $(LIBXLU_OBJS): CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 
 CLIENTS = xl testidl libxl-save-helper
 
+CFLAGS_XL += $(CFLAGS_libxenlight)
+CFLAGS_XL += -Wshadow
+
 XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o xl_sxp.o
 $(XL_OBJS) _libxl.api-for-check: \
             CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
-$(XL_OBJS): CFLAGS += $(CFLAGS_libxenlight)
+$(XL_OBJS): CFLAGS += $(CFLAGS_XL)
 $(XL_OBJS): CFLAGS += -include $(XEN_ROOT)/tools/config.h # libxl_json.h needs it.
 
 SAVE_HELPER_OBJS = libxl_save_helper.o _libxl_save_msgs_helper.o

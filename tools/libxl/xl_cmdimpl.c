@@ -67,9 +67,7 @@ libxl_ctx *ctx;
 
 xlchild children[child_max];
 
-/* when we operate on a domain, it is this one: */
 #define INVALID_DOMID ~0
-static uint32_t domid = INVALID_DOMID;
 static const char *common_domname;
 static int fd_lock = -1;
 
@@ -197,8 +195,10 @@ static int cpupool_qualifier_to_cpupoolid(const char *p, uint32_t *poolid_r,
     return was_name ? libxl_name_to_cpupoolid(ctx, p, poolid_r) : 0;
 }
 
-static void find_domain(const char *p)
+static uint32_t find_domain(const char *p) __attribute__((warn_unused_result));
+static uint32_t find_domain(const char *p)
 {
+    uint32_t domid;
     int rc, was_name;
 
     rc = domain_qualifier_to_domid(p, &domid, &was_name);
@@ -207,6 +207,7 @@ static void find_domain(const char *p)
         exit(2);
     }
     common_domname = was_name ? p : libxl_domid_to_name(ctx, domid);
+    return domid;
 }
 
 static int vncviewer(uint32_t domid, int autopass)
@@ -1583,7 +1584,7 @@ static int preserve_domain(uint32_t *r_domid, libxl_event *event,
     return rc == 0 ? 1 : 0;
 }
 
-static int freemem(libxl_domain_build_info *b_info)
+static int freemem(uint32_t domid, libxl_domain_build_info *b_info)
 {
     int rc, retries = 3;
     uint32_t need_memkb, free_memkb;
@@ -1663,7 +1664,7 @@ static void autoconnect_console(libxl_ctx *ctx_ignored,
     _exit(1);
 }
 
-static int domain_wait_event(libxl_event **event_r)
+static int domain_wait_event(uint32_t domid, libxl_event **event_r)
 {
     int ret;
     for (;;) {
@@ -1697,8 +1698,10 @@ static void evdisable_disk_ejects(libxl_evgen_disk_eject **diskws,
     }
 }
 
-static int create_domain(struct domain_create *dom_info)
+static uint32_t create_domain(struct domain_create *dom_info)
 {
+    uint32_t domid = INVALID_DOMID;
+
     libxl_domain_config d_config;
 
     int debug = dom_info->debug;
@@ -1874,7 +1877,7 @@ start:
     if (rc < 0)
         goto error_out;
 
-    ret = freemem(&d_config.b_info);
+    ret = freemem(domid, &d_config.b_info);
     if (ret < 0) {
         fprintf(stderr, "failed to free memory for the domain\n");
         ret = ERROR_FAIL;
@@ -2024,7 +2027,7 @@ start:
     }
     while (1) {
         libxl_event *event;
-        ret = domain_wait_event(&event);
+        ret = domain_wait_event(domid, &event);
         if (ret) goto out;
 
         switch (event->type) {
@@ -2236,12 +2239,10 @@ static int def_getopt(int argc, char * const argv[], const char *optstring,
     return -1;
 }
 
-static int set_memory_max(const char *p, const char *mem)
+static int set_memory_max(uint32_t domid, const char *mem)
 {
     int64_t memorykb;
     int rc;
-
-    find_domain(p);
 
     memorykb = parse_mem_size_kb(mem);
     if (memorykb == -1) {
@@ -2256,17 +2257,18 @@ static int set_memory_max(const char *p, const char *mem)
 
 int main_memmax(int argc, char **argv)
 {
+    uint32_t domid;
     int opt = 0;
-    char *p = NULL, *mem;
+    char *mem;
     int rc;
 
     if ((opt = def_getopt(argc, argv, "", "mem-max", 2)) != -1)
         return opt;
 
-    p = argv[optind];
+    domid = find_domain(argv[optind]);
     mem = argv[optind + 1];
 
-    rc = set_memory_max(p, mem);
+    rc = set_memory_max(domid, mem);
     if (rc) {
         fprintf(stderr, "cannot set domid %d static max memory to : %s\n", domid, mem);
         return 1;
@@ -2275,11 +2277,9 @@ int main_memmax(int argc, char **argv)
     return 0;
 }
 
-static void set_memory_target(const char *p, const char *mem)
+static void set_memory_target(uint32_t domid, const char *mem)
 {
     long long int memorykb;
-
-    find_domain(p);
 
     memorykb = parse_mem_size_kb(mem);
     if (memorykb == -1)  {
@@ -2292,26 +2292,26 @@ static void set_memory_target(const char *p, const char *mem)
 
 int main_memset(int argc, char **argv)
 {
+    uint32_t domid;
     int opt = 0;
-    const char *p = NULL, *mem;
+    const char *mem;
 
     if ((opt = def_getopt(argc, argv, "", "mem-set", 2)) != -1)
         return opt;
 
-    p = argv[optind];
+    domid = find_domain(argv[optind]);
     mem = argv[optind + 1];
 
-    set_memory_target(p, mem);
+    set_memory_target(domid, mem);
     return 0;
 }
 
-static void cd_insert(const char *dom, const char *virtdev, char *phys)
+static void cd_insert(uint32_t domid, const char *virtdev, char *phys)
 {
     libxl_device_disk disk; /* we don't free disk's contents */
     char *buf = NULL;
     XLU_Config *config = 0;
 
-    find_domain(dom);
 
     if (asprintf(&buf, "vdev=%s,access=r,devtype=cdrom,target=%s",
                  virtdev, phys ? phys : "") < 0) {
@@ -2331,38 +2331,41 @@ static void cd_insert(const char *dom, const char *virtdev, char *phys)
 
 int main_cd_eject(int argc, char **argv)
 {
+    uint32_t domid;
     int opt = 0;
-    const char *p = NULL, *virtdev;
+    const char *virtdev;
 
     if ((opt = def_getopt(argc, argv, "", "cd-eject", 2)) != -1)
         return opt;
 
-    p = argv[optind];
+    domid = find_domain(argv[optind]);
     virtdev = argv[optind + 1];
 
-    cd_insert(p, virtdev, NULL);
+    cd_insert(domid, virtdev, NULL);
     return 0;
 }
 
 int main_cd_insert(int argc, char **argv)
 {
+    uint32_t domid;
     int opt = 0;
-    const char *p = NULL, *virtdev;
+    const char *virtdev;
     char *file = NULL; /* modified by cd_insert tokenising it */
 
     if ((opt = def_getopt(argc, argv, "", "cd-insert", 3)) != -1)
         return opt;
 
-    p = argv[optind];
+    domid = find_domain(argv[optind]);
     virtdev = argv[optind + 1];
     file = argv[optind + 2];
 
-    cd_insert(p, virtdev, file);
+    cd_insert(domid, virtdev, file);
     return 0;
 }
 
 int main_console(int argc, char **argv)
 {
+    uint32_t domid;
     int opt = 0, num = 0;
     libxl_console_type type = 0;
 
@@ -2386,7 +2389,7 @@ int main_console(int argc, char **argv)
         }
     }
 
-    find_domain(argv[optind]);
+    domid = find_domain(argv[optind]);
     if (!type)
         libxl_primary_console_exec(ctx, domid);
     else
@@ -2403,6 +2406,7 @@ int main_vncviewer(int argc, char **argv)
         {"help", 0, 0, 'h'},
         {0, 0, 0, 0}
     };
+    uint32_t domid;
     int opt, autopass = 0;
 
     while (1) {
@@ -2428,19 +2432,17 @@ int main_vncviewer(int argc, char **argv)
         return 2;
     }
 
-    find_domain(argv[optind]);
+    domid = find_domain(argv[optind]);
 
     if (vncviewer(domid, autopass))
         return 1;
     return 0;
 }
 
-static void pcilist(const char *dom)
+static void pcilist(uint32_t domid)
 {
     libxl_device_pci *pcidevs;
     int num, i;
-
-    find_domain(dom);
 
     pcidevs = libxl_device_pci_list(ctx, domid, &num);
     if (pcidevs == NULL)
@@ -2457,27 +2459,25 @@ static void pcilist(const char *dom)
 
 int main_pcilist(int argc, char **argv)
 {
+    uint32_t domid;
     int opt;
-    const char *domname = NULL;
 
     if ((opt = def_getopt(argc, argv, "", "pci-list", 1)) != -1)
         return opt;
 
-    domname = argv[optind];
+    domid = find_domain(argv[optind]);
 
-    pcilist(domname);
+    pcilist(domid);
     return 0;
 }
 
-static void pcidetach(const char *dom, const char *bdf, int force)
+static void pcidetach(uint32_t domid, const char *bdf, int force)
 {
     libxl_device_pci pcidev;
     XLU_Config *config;
 
-    find_domain(dom);
-
     libxl_device_pci_init(&pcidev);
-    
+
     config = xlu_cfg_init(stderr, "command line");
     if (!config) { perror("xlu_cfg_inig"); exit(-1); }
 
@@ -2496,9 +2496,10 @@ static void pcidetach(const char *dom, const char *bdf, int force)
 
 int main_pcidetach(int argc, char **argv)
 {
+    uint32_t domid;
     int opt;
     int force = 0;
-    const char *domname = NULL, *bdf = NULL;
+    const char *bdf = NULL;
 
     while ((opt = def_getopt(argc, argv, "f", "pci-detach", 2)) != -1) {
         switch (opt) {
@@ -2510,18 +2511,16 @@ int main_pcidetach(int argc, char **argv)
         }
     }
 
-    domname = argv[optind];
+    domid = find_domain(argv[optind]);
     bdf = argv[optind + 1];
 
-    pcidetach(domname, bdf, force);
+    pcidetach(domid, bdf, force);
     return 0;
 }
-static void pciattach(const char *dom, const char *bdf, const char *vs)
+static void pciattach(uint32_t domid, const char *bdf, const char *vs)
 {
     libxl_device_pci pcidev;
     XLU_Config *config;
-
-    find_domain(dom);
 
     libxl_device_pci_init(&pcidev);
 
@@ -2540,19 +2539,20 @@ static void pciattach(const char *dom, const char *bdf, const char *vs)
 
 int main_pciattach(int argc, char **argv)
 {
+    uint32_t domid;
     int opt;
-    const char *domname = NULL, *bdf = NULL, *vs = NULL;
+    const char *bdf = NULL, *vs = NULL;
 
     if ((opt = def_getopt(argc, argv, "", "pci-attach", 2)) != -1)
         return opt;
 
-    domname = argv[optind];
+    domid = find_domain(argv[optind]);
     bdf = argv[optind + 1];
 
     if (optind + 1 < argc)
         vs = argv[optind + 2];
 
-    pciattach(domname, bdf, vs);
+    pciattach(domid, bdf, vs);
     return 0;
 }
 
@@ -2664,22 +2664,20 @@ int main_pciassignable_remove(int argc, char **argv)
     return 0;
 }
 
-static void pause_domain(const char *p)
+static void pause_domain(uint32_t domid)
 {
-    find_domain(p);
     libxl_domain_pause(ctx, domid);
 }
 
-static void unpause_domain(const char *p)
+static void unpause_domain(uint32_t domid)
 {
-    find_domain(p);
     libxl_domain_unpause(ctx, domid);
 }
 
-static void destroy_domain(const char *p)
+static void destroy_domain(uint32_t domid)
 {
     int rc;
-    find_domain(p);
+
     if (domid == 0) {
         fprintf(stderr, "Cannot destroy privileged domain 0.\n\n");
         exit(-1);
@@ -2688,13 +2686,12 @@ static void destroy_domain(const char *p)
     if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n",rc); exit(-1); }
 }
 
-static void shutdown_domain(const char *p, int wait_for_it,
+static void shutdown_domain(uint32_t domid, int wait_for_it,
                             int fallback_trigger)
 {
     int rc;
     libxl_event *event;
 
-    find_domain(p);
     rc=libxl_domain_shutdown(ctx, domid);
     if (rc == ERROR_NOPARAVIRT) {
         if (fallback_trigger) {
@@ -2721,7 +2718,7 @@ static void shutdown_domain(const char *p, int wait_for_it,
         }
 
         for (;;) {
-            rc = domain_wait_event(&event);
+            rc = domain_wait_event(domid, &event);
             if (rc) exit(-1);
 
             switch (event->type) {
@@ -2748,10 +2745,10 @@ static void shutdown_domain(const char *p, int wait_for_it,
     }
 }
 
-static void reboot_domain(const char *p, int fallback_trigger)
+static void reboot_domain(uint32_t domid, int fallback_trigger)
 {
     int rc;
-    find_domain(p);
+
     rc=libxl_domain_reboot(ctx, domid);
     if (rc == ERROR_NOPARAVIRT) {
         if (fallback_trigger) {
@@ -2808,7 +2805,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         if (default_output_format == OUTPUT_FORMAT_JSON)
             s = printf_info_one_json(hand, info[i].domid, &d_config);
         else
-            printf_info_sexp(domid, &d_config);
+            printf_info_sexp(info[i].domid, &d_config);
         libxl_domain_config_dispose(&d_config);
         free(data);
         free(config_source);
@@ -2910,14 +2907,12 @@ static void list_vm(void)
     libxl_vminfo_list_free(info, nb_vm);
 }
 
-static void save_domain_core_begin(const char *domain_spec,
+static void save_domain_core_begin(uint32_t domid,
                                    const char *override_config_file,
                                    uint8_t **config_data_r,
                                    int *config_len_r)
 {
     int rc;
-
-    find_domain(domain_spec);
 
     /* configuration file in optional data: */
 
@@ -2975,14 +2970,15 @@ static void save_domain_core_writeconfig(int fd, const char *source,
             hdr.optional_data_len);
 }
 
-static int save_domain(const char *p, const char *filename, int checkpoint,
+static int save_domain(uint32_t domid, const char *filename, int checkpoint,
                 const char *override_config_file)
 {
     int fd;
     uint8_t *config_data;
     int config_len;
 
-    save_domain_core_begin(p, override_config_file, &config_data, &config_len);
+    save_domain_core_begin(domid, override_config_file,
+                           &config_data, &config_len);
 
     if (!config_len) {
         fputs(" Savefile will not contain xl domain config\n", stderr);
@@ -3152,7 +3148,7 @@ static void migrate_do_preamble(int send_fd, int recv_fd, pid_t child,
 
 }
 
-static void migrate_domain(const char *domain_spec, const char *rune,
+static void migrate_domain(uint32_t domid, const char *rune,
                            const char *override_config_file)
 {
     pid_t child = -1;
@@ -3163,7 +3159,7 @@ static void migrate_domain(const char *domain_spec, const char *rune,
     uint8_t *config_data;
     int config_len;
 
-    save_domain_core_begin(domain_spec, override_config_file,
+    save_domain_core_begin(domid, override_config_file,
                            &config_data, &config_len);
 
     if (!config_len) {
@@ -3290,10 +3286,10 @@ static void migrate_domain(const char *domain_spec, const char *rune,
     exit(-ERROR_BADFAIL);
 }
 
-static void core_dump_domain(const char *domain_spec, const char *filename)
+static void core_dump_domain(uint32_t domid, const char *filename)
 {
     int rc;
-    find_domain(domain_spec);
+
     rc=libxl_domain_core_dump(ctx, domid, filename, NULL);
     if (rc) { fprintf(stderr,"core dump failed (rc=%d)\n",rc);exit(-1); }
 }
@@ -3301,6 +3297,7 @@ static void core_dump_domain(const char *domain_spec, const char *filename)
 static void migrate_receive(int debug, int daemonize, int monitor,
                             int send_fd, int recv_fd, int remus)
 {
+    uint32_t domid;
     int rc, rc2;
     char rc_buf;
     char *migration_domname;
@@ -3331,6 +3328,8 @@ static void migrate_receive(int debug, int daemonize, int monitor,
                 " (code %d).\n", rc);
         exit(-rc);
     }
+
+    domid = rc;
 
     if (remus) {
         /* If we are here, it means that the sender (primary) has crashed.
@@ -3550,7 +3549,8 @@ int main_migrate_receive(int argc, char **argv)
 
 int main_save(int argc, char **argv)
 {
-    const char *filename, *p;
+    uint32_t domid;
+    const char *filename;
     const char *config_filename = NULL;
     int checkpoint = 0;
     int opt;
@@ -3570,18 +3570,18 @@ int main_save(int argc, char **argv)
         return 2;
     }
 
-    p = argv[optind];
+    domid = find_domain(argv[optind]);
     filename = argv[optind + 1];
     if ( argc - optind >= 3 )
         config_filename = argv[optind + 2];
 
-    save_domain(p, filename, checkpoint, config_filename);
+    save_domain(domid, filename, checkpoint, config_filename);
     return 0;
 }
 
 int main_migrate(int argc, char **argv)
 {
-    const char *p = NULL;
+    uint32_t domid;
     const char *config_filename = NULL;
     const char *ssh_command = "ssh";
     char *rune = NULL;
@@ -3611,7 +3611,7 @@ int main_migrate(int argc, char **argv)
         }
     }
 
-    p = argv[optind];
+    domid = find_domain(argv[optind]);
     host = argv[optind + 1];
 
     if (!ssh_command[0]) {
@@ -3624,7 +3624,7 @@ int main_migrate(int argc, char **argv)
             return 1;
     }
 
-    migrate_domain(p, rune, config_filename);
+    migrate_domain(domid, rune, config_filename);
     return 0;
 }
 
@@ -3635,7 +3635,7 @@ int main_dump_core(int argc, char **argv)
     if ((opt = def_getopt(argc, argv, "", "dump-core", 2)) != -1)
         return opt;
 
-    core_dump_domain(argv[optind], argv[optind + 1]);
+    core_dump_domain(find_domain(argv[optind]), argv[optind + 1]);
     return 0;
 }
 
@@ -3646,7 +3646,7 @@ int main_pause(int argc, char **argv)
     if ((opt = def_getopt(argc, argv, "", "pause", 1)) != -1)
         return opt;
 
-    pause_domain(argv[optind]);
+    pause_domain(find_domain(argv[optind]));
 
     return 0;
 }
@@ -3658,7 +3658,7 @@ int main_unpause(int argc, char **argv)
     if ((opt = def_getopt(argc, argv, "", "unpause", 1)) != -1)
         return opt;
 
-    unpause_domain(argv[optind]);
+    unpause_domain(find_domain(argv[optind]));
 
     return 0;
 }
@@ -3670,7 +3670,7 @@ int main_destroy(int argc, char **argv)
     if ((opt = def_getopt(argc, argv, "", "destroy", 1)) != -1)
         return opt;
 
-    destroy_domain(argv[optind]);
+    destroy_domain(find_domain(argv[optind]));
     return 0;
 }
 
@@ -3693,7 +3693,7 @@ int main_shutdown(int argc, char **argv)
         }
     }
 
-    shutdown_domain(argv[optind], wait_for_it, fallback_trigger);
+    shutdown_domain(find_domain(argv[optind]), wait_for_it, fallback_trigger);
     return 0;
 }
 
@@ -3712,7 +3712,7 @@ int main_reboot(int argc, char **argv)
         }
     }
 
-    reboot_domain(argv[optind], fallback_trigger);
+    reboot_domain(find_domain(argv[optind]), fallback_trigger);
     return 0;
 }
 
@@ -3766,7 +3766,7 @@ int main_list(int argc, char **argv)
         }
         info_free = info;
     } else if (optind == argc-1) {
-        find_domain(argv[optind]);
+        uint32_t domid = find_domain(argv[optind]);
         rc = libxl_domain_info(ctx, &info_buf, domid);
         if (rc == ERROR_INVAL) {
             fprintf(stderr, "Error: Domain \'%s\' does not exist.\n",
@@ -3915,6 +3915,7 @@ int main_create(int argc, char **argv)
 
 int main_config_update(int argc, char **argv)
 {
+    uint32_t domid;
     const char *filename = NULL;
     char *p;
     char extra_config[1024];
@@ -3936,7 +3937,7 @@ int main_config_update(int argc, char **argv)
         exit(1);
     }
 
-    find_domain(argv[1]);
+    domid = find_domain(argv[1]);
     argc--; argv++;
 
     if (argv[1] && argv[1][0] != '-' && !strchr(argv[1], '=')) {
@@ -4027,11 +4028,9 @@ int main_config_update(int argc, char **argv)
     return 0;
 }
 
-static void button_press(const char *p, const char *b)
+static void button_press(uint32_t domid, const char *b)
 {
     libxl_trigger trigger;
-
-    find_domain(p);
 
     if (!strcmp(b, "power")) {
         trigger = LIBXL_TRIGGER_POWER;
@@ -4055,7 +4054,7 @@ int main_button_press(int argc, char **argv)
     if ((opt = def_getopt(argc, argv, "", "button-press", 2)) != -1)
         return opt;
 
-    button_press(argv[optind], argv[optind + 1]);
+    button_press(find_domain(argv[optind]), argv[optind + 1]);
 
     return 0;
 }
@@ -4181,11 +4180,7 @@ static void vcpulist(int argc, char **argv)
         libxl_dominfo_list_free(dominfo, nb_domain);
     } else {
         for (; argc > 0; ++argv, --argc) {
-            if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
-                fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
-                goto vcpulist_out;
-            }
-
+            uint32_t domid = find_domain(*argv);
             print_domain_vcpuinfo(domid, physinfo.nr_cpus);
         }
     }
@@ -4204,7 +4199,7 @@ int main_vcpulist(int argc, char **argv)
     return 0;
 }
 
-static void vcpupin(const char *d, const char *vcpu, char *cpu)
+static void vcpupin(uint32_t domid, const char *vcpu, char *cpu)
 {
     libxl_vcpuinfo *vcpuinfo;
     libxl_bitmap cpumap;
@@ -4221,8 +4216,6 @@ static void vcpupin(const char *d, const char *vcpu, char *cpu)
         }
         vcpuid = -1;
     }
-
-    find_domain(d);
 
     if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
         goto vcpupin_out;
@@ -4263,11 +4256,11 @@ int main_vcpupin(int argc, char **argv)
     if ((opt = def_getopt(argc, argv, "", "vcpu-pin", 3)) != -1)
         return opt;
 
-    vcpupin(argv[optind], argv[optind+1] , argv[optind+2]);
+    vcpupin(find_domain(argv[optind]), argv[optind+1] , argv[optind+2]);
     return 0;
 }
 
-static void vcpuset(const char *d, const char* nr_vcpus)
+static void vcpuset(uint32_t domid, const char* nr_vcpus)
 {
     char *endptr;
     unsigned int max_vcpus, i;
@@ -4278,8 +4271,6 @@ static void vcpuset(const char *d, const char* nr_vcpus)
         fprintf(stderr, "Error: Invalid argument.\n");
         return;
     }
-
-    find_domain(d);
 
     if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
         fprintf(stderr, "libxl_cpu_bitmap_alloc failed\n");
@@ -4301,7 +4292,7 @@ int main_vcpuset(int argc, char **argv)
     if ((opt = def_getopt(argc, argv, "", "vcpu-set", 2)) != -1)
         return opt;
 
-    vcpuset(argv[optind], argv[optind+1]);
+    vcpuset(find_domain(argv[optind]), argv[optind+1]);
     return 0;
 }
 
@@ -4538,7 +4529,7 @@ int main_sharing(int argc, char **argv)
         }
         info_free = info;
     } else if (optind == argc-1) {
-        find_domain(argv[optind]);
+        uint32_t domid = find_domain(argv[optind]);
         rc = libxl_domain_info(ctx, &info_buf, domid);
         if (rc == ERROR_INVAL) {
             fprintf(stderr, "Error: Domain \'%s\' does not exist.\n",
@@ -4898,7 +4889,7 @@ int main_sched_credit(int argc, char **argv)
                                     sched_credit_pool_output,
                                     cpupool);
     } else {
-        find_domain(dom);
+        uint32_t domid = find_domain(dom);
 
         if (!opt_w && !opt_c) { /* output credit scheduler info */
             sched_credit_domain_output(-1);
@@ -4975,7 +4966,7 @@ int main_sched_credit2(int argc, char **argv)
                                     sched_default_pool_output,
                                     cpupool);
     } else {
-        find_domain(dom);
+        uint32_t domid = find_domain(dom);
 
         if (!opt_w) { /* output credit2 scheduler info */
             sched_credit2_domain_output(-1);
@@ -5078,7 +5069,7 @@ int main_sched_sedf(int argc, char **argv)
                                     sched_default_pool_output,
                                     cpupool);
     } else {
-        find_domain(dom);
+        uint32_t domid = find_domain(dom);
 
         if (!opt_p && !opt_s && !opt_l && !opt_e && !opt_w) {
             /* output sedf scheduler info */
@@ -5118,6 +5109,7 @@ int main_sched_sedf(int argc, char **argv)
 
 int main_domid(int argc, char **argv)
 {
+    uint32_t domid;
     int opt;
     const char *domname = NULL;
 
@@ -5138,6 +5130,7 @@ int main_domid(int argc, char **argv)
 
 int main_domname(int argc, char **argv)
 {
+    uint32_t domid;
     int opt;
     char *domname = NULL;
     char *endptr = NULL;
@@ -5166,18 +5159,17 @@ int main_domname(int argc, char **argv)
 
 int main_rename(int argc, char **argv)
 {
+    uint32_t domid;
     int opt;
-    const char *dom;
-    const char *new_name;
+    const char *dom, *new_name;
 
     if ((opt = def_getopt(argc, argv, "", "rename", 2)) != -1)
         return opt;
 
     dom = argv[optind++];
-
-    find_domain(dom);
     new_name = argv[optind];
 
+    domid = find_domain(dom);
     if (libxl_domain_rename(ctx, domid, common_domname, new_name)) {
         fprintf(stderr, "Can't rename domain '%s'.\n", dom);
         return 1;
@@ -5188,9 +5180,9 @@ int main_rename(int argc, char **argv)
 
 int main_trigger(int argc, char **argv)
 {
+    uint32_t domid;
     int opt;
     char *endptr = NULL;
-    const char *dom = NULL;
     int vcpuid = 0;
     const char *trigger_name = NULL;
     libxl_trigger trigger;
@@ -5198,9 +5190,7 @@ int main_trigger(int argc, char **argv)
     if ((opt = def_getopt(argc, argv, "", "trigger", 2)) != -1)
         return opt;
 
-    dom = argv[optind++];
-
-    find_domain(dom);
+    domid = find_domain(argv[optind++]);
 
     trigger_name = argv[optind++];
     if (libxl_trigger_from_string(trigger_name, &trigger)) {
@@ -5223,16 +5213,14 @@ int main_trigger(int argc, char **argv)
 
 int main_sysrq(int argc, char **argv)
 {
+    uint32_t domid;
     int opt;
     const char *sysrq = NULL;
-    const char *dom = NULL;
 
     if ((opt = def_getopt(argc, argv, "", "sysrq", 2)) != -1)
         return opt;
 
-    dom = argv[optind++];
-
-    find_domain(dom);
+    domid = find_domain(argv[optind++]);
 
     sysrq = argv[optind];
 
@@ -5306,6 +5294,7 @@ int main_top(int argc, char **argv)
 
 int main_networkattach(int argc, char **argv)
 {
+    uint32_t domid;
     int opt;
     libxl_device_nic nic;
     XLU_Config *config = 0;
@@ -5322,10 +5311,7 @@ int main_networkattach(int argc, char **argv)
         return 0;
     }
 
-    if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
-        return 1;
-    }
+    domid = find_domain(argv[optind]);
 
     config= xlu_cfg_init(stderr, "command line");
     if (!config) {
@@ -5411,10 +5397,7 @@ int main_networklist(int argc, char **argv)
     printf("%-3s %-2s %-17s %-6s %-5s %-6s %5s/%-5s %-30s\n",
            "Idx", "BE", "Mac Addr.", "handle", "state", "evt-ch", "tx-", "rx-ring-ref", "BE-path");
     for (argv += optind, argc -= optind; argc > 0; --argc, ++argv) {
-        if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
-            fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
-            continue;
-        }
+        uint32_t domid = find_domain(*argv);
         nics = libxl_device_nic_list(ctx, domid, &nb);
         if (!nics) {
             continue;
@@ -5440,16 +5423,14 @@ int main_networklist(int argc, char **argv)
 
 int main_networkdetach(int argc, char **argv)
 {
+    uint32_t domid;
     int opt;
     libxl_device_nic nic;
 
     if ((opt = def_getopt(argc, argv, "", "network-detach", 2)) != -1)
         return opt;
 
-    if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
-        return 1;
-    }
+    domid = find_domain(argv[optind]);
 
     if (!strchr(argv[optind+1], ':')) {
         if (libxl_devid_to_device_nic(ctx, domid, atoi(argv[optind+1]), &nic)) {
@@ -5518,6 +5499,7 @@ int main_blocklist(int argc, char **argv)
     printf("%-5s %-3s %-6s %-5s %-6s %-8s %-30s\n",
            "Vdev", "BE", "handle", "state", "evt-ch", "ring-ref", "BE-path");
     for (argv += optind, argc -= optind; argc > 0; --argc, ++argv) {
+        uint32_t domid;
         if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
             fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
             continue;
@@ -5543,16 +5525,15 @@ int main_blocklist(int argc, char **argv)
 
 int main_blockdetach(int argc, char **argv)
 {
+    uint32_t domid;
     int opt, rc = 0;
     libxl_device_disk disk;
 
     if ((opt = def_getopt(argc, argv, "", "block-detach", 2)) != -1)
         return opt;
 
-    if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
-        fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
-        return 1;
-    }
+    domid = find_domain(argv[optind]);
+
     if (libxl_vdev_to_device_disk(ctx, domid, argv[optind+1], &disk)) {
         fprintf(stderr, "Error: Device %s not connected.\n", argv[optind+1]);
         return 1;
@@ -5726,7 +5707,7 @@ static void print_uptime(int short_mode, uint32_t doms[], int nb_doms)
 
 int main_uptime(int argc, char **argv)
 {
-    const char *dom = NULL;
+    const char *dom;
     int short_mode = 0;
     uint32_t domains[100];
     int nb_doms = 0;
@@ -5742,10 +5723,8 @@ int main_uptime(int argc, char **argv)
         }
     }
 
-    for (;(dom = argv[optind]) != NULL; nb_doms++,optind++) {
-        find_domain(dom);
-        domains[nb_doms] = domid;
-    }
+    for (;(dom = argv[optind]) != NULL; nb_doms++,optind++)
+        domains[nb_doms] = find_domain(dom);
 
     print_uptime(short_mode, domains, nb_doms);
 
@@ -5754,6 +5733,7 @@ int main_uptime(int argc, char **argv)
 
 int main_tmem_list(int argc, char **argv)
 {
+    uint32_t domid;
     const char *dom = NULL;
     char *buf = NULL;
     int use_long = 0;
@@ -5781,9 +5761,9 @@ int main_tmem_list(int argc, char **argv)
     }
 
     if (all)
-        domid = -1;
+        domid = INVALID_DOMID;
     else
-        find_domain(dom);
+        domid = find_domain(dom);
 
     buf = libxl_tmem_list(ctx, domid, use_long);
     if (buf == NULL)
@@ -5796,6 +5776,7 @@ int main_tmem_list(int argc, char **argv)
 
 int main_tmem_freeze(int argc, char **argv)
 {
+    uint32_t domid;
     const char *dom = NULL;
     int all = 0;
     int opt;
@@ -5818,9 +5799,9 @@ int main_tmem_freeze(int argc, char **argv)
     }
 
     if (all)
-        domid = -1;
+        domid = INVALID_DOMID;
     else
-        find_domain(dom);
+        domid = find_domain(dom);
 
     libxl_tmem_freeze(ctx, domid);
     return 0;
@@ -5828,6 +5809,7 @@ int main_tmem_freeze(int argc, char **argv)
 
 int main_tmem_thaw(int argc, char **argv)
 {
+    uint32_t domid;
     const char *dom = NULL;
     int all = 0;
     int opt;
@@ -5850,9 +5832,9 @@ int main_tmem_thaw(int argc, char **argv)
     }
 
     if (all)
-        domid = -1;
+        domid = INVALID_DOMID;
     else
-        find_domain(dom);
+        domid = find_domain(dom);
 
     libxl_tmem_thaw(ctx, domid);
     return 0;
@@ -5860,6 +5842,7 @@ int main_tmem_thaw(int argc, char **argv)
 
 int main_tmem_set(int argc, char **argv)
 {
+    uint32_t domid;
     const char *dom = NULL;
     uint32_t weight = 0, cap = 0, compress = 0;
     int opt_w = 0, opt_c = 0, opt_p = 0;
@@ -5896,9 +5879,9 @@ int main_tmem_set(int argc, char **argv)
     }
 
     if (all)
-        domid = -1;
+        domid = INVALID_DOMID;
     else
-        find_domain(dom);
+        domid = find_domain(dom);
 
     if (!opt_w && !opt_c && !opt_p) {
         fprintf(stderr, "No set value specified.\n\n");
@@ -5918,6 +5901,7 @@ int main_tmem_set(int argc, char **argv)
 
 int main_tmem_shared_auth(int argc, char **argv)
 {
+    uint32_t domid;
     const char *autharg = NULL;
     char *endptr = NULL;
     const char *dom = NULL;
@@ -5950,9 +5934,9 @@ int main_tmem_shared_auth(int argc, char **argv)
     }
 
     if (all)
-        domid = -1;
+        domid = INVALID_DOMID;
     else
-        find_domain(dom);
+        domid = find_domain(dom);
 
     if (uuid == NULL || autharg == NULL) {
         fprintf(stderr, "No uuid or auth specified.\n\n");
@@ -6705,9 +6689,10 @@ done:
 
 int main_remus(int argc, char **argv)
 {
+    uint32_t domid;
     int opt, rc, daemonize = 1;
     const char *ssh_command = "ssh";
-    char *host = NULL, *rune = NULL, *domain = NULL;
+    char *host = NULL, *rune = NULL;
     libxl_domain_remus_info r_info;
     int send_fd = -1, recv_fd = -1;
     pid_t child = -1;
@@ -6743,11 +6728,10 @@ int main_remus(int argc, char **argv)
         }
     }
 
-    domain = argv[optind];
+    domid = find_domain(argv[optind]);
     host = argv[optind + 1];
 
     if (r_info.blackhole) {
-        find_domain(domain);
         send_fd = open("/dev/null", O_RDWR, 0644);
         if (send_fd < 0) {
             perror("failed to open /dev/null");
@@ -6764,7 +6748,7 @@ int main_remus(int argc, char **argv)
                 return 1;
         }
 
-        save_domain_core_begin(domain, NULL, &config_data, &config_len);
+        save_domain_core_begin(domid, NULL, &config_data, &config_len);
 
         if (!config_len) {
             fprintf(stderr, "No config file stored for running domain and "
