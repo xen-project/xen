@@ -108,12 +108,10 @@ static int flask_domain_alloc_security(struct domain *d)
 
     memset(dsec, 0, sizeof(struct domain_security_struct));
 
-    dsec->create_sid = SECSID_NULL;
     switch ( d->domain_id )
     {
     case DOMID_IDLE:
         dsec->sid = SECINITSID_XEN;
-        dsec->create_sid = SECINITSID_DOM0;
         break;
     case DOMID_XEN:
         dsec->sid = SECINITSID_DOMXEN;
@@ -489,25 +487,24 @@ static int flask_domain_create(struct domain *d, u32 ssidref)
     int rc;
     struct domain_security_struct *dsec1;
     struct domain_security_struct *dsec2;
+    static int dom0_created = 0;
 
     dsec1 = current->domain->ssid;
+    dsec2 = d->ssid;
 
-    if ( dsec1->create_sid == SECSID_NULL ) 
-        dsec1->create_sid = ssidref;
-
-    rc = avc_has_perm(dsec1->sid, dsec1->create_sid, SECCLASS_DOMAIN, 
-                      DOMAIN__CREATE, NULL);
-    if ( rc )
+    if ( is_idle_domain(current->domain) && !dom0_created )
     {
-        dsec1->create_sid = SECSID_NULL;
-        return rc;
+        dsec2->sid = SECINITSID_DOM0;
+        dom0_created = 1;
+        return 0;
     }
 
-    dsec2 = d->ssid;
-    dsec2->sid = dsec1->create_sid;
+    rc = avc_has_perm(dsec1->sid, ssidref, SECCLASS_DOMAIN,
+                      DOMAIN__CREATE, NULL);
+    if ( rc )
+        return rc;
 
-    dsec1->create_sid = SECSID_NULL;
-    dsec2->create_sid = SECSID_NULL;
+    dsec2->sid = ssidref;
 
     return rc;
 }

@@ -52,8 +52,6 @@ type device_t, resource_type;
 # Rules required to boot the hypervisor and dom0
 #
 ################################################################################
-allow xen_t dom0_t:domain { create };
-
 allow dom0_t xen_t:xen { kexec readapic writeapic mtrr_read mtrr_add mtrr_del
 	scheduler physinfo heap quirk readconsole writeconsole settime getcpuinfo
 	microcode cpupool_op sched_op pm_op };

@@ -19,7 +19,6 @@
 
 struct domain_security_struct {
     u32 sid;               /* current SID */
-    u32 create_sid;
 };
 
 struct evtchn_security_struct {
