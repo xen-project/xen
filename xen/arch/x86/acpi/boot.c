@@ -452,7 +452,7 @@ static int __init acpi_parse_madt_lapic_entries(void)
 	} else if (count < 0 || x2count < 0) {
 		printk(KERN_ERR PREFIX "Error parsing LAPIC entry\n");
 		/* TBD: Cleanup to allow fallback to MPS */
-		return count;
+		return count < 0 ? count : x2count;
 	}
 
 	count =
@@ -464,7 +464,7 @@ static int __init acpi_parse_madt_lapic_entries(void)
 	if (count < 0 || x2count < 0) {
 		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
 		/* TBD: Cleanup to allow fallback to MPS */
-		return count;
+		return count < 0 ? count : x2count;
 	}
 	return 0;
 }
