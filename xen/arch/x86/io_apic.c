@@ -225,9 +225,8 @@ void __ioapic_write_entry(
 {
     void (*write)(unsigned int, unsigned int, unsigned int)
         = raw ? __io_apic_write : io_apic_write;
-    union entry_union eu = {{0, 0}};
+    union entry_union eu = { .entry = e };
 
-    eu.entry = e;
     (*write)(apic, 0x11 + 2*pin, eu.w2);
     (*write)(apic, 0x10 + 2*pin, eu.w1);
 }
@@ -2384,8 +2383,7 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
     SET_DEST(rte.dest.dest32, rte.dest.logical.logical_dest,
              cpu_mask_to_apicid(desc->arch.cpu_mask));
 
-    io_apic_write(apic, 0x10 + 2 * pin, *(((int *)&rte) + 0));
-    io_apic_write(apic, 0x11 + 2 * pin, *(((int *)&rte) + 1));
+    __ioapic_write_entry(apic, pin, 0, rte);
     
     spin_unlock_irqrestore(&ioapic_lock, flags);
 
@@ -2414,7 +2412,6 @@ void dump_ioapic_irq_info(void)
     struct irq_pin_list *entry;
     struct IO_APIC_route_entry rte;
     unsigned int irq, pin, printed = 0;
-    unsigned long flags;
 
     if ( !irq_2_pin )
         return;
@@ -2436,10 +2433,7 @@ void dump_ioapic_irq_info(void)
 
             printk("      Apic 0x%02x, Pin %2d: ", entry->apic, pin);
 
-            spin_lock_irqsave(&ioapic_lock, flags);
-            *(((int *)&rte) + 0) = io_apic_read(entry->apic, 0x10 + 2 * pin);
-            *(((int *)&rte) + 1) = io_apic_read(entry->apic, 0x11 + 2 * pin);
-            spin_unlock_irqrestore(&ioapic_lock, flags);
+            rte = ioapic_read_entry(entry->apic, pin, 0);
 
             printk("vec=%02x delivery=%-5s dest=%c status=%d "
                    "polarity=%d irr=%d trig=%c mask=%d dest_id:%d\n",
