@@ -884,7 +884,7 @@ long arch_do_domctl(
         int found = 0;
 
         ret = -EINVAL;
-        if ( (np == 0) || (fgp > MAX_IOPORTS) || (fmp > MAX_IOPORTS) ||
+        if ( ((fgp | fmp | (np - 1)) >= MAX_IOPORTS) ||
             ((fgp + np) > MAX_IOPORTS) || ((fmp + np) > MAX_IOPORTS) )
         {
             printk(XENLOG_G_ERR
