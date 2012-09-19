@@ -1040,8 +1040,6 @@ static void dma_msi_mask(struct irq_desc *desc)
     unsigned long flags;
     struct iommu *iommu = desc->action->dev_id;
 
-    irq_complete_move(desc);
-
     /* mask it */
     spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writel(iommu->reg, DMAR_FECTL_REG, DMA_FECTL_IM);
@@ -1052,6 +1050,13 @@ static unsigned int dma_msi_startup(struct irq_desc *desc)
 {
     dma_msi_unmask(desc);
     return 0;
+}
+
+static void dma_msi_ack(struct irq_desc *desc)
+{
+    irq_complete_move(desc);
+    dma_msi_mask(desc);
+    move_masked_irq(desc);
 }
 
 static void dma_msi_end(struct irq_desc *desc, u8 vector)
@@ -1115,7 +1120,7 @@ static hw_irq_controller dma_msi_type = {
     .shutdown = dma_msi_mask,
     .enable = dma_msi_unmask,
     .disable = dma_msi_mask,
-    .ack = dma_msi_mask,
+    .ack = dma_msi_ack,
     .end = dma_msi_end,
     .set_affinity = dma_msi_set_affinity,
 };
