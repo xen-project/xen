@@ -2397,7 +2397,8 @@ static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
              break;
          rc = (pool->persistent ? TMEM_POOL_PERSIST : 0) |
               (pool->shared ? TMEM_POOL_SHARED : 0) |
-              (pool->pageshift << TMEM_POOL_PAGESIZE_SHIFT);
+              (pool->pageshift << TMEM_POOL_PAGESIZE_SHIFT) |
+              (TMEM_SPEC_VERSION << TMEM_POOL_VERSION_SHIFT);
         break;
     case TMEMC_SAVE_GET_POOL_NPAGES:
          if ( pool == NULL )
