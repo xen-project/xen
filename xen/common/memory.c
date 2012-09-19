@@ -329,22 +329,9 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
         out_chunk_order = exch.in.extent_order - exch.out.extent_order;
     }
 
-    if ( likely(exch.in.domid == DOMID_SELF) )
-    {
-        d = rcu_lock_current_domain();
-    }
-    else
-    {
-        if ( (d = rcu_lock_domain_by_id(exch.in.domid)) == NULL )
-            goto fail_early;
-
-        if ( !IS_PRIV_FOR(current->domain, d) )
-        {
-            rcu_unlock_domain(d);
-            rc = -EPERM;
-            goto fail_early;
-        }
-    }
+    rc = rcu_lock_target_domain_by_id(exch.in.domid, &d);
+    if ( rc )
+        goto fail_early;
 
     memflags |= MEMF_bits(domain_clamp_alloc_bitsize(
         d,
@@ -583,20 +570,8 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
              && (reservation.mem_flags & XENMEMF_populate_on_demand) )
             args.memflags |= MEMF_populate_on_demand;
 
-        if ( likely(reservation.domid == DOMID_SELF) )
-        {
-            d = rcu_lock_current_domain();
-        }
-        else
-        {
-            if ( (d = rcu_lock_domain_by_id(reservation.domid)) == NULL )
-                return start_extent;
-            if ( !IS_PRIV_FOR(current->domain, d) )
-            {
-                rcu_unlock_domain(d);
-                return start_extent;
-            }
-        }
+        if ( unlikely(rcu_lock_target_domain_by_id(reservation.domid, &d)) )
+            return start_extent;
         args.domain = d;
 
         rc = xsm_memory_adjust_reservation(current->domain, d);
