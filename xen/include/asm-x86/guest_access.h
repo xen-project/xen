@@ -51,6 +51,9 @@
     (XEN_GUEST_HANDLE(type)) { _x };            \
 })
 
+#define guest_handle_for_field(hnd, type, fld)          \
+    ((XEN_GUEST_HANDLE(type)) { &(hnd).p->fld })
+
 #define guest_handle_from_ptr(ptr, type)        \
     ((XEN_GUEST_HANDLE(type)) { (type *)ptr })
 #define const_guest_handle_from_ptr(ptr, type)  \
