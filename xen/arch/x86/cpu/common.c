@@ -68,6 +68,7 @@ static void default_init(struct cpuinfo_x86 * c)
 		else if (c->x86 == 3)
 			safe_strcpy(c->x86_model_id, "386");
 	}
+        __clear_bit(X86_FEATURE_SEP, c->x86_capability);
 }
 
 static struct cpu_dev default_cpu = {
