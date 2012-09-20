@@ -32,8 +32,11 @@
 static char opt_famrev[14];
 string_param("cpuid_mask_cpu", opt_famrev);
 
-static int opt_allow_unsafe;
+#ifdef __x86_64__
+/* 1 = allow, 0 = don't allow guest creation, -1 = don't allow boot */
+int __read_mostly opt_allow_unsafe;
 boolean_param("allow_unsafe", opt_allow_unsafe);
+#endif
 
 static inline void wrmsr_amd(unsigned int index, unsigned int lo, 
 		unsigned int hi)
@@ -623,10 +626,19 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		clear_bit(X86_FEATURE_MCE, c->x86_capability);
 
 #ifdef __x86_64__
-	if (cpu_has_amd_erratum(c, AMD_ERRATUM_121) && !opt_allow_unsafe)
+	if (!cpu_has_amd_erratum(c, AMD_ERRATUM_121))
+		opt_allow_unsafe = 1;
+	else if (opt_allow_unsafe < 0)
 		panic("Xen will not boot on this CPU for security reasons.\n"
 		      "Pass \"allow_unsafe\" if you're trusting all your"
 		      " (PV) guest kernels.\n");
+	else if (!opt_allow_unsafe && c == &boot_cpu_data)
+		printk(KERN_WARNING
+		       "*** Xen will not allow creation of DomU-s on"
+		       " this CPU for security reasons. ***\n"
+		       KERN_WARNING
+		       "*** Pass \"allow_unsafe\" if you're trusting"
+		       " all your (PV) guest kernels. ***\n");
 
 	/* AMD CPUs do not support SYSENTER outside of legacy mode. */
 	clear_bit(X86_FEATURE_SEP, c->x86_capability);
