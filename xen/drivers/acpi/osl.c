@@ -27,6 +27,7 @@
 #include <asm/io.h>
 #include <xen/config.h>
 #include <xen/init.h>
+#include <xen/pfn.h>
 #include <xen/types.h>
 #include <xen/errno.h>
 #include <xen/acpi.h>
@@ -181,4 +182,39 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u32 value, u32 width)
 	unmap_domain_page(virt_addr);
 
 	return AE_OK;
+}
+
+#define is_xmalloc_memory(ptr) ((unsigned long)(ptr) & (PAGE_SIZE - 1))
+
+void *__init acpi_os_alloc_memory(size_t sz)
+{
+	void *ptr;
+
+	if (system_state == SYS_STATE_early_boot)
+		return mfn_to_virt(alloc_boot_pages(PFN_UP(sz), 1));
+
+	ptr = xmalloc_bytes(sz);
+	ASSERT(!ptr || is_xmalloc_memory(ptr));
+	return ptr;
+}
+
+void *__init acpi_os_zalloc_memory(size_t sz)
+{
+	void *ptr;
+
+	if (system_state != SYS_STATE_early_boot) {
+		ptr = xzalloc_bytes(sz);
+		ASSERT(!ptr || is_xmalloc_memory(ptr));
+		return ptr;
+	}
+	ptr = acpi_os_alloc_memory(sz);
+	return ptr ? memset(ptr, 0, sz) : NULL;
+}
+
+void __init acpi_os_free_memory(void *ptr)
+{
+	if (is_xmalloc_memory(ptr))
+		xfree(ptr);
+	else if (ptr && system_state == SYS_STATE_early_boot)
+		init_boot_pages(__pa(ptr), __pa(ptr) + PAGE_SIZE);
 }

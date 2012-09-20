@@ -41,8 +41,6 @@ mps_inti_flags_polarity[] = { "dfl", "high", "res", "low" };
 static const char *__initdata
 mps_inti_flags_trigger[] = { "dfl", "edge", "res", "level" };
 
-static struct acpi_table_desc initial_tables[ACPI_MAX_TABLES];
-
 static int acpi_apic_instance __initdata;
 
 void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
@@ -324,7 +322,7 @@ static void __init check_multiple_madt(void)
 
 int __init acpi_table_init(void)
 {
-	acpi_initialize_tables(initial_tables, ACPI_MAX_TABLES, 0);
+	acpi_initialize_tables(NULL, ACPI_MAX_TABLES, 0);
 	check_multiple_madt();
 	return 0;
 }

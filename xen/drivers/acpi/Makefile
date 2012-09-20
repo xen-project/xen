@@ -2,7 +2,7 @@ subdir-y += tables
 subdir-y += utilities
 subdir-$(x86) += apei
 
-obj-y += tables.o
+obj-bin-y += tables.init.o
 obj-y += numa.o
 obj-y += osl.o
 obj-y += pmstat.o
