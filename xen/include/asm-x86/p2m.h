@@ -255,11 +255,11 @@ struct p2m_domain {
     struct {
         struct page_list_head super,   /* List of superpages                */
                          single;       /* Non-super lists                   */
-        int              count,        /* # of pages in cache lists         */
+        long             count,        /* # of pages in cache lists         */
                          entry_count;  /* # of pages in p2m marked pod      */
-        unsigned         reclaim_super; /* Last gpfn of a scan */
-        unsigned         reclaim_single; /* Last gpfn of a scan */
-        unsigned         max_guest;    /* gpfn of max guest demand-populate */
+        unsigned long    reclaim_super; /* Last gpfn of a scan */
+        unsigned long    reclaim_single; /* Last gpfn of a scan */
+        unsigned long    max_guest;    /* gpfn of max guest demand-populate */
     } pod;
 };
 
