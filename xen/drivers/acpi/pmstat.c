@@ -203,8 +203,6 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
     struct list_head *pos;
     uint32_t cpu, i, j = 0;
 
-    if ( !op || !cpu_online(op->cpuid) )
-        return -EINVAL;
     pmpt = processor_pminfo[op->cpuid];
     policy = per_cpu(cpufreq_cpu_policy, op->cpuid);
 
@@ -312,9 +310,6 @@ static int set_cpufreq_gov(struct xen_sysctl_pm_op *op)
 {
     struct cpufreq_policy new_policy, *old_policy;
 
-    if ( !op || !cpu_online(op->cpuid) )
-        return -EINVAL;
-
     old_policy = per_cpu(cpufreq_cpu_policy, op->cpuid);
     if ( !old_policy )
         return -EINVAL;
@@ -333,8 +328,6 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
     int ret = 0;
     struct cpufreq_policy *policy;
 
-    if ( !op || !cpu_online(op->cpuid) )
-        return -EINVAL;
     policy = per_cpu(cpufreq_cpu_policy, op->cpuid);
 
     if ( !policy || !policy->governor )
@@ -411,22 +404,12 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
     return ret;
 }
 
-static int get_cpufreq_avgfreq(struct xen_sysctl_pm_op *op)
-{
-    if ( !op || !cpu_online(op->cpuid) )
-        return -EINVAL;
-
-    op->u.get_avgfreq = cpufreq_driver_getavg(op->cpuid, USR_GETAVG);
-
-    return 0;
-}
-
 int do_pm_op(struct xen_sysctl_pm_op *op)
 {
     int ret = 0;
     const struct processor_pminfo *pmpt;
 
-    if ( !op || !cpu_online(op->cpuid) )
+    if ( !op || op->cpuid >= NR_CPUS || !cpu_online(op->cpuid) )
         return -EINVAL;
     pmpt = processor_pminfo[op->cpuid];
 
@@ -462,7 +445,7 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
 
     case GET_CPUFREQ_AVGFREQ:
     {
-        ret = get_cpufreq_avgfreq(op);
+        op->u.get_avgfreq = cpufreq_driver_getavg(op->cpuid, USR_GETAVG);
         break;
     }
 
