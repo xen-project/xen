@@ -825,10 +825,12 @@ long arch_do_domctl(
         unsigned long mfn = domctl->u.memory_mapping.first_mfn;
         unsigned long nr_mfns = domctl->u.memory_mapping.nr_mfns;
         int add = domctl->u.memory_mapping.add_mapping;
-        int i;
+        unsigned long i;
 
         ret = -EINVAL;
-        if ( (mfn + nr_mfns - 1) < mfn ) /* wrap? */
+        if ( (mfn + nr_mfns - 1) < mfn || /* wrap? */
+             ((mfn | (mfn + nr_mfns - 1)) >> (paddr_bits - PAGE_SHIFT)) ||
+             (gfn + nr_mfns - 1) < gfn ) /* wrap? */
             break;
 
         ret = -EPERM;
@@ -853,8 +855,25 @@ long arch_do_domctl(
                    d->domain_id, gfn, mfn, nr_mfns);
 
             ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
-            for ( i = 0; i < nr_mfns; i++ )
-                set_mmio_p2m_entry(d, gfn+i, _mfn(mfn+i));
+            if ( !ret && paging_mode_translate(d) )
+            {
+                for ( i = 0; !ret && i < nr_mfns; i++ )
+                    if ( !set_mmio_p2m_entry(d, gfn + i, _mfn(mfn + i)) )
+                        ret = -EIO;
+                if ( ret )
+                {
+                    printk(XENLOG_G_WARNING
+                           "memory_map:fail: dom%d gfn=%lx mfn=%lx\n",
+                           d->domain_id, gfn + i, mfn + i);
+                    while ( i-- )
+                        clear_mmio_p2m_entry(d, gfn + i);
+                    if ( iomem_deny_access(d, mfn, mfn + nr_mfns - 1) &&
+                         IS_PRIV(current->domain) )
+                        printk(XENLOG_ERR
+                               "memory_map: failed to deny dom%d access to [%lx,%lx]\n",
+                               d->domain_id, mfn, mfn + nr_mfns - 1);
+                }
+            }
         }
         else
         {
@@ -862,9 +881,17 @@ long arch_do_domctl(
                    "memory_map:remove: dom%d gfn=%lx mfn=%lx nr=%lx\n",
                    d->domain_id, gfn, mfn, nr_mfns);
 
-            for ( i = 0; i < nr_mfns; i++ )
-                clear_mmio_p2m_entry(d, gfn+i);
+            if ( paging_mode_translate(d) )
+                for ( i = 0; i < nr_mfns; i++ )
+                    add |= !clear_mmio_p2m_entry(d, gfn + i);
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
+            if ( !ret && add )
+                ret = -EIO;
+            if ( ret && IS_PRIV(current->domain) )
+                printk(XENLOG_ERR
+                       "memory_map: error %ld %s dom%d access to [%lx,%lx]\n",
+                       ret, add ? "removing" : "denying", d->domain_id,
+                       mfn, mfn + nr_mfns - 1);
         }
 
         rcu_unlock_domain(d);
@@ -926,12 +953,23 @@ long arch_do_domctl(
             if ( !found )
             {
                 g2m_ioport = xmalloc(struct g2m_ioport);
+                if ( !g2m_ioport )
+                    ret = -ENOMEM;
+            }
+            if ( !found && !ret )
+            {
                 g2m_ioport->gport = fgp;
                 g2m_ioport->mport = fmp;
                 g2m_ioport->np = np;
                 list_add_tail(&g2m_ioport->list, &hd->g2m_ioport_list);
             }
-            ret = ioports_permit_access(d, fmp, fmp + np - 1);
+            if ( !ret )
+                ret = ioports_permit_access(d, fmp, fmp + np - 1);
+            if ( ret && !found && g2m_ioport )
+            {
+                list_del(&g2m_ioport->list);
+                xfree(g2m_ioport);
+            }
         }
         else
         {
@@ -946,6 +984,10 @@ long arch_do_domctl(
                     break;
                 }
             ret = ioports_deny_access(d, fmp, fmp + np - 1);
+            if ( ret && IS_PRIV(current->domain) )
+                printk(XENLOG_ERR
+                       "ioport_map: error %ld denying dom%d access to [%x,%x]\n",
+                       ret, d->domain_id, fmp, fmp + np - 1);
         }
         rcu_unlock_domain(d);
     }
