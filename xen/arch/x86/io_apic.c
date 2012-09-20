@@ -43,8 +43,8 @@ static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
 static DEFINE_SPINLOCK(ioapic_lock);
 
 bool_t __read_mostly skip_ioapic_setup;
-bool_t __read_mostly ioapic_ack_new = 1;
-bool_t __read_mostly ioapic_ack_forced = 0;
+bool_t __initdata ioapic_ack_new = 1;
+bool_t __initdata ioapic_ack_forced = 0;
 
 /*
  * # of IRQ routing registers
@@ -918,7 +918,7 @@ static inline int IO_APIC_irq_trigger(int irq)
     return 0;
 }
 
-static hw_irq_controller ioapic_level_type;
+static struct hw_interrupt_type ioapic_level_type;
 static hw_irq_controller ioapic_edge_type;
 
 #define IOAPIC_AUTO	-1
@@ -1605,9 +1605,6 @@ static void mask_and_ack_level_ioapic_irq(struct irq_desc *desc)
 
     irq_complete_move(desc);
 
-    if ( ioapic_ack_new )
-        return;
-
     if ( !directed_eoi_enabled )
         mask_IO_APIC_irq(desc);
 
@@ -1651,34 +1648,29 @@ static void mask_and_ack_level_ioapic_irq(struct irq_desc *desc)
     }
 }
 
-static void end_level_ioapic_irq(struct irq_desc *desc, u8 vector)
+static void end_level_ioapic_irq_old(struct irq_desc *desc, u8 vector)
 {
-    unsigned long v;
-    int i;
-
-    if ( !ioapic_ack_new )
+    if ( directed_eoi_enabled )
     {
-        if ( directed_eoi_enabled )
+        if ( !(desc->status & (IRQ_DISABLED|IRQ_MOVE_PENDING)) )
         {
-            if ( !(desc->status & (IRQ_DISABLED|IRQ_MOVE_PENDING)) )
-            {
-                eoi_IO_APIC_irq(desc);
-                return;
-            }
-
-            mask_IO_APIC_irq(desc);
             eoi_IO_APIC_irq(desc);
-            if ( (desc->status & IRQ_MOVE_PENDING) &&
-                 !io_apic_level_ack_pending(desc->irq) )
-                move_masked_irq(desc);
+            return;
         }
 
-        if ( !(desc->status & IRQ_DISABLED) )
-            unmask_IO_APIC_irq(desc);
-
-        return;
+        mask_IO_APIC_irq(desc);
+        eoi_IO_APIC_irq(desc);
+        if ( (desc->status & IRQ_MOVE_PENDING) &&
+             !io_apic_level_ack_pending(desc->irq) )
+            move_masked_irq(desc);
     }
 
+    if ( !(desc->status & IRQ_DISABLED) )
+        unmask_IO_APIC_irq(desc);
+}
+
+static void end_level_ioapic_irq_new(struct irq_desc *desc, u8 vector)
+{
 /*
  * It appears there is an erratum which affects at least version 0x11
  * of I/O APIC (that's the 82093AA and cores integrated into various
@@ -1698,7 +1690,7 @@ static void end_level_ioapic_irq(struct irq_desc *desc, u8 vector)
  * operation to prevent an edge-triggered interrupt escaping meanwhile.
  * The idea is from Manfred Spraul.  --macro
  */
-    i = desc->arch.vector;
+    unsigned int v, i = desc->arch.vector;
 
     /* Manually EOI the old vector if we are moving to the new */
     if ( vector && i != vector )
@@ -1741,14 +1733,14 @@ static hw_irq_controller ioapic_edge_type = {
     .set_affinity 	= set_ioapic_affinity_irq,
 };
 
-static hw_irq_controller ioapic_level_type = {
+static struct hw_interrupt_type __read_mostly ioapic_level_type = {
     .typename 	= "IO-APIC-level",
     .startup 	= startup_level_ioapic_irq,
     .shutdown 	= mask_IO_APIC_irq,
     .enable 	= unmask_IO_APIC_irq,
     .disable 	= mask_IO_APIC_irq,
     .ack 		= mask_and_ack_level_ioapic_irq,
-    .end 		= end_level_ioapic_irq,
+    .end 		= end_level_ioapic_irq_old,
     .set_affinity 	= set_ioapic_affinity_irq,
 };
 
@@ -2005,6 +1997,11 @@ void __init setup_IO_APIC(void)
 
     printk("ENABLING IO-APIC IRQs\n");
     printk(" -> Using %s ACK method\n", ioapic_ack_new ? "new" : "old");
+
+    if (ioapic_ack_new) {
+        ioapic_level_type.ack = irq_complete_move;
+        ioapic_level_type.end = end_level_ioapic_irq_new;
+    }
 
     /*
      * Set up IO-APIC IRQ routing.

@@ -1495,7 +1495,8 @@ static int pirq_acktype(struct domain *d, int pirq)
      * on which they were received. This is because we tickle the LAPIC to EOI.
      */
     if ( !strcmp(desc->handler->typename, "IO-APIC-level") )
-        return ioapic_ack_new ? ACKTYPE_EOI : ACKTYPE_UNMASK;
+        return desc->handler->ack == irq_complete_move ?
+               ACKTYPE_EOI : ACKTYPE_UNMASK;
 
     /* Legacy PIC interrupts can be acknowledged from any CPU. */
     if ( !strcmp(desc->handler->typename, "XT-PIC") )
