@@ -542,13 +542,13 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
             }
 
             /* Populate this superpage */
-            ASSERT(i == 1);
+            ASSERT(i <= 2);
 
             index = gfn_remainder >> ( i * EPT_TABLE_ORDER);
             ept_entry = table + index;
 
-            if ( !ept_pod_check_and_populate(p2m, gfn,
-                                             ept_entry, 9, q) )
+            if ( !ept_pod_check_and_populate(p2m, gfn, ept_entry,
+                                             i * EPT_TABLE_ORDER, q) )
                 goto retry;
             else
                 goto out;
