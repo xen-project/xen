@@ -45,11 +45,10 @@ struct acpi_processor_cx
     u8 entry_method; /* ACPI_CSTATE_EM_xxx */
     u32 address;
     u32 latency;
-    u32 latency_ticks;
+    u32 target_residency;
     u32 power;
     u32 usage;
     u64 time;
-    u32 target_residency;
 };
 
 struct acpi_processor_flags

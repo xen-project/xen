@@ -74,7 +74,6 @@ static void (*lapic_timer_off)(void);
 static void (*lapic_timer_on)(void);
 
 static uint64_t (*__read_mostly tick_to_ns)(uint64_t) = acpi_pm_tick_to_ns;
-static uint64_t (*__read_mostly ns_to_tick)(uint64_t) = ns_to_acpi_pm_tick;
 
 static void (*pm_idle_save) (void) __read_mostly;
 unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER - 1;
@@ -225,7 +224,6 @@ __initcall(cpu_idle_key_init);
 static uint64_t get_stime_tick(void) { return (uint64_t)NOW(); }
 static uint64_t stime_ticks_elapsed(uint64_t t1, uint64_t t2) { return t2 - t1; }
 static uint64_t stime_tick_to_ns(uint64_t ticks) { return ticks; }
-static uint64_t ns_to_stime_tick(uint64_t ns) { return ns; }
 
 static uint64_t get_acpi_pm_tick(void) { return (uint64_t)inl(pmtmr_ioport); }
 static uint64_t acpi_pm_ticks_elapsed(uint64_t t1, uint64_t t2)
@@ -665,7 +663,6 @@ static int cpuidle_init_cpu(int cpu)
             get_tick = get_stime_tick;
             ticks_elapsed = stime_ticks_elapsed;
             tick_to_ns = stime_tick_to_ns;
-            ns_to_tick = ns_to_stime_tick;
         }
 
         acpi_power = xzalloc(struct acpi_processor_power);
@@ -943,7 +940,6 @@ static void set_cx(
     cx->latency  = xen_cx->latency;
     cx->power    = xen_cx->power;
     
-    cx->latency_ticks = ns_to_tick(cx->latency * 1000UL);
     cx->target_residency = cx->latency * latency_factor;
     if ( cx->type == ACPI_STATE_C1 || cx->type == ACPI_STATE_C2 )
         acpi_power->safe_state = cx;
