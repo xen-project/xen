@@ -1516,9 +1516,6 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
 
 struct hvm_function_table * __init start_vmx(void)
 {
-    if ( !test_bit(X86_FEATURE_VMXE, &boot_cpu_data.x86_capability) )
-        return NULL;
-
     set_in_cr4(X86_CR4_VMXE);
 
     if ( vmx_cpu_up() )

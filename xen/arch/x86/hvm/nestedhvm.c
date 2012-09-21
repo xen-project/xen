@@ -152,7 +152,7 @@ static int __init
 nestedhvm_setup(void)
 {
     /* Same format and size as hvm_io_bitmap (Intel needs only 2 pages). */
-    unsigned int nr = (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) ? 2 : 3;
+    unsigned nr = cpu_has_vmx ? 2 : 3;
     unsigned int i, order = get_order_from_pages(nr);
 
     if ( !hvm_funcs.name )

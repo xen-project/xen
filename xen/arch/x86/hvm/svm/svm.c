@@ -1240,9 +1240,6 @@ struct hvm_function_table * __init start_svm(void)
 {
     bool_t printed = 0;
 
-    if ( !test_bit(X86_FEATURE_SVM, &boot_cpu_data.x86_capability) )
-        return NULL;
-
     svm_host_osvw_reset();
 
     if ( svm_cpu_up() )

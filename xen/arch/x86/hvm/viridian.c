@@ -156,8 +156,7 @@ static void enable_hypercall_page(struct domain *d)
     *(u32 *)(p + 1) = 0x80000000;
     *(u8  *)(p + 5) = 0x0f; /* vmcall/vmmcall */
     *(u8  *)(p + 6) = 0x01;
-    *(u8  *)(p + 7) = ((boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
-                       ? 0xc1 : 0xd9);
+    *(u8  *)(p + 7) = (cpu_has_vmx ? 0xc1 : 0xd9);
     *(u8  *)(p + 8) = 0xc3; /* ret */
     memset(p + 9, 0xcc, PAGE_SIZE - 9); /* int3, int3, ... */
 

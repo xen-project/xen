@@ -83,7 +83,7 @@ static void p2m_initialise(struct domain *d, struct p2m_domain *p2m)
 
     p2m->cr3 = CR3_EADDR;
 
-    if ( hap_enabled(d) && (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) )
+    if ( hap_enabled(d) && cpu_has_vmx )
         ept_p2m_init(p2m);
     else
         p2m_pt_init(p2m);

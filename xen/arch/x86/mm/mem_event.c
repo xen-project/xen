@@ -608,7 +608,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
                 break;
 
             /* Currently only EPT is supported */
-            if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+            if ( !cpu_has_vmx )
                 break;
 
             rc = mem_event_enable(d, mec, med, _VPF_mem_access, 

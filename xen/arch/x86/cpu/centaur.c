@@ -45,16 +45,10 @@ static void __init init_c3(struct cpuinfo_x86 *c)
 		c->x86_capability[5] = cpuid_edx(0xC0000001);
 	}
 
-	/* Cyrix III family needs CX8 & PGE explicity enabled. */
-	if (c->x86_model >=6 && c->x86_model <= 9) {
-		rdmsrl(MSR_VIA_FCR, msr_content);
-		wrmsrl(MSR_VIA_FCR, msr_content | (1ULL << 1 | 1ULL << 7));
-		set_bit(X86_FEATURE_CX8, c->x86_capability);
+	if (c->x86 == 0x6 && c->x86_model >= 0xf) {
+		c->x86_cache_alignment = c->x86_clflush_size * 2;
+		set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);
 	}
-
-	/* Before Nehemiah, the C3's had 3dNOW! */
-	if (c->x86_model >=6 && c->x86_model <9)
-		set_bit(X86_FEATURE_3DNOW, c->x86_capability);
 
 	get_model_name(c);
 	display_cacheinfo(c);
@@ -62,34 +56,14 @@ static void __init init_c3(struct cpuinfo_x86 *c)
 
 static void __init init_centaur(struct cpuinfo_x86 *c)
 {
-	/* Bit 31 in normal CPUID used for nonstandard 3DNow ID;
-	   3DNow is IDd by bit 31 in extended CPUID (1*32+31) anyway */
-	clear_bit(0*32+31, c->x86_capability);
-
 	if (c->x86 == 6)
 		init_c3(c);
-}
-
-static unsigned int centaur_size_cache(struct cpuinfo_x86 * c, unsigned int size)
-{
-	/* VIA C3 CPUs (670-68F) need further shifting. */
-	if ((c->x86 == 6) && ((c->x86_model == 7) || (c->x86_model == 8)))
-		size >>= 8;
-
-	/* VIA also screwed up Nehemiah stepping 1, and made
-	   it return '65KB' instead of '64KB'
-	   - Note, it seems this may only be in engineering samples. */
-	if ((c->x86==6) && (c->x86_model==9) && (c->x86_mask==1) && (size==65))
-		size -=1;
-
-	return size;
 }
 
 static struct cpu_dev centaur_cpu_dev __cpuinitdata = {
 	.c_vendor	= "Centaur",
 	.c_ident	= { "CentaurHauls" },
 	.c_init		= init_centaur,
-	.c_size_cache	= centaur_size_cache,
 };
 
 int __init centaur_init_cpu(void)
@@ -97,5 +71,3 @@ int __init centaur_init_cpu(void)
 	cpu_devs[X86_VENDOR_CENTAUR] = &centaur_cpu_dev;
 	return 0;
 }
-
-//early_arch_initcall(centaur_init_cpu);

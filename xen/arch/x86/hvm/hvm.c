@@ -111,17 +111,10 @@ static int __init hvm_enable(void)
 {
     struct hvm_function_table *fns = NULL;
 
-    switch ( boot_cpu_data.x86_vendor )
-    {
-    case X86_VENDOR_INTEL:
+    if ( cpu_has_vmx )
         fns = start_vmx();
-        break;
-    case X86_VENDOR_AMD:
+    else if ( cpu_has_svm )
         fns = start_svm();
-        break;
-    default:
-        break;
-    }
 
     if ( fns == NULL )
         return 0;

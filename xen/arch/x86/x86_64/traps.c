@@ -399,7 +399,8 @@ void __devinit subarch_percpu_traps_init(void)
     wrmsrl(MSR_LSTAR, (unsigned long)stack);
     stack += write_stack_trampoline(stack, stack_bottom, FLAT_KERNEL_CS64);
 
-    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL ||
+         boot_cpu_data.x86_vendor == X86_VENDOR_CENTAUR )
     {
         /* SYSENTER entry. */
         wrmsrl(MSR_IA32_SYSENTER_ESP, (unsigned long)stack_bottom);
