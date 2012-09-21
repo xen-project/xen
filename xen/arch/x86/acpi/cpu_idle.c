@@ -39,7 +39,6 @@
 #include <xen/smp.h>
 #include <xen/guest_access.h>
 #include <xen/keyhandler.h>
-#include <xen/cpuidle.h>
 #include <xen/trace.h>
 #include <xen/sched-if.h>
 #include <xen/irq.h>
@@ -54,6 +53,8 @@
 #include <public/sysctl.h>
 #include <acpi/cpufreq/cpufreq.h>
 #include <asm/apic.h>
+#include <asm/cpuidle.h>
+#include <asm/mwait.h>
 #include <xen/notifier.h>
 #include <xen/cpu.h>
 
@@ -70,18 +71,18 @@
 #define GET_CC7_RES(val)  GET_HW_RES_IN_NS(0x3FE, val) /* SNB only */
 
 static void lapic_timer_nop(void) { }
-static void (*lapic_timer_off)(void);
-static void (*lapic_timer_on)(void);
+void (*__read_mostly lapic_timer_off)(void);
+void (*__read_mostly lapic_timer_on)(void);
 
 static uint64_t (*__read_mostly tick_to_ns)(uint64_t) = acpi_pm_tick_to_ns;
 
-static void (*pm_idle_save) (void) __read_mostly;
+void (*__read_mostly pm_idle_save)(void);
 unsigned int max_cstate __read_mostly = ACPI_PROCESSOR_MAX_POWER - 1;
 integer_param("max_cstate", max_cstate);
 static bool_t __read_mostly local_apic_timer_c2_ok;
 boolean_param("lapic_timer_c2_ok", local_apic_timer_c2_ok);
 
-static struct acpi_processor_power *__read_mostly processor_powers[NR_CPUS];
+struct acpi_processor_power *__read_mostly processor_powers[NR_CPUS];
 
 struct hw_residencies
 {
@@ -236,11 +237,9 @@ static uint64_t acpi_pm_ticks_elapsed(uint64_t t1, uint64_t t2)
         return ((0xFFFFFFFF - t1) + t2 +1);
 }
 
-static uint64_t (*__read_mostly get_tick)(void) = get_acpi_pm_tick;
+uint64_t (*__read_mostly cpuidle_get_tick)(void) = get_acpi_pm_tick;
 static uint64_t (*__read_mostly ticks_elapsed)(uint64_t, uint64_t)
     = acpi_pm_ticks_elapsed;
-
-#define MWAIT_ECX_INTERRUPT_BREAK   (0x1)
 
 /*
  * The bit is set iff cpu use monitor/mwait to enter C state
@@ -263,7 +262,7 @@ void cpuidle_wakeup_mwait(cpumask_t *mask)
     cpumask_andnot(mask, mask, &target);
 }
 
-static void mwait_idle_with_hints(unsigned long eax, unsigned long ecx)
+void mwait_idle_with_hints(unsigned int eax, unsigned int ecx)
 {
     unsigned int cpu = smp_processor_id();
     s_time_t expires = per_cpu(timer_deadline, cpu);
@@ -334,7 +333,7 @@ static struct {
     unsigned int count;
 } c3_cpu_status = { .lock = SPIN_LOCK_UNLOCKED };
 
-static inline void trace_exit_reason(u32 *irq_traced)
+void trace_exit_reason(u32 *irq_traced)
 {
     if ( unlikely(tb_init_done) )
     {
@@ -352,15 +351,6 @@ static inline void trace_exit_reason(u32 *irq_traced)
             curbit = find_next_bit((const unsigned long *)irr_status, 256, curbit + 1);
         }
     }
-}
-
-/* vcpu is urgent if vcpu is polling event channel
- *
- * if urgent vcpu exists, CPU should not enter deep C state
- */
-static int sched_has_urgent_vcpu(void)
-{
-    return atomic_read(&this_cpu(schedule_data).urgent_count);
 }
 
 /*
@@ -388,10 +378,11 @@ bool_t errata_c6_eoi_workaround(void)
     return (fix_needed && cpu_has_pending_apic_eoi());
 }
 
-static inline void acpi_update_idle_stats(struct acpi_processor_power *power,
-                                          struct acpi_processor_cx *cx,
-                                          int64_t sleep_ticks)
+void update_idle_stats(struct acpi_processor_power *power,
+                       struct acpi_processor_cx *cx,
+                       uint64_t before, uint64_t after)
 {
+    int64_t sleep_ticks = ticks_elapsed(before, after);
     /* Interrupts are disabled */
 
     spin_lock(&power->stat_lock);
@@ -472,19 +463,19 @@ static void acpi_processor_idle(void)
         if ( cx->type == ACPI_STATE_C1 || local_apic_timer_c2_ok )
         {
             /* Get start time (ticks) */
-            t1 = get_tick();
+            t1 = cpuidle_get_tick();
             /* Trace cpu idle entry */
             TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
             /* Invoke C2 */
             acpi_idle_do_entry(cx);
             /* Get end time (ticks) */
-            t2 = get_tick();
+            t2 = cpuidle_get_tick();
             trace_exit_reason(irq_traced);
             /* Trace cpu idle exit */
             TRACE_6D(TRC_PM_IDLE_EXIT, cx->idx, t2,
                      irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
             /* Update statistics */
-            acpi_update_idle_stats(power, cx, ticks_elapsed(t1, t2));
+            update_idle_stats(power, cx, t1, t2);
             /* Re-enable interrupts */
             local_irq_enable();
             break;
@@ -500,7 +491,7 @@ static void acpi_processor_idle(void)
         lapic_timer_off();
 
         /* Get start time (ticks) */
-        t1 = get_tick();
+        t1 = cpuidle_get_tick();
         /* Trace cpu idle entry */
         TRACE_4D(TRC_PM_IDLE_ENTRY, cx->idx, t1, exp, pred);
 
@@ -549,7 +540,7 @@ static void acpi_processor_idle(void)
         }
 
         /* Get end time (ticks) */
-        t2 = get_tick();
+        t2 = cpuidle_get_tick();
 
         /* recovering TSC */
         cstate_restore_tsc();
@@ -559,7 +550,7 @@ static void acpi_processor_idle(void)
                  irq_traced[0], irq_traced[1], irq_traced[2], irq_traced[3]);
 
         /* Update statistics */
-        acpi_update_idle_stats(power, cx, ticks_elapsed(t1, t2));
+        update_idle_stats(power, cx, t1, t2);
         /* Re-enable interrupts */
         local_irq_enable();
         /* recovering APIC */
@@ -586,7 +577,7 @@ static void acpi_processor_idle(void)
         cpuidle_current_governor->reflect(power);
 }
 
-static void acpi_dead_idle(void)
+void acpi_dead_idle(void)
 {
     struct acpi_processor_power *power;
     struct acpi_processor_cx *cx;
@@ -649,7 +640,7 @@ default_halt:
         halt();
 }
 
-static int cpuidle_init_cpu(int cpu)
+int cpuidle_init_cpu(unsigned int cpu)
 {
     struct acpi_processor_power *acpi_power;
 
@@ -660,7 +651,7 @@ static int cpuidle_init_cpu(int cpu)
 
         if ( cpu == 0 && boot_cpu_has(X86_FEATURE_NONSTOP_TSC) )
         {
-            get_tick = get_stime_tick;
+            cpuidle_get_tick = get_stime_tick;
             ticks_elapsed = stime_ticks_elapsed;
             tick_to_ns = stime_tick_to_ns;
         }
@@ -684,9 +675,6 @@ static int cpuidle_init_cpu(int cpu)
 
     return 0;
 }
-
-#define MWAIT_SUBSTATE_MASK (0xf)
-#define MWAIT_SUBSTATE_SIZE (4)
 
 static int acpi_processor_ffh_cstate_probe(xen_processor_cx_t *cx)
 {
@@ -1026,6 +1014,9 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
     if ( unlikely(!guest_handle_okay(power->states, power->count)) )
         return -EFAULT;
 
+    if ( pm_idle_save && pm_idle != acpi_processor_idle )
+        return 0;
+
     print_cx_pminfo(cpu, power);
 
     /* map from acpi_id to cpu_id */
@@ -1195,7 +1186,12 @@ static struct notifier_block cpu_nfb = {
 static int __init cpuidle_presmp_init(void)
 {
     void *cpu = (void *)(long)smp_processor_id();
-    cpu_callback(&cpu_nfb, CPU_ONLINE, cpu);
+
+    if ( !xen_cpuidle )
+        return 0;
+
+    mwait_idle_init(&cpu_nfb);
+    cpu_nfb.notifier_call(&cpu_nfb, CPU_ONLINE, cpu);
     register_cpu_notifier(&cpu_nfb);
     return 0;
 }

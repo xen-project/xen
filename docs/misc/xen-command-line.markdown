@@ -620,6 +620,14 @@ limit is ignored by Xen.
 
 Specify if the MMConfig space should be enabled.
 
+### mwait-idle
+> `= <boolean>`
+
+> Default: `true`
+
+Use the MWAIT idle driver (with model specific C-state knowledge) instead
+of the ACPI based one.
+
 ### nmi
 > `= ignore | dom0 | fatal`
 
