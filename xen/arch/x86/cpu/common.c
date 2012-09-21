@@ -15,9 +15,6 @@
 
 #include "cpu.h"
 
-static int cachesize_override __cpuinitdata = -1;
-size_param("cachesize", cachesize_override);
-
 static bool_t __cpuinitdata use_xsave = 1;
 boolean_param("xsave", use_xsave);
 
@@ -120,49 +117,12 @@ void __cpuinit display_cacheinfo(struct cpuinfo_x86 *c)
 	ecx = cpuid_ecx(0x80000006);
 	l2size = ecx >> 16;
 	
-	/* do processor-specific cache resizing */
-	if (this_cpu->c_size_cache)
-		l2size = this_cpu->c_size_cache(c,l2size);
-
-	/* Allow user to override all this if necessary. */
-	if (cachesize_override != -1)
-		l2size = cachesize_override;
-
-	if ( l2size == 0 )
-		return;		/* Again, no L2 cache is possible */
-
 	c->x86_cache_size = l2size;
 
 	if (opt_cpu_info)
 		printk("CPU: L2 Cache: %dK (%d bytes/line)\n",
 		       l2size, ecx & 0xFF);
 }
-
-/* Naming convention should be: <Name> [(<Codename>)] */
-/* This table only is used unless init_<vendor>() below doesn't set it; */
-/* in particular, if CPUID levels 0x80000002..4 are supported, this isn't used */
-
-/* Look up CPU names by table lookup. */
-static char __cpuinit *table_lookup_model(struct cpuinfo_x86 *c)
-{
-	struct cpu_model_info *info;
-
-	if ( c->x86_model >= 16 )
-		return NULL;	/* Range check */
-
-	if (!this_cpu)
-		return NULL;
-
-	info = this_cpu->c_models;
-
-	while (info && info->family) {
-		if (info->family == c->x86)
-			return info->model_names[c->x86_model];
-		info++;
-	}
-	return NULL;		/* Not found */
-}
-
 
 static void __cpuinit get_cpu_vendor(struct cpuinfo_x86 *c, int early)
 {
@@ -356,14 +316,9 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 
 	/* If the model name is still unset, do table lookup. */
 	if ( !c->x86_model_id[0] ) {
-		char *p;
-		p = table_lookup_model(c);
-		if ( p )
-			safe_strcpy(c->x86_model_id, p);
-		else
-			/* Last resort... */
-			snprintf(c->x86_model_id, sizeof(c->x86_model_id),
-				"%02x/%02x", c->x86_vendor, c->x86_model);
+		/* Last resort... */
+		snprintf(c->x86_model_id, sizeof(c->x86_model_id),
+			"%02x/%02x", c->x86_vendor, c->x86_model);
 	}
 
 	/* Now the feature flags better reflect actual CPU features! */

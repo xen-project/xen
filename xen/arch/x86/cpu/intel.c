@@ -292,49 +292,10 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 		set_bit(X86_FEATURE_ARAT, c->x86_capability);
 }
 
-
-static unsigned int intel_size_cache(struct cpuinfo_x86 * c, unsigned int size)
-{
-	/* Intel PIII Tualatin. This comes in two flavours.
-	 * One has 256kb of cache, the other 512. We have no way
-	 * to determine which, so we use a boottime override
-	 * for the 512kb model, and assume 256 otherwise.
-	 */
-	if ((c->x86 == 6) && (c->x86_model == 11) && (size == 0))
-		size = 256;
-	return size;
-}
-
 static struct cpu_dev intel_cpu_dev __cpuinitdata = {
 	.c_vendor	= "Intel",
 	.c_ident 	= { "GenuineIntel" },
-	.c_models = {
-		{ .vendor = X86_VENDOR_INTEL, .family = 6, .model_names =
-		  { 
-			  [0] = "Pentium Pro A-step",
-			  [1] = "Pentium Pro", 
-			  [3] = "Pentium II (Klamath)", 
-			  [4] = "Pentium II (Deschutes)", 
-			  [5] = "Pentium II (Deschutes)", 
-			  [6] = "Mobile Pentium II",
-			  [7] = "Pentium III (Katmai)", 
-			  [8] = "Pentium III (Coppermine)", 
-			  [10] = "Pentium III (Cascades)",
-			  [11] = "Pentium III (Tualatin)",
-		  }
-		},
-		{ .vendor = X86_VENDOR_INTEL, .family = 15, .model_names =
-		  {
-			  [0] = "Pentium 4 (Unknown)",
-			  [1] = "Pentium 4 (Willamette)",
-			  [2] = "Pentium 4 (Northwood)",
-			  [4] = "Pentium 4 (Foster)",
-			  [5] = "Pentium 4 (Foster)",
-		  }
-		},
-	},
 	.c_init		= init_intel,
-	.c_size_cache	= intel_size_cache,
 };
 
 int __init intel_cpu_init(void)
