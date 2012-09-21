@@ -485,8 +485,7 @@ static void pmc_setup_one_p4_counter(unsigned int ctr)
 	
 	/* find our event binding structure. */
 	if (counter_config[ctr].event <= 0 || counter_config[ctr].event > NUM_EVENTS) {
-		printk(KERN_ERR 
-		       "oprofile: P4 event code 0x%lx out of range\n", 
+		printk(KERN_ERR "oprofile: P4 event code %#lx out of range\n",
 		       counter_config[ctr].event);
 		return;
 	}
@@ -526,7 +525,7 @@ static void pmc_setup_one_p4_counter(unsigned int ctr)
 	}
 
 	printk(KERN_ERR 
-	       "oprofile: P4 event code 0x%lx no binding, stag %d ctr %d\n",
+	       "oprofile: P4 event code %#lx no binding, stag %d ctr %d\n",
 	       counter_config[ctr].event, stag, ctr);
 }
 

@@ -217,7 +217,7 @@ static void dump_iommu_info(unsigned char key)
             struct iremap_entry *iremap_entries = NULL;
             int print_cnt = 0;
 
-            printk("  Interrupt remapping table (nr_entry=0x%x. "
+            printk("  Interrupt remapping table (nr_entry=%#x. "
                 "Only dump P=1 entries here):\n", nr_entry);
             printk("       SVT  SQ   SID      DST  V  AVL DLM TM RH DM "
                    "FPD P\n");

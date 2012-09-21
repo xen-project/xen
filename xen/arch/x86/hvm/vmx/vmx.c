@@ -210,7 +210,7 @@ long_mode_do_msr_read(unsigned int msr, uint64_t *msr_content)
         return HNDL_unhandled;
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_0, "msr 0x%x content 0x%"PRIx64, msr, *msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_0, "msr %#x content %#"PRIx64, msr, *msr_content);
 
     return HNDL_done;
 }
@@ -222,7 +222,7 @@ long_mode_do_msr_write(unsigned int msr, uint64_t msr_content)
     struct vmx_msr_state *guest_msr_state = &v->arch.hvm_vmx.msr_state;
     struct vmx_msr_state *host_msr_state = &this_cpu(host_msr_state);
 
-    HVM_DBG_LOG(DBG_LEVEL_0, "msr 0x%x content 0x%"PRIx64, msr, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_0, "msr %#x content %#"PRIx64, msr, msr_content);
 
     switch ( msr )
     {
@@ -466,7 +466,7 @@ static int vmx_restore_cr0_cr3(
                                      NULL, P2M_ALLOC);
             if ( !page )
             {
-                gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%lx\n", cr3);
+                gdprintk(XENLOG_ERR, "Invalid CR3 value=%#lx\n", cr3);
                 return -EINVAL;
             }
         }
@@ -492,7 +492,7 @@ static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
          ((c->pending_type == 1) || (c->pending_type > 6) ||
           (c->pending_reserved != 0)) )
     {
-        gdprintk(XENLOG_ERR, "Invalid pending event 0x%"PRIx32".\n",
+        gdprintk(XENLOG_ERR, "Invalid pending event %#"PRIx32".\n",
                  c->pending_event);
         return -EINVAL;
     }
@@ -524,7 +524,7 @@ static int vmx_vmcs_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     if ( c->pending_valid )
     {
-        gdprintk(XENLOG_INFO, "Re-injecting 0x%"PRIx32", 0x%"PRIx32"\n",
+        gdprintk(XENLOG_INFO, "Re-injecting %#"PRIx32", %#"PRIx32"\n",
                  c->pending_event, c->error_code);
 
         if ( hvm_event_needs_reinjection(c->pending_type, c->pending_vector) )
@@ -1789,7 +1789,7 @@ static int is_last_branch_msr(u32 ecx)
 
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
-    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x", msr);
+    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%#x", msr);
 
     switch ( msr )
     {
@@ -1854,7 +1854,7 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
     }
 
 done:
-    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%x, msr_value=0x%"PRIx64,
+    HVM_DBG_LOG(DBG_LEVEL_1, "returns: ecx=%#x, msr_value=%#"PRIx64,
                 msr, *msr_content);
     return X86EMUL_OKAY;
 
@@ -1927,8 +1927,7 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
     struct vcpu *v = current;
 
-    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%x, msr_value=0x%"PRIx64,
-                msr, msr_content);
+    HVM_DBG_LOG(DBG_LEVEL_1, "ecx=%#x, msr_value=%#"PRIx64, msr, msr_content);
 
     switch ( msr )
     {
@@ -2107,7 +2106,7 @@ static void vmx_failed_vmentry(unsigned int exit_reason,
     unsigned long exit_qualification = __vmread(EXIT_QUALIFICATION);
     struct vcpu *curr = current;
 
-    printk("Failed vm entry (exit reason 0x%x) ", exit_reason);
+    printk("Failed vm entry (exit reason %#x) ", exit_reason);
     switch ( failed_vmentry_reason )
     {
     case EXIT_REASON_INVALID_GUEST_STATE:

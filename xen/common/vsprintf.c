@@ -171,10 +171,14 @@ static char *number(
         }
     }
     if (type & SPECIAL) {
-        if (base == 16)
+        if (num == 0)
+            type &= ~SPECIAL;
+        else if (base == 16)
             size -= 2;
         else if (base == 8)
             size--;
+        else
+            type &= ~SPECIAL;
     }
     i = 0;
     if (num == 0)
@@ -197,14 +201,10 @@ static char *number(
         ++buf;
     }
     if (type & SPECIAL) {
-        if (base==8) {
-            if (buf <= end)
-                *buf = '0';
-            ++buf;
-        } else if (base==16) {
-            if (buf <= end)
-                *buf = '0';
-            ++buf;
+        if (buf <= end)
+            *buf = '0';
+        ++buf;
+        if (base == 16) {
             if (buf <= end)
                 *buf = digits[33];
             ++buf;

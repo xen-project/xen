@@ -872,7 +872,7 @@ static int sh_skip_sync(struct vcpu *v, mfn_t gl1mfn)
         return SHADOW_INTERNAL_NAME(sh_safe_not_to_sync, 3)(v, gl1mfn);
     else if ( pg->shadow_flags & SHF_L1_64 )
         return SHADOW_INTERNAL_NAME(sh_safe_not_to_sync, 4)(v, gl1mfn);
-    SHADOW_ERROR("gmfn 0x%lx was OOS but not shadowed as an l1.\n", 
+    SHADOW_ERROR("gmfn %#lx was OOS but not shadowed as an l1.\n",
                  mfn_x(gl1mfn));
     BUG();
     return 0; /* BUG() is no longer __attribute__((noreturn)). */
@@ -2596,8 +2596,8 @@ void sh_remove_shadows(struct vcpu *v, mfn_t gmfn, int fast, int all)
     smfn = shadow_hash_lookup(v, mfn_x(gmfn), t);                       \
     if ( unlikely(!mfn_valid(smfn)) )                                   \
     {                                                                   \
-        SHADOW_ERROR(": gmfn %#lx has flags 0x%"PRIx32                  \
-                     " but no type-0x%"PRIx32" shadow\n",               \
+        SHADOW_ERROR(": gmfn %#lx has flags %#"PRIx32                   \
+                     " but no type-%#"PRIx32" shadow\n",                \
                      mfn_x(gmfn), (uint32_t)pg->shadow_flags, t);       \
         break;                                                          \
     }                                                                   \

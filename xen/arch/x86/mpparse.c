@@ -216,7 +216,7 @@ static void __init MP_ioapic_info (struct mpc_config_ioapic *m)
 	if (!(m->mpc_flags & MPC_APIC_USABLE))
 		return;
 
-	printk(KERN_INFO "I/O APIC #%d Version %d at 0x%X.\n",
+	printk(KERN_INFO "I/O APIC #%d Version %d at %#x.\n",
 		m->mpc_apicid, m->mpc_apicver, m->mpc_apicaddr);
 	if (nr_ioapics >= MAX_IO_APICS) {
 		printk(KERN_CRIT "Max # of I/O APICs (%d) exceeded (found %d).\n",
@@ -278,7 +278,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 	unsigned char *mpt=((unsigned char *)mpc)+count;
 
 	if (memcmp(mpc->mpc_signature,MPC_SIGNATURE,4)) {
-		printk(KERN_ERR "SMP mptable: bad signature [0x%x]!\n",
+		printk(KERN_ERR "SMP mptable: bad signature [%#x]!\n",
 			*(u32 *)mpc->mpc_signature);
 		return 0;
 	}
@@ -305,7 +305,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 
 	mps_oem_check(mpc, oem, str);
 
-	printk("APIC at: 0x%X\n",mpc->mpc_lapic);
+	printk("APIC at: %#x\n", mpc->mpc_lapic);
 
 	/* 
 	 * Save the local APIC address (it might be non-default) -- but only
@@ -881,7 +881,7 @@ void __init mp_register_ioapic (
 	mp_ioapic_routing[idx].gsi_end = gsi_base + 
 		io_apic_get_redir_entries(idx);
 
-	printk("IOAPIC[%d]: apic_id %d, version %d, address 0x%x, "
+	printk("IOAPIC[%d]: apic_id %d, version %d, address %#x, "
 		"GSI %d-%d\n", idx, mp_ioapics[idx].mpc_apicid, 
 		mp_ioapics[idx].mpc_apicver, mp_ioapics[idx].mpc_apicaddr,
 		mp_ioapic_routing[idx].gsi_base,

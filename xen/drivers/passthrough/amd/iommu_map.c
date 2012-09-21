@@ -795,7 +795,7 @@ void amd_iommu_share_p2m(struct domain *d)
 
         /* When sharing p2m with iommu, paging mode = 4 */
         hd->paging_mode = IOMMU_PAGING_MODE_LEVEL_4;
-        AMD_IOMMU_DEBUG("Share p2m table with iommu: p2m table = 0x%lx\n",
+        AMD_IOMMU_DEBUG("Share p2m table with iommu: p2m table = %#lx\n",
                         mfn_x(pgd_mfn));
     }
 }

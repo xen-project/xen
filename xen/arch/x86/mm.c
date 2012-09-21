@@ -3102,7 +3102,7 @@ long do_mmuext_op(
         }
 
         default:
-            MEM_LOG("Invalid extended pt command 0x%x", op.cmd);
+            MEM_LOG("Invalid extended pt command %#x", op.cmd);
             rc = -ENOSYS;
             okay = 0;
             break;

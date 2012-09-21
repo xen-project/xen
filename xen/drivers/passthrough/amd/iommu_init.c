@@ -616,8 +616,8 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
                                        IOMMU_EVENT_FLAGS_SHIFT);
         addr= (u64*) (entry + 2);
         printk(XENLOG_ERR "AMD-Vi: "
-               "%s: domain = %d, device id = 0x%04x, "
-               "fault address = 0x%"PRIx64", flags = 0x%03x\n",
+               "%s: domain = %d, device id = %#x, "
+               "fault address = %#"PRIx64", flags = %#x\n",
                event_str[code-1], domain_id, device_id, *addr, flags);
 
         /* Tell the device to stop DMAing; we can't rely on the guest to

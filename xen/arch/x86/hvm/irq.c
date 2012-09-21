@@ -488,7 +488,7 @@ static void irq_dump(struct domain *d)
            hvm_irq->pci_link_assert_count[1],
            hvm_irq->pci_link_assert_count[2],
            hvm_irq->pci_link_assert_count[3]);
-    printk("Callback via %i:0x%"PRIx32",%s asserted\n", 
+    printk("Callback via %i:%#"PRIx32",%s asserted\n",
            hvm_irq->callback_via_type, hvm_irq->callback_via.gsi, 
            hvm_irq->callback_via_asserted ? "" : " not");
 }

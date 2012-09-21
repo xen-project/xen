@@ -381,7 +381,7 @@ static int __init acpi_dmar_check_length(
     if ( h->length >= min_len )
         return 0;
     dprintk(XENLOG_ERR VTDPREFIX,
-            "Invalid ACPI DMAR entry length: 0x%x\n",
+            "Invalid ACPI DMAR entry length: %#x\n",
             h->length);
     return -EINVAL;
 }
@@ -749,7 +749,7 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
             break;
         default:
             dprintk(XENLOG_WARNING VTDPREFIX,
-                    "Ignore unknown DMAR structure type (0x%x)\n",
+                    "Ignore unknown DMAR structure type (%#x)\n",
                     entry_header->type);
             break;
         }

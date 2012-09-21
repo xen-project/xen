@@ -241,7 +241,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
          ((c->pending_type == 1) || (c->pending_type > 6) ||
           (c->pending_reserved != 0)) )
     {
-        gdprintk(XENLOG_ERR, "Invalid pending event 0x%"PRIx32".\n",
+        gdprintk(XENLOG_ERR, "Invalid pending event %#"PRIx32".\n",
                  c->pending_event);
         return -EINVAL;
     }
@@ -254,7 +254,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
                                      NULL, P2M_ALLOC);
             if ( !page )
             {
-                gdprintk(XENLOG_ERR, "Invalid CR3 value=0x%"PRIx64"\n",
+                gdprintk(XENLOG_ERR, "Invalid CR3 value=%#"PRIx64"\n",
                          c->cr3);
                 return -EINVAL;
             }
@@ -289,7 +289,7 @@ static int svm_vmcb_restore(struct vcpu *v, struct hvm_hw_cpu *c)
 
     if ( c->pending_valid ) 
     {
-        gdprintk(XENLOG_INFO, "Re-injecting 0x%"PRIx32", 0x%"PRIx32"\n",
+        gdprintk(XENLOG_INFO, "Re-injecting %#"PRIx32", %#"PRIx32"\n",
                  c->pending_event, c->error_code);
 
         if ( hvm_event_needs_reinjection(c->pending_type, c->pending_vector) )
@@ -2398,8 +2398,8 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     default:
     exit_and_crash:
-        gdprintk(XENLOG_ERR, "unexpected VMEXIT: exit reason = 0x%"PRIx64", "
-                 "exitinfo1 = %"PRIx64", exitinfo2 = %"PRIx64"\n",
+        gdprintk(XENLOG_ERR, "unexpected VMEXIT: exit reason = %#"PRIx64", "
+                 "exitinfo1 = %#"PRIx64", exitinfo2 = %#"PRIx64"\n",
                  exit_reason, 
                  (u64)vmcb->exitinfo1, (u64)vmcb->exitinfo2);
         domain_crash(v->domain);

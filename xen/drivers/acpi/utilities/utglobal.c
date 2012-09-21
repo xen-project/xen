@@ -79,7 +79,7 @@ const char *__init acpi_format_exception(acpi_status status)
 		/* Exception code was not recognized */
 
 		ACPI_ERROR((AE_INFO,
-			    "Unknown exception code: 0x%8.8X", status));
+			    "Unknown exception code: %#X", status));
 
 		exception = "UNKNOWN_STATUS_CODE";
 		dump_execution_state();

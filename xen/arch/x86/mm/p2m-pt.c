@@ -110,8 +110,8 @@ p2m_find_entry(void *table, unsigned long *gfn_remainder,
     index = *gfn_remainder >> shift;
     if ( index >= max )
     {
-        P2M_DEBUG("gfn=0x%lx out of range "
-                  "(gfn_remainder=0x%lx shift=%d index=0x%x max=0x%x)\n",
+        P2M_DEBUG("gfn=%#lx out of range "
+                  "(gfn_remainder=%#lx shift=%d index=%#x max=%#x)\n",
                   gfn, *gfn_remainder, shift, index, max);
         return NULL;
     }

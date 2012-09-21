@@ -366,8 +366,8 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 					continue;
 			}
 			printk(KERN_WARNING
-			       "mtrr: 0x%lx000,0x%lx000 overlaps existing"
-			       " 0x%lx000,0x%lx000\n", base, size, lbase,
+			       "mtrr: %#lx000,%#lx000 overlaps existing"
+			       " %#lx000,%#lx000\n", base, size, lbase,
 			       lsize);
 			goto out;
 		}
@@ -412,7 +412,7 @@ static int mtrr_check(unsigned long base, unsigned long size)
 		printk(KERN_WARNING
 			"mtrr: size and base must be multiples of 4 kiB\n");
 		printk(KERN_DEBUG
-			"mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+			"mtrr: size: %#lx  base: %#lx\n", size, base);
 		dump_stack();
 		return -1;
 	}

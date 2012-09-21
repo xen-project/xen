@@ -88,7 +88,7 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_IA32_MC0_CTL:
         /* stick all 1's to MCi_CTL */
         *val = ~0UL;
-        mce_printk(MCE_VERBOSE, "MCE: rdmsr MC%u_CTL 0x%"PRIx64"\n",
+        mce_printk(MCE_VERBOSE, "MCE: rdmsr MC%u_CTL %#"PRIx64"\n",
                    bank, *val);
         break;
     case MSR_IA32_MC0_STATUS:
@@ -102,7 +102,7 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
                 *val = entry->mci_status;
                 mce_printk(MCE_VERBOSE,
                            "MCE: rd MC%u_STATUS in vMCE# context "
-                           "value 0x%"PRIx64"\n", bank, *val);
+                           "value %#"PRIx64"\n", bank, *val);
             }
         }
         break;
@@ -116,7 +116,7 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
                 *val = entry->mci_addr;
                 mce_printk(MCE_VERBOSE,
                            "MCE: rdmsr MC%u_ADDR in vMCE# context "
-                           "0x%"PRIx64"\n", bank, *val);
+                           "%#"PRIx64"\n", bank, *val);
             }
         }
         break;
@@ -130,7 +130,7 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
                 *val = entry->mci_misc;
                 mce_printk(MCE_VERBOSE,
                            "MCE: rd MC%u_MISC in vMCE# context "
-                           "0x%"PRIx64"\n", bank, *val);
+                           "%#"PRIx64"\n", bank, *val);
             }
         }
         break;
@@ -171,18 +171,18 @@ int vmce_rdmsr(uint32_t msr, uint64_t *val)
         *val = vmce->mcg_status;
         if (*val)
             mce_printk(MCE_VERBOSE,
-                       "MCE: rdmsr MCG_STATUS 0x%"PRIx64"\n", *val);
+                       "MCE: rdmsr MCG_STATUS %#"PRIx64"\n", *val);
         break;
     case MSR_IA32_MCG_CAP:
         *val = cur->arch.mcg_cap;
-        mce_printk(MCE_VERBOSE, "MCE: rdmsr MCG_CAP 0x%"PRIx64"\n",
+        mce_printk(MCE_VERBOSE, "MCE: rdmsr MCG_CAP %#"PRIx64"\n",
                    *val);
         break;
     case MSR_IA32_MCG_CTL:
         /* Stick all 1's when CTL support, and 0's when no CTL support */
         if ( cur->arch.mcg_cap & MCG_CTL_P )
             *val = ~0ULL;
-        mce_printk(MCE_VERBOSE, "MCE: rdmsr MCG_CTL 0x%"PRIx64"\n", *val);
+        mce_printk(MCE_VERBOSE, "MCE: rdmsr MCG_CTL %#"PRIx64"\n", *val);
         break;
     default:
         ret = mce_bank_msr(cur, msr) ? bank_mce_rdmsr(cur, msr, val) : 0;

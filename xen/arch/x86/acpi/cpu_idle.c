@@ -978,11 +978,11 @@ static void print_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
             return;
         
         printk("\tstates[%d]:\n", i);
-        printk("\t\treg.space_id = 0x%x\n", state.reg.space_id);
-        printk("\t\treg.bit_width = 0x%x\n", state.reg.bit_width);
-        printk("\t\treg.bit_offset = 0x%x\n", state.reg.bit_offset);
-        printk("\t\treg.access_size = 0x%x\n", state.reg.access_size);
-        printk("\t\treg.address = 0x%"PRIx64"\n", state.reg.address);
+        printk("\t\treg.space_id = %#x\n", state.reg.space_id);
+        printk("\t\treg.bit_width = %#x\n", state.reg.bit_width);
+        printk("\t\treg.bit_offset = %#x\n", state.reg.bit_offset);
+        printk("\t\treg.access_size = %#x\n", state.reg.access_size);
+        printk("\t\treg.address = %#"PRIx64"\n", state.reg.address);
         printk("\t\ttype    = %d\n", state.type);
         printk("\t\tlatency = %d\n", state.latency);
         printk("\t\tpower   = %d\n", state.power);

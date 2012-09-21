@@ -58,7 +58,7 @@ xencomm_get_page(unsigned long paddr, struct page_info **page)
          * is freed with decrease reservation hypercall at the same time.
          */
         gdprintk(XENLOG_WARNING,
-                 "bad page is passed. paddr 0x%lx maddr 0x%lx\n",
+                 "bad page is passed. paddr %#lx maddr %#lx\n",
                  paddr, maddr);
         return -EFAULT;
     }
@@ -117,7 +117,7 @@ xencomm_ctxt_init(const void *handle, struct xencomm_ctxt *ctxt)
     desc = xencomm_vaddr((unsigned long)handle, page);
     if ( desc->magic != XENCOMM_MAGIC )
     {
-        printk("%s: error: %p magic was 0x%x\n", __func__, desc, desc->magic);
+        printk("%s: error: %p magic was %#x\n", __func__, desc, desc->magic);
         put_page(page);
         return -EINVAL;
     }

@@ -2035,7 +2035,7 @@ static int init_vtd_hw(void)
             {
                 iommu_intremap = 0;
                 dprintk(XENLOG_ERR VTDPREFIX,
-                    "ioapic_to_iommu: ioapic 0x%x (id: 0x%x) is NULL! "
+                    "ioapic_to_iommu: ioapic %#x (id: %#x) is NULL! "
                     "Will not try to enable Interrupt Remapping.\n",
                     apic, IO_APIC_ID(apic));
                 break;

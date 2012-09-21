@@ -393,7 +393,7 @@ int dpci_ioport_intercept(ioreq_t *p)
 
     if ( !ioports_access_permitted(d, mport, mport + p->size - 1) ) 
     {
-        gdprintk(XENLOG_ERR, "Error: access to gport=0x%x denied!\n",
+        gdprintk(XENLOG_ERR, "Error: access to gport=%#x denied!\n",
                  (uint32_t)p->addr);
         return X86EMUL_UNHANDLEABLE;
     }

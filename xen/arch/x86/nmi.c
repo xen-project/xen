@@ -245,7 +245,7 @@ static inline void write_watchdog_counter(const char *descr)
 
     do_div(count, nmi_hz);
     if(descr)
-        Dprintk("setting %s to -0x%"PRIx64"\n", descr, count);
+        Dprintk("setting %s to -%#"PRIx64"\n", descr, count);
     wrmsrl(nmi_perfctr_msr, 0 - count);
 }
 

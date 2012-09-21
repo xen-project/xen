@@ -95,7 +95,7 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 			if (p->inti_flags  &
 			    ~(ACPI_MADT_POLARITY_MASK | ACPI_MADT_TRIGGER_MASK))
 				printk(KERN_INFO PREFIX
-				       "INT_SRC_OVR unexpected reserved flags: 0x%x\n",
+				       "INT_SRC_OVR unexpected reserved flags: %#x\n",
 				       p->inti_flags  &
 					~(ACPI_MADT_POLARITY_MASK | ACPI_MADT_TRIGGER_MASK));
 
@@ -119,7 +119,7 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 			struct acpi_madt_local_apic_nmi *p =
 			    (struct acpi_madt_local_apic_nmi *)header;
 			printk(KERN_INFO PREFIX
-			       "LAPIC_NMI (acpi_id[0x%02x] %s %s lint[0x%x])\n",
+			       "LAPIC_NMI (acpi_id[0x%02x] %s %s lint[%#x])\n",
 			       p->processor_id,
 			       mps_inti_flags_polarity[p->inti_flags & ACPI_MADT_POLARITY_MASK	],
 			       mps_inti_flags_trigger[(p->inti_flags & ACPI_MADT_TRIGGER_MASK) >> 2],
@@ -137,7 +137,7 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 			trigger = (p->inti_flags & ACPI_MADT_TRIGGER_MASK) >> 2;
 
 			printk(KERN_INFO PREFIX
-			       "X2APIC_NMI (uid[0x%02x] %s %s lint[0x%x])\n",
+			       "X2APIC_NMI (uid[0x%02x] %s %s lint[%#x])\n",
 			       p->uid,
 			       mps_inti_flags_polarity[polarity],
 			       mps_inti_flags_trigger[trigger],
@@ -160,7 +160,7 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 			struct acpi_madt_io_sapic *p =
 			    (struct acpi_madt_io_sapic *)header;
 			printk(KERN_INFO PREFIX
-			       "IOSAPIC (id[0x%x] address[%p] gsi_base[%d])\n",
+			       "IOSAPIC (id[%#x] address[%p] gsi_base[%d])\n",
 			       p->id, (void *)(unsigned long)p->address,
 			       p->global_irq_base);
 		}
@@ -182,7 +182,7 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 			struct acpi_madt_interrupt_source *p =
 			    (struct acpi_madt_interrupt_source *)header;
 			printk(KERN_INFO PREFIX
-			       "PLAT_INT_SRC (%s %s type[0x%x] id[0x%04x] eid[0x%x] iosapic_vector[0x%x] global_irq[0x%x]\n",
+			       "PLAT_INT_SRC (%s %s type[%#x] id[0x%04x] eid[%#x] iosapic_vector[%#x] global_irq[%#x]\n",
 			       mps_inti_flags_polarity[p->inti_flags & ACPI_MADT_POLARITY_MASK],
 			       mps_inti_flags_trigger[(p->inti_flags & ACPI_MADT_TRIGGER_MASK) >> 2],
 			       p->type, p->id, p->eid, p->io_sapic_vector,
@@ -192,7 +192,7 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 
 	default:
 		printk(KERN_WARNING PREFIX
-		       "Found unsupported MADT entry (type = 0x%x)\n",
+		       "Found unsupported MADT entry (type = %#x)\n",
 		       header->type);
 		break;
 	}
@@ -242,7 +242,7 @@ acpi_table_parse_entries(char *id,
 		    ((unsigned long)entry + entry->length);
 	}
 	if (max_entries && count > max_entries) {
-		printk(KERN_WARNING PREFIX "[%4.4s:0x%02x] ignored %i entries of "
+		printk(KERN_WARNING PREFIX "[%4.4s:%#x] ignored %i entries of "
 		       "%i found\n", id, entry_id, count - max_entries, count);
 	}
 

@@ -1468,7 +1468,7 @@ int hvm_set_efer(uint64_t value)
     if ( !hvm_efer_valid(v->domain, value, efer_validbits) )
     {
         gdprintk(XENLOG_WARNING, "Trying to set reserved bit in "
-                 "EFER: 0x%"PRIx64"\n", value);
+                 "EFER: %#"PRIx64"\n", value);
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
         return X86EMUL_EXCEPTION;
     }
@@ -4095,7 +4095,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             {
                 put_gfn(d, pfn);
                 gdprintk(XENLOG_WARNING,
-                         "type for pfn 0x%lx changed to grant while "
+                         "type for pfn %#lx changed to grant while "
                          "we were working?\n", pfn);
                 goto param_fail4;
             }
@@ -4106,7 +4106,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 {
                     put_gfn(d, pfn);
                     gdprintk(XENLOG_WARNING,
-                             "type of pfn 0x%lx changed from %d to %d while "
+                             "type of pfn %#lx changed from %d to %d while "
                              "we were trying to change it to %d\n",
                              pfn, t, nt, memtype[a.hvmmem_type]);
                     goto param_fail4;

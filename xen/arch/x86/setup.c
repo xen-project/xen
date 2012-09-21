@@ -482,13 +482,13 @@ static void __init kexec_reserve_area(struct e820map *e820)
 
     if ( !reserve_e820_ram(e820, kdump_start, kdump_start + kdump_size) )
     {
-        printk("Kdump: DISABLED (failed to reserve %luMB (%lukB) at 0x%lx)"
+        printk("Kdump: DISABLED (failed to reserve %luMB (%lukB) at %#lx)"
                "\n", kdump_size >> 20, kdump_size >> 10, kdump_start);
         kexec_crash_area.start = kexec_crash_area.size = 0;
     }
     else
     {
-        printk("Kdump: %luMB (%lukB) at 0x%lx\n",
+        printk("Kdump: %luMB (%lukB) at %#lx\n",
                kdump_size >> 20, kdump_size >> 10, kdump_start);
     }
 }

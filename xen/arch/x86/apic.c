@@ -689,7 +689,7 @@ void __devinit setup_local_APIC(void)
         value = apic_read(APIC_ESR);
         if (value != oldvalue)
             apic_printk(APIC_VERBOSE, "ESR value before enabling "
-                        "vector: 0x%08lx  after: 0x%08lx\n",
+                        "vector: %#lx  after: %#lx\n",
                         oldvalue, value);
     } else {
         if (esr_disable)    
@@ -1210,7 +1210,7 @@ static int __init calibrate_APIC_clock(void)
     bus_cycle  = (u32) (1000000000000LL/bus_freq); /* in pico seconds */
     bus_scale  = (1000*262144)/bus_cycle;
 
-    apic_printk(APIC_VERBOSE, "..... bus_scale = 0x%08X\n", bus_scale);
+    apic_printk(APIC_VERBOSE, "..... bus_scale = %#x\n", bus_scale);
     /* reset APIC to zero timeout value */
     __setup_APIC_LVTT(0);
 

@@ -1147,7 +1147,7 @@ static int x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
         }
 
         if (reason != NULL) {
-            printk("HV MSR INJECT ERROR: MSR 0x%llx %s\n",
+            printk("HV MSR INJECT ERROR: MSR %#Lx %s\n",
                    (unsigned long long)mci->mcinj_msr[i].reg, reason);
             errs++;
         }
@@ -1191,8 +1191,7 @@ static void x86_mc_msrinject(void *data)
 
     for (i = 0, msr = &mci->mcinj_msr[0];
          i < mci->mcinj_count; i++, msr++) {
-        printk("HV MSR INJECT (%s) target %u actual %u MSR 0x%llx "
-               "<-- 0x%llx\n",
+        printk("HV MSR INJECT (%s) target %u actual %u MSR %#Lx <-- %#Lx\n",
                intpose ?  "interpose" : "hardware",
                mci->mcinj_cpunr, smp_processor_id(),
                (unsigned long long)msr->reg,

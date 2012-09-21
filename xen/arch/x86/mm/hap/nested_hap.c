@@ -129,7 +129,7 @@ nestedhap_fix_p2m(struct vcpu *v, struct p2m_domain *p2m,
 
     if (rv == 0) {
         gdprintk(XENLOG_ERR,
-		"failed to set entry for 0x%"PRIx64" -> 0x%"PRIx64"\n",
+		"failed to set entry for %#"PRIx64" -> %#"PRIx64"\n",
 		L2_gpa, L0_gpa);
         BUG();
     }

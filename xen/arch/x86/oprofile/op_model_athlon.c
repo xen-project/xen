@@ -478,7 +478,7 @@ static int __init init_ibs_nmi(void)
 					if (value != (IBSCTL_LVTOFFSETVAL |
 						APIC_EILVT_LVTOFF_IBS)) {
 						printk("Xenoprofile: Failed to setup IBS LVT offset, "
-							"IBSCTL = %#08x\n", value);
+							"IBSCTL = %#x\n", value);
 						return 1;
 					}
 					nodes++;
@@ -523,7 +523,7 @@ void __init ibs_init(void)
 		return;
 	}
 
-	printk("Xenoprofile: AMD IBS detected (0x%08x)\n",
+	printk("Xenoprofile: AMD IBS detected (%#x)\n",
 		(unsigned)ibs_caps);
 }
 

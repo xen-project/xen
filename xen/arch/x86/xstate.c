@@ -163,7 +163,7 @@ void xstate_init(void)
         xsave_cntxt_size = ebx;
         xfeature_mask = eax + ((u64)edx << 32);
         xfeature_mask &= XCNTXT_MASK;
-        printk("%s: using cntxt_size: 0x%x and states: 0x%"PRIx64"\n",
+        printk("%s: using cntxt_size: %#x and states: %#"PRIx64"\n",
             __func__, xsave_cntxt_size, xfeature_mask);
 
         /* Check XSAVEOPT feature. */

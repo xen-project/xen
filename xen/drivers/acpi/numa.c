@@ -78,8 +78,8 @@ void __init acpi_table_print_srat_entry(struct acpi_subtable_header * header)
 			if (srat_rev < 2)
 				proximity_domain &= 0xff;
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-					  "SRAT Memory (%#016"PRIx64
-					  " length %#016"PRIx64")"
+					  "SRAT Memory (%#"PRIx64
+					  " length %#"PRIx64")"
 					  " in proximity domain %d %s%s\n",
 					  p->base_address, p->length,
 					  proximity_domain,
@@ -108,7 +108,7 @@ void __init acpi_table_print_srat_entry(struct acpi_subtable_header * header)
 		break;
 	default:
 		printk(KERN_WARNING PREFIX
-		       "Found unsupported SRAT entry (type = 0x%x)\n",
+		       "Found unsupported SRAT entry (type = %#x)\n",
 		       header->type);
 		break;
 	}

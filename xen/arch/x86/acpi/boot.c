@@ -341,14 +341,14 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 	}
 
 	if (facs->length < 24) {
-		printk(KERN_ERR PREFIX "Invalid FACS table length: 0x%x",
+		printk(KERN_ERR PREFIX "Invalid FACS table length: %#x",
 			facs->length);
 		goto bad;
 	}
 
 	if (facs->length < 64)
 		printk(KERN_WARNING PREFIX
-			"FACS is shorter than ACPI spec allow: 0x%x",
+			"FACS is shorter than ACPI spec allow: %#x",
 			facs->length);
 
 	acpi_sinfo.wakeup_vector = facs_pa + 

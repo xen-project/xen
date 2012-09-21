@@ -121,8 +121,8 @@ static void amd_iommu_setup_domain_device(
 
         amd_iommu_flush_device(iommu, req_id);
 
-        AMD_IOMMU_DEBUG("Setup I/O page table: device id = 0x%04x, "
-                        "root table = 0x%"PRIx64", "
+        AMD_IOMMU_DEBUG("Setup I/O page table: device id = %#x, "
+                        "root table = %#"PRIx64", "
                         "domain = %d, paging mode = %d\n", req_id,
                         page_to_maddr(hd->root_table),
                         hd->domain_id, hd->paging_mode);
@@ -314,7 +314,7 @@ void amd_iommu_disable_domain_device(struct domain *domain,
 
         amd_iommu_flush_device(iommu, req_id);
 
-        AMD_IOMMU_DEBUG("Disable: device id = 0x%04x, "
+        AMD_IOMMU_DEBUG("Disable: device id = %#x, "
                         "domain = %d, paging mode = %d\n",
                         req_id,  domain_hvm_iommu(domain)->domain_id,
                         domain_hvm_iommu(domain)->paging_mode);

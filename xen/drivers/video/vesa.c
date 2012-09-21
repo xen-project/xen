@@ -111,7 +111,7 @@ void __init vesa_init(void)
 
     vga_puts = vesa_redraw_puts;
 
-    printk(XENLOG_INFO "vesafb: framebuffer at 0x%x, mapped to 0x%p, "
+    printk(XENLOG_INFO "vesafb: framebuffer at %#x, mapped to 0x%p, "
            "using %uk, total %uk\n",
            vlfb_info.lfb_base, lfb,
            vram_remap >> 10, vram_total >> 10);

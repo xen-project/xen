@@ -88,7 +88,7 @@ static int collect_cpu_info(int cpu, struct cpu_signature *csig)
 
     rdmsrl(MSR_AMD_PATCHLEVEL, csig->rev);
 
-    printk(KERN_DEBUG "microcode: collect_cpu_info: patch_id=0x%x\n",
+    printk(KERN_DEBUG "microcode: collect_cpu_info: patch_id=%#x\n",
            csig->rev);
 
     return 0;
@@ -132,7 +132,7 @@ static int microcode_fits(const struct microcode_amd *mc_amd, int cpu)
         return 0;
 
     printk(KERN_DEBUG "microcode: CPU%d found a matching microcode "
-           "update with version 0x%x (current=0x%x)\n",
+           "update with version %#x (current=%#x)\n",
            cpu, mc_header->patch_id, uci->cpu_sig.rev);
 
     return 1;
@@ -169,7 +169,7 @@ static int apply_microcode(int cpu)
     if ( rev != hdr->patch_id )
     {
         printk(KERN_ERR "microcode: CPU%d update from revision "
-               "0x%x to 0x%x failed\n", cpu, hdr->patch_id, rev);
+               "%#x to %#x failed\n", cpu, hdr->patch_id, rev);
         return -EIO;
     }
 

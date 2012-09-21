@@ -396,13 +396,13 @@ int __init construct_dom0(
     }
     if (elf_64bit(&elf) && machine == EM_X86_64)
         compatible = 1;
-    printk(" Dom0 kernel: %s%s, %s, paddr 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
+    printk(" Dom0 kernel: %s%s, %s, paddr %#" PRIx64 " -> %#" PRIx64 "\n",
            elf_64bit(&elf) ? "64-bit" : "32-bit",
            parms.pae       ? ", PAE"  : "",
            elf_msb(&elf)   ? "msb"    : "lsb",
            elf.pstart, elf.pend);
     if ( elf.bsd_symtab_pstart )
-        printk(" Dom0 symbol map 0x%" PRIx64 " -> 0x%" PRIx64 "\n",
+        printk(" Dom0 symbol map %#" PRIx64 " -> %#" PRIx64 "\n",
                elf.bsd_symtab_pstart, elf.bsd_symtab_pend);
 
     if ( !compatible )

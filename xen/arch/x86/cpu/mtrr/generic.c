@@ -410,7 +410,7 @@ int generic_validate_add_page(unsigned long base, unsigned long size, unsigned i
 	    boot_cpu_data.x86_model == 1 &&
 	    boot_cpu_data.x86_mask <= 7) {
 		if (base & ((1 << (22 - PAGE_SHIFT)) - 1)) {
-			printk(KERN_WARNING "mtrr: base(0x%lx000) is not 4 MiB aligned\n", base);
+			printk(KERN_WARNING "mtrr: base(%#lx000) is not 4 MiB aligned\n", base);
 			return -EINVAL;
 		}
 		if (!(base + size < 0x70000 || base > 0x7003F) &&
@@ -427,7 +427,7 @@ int generic_validate_add_page(unsigned long base, unsigned long size, unsigned i
 	for (lbase = base; !(lbase & 1) && (last & 1);
 	     lbase = lbase >> 1, last = last >> 1) ;
 	if (lbase != last) {
-		printk(KERN_WARNING "mtrr: base(0x%lx000) is not aligned on a size(0x%lx000) boundary\n",
+		printk(KERN_WARNING "mtrr: base(%#lx000) is not aligned on a size(%#lx000) boundary\n",
 		       base, size);
 		return -EINVAL;
 	}

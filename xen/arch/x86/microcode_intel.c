@@ -122,7 +122,7 @@ static int collect_cpu_info(int cpu_num, struct cpu_signature *csig)
     /* get the current revision from MSR 0x8B */
     rdmsrl(MSR_IA32_UCODE_REV, msr_content);
     csig->rev = (uint32_t)(msr_content >> 32);
-    pr_debug("microcode: collect_cpu_info : sig=0x%x, pf=0x%x, rev=0x%x\n",
+    pr_debug("microcode: collect_cpu_info : sig=%#x, pf=%#x, rev=%#x\n",
              csig->sig, csig->pf, csig->rev);
 
     return 0;
@@ -264,7 +264,7 @@ static int get_matching_microcode(const void *mc, int cpu)
     if ( uci->mc.mc_intel && uci->mc.mc_intel->hdr.rev >= mc_header->rev )
         return 0;
     pr_debug("microcode: CPU%d found a matching microcode update with"
-             " version 0x%x (current=0x%x)\n",
+             " version %#x (current=%#x)\n",
              cpu, mc_header->rev, uci->cpu_sig.rev);
     new_mc = xmalloc_bytes(total_size);
     if ( new_mc == NULL )
@@ -311,11 +311,11 @@ static int apply_microcode(int cpu)
     if ( val[1] != uci->mc.mc_intel->hdr.rev )
     {
         printk(KERN_ERR "microcode: CPU%d update from revision "
-               "0x%x to 0x%x failed\n", cpu_num, uci->cpu_sig.rev, val[1]);
+               "%#x to %#x failed\n", cpu_num, uci->cpu_sig.rev, val[1]);
         return -EIO;
     }
     printk(KERN_INFO "microcode: CPU%d updated from revision "
-           "0x%x to 0x%x, date = %04x-%02x-%02x \n",
+           "%#x to %#x, date = %04x-%02x-%02x \n",
            cpu_num, uci->cpu_sig.rev, val[1],
            uci->mc.mc_intel->hdr.date & 0xffff,
            uci->mc.mc_intel->hdr.date >> 24,

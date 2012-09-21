@@ -377,7 +377,7 @@ static void print_PSS(struct xen_processor_px *ptr, int count)
     printk("\t_PSS: state_count=%d\n", count);
     for (i=0; i<count; i++){
         printk("\tState%d: %"PRId64"MHz %"PRId64"mW %"PRId64"us "
-               "%"PRId64"us 0x%"PRIx64" 0x%"PRIx64"\n",
+               "%"PRId64"us %#"PRIx64" %#"PRIx64"\n",
                i,
                ptr[i].core_frequency,
                ptr[i].power,

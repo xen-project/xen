@@ -2171,7 +2171,7 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
             // attempt by the guest to write to a xen reserved slot
             //
             SHADOW_PRINTK("%s out-of-range update "
-                           "sl4mfn=%05lx index=0x%x val=%" SH_PRI_pte "\n",
+                           "sl4mfn=%05lx index=%#x val=%" SH_PRI_pte "\n",
                            __func__, mfn_x(sl4mfn), shadow_index, new_sl4e.l4);
             if ( shadow_l4e_get_flags(new_sl4e) & _PAGE_PRESENT )
             {

@@ -121,7 +121,7 @@ static u32 adjust_vmx_controls(
 static bool_t cap_check(const char *name, u32 expected, u32 saw)
 {
     if ( saw != expected )
-        printk("VMX %s: saw 0x%08x expected 0x%08x\n", name, saw, expected);
+        printk("VMX %s: saw %#x expected %#x\n", name, saw, expected);
     return saw != expected;
 }
 

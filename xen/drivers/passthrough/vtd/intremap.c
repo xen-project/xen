@@ -135,7 +135,7 @@ int iommu_supports_eim(void)
         if ( !ioapic_to_drhd(IO_APIC_ID(apic)) )
     {
             dprintk(XENLOG_WARNING VTDPREFIX,
-                    "There is not a DRHD for IOAPIC 0x%x (id: 0x%x)!\n",
+                    "There is not a DRHD for IOAPIC %#x (id: %#x)!\n",
                     apic, IO_APIC_ID(apic));
             return 0;
     }

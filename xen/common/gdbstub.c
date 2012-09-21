@@ -263,7 +263,7 @@ gdb_write_to_packet_hex(unsigned long x, int int_size, struct gdb_context *ctx)
     case sizeof(u64):
         break;
     default:
-        dbg_printk("WARNING: %s x: 0x%lx int_size: %d\n",
+        dbg_printk("WARNING: %s x: %#lx int_size: %d\n",
                    __func__, x, int_size);
         break;
     }

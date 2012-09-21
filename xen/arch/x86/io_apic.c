@@ -2204,7 +2204,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
     entry.vector = vector;
 
     apic_printk(APIC_DEBUG, KERN_DEBUG "IOAPIC[%d]: Set PCI routing entry "
-		"(%d-%d -> 0x%x -> IRQ %d Mode:%i Active:%i)\n", ioapic,
+		"(%d-%d -> %#x -> IRQ %d Mode:%i Active:%i)\n", ioapic,
 		mp_ioapics[ioapic].mpc_apicid, pin, entry.vector, irq,
 		edge_level, active_high_low);
 

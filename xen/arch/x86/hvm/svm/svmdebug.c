@@ -32,33 +32,32 @@ static void svm_dump_sel(const char *name, svm_segment_register_t *s)
 void svm_vmcb_dump(const char *from, struct vmcb_struct *vmcb)
 {
     printk("Dumping guest's current state at %s...\n", from);
-    printk("Size of VMCB = %d, paddr = 0x%016lx, vaddr = %p\n",
+    printk("Size of VMCB = %d, paddr = %#lx, vaddr = %p\n",
            (int) sizeof(struct vmcb_struct), virt_to_maddr(vmcb), vmcb);
 
-    printk("cr_intercepts = 0x%08x dr_intercepts = 0x%08x "
-           "exception_intercepts = 0x%08x\n", 
+    printk("cr_intercepts = %#x dr_intercepts = %#x "
+           "exception_intercepts = %#x\n",
            vmcb->_cr_intercepts, vmcb->_dr_intercepts, 
            vmcb->_exception_intercepts);
-    printk("general1_intercepts = 0x%08x general2_intercepts = 0x%08x\n", 
+    printk("general1_intercepts = %#x general2_intercepts = %#x\n",
            vmcb->_general1_intercepts, vmcb->_general2_intercepts);
-    printk("iopm_base_pa = 0x%016llx msrpm_base_pa = 0x%016llx tsc_offset = "
-            "0x%016llx\n", 
+    printk("iopm_base_pa = %#Lx msrpm_base_pa = %#Lx tsc_offset = %#Lx\n",
            (unsigned long long)vmcb->_iopm_base_pa,
            (unsigned long long)vmcb->_msrpm_base_pa,
            (unsigned long long)vmcb->_tsc_offset);
-    printk("tlb_control = 0x%08x vintr = 0x%016llx interrupt_shadow = "
-            "0x%016llx\n", vmcb->tlb_control,
+    printk("tlb_control = %#x vintr = %#Lx interrupt_shadow = %#Lx\n",
+           vmcb->tlb_control,
            (unsigned long long)vmcb->_vintr.bytes,
            (unsigned long long)vmcb->interrupt_shadow);
-    printk("exitcode = 0x%016llx exitintinfo = 0x%016llx\n", 
+    printk("exitcode = %#Lx exitintinfo = %#Lx\n",
            (unsigned long long)vmcb->exitcode,
            (unsigned long long)vmcb->exitintinfo.bytes);
-    printk("exitinfo1 = 0x%016llx exitinfo2 = 0x%016llx \n",
+    printk("exitinfo1 = %#Lx exitinfo2 = %#Lx \n",
            (unsigned long long)vmcb->exitinfo1,
            (unsigned long long)vmcb->exitinfo2);
-    printk("np_enable = 0x%016llx guest_asid = 0x%03x\n", 
+    printk("np_enable = %Lx guest_asid = %#x\n",
            (unsigned long long)vmcb->_np_enable, vmcb->_guest_asid);
-    printk("cpl = %d efer = 0x%016llx star = 0x%016llx lstar = 0x%016llx\n", 
+    printk("cpl = %d efer = %#Lx star = %#Lx lstar = %#Lx\n",
            vmcb->_cpl, (unsigned long long)vmcb->_efer,
            (unsigned long long)vmcb->star, (unsigned long long)vmcb->lstar);
     printk("CR0 = 0x%016llx CR2 = 0x%016llx\n",
@@ -77,7 +76,7 @@ void svm_vmcb_dump(const char *from, struct vmcb_struct *vmcb)
     printk("KernGSBase = 0x%016llx PAT = 0x%016llx \n", 
            (unsigned long long)vmcb->kerngsbase,
            (unsigned long long)vmcb->_g_pat);
-    printk("H_CR3 = 0x%016llx CleanBits = 0x%08x\n",
+    printk("H_CR3 = 0x%016llx CleanBits = %#x\n",
            (unsigned long long)vmcb->_h_cr3, vmcb->cleanbits.bytes);
 
     /* print out all the selectors */
@@ -104,48 +103,48 @@ svm_vmcb_isvalid(const char *from, struct vmcb_struct *vmcb,
     } else return 1;
 
     if ((vmcb->_efer & EFER_SVME) == 0) {
-        PRINTF("EFER: SVME bit not set (0x%"PRIx64")\n", vmcb->_efer);
+        PRINTF("EFER: SVME bit not set (%#"PRIx64")\n", vmcb->_efer);
     }
 
     if ((vmcb->_cr0 & X86_CR0_CD) == 0 && (vmcb->_cr0 & X86_CR0_NW) != 0) {
-        PRINTF("CR0: CD bit is zero and NW bit set (0x%"PRIx64")\n",
+        PRINTF("CR0: CD bit is zero and NW bit set (%#"PRIx64")\n",
                 vmcb->_cr0);
     }
 
     if ((vmcb->_cr0 >> 32U) != 0) {
-        PRINTF("CR0: bits [63:32] are not zero (0x%"PRIx64")\n",
+        PRINTF("CR0: bits [63:32] are not zero (%#"PRIx64")\n",
                 vmcb->_cr0);
     }
 
     if ((vmcb->_cr3 & 0x7) != 0) {
-        PRINTF("CR3: MBZ bits are set (0x%"PRIx64")\n", vmcb->_cr3);
+        PRINTF("CR3: MBZ bits are set (%#"PRIx64")\n", vmcb->_cr3);
     }
     if ((vmcb->_efer & EFER_LMA) && (vmcb->_cr3 & 0xfe) != 0) {
-        PRINTF("CR3: MBZ bits are set (0x%"PRIx64")\n", vmcb->_cr3);
+        PRINTF("CR3: MBZ bits are set (%#"PRIx64")\n", vmcb->_cr3);
     }
 
     if ((vmcb->_cr4 >> 19U) != 0) {
-        PRINTF("CR4: bits [63:19] are not zero (0x%"PRIx64")\n",
+        PRINTF("CR4: bits [63:19] are not zero (%#"PRIx64")\n",
                 vmcb->_cr4);
     }
 
     if (((vmcb->_cr4 >> 11U) & 0x7fU) != 0) {
-        PRINTF("CR4: bits [17:11] are not zero (0x%"PRIx64")\n",
+        PRINTF("CR4: bits [17:11] are not zero (%#"PRIx64")\n",
                 vmcb->_cr4);
     }
 
     if ((vmcb->_dr6 >> 32U) != 0) {
-        PRINTF("DR6: bits [63:32] are not zero (0x%"PRIx64")\n",
+        PRINTF("DR6: bits [63:32] are not zero (%#"PRIx64")\n",
                 vmcb->_dr6);
     }
 
     if ((vmcb->_dr7 >> 32U) != 0) {
-        PRINTF("DR7: bits [63:32] are not zero (0x%"PRIx64")\n",
+        PRINTF("DR7: bits [63:32] are not zero (%#"PRIx64")\n",
                 vmcb->_dr7);
     }
 
     if ((vmcb->_efer >> 15U) != 0) {
-        PRINTF("EFER: bits [63:15] are not zero (0x%"PRIx64")\n",
+        PRINTF("EFER: bits [63:15] are not zero (%#"PRIx64")\n",
                 vmcb->_efer);
     }
 
@@ -168,12 +167,12 @@ svm_vmcb_isvalid(const char *from, struct vmcb_struct *vmcb,
     }
 
     if ((vmcb->_general2_intercepts & GENERAL2_INTERCEPT_VMRUN) == 0) {
-        PRINTF("GENERAL2_INTERCEPT: VMRUN intercept bit is clear (0x%"PRIx32")\n",
+        PRINTF("GENERAL2_INTERCEPT: VMRUN intercept bit is clear (%#"PRIx32")\n",
             vmcb->_general2_intercepts);
     }
 
     if (vmcb->eventinj.fields.resvd1 != 0) {
-        PRINTF("eventinj: MBZ bits are set (0x%"PRIx64")\n",
+        PRINTF("eventinj: MBZ bits are set (%#"PRIx64")\n",
                 vmcb->eventinj.bytes);
     }
 

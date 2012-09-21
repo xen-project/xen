@@ -119,12 +119,12 @@ void __init tboot_probe(void)
     g_tboot_shared = tboot_shared;
     printk("TBOOT: found shared page at phys addr %lx:\n", p_tboot_shared);
     printk("  version: %d\n", tboot_shared->version);
-    printk("  log_addr: 0x%08x\n", tboot_shared->log_addr);
-    printk("  shutdown_entry: 0x%08x\n", tboot_shared->shutdown_entry);
-    printk("  tboot_base: 0x%08x\n", tboot_shared->tboot_base);
-    printk("  tboot_size: 0x%x\n", tboot_shared->tboot_size);
+    printk("  log_addr: %#x\n", tboot_shared->log_addr);
+    printk("  shutdown_entry: %#x\n", tboot_shared->shutdown_entry);
+    printk("  tboot_base: %#x\n", tboot_shared->tboot_base);
+    printk("  tboot_size: %#x\n", tboot_shared->tboot_size);
     if ( tboot_shared->version >= 6 )
-        printk("  flags: 0x%08x\n", tboot_shared->flags);
+        printk("  flags: %#x\n", tboot_shared->flags);
 
     /* these will be needed by tboot_protect_mem_regions() and/or
        tboot_parse_dmar_table(), so get them now */
@@ -352,7 +352,7 @@ void tboot_shutdown(uint32_t shutdown_type)
                            __PAGE_HYPERVISOR);
     if ( err != 0 )
     {
-        printk("error (0x%x) mapping tboot pages (mfns) @ 0x%x, 0x%x\n", err,
+        printk("error (%#x) mapping tboot pages (mfns) @ %#x, %#x\n", err,
                map_base, map_size);
         return;
     }

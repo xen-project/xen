@@ -943,7 +943,7 @@ nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
         break;
 
     default:
-        gdprintk(XENLOG_ERR, "Illegal exitcode 0x%"PRIx64"\n", exitcode);
+        gdprintk(XENLOG_ERR, "Illegal exitcode %#"PRIx64"\n", exitcode);
         BUG();
         break;
     }
@@ -1235,7 +1235,7 @@ int nsvm_wrmsr(struct vcpu *v, unsigned int msr, uint64_t msr_content)
     case MSR_K8_VM_HSAVE_PA:
         if (!nestedsvm_vmcb_isvalid(v, msr_content)) {
             gdprintk(XENLOG_ERR,
-                "MSR_K8_VM_HSAVE_PA value invalid 0x%"PRIx64"\n", msr_content);
+                "MSR_K8_VM_HSAVE_PA value invalid %#"PRIx64"\n", msr_content);
             ret = -1; /* inject #GP */
             break;
         }
@@ -1244,7 +1244,7 @@ int nsvm_wrmsr(struct vcpu *v, unsigned int msr, uint64_t msr_content)
     case MSR_AMD64_TSC_RATIO:
         if ((msr_content & ~TSC_RATIO_RSVD_BITS) != msr_content) {
             gdprintk(XENLOG_ERR,
-                "reserved bits set in MSR_AMD64_TSC_RATIO 0x%"PRIx64"\n",
+                "reserved bits set in MSR_AMD64_TSC_RATIO %#"PRIx64"\n",
                 msr_content);
             ret = -1; /* inject #GP */
             break;

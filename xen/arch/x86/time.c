@@ -1955,11 +1955,11 @@ static void dump_softtsc(unsigned char key)
         printk("dom%u%s: mode=%d",d->domain_id,
                 is_hvm_domain(d) ? "(hvm)" : "", d->arch.tsc_mode);
         if ( d->arch.vtsc_offset )
-            printk(",ofs=0x%"PRIx64"",d->arch.vtsc_offset);
+            printk(",ofs=%#"PRIx64, d->arch.vtsc_offset);
         if ( d->arch.tsc_khz )
-            printk(",khz=%"PRIu32"",d->arch.tsc_khz);
+            printk(",khz=%"PRIu32, d->arch.tsc_khz);
         if ( d->arch.incarnation )
-            printk(",inc=%"PRIu32"",d->arch.incarnation);
+            printk(",inc=%"PRIu32, d->arch.incarnation);
         if ( !(d->arch.vtsc_kerncount | d->arch.vtsc_usercount) )
         {
             printk("\n");

@@ -172,7 +172,7 @@ static uint32_t vlapic_get_ppr(struct vlapic *vlapic)
         ppr = isrv & 0xf0;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC_INTERRUPT,
-                "vlapic %p, ppr 0x%x, isr 0x%x, isrv 0x%x",
+                "vlapic %p, ppr %#x, isr %#x, isrv %#x",
                 vlapic, ppr, isr, isrv);
 
     return ppr;
@@ -215,8 +215,8 @@ bool_t vlapic_match_dest(
     struct vlapic *target, struct vlapic *source,
     int short_hand, uint8_t dest, uint8_t dest_mode)
 {
-    HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "target %p, source %p, dest 0x%x, "
-                "dest_mode 0x%x, short_hand 0x%x",
+    HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "target %p, source %p, dest %#x, "
+                "dest_mode %#x, short_hand %#x",
                 target, source, dest, dest_mode, short_hand);
 
     switch ( short_hand )
@@ -562,20 +562,20 @@ static int vlapic_read(
         break;
 
     default:
-        gdprintk(XENLOG_ERR, "Local APIC read with len=0x%lx, "
+        gdprintk(XENLOG_ERR, "Local APIC read with len=%#lx, "
                  "should be 4 instead.\n", len);
         goto exit_and_crash;
     }
 
-    HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "offset 0x%x with length 0x%lx, "
-                "and the result is 0x%lx", offset, len, result);
+    HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "offset %#x with length %#lx, "
+                "and the result is %#lx", offset, len, result);
 
  out:
     *pval = result;
     return X86EMUL_OKAY;
 
  unaligned_exit_and_crash:
-    gdprintk(XENLOG_ERR, "Unaligned LAPIC read len=0x%lx at offset=0x%x.\n",
+    gdprintk(XENLOG_ERR, "Unaligned LAPIC read len=%#lx at offset=%#x.\n",
              len, offset);
  exit_and_crash:
     domain_crash(v->domain);
@@ -759,7 +759,7 @@ static int vlapic_reg_write(struct vcpu *v,
 
     case APIC_TDCR:
         vlapic_set_tdcr(vlapic, val & 0xb);
-        HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER, "timer divisor is 0x%x",
+        HVM_DBG_LOG(DBG_LEVEL_VLAPIC_TIMER, "timer divisor is %#x",
                     vlapic->hw.timer_divisor);
         break;
 
@@ -768,7 +768,7 @@ static int vlapic_reg_write(struct vcpu *v,
     }
     if (rc == X86EMUL_UNHANDLEABLE)
         gdprintk(XENLOG_DEBUG,
-                "Local APIC Write wrong to register 0x%x\n", offset);
+                "Local APIC Write wrong to register %#x\n", offset);
     return rc;
 }
 
@@ -781,7 +781,7 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
 
     if ( offset != 0xb0 )
         HVM_DBG_LOG(DBG_LEVEL_VLAPIC,
-                    "offset 0x%x with length 0x%lx, and value is 0x%lx",
+                    "offset %#x with length %#lx, and value is %#lx",
                     offset, len, val);
 
     /*
@@ -827,7 +827,7 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
     return vlapic_reg_write(v, offset, val);
 
  unaligned_exit_and_crash:
-    gdprintk(XENLOG_ERR, "Unaligned LAPIC write len=0x%lx at offset=0x%x.\n",
+    gdprintk(XENLOG_ERR, "Unaligned LAPIC write len=%#lx at offset=%#x.\n",
              len, offset);
  exit_and_crash:
     domain_crash(v->domain);
