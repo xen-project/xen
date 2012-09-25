@@ -2379,12 +2379,18 @@ static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
         rc = MAX_POOLS_PER_DOMAIN;
         break;
     case TMEMC_SAVE_GET_CLIENT_WEIGHT:
+        if ( client == NULL )
+            break;
         rc = client->weight == -1 ? -2 : client->weight;
         break;
     case TMEMC_SAVE_GET_CLIENT_CAP:
+        if ( client == NULL )
+            break;
         rc = client->cap == -1 ? -2 : client->cap;
         break;
     case TMEMC_SAVE_GET_CLIENT_FLAGS:
+        if ( client == NULL )
+            break;
         rc = (client->compress ? TMEM_CLIENT_COMPRESS : 0 ) |
              (client->was_frozen ? TMEM_CLIENT_FROZEN : 0 );
         break;
@@ -2408,6 +2414,8 @@ static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
         *uuid = pool->uuid[1];
         rc = 0;
     case TMEMC_SAVE_END:
+        if ( client == NULL )
+            break;
         client->live_migrating = 0;
         if ( !list_empty(&client->persistent_invalidated_list) )
             list_for_each_entry_safe(pgp,pgp2,
