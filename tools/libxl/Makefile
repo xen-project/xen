@@ -9,7 +9,7 @@ MAJOR = 2.0
 MINOR = 0
 
 XLUMAJOR = 1.0
-XLUMINOR = 0
+XLUMINOR = 1
 
 CFLAGS += -Werror -Wno-format-zero-length -Wmissing-declarations \
 	-Wno-declaration-after-statement -Wformat-nonliteral
