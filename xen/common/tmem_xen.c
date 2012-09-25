@@ -97,7 +97,7 @@ static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
     return NULL;
 }
 
-static inline void cli_put_page(tmem_cli_mfn_t cmfn, void *cli_va, pfp_t *cli_pfp,
+static inline void cli_put_page(void *cli_va, pfp_t *cli_pfp,
                                 unsigned long cli_mfn, bool_t mark_dirty)
 {
     ASSERT(0);
@@ -126,20 +126,20 @@ static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
     }
 
     *pcli_mfn = page_to_mfn(page);
-    *pcli_pfp = (pfp_t *)page;
+    *pcli_pfp = page;
     return map_domain_page(*pcli_mfn);
 }
 
-static inline void cli_put_page(tmem_cli_mfn_t cmfn, void *cli_va, pfp_t *cli_pfp,
+static inline void cli_put_page(void *cli_va, pfp_t *cli_pfp,
                                 unsigned long cli_mfn, bool_t mark_dirty)
 {
     if ( mark_dirty )
     {
-        put_page_and_type((struct page_info *)cli_pfp);
+        put_page_and_type(cli_pfp);
         paging_mark_dirty(current->domain,cli_mfn);
     }
     else
-        put_page((struct page_info *)cli_pfp);
+        put_page(cli_pfp);
     unmap_domain_page(cli_va);
 }
 #endif
@@ -188,7 +188,7 @@ EXPORT int tmh_copy_from_client(pfp_t *pfp,
     else if ( len )
         rc = -EINVAL;
     if ( cli_va )
-        cli_put_page(cmfn, cli_va, cli_pfp, cli_mfn, 0);
+        cli_put_page(cli_va, cli_pfp, cli_mfn, 0);
     unmap_domain_page(tmem_va);
     return rc;
 }
@@ -221,7 +221,7 @@ EXPORT int tmh_compress_from_client(tmem_cli_mfn_t cmfn,
     ASSERT(ret == LZO_E_OK);
     *out_va = dmem;
     if ( cli_va )
-        cli_put_page(cmfn, cli_va, cli_pfp, cli_mfn, 0);
+        cli_put_page(cli_va, cli_pfp, cli_mfn, 0);
     return 1;
 }
 
@@ -259,7 +259,7 @@ EXPORT int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
         rc = -EINVAL;
     unmap_domain_page(tmem_va);
     if ( cli_va )
-        cli_put_page(cmfn, cli_va, cli_pfp, cli_mfn, 1);
+        cli_put_page(cli_va, cli_pfp, cli_mfn, 1);
     mb();
     return rc;
 }
@@ -286,7 +286,7 @@ EXPORT int tmh_decompress_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
     ASSERT(ret == LZO_E_OK);
     ASSERT(out_len == PAGE_SIZE);
     if ( cli_va )
-        cli_put_page(cmfn, cli_va, cli_pfp, cli_mfn, 1);
+        cli_put_page(cli_va, cli_pfp, cli_mfn, 1);
     else if ( copy_to_guest(clibuf, scratch, PAGE_SIZE) )
         return -EFAULT;
     mb();
@@ -310,7 +310,7 @@ EXPORT int tmh_copy_tze_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
         memcpy((char *)cli_va,(char *)tmem_va,len);
     if ( len < PAGE_SIZE )
         memset((char *)cli_va+len,0,PAGE_SIZE-len);
-    cli_put_page(cmfn, cli_va, cli_pfp, cli_mfn, 1);
+    cli_put_page(cli_va, cli_pfp, cli_mfn, 1);
     mb();
     return 1;
 }
