@@ -2541,10 +2541,8 @@ static NOINLINE int do_tmem_control(struct tmem_op *op)
     OID *oidp = (OID *)(&op->u.ctrl.oid[0]);
 
     if (!tmh_current_is_privileged())
-    {
-        /* don't fail... mystery: sometimes dom0 fails here */
-        /* return -EPERM; */
-    }
+        return -EPERM;
+
     switch(subop)
     {
     case TMEMC_THAW:
