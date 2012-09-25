@@ -121,7 +121,7 @@ static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
     if ( !ret )
         return NULL;
     *pcli_mfn = cli_mfn;
-    *pcli_pfp = (pfp_t *)page;
+    *pcli_pfp = page;
     return map_domain_page(cli_mfn);
 }
 
@@ -130,11 +130,11 @@ static inline void cli_put_page(void *cli_va, pfp_t *cli_pfp,
 {
     if ( mark_dirty )
     {
-        put_page_and_type((struct page_info *)cli_pfp);
+        put_page_and_type(cli_pfp);
         paging_mark_dirty(current->domain,cli_mfn);
     }
     else
-        put_page((struct page_info *)cli_pfp);
+        put_page(cli_pfp);
     unmap_domain_page(cli_va);
 }
 #endif
