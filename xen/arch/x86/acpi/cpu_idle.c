@@ -659,8 +659,7 @@ void acpi_dead_idle(void)
     }
 
 default_halt:
-    for ( ; ; )
-        halt();
+    default_dead_idle();
 }
 
 int cpuidle_init_cpu(unsigned int cpu)

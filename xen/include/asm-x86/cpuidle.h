@@ -18,6 +18,7 @@ extern uint64_t (*cpuidle_get_tick)(void);
 
 int mwait_idle_init(struct notifier_block *);
 int cpuidle_init_cpu(unsigned int cpu);
+void default_dead_idle(void);
 void acpi_dead_idle(void);
 void trace_exit_reason(u32 *irq_traced);
 void update_idle_stats(struct acpi_processor_power *,

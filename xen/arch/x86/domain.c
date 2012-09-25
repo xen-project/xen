@@ -45,6 +45,7 @@
 #include <asm/desc.h>
 #include <asm/i387.h>
 #include <asm/xstate.h>
+#include <asm/cpuidle.h>
 #include <asm/mpspec.h>
 #include <asm/ldt.h>
 #include <asm/fixmap.h>
@@ -64,7 +65,6 @@ DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 DEFINE_PER_CPU(unsigned long, cr4);
 
 static void default_idle(void);
-static void default_dead_idle(void);
 void (*pm_idle) (void) __read_mostly = default_idle;
 void (*dead_idle) (void) __read_mostly = default_dead_idle;
 
@@ -82,8 +82,14 @@ static void default_idle(void)
         local_irq_enable();
 }
 
-static void default_dead_idle(void)
+void default_dead_idle(void)
 {
+    /*
+     * When going into S3, without flushing caches modified data may be
+     * held by the CPUs spinning here indefinitely, and get discarded by
+     * a subsequent INIT.
+     */
+    wbinvd();
     for ( ; ; )
         halt();
 }
