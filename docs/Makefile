@@ -25,7 +25,7 @@ DOC_TXT         := $(patsubst %.txt,txt/%.txt,$(wildcard misc/*.txt)) \
 all: build
 
 .PHONY: build
-build: html txt man-pages
+build: html txt man-pages figs
 	@if which $(DOT) 1>/dev/null 2>/dev/null ; then              \
 	$(MAKE) -C xen-api build ; else                              \
         echo "Graphviz (dot) not installed; skipping xen-api." ; fi
@@ -39,6 +39,10 @@ html: $(DOC_HTML) html/index.html
 
 .PHONY: txt
 txt: $(DOC_TXT)
+
+.PHONY: figs
+figs:
+	$(MAKE) -C figs
 
 .PHONY: python-dev-docs
 python-dev-docs:
@@ -68,6 +72,7 @@ man5/%.5: man/%.pod.5 Makefile
 .PHONY: clean
 clean:
 	$(MAKE) -C xen-api clean
+	$(MAKE) -C figs clean
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
 	rm -rf *.ilg *.log *.ind *.toc *.bak core
 	rm -rf html txt

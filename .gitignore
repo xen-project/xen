@@ -374,3 +374,4 @@ tools/xenstore/xenstore-watch
 
 docs/txt/misc/*.txt
 docs/txt/man/*.txt
+docs/figs/*.png

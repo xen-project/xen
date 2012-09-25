@@ -45,6 +45,7 @@
 ^docs/interface/interface\.css$
 ^docs/interface/interface\.html$
 ^docs/interface/labels\.pl$
+^docs/figs/.*\.png
 ^docs/man1/
 ^docs/man5/
 ^docs/pdf/.*$
