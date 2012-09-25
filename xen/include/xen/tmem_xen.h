@@ -482,27 +482,33 @@ static inline int tmh_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
     return copy_from_guest(op, uops, 1);
 }
 
+#define tmh_cli_buf_null guest_handle_from_ptr(NULL, char)
+
 static inline void tmh_copy_to_client_buf_offset(tmem_cli_va_t clibuf, int off,
                                            char *tmembuf, int len)
 {
     copy_to_guest_offset(clibuf,off,tmembuf,len);
 }
 
+#define tmh_copy_to_client_buf(clibuf, tmembuf, cnt) \
+    copy_to_guest(guest_handle_cast(clibuf, void), tmembuf, cnt)
+
+#define tmh_client_buf_add guest_handle_add_offset
+
 #define TMH_CLI_ID_NULL ((cli_id_t)((domid_t)-1L))
 
 #define tmh_cli_id_str "domid"
 #define tmh_client_str "domain"
 
-extern int tmh_decompress_to_client(tmem_cli_mfn_t,void*,size_t,void*);
+int tmh_decompress_to_client(tmem_cli_mfn_t, void *, size_t, tmem_cli_va_t);
 
-extern int tmh_compress_from_client(tmem_cli_mfn_t,void**,size_t *,void*);
+int tmh_compress_from_client(tmem_cli_mfn_t, void **, size_t *, tmem_cli_va_t);
 
-extern int tmh_copy_from_client(pfp_t *pfp,
-    tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
-    pagesize_t pfn_offset, pagesize_t len, void *cva);
+int tmh_copy_from_client(pfp_t *, tmem_cli_mfn_t, pagesize_t tmem_offset,
+    pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_t);
 
-extern int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
-    pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len, void *cva);
+int tmh_copy_to_client(tmem_cli_mfn_t, pfp_t *, pagesize_t tmem_offset,
+    pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_t);
 
 extern int tmh_copy_tze_to_client(tmem_cli_mfn_t cmfn, void *tmem_va, pagesize_t len);
 
