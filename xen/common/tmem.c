@@ -2659,13 +2659,19 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     if ( client != NULL && tmh_client_is_dying(client) )
     {
         rc = -ENODEV;
-        goto out;
+        if ( tmh_lock_all )
+            goto out;
+ simple_error:
+        errored_tmem_ops++;
+        return rc;
     }
 
     if ( unlikely(tmh_get_tmemop_from_client(&op, uops) != 0) )
     {
         printk("tmem: can't get tmem struct from %s\n",client_str);
         rc = -EFAULT;
+        if ( !tmh_lock_all )
+            goto simple_error;
         goto out;
     }
 
