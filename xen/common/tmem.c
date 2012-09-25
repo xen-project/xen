@@ -1538,7 +1538,7 @@ copy_uncompressed:
     /* tmh_copy_from_client properly handles len==0 and offsets != 0 */
     ret = tmh_copy_from_client(pgp->pfp, cmfn, tmem_offset, pfn_offset, len,
                                tmh_cli_buf_null);
-    if ( ret == -EFAULT )
+    if ( ret < 0 )
         goto bad_copy;
     if ( tmh_dedup_enabled() && !is_persistent(pool) )
     {
@@ -1559,9 +1559,7 @@ done:
     return 1;
 
 bad_copy:
-    /* this should only happen if the client passed a bad mfn */
     failed_copies++;
-    ret = -EFAULT;
     goto cleanup;
 
 failed_dup:
@@ -1665,7 +1663,7 @@ copy_uncompressed:
     /* tmh_copy_from_client properly handles len==0 (TMEM_NEW_PAGE) */
     ret = tmh_copy_from_client(pgp->pfp, cmfn, tmem_offset, pfn_offset, len,
                                clibuf);
-    if ( ret == -EFAULT )
+    if ( ret < 0 )
         goto bad_copy;
     if ( tmh_dedup_enabled() && !is_persistent(pool) )
     {
@@ -1705,8 +1703,6 @@ insert_page:
     return 1;
 
 bad_copy:
-    /* this should only happen if the client passed a bad mfn */
-    ret = -EFAULT;
     failed_copies++;
 
 delete_and_free:
@@ -1740,7 +1736,7 @@ static NOINLINE int do_tmem_get(pool_t *pool, OID *oidp, uint32_t index,
     pgp_t *pgp;
     client_t *client = pool->client;
     DECL_LOCAL_CYC_COUNTER(decompress);
-    int rc = -EFAULT;
+    int rc;
 
     if ( !_atomic_read(pool->pgp_count) )
         return -EEMPTY;
@@ -1764,20 +1760,20 @@ static NOINLINE int do_tmem_get(pool_t *pool, OID *oidp, uint32_t index,
     ASSERT(pgp->size != -1);
     if ( tmh_dedup_enabled() && !is_persistent(pool) &&
               pgp->firstbyte != NOT_SHAREABLE )
-    {
         rc = pcd_copy_to_client(cmfn, pgp);
-        if ( rc <= 0 )
-            goto bad_copy;
-    } else if ( pgp->size != 0 ) {
+    else if ( pgp->size != 0 )
+    {
         START_CYC_COUNTER(decompress);
         rc = tmh_decompress_to_client(cmfn, pgp->cdata,
                                       pgp->size, clibuf);
-        if ( rc <= 0 )
-            goto bad_copy;
         END_CYC_COUNTER(decompress);
-    } else if ( tmh_copy_to_client(cmfn, pgp->pfp, tmem_offset,
-                                 pfn_offset, len, clibuf) == -EFAULT)
+    }
+    else
+        rc = tmh_copy_to_client(cmfn, pgp->pfp, tmem_offset,
+                                pfn_offset, len, clibuf);
+    if ( rc <= 0 )
         goto bad_copy;
+
     if ( is_ephemeral(pool) )
     {
         if ( is_private(pool) )
@@ -1814,7 +1810,6 @@ static NOINLINE int do_tmem_get(pool_t *pool, OID *oidp, uint32_t index,
     return 1;
 
 bad_copy:
-    /* this should only happen if the client passed a bad mfn */
     failed_copies++;
     return rc;
 }
