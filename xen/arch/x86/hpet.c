@@ -495,7 +495,7 @@ void __init hpet_broadcast_init(void)
     u32 hpet_id, cfg;
     unsigned int i, n;
 
-    if ( hpet_rate == 0 )
+    if ( hpet_rate == 0 || hpet_broadcast_is_available() )
         return;
 
     cfg = hpet_read32(HPET_CFG);

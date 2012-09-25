@@ -74,6 +74,29 @@ static void lapic_timer_nop(void) { }
 void (*__read_mostly lapic_timer_off)(void);
 void (*__read_mostly lapic_timer_on)(void);
 
+bool_t lapic_timer_init(void)
+{
+    if ( boot_cpu_has(X86_FEATURE_ARAT) )
+    {
+        lapic_timer_off = lapic_timer_nop;
+        lapic_timer_on = lapic_timer_nop;
+    }
+    else if ( hpet_broadcast_is_available() )
+    {
+        lapic_timer_off = hpet_broadcast_enter;
+        lapic_timer_on = hpet_broadcast_exit;
+    }
+    else if ( pit_broadcast_is_available() )
+    {
+        lapic_timer_off = pit_broadcast_enter;
+        lapic_timer_on = pit_broadcast_exit;
+    }
+    else
+        return 0;
+
+    return 1;
+}
+
 static uint64_t (*__read_mostly tick_to_ns)(uint64_t) = acpi_pm_tick_to_ns;
 
 void (*__read_mostly pm_idle_save)(void);
@@ -789,25 +812,8 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
         if ( local_apic_timer_c2_ok )
             break;
     case ACPI_STATE_C3:
-        if ( boot_cpu_has(X86_FEATURE_ARAT) )
-        {
-            lapic_timer_off = lapic_timer_nop;
-            lapic_timer_on = lapic_timer_nop;
-        }
-        else if ( hpet_broadcast_is_available() )
-        {
-            lapic_timer_off = hpet_broadcast_enter;
-            lapic_timer_on = hpet_broadcast_exit;
-        }
-        else if ( pit_broadcast_is_available() )
-        {
-            lapic_timer_off = pit_broadcast_enter;
-            lapic_timer_on = pit_broadcast_exit;
-        }
-        else
-        {
+        if ( !lapic_timer_init() )
             return -EINVAL;
-        }
 
         /* All the logic here assumes flags.bm_check is same across all CPUs */
         if ( bm_check_flag == -1 )

@@ -56,6 +56,7 @@
 #include <xen/softirq.h>
 #include <xen/trace.h>
 #include <asm/cpuidle.h>
+#include <asm/hpet.h>
 #include <asm/mwait.h>
 #include <asm/msr.h>
 #include <acpi/cpufreq/cpufreq.h>
@@ -500,6 +501,12 @@ int __init mwait_idle_init(struct notifier_block *nfb)
 		return -ENODEV;
 
 	err = mwait_idle_probe();
+	if (!err) {
+		if (!boot_cpu_has(X86_FEATURE_ARAT))
+			hpet_broadcast_init();
+		if (!lapic_timer_init())
+			err = -EINVAL;
+	}
 	if (!err) {
 		nfb->notifier_call = mwait_idle_cpu_init;
 		mwait_idle_cpu_init(nfb, CPU_UP_PREPARE, NULL);

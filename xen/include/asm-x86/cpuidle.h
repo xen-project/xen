@@ -10,6 +10,7 @@ extern struct acpi_processor_power *processor_powers[];
 
 extern void (*pm_idle_save)(void);
 
+bool_t lapic_timer_init(void);
 extern void (*lapic_timer_off)(void);
 extern void (*lapic_timer_on)(void);
 
