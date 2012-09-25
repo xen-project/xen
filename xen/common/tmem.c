@@ -1793,7 +1793,6 @@ static NOINLINE int do_tmem_get(pool_t *pool, OID *oidp, uint32_t index,
             list_del(&pgp->us.client_eph_pages);
             list_add_tail(&pgp->us.client_eph_pages,&client->ephemeral_page_list);
             tmem_spin_unlock(&eph_lists_spinlock);
-            ASSERT(obj != NULL);
             obj->last_client = tmh_get_cli_id_from_current();
         }
     }
@@ -1810,6 +1809,8 @@ static NOINLINE int do_tmem_get(pool_t *pool, OID *oidp, uint32_t index,
     return 1;
 
 bad_copy:
+    obj->no_evict = 0;
+    tmem_spin_unlock(&obj->obj_spinlock);
     failed_copies++;
     return rc;
 }
