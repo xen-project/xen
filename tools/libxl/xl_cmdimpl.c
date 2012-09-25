@@ -2992,15 +2992,18 @@ static int save_domain(uint32_t domid, const char *filename, int checkpoint,
 
     save_domain_core_writeconfig(fd, filename, config_data, config_len);
 
-    MUST(libxl_domain_suspend(ctx, domid, fd, 0, NULL));
+    int rc = libxl_domain_suspend(ctx, domid, fd, 0, NULL);
     close(fd);
 
-    if (checkpoint)
+    if (rc < 0)
+        fprintf(stderr, "Failed to save domain, resuming domain\n");
+
+    if (checkpoint || rc < 0)
         libxl_domain_resume(ctx, domid, 1, 0);
     else
         libxl_domain_destroy(ctx, domid, 0);
 
-    exit(0);
+    exit(rc < 0 ? 1 : 0);
 }
 
 static pid_t create_migration_child(const char *rune, int *send_fd,
