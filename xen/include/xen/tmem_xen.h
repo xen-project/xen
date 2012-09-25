@@ -512,6 +512,9 @@ int tmh_copy_to_client(tmem_cli_mfn_t, pfp_t *, pagesize_t tmem_offset,
 
 extern int tmh_copy_tze_to_client(tmem_cli_mfn_t cmfn, void *tmem_va, pagesize_t len);
 
+#define tmh_client_err(fmt, args...)  printk(XENLOG_G_ERR fmt, ##args)
+#define tmh_client_warn(fmt, args...) printk(XENLOG_G_WARNING fmt, ##args)
+#define tmh_client_info(fmt, args...) printk(XENLOG_G_INFO fmt, ##args)
 
 #define TMEM_PERF
 #ifdef TMEM_PERF

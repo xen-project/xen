@@ -1107,7 +1107,7 @@ static int shared_pool_join(pool_t *pool, client_t *new_client)
     sl->client = new_client;
     list_add_tail(&sl->share_list, &pool->share_list);
     if ( new_client->cli_id != pool->client->cli_id )
-        printk("adding new %s %d to shared pool owned by %s %d\n",
+        tmh_client_info("adding new %s %d to shared pool owned by %s %d\n",
             client_str, new_client->cli_id, client_str, pool->client->cli_id);
     return ++pool->shared_count;
 }
@@ -1137,7 +1137,7 @@ static NOINLINE void shared_pool_reassign(pool_t *pool)
     old_client->eph_count -= _atomic_read(pool->pgp_count);
     list_splice_init(&old_client->ephemeral_page_list,
                      &new_client->ephemeral_page_list);
-    printk("reassigned shared pool from %s=%d to %s=%d pool_id=%d\n",
+    tmh_client_info("reassigned shared pool from %s=%d to %s=%d pool_id=%d\n",
         cli_id_str, old_client->cli_id, cli_id_str, new_client->cli_id, poolid);
     pool->pool_id = poolid;
 }
@@ -1173,7 +1173,7 @@ static NOINLINE int shared_pool_quit(pool_t *pool, cli_id_t cli_id)
             }
         return 0;
     }
-    printk("tmem: no match unsharing pool, %s=%d\n",
+    tmh_client_warn("tmem: no match unsharing pool, %s=%d\n",
         cli_id_str,pool->client->cli_id);
     return -1;
 }
@@ -1184,17 +1184,18 @@ static void pool_flush(pool_t *pool, cli_id_t cli_id, bool_t destroy)
     ASSERT(pool != NULL);
     if ( (is_shared(pool)) && (shared_pool_quit(pool,cli_id) > 0) )
     {
-        printk("tmem: %s=%d no longer using shared pool %d owned by %s=%d\n",
+        tmh_client_warn("tmem: %s=%d no longer using shared pool %d owned by %s=%d\n",
            cli_id_str, cli_id, pool->pool_id, cli_id_str,pool->client->cli_id);
         return;
     }
-    printk("%s %s-%s tmem pool ",destroy?"destroying":"flushing",
-        is_persistent(pool) ? "persistent" : "ephemeral" ,
-        is_shared(pool) ? "shared" : "private");
-    printk("%s=%d pool_id=%d\n", cli_id_str,pool->client->cli_id,pool->pool_id);
+    tmh_client_info("%s %s-%s tmem pool %s=%d pool_id=%d\n",
+                    destroy ? "destroying" : "flushing",
+                    is_persistent(pool) ? "persistent" : "ephemeral" ,
+                    is_shared(pool) ? "shared" : "private",
+                    cli_id_str, pool->client->cli_id, pool->pool_id);
     if ( pool->client->live_migrating )
     {
-        printk("can't %s pool while %s is live-migrating\n",
+        tmh_client_warn("can't %s pool while %s is live-migrating\n",
                destroy?"destroy":"flush", client_str);
         return;
     }
@@ -1213,21 +1214,22 @@ static client_t *client_create(cli_id_t cli_id)
     client_t *client = tmh_alloc_infra(sizeof(client_t),__alignof__(client_t));
     int i;
 
-    printk("tmem: initializing tmem capability for %s=%d...",cli_id_str,cli_id);
+    tmh_client_info("tmem: initializing tmem capability for %s=%d...",
+                    cli_id_str, cli_id);
     if ( client == NULL )
     {
-        printk("failed... out of memory\n");
+        tmh_client_err("failed... out of memory\n");
         goto fail;
     }
     memset(client,0,sizeof(client_t));
     if ( (client->tmh = tmh_client_init(cli_id)) == NULL )
     {
-        printk("failed... can't allocate host-dependent part of client\n");
+        tmh_client_err("failed... can't allocate host-dependent part of client\n");
         goto fail;
     }
     if ( !tmh_set_client_from_id(client, client->tmh, cli_id) )
     {
-        printk("failed... can't set client\n");
+        tmh_client_err("failed... can't set client\n");
         goto fail;
     }
     client->cli_id = cli_id;
@@ -1249,7 +1251,7 @@ static client_t *client_create(cli_id_t cli_id)
     client->eph_count = client->eph_count_max = 0;
     client->total_cycles = 0; client->succ_pers_puts = 0;
     client->succ_eph_gets = 0; client->succ_pers_gets = 0;
-    printk("ok\n");
+    tmh_client_info("ok\n");
     return client;
 
  fail:
@@ -1903,32 +1905,33 @@ static NOINLINE int do_tmem_new_pool(cli_id_t this_cli_id,
         cli_id = tmh_get_cli_id_from_current();
     else
         cli_id = this_cli_id;
-    printk("tmem: allocating %s-%s tmem pool for %s=%d...",
+    tmh_client_info("tmem: allocating %s-%s tmem pool for %s=%d...",
         persistent ? "persistent" : "ephemeral" ,
         shared ? "shared" : "private", cli_id_str, cli_id);
     if ( specversion != TMEM_SPEC_VERSION )
     {
-        printk("failed... unsupported spec version\n");
+        tmh_client_err("failed... unsupported spec version\n");
         return -EPERM;
     }
     if ( pagebits != (PAGE_SHIFT - 12) )
     {
-        printk("failed... unsupported pagesize %d\n",1<<(pagebits+12));
+        tmh_client_err("failed... unsupported pagesize %d\n",
+                       1 << (pagebits + 12));
         return -EPERM;
     }
     if ( flags & TMEM_POOL_PRECOMPRESSED )
     {
-        printk("failed... precompression flag set but unsupported\n");
+        tmh_client_err("failed... precompression flag set but unsupported\n");
         return -EPERM;
     }
     if ( flags & TMEM_POOL_RESERVED_BITS )
     {
-        printk("failed... reserved bits must be zero\n");
+        tmh_client_err("failed... reserved bits must be zero\n");
         return -EPERM;
     }
     if ( (pool = pool_alloc()) == NULL )
     {
-        printk("failed... out of memory\n");
+        tmh_client_err("failed... out of memory\n");
         return -ENOMEM;
     }
     if ( this_cli_id != CLI_ID_NULL )
@@ -1947,7 +1950,7 @@ static NOINLINE int do_tmem_new_pool(cli_id_t this_cli_id,
                 break;
         if ( d_poolid >= MAX_POOLS_PER_DOMAIN )
         {
-            printk("failed... no more pool slots available for this %s\n",
+            tmh_client_err("failed... no more pool slots available for this %s\n",
                    client_str);
             goto fail;
         }
@@ -1977,9 +1980,8 @@ static NOINLINE int do_tmem_new_pool(cli_id_t this_cli_id,
             {
                 if ( shpool->uuid[0] == uuid_lo && shpool->uuid[1] == uuid_hi )
                 {
-                    printk("(matches shared pool uuid=%"PRIx64".%"PRIx64") ",
-                        uuid_hi, uuid_lo);
-                    printk("pool_id=%d\n",d_poolid);
+                    tmh_client_info("(matches shared pool uuid=%"PRIx64".%"PRIx64") pool_id=%d\n",
+                        uuid_hi, uuid_lo, d_poolid);
                     client->pools[d_poolid] = global_shared_pools[s_poolid];
                     shared_pool_join(global_shared_pools[s_poolid], client);
                     pool_free(pool);
@@ -1991,7 +1993,7 @@ static NOINLINE int do_tmem_new_pool(cli_id_t this_cli_id,
         }
         if ( first_unused_s_poolid == MAX_GLOBAL_SHARED_POOLS )
         {
-            printk("tmem: failed... no global shared pool slots available\n");
+            tmh_client_warn("tmem: failed... no global shared pool slots available\n");
             goto fail;
         }
         else
@@ -2007,7 +2009,7 @@ static NOINLINE int do_tmem_new_pool(cli_id_t this_cli_id,
     pool->pool_id = d_poolid;
     pool->persistent = persistent;
     pool->uuid[0] = uuid_lo; pool->uuid[1] = uuid_hi;
-    printk("pool_id=%d\n",d_poolid);
+    tmh_client_info("pool_id=%d\n", d_poolid);
     return d_poolid;
 
 fail:
@@ -2030,14 +2032,15 @@ static int tmemc_freeze_pools(cli_id_t cli_id, int arg)
     {
         list_for_each_entry(client,&global_client_list,client_list)
             client_freeze(client,freeze);
-        printk("tmem: all pools %s for all %ss\n",s,client_str);
+        tmh_client_info("tmem: all pools %s for all %ss\n", s, client_str);
     }
     else
     {
         if ( (client = tmh_client_from_cli_id(cli_id)) == NULL)
             return -1;
         client_freeze(client,freeze);
-        printk("tmem: all pools %s for %s=%d\n",s,cli_id_str,cli_id);
+        tmh_client_info("tmem: all pools %s for %s=%d\n",
+                         s, cli_id_str, cli_id);
     }
     return 0;
 }
@@ -2048,7 +2051,7 @@ static int tmemc_flush_mem(cli_id_t cli_id, uint32_t kb)
 
     if ( cli_id != CLI_ID_NULL )
     {
-        printk("tmem: %s-specific flush not supported yet, use --all\n",
+        tmh_client_warn("tmem: %s-specific flush not supported yet, use --all\n",
            client_str);
         return -1;
     }
@@ -2261,13 +2264,15 @@ static int tmemc_set_var_one(client_t *client, uint32_t subop, uint32_t arg1)
     case TMEMC_SET_WEIGHT:
         old_weight = client->weight;
         client->weight = arg1;
-        printk("tmem: weight set to %d for %s=%d\n",arg1,cli_id_str,cli_id);
+        tmh_client_info("tmem: weight set to %d for %s=%d\n",
+                        arg1, cli_id_str, cli_id);
         atomic_sub(old_weight,&client_weight_total);
         atomic_add(client->weight,&client_weight_total);
         break;
     case TMEMC_SET_CAP:
         client->cap = arg1;
-        printk("tmem: cap set to %d for %s=%d\n",arg1,cli_id_str,cli_id);
+        tmh_client_info("tmem: cap set to %d for %s=%d\n",
+                        arg1, cli_id_str, cli_id);
         break;
     case TMEMC_SET_COMPRESS:
 #ifdef __i386__
@@ -2275,17 +2280,17 @@ static int tmemc_set_var_one(client_t *client, uint32_t subop, uint32_t arg1)
 #endif
         if ( tmh_dedup_enabled() )
         {
-            printk("tmem: compression %s for all %ss, cannot be changed "
-                   "when tmem_dedup is enabled\n",
-            tmh_compression_enabled() ? "enabled" : "disabled",client_str);
+            tmh_client_warn("tmem: compression %s for all %ss, cannot be changed when tmem_dedup is enabled\n",
+                            tmh_compression_enabled() ? "enabled" : "disabled",
+                            client_str);
             return -1;
         }
         client->compress = arg1 ? 1 : 0;
-        printk("tmem: compression %s for %s=%d\n",
+        tmh_client_info("tmem: compression %s for %s=%d\n",
             arg1 ? "enabled" : "disabled",cli_id_str,cli_id);
         break;
     default:
-        printk("tmem: unknown subop %d for tmemc_set_var\n",subop);
+        tmh_client_warn("tmem: unknown subop %d for tmemc_set_var\n", subop);
         return -1;
     }
     return 0;
@@ -2668,7 +2673,7 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
 
     if ( unlikely(tmh_get_tmemop_from_client(&op, uops) != 0) )
     {
-        printk("tmem: can't get tmem struct from %s\n",client_str);
+        tmh_client_err("tmem: can't get tmem struct from %s\n", client_str);
         rc = -EFAULT;
         if ( !tmh_lock_all )
             goto simple_error;
@@ -2702,7 +2707,8 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
         tmem_write_lock_set = 1;
         if ( (client = client_create(tmh_get_cli_id_from_current())) == NULL )
         {
-            printk("tmem: can't create tmem structure for %s\n",client_str);
+            tmh_client_err("tmem: can't create tmem structure for %s\n",
+                           client_str);
             rc = -ENOMEM;
             goto out;
         }
@@ -2726,8 +2732,8 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
         if ( ((uint32_t)op.pool_id >= MAX_POOLS_PER_DOMAIN) ||
              ((pool = client->pools[op.pool_id]) == NULL) )
         {
+            tmh_client_err("tmem: operation requested on uncreated pool\n");
             rc = -ENODEV;
-            printk("tmem: operation requested on uncreated pool\n");
             goto out;
         }
         ASSERT_SENTINEL(pool,POOL);
@@ -2783,11 +2789,11 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
         break;
     case TMEM_XCHG:
         /* need to hold global lock to ensure xchg is atomic */
-        printk("tmem_xchg op not implemented yet\n");
+        tmh_client_warn("tmem_xchg op not implemented yet\n");
         rc = 0;
         break;
     default:
-        printk("tmem: op %d not implemented\n", op.cmd);
+        tmh_client_warn("tmem: op %d not implemented\n", op.cmd);
         rc = 0;
         break;
     }
