@@ -324,51 +324,39 @@ static int vmce_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 HVM_REGISTER_SAVE_RESTORE(VMCE_VCPU, vmce_save_vcpu_ctxt,
                           vmce_load_vcpu_ctxt, 1, HVMSR_PER_VCPU);
 
-int inject_vmce(struct domain *d)
+/*
+ * for Intel MCE, broadcast vMCE to all vcpus
+ * for AMD MCE, only inject vMCE to vcpu0
+ */
+int inject_vmce(struct domain *d, int vcpu)
 {
-    int cpu = smp_processor_id();
+    struct vcpu *v;
 
-    /* PV guest and HVM guest have different vMCE# injection methods. */
-    if ( !test_and_set_bool(d->vcpu[0]->mce_pending) )
+    for_each_vcpu ( d, v )
     {
-        if ( d->is_hvm )
+        if ( vcpu >= 0 && v->vcpu_id != vcpu )
+            continue;
+
+        if ( (is_hvm_domain(d) ||
+              guest_has_trap_callback(d, v->vcpu_id, TRAP_machine_check)) &&
+             !test_and_set_bool(v->mce_pending) )
         {
-            mce_printk(MCE_VERBOSE, "MCE: inject vMCE to HVM DOM %d\n",
-                       d->domain_id);
-            vcpu_kick(d->vcpu[0]);
+            mce_printk(MCE_VERBOSE, "MCE: inject vMCE to d%d:v%d\n",
+                       d->domain_id, v->vcpu_id);
+            vcpu_kick(v);
         }
         else
         {
-            mce_printk(MCE_VERBOSE, "MCE: inject vMCE to PV DOM%d\n",
-                       d->domain_id);
-            if ( guest_has_trap_callback(d, 0, TRAP_machine_check) )
-            {
-                cpumask_copy(d->vcpu[0]->cpu_affinity_tmp,
-                             d->vcpu[0]->cpu_affinity);
-                mce_printk(MCE_VERBOSE, "MCE: CPU%d set affinity, old %d\n",
-                           cpu, d->vcpu[0]->processor);
-                vcpu_set_affinity(d->vcpu[0], cpumask_of(cpu));
-                vcpu_kick(d->vcpu[0]);
-            }
-            else
-            {
-                mce_printk(MCE_VERBOSE,
-                           "MCE: Kill PV guest with No MCE handler\n");
-                domain_crash(d);
-            }
+            mce_printk(MCE_QUIET, "Failed to inject vMCE to d%d:v%d\n",
+                       d->domain_id, v->vcpu_id);
+            return -EBUSY;
         }
+
+        if ( vcpu >= 0 )
+            return 0;
     }
-    else
-    {
-        /* new vMCE comes while first one has not been injected yet,
-         * in this case, inject fail. [We can't lose this vMCE for
-         * the mce node's consistency].
-         */
-        mce_printk(MCE_QUIET, "There's a pending vMCE waiting to be injected "
-                   " to this DOM%d!\n", d->domain_id);
-        return -1;
-    }
-    return 0;
+
+    return v ? -ESRCH : 0;
 }
 
 int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,

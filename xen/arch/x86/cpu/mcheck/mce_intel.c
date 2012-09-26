@@ -359,7 +359,7 @@ static void intel_memerr_dhandler(
                 }
 
                 /* We will inject vMCE to DOMU*/
-                if ( inject_vmce(d) < 0 )
+                if ( inject_vmce(d, -1) < 0 )
                 {
                     mce_printk(MCE_QUIET, "inject vMCE to DOM%d"
                       " failed\n", d->domain_id);

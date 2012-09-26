@@ -168,7 +168,7 @@ void x86_mcinfo_dump(struct mc_info *mi);
 
 int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
     uint64_t gstatus);
-int inject_vmce(struct domain *d);
+int inject_vmce(struct domain *d, int vcpu);
 
 static inline int mce_vendor_bank_msr(const struct vcpu *v, uint32_t msr)
 {
