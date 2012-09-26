@@ -37,26 +37,35 @@ __asm__(".section .text");
 
 BUILD_COMMON_IRQ()
 
-#define BI(x,y) \
-    BUILD_IRQ(x##y)
+#define IRQ_NAME(nr) VEC##nr##_interrupt
+
+#define BI(nr)                                           \
+void IRQ_NAME(nr)(void);                                 \
+__asm__(                                                 \
+".if " STR(0x##nr) " >= " STR(FIRST_DYNAMIC_VECTOR) "\n" \
+__ALIGN_STR "\n"                                         \
+STR(IRQ_NAME(nr)) ":\n\t"                                \
+BUILD_IRQ(0x##nr) "\n"                                   \
+".else\n"                                                \
+".equ " STR(IRQ_NAME(nr)) ", 0\n"                        \
+".endif\n")
 
 #define BUILD_16_IRQS(x) \
-    BI(x,0) BI(x,1) BI(x,2) BI(x,3) \
-    BI(x,4) BI(x,5) BI(x,6) BI(x,7) \
-    BI(x,8) BI(x,9) BI(x,a) BI(x,b) \
-    BI(x,c) BI(x,d) BI(x,e) BI(x,f)
+    BI(x##0); BI(x##1); BI(x##2); BI(x##3); \
+    BI(x##4); BI(x##5); BI(x##6); BI(x##7); \
+    BI(x##8); BI(x##9); BI(x##a); BI(x##b); \
+    BI(x##c); BI(x##d); BI(x##e); BI(x##f)
 
-BUILD_16_IRQS(0x0) BUILD_16_IRQS(0x1) BUILD_16_IRQS(0x2) BUILD_16_IRQS(0x3)
-BUILD_16_IRQS(0x4) BUILD_16_IRQS(0x5) BUILD_16_IRQS(0x6) BUILD_16_IRQS(0x7)
-BUILD_16_IRQS(0x8) BUILD_16_IRQS(0x9) BUILD_16_IRQS(0xa) BUILD_16_IRQS(0xb)
-BUILD_16_IRQS(0xc) BUILD_16_IRQS(0xd) BUILD_16_IRQS(0xe) BUILD_16_IRQS(0xf)
+BUILD_16_IRQS(0); BUILD_16_IRQS(1); BUILD_16_IRQS(2); BUILD_16_IRQS(3);
+BUILD_16_IRQS(4); BUILD_16_IRQS(5); BUILD_16_IRQS(6); BUILD_16_IRQS(7);
+BUILD_16_IRQS(8); BUILD_16_IRQS(9); BUILD_16_IRQS(a); BUILD_16_IRQS(b);
+BUILD_16_IRQS(c); BUILD_16_IRQS(d); BUILD_16_IRQS(e); BUILD_16_IRQS(f);
 
 #undef BUILD_16_IRQS
 #undef BI
 
 
-#define IRQ(x,y) \
-    IRQ##x##y##_interrupt
+#define IRQ(x,y) IRQ_NAME(x##y)
 
 #define IRQLIST_16(x) \
     IRQ(x,0), IRQ(x,1), IRQ(x,2), IRQ(x,3), \
@@ -64,12 +73,12 @@ BUILD_16_IRQS(0xc) BUILD_16_IRQS(0xd) BUILD_16_IRQS(0xe) BUILD_16_IRQS(0xf)
     IRQ(x,8), IRQ(x,9), IRQ(x,a), IRQ(x,b), \
     IRQ(x,c), IRQ(x,d), IRQ(x,e), IRQ(x,f)
 
-    static void (*interrupt[])(void) = {
-        IRQLIST_16(0x0), IRQLIST_16(0x1), IRQLIST_16(0x2), IRQLIST_16(0x3),
-        IRQLIST_16(0x4), IRQLIST_16(0x5), IRQLIST_16(0x6), IRQLIST_16(0x7),
-        IRQLIST_16(0x8), IRQLIST_16(0x9), IRQLIST_16(0xa), IRQLIST_16(0xb),
-        IRQLIST_16(0xc), IRQLIST_16(0xd), IRQLIST_16(0xe), IRQLIST_16(0xf)
-    };
+static void (*__initdata interrupt[NR_VECTORS])(void) = {
+    IRQLIST_16(0), IRQLIST_16(1), IRQLIST_16(2), IRQLIST_16(3),
+    IRQLIST_16(4), IRQLIST_16(5), IRQLIST_16(6), IRQLIST_16(7),
+    IRQLIST_16(8), IRQLIST_16(9), IRQLIST_16(a), IRQLIST_16(b),
+    IRQLIST_16(c), IRQLIST_16(d), IRQLIST_16(e), IRQLIST_16(f)
+};
 
 #undef IRQ
 #undef IRQLIST_16
@@ -400,6 +409,7 @@ void __init init_IRQ(void)
     {
         if (vector == HYPERCALL_VECTOR || vector == LEGACY_SYSCALL_VECTOR)
             continue;
+        BUG_ON(!interrupt[vector]);
         set_intr_gate(vector, interrupt[vector]);
     }
 

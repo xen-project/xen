@@ -99,17 +99,10 @@ __asm__(                                        \
     "callq " STR(do_IRQ) "\n\t"                 \
     "jmp ret_from_intr\n");
 
-#define IRQ_NAME2(nr) nr##_interrupt(void)
-#define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
-
 #define BUILD_IRQ(nr)                           \
-void IRQ_NAME(nr);                   \
-__asm__(                                        \
-"\n"__ALIGN_STR"\n"                             \
-STR(IRQ) #nr "_interrupt:\n\t"                  \
     "pushq $0\n\t"                              \
     "movl $"#nr",4(%rsp)\n\t"                   \
-    "jmp common_interrupt");
+    "jmp common_interrupt"
 
 #ifdef __ASSEMBLY__
 # define _ASM_EX(p) p-.
