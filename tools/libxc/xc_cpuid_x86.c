@@ -362,7 +362,8 @@ static void xc_cpuid_hvm_policy(
 
     case 0x00000007: /* Intel-defined CPU features */
         if ( input[1] == 0 ) {
-            regs[1] &= (bitmaskof(X86_FEATURE_BMI1) |
+            regs[1] &= (bitmaskof(X86_FEATURE_TSC_ADJUST) |
+                        bitmaskof(X86_FEATURE_BMI1) |
                         bitmaskof(X86_FEATURE_HLE)  |
                         bitmaskof(X86_FEATURE_AVX2) |
                         bitmaskof(X86_FEATURE_SMEP) |
