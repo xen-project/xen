@@ -445,10 +445,10 @@ domain_crash_synchronous_string:
 
 ENTRY(domain_crash_synchronous)
         # Get out of the guest-save area of the stack.
-        GET_CPUINFO_FIELD(CPUINFO_guest_cpu_user_regs,%rax)
-        movq  %rax,%rsp
+        GET_STACK_BASE(%rax)
+        leaq  STACK_CPUINFO_FIELD(guest_cpu_user_regs)(%rax),%rsp
         # create_bounce_frame() temporarily clobbers CS.RPL. Fix up.
-        GET_CURRENT(%rax)
+        __GET_CURRENT(%rax)
         movq  VCPU_domain(%rax),%rax
         testb $1,DOMAIN_is_32bit_pv(%rax)
         setz  %al
@@ -622,7 +622,7 @@ handle_ist_exception:
         testb $3,UREGS_cs(%rsp)
         jz    1f
         /* Interrupted guest context. Copy the context to stack bottom. */
-        GET_CPUINFO_FIELD(CPUINFO_guest_cpu_user_regs,%rdi)
+        GET_CPUINFO_FIELD(guest_cpu_user_regs,%rdi)
         movq  %rsp,%rsi
         movl  $UREGS_kernel_sizeof/8,%ecx
         movq  %rdi,%rsp
