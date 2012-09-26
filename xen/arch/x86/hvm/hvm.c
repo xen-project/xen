@@ -237,6 +237,7 @@ int hvm_set_guest_pat(struct vcpu *v, u64 guest_pat)
 void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
 {
     uint64_t tsc;
+    uint64_t delta_tsc;
 
     if ( v->domain->arch.vtsc )
     {
@@ -248,8 +249,20 @@ void hvm_set_guest_tsc(struct vcpu *v, u64 guest_tsc)
         rdtscll(tsc);
     }
 
-    v->arch.hvm_vcpu.cache_tsc_offset = guest_tsc - tsc;
+    delta_tsc = guest_tsc - tsc;
+    v->arch.hvm_vcpu.msr_tsc_adjust += delta_tsc
+                          - v->arch.hvm_vcpu.cache_tsc_offset;
+    v->arch.hvm_vcpu.cache_tsc_offset = delta_tsc;
+
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+}
+
+void hvm_set_guest_tsc_adjust(struct vcpu *v, u64 tsc_adjust)
+{
+    v->arch.hvm_vcpu.cache_tsc_offset += tsc_adjust
+                            - v->arch.hvm_vcpu.msr_tsc_adjust;
+    hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+    v->arch.hvm_vcpu.msr_tsc_adjust = tsc_adjust;
 }
 
 u64 hvm_get_guest_tsc(struct vcpu *v)
@@ -268,6 +281,11 @@ u64 hvm_get_guest_tsc(struct vcpu *v)
     }
 
     return tsc + v->arch.hvm_vcpu.cache_tsc_offset;
+}
+
+u64 hvm_get_guest_tsc_adjust(struct vcpu *v)
+{
+    return v->arch.hvm_vcpu.msr_tsc_adjust;
 }
 
 void hvm_migrate_timers(struct vcpu *v)
@@ -2769,6 +2787,10 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         *msr_content = hvm_get_guest_tsc(v);
         break;
 
+    case MSR_IA32_TSC_ADJUST:
+        *msr_content = hvm_get_guest_tsc_adjust(v);
+        break;
+
     case MSR_TSC_AUX:
         *msr_content = hvm_msr_tsc_aux(v);
         break;
@@ -2880,6 +2902,10 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 
     case MSR_IA32_TSC:
         hvm_set_guest_tsc(v, msr_content);
+        break;
+
+    case MSR_IA32_TSC_ADJUST:
+        hvm_set_guest_tsc_adjust(v, msr_content);
         break;
 
     case MSR_TSC_AUX:
@@ -3428,6 +3454,8 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     v->arch.hvm_vcpu.cache_tsc_offset =
         v->domain->vcpu[0]->arch.hvm_vcpu.cache_tsc_offset;
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
+
+    v->arch.hvm_vcpu.msr_tsc_adjust = 0;
 
     paging_update_paging_modes(v);
 
