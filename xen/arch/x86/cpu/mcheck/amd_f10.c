@@ -104,3 +104,28 @@ enum mcheck_type amd_f10_mcheck_init(struct cpuinfo_x86 *c)
 
 	return mcheck_amd_famXX;
 }
+
+/* amd specific MCA MSR */
+int vmce_amd_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
+{
+        switch (msr) {
+        case MSR_F10_MC4_MISC1:
+        case MSR_F10_MC4_MISC2:
+        case MSR_F10_MC4_MISC3:
+                break;
+        }
+
+        return 1;
+}
+
+int vmce_amd_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
+{
+        switch (msr) {
+        case MSR_F10_MC4_MISC1:
+        case MSR_F10_MC4_MISC2:
+        case MSR_F10_MC4_MISC3:
+                break;
+        }
+
+        return 1;
+}

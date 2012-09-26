@@ -21,6 +21,7 @@
 #include <asm/msr.h>
 
 #include "mce.h"
+#include "vmce.h"
 
 DEFINE_PER_CPU(struct mca_banks *, poll_bankmask);
 static struct timer mce_timer;

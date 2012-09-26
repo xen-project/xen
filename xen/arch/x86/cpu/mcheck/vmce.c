@@ -33,8 +33,10 @@
 #include <asm/system.h>
 #include <asm/msr.h>
 #include <asm/p2m.h>
+
 #include "mce.h"
 #include "x86_mca.h"
+#include "vmce.h"
 
 /*
  * MCG_SER_P:  software error recovery supported
@@ -143,7 +145,10 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
         switch ( boot_cpu_data.x86_vendor )
         {
         case X86_VENDOR_INTEL:
-            ret = intel_mce_rdmsr(v, msr, val);
+            ret = vmce_intel_rdmsr(v, msr, val);
+            break;
+        case X86_VENDOR_AMD:
+            ret = vmce_amd_rdmsr(v, msr, val);
             break;
         default:
             ret = 0;
@@ -200,7 +205,7 @@ int vmce_rdmsr(uint32_t msr, uint64_t *val)
  * For historic version reason, bank number may greater than GUEST_MC_BANK_NUM,
  * when migratie from old vMCE version to new vMCE.
  */
-static int bank_mce_wrmsr(struct vcpu *v, u32 msr, u64 val)
+static int bank_mce_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 {
     int ret = 1;
     unsigned int bank = (msr - MSR_IA32_MC0_CTL) / 4;
@@ -238,7 +243,10 @@ static int bank_mce_wrmsr(struct vcpu *v, u32 msr, u64 val)
         switch ( boot_cpu_data.x86_vendor )
         {
         case X86_VENDOR_INTEL:
-            ret = intel_mce_wrmsr(v, msr, val);
+            ret = vmce_intel_wrmsr(v, msr, val);
+            break;
+        case X86_VENDOR_AMD:
+            ret = vmce_amd_wrmsr(v, msr, val);
             break;
         default:
             ret = 0;
@@ -255,7 +263,7 @@ static int bank_mce_wrmsr(struct vcpu *v, u32 msr, u64 val)
  * = 0: Not handled, should be handled by other components
  * > 0: Success
  */
-int vmce_wrmsr(u32 msr, u64 val)
+int vmce_wrmsr(uint32_t msr, uint64_t val)
 {
     struct vcpu *cur = current;
     int ret = 1;

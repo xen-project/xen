@@ -1,0 +1,23 @@
+#ifndef _MCHECK_VMCE_H
+#define _MCHECK_VMCE_H
+
+#include "x86_mca.h"
+
+int vmce_init(struct cpuinfo_x86 *c);
+
+#define dom0_vmce_enabled() (dom0 && dom0->max_vcpus && dom0->vcpu[0] \
+        && guest_enabled_event(dom0->vcpu[0], VIRQ_MCA))
+
+int is_vmce_ready(struct mcinfo_bank *bank, struct domain *d);
+int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn);
+
+int vmce_intel_rdmsr(const struct vcpu *, uint32_t msr, uint64_t *val);
+int vmce_intel_wrmsr(struct vcpu *, uint32_t msr, uint64_t val);
+int vmce_amd_rdmsr(const struct vcpu *, uint32_t msr, uint64_t *val);
+int vmce_amd_wrmsr(struct vcpu *, uint32_t msr, uint64_t val);
+
+int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
+    uint64_t gstatus);
+int inject_vmce(struct domain *d, int vcpu);
+
+#endif

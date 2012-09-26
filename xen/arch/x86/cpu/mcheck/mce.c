@@ -25,6 +25,7 @@
 #include "mce.h"
 #include "barrier.h"
 #include "util.h"
+#include "vmce.h"
 
 bool_t __read_mostly mce_disabled;
 invbool_param("mce", mce_disabled);

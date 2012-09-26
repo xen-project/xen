@@ -49,14 +49,8 @@ void intel_mcheck_timer(struct cpuinfo_x86 *c);
 void mce_intel_feature_init(struct cpuinfo_x86 *c);
 void amd_nonfatal_mcheck_init(struct cpuinfo_x86 *c);
 
-int is_vmce_ready(struct mcinfo_bank *bank, struct domain *d);
-int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn);
-
-u64 mce_cap_init(void);
+uint64_t mce_cap_init(void);
 extern unsigned int firstbank;
-
-int intel_mce_rdmsr(const struct vcpu *, uint32_t msr, uint64_t *val);
-int intel_mce_wrmsr(struct vcpu *, uint32_t msr, uint64_t val);
 
 struct mcinfo_extended *intel_get_extended_msrs(
     struct mcinfo_global *mig, struct mc_info *mi);
@@ -68,9 +62,6 @@ struct mc_info *x86_mcinfo_getptr(void);
 void mc_panic(char *s);
 void x86_mc_get_cpu_info(unsigned, uint32_t *, uint16_t *, uint16_t *,
 			 uint32_t *, uint32_t *, uint32_t *, uint32_t *);
-
-#define dom0_vmce_enabled() (dom0 && dom0->max_vcpus && dom0->vcpu[0] \
-	&& guest_enabled_event(dom0->vcpu[0], VIRQ_MCA))
 
 /* Register a handler for machine check exceptions. */
 typedef void (*x86_mce_vector_t)(struct cpu_user_regs *, long);
@@ -165,10 +156,6 @@ extern void x86_mce_callback_register(x86_mce_callback_t);
 void *x86_mcinfo_add(struct mc_info *mi, void *mcinfo);
 void *x86_mcinfo_reserve(struct mc_info *mi, int size);
 void x86_mcinfo_dump(struct mc_info *mi);
-
-int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
-    uint64_t gstatus);
-int inject_vmce(struct domain *d, int vcpu);
 
 static inline int mce_vendor_bank_msr(const struct vcpu *v, uint32_t msr)
 {

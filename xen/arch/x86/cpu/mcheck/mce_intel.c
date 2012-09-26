@@ -18,6 +18,7 @@
 #include "x86_mca.h"
 #include "barrier.h"
 #include "util.h"
+#include "vmce.h"
 
 DEFINE_PER_CPU(struct mca_banks *, mce_banks_owned);
 DEFINE_PER_CPU(struct mca_banks *, no_cmci_banks);
@@ -980,7 +981,7 @@ enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
 }
 
 /* intel specific MCA MSR */
-int intel_mce_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
+int vmce_intel_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 {
     unsigned int bank = msr - MSR_IA32_MC0_CTL2;
 
@@ -993,7 +994,7 @@ int intel_mce_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
     return 1;
 }
 
-int intel_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
+int vmce_intel_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 {
     unsigned int bank = msr - MSR_IA32_MC0_CTL2;
 

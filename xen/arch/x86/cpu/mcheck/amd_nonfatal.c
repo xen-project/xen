@@ -64,6 +64,7 @@
 #include <asm/msr.h>
 
 #include "mce.h"
+#include "vmce.h"
 
 static struct timer mce_timer;
 
