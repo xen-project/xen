@@ -32,6 +32,7 @@
 #error "domctl operations are intended for use by node control tools only"
 #endif
 
+#include <xen/hvm/save.h>
 #include "xen.h"
 #include "grant_table.h"
 
@@ -564,7 +565,14 @@ struct xen_domctl_ext_vcpucontext {
     uint16_t         sysenter_callback_cs;
     uint8_t          syscall32_disables_events;
     uint8_t          sysenter_disables_events;
-    uint64_aligned_t mcg_cap;
+#if defined(__GNUC__)
+    union {
+        uint64_aligned_t mcg_cap;
+        struct hvm_vmce_vcpu vmce;
+    };
+#else
+    struct hvm_vmce_vcpu vmce;
+#endif
 #endif
 };
 typedef struct xen_domctl_ext_vcpucontext xen_domctl_ext_vcpucontext_t;

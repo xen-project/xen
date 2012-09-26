@@ -1066,12 +1066,14 @@ long arch_do_domctl(
                 evc->syscall32_callback_eip    = 0;
                 evc->syscall32_disables_events = 0;
             }
-            evc->mcg_cap = v->arch.vmce.mcg_cap;
+            evc->vmce.caps = v->arch.vmce.mcg_cap;
+            evc->vmce.mci_ctl2_bank0 = v->arch.vmce.bank[0].mci_ctl2;
+            evc->vmce.mci_ctl2_bank1 = v->arch.vmce.bank[1].mci_ctl2;
         }
         else
         {
             ret = -EINVAL;
-            if ( evc->size < offsetof(typeof(*evc), mcg_cap) )
+            if ( evc->size < offsetof(typeof(*evc), vmce) )
                 goto ext_vcpucontext_out;
             if ( !is_hvm_domain(d) )
             {
@@ -1101,9 +1103,21 @@ long arch_do_domctl(
                  evc->syscall32_callback_eip )
                 goto ext_vcpucontext_out;
 
-            if ( evc->size >= offsetof(typeof(*evc), mcg_cap) +
-                              sizeof(evc->mcg_cap) )
-                ret = vmce_restore_vcpu(v, evc->mcg_cap);
+            BUILD_BUG_ON(offsetof(struct xen_domctl_ext_vcpucontext,
+                                  mcg_cap) !=
+                         offsetof(struct xen_domctl_ext_vcpucontext,
+                                  vmce.caps));
+            BUILD_BUG_ON(sizeof(evc->mcg_cap) != sizeof(evc->vmce.caps));
+            if ( evc->size >= offsetof(typeof(*evc), vmce) +
+                              sizeof(evc->vmce) )
+                ret = vmce_restore_vcpu(v, &evc->vmce);
+            else if ( evc->size >= offsetof(typeof(*evc), mcg_cap) +
+                                   sizeof(evc->mcg_cap) )
+            {
+                struct hvm_vmce_vcpu vmce = { .caps = evc->mcg_cap };
+
+                ret = vmce_restore_vcpu(v, &vmce);
+            }
         }
 
         ret = 0;

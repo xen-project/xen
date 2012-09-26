@@ -577,6 +577,8 @@ DECLARE_HVM_SAVE_TYPE(VIRIDIAN_VCPU, 17, struct hvm_viridian_vcpu_context);
 
 struct hvm_vmce_vcpu {
     uint64_t caps;
+    uint64_t mci_ctl2_bank0;
+    uint64_t mci_ctl2_bank1;
 };
 
 DECLARE_HVM_SAVE_TYPE(VMCE_VCPU, 18, struct hvm_vmce_vcpu);

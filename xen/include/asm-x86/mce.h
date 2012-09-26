@@ -33,7 +33,7 @@ struct vmce {
 
 /* Guest vMCE MSRs virtualization */
 extern void vmce_init_vcpu(struct vcpu *);
-extern int vmce_restore_vcpu(struct vcpu *, uint64_t caps);
+extern int vmce_restore_vcpu(struct vcpu *, const struct hvm_vmce_vcpu *);
 extern int vmce_wrmsr(uint32_t msr, uint64_t val);
 extern int vmce_rdmsr(uint32_t msr, uint64_t *val);
 

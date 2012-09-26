@@ -388,6 +388,8 @@ static void dump_vmce_vcpu(void)
     HVM_SAVE_TYPE(VMCE_VCPU) p;
     READ(p);
     printf("    VMCE_VCPU: caps %" PRIx64 "\n", p.caps);
+    printf("    VMCE_VCPU: bank0 mci_ctl2 %" PRIx64 "\n", p.mci_ctl2_bank0);
+    printf("    VMCE_VCPU: bank1 mci_ctl2 %" PRIx64 "\n", p.mci_ctl2_bank1);
 }
 
 int main(int argc, char **argv)

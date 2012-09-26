@@ -68,7 +68,7 @@ void vmce_init_vcpu(struct vcpu *v)
     spin_lock_init(&v->arch.vmce.lock);
 }
 
-int vmce_restore_vcpu(struct vcpu *v, uint64_t caps)
+int vmce_restore_vcpu(struct vcpu *v, const struct hvm_vmce_vcpu *ctxt)
 {
     unsigned long guest_mcg_cap;
 
@@ -77,16 +77,20 @@ int vmce_restore_vcpu(struct vcpu *v, uint64_t caps)
     else
         guest_mcg_cap = AMD_GUEST_MCG_CAP;
 
-    if ( caps & ~guest_mcg_cap & ~MCG_CAP_COUNT & ~MCG_CTL_P )
+    if ( ctxt->caps & ~guest_mcg_cap & ~MCG_CAP_COUNT & ~MCG_CTL_P )
     {
         dprintk(XENLOG_G_ERR, "%s restore: unsupported MCA capabilities"
                 " %#" PRIx64 " for d%d:v%u (supported: %#Lx)\n",
-                is_hvm_vcpu(v) ? "HVM" : "PV", caps, v->domain->domain_id,
-                v->vcpu_id, guest_mcg_cap & ~MCG_CAP_COUNT);
+                is_hvm_vcpu(v) ? "HVM" : "PV", ctxt->caps,
+                v->domain->domain_id, v->vcpu_id,
+                guest_mcg_cap & ~MCG_CAP_COUNT);
         return -EPERM;
     }
 
-    v->arch.vmce.mcg_cap = caps;
+    v->arch.vmce.mcg_cap = ctxt->caps;
+    v->arch.vmce.bank[0].mci_ctl2 = ctxt->mci_ctl2_bank0;
+    v->arch.vmce.bank[1].mci_ctl2 = ctxt->mci_ctl2_bank1;
+
     return 0;
 }
 
@@ -291,7 +295,9 @@ static int vmce_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
     for_each_vcpu( d, v ) {
         struct hvm_vmce_vcpu ctxt = {
-            .caps = v->arch.vmce.mcg_cap
+            .caps = v->arch.vmce.mcg_cap,
+            .mci_ctl2_bank0 = v->arch.vmce.bank[0].mci_ctl2,
+            .mci_ctl2_bank1 = v->arch.vmce.bank[1].mci_ctl2
         };
 
         err = hvm_save_entry(VMCE_VCPU, v->vcpu_id, h, &ctxt);
@@ -316,9 +322,9 @@ static int vmce_load_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         err = -EINVAL;
     }
     else
-        err = hvm_load_entry(VMCE_VCPU, h, &ctxt);
+        err = hvm_load_entry_zeroextend(VMCE_VCPU, h, &ctxt);
 
-    return err ?: vmce_restore_vcpu(v, ctxt.caps);
+    return err ?: vmce_restore_vcpu(v, &ctxt);
 }
 
 HVM_REGISTER_SAVE_RESTORE(VMCE_VCPU, vmce_save_vcpu_ctxt,
