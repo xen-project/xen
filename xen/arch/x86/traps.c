@@ -199,7 +199,7 @@ static void show_trace(struct cpu_user_regs *regs)
     while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )
     {
         addr = *stack++;
-        if ( is_kernel_text(addr) || is_kernel_inittext(addr) )
+        if ( is_active_kernel_text(addr) )
         {
             printk("[<%p>]", _p(addr));
             print_symbol(" %s\n   ", addr);
@@ -217,8 +217,16 @@ static void show_trace(struct cpu_user_regs *regs)
 
     printk("Xen call trace:\n   ");
 
-    printk("[<%p>]", _p(regs->eip));
-    print_symbol(" %s\n   ", regs->eip);
+    /*
+     * If RIP is not pointing into hypervisor code then someone may have
+     * called into oblivion. Peek to see if they left a return address at
+     * top of stack.
+     */
+    addr = is_active_kernel_text(regs->eip) ||
+           !is_active_kernel_text(*ESP_BEFORE_EXCEPTION(regs)) ?
+           regs->eip : *ESP_BEFORE_EXCEPTION(regs);
+    printk("[<%p>]", _p(addr));
+    print_symbol(" %s\n   ", addr);
 
     /* Bounds for range of valid frame pointer. */
     low  = (unsigned long)(ESP_BEFORE_EXCEPTION(regs) - 2);
@@ -322,7 +330,7 @@ void show_stack_overflow(unsigned int cpu, unsigned long esp)
     while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )
     {
         addr = *stack++;
-        if ( is_kernel_text(addr) || is_kernel_inittext(addr) )
+        if ( is_active_kernel_text(addr) )
         {
             printk("%p: [<%p>]", stack, _p(addr));
             print_symbol(" %s\n   ", addr);

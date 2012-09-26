@@ -5,6 +5,8 @@
  * 'kernel.h' contains some often-used function prototypes etc
  */
 
+#include <xen/types.h>
+
 /*
  * min()/max() macros that also do
  * strict type-checking.. See the
@@ -94,6 +96,8 @@ extern enum system_state {
     SYS_STATE_suspend,
     SYS_STATE_resume
 } system_state;
+
+bool_t is_active_kernel_text(unsigned long addr);
 
 #endif /* _LINUX_KERNEL_H */
 

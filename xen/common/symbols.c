@@ -93,6 +93,12 @@ static unsigned int get_symbol_offset(unsigned long pos)
     return name - symbols_names;
 }
 
+bool_t is_active_kernel_text(unsigned long addr)
+{
+    return (is_kernel_text(addr) ||
+            (system_state == SYS_STATE_boot && is_kernel_inittext(addr)));
+}
+
 const char *symbols_lookup(unsigned long addr,
                            unsigned long *symbolsize,
                            unsigned long *offset,
@@ -104,7 +110,7 @@ const char *symbols_lookup(unsigned long addr,
     namebuf[KSYM_NAME_LEN] = 0;
     namebuf[0] = 0;
 
-    if (!is_kernel_text(addr) && !is_kernel_inittext(addr))
+    if (!is_active_kernel_text(addr))
         return NULL;
 
         /* do a binary search on the sorted symbols_addresses array */
