@@ -754,6 +754,19 @@ get_page_from_l1e(
             return -EINVAL;
         }
 
+        if ( pg_owner != l1e_owner &&
+             !iomem_access_permitted(l1e_owner, mfn, mfn) )
+        {
+            if ( mfn != (PADDR_MASK >> PAGE_SHIFT) ) /* INVALID_MFN? */
+            {
+                MEM_LOG("Dom%u attempted to map I/O space %08lx in dom%u to dom%u",
+                        curr->domain->domain_id, mfn, pg_owner->domain_id,
+                        l1e_owner->domain_id);
+                return -EPERM;
+            }
+            return -EINVAL;
+        }
+
         if ( !(l1f & _PAGE_RW) ||
              !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
             return 0;
