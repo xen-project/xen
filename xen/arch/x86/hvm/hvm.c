@@ -603,6 +603,46 @@ void hvm_domain_destroy(struct domain *d)
     hvm_destroy_cacheattr_region_list(d);
 }
 
+static int hvm_save_tsc_adjust(struct domain *d, hvm_domain_context_t *h)
+{
+    struct vcpu *v;
+    struct hvm_tsc_adjust ctxt;
+    int err = 0;
+
+    for_each_vcpu ( d, v )
+    {
+        ctxt.tsc_adjust = v->arch.hvm_vcpu.msr_tsc_adjust;
+        err = hvm_save_entry(TSC_ADJUST, v->vcpu_id, h, &ctxt);
+        if ( err )
+            break;
+    }
+
+    return err;
+}
+
+static int hvm_load_tsc_adjust(struct domain *d, hvm_domain_context_t *h)
+{
+    unsigned int vcpuid = hvm_load_instance(h);
+    struct vcpu *v;
+    struct hvm_tsc_adjust ctxt;
+
+    if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
+    {
+        dprintk(XENLOG_G_ERR, "HVM restore: dom%d has no vcpu%u\n",
+                d->domain_id, vcpuid);
+        return -EINVAL;
+    }
+
+    if ( hvm_load_entry(TSC_ADJUST, h, &ctxt) != 0 )
+        return -EINVAL;
+
+    v->arch.hvm_vcpu.msr_tsc_adjust = ctxt.tsc_adjust;
+    return 0;
+}
+
+HVM_REGISTER_SAVE_RESTORE(TSC_ADJUST, hvm_save_tsc_adjust,
+                          hvm_load_tsc_adjust, 1, HVMSR_PER_VCPU);
+
 static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
     struct vcpu *v;

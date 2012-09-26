@@ -392,6 +392,13 @@ static void dump_vmce_vcpu(void)
     printf("    VMCE_VCPU: bank1 mci_ctl2 %" PRIx64 "\n", p.mci_ctl2_bank1);
 }
 
+static void dump_tsc_adjust(void)
+{
+    HVM_SAVE_TYPE(TSC_ADJUST) p;
+    READ(p);
+    printf("    TSC_ADJUST: tsc_adjust %" PRIx64 "\n", p.tsc_adjust);
+}
+
 int main(int argc, char **argv)
 {
     int entry, domid;
@@ -459,6 +466,7 @@ int main(int argc, char **argv)
         case HVM_SAVE_CODE(VIRIDIAN_DOMAIN): dump_viridian_domain(); break;
         case HVM_SAVE_CODE(VIRIDIAN_VCPU): dump_viridian_vcpu(); break;
         case HVM_SAVE_CODE(VMCE_VCPU): dump_vmce_vcpu(); break;
+        case HVM_SAVE_CODE(TSC_ADJUST): dump_tsc_adjust(); break;
         case HVM_SAVE_CODE(END): break;
         default:
             printf(" ** Don't understand type %u: skipping\n",
