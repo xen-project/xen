@@ -169,15 +169,13 @@ void x86_mcinfo_dump(struct mc_info *mi);
 int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
     uint64_t gstatus);
 int inject_vmce(struct domain *d);
-int vmce_domain_inject(struct mcinfo_bank *bank, struct domain *d,
-    struct mcinfo_global *global);
 
 static inline int mce_vendor_bank_msr(const struct vcpu *v, uint32_t msr)
 {
     switch (boot_cpu_data.x86_vendor) {
     case X86_VENDOR_INTEL:
         if (msr >= MSR_IA32_MC0_CTL2 &&
-            msr < MSR_IA32_MCx_CTL2(v->arch.mcg_cap & MCG_CAP_COUNT) )
+            msr < MSR_IA32_MCx_CTL2(v->arch.vmce.mcg_cap & MCG_CAP_COUNT) )
             return 1;
         break;
     case X86_VENDOR_AMD:
@@ -195,7 +193,7 @@ static inline int mce_vendor_bank_msr(const struct vcpu *v, uint32_t msr)
 static inline int mce_bank_msr(const struct vcpu *v, uint32_t msr)
 {
     if ( (msr >= MSR_IA32_MC0_CTL &&
-          msr < MSR_IA32_MCx_CTL(v->arch.mcg_cap & MCG_CAP_COUNT)) ||
+         msr < MSR_IA32_MCx_CTL(v->arch.vmce.mcg_cap & MCG_CAP_COUNT)) ||
          mce_vendor_bank_msr(v, msr) )
         return 1;
     return 0;

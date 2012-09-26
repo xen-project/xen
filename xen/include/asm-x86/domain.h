@@ -296,9 +296,6 @@ struct arch_domain
 
     struct PITState vpit;
 
-    /* For Guest vMCA handling */
-    struct domain_mca_msrs *vmca_msrs;
-
     /* TSC management (emulation, pv, scaling, stats) */
     int tsc_mode;            /* see include/asm-x86/time.h */
     bool_t vtsc;             /* tsc is emulated (may change after migrate) */
@@ -438,8 +435,8 @@ struct arch_vcpu
      * and thus should be saved/restored. */
     bool_t nonlazy_xstate_used;
 
-    uint64_t mcg_cap;
-    
+    struct vmce vmce;
+
     struct paging_vcpu paging;
 
     uint32_t gdbsx_vcpu_event;

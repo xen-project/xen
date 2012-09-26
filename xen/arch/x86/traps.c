@@ -3141,50 +3141,6 @@ void async_exception_cleanup(struct vcpu *curr)
                 break;
     ASSERT(trap <= VCPU_TRAP_LAST);
 
-    /* inject vMCE to PV_Guest including DOM0. */
-    if ( trap == VCPU_TRAP_MCE )
-    {
-        gdprintk(XENLOG_DEBUG, "MCE: Return from vMCE# trap!\n");
-        if ( curr->vcpu_id == 0 )
-        {
-            struct domain *d = curr->domain;
-
-            if ( !d->arch.vmca_msrs->nr_injection )
-            {
-                printk(XENLOG_WARNING "MCE: ret from vMCE#, "
-                       "no injection node\n");
-                goto end;
-            }
-
-            d->arch.vmca_msrs->nr_injection--;
-            if ( !list_empty(&d->arch.vmca_msrs->impact_header) )
-            {
-                struct bank_entry *entry;
-
-                entry = list_entry(d->arch.vmca_msrs->impact_header.next,
-                                   struct bank_entry, list);
-                gdprintk(XENLOG_DEBUG, "MCE: delete last injection node\n");
-                list_del(&entry->list);
-            }
-            else
-                printk(XENLOG_ERR "MCE: didn't found last injection node\n");
-
-            /* further injection */
-            if ( d->arch.vmca_msrs->nr_injection > 0 &&
-                 guest_has_trap_callback(d, 0, TRAP_machine_check) &&
-                 !test_and_set_bool(curr->mce_pending) )
-            {
-                int cpu = smp_processor_id();
-
-                cpumask_copy(curr->cpu_affinity_tmp, curr->cpu_affinity);
-                printk(XENLOG_DEBUG "MCE: CPU%d set affinity, old %d\n",
-                       cpu, curr->processor);
-                vcpu_set_affinity(curr, cpumask_of(cpu));
-            }
-        }
-    }
-
-end:
     /* Restore previous asynchronous exception mask. */
     curr->async_exception_mask = curr->async_exception_state(trap).old_mask;
 }

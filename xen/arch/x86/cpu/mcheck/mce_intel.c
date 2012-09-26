@@ -982,31 +982,27 @@ enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
 /* intel specific MCA MSR */
 int intel_mce_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 {
-    int ret = 0;
+    unsigned int bank = msr - MSR_IA32_MC0_CTL2;
 
-    if ( msr >= MSR_IA32_MC0_CTL2 &&
-         msr < MSR_IA32_MCx_CTL2(v->arch.mcg_cap & MCG_CAP_COUNT) )
+    if ( bank < GUEST_MC_BANK_NUM )
     {
-        mce_printk(MCE_QUIET, "We have disabled CMCI capability, "
-                 "Guest should not write this MSR!\n");
-         ret = 1;
+        v->arch.vmce.bank[bank].mci_ctl2 = val;
+        mce_printk(MCE_VERBOSE, "MCE: wr MC%u_CTL2 %#"PRIx64"\n", bank, val);
     }
 
-    return ret;
+    return 1;
 }
 
 int intel_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 {
-    int ret = 0;
+    unsigned int bank = msr - MSR_IA32_MC0_CTL2;
 
-    if ( msr >= MSR_IA32_MC0_CTL2 &&
-         msr < MSR_IA32_MCx_CTL2(v->arch.mcg_cap & MCG_CAP_COUNT) )
+    if ( bank < GUEST_MC_BANK_NUM )
     {
-        mce_printk(MCE_QUIET, "We have disabled CMCI capability, "
-                 "Guest should not read this MSR!\n");
-        ret = 1;
+        *val = v->arch.vmce.bank[bank].mci_ctl2;
+        mce_printk(MCE_VERBOSE, "MCE: rd MC%u_CTL2 %#"PRIx64"\n", bank, *val);
     }
 
-    return ret;
+    return 1;
 }
 

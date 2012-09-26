@@ -1066,7 +1066,7 @@ long arch_do_domctl(
                 evc->syscall32_callback_eip    = 0;
                 evc->syscall32_disables_events = 0;
             }
-            evc->mcg_cap = v->arch.mcg_cap;
+            evc->mcg_cap = v->arch.vmce.mcg_cap;
         }
         else
         {

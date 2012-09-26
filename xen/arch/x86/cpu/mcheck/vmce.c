@@ -1,5 +1,22 @@
 /*
- * vmce.c - virtual MCE support
+ * vmce.c - provide software emulated vMCE support to guest
+ *
+ * Copyright (C) 2010, 2011 Jiang, Yunhong <yunhong.jiang@intel.com>
+ * Copyright (C) 2012, 2013 Liu, Jinsong <jinsong.liu@intel.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <xen/init.h>
@@ -20,66 +37,67 @@
 #include "x86_mca.h"
 
 /*
- * Emulate 2 banks for guest
- * Bank0: reserved for 'bank0 quirk' occur at some very old processors:
- *   1). Intel cpu whose family-model value < 06-1A;
- *   2). AMD K7
- * Bank1: used to transfer error info to guest
+ * MCG_SER_P:  software error recovery supported
+ * MCG_TES_P:  to avoid MCi_status bit56:53 model specific
+ * MCG_CMCI_P: expose CMCI capability but never really inject it to guest,
+ *             for sake of performance since guest not polling periodically
  */
-#define GUEST_BANK_NUM 2
-#define GUEST_MCG_CAP (MCG_TES_P | MCG_SER_P | GUEST_BANK_NUM)
+#define INTEL_GUEST_MCG_CAP (MCG_SER_P |	\
+                             MCG_TES_P |	\
+                             MCG_CMCI_P |	\
+                             GUEST_MC_BANK_NUM)
 
-#define dom_vmce(x)   ((x)->arch.vmca_msrs)
-
-int vmce_init_msr(struct domain *d)
-{
-    dom_vmce(d) = xmalloc(struct domain_mca_msrs);
-    if ( !dom_vmce(d) )
-        return -ENOMEM;
-
-    dom_vmce(d)->mcg_status = 0x0;
-    dom_vmce(d)->nr_injection = 0;
-
-    INIT_LIST_HEAD(&dom_vmce(d)->impact_header);
-    spin_lock_init(&dom_vmce(d)->lock);
-
-    return 0;
-}
-
-void vmce_destroy_msr(struct domain *d)
-{
-    if ( !dom_vmce(d) )
-        return;
-    xfree(dom_vmce(d));
-    dom_vmce(d) = NULL;
-}
+#define AMD_GUEST_MCG_CAP GUEST_MC_BANK_NUM
 
 void vmce_init_vcpu(struct vcpu *v)
 {
-    v->arch.mcg_cap = GUEST_MCG_CAP;
+    int i;
+
+    /* global MCA MSRs init */
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+        v->arch.vmce.mcg_cap = INTEL_GUEST_MCG_CAP;
+    else
+        v->arch.vmce.mcg_cap = AMD_GUEST_MCG_CAP;
+
+    v->arch.vmce.mcg_status = 0;
+
+    /* per-bank MCA MSRs init */
+    for ( i = 0; i < GUEST_MC_BANK_NUM; i++ )
+        memset(&v->arch.vmce.bank[i], 0, sizeof(struct vmce_bank));
+
+    spin_lock_init(&v->arch.vmce.lock);
 }
 
 int vmce_restore_vcpu(struct vcpu *v, uint64_t caps)
 {
-    if ( caps & ~GUEST_MCG_CAP & ~MCG_CAP_COUNT & ~MCG_CTL_P )
+    unsigned long guest_mcg_cap;
+
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+        guest_mcg_cap = INTEL_GUEST_MCG_CAP;
+    else
+        guest_mcg_cap = AMD_GUEST_MCG_CAP;
+
+    if ( caps & ~guest_mcg_cap & ~MCG_CAP_COUNT & ~MCG_CTL_P )
     {
         dprintk(XENLOG_G_ERR, "%s restore: unsupported MCA capabilities"
                 " %#" PRIx64 " for d%d:v%u (supported: %#Lx)\n",
                 is_hvm_vcpu(v) ? "HVM" : "PV", caps, v->domain->domain_id,
-                v->vcpu_id, GUEST_MCG_CAP & ~MCG_CAP_COUNT);
+                v->vcpu_id, guest_mcg_cap & ~MCG_CAP_COUNT);
         return -EPERM;
     }
 
-    v->arch.mcg_cap = caps;
+    v->arch.vmce.mcg_cap = caps;
     return 0;
 }
 
+/*
+ * For historic version reason, bank number may greater than GUEST_MC_BANK_NUM,
+ * when migrating from old vMCE version to new vMCE.
+ */
 static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
 {
     int ret = 1;
     unsigned int bank = (msr - MSR_IA32_MC0_CTL) / 4;
-    struct domain_mca_msrs *vmce = dom_vmce(v->domain);
-    struct bank_entry *entry;
 
     *val = 0;
 
@@ -88,50 +106,33 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
     case MSR_IA32_MC0_CTL:
         /* stick all 1's to MCi_CTL */
         *val = ~0UL;
-        mce_printk(MCE_VERBOSE, "MCE: rdmsr MC%u_CTL %#"PRIx64"\n",
-                   bank, *val);
+        mce_printk(MCE_VERBOSE, "MCE: rd MC%u_CTL %#"PRIx64"\n", bank, *val);
         break;
     case MSR_IA32_MC0_STATUS:
-        /* Only error bank is read. Non-error banks simply return. */
-        if ( !list_empty(&vmce->impact_header) )
+        if ( bank < GUEST_MC_BANK_NUM )
         {
-            entry = list_entry(vmce->impact_header.next,
-                               struct bank_entry, list);
-            if ( entry->bank == bank )
-            {
-                *val = entry->mci_status;
-                mce_printk(MCE_VERBOSE,
-                           "MCE: rd MC%u_STATUS in vMCE# context "
-                           "value %#"PRIx64"\n", bank, *val);
-            }
+            *val = v->arch.vmce.bank[bank].mci_status;
+            if ( *val )
+                mce_printk(MCE_VERBOSE, "MCE: rd MC%u_STATUS %#"PRIx64"\n",
+                           bank, *val);
         }
         break;
     case MSR_IA32_MC0_ADDR:
-        if ( !list_empty(&vmce->impact_header) )
+        if ( bank < GUEST_MC_BANK_NUM )
         {
-            entry = list_entry(vmce->impact_header.next,
-                               struct bank_entry, list);
-            if ( entry->bank == bank )
-            {
-                *val = entry->mci_addr;
-                mce_printk(MCE_VERBOSE,
-                           "MCE: rdmsr MC%u_ADDR in vMCE# context "
-                           "%#"PRIx64"\n", bank, *val);
-            }
+            *val = v->arch.vmce.bank[bank].mci_addr;
+            if ( *val )
+                mce_printk(MCE_VERBOSE, "MCE: rd MC%u_ADDR %#"PRIx64"\n",
+                           bank, *val);
         }
         break;
     case MSR_IA32_MC0_MISC:
-        if ( !list_empty(&vmce->impact_header) )
+        if ( bank < GUEST_MC_BANK_NUM )
         {
-            entry = list_entry(vmce->impact_header.next,
-                               struct bank_entry, list);
-            if ( entry->bank == bank )
-            {
-                *val = entry->mci_misc;
-                mce_printk(MCE_VERBOSE,
-                           "MCE: rd MC%u_MISC in vMCE# context "
-                           "%#"PRIx64"\n", bank, *val);
-            }
+            *val = v->arch.vmce.bank[bank].mci_misc;
+            if ( *val )
+                mce_printk(MCE_VERBOSE, "MCE: rd MC%u_MISC %#"PRIx64"\n",
+                           bank, *val);
         }
         break;
     default:
@@ -157,56 +158,48 @@ static int bank_mce_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
  */
 int vmce_rdmsr(uint32_t msr, uint64_t *val)
 {
-    const struct vcpu *cur = current;
-    struct domain_mca_msrs *vmce = dom_vmce(cur->domain);
+    struct vcpu *cur = current;
     int ret = 1;
 
     *val = 0;
 
-    spin_lock(&vmce->lock);
+    spin_lock(&cur->arch.vmce.lock);
 
     switch ( msr )
     {
     case MSR_IA32_MCG_STATUS:
-        *val = vmce->mcg_status;
+        *val = cur->arch.vmce.mcg_status;
         if (*val)
             mce_printk(MCE_VERBOSE,
-                       "MCE: rdmsr MCG_STATUS %#"PRIx64"\n", *val);
+                       "MCE: rd MCG_STATUS %#"PRIx64"\n", *val);
         break;
     case MSR_IA32_MCG_CAP:
-        *val = cur->arch.mcg_cap;
-        mce_printk(MCE_VERBOSE, "MCE: rdmsr MCG_CAP %#"PRIx64"\n",
-                   *val);
+        *val = cur->arch.vmce.mcg_cap;
+        mce_printk(MCE_VERBOSE, "MCE: rd MCG_CAP %#"PRIx64"\n", *val);
         break;
     case MSR_IA32_MCG_CTL:
-        /* Stick all 1's when CTL support, and 0's when no CTL support */
-        if ( cur->arch.mcg_cap & MCG_CTL_P )
+        if ( cur->arch.vmce.mcg_cap & MCG_CTL_P )
             *val = ~0ULL;
-        mce_printk(MCE_VERBOSE, "MCE: rdmsr MCG_CTL %#"PRIx64"\n", *val);
+        mce_printk(MCE_VERBOSE, "MCE: rd MCG_CTL %#"PRIx64"\n", *val);
         break;
     default:
         ret = mce_bank_msr(cur, msr) ? bank_mce_rdmsr(cur, msr, val) : 0;
         break;
     }
 
-    spin_unlock(&vmce->lock);
+    spin_unlock(&cur->arch.vmce.lock);
+
     return ret;
 }
 
+/*
+ * For historic version reason, bank number may greater than GUEST_MC_BANK_NUM,
+ * when migratie from old vMCE version to new vMCE.
+ */
 static int bank_mce_wrmsr(struct vcpu *v, u32 msr, u64 val)
 {
     int ret = 1;
     unsigned int bank = (msr - MSR_IA32_MC0_CTL) / 4;
-    struct domain_mca_msrs *vmce = dom_vmce(v->domain);
-    struct bank_entry *entry = NULL;
-
-    /* Give the first entry of the list, it corresponds to current
-     * vMCE# injection. When vMCE# is finished processing by the
-     * the guest, this node will be deleted.
-     * Only error bank is written. Non-error banks simply return.
-     */
-    if ( !list_empty(&vmce->impact_header) )
-        entry = list_entry(vmce->impact_header.next, struct bank_entry, list);
 
     switch ( msr & (MSR_IA32_MC0_CTL | 3) )
     {
@@ -217,50 +210,25 @@ static int bank_mce_wrmsr(struct vcpu *v, u32 msr, u64 val)
          */
         break;
     case MSR_IA32_MC0_STATUS:
-        if ( entry && (entry->bank == bank) )
-        {
-            entry->mci_status = val;
-            mce_printk(MCE_VERBOSE,
-                       "MCE: wr MC%u_STATUS %"PRIx64" in vMCE#\n",
-                       bank, val);
-        }
-        else
-            mce_printk(MCE_VERBOSE,
-                       "MCE: wr MC%u_STATUS %"PRIx64"\n", bank, val);
+        mce_printk(MCE_VERBOSE, "MCE: wr MC%u_STATUS %#"PRIx64"\n", bank, val);
+        if ( val )
+            ret = -1;
+        else if ( bank < GUEST_MC_BANK_NUM )
+            v->arch.vmce.bank[bank].mci_status = val;
         break;
     case MSR_IA32_MC0_ADDR:
-        if ( !~val )
-        {
-            mce_printk(MCE_QUIET,
-                       "MCE: wr MC%u_ADDR with all 1s will cause #GP\n", bank);
+        mce_printk(MCE_VERBOSE, "MCE: wr MC%u_ADDR %#"PRIx64"\n", bank, val);
+        if ( val )
             ret = -1;
-        }
-        else if ( entry && (entry->bank == bank) )
-        {
-            entry->mci_addr = val;
-            mce_printk(MCE_VERBOSE,
-                       "MCE: wr MC%u_ADDR %"PRIx64" in vMCE#\n", bank, val);
-        }
-        else
-            mce_printk(MCE_VERBOSE,
-                       "MCE: wr MC%u_ADDR %"PRIx64"\n", bank, val);
+        else if ( bank < GUEST_MC_BANK_NUM )
+            v->arch.vmce.bank[bank].mci_addr = val;
         break;
     case MSR_IA32_MC0_MISC:
-        if ( !~val )
-        {
-            mce_printk(MCE_QUIET,
-                       "MCE: wr MC%u_MISC with all 1s will cause #GP\n", bank);
+        mce_printk(MCE_VERBOSE, "MCE: wr MC%u_MISC %#"PRIx64"\n", bank, val);
+        if ( val )
             ret = -1;
-        }
-        else if ( entry && (entry->bank == bank) )
-        {
-            entry->mci_misc = val;
-            mce_printk(MCE_VERBOSE,
-                       "MCE: wr MC%u_MISC %"PRIx64" in vMCE#\n", bank, val);
-        }
-        else
-            mce_printk(MCE_VERBOSE,
-                       "MCE: wr MC%u_MISC %"PRIx64"\n", bank, val);
+        else if ( bank < GUEST_MC_BANK_NUM )
+            v->arch.vmce.bank[bank].mci_misc = val;
         break;
     default:
         switch ( boot_cpu_data.x86_vendor )
@@ -286,52 +254,33 @@ static int bank_mce_wrmsr(struct vcpu *v, u32 msr, u64 val)
 int vmce_wrmsr(u32 msr, u64 val)
 {
     struct vcpu *cur = current;
-    struct bank_entry *entry = NULL;
-    struct domain_mca_msrs *vmce = dom_vmce(cur->domain);
     int ret = 1;
 
-    spin_lock(&vmce->lock);
+    spin_lock(&cur->arch.vmce.lock);
 
     switch ( msr )
     {
     case MSR_IA32_MCG_CTL:
+        /* If MCG_CTL exists then stick to all 1's, else ignore. */
         break;
     case MSR_IA32_MCG_STATUS:
-        vmce->mcg_status = val;
-        mce_printk(MCE_VERBOSE, "MCE: wrmsr MCG_STATUS %"PRIx64"\n", val);
-        /* For HVM guest, this is the point for deleting vMCE injection node */
-        if ( is_hvm_vcpu(cur) && (vmce->nr_injection > 0) )
-        {
-            vmce->nr_injection--; /* Should be 0 */
-            if ( !list_empty(&vmce->impact_header) )
-            {
-                entry = list_entry(vmce->impact_header.next,
-                                   struct bank_entry, list);
-                if ( entry->mci_status & MCi_STATUS_VAL )
-                    mce_printk(MCE_QUIET, "MCE: MCi_STATUS MSR should have "
-                               "been cleared before write MCG_STATUS MSR\n");
-
-                mce_printk(MCE_QUIET, "MCE: Delete HVM last injection "
-                           "Node, nr_injection %u\n",
-                           vmce->nr_injection);
-                list_del(&entry->list);
-                xfree(entry);
-            }
-            else
-                mce_printk(MCE_QUIET, "MCE: Not found HVM guest"
-                           " last injection Node, something Wrong!\n");
-        }
+        cur->arch.vmce.mcg_status = val;
+        mce_printk(MCE_VERBOSE, "MCE: wr MCG_STATUS %"PRIx64"\n", val);
         break;
     case MSR_IA32_MCG_CAP:
-        mce_printk(MCE_QUIET, "MCE: MCG_CAP is read-only\n");
-        ret = -1;
+        /*
+         * According to Intel SDM, IA32_MCG_CAP is a read-only register,
+         * the effect of writing to the IA32_MCG_CAP is undefined. Here we
+         * treat writing as 'write not change'. Guest would not surprise.
+         */
+        mce_printk(MCE_VERBOSE, "MCE: MCG_CAP is r/o\n");
         break;
     default:
         ret = mce_bank_msr(cur, msr) ? bank_mce_wrmsr(cur, msr, val) : 0;
         break;
     }
 
-    spin_unlock(&vmce->lock);
+    spin_unlock(&cur->arch.vmce.lock);
     return ret;
 }
 
@@ -342,7 +291,7 @@ static int vmce_save_vcpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 
     for_each_vcpu( d, v ) {
         struct hvm_vmce_vcpu ctxt = {
-            .caps = v->arch.mcg_cap
+            .caps = v->arch.vmce.mcg_cap
         };
 
         err = hvm_save_entry(VMCE_VCPU, v->vcpu_id, h, &ctxt);
@@ -422,92 +371,37 @@ int inject_vmce(struct domain *d)
     return 0;
 }
 
-/* This node list records errors impacting a domain. when one
- * MCE# happens, one error bank impacts a domain. This error node
- * will be inserted to the tail of the per_dom data for vMCE# MSR
- * virtualization. When one vMCE# injection is finished processing
- * processed by guest, the corresponding node will be deleted.
- * This node list is for GUEST vMCE# MSRS virtualization.
- */
-static struct bank_entry* alloc_bank_entry(void)
-{
-    struct bank_entry *entry;
-
-    entry = xzalloc(struct bank_entry);
-    if ( entry == NULL )
-    {
-        printk(KERN_ERR "MCE: malloc bank_entry failed\n");
-        return NULL;
-    }
-
-    INIT_LIST_HEAD(&entry->list);
-    return entry;
-}
-
-/* Fill error bank info for #vMCE injection and GUEST vMCE#
- * MSR virtualization data
- * 1) Log down how many nr_injections of the impacted.
- * 2) Copy MCE# error bank to impacted DOM node list,
- *    for vMCE# MSRs virtualization
- */
 int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
-                   uint64_t gstatus) {
-    struct bank_entry *entry;
+                   uint64_t gstatus)
+{
+    struct vcpu *v = d->vcpu[0];
 
-    /* This error bank impacts one domain, we need to fill domain related
-     * data for vMCE MSRs virtualization and vMCE# injection */
     if ( mc_bank->mc_domid != (uint16_t)~0 )
     {
-        /* For HVM guest, Only when first vMCE is consumed by HVM guest
-         * successfully, will we generete another node and inject another vMCE.
-         */
-        if ( d->is_hvm && (dom_vmce(d)->nr_injection > 0) )
+        if ( v->arch.vmce.mcg_status & MCG_STATUS_MCIP )
         {
-            mce_printk(MCE_QUIET, "MCE: HVM guest has not handled previous"
+            mce_printk(MCE_QUIET, "MCE: guest has not handled previous"
                        " vMCE yet!\n");
             return -1;
         }
 
-        entry = alloc_bank_entry();
-        if ( entry == NULL )
-            return -1;
+        spin_lock(&v->arch.vmce.lock);
 
-        entry->mci_status = mc_bank->mc_status;
-        entry->mci_addr = mc_bank->mc_addr;
-        entry->mci_misc = mc_bank->mc_misc;
-        entry->bank = mc_bank->mc_bank;
+        v->arch.vmce.mcg_status = gstatus;
+        /*
+         * 1. Skip bank 0 to avoid 'bank 0 quirk' of old processors
+         * 2. Filter MCi_STATUS MSCOD model specific error code to guest
+         */
+        v->arch.vmce.bank[1].mci_status = mc_bank->mc_status &
+                                              MCi_STATUS_MSCOD_MASK;
+        v->arch.vmce.bank[1].mci_addr = mc_bank->mc_addr;
+        v->arch.vmce.bank[1].mci_misc = mc_bank->mc_misc;
 
-        spin_lock(&dom_vmce(d)->lock);
-        /* New error Node, insert to the tail of the per_dom data */
-        list_add_tail(&entry->list, &dom_vmce(d)->impact_header);
-        /* Fill MSR global status */
-        dom_vmce(d)->mcg_status = gstatus;
-        /* New node impact the domain, need another vMCE# injection*/
-        dom_vmce(d)->nr_injection++;
-        spin_unlock(&dom_vmce(d)->lock);
-
-        mce_printk(MCE_VERBOSE,"MCE: Found error @[BANK%d "
-                   "status %"PRIx64" addr %"PRIx64" domid %d]\n ",
-                   mc_bank->mc_bank, mc_bank->mc_status, mc_bank->mc_addr,
-                   mc_bank->mc_domid);
+        spin_unlock(&v->arch.vmce.lock);
     }
 
     return 0;
 }
-
-#if 0 /* currently unused */
-int vmce_domain_inject(
-    struct mcinfo_bank *bank, struct domain *d, struct mcinfo_global *global)
-{
-    int ret;
-
-    ret = fill_vmsr_data(bank, d, global->mc_gstatus);
-    if ( ret < 0 )
-        return ret;
-
-    return inject_vmce(d);
-}
-#endif
 
 static int is_hvm_vmce_ready(struct mcinfo_bank *bank, struct domain *d)
 {

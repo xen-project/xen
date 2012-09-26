@@ -577,9 +577,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
         if ( (rc = iommu_domain_init(d)) != 0 )
             goto fail;
-
-        /* For Guest vMCE MSRs virtualization */
-        vmce_init_msr(d);
     }
 
     if ( is_hvm_domain(d) )
@@ -606,7 +603,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
  fail:
     d->is_dying = DOMDYING_dead;
-    vmce_destroy_msr(d);
     cleanup_domain_irq_mapping(d);
     free_xenheap_page(d->shared_info);
     if ( paging_initialised )
@@ -629,7 +625,6 @@ void arch_domain_destroy(struct domain *d)
     else
         xfree(d->arch.pv_domain.e820);
 
-    vmce_destroy_msr(d);
     free_domain_pirqs(d);
     if ( !is_idle_domain(d) )
         iommu_domain_destroy(d);
