@@ -261,8 +261,6 @@ static int get_matching_microcode(const void *mc, int cpu)
     }
     return 0;
  find:
-    if ( uci->mc.mc_intel && uci->mc.mc_intel->hdr.rev >= mc_header->rev )
-        return 0;
     pr_debug("microcode: CPU%d found a matching microcode update with"
              " version %#x (current=%#x)\n",
              cpu, mc_header->rev, uci->cpu_sig.rev);
