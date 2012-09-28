@@ -374,8 +374,9 @@ int switch_compat(struct domain *d)
 
 static inline bool_t standalone_trap_ctxt(struct vcpu *v)
 {
-    BUILD_BUG_ON(256 * sizeof(*v->arch.pv_vcpu.trap_ctxt) > PAGE_SIZE);
-    return 256 * sizeof(*v->arch.pv_vcpu.trap_ctxt) + sizeof(*v) > PAGE_SIZE;
+    BUILD_BUG_ON(NR_VECTORS * sizeof(*v->arch.pv_vcpu.trap_ctxt) > PAGE_SIZE);
+    return NR_VECTORS * sizeof(*v->arch.pv_vcpu.trap_ctxt) + sizeof(*v)
+           > PAGE_SIZE;
 }
 
 int vcpu_initialise(struct vcpu *v)
@@ -432,7 +433,7 @@ int vcpu_initialise(struct vcpu *v)
         }
         else
             v->arch.pv_vcpu.trap_ctxt = (void *)v + PAGE_SIZE -
-                256 * sizeof(*v->arch.pv_vcpu.trap_ctxt);
+                NR_VECTORS * sizeof(*v->arch.pv_vcpu.trap_ctxt);
 
         /* PV guests by default have a 100Hz ticker. */
         v->periodic_period = MILLISECS(10);
@@ -702,7 +703,7 @@ int arch_set_info_guest(
             fixup_guest_stack_selector(d, c.nat->kernel_ss);
             fixup_guest_code_selector(d, c.nat->user_regs.cs);
 
-            for ( i = 0; i < 256; i++ )
+            for ( i = 0; i < ARRAY_SIZE(c.nat->trap_ctxt); i++ )
             {
                 if ( !is_canonical_address(c.nat->trap_ctxt[i].address) )
                     return -EINVAL;
@@ -725,7 +726,7 @@ int arch_set_info_guest(
             fixup_guest_code_selector(d, c.cmp->event_callback_cs);
             fixup_guest_code_selector(d, c.cmp->failsafe_callback_cs);
 
-            for ( i = 0; i < 256; i++ )
+            for ( i = 0; i < ARRAY_SIZE(c.cmp->trap_ctxt); i++ )
                 fixup_guest_code_selector(d, c.cmp->trap_ctxt[i].cs);
 
             /* LDT safety checks. */

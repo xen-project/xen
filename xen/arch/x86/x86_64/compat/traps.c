@@ -317,7 +317,7 @@ int compat_set_trap_table(XEN_GUEST_HANDLE(trap_info_compat_t) traps)
     /* If no table is presented then clear the entire virtual IDT. */
     if ( guest_handle_is_null(traps) )
     {
-        memset(dst, 0, 256 * sizeof(*dst));
+        memset(dst, 0, NR_VECTORS * sizeof(*dst));
         return 0;
     }
 

@@ -3506,7 +3506,7 @@ int guest_has_trap_callback(struct domain *d, uint16_t vcpuid, unsigned int trap
     BUG_ON(vcpuid >= d->max_vcpus);
 
     /* Sanity check - XXX should be more fine grained. */
-    BUG_ON(trap_nr > TRAP_syscall);
+    BUG_ON(trap_nr >= NR_VECTORS);
 
     v = d->vcpu[vcpuid];
     t = &v->arch.pv_vcpu.trap_ctxt[trap_nr];
@@ -3574,7 +3574,7 @@ long do_set_trap_table(XEN_GUEST_HANDLE(const_trap_info_t) traps)
     /* If no table is presented then clear the entire virtual IDT. */
     if ( guest_handle_is_null(traps) )
     {
-        memset(dst, 0, 256 * sizeof(*dst));
+        memset(dst, 0, NR_VECTORS * sizeof(*dst));
         init_int80_direct_trap(curr);
         return 0;
     }
