@@ -192,7 +192,6 @@ static int __devinit num_cpu_cores(struct cpuinfo_x86 *c)
 static void __devinit init_intel(struct cpuinfo_x86 *c)
 {
 	unsigned int l2 = 0;
-	char *p = NULL;
 
 	/* Detect the extended topology information if available */
 	detect_extended_topology(c);
@@ -209,37 +208,6 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 	/* SEP CPUID bug: Pentium Pro reports SEP but doesn't have it until model 3 mask 3 */
 	if ((c->x86<<8 | c->x86_model<<4 | c->x86_mask) < 0x633)
 		clear_bit(X86_FEATURE_SEP, c->x86_capability);
-
-	/* Names for the Pentium II/Celeron processors 
-	   detectable only by also checking the cache size.
-	   Dixon is NOT a Celeron. */
-	if (c->x86 == 6) {
-		switch (c->x86_model) {
-		case 5:
-			if (c->x86_mask == 0) {
-				if (l2 == 0)
-					p = "Celeron (Covington)";
-				else if (l2 == 256)
-					p = "Mobile Pentium II (Dixon)";
-			}
-			break;
-			
-		case 6:
-			if (l2 == 128)
-				p = "Celeron (Mendocino)";
-			else if (c->x86_mask == 0 || c->x86_mask == 5)
-				p = "Celeron-A";
-			break;
-			
-		case 8:
-			if (l2 == 128)
-				p = "Celeron (Coppermine)";
-			break;
-		}
-	}
-
-	if ( p )
-		safe_strcpy(c->x86_model_id, p);
 
 	if ( !cpu_has(c, X86_FEATURE_XTOPOLOGY) )
 	{
@@ -275,10 +243,6 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 	}
 #endif
 
-	if (c->x86 == 15)
-		set_bit(X86_FEATURE_P4, c->x86_capability);
-	if (c->x86 == 6) 
-		set_bit(X86_FEATURE_P3, c->x86_capability);
 	if ((c->x86 == 0xf && c->x86_model >= 0x03) ||
 		(c->x86 == 0x6 && c->x86_model >= 0x0e))
 		set_bit(X86_FEATURE_CONSTANT_TSC, c->x86_capability);

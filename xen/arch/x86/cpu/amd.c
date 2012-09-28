@@ -180,7 +180,7 @@ static void __devinit set_cpuidmask(const struct cpuinfo_x86 *c)
 	if (c->x86 >= 0x10) {
 		wrmsr(MSR_K8_FEATURE_MASK, feat_edx, feat_ecx);
 		wrmsr(MSR_K8_EXT_FEATURE_MASK, extfeat_edx, extfeat_ecx);
-	} else if (c->x86 == 0x0f) {
+	} else {
 		wrmsr_amd(MSR_K8_FEATURE_MASK, feat_edx, feat_ecx);
 		wrmsr_amd(MSR_K8_EXT_FEATURE_MASK, extfeat_edx, extfeat_ecx);
 	}
@@ -234,14 +234,7 @@ int cpu_has_amd_erratum(const struct cpuinfo_x86 *cpu, int osvw_id, ...)
 /* Can this system suffer from TSC drift due to C1 clock ramping? */
 static int c1_ramping_may_cause_clock_drift(struct cpuinfo_x86 *c) 
 { 
-	if (c->x86 < 0xf) {
-		/*
-		 * TSC drift doesn't exist on 7th Gen or less
-		 * However, OS still needs to consider effects
-		 * of P-state changes on TSC
-		 */
-		return 0;
-	} else if (cpuid_edx(0x80000007) & (1<<8)) {
+	if (cpuid_edx(0x80000007) & (1<<8)) {
 		/*
 		 * CPUID.AdvPowerMgmtInfo.TscInvariant
 		 * EDX bit 8, 8000_0007
@@ -416,41 +409,7 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 
 	switch(c->x86)
 	{
-	case 6: /* An Athlon/Duron */
- 
-		/* Bit 15 of Athlon specific MSR 15, needs to be 0
-		 * to enable SSE on Palomino/Morgan/Barton CPU's.
-		 * If the BIOS didn't enable it already, enable it here.
-		 */
-		if (c->x86_model >= 6 && c->x86_model <= 10) {
-			if (!cpu_has(c, X86_FEATURE_XMM)) {
-				printk(KERN_INFO "Enabling disabled K7/SSE Support.\n");
-				rdmsr(MSR_K7_HWCR, l, h);
-				l &= ~0x00008000;
-				wrmsr(MSR_K7_HWCR, l, h);
-				set_bit(X86_FEATURE_XMM, c->x86_capability);
-			}
-		}
-
-		/* It's been determined by AMD that Athlons since model 8 stepping 1
-		 * are more robust with CLK_CTL set to 200xxxxx instead of 600xxxxx
-		 * As per AMD technical note 27212 0.2
-		 */
-		if ((c->x86_model == 8 && c->x86_mask>=1) || (c->x86_model > 8)) {
-			rdmsr(MSR_K7_CLK_CTL, l, h);
-			if ((l & 0xfff00000) != 0x20000000) {
-				printk ("CPU: CLK_CTL MSR was %x. Reprogramming to %x\n", l,
-					((l & 0x000fffff)|0x20000000));
-				wrmsr(MSR_K7_CLK_CTL, (l & 0x000fffff)|0x20000000, h);
-			}
-		}
-		set_bit(X86_FEATURE_K7, c->x86_capability);
-		break;
-
-	case 0xf:
-	/* Use K8 tuning for Fam10h and Fam11h */
-	case 0x10 ... 0x17:
-		set_bit(X86_FEATURE_K8, c->x86_capability);
+	case 0xf ... 0x17:
 		disable_c1e(NULL);
 		if (acpi_smi_cmd && (acpi_enable_value | acpi_disable_value))
 			pv_post_outb_hook = check_disable_c1e;
