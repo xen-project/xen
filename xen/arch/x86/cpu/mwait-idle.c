@@ -71,7 +71,7 @@
 # define pr_debug(fmt...)
 #endif
 
-static __initdata s8 no_mwait_idle = -1;
+static __initdata bool_t no_mwait_idle;
 invbool_param("mwait-idle", no_mwait_idle);
 
 static unsigned int mwait_substates;
@@ -499,13 +499,6 @@ int __init mwait_idle_init(struct notifier_block *nfb)
 
 	if (pm_idle_save)
 		return -ENODEV;
-
-	/* XXX The no-ARAT case is supposedly being taken care of, but at
-	 * least some systems without ARAT hang for some reason, apparently
-	 * only when using HPET broadcast mode (PIT broadcast mode seems to
-	 * be fine). */
-	if (no_mwait_idle < 0 && boot_cpu_has(X86_FEATURE_ARAT))
-		no_mwait_idle = 0;
 
 	err = mwait_idle_probe();
 	if (!err) {
