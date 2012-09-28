@@ -369,7 +369,7 @@ static void __init hpet_fsb_cap_lookup(void)
     if ( !hpet_events )
         return;
 
-    for ( i = 0; i < num_chs; i++ )
+    for ( i = 0; i < num_chs && num_hpets_used < nr_cpu_ids; i++ )
     {
         struct hpet_event_channel *ch = &hpet_events[num_hpets_used];
         u32 cfg = hpet_read32(HPET_Tn_CFG(i));
@@ -407,6 +407,9 @@ static struct hpet_event_channel *hpet_get_channel(unsigned int cpu)
 
     if ( num_hpets_used == 0 )
         return hpet_events;
+
+    if ( num_hpets_used >= nr_cpu_ids )
+        return &hpet_events[cpu];
 
     do {
         next = next_channel;
