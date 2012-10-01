@@ -41,6 +41,7 @@
 #define PVDRIVERS_PRODUCT_LIST(EACH)                         \
         EACH("xensource-windows", 0x0001) /* Citrix */       \
         EACH("gplpv-windows",     0x0002) /* James Harper */ \
+        EACH("linux",             0x0003)                    \
         EACH("experimental",      0xffff)
 
 #endif /* _XEN_PUBLIC_PVDRIVERS_H_ */
