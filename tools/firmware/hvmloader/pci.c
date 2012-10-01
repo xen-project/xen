@@ -36,19 +36,25 @@ unsigned long igd_opregion_pgbase = 0;
 
 void pci_setup(void)
 {
-    uint32_t base, devfn, bar_reg, bar_data, bar_sz, cmd, mmio_total = 0;
+    uint8_t is_64bar, using_64bar, bar64_relocate = 0;
+    uint32_t devfn, bar_reg, cmd, bar_data, bar_data_upper;
+    uint64_t base, bar_sz, bar_sz_upper, mmio_total = 0;
     uint32_t vga_devfn = 256;
     uint16_t class, vendor_id, device_id;
     unsigned int bar, pin, link, isa_irq;
+    int64_t mmio_left;
 
     /* Resources assignable to PCI devices via BARs. */
     struct resource {
-        uint32_t base, max;
-    } *resource, mem_resource, io_resource;
+        uint64_t base, max;
+    } *resource, mem_resource, high_mem_resource, io_resource;
 
     /* Create a list of device BARs in descending order of size. */
     struct bars {
-        uint32_t devfn, bar_reg, bar_sz;
+        uint32_t is_64bar;
+        uint32_t devfn;
+        uint32_t bar_reg;
+        uint64_t bar_sz;
     } *bars = (struct bars *)scratch_start;
     unsigned int i, nr_bars = 0;
 
@@ -133,22 +139,34 @@ void pci_setup(void)
         /* Map the I/O memory and port resources. */
         for ( bar = 0; bar < 7; bar++ )
         {
+            bar_sz_upper = 0;
             bar_reg = PCI_BASE_ADDRESS_0 + 4*bar;
             if ( bar == 6 )
                 bar_reg = PCI_ROM_ADDRESS;
 
             bar_data = pci_readl(devfn, bar_reg);
+            is_64bar = !!((bar_data & (PCI_BASE_ADDRESS_SPACE |
+                         PCI_BASE_ADDRESS_MEM_TYPE_MASK)) ==
+                         (PCI_BASE_ADDRESS_SPACE_MEMORY |
+                         PCI_BASE_ADDRESS_MEM_TYPE_64));
             pci_writel(devfn, bar_reg, ~0);
             bar_sz = pci_readl(devfn, bar_reg);
             pci_writel(devfn, bar_reg, bar_data);
-            if ( bar_sz == 0 )
-                continue;
 
             bar_sz &= (((bar_data & PCI_BASE_ADDRESS_SPACE) ==
                         PCI_BASE_ADDRESS_SPACE_MEMORY) ?
                        PCI_BASE_ADDRESS_MEM_MASK :
                        (PCI_BASE_ADDRESS_IO_MASK & 0xffff));
+            if (is_64bar) {
+                bar_data_upper = pci_readl(devfn, bar_reg + 4);
+                pci_writel(devfn, bar_reg + 4, ~0);
+                bar_sz_upper = pci_readl(devfn, bar_reg + 4);
+                pci_writel(devfn, bar_reg + 4, bar_data_upper);
+                bar_sz = (bar_sz_upper << 32) | bar_sz;
+            }
             bar_sz &= ~(bar_sz - 1);
+            if ( bar_sz == 0 )
+                continue;
 
             for ( i = 0; i < nr_bars; i++ )
                 if ( bars[i].bar_sz < bar_sz )
@@ -157,6 +175,7 @@ void pci_setup(void)
             if ( i != nr_bars )
                 memmove(&bars[i+1], &bars[i], (nr_bars-i) * sizeof(*bars));
 
+            bars[i].is_64bar = is_64bar;
             bars[i].devfn   = devfn;
             bars[i].bar_reg = bar_reg;
             bars[i].bar_sz  = bar_sz;
@@ -167,11 +186,8 @@ void pci_setup(void)
 
             nr_bars++;
 
-            /* Skip the upper-half of the address for a 64-bit BAR. */
-            if ( (bar_data & (PCI_BASE_ADDRESS_SPACE |
-                              PCI_BASE_ADDRESS_MEM_TYPE_MASK)) == 
-                 (PCI_BASE_ADDRESS_SPACE_MEMORY | 
-                  PCI_BASE_ADDRESS_MEM_TYPE_64) )
+            /*The upper half is already calculated, skip it! */
+            if (is_64bar)
                 bar++;
         }
 
@@ -197,6 +213,9 @@ void pci_setup(void)
             ((pci_mem_start << 1) != 0) )
         pci_mem_start <<= 1;
 
+    if ( (pci_mem_start << 1) != 0 )
+        bar64_relocate = 1;
+
     /* Relocate RAM that overlaps PCI space (in 64k-page chunks). */
     while ( (pci_mem_start >> PAGE_SHIFT) < hvm_info->low_mem_pgend )
     {
@@ -218,10 +237,14 @@ void pci_setup(void)
         hvm_info->high_mem_pgend += nr_pages;
     }
 
+    high_mem_resource.base = ((uint64_t)hvm_info->high_mem_pgend) << PAGE_SHIFT; 
+    high_mem_resource.max = 1ull << cpu_phys_addr();
     mem_resource.base = pci_mem_start;
     mem_resource.max = pci_mem_end;
     io_resource.base = 0xc000;
     io_resource.max = 0x10000;
+
+    mmio_left = pci_mem_end - pci_mem_start;
 
     /* Assign iomem and ioport resources in descending order of size. */
     for ( i = 0; i < nr_bars; i++ )
@@ -230,13 +253,29 @@ void pci_setup(void)
         bar_reg = bars[i].bar_reg;
         bar_sz  = bars[i].bar_sz;
 
+        using_64bar = bars[i].is_64bar && bar64_relocate && (mmio_left < bar_sz);
         bar_data = pci_readl(devfn, bar_reg);
 
         if ( (bar_data & PCI_BASE_ADDRESS_SPACE) ==
              PCI_BASE_ADDRESS_SPACE_MEMORY )
         {
-            resource = &mem_resource;
-            bar_data &= ~PCI_BASE_ADDRESS_MEM_MASK;
+            /* Mapping high memory if PCI deivce is 64 bits bar and the bar size
+               is larger than 512M */
+            if (using_64bar && (bar_sz > PCI_MIN_BIG_BAR_SIZE)) {
+                if ( high_mem_resource.base & (bar_sz - 1) )
+                    high_mem_resource.base = high_mem_resource.base - 
+                        (high_mem_resource.base & (bar_sz - 1)) + bar_sz;
+                else
+                    high_mem_resource.base = high_mem_resource.base - 
+                        (high_mem_resource.base & (bar_sz - 1));
+                resource = &high_mem_resource;
+                bar_data &= ~PCI_BASE_ADDRESS_MEM_MASK;
+            } 
+            else {
+                resource = &mem_resource;
+                bar_data &= ~PCI_BASE_ADDRESS_MEM_MASK;
+            }
+            mmio_left -= bar_sz;
         }
         else
         {
@@ -244,13 +283,14 @@ void pci_setup(void)
             bar_data &= ~PCI_BASE_ADDRESS_IO_MASK;
         }
 
-        base = (resource->base + bar_sz - 1) & ~(bar_sz - 1);
-        bar_data |= base;
+        base = (resource->base  + bar_sz - 1) & ~(uint64_t)(bar_sz - 1);
+        bar_data |= (uint32_t)base;
+        bar_data_upper = (uint32_t)(base >> 32);
         base += bar_sz;
 
         if ( (base < resource->base) || (base > resource->max) )
         {
-            printf("pci dev %02x:%x bar %02x size %08x: no space for "
+            printf("pci dev %02x:%x bar %02x size %llx: no space for "
                    "resource!\n", devfn>>3, devfn&7, bar_reg, bar_sz);
             continue;
         }
@@ -258,8 +298,11 @@ void pci_setup(void)
         resource->base = base;
 
         pci_writel(devfn, bar_reg, bar_data);
-        printf("pci dev %02x:%x bar %02x size %08x: %08x\n",
+        if (using_64bar)
+            pci_writel(devfn, bar_reg + 4, bar_data_upper);
+        printf("pci dev %02x:%x bar %02x size %llx: %08x\n",
                devfn>>3, devfn&7, bar_reg, bar_sz, bar_data);
+			
 
         /* Now enable the memory or I/O mapping. */
         cmd = pci_readw(devfn, PCI_COMMAND);

@@ -40,17 +40,10 @@
 #define MSR_PAT              0x0277
 #define MSR_MTRRdefType      0x02ff
 
-void cacheattr_init(void)
+unsigned int cpu_phys_addr(void)
 {
     uint32_t eax, ebx, ecx, edx;
-    uint64_t mtrr_cap, mtrr_def, content, addr_mask;
-    unsigned int i, nr_var_ranges, phys_bits = 36;
-
-    /* Does the CPU support architectural MTRRs? */
-    cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
-    if ( !(edx & (1u << 12)) )
-         return;
-
+    unsigned int phys_bits = 36;
     /* Find the physical address size for this CPU. */
     cpuid(0x80000000, &eax, &ebx, &ecx, &edx);
     if ( eax >= 0x80000008 )
@@ -58,6 +51,22 @@ void cacheattr_init(void)
         cpuid(0x80000008, &eax, &ebx, &ecx, &edx);
         phys_bits = (uint8_t)eax;
     }
+
+    return phys_bits;
+}
+
+void cacheattr_init(void)
+{
+    uint32_t eax, ebx, ecx, edx;
+    uint64_t mtrr_cap, mtrr_def, content, addr_mask;
+    unsigned int i, nr_var_ranges, phys_bits;
+
+    /* Does the CPU support architectural MTRRs? */
+    cpuid(0x00000001, &eax, &ebx, &ecx, &edx);
+    if ( !(edx & (1u << 12)) )
+         return;
+
+    phys_bits = cpu_phys_addr();
 
     printf("%u-bit phys ... ", phys_bits);
 

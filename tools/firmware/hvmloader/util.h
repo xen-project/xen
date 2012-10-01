@@ -215,6 +215,7 @@ void pci_setup(void);
 uint32_t rombios_highbios_setup(void);
 
 /* Miscellaneous. */
+unsigned int cpu_phys_addr(void);
 void cacheattr_init(void);
 unsigned long create_mp_tables(void *table);
 void hvm_write_smbios_tables(
