@@ -264,6 +264,49 @@ static void sercon_puts(const char *s)
         serial_puts(sercon_handle, s);
 }
 
+static void dump_console_ring_key(unsigned char key)
+{
+    uint32_t idx, len, sofar, c;
+    unsigned int order;
+    char *buf;
+
+    printk("'%c' pressed -> dumping console ring buffer (dmesg)\n", key);
+
+    /* create a buffer in which we'll copy the ring in the correct
+       order and NUL terminate */
+    order = get_order_from_bytes(conring_size + 1);
+    buf = alloc_xenheap_pages(order, 0);
+    if ( buf == NULL )
+    {
+        printk("unable to allocate memory!\n");
+        return;
+    }
+
+    c = conringc;
+    sofar = 0;
+    while ( (c != conringp) )
+    {
+        idx = CONRING_IDX_MASK(c);
+        len = conringp - c;
+        if ( (idx + len) > conring_size )
+            len = conring_size - idx;
+        memcpy(buf + sofar, &conring[idx], len);
+        sofar += len;
+        c += len;
+    }
+    buf[sofar] = '\0';
+
+    sercon_puts(buf);
+    vga_puts(buf);
+
+    free_xenheap_pages(buf, order);
+}
+
+static struct keyhandler dump_console_ring_keyhandler = {
+    .u.fn = dump_console_ring_key,
+    .desc = "synchronously dump console ring buffer (dmesg)"
+};
+
 /* CTRL-<switch_char> switches input direction between Xen and DOM0. */
 #define switch_code (opt_conswitch[0]-'a'+1)
 static int __read_mostly xen_rx = 1; /* FALSE => serial input passed to domain 0. */
@@ -660,6 +703,8 @@ void __init console_endboot(void)
      */
     if ( opt_conswitch[1] == 'x' )
         xen_rx = !xen_rx;
+
+    register_keyhandler('w', &dump_console_ring_keyhandler);
 
     /* Serial input is directed to DOM0 by default. */
     switch_serial_input();
