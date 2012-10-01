@@ -65,4 +65,4 @@ decimal number.  `{product_name}` is a string corresponding to the
 product number in step 3.
 
 The master registry of product names and numbers is in
-qemu-xen-unstable's xenstore.c.
+xen/include/public/hvm/pvdrivers.h
