@@ -12,6 +12,7 @@ misc/kexec_and_kdump		Kexec and Kdump for Xen
 misc/tscmode			TSC Mode HOWTO
 misc/vbd-interface		Xen Guest Disk (VBD) Interface
 misc/xenstore			Xenstore protocol specification
+misc/xenstore-paths		Xenstore path documentation
 misc/xl-disk-configuration	XL Disk Configuration
 misc/xl-network-configuration	XL Network Configuration
 misc/distro_mapping		Distro Directory Layouts
