@@ -734,9 +734,6 @@ Choose the default scheduler.
 ### sched\_credit2\_migrate\_resist
 > `= <integer>`
 
-### sched\_credit\_default\_yield
-> `= <boolean>`
-
 ### sched\_credit\_tslice\_ms
 > `= <integer>`
 

@@ -103,8 +103,6 @@
 /*
  * Boot parameters
  */
-static bool_t __read_mostly sched_credit_default_yield;
-boolean_param("sched_credit_default_yield", sched_credit_default_yield);
 static int __read_mostly sched_credit_tslice_ms = CSCHED_DEFAULT_TSLICE_MS;
 integer_param("sched_credit_tslice_ms", sched_credit_tslice_ms);
 
@@ -783,11 +781,8 @@ csched_vcpu_yield(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const sv = CSCHED_VCPU(vc);
 
-    if ( !sched_credit_default_yield )
-    {
-        /* Let the scheduler know that this vcpu is trying to yield */
-        sv->flags |= CSCHED_FLAG_VCPU_YIELD;
-    }
+    /* Let the scheduler know that this vcpu is trying to yield */
+    sv->flags |= CSCHED_FLAG_VCPU_YIELD;
 }
 
 static int
