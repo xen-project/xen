@@ -740,11 +740,33 @@ Choose the default scheduler.
 ### sched\_credit\_tslice\_ms
 > `= <integer>`
 
+Set the timeslice of the credit1 scheduler, in milliseconds.  The
+default is 30ms.  Reasonable values may include 10, 5, or even 1 for
+very latency-sensitive workloads.
+
 ### sched\_ratelimit\_us
 > `= <integer>`
 
+In order to limit the rate of context switching, set the minimum
+amount of time that a vcpu can be scheduled for before preempting it,
+in microseconds.  The default is 1000us (1ms).  Setting this to 0
+disables it altogether.
+
 ### sched\_smt\_power\_savings
 > `= <boolean>`
+
+Normally Xen will try to maximize performance and cache utilization by
+spreading out vcpus across as many different divisions as possible
+(i.e, numa nodes, sockets, cores threads, &c).  This often maximizes
+throughput, but also maximizes energy usage, since it reduces the
+depth to which a processor can sleep.
+
+This option inverts the logic, so that the scheduler in effect tries
+to keep the vcpus on the smallest amount of silicon possible; i.e.,
+first fill up sibling threads, then sibling cores, then sibling
+sockets, &c.  This will reduce performance somewhat, particularly on
+systems with hyperthreading enabled, but should reduce power by
+enabling more sockets and cores to go into deeper sleep states.
 
 ### serial\_tx\_buffer
 > `= <size>`
