@@ -128,11 +128,15 @@ static void do_get_hw_residencies(void *arg)
 
     switch ( c->x86_model )
     {
-    /* Ivy bridge */
-    case 0x3A:
     /* Sandy bridge */
     case 0x2A:
     case 0x2D:
+    /* Ivy bridge */
+    case 0x3A:
+    case 0x3E:
+    /* Haswell */
+    case 0x3c:
+    case 0x45:
         GET_PC2_RES(hw_res->pc2);
         GET_CC7_RES(hw_res->cc7);
         /* fall through */
