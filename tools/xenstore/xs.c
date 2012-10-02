@@ -110,6 +110,11 @@ struct xs_handle {
 
 #define read_thread_exists(h)	(h->read_thr_exists)
 
+/* Because pthread_cleanup_p* are not available when USE_PTHREAD is
+ * disabled, use these macros which convert appropriately. */
+#define cleanup_push_heap(p)        cleanup_push(free, p)
+#define cleanup_pop_heap(run, p)    cleanup_pop((run))
+
 static void *read_thread(void *arg);
 
 #else /* !defined(USE_PTHREAD) */
@@ -129,6 +134,9 @@ struct xs_handle {
 #define cleanup_push(f, a)	((void)0)
 #define cleanup_pop(run)	((void)0)
 #define read_thread_exists(h)	(0)
+
+#define cleanup_push_heap(p)        ((void)0)
+#define cleanup_pop_heap(run, p)    do { if ((run)) free(p); } while(0)
 
 #endif
 
@@ -1059,7 +1067,7 @@ static int read_message(struct xs_handle *h, int nonblocking)
 	msg = malloc(sizeof(*msg));
 	if (msg == NULL)
 		goto error;
-	cleanup_push(free, msg);
+	cleanup_push_heap(msg);
 	if (!read_all(h->fd, &msg->hdr, sizeof(msg->hdr), nonblocking)) { /* Cancellation point */
 		saved_errno = errno;
 		goto error_freemsg;
@@ -1069,7 +1077,7 @@ static int read_message(struct xs_handle *h, int nonblocking)
 	body = msg->body = malloc(msg->hdr.len + 1);
 	if (body == NULL)
 		goto error_freemsg;
-	cleanup_push(free, body);
+	cleanup_push_heap(body);
 	if (!read_all(h->fd, body, msg->hdr.len, 0)) { /* Cancellation point */
 		saved_errno = errno;
 		goto error_freebody;
@@ -1098,6 +1106,7 @@ static int read_message(struct xs_handle *h, int nonblocking)
 		/* There should only ever be one response pending! */
 		if (!list_empty(&h->reply_list)) {
 			mutex_unlock(&h->reply_mutex);
+			saved_errno = EEXIST;
 			goto error_freebody;
 		}
 
@@ -1110,9 +1119,9 @@ static int read_message(struct xs_handle *h, int nonblocking)
 	ret = 0;
 
 error_freebody:
-	cleanup_pop(ret == -1);
+	cleanup_pop_heap(ret == -1, body);
 error_freemsg:
-	cleanup_pop(ret == -1);
+	cleanup_pop_heap(ret == -1, msg);
 error:
 	errno = saved_errno;
 
