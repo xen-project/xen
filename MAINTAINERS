@@ -261,6 +261,21 @@ S:	Supported
 F:	tools/xentrace/
 F:	xen/common/trace.c
 
+VTPM
+M:	Matthew Fioravante <matthew.fioravante@jhuapl.edu>
+S:	Supported
+F:	tools/vtpm
+F:	tools/vtpm_manager
+F:	extras/minios-os/tpmfront.c
+F:	extras/minios-os/tpmback.c
+F:	extras/minios-os/tpm-tis.c
+F:	extras/minios-os/include/tpmfront.h
+F:	extras/minios-os/include/tpmback.h
+F:	extras/minios-os/include/tpm-tis.h
+F:	stubdom/vtpm
+F:	stubdom/vtpmmgr
+F:	docs/misc/vtpm.txt
+
 THE REST
 M:	Keir Fraser <keir@xen.org>
 L:	xen-devel@lists.xen.org
