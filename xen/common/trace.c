@@ -816,6 +816,58 @@ unlock:
         tasklet_schedule(&trace_notify_dom0_tasklet);
 }
 
+void __trace_hypercall(unsigned long op, const unsigned long *args)
+{
+    struct {
+        uint32_t op;
+        uint32_t args[6];
+    } __attribute__((packed)) d;
+    uint32_t *a = d.args;
+
+#define APPEND_ARG32(i)                         \
+    do {                                        \
+        unsigned i_ = (i);                      \
+        *a++ = args[(i_)];                      \
+        d.op |= TRC_PV_HYPERCALL_V2_ARG_32(i_); \
+    } while( 0 )
+
+    /*
+     * This shouldn't happen as @op should be small enough but just in
+     * case, warn if the argument bits in the trace record would
+     * clobber the hypercall op.
+     */
+    WARN_ON(op & TRC_PV_HYPERCALL_V2_ARG_MASK);
+
+    d.op = op;
+
+    switch ( op )
+    {
+    case __HYPERVISOR_mmu_update:
+        APPEND_ARG32(1); /* count */
+        break;
+    case __HYPERVISOR_multicall:
+        APPEND_ARG32(1); /* count */
+        break;
+    case __HYPERVISOR_grant_table_op:
+        APPEND_ARG32(0); /* cmd */
+        APPEND_ARG32(2); /* count */
+        break;
+    case __HYPERVISOR_vcpu_op:
+        APPEND_ARG32(0); /* cmd */
+        APPEND_ARG32(1); /* vcpuid */
+        break;
+    case __HYPERVISOR_mmuext_op:
+        APPEND_ARG32(1); /* count */
+        break;
+    case __HYPERVISOR_sched_op:
+        APPEND_ARG32(0); /* cmd */
+        break;
+    }
+
+    __trace_var(TRC_PV_HYPERCALL_V2, 1,
+                sizeof(uint32_t) * (1 + (a - d.args)), &d);
+}
+
 /*
  * Local variables:
  * mode: C

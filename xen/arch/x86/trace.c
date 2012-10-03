@@ -9,33 +9,28 @@
 void trace_hypercall(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
+    unsigned long args[6];
 
     if ( is_pv_32on64_vcpu(current) )
     {
-        struct {
-            u32 eip,eax;
-        } __attribute__((packed)) d;
-            
-        d.eip = regs->eip;
-        d.eax = regs->eax;
-
-        __trace_var(TRC_PV_HYPERCALL, 1, sizeof(d), &d);
+        args[0] = regs->ebx;
+        args[1] = regs->ecx;
+        args[2] = regs->edx;
+        args[3] = regs->esi;
+        args[4] = regs->edi;
+        args[5] = regs->ebp;
     }
     else
     {
-        struct {
-            unsigned long eip;
-            u32 eax;
-        } __attribute__((packed)) d;
-        u32 event;
-
-        event = TRC_PV_HYPERCALL;
-        event |= TRC_64_FLAG;
-        d.eip = regs->eip;
-        d.eax = regs->eax;
-
-        __trace_var(event, 1/*tsc*/, sizeof(d), &d);
+        args[0] = regs->rdi;
+        args[1] = regs->rsi;
+        args[2] = regs->rdx;
+        args[3] = regs->r10;
+        args[4] = regs->r8;
+        args[5] = regs->r9;
     }
+
+    __trace_hypercall(regs->eax, args);
 }
 
 void __trace_pv_trap(int trapnr, unsigned long eip,

@@ -107,6 +107,36 @@
 #define TRC_PV_GDT_LDT_MAPPING_FAULT (TRC_PV_ENTRY + 10)
 #define TRC_PV_PTWR_EMULATION        (TRC_PV_ENTRY + 11)
 #define TRC_PV_PTWR_EMULATION_PAE    (TRC_PV_ENTRY + 12)
+#define TRC_PV_HYPERCALL_V2          (TRC_PV_ENTRY + 13)
+
+/*
+ * TRC_PV_HYPERCALL_V2 format
+ *
+ * Only some of the hypercall argument are recorded. Bit fields A0 to
+ * A5 in the first extra word are set if the argument is present and
+ * the arguments themselves are packed sequentially in the following
+ * words.
+ *
+ * The TRC_64_FLAG bit is not set for these events (even if there are
+ * 64-bit arguments in the record).
+ *
+ * Word
+ * 0    bit 31 30|29 28|27 26|25 24|23 22|21 20|19 ... 0
+ *          A5   |A4   |A3   |A2   |A1   |A0   |Hypercall op
+ * 1    First 32 bit (or low word of first 64 bit) arg in record
+ * 2    Second 32 bit (or high word of first 64 bit) arg in record
+ * ...
+ *
+ * A0-A5 bitfield values:
+ *
+ *   00b  Argument not present
+ *   01b  32-bit argument present
+ *   10b  64-bit argument present
+ *   11b  Reserved
+ */
+#define TRC_PV_HYPERCALL_V2_ARG_32(i) (0x1 << (20 + 2*(i)))
+#define TRC_PV_HYPERCALL_V2_ARG_64(i) (0x2 << (20 + 2*(i)))
+#define TRC_PV_HYPERCALL_V2_ARG_MASK  (0xfff00000)
 
 #define TRC_SHADOW_NOT_SHADOW                 (TRC_SHADOW +  1)
 #define TRC_SHADOW_FAST_PROPAGATE             (TRC_SHADOW +  2)
