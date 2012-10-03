@@ -242,6 +242,21 @@ S:	Supported
 T:	hg http://xenbits.xen.org/linux-2.6.18-xen.hg
 F:	drivers/xen/usb*/
 
+VTPM
+M:	Matthew Fioravante <matthew.fioravante@jhuapl.edu>
+S:	Supported
+F:	extras/minios-os/tpmfront.c
+F:	extras/minios-os/tpmback.c
+F:	extras/minios-os/tpm-tis.c
+F:	extras/minios-os/include/tpmfront.h
+F:	extras/minios-os/include/tpmback.h
+F:	extras/minios-os/include/tpm-tis.h
+F:	tools/vtpm/
+F:	tools/vtpm_manager/
+F:	stubdom/vtpm/
+F:	stubdom/vtpmmgr/
+F:	docs/misc/vtpm.txt
+
 X86 ARCHITECTURE
 M:	Keir Fraser <keir@xen.org>
 M:	Jan Beulich <jbeulich@suse.com>
@@ -260,21 +275,6 @@ M:	George Dunlap <george.dunlap@eu.citrix.com>
 S:	Supported
 F:	tools/xentrace/
 F:	xen/common/trace.c
-
-VTPM
-M:	Matthew Fioravante <matthew.fioravante@jhuapl.edu>
-S:	Supported
-F:	tools/vtpm
-F:	tools/vtpm_manager
-F:	extras/minios-os/tpmfront.c
-F:	extras/minios-os/tpmback.c
-F:	extras/minios-os/tpm-tis.c
-F:	extras/minios-os/include/tpmfront.h
-F:	extras/minios-os/include/tpmback.h
-F:	extras/minios-os/include/tpm-tis.h
-F:	stubdom/vtpm
-F:	stubdom/vtpmmgr
-F:	docs/misc/vtpm.txt
 
 THE REST
 M:	Keir Fraser <keir@xen.org>
