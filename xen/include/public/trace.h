@@ -94,7 +94,8 @@
 #define TRC_MEM_POD_ZERO_RECLAIM    (TRC_MEM + 17)
 #define TRC_MEM_POD_SUPERPAGE_SPLINTER (TRC_MEM + 18)
 
-#define TRC_PV_ENTRY 0x00201000 /* Hypervisor entry points for PV guests. */
+#define TRC_PV_ENTRY   0x00201000 /* Hypervisor entry points for PV guests. */
+#define TRC_PV_SUBCALL 0x00202000 /* Sub-call in a multicall hypercall */
 
 #define TRC_PV_HYPERCALL             (TRC_PV_ENTRY +  1)
 #define TRC_PV_TRAP                  (TRC_PV_ENTRY +  3)
@@ -108,6 +109,7 @@
 #define TRC_PV_PTWR_EMULATION        (TRC_PV_ENTRY + 11)
 #define TRC_PV_PTWR_EMULATION_PAE    (TRC_PV_ENTRY + 12)
 #define TRC_PV_HYPERCALL_V2          (TRC_PV_ENTRY + 13)
+#define TRC_PV_HYPERCALL_SUBCALL     (TRC_PV_SUBCALL + 14)
 
 /*
  * TRC_PV_HYPERCALL_V2 format

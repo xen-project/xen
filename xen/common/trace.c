@@ -816,7 +816,8 @@ unlock:
         tasklet_schedule(&trace_notify_dom0_tasklet);
 }
 
-void __trace_hypercall(unsigned long op, const unsigned long *args)
+void __trace_hypercall(uint32_t event, unsigned long op,
+                       const unsigned long *args)
 {
     struct {
         uint32_t op;
@@ -864,8 +865,7 @@ void __trace_hypercall(unsigned long op, const unsigned long *args)
         break;
     }
 
-    __trace_var(TRC_PV_HYPERCALL_V2, 1,
-                sizeof(uint32_t) * (1 + (a - d.args)), &d);
+    __trace_var(event, 1, sizeof(uint32_t) * (1 + (a - d.args)), &d);
 }
 
 /*

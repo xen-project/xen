@@ -5,6 +5,7 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/multicall.h>
+#include <xen/trace.h>
 
 #define COMPAT
 typedef int ret_t;
@@ -24,6 +25,17 @@ DEFINE_XEN_GUEST_HANDLE(multicall_entry_compat_t);
 #define call                 compat_call
 #define do_multicall(l, n)   compat_multicall(_##l, n)
 #define _XEN_GUEST_HANDLE(t) XEN_GUEST_HANDLE(t)
+
+static void __trace_multicall_call(multicall_entry_t *call)
+{
+    unsigned long args[6];
+    int i;
+
+    for ( i = 0; i < ARRAY_SIZE(args); i++ )
+        args[i] = call->args[i];
+
+    __trace_hypercall(TRC_PV_HYPERCALL_SUBCALL, call->op, args);
+}
 
 #include "../multicall.c"
 

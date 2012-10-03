@@ -11,13 +11,27 @@
 #include <xen/multicall.h>
 #include <xen/guest_access.h>
 #include <xen/perfc.h>
+#include <xen/trace.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
 
 #ifndef COMPAT
 typedef long ret_t;
 #define xlat_multicall_entry(mcs)
+
+static void __trace_multicall_call(multicall_entry_t *call)
+{
+    __trace_hypercall(TRC_PV_HYPERCALL_SUBCALL, call->op, call->args);
+}
 #endif
+
+static void trace_multicall_call(multicall_entry_t *call)
+{
+    if ( !tb_init_done )
+        return;
+
+    __trace_multicall_call(call);
+}
 
 ret_t
 do_multicall(
@@ -46,6 +60,8 @@ do_multicall(
             rc = -EFAULT;
             break;
         }
+
+        trace_multicall_call(&mcs->call);
 
         do_multicall_call(&mcs->call);
 

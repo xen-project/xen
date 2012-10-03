@@ -112,6 +112,7 @@ last_tsc = [0]
 
 TRC_TRACE_IRQ = 0x1f004
 TRC_PV_HYPERCALL_V2 = 0x20100d
+TRC_PV_HYPERCALL_SUBCALL = 0x20100e
 
 NR_VECTORS = 256
 irq_measure = [{'count':0, 'tot_cycles':0, 'max_cycles':0}] * NR_VECTORS
@@ -199,7 +200,7 @@ while not interrupted:
             d3 = irq_measure[d1]['tot_cycles']
             d4 = irq_measure[d1]['max_cycles']
 
-        if event == TRC_PV_HYPERCALL_V2:
+        if event == TRC_PV_HYPERCALL_V2 or event == TRC_PV_HYPERCALL_SUBCALL:
             # Mask off the argument present bits.
             d1 &= 0x000fffff
 

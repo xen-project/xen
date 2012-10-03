@@ -30,7 +30,7 @@ void trace_hypercall(void)
         args[5] = regs->r9;
     }
 
-    __trace_hypercall(regs->eax, args);
+    __trace_hypercall(TRC_PV_HYPERCALL_V2, regs->eax, args);
 }
 
 void __trace_pv_trap(int trapnr, unsigned long eip,

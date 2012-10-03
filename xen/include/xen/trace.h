@@ -44,7 +44,8 @@ static inline void trace_var(u32 event, int cycles, int extra,
         __trace_var(event, cycles, extra, extra_data);
 }
 
-void __trace_hypercall(unsigned long call, const unsigned long *args);
+void __trace_hypercall(uint32_t event, unsigned long op,
+                       const unsigned long *args);
 
 /* Convenience macros for calling the trace function. */
 #define TRACE_0D(_e)                            \

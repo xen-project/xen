@@ -105,6 +105,7 @@
 0x0020100c  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  ptwr_emulation_pae  [ addr = 0x%(3)08x, eip = 0x%(4)08x, npte = 0x%(2)08x%(1)08x ]
 0x0020110c  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  ptwr_emulation_pae  [ addr = 0x%(4)08x%(3)08x, rip = 0x%(6)08x%(5)08x, npte = 0x%(2)08x%(1)08x ]
 0x0020100d  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  hypercall  [ op = 0x%(1)08x ]
+0x0020200e  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)    hypercall  [ op = 0x%(1)08x ]
 
 0x0040f001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  shadow_not_shadow                 [ gl1e = 0x%(2)08x%(1)08x, va = 0x%(3)08x, flags = 0x%(4)08x ]
 0x0040f101  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  shadow_not_shadow                 [ gl1e = 0x%(2)08x%(1)08x, va = 0x%(4)08x%(3)08x, flags = 0x%(5)08x ]
