@@ -94,20 +94,19 @@
 #define TRC_MEM_POD_ZERO_RECLAIM    (TRC_MEM + 17)
 #define TRC_MEM_POD_SUPERPAGE_SPLINTER (TRC_MEM + 18)
 
+#define TRC_PV_ENTRY 0x00201000 /* Hypervisor entry points for PV guests. */
 
-#define TRC_PV_HYPERCALL             (TRC_PV +  1)
-#define TRC_PV_TRAP                  (TRC_PV +  3)
-#define TRC_PV_PAGE_FAULT            (TRC_PV +  4)
-#define TRC_PV_FORCED_INVALID_OP     (TRC_PV +  5)
-#define TRC_PV_EMULATE_PRIVOP        (TRC_PV +  6)
-#define TRC_PV_EMULATE_4GB           (TRC_PV +  7)
-#define TRC_PV_MATH_STATE_RESTORE    (TRC_PV +  8)
-#define TRC_PV_PAGING_FIXUP          (TRC_PV +  9)
-#define TRC_PV_GDT_LDT_MAPPING_FAULT (TRC_PV + 10)
-#define TRC_PV_PTWR_EMULATION        (TRC_PV + 11)
-#define TRC_PV_PTWR_EMULATION_PAE    (TRC_PV + 12)
-  /* Indicates that addresses in trace record are 64 bits */
-#define TRC_64_FLAG               (0x100) 
+#define TRC_PV_HYPERCALL             (TRC_PV_ENTRY +  1)
+#define TRC_PV_TRAP                  (TRC_PV_ENTRY +  3)
+#define TRC_PV_PAGE_FAULT            (TRC_PV_ENTRY +  4)
+#define TRC_PV_FORCED_INVALID_OP     (TRC_PV_ENTRY +  5)
+#define TRC_PV_EMULATE_PRIVOP        (TRC_PV_ENTRY +  6)
+#define TRC_PV_EMULATE_4GB           (TRC_PV_ENTRY +  7)
+#define TRC_PV_MATH_STATE_RESTORE    (TRC_PV_ENTRY +  8)
+#define TRC_PV_PAGING_FIXUP          (TRC_PV_ENTRY +  9)
+#define TRC_PV_GDT_LDT_MAPPING_FAULT (TRC_PV_ENTRY + 10)
+#define TRC_PV_PTWR_EMULATION        (TRC_PV_ENTRY + 11)
+#define TRC_PV_PTWR_EMULATION_PAE    (TRC_PV_ENTRY + 12)
 
 #define TRC_SHADOW_NOT_SHADOW                 (TRC_SHADOW +  1)
 #define TRC_SHADOW_FAST_PROPAGATE             (TRC_SHADOW +  2)
@@ -187,6 +186,14 @@
 #define TRC_HW_IRQ_UNMAPPED_VECTOR    (TRC_HW_IRQ + 0x7)
 #define TRC_HW_IRQ_HANDLED            (TRC_HW_IRQ + 0x8)
 
+/*
+ * Event Flags
+ *
+ * Some events (e.g, TRC_PV_TRAP and TRC_HVM_IOMEM_READ) have multiple
+ * record formats.  These event flags distinguish between the
+ * different formats.
+ */
+#define TRC_64_FLAG 0x100 /* Addresses are 64 bits (instead of 32 bits) */
 
 /* This structure represents a single trace buffer record. */
 struct t_rec {
