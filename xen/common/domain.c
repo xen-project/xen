@@ -9,7 +9,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/ctype.h>
-#include <xen/errno.h>
+#include <xen/err.h>
 #include <xen/sched.h>
 #include <xen/domain.h>
 #include <xen/mm.h>
@@ -217,17 +217,17 @@ struct domain *domain_create(
     struct domain *d, **pd;
     enum { INIT_xsm = 1u<<0, INIT_watchdog = 1u<<1, INIT_rangeset = 1u<<2,
            INIT_evtchn = 1u<<3, INIT_gnttab = 1u<<4, INIT_arch = 1u<<5 };
-    int init_status = 0;
+    int err, init_status = 0;
     int poolid = CPUPOOLID_NONE;
 
     if ( (d = alloc_domain_struct()) == NULL )
-        return NULL;
+        return ERR_PTR(-ENOMEM);
 
     d->domain_id = domid;
 
     lock_profile_register_struct(LOCKPROF_TYPE_PERDOM, d, domid, "Domain");
 
-    if ( xsm_alloc_security_domain(d) != 0 )
+    if ( (err = xsm_alloc_security_domain(d)) != 0 )
         goto fail;
     init_status |= INIT_xsm;
 
@@ -261,14 +261,14 @@ struct domain *domain_create(
     d->iomem_caps = rangeset_new(d, "I/O Memory", RANGESETF_prettyprint_hex);
     d->irq_caps   = rangeset_new(d, "Interrupts", 0);
     if ( (d->iomem_caps == NULL) || (d->irq_caps == NULL) )
-        goto fail;
+        goto nomem;
 
     if ( domcr_flags & DOMCRF_dummy )
         return d;
 
     if ( !is_idle_domain(d) )
     {
-        if ( xsm_domain_create(d, ssidref) != 0 )
+        if ( (err = xsm_domain_create(d, ssidref)) != 0 )
             goto fail;
 
         d->is_paused_by_controller = 1;
@@ -285,29 +285,29 @@ struct domain *domain_create(
         d->pirq_mask = xmalloc_array(
             unsigned long, BITS_TO_LONGS(d->nr_pirqs));
         if ( (d->pirq_to_evtchn == NULL) || (d->pirq_mask == NULL) )
-            goto fail;
+            goto nomem;
         memset(d->pirq_to_evtchn, 0, d->nr_pirqs * sizeof(*d->pirq_to_evtchn));
         bitmap_zero(d->pirq_mask, d->nr_pirqs);
 
-        if ( evtchn_init(d) != 0 )
+        if ( (err = evtchn_init(d)) != 0 )
             goto fail;
         init_status |= INIT_evtchn;
 
-        if ( grant_table_create(d) != 0 )
+        if ( (err = grant_table_create(d)) != 0 )
             goto fail;
         init_status |= INIT_gnttab;
 
         poolid = 0;
     }
 
-    if ( arch_domain_create(d, domcr_flags) != 0 )
+    if ( (err = arch_domain_create(d, domcr_flags)) != 0 )
         goto fail;
     init_status |= INIT_arch;
 
-    if ( cpupool_add_domain(d, poolid) != 0 )
+    if ( (err = cpupool_add_domain(d, poolid)) != 0 )
         goto fail;
 
-    if ( sched_init_domain(d) != 0 )
+    if ( (err = sched_init_domain(d)) != 0 )
         goto fail;
 
     if ( !is_idle_domain(d) )
@@ -326,6 +326,8 @@ struct domain *domain_create(
 
     return d;
 
+ nomem:
+    err = -ENOMEM;
  fail:
     d->is_dying = DOMDYING_dead;
     atomic_set(&d->refcnt, DOMAIN_DESTROYED);
@@ -347,7 +349,7 @@ struct domain *domain_create(
     xfree(d->pirq_mask);
     xfree(d->pirq_to_evtchn);
     free_domain_struct(d);
-    return NULL;
+    return ERR_PTR(err);
 }
 
 
