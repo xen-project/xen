@@ -144,6 +144,11 @@ void __devinit early_intel_workaround(struct cpuinfo_x86 *c)
 				       c->cpuid_level);
 		}
 	}
+
+	/* CPUID workaround for Intel 0F33/0F34 CPU */
+	if (boot_cpu_data.x86 == 0xF && boot_cpu_data.x86_model == 3 &&
+	    (boot_cpu_data.x86_mask == 3 || boot_cpu_data.x86_mask == 4))
+		paddr_bits = 36;
 }
 
 /*

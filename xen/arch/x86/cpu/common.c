@@ -36,6 +36,8 @@ integer_param("cpuid_mask_ext_edx", opt_cpuid_mask_ext_edx);
 
 struct cpu_dev * cpu_devs[X86_VENDOR_NUM] = {};
 
+unsigned int paddr_bits __read_mostly = 36;
+
 /*
  * Default host IA32_CR_PAT value to cover all memory types.
  * BIOS usually sets it to 0x07040600070406.
@@ -265,6 +267,8 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 		}
 		if ( xlvl >= 0x80000004 )
 			get_model_name(c); /* Default name */
+		if ( xlvl >= 0x80000008 )
+			paddr_bits = cpuid_eax(0x80000008) & 0xff;
 	}
 
 	/* Intel-defined flags: level 0x00000007 */

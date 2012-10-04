@@ -587,8 +587,6 @@ struct mtrr_value {
 	unsigned long	lsize;
 };
 
-unsigned int paddr_bits __read_mostly = 36;
-
 /**
  * mtrr_bp_init - initialize mtrrs on the boot CPU
  *
@@ -602,48 +600,12 @@ void __init mtrr_bp_init(void)
 
 	if (cpu_has_mtrr) {
 		mtrr_if = &generic_mtrr_ops;
-		size_or_mask = 0xff000000;	/* 36 bits */
-		size_and_mask = 0x00f00000;
-
-		/* This is an AMD specific MSR, but we assume(hope?) that
-		   Intel will implement it to when they extend the address
-		   bus of the Xeon. */
-		if (cpuid_eax(0x80000000) >= 0x80000008) {
-			paddr_bits = cpuid_eax(0x80000008) & 0xff;
-			/* CPUID workaround for Intel 0F33/0F34 CPU */
-			if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
-			    boot_cpu_data.x86 == 0xF &&
-			    boot_cpu_data.x86_model == 0x3 &&
-			    (boot_cpu_data.x86_mask == 0x3 ||
-			     boot_cpu_data.x86_mask == 0x4))
-				paddr_bits = 36;
-
-			size_or_mask = ~((1ULL << (paddr_bits - PAGE_SHIFT)) - 1);
-			size_and_mask = ~size_or_mask & 0xfffff00000ULL;
-		} else if (boot_cpu_data.x86_vendor == X86_VENDOR_CENTAUR &&
-			   boot_cpu_data.x86 == 6) {
-			/* VIA C* family have Intel style MTRRs, but
-			   don't support PAE */
-			size_or_mask = 0xfff00000;	/* 32 bits */
-			size_and_mask = 0;
-		}
 	} else {
 #ifndef CONFIG_X86_64
 		switch (boot_cpu_data.x86_vendor) {
-		case X86_VENDOR_AMD:
-			if (cpu_has_k6_mtrr) {
-				/* Pre-Athlon (K6) AMD CPU MTRRs */
-				mtrr_if = mtrr_ops[X86_VENDOR_AMD];
-				size_or_mask = 0xfff00000;	/* 32 bits */
-				size_and_mask = 0;
-			}
-			break;
 		case X86_VENDOR_CYRIX:
-			if (cpu_has_cyrix_arr) {
+			if (cpu_has_cyrix_arr)
 				mtrr_if = mtrr_ops[X86_VENDOR_CYRIX];
-				size_or_mask = 0xfff00000;	/* 32 bits */
-				size_and_mask = 0;
-			}
 			break;
 		default:
 			break;
@@ -652,6 +614,8 @@ void __init mtrr_bp_init(void)
 	}
 
 	if (mtrr_if) {
+		size_or_mask = ~((1ULL << (paddr_bits - PAGE_SHIFT)) - 1);
+		size_and_mask = ~size_or_mask & 0xfffff00000ULL;
 		set_num_var_ranges();
 		init_table();
 		if (use_intel())
