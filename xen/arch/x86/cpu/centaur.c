@@ -56,6 +56,9 @@ static void __init init_c3(struct cpuinfo_x86 *c)
 	if (c->x86_model >=6 && c->x86_model <9)
 		set_bit(X86_FEATURE_3DNOW, c->x86_capability);
 
+	if (cpuid_eax(0x80000000) < 0x80000008)
+		paddr_bits = 32;
+
 	get_model_name(c);
 	display_cacheinfo(c);
 }

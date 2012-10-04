@@ -303,7 +303,9 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 	}
 	safe_strcpy(c->x86_model_id, Cx86_model[dir0_msn & 7]);
 	if (p) safe_strcat(c->x86_model_id, p);
-	return;
+
+	if (cpu_has_cyrix_arr)
+		paddr_bits = 32;
 }
 
 /*
