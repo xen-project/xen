@@ -552,8 +552,6 @@ void microcode_set_module(unsigned int);
 int microcode_update(XEN_GUEST_HANDLE(const_void), unsigned long len);
 int microcode_resume_cpu(int cpu);
 
-unsigned long *get_x86_gpr(struct cpu_user_regs *regs, unsigned int modrm_reg);
-
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_X86_PROCESSOR_H */

@@ -223,56 +223,18 @@ void __set_vvmcs(void *vvmcs, u32 vmcs_encoding, u64 val)
 static unsigned long reg_read(struct cpu_user_regs *regs,
                               enum vmx_regs_enc index)
 {
-    unsigned long value = 0;
+    unsigned long *pval = decode_register(index, regs, 0);
 
-    switch ( index ) {
-    CASE_GET_REG(RAX, eax);
-    CASE_GET_REG(RCX, ecx);
-    CASE_GET_REG(RDX, edx);
-    CASE_GET_REG(RBX, ebx);
-    CASE_GET_REG(RBP, ebp);
-    CASE_GET_REG(RSI, esi);
-    CASE_GET_REG(RDI, edi);
-    CASE_GET_REG(RSP, esp);
-    CASE_GET_REG(R8, r8);
-    CASE_GET_REG(R9, r9);
-    CASE_GET_REG(R10, r10);
-    CASE_GET_REG(R11, r11);
-    CASE_GET_REG(R12, r12);
-    CASE_GET_REG(R13, r13);
-    CASE_GET_REG(R14, r14);
-    CASE_GET_REG(R15, r15);
-    default:
-        break;
-    }
-
-    return value;
+    return *pval;
 }
 
 static void reg_write(struct cpu_user_regs *regs,
                       enum vmx_regs_enc index,
                       unsigned long value)
 {
-    switch ( index ) {
-    CASE_SET_REG(RAX, eax);
-    CASE_SET_REG(RCX, ecx);
-    CASE_SET_REG(RDX, edx);
-    CASE_SET_REG(RBX, ebx);
-    CASE_SET_REG(RBP, ebp);
-    CASE_SET_REG(RSI, esi);
-    CASE_SET_REG(RDI, edi);
-    CASE_SET_REG(RSP, esp);
-    CASE_SET_REG(R8, r8);
-    CASE_SET_REG(R9, r9);
-    CASE_SET_REG(R10, r10);
-    CASE_SET_REG(R11, r11);
-    CASE_SET_REG(R12, r12);
-    CASE_SET_REG(R13, r13);
-    CASE_SET_REG(R14, r14);
-    CASE_SET_REG(R15, r15);
-    default:
-        break;
-    }
+    unsigned long *pval = decode_register(index, regs, 0);
+
+    *pval = value;
 }
 
 static inline u32 __n2_exec_control(struct vcpu *v)

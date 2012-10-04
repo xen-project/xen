@@ -1585,7 +1585,7 @@ int hvm_mov_to_cr(unsigned int cr, unsigned int gpr)
     struct vcpu *curr = current;
     unsigned long val, *reg;
 
-    if ( (reg = get_x86_gpr(guest_cpu_user_regs(), gpr)) == NULL )
+    if ( (reg = decode_register(gpr, guest_cpu_user_regs(), 0)) == NULL )
     {
         gdprintk(XENLOG_ERR, "invalid gpr: %u\n", gpr);
         goto exit_and_crash;
@@ -1627,7 +1627,7 @@ int hvm_mov_from_cr(unsigned int cr, unsigned int gpr)
     struct vcpu *curr = current;
     unsigned long val = 0, *reg;
 
-    if ( (reg = get_x86_gpr(guest_cpu_user_regs(), gpr)) == NULL )
+    if ( (reg = decode_register(gpr, guest_cpu_user_regs(), 0)) == NULL )
     {
         gdprintk(XENLOG_ERR, "invalid gpr: %u\n", gpr);
         goto exit_and_crash;
