@@ -32,9 +32,9 @@
 #error "domctl operations are intended for use by node control tools only"
 #endif
 
-#include <xen/hvm/save.h>
 #include "xen.h"
 #include "grant_table.h"
+#include "hvm/save.h"
 
 #define XEN_DOMCTL_INTERFACE_VERSION 0x00000008
 
