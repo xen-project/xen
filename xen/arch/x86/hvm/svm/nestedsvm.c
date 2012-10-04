@@ -741,6 +741,10 @@ nsvm_vcpu_vmrun(struct vcpu *v, struct cpu_user_regs *regs)
         return 1;
     }
 
+    /* If l1 guest uses shadow paging, update the paging mode. */
+    if (!nestedhvm_paging_mode_hap(v))
+        paging_update_paging_modes(v);
+
     nv->nv_vmswitch_in_progress = 0;
     return 0;
 }
@@ -1407,6 +1411,10 @@ nestedsvm_vcpu_vmexit(struct vcpu *v, struct cpu_user_regs *regs,
      * modifications to the virtual VMCB/VMCS.
      */
     rc = nhvm_vcpu_vmexit(v, regs, exitcode);
+
+    /* If l1 guest uses shadow paging, update the paging mode. */
+    if (!nestedhvm_paging_mode_hap(v))
+        paging_update_paging_modes(v);
 
     nv->nv_vmswitch_in_progress = 0;
 
