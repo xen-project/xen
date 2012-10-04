@@ -647,6 +647,12 @@ static void acpi_dead_idle(void)
     }
 
 default_halt:
+    /*
+     * When going into S3, without flushing caches modified data may be
+     * held by the CPUs spinning here indefinitely, and get discarded by
+     * a subsequent INIT.
+     */
+    wbinvd();
     for ( ; ; )
         halt();
 }

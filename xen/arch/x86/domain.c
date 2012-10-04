@@ -86,6 +86,12 @@ static void default_idle(void)
 
 static void default_dead_idle(void)
 {
+    /*
+     * When going into S3, without flushing caches modified data may be
+     * held by the CPUs spinning here indefinitely, and get discarded by
+     * a subsequent INIT.
+     */
+    wbinvd();
     for ( ; ; )
         halt();
 }
