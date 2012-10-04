@@ -24,7 +24,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <xen/config.h>
+#include <xen/err.h>
 #include <xen/iocap.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
@@ -170,6 +170,30 @@ static int __get_paged_frame(unsigned long gfn, unsigned long *frame, int readon
 #endif
 
     return rc;
+}
+
+static struct domain *gt_lock_target_domain_by_id(domid_t dom)
+{
+    struct domain *d;
+    int rc = GNTST_general_error;
+
+    switch ( rcu_lock_target_domain_by_id(dom, &d) )
+    {
+    case 0:
+        return d;
+
+    case -ESRCH:
+        gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
+        rc = GNTST_bad_domain;
+        break;
+
+    case -EPERM:
+        rc = GNTST_permission_denied;
+        break;
+    }
+
+    ASSERT(rc < 0 && -rc <= MAX_ERRNO);
+    return ERR_PTR(rc);
 }
 
 static inline int
@@ -1216,7 +1240,6 @@ gnttab_setup_table(
     struct domain *d;
     int            i;
     unsigned long  gmfn;
-    domid_t        dom;
 
     if ( count != 1 )
         return -EINVAL;
@@ -1236,25 +1259,11 @@ gnttab_setup_table(
         goto out1;
     }
 
-    dom = op.dom;
-    if ( dom == DOMID_SELF )
+    d = gt_lock_target_domain_by_id(op.dom);
+    if ( IS_ERR(d) )
     {
-        d = rcu_lock_current_domain();
-    }
-    else
-    {
-        if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
-        {
-            gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
-            op.status = GNTST_bad_domain;
-            goto out1;
-        }
-
-        if ( unlikely(!IS_PRIV_FOR(current->domain, d)) )
-        {
-            op.status = GNTST_permission_denied;
-            goto out2;
-        }
+        op.status = PTR_ERR(d);
+        goto out1;
     }
 
     if ( xsm_grant_setup(current->domain, d) )
@@ -1309,7 +1318,6 @@ gnttab_query_size(
 {
     struct gnttab_query_size op;
     struct domain *d;
-    domid_t        dom;
     int rc;
 
     if ( count != 1 )
@@ -1321,25 +1329,11 @@ gnttab_query_size(
         return -EFAULT;
     }
 
-    dom = op.dom;
-    if ( dom == DOMID_SELF )
+    d = gt_lock_target_domain_by_id(op.dom);
+    if ( IS_ERR(d) )
     {
-        d = rcu_lock_current_domain();
-    }
-    else
-    {
-        if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
-        {
-            gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
-            op.status = GNTST_bad_domain;
-            goto query_out;
-        }
-
-        if ( unlikely(!IS_PRIV_FOR(current->domain, d)) )
-        {
-            op.status = GNTST_permission_denied;
-            goto query_out_unlock;
-        }
+        op.status = PTR_ERR(d);
+        goto query_out;
     }
 
     rc = xsm_grant_query_size(current->domain, d);
@@ -2179,7 +2173,6 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE(gnttab_get_status_frames_t) uop,
     struct grant_table *gt;
     uint64_t       gmfn;
     int i;
-    int rc;
 
     if ( count != 1 )
         return -EINVAL;
@@ -2191,15 +2184,10 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE(gnttab_get_status_frames_t) uop,
         return -EFAULT;
     }
 
-    rc = rcu_lock_target_domain_by_id(op.dom, &d);
-    if ( rc < 0 )
+    d = gt_lock_target_domain_by_id(op.dom);
+    if ( IS_ERR(d) )
     {
-        if ( rc == -ESRCH )
-            op.status = GNTST_bad_domain;
-        else if ( rc == -EPERM )
-            op.status = GNTST_permission_denied;
-        else
-            op.status = GNTST_general_error;
+        op.status = PTR_ERR(d);
         goto out1;
     }
 
