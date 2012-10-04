@@ -521,8 +521,8 @@ static int remap_entry_to_msi_msg(
     if ( x2apic_enabled )
         msg->dest32 = iremap_entry->lo.dst;
     else
-        msg->address_lo |=
-            ((iremap_entry->lo.dst >> 8) & 0xff ) << MSI_ADDR_DEST_ID_SHIFT;
+        msg->dest32 = (iremap_entry->lo.dst >> 8) & 0xff;
+    msg->address_lo |= (msg->dest32 & 0xff) << MSI_ADDR_DEST_ID_SHIFT;
 
     msg->data =
         MSI_DATA_TRIGGER_EDGE |
