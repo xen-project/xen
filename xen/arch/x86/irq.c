@@ -430,8 +430,7 @@ static int __assign_irq_vector(
      * 0x80, because int 0x80 is hm, kind of importantish. ;)
      */
     static int current_vector = FIRST_DYNAMIC_VECTOR, current_offset = 0;
-    unsigned int old_vector;
-    int cpu, err;
+    int cpu, err, old_vector;
     cpumask_t tmp_mask;
     vmask_t *irq_used_vectors = NULL;
 
