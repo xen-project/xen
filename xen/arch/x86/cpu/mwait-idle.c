@@ -501,11 +501,14 @@ int __init mwait_idle_init(struct notifier_block *nfb)
 		return -ENODEV;
 
 	err = mwait_idle_probe();
-	if (!err) {
-		if (!boot_cpu_has(X86_FEATURE_ARAT))
-			hpet_broadcast_init();
-		if (!lapic_timer_init())
+	if (!err && !boot_cpu_has(X86_FEATURE_ARAT)) {
+		hpet_broadcast_init();
+		if (xen_cpuidle < 0 && !hpet_broadcast_is_available())
+			err = -ENODEV;
+		else if(!lapic_timer_init())
 			err = -EINVAL;
+		if (err)
+			pr_debug(PREFIX "not used (%d)\n", err);
 	}
 	if (!err) {
 		nfb->notifier_call = mwait_idle_cpu_init;
