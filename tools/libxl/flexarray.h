@@ -16,16 +16,19 @@
 #ifndef FLEXARRAY_H
 #define FLEXARRAY_H
 
+struct libxl__gc;
+
 typedef struct flexarray {
     int size;
     int autogrow;
     unsigned int count;
     void **data; /* array of pointer */
+    struct libxl__gc *gc;
 } flexarray_t;
 
-_hidden flexarray_t *flexarray_make(int size, int autogrow);
+_hidden flexarray_t *flexarray_make(struct libxl__gc *gc, int size, int autogrow);
 _hidden void flexarray_free(flexarray_t *array);
-_hidden int flexarray_grow(flexarray_t *array, int extents);
+_hidden void flexarray_grow(flexarray_t *array, int extents);
 _hidden int flexarray_set(flexarray_t *array, unsigned int index, void *ptr);
 _hidden int flexarray_append(flexarray_t *array, void *ptr);
 _hidden int flexarray_append_pair(flexarray_t *array, void *ptr1, void *ptr2);

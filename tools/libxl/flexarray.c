@@ -16,36 +16,43 @@
 #include "libxl_internal.h"
 #include <stdarg.h>
 
-flexarray_t *flexarray_make(int size, int autogrow)
+/*
+ * It is safe to store gc in the struct because:
+ * - If it an actual gc, then the flexarray should not be used after the gc
+ *   have been freed.
+ * - If it is a NOGC, then this point to a structure embedded in libxl_ctx,
+ *   therefore will survive across several libxl calls.
+ */
+
+flexarray_t *flexarray_make(libxl__gc *gc, int size, int autogrow)
 {
-    flexarray_t *array = malloc(sizeof(struct flexarray));
-    if (array) {
-        array->size = size;
-        array->autogrow = autogrow;
-        array->count = 0;
-        array->data = calloc(size, sizeof(void *));
-    }
+    flexarray_t *array;
+
+    GCNEW(array);
+    array->size = size;
+    array->autogrow = autogrow;
+    array->count = 0;
+    array->gc = gc;
+    GCNEW_ARRAY(array->data, size);
+
     return array;
 }
 
 void flexarray_free(flexarray_t *array)
 {
+    assert(!libxl__gc_is_real(array->gc));
     free(array->data);
     free(array);
 }
 
-int flexarray_grow(flexarray_t *array, int extents)
+void flexarray_grow(flexarray_t *array, int extents)
 {
-    void **data;
     int newsize;
+    libxl__gc *gc = array->gc;
 
     newsize = array->size + extents;
-    data = realloc(array->data, sizeof(void *) * newsize);
-    if (!data)
-        return 1;
+    GCREALLOC_ARRAY(array->data, newsize);
     array->size += extents;
-    array->data = data;
-    return 0;
 }
 
 int flexarray_set(flexarray_t *array, unsigned int idx, void *ptr)
@@ -55,8 +62,7 @@ int flexarray_set(flexarray_t *array, unsigned int idx, void *ptr)
         if (!array->autogrow)
             return 1;
         newsize = (array->size * 2 < idx) ? idx + 1 : array->size * 2;
-        if (flexarray_grow(array, newsize - array->size))
-            return 2;
+        flexarray_grow(array, newsize - array->size);
     }
     if ( idx + 1 > array->count )
         array->count = idx + 1;
@@ -104,7 +110,8 @@ void **flexarray_contents(flexarray_t *array)
 {
     void **data;
     data = array->data;
-    free(array);
+    if (!libxl__gc_is_real(array->gc))
+        free(array);
     return data;
 }
 

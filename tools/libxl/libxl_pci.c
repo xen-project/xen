@@ -73,12 +73,8 @@ int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
     libxl__device device;
     int ret = ERROR_NOMEM, i;
 
-    front = flexarray_make(16, 1);
-    if (!front)
-        goto out;
-    back = flexarray_make(16, 1);
-    if (!back)
-        goto out;
+    front = flexarray_make(gc, 16, 1);
+    back = flexarray_make(gc, 16, 1);
 
     ret = 0;
 
@@ -108,11 +104,6 @@ int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
                               libxl__xs_kvs_of_flexarray(gc, back, back->count),
                               libxl__xs_kvs_of_flexarray(gc, front, front->count));
 
-out:
-    if (back)
-        flexarray_free(back);
-    if (front)
-        flexarray_free(front);
     return 0;
 }
 
@@ -138,9 +129,7 @@ static int libxl__device_pci_add_xenstore(libxl__gc *gc, uint32_t domid, libxl_d
             return ERROR_FAIL;
     }
 
-    back = flexarray_make(16, 1);
-    if (!back)
-        return ERROR_NOMEM;
+    back = flexarray_make(gc, 16, 1);
 
     LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Adding new pci device to xenstore");
     num = atoi(num_devs);
@@ -157,7 +146,6 @@ retry_transaction:
         if (errno == EAGAIN)
             goto retry_transaction;
 
-    flexarray_free(back);
     return 0;
 }
 

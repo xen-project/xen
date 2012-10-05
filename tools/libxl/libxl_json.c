@@ -220,13 +220,7 @@ static libxl__json_object *json_object_alloc(libxl__gc *gc,
     obj->type = type;
 
     if (type == JSON_MAP || type == JSON_ARRAY) {
-        flexarray_t *array = flexarray_make(1, 1);
-        if (array == NULL) {
-            LIBXL__LOG_ERRNO(libxl__gc_owner(gc), LIBXL__LOG_ERROR,
-                             "Failed to allocate a flexarray");
-            free(obj);
-            return NULL;
-        }
+        flexarray_t *array = flexarray_make(NOGC, 1, 1);
         if (type == JSON_MAP)
             obj->u.map = array;
         else

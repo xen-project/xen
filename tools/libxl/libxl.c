@@ -1820,27 +1820,15 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
         rc = libxl__device_disk_setdefault(gc, disk);
         if (rc) goto out;
 
-        if (front)
-            flexarray_free(front);
-        front = flexarray_make(16, 1);
-        if (!front) {
-            rc = ERROR_NOMEM;
-            goto out;
-        }
-        if (back)
-            flexarray_free(back);
-        back = flexarray_make(16, 1);
-        if (!back) {
-            rc = ERROR_NOMEM;
-            goto out_free;
-        }
+        front = flexarray_make(gc, 16, 1);
+        back = flexarray_make(gc, 16, 1);
 
         GCNEW(device);
         rc = libxl__device_from_disk(gc, domid, disk, device);
         if (rc != 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Invalid or unsupported"
                    " virtual disk identifier %s", disk->vdev);
-            goto out_free;
+            goto out;
         }
 
         switch (disk->backend) {
@@ -1878,7 +1866,7 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
                     LOG(ERROR, "failed to get blktap devpath for %p\n",
                         disk->pdev_path);
                     rc = ERROR_FAIL;
-                    goto out_free;
+                    goto out;
                 }
                 flexarray_append(back, "tapdisk-params");
                 flexarray_append(back, libxl__sprintf(gc, "%s:%s",
@@ -1900,7 +1888,7 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
             default:
                 LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "unrecognized disk backend type: %d\n", disk->backend);
                 rc = ERROR_INVAL;
-                goto out_free;
+                goto out;
         }
 
         flexarray_append(back, "frontend-id");
@@ -1937,7 +1925,7 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
 
         rc = libxl__xs_transaction_commit(gc, &t);
         if (!rc) break;
-        if (rc < 0) goto out_free;
+        if (rc < 0) goto out;
     }
 
     aodev->dev = device;
@@ -1946,9 +1934,6 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
 
     rc = 0;
 
-out_free:
-    flexarray_free(back);
-    flexarray_free(front);
 out:
     libxl__xs_transaction_abort(gc, &t);
     aodev->rc = rc;
@@ -2204,7 +2189,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     if (rc) goto out;
     path = libxl__device_backend_path(gc, &device);
 
-    insert = flexarray_make(4, 1);
+    insert = flexarray_make(gc, 4, 1);
 
     flexarray_append_pair(insert, "type",
                           libxl__device_disk_string_of_backend(disk->backend));
@@ -2229,8 +2214,6 @@ out:
     for (i = 0; i < num; i++)
         libxl_device_disk_dispose(&disks[i]);
     free(disks);
-
-    if (insert) flexarray_free(insert);
 
     if (rc) return AO_ABORT(rc);
     return AO_INPROGRESS;
@@ -2567,21 +2550,13 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     rc = libxl__device_nic_setdefault(gc, nic, domid);
     if (rc) goto out;
 
-    front = flexarray_make(16, 1);
-    if (!front) {
-        rc = ERROR_NOMEM;
-        goto out;
-    }
-    back = flexarray_make(16, 1);
-    if (!back) {
-        rc = ERROR_NOMEM;
-        goto out_free;
-    }
+    front = flexarray_make(gc, 16, 1);
+    back = flexarray_make(gc, 16, 1);
 
     if (nic->devid == -1) {
         if (!(dompath = libxl__xs_get_dompath(gc, domid))) {
             rc = ERROR_FAIL;
-            goto out_free;
+            goto out;
         }
         if (!(l = libxl__xs_directory(gc, XBT_NULL,
                                      libxl__sprintf(gc, "%s/device/vif", dompath), &nb))) {
@@ -2593,7 +2568,7 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
 
     GCNEW(device);
     rc = libxl__device_from_nic(gc, domid, nic, device);
-    if ( rc != 0 ) goto out_free;
+    if ( rc != 0 ) goto out;
 
     flexarray_append(back, "frontend-id");
     flexarray_append(back, libxl__sprintf(gc, "%d", domid));
@@ -2652,9 +2627,6 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     libxl__wait_device_connection(egc, aodev);
 
     rc = 0;
-out_free:
-    flexarray_free(back);
-    flexarray_free(front);
 out:
     aodev->rc = rc;
     if (rc) aodev->callback(egc, aodev);
@@ -2851,16 +2823,8 @@ int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
         goto out;
     }
 
-    front = flexarray_make(16, 1);
-    if (!front) {
-        rc = ERROR_NOMEM;
-        goto out;
-    }
-    back = flexarray_make(16, 1);
-    if (!back) {
-        rc = ERROR_NOMEM;
-        goto out_free;
-    }
+    front = flexarray_make(gc, 16, 1);
+    back = flexarray_make(gc, 16, 1);
 
     device.backend_devid = console->devid;
     device.backend_domid = console->backend_domid;
@@ -2908,9 +2872,6 @@ int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
                              libxl__xs_kvs_of_flexarray(gc, front, front->count));
     rc = 0;
-out_free:
-    flexarray_free(back);
-    flexarray_free(front);
 out:
     return rc;
 }
@@ -2964,19 +2925,11 @@ int libxl__device_vkb_add(libxl__gc *gc, uint32_t domid,
     rc = libxl__device_vkb_setdefault(gc, vkb);
     if (rc) goto out;
 
-    front = flexarray_make(16, 1);
-    if (!front) {
-        rc = ERROR_NOMEM;
-        goto out;
-    }
-    back = flexarray_make(16, 1);
-    if (!back) {
-        rc = ERROR_NOMEM;
-        goto out_free;
-    }
+    front = flexarray_make(gc, 16, 1);
+    back = flexarray_make(gc, 16, 1);
 
     rc = libxl__device_from_vkb(gc, domid, vkb, &device);
-    if (rc != 0) goto out_free;
+    if (rc != 0) goto out;
 
     flexarray_append(back, "frontend-id");
     flexarray_append(back, libxl__sprintf(gc, "%d", domid));
@@ -2996,9 +2949,6 @@ int libxl__device_vkb_add(libxl__gc *gc, uint32_t domid,
                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
                              libxl__xs_kvs_of_flexarray(gc, front, front->count));
     rc = 0;
-out_free:
-    flexarray_free(back);
-    flexarray_free(front);
 out:
     return rc;
 }
@@ -3063,19 +3013,11 @@ int libxl__device_vfb_add(libxl__gc *gc, uint32_t domid, libxl_device_vfb *vfb)
     rc = libxl__device_vfb_setdefault(gc, vfb);
     if (rc) goto out;
 
-    front = flexarray_make(16, 1);
-    if (!front) {
-        rc = ERROR_NOMEM;
-        goto out;
-    }
-    back = flexarray_make(16, 1);
-    if (!back) {
-        rc = ERROR_NOMEM;
-        goto out_free;
-    }
+    front = flexarray_make(gc, 16, 1);
+    back = flexarray_make(gc, 16, 1);
 
     rc = libxl__device_from_vfb(gc, domid, vfb, &device);
-    if (rc != 0) goto out_free;
+    if (rc != 0) goto out;
 
     flexarray_append_pair(back, "frontend-id", libxl__sprintf(gc, "%d", domid));
     flexarray_append_pair(back, "online", "1");
@@ -3108,9 +3050,6 @@ int libxl__device_vfb_add(libxl__gc *gc, uint32_t domid, libxl_device_vfb *vfb)
                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
                              libxl__xs_kvs_of_flexarray(gc, front, front->count));
     rc = 0;
-out_free:
-    flexarray_free(front);
-    flexarray_free(back);
 out:
     return rc;
 }

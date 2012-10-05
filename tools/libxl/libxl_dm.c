@@ -109,10 +109,7 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
     const char *keymap = dm_keymap(guest_config);
     int i;
     flexarray_t *dm_args;
-    dm_args = flexarray_make(16, 1);
-
-    if (!dm_args)
-        return NULL;
+    dm_args = flexarray_make(gc, 16, 1);
 
     flexarray_vappend(dm_args, dm,
                       "-d", libxl__sprintf(gc, "%d", domid), NULL);
@@ -340,9 +337,7 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     int i;
     uint64_t ram_size;
 
-    dm_args = flexarray_make(16, 1);
-    if (!dm_args)
-        return NULL;
+    dm_args = flexarray_make(gc, 16, 1);
 
     flexarray_vappend(dm_args, dm,
                       "-xen-domid",
@@ -837,7 +832,7 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
                          "setting target domain %d -> %d",
                          dm_domid, guest_domid);
         ret = ERROR_FAIL;
-        goto out_free;
+        goto out;
     }
     xs_set_target(ctx->xsh, dm_domid, guest_domid);
 
@@ -861,11 +856,8 @@ retry_transaction:
     libxl__add_disks(egc, ao, dm_domid, dm_config, &sdss->multidev);
     libxl__multidev_prepared(egc, &sdss->multidev, 0);
 
-    free(args);
     return;
 
-out_free:
-    free(args);
 out:
     assert(ret);
     spawn_stubdom_pvqemu_cb(egc, &sdss->pvqemu, ret);
@@ -1165,7 +1157,6 @@ retry_transaction:
 out_close:
     close(null);
     close(logfile_w);
-    free(args);
 out:
     if (rc)
         device_model_spawn_outcome(egc, dmss, rc);

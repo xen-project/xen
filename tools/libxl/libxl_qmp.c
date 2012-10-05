@@ -763,7 +763,7 @@ int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
     if (!hostaddr)
         return -1;
 
-    parameters = flexarray_make(6, 1);
+    parameters = flexarray_make(gc, 6, 1);
     flexarray_append_pair(parameters, "driver", "xen-pci-passthrough");
     flexarray_append_pair(parameters, "id",
                           libxl__sprintf(gc, PCI_PT_QDEV_ID,
@@ -777,8 +777,6 @@ int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
                                              PCI_FUNC(pcidev->vdevfn)));
     }
     args = libxl__xs_kvs_of_flexarray(gc, parameters, parameters->count);
-    if (!args)
-        return -1;
 
     rc = qmp_synchronous_send(qmp, "device_add", &args,
                               NULL, NULL, qmp->timeout);
@@ -787,7 +785,6 @@ int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
                                   pci_add_callback, pcidev, qmp->timeout);
     }
 
-    flexarray_free(parameters);
     libxl__qmp_close(qmp);
     return rc;
 }
@@ -803,16 +800,13 @@ static int qmp_device_del(libxl__gc *gc, int domid, char *id)
     if (!qmp)
         return ERROR_FAIL;
 
-    parameters = flexarray_make(2, 1);
+    parameters = flexarray_make(gc, 2, 1);
     flexarray_append_pair(parameters, "id", id);
     args = libxl__xs_kvs_of_flexarray(gc, parameters, parameters->count);
-    if (!args)
-        return ERROR_NOMEM;
 
     rc = qmp_synchronous_send(qmp, "device_del", &args,
                               NULL, NULL, qmp->timeout);
 
-    flexarray_free(parameters);
     libxl__qmp_close(qmp);
     return rc;
 }
@@ -838,24 +832,13 @@ int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename)
     if (!qmp)
         return ERROR_FAIL;
 
-    parameters = flexarray_make(2, 1);
-    if (!parameters) {
-        rc = ERROR_NOMEM;
-        goto out;
-    }
+    parameters = flexarray_make(gc, 2, 1);
     flexarray_append_pair(parameters, "filename", (char *)filename);
     args = libxl__xs_kvs_of_flexarray(gc, parameters, parameters->count);
-    if (!args) {
-        rc = ERROR_NOMEM;
-        goto out2;
-    }
 
     rc = qmp_synchronous_send(qmp, "xen-save-devices-state", &args,
                               NULL, NULL, qmp->timeout);
 
-out2:
-    flexarray_free(parameters);
-out:
     libxl__qmp_close(qmp);
     return rc;
 }
@@ -867,19 +850,16 @@ static int qmp_change(libxl__gc *gc, libxl__qmp_handler *qmp,
     libxl_key_value_list args = NULL;
     int rc = 0;
 
-    parameters = flexarray_make(6, 1);
+    parameters = flexarray_make(gc, 6, 1);
     flexarray_append_pair(parameters, "device", device);
     flexarray_append_pair(parameters, "target", target);
     if (arg)
         flexarray_append_pair(parameters, "arg", arg);
     args = libxl__xs_kvs_of_flexarray(gc, parameters, parameters->count);
-    if (!args)
-        return ERROR_NOMEM;
 
     rc = qmp_synchronous_send(qmp, "change", &args,
                               NULL, NULL, qmp->timeout);
 
-    flexarray_free(parameters);
     return rc;
 }
 
