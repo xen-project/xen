@@ -560,7 +560,7 @@ static int intel_need_clearbank_scan(enum mca_source who, u64 status)
  * 4) SRAO ser_support = 1, PCC = 0, S = 1, AR = 0, EN = 1 [UC = 1]
  * 5) UCNA ser_support = 1, OVER = 0, EN = 1, PCC = 0, S = 0, AR = 0, [UC = 1]
  */
-static int intel_recoverable_scan(u64 status)
+static int intel_recoverable_scan(uint64_t status)
 {
 
     if ( !(status & MCi_STATUS_UC ) )

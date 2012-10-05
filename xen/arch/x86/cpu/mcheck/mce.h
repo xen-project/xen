@@ -73,7 +73,7 @@ extern void mcheck_cmn_handler(struct cpu_user_regs *, long,
     struct mca_banks *, struct mca_banks *);
 
 /* Register a handler for judging whether mce is recoverable. */
-typedef int (*mce_recoverable_t)(u64 status);
+typedef int (*mce_recoverable_t)(uint64_t status);
 extern void mce_recoverable_register(mce_recoverable_t);
 
 /* Read an MSR, checking for an interposed value first */

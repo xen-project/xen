@@ -37,18 +37,13 @@
 
 #include <xen/init.h>
 #include <xen/types.h>
-#include <xen/kernel.h>
-#include <xen/config.h>
-#include <xen/smp.h>
 
-#include <asm/processor.h>
-#include <asm/system.h>
 #include <asm/msr.h>
 
 #include "mce.h"
 #include "mce_quirks.h"
 #include "x86_mca.h"
-
+#include "mce_amd.h"
 
 static struct mcinfo_extended *
 amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
@@ -101,6 +96,7 @@ enum mcheck_type amd_f10_mcheck_init(struct cpuinfo_x86 *c)
 		mcequirk_amd_apply(quirkflag);
 
 	x86_mce_callback_register(amd_f10_handler);
+	mce_recoverable_register(mc_amd_recoverable_scan);
 
 	return mcheck_amd_famXX;
 }
