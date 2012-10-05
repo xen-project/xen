@@ -496,6 +496,17 @@ is given in hexadecimal and may either a span e.g. C<2f8-2ff>
 It is recommended to use this option only for trusted VMs under
 administrator control.
 
+=item B<iomem=[ "IOMEM_START,NUM_PAGES", "IOMEM_START,NUM_PAGES", ... ]>
+
+Allow guest to access specific hardware I/O memory pages. B<IOMEM_START>
+is a physical page number. B<NUM_PAGES> is the number
+of pages beginning with B<START_PAGE> to allow access. Both values
+must be given in hexadecimal.
+
+It is recommended to use this option only for trusted VMs under
+administrator control.
+
+
 =item B<irqs=[ NUMBER, NUMBER, ... ]>
 
 Allow a guest to access specific physical IRQs.

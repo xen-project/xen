@@ -574,8 +574,8 @@ static void parse_config_data(const char *config_source,
     long l;
     XLU_Config *config;
     XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids;
-    XLU_ConfigList *ioports, *irqs;
-    int num_ioports, num_irqs;
+    XLU_ConfigList *ioports, *irqs, *iomem;
+    int num_ioports, num_irqs, num_iomem;
     int pci_power_mgmt = 0;
     int pci_msitranslate = 0;
     int pci_permissive = 0;
@@ -1004,6 +1004,33 @@ static void parse_config_data(const char *config_source,
             b_info->irqs[i] = ul;
         }
     }
+
+    if (!xlu_cfg_get_list(config, "iomem", &iomem, &num_iomem, 0)) {
+        b_info->num_iomem = num_iomem;
+        b_info->iomem = calloc(num_iomem, sizeof(*b_info->iomem));
+        if (b_info->iomem == NULL) {
+            fprintf(stderr, "unable to allocate memory for iomem\n");
+            exit(-1);
+        }
+        for (i = 0; i < num_iomem; i++) {
+            buf = xlu_cfg_get_listitem (iomem, i);
+            if (!buf) {
+                fprintf(stderr,
+                        "xl: Unable to get element %d in iomem list\n", i);
+                exit(1);
+            }
+            if(sscanf(buf, "%" SCNx64",%" SCNx64,
+                     &b_info->iomem[i].start,
+                     &b_info->iomem[i].number)
+                  != 2) {
+               fprintf(stderr,
+                       "xl: Invalid argument parsing iomem: %s\n", buf);
+               exit(1);
+            }
+        }
+    }
+
+
 
     if (!xlu_cfg_get_list (config, "disk", &vbds, 0, 0)) {
         d_config->num_disks = 0;

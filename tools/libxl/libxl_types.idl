@@ -141,6 +141,11 @@ libxl_ioport_range = Struct("ioport_range", [
     ("number", uint32),
     ])
 
+libxl_iomem_range = Struct("iomem_range", [
+    ("start", uint64),
+    ("number", uint64),
+    ])
+
 libxl_vga_interface_info = Struct("vga_interface_info", [
     ("kind",    libxl_vga_interface_type),
     ])
@@ -285,6 +290,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
 
     ("ioports",          Array(libxl_ioport_range, "num_ioports")),
     ("irqs",             Array(uint32, "num_irqs")),
+    ("iomem",            Array(libxl_iomem_range, "num_iomem")),
 
     ("u", KeyedUnion(None, libxl_domain_type, "type",
                 [("hvm", Struct(None, [("firmware",         string),

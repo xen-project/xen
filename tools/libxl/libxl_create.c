@@ -942,7 +942,7 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
 
         ret = xc_domain_ioport_permission(CTX->xch, domid,
                                           io->first, io->number, 1);
-        if ( ret<0 ){
+        if (ret < 0) {
             LOGE(ERROR,
                  "failed give dom%d access to ioports %"PRIx32"-%"PRIx32,
                  domid, io->first, io->first + io->number - 1);
@@ -956,12 +956,30 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         LOG(DEBUG, "dom%d irq %"PRIx32, domid, irq);
 
         ret = xc_domain_irq_permission(CTX->xch, domid, irq, 1);
-        if ( ret<0 ){
+        if (ret < 0) {
             LOGE(ERROR,
                  "failed give dom%d access to irq %"PRId32, domid, irq);
             ret = ERROR_FAIL;
         }
     }
+
+    for (i = 0; i < d_config->b_info.num_iomem; i++) {
+        libxl_iomem_range *io = &d_config->b_info.iomem[i];
+
+        LOG(DEBUG, "dom%d iomem %"PRIx64"-%"PRIx64,
+            domid, io->start, io->start + io->number - 1);
+
+        ret = xc_domain_iomem_permission(CTX->xch, domid,
+                                          io->start, io->number, 1);
+        if (ret < 0) {
+            LOGE(ERROR,
+                 "failed give dom%d access to iomem range %"PRIx64"-%"PRIx64,
+                 domid, io->start, io->start + io->number - 1);
+            ret = ERROR_FAIL;
+        }
+    }
+
+
 
     for (i = 0; i < d_config->num_nics; i++) {
         /* We have to init the nic here, because we still haven't
