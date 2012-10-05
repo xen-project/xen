@@ -341,14 +341,20 @@ HVM_REGISTER_SAVE_RESTORE(VMCE_VCPU, vmce_save_vcpu_ctxt,
 /*
  * for Intel MCE, broadcast vMCE to all vcpus
  * for AMD MCE, only inject vMCE to vcpu0
+ *
+ * @ d, domain to which would inject vmce
+ * @ vcpu,
+ *   -1 (VMCE_INJECT_BROADCAST), broadcast vMCE to all vcpus
+ *   >= 0, vcpu, the vMCE is injected to
  */
 int inject_vmce(struct domain *d, int vcpu)
 {
     struct vcpu *v;
+    int ret = -ESRCH;
 
     for_each_vcpu ( d, v )
     {
-        if ( vcpu >= 0 && v->vcpu_id != vcpu )
+        if ( vcpu != VMCE_INJECT_BROADCAST && vcpu != v->vcpu_id )
             continue;
 
         if ( (is_hvm_domain(d) ||
@@ -358,19 +364,21 @@ int inject_vmce(struct domain *d, int vcpu)
             mce_printk(MCE_VERBOSE, "MCE: inject vMCE to d%d:v%d\n",
                        d->domain_id, v->vcpu_id);
             vcpu_kick(v);
+            ret = 0;
         }
         else
         {
             mce_printk(MCE_QUIET, "Failed to inject vMCE to d%d:v%d\n",
                        d->domain_id, v->vcpu_id);
-            return -EBUSY;
+            ret = -EBUSY;
+            break;
         }
 
-        if ( vcpu >= 0 )
-            return 0;
+        if ( vcpu != VMCE_INJECT_BROADCAST )
+            break;
     }
 
-    return v ? -ESRCH : 0;
+    return ret;
 }
 
 int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
