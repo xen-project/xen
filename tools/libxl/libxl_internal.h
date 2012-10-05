@@ -446,6 +446,11 @@ static inline libxl_ctx *libxl__gc_owner(libxl__gc *gc)
     return gc->owner;
 }
 
+static inline int libxl__gc_is_real(const libxl__gc *gc)
+{
+    return gc->alloc_maxsize >= 0;
+}
+
 /*
  * Memory allocation tracking/helpers
  *
