@@ -484,7 +484,6 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
 
                 if (o) {
                     rc = qmp_handle_response(qmp, o);
-                    libxl__json_object_free(gc, o);
                 } else {
                     LIBXL__LOG(qmp->ctx, LIBXL__LOG_ERROR,
                                "Parse error of : %s\n", s);

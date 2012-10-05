@@ -210,17 +210,12 @@ static libxl__json_object *json_object_alloc(libxl__gc *gc,
 {
     libxl__json_object *obj;
 
-    obj = calloc(1, sizeof (libxl__json_object));
-    if (obj == NULL) {
-        LIBXL__LOG_ERRNO(libxl__gc_owner(gc), LIBXL__LOG_ERROR,
-                         "Failed to allocate a libxl__json_object");
-        return NULL;
-    }
+    obj = libxl__zalloc(gc, sizeof(*obj));
 
     obj->type = type;
 
     if (type == JSON_MAP || type == JSON_ARRAY) {
-        flexarray_t *array = flexarray_make(NOGC, 1, 1);
+        flexarray_t *array = flexarray_make(gc, 1, 1);
         if (type == JSON_MAP)
             obj->u.map = array;
         else
@@ -250,11 +245,7 @@ static int json_object_append_to(libxl__gc *gc,
         break;
     }
     case JSON_ARRAY:
-        if (flexarray_append(dst->u.array, obj) == 2) {
-            LIBXL__LOG_ERRNO(libxl__gc_owner(gc), LIBXL__LOG_ERROR,
-                             "Failed to grow a flexarray");
-            return -1;
-        }
+        flexarray_append(dst->u.array, obj);
         break;
     default:
         LIBXL__LOG(libxl__gc_owner(gc), LIBXL__LOG_ERROR,
@@ -387,11 +378,9 @@ static int json_callback_null(void *opaque)
 
     DEBUG_GEN(ctx, null);
 
-    if ((obj = json_object_alloc(ctx->gc, JSON_NULL)) == NULL)
-        return 0;
+    obj = json_object_alloc(ctx->gc, JSON_NULL);
 
     if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
-        libxl__json_object_free(ctx->gc, obj);
         return 0;
     }
 
@@ -405,12 +394,10 @@ static int json_callback_boolean(void *opaque, int boolean)
 
     DEBUG_GEN_VALUE(ctx, bool, boolean);
 
-    if ((obj = json_object_alloc(ctx->gc,
-                                 boolean ? JSON_TRUE : JSON_FALSE)) == NULL)
-        return 0;
+    obj = json_object_alloc(ctx->gc,
+                            boolean ? JSON_TRUE : JSON_FALSE);
 
     if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
-        libxl__json_object_free(ctx->gc, obj);
         return 0;
     }
 
@@ -442,8 +429,7 @@ static int json_callback_number(void *opaque, const char *s, libxl_yajl_length l
             goto error;
         }
 
-        if ((obj = json_object_alloc(ctx->gc, JSON_DOUBLE)) == NULL)
-            return 0;
+        obj = json_object_alloc(ctx->gc, JSON_DOUBLE);
         obj->u.d = d;
     } else {
         long long i = strtoll(s, NULL, 10);
@@ -452,23 +438,16 @@ static int json_callback_number(void *opaque, const char *s, libxl_yajl_length l
             goto error;
         }
 
-        if ((obj = json_object_alloc(ctx->gc, JSON_INTEGER)) == NULL)
-            return 0;
+        obj = json_object_alloc(ctx->gc, JSON_INTEGER);
         obj->u.i = i;
     }
     goto out;
 
 error:
     /* If the conversion fail, we just store the original string. */
-    if ((obj = json_object_alloc(ctx->gc, JSON_NUMBER)) == NULL)
-        return 0;
+    obj = json_object_alloc(ctx->gc, JSON_NUMBER);
 
-    t = malloc(len + 1);
-    if (t == NULL) {
-        LIBXL__LOG_ERRNO(libxl__gc_owner(ctx->gc), LIBXL__LOG_ERROR,
-                         "Failed to allocate");
-        return 0;
-    }
+    t = libxl__zalloc(ctx->gc, len + 1);
     strncpy(t, s, len);
     t[len] = 0;
 
@@ -476,7 +455,6 @@ error:
 
 out:
     if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
-        libxl__json_object_free(ctx->gc, obj);
         return 0;
     }
 
@@ -490,26 +468,17 @@ static int json_callback_string(void *opaque, const unsigned char *str,
     char *t = NULL;
     libxl__json_object *obj = NULL;
 
-    t = malloc(len + 1);
-    if (t == NULL) {
-        LIBXL__LOG_ERRNO(libxl__gc_owner(ctx->gc), LIBXL__LOG_ERROR,
-                         "Failed to allocate");
-        return 0;
-    }
+    t = libxl__zalloc(ctx->gc, len + 1);
 
     DEBUG_GEN_STRING(ctx, str, len);
 
     strncpy(t, (const char *) str, len);
     t[len] = 0;
 
-    if ((obj = json_object_alloc(ctx->gc, JSON_STRING)) == NULL) {
-        free(t);
-        return 0;
-    }
+    obj = json_object_alloc(ctx->gc, JSON_STRING);
     obj->u.string = t;
 
     if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
-        libxl__json_object_free(ctx->gc, obj);
         return 0;
     }
 
@@ -522,13 +491,9 @@ static int json_callback_map_key(void *opaque, const unsigned char *str,
     libxl__yajl_ctx *ctx = opaque;
     char *t = NULL;
     libxl__json_object *obj = ctx->current;
+    libxl__gc *gc = ctx->gc;
 
-    t = malloc(len + 1);
-    if (t == NULL) {
-        LIBXL__LOG_ERRNO(libxl__gc_owner(ctx->gc), LIBXL__LOG_ERROR,
-                         "Failed to allocate");
-        return 0;
-    }
+    t = libxl__zalloc(gc, len + 1);
 
     DEBUG_GEN_STRING(ctx, str, len);
 
@@ -536,21 +501,13 @@ static int json_callback_map_key(void *opaque, const unsigned char *str,
     t[len] = 0;
 
     if (libxl__json_object_is_map(obj)) {
-        libxl__json_map_node *node = malloc(sizeof (libxl__json_map_node));
-        if (node == NULL) {
-            LIBXL__LOG_ERRNO(libxl__gc_owner(ctx->gc), LIBXL__LOG_ERROR,
-                             "Failed to allocate");
-            return 0;
-        }
+        libxl__json_map_node *node;
 
+        GCNEW(node);
         node->map_key = t;
         node->obj = NULL;
 
-        if (flexarray_append(obj->u.map, node) == 2) {
-            LIBXL__LOG_ERRNO(libxl__gc_owner(ctx->gc), LIBXL__LOG_ERROR,
-                             "Failed to grow a flexarray");
-            return 0;
-        }
+        flexarray_append(obj->u.map, node);
     } else {
         LIBXL__LOG(libxl__gc_owner(ctx->gc), LIBXL__LOG_ERROR,
                    "Current json object is not a map");
@@ -567,12 +524,10 @@ static int json_callback_start_map(void *opaque)
 
     DEBUG_GEN(ctx, map_open);
 
-    if ((obj = json_object_alloc(ctx->gc, JSON_MAP)) == NULL)
-        return 0;
+    obj = json_object_alloc(ctx->gc, JSON_MAP);
 
     if (ctx->current) {
         if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
-            libxl__json_object_free(ctx->gc, obj);
             return 0;
         }
     }
@@ -609,12 +564,10 @@ static int json_callback_start_array(void *opaque)
 
     DEBUG_GEN(ctx, array_open);
 
-    if ((obj = json_object_alloc(ctx->gc, JSON_ARRAY)) == NULL)
-        return 0;
+    obj = json_object_alloc(ctx->gc, JSON_ARRAY);
 
     if (ctx->current) {
         if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
-            libxl__json_object_free(ctx->gc, obj);
             return 0;
         }
     }
@@ -704,8 +657,6 @@ out:
 
     LIBXL__LOG(libxl__gc_owner(gc), LIBXL__LOG_ERROR, "yajl error: %s", str);
     yajl_free_error(yajl_ctx.hand, str);
-
-    libxl__json_object_free(gc, yajl_ctx.head);
     yajl_ctx_free(&yajl_ctx);
     return NULL;
 }
