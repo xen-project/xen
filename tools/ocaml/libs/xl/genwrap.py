@@ -10,6 +10,7 @@ builtins = {
     "int":                  ("int",                    "%(c)s = Int_val(%(o)s)",            "Val_int(%(c)s)"  ),
     "char *":               ("string",                 "%(c)s = dup_String_val(gc, %(o)s)", "caml_copy_string(%(c)s)"),
     "libxl_domid":          ("domid",                  "%(c)s = Int_val(%(o)s)",            "Val_int(%(c)s)"  ),
+    "libxl_devid":          ("devid",                  "%(c)s = Int_val(%(o)s)",            "Val_int(%(c)s)"  ),
     "libxl_defbool":        ("bool option",            "%(c)s = Defbool_val(%(o)s)",        "Val_defbool(%(c)s)" ),
     "libxl_uuid":           ("int array",              "Uuid_val(gc, lg, &%(c)s, %(o)s)",   "Val_uuid(&%(c)s)"),
     "libxl_key_value_list": ("(string * string) list", None,                                None),
@@ -41,8 +42,8 @@ def stub_fn_name(ty, name):
     return "stub_xl_%s_%s" % (ty.rawname,name)
     
 def ocaml_type_of(ty):
-    if ty.rawname == "domid":
-        return "domid"
+    if ty.rawname in ["domid","devid"]:
+        return ty.rawname
     elif isinstance(ty,idl.UInt):
         if ty.width in [8, 16]:
             # handle as ints

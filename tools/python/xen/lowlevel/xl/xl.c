@@ -281,6 +281,11 @@ int attrib__libxl_domid_set(PyObject *v, libxl_domid *domid) {
     return 0;
 }
 
+int attrib__libxl_devid_set(PyObject *v, libxl_devid *devid) {
+   *devid = PyInt_AsLong(v);
+   return 0;
+}
+
 int attrib__struct_in_addr_set(PyObject *v, struct in_addr *pptr)
 {
     PyErr_SetString(PyExc_NotImplementedError, "Setting in_addr");
@@ -340,6 +345,10 @@ PyObject *attrib__libxl_uuid_get(libxl_uuid *pptr)
 
 PyObject *attrib__libxl_domid_get(libxl_domid *domid) {
     return PyInt_FromLong(*domid);
+}
+
+PyObject *attrib__libxl_devid_get(libxl_devid *devid) {
+    return PyInt_FromLong(*devid);
 }
 
 PyObject *attrib__struct_in_addr_get(struct in_addr *pptr)
