@@ -26,7 +26,13 @@ typedef struct flexarray {
     struct libxl__gc *gc;
 } flexarray_t;
 
-_hidden flexarray_t *flexarray_make(struct libxl__gc *gc, int size, int autogrow);
+/*
+ * NOGC can be used with flexarrays, but flexarray_free will need to be called
+ * to free the struct. The content of the flexarray will not be freed through
+ * flexarray_free.
+ */
+_hidden flexarray_t *flexarray_make(struct libxl__gc *gc_opt,
+                                    int size, int autogrow);
 _hidden void flexarray_free(flexarray_t *array);
 _hidden void flexarray_grow(flexarray_t *array, int extents);
 _hidden int flexarray_set(flexarray_t *array, unsigned int index, void *ptr);
