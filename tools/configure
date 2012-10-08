@@ -6543,6 +6543,10 @@ $as_echo "$ax_cv_pthread_flags" >&6; }
 
 
 
+
+    saved_CPPFLAGS="$CPPFLAGS"
+
+    CPPFLAGS="$CPPFLAGS -Werror"
     ac_fn_c_check_header_mongrel "$LINENO" "libutil.h" "ac_cv_header_libutil_h" "$ac_includes_default"
 if test "x$ac_cv_header_libutil_h" = x""yes; then :
 
@@ -6552,6 +6556,9 @@ $as_echo "#define INCLUDE_LIBUTIL_H <libutil.h>" >>confdefs.h
 
 fi
 
+
+
+    CPPFLAGS="$saved_CPPFLAGS"
 
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for openpty et al" >&5
 $as_echo_n "checking for openpty et al... " >&6; }
