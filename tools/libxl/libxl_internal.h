@@ -1432,7 +1432,6 @@ _hidden yajl_gen_status libxl__yajl_gen_asciiz(yajl_gen hand, const char *str);
 _hidden yajl_gen_status libxl__yajl_gen_enum(yajl_gen hand, const char *str);
 
 typedef enum {
-    JSON_ERROR,
     JSON_NULL,
     JSON_TRUE,
     JSON_FALSE,
