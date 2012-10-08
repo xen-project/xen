@@ -150,7 +150,7 @@ def _vscsi_get_scsidevices_by_sysfs():
     return devices
 
 
-def vscsi_get_scsidevices(mask=""):
+def vscsi_get_scsidevices(mask="*"):
     """ get all scsi devices information """
 
     devices = _vscsi_get_scsidevices_by_lsscsi("[%s]" % mask)
@@ -279,7 +279,7 @@ def get_scsi_device(pHCTL):
             return _make_scsi_record(scsi_info)
     return None
 
-def get_all_scsi_devices(mask=""):
+def get_all_scsi_devices(mask="*"):
     scsi_records = []
     for scsi_info in vscsi_get_scsidevices(mask):
         scsi_record = _make_scsi_record(scsi_info)
