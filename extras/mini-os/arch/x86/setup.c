@@ -74,9 +74,28 @@ shared_info_t *map_shared_info(unsigned long pa)
 	return (shared_info_t *)shared_info;
 }
 
+static inline void fpu_init(void) {
+	asm volatile("fninit");
+}
+
+#ifdef __SSE__
+static inline void sse_init(void) {
+	unsigned long status = 0x1f80;
+	asm volatile("ldmxcsr %0" : : "m" (status));
+}
+#else
+#define sse_init()
+#endif
+
 void
 arch_init(start_info_t *si)
 {
+	/*Initialize floating point unit */
+        fpu_init();
+
+        /* Initialize SSE */
+        sse_init();
+
 	/* Copy the start_info struct to a globally-accessible area. */
 	/* WARN: don't do printk before here, it uses information from
 	   shared_info. Use xprintk instead. */
@@ -98,6 +117,7 @@ arch_init(start_info_t *si)
 		(unsigned long)hypervisor_callback,
 		(unsigned long)failsafe_callback, 0);
 #endif
+
 
 }
 
