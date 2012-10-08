@@ -78,7 +78,7 @@ struct libxl__qmp_handler {
 };
 
 static int qmp_send(libxl__qmp_handler *qmp,
-                    const char *cmd, libxl_key_value_list *args,
+                    const char *cmd, libxl__json_object *args,
                     qmp_callback_t callback, void *opaque,
                     qmp_request_context *context);
 
@@ -502,7 +502,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
 }
 
 static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
-                              const char *cmd, libxl_key_value_list *args,
+                              const char *cmd, libxl__json_object *args,
                               qmp_callback_t callback, void *opaque,
                               qmp_request_context *context)
 {
@@ -526,7 +526,7 @@ static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
     yajl_gen_integer(hand, ++qmp->last_id_used);
     if (args) {
         libxl__yajl_gen_asciiz(hand, "arguments");
-        libxl_key_value_list_gen_json(hand, args);
+        libxl__json_object_to_yajl_gen(gc, hand, args);
     }
     yajl_gen_map_close(hand);
 
@@ -560,7 +560,7 @@ out:
 }
 
 static int qmp_send(libxl__qmp_handler *qmp,
-                    const char *cmd, libxl_key_value_list *args,
+                    const char *cmd, libxl__json_object *args,
                     qmp_callback_t callback, void *opaque,
                     qmp_request_context *context)
 {
@@ -588,7 +588,7 @@ out:
 }
 
 static int qmp_synchronous_send(libxl__qmp_handler *qmp, const char *cmd,
-                                libxl_key_value_list *args,
+                                libxl__json_object *args,
                                 qmp_callback_t callback, void *opaque,
                                 int ask_timeout)
 {
@@ -623,7 +623,6 @@ static void qmp_free_handler(libxl__qmp_handler *qmp)
     free(qmp);
 }
 
-#if 0
 /*
  * QMP Parameters Helpers
  */
@@ -658,6 +657,7 @@ static void qmp_parameters_add_string(libxl__gc *gc,
     qmp_parameters_common_add(gc, param, name, obj);
 }
 
+#if 0
 static void qmp_parameters_add_bool(libxl__gc *gc,
                                     libxl__json_object **param,
                                     const char *name, bool b)
@@ -668,11 +668,11 @@ static void qmp_parameters_add_bool(libxl__gc *gc,
     obj->u.b = b;
     qmp_parameters_common_add(gc, param, name, obj);
 }
+#endif
 
 #define QMP_PARAMETERS_SPRINTF(args, name, format, ...) \
     qmp_parameters_add_string(gc, args, name, \
                               libxl__sprintf(gc, format, __VA_ARGS__))
-#endif
 
 /*
  * API
@@ -800,8 +800,7 @@ out:
 int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
 {
     libxl__qmp_handler *qmp = NULL;
-    flexarray_t *parameters = NULL;
-    libxl_key_value_list args = NULL;
+    libxl__json_object *args = NULL;
     char *hostaddr = NULL;
     int rc = 0;
 
@@ -814,22 +813,16 @@ int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
     if (!hostaddr)
         return -1;
 
-    parameters = flexarray_make(gc, 6, 1);
-    flexarray_append_pair(parameters, "driver", "xen-pci-passthrough");
-    flexarray_append_pair(parameters, "id",
-                          libxl__sprintf(gc, PCI_PT_QDEV_ID,
-                                         pcidev->bus, pcidev->dev,
-                                         pcidev->func));
-    flexarray_append_pair(parameters, "hostaddr", hostaddr);
+    qmp_parameters_add_string(gc, &args, "driver", "xen-pci-passthrough");
+    QMP_PARAMETERS_SPRINTF(&args, "id", PCI_PT_QDEV_ID,
+                           pcidev->bus, pcidev->dev, pcidev->func);
+    qmp_parameters_add_string(gc, &args, "hostaddr", hostaddr);
     if (pcidev->vdevfn) {
-        flexarray_append_pair(parameters, "addr",
-                              libxl__sprintf(gc, "%x.%x",
-                                             PCI_SLOT(pcidev->vdevfn),
-                                             PCI_FUNC(pcidev->vdevfn)));
+        QMP_PARAMETERS_SPRINTF(&args, "addr", "%x.%x",
+                               PCI_SLOT(pcidev->vdevfn), PCI_FUNC(pcidev->vdevfn));
     }
-    args = libxl__xs_kvs_of_flexarray(gc, parameters, parameters->count);
 
-    rc = qmp_synchronous_send(qmp, "device_add", &args,
+    rc = qmp_synchronous_send(qmp, "device_add", args,
                               NULL, NULL, qmp->timeout);
     if (rc == 0) {
         rc = qmp_synchronous_send(qmp, "query-pci", NULL,
@@ -843,19 +836,16 @@ int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
 static int qmp_device_del(libxl__gc *gc, int domid, char *id)
 {
     libxl__qmp_handler *qmp = NULL;
-    flexarray_t *parameters = NULL;
-    libxl_key_value_list args = NULL;
+    libxl__json_object *args = NULL;
     int rc = 0;
 
     qmp = libxl__qmp_initialize(gc, domid);
     if (!qmp)
         return ERROR_FAIL;
 
-    parameters = flexarray_make(gc, 2, 1);
-    flexarray_append_pair(parameters, "id", id);
-    args = libxl__xs_kvs_of_flexarray(gc, parameters, parameters->count);
+    qmp_parameters_add_string(gc, &args, "id", id);
 
-    rc = qmp_synchronous_send(qmp, "device_del", &args,
+    rc = qmp_synchronous_send(qmp, "device_del", args,
                               NULL, NULL, qmp->timeout);
 
     libxl__qmp_close(qmp);
@@ -875,19 +865,16 @@ int libxl__qmp_pci_del(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
 int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename)
 {
     libxl__qmp_handler *qmp = NULL;
-    flexarray_t *parameters = NULL;
-    libxl_key_value_list args = NULL;
+    libxl__json_object *args = NULL;
     int rc = 0;
 
     qmp = libxl__qmp_initialize(gc, domid);
     if (!qmp)
         return ERROR_FAIL;
 
-    parameters = flexarray_make(gc, 2, 1);
-    flexarray_append_pair(parameters, "filename", (char *)filename);
-    args = libxl__xs_kvs_of_flexarray(gc, parameters, parameters->count);
+    qmp_parameters_add_string(gc, &args, "filename", (char *)filename);
 
-    rc = qmp_synchronous_send(qmp, "xen-save-devices-state", &args,
+    rc = qmp_synchronous_send(qmp, "xen-save-devices-state", args,
                               NULL, NULL, qmp->timeout);
 
     libxl__qmp_close(qmp);
@@ -897,18 +884,16 @@ int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename)
 static int qmp_change(libxl__gc *gc, libxl__qmp_handler *qmp,
                       char *device, char *target, char *arg)
 {
-    flexarray_t *parameters = NULL;
-    libxl_key_value_list args = NULL;
+    libxl__json_object *args = NULL;
     int rc = 0;
 
-    parameters = flexarray_make(gc, 6, 1);
-    flexarray_append_pair(parameters, "device", device);
-    flexarray_append_pair(parameters, "target", target);
-    if (arg)
-        flexarray_append_pair(parameters, "arg", arg);
-    args = libxl__xs_kvs_of_flexarray(gc, parameters, parameters->count);
+    qmp_parameters_add_string(gc, &args, "device", device);
+    qmp_parameters_add_string(gc, &args, "target", target);
+    if (arg) {
+        qmp_parameters_add_string(gc, &args, "arg", arg);
+    }
 
-    rc = qmp_synchronous_send(qmp, "change", &args,
+    rc = qmp_synchronous_send(qmp, "change", args,
                               NULL, NULL, qmp->timeout);
 
     return rc;
