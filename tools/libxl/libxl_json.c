@@ -366,6 +366,67 @@ const libxl__json_object *libxl__json_map_get(const char *key,
     return NULL;
 }
 
+yajl_status libxl__json_object_to_yajl_gen(libxl__gc *gc,
+                                           yajl_gen hand,
+                                           libxl__json_object *obj)
+{
+    int idx = 0;
+    yajl_status rc;
+
+    switch (obj->type) {
+    case JSON_NULL:
+        return yajl_gen_null(hand);
+    case JSON_BOOL:
+        return yajl_gen_bool(hand, obj->u.b);
+    case JSON_INTEGER:
+        return yajl_gen_integer(hand, obj->u.i);
+    case JSON_DOUBLE:
+        return yajl_gen_double(hand, obj->u.d);
+    case JSON_NUMBER:
+        return yajl_gen_number(hand, obj->u.string, strlen(obj->u.string));
+    case JSON_STRING:
+        return libxl__yajl_gen_asciiz(hand, obj->u.string);
+    case JSON_MAP: {
+        libxl__json_map_node *node = NULL;
+
+        rc = yajl_gen_map_open(hand);
+        if (rc != yajl_status_ok)
+            return rc;
+        for (idx = 0; idx < obj->u.map->count; idx++) {
+            if (flexarray_get(obj->u.map, idx, (void**)&node) != 0)
+                break;
+
+            rc = libxl__yajl_gen_asciiz(hand, node->map_key);
+            if (rc != yajl_status_ok)
+                return rc;
+            rc = libxl__json_object_to_yajl_gen(gc, hand, node->obj);
+            if (rc != yajl_status_ok)
+                return rc;
+        }
+        return yajl_gen_map_close(hand);
+    }
+    case JSON_ARRAY: {
+        libxl__json_object *node = NULL;
+
+        rc = yajl_gen_array_open(hand);
+        if (rc != yajl_status_ok)
+            return rc;
+        for (idx = 0; idx < obj->u.array->count; idx++) {
+            if (flexarray_get(obj->u.array, idx, (void**)&node) != 0)
+                break;
+            rc = libxl__json_object_to_yajl_gen(gc, hand, node);
+            if (rc != yajl_status_ok)
+                return rc;
+        }
+        return yajl_gen_array_close(hand);
+    }
+    case JSON_ANY:
+        /* JSON_ANY is not a valid value for obj->type. */
+        ;
+    }
+    abort();
+}
+
 
 /*
  * JSON callbacks

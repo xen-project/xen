@@ -1543,6 +1543,9 @@ libxl__json_map_node *libxl__json_map_node_get(const libxl__json_object *o,
 _hidden const libxl__json_object *libxl__json_map_get(const char *key,
                                           const libxl__json_object *o,
                                           libxl__json_node_type expected_type);
+_hidden yajl_status libxl__json_object_to_yajl_gen(libxl__gc *gc_opt,
+                                                   yajl_gen hand,
+                                                   libxl__json_object *param);
 _hidden void libxl__json_object_free(libxl__gc *gc_opt,
                                      libxl__json_object *obj);
 
