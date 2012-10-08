@@ -359,6 +359,7 @@ int close(int fd)
 	    return res;
 	}
 #endif
+#ifdef CONFIG_XC
 	case FTYPE_XC:
 	    minios_interface_close_fd(fd);
 	    return 0;
@@ -368,6 +369,7 @@ int close(int fd)
 	case FTYPE_GNTMAP:
 	    minios_gnttab_close_fd(fd);
 	    return 0;
+#endif
 #ifdef CONFIG_NETFRONT
 	case FTYPE_TAP:
 	    shutdown_netfront(files[fd].tap.dev);
@@ -1153,10 +1155,13 @@ void *mmap(void *start, size_t length, int prot, int flags, int fd, off_t offset
 
     if (fd == -1)
         return map_zero(n, 1);
+#ifdef CONFIG_XC
     else if (files[fd].type == FTYPE_XC) {
         unsigned long zero = 0;
         return map_frames_ex(&zero, n, 0, 0, 1, DOMID_SELF, NULL, 0);
-    } else if (files[fd].type == FTYPE_MEM) {
+    }
+#endif
+    else if (files[fd].type == FTYPE_MEM) {
         unsigned long first_mfn = offset >> PAGE_SHIFT;
         return map_frames_ex(&first_mfn, n, 0, 1, 1, DOMID_IO, NULL, _PAGE_PRESENT|_PAGE_RW);
     } else ASSERT(0);

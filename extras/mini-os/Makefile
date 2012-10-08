@@ -27,6 +27,7 @@ CONFIG_FBFRONT ?= y
 CONFIG_KBDFRONT ?= y
 CONFIG_CONSFRONT ?= y
 CONFIG_XENBUS ?= y
+CONFIG_XC ?=y
 CONFIG_LWIP ?= $(lwip)
 
 # Export config items as compiler directives
@@ -144,7 +145,9 @@ endif
 OBJS := $(filter-out $(OBJ_DIR)/lwip%.o $(LWO), $(OBJS))
 
 ifeq ($(libc),y)
+ifeq ($(CONFIG_XC),y)
 APP_LDLIBS += -L$(XEN_ROOT)/stubdom/libxc-$(XEN_TARGET_ARCH) -whole-archive -lxenguest -lxenctrl -no-whole-archive
+endif
 APP_LDLIBS += -lpci
 APP_LDLIBS += -lz
 APP_LDLIBS += -lm
