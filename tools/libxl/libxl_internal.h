@@ -1433,8 +1433,7 @@ _hidden yajl_gen_status libxl__yajl_gen_enum(yajl_gen hand, const char *str);
 
 typedef enum {
     JSON_NULL,
-    JSON_TRUE,
-    JSON_FALSE,
+    JSON_BOOL,
     JSON_INTEGER,
     JSON_DOUBLE,
     /* number is store in string, it's too big to be a long long or a double */
@@ -1448,6 +1447,7 @@ typedef enum {
 typedef struct libxl__json_object {
     libxl__json_node_type type;
     union {
+        bool b;
         long long i;
         double d;
         char *string;
@@ -1466,6 +1466,10 @@ typedef struct {
 
 typedef struct libxl__yajl_ctx libxl__yajl_ctx;
 
+static inline bool libxl__json_object_is_bool(const libxl__json_object *o)
+{
+    return o != NULL && o->type == JSON_BOOL;
+}
 static inline bool libxl__json_object_is_string(const libxl__json_object *o)
 {
     return o != NULL && o->type == JSON_STRING;
@@ -1483,6 +1487,13 @@ static inline bool libxl__json_object_is_array(const libxl__json_object *o)
     return o != NULL && o->type == JSON_ARRAY;
 }
 
+static inline bool libxl__json_object_get_bool(const libxl__json_object *o)
+{
+    if (libxl__json_object_is_bool(o))
+        return o->u.b;
+    else
+        return false;
+}
 static inline
 const char *libxl__json_object_get_string(const libxl__json_object *o)
 {

@@ -178,7 +178,8 @@ static int qmp_register_vnc_callback(libxl__qmp_handler *qmp,
         goto out;
     }
 
-    if (libxl__json_map_get("enabled", o, JSON_FALSE)) {
+    obj = libxl__json_map_get("enabled", o, JSON_BOOL);
+    if (!obj || !libxl__json_object_get_bool(obj)) {
         rc = 0;
         goto out;
     }
