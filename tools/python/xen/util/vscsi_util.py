@@ -105,6 +105,8 @@ def _vscsi_get_scsidevices_by_lsscsi(option = ""):
             devname = None
         try:
             sg = s[-1].split('/dev/')[1]
+            if devname is None:
+                devname = sg
             scsi_id = _vscsi_get_scsiid(sg)
         except IndexError:
             sg = None
