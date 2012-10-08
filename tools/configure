@@ -551,11 +551,11 @@ MAKEFLAGS=
 
 # Identity of this package.
 PACKAGE_NAME='Xen Hypervisor'
-PACKAGE_TARNAME='xen-hypervisor'
+PACKAGE_TARNAME='xen'
 PACKAGE_VERSION='4.3'
 PACKAGE_STRING='Xen Hypervisor 4.3'
 PACKAGE_BUGREPORT='xen-devel@lists.xen.org'
-PACKAGE_URL=''
+PACKAGE_URL='http://www.xen.org/'
 
 ac_unique_file="libxl/libxl.c"
 ac_default_prefix=/usr
@@ -1349,7 +1349,7 @@ Fine tuning of the installation directories:
   --infodir=DIR           info documentation [DATAROOTDIR/info]
   --localedir=DIR         locale-dependent data [DATAROOTDIR/locale]
   --mandir=DIR            man documentation [DATAROOTDIR/man]
-  --docdir=DIR            documentation root [DATAROOTDIR/doc/xen-hypervisor]
+  --docdir=DIR            documentation root [DATAROOTDIR/doc/xen]
   --htmldir=DIR           html documentation [DOCDIR]
   --dvidir=DIR            dvi documentation [DOCDIR]
   --pdfdir=DIR            pdf documentation [DOCDIR]
@@ -1428,6 +1428,7 @@ Use these variables to override the choices made by `configure' or to help
 it to find libraries and programs with nonstandard names/locations.
 
 Report bugs to <xen-devel@lists.xen.org>.
+Xen Hypervisor home page: <http://www.xen.org/>.
 _ACEOF
 ac_status=$?
 fi
@@ -7321,7 +7322,8 @@ $config_files
 Configuration headers:
 $config_headers
 
-Report bugs to <xen-devel@lists.xen.org>."
+Report bugs to <xen-devel@lists.xen.org>.
+Xen Hypervisor home page: <http://www.xen.org/>."
 
 _ACEOF
 cat >>$CONFIG_STATUS <<_ACEOF || ac_write_fail=1
