@@ -845,18 +845,6 @@ unsigned long alloc_contig_pages(int order, unsigned int addr_bits)
 }
 
 /*
- * Check if a given MFN refers to real memory
- */
-static long system_ram_end_mfn;
-int mfn_is_ram(unsigned long mfn)
-{
-    /* very crude check if a given MFN is memory or not. Probably should
-     * make this a little more sophisticated ;) */
-    return (mfn <= system_ram_end_mfn) ? 1 : 0;
-}
-
-
-/*
  * Clear some of the bootstrap memory
  */
 static void clear_bootstrap(void)
@@ -950,10 +938,6 @@ void arch_init_mm(unsigned long* start_pfn_p, unsigned long* max_pfn_p)
     build_pagetable(&start_pfn, &max_pfn);
     clear_bootstrap();
     set_readonly(&_text, &_erodata);
-
-    /* get the number of physical pages the system has. Used to check for
-     * system memory. */
-    system_ram_end_mfn = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
 
     *start_pfn_p = start_pfn;
     *max_pfn_p = max_pfn;

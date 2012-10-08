@@ -229,6 +229,5 @@ static __inline__ paddr_t machine_to_phys(maddr_t machine)
 #define do_map_zero(start, n) do_map_frames(start, &mfn_zero, n, 0, 0, DOMID_SELF, NULL, L1_PROT_RO)
 
 pgentry_t *need_pgt(unsigned long addr);
-int mfn_is_ram(unsigned long mfn);
 
 #endif /* _ARCH_MM_H_ */

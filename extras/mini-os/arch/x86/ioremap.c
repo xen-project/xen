@@ -35,7 +35,6 @@ static void *__do_ioremap(unsigned long phys_addr, unsigned long size,
     unsigned long va;
     unsigned long mfns, mfn;
     unsigned long num_pages, offset;
-    int i;
 
     /* allow non page aligned addresses but for mapping we need to align them */
     offset = (phys_addr & ~PAGE_MASK);
@@ -43,21 +42,9 @@ static void *__do_ioremap(unsigned long phys_addr, unsigned long size,
     phys_addr &= PAGE_MASK;
     mfns = mfn = phys_addr >> PAGE_SHIFT;
     
-    /* sanity checks on list of MFNs */
-    for ( i = 0; i < num_pages; i++, mfn++ )
-    {
-        if ( mfn_is_ram(mfn) )
-        {
-            printk("ioremap: mfn 0x%ulx is RAM\n", mfn);
-            goto mfn_invalid;
-        }
-    }   
     va = (unsigned long)map_frames_ex(&mfns, num_pages, 0, 1, 1,
                                       DOMID_IO, NULL, prot);
     return (void *)(va + offset);
-    
-mfn_invalid:
-    return NULL;
 }
 
 void *ioremap(unsigned long phys_addr, unsigned long size)
