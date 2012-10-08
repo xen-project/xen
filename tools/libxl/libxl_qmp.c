@@ -797,6 +797,23 @@ out:
     return rc;
 }
 
+static int qmp_run_command(libxl__gc *gc, int domid,
+                           const char *cmd, libxl__json_object *args,
+                           qmp_callback_t callback, void *opaque)
+{
+    libxl__qmp_handler *qmp = NULL;
+    int rc = 0;
+
+    qmp = libxl__qmp_initialize(gc, domid);
+    if (!qmp)
+        return ERROR_FAIL;
+
+    rc = qmp_synchronous_send(qmp, cmd, args, callback, opaque, qmp->timeout);
+
+    libxl__qmp_close(qmp);
+    return rc;
+}
+
 int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
 {
     libxl__qmp_handler *qmp = NULL;
@@ -835,21 +852,10 @@ int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
 
 static int qmp_device_del(libxl__gc *gc, int domid, char *id)
 {
-    libxl__qmp_handler *qmp = NULL;
     libxl__json_object *args = NULL;
-    int rc = 0;
-
-    qmp = libxl__qmp_initialize(gc, domid);
-    if (!qmp)
-        return ERROR_FAIL;
 
     qmp_parameters_add_string(gc, &args, "id", id);
-
-    rc = qmp_synchronous_send(qmp, "device_del", args,
-                              NULL, NULL, qmp->timeout);
-
-    libxl__qmp_close(qmp);
-    return rc;
+    return qmp_run_command(gc, domid, "device_del", args, NULL, NULL);
 }
 
 int libxl__qmp_pci_del(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
@@ -864,21 +870,11 @@ int libxl__qmp_pci_del(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
 
 int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename)
 {
-    libxl__qmp_handler *qmp = NULL;
     libxl__json_object *args = NULL;
-    int rc = 0;
-
-    qmp = libxl__qmp_initialize(gc, domid);
-    if (!qmp)
-        return ERROR_FAIL;
 
     qmp_parameters_add_string(gc, &args, "filename", (char *)filename);
-
-    rc = qmp_synchronous_send(qmp, "xen-save-devices-state", args,
-                              NULL, NULL, qmp->timeout);
-
-    libxl__qmp_close(qmp);
-    return rc;
+    return qmp_run_command(gc, domid, "xen-save-devices-state", args,
+                           NULL, NULL);
 }
 
 static int qmp_change(libxl__gc *gc, libxl__qmp_handler *qmp,
@@ -901,34 +897,12 @@ static int qmp_change(libxl__gc *gc, libxl__qmp_handler *qmp,
 
 int libxl__qmp_stop(libxl__gc *gc, int domid)
 {
-    libxl__qmp_handler *qmp = NULL;
-    int rc = 0;
-
-    qmp = libxl__qmp_initialize(gc, domid);
-    if (!qmp)
-        return ERROR_FAIL;
-
-    rc = qmp_synchronous_send(qmp, "stop", NULL,
-                              NULL, NULL, qmp->timeout);
-
-    libxl__qmp_close(qmp);
-    return rc;
+    return qmp_run_command(gc, domid, "stop", NULL, NULL, NULL);
 }
 
 int libxl__qmp_resume(libxl__gc *gc, int domid)
 {
-    libxl__qmp_handler *qmp = NULL;
-    int rc = 0;
-
-    qmp = libxl__qmp_initialize(gc, domid);
-    if (!qmp)
-        return ERROR_FAIL;
-
-    rc = qmp_synchronous_send(qmp, "cont", NULL,
-                              NULL, NULL, qmp->timeout);
-
-    libxl__qmp_close(qmp);
-    return rc;
+    return qmp_run_command(gc, domid, "cont", NULL, NULL, NULL);
 }
 
 int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
