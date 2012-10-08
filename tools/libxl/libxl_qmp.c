@@ -623,6 +623,57 @@ static void qmp_free_handler(libxl__qmp_handler *qmp)
     free(qmp);
 }
 
+#if 0
+/*
+ * QMP Parameters Helpers
+ */
+static void qmp_parameters_common_add(libxl__gc *gc,
+                                      libxl__json_object **param,
+                                      const char *name,
+                                      libxl__json_object *obj)
+{
+    libxl__json_map_node *arg = NULL;
+
+    if (!*param) {
+        *param = libxl__json_object_alloc(gc, JSON_MAP);
+    }
+
+    arg = libxl__zalloc(gc, sizeof(*arg));
+
+    arg->map_key = libxl__strdup(gc, name);
+    arg->obj = obj;
+
+    flexarray_append((*param)->u.map, arg);
+}
+
+static void qmp_parameters_add_string(libxl__gc *gc,
+                                      libxl__json_object **param,
+                                      const char *name, const char *argument)
+{
+    libxl__json_object *obj;
+
+    obj = libxl__json_object_alloc(gc, JSON_STRING);
+    obj->u.string = libxl__strdup(gc, argument);
+
+    qmp_parameters_common_add(gc, param, name, obj);
+}
+
+static void qmp_parameters_add_bool(libxl__gc *gc,
+                                    libxl__json_object **param,
+                                    const char *name, bool b)
+{
+    libxl__json_object *obj;
+
+    obj = libxl__json_object_alloc(gc, JSON_BOOL);
+    obj->u.b = b;
+    qmp_parameters_common_add(gc, param, name, obj);
+}
+
+#define QMP_PARAMETERS_SPRINTF(args, name, format, ...) \
+    qmp_parameters_add_string(gc, args, name, \
+                              libxl__sprintf(gc, format, __VA_ARGS__))
+#endif
+
 /*
  * API
  */
