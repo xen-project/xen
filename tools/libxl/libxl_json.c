@@ -205,7 +205,7 @@ yajl_gen_status libxl__string_gen_json(yajl_gen hand,
  * libxl__json_object helper functions
  */
 
-static libxl__json_object *json_object_alloc(libxl__gc *gc,
+libxl__json_object *libxl__json_object_alloc(libxl__gc *gc,
                                              libxl__json_node_type type)
 {
     libxl__json_object *obj;
@@ -225,7 +225,7 @@ static libxl__json_object *json_object_alloc(libxl__gc *gc,
     return obj;
 }
 
-static int json_object_append_to(libxl__gc *gc,
+int libxl__json_object_append_to(libxl__gc *gc,
                                  libxl__json_object *obj,
                                  libxl__json_object *dst)
 {
@@ -378,9 +378,9 @@ static int json_callback_null(void *opaque)
 
     DEBUG_GEN(ctx, null);
 
-    obj = json_object_alloc(ctx->gc, JSON_NULL);
+    obj = libxl__json_object_alloc(ctx->gc, JSON_NULL);
 
-    if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
+    if (libxl__json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
         return 0;
     }
 
@@ -394,10 +394,10 @@ static int json_callback_boolean(void *opaque, int boolean)
 
     DEBUG_GEN_VALUE(ctx, bool, boolean);
 
-    obj = json_object_alloc(ctx->gc,
-                            boolean ? JSON_TRUE : JSON_FALSE);
+    obj = libxl__json_object_alloc(ctx->gc,
+                                   boolean ? JSON_TRUE : JSON_FALSE);
 
-    if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
+    if (libxl__json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
         return 0;
     }
 
@@ -429,7 +429,7 @@ static int json_callback_number(void *opaque, const char *s, libxl_yajl_length l
             goto error;
         }
 
-        obj = json_object_alloc(ctx->gc, JSON_DOUBLE);
+        obj = libxl__json_object_alloc(ctx->gc, JSON_DOUBLE);
         obj->u.d = d;
     } else {
         long long i = strtoll(s, NULL, 10);
@@ -438,14 +438,14 @@ static int json_callback_number(void *opaque, const char *s, libxl_yajl_length l
             goto error;
         }
 
-        obj = json_object_alloc(ctx->gc, JSON_INTEGER);
+        obj = libxl__json_object_alloc(ctx->gc, JSON_INTEGER);
         obj->u.i = i;
     }
     goto out;
 
 error:
     /* If the conversion fail, we just store the original string. */
-    obj = json_object_alloc(ctx->gc, JSON_NUMBER);
+    obj = libxl__json_object_alloc(ctx->gc, JSON_NUMBER);
 
     t = libxl__zalloc(ctx->gc, len + 1);
     strncpy(t, s, len);
@@ -454,7 +454,7 @@ error:
     obj->u.string = t;
 
 out:
-    if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
+    if (libxl__json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
         return 0;
     }
 
@@ -475,10 +475,10 @@ static int json_callback_string(void *opaque, const unsigned char *str,
     strncpy(t, (const char *) str, len);
     t[len] = 0;
 
-    obj = json_object_alloc(ctx->gc, JSON_STRING);
+    obj = libxl__json_object_alloc(ctx->gc, JSON_STRING);
     obj->u.string = t;
 
-    if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
+    if (libxl__json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
         return 0;
     }
 
@@ -524,10 +524,10 @@ static int json_callback_start_map(void *opaque)
 
     DEBUG_GEN(ctx, map_open);
 
-    obj = json_object_alloc(ctx->gc, JSON_MAP);
+    obj = libxl__json_object_alloc(ctx->gc, JSON_MAP);
 
     if (ctx->current) {
-        if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
+        if (libxl__json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
             return 0;
         }
     }
@@ -564,10 +564,10 @@ static int json_callback_start_array(void *opaque)
 
     DEBUG_GEN(ctx, array_open);
 
-    obj = json_object_alloc(ctx->gc, JSON_ARRAY);
+    obj = libxl__json_object_alloc(ctx->gc, JSON_ARRAY);
 
     if (ctx->current) {
-        if (json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
+        if (libxl__json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
             return 0;
         }
     }

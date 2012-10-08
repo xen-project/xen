@@ -1516,6 +1516,15 @@ static inline long long libxl__json_object_get_integer(const libxl__json_object 
         return -1;
 }
 
+/*
+ * NOGC can be used with those json_object functions, but the
+ * libxl__json_object* will need to be freed with libxl__json_object_free.
+ */
+_hidden libxl__json_object *libxl__json_object_alloc(libxl__gc *gc_opt,
+                                                     libxl__json_node_type type);
+_hidden int libxl__json_object_append_to(libxl__gc *gc_opt,
+                                         libxl__json_object *obj,
+                                         libxl__json_object *dst);
 _hidden libxl__json_object *libxl__json_array_get(const libxl__json_object *o,
                                                   int i);
 _hidden
@@ -1524,9 +1533,10 @@ libxl__json_map_node *libxl__json_map_node_get(const libxl__json_object *o,
 _hidden const libxl__json_object *libxl__json_map_get(const char *key,
                                           const libxl__json_object *o,
                                           libxl__json_node_type expected_type);
-_hidden void libxl__json_object_free(libxl__gc *gc, libxl__json_object *obj);
+_hidden void libxl__json_object_free(libxl__gc *gc_opt,
+                                     libxl__json_object *obj);
 
-_hidden libxl__json_object *libxl__json_parse(libxl__gc *gc, const char *s);
+_hidden libxl__json_object *libxl__json_parse(libxl__gc *gc_opt, const char *s);
 
   /* Based on /local/domain/$domid/dm-version xenstore key
    * default is qemu xen traditional */
