@@ -657,7 +657,6 @@ static void qmp_parameters_add_string(libxl__gc *gc,
     qmp_parameters_common_add(gc, param, name, obj);
 }
 
-#if 0
 static void qmp_parameters_add_bool(libxl__gc *gc,
                                     libxl__json_object **param,
                                     const char *name, bool b)
@@ -668,7 +667,6 @@ static void qmp_parameters_add_bool(libxl__gc *gc,
     obj->u.b = b;
     qmp_parameters_common_add(gc, param, name, obj);
 }
-#endif
 
 #define QMP_PARAMETERS_SPRINTF(args, name, format, ...) \
     qmp_parameters_add_string(gc, args, name, \
@@ -903,6 +901,16 @@ int libxl__qmp_stop(libxl__gc *gc, int domid)
 int libxl__qmp_resume(libxl__gc *gc, int domid)
 {
     return qmp_run_command(gc, domid, "cont", NULL, NULL, NULL);
+}
+
+int libxl__qmp_set_global_dirty_log(libxl__gc *gc, int domid, bool enable)
+{
+    libxl__json_object *args = NULL;
+
+    qmp_parameters_add_bool(gc, &args, "enable", enable);
+
+    return qmp_run_command(gc, domid, "xen-set-global-dirty-log", args,
+                           NULL, NULL);
 }
 
 int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
