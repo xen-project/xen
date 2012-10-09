@@ -132,7 +132,8 @@ extern int vcpu_vgic_init(struct vcpu *v);
 extern void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq,int virtual);
 extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
 
-extern void gic_route_irqs(void);
+extern void gic_route_ppis(void);
+extern void gic_route_spis(void);
 
 extern void gic_inject(void);
 

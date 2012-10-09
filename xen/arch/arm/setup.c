@@ -200,7 +200,8 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     init_IRQ();
 
-    gic_route_irqs();
+    gic_route_ppis();
+    gic_route_spis();
 
     init_maintenance_interrupt();
     init_timer_interrupt();

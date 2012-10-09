@@ -88,20 +88,14 @@ typedef struct irq_desc {
     struct list_head rl_link;
 } __cacheline_aligned irq_desc_t;
 
+#ifndef irq_to_desc
 #define irq_to_desc(irq)    (&irq_desc[irq])
+#endif
 
 int init_one_irq_desc(struct irq_desc *);
 int arch_init_one_irq_desc(struct irq_desc *);
 
 #define irq_desc_initialized(desc) ((desc)->handler != NULL)
-
-#if defined(__arm__)
-
-#define NR_IRQS		1024
-#define nr_irqs NR_IRQS
-extern irq_desc_t irq_desc[NR_IRQS];
-
-#endif
 
 extern int setup_irq(unsigned int irq, struct irqaction *);
 extern void release_irq(unsigned int irq);

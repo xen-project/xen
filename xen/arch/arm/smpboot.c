@@ -26,6 +26,8 @@
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/softirq.h>
+#include <xen/timer.h>
+#include <xen/irq.h>
 #include <asm/vfp.h>
 #include "gic.h"
 
@@ -129,8 +131,13 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
     enable_vfp();
 
     gic_init_secondary_cpu();
+
+    init_secondary_IRQ();
+
+    gic_route_ppis();
+
+    init_maintenance_interrupt();
     init_timer_interrupt();
-    gic_route_irqs();
 
     set_current(idle_vcpu[cpuid]);
 

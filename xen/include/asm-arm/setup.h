@@ -9,8 +9,6 @@ void arch_get_xen_caps(xen_capabilities_info_t *info);
 
 int construct_dom0(struct domain *d);
 
-void init_IRQ(void);
-
 #endif
 /*
  * Local variables:

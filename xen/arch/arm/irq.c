@@ -58,18 +58,39 @@ static int __init init_irq_data(void)
 {
     int irq;
 
-    for (irq = 0; irq < NR_IRQS; irq++) {
+    for (irq = NR_LOCAL_IRQS; irq < NR_IRQS; irq++) {
         struct irq_desc *desc = irq_to_desc(irq);
         init_one_irq_desc(desc);
         desc->irq = irq;
         desc->action  = NULL;
     }
+
+    return 0;
+}
+
+static int __cpuinit init_local_irq_data(void)
+{
+    int irq;
+
+    for (irq = 0; irq < NR_LOCAL_IRQS; irq++) {
+        struct irq_desc *desc = irq_to_desc(irq);
+        init_one_irq_desc(desc);
+        desc->irq = irq;
+        desc->action  = NULL;
+    }
+
     return 0;
 }
 
 void __init init_IRQ(void)
 {
+    BUG_ON(init_local_irq_data() < 0);
     BUG_ON(init_irq_data() < 0);
+}
+
+void __cpuinit init_secondary_IRQ(void)
+{
+    BUG_ON(init_local_irq_data() < 0);
 }
 
 int __init request_irq(unsigned int irq,

@@ -50,8 +50,16 @@ static struct {
     uint64_t lr_mask;
 } gic;
 
-irq_desc_t irq_desc[NR_IRQS];
+static irq_desc_t irq_desc[NR_IRQS];
+static DEFINE_PER_CPU(irq_desc_t[NR_LOCAL_IRQS], local_irq_desc);
+
 unsigned nr_lrs;
+
+irq_desc_t *__irq_to_desc(int irq)
+{
+    if (irq < NR_LOCAL_IRQS) return &this_cpu(local_irq_desc)[irq];
+    return &irq_desc[irq-NR_LOCAL_IRQS];
+}
 
 void gic_save_state(struct vcpu *v)
 {
@@ -260,8 +268,8 @@ static void __cpuinit gic_cpu_init(void)
 {
     int i;
 
-    /* The first 32 interrupts (PPI and SGI) are banked per-cpu, so 
-     * even though they are controlled with GICD registers, they must 
+    /* The first 32 interrupts (PPI and SGI) are banked per-cpu, so
+     * even though they are controlled with GICD registers, they must
      * be set up here with the other per-cpu state. */
     GICD[GICD_ICENABLER] = 0xffff0000; /* Disable all PPI */
     GICD[GICD_ISENABLER] = 0x0000ffff; /* Enable all SGI */
@@ -342,7 +350,7 @@ void gic_disable_cpu(void)
     spin_unlock_irq(&gic.lock);
 }
 
-void gic_route_irqs(void)
+void gic_route_ppis(void)
 {
     /* XXX should get these from DT */
     /* GIC maintenance */
@@ -351,6 +359,11 @@ void gic_route_irqs(void)
     gic_route_irq(26, 1, 1u << smp_processor_id(), 0xa0);
     /* Timer */
     gic_route_irq(30, 1, 1u << smp_processor_id(), 0xa0);
+}
+
+void gic_route_spis(void)
+{
+    /* XXX should get these from DT */
     /* UART */
     gic_route_irq(37, 0, 1u << smp_processor_id(), 0xa0);
 }
@@ -408,7 +421,7 @@ int __init setup_irq(unsigned int irq, struct irqaction *new)
 
     rc = __setup_irq(desc, irq, new);
 
-    spin_unlock_irqrestore(&desc->lock,flags);
+    spin_unlock_irqrestore(&desc->lock, flags);
 
     return rc;
 }
