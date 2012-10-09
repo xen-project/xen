@@ -42,7 +42,9 @@ txt: $(DOC_TXT)
 
 .PHONY: figs
 figs:
-	$(MAKE) -C figs
+	@set -e ; if which $(FIG2DEV) 1>/dev/null 2>/dev/null; then \
+	set -x; $(MAKE) -C figs ; else                   \
+	echo "fig2dev (transfig) not installed; skipping figs."; fi
 
 .PHONY: python-dev-docs
 python-dev-docs:
