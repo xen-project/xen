@@ -544,11 +544,12 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             if (disks[i].is_cdrom) {
                 if (disks[i].format == LIBXL_DISK_FORMAT_EMPTY)
                     drive = libxl__sprintf
-                        (gc, "if=ide,index=%d,media=cdrom,cache=writeback", disk);
+                        (gc, "if=ide,index=%d,media=cdrom,cache=writeback,id=ide-%i",
+                         disk, dev_number);
                 else
                     drive = libxl__sprintf
-                        (gc, "file=%s,if=ide,index=%d,media=cdrom,format=%s,cache=writeback",
-                         disks[i].pdev_path, disk, format);
+                        (gc, "file=%s,if=ide,index=%d,media=cdrom,format=%s,cache=writeback,id=ide-%i",
+                         disks[i].pdev_path, disk, format, dev_number);
             } else {
                 if (disks[i].format == LIBXL_DISK_FORMAT_EMPTY) {
                     LIBXL__LOG(ctx, LIBXL__LOG_WARNING, "cannot support"
