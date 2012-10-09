@@ -120,8 +120,14 @@ static int p2m_create_table(struct domain *d,
     return 0;
 }
 
+enum p2m_operation {
+    INSERT,
+    ALLOCATE,
+    REMOVE
+};
+
 static int create_p2m_entries(struct domain *d,
-                     int alloc,
+                     enum p2m_operation op,
                      paddr_t start_gpaddr,
                      paddr_t end_gpaddr,
                      paddr_t maddr,
@@ -191,25 +197,39 @@ static int create_p2m_entries(struct domain *d,
         }
 
         /* Allocate a new RAM page and attach */
-        if (alloc)
-        {
-            struct page_info *page;
-            lpae_t pte;
+        switch (op) {
+            case ALLOCATE:
+                {
+                    struct page_info *page;
+                    lpae_t pte;
 
-            rc = -ENOMEM;
-            page = alloc_domheap_page(d, 0);
-            if ( page == NULL ) {
-                printk("p2m_populate_ram: failed to allocate page\n");
-                goto out;
-            }
+                    rc = -ENOMEM;
+                    page = alloc_domheap_page(d, 0);
+                    if ( page == NULL ) {
+                        printk("p2m_populate_ram: failed to allocate page\n");
+                        goto out;
+                    }
 
-            pte = mfn_to_p2m_entry(page_to_mfn(page), mattr);
+                    pte = mfn_to_p2m_entry(page_to_mfn(page), mattr);
 
-            write_pte(&third[third_table_offset(addr)], pte);
-        } else {
-            lpae_t pte = mfn_to_p2m_entry(maddr >> PAGE_SHIFT, mattr);
-            write_pte(&third[third_table_offset(addr)], pte);
-            maddr += PAGE_SIZE;
+                    write_pte(&third[third_table_offset(addr)], pte);
+                }
+                break;
+            case INSERT:
+                {
+                    lpae_t pte = mfn_to_p2m_entry(maddr >> PAGE_SHIFT, mattr);
+                    write_pte(&third[third_table_offset(addr)], pte);
+                    maddr += PAGE_SIZE;
+                }
+                break;
+            case REMOVE:
+                {
+                    lpae_t pte;
+                    memset(&pte, 0x00, sizeof(pte));
+                    write_pte(&third[third_table_offset(addr)], pte);
+                    maddr += PAGE_SIZE;
+                }
+                break;
         }
     }
 
@@ -229,7 +249,7 @@ int p2m_populate_ram(struct domain *d,
                      paddr_t start,
                      paddr_t end)
 {
-    return create_p2m_entries(d, 1, start, end, 0, MATTR_MEM);
+    return create_p2m_entries(d, ALLOCATE, start, end, 0, MATTR_MEM);
 }
 
 int map_mmio_regions(struct domain *d,
@@ -237,7 +257,7 @@ int map_mmio_regions(struct domain *d,
                      paddr_t end_gaddr,
                      paddr_t maddr)
 {
-    return create_p2m_entries(d, 0, start_gaddr, end_gaddr, maddr, MATTR_DEV);
+    return create_p2m_entries(d, INSERT, start_gaddr, end_gaddr, maddr, MATTR_DEV);
 }
 
 int guest_physmap_add_page(struct domain *d,
@@ -245,7 +265,7 @@ int guest_physmap_add_page(struct domain *d,
                            unsigned long mfn,
                            unsigned int page_order)
 {
-    return create_p2m_entries(d, 0, gpfn << PAGE_SHIFT,
+    return create_p2m_entries(d, INSERT, gpfn << PAGE_SHIFT,
                               (gpfn + (1<<page_order)) << PAGE_SHIFT,
                               mfn << PAGE_SHIFT, MATTR_MEM);
 }
@@ -254,7 +274,9 @@ void guest_physmap_remove_page(struct domain *d,
                                unsigned long gpfn,
                                unsigned long mfn, unsigned int page_order)
 {
-    ASSERT(0);
+    create_p2m_entries(d, REMOVE, gpfn << PAGE_SHIFT,
+                       (gpfn + (1<<page_order)) << PAGE_SHIFT,
+                       mfn << PAGE_SHIFT, MATTR_MEM);
 }
 
 int p2m_alloc_table(struct domain *d)
@@ -318,6 +340,13 @@ int p2m_init(struct domain *d)
 
     return 0;
 }
+
+unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)
+{
+    paddr_t p = p2m_lookup(d, gpfn << PAGE_SHIFT);
+    return p >> PAGE_SHIFT;
+}
+
 /*
  * Local variables:
  * mode: C

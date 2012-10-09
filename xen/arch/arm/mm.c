@@ -525,6 +525,121 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
 
     return 0;
 }
+
+struct domain *page_get_owner_and_reference(struct page_info *page)
+{
+    unsigned long x, y = page->count_info;
+
+    do {
+        x = y;
+        /*
+         * Count ==  0: Page is not allocated, so we cannot take a reference.
+         * Count == -1: Reference count would wrap, which is invalid.
+         */
+        if ( unlikely(((x + 1) & PGC_count_mask) <= 1) )
+            return NULL;
+    }
+    while ( (y = cmpxchg(&page->count_info, x, x + 1)) != x );
+
+    return page_get_owner(page);
+}
+
+void put_page(struct page_info *page)
+{
+    unsigned long nx, x, y = page->count_info;
+
+    do {
+        ASSERT((y & PGC_count_mask) != 0);
+        x  = y;
+        nx = x - 1;
+    }
+    while ( unlikely((y = cmpxchg(&page->count_info, x, nx)) != x) );
+
+    if ( unlikely((nx & PGC_count_mask) == 0) )
+    {
+        free_domheap_page(page);
+    }
+}
+
+int get_page(struct page_info *page, struct domain *domain)
+{
+    struct domain *owner = page_get_owner_and_reference(page);
+
+    if ( likely(owner == domain) )
+        return 1;
+
+    if ( owner != NULL )
+        put_page(page);
+
+    return 0;
+}
+
+void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
+{
+    /*
+     * Note that this cannot be clear_bit(), as the access must be
+     * confined to the specified 2 bytes.
+     */
+    uint16_t mask = ~(1 << nr), old;
+
+    do {
+        old = *addr;
+    } while (cmpxchg(addr, old, old & mask) != old);
+}
+
+void gnttab_mark_dirty(struct domain *d, unsigned long l)
+{
+    /* XXX: mark dirty */
+    static int warning;
+    if (!warning) {
+        gdprintk(XENLOG_WARNING, "gnttab_mark_dirty not implemented yet\n");
+        warning = 1;
+    }
+}
+
+int create_grant_host_mapping(unsigned long addr, unsigned long frame,
+                              unsigned int flags, unsigned int cache_flags)
+{
+    int rc;
+
+    if ( cache_flags  || (flags & ~GNTMAP_readonly) != GNTMAP_host_map )
+        return GNTST_general_error;
+
+    /* XXX: read only mappings */
+    if ( flags & GNTMAP_readonly )
+    {
+        gdprintk(XENLOG_WARNING, "read only mappings not implemented yet\n");
+        return GNTST_general_error;
+    }
+
+    rc = guest_physmap_add_page(current->domain,
+                                 addr >> PAGE_SHIFT, frame, 0);
+    if ( rc )
+        return GNTST_general_error;
+    else
+        return GNTST_okay;
+}
+
+int replace_grant_host_mapping(unsigned long addr, unsigned long mfn,
+        unsigned long new_addr, unsigned int flags)
+{
+    unsigned long gfn = (unsigned long)(addr >> PAGE_SHIFT);
+    struct domain *d = current->domain;
+
+    if ( new_addr != 0 || (flags & GNTMAP_contains_pte) )
+        return GNTST_general_error;
+
+    guest_physmap_remove_page(d, gfn, mfn, 0);
+
+    return GNTST_okay;
+}
+
+int is_iomem_page(unsigned long mfn)
+{
+    if ( !mfn_valid(mfn) )
+        return 1;
+    return 0;
+}
 /*
  * Local variables:
  * mode: C
