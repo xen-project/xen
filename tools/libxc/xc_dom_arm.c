@@ -25,6 +25,10 @@
 #include "xg_private.h"
 #include "xc_dom.h"
 
+#define NR_MAGIC_PAGES 2
+#define CONSOLE_PFN_OFFSET 0
+#define XENSTORE_PFN_OFFSET 1
+
 /* ------------------------------------------------------------------------ */
 /*
  * arm guests are hybrid and start off with paging disabled, therefore no
@@ -46,13 +50,30 @@ static int setup_pgtables_arm(struct xc_dom_image *dom)
 
 static int alloc_magic_pages(struct xc_dom_image *dom)
 {
+    int rc, i;
+    xen_pfn_t store_pfn, console_pfn, p2m[NR_MAGIC_PAGES];
+
     DOMPRINTF_CALLED(dom->xch);
-    /* XXX
-     *   dom->p2m_guest
-     *   dom->start_info_pfn
-     *   dom->xenstore_pfn
-     *   dom->console_pfn
-     */
+
+    for (i = 0; i < NR_MAGIC_PAGES; i++)
+        p2m[i] = dom->rambase_pfn + dom->total_pages + i;
+
+    rc = xc_domain_populate_physmap_exact(
+            dom->xch, dom->guest_domid, NR_MAGIC_PAGES,
+            0, 0, p2m);
+    if ( rc < 0 )
+        return rc;
+
+    console_pfn = dom->rambase_pfn + dom->total_pages + CONSOLE_PFN_OFFSET;
+    store_pfn = dom->rambase_pfn + dom->total_pages + XENSTORE_PFN_OFFSET;
+
+    xc_clear_domain_page(dom->xch, dom->guest_domid, console_pfn);
+    xc_clear_domain_page(dom->xch, dom->guest_domid, store_pfn);
+    xc_set_hvm_param(dom->xch, dom->guest_domid, HVM_PARAM_CONSOLE_PFN,
+            console_pfn);
+    xc_set_hvm_param(dom->xch, dom->guest_domid, HVM_PARAM_STORE_PFN,
+            store_pfn);
+
     return 0;
 }
 
