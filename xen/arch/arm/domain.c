@@ -386,6 +386,10 @@ int vcpu_initialise(struct vcpu *v)
     v->arch.saved_context.sp = (uint32_t)v->arch.cpu_info;
     v->arch.saved_context.pc = (uint32_t)continue_new_vcpu;
 
+    /* Idle VCPUs don't need the rest of this setup */
+    if ( is_idle_vcpu(v) )
+        return rc;
+
     if ( (rc = vcpu_vgic_init(v)) != 0 )
         return rc;
 
