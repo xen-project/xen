@@ -2141,12 +2141,6 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
         rc = ERROR_FAIL;
         goto out;
     }
-    if (dm_ver != LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL) {
-        LOG(ERROR, "cdrom-insert does not work with %s",
-            libxl_device_model_version_to_string(dm_ver));
-        rc = ERROR_INVAL;
-        goto out;
-    }
 
     disks = libxl_device_disk_list(ctx, domid, &num);
     for (i = 0; i < num; i++) {
@@ -2170,6 +2164,12 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
 
     rc = libxl__device_from_disk(gc, domid, disk, &device);
     if (rc) goto out;
+
+    if (dm_ver == LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
+        rc = libxl__qmp_insert_cdrom(gc, domid, disk);
+        if (rc) goto out;
+    }
+
     path = libxl__device_backend_path(gc, &device);
 
     insert = flexarray_make(gc, 4, 1);
