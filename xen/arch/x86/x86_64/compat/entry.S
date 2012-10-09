@@ -59,8 +59,8 @@ UNLIKELY_END(msi_check)
 #endif
         cmpb  $0,tb_init_done(%rip)
 UNLIKELY_START(ne, compat_trace)
-        call  trace_hypercall
-        /* Now restore all the registers that trace_hypercall clobbered */
+        call  __trace_hypercall_entry
+        /* Restore the registers that __trace_hypercall_entry clobbered. */
         movl  UREGS_rax+SHADOW_BYTES(%rsp),%eax   /* Hypercall #  */
         movl  UREGS_rbx+SHADOW_BYTES(%rsp),%edi   /* Arg 1        */
         movl  UREGS_rcx+SHADOW_BYTES(%rsp),%esi   /* Arg 2        */

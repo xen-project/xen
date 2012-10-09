@@ -6,7 +6,7 @@
 #include <xen/sched.h>
 #include <xen/trace.h>
 
-void trace_hypercall(void)
+void __trace_hypercall_entry(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     unsigned long args[6];
