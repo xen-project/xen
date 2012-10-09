@@ -25,6 +25,7 @@
 #include "mce.h"
 #include "x86_mca.h"
 #include "mce_amd.h"
+#include "mcaction.h"
 
 /* Error Code Types */
 enum mc_ec_type {
@@ -74,4 +75,26 @@ mc_amd_recoverable_scan(uint64_t status)
     }
 
     return ret;
+}
+
+int
+mc_amd_addrcheck(uint64_t status, uint64_t misc, int addrtype)
+{
+    enum mc_ec_type ectype;
+    uint16_t errorcode;
+
+    errorcode = status & (MCi_STATUS_MCA | MCi_STATUS_MSEC);
+    ectype = mc_ec2type(errorcode);
+
+    switch (ectype) {
+    case MC_EC_BUS_TYPE: /* value in addr MSR is physical */
+    case MC_EC_MEM_TYPE: /* value in addr MSR is physical */
+        return (addrtype == MC_ADDR_PHYSICAL);
+    case MC_EC_TLB_TYPE: /* value in addr MSR is virtual */
+        return (addrtype == MC_ADDR_VIRTUAL);
+    }
+
+    /* unreached */
+    BUG();
+    return 0;
 }

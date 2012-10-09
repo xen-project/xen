@@ -44,6 +44,7 @@
 #include "mce_quirks.h"
 #include "x86_mca.h"
 #include "mce_amd.h"
+#include "mcaction.h"
 
 static struct mcinfo_extended *
 amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
@@ -97,6 +98,7 @@ enum mcheck_type amd_f10_mcheck_init(struct cpuinfo_x86 *c)
 
 	x86_mce_callback_register(amd_f10_handler);
 	mce_recoverable_register(mc_amd_recoverable_scan);
+	mce_register_addrcheck(mc_amd_addrcheck);
 
 	return mcheck_amd_famXX;
 }

@@ -24,6 +24,7 @@
 
 #include "mce.h"
 #include "barrier.h"
+#include "mcaction.h"
 #include "util.h"
 #include "vmce.h"
 
@@ -216,7 +217,7 @@ static void mca_init_bank(enum mca_source who,
 
     if ((mib->mc_status & MCi_STATUS_MISCV) &&
         (mib->mc_status & MCi_STATUS_ADDRV) &&
-        ((mib->mc_misc & MCi_MISC_ADDRMOD_MASK) == MCi_MISC_PHYSMOD) && 
+        (mc_check_addr(mib->mc_status, mib->mc_misc, MC_ADDR_PHYSICAL)) &&
         (who == MCA_POLLER || who == MCA_CMCI_HANDLER) &&
         (mfn_valid(paddr_to_pfn(mib->mc_addr))))
     {
