@@ -101,6 +101,8 @@ static int vcpu_arm(struct xc_dom_image *dom, void *ptr)
 
     ctxt->user_regs.cpsr = PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_SVC;
 
+    ctxt->flags = VGCF_online;
+
     DOMPRINTF("Initial state CPSR %#"PRIx32" PC %#"PRIx32,
            ctxt->user_regs.cpsr, ctxt->user_regs.pc);
 

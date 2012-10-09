@@ -503,7 +503,10 @@ int arch_set_info_guest(
     v->arch.ttbr1 = ctxt->ttbr1;
     v->arch.ttbcr = ctxt->ttbcr;
 
-    clear_bit(_VPF_down, &v->pause_flags);
+    if ( ctxt->flags & VGCF_online )
+        clear_bit(_VPF_down, &v->pause_flags);
+    else
+        set_bit(_VPF_down, &v->pause_flags);
 
     return 0;
 }

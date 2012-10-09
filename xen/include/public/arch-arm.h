@@ -125,6 +125,10 @@ typedef uint64_t xen_pfn_t;
 typedef uint32_t xen_ulong_t;
 
 struct vcpu_guest_context {
+#define _VGCF_online                   0
+#define VGCF_online                    (1<<_VGCF_online)
+    uint32_t flags;                         /* VGCF_* */
+
     struct cpu_user_regs user_regs;         /* User-level CPU registers     */
 
     uint32_t sctlr;
