@@ -667,7 +667,7 @@ static void desched_extra_dom(s_time_t now, struct vcpu *d)
 static struct task_slice sedf_do_extra_schedule(
     s_time_t now, s_time_t end_xt, struct list_head *extraq[], int cpu)
 {
-    struct task_slice   ret;
+    struct task_slice   ret = { 0 };
     struct sedf_vcpu_info *runinf;
     ASSERT(end_xt > now);
 
