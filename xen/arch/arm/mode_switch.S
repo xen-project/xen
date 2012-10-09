@@ -23,6 +23,8 @@
 
 /* Get up a CPU into Hyp mode.  Clobbers r0-r3.
  *
+ * Expects r12 == CPU number
+ *
  * This code is specific to the VE model, and not intended to be used
  * on production systems.  As such it's a bit hackier than the main
  * boot code in head.S.  In future it will be replaced by better
@@ -46,19 +48,28 @@ enter_hyp_mode:
 	mcr   CP32(r0, CNTFRQ)
 	ldr   r0, =0x40c00           /* SMP, c11, c10 in non-secure mode */
 	mcr   CP32(r0, NSACR)
-	/* Continuing ugliness: Set up the GIC so NS state owns interrupts */
 	mov   r0, #GIC_BASE_ADDRESS
 	add   r0, r0, #GIC_DR_OFFSET
+	/* Disable the GIC distributor, on the boot CPU only */
 	mov   r1, #0
-	str   r1, [r0]               /* Disable delivery in the distributor */
+	teq   r12, #0                /* Is this the boot CPU? */
+	streq r1, [r0]
+	/* Continuing ugliness: Set up the GIC so NS state owns interrupts,
+	 * The first 32 interrupts (SGIs & PPIs) must be configured on all
+	 * CPUs while the remainder are SPIs and only need to be done one, on
+	 * the boot CPU. */
 	add   r0, r0, #0x80          /* GICD_IGROUP0 */
 	mov   r2, #0xffffffff        /* All interrupts to group 1 */
-	str   r2, [r0]
-	str   r2, [r0, #4]
-	str   r2, [r0, #8]
-	/* Must drop priority mask below 0x80 before entering NS state */
+	teq   r12, #0                /* Boot CPU? */
+	str   r2, [r0]               /* Interrupts  0-31 (SGI & PPI) */
+	streq r2, [r0, #4]           /* Interrupts 32-63 (SPI) */
+	streq r2, [r0, #8]           /* Interrupts 64-95 (SPI) */
+	/* Disable the GIC CPU interface on all processors */
 	mov   r0, #GIC_BASE_ADDRESS
 	add   r0, r0, #GIC_CR_OFFSET
+	mov   r1, #0
+	str   r1, [r0]
+	/* Must drop priority mask below 0x80 before entering NS state */
 	ldr   r1, =0xff
 	str   r1, [r0, #0x4]         /* -> GICC_PMR */
 	/* Reset a few config registers */
