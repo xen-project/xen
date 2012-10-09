@@ -574,6 +574,19 @@ int get_page(struct page_info *page, struct domain *domain)
     return 0;
 }
 
+/* Common code requires get_page_type and put_page_type.
+ * We don't care about typecounts so we just do the minimum to make it
+ * happy. */
+int get_page_type(struct page_info *page, unsigned long type)
+{
+    return 1;
+}
+
+void put_page_type(struct page_info *page)
+{
+    return;
+}
+
 void gnttab_clear_flag(unsigned long nr, uint16_t *addr)
 {
     /*

@@ -71,7 +71,6 @@ struct page_info
 
 #define PGT_none          PG_mask(0, 4)  /* no special uses of this page   */
 #define PGT_writable_page PG_mask(7, 4)  /* has writable mappings?         */
-#define PGT_shared_page   PG_mask(8, 4)  /* CoW sharable page              */
 #define PGT_type_mask     PG_mask(15, 4) /* Bits 28-31 or 60-63.           */
 
  /* Owning guest has pinned this page to its current type? */

@@ -22,10 +22,6 @@ DUMMY(arch_get_info_guest);
 DUMMY(arch_vcpu_reset);
 NOP(update_vcpu_system_time);
 
-/* Page Reference & Type Maintenance */
-DUMMY(get_page_type);
-DUMMY(put_page_type);
-
 /* Grant Tables */
 DUMMY(steal_page);
 
