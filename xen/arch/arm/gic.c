@@ -57,9 +57,11 @@ void gic_save_state(struct vcpu *v)
 {
     int i;
 
+    spin_lock_irq(&gic.lock);
     for ( i=0; i<nr_lrs; i++)
         v->arch.gic_lr[i] = GICH[GICH_LR + i];
     v->arch.lr_mask = gic.lr_mask;
+    spin_unlock_irq(&gic.lock);
     /* Disable until next VCPU scheduled */
     GICH[GICH_HCR] = 0;
     isb();
@@ -72,9 +74,11 @@ void gic_restore_state(struct vcpu *v)
     if ( is_idle_vcpu(v) )
         return;
 
+    spin_lock_irq(&gic.lock);
     gic.lr_mask = v->arch.lr_mask;
     for ( i=0; i<nr_lrs; i++)
         GICH[GICH_LR + i] = v->arch.gic_lr[i];
+    spin_unlock_irq(&gic.lock);
     GICH[GICH_HCR] = GICH_HCR_EN;
     isb();
 
@@ -469,9 +473,11 @@ static void gic_restore_pending_irqs(struct vcpu *v)
         i = find_first_zero_bit(&gic.lr_mask, nr_lrs);
         if ( i >= nr_lrs ) return;
 
+        spin_lock_irq(&gic.lock);
         gic_set_lr(i, p->irq, GICH_LR_PENDING, p->priority);
         list_del_init(&p->lr_queue);
         set_bit(i, &gic.lr_mask);
+        spin_unlock_irq(&gic.lock);
     }
 
 }
