@@ -38,7 +38,10 @@ dev-docs: python-dev-docs
 html: $(DOC_HTML) html/index.html
 
 .PHONY: txt
-txt: $(DOC_TXT)
+txt:
+	@if which $(POD2TEXT) 1>/dev/null 2>/dev/null; then \
+	$(MAKE) $(DOC_TXT); else              \
+	echo "pod2text not installed; skipping text outputs."; fi
 
 .PHONY: figs
 figs:
