@@ -475,12 +475,7 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, unsigned long iss)
 #endif
 
     if ( iss != XEN_HYPERCALL_TAG )
-    {
-        printk("%s %d: received an alien hypercall iss=%lx\n", __func__ ,
-                __LINE__ , iss);
-        regs->r0 = -EINVAL;
-        return;
-    }
+        domain_crash_synchronous();
 
     if ( regs->r12 >= ARRAY_SIZE(arm_hypercall_table) )
     {
