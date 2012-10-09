@@ -148,6 +148,10 @@ typedef l4_pgentry_64_t l4_pgentry_t;
 #define l4_table_offset(_a) l4_table_offset_x86_64(_a)
 #endif
 
+#define PAGE_SHIFT_ARM          12
+#define PAGE_SIZE_ARM           (1UL << PAGE_SHIFT_ARM)
+#define PAGE_MASK_ARM           (~(PAGE_SIZE_ARM-1))
+
 #define PAGE_SHIFT_X86          12
 #define PAGE_SIZE_X86           (1UL << PAGE_SHIFT_X86)
 #define PAGE_MASK_X86           (~(PAGE_SIZE_X86-1))

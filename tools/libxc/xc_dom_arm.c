@@ -18,14 +18,143 @@
  * Copyright (c) 2011, Citrix Systems
  */
 #include <inttypes.h>
+
 #include <xen/xen.h>
+#include <xen/io/protocols.h>
+
 #include "xg_private.h"
 #include "xc_dom.h"
 
+/* ------------------------------------------------------------------------ */
+/*
+ * arm guests are hybrid and start off with paging disabled, therefore no
+ * pagetables and nothing to do here.
+ */
+static int count_pgtables_arm(struct xc_dom_image *dom)
+{
+    DOMPRINTF_CALLED(dom->xch);
+    return 0;
+}
+
+static int setup_pgtables_arm(struct xc_dom_image *dom)
+{
+    DOMPRINTF_CALLED(dom->xch);
+    return 0;
+}
+
+/* ------------------------------------------------------------------------ */
+
+static int alloc_magic_pages(struct xc_dom_image *dom)
+{
+    DOMPRINTF_CALLED(dom->xch);
+    /* XXX
+     *   dom->p2m_guest
+     *   dom->start_info_pfn
+     *   dom->xenstore_pfn
+     *   dom->console_pfn
+     */
+    return 0;
+}
+
+/* ------------------------------------------------------------------------ */
+
+static int start_info_arm(struct xc_dom_image *dom)
+{
+    DOMPRINTF_CALLED(dom->xch);
+    return 0;
+}
+
+static int shared_info_arm(struct xc_dom_image *dom, void *ptr)
+{
+    DOMPRINTF_CALLED(dom->xch);
+    return 0;
+}
+
+/* ------------------------------------------------------------------------ */
+
+static int vcpu_arm(struct xc_dom_image *dom, void *ptr)
+{
+    vcpu_guest_context_t *ctxt = ptr;
+
+    DOMPRINTF_CALLED(dom->xch);
+
+    /* clear everything */
+    memset(ctxt, 0, sizeof(*ctxt));
+
+    ctxt->user_regs.pc = dom->parms.virt_entry;
+
+    /* Linux boot protocol. See linux.Documentation/arm/Booting. */
+    ctxt->user_regs.r0 = 0; /* SBZ */
+    /* Machine ID: We use DTB therefore no machine id */
+    ctxt->user_regs.r1 = 0xffffffff;
+    /* ATAGS/DTB: We currently require that the guest kernel to be
+     * using CONFIG_ARM_APPENDED_DTB. Ensure that r2 does not look
+     * like a valid pointer to a set of ATAGS or a DTB.
+     */
+    ctxt->user_regs.r2 = 0xffffffff;
+
+    ctxt->sctlr = /* #define SCTLR_BASE */0x00c50078;
+
+    ctxt->ttbr0 = 0;
+    ctxt->ttbr1 = 0;
+    ctxt->ttbcr = 0; /* Defined Reset Value */
+
+    ctxt->user_regs.cpsr = PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_SVC;
+
+    DOMPRINTF("Initial state CPSR %#"PRIx32" PC %#"PRIx32,
+           ctxt->user_regs.cpsr, ctxt->user_regs.pc);
+
+    return 0;
+}
+
+/* ------------------------------------------------------------------------ */
+
+static struct xc_dom_arch xc_dom_32 = {
+    .guest_type = "xen-3.0-armv7l",
+    .native_protocol = XEN_IO_PROTO_ABI_ARM,
+    .page_shift = PAGE_SHIFT_ARM,
+    .sizeof_pfn = 8,
+    .alloc_magic_pages = alloc_magic_pages,
+    .count_pgtables = count_pgtables_arm,
+    .setup_pgtables = setup_pgtables_arm,
+    .start_info = start_info_arm,
+    .shared_info = shared_info_arm,
+    .vcpu = vcpu_arm,
+};
+
+static void __init register_arch_hooks(void)
+{
+    xc_dom_register_arch_hooks(&xc_dom_32);
+}
+
 int arch_setup_meminit(struct xc_dom_image *dom)
 {
-    errno = ENOSYS;
-    return -1;
+    int rc;
+    xen_pfn_t pfn, allocsz, i;
+
+    dom->shadow_enabled = 1;
+
+    dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * dom->total_pages);
+
+    /* setup initial p2m */
+    for ( pfn = 0; pfn < dom->total_pages; pfn++ )
+        dom->p2m_host[pfn] = pfn + dom->rambase_pfn;
+
+    /* allocate guest memory */
+    for ( i = rc = allocsz = 0;
+          (i < dom->total_pages) && !rc;
+          i += allocsz )
+    {
+        allocsz = dom->total_pages - i;
+        if ( allocsz > 1024*1024 )
+            allocsz = 1024*1024;
+
+        rc = xc_domain_populate_physmap_exact(
+            dom->xch, dom->guest_domid, allocsz,
+            0, 0, &dom->p2m_host[i]);
+    }
+
+    return 0;
 }
 
 int arch_setup_bootearly(struct xc_dom_image *dom)
@@ -36,9 +165,14 @@ int arch_setup_bootearly(struct xc_dom_image *dom)
 
 int arch_setup_bootlate(struct xc_dom_image *dom)
 {
-    DOMPRINTF("%s: doing nothing", __FUNCTION__);
+    /* XXX
+     *   map shared info
+     *   map grant tables
+     *   setup shared info
+     */
     return 0;
 }
+
 /*
  * Local variables:
  * mode: C

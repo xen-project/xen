@@ -307,15 +307,17 @@ void *xc_dom_pfn_to_ptr(struct xc_dom_image *dom, xen_pfn_t pfn,
                         xen_pfn_t count)
 {
     struct xc_dom_phys *phys;
+    xen_pfn_t offset;
     unsigned int page_shift = XC_DOM_PAGE_SHIFT(dom);
     char *mode = "unset";
 
-    if ( pfn > dom->total_pages ||    /* multiple checks to avoid overflows */
+    offset = pfn - dom->rambase_pfn;
+    if ( offset > dom->total_pages || /* multiple checks to avoid overflows */
          count > dom->total_pages ||
-         pfn > dom->total_pages - count )
+         offset > dom->total_pages - count )
     {
-        DOMPRINTF("%s: pfn out of range (0x%" PRIpfn " > 0x%" PRIpfn ")",
-                  __FUNCTION__, pfn, dom->total_pages);
+        DOMPRINTF("%s: pfn %"PRI_xen_pfn" out of range (0x%" PRIpfn " > 0x%" PRIpfn ")",
+                  __FUNCTION__, pfn, offset, dom->total_pages);
         return NULL;
     }
 

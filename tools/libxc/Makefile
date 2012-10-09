@@ -58,6 +58,7 @@ GUEST_SRCS-y += libelf-dominfo.c libelf-relocate.c
 GUEST_SRCS-y                 += xc_dom_core.c xc_dom_boot.c
 GUEST_SRCS-y                 += xc_dom_elfloader.c
 GUEST_SRCS-$(CONFIG_X86)     += xc_dom_bzimageloader.c
+GUEST_SRCS-$(CONFIG_ARM)     += xc_dom_armzimageloader.c
 GUEST_SRCS-y                 += xc_dom_binloader.c
 GUEST_SRCS-y                 += xc_dom_compat_linux.c
 
