@@ -103,6 +103,7 @@ static int vtimer_emulate_64(struct cpu_user_regs *regs, union hsr hsr)
     struct hsr_cp64 cp64 = hsr.cp64;
     uint32_t *r1 = &regs->r0 + cp64.reg1;
     uint32_t *r2 = &regs->r0 + cp64.reg2;
+    uint64_t ticks;
     s_time_t now;
 
     switch ( hsr.bits & HSR_CP64_REGS_MASK )
@@ -111,8 +112,9 @@ static int vtimer_emulate_64(struct cpu_user_regs *regs, union hsr hsr)
         if ( cp64.read )
         {
             now = NOW() - v->arch.vtimer.offset;
-            *r1 = (uint32_t)(now & 0xffffffff);
-            *r2 = (uint32_t)(now >> 32);
+            ticks = ns_to_ticks(now);
+            *r1 = (uint32_t)(ticks & 0xffffffff);
+            *r2 = (uint32_t)(ticks >> 32);
             return 1;
         }
         else
