@@ -189,12 +189,7 @@ static int create_p2m_entries(struct domain *d,
         /* else: third already valid */
 
         if ( third[third_table_offset(addr)].p2m.valid )
-        {
-            /* p2m entry already present */
-            free_domheap_page(
-                    mfn_to_page(third[third_table_offset(addr)].p2m.base));
             flush_tlb_all_local();
-        }
 
         /* Allocate a new RAM page and attach */
         switch (op) {
