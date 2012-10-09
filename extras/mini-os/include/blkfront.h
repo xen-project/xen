@@ -28,7 +28,17 @@ struct blkfront_info
 };
 struct blkfront_dev *init_blkfront(char *nodename, struct blkfront_info *info);
 #ifdef HAVE_LIBC
+#include <sys/stat.h>
+/* POSIX IO functions:
+ * use blkfront_open() to get a file descriptor to the block device
+ * Don't use the other blkfront posix functions here directly, instead use
+ * read(), write(), lseek() and fstat() on the file descriptor
+ */
 int blkfront_open(struct blkfront_dev *dev);
+int blkfront_posix_rwop(int fd, uint8_t* buf, size_t count, int write);
+#define blkfront_posix_write(fd, buf, count) blkfront_posix_rwop(fd, (uint8_t*)buf, count, 1)
+#define blkfront_posix_read(fd, buf, count) blkfront_posix_rwop(fd, (uint8_t*)buf, count, 0)
+int blkfront_posix_fstat(int fd, struct stat* buf);
 #endif
 void blkfront_aio(struct blkfront_aiocb *aiocbp, int write);
 #define blkfront_aio_read(aiocbp) blkfront_aio(aiocbp, 0)

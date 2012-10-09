@@ -174,6 +174,7 @@ extern struct file {
 	} tap;
 	struct {
 	    struct blkfront_dev *dev;
+            off_t offset;
 	} blk;
 	struct {
 	    struct kbdfront_dev *dev;

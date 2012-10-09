@@ -289,6 +289,11 @@ int read(int fd, void *buf, size_t nbytes)
 	    return ret * sizeof(union xenfb_in_event);
         }
 #endif
+#ifdef CONFIG_BLKFRONT
+        case FTYPE_BLK: {
+	    return blkfront_posix_read(fd, buf, nbytes);
+        }
+#endif
 	default:
 	    break;
     }
@@ -321,6 +326,10 @@ int write(int fd, const void *buf, size_t nbytes)
 	    netfront_xmit(files[fd].tap.dev, (void*) buf, nbytes);
 	    return nbytes;
 #endif
+#ifdef CONFIG_BLKFRONT
+	case FTYPE_BLK:
+	    return blkfront_posix_write(fd, buf, nbytes);
+#endif
 	default:
 	    break;
     }
@@ -331,8 +340,37 @@ int write(int fd, const void *buf, size_t nbytes)
 
 off_t lseek(int fd, off_t offset, int whence)
 {
-    errno = ESPIPE;
-    return (off_t) -1;
+    switch(files[fd].type) {
+#ifdef CONFIG_BLKFRONT
+       case FTYPE_BLK:
+	  switch (whence) {
+	     case SEEK_SET:
+		files[fd].file.offset = offset;
+		break;
+	     case SEEK_CUR:
+		files[fd].file.offset += offset;
+		break;
+	     case SEEK_END:
+		{
+		   struct stat st;
+		   int ret;
+		   ret = fstat(fd, &st);
+		   if (ret)
+		      return -1;
+		   files[fd].file.offset = st.st_size + offset;
+		   break;
+		}
+	     default:
+		errno = EINVAL;
+		return -1;
+	  }
+	  return files[fd].file.offset;
+	  break;
+#endif
+       default: /* Not implemented on this FTYPE */
+	  errno = ESPIPE;
+	  return (off_t) -1;
+    }
 }
 
 int fsync(int fd) {
@@ -447,6 +485,10 @@ int fstat(int fd, struct stat *buf)
 	    buf->st_ctime = time(NULL);
 	    return 0;
 	}
+#ifdef CONFIG_BLKFRONT
+	case FTYPE_BLK:
+	   return blkfront_posix_fstat(fd, buf);
+#endif
 	default:
 	    break;
     }

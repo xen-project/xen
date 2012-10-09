@@ -392,6 +392,7 @@ void blkfront_aio(struct blkfront_aiocb *aiocbp, int write)
 static void blkfront_aio_cb(struct blkfront_aiocb *aiocbp, int ret)
 {
     aiocbp->data = (void*) 1;
+    aiocbp->aio_cb = NULL;
 }
 
 void blkfront_io(struct blkfront_aiocb *aiocbp, int write)
@@ -547,9 +548,177 @@ moretodo:
 #ifdef HAVE_LIBC
 int blkfront_open(struct blkfront_dev *dev)
 {
+    /* Silently prevent multiple opens */
+    if(dev->fd != -1) {
+       return dev->fd;
+    }
     dev->fd = alloc_fd(FTYPE_BLK);
     printk("blk_open(%s) -> %d\n", dev->nodename, dev->fd);
     files[dev->fd].blk.dev = dev;
+    files[dev->fd].blk.offset = 0;
     return dev->fd;
+}
+
+int blkfront_posix_rwop(int fd, uint8_t* buf, size_t count, int write)
+{
+   struct blkfront_dev* dev = files[fd].blk.dev;
+   off_t offset = files[fd].blk.offset;
+   struct blkfront_aiocb aiocb;
+   unsigned long long disksize = dev->info.sectors * dev->info.sector_size;
+   unsigned int blocksize = dev->info.sector_size;
+
+   int blknum;
+   int blkoff;
+   size_t bytes;
+   int rc = 0;
+   int alignedbuf = 0;
+   uint8_t* copybuf = NULL;
+
+   /* RW 0 bytes is just a NOP */
+   if(count == 0) {
+      return 0;
+   }
+   /* Check for NULL buffer */
+   if( buf == NULL ) {
+      errno = EFAULT;
+      return -1;
+   }
+
+   /* Write mode checks */
+   if(write) {
+      /*Make sure we have write permission */
+      if(dev->info.info & VDISK_READONLY 
+            || (dev->info.mode != O_RDWR  && dev->info.mode !=  O_WRONLY)) {
+         errno = EACCES;
+         return -1;
+      }
+      /*Make sure disk is big enough for this write */
+      if(offset + count > disksize) {
+         errno = ENOSPC;
+         return -1;
+      }
+   }
+   /* Read mode checks */
+   else
+   {
+      /* Reading past the disk? Just return 0 */
+      if(offset >= disksize) {
+         return 0;
+      }
+
+      /*If the requested read is bigger than the disk, just
+       * read as much as we can until the end */
+      if(offset + count > disksize) {
+         count = disksize - offset;
+      }
+   }
+   /* Determine which block to start at and at which offset inside of it */
+   blknum = offset / blocksize;
+   blkoff = offset % blocksize;
+
+   /* Optimization: We need to check if buf is aligned to the sector size.
+    * This is somewhat tricky code. We have to add the blocksize - block offset
+    * because the first block may be a partial block and then for every subsequent
+    * block rw the buffer will be offset.*/
+   if(!((uintptr_t) (buf +(blocksize -  blkoff)) & (dev->info.sector_size-1))) {
+      alignedbuf = 1;
+   }
+
+   /* Setup aiocb block object */
+   aiocb.aio_dev = dev;
+   aiocb.aio_offset = blknum * blocksize;
+   aiocb.aio_cb = NULL;
+   aiocb.data = NULL;
+
+   /* If our buffer is unaligned or its aligned but we will need to rw a partial block
+    * then a copy will have to be done */
+   if(!alignedbuf || blkoff != 0 || count % blocksize != 0) {
+      copybuf = _xmalloc(blocksize, dev->info.sector_size);
+   }
+
+   rc = count;
+   while(count > 0) {
+      /* determine how many bytes to read/write from/to the current block buffer */
+      if(!alignedbuf || blkoff != 0 || count < blocksize) {
+         /* This is the case for unaligned R/W or partial block */
+         bytes = count < blocksize - blkoff ? count : blocksize - blkoff;
+         aiocb.aio_nbytes = blocksize;
+      } else {
+         /* We can optimize further if buffer is page aligned */
+         int not_page_aligned = 0;
+         if(((uintptr_t)buf) & (PAGE_SIZE -1)) {
+            not_page_aligned = 1;
+         }
+
+         /* For an aligned R/W we can read up to the maximum transfer size */
+         bytes = count > (BLKIF_MAX_SEGMENTS_PER_REQUEST-not_page_aligned)*PAGE_SIZE 
+            ? (BLKIF_MAX_SEGMENTS_PER_REQUEST-not_page_aligned)*PAGE_SIZE
+            : count & ~(blocksize -1);
+         aiocb.aio_nbytes = bytes;
+      }
+
+      /* read operation */
+      if(!write) {
+         if (alignedbuf && bytes >= blocksize) {
+            /* If aligned and were reading a whole block, just read right into buf */
+            aiocb.aio_buf = buf;
+            blkfront_read(&aiocb);
+         } else {
+            /* If not then we have to do a copy */
+            aiocb.aio_buf = copybuf;
+            blkfront_read(&aiocb);
+            memcpy(buf, &copybuf[blkoff], bytes);
+         }
+      }
+      /* Write operation */
+      else {
+         if(alignedbuf && bytes >= blocksize) {
+            /* If aligned and were writing a whole block, just write directly from buf */
+            aiocb.aio_buf = buf;
+            blkfront_write(&aiocb);
+         } else {
+            /* If not then we have to do a copy. */
+            aiocb.aio_buf = copybuf;
+            /* If we're writing a partial block, we need to read the current contents first
+             * so we don't overwrite the extra bits with garbage */
+            if(blkoff != 0 || bytes < blocksize) {
+               blkfront_read(&aiocb);
+            }
+            memcpy(&copybuf[blkoff], buf, bytes);
+            blkfront_write(&aiocb);
+         }
+      }
+      /* Will start at beginning of all remaining blocks */
+      blkoff = 0;
+
+      /* Increment counters and continue */
+      count -= bytes;
+      buf += bytes;
+      if(bytes < blocksize) {
+         //At minimum we read one block
+         aiocb.aio_offset += blocksize;
+      } else {
+         //If we read more than a block, was a multiple of blocksize
+         aiocb.aio_offset += bytes;
+      }
+   }
+
+   free(copybuf);
+   files[fd].blk.offset += rc;
+   return rc;
+
+}
+
+int blkfront_posix_fstat(int fd, struct stat* buf)
+{
+   struct blkfront_dev* dev = files[fd].blk.dev;
+
+   buf->st_mode = dev->info.mode;
+   buf->st_uid = 0;
+   buf->st_gid = 0;
+   buf->st_size = dev->info.sectors * dev->info.sector_size;
+   buf->st_atime = buf->st_mtime = buf->st_ctime = time(NULL);
+
+   return 0;
 }
 #endif
