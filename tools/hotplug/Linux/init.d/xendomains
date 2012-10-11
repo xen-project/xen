@@ -438,7 +438,7 @@ stop()
 	    echo -n "(shut)"
 	    watchdog_xencmd shutdown &
 	    WDOG_PID=$!
-	    XMR=`$CMD shutdown $id $XENDOMAINS_SHUTDOWN 2>&1 1>/dev/null`
+	    XMR=`$CMD shutdown $XENDOMAINS_SHUTDOWN $id 2>&1 1>/dev/null`
 	    if test $? -ne 0; then
 		echo -e "\nAn error occurred while shutting down domain:\n$XMR\n"
 		rc_failed $?
