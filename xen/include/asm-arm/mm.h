@@ -138,7 +138,7 @@ extern unsigned long max_page;
 extern unsigned long total_pages;
 
 /* Boot-time pagetable setup */
-extern void setup_pagetables(unsigned long boot_phys_offset);
+extern void setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr);
 /* MMU setup for seccondary CPUS (which already have paging enabled) */
 extern void __cpuinit mmu_init_secondary_cpu(void);
 /* Set up the xenheap: up to 1GB of contiguous, always-mapped memory.

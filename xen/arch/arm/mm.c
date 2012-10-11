@@ -205,14 +205,11 @@ void unmap_domain_page(const void *va)
 
 /* Boot-time pagetable setup.
  * Changes here may need matching changes in head.S */
-void __init setup_pagetables(unsigned long boot_phys_offset)
+void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 {
-    paddr_t xen_paddr;
     unsigned long dest_va;
     lpae_t pte, *p;
     int i;
-
-    xen_paddr = device_tree_get_xen_paddr();
 
     /* Map the destination in the boot misc area. */
     dest_va = BOOT_MISC_VIRT_START;

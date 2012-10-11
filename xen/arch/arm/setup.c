@@ -38,6 +38,7 @@
 #include <asm/current.h>
 #include <asm/setup.h>
 #include <asm/vfp.h>
+#include <asm/early_printk.h>
 #include "gic.h"
 
 static __attribute_used__ void init_done(void)
@@ -65,6 +66,38 @@ static void __init processor_id(void)
     printk("ISA Features: %08x %08x %08x %08x %08x %08x\n",
            READ_CP32(ID_ISAR0), READ_CP32(ID_ISAR1), READ_CP32(ID_ISAR2),
            READ_CP32(ID_ISAR3), READ_CP32(ID_ISAR4), READ_CP32(ID_ISAR5));
+}
+
+/**
+ * get_xen_paddr - get physical address to relocate Xen to
+ *
+ * Xen is relocated to the top of RAM and aligned to a XEN_PADDR_ALIGN
+ * boundary.
+ */
+static paddr_t __init get_xen_paddr(void)
+{
+    struct dt_mem_info *mi = &early_info.mem;
+    paddr_t min_size;
+    paddr_t paddr = 0, t;
+    int i;
+
+    min_size = (_end - _start + (XEN_PADDR_ALIGN-1)) & ~(XEN_PADDR_ALIGN-1);
+
+    /* Find the highest bank with enough space. */
+    for ( i = 0; i < mi->nr_banks; i++ )
+    {
+        if ( mi->bank[i].size >= min_size )
+        {
+            t = mi->bank[i].start + mi->bank[i].size - min_size;
+            if ( t > paddr )
+                paddr = t;
+        }
+    }
+
+    if ( !paddr )
+        early_panic("Not enough memory to relocate Xen\n");
+
+    return paddr;
 }
 
 static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
@@ -156,7 +189,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     cmdline_parse(device_tree_bootargs(fdt));
 
-    setup_pagetables(boot_phys_offset);
+    setup_pagetables(boot_phys_offset, get_xen_paddr());
 
 #ifdef EARLY_UART_ADDRESS
     /* Map the UART */

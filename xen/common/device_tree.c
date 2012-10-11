@@ -273,38 +273,6 @@ size_t __init device_tree_early_init(const void *fdt)
     return fdt_totalsize(fdt);
 }
 
-/**
- * device_tree_get_xen_paddr - get physical address to relocate Xen to
- *
- * Xen is relocated to the top of RAM and aligned to a XEN_PADDR_ALIGN
- * boundary.
- */
-paddr_t __init device_tree_get_xen_paddr(void)
-{
-    struct dt_mem_info *mi = &early_info.mem;
-    paddr_t min_size;
-    paddr_t paddr = 0, t;
-    int i;
-
-    min_size = (_end - _start + (XEN_PADDR_ALIGN-1)) & ~(XEN_PADDR_ALIGN-1);
-
-    /* Find the highest bank with enough space. */
-    for ( i = 0; i < mi->nr_banks; i++ )
-    {
-        if ( mi->bank[i].size >= min_size )
-        {
-            t = mi->bank[i].start + mi->bank[i].size - min_size;
-            if ( t > paddr )
-                paddr = t;
-        }
-    }
-
-    if ( !paddr )
-        early_panic("Not enough memory to relocate Xen\n");
-
-    return paddr;
-}
-
 /*
  * Local variables:
  * mode: C

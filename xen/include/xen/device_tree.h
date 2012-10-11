@@ -39,7 +39,6 @@ extern struct dt_early_info early_info;
 extern void *device_tree_flattened;
 
 size_t device_tree_early_init(const void *fdt);
-paddr_t device_tree_get_xen_paddr(void);
 
 void device_tree_get_reg(const u32 **cell, u32 address_cells, u32 size_cells,
                          u64 *start, u64 *size);
