@@ -46,11 +46,12 @@ uint64_t boot_httbr;
 static paddr_t phys_offset;
 
 /* Limits of the Xen heap */
-unsigned long xenheap_mfn_start, xenheap_mfn_end;
-unsigned long xenheap_virt_end;
+unsigned long xenheap_mfn_start __read_mostly;
+unsigned long xenheap_mfn_end __read_mostly;
+unsigned long xenheap_virt_end __read_mostly;
 
-unsigned long frametable_base_mfn;
-unsigned long frametable_virt_end;
+unsigned long frametable_base_mfn __read_mostly;
+unsigned long frametable_virt_end __read_mostly;
 
 unsigned long max_page;
 
