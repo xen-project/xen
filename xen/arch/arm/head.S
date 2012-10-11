@@ -127,8 +127,26 @@ boot_cpu:
 	add   pc, r0, r10            /* Call PA of function */
 
 hyp:
-	PRINT("- Setting up control registers -\r\n")
 
+	/* Zero BSS On the boot CPU to avoid nasty surprises */
+	teq   r12, #0
+	bne   skip_bss
+
+	PRINT("- Zero BSS -\r\n")
+	ldr   r0, =__bss_start       /* Load start & end of bss */
+	ldr   r1, =__bss_end
+	add   r0, r0, r10            /* Apply physical offset */
+	add   r1, r1, r10
+	
+	mov   r2, #0
+1:	str   r2, [r0], #4
+	cmp   r0, r1
+	blo   1b
+
+skip_bss:	
+
+	PRINT("- Setting up control registers -\r\n")
+	
 	/* Set up memory attribute type tables */
 	ldr   r0, =MAIR0VAL
 	ldr   r1, =MAIR1VAL
