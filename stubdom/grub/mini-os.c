@@ -241,7 +241,7 @@ load_module (char *module, char *arg)
 
     if ((void*) (multiboot_next_module_header+1) - module_image > PAGE_SIZE) {
         /* Too many modules */
-        ERR_WONT_FIT;
+        errnum = ERR_WONT_FIT;
         return 0;
     }
 
