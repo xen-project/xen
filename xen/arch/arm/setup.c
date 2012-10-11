@@ -114,6 +114,8 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
      * TODO: only using the first RAM bank for now.  The heaps and the
      * frame table assume RAM is physically contiguous.
      */
+    if ( early_info.mem.nr_banks > 1 )
+        early_printk("WARNING: Only using first bank of memory\n");
     ram_start = early_info.mem.bank[0].start;
     ram_size  = early_info.mem.bank[0].size;
     ram_end = ram_start + ram_size;
