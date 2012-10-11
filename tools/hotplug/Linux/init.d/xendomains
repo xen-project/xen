@@ -434,7 +434,7 @@ stop()
 	    fi
 	fi
 	if test -n "$XENDOMAINS_SHUTDOWN"; then
-	    # XENDOMAINS_SHUTDOWN should be "--halt --wait"
+	    # XENDOMAINS_SHUTDOWN should be "--wait"
 	    echo -n "(shut)"
 	    watchdog_xencmd shutdown &
 	    WDOG_PID=$!
@@ -453,7 +453,7 @@ stop()
     # This is because it's easier to do ;-) but arguably if this script is run
     # on system shutdown then it's also the right thing to do.
     if ! all_zombies && test -n "$XENDOMAINS_SHUTDOWN_ALL"; then
-	# XENDOMAINS_SHUTDOWN_ALL should be "--all --halt --wait"
+	# XENDOMAINS_SHUTDOWN_ALL should be "--all --wait"
 	echo -n " SHUTDOWN_ALL "
 	watchdog_xencmd shutdown 1 false &
 	WDOG_PID=$!

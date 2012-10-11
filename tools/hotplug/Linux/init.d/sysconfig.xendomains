@@ -56,29 +56,29 @@ XENDOMAINS_MIGRATE=""
 XENDOMAINS_SAVE=/var/lib/xen/save
 
 ## Type: string
-## Default: "--halt --wait"
+## Default: "--wait"
 #
 # If neither MIGRATE nor SAVE were enabled or if they failed, you can
 # try to shut down a domain by sending it a shutdown request. To do this,
-# set this to "--halt --wait". Omit the "--wait" flag to avoid waiting
+# set this to "--wait". Omit the "--wait" flag to avoid waiting
 # for the domain to be really down. Leave empty to skip domain shutdown.
 #
-XENDOMAINS_SHUTDOWN="--halt --wait"
+XENDOMAINS_SHUTDOWN="--wait"
 
 ## Type: string
-## Default: "--all --halt --wait"
+## Default: "--all --wait"
 #
 # After we have gone over all virtual machines (resp. all automatically
 # started ones, see XENDOMAINS_AUTO_ONLY below) in a loop and sent SysRq,
 # migrated, saved and/or shutdown according to the settings above, we
 # might want to shutdown the virtual machines that are still running
 # for some reason or another. To do this, set this variable to
-# "--all --halt --wait", it will be passed to xm shutdown.
+# "--all --wait", it will be passed to xm shutdown.
 # Leave it empty not to do anything special here.
 # (Note: This will hit all virtual machines, even if XENDOMAINS_AUTO_ONLY
 # is set.)
 # 
-XENDOMAINS_SHUTDOWN_ALL="--all --halt --wait"
+XENDOMAINS_SHUTDOWN_ALL="--all --wait"
 
 ## Type: boolean
 ## Default: true

@@ -94,7 +94,7 @@ xendomains_stop()
 	#
 	echo "Stopping xen domains."
 	for domain in $(xendomains_list); do
-		${ctl_command} shutdown --halt $domain
+		${ctl_command} shutdown $domain
 	done
 	while [ $timeout -gt 0 ]; do
 		livedomains=$(xendomains_list)
