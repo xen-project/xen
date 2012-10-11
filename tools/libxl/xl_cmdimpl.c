@@ -3709,8 +3709,12 @@ int main_shutdown(int argc, char **argv)
     int opt;
     int wait_for_it = 0;
     int fallback_trigger = 0;
+    static struct option long_options[] = {
+        {"wait", 0, 0, 'w'},
+        {0, 0, 0, 0}
+    };
 
-    while ((opt = def_getopt(argc, argv, "wF", "shutdown", 1)) != -1) {
+    while ((opt = getopt_long(argc, argv, "wF", long_options, NULL)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
