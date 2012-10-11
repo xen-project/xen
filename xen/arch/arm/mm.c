@@ -352,7 +352,7 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
 
     /* Round up to 32M boundary */
     frametable_size = (frametable_size + 0x1ffffff) & ~0x1ffffff;
-    base_mfn = alloc_boot_pages(frametable_size >> PAGE_SHIFT, 5);
+    base_mfn = alloc_boot_pages(frametable_size >> PAGE_SHIFT, 32<<(20-12));
     create_mappings(FRAMETABLE_VIRT_START, base_mfn, frametable_size >> PAGE_SHIFT);
 
     memset(&frame_table[0], 0, nr_pages * sizeof(struct page_info));
