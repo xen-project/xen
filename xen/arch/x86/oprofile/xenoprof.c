@@ -74,16 +74,26 @@ int compat_oprof_arch_counter(XEN_GUEST_HANDLE(void) arg)
     return 0;
 }
 
-int xenoprofile_get_mode(const struct vcpu *v,
-                         const struct cpu_user_regs *regs)
+int xenoprofile_get_mode(struct vcpu *curr, const struct cpu_user_regs *regs)
 {
     if ( !guest_mode(regs) )
         return 2;
 
-    if ( is_hvm_vcpu(v) )
-        return ((regs->cs & 3) != 3);
+    if ( !is_hvm_vcpu(curr) )
+        return guest_kernel_mode(curr, regs);
 
-    return guest_kernel_mode(v, regs);  
+    switch ( hvm_guest_x86_mode(curr) )
+    {
+        struct segment_register ss;
+
+    case 0: /* real mode */
+        return 1;
+    case 1: /* vm86 mode */
+        return 0;
+    default:
+        hvm_get_segment_register(curr, x86_seg_ss, &ss);
+        return (ss.sel & 3) != 3;
+    }
 }
 
 /*
