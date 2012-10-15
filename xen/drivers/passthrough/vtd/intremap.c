@@ -217,13 +217,6 @@ static int remap_entry_to_ioapic_rte(
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
-    if ( ir_ctrl == NULL )
-    {
-        dprintk(XENLOG_ERR VTDPREFIX,
-                "remap_entry_to_ioapic_rte: ir_ctl is not ready\n");
-        return -EFAULT;
-    }
-
     if ( index < 0 || index > IREMAP_ENTRY_NR - 1 )
     {
         dprintk(XENLOG_ERR VTDPREFIX,
@@ -358,8 +351,7 @@ unsigned int io_apic_read_remap_rte(
     struct iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
-    if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 ||
-        (ir_ctrl->iremap_num == 0) ||
+    if ( !ir_ctrl || !ir_ctrl->iremap_maddr || !ir_ctrl->iremap_num ||
         ( (index = apic_pin_2_ir_idx[apic][ioapic_pin]) < 0 ) )
         return __io_apic_read(apic, reg);
 
@@ -385,7 +377,7 @@ void io_apic_write_remap_rte(
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
     int saved_mask;
 
-    if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 )
+    if ( !ir_ctrl || !ir_ctrl->iremap_maddr )
     {
         __io_apic_write(apic, reg, value);
         return;
@@ -474,13 +466,6 @@ static int remap_entry_to_msi_msg(
     int index;
     unsigned long flags;
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
-
-    if ( ir_ctrl == NULL )
-    {
-        dprintk(XENLOG_ERR VTDPREFIX,
-                "remap_entry_to_msi_msg: ir_ctl == NULL");
-        return -EFAULT;
-    }
 
     remap_rte = (struct msi_msg_remap_entry *) msg;
     index = (remap_rte->address_lo.index_15 << 15) |
@@ -644,7 +629,7 @@ void msi_msg_read_remap_rte(
     iommu = drhd->iommu;
 
     ir_ctrl = iommu_ir_ctrl(iommu);
-    if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 )
+    if ( !ir_ctrl || !ir_ctrl->iremap_maddr )
         return;
 
     remap_entry_to_msi_msg(iommu, msg);
@@ -663,7 +648,7 @@ void msi_msg_write_remap_rte(
     iommu = drhd->iommu;
 
     ir_ctrl = iommu_ir_ctrl(iommu);
-    if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 )
+    if ( !ir_ctrl || !ir_ctrl->iremap_maddr )
         return;
 
     msi_msg_to_remap_entry(iommu, pdev, msi_desc, msg);

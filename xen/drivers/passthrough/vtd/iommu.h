@@ -20,7 +20,7 @@
 #ifndef _INTEL_IOMMU_H_
 #define _INTEL_IOMMU_H_
 
-#include <xen/types.h>
+#include <xen/iommu.h>
 
 /*
  * Intel IOMMU register specification per version 1.0 public spec.
@@ -509,6 +509,21 @@ struct intel_iommu {
     struct iommu_flush flush;
     struct acpi_drhd_unit *drhd;
 };
+
+static inline struct qi_ctrl *iommu_qi_ctrl(struct iommu *iommu)
+{
+    return iommu ? &iommu->intel->qi_ctrl : NULL;
+}
+
+static inline struct ir_ctrl *iommu_ir_ctrl(struct iommu *iommu)
+{
+    return iommu ? &iommu->intel->ir_ctrl : NULL;
+}
+
+static inline struct iommu_flush *iommu_get_flush(struct iommu *iommu)
+{
+    return iommu ? &iommu->intel->flush : NULL;
+}
 
 #define INTEL_IOMMU_DEBUG(fmt, args...) \
     do  \

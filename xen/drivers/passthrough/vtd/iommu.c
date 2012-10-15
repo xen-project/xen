@@ -153,21 +153,6 @@ static void __init free_intel_iommu(struct intel_iommu *intel)
     xfree(intel);
 }
 
-struct qi_ctrl *iommu_qi_ctrl(struct iommu *iommu)
-{
-    return iommu ? &iommu->intel->qi_ctrl : NULL;
-}
-
-struct ir_ctrl *iommu_ir_ctrl(struct iommu *iommu)
-{
-    return iommu ? &iommu->intel->ir_ctrl : NULL;
-}
-
-struct iommu_flush *iommu_get_flush(struct iommu *iommu)
-{
-    return iommu ? &iommu->intel->flush : NULL;
-}
-
 static int iommus_incoherent;
 static void __iommu_flush_cache(void *addr, unsigned int size)
 {

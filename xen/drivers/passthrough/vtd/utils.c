@@ -267,8 +267,7 @@ static void dump_iommu_info(unsigned char key)
         {
             iommu = ioapic_to_iommu(mp_ioapics[apic].mpc_apicid);
             ir_ctrl = iommu_ir_ctrl(iommu);
-            if ( !iommu || !ir_ctrl || ir_ctrl->iremap_maddr == 0 ||
-                ir_ctrl->iremap_num == 0 )
+            if ( !ir_ctrl || !ir_ctrl->iremap_maddr || !ir_ctrl->iremap_num )
                 continue;
 
             printk( "\nRedirection table of IOAPIC %x:\n", apic);
