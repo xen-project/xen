@@ -86,12 +86,13 @@ static void __init add_ivrs_mapping_entry(
 }
 
 static struct amd_iommu * __init find_iommu_from_bdf_cap(
-    u16 bdf, u8 cap_offset)
+    u16 seg, u16 bdf, u16 cap_offset)
 {
     struct amd_iommu *iommu;
 
     for_each_amd_iommu ( iommu )
-        if ( (iommu->bdf == bdf) && (iommu->cap_offset == cap_offset) )
+        if ( (iommu->seg == seg) && (iommu->bdf == bdf) &&
+             (iommu->cap_offset == cap_offset) )
             return iommu;
 
     return NULL;
@@ -319,10 +320,11 @@ static int __init parse_ivmd_device_iommu(
     const struct acpi_ivrs_memory *ivmd_block,
     unsigned long base, unsigned long limit, u8 iw, u8 ir)
 {
+    int seg = 0; /* XXX */
     struct amd_iommu *iommu;
 
     /* find target IOMMU */
-    iommu = find_iommu_from_bdf_cap(ivmd_block->header.device_id,
+    iommu = find_iommu_from_bdf_cap(seg, ivmd_block->header.device_id,
                                     ivmd_block->aux_data);
     if ( !iommu )
     {
@@ -669,7 +671,8 @@ static int __init parse_ivhd_block(const struct acpi_ivrs_hardware *ivhd_block)
         return -ENODEV;
     }
 
-    iommu = find_iommu_from_bdf_cap(ivhd_block->header.device_id,
+    iommu = find_iommu_from_bdf_cap(ivhd_block->pci_segment_group,
+                                    ivhd_block->header.device_id,
                                     ivhd_block->capability_offset);
     if ( !iommu )
     {
