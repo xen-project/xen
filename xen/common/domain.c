@@ -420,6 +420,13 @@ struct domain *rcu_lock_domain_by_id(domid_t dom)
     return d;
 }
 
+struct domain *rcu_lock_domain_by_any_id(domid_t dom)
+{
+    if ( dom == DOMID_SELF )
+        return rcu_lock_current_domain();
+    return rcu_lock_domain_by_id(dom);
+}
+
 int rcu_lock_target_domain_by_id(domid_t dom, struct domain **d)
 {
     if ( dom == DOMID_SELF )
@@ -446,6 +453,20 @@ int rcu_lock_remote_target_domain_by_id(domid_t dom, struct domain **d)
         return -ESRCH;
 
     if ( (*d == current->domain) || !IS_PRIV_FOR(current->domain, *d) )
+    {
+        rcu_unlock_domain(*d);
+        return -EPERM;
+    }
+
+    return 0;
+}
+
+int rcu_lock_remote_domain_by_id(domid_t dom, struct domain **d)
+{
+    if ( (*d = rcu_lock_domain_by_id(dom)) == NULL )
+        return -ESRCH;
+
+    if ( *d == current->domain )
     {
         rcu_unlock_domain(*d);
         return -EPERM;
