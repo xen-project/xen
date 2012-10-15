@@ -48,22 +48,6 @@ extern struct rangeset *mmio_ro_ranges;
 #define PAGE_MASK_4K        (((u64)-1) << PAGE_SHIFT_4K)
 #define PAGE_ALIGN_4K(addr) (((addr) + PAGE_SIZE_4K - 1) & PAGE_MASK_4K)
 
-struct iommu {
-    struct list_head list;
-    void __iomem *reg; /* Pointer to hardware regs, virtual addr */
-    u32	index;         /* Sequence number of iommu */
-    u32 nr_pt_levels;
-    u64	cap;
-    u64	ecap;
-    spinlock_t lock; /* protect context, domain ids */
-    spinlock_t register_lock; /* protect iommu register handling */
-    u64 root_maddr; /* root entry machine address */
-    int irq;
-    struct intel_iommu *intel;
-    unsigned long *domid_bitmap;  /* domain id bitmap */
-    u16 *domid_map;               /* domain id mapping array */
-};
-
 int iommu_setup(void);
 int iommu_supports_eim(void);
 int iommu_enable_x2apic_IR(void);
@@ -94,25 +78,18 @@ void pt_pci_init(void);
 struct pirq;
 int hvm_do_IRQ_dpci(struct domain *, struct pirq *);
 int dpci_ioport_intercept(ioreq_t *p);
-int pt_irq_create_bind_vtd(struct domain *d,
-                           xen_domctl_bind_pt_irq_t *pt_irq_bind);
-int pt_irq_destroy_bind_vtd(struct domain *d,
-                            xen_domctl_bind_pt_irq_t *pt_irq_bind);
-unsigned int io_apic_read_remap_rte(unsigned int apic, unsigned int reg);
-void io_apic_write_remap_rte(unsigned int apic,
-                             unsigned int reg, unsigned int value);
+int pt_irq_create_bind(struct domain *, xen_domctl_bind_pt_irq_t *);
+int pt_irq_destroy_bind(struct domain *, xen_domctl_bind_pt_irq_t *);
 
-struct msi_desc;
-struct msi_msg;
-void msi_msg_read_remap_rte(struct msi_desc *msi_desc, struct msi_msg *msg);
-void msi_msg_write_remap_rte(struct msi_desc *msi_desc, struct msi_msg *msg);
 void hvm_dpci_isairq_eoi(struct domain *d, unsigned int isairq);
 struct hvm_irq_dpci *domain_get_irq_dpci(const struct domain *);
 void free_hvm_irq_dpci(struct hvm_irq_dpci *dpci);
 bool_t pt_irq_need_timer(uint32_t flags);
 
 #define PT_IRQ_TIME_OUT MILLISECS(8)
-#define VTDPREFIX "[VT-D]"
+
+struct msi_desc;
+struct msi_msg;
 
 struct iommu_ops {
     int (*init)(struct domain *d);

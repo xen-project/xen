@@ -510,6 +510,22 @@ struct intel_iommu {
     struct acpi_drhd_unit *drhd;
 };
 
+struct iommu {
+    struct list_head list;
+    void __iomem *reg; /* Pointer to hardware regs, virtual addr */
+    u32	index;         /* Sequence number of iommu */
+    u32 nr_pt_levels;
+    u64	cap;
+    u64	ecap;
+    spinlock_t lock; /* protect context, domain ids */
+    spinlock_t register_lock; /* protect iommu register handling */
+    u64 root_maddr; /* root entry machine address */
+    int irq;
+    struct intel_iommu *intel;
+    unsigned long *domid_bitmap;  /* domain id bitmap */
+    u16 *domid_map;               /* domain id mapping array */
+};
+
 static inline struct qi_ctrl *iommu_qi_ctrl(struct iommu *iommu)
 {
     return iommu ? &iommu->intel->qi_ctrl : NULL;

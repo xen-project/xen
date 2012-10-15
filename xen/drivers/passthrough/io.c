@@ -95,7 +95,7 @@ void free_hvm_irq_dpci(struct hvm_irq_dpci *dpci)
     xfree(dpci);
 }
 
-int pt_irq_create_bind_vtd(
+int pt_irq_create_bind(
     struct domain *d, xen_domctl_bind_pt_irq_t *pt_irq_bind)
 {
     struct hvm_irq_dpci *hvm_irq_dpci = NULL;
@@ -277,14 +277,14 @@ int pt_irq_create_bind_vtd(
         spin_unlock(&d->event_lock);
 
         if ( iommu_verbose )
-            dprintk(VTDPREFIX,
+            dprintk(XENLOG_G_INFO,
                     "d%d: bind: m_gsi=%u g_gsi=%u device=%u intx=%u\n",
                     d->domain_id, pirq, guest_gsi, device, intx);
     }
     return 0;
 }
 
-int pt_irq_destroy_bind_vtd(
+int pt_irq_destroy_bind(
     struct domain *d, xen_domctl_bind_pt_irq_t *pt_irq_bind)
 {
     struct hvm_irq_dpci *hvm_irq_dpci = NULL;
@@ -302,7 +302,7 @@ int pt_irq_destroy_bind_vtd(
     link = hvm_pci_intx_link(device, intx);
 
     if ( iommu_verbose )
-        dprintk(VTDPREFIX,
+        dprintk(XENLOG_G_INFO,
                 "d%d: unbind: m_gsi=%u g_gsi=%u device=%u intx=%u\n",
                 d->domain_id, machine_gsi, guest_gsi, device, intx);
 
@@ -360,7 +360,7 @@ int pt_irq_destroy_bind_vtd(
     spin_unlock(&d->event_lock);
 
     if ( iommu_verbose )
-        dprintk(VTDPREFIX,
+        dprintk(XENLOG_G_INFO,
                 "d%d unmap: m_irq=%u device=%u intx=%u\n",
                 d->domain_id, machine_gsi, device, intx);
 

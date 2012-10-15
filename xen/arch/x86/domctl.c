@@ -776,7 +776,7 @@ long arch_do_domctl(
         if ( iommu_enabled )
         {
             spin_lock(&pcidevs_lock);
-            ret = pt_irq_create_bind_vtd(d, bind);
+            ret = pt_irq_create_bind(d, bind);
             spin_unlock(&pcidevs_lock);
         }
         if ( ret < 0 )
@@ -806,7 +806,7 @@ long arch_do_domctl(
         if ( iommu_enabled )
         {
             spin_lock(&pcidevs_lock);
-            ret = pt_irq_destroy_bind_vtd(d, bind);
+            ret = pt_irq_destroy_bind(d, bind);
             spin_unlock(&pcidevs_lock);
         }
         if ( ret < 0 )

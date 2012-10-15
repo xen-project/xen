@@ -24,6 +24,8 @@
 #include "dmar.h"
 #include <xen/keyhandler.h>
 
+#define VTDPREFIX "[VT-D]"
+
 extern bool_t rwbf_quirk;
 
 void print_iommu_regs(struct acpi_drhd_unit *drhd);
@@ -78,6 +80,15 @@ int domain_context_mapping_one(struct domain *domain, struct iommu *iommu,
                                u8 bus, u8 devfn);
 int domain_context_unmap_one(struct domain *domain, struct iommu *iommu,
                              u8 bus, u8 devfn);
+
+unsigned int io_apic_read_remap_rte(unsigned int apic, unsigned int reg);
+void io_apic_write_remap_rte(unsigned int apic,
+                             unsigned int reg, unsigned int value);
+
+struct msi_desc;
+struct msi_msg;
+void msi_msg_read_remap_rte(struct msi_desc *, struct msi_msg *);
+void msi_msg_write_remap_rte(struct msi_desc *, struct msi_msg *);
 
 int is_igd_vt_enabled_quirk(void);
 void platform_quirks_init(void);
