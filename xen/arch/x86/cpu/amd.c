@@ -11,6 +11,7 @@
 #include <asm/hvm/support.h>
 #include <asm/setup.h> /* amd_init_cpu */
 #include <asm/acpi.h>
+#include <asm/apic.h>
 
 #include "cpu.h"
 
@@ -484,6 +485,17 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	 */
 	if (c->x86 > 0x11)
 		set_bit(X86_FEATURE_ARAT, c->x86_capability);
+
+	/*
+	 * Prior to Family 0x14, perf counters are not reset during warm reboot.
+	 * We have to reset them manually.
+	 */
+	if (nmi_watchdog != NMI_LOCAL_APIC && c->x86 < 0x14) {
+		wrmsrl(MSR_K7_PERFCTR0, 0);
+		wrmsrl(MSR_K7_PERFCTR1, 0);
+		wrmsrl(MSR_K7_PERFCTR2, 0);
+		wrmsrl(MSR_K7_PERFCTR3, 0);
+	}
 
 	if (cpuid_edx(0x80000007) & (1 << 10)) {
 		rdmsr(MSR_K7_HWCR, l, h);
