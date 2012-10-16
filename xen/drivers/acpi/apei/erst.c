@@ -715,12 +715,23 @@ int erst_clear(u64 record_id)
 
 static int __init erst_check_table(struct acpi_table_erst *erst_tab)
 {
-	if (erst_tab->header_length != sizeof(struct acpi_table_erst))
+	if (erst_tab->header.length < sizeof(*erst_tab))
 		return -EINVAL;
-	if (erst_tab->header.length < sizeof(struct acpi_table_erst))
+
+	switch (erst_tab->header_length) {
+	case sizeof(*erst_tab) - sizeof(erst_tab->header):
+	/*
+	 * While invalid per specification, there are (early?) systems
+	 * indicating the full header size here, so accept that value too.
+	 */
+	case sizeof(*erst_tab):
+		break;
+	default:
 		return -EINVAL;
+	}
+
 	if (erst_tab->entries !=
-	    (erst_tab->header.length - sizeof(struct acpi_table_erst)) /
+	    (erst_tab->header.length - sizeof(*erst_tab)) /
 	    sizeof(struct acpi_erst_entry))
 		return -EINVAL;
 
