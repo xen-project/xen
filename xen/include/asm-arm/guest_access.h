@@ -27,16 +27,40 @@ unsigned long raw_clear_guest(void *to, unsigned len);
 #define guest_handle_add_offset(hnd, nr) ((hnd).p += (nr))
 #define guest_handle_subtract_offset(hnd, nr) ((hnd).p -= (nr))
 
-/* Cast a guest handle to the specified type of handle. */
+/* Cast a guest handle (either XEN_GUEST_HANDLE or XEN_GUEST_HANDLE_PARAM)
+ * to the specified type of XEN_GUEST_HANDLE_PARAM. */
 #define guest_handle_cast(hnd, type) ({         \
     type *_x = (hnd).p;                         \
-    (XEN_GUEST_HANDLE(type)) { _x };            \
+    (XEN_GUEST_HANDLE_PARAM(type)) { _x };            \
+})
+
+/* Cast a XEN_GUEST_HANDLE to XEN_GUEST_HANDLE_PARAM */
+#define guest_handle_to_param(hnd, type) ({                  \
+    typeof((hnd).p) _x = (hnd).p;                            \
+    XEN_GUEST_HANDLE_PARAM(type) _y = { _x };                \
+    /* type checking: make sure that the pointers inside     \
+     * XEN_GUEST_HANDLE and XEN_GUEST_HANDLE_PARAM are of    \
+     * the same type, then return hnd */                     \
+    (void)(&_x == &_y.p);                                    \
+    _y;                                                      \
+})
+
+
+/* Cast a XEN_GUEST_HANDLE_PARAM to XEN_GUEST_HANDLE */
+#define guest_handle_from_param(hnd, type) ({               \
+    typeof((hnd).p) _x = (hnd).p;                           \
+    XEN_GUEST_HANDLE(type) _y = { _x };                     \
+    /* type checking: make sure that the pointers inside    \
+     * XEN_GUEST_HANDLE and XEN_GUEST_HANDLE_PARAM are of   \
+     * the same type, then return hnd */                    \
+    (void)(&_x == &_y.p);                                   \
+    _y;                                                     \
 })
 
 #define guest_handle_from_ptr(ptr, type)        \
-    ((XEN_GUEST_HANDLE(type)) { (type *)ptr })
+    ((XEN_GUEST_HANDLE_PARAM(type)) { (type *)ptr })
 #define const_guest_handle_from_ptr(ptr, type)  \
-    ((XEN_GUEST_HANDLE(const_##type)) { (const type *)ptr })
+    ((XEN_GUEST_HANDLE_PARAM(const_##type)) { (const type *)ptr })
 
 /*
  * Copy an array of objects to guest context via a guest handle,

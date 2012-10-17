@@ -66,9 +66,29 @@ static inline unsigned long xencomm_inline_addr(const void *handle)
 /* Cast a guest handle to the specified type of handle. */
 #define guest_handle_cast(hnd, type) ({         \
     type *_x = (hnd).p;                         \
-    XEN_GUEST_HANDLE(type) _y;                  \
+    XEN_GUEST_HANDLE_PARAM(type) _y;            \
     set_xen_guest_handle(_y, _x);               \
     _y;                                         \
+})
+
+/* Cast a XEN_GUEST_HANDLE to XEN_GUEST_HANDLE_PARAM */
+#define guest_handle_to_param(hnd, type) ({                  \
+    /* type checking: make sure that the pointers inside     \
+     * XEN_GUEST_HANDLE and XEN_GUEST_HANDLE_PARAM are of    \
+     * the same type, then return hnd */                     \
+    (void)((typeof(&(hnd).p)) 0 ==                           \
+        (typeof(&((XEN_GUEST_HANDLE_PARAM(type)) {}).p)) 0); \
+    (hnd);                                                   \
+})
+
+/* Cast a XEN_GUEST_HANDLE_PARAM to XEN_GUEST_HANDLE */
+#define guest_handle_from_param(hnd, type) ({                \
+    /* type checking: make sure that the pointers inside     \
+     * XEN_GUEST_HANDLE and XEN_GUEST_HANDLE_PARAM are of    \
+     * the same type, then return hnd */                     \
+    (void)((typeof(&(hnd).p)) 0 ==                           \
+        (typeof(&((XEN_GUEST_HANDLE_PARAM(type)) {}).p)) 0); \
+    (hnd);                                                   \
 })
 
 /* Since we run in real mode, we can safely access all addresses. That also
