@@ -436,6 +436,16 @@ static struct hpet_event_channel *hpet_get_channel(unsigned int cpu)
     return ch;
 }
 
+static void set_channel_irq_affinity(const struct hpet_event_channel *ch)
+{
+    struct irq_desc *desc = irq_to_desc(ch->irq);
+
+    ASSERT(!local_irq_is_enabled());
+    spin_lock(&desc->lock);
+    hpet_msi_set_affinity(desc, cpumask_of(ch->cpu));
+    spin_unlock(&desc->lock);
+}
+
 static void hpet_attach_channel(unsigned int cpu,
                                 struct hpet_event_channel *ch)
 {
@@ -450,7 +460,7 @@ static void hpet_attach_channel(unsigned int cpu,
     if ( ch->cpu != cpu )
         return;
 
-    hpet_msi_set_affinity(irq_to_desc(ch->irq), cpumask_of(ch->cpu));
+    set_channel_irq_affinity(ch);
 }
 
 static void hpet_detach_channel(unsigned int cpu,
@@ -472,7 +482,7 @@ static void hpet_detach_channel(unsigned int cpu,
     }
 
     ch->cpu = cpumask_first(ch->cpumask);
-    hpet_msi_set_affinity(irq_to_desc(ch->irq), cpumask_of(ch->cpu));
+    set_channel_irq_affinity(ch);
 }
 
 #include <asm/mc146818rtc.h>
