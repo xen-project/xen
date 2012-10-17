@@ -1322,7 +1322,7 @@ gnttab_setup_table(
     struct domain *d;
     struct grant_table *gt;
     int            i;
-    unsigned long  gmfn;
+    xen_pfn_t  gmfn;
 
     if ( count != 1 )
         return -EINVAL;

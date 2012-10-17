@@ -4100,7 +4100,8 @@ long set_gdt(struct vcpu *v,
 }
 
 
-long do_set_gdt(XEN_GUEST_HANDLE_PARAM(ulong) frame_list, unsigned int entries)
+long do_set_gdt(XEN_GUEST_HANDLE_PARAM(xen_ulong_t) frame_list,
+                unsigned int entries)
 {
     int nr_pages = (entries + 511) / 512;
     unsigned long frames[16];

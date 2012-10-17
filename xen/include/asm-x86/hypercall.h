@@ -33,7 +33,7 @@ do_mmu_update(
 
 extern long
 do_set_gdt(
-    XEN_GUEST_HANDLE_PARAM(ulong) frame_list,
+    XEN_GUEST_HANDLE_PARAM(xen_ulong_t) frame_list,
     unsigned int entries);
 
 extern long
