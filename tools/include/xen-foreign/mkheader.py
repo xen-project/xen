@@ -16,6 +16,13 @@ inttypes = {};
 header = {};
 footer = {};
 
+#arm
+inttypes["arm"] = {
+    "unsigned long" : "uint32_t",
+    "long"          : "uint32_t",
+    "xen_pfn_t"     : "uint64_t",
+};
+
 # x86_32
 inttypes["x86_32"] = {
     "unsigned long" : "uint32_t",

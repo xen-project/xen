@@ -13,9 +13,14 @@ structs = [ "start_info",
             "arch_shared_info",
             "shared_info" ];
 
-defines = [ "__i386__",
+defines = [ "__arm__",
+            "__i386__",
             "__x86_64__",
 
+            # arm
+            # None
+
+            # x86_{32,64}
             "FLAT_RING1_CS",
             "FLAT_RING1_DS",
             "FLAT_RING1_SS",
