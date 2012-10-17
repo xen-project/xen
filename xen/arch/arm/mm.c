@@ -25,6 +25,8 @@
 #include <xen/mm.h>
 #include <xen/preempt.h>
 #include <xen/errno.h>
+#include <xen/softirq.h>
+#include <xen/event.h>
 #include <xen/guest_access.h>
 #include <xen/domain_page.h>
 #include <asm/page.h>
@@ -459,37 +461,96 @@ void share_xen_page_with_guest(struct page_info *page,
     spin_unlock(&d->page_alloc_lock);
 }
 
-static int xenmem_add_to_physmap_once(
+static int xenmem_add_to_physmap_one(
     struct domain *d,
-    const struct xen_add_to_physmap *xatp)
+    uint16_t space,
+    domid_t foreign_domid,
+    unsigned long idx,
+    xen_pfn_t gpfn)
 {
     unsigned long mfn = 0;
     int rc;
 
-    switch ( xatp->space )
+    switch ( space )
     {
-        case XENMAPSPACE_shared_info:
-            if ( xatp->idx == 0 )
-                mfn = virt_to_mfn(d->shared_info);
-            break;
-        default:
-            return -ENOSYS;
+    case XENMAPSPACE_shared_info:
+        if ( idx == 0 )
+            mfn = virt_to_mfn(d->shared_info);
+        break;
+    case XENMAPSPACE_gmfn_foreign:
+    {
+        paddr_t maddr;
+        struct domain *od;
+        rc = rcu_lock_target_domain_by_id(foreign_domid, &od);
+        if ( rc < 0 )
+            return rc;
+
+        maddr = p2m_lookup(od, idx << PAGE_SHIFT);
+        if ( maddr == INVALID_PADDR )
+        {
+            dump_p2m_lookup(od, idx << PAGE_SHIFT);
+            rcu_unlock_domain(od);
+            return -EINVAL;
+        }
+
+        mfn = maddr >> PAGE_SHIFT;
+
+        rcu_unlock_domain(od);
+        break;
+    }
+
+    default:
+        return -ENOSYS;
     }
 
     domain_lock(d);
 
     /* Map at new location. */
-    rc = guest_physmap_add_page(d, xatp->gpfn, mfn, 0);
+    rc = guest_physmap_add_page(d, gpfn, mfn, 0);
 
     domain_unlock(d);
 
     return rc;
 }
 
-static int xenmem_add_to_physmap(struct domain *d,
-                                 struct xen_add_to_physmap *xatp)
+static int xenmem_add_to_physmap_range(struct domain *d,
+                                       struct xen_add_to_physmap_range *xatpr)
 {
-    return xenmem_add_to_physmap_once(d, xatp);
+    int rc;
+
+    /* Process entries in reverse order to allow continuations */
+    while ( xatpr->size > 0 )
+    {
+        xen_ulong_t idx;
+        xen_pfn_t gpfn;
+
+        rc = copy_from_guest_offset(&idx, xatpr->idxs, xatpr->size-1, 1);
+        if ( rc < 0 )
+            goto out;
+
+        rc = copy_from_guest_offset(&gpfn, xatpr->gpfns, xatpr->size-1, 1);
+        if ( rc < 0 )
+            goto out;
+
+        rc = xenmem_add_to_physmap_one(d, xatpr->space,
+                                       xatpr->foreign_domid,
+                                       idx, gpfn);
+
+        xatpr->size--;
+
+        /* Check for continuation if it's not the last interation */
+        if ( xatpr->size > 0 && hypercall_preempt_check() )
+        {
+            rc = -EAGAIN;
+            goto out;
+        }
+    }
+
+    rc = 0;
+
+out:
+    return rc;
+
 }
 
 long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
@@ -506,13 +567,44 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
         if ( copy_from_guest(&xatp, arg, 1) )
             return -EFAULT;
 
+        /* This one is only supported by add_to_physmap_range */
+        if ( xatp.space == XENMAPSPACE_gmfn_foreign )
+            return -EINVAL;
+
         rc = rcu_lock_target_domain_by_id(xatp.domid, &d);
         if ( rc != 0 )
             return rc;
 
-        rc = xenmem_add_to_physmap(d, &xatp);
+        rc = xenmem_add_to_physmap_one(d, xatp.space, DOMID_INVALID,
+                                       xatp.idx, xatp.gpfn);
 
         rcu_unlock_domain(d);
+
+        return rc;
+    }
+
+    case XENMEM_add_to_physmap_range:
+    {
+        struct xen_add_to_physmap_range xatpr;
+        struct domain *d;
+
+        if ( copy_from_guest(&xatpr, arg, 1) )
+            return -EFAULT;
+
+        rc = rcu_lock_target_domain_by_id(xatpr.domid, &d);
+        if ( rc != 0 )
+            return rc;
+
+        rc = xenmem_add_to_physmap_range(d, &xatpr);
+
+        rcu_unlock_domain(d);
+
+        if ( rc && copy_to_guest(arg, &xatpr, 1) )
+            rc = -EFAULT;
+
+        if ( rc == -EAGAIN )
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_memory_op, "ih", op, arg);
 
         return rc;
     }

@@ -198,6 +198,15 @@ struct xen_machphys_mapping {
 typedef struct xen_machphys_mapping xen_machphys_mapping_t;
 DEFINE_XEN_GUEST_HANDLE(xen_machphys_mapping_t);
 
+/* Source mapping space. */
+/* ` enum phys_map_space { */
+#define XENMAPSPACE_shared_info  0 /* shared info page */
+#define XENMAPSPACE_grant_table  1 /* grant table page */
+#define XENMAPSPACE_gmfn         2 /* GMFN */
+#define XENMAPSPACE_gmfn_range   3 /* GMFN range */
+#define XENMAPSPACE_gmfn_foreign 4 /* GMFN from another dom */
+/* ` } */
+
 /*
  * Sets the GPFN at which a particular page appears in the specified guest's
  * pseudophysical address space.
@@ -211,23 +220,38 @@ struct xen_add_to_physmap {
     /* Number of pages to go through for gmfn_range */
     uint16_t    size;
 
-    /* Source mapping space. */
-#define XENMAPSPACE_shared_info 0 /* shared info page */
-#define XENMAPSPACE_grant_table 1 /* grant table page */
-#define XENMAPSPACE_gmfn        2 /* GMFN */
-#define XENMAPSPACE_gmfn_range  3 /* GMFN range */
-    unsigned int space;
+    unsigned int space; /* => enum phys_map_space */
 
 #define XENMAPIDX_grant_table_status 0x80000000
 
-    /* Index into source mapping space. */
+    /* Index into space being mapped. */
     xen_ulong_t idx;
 
-    /* GPFN where the source mapping page should appear. */
+    /* GPFN in domid where the source mapping page should appear. */
     xen_pfn_t     gpfn;
 };
 typedef struct xen_add_to_physmap xen_add_to_physmap_t;
 DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_t);
+
+/* A batched version of add_to_physmap. */
+#define XENMEM_add_to_physmap_range 23
+struct xen_add_to_physmap_range {
+    /* Which domain to change the mapping for. */
+    domid_t domid;
+    uint16_t space; /* => enum phys_map_space */
+
+    /* Number of pages to go through */
+    uint16_t size;
+    domid_t foreign_domid; /* IFF gmfn_foreign */
+
+    /* Indexes into space being mapped. */
+    XEN_GUEST_HANDLE(xen_ulong_t) idxs;
+
+    /* GPFN in domdwhere the source mapping page should appear. */
+    XEN_GUEST_HANDLE(xen_pfn_t) gpfns;
+};
+typedef struct xen_add_to_physmap_range xen_add_to_physmap_range_t;
+DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_range_t);
 
 /*
  * Unmaps the page appearing at a particular GPFN from the specified guest's
