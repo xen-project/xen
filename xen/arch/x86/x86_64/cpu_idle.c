@@ -57,10 +57,12 @@ static int copy_from_compat_state(xen_processor_cx_t *xen_state,
 {
 #define XLAT_processor_cx_HNDL_dp(_d_, _s_) do { \
     XEN_GUEST_HANDLE(compat_processor_csd_t) dps; \
+    XEN_GUEST_HANDLE_PARAM(xen_processor_csd_t) dps_param; \
     if ( unlikely(!compat_handle_okay((_s_)->dp, (_s_)->dpcnt)) ) \
             return -EFAULT; \
     guest_from_compat_handle(dps, (_s_)->dp); \
-    (_d_)->dp = guest_handle_cast(dps, xen_processor_csd_t); \
+    dps_param = guest_handle_cast(dps, xen_processor_csd_t); \
+    (_d_)->dp = guest_handle_from_param(dps_param, xen_processor_csd_t); \
 } while (0)
     XLAT_processor_cx(xen_state, state);
 #undef XLAT_processor_cx_HNDL_dp

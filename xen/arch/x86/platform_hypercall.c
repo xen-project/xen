@@ -61,7 +61,7 @@ long cpu_down_helper(void *data);
 long core_parking_helper(void *data);
 uint32_t get_cur_idle_nums(void);
 
-ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
+ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 {
     ret_t ret = 0;
     struct xen_platform_op curop, *op = &curop;
@@ -186,7 +186,9 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             }
         }
 
-        ret = microcode_update(data, op->u.microcode.length);
+        ret = microcode_update(
+                guest_handle_to_param(data, const_void),
+                op->u.microcode.length);
         spin_unlock(&vcpu_alloc_lock);
     }
     break;
@@ -454,7 +456,9 @@ ret_t do_platform_op(XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op)
             XEN_GUEST_HANDLE(uint32) pdc;
 
             guest_from_compat_handle(pdc, op->u.set_pminfo.u.pdc);
-            ret = acpi_set_pdc_bits(op->u.set_pminfo.id, pdc);
+            ret = acpi_set_pdc_bits(
+                    op->u.set_pminfo.id,
+                    guest_handle_to_param(pdc, uint32));
         }
         break;
 

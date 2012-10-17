@@ -2913,7 +2913,9 @@ long do_mmuext_op(
         {
             cpumask_t pmask;
 
-            if ( unlikely(vcpumask_to_pcpumask(d, op.arg2.vcpumask, &pmask)) )
+            if ( unlikely(vcpumask_to_pcpumask(d,
+                            guest_handle_to_param(op.arg2.vcpumask, const_void),
+                            &pmask)) )
             {
                 okay = 0;
                 break;
@@ -4195,6 +4197,7 @@ static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
     if ( s > ctxt->s )
     {
         e820entry_t ent;
+        XEN_GUEST_HANDLE_PARAM(e820entry_t) buffer_param;
         XEN_GUEST_HANDLE(e820entry_t) buffer;
 
         if ( ctxt->n + 1 >= ctxt->map.nr_entries )
@@ -4202,7 +4205,8 @@ static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
         ent.addr = (uint64_t)ctxt->s << PAGE_SHIFT;
         ent.size = (uint64_t)(s - ctxt->s) << PAGE_SHIFT;
         ent.type = E820_RESERVED;
-        buffer = guest_handle_cast(ctxt->map.buffer, e820entry_t);
+        buffer_param = guest_handle_cast(ctxt->map.buffer, e820entry_t);
+        buffer = guest_handle_from_param(buffer_param, e820entry_t);
         if ( __copy_to_guest_offset(buffer, ctxt->n, &ent, 1) )
             return -EFAULT;
         ctxt->n++;
@@ -4499,6 +4503,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
     {
         struct memory_map_context ctxt;
         XEN_GUEST_HANDLE(e820entry_t) buffer;
+        XEN_GUEST_HANDLE_PARAM(e820entry_t) buffer_param;
         unsigned int i;
 
         if ( !IS_PRIV(current->domain) )
@@ -4513,7 +4518,8 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( ctxt.map.nr_entries < e820.nr_map + 1 )
             return -EINVAL;
 
-        buffer = guest_handle_cast(ctxt.map.buffer, e820entry_t);
+        buffer_param = guest_handle_cast(ctxt.map.buffer, e820entry_t);
+        buffer = guest_handle_from_param(buffer_param, e820entry_t);
         if ( !guest_handle_okay(buffer, ctxt.map.nr_entries) )
             return -EFAULT;
 

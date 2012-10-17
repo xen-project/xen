@@ -25,6 +25,7 @@ DEFINE_XEN_GUEST_HANDLE(multicall_entry_compat_t);
 #define call                 compat_call
 #define do_multicall(l, n)   compat_multicall(_##l, n)
 #define _XEN_GUEST_HANDLE(t) XEN_GUEST_HANDLE(t)
+#define _XEN_GUEST_HANDLE_PARAM(t) XEN_GUEST_HANDLE(t)
 
 static void __trace_multicall_call(multicall_entry_t *call)
 {

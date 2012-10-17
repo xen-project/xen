@@ -74,8 +74,11 @@ dump_guest_backtrace(struct vcpu *vcpu, const struct frame_head *head,
     }
     else
     {
-        XEN_GUEST_HANDLE(const_frame_head_t) guest_head =
+        XEN_GUEST_HANDLE(const_frame_head_t) guest_head;
+        XEN_GUEST_HANDLE_PARAM(const_frame_head_t) guest_head_param =
             const_guest_handle_from_ptr(head, frame_head_t);
+        guest_head = guest_handle_from_param(guest_head_param,
+					     const_frame_head_t);
 
         /* Also check accessibility of one struct frame_head beyond */
         if (!guest_handle_okay(guest_head, 2))

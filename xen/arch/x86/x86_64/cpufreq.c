@@ -45,10 +45,12 @@ compat_set_px_pminfo(uint32_t cpu, struct compat_processor_performance *perf)
 
 #define XLAT_processor_performance_HNDL_states(_d_, _s_) do { \
     XEN_GUEST_HANDLE(compat_processor_px_t) states; \
+    XEN_GUEST_HANDLE_PARAM(xen_processor_px_t) states_t; \
     if ( unlikely(!compat_handle_okay((_s_)->states, (_s_)->state_count)) ) \
         return -EFAULT; \
     guest_from_compat_handle(states, (_s_)->states); \
-    (_d_)->states = guest_handle_cast(states, xen_processor_px_t); \
+    states_t = guest_handle_cast(states, xen_processor_px_t); \
+    (_d_)->states = guest_handle_from_param(states_t, xen_processor_px_t); \
 } while (0)
 
     XLAT_processor_performance(xen_perf, perf);

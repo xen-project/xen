@@ -38,6 +38,7 @@ CHECK_pf_pcpu_version;
 
 #define COMPAT
 #define _XEN_GUEST_HANDLE(t) XEN_GUEST_HANDLE(t)
+#define _XEN_GUEST_HANDLE_PARAM(t) XEN_GUEST_HANDLE_PARAM(t)
 typedef int ret_t;
 
 #include "../platform_hypercall.c"
