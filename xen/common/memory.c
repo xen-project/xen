@@ -540,7 +540,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
             return start_extent;
 
         /* Is size too large for us to encode a continuation? */
-        if ( reservation.nr_extents > (ULONG_MAX >> MEMOP_EXTENT_SHIFT) )
+        if ( reservation.nr_extents > (UINT_MAX >> MEMOP_EXTENT_SHIFT) )
             return start_extent;
 
         if ( unlikely(start_extent >= reservation.nr_extents) )
