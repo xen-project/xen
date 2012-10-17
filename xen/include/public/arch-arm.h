@@ -74,7 +74,7 @@
 #define __XEN_GUEST_HANDLE(name)        __guest_handle_64_ ## name
 #define XEN_GUEST_HANDLE(name)          __XEN_GUEST_HANDLE(name)
 /* this is going to be changed on 64 bit */
-#define XEN_GUEST_HANDLE_PARAM(name)   XEN_GUEST_HANDLE(name)
+#define XEN_GUEST_HANDLE_PARAM(name)    __guest_handle_ ## name
 #define set_xen_guest_handle_raw(hnd, val)                  \
     do {                                                    \
         typeof(&(hnd)) _sxghr_tmp = &(hnd);                 \
