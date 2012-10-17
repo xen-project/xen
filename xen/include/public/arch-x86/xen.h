@@ -85,6 +85,7 @@ typedef unsigned long xen_pfn_t;
 #ifndef __ASSEMBLY__
 
 typedef unsigned long xen_ulong_t;
+#define PRI_xen_ulong "lx"
 
 /*
  * ` enum neg_errnoval

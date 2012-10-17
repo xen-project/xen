@@ -122,7 +122,8 @@ typedef uint64_t xen_pfn_t;
 /* Only one. All other VCPUS must use VCPUOP_register_vcpu_info */
 #define XEN_LEGACY_MAX_VCPUS 1
 
-typedef uint32_t xen_ulong_t;
+typedef uint64_t xen_ulong_t;
+#define PRI_xen_ulong PRIx64
 
 struct vcpu_guest_context {
 #define _VGCF_online                   0

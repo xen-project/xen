@@ -1439,7 +1439,7 @@ static PyObject *pyxc_xeninfo(XcObject *self)
     if ( xc_version(self->xc_handle, XENVER_commandline, &xen_commandline) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
-    snprintf(str, sizeof(str), "virt_start=0x%lx", p_parms.virt_start);
+    snprintf(str, sizeof(str), "virt_start=0x%"PRI_xen_ulong, p_parms.virt_start);
 
     xen_pagesize = xc_version(self->xc_handle, XENVER_pagesize, NULL);
     if (xen_pagesize < 0 )
