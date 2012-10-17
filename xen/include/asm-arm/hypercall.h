@@ -2,7 +2,7 @@
 #define __ASM_ARM_HYPERCALL_H__
 
 #include <public/domctl.h> /* for arch_do_domctl */
-int do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg);
+int do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 
 #endif /* __ASM_ARM_HYPERCALL_H__ */
 /*

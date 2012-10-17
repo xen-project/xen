@@ -15,7 +15,7 @@
 CHECK_vcpu_set_periodic_timer;
 #undef xen_vcpu_set_periodic_timer
 
-int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
+int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct domain *d = current->domain;
     struct vcpu *v;

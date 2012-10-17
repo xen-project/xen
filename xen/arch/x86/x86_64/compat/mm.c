@@ -5,7 +5,7 @@
 #include <asm/mem_event.h>
 #include <asm/mem_sharing.h>
 
-int compat_set_gdt(XEN_GUEST_HANDLE(uint) frame_list, unsigned int entries)
+int compat_set_gdt(XEN_GUEST_HANDLE_PARAM(uint) frame_list, unsigned int entries)
 {
     unsigned int i, nr_pages = (entries + 511) / 512;
     unsigned long frames[16];
@@ -44,7 +44,7 @@ int compat_update_descriptor(u32 pa_lo, u32 pa_hi, u32 desc_lo, u32 desc_hi)
                                 desc_lo | ((u64)desc_hi << 32));
 }
 
-int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
+int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct compat_machphys_mfn_list xmml;
     l2_pgentry_t l2e;
@@ -260,14 +260,14 @@ int compat_update_va_mapping_otherdomain(unsigned long va, u32 lo, u32 hi,
 
 DEFINE_XEN_GUEST_HANDLE(mmuext_op_compat_t);
 
-int compat_mmuext_op(XEN_GUEST_HANDLE(mmuext_op_compat_t) cmp_uops,
+int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(mmuext_op_compat_t) cmp_uops,
                      unsigned int count,
-                     XEN_GUEST_HANDLE(uint) pdone,
+                     XEN_GUEST_HANDLE_PARAM(uint) pdone,
                      unsigned int foreigndom)
 {
     unsigned int i, preempt_mask;
     int rc = 0;
-    XEN_GUEST_HANDLE(mmuext_op_t) nat_ops;
+    XEN_GUEST_HANDLE_PARAM(mmuext_op_t) nat_ops;
 
     preempt_mask = count & MMU_UPDATE_PREEMPTED;
     count ^= preempt_mask;

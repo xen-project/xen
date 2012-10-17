@@ -380,7 +380,7 @@ static int dummy_sched_op (void)
     return 0;
 }
 
-static long dummy___do_xsm_op(XEN_GUEST_HANDLE(xsm_op_t) op)
+static long dummy___do_xsm_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
 {
     return -ENOSYS;
 }

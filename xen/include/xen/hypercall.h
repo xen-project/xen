@@ -29,29 +29,29 @@ do_sched_op_compat(
 extern long
 do_sched_op(
     int cmd,
-    XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern long
 do_domctl(
-    XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
+    XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl);
 
 extern long
 arch_do_domctl(
     struct xen_domctl *domctl,
-    XEN_GUEST_HANDLE(xen_domctl_t) u_domctl);
+    XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl);
 
 extern long
 do_sysctl(
-    XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
+    XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl);
 
 extern long
 arch_do_sysctl(
     struct xen_sysctl *sysctl,
-    XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl);
+    XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl);
 
 extern long
 do_platform_op(
-    XEN_GUEST_HANDLE(xen_platform_op_t) u_xenpf_op);
+    XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op);
 
 /*
  * To allow safe resume of do_memory_op() after preemption, we need to know
@@ -64,11 +64,11 @@ do_platform_op(
 extern long
 do_memory_op(
     unsigned long cmd,
-    XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern long
 do_multicall(
-    XEN_GUEST_HANDLE(multicall_entry_t) call_list,
+    XEN_GUEST_HANDLE_PARAM(multicall_entry_t) call_list,
     unsigned int nr_calls);
 
 extern long
@@ -77,23 +77,23 @@ do_set_timer_op(
 
 extern long
 do_event_channel_op(
-    int cmd, XEN_GUEST_HANDLE(void) arg);
+    int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern long
 do_xen_version(
     int cmd,
-    XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern long
 do_console_io(
     int cmd,
     int count,
-    XEN_GUEST_HANDLE(char) buffer);
+    XEN_GUEST_HANDLE_PARAM(char) buffer);
 
 extern long
 do_grant_table_op(
     unsigned int cmd,
-    XEN_GUEST_HANDLE(void) uop,
+    XEN_GUEST_HANDLE_PARAM(void) uop,
     unsigned int count);
 
 extern long
@@ -105,72 +105,72 @@ extern long
 do_vcpu_op(
     int cmd,
     int vcpuid,
-    XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 struct vcpu;
 extern long
 arch_do_vcpu_op(int cmd,
     struct vcpu *v,
-    XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern long
 do_nmi_op(
     unsigned int cmd,
-    XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern long
 do_hvm_op(
     unsigned long op,
-    XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern long
 do_kexec_op(
     unsigned long op,
     int arg1,
-    XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern long
 do_xsm_op(
-    XEN_GUEST_HANDLE(xsm_op_t) u_xsm_op);
+    XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_xsm_op);
 
 extern long
 do_tmem_op(
-    XEN_GUEST_HANDLE(tmem_op_t) uops);
+    XEN_GUEST_HANDLE_PARAM(tmem_op_t) uops);
 
 extern long
-do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg);
+do_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);
 
 #ifdef CONFIG_COMPAT
 
 extern int
 compat_memory_op(
     unsigned int cmd,
-    XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern int
 compat_grant_table_op(
     unsigned int cmd,
-    XEN_GUEST_HANDLE(void) uop,
+    XEN_GUEST_HANDLE_PARAM(void) uop,
     unsigned int count);
 
 extern int
 compat_vcpu_op(
     int cmd,
     int vcpuid,
-    XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern int
-compat_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg);
+compat_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern int
 compat_xen_version(
     int cmd,
-    XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern int
 compat_sched_op(
     int cmd,
-    XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern int
 compat_set_timer_op(

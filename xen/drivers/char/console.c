@@ -182,7 +182,7 @@ static void putchar_console_ring(int c)
 
 long read_console_ring(struct xen_sysctl_readconsole *op)
 {
-    XEN_GUEST_HANDLE(char) str;
+    XEN_GUEST_HANDLE_PARAM(char) str;
     uint32_t idx, len, max, sofar, c;
 
     str   = guest_handle_cast(op->buffer, char),
@@ -363,7 +363,7 @@ static void notify_dom0_con_ring(unsigned long unused)
 static DECLARE_SOFTIRQ_TASKLET(notify_dom0_con_ring_tasklet,
                                notify_dom0_con_ring, 0);
 
-static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
+static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
 {
     char kbuf[128], *kptr;
     int kcount;
@@ -401,7 +401,7 @@ static long guest_console_write(XEN_GUEST_HANDLE(char) buffer, int count)
     return 0;
 }
 
-long do_console_io(int cmd, int count, XEN_GUEST_HANDLE(char) buffer)
+long do_console_io(int cmd, int count, XEN_GUEST_HANDLE_PARAM(char) buffer)
 {
     long rc;
     unsigned int idx, len;

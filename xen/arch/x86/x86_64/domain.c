@@ -23,7 +23,7 @@ CHECK_vcpu_get_physid;
 
 int
 arch_compat_vcpu_op(
-    int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg)
+    int cmd, struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int rc = -ENOSYS;
 

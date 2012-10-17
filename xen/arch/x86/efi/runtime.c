@@ -184,7 +184,7 @@ int efi_get_info(uint32_t idx, union xenpf_efi_info *info)
     return 0;
 }
 
-static long gwstrlen(XEN_GUEST_HANDLE(CHAR16) str)
+static long gwstrlen(XEN_GUEST_HANDLE_PARAM(CHAR16) str)
 {
     unsigned long len;
 

@@ -27,7 +27,7 @@ ret_t do_physdev_op_compat(XEN_GUEST_HANDLE(physdev_op_t) uop)
 #ifndef COMPAT
 
 /* Legacy hypercall (as of 0x00030202). */
-long do_event_channel_op_compat(XEN_GUEST_HANDLE(evtchn_op_t) uop)
+long do_event_channel_op_compat(XEN_GUEST_HANDLE_PARAM(evtchn_op_t) uop)
 {
     struct evtchn_op op;
 

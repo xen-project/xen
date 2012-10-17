@@ -11,7 +11,7 @@
 
 #include <asm/hypercall.h>
 
-long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
+long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
 {
     long rc = 0;

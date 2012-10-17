@@ -3091,14 +3091,14 @@ static int grant_table_op_is_allowed(unsigned int cmd)
 }
 
 static long hvm_grant_table_op(
-    unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
+    unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) uop, unsigned int count)
 {
     if ( !grant_table_op_is_allowed(cmd) )
         return -ENOSYS; /* all other commands need auditing */
     return do_grant_table_op(cmd, uop, count);
 }
 
-static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     long rc;
 
@@ -3116,7 +3116,7 @@ static long hvm_memory_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     return do_memory_op(cmd, arg);
 }
 
-static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     switch ( cmd )
     {
@@ -3132,7 +3132,7 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
 }
 
 static long hvm_vcpu_op(
-    int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
+    int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     long rc;
 
@@ -3163,7 +3163,7 @@ typedef unsigned long hvm_hypercall_t(
     [ __HYPERVISOR_ ## x ] = (hvm_hypercall_t *) do_ ## x
 
 static long hvm_grant_table_op_compat32(unsigned int cmd,
-                                        XEN_GUEST_HANDLE(void) uop,
+                                        XEN_GUEST_HANDLE_PARAM(void) uop,
                                         unsigned int count)
 {
     if ( !grant_table_op_is_allowed(cmd) )
@@ -3171,7 +3171,7 @@ static long hvm_grant_table_op_compat32(unsigned int cmd,
     return compat_grant_table_op(cmd, uop, count);
 }
 
-static long hvm_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
+static long hvm_memory_op_compat32(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int rc;
 
@@ -3190,7 +3190,7 @@ static long hvm_memory_op_compat32(int cmd, XEN_GUEST_HANDLE(void) arg)
 }
 
 static long hvm_vcpu_op_compat32(
-    int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
+    int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     long rc;
 
@@ -3214,7 +3214,7 @@ static long hvm_vcpu_op_compat32(
 }
 
 static long hvm_physdev_op_compat32(
-    int cmd, XEN_GUEST_HANDLE(void) arg)
+    int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     switch ( cmd )
     {
@@ -3380,7 +3380,7 @@ void hvm_hypercall_page_initialise(struct domain *d,
 }
 
 static int hvmop_set_pci_intx_level(
-    XEN_GUEST_HANDLE(xen_hvm_set_pci_intx_level_t) uop)
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_set_pci_intx_level_t) uop)
 {
     struct xen_hvm_set_pci_intx_level op;
     struct domain *d;
@@ -3547,7 +3547,7 @@ static void hvm_s3_resume(struct domain *d)
 }
 
 static int hvmop_set_isa_irq_level(
-    XEN_GUEST_HANDLE(xen_hvm_set_isa_irq_level_t) uop)
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_set_isa_irq_level_t) uop)
 {
     struct xen_hvm_set_isa_irq_level op;
     struct domain *d;
@@ -3591,7 +3591,7 @@ static int hvmop_set_isa_irq_level(
 }
 
 static int hvmop_set_pci_link_route(
-    XEN_GUEST_HANDLE(xen_hvm_set_pci_link_route_t) uop)
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_set_pci_link_route_t) uop)
 {
     struct xen_hvm_set_pci_link_route op;
     struct domain *d;
@@ -3624,7 +3624,7 @@ static int hvmop_set_pci_link_route(
 }
 
 static int hvmop_inject_msi(
-    XEN_GUEST_HANDLE(xen_hvm_inject_msi_t) uop)
+    XEN_GUEST_HANDLE_PARAM(xen_hvm_inject_msi_t) uop)
 {
     struct xen_hvm_inject_msi op;
     struct domain *d;
@@ -3708,7 +3708,7 @@ static int hvm_replace_event_channel(struct vcpu *v, domid_t remote_domid,
     return 0;
 }
 
-long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
+long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
 {
     struct domain *curr_d = current->domain;

@@ -519,7 +519,7 @@ static long unregister_guest_callback(struct callback_unregister *unreg)
 }
 
 
-long do_callback_op(int cmd, XEN_GUEST_HANDLE(const_void) arg)
+long do_callback_op(int cmd, XEN_GUEST_HANDLE_PARAM(const_void) arg)
 {
     long ret;
 

@@ -48,7 +48,7 @@ static int gdbsx_guest_mem_io(
 
 long arch_do_domctl(
     struct xen_domctl *domctl,
-    XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
+    XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     long ret = 0;
 

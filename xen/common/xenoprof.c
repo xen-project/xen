@@ -404,7 +404,7 @@ static int add_active_list(domid_t domid)
     return 0;
 }
 
-static int add_passive_list(XEN_GUEST_HANDLE(void) arg)
+static int add_passive_list(XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct xenoprof_passive passive;
     struct domain *d;
@@ -585,7 +585,7 @@ void xenoprof_log_event(struct vcpu *vcpu, const struct cpu_user_regs *regs,
 
 
 
-static int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
+static int xenoprof_op_init(XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct domain *d = current->domain;
     struct xenoprof_init xenoprof_init;
@@ -611,7 +611,7 @@ static int xenoprof_op_init(XEN_GUEST_HANDLE(void) arg)
 
 #endif /* !COMPAT */
 
-static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
+static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct xenoprof_get_buffer xenoprof_get_buffer;
     struct domain *d = current->domain;
@@ -662,7 +662,7 @@ static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE(void) arg)
                       || (op == XENOPROF_disable_virq)  \
                       || (op == XENOPROF_get_buffer))
  
-ret_t do_xenoprof_op(int op, XEN_GUEST_HANDLE(void) arg)
+ret_t do_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int ret = 0;
     

@@ -579,7 +579,7 @@ out:
 
 }
 
-long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
+long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int rc;
 

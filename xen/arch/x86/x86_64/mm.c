@@ -1027,7 +1027,7 @@ void __init subarch_init_memory(void)
     }
 }
 
-long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
+long subarch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct xen_machphys_mfn_list xmml;
     l3_pgentry_t l3e;

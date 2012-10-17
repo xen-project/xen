@@ -2652,7 +2652,7 @@ static void put_pg_owner(struct domain *pg_owner)
 }
 
 static inline int vcpumask_to_pcpumask(
-    struct domain *d, XEN_GUEST_HANDLE(const_void) bmap, cpumask_t *pmask)
+    struct domain *d, XEN_GUEST_HANDLE_PARAM(const_void) bmap, cpumask_t *pmask)
 {
     unsigned int vcpu_id, vcpu_bias, offs;
     unsigned long vmask;
@@ -2692,9 +2692,9 @@ static inline int vcpumask_to_pcpumask(
 #define fixunmap_domain_page(ptr) ((void)(ptr))
 
 long do_mmuext_op(
-    XEN_GUEST_HANDLE(mmuext_op_t) uops,
+    XEN_GUEST_HANDLE_PARAM(mmuext_op_t) uops,
     unsigned int count,
-    XEN_GUEST_HANDLE(uint) pdone,
+    XEN_GUEST_HANDLE_PARAM(uint) pdone,
     unsigned int foreigndom)
 {
     struct mmuext_op op;
@@ -3151,9 +3151,9 @@ long do_mmuext_op(
 }
 
 long do_mmu_update(
-    XEN_GUEST_HANDLE(mmu_update_t) ureqs,
+    XEN_GUEST_HANDLE_PARAM(mmu_update_t) ureqs,
     unsigned int count,
-    XEN_GUEST_HANDLE(uint) pdone,
+    XEN_GUEST_HANDLE_PARAM(uint) pdone,
     unsigned int foreigndom)
 {
     struct mmu_update req;
@@ -4098,7 +4098,7 @@ long set_gdt(struct vcpu *v,
 }
 
 
-long do_set_gdt(XEN_GUEST_HANDLE(ulong) frame_list, unsigned int entries)
+long do_set_gdt(XEN_GUEST_HANDLE_PARAM(ulong) frame_list, unsigned int entries)
 {
     int nr_pages = (entries + 511) / 512;
     unsigned long frames[16];
@@ -4370,7 +4370,7 @@ static int xenmem_add_to_physmap(struct domain *d,
     return xenmem_add_to_physmap_once(d, xatp);
 }
 
-long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg)
+long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int rc;
 

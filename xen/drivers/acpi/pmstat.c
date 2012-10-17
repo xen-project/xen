@@ -496,7 +496,7 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
     return ret;
 }
 
-int acpi_set_pdc_bits(u32 acpi_id, XEN_GUEST_HANDLE(uint32) pdc)
+int acpi_set_pdc_bits(u32 acpi_id, XEN_GUEST_HANDLE_PARAM(uint32) pdc)
 {
     u32 bits[3];
     int ret;

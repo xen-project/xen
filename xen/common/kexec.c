@@ -613,7 +613,7 @@ static int kexec_get_range_internal(xen_kexec_range_t *range)
     return ret;
 }
 
-static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
+static int kexec_get_range(XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
     xen_kexec_range_t range;
     int ret = -EINVAL;
@@ -629,7 +629,7 @@ static int kexec_get_range(XEN_GUEST_HANDLE(void) uarg)
     return ret;
 }
 
-static int kexec_get_range_compat(XEN_GUEST_HANDLE(void) uarg)
+static int kexec_get_range_compat(XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
 #ifdef CONFIG_COMPAT
     xen_kexec_range_t range;
@@ -777,7 +777,7 @@ static int kexec_load_unload_internal(unsigned long op, xen_kexec_load_t *load)
     return ret;
 }
 
-static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
+static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
     xen_kexec_load_t load;
 
@@ -788,7 +788,7 @@ static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
 }
 
 static int kexec_load_unload_compat(unsigned long op,
-                                    XEN_GUEST_HANDLE(void) uarg)
+                                    XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
 #ifdef CONFIG_COMPAT
     compat_kexec_load_t compat_load;
@@ -813,7 +813,7 @@ static int kexec_load_unload_compat(unsigned long op,
 #endif /* CONFIG_COMPAT */
 }
 
-static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
+static int kexec_exec(XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
     xen_kexec_exec_t exec;
     xen_kexec_image_t *image;
@@ -845,7 +845,8 @@ static int kexec_exec(XEN_GUEST_HANDLE(void) uarg)
     return -EINVAL; /* never reached */
 }
 
-static int do_kexec_op_internal(unsigned long op, XEN_GUEST_HANDLE(void) uarg,
+static int do_kexec_op_internal(unsigned long op,
+                                XEN_GUEST_HANDLE_PARAM(void) uarg,
                                 bool_t compat)
 {
     unsigned long flags;
@@ -886,13 +887,13 @@ static int do_kexec_op_internal(unsigned long op, XEN_GUEST_HANDLE(void) uarg,
     return ret;
 }
 
-long do_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
+long do_kexec_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
     return do_kexec_op_internal(op, uarg, 0);
 }
 
 #ifdef CONFIG_COMPAT
-int compat_kexec_op(unsigned long op, XEN_GUEST_HANDLE(void) uarg)
+int compat_kexec_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
     return do_kexec_op_internal(op, uarg, 1);
 }

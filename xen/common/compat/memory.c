@@ -13,7 +13,7 @@ CHECK_TYPE(domid);
 #undef compat_domid_t
 #undef xen_domid_t
 
-int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
+int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
 {
     int rc, split, op = cmd & MEMOP_CMD_MASK;
     unsigned int start_extent = cmd >> MEMOP_EXTENT_SHIFT;
@@ -22,7 +22,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE(void) compat)
     {
         unsigned int i, end_extent = 0;
         union {
-            XEN_GUEST_HANDLE(void) hnd;
+            XEN_GUEST_HANDLE_PARAM(void) hnd;
             struct xen_memory_reservation *rsrv;
             struct xen_memory_exchange *xchg;
             struct xen_remove_from_physmap *xrfp;

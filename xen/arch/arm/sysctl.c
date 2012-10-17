@@ -13,7 +13,7 @@
 #include <public/sysctl.h>
 
 long arch_do_sysctl(struct xen_sysctl *sysctl,
-                    XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
+                    XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 {
     return -ENOSYS;
 }

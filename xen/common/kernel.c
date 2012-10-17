@@ -204,7 +204,7 @@ void __init do_initcalls(void)
  * Simple hypercalls.
  */
 
-DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
+DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     switch ( cmd )
     {
@@ -332,7 +332,7 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE(void) arg)
     return -ENOSYS;
 }
 
-DO(nmi_op)(unsigned int cmd, XEN_GUEST_HANDLE(void) arg)
+DO(nmi_op)(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct xennmi_callback cb;
     long rc = 0;

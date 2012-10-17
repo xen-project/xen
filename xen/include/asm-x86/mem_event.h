@@ -65,7 +65,7 @@ int mem_event_get_response(struct domain *d, struct mem_event_domain *med,
 struct domain *get_mem_event_op_target(uint32_t domain, int *rc);
 int do_mem_event_op(int op, uint32_t domain, void *arg);
 int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
-                     XEN_GUEST_HANDLE(void) u_domctl);
+                     XEN_GUEST_HANDLE_PARAM(void) u_domctl);
 
 #endif /* __MEM_EVENT_H__ */
 

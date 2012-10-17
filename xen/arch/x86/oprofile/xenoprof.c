@@ -17,7 +17,7 @@
 
 #include "op_counter.h"
 
-int xenoprof_arch_counter(XEN_GUEST_HANDLE(void) arg)
+int xenoprof_arch_counter(XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct xenoprof_counter counter;
 
@@ -37,7 +37,7 @@ int xenoprof_arch_counter(XEN_GUEST_HANDLE(void) arg)
     return 0;
 }
 
-int xenoprof_arch_ibs_counter(XEN_GUEST_HANDLE(void) arg)
+int xenoprof_arch_ibs_counter(XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct xenoprof_ibs_counter ibs_counter;
 
@@ -54,7 +54,7 @@ int xenoprof_arch_ibs_counter(XEN_GUEST_HANDLE(void) arg)
     return 0;
 }
 
-int compat_oprof_arch_counter(XEN_GUEST_HANDLE(void) arg)
+int compat_oprof_arch_counter(XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct compat_oprof_counter counter;
 

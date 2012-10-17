@@ -18,22 +18,22 @@
 
 extern long
 do_event_channel_op_compat(
-    XEN_GUEST_HANDLE(evtchn_op_t) uop);
+    XEN_GUEST_HANDLE_PARAM(evtchn_op_t) uop);
 
 extern long
 do_set_trap_table(
-    XEN_GUEST_HANDLE(const_trap_info_t) traps);
+    XEN_GUEST_HANDLE_PARAM(const_trap_info_t) traps);
 
 extern long
 do_mmu_update(
-    XEN_GUEST_HANDLE(mmu_update_t) ureqs,
+    XEN_GUEST_HANDLE_PARAM(mmu_update_t) ureqs,
     unsigned int count,
-    XEN_GUEST_HANDLE(uint) pdone,
+    XEN_GUEST_HANDLE_PARAM(uint) pdone,
     unsigned int foreigndom);
 
 extern long
 do_set_gdt(
-    XEN_GUEST_HANDLE(ulong) frame_list,
+    XEN_GUEST_HANDLE_PARAM(ulong) frame_list,
     unsigned int entries);
 
 extern long
@@ -60,7 +60,7 @@ do_update_descriptor(
     u64 desc);
 
 extern long
-do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc);
+do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc);
 
 extern long
 do_update_va_mapping(
@@ -70,7 +70,7 @@ do_update_va_mapping(
 
 extern long
 do_physdev_op(
-    int cmd, XEN_GUEST_HANDLE(void) arg);
+    int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern long
 do_update_va_mapping_otherdomain(
@@ -81,9 +81,9 @@ do_update_va_mapping_otherdomain(
 
 extern long
 do_mmuext_op(
-    XEN_GUEST_HANDLE(mmuext_op_t) uops,
+    XEN_GUEST_HANDLE_PARAM(mmuext_op_t) uops,
     unsigned int count,
-    XEN_GUEST_HANDLE(uint) pdone,
+    XEN_GUEST_HANDLE_PARAM(uint) pdone,
     unsigned int foreigndom);
 
 extern unsigned long
@@ -104,10 +104,10 @@ do_set_segment_base(
 extern int
 compat_physdev_op(
     int cmd,
-    XEN_GUEST_HANDLE(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) arg);
 
 extern int
 arch_compat_vcpu_op(
-    int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg);
+    int cmd, struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg);
 
 #endif /* __ASM_X86_HYPERCALL_H__ */

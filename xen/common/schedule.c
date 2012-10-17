@@ -836,7 +836,7 @@ typedef long ret_t;
 
 #endif /* !COMPAT */
 
-ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     ret_t ret = 0;
 

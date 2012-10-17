@@ -512,7 +512,7 @@ void mem_event_cleanup(struct domain *d)
 }
 
 int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
-                     XEN_GUEST_HANDLE(void) u_domctl)
+                     XEN_GUEST_HANDLE_PARAM(void) u_domctl)
 {
     int rc;
 

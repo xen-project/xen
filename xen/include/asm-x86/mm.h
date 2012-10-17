@@ -555,10 +555,10 @@ void *do_page_walk(struct vcpu *v, unsigned long addr);
 int __sync_local_execstate(void);
 
 /* Arch-specific portion of memory_op hypercall. */
-long arch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
-long subarch_memory_op(int op, XEN_GUEST_HANDLE(void) arg);
-int compat_arch_memory_op(int op, XEN_GUEST_HANDLE(void));
-int compat_subarch_memory_op(int op, XEN_GUEST_HANDLE(void));
+long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);
+long subarch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg);
+int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void));
+int compat_subarch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void));
 
 int steal_page(
     struct domain *d, struct page_info *page, unsigned int memflags);

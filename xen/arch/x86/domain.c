@@ -1077,7 +1077,7 @@ map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
 
 long
 arch_do_vcpu_op(
-    int cmd, struct vcpu *v, XEN_GUEST_HANDLE(void) arg)
+    int cmd, struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     long rc = 0;
 

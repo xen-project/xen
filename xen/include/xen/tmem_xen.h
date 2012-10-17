@@ -430,7 +430,8 @@ static inline void tmh_tze_copy_from_pfp(void *tva, pfp_t *pfp, pagesize_t len)
 typedef XEN_GUEST_HANDLE(void) cli_mfn_t;
 typedef XEN_GUEST_HANDLE(char) cli_va_t;
 */
-typedef XEN_GUEST_HANDLE(tmem_op_t) tmem_cli_op_t;
+typedef XEN_GUEST_HANDLE_PARAM(tmem_op_t) tmem_cli_op_t;
+typedef XEN_GUEST_HANDLE_PARAM(char) tmem_cli_va_param_t;
 
 static inline int tmh_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
 {
@@ -466,8 +467,9 @@ static inline int tmh_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
 
 #define tmh_cli_buf_null guest_handle_from_ptr(NULL, char)
 
-static inline void tmh_copy_to_client_buf_offset(tmem_cli_va_t clibuf, int off,
-                                           char *tmembuf, int len)
+static inline void tmh_copy_to_client_buf_offset(tmem_cli_va_param_t clibuf,
+						 int off,
+						 char *tmembuf, int len)
 {
     copy_to_guest_offset(clibuf,off,tmembuf,len);
 }
@@ -482,15 +484,17 @@ static inline void tmh_copy_to_client_buf_offset(tmem_cli_va_t clibuf, int off,
 #define tmh_cli_id_str "domid"
 #define tmh_client_str "domain"
 
-int tmh_decompress_to_client(tmem_cli_mfn_t, void *, size_t, tmem_cli_va_t);
+int tmh_decompress_to_client(tmem_cli_mfn_t, void *, size_t,
+			     tmem_cli_va_param_t);
 
-int tmh_compress_from_client(tmem_cli_mfn_t, void **, size_t *, tmem_cli_va_t);
+int tmh_compress_from_client(tmem_cli_mfn_t, void **, size_t *,
+			     tmem_cli_va_param_t);
 
 int tmh_copy_from_client(pfp_t *, tmem_cli_mfn_t, pagesize_t tmem_offset,
-    pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_t);
+    pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t);
 
 int tmh_copy_to_client(tmem_cli_mfn_t, pfp_t *, pagesize_t tmem_offset,
-    pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_t);
+    pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t);
 
 extern int tmh_copy_tze_to_client(tmem_cli_mfn_t cmfn, void *tmem_va, pagesize_t len);
 

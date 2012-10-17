@@ -1289,7 +1289,7 @@ CHECK_mcinfo_recovery;
 # undef xen_mcinfo_recovery
 
 /* Machine Check Architecture Hypercall */
-long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
+long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 {
     long ret = 0;
     struct xen_mc curop, *op = &curop;

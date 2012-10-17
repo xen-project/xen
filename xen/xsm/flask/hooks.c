@@ -1462,7 +1462,7 @@ static int flask_vcpuextstate (struct domain *d, uint32_t cmd)
 }
 #endif
 
-long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op);
+long do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
 
 static struct xsm_operations flask_ops = {
     .security_domaininfo = flask_security_domaininfo,

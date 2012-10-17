@@ -27,7 +27,7 @@
 #include <xsm/xsm.h>
 #include <xen/pmstat.h>
 
-long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
+long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 {
     long ret = 0;
     struct xen_sysctl curop, *op = &curop;

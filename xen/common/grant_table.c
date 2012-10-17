@@ -833,7 +833,7 @@ __gnttab_map_grant_ref(
 
 static long
 gnttab_map_grant_ref(
-    XEN_GUEST_HANDLE(gnttab_map_grant_ref_t) uop, unsigned int count)
+    XEN_GUEST_HANDLE_PARAM(gnttab_map_grant_ref_t) uop, unsigned int count)
 {
     int i;
     struct gnttab_map_grant_ref op;
@@ -1102,7 +1102,7 @@ __gnttab_unmap_grant_ref(
 
 static long
 gnttab_unmap_grant_ref(
-    XEN_GUEST_HANDLE(gnttab_unmap_grant_ref_t) uop, unsigned int count)
+    XEN_GUEST_HANDLE_PARAM(gnttab_unmap_grant_ref_t) uop, unsigned int count)
 {
     int i, c, partial_done, done = 0;
     struct gnttab_unmap_grant_ref op;
@@ -1164,7 +1164,7 @@ __gnttab_unmap_and_replace(
 
 static long
 gnttab_unmap_and_replace(
-    XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t) uop, unsigned int count)
+    XEN_GUEST_HANDLE_PARAM(gnttab_unmap_and_replace_t) uop, unsigned int count)
 {
     int i, c, partial_done, done = 0;
     struct gnttab_unmap_and_replace op;
@@ -1316,7 +1316,7 @@ active_alloc_failed:
 
 static long 
 gnttab_setup_table(
-    XEN_GUEST_HANDLE(gnttab_setup_table_t) uop, unsigned int count)
+    XEN_GUEST_HANDLE_PARAM(gnttab_setup_table_t) uop, unsigned int count)
 {
     struct gnttab_setup_table op;
     struct domain *d;
@@ -1395,7 +1395,7 @@ gnttab_setup_table(
 
 static long 
 gnttab_query_size(
-    XEN_GUEST_HANDLE(gnttab_query_size_t) uop, unsigned int count)
+    XEN_GUEST_HANDLE_PARAM(gnttab_query_size_t) uop, unsigned int count)
 {
     struct gnttab_query_size op;
     struct domain *d;
@@ -1517,7 +1517,7 @@ gnttab_prepare_for_transfer(
 
 static long
 gnttab_transfer(
-    XEN_GUEST_HANDLE(gnttab_transfer_t) uop, unsigned int count)
+    XEN_GUEST_HANDLE_PARAM(gnttab_transfer_t) uop, unsigned int count)
 {
     struct domain *d = current->domain;
     struct domain *e;
@@ -2125,7 +2125,7 @@ __gnttab_copy(
 
 static long
 gnttab_copy(
-    XEN_GUEST_HANDLE(gnttab_copy_t) uop, unsigned int count)
+    XEN_GUEST_HANDLE_PARAM(gnttab_copy_t) uop, unsigned int count)
 {
     int i;
     struct gnttab_copy op;
@@ -2144,7 +2144,7 @@ gnttab_copy(
 }
 
 static long
-gnttab_set_version(XEN_GUEST_HANDLE(gnttab_set_version_t uop))
+gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t uop))
 {
     gnttab_set_version_t op;
     struct domain *d = current->domain;
@@ -2263,7 +2263,7 @@ out:
 }
 
 static long
-gnttab_get_status_frames(XEN_GUEST_HANDLE(gnttab_get_status_frames_t) uop,
+gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
                          int count)
 {
     gnttab_get_status_frames_t op;
@@ -2327,7 +2327,7 @@ out1:
 }
 
 static long
-gnttab_get_version(XEN_GUEST_HANDLE(gnttab_get_version_t uop))
+gnttab_get_version(XEN_GUEST_HANDLE_PARAM(gnttab_get_version_t uop))
 {
     gnttab_get_version_t op;
     struct domain *d;
@@ -2412,7 +2412,7 @@ out:
 }
 
 static long
-gnttab_swap_grant_ref(XEN_GUEST_HANDLE(gnttab_swap_grant_ref_t uop),
+gnttab_swap_grant_ref(XEN_GUEST_HANDLE_PARAM(gnttab_swap_grant_ref_t uop),
                       unsigned int count)
 {
     int i;
@@ -2433,7 +2433,7 @@ gnttab_swap_grant_ref(XEN_GUEST_HANDLE(gnttab_swap_grant_ref_t uop),
 
 long
 do_grant_table_op(
-    unsigned int cmd, XEN_GUEST_HANDLE(void) uop, unsigned int count)
+    unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) uop, unsigned int count)
 {
     long rc;
     
@@ -2445,7 +2445,7 @@ do_grant_table_op(
     {
     case GNTTABOP_map_grant_ref:
     {
-        XEN_GUEST_HANDLE(gnttab_map_grant_ref_t) map =
+        XEN_GUEST_HANDLE_PARAM(gnttab_map_grant_ref_t) map =
             guest_handle_cast(uop, gnttab_map_grant_ref_t);
         if ( unlikely(!guest_handle_okay(map, count)) )
             goto out;
@@ -2459,7 +2459,7 @@ do_grant_table_op(
     }
     case GNTTABOP_unmap_grant_ref:
     {
-        XEN_GUEST_HANDLE(gnttab_unmap_grant_ref_t) unmap =
+        XEN_GUEST_HANDLE_PARAM(gnttab_unmap_grant_ref_t) unmap =
             guest_handle_cast(uop, gnttab_unmap_grant_ref_t);
         if ( unlikely(!guest_handle_okay(unmap, count)) )
             goto out;
@@ -2473,7 +2473,7 @@ do_grant_table_op(
     }
     case GNTTABOP_unmap_and_replace:
     {
-        XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t) unmap =
+        XEN_GUEST_HANDLE_PARAM(gnttab_unmap_and_replace_t) unmap =
             guest_handle_cast(uop, gnttab_unmap_and_replace_t);
         if ( unlikely(!guest_handle_okay(unmap, count)) )
             goto out;
@@ -2497,7 +2497,7 @@ do_grant_table_op(
     }
     case GNTTABOP_transfer:
     {
-        XEN_GUEST_HANDLE(gnttab_transfer_t) transfer =
+        XEN_GUEST_HANDLE_PARAM(gnttab_transfer_t) transfer =
             guest_handle_cast(uop, gnttab_transfer_t);
         if ( unlikely(!guest_handle_okay(transfer, count)) )
             goto out;
@@ -2511,7 +2511,7 @@ do_grant_table_op(
     }
     case GNTTABOP_copy:
     {
-        XEN_GUEST_HANDLE(gnttab_copy_t) copy =
+        XEN_GUEST_HANDLE_PARAM(gnttab_copy_t) copy =
             guest_handle_cast(uop, gnttab_copy_t);
         if ( unlikely(!guest_handle_okay(copy, count)) )
             goto out;
@@ -2548,7 +2548,7 @@ do_grant_table_op(
     }
     case GNTTABOP_swap_grant_ref:
     {
-        XEN_GUEST_HANDLE(gnttab_swap_grant_ref_t) swap =
+        XEN_GUEST_HANDLE_PARAM(gnttab_swap_grant_ref_t) swap =
             guest_handle_cast(uop, gnttab_swap_grant_ref_t);
         if ( unlikely(!guest_handle_okay(swap, count)) )
             goto out;

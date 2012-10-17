@@ -970,7 +970,7 @@ out:
 }
 
 
-long do_event_channel_op(int cmd, XEN_GUEST_HANDLE(void) arg)
+long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     long rc;
 

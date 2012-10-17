@@ -654,7 +654,7 @@ void paging_vcpu_init(struct vcpu *v)
 
 
 int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
-                  XEN_GUEST_HANDLE(void) u_domctl)
+                  XEN_GUEST_HANDLE_PARAM(void) u_domctl)
 {
     int rc;
 

@@ -146,7 +146,7 @@ static inline void cli_put_page(void *cli_va, pfp_t *cli_pfp,
 
 EXPORT int tmh_copy_from_client(pfp_t *pfp,
     tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
-    pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_t clibuf)
+    pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t clibuf)
 {
     unsigned long tmem_mfn, cli_mfn = 0;
     char *tmem_va, *cli_va = NULL;
@@ -194,7 +194,7 @@ EXPORT int tmh_copy_from_client(pfp_t *pfp,
 }
 
 EXPORT int tmh_compress_from_client(tmem_cli_mfn_t cmfn,
-    void **out_va, size_t *out_len, tmem_cli_va_t clibuf)
+    void **out_va, size_t *out_len, tmem_cli_va_param_t clibuf)
 {
     int ret = 0;
     unsigned char *dmem = this_cpu(dstmem);
@@ -227,7 +227,7 @@ EXPORT int tmh_compress_from_client(tmem_cli_mfn_t cmfn,
 
 EXPORT int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
     pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len,
-    tmem_cli_va_t clibuf)
+    tmem_cli_va_param_t clibuf)
 {
     unsigned long tmem_mfn, cli_mfn = 0;
     char *tmem_va, *cli_va = NULL;
@@ -265,7 +265,7 @@ EXPORT int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
 }
 
 EXPORT int tmh_decompress_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
-                                    size_t size, tmem_cli_va_t clibuf)
+                                    size_t size, tmem_cli_va_param_t clibuf)
 {
     unsigned long cli_mfn = 0;
     pfp_t *cli_pfp = NULL;

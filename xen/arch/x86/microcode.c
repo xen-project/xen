@@ -195,7 +195,7 @@ static long do_microcode_update(void *_info)
     return error;
 }
 
-int microcode_update(XEN_GUEST_HANDLE(const_void) buf, unsigned long len)
+int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void) buf, unsigned long len)
 {
     int ret;
     struct microcode_info *info;

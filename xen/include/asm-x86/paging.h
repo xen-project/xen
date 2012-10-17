@@ -207,7 +207,7 @@ int paging_domain_init(struct domain *d, unsigned int domcr_flags);
  * and disable ephemeral shadow modes (test mode and log-dirty mode) and
  * manipulate the log-dirty bitmap. */
 int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
-                  XEN_GUEST_HANDLE(void) u_domctl);
+                  XEN_GUEST_HANDLE_PARAM(void) u_domctl);
 
 /* Call when destroying a domain */
 void paging_teardown(struct domain *d);

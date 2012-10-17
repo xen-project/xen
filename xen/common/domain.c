@@ -827,7 +827,7 @@ void vcpu_reset(struct vcpu *v)
 }
 
 
-long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
+long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct domain *d = current->domain;
     struct vcpu *v;

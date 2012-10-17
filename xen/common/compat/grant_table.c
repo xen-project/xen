@@ -52,12 +52,12 @@ CHECK_gnttab_swap_grant_ref;
 #undef xen_gnttab_swap_grant_ref
 
 int compat_grant_table_op(unsigned int cmd,
-                          XEN_GUEST_HANDLE(void) cmp_uop,
+                          XEN_GUEST_HANDLE_PARAM(void) cmp_uop,
                           unsigned int count)
 {
     int rc = 0;
     unsigned int i;
-    XEN_GUEST_HANDLE(void) cnt_uop;
+    XEN_GUEST_HANDLE_PARAM(void) cnt_uop;
 
     set_xen_guest_handle(cnt_uop, NULL);
     switch ( cmd )
@@ -206,7 +206,7 @@ int compat_grant_table_op(unsigned int cmd,
             }
             if ( rc >= 0 )
             {
-                XEN_GUEST_HANDLE(gnttab_transfer_compat_t) xfer;
+                XEN_GUEST_HANDLE_PARAM(gnttab_transfer_compat_t) xfer;
 
                 xfer = guest_handle_cast(cmp_uop, gnttab_transfer_compat_t);
                 guest_handle_add_offset(xfer, i);
@@ -251,7 +251,7 @@ int compat_grant_table_op(unsigned int cmd,
             }
             if ( rc >= 0 )
             {
-                XEN_GUEST_HANDLE(gnttab_copy_compat_t) copy;
+                XEN_GUEST_HANDLE_PARAM(gnttab_copy_compat_t) copy;
 
                 copy = guest_handle_cast(cmp_uop, gnttab_copy_compat_t);
                 guest_handle_add_offset(copy, i);

@@ -139,7 +139,7 @@ struct xsm_operations {
     int (*cpupool_op)(void);
     int (*sched_op)(void);
 
-    long (*__do_xsm_op) (XEN_GUEST_HANDLE(xsm_op_t) op);
+    long (*__do_xsm_op) (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op);
 
 #ifdef CONFIG_X86
     int (*shadow_control) (struct domain *d, uint32_t op);
@@ -585,7 +585,7 @@ static inline int xsm_sched_op(void)
     return xsm_call(sched_op());
 }
 
-static inline long __do_xsm_op (XEN_GUEST_HANDLE(xsm_op_t) op)
+static inline long __do_xsm_op (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
 {
 #ifdef XSM_ENABLE
     return xsm_ops->__do_xsm_op(op);

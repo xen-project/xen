@@ -71,7 +71,7 @@ static int domain_has_security(struct domain *d, u32 perms)
                         perms, NULL);
 }
 
-static int flask_copyin_string(XEN_GUEST_HANDLE(char) u_buf, char **buf, uint32_t size)
+static int flask_copyin_string(XEN_GUEST_HANDLE_PARAM(char) u_buf, char **buf, uint32_t size)
 {
     char *tmp = xmalloc_bytes(size + 1);
     if ( !tmp )
@@ -618,7 +618,7 @@ static int flask_relabel_domain(struct xen_flask_relabel *arg)
     return rc;
 }
 
-long do_flask_op(XEN_GUEST_HANDLE(xsm_op_t) u_flask_op)
+long do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op)
 {
     xen_flask_op_t op;
     int rv;

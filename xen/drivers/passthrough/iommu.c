@@ -527,7 +527,7 @@ void iommu_crash_shutdown(void)
 
 int iommu_do_domctl(
     struct xen_domctl *domctl,
-    XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
+    XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     struct domain *d;
     u16 seg;

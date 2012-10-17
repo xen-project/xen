@@ -40,9 +40,9 @@ int xenoprof_arch_init(int *num_events, char *cpu_type);
 #define xenoprof_arch_disable_virq()            nmi_disable_virq()
 #define xenoprof_arch_release_counters()        nmi_release_counters()
 
-int xenoprof_arch_counter(XEN_GUEST_HANDLE(void) arg);
-int compat_oprof_arch_counter(XEN_GUEST_HANDLE(void) arg);
-int xenoprof_arch_ibs_counter(XEN_GUEST_HANDLE(void) arg);
+int xenoprof_arch_counter(XEN_GUEST_HANDLE_PARAM(void) arg);
+int compat_oprof_arch_counter(XEN_GUEST_HANDLE_PARAM(void) arg);
+int xenoprof_arch_ibs_counter(XEN_GUEST_HANDLE_PARAM(void) arg);
 
 struct vcpu;
 struct cpu_user_regs;

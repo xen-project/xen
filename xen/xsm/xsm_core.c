@@ -111,7 +111,7 @@ int unregister_xsm(struct xsm_operations *ops)
 
 #endif
 
-long do_xsm_op (XEN_GUEST_HANDLE(xsm_op_t) op)
+long do_xsm_op (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
 {
     return __do_xsm_op(op);
 }

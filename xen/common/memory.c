@@ -277,7 +277,7 @@ static void decrease_reservation(struct memop_args *a)
     a->nr_done = i;
 }
 
-static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
+static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
 {
     struct xen_memory_exchange exch;
     PAGE_LIST_HEAD(in_chunk_list);
@@ -517,7 +517,7 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
     return rc;
 }
 
-long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
+long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct domain *d;
     int rc, op;

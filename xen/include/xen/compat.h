@@ -22,6 +22,9 @@
     __DEFINE_COMPAT_HANDLE(const_ ## name, const name)
 #define COMPAT_HANDLE(name)          __compat_handle_ ## name
 
+/* NB: it is assumed that if an arch uses the compat layer it does not
+ * distinguish handles from parameter handles. */
+#define COMPAT_HANDLE_PARAM(name)    __compat_handle_ ## name
 /* Is the compat handle a NULL reference? */
 #define compat_handle_is_null(hnd)        ((hnd).c == 0)
 

@@ -58,7 +58,7 @@ long cpu_down_helper(void *data)
 }
 
 long arch_do_sysctl(
-    struct xen_sysctl *sysctl, XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
+    struct xen_sysctl *sysctl, XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 {
     long ret = 0;
 

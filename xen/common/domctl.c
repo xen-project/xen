@@ -239,7 +239,7 @@ void domctl_lock_release(void)
     spin_unlock(&current->domain->hypercall_deadlock_mutex);
 }
 
-long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
+long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     long ret = 0;
     struct xen_domctl curop, *op = &curop;

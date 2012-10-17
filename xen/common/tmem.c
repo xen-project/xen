@@ -1444,7 +1444,7 @@ static inline void tmem_ensure_avail_pages(void)
 /************ TMEM CORE OPERATIONS ************************************/
 
 static NOINLINE int do_tmem_put_compress(pgp_t *pgp, tmem_cli_mfn_t cmfn,
-                                         tmem_cli_va_t clibuf)
+                                         tmem_cli_va_param_t clibuf)
 {
     void *dst, *p;
     size_t size;
@@ -1488,7 +1488,7 @@ out:
 
 static NOINLINE int do_tmem_dup_put(pgp_t *pgp, tmem_cli_mfn_t cmfn,
        pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len,
-       tmem_cli_va_t clibuf)
+       tmem_cli_va_param_t clibuf)
 {
     pool_t *pool;
     obj_t *obj;
@@ -1579,7 +1579,7 @@ cleanup:
 static NOINLINE int do_tmem_put(pool_t *pool,
               OID *oidp, uint32_t index,
               tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
-              pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_t clibuf)
+              pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t clibuf)
 {
     obj_t *obj = NULL, *objfound = NULL, *objnew = NULL;
     pgp_t *pgp = NULL, *pgpdel = NULL;
@@ -1722,7 +1722,7 @@ free:
 
 static NOINLINE int do_tmem_get(pool_t *pool, OID *oidp, uint32_t index,
               tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
-              pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_t clibuf)
+              pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t clibuf)
 {
     obj_t *obj;
     pgp_t *pgp;
@@ -2066,8 +2066,8 @@ static int tmemc_flush_mem(cli_id_t cli_id, uint32_t kb)
  */
 #define BSIZE 1024
 
-static int tmemc_list_client(client_t *c, tmem_cli_va_t buf, int off, 
-                             uint32_t len, bool_t use_long)
+static int tmemc_list_client(client_t *c, tmem_cli_va_param_t buf,
+                             int off, uint32_t len, bool_t use_long)
 {
     char info[BSIZE];
     int i, n = 0, sum = 0;
@@ -2119,7 +2119,7 @@ static int tmemc_list_client(client_t *c, tmem_cli_va_t buf, int off,
     return sum;
 }
 
-static int tmemc_list_shared(tmem_cli_va_t buf, int off, uint32_t len,
+static int tmemc_list_shared(tmem_cli_va_param_t buf, int off, uint32_t len,
                               bool_t use_long)
 {
     char info[BSIZE];
@@ -2159,8 +2159,8 @@ static int tmemc_list_shared(tmem_cli_va_t buf, int off, uint32_t len,
 }
 
 #ifdef TMEM_PERF
-static int tmemc_list_global_perf(tmem_cli_va_t buf, int off, uint32_t len,
-                              bool_t use_long)
+static int tmemc_list_global_perf(tmem_cli_va_param_t buf, int off,
+                                  uint32_t len, bool_t use_long)
 {
     char info[BSIZE];
     int n = 0, sum = 0;
@@ -2194,7 +2194,7 @@ static int tmemc_list_global_perf(tmem_cli_va_t buf, int off, uint32_t len,
 #define tmemc_list_global_perf(_buf,_off,_len,_use) (0)
 #endif
 
-static int tmemc_list_global(tmem_cli_va_t buf, int off, uint32_t len,
+static int tmemc_list_global(tmem_cli_va_param_t buf, int off, uint32_t len,
                               bool_t use_long)
 {
     char info[BSIZE];
@@ -2226,7 +2226,7 @@ static int tmemc_list_global(tmem_cli_va_t buf, int off, uint32_t len,
     return sum;
 }
 
-static int tmemc_list(cli_id_t cli_id, tmem_cli_va_t buf, uint32_t len,
+static int tmemc_list(cli_id_t cli_id, tmem_cli_va_param_t buf, uint32_t len,
                                bool_t use_long)
 {
     client_t *client;
@@ -2338,7 +2338,7 @@ static NOINLINE int tmemc_shared_pool_auth(cli_id_t cli_id, uint64_t uuid_lo,
 }
 
 static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
-                        uint32_t subop, tmem_cli_va_t buf, uint32_t arg1)
+                        uint32_t subop, tmem_cli_va_param_t buf, uint32_t arg1)
 {
     client_t *client = tmh_client_from_cli_id(cli_id);
     pool_t *pool = (client == NULL || pool_id >= MAX_POOLS_PER_DOMAIN)
@@ -2427,7 +2427,7 @@ static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
 }
 
 static NOINLINE int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
-                        tmem_cli_va_t buf, uint32_t bufsize)
+                        tmem_cli_va_param_t buf, uint32_t bufsize)
 {
     client_t *client = tmh_client_from_cli_id(cli_id);
     pool_t *pool = (client == NULL || pool_id >= MAX_POOLS_PER_DOMAIN)
@@ -2479,7 +2479,7 @@ out:
     return ret;
 }
 
-static NOINLINE int tmemc_save_get_next_inv(int cli_id, tmem_cli_va_t buf,
+static NOINLINE int tmemc_save_get_next_inv(int cli_id, tmem_cli_va_param_t buf,
                         uint32_t bufsize)
 {
     client_t *client = tmh_client_from_cli_id(cli_id);
@@ -2522,7 +2522,7 @@ out:
 }
 
 static int tmemc_restore_put_page(int cli_id, uint32_t pool_id, OID *oidp,
-                      uint32_t index, tmem_cli_va_t buf, uint32_t bufsize)
+                      uint32_t index, tmem_cli_va_param_t buf, uint32_t bufsize)
 {
     client_t *client = tmh_client_from_cli_id(cli_id);
     pool_t *pool = (client == NULL || pool_id >= MAX_POOLS_PER_DOMAIN)
@@ -2566,7 +2566,8 @@ static NOINLINE int do_tmem_control(struct tmem_op *op)
         ret = tmemc_flush_mem(op->u.ctrl.cli_id,op->u.ctrl.arg1);
         break;
     case TMEMC_LIST:
-        ret = tmemc_list(op->u.ctrl.cli_id,op->u.ctrl.buf,
+        ret = tmemc_list(op->u.ctrl.cli_id,
+                         guest_handle_cast(op->u.ctrl.buf, char),
                          op->u.ctrl.arg1,op->u.ctrl.arg2);
         break;
     case TMEMC_SET_WEIGHT:
@@ -2589,20 +2590,24 @@ static NOINLINE int do_tmem_control(struct tmem_op *op)
     case TMEMC_SAVE_GET_POOL_UUID:
     case TMEMC_SAVE_END:
         ret = tmemc_save_subop(op->u.ctrl.cli_id,pool_id,subop,
-                        op->u.ctrl.buf,op->u.ctrl.arg1);
+                               guest_handle_cast(op->u.ctrl.buf, char),
+                               op->u.ctrl.arg1);
         break;
     case TMEMC_SAVE_GET_NEXT_PAGE:
         ret = tmemc_save_get_next_page(op->u.ctrl.cli_id, pool_id,
-                                       op->u.ctrl.buf, op->u.ctrl.arg1);
+                                       guest_handle_cast(op->u.ctrl.buf, char),
+                                       op->u.ctrl.arg1);
         break;
     case TMEMC_SAVE_GET_NEXT_INV:
-        ret = tmemc_save_get_next_inv(op->u.ctrl.cli_id, op->u.ctrl.buf,
+        ret = tmemc_save_get_next_inv(op->u.ctrl.cli_id,
+                                      guest_handle_cast(op->u.ctrl.buf, char),
                                       op->u.ctrl.arg1);
         break;
     case TMEMC_RESTORE_PUT_PAGE:
         ret = tmemc_restore_put_page(op->u.ctrl.cli_id,pool_id,
                                      oidp, op->u.ctrl.arg2,
-                                     op->u.ctrl.buf, op->u.ctrl.arg1);
+                                     guest_handle_cast(op->u.ctrl.buf, char),
+                                     op->u.ctrl.arg1);
         break;
     case TMEMC_RESTORE_FLUSH_PAGE:
         ret = tmemc_restore_flush_page(op->u.ctrl.cli_id,pool_id,

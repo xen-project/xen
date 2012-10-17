@@ -3536,7 +3536,7 @@ int send_guest_trap(struct domain *d, uint16_t vcpuid, unsigned int trap_nr)
 }
 
 
-long do_set_trap_table(XEN_GUEST_HANDLE(const_trap_info_t) traps)
+long do_set_trap_table(XEN_GUEST_HANDLE_PARAM(const_trap_info_t) traps)
 {
     struct trap_info cur;
     struct vcpu *curr = current;
