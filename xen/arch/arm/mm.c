@@ -25,6 +25,7 @@
 #include <xen/mm.h>
 #include <xen/preempt.h>
 #include <xen/errno.h>
+#include <xen/grant_table.h>
 #include <xen/softirq.h>
 #include <xen/event.h>
 #include <xen/guest_access.h>
@@ -473,6 +474,31 @@ static int xenmem_add_to_physmap_one(
 
     switch ( space )
     {
+    case XENMAPSPACE_grant_table:
+        spin_lock(&d->grant_table->lock);
+
+        if ( d->grant_table->gt_version == 0 )
+            d->grant_table->gt_version = 1;
+
+        if ( d->grant_table->gt_version == 2 &&
+                (idx & XENMAPIDX_grant_table_status) )
+        {
+            idx &= ~XENMAPIDX_grant_table_status;
+            if ( idx < nr_status_frames(d->grant_table) )
+                mfn = virt_to_mfn(d->grant_table->status[idx]);
+        }
+        else
+        {
+            if ( (idx >= nr_grant_frames(d->grant_table)) &&
+                    (idx < max_nr_grant_frames) )
+                gnttab_grow_table(d, idx + 1);
+
+            if ( idx < nr_grant_frames(d->grant_table) )
+                mfn = virt_to_mfn(d->grant_table->shared_raw[idx]);
+        }
+
+        spin_unlock(&d->grant_table->lock);
+        break;
     case XENMAPSPACE_shared_info:
         if ( idx == 0 )
             mfn = virt_to_mfn(d->shared_info);
