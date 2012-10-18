@@ -53,6 +53,7 @@
     (*(volatile u32 *)(fix_to_virt(FIX_HPET_BASE) + (x)) = (y))
 
 extern unsigned long hpet_address;
+extern u8 hpet_blockid;
 
 /*
  * Detect and initialise HPET hardware: return counter update frequency.

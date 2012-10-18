@@ -107,6 +107,19 @@ static u16 apicid_to_bdf(int apic_id)
     return 0;
 }
 
+static u16 hpetid_to_bdf(unsigned int hpet_id)
+{
+    struct acpi_drhd_unit *drhd = hpet_to_drhd(hpet_id);
+    struct acpi_hpet_unit *acpi_hpet_unit;
+
+    list_for_each_entry ( acpi_hpet_unit, &drhd->hpet_list, list )
+        if ( acpi_hpet_unit->id == hpet_id )
+            return acpi_hpet_unit->bdf;
+
+    dprintk(XENLOG_ERR VTDPREFIX, "Didn't find the bdf for HPET %u!\n", hpet_id);
+    return 0;
+}
+
 static void set_ire_sid(struct iremap_entry *ire,
                         unsigned int svt, unsigned int sq, unsigned int sid)
 {
@@ -119,6 +132,16 @@ static void set_ioapic_source_id(int apic_id, struct iremap_entry *ire)
 {
     set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_ALL_16,
                 apicid_to_bdf(apic_id));
+}
+
+static void set_hpet_source_id(unsigned int id, struct iremap_entry *ire)
+{
+    /*
+     * Should really use SQ_ALL_16. Some platforms are broken.
+     * While we figure out the right quirks for these broken platforms, use
+     * SQ_13_IGNORE_3 for now.
+     */
+    set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_13_IGNORE_3, hpetid_to_bdf(id));
 }
 
 int iommu_supports_eim(void)
@@ -592,7 +615,10 @@ static int msi_msg_to_remap_entry(
         new_ire.lo.dst = ((msg->address_lo >> MSI_ADDR_DEST_ID_SHIFT)
                           & 0xff) << 8;
 
-    set_msi_source_id(pdev, &new_ire);
+    if ( pdev )
+        set_msi_source_id(pdev, &new_ire);
+    else
+        set_hpet_source_id(msi_desc->hpet_id, &new_ire);
     new_ire.hi.res_1 = 0;
     new_ire.lo.p = 1;    /* finally, set present bit */
 
@@ -624,7 +650,9 @@ void msi_msg_read_remap_rte(
     struct iommu *iommu = NULL;
     struct ir_ctrl *ir_ctrl;
 
-    if ( (drhd = acpi_find_matched_drhd_unit(pdev)) == NULL )
+    drhd = pdev ? acpi_find_matched_drhd_unit(pdev)
+                : hpet_to_drhd(msi_desc->hpet_id);
+    if ( !drhd )
         return;
     iommu = drhd->iommu;
 
@@ -643,7 +671,9 @@ void msi_msg_write_remap_rte(
     struct iommu *iommu = NULL;
     struct ir_ctrl *ir_ctrl;
 
-    if ( (drhd = acpi_find_matched_drhd_unit(pdev)) == NULL )
+    drhd = pdev ? acpi_find_matched_drhd_unit(pdev)
+                : hpet_to_drhd(msi_desc->hpet_id);
+    if ( !drhd )
         return;
     iommu = drhd->iommu;
 
@@ -652,6 +682,32 @@ void msi_msg_write_remap_rte(
         return;
 
     msi_msg_to_remap_entry(iommu, pdev, msi_desc, msg);
+}
+
+int __init intel_setup_hpet_msi(struct msi_desc *msi_desc)
+{
+    struct iommu *iommu = hpet_to_iommu(msi_desc->hpet_id);
+    struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
+    unsigned long flags;
+    int rc = 0;
+
+    if ( !ir_ctrl || !ir_ctrl->iremap_maddr )
+        return 0;
+
+    spin_lock_irqsave(&ir_ctrl->iremap_lock, flags);
+    msi_desc->remap_index = alloc_remap_entry(iommu);
+    if ( msi_desc->remap_index >= IREMAP_ENTRY_NR )
+    {
+        dprintk(XENLOG_ERR VTDPREFIX,
+                "%s: intremap index (%d) is larger than"
+                " the maximum index (%d)!\n",
+                __func__, msi_desc->remap_index, IREMAP_ENTRY_NR - 1);
+        msi_desc->remap_index = -1;
+        rc = -ENXIO;
+    }
+    spin_unlock_irqrestore(&ir_ctrl->iremap_lock, flags);
+
+    return rc;
 }
 
 int enable_intremap(struct iommu *iommu, int eim)

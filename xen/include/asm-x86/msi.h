@@ -97,7 +97,10 @@ struct msi_desc {
 
 	struct list_head list;
 
-	void __iomem *mask_base;        /* va for the entry in mask table */
+	union {
+		void __iomem *mask_base;/* va for the entry in mask table */
+		unsigned int hpet_id;   /* HPET (dev is NULL)             */
+	};
 	struct pci_dev *dev;
 	int irq;
 

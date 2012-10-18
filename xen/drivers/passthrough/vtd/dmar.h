@@ -39,6 +39,19 @@ struct acpi_ioapic_unit {
     }ioapic;
 };
 
+struct acpi_hpet_unit {
+    struct list_head list;
+    unsigned int id;
+    union {
+        u16 bdf;
+        struct {
+            u16 func: 3,
+                dev:  5,
+                bus:  8;
+        };
+    };
+};
+
 struct dmar_scope {
     DECLARE_BITMAP(buses, 256);         /* buses owned by this unit */
     u16    *devices;                    /* devices owned by this unit */
@@ -53,6 +66,7 @@ struct acpi_drhd_unit {
     u8     include_all:1;
     struct iommu *iommu;
     struct list_head ioapic_list;
+    struct list_head hpet_list;
 };
 
 struct acpi_rmrr_unit {

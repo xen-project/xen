@@ -54,7 +54,9 @@ int iommu_flush_iec_index(struct iommu *iommu, u8 im, u16 iidx);
 void clear_fault_bits(struct iommu *iommu);
 
 struct iommu * ioapic_to_iommu(unsigned int apic_id);
+struct iommu * hpet_to_iommu(unsigned int hpet_id);
 struct acpi_drhd_unit * ioapic_to_drhd(unsigned int apic_id);
+struct acpi_drhd_unit * hpet_to_drhd(unsigned int hpet_id);
 struct acpi_drhd_unit * iommu_to_drhd(struct iommu *iommu);
 struct acpi_rhsa_unit * drhd_to_rhsa(struct acpi_drhd_unit *drhd);
 
@@ -89,6 +91,8 @@ struct msi_desc;
 struct msi_msg;
 void msi_msg_read_remap_rte(struct msi_desc *, struct msi_msg *);
 void msi_msg_write_remap_rte(struct msi_desc *, struct msi_msg *);
+
+int intel_setup_hpet_msi(struct msi_desc *);
 
 int is_igd_vt_enabled_quirk(void);
 void platform_quirks_init(void);

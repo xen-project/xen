@@ -147,6 +147,34 @@ struct iommu * ioapic_to_iommu(unsigned int apic_id)
     return NULL;
 }
 
+static bool_t acpi_hpet_device_match(
+    struct list_head *list, unsigned int hpet_id)
+{
+    struct acpi_hpet_unit *hpet;
+
+    list_for_each_entry( hpet, list, list )
+        if (hpet->id == hpet_id)
+            return 1;
+    return 0;
+}
+
+struct acpi_drhd_unit *hpet_to_drhd(unsigned int hpet_id)
+{
+    struct acpi_drhd_unit *drhd;
+
+    list_for_each_entry( drhd, &acpi_drhd_units, list )
+        if ( acpi_hpet_device_match(&drhd->hpet_list, hpet_id) )
+            return drhd;
+    return NULL;
+}
+
+struct iommu *hpet_to_iommu(unsigned int hpet_id)
+{
+    struct acpi_drhd_unit *drhd = hpet_to_drhd(hpet_id);
+
+    return drhd ? drhd->iommu : NULL;
+}
+
 static int __init acpi_register_atsr_unit(struct acpi_atsr_unit *atsr)
 {
     /*
@@ -330,6 +358,22 @@ static int __init acpi_parse_dev_scope(
             if ( iommu_verbose )
                 dprintk(VTDPREFIX, " MSI HPET: %04x:%02x:%02x.%u\n",
                         seg, bus, path->dev, path->fn);
+
+            if ( type == DMAR_TYPE )
+            {
+                struct acpi_drhd_unit *drhd = acpi_entry;
+                struct acpi_hpet_unit *acpi_hpet_unit;
+
+                acpi_hpet_unit = xmalloc(struct acpi_hpet_unit);
+                if ( !acpi_hpet_unit )
+                    return -ENOMEM;
+                acpi_hpet_unit->id = acpi_scope->enumeration_id;
+                acpi_hpet_unit->bus = bus;
+                acpi_hpet_unit->dev = path->dev;
+                acpi_hpet_unit->func = path->fn;
+                list_add(&acpi_hpet_unit->list, &drhd->hpet_list);
+            }
+
             break;
 
         case ACPI_DMAR_SCOPE_TYPE_ENDPOINT:
@@ -407,6 +451,7 @@ acpi_parse_one_drhd(struct acpi_dmar_header *header)
     dmaru->segment = drhd->segment;
     dmaru->include_all = drhd->flags & ACPI_DMAR_INCLUDE_ALL;
     INIT_LIST_HEAD(&dmaru->ioapic_list);
+    INIT_LIST_HEAD(&dmaru->hpet_list);
     if ( iommu_verbose )
         dprintk(VTDPREFIX, "  dmaru->address = %"PRIx64"\n",
                 dmaru->address);

@@ -2396,6 +2396,7 @@ const struct iommu_ops intel_iommu_ops = {
     .update_ire_from_msi = msi_msg_write_remap_rte,
     .read_apic_from_ire = io_apic_read_remap_rte,
     .read_msi_from_ire = msi_msg_read_remap_rte,
+    .setup_hpet_msi = intel_setup_hpet_msi,
     .suspend = vtd_suspend,
     .resume = vtd_resume,
     .share_p2m = iommu_set_pgd,

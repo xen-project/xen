@@ -40,7 +40,7 @@ struct hpet_event_channel
 
     unsigned int idx;   /* physical channel idx */
     unsigned int cpu;   /* msi target */
-    int irq;            /* msi irq */
+    struct msi_desc msi;/* msi state */
     unsigned int flags; /* HPET_EVT_x */
 } __cacheline_aligned;
 static struct hpet_event_channel *__read_mostly hpet_events;
@@ -51,6 +51,7 @@ static unsigned int __read_mostly num_hpets_used;
 DEFINE_PER_CPU(struct hpet_event_channel *, cpu_bc_channel);
 
 unsigned long __read_mostly hpet_address;
+u8 __initdata hpet_blockid;
 
 /*
  * force_hpet_broadcast: by default legacy hpet broadcast will be stopped
@@ -252,6 +253,8 @@ static void hpet_msi_mask(struct irq_desc *desc)
 
 static void hpet_msi_write(struct hpet_event_channel *ch, struct msi_msg *msg)
 {
+    if ( iommu_intremap )
+        iommu_update_ire_from_msi(&ch->msi, msg);
     hpet_write32(msg->data, HPET_Tn_ROUTE(ch->idx));
     hpet_write32(msg->address_lo, HPET_Tn_ROUTE(ch->idx) + 4);
 }
@@ -261,6 +264,8 @@ static void hpet_msi_read(struct hpet_event_channel *ch, struct msi_msg *msg)
     msg->data = hpet_read32(HPET_Tn_ROUTE(ch->idx));
     msg->address_lo = hpet_read32(HPET_Tn_ROUTE(ch->idx) + 4);
     msg->address_hi = 0;
+    if ( iommu_intremap )
+        iommu_read_msi_from_ire(&ch->msi, msg);
 }
 
 static unsigned int hpet_msi_startup(struct irq_desc *desc)
@@ -292,6 +297,7 @@ static void hpet_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
     msg.data |= MSI_DATA_VECTOR(desc->arch.vector);
     msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
     msg.address_lo |= MSI_ADDR_DEST_ID(dest);
+    msg.dest32 = dest;
     hpet_msi_write(desc->action->dev_id, &msg);
 }
 
@@ -316,49 +322,54 @@ static void __hpet_setup_msi_irq(struct irq_desc *desc)
     hpet_msi_write(desc->action->dev_id, &msg);
 }
 
-static int __init hpet_setup_msi_irq(unsigned int irq, struct hpet_event_channel *ch)
+static int __init hpet_setup_msi_irq(struct hpet_event_channel *ch)
 {
     int ret;
-    irq_desc_t *desc = irq_to_desc(irq);
+    irq_desc_t *desc = irq_to_desc(ch->msi.irq);
+
+    if ( iommu_intremap )
+    {
+        ch->msi.hpet_id = hpet_blockid;
+        ret = iommu_setup_hpet_msi(&ch->msi);
+        if ( ret )
+            return ret;
+    }
 
     desc->handler = &hpet_msi_type;
-    ret = request_irq(irq, hpet_interrupt_handler, 0, "HPET", ch);
+    ret = request_irq(ch->msi.irq, hpet_interrupt_handler, 0, "HPET", ch);
     if ( ret < 0 )
+    {
+        if ( iommu_intremap )
+            iommu_update_ire_from_msi(&ch->msi, NULL);
         return ret;
+    }
 
     __hpet_setup_msi_irq(desc);
 
     return 0;
 }
 
-static int __init hpet_assign_irq(unsigned int idx)
+static int __init hpet_assign_irq(struct hpet_event_channel *ch)
 {
     int irq;
 
     if ( (irq = create_irq(NUMA_NO_NODE)) < 0 )
         return irq;
 
-    if ( hpet_setup_msi_irq(irq, hpet_events + idx) )
+    ch->msi.irq = irq;
+    if ( hpet_setup_msi_irq(ch) )
     {
         destroy_irq(irq);
         return -EINVAL;
     }
 
-    return irq;
+    return 0;
 }
 
 static void __init hpet_fsb_cap_lookup(void)
 {
     u32 id;
     unsigned int i, num_chs;
-
-    /* TODO. */
-    if ( iommu_intremap )
-    {
-        printk(XENLOG_INFO "HPET's MSI mode hasn't been supported when "
-            "Interrupt Remapping is enabled.\n");
-        return;
-    }
 
     id = hpet_read32(HPET_ID);
 
@@ -391,8 +402,8 @@ static void __init hpet_fsb_cap_lookup(void)
         ch->flags = 0;
         ch->idx = i;
 
-        if ( (ch->irq = hpet_assign_irq(num_hpets_used++)) < 0 )
-            num_hpets_used--;
+        if ( hpet_assign_irq(ch) == 0 )
+            num_hpets_used++;
     }
 
     printk(XENLOG_INFO "HPET: %u timers (%u will be used for broadcast)\n",
@@ -438,7 +449,7 @@ static struct hpet_event_channel *hpet_get_channel(unsigned int cpu)
 
 static void set_channel_irq_affinity(const struct hpet_event_channel *ch)
 {
-    struct irq_desc *desc = irq_to_desc(ch->irq);
+    struct irq_desc *desc = irq_to_desc(ch->msi.irq);
 
     ASSERT(!local_irq_is_enabled());
     spin_lock(&desc->lock);
@@ -530,7 +541,7 @@ void __init hpet_broadcast_init(void)
             hpet_events = xzalloc(struct hpet_event_channel);
         if ( !hpet_events || !zalloc_cpumask_var(&hpet_events->cpumask) )
             return;
-        hpet_events->irq = -1;
+        hpet_events->msi.irq = -1;
 
         /* Start HPET legacy interrupts */
         cfg |= HPET_CFG_LEGACY;
@@ -598,8 +609,8 @@ void hpet_broadcast_resume(void)
 
     for ( i = 0; i < n; i++ )
     {
-        if ( hpet_events[i].irq >= 0 )
-            __hpet_setup_msi_irq(irq_to_desc(hpet_events[i].irq));
+        if ( hpet_events[i].msi.irq >= 0 )
+            __hpet_setup_msi_irq(irq_to_desc(hpet_events[i].msi.irq));
 
         /* set HPET Tn as oneshot */
         cfg = hpet_read32(HPET_Tn_CFG(hpet_events[i].idx));

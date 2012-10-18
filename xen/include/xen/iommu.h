@@ -109,6 +109,7 @@ struct iommu_ops {
     void (*update_ire_from_msi)(struct msi_desc *msi_desc, struct msi_msg *msg);
     void (*read_msi_from_ire)(struct msi_desc *msi_desc, struct msi_msg *msg);
     unsigned int (*read_apic_from_ire)(unsigned int apic, unsigned int reg);
+    int (*setup_hpet_msi)(struct msi_desc *);
     void (*suspend)(void);
     void (*resume)(void);
     void (*share_p2m)(struct domain *d);
@@ -122,6 +123,7 @@ void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned in
 void iommu_update_ire_from_msi(struct msi_desc *msi_desc, struct msi_msg *msg);
 void iommu_read_msi_from_ire(struct msi_desc *msi_desc, struct msi_msg *msg);
 unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg);
+int iommu_setup_hpet_msi(struct msi_desc *);
 
 void iommu_suspend(void);
 void iommu_resume(void);
