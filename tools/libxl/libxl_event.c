@@ -1157,7 +1157,8 @@ void libxl_event_free(libxl_ctx *ctx, libxl_event *event)
 }
 
 libxl_event *libxl__event_new(libxl__egc *egc,
-                              libxl_event_type type, uint32_t domid)
+                              libxl_event_type type, uint32_t domid,
+                              libxl_ev_user for_user)
 {
     EGC_GC;
     libxl_event *ev;
@@ -1168,6 +1169,7 @@ libxl_event *libxl__event_new(libxl__egc *egc,
     libxl_event_init_type(ev, type);
 
     ev->domid = domid;
+    ev->for_user = for_user;
 
     return ev;
 }
@@ -1528,9 +1530,8 @@ void libxl__ao_complete_check_progress_reports(libxl__egc *egc, libxl__ao *ao)
         LIBXL_TAILQ_INSERT_TAIL(&egc->aos_for_callback, ao, entry_for_callback);
     } else {
         libxl_event *ev;
-        ev = NEW_EVENT(egc, OPERATION_COMPLETE, ao->domid);
+        ev = NEW_EVENT(egc, OPERATION_COMPLETE, ao->domid, ao->how.u.for_event);
         if (ev) {
-            ev->for_user = ao->how.u.for_event;
             ev->u.operation_complete.rc = ao->rc;
             libxl__event_occurred(egc, ev);
         }
@@ -1662,7 +1663,6 @@ void libxl__ao_progress_report(libxl__egc *egc, libxl__ao *ao,
         const libxl_asyncprogress_how *how, libxl_event *ev)
 {
     AO_GC;
-    ev->for_user = how->for_event;
     if (how->callback == dummy_asyncprogress_callback_ignore) {
         LOG(DEBUG,"ao %p: progress report: ignored",ao);
         libxl_event_free(CTX,ev);

@@ -783,13 +783,14 @@ _hidden void libxl__event_occurred(libxl__egc*, libxl_event *event);
    * event should be suitable for passing to libxl_event_free. */
 
 _hidden libxl_event *libxl__event_new(libxl__egc*, libxl_event_type,
-                                      uint32_t domid);
+                                      uint32_t domid,
+                                      libxl_ev_user for_user);
   /* Convenience function.
    * Allocates a new libxl_event, fills in domid and type.
    * Cannot fail. */
 
-#define NEW_EVENT(egc, type, domid)                              \
-    libxl__event_new((egc), LIBXL_EVENT_TYPE_##type, (domid))
+#define NEW_EVENT(egc, type, domid, user)                        \
+    libxl__event_new((egc), LIBXL_EVENT_TYPE_##type, (domid), (user))
     /* Convenience macro. */
 
 /*
