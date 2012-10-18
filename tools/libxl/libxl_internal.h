@@ -1709,10 +1709,12 @@ _hidden void libxl__egc_cleanup(libxl__egc *egc);
 
 #define AO_INPROGRESS ({                                        \
         libxl_ctx *ao__ctx = libxl__gc_owner(&ao->gc);          \
+        CTX_UNLOCK;                                             \
+        EGC_FREE;                                               \
+        CTX_LOCK;                                               \
         int ao__rc = libxl__ao_inprogress(ao,                   \
                                __FILE__, __LINE__, __func__);   \
         libxl__ctx_unlock(ao__ctx); /* gc is now invalid */     \
-        EGC_FREE;                                               \
         (ao__rc);                                               \
    })
 
