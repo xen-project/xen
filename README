@@ -54,7 +54,7 @@ provided by your OS distributor:
     * pkg-config
     * bridge-utils package (/sbin/brctl)
     * iproute package (/sbin/ip)
-    * hotplug or udev
+    * udev
     * GNU bison and GNU flex
     * GNU gettext
     * 16-bit x86 assembler, loader and compiler (dev86 rpm or bin86 & bcc debs)
@@ -120,9 +120,9 @@ performed with root privileges.]
 
    make install and make dist differ in that make install does the
    right things for your local machine (installing the appropriate
-   version of hotplug or udev scripts, for example), but make dist
-   includes all versions of those scripts, so that you can copy the dist
-   directory to another machine and install from that distribution.
+   version of udev scripts, for example), but make dist includes all
+   versions of those scripts, so that you can copy the dist directory
+   to another machine and install from that distribution.
    
 Python Runtime Libraries
 ========================

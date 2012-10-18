@@ -27,31 +27,8 @@ XEN_SCRIPT_DATA += xen-hotplug-common.sh xen-network-common.sh vif-common.sh
 XEN_SCRIPT_DATA += block-common.sh vtpm-common.sh vtpm-hotplug-common.sh
 XEN_SCRIPT_DATA += vtpm-migration.sh vtpm-impl
 
-XEN_HOTPLUG_DIR = $(CONFIG_DIR)/hotplug
-XEN_HOTPLUG_SCRIPTS = xen-backend.agent
-
-UDEVVER = 0
-ifeq ($(shell [ -x /sbin/udevadm ] && echo 1),1)
-UDEVVER = $(shell /sbin/udevadm info -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/' )
-endif
-ifeq ($(shell [ -x /usr/bin/udevinfo ] && echo 1),1)
-UDEVVER = $(shell /usr/bin/udevinfo -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/' )
-endif
-
 UDEV_RULES_DIR = $(CONFIG_DIR)/udev
 UDEV_RULES = xen-backend.rules xend.rules
-
-DI = $(if $(DISTDIR),$(shell readlink -f $(DISTDIR)),)
-DE = $(if $(DESTDIR),$(shell readlink -f $(DESTDIR)),)
-ifeq ($(findstring $(DI),$(DE)),$(DI))
-HOTPLUGS=install-hotplug install-udev
-else
-ifeq ($(shell [ $(UDEVVER) -ge 059 ] && echo 1),1)
-HOTPLUGS=install-udev
-else
-HOTPLUGS=install-hotplug
-endif
-endif
 
 .PHONY: all
 all:
@@ -60,7 +37,7 @@ all:
 build:
 
 .PHONY: install
-install: all install-initd install-scripts $(HOTPLUGS)
+install: all install-initd install-scripts install-udev
 
 # See docs/misc/distro_mapping.txt for INITD_DIR location
 .PHONY: install-initd
@@ -85,15 +62,6 @@ install-scripts:
 	set -e; for i in $(XEN_SCRIPT_DATA); \
 	    do \
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \
-	done
-
-.PHONY: install-hotplug
-install-hotplug:
-	[ -d $(DESTDIR)$(XEN_HOTPLUG_DIR) ] || \
-		$(INSTALL_DIR) $(DESTDIR)$(XEN_HOTPLUG_DIR)
-	set -e; for i in $(XEN_HOTPLUG_SCRIPTS); \
-	    do \
-	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_HOTPLUG_DIR); \
 	done
 
 .PHONY: install-udev

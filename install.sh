@@ -27,20 +27,6 @@ tmp="`mktemp -d`"
 echo "Installing Xen from '$src' to '$dst'..."
 (cd $src; tar -cf - * ) | tar -C "$tmp" -xf -
 
-[ -x "$(which udevinfo)" ] && \
-  UDEV_VERSION=$(udevinfo -V | sed -e 's/^[^0-9]* \([0-9]\{1,\}\)[^0-9]\{0,\}/\1/')
-
-[ -z "$UDEV_VERSION" -a -x /sbin/udevadm ] && \
-  UDEV_VERSION=$(/sbin/udevadm info -V | awk '{print $NF}')
-
-if [ -n "$UDEV_VERSION" ] && [ $UDEV_VERSION -ge 059 ]; then
-  echo " - installing for udev-based system"
-  rm -rf "$tmp/etc/hotplug"
-else
-  echo " - installing for hotplug-based system"
-  rm -rf "$tmp/etc/udev"
-fi
-
 echo " - modifying permissions"
 chmod -R a+rX "$tmp"
 

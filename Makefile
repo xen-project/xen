@@ -223,7 +223,6 @@ uninstall:
 	$(MAKE) -C xen uninstall
 	rm -rf $(D)$(CONFIG_DIR)/init.d/xendomains $(D)$(CONFIG_DIR)/init.d/xend
 	rm -rf $(D)$(CONFIG_DIR)/init.d/xencommons $(D)$(CONFIG_DIR)/init.d/xen-watchdog
-	rm -rf $(D)$(CONFIG_DIR)/hotplug/xen-backend.agent
 	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xen-backend.rules
 	rm -f  $(D)$(CONFIG_DIR)/udev/rules.d/xend.rules
 	rm -f  $(D)$(SYSCONFIG_DIR)/xendomains
