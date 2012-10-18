@@ -2713,12 +2713,46 @@ static void destroy_domain(uint32_t domid)
     if (rc) { fprintf(stderr,"destroy failed (rc=%d)\n",rc); exit(-1); }
 }
 
-static void shutdown_domain(uint32_t domid, int wait_for_it,
+static void wait_for_domain_deaths(libxl_evgen_domain_death **deathws, int nr)
+{
+    int rc, count = 0;
+    LOG("Waiting for %d domains to shutdown", nr);
+    while(1 && count < nr) {
+        libxl_event *event;
+        rc = libxl_event_wait(ctx, &event, LIBXL_EVENTMASK_ALL, 0,0);
+        if (rc) {
+            LOG("Failed to get event, quitting (rc=%d)", rc);
+            exit(-1);
+        }
+
+        switch (event->type) {
+        case LIBXL_EVENT_TYPE_DOMAIN_DEATH:
+            LOG("Domain %d has been destroyed", event->domid);
+            libxl_evdisable_domain_death(ctx, deathws[event->for_user]);
+            count++;
+            break;
+        case LIBXL_EVENT_TYPE_DOMAIN_SHUTDOWN:
+            LOG("Domain %d has been shut down, reason code %d",
+                event->domid, event->u.domain_shutdown.shutdown_reason);
+            libxl_evdisable_domain_death(ctx, deathws[event->for_user]);
+            count++;
+            break;
+        default:
+            LOG("Unexpected event type %d", event->type);
+            break;
+        }
+        libxl_event_free(ctx, event);
+    }
+}
+
+static void shutdown_domain(uint32_t domid,
+                            libxl_evgen_domain_death **deathw,
+                            libxl_ev_user for_user,
                             int fallback_trigger)
 {
     int rc;
-    libxl_event *event;
 
+    fprintf(stderr, "Shutting down domain %d\n", domid);
     rc=libxl_domain_shutdown(ctx, domid);
     if (rc == ERROR_NOPARAVIRT) {
         if (fallback_trigger) {
@@ -2731,44 +2765,19 @@ static void shutdown_domain(uint32_t domid, int wait_for_it,
             fprintf(stderr, "Use \"-F\" to fallback to ACPI power event.\n");
         }
     }
+
     if (rc) {
         fprintf(stderr,"shutdown failed (rc=%d)\n",rc);exit(-1);
     }
 
-    if (wait_for_it) {
-        libxl_evgen_domain_death *deathw;
-
-        rc = libxl_evenable_domain_death(ctx, domid, 0, &deathw);
+    if (deathw) {
+        rc = libxl_evenable_domain_death(ctx, domid, for_user, deathw);
         if (rc) {
             fprintf(stderr,"wait for death failed (evgen, rc=%d)\n",rc);
             exit(-1);
         }
-
-        for (;;) {
-            rc = domain_wait_event(domid, &event);
-            if (rc) exit(-1);
-
-            switch (event->type) {
-
-            case LIBXL_EVENT_TYPE_DOMAIN_DEATH:
-                LOG("Domain %d has been destroyed", domid);
-                goto done;
-
-            case LIBXL_EVENT_TYPE_DOMAIN_SHUTDOWN:
-                LOG("Domain %d has been shut down, reason code %d %x", domid,
-                    event->u.domain_shutdown.shutdown_reason,
-                    event->u.domain_shutdown.shutdown_reason);
-                goto done;
-
-            default:
-                LOG("Unexpected event type %d", event->type);
-                break;
-            }
-            libxl_event_free(ctx, event);
-        }
-    done:
-        libxl_event_free(ctx, event);
-        libxl_evdisable_domain_death(ctx, deathw);
+        printf("Waiting for domain %d death %p %"PRIx64"\n",
+               domid, *deathw, for_user);
     }
 }
 
@@ -3706,18 +3715,21 @@ int main_destroy(int argc, char **argv)
 
 int main_shutdown(int argc, char **argv)
 {
-    int opt;
-    int wait_for_it = 0;
+    int opt, i, nb_domain;
+    int wait_for_it = 0, all =0;
     int fallback_trigger = 0;
     static struct option long_options[] = {
+        {"all", 0, 0, 'a'},
         {"wait", 0, 0, 'w'},
         {0, 0, 0, 0}
     };
 
-    while ((opt = getopt_long(argc, argv, "wF", long_options, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "awF", long_options, NULL)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
+        case 'a':
+            all = 1;
         case 'w':
             wait_for_it = 1;
             break;
@@ -3727,7 +3739,44 @@ int main_shutdown(int argc, char **argv)
         }
     }
 
-    shutdown_domain(find_domain(argv[optind]), wait_for_it, fallback_trigger);
+    if (!argv[optind] && !all) {
+        fprintf(stderr, "You must specify -a or a domain id.\n\n");
+        return opt;
+    }
+
+    if (all) {
+        libxl_dominfo *dominfo;
+        libxl_evgen_domain_death **deathws = NULL;
+        if (!(dominfo = libxl_list_domain(ctx, &nb_domain))) {
+            fprintf(stderr, "libxl_list_domain failed.\n");
+            return -1;
+        }
+
+        if (wait_for_it)
+            deathws = calloc(nb_domain, sizeof(*deathws));
+
+        for (i = 0; i<nb_domain; i++) {
+            if (dominfo[i].domid == 0)
+                continue;
+            shutdown_domain(dominfo[i].domid,
+                            deathws ? &deathws[i] : NULL, i,
+                            fallback_trigger);
+        }
+
+        wait_for_domain_deaths(deathws, nb_domain - 1 /* not dom 0 */);
+        libxl_dominfo_list_free(dominfo, nb_domain);
+    } else {
+        libxl_evgen_domain_death *deathw = NULL;
+        uint32_t domid = find_domain(argv[optind]);
+
+        shutdown_domain(domid, wait_for_it ? &deathw : NULL, 0,
+                        fallback_trigger);
+
+        if (wait_for_it)
+            wait_for_domain_deaths(&deathw, 1);
+    }
+
+
     return 0;
 }
 

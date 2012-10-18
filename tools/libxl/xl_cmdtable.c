@@ -60,11 +60,12 @@ struct cmd_spec cmd_table[] = {
     { "shutdown",
       &main_shutdown, 0, 1,
       "Issue a shutdown signal to a domain",
-      "[options] <Domain>",
+      "[options] <-a|Domain>",
+      "-a, --all               Shutdown all guest domains.\n"
       "-h                      Print this help.\n"
       "-F                      Fallback to ACPI power event for HVM guests with\n"
       "                        no PV drivers.\n"
-      "-w, --wait              Wait for guest to shutdown.\n"
+      "-w, --wait              Wait for guest(s) to shutdown.\n"
     },
     { "reboot",
       &main_reboot, 0, 1,

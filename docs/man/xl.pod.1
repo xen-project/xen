@@ -527,7 +527,7 @@ List specifically for that domain. Otherwise, list for all domains.
 
 =back
 
-=item B<shutdown> [I<OPTIONS>] I<domain-id>
+=item B<shutdown> [I<OPTIONS>] I<-a|domain-id>
 
 Gracefully shuts down a domain.  This coordinates with the domain OS
 to perform graceful shutdown, so there is no guarantee that it will
@@ -549,6 +549,11 @@ domain was created.
 B<OPTIONS>
 
 =over 4
+
+=item B<-a>, B<--all>
+
+Shutdown all guest domains.  Often used when doing a complete shutdown
+of a Xen system.
 
 =item B<-w>, B<--wait>
 
