@@ -59,6 +59,9 @@ claim_lock()
             print "y\n" if $fd_inum eq $file_inum;
                              ' "$_lockfile" )
         if [ x$rightfile = xy ]; then break; fi
+	# Some versions of bash appear to be buggy if the same
+	# $_lockfile is opened repeatedly. Close the current fd here.
+        eval "exec $_lockfd<&-"
     done
 }
 
