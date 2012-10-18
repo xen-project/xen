@@ -1,4 +1,4 @@
-## Path: System/xen
+## Path: System/Virtualization
 ## Description: xen domain start/stop on boot
 ## Type: string
 ## Default: 
