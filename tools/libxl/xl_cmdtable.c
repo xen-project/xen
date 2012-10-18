@@ -70,10 +70,12 @@ struct cmd_spec cmd_table[] = {
     { "reboot",
       &main_reboot, 0, 1,
       "Issue a reboot signal to a domain",
-      "[options] <Domain>",
+      "[options] <-a|Domain>",
+      "-a, --all               Shutdown all guest domains.\n"
       "-h                      Print this help.\n"
       "-F                      Fallback to ACPI reset event for HVM guests with\n"
       "                        no PV drivers.\n"
+      "-w, --wait              Wait for guest(s) to reboot.\n"
     },
     { "pci-attach",
       &main_pciattach, 0, 1,

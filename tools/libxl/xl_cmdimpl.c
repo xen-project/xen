@@ -2716,7 +2716,7 @@ static void destroy_domain(uint32_t domid)
 static void wait_for_domain_deaths(libxl_evgen_domain_death **deathws, int nr)
 {
     int rc, count = 0;
-    LOG("Waiting for %d domains to shutdown", nr);
+    LOG("Waiting for %d domains", nr);
     while(1 && count < nr) {
         libxl_event *event;
         rc = libxl_event_wait(ctx, &event, LIBXL_EVENTMASK_ALL, 0,0);
@@ -2776,15 +2776,15 @@ static void shutdown_domain(uint32_t domid,
             fprintf(stderr,"wait for death failed (evgen, rc=%d)\n",rc);
             exit(-1);
         }
-        printf("Waiting for domain %d death %p %"PRIx64"\n",
-               domid, *deathw, for_user);
     }
 }
 
-static void reboot_domain(uint32_t domid, int fallback_trigger)
+static void reboot_domain(uint32_t domid, libxl_evgen_domain_death **deathw,
+                          libxl_ev_user for_user, int fallback_trigger)
 {
     int rc;
 
+    fprintf(stderr, "Rebooting domain %d\n", domid);
     rc=libxl_domain_reboot(ctx, domid);
     if (rc == ERROR_NOPARAVIRT) {
         if (fallback_trigger) {
@@ -2799,6 +2799,14 @@ static void reboot_domain(uint32_t domid, int fallback_trigger)
     }
     if (rc) {
         fprintf(stderr,"reboot failed (rc=%d)\n",rc);exit(-1);
+    }
+
+    if (deathw) {
+        rc = libxl_evenable_domain_death(ctx, domid, for_user, deathw);
+        if (rc) {
+            fprintf(stderr,"wait for death failed (evgen, rc=%d)\n",rc);
+            exit(-1);
+        }
     }
 }
 
@@ -3713,8 +3721,11 @@ int main_destroy(int argc, char **argv)
     return 0;
 }
 
-int main_shutdown(int argc, char **argv)
+static int main_shutdown_or_reboot(int reboot, int argc, char **argv)
 {
+    void (*fn)(uint32_t domid,
+               libxl_evgen_domain_death **, libxl_ev_user, int) =
+        reboot ? &reboot_domain : &shutdown_domain;
     int opt, i, nb_domain;
     int wait_for_it = 0, all =0;
     int fallback_trigger = 0;
@@ -3730,6 +3741,7 @@ int main_shutdown(int argc, char **argv)
             return opt;
         case 'a':
             all = 1;
+            break;
         case 'w':
             wait_for_it = 1;
             break;
@@ -3758,9 +3770,8 @@ int main_shutdown(int argc, char **argv)
         for (i = 0; i<nb_domain; i++) {
             if (dominfo[i].domid == 0)
                 continue;
-            shutdown_domain(dominfo[i].domid,
-                            deathws ? &deathws[i] : NULL, i,
-                            fallback_trigger);
+            fn(dominfo[i].domid, deathws ? &deathws[i] : NULL, i,
+               fallback_trigger);
         }
 
         wait_for_domain_deaths(deathws, nb_domain - 1 /* not dom 0 */);
@@ -3769,8 +3780,7 @@ int main_shutdown(int argc, char **argv)
         libxl_evgen_domain_death *deathw = NULL;
         uint32_t domid = find_domain(argv[optind]);
 
-        shutdown_domain(domid, wait_for_it ? &deathw : NULL, 0,
-                        fallback_trigger);
+        fn(domid, wait_for_it ? &deathw : NULL, 0, fallback_trigger);
 
         if (wait_for_it)
             wait_for_domain_deaths(&deathw, 1);
@@ -3780,23 +3790,14 @@ int main_shutdown(int argc, char **argv)
     return 0;
 }
 
+int main_shutdown(int argc, char **argv)
+{
+    return main_shutdown_or_reboot(0, argc, argv);
+}
+
 int main_reboot(int argc, char **argv)
 {
-    int opt;
-    int fallback_trigger = 0;
-
-    while ((opt = def_getopt(argc, argv, "F", "reboot", 1)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'F':
-            fallback_trigger = 1;
-            break;
-        }
-    }
-
-    reboot_domain(find_domain(argv[optind]), fallback_trigger);
-    return 0;
+    return main_shutdown_or_reboot(1, argc, argv);
 }
 
 int main_list(int argc, char **argv)
