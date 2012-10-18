@@ -6,8 +6,8 @@ HOTPLUGPATH="hotplugpath.sh"
 # OS-independent hotplug scripts go in this directory
 
 # Xen scripts to go there.
-XEN_SCRIPTS = $(HOTPLUGPATH)
-XEN_SCRIPT_DATA =
+XEN_SCRIPTS =
+XEN_SCRIPT_DATA = $(HOTPLUGPATH)
 
 genpath-target = $(call buildmakevars2file,$(HOTPLUGPATH))
 $(eval $(genpath-target))
