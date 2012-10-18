@@ -23,23 +23,25 @@ OBJS     = $(SRCS:.c=.o)
 OBJS_PIC = $(SRCS:.c=.opic)
 IBINS   :=
 
-LIB      = libblktap.a libblktap.so.$(MAJOR).$(MINOR)
+LIB      = libblktap.a
+LIB_SO   = libblktap.so.$(MAJOR).$(MINOR)
 
 .PHONY: all
-all: $(LIB)
+all: $(LIB) $(LIB_SO)
 
 .PHONY: install
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(LIBDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(INCLUDEDIR)
-	$(INSTALL_PROG) $(LIB) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_PROG) $(LIB_SO) $(DESTDIR)$(LIBDIR)
+	$(INSTALL_DATA) $(LIB) $(DESTDIR)$(LIBDIR)
 	ln -sf libblktap.so.$(MAJOR).$(MINOR) $(DESTDIR)$(LIBDIR)/libblktap.so.$(MAJOR)
 	ln -sf libblktap.so.$(MAJOR) $(DESTDIR)$(LIBDIR)/libblktap.so
 	$(INSTALL_DATA) blktaplib.h $(DESTDIR)$(INCLUDEDIR)
 
 .PHONY: clean
 clean:
-	rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen TAGS
+	rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) $(LIB_SO) *~ $(DEPS) xen TAGS
 
 libblktap.so.$(MAJOR).$(MINOR): $(OBJS_PIC) 
 	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,$(SONAME) $(SHLIB_LDFLAGS) \
