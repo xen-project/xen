@@ -498,7 +498,7 @@ unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg)
 int __init iommu_setup_hpet_msi(struct msi_desc *msi)
 {
     const struct iommu_ops *ops = iommu_get_ops();
-    return ops->setup_hpet_msi ? ops->setup_hpet_msi(msi) : 0;
+    return ops->setup_hpet_msi ? ops->setup_hpet_msi(msi) : -ENODEV;
 }
 
 void iommu_resume()
