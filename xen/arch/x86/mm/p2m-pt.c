@@ -405,7 +405,7 @@ p2m_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
         }
         
         ASSERT(!mfn_valid(mfn) || p2mt != p2m_mmio_direct);
-        if ( mfn_valid(mfn) || p2m_is_magic(p2mt) )
+        if ( mfn_valid(mfn) || p2m_is_pod(p2mt) )
             l2e_content = l2e_from_pfn(mfn_x(mfn),
                                        p2m_type_to_flags(p2mt, mfn) |
                                        _PAGE_PSE);

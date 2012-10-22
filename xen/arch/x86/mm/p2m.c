@@ -238,7 +238,7 @@ struct page_info *get_page_from_gfn_p2m(
             return page;
 
         /* Error path: not a suitable GFN at all */
-        if ( !p2m_is_ram(*t) && !p2m_is_paging(*t) && !p2m_is_magic(*t) )
+        if ( !p2m_is_ram(*t) && !p2m_is_paging(*t) && !p2m_is_pod(*t) )
             return NULL;
     }
 

@@ -139,7 +139,7 @@ typedef unsigned int p2m_query_t;
                       | p2m_to_mask(p2m_grant_map_ro)   \
                       | p2m_to_mask(p2m_ram_shared) )
 
-#define P2M_MAGIC_TYPES (p2m_to_mask(p2m_populate_on_demand))
+#define P2M_POD_TYPES (p2m_to_mask(p2m_populate_on_demand))
 
 /* Pageable types */
 #define P2M_PAGEABLE_TYPES (p2m_to_mask(p2m_ram_rw) \
@@ -167,7 +167,7 @@ typedef unsigned int p2m_query_t;
 #define p2m_is_hole(_t) (p2m_to_mask(_t) & P2M_HOLE_TYPES)
 #define p2m_is_mmio(_t) (p2m_to_mask(_t) & P2M_MMIO_TYPES)
 #define p2m_is_readonly(_t) (p2m_to_mask(_t) & P2M_RO_TYPES)
-#define p2m_is_magic(_t) (p2m_to_mask(_t) & P2M_MAGIC_TYPES)
+#define p2m_is_pod(_t) (p2m_to_mask(_t) & P2M_POD_TYPES)
 #define p2m_is_grant(_t) (p2m_to_mask(_t) & P2M_GRANT_TYPES)
 /* Grant types are *not* considered valid, because they can be
    unmapped at any time and, unless you happen to be the shadow or p2m
