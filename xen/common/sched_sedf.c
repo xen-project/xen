@@ -97,7 +97,6 @@ struct sedf_vcpu_info {
     int   block_tot;
     int   short_block_tot;
     int   long_block_tot;
-    int   short_cont;
     int   pen_extra_blocks;
     int   pen_extra_slices;
 #endif
@@ -1201,12 +1200,10 @@ static void sedf_dump_domain(struct vcpu *d)
         printk(" pen=%"PRIu64"%%", (EDOM_INFO(d)->penalty_time_tot * 100) /
                EDOM_INFO(d)->block_time_tot);
     if ( EDOM_INFO(d)->block_tot != 0 )
-        printk("\n   blks=%u sh=%u (%u%%) (shc=%u (%u%%) shex=%i "\
+        printk("\n   blks=%u sh=%u (%u%%) (shex=%i "\
                "shexsl=%i) l=%u (%u%%) avg: b=%"PRIu64" p=%"PRIu64"",
                EDOM_INFO(d)->block_tot, EDOM_INFO(d)->short_block_tot,
-               (EDOM_INFO(d)->short_block_tot * 100) 
-               / EDOM_INFO(d)->block_tot, EDOM_INFO(d)->short_cont,
-               (EDOM_INFO(d)->short_cont * 100) / EDOM_INFO(d)->block_tot,
+               (EDOM_INFO(d)->short_block_tot * 100) / EDOM_INFO(d)->block_tot,
                EDOM_INFO(d)->pen_extra_blocks,
                EDOM_INFO(d)->pen_extra_slices,
                EDOM_INFO(d)->long_block_tot,
