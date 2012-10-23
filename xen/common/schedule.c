@@ -312,11 +312,13 @@ void sched_destroy_vcpu(struct vcpu *v)
 
 int sched_init_domain(struct domain *d)
 {
+    SCHED_STAT_CRANK(dom_init);
     return SCHED_OP(DOM2OP(d), init_domain, d);
 }
 
 void sched_destroy_domain(struct domain *d)
 {
+    SCHED_STAT_CRANK(dom_destroy);
     SCHED_OP(DOM2OP(d), destroy_domain, d);
 }
 
@@ -1084,7 +1086,7 @@ static void schedule(void)
 
     ASSERT(!in_atomic());
 
-    perfc_incr(sched_run);
+    SCHED_STAT_CRANK(sched_run);
 
     sd = &this_cpu(schedule_data);
 
@@ -1162,7 +1164,7 @@ static void schedule(void)
 
     pcpu_schedule_unlock_irq(cpu);
 
-    perfc_incr(sched_ctx);
+    SCHED_STAT_CRANK(sched_ctx);
 
     stop_timer(&prev->periodic_timer);
 
@@ -1196,7 +1198,7 @@ void context_saved(struct vcpu *prev)
 static void s_timer_fn(void *unused)
 {
     raise_softirq(SCHEDULE_SOFTIRQ);
-    perfc_incr(sched_irq);
+    SCHED_STAT_CRANK(sched_irq);
 }
 
 /* Per-VCPU periodic timer function: sends a virtual timer interrupt. */

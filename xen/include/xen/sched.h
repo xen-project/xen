@@ -16,6 +16,7 @@
 #include <xen/tasklet.h>
 #include <xen/mm.h>
 #include <xen/smp.h>
+#include <xen/perfc.h>
 #include <asm/atomic.h>
 #include <xen/wait.h>
 #include <public/xen.h>
@@ -28,6 +29,18 @@
 #include <compat/vcpu.h>
 DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t);
 #endif
+
+/*
+ * Stats
+ *
+ * Enable and ease the use of scheduling related performance counters.
+ *
+ */
+#ifdef PERF_COUNTERS
+#define SCHED_STATS
+#endif
+
+#define SCHED_STAT_CRANK(_X)                (perfc_incr(_X))
 
 /* A global pointer to the initial domain (DOM0). */
 extern struct domain *dom0;

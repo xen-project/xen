@@ -16,24 +16,11 @@
 #include <xen/delay.h>
 #include <xen/event.h>
 #include <xen/time.h>
-#include <xen/perfc.h>
 #include <xen/sched-if.h>
 #include <xen/softirq.h>
 #include <asm/atomic.h>
 #include <xen/errno.h>
 #include <xen/keyhandler.h>
-
-/*
- * CSCHED_STATS
- *
- * Manage very basic per-vCPU counters and stats.
- *
- * Useful for debugging live systems. The stats are displayed
- * with runq dumps ('r' on the Xen console).
- */
-#ifdef PERF_COUNTERS
-#define CSCHED_STATS
-#endif
 
 
 /*
@@ -75,29 +62,36 @@
 
 
 /*
- * Stats
+ * CSCHED_STATS
+ *
+ * Manage very basic per-vCPU counters and stats.
+ *
+ * Useful for debugging live systems. The stats are displayed
+ * with runq dumps ('r' on the Xen console).
  */
-#define CSCHED_STAT_CRANK(_X)               (perfc_incr(_X))
+#ifdef SCHED_STATS
 
-#ifdef CSCHED_STATS
+#define CSCHED_STATS
 
-#define CSCHED_VCPU_STATS_RESET(_V)                     \
+#define SCHED_VCPU_STATS_RESET(_V)                      \
     do                                                  \
     {                                                   \
         memset(&(_V)->stats, 0, sizeof((_V)->stats));   \
     } while ( 0 )
 
-#define CSCHED_VCPU_STAT_CRANK(_V, _X)      (((_V)->stats._X)++)
+#define SCHED_VCPU_STAT_CRANK(_V, _X)       (((_V)->stats._X)++)
 
-#define CSCHED_VCPU_STAT_SET(_V, _X, _Y)    (((_V)->stats._X) = (_Y))
+#define SCHED_VCPU_STAT_SET(_V, _X, _Y)     (((_V)->stats._X) = (_Y))
 
-#else /* CSCHED_STATS */
+#else /* !SCHED_STATS */
 
-#define CSCHED_VCPU_STATS_RESET(_V)         do {} while ( 0 )
-#define CSCHED_VCPU_STAT_CRANK(_V, _X)      do {} while ( 0 )
-#define CSCHED_VCPU_STAT_SET(_V, _X, _Y)    do {} while ( 0 )
+#undef CSCHED_STATS
 
-#endif /* CSCHED_STATS */
+#define SCHED_VCPU_STATS_RESET(_V)         do {} while ( 0 )
+#define SCHED_VCPU_STAT_CRANK(_V, _X)      do {} while ( 0 )
+#define SCHED_VCPU_STAT_SET(_V, _X, _Y)    do {} while ( 0 )
+
+#endif /* SCHED_STATS */
 
 
 /*
@@ -264,13 +258,13 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
     if ( new->pri > cur->pri )
     {
         if ( cur->pri == CSCHED_PRI_IDLE )
-            CSCHED_STAT_CRANK(tickle_local_idler);
+            SCHED_STAT_CRANK(tickle_local_idler);
         else if ( cur->pri == CSCHED_PRI_TS_OVER )
-            CSCHED_STAT_CRANK(tickle_local_over);
+            SCHED_STAT_CRANK(tickle_local_over);
         else if ( cur->pri == CSCHED_PRI_TS_UNDER )
-            CSCHED_STAT_CRANK(tickle_local_under);
+            SCHED_STAT_CRANK(tickle_local_under);
         else
-            CSCHED_STAT_CRANK(tickle_local_other);
+            SCHED_STAT_CRANK(tickle_local_other);
 
         cpumask_set_cpu(cpu, &mask);
     }
@@ -283,7 +277,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
     {
         if ( cpumask_empty(prv->idlers) )
         {
-            CSCHED_STAT_CRANK(tickle_idlers_none);
+            SCHED_STAT_CRANK(tickle_idlers_none);
         }
         else
         {
@@ -292,7 +286,7 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
             cpumask_and(&idle_mask, prv->idlers, new->vcpu->cpu_affinity);
             if ( !cpumask_empty(&idle_mask) )
             {
-                CSCHED_STAT_CRANK(tickle_idlers_some);
+                SCHED_STAT_CRANK(tickle_idlers_some);
                 if ( opt_tickle_one_idle )
                 {
                     this_cpu(last_tickle_cpu) = 
@@ -404,7 +398,7 @@ __csched_vcpu_check(struct vcpu *vc)
         BUG_ON( !is_idle_vcpu(vc) );
     }
 
-    CSCHED_STAT_CRANK(vcpu_check);
+    SCHED_STAT_CRANK(vcpu_check);
 }
 #define CSCHED_VCPU_CHECK(_vc)  (__csched_vcpu_check(_vc))
 #else
@@ -437,7 +431,7 @@ __csched_vcpu_is_cache_hot(struct vcpu *v)
                ((uint64_t)vcpu_migration_delay * 1000u));
 
     if ( hot )
-        CSCHED_STAT_CRANK(vcpu_hot);
+        SCHED_STAT_CRANK(vcpu_hot);
 
     return hot;
 }
@@ -559,8 +553,8 @@ __csched_vcpu_acct_start(struct csched_private *prv, struct csched_vcpu *svc)
 
     if ( list_empty(&svc->active_vcpu_elem) )
     {
-        CSCHED_VCPU_STAT_CRANK(svc, state_active);
-        CSCHED_STAT_CRANK(acct_vcpu_active);
+        SCHED_VCPU_STAT_CRANK(svc, state_active);
+        SCHED_STAT_CRANK(acct_vcpu_active);
 
         sdom->active_vcpu_count++;
         list_add(&svc->active_vcpu_elem, &sdom->active_vcpu);
@@ -583,8 +577,8 @@ __csched_vcpu_acct_stop_locked(struct csched_private *prv,
 
     BUG_ON( list_empty(&svc->active_vcpu_elem) );
 
-    CSCHED_VCPU_STAT_CRANK(svc, state_idle);
-    CSCHED_STAT_CRANK(acct_vcpu_idle);
+    SCHED_VCPU_STAT_CRANK(svc, state_idle);
+    SCHED_STAT_CRANK(acct_vcpu_idle);
 
     BUG_ON( prv->weight < sdom->weight );
     sdom->active_vcpu_count--;
@@ -633,8 +627,8 @@ csched_vcpu_acct(struct csched_private *prv, unsigned int cpu)
     }
     else if ( _csched_cpu_pick(ops, current, 0) != cpu )
     {
-        CSCHED_VCPU_STAT_CRANK(svc, migrate_r);
-        CSCHED_STAT_CRANK(migrate_running);
+        SCHED_VCPU_STAT_CRANK(svc, migrate_r);
+        SCHED_STAT_CRANK(migrate_running);
         set_bit(_VPF_migrating, &current->pause_flags);
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
     }
@@ -658,8 +652,8 @@ csched_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
     svc->flags = 0U;
     svc->pri = is_idle_domain(vc->domain) ?
         CSCHED_PRI_IDLE : CSCHED_PRI_TS_UNDER;
-    CSCHED_VCPU_STATS_RESET(svc);
-    CSCHED_STAT_CRANK(vcpu_init);
+    SCHED_VCPU_STATS_RESET(svc);
+    SCHED_STAT_CRANK(vcpu_init);
     return svc;
 }
 
@@ -690,7 +684,7 @@ csched_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
     struct csched_dom * const sdom = svc->sdom;
     unsigned long flags;
 
-    CSCHED_STAT_CRANK(vcpu_destroy);
+    SCHED_STAT_CRANK(vcpu_destroy);
 
     if ( __vcpu_on_runq(svc) )
         __runq_remove(svc);
@@ -711,7 +705,7 @@ csched_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
 {
     struct csched_vcpu * const svc = CSCHED_VCPU(vc);
 
-    CSCHED_STAT_CRANK(vcpu_sleep);
+    SCHED_STAT_CRANK(vcpu_sleep);
 
     BUG_ON( is_idle_vcpu(vc) );
 
@@ -731,19 +725,19 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 
     if ( unlikely(per_cpu(schedule_data, cpu).curr == vc) )
     {
-        CSCHED_STAT_CRANK(vcpu_wake_running);
+        SCHED_STAT_CRANK(vcpu_wake_running);
         return;
     }
     if ( unlikely(__vcpu_on_runq(svc)) )
     {
-        CSCHED_STAT_CRANK(vcpu_wake_onrunq);
+        SCHED_STAT_CRANK(vcpu_wake_onrunq);
         return;
     }
 
     if ( likely(vcpu_runnable(vc)) )
-        CSCHED_STAT_CRANK(vcpu_wake_runnable);
+        SCHED_STAT_CRANK(vcpu_wake_runnable);
     else
-        CSCHED_STAT_CRANK(vcpu_wake_not_runnable);
+        SCHED_STAT_CRANK(vcpu_wake_not_runnable);
 
     /*
      * We temporarly boost the priority of awaking VCPUs!
@@ -883,8 +877,6 @@ csched_dom_init(const struct scheduler *ops, struct domain *dom)
 {
     struct csched_dom *sdom;
 
-    CSCHED_STAT_CRANK(dom_init);
-
     if ( is_idle_domain(dom) )
         return 0;
 
@@ -906,7 +898,6 @@ csched_free_domdata(const struct scheduler *ops, void *data)
 static void
 csched_dom_destroy(const struct scheduler *ops, struct domain *dom)
 {
-    CSCHED_STAT_CRANK(dom_destroy);
     csched_free_domdata(ops, CSCHED_DOM(dom));
 }
 
@@ -989,18 +980,18 @@ csched_acct(void* dummy)
     if ( prv->credit_balance < 0 )
     {
         credit_total -= prv->credit_balance;
-        CSCHED_STAT_CRANK(acct_balance);
+        SCHED_STAT_CRANK(acct_balance);
     }
 
     if ( unlikely(weight_total == 0) )
     {
         prv->credit_balance = 0;
         spin_unlock_irqrestore(&prv->lock, flags);
-        CSCHED_STAT_CRANK(acct_no_work);
+        SCHED_STAT_CRANK(acct_no_work);
         goto out;
     }
 
-    CSCHED_STAT_CRANK(acct_run);
+    SCHED_STAT_CRANK(acct_run);
 
     weight_left = weight_total;
     credit_balance = 0;
@@ -1075,7 +1066,7 @@ csched_acct(void* dummy)
                  * the queue to give others a chance at them in future
                  * accounting periods.
                  */
-                CSCHED_STAT_CRANK(acct_reorder);
+                SCHED_STAT_CRANK(acct_reorder);
                 list_del(&sdom->active_sdom_elem);
                 list_add(&sdom->active_sdom_elem, &prv->active_sdom);
             }
@@ -1110,7 +1101,7 @@ csched_acct(void* dummy)
                      credit < -credit_cap &&
                      !(svc->flags & CSCHED_FLAG_VCPU_PARKED) )
                 {
-                    CSCHED_STAT_CRANK(vcpu_park);
+                    SCHED_STAT_CRANK(vcpu_park);
                     vcpu_pause_nosync(svc->vcpu);
                     svc->flags |= CSCHED_FLAG_VCPU_PARKED;
                 }
@@ -1118,7 +1109,7 @@ csched_acct(void* dummy)
                 /* Lower bound on credits */
                 if ( credit < -prv->credits_per_tslice )
                 {
-                    CSCHED_STAT_CRANK(acct_min_credit);
+                    SCHED_STAT_CRANK(acct_min_credit);
                     credit = -prv->credits_per_tslice;
                     atomic_set(&svc->credit, credit);
                 }
@@ -1135,7 +1126,7 @@ csched_acct(void* dummy)
                      * call to make sure the VCPU's priority is not boosted
                      * if it is woken up here.
                      */
-                    CSCHED_STAT_CRANK(vcpu_unpark);
+                    SCHED_STAT_CRANK(vcpu_unpark);
                     vcpu_unpause(svc->vcpu);
                     svc->flags &= ~CSCHED_FLAG_VCPU_PARKED;
                 }
@@ -1151,8 +1142,8 @@ csched_acct(void* dummy)
                 }
             }
 
-            CSCHED_VCPU_STAT_SET(svc, credit_last, credit);
-            CSCHED_VCPU_STAT_SET(svc, credit_incr, credit_fair);
+            SCHED_VCPU_STAT_SET(svc, credit_last, credit);
+            SCHED_VCPU_STAT_SET(svc, credit_incr, credit_fair);
             credit_balance += credit;
         }
     }
@@ -1229,8 +1220,8 @@ csched_runq_steal(int peer_cpu, int cpu, int pri)
             if (__csched_vcpu_is_migrateable(vc, cpu))
             {
                 /* We got a candidate. Grab it! */
-                CSCHED_VCPU_STAT_CRANK(speer, migrate_q);
-                CSCHED_STAT_CRANK(migrate_queued);
+                SCHED_VCPU_STAT_CRANK(speer, migrate_q);
+                SCHED_STAT_CRANK(migrate_queued);
                 WARN_ON(vc->is_urgent);
                 __runq_remove(speer);
                 vc->processor = cpu;
@@ -1239,7 +1230,7 @@ csched_runq_steal(int peer_cpu, int cpu, int pri)
         }
     }
 
-    CSCHED_STAT_CRANK(steal_peer_idle);
+    SCHED_STAT_CRANK(steal_peer_idle);
     return NULL;
 }
 
@@ -1260,11 +1251,11 @@ csched_load_balance(struct csched_private *prv, int cpu,
         goto out;
 
     if ( snext->pri == CSCHED_PRI_IDLE )
-        CSCHED_STAT_CRANK(load_balance_idle);
+        SCHED_STAT_CRANK(load_balance_idle);
     else if ( snext->pri == CSCHED_PRI_TS_OVER )
-        CSCHED_STAT_CRANK(load_balance_over);
+        SCHED_STAT_CRANK(load_balance_over);
     else
-        CSCHED_STAT_CRANK(load_balance_other);
+        SCHED_STAT_CRANK(load_balance_other);
 
     /*
      * Peek at non-idling CPUs in the system, starting with our
@@ -1288,7 +1279,7 @@ csched_load_balance(struct csched_private *prv, int cpu,
          */
         if ( !pcpu_schedule_trylock(peer_cpu) )
         {
-            CSCHED_STAT_CRANK(steal_trylock_failed);
+            SCHED_STAT_CRANK(steal_trylock_failed);
             continue;
         }
 
@@ -1327,7 +1318,7 @@ csched_schedule(
     struct task_slice ret;
     s_time_t runtime, tslice;
 
-    CSCHED_STAT_CRANK(schedule);
+    SCHED_STAT_CRANK(schedule);
     CSCHED_VCPU_CHECK(current);
 
     runtime = now - current->runstate.state_entry_time;
