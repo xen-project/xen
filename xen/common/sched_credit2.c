@@ -753,6 +753,8 @@ csched_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
         svc->weight = 0;
     }
 
+    SCHED_STAT_CRANK(vcpu_init);
+
     return svc;
 }
 
@@ -870,6 +872,8 @@ csched_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
 
     if ( ! is_idle_vcpu(vc) )
     {
+        SCHED_STAT_CRANK(vcpu_destroy);
+
         /* Remove from runqueue */
         vcpu_schedule_lock_irq(vc);
 
@@ -1587,6 +1591,7 @@ csched_schedule(
     struct csched_vcpu *snext = NULL;
     struct task_slice ret;
 
+    SCHED_STAT_CRANK(schedule);
     CSCHED_VCPU_CHECK(current);
 
     d2printk("sc p%d c d%dv%d now %"PRI_stime"\n",

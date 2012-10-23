@@ -332,6 +332,8 @@ static void *sedf_alloc_vdata(const struct scheduler *ops, struct vcpu *v, void 
     INIT_LIST_HEAD(&(inf->extralist[EXTRA_PEN_Q]));
     INIT_LIST_HEAD(&(inf->extralist[EXTRA_UTIL_Q]));
 
+    SCHED_STAT_CRANK(vcpu_init);
+
     return inf;
 }
 
@@ -762,6 +764,8 @@ static struct task_slice sedf_do_schedule(
         EXTRAQ(cpu, EXTRA_PEN_Q), EXTRAQ(cpu, EXTRA_UTIL_Q)};
     struct sedf_vcpu_info *runinf, *waitinf;
     struct task_slice      ret;
+
+    SCHED_STAT_CRANK(schedule);
 
     /* Idle tasks don't need any of the following stuf */
     if ( is_idle_vcpu(current) )
