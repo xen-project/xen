@@ -995,7 +995,7 @@ nsvm_vmcb_guest_intercepts_trap(struct vcpu *v, unsigned int trapnr, int errcode
 }
 
 static int
-nsvm_vmcb_prepare4vmexit(struct vcpu *v)
+nsvm_vmcb_prepare4vmexit(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
@@ -1119,17 +1119,22 @@ nsvm_vmcb_prepare4vmexit(struct vcpu *v)
     ns_vmcb->_dr7 = n2vmcb->_dr7;
     ns_vmcb->_dr6 = n2vmcb->_dr6;
 
+    /* Restore registers from regs as those values
+     * can be newer than in n2vmcb (e.g. due to an
+     * instruction emulation right before).
+     */
+
     /* RFLAGS */
-    ns_vmcb->rflags = n2vmcb->rflags;
+    ns_vmcb->rflags = n2vmcb->rflags = regs->rflags;
 
     /* RIP */
-    ns_vmcb->rip = n2vmcb->rip;
+    ns_vmcb->rip = n2vmcb->rip = regs->rip;
 
     /* RSP */
-    ns_vmcb->rsp = n2vmcb->rsp;
+    ns_vmcb->rsp = n2vmcb->rsp = regs->rsp;
 
     /* RAX */
-    ns_vmcb->rax = n2vmcb->rax;
+    ns_vmcb->rax = n2vmcb->rax = regs->rax;
 
     /* Keep the l2 guest values of the fs, gs, ldtr, tr, kerngsbase,
      * star, lstar, cstar, sfmask, sysenter_cs, sysenter_esp,
@@ -1363,7 +1368,7 @@ nestedsvm_vmexit_n2n1(struct vcpu *v, struct cpu_user_regs *regs)
     ASSERT(vcpu_nestedhvm(v).nv_vmswitch_in_progress);
     ASSERT(nestedhvm_vcpu_in_guestmode(v));
 
-    rc = nsvm_vmcb_prepare4vmexit(v);
+    rc = nsvm_vmcb_prepare4vmexit(v, regs);
     if (rc)
         ret = NESTEDHVM_VMEXIT_ERROR;
 
