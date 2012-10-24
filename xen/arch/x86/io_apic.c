@@ -990,18 +990,17 @@ static void __init setup_IO_APIC_irqs(void)
             else
                 add_pin_to_irq(irq, apic, pin);
 
-            if (!apic && !IO_APIC_IRQ(irq))
+            if (!IO_APIC_IRQ(irq))
                 continue;
 
-            if (IO_APIC_IRQ(irq)) {
-                vector = assign_irq_vector(irq, NULL);
-                BUG_ON(vector < 0);
-                entry.vector = vector;
-                ioapic_register_intr(irq, IOAPIC_AUTO);
+            vector = assign_irq_vector(irq, NULL);
+            BUG_ON(vector < 0);
+            entry.vector = vector;
+            ioapic_register_intr(irq, IOAPIC_AUTO);
 
-                if (!apic && platform_legacy_irq(irq))
-                    disable_8259A_irq(irq_to_desc(irq));
-            }
+            if (platform_legacy_irq(irq))
+                disable_8259A_irq(irq_to_desc(irq));
+
             desc = irq_to_desc(irq);
             SET_DEST(entry.dest.dest32, entry.dest.logical.logical_dest,
                      cpu_mask_to_apicid(desc->arch.cpu_mask));
@@ -2245,18 +2244,15 @@ unsigned apic_gsi_base(int apic);
 
 static int apic_pin_2_gsi_irq(int apic, int pin)
 {
-    int idx, irq;
+    int idx;
 
     if (apic < 0)
        return -EINVAL;
 
-    irq = apic_gsi_base(apic) + pin;
-    if (apic == 0) {
-        idx = find_irq_entry(apic, pin, mp_INT);
-        if (idx >= 0)
-            irq = pin_2_irq(idx, apic, pin);
-    }
-    return irq;
+    idx = find_irq_entry(apic, pin, mp_INT);
+
+    return idx >= 0 ? pin_2_irq(idx, apic, pin)
+                    : apic_gsi_base(apic) + pin;
 }
 
 int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
