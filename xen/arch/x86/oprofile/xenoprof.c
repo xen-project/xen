@@ -26,7 +26,7 @@ int xenoprof_arch_counter(XEN_GUEST_HANDLE(void) arg)
     if ( copy_from_guest(&counter, arg, 1) )
         return -EFAULT;
 
-    if ( counter.ind > OP_MAX_COUNTER )
+    if ( counter.ind >= OP_MAX_COUNTER )
         return -E2BIG;
 
     counter_config[counter.ind].count     = counter.count;
@@ -64,7 +64,7 @@ int compat_oprof_arch_counter(XEN_GUEST_HANDLE(void) arg)
     if ( copy_from_guest(&counter, arg, 1) )
         return -EFAULT;
 
-    if ( counter.ind > OP_MAX_COUNTER )
+    if ( counter.ind >= OP_MAX_COUNTER )
         return -E2BIG;
 
     counter_config[counter.ind].count     = counter.count;
