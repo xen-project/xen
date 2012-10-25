@@ -253,17 +253,19 @@ static void hpet_msi_mask(struct irq_desc *desc)
 
 static void hpet_msi_write(struct hpet_event_channel *ch, struct msi_msg *msg)
 {
+    ch->msi.msg = *msg;
     if ( iommu_intremap )
         iommu_update_ire_from_msi(&ch->msi, msg);
     hpet_write32(msg->data, HPET_Tn_ROUTE(ch->idx));
     hpet_write32(msg->address_lo, HPET_Tn_ROUTE(ch->idx) + 4);
 }
 
-static void hpet_msi_read(struct hpet_event_channel *ch, struct msi_msg *msg)
+static void __maybe_unused
+hpet_msi_read(struct hpet_event_channel *ch, struct msi_msg *msg)
 {
     msg->data = hpet_read32(HPET_Tn_ROUTE(ch->idx));
     msg->address_lo = hpet_read32(HPET_Tn_ROUTE(ch->idx) + 4);
-    msg->address_hi = 0;
+    msg->address_hi = MSI_ADDR_BASE_HI;
     if ( iommu_intremap )
         iommu_read_msi_from_ire(&ch->msi, msg);
 }
@@ -285,20 +287,19 @@ static void hpet_msi_ack(struct irq_desc *desc)
 
 static void hpet_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
 {
-    struct msi_msg msg;
-    unsigned int dest;
+    struct hpet_event_channel *ch = desc->action->dev_id;
+    struct msi_msg msg = ch->msi.msg;
 
-    dest = set_desc_affinity(desc, mask);
-    if (dest == BAD_APICID)
+    msg.dest32 = set_desc_affinity(desc, mask);
+    if ( msg.dest32 == BAD_APICID )
         return;
 
-    hpet_msi_read(desc->action->dev_id, &msg);
     msg.data &= ~MSI_DATA_VECTOR_MASK;
     msg.data |= MSI_DATA_VECTOR(desc->arch.vector);
     msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
-    msg.address_lo |= MSI_ADDR_DEST_ID(dest);
-    msg.dest32 = dest;
-    hpet_msi_write(desc->action->dev_id, &msg);
+    msg.address_lo |= MSI_ADDR_DEST_ID(msg.dest32);
+    if ( msg.data != ch->msi.msg.data || msg.dest32 != ch->msi.msg.dest32 )
+        hpet_msi_write(ch, &msg);
 }
 
 /*
