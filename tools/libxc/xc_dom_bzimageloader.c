@@ -47,7 +47,7 @@ static int xc_try_bzip2_decode(
     char *out_buf;
     char *tmp_buf;
     int retval = -1;
-    int outsize;
+    unsigned int outsize;
     uint64_t total;
 
     stream.bzalloc = NULL;
@@ -79,6 +79,17 @@ static int xc_try_bzip2_decode(
     stream.next_out = out_buf;
     stream.avail_out = dom->kernel_size;
 
+    /*
+     * stream.avail_in is an unsigned int, while kernel_size is a
+     * size_t. Check we aren't overflowing.
+     */
+    if ( stream.avail_in != dom->kernel_size )
+    {
+        DOMPRINTF("BZIP2: Input too large");
+        free(out_buf);
+        goto bzip2_cleanup;
+    }
+
     for ( ; ; )
     {
         ret = BZ2_bzDecompress(&stream);
@@ -98,9 +109,16 @@ static int xc_try_bzip2_decode(
         if ( stream.avail_out == 0 )
         {
             /* Protect against output buffer overflow */
-            if ( outsize > INT_MAX / 2 )
+            if ( outsize > UINT_MAX / 2 )
             {
                 DOMPRINTF("BZIP2: output buffer overflow");
+                free(out_buf);
+                goto bzip2_cleanup;
+            }
+
+            if ( xc_dom_kernel_check_size(dom, outsize * 2) )
+            {
+                DOMPRINTF("BZIP2: output too large");
                 free(out_buf);
                 goto bzip2_cleanup;
             }
@@ -172,7 +190,7 @@ static int _xc_try_lzma_decode(
     unsigned char *out_buf;
     unsigned char *tmp_buf;
     int retval = -1;
-    int outsize;
+    size_t outsize;
     const char *msg;
 
     /* sigh.  We don't know up-front how much memory we are going to need
@@ -244,9 +262,16 @@ static int _xc_try_lzma_decode(
         if ( stream->avail_out == 0 )
         {
             /* Protect against output buffer overflow */
-            if ( outsize > INT_MAX / 2 )
+            if ( outsize > SIZE_MAX / 2 )
             {
                 DOMPRINTF("%s: output buffer overflow", what);
+                free(out_buf);
+                goto lzma_cleanup;
+            }
+
+            if ( xc_dom_kernel_check_size(dom, outsize * 2) )
+            {
+                DOMPRINTF("%s: output too large", what);
                 free(out_buf);
                 goto lzma_cleanup;
             }
@@ -359,6 +384,12 @@ static int xc_try_lzo1x_decode(
         0x89, 0x4c, 0x5a, 0x4f, 0x00, 0x0d, 0x0a, 0x1a, 0x0a
     };
 
+    /*
+     * lzo_uint should match size_t. Check that this is the case to be
+     * sure we won't overflow various lzo_uint fields.
+     */
+    XC_BUILD_BUG_ON(sizeof(lzo_uint) != sizeof(size_t));
+
     ret = lzo_init();
     if ( ret != LZO_E_OK )
     {
@@ -436,6 +467,14 @@ static int xc_try_lzo1x_decode(
 
         msg = "Bad source length";
         if ( src_len <= 0 || src_len > dst_len || src_len > left )
+            break;
+
+        msg = "Output buffer overflow";
+        if ( *size > SIZE_MAX - dst_len )
+            break;
+
+        msg = "Decompressed image too large";
+        if ( xc_dom_kernel_check_size(dom, *size + dst_len) )
             break;
 
         msg = "Failed to (re)alloc memory";

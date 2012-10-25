@@ -137,6 +137,10 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     dom = xc_dom_allocate(xc_handle, cmdline, features);
     dom->allocate = kexec_allocate;
 
+    /* We are using guest owned memory, therefore no limits. */
+    xc_dom_kernel_max_size(dom, 0);
+    xc_dom_ramdisk_max_size(dom, 0);
+
     dom->kernel_blob = kernel;
     dom->kernel_size = kernel_size;
 

@@ -2118,6 +2118,7 @@ start:
 
             case 0:
                 LOG("Done. Exiting now");
+                libxl_event_free(ctx, event);
                 ret = 0;
                 goto out;
 
@@ -2127,6 +2128,7 @@ start:
 
         case LIBXL_EVENT_TYPE_DOMAIN_DEATH:
             LOG("Domain %d has been destroyed.", domid);
+            libxl_event_free(ctx, event);
             ret = 0;
             goto out;
 
