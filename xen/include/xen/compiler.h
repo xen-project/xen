@@ -1,7 +1,7 @@
 #ifndef __LINUX_COMPILER_H
 #define __LINUX_COMPILER_H
 
-#if !defined(__GNUC__) || (__GNUC__ < 3)
+#if !defined(__GNUC__) || (__GNUC__ < 4)
 #error Sorry, your compiler is too old/not recognized.
 #endif
 
@@ -17,11 +17,11 @@
 #ifdef __clang__
 /* Clang can replace some vars with new automatic ones that go in .data;
  * mark all explicit-segment vars 'used' to prevent that. */
-#define __section(s)      __attribute_used__ __attribute__((__section__(s)))
+#define __section(s)      __used __attribute__((__section__(s)))
 #else
 #define __section(s)      __attribute__((__section__(s)))
 #endif
-#define __used_section(s) __attribute_used__ __attribute__((__section__(s)))
+#define __used_section(s) __used __attribute__((__section__(s)))
 #define __text_section(s) __attribute__((__section__(s)))
 
 #ifdef INIT_SECTIONS_ONLY
@@ -36,23 +36,23 @@
 #define __attribute_pure__  __attribute__((pure))
 #define __attribute_const__ __attribute__((__const__))
 
-#if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 3)
-#define __attribute_used__ __attribute__((__used__))
-#else
-#define __attribute_used__ __attribute__((__unused__))
-#endif
+/*
+ * The difference between the following two attributes is that __used is
+ * intended to be used in cases where a reference to an identifier may be
+ * invisible to the compiler (e.g. an inline assembly operand not listed
+ * in the asm()'s operands), preventing the compiler from eliminating the
+ * variable or function.
+ * __maybe_unused otoh is to be used to merely prevent warnings (e.g. when
+ * an identifier is used only inside a preprocessor conditional, yet putting
+ * its declaration/definition inside another conditional would harm code
+ * readability).
+ */
+#define __used         __attribute__((__used__))
+#define __maybe_unused __attribute__((__unused__))
 
-#if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
 #define __must_check __attribute__((warn_unused_result))
-#else
-#define __must_check
-#endif
 
-#if __GNUC__ > 3
 #define offsetof(a,b) __builtin_offsetof(a,b)
-#else
-#define offsetof(a,b) ((unsigned long)&(((a *)0)->b))
-#endif
 
 /* &a[0] degrades to a pointer: a different type from an array */
 #define __must_be_array(a) \

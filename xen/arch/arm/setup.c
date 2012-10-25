@@ -41,7 +41,7 @@
 #include <asm/early_printk.h>
 #include "gic.h"
 
-static __attribute_used__ void init_done(void)
+static __used void init_done(void)
 {
     free_init_memory();
     startup_cpu_idle_loop();

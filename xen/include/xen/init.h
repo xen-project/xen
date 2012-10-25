@@ -114,9 +114,6 @@ extern struct kernel_param __setup_start, __setup_end;
     __kparam __setup_##_var = \
         { __setup_str_##_var, OPT_STR, &_var, sizeof(_var) }
 
-/* Make sure obsolete cmdline params don't break the build. */
-#define __setup(_name, _fn) static void * __attribute_used__ _dummy_##_fn = _fn
-    
 #endif /* __ASSEMBLY__ */
 
 #ifdef CONFIG_HOTPLUG
