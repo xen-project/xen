@@ -3774,7 +3774,9 @@ static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
                fallback_trigger);
         }
 
-        wait_for_domain_deaths(deathws, nb_domain - 1 /* not dom 0 */);
+        if (wait_for_it)
+            wait_for_domain_deaths(deathws, nb_domain - 1 /* not dom 0 */);
+
         libxl_dominfo_list_free(dominfo, nb_domain);
     } else {
         libxl_evgen_domain_death *deathw = NULL;
