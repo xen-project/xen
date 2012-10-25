@@ -23,7 +23,7 @@
  * urgent uses, intended for use from machine check exception handlers,
  * and non-urgent uses intended for use from error pollers.
  * Associated with each logout entry of whatever class is a data area
- * sized per the single argument to mctelem_init.  mcelem_init should be
+ * sized per the single argument to mctelem_init.  mctelem_init should be
  * called from MCA init code before anybody has the chance to change the
  * machine check vector with mcheck_mca_logout or to use mcheck_mca_logout.
  *
@@ -45,7 +45,7 @@
  * which will return a cookie referencing the oldest (first committed)
  * entry of the requested class.  Access the associated data using
  * mctelem_dataptr and when finished use mctelem_consume_oldest_end - in the
- * begin .. end bracket you are guaranteed that the entry canot be freed
+ * begin .. end bracket you are guaranteed that the entry can't be freed
  * even if it is ack'd elsewhere).  Once the ultimate consumer of the
  * telemetry has processed it to stable storage it should acknowledge
  * the telemetry quoting the cookie id, at which point we will free

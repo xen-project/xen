@@ -122,6 +122,7 @@ struct mca_summary {
 
 DECLARE_PER_CPU(struct mca_banks *, poll_bankmask);
 DECLARE_PER_CPU(struct mca_banks *, no_cmci_banks);
+DECLARE_PER_CPU(struct mca_banks *, mce_clear_banks);
 
 extern bool_t cmci_support;
 extern bool_t is_mc_panic;

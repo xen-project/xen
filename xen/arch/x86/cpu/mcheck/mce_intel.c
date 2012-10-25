@@ -21,9 +21,7 @@
 #include "vmce.h"
 #include "mcaction.h"
 
-DEFINE_PER_CPU(struct mca_banks *, mce_banks_owned);
-DEFINE_PER_CPU(struct mca_banks *, no_cmci_banks);
-DEFINE_PER_CPU(struct mca_banks *, mce_clear_banks);
+static DEFINE_PER_CPU_READ_MOSTLY(struct mca_banks *, mce_banks_owned);
 bool_t __read_mostly cmci_support = 0;
 static bool_t __read_mostly ser_support = 0;
 static bool_t __read_mostly mce_force_broadcast;
@@ -789,36 +787,28 @@ static void intel_init_mce(void)
 
 static void cpu_mcabank_free(unsigned int cpu)
 {
-    struct mca_banks *mb1, *mb2, *mb3;
+    struct mca_banks *cmci = per_cpu(no_cmci_banks, cpu);
+    struct mca_banks *owned = per_cpu(mce_banks_owned, cpu);
 
-    mb1 = per_cpu(mce_clear_banks, cpu);
-    mb2 = per_cpu(no_cmci_banks, cpu);
-    mb3 = per_cpu(mce_banks_owned, cpu);
-
-    mcabanks_free(mb1);
-    mcabanks_free(mb2);
-    mcabanks_free(mb3);
+    mcabanks_free(cmci);
+    mcabanks_free(owned);
 }
 
 static int cpu_mcabank_alloc(unsigned int cpu)
 {
-    struct mca_banks *mb1, *mb2, *mb3;
+    struct mca_banks *cmci = mcabanks_alloc();
+    struct mca_banks *owned = mcabanks_alloc();
 
-    mb1 = mcabanks_alloc();
-    mb2 = mcabanks_alloc();
-    mb3 = mcabanks_alloc();
-    if (!mb1 || !mb2 || !mb3)
+    if (!cmci || !owned)
         goto out;
 
-    per_cpu(mce_clear_banks, cpu) = mb1;
-    per_cpu(no_cmci_banks, cpu) = mb2;
-    per_cpu(mce_banks_owned, cpu) = mb3;
+    per_cpu(no_cmci_banks, cpu) = cmci;
+    per_cpu(mce_banks_owned, cpu) = owned;
 
     return 0;
 out:
-    mcabanks_free(mb1);
-    mcabanks_free(mb2);
-    mcabanks_free(mb3);
+    mcabanks_free(cmci);
+    mcabanks_free(owned);
     return -ENOMEM;
 }
 

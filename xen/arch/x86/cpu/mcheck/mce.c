@@ -35,6 +35,10 @@ bool_t is_mc_panic;
 unsigned int __read_mostly nr_mce_banks;
 unsigned int __read_mostly firstbank;
 
+DEFINE_PER_CPU_READ_MOSTLY(struct mca_banks *, poll_bankmask);
+DEFINE_PER_CPU_READ_MOSTLY(struct mca_banks *, no_cmci_banks);
+DEFINE_PER_CPU_READ_MOSTLY(struct mca_banks *, mce_clear_banks);
+
 static void intpose_init(void);
 static void mcinfo_clear(struct mc_info *);
 struct mca_banks *mca_allbanks;
@@ -691,22 +695,29 @@ int mca_cap_init(void)
     return mca_allbanks ? 0:-ENOMEM;
 }
 
-static void cpu_poll_bankmask_free(unsigned int cpu)
+static void cpu_bank_free(unsigned int cpu)
 {
-    struct mca_banks *mb = per_cpu(poll_bankmask, cpu);
+    struct mca_banks *poll = per_cpu(poll_bankmask, cpu);
+    struct mca_banks *clr = per_cpu(mce_clear_banks, cpu);
 
-    mcabanks_free(mb);
+    mcabanks_free(poll);
+    mcabanks_free(clr);
 }
 
-static int cpu_poll_bankmask_alloc(unsigned int cpu)
+static int cpu_bank_alloc(unsigned int cpu)
 {
-    struct mca_banks *mb;
+    struct mca_banks *poll = mcabanks_alloc();
+    struct mca_banks *clr = mcabanks_alloc();
 
-    mb = mcabanks_alloc();
-    if ( !mb )
+    if ( !poll || !clr )
+    {
+        mcabanks_free(poll);
+        mcabanks_free(clr);
         return -ENOMEM;
+    }
 
-    per_cpu(poll_bankmask, cpu) = mb;
+    per_cpu(poll_bankmask, cpu) = poll;
+    per_cpu(mce_clear_banks, cpu) = clr;
     return 0;
 }
 
@@ -719,11 +730,11 @@ static int cpu_callback(
     switch ( action )
     {
     case CPU_UP_PREPARE:
-        rc = cpu_poll_bankmask_alloc(cpu);
+        rc = cpu_bank_alloc(cpu);
         break;
     case CPU_UP_CANCELED:
     case CPU_DEAD:
-        cpu_poll_bankmask_free(cpu);
+        cpu_bank_free(cpu);
         break;
     default:
         break;
@@ -757,6 +768,10 @@ void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
     if (mca_cap_init())
         return;
 
+    /* Early MCE initialisation for BSP. */
+    if ( bsp && cpu_bank_alloc(smp_processor_id()) )
+        BUG();
+
     switch (c->x86_vendor) {
     case X86_VENDOR_AMD:
         inited = amd_mcheck_init(c);
@@ -787,18 +802,14 @@ void mcheck_init(struct cpuinfo_x86 *c, bool_t bsp)
     set_in_cr4(X86_CR4_MCE);
 
     if ( bsp )
-    {
-        /* Early MCE initialisation for BSP. */
-        if ( cpu_poll_bankmask_alloc(0) )
-            BUG();
         register_cpu_notifier(&cpu_nfb);
-    }
     set_poll_bankmask(c);
 
     return;
  out:
-    if (smp_processor_id() == 0)
+    if ( bsp )
     {
+        cpu_bank_free(smp_processor_id());
         mcabanks_free(mca_allbanks);
         mca_allbanks = NULL;
     }

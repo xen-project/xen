@@ -72,7 +72,23 @@
 /* Machine Check Handler for AMD K8 family series */
 static void k8_machine_check(struct cpu_user_regs *regs, long error_code)
 {
-	mcheck_cmn_handler(regs, error_code, mca_allbanks, NULL);
+	mcheck_cmn_handler(regs, error_code, mca_allbanks,
+			   __get_cpu_var(mce_clear_banks));
+}
+
+static int k8_need_clearbank_scan(enum mca_source who, uint64_t status)
+{
+	if (who != MCA_MCE_SCAN)
+		return 1;
+
+	/*
+	 * For fatal error, it shouldn't be cleared so that sticky bank
+	 * have a chance to be handled after reboot by polling.
+	 */
+	if ((status & MCi_STATUS_UC) && (status & MCi_STATUS_PCC))
+		return 0;
+
+	return 1;
 }
 
 /* AMD K8 machine check */
@@ -85,6 +101,7 @@ enum mcheck_type amd_k8_mcheck_init(struct cpuinfo_x86 *c)
 
 	mce_handler_init();
 	x86_mce_vector_register(k8_machine_check);
+	mce_need_clearbank_register(k8_need_clearbank_scan);
 
 	for (i = 0; i < nr_mce_banks; i++) {
 		if (quirkflag == MCEQUIRK_K8_GART && i == 4) {
