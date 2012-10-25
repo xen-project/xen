@@ -56,7 +56,7 @@ static inline void ibs_init(void) {}
 #define ibs_caps 0
 #endif
 
-int xenoprofile_get_mode(const struct vcpu *, const struct cpu_user_regs *);
+int xenoprofile_get_mode(struct vcpu *, const struct cpu_user_regs *);
 
 static inline int xenoprof_backtrace_supported(void)
 {
