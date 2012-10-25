@@ -489,7 +489,8 @@ int libxl__ev_xswatch_register(libxl__gc *gc, libxl__ev_xswatch *w,
         int newarraysize = (CTX->watch_nslots + 1) << 2;
         int i;
         libxl__ev_watch_slot *newarray =
-            realloc(CTX->watch_slots, sizeof(*newarray) * newarraysize);
+            libxl__realloc(NOGC,
+                           CTX->watch_slots, sizeof(*newarray) * newarraysize);
         if (!newarray) goto out_nomem;
         for (i = CTX->watch_nslots; i < newarraysize; i++)
             LIBXL_SLIST_INSERT_HEAD(&CTX->watch_freeslots,
@@ -1343,7 +1344,7 @@ static int eventloop_iteration(libxl__egc *egc, libxl__poller *poller) {
 
         struct pollfd *newarray =
             (nfds > INT_MAX / sizeof(struct pollfd) / 2) ? 0 :
-            realloc(poller->fd_polls, sizeof(*newarray) * nfds);
+            libxl__realloc(NOGC, poller->fd_polls, sizeof(*newarray) * nfds);
 
         if (!newarray) { rc = ERROR_NOMEM; goto out; }
 
