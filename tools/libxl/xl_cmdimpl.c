@@ -3721,11 +3721,11 @@ int main_destroy(int argc, char **argv)
     return 0;
 }
 
-static int main_shutdown_or_reboot(int reboot, int argc, char **argv)
+static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
 {
     void (*fn)(uint32_t domid,
                libxl_evgen_domain_death **, libxl_ev_user, int) =
-        reboot ? &reboot_domain : &shutdown_domain;
+        do_reboot ? &reboot_domain : &shutdown_domain;
     int opt, i, nb_domain;
     int wait_for_it = 0, all =0;
     int fallback_trigger = 0;
