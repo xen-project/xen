@@ -67,7 +67,17 @@ extern unsigned long pci_mem_start, pci_mem_end;
 #define RESERVED_MEMBASE              0xFC000000
 /* NB. ACPI_INFO_PHYSICAL_ADDRESS *MUST* match definition in acpi/dsdt.asl! */
 #define ACPI_INFO_PHYSICAL_ADDRESS    0xFC000000
-#define RESERVED_MEMORY_DYNAMIC       0xFC001000
+#define RESERVED_MEMORY_DYNAMIC_START 0xFC001000
+#define RESERVED_MEMORY_DYNAMIC_END   0xFE000000
+/*
+ * GUEST_RESERVED: Physical address space reserved for guest use.
+ * This is not dynamically advertised to guests, so this range must *never*
+ * be used for any purpose by us, in future. It must always be marked as
+ * reserved in the memory map (e.g., E820_RESERVED) so that mechanisms such
+ * as PCI BAR remapping do not allocate from this region.
+ */
+#define GUEST_RESERVED_START          0xFE700000
+#define GUEST_RESERVED_END            0xFE800000
 
 extern unsigned long scratch_start;
 

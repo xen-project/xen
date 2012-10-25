@@ -416,13 +416,14 @@ void mem_hole_populate_ram(xen_pfn_t mfn, uint32_t nr_mfns)
     }
 }
 
-static uint32_t reserve = RESERVED_MEMORY_DYNAMIC - 1;
+static uint32_t alloc_up = RESERVED_MEMORY_DYNAMIC_START - 1;
+static uint32_t alloc_down = RESERVED_MEMORY_DYNAMIC_END;
 
 xen_pfn_t mem_hole_alloc(uint32_t nr_mfns)
 {
-    hvm_info->reserved_mem_pgstart -= nr_mfns;
-    BUG_ON(hvm_info->reserved_mem_pgstart <= (reserve >> PAGE_SHIFT));
-    return hvm_info->reserved_mem_pgstart;
+    alloc_down -= nr_mfns << PAGE_SHIFT;
+    BUG_ON(alloc_up >= alloc_down);
+    return alloc_down >> PAGE_SHIFT;
 }
 
 void *mem_alloc(uint32_t size, uint32_t align)
@@ -433,18 +434,18 @@ void *mem_alloc(uint32_t size, uint32_t align)
     if ( align < 16 )
         align = 16;
 
-    s = (reserve + align) & ~(align - 1);
+    s = (alloc_up + align) & ~(align - 1);
     e = s + size - 1;
 
-    BUG_ON((e < s) || (e >> PAGE_SHIFT) >= hvm_info->reserved_mem_pgstart);
+    BUG_ON((e < s) || (e >= alloc_down));
 
-    while ( (reserve >> PAGE_SHIFT) != (e >> PAGE_SHIFT) )
+    while ( (alloc_up >> PAGE_SHIFT) != (e >> PAGE_SHIFT) )
     {
-        reserve += PAGE_SIZE;
-        mem_hole_populate_ram(reserve >> PAGE_SHIFT, 1);
+        alloc_up += PAGE_SIZE;
+        mem_hole_populate_ram(alloc_up >> PAGE_SHIFT, 1);
     }
 
-    reserve = e;
+    alloc_up = e;
 
     return (void *)(unsigned long)s;
 }
