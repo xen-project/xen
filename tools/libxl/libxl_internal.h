@@ -373,8 +373,6 @@ typedef struct {
 #define PCI_SLOT(devfn)         (((devfn) >> 3) & 0x1f)
 #define PCI_FUNC(devfn)         ((devfn) & 0x07)
 #define AUTO_PHP_SLOT          0x100
-#define SYSFS_PCI_DEV          "/sys/bus/pci/devices"
-#define SYSFS_PCIBACK_DRIVER   "/sys/bus/pci/drivers/pciback"
 #define XENSTORE_PID_FILE      "/var/run/xenstored.pid"
 
 #define PROC_PCI_NUM_RESOURCES 7

@@ -23,12 +23,25 @@
 
 #define _GNU_SOURCE
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__)
+#define SYSFS_PCI_DEV          "/sys/bus/pci/devices"
+#define SYSFS_PCIBACK_DRIVER   "/kern/xen/pci"
+#include <util.h>
+#elif defined(__OpenBSD__)
 #include <util.h>
 #elif defined(__linux__)
+#define SYSFS_PCI_DEV          "/sys/bus/pci/devices"
+#define SYSFS_PCIBACK_DRIVER   "/sys/bus/pci/drivers/pciback"
 #include <pty.h>
 #elif defined(__sun__)
 #include <stropts.h>
+#endif
+
+#ifndef SYSFS_PCIBACK_DRIVER
+#error define SYSFS_PCIBACK_DRIVER for your platform
+#endif
+#ifndef SYSFS_PCI_DEV
+#error define SYSFS_PCI_DEV for your platform
 #endif
 
 #ifdef NEED_OWN_ASPRINTF
