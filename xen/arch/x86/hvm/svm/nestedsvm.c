@@ -122,6 +122,15 @@ void nsvm_vcpu_destroy(struct vcpu *v)
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
     struct nestedsvm *svm = &vcpu_nestedsvm(v);
 
+    /*
+     * When destroying the vcpu, it may be running on behalf of l2 guest.
+     * Therefore we need to switch the VMCB pointer back to the l1 vmcb,
+     * in order to avoid double free of l2 vmcb and the possible memory leak
+     * of l1 vmcb page.
+     */
+    if (nv->nv_n1vmcx)
+        v->arch.hvm_svm.vmcb = nv->nv_n1vmcx;
+
     if (svm->ns_cached_msrpm) {
         free_xenheap_pages(svm->ns_cached_msrpm,
                            get_order_from_bytes(MSRPM_SIZE));
