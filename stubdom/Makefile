@@ -76,8 +76,6 @@ TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
 
 TARGETS=ioemu c caml grub xenstore
 
-CROSS_MAKE := $(MAKE) DESTDIR=
-
 .PHONY: all
 all: build
 ifeq ($(STUBDOM_SUPPORTED),1)
@@ -113,8 +111,8 @@ $(NEWLIB_STAMPFILE): mk-headers-$(XEN_TARGET_ARCH) newlib-$(NEWLIB_VERSION)
 	mkdir -p newlib-$(XEN_TARGET_ARCH)
 	( cd newlib-$(XEN_TARGET_ARCH) && \
 	  CC_FOR_TARGET="$(CC) $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) $(NEWLIB_CFLAGS)" AR_FOR_TARGET=$(AR) LD_FOR_TARGET=$(LD) RANLIB_FOR_TARGET=$(RANLIB) ../newlib-$(NEWLIB_VERSION)/configure --prefix=$(CROSS_PREFIX) --verbose --target=$(GNU_TARGET_ARCH)-xen-elf --enable-newlib-io-long-long --disable-multilib && \
-	  $(CROSS_MAKE) && \
-	  $(CROSS_MAKE) install )
+	  $(MAKE) DESTDIR= && \
+	  $(MAKE) DESTDIR= install )
 
 ############
 # Cross-zlib
@@ -133,8 +131,8 @@ cross-zlib: $(ZLIB_STAMPFILE)
 $(ZLIB_STAMPFILE): zlib-$(XEN_TARGET_ARCH) $(NEWLIB_STAMPFILE)
 	( cd $< && \
 	  CFLAGS="$(TARGET_CPPFLAGS) $(TARGET_CFLAGS)" CC=$(CC) ./configure --prefix=$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf && \
-	  $(CROSS_MAKE) libz.a && \
-	  $(CROSS_MAKE) install )
+	  $(MAKE) DESTDIR= libz.a && \
+	  $(MAKE) DESTDIR= install )
 
 ##############
 # Cross-libpci
@@ -158,7 +156,7 @@ $(LIBPCI_STAMPFILE): pciutils-$(XEN_TARGET_ARCH) $(NEWLIB_STAMPFILE) $(ZLIB_STAM
 	  chmod u+w lib/config.h && \
 	  echo '#define PCILIB_VERSION "$(LIBPCI_VERSION)"' >> lib/config.h && \
 	  ln -sf ../../libpci.config.mak lib/config.mk && \
-	  $(CROSS_MAKE) CC="$(CC) $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) -I$(call realpath,$(MINI_OS)/include)" lib/libpci.a && \
+	  $(MAKE) DESTDIR= CC="$(CC) $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) -I$(call realpath,$(MINI_OS)/include)" lib/libpci.a && \
 	  $(INSTALL_DATA) lib/libpci.a $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib/ && \
 	  $(INSTALL_DIR) $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include/pci && \
 	  $(INSTALL_DATA) lib/config.h lib/header.h lib/pci.h lib/types.h $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include/pci/ \
@@ -203,8 +201,8 @@ $(OCAML_STAMPFILE): ocaml-$(XEN_TARGET_ARCH)/.dirstamp
 		-no-pthread -no-shared-libs -no-tk -no-curses \
 		-cc "$(CC) -U_FORTIFY_SOURCE -fno-stack-protector -mno-red-zone"
 	$(foreach i,$(MINIOS_HASNOT),sed -i 's,^\(#define HAS_$(i)\),//\1,' ocaml-$(XEN_TARGET_ARCH)/config/s.h ; )
-	$(CROSS_MAKE) -C ocaml-$(XEN_TARGET_ARCH) world
-	$(CROSS_MAKE) -C ocaml-$(XEN_TARGET_ARCH) opt
+	$(MAKE) DESTDIR= -C ocaml-$(XEN_TARGET_ARCH) world
+	$(MAKE) DESTDIR= -C ocaml-$(XEN_TARGET_ARCH) opt
 	$(MAKE) -C ocaml-$(XEN_TARGET_ARCH) install
 	touch $@
 
@@ -219,7 +217,7 @@ QEMU_ROOT := $(shell if [ -d "$(CONFIG_QEMU)" ]; then echo "$(CONFIG_QEMU)"; els
 
 ifeq ($(QEMU_ROOT),.)
 $(XEN_ROOT)/tools/qemu-xen-traditional-dir:
-	$(CROSS_MAKE) -C $(XEN_ROOT)/tools qemu-xen-traditional-dir-find
+	$(MAKE) DESTDIR= -C $(XEN_ROOT)/tools qemu-xen-traditional-dir-find
 
 ioemu/linkfarm.stamp: $(XEN_ROOT)/tools/qemu-xen-traditional-dir
 	mkdir -p ioemu
@@ -250,7 +248,7 @@ mk-headers-$(XEN_TARGET_ARCH): ioemu/linkfarm.stamp
           ( [ -h include/xen/libelf ] || ln -sf $(XEN_ROOT)/tools/include/xen/libelf include/xen/libelf ) && \
 	  mkdir -p include/xen-foreign && \
 	  ln -sf $(wildcard $(XEN_ROOT)/tools/include/xen-foreign/*) include/xen-foreign/ && \
-	  $(CROSS_MAKE) -C include/xen-foreign/ && \
+	  $(MAKE) DESTDIR= -C include/xen-foreign/ && \
 	  ( [ -h include/xen/foreign ] || ln -sf ../xen-foreign include/xen/foreign )
 	mkdir -p libxc-$(XEN_TARGET_ARCH)
 	[ -h libxc-$(XEN_TARGET_ARCH)/Makefile ] || ( cd libxc-$(XEN_TARGET_ARCH) && \
@@ -267,7 +265,7 @@ mk-headers-$(XEN_TARGET_ARCH): ioemu/linkfarm.stamp
 	  ln -sf $(XEN_ROOT)/tools/xenstore/*.c . && \
 	  ln -sf $(XEN_ROOT)/tools/xenstore/*.h . && \
 	  ln -sf $(XEN_ROOT)/tools/xenstore/Makefile . )
-	$(CROSS_MAKE) -C $(MINI_OS) links
+	$(MAKE) DESTDIR= -C $(MINI_OS) links
 	touch mk-headers-$(XEN_TARGET_ARCH)
 
 TARGETS_MINIOS=$(addprefix mini-os-$(XEN_TARGET_ARCH)-,$(TARGETS))
@@ -284,7 +282,7 @@ $(TARGETS_MINIOS): mini-os-%:
 .PHONY: libxc
 libxc: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a libxc-$(XEN_TARGET_ARCH)/libxenguest.a
 libxc-$(XEN_TARGET_ARCH)/libxenctrl.a: cross-zlib
-	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(CROSS_MAKE) -C libxc-$(XEN_TARGET_ARCH)
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C libxc-$(XEN_TARGET_ARCH)
 
  libxc-$(XEN_TARGET_ARCH)/libxenguest.a: libxc-$(XEN_TARGET_ARCH)/libxenctrl.a
 
@@ -302,7 +300,7 @@ ioemu: cross-zlib cross-libpci libxc
 	    TARGET_CFLAGS="$(TARGET_CFLAGS)" \
 	    TARGET_LDFLAGS="$(TARGET_LDFLAGS)" \
 	    $(QEMU_ROOT)/xen-setup-stubdom )
-	$(CROSS_MAKE) -C ioemu -f $(QEMU_ROOT)/Makefile
+	$(MAKE) DESTDIR= -C ioemu -f $(QEMU_ROOT)/Makefile
 
 ######
 # caml
@@ -310,7 +308,7 @@ ioemu: cross-zlib cross-libpci libxc
 
 .PHONY: caml
 caml: $(CROSS_ROOT)
-	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(CROSS_MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) OCAMLC_CROSS_PREFIX=$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/bin/
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) OCAMLC_CROSS_PREFIX=$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/bin/
 
 ###
 # C
@@ -318,7 +316,7 @@ caml: $(CROSS_ROOT)
 
 .PHONY: c
 c: $(CROSS_ROOT)
-	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(CROSS_MAKE) -C $@ LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) 
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) 
 
 ######
 # Grub
@@ -337,7 +335,7 @@ grub-upstream: grub-$(GRUB_VERSION).tar.gz
 .PHONY: grub
 grub: grub-upstream $(CROSS_ROOT)
 	mkdir -p grub-$(XEN_TARGET_ARCH)
-	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(CROSS_MAKE) -C $@ OBJ_DIR=$(CURDIR)/grub-$(XEN_TARGET_ARCH)
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ OBJ_DIR=$(CURDIR)/grub-$(XEN_TARGET_ARCH)
 
 ##########
 # xenstore
@@ -345,7 +343,7 @@ grub: grub-upstream $(CROSS_ROOT)
 
 .PHONY: xenstore
 xenstore: $(CROSS_ROOT)
-	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(CROSS_MAKE) -C $@ xenstored.a CONFIG_STUBDOM=y
+	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ xenstored.a CONFIG_STUBDOM=y
 
 ########
 # minios
@@ -354,23 +352,23 @@ xenstore: $(CROSS_ROOT)
 .PHONY: ioemu-stubdom
 ioemu-stubdom: APP_OBJS=$(CURDIR)/ioemu/i386-stubdom/qemu.a $(CURDIR)/ioemu/i386-stubdom/libqemu.a $(CURDIR)/ioemu/libqemu_common.a
 ioemu-stubdom: mini-os-$(XEN_TARGET_ARCH)-ioemu lwip-$(XEN_TARGET_ARCH) libxc ioemu
-	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/ioemu-minios.cfg" $(CROSS_MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) APP_OBJS="$(APP_OBJS)"
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/ioemu-minios.cfg" $(MAKE) DESTDIR= -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) APP_OBJS="$(APP_OBJS)"
 
 .PHONY: caml-stubdom
 caml-stubdom: mini-os-$(XEN_TARGET_ARCH)-caml lwip-$(XEN_TARGET_ARCH) libxc cross-ocaml caml
-	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/caml/minios.cfg" $(CROSS_MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) APP_OBJS="$(CURDIR)/caml/main-caml.o $(CURDIR)/caml/caml.o $(CAMLLIB)/libasmrun.a"
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/caml/minios.cfg" $(MAKE) DESTDIR= -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) APP_OBJS="$(CURDIR)/caml/main-caml.o $(CURDIR)/caml/caml.o $(CAMLLIB)/libasmrun.a"
 
 .PHONY: c-stubdom
 c-stubdom: mini-os-$(XEN_TARGET_ARCH)-c lwip-$(XEN_TARGET_ARCH) libxc c
-	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/c/minios.cfg" $(CROSS_MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) APP_OBJS=$(CURDIR)/c/main.a
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/c/minios.cfg" $(MAKE) DESTDIR= -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) APP_OBJS=$(CURDIR)/c/main.a
 
 .PHONY: pv-grub
 pv-grub: mini-os-$(XEN_TARGET_ARCH)-grub libxc grub
-	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/grub/minios.cfg" $(CROSS_MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/grub-$(XEN_TARGET_ARCH)/main.a
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/grub/minios.cfg" $(MAKE) DESTDIR= -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/grub-$(XEN_TARGET_ARCH)/main.a
 
 .PHONY: xenstore-stubdom
 xenstore-stubdom: mini-os-$(XEN_TARGET_ARCH)-xenstore libxc xenstore
-	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/xenstore-minios.cfg" $(CROSS_MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/xenstore/xenstored.a
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/xenstore-minios.cfg" $(MAKE) DESTDIR= -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/xenstore/xenstored.a
 
 #########
 # install
@@ -412,13 +410,13 @@ clean:
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-caml
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-grub
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-xenstore
-	$(CROSS_MAKE) -C caml clean
-	$(CROSS_MAKE) -C c clean
+	$(MAKE) DESTDIR= -C caml clean
+	$(MAKE) DESTDIR= -C c clean
 	rm -fr grub-$(XEN_TARGET_ARCH)
 	rm -f $(STUBDOMPATH)
-	[ ! -d libxc-$(XEN_TARGET_ARCH) ] || $(CROSS_MAKE) -C libxc-$(XEN_TARGET_ARCH) clean
-	-[ ! -d ioemu ] || $(CROSS_MAKE) -C ioemu clean
-	-[ ! -d xenstore ] || $(CROSS_MAKE) -C xenstore clean
+	[ ! -d libxc-$(XEN_TARGET_ARCH) ] || $(MAKE) DESTDIR= -C libxc-$(XEN_TARGET_ARCH) clean
+	-[ ! -d ioemu ] || $(MAKE) DESTDIR= -C ioemu clean
+	-[ ! -d xenstore ] || $(MAKE) DESTDIR= -C xenstore clean
 
 # clean the cross-compilation result
 .PHONY: crossclean
