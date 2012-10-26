@@ -159,8 +159,7 @@ void *xc_dom_malloc_page_aligned(struct xc_dom_image *dom, size_t size)
 }
 
 void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
-                            const char *filename, size_t * size,
-                            const size_t max_size)
+                            const char *filename, size_t * size)
 {
     struct xc_dom_mem *block = NULL;
     int fd = -1;
@@ -171,13 +170,6 @@ void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
 
     lseek(fd, 0, SEEK_SET);
     *size = lseek(fd, 0, SEEK_END);
-
-    if ( max_size && *size > max_size )
-    {
-        xc_dom_panic(dom->xch, XC_OUT_OF_MEMORY,
-                     "tried to map file which is too large");
-        goto err;
-    }
 
     block = malloc(sizeof(*block));
     if ( block == NULL )
@@ -230,40 +222,6 @@ char *xc_dom_strdup(struct xc_dom_image *dom, const char *str)
 }
 
 /* ------------------------------------------------------------------------ */
-/* decompression buffer sizing                                              */
-int xc_dom_kernel_check_size(struct xc_dom_image *dom, size_t sz)
-{
-    /* No limit */
-    if ( !dom->max_kernel_size )
-        return 0;
-
-    if ( sz > dom->max_kernel_size )
-    {
-        xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
-                     "kernel image too large");
-        return 1;
-    }
-
-    return 0;
-}
-
-int xc_dom_ramdisk_check_size(struct xc_dom_image *dom, size_t sz)
-{
-    /* No limit */
-    if ( !dom->max_ramdisk_size )
-        return 0;
-
-    if ( sz > dom->max_ramdisk_size )
-    {
-        xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
-                     "ramdisk image too large");
-        return 1;
-    }
-
-    return 0;
-}
-
-/* ------------------------------------------------------------------------ */
 /* read files, copy memory blocks, with transparent gunzip                  */
 
 size_t xc_dom_check_gzip(xc_interface *xch, void *blob, size_t ziplen)
@@ -277,7 +235,7 @@ size_t xc_dom_check_gzip(xc_interface *xch, void *blob, size_t ziplen)
 
     gzlen = blob + ziplen - 4;
     unziplen = gzlen[3] << 24 | gzlen[2] << 16 | gzlen[1] << 8 | gzlen[0];
-    if ( (unziplen < 0) || (unziplen > XC_DOM_DECOMPRESS_MAX) )
+    if ( (unziplen < 0) || (unziplen > (1024*1024*1024)) ) /* 1GB limit */
     {
         xc_dom_printf
             (xch,
@@ -328,9 +286,6 @@ int xc_dom_try_gunzip(struct xc_dom_image *dom, void **blob, size_t * size)
 
     unziplen = xc_dom_check_gzip(dom->xch, *blob, *size);
     if ( unziplen == 0 )
-        return 0;
-
-    if ( xc_dom_kernel_check_size(dom, unziplen) )
         return 0;
 
     unzip = xc_dom_malloc(dom, unziplen);
@@ -635,9 +590,6 @@ struct xc_dom_image *xc_dom_allocate(xc_interface *xch,
     memset(dom, 0, sizeof(*dom));
     dom->xch = xch;
 
-    dom->max_kernel_size = XC_DOM_DECOMPRESS_MAX;
-    dom->max_ramdisk_size = XC_DOM_DECOMPRESS_MAX;
-
     if ( cmdline )
         dom->cmdline = xc_dom_strdup(dom, cmdline);
     if ( features )
@@ -658,25 +610,10 @@ struct xc_dom_image *xc_dom_allocate(xc_interface *xch,
     return NULL;
 }
 
-int xc_dom_kernel_max_size(struct xc_dom_image *dom, size_t sz)
-{
-    DOMPRINTF("%s: kernel_max_size=%zx", __FUNCTION__, sz);
-    dom->max_kernel_size = sz;
-    return 0;
-}
-
-int xc_dom_ramdisk_max_size(struct xc_dom_image *dom, size_t sz)
-{
-    DOMPRINTF("%s: ramdisk_max_size=%zx", __FUNCTION__, sz);
-    dom->max_ramdisk_size = sz;
-    return 0;
-}
-
 int xc_dom_kernel_file(struct xc_dom_image *dom, const char *filename)
 {
     DOMPRINTF("%s: filename=\"%s\"", __FUNCTION__, filename);
-    dom->kernel_blob = xc_dom_malloc_filemap(dom, filename, &dom->kernel_size,
-                                             dom->max_kernel_size);
+    dom->kernel_blob = xc_dom_malloc_filemap(dom, filename, &dom->kernel_size);
     if ( dom->kernel_blob == NULL )
         return -1;
     return xc_dom_try_gunzip(dom, &dom->kernel_blob, &dom->kernel_size);
@@ -685,10 +622,8 @@ int xc_dom_kernel_file(struct xc_dom_image *dom, const char *filename)
 int xc_dom_ramdisk_file(struct xc_dom_image *dom, const char *filename)
 {
     DOMPRINTF("%s: filename=\"%s\"", __FUNCTION__, filename);
-    /* We do not enforce any particular size limit here */
     dom->ramdisk_blob =
-        xc_dom_malloc_filemap(dom, filename, &dom->ramdisk_size, 0);
-
+        xc_dom_malloc_filemap(dom, filename, &dom->ramdisk_size);
     if ( dom->ramdisk_blob == NULL )
         return -1;
 //    return xc_dom_try_gunzip(dom, &dom->ramdisk_blob, &dom->ramdisk_size);
@@ -848,11 +783,7 @@ int xc_dom_build_image(struct xc_dom_image *dom)
         void *ramdiskmap;
 
         unziplen = xc_dom_check_gzip(dom->xch, dom->ramdisk_blob, dom->ramdisk_size);
-        if ( xc_dom_ramdisk_check_size(dom, unziplen) != 0 )
-            unziplen = 0;
-
         ramdisklen = unziplen ? unziplen : dom->ramdisk_size;
-
         if ( xc_dom_alloc_segment(dom, &dom->ramdisk_seg, "ramdisk", 0,
                                   ramdisklen) != 0 )
             goto err;
