@@ -74,8 +74,7 @@ LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
 $(LIBXL_OBJS): CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest) $(CFLAGS_libxenstore) $(CFLAGS_libblktapctl) -include $(XEN_ROOT)/tools/config.h
 
 AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h _paths.h \
-	_libxl_save_msgs_callout.h _libxl_save_msgs_helper.h \
-        libxl.api-ok
+	_libxl_save_msgs_callout.h _libxl_save_msgs_helper.h
 AUTOSRCS= libxlu_cfg_y.c libxlu_cfg_l.c
 AUTOSRCS += _libxl_save_msgs_callout.c _libxl_save_msgs_helper.c
 LIBXLU_OBJS = libxlu_cfg_y.o libxlu_cfg_l.o libxlu_cfg.o \
@@ -102,7 +101,8 @@ testidl.c: libxl_types.idl gentest.py libxl.h $(AUTOINCS)
 all: $(CLIENTS) libxenlight.so libxenlight.a libxlutil.so libxlutil.a \
 	$(AUTOSRCS) $(AUTOINCS)
 
-$(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS) $(SAVE_HELPER_OBJS): $(AUTOINCS)
+$(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS) $(SAVE_HELPER_OBJS): \
+	$(AUTOINCS) libxl.api-ok
 
 %.c %.h:: %.y
 	@rm -f $*.[ch]
@@ -119,7 +119,7 @@ libxl.api-ok: check-libxl-api-rules _libxl.api-for-check
 	$(PERL) $^
 	touch $@
 
-_%.api-for-check: %.h
+_%.api-for-check: %.h $(AUTOINCS)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(CFLAGS_$*.o) -c -E $< $(APPEND_CFLAGS) \
 		-DLIBXL_EXTERNAL_CALLERS_ONLY=LIBXL_EXTERNAL_CALLERS_ONLY \
 		>$@.new
