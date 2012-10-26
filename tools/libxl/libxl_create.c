@@ -705,7 +705,8 @@ static void domcreate_console_available(libxl__egc *egc,
                                         libxl__domain_create_state *dcs) {
     libxl__ao_progress_report(egc, dcs->ao, &dcs->aop_console_how,
                               NEW_EVENT(egc, DOMAIN_CREATE_CONSOLE_AVAILABLE,
-                                        dcs->guest_domid));
+                                        dcs->guest_domid,
+                                        dcs->aop_console_how.for_event));
 }
 
 static void domcreate_bootloader_done(libxl__egc *egc,

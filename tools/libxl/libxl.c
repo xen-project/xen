@@ -972,7 +972,7 @@ static void domain_death_occurred(libxl__egc *egc,
     libxl_evgen_domain_death *evg_next = LIBXL_TAILQ_NEXT(evg, entry);
     *evg_upd = evg_next;
 
-    libxl_event *ev = NEW_EVENT(egc, DOMAIN_DEATH, evg->domid);
+    libxl_event *ev = NEW_EVENT(egc, DOMAIN_DEATH, evg->domid, evg->user);
 
     libxl__event_occurred(egc, ev);
 
@@ -1058,8 +1058,9 @@ static void domain_death_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
 
             if (!evg->shutdown_reported &&
                 (got->flags & XEN_DOMINF_shutdown)) {
-                libxl_event *ev = NEW_EVENT(egc, DOMAIN_SHUTDOWN, got->domain);
-                
+                libxl_event *ev = NEW_EVENT(egc, DOMAIN_SHUTDOWN,
+                                            got->domain, evg->user);
+
                 LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, " shutdown reporting");
 
                 ev->u.domain_shutdown.shutdown_reason =
@@ -1158,7 +1159,7 @@ static void disk_eject_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
         return;
     }
 
-    libxl_event *ev = NEW_EVENT(egc, DISK_EJECT, evg->domid);
+    libxl_event *ev = NEW_EVENT(egc, DISK_EJECT, evg->domid, evg->user);
     libxl_device_disk *disk = &ev->u.disk_eject.disk;
     
     backend = libxl__xs_read(gc, XBT_NULL,
