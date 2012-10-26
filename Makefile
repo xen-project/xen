@@ -103,7 +103,7 @@ tools/firmware/seabios-dir-force-update:
 
 .PHONY: install-docs
 install-docs:
-	$(MAKE) -C docs install || true
+	$(MAKE) -C docs install
 
 .PHONY: dev-docs
 dev-docs:
