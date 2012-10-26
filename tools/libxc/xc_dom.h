@@ -55,6 +55,9 @@ struct xc_dom_image {
     void *ramdisk_blob;
     size_t ramdisk_size;
 
+    size_t max_kernel_size;
+    size_t max_ramdisk_size;
+
     /* arguments and parameters */
     char *cmdline;
     uint32_t f_requested[XENFEAT_NR_SUBMAPS];
@@ -194,6 +197,23 @@ void xc_dom_release_phys(struct xc_dom_image *dom);
 void xc_dom_release(struct xc_dom_image *dom);
 int xc_dom_mem_init(struct xc_dom_image *dom, unsigned int mem_mb);
 
+/* Set this larger if you have enormous ramdisks/kernels. Note that
+ * you should trust all kernels not to be maliciously large (e.g. to
+ * exhaust all dom0 memory) if you do this (see CVE-2012-4544 /
+ * XSA-25). You can also set the default independently for
+ * ramdisks/kernels in xc_dom_allocate() or call
+ * xc_dom_{kernel,ramdisk}_max_size.
+ */
+#ifndef XC_DOM_DECOMPRESS_MAX
+#define XC_DOM_DECOMPRESS_MAX (1024*1024*1024) /* 1GB */
+#endif
+
+int xc_dom_kernel_check_size(struct xc_dom_image *dom, size_t sz);
+int xc_dom_kernel_max_size(struct xc_dom_image *dom, size_t sz);
+
+int xc_dom_ramdisk_check_size(struct xc_dom_image *dom, size_t sz);
+int xc_dom_ramdisk_max_size(struct xc_dom_image *dom, size_t sz);
+
 size_t xc_dom_check_gzip(xc_interface *xch,
                      void *blob, size_t ziplen);
 int xc_dom_do_gunzip(xc_interface *xch,
@@ -254,7 +274,8 @@ void xc_dom_log_memory_footprint(struct xc_dom_image *dom);
 void *xc_dom_malloc(struct xc_dom_image *dom, size_t size);
 void *xc_dom_malloc_page_aligned(struct xc_dom_image *dom, size_t size);
 void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
-                            const char *filename, size_t * size);
+                            const char *filename, size_t * size,
+                            const size_t max_size);
 char *xc_dom_strdup(struct xc_dom_image *dom, const char *str);
 
 /* --- alloc memory pool ------------------------------------------- */
