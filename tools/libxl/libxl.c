@@ -2476,6 +2476,8 @@ out:
 int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
                                  uint32_t domid)
 {
+    int run_hotplug_scripts;
+
     if (!nic->mtu)
         nic->mtu = 1492;
     if (!nic->model) {
@@ -2504,6 +2506,18 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
     if ( !nic->script && asprintf(&nic->script, "%s/vif-bridge",
                                   libxl__xen_script_dir_path()) < 0 )
         return ERROR_FAIL;
+
+    run_hotplug_scripts = libxl__hotplug_settings(gc, XBT_NULL);
+    if (run_hotplug_scripts < 0) {
+        LOG(ERROR, "unable to get current hotplug scripts execution setting");
+        return run_hotplug_scripts;
+    }
+    if (nic->backend_domid != LIBXL_TOOLSTACK_DOMID && run_hotplug_scripts) {
+        LOG(ERROR, "cannot use a backend domain different than %d if"
+                   "hotplug scripts are executed from libxl",
+                   LIBXL_TOOLSTACK_DOMID);
+        return ERROR_FAIL;
+    }
 
     switch (libxl__domain_type(gc, domid)) {
     case LIBXL_DOMAIN_TYPE_HVM:
