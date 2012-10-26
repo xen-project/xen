@@ -585,7 +585,7 @@ def get_entry_idx(cf, entry):
 
     return None
 
-def run_grub(file, entry, fs, arg):
+def run_grub(file, entry, fs, cfg_args):
     global g
     global sel
 
@@ -622,8 +622,8 @@ def run_grub(file, entry, fs, arg):
         grubcfg["ramdisk"] = img.initrd[1]
     if img.args:
         grubcfg["args"] += img.args
-    if arg:
-        grubcfg["args"] += " " + args
+    if cfg_args:
+        grubcfg["args"] += " " + cfg_args
 
     return grubcfg
 
