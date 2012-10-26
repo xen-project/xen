@@ -64,7 +64,7 @@ struct cmd_spec cmd_table[] = {
       "-h                      Print this help.\n"
       "-F                      Fallback to ACPI power event for HVM guests with\n"
       "                        no PV drivers.\n"
-      "-w                      Wait for guest to shutdown.\n"
+      "-w, --wait              Wait for guest to shutdown.\n"
     },
     { "reboot",
       &main_reboot, 0, 1,
