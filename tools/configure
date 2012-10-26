@@ -603,7 +603,7 @@ PTHREAD_LIBS
 PTHREAD_LDFLAGS
 PTHREAD_CFLAGS
 libgcrypt
-libext2fs
+EXTFS_LIBS
 system_aio
 zlib
 glib_LIBS
@@ -2379,6 +2379,8 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 # We invoke AX_PTHREAD_VARS with the name of another macro
 # which is then expanded once for each variable.
+
+
 
 
 
@@ -6325,6 +6327,10 @@ else
   as_fn_error $? "Could not find libcrypto" "$LINENO" 5
 fi
 
+
+ac_fn_c_check_header_mongrel "$LINENO" "ext2fs/ext2fs.h" "ac_cv_header_ext2fs_ext2fs_h" "$ac_includes_default"
+if test "x$ac_cv_header_ext2fs_ext2fs_h" = x""yes; then :
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ext2fs_open2 in -lext2fs" >&5
 $as_echo_n "checking for ext2fs_open2 in -lext2fs... " >&6; }
 if test "${ac_cv_lib_ext2fs_ext2fs_open2+set}" = set; then :
@@ -6362,10 +6368,70 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ext2fs_ext2fs_open2" >&5
 $as_echo "$ac_cv_lib_ext2fs_ext2fs_open2" >&6; }
 if test "x$ac_cv_lib_ext2fs_ext2fs_open2" = x""yes; then :
-  libext2fs="y"
-else
-  libext2fs="n"
+
+
+$as_echo "#define INCLUDE_EXTFS_H <ext2fs/ext2fs.h>" >>confdefs.h
+
+    EXTFS_LIBS="-lext2fs"
+
 fi
+
+
+fi
+
+
+ac_fn_c_check_header_mongrel "$LINENO" "ext4fs/ext2fs.h" "ac_cv_header_ext4fs_ext2fs_h" "$ac_includes_default"
+if test "x$ac_cv_header_ext4fs_ext2fs_h" = x""yes; then :
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ext2fs_open2 in -lext4fs" >&5
+$as_echo_n "checking for ext2fs_open2 in -lext4fs... " >&6; }
+if test "${ac_cv_lib_ext4fs_ext2fs_open2+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lext4fs  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char ext2fs_open2 ();
+int
+main ()
+{
+return ext2fs_open2 ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_ext4fs_ext2fs_open2=yes
+else
+  ac_cv_lib_ext4fs_ext2fs_open2=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ext4fs_ext2fs_open2" >&5
+$as_echo "$ac_cv_lib_ext4fs_ext2fs_open2" >&6; }
+if test "x$ac_cv_lib_ext4fs_ext2fs_open2" = x""yes; then :
+
+
+$as_echo "#define INCLUDE_EXTFS_H <ext4fs/ext2fs.h>" >>confdefs.h
+
+    EXTFS_LIBS="-lext4fs"
+
+fi
+
+
+fi
+
+
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for gcry_md_hash_buffer in -lgcrypt" >&5

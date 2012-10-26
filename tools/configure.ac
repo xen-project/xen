@@ -34,6 +34,7 @@ m4_include([m4/pkg.m4])
 m4_include([m4/curses.m4])
 m4_include([m4/pthread.m4])
 m4_include([m4/ptyfuncs.m4])
+m4_include([m4/extfs.m4])
 
 # Enable/disable options
 AX_ARG_DEFAULT_DISABLE([githttp], [Download GIT repositories via HTTP])
@@ -131,8 +132,7 @@ AC_SUBST(zlib)
 AC_CHECK_LIB([aio], [io_setup], [system_aio="y"], [system_aio="n"])
 AC_SUBST(system_aio)
 AC_CHECK_LIB([crypto], [MD5], [], [AC_MSG_ERROR([Could not find libcrypto])])
-AC_CHECK_LIB([ext2fs], [ext2fs_open2], [libext2fs="y"], [libext2fs="n"])
-AC_SUBST(libext2fs)
+AX_CHECK_EXTFS
 AC_CHECK_LIB([gcrypt], [gcry_md_hash_buffer], [libgcrypt="y"], [libgcrypt="n"])
 AC_SUBST(libgcrypt)
 AX_CHECK_PTHREAD

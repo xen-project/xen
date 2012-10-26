@@ -57,5 +57,5 @@ CONFIG_SYSTEM_LIBAIO:= @system_aio@
 ZLIB                := @zlib@
 CONFIG_LIBICONV     := @libiconv@
 CONFIG_GCRYPT       := @libgcrypt@
-CONFIG_EXT2FS       := @libext2fs@
+EXTFS_LIBS          := @EXTFS_LIBS@
 CURSES_LIBS         := @CURSES_LIBS@
