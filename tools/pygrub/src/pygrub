@@ -615,13 +615,15 @@ def run_grub(file, entry, fs, arg):
     except IndexError:
         img = g.cf.images[0]
 
-    grubcfg = { "kernel": None, "ramdisk": None, "args": None }
+    grubcfg = { "kernel": None, "ramdisk": None, "args": "" }
 
     grubcfg["kernel"] = img.kernel[1]
     if img.initrd:
         grubcfg["ramdisk"] = img.initrd[1]
     if img.args:
-        grubcfg["args"] = img.args + " " + arg
+        grubcfg["args"] += img.args
+    if arg:
+        grubcfg["args"] += " " + args
 
     return grubcfg
 
