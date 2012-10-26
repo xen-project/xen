@@ -549,10 +549,10 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             if (disks[i].is_cdrom) {
                 if (disks[i].format == LIBXL_DISK_FORMAT_EMPTY)
                     drive = libxl__sprintf
-                        (gc, "if=ide,index=%d,media=cdrom", disk);
+                        (gc, "if=ide,index=%d,media=cdrom,cache=writeback", disk);
                 else
                     drive = libxl__sprintf
-                        (gc, "file=%s,if=ide,index=%d,media=cdrom,format=%s",
+                        (gc, "file=%s,if=ide,index=%d,media=cdrom,format=%s,cache=writeback",
                          disks[i].pdev_path, disk, format);
             } else {
                 if (disks[i].format == LIBXL_DISK_FORMAT_EMPTY) {
@@ -575,11 +575,11 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                  */
                 if (strncmp(disks[i].vdev, "sd", 2) == 0)
                     drive = libxl__sprintf
-                        (gc, "file=%s,if=scsi,bus=0,unit=%d,format=%s",
+                        (gc, "file=%s,if=scsi,bus=0,unit=%d,format=%s,cache=writeback",
                          disks[i].pdev_path, disk, format);
                 else if (disk < 4)
                     drive = libxl__sprintf
-                        (gc, "file=%s,if=ide,index=%d,media=disk,format=%s",
+                        (gc, "file=%s,if=ide,index=%d,media=disk,format=%s,cache=writeback",
                          disks[i].pdev_path, disk, format);
                 else
                     continue; /* Do not emulate this disk */
