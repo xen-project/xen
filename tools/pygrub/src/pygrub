@@ -595,7 +595,17 @@ def run_grub(file, entry, fs, cfg_args):
         sel = g.run()
 
     g = Grub(file, fs)
-    if interactive:
+
+    if list_entries:
+        for i in range(len(g.cf.images)):
+            img = g.cf.images[i]
+            print "title: %s" % img.title
+            print "  root: %s" % img.root
+            print "  kernel: %s" % img.kernel[1]
+            print "  args: %s" % img.args
+            print "  initrd: %s" % img.initrd[1]
+
+    if interactive and not list_entries:
         curses.wrapper(run_main)
     else:
         sel = g.cf.default
@@ -702,7 +712,7 @@ if __name__ == "__main__":
     sel = None
     
     def usage():
-        print >> sys.stderr, "Usage: %s [-q|--quiet] [-i|--interactive] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] [--output-directory=] [--output-format=sxp|simple|simple0] <image>" %(sys.argv[0],)
+        print >> sys.stderr, "Usage: %s [-q|--quiet] [-i|--interactive] [-l|--list-entries] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] [--output-directory=] [--output-format=sxp|simple|simple0] <image>" %(sys.argv[0],)
 
     def copy_from_image(fs, file_to_read, file_type, output_directory,
                         not_really):
@@ -736,8 +746,8 @@ if __name__ == "__main__":
             dataoff += len(data)
 
     try:
-        opts, args = getopt.gnu_getopt(sys.argv[1:], 'qinh::',
-                                   ["quiet", "interactive", "not-really", "help", 
+        opts, args = getopt.gnu_getopt(sys.argv[1:], 'qilnh::',
+                                   ["quiet", "interactive", "list-entries", "not-really", "help",
                                     "output=", "output-format=", "output-directory=",
                                     "entry=", "kernel=", 
                                     "ramdisk=", "args=", "isconfig", "debug"])
@@ -753,6 +763,7 @@ if __name__ == "__main__":
     output = None
     entry = None
     interactive = True
+    list_entries = False
     isconfig = False
     debug = False
     not_really = False
@@ -771,6 +782,8 @@ if __name__ == "__main__":
             interactive = False
         elif o in ("-i", "--interactive"):
             interactive = True
+        elif o in ("-l", "--list-entries"):
+            list_entries = True
         elif o in ("-n", "--not-really"):
             not_really = True
         elif o in ("-h", "--help"):
@@ -854,6 +867,9 @@ if __name__ == "__main__":
 		traceback.print_exc()
             fs = None
             continue
+
+    if list_entries:
+        sys.exit(0)
 
     # Did looping through partitions find us a kernel?
     if not fs:
