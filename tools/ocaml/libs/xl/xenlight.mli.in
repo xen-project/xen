@@ -16,6 +16,7 @@
 exception Error of string
 
 type domid = int
+type devid = int
 
 (* @@LIBXL_TYPES@@ *)
 

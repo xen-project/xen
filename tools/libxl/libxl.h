@@ -307,6 +307,7 @@ void libxl_cpuid_dispose(libxl_cpuid_policy_list *cpuid_list);
 #define LIBXL_PCI_FUNC_ALL (~0U)
 
 typedef uint32_t libxl_domid;
+typedef int libxl_devid;
 
 /*
  * Formatting Enumerations.

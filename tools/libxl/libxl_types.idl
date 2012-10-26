@@ -8,6 +8,7 @@ namespace("libxl_")
 libxl_defbool = Builtin("defbool", passby=PASS_BY_REFERENCE)
 
 libxl_domid = Builtin("domid", json_fn = "yajl_gen_integer", autogenerate_json = False)
+libxl_devid = Builtin("devid", json_fn = "yajl_gen_integer", autogenerate_json = False, signed = True, init_val="-1")
 libxl_uuid = Builtin("uuid", passby=PASS_BY_REFERENCE)
 libxl_mac = Builtin("mac", passby=PASS_BY_REFERENCE)
 libxl_bitmap = Builtin("bitmap", dispose_fn="libxl_bitmap_dispose", passby=PASS_BY_REFERENCE)
@@ -337,7 +338,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
 
 libxl_device_vfb = Struct("device_vfb", [
     ("backend_domid", libxl_domid),
-    ("devid",         integer),
+    ("devid",         libxl_devid),
     ("vnc",           libxl_vnc_info),
     ("sdl",           libxl_sdl_info),
     # set keyboard layout, default is en-us keyboard
@@ -346,7 +347,7 @@ libxl_device_vfb = Struct("device_vfb", [
 
 libxl_device_vkb = Struct("device_vkb", [
     ("backend_domid", libxl_domid),
-    ("devid", integer),
+    ("devid", libxl_devid),
     ])
 
 libxl_device_disk = Struct("device_disk", [
@@ -363,7 +364,7 @@ libxl_device_disk = Struct("device_disk", [
 
 libxl_device_nic = Struct("device_nic", [
     ("backend_domid", libxl_domid),
-    ("devid", integer),
+    ("devid", libxl_devid),
     ("mtu", integer),
     ("model", string),
     ("mac", libxl_mac),
@@ -393,7 +394,7 @@ libxl_diskinfo = Struct("diskinfo", [
     ("backend_id", uint32),
     ("frontend", string),
     ("frontend_id", uint32),
-    ("devid", integer),
+    ("devid", libxl_devid),
     ("state", integer),
     ("evtch", integer),
     ("rref", integer),
@@ -404,7 +405,7 @@ libxl_nicinfo = Struct("nicinfo", [
     ("backend_id", uint32),
     ("frontend", string),
     ("frontend_id", uint32),
-    ("devid", integer),
+    ("devid", libxl_devid),
     ("state", integer),
     ("evtch", integer),
     ("rref_tx", integer),
