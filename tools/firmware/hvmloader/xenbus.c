@@ -64,6 +64,8 @@ void xenbus_setup(void)
 /* Reset the xenbus connection so the next kernel can start again. */
 void xenbus_shutdown(void)
 {
+    struct shared_info *shinfo = get_shared_info();
+
     ASSERT(rings != NULL);
 
     /* We zero out the whole ring -- the backend can handle this, and it's 
@@ -72,7 +74,9 @@ void xenbus_shutdown(void)
     memset(rings, 0, sizeof *rings);
 
     /* Clear the event-channel state too. */
-    memset(get_shared_info(), 0, PAGE_SIZE);
+    memset(shinfo->vcpu_info, 0, sizeof(shinfo->vcpu_info));
+    memset(shinfo->evtchn_pending, 0, sizeof(shinfo->evtchn_pending));
+    memset(shinfo->evtchn_mask, 0, sizeof(shinfo->evtchn_mask));
 
     rings = NULL;
 }
