@@ -3578,6 +3578,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                 a.mem_type =  HVMMEM_ram_ro;
             else if ( p2m_is_ram(t) )
                 a.mem_type =  HVMMEM_ram_rw;
+            else if ( p2m_is_magic(t) )
+                a.mem_type =  HVMMEM_ram_rw;
+            else if ( p2m_is_grant(t) )
+                a.mem_type =  HVMMEM_ram_rw;
             else
                 a.mem_type =  HVMMEM_mmio_dm;
             rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
