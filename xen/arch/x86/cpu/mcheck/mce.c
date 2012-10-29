@@ -567,15 +567,12 @@ int mce_available(struct cpuinfo_x86 *c)
 }
 
 /*
- * Check if bank 0 is usable for MCE. It isn't for AMD K7,
- * and Intel P6 family before model 0x1a.
+ * Check if bank 0 is usable for MCE. It isn't for Intel P6 family
+ * before model 0x1a.
  */
 unsigned int mce_firstbank(struct cpuinfo_x86 *c)
 {
     if (c->x86 == 6) {
-        if (c->x86_vendor == X86_VENDOR_AMD)
-            return 1;
-
         if (c->x86_vendor == X86_VENDOR_INTEL && c->x86_model < 0x1a)
             return 1;
     }
@@ -591,7 +588,6 @@ int show_mca_info(int inited, struct cpuinfo_x86 *c)
         char prefix[20];
         static const char *const type_str[] = {
             [mcheck_amd_famXX] = "AMD",
-            [mcheck_amd_k7] = "AMD K7",
             [mcheck_amd_k8] = "AMD K8",
             [mcheck_intel] = "Intel"
         };

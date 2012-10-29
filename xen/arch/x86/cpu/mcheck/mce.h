@@ -33,7 +33,6 @@ enum mcheck_type {
 	mcheck_unset = -1,
 	mcheck_none,
 	mcheck_amd_famXX,
-	mcheck_amd_k7,
 	mcheck_amd_k8,
 	mcheck_intel
 };

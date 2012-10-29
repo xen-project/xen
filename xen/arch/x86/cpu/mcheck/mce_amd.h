@@ -1,7 +1,6 @@
 #ifndef _MCHECK_AMD_H
 #define _MCHECK_AMD_H
 
-enum mcheck_type amd_k7_mcheck_init(struct cpuinfo_x86 *c);
 enum mcheck_type amd_k8_mcheck_init(struct cpuinfo_x86 *c);
 enum mcheck_type amd_f10_mcheck_init(struct cpuinfo_x86 *c);
 

@@ -1,6 +1,6 @@
 /*
- * MCA implementation for AMD K7/K8 CPUs
- * Copyright (c) 2007 Advanced Micro Devices, Inc. 
+ * MCA implementation for AMD CPUs
+ * Copyright (c) 2007-2012 Advanced Micro Devices, Inc. 
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

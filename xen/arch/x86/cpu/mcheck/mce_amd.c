@@ -106,10 +106,6 @@ amd_mcheck_init(struct cpuinfo_x86 *ci)
 
     switch ( ci->x86 )
     {
-    case 6:
-        rc = amd_k7_mcheck_init(ci);
-        break;
-
     default:
         /* Assume that machine check support is available.
          * The minimum provided support is at least the K8. */

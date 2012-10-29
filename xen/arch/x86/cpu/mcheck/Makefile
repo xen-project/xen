@@ -1,5 +1,4 @@
 obj-y += amd_nonfatal.o
-obj-y += k7.o
 obj-y += amd_k8.o
 obj-y += amd_f10.o
 obj-y += mce_amd.o

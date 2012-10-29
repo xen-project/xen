@@ -102,12 +102,6 @@ static int __init init_nonfatal_mce_checker(void)
 	 */
 	switch (c->x86_vendor) {
 	case X86_VENDOR_AMD:
-		if (c->x86 == 6) { /* K7 */
-			init_timer(&mce_timer, mce_work_fn, NULL, 0);
-			set_timer(&mce_timer, NOW() + MCE_PERIOD);
-			break;
-		}
-
 		/* Assume we are on K8 or newer AMD CPU here */
 		amd_nonfatal_mcheck_init(c);
 		break;

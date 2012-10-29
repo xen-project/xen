@@ -25,8 +25,6 @@
 #define ANY -1
 
 static const struct mce_quirkdata mce_amd_quirks[] = {
-	{ 0x6 /* cpu family */, ANY /* all models */, ANY /* all steppings */,
-	  MCEQUIRK_K7_BANK0 },
 	{ 0xf /* cpu family */, ANY /* all models */, ANY /* all steppings */,
 	  MCEQUIRK_K8_GART },
 	{ 0x10 /* cpu family */, ANY /* all models */, ANY /* all steppings */,
@@ -59,9 +57,6 @@ int mcequirk_amd_apply(enum mcequirk_amd_flags flags)
 	u64 val;
 
 	switch (flags) {
-	case MCEQUIRK_K7_BANK0:
-		return 1; /* first bank */
-
 	case MCEQUIRK_K8_GART:
 		/*
 		 * Enable error reporting for all errors except for GART
