@@ -303,9 +303,10 @@ static struct page_info *alloc_heap_pages(
     unsigned int first_node, i, j, zone = 0, nodemask_retry = 0;
     unsigned int node = (uint8_t)((memflags >> _MEMF_node) - 1);
     unsigned long request = 1UL << order;
-    cpumask_t extra_cpus_mask, mask;
     struct page_info *pg;
     nodemask_t nodemask = (d != NULL ) ? d->node_affinity : node_online_map;
+    bool_t need_tlbflush = 0;
+    uint32_t tlbflush_timestamp = 0;
 
     if ( node == NUMA_NO_NODE )
     {
@@ -417,20 +418,19 @@ static struct page_info *alloc_heap_pages(
     if ( d != NULL )
         d->last_alloc_node = node;
 
-    cpus_clear(mask);
-
     for ( i = 0; i < (1 << order); i++ )
     {
         /* Reference count must continuously be zero for free pages. */
         BUG_ON(pg[i].count_info != PGC_state_free);
         pg[i].count_info = PGC_state_inuse;
 
-        if ( pg[i].u.free.need_tlbflush )
+        if ( pg[i].u.free.need_tlbflush &&
+             (pg[i].tlbflush_timestamp <= tlbflush_current_time()) &&
+             (!need_tlbflush ||
+              (pg[i].tlbflush_timestamp > tlbflush_timestamp)) )
         {
-            /* Add in extra CPUs that need flushing because of this page. */
-            cpus_andnot(extra_cpus_mask, cpu_online_map, mask);
-            tlbflush_filter(extra_cpus_mask, pg[i].tlbflush_timestamp);
-            cpus_or(mask, mask, extra_cpus_mask);
+            need_tlbflush = 1;
+            tlbflush_timestamp = pg[i].tlbflush_timestamp;
         }
 
         /* Initialise fields which have other uses for free pages. */
@@ -440,10 +440,15 @@ static struct page_info *alloc_heap_pages(
 
     spin_unlock(&heap_lock);
 
-    if ( unlikely(!cpus_empty(mask)) )
+    if ( need_tlbflush )
     {
-        perfc_incr(need_flush_tlb_flush);
-        flush_tlb_mask(&mask);
+        cpumask_t mask = cpu_online_map;
+        tlbflush_filter(mask, tlbflush_timestamp);
+        if ( !cpus_empty(mask) )
+        {
+            perfc_incr(need_flush_tlb_flush);
+            flush_tlb_mask(&mask);
+        }
     }
 
     return pg;
