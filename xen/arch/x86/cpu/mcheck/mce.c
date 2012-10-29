@@ -298,7 +298,6 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
 
     gstatus = mca_rdmsr(MSR_IA32_MCG_STATUS);
     switch (who) {
-    case MCA_MCE_HANDLER:
     case MCA_MCE_SCAN:
         mc_flags = MC_FLAG_MCE;
         which = MC_URGENT;

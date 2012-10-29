@@ -100,7 +100,6 @@ static inline uint64_t mca_rdmsr(unsigned int msr)
  * of the MCA data observed in the logout operation. */
 
 enum mca_source {
-	MCA_MCE_HANDLER,
 	MCA_POLLER,
 	MCA_CMCI_HANDLER,
 	MCA_RESET,
