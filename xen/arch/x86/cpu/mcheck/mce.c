@@ -560,30 +560,6 @@ void mcheck_mca_clearbanks(struct mca_banks *bankmask)
     }
 }
 
-static enum mcheck_type amd_mcheck_init(struct cpuinfo_x86 *ci)
-{
-    enum mcheck_type rc = mcheck_none;
-
-    switch (ci->x86) {
-    case 6:
-        rc = amd_k7_mcheck_init(ci);
-        break;
-
-    default:
-        /* Assume that machine check support is available.
-         * The minimum provided support is at least the K8. */
-    case 0xf:
-        rc = amd_k8_mcheck_init(ci);
-        break;
-
-    case 0x10 ... 0x17:
-        rc = amd_f10_mcheck_init(ci);
-        break;
-    }
-
-    return rc;
-}
-
 /*check the existence of Machine Check*/
 int mce_available(struct cpuinfo_x86 *c)
 {
