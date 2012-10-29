@@ -21,11 +21,23 @@
 #include <xen/types.h>
 
 #include <asm/msr.h>
+#include <asm/processor.h>
 
 #include "mce.h"
 #include "x86_mca.h"
 #include "mce_amd.h"
 #include "mcaction.h"
+
+#include "mce_quirks.h"
+
+#define ANY -1
+
+static const struct mce_quirkdata mce_amd_quirks[] = {
+    { 0xf /* cpu family */, ANY /* all models */, ANY /* all steppings */,
+      MCEQUIRK_K8_GART },
+    { 0x10 /* cpu family */, ANY /* all models */, ANY /* all steppings */,
+      MCEQUIRK_F10_GART },
+};
 
 /* Error Code Types */
 enum mc_ec_type {
@@ -96,6 +108,53 @@ mc_amd_addrcheck(uint64_t status, uint64_t misc, int addrtype)
 
     /* unreached */
     BUG();
+    return 0;
+}
+
+/* MC quirks */
+enum mcequirk_amd_flags
+mcequirk_lookup_amd_quirkdata(struct cpuinfo_x86 *c)
+{
+    int i;
+
+    BUG_ON(c->x86_vendor != X86_VENDOR_AMD);
+
+    for ( i = 0; i < ARRAY_SIZE(mce_amd_quirks); i++ )
+    {
+        if ( c->x86 != mce_amd_quirks[i].cpu_family )
+            continue;
+        if ( (mce_amd_quirks[i].cpu_model != ANY) &&
+             (mce_amd_quirks[i].cpu_model != c->x86_model) )
+            continue;
+        if ( (mce_amd_quirks[i].cpu_stepping != ANY) &&
+             (mce_amd_quirks[i].cpu_stepping != c->x86_mask) )
+                continue;
+        return mce_amd_quirks[i].quirk;
+    }
+    return 0;
+}
+
+int mcequirk_amd_apply(enum mcequirk_amd_flags flags)
+{
+    uint64_t val;
+
+    switch ( flags )
+    {
+    case MCEQUIRK_K8_GART:
+        /*
+         * Enable error reporting for all errors except for GART
+         * TBL walk error reporting, which trips off incorrectly
+         * with AGP GART & 3ware & Cerberus.
+         */
+        wrmsrl(MSR_IA32_MCx_CTL(4), ~(1ULL << 10));
+        wrmsrl(MSR_IA32_MCx_STATUS(4), 0ULL);
+        break;
+    case MCEQUIRK_F10_GART:
+        if ( rdmsr_safe(MSR_AMD64_MCx_MASK(4), val) == 0 )
+                wrmsr_safe(MSR_AMD64_MCx_MASK(4), val | (1 << 10));
+        break;
+    }
+
     return 0;
 }
 
