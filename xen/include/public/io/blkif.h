@@ -126,6 +126,19 @@
  *      of this type may still be returned at any time with the
  *      BLKIF_RSP_EOPNOTSUPP result code.
  *
+ * feature-persistent
+ *      Values:         0/1 (boolean)
+ *      Default Value:  0
+ *      Notes: 7
+ *
+ *      A value of "1" indicates that the backend can keep the grants used
+ *      by the frontend driver mapped, so the same set of grants should be
+ *      used in all transactions. The maximum number of grants the backend
+ *      can map persistently depends on the implementation, but ideally it
+ *      should be RING_SIZE * BLKIF_MAX_SEGMENTS_PER_REQUEST. Using this
+ *      feature the backend doesn't need to unmap each grant, preventing
+ *      costly TLB flushes.
+ *
  *----------------------- Request Transport Parameters ------------------------
  *
  * max-ring-page-order
@@ -242,6 +255,15 @@
  *      The size of the frontend allocated request ring buffer in units of
  *      machine pages.  The value must be a power of 2.
  *
+ * feature-persistent
+ *      Values:         0/1 (boolean)
+ *      Default Value:  0
+ *      Notes: 7, 8
+ *
+ *      A value of "1" indicates that the frontend will reuse the same grants
+ *      for all transactions, allowing the backend to map them with write
+ *      access (even when it should be read-only).
+ *
  *------------------------- Virtual Device Properties -------------------------
  *
  * device-type
@@ -279,6 +301,13 @@
  *     'ring-ref' is used to communicate the grant reference for this
  *     page to the backend.  When using a multi-page ring, the 'ring-ref'
  *     node is not created.  Instead 'ring-ref0' - 'ring-refN' are used.
+ * (7) When using persistent grants data has to be copied from/to the page
+ *     where the grant is currently mapped. The overhead of doing this copy
+ *     however doesn't suppress the speed improvement of not having to unmap
+ *     the grants.
+ * (8) The frontend driver has to allow the backend driver to map all grants
+ *     with write access, even when they should be mapped read-only, since
+ *     further requests may reuse this grants and require write permisions.
  */
 
 /*
