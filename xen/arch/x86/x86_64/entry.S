@@ -47,12 +47,10 @@ restore_all_guest:
         cmpl  $1,%ecx
         ja    .Lforce_iret
 
-        addq  $8,%rsp
-        popq  %rcx                    # RIP
-        popq  %r11                    # CS
-        cmpw  $FLAT_USER_CS32,%r11
-        popq  %r11                    # RFLAGS
-        popq  %rsp                    # RSP
+        cmpw  $FLAT_USER_CS32,16(%rsp)# CS
+        movq  8(%rsp),%rcx            # RIP
+        movq  24(%rsp),%r11           # RFLAGS
+        movq  32(%rsp),%rsp           # RSP
         je    1f
         sysretq
 1:      sysretl
@@ -101,8 +99,7 @@ failsafe_callback:
         ALIGN
 /* No special register assumptions. */
 restore_all_xen:
-        RESTORE_ALL
-        addq  $8,%rsp
+        RESTORE_ALL adj=8
         iretq
 
 /*
@@ -311,8 +308,7 @@ ENTRY(int80_direct_trap)
 UNLIKELY_START(ne, msi_check)
         movl  $0x80,%edi
         call  check_for_unexpected_msi
-        RESTORE_ALL
-        SAVE_ALL
+        LOAD_C_CLOBBERED
 UNLIKELY_END(msi_check)
 
         GET_CURRENT(%rbx)

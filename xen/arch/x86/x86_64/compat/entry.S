@@ -21,8 +21,7 @@ ENTRY(compat_hypercall)
 UNLIKELY_START(ne, msi_check)
         movl  $HYPERCALL_VECTOR,%edi
         call  check_for_unexpected_msi
-        RESTORE_ALL
-        SAVE_ALL
+        LOAD_C_CLOBBERED
 UNLIKELY_END(msi_check)
 
         GET_CURRENT(%rbx)
@@ -173,8 +172,7 @@ compat_bad_hypercall:
 /* %rbx: struct vcpu, interrupts disabled */
 compat_restore_all_guest:
         ASSERT_INTERRUPTS_DISABLED
-        RESTORE_ALL
-        addq  $8,%rsp
+        RESTORE_ALL adj=8
 .Lft0:  iretq
 
 .section .fixup,"ax"
