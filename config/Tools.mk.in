@@ -22,6 +22,7 @@ AS86                := @AS86@
 LD86                := @LD86@
 BCC                 := @BCC@
 IASL                := @IASL@
+FETCHER             := @FETCHER@
 
 # Extra folder for libs/includes
 PREPEND_INCLUDES    := @PREPEND_INCLUDES@

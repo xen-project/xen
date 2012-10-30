@@ -35,6 +35,7 @@ m4_include([m4/curses.m4])
 m4_include([m4/pthread.m4])
 m4_include([m4/ptyfuncs.m4])
 m4_include([m4/extfs.m4])
+m4_include([m4/fetcher.m4])
 
 # Enable/disable options
 AX_ARG_DEFAULT_DISABLE([githttp], [Download GIT repositories via HTTP])
@@ -117,6 +118,7 @@ esac
  AX_CHECK_UUID
  AX_CHECK_CURSES
 PKG_CHECK_MODULES(glib, [glib-2.0 >= 2.12])
+AX_CHECK_FETCHER
 
 # Checks for libraries.
 AC_CHECK_HEADER([bzlib.h], [

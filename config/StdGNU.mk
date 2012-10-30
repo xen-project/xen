@@ -22,8 +22,6 @@ MSGMERGE   = msgmerge
 # Allow git to be wrappered in the environment
 GIT        ?= git
 
-WGET       ?= wget -c
-
 INSTALL      = install
 INSTALL_DIR  = $(INSTALL) -d -m0755 -p
 INSTALL_DATA = $(INSTALL) -m0644 -p
