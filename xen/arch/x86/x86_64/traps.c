@@ -67,10 +67,15 @@ static void _show_registers(
            regs->rbp, regs->rsp, regs->r8);
     printk("r9:  %016lx   r10: %016lx   r11: %016lx\n",
            regs->r9,  regs->r10, regs->r11);
-    printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
-           regs->r12, regs->r13, regs->r14);
-    printk("r15: %016lx   cr0: %016lx   cr4: %016lx\n",
-           regs->r15, crs[0], crs[4]);
+    if ( !(regs->entry_vector & TRAP_regs_partial) )
+    {
+        printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
+               regs->r12, regs->r13, regs->r14);
+        printk("r15: %016lx   cr0: %016lx   cr4: %016lx\n",
+               regs->r15, crs[0], crs[4]);
+    }
+    else
+        printk("cr0: %016lx   cr4: %016lx\n", crs[0], crs[4]);
     printk("cr3: %016lx   cr2: %016lx\n", crs[3], crs[2]);
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   "
            "ss: %04x   cs: %04x\n",
@@ -301,7 +306,7 @@ unsigned long do_iret(void)
 
     if ( !(iret_saved.flags & VGCF_in_syscall) )
     {
-        regs->entry_vector = 0;
+        regs->entry_vector &= ~TRAP_syscall;
         regs->r11 = iret_saved.r11;
         regs->rcx = iret_saved.rcx;
     }

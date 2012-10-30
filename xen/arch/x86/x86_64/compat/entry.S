@@ -14,8 +14,7 @@
 
 ENTRY(compat_hypercall)
         pushq $0
-        movl  $TRAP_syscall,4(%rsp)
-        SAVE_ALL
+        SAVE_VOLATILE type=TRAP_syscall compat=1
 
         cmpb  $0,untrusted_msi(%rip)
 UNLIKELY_START(ne, msi_check)
@@ -126,6 +125,7 @@ compat_test_guest_events:
 /* %rbx: struct vcpu */
 compat_process_softirqs:
         sti
+        andl  $~TRAP_regs_partial,UREGS_entry_vector(%rsp)
         call  do_softirq
         jmp   compat_test_all_events
 
@@ -172,7 +172,7 @@ compat_bad_hypercall:
 /* %rbx: struct vcpu, interrupts disabled */
 compat_restore_all_guest:
         ASSERT_INTERRUPTS_DISABLED
-        RESTORE_ALL adj=8
+        RESTORE_ALL adj=8 compat=1
 .Lft0:  iretq
 
 .section .fixup,"ax"
@@ -243,7 +243,7 @@ UNLIKELY_END(compat_syscall_gpf)
 
 ENTRY(compat_sysenter)
         movq  VCPU_trap_ctxt(%rbx),%rcx
-        cmpl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
+        cmpb  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
         movzwl VCPU_sysenter_sel(%rbx),%eax
         movzwl TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_cs(%rcx),%ecx
         cmovel %ecx,%eax

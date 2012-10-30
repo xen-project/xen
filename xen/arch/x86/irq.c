@@ -704,7 +704,7 @@ void irq_complete_move(struct irq_desc *desc)
     if (likely(!desc->arch.move_in_progress))
         return;
 
-    vector = get_irq_regs()->entry_vector;
+    vector = (u8)get_irq_regs()->entry_vector;
     me = smp_processor_id();
 
     if ( vector == desc->arch.vector &&
@@ -798,7 +798,7 @@ void do_IRQ(struct cpu_user_regs *regs)
     struct irqaction *action;
     uint32_t          tsc_in;
     struct irq_desc  *desc;
-    unsigned int      vector = regs->entry_vector;
+    unsigned int      vector = (u8)regs->entry_vector;
     int irq = __get_cpu_var(vector_irq[vector]);
     struct cpu_user_regs *old_regs = set_irq_regs(regs);
     
@@ -892,7 +892,7 @@ void do_IRQ(struct cpu_user_regs *regs)
 
  out:
     if ( desc->handler->end )
-        desc->handler->end(desc, regs->entry_vector);
+        desc->handler->end(desc, vector);
  out_no_end:
     spin_unlock(&desc->lock);
  out_no_unlock:
@@ -1113,7 +1113,7 @@ static void __do_IRQ_guest(int irq)
     struct domain      *d;
     int                 i, sp;
     struct pending_eoi *peoi = this_cpu(pending_eoi);
-    int vector = get_irq_regs()->entry_vector;
+    unsigned int        vector = (u8)get_irq_regs()->entry_vector;
 
     if ( unlikely(action->nr_guests == 0) )
     {

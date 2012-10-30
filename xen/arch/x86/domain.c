@@ -143,6 +143,7 @@ static void continue_idle_domain(struct vcpu *v)
 static void continue_nonidle_domain(struct vcpu *v)
 {
     check_wakeup_from_wait();
+    mark_regs_dirty(guest_cpu_user_regs());
     reset_stack_and_jump(ret_from_intr);
 }
 
@@ -1312,7 +1313,7 @@ static void load_segments(struct vcpu *n)
             if ( test_bit(_VGCF_failsafe_disables_events, &n->arch.vgc_flags) )
                 vcpu_info(n, evtchn_upcall_mask) = 1;
 
-            regs->entry_vector  = TRAP_syscall;
+            regs->entry_vector |= TRAP_syscall;
             regs->_eflags      &= 0xFFFCBEFFUL;
             regs->ss            = FLAT_COMPAT_KERNEL_SS;
             regs->_esp          = (unsigned long)(esp-7);
@@ -1354,7 +1355,7 @@ static void load_segments(struct vcpu *n)
         if ( test_bit(_VGCF_failsafe_disables_events, &n->arch.vgc_flags) )
             vcpu_info(n, evtchn_upcall_mask) = 1;
 
-        regs->entry_vector  = TRAP_syscall;
+        regs->entry_vector |= TRAP_syscall;
         regs->rflags       &= ~(X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|
                                 X86_EFLAGS_NT|X86_EFLAGS_TF);
         regs->ss            = FLAT_KERNEL_SS;

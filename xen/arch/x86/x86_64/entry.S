@@ -123,9 +123,8 @@ ENTRY(syscall_enter)
         movl  $FLAT_KERNEL_SS,24(%rsp)
         pushq %rcx
         pushq $0
-        movl  $TRAP_syscall,4(%rsp)
-        movq  24(%rsp),%r11 /* Re-load user RFLAGS into %r11 before SAVE_ALL */
-        SAVE_ALL
+        movq  24(%rsp),%r11 /* Re-load user RFLAGS into %r11 before saving */
+        SAVE_VOLATILE TRAP_syscall
         GET_CURRENT(%rbx)
         movq  VCPU_domain(%rbx),%rcx
         testb $1,DOMAIN_is_32bit_pv(%rcx)
@@ -222,6 +221,7 @@ test_guest_events:
 /* %rbx: struct vcpu */
 process_softirqs:
         sti       
+        SAVE_PRESERVED
         call do_softirq
         jmp  test_all_events
 
@@ -275,8 +275,7 @@ sysenter_eflags_saved:
         pushq $3 /* ring 3 null cs */
         pushq $0 /* null rip */
         pushq $0
-        movl  $TRAP_syscall,4(%rsp)
-        SAVE_ALL
+        SAVE_VOLATILE TRAP_syscall
         GET_CURRENT(%rbx)
         cmpb  $0,VCPU_sysenter_disables_events(%rbx)
         movq  VCPU_sysenter_addr(%rbx),%rax
@@ -286,6 +285,7 @@ sysenter_eflags_saved:
         leal  (,%rcx,TBF_INTERRUPT),%ecx
 UNLIKELY_START(z, sysenter_gpf)
         movq  VCPU_trap_ctxt(%rbx),%rsi
+        SAVE_PRESERVED
         movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
         movl  %eax,TRAPBOUNCE_error_code(%rdx)
         movq  TRAP_gp_fault * TRAPINFO_sizeof + TRAPINFO_eip(%rsi),%rax
@@ -302,7 +302,7 @@ UNLIKELY_END(sysenter_gpf)
 
 ENTRY(int80_direct_trap)
         pushq $0
-        SAVE_ALL
+        SAVE_VOLATILE 0x80
 
         cmpb  $0,untrusted_msi(%rip)
 UNLIKELY_START(ne, msi_check)
@@ -331,6 +331,7 @@ int80_slow_path:
          * IDT entry with DPL==0.
          */
         movl  $((0x80 << 3) | 0x2),UREGS_error_code(%rsp)
+        SAVE_PRESERVED
         movl  $TRAP_gp_fault,UREGS_entry_vector(%rsp)
         /* A GPF wouldn't have incremented the instruction pointer. */
         subq  $2,UREGS_rip(%rsp)
@@ -412,7 +413,7 @@ UNLIKELY_END(bounce_failsafe)
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
         /* Also clear AC: alignment checks shouldn't trigger in kernel mode. */
-        movl  $TRAP_syscall,UREGS_entry_vector+8(%rsp)
+        orl   $TRAP_syscall,UREGS_entry_vector+8(%rsp)
         andl  $~(X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|\
                  X86_EFLAGS_NT|X86_EFLAGS_TF),UREGS_eflags+8(%rsp)
         movq  $FLAT_KERNEL_SS,UREGS_ss+8(%rsp)
@@ -477,7 +478,7 @@ handle_exception_saved:
         jz    exception_with_ints_disabled
         sti
 1:      movq  %rsp,%rdi
-        movl  UREGS_entry_vector(%rsp),%eax
+        movzbl UREGS_entry_vector(%rsp),%eax
         leaq  exception_table(%rip),%rdx
         GET_CURRENT(%rbx)
         PERFC_INCR(exceptions, %rax, %rbx)
@@ -518,7 +519,7 @@ exception_with_ints_disabled:
 
 /* No special register assumptions. */
 FATAL_exception_with_ints_disabled:
-        movl  UREGS_entry_vector(%rsp),%edi
+        movzbl UREGS_entry_vector(%rsp),%edi
         movq  %rsp,%rsi
         call  fatal_trap
         ud2
@@ -624,7 +625,7 @@ handle_ist_exception:
         movq  %rdi,%rsp
         rep   movsq
 1:      movq  %rsp,%rdi
-        movl  UREGS_entry_vector(%rsp),%eax
+        movzbl UREGS_entry_vector(%rsp),%eax
         leaq  exception_table(%rip),%rdx
         callq *(%rdx,%rax,8)
         jmp   ret_from_intr

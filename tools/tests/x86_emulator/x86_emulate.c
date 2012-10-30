@@ -10,6 +10,7 @@ typedef bool bool_t;
 #define BUG() abort()
 
 #define cpu_has_amd_erratum(nr) 0
+#define mark_regs_dirty(r) ((void)(r))
 
 #include "x86_emulate/x86_emulate.h"
 #include "x86_emulate/x86_emulate.c"

@@ -124,10 +124,12 @@ void wake_up_all(struct waitqueue_head *wq)
 
 static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
 {
-    char *cpu_info = (char *)get_cpu_info();
+    struct cpu_info *cpu_info = get_cpu_info();
     struct vcpu *curr = current;
     unsigned long dummy;
+    u32 entry_vector = cpu_info->guest_cpu_user_regs.entry_vector;
 
+    cpu_info->guest_cpu_user_regs.entry_vector &= ~TRAP_regs_partial;
     ASSERT(wqv->esp == 0);
 
     /* Save current VCPU affinity; force wakeup on *this* CPU only. */
@@ -157,6 +159,8 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
         gdprintk(XENLOG_ERR, "Stack too large in %s\n", __FUNCTION__);
         domain_crash_synchronous();
     }
+
+    cpu_info->guest_cpu_user_regs.entry_vector = entry_vector;
 }
 
 static void __finish_wait(struct waitqueue_vcpu *wqv)
