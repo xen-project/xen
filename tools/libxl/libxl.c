@@ -3653,21 +3653,25 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     physinfo->free_pages = xcphysinfo.free_pages;
     physinfo->scrub_pages = xcphysinfo.scrub_pages;
     l = xc_sharing_freed_pages(ctx->xch);
-    if (l == -ENOSYS) {
-        l = 0;
-    } else if (l < 0) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, l,
-                            "getting sharing freed pages");
-        return ERROR_FAIL;
+    if (l < 0) {
+        if (errno == ENOSYS) {
+            l = 0;
+        } else {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                             "getting sharing freed pages");
+            return ERROR_FAIL;
+        }
     }
     physinfo->sharing_freed_pages = l;
     l = xc_sharing_used_frames(ctx->xch);
-    if (l == -ENOSYS) {
-        l = 0;
-    } else if (l < 0) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, l,
-                            "getting sharing used frames");
-        return ERROR_FAIL;
+    if (l < 0) {
+        if (errno == ENOSYS) {
+            l = 0;
+        } else {
+            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
+                             "getting sharing used frames");
+            return ERROR_FAIL;
+        }
     }
     physinfo->sharing_used_frames = l;
     physinfo->nr_nodes = xcphysinfo.nr_nodes;
