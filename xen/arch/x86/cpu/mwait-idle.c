@@ -96,7 +96,6 @@ static const struct cpuidle_state {
 	char		name[16];
 	unsigned int	flags;
 	unsigned int	exit_latency; /* in US */
-	int		power_usage; /* in mW */
 	unsigned int	target_residency; /* in US */
 } *cpuidle_state_table;
 
@@ -479,7 +478,6 @@ static int mwait_idle_cpu_init(struct notifier_block *nfb,
 		cx->type = cstate;
 		cx->address = get_driver_data(cstate);
 		cx->entry_method = ACPI_CSTATE_EM_FFH;
-		cx->power = cpuidle_state_table[cstate].power_usage;
 		cx->latency = cpuidle_state_table[cstate].exit_latency;
 		cx->target_residency =
 			cpuidle_state_table[cstate].target_residency;

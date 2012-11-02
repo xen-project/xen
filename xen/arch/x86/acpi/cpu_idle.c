@@ -935,7 +935,6 @@ static void set_cx(
     }
 
     cx->latency  = xen_cx->latency;
-    cx->power    = xen_cx->power;
     
     cx->target_residency = cx->latency * latency_factor;
     if ( cx->type == ACPI_STATE_C1 || cx->type == ACPI_STATE_C2 )

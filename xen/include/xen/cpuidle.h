@@ -46,7 +46,6 @@ struct acpi_processor_cx
     u32 address;
     u32 latency;
     u32 target_residency;
-    u32 power;
     u32 usage;
     u64 time;
 };
