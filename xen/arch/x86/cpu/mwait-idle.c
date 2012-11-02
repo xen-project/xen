@@ -365,6 +365,7 @@ static struct intel_idle_id {
 	ICPU(0x2a, snb),
 	ICPU(0x2d, snb),
 	ICPU(0x3a, ivb),
+	ICPU(0x3e, ivb),
 	{}
 };
 
