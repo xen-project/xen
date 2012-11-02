@@ -164,9 +164,13 @@ int __init amd_iov_detect(void)
 {
     INIT_LIST_HEAD(&amd_iommu_head);
 
+    if ( !iommu_enable && !iommu_intremap )
+        return 0;
+
     if ( (amd_iommu_detect_acpi() !=0) || (iommu_found() == 0) )
     {
         printk("AMD-Vi: IOMMU not found!\n");
+        iommu_intremap = 0;
         return -ENODEV;
     }
 

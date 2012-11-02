@@ -975,6 +975,8 @@ void __init x2apic_bsp_setup(void)
         goto restore_out;
     }
 
+    force_iommu = 1;
+
     genapic = apic_x2apic_probe();
     printk("Switched to APIC driver %s.\n", genapic->name);
 

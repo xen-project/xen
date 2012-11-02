@@ -41,7 +41,8 @@ static void iommu_dump_p2m_table(unsigned char key);
  *   no-intremap                Disable VT-d Interrupt Remapping
  */
 custom_param("iommu", parse_iommu_param);
-bool_t __read_mostly iommu_enabled = 1;
+bool_t __initdata iommu_enable = 1;
+bool_t __read_mostly iommu_enabled;
 bool_t __read_mostly force_iommu;
 bool_t __initdata iommu_dom0_strict;
 bool_t __read_mostly iommu_verbose;
@@ -77,7 +78,7 @@ static void __init parse_iommu_param(char *s)
             *ss = '\0';
 
         if ( !parse_bool(s) )
-            iommu_enabled = 0;
+            iommu_enable = 0;
         else if ( !strcmp(s, "force") || !strcmp(s, "required") )
             force_iommu = val;
         else if ( !strcmp(s, "workaround_bios_bug") )
@@ -395,7 +396,7 @@ int __init iommu_setup(void)
     if ( iommu_dom0_strict )
         iommu_passthrough = 0;
 
-    if ( iommu_enabled )
+    if ( iommu_enable )
     {
         rc = iommu_hardware_setup();
         iommu_enabled = (rc == 0);
@@ -409,8 +410,6 @@ int __init iommu_setup(void)
     if ( !iommu_enabled )
     {
         iommu_snoop = 0;
-        iommu_qinval = 0;
-        iommu_intremap = 0;
         iommu_passthrough = 0;
         iommu_dom0_strict = 0;
     }

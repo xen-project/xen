@@ -2086,7 +2086,10 @@ int __init intel_vtd_setup(void)
     int ret;
 
     if ( list_empty(&acpi_drhd_units) )
-        return -ENODEV;
+    {
+        ret = -ENODEV;
+        goto error;
+    }
 
     platform_quirks_init();
 

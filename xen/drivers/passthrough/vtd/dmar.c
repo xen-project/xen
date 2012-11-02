@@ -744,7 +744,7 @@ static int __init acpi_parse_dmar(struct acpi_table_header *table)
     dmar = (struct acpi_table_dmar *)table;
     dmar_flags = dmar->flags;
 
-    if ( !iommu_enabled )
+    if ( !iommu_enable && !iommu_intremap )
     {
         ret = -EINVAL;
         goto out;

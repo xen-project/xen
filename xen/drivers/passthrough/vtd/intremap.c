@@ -149,8 +149,7 @@ int iommu_supports_eim(void)
     struct acpi_drhd_unit *drhd;
     int apic;
 
-    if ( !iommu_enabled || !iommu_qinval || !iommu_intremap ||
-         list_empty(&acpi_drhd_units) )
+    if ( !iommu_qinval || !iommu_intremap || list_empty(&acpi_drhd_units) )
         return 0;
 
     /* We MUST have a DRHD unit for each IOAPIC. */
