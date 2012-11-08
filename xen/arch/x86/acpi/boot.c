@@ -28,6 +28,7 @@
 #include <xen/init.h>
 #include <xen/acpi.h>
 #include <xen/irq.h>
+#include <xen/mm.h>
 #include <xen/dmi.h>
 #include <asm/fixmap.h>
 #include <asm/page.h>
@@ -285,6 +286,27 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
 #else
 #define	acpi_parse_hpet	NULL
 #endif
+
+static int __init acpi_invalidate_bgrt(struct acpi_table_header *table)
+{
+	struct acpi_table_bgrt *bgrt_tbl =
+		container_of(table, struct acpi_table_bgrt, header);
+
+	if (table->length < sizeof(*bgrt_tbl))
+		return -1;
+
+	if (bgrt_tbl->version == 1 && bgrt_tbl->image_address
+	    && !page_is_ram_type(PFN_DOWN(bgrt_tbl->image_address),
+				 RAM_TYPE_CONVENTIONAL))
+		return 0;
+
+	printk(KERN_INFO PREFIX "BGRT: invalidating v%d image at %#"PRIx64"\n",
+	       bgrt_tbl->version, bgrt_tbl->image_address);
+	bgrt_tbl->image_address = 0;
+	bgrt_tbl->status &= ~1;
+
+	return 0;
+}
 
 #ifdef CONFIG_ACPI_SLEEP
 #define acpi_fadt_copy_address(dst, src, len) do {			\
@@ -652,6 +674,8 @@ int __init acpi_boot_init(void)
 	acpi_dmar_init();
 
 	erst_init();
+
+	acpi_table_parse(ACPI_SIG_BGRT, acpi_invalidate_bgrt);
 
 	return 0;
 }
