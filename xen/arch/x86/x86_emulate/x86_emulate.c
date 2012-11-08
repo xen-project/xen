@@ -1996,13 +1996,10 @@ x86_emulate(
             if ( (rc = read_ulong(x86_seg_ss, sp_post_inc(op_bytes),
                                   &dst.val, op_bytes, ctxt, ops)) != 0 )
                 goto done;
-            switch ( op_bytes )
-            {
-            case 1: *(uint8_t  *)regs[i] = (uint8_t)dst.val; break;
-            case 2: *(uint16_t *)regs[i] = (uint16_t)dst.val; break;
-            case 4: *regs[i] = (uint32_t)dst.val; break; /* 64b: zero-ext */
-            case 8: *regs[i] = dst.val; break;
-            }
+            if ( op_bytes == 2 )
+                *(uint16_t *)regs[i] = (uint16_t)dst.val;
+            else
+                *regs[i] = dst.val; /* 64b: zero-ext done by read_ulong() */
         }
         break;
     }
