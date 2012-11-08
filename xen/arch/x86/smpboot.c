@@ -64,8 +64,6 @@ struct cpuinfo_x86 cpu_data[NR_CPUS];
 u32 x86_cpu_to_apicid[NR_CPUS] __read_mostly =
 	{ [0 ... NR_CPUS-1] = BAD_APICID };
 
-static void map_cpu_to_logical_apicid(void);
-
 static int cpu_error;
 static enum cpu_state {
     CPU_STATE_DYING,    /* slave -> master: I am dying */
@@ -202,7 +200,6 @@ void smp_callin(void)
     Dprintk("CALLIN, before setup_local_APIC().\n");
     x2apic_ap_setup();
     setup_local_APIC();
-    map_cpu_to_logical_apicid();
 
     /* Save our processor parameters. */
     smp_store_cpu_info(cpu);
@@ -400,22 +397,6 @@ extern struct {
     void * esp;
     unsigned short ss;
 } stack_start;
-
-u32 cpu_2_logical_apicid[NR_CPUS] __read_mostly =
-    { [0 ... NR_CPUS-1] = BAD_APICID };
-
-static void map_cpu_to_logical_apicid(void)
-{
-    int cpu = smp_processor_id();
-    int apicid = logical_smp_processor_id();
-
-    cpu_2_logical_apicid[cpu] = apicid;
-}
-
-static void unmap_cpu_to_logical_apicid(int cpu)
-{
-    cpu_2_logical_apicid[cpu] = BAD_APICID;
-}
 
 static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 {
@@ -646,7 +627,6 @@ static int do_boot_cpu(int apicid, int cpu)
 void cpu_exit_clear(unsigned int cpu)
 {
     cpu_uninit(cpu);
-    unmap_cpu_to_logical_apicid(cpu);
     set_cpu_state(CPU_STATE_DEAD);
 }
 
@@ -775,7 +755,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
         if (APIC_init_uniprocessor())
             printk(KERN_NOTICE "Local APIC not detected."
                    " Using dummy APIC emulation.\n");
-        map_cpu_to_logical_apicid();
         return;
     }
 
@@ -804,7 +783,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
     connect_bsp_APIC();
     setup_local_APIC();
-    map_cpu_to_logical_apicid();
 
     smpboot_setup_io_apic();
 

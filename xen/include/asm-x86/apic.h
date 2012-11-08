@@ -158,12 +158,6 @@ static __inline u32 get_apic_id(void) /* Get the physical APIC id */
     return x2apic_enabled ? id : GET_xAPIC_ID(id);
 }
 
-static __inline u32 get_logical_apic_id(void)
-{
-    u32 logical_id = apic_read(APIC_LDR);
-    return x2apic_enabled ? logical_id : GET_xAPIC_LOGICAL_ID(logical_id);
-}
-
 void apic_wait_icr_idle(void);
 
 int get_physical_broadcast(void);

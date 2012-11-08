@@ -1024,7 +1024,6 @@ __next:
     if (boot_cpu_physical_apicid == -1U)
         boot_cpu_physical_apicid = get_apic_id();
     x86_cpu_to_apicid[0] = get_apic_id();
-    cpu_2_logical_apicid[0] = get_logical_apic_id();
 
     init_ioapic_mappings();
 }

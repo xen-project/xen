@@ -32,14 +32,15 @@
 static bool_t __initdata x2apic_phys; /* By default we use logical cluster mode. */
 boolean_param("x2apic_phys", x2apic_phys);
 
+static DEFINE_PER_CPU_READ_MOSTLY(u32, cpu_2_logical_apicid);
+
 static void init_apic_ldr_x2apic_phys(void)
 {
 }
 
 static void init_apic_ldr_x2apic_cluster(void)
 {
-    int cpu = smp_processor_id();
-    cpu_2_logical_apicid[cpu] = apic_read(APIC_LDR);
+    this_cpu(cpu_2_logical_apicid) = apic_read(APIC_LDR);
 }
 
 static void __init clustered_apic_check_x2apic(void)
@@ -48,7 +49,7 @@ static void __init clustered_apic_check_x2apic(void)
 
 static unsigned int cpu_mask_to_apicid_x2apic_cluster(const cpumask_t *cpumask)
 {
-    return cpu_2_logical_apicid[cpumask_first(cpumask)];
+    return per_cpu(cpu_2_logical_apicid, cpumask_first(cpumask));
 }
 
 static void __send_IPI_mask_x2apic(
@@ -77,7 +78,7 @@ static void __send_IPI_mask_x2apic(
         if ( !cpu_online(cpu) || (cpu == smp_processor_id()) )
             continue;
         msr_content = (dest_mode == APIC_DEST_PHYSICAL)
-            ? cpu_physical_id(cpu) : cpu_2_logical_apicid[cpu];
+            ? cpu_physical_id(cpu) : per_cpu(cpu_2_logical_apicid, cpu);
         msr_content = (msr_content << 32) | APIC_DM_FIXED | dest_mode | vector;
         apic_wrmsr(APIC_ICR, msr_content);
     }
