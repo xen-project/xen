@@ -3505,7 +3505,7 @@ sh_invlpg(struct vcpu *v, unsigned long va)
             perfc_incr(shadow_invlpg_fault);
             return 0;
         }
-        if ( (!shadow_l3e_get_flags(sl3e) & _PAGE_PRESENT) )
+        if ( !(shadow_l3e_get_flags(sl3e) & _PAGE_PRESENT) )
             return 0;
     }
 #else /* SHADOW_PAGING_LEVELS == 3 */
