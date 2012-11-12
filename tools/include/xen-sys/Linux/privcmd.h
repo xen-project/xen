@@ -64,6 +64,9 @@ typedef struct privcmd_mmapbatch {
 	xen_pfn_t __user *arr; /* array of mfns - top nibble set on err */
 } privcmd_mmapbatch_t; 
 
+#define PRIVCMD_MMAPBATCH_MFN_ERROR     0xf0000000U
+#define PRIVCMD_MMAPBATCH_PAGED_ERROR   0x80000000U
+
 typedef struct privcmd_mmapbatch_v2 {
 	unsigned int num; /* number of pages to populate */
 	domid_t dom;      /* target domain */
