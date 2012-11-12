@@ -23,6 +23,19 @@
  *
  */
 
+/*
+ * The superpages flag in restore has two different meanings depending on
+ * the type of domain.
+ *
+ * For an HVM domain, the flag means to look for properly aligned contiguous
+ * pages and try to allocate a superpage to satisfy it.  If that fails,
+ * fall back to small pages.
+ *
+ * For a PV domain, the flag means allocate all memory as superpages.  If that
+ * fails, the restore fails.  This behavior is required for PV guests who
+ * want to use superpages.
+ */
+
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -41,6 +54,9 @@ struct restore_ctx {
     xen_pfn_t *live_p2m; /* Live mapping of the table mapping each PFN to its current MFN. */
     xen_pfn_t *p2m; /* A table mapping each PFN to its new MFN. */
     xen_pfn_t *p2m_batch; /* A table of P2M mappings in the current region.  */
+    xen_pfn_t *p2m_saved_batch; /* Copy of p2m_batch array for pv superpage alloc */
+    int superpages; /* Superpage allocation has been requested */
+    int hvm;    /* This is an hvm domain */
     int completed; /* Set when a consistent image is available */
     int last_checkpoint; /* Set when we should commit to the current checkpoint when it completes. */
     int compressing; /* Set when sender signals that pages would be sent compressed (for Remus) */
@@ -48,11 +64,6 @@ struct restore_ctx {
 };
 
 #define HEARTBEAT_MS 1000
-
-#define SUPERPAGE_PFN_SHIFT  9
-#define SUPERPAGE_NR_PFNS    (1UL << SUPERPAGE_PFN_SHIFT)
-
-#define SUPER_PAGE_START(pfn)    (((pfn) & (SUPERPAGE_NR_PFNS-1)) == 0 )
 
 #ifndef __MINIOS__
 static ssize_t rdexact(xc_interface *xch, struct restore_ctx *ctx,
@@ -103,6 +114,49 @@ static ssize_t rdexact(xc_interface *xch, struct restore_ctx *ctx,
 #else
 #define RDEXACT read_exact
 #endif
+
+#define SUPERPAGE_PFN_SHIFT  9
+#define SUPERPAGE_NR_PFNS    (1UL << SUPERPAGE_PFN_SHIFT)
+#define SUPERPAGE(_pfn) ((_pfn) & (~(SUPERPAGE_NR_PFNS-1)))
+#define SUPER_PAGE_START(pfn)    (((pfn) & (SUPERPAGE_NR_PFNS-1)) == 0 )
+
+/*
+** When we're restoring into a pv superpage-allocated guest, we take
+** a copy of the p2m_batch array to preserve the pfn, then allocate the
+** corresponding superpages.  We then fill in the p2m array using the saved
+** pfns.
+*/
+static int alloc_superpage_mfns(
+    xc_interface *xch, uint32_t dom, struct restore_ctx *ctx, int nr_mfns)
+{
+    int i, j, max = 0;
+    unsigned long pfn, base_pfn, mfn;
+
+    for (i = 0; i < nr_mfns; i++)
+    {
+        pfn = ctx->p2m_batch[i];
+        base_pfn = SUPERPAGE(pfn);
+        if (ctx->p2m[base_pfn] != (INVALID_P2M_ENTRY-2))
+        {
+            ctx->p2m_saved_batch[max] = base_pfn;
+            ctx->p2m_batch[max] = base_pfn;
+            max++;
+            ctx->p2m[base_pfn] = INVALID_P2M_ENTRY-2;
+        }
+    }
+    if (xc_domain_populate_physmap_exact(xch, dom, max, SUPERPAGE_PFN_SHIFT,
+                                         0, ctx->p2m_batch) != 0)
+        return 1;
+
+    for (i = 0; i < max; i++)
+    {
+        mfn = ctx->p2m_batch[i];
+        pfn = ctx->p2m_saved_batch[i];
+        for (j = 0; j < SUPERPAGE_NR_PFNS; j++)
+            ctx->p2m[pfn++] = mfn++;
+    }
+    return 0;
+}
 /*
 ** In the state file (or during transfer), all page-table pages are
 ** converted into a 'canonical' form where references to actual mfns
@@ -113,7 +167,7 @@ static ssize_t rdexact(xc_interface *xch, struct restore_ctx *ctx,
 static int uncanonicalize_pagetable(
     xc_interface *xch, uint32_t dom, struct restore_ctx *ctx, void *page)
 {
-    int i, pte_last, nr_mfns = 0;
+    int i, rc, pte_last, nr_mfns = 0;
     unsigned long pfn;
     uint64_t pte;
     struct domain_info_context *dinfo = &ctx->dinfo;
@@ -152,13 +206,20 @@ static int uncanonicalize_pagetable(
     }
 
     /* Allocate the requisite number of mfns. */
-    if ( nr_mfns &&
-         (xc_domain_populate_physmap_exact(xch, dom, nr_mfns, 0, 0,
-                                            ctx->p2m_batch) != 0) )
-    { 
-        ERROR("Failed to allocate memory for batch.!\n"); 
-        errno = ENOMEM;
-        return 0; 
+    if (nr_mfns)
+    {
+        if (!ctx->hvm && ctx->superpages)
+            rc = alloc_superpage_mfns(xch, dom, ctx, nr_mfns);
+        else
+            rc = xc_domain_populate_physmap_exact(xch, dom, nr_mfns, 0, 0,
+                                                  ctx->p2m_batch);
+
+        if (rc)
+        {
+            ERROR("Failed to allocate memory for batch.!\n");
+            errno = ENOMEM;
+            return 0;
+        }
     }
     
     /* Second pass: uncanonicalize each present PTE */
@@ -1018,8 +1079,8 @@ static int pagebuf_get(xc_interface *xch, struct restore_ctx *ctx,
 
 static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
                        xen_pfn_t* region_mfn, unsigned long* pfn_type, int pae_extended_cr3,
-                       unsigned int hvm, struct xc_mmu* mmu,
-                       pagebuf_t* pagebuf, int curbatch, int superpages)
+                       struct xc_mmu* mmu,
+                       pagebuf_t* pagebuf, int curbatch)
 {
     int i, j, curpage, nr_mfns;
     int k, scount;
@@ -1061,7 +1122,7 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
                 /* Is this the next expected continuation? */
                 if ( pfn == superpage_start + scount )
                 {
-                    if ( !superpages )
+                    if ( !ctx->superpages )
                     {
                         ERROR("Unexpexted codepath with no superpages");
                         return -1;
@@ -1114,16 +1175,17 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
             }
 
             /* Are we ready to start a new superpage candidate? */
-            if ( superpages && SUPER_PAGE_START(pfn) )
+            if ( ctx->hvm && ctx->superpages && SUPER_PAGE_START(pfn) )
             {
                 superpage_start=pfn;
                 scount++;
-                continue;
             }
-            
-            /* Add the current pfn to pfn_batch */
-            ctx->p2m_batch[nr_mfns++] = pfn; 
-            ctx->p2m[pfn]--;
+            else
+            {
+                /* Add the current pfn to pfn_batch */
+                ctx->p2m_batch[nr_mfns++] = pfn;
+                ctx->p2m[pfn]--;
+            }
         }
     }
 
@@ -1144,9 +1206,14 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
     {
         DPRINTF("Mapping order 0,  %d; first pfn %lx\n", nr_mfns, ctx->p2m_batch[0]);
     
-        if(xc_domain_populate_physmap_exact(xch, dom, nr_mfns, 0,
-                                            0, ctx->p2m_batch) != 0) 
-        { 
+        if (!ctx->hvm && ctx->superpages)
+            rc = alloc_superpage_mfns(xch, dom, ctx, nr_mfns);
+        else
+            rc = xc_domain_populate_physmap_exact(xch, dom, nr_mfns, 0, 0,
+                                                  ctx->p2m_batch);
+
+        if (rc)
+        {
             ERROR("Failed to allocate memory for batch.!\n"); 
             errno = ENOMEM;
             return -1;
@@ -1175,7 +1242,7 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
              || pagetype == XEN_DOMCTL_PFINFO_XALLOC )
             region_mfn[i] = ~0UL; /* map will fail but we don't care */
         else
-            region_mfn[i] = hvm ? pfn : ctx->p2m[pfn]; 
+            region_mfn[i] = ctx->hvm ? pfn : ctx->p2m[pfn];
     }
 
     /* Map relevant mfns */
@@ -1298,7 +1365,7 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
             }
         }
 
-        if ( !hvm &&
+        if ( !ctx->hvm &&
              xc_add_mmu_update(xch, mmu,
                                (((unsigned long long)mfn) << PAGE_SHIFT)
                                | MMU_MACHPHYS_UPDATE, pfn) )
@@ -1389,6 +1456,9 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
     memset(ctx, 0, sizeof(*ctx));
 
+    ctx->superpages = superpages;
+    ctx->hvm = hvm;
+
     ctxt = xc_hypercall_buffer_alloc(xch, ctxt, sizeof(*ctxt));
 
     if ( ctxt == NULL )
@@ -1452,6 +1522,9 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
     region_mfn = malloc(ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
     ctx->p2m_batch = malloc(ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
+    if (!ctx->hvm && ctx->superpages)
+        ctx->p2m_saved_batch =
+            malloc(ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
 
     if ( (ctx->p2m == NULL) || (pfn_type == NULL) ||
          (region_mfn == NULL) || (ctx->p2m_batch == NULL) )
@@ -1575,8 +1648,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
             int brc;
 
             brc = apply_batch(xch, dom, ctx, region_mfn, pfn_type,
-                              pae_extended_cr3, hvm, mmu, &pagebuf, curbatch,
-                              superpages);
+                              pae_extended_cr3, mmu, &pagebuf, curbatch);
             if ( brc < 0 )
                 goto out;
 
