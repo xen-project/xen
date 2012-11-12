@@ -672,6 +672,36 @@ int __init pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func)
     return 1;
 }
 
+void pci_check_disable_device(u16 seg, u8 bus, u8 devfn)
+{
+    struct pci_dev *pdev;
+    s_time_t now = NOW();
+    u16 cword;
+
+    spin_lock(&pcidevs_lock);
+    pdev = pci_get_pdev(seg, bus, devfn);
+    if ( pdev )
+    {
+        if ( now < pdev->fault.time ||
+             now - pdev->fault.time > MILLISECS(10) )
+            pdev->fault.count >>= 1;
+        pdev->fault.time = now;
+        if ( ++pdev->fault.count < PT_FAULT_THRESHOLD )
+            pdev = NULL;
+    }
+    spin_unlock(&pcidevs_lock);
+
+    if ( !pdev )
+        return;
+
+    /* Tell the device to stop DMAing; we can't rely on the guest to
+     * control it for us. */
+    cword = pci_conf_read16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                            PCI_COMMAND);
+    pci_conf_write16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                     PCI_COMMAND, cword & ~PCI_COMMAND_MASTER);
+}
+
 /*
  * scan pci devices to add all existed PCI devices to alldevs_list,
  * and setup pci hierarchy in array bus2bridge.

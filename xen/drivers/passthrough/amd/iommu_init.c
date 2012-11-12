@@ -566,7 +566,7 @@ static hw_irq_controller iommu_maskable_msi_type = {
 
 static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
 {
-    u16 domain_id, device_id, bdf, cword, flags;
+    u16 domain_id, device_id, bdf, flags;
     u32 code;
     u64 *addr;
     int count = 0;
@@ -620,18 +620,10 @@ static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
                "fault address = %#"PRIx64", flags = %#x\n",
                event_str[code-1], domain_id, device_id, *addr, flags);
 
-        /* Tell the device to stop DMAing; we can't rely on the guest to
-         * control it for us. */
         for ( bdf = 0; bdf < ivrs_bdf_entries; bdf++ )
             if ( get_dma_requestor_id(iommu->seg, bdf) == device_id )
-            {
-                cword = pci_conf_read16(iommu->seg, PCI_BUS(bdf),
-                                        PCI_SLOT(bdf), PCI_FUNC(bdf),
-                                        PCI_COMMAND);
-                pci_conf_write16(iommu->seg, PCI_BUS(bdf), PCI_SLOT(bdf),
-                                 PCI_FUNC(bdf), PCI_COMMAND, 
-                                 cword & ~PCI_COMMAND_MASTER);
-            }
+                pci_check_disable_device(iommu->seg, PCI_BUS(bdf),
+                                         PCI_DEVFN2(bdf));
     }
     else
     {

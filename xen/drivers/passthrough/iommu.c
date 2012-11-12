@@ -215,6 +215,7 @@ static int device_assigned(u16 seg, u8 bus, u8 devfn)
 static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
+    struct pci_dev *pdev;
     int rc = 0;
 
     if ( !iommu_enabled || !hd->platform_ops )
@@ -228,6 +229,10 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
         return -EXDEV;
 
     spin_lock(&pcidevs_lock);
+    pdev = pci_get_pdev(seg, bus, devfn);
+    if ( pdev )
+        pdev->fault.count = 0;
+
     if ( (rc = hd->platform_ops->assign_device(d, seg, bus, devfn)) )
         goto done;
 
@@ -378,6 +383,8 @@ int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
                 d->domain_id, seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         return ret;
     }
+
+    pdev->fault.count = 0;
 
     if ( !has_arch_pdevs(d) && need_iommu(d) )
     {

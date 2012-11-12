@@ -64,6 +64,11 @@ struct pci_dev {
     const u8 devfn;
     struct pci_dev_info info;
     struct arch_pci_dev arch;
+    struct {
+        s_time_t time;
+        unsigned int count;
+#define PT_FAULT_THRESHOLD 10
+    } fault;
     u64 vf_rlen[6];
 };
 
@@ -107,6 +112,7 @@ int pci_hide_device(int bus, int devfn);
 struct pci_dev *pci_get_pdev(int seg, int bus, int devfn);
 struct pci_dev *pci_get_pdev_by_domain(
     struct domain *, int seg, int bus, int devfn);
+void pci_check_disable_device(u16 seg, u8 bus, u8 devfn);
 
 uint8_t pci_conf_read8(
     unsigned int seg, unsigned int bus, unsigned int dev, unsigned int func,

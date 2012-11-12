@@ -917,7 +917,7 @@ static void __do_iommu_page_fault(struct iommu *iommu)
     while (1)
     {
         u8 fault_reason;
-        u16 source_id, cword;
+        u16 source_id;
         u32 data;
         u64 guest_addr;
         int type;
@@ -950,14 +950,8 @@ static void __do_iommu_page_fault(struct iommu *iommu)
         iommu_page_fault_do_one(iommu, type, fault_reason,
                                 source_id, guest_addr);
 
-        /* Tell the device to stop DMAing; we can't rely on the guest to
-         * control it for us. */
-        cword = pci_conf_read16(iommu->intel->drhd->segment,
-                                PCI_BUS(source_id), PCI_SLOT(source_id),
-                                PCI_FUNC(source_id), PCI_COMMAND);
-        pci_conf_write16(iommu->intel->drhd->segment, PCI_BUS(source_id),
-                         PCI_SLOT(source_id), PCI_FUNC(source_id),
-                         PCI_COMMAND, cword & ~PCI_COMMAND_MASTER);
+        pci_check_disable_device(iommu->intel->drhd->segment,
+                                 PCI_BUS(source_id), PCI_DEVFN2(source_id));
 
         fault_index++;
         if ( fault_index > cap_num_fault_regs(iommu->cap) )
