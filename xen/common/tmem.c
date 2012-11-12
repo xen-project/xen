@@ -2436,10 +2436,12 @@ static NOINLINE int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
     OID oid;
     int ret = 0;
     struct tmem_handle h;
-    unsigned int pagesize = 1 << (pool->pageshift+12);
+    unsigned int pagesize;
 
     if ( pool == NULL || is_ephemeral(pool) )
         return -1;
+
+    pagesize = 1 << (pool->pageshift + 12);
     if ( bufsize < pagesize + sizeof(struct tmem_handle) )
         return -ENOMEM;
 
