@@ -1927,7 +1927,7 @@ start:
          * On subsequent reboot etc we should create the domain, not
          * restore/migrate-receive it again.
          */
-        restore_file = NULL;
+        restoring = 0;
     }else{
         ret = libxl_domain_create_new(ctx, &d_config, &domid,
                                       0, autoconnect_console_how);
