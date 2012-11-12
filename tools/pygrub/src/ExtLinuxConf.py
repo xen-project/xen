@@ -207,7 +207,7 @@ class ExtLinuxConfigFile(object):
                  }
         
 if __name__ == "__main__":
-    if sys.argv < 2:
+    if len(sys.argv) < 2:
         raise RuntimeError, "Need a configuration file to read"
     g = ExtLinuxConfigFile(sys.argv[1])
     for i in g.images:

@@ -169,8 +169,8 @@ class LiloConfigFile(object):
                  }
 
 if __name__ == "__main__":
-    if sys.argv < 2:
-        raise RuntimeError, "Need a grub.conf to read"
+    if len(sys.argv) < 2:
+        raise RuntimeError, "Need a lilo.conf to read"
     g = LiloConfigFile(sys.argv[1])
     for i in g.images:
         print i #, i.title, i.root, i.kernel, i.args, i.initrd

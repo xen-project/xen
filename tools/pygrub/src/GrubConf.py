@@ -454,7 +454,7 @@ class Grub2ConfigFile(_GrubConfigFile):
                 }
         
 if __name__ == "__main__":
-    if sys.argv < 3:
+    if len(sys.argv) < 3:
         raise RuntimeError, "Need a grub version (\"grub\" or \"grub2\") and a grub.conf or grub.cfg to read"
     if sys.argv[1] == "grub":
         g = GrubConfigFile(sys.argv[2])
