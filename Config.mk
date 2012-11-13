@@ -179,9 +179,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= d7d453f51459b591faa96d1c123b5bfff7c5b6b6
-# Thu Sep 6 17:05:30 2012 +0100
-# Disable qemu monitor by default.  The qemu monitor is an overly
+QEMU_TAG ?= b36c42985575cd6d761d39e5770e57a1f52832ae
+# Tue Nov 13 18:25:17 2012 +0000
+# mapcache: Fix invalidate if memory requested was not bucket aligned
 
 # Optional components
 XENSTAT_XENTOP     ?= y
