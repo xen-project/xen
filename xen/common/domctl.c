@@ -78,7 +78,7 @@ int xenctl_cpumap_to_cpumask(
     {
         if ( copy_from_guest(bytemap, xenctl_cpumap->bitmap, copy_bytes) )
             err = -EFAULT;
-        if ( (xenctl_cpumap->nr_cpus & 7) && (guest_bytes <= sizeof(bytemap)) )
+        if ( (xenctl_cpumap->nr_cpus & 7) && (guest_bytes == copy_bytes) )
             bytemap[guest_bytes-1] &= ~(0xff << (xenctl_cpumap->nr_cpus & 7));
     }
 
