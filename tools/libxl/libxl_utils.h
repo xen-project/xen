@@ -64,6 +64,11 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid, int devid,
 int libxl_vdev_to_device_disk(libxl_ctx *ctx, uint32_t domid, const char *vdev,
                                libxl_device_disk *disk);
 
+int libxl_uuid_to_device_vtpm(libxl_ctx *ctx, uint32_t domid,
+                               libxl_uuid *uuid, libxl_device_vtpm *vtpm);
+int libxl_devid_to_device_vtpm(libxl_ctx *ctx, uint32_t domid,
+                               int devid, libxl_device_vtpm *vtpm);
+
 int libxl_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *bitmap, int n_bits);
     /* Allocated bimap is from malloc, libxl_bitmap_dispose() to be
      * called by the application when done. */

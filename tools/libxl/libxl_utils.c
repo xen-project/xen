@@ -463,6 +463,33 @@ int libxl_pipe(libxl_ctx *ctx, int pipes[2])
     return 0;
 }
 
+int libxl_uuid_to_device_vtpm(libxl_ctx *ctx, uint32_t domid,
+                            libxl_uuid* uuid, libxl_device_vtpm *vtpm)
+{
+    libxl_device_vtpm *vtpms;
+    int nb, i;
+    int rc;
+
+    vtpms = libxl_device_vtpm_list(ctx, domid, &nb);
+    if (!vtpms)
+        return ERROR_FAIL;
+
+    memset(vtpm, 0, sizeof (libxl_device_vtpm));
+    rc = 1;
+    for (i = 0; i < nb; ++i) {
+        if(!libxl_uuid_compare(uuid, &vtpms[i].uuid)) {
+            vtpm->backend_domid = vtpms[i].backend_domid;
+            vtpm->devid = vtpms[i].devid;
+            libxl_uuid_copy(&vtpm->uuid, &vtpms[i].uuid);
+            rc = 0;
+            break;
+        }
+    }
+
+    libxl_device_vtpm_list_free(vtpms, nb);
+    return rc;
+}
+
 int libxl_mac_to_device_nic(libxl_ctx *ctx, uint32_t domid,
                             const char *mac, libxl_device_nic *nic)
 {
@@ -817,6 +844,22 @@ void libxl_cpupoolinfo_list_free(libxl_cpupoolinfo *list, int nr)
     for (i = 0; i < nr; i++)
         libxl_cpupoolinfo_dispose(&list[i]);
     free(list);
+}
+
+void libxl_vtpminfo_list_free(libxl_vtpminfo* list, int nr)
+{
+   int i;
+   for (i = 0; i < nr; i++)
+      libxl_vtpminfo_dispose(&list[i]);
+   free(list);
+}
+
+void libxl_device_vtpm_list_free(libxl_device_vtpm* list, int nr)
+{
+   int i;
+   for (i = 0; i < nr; i++)
+      libxl_device_vtpm_dispose(&list[i]);
+   free(list);
 }
 
 int libxl_domid_valid_guest(uint32_t domid)

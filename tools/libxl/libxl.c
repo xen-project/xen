@@ -1710,6 +1710,243 @@ out:
 }
 
 /******************************************************************************/
+int libxl__device_vtpm_setdefault(libxl__gc *gc, libxl_device_vtpm *vtpm)
+{
+   if(libxl_uuid_is_nil(&vtpm->uuid)) {
+      libxl_uuid_generate(&vtpm->uuid);
+   }
+   return 0;
+}
+
+static int libxl__device_from_vtpm(libxl__gc *gc, uint32_t domid,
+                                   libxl_device_vtpm *vtpm,
+                                   libxl__device *device)
+{
+   device->backend_devid   = vtpm->devid;
+   device->backend_domid   = vtpm->backend_domid;
+   device->backend_kind    = LIBXL__DEVICE_KIND_VTPM;
+   device->devid           = vtpm->devid;
+   device->domid           = domid;
+   device->kind            = LIBXL__DEVICE_KIND_VTPM;
+
+   return 0;
+}
+
+void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
+                           libxl_device_vtpm *vtpm,
+                           libxl__ao_device *aodev)
+{
+    STATE_AO_GC(aodev->ao);
+    flexarray_t *front;
+    flexarray_t *back;
+    libxl__device *device;
+    char *dompath, **l;
+    unsigned int nb, rc;
+
+    rc = libxl__device_vtpm_setdefault(gc, vtpm);
+    if (rc) goto out;
+
+    front = flexarray_make(gc, 16, 1);
+    back = flexarray_make(gc, 16, 1);
+
+    if(vtpm->devid == -1) {
+        if (!(dompath = libxl__xs_get_dompath(gc, domid))) {
+            rc = ERROR_FAIL;
+            goto out;
+        }
+        l = libxl__xs_directory(gc, XBT_NULL,
+              GCSPRINTF("%s/device/vtpm", dompath), &nb);
+        if(l == NULL || nb == 0) {
+            vtpm->devid = 0;
+        } else {
+            vtpm->devid = strtoul(l[nb - 1], NULL, 10) + 1;
+        }
+    }
+
+    GCNEW(device);
+    rc = libxl__device_from_vtpm(gc, domid, vtpm, device);
+    if ( rc != 0 ) goto out;
+
+    flexarray_append(back, "frontend-id");
+    flexarray_append(back, GCSPRINTF("%d", domid));
+    flexarray_append(back, "online");
+    flexarray_append(back, "1");
+    flexarray_append(back, "state");
+    flexarray_append(back, GCSPRINTF("%d", 1));
+    flexarray_append(back, "handle");
+    flexarray_append(back, GCSPRINTF("%d", vtpm->devid));
+
+    flexarray_append(back, "uuid");
+    flexarray_append(back, GCSPRINTF(LIBXL_UUID_FMT, LIBXL_UUID_BYTES(vtpm->uuid)));
+    flexarray_append(back, "resume");
+    flexarray_append(back, "False");
+
+    flexarray_append(front, "backend-id");
+    flexarray_append(front, GCSPRINTF("%d", vtpm->backend_domid));
+    flexarray_append(front, "state");
+    flexarray_append(front, GCSPRINTF("%d", 1));
+    flexarray_append(front, "handle");
+    flexarray_append(front, GCSPRINTF("%d", vtpm->devid));
+
+    libxl__device_generic_add(gc, XBT_NULL, device,
+                             libxl__xs_kvs_of_flexarray(gc, back, back->count),
+                             libxl__xs_kvs_of_flexarray(gc, front, front->count));
+
+    aodev->dev = device;
+    aodev->action = DEVICE_CONNECT;
+    libxl__wait_device_connection(egc, aodev);
+
+    rc = 0;
+out:
+    aodev->rc = rc;
+    if(rc) aodev->callback(egc, aodev);
+    return;
+}
+
+libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx, uint32_t domid, int *num)
+{
+    GC_INIT(ctx);
+
+    libxl_device_vtpm* vtpms = NULL;
+    char* fe_path = NULL;
+    char** dir = NULL;
+    unsigned int ndirs = 0;
+
+    *num = 0;
+
+    fe_path = libxl__sprintf(gc, "%s/device/vtpm", libxl__xs_get_dompath(gc, domid));
+    dir = libxl__xs_directory(gc, XBT_NULL, fe_path, &ndirs);
+    if(dir) {
+       vtpms = malloc(sizeof(*vtpms) * ndirs);
+       libxl_device_vtpm* vtpm;
+       libxl_device_vtpm* end = vtpms + ndirs;
+       for(vtpm = vtpms; vtpm < end; ++vtpm, ++dir) {
+          char* tmp;
+          const char* be_path = libxl__xs_read(gc, XBT_NULL,
+                GCSPRINTF("%s/%s/backend",
+                   fe_path, *dir));
+
+          vtpm->devid = atoi(*dir);
+
+          tmp = libxl__xs_read(gc, XBT_NULL,
+                GCSPRINTF("%s/%s/backend_id",
+                   fe_path, *dir));
+          vtpm->backend_domid = atoi(tmp);
+
+          tmp = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/uuid", be_path));
+          if(tmp) {
+             if(libxl_uuid_from_string(&(vtpm->uuid), tmp)) {
+                LOG(ERROR, "%s/uuid is a malformed uuid?? (%s) Probably a bug!!\n", be_path, tmp);
+                exit(1);
+             }
+          }
+       }
+    }
+    *num = ndirs;
+
+    GC_FREE;
+    return vtpms;
+}
+
+int libxl_device_vtpm_getinfo(libxl_ctx *ctx,
+                              uint32_t domid,
+                              libxl_device_vtpm *vtpm,
+                              libxl_vtpminfo *vtpminfo)
+{
+    GC_INIT(ctx);
+    char *dompath, *vtpmpath;
+    char *val;
+    int rc = 0;
+
+    libxl_vtpminfo_init(vtpminfo);
+    dompath = libxl__xs_get_dompath(gc, domid);
+    vtpminfo->devid = vtpm->devid;
+
+    vtpmpath = GCSPRINTF("%s/device/vtpm/%d", dompath, vtpminfo->devid);
+    vtpminfo->backend = xs_read(ctx->xsh, XBT_NULL,
+          GCSPRINTF("%s/backend", vtpmpath), NULL);
+    if (!vtpminfo->backend) {
+        goto err;
+    }
+    if(!libxl__xs_read(gc, XBT_NULL, vtpminfo->backend)) {
+       goto err;
+    }
+
+    val = libxl__xs_read(gc, XBT_NULL,
+          GCSPRINTF("%s/backend-id", vtpmpath));
+    vtpminfo->backend_id = val ? strtoul(val, NULL, 10) : -1;
+
+    val = libxl__xs_read(gc, XBT_NULL,
+          GCSPRINTF("%s/state", vtpmpath));
+    vtpminfo->state = val ? strtoul(val, NULL, 10) : -1;
+
+    val = libxl__xs_read(gc, XBT_NULL,
+          GCSPRINTF("%s/event-channel", vtpmpath));
+    vtpminfo->evtch = val ? strtoul(val, NULL, 10) : -1;
+
+    val = libxl__xs_read(gc, XBT_NULL,
+          GCSPRINTF("%s/ring-ref", vtpmpath));
+    vtpminfo->rref = val ? strtoul(val, NULL, 10) : -1;
+
+    vtpminfo->frontend = xs_read(ctx->xsh, XBT_NULL,
+          GCSPRINTF("%s/frontend", vtpminfo->backend), NULL);
+
+    val = libxl__xs_read(gc, XBT_NULL,
+          GCSPRINTF("%s/frontend-id", vtpminfo->backend));
+    vtpminfo->frontend_id = val ? strtoul(val, NULL, 10) : -1;
+
+    val = libxl__xs_read(gc, XBT_NULL,
+          GCSPRINTF("%s/uuid", vtpminfo->backend));
+    if(val == NULL) {
+       LOG(ERROR, "%s/uuid does not exist!\n", vtpminfo->backend);
+       goto err;
+    }
+    if(libxl_uuid_from_string(&(vtpminfo->uuid), val)) {
+       LOG(ERROR,
+             "%s/uuid is a malformed uuid?? (%s) Probably a bug!\n",
+             vtpminfo->backend, val);
+       goto err;
+    }
+
+    goto exit;
+err:
+    rc = ERROR_FAIL;
+exit:
+    GC_FREE;
+    return rc;
+}
+
+int libxl_devid_to_device_vtpm(libxl_ctx *ctx,
+                               uint32_t domid,
+                               int devid,
+                               libxl_device_vtpm *vtpm)
+{
+    libxl_device_vtpm *vtpms;
+    int nb, i;
+    int rc;
+
+    vtpms = libxl_device_vtpm_list(ctx, domid, &nb);
+    if (!vtpms)
+        return ERROR_FAIL;
+
+    memset(vtpm, 0, sizeof (libxl_device_vtpm));
+    rc = 1;
+    for (i = 0; i < nb; ++i) {
+        if(devid == vtpms[i].devid) {
+            vtpm->backend_domid = vtpms[i].backend_domid;
+            vtpm->devid = vtpms[i].devid;
+            libxl_uuid_copy(&vtpm->uuid, &vtpms[i].uuid);
+            rc = 0;
+            break;
+        }
+    }
+
+    libxl_device_vtpm_list_free(vtpms, nb);
+    return rc;
+}
+
+
+/******************************************************************************/
 
 int libxl__device_disk_setdefault(libxl__gc *gc, libxl_device_disk *disk)
 {
@@ -3046,6 +3283,8 @@ out:
  * libxl_device_disk_destroy
  * libxl_device_nic_remove
  * libxl_device_nic_destroy
+ * libxl_device_vtpm_remove
+ * libxl_device_vtpm_destroy
  * libxl_device_vkb_remove
  * libxl_device_vkb_destroy
  * libxl_device_vfb_remove
@@ -3097,6 +3336,10 @@ DEFINE_DEVICE_REMOVE(vkb, destroy, 1)
 DEFINE_DEVICE_REMOVE(vfb, remove, 0)
 DEFINE_DEVICE_REMOVE(vfb, destroy, 1)
 
+/* vtpm */
+DEFINE_DEVICE_REMOVE(vtpm, remove, 0)
+DEFINE_DEVICE_REMOVE(vtpm, destroy, 1)
+
 #undef DEFINE_DEVICE_REMOVE
 
 /******************************************************************************/
@@ -3105,6 +3348,7 @@ DEFINE_DEVICE_REMOVE(vfb, destroy, 1)
 /* The following functions are defined:
  * libxl_device_disk_add
  * libxl_device_nic_add
+ * libxl_device_vtpm_add
  */
 
 #define DEFINE_DEVICE_ADD(type)                                         \
@@ -3130,6 +3374,9 @@ DEFINE_DEVICE_ADD(disk)
 
 /* nic */
 DEFINE_DEVICE_ADD(nic)
+
+/* vtpm */
+DEFINE_DEVICE_ADD(vtpm)
 
 #undef DEFINE_DEVICE_ADD
 

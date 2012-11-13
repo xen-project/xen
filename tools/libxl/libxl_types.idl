@@ -395,6 +395,12 @@ libxl_device_pci = Struct("device_pci", [
     ("permissive", bool),
     ])
 
+libxl_device_vtpm = Struct("device_vtpm", [
+    ("backend_domid",    libxl_domid),
+    ("devid",            libxl_devid),
+    ("uuid",             libxl_uuid),
+])
+
 libxl_diskinfo = Struct("diskinfo", [
     ("backend", string),
     ("backend_id", uint32),
@@ -416,6 +422,18 @@ libxl_nicinfo = Struct("nicinfo", [
     ("evtch", integer),
     ("rref_tx", integer),
     ("rref_rx", integer),
+    ], dir=DIR_OUT)
+
+libxl_vtpminfo = Struct("vtpminfo", [
+    ("backend", string),
+    ("backend_id", uint32),
+    ("frontend", string),
+    ("frontend_id", uint32),
+    ("devid", libxl_devid),
+    ("state", integer),
+    ("evtch", integer),
+    ("rref", integer),
+    ("uuid", libxl_uuid),
     ], dir=DIR_OUT)
 
 libxl_vcpuinfo = Struct("vcpuinfo", [

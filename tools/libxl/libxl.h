@@ -478,13 +478,14 @@ typedef struct {
     libxl_domain_create_info c_info;
     libxl_domain_build_info b_info;
 
-    int num_disks, num_nics, num_pcidevs, num_vfbs, num_vkbs;
+    int num_disks, num_nics, num_pcidevs, num_vfbs, num_vkbs, num_vtpms;
 
     libxl_device_disk *disks;
     libxl_device_nic *nics;
     libxl_device_pci *pcidevs;
     libxl_device_vfb *vfbs;
     libxl_device_vkb *vkbs;
+    libxl_device_vtpm *vtpms;
 
     libxl_action_on_shutdown on_poweroff;
     libxl_action_on_shutdown on_reboot;
@@ -645,6 +646,9 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
                                 int *nb_vcpu, int *nr_vcpus_out);
 void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr_vcpus);
 
+void libxl_device_vtpm_list_free(libxl_device_vtpm*, int nr_vtpms);
+void libxl_vtpminfo_list_free(libxl_vtpminfo *, int nr_vtpms);
+
 /*
  * Devices
  * =======
@@ -744,6 +748,23 @@ int libxl_device_nic_destroy(libxl_ctx *ctx, uint32_t domid,
 libxl_device_nic *libxl_device_nic_list(libxl_ctx *ctx, uint32_t domid, int *num);
 int libxl_device_nic_getinfo(libxl_ctx *ctx, uint32_t domid,
                               libxl_device_nic *nic, libxl_nicinfo *nicinfo);
+
+/* Virtual TPMs */
+int libxl_device_vtpm_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vtpm *vtpm,
+                          const libxl_asyncop_how *ao_how)
+                          LIBXL_EXTERNAL_CALLERS_ONLY;
+int libxl_device_vtpm_remove(libxl_ctx *ctx, uint32_t domid,
+                            libxl_device_vtpm *vtpm,
+                            const libxl_asyncop_how *ao_how)
+                            LIBXL_EXTERNAL_CALLERS_ONLY;
+int libxl_device_vtpm_destroy(libxl_ctx *ctx, uint32_t domid,
+                              libxl_device_vtpm *vtpm,
+                              const libxl_asyncop_how *ao_how)
+                              LIBXL_EXTERNAL_CALLERS_ONLY;
+
+libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx, uint32_t domid, int *num);
+int libxl_device_vtpm_getinfo(libxl_ctx *ctx, uint32_t domid,
+                               libxl_device_vtpm *vtpm, libxl_vtpminfo *vtpminfo);
 
 /* Keyboard */
 int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb,

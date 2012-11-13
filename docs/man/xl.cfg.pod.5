@@ -298,6 +298,35 @@ Specifies the networking provision (both emulated network adapters,
 and Xen virtual interfaces) to provided to the guest.  See
 F<docs/misc/xl-network-configuration.markdown>.
 
+=item B<vtpm=[ "VTPM_SPEC_STRING", "VTPM_SPEC_STRING", ...]>
+
+Specifies the virtual trusted platform module to be
+provided to the guest. Please see F<docs/misc/vtpm.txt>
+for more details.
+
+Each B<VTPM_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
+settings, from the following list:
+
+=over 4
+
+=item C<backend=DOMAIN>
+
+Specify the backend domain name of id. This value is required!
+If this domain is a guest, the backend should be set to the
+vtpm domain name. If this domain is a vtpm, the
+backend should be set to the vtpm manager domain name.
+
+=item C<uuid=UUID>
+
+Specify the uuid of this vtpm device. The uuid is used to uniquely
+identify the vtpm device. You can create one using the uuidgen
+program on unix systems. If left unspecified, a new uuid
+will be randomly generated every time the domain boots.
+If this is a vtpm domain, you should specify a value. The
+value is optional if this is a guest domain.
+
+=back
+
 =item B<vfb=[ "VFB_SPEC_STRING", "VFB_SPEC_STRING", ...]>
 
 Specifies the paravirtual framebuffer devices which should be supplied

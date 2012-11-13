@@ -1106,6 +1106,31 @@ List virtual network interfaces for a domain.
 
 =back
 
+=head2 VTPM DEVICES
+
+=over 4
+
+=item B<vtpm-attach> I<domain-id> I<vtpm-device>
+
+Creates a new vtpm device in the domain specified by I<domain-id>.
+I<vtpm-device> describes the device to attach, using the same format as the
+B<vtpm> string in the domain config file. See L<xl.cfg> for
+more information.
+
+=item B<vtpm-detach> I<domain-id> I<devid|uuid>
+
+Removes the vtpm device from the domain specified by I<domain-id>.
+I<devid> is the numeric device id given to the virtual trusted
+platform module device. You will need to run B<xl vtpm-list> to determine that number.
+Alternatively the I<uuid> of the vtpm can be used to
+select the virtual device to detach.
+
+=item B<vtpm-list> I<domain-id>
+
+List virtual trusted platform modules for a domain.
+
+=back
+
 =head1 PCI PASS-THROUGH
 
 =over 4

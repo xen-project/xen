@@ -573,7 +573,7 @@ static void parse_config_data(const char *config_source,
     const char *buf;
     long l;
     XLU_Config *config;
-    XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids;
+    XLU_ConfigList *cpus, *vbds, *nics, *pcis, *cvfbs, *cpuids, *vtpms;
     XLU_ConfigList *ioports, *irqs, *iomem;
     int num_ioports, num_irqs, num_iomem;
     int pci_power_mgmt = 0;
@@ -1048,6 +1048,58 @@ static void parse_config_data(const char *config_source,
         }
     }
 
+    if (!xlu_cfg_get_list(config, "vtpm", &vtpms, 0, 0)) {
+        d_config->num_vtpms = 0;
+        d_config->vtpms = NULL;
+        while ((buf = xlu_cfg_get_listitem (vtpms, d_config->num_vtpms)) != NULL) {
+            libxl_device_vtpm *vtpm;
+            char * buf2 = strdup(buf);
+            char *p, *p2;
+            bool got_backend = false;
+
+            d_config->vtpms = (libxl_device_vtpm *) realloc(d_config->vtpms,
+                  sizeof(libxl_device_vtpm) * (d_config->num_vtpms+1));
+            vtpm = d_config->vtpms + d_config->num_vtpms;
+            libxl_device_vtpm_init(vtpm);
+            vtpm->devid = d_config->num_vtpms;
+
+            p = strtok(buf2, ",");
+            if(p) {
+               do {
+                  while(*p == ' ')
+                     ++p;
+                  if ((p2 = strchr(p, '=')) == NULL)
+                     break;
+                  *p2 = '\0';
+                  if (!strcmp(p, "backend")) {
+                     if(domain_qualifier_to_domid(p2 + 1, &(vtpm->backend_domid), 0))
+                     {
+                        fprintf(stderr,
+                              "Specified vtpm backend domain `%s' does not exist!\n", p2 + 1);
+                        exit(1);
+                     }
+                     got_backend = true;
+                  } else if(!strcmp(p, "uuid")) {
+                     if( libxl_uuid_from_string(&vtpm->uuid, p2 + 1) ) {
+                        fprintf(stderr,
+                              "Failed to parse vtpm UUID: %s\n", p2 + 1);
+                        exit(1);
+                    }
+                  } else {
+                     fprintf(stderr, "Unknown string `%s' in vtpm spec\n", p);
+                     exit(1);
+                  }
+               } while ((p = strtok(NULL, ",")) != NULL);
+            }
+            if(!got_backend) {
+               fprintf(stderr, "vtpm spec missing required backend field!\n");
+               exit(1);
+            }
+            free(buf2);
+            d_config->num_vtpms++;
+        }
+    }
+
     if (!xlu_cfg_get_list (config, "vif", &nics, 0, 0)) {
         d_config->num_nics = 0;
         d_config->nics = NULL;
@@ -1073,7 +1125,7 @@ static void parse_config_data(const char *config_source,
 
             p = strtok(buf2, ",");
             if (!p)
-                goto skip;
+                goto skip_nic;
             do {
                 while (*p == ' ')
                     p++;
@@ -1137,7 +1189,7 @@ static void parse_config_data(const char *config_source,
                     fprintf(stderr, "the accel parameter for vifs is currently not supported\n");
                 }
             } while ((p = strtok(NULL, ",")) != NULL);
-skip:
+skip_nic:
             free(buf2);
             d_config->num_nics++;
         }
@@ -5633,6 +5685,132 @@ int main_blockdetach(int argc, char **argv)
     libxl_device_disk_dispose(&disk);
     return rc;
 }
+
+int main_vtpmattach(int argc, char **argv)
+{
+    int opt;
+    libxl_device_vtpm vtpm;
+    char *oparg;
+    unsigned int val;
+    uint32_t domid;
+
+    if ((opt = def_getopt(argc, argv, "", "vtpm-attach", 1)) != -1)
+        return opt;
+
+    if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
+        fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
+        return 1;
+    }
+    ++optind;
+
+    libxl_device_vtpm_init(&vtpm);
+    for (argv += optind, argc -= optind; argc > 0; ++argv, --argc) {
+        if (MATCH_OPTION("uuid", *argv, oparg)) {
+            if(libxl_uuid_from_string(&(vtpm.uuid), oparg)) {
+                fprintf(stderr, "Invalid uuid specified (%s)\n", oparg);
+                return 1;
+            }
+        } else if (MATCH_OPTION("backend", *argv, oparg)) {
+            if(domain_qualifier_to_domid(oparg, &val, 0)) {
+                fprintf(stderr,
+                      "Specified backend domain does not exist, defaulting to Dom0\n");
+                val = 0;
+            }
+            vtpm.backend_domid = val;
+        } else {
+            fprintf(stderr, "unrecognized argument `%s'\n", *argv);
+            return 1;
+        }
+    }
+
+    if(dryrun_only) {
+       char* json = libxl_device_vtpm_to_json(ctx, &vtpm);
+       printf("vtpm: %s\n", json);
+       free(json);
+       libxl_device_vtpm_dispose(&vtpm);
+       if (ferror(stdout) || fflush(stdout)) { perror("stdout"); exit(-1); }
+       return 0;
+    }
+
+    if (libxl_device_vtpm_add(ctx, domid, &vtpm, 0)) {
+        fprintf(stderr, "libxl_device_vtpm_add failed.\n");
+        return 1;
+    }
+    libxl_device_vtpm_dispose(&vtpm);
+    return 0;
+}
+
+int main_vtpmlist(int argc, char **argv)
+{
+    int opt;
+    libxl_device_vtpm *vtpms;
+    libxl_vtpminfo vtpminfo;
+    int nb, i;
+
+    if ((opt = def_getopt(argc, argv, "", "vtpm-list", 1)) != -1)
+        return opt;
+
+    /*      Idx  BE   UUID   Hdl  Sta  evch rref  BE-path */
+    printf("%-3s %-2s %-36s %-6s %-5s %-6s %-5s %-10s\n",
+           "Idx", "BE", "Uuid", "handle", "state", "evt-ch", "ring-ref", "BE-path");
+    for (argv += optind, argc -= optind; argc > 0; --argc, ++argv) {
+        uint32_t domid;
+        if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
+            fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
+            continue;
+        }
+        if (!(vtpms = libxl_device_vtpm_list(ctx, domid, &nb))) {
+            continue;
+        }
+        for (i = 0; i < nb; ++i) {
+           if(!libxl_device_vtpm_getinfo(ctx, domid, &vtpms[i], &vtpminfo)) {
+              /*      Idx  BE     UUID             Hdl Sta evch rref BE-path*/
+              printf("%-3d %-2d " LIBXL_UUID_FMT " %6d %5d %6d %8d %-30s\n",
+                    vtpminfo.devid, vtpminfo.backend_id,
+                    LIBXL_UUID_BYTES(vtpminfo.uuid),
+                    vtpminfo.devid, vtpminfo.state, vtpminfo.evtch,
+                    vtpminfo.rref, vtpminfo.backend);
+
+              libxl_vtpminfo_dispose(&vtpminfo);
+           }
+           libxl_device_vtpm_dispose(&vtpms[i]);
+        }
+        free(vtpms);
+    }
+    return 0;
+}
+
+int main_vtpmdetach(int argc, char **argv)
+{
+    uint32_t domid;
+    int opt, rc=0;
+    libxl_device_vtpm vtpm;
+    libxl_uuid uuid;
+
+    if ((opt = def_getopt(argc, argv, "", "vtpm-detach", 2)) != -1)
+        return opt;
+
+    domid = find_domain(argv[optind]);
+
+    if ( libxl_uuid_from_string(&uuid, argv[optind+1])) {
+        if (libxl_devid_to_device_vtpm(ctx, domid, atoi(argv[optind+1]), &vtpm)) {
+            fprintf(stderr, "Unknown device %s.\n", argv[optind+1]);
+            return 1;
+        }
+    } else {
+        if (libxl_uuid_to_device_vtpm(ctx, domid, &uuid, &vtpm)) {
+            fprintf(stderr, "Unknown device %s.\n", argv[optind+1]);
+            return 1;
+        }
+    }
+    rc = libxl_device_vtpm_remove(ctx, domid, &vtpm, 0);
+    if (rc) {
+        fprintf(stderr, "libxl_device_vtpm_remove failed.\n");
+    }
+    libxl_device_vtpm_dispose(&vtpm);
+    return rc;
+}
+
 
 static char *uptime_to_string(unsigned long uptime, int short_mode)
 {
