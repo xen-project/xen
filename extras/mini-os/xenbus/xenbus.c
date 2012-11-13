@@ -719,6 +719,33 @@ int xenbus_read_integer(const char *path)
     return t;
 }
 
+int xenbus_read_uuid(const char* path, unsigned char uuid[16]) {
+   char * res, *buf;
+   res = xenbus_read(XBT_NIL, path, &buf);
+   if(res) {
+      printk("Failed to read %s.\n", path);
+      free(res);
+      return 0;
+   }
+   if(strlen(buf) != ((2*16)+4) /* 16 hex bytes and 4 hyphens */
+         || sscanf(buf,
+            "%2hhx%2hhx%2hhx%2hhx-"
+            "%2hhx%2hhx-"
+            "%2hhx%2hhx-"
+            "%2hhx%2hhx-"
+            "%2hhx%2hhx%2hhx%2hhx%2hhx%2hhx",
+            uuid, uuid + 1, uuid + 2, uuid + 3,
+            uuid + 4, uuid + 5, uuid + 6, uuid + 7,
+            uuid + 8, uuid + 9, uuid + 10, uuid + 11,
+            uuid + 12, uuid + 13, uuid + 14, uuid + 15) != 16) {
+      printk("Xenbus path %s value %s is not a uuid!\n", path, buf);
+      free(buf);
+      return 0;
+   }
+   free(buf);
+   return 1;
+}
+
 char* xenbus_printf(xenbus_transaction_t xbt,
                                   const char* node, const char* path,
                                   const char* fmt, ...)

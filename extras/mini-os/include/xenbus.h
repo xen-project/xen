@@ -95,6 +95,10 @@ char *xenbus_transaction_end(xenbus_transaction_t, int abort,
 /* Read path and parse it as an integer.  Returns -1 on error. */
 int xenbus_read_integer(const char *path);
 
+/* Read path and parse it as 16 byte uuid. Returns 1 if
+ * read and parsing were successful, 0 if not */
+int xenbus_read_uuid(const char* path, unsigned char uuid[16]);
+
 /* Contraction of snprintf and xenbus_write(path/node). */
 char* xenbus_printf(xenbus_transaction_t xbt,
                                   const char* node, const char* path,
