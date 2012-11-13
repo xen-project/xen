@@ -143,7 +143,6 @@ AC_CONFIG_FILES([
     tests/unpause/Makefile
     tests/vcpu-pin/Makefile
     tests/vcpu-disable/Makefile
-    tests/vtpm/Makefile
     tests/xapi/Makefile
     tests/enforce_dom0_cpus/Makefile
     tests/cpupool/Makefile

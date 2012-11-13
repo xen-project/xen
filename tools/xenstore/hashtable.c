@@ -3,7 +3,6 @@
 /*
  * There are duplicates of this code in:
  *  - tools/blktap2/drivers/hashtable.c
- *  - tools/vtpm_manager/util/hashtable.c
  */
 
 #include "hashtable.h"

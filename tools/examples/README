@@ -25,13 +25,7 @@ vif-bridge          - virtual network start/stop script in bridged mode
 vif-common.sh       - sourced by vif-bridge 
 vif-nat             - xen virtual network start/stop script in NAT mode 
 vif-route           - xen virtual network start/stop script in routed mode
-vtpm                - called by xen-backend.agent to bind/unbind vTPM devices
-vtpm-common.sh      - common code for vTPM handling
-vtpm-delete         - remove an entry from the vTPM table given the
-                      domain's name
-vtpm-hotplug-common.sh - sourced by vtpm
-vtpm-migration.sh   - sourced by external-device-migrate
-xen-backend.agent   - calls block, vif-*, vtpm scripts to add, remove, hotplug
+xen-backend.agent   - calls block, vif-* scripts to add, remove, hotplug
                       devices  
 xen-backend.rules   - hotplug script rules
 xend-config.sxp     - default xend configuration file

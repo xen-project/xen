@@ -22,4 +22,3 @@ sysrq 01_sysrq_basic_neg.test 02_sysrq_sync_pos.test
 unpause
 vcpu-disable
 vcpu-pin
-vtpm

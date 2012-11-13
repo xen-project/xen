@@ -122,20 +122,6 @@ disk = [ 'phy:hda%d,hda1,w' % (vmid)]
 # configured in xend-config.sxp.
 
 #----------------------------------------------------------------------------
-# Define to which TPM instance the user domain should communicate.
-# The vtpm entry is of the form 'instance=INSTANCE,backend=DOM'
-# where INSTANCE indicates the instance number of the TPM the VM
-# should be talking to and DOM provides the domain where the backend
-# is located.
-# Note that no two virtual machines should try to connect to the same
-# TPM instance. The handling of all TPM instances does require
-# some management effort in so far that VM configration files (and thus
-# a VM) should be associated with a TPM instance throughout the lifetime
-# of the VM / VM configuration file. The instance number must be
-# greater or equal to 1.
-#vtpm = ['instance=%d,backend=0' % (vmid) ]
-
-#----------------------------------------------------------------------------
 # Set the kernel command line for the new domain.
 # You only need to define the IP parameters and hostname if the domain's
 # IP config doesn't, e.g. in ifcfg-eth0 or via DHCP.

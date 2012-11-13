@@ -3,7 +3,6 @@
 /*
  * There are duplicates of this code in:
  *  - tools/xenstore/hashtable_private.h
- *  - tools/vtpm_manager/util/hashtable_private.h
  */
 
 #ifndef __HASHTABLE_PRIVATE_CWC22_H__

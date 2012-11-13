@@ -25,7 +25,6 @@ SUBDIRS = 	               	\
 		unpause         \
 		vcpu-disable    \
 		vcpu-pin	\
-		vtpm            \
 		enforce_dom0_cpus	\
 		save restore migrate	\
 		cpupool

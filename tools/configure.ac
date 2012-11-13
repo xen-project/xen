@@ -40,7 +40,6 @@ m4_include([m4/fetcher.m4])
 # Enable/disable options
 AX_ARG_DEFAULT_DISABLE([githttp], [Download GIT repositories via HTTP])
 AX_ARG_DEFAULT_ENABLE([monitors], [Disable xenstat and xentop monitoring tools])
-AX_ARG_DEFAULT_DISABLE([vtpm], [Enable Virtual Trusted Platform Module])
 AX_ARG_DEFAULT_DISABLE([xenapi], [Enable Xen API Bindings])
 AX_ARG_DEFAULT_ENABLE([ocamltools], [Disable Ocaml tools])
 AX_ARG_DEFAULT_DISABLE([miniterm], [Enable miniterm])

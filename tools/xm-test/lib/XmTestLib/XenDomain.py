@@ -59,7 +59,6 @@ class XenConfig:
         # These options need to be lists
         self.defaultOpts["disk"] = []
         self.defaultOpts["vif"]  = []
-        self.defaultOpts["vtpm"] = []
 
         self.opts = self.defaultOpts
 
