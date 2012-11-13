@@ -130,20 +130,36 @@ def _vscsi_get_scsidevices_by_sysfs():
 
     for dirpath, dirnames, files in os.walk(sysfs_mnt + SYSFS_SCSI_PATH):
         for hctl in dirnames:
+            if len(hctl.split(':')) != 4:
+                continue
             paths = os.path.join(dirpath, hctl)
             devname = None
             sg = None
             scsi_id = None
             for f in os.listdir(paths):
                 realpath = os.path.realpath(os.path.join(paths, f))
-                if  re.match('^block', f) or \
-                    re.match('^tape', f) or \
-                    re.match('^scsi_changer', f) or \
-                    re.match('^onstream_tape', f):
+                if  re.match('^block:', f) or \
+                    re.match('^tape:', f) or \
+                    re.match('^scsi_changer:', f) or \
+                    re.match('^onstream_tape:', f):
                     devname = os.path.basename(realpath)
+                elif f == "block" or \
+                     f == "tape" or \
+                     f == "scsi_changer" or \
+                     f == "onstream_tape":
+                    for dir in os.listdir(os.path.join(paths, f)):
+                        if os.path.exists(os.path.join(paths, f, dir, "dev")):
+                            devname = os.path.basename(dir)
 
-                if re.match('^scsi_generic', f):
+                if re.match('^scsi_generic:', f):
                     sg = os.path.basename(realpath)
+                elif f == "scsi_generic":
+                    for dir in os.listdir(os.path.join(paths, f)):
+                        if os.path.exists(os.path.join(paths, f, dir, "dev")):
+                            sg = os.path.basename(dir)
+                if sg:
+                    if devname is None:
+                        devname = sg
                     scsi_id = _vscsi_get_scsiid(sg)
             devices.append([hctl, devname, sg, scsi_id])
 
