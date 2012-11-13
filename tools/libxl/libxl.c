@@ -3186,6 +3186,8 @@ int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb)
         }
 
         libxl_defbool_setdefault(&vfb->vnc.findunused, true);
+    } else {
+        libxl_defbool_setdefault(&vfb->vnc.findunused, false);
     }
 
     libxl_defbool_setdefault(&vfb->sdl.enable, false);
