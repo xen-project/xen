@@ -142,6 +142,8 @@ enum fd_type {
     FTYPE_FB,
     FTYPE_MEM,
     FTYPE_SAVEFILE,
+    FTYPE_TPMFRONT,
+    FTYPE_TPM_TIS,
 };
 
 LIST_HEAD(evtchn_port_list, evtchn_port_info);
@@ -185,6 +187,20 @@ extern struct file {
 	struct {
 	    struct consfront_dev *dev;
 	} cons;
+#ifdef CONFIG_TPMFRONT
+	struct {
+	   struct tpmfront_dev *dev;
+	   int respgot;
+	   off_t offset;
+	} tpmfront;
+#endif
+#ifdef CONFIG_TPM_TIS
+	struct {
+	   struct tpm_chip *dev;
+	   int respgot;
+	   off_t offset;
+	} tpm_tis;
+#endif
 #ifdef CONFIG_XENBUS
         struct {
             /* To each xenbus FD is associated a queue of watch events for this
