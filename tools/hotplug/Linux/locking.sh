@@ -44,7 +44,7 @@ claim_lock()
     # See below for a correctness proof.
     local rightfile
     while true; do
-        eval "exec $_lockfd>>$_lockfile"
+        eval "exec $_lockfd<>$_lockfile"
         flock -x $_lockfd || return $?
         # We can't just stat /dev/stdin or /proc/self/fd/$_lockfd or
         # use bash's test -ef because those all go through what is
