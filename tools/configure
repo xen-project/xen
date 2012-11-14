@@ -668,7 +668,6 @@ lomount
 miniterm
 ocamltools
 xenapi
-vtpm
 monitors
 githttp
 host_os
@@ -722,7 +721,6 @@ ac_user_opts='
 enable_option_checking
 enable_githttp
 enable_monitors
-enable_vtpm
 enable_xenapi
 enable_ocamltools
 enable_miniterm
@@ -1381,8 +1379,6 @@ Optional Features:
                           DISABLED)
   --disable-monitors      Disable xenstat and xentop monitoring tools (default
                           is ENABLED)
-  --enable-vtpm           Enable Virtual Trusted Platform Module (default is
-                          DISABLED)
   --enable-xenapi         Enable Xen API Bindings (default is DISABLED)
   --disable-ocamltools    Disable Ocaml tools (default is ENABLED)
   --enable-miniterm       Enable miniterm (default is DISABLED)
@@ -2442,29 +2438,6 @@ elif test -z $ax_cv_monitors; then :
 
 fi
 monitors=$ax_cv_monitors
-
-
-
-# Check whether --enable-vtpm was given.
-if test "${enable_vtpm+set}" = set; then :
-  enableval=$enable_vtpm;
-fi
-
-
-if test "x$enable_vtpm" = "xno"; then :
-
-    ax_cv_vtpm="n"
-
-elif test "x$enable_vtpm" = "xyes"; then :
-
-    ax_cv_vtpm="y"
-
-elif test -z $ax_cv_vtpm; then :
-
-    ax_cv_vtpm="n"
-
-fi
-vtpm=$ax_cv_vtpm
 
 
 
