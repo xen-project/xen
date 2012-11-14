@@ -318,6 +318,8 @@ int compat_grant_table_op(unsigned int cmd,
 #undef XLAT_gnttab_get_status_frames_HNDL_frame_list
                 if ( unlikely(__copy_to_guest(cmp_uop, &cmp.get_status, 1)) )
                     rc = -EFAULT;
+                else
+                    i = 1;
             }
             break;
         }
