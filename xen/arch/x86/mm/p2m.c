@@ -2207,7 +2207,10 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     if ( mfn_valid(_mfn(mfn)) ) 
     {
         if ( !set_p2m_entry(d, gfn, _mfn(mfn), page_order, t) )
+        {
             rc = -EINVAL;
+            goto out; /* Failed to update p2m, bail without updating m2p. */
+        }
         if ( !p2m_is_grant(t) )
         {
             for ( i = 0; i < (1UL << page_order); i++ )
@@ -2228,6 +2231,7 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
         }
     }
 
+out:
     audit_p2m(d);
     p2m_unlock(d->arch.p2m);
 
