@@ -243,6 +243,7 @@ void parse_pool(char *s)
     unsigned long long flush_objs = parse(s,"ot");
 
     parse_string(s,"PT",pool_type,2);
+    pool_type[2] = '\0';
     if (pool_type[1] == 'S')
         return; /* no need to repeat print data for shared pools */
     printf("domid%lu,id%lu[%s]:pgp=%llu(max=%llu) obj=%llu(%llu) "
@@ -286,6 +287,7 @@ void parse_shared_pool(char *s)
     unsigned long long flush_objs = parse(s,"ot");
 
     parse_string(s,"PT",pool_type,2);
+    pool_type[2] = '\0';
     parse_sharers(s,"SC",buf,BUFSIZE);
     printf("poolid=%lu[%s] uuid=%llx.%llx, shared-by:%s: "
            "pgp=%llu(max=%llu) obj=%llu(%llu) "
