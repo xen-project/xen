@@ -633,7 +633,10 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
     if ( mfn_valid(_mfn(mfn)) ) 
     {
         if ( !set_p2m_entry(p2m, gfn, _mfn(mfn), page_order, t, p2m->default_access) )
+        {
             rc = -EINVAL;
+            goto out; /* Failed to update p2m, bail without updating m2p. */
+        }
         if ( !p2m_is_grant(t) )
         {
             for ( i = 0; i < (1UL << page_order); i++ )
@@ -656,6 +659,7 @@ guest_physmap_add_entry(struct domain *d, unsigned long gfn,
         }
     }
 
+out:
     p2m_unlock(p2m);
 
     return rc;
