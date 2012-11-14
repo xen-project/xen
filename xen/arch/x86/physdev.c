@@ -234,6 +234,10 @@ static int physdev_unmap_pirq(struct physdev_unmap_pirq *unmap)
     if ( ret )
         return ret;
 
+    ret = -EINVAL;
+    if ( unmap->pirq < 0 || unmap->pirq >= d->nr_pirqs )
+        goto free_domain;
+
     if ( is_hvm_domain(d) )
     {
         spin_lock(&d->event_lock);
