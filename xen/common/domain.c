@@ -903,6 +903,9 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( set.period_ns < MILLISECS(1) )
             return -EINVAL;
 
+        if ( set.period_ns > STIME_DELTA_MAX )
+            return -EINVAL;
+
         v->periodic_period = set.period_ns;
         vcpu_force_reschedule(v);
 
