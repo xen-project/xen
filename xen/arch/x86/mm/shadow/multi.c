@@ -4478,8 +4478,12 @@ static void sh_pagetable_dying(struct vcpu *v, paddr_t gpa)
         unsigned long gfn;
         mfn_t smfn, gmfn;
 
-        if ( fast_path )
-            smfn = _mfn(pagetable_get_pfn(v->arch.shadow_table[i]));
+        if ( fast_path ) {
+            if ( pagetable_is_null(v->arch.shadow_table[i]) )
+                smfn = _mfn(INVALID_MFN);
+            else
+                smfn = _mfn(pagetable_get_pfn(v->arch.shadow_table[i]));
+        }
         else
         {
             /* retrieving the l2s */
