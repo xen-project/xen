@@ -124,6 +124,7 @@
 /* XXX: write this into the DT */
 #define VGIC_IRQ_EVTCHN_CALLBACK 31
 
+#ifndef __ASSEMBLY__
 extern int domain_vgic_init(struct domain *d);
 extern void domain_vgic_free(struct domain *d);
 
@@ -158,6 +159,7 @@ extern int gicv_setup(struct domain *d);
 extern void gic_save_state(struct vcpu *v);
 extern void gic_restore_state(struct vcpu *v);
 
+#endif /* __ASSEMBLY__ */
 #endif
 
 /*

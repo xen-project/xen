@@ -80,12 +80,12 @@ start:
 	beq   boot_cpu               /* If we're CPU 0, boot now */
 
 	/* Non-boot CPUs wait here to be woken up one at a time. */
-1:	wfe
-	dsb
+1:	dsb
 	ldr   r0, =smp_up_cpu        /* VA of gate */
 	add   r0, r0, r10            /* PA of gate */
 	ldr   r1, [r0]               /* Which CPU is being booted? */
 	teq   r1, r12                /* Is it us? */
+	wfene
 	bne   1b
 
 boot_cpu:
@@ -98,6 +98,10 @@ boot_cpu:
 	bl    putn
 	PRINT(" booting -\r\n")
 #endif
+
+	/* Wake up secondary cpus */
+	teq   r12, #0
+	bleq  kick_cpus
 
 	/* Check that this CPU has Hyp mode */
 	mrc   CP32(r0, ID_PFR1)

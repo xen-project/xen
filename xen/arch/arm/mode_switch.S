@@ -19,7 +19,35 @@
 
 #include <asm/config.h>
 #include <asm/page.h>
+#include <asm/platform_vexpress.h>
 #include <asm/asm_defns.h>
+#include "gic.h"
+
+
+/* XXX: Versatile Express specific code */
+/* wake up secondary cpus */
+.globl kick_cpus
+kick_cpus:
+	/* write start paddr to v2m sysreg FLAGSSET register */
+	ldr   r0, =(V2M_SYS_MMIO_BASE)        /* base V2M sysreg MMIO address */
+	dsb
+	mov   r2, #0xffffffff
+	str   r2, [r0, #(V2M_SYS_FLAGSCLR)]
+	dsb
+	ldr   r2, =start
+	add   r2, r2, r10
+	str   r2, [r0, #(V2M_SYS_FLAGSSET)]
+	dsb
+	/* send an interrupt */
+	ldr   r0, =(GIC_BASE_ADDRESS + GIC_DR_OFFSET) /* base GICD MMIO address */
+	mov   r2, #0x1
+	str   r2, [r0, #(GICD_CTLR * 4)]      /* enable distributor */
+	mov   r2, #0xfe0000
+	str   r2, [r0, #(GICD_SGIR * 4)]      /* send IPI to everybody */
+	dsb
+	str   r2, [r0, #(GICD_CTLR * 4)]      /* disable distributor */
+	mov   pc, lr
+
 
 /* Get up a CPU into Hyp mode.  Clobbers r0-r3.
  *
