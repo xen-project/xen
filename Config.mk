@@ -214,7 +214,7 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.2.0
+QEMU_TAG ?= xen-4.2.1-rc1
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
