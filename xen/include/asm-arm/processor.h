@@ -3,6 +3,9 @@
 
 #include <asm/cpregs.h>
 
+/* MIDR Main ID Register */
+#define MIDR_MASK    0xff0ffff0
+
 /* TTBCR Translation Table Base Control Register */
 #define TTBCR_EAE    0x80000000
 #define TTBCR_N_MASK 0x07

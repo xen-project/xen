@@ -19,6 +19,7 @@
 
 #include <asm/config.h>
 #include <asm/page.h>
+#include <asm/processor-ca15.h>
 #include <asm/asm_defns.h>
 
 #define PT_PT  0xe7f /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=111, T=1, P=1 */
@@ -148,6 +149,15 @@ skip_bss:
 
 	PRINT("- Setting up control registers -\r\n")
 	
+	/* Read CPU ID */
+	mrc   CP32(r0, MIDR)
+	ldr   r1, =(MIDR_MASK)
+	and   r0, r0, r1
+	/* Is this a Cortex A15? */
+	ldr   r1, =(CORTEX_A15_ID)
+	teq   r0, r1
+	bleq  cortex_a15_init
+
 	/* Set up memory attribute type tables */
 	ldr   r0, =MAIR0VAL
 	ldr   r1, =MAIR1VAL

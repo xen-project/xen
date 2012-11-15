@@ -104,6 +104,7 @@
 /* Coprocessor 15 */
 
 /* CP15 CR0: CPUID and Cache Type Registers */
+#define MIDR            p15,0,c0,c0,0   /* Main ID Register */
 #define MPIDR           p15,0,c0,c0,5   /* Multiprocessor Affinity Register */
 #define ID_PFR0         p15,0,c0,c1,0   /* Processor Feature Register 0 */
 #define ID_PFR1         p15,0,c0,c1,1   /* Processor Feature Register 1 */
