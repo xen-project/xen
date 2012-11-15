@@ -194,9 +194,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     setup_pagetables(boot_phys_offset, get_xen_paddr());
 
 #ifdef EARLY_UART_ADDRESS
-    /* Map the UART */
     /* TODO Need to get device tree or command line for UART address */
-    set_fixmap(FIXMAP_CONSOLE, EARLY_UART_ADDRESS >> PAGE_SHIFT, DEV_SHARED);
     pl011_init(0, FIXMAP_ADDR(FIXMAP_CONSOLE));
     console_init_preirq();
 #endif

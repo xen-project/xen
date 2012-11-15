@@ -24,6 +24,7 @@
 #define PT_PT  0xe7f /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=111, T=1, P=1 */
 #define PT_MEM 0xe7d /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=111, T=0, P=1 */
 #define PT_DEV 0xe71 /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=100, T=0, P=1 */
+#define PT_DEV_L3 0xe73 /* lev3: nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=100, T=1, P=1 */
 
 #define PT_UPPER(x) (PT_##x & 0xf00)
 #define PT_LOWER(x) (PT_##x & 0x0ff)
@@ -183,6 +184,18 @@ skip_bss:
 	teq   r12, #0
 	bne   pt_ready
 	
+	/* console fixmap */
+#ifdef EARLY_UART_ADDRESS
+	ldr   r1, =xen_fixmap
+	add   r1, r1, r10            /* r1 := paddr (xen_fixmap) */
+	mov   r3, #0
+	lsr   r2, r11, #12
+	lsl   r2, r2, #12            /* 4K aligned paddr of UART */
+	orr   r2, r2, #PT_UPPER(DEV_L3)
+	orr   r2, r2, #PT_LOWER(DEV_L3) /* r2:r3 := 4K dev map including UART */
+	strd  r2, r3, [r1, #(FIXMAP_CONSOLE*8)] /* Map it in the first fixmap's slot */
+#endif
+
 	/* Build the baseline idle pagetable's first-level entries */
 	ldr   r1, =xen_second
 	add   r1, r1, r10            /* r1 := paddr (xen_second) */
@@ -205,17 +218,15 @@ skip_bss:
 	ldr   r4, =start
 	lsr   r4, #18                /* Slot for vaddr(start) */
 	strd  r2, r3, [r1, r4]       /* Map Xen there too */
-#ifdef EARLY_UART_ADDRESS
-	ldr   r3, =(1<<(54-32))      /* NS for device mapping */
-	lsr   r2, r11, #21
-	lsl   r2, r2, #21            /* 2MB-aligned paddr of UART */
-	orr   r2, r2, #PT_UPPER(DEV)
-	orr   r2, r2, #PT_LOWER(DEV) /* r2:r3 := 2MB dev map including UART */
+
+	/* xen_fixmap pagetable */
+	ldr   r2, =xen_fixmap
+	add   r2, r2, r10            /* r2 := paddr (xen_fixmap) */
+	orr   r2, r2, #PT_UPPER(PT)
+	orr   r2, r2, #PT_LOWER(PT)  /* r2:r3 := table map of xen_fixmap */
 	add   r4, r4, #8
 	strd  r2, r3, [r1, r4]       /* Map it in the fixmap's slot */
-#else
-	add   r4, r4, #8             /* Skip over unused fixmap slot */
-#endif
+
 	mov   r3, #0x0
 	lsr   r2, r8, #21
 	lsl   r2, r2, #21            /* 2MB-aligned paddr of DTB */
@@ -236,13 +247,10 @@ pt_ready:
 	mov   pc, r1                 /* Get a proper vaddr into PC */
 paging:
 
+
 #ifdef EARLY_UART_ADDRESS
-	/* Recover the UART address in the new address space. */
-	lsl   r11, #11
-	lsr   r11, #11               /* UART base's offset from 2MB base */
-	adr   r0, start
-	add   r0, r0, #0x200000      /* vaddr of the fixmap's 2MB slot */
-	add   r11, r11, r0           /* r11 := vaddr (UART base address) */
+	/* Use a virtual address to access the UART. */
+	ldr   r11, =FIXMAP_ADDR(FIXMAP_CONSOLE)
 #endif
 
 	PRINT("- Ready -\r\n")
@@ -261,8 +269,6 @@ paging:
 	mcr   CP32(r0, BPIALL)       /* Flush branch predictor */
 	dsb                          /* Ensure completion of TLB+BP flush */
 	isb
- 	/* Now, the UART is in its proper fixmap address */
-	ldrne r11, =FIXMAP_ADDR(FIXMAP_CONSOLE)
 
 	/* Non-boot CPUs report that they've got this far */
 	ldr   r0, =ready_cpus

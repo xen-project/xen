@@ -40,7 +40,7 @@ struct domain *dom_xen, *dom_io;
 /* Static start-of-day pagetables that we use before the allocators are up */
 lpae_t xen_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 lpae_t xen_second[LPAE_ENTRIES*4] __attribute__((__aligned__(4096*4)));
-static lpae_t xen_fixmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+lpae_t xen_fixmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 static lpae_t xen_xenmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 
 /* Non-boot CPUs use this to find the correct pagetables. */

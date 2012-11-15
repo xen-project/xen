@@ -17,12 +17,11 @@
 
 #ifdef EARLY_UART_ADDRESS
 
-static void __init early_putch(char c)
+void __init early_putch(char c)
 {
     volatile uint32_t *r;
 
-    r = (uint32_t *)((EARLY_UART_ADDRESS & 0x001fffff)
-                     + XEN_VIRT_START + (1 << 21));
+    r = (uint32_t *)(XEN_VIRT_START + (1 << 21));
 
     /* XXX: assuming a PL011 UART. */
     while(*(r + 0x6) & 0x8)
