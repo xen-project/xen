@@ -179,7 +179,7 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= b36c42985575cd6d761d39e5770e57a1f52832ae
+QEMU_TAG ?= xen-4.1.4-rc1
 # Tue Nov 13 18:25:17 2012 +0000
 # mapcache: Fix invalidate if memory requested was not bucket aligned
 
