@@ -241,8 +241,8 @@ void __init pl011_init(int index, unsigned long register_base_address)
 
     uart = &pl011_com[index];
 
-    uart->clock_hz  = 7372800;
-    uart->baud      = 115200;
+    uart->clock_hz  = 0x16e3600;
+    uart->baud      = 38400;
     uart->data_bits = 8;
     uart->parity    = PARITY_NONE;
     uart->stop_bits = 1;
