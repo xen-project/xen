@@ -184,7 +184,7 @@ static int time_register_finite(libxl__gc *gc, libxl__ev_time *ev,
 static void time_deregister(libxl__gc *gc, libxl__ev_time *ev)
 {
     if (!ev->infinite) {
-        OSEVENT_HOOK_VOID(timeout_deregister, &ev->for_app_reg);
+        OSEVENT_HOOK_VOID(timeout_deregister, ev->for_app_reg);
         LIBXL_TAILQ_REMOVE(&CTX->etimes, ev, entry);
     }
 }
