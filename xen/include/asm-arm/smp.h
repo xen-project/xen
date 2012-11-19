@@ -22,6 +22,8 @@ extern void stop_cpu(void);
 extern void
 make_cpus_ready(unsigned int max_cpus, unsigned long boot_phys_offset);
 
+extern void smp_clear_cpu_maps (void);
+extern int smp_get_max_cpus (void);
 #endif
 /*
  * Local variables:

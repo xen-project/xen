@@ -71,18 +71,31 @@ static void setup_cpu_sibling_map(int cpu)
     cpumask_set_cpu(cpu, per_cpu(cpu_core_mask, cpu));
 }
 
+void __init
+smp_clear_cpu_maps (void)
+{
+    cpumask_clear(&cpu_possible_map);
+    cpumask_clear(&cpu_online_map);
+    cpumask_set_cpu(0, &cpu_online_map);
+    cpumask_set_cpu(0, &cpu_possible_map);
+}
+
+int __init
+smp_get_max_cpus (void)
+{
+    int i, max_cpus = 0;
+
+    for ( i = 0; i < nr_cpu_ids; i++ )
+        if ( cpu_possible(i) )
+            max_cpus++;
+
+    return max_cpus;
+}
+
 
 void __init
 smp_prepare_cpus (unsigned int max_cpus)
 {
-    int i;
-
-    cpumask_clear(&cpu_online_map);
-    cpumask_set_cpu(0, &cpu_online_map);
-
-    cpumask_clear(&cpu_possible_map);
-    for ( i = 0; i < max_cpus; i++ )
-        cpumask_set_cpu(i, &cpu_possible_map);
     cpumask_copy(&cpu_present_map, &cpu_possible_map);
 
     setup_cpu_sibling_map(0);

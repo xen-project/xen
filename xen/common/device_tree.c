@@ -18,6 +18,7 @@
 #include <xen/mm.h>
 #include <xen/stdarg.h>
 #include <xen/string.h>
+#include <xen/cpumask.h>
 #include <asm/early_printk.h>
 
 struct dt_early_info __initdata early_info;
@@ -39,6 +40,18 @@ bool_t device_tree_node_matches(const void *fdt, int node, const char *match)
        "match-foo". */
     return strncmp(name, match, match_len) == 0
         && (name[match_len] == '@' || name[match_len] == '\0');
+}
+
+bool_t device_tree_type_matches(const void *fdt, int node, const char *match)
+{
+    int len;
+    const void *prop;
+
+    prop = fdt_getprop(fdt, node, "device_type", &len);
+    if ( prop == NULL )
+        return 0;
+
+    return !strncmp(prop, match, len);
 }
 
 static void __init get_val(const u32 **cell, u32 cells, u64 *val)
@@ -229,6 +242,34 @@ static void __init process_memory_node(const void *fdt, int node,
     }
 }
 
+static void __init process_cpu_node(const void *fdt, int node,
+                                    const char *name,
+                                    u32 address_cells, u32 size_cells)
+{
+    const struct fdt_property *prop;
+    const u32 *cell;
+    paddr_t start, size;
+
+    if ( address_cells != 1 || size_cells != 0 )
+    {
+        early_printk("fdt: node `%s': invalid #address-cells or #size-cells",
+                     name);
+        return;
+    }
+
+    prop = fdt_get_property(fdt, node, "reg", NULL);
+    if ( !prop )
+    {
+        early_printk("fdt: node `%s': missing `reg' property\n", name);
+        return;
+    }
+
+    cell = (const u32 *)prop->data;
+    device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
+
+    cpumask_set_cpu(start, &cpu_possible_map);
+}
+
 static int __init early_scan_node(const void *fdt,
                                   int node, const char *name, int depth,
                                   u32 address_cells, u32 size_cells,
@@ -236,6 +277,8 @@ static int __init early_scan_node(const void *fdt,
 {
     if ( device_tree_node_matches(fdt, node, "memory") )
         process_memory_node(fdt, node, name, address_cells, size_cells);
+    else if ( device_tree_type_matches(fdt, node, "cpu") )
+        process_cpu_node(fdt, node, name, address_cells, size_cells);
 
     return 0;
 }

@@ -304,7 +304,7 @@ static void __cpuinit gic_hyp_disable(void)
 }
 
 /* Set up the GIC */
-int __init gic_init(void)
+void __init gic_init(void)
 {
     /* XXX FIXME get this from devicetree */
     gic.dbase = GIC_BASE_ADDRESS + GIC_DR_OFFSET;
@@ -328,8 +328,6 @@ int __init gic_init(void)
     gic.lr_mask = 0ULL;
 
     spin_unlock(&gic.lock);
-
-    return gic.cpus;
 }
 
 /* Set up the per-CPU parts of the GIC for a secondary CPU */
