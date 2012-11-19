@@ -423,9 +423,25 @@ typedef struct mmuext_op mmuext_op_t;
 DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 #endif
 
+/*
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_update_va_mapping(unsigned long va, u64 val,
+ * `                              enum uvm_flags flags)
+ * `
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_update_va_mapping_otherdomain(unsigned long va, u64 val,
+ * `                                          enum uvm_flags flags,
+ * `                                          domid_t domid)
+ * `
+ * ` @va: The virtual address whose mapping we want to change
+ * ` @val: The new page table entry, must contain a machine address
+ * ` @flags: Control TLB flushes
+ */
+*/
 /* These are passed as 'flags' to update_va_mapping. They can be ORed. */
 /* When specifying UVMF_MULTI, also OR in a pointer to a CPU bitmap.   */
 /* UVMF_LOCAL is merely UVMF_MULTI with a NULL bitmap pointer.         */
+/* ` enum uvm_flags { */
 #define UVMF_NONE               (0UL<<0) /* No flushing at all.   */
 #define UVMF_TLB_FLUSH          (1UL<<0) /* Flush entire TLB(s).  */
 #define UVMF_INVLPG             (2UL<<0) /* Flush only one entry. */
@@ -433,6 +449,7 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 #define UVMF_MULTI              (0UL<<2) /* Flush subset of TLBs. */
 #define UVMF_LOCAL              (0UL<<2) /* Flush local TLB.      */
 #define UVMF_ALL                (1UL<<2) /* Flush all TLBs.       */
+/* ` } */
 
 /*
  * Commands to HYPERVISOR_console_io().
