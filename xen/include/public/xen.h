@@ -319,48 +319,54 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 
 /*
  * MMU EXTENDED OPERATIONS
- * 
- * HYPERVISOR_mmuext_op() accepts a list of mmuext_op structures.
+ *
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_mmuext_op(mmuext_op_t uops[],
+ * `                      unsigned int count,
+ * `                      unsigned int *pdone,
+ * `                      unsigned int foreigndom)
+ */
+/* HYPERVISOR_mmuext_op() accepts a list of mmuext_op structures.
  * A foreigndom (FD) can be specified (or DOMID_SELF for none).
  * Where the FD has some effect, it is described below.
- * 
+ *
  * cmd: MMUEXT_(UN)PIN_*_TABLE
  * mfn: Machine frame number to be (un)pinned as a p.t. page.
  *      The frame must belong to the FD, if one is specified.
- * 
+ *
  * cmd: MMUEXT_NEW_BASEPTR
  * mfn: Machine frame number of new page-table base to install in MMU.
- * 
+ *
  * cmd: MMUEXT_NEW_USER_BASEPTR [x86/64 only]
  * mfn: Machine frame number of new page-table base to install in MMU
  *      when in user space.
- * 
+ *
  * cmd: MMUEXT_TLB_FLUSH_LOCAL
  * No additional arguments. Flushes local TLB.
- * 
+ *
  * cmd: MMUEXT_INVLPG_LOCAL
  * linear_addr: Linear address to be flushed from the local TLB.
- * 
+ *
  * cmd: MMUEXT_TLB_FLUSH_MULTI
  * vcpumask: Pointer to bitmap of VCPUs to be flushed.
- * 
+ *
  * cmd: MMUEXT_INVLPG_MULTI
  * linear_addr: Linear address to be flushed.
  * vcpumask: Pointer to bitmap of VCPUs to be flushed.
- * 
+ *
  * cmd: MMUEXT_TLB_FLUSH_ALL
  * No additional arguments. Flushes all VCPUs' TLBs.
- * 
+ *
  * cmd: MMUEXT_INVLPG_ALL
  * linear_addr: Linear address to be flushed from all VCPUs' TLBs.
- * 
+ *
  * cmd: MMUEXT_FLUSH_CACHE
  * No additional arguments. Writes back and flushes cache contents.
  *
  * cmd: MMUEXT_FLUSH_CACHE_GLOBAL
  * No additional arguments. Writes back and flushes cache contents
  * on all CPUs in the system.
- * 
+ *
  * cmd: MMUEXT_SET_LDT
  * linear_addr: Linear address of LDT base (NB. must be page-aligned).
  * nr_ents: Number of entries in LDT.
@@ -375,6 +381,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
  * cmd: MMUEXT_[UN]MARK_SUPER
  * mfn: Machine frame number of head of superpage to be [un]marked.
  */
+/* ` enum mmuext_cmd { */
 #define MMUEXT_PIN_L1_TABLE      0
 #define MMUEXT_PIN_L2_TABLE      1
 #define MMUEXT_PIN_L3_TABLE      2
@@ -395,10 +402,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #define MMUEXT_FLUSH_CACHE_GLOBAL 18
 #define MMUEXT_MARK_SUPER       19
 #define MMUEXT_UNMARK_SUPER     20
+/* ` } */
 
 #ifndef __ASSEMBLY__
 struct mmuext_op {
-    unsigned int cmd;
+    unsigned int cmd; /* => enum mmuext_cmd */
     union {
         /* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR
          * CLEAR_PAGE, COPY_PAGE, [UN]MARK_SUPER */
