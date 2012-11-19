@@ -979,7 +979,6 @@ long arch_do_domctl(
         if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
             break;
 
-        ret=0;
         if ( domctl->u.memory_mapping.add_mapping )
         {
             gdprintk(XENLOG_INFO,
@@ -1079,6 +1078,7 @@ long arch_do_domctl(
                     found = 1;
                     break;
                 }
+            ret = 0;
             if ( !found )
             {
                 g2m_ioport = xmalloc(struct g2m_ioport);
