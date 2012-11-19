@@ -97,11 +97,17 @@ void amd_iommu_msi_msg_update_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg);
 void amd_iommu_read_msi_from_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg);
+int amd_setup_hpet_msi(struct msi_desc *msi_desc);
 
 extern struct ioapic_sbdf {
     u16 bdf, seg;
 } ioapic_sbdf[MAX_IO_APICS];
 extern void *shared_intremap_table;
+
+extern struct hpet_sbdf {
+    u16 bdf, seg, id;
+    struct amd_iommu *iommu;
+} hpet_sbdf;
 
 /* power management support */
 void amd_iommu_resume(void);

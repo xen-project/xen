@@ -28,6 +28,7 @@
 #define INTREMAP_ENTRIES (1 << INTREMAP_LENGTH)
 
 struct ioapic_sbdf ioapic_sbdf[MAX_IO_APICS];
+struct hpet_sbdf hpet_sbdf;
 void *shared_intremap_table;
 static DEFINE_SPINLOCK(shared_intremap_lock);
 
@@ -262,19 +263,18 @@ void amd_iommu_ioapic_update_ire(
 }
 
 static void update_intremap_entry_from_msi_msg(
-    struct amd_iommu *iommu, struct pci_dev *pdev,
+    struct amd_iommu *iommu, u8 bdf,
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
     unsigned long flags;
     u32* entry;
-    u16 bdf, req_id, alias_id;
+    u16 req_id, alias_id;
     u8 delivery_mode, dest, vector, dest_mode;
     spinlock_t *lock;
     int offset;
 
-    bdf = PCI_BDF2(pdev->bus, pdev->devfn);
-    req_id = get_dma_requestor_id(pdev->seg, bdf);
-    alias_id = get_intremap_requestor_id(pdev->seg, bdf);
+    req_id = get_dma_requestor_id(iommu->seg, bdf);
+    alias_id = get_intremap_requestor_id(iommu->seg, bdf);
 
     if ( msg == NULL )
     {
@@ -284,7 +284,7 @@ static void update_intremap_entry_from_msi_msg(
         spin_unlock_irqrestore(lock, flags);
 
         if ( ( req_id != alias_id ) &&
-             get_ivrs_mappings(pdev->seg)[alias_id].intremap_table != NULL )
+             get_ivrs_mappings(iommu->seg)[alias_id].intremap_table != NULL )
         {
             lock = get_intremap_lock(iommu->seg, alias_id);
             spin_lock_irqsave(lock, flags);
@@ -317,7 +317,7 @@ static void update_intremap_entry_from_msi_msg(
 
     lock = get_intremap_lock(iommu->seg, alias_id);
     if ( ( req_id != alias_id ) &&
-         get_ivrs_mappings(pdev->seg)[alias_id].intremap_table != NULL )
+         get_ivrs_mappings(iommu->seg)[alias_id].intremap_table != NULL )
     {
         spin_lock_irqsave(lock, flags);
         entry = (u32*)get_intremap_entry(iommu->seg, alias_id, offset);
@@ -340,20 +340,23 @@ void amd_iommu_msi_msg_update_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
     struct pci_dev *pdev = msi_desc->dev;
-    int bdf = PCI_BDF2(pdev->bus, pdev->devfn);
+    int bdf, seg;
     struct amd_iommu *iommu;
 
     if ( !iommu_intremap )
         return;
 
-    iommu = find_iommu_for_device(pdev->seg, bdf);
+    bdf = pdev ? PCI_BDF2(pdev->bus, pdev->devfn) : hpet_sbdf.bdf;
+    seg = pdev ? pdev->seg : hpet_sbdf.seg;
+
+    iommu = find_iommu_for_device(seg, bdf);
     if ( !iommu )
     {
         AMD_IOMMU_DEBUG("Fail to find iommu for MSI device id = %#x\n", bdf);
         return;
     }
 
-    update_intremap_entry_from_msi_msg(iommu, pdev, msi_desc, msg);
+    update_intremap_entry_from_msi_msg(iommu, bdf, msi_desc, msg);
 }
 
 void amd_iommu_read_msi_from_ire(
@@ -382,4 +385,16 @@ void* __init amd_iommu_alloc_intremap_table(void)
     BUG_ON(tb == NULL);
     memset(tb, 0, PAGE_SIZE * (1UL << INTREMAP_TABLE_ORDER));
     return tb;
+}
+
+int __init amd_setup_hpet_msi(struct msi_desc *msi_desc)
+{
+    if ( (!msi_desc->hpet_id != hpet_sbdf.id) ||
+         (hpet_sbdf.iommu == NULL) )
+    {
+        AMD_IOMMU_DEBUG("Fail to setup HPET MSI remapping\n");
+        return 1;
+    }
+
+    return 0;
 }

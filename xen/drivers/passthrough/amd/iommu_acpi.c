@@ -653,9 +653,32 @@ static u16 __init parse_ivhd_device_special(
     }
 
     add_ivrs_mapping_entry(bdf, bdf, special->header.data_setting, iommu);
+
+    switch ( special->variety )
+    {
+    case ACPI_IVHD_IOAPIC:
     /* set device id of ioapic */
-    ioapic_sbdf[special->handle].bdf = bdf;
-    ioapic_sbdf[special->handle].seg = seg;
+        ioapic_sbdf[special->handle].bdf = bdf;
+        ioapic_sbdf[special->handle].seg = seg;
+        break;
+    case ACPI_IVHD_HPET:
+        /* set device id of hpet */
+        if ( hpet_sbdf.iommu )
+        {
+            printk(XENLOG_WARNING "Only one IVHD HPET entry is supported\n");
+            break;
+        }
+        hpet_sbdf.id = special->handle;
+        hpet_sbdf.bdf = bdf;
+        hpet_sbdf.seg = seg;
+        hpet_sbdf.iommu = iommu;
+        break;
+    default:
+        printk(XENLOG_ERR "Unrecognized IVHD special variety %#x\n",
+               special->variety);
+        return 0;
+    }
+
     return dev_length;
 }
 

@@ -599,6 +599,7 @@ const struct iommu_ops amd_iommu_ops = {
     .update_ire_from_msi = amd_iommu_msi_msg_update_ire,
     .read_apic_from_ire = __io_apic_read,
     .read_msi_from_ire = amd_iommu_read_msi_from_ire,
+    .setup_hpet_msi = amd_setup_hpet_msi,
     .suspend = amd_iommu_suspend,
     .resume = amd_iommu_resume,
     .share_p2m = amd_iommu_share_p2m,
