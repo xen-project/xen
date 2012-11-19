@@ -445,7 +445,6 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
  * ` @val: The new page table entry, must contain a machine address
  * ` @flags: Control TLB flushes
  */
-*/
 /* These are passed as 'flags' to update_va_mapping. They can be ORed. */
 /* When specifying UVMF_MULTI, also OR in a pointer to a CPU bitmap.   */
 /* UVMF_LOCAL is merely UVMF_MULTI with a NULL bitmap pointer.         */
