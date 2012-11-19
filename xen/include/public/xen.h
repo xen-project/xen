@@ -680,7 +680,8 @@ typedef struct shared_info shared_info_t;
 #endif
 
 /*
- * Start-of-day memory layout:
+ * `incontents 200 startofday Start-of-day memory layout
+ *
  *  1. The domain is started within contiguous virtual-memory region.
  *  2. The contiguous region ends on an aligned 4MB boundary.
  *  3. This the order of bootstrap elements in the initial virtual region:
