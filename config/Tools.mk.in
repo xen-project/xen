@@ -44,7 +44,6 @@ GIT_HTTP            := @githttp@
 
 # Optional components
 XENSTAT_XENTOP      := @monitors@
-VTPM_TOOLS          := @vtpm@
 LIBXENAPI_BINDINGS  := @xenapi@
 OCAML_TOOLS         := @ocamltools@
 CONFIG_MINITERM     := @miniterm@
