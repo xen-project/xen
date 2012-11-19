@@ -540,7 +540,10 @@ typedef struct mmu_update mmu_update_t;
 DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
 
 /*
- * Send an array of these to HYPERVISOR_multicall().
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_multicall(multicall_entry_t call_list[],
+ * `                      unsigned int nr_calls);
+ *
  * NB. The fields are natural register size for this architecture.
  */
 struct multicall_entry {
