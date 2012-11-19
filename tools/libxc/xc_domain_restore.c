@@ -1967,8 +1967,14 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         if ( i == 0 )
         {
             /*
-             * Uncanonicalise the suspend-record frame number and poke
-             * resume record.
+             * Uncanonicalise the start info frame number and poke in
+             * updated values into the start info itself.
+             *
+             * The start info MFN is the 3rd argument to the
+             * HYPERVISOR_sched_op hypercall when op==SCHEDOP_shutdown
+             * and reason==SHUTDOWN_suspend, it is canonicalised in
+             * xc_domain_save and therefore the PFN is found in the
+             * edx register.
              */
             pfn = GET_FIELD(ctxt, user_regs.edx);
             if ( (pfn >= dinfo->p2m_size) ||

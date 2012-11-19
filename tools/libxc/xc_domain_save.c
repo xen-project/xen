@@ -1868,7 +1868,14 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
         goto out;
     }
 
-    /* Canonicalise the suspend-record frame number. */
+    /*
+     * Canonicalise the start info frame number.
+     *
+     * The start info MFN is the 3rd argument to the
+     * HYPERVISOR_sched_op hypercall when op==SCHEDOP_shutdown and
+     * reason==SHUTDOWN_suspend and is therefore found in the edx
+     * register.
+     */
     mfn = GET_FIELD(&ctxt, user_regs.edx);
     if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
     {
