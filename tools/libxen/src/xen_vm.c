@@ -35,7 +35,6 @@
 #include <xen/api/xen_vm.h>
 #include <xen/api/xen_vm_guest_metrics.h>
 #include <xen/api/xen_vm_metrics.h>
-#include <xen/api/xen_vtpm.h>
 #include <xen/api/xen_cpu_pool.h>
 
 
@@ -119,9 +118,6 @@ static const struct_member xen_vm_record_struct_members[] =
         { .key = "crash_dumps",
           .type = &abstract_type_ref_set,
           .offset = offsetof(xen_vm_record, crash_dumps) },
-        { .key = "VTPMs",
-          .type = &abstract_type_ref_set,
-          .offset = offsetof(xen_vm_record, vtpms) },
         { .key = "PV_bootloader",
           .type = &abstract_type_string,
           .offset = offsetof(xen_vm_record, pv_bootloader) },
@@ -203,7 +199,6 @@ xen_vm_record_free(xen_vm_record *record)
     xen_vif_record_opt_set_free(record->vifs);
     xen_vbd_record_opt_set_free(record->vbds);
     xen_crashdump_record_opt_set_free(record->crash_dumps);
-    xen_vtpm_record_opt_set_free(record->vtpms);
     free(record->pv_bootloader);
     free(record->pv_kernel);
     free(record->pv_ramdisk);
@@ -663,23 +658,6 @@ xen_vm_get_crash_dumps(xen_session *session, struct xen_crashdump_set **result, 
 
     *result = NULL;
     XEN_CALL_("VM.get_crash_dumps");
-    return session->ok;
-}
-
-
-bool
-xen_vm_get_vtpms(xen_session *session, struct xen_vtpm_set **result, xen_vm vm)
-{
-    abstract_value param_values[] =
-        {
-            { .type = &abstract_type_string,
-              .u.string_val = vm }
-        };
-
-    abstract_type result_type = abstract_type_string_set;
-
-    *result = NULL;
-    XEN_CALL_("VM.get_VTPMs");
     return session->ok;
 }
 

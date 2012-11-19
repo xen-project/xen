@@ -33,7 +33,6 @@
 #include <xen/api/xen_vm_guest_metrics_decl.h>
 #include <xen/api/xen_vm_metrics_decl.h>
 #include <xen/api/xen_vm_power_state.h>
-#include <xen/api/xen_vtpm_decl.h>
 #include <xen/api/xen_cpu_pool_decl.h>
 
 
@@ -98,7 +97,6 @@ typedef struct xen_vm_record
     struct xen_vif_record_opt_set *vifs;
     struct xen_vbd_record_opt_set *vbds;
     struct xen_crashdump_record_opt_set *crash_dumps;
-    struct xen_vtpm_record_opt_set *vtpms;
     char *pv_bootloader;
     char *pv_kernel;
     char *pv_ramdisk;
@@ -393,13 +391,6 @@ xen_vm_get_vbds(xen_session *session, struct xen_vbd_set **result, xen_vm vm);
  */
 extern bool
 xen_vm_get_crash_dumps(xen_session *session, struct xen_crashdump_set **result, xen_vm vm);
-
-
-/**
- * Get the VTPMs field of the given VM.
- */
-extern bool
-xen_vm_get_vtpms(xen_session *session, struct xen_vtpm_set **result, xen_vm vm);
 
 
 /**

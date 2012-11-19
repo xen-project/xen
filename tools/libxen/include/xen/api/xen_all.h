@@ -35,7 +35,6 @@
 #include <xen/api/xen_vm.h>
 #include <xen/api/xen_vm_metrics.h>
 #include <xen/api/xen_vm_power_state.h>
-#include <xen/api/xen_vtpm.h>
 #include <xen/api/xen_xspolicy.h>
 #include <xen/api/xen_cpu_pool.h>
 #endif
