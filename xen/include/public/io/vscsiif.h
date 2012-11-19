@@ -30,25 +30,22 @@
 #include "ring.h"
 #include "../grant_table.h"
 
-/* command between backend and frontend */
+/* commands between backend and frontend */
 #define VSCSIIF_ACT_SCSI_CDB         1    /* SCSI CDB command */
 #define VSCSIIF_ACT_SCSI_ABORT       2    /* SCSI Device(Lun) Abort*/
 #define VSCSIIF_ACT_SCSI_RESET       3    /* SCSI Device(Lun) Reset*/
 
-
-#define VSCSIIF_BACK_MAX_PENDING_REQS    128
-
 /*
  * Maximum scatter/gather segments per request.
  *
- * Considering balance between allocating al least 16 "vscsiif_request"
- * structures on one page (4096bytes) and number of scatter gather 
- * needed, we decided to use 26 as a magic number.
+ * Considering balance between allocating at least 16 "vscsiif_request"
+ * structures on one page (4096 bytes) and the number of scatter/gather
+ * elements needed, we decided to use 26 as a magic number.
  */
 #define VSCSIIF_SG_TABLESIZE             26
 
 /*
- * base on linux kernel 2.6.18
+ * based on Linux kernel 2.6.18
  */
 #define VSCSIIF_MAX_COMMAND_SIZE         16
 #define VSCSIIF_SENSE_BUFFERSIZE         96
