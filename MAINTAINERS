@@ -252,8 +252,6 @@ F:	extras/minios-os/tpm-tis.c
 F:	extras/minios-os/include/tpmfront.h
 F:	extras/minios-os/include/tpmback.h
 F:	extras/minios-os/include/tpm-tis.h
-F:	tools/vtpm/
-F:	tools/vtpm_manager/
 F:	stubdom/vtpm/
 F:	stubdom/vtpmmgr/
 F:	docs/misc/vtpm.txt
