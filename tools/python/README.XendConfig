@@ -71,8 +71,6 @@ vbds                            !(devices.vbds)
  - io_read_kbs
  - io_write_kbs
 
-tpm_instance                    tpm.instance
-tpm_backend                     tpm.backend
 bios_boot                       image.boot?
 platform_std_VGA                image.stdvga
 platform_serial                 image.serial

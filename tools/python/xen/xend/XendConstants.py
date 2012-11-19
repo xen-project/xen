@@ -115,19 +115,13 @@ TRIGGER_TYPE = {
 }
 
 #
-# Device migration stages (eg. XendDomainInfo, XendCheckpoint, server.tpmif)
+# Device migration stages (eg. XendDomainInfo, XendCheckpoint)
 #
 
 DEV_MIGRATE_TEST  = 0
 DEV_MIGRATE_STEP1 = 1
 DEV_MIGRATE_STEP2 = 2
 DEV_MIGRATE_STEP3 = 3
-
-#
-# VTPM-related constants
-#
-
-VTPM_DELETE_SCRIPT = auxbin.scripts_dir() + '/vtpm-delete'
 
 #
 # Xenstore Constants

@@ -3908,12 +3908,6 @@ class XendDomainInfo:
             else:
                 config['mode'] = 'RW'
 
-        if dev_class == 'vtpm':
-            if not config.has_key('type'):
-                config['type'] = 'paravirtualised' # TODO
-            if not config.has_key('backend'):
-                config['backend'] = "00000000-0000-0000-0000-000000000000"
-
         return config
 
     def get_dev_property(self, dev_class, dev_uuid, field):
@@ -3944,9 +3938,6 @@ class XendDomainInfo:
 
     def get_vbds(self):
         return self.info.get('vbd_refs', [])
-
-    def get_vtpms(self):
-        return self.info.get('vtpm_refs', [])
 
     def get_dpcis(self):
         return XendDPCI.get_by_VM(self.info.get('uuid'))
@@ -4044,23 +4035,6 @@ class XendDomainInfo:
                 self.info['vif_refs'].remove(dev_uuid)
                 raise            
  
-        return dev_uuid
-
-    def create_vtpm(self, xenapi_vtpm):
-        """Create a VTPM device from the passed struct in Xen API format.
-
-        @return: uuid of the device
-        @rtype: string
-        """
-
-        if self._stateGet() not in (DOM_STATE_HALTED,):
-            raise VmError("Can only add vTPM to a halted domain.")
-        if self.get_vtpms() != []:
-            raise VmError('Domain already has a vTPM.')
-        dev_uuid = self.info.device_add('vtpm', cfg_xenapi = xenapi_vtpm)
-        if not dev_uuid:
-            raise XendError('Failed to create device')
-
         return dev_uuid
 
     def create_console(self, xenapi_console):
@@ -4300,9 +4274,6 @@ class XendDomainInfo:
 
     def destroy_vif(self, dev_uuid):
         self.destroy_device_by_uuid('vif', dev_uuid)
-
-    def destroy_vtpm(self, dev_uuid):
-        self.destroy_device_by_uuid('vtpm', dev_uuid)
 
     def destroy_dpci(self, dev_uuid):
 

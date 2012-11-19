@@ -19,7 +19,7 @@
 # A collection of DevControllers 
 #
 
-from xen.xend.server import blkif, netif, tpmif, pciif, iopif, irqif, vfbif, vscsiif, netif2, vusbif
+from xen.xend.server import blkif, netif, pciif, iopif, irqif, vfbif, vscsiif, netif2, vusbif
 from xen.xend.server.BlktapController import BlktapController, Blktap2Controller
 from xen.xend.server.ConsoleController import ConsoleController
 
@@ -38,7 +38,6 @@ class XendDevices:
         'vbd': blkif.BlkifController,
         'vif': netif.NetifController,
         'vif2': netif2.NetifController2,
-        'vtpm': tpmif.TPMifController,
         'pci': pciif.PciController,
         'ioports': iopif.IOPortsController,
         'irq': irqif.IRQController,
@@ -82,6 +81,5 @@ class XendDevices:
         @type domain: XendDomainInfo
         """
         from xen.xend.XendLogging import log
-        tpmif.destroy_vtpmstate(domain.info.get('vtpm_refs'))
 
     destroy_device_state = classmethod(destroy_device_state)

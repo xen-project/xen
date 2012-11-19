@@ -324,10 +324,6 @@ gopts.var('netif', val='no|yes',
           fn=set_bool, default=0,
           use="Make the domain a network interface backend.")
 
-gopts.var('tpmif', val='no|yes',
-          fn=append_value, default=0,
-          use="Make the domain a TPM interface backend.")
-
 gopts.var('disk', val='phy:DEV,VDEV,MODE[,DOM]',
           fn=append_value, default=[],
           use="""Add a disk device to a domain. The physical device is DEV,
@@ -418,20 +414,6 @@ gopts.var('vif2', val="front_mac=MAC,back_mac=MAC,backend=DOM,pdev=PDEV,max_bypa
           use="""Add a netchannel2 network interface using given front
           and backend MAC addresses.  Randomly generated
           addresses will be used if either address is missing.""")
-
-gopts.var('vtpm', val="instance=INSTANCE,backend=DOM,type=TYPE",
-          fn=append_value, default=[],
-          use="""Add a TPM interface. On the backend side use the given
-          instance as virtual TPM instance. The given number is merely the
-          preferred instance number. The hotplug script will determine
-          which instance number will actually be assigned to the domain.
-          The associtation between virtual machine and the TPM instance
-          number can be found in /etc/xen/vtpm.db. Use the backend in the
-          given domain.
-          The type parameter can be used to select a specific driver type
-          that the VM can use. To prevent a fully virtualized domain (HVM)
-          from being able to access an emulated device model, you may specify
-          'paravirtualized' here.""")
 
 gopts.var('access_control', val="policy=POLICY,label=LABEL",
           fn=append_value, default=[],
@@ -997,37 +979,6 @@ def configure_mem_prot(config_image, vals):
     """
     config_image.append(['s3_integrity', vals.s3_integrity])
 
-def configure_vtpm(config_devs, vals):
-    """Create the config for virtual TPM interfaces.
-    """
-    vtpm = vals.vtpm
-    if len(vtpm) > 0:
-        d = vtpm[0]
-        instance = d.get('instance')
-        uuid = d.get('uuid')
-        if instance == "VTPMD":
-            instance = "0"
-        else:
-            if instance != None:
-                try:
-                    if int(instance) == 0:
-                        err('VM config error: vTPM instance must not be 0.')
-                except ValueError:
-                    err('Vm config error: could not parse instance number.')
-        backend = d.get('backend')
-        typ = d.get('type')
-        config_vtpm = ['vtpm']
-        if instance:
-            config_vtpm.append(['pref_instance', instance])
-        if backend:
-            config_vtpm.append(['backend', backend])
-        if typ:
-            config_vtpm.append(['type', typ])
-        if uuid:
-            config_vtpm.append(['uuid', uuid])
-        config_devs.append(['device', config_vtpm])
-
-
 def configure_vifs(config_devs, vals):
     """Create the config for virtual network interfaces.
     """
@@ -1160,8 +1111,6 @@ def make_config(vals):
         config.append(['backend', ['blkif']])
     if vals.netif:
         config.append(['backend', ['netif']])
-    if vals.tpmif:
-        config.append(['backend', ['tpmif']])
     if vals.localtime:
         config.append(['localtime', vals.localtime])
     if vals.oos:
@@ -1193,7 +1142,6 @@ def make_config(vals):
     configure_ioports(config_devs, vals)
     configure_irq(config_devs, vals)
     configure_vifs(config_devs, vals)
-    configure_vtpm(config_devs, vals)
     configure_vfbs(config_devs, vals)
     configure_security(config, vals)
     config += config_devs
@@ -1307,22 +1255,6 @@ def preprocess_irq(vals):
         irq.append(d)
     vals.irq = irq
 
-def preprocess_vtpm(vals):
-    if not vals.vtpm: return
-    vtpms = []
-    for vtpm in vals.vtpm:
-        d = {}
-        a = vtpm.split(',')
-        for b in a:
-            (k, v) = b.strip().split('=', 1)
-            k = k.strip()
-            v = v.strip()
-            if k not in ['backend', 'instance', 'uuid']:
-                err('Invalid vtpm specifier: ' + vtpm)
-            d[k] = v
-        vtpms.append(d)
-    vals.vtpm = vtpms
-
 def preprocess_access_control(vals):
     if not vals.access_control:
         return
@@ -1401,7 +1333,6 @@ def preprocess(vals):
     preprocess_ip(vals)
     preprocess_irq(vals)
     preprocess_nfs(vals)
-    preprocess_vtpm(vals)
     preprocess_access_control(vals)
     preprocess_cpuid(vals, 'cpuid')
     preprocess_cpuid(vals, 'cpuid_check')

@@ -375,12 +375,6 @@ class xenapi_create:
 
             self.create_vifs(vm_ref, vifs, networks)
 
-            # Now create vtpms
-
-            vtpms = vm.getElementsByTagName("vtpm")
-
-            self.create_vtpms(vm_ref, vtpms)
-
             # Now create consoles
 
             consoles = vm.getElementsByTagName("console")
@@ -487,21 +481,6 @@ class xenapi_create:
         except IndexError:
             self._network_refs = server.xenapi.network.get_all()
             return self._network_refs.pop(0)
-
-    def create_vtpms(self, vm_ref, vtpms):
-        if len(vtpms) > 1:
-            vtpms = [ vtpms[0] ]
-        log(DEBUG, "create_vtpms")
-        return map(lambda vtpm: self.create_vtpm(vm_ref, vtpm), vtpms)
-
-    def create_vtpm(self, vm_ref, vtpm):
-        vtpm_record = {
-            "VM":
-                vm_ref,
-            "backend":
-                vtpm.attributes["backend"].value
-        }
-        return server.xenapi.VTPM.create(vtpm_record)
 
     def create_consoles(self, vm_ref, consoles):
         log(DEBUG, "create_consoles")
@@ -632,9 +611,6 @@ class sxp2xml:
 
         vifs_sxp = map(lambda x: x[1], [device for device in devices
                                         if device[1][0] == "vif"])
-
-        vtpms_sxp = map(lambda x: x[1], [device for device in devices
-                                         if device[1][0] == "vtpm"])
 
         vfbs_sxp = map(lambda x: x[1], [device for device in devices
                                         if device[1][0] == "vfb"])
@@ -780,12 +756,6 @@ class sxp2xml:
 
         map(vm.appendChild, vifs)
 
-        # And now the vTPMs
-
-        vtpms = map(lambda vtpm: self.extract_vtpm(vtpm, document), vtpms_sxp)
-
-        map(vm.appendChild, vtpms)
-
         # And now the pcis
 
         pcis = self.extract_pcis(pcis_sxp, document)
@@ -922,15 +892,6 @@ class sxp2xml:
                 = get_child_by_name(vif_sxp, "bridge")
         
         return vif
-
-    def extract_vtpm(self, vtpm_sxp, document):
-
-        vtpm = document.createElement("vtpm")
-
-        vtpm.attributes["backend"] \
-             = get_child_by_name(vtpm_sxp, "backend", "0")
-
-        return vtpm
 
     def extract_vfb(self, vfb_sxp, document):
 

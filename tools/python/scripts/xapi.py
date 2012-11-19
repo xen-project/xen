@@ -58,7 +58,6 @@ COMMANDS = {
     'vdi-rename': ('<vdi_uuid> <new_name>', 'Rename VDI'),
     'vdi-destroy': ('<vdi_uuid>', 'Delete VDI'),
     'vif-create': ('<domname> <pycfg>', 'Create VIF attached to domname'),
-    'vtpm-create' : ('<domname> <pycfg>', 'Create VTPM attached to domname'),
 
     'vm-create': ('<pycfg>', 'Create VM with python config'),
     'vm-destroy': ('<domname>', 'Delete VM'),
@@ -284,22 +283,16 @@ def xapi_vm_list(args, async = False):
         if is_long:
             vbds = vm_info['VBDs']
             vifs = vm_info['VIFs']
-            vtpms = vm_info['VTPMs']
             vif_infos = []
             vbd_infos = []
-            vtpm_infos = []
             for vbd in vbds:
                 vbd_info = execute(server, 'VBD.get_record', (session, vbd))
                 vbd_infos.append(vbd_info)
             for vif in vifs:
                 vif_info = execute(server, 'VIF.get_record', (session, vif))
                 vif_infos.append(vif_info)
-            for vtpm in vtpms:
-                vtpm_info = execute(server, 'VTPM.get_record', (session, vtpm))
-                vtpm_infos.append(vtpm_info)
             vm_info['VBDs'] = vbd_infos
             vm_info['VIFs'] = vif_infos
-            vm_info['VTPMs'] = vtpm_infos
             pprint(vm_info)
         else:
             print VM_LIST_FORMAT % _stringify(vm_info)
@@ -659,19 +652,6 @@ def xapi_vdi_rename(args, async = False):
         print 'Task started: %s' % result
     else:
         print 'Done.'
-
-
-
-def xapi_vtpm_create(args, async = False):
-    server, session = connect()
-    domname = args[0]
-    cfg = _read_python_cfg(args[1])
-
-    vm_uuid = resolve_vm(server, session, domname)
-    cfg['VM'] = vm_uuid
-    print "Creating vTPM with cfg = %s" % cfg
-    vtpm_uuid = execute(server, 'VTPM.create', (session, cfg))
-    print "Done. (%s)" % vtpm_uuid
 
 
 def xapi_pif_list(args, async = False):

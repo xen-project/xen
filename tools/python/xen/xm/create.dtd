@@ -38,7 +38,6 @@
                  memory,
                  vbd*,
                  vif*,
-                 vtpm*,
                  pci*,
                  vscsi*,
                  console*,
@@ -81,9 +80,6 @@
                  qos_algorithm_type CDATA    #REQUIRED
                  network         CDATA       #IMPLIED
                  security_label  CDATA       #IMPLIED>
-
-<!ELEMENT vtpm   (name*)>
-<!ATTLIST vtpm   backend         CDATA #REQUIRED>
 
 <!ELEMENT pci    (pci_opt*)>
 <!ATTLIST pci    domain          CDATA #REQUIRED

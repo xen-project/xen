@@ -204,7 +204,6 @@ SUBCOMMAND_HELP = {
     'vnet-create'   :  ('<ConfigFile>','Create a vnet from ConfigFile.'),
     'vnet-delete'   :  ('<VnetId>', 'Delete a Vnet.'),
     'vnet-list'     :  ('[-l|--long]', 'List Vnets.'),
-    'vtpm-list'     :  ('<Domain> [--long]', 'List virtual TPM devices.'),
     'pci-attach'    :  ('[-o|--options=<opt>] <Domain> <domain:bus:slot.func> [virtual slot]',
                         'Insert a new pass-through pci device.'),
     'pci-detach'    :  ('<Domain> <domain:bus:slot.func>',
@@ -469,7 +468,6 @@ device_commands = [
     "network2-attach",
     "network2-detach",
     "network2-list",
-    "vtpm-list",
     "pci-attach",
     "pci-detach",
     "pci-list",
@@ -2392,39 +2390,6 @@ def xm_block_list(args):
                    "%(be-path)-30s  "
                    % ni)
 
-def xm_vtpm_list(args):
-    (use_long, params) = arg_check_for_resource_list(args, "vtpm-list")
-
-    dom = params[0]
-
-    if serverType == SERVER_XEN_API:
-        vtpm_refs = server.xenapi.VM.get_VTPMs(get_single_vm(dom))
-        vtpm_properties = \
-            map(server.xenapi.VTPM.get_runtime_properties, vtpm_refs)
-        devs = map(lambda (handle, properties): [handle, map2sxp(properties)],
-                   zip(range(len(vtpm_properties)), vtpm_properties))
-    else:
-        devs = server.xend.domain.getDeviceSxprs(dom, 'vtpm')
-
-    if use_long:
-        map(PrettyPrint.prettyprint, devs)
-    else:
-        hdr = 0
-        for x in devs:
-            if hdr == 0:
-                print 'Idx  BE handle state evt-ch ring-ref BE-path'
-                hdr = 1
-            ni = parse_dev_info(x[1])
-            ni['idx'] = int(x[0])
-            print ("%(idx)-3d   "
-                   "%(backend-id)-3d  "
-                   "%(handle)-3d   "
-                   "%(state)-3d    "
-                   "%(event-ch)-3d    "
-                   "%(ring-ref)-5d "
-                   "%(be-path)-30s  "
-                   % ni)
-
 def attached_pci_dict_bin(dom):
     devs = []
     if serverType == SERVER_XEN_API:
@@ -3854,8 +3819,6 @@ commands = {
     "vnet-list": xm_vnet_list,
     "vnet-create": xm_vnet_create,
     "vnet-delete": xm_vnet_delete,
-    # vtpm
-    "vtpm-list": xm_vtpm_list,
     #pci
     "pci-attach": xm_pci_attach,
     "pci-detach": xm_pci_detach,

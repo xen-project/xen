@@ -417,7 +417,6 @@ class XendConfig(dict):
             'console_refs': [],
             'vif_refs': [],
             'vbd_refs': [],
-            'vtpm_refs': [],
             'other_config': {},
             'platform': {},
             'target': 0,
@@ -937,7 +936,6 @@ class XendConfig(dict):
         self['console_refs'] = cfg.get('console_refs', [])
         self['vif_refs'] = cfg.get('vif_refs', [])
         self['vbd_refs'] = cfg.get('vbd_refs', [])
-        self['vtpm_refs'] = cfg.get('vtpm_refs', [])
 
         # coalesce hvm vnc frame buffer with vfb config
         if self.is_hvm() and int(self['platform'].get('vnc', 0)) != 0:
@@ -1488,7 +1486,7 @@ class XendConfig(dict):
 
             # store dev references by uuid for certain device types
             target['devices'][dev_uuid] = (dev_type, dev_info)
-            if dev_type in ('vif', 'vbd', 'vtpm'):
+            if dev_type in ('vif', 'vbd'):
                 param = '%s_refs' % dev_type
                 if param not in target:
                     target[param] = []
@@ -1629,18 +1627,6 @@ class XendConfig(dict):
                 dev_info['uuid'] = dev_uuid
                 target['devices'][dev_uuid] = (dev_type, dev_info)
                 target['vbd_refs'].append(dev_uuid)                
-
-            elif dev_type == 'vtpm':
-                if cfg_xenapi.get('type'):
-                    dev_info['type'] = cfg_xenapi.get('type')
-
-                dev_uuid = cfg_xenapi.get('uuid', None)
-                if not dev_uuid:
-                    dev_uuid = uuid.createString()
-                dev_info['uuid'] = dev_uuid
-                dev_info['other_config'] = cfg_xenapi.get('other_config', {})
-                target['devices'][dev_uuid] = (dev_type, dev_info)
-                target['vtpm_refs'].append(dev_uuid)
 
             elif dev_type == 'console':
                 dev_uuid = cfg_xenapi.get('uuid', None)
@@ -2078,8 +2064,7 @@ class XendConfig(dict):
 
         result.extend(target.get('console_refs', []) +
                       target.get('vbd_refs', []) +
-                      target.get('vif_refs', []) +
-                      target.get('vtpm_refs', []))
+                      target.get('vif_refs', []))
 
         result.extend([u for u in target['devices'].keys() if u not in result])
         return result
