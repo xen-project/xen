@@ -278,8 +278,12 @@ paging:
 	ldr   r4, =boot_httbr        /* VA of HTTBR value stashed by CPU 0 */
 	add   r4, r4, r10            /* PA of it */
 	ldrd  r4, r5, [r4]           /* Actual value */
+	dsb
 	mcrr  CP64(r4, r5, HTTBR)
+	dsb
+	isb
 	mcr   CP32(r0, TLBIALLH)     /* Flush hypervisor TLB */
+	mcr   CP32(r0, ICIALLU)      /* Flush I-cache */
 	mcr   CP32(r0, BPIALL)       /* Flush branch predictor */
 	dsb                          /* Ensure completion of TLB+BP flush */
 	isb
@@ -291,6 +295,8 @@ paging:
 	strex r2, r1, [r0]           /*            { writeback            } */
 	teq   r2, #0
 	bne   1b
+	dsb
+	mcr   CP32(r0, DCCMVAC)      /* flush D-Cache */
 	dsb
 
 	/* Here, the non-boot CPUs must wait again -- they're now running on

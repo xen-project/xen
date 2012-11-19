@@ -228,27 +228,74 @@ static inline lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr)
     return e;
 }
 
-/* Write a pagetable entry */
+/* Write a pagetable entry.
+ *
+ * If the table entry is changing a text mapping, it is responsibility
+ * of the caller to issue an ISB after write_pte.
+ */
 static inline void write_pte(lpae_t *p, lpae_t pte)
 {
     asm volatile (
+        /* Ensure any writes have completed with the old mappings. */
+        "dsb;"
         /* Safely write the entry (STRD is atomic on CPUs that support LPAE) */
         "strd %0, %H0, [%1];"
+        "dsb;"
         /* Push this cacheline to the PoC so the rest of the system sees it. */
         STORE_CP32(1, DCCMVAC)
+        /* Ensure that the data flush is completed before proceeding */
+        "dsb;"
         : : "r" (pte.bits), "r" (p) : "memory");
 }
 
+
+/* Function for flushing medium-sized areas.
+ * if 'range' is large enough we might want to use model-specific
+ * full-cache flushes. */
+static inline void flush_xen_dcache_va_range(void *p, unsigned long size)
+{
+    int cacheline_bytes  = READ_CP32(CCSIDR);
+    void *end;
+    dsb();           /* So the CPU issues all writes to the range */
+    for ( end = p + size; p < end; p += cacheline_bytes )
+        WRITE_CP32((uint32_t) p, DCCMVAC);
+    dsb();           /* So we know the flushes happen before continuing */
+}
+
+
+/* Macro for flushing a single small item.  The predicate is always
+ * compile-time constant so this will compile down to 3 instructions in
+ * the common case.  Make sure to call it with the correct type of
+ * pointer! */
+#define flush_xen_dcache_va(p) do {                                     \
+    int cacheline_bytes  = READ_CP32(CCSIDR);                           \
+    typeof(p) _p = (p);                                                 \
+    if ( ((unsigned long)_p & ~(cacheline_bytes - 1)) !=                \
+        (((unsigned long)_p + (sizeof *_p)) & ~(cacheline_bytes - 1)) ) \
+        flush_xen_dcache_va_range(_p, sizeof *_p);                      \
+    else                                                                \
+        asm volatile (                                                  \
+            "dsb;"   /* Finish all earlier writes */                    \
+            STORE_CP32(0, DCCMVAC)                                      \
+            "dsb;"   /* Finish flush before continuing */               \
+            : : "r" (_p), "m" (*_p));                                   \
+} while (0)
+
+
 /*
  * Flush all hypervisor mappings from the TLB and branch predictor.
- * This is needed after changing Xen code mappings. 
+ * This is needed after changing Xen code mappings.
+ *
+ * The caller needs to issue the necessary DSB and D-cache flushes
+ * before calling flush_xen_text_tlb.
  */
 static inline void flush_xen_text_tlb(void)
 {
     register unsigned long r0 asm ("r0");
     asm volatile (
-        "dsb;"                        /* Ensure visibility of PTE writes */
+        "isb;"                        /* Ensure synchronization with previous changes to text */
         STORE_CP32(0, TLBIALLH)       /* Flush hypervisor TLB */
+        STORE_CP32(0, ICIALLU)        /* Flush I-cache */
         STORE_CP32(0, BPIALL)         /* Flush branch predictor */
         "dsb;"                        /* Ensure completion of TLB+BP flush */
         "isb;"

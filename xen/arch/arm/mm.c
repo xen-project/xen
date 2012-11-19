@@ -247,14 +247,13 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 
     /* Change pagetables to the copy in the relocated Xen */
     boot_httbr = (unsigned long) xen_pgtable + phys_offset;
-    asm volatile (
-        STORE_CP64(0, HTTBR)          /* Change translation base */
-        "dsb;"                        /* Ensure visibility of HTTBR update */
-        STORE_CP32(0, TLBIALLH)       /* Flush hypervisor TLB */
-        STORE_CP32(0, BPIALL)         /* Flush branch predictor */
-        "dsb;"                        /* Ensure completion of TLB+BP flush */
-        "isb;"
-        : : "r" (boot_httbr) : "memory");
+    flush_xen_dcache_va(&boot_httbr);
+    flush_xen_dcache_va_range((void*)dest_va, _end - _start);
+    flush_xen_text_tlb();
+
+    WRITE_CP64(boot_httbr, HTTBR); /* Change translation base */
+    dsb();                         /* Ensure visibility of HTTBR update */
+    flush_xen_text_tlb();
 
     /* Undo the temporary map */
     pte.bits = 0;
@@ -294,11 +293,12 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
                            >> PAGE_SHIFT);
     pte.pt.table = 1;
     write_pte(xen_second + second_linear_offset(XEN_VIRT_START), pte);
-    /* Have changed a mapping used for .text. Flush everything for safety. */
-    flush_xen_text_tlb();
+    /* TLBFLUSH and ISB would be needed here, but wait until we set WXN */
 
     /* From now on, no mapping may be both writable and executable. */
     WRITE_CP32(READ_CP32(HSCTLR) | SCTLR_WXN, HSCTLR);
+    /* Flush everything after setting WXN bit. */
+    flush_xen_text_tlb();
 }
 
 /* MMU setup for secondary CPUS (which already have paging enabled) */
@@ -306,6 +306,7 @@ void __cpuinit mmu_init_secondary_cpu(void)
 {
     /* From now on, no mapping may be both writable and executable. */
     WRITE_CP32(READ_CP32(HSCTLR) | SCTLR_WXN, HSCTLR);
+    flush_xen_text_tlb();
 }
 
 /* Create Xen's mappings of memory.
