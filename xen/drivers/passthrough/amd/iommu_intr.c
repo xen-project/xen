@@ -263,7 +263,7 @@ void amd_iommu_ioapic_update_ire(
 }
 
 static void update_intremap_entry_from_msi_msg(
-    struct amd_iommu *iommu, u8 bdf,
+    struct amd_iommu *iommu, u16 bdf,
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
     unsigned long flags;
