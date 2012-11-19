@@ -360,45 +360,54 @@ int write(int fd, const void *buf, size_t nbytes)
 
 off_t lseek(int fd, off_t offset, int whence)
 {
+    off_t* target = NULL;
     switch(files[fd].type) {
-#if defined(CONFIG_BLKFRONT) || defined(CONFIG_TPMFRONT) || defined(CONFIG_TPM_TIS)
 #ifdef CONFIG_BLKFRONT
        case FTYPE_BLK:
+          target = &files[fd].blk.offset;
+          break;
 #endif
-#ifdef CONFIG_TPMFRNT
+#ifdef CONFIG_TPMFRONT
        case FTYPE_TPMFRONT:
+          target = &files[fd].tpmfront.offset;
+          break;
 #endif
 #ifdef CONFIG_TPM_TIS
        case FTYPE_TPM_TIS:
+          target = &files[fd].tpm_tis.offset;
+          break;
 #endif
-	  switch (whence) {
-	     case SEEK_SET:
-		files[fd].file.offset = offset;
-		break;
-	     case SEEK_CUR:
-		files[fd].file.offset += offset;
-		break;
-	     case SEEK_END:
-		{
-		   struct stat st;
-		   int ret;
-		   ret = fstat(fd, &st);
-		   if (ret)
-		      return -1;
-		   files[fd].file.offset = st.st_size + offset;
-		   break;
-		}
-	     default:
-		errno = EINVAL;
-		return -1;
-	  }
-	  return files[fd].file.offset;
-	  break;
-#endif
-       default: /* Not implemented on this FTYPE */
-	  errno = ESPIPE;
-	  return (off_t) -1;
+       case FTYPE_FILE:
+          target = &files[fd].file.offset;
+          break;
+       default:
+          /* Not implemented for this filetype */
+          errno = ESPIPE;
+          return (off_t) -1;
     }
+
+    switch (whence) {
+       case SEEK_SET:
+          *target = offset;
+          break;
+       case SEEK_CUR:
+          *target += offset;
+          break;
+       case SEEK_END:
+          {
+             struct stat st;
+             int ret;
+             ret = fstat(fd, &st);
+             if (ret)
+                return -1;
+             *target = st.st_size + offset;
+             break;
+          }
+       default:
+          errno = EINVAL;
+          return -1;
+    }
+    return *target;
 }
 
 int fsync(int fd) {
