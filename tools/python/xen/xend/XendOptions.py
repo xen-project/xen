@@ -349,6 +349,10 @@ class XendOptions:
         else:
             return None
 
+    def get_external_migration_tool(self):
+        """@return the name of the tool to handle virtual device migration."""
+        return self.get_config_string('external-migration-tool', self.external_migration_tool_default)
+
     def get_enable_dump(self):
         return self.get_config_bool('enable-dump', 'no')
 

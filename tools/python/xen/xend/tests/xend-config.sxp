@@ -127,3 +127,5 @@
 # Whether to enable core-dumps when domains crash.
 #(enable-dump no)
 
+# The tool used for initiating virtual device migration
+#(external-migration-tool '')
