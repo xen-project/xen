@@ -237,7 +237,7 @@ static void hpet_msi_unmask(struct irq_desc *desc)
     struct hpet_event_channel *ch = desc->action->dev_id;
 
     cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
-    cfg |= HPET_TN_FSB;
+    cfg |= HPET_TN_ENABLE;
     hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
     ch->msi.msi_attrib.masked = 0;
 }
@@ -248,7 +248,7 @@ static void hpet_msi_mask(struct irq_desc *desc)
     struct hpet_event_channel *ch = desc->action->dev_id;
 
     cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
-    cfg &= ~HPET_TN_FSB;
+    cfg &= ~HPET_TN_ENABLE;
     hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
     ch->msi.msi_attrib.masked = 1;
 }
@@ -328,6 +328,7 @@ static void __hpet_setup_msi_irq(struct irq_desc *desc)
 static int __init hpet_setup_msi_irq(struct hpet_event_channel *ch)
 {
     int ret;
+    u32 cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
     irq_desc_t *desc = irq_to_desc(ch->msi.irq);
 
     if ( iommu_intremap )
@@ -337,6 +338,11 @@ static int __init hpet_setup_msi_irq(struct hpet_event_channel *ch)
         if ( ret )
             return ret;
     }
+
+    /* set HPET Tn as oneshot */
+    cfg &= ~(HPET_TN_LEVEL | HPET_TN_PERIODIC);
+    cfg |= HPET_TN_FSB | HPET_TN_32BIT;
+    hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
 
     desc->handler = &hpet_msi_type;
     ret = request_irq(ch->msi.irq, hpet_interrupt_handler, 0, "HPET", ch);
@@ -392,17 +398,6 @@ static void __init hpet_fsb_cap_lookup(void)
         /* Only consider HPET timer with MSI support */
         if ( !(cfg & HPET_TN_FSB_CAP) )
             continue;
-
-        /* hpet_setup(), via hpet_resume(), attempted to clear HPET_TN_FSB, so
-         * if it is still set... */
-        if ( !(cfg & HPET_TN_FSB) )
-            ch->msi.msi_attrib.maskbit = 1;
-        else
-        {
-            ch->msi.msi_attrib.maskbit = 0;
-            printk(XENLOG_WARNING "HPET: channel %u is not maskable (%04x)\n",
-                   i, cfg);
-        }
 
         if ( !zalloc_cpumask_var(&ch->cpumask) )
         {
@@ -570,11 +565,14 @@ void __init hpet_broadcast_init(void)
 
     for ( i = 0; i < n; i++ )
     {
-        /* set HPET Tn as oneshot */
-        cfg = hpet_read32(HPET_Tn_CFG(hpet_events[i].idx));
-        cfg &= ~(HPET_TN_LEVEL | HPET_TN_PERIODIC);
-        cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
-        hpet_write32(cfg, HPET_Tn_CFG(hpet_events[i].idx));
+        if ( i == 0 && (cfg & HPET_CFG_LEGACY) )
+        {
+            /* set HPET T0 as oneshot */
+            cfg = hpet_read32(HPET_Tn_CFG(0));
+            cfg &= ~(HPET_TN_LEVEL | HPET_TN_PERIODIC);
+            cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
+            hpet_write32(cfg, HPET_Tn_CFG(0));
+        }
 
         /*
          * The period is a femto seconds value. We need to calculate the scaled
@@ -588,6 +586,7 @@ void __init hpet_broadcast_init(void)
         wmb();
         hpet_events[i].event_handler = handle_hpet_broadcast;
 
+        hpet_events[i].msi.msi_attrib.maskbit = 1;
         hpet_events[i].msi.msi_attrib.pos = MSI_TYPE_HPET;
     }
 
@@ -633,6 +632,8 @@ void hpet_broadcast_resume(void)
         cfg = hpet_read32(HPET_Tn_CFG(hpet_events[i].idx));
         cfg &= ~(HPET_TN_LEVEL | HPET_TN_PERIODIC);
         cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
+        if ( !(hpet_events[i].flags & HPET_EVT_LEGACY) )
+            cfg |= HPET_TN_FSB;
         hpet_write32(cfg, HPET_Tn_CFG(hpet_events[i].idx));
 
         hpet_events[i].next_event = STIME_MAX;
@@ -811,10 +812,7 @@ void hpet_resume(u32 *boot_cfg)
     {
         cfg = hpet_read32(HPET_Tn_CFG(i));
         if ( boot_cfg )
-        {
             boot_cfg[i + 1] = cfg;
-            cfg &= ~HPET_TN_FSB;
-        }
         cfg &= ~HPET_TN_ENABLE;
         if ( cfg & HPET_TN_RESERVED )
         {
