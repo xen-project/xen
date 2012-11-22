@@ -109,6 +109,14 @@ struct msi_desc {
 	int remap_index;		/* index in interrupt remapping table */
 };
 
+/*
+ * Values stored into msi_desc.msi_attrib.pos for non-PCI devices
+ * (msi_desc.msi_attrib.type is zero):
+ */
+#define MSI_TYPE_UNKNOWN 0
+#define MSI_TYPE_HPET    1
+#define MSI_TYPE_IOMMU   2
+
 int msi_maskable_irq(const struct msi_desc *);
 int msi_free_irq(struct msi_desc *entry);
 

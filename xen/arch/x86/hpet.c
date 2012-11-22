@@ -239,6 +239,7 @@ static void hpet_msi_unmask(struct irq_desc *desc)
     cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
     cfg |= HPET_TN_FSB;
     hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
+    ch->msi.msi_attrib.masked = 0;
 }
 
 static void hpet_msi_mask(struct irq_desc *desc)
@@ -249,6 +250,7 @@ static void hpet_msi_mask(struct irq_desc *desc)
     cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
     cfg &= ~HPET_TN_FSB;
     hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
+    ch->msi.msi_attrib.masked = 1;
 }
 
 static void hpet_msi_write(struct hpet_event_channel *ch, struct msi_msg *msg)
@@ -346,6 +348,7 @@ static int __init hpet_setup_msi_irq(struct hpet_event_channel *ch)
     }
 
     __hpet_setup_msi_irq(desc);
+    desc->msi_desc = &ch->msi;
 
     return 0;
 }
@@ -389,6 +392,17 @@ static void __init hpet_fsb_cap_lookup(void)
         /* Only consider HPET timer with MSI support */
         if ( !(cfg & HPET_TN_FSB_CAP) )
             continue;
+
+        /* hpet_setup(), via hpet_resume(), attempted to clear HPET_TN_FSB, so
+         * if it is still set... */
+        if ( !(cfg & HPET_TN_FSB) )
+            ch->msi.msi_attrib.maskbit = 1;
+        else
+        {
+            ch->msi.msi_attrib.maskbit = 0;
+            printk(XENLOG_WARNING "HPET: channel %u is not maskable (%04x)\n",
+                   i, cfg);
+        }
 
         if ( !zalloc_cpumask_var(&ch->cpumask) )
         {
@@ -573,6 +587,8 @@ void __init hpet_broadcast_init(void)
         spin_lock_init(&hpet_events[i].lock);
         wmb();
         hpet_events[i].event_handler = handle_hpet_broadcast;
+
+        hpet_events[i].msi.msi_attrib.pos = MSI_TYPE_HPET;
     }
 
     if ( !num_hpets_used )
@@ -795,7 +811,10 @@ void hpet_resume(u32 *boot_cfg)
     {
         cfg = hpet_read32(HPET_Tn_CFG(i));
         if ( boot_cfg )
+        {
             boot_cfg[i + 1] = cfg;
+            cfg &= ~HPET_TN_FSB;
+        }
         cfg &= ~HPET_TN_ENABLE;
         if ( cfg & HPET_TN_RESERVED )
         {

@@ -1119,17 +1119,17 @@ static void dump_msi(unsigned char key)
 {
     unsigned int irq;
 
-    printk("PCI-MSI interrupt information:\n");
+    printk("MSI information:\n");
 
     for ( irq = 0; irq < nr_irqs; irq++ )
     {
         struct irq_desc *desc = irq_to_desc(irq);
         const struct msi_desc *entry;
         u32 addr, data, dest32;
-        int mask;
+        char mask;
         struct msi_attrib attr;
         unsigned long flags;
-        char type;
+        const char *type = "???";
 
         if ( !irq_desc_initialized(desc) )
             continue;
@@ -1145,21 +1145,30 @@ static void dump_msi(unsigned char key)
 
         switch ( entry->msi_attrib.type )
         {
-        case PCI_CAP_ID_MSI: type = ' '; break;
-        case PCI_CAP_ID_MSIX: type = 'X'; break;
-        default: type = '?'; break;
+        case PCI_CAP_ID_MSI: type = "MSI"; break;
+        case PCI_CAP_ID_MSIX: type = "MSI-X"; break;
+        case 0:
+            switch ( entry->msi_attrib.pos )
+            {
+            case MSI_TYPE_HPET: type = "HPET"; break;
+            case MSI_TYPE_IOMMU: type = "IOMMU"; break;
+            }
+            break;
         }
 
         data = entry->msg.data;
         addr = entry->msg.address_lo;
         dest32 = entry->msg.dest32;
         attr = entry->msi_attrib;
-        mask = msi_get_mask_bit(entry);
+        if ( entry->msi_attrib.type )
+            mask = msi_get_mask_bit(entry) ? '1' : '0';
+        else
+            mask = '?';
 
         spin_unlock_irqrestore(&desc->lock, flags);
 
-        printk(" MSI%c %4u vec=%02x%7s%6s%3sassert%5s%7s"
-               " dest=%08x mask=%d/%d/%d\n",
+        printk(" %-6s%4u vec=%02x%7s%6s%3sassert%5s%7s"
+               " dest=%08x mask=%d/%d/%c\n",
                type, irq,
                (data & MSI_DATA_VECTOR_MASK) >> MSI_DATA_VECTOR_SHIFT,
                data & MSI_DATA_DELIVERY_LOWPRI ? "lowest" : "fixed",
