@@ -1,0 +1,204 @@
+#ifdef VMAP_VIRT_START
+#include <xen/bitmap.h>
+#include <xen/cache.h>
+#include <xen/init.h>
+#include <xen/mm.h>
+#include <xen/pfn.h>
+#include <xen/spinlock.h>
+#include <xen/types.h>
+#include <xen/vmap.h>
+#include <asm/page.h>
+
+static DEFINE_SPINLOCK(vm_lock);
+static void *__read_mostly vm_base;
+#define vm_bitmap ((unsigned long *)vm_base)
+/* highest allocated bit in the bitmap */
+static unsigned int __read_mostly vm_top;
+/* total number of bits in the bitmap */
+static unsigned int __read_mostly vm_end;
+/* lowest known clear bit in the bitmap */
+static unsigned int vm_low;
+
+void __init vm_init(void)
+{
+    unsigned int i, nr;
+    unsigned long va;
+
+    vm_base = (void *)VMAP_VIRT_START;
+    vm_end = PFN_DOWN(arch_vmap_virt_end() - vm_base);
+    vm_low = PFN_UP((vm_end + 7) / 8);
+    nr = PFN_UP((vm_low + 7) / 8);
+    vm_top = nr * PAGE_SIZE * 8;
+
+    for ( i = 0, va = (unsigned long)vm_bitmap; i < nr; ++i, va += PAGE_SIZE )
+    {
+        struct page_info *pg = alloc_domheap_page(NULL, 0);
+
+        map_pages_to_xen(va, page_to_mfn(pg), 1, PAGE_HYPERVISOR);
+        clear_page((void *)va);
+    }
+    bitmap_fill(vm_bitmap, vm_low);
+
+    /* Populate page tables for the bitmap if necessary. */
+    map_pages_to_xen(va, 0, vm_low - nr, MAP_SMALL_PAGES);
+}
+
+void *vm_alloc(unsigned int nr, unsigned int align)
+{
+    unsigned int start, bit;
+
+    if ( !align )
+        align = 1;
+    else if ( align & (align - 1) )
+        align &= -align;
+
+    spin_lock(&vm_lock);
+    for ( ; ; )
+    {
+        struct page_info *pg;
+
+        ASSERT(!test_bit(vm_low, vm_bitmap));
+        for ( start = vm_low; ; )
+        {
+            bit = find_next_bit(vm_bitmap, vm_top, start + 1);
+            if ( bit > vm_top )
+                bit = vm_top;
+            /*
+             * Note that this skips the first bit, making the
+             * corresponding page a guard one.
+             */
+            start = (start + align) & ~(align - 1);
+            if ( start + nr <= bit )
+                break;
+            start = bit < vm_top ?
+                    find_next_zero_bit(vm_bitmap, vm_top, bit + 1) : bit;
+            if ( start >= vm_top )
+                break;
+        }
+
+        if ( start < vm_top )
+            break;
+
+        spin_unlock(&vm_lock);
+
+        if ( vm_top >= vm_end )
+            return NULL;
+
+        pg = alloc_domheap_page(NULL, 0);
+        if ( !pg )
+            return NULL;
+
+        spin_lock(&vm_lock);
+
+        if ( start >= vm_top )
+        {
+            unsigned long va = (unsigned long)vm_bitmap + vm_top / 8;
+
+            if ( !map_pages_to_xen(va, page_to_mfn(pg), 1, PAGE_HYPERVISOR) )
+            {
+                clear_page((void *)va);
+                vm_top += PAGE_SIZE * 8;
+                if ( vm_top > vm_end )
+                    vm_top = vm_end;
+                continue;
+            }
+        }
+
+        free_domheap_page(pg);
+
+        if ( start >= vm_top )
+        {
+            spin_unlock(&vm_lock);
+            return NULL;
+        }
+    }
+
+    for ( bit = start; bit < start + nr; ++bit )
+        __set_bit(bit, vm_bitmap);
+    if ( start <= vm_low + 2 )
+        vm_low = bit;
+    spin_unlock(&vm_lock);
+
+    return vm_base + start * PAGE_SIZE;
+}
+
+static unsigned int vm_index(const void *va)
+{
+    unsigned long addr = (unsigned long)va & ~(PAGE_SIZE - 1);
+    unsigned int idx;
+
+    if ( addr < VMAP_VIRT_START + (vm_end / 8) ||
+         addr >= VMAP_VIRT_START + vm_top * PAGE_SIZE )
+        return 0;
+
+    idx = PFN_DOWN(va - vm_base);
+    return !test_bit(idx - 1, vm_bitmap) &&
+           test_bit(idx, vm_bitmap) ? idx : 0;
+}
+
+static unsigned int vm_size(const void *va)
+{
+    unsigned int start = vm_index(va), end;
+
+    if ( !start )
+        return 0;
+
+    end = find_next_zero_bit(vm_bitmap, vm_top, start + 1);
+
+    return min(end, vm_top) - start;
+}
+
+void vm_free(const void *va)
+{
+    unsigned int bit = vm_index(va);
+
+    if ( !bit )
+    {
+        WARN_ON(va != NULL);
+        return;
+    }
+
+    spin_lock(&vm_lock);
+    if ( bit < vm_low )
+    {
+        vm_low = bit - 1;
+        while ( !test_bit(vm_low - 1, vm_bitmap) )
+            --vm_low;
+    }
+    while ( __test_and_clear_bit(bit, vm_bitmap) )
+        if ( ++bit == vm_top )
+            break;
+    spin_unlock(&vm_lock);
+}
+
+void *__vmap(const unsigned long *mfn, unsigned int granularity,
+             unsigned int nr, unsigned int align, unsigned int flags)
+{
+    void *va = vm_alloc(nr * granularity, align);
+    unsigned long cur = (unsigned long)va;
+
+    for ( ; va && nr--; ++mfn, cur += PAGE_SIZE * granularity )
+    {
+        if ( map_pages_to_xen(cur, *mfn, granularity, flags) )
+        {
+            vunmap(va);
+            va = NULL;
+        }
+    }
+
+    return va;
+}
+
+void *vmap(const unsigned long *mfn, unsigned int nr)
+{
+    return __vmap(mfn, 1, nr, 1, PAGE_HYPERVISOR);
+}
+
+void vunmap(const void *va)
+{
+    unsigned long addr = (unsigned long)va;
+
+    destroy_xen_mappings(addr, addr + PAGE_SIZE * vm_size(va));
+    vm_free(va);
+}
+#endif

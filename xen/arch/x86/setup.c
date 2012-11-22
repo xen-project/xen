@@ -1104,6 +1104,7 @@ void __init __start_xen(unsigned long mbi_p)
     end_boot_allocator();
     system_state = SYS_STATE_boot;
 
+    vm_init();
     vesa_init();
 
     softirq_init();

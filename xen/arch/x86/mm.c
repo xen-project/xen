@@ -100,6 +100,7 @@
 #include <xen/iocap.h>
 #include <xen/guest_access.h>
 #include <xen/pfn.h>
+#include <xen/vmap.h>
 #include <xen/xmalloc.h>
 #include <xen/efi.h>
 #include <xen/grant_table.h>
@@ -5458,6 +5459,32 @@ void __set_fixmap(
 {
     BUG_ON(idx >= __end_of_fixed_addresses);
     map_pages_to_xen(fix_to_virt(idx), mfn, 1, flags);
+}
+
+void *__init arch_vmap_virt_end(void)
+{
+    return (void *)fix_to_virt(__end_of_fixed_addresses);
+}
+
+void __iomem *ioremap(paddr_t pa, size_t len)
+{
+    unsigned long pfn = PFN_DOWN(pa);
+    void *va;
+
+    WARN_ON(page_is_ram_type(pfn, RAM_TYPE_CONVENTIONAL));
+
+    /* The low first Mb is always mapped. */
+    if ( !((pa + len - 1) >> 20) )
+        va = __va(pa);
+    else
+    {
+        unsigned int offs = pa & (PAGE_SIZE - 1);
+        unsigned int nr = PFN_UP(offs + len);
+
+        va = __vmap(&pfn, nr, 1, 1, PAGE_HYPERVISOR_NOCACHE) + offs;
+    }
+
+    return (void __force __iomem *)va;
 }
 
 #ifdef MEMORY_GUARD

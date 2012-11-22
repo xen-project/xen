@@ -15,7 +15,7 @@
 #include <xen/config.h>
 #include <asm/page.h>
 
-#define FIXADDR_TOP (IOREMAP_VIRT_END - PAGE_SIZE)
+#define FIXADDR_TOP (VMAP_VIRT_END - PAGE_SIZE)
 
 #ifndef __ASSEMBLY__
 

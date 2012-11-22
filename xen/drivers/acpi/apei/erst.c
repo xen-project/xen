@@ -247,9 +247,6 @@ static int erst_exec_move_data(struct apei_exec_context *ctx,
 {
 	int rc;
 	u64 offset;
-#ifdef CONFIG_X86
-	enum fixed_addresses idx;
-#endif
 	void *src, *dst;
 
 	/* ioremap does not work in interrupt context */
@@ -263,39 +260,11 @@ static int erst_exec_move_data(struct apei_exec_context *ctx,
 	if (rc)
 		return rc;
 
-#ifdef CONFIG_X86
-	switch (ctx->var2) {
-	case 0:
-		return 0;
-	case 1 ... PAGE_SIZE:
-		break;
-	default:
-		printk(KERN_WARNING
-		       "MOVE_DATA cannot be used for %#"PRIx64" bytes of data\n",
-		       ctx->var2);
-		return -EOPNOTSUPP;
-	}
-
-	src = __acpi_map_table(ctx->src_base + offset, ctx->var2);
-#else
 	src = ioremap(ctx->src_base + offset, ctx->var2);
-#endif
 	if (!src)
 		return -ENOMEM;
 
-#ifdef CONFIG_X86
-	BUILD_BUG_ON(FIX_ACPI_PAGES < 4);
-	idx = virt_to_fix((unsigned long)src + 2 * PAGE_SIZE);
-	offset += ctx->dst_base;
-	dst = (void *)fix_to_virt(idx) + (offset & ~PAGE_MASK);
-	set_fixmap(idx, offset);
-	if (PFN_DOWN(offset) != PFN_DOWN(offset + ctx->var2 - 1)) {
-		idx = virt_to_fix((unsigned long)dst + PAGE_SIZE);
-		set_fixmap(idx, offset + PAGE_SIZE);
-	}
-#else
 	dst = ioremap(ctx->dst_base + offset, ctx->var2);
-#endif
 	if (dst) {
 		memmove(dst, src, ctx->var2);
 		iounmap(dst);

@@ -1,13 +1,9 @@
 #ifndef _ASM_IO_H
 #define _ASM_IO_H
 
-#include <xen/config.h>
+#include <xen/vmap.h>
 #include <xen/types.h>
 #include <asm/page.h>
-
-/* We don't need real ioremap() on Xen/x86. */
-#define ioremap(x,l) (__va(x))
-#define iounmap(p)   ((void)0)
 
 #define readb(x) (*(volatile char *)(x))
 #define readw(x) (*(volatile short *)(x))

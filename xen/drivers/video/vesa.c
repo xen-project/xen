@@ -10,6 +10,7 @@
 #include <xen/xmalloc.h>
 #include <xen/kernel.h>
 #include <xen/vga.h>
+#include <asm/io.h>
 #include <asm/page.h>
 #include "font.h"
 
@@ -101,13 +102,11 @@ void __init vesa_init(void)
     if ( !line_len )
         goto fail;
 
-    if ( map_pages_to_xen(IOREMAP_VIRT_START,
-                          vlfb_info.lfb_base >> PAGE_SHIFT,
-                          vram_remap >> PAGE_SHIFT,
-                          PAGE_HYPERVISOR_NOCACHE) )
+    lfb = ioremap(vlfb_info.lfb_base, vram_remap);
+    if ( !lfb )
         goto fail;
 
-    lfb = memset((void *)IOREMAP_VIRT_START, 0, vram_remap);
+    memset(lfb, 0, vram_remap);
 
     vga_puts = vesa_redraw_puts;
 
