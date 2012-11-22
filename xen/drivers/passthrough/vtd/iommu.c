@@ -1289,11 +1289,11 @@ int domain_context_mapping_one(
         {
             if ( pdev->domain != domain )
             {
-                dprintk(XENLOG_INFO VTDPREFIX, "d%d: bdf = %x:%x.%x owned by d%d!",
-                        domain->domain_id, 
-                        bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                        (pdev->domain)
-                        ? pdev->domain->domain_id : -1);
+                printk(XENLOG_G_INFO VTDPREFIX
+                       "d%d: %04x:%02x:%02x.%u owned by d%d!",
+                       domain->domain_id,
+                       seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                       pdev->domain ? pdev->domain->domain_id : -1);
                 res = -EINVAL;
             }
         }
@@ -1304,17 +1304,19 @@ int domain_context_mapping_one(
             
             if ( cdomain < 0 )
             {
-                dprintk(VTDPREFIX, "d%d: bdf = %x:%x.%x mapped, but can't find owner!\n",
-                        domain->domain_id, 
-                        bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
+                printk(XENLOG_G_WARNING VTDPREFIX
+                       "d%d: %04x:%02x:%02x.%u mapped, but can't find owner!\n",
+                       domain->domain_id,
+                       seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
                 res = -EINVAL;
             }
             else if ( cdomain != domain->domain_id )
             {
-                dprintk(XENLOG_INFO VTDPREFIX, "d%d: bdf = %x:%x.%x already mapped to d%d!",
-                        domain->domain_id, 
-                        bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
-                        cdomain);
+                printk(XENLOG_G_INFO VTDPREFIX
+                       "d%d: %04x:%02x:%02x.%u already mapped to d%d!",
+                       domain->domain_id,
+                       seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                       cdomain);
                 res = -EINVAL;
             }
         }
