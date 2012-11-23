@@ -593,7 +593,8 @@ static int cpupool_info(libxl__gc *gc,
     xcinfo = xc_cpupool_getinfo(CTX->xch, poolid);
     if (xcinfo == NULL)
     {
-        LOGE(ERROR, "failed to get info for cpupool%d\n", poolid);
+        if (exact || errno != ENOENT)
+            LOGE(ERROR, "failed to get info for cpupool%d\n", poolid);
         return ERROR_FAIL;
     }
 
