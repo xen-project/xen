@@ -104,7 +104,7 @@ class xPopen3:
             os.dup2(c2pwrite, 1)
             if capturestderr:
                 os.dup2(errin, 2)
-            self._run_child(cmd)
+            self._run_child(cmd, env)
         os.close(p2cread)
         self.tochild = os.fdopen(p2cwrite, 'w', bufsize)
         os.close(c2pwrite)
@@ -116,7 +116,7 @@ class xPopen3:
             self.childerr = None
         _active.append(self)
 
-    def _run_child(self, cmd):
+    def _run_child(self, cmd, env):
         if isinstance(cmd, basestring):
             cmd = ['/bin/sh', '-c', cmd]
         for i in range(3, MAXFD):
@@ -127,7 +127,6 @@ class xPopen3:
             except OSError:
                 pass
         try:
-            os.execvp(cmd[0], cmd)
             if env is None:
                 os.execvp(cmd[0], cmd)
             else:
