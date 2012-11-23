@@ -247,7 +247,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 
     /* Change pagetables to the copy in the relocated Xen */
     boot_httbr = (unsigned long) xen_pgtable + phys_offset;
-    flush_xen_dcache_va(&boot_httbr);
+    flush_xen_dcache(boot_httbr);
     flush_xen_dcache_va_range((void*)dest_va, _end - _start);
     flush_xen_text_tlb();
 

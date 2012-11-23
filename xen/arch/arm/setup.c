@@ -175,6 +175,21 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     end_boot_allocator();
 }
 
+size_t __read_mostly cacheline_bytes;
+
+/* Very early check of the CPU cache properties */
+void __init setup_cache(void)
+{
+    uint32_t ccsid;
+
+    /* Read the cache size ID register for the level-0 data cache */
+    WRITE_CP32(0, CSSELR);
+    ccsid = READ_CP32(CCSIDR);
+
+    /* Low 3 bits are log2(cacheline size in words) - 2. */
+    cacheline_bytes = 1U << (4 + (ccsid & 0x7));
+}
+
 /* C entry point for boot CPU */
 void __init start_xen(unsigned long boot_phys_offset,
                       unsigned long arm_type,
@@ -184,6 +199,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     void *fdt;
     size_t fdt_size;
     int cpus, i;
+
+    setup_cache();
 
     smp_clear_cpu_maps();
 

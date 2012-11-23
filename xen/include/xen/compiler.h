@@ -54,6 +54,10 @@
 
 #define offsetof(a,b) __builtin_offsetof(a,b)
 
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 201112L
+#define alignof __alignof__
+#endif
+
 /* &a[0] degrades to a pointer: a different type from an array */
 #define __must_be_array(a) \
   BUILD_BUG_ON_ZERO(__builtin_types_compatible_p(typeof(a), typeof(&a[0])))

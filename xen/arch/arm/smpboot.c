@@ -118,8 +118,8 @@ make_cpus_ready(unsigned int max_cpus, unsigned long boot_phys_offset)
         /* Tell the next CPU to get ready */
         /* TODO: handle boards where CPUIDs are not contiguous */
         *gate = i;
-        flush_xen_dcache_va(gate);
-        asm volatile("dsb; isb; sev");
+        flush_xen_dcache(*gate);
+        asm volatile("isb; sev");
         /* And wait for it to respond */
         while ( ready_cpus < i )
             smp_rmb();
@@ -217,8 +217,8 @@ int __cpu_up(unsigned int cpu)
     smp_up_cpu = cpu;
     /* we need to make sure that the change to smp_up_cpu is visible to
      * secondary cpus with D-cache off */
-    flush_xen_dcache_va(&smp_up_cpu);
-    asm volatile("dsb; isb; sev");
+    flush_xen_dcache(smp_up_cpu);
+    asm volatile("isb; sev");
 
     while ( !cpu_online(cpu) )
     {
