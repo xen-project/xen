@@ -140,8 +140,9 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
         : "a" ((u32)delta), "1" ((u32)(delta >> 32)), "2" (scale->mul_frac) );
 #else
     asm (
-        "mul %%rdx ; shrd $32,%%rdx,%%rax"
-        : "=a" (product) : "0" (delta), "d" ((u64)scale->mul_frac) );
+        "mul %2 ; shrd $32,%1,%0"
+        : "=a" (product), "=d" (delta)
+        : "rm" (delta), "0" ((u64)scale->mul_frac) );
 #endif
 
     return product;
