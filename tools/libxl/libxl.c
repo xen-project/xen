@@ -2354,6 +2354,7 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
 
     libxl__device device;
     const char * path;
+    char * tmp;
 
     flexarray_t *insert = NULL;
 
@@ -2384,8 +2385,11 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     disks = libxl_device_disk_list(ctx, domid, &num);
     for (i = 0; i < num; i++) {
         if (disks[i].is_cdrom && !strcmp(disk->vdev, disks[i].vdev))
-            /* found */
+        {
+            /* Found.  Set backend type appropriately. */
+            disk->backend=disks[i].backend;
             break;
+        }
     }
     if (i == num) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Virtual device not found");
@@ -2410,6 +2414,17 @@ int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
     }
 
     path = libxl__device_backend_path(gc, &device);
+
+    /* Sanity check: make sure the backend exists before writing here */
+    tmp = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/frontend", path));
+    if (!tmp)
+    {
+        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Internal error: %s does not exist",
+            libxl__sprintf(gc, "%s/frontend", path));
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
 
     insert = flexarray_make(gc, 4, 1);
 
