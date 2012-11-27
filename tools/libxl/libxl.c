@@ -3764,7 +3764,8 @@ int libxl_wait_for_free_memory(libxl_ctx *ctx, uint32_t domid, uint32_t
         rc = libxl_get_physinfo(ctx, &info);
         if (rc < 0)
             goto out;
-        if (info.free_pages * 4 - freemem_slack >= memory_kb) {
+        if (info.free_pages * 4 >= freemem_slack &&
+            info.free_pages * 4 - freemem_slack >= memory_kb) {
             rc = 0;
             goto out;
         }
