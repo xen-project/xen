@@ -440,6 +440,11 @@ reservation is unlimited.
 For example, to set dom0's initial memory allocation to 512MB but
 allow it to balloon up as far as 1GB use `dom0_mem=512M,max:1G`
 
+If you use this option then it is highly recommended that you disable
+any dom0 autoballooning feature present in your toolstack. See the
+_xl.conf(5)_ man page or [Xen Best
+Practices](http://wiki.xen.org/wiki/Xen_Best_Practices#Xen_dom0_dedicated_memory_and_preventing_dom0_memory_ballooning).
+
 ### dom0\_shadow
 > `= <boolean>`
 
