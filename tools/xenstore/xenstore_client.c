@@ -25,7 +25,6 @@
 #define PATH_SEP '/'
 #define MAX_PATH_LEN 256
 
-#define MAX_PERMS 16
 
 enum mode {
     MODE_unknown,
@@ -407,44 +406,41 @@ perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh
                 output("%s\n", list[i]);
             }
             free(list);
-	    optind++;
-	    break;
-	}
-	case MODE_ls: {
-	    do_ls(xsh, argv[optind], 0, prefix);
- 	    optind++;
- 	    break;
+            optind++;
+            break;
+        }
+        case MODE_ls: {
+            do_ls(xsh, argv[optind], 0, prefix);
+            optind++;
+            break;
         }
         case MODE_chmod: {
-            struct xs_permissions perms[MAX_PERMS];
-            int nperms = 0;
             /* save path pointer: */
             char *path = argv[optind++];
-            for (; argv[optind]; optind++, nperms++)
+            int nperms = argc - optind;
+            struct xs_permissions perms[nperms];
+            int i;
+            for (i = 0; argv[optind]; optind++, i++)
             {
-                if (MAX_PERMS <= nperms)
-                    errx(1, "Too many permissions specified.  "
-			 "Maximum per invocation is %d.", MAX_PERMS);
-
-                perms[nperms].id = atoi(argv[optind]+1);
+                perms[i].id = atoi(argv[optind]+1);
 
                 switch (argv[optind][0])
                 {
                 case 'n':
-                    perms[nperms].perms = XS_PERM_NONE;
+                    perms[i].perms = XS_PERM_NONE;
                     break;
                 case 'r':
-                    perms[nperms].perms = XS_PERM_READ;
+                    perms[i].perms = XS_PERM_READ;
                     break;
                 case 'w':
-                    perms[nperms].perms = XS_PERM_WRITE;
+                    perms[i].perms = XS_PERM_WRITE;
                     break;
                 case 'b':
-                    perms[nperms].perms = XS_PERM_READ | XS_PERM_WRITE;
+                    perms[i].perms = XS_PERM_READ | XS_PERM_WRITE;
                     break;
                 default:
                     errx(1, "Invalid permission specification: '%c'",
-			 argv[optind][0]);
+                         argv[optind][0]);
                 }
             }
 
