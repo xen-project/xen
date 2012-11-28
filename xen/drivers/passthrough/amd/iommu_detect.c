@@ -39,7 +39,9 @@ static int __init get_iommu_msi_capabilities(
 
     AMD_IOMMU_DEBUG("Found MSI capability block at %#x\n", pos);
 
-    iommu->msi_cap = pos;
+    iommu->msi.msi_attrib.type = PCI_CAP_ID_MSI;
+    iommu->msi.msi_attrib.pos = pos;
+    iommu->msi.msi_attrib.is_64 = 1;
     return 0;
 }
 

@@ -263,7 +263,7 @@ static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
     }
 }
 
-static void set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
+void set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
 {
     struct msi_msg msg;
     unsigned int dest;

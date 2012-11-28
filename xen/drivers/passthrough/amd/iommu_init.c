@@ -449,42 +449,10 @@ static void iommu_reset_log(struct amd_iommu *iommu,
     ctrl_func(iommu, IOMMU_CONTROL_ENABLED);
 }
 
-static void iommu_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
-{
-    struct msi_msg msg;
-    unsigned int dest;
-    struct amd_iommu *iommu = desc->action->dev_id;
-    u16 seg = iommu->seg;
-    u8 bus = PCI_BUS(iommu->bdf);
-    u8 dev = PCI_SLOT(iommu->bdf);
-    u8 func = PCI_FUNC(iommu->bdf);
-
-    dest = set_desc_affinity(desc, mask);
-
-    if ( dest == BAD_APICID )
-    {
-        dprintk(XENLOG_ERR, "Set iommu interrupt affinity error!\n");
-        return;
-    }
-
-    msi_compose_msg(desc, &msg);
-    /* Is this override really needed? */
-    msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
-    msg.address_lo |= MSI_ADDR_DEST_ID(dest & 0xff);
-
-    pci_conf_write32(seg, bus, dev, func,
-        iommu->msi_cap + PCI_MSI_DATA_64, msg.data);
-    pci_conf_write32(seg, bus, dev, func,
-        iommu->msi_cap + PCI_MSI_ADDRESS_LO, msg.address_lo);
-    pci_conf_write32(seg, bus, dev, func,
-        iommu->msi_cap + PCI_MSI_ADDRESS_HI, msg.address_hi);
-    
-}
-
 static void amd_iommu_msi_enable(struct amd_iommu *iommu, int flag)
 {
     __msi_set_enable(iommu->seg, PCI_BUS(iommu->bdf), PCI_SLOT(iommu->bdf),
-                     PCI_FUNC(iommu->bdf), iommu->msi_cap, flag);
+                     PCI_FUNC(iommu->bdf), iommu->msi.msi_attrib.pos, flag);
 }
 
 static void iommu_msi_unmask(struct irq_desc *desc)
@@ -495,6 +463,7 @@ static void iommu_msi_unmask(struct irq_desc *desc)
     spin_lock_irqsave(&iommu->lock, flags);
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
     spin_unlock_irqrestore(&iommu->lock, flags);
+    iommu->msi.msi_attrib.masked = 0;
 }
 
 static void iommu_msi_mask(struct irq_desc *desc)
@@ -507,6 +476,7 @@ static void iommu_msi_mask(struct irq_desc *desc)
     spin_lock_irqsave(&iommu->lock, flags);
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_DISABLED);
     spin_unlock_irqrestore(&iommu->lock, flags);
+    iommu->msi.msi_attrib.masked = 1;
 }
 
 static unsigned int iommu_msi_startup(struct irq_desc *desc)
@@ -530,7 +500,7 @@ static hw_irq_controller iommu_msi_type = {
     .disable = iommu_msi_mask,
     .ack = iommu_msi_mask,
     .end = iommu_msi_end,
-    .set_affinity = iommu_msi_set_affinity,
+    .set_affinity = set_msi_affinity,
 };
 
 static unsigned int iommu_maskable_msi_startup(struct irq_desc *desc)
@@ -561,7 +531,7 @@ static hw_irq_controller iommu_maskable_msi_type = {
     .disable = mask_msi_irq,
     .ack = iommu_maskable_msi_ack,
     .end = iommu_maskable_msi_end,
-    .set_affinity = iommu_msi_set_affinity,
+    .set_affinity = set_msi_affinity,
 };
 
 static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
@@ -775,9 +745,11 @@ static void iommu_interrupt_handler(int irq, void *dev_id,
     tasklet_schedule(&amd_iommu_irq_tasklet);
 }
 
-static int __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
+static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
 {
     int irq, ret;
+    struct irq_desc *desc;
+    unsigned long flags;
     u16 control;
 
     irq = create_irq(NUMA_NO_NODE);
@@ -786,23 +758,38 @@ static int __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
         dprintk(XENLOG_ERR, "IOMMU: no irqs\n");
         return 0;
     }
-    
+
+    desc = irq_to_desc(irq);
+    spin_lock_irqsave(&pcidevs_lock, flags);
+    iommu->msi.dev = pci_get_pdev(iommu->seg, PCI_BUS(iommu->bdf),
+                                  PCI_DEVFN2(iommu->bdf));
+    spin_unlock_irqrestore(&pcidevs_lock, flags);
+    if ( !iommu->msi.dev )
+    {
+        AMD_IOMMU_DEBUG("IOMMU: no pdev for %04x:%02x:%02x.%u\n",
+                        iommu->seg, PCI_BUS(iommu->bdf),
+                        PCI_SLOT(iommu->bdf), PCI_FUNC(iommu->bdf));
+        return 0;
+    }
+    desc->msi_desc = &iommu->msi;
     control = pci_conf_read16(iommu->seg, PCI_BUS(iommu->bdf),
                               PCI_SLOT(iommu->bdf), PCI_FUNC(iommu->bdf),
-                              iommu->msi_cap + PCI_MSI_FLAGS);
-    irq_desc[irq].handler = control & PCI_MSI_FLAGS_MASKBIT ?
-                            &iommu_maskable_msi_type : &iommu_msi_type;
+                              iommu->msi.msi_attrib.pos + PCI_MSI_FLAGS);
+    iommu->msi.msi_attrib.maskbit = !!(control & PCI_MSI_FLAGS_MASKBIT);
+    desc->handler = control & PCI_MSI_FLAGS_MASKBIT ?
+                    &iommu_maskable_msi_type : &iommu_msi_type;
     ret = request_irq(irq, iommu_interrupt_handler, 0, "amd_iommu", iommu);
     if ( ret )
     {
-        irq_desc[irq].handler = &no_irq_type;
+        desc->handler = &no_irq_type;
         destroy_irq(irq);
         AMD_IOMMU_DEBUG("can't request irq\n");
         return 0;
     }
 
-    iommu->irq = irq;
-    return irq;
+    iommu->msi.irq = irq;
+
+    return 1;
 }
 
 static void enable_iommu(struct amd_iommu *iommu)
@@ -825,7 +812,7 @@ static void enable_iommu(struct amd_iommu *iommu)
     if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
         register_iommu_ppr_log_in_mmio_space(iommu);
 
-    iommu_msi_set_affinity(irq_to_desc(iommu->irq), &cpu_online_map);
+    set_msi_affinity(irq_to_desc(iommu->msi.irq), &cpu_online_map);
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
 
     set_iommu_ht_flags(iommu);
@@ -947,7 +934,7 @@ static int __init amd_iommu_init_one(struct amd_iommu *iommu)
         if ( allocate_ppr_log(iommu) == NULL )
             goto error_out;
 
-    if ( set_iommu_interrupt_handler(iommu) == 0 )
+    if ( !set_iommu_interrupt_handler(iommu) )
         goto error_out;
 
     /* To make sure that device_table.buffer has been successfully allocated */

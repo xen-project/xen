@@ -25,6 +25,7 @@
 #include <xen/list.h>
 #include <xen/spinlock.h>
 #include <xen/tasklet.h>
+#include <asm/msi.h>
 #include <asm/hvm/svm/amd-iommu-defs.h>
 
 #define iommu_found()           (!list_empty(&amd_iommu_head))
@@ -82,8 +83,9 @@ struct amd_iommu {
 
     u16 seg;
     u16 bdf;
+    struct msi_desc msi;
+
     u16 cap_offset;
-    u8 msi_cap;
     iommu_cap_t cap;
 
     u8 ht_flags;
@@ -103,7 +105,6 @@ struct amd_iommu {
     uint64_t exclusion_limit;
 
     int enabled;
-    int irq;
 };
 
 struct ivrs_mappings {
