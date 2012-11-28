@@ -21,6 +21,7 @@
 #define _INTEL_IOMMU_H_
 
 #include <xen/iommu.h>
+#include <asm/msi.h>
 
 /*
  * Intel IOMMU register specification per version 1.0 public spec.
@@ -520,7 +521,7 @@ struct iommu {
     spinlock_t lock; /* protect context, domain ids */
     spinlock_t register_lock; /* protect iommu register handling */
     u64 root_maddr; /* root entry machine address */
-    int irq;
+    struct msi_desc msi;
     struct intel_iommu *intel;
     unsigned long *domid_bitmap;  /* domain id bitmap */
     u16 *domid_map;               /* domain id mapping array */

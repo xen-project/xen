@@ -1008,6 +1008,7 @@ static void dma_msi_unmask(struct irq_desc *desc)
     spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writel(iommu->reg, DMAR_FECTL_REG, 0);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
+    iommu->msi.msi_attrib.masked = 0;
 }
 
 static void dma_msi_mask(struct irq_desc *desc)
@@ -1019,6 +1020,7 @@ static void dma_msi_mask(struct irq_desc *desc)
     spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writel(iommu->reg, DMAR_FECTL_REG, DMA_FECTL_IM);
     spin_unlock_irqrestore(&iommu->register_lock, flags);
+    iommu->msi.msi_attrib.masked = 1;
 }
 
 static unsigned int dma_msi_startup(struct irq_desc *desc)
@@ -1059,6 +1061,7 @@ static void dma_msi_set_affinity(struct irq_desc *desc, const cpumask_t *mask)
         msg.address_hi = dest & 0xFFFFFF00;
     msg.address_lo &= ~MSI_ADDR_DEST_ID_MASK;
     msg.address_lo |= MSI_ADDR_DEST_ID(dest & 0xff);
+    iommu->msi.msg = msg;
 
     spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writel(iommu->reg, DMAR_FEDATA_REG, msg.data);
@@ -1082,6 +1085,8 @@ static int __init iommu_set_interrupt(struct acpi_drhd_unit *drhd)
 {
     int irq, ret;
     struct acpi_rhsa_unit *rhsa = drhd_to_rhsa(drhd);
+    struct iommu *iommu = drhd->iommu;
+    struct irq_desc *desc;
 
     irq = create_irq(rhsa ? pxm_to_node(rhsa->proximity_domain)
                           : NUMA_NO_NODE);
@@ -1091,17 +1096,24 @@ static int __init iommu_set_interrupt(struct acpi_drhd_unit *drhd)
         return -EINVAL;
     }
 
-    irq_desc[irq].handler = &dma_msi_type;
-    ret = request_irq(irq, iommu_page_fault, 0, "dmar", drhd->iommu);
+    desc = irq_to_desc(irq);
+    desc->handler = &dma_msi_type;
+    ret = request_irq(irq, iommu_page_fault, 0, "dmar", iommu);
     if ( ret )
     {
-        irq_desc[irq].handler = &no_irq_type;
+        desc->handler = &no_irq_type;
         destroy_irq(irq);
         dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: can't request irq\n");
         return ret;
     }
 
-    return irq;
+    iommu->msi.irq = irq;
+    iommu->msi.msi_attrib.pos = MSI_TYPE_IOMMU;
+    iommu->msi.msi_attrib.maskbit = 1;
+    iommu->msi.msi_attrib.is_64 = 1;
+    desc->msi_desc = &iommu->msi;
+
+    return 0;
 }
 
 int __init iommu_alloc(struct acpi_drhd_unit *drhd)
@@ -1121,7 +1133,7 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     if ( iommu == NULL )
         return -ENOMEM;
 
-    iommu->irq = -1; /* No irq assigned yet. */
+    iommu->msi.irq = -1; /* No irq assigned yet. */
 
     iommu->intel = alloc_intel_iommu();
     if ( iommu->intel == NULL )
@@ -1218,8 +1230,8 @@ void __init iommu_free(struct acpi_drhd_unit *drhd)
     xfree(iommu->domid_map);
 
     free_intel_iommu(iommu->intel);
-    if ( iommu->irq >= 0 )
-        destroy_irq(iommu->irq);
+    if ( iommu->msi.irq >= 0 )
+        destroy_irq(iommu->msi.irq);
     xfree(iommu);
 }
 
@@ -1976,7 +1988,7 @@ static int init_vtd_hw(void)
 
         iommu = drhd->iommu;
 
-        desc = irq_to_desc(iommu->irq);
+        desc = irq_to_desc(iommu->msi.irq);
         dma_msi_set_affinity(desc, desc->arch.cpu_mask);
 
         clear_fault_bits(iommu);
@@ -2122,12 +2134,11 @@ int __init intel_vtd_setup(void)
             iommu_hap_pt_share = 0;
 
         ret = iommu_set_interrupt(drhd);
-        if ( ret < 0 )
+        if ( ret )
         {
             dprintk(XENLOG_ERR VTDPREFIX, "IOMMU: interrupt setup failed\n");
             goto error;
         }
-        iommu->irq = ret;
     }
 
     softirq_tasklet_init(&vtd_fault_tasklet, do_iommu_page_fault, 0);
