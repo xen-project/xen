@@ -38,7 +38,7 @@ First, there are a number of prerequisites for building a Xen source
 release. Make sure you have all the following installed, either by
 visiting the project webpage or installing a pre-built package
 provided by your OS distributor:
-    * GCC v3.4 or later
+    * GCC v4.1 or later
     * GNU Make
     * GNU Binutils
     * Development install of zlib (e.g., zlib-dev)
