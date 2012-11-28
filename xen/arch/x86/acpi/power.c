@@ -219,6 +219,7 @@ static int enter_state(u32 state)
     mtrr_aps_sync_begin();
     enable_nonboot_cpus();
     mtrr_aps_sync_end();
+    adjust_vtd_irq_affinities();
     acpi_dmar_zap();
     thaw_domains();
     system_state = SYS_STATE_active;

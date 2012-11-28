@@ -137,6 +137,9 @@ int iommu_do_domctl(struct xen_domctl *, XEN_GUEST_HANDLE_PARAM(xen_domctl_t));
 void iommu_iotlb_flush(struct domain *d, unsigned long gfn, unsigned int page_count);
 void iommu_iotlb_flush_all(struct domain *d);
 
+/* While VT-d specific, this must get declared in a generic header. */
+int adjust_vtd_irq_affinities(void);
+
 /*
  * The purpose of the iommu_dont_flush_iotlb optional cpu flag is to
  * avoid unecessary iotlb_flush in the low level IOMMU code.

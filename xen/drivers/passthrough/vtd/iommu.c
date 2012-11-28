@@ -1971,6 +1971,33 @@ void clear_fault_bits(struct iommu *iommu)
     spin_unlock_irqrestore(&iommu->register_lock, flags);
 }
 
+static void adjust_irq_affinity(struct acpi_drhd_unit *drhd)
+{
+    const struct acpi_rhsa_unit *rhsa = drhd_to_rhsa(drhd);
+    unsigned int node = rhsa ? pxm_to_node(rhsa->proximity_domain)
+                             : NUMA_NO_NODE;
+    const cpumask_t *cpumask = &cpu_online_map;
+
+    if ( node < MAX_NUMNODES && node_online(node) &&
+         cpumask_intersects(&node_to_cpumask(node), cpumask) )
+        cpumask = &node_to_cpumask(node);
+    dma_msi_set_affinity(irq_to_desc(drhd->iommu->msi.irq), cpumask);
+}
+
+int adjust_vtd_irq_affinities(void)
+{
+    struct acpi_drhd_unit *drhd;
+
+    if ( !iommu_enabled )
+        return 0;
+
+    for_each_drhd_unit ( drhd )
+        adjust_irq_affinity(drhd);
+
+    return 0;
+}
+__initcall(adjust_vtd_irq_affinities);
+
 static int init_vtd_hw(void)
 {
     struct acpi_drhd_unit *drhd;
@@ -1984,12 +2011,9 @@ static int init_vtd_hw(void)
      */
     for_each_drhd_unit ( drhd )
     {
-        struct irq_desc *desc;
+        adjust_irq_affinity(drhd);
 
         iommu = drhd->iommu;
-
-        desc = irq_to_desc(iommu->msi.irq);
-        dma_msi_set_affinity(desc, desc->arch.cpu_mask);
 
         clear_fault_bits(iommu);
 
