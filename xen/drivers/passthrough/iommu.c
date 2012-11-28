@@ -92,7 +92,11 @@ static void __init parse_iommu_param(char *s)
         else if ( !strcmp(s, "intremap") )
             iommu_intremap = val;
         else if ( !strcmp(s, "debug") )
+        {
             iommu_debug = val;
+            if ( val )
+                iommu_verbose = 1;
+        }
         else if ( !strcmp(s, "amd-iommu-perdev-intremap") )
             amd_iommu_perdev_intremap = val;
         else if ( !strcmp(s, "dom0-passthrough") )
