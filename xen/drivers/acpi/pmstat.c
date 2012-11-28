@@ -521,8 +521,8 @@ int acpi_set_pdc_bits(u32 acpi_id, XEN_GUEST_HANDLE_PARAM(uint32) pdc)
                     ACPI_PDC_SMP_C1PT) & ~mask;
         ret = arch_acpi_set_pdc_bits(acpi_id, bits, mask);
     }
-    if ( !ret )
-        ret = copy_to_guest_offset(pdc, 2, bits + 2, 1);
+    if ( !ret && __copy_to_guest_offset(pdc, 2, bits + 2, 1) )
+        ret = -EFAULT;
 
     return ret;
 }
