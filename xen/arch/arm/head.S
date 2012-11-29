@@ -22,6 +22,8 @@
 #include <asm/processor-ca15.h>
 #include <asm/asm_defns.h>
 
+#define ZIMAGE_MAGIC_NUMBER 0x016f2818
+
 #define PT_PT  0xe7f /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=111, T=1, P=1 */
 #define PT_MEM 0xe7d /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=111, T=0, P=1 */
 #define PT_DEV 0xe71 /* nG=1, AF=1, SH=10, AP=01, NS=1, ATTR=100, T=0, P=1 */
@@ -52,6 +54,21 @@
 	 * or the initial pagetable code below will need adjustment. */
 	.global start
 start:
+
+	/* zImage magic header, see:
+	 * http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html#d0e309
+	 */
+	.rept 8
+	mov   r0, r0
+	.endr
+	b     past_zImage
+
+	.word ZIMAGE_MAGIC_NUMBER    /* Magic numbers to help the loader */
+	.word 0x00000000             /* absolute load/run zImage address or
+	                              * 0 for PiC */
+	.word (_end - start)         /* zImage end address */
+
+past_zImage:
 	cpsid aif                    /* Disable all interrupts */
 
 	/* Save the bootloader arguments in less-clobberable registers */
