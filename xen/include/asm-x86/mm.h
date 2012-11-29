@@ -456,6 +456,11 @@ static inline _type _name##_x(_name##_t n) { return n; }
 
 TYPE_SAFE(unsigned long,mfn);
 
+#ifndef mfn_t
+#define mfn_t /* Grep fodder: mfn_t, _mfn() and mfn_x() are defined above */
+#undef mfn_t
+#endif
+
 /* Macro for printk formats: use as printk("%"PRI_mfn"\n", mfn_x(foo)); */
 #define PRI_mfn "05lx"
 
