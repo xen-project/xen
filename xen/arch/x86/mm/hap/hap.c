@@ -567,6 +567,9 @@ void hap_teardown(struct domain *d)
 
     d->arch.paging.mode &= ~PG_log_dirty;
 
+    xfree(d->arch.hvm_domain.dirty_vram);
+    d->arch.hvm_domain.dirty_vram = NULL;
+
     paging_unlock(d);
 }
 
