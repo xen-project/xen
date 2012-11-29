@@ -307,7 +307,7 @@
  *     the grants.
  * (8) The frontend driver has to allow the backend driver to map all grants
  *     with write access, even when they should be mapped read-only, since
- *     further requests may reuse this grants and require write permisions.
+ *     further requests may reuse these grants and require write permissions.
  */
 
 /*
