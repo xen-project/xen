@@ -304,13 +304,15 @@ static int __init scope_device_count(const void *start, const void *end)
 
 
 static int __init acpi_parse_dev_scope(
-    const void *start, const void *end, void *acpi_entry, int type, u16 seg)
+    const void *start, const void *end, struct dmar_scope *scope,
+    int type, u16 seg)
 {
-    struct dmar_scope *scope = acpi_entry;
     struct acpi_ioapic_unit *acpi_ioapic_unit;
     const struct acpi_dmar_device_scope *acpi_scope;
     u16 bus, sub_bus, sec_bus;
     const struct acpi_dmar_pci_path *path;
+    struct acpi_drhd_unit *drhd = type == DMAR_TYPE ?
+        container_of(scope, struct acpi_drhd_unit, scope) : NULL;
     int depth, cnt, didx = 0;
 
     if ( (cnt = scope_device_count(start, end)) < 0 )
@@ -359,9 +361,8 @@ static int __init acpi_parse_dev_scope(
                 dprintk(VTDPREFIX, " MSI HPET: %04x:%02x:%02x.%u\n",
                         seg, bus, path->dev, path->fn);
 
-            if ( type == DMAR_TYPE )
+            if ( drhd )
             {
-                struct acpi_drhd_unit *drhd = acpi_entry;
                 struct acpi_hpet_unit *acpi_hpet_unit;
 
                 acpi_hpet_unit = xmalloc(struct acpi_hpet_unit);
@@ -381,10 +382,8 @@ static int __init acpi_parse_dev_scope(
                 dprintk(VTDPREFIX, " endpoint: %04x:%02x:%02x.%u\n",
                         seg, bus, path->dev, path->fn);
 
-            if ( type == DMAR_TYPE )
+            if ( drhd )
             {
-                struct acpi_drhd_unit *drhd = acpi_entry;
-
                 if ( (seg == 0) && (bus == 0) && (path->dev == 2) &&
                      (path->fn == 0) )
                     igd_drhd_address = drhd->address;
@@ -397,9 +396,8 @@ static int __init acpi_parse_dev_scope(
                 dprintk(VTDPREFIX, " IOAPIC: %04x:%02x:%02x.%u\n",
                         seg, bus, path->dev, path->fn);
 
-            if ( type == DMAR_TYPE )
+            if ( drhd )
             {
-                struct acpi_drhd_unit *drhd = acpi_entry;
                 acpi_ioapic_unit = xmalloc(struct acpi_ioapic_unit);
                 if ( !acpi_ioapic_unit )
                     return -ENOMEM;
@@ -463,7 +461,7 @@ acpi_parse_one_drhd(struct acpi_dmar_header *header)
     dev_scope_start = (void *)(drhd + 1);
     dev_scope_end = ((void *)drhd) + header->length;
     ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
-                               dmaru, DMAR_TYPE, drhd->segment);
+                               &dmaru->scope, DMAR_TYPE, drhd->segment);
 
     if ( dmaru->include_all )
     {
@@ -590,7 +588,7 @@ acpi_parse_one_rmrr(struct acpi_dmar_header *header)
     dev_scope_start = (void *)(rmrr + 1);
     dev_scope_end   = ((void *)rmrr) + header->length;
     ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
-                               rmrru, RMRR_TYPE, rmrr->segment);
+                               &rmrru->scope, RMRR_TYPE, rmrr->segment);
 
     if ( ret || (rmrru->scope.devices_cnt == 0) )
         xfree(rmrru);
@@ -683,7 +681,7 @@ acpi_parse_one_atsr(struct acpi_dmar_header *header)
         dev_scope_start = (void *)(atsr + 1);
         dev_scope_end   = ((void *)atsr) + header->length;
         ret = acpi_parse_dev_scope(dev_scope_start, dev_scope_end,
-                                   atsru, ATSR_TYPE, atsr->segment);
+                                   &atsru->scope, ATSR_TYPE, atsr->segment);
     }
     else
     {

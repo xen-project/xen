@@ -59,7 +59,7 @@ struct dmar_scope {
 };
 
 struct acpi_drhd_unit {
-    struct dmar_scope scope;            /* must be first member of struct */
+    struct dmar_scope scope;
     struct list_head list;
     u64    address;                     /* register base address of the unit */
     u16    segment;
@@ -70,7 +70,7 @@ struct acpi_drhd_unit {
 };
 
 struct acpi_rmrr_unit {
-    struct dmar_scope scope;            /* must be first member of struct */
+    struct dmar_scope scope;
     struct list_head list;
     u64    base_address;
     u64    end_address;
@@ -79,7 +79,7 @@ struct acpi_rmrr_unit {
 };
 
 struct acpi_atsr_unit {
-    struct dmar_scope scope;            /* must be first member of struct */
+    struct dmar_scope scope;
     struct list_head list;
     u16    segment;
     u8     all_ports:1;
