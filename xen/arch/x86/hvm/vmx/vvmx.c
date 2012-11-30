@@ -530,7 +530,7 @@ static void nvmx_update_exit_control(struct vcpu *v, unsigned long host_cntrl)
     shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_CONTROLS);
     shadow_cntrl &= ~(VM_EXIT_SAVE_DEBUG_CNTRLS 
                       | VM_EXIT_LOAD_HOST_PAT
-                      | VM_EXIT_SAVE_GUEST_EFER);
+                      | VM_EXIT_LOAD_HOST_EFER);
     shadow_cntrl |= host_cntrl;
     __vmwrite(VM_EXIT_CONTROLS, shadow_cntrl);
 }
@@ -625,6 +625,7 @@ static const u16 vmcs_gstate_field[] = {
     VMCS_LINK_POINTER,
     GUEST_IA32_DEBUGCTL,
     GUEST_PAT,
+    GUEST_EFER,
     /* 32 BITS */
     GUEST_ES_LIMIT,
     GUEST_CS_LIMIT,
@@ -1332,14 +1333,17 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
                VM_EXIT_IA32E_MODE |
                VM_EXIT_SAVE_PREEMPT_TIMER |
                VM_EXIT_SAVE_GUEST_PAT |
-               VM_EXIT_LOAD_HOST_PAT;
+               VM_EXIT_LOAD_HOST_PAT |
+               VM_EXIT_SAVE_GUEST_EFER |
+               VM_EXIT_LOAD_HOST_EFER;
 	/* 0-settings */
         data = ((data | tmp) << 32) | tmp;
         break;
     case MSR_IA32_VMX_ENTRY_CTLS:
         /* bit 0-8, and 12 must be 1 (refer G5 of SDM) */
         tmp = 0x11ff;
-        data = VM_ENTRY_LOAD_GUEST_PAT;
+        data = VM_ENTRY_LOAD_GUEST_PAT |
+               VM_ENTRY_LOAD_GUEST_EFER;
         data = ((data | tmp) << 32) | tmp;
         break;
 
