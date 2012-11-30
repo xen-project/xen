@@ -1273,7 +1273,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
                CPU_BASED_USE_TSC_OFFSETING |
                CPU_BASED_UNCOND_IO_EXITING |
                CPU_BASED_RDTSC_EXITING |
-               CPU_BASED_MONITOR_TRAP_FLAG;
+               CPU_BASED_MONITOR_TRAP_FLAG |
+               CPU_BASED_VIRTUAL_NMI_PENDING;
         /* bit 1, 4-6,8,13-16,26 must be 1 (refer G4 of SDM) */
         tmp = ( (1<<26) | (0xf << 13) | 0x100 | (0x7 << 4) | 0x2);
         /* 0-settings */
