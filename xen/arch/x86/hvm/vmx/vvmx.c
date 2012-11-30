@@ -1259,7 +1259,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         break;
     case MSR_IA32_VMX_PROCBASED_CTLS:
         /* 1-seetings */
-        data = (CPU_BASED_HLT_EXITING |
+        data = CPU_BASED_HLT_EXITING |
                CPU_BASED_VIRTUAL_INTR_PENDING |
                CPU_BASED_CR8_LOAD_EXITING |
                CPU_BASED_CR8_STORE_EXITING |
@@ -1272,7 +1272,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
                CPU_BASED_ACTIVATE_IO_BITMAP |
                CPU_BASED_USE_TSC_OFFSETING |
                CPU_BASED_UNCOND_IO_EXITING |
-               CPU_BASED_RDTSC_EXITING);
+               CPU_BASED_RDTSC_EXITING |
+               CPU_BASED_MONITOR_TRAP_FLAG;
         /* bit 1, 4-6,8,13-16,26 must be 1 (refer G4 of SDM) */
         tmp = ( (1<<26) | (0xf << 13) | 0x100 | (0x7 << 4) | 0x2);
         /* 0-settings */
@@ -1473,6 +1474,11 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_PENDING_VIRT_NMI:
         ctrl = __n2_exec_control(v);
         if ( ctrl & CPU_BASED_VIRTUAL_NMI_PENDING )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    case EXIT_REASON_MONITOR_TRAP_FLAG:
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_MONITOR_TRAP_FLAG)
             nvcpu->nv_vmexit_pending = 1;
         break;
     /* L1 has priority handling several other types of exits */
