@@ -1300,7 +1300,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         break;
     case MSR_IA32_VMX_PROCBASED_CTLS2:
         /* 1-seetings */
-        data = 0;
+        data = SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING;
         /* 0-settings */
         tmp = 0;
         data = (data << 32) | tmp;
@@ -1505,6 +1505,12 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_MONITOR_TRAP_FLAG:
         ctrl = __n2_exec_control(v);
         if ( ctrl & CPU_BASED_MONITOR_TRAP_FLAG)
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    case EXIT_REASON_ACCESS_GDTR_OR_IDTR:
+    case EXIT_REASON_ACCESS_LDTR_OR_TR:
+        ctrl = __n2_secondary_exec_control(v);
+        if ( ctrl & SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING )
             nvcpu->nv_vmexit_pending = 1;
         break;
     /* L1 has priority handling several other types of exits */
