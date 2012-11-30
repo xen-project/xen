@@ -357,6 +357,7 @@ enum vmcs_field {
     GUEST_INTERRUPTIBILITY_INFO     = 0x00004824,
     GUEST_ACTIVITY_STATE            = 0x00004826,
     GUEST_SYSENTER_CS               = 0x0000482A,
+    GUEST_PREEMPTION_TIMER          = 0x0000482e,
     HOST_SYSENTER_CS                = 0x00004c00,
     CR0_GUEST_HOST_MASK             = 0x00006000,
     CR4_GUEST_HOST_MASK             = 0x00006002,

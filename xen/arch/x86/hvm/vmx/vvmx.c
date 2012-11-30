@@ -237,6 +237,13 @@ static void reg_write(struct cpu_user_regs *regs,
     *pval = value;
 }
 
+static inline u32 __n2_pin_exec_control(struct vcpu *v)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+
+    return __get_vvmcs(nvcpu->nv_vvmcx, PIN_BASED_VM_EXEC_CONTROL);
+}
+
 static inline u32 __n2_exec_control(struct vcpu *v)
 {
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
@@ -511,7 +518,6 @@ static void nvmx_update_pin_control(struct vcpu *v, unsigned long host_cntrl)
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
 
     shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, PIN_BASED_VM_EXEC_CONTROL);
-    shadow_cntrl &= ~PIN_BASED_PREEMPT_TIMER;
     shadow_cntrl |= host_cntrl;
     __vmwrite(PIN_BASED_VM_EXEC_CONTROL, shadow_cntrl);
 }
@@ -641,6 +647,7 @@ static const u16 vmcs_gstate_field[] = {
     GUEST_INTERRUPTIBILITY_INFO,
     GUEST_ACTIVITY_STATE,
     GUEST_SYSENTER_CS,
+    GUEST_PREEMPTION_TIMER,
     /* natural */
     GUEST_ES_BASE,
     GUEST_CS_BASE,
@@ -1269,7 +1276,9 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         break;
     case MSR_IA32_VMX_PINBASED_CTLS:
         /* 1-seetings */
-        data = PIN_BASED_EXT_INTR_MASK | PIN_BASED_NMI_EXITING;
+        data = PIN_BASED_EXT_INTR_MASK |
+               PIN_BASED_NMI_EXITING |
+               PIN_BASED_PREEMPT_TIMER;
         data <<= 32;
 	/* 0-settings */
         data |= 0;
@@ -1511,6 +1520,11 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_ACCESS_LDTR_OR_TR:
         ctrl = __n2_secondary_exec_control(v);
         if ( ctrl & SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    case EXIT_REASON_VMX_PREEMPTION_TIMER_EXPIRED:
+        ctrl = __n2_pin_exec_control(v);
+        if ( ctrl & PIN_BASED_PREEMPT_TIMER )
             nvcpu->nv_vmexit_pending = 1;
         break;
     /* L1 has priority handling several other types of exits */
