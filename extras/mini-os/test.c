@@ -413,6 +413,7 @@ static void kbdfront_thread(void *p)
     }
 }
 
+#ifdef CONFIG_PCIFRONT
 static struct pcifront_dev *pci_dev;
 
 static void print_pcidev(unsigned int domain, unsigned int bus, unsigned int slot, unsigned int fun)
@@ -436,6 +437,7 @@ static void pcifront_thread(void *p)
     printk("PCI devices:\n");
     pcifront_scan(pci_dev, print_pcidev);
 }
+#endif
 
 int app_main(start_info_t *si)
 {
@@ -446,7 +448,9 @@ int app_main(start_info_t *si)
     create_thread("blkfront", blkfront_thread, si);
     create_thread("fbfront", fbfront_thread, si);
     create_thread("kbdfront", kbdfront_thread, si);
+#ifdef CONFIG_PCIFRONT
     create_thread("pcifront", pcifront_thread, si);
+#endif
     return 0;
 }
 
@@ -464,6 +468,8 @@ void shutdown_frontends(void)
     if (kbd_dev)
         shutdown_kbdfront(kbd_dev);
 
+#ifdef CONFIG_PCIFRONT
     if (pci_dev)
         shutdown_pcifront(pci_dev);
+#endif
 }
