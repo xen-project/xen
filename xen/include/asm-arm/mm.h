@@ -179,7 +179,7 @@ extern void clear_fixmap(unsigned map);
 #define paddr_to_pdx(pa)    pfn_to_pdx(paddr_to_pfn(pa))
 
 
-static inline paddr_t virt_to_maddr(void *va)
+static inline paddr_t virt_to_maddr(const void *va)
 {
     uint64_t par = va_to_par((uint32_t)va);
     return (par & PADDR_MASK & PAGE_MASK) | ((unsigned long) va & ~PAGE_MASK);
