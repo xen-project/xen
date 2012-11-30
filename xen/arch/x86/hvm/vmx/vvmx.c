@@ -530,7 +530,8 @@ static void nvmx_update_exit_control(struct vcpu *v, unsigned long host_cntrl)
     shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_CONTROLS);
     shadow_cntrl &= ~(VM_EXIT_SAVE_DEBUG_CNTRLS 
                       | VM_EXIT_LOAD_HOST_PAT
-                      | VM_EXIT_LOAD_HOST_EFER);
+                      | VM_EXIT_LOAD_HOST_EFER
+                      | VM_EXIT_LOAD_PERF_GLOBAL_CTRL);
     shadow_cntrl |= host_cntrl;
     __vmwrite(VM_EXIT_CONTROLS, shadow_cntrl);
 }
@@ -541,7 +542,9 @@ static void nvmx_update_entry_control(struct vcpu *v)
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
 
     shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, VM_ENTRY_CONTROLS);
-    shadow_cntrl &= ~(VM_ENTRY_LOAD_GUEST_PAT | VM_ENTRY_LOAD_GUEST_EFER);
+    shadow_cntrl &= ~(VM_ENTRY_LOAD_GUEST_PAT
+                      | VM_ENTRY_LOAD_GUEST_EFER
+                      | VM_ENTRY_LOAD_PERF_GLOBAL_CTRL);
     __vmwrite(VM_ENTRY_CONTROLS, shadow_cntrl);
 }
 
@@ -626,6 +629,7 @@ static const u16 vmcs_gstate_field[] = {
     GUEST_IA32_DEBUGCTL,
     GUEST_PAT,
     GUEST_EFER,
+    GUEST_PERF_GLOBAL_CTRL,
     /* 32 BITS */
     GUEST_ES_LIMIT,
     GUEST_CS_LIMIT,
@@ -761,6 +765,8 @@ static void load_shadow_guest_state(struct vcpu *v)
     control = __get_vvmcs(vvmcs, VM_ENTRY_CONTROLS);
     if ( control & VM_ENTRY_LOAD_GUEST_PAT )
         hvm_set_guest_pat(v, __get_vvmcs(vvmcs, GUEST_PAT));
+    if ( control & VM_ENTRY_LOAD_PERF_GLOBAL_CTRL )
+        hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL, __get_vvmcs(vvmcs, GUEST_PERF_GLOBAL_CTRL));
 
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 
@@ -890,6 +896,8 @@ static void load_vvmcs_host_state(struct vcpu *v)
     control = __get_vvmcs(vvmcs, VM_EXIT_CONTROLS);
     if ( control & VM_EXIT_LOAD_HOST_PAT )
         hvm_set_guest_pat(v, __get_vvmcs(vvmcs, HOST_PAT));
+    if ( control & VM_EXIT_LOAD_PERF_GLOBAL_CTRL )
+        hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL, __get_vvmcs(vvmcs, HOST_PERF_GLOBAL_CTRL));
 
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 
@@ -1335,7 +1343,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
                VM_EXIT_SAVE_GUEST_PAT |
                VM_EXIT_LOAD_HOST_PAT |
                VM_EXIT_SAVE_GUEST_EFER |
-               VM_EXIT_LOAD_HOST_EFER;
+               VM_EXIT_LOAD_HOST_EFER |
+               VM_EXIT_LOAD_PERF_GLOBAL_CTRL;
 	/* 0-settings */
         data = ((data | tmp) << 32) | tmp;
         break;
@@ -1343,7 +1352,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         /* bit 0-8, and 12 must be 1 (refer G5 of SDM) */
         tmp = 0x11ff;
         data = VM_ENTRY_LOAD_GUEST_PAT |
-               VM_ENTRY_LOAD_GUEST_EFER;
+               VM_ENTRY_LOAD_GUEST_EFER |
+               VM_ENTRY_LOAD_PERF_GLOBAL_CTRL;
         data = ((data | tmp) << 32) | tmp;
         break;
 

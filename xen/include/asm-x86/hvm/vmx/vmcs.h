@@ -162,6 +162,7 @@ extern u32 vmx_pin_based_exec_control;
 
 #define VM_EXIT_SAVE_DEBUG_CNTRLS       0x00000004
 #define VM_EXIT_IA32E_MODE              0x00000200
+#define VM_EXIT_LOAD_PERF_GLOBAL_CTRL   0x00001000
 #define VM_EXIT_ACK_INTR_ON_EXIT        0x00008000
 #define VM_EXIT_SAVE_GUEST_PAT          0x00040000
 #define VM_EXIT_LOAD_HOST_PAT           0x00080000
@@ -173,6 +174,7 @@ extern u32 vmx_vmexit_control;
 #define VM_ENTRY_IA32E_MODE             0x00000200
 #define VM_ENTRY_SMM                    0x00000400
 #define VM_ENTRY_DEACT_DUAL_MONITOR     0x00000800
+#define VM_ENTRY_LOAD_PERF_GLOBAL_CTRL  0x00002000
 #define VM_ENTRY_LOAD_GUEST_PAT         0x00004000
 #define VM_ENTRY_LOAD_GUEST_EFER        0x00008000
 extern u32 vmx_vmentry_control;
@@ -302,6 +304,8 @@ enum vmcs_field {
     GUEST_PAT_HIGH                  = 0x00002805,
     GUEST_EFER                      = 0x00002806,
     GUEST_EFER_HIGH                 = 0x00002807,
+    GUEST_PERF_GLOBAL_CTRL          = 0x00002808,
+    GUEST_PERF_GLOBAL_CTRL_HIGH     = 0x00002809,
     GUEST_PDPTR0                    = 0x0000280a,
     GUEST_PDPTR0_HIGH               = 0x0000280b,
     GUEST_PDPTR1                    = 0x0000280c,
@@ -314,6 +318,8 @@ enum vmcs_field {
     HOST_PAT_HIGH                   = 0x00002c01,
     HOST_EFER                       = 0x00002c02,
     HOST_EFER_HIGH                  = 0x00002c03,
+    HOST_PERF_GLOBAL_CTRL           = 0x00002c04,
+    HOST_PERF_GLOBAL_CTRL_HIGH      = 0x00002c05,
     PIN_BASED_VM_EXEC_CONTROL       = 0x00004000,
     CPU_BASED_VM_EXEC_CONTROL       = 0x00004002,
     EXCEPTION_BITMAP                = 0x00004004,
