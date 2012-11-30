@@ -68,6 +68,7 @@ void setup_xen_features(void)
     }
 }
 
+#ifdef CONFIG_XENBUS
 static void shutdown_thread(void *p)
 {
     const char *path = "control/shutdown";
@@ -96,6 +97,7 @@ static void shutdown_thread(void *p)
     wmb();
     wake_up(&shutdown_queue);
 }
+#endif
 
 
 /* This should be overridden by the application we are linked against. */
@@ -160,7 +162,9 @@ void start_kernel(start_info_t *si)
     /* Init XenBus */
     init_xenbus();
 
+#ifdef CONFIG_XENBUS
     create_thread("shutdown", shutdown_thread, NULL);
+#endif
 
     /* Call (possibly overridden) app_main() */
     app_main(&start_info);
