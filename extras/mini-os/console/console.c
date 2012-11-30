@@ -54,9 +54,7 @@
    NOTE: you need to enable verbose in xen/Rules.mk for it to work. */
 static int console_initialised = 0;
 
-
-#ifndef HAVE_LIBC
-void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
+__attribute__((weak)) void console_input(char * buf, unsigned len)
 {
     if(len > 0)
     {
@@ -67,6 +65,12 @@ void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
         if(buf[len-1] == '\r')
             printk("\nNo console input handler.\n");
     }
+}
+
+#ifndef HAVE_LIBC
+void xencons_rx(char *buf, unsigned len, struct pt_regs *regs)
+{
+    console_input(buf, len);
 }
 
 void xencons_tx(void)
