@@ -38,11 +38,15 @@ endif
 
 ALL_OBJS := head.o $(ALL_OBJS)
 
-$(TARGET): $(TARGET)-syms
+$(TARGET): $(TARGET)-syms $(TARGET).bin
 	# XXX: VE model loads by VMA so instead of
 	# making a proper ELF we link with LMA == VMA and adjust crudely
 	$(OBJCOPY) --change-addresses +0x80000000 $< $@
 	$(STRIP) $@
+
+#
+$(TARGET).bin: $(TARGET)-syms
+	objcopy -O binary -S $< $@
 
 #$(TARGET): $(TARGET)-syms $(efi-y) boot/mkelf32
 #	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
