@@ -48,6 +48,10 @@
 
 uint8_t xen_features[XENFEAT_NR_SUBMAPS * 32];
 
+unsigned int do_shutdown = 0;
+unsigned int shutdown_reason;
+DECLARE_WAIT_QUEUE_HEAD(shutdown_queue);
+
 void setup_xen_features(void)
 {
     xen_feature_info_t fi;
@@ -63,6 +67,36 @@ void setup_xen_features(void)
             xen_features[i*32+j] = !!(fi.submap & 1<<j);
     }
 }
+
+static void shutdown_thread(void *p)
+{
+    const char *path = "control/shutdown";
+    const char *token = path;
+    xenbus_event_queue events = NULL;
+    char *shutdown, *err;
+    xenbus_watch_path_token(XBT_NIL, path, token, &events);
+    while ((err = xenbus_read(XBT_NIL, path, &shutdown)) != NULL)
+    {
+        free(err);
+        xenbus_wait_for_watch(&events);
+    }
+    xenbus_unwatch_path_token(XBT_NIL, path, token);
+    xenbus_write(XBT_NIL, path, "");
+    printk("Shutting down (%s)\n", shutdown);
+
+    if (!strcmp(shutdown, "poweroff"))
+        shutdown_reason = SHUTDOWN_poweroff;
+    else if (!strcmp(shutdown, "reboot"))
+        shutdown_reason = SHUTDOWN_reboot;
+    else
+        /* Unknown */
+        shutdown_reason = SHUTDOWN_crash;
+    wmb();
+    do_shutdown = 1;
+    wmb();
+    wake_up(&shutdown_queue);
+}
+
 
 /* This should be overridden by the application we are linked against. */
 __attribute__((weak)) int app_main(start_info_t *si)
@@ -125,6 +159,8 @@ void start_kernel(start_info_t *si)
  
     /* Init XenBus */
     init_xenbus();
+
+    create_thread("shutdown", shutdown_thread, NULL);
 
     /* Call (possibly overridden) app_main() */
     app_main(&start_info);

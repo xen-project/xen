@@ -46,6 +46,7 @@
 #include <xen/version.h>
 
 static struct netfront_dev *net_dev;
+static struct semaphore net_sem = __SEMAPHORE_INITIALIZER(net_sem, 0);
 
 void test_xenbus(void);
 
@@ -70,12 +71,14 @@ static void periodic_thread(void *p)
 static void netfront_thread(void *p)
 {
     net_dev = init_netfront(NULL, NULL, NULL, NULL);
+    up(&net_sem);
 }
 
 static struct blkfront_dev *blk_dev;
 static struct blkfront_info blk_info;
 static uint64_t blk_size_read;
 static uint64_t blk_size_write;
+static struct semaphore blk_sem = __SEMAPHORE_INITIALIZER(blk_sem, 0);;
 
 struct blk_req {
     struct blkfront_aiocb aiocb;
@@ -189,8 +192,10 @@ static void blkfront_thread(void *p)
     time_t lasttime = 0;
 
     blk_dev = init_blkfront(NULL, &blk_info);
-    if (!blk_dev)
+    if (!blk_dev) {
+        up(&blk_sem);
         return;
+    }
 
     if (blk_info.info & VDISK_CDROM)
         printk("Block device is a CDROM\n");
@@ -210,7 +215,7 @@ static void blkfront_thread(void *p)
         blk_read_sector(blk_info.sectors-1);
     }
 
-    while (1) {
+    while (!do_shutdown) {
         uint64_t sector = rand() % blk_info.sectors;
         struct timeval tv;
 #ifdef BLKTEST_WRITE
@@ -235,6 +240,7 @@ static void blkfront_thread(void *p)
         }
 #endif
     }
+    up(&blk_sem);
 }
 
 #define WIDTH 800
@@ -293,7 +299,6 @@ static void fbfront_thread(void *p)
     xfree(mfns);
     if (!fb_dev) {
         xfree(fb);
-        return;
     }
     up(&fbfront_sem);
 }
@@ -330,17 +335,21 @@ static void refresh_cursor(int new_x, int new_y)
 }
 
 static struct kbdfront_dev *kbd_dev;
+static struct semaphore kbd_sem = __SEMAPHORE_INITIALIZER(kbd_sem, 0);
 static void kbdfront_thread(void *p)
 {
     DEFINE_WAIT(w);
     DEFINE_WAIT(w2);
+    DEFINE_WAIT(w3);
     int x = WIDTH / 2, y = HEIGHT / 2, z = 0;
 
     kbd_dev = init_kbdfront(NULL, 1);
-    if (!kbd_dev)
-        return;
-
     down(&fbfront_sem);
+    if (!kbd_dev) {
+        up(&kbd_sem);
+        return;
+    }
+
     refresh_cursor(x, y);
     while (1) {
         union xenkbd_in_event kbdevent;
@@ -349,6 +358,11 @@ static void kbdfront_thread(void *p)
 
         add_waiter(w, kbdfront_queue);
         add_waiter(w2, fbfront_queue);
+        add_waiter(w3, shutdown_queue);
+
+        rmb();
+        if (do_shutdown)
+            break;
 
         while (kbdfront_receive(kbd_dev, &kbdevent, 1) != 0) {
             sleep = 0;
@@ -391,9 +405,11 @@ static void kbdfront_thread(void *p)
                         fbfront_update(fb_dev, x - 16, y - 16, 33, 33);
                     }
                 } else if (kbdevent.key.keycode == KEY_Q) {
-                    struct sched_shutdown sched_shutdown = { .reason = SHUTDOWN_poweroff };
-                    HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
-                    do_exit();
+                    shutdown_reason = SHUTDOWN_poweroff;
+                    wmb();
+                    do_shutdown = 1;
+                    wmb();
+                    wake_up(&shutdown_queue);
                 }
                 break;
             }
@@ -410,11 +426,16 @@ static void kbdfront_thread(void *p)
         }
         if (sleep)
             schedule();
+        remove_waiter(w3, shutdown_queue);
+        remove_waiter(w2, fbfront_queue);
+        remove_waiter(w, kbdfront_queue);
     }
+    up(&kbd_sem);
 }
 
 #ifdef CONFIG_PCIFRONT
 static struct pcifront_dev *pci_dev;
+static struct semaphore pci_sem = __SEMAPHORE_INITIALIZER(pci_sem, 0);
 
 static void print_pcidev(unsigned int domain, unsigned int bus, unsigned int slot, unsigned int fun)
 {
@@ -432,12 +453,59 @@ static void pcifront_thread(void *p)
 {
     pcifront_watches(NULL);
     pci_dev = init_pcifront(NULL);
-    if (!pci_dev)
+    if (!pci_dev) {
+        up(&pci_sem);
         return;
+    }
     printk("PCI devices:\n");
     pcifront_scan(pci_dev, print_pcidev);
+    up(&pci_sem);
 }
 #endif
+
+void shutdown_frontends(void)
+{
+    down(&net_sem);
+    if (net_dev)
+        shutdown_netfront(net_dev);
+
+    down(&blk_sem);
+    if (blk_dev)
+        shutdown_blkfront(blk_dev);
+
+    if (fb_dev)
+        shutdown_fbfront(fb_dev);
+
+    down(&kbd_sem);
+    if (kbd_dev)
+        shutdown_kbdfront(kbd_dev);
+
+#ifdef CONFIG_PCIFRONT
+    down(&pci_sem);
+    if (pci_dev)
+        shutdown_pcifront(pci_dev);
+#endif
+}
+
+static void shutdown_thread(void *p)
+{
+    DEFINE_WAIT(w);
+
+    while (1) {
+        add_waiter(w, shutdown_queue);
+        rmb();
+        if (do_shutdown) {
+            rmb();
+            break;
+        }
+        schedule();
+        remove_waiter(w, shutdown_queue);
+    }
+
+    shutdown_frontends();
+
+    HYPERVISOR_shutdown(shutdown_reason);
+}
 
 int app_main(start_info_t *si)
 {
@@ -451,25 +519,6 @@ int app_main(start_info_t *si)
 #ifdef CONFIG_PCIFRONT
     create_thread("pcifront", pcifront_thread, si);
 #endif
+    create_thread("shutdown", shutdown_thread, si);
     return 0;
-}
-
-void shutdown_frontends(void)
-{
-    if (net_dev)
-        shutdown_netfront(net_dev);
-
-    if (blk_dev)
-        shutdown_blkfront(blk_dev);
-
-    if (fb_dev)
-        shutdown_fbfront(fb_dev);
-
-    if (kbd_dev)
-        shutdown_kbdfront(kbd_dev);
-
-#ifdef CONFIG_PCIFRONT
-    if (pci_dev)
-        shutdown_pcifront(pci_dev);
-#endif
 }
