@@ -344,7 +344,7 @@ void vmx_update_cpu_exec_control(struct vcpu *v)
         __vmwrite(CPU_BASED_VM_EXEC_CONTROL, v->arch.hvm_vmx.exec_control);
 }
 
-static void vmx_update_secondary_exec_control(struct vcpu *v)
+void vmx_update_secondary_exec_control(struct vcpu *v)
 {
     if ( nestedhvm_vcpu_in_guestmode(v) )
         nvmx_update_secondary_exec_control(v,

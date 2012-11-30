@@ -244,6 +244,17 @@ static inline u32 __n2_exec_control(struct vcpu *v)
     return __get_vvmcs(nvcpu->nv_vvmcx, CPU_BASED_VM_EXEC_CONTROL);
 }
 
+static inline u32 __n2_secondary_exec_control(struct vcpu *v)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    u64 second_ctrl = 0;
+
+    if ( __n2_exec_control(v) & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS )
+        second_ctrl = __get_vvmcs(nvcpu->nv_vvmcx, SECONDARY_VM_EXEC_CONTROL);
+
+    return second_ctrl;
+}
+
 static int vmx_inst_check_privilege(struct cpu_user_regs *regs, int vmxop_check)
 {
     struct vcpu *v = current;
@@ -454,7 +465,6 @@ void nvmx_update_exec_control(struct vcpu *v, u32 host_cntrl)
     /* Enforce the removed features */
     shadow_cntrl &= ~(CPU_BASED_TPR_SHADOW
                       | CPU_BASED_ACTIVATE_MSR_BITMAP
-                      | CPU_BASED_ACTIVATE_SECONDARY_CONTROLS
                       | CPU_BASED_ACTIVATE_IO_BITMAP
                       | CPU_BASED_UNCOND_IO_EXITING);
     shadow_cntrl |= host_cntrl;
@@ -487,7 +497,12 @@ void nvmx_update_exec_control(struct vcpu *v, u32 host_cntrl)
 void nvmx_update_secondary_exec_control(struct vcpu *v,
                                             unsigned long value)
 {
-    set_shadow_control(v, SECONDARY_VM_EXEC_CONTROL, value);
+    u32 shadow_cntrl;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+
+    shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, SECONDARY_VM_EXEC_CONTROL);
+    shadow_cntrl |= value;
+    set_shadow_control(v, SECONDARY_VM_EXEC_CONTROL, shadow_cntrl);
 }
 
 static void nvmx_update_pin_control(struct vcpu *v, unsigned long host_cntrl)
@@ -714,6 +729,7 @@ static void load_shadow_control(struct vcpu *v)
      */
     nvmx_update_pin_control(v, vmx_pin_based_exec_control);
     vmx_update_cpu_exec_control(v);
+    vmx_update_secondary_exec_control(v);
     nvmx_update_exit_control(v, vmx_vmexit_control);
     nvmx_update_entry_control(v);
     vmx_update_exception_bitmap(v);
@@ -923,6 +939,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
         v->arch.hvm_vcpu.guest_efer &= ~(EFER_LMA | EFER_LME);
 
     vmx_update_cpu_exec_control(v);
+    vmx_update_secondary_exec_control(v);
     vmx_update_exception_bitmap(v);
 
     load_vvmcs_host_state(v);
@@ -1274,11 +1291,19 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
                CPU_BASED_UNCOND_IO_EXITING |
                CPU_BASED_RDTSC_EXITING |
                CPU_BASED_MONITOR_TRAP_FLAG |
-               CPU_BASED_VIRTUAL_NMI_PENDING;
+               CPU_BASED_VIRTUAL_NMI_PENDING |
+               CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
         /* bit 1, 4-6,8,13-16,26 must be 1 (refer G4 of SDM) */
         tmp = ( (1<<26) | (0xf << 13) | 0x100 | (0x7 << 4) | 0x2);
         /* 0-settings */
         data = ((data | tmp) << 32) | (tmp);
+        break;
+    case MSR_IA32_VMX_PROCBASED_CTLS2:
+        /* 1-seetings */
+        data = 0;
+        /* 0-settings */
+        tmp = 0;
+        data = (data << 32) | tmp;
         break;
     case MSR_IA32_VMX_EXIT_CTLS:
         /* 1-seetings */
