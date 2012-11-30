@@ -795,6 +795,7 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
 static void enable_iommu(struct amd_iommu *iommu)
 {
     unsigned long flags;
+    struct irq_desc *desc;
 
     spin_lock_irqsave(&iommu->lock, flags);
 
@@ -812,7 +813,11 @@ static void enable_iommu(struct amd_iommu *iommu)
     if ( iommu_has_feature(iommu, IOMMU_EXT_FEATURE_PPRSUP_SHIFT) )
         register_iommu_ppr_log_in_mmio_space(iommu);
 
-    set_msi_affinity(irq_to_desc(iommu->msi.irq), &cpu_online_map);
+    desc = irq_to_desc(iommu->msi.irq);
+    spin_lock(&desc->lock);
+    set_msi_affinity(desc, &cpu_online_map);
+    spin_unlock(&desc->lock);
+
     amd_iommu_msi_enable(iommu, IOMMU_CONTROL_ENABLED);
 
     set_iommu_ht_flags(iommu);
