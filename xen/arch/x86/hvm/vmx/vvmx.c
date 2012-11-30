@@ -530,8 +530,7 @@ static void nvmx_update_exit_control(struct vcpu *v, unsigned long host_cntrl)
     shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_CONTROLS);
     shadow_cntrl &= ~(VM_EXIT_SAVE_DEBUG_CNTRLS 
                       | VM_EXIT_SAVE_GUEST_PAT
-                      | VM_EXIT_SAVE_GUEST_EFER
-                      | VM_EXIT_SAVE_PREEMPT_TIMER);
+                      | VM_EXIT_SAVE_GUEST_EFER);
     shadow_cntrl |= host_cntrl;
     __vmwrite(VM_EXIT_CONTROLS, shadow_cntrl);
 }
@@ -1318,8 +1317,9 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         /* 1-seetings */
         /* bit 0-8, 10,11,13,14,16,17 must be 1 (refer G4 of SDM) */
         tmp = 0x36dff;
-        data = VM_EXIT_ACK_INTR_ON_EXIT;
-        data |= VM_EXIT_IA32E_MODE;
+        data = VM_EXIT_ACK_INTR_ON_EXIT |
+               VM_EXIT_IA32E_MODE |
+               VM_EXIT_SAVE_PREEMPT_TIMER;
 	/* 0-settings */
         data = ((data | tmp) << 32) | tmp;
         break;
