@@ -214,17 +214,15 @@ static inline struct page_info *virt_to_page(const void *v)
     ASSERT(va >= XENHEAP_VIRT_START);
     ASSERT(va < xenheap_virt_end);
 
-    return frame_table + ((va - XENHEAP_VIRT_START) >> PAGE_SHIFT);
+    return frame_table
+        + ((va - XENHEAP_VIRT_START) >> PAGE_SHIFT)
+        + xenheap_mfn_start
+        - frametable_base_mfn;
 }
 
 static inline void *page_to_virt(const struct page_info *pg)
 {
-    ASSERT((unsigned long)pg - FRAMETABLE_VIRT_START < frametable_virt_end);
-    return (void *)(XENHEAP_VIRT_START +
-                    ((unsigned long)pg - FRAMETABLE_VIRT_START) /
-                    (sizeof(*pg) / (sizeof(*pg) & -sizeof(*pg))) *
-                    (PAGE_SIZE / (sizeof(*pg) & -sizeof(*pg))));
-
+    return mfn_to_virt(page_to_mfn(pg));
 }
 
 struct domain *page_get_owner_and_reference(struct page_info *page);
