@@ -123,9 +123,11 @@ SECTIONS
   } :text
   _end = . ;
 
+#ifdef CONFIG_DTB_FILE
   /* Section for the device tree blob (if any). */
   _sdtb = .;
   .dtb : { *(.dtb) } :text
+#endif
 
   /* Sections to be discarded */
   /DISCARD/ : {
