@@ -529,7 +529,7 @@ static void nvmx_update_exit_control(struct vcpu *v, unsigned long host_cntrl)
 
     shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_CONTROLS);
     shadow_cntrl &= ~(VM_EXIT_SAVE_DEBUG_CNTRLS 
-                      | VM_EXIT_SAVE_GUEST_PAT
+                      | VM_EXIT_LOAD_HOST_PAT
                       | VM_EXIT_SAVE_GUEST_EFER);
     shadow_cntrl |= host_cntrl;
     __vmwrite(VM_EXIT_CONTROLS, shadow_cntrl);
@@ -624,6 +624,7 @@ static const u16 vmcs_gstate_field[] = {
     /* 64 BITS */
     VMCS_LINK_POINTER,
     GUEST_IA32_DEBUGCTL,
+    GUEST_PAT,
     /* 32 BITS */
     GUEST_ES_LIMIT,
     GUEST_CS_LIMIT,
@@ -746,6 +747,7 @@ static void load_shadow_guest_state(struct vcpu *v)
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     void *vvmcs = nvcpu->nv_vvmcx;
     int i;
+    u32 control;
 
     /* vvmcs.gstate to shadow vmcs.gstate */
     for ( i = 0; i < ARRAY_SIZE(vmcs_gstate_field); i++ )
@@ -754,6 +756,10 @@ static void load_shadow_guest_state(struct vcpu *v)
     hvm_set_cr0(__get_vvmcs(vvmcs, GUEST_CR0));
     hvm_set_cr4(__get_vvmcs(vvmcs, GUEST_CR4));
     hvm_set_cr3(__get_vvmcs(vvmcs, GUEST_CR3));
+
+    control = __get_vvmcs(vvmcs, VM_ENTRY_CONTROLS);
+    if ( control & VM_ENTRY_LOAD_GUEST_PAT )
+        hvm_set_guest_pat(v, __get_vvmcs(vvmcs, GUEST_PAT));
 
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 
@@ -868,6 +874,7 @@ static void load_vvmcs_host_state(struct vcpu *v)
     int i;
     u64 r;
     void *vvmcs = vcpu_nestedhvm(v).nv_vvmcx;
+    u32 control;
 
     for ( i = 0; i < ARRAY_SIZE(vmcs_h2g_field); i++ )
     {
@@ -878,6 +885,10 @@ static void load_vvmcs_host_state(struct vcpu *v)
     hvm_set_cr0(__get_vvmcs(vvmcs, HOST_CR0));
     hvm_set_cr4(__get_vvmcs(vvmcs, HOST_CR4));
     hvm_set_cr3(__get_vvmcs(vvmcs, HOST_CR3));
+
+    control = __get_vvmcs(vvmcs, VM_EXIT_CONTROLS);
+    if ( control & VM_EXIT_LOAD_HOST_PAT )
+        hvm_set_guest_pat(v, __get_vvmcs(vvmcs, HOST_PAT));
 
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 
@@ -1319,14 +1330,17 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         tmp = 0x36dff;
         data = VM_EXIT_ACK_INTR_ON_EXIT |
                VM_EXIT_IA32E_MODE |
-               VM_EXIT_SAVE_PREEMPT_TIMER;
+               VM_EXIT_SAVE_PREEMPT_TIMER |
+               VM_EXIT_SAVE_GUEST_PAT |
+               VM_EXIT_LOAD_HOST_PAT;
 	/* 0-settings */
         data = ((data | tmp) << 32) | tmp;
         break;
     case MSR_IA32_VMX_ENTRY_CTLS:
         /* bit 0-8, and 12 must be 1 (refer G5 of SDM) */
-        data = 0x11ff;
-        data = (data << 32) | data;
+        tmp = 0x11ff;
+        data = VM_ENTRY_LOAD_GUEST_PAT;
+        data = ((data | tmp) << 32) | tmp;
         break;
 
     case IA32_FEATURE_CONTROL_MSR:
