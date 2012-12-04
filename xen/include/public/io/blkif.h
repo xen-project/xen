@@ -137,7 +137,22 @@
  *      can map persistently depends on the implementation, but ideally it
  *      should be RING_SIZE * BLKIF_MAX_SEGMENTS_PER_REQUEST. Using this
  *      feature the backend doesn't need to unmap each grant, preventing
- *      costly TLB flushes.
+ *      costly TLB flushes. The backend driver should only map grants
+ *      persistently if the frontend supports it. If a backend driver chooses
+ *      to use the persistent protocol when the frontend doesn't support it,
+ *      it will probably hit the maximum number of persistently mapped grants
+ *      (due to the fact that the frontend won't be reusing the same grants),
+ *      and fall back to non-persistent mode. Backend implementations may
+ *      shrink or expand the number of persistently mapped grants without
+ *      notifying the frontend depending on memory constraints (this might
+ *      cause a performance degradation).
+ *
+ *      If a backend driver wants to limit the maximum number of persistently
+ *      mapped grants to a value less than RING_SIZE *
+ *      BLKIF_MAX_SEGMENTS_PER_REQUEST a LRU strategy should be used to
+ *      discard the grants that are less commonly used. Using a LRU in the
+ *      backend driver paired with a LIFO queue in the frontend will
+ *      allow us to have better performance in this scenario.
  *
  *----------------------- Request Transport Parameters ------------------------
  *
@@ -258,11 +273,23 @@
  * feature-persistent
  *      Values:         0/1 (boolean)
  *      Default Value:  0
- *      Notes: 7, 8
+ *      Notes: 7, 8, 9
  *
  *      A value of "1" indicates that the frontend will reuse the same grants
  *      for all transactions, allowing the backend to map them with write
- *      access (even when it should be read-only).
+ *      access (even when it should be read-only). If the frontend hits the
+ *      maximum number of allowed persistently mapped grants, it can fallback
+ *      to non persistent mode. This will cause a performance degradation,
+ *      since the the backend driver will still try to map those grants
+ *      persistently. Since the persistent grants protocol is compatible with
+ *      the previous protocol, a frontend driver can choose to work in
+ *      persistent mode even when the backend doesn't support it.
+ *
+ *      It is recommended that the frontend driver stores the persistently
+ *      mapped grants in a LIFO queue, so a subset of all persistently mapped
+ *      grants gets used commonly. This is done in case the backend driver
+ *      decides to limit the maximum number of persistently mapped grants
+ *      to a value less than RING_SIZE * BLKIF_MAX_SEGMENTS_PER_REQUEST.
  *
  *------------------------- Virtual Device Properties -------------------------
  *
@@ -308,6 +335,10 @@
  * (8) The frontend driver has to allow the backend driver to map all grants
  *     with write access, even when they should be mapped read-only, since
  *     further requests may reuse these grants and require write permissions.
+ * (9) Linux implementation doesn't have a limit on the maximum number of
+ *     grants that can be persistently mapped in the frontend driver, but
+ *     due to the frontent driver implementation it should never be bigger
+ *     than RING_SIZE * BLKIF_MAX_SEGMENTS_PER_REQUEST.
  */
 
 /*
