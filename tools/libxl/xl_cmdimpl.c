@@ -1257,6 +1257,7 @@ skip_nic:
                     vfb->sdl.xauthority = strdup(p2 + 1);
                 }
             } while ((p = strtok(NULL, ",")) != NULL);
+
 skip_vfb:
             free(buf2);
             d_config->num_vfbs++;
@@ -1490,6 +1491,16 @@ skip_vfb:
         xlu_cfg_replace_string (config, "soundhw", &b_info->u.hvm.soundhw, 0);
         xlu_cfg_get_defbool(config, "xen_platform_pci",
                             &b_info->u.hvm.xen_platform_pci, 0);
+
+        if(b_info->u.hvm.vnc.listen
+           && b_info->u.hvm.vnc.display
+           && strchr(b_info->u.hvm.vnc.listen, ':') != NULL) {
+            fprintf(stderr,
+                    "ERROR: Display specified both in vnclisten"
+                    " and vncdisplay!\n");
+            exit (1);
+
+        }
     }
 
     xlu_cfg_destroy(config);

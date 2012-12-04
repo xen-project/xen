@@ -350,10 +350,16 @@ other VNC-related settings.  The default is to enable this.
 
 Specifies the IP address, and optionally VNC display number, to use.
 
+NB that if you specify the display number here, you should not use
+vncdisplay.
+
 =item C<vncdisplay=DISPLAYNUM>
 
 Specifies the VNC display number to use.  The actual TCP port number
 will be DISPLAYNUM+5900.
+
+NB that you should not use this option if you set the displaynum in the
+vnclisten string.
 
 =item C<vncunused=BOOLEAN>
 
