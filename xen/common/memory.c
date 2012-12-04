@@ -308,6 +308,13 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
         goto fail_early;
     }
 
+    if ( !guest_handle_okay(exch.in.extent_start, exch.in.nr_extents) ||
+         !guest_handle_okay(exch.out.extent_start, exch.out.nr_extents) )
+    {
+        rc = -EFAULT;
+        goto fail_early;
+    }
+
     /* Only privileged guests can allocate multi-page contiguous extents. */
     if ( !multipage_allocation_permitted(current->domain,
                                          exch.in.extent_order) ||
