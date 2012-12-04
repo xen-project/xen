@@ -1117,6 +1117,9 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     mfn_t omfn;
     int rc = 0;
 
+    if ( !IS_PRIV_FOR(current->domain, d) )
+        return -EPERM;
+
     if ( !paging_mode_translate(d) )
         return -EINVAL;
 
@@ -1131,8 +1134,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
         omfn = p2m->get_entry(p2m, gfn + i, &ot, &a, 0, NULL);
         if ( p2m_is_ram(ot) )
         {
-            printk("%s: gfn_to_mfn returned type %d!\n",
-                   __func__, ot);
+            P2M_DEBUG("gfn_to_mfn returned type %d!\n", ot);
             rc = -EBUSY;
             goto out;
         }
@@ -1156,9 +1158,9 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
         pod_unlock(p2m);
     }
 
+out:
     gfn_unlock(p2m, gfn, order);
 
-out:
     return rc;
 }
 
