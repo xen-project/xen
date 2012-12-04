@@ -1176,15 +1176,15 @@ guest. Valid values are:
 
 =over 4
 
-=item B<qemu-xen-traditional>
-
-Use the device-model based upon the historical Xen fork of Qemu.  This
-device-model is currently the default.
-
 =item B<qemu-xen>
 
-use the device-model merged into the upstream QEMU project.  This
-device-model will become the default in a future version of Xen.
+Use the device-model merged into the upstream QEMU project.
+This device-model is the default for Linux dom0.
+
+=item B<qemu-xen-traditional>
+
+Use the device-model based upon the historical Xen fork of Qemu.
+This device-model is still the default for NetBSD dom0.
 
 =back
 

@@ -267,3 +267,8 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
 out:
     return rc;
 }
+
+libxl_device_model_version libxl__default_device_model(libxl__gc *gc)
+{
+    return LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN;
+}
