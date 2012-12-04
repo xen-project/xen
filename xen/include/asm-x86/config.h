@@ -119,6 +119,9 @@ extern char wakeup_start[];
 extern unsigned int video_mode, video_flags;
 extern unsigned short boot_edid_caps;
 extern unsigned char boot_edid_info[128];
+
+#define GB(_gb) (_gb ## UL << 30)
+
 #endif
 
 #define asmlinkage
@@ -134,7 +137,6 @@ extern unsigned char boot_edid_info[128];
 #define PML4_ADDR(_slot)                             \
     ((((_slot ## UL) >> 8) * 0xffff000000000000UL) | \
      (_slot ## UL << PML4_ENTRY_BITS))
-#define GB(_gb) (_gb ## UL << 30)
 #else
 #define PML4_ENTRY_BYTES (1 << PML4_ENTRY_BITS)
 #define PML4_ADDR(_slot)                             \
