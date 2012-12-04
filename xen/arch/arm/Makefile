@@ -46,7 +46,7 @@ $(TARGET): $(TARGET)-syms $(TARGET).bin
 
 #
 $(TARGET).bin: $(TARGET)-syms
-	objcopy -O binary -S $< $@
+	$(OBJCOPY) -O binary -S $< $@
 
 #$(TARGET): $(TARGET)-syms $(efi-y) boot/mkelf32
 #	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
