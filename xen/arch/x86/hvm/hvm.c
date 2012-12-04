@@ -3984,6 +3984,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !is_hvm_domain(d) )
             goto param_fail2;
 
+        if ( a.nr > GB(1) >> PAGE_SHIFT )
+            goto param_fail2;
+
         rc = xsm_hvm_param(d, op);
         if ( rc )
             goto param_fail2;
@@ -4010,7 +4013,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
     {
         struct xen_hvm_modified_memory a;
         struct domain *d;
-        unsigned long pfn;
 
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
@@ -4037,9 +4039,11 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !paging_mode_log_dirty(d) )
             goto param_fail3;
 
-        for ( pfn = a.first_pfn; pfn < a.first_pfn + a.nr; pfn++ )
+        while ( a.nr > 0 )
         {
+            unsigned long pfn = a.first_pfn;
             struct page_info *page;
+
             page = get_page_from_gfn(d, pfn, NULL, P2M_UNSHARE);
             if ( page )
             {
@@ -4048,6 +4052,19 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 /* don't take a long time and don't die either */
                 sh_remove_shadows(d->vcpu[0], _mfn(page_to_mfn(page)), 1, 0);
                 put_page(page);
+            }
+
+            a.first_pfn++;
+            a.nr--;
+
+            /* Check for continuation if it's not the last interation */
+            if ( a.nr > 0 && hypercall_preempt_check() )
+            {
+                if ( copy_to_guest(arg, &a, 1) )
+                    rc = -EFAULT;
+                else
+                    rc = -EAGAIN;
+                break;
             }
         }
 
@@ -4104,7 +4121,6 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
     {
         struct xen_hvm_set_mem_type a;
         struct domain *d;
-        unsigned long pfn;
         
         /* Interface types to internal p2m types */
         p2m_type_t memtype[] = {
@@ -4137,8 +4153,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( a.hvmmem_type >= ARRAY_SIZE(memtype) )
             goto param_fail4;
 
-        for ( pfn = a.first_pfn; pfn < a.first_pfn + a.nr; pfn++ )
+        while ( a.nr )
         {
+            unsigned long pfn = a.first_pfn;
             p2m_type_t t;
             p2m_type_t nt;
             mfn_t mfn;
@@ -4178,6 +4195,19 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 }
             }
             put_gfn(d, pfn);
+
+            a.first_pfn++;
+            a.nr--;
+
+            /* Check for continuation if it's not the last interation */
+            if ( a.nr > 0 && hypercall_preempt_check() )
+            {
+                if ( copy_to_guest(arg, &a, 1) )
+                    rc = -EFAULT;
+                else
+                    rc = -EAGAIN;
+                goto param_fail4;
+            }
         }
 
         rc = 0;
