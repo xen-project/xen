@@ -1126,12 +1126,13 @@ fault:
 }
 
 static int
-gnttab_populate_status_frames(struct domain *d, struct grant_table *gt)
+gnttab_populate_status_frames(struct domain *d, struct grant_table *gt,
+                              unsigned int req_nr_frames)
 {
     unsigned i;
     unsigned req_status_frames;
 
-    req_status_frames = grant_to_status_frames(gt->nr_grant_frames);
+    req_status_frames = grant_to_status_frames(req_nr_frames);
     for ( i = nr_status_frames(gt); i < req_status_frames; i++ )
     {
         if ( (gt->status[i] = alloc_xenheap_page()) == NULL )
@@ -1162,7 +1163,12 @@ gnttab_unpopulate_status_frames(struct domain *d, struct grant_table *gt)
 
     for ( i = 0; i < nr_status_frames(gt); i++ )
     {
-        page_set_owner(virt_to_page(gt->status[i]), dom_xen);
+        struct page_info *pg = virt_to_page(gt->status[i]);
+
+        BUG_ON(page_get_owner(pg) != d);
+        if ( test_and_clear_bit(_PGC_allocated, &pg->count_info) )
+            put_page(pg);
+        BUG_ON(pg->count_info & ~PGC_xen_heap);
         free_xenheap_page(gt->status[i]);
         gt->status[i] = NULL;
     }
@@ -1200,18 +1206,17 @@ gnttab_grow_table(struct domain *d, unsigned int req_nr_frames)
         clear_page(gt->shared_raw[i]);
     }
 
-    /* Share the new shared frames with the recipient domain */
-    for ( i = nr_grant_frames(gt); i < req_nr_frames; i++ )
-        gnttab_create_shared_page(d, gt, i);
-
-    gt->nr_grant_frames = req_nr_frames;
-
     /* Status pages - version 2 */
     if (gt->gt_version > 1)
     {
-        if ( gnttab_populate_status_frames(d, gt) )
+        if ( gnttab_populate_status_frames(d, gt, req_nr_frames) )
             goto shared_alloc_failed;
     }
+
+    /* Share the new shared frames with the recipient domain */
+    for ( i = nr_grant_frames(gt); i < req_nr_frames; i++ )
+        gnttab_create_shared_page(d, gt, i);
+    gt->nr_grant_frames = req_nr_frames;
 
     return 1;
 
@@ -2134,7 +2139,7 @@ gnttab_set_version(XEN_GUEST_HANDLE(gnttab_set_version_t uop))
 
     if ( op.version == 2 && gt->gt_version < 2 )
     {
-        res = gnttab_populate_status_frames(d, gt);
+        res = gnttab_populate_status_frames(d, gt, nr_grant_frames(gt));
         if ( res < 0)
             goto out_unlock;
     }
@@ -2449,9 +2454,6 @@ grant_table_create(
         clear_page(t->shared_raw[i]);
     }
     
-    for ( i = 0; i < INITIAL_NR_GRANT_FRAMES; i++ )
-        gnttab_create_shared_page(d, t, i);
-
     /* Status pages for grant table - for version 2 */
     t->status = xmalloc_array(grant_status_t *,
                               grant_to_status_frames(max_nr_grant_frames));
@@ -2459,6 +2461,10 @@ grant_table_create(
         goto no_mem_4;
     memset(t->status, 0,
            grant_to_status_frames(max_nr_grant_frames) * sizeof(t->status[0]));
+
+    for ( i = 0; i < INITIAL_NR_GRANT_FRAMES; i++ )
+        gnttab_create_shared_page(d, t, i);
+
     t->nr_status_frames = 0;
 
     /* Okay, install the structure. */
