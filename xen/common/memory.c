@@ -115,7 +115,8 @@ static void populate_physmap(struct memop_args *a)
 
         if ( a->memflags & MEMF_populate_on_demand )
         {
-            if ( guest_physmap_mark_populate_on_demand(d, gpfn,
+            if ( a->extent_order > MAX_ORDER ||
+                 guest_physmap_mark_populate_on_demand(d, gpfn,
                                                        a->extent_order) < 0 )
                 goto out;
         }
@@ -235,7 +236,8 @@ static void decrease_reservation(struct memop_args *a)
     xen_pfn_t gmfn;
 
     if ( !guest_handle_subrange_okay(a->extent_list, a->nr_done,
-                                     a->nr_extents-1) )
+                                     a->nr_extents-1) ||
+         a->extent_order > MAX_ORDER )
         return;
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
@@ -297,6 +299,9 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
     if ( (exch.nr_exchanged > exch.in.nr_extents) ||
          /* Input and output domain identifiers match? */
          (exch.in.domid != exch.out.domid) ||
+         /* Extent orders are sensible? */
+         (exch.in.extent_order > MAX_ORDER) ||
+         (exch.out.extent_order > MAX_ORDER) ||
          /* Sizes of input and output lists do not overflow a long? */
          ((~0UL >> exch.in.extent_order) < exch.in.nr_extents) ||
          ((~0UL >> exch.out.extent_order) < exch.out.nr_extents) ||
