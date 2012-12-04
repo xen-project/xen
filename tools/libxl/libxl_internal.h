@@ -1041,7 +1041,7 @@ static inline void libxl__domaindeathcheck_stop(libxl__gc *gc,
  * type of file using the PHY backend
  * st_mode: mode_t of the file, as returned by stat function
  *
- * Returns 0 on success, and < 0 on error.
+ * Returns 1 on success, and 0 if not suitable for phy backend.
  */
 _hidden int libxl__try_phy_backend(mode_t st_mode);
 
