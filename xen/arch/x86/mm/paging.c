@@ -529,13 +529,18 @@ int paging_log_dirty_range(struct domain *d,
 
     if ( !d->arch.paging.log_dirty.fault_count &&
          !d->arch.paging.log_dirty.dirty_count ) {
-        int size = (nr + BITS_PER_LONG - 1) / BITS_PER_LONG;
-        unsigned long zeroes[size];
-        memset(zeroes, 0x00, size * BYTES_PER_LONG);
+        static uint8_t zeroes[PAGE_SIZE];
+        int off, size;
+
+        size = ((nr + BITS_PER_LONG - 1) / BITS_PER_LONG) * sizeof (long);
         rv = 0;
-        if ( copy_to_guest_offset(dirty_bitmap, 0, (uint8_t *) zeroes,
-                                  size * BYTES_PER_LONG) != 0 )
-            rv = -EFAULT;
+        for ( off = 0; !rv && off < size; off += sizeof zeroes )
+        {
+            int todo = min(size - off, (int) PAGE_SIZE);
+            if ( copy_to_guest_offset(dirty_bitmap, off, zeroes, todo) )
+                rv = -EFAULT;
+            off += todo;
+        }
         goto out;
     }
     d->arch.paging.log_dirty.fault_count = 0;
