@@ -2412,6 +2412,9 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     mfn_t omfn;
     int rc = 0;
 
+    if ( !IS_PRIV_FOR(current->domain, d) )
+        return -EPERM;
+
     if ( !paging_mode_translate(d) )
         return -EINVAL;
 
@@ -2430,8 +2433,7 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
         omfn = gfn_to_mfn_query(p2m, gfn + i, &ot);
         if ( p2m_is_ram(ot) )
         {
-            printk("%s: gfn_to_mfn returned type %d!\n",
-                   __func__, ot);
+            P2M_DEBUG("gfn_to_mfn returned type %d!\n", ot);
             rc = -EBUSY;
             goto out;
         }
@@ -2453,10 +2455,10 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
         BUG_ON(p2m->pod.entry_count < 0);
     }
 
+out:
     audit_p2m(p2m, 1);
     p2m_unlock(p2m);
 
-out:
     return rc;
 }
 
