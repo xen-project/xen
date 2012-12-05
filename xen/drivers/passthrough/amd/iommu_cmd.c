@@ -321,7 +321,7 @@ void amd_iommu_flush_iotlb(struct pci_dev *pdev,
 
     req_id = get_dma_requestor_id(iommu->seg, bdf);
     queueid = req_id;
-    maxpend = (ats_pdev->ats_queue_depth + 32) & 0xff;
+    maxpend = ats_pdev->ats_queue_depth & 0xff;
 
     /* send INVALIDATE_IOTLB_PAGES command */
     spin_lock_irqsave(&iommu->lock, flags);

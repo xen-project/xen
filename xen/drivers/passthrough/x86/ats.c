@@ -93,7 +93,8 @@ int enable_ats_device(int seg, int bus, int devfn)
         pdev->devfn = devfn;
         value = pci_conf_read16(seg, bus, PCI_SLOT(devfn),
                                 PCI_FUNC(devfn), pos + ATS_REG_CAP);
-        pdev->ats_queue_depth = value & ATS_QUEUE_DEPTH_MASK;
+        pdev->ats_queue_depth = value & ATS_QUEUE_DEPTH_MASK ?:
+                                ATS_QUEUE_DEPTH_MASK + 1;
         list_add(&pdev->list, &ats_devices);
     }
 

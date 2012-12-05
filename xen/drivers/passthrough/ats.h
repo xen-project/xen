@@ -28,7 +28,7 @@ struct pci_ats_dev {
 
 #define ATS_REG_CAP    4
 #define ATS_REG_CTL    6
-#define ATS_QUEUE_DEPTH_MASK     0xF
+#define ATS_QUEUE_DEPTH_MASK     0x1f
 #define ATS_ENABLE               (1<<15)
 
 extern struct list_head ats_devices;
