@@ -113,7 +113,9 @@ S:	Supported
 F:	xen/common/cpupool.c
 
 DEVICE TREE
-M:	David Vrabel <david.vrabel@citrix.com>
+M:	Ian Campbell <ian.campbell@citrix.com>
+M:	Stefano Stabellini <stefano.stabellini@citrix.com>
+M:	Tim Deegan <tim@xen.org>
 S:	Supported
 F:	xen/common/libfdt/
 F:	xen/common/device_tree.c
