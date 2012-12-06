@@ -399,6 +399,8 @@ void ept_p2m_init(struct p2m_domain *p2m);
 void ept_walk_table(struct domain *d, unsigned long gfn);
 void setup_ept_dump(void);
 
+void update_guest_eip(void);
+
 /* EPT violation qualifications definitions */
 #define _EPT_READ_VIOLATION         0
 #define EPT_READ_VIOLATION          (1UL<<_EPT_READ_VIOLATION)

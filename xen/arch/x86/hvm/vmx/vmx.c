@@ -1555,7 +1555,7 @@ static int get_instruction_length(void)
     return len;
 }
 
-static void update_guest_eip(void)
+void update_guest_eip(void)
 {
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     unsigned long x;

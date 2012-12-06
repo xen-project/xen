@@ -1614,6 +1614,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
             tsc += __get_vvmcs(nvcpu->nv_vvmcx, TSC_OFFSET);
             regs->eax = (uint32_t)tsc;
             regs->edx = (uint32_t)(tsc >> 32);
+            update_guest_eip();
 
             return 1;
         }
