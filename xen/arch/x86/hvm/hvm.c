@@ -2460,9 +2460,7 @@ static enum hvm_copy_result __hvm_copy(
             return HVMCOPY_unhandleable;
         }
         if ( !page )
-        {
             return HVMCOPY_bad_gfn_to_mfn;
-        }
 
         p = (char *)__map_domain_page(page) + (addr & ~PAGE_MASK);
 
@@ -2560,11 +2558,7 @@ static enum hvm_copy_result __hvm_clear(paddr_t addr, int size)
             return HVMCOPY_unhandleable;
         }
         if ( !page )
-        {
-            if ( page )
-                put_page(page);
             return HVMCOPY_bad_gfn_to_mfn;
-        }
 
         p = (char *)__map_domain_page(page) + (addr & ~PAGE_MASK);
 
