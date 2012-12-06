@@ -36,6 +36,15 @@ struct nestedvmx {
 
 #define vcpu_2_nvmx(v)	(vcpu_nestedhvm(v).u.nvmx)
 
+/* bit 1, 2, 4 must be 1 */
+#define VMX_PINBASED_CTLS_DEFAULT1	0x16
+/* bit 1, 4-6,8,13-16,26 must be 1 */
+#define VMX_PROCBASED_CTLS_DEFAULT1	0x401e172
+/* bit 0-8, 10,11,13,14,16,17 must be 1 */
+#define VMX_EXIT_CTLS_DEFAULT1		0x36dff
+/* bit 0-8, and 12 must be 1 */
+#define VMX_ENTRY_CTLS_DEFAULT1		0x11ff
+
 /*
  * Encode of VMX instructions base on Table 24-11 & 24-12 of SDM 3B
  */

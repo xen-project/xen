@@ -1299,7 +1299,7 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
  */
 int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
 {
-    u64 data = 0, tmp;
+    u64 data = 0, tmp = 0;
     int r = 1;
 
     if ( !nestedhvm_enabled(current->domain) )
@@ -1318,9 +1318,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         data = PIN_BASED_EXT_INTR_MASK |
                PIN_BASED_NMI_EXITING |
                PIN_BASED_PREEMPT_TIMER;
-        data <<= 32;
-	/* 0-settings */
-        data |= 0;
+        tmp = VMX_PINBASED_CTLS_DEFAULT1;
+        data = ((data | tmp) << 32) | (tmp);
         break;
     case MSR_IA32_VMX_PROCBASED_CTLS:
         /* 1-seetings */
@@ -1342,8 +1341,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
                CPU_BASED_VIRTUAL_NMI_PENDING |
                CPU_BASED_ACTIVATE_MSR_BITMAP |
                CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
-        /* bit 1, 4-6,8,13-16,26 must be 1 (refer G4 of SDM) */
-        tmp = ( (1<<26) | (0xf << 13) | 0x100 | (0x7 << 4) | 0x2);
+        tmp = VMX_PROCBASED_CTLS_DEFAULT1;
         /* 0-settings */
         data = ((data | tmp) << 32) | (tmp);
         break;
@@ -1356,8 +1354,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         break;
     case MSR_IA32_VMX_EXIT_CTLS:
         /* 1-seetings */
-        /* bit 0-8, 10,11,13,14,16,17 must be 1 (refer G4 of SDM) */
-        tmp = 0x36dff;
+        tmp = VMX_EXIT_CTLS_DEFAULT1;
         data = VM_EXIT_ACK_INTR_ON_EXIT |
                VM_EXIT_IA32E_MODE |
                VM_EXIT_SAVE_PREEMPT_TIMER |
@@ -1370,8 +1367,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         data = ((data | tmp) << 32) | tmp;
         break;
     case MSR_IA32_VMX_ENTRY_CTLS:
-        /* bit 0-8, and 12 must be 1 (refer G5 of SDM) */
-        tmp = 0x11ff;
+        /* 1-seetings */
+        tmp = VMX_ENTRY_CTLS_DEFAULT1;
         data = VM_ENTRY_LOAD_GUEST_PAT |
                VM_ENTRY_LOAD_GUEST_EFER |
                VM_ENTRY_LOAD_PERF_GLOBAL_CTRL;
