@@ -1314,24 +1314,32 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 }
 
+#define __emul_value(enable1, default1) \
+    ((enable1 | default1) << 32 | (default1))
+
+#define gen_vmx_msr(enable1, default1, host_value) \
+    (((__emul_value(enable1, default1) & host_value) & (~0ul << 32)) | \
+    ((uint32_t)(__emul_value(enable1, default1) | host_value)))
+
 /*
  * Capability reporting
  */
 int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
 {
-    u64 data = 0, tmp = 0;
+    u64 data = 0, host_data = 0;
     int r = 1;
 
     if ( !nestedhvm_enabled(current->domain) )
         return 0;
+
+    rdmsrl(msr, host_data);
 
     /*
      * Remove unsupport features from n1 guest capability MSR
      */
     switch (msr) {
     case MSR_IA32_VMX_BASIC:
-        data = VVMCS_REVISION | ((u64)PAGE_SIZE) << 32 | 
-               ((u64)MTRR_TYPE_WRBACK) << 50 | VMX_BASIC_DEFAULT1_ZERO;
+        data = (host_data & (~0ul << 32)) | VVMCS_REVISION;
         break;
     case MSR_IA32_VMX_PINBASED_CTLS:
     case MSR_IA32_VMX_TRUE_PINBASED_CTLS:
@@ -1339,8 +1347,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         data = PIN_BASED_EXT_INTR_MASK |
                PIN_BASED_NMI_EXITING |
                PIN_BASED_PREEMPT_TIMER;
-        tmp = VMX_PINBASED_CTLS_DEFAULT1;
-        data = ((data | tmp) << 32) | (tmp);
+        data = gen_vmx_msr(data, VMX_PINBASED_CTLS_DEFAULT1, host_data);
         break;
     case MSR_IA32_VMX_PROCBASED_CTLS:
     case MSR_IA32_VMX_TRUE_PROCBASED_CTLS:
@@ -1365,22 +1372,17 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
                CPU_BASED_PAUSE_EXITING |
                CPU_BASED_RDPMC_EXITING |
                CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
-        tmp = VMX_PROCBASED_CTLS_DEFAULT1;
-        /* 0-settings */
-        data = ((data | tmp) << 32) | (tmp);
+        data = gen_vmx_msr(data, VMX_PROCBASED_CTLS_DEFAULT1, host_data);
         break;
     case MSR_IA32_VMX_PROCBASED_CTLS2:
         /* 1-seetings */
         data = SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING |
                SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
-        /* 0-settings */
-        tmp = 0;
-        data = (data << 32) | tmp;
+        data = gen_vmx_msr(data, 0, host_data);
         break;
     case MSR_IA32_VMX_EXIT_CTLS:
     case MSR_IA32_VMX_TRUE_EXIT_CTLS:
         /* 1-seetings */
-        tmp = VMX_EXIT_CTLS_DEFAULT1;
         data = VM_EXIT_ACK_INTR_ON_EXIT |
                VM_EXIT_IA32E_MODE |
                VM_EXIT_SAVE_PREEMPT_TIMER |
@@ -1389,18 +1391,16 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
                VM_EXIT_SAVE_GUEST_EFER |
                VM_EXIT_LOAD_HOST_EFER |
                VM_EXIT_LOAD_PERF_GLOBAL_CTRL;
-	/* 0-settings */
-        data = ((data | tmp) << 32) | tmp;
+        data = gen_vmx_msr(data, VMX_EXIT_CTLS_DEFAULT1, host_data);
         break;
     case MSR_IA32_VMX_ENTRY_CTLS:
     case MSR_IA32_VMX_TRUE_ENTRY_CTLS:
         /* 1-seetings */
-        tmp = VMX_ENTRY_CTLS_DEFAULT1;
         data = VM_ENTRY_LOAD_GUEST_PAT |
                VM_ENTRY_LOAD_GUEST_EFER |
                VM_ENTRY_LOAD_PERF_GLOBAL_CTRL |
                VM_ENTRY_IA32E_MODE;
-        data = ((data | tmp) << 32) | tmp;
+        data = gen_vmx_msr(data, VMX_ENTRY_CTLS_DEFAULT1, host_data);
         break;
 
     case IA32_FEATURE_CONTROL_MSR:
