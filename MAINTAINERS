@@ -1,5 +1,6 @@
 
 	List of maintainers and how to submit changes
+	=============================================
 
 Please try to follow the guidelines below.  This will make things
 easier on the maintainers.  Not all of these guidelines matter for every
@@ -15,7 +16,11 @@ trivial patch so apply some common sense.
 	'diff -u' to make the patch easy to merge. Be prepared to get your
 	changes sent back with seemingly silly requests about formatting
 	and variable names.  These aren't as silly as they seem. One
-	job the maintainersdo is to keep things looking the same.
+	job the maintainers do is to keep things looking the same.
+
+	PLEASE see http://wiki.xen.org/wiki/Submitting_Xen_Patches for
+	hints on how to submit a patch to xen-unstable in a suitable
+	form.
 
 	PLEASE try to include any credit lines you want added with the
 	patch. It avoids people being missed off by mistake and makes
@@ -33,6 +38,23 @@ trivial patch so apply some common sense.
 	not you.
 
 5.	Happy hacking.
+
+
+	Stable Release Maintenance
+	==========================
+
+The policy for inclusion in a Xen stable release is different to that
+for inclusion in xen-unstable.
+
+Please see http://wiki.xen.org/wiki/Xen_Maintenance_Releases for more
+information.
+
+Remember to copy the appropriate stable branch maintainer who will be
+listed in this section of the MAINTAINERS file in the appropriate
+branch.
+
+	Unstable Subsystem Maintainers
+	==============================
 
 Descriptions of section entries:
 
