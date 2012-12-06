@@ -48,9 +48,11 @@
 
 uint8_t xen_features[XENFEAT_NR_SUBMAPS * 32];
 
+#ifdef CONFIG_XENBUS
 unsigned int do_shutdown = 0;
 unsigned int shutdown_reason;
 DECLARE_WAIT_QUEUE_HEAD(shutdown_queue);
+#endif
 
 void setup_xen_features(void)
 {
