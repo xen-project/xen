@@ -1641,7 +1641,8 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         break;
     case EXIT_REASON_DR_ACCESS:
         ctrl = __n2_exec_control(v);
-        if ( ctrl & CPU_BASED_MOV_DR_EXITING )
+        if ( (ctrl & CPU_BASED_MOV_DR_EXITING) &&
+            v->arch.hvm_vcpu.flag_dr_dirty )
             nvcpu->nv_vmexit_pending = 1;
         break;
     case EXIT_REASON_INVLPG:
