@@ -209,12 +209,18 @@ long arch_do_domctl(
                 for ( j = 0; j < k; j++ )
                 {
                     unsigned long type = 0;
+                    p2m_type_t t;
 
-                    page = get_page_from_gfn(d, arr[j], NULL, P2M_ALLOC);
+                    page = get_page_from_gfn(d, arr[j], &t, P2M_ALLOC);
 
                     if ( unlikely(!page) ||
                          unlikely(is_xen_heap_page(page)) )
-                        type = XEN_DOMCTL_PFINFO_XTAB;
+                    {
+                        if ( p2m_is_broken(t) )
+                            type = XEN_DOMCTL_PFINFO_BROKEN;
+                        else
+                            type = XEN_DOMCTL_PFINFO_XTAB;
+                    }
                     else
                     {
                         switch( page->u.inuse.type_info & PGT_type_mask )
@@ -235,6 +241,9 @@ long arch_do_domctl(
 
                         if ( page->u.inuse.type_info & PGT_pinned )
                             type |= XEN_DOMCTL_PFINFO_LPINTAB;
+
+                        if ( page->count_info & PGC_broken )
+                            type = XEN_DOMCTL_PFINFO_BROKEN;
                     }
 
                     if ( page )
@@ -1565,6 +1574,29 @@ long arch_do_domctl(
             }
             rcu_unlock_domain(d);
         } 
+    }
+    break;
+
+    case XEN_DOMCTL_set_broken_page_p2m:
+    {
+        struct domain *d;
+
+        d = rcu_lock_domain_by_id(domctl->domain);
+        if ( d != NULL )
+        {
+            p2m_type_t pt;
+            unsigned long pfn = domctl->u.set_broken_page_p2m.pfn;
+            mfn_t mfn = get_gfn_query(d, pfn, &pt);
+
+            if ( unlikely(!mfn_valid(mfn_x(mfn)) || !p2m_is_ram(pt) ||
+                         (p2m_change_type(d, pfn, pt, p2m_ram_broken) != pt)) )
+                ret = -EINVAL;
+
+            put_gfn(d, pfn);
+            rcu_unlock_domain(d);
+        }
+        else
+            ret = -ESRCH;
     }
     break;
 

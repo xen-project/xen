@@ -136,6 +136,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getmemlist_t);
 #define XEN_DOMCTL_PFINFO_LPINTAB (0x1U<<31)
 #define XEN_DOMCTL_PFINFO_XTAB    (0xfU<<28) /* invalid page */
 #define XEN_DOMCTL_PFINFO_XALLOC  (0xeU<<28) /* allocate-only page */
+#define XEN_DOMCTL_PFINFO_BROKEN  (0xdU<<28) /* broken page */
 #define XEN_DOMCTL_PFINFO_LTAB_MASK (0xfU<<28)
 
 struct xen_domctl_getpageframeinfo {
@@ -834,6 +835,12 @@ struct xen_domctl_set_access_required {
 typedef struct xen_domctl_set_access_required xen_domctl_set_access_required_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_access_required_t);
 
+struct xen_domctl_set_broken_page_p2m {
+    uint64_aligned_t pfn;
+};
+typedef struct xen_domctl_set_broken_page_p2m xen_domctl_set_broken_page_p2m_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_broken_page_p2m_t);
+
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -899,6 +906,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_set_access_required           64
 #define XEN_DOMCTL_audit_p2m                     65
 #define XEN_DOMCTL_set_virq_handler              66
+#define XEN_DOMCTL_set_broken_page_p2m           67
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -954,6 +962,7 @@ struct xen_domctl {
         struct xen_domctl_audit_p2m         audit_p2m;
         struct xen_domctl_set_virq_handler  set_virq_handler;
         struct xen_domctl_gdbsx_memio       gdbsx_guest_memio;
+        struct xen_domctl_set_broken_page_p2m set_broken_page_p2m;
         struct xen_domctl_gdbsx_pauseunp_vcpu gdbsx_pauseunp_vcpu;
         struct xen_domctl_gdbsx_domstatus   gdbsx_domstatus;
         uint8_t                             pad[128];

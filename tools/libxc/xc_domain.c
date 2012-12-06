@@ -283,6 +283,22 @@ int xc_domain_getinfolist(xc_interface *xch,
     return ret;
 }
 
+/* set broken page p2m */
+int xc_set_broken_page_p2m(xc_interface *xch,
+                           uint32_t domid,
+                           unsigned long pfn)
+{
+    int ret;
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_set_broken_page_p2m;
+    domctl.domain = (domid_t)domid;
+    domctl.u.set_broken_page_p2m.pfn = pfn;
+    ret = do_domctl(xch, &domctl);
+
+    return ret ? -1 : 0;
+}
+
 /* get info from hvm guest for save */
 int xc_domain_hvm_getcontext(xc_interface *xch,
                              uint32_t domid,

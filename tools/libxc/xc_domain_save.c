@@ -1277,6 +1277,13 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                 if ( !hvm )
                     gmfn = pfn_to_mfn(gmfn);
 
+                if ( pfn_type[j] == XEN_DOMCTL_PFINFO_BROKEN )
+                {
+                    pfn_type[j] |= pfn_batch[j];
+                    ++run;
+                    continue;
+                }
+
                 if ( pfn_err[j] )
                 {
                     if ( pfn_type[j] == XEN_DOMCTL_PFINFO_XTAB )
@@ -1371,8 +1378,12 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
                     }
                 }
 
-                /* skip pages that aren't present or are alloc-only */
+                /*
+                 * skip pages that aren't present,
+                 * or are broken, or are alloc-only
+                 */
                 if ( pagetype == XEN_DOMCTL_PFINFO_XTAB
+                    || pagetype == XEN_DOMCTL_PFINFO_BROKEN
                     || pagetype == XEN_DOMCTL_PFINFO_XALLOC )
                     continue;
 

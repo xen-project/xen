@@ -575,6 +575,17 @@ int xc_domain_getinfolist(xc_interface *xch,
                           xc_domaininfo_t *info);
 
 /**
+ * This function set p2m for broken page
+ * &parm xch a handle to an open hypervisor interface
+ * @parm domid the domain id which broken page belong to
+ * @parm pfn the pfn number of the broken page
+ * @return 0 on success, -1 on failure
+ */
+int xc_set_broken_page_p2m(xc_interface *xch,
+                           uint32_t domid,
+                           unsigned long pfn);
+
+/**
  * This function returns information about the context of a hvm domain
  * @parm xch a handle to an open hypervisor interface
  * @parm domid the domain to get information from

@@ -1023,9 +1023,15 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
 
     countpages = count;
     for (i = oldcount; i < buf->nr_pages; ++i)
-        if ((buf->pfn_types[i] & XEN_DOMCTL_PFINFO_LTAB_MASK) == XEN_DOMCTL_PFINFO_XTAB
-            ||(buf->pfn_types[i] & XEN_DOMCTL_PFINFO_LTAB_MASK) == XEN_DOMCTL_PFINFO_XALLOC)
+    {
+        unsigned long pagetype;
+
+        pagetype = buf->pfn_types[i] & XEN_DOMCTL_PFINFO_LTAB_MASK;
+        if ( pagetype == XEN_DOMCTL_PFINFO_XTAB ||
+             pagetype == XEN_DOMCTL_PFINFO_BROKEN ||
+             pagetype == XEN_DOMCTL_PFINFO_XALLOC )
             --countpages;
+    }
 
     if (!countpages)
         return count;
@@ -1266,6 +1272,17 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
              || pagetype == XEN_DOMCTL_PFINFO_XALLOC)
             /* a bogus/unmapped/allocate-only page: skip it */
             continue;
+
+        if ( pagetype == XEN_DOMCTL_PFINFO_BROKEN )
+        {
+            if ( xc_set_broken_page_p2m(xch, dom, pfn) )
+            {
+                ERROR("Set p2m for broken page failed, "
+                      "dom=%d, pfn=%lx\n", dom, pfn);
+                goto err_mapped;
+            }
+            continue;
+        }
 
         if (pfn_err[i])
         {
