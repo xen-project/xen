@@ -2802,7 +2802,7 @@ grant_table_destroy(
     d->grant_table = NULL;
 }
 
-void gnttab_usage_print(struct domain *rd)
+static void gnttab_usage_print(struct domain *rd)
 {
     int first = 1;
     grant_ref_t ref;
