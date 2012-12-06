@@ -108,6 +108,7 @@ ENTRY(return_to_guest)
 	RESTORE_ONE_BANKED(R11_fiq); RESTORE_ONE_BANKED(R12_fiq);
 	/* Fall thru */
 ENTRY(return_to_hypervisor)
+	cpsid i
 	ldr lr, [sp, #UREGS_lr]
 	ldr r11, [sp, #UREGS_pc]
 	msr ELR_hyp, r11
