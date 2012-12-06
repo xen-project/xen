@@ -1362,6 +1362,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
                CPU_BASED_MONITOR_TRAP_FLAG |
                CPU_BASED_VIRTUAL_NMI_PENDING |
                CPU_BASED_ACTIVATE_MSR_BITMAP |
+               CPU_BASED_PAUSE_EXITING |
+               CPU_BASED_RDPMC_EXITING |
                CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
         tmp = VMX_PROCBASED_CTLS_DEFAULT1;
         /* 0-settings */
