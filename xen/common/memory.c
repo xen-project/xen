@@ -99,7 +99,8 @@ static void populate_physmap(struct memop_args *a)
                                      a->nr_extents-1) )
         return;
 
-    if ( !multipage_allocation_permitted(current->domain, a->extent_order) )
+    if ( a->memflags & MEMF_populate_on_demand ? a->extent_order > MAX_ORDER :
+         !multipage_allocation_permitted(current->domain, a->extent_order) )
         return;
 
     for ( i = a->nr_done; i < a->nr_extents; i++ )
@@ -115,8 +116,7 @@ static void populate_physmap(struct memop_args *a)
 
         if ( a->memflags & MEMF_populate_on_demand )
         {
-            if ( a->extent_order > MAX_ORDER ||
-                 guest_physmap_mark_populate_on_demand(d, gpfn,
+            if ( guest_physmap_mark_populate_on_demand(d, gpfn,
                                                        a->extent_order) < 0 )
                 goto out;
         }
