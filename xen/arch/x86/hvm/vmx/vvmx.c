@@ -48,6 +48,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
     nvmx->intr.error_code = 0;
     nvmx->iobitmap[0] = NULL;
     nvmx->iobitmap[1] = NULL;
+    nvmx->msrbitmap = NULL;
     return 0;
 out:
     return -ENOMEM;
@@ -561,6 +562,17 @@ static void __clear_current_vvmcs(struct vcpu *v)
         __vmpclear(virt_to_maddr(nvcpu->nv_n2vmcx));
 }
 
+static void __map_msr_bitmap(struct vcpu *v)
+{
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    unsigned long gpa;
+
+    if ( nvmx->msrbitmap )
+        hvm_unmap_guest_frame (nvmx->msrbitmap); 
+    gpa = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, MSR_BITMAP);
+    nvmx->msrbitmap = hvm_map_guest_frame_ro(gpa >> PAGE_SHIFT);
+}
+
 static void __map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
@@ -596,6 +608,10 @@ static void nvmx_purge_vvmcs(struct vcpu *v)
             hvm_unmap_guest_frame(nvmx->iobitmap[i]); 
             nvmx->iobitmap[i] = NULL;
         }
+    }
+    if ( nvmx->msrbitmap ) {
+        hvm_unmap_guest_frame(nvmx->msrbitmap);
+        nvmx->msrbitmap = NULL;
     }
 }
 
@@ -1153,6 +1169,7 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
         nvcpu->nv_vvmcx = hvm_map_guest_frame_rw(gpa >> PAGE_SHIFT);
         nvcpu->nv_vvmcxaddr = gpa;
         map_io_bitmap_all (v);
+        __map_msr_bitmap(v);
     }
 
     vmreturn(regs, VMSUCCEED);
@@ -1270,6 +1287,9 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
               vmcs_encoding == IO_BITMAP_B_HIGH )
         __map_io_bitmap (v, IO_BITMAP_B);
 
+    if ( vmcs_encoding == MSR_BITMAP || vmcs_encoding == MSR_BITMAP_HIGH )
+        __map_msr_bitmap(v);
+
     vmreturn(regs, VMSUCCEED);
     return X86EMUL_OKAY;
 }
@@ -1320,6 +1340,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
                CPU_BASED_RDTSC_EXITING |
                CPU_BASED_MONITOR_TRAP_FLAG |
                CPU_BASED_VIRTUAL_NMI_PENDING |
+               CPU_BASED_ACTIVATE_MSR_BITMAP |
                CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
         /* bit 1, 4-6,8,13-16,26 must be 1 (refer G4 of SDM) */
         tmp = ( (1<<26) | (0xf << 13) | 0x100 | (0x7 << 4) | 0x2);
@@ -1497,8 +1518,6 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_TRIPLE_FAULT:
     case EXIT_REASON_TASK_SWITCH:
     case EXIT_REASON_CPUID:
-    case EXIT_REASON_MSR_READ:
-    case EXIT_REASON_MSR_WRITE:
     case EXIT_REASON_VMCALL:
     case EXIT_REASON_VMCLEAR:
     case EXIT_REASON_VMLAUNCH:
@@ -1514,6 +1533,22 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         /* inject to L1 */
         nvcpu->nv_vmexit_pending = 1;
         break;
+    case EXIT_REASON_MSR_READ:
+    case EXIT_REASON_MSR_WRITE:
+    {
+        int status;
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_ACTIVATE_MSR_BITMAP )
+        {
+            status = vmx_check_msr_bitmap(nvmx->msrbitmap, regs->ecx,
+                         !!(exit_reason == EXIT_REASON_MSR_WRITE));
+            if ( status )
+                nvcpu->nv_vmexit_pending = 1;
+        }
+        else
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    }
     case EXIT_REASON_IO_INSTRUCTION:
         ctrl = __n2_exec_control(v);
         if ( ctrl & CPU_BASED_ACTIVATE_IO_BITMAP )

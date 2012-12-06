@@ -26,6 +26,7 @@
 struct nestedvmx {
     paddr_t    vmxon_region_pa;
     void       *iobitmap[2];		/* map (va) of L1 guest I/O bitmap */
+    void       *msrbitmap;		/* map (va) of L1 guest MSR bitmap */
     /* deferred nested interrupt */
     struct {
         unsigned long intr_info;

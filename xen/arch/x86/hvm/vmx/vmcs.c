@@ -674,6 +674,34 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
 }
 
 /*
+ * access_type: read == 0, write == 1
+ */
+int vmx_check_msr_bitmap(unsigned long *msr_bitmap, u32 msr, int access_type)
+{
+    int ret = 1;
+    if ( !msr_bitmap )
+        return 1;
+
+    if ( msr <= 0x1fff )
+    {
+        if ( access_type == 0 )
+            ret = test_bit(msr, msr_bitmap + 0x000/BYTES_PER_LONG); /* read-low */
+        else if ( access_type == 1 )
+            ret = test_bit(msr, msr_bitmap + 0x800/BYTES_PER_LONG); /* write-low */
+    }
+    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
+    {
+        msr &= 0x1fff;
+        if ( access_type == 0 )
+            ret = test_bit(msr, msr_bitmap + 0x400/BYTES_PER_LONG); /* read-high */
+        else if ( access_type == 1 )
+            ret = test_bit(msr, msr_bitmap + 0xc00/BYTES_PER_LONG); /* write-high */
+    }
+    return ret;
+}
+
+
+/*
  * Switch VMCS between layer 1 & 2 guest
  */
 void vmx_vmcs_switch(struct vmcs_struct *from, struct vmcs_struct *to)

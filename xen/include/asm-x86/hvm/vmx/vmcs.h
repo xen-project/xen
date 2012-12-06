@@ -427,6 +427,7 @@ int vmx_add_host_load_msr(u32 msr);
 void vmx_vmcs_switch(struct vmcs_struct *from, struct vmcs_struct *to);
 void vmx_set_eoi_exit_bitmap(struct vcpu *v, u8 vector);
 void vmx_clear_eoi_exit_bitmap(struct vcpu *v, u8 vector);
+int vmx_check_msr_bitmap(unsigned long *msr_bitmap, u32 msr, int access_type);
 
 #endif /* ASM_X86_HVM_VMX_VMCS_H__ */
 
