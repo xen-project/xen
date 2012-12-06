@@ -1376,7 +1376,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         tmp = VMX_ENTRY_CTLS_DEFAULT1;
         data = VM_ENTRY_LOAD_GUEST_PAT |
                VM_ENTRY_LOAD_GUEST_EFER |
-               VM_ENTRY_LOAD_PERF_GLOBAL_CTRL;
+               VM_ENTRY_LOAD_PERF_GLOBAL_CTRL |
+               VM_ENTRY_IA32E_MODE;
         data = ((data | tmp) << 32) | tmp;
         break;
 
