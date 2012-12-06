@@ -554,6 +554,24 @@ void nvmx_update_exception_bitmap(struct vcpu *v, unsigned long value)
     set_shadow_control(v, EXCEPTION_BITMAP, value);
 }
 
+static void nvmx_update_apic_access_address(struct vcpu *v)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    u64 apic_gpfn, apic_mfn;
+    u32 ctrl;
+    void *apic_va;
+
+    ctrl = __n2_secondary_exec_control(v);
+    if ( ctrl & SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES )
+    {
+        apic_gpfn = __get_vvmcs(nvcpu->nv_vvmcx, APIC_ACCESS_ADDR) >> PAGE_SHIFT;
+        apic_va = hvm_map_guest_frame_ro(apic_gpfn);
+        apic_mfn = virt_to_mfn(apic_va);
+        __vmwrite(APIC_ACCESS_ADDR, (apic_mfn << PAGE_SHIFT));
+        hvm_unmap_guest_frame(apic_va); 
+    }
+}
+
 static void __clear_current_vvmcs(struct vcpu *v)
 {
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
@@ -761,6 +779,7 @@ static void load_shadow_control(struct vcpu *v)
     nvmx_update_exit_control(v, vmx_vmexit_control);
     nvmx_update_entry_control(v);
     vmx_update_exception_bitmap(v);
+    nvmx_update_apic_access_address(v);
 }
 
 static void load_shadow_guest_state(struct vcpu *v)
@@ -1350,7 +1369,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         break;
     case MSR_IA32_VMX_PROCBASED_CTLS2:
         /* 1-seetings */
-        data = SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING;
+        data = SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING |
+               SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
         /* 0-settings */
         tmp = 0;
         data = (data << 32) | tmp;
@@ -1680,6 +1700,11 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
 
         break;
     }
+    case EXIT_REASON_APIC_ACCESS:
+        ctrl = __n2_secondary_exec_control(v);
+        if ( ctrl & SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
     default:
         gdprintk(XENLOG_WARNING, "Unknown nested vmexit reason %x.\n",
                  exit_reason);
