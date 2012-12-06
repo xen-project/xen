@@ -991,7 +991,8 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
 
     regs->eip = __get_vvmcs(nvcpu->nv_vvmcx, HOST_RIP);
     regs->esp = __get_vvmcs(nvcpu->nv_vvmcx, HOST_RSP);
-    regs->eflags = __vmread(GUEST_RFLAGS);
+    /* VM exit clears all bits except bit 1 */
+    regs->eflags = 0x2;
 
     /* updating host cr0 to sync TS bit */
     __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
