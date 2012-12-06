@@ -25,11 +25,8 @@ live relocation of VMs. Ports to Linux, NetBSD, FreeBSD and Solaris
 are available from the community.
 
 This file contains some quick-start instructions to install Xen on
-your system. For full documentation, see the Xen User Manual. If this
-is a pre-built release then you can find the manual at:
- dist/install/usr/share/doc/xen/pdf/user.pdf
-If you have a source release, then 'make -C docs' will build the
-manual at docs/pdf/user.pdf.
+your system. For more information see http:/www.xen.org/ and
+http://wiki.xen.org/
 
 Quick-Start Guide
 =================
