@@ -445,8 +445,7 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
         }
 
         /* Assign each output page to the domain. */
-        j = 0;
-        while ( (page = page_list_remove_head(&out_chunk_list)) )
+        for ( j = 0; (page = page_list_remove_head(&out_chunk_list)); ++j )
         {
             if ( assign_pages(d, page, exch.out.extent_order,
                               MEMF_no_refcount) )
@@ -477,9 +476,12 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
                 goto dying;
             }
 
-            /* Note that we ignore errors accessing the output extent list. */
-            (void)__copy_from_guest_offset(
-                &gpfn, exch.out.extent_start, (i<<out_chunk_order)+j, 1);
+            if ( __copy_from_guest_offset(&gpfn, exch.out.extent_start,
+                                          (i << out_chunk_order) + j, 1) )
+            {
+                rc = -EFAULT;
+                continue;
+            }
 
             mfn = page_to_mfn(page);
             guest_physmap_add_page(d, gpfn, mfn, exch.out.extent_order);
@@ -488,10 +490,11 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
             {
                 for ( k = 0; k < (1UL << exch.out.extent_order); k++ )
                     set_gpfn_from_mfn(mfn + k, gpfn + k);
-                (void)__copy_to_guest_offset(
-                    exch.out.extent_start, (i<<out_chunk_order)+j, &mfn, 1);
+                if ( __copy_to_guest_offset(exch.out.extent_start,
+                                            (i << out_chunk_order) + j,
+                                            &mfn, 1) )
+                    rc = -EFAULT;
             }
-            j++;
         }
         BUG_ON( !(d->is_dying) && (j != (1UL << out_chunk_order)) );
     }

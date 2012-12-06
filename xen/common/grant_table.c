@@ -1347,6 +1347,9 @@ gnttab_setup_table(
         goto out1;
     }
 
+    if ( !guest_handle_okay(op.frame_list, op.nr_frames) )
+        return -EFAULT;
+
     d = gt_lock_target_domain_by_id(op.dom);
     if ( IS_ERR(d) )
     {
@@ -1384,7 +1387,8 @@ gnttab_setup_table(
         gmfn = gnttab_shared_gmfn(d, gt, i);
         /* Grant tables cannot be shared */
         BUG_ON(SHARED_M2P(gmfn));
-        (void)copy_to_guest_offset(op.frame_list, i, &gmfn, 1);
+        if ( __copy_to_guest_offset(op.frame_list, i, &gmfn, 1) )
+            op.status = GNTST_bad_virt_addr;
     }
 
  out3:

@@ -283,18 +283,25 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
                 compat_pfn_t pfn = nat.xchg->out.extent_start.p[start_extent];
 
                 BUG_ON(pfn != nat.xchg->out.extent_start.p[start_extent]);
-                /* Note that we ignore errors accessing the output extent list. */
-                __copy_to_compat_offset(cmp.xchg.out.extent_start, start_extent, &pfn, 1);
+                if ( __copy_to_compat_offset(cmp.xchg.out.extent_start,
+                                             start_extent, &pfn, 1) )
+                {
+                    rc = -EFAULT;
+                    break;
+                }
             }
 
             cmp.xchg.nr_exchanged = nat.xchg->nr_exchanged;
             if ( copy_field_to_guest(guest_handle_cast(compat, compat_memory_exchange_t),
                                      &cmp.xchg, nr_exchanged) )
+                rc = -EFAULT;
+
+            if ( rc < 0 )
             {
                 if ( split < 0 )
                     /* Cannot cancel the continuation... */
                     domain_crash(current->domain);
-                return -EFAULT;
+                return rc;
             }
             break;
         }
