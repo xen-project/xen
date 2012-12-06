@@ -1311,9 +1311,10 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
     switch (msr) {
     case MSR_IA32_VMX_BASIC:
         data = VVMCS_REVISION | ((u64)PAGE_SIZE) << 32 | 
-               ((u64)MTRR_TYPE_WRBACK) << 50;
+               ((u64)MTRR_TYPE_WRBACK) << 50 | VMX_BASIC_DEFAULT1_ZERO;
         break;
     case MSR_IA32_VMX_PINBASED_CTLS:
+    case MSR_IA32_VMX_TRUE_PINBASED_CTLS:
         /* 1-seetings */
         data = PIN_BASED_EXT_INTR_MASK |
                PIN_BASED_NMI_EXITING |
@@ -1322,6 +1323,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         data = ((data | tmp) << 32) | (tmp);
         break;
     case MSR_IA32_VMX_PROCBASED_CTLS:
+    case MSR_IA32_VMX_TRUE_PROCBASED_CTLS:
         /* 1-seetings */
         data = CPU_BASED_HLT_EXITING |
                CPU_BASED_VIRTUAL_INTR_PENDING |
@@ -1353,6 +1355,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         data = (data << 32) | tmp;
         break;
     case MSR_IA32_VMX_EXIT_CTLS:
+    case MSR_IA32_VMX_TRUE_EXIT_CTLS:
         /* 1-seetings */
         tmp = VMX_EXIT_CTLS_DEFAULT1;
         data = VM_EXIT_ACK_INTR_ON_EXIT |
@@ -1367,6 +1370,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         data = ((data | tmp) << 32) | tmp;
         break;
     case MSR_IA32_VMX_ENTRY_CTLS:
+    case MSR_IA32_VMX_TRUE_ENTRY_CTLS:
         /* 1-seetings */
         tmp = VMX_ENTRY_CTLS_DEFAULT1;
         data = VM_ENTRY_LOAD_GUEST_PAT |

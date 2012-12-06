@@ -237,7 +237,7 @@ static int vmx_init_vmcs_config(void)
          * We check VMX_BASIC_MSR[55] to correctly handle default controls.
          */
         uint32_t must_be_one, must_be_zero, msr = MSR_IA32_VMX_PROCBASED_CTLS;
-        if ( vmx_basic_msr_high & (1u << 23) )
+        if ( vmx_basic_msr_high & (VMX_BASIC_DEFAULT1_ZERO >> 32) )
             msr = MSR_IA32_VMX_TRUE_PROCBASED_CTLS;
         rdmsr(msr, must_be_one, must_be_zero);
         if ( must_be_one & (CPU_BASED_INVLPG_EXITING |

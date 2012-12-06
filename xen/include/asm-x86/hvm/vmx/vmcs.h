@@ -247,6 +247,12 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
 #define VMX_INTR_SHADOW_SMI             0x00000004
 #define VMX_INTR_SHADOW_NMI             0x00000008
 
+/* 
+ * bit 55 of IA32_VMX_BASIC MSR, indicating whether any VMX controls that
+ * default to 1 may be cleared to 0.
+ */
+#define VMX_BASIC_DEFAULT1_ZERO		(1ULL << 55)
+
 /* VMCS field encodings. */
 enum vmcs_field {
     VIRTUAL_PROCESSOR_ID            = 0x00000000,
