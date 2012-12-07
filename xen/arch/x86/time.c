@@ -1151,7 +1151,7 @@ static void local_time_calibration(void)
  * The Linux original version of this function is
  * Copyright (c) 2006, Red Hat, Inc., Ingo Molnar
  */
-void check_tsc_warp(unsigned long tsc_khz, unsigned long *max_warp)
+static void check_tsc_warp(unsigned long tsc_khz, unsigned long *max_warp)
 {
 #define rdtsc_barrier() mb()
     static DEFINE_SPINLOCK(sync_lock);

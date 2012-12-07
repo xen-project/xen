@@ -1931,7 +1931,7 @@ static void svm_wbinvd_intercept(void)
 
 static void svm_vmexit_do_invalidate_cache(struct cpu_user_regs *regs)
 {
-    enum instruction_index list[] = { INSTR_INVD, INSTR_WBINVD };
+    static const enum instruction_index list[] = { INSTR_INVD, INSTR_WBINVD };
     int inst_len;
 
     inst_len = __get_instruction_length_from_list(

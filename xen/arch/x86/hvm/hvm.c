@@ -4117,10 +4117,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct domain *d;
         
         /* Interface types to internal p2m types */
-        p2m_type_t memtype[] = {
-            p2m_ram_rw,        /* HVMMEM_ram_rw  */
-            p2m_ram_ro,        /* HVMMEM_ram_ro  */
-            p2m_mmio_dm        /* HVMMEM_mmio_dm */
+        static const p2m_type_t memtype[] = {
+            [HVMMEM_ram_rw]  = p2m_ram_rw,
+            [HVMMEM_ram_ro]  = p2m_ram_ro,
+            [HVMMEM_mmio_dm] = p2m_mmio_dm
         };
 
         if ( copy_from_guest(&a, arg, 1) )

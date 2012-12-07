@@ -179,7 +179,7 @@ static void synchronize_tsc_slave(unsigned int slave)
     }
 }
 
-void smp_callin(void)
+static void smp_callin(void)
 {
     unsigned int cpu = smp_processor_id();
     int i, rc;

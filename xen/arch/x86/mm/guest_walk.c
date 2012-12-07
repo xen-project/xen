@@ -34,7 +34,7 @@
 /* Flags that are needed in a pagetable entry, with the sense of NX inverted */
 static uint32_t mandatory_flags(struct vcpu *v, uint32_t pfec) 
 {
-    static uint32_t flags[] = {
+    static const uint32_t flags[] = {
         /* I/F -  Usr Wr */
         /* 0   0   0   0 */ _PAGE_PRESENT, 
         /* 0   0   0   1 */ _PAGE_PRESENT|_PAGE_RW,

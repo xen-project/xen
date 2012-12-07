@@ -45,7 +45,7 @@ enum instruction_index {
 struct vcpu;
 
 int __get_instruction_length_from_list(
-    struct vcpu *v, enum instruction_index *list, unsigned int list_count);
+    struct vcpu *, const enum instruction_index *, unsigned int list_count);
 
 static inline int __get_instruction_length(
     struct vcpu *v, enum instruction_index instr)

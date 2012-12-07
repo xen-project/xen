@@ -45,7 +45,7 @@ static void _show_registers(
     const struct cpu_user_regs *regs, unsigned long crs[8],
     enum context context, const struct vcpu *v)
 {
-    const static char *context_names[] = {
+    static const char *const context_names[] = {
         [CTXT_hypervisor] = "hypervisor",
         [CTXT_pv_guest]   = "pv guest",
         [CTXT_hvm_guest]  = "hvm guest"

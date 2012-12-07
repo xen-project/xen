@@ -2475,9 +2475,11 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_update_cpu_exec_control(v);
         break;
     case EXIT_REASON_TASK_SWITCH: {
-        const enum hvm_task_switch_reason reasons[] = {
-            TSW_call_or_int, TSW_iret, TSW_jmp, TSW_call_or_int };
+        static const enum hvm_task_switch_reason reasons[] = {
+            TSW_call_or_int, TSW_iret, TSW_jmp, TSW_call_or_int
+        };
         int32_t ecode = -1, source;
+
         exit_qualification = __vmread(EXIT_QUALIFICATION);
         source = (exit_qualification >> 30) & 3;
         /* Vectored event should fill in interrupt information. */
