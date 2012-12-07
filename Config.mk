@@ -218,7 +218,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.2.0-rc4
+QEMU_TAG ?= 6a0cf3786f1964fdf5a17f88f26cb499f4e89c81
+# Thu Dec 6 12:35:58 2012 +0000
+# qemu-stubdom: prevent useless medium change
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
