@@ -519,6 +519,7 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
                             put_page(dp);
                         return 0;
                     }
+                    ASSERT(!dp);
                     tmp = stdvga_mem_read(data, p->size);
                 }
                 stdvga_mem_write(addr, tmp, p->size);
