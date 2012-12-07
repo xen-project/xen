@@ -607,15 +607,15 @@ extern void audit_p2m(struct domain *d,
 #endif /* P2M_AUDIT */
 
 /* Printouts */
-#define P2M_PRINTK(_f, _a...)                                \
-    debugtrace_printk("p2m: %s(): " _f, __func__, ##_a)
-#define P2M_ERROR(_f, _a...)                                 \
-    printk("pg error: %s(): " _f, __func__, ##_a)
+#define P2M_PRINTK(f, a...)                                \
+    debugtrace_printk("p2m: %s(): " f, __func__, ##a)
+#define P2M_ERROR(f, a...)                                 \
+    printk(XENLOG_G_ERR "pg error: %s(): " f, __func__, ##a)
 #if P2M_DEBUGGING
-#define P2M_DEBUG(_f, _a...)                                 \
-    debugtrace_printk("p2mdebug: %s(): " _f, __func__, ##_a)
+#define P2M_DEBUG(f, a...)                                 \
+    debugtrace_printk("p2mdebug: %s(): " f, __func__, ##a)
 #else
-#define P2M_DEBUG(_f, _a...) do { (void)(_f); } while(0)
+#define P2M_DEBUG(f, a...) do { (void)(f); } while(0)
 #endif
 
 /* Called by p2m code when demand-populating a PoD page */

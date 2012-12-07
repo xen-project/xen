@@ -46,18 +46,6 @@ boolean_param("hap_1gb", opt_hap_1gb);
 bool_t __read_mostly opt_hap_2mb = 1;
 boolean_param("hap_2mb", opt_hap_2mb);
 
-/* Printouts */
-#define P2M_PRINTK(_f, _a...)                                \
-    debugtrace_printk("p2m: %s(): " _f, __func__, ##_a)
-#define P2M_ERROR(_f, _a...)                                 \
-    printk("pg error: %s(): " _f, __func__, ##_a)
-#if P2M_DEBUGGING
-#define P2M_DEBUG(_f, _a...)                                 \
-    debugtrace_printk("p2mdebug: %s(): " _f, __func__, ##_a)
-#else
-#define P2M_DEBUG(_f, _a...) do { (void)(_f); } while(0)
-#endif
-
 
 /* Override macros from asm/page.h to make them work with mfn_t */
 #undef mfn_to_page
