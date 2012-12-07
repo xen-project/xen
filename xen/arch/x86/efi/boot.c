@@ -24,6 +24,18 @@
 #include <asm/msr.h>
 #include <asm/processor.h>
 
+#define SHIM_LOCK_PROTOCOL_GUID \
+  { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} }
+
+typedef EFI_STATUS
+(/* _not_ EFIAPI */ *EFI_SHIM_LOCK_VERIFY) (
+    IN VOID *Buffer,
+    IN UINT32 Size);
+
+typedef struct {
+    EFI_SHIM_LOCK_VERIFY Verify;
+} EFI_SHIM_LOCK_PROTOCOL;
+
 extern char start[];
 extern u32 cpuid_ext_features;
 
@@ -640,12 +652,14 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     static EFI_GUID __initdata gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
     static EFI_GUID __initdata bio_guid = BLOCK_IO_PROTOCOL;
     static EFI_GUID __initdata devp_guid = DEVICE_PATH_PROTOCOL;
+    static EFI_GUID __initdata shim_lock_guid = SHIM_LOCK_PROTOCOL_GUID;
     EFI_LOADED_IMAGE *loaded_image;
     EFI_STATUS status;
     unsigned int i, argc;
     CHAR16 **argv, *file_name, *cfg_file_name = NULL;
     UINTN cols, rows, depth, size, map_key, info_size, gop_mode = ~0;
     EFI_HANDLE *handles = NULL;
+    EFI_SHIM_LOCK_PROTOCOL *shim_lock;
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
     EFI_FILE_HANDLE dir_handle;
@@ -834,6 +848,11 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     split_value(name.s);
     read_file(dir_handle, s2w(&name), &kernel);
     efi_bs->FreePool(name.w);
+
+    if ( !EFI_ERROR(efi_bs->LocateProtocol(&shim_lock_guid, NULL,
+                    (void **)&shim_lock)) &&
+         shim_lock->Verify(kernel.ptr, kernel.size) != EFI_SUCCESS )
+        blexit(L"Dom0 kernel image could not be verified\r\n");
 
     name.s = get_value(&cfg, section.s, "ramdisk");
     if ( name.s )
