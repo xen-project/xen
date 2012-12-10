@@ -3843,7 +3843,7 @@ int donate_page(
     {
         if ( d->tot_pages >= d->max_pages )
             goto fail;
-        d->tot_pages++;
+        domain_adjust_tot_pages(d, 1);
     }
 
     page->count_info = PGC_allocated | 1;
@@ -3893,7 +3893,7 @@ int steal_page(
     } while ( (y = cmpxchg(&page->count_info, x, x | 1)) != x );
 
     /* Unlink from original owner. */
-    if ( !(memflags & MEMF_no_refcount) && !--d->tot_pages )
+    if ( !(memflags & MEMF_no_refcount) && !domain_adjust_tot_pages(d, -1) )
         drop_dom_ref = 1;
     page_list_del(page, &d->page_list);
 

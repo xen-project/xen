@@ -1667,7 +1667,7 @@ gnttab_transfer(
         }
 
         /* Okay, add the page to 'e'. */
-        if ( unlikely(e->tot_pages++ == 0) )
+        if ( unlikely(domain_adjust_tot_pages(e, 1) == 1) )
             get_knownalive_domain(e);
         page_list_add_tail(page, &e->page_list);
         page_set_owner(page, e);

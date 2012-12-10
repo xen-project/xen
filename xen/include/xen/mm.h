@@ -48,6 +48,8 @@ void free_xenheap_pages(void *v, unsigned int order);
 #define alloc_xenheap_page() (alloc_xenheap_pages(0,0))
 #define free_xenheap_page(v) (free_xenheap_pages(v,0))
 
+unsigned long domain_adjust_tot_pages(struct domain *d, long pages);
+
 /* Domain suballocator. These functions are *not* interrupt-safe.*/
 void init_domheap_pages(paddr_t ps, paddr_t pe);
 struct page_info *alloc_domheap_pages(

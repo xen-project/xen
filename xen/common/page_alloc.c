@@ -239,6 +239,12 @@ static long midsize_alloc_zone_pages;
 
 static DEFINE_SPINLOCK(heap_lock);
 
+unsigned long domain_adjust_tot_pages(struct domain *d, long pages)
+{
+    ASSERT(spin_is_locked(&d->page_alloc_lock));
+    return d->tot_pages += pages;
+}
+
 static unsigned long init_node_heap(int node, unsigned long mfn,
                                     unsigned long nr, bool_t *use_tail)
 {
@@ -1291,7 +1297,7 @@ int assign_pages(
         if ( unlikely(d->tot_pages == 0) )
             get_knownalive_domain(d);
 
-        d->tot_pages += 1 << order;
+        domain_adjust_tot_pages(d, 1 << order);
     }
 
     for ( i = 0; i < (1 << order); i++ )
@@ -1375,7 +1381,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
             page_list_del2(&pg[i], &d->page_list, &d->arch.relmem_list);
         }
 
-        d->tot_pages -= 1 << order;
+        domain_adjust_tot_pages(d, -(1 << order));
         drop_dom_ref = (d->tot_pages == 0);
 
         spin_unlock_recursive(&d->page_alloc_lock);
