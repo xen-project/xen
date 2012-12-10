@@ -835,8 +835,9 @@ csched_sys_cntl(const struct scheduler *ops,
     case XEN_SYSCTL_SCHEDOP_putinfo:
         if (params->tslice_ms > XEN_SYSCTL_CSCHED_TSLICE_MAX
             || params->tslice_ms < XEN_SYSCTL_CSCHED_TSLICE_MIN 
-            || params->ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX
-            || params->ratelimit_us < XEN_SYSCTL_SCHED_RATELIMIT_MIN 
+            || (params->ratelimit_us
+                && (params->ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX
+                    || params->ratelimit_us < XEN_SYSCTL_SCHED_RATELIMIT_MIN))
             || MICROSECS(params->ratelimit_us) > MILLISECS(params->tslice_ms) )
                 goto out;
         prv->tslice_ms = params->tslice_ms;
@@ -1591,17 +1592,6 @@ csched_init(struct scheduler *ops)
                XEN_SYSCTL_CSCHED_TSLICE_MAX,
                CSCHED_DEFAULT_TSLICE_MS);
         sched_credit_tslice_ms = CSCHED_DEFAULT_TSLICE_MS;
-    }
-
-    if ( sched_ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX
-         || sched_ratelimit_us < XEN_SYSCTL_SCHED_RATELIMIT_MIN )
-    {
-        printk("WARNING: sched_ratelimit_us outside of valid range [%d,%d].\n"
-               " Resetting to default %u\n",
-               XEN_SYSCTL_SCHED_RATELIMIT_MIN,
-               XEN_SYSCTL_SCHED_RATELIMIT_MAX,
-               SCHED_DEFAULT_RATELIMIT_US);
-        sched_ratelimit_us = SCHED_DEFAULT_RATELIMIT_US;
     }
 
     prv->tslice_ms = sched_credit_tslice_ms;

@@ -1324,6 +1324,18 @@ void __init scheduler_init(void)
     if ( SCHED_OP(&ops, init) )
         panic("scheduler returned error on init\n");
 
+    if ( sched_ratelimit_us &&
+         (sched_ratelimit_us > XEN_SYSCTL_SCHED_RATELIMIT_MAX
+          || sched_ratelimit_us < XEN_SYSCTL_SCHED_RATELIMIT_MIN) )
+    {
+        printk("WARNING: sched_ratelimit_us outside of valid range [%d,%d].\n"
+               " Resetting to default %u\n",
+               XEN_SYSCTL_SCHED_RATELIMIT_MIN,
+               XEN_SYSCTL_SCHED_RATELIMIT_MAX,
+               SCHED_DEFAULT_RATELIMIT_US);
+        sched_ratelimit_us = SCHED_DEFAULT_RATELIMIT_US;
+    }
+
     idle_domain = domain_create(DOMID_IDLE, 0, 0);
     BUG_ON(IS_ERR(idle_domain));
     idle_domain->vcpu = idle_vcpu;
