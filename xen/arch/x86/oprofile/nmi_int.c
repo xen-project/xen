@@ -342,36 +342,12 @@ static int __init ppro_init(char ** cpu_type)
 		return 0;
 
 	switch (cpu_model) {
-	case 0 ... 2:
-		*cpu_type = "i386/ppro";
-		break;
-	case 3 ... 5:
-		*cpu_type = "i386/pii";
-		break;
-	case 6 ... 8:
-	case 10 ... 11:
-		*cpu_type = "i386/piii";
-		break;
-	case 9:
-	case 13:
-		*cpu_type = "i386/p6_mobile";
-		break;
 	case 14:
 		*cpu_type = "i386/core";
 		break;
 	case 15:
-	case 23:
-	case 29:
 		*cpu_type = "i386/core_2";
 		ppro_has_global_ctrl = 1;
-		break;
-	case 26:
-		arch_perfmon_setup_counters();
-		*cpu_type = "i386/core_i7";
-		ppro_has_global_ctrl = 1;
-		break;
-	case 28:
-		*cpu_type = "i386/atom";
 		break;
 	default:
 		/* Unknown */
@@ -389,6 +365,7 @@ static int __init arch_perfmon_init(char **cpu_type)
 	*cpu_type = "i386/arch_perfmon";
 	model = &op_arch_perfmon_spec;
 	arch_perfmon_setup_counters();
+	ppro_has_global_ctrl = 1;
 	return 1;
 }
 
@@ -413,14 +390,8 @@ static int __init nmi_init(void)
 				       "AMD processor family %d is not "
 				       "supported\n", family);
 				return -ENODEV;
-			case 6:
-				model = &op_athlon_spec;
-				cpu_type = "i386/athlon";
-				break;
 			case 0xf:
 				model = &op_athlon_spec;
-				/* Actually it could be i386/hammer too, but
-				   give user space an consistent name. */
 				cpu_type = "x86-64/hammer";
 				break;
 			case 0x10:
