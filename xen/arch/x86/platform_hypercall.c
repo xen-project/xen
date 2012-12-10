@@ -115,7 +115,8 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
         {
             op->u.add_memtype.handle = 0;
             op->u.add_memtype.reg    = ret;
-            ret = copy_to_guest(u_xenpf_op, op, 1) ? -EFAULT : 0;
+            ret = __copy_field_to_guest(u_xenpf_op, op, u.add_memtype) ?
+                  -EFAULT : 0;
             if ( ret != 0 )
                 mtrr_del_page(ret, 0, 0);
         }
@@ -157,7 +158,8 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
             op->u.read_memtype.mfn     = mfn;
             op->u.read_memtype.nr_mfns = nr_mfns;
             op->u.read_memtype.type    = type;
-            ret = copy_to_guest(u_xenpf_op, op, 1) ? -EFAULT : 0;
+            ret = __copy_field_to_guest(u_xenpf_op, op, u.read_memtype)
+                  ? -EFAULT : 0;
         }
     }
     break;
@@ -263,8 +265,8 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
             C(legacy_sectors_per_track);
 #undef C
 
-            ret = (copy_field_to_guest(u_xenpf_op, op,
-                                      u.firmware_info.u.disk_info)
+            ret = (__copy_field_to_guest(u_xenpf_op, op,
+                                         u.firmware_info.u.disk_info)
                    ? -EFAULT : 0);
             break;
         }
@@ -281,8 +283,8 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
             op->u.firmware_info.u.disk_mbr_signature.mbr_signature =
                 sig->signature;
 
-            ret = (copy_field_to_guest(u_xenpf_op, op,
-                                      u.firmware_info.u.disk_mbr_signature)
+            ret = (__copy_field_to_guest(u_xenpf_op, op,
+                                         u.firmware_info.u.disk_mbr_signature)
                    ? -EFAULT : 0);
             break;
         }
@@ -299,10 +301,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
                 bootsym(boot_edid_caps) >> 8;
 
             ret = 0;
-            if ( copy_field_to_guest(u_xenpf_op, op, u.firmware_info.
-                                     u.vbeddc_info.capabilities) ||
-                 copy_field_to_guest(u_xenpf_op, op, u.firmware_info.
-                                     u.vbeddc_info.edid_transfer_time) ||
+            if ( __copy_field_to_guest(u_xenpf_op, op, u.firmware_info.
+                                       u.vbeddc_info.capabilities) ||
+                 __copy_field_to_guest(u_xenpf_op, op, u.firmware_info.
+                                       u.vbeddc_info.edid_transfer_time) ||
                  copy_to_compat(op->u.firmware_info.u.vbeddc_info.edid,
                                 bootsym(boot_edid_info), 128) )
                 ret = -EFAULT;
@@ -311,8 +313,8 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
             ret = efi_get_info(op->u.firmware_info.index,
                                &op->u.firmware_info.u.efi_info);
             if ( ret == 0 &&
-                 copy_field_to_guest(u_xenpf_op, op,
-                                     u.firmware_info.u.efi_info) )
+                 __copy_field_to_guest(u_xenpf_op, op,
+                                       u.firmware_info.u.efi_info) )
                 ret = -EFAULT;
             break;
         case XEN_FW_KBD_SHIFT_FLAGS:
@@ -323,8 +325,8 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
             op->u.firmware_info.u.kbd_shift_flags = bootsym(kbd_shift_flags);
 
             ret = 0;
-            if ( copy_field_to_guest(u_xenpf_op, op,
-                                     u.firmware_info.u.kbd_shift_flags) )
+            if ( __copy_field_to_guest(u_xenpf_op, op,
+                                       u.firmware_info.u.kbd_shift_flags) )
                 ret = -EFAULT;
             break;
         default:
@@ -340,7 +342,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 
         ret = efi_runtime_call(&op->u.efi_runtime_call);
         if ( ret == 0 &&
-             copy_field_to_guest(u_xenpf_op, op, u.efi_runtime_call) )
+             __copy_field_to_guest(u_xenpf_op, op, u.efi_runtime_call) )
             ret = -EFAULT;
         break;
 
@@ -412,7 +414,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
             ret = cpumask_to_xenctl_cpumap(&ctlmap, cpumap);
         free_cpumask_var(cpumap);
 
-        if ( ret == 0 && copy_to_guest(u_xenpf_op, op, 1) )
+        if ( ret == 0 && __copy_field_to_guest(u_xenpf_op, op, u.getidletime) )
             ret = -EFAULT;
     }
     break;
@@ -503,7 +505,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 
         put_cpu_maps();
 
-        ret = copy_to_guest(u_xenpf_op, op, 1) ? -EFAULT : 0;
+        ret = __copy_field_to_guest(u_xenpf_op, op, u.pcpu_info) ? -EFAULT : 0;
     }
     break;
 
@@ -538,7 +540,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 
         put_cpu_maps();
 
-        if ( copy_field_to_guest(u_xenpf_op, op, u.pcpu_version) )
+        if ( __copy_field_to_guest(u_xenpf_op, op, u.pcpu_version) )
             ret = -EFAULT;
     }
     break;
@@ -639,7 +641,8 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 
         case XEN_CORE_PARKING_GET:
             op->u.core_parking.idle_nums = get_cur_idle_nums();
-            ret = copy_to_guest(u_xenpf_op, op, 1) ? -EFAULT : 0;
+            ret = __copy_field_to_guest(u_xenpf_op, op, u.core_parking) ?
+                  -EFAULT : 0;
             break;
 
         default:

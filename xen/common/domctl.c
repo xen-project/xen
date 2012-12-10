@@ -242,6 +242,7 @@ void domctl_lock_release(void)
 long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     long ret = 0;
+    bool_t copyback = 0;
     struct xen_domctl curop, *op = &curop;
 
     if ( copy_from_guest(op, u_domctl, 1) )
@@ -469,8 +470,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
                sizeof(xen_domain_handle_t));
 
         op->domain = d->domain_id;
-        if ( copy_to_guest(u_domctl, op, 1) )
-            ret = -EFAULT;
+        copyback = 1;
     }
     break;
 
@@ -653,8 +653,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             goto scheduler_op_out;
 
         ret = sched_adjust(d, &op->u.scheduler_op);
-        if ( copy_to_guest(u_domctl, op, 1) )
-            ret = -EFAULT;
+        copyback = 1;
 
     scheduler_op_out:
         rcu_unlock_domain(d);
@@ -686,8 +685,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         getdomaininfo(d, &op->u.getdomaininfo);
 
         op->domain = op->u.getdomaininfo.domain;
-        if ( copy_to_guest(u_domctl, op, 1) )
-            ret = -EFAULT;
+        copyback = 1;
 
     getdomaininfo_out:
         rcu_read_unlock(&domlist_read_lock);
@@ -747,8 +745,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         ret = copy_to_guest(op->u.vcpucontext.ctxt, c.nat, 1);
 #endif
 
-        if ( copy_to_guest(u_domctl, op, 1) || ret )
+        if ( ret )
             ret = -EFAULT;
+        copyback = 1;
 
     getvcpucontext_out:
         xfree(c.nat);
@@ -786,9 +785,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         op->u.getvcpuinfo.cpu_time = runstate.time[RUNSTATE_running];
         op->u.getvcpuinfo.cpu      = v->processor;
         ret = 0;
-
-        if ( copy_to_guest(u_domctl, op, 1) )
-            ret = -EFAULT;
+        copyback = 1;
 
     getvcpuinfo_out:
         rcu_unlock_domain(d);
@@ -1044,6 +1041,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     }
 
     domctl_lock_release();
+
+    if ( copyback && __copy_to_guest(u_domctl, op, 1) )
+        ret = -EFAULT;
 
     return ret;
 }

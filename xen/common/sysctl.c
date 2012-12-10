@@ -30,6 +30,7 @@
 long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 {
     long ret = 0;
+    int copyback = -1;
     struct xen_sysctl curop, *op = &curop;
     static DEFINE_SPINLOCK(sysctl_lock);
 
@@ -55,42 +56,28 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     switch ( op->cmd )
     {
     case XEN_SYSCTL_readconsole:
-    {
         ret = xsm_readconsole(op->u.readconsole.clear);
         if ( ret )
             break;
 
         ret = read_console_ring(&op->u.readconsole);
-        if ( copy_to_guest(u_sysctl, op, 1) )
-            ret = -EFAULT;
-    }
-    break;
+        break;
 
     case XEN_SYSCTL_tbuf_op:
-    {
         ret = xsm_tbufcontrol();
         if ( ret )
             break;
 
         ret = tb_control(&op->u.tbuf_op);
-        if ( copy_to_guest(u_sysctl, op, 1) )
-            ret = -EFAULT;
-    }
-    break;
+        break;
     
     case XEN_SYSCTL_sched_id:
-    {
         ret = xsm_sched_id();
         if ( ret )
             break;
 
         op->u.sched_id.sched_id = sched_id();
-        if ( copy_to_guest(u_sysctl, op, 1) )
-            ret = -EFAULT;
-        else
-            ret = 0;
-    }
-    break;
+        break;
 
     case XEN_SYSCTL_getdomaininfolist:
     { 
@@ -129,38 +116,27 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
             break;
         
         op->u.getdomaininfolist.num_domains = num_domains;
-
-        if ( copy_to_guest(u_sysctl, op, 1) )
-            ret = -EFAULT;
     }
     break;
 
 #ifdef PERF_COUNTERS
     case XEN_SYSCTL_perfc_op:
-    {
         ret = xsm_perfcontrol();
         if ( ret )
             break;
 
         ret = perfc_control(&op->u.perfc_op);
-        if ( copy_to_guest(u_sysctl, op, 1) )
-            ret = -EFAULT;
-    }
-    break;
+        break;
 #endif
 
 #ifdef LOCK_PROFILE
     case XEN_SYSCTL_lockprof_op:
-    {
         ret = xsm_lockprof();
         if ( ret )
             break;
 
         ret = spinlock_profile_control(&op->u.lockprof_op);
-        if ( copy_to_guest(u_sysctl, op, 1) )
-            ret = -EFAULT;
-    }
-    break;
+        break;
 #endif
     case XEN_SYSCTL_debug_keys:
     {
@@ -179,6 +155,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
             handle_keypress(c, guest_cpu_user_regs());
         }
         ret = 0;
+        copyback = 0;
     }
     break;
 
@@ -193,22 +170,21 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         if ( ret )
             break;
 
+        ret = -EFAULT;
         for ( i = 0; i < nr_cpus; i++ )
         {
             cpuinfo.idletime = get_cpu_idle_time(i);
 
-            ret = -EFAULT;
             if ( copy_to_guest_offset(op->u.getcpuinfo.info, i, &cpuinfo, 1) )
                 goto out;
         }
 
         op->u.getcpuinfo.nr_cpus = i;
-        ret = copy_to_guest(u_sysctl, op, 1) ? -EFAULT : 0;
+        ret = 0;
     }
     break;
 
     case XEN_SYSCTL_availheap:
-    { 
         ret = xsm_availheap();
         if ( ret )
             break;
@@ -218,47 +194,26 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
             op->u.availheap.min_bitwidth,
             op->u.availheap.max_bitwidth);
         op->u.availheap.avail_bytes <<= PAGE_SHIFT;
-
-        ret = copy_to_guest(u_sysctl, op, 1) ? -EFAULT : 0;
-    }
-    break;
+        break;
 
 #ifdef HAS_ACPI
     case XEN_SYSCTL_get_pmstat:
-    {
         ret = xsm_get_pmstat();
         if ( ret )
             break;
 
         ret = do_get_pm_info(&op->u.get_pmstat);
-        if ( ret )
-            break;
-
-        if ( copy_to_guest(u_sysctl, op, 1) )
-        {
-            ret = -EFAULT;
-            break;
-        }
-    }
-    break;
+        break;
 
     case XEN_SYSCTL_pm_op:
-    {
         ret = xsm_pm_op();
         if ( ret )
             break;
 
         ret = do_pm_op(&op->u.pm_op);
-        if ( ret && (ret != -EAGAIN) )
-            break;
-
-        if ( copy_to_guest(u_sysctl, op, 1) )
-        {
-            ret = -EFAULT;
-            break;
-        }
-    }
-    break;
+        if ( ret == -EAGAIN )
+            copyback = 1;
+        break;
 #endif
 
     case XEN_SYSCTL_page_offline_op:
@@ -317,40 +272,38 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         }
 
         xfree(status);
+        copyback = 0;
     }
     break;
 
     case XEN_SYSCTL_cpupool_op:
-    {
         ret = xsm_cpupool_op();
         if ( ret )
             break;
 
         ret = cpupool_do_sysctl(&op->u.cpupool_op);
-        if ( (ret == 0) && copy_to_guest(u_sysctl, op, 1) )
-            ret = -EFAULT;
-    }
-    break;
+        break;
 
     case XEN_SYSCTL_scheduler_op:
-    {
         ret = xsm_sched_op();
         if ( ret )
             break;
 
         ret = sched_adjust_global(&op->u.scheduler_op);
-        if ( (ret == 0) && copy_to_guest(u_sysctl, op, 1) )
-            ret = -EFAULT;
-    }
-    break;
+        break;
 
     default:
         ret = arch_do_sysctl(op, u_sysctl);
+        copyback = 0;
         break;
     }
 
  out:
     spin_unlock(&sysctl_lock);
+
+    if ( copyback && (!ret || copyback > 0) &&
+         __copy_to_guest(u_sysctl, op, 1) )
+        ret = -EFAULT;
 
     return ret;
 }

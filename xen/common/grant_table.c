@@ -1115,12 +1115,13 @@ gnttab_unmap_grant_ref(
 
         for ( i = 0; i < c; i++ )
         {
-            if ( unlikely(__copy_from_guest_offset(&op, uop, done+i, 1)) )
+            if ( unlikely(__copy_from_guest(&op, uop, 1)) )
                 goto fault;
             __gnttab_unmap_grant_ref(&op, &(common[i]));
             ++partial_done;
-            if ( unlikely(__copy_to_guest_offset(uop, done+i, &op, 1)) )
+            if ( unlikely(__copy_field_to_guest(uop, &op, status)) )
                 goto fault;
+            guest_handle_add_offset(uop, 1);
         }
 
         flush_tlb_mask(current->domain->domain_dirty_cpumask);
@@ -1177,12 +1178,13 @@ gnttab_unmap_and_replace(
         
         for ( i = 0; i < c; i++ )
         {
-            if ( unlikely(__copy_from_guest_offset(&op, uop, done+i, 1)) )
+            if ( unlikely(__copy_from_guest(&op, uop, 1)) )
                 goto fault;
             __gnttab_unmap_and_replace(&op, &(common[i]));
             ++partial_done;
-            if ( unlikely(__copy_to_guest_offset(uop, done+i, &op, 1)) )
+            if ( unlikely(__copy_field_to_guest(uop, &op, status)) )
                 goto fault;
+            guest_handle_add_offset(uop, 1);
         }
         
         flush_tlb_mask(current->domain->domain_dirty_cpumask);
@@ -1396,7 +1398,7 @@ gnttab_setup_table(
  out2:
     rcu_unlock_domain(d);
  out1:
-    if ( unlikely(copy_to_guest(uop, &op, 1)) )
+    if ( unlikely(__copy_field_to_guest(uop, &op, status)) )
         return -EFAULT;
 
     return 0;
@@ -1446,7 +1448,7 @@ gnttab_query_size(
     rcu_unlock_domain(d);
 
  query_out:
-    if ( unlikely(copy_to_guest(uop, &op, 1)) )
+    if ( unlikely(__copy_to_guest(uop, &op, 1)) )
         return -EFAULT;
 
     return 0;
@@ -1542,7 +1544,7 @@ gnttab_transfer(
             return i;
 
         /* Read from caller address space. */
-        if ( unlikely(__copy_from_guest_offset(&gop, uop, i, 1)) )
+        if ( unlikely(__copy_from_guest(&gop, uop, 1)) )
         {
             gdprintk(XENLOG_INFO, "gnttab_transfer: error reading req %d/%d\n",
                     i, count);
@@ -1701,12 +1703,13 @@ gnttab_transfer(
         gop.status = GNTST_okay;
 
     copyback:
-        if ( unlikely(__copy_to_guest_offset(uop, i, &gop, 1)) )
+        if ( unlikely(__copy_field_to_guest(uop, &gop, status)) )
         {
             gdprintk(XENLOG_INFO, "gnttab_transfer: error writing resp "
                      "%d/%d\n", i, count);
             return -EFAULT;
         }
+        guest_handle_add_offset(uop, 1);
     }
 
     return 0;
@@ -2143,17 +2146,18 @@ gnttab_copy(
     {
         if (i && hypercall_preempt_check())
             return i;
-        if ( unlikely(__copy_from_guest_offset(&op, uop, i, 1)) )
+        if ( unlikely(__copy_from_guest(&op, uop, 1)) )
             return -EFAULT;
         __gnttab_copy(&op);
-        if ( unlikely(__copy_to_guest_offset(uop, i, &op, 1)) )
+        if ( unlikely(__copy_field_to_guest(uop, &op, status)) )
             return -EFAULT;
+        guest_handle_add_offset(uop, 1);
     }
     return 0;
 }
 
 static long
-gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t uop))
+gnttab_set_version(XEN_GUEST_HANDLE_PARAM(gnttab_set_version_t) uop)
 {
     gnttab_set_version_t op;
     struct domain *d = current->domain;
@@ -2265,7 +2269,7 @@ out_unlock:
 out:
     op.version = gt->gt_version;
 
-    if (copy_to_guest(uop, &op, 1))
+    if (__copy_to_guest(uop, &op, 1))
         res = -EFAULT;
 
     return res;
@@ -2329,14 +2333,14 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
 out2:
     rcu_unlock_domain(d);
 out1:
-    if ( unlikely(copy_to_guest(uop, &op, 1)) )
+    if ( unlikely(__copy_field_to_guest(uop, &op, status)) )
         return -EFAULT;
 
     return 0;
 }
 
 static long
-gnttab_get_version(XEN_GUEST_HANDLE_PARAM(gnttab_get_version_t uop))
+gnttab_get_version(XEN_GUEST_HANDLE_PARAM(gnttab_get_version_t) uop)
 {
     gnttab_get_version_t op;
     struct domain *d;
@@ -2359,7 +2363,7 @@ gnttab_get_version(XEN_GUEST_HANDLE_PARAM(gnttab_get_version_t uop))
 
     rcu_unlock_domain(d);
 
-    if ( copy_to_guest(uop, &op, 1) )
+    if ( __copy_field_to_guest(uop, &op, version) )
         return -EFAULT;
 
     return 0;
@@ -2421,7 +2425,7 @@ out:
 }
 
 static long
-gnttab_swap_grant_ref(XEN_GUEST_HANDLE_PARAM(gnttab_swap_grant_ref_t uop),
+gnttab_swap_grant_ref(XEN_GUEST_HANDLE_PARAM(gnttab_swap_grant_ref_t) uop,
                       unsigned int count)
 {
     int i;
@@ -2431,11 +2435,12 @@ gnttab_swap_grant_ref(XEN_GUEST_HANDLE_PARAM(gnttab_swap_grant_ref_t uop),
     {
         if ( i && hypercall_preempt_check() )
             return i;
-        if ( unlikely(__copy_from_guest_offset(&op, uop, i, 1)) )
+        if ( unlikely(__copy_from_guest(&op, uop, 1)) )
             return -EFAULT;
         op.status = __gnttab_swap_grant_ref(op.ref_a, op.ref_b);
-        if ( unlikely(__copy_to_guest_offset(uop, i, &op, 1)) )
+        if ( unlikely(__copy_field_to_guest(uop, &op, status)) )
             return -EFAULT;
+        guest_handle_add_offset(uop, 1);
     }
     return 0;
 }

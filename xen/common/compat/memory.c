@@ -292,8 +292,9 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             }
 
             cmp.xchg.nr_exchanged = nat.xchg->nr_exchanged;
-            if ( copy_field_to_guest(guest_handle_cast(compat, compat_memory_exchange_t),
-                                     &cmp.xchg, nr_exchanged) )
+            if ( __copy_field_to_guest(guest_handle_cast(compat,
+                                                         compat_memory_exchange_t),
+                                       &cmp.xchg, nr_exchanged) )
                 rc = -EFAULT;
 
             if ( rc < 0 )

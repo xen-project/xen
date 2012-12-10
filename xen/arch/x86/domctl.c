@@ -51,6 +51,7 @@ long arch_do_domctl(
     XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     long ret = 0;
+    bool_t copyback = 0;
 
     switch ( domctl->cmd )
     {
@@ -66,7 +67,7 @@ long arch_do_domctl(
                                 &domctl->u.shadow_op,
                                 guest_handle_cast(u_domctl, void));
             rcu_unlock_domain(d);
-            copy_to_guest(u_domctl, domctl, 1);
+            copyback = 1;
         } 
     }
     break;
@@ -150,8 +151,7 @@ long arch_do_domctl(
         }
 
         rcu_unlock_domain(d);
-
-        copy_to_guest(u_domctl, domctl, 1);
+        copyback = 1;
     }
     break;
 
@@ -417,7 +417,7 @@ long arch_do_domctl(
             spin_unlock(&d->page_alloc_lock);
 
             domctl->u.getmemlist.num_pfns = i;
-            copy_to_guest(u_domctl, domctl, 1);
+            copyback = 1;
         getmemlist_out:
             rcu_unlock_domain(d);
         }
@@ -548,13 +548,11 @@ long arch_do_domctl(
             ret = -EFAULT;
 
     gethvmcontext_out:
-        if ( copy_to_guest(u_domctl, domctl, 1) )
-            ret = -EFAULT;
+        rcu_unlock_domain(d);
+        copyback = 1;
 
         if ( c.data != NULL )
             xfree(c.data);
-
-        rcu_unlock_domain(d);
     }
     break;
 
@@ -636,11 +634,9 @@ long arch_do_domctl(
         domctl->u.address_size.size =
             is_pv_32on64_domain(d) ? 32 : BITS_PER_LONG;
 
-        ret = 0;
         rcu_unlock_domain(d);
-
-        if ( copy_to_guest(u_domctl, domctl, 1) )
-            ret = -EFAULT;
+        ret = 0;
+        copyback = 1;
     }
     break;
 
@@ -685,13 +681,9 @@ long arch_do_domctl(
 
         domctl->u.address_size.size = d->arch.physaddr_bitsize;
 
-        ret = 0;
         rcu_unlock_domain(d);
-
-        if ( copy_to_guest(u_domctl, domctl, 1) )
-            ret = -EFAULT;
-
-
+        ret = 0;
+        copyback = 1;
     }
     break;
 
@@ -1133,9 +1125,8 @@ long arch_do_domctl(
 
     ext_vcpucontext_out:
         rcu_unlock_domain(d);
-        if ( (domctl->cmd == XEN_DOMCTL_get_ext_vcpucontext) &&
-             copy_to_guest(u_domctl, domctl, 1) )
-            ret = -EFAULT;
+        if ( domctl->cmd == XEN_DOMCTL_get_ext_vcpucontext )
+            copyback = 1;
     }
     break;
 
@@ -1277,10 +1268,10 @@ long arch_do_domctl(
             domctl->u.gdbsx_guest_memio.len;
 
         ret = gdbsx_guest_mem_io(domctl->domain, &domctl->u.gdbsx_guest_memio);
-        if ( !ret && copy_to_guest(u_domctl, domctl, 1) )
-            ret = -EFAULT;
 
         rcu_unlock_domain(d);
+        if ( !ret )
+           copyback = 1;
     }
     break;
 
@@ -1367,10 +1358,9 @@ long arch_do_domctl(
                 }
             }
         }
-        ret = 0;
-        if ( copy_to_guest(u_domctl, domctl, 1) )
-            ret = -EFAULT;
         rcu_unlock_domain(d);
+        ret = 0;
+        copyback = 1;
     }
     break;
 
@@ -1494,9 +1484,8 @@ long arch_do_domctl(
 
     vcpuextstate_out:
         rcu_unlock_domain(d);
-        if ( (domctl->cmd == XEN_DOMCTL_getvcpuextstate) &&
-             copy_to_guest(u_domctl, domctl, 1) )
-            ret = -EFAULT;
+        if ( domctl->cmd == XEN_DOMCTL_getvcpuextstate )
+            copyback = 1;
     }
     break;
 
@@ -1513,7 +1502,7 @@ long arch_do_domctl(
                 ret = mem_event_domctl(d, &domctl->u.mem_event_op,
                                        guest_handle_cast(u_domctl, void));
             rcu_unlock_domain(d);
-            copy_to_guest(u_domctl, domctl, 1);
+            copyback = 1;
         } 
     }
     break;
@@ -1548,8 +1537,7 @@ long arch_do_domctl(
                   &domctl->u.audit_p2m.m2p_bad,
                   &domctl->u.audit_p2m.p2m_bad);
         rcu_unlock_domain(d);
-        if ( copy_to_guest(u_domctl, domctl, 1) ) 
-            ret = -EFAULT;
+        copyback = 1;
     }
     break;
 #endif /* P2M_AUDIT */
@@ -1604,6 +1592,9 @@ long arch_do_domctl(
         ret = iommu_do_domctl(domctl, u_domctl);
         break;
     }
+
+    if ( copyback && __copy_to_guest(u_domctl, domctl, 1) )
+        ret = -EFAULT;
 
     return ret;
 }

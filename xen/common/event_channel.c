@@ -981,7 +981,7 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&alloc_unbound, arg, 1) != 0 )
             return -EFAULT;
         rc = evtchn_alloc_unbound(&alloc_unbound);
-        if ( (rc == 0) && (copy_to_guest(arg, &alloc_unbound, 1) != 0) )
+        if ( !rc && __copy_to_guest(arg, &alloc_unbound, 1) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
     }
@@ -991,7 +991,7 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&bind_interdomain, arg, 1) != 0 )
             return -EFAULT;
         rc = evtchn_bind_interdomain(&bind_interdomain);
-        if ( (rc == 0) && (copy_to_guest(arg, &bind_interdomain, 1) != 0) )
+        if ( !rc && __copy_to_guest(arg, &bind_interdomain, 1) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
     }
@@ -1001,7 +1001,7 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&bind_virq, arg, 1) != 0 )
             return -EFAULT;
         rc = evtchn_bind_virq(&bind_virq);
-        if ( (rc == 0) && (copy_to_guest(arg, &bind_virq, 1) != 0) )
+        if ( !rc && __copy_to_guest(arg, &bind_virq, 1) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
     }
@@ -1011,7 +1011,7 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&bind_ipi, arg, 1) != 0 )
             return -EFAULT;
         rc = evtchn_bind_ipi(&bind_ipi);
-        if ( (rc == 0) && (copy_to_guest(arg, &bind_ipi, 1) != 0) )
+        if ( !rc && __copy_to_guest(arg, &bind_ipi, 1) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
     }
@@ -1021,7 +1021,7 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&bind_pirq, arg, 1) != 0 )
             return -EFAULT;
         rc = evtchn_bind_pirq(&bind_pirq);
-        if ( (rc == 0) && (copy_to_guest(arg, &bind_pirq, 1) != 0) )
+        if ( !rc && __copy_to_guest(arg, &bind_pirq, 1) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
     }
@@ -1047,7 +1047,7 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&status, arg, 1) != 0 )
             return -EFAULT;
         rc = evtchn_status(&status);
-        if ( (rc == 0) && (copy_to_guest(arg, &status, 1) != 0) )
+        if ( !rc && __copy_to_guest(arg, &status, 1) )
             rc = -EFAULT;
         break;
     }

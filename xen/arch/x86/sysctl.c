@@ -93,7 +93,7 @@ long arch_do_sysctl(
         if ( iommu_enabled )
             pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm_directio;
 
-        if ( copy_to_guest(u_sysctl, sysctl, 1) )
+        if ( __copy_field_to_guest(u_sysctl, sysctl, u.physinfo) )
             ret = -EFAULT;
     }
     break;
@@ -133,7 +133,8 @@ long arch_do_sysctl(
             }
         }
 
-        ret = ((i <= max_cpu_index) || copy_to_guest(u_sysctl, sysctl, 1))
+        ret = ((i <= max_cpu_index) ||
+               __copy_field_to_guest(u_sysctl, sysctl, u.topologyinfo))
             ? -EFAULT : 0;
     }
     break;
@@ -185,7 +186,8 @@ long arch_do_sysctl(
             }
         }
 
-        ret = ((i <= max_node_index) || copy_to_guest(u_sysctl, sysctl, 1))
+        ret = ((i <= max_node_index) ||
+               __copy_field_to_guest(u_sysctl, sysctl, u.numainfo))
             ? -EFAULT : 0;
     }
     break;

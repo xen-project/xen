@@ -4407,7 +4407,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         if ( xatp.space == XENMAPSPACE_gmfn_range )
         {
-            if ( rc && copy_to_guest(arg, &xatp, 1) )
+            if ( rc && __copy_to_guest(arg, &xatp, 1) )
                 rc = -EFAULT;
 
             if ( rc == -EAGAIN )
@@ -4492,7 +4492,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         map.nr_entries = min(map.nr_entries, d->arch.pv_domain.nr_e820);
         if ( copy_to_guest(map.buffer, d->arch.pv_domain.e820,
                            map.nr_entries) ||
-             copy_to_guest(arg, &map, 1) )
+             __copy_to_guest(arg, &map, 1) )
         {
             spin_unlock(&d->arch.pv_domain.e820_lock);
             return -EFAULT;
@@ -4559,7 +4559,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         ctxt.map.nr_entries = ctxt.n;
 
-        if ( copy_to_guest(arg, &ctxt.map, 1) )
+        if ( __copy_to_guest(arg, &ctxt.map, 1) )
             return -EFAULT;
 
         return 0;
@@ -4630,7 +4630,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
             target.pod_cache_pages = p2m->pod.count;
             target.pod_entries     = p2m->pod.entry_count;
 
-            if ( copy_to_guest(arg, &target, 1) )
+            if ( __copy_to_guest(arg, &target, 1) )
             {
                 rc= -EFAULT;
                 goto pod_target_out_unlock;

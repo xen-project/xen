@@ -586,7 +586,7 @@ int iommu_do_domctl(
             domctl->u.get_device_group.num_sdevs = ret;
             ret = 0;
         }
-        if ( copy_to_guest(u_domctl, domctl, 1) )
+        if ( __copy_field_to_guest(u_domctl, domctl, u.get_device_group) )
             ret = -EFAULT;
         rcu_unlock_domain(d);
     }

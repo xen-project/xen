@@ -122,7 +122,7 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 #define XLAT_memory_map_HNDL_buffer(_d_, _s_) ((void)0)
         XLAT_memory_map(&cmp, nat);
 #undef XLAT_memory_map_HNDL_buffer
-        if ( copy_to_guest(arg, &cmp, 1) )
+        if ( __copy_to_guest(arg, &cmp, 1) )
             rc = -EFAULT;
 
         break;
@@ -148,7 +148,7 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         XLAT_pod_target(&cmp, nat);
 
-        if ( copy_to_guest(arg, &cmp, 1) )
+        if ( __copy_to_guest(arg, &cmp, 1) )
         {
             if ( rc == __HYPERVISOR_memory_op )
                 hypercall_cancel_continuation();
@@ -200,7 +200,7 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         }
 
         xmml.nr_extents = i;
-        if ( copy_to_guest(arg, &xmml, 1) )
+        if ( __copy_to_guest(arg, &xmml, 1) )
             rc = -EFAULT;
 
         break;
@@ -219,7 +219,7 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&meo, arg, 1) )
             return -EFAULT;
         rc = do_mem_event_op(op, meo.domain, (void *) &meo);
-        if ( !rc && copy_to_guest(arg, &meo, 1) )
+        if ( !rc && __copy_to_guest(arg, &meo, 1) )
             return -EFAULT;
         break;
     }
@@ -231,7 +231,7 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( mso.op == XENMEM_sharing_op_audit )
             return mem_sharing_audit(); 
         rc = do_mem_event_op(op, mso.domain, (void *) &mso);
-        if ( !rc && copy_to_guest(arg, &mso, 1) )
+        if ( !rc && __copy_to_guest(arg, &mso, 1) )
             return -EFAULT;
         break;
     }

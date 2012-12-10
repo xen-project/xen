@@ -384,7 +384,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         irq_status_query.flags |= XENIRQSTAT_needs_eoi;
         if ( pirq_shared(v->domain, irq) )
             irq_status_query.flags |= XENIRQSTAT_shared;
-        ret = copy_to_guest(arg, &irq_status_query, 1) ? -EFAULT : 0;
+        ret = __copy_to_guest(arg, &irq_status_query, 1) ? -EFAULT : 0;
         break;
     }
 
@@ -412,7 +412,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         ret = physdev_map_pirq(map.domid, map.type, &map.index, &map.pirq,
                                &msi);
 
-        if ( copy_to_guest(arg, &map, 1) != 0 )
+        if ( __copy_to_guest(arg, &map, 1) )
             ret = -EFAULT;
         break;
     }
@@ -440,7 +440,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( ret )
             break;
         ret = ioapic_guest_read(apic.apic_physbase, apic.reg, &apic.value);
-        if ( copy_to_guest(arg, &apic, 1) != 0 )
+        if ( __copy_to_guest(arg, &apic, 1) )
             ret = -EFAULT;
         break;
     }
@@ -478,7 +478,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         irq_op.vector = irq_op.irq;
         ret = 0;
         
-        if ( copy_to_guest(arg, &irq_op, 1) != 0 )
+        if ( __copy_to_guest(arg, &irq_op, 1) )
             ret = -EFAULT;
         break;
     }
@@ -714,7 +714,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( ret >= 0 )
         {
             out.pirq = ret;
-            ret = copy_to_guest(arg, &out, 1) ? -EFAULT : 0;
+            ret = __copy_to_guest(arg, &out, 1) ? -EFAULT : 0;
         }
 
         break;

@@ -449,7 +449,7 @@ static int add_passive_list(XEN_GUEST_HANDLE_PARAM(void) arg)
             current->domain, __pa(d->xenoprof->rawbuf),
             passive.buf_gmaddr, d->xenoprof->npages);
 
-    if ( copy_to_guest(arg, &passive, 1) )
+    if ( __copy_to_guest(arg, &passive, 1) )
     {
         put_domain(d);
         return -EFAULT;
@@ -604,7 +604,7 @@ static int xenoprof_op_init(XEN_GUEST_HANDLE_PARAM(void) arg)
     if ( xenoprof_init.is_primary )
         xenoprof_primary_profiler = current->domain;
 
-    return (copy_to_guest(arg, &xenoprof_init, 1) ? -EFAULT : 0);
+    return __copy_to_guest(arg, &xenoprof_init, 1) ? -EFAULT : 0;
 }
 
 #define ret_t long
@@ -651,10 +651,7 @@ static int xenoprof_op_get_buffer(XEN_GUEST_HANDLE_PARAM(void) arg)
             d, __pa(d->xenoprof->rawbuf), xenoprof_get_buffer.buf_gmaddr,
             d->xenoprof->npages);
 
-    if ( copy_to_guest(arg, &xenoprof_get_buffer, 1) )
-        return -EFAULT;
-
-    return 0;
+    return __copy_to_guest(arg, &xenoprof_get_buffer, 1) ? -EFAULT : 0;
 }
 
 #define NONPRIV_OP(op) ( (op == XENOPROF_init)          \

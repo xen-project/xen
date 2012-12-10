@@ -1074,7 +1074,7 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         }
 
         xmml.nr_extents = i;
-        if ( copy_to_guest(arg, &xmml, 1) )
+        if ( __copy_to_guest(arg, &xmml, 1) )
             return -EFAULT;
 
         break;
@@ -1092,7 +1092,7 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&meo, arg, 1) )
             return -EFAULT;
         rc = do_mem_event_op(op, meo.domain, (void *) &meo);
-        if ( !rc && copy_to_guest(arg, &meo, 1) )
+        if ( !rc && __copy_to_guest(arg, &meo, 1) )
             return -EFAULT;
         break;
     }
@@ -1104,7 +1104,7 @@ long subarch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( mso.op == XENMEM_sharing_op_audit )
             return mem_sharing_audit(); 
         rc = do_mem_event_op(op, mso.domain, (void *) &mso);
-        if ( !rc && copy_to_guest(arg, &mso, 1) )
+        if ( !rc && __copy_to_guest(arg, &mso, 1) )
             return -EFAULT;
         break;
     }

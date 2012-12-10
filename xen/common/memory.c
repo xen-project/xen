@@ -359,7 +359,7 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
         {
             exch.nr_exchanged = i << in_chunk_order;
             rcu_unlock_domain(d);
-            if ( copy_field_to_guest(arg, &exch, nr_exchanged) )
+            if ( __copy_field_to_guest(arg, &exch, nr_exchanged) )
                 return -EFAULT;
             return hypercall_create_continuation(
                 __HYPERVISOR_memory_op, "lh", XENMEM_exchange, arg);
@@ -500,7 +500,7 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
     }
 
     exch.nr_exchanged = exch.in.nr_extents;
-    if ( copy_field_to_guest(arg, &exch, nr_exchanged) )
+    if ( __copy_field_to_guest(arg, &exch, nr_exchanged) )
         rc = -EFAULT;
     rcu_unlock_domain(d);
     return rc;
@@ -527,7 +527,7 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
     exch.nr_exchanged = i << in_chunk_order;
 
  fail_early:
-    if ( copy_field_to_guest(arg, &exch, nr_exchanged) )
+    if ( __copy_field_to_guest(arg, &exch, nr_exchanged) )
         rc = -EFAULT;
     return rc;
 }
