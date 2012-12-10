@@ -421,6 +421,12 @@ struct xen_mem_sharing_op {
 typedef struct xen_mem_sharing_op xen_mem_sharing_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_mem_sharing_op_t);
 
+/*
+ * Reserve ops for future/out-of-tree "claim" patches (Oracle)
+ */
+#define XENMEM_claim_pages                  24
+#define XENMEM_get_unclaimed_pages          25
+
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
