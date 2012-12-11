@@ -370,9 +370,9 @@ void __devinit subarch_percpu_traps_init(void)
     {
         /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
         set_intr_gate(TRAP_double_fault, &double_fault);
-        idt_table[TRAP_double_fault].a  |= IST_DF << 32;
-        idt_table[TRAP_nmi].a           |= IST_NMI << 32;
-        idt_table[TRAP_machine_check].a |= IST_MCE << 32;
+        set_ist(&idt_table[TRAP_double_fault],  IST_DF);
+        set_ist(&idt_table[TRAP_nmi],           IST_NMI);
+        set_ist(&idt_table[TRAP_machine_check], IST_MCE);
 
         /*
          * The 32-on-64 hypercall entry vector is only accessible from ring 1.

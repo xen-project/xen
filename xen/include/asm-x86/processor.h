@@ -425,10 +425,20 @@ struct tss_struct {
     u8 __cacheline_filler[24];
 } __cacheline_aligned __attribute__((packed));
 
-#define IST_DF  1UL
-#define IST_NMI 2UL
-#define IST_MCE 3UL
-#define IST_MAX 3UL
+#define IST_NONE 0UL
+#define IST_DF   1UL
+#define IST_NMI  2UL
+#define IST_MCE  3UL
+#define IST_MAX  3UL
+
+/* Set the interrupt stack table used by a particular interrupt
+ * descriptor table entry. */
+static always_inline void set_ist(idt_entry_t *idt, unsigned long ist)
+{
+    /* IST is a 3 bit field, 32 bits into the IDT entry. */
+    ASSERT(ist <= IST_MAX);
+    idt->a = (idt->a & ~(7UL << 32)) | (ist << 32);
+}
 
 #define IDT_ENTRIES 256
 extern idt_entry_t idt_table[];
