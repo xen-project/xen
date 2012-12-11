@@ -88,13 +88,13 @@ static int collect_cpu_info(int cpu, struct cpu_signature *csig)
 
     rdmsrl(MSR_AMD_PATCHLEVEL, csig->rev);
 
-    printk(KERN_DEBUG "microcode: collect_cpu_info: patch_id=%#x\n",
-           csig->rev);
+    printk(KERN_DEBUG "microcode: CPU%d collect_cpu_info: patch_id=%#x\n",
+           cpu, csig->rev);
 
     return 0;
 }
 
-static int microcode_fits(const struct microcode_amd *mc_amd, int cpu)
+static bool_t microcode_fits(const struct microcode_amd *mc_amd, int cpu)
 {
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     const struct microcode_header_amd *mc_header = mc_amd->mpb;
@@ -121,12 +121,7 @@ static int microcode_fits(const struct microcode_amd *mc_amd, int cpu)
         return 0;
 
     if ( (mc_header->processor_rev_id) != equiv_cpu_id )
-    {
-        printk(KERN_DEBUG "microcode: CPU%d patch does not match "
-               "(patch is %x, cpu base id is %x) \n",
-               cpu, mc_header->processor_rev_id, equiv_cpu_id);
-        return -EINVAL;
-    }
+        return 0;
 
     if ( mc_header->patch_id <= uci->cpu_sig.rev )
         return 0;
@@ -173,7 +168,7 @@ static int apply_microcode(int cpu)
         return -EIO;
     }
 
-    printk(KERN_INFO "microcode: CPU%d updated from revision %#x to %#x\n",
+    printk(KERN_WARNING "microcode: CPU%d updated from revision %#x to %#x\n",
            cpu, uci->cpu_sig.rev, hdr->patch_id);
 
     uci->cpu_sig.rev = rev;
@@ -181,7 +176,7 @@ static int apply_microcode(int cpu)
     return 0;
 }
 
-static int get_next_ucode_from_buffer_amd(
+static int get_ucode_from_buffer_amd(
     struct microcode_amd *mc_amd,
     const void *buf,
     size_t bufsize,
@@ -195,22 +190,21 @@ static int get_next_ucode_from_buffer_amd(
 
     /* No more data */
     if ( off >= bufsize )
-        return 1;
+    {
+        printk(KERN_ERR "microcode: Microcode buffer overrun\n");
+        return -EINVAL;
+    }
 
     mpbuf = (const struct mpbhdr *)&bufp[off];
     if ( mpbuf->type != UCODE_UCODE_TYPE )
     {
-        printk(KERN_ERR "microcode: error! "
-               "Wrong microcode payload type field\n");
+        printk(KERN_ERR "microcode: Wrong microcode payload type field\n");
         return -EINVAL;
     }
 
-    printk(KERN_DEBUG "microcode: size %zu, block size %u, offset %zu\n",
-           bufsize, mpbuf->len, off);
-
     if ( (off + mpbuf->len) > bufsize )
     {
-        printk(KERN_ERR "microcode: error! Bad data in microcode data file\n");
+        printk(KERN_ERR "microcode: Bad data in microcode data file\n");
         return -EINVAL;
     }
 
@@ -230,6 +224,11 @@ static int get_next_ucode_from_buffer_amd(
 
     *offset = off + mpbuf->len + 8;
 
+    printk(KERN_DEBUG "microcode: CPU%d size %zu, block size %u offset %zu equivID %#x rev %#x\n",
+           raw_smp_processor_id(), bufsize, mpbuf->len, off,
+           ((struct microcode_header_amd *)mc_amd->mpb)->processor_rev_id,
+           ((struct microcode_header_amd *)mc_amd->mpb)->patch_id);
+
     return 0;
 }
 
@@ -246,23 +245,20 @@ static int install_equiv_cpu_table(
 
     if ( mpbuf->type != UCODE_EQUIV_CPU_TABLE_TYPE )
     {
-        printk(KERN_ERR "microcode: error! "
-               "Wrong microcode equivalent cpu table type field\n");
+        printk(KERN_ERR "microcode: Wrong microcode equivalent cpu table type field\n");
         return -EINVAL;
     }
 
     if ( mpbuf->len == 0 )
     {
-        printk(KERN_ERR "microcode: error! "
-               "Wrong microcode equivalent cpu table length\n");
+        printk(KERN_ERR "microcode: Wrong microcode equivalent cpu table length\n");
         return -EINVAL;
     }
 
     mc_amd->equiv_cpu_table = xmalloc_bytes(mpbuf->len);
     if ( !mc_amd->equiv_cpu_table )
     {
-        printk(KERN_ERR "microcode: error! "
-               "Can not allocate memory for equivalent cpu table\n");
+        printk(KERN_ERR "microcode: Cannot allocate memory for equivalent cpu table\n");
         return -ENOMEM;
     }
 
@@ -278,8 +274,8 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
 {
     struct microcode_amd *mc_amd, *mc_old;
     size_t offset = bufsize;
+    size_t last_offset, applied_offset = 0;
     int error = 0;
-    int ret;
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
 
     /* We should bind the task to the CPU */
@@ -287,8 +283,7 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
 
     if ( *(const uint32_t *)buf != UCODE_MAGIC )
     {
-        printk(KERN_ERR "microcode: error! Wrong "
-               "microcode patch file magic\n");
+        printk(KERN_ERR "microcode: Wrong microcode patch file magic\n");
         error = -EINVAL;
         goto out;
     }
@@ -296,8 +291,7 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
     mc_amd = xmalloc(struct microcode_amd);
     if ( !mc_amd )
     {
-        printk(KERN_ERR "microcode: error! "
-               "Can not allocate memory for microcode patch\n");
+        printk(KERN_ERR "microcode: Cannot allocate memory for microcode patch\n");
         error = -ENOMEM;
         goto out;
     }
@@ -321,33 +315,38 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
      */
     mc_amd->mpb = NULL;
     mc_amd->mpb_size = 0;
-    while ( (ret = get_next_ucode_from_buffer_amd(mc_amd, buf, bufsize,
-                                                  &offset)) == 0 )
+    last_offset = offset;
+    while ( (error = get_ucode_from_buffer_amd(mc_amd, buf, bufsize,
+                                               &offset)) == 0 )
     {
-        error = microcode_fits(mc_amd, cpu);
-        if (error <= 0)
-            continue;
-
-        error = apply_microcode(cpu);
-        if (error == 0)
+        if ( microcode_fits(mc_amd, cpu) )
         {
-            error = 1;
-            break;
+            error = apply_microcode(cpu);
+            if ( error )
+                break;
+            applied_offset = last_offset;
         }
-    }
 
-    if ( ret < 0 )
-        error = ret;
+        last_offset = offset;
+
+        if ( offset >= bufsize )
+            break;
+    }
 
     /* On success keep the microcode patch for
      * re-apply on resume.
      */
-    if ( error == 1 )
+    if ( applied_offset )
     {
-        xfree(mc_old);
-        error = 0;
+        int ret = get_ucode_from_buffer_amd(mc_amd, buf, bufsize,
+                                            &applied_offset);
+        if ( ret == 0 )
+            xfree(mc_old);
+        else
+            error = ret;
     }
-    else
+
+    if ( !applied_offset || error )
     {
         xfree(mc_amd);
         uci->mc.mc_amd = mc_old;
@@ -356,6 +355,12 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
   out:
     svm_host_osvw_init();
 
+    /*
+     * In some cases we may return an error even if processor's microcode has
+     * been updated. For example, the first patch in a container file is loaded
+     * successfully but subsequent container file processing encounters a
+     * failure.
+     */
     return error;
 }
 
@@ -364,10 +369,9 @@ static int microcode_resume_match(int cpu, const void *mc)
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
     struct microcode_amd *mc_amd = uci->mc.mc_amd;
     const struct microcode_amd *src = mc;
-    int res = microcode_fits(src, cpu);
 
-    if ( res <= 0 )
-        return res;
+    if ( !microcode_fits(src, cpu) )
+        return 0;
 
     if ( src != mc_amd )
     {
