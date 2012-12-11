@@ -301,7 +301,7 @@ static inline struct page_info *__virt_to_page(const void *v)
 
 static inline void *__page_to_virt(const struct page_info *pg)
 {
-    ASSERT((unsigned long)pg - FRAMETABLE_VIRT_START < FRAMETABLE_VIRT_END);
+    ASSERT((unsigned long)pg - FRAMETABLE_VIRT_START < FRAMETABLE_SIZE);
     /*
      * (sizeof(*pg) & -sizeof(*pg)) selects the LS bit of sizeof(*pg). The
      * division and re-multiplication avoids one shift when sizeof(*pg) is a

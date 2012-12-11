@@ -182,28 +182,6 @@ static uint32_t base_disallow_mask;
       !is_hvm_domain(d)) ?                                      \
      L1_DISALLOW_MASK : (L1_DISALLOW_MASK & ~PAGE_CACHE_ATTRS))
 
-static void __init init_spagetable(void)
-{
-    unsigned long s, start = SPAGETABLE_VIRT_START;
-    unsigned long end = SPAGETABLE_VIRT_END;
-    unsigned long step, mfn;
-    unsigned int max_entries;
-
-    step = 1UL << PAGETABLE_ORDER;
-    max_entries = (max_pdx + ((1UL<<SUPERPAGE_ORDER)-1)) >> SUPERPAGE_ORDER;
-    end = start + (((max_entries * sizeof(*spage_table)) +
-                    ((1UL<<SUPERPAGE_SHIFT)-1)) & (~((1UL<<SUPERPAGE_SHIFT)-1)));
-
-    for (s = start; s < end; s += step << PAGE_SHIFT)
-    {
-        mfn = alloc_boot_pages(step, step);
-        if ( !mfn )
-            panic("Not enough memory for spage table");
-        map_pages_to_xen(s, mfn, step, PAGE_HYPERVISOR);
-    }
-    memset((void *)start, 0, end - start);
-}
-
 static void __init init_frametable_chunk(void *start, void *end)
 {
     unsigned long s = (unsigned long)start;
@@ -232,15 +210,25 @@ static void __init init_frametable_chunk(void *start, void *end)
     }
 
     memset(start, 0, end - start);
-    memset(end, -1, s - (unsigned long)end);
+    memset(end, -1, s - e);
+}
+
+static void __init init_spagetable(void)
+{
+    BUILD_BUG_ON(XEN_VIRT_END > SPAGETABLE_VIRT_START);
+
+    init_frametable_chunk(spage_table,
+                          mem_hotplug ? (void *)SPAGETABLE_VIRT_END
+                                      : pdx_to_spage(max_pdx - 1) + 1);
 }
 
 void __init init_frametable(void)
 {
     unsigned int sidx, eidx, nidx;
     unsigned int max_idx = (max_pdx + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT;
+    struct page_info *end_pg, *top_pg;
 
-    BUILD_BUG_ON(XEN_VIRT_END > FRAMETABLE_VIRT_END);
+    BUILD_BUG_ON(XEN_VIRT_END > FRAMETABLE_VIRT_START);
     BUILD_BUG_ON(FRAMETABLE_VIRT_START & ((1UL << L2_PAGETABLE_SHIFT) - 1));
 
     for ( sidx = 0; ; sidx = nidx )
@@ -252,17 +240,13 @@ void __init init_frametable(void)
         init_frametable_chunk(pdx_to_page(sidx * PDX_GROUP_COUNT),
                               pdx_to_page(eidx * PDX_GROUP_COUNT));
     }
-    if ( !mem_hotplug )
-        init_frametable_chunk(pdx_to_page(sidx * PDX_GROUP_COUNT),
-                              pdx_to_page(max_pdx - 1) + 1);
-    else
-    {
-        init_frametable_chunk(pdx_to_page(sidx * PDX_GROUP_COUNT),
-                              pdx_to_page(max_idx * PDX_GROUP_COUNT - 1) + 1);
-        memset(pdx_to_page(max_pdx), -1,
-               (unsigned long)pdx_to_page(max_idx * PDX_GROUP_COUNT) -
-               (unsigned long)pdx_to_page(max_pdx));
-    }
+
+    end_pg = pdx_to_page(max_pdx - 1) + 1;
+    top_pg = mem_hotplug ? pdx_to_page(max_idx * PDX_GROUP_COUNT - 1) + 1
+                         : end_pg;
+    init_frametable_chunk(pdx_to_page(sidx * PDX_GROUP_COUNT), top_pg);
+    memset(end_pg, -1, (unsigned long)top_pg - (unsigned long)end_pg);
+
     if (opt_allow_superpage)
         init_spagetable();
 }

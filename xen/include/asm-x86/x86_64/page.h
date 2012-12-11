@@ -46,8 +46,8 @@ extern void pfn_pdx_hole_setup(unsigned long);
 
 #define page_to_pdx(pg)  ((pg) - frame_table)
 #define pdx_to_page(pdx) (frame_table + (pdx))
-#define spage_to_pdx(spg) ((spg>>(SUPERPAGE_SHIFT-PAGE_SHIFT)) - spage_table)
-#define pdx_to_spage(pdx) (spage_table + ((pdx)<<(SUPERPAGE_SHIFT-PAGE_SHIFT)))
+#define spage_to_pdx(spg) (((spg) - spage_table)<<(SUPERPAGE_SHIFT-PAGE_SHIFT))
+#define pdx_to_spage(pdx) (spage_table + ((pdx)>>(SUPERPAGE_SHIFT-PAGE_SHIFT)))
 /*
  * Note: These are solely for the use by page_{get,set}_owner(), and
  *       therefore don't need to handle the XEN_VIRT_{START,END} range.
