@@ -3070,7 +3070,7 @@ long do_mmuext_op(
             page = get_page_from_gfn(pg_owner, op.arg1.mfn, NULL, P2M_ALLOC);
             if ( unlikely(!page) )
             {
-                rc = -EINVAL;
+                okay = 0;
                 break;
             }
 
@@ -3130,6 +3130,7 @@ long do_mmuext_op(
             page = get_page_from_gfn(pg_owner, op.arg1.mfn, NULL, P2M_ALLOC);
             if ( unlikely(!page) )
             {
+                okay = 0;
                 MEM_LOG("Mfn %lx bad domain", op.arg1.mfn);
                 break;
             }
