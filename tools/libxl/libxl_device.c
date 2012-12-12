@@ -250,6 +250,7 @@ int libxl__device_destroy(libxl_ctx *ctx, char *be_path, int force)
     if (!state)
         goto out;
     if (atoi(state) != 4) {
+        libxl__device_destroy_tapdisk(&gc, be_path);
         xs_rm(ctx->xsh, XBT_NULL, be_path);
         goto out;
     }
@@ -368,6 +369,7 @@ int libxl__devices_destroy(libxl_ctx *ctx, uint32_t domid, int force)
             }
         }
     }
+    libxl__device_destroy_tapdisk(&gc, be_path);
 out:
     libxl__free_all(&gc);
     return 0;

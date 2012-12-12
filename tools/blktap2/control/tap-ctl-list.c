@@ -506,16 +506,14 @@ out:
 }
 
 int
-tap_ctl_find_minor(const char *type, const char *path)
+tap_ctl_find(const char *type, const char *path, tap_list_t *tap)
 {
 	tap_list_t **list, **_entry;
-	int minor, err;
+	int ret = -ENOENT, err;
 
 	err = tap_ctl_list(&list);
 	if (err)
 		return err;
-
-	minor = -1;
 
 	for (_entry = list; *_entry != NULL; ++_entry) {
 		tap_list_t *entry  = *_entry;
@@ -526,11 +524,13 @@ tap_ctl_find_minor(const char *type, const char *path)
 		if (path && (!entry->path || strcmp(entry->path, path)))
 			continue;
 
-		minor = entry->minor;
+		*tap = *entry;
+		tap->type = tap->path = NULL;
+		ret = 0;
 		break;
 	}
 
 	tap_ctl_free_list(list);
 
-	return minor >= 0 ? minor : -ENOENT;
+	return ret;
 }
