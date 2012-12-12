@@ -295,16 +295,9 @@ void vmx_intr_assist(void)
                     intack.vector;
         __vmwrite(GUEST_INTR_STATUS, status);
         if (v->arch.hvm_vmx.eoi_exitmap_changed) {
-#ifdef __i386__
-#define UPDATE_EOI_EXITMAP(v, e) {                             \
-        if (test_and_clear_bit(e, &v->arch.hvm_vmx.eoi_exitmap_changed)) {      \
-                __vmwrite(EOI_EXIT_BITMAP##e, v->arch.hvm_vmx.eoi_exit_bitmap[e]);    \
-                __vmwrite(EOI_EXIT_BITMAP##e##_HIGH, v.arch.hvm_vmx.eoi_exit_bitmap[e] >> 32);}}
-#else
 #define UPDATE_EOI_EXITMAP(v, e) {                             \
         if (test_and_clear_bit(e, &v->arch.hvm_vmx.eoi_exitmap_changed)) {      \
                 __vmwrite(EOI_EXIT_BITMAP##e, v->arch.hvm_vmx.eoi_exit_bitmap[e]);}}
-#endif
                 UPDATE_EOI_EXITMAP(v, 0);
                 UPDATE_EOI_EXITMAP(v, 1);
                 UPDATE_EOI_EXITMAP(v, 2);
