@@ -34,6 +34,7 @@
 #define VSCSIIF_ACT_SCSI_CDB         1    /* SCSI CDB command */
 #define VSCSIIF_ACT_SCSI_ABORT       2    /* SCSI Device(Lun) Abort*/
 #define VSCSIIF_ACT_SCSI_RESET       3    /* SCSI Device(Lun) Reset*/
+#define VSCSIIF_ACT_SCSI_SG_PRESET   4    /* Preset SG elements */
 
 /*
  * Maximum scatter/gather segments per request.
@@ -50,6 +51,12 @@
 #define VSCSIIF_MAX_COMMAND_SIZE         16
 #define VSCSIIF_SENSE_BUFFERSIZE         96
 
+struct scsiif_request_segment {
+    grant_ref_t gref;
+    uint16_t offset;
+    uint16_t length;
+};
+typedef struct scsiif_request_segment vscsiif_segment_t;
 
 struct vscsiif_request {
     uint16_t rqid;          /* private guest value, echoed in resp  */
@@ -66,18 +73,26 @@ struct vscsiif_request {
                                          DMA_NONE(3) requests  */
     uint8_t nr_segments;              /* Number of pieces of scatter-gather */
 
-    struct scsiif_request_segment {
-        grant_ref_t gref;
-        uint16_t offset;
-        uint16_t length;
-    } seg[VSCSIIF_SG_TABLESIZE];
+    vscsiif_segment_t seg[VSCSIIF_SG_TABLESIZE];
     uint32_t reserved[3];
 };
 typedef struct vscsiif_request vscsiif_request_t;
 
+#define VSCSIIF_SG_LIST_SIZE ((sizeof(vscsiif_request_t) - 4) \
+                              / sizeof(vscsiif_segment_t))
+
+struct vscsiif_sg_list {
+    /* First two fields must match struct vscsiif_request! */
+    uint16_t rqid;          /* private guest value, must match main req */
+    uint8_t act;            /* VSCSIIF_ACT_SCSI_SG_PRESET */
+    uint8_t nr_segments;    /* Number of pieces of scatter-gather */
+    vscsiif_segment_t seg[VSCSIIF_SG_LIST_SIZE];
+};
+typedef struct vscsiif_sg_list vscsiif_sg_list_t;
+
 struct vscsiif_response {
     uint16_t rqid;
-    uint8_t padding;
+    uint8_t act;               /* valid only when backend supports SG_PRESET */
     uint8_t sense_len;
     uint8_t sense_buffer[VSCSIIF_SENSE_BUFFERSIZE];
     int32_t rslt;
