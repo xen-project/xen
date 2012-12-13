@@ -270,6 +270,15 @@ UUID will be generated.
 
 Assign an XSM security label to this domain.
 
+=item B<init_seclabel="LABEL">
+
+Specify an XSM security label used for this domain temporarily during
+its build. The domain's XSM label will be changed to the execution
+seclabel (specified by "seclabel") once the build is complete, prior to
+unpausing the domain. With a properly constructed security policy (such
+as nomigrate_t in the example policy), this can be used to build a
+domain whose memory is not accessible to the toolstack domain.
+
 =item B<nomigrate=BOOLEAN>
 
 Disable migration of this domain.  This enables certain other features

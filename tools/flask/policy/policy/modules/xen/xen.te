@@ -90,6 +90,7 @@ create_domain(dom0_t, isolated_domU_t)
 manage_domain(dom0_t, isolated_domU_t)
 domain_comms(dom0_t, isolated_domU_t)
 
+# Declare a boolean that denies creation of prot_domU_t domains
 gen_bool(prot_doms_locked, false)
 declare_domain(prot_domU_t)
 if (!prot_doms_locked) {
@@ -110,6 +111,15 @@ create_domain(dom0_t, dm_dom_t)
 manage_domain(dom0_t, dm_dom_t)
 domain_comms(dom0_t, dm_dom_t)
 device_model(dm_dom_t, domHVM_t)
+
+# nomigrate_t must be built via the nomigrate_t_building label; once built,
+# dom0 cannot read its memory.
+declare_domain(nomigrate_t)
+declare_build_label(nomigrate_t)
+create_domain_build_label(dom0_t, nomigrate_t)
+manage_domain(dom0_t, nomigrate_t)
+domain_comms(dom0_t, nomigrate_t)
+domain_self_comms(nomigrate_t)
 
 ###############################################################################
 #

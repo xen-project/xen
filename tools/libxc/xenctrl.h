@@ -2169,6 +2169,7 @@ int xc_flask_policyvers(xc_interface *xc_handle);
 int xc_flask_avc_hashstats(xc_interface *xc_handle, char *buf, int size);
 int xc_flask_getavc_threshold(xc_interface *xc_handle);
 int xc_flask_setavc_threshold(xc_interface *xc_handle, int threshold);
+int xc_flask_relabel_domain(xc_interface *xch, int domid, uint32_t sid);
 
 struct elf_binary;
 void xc_elf_set_logfile(xc_interface *xch, struct elf_binary *elf,

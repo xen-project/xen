@@ -1182,6 +1182,10 @@ static void domcreate_complete(libxl__egc *egc,
                                int rc)
 {
     STATE_AO_GC(dcs->ao);
+    libxl_domain_config *const d_config = dcs->guest_config;
+
+    if (!rc && d_config->b_info.exec_ssidref)
+        rc = xc_flask_relabel_domain(CTX->xch, dcs->guest_domid, d_config->b_info.exec_ssidref);
 
     if (rc) {
         if (dcs->guest_domid) {

@@ -422,6 +422,16 @@ int xc_flask_setavc_threshold(xc_interface *xch, int threshold)
     return xc_flask_op(xch, &op);
 }
 
+int xc_flask_relabel_domain(xc_interface *xch, int domid, uint32_t sid)
+{
+    DECLARE_FLASK_OP;
+    op.cmd = FLASK_RELABEL_DOMAIN;
+    op.u.relabel.domid = domid;
+    op.u.relabel.sid = sid;
+
+    return xc_flask_op(xch, &op);
+}
+
 /*
  * Local variables:
  * mode: C

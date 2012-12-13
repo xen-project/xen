@@ -9,24 +9,47 @@
 #   Declare a type as a domain type, and allow basic domain setup
 define(`declare_domain', `
 	type $1, domain_type`'ifelse(`$#', `1', `', `,shift($@)');
+	type $1_channel, event_type;
+	type_transition $1 domain_type:event $1_channel;
 	allow $1 $1:grant { query setup };
 	allow $1 $1:mmu { adjust physmap map_read map_write stat pinpage };
 	allow $1 $1:hvm { getparam setparam };
 ')
 
-# create_domain(priv, target)
-#   Allow a domain to be created
-define(`create_domain', `
+# declare_build_label(type)
+#   Declare a paired _building type for the given domain type
+define(`declare_build_label', `
+	type $1_building, domain_type;
+	type_transition $1_building domain_type:event $1_channel;
+	allow $1_building $1 : domain transition;
+')
+
+define(`create_domain_common', `
 	allow $1 $2:domain { create max_vcpus setdomainmaxmem setaddrsize
-			getdomaininfo hypercall setvcpucontext scheduler
-			unpause getvcpuinfo getvcpuextstate getaddrsize
-			getvcpuaffinity };
+			getdomaininfo hypercall setvcpucontext setextvcpucontext
+			scheduler getvcpuinfo getvcpuextstate getaddrsize
+			getvcpuaffinity setvcpuaffinity };
 	allow $1 $2:security check_context;
 	allow $1 $2:shadow enable;
 	allow $1 $2:mmu {map_read map_write adjust memorymap physmap pinpage};
 	allow $1 $2:grant setup;
-	allow $1 $2:hvm { cacheattr getparam hvmctl irqlevel pciroute setparam pcilevel trackdirtyvram };
-	allow $1 $2_$1_channel:event create;
+	allow $1 $2:hvm { cacheattr getparam hvmctl irqlevel pciroute sethvmc setparam pcilevel trackdirtyvram };
+')
+
+# create_domain(priv, target)
+#   Allow a domain to be created directly
+define(`create_domain', `
+	create_domain_common($1, $2)
+	allow $1 $2_channel:event create;
+')
+
+# create_domain_build_label(priv, target)
+#   Allow a domain to be created via its domain build label
+define(`create_domain_build_label', `
+	create_domain_common($1, $2_building)
+	allow $1 $2_channel:event create;
+	allow $1 $2_building:domain2 relabelfrom;
+	allow $1 $2:domain2 relabelto;
 ')
 
 # manage_domain(priv, target)
@@ -35,6 +58,15 @@ define(`manage_domain', `
 	allow $1 $2:domain { getdomaininfo getvcpuinfo getvcpuaffinity
 			getaddrsize pause unpause trigger shutdown destroy
 			setvcpuaffinity setdomainmaxmem };
+')
+
+# migrate_domain_out(priv, target)
+#   Allow creation of a snapshot or migration image from a domain
+#   (inbound migration is the same as domain creation)
+define(`migrate_domain_out', `
+	allow $1 $2:hvm { gethvmc getparam irqlevel };
+	allow $1 $2:mmu { stat pageinfo map_read };
+	allow $1 $2:domain { getaddrsize getvcpucontext getextvcpucontext getvcpuextstate pause destroy };
 ')
 
 ################################################################################
@@ -47,8 +79,6 @@ define(`manage_domain', `
 #   This allows an event channel to be created from domains with labels
 #   <source> to <dest> and will label it <chan-label>
 define(`create_channel', `
-	type $3, event_type;
-	type_transition $1 $2:event $3;
 	allow $1 $3:event { create send status };
 	allow $3 $2:event { bind };
 ')
@@ -56,8 +86,8 @@ define(`create_channel', `
 # domain_event_comms(dom1, dom2)
 #   Allow two domain types to communicate using event channels
 define(`domain_event_comms', `
-	create_channel($1, $2, $1_$2_channel)
-	create_channel($2, $1, $2_$1_channel)
+	create_channel($1, $2, $1_channel)
+	create_channel($2, $1, $2_channel)
 ')
 
 # domain_comms(dom1, dom2)
@@ -72,7 +102,7 @@ define(`domain_comms', `
 #   Allow a domain types to communicate with others of its type using grants
 #   and event channels (this includes event channels to DOMID_SELF)
 define(`domain_self_comms', `
-	create_channel($1, $1, $1_self_channel)
+	create_channel($1, $1, $1_channel)
 	allow $1 $1:grant { map_read map_write copy unmap };
 ')
 

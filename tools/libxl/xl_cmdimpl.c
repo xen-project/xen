@@ -596,9 +596,23 @@ static void parse_config_data(const char *config_source,
         exit(1);
     }
 
-    if (!xlu_cfg_get_string (config, "seclabel", &buf, 0)) {
+    if (!xlu_cfg_get_string (config, "init_seclabel", &buf, 0)) {
         e = libxl_flask_context_to_sid(ctx, (char *)buf, strlen(buf),
                                     &c_info->ssidref);
+        if (e) {
+            if (errno == ENOSYS) {
+                fprintf(stderr, "XSM Disabled: init_seclabel not supported\n");
+            } else {
+                fprintf(stderr, "Invalid init_seclabel: %s\n", buf);
+                exit(1);
+            }
+        }
+    }
+
+    if (!xlu_cfg_get_string (config, "seclabel", &buf, 0)) {
+        uint32_t ssidref;
+        e = libxl_flask_context_to_sid(ctx, (char *)buf, strlen(buf),
+                                    &ssidref);
         if (e) {
             if (errno == ENOSYS) {
                 fprintf(stderr, "XSM Disabled: seclabel not supported\n");
@@ -606,6 +620,10 @@ static void parse_config_data(const char *config_source,
                 fprintf(stderr, "Invalid seclabel: %s\n", buf);
                 exit(1);
             }
+        } else if (c_info->ssidref) {
+            b_info->exec_ssidref = ssidref;
+        } else {
+            c_info->ssidref = ssidref;
         }
     }
 
