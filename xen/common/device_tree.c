@@ -44,14 +44,13 @@ bool_t device_tree_node_matches(const void *fdt, int node, const char *match)
 
 bool_t device_tree_type_matches(const void *fdt, int node, const char *match)
 {
-    int len;
     const void *prop;
 
-    prop = fdt_getprop(fdt, node, "device_type", &len);
+    prop = fdt_getprop(fdt, node, "device_type", NULL);
     if ( prop == NULL )
         return 0;
 
-    return !strncmp(prop, match, len);
+    return !strcmp(prop, match);
 }
 
 bool_t device_tree_node_compatible(const void *fdt, int node, const char *match)
