@@ -725,7 +725,7 @@ static void domain_suspend_switch_qemu_xen_traditional_logdirty
             rc = libxl__xs_read_checked(gc, t, lds->ret_path, &got_ret);
             if (rc) goto out;
 
-            if (strcmp(got, got_ret)) {
+            if (!got_ret || strcmp(got, got_ret)) {
                 LOG(ERROR,"controlling logdirty: qemu was already sent"
                     " command `%s' (xenstore path `%s') but result is `%s'",
                     got, lds->cmd_path, got_ret ? got_ret : "<none>");
