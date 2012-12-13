@@ -54,6 +54,33 @@ bool_t device_tree_type_matches(const void *fdt, int node, const char *match)
     return !strncmp(prop, match, len);
 }
 
+bool_t device_tree_node_compatible(const void *fdt, int node, const char *match)
+{
+    int len, l;
+    const void *prop;
+
+    prop = fdt_getprop(fdt, node, "compatible", &len);
+    if ( prop == NULL )
+        return 0;
+
+    while ( len > 0 ) {
+        if ( !strcmp(prop, match) )
+            return 1;
+        l = strlen(prop) + 1;
+        prop += l;
+        len -= l;
+    }
+
+    return 0;
+}
+
+static int device_tree_nr_reg_ranges(const struct fdt_property *prop,
+        u32 address_cells, u32 size_cells)
+{
+    u32 reg_cells = address_cells + size_cells;
+    return fdt32_to_cpu(prop->len) / (reg_cells * sizeof(u32));
+}
+
 static void __init get_val(const u32 **cell, u32 cells, u64 *val)
 {
     *val = 0;
@@ -209,7 +236,6 @@ static void __init process_memory_node(const void *fdt, int node,
                                        u32 address_cells, u32 size_cells)
 {
     const struct fdt_property *prop;
-    size_t reg_cells;
     int i;
     int banks;
     const u32 *cell;
@@ -230,8 +256,7 @@ static void __init process_memory_node(const void *fdt, int node,
     }
 
     cell = (const u32 *)prop->data;
-    reg_cells = address_cells + size_cells;
-    banks = fdt32_to_cpu(prop->len) / (reg_cells * sizeof(u32));
+    banks = device_tree_nr_reg_ranges(prop, address_cells, size_cells);
 
     for ( i = 0; i < banks && early_info.mem.nr_banks < NR_MEM_BANKS; i++ )
     {
@@ -270,6 +295,46 @@ static void __init process_cpu_node(const void *fdt, int node,
     cpumask_set_cpu(start, &cpu_possible_map);
 }
 
+static void __init process_gic_node(const void *fdt, int node,
+                                    const char *name,
+                                    u32 address_cells, u32 size_cells)
+{
+    const struct fdt_property *prop;
+    const u32 *cell;
+    paddr_t start, size;
+    int interfaces;
+
+    if ( address_cells < 1 || size_cells < 1 )
+    {
+        early_printk("fdt: node `%s': invalid #address-cells or #size-cells",
+                     name);
+        return;
+    }
+
+    prop = fdt_get_property(fdt, node, "reg", NULL);
+    if ( !prop )
+    {
+        early_printk("fdt: node `%s': missing `reg' property\n", name);
+        return;
+    }
+
+    cell = (const u32 *)prop->data;
+    interfaces = device_tree_nr_reg_ranges(prop, address_cells, size_cells);
+    if ( interfaces < 4 )
+    {
+        early_printk("fdt: node `%s': not enough ranges\n", name);
+        return;
+    }
+    device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
+    early_info.gic.gic_dist_addr = start;
+    device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
+    early_info.gic.gic_cpu_addr = start;
+    device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
+    early_info.gic.gic_hyp_addr = start;
+    device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
+    early_info.gic.gic_vcpu_addr = start;
+}
+
 static int __init early_scan_node(const void *fdt,
                                   int node, const char *name, int depth,
                                   u32 address_cells, u32 size_cells,
@@ -279,6 +344,8 @@ static int __init early_scan_node(const void *fdt,
         process_memory_node(fdt, node, name, address_cells, size_cells);
     else if ( device_tree_type_matches(fdt, node, "cpu") )
         process_cpu_node(fdt, node, name, address_cells, size_cells);
+    else if ( device_tree_node_compatible(fdt, node, "arm,cortex-a15-gic") )
+        process_gic_node(fdt, node, name, address_cells, size_cells);
 
     return 0;
 }

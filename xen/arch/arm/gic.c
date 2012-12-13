@@ -26,6 +26,7 @@
 #include <xen/errno.h>
 #include <xen/softirq.h>
 #include <xen/list.h>
+#include <xen/device_tree.h>
 #include <asm/p2m.h>
 #include <asm/domain.h>
 
@@ -33,10 +34,8 @@
 
 /* Access to the GIC Distributor registers through the fixmap */
 #define GICD ((volatile uint32_t *) FIXMAP_ADDR(FIXMAP_GICD))
-#define GICC ((volatile uint32_t *) (FIXMAP_ADDR(FIXMAP_GICC1)  \
-                                     + (GIC_CR_OFFSET & 0xfff)))
-#define GICH ((volatile uint32_t *) (FIXMAP_ADDR(FIXMAP_GICH)  \
-                                     + (GIC_HR_OFFSET & 0xfff)))
+#define GICC ((volatile uint32_t *) FIXMAP_ADDR(FIXMAP_GICC1))
+#define GICH ((volatile uint32_t *) FIXMAP_ADDR(FIXMAP_GICH))
 static void gic_restore_pending_irqs(struct vcpu *v);
 
 /* Global state */
@@ -44,6 +43,7 @@ static struct {
     paddr_t dbase;       /* Address of distributor registers */
     paddr_t cbase;       /* Address of CPU interface registers */
     paddr_t hbase;       /* Address of virtual interface registers */
+    paddr_t vbase;       /* Address of virtual cpu interface registers */
     unsigned int lines;
     unsigned int cpus;
     spinlock_t lock;
@@ -306,10 +306,28 @@ static void __cpuinit gic_hyp_disable(void)
 /* Set up the GIC */
 void __init gic_init(void)
 {
-    /* XXX FIXME get this from devicetree */
-    gic.dbase = GIC_BASE_ADDRESS + GIC_DR_OFFSET;
-    gic.cbase = GIC_BASE_ADDRESS + GIC_CR_OFFSET;
-    gic.hbase = GIC_BASE_ADDRESS + GIC_HR_OFFSET;
+    printk("GIC initialization:\n"
+              "        gic_dist_addr=%"PRIpaddr"\n"
+              "        gic_cpu_addr=%"PRIpaddr"\n"
+              "        gic_hyp_addr=%"PRIpaddr"\n"
+              "        gic_vcpu_addr=%"PRIpaddr"\n",
+              early_info.gic.gic_dist_addr, early_info.gic.gic_cpu_addr,
+              early_info.gic.gic_hyp_addr, early_info.gic.gic_vcpu_addr);
+    if ( !early_info.gic.gic_dist_addr ||
+         !early_info.gic.gic_cpu_addr ||
+         !early_info.gic.gic_hyp_addr ||
+         !early_info.gic.gic_vcpu_addr )
+        panic("the physical address of one of the GIC interfaces is missing\n");
+    if ( (early_info.gic.gic_dist_addr & ~PAGE_MASK) ||
+         (early_info.gic.gic_cpu_addr & ~PAGE_MASK) ||
+         (early_info.gic.gic_hyp_addr & ~PAGE_MASK) ||
+         (early_info.gic.gic_vcpu_addr & ~PAGE_MASK) )
+        panic("GIC interfaces not page aligned.\n");
+
+    gic.dbase = early_info.gic.gic_dist_addr;
+    gic.cbase = early_info.gic.gic_cpu_addr;
+    gic.hbase = early_info.gic.gic_hyp_addr;
+    gic.vbase = early_info.gic.gic_vcpu_addr;
     set_fixmap(FIXMAP_GICD, gic.dbase >> PAGE_SHIFT, DEV_SHARED);
     BUILD_BUG_ON(FIXMAP_ADDR(FIXMAP_GICC1) !=
                  FIXMAP_ADDR(FIXMAP_GICC2)-PAGE_SIZE);
@@ -569,9 +587,9 @@ int gicv_setup(struct domain *d)
 {
     /* map the gic virtual cpu interface in the gic cpu interface region of
      * the guest */
-    return map_mmio_regions(d, GIC_BASE_ADDRESS + GIC_CR_OFFSET,
-                        GIC_BASE_ADDRESS + GIC_CR_OFFSET + (2 * PAGE_SIZE) - 1,
-                        GIC_BASE_ADDRESS + GIC_VR_OFFSET);
+    return map_mmio_regions(d, gic.cbase,
+                        gic.cbase + (2 * PAGE_SIZE) - 1,
+                        gic.vbase);
 }
 
 static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)

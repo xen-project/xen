@@ -26,8 +26,16 @@ struct dt_mem_info {
     struct membank bank[NR_MEM_BANKS];
 };
 
+struct dt_gic_info {
+    paddr_t gic_dist_addr;
+    paddr_t gic_cpu_addr;
+    paddr_t gic_hyp_addr;
+    paddr_t gic_vcpu_addr;
+};
+
 struct dt_early_info {
     struct dt_mem_info mem;
+    struct dt_gic_info gic;
 };
 
 typedef int (*device_tree_node_func)(const void *fdt,
