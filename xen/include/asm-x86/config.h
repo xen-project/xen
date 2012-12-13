@@ -12,6 +12,7 @@
 
 #define BYTES_PER_LONG (1 << LONG_BYTEORDER)
 #define BITS_PER_LONG (BYTES_PER_LONG << 3)
+#define BITS_PER_BYTE 8
 
 #define CONFIG_X86 1
 #define CONFIG_X86_HT 1

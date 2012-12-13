@@ -137,10 +137,10 @@ struct paging_mode {
 void paging_free_log_dirty_bitmap(struct domain *d);
 
 /* get the dirty bitmap for a specific range of pfns */
-int paging_log_dirty_range(struct domain *d,
-                           unsigned long begin_pfn,
-                           unsigned long nr,
-                           XEN_GUEST_HANDLE_64(uint8) dirty_bitmap);
+void paging_log_dirty_range(struct domain *d,
+                            unsigned long begin_pfn,
+                            unsigned long nr,
+                            uint8_t *dirty_bitmap);
 
 /* enable log dirty */
 int paging_log_dirty_enable(struct domain *d);
