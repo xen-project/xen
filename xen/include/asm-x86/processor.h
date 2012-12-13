@@ -527,6 +527,7 @@ void do_ ## _name(struct cpu_user_regs *regs)
 DECLARE_TRAP_HANDLER(divide_error);
 DECLARE_TRAP_HANDLER(debug);
 DECLARE_TRAP_HANDLER(nmi);
+DECLARE_TRAP_HANDLER(nmi_crash);
 DECLARE_TRAP_HANDLER(int3);
 DECLARE_TRAP_HANDLER(overflow);
 DECLARE_TRAP_HANDLER(bounds);
@@ -544,6 +545,9 @@ DECLARE_TRAP_HANDLER(machine_check);
 DECLARE_TRAP_HANDLER(alignment_check);
 DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
 #undef DECLARE_TRAP_HANDLER
+
+void trap_nop(void);
+void enable_nmis(void);
 
 void syscall_enter(void);
 void sysenter_entry(void);

@@ -635,10 +635,43 @@ ENTRY(nmi)
         movl  $TRAP_nmi,4(%rsp)
         jmp   handle_ist_exception
 
+ENTRY(nmi_crash)
+        pushq $0
+        movl $TRAP_nmi,4(%rsp)
+        SAVE_ALL
+        movq %rsp,%rdi
+        callq do_nmi_crash /* Does not return */
+        ud2
+
 ENTRY(machine_check)
         pushq $0
         movl  $TRAP_machine_check,4(%rsp)
         jmp   handle_ist_exception
+
+/* Enable NMIs.  No special register assumptions. Only %rax is not preserved. */
+ENTRY(enable_nmis)
+        movq  %rsp, %rax /* Grab RSP before pushing */
+
+        /* Set up stack frame */
+        pushq $0               /* SS */
+        pushq %rax             /* RSP */
+        pushfq                 /* RFLAGS */
+        pushq $__HYPERVISOR_CS /* CS */
+        leaq  1f(%rip),%rax
+        pushq %rax             /* RIP */
+
+        iretq /* Disable the hardware NMI latch */
+1:
+        retq
+
+/* No op trap handler.  Required for kexec crash path.  This is not
+ * declared with the ENTRY() macro to avoid wasted alignment space.
+ */
+.globl trap_nop
+trap_nop:
+        iretq
+
+
 
 .section .rodata, "a", @progbits
 

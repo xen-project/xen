@@ -81,11 +81,33 @@ void machine_kexec(xen_kexec_image_t *image)
         .base = (unsigned long)(boot_cpu_gdt_table - FIRST_RESERVED_GDT_ENTRY),
         .limit = LAST_RESERVED_GDT_BYTE
     };
+    int i;
 
     /* We are about to permenantly jump out of the Xen context into the kexec
      * purgatory code.  We really dont want to be still servicing interupts.
      */
     local_irq_disable();
+
+    /* Now regular interrupts are disabled, we need to reduce the impact
+     * of interrupts not disabled by 'cli'.
+     *
+     * The NMI handlers have already been set up nmi_shootdown_cpus().  All
+     * pcpus other than us have the nmi_crash handler, while we have the nop
+     * handler.
+     *
+     * The MCE handlers touch extensive areas of Xen code and data.  At this
+     * point, there is nothing we can usefully do, so set the nop handler.
+     */
+    for ( i = 0; i < nr_cpu_ids; i++ )
+    {
+        if ( idt_tables[i] == NULL )
+            continue;
+        _update_gate_addr_lower(&idt_tables[i][TRAP_machine_check], &trap_nop);
+    }
+
+    /* Explicitly enable NMIs on this CPU.  Some crashdump kernels do
+     * not like running with NMIs disabled. */
+    enable_nmis();
 
     /*
      * compat_machine_kexec() returns to idle pagetables, which requires us
