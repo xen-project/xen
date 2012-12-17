@@ -67,6 +67,8 @@ struct xs_handle {
 
 	/* Clients can select() on this pipe to wait for a watch to fire. */
 	int watch_pipe[2];
+	/* Filtering watch event in unwatch function? */
+	bool unwatch_filter;
 
 	/*
          * A list of replies. Currently only one will ever be outstanding
@@ -125,6 +127,8 @@ struct xs_handle {
 	struct list_head watch_list;
 	/* Clients can select() on this pipe to wait for a watch to fire. */
 	int watch_pipe[2];
+	/* Filtering watch event in unwatch function? */
+	bool unwatch_filter;
 };
 
 #define mutex_lock(m)		((void)0)
@@ -247,6 +251,8 @@ static struct xs_handle *get_handle(const char *connect_to)
 	/* Watch pipe is allocated on demand in xs_fileno(). */
 	h->watch_pipe[0] = h->watch_pipe[1] = -1;
 
+	h->unwatch_filter = false;
+
 #ifdef USE_PTHREAD
 	pthread_mutex_init(&h->watch_mutex, NULL);
 	pthread_cond_init(&h->watch_condvar, NULL);
@@ -286,6 +292,9 @@ struct xs_handle *xs_open(unsigned long flags)
 
 	if (!xsh && !(flags & XS_OPEN_SOCKETONLY))
 		xsh = get_handle(xs_domain_dev());
+
+	if (xsh && (flags & XS_UNWATCH_FILTER))
+		xsh->unwatch_filter = true;
 
 	return xsh;
 }
@@ -753,6 +762,19 @@ bool xs_watch(struct xs_handle *h, const char *path, const char *token)
 				ARRAY_SIZE(iov), NULL));
 }
 
+
+/* Clear the pipe token if there are no more pending watchs.
+ * We suppose the watch_mutex is already taken.
+ */
+static void xs_maybe_clear_watch_pipe(struct xs_handle *h)
+{
+	char c;
+
+	if (list_empty(&h->watch_list) && (h->watch_pipe[0] != -1))
+		while (read(h->watch_pipe[0], &c, 1) != 1)
+			continue;
+}
+
 /* Find out what node change was on (will block if nothing pending).
  * Returns array of two pointers: path and token, or NULL.
  * Call free() after use.
@@ -761,7 +783,7 @@ static char **read_watch_internal(struct xs_handle *h, unsigned int *num,
 				  int nonblocking)
 {
 	struct xs_stored_msg *msg;
-	char **ret, *strings, c = 0;
+	char **ret, *strings;
 	unsigned int num_strings, i;
 
 	mutex_lock(&h->watch_mutex);
@@ -798,11 +820,7 @@ static char **read_watch_internal(struct xs_handle *h, unsigned int *num,
 	msg = list_top(&h->watch_list, struct xs_stored_msg, list);
 	list_del(&msg->list);
 
-	/* Clear the pipe token if there are no more pending watches. */
-	if (list_empty(&h->watch_list) && (h->watch_pipe[0] != -1))
-		while (read(h->watch_pipe[0], &c, 1) != 1)
-			continue;
-
+	xs_maybe_clear_watch_pipe(h);
 	mutex_unlock(&h->watch_mutex);
 
 	assert(msg->hdr.type == XS_WATCH_EVENT);
@@ -855,14 +873,64 @@ char **xs_read_watch(struct xs_handle *h, unsigned int *num)
 bool xs_unwatch(struct xs_handle *h, const char *path, const char *token)
 {
 	struct iovec iov[2];
+	struct xs_stored_msg *msg, *tmsg;
+	bool res;
+	char *s, *p;
+	unsigned int i;
+	char *l_token, *l_path;
 
 	iov[0].iov_base = (char *)path;
 	iov[0].iov_len = strlen(path) + 1;
 	iov[1].iov_base = (char *)token;
 	iov[1].iov_len = strlen(token) + 1;
 
-	return xs_bool(xs_talkv(h, XBT_NULL, XS_UNWATCH, iov,
-				ARRAY_SIZE(iov), NULL));
+	res = xs_bool(xs_talkv(h, XBT_NULL, XS_UNWATCH, iov,
+			       ARRAY_SIZE(iov), NULL));
+
+	if (!h->unwatch_filter) /* Don't filter the watch list */
+		return res;
+
+
+	/* Filter the watch list to remove potential message */
+	mutex_lock(&h->watch_mutex);
+
+	if (list_empty(&h->watch_list)) {
+		mutex_unlock(&h->watch_mutex);
+		return res;
+	}
+
+	list_for_each_entry_safe(msg, tmsg, &h->watch_list, list) {
+		assert(msg->hdr.type == XS_WATCH_EVENT);
+
+		s = msg->body;
+
+		l_token = NULL;
+		l_path = NULL;
+
+		for (p = s, i = 0; p < msg->body + msg->hdr.len; p++) {
+			if (*p == '\0')
+			{
+				if (i == XS_WATCH_TOKEN)
+					l_token = s;
+				else if (i == XS_WATCH_PATH)
+					l_path = s;
+				i++;
+				s = p + 1;
+			}
+		}
+
+		if (l_token && !strcmp(token, l_token) &&
+		    l_path && xs_path_is_subpath(path, l_path)) {
+			list_del(&msg->list);
+			free(msg);
+		}
+	}
+
+	xs_maybe_clear_watch_pipe(h);
+
+	mutex_unlock(&h->watch_mutex);
+
+	return res;
 }
 
 /* Start a transaction: changes by others will not be seen during this

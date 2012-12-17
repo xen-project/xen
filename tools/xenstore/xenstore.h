@@ -27,6 +27,27 @@
 #define XS_OPEN_READONLY	1UL<<0
 #define XS_OPEN_SOCKETONLY      1UL<<1
 
+/*
+ * Setting XS_UNWATCH_FILTER arranges that after xs_unwatch, no
+ * related watch events will be delivered via xs_read_watch.  But
+ * this relies on the couple token, subpath is unique.
+ *
+ * XS_UNWATCH_FILTER clear          XS_UNWATCH_FILTER set
+ *
+ * Even after xs_unwatch, "stale"   After xs_unwatch returns, no
+ * instances of the watch event     watch events with the same
+ * may be delivered.                token and with the same subpath
+ *                                  will be delivered.
+ *
+ * A path and a subpath can be      The application must avoid
+ * register with the same token.    registering a path (/foo/) and
+ *                                  a subpath (/foo/bar) with the
+ *                                  same path until a successful
+ *                                  xs_unwatch for the first watch
+ *                                  has returned.
+ */
+#define XS_UNWATCH_FILTER     1UL<<2
+
 struct xs_handle;
 typedef uint32_t xs_transaction_t;
 
