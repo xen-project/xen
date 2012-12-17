@@ -251,6 +251,7 @@ int libxl__device_destroy(libxl_ctx *ctx, char *be_path, int force)
         goto out;
     if (atoi(state) != 4) {
         libxl__device_destroy_tapdisk(&gc, be_path);
+        xs_rm(ctx->xsh, XBT_NULL, be_path);
         goto out;
     }
 

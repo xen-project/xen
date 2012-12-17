@@ -59,7 +59,6 @@ void libxl__device_destroy_tapdisk(libxl__gc *gc, char *be_path)
     char *path, *params, *type, *disk;
     int err;
     tap_list_t tap;
-    libxl_ctx *ctx = libxl__gc_owner(gc);
 
     path = libxl__sprintf(gc, "%s/tapdisk-params", be_path);
     if (!path) return;
@@ -75,12 +74,6 @@ void libxl__device_destroy_tapdisk(libxl__gc *gc, char *be_path)
 
     err = tap_ctl_find(type, disk, &tap);
     if (err < 0) return;
-
-    /*
-     * Remove the instance of the backend device to avoid a deadlock with the
-     * removal of the tap device.
-     */
-    xs_rm(ctx->xsh, XBT_NULL, be_path);
 
     tap_ctl_destroy(tap.id, tap.minor);
 }
