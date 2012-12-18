@@ -21,6 +21,7 @@
 #include <asm/atomic.h>
 #include <xen/errno.h>
 #include <xen/keyhandler.h>
+#include <xen/trace.h>
 
 
 /*
@@ -95,6 +96,18 @@
 #define SCHED_VCPU_STAT_SET(_V, _X, _Y)    do {} while ( 0 )
 
 #endif /* SCHED_STATS */
+
+
+/*
+ * Credit tracing events ("only" 512 available!). Check
+ * include/public/trace.h for more details.
+ */
+#define TRC_CSCHED_SCHED_TASKLET TRC_SCHED_CLASS_EVT(CSCHED, 1)
+#define TRC_CSCHED_ACCOUNT_START TRC_SCHED_CLASS_EVT(CSCHED, 2)
+#define TRC_CSCHED_ACCOUNT_STOP  TRC_SCHED_CLASS_EVT(CSCHED, 3)
+#define TRC_CSCHED_STOLEN_VCPU   TRC_SCHED_CLASS_EVT(CSCHED, 4)
+#define TRC_CSCHED_PICKED_CPU    TRC_SCHED_CLASS_EVT(CSCHED, 5)
+#define TRC_CSCHED_TICKLE        TRC_SCHED_CLASS_EVT(CSCHED, 6)
 
 
 /*
@@ -316,9 +329,18 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
         }
     }
 
-    /* Send scheduler interrupts to designated CPUs */
     if ( !cpumask_empty(&mask) )
+    {
+        if ( unlikely(tb_init_done) )
+        {
+            /* Avoid TRACE_*: saves checking !tb_init_done each step */
+            for_each_cpu(cpu, &mask)
+                __trace_var(TRC_CSCHED_TICKLE, 0, sizeof(cpu), &cpu);
+        }
+
+        /* Send scheduler interrupts to designated CPUs */
         cpumask_raise_softirq(&mask, SCHEDULE_SOFTIRQ);
+    }
 }
 
 static void
@@ -555,6 +577,8 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
     if ( commit && spc )
        spc->idle_bias = cpu;
 
+    TRACE_3D(TRC_CSCHED_PICKED_CPU, vc->domain->domain_id, vc->vcpu_id, cpu);
+
     return cpu;
 }
 
@@ -587,6 +611,9 @@ __csched_vcpu_acct_start(struct csched_private *prv, struct csched_vcpu *svc)
         }
     }
 
+    TRACE_3D(TRC_CSCHED_ACCOUNT_START, sdom->dom->domain_id,
+             svc->vcpu->vcpu_id, sdom->active_vcpu_count);
+
     spin_unlock_irqrestore(&prv->lock, flags);
 }
 
@@ -609,6 +636,9 @@ __csched_vcpu_acct_stop_locked(struct csched_private *prv,
     {
         list_del_init(&sdom->active_sdom_elem);
     }
+
+    TRACE_3D(TRC_CSCHED_ACCOUNT_STOP, sdom->dom->domain_id,
+             svc->vcpu->vcpu_id, sdom->active_vcpu_count);
 }
 
 static void
@@ -1242,6 +1272,8 @@ csched_runq_steal(int peer_cpu, int cpu, int pri)
             if (__csched_vcpu_is_migrateable(vc, cpu))
             {
                 /* We got a candidate. Grab it! */
+                TRACE_3D(TRC_CSCHED_STOLEN_VCPU, peer_cpu,
+                         vc->domain->domain_id, vc->vcpu_id);
                 SCHED_VCPU_STAT_CRANK(speer, migrate_q);
                 SCHED_STAT_CRANK(migrate_queued);
                 WARN_ON(vc->is_urgent);
@@ -1402,6 +1434,7 @@ csched_schedule(
     /* Tasklet work (which runs in idle VCPU context) overrides all else. */
     if ( tasklet_work_scheduled )
     {
+        TRACE_0D(TRC_CSCHED_SCHED_TASKLET);
         snext = CSCHED_VCPU(idle_vcpu[cpu]);
         snext->pri = CSCHED_PRI_TS_BOOST;
     }
