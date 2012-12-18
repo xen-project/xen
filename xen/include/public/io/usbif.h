@@ -71,7 +71,6 @@ enum usb_spec_version {
 #define usbif_pipesubmit(pipe) (!usbif_pipeunlink(pipe))
 #define usbif_setunlink_pipe(pipe) ((pipe)|(0x20))
 
-#define USBIF_BACK_MAX_PENDING_REQS (128)
 #define USBIF_MAX_SEGMENTS_PER_REQUEST (16)
 
 /*
