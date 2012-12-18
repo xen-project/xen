@@ -57,6 +57,32 @@
 #define TRC_SCHED_CLASS     0x00022000   /* Scheduler-specific    */
 #define TRC_SCHED_VERBOSE   0x00028000   /* More inclusive scheduling */
 
+/*
+ * The highest 3 bits of the last 12 bits of TRC_SCHED_CLASS above are
+ * reserved for encoding what scheduler produced the information. The
+ * actual event is encoded in the last 9 bits.
+ *
+ * This means we have 8 scheduling IDs available (which means at most 8
+ * schedulers generating events) and, in each scheduler, up to 512
+ * different events.
+ */
+#define TRC_SCHED_ID_BITS 3
+#define TRC_SCHED_ID_SHIFT (TRC_SUBCLS_SHIFT - TRC_SCHED_ID_BITS)
+#define TRC_SCHED_ID_MASK (((1UL<<TRC_SCHED_ID_BITS) - 1) << TRC_SCHED_ID_SHIFT)
+#define TRC_SCHED_EVT_MASK (~(TRC_SCHED_ID_MASK))
+
+/* Per-scheduler IDs, to identify scheduler specific events */
+#define TRC_SCHED_CSCHED   0
+#define TRC_SCHED_CSCHED2  1
+#define TRC_SCHED_SEDF     2
+#define TRC_SCHED_ARINC653 3
+
+/* Per-scheduler tracing */
+#define TRC_SCHED_CLASS_EVT(_c, _e) \
+  ( ( TRC_SCHED_CLASS | \
+      ((TRC_SCHED_##_c << TRC_SCHED_ID_SHIFT) & TRC_SCHED_ID_MASK) ) + \
+    (_e & TRC_SCHED_EVT_MASK) )
+
 /* Trace classes for Hardware */
 #define TRC_HW_PM           0x00801000   /* Power management traces */
 #define TRC_HW_IRQ          0x00802000   /* Traces relating to the handling of IRQs */
