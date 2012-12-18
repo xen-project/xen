@@ -134,6 +134,7 @@ struct csched_vcpu {
         uint32_t state_idle;
         uint32_t migrate_q;
         uint32_t migrate_r;
+        uint32_t kicked_away;
     } stats;
 #endif
 };
@@ -251,54 +252,67 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
 {
     struct csched_vcpu * const cur = CSCHED_VCPU(curr_on_cpu(cpu));
     struct csched_private *prv = CSCHED_PRIV(per_cpu(scheduler, cpu));
-    cpumask_t mask;
+    cpumask_t mask, idle_mask;
+    int idlers_empty;
 
     ASSERT(cur);
     cpumask_clear(&mask);
 
-    /* If strictly higher priority than current VCPU, signal the CPU */
-    if ( new->pri > cur->pri )
-    {
-        if ( cur->pri == CSCHED_PRI_IDLE )
-            SCHED_STAT_CRANK(tickle_local_idler);
-        else if ( cur->pri == CSCHED_PRI_TS_OVER )
-            SCHED_STAT_CRANK(tickle_local_over);
-        else if ( cur->pri == CSCHED_PRI_TS_UNDER )
-            SCHED_STAT_CRANK(tickle_local_under);
-        else
-            SCHED_STAT_CRANK(tickle_local_other);
-
-        cpumask_set_cpu(cpu, &mask);
-    }
+    idlers_empty = cpumask_empty(prv->idlers);
 
     /*
-     * If this CPU has at least two runnable VCPUs, we tickle any idlers to
-     * let them know there is runnable work in the system...
+     * If the pcpu is idle, or there are no idlers and the new
+     * vcpu is a higher priority than the old vcpu, run it here.
+     *
+     * If there are idle cpus, first try to find one suitable to run
+     * new, so we can avoid preempting cur.  If we cannot find a
+     * suitable idler on which to run new, run it here, but try to
+     * find a suitable idler on which to run cur instead.
      */
-    if ( cur->pri > CSCHED_PRI_IDLE )
+    if ( cur->pri == CSCHED_PRI_IDLE
+         || (idlers_empty && new->pri > cur->pri) )
     {
-        if ( cpumask_empty(prv->idlers) )
+        if ( cur->pri != CSCHED_PRI_IDLE )
+            SCHED_STAT_CRANK(tickle_idlers_none);
+        cpumask_set_cpu(cpu, &mask);
+    }
+    else if ( !idlers_empty )
+    {
+        /* Check whether or not there are idlers that can run new */
+        cpumask_and(&idle_mask, prv->idlers, new->vcpu->cpu_affinity);
+
+        /*
+         * If there are no suitable idlers for new, and it's higher
+         * priority than cur, ask the scheduler to migrate cur away.
+         * We have to act like this (instead of just waking some of
+         * the idlers suitable for cur) because cur is running.
+         *
+         * If there are suitable idlers for new, no matter priorities,
+         * leave cur alone (as it is running and is, likely, cache-hot)
+         * and wake some of them (which is waking up and so is, likely,
+         * cache cold anyway).
+         */
+        if ( cpumask_empty(&idle_mask) && new->pri > cur->pri )
         {
             SCHED_STAT_CRANK(tickle_idlers_none);
+            SCHED_VCPU_STAT_CRANK(cur, kicked_away);
+            SCHED_VCPU_STAT_CRANK(cur, migrate_r);
+            SCHED_STAT_CRANK(migrate_kicked_away);
+            set_bit(_VPF_migrating, &cur->vcpu->pause_flags);
+            cpumask_set_cpu(cpu, &mask);
         }
-        else
+        else if ( !cpumask_empty(&idle_mask) )
         {
-            cpumask_t idle_mask;
-
-            cpumask_and(&idle_mask, prv->idlers, new->vcpu->cpu_affinity);
-            if ( !cpumask_empty(&idle_mask) )
+            /* Which of the idlers suitable for new shall we wake up? */
+            SCHED_STAT_CRANK(tickle_idlers_some);
+            if ( opt_tickle_one_idle )
             {
-                SCHED_STAT_CRANK(tickle_idlers_some);
-                if ( opt_tickle_one_idle )
-                {
-                    this_cpu(last_tickle_cpu) = 
-                        cpumask_cycle(this_cpu(last_tickle_cpu), &idle_mask);
-                    cpumask_set_cpu(this_cpu(last_tickle_cpu), &mask);
-                }
-                else
-                    cpumask_or(&mask, &mask, &idle_mask);
+                this_cpu(last_tickle_cpu) =
+                    cpumask_cycle(this_cpu(last_tickle_cpu), &idle_mask);
+                cpumask_set_cpu(this_cpu(last_tickle_cpu), &mask);
             }
-            cpumask_and(&mask, &mask, new->vcpu->cpu_affinity);
+            else
+                cpumask_or(&mask, &mask, &idle_mask);
         }
     }
 
@@ -1456,13 +1470,14 @@ csched_dump_vcpu(struct csched_vcpu *svc)
     {
         printk(" credit=%i [w=%u]", atomic_read(&svc->credit), sdom->weight);
 #ifdef CSCHED_STATS
-        printk(" (%d+%u) {a/i=%u/%u m=%u+%u}",
+        printk(" (%d+%u) {a/i=%u/%u m=%u+%u (k=%u)}",
                 svc->stats.credit_last,
                 svc->stats.credit_incr,
                 svc->stats.state_active,
                 svc->stats.state_idle,
                 svc->stats.migrate_q,
-                svc->stats.migrate_r);
+                svc->stats.migrate_r,
+                svc->stats.kicked_away);
 #endif
     }
 
