@@ -47,7 +47,7 @@ static int gdbsx_guest_mem_io(
 }
 
 long arch_do_domctl(
-    struct xen_domctl *domctl,
+    struct xen_domctl *domctl, struct domain *d,
     XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     long ret = 0;
@@ -58,33 +58,21 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_shadow_op:
     {
-        struct domain *d;
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d != NULL )
-        {
-            ret = paging_domctl(d,
-                                &domctl->u.shadow_op,
-                                guest_handle_cast(u_domctl, void));
-            rcu_unlock_domain(d);
-            copyback = 1;
-        } 
+        ret = paging_domctl(d,
+                            &domctl->u.shadow_op,
+                            guest_handle_cast(u_domctl, void));
+        copyback = 1;
     }
     break;
 
     case XEN_DOMCTL_ioport_permission:
     {
-        struct domain *d;
         unsigned int fp = domctl->u.ioport_permission.first_port;
         unsigned int np = domctl->u.ioport_permission.nr_ports;
         int allow = domctl->u.ioport_permission.allow_access;
 
         ret = -EINVAL;
         if ( (fp + np) > 65536 )
-            break;
-
-        ret = -ESRCH;
-        if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
             break;
 
         if ( np == 0 )
@@ -95,8 +83,6 @@ long arch_do_domctl(
             ret = ioports_permit_access(d, fp, fp + np - 1);
         else
             ret = ioports_deny_access(d, fp, fp + np - 1);
-
-        rcu_unlock_domain(d);
     }
     break;
 
@@ -104,23 +90,16 @@ long arch_do_domctl(
     {
         struct page_info *page;
         unsigned long mfn = domctl->u.getpageframeinfo.gmfn;
-        domid_t dom = domctl->domain;
-        struct domain *d;
 
         ret = -EINVAL;
-
-        if ( unlikely(!mfn_valid(mfn)) ||
-             unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
+        if ( unlikely(!mfn_valid(mfn)) )
             break;
 
         page = mfn_to_page(mfn);
 
         ret = xsm_getpageframeinfo(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         if ( likely(get_page(page, d)) )
         {
@@ -150,7 +129,6 @@ long arch_do_domctl(
             put_page(page);
         }
 
-        rcu_unlock_domain(d);
         copyback = 1;
     }
     break;
@@ -160,27 +138,17 @@ long arch_do_domctl(
         {
             unsigned int n, j;
             unsigned int num = domctl->u.getpageframeinfo3.num;
-            domid_t dom = domctl->domain;
-            struct domain *d;
             struct page_info *page;
             xen_pfn_t *arr;
 
-            ret = -ESRCH;
-            if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
-                break;
-
             ret = xsm_getpageframeinfo(d);
             if ( ret )
-            {
-                rcu_unlock_domain(d);
                 break;
-            }
 
             if ( unlikely(num > 1024) ||
                  unlikely(num != domctl->u.getpageframeinfo3.num) )
             {
                 ret = -E2BIG;
-                rcu_unlock_domain(d);
                 break;
             }
 
@@ -188,7 +156,6 @@ long arch_do_domctl(
             if ( !page )
             {
                 ret = -ENOMEM;
-                rcu_unlock_domain(d);
                 break;
             }
             arr = page_to_virt(page);
@@ -263,7 +230,6 @@ long arch_do_domctl(
 
             free_domheap_page(virt_to_page(arr));
 
-            rcu_unlock_domain(d);
             break;
         }
         /* fall thru */
@@ -271,25 +237,15 @@ long arch_do_domctl(
     {
         int n,j;
         int num = domctl->u.getpageframeinfo2.num;
-        domid_t dom = domctl->domain;
-        struct domain *d;
         uint32_t *arr32;
-        ret = -ESRCH;
-
-        if ( unlikely((d = rcu_lock_domain_by_id(dom)) == NULL) )
-            break;
 
         ret = xsm_getpageframeinfo(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         if ( unlikely(num > 1024) )
         {
             ret = -E2BIG;
-            rcu_unlock_domain(d);
             break;
         }
 
@@ -297,7 +253,6 @@ long arch_do_domctl(
         if ( !arr32 )
         {
             ret = -ENOMEM;
-            rcu_unlock_domain(d);
             break;
         }
  
@@ -369,78 +324,58 @@ long arch_do_domctl(
         }
 
         free_xenheap_page(arr32);
-
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_getmemlist:
     {
         int i;
-        struct domain *d = rcu_lock_domain_by_id(domctl->domain);
         unsigned long max_pfns = domctl->u.getmemlist.max_pfns;
         uint64_t mfn;
         struct page_info *page;
 
-        ret = -EINVAL;
-        if ( d != NULL )
+        ret = xsm_getmemlist(d);
+        if ( ret )
+            break;
+
+        if ( unlikely(d->is_dying) ) {
+            ret = -EINVAL;
+            break;
+        }
+
+        spin_lock(&d->page_alloc_lock);
+
+        ret = i = 0;
+        page_list_for_each(page, &d->page_list)
         {
-            ret = xsm_getmemlist(d);
-            if ( ret )
+            if ( i >= max_pfns )
+                break;
+            mfn = page_to_mfn(page);
+            if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
+                                      i, &mfn, 1) )
             {
-                rcu_unlock_domain(d);
+                ret = -EFAULT;
                 break;
             }
+			++i;
+		}
 
-            spin_lock(&d->page_alloc_lock);
+        spin_unlock(&d->page_alloc_lock);
 
-            if ( unlikely(d->is_dying) ) {
-                spin_unlock(&d->page_alloc_lock);
-                goto getmemlist_out;
-            }
-
-            ret = i = 0;
-            page_list_for_each(page, &d->page_list)
-            {
-                if ( i >= max_pfns )
-                    break;
-                mfn = page_to_mfn(page);
-                if ( copy_to_guest_offset(domctl->u.getmemlist.buffer,
-                                          i, &mfn, 1) )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-                ++i;
-            }
-            
-            spin_unlock(&d->page_alloc_lock);
-
-            domctl->u.getmemlist.num_pfns = i;
-            copyback = 1;
-        getmemlist_out:
-            rcu_unlock_domain(d);
-        }
+        domctl->u.getmemlist.num_pfns = i;
+        copyback = 1;
     }
     break;
 
     case XEN_DOMCTL_hypercall_init:
     {
-        struct domain *d = rcu_lock_domain_by_id(domctl->domain);
         unsigned long gmfn = domctl->u.hypercall_init.gmfn;
         struct page_info *page;
         void *hypercall_page;
 
-        ret = -ESRCH;
-        if ( unlikely(d == NULL) )
-            break;
-
         ret = xsm_hypercall_init(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
 
@@ -449,7 +384,6 @@ long arch_do_domctl(
         {
             if ( page )
                 put_page(page);
-            rcu_unlock_domain(d);
             break;
         }
 
@@ -460,19 +394,12 @@ long arch_do_domctl(
         unmap_domain_page(hypercall_page);
 
         put_page_and_type(page);
-
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_sethvmcontext:
     { 
         struct hvm_domain_context c = { .size = domctl->u.hvmcontext.size };
-        struct domain *d;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
 
         ret = xsm_hvmcontext(d, domctl->cmd);
         if ( ret )
@@ -497,19 +424,12 @@ long arch_do_domctl(
     sethvmcontext_out:
         if ( c.data != NULL )
             xfree(c.data);
-
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_gethvmcontext:
     { 
         struct hvm_domain_context c = { 0 };
-        struct domain *d;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
 
         ret = xsm_hvmcontext(d, domctl->cmd);
         if ( ret )
@@ -548,7 +468,6 @@ long arch_do_domctl(
             ret = -EFAULT;
 
     gethvmcontext_out:
-        rcu_unlock_domain(d);
         copyback = 1;
 
         if ( c.data != NULL )
@@ -558,46 +477,28 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_gethvmcontext_partial:
     { 
-        struct domain *d;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
-
         ret = xsm_hvmcontext(d, domctl->cmd);
         if ( ret )
-            goto gethvmcontext_partial_out;
+            break;
 
         ret = -EINVAL;
         if ( !is_hvm_domain(d) ) 
-            goto gethvmcontext_partial_out;
+            break;
 
         domain_pause(d);
         ret = hvm_save_one(d, domctl->u.hvmcontext_partial.type,
                            domctl->u.hvmcontext_partial.instance,
                            domctl->u.hvmcontext_partial.buffer);
         domain_unpause(d);
-
-    gethvmcontext_partial_out:
-        rcu_unlock_domain(d);
     }
     break;
 
 
     case XEN_DOMCTL_set_address_size:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
-
         ret = xsm_address_size(d, domctl->cmd);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         switch ( domctl->u.address_size.size )
         {
@@ -611,30 +512,18 @@ long arch_do_domctl(
             ret = (domctl->u.address_size.size == BITS_PER_LONG) ? 0 : -EINVAL;
             break;
         }
-
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_get_address_size:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
-
         ret = xsm_address_size(d, domctl->cmd);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         domctl->u.address_size.size =
             is_pv_32on64_domain(d) ? 32 : BITS_PER_LONG;
 
-        rcu_unlock_domain(d);
         ret = 0;
         copyback = 1;
     }
@@ -642,46 +531,28 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_set_machine_address_size:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
-
         ret = xsm_machine_address_size(d, domctl->cmd);
         if ( ret )
-            goto set_machine_address_size_out;
+            break;
 
         ret = -EBUSY;
         if ( d->tot_pages > 0 )
-            goto set_machine_address_size_out;
+            break;
 
         d->arch.physaddr_bitsize = domctl->u.address_size.size;
 
         ret = 0;
-    set_machine_address_size_out:
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_get_machine_address_size:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
-
         ret = xsm_machine_address_size(d, domctl->cmd);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         domctl->u.address_size.size = d->arch.physaddr_bitsize;
 
-        rcu_unlock_domain(d);
         ret = 0;
         copyback = 1;
     }
@@ -689,25 +560,20 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_sendtrigger:
     {
-        struct domain *d;
         struct vcpu *v;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
 
         ret = xsm_sendtrigger(d);
         if ( ret )
-            goto sendtrigger_out;
+            break;
 
         ret = -EINVAL;
         if ( domctl->u.sendtrigger.vcpu >= MAX_VIRT_CPUS )
-            goto sendtrigger_out;
+            break;
 
         ret = -ESRCH;
         if ( domctl->u.sendtrigger.vcpu >= d->max_vcpus ||
              (v = d->vcpu[domctl->u.sendtrigger.vcpu]) == NULL )
-            goto sendtrigger_out;
+            break;
 
         switch ( domctl->u.sendtrigger.trigger )
         {
@@ -744,34 +610,27 @@ long arch_do_domctl(
         default:
             ret = -ENOSYS;
         }
-
-    sendtrigger_out:
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_bind_pt_irq:
     {
-        struct domain * d;
         xen_domctl_bind_pt_irq_t * bind;
 
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
         bind = &(domctl->u.bind_pt_irq);
 
         ret = -EINVAL;
         if ( !is_hvm_domain(d) )
-            goto bind_out;
+            break;
 
         ret = xsm_bind_pt_irq(d, bind);
         if ( ret )
-            goto bind_out;
+            break;
 
         ret = -EPERM;
         if ( !IS_PRIV(current->domain) &&
              !irq_access_permitted(current->domain, bind->machine_irq) )
-            goto bind_out;
+            break;
 
         ret = -ESRCH;
         if ( iommu_enabled )
@@ -783,26 +642,19 @@ long arch_do_domctl(
         if ( ret < 0 )
             printk(XENLOG_G_ERR "pt_irq_create_bind failed (%ld) for dom%d\n",
                    ret, d->domain_id);
-
-    bind_out:
-        rcu_unlock_domain(d);
     }
     break;    
 
     case XEN_DOMCTL_unbind_pt_irq:
     {
-        struct domain * d;
         xen_domctl_bind_pt_irq_t * bind;
 
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
         bind = &(domctl->u.bind_pt_irq);
 
         ret = -EPERM;
         if ( !IS_PRIV(current->domain) &&
              !irq_access_permitted(current->domain, bind->machine_irq) )
-            goto unbind_out;
+            break;
 
         if ( iommu_enabled )
         {
@@ -813,15 +665,11 @@ long arch_do_domctl(
         if ( ret < 0 )
             printk(XENLOG_G_ERR "pt_irq_destroy_bind failed (%ld) for dom%d\n",
                    ret, d->domain_id);
-
-    unbind_out:
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_memory_mapping:
     {
-        struct domain *d;
         unsigned long gfn = domctl->u.memory_mapping.first_gfn;
         unsigned long mfn = domctl->u.memory_mapping.first_mfn;
         unsigned long nr_mfns = domctl->u.memory_mapping.nr_mfns;
@@ -839,15 +687,9 @@ long arch_do_domctl(
              !iomem_access_permitted(current->domain, mfn, mfn + nr_mfns - 1) )
             break;
 
-        ret = -ESRCH;
-        if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
-            break;
-
         ret = xsm_iomem_permission(d, mfn, mfn + nr_mfns - 1, add);
-        if ( ret ) {
-            rcu_unlock_domain(d);
+        if ( ret )
             break;
-        }
 
         if ( add )
         {
@@ -894,15 +736,12 @@ long arch_do_domctl(
                        ret, add ? "removing" : "denying", d->domain_id,
                        mfn, mfn + nr_mfns - 1);
         }
-
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_ioport_mapping:
     {
 #define MAX_IOPORTS    0x10000
-        struct domain *d;
         struct hvm_iommu *hd;
         unsigned int fgp = domctl->u.ioport_mapping.first_gport;
         unsigned int fmp = domctl->u.ioport_mapping.first_mport;
@@ -926,15 +765,9 @@ long arch_do_domctl(
              !ioports_access_permitted(current->domain, fmp, fmp + np - 1) )
             break;
 
-        ret = -ESRCH;
-        if ( unlikely((d = rcu_lock_domain_by_id(domctl->domain)) == NULL) )
-            break;
-
         ret = xsm_ioport_permission(d, fmp, fmp + np - 1, add);
-        if ( ret ) {
-            rcu_unlock_domain(d);
+        if ( ret )
             break;
-        }
 
         hd = domain_hvm_iommu(d);
         if ( add )
@@ -990,30 +823,19 @@ long arch_do_domctl(
                        "ioport_map: error %ld denying dom%d access to [%x,%x]\n",
                        ret, d->domain_id, fmp, fmp + np - 1);
         }
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_pin_mem_cacheattr:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d == NULL )
-            break;
-
         ret = xsm_pin_mem_cacheattr(d);
         if ( ret )
-            goto pin_out;
+            break;
 
         ret = hvm_set_mem_pinned_cacheattr(
             d, domctl->u.pin_mem_cacheattr.start,
             domctl->u.pin_mem_cacheattr.end,
             domctl->u.pin_mem_cacheattr.type);
-
-    pin_out:
-        rcu_unlock_domain(d);
     }
     break;
 
@@ -1021,19 +843,13 @@ long arch_do_domctl(
     case XEN_DOMCTL_get_ext_vcpucontext:
     {
         struct xen_domctl_ext_vcpucontext *evc;
-        struct domain *d;
         struct vcpu *v;
 
         evc = &domctl->u.ext_vcpucontext;
 
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d == NULL )
-            break;
-
         ret = xsm_ext_vcpucontext(d, domctl->cmd);
         if ( ret )
-            goto ext_vcpucontext_out;
+            break;
 
         ret = -ESRCH;
         if ( (evc->vcpu >= d->max_vcpus) ||
@@ -1124,7 +940,6 @@ long arch_do_domctl(
         ret = 0;
 
     ext_vcpucontext_out:
-        rcu_unlock_domain(d);
         if ( domctl->cmd == XEN_DOMCTL_get_ext_vcpucontext )
             copyback = 1;
     }
@@ -1132,15 +947,9 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_set_cpuid:
     {
-        struct domain *d;
         xen_domctl_cpuid_t *ctl = &domctl->u.cpuid;
         cpuid_input_t *cpuid = NULL; 
         int i;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d == NULL )
-            break;
 
         for ( i = 0; i < MAX_CPUID_INPUT; i++ )
         {
@@ -1164,20 +973,12 @@ long arch_do_domctl(
             memcpy(cpuid, ctl, sizeof(cpuid_input_t));
             ret = 0;
         }
-
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_gettscinfo:
     {
-        struct domain *d;
         xen_guest_tsc_info_t info;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d == NULL )
-            break;
 
         domain_pause(d);
         tsc_get_info(d, &info.tsc_mode,
@@ -1189,20 +990,11 @@ long arch_do_domctl(
         else
             ret = 0;
         domain_unpause(d);
-
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_settscinfo:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d == NULL )
-            break;
-
         domain_pause(d);
         tsc_set_info(d, domctl->u.tsc_info.info.tsc_mode,
                      domctl->u.tsc_info.info.elapsed_nsec,
@@ -1210,66 +1002,40 @@ long arch_do_domctl(
                      domctl->u.tsc_info.info.incarnation);
         domain_unpause(d);
 
-        rcu_unlock_domain(d);
         ret = 0;
     }
     break;
 
     case XEN_DOMCTL_suppress_spurious_page_faults:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d != NULL )
-        {
-            d->arch.suppress_spurious_page_faults = 1;
-            rcu_unlock_domain(d);
-            ret = 0;
-        }
+        d->arch.suppress_spurious_page_faults = 1;
+        ret = 0;
     }
     break;
 
     case XEN_DOMCTL_debug_op:
     {
-        struct domain *d;
         struct vcpu *v;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d == NULL )
-            break;
 
         ret = -EINVAL;
         if ( (domctl->u.debug_op.vcpu >= d->max_vcpus) ||
              ((v = d->vcpu[domctl->u.debug_op.vcpu]) == NULL) )
-            goto debug_op_out;
+            break;
 
         ret = -EINVAL;
         if ( !is_hvm_domain(d))
-            goto debug_op_out;
+            break;
 
         ret = hvm_debug_op(v, domctl->u.debug_op.op);
-
-    debug_op_out:
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_gdbsx_guestmemio:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
-
         domctl->u.gdbsx_guest_memio.remain =
             domctl->u.gdbsx_guest_memio.len;
 
         ret = gdbsx_guest_mem_io(domctl->domain, &domctl->u.gdbsx_guest_memio);
-
-        rcu_unlock_domain(d);
         if ( !ret )
            copyback = 1;
     }
@@ -1277,70 +1043,41 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_gdbsx_pausevcpu:
     {
-        struct domain *d;
         struct vcpu *v;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
 
         ret = -EBUSY;
         if ( !d->is_paused_by_controller )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
         ret = -EINVAL;
         if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= MAX_VIRT_CPUS ||
              (v = d->vcpu[domctl->u.gdbsx_pauseunp_vcpu.vcpu]) == NULL )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
         vcpu_pause(v);
         ret = 0;
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_gdbsx_unpausevcpu:
     {
-        struct domain *d;
         struct vcpu *v;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
 
         ret = -EBUSY;
         if ( !d->is_paused_by_controller )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
         ret = -EINVAL;
         if ( domctl->u.gdbsx_pauseunp_vcpu.vcpu >= MAX_VIRT_CPUS ||
              (v = d->vcpu[domctl->u.gdbsx_pauseunp_vcpu.vcpu]) == NULL )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
         if ( !atomic_read(&v->pause_count) )
             printk("WARN: Unpausing vcpu:%d which is not paused\n", v->vcpu_id);
         vcpu_unpause(v);
         ret = 0;
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_gdbsx_domstatus:
     {
-        struct domain *d;
         struct vcpu *v;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(domctl->domain)) == NULL )
-            break;
 
         domctl->u.gdbsx_domstatus.vcpu_id = -1;
         domctl->u.gdbsx_domstatus.paused = d->is_paused_by_controller;
@@ -1358,7 +1095,6 @@ long arch_do_domctl(
                 }
             }
         }
-        rcu_unlock_domain(d);
         ret = 0;
         copyback = 1;
     }
@@ -1368,7 +1104,6 @@ long arch_do_domctl(
     case XEN_DOMCTL_getvcpuextstate:
     {
         struct xen_domctl_vcpuextstate *evc;
-        struct domain *d;
         struct vcpu *v;
         uint32_t offset = 0;
         uint64_t _xfeature_mask = 0;
@@ -1378,12 +1113,6 @@ long arch_do_domctl(
 #define PV_XSAVE_SIZE (2 * sizeof(uint64_t) + xsave_cntxt_size)
 
         evc = &domctl->u.vcpuextstate;
-
-        ret = -ESRCH;
-
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d == NULL )
-            break;
 
         ret = xsm_vcpuextstate(d, domctl->cmd);
         if ( ret )
@@ -1483,7 +1212,6 @@ long arch_do_domctl(
         ret = 0;
 
     vcpuextstate_out:
-        rcu_unlock_domain(d);
         if ( domctl->cmd == XEN_DOMCTL_getvcpuextstate )
             copyback = 1;
     }
@@ -1491,52 +1219,35 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_mem_event_op:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d != NULL )
-        {
-            ret = xsm_mem_event(d);
-            if ( !ret )
-                ret = mem_event_domctl(d, &domctl->u.mem_event_op,
-                                       guest_handle_cast(u_domctl, void));
-            rcu_unlock_domain(d);
-            copyback = 1;
-        } 
+        ret = xsm_mem_event(d);
+        if ( !ret )
+            ret = mem_event_domctl(d, &domctl->u.mem_event_op,
+                                   guest_handle_cast(u_domctl, void));
+        copyback = 1;
     }
     break;
 
     case XEN_DOMCTL_mem_sharing_op:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d != NULL )
-        {
-            ret = xsm_mem_sharing(d);
-            if ( !ret )
-                ret = mem_sharing_domctl(d, &domctl->u.mem_sharing_op);
-            rcu_unlock_domain(d);
-        } 
+        ret = xsm_mem_sharing(d);
+        if ( !ret )
+            ret = mem_sharing_domctl(d, &domctl->u.mem_sharing_op);
     }
     break;
 
 #if P2M_AUDIT
     case XEN_DOMCTL_audit_p2m:
     {
-        struct domain *d;
-
-        ret = rcu_lock_remote_target_domain_by_id(domctl->domain, &d);
-        if ( ret != 0 )
+        if ( d == current->domain )
+        {
+            ret = -EPERM;
             break;
+        }
 
         audit_p2m(d,
                   &domctl->u.audit_p2m.orphans,
                   &domctl->u.audit_p2m.m2p_bad,
                   &domctl->u.audit_p2m.p2m_bad);
-        rcu_unlock_domain(d);
         copyback = 1;
     }
     break;
@@ -1544,52 +1255,36 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_set_access_required:
     {
-        struct domain *d;
         struct p2m_domain* p2m;
         
         ret = -EPERM;
-        if ( current->domain->domain_id == domctl->domain )
+        if ( current->domain == d )
             break;
 
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d != NULL )
-        {
-            ret = xsm_mem_event(d);
-            if ( !ret ) {
-                p2m = p2m_get_hostp2m(d);
-                p2m->access_required = domctl->u.access_required.access_required;
-            }
-            rcu_unlock_domain(d);
-        } 
+        ret = xsm_mem_event(d);
+        if ( !ret ) {
+            p2m = p2m_get_hostp2m(d);
+            p2m->access_required = domctl->u.access_required.access_required;
+        }
     }
     break;
 
     case XEN_DOMCTL_set_broken_page_p2m:
     {
-        struct domain *d;
+        p2m_type_t pt;
+        unsigned long pfn = domctl->u.set_broken_page_p2m.pfn;
+        mfn_t mfn = get_gfn_query(d, pfn, &pt);
 
-        d = rcu_lock_domain_by_id(domctl->domain);
-        if ( d != NULL )
-        {
-            p2m_type_t pt;
-            unsigned long pfn = domctl->u.set_broken_page_p2m.pfn;
-            mfn_t mfn = get_gfn_query(d, pfn, &pt);
+        if ( unlikely(!mfn_valid(mfn_x(mfn)) || !p2m_is_ram(pt) ||
+                     (p2m_change_type(d, pfn, pt, p2m_ram_broken) != pt)) )
+            ret = -EINVAL;
 
-            if ( unlikely(!mfn_valid(mfn_x(mfn)) || !p2m_is_ram(pt) ||
-                         (p2m_change_type(d, pfn, pt, p2m_ram_broken) != pt)) )
-                ret = -EINVAL;
-
-            put_gfn(d, pfn);
-            rcu_unlock_domain(d);
-        }
-        else
-            ret = -ESRCH;
+        put_gfn(d, pfn);
     }
     break;
 
     default:
-        ret = iommu_do_domctl(domctl, u_domctl);
+        ret = iommu_do_domctl(domctl, d, u_domctl);
         break;
     }
 

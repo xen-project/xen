@@ -10,7 +10,7 @@
 #include <xen/errno.h>
 #include <public/domctl.h>
 
-long arch_do_domctl(struct xen_domctl *domctl,
+long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
                     XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
     return -ENOSYS;

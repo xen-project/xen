@@ -37,7 +37,7 @@ do_domctl(
 
 extern long
 arch_do_domctl(
-    struct xen_domctl *domctl,
+    struct xen_domctl *domctl, struct domain *d,
     XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl);
 
 extern long

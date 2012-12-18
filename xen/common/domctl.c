@@ -882,7 +882,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     break;
 
     default:
-        ret = arch_do_domctl(op, u_domctl);
+        ret = arch_do_domctl(op, d, u_domctl);
         break;
     }
 
