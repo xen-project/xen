@@ -41,6 +41,8 @@ struct schedule_data {
     atomic_t            urgent_count;   /* how many urgent vcpus           */
 };
 
+#define curr_on_cpu(c)    (per_cpu(schedule_data, c).curr)
+
 DECLARE_PER_CPU(struct schedule_data, schedule_data);
 DECLARE_PER_CPU(struct scheduler *, scheduler);
 DECLARE_PER_CPU(struct cpupool *, cpupool);

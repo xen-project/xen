@@ -228,7 +228,7 @@ static void burn_credits(struct csched_vcpu *svc, s_time_t now)
     unsigned int credits;
 
     /* Assert svc is current */
-    ASSERT(svc==CSCHED_VCPU(per_cpu(schedule_data, svc->vcpu->processor).curr));
+    ASSERT( svc == CSCHED_VCPU(curr_on_cpu(svc->vcpu->processor)) );
 
     if ( (delta = now - svc->start_time) <= 0 )
         return;
@@ -246,8 +246,7 @@ DEFINE_PER_CPU(unsigned int, last_tickle_cpu);
 static inline void
 __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
 {
-    struct csched_vcpu * const cur =
-        CSCHED_VCPU(per_cpu(schedule_data, cpu).curr);
+    struct csched_vcpu * const cur = CSCHED_VCPU(curr_on_cpu(cpu));
     struct csched_private *prv = CSCHED_PRIV(per_cpu(scheduler, cpu));
     cpumask_t mask;
 
@@ -371,7 +370,7 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
         per_cpu(schedule_data, cpu).sched_priv = spc;
 
     /* Start off idling... */
-    BUG_ON(!is_idle_vcpu(per_cpu(schedule_data, cpu).curr));
+    BUG_ON(!is_idle_vcpu(curr_on_cpu(cpu)));
     cpumask_set_cpu(cpu, prv->idlers);
 
     spin_unlock_irqrestore(&prv->lock, flags);
@@ -709,7 +708,7 @@ csched_vcpu_sleep(const struct scheduler *ops, struct vcpu *vc)
 
     BUG_ON( is_idle_vcpu(vc) );
 
-    if ( per_cpu(schedule_data, vc->processor).curr == vc )
+    if ( curr_on_cpu(vc->processor) == vc )
         cpu_raise_softirq(vc->processor, SCHEDULE_SOFTIRQ);
     else if ( __vcpu_on_runq(svc) )
         __runq_remove(svc);
@@ -723,7 +722,7 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 
     BUG_ON( is_idle_vcpu(vc) );
 
-    if ( unlikely(per_cpu(schedule_data, cpu).curr == vc) )
+    if ( unlikely(curr_on_cpu(cpu) == vc) )
     {
         SCHED_STAT_CRANK(vcpu_wake_running);
         return;
@@ -1192,7 +1191,7 @@ static struct csched_vcpu *
 csched_runq_steal(int peer_cpu, int cpu, int pri)
 {
     const struct csched_pcpu * const peer_pcpu = CSCHED_PCPU(peer_cpu);
-    const struct vcpu * const peer_vcpu = per_cpu(schedule_data, peer_cpu).curr;
+    const struct vcpu * const peer_vcpu = curr_on_cpu(peer_cpu);
     struct csched_vcpu *speer;
     struct list_head *iter;
     struct vcpu *vc;
@@ -1480,7 +1479,7 @@ csched_dump_pcpu(const struct scheduler *ops, int cpu)
     printk("core=%s\n", cpustr);
 
     /* current VCPU */
-    svc = CSCHED_VCPU(per_cpu(schedule_data, cpu).curr);
+    svc = CSCHED_VCPU(curr_on_cpu(cpu));
     if ( svc )
     {
         printk("\trun: ");
