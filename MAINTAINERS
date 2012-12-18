@@ -184,6 +184,15 @@ F:	xen/arch/x86/hvm/vmx/
 F:	xen/arch/x86/mm/hap/p2m-ept.c
 F:	xen/include/asm-x86/hvm/vmx/
 
+IOMMU VENDOR INDEPENDENT CODE
+M:	Xiantao Zhang <xiantao.zhang@intel.com>
+M:	Jan Beulich <jbeulich@suse.com>
+S:	Supported
+F:	xen/drivers/passthrough/
+X:	xen/drivers/passthrough/amd/
+X:	xen/drivers/passthrough/vtd/
+F:	xen/include/xen/iommu.h
+
 LINUX (PV_OPS)
 M:	Jeremy Fitzhardinge <jeremy@goop.org>
 S:	Supported
