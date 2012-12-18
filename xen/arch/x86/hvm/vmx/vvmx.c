@@ -471,8 +471,7 @@ void nvmx_update_exec_control(struct vcpu *v, u32 host_cntrl)
     shadow_cntrl = __n2_exec_control(v);
     pio_cntrl &= shadow_cntrl;
     /* Enforce the removed features */
-    shadow_cntrl &= ~(CPU_BASED_TPR_SHADOW
-                      | CPU_BASED_ACTIVATE_MSR_BITMAP
+    shadow_cntrl &= ~(CPU_BASED_ACTIVATE_MSR_BITMAP
                       | CPU_BASED_ACTIVATE_IO_BITMAP
                       | CPU_BASED_UNCOND_IO_EXITING);
     shadow_cntrl |= host_cntrl;
@@ -570,6 +569,38 @@ static void nvmx_update_apic_access_address(struct vcpu *v)
         __vmwrite(APIC_ACCESS_ADDR, (apic_mfn << PAGE_SHIFT));
         hvm_unmap_guest_frame(apic_va); 
     }
+    else
+        __vmwrite(APIC_ACCESS_ADDR, 0);
+}
+
+static void nvmx_update_virtual_apic_address(struct vcpu *v)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    u64 vapic_gpfn, vapic_mfn;
+    u32 ctrl;
+    void *vapic_va;
+
+    ctrl = __n2_exec_control(v);
+    if ( ctrl & CPU_BASED_TPR_SHADOW )
+    {
+        vapic_gpfn = __get_vvmcs(nvcpu->nv_vvmcx, VIRTUAL_APIC_PAGE_ADDR) >> PAGE_SHIFT;
+        vapic_va = hvm_map_guest_frame_ro(vapic_gpfn);
+        vapic_mfn = virt_to_mfn(vapic_va);
+        __vmwrite(VIRTUAL_APIC_PAGE_ADDR, (vapic_mfn << PAGE_SHIFT));
+        hvm_unmap_guest_frame(vapic_va); 
+    }
+    else
+        __vmwrite(VIRTUAL_APIC_PAGE_ADDR, 0);
+}
+
+static void nvmx_update_tpr_threshold(struct vcpu *v)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    u32 ctrl = __n2_exec_control(v);
+    if ( ctrl & CPU_BASED_TPR_SHADOW )
+        __vmwrite(TPR_THRESHOLD, __get_vvmcs(nvcpu->nv_vvmcx, TPR_THRESHOLD));
+    else
+        __vmwrite(TPR_THRESHOLD, 0);
 }
 
 static void __clear_current_vvmcs(struct vcpu *v)
@@ -780,6 +811,8 @@ static void load_shadow_control(struct vcpu *v)
     nvmx_update_entry_control(v);
     vmx_update_exception_bitmap(v);
     nvmx_update_apic_access_address(v);
+    nvmx_update_virtual_apic_address(v);
+    nvmx_update_tpr_threshold(v);
 }
 
 static void load_shadow_guest_state(struct vcpu *v)
@@ -1371,6 +1404,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
                CPU_BASED_ACTIVATE_MSR_BITMAP |
                CPU_BASED_PAUSE_EXITING |
                CPU_BASED_RDPMC_EXITING |
+               CPU_BASED_TPR_SHADOW |
                CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
         data = gen_vmx_msr(data, VMX_PROCBASED_CTLS_DEFAULT1, host_data);
         break;
@@ -1705,6 +1739,11 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     case EXIT_REASON_APIC_ACCESS:
         ctrl = __n2_secondary_exec_control(v);
         if ( ctrl & SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES )
+            nvcpu->nv_vmexit_pending = 1;
+        break;
+    case EXIT_REASON_TPR_BELOW_THRESHOLD:
+        ctrl = __n2_exec_control(v);
+        if ( ctrl & CPU_BASED_TPR_SHADOW )
             nvcpu->nv_vmexit_pending = 1;
         break;
     default:

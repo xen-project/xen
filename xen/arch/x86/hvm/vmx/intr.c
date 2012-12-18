@@ -324,7 +324,9 @@ void vmx_intr_assist(void)
     }
 
  out:
-    if ( !cpu_has_vmx_virtual_intr_delivery && cpu_has_vmx_tpr_shadow )
+    if ( !nestedhvm_vcpu_in_guestmode(v) &&
+         !cpu_has_vmx_virtual_intr_delivery &&
+         cpu_has_vmx_tpr_shadow )
         __vmwrite(TPR_THRESHOLD, tpr_threshold);
 }
 
