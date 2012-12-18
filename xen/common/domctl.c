@@ -244,6 +244,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     long ret = 0;
     bool_t copyback = 0;
     struct xen_domctl curop, *op = &curop;
+    struct domain *d;
 
     if ( copy_from_guest(op, u_domctl, 1) )
         return -EFAULT;
@@ -253,19 +254,29 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     switch ( op->cmd )
     {
+    case XEN_DOMCTL_createdomain:
+    case XEN_DOMCTL_getdomaininfo:
+    case XEN_DOMCTL_test_assign_device:
+        d = NULL;
+        break;
+    default:
+        d = rcu_lock_domain_by_id(op->domain);
+        if ( d == NULL )
+            return -ESRCH;
+    }
+
+    switch ( op->cmd )
+    {
     case XEN_DOMCTL_ioport_mapping:
     case XEN_DOMCTL_memory_mapping:
     case XEN_DOMCTL_bind_pt_irq:
     case XEN_DOMCTL_unbind_pt_irq: {
-        struct domain *d;
-        bool_t is_priv = IS_PRIV(current->domain);
-        if ( !is_priv && ((d = rcu_lock_domain_by_id(op->domain)) != NULL) )
-        {
-            is_priv = IS_PRIV_FOR(current->domain, d);
-            rcu_unlock_domain(d);
-        }
+        bool_t is_priv = IS_PRIV_FOR(current->domain, d);
         if ( !is_priv )
-            return -EPERM;
+        {
+            ret = -EPERM;
+            goto domctl_out_unlock_domonly;
+        }
         break;
     }
 #ifdef XSM_ENABLE
@@ -279,15 +290,18 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     }
 
     if ( !domctl_lock_acquire() )
+    {
+        if ( d )
+            rcu_unlock_domain(d);
         return hypercall_create_continuation(
             __HYPERVISOR_domctl, "h", u_domctl);
+    }
 
     switch ( op->cmd )
     {
 
     case XEN_DOMCTL_setvcpucontext:
     {
-        struct domain *d = rcu_lock_domain_by_id(op->domain);
         vcpu_guest_context_u c = { .nat = NULL };
         unsigned int vcpu = op->u.vcpucontext.vcpu;
         struct vcpu *v;
@@ -341,77 +355,48 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     svc_out:
         free_vcpu_guest_context(c.nat);
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_pausedomain:
     {
-        struct domain *d = rcu_lock_domain_by_id(op->domain);
-        ret = -ESRCH;
-        if ( d != NULL )
-        {
-            ret = xsm_pausedomain(d);
-            if ( ret )
-                goto pausedomain_out;
+        ret = xsm_pausedomain(d);
+        if ( ret )
+            break;
 
-            ret = -EINVAL;
-            if ( d != current->domain )
-            {
-                domain_pause_by_systemcontroller(d);
-                ret = 0;
-            }
-        pausedomain_out:
-            rcu_unlock_domain(d);
+        ret = -EINVAL;
+        if ( d != current->domain )
+        {
+            domain_pause_by_systemcontroller(d);
+            ret = 0;
         }
     }
     break;
 
     case XEN_DOMCTL_unpausedomain:
     {
-        struct domain *d = rcu_lock_domain_by_id(op->domain);
-
-        ret = -ESRCH;
-        if ( d == NULL )
-            break;
-
         ret = xsm_unpausedomain(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         domain_unpause_by_systemcontroller(d);
-        rcu_unlock_domain(d);
         ret = 0;
     }
     break;
 
     case XEN_DOMCTL_resumedomain:
     {
-        struct domain *d = rcu_lock_domain_by_id(op->domain);
-
-        ret = -ESRCH;
-        if ( d == NULL )
-            break;
-
         ret = xsm_resumedomain(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         domain_resume(d);
-        rcu_unlock_domain(d);
         ret = 0;
     }
     break;
 
     case XEN_DOMCTL_createdomain:
     {
-        struct domain *d;
         domid_t        dom;
         static domid_t rover = 0;
         unsigned int domcr_flags;
@@ -461,6 +446,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( IS_ERR(d) )
         {
             ret = PTR_ERR(d);
+            d = NULL;
             break;
         }
 
@@ -471,39 +457,28 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
         op->domain = d->domain_id;
         copyback = 1;
+        d = NULL;
     }
     break;
 
     case XEN_DOMCTL_max_vcpus:
     {
-        struct domain *d;
         unsigned int i, max = op->u.max_vcpus.max, cpu;
         cpumask_t *online;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
-            break;
 
         ret = -EINVAL;
         if ( (d == current->domain) || /* no domain_pause() */
              (max > MAX_VIRT_CPUS) ||
              (is_hvm_domain(d) && (max > MAX_HVM_VCPUS)) )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         ret = xsm_max_vcpus(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         /* Until Xenoprof can dynamically grow its vcpu-s array... */
         if ( d->xenoprof )
         {
-            rcu_unlock_domain(d);
             ret = -EAGAIN;
             break;
         }
@@ -578,44 +553,31 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     maxvcpu_out_novcpulock:
         domain_unpause(d);
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_destroydomain:
     {
-        struct domain *d = rcu_lock_domain_by_id(op->domain);
-        ret = -ESRCH;
-        if ( d != NULL )
-        {
-            ret = xsm_destroydomain(d) ? : domain_kill(d);
-            rcu_unlock_domain(d);
-        }
+        ret = xsm_destroydomain(d) ? : domain_kill(d);
     }
     break;
 
     case XEN_DOMCTL_setvcpuaffinity:
     case XEN_DOMCTL_getvcpuaffinity:
     {
-        domid_t dom = op->domain;
-        struct domain *d = rcu_lock_domain_by_id(dom);
         struct vcpu *v;
-
-        ret = -ESRCH;
-        if ( d == NULL )
-            break;
 
         ret = xsm_vcpuaffinity(op->cmd, d);
         if ( ret )
-            goto vcpuaffinity_out;
+            break;
 
         ret = -EINVAL;
         if ( op->u.vcpuaffinity.vcpu >= d->max_vcpus )
-            goto vcpuaffinity_out;
+            break;
 
         ret = -ESRCH;
         if ( (v = d->vcpu[op->u.vcpuaffinity.vcpu]) == NULL )
-            goto vcpuaffinity_out;
+            break;
 
         if ( op->cmd == XEN_DOMCTL_setvcpuaffinity )
         {
@@ -634,35 +596,22 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             ret = cpumask_to_xenctl_cpumap(
                 &op->u.vcpuaffinity.cpumap, v->cpu_affinity);
         }
-
-    vcpuaffinity_out:
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_scheduler_op:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
-            break;
-
         ret = xsm_scheduler(d);
         if ( ret )
-            goto scheduler_op_out;
+            break;
 
         ret = sched_adjust(d, &op->u.scheduler_op);
         copyback = 1;
-
-    scheduler_op_out:
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_getdomaininfo:
     { 
-        struct domain *d;
         domid_t dom = op->domain;
 
         rcu_read_lock(&domlist_read_lock);
@@ -689,18 +638,14 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     getdomaininfo_out:
         rcu_read_unlock(&domlist_read_lock);
+        d = NULL;
     }
     break;
 
     case XEN_DOMCTL_getvcpucontext:
     { 
         vcpu_guest_context_u c = { .nat = NULL };
-        struct domain       *d;
         struct vcpu         *v;
-
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
-            break;
 
         ret = xsm_getvcpucontext(d);
         if ( ret )
@@ -751,31 +696,25 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     getvcpucontext_out:
         xfree(c.nat);
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_getvcpuinfo:
     { 
-        struct domain *d;
         struct vcpu   *v;
         struct vcpu_runstate_info runstate;
 
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(op->domain)) == NULL )
-            break;
-
         ret = xsm_getvcpuinfo(d);
         if ( ret )
-            goto getvcpuinfo_out;
+            break;
 
         ret = -EINVAL;
         if ( op->u.getvcpuinfo.vcpu >= d->max_vcpus )
-            goto getvcpuinfo_out;
+            break;
 
         ret = -ESRCH;
         if ( (v = d->vcpu[op->u.getvcpuinfo.vcpu]) == NULL )
-            goto getvcpuinfo_out;
+            break;
 
         vcpu_runstate_get(v, &runstate);
 
@@ -786,25 +725,16 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         op->u.getvcpuinfo.cpu      = v->processor;
         ret = 0;
         copyback = 1;
-
-    getvcpuinfo_out:
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_max_mem:
     {
-        struct domain *d;
         unsigned long new_max;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(op->domain);
-        if ( d == NULL )
-            break;
 
         ret = xsm_setdomainmaxmem(d);
         if ( ret )
-            goto max_mem_out;
+            break;
 
         ret = -EINVAL;
         new_max = op->u.max_mem.max_memkb >> (PAGE_SHIFT-10);
@@ -818,76 +748,42 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         d->max_pages = new_max;
         ret = 0;
         spin_unlock(&d->page_alloc_lock);
-
-    max_mem_out:
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_setdomainhandle:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(op->domain);
-        if ( d == NULL )
-            break;
-
         ret = xsm_setdomainhandle(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         memcpy(d->handle, op->u.setdomainhandle.handle,
                sizeof(xen_domain_handle_t));
-        rcu_unlock_domain(d);
         ret = 0;
     }
     break;
 
     case XEN_DOMCTL_setdebugging:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(op->domain);
-        if ( d == NULL )
-            break;
-
         ret = -EINVAL;
         if ( d == current->domain ) /* no domain_pause() */
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         ret = xsm_setdebugging(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         domain_pause(d);
         d->debugger_attached = !!op->u.setdebugging.enable;
         domain_unpause(d); /* causes guest to latch new status */
-        rcu_unlock_domain(d);
         ret = 0;
     }
     break;
 
     case XEN_DOMCTL_irq_permission:
     {
-        struct domain *d;
         unsigned int pirq = op->u.irq_permission.pirq;
         int allow = op->u.irq_permission.allow_access;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(op->domain);
-        if ( d == NULL )
-            break;
 
         if ( pirq >= d->nr_pirqs )
             ret = -EINVAL;
@@ -897,14 +793,11 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             ret = irq_permit_access(d, pirq);
         else
             ret = irq_deny_access(d, pirq);
-
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_iomem_permission:
     {
-        struct domain *d;
         unsigned long mfn = op->u.iomem_permission.first_mfn;
         unsigned long nr_mfns = op->u.iomem_permission.nr_mfns;
         int allow = op->u.iomem_permission.allow_access;
@@ -913,125 +806,78 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( (mfn + nr_mfns - 1) < mfn ) /* wrap? */
             break;
 
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(op->domain);
-        if ( d == NULL )
-            break;
-
         if ( xsm_iomem_permission(d, mfn, mfn + nr_mfns - 1, allow) )
             ret = -EPERM;
         else if ( allow )
             ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
         else
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
-
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_settimeoffset:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(op->domain);
-        if ( d == NULL )
-            break;
-
         ret = xsm_domain_settime(d);
         if ( ret )
-        {
-            rcu_unlock_domain(d);
             break;
-        }
 
         domain_set_time_offset(d, op->u.settimeoffset.time_offset_seconds);
-        rcu_unlock_domain(d);
         ret = 0;
     }
     break;
 
     case XEN_DOMCTL_set_target:
     {
-        struct domain *d, *e;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(op->domain);
-        if ( d == NULL )
-            break;
+        struct domain *e;
 
         ret = -ESRCH;
         e = get_domain_by_id(op->u.set_target.target);
         if ( e == NULL )
-            goto set_target_out;
+            break;
 
         ret = -EINVAL;
         if ( (d == e) || (d->target != NULL) )
         {
             put_domain(e);
-            goto set_target_out;
+            break;
         }
 
         ret = xsm_set_target(d, e);
         if ( ret ) {
             put_domain(e);
-            goto set_target_out;            
+            break;
         }
 
         /* Hold reference on @e until we destroy @d. */
         d->target = e;
 
         ret = 0;
-
-    set_target_out:
-        rcu_unlock_domain(d);
     }
     break;
 
     case XEN_DOMCTL_subscribe:
     {
-        struct domain *d;
-
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(op->domain);
-        if ( d != NULL )
-        {
-            ret = xsm_domctl(d, op->cmd);
-            if ( !ret )
-                d->suspend_evtchn = op->u.subscribe.port;
-            rcu_unlock_domain(d);
-        }
+        ret = xsm_domctl(d, op->cmd);
+        if ( !ret )
+            d->suspend_evtchn = op->u.subscribe.port;
     }
     break;
 
     case XEN_DOMCTL_disable_migrate:
     {
-        struct domain *d;
-        ret = -ESRCH;
-        if ( (d = rcu_lock_domain_by_id(op->domain)) != NULL )
-        {
-            ret = xsm_domctl(d, op->cmd);
-            if ( !ret )
-                d->disable_migrate = op->u.disable_migrate.disable;
-            rcu_unlock_domain(d);
-        }
+        ret = xsm_domctl(d, op->cmd);
+        if ( !ret )
+            d->disable_migrate = op->u.disable_migrate.disable;
     }
     break;
 
     case XEN_DOMCTL_set_virq_handler:
     {
-        struct domain *d;
         uint32_t virq = op->u.set_virq_handler.virq;
 
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(op->domain);
-        if ( d != NULL )
-        {
-            ret = xsm_set_virq_handler(d, virq);
-            if ( !ret )
-                ret = set_global_virq_handler(d, virq);
-            rcu_unlock_domain(d);
-        }
+        ret = xsm_set_virq_handler(d, virq);
+        if ( !ret )
+            ret = set_global_virq_handler(d, virq);
     }
     break;
 
@@ -1041,6 +887,10 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     }
 
     domctl_lock_release();
+
+ domctl_out_unlock_domonly:
+    if ( d )
+        rcu_unlock_domain(d);
 
     if ( copyback && __copy_to_guest(u_domctl, op, 1) )
         ret = -EFAULT;
