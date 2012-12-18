@@ -59,6 +59,9 @@
 #define CSCHED_VCPU(_vcpu)  ((struct csched_vcpu *) (_vcpu)->sched_priv)
 #define CSCHED_DOM(_dom)    ((struct csched_dom *) (_dom)->sched_priv)
 #define RUNQ(_cpu)          (&(CSCHED_PCPU(_cpu)->runq))
+/* Is the first element of _cpu's runq its idle vcpu? */
+#define IS_RUNQ_IDLE(_cpu)  (list_empty(RUNQ(_cpu)) || \
+                             is_idle_vcpu(__runq_elem(RUNQ(_cpu)->next)->vcpu))
 
 
 /*
@@ -478,9 +481,14 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
      * distinct cores first and guarantees we don't do something stupid
      * like run two VCPUs on co-hyperthreads while there are idle cores
      * or sockets.
+     *
+     * Notice that, when computing the "idleness" of cpu, we may want to
+     * discount vc. That is, iff vc is the currently running and the only
+     * runnable vcpu on cpu, we add cpu to the idlers.
      */
     cpumask_and(&idlers, &cpu_online_map, CSCHED_PRIV(ops)->idlers);
-    cpumask_set_cpu(cpu, &idlers);
+    if ( vc->processor == cpu && IS_RUNQ_IDLE(cpu) )
+        cpumask_set_cpu(cpu, &idlers);
     cpumask_and(&cpus, &cpus, &idlers);
     cpumask_clear_cpu(cpu, &cpus);
 
