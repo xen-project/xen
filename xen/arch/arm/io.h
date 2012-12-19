@@ -21,6 +21,7 @@
 
 #include <xen/lib.h>
 #include <asm/processor.h>
+#include <asm/regs.h>
 
 typedef struct
 {

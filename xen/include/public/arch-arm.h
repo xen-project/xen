@@ -119,12 +119,15 @@ struct cpu_user_regs
 
     /* Outer guest frame only from here on... */
 
-    uint32_t r8_fiq, r9_fiq, r10_fiq, r11_fiq, r12_fiq;
-
     uint32_t sp_usr; /* LR_usr is the same register as LR, see above */
 
-    uint32_t sp_svc, sp_abt, sp_und, sp_irq, sp_fiq;
-    uint32_t lr_svc, lr_abt, lr_und, lr_irq, lr_fiq;
+    uint32_t sp_irq, lr_irq;
+    uint32_t sp_svc, lr_svc;
+    uint32_t sp_abt, lr_abt;
+    uint32_t sp_und, lr_und;
+
+    uint32_t r8_fiq, r9_fiq, r10_fiq, r11_fiq, r12_fiq;
+    uint32_t sp_fiq, lr_fiq;
 
     uint32_t spsr_svc, spsr_abt, spsr_und, spsr_irq, spsr_fiq;
 

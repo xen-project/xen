@@ -12,7 +12,7 @@
         RESTORE_ONE_BANKED(SP_##mode) ; RESTORE_ONE_BANKED(LR_##mode) ; RESTORE_ONE_BANKED(SPSR_##mode)
 
 #define SAVE_ALL                                                        \
-        sub sp, #(UREGS_R8_fiq - UREGS_sp); /* SP, LR, SPSR, PC */      \
+        sub sp, #(UREGS_SP_usr - UREGS_sp); /* SP, LR, SPSR, PC */      \
         push {r0-r12}; /* Save R0-R12 */                                \
                                                                         \
         mrs r11, ELR_hyp;               /* ELR_hyp is return address. */\
@@ -115,7 +115,7 @@ ENTRY(return_to_hypervisor)
         ldr r11, [sp, #UREGS_cpsr]
         msr SPSR_hyp, r11
         pop {r0-r12}
-        add sp, #(UREGS_R8_fiq - UREGS_sp); /* SP, LR, SPSR, PC */
+        add sp, #(UREGS_SP_usr - UREGS_sp); /* SP, LR, SPSR, PC */
         eret
 
 /*

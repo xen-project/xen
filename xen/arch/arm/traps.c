@@ -43,7 +43,7 @@
  * stack) must be doubleword-aligned in size.  */
 static inline void check_stack_alignment_constraints(void) {
     BUILD_BUG_ON((sizeof (struct cpu_user_regs)) & 0x7);
-    BUILD_BUG_ON((offsetof(struct cpu_user_regs, r8_fiq)) & 0x7);
+    BUILD_BUG_ON((offsetof(struct cpu_user_regs, sp_usr)) & 0x7);
     BUILD_BUG_ON((sizeof (struct cpu_info)) & 0x7);
 }
 
