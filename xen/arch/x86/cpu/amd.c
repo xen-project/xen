@@ -448,6 +448,14 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		}
 	}
 
+	/*
+	 * The way access filter has a performance penalty on some workloads.
+	 * Disable it on the affected CPUs.
+	 */
+	if (c->x86 == 0x15 && c->x86_model >= 0x02 && c->x86_model < 0x20 &&
+	    !rdmsr_safe(MSR_AMD64_IC_CFG, value) && (value & 0x1e) != 0x1e)
+		wrmsr_safe(MSR_AMD64_IC_CFG, value | 0x1e);
+
         amd_get_topology(c);
 
 	/* Pointless to use MWAIT on Family10 as it does not deep sleep. */
