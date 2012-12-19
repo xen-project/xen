@@ -21,8 +21,15 @@
 
 .globl cortex_a15_init
 cortex_a15_init:
-	/* Set up the SMP bit in ACTLR */
-	mrc   CP32(r0, ACTLR)
-	orr   r0, r0, #(ACTLR_CA15_SMP) /* enable SMP bit*/
-	mcr   CP32(r0, ACTLR)
-	mov   pc, lr
+        /* Set up the SMP bit in ACTLR */
+        mrc   CP32(r0, ACTLR)
+        orr   r0, r0, #(ACTLR_CA15_SMP) /* enable SMP bit */
+        mcr   CP32(r0, ACTLR)
+        mov   pc, lr
+
+/*
+ * Local variables:
+ * mode: ASM
+ * indent-tabs-mode: nil
+ * End:
+ */
