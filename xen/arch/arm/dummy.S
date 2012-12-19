@@ -14,7 +14,6 @@ DUMMY(pirq_guest_unbind);
 DUMMY(pirq_set_affinity);
 
 /* VCPU */
-DUMMY(arch_vcpu_reset);
 NOP(update_vcpu_system_time);
 
 /* Grant Tables */

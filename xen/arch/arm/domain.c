@@ -515,6 +515,11 @@ int arch_set_info_guest(
     return 0;
 }
 
+void arch_vcpu_reset(struct vcpu *v)
+{
+    vcpu_end_shutdown_deferral(v);
+}
+
 void arch_dump_domain_info(struct domain *d)
 {
 }
