@@ -30,7 +30,7 @@
 #include <asm/p2m.h>
 #include <asm/domain.h>
 
-#include "gic.h"
+#include <asm/gic.h>
 
 /* Access to the GIC Distributor registers through the fixmap */
 #define GICD ((volatile uint32_t *) FIXMAP_ADDR(FIXMAP_GICD))

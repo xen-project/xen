@@ -35,7 +35,7 @@
 
 #include "io.h"
 #include "vtimer.h"
-#include "gic.h"
+#include <asm/gic.h>
 
 /* The base of the stack must always be double-word aligned, which means
  * that both the kernel half of struct cpu_user_regs (which is pushed in

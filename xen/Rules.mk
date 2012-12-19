@@ -28,7 +28,7 @@ endif
 # Set ARCH/SUBARCH appropriately.
 override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
 override TARGET_ARCH     := $(shell echo $(XEN_TARGET_ARCH) | \
-                              sed -e 's/x86.*/x86/')
+                              sed -e 's/x86.*/x86/' -e s'/arm\(32\|64\)/arm/g')
 
 TARGET := $(BASEDIR)/xen
 

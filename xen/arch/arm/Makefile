@@ -1,8 +1,7 @@
-subdir-y += lib
+subdir-$(arm32) += arm32
 
 obj-y += dummy.o
 obj-y += early_printk.o
-obj-y += entry.o
 obj-y += domain.o
 obj-y += domctl.o
 obj-y += sysctl.o
@@ -12,8 +11,6 @@ obj-y += io.o
 obj-y += irq.o
 obj-y += kernel.o
 obj-y += mm.o
-obj-y += mode_switch.o
-obj-y += proc-ca15.o
 obj-y += p2m.o
 obj-y += percpu.o
 obj-y += guestcopy.o
@@ -36,7 +33,7 @@ obj-y += dtb.o
 AFLAGS += -DCONFIG_DTB_FILE=\"$(CONFIG_DTB_FILE)\"
 endif
 
-ALL_OBJS := head.o $(ALL_OBJS)
+ALL_OBJS := $(TARGET_SUBARCH)/head.o $(ALL_OBJS)
 
 $(TARGET): $(TARGET)-syms $(TARGET).bin
 	# XXX: VE model loads by VMA so instead of
@@ -81,7 +78,7 @@ $(TARGET)-syms: prelink.o xen.lds $(BASEDIR)/common/symbols-dummy.o
 	    $(@D)/.$(@F).1.o -o $@
 	rm -f $(@D)/.$(@F).[0-9]*
 
-asm-offsets.s: asm-offsets.c
+asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c
 	$(CC) $(filter-out -flto,$(CFLAGS)) -S -o $@ $<
 
 xen.lds: xen.lds.S

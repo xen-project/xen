@@ -12,7 +12,7 @@
 #include <asm/p2m.h>
 #include <asm/irq.h>
 
-#include "gic.h"
+#include <asm/gic.h>
 #include "vtimer.h"
 #include "vpl011.h"
 

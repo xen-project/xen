@@ -21,7 +21,7 @@
 #include <asm/page.h>
 #include <asm/platform_vexpress.h>
 #include <asm/asm_defns.h>
-#include "gic.h"
+#include <asm/gic.h>
 
 
 /* XXX: Versatile Express specific code */

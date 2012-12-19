@@ -39,7 +39,7 @@
 #include <asm/setup.h>
 #include <asm/vfp.h>
 #include <asm/early_printk.h>
-#include "gic.h"
+#include <asm/gic.h>
 
 static __used void init_done(void)
 {

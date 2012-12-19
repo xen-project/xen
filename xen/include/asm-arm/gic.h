@@ -1,6 +1,4 @@
 /*
- * xen/arch/arm/gic.h
- *
  * ARM Generic Interrupt Controller support
  *
  * Tim Deegan <tim@xen.org>
@@ -17,8 +15,8 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __ARCH_ARM_GIC_H__
-#define __ARCH_ARM_GIC_H__
+#ifndef __ASM_ARM_GIC_H__
+#define __ASM_ARM_GIC_H__
 
 #define GICD_CTLR       (0x000/4)
 #define GICD_TYPER      (0x004/4)

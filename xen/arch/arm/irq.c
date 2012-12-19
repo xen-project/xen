@@ -25,7 +25,7 @@
 #include <xen/errno.h>
 #include <xen/sched.h>
 
-#include "gic.h"
+#include <asm/gic.h>
 
 static void enable_none(struct irq_desc *irq) { }
 static unsigned int startup_none(struct irq_desc *irq) { return 0; }

@@ -29,7 +29,7 @@
 #include <xen/timer.h>
 #include <xen/irq.h>
 #include <asm/vfp.h>
-#include "gic.h"
+#include <asm/gic.h>
 
 cpumask_t cpu_online_map;
 EXPORT_SYMBOL(cpu_online_map);

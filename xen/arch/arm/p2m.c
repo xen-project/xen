@@ -4,7 +4,7 @@
 #include <xen/errno.h>
 #include <xen/domain_page.h>
 #include <asm/flushtlb.h>
-#include "gic.h"
+#include <asm/gic.h>
 
 void dump_p2m_lookup(struct domain *d, paddr_t addr)
 {

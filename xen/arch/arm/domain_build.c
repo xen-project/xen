@@ -11,7 +11,7 @@
 #include <xen/libfdt/libfdt.h>
 #include <xen/guest_access.h>
 
-#include "gic.h"
+#include <asm/gic.h>
 #include "kernel.h"
 
 static unsigned int __initdata opt_dom0_max_vcpus;

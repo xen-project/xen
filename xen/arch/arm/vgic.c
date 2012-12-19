@@ -27,7 +27,7 @@
 #include <asm/current.h>
 
 #include "io.h"
-#include "gic.h"
+#include <asm/gic.h>
 
 #define VGIC_DISTR_BASE_ADDRESS 0x000000002c001000
 
