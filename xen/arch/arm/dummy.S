@@ -9,9 +9,6 @@ x:	mov pc, lr
 /* PIRQ support */
 DUMMY(nr_irqs_gsi);
 
-/* VCPU */
-NOP(update_vcpu_system_time);
-
 /* Grant Tables */
 DUMMY(steal_page);
 
@@ -21,8 +18,6 @@ DUMMY(page_is_ram_type);
 /* Other */
 DUMMY(domain_get_maximum_gpfn);
 DUMMY(domain_relinquish_resources);
-DUMMY(domain_set_time_offset);
 DUMMY(dom_cow);
 DUMMY(send_timer_event);
 DUMMY(share_xen_page_with_privileged_guests);
-DUMMY(wallclock_time);

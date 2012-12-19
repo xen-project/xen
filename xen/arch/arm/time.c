@@ -25,6 +25,7 @@
 #include <xen/mm.h>
 #include <xen/softirq.h>
 #include <xen/time.h>
+#include <xen/sched.h>
 #include <asm/system.h>
 
 /*
@@ -183,6 +184,23 @@ void udelay(unsigned long usecs)
         ;
     dsb();
     isb();
+}
+
+/* VCPU PV clock. */
+void update_vcpu_system_time(struct vcpu *v)
+{
+    /* XXX update shared_info->wc_* */
+}
+
+void domain_set_time_offset(struct domain *d, int32_t time_offset_seconds)
+{
+    d->time_offset_seconds = time_offset_seconds;
+    /* XXX update guest visible wallclock time */
+}
+
+struct tm wallclock_time(void)
+{
+    return (struct tm) { 0 };
 }
 
 /*
