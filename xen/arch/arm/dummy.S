@@ -7,7 +7,6 @@ x:	.word 0xe7f000f0 /* Undefined instruction */
 x:	mov pc, lr
 	
 /* SMP support */
-DUMMY(node_online_map);
 DUMMY(smp_send_state_dump);
 
 /* PIRQ support */

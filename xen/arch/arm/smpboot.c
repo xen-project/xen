@@ -38,6 +38,9 @@ EXPORT_SYMBOL(cpu_online_map);
 cpumask_t cpu_possible_map;
 EXPORT_SYMBOL(cpu_possible_map);
 
+/* Fake one node for now. See also include/asm-arm/numa.h */
+nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
+
 /* Xen stack for bringing up the first CPU. */
 static unsigned char __initdata cpu0_boot_stack[STACK_SIZE]
        __attribute__((__aligned__(STACK_SIZE)));
