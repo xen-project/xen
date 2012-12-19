@@ -435,6 +435,12 @@ int donate_page(struct domain *d, struct page_info *page, unsigned int memflags)
     return -ENOSYS;
 }
 
+int steal_page(
+    struct domain *d, struct page_info *page, unsigned int memflags)
+{
+    return -1;
+}
+
 void share_xen_page_with_guest(struct page_info *page,
                           struct domain *d, int readonly)
 {

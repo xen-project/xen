@@ -9,9 +9,6 @@ x:	mov pc, lr
 /* PIRQ support */
 DUMMY(nr_irqs_gsi);
 
-/* Grant Tables */
-DUMMY(steal_page);
-
 /* Page Offlining */
 DUMMY(page_is_ram_type);
 
