@@ -447,6 +447,11 @@ int page_is_ram_type(unsigned long mfn, unsigned long mem_type)
     return 0;
 }
 
+unsigned long domain_get_maximum_gpfn(struct domain *d)
+{
+    return -ENOSYS;
+}
+
 void share_xen_page_with_guest(struct page_info *page,
                           struct domain *d, int readonly)
 {

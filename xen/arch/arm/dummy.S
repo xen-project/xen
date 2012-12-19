@@ -10,7 +10,6 @@ x:	mov pc, lr
 DUMMY(nr_irqs_gsi);
 
 /* Other */
-DUMMY(domain_get_maximum_gpfn);
 DUMMY(domain_relinquish_resources);
 DUMMY(dom_cow);
 DUMMY(send_timer_event);
