@@ -11,6 +11,10 @@
 #include <irq_vectors.h>
 #include <asm/percpu.h>
 
+extern unsigned int nr_irqs_gsi;
+extern unsigned int nr_irqs;
+#define nr_static_irqs nr_irqs_gsi
+
 #define IO_APIC_IRQ(irq)    (platform_legacy_irq(irq) ?    \
 			     (1 << (irq)) & io_apic_irqs : \
 			     (irq) < nr_irqs_gsi)

@@ -72,7 +72,7 @@ static int get_irq_sid(int irq, u32 *sid, struct avc_audit_data *ad)
     struct irq_desc *desc = irq_to_desc(irq);
     if ( irq >= nr_irqs || irq < 0 )
         return -EINVAL;
-    if ( irq < nr_irqs_gsi ) {
+    if ( irq < nr_static_irqs ) {
         if (ad) {
             AVC_AUDIT_DATA_INIT(ad, IRQ);
             ad->irq = irq;
@@ -699,7 +699,7 @@ static int flask_map_domain_pirq (struct domain *d, int irq, void *data)
     if ( rc )
         return rc;
 
-    if ( irq >= nr_irqs_gsi && msi ) {
+    if ( irq >= nr_static_irqs && msi ) {
         u32 machine_bdf = (msi->seg << 16) | (msi->bus << 8) | msi->devfn;
         AVC_AUDIT_DATA_INIT(&ad, DEV);
         ad.device = machine_bdf;

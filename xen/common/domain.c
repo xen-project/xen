@@ -259,9 +259,9 @@ struct domain *domain_create(
         atomic_inc(&d->pause_count);
 
         if ( domid )
-            d->nr_pirqs = nr_irqs_gsi + extra_domU_irqs;
+            d->nr_pirqs = nr_static_irqs + extra_domU_irqs;
         else
-            d->nr_pirqs = nr_irqs_gsi + extra_dom0_irqs;
+            d->nr_pirqs = nr_static_irqs + extra_dom0_irqs;
         if ( d->nr_pirqs > nr_irqs )
             d->nr_pirqs = nr_irqs;
 

@@ -21,6 +21,9 @@ struct irq_cfg {
 #define NR_IRQS		1024
 #define nr_irqs NR_IRQS
 
+#define nr_irqs NR_IRQS
+#define nr_static_irqs NR_IRQS
+
 struct irq_desc;
 
 struct irq_desc *__irq_to_desc(int irq);
