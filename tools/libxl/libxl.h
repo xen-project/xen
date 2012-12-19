@@ -474,26 +474,6 @@ typedef struct {
 
 #define LIBXL_VERSION 0
 
-typedef struct {
-    libxl_domain_create_info c_info;
-    libxl_domain_build_info b_info;
-
-    int num_disks, num_nics, num_pcidevs, num_vfbs, num_vkbs, num_vtpms;
-
-    libxl_device_disk *disks;
-    libxl_device_nic *nics;
-    libxl_device_pci *pcidevs;
-    libxl_device_vfb *vfbs;
-    libxl_device_vkb *vkbs;
-    libxl_device_vtpm *vtpms;
-
-    libxl_action_on_shutdown on_poweroff;
-    libxl_action_on_shutdown on_reboot;
-    libxl_action_on_shutdown on_watchdog;
-    libxl_action_on_shutdown on_crash;
-} libxl_domain_config;
-char *libxl_domain_config_to_json(libxl_ctx *ctx, libxl_domain_config *p);
-
 /* context functions */
 int libxl_ctx_alloc(libxl_ctx **pctx, int version,
                     unsigned flags /* none currently defined */,

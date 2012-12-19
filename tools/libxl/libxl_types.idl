@@ -402,6 +402,23 @@ libxl_device_vtpm = Struct("device_vtpm", [
     ("uuid",             libxl_uuid),
 ])
 
+libxl_domain_config = Struct("domain_config", [
+    ("c_info", libxl_domain_create_info),
+    ("b_info", libxl_domain_build_info),
+
+    ("disks", Array(libxl_device_disk, "num_disks")),
+    ("nics", Array(libxl_device_nic, "num_nics")),
+    ("pcidevs", Array(libxl_device_pci, "num_pcidevs")),
+    ("vfbs", Array(libxl_device_vfb, "num_vfbs")),
+    ("vkbs", Array(libxl_device_vkb, "num_vkbs")),
+    ("vtpms", Array(libxl_device_vtpm, "num_vtpms")),
+
+    ("on_poweroff", libxl_action_on_shutdown),
+    ("on_reboot", libxl_action_on_shutdown),
+    ("on_watchdog", libxl_action_on_shutdown),
+    ("on_crash", libxl_action_on_shutdown),
+    ])
+
 libxl_diskinfo = Struct("diskinfo", [
     ("backend", string),
     ("backend_id", uint32),

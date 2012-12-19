@@ -283,6 +283,7 @@ if __name__ == '__main__':
         "cpupoolinfo",
         "domain_create_info",
         "domain_build_info",
+        "domain_config",
         "vcpuinfo",
         "event",
         ]

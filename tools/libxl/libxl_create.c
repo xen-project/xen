@@ -24,43 +24,6 @@
 #include <xenguest.h>
 #include <xen/hvm/hvm_info_table.h>
 
-void libxl_domain_config_init(libxl_domain_config *d_config)
-{
-    memset(d_config, 0, sizeof(*d_config));
-    libxl_domain_create_info_init(&d_config->c_info);
-    libxl_domain_build_info_init(&d_config->b_info);
-}
-
-void libxl_domain_config_dispose(libxl_domain_config *d_config)
-{
-    int i;
-
-    for (i=0; i<d_config->num_disks; i++)
-        libxl_device_disk_dispose(&d_config->disks[i]);
-    free(d_config->disks);
-
-    for (i=0; i<d_config->num_nics; i++)
-        libxl_device_nic_dispose(&d_config->nics[i]);
-    free(d_config->nics);
-
-    for (i=0; i<d_config->num_pcidevs; i++)
-        libxl_device_pci_dispose(&d_config->pcidevs[i]);
-    free(d_config->pcidevs);
-
-    for (i=0; i<d_config->num_vfbs; i++)
-        libxl_device_vfb_dispose(&d_config->vfbs[i]);
-    free(d_config->vfbs);
-
-    for (i=0; i<d_config->num_vkbs; i++)
-        libxl_device_vkb_dispose(&d_config->vkbs[i]);
-    free(d_config->vkbs);
-
-    libxl_device_vtpm_list_free(d_config->vtpms, d_config->num_vtpms);
-
-    libxl_domain_create_info_dispose(&d_config->c_info);
-    libxl_domain_build_info_dispose(&d_config->b_info);
-}
-
 int libxl__domain_create_info_setdefault(libxl__gc *gc,
                                          libxl_domain_create_info *c_info)
 {
