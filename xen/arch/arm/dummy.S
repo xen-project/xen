@@ -7,11 +7,7 @@ x:	.word 0xe7f000f0 /* Undefined instruction */
 x:	mov pc, lr
 	
 /* PIRQ support */
-DUMMY(alloc_pirq_struct);
 DUMMY(nr_irqs_gsi);
-DUMMY(pirq_guest_bind);
-DUMMY(pirq_guest_unbind);
-DUMMY(pirq_set_affinity);
 
 /* VCPU */
 NOP(update_vcpu_system_time);

@@ -192,6 +192,35 @@ out_no_end:
 }
 
 /*
+ * pirq event channels. We don't use these on ARM, instead we use the
+ * features of the GIC to inject virtualised normal interrupts.
+ */
+struct pirq *alloc_pirq_struct(struct domain *d)
+{
+    return NULL;
+}
+
+/*
+ * These are all unreachable given an alloc_pirq_struct
+ * which returns NULL, all callers try to lookup struct pirq first
+ * which will fail.
+ */
+int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
+{
+    BUG();
+}
+
+void pirq_guest_unbind(struct domain *d, struct pirq *pirq)
+{
+    BUG();
+}
+
+void pirq_set_affinity(struct domain *d, int pirq, const cpumask_t *mask)
+{
+    BUG();
+}
+
+/*
  * Local variables:
  * mode: C
  * c-set-style: "BSD"
