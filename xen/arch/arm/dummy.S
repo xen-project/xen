@@ -10,5 +10,4 @@ x:	mov pc, lr
 DUMMY(nr_irqs_gsi);
 
 /* Other */
-DUMMY(send_timer_event);
 DUMMY(share_xen_page_with_privileged_guests);

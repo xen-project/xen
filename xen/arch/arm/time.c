@@ -26,6 +26,7 @@
 #include <xen/softirq.h>
 #include <xen/time.h>
 #include <xen/sched.h>
+#include <xen/event.h>
 #include <asm/system.h>
 
 /*
@@ -184,6 +185,12 @@ void udelay(unsigned long usecs)
         ;
     dsb();
     isb();
+}
+
+/* VCPU PV timers. */
+void send_timer_event(struct vcpu *v)
+{
+    send_guest_vcpu_virq(v, VIRQ_TIMER);
 }
 
 /* VCPU PV clock. */
