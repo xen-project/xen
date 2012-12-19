@@ -520,6 +520,13 @@ void arch_vcpu_reset(struct vcpu *v)
     vcpu_end_shutdown_deferral(v);
 }
 
+int domain_relinquish_resources(struct domain *d)
+{
+    /* XXX teardown pagetables, free pages etc */
+    ASSERT(0);
+    return 0;
+}
+
 void arch_dump_domain_info(struct domain *d)
 {
 }
