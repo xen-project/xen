@@ -15,7 +15,7 @@
 #ifdef EARLY_UART_ADDRESS
 
 void early_printk(const char *fmt, ...);
-void early_panic(const char *fmt, ...);
+void early_panic(const char *fmt, ...) __attribute__((noreturn));
 
 #else
 
