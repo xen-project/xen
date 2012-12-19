@@ -282,8 +282,6 @@ int construct_dom0(struct domain *d)
     map_mmio_regions(d, 0x18000000, 0x1BFFFFFF, 0x18000000);
     printk("Map CS3 MMIO regions 1:1 in the P2M %#llx->%#llx\n", 0x1C000000ULL, 0x1FFFFFFFULL);
     map_mmio_regions(d, 0x1C000000, 0x1FFFFFFF, 0x1C000000);
-    printk("Map VGIC MMIO regions 1:1 in the P2M %#llx->%#llx\n", 0x2C008000ULL, 0x2DFFFFFFULL);
-    map_mmio_regions(d, 0x2C008000, 0x2DFFFFFF, 0x2C008000);
 
     printk("Routing peripheral interrupts to guest\n");
     /* TODO Get from device tree */
