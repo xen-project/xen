@@ -348,6 +348,12 @@ void __init gic_init(void)
     spin_unlock(&gic.lock);
 }
 
+void smp_send_state_dump(unsigned int cpu)
+{
+    printk("WARNING: unable to send state dump request to CPU%d\n", cpu);
+    /* XXX TODO -- send an SGI */
+}
+
 /* Set up the per-CPU parts of the GIC for a secondary CPU */
 void __cpuinit gic_init_secondary_cpu(void)
 {

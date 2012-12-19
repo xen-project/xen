@@ -6,9 +6,6 @@ x:	.word 0xe7f000f0 /* Undefined instruction */
 	.globl x; \
 x:	mov pc, lr
 	
-/* SMP support */
-DUMMY(smp_send_state_dump);
-
 /* PIRQ support */
 DUMMY(alloc_pirq_struct);
 DUMMY(nr_irqs_gsi);
