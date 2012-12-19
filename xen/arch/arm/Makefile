@@ -1,6 +1,5 @@
 subdir-$(arm32) += arm32
 
-obj-y += dummy.o
 obj-y += early_printk.o
 obj-y += domain.o
 obj-y += domctl.o
