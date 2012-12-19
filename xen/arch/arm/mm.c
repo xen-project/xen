@@ -441,6 +441,12 @@ int steal_page(
     return -1;
 }
 
+int page_is_ram_type(unsigned long mfn, unsigned long mem_type)
+{
+    ASSERT(0);
+    return 0;
+}
+
 void share_xen_page_with_guest(struct page_info *page,
                           struct domain *d, int readonly)
 {
