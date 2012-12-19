@@ -8,6 +8,3 @@ x:	mov pc, lr
 	
 /* PIRQ support */
 DUMMY(nr_irqs_gsi);
-
-/* Other */
-DUMMY(share_xen_page_with_privileged_guests);

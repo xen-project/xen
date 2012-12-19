@@ -506,6 +506,12 @@ void share_xen_page_with_guest(struct page_info *page,
     spin_unlock(&d->page_alloc_lock);
 }
 
+void share_xen_page_with_privileged_guests(
+    struct page_info *page, int readonly)
+{
+    share_xen_page_with_guest(page, dom_xen, readonly);
+}
+
 static int xenmem_add_to_physmap_one(
     struct domain *d,
     uint16_t space,
