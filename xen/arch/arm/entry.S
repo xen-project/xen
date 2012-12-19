@@ -11,22 +11,22 @@
 #define RESTORE_BANKED(mode) \
 	RESTORE_ONE_BANKED(SP_##mode) ; RESTORE_ONE_BANKED(LR_##mode) ; RESTORE_ONE_BANKED(SPSR_##mode)
 
-#define SAVE_ALL											\
-	sub sp, #(UREGS_R8_fiq - UREGS_sp); /* SP, LR, SPSR, PC */					\
-	push {r0-r12}; /* Save R0-R12 */								\
-													\
-	mrs r11, ELR_hyp;		/* ELR_hyp is return address. */				\
-	str r11, [sp, #UREGS_pc];									\
-													\
-	str lr, [sp, #UREGS_lr];									\
-													\
-	add r11, sp, #UREGS_kernel_sizeof+4;								\
-	str r11, [sp, #UREGS_sp];									\
-													\
-	mrs r11, SPSR_hyp;										\
-	str r11, [sp, #UREGS_cpsr];									\
-	and r11, #PSR_MODE_MASK;									\
-	cmp r11, #PSR_MODE_HYP;										\
+#define SAVE_ALL							\
+	sub sp, #(UREGS_R8_fiq - UREGS_sp); /* SP, LR, SPSR, PC */	\
+	push {r0-r12}; /* Save R0-R12 */				\
+									\
+	mrs r11, ELR_hyp;		/* ELR_hyp is return address. */\
+	str r11, [sp, #UREGS_pc];					\
+									\
+	str lr, [sp, #UREGS_lr];					\
+									\
+	add r11, sp, #UREGS_kernel_sizeof+4;				\
+	str r11, [sp, #UREGS_sp];					\
+									\
+	mrs r11, SPSR_hyp;						\
+	str r11, [sp, #UREGS_cpsr];					\
+	and r11, #PSR_MODE_MASK;					\
+	cmp r11, #PSR_MODE_HYP;						\
 	blne save_guest_regs
 
 save_guest_regs:
@@ -43,25 +43,25 @@ save_guest_regs:
 	SAVE_ONE_BANKED(R11_fiq); SAVE_ONE_BANKED(R12_fiq);
 	mov pc, lr
 
-#define DEFINE_TRAP_ENTRY(trap)										\
-	ALIGN;												\
-trap_##trap:												\
-	SAVE_ALL;											\
-	cpsie i; 	/* local_irq_enable */								\
-	adr lr, return_from_trap;									\
-	mov r0, sp;											\
-	mov r11, sp;											\
-	bic sp, #7; /* Align the stack pointer (noop on guest trap) */					\
+#define DEFINE_TRAP_ENTRY(trap)						\
+	ALIGN;								\
+trap_##trap:								\
+	SAVE_ALL;							\
+	cpsie i; 	/* local_irq_enable */				\
+	adr lr, return_from_trap;					\
+	mov r0, sp;							\
+	mov r11, sp;							\
+	bic sp, #7; /* Align the stack pointer (noop on guest trap) */	\
 	b do_trap_##trap
 
-#define DEFINE_TRAP_ENTRY_NOIRQ(trap)									\
-	ALIGN;												\
-trap_##trap:												\
-	SAVE_ALL;											\
-	adr lr, return_from_trap;									\
-	mov r0, sp;											\
-	mov r11, sp;											\
-	bic sp, #7; /* Align the stack pointer (noop on guest trap) */					\
+#define DEFINE_TRAP_ENTRY_NOIRQ(trap)					\
+	ALIGN;								\
+trap_##trap:								\
+	SAVE_ALL;							\
+	adr lr, return_from_trap;					\
+	mov r0, sp;							\
+	mov r11, sp;							\
+	bic sp, #7; /* Align the stack pointer (noop on guest trap) */	\
 	b do_trap_##trap
 
 .globl hyp_traps_vector
