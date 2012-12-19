@@ -265,6 +265,8 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     rcu_init();
 
+    arch_init_memory();
+
     local_irq_enable();
 
     smp_prepare_cpus(cpus);

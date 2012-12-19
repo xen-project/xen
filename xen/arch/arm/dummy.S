@@ -10,6 +10,5 @@ x:	mov pc, lr
 DUMMY(nr_irqs_gsi);
 
 /* Other */
-DUMMY(dom_cow);
 DUMMY(send_timer_event);
 DUMMY(share_xen_page_with_privileged_guests);

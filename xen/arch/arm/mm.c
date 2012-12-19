@@ -30,12 +30,13 @@
 #include <xen/event.h>
 #include <xen/guest_access.h>
 #include <xen/domain_page.h>
+#include <xen/err.h>
 #include <asm/page.h>
 #include <asm/current.h>
 #include <public/memory.h>
 #include <xen/sched.h>
 
-struct domain *dom_xen, *dom_io;
+struct domain *dom_xen, *dom_io, *dom_cow;
 
 /* Static start-of-day pagetables that we use before the allocators are up */
 lpae_t xen_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
@@ -206,6 +207,31 @@ void unmap_domain_page(const void *va)
     local_irq_restore(flags);
 }
 
+void __init arch_init_memory(void)
+{
+    /*
+     * Initialise our DOMID_XEN domain.
+     * Any Xen-heap pages that we will allow to be mapped will have
+     * their domain field set to dom_xen.
+     */
+    dom_xen = domain_create(DOMID_XEN, DOMCRF_dummy, 0);
+    BUG_ON(IS_ERR(dom_xen));
+
+    /*
+     * Initialise our DOMID_IO domain.
+     * This domain owns I/O pages that are within the range of the page_info
+     * array. Mappings occur at the priv of the caller.
+     */
+    dom_io = domain_create(DOMID_IO, DOMCRF_dummy, 0);
+    BUG_ON(IS_ERR(dom_io));
+
+    /*
+     * Initialise our COW domain.
+     * This domain owns sharable pages.
+     */
+    dom_cow = domain_create(DOMID_COW, DOMCRF_dummy, 0);
+    BUG_ON(IS_ERR(dom_cow));
+}
 
 /* Boot-time pagetable setup.
  * Changes here may need matching changes in head.S */
