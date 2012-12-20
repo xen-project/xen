@@ -225,6 +225,7 @@ void double_fault(void);
 void do_double_fault(struct cpu_user_regs *regs)
 {
     unsigned int cpu;
+    unsigned long crs[8];
 
     watchdog_disable();
 
@@ -235,22 +236,18 @@ void do_double_fault(struct cpu_user_regs *regs)
     /* Find information saved during fault and dump it to the console. */
     printk("*** DOUBLE FAULT ***\n");
     print_xen_info();
-    printk("CPU:    %d\nRIP:    %04x:[<%016lx>]",
-           cpu, regs->cs, regs->rip);
-    print_symbol(" %s", regs->rip);
-    printk("\nRFLAGS: %016lx\n", regs->rflags);
-    printk("rax: %016lx   rbx: %016lx   rcx: %016lx\n",
-           regs->rax, regs->rbx, regs->rcx);
-    printk("rdx: %016lx   rsi: %016lx   rdi: %016lx\n",
-           regs->rdx, regs->rsi, regs->rdi);
-    printk("rbp: %016lx   rsp: %016lx   r8:  %016lx\n",
-           regs->rbp, regs->rsp, regs->r8);
-    printk("r9:  %016lx   r10: %016lx   r11: %016lx\n",
-           regs->r9,  regs->r10, regs->r11);
-    printk("r12: %016lx   r13: %016lx   r14: %016lx\n",
-           regs->r12, regs->r13, regs->r14);
-    printk("r15: %016lx    cs: %016lx    ss: %016lx\n",
-           regs->r15, (long)regs->cs, (long)regs->ss);
+
+    crs[0] = read_cr0();
+    crs[2] = read_cr2();
+    crs[3] = read_cr3();
+    crs[4] = read_cr4();
+    regs->ds = read_segment_register(ds);
+    regs->es = read_segment_register(es);
+    regs->fs = read_segment_register(fs);
+    regs->gs = read_segment_register(gs);
+
+    printk("CPU:    %d\n", cpu);
+    _show_registers(regs, crs, CTXT_hypervisor, NULL);
     show_stack_overflow(cpu, regs->rsp);
 
     panic("DOUBLE FAULT -- system shutdown\n");
