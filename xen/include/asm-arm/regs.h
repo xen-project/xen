@@ -30,6 +30,12 @@
 
 #define return_reg(v) ((v)->arch.cpu_info->guest_cpu_user_regs.r0)
 
+/*
+ * Returns a pointer to the given register value in regs, taking the
+ * processor mode (CPSR) into account.
+ */
+extern uint32_t *select_user_reg(struct cpu_user_regs *regs, int reg);
+
 #endif /* __ARM_REGS_H__ */
 /*
  * Local variables:

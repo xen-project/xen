@@ -92,7 +92,7 @@ static int uart0_mmio_read(struct vcpu *v, mmio_info_t *info)
 {
     struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
-    uint32_t *r = &regs->r0 + dabt.reg;
+    uint32_t *r = select_user_reg(regs, dabt.reg);
     int offset = (int)(info->gpa - UART0_START);
 
     switch ( offset )
@@ -114,7 +114,7 @@ static int uart0_mmio_write(struct vcpu *v, mmio_info_t *info)
 {
     struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
-    uint32_t *r = &regs->r0 + dabt.reg;
+    uint32_t *r = select_user_reg(regs, dabt.reg);
     int offset = (int)(info->gpa - UART0_START);
 
     switch ( offset )

@@ -22,6 +22,7 @@
 #include <xen/timer.h>
 #include <xen/sched.h>
 #include <asm/gic.h>
+#include <asm/regs.h>
 
 extern s_time_t ticks_to_ns(uint64_t ticks);
 extern uint64_t ns_to_ticks(s_time_t ns);
@@ -49,7 +50,7 @@ static int vtimer_emulate_32(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct vcpu *v = current;
     struct hsr_cp32 cp32 = hsr.cp32;
-    uint32_t *r = &regs->r0 + cp32.reg;
+    uint32_t *r = select_user_reg(regs, cp32.reg);
     s_time_t now;
 
     switch ( hsr.bits & HSR_CP32_REGS_MASK )
@@ -101,8 +102,8 @@ static int vtimer_emulate_64(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct vcpu *v = current;
     struct hsr_cp64 cp64 = hsr.cp64;
-    uint32_t *r1 = &regs->r0 + cp64.reg1;
-    uint32_t *r2 = &regs->r0 + cp64.reg2;
+    uint32_t *r1 = select_user_reg(regs, cp64.reg1);
+    uint32_t *r2 = select_user_reg(regs, cp64.reg2);
     uint64_t ticks;
     s_time_t now;
 

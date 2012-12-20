@@ -73,6 +73,64 @@ static void print_xen_info(void)
            debug, print_tainted(taint_str));
 }
 
+uint32_t *select_user_reg(struct cpu_user_regs *regs, int reg)
+{
+    BUG_ON( guest_mode(regs) );
+
+    /*
+     * We rely heavily on the layout of cpu_user_regs to avoid having
+     * to handle all of the registers individually. Use BUILD_BUG_ON to
+     * ensure that things which expect are contiguous actually are.
+     */
+#define REGOFFS(R) offsetof(struct cpu_user_regs, R)
+
+    switch ( reg ) {
+    case 0 ... 7: /* Unbanked registers */
+        BUILD_BUG_ON(REGOFFS(r0) + 7*sizeof(uint32_t) != REGOFFS(r7));
+        return &regs->r0 + reg;
+    case 8 ... 12: /* Register banked in FIQ mode */
+        BUILD_BUG_ON(REGOFFS(r8_fiq) + 4*sizeof(uint32_t) != REGOFFS(r12_fiq));
+        if ( fiq_mode(regs) )
+            return &regs->r8_fiq + reg - 8;
+        else
+            return &regs->r8 + reg - 8;
+    case 13 ... 14: /* Banked SP + LR registers */
+        BUILD_BUG_ON(REGOFFS(sp_fiq) + 1*sizeof(uint32_t) != REGOFFS(lr_fiq));
+        BUILD_BUG_ON(REGOFFS(sp_irq) + 1*sizeof(uint32_t) != REGOFFS(lr_irq));
+        BUILD_BUG_ON(REGOFFS(sp_svc) + 1*sizeof(uint32_t) != REGOFFS(lr_svc));
+        BUILD_BUG_ON(REGOFFS(sp_abt) + 1*sizeof(uint32_t) != REGOFFS(lr_abt));
+        BUILD_BUG_ON(REGOFFS(sp_und) + 1*sizeof(uint32_t) != REGOFFS(lr_und));
+        switch ( regs->cpsr & PSR_MODE_MASK )
+        {
+        case PSR_MODE_USR:
+        case PSR_MODE_SYS: /* Sys regs are the usr regs */
+            if ( reg == 13 )
+                return &regs->sp_usr;
+            else /* lr_usr == lr in a user frame */
+                return &regs->lr;
+        case PSR_MODE_FIQ:
+            return &regs->sp_fiq + reg - 13;
+        case PSR_MODE_IRQ:
+            return &regs->sp_irq + reg - 13;
+        case PSR_MODE_SVC:
+            return &regs->sp_svc + reg - 13;
+        case PSR_MODE_ABT:
+            return &regs->sp_abt + reg - 13;
+        case PSR_MODE_UND:
+            return &regs->sp_und + reg - 13;
+        case PSR_MODE_MON:
+        case PSR_MODE_HYP:
+        default:
+            BUG();
+        }
+    case 15: /* PC */
+        return &regs->pc;
+    default:
+        BUG();
+    }
+#undef REGOFFS
+}
+
 static const char *decode_fsc(uint32_t fsc, int *level)
 {
     const char *msg = NULL;
@@ -448,7 +506,7 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
     switch ( code ) {
     case 0xe0 ... 0xef:
         reg = code - 0xe0;
-        r = &regs->r0 + reg;
+        r = select_user_reg(regs, reg);
         printk("DOM%d: R%d = %#010"PRIx32" at %#010"PRIx32"\n",
                domid, reg, *r, regs->pc);
         break;
@@ -518,7 +576,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
                        union hsr hsr)
 {
     struct hsr_cp32 cp32 = hsr.cp32;
-    uint32_t *r = &regs->r0 + cp32.reg;
+    uint32_t *r = select_user_reg(regs, cp32.reg);
 
     if ( !cp32.ccvalid ) {
         dprintk(XENLOG_ERR, "cp_15(32): need to handle invalid condition codes\n");

@@ -160,7 +160,7 @@ static int vgic_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
 {
     struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
-    uint32_t *r = &regs->r0 + dabt.reg;
+    uint32_t *r = select_user_reg(regs, dabt.reg);
     struct vgic_irq_rank *rank;
     int offset = (int)(info->gpa - VGIC_DISTR_BASE_ADDRESS);
     int gicd_reg = REG(offset);
@@ -372,7 +372,7 @@ static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
 {
     struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
-    uint32_t *r = &regs->r0 + dabt.reg;
+    uint32_t *r = select_user_reg(regs, dabt.reg);
     struct vgic_irq_rank *rank;
     int offset = (int)(info->gpa - VGIC_DISTR_BASE_ADDRESS);
     int gicd_reg = REG(offset);
