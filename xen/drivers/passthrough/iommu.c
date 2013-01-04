@@ -591,7 +591,7 @@ int iommu_do_domctl(
         if ( ret )
             break;
 
-        seg = domctl->u.get_device_group.machine_sbdf >> 16;
+        seg = domctl->u.assign_device.machine_sbdf >> 16;
         bus = (domctl->u.assign_device.machine_sbdf >> 8) & 0xff;
         devfn = domctl->u.assign_device.machine_sbdf & 0xff;
 
@@ -615,7 +615,7 @@ int iommu_do_domctl(
         if ( ret )
             break;
 
-        seg = domctl->u.get_device_group.machine_sbdf >> 16;
+        seg = domctl->u.assign_device.machine_sbdf >> 16;
         bus = (domctl->u.assign_device.machine_sbdf >> 8) & 0xff;
         devfn = domctl->u.assign_device.machine_sbdf & 0xff;
 
@@ -634,7 +634,7 @@ int iommu_do_domctl(
         if ( ret )
             break;
 
-        seg = domctl->u.get_device_group.machine_sbdf >> 16;
+        seg = domctl->u.assign_device.machine_sbdf >> 16;
         bus = (domctl->u.assign_device.machine_sbdf >> 8) & 0xff;
         devfn = domctl->u.assign_device.machine_sbdf & 0xff;
 
