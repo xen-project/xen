@@ -1275,7 +1275,7 @@ static void __init intel_iommu_dom0_init(struct domain *d)
 int domain_context_mapping_one(
     struct domain *domain,
     struct iommu *iommu,
-    u8 bus, u8 devfn)
+    u8 bus, u8 devfn, const struct pci_dev *pdev)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(domain);
     struct context_entry *context, *context_entries;
@@ -1292,11 +1292,9 @@ int domain_context_mapping_one(
     if ( context_present(*context) )
     {
         int res = 0;
-        struct pci_dev *pdev = NULL;
 
-        /* First try to get domain ownership from device structure.  If that's
+        /* Try to get domain ownership from device structure.  If that's
          * not available, try to read it from the context itself. */
-        pdev = pci_get_pdev(seg, bus, devfn);
         if ( pdev )
         {
             if ( pdev->domain != domain )
@@ -1417,13 +1415,12 @@ int domain_context_mapping_one(
 }
 
 static int domain_context_mapping(
-    struct domain *domain, u16 seg, u8 bus, u8 devfn)
+    struct domain *domain, u8 devfn, const struct pci_dev *pdev)
 {
     struct acpi_drhd_unit *drhd;
     int ret = 0;
     u32 type;
-    u8 secbus;
-    struct pci_dev *pdev = pci_get_pdev(seg, bus, devfn);
+    u8 seg = pdev->seg, bus = pdev->bus, secbus;
 
     drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
@@ -1444,8 +1441,9 @@ static int domain_context_mapping(
             dprintk(VTDPREFIX, "d%d:PCIe: map %04x:%02x:%02x.%u\n",
                     domain->domain_id, seg, bus,
                     PCI_SLOT(devfn), PCI_FUNC(devfn));
-        ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
-        if ( !ret && ats_device(pdev, drhd) > 0 )
+        ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn,
+                                         pdev);
+        if ( !ret && devfn == pdev->devfn && ats_device(pdev, drhd) > 0 )
             enable_ats_device(seg, bus, devfn);
 
         break;
@@ -1456,14 +1454,16 @@ static int domain_context_mapping(
                     domain->domain_id, seg, bus,
                     PCI_SLOT(devfn), PCI_FUNC(devfn));
 
-        ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
+        ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn,
+                                         pdev);
         if ( ret )
             break;
 
         if ( find_upstream_bridge(seg, &bus, &devfn, &secbus) < 1 )
             break;
 
-        ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn);
+        ret = domain_context_mapping_one(domain, drhd->iommu, bus, devfn,
+                                         pci_get_pdev(seg, bus, devfn));
 
         /*
          * Devices behind PCIe-to-PCI/PCIx bridge may generate different
@@ -1472,7 +1472,8 @@ static int domain_context_mapping(
          */
         if ( !ret && pdev_type(seg, bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE &&
              (secbus != pdev->bus || pdev->devfn != 0) )
-            ret = domain_context_mapping_one(domain, drhd->iommu, secbus, 0);
+            ret = domain_context_mapping_one(domain, drhd->iommu, secbus, 0,
+                                             pci_get_pdev(seg, secbus, 0));
 
         break;
 
@@ -1545,17 +1546,14 @@ int domain_context_unmap_one(
 }
 
 static int domain_context_unmap(
-    struct domain *domain, u16 seg, u8 bus, u8 devfn)
+    struct domain *domain, u8 devfn, const struct pci_dev *pdev)
 {
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     int ret = 0;
     u32 type;
-    u8 tmp_bus, tmp_devfn, secbus;
-    struct pci_dev *pdev = pci_get_pdev(seg, bus, devfn);
+    u8 seg = pdev->seg, bus = pdev->bus, tmp_bus, tmp_devfn, secbus;
     int found = 0;
-
-    BUG_ON(!pdev);
 
     drhd = acpi_find_matched_drhd_unit(pdev);
     if ( !drhd )
@@ -1576,7 +1574,7 @@ static int domain_context_unmap(
                     domain->domain_id, seg, bus,
                     PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = domain_context_unmap_one(domain, iommu, bus, devfn);
-        if ( !ret && ats_device(pdev, drhd) > 0 )
+        if ( !ret && devfn == pdev->devfn && ats_device(pdev, drhd) > 0 )
             disable_ats_device(seg, bus, devfn);
 
         break;
@@ -1670,11 +1668,11 @@ static int reassign_device_ownership(
     if ( (target != dom0) && !iommu_intremap )
         untrusted_msi = 1;
 
-    ret = domain_context_unmap(source, pdev->seg, pdev->bus, devfn);
+    ret = domain_context_unmap(source, devfn, pdev);
     if ( ret )
         return ret;
 
-    ret = domain_context_mapping(target, pdev->seg, pdev->bus, devfn);
+    ret = domain_context_mapping(target, devfn, pdev);
     if ( ret )
         return ret;
 
@@ -1884,7 +1882,7 @@ static int intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
     if ( !pdev->domain )
         return -EINVAL;
 
-    ret = domain_context_mapping(pdev->domain, pdev->seg, pdev->bus, devfn);
+    ret = domain_context_mapping(pdev->domain, devfn, pdev);
     if ( ret )
     {
         dprintk(XENLOG_ERR VTDPREFIX, "d%d: context mapping failed\n",
@@ -1944,14 +1942,14 @@ static int intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
         }
     }
 
-    return domain_context_unmap(pdev->domain, pdev->seg, pdev->bus, devfn);
+    return domain_context_unmap(pdev->domain, devfn, pdev);
 }
 
 static int __init setup_dom0_device(u8 devfn, struct pci_dev *pdev)
 {
     int err;
 
-    err = domain_context_mapping(pdev->domain, pdev->seg, pdev->bus, devfn);
+    err = domain_context_mapping(pdev->domain, devfn, pdev);
     if ( !err && devfn == pdev->devfn )
         pci_vtd_quirk(pdev);
     return err;

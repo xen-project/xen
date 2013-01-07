@@ -288,7 +288,7 @@ static void map_me_phantom_function(struct domain *domain, u32 dev, int map)
     /* map or unmap ME phantom function */
     if ( map )
         domain_context_mapping_one(domain, drhd->iommu, 0,
-                                   PCI_DEVFN(dev, 7));
+                                   PCI_DEVFN(dev, 7), NULL);
     else
         domain_context_unmap_one(domain, drhd->iommu, 0,
                                  PCI_DEVFN(dev, 7));
