@@ -442,13 +442,22 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
     devfn = pdev->devfn;
     switch ( pdev->type )
     {
+        unsigned int sq;
+
     case DEV_TYPE_PCIe_BRIDGE:
     case DEV_TYPE_PCIe2PCI_BRIDGE:
     case DEV_TYPE_LEGACY_PCI_BRIDGE:
         break;
 
     case DEV_TYPE_PCIe_ENDPOINT:
-        set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_ALL_16, PCI_BDF2(bus, devfn));
+        switch ( pdev->phantom_stride )
+        {
+        case 1: sq = SQ_13_IGNORE_3; break;
+        case 2: sq = SQ_13_IGNORE_2; break;
+        case 4: sq = SQ_13_IGNORE_1; break;
+        default: sq = SQ_ALL_16; break;
+        }
+        set_ire_sid(ire, SVT_VERIFY_SID_SQ, sq, PCI_BDF2(bus, devfn));
         break;
 
     case DEV_TYPE_PCI:
