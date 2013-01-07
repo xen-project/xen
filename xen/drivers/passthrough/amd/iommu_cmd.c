@@ -287,12 +287,12 @@ void invalidate_iommu_all(struct amd_iommu *iommu)
     send_iommu_command(iommu, cmd);
 }
 
-void amd_iommu_flush_iotlb(struct pci_dev *pdev,
+void amd_iommu_flush_iotlb(u8 devfn, const struct pci_dev *pdev,
                            uint64_t gaddr, unsigned int order)
 {
     unsigned long flags;
     struct amd_iommu *iommu;
-    unsigned int bdf, req_id, queueid, maxpend;
+    unsigned int req_id, queueid, maxpend;
     struct pci_ats_dev *ats_pdev;
 
     if ( !ats_enabled )
@@ -305,8 +305,8 @@ void amd_iommu_flush_iotlb(struct pci_dev *pdev,
     if ( !pci_ats_enabled(ats_pdev->seg, ats_pdev->bus, ats_pdev->devfn) )
         return;
 
-    bdf = PCI_BDF2(ats_pdev->bus, ats_pdev->devfn);
-    iommu = find_iommu_for_device(ats_pdev->seg, bdf);
+    iommu = find_iommu_for_device(ats_pdev->seg,
+                                  PCI_BDF2(ats_pdev->bus, ats_pdev->devfn));
 
     if ( !iommu )
     {
@@ -319,7 +319,7 @@ void amd_iommu_flush_iotlb(struct pci_dev *pdev,
     if ( !iommu_has_cap(iommu, PCI_CAP_IOTLB_SHIFT) )
         return;
 
-    req_id = get_dma_requestor_id(iommu->seg, bdf);
+    req_id = get_dma_requestor_id(iommu->seg, PCI_BDF2(ats_pdev->bus, devfn));
     queueid = req_id;
     maxpend = ats_pdev->ats_queue_depth & 0xff;
 
@@ -339,7 +339,7 @@ static void amd_iommu_flush_all_iotlbs(struct domain *d, uint64_t gaddr,
         return;
 
     for_each_pdev( d, pdev )
-        amd_iommu_flush_iotlb(pdev, gaddr, order);
+        amd_iommu_flush_iotlb(pdev->devfn, pdev, gaddr, order);
 }
 
 /* Flush iommu cache after p2m changes. */

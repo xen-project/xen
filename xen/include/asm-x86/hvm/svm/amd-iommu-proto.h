@@ -78,8 +78,8 @@ void iommu_dte_set_guest_cr3(u32 *dte, u16 dom_id, u64 gcr3,
 void amd_iommu_flush_all_pages(struct domain *d);
 void amd_iommu_flush_pages(struct domain *d, unsigned long gfn,
                            unsigned int order);
-void amd_iommu_flush_iotlb(struct pci_dev *pdev, uint64_t gaddr,
-                           unsigned int order);
+void amd_iommu_flush_iotlb(u8 devfn, const struct pci_dev *pdev,
+                           uint64_t gaddr, unsigned int order);
 void amd_iommu_flush_device(struct amd_iommu *iommu, uint16_t bdf);
 void amd_iommu_flush_intremap(struct amd_iommu *iommu, uint16_t bdf);
 void amd_iommu_flush_all_caches(struct amd_iommu *iommu);

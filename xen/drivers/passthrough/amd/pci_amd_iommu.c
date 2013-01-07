@@ -138,7 +138,7 @@ static void amd_iommu_setup_domain_device(
         if ( devfn == pdev->devfn )
             enable_ats_device(iommu->seg, bus, devfn);
 
-        amd_iommu_flush_iotlb(pdev, INV_IOMMU_ALL_PAGES_ADDRESS, 0);
+        amd_iommu_flush_iotlb(devfn, pdev, INV_IOMMU_ALL_PAGES_ADDRESS, 0);
     }
 }
 
