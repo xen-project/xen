@@ -703,6 +703,16 @@ Defaults to booting secondary processors.
 
 Default: `on`
 
+### pci-phantom
+> `=[<seg>:]<bus>:<device>,<stride>`
+
+Mark a group of PCI devices as using phantom functions without actually
+advertising so, so the IOMMU can create translation contexts for them.
+
+All numbers specified must be hexadecimal ones.
+
+This option can be specified more than once (up to 8 times at present).
+
 ### ple\_gap
 > `= <integer>`
 

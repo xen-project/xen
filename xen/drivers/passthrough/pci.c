@@ -121,6 +121,49 @@ const unsigned long *pci_get_ro_map(u16 seg)
     return pseg ? pseg->ro_map : NULL;
 }
 
+static struct phantom_dev {
+    u16 seg;
+    u8 bus, slot, stride;
+} phantom_devs[8];
+static unsigned int nr_phantom_devs;
+
+static void __init parse_phantom_dev(char *str) {
+    const char *s = str;
+    struct phantom_dev phantom;
+
+    if ( !s || !*s || nr_phantom_devs >= ARRAY_SIZE(phantom_devs) )
+        return;
+
+    phantom.seg = simple_strtol(s, &s, 16);
+    if ( *s != ':' )
+        return;
+
+    phantom.bus = simple_strtol(s + 1, &s, 16);
+    if ( *s == ',' )
+    {
+        phantom.slot = phantom.bus;
+        phantom.bus = phantom.seg;
+        phantom.seg = 0;
+    }
+    else if ( *s == ':' )
+        phantom.slot = simple_strtol(s + 1, &s, 16);
+    else
+        return;
+
+    if ( *s != ',' )
+        return;
+    switch ( phantom.stride = simple_strtol(s + 1, &s, 0) )
+    {
+    case 1: case 2: case 4:
+        if ( *s )
+    default:
+            return;
+    }
+
+    phantom_devs[nr_phantom_devs++] = phantom;
+}
+custom_param("pci-phantom", parse_phantom_dev);
+
 static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
 {
     struct pci_dev *pdev;
@@ -180,6 +223,20 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
                                                       PCI_EXP_DEVCAP_PHANTOM);
                 if ( PCI_FUNC(devfn) >= pdev->phantom_stride )
                     pdev->phantom_stride = 0;
+            }
+            else
+            {
+                unsigned int i;
+
+                for ( i = 0; i < nr_phantom_devs; ++i )
+                    if ( phantom_devs[i].seg == pseg->nr &&
+                         phantom_devs[i].bus == bus &&
+                         phantom_devs[i].slot == PCI_SLOT(devfn) &&
+                         phantom_devs[i].stride > PCI_FUNC(devfn) )
+                    {
+                        pdev->phantom_stride = phantom_devs[i].stride;
+                        break;
+                    }
             }
             break;
 
