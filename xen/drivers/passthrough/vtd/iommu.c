@@ -50,7 +50,7 @@ int nr_iommus;
 
 static struct tasklet vtd_fault_tasklet;
 
-static void setup_dom0_device(struct pci_dev *);
+static int setup_dom0_device(u8 devfn, struct pci_dev *);
 static void setup_dom0_rmrr(struct domain *d);
 
 static int domain_iommu_domid(struct domain *d,
@@ -1873,7 +1873,7 @@ static int rmrr_identity_mapping(struct domain *d,
     return 0;
 }
 
-static int intel_iommu_add_device(struct pci_dev *pdev)
+static int intel_iommu_add_device(u8 devfn, struct pci_dev *pdev)
 {
     struct acpi_rmrr_unit *rmrr;
     u16 bdf;
@@ -1884,8 +1884,7 @@ static int intel_iommu_add_device(struct pci_dev *pdev)
     if ( !pdev->domain )
         return -EINVAL;
 
-    ret = domain_context_mapping(pdev->domain, pdev->seg, pdev->bus,
-                                 pdev->devfn);
+    ret = domain_context_mapping(pdev->domain, pdev->seg, pdev->bus, devfn);
     if ( ret )
     {
         dprintk(XENLOG_ERR VTDPREFIX, "d%d: context mapping failed\n",
@@ -1897,7 +1896,7 @@ static int intel_iommu_add_device(struct pci_dev *pdev)
     {
         if ( rmrr->segment == pdev->seg &&
              PCI_BUS(bdf) == pdev->bus &&
-             PCI_DEVFN2(bdf) == pdev->devfn )
+             PCI_DEVFN2(bdf) == devfn )
         {
             ret = rmrr_identity_mapping(pdev->domain, rmrr);
             if ( ret )
@@ -1922,7 +1921,7 @@ static int intel_iommu_enable_device(struct pci_dev *pdev)
     return ret >= 0 ? 0 : ret;
 }
 
-static int intel_iommu_remove_device(struct pci_dev *pdev)
+static int intel_iommu_remove_device(u8 devfn, struct pci_dev *pdev)
 {
     struct acpi_rmrr_unit *rmrr;
     u16 bdf;
@@ -1940,19 +1939,22 @@ static int intel_iommu_remove_device(struct pci_dev *pdev)
         {
             if ( rmrr->segment == pdev->seg &&
                  PCI_BUS(bdf) == pdev->bus &&
-                 PCI_DEVFN2(bdf) == pdev->devfn )
+                 PCI_DEVFN2(bdf) == devfn )
                 return 0;
         }
     }
 
-    return domain_context_unmap(pdev->domain, pdev->seg, pdev->bus,
-                                pdev->devfn);
+    return domain_context_unmap(pdev->domain, pdev->seg, pdev->bus, devfn);
 }
 
-static void __init setup_dom0_device(struct pci_dev *pdev)
+static int __init setup_dom0_device(u8 devfn, struct pci_dev *pdev)
 {
-    domain_context_mapping(pdev->domain, pdev->seg, pdev->bus, pdev->devfn);
-    pci_vtd_quirk(pdev);
+    int err;
+
+    err = domain_context_mapping(pdev->domain, pdev->seg, pdev->bus, devfn);
+    if ( !err && devfn == pdev->devfn )
+        pci_vtd_quirk(pdev);
+    return err;
 }
 
 void clear_fault_bits(struct iommu *iommu)

@@ -168,7 +168,7 @@ int iommu_add_device(struct pci_dev *pdev)
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
-    return hd->platform_ops->add_device(pdev);
+    return hd->platform_ops->add_device(pdev->devfn, pdev);
 }
 
 int iommu_enable_device(struct pci_dev *pdev)
@@ -198,7 +198,7 @@ int iommu_remove_device(struct pci_dev *pdev)
     if ( !iommu_enabled || !hd->platform_ops )
         return 0;
 
-    return hd->platform_ops->remove_device(pdev);
+    return hd->platform_ops->remove_device(pdev->devfn, pdev);
 }
 
 /*

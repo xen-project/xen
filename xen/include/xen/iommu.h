@@ -94,9 +94,9 @@ struct msi_msg;
 struct iommu_ops {
     int (*init)(struct domain *d);
     void (*dom0_init)(struct domain *d);
-    int (*add_device)(struct pci_dev *pdev);
+    int (*add_device)(u8 devfn, struct pci_dev *);
     int (*enable_device)(struct pci_dev *pdev);
-    int (*remove_device)(struct pci_dev *pdev);
+    int (*remove_device)(u8 devfn, struct pci_dev *);
     int (*assign_device)(struct domain *, u8 devfn, struct pci_dev *);
     void (*teardown)(struct domain *d);
     int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn,

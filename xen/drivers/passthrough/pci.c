@@ -743,7 +743,7 @@ int __init scan_pci_devices(void)
 
 struct setup_dom0 {
     struct domain *d;
-    void (*handler)(struct pci_dev *);
+    int (*handler)(u8 devfn, struct pci_dev *);
 };
 
 static int __init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
@@ -764,12 +764,12 @@ static int __init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
             {
                 pdev->domain = ctxt->d;
                 list_add(&pdev->domain_list, &ctxt->d->arch.pdev_list);
-                ctxt->handler(pdev);
+                ctxt->handler(devfn, pdev);
             }
             else if ( pdev->domain == dom_xen )
             {
                 pdev->domain = ctxt->d;
-                ctxt->handler(pdev);
+                ctxt->handler(devfn, pdev);
                 pdev->domain = dom_xen;
             }
             else if ( pdev->domain != ctxt->d )
@@ -783,7 +783,7 @@ static int __init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
 }
 
 void __init setup_dom0_pci_devices(
-    struct domain *d, void (*handler)(struct pci_dev *))
+    struct domain *d, int (*handler)(u8 devfn, struct pci_dev *))
 {
     struct setup_dom0 ctxt = { .d = d, .handler = handler };
 
