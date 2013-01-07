@@ -97,13 +97,13 @@ struct iommu_ops {
     int (*add_device)(struct pci_dev *pdev);
     int (*enable_device)(struct pci_dev *pdev);
     int (*remove_device)(struct pci_dev *pdev);
-    int (*assign_device)(struct domain *d, u16 seg, u8 bus, u8 devfn);
+    int (*assign_device)(struct domain *, u8 devfn, struct pci_dev *);
     void (*teardown)(struct domain *d);
     int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn,
                     unsigned int flags);
     int (*unmap_page)(struct domain *d, unsigned long gfn);
     int (*reassign_device)(struct domain *s, struct domain *t,
-			   u16 seg, u8 bus, u8 devfn);
+			   u8 devfn, struct pci_dev *);
     int (*get_device_group_id)(u16 seg, u8 bus, u8 devfn);
     void (*update_ire_from_apic)(unsigned int apic, unsigned int reg, unsigned int value);
     void (*update_ire_from_msi)(struct msi_desc *msi_desc, struct msi_msg *msg);

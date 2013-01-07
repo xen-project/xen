@@ -332,34 +332,31 @@ void amd_iommu_disable_domain_device(struct domain *domain,
         disable_ats_device(iommu->seg, bus, devfn);
 }
 
-static int reassign_device( struct domain *source, struct domain *target,
-                            u16 seg, u8 bus, u8 devfn)
+static int reassign_device(struct domain *source, struct domain *target,
+                           u8 devfn, struct pci_dev *pdev)
 {
-    struct pci_dev *pdev;
     struct amd_iommu *iommu;
     int bdf;
     struct hvm_iommu *t = domain_hvm_iommu(target);
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev_by_domain(source, seg, bus, devfn);
-    if ( !pdev )
-        return -ENODEV;
-
-    bdf = PCI_BDF2(bus, devfn);
-    iommu = find_iommu_for_device(seg, bdf);
+    bdf = PCI_BDF2(pdev->bus, pdev->devfn);
+    iommu = find_iommu_for_device(pdev->seg, bdf);
     if ( !iommu )
     {
         AMD_IOMMU_DEBUG("Fail to find iommu."
                         " %04x:%02x:%x02.%x cannot be assigned to dom%d\n",
-                        seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                        pdev->seg, pdev->bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                         target->domain_id);
         return -ENODEV;
     }
 
     amd_iommu_disable_domain_device(source, iommu, bdf);
 
-    list_move(&pdev->domain_list, &target->arch.pdev_list);
-    pdev->domain = target;
+    if ( devfn == pdev->devfn )
+    {
+        list_move(&pdev->domain_list, &target->arch.pdev_list);
+        pdev->domain = target;
+    }
 
     /* IO page tables might be destroyed after pci-detach the last device
      * In this case, we have to re-allocate root table for next pci-attach.*/
@@ -368,17 +365,18 @@ static int reassign_device( struct domain *source, struct domain *target,
 
     amd_iommu_setup_domain_device(target, iommu, bdf);
     AMD_IOMMU_DEBUG("Re-assign %04x:%02x:%02x.%u from dom%d to dom%d\n",
-                    seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                    pdev->seg, pdev->bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                     source->domain_id, target->domain_id);
 
     return 0;
 }
 
-static int amd_iommu_assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
+static int amd_iommu_assign_device(struct domain *d, u8 devfn,
+                                   struct pci_dev *pdev)
 {
-    struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(seg);
-    int bdf = PCI_BDF2(bus, devfn);
-    int req_id = get_dma_requestor_id(seg, bdf);
+    struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(pdev->seg);
+    int bdf = PCI_BDF2(pdev->bus, devfn);
+    int req_id = get_dma_requestor_id(pdev->seg, bdf);
 
     if ( ivrs_mappings[req_id].unity_map_enable )
     {
@@ -390,7 +388,7 @@ static int amd_iommu_assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
             ivrs_mappings[req_id].read_permission);
     }
 
-    return reassign_device(dom0, d, seg, bus, devfn);
+    return reassign_device(dom0, d, devfn, pdev);
 }
 
 static void deallocate_next_page_table(struct page_info* pg, int level)
@@ -449,12 +447,6 @@ static void amd_iommu_domain_destroy(struct domain *d)
     guest_iommu_destroy(d);
     deallocate_iommu_page_tables(d);
     amd_iommu_flush_all_pages(d);
-}
-
-static int amd_iommu_return_device(
-    struct domain *s, struct domain *t, u16 seg, u8 bus, u8 devfn)
-{
-    return reassign_device(s, t, seg, bus, devfn);
 }
 
 static int amd_iommu_add_device(struct pci_dev *pdev)
@@ -593,7 +585,7 @@ const struct iommu_ops amd_iommu_ops = {
     .teardown = amd_iommu_domain_destroy,
     .map_page = amd_iommu_map_page,
     .unmap_page = amd_iommu_unmap_page,
-    .reassign_device = amd_iommu_return_device,
+    .reassign_device = reassign_device,
     .get_device_group_id = amd_iommu_group_id,
     .update_ire_from_apic = amd_iommu_ioapic_update_ire,
     .update_ire_from_msi = amd_iommu_msi_msg_update_ire,

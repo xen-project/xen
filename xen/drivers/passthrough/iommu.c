@@ -233,11 +233,16 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
         return -EXDEV;
 
     spin_lock(&pcidevs_lock);
-    pdev = pci_get_pdev(seg, bus, devfn);
-    if ( pdev )
-        pdev->fault.count = 0;
+    pdev = pci_get_pdev_by_domain(dom0, seg, bus, devfn);
+    if ( !pdev )
+    {
+        rc = pci_get_pdev(seg, bus, devfn) ? -EBUSY : -ENODEV;
+        goto done;
+    }
 
-    if ( (rc = hd->platform_ops->assign_device(d, seg, bus, devfn)) )
+    pdev->fault.count = 0;
+
+    if ( (rc = hd->platform_ops->assign_device(d, devfn, pdev)) )
         goto done;
 
     if ( has_arch_pdevs(d) && !need_iommu(d) )
@@ -368,18 +373,11 @@ int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
         return -EINVAL;
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev(seg, bus, devfn);
+    pdev = pci_get_pdev_by_domain(d, seg, bus, devfn);
     if ( !pdev )
         return -ENODEV;
 
-    if ( pdev->domain != d )
-    {
-        dprintk(XENLOG_G_ERR,
-                "d%d: deassign a device not owned\n", d->domain_id);
-        return -EINVAL;
-    }
-
-    ret = hd->platform_ops->reassign_device(d, dom0, seg, bus, devfn);
+    ret = hd->platform_ops->reassign_device(d, dom0, devfn, pdev);
     if ( ret )
     {
         dprintk(XENLOG_G_ERR,

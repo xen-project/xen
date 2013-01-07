@@ -1658,16 +1658,9 @@ out:
 static int reassign_device_ownership(
     struct domain *source,
     struct domain *target,
-    u16 seg, u8 bus, u8 devfn)
+    u8 devfn, struct pci_dev *pdev)
 {
-    struct pci_dev *pdev;
     int ret;
-
-    ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev_by_domain(source, seg, bus, devfn);
-
-    if (!pdev)
-        return -ENODEV;
 
     /*
      * Devices assigned to untrusted domains (here assumed to be any domU)
@@ -1677,16 +1670,19 @@ static int reassign_device_ownership(
     if ( (target != dom0) && !iommu_intremap )
         untrusted_msi = 1;
 
-    ret = domain_context_unmap(source, seg, bus, devfn);
+    ret = domain_context_unmap(source, pdev->seg, pdev->bus, devfn);
     if ( ret )
         return ret;
 
-    ret = domain_context_mapping(target, seg, bus, devfn);
+    ret = domain_context_mapping(target, pdev->seg, pdev->bus, devfn);
     if ( ret )
         return ret;
 
-    list_move(&pdev->domain_list, &target->arch.pdev_list);
-    pdev->domain = target;
+    if ( devfn == pdev->devfn )
+    {
+        list_move(&pdev->domain_list, &target->arch.pdev_list);
+        pdev->domain = target;
+    }
 
     return ret;
 }
@@ -2202,36 +2198,26 @@ int __init intel_vtd_setup(void)
 }
 
 static int intel_iommu_assign_device(
-    struct domain *d, u16 seg, u8 bus, u8 devfn)
+    struct domain *d, u8 devfn, struct pci_dev *pdev)
 {
     struct acpi_rmrr_unit *rmrr;
     int ret = 0, i;
-    struct pci_dev *pdev;
-    u16 bdf;
+    u16 bdf, seg;
+    u8 bus;
 
     if ( list_empty(&acpi_drhd_units) )
         return -ENODEV;
 
-    ASSERT(spin_is_locked(&pcidevs_lock));
-    pdev = pci_get_pdev(seg, bus, devfn);
-    if (!pdev)
-        return -ENODEV;
-
-    if (pdev->domain != dom0)
-    {
-        dprintk(XENLOG_ERR VTDPREFIX,
-                "IOMMU: assign a assigned device\n");
-       return -EBUSY;
-    }
-
-    ret = reassign_device_ownership(dom0, d, seg, bus, devfn);
+    ret = reassign_device_ownership(dom0, d, devfn, pdev);
     if ( ret )
         goto done;
 
     /* FIXME: Because USB RMRR conflicts with guest bios region,
      * ignore USB RMRR temporarily.
      */
-    if ( is_usb_device(seg, bus, devfn) )
+    seg = pdev->seg;
+    bus = pdev->bus;
+    if ( is_usb_device(seg, bus, pdev->devfn) )
     {
         ret = 0;
         goto done;
