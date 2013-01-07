@@ -598,7 +598,6 @@ static int update_paging_mode(struct domain *d, unsigned long gfn)
         for_each_pdev( d, pdev )
         {
             bdf = PCI_BDF2(pdev->bus, pdev->devfn);
-            req_id = get_dma_requestor_id(pdev->seg, bdf);
             iommu = find_iommu_for_device(pdev->seg, bdf);
             if ( !iommu )
             {
@@ -607,16 +606,21 @@ static int update_paging_mode(struct domain *d, unsigned long gfn)
             }
 
             spin_lock_irqsave(&iommu->lock, flags);
-            device_entry = iommu->dev_table.buffer +
-                           (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
+            do {
+                req_id = get_dma_requestor_id(pdev->seg, bdf);
+                device_entry = iommu->dev_table.buffer +
+                               (req_id * IOMMU_DEV_TABLE_ENTRY_SIZE);
 
-            /* valid = 0 only works for dom0 passthrough mode */
-            amd_iommu_set_root_page_table((u32 *)device_entry,
-                                          page_to_maddr(hd->root_table),
-                                          hd->domain_id,
-                                          hd->paging_mode, 1);
+                /* valid = 0 only works for dom0 passthrough mode */
+                amd_iommu_set_root_page_table((u32 *)device_entry,
+                                              page_to_maddr(hd->root_table),
+                                              hd->domain_id,
+                                              hd->paging_mode, 1);
 
-            amd_iommu_flush_device(iommu, req_id);
+                amd_iommu_flush_device(iommu, req_id);
+                bdf += pdev->phantom_stride;
+            } while ( PCI_DEVFN2(bdf) != pdev->devfn &&
+                      PCI_SLOT(bdf) == PCI_SLOT(pdev->devfn) );
             spin_unlock_irqrestore(&iommu->lock, flags);
         }
 

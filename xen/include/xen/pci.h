@@ -63,6 +63,8 @@ struct pci_dev {
     const u8 bus;
     const u8 devfn;
 
+    u8 phantom_stride;
+
     enum pdev_type {
         DEV_TYPE_PCI_UNKNOWN,
         DEV_TYPE_PCIe_ENDPOINT,
@@ -114,6 +116,7 @@ int pci_ro_device(int seg, int bus, int devfn);
 void arch_pci_ro_device(int seg, int bdf);
 int pci_hide_device(int bus, int devfn);
 struct pci_dev *pci_get_pdev(int seg, int bus, int devfn);
+struct pci_dev *pci_get_real_pdev(int seg, int bus, int devfn);
 struct pci_dev *pci_get_pdev_by_domain(
     struct domain *, int seg, int bus, int devfn);
 void pci_check_disable_device(u16 seg, u8 bus, u8 devfn);

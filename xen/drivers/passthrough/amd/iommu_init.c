@@ -667,7 +667,7 @@ void parse_ppr_log_entry(struct amd_iommu *iommu, u32 entry[])
     devfn = PCI_DEVFN2(device_id);
 
     spin_lock(&pcidevs_lock);
-    pdev = pci_get_pdev(iommu->seg, bus, devfn);
+    pdev = pci_get_real_pdev(iommu->seg, bus, devfn);
     spin_unlock(&pcidevs_lock);
 
     if ( pdev )

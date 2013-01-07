@@ -339,7 +339,15 @@ static void amd_iommu_flush_all_iotlbs(struct domain *d, uint64_t gaddr,
         return;
 
     for_each_pdev( d, pdev )
-        amd_iommu_flush_iotlb(pdev->devfn, pdev, gaddr, order);
+    {
+        u8 devfn = pdev->devfn;
+
+        do {
+            amd_iommu_flush_iotlb(devfn, pdev, gaddr, order);
+            devfn += pdev->phantom_stride;
+        } while ( devfn != pdev->devfn &&
+                  PCI_SLOT(devfn) == PCI_SLOT(pdev->devfn) );
+    }
 }
 
 /* Flush iommu cache after p2m changes. */

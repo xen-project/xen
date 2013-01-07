@@ -58,6 +58,9 @@ do {                                                            \
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]) + __must_be_array(x))
 
+#define MASK_EXTR(v, m) (((v) & (m)) / ((m) & -(m)))
+#define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))
+
 #define reserve_bootmem(_p,_l) ((void)0)
 
 struct domain;

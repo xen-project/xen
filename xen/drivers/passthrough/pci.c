@@ -144,6 +144,8 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
     /* update bus2bridge */
     switch ( pdev->type = pdev_type(pseg->nr, bus, devfn) )
     {
+        int pos;
+        u16 cap;
         u8 sec_bus, sub_bus;
 
         case DEV_TYPE_PCIe_BRIDGE:
@@ -167,6 +169,20 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
             break;
 
         case DEV_TYPE_PCIe_ENDPOINT:
+            pos = pci_find_cap_offset(pseg->nr, bus, PCI_SLOT(devfn),
+                                      PCI_FUNC(devfn), PCI_CAP_ID_EXP);
+            BUG_ON(!pos);
+            cap = pci_conf_read16(pseg->nr, bus, PCI_SLOT(devfn),
+                                  PCI_FUNC(devfn), pos + PCI_EXP_DEVCAP);
+            if ( cap & PCI_EXP_DEVCAP_PHANTOM )
+            {
+                pdev->phantom_stride = 8 >> MASK_EXTR(cap,
+                                                      PCI_EXP_DEVCAP_PHANTOM);
+                if ( PCI_FUNC(devfn) >= pdev->phantom_stride )
+                    pdev->phantom_stride = 0;
+            }
+            break;
+
         case DEV_TYPE_PCI:
             break;
 
@@ -288,6 +304,27 @@ struct pci_dev *pci_get_pdev(int seg, int bus, int devfn)
                                      pseg->nr + 1, 1) );
 
     return NULL;
+}
+
+struct pci_dev *pci_get_real_pdev(int seg, int bus, int devfn)
+{
+    struct pci_dev *pdev;
+    int stride;
+
+    if ( seg < 0 || bus < 0 || devfn < 0 )
+        return NULL;
+
+    for ( pdev = pci_get_pdev(seg, bus, devfn), stride = 4;
+          !pdev && stride; stride >>= 1 )
+    {
+        if ( !(devfn & (8 - stride)) )
+            continue;
+        pdev = pci_get_pdev(seg, bus, devfn & ~(8 - stride));
+        if ( pdev && stride != pdev->phantom_stride )
+            pdev = NULL;
+    }
+
+    return pdev;
 }
 
 struct pci_dev *pci_get_pdev_by_domain(
@@ -488,8 +525,19 @@ int pci_add_device(u16 seg, u8 bus, u8 devfn, const struct pci_dev_info *info)
 
 out:
     spin_unlock(&pcidevs_lock);
-    printk(XENLOG_DEBUG "PCI add %s %04x:%02x:%02x.%u\n", pdev_type,
-           seg, bus, slot, func);
+    if ( !ret )
+    {
+        printk(XENLOG_DEBUG "PCI add %s %04x:%02x:%02x.%u\n", pdev_type,
+               seg, bus, slot, func);
+        while ( pdev->phantom_stride )
+        {
+            func += pdev->phantom_stride;
+            if ( PCI_SLOT(func) )
+                break;
+            printk(XENLOG_DEBUG "PCI phantom %04x:%02x:%02x.%u\n",
+                   seg, bus, slot, func);
+        }
+    }
     return ret;
 }
 
@@ -681,7 +729,7 @@ void pci_check_disable_device(u16 seg, u8 bus, u8 devfn)
     u16 cword;
 
     spin_lock(&pcidevs_lock);
-    pdev = pci_get_pdev(seg, bus, devfn);
+    pdev = pci_get_real_pdev(seg, bus, devfn);
     if ( pdev )
     {
         if ( now < pdev->fault.time ||
@@ -698,6 +746,7 @@ void pci_check_disable_device(u16 seg, u8 bus, u8 devfn)
 
     /* Tell the device to stop DMAing; we can't rely on the guest to
      * control it for us. */
+    devfn = pdev->devfn;
     cword = pci_conf_read16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
                             PCI_COMMAND);
     pci_conf_write16(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
@@ -759,6 +808,27 @@ struct setup_dom0 {
     int (*handler)(u8 devfn, struct pci_dev *);
 };
 
+static void setup_one_dom0_device(const struct setup_dom0 *ctxt,
+                                  struct pci_dev *pdev)
+{
+    u8 devfn = pdev->devfn;
+
+    do {
+        int err = ctxt->handler(devfn, pdev);
+
+        if ( err )
+        {
+            printk(XENLOG_ERR "setup %04x:%02x:%02x.%u for d%d failed (%d)\n",
+                   pdev->seg, pdev->bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                   ctxt->d->domain_id, err);
+            if ( devfn == pdev->devfn )
+                return;
+        }
+        devfn += pdev->phantom_stride;
+    } while ( devfn != pdev->devfn &&
+              PCI_SLOT(devfn) == PCI_SLOT(pdev->devfn) );
+}
+
 static int __init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
 {
     struct setup_dom0 *ctxt = arg;
@@ -777,12 +847,12 @@ static int __init _setup_dom0_pci_devices(struct pci_seg *pseg, void *arg)
             {
                 pdev->domain = ctxt->d;
                 list_add(&pdev->domain_list, &ctxt->d->arch.pdev_list);
-                ctxt->handler(devfn, pdev);
+                setup_one_dom0_device(ctxt, pdev);
             }
             else if ( pdev->domain == dom_xen )
             {
                 pdev->domain = ctxt->d;
-                ctxt->handler(devfn, pdev);
+                setup_one_dom0_device(ctxt, pdev);
                 pdev->domain = dom_xen;
             }
             else if ( pdev->domain != ctxt->d )
