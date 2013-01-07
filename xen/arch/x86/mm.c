@@ -2318,7 +2318,7 @@ int get_page_type(struct page_info *page, unsigned long type)
     int rc = __get_page_type(page, type, 0);
     if ( likely(rc == 0) )
         return 1;
-    ASSERT(rc == -EINVAL);
+    ASSERT(rc != -EINTR && rc != -EAGAIN);
     return 0;
 }
 
