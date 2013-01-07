@@ -430,7 +430,6 @@ void io_apic_write_remap_rte(
 
 static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
 {
-    int type;
     u16 seg;
     u8 bus, devfn, secbus;
     int ret;
@@ -441,8 +440,7 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
     seg = pdev->seg;
     bus = pdev->bus;
     devfn = pdev->devfn;
-    type = pdev_type(seg, bus, devfn);
-    switch ( type )
+    switch ( pdev->type )
     {
     case DEV_TYPE_PCIe_BRIDGE:
     case DEV_TYPE_PCIe2PCI_BRIDGE:
@@ -474,7 +472,7 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
     default:
         dprintk(XENLOG_WARNING VTDPREFIX,
                 "d%d: unknown(%u): %04x:%02x:%02x.%u\n",
-                pdev->domain->domain_id, type,
+                pdev->domain->domain_id, pdev->type,
                 seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         break;
    }

@@ -62,6 +62,17 @@ struct pci_dev {
     const u16 seg;
     const u8 bus;
     const u8 devfn;
+
+    enum pdev_type {
+        DEV_TYPE_PCI_UNKNOWN,
+        DEV_TYPE_PCIe_ENDPOINT,
+        DEV_TYPE_PCIe_BRIDGE,       // PCIe root port, switch
+        DEV_TYPE_PCIe2PCI_BRIDGE,   // PCIe-to-PCI/PCIx bridge
+        DEV_TYPE_PCI2PCIe_BRIDGE,   // PCI/PCIx-to-PCIe bridge
+        DEV_TYPE_LEGACY_PCI_BRIDGE, // Legacy PCI bridge
+        DEV_TYPE_PCI,
+    } type;
+
     struct pci_dev_info info;
     struct arch_pci_dev arch;
     struct {
@@ -83,18 +94,10 @@ struct pci_dev {
 
 extern spinlock_t pcidevs_lock;
 
-enum {
-    DEV_TYPE_PCIe_ENDPOINT,
-    DEV_TYPE_PCIe_BRIDGE,       // PCIe root port, switch
-    DEV_TYPE_PCIe2PCI_BRIDGE,   // PCIe-to-PCI/PCIx bridge
-    DEV_TYPE_LEGACY_PCI_BRIDGE, // Legacy PCI bridge
-    DEV_TYPE_PCI,
-};
-
 bool_t pci_known_segment(u16 seg);
 int pci_device_detect(u16 seg, u8 bus, u8 dev, u8 func);
 int scan_pci_devices(void);
-int pdev_type(u16 seg, u8 bus, u8 devfn);
+enum pdev_type pdev_type(u16 seg, u8 bus, u8 devfn);
 int find_upstream_bridge(u16 seg, u8 *bus, u8 *devfn, u8 *secbus);
 struct pci_dev *pci_lock_pdev(int seg, int bus, int devfn);
 struct pci_dev *pci_lock_domain_pdev(

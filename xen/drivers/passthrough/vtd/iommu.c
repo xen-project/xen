@@ -1419,7 +1419,6 @@ static int domain_context_mapping(
 {
     struct acpi_drhd_unit *drhd;
     int ret = 0;
-    u32 type;
     u8 seg = pdev->seg, bus = pdev->bus, secbus;
 
     drhd = acpi_find_matched_drhd_unit(pdev);
@@ -1428,8 +1427,7 @@ static int domain_context_mapping(
 
     ASSERT(spin_is_locked(&pcidevs_lock));
 
-    type = pdev_type(seg, bus, devfn);
-    switch ( type )
+    switch ( pdev->type )
     {
     case DEV_TYPE_PCIe_BRIDGE:
     case DEV_TYPE_PCIe2PCI_BRIDGE:
@@ -1479,7 +1477,7 @@ static int domain_context_mapping(
 
     default:
         dprintk(XENLOG_ERR VTDPREFIX, "d%d:unknown(%u): %04x:%02x:%02x.%u\n",
-                domain->domain_id, type,
+                domain->domain_id, pdev->type,
                 seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = -EINVAL;
         break;
@@ -1551,7 +1549,6 @@ static int domain_context_unmap(
     struct acpi_drhd_unit *drhd;
     struct iommu *iommu;
     int ret = 0;
-    u32 type;
     u8 seg = pdev->seg, bus = pdev->bus, tmp_bus, tmp_devfn, secbus;
     int found = 0;
 
@@ -1560,8 +1557,7 @@ static int domain_context_unmap(
         return -ENODEV;
     iommu = drhd->iommu;
 
-    type = pdev_type(seg, bus, devfn);
-    switch ( type )
+    switch ( pdev->type )
     {
     case DEV_TYPE_PCIe_BRIDGE:
     case DEV_TYPE_PCIe2PCI_BRIDGE:
@@ -1608,7 +1604,7 @@ static int domain_context_unmap(
 
     default:
         dprintk(XENLOG_ERR VTDPREFIX, "d%d:unknown(%u): %04x:%02x:%02x.%u\n",
-                domain->domain_id, type,
+                domain->domain_id, pdev->type,
                 seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         ret = -EINVAL;
         goto out;

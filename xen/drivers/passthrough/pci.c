@@ -142,7 +142,7 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
     spin_lock_init(&pdev->msix_table_lock);
 
     /* update bus2bridge */
-    switch ( pdev_type(pseg->nr, bus, devfn) )
+    switch ( pdev->type = pdev_type(pseg->nr, bus, devfn) )
     {
         u8 sec_bus, sub_bus;
 
@@ -182,7 +182,7 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
 static void free_pdev(struct pci_seg *pseg, struct pci_dev *pdev)
 {
     /* update bus2bridge */
-    switch ( pdev_type(pseg->nr, pdev->bus, pdev->devfn) )
+    switch ( pdev->type )
     {
         u8 dev, func, sec_bus, sub_bus;
 
@@ -199,6 +199,9 @@ static void free_pdev(struct pci_seg *pseg, struct pci_dev *pdev)
             for ( ; sec_bus <= sub_bus; sec_bus++ )
                 pseg->bus2bridge[sec_bus] = pseg->bus2bridge[pdev->bus];
             spin_unlock(&pseg->bus2bridge_lock);
+            break;
+
+        default:
             break;
     }
 
@@ -587,20 +590,30 @@ void pci_release_devices(struct domain *d)
 
 #define PCI_CLASS_BRIDGE_PCI     0x0604
 
-int pdev_type(u16 seg, u8 bus, u8 devfn)
+enum pdev_type pdev_type(u16 seg, u8 bus, u8 devfn)
 {
     u16 class_device, creg;
     u8 d = PCI_SLOT(devfn), f = PCI_FUNC(devfn);
     int pos = pci_find_cap_offset(seg, bus, d, f, PCI_CAP_ID_EXP);
 
     class_device = pci_conf_read16(seg, bus, d, f, PCI_CLASS_DEVICE);
-    if ( class_device == PCI_CLASS_BRIDGE_PCI )
+    switch ( class_device )
     {
+    case PCI_CLASS_BRIDGE_PCI:
         if ( !pos )
             return DEV_TYPE_LEGACY_PCI_BRIDGE;
         creg = pci_conf_read16(seg, bus, d, f, pos + PCI_EXP_FLAGS);
-        return ((creg & PCI_EXP_FLAGS_TYPE) >> 4) == PCI_EXP_TYPE_PCI_BRIDGE ?
-            DEV_TYPE_PCIe2PCI_BRIDGE : DEV_TYPE_PCIe_BRIDGE;
+        switch ( (creg & PCI_EXP_FLAGS_TYPE) >> 4 )
+        {
+        case PCI_EXP_TYPE_PCI_BRIDGE:
+            return DEV_TYPE_PCIe2PCI_BRIDGE;
+        case PCI_EXP_TYPE_PCIE_BRIDGE:
+            return DEV_TYPE_PCI2PCIe_BRIDGE;
+        }
+        return DEV_TYPE_PCIe_BRIDGE;
+
+    case 0x0000: case 0xffff:
+        return DEV_TYPE_PCI_UNKNOWN;
     }
 
     return pos ? DEV_TYPE_PCIe_ENDPOINT : DEV_TYPE_PCI;
