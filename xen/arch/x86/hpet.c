@@ -262,7 +262,7 @@ static void hpet_msi_unmask(unsigned int irq)
     ch = &hpet_events[ch_idx];
 
     cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
-    cfg |= HPET_TN_FSB;
+    cfg |= HPET_TN_ENABLE;
     hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
 }
 
@@ -276,7 +276,7 @@ static void hpet_msi_mask(unsigned int irq)
     ch = &hpet_events[ch_idx];
 
     cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
-    cfg &= ~HPET_TN_FSB;
+    cfg &= ~HPET_TN_ENABLE;
     hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
 }
 
@@ -367,7 +367,13 @@ static int hpet_setup_msi_irq(unsigned int irq)
     int ret;
     struct msi_msg msg;
     struct hpet_event_channel *ch = &hpet_events[irq_to_channel(irq)];
+    u32 cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
     irq_desc_t *desc = irq_to_desc(irq);
+
+    /* set HPET Tn as oneshot */
+    cfg &= ~(HPET_TN_LEVEL | HPET_TN_PERIODIC);
+    cfg |= HPET_TN_FSB | HPET_TN_32BIT;
+    hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
 
     if ( desc->handler == &no_irq_type )
     {
@@ -593,12 +599,6 @@ void hpet_broadcast_init(void)
 
         for ( i = 0; i < num_hpets_used; i++ )
         {
-            /* set HPET Tn as oneshot */
-            cfg = hpet_read32(HPET_Tn_CFG(hpet_events[i].idx));
-            cfg &= ~HPET_TN_PERIODIC;
-            cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
-            hpet_write32(cfg, HPET_Tn_CFG(hpet_events[i].idx));
-  
             hpet_events[i].mult = div_sc((unsigned long)hpet_rate,
                                          1000000000ul, 32);
             hpet_events[i].shift = 32;
@@ -626,7 +626,7 @@ void hpet_broadcast_init(void)
 
     /* set HPET T0 as oneshot */
     cfg = hpet_read32(HPET_T0_CFG);
-    cfg &= ~HPET_TN_PERIODIC;
+    cfg &= ~(HPET_TN_LEVEL | HPET_TN_PERIODIC);
     cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
     hpet_write32(cfg, HPET_T0_CFG);
 
