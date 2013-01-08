@@ -1462,7 +1462,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         data = 0x267ff & ~X86_CR4_SMXE;
         break;
     case MSR_IA32_VMX_MISC:
-        gdprintk(XENLOG_WARNING, "VMX MSR %x not fully supported yet.\n", msr);
+        /* Do not support CR3-target feature now */
+        data = host_data & ~VMX_MISC_CR3_TARGET;
         break;
     default:
         r = 0;
