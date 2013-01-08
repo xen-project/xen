@@ -345,16 +345,13 @@ void pci_release_devices(struct domain *d)
 
 int pdev_type(u8 bus, u8 devfn)
 {
-    u16 class_device;
-    u16 status, creg;
-    int pos;
+    u16 class_device, creg;
     u8 d = PCI_SLOT(devfn), f = PCI_FUNC(devfn);
+    int pos = pci_find_cap_offset(bus, d, f, PCI_CAP_ID_EXP);
 
     class_device = pci_conf_read16(bus, d, f, PCI_CLASS_DEVICE);
     if ( class_device == PCI_CLASS_BRIDGE_PCI )
     {
-        pos = pci_find_next_cap(bus, devfn,
-                                PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP);
         if ( !pos )
             return DEV_TYPE_LEGACY_PCI_BRIDGE;
         creg = pci_conf_read16(bus, d, f, pos + PCI_EXP_FLAGS);
@@ -362,14 +359,7 @@ int pdev_type(u8 bus, u8 devfn)
             DEV_TYPE_PCIe2PCI_BRIDGE : DEV_TYPE_PCIe_BRIDGE;
     }
 
-    status = pci_conf_read16(bus, d, f, PCI_STATUS);
-    if ( !(status & PCI_STATUS_CAP_LIST) )
-        return DEV_TYPE_PCI;
-
-    if ( pci_find_next_cap(bus, devfn, PCI_CAPABILITY_LIST, PCI_CAP_ID_EXP) )
-        return DEV_TYPE_PCIe_ENDPOINT;
-
-    return DEV_TYPE_PCI;
+    return pos ? DEV_TYPE_PCIe_ENDPOINT : DEV_TYPE_PCI;
 }
 
 /*
