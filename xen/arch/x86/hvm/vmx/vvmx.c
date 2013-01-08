@@ -603,6 +603,17 @@ static void nvmx_update_tpr_threshold(struct vcpu *v)
         __vmwrite(TPR_THRESHOLD, 0);
 }
 
+static void nvmx_update_pfec(struct vcpu *v)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    void *vvmcs = nvcpu->nv_vvmcx;
+
+    __vmwrite(PAGE_FAULT_ERROR_CODE_MASK,
+        __get_vvmcs(vvmcs, PAGE_FAULT_ERROR_CODE_MASK));
+    __vmwrite(PAGE_FAULT_ERROR_CODE_MATCH,
+        __get_vvmcs(vvmcs, PAGE_FAULT_ERROR_CODE_MATCH));
+}
+
 static void __clear_current_vvmcs(struct vcpu *v)
 {
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
@@ -813,6 +824,7 @@ static void load_shadow_control(struct vcpu *v)
     nvmx_update_apic_access_address(v);
     nvmx_update_virtual_apic_address(v);
     nvmx_update_tpr_threshold(v);
+    nvmx_update_pfec(v);
 }
 
 static void load_shadow_guest_state(struct vcpu *v)
