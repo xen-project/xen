@@ -473,7 +473,7 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
                 set_ire_sid(ire, SVT_VERIFY_BUS, SQ_ALL_16,
                             (bus << 8) | pdev->bus);
             else if ( pdev_type(seg, bus, devfn) == DEV_TYPE_LEGACY_PCI_BRIDGE )
-                set_ire_sid(ire, SVT_VERIFY_BUS, SQ_ALL_16,
+                set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_ALL_16,
                             PCI_BDF2(bus, devfn));
         }
         break;
