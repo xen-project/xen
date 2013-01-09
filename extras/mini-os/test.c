@@ -45,6 +45,10 @@
 #include <xen/features.h>
 #include <xen/version.h>
 
+static unsigned int do_shutdown = 0;
+static unsigned int shutdown_reason;
+static DECLARE_WAIT_QUEUE_HEAD(shutdown_queue);
+
 static struct netfront_dev *net_dev;
 static struct semaphore net_sem = __SEMAPHORE_INITIALIZER(net_sem, 0);
 
@@ -485,6 +489,15 @@ void shutdown_frontends(void)
     if (pci_dev)
         shutdown_pcifront(pci_dev);
 #endif
+}
+
+void app_shutdown(unsigned reason)
+{
+    shutdown_reason = reason;
+    wmb();
+    do_shutdown = 1;
+    wmb();
+    wake_up(&shutdown_queue);
 }
 
 static void shutdown_thread(void *p)

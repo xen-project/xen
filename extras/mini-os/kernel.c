@@ -48,12 +48,6 @@
 
 uint8_t xen_features[XENFEAT_NR_SUBMAPS * 32];
 
-#ifdef CONFIG_XENBUS
-unsigned int do_shutdown = 0;
-unsigned int shutdown_reason;
-DECLARE_WAIT_QUEUE_HEAD(shutdown_queue);
-#endif
-
 void setup_xen_features(void)
 {
     xen_feature_info_t fi;
@@ -71,12 +65,19 @@ void setup_xen_features(void)
 }
 
 #ifdef CONFIG_XENBUS
+/* This should be overridden by the application we are linked against. */
+__attribute__((weak)) void app_shutdown(unsigned reason)
+{
+    printk("Shutdown requested: %d\n", reason);
+}
+
 static void shutdown_thread(void *p)
 {
     const char *path = "control/shutdown";
     const char *token = path;
     xenbus_event_queue events = NULL;
     char *shutdown, *err;
+    unsigned int shutdown_reason;
     xenbus_watch_path_token(XBT_NIL, path, token, &events);
     while ((err = xenbus_read(XBT_NIL, path, &shutdown)) != NULL)
     {
@@ -94,10 +95,7 @@ static void shutdown_thread(void *p)
     else
         /* Unknown */
         shutdown_reason = SHUTDOWN_crash;
-    wmb();
-    do_shutdown = 1;
-    wmb();
-    wake_up(&shutdown_queue);
+    app_shutdown(shutdown_reason);
 }
 #endif
 
