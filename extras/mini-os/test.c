@@ -45,13 +45,13 @@
 #include <xen/features.h>
 #include <xen/version.h>
 
+#ifdef CONFIG_XENBUS
 static unsigned int do_shutdown = 0;
 static unsigned int shutdown_reason;
 static DECLARE_WAIT_QUEUE_HEAD(shutdown_queue);
+#endif
 
-static struct netfront_dev *net_dev;
-static struct semaphore net_sem = __SEMAPHORE_INITIALIZER(net_sem, 0);
-
+#ifdef CONFIG_XENBUS
 void test_xenbus(void);
 
 static void xenbus_tester(void *p)
@@ -59,6 +59,7 @@ static void xenbus_tester(void *p)
     printk("Xenbus tests disabled, because of a Xend bug.\n");
     /* test_xenbus(); */
 }
+#endif
 
 static void periodic_thread(void *p)
 {
@@ -72,12 +73,18 @@ static void periodic_thread(void *p)
     }
 }
 
+#ifdef CONFIG_NETFRONT
+static struct netfront_dev *net_dev;
+static struct semaphore net_sem = __SEMAPHORE_INITIALIZER(net_sem, 0);
+
 static void netfront_thread(void *p)
 {
     net_dev = init_netfront(NULL, NULL, NULL, NULL);
     up(&net_sem);
 }
+#endif
 
+#ifdef CONFIG_BLKFRONT
 static struct blkfront_dev *blk_dev;
 static struct blkfront_info blk_info;
 static uint64_t blk_size_read;
@@ -246,7 +253,9 @@ static void blkfront_thread(void *p)
     }
     up(&blk_sem);
 }
+#endif
 
+#if defined(CONFIG_FBFRONT) && defined(CONFIG_KBDFRONT)
 #define WIDTH 800
 #define HEIGHT 600
 #define DEPTH 32
@@ -436,6 +445,7 @@ static void kbdfront_thread(void *p)
     }
     up(&kbd_sem);
 }
+#endif
 
 #ifdef CONFIG_PCIFRONT
 static struct pcifront_dev *pci_dev;
@@ -469,20 +479,26 @@ static void pcifront_thread(void *p)
 
 void shutdown_frontends(void)
 {
+#ifdef CONFIG_NETFRONT
     down(&net_sem);
     if (net_dev)
         shutdown_netfront(net_dev);
+#endif
 
+#ifdef CONFIG_BLKFRONT
     down(&blk_sem);
     if (blk_dev)
         shutdown_blkfront(blk_dev);
+#endif
 
+#if defined(CONFIG_FBFRONT) && defined(CONFIG_KBDFRONT)
     if (fb_dev)
         shutdown_fbfront(fb_dev);
 
     down(&kbd_sem);
     if (kbd_dev)
         shutdown_kbdfront(kbd_dev);
+#endif
 
 #ifdef CONFIG_PCIFRONT
     down(&pci_sem);
@@ -491,6 +507,7 @@ void shutdown_frontends(void)
 #endif
 }
 
+#ifdef CONFIG_XENBUS
 void app_shutdown(unsigned reason)
 {
     shutdown_reason = reason;
@@ -519,19 +536,30 @@ static void shutdown_thread(void *p)
 
     HYPERVISOR_shutdown(shutdown_reason);
 }
+#endif
 
 int app_main(start_info_t *si)
 {
     printk("Test main: start_info=%p\n", si);
+#ifdef CONFIG_XENBUS
     create_thread("xenbus_tester", xenbus_tester, si);
+#endif
     create_thread("periodic_thread", periodic_thread, si);
+#ifdef CONFIG_NETFRONT
     create_thread("netfront", netfront_thread, si);
+#endif
+#ifdef CONFIG_BLKFRONT
     create_thread("blkfront", blkfront_thread, si);
+#endif
+#if defined(CONFIG_FBFRONT) && defined(CONFIG_KBDFRONT)
     create_thread("fbfront", fbfront_thread, si);
     create_thread("kbdfront", kbdfront_thread, si);
+#endif
 #ifdef CONFIG_PCIFRONT
     create_thread("pcifront", pcifront_thread, si);
 #endif
+#ifdef CONFIG_XENBUS
     create_thread("shutdown", shutdown_thread, si);
+#endif
     return 0;
 }
