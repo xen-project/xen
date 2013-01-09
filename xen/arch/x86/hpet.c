@@ -236,7 +236,7 @@ static void hpet_msi_unmask(struct irq_desc *desc)
     struct hpet_event_channel *ch = desc->action->dev_id;
 
     cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
-    cfg |= HPET_TN_FSB;
+    cfg |= HPET_TN_ENABLE;
     hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
 }
 
@@ -246,7 +246,7 @@ static void hpet_msi_mask(struct irq_desc *desc)
     struct hpet_event_channel *ch = desc->action->dev_id;
 
     cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
-    cfg &= ~HPET_TN_FSB;
+    cfg &= ~HPET_TN_ENABLE;
     hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
 }
 
@@ -319,7 +319,13 @@ static void __hpet_setup_msi_irq(struct irq_desc *desc)
 static int __init hpet_setup_msi_irq(unsigned int irq, struct hpet_event_channel *ch)
 {
     int ret;
+    u32 cfg = hpet_read32(HPET_Tn_CFG(ch->idx));
     irq_desc_t *desc = irq_to_desc(irq);
+
+    /* set HPET Tn as oneshot */
+    cfg &= ~(HPET_TN_LEVEL | HPET_TN_PERIODIC);
+    cfg |= HPET_TN_FSB | HPET_TN_32BIT;
+    hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
 
     desc->handler = &hpet_msi_type;
     ret = request_irq(irq, hpet_interrupt_handler, 0, "HPET", ch);
@@ -541,11 +547,14 @@ void __init hpet_broadcast_init(void)
 
     for ( i = 0; i < n; i++ )
     {
-        /* set HPET Tn as oneshot */
-        cfg = hpet_read32(HPET_Tn_CFG(hpet_events[i].idx));
-        cfg &= ~(HPET_TN_LEVEL | HPET_TN_PERIODIC);
-        cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
-        hpet_write32(cfg, HPET_Tn_CFG(hpet_events[i].idx));
+        if ( i == 0 && (cfg & HPET_CFG_LEGACY) )
+        {
+            /* set HPET T0 as oneshot */
+            cfg = hpet_read32(HPET_Tn_CFG(0));
+            cfg &= ~(HPET_TN_LEVEL | HPET_TN_PERIODIC);
+            cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
+            hpet_write32(cfg, HPET_Tn_CFG(0));
+        }
 
         /*
          * The period is a femto seconds value. We need to calculate the scaled
@@ -602,6 +611,8 @@ void hpet_broadcast_resume(void)
         cfg = hpet_read32(HPET_Tn_CFG(hpet_events[i].idx));
         cfg &= ~(HPET_TN_LEVEL | HPET_TN_PERIODIC);
         cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
+        if ( !(hpet_events[i].flags & HPET_EVT_LEGACY) )
+            cfg |= HPET_TN_FSB;
         hpet_write32(cfg, HPET_Tn_CFG(hpet_events[i].idx));
 
         hpet_events[i].next_event = STIME_MAX;
