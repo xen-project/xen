@@ -1057,6 +1057,8 @@ __initcall(__hvm_register_CPU_XSAVE_save_and_restore);
 int hvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
+    struct domain *d = v->domain;
+    domid_t dm_domid = d->arch.hvm_domain.params[HVM_PARAM_DM_DOMAIN];
 
     hvm_asid_flush_vcpu(v);
 
@@ -1066,12 +1068,12 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 )
         goto fail2;
 
-    if ( nestedhvm_enabled(v->domain) 
+    if ( nestedhvm_enabled(d) 
          && (rc = nestedhvm_vcpu_initialise(v)) < 0 ) 
         goto fail3;
 
     /* Create ioreq event channel. */
-    rc = alloc_unbound_xen_event_channel(v, current->domain->domain_id, NULL);
+    rc = alloc_unbound_xen_event_channel(v, dm_domid, NULL);
     if ( rc < 0 )
         goto fail4;
 
@@ -1081,16 +1083,16 @@ int hvm_vcpu_initialise(struct vcpu *v)
     if ( v->vcpu_id == 0 )
     {
         /* Create bufioreq event channel. */
-        rc = alloc_unbound_xen_event_channel(v, current->domain->domain_id, NULL);
+        rc = alloc_unbound_xen_event_channel(v, dm_domid, NULL);
         if ( rc < 0 )
             goto fail2;
-        v->domain->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_EVTCHN] = rc;
+        d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_EVTCHN] = rc;
     }
 
-    spin_lock(&v->domain->arch.hvm_domain.ioreq.lock);
-    if ( v->domain->arch.hvm_domain.ioreq.va != NULL )
+    spin_lock(&d->arch.hvm_domain.ioreq.lock);
+    if ( d->arch.hvm_domain.ioreq.va != NULL )
         get_ioreq(v)->vp_eport = v->arch.hvm_vcpu.xen_port;
-    spin_unlock(&v->domain->arch.hvm_domain.ioreq.lock);
+    spin_unlock(&d->arch.hvm_domain.ioreq.lock);
 
     spin_lock_init(&v->arch.hvm_vcpu.tm_lock);
     INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
