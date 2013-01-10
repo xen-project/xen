@@ -26,16 +26,38 @@
 #include "smbios_types.h"
 #include "util.h"
 #include "hypercall.h"
+#include <xen/hvm/hvm_xs_strings.h>
 
+/* SBMIOS handle base values */
+#define SMBIOS_HANDLE_TYPE0   0x0000
+#define SMBIOS_HANDLE_TYPE1   0x0100
+#define SMBIOS_HANDLE_TYPE2   0x0200
+#define SMBIOS_HANDLE_TYPE3   0x0300
+#define SMBIOS_HANDLE_TYPE4   0x0400
+#define SMBIOS_HANDLE_TYPE11  0x0B00
+#define SMBIOS_HANDLE_TYPE16  0x1000
+#define SMBIOS_HANDLE_TYPE17  0x1100
+#define SMBIOS_HANDLE_TYPE19  0x1300
+#define SMBIOS_HANDLE_TYPE20  0x1400
+#define SMBIOS_HANDLE_TYPE22  0x1600
+#define SMBIOS_HANDLE_TYPE32  0x2000
+#define SMBIOS_HANDLE_TYPE39  0x2700
+#define SMBIOS_HANDLE_TYPE127 0x7f00
+
+static void
+smbios_pt_init(void);
+static void*
+get_smbios_pt_struct(uint8_t type, uint32_t *length_out);
+static void
+get_cpu_manufacturer(char *buf, int len);
 static int
 write_smbios_tables(void *ep, void *start,
                     uint32_t vcpus, uint64_t memsize,
                     uint8_t uuid[16], char *xen_version,
                     uint32_t xen_major_version, uint32_t xen_minor_version,
                     unsigned *nr_structs, unsigned *max_struct_size);
-
-static void
-get_cpu_manufacturer(char *buf, int len);
+static uint64_t
+get_memsize(void);
 static void
 smbios_entry_point_init(void *start,
                         uint16_t max_structure_size,
@@ -48,6 +70,8 @@ smbios_type_0_init(void *start, const char *xen_version,
 static void *
 smbios_type_1_init(void *start, const char *xen_version, 
                    uint8_t uuid[16]);
+static void *
+smbios_type_2_init(void *start);
 static void *
 smbios_type_3_init(void *start);
 static void *
@@ -64,9 +88,72 @@ smbios_type_19_init(void *start, uint32_t memory_size_mb, int instance);
 static void *
 smbios_type_20_init(void *start, uint32_t memory_size_mb, int instance);
 static void *
+smbios_type_22_init(void *start);
+static void *
 smbios_type_32_init(void *start);
 static void *
+smbios_type_39_init(void *start);
+static void *
+smbios_type_vendor_oem_init(void *start);
+static void *
 smbios_type_127_init(void *start);
+
+static uint32_t *smbios_pt_addr = NULL;
+static uint32_t smbios_pt_length = 0;
+
+static void
+smbios_pt_init(void)
+{
+    const char *s;
+
+    s = xenstore_read(HVM_XS_SMBIOS_PT_ADDRESS, NULL);
+    if ( s == NULL )
+        goto reset;
+
+    smbios_pt_addr = (uint32_t*)(uint32_t)strtoll(s, NULL, 0);
+    if ( smbios_pt_addr == NULL )
+        goto reset;
+
+    s = xenstore_read(HVM_XS_SMBIOS_PT_LENGTH, NULL);
+    if ( s == NULL )
+        goto reset;
+
+    smbios_pt_length = (uint32_t)strtoll(s, NULL, 0);
+    if ( smbios_pt_length == 0 )
+        goto reset;
+
+    return;
+
+reset:
+    smbios_pt_addr = NULL;
+    smbios_pt_length = 0;
+}
+
+static void*
+get_smbios_pt_struct(uint8_t type, uint32_t *length_out)
+{
+    uint32_t *sep = smbios_pt_addr;
+    uint32_t total = 0;
+    uint8_t *ptr;
+
+    if ( sep == NULL )
+        return NULL;
+
+    while ( total < smbios_pt_length )
+    {
+        ptr = (uint8_t*)(sep + 1);
+        if ( ptr[0] == type )
+        {
+            *length_out = *sep;
+            return ptr;
+        }
+
+        total += (*sep + sizeof(uint32_t));
+        sep = (uint32_t*)(ptr + *sep);
+    }
+
+    return NULL;
+}
 
 static void
 get_cpu_manufacturer(char *buf, int len)
@@ -97,6 +184,8 @@ write_smbios_tables(void *ep, void *start,
     char cpu_manufacturer[15];
     int i, nr_mem_devs;
 
+    smbios_pt_init();
+
     get_cpu_manufacturer(cpu_manufacturer, 15);
 
     p = (char *)start;
@@ -112,6 +201,7 @@ write_smbios_tables(void *ep, void *start,
     do_struct(smbios_type_0_init(p, xen_version, xen_major_version,
                                  xen_minor_version));
     do_struct(smbios_type_1_init(p, xen_version, uuid));
+    do_struct(smbios_type_2_init(p));
     do_struct(smbios_type_3_init(p));
     for ( cpu_num = 1; cpu_num <= vcpus; cpu_num++ )
         do_struct(smbios_type_4_init(p, cpu_num, cpu_manufacturer));
@@ -130,7 +220,10 @@ write_smbios_tables(void *ep, void *start,
         do_struct(smbios_type_20_init(p, dev_memsize, i));
     }
 
+    do_struct(smbios_type_22_init(p));
     do_struct(smbios_type_32_init(p));
+    do_struct(smbios_type_39_init(p));
+    do_struct(smbios_type_vendor_oem_init(p));
     do_struct(smbios_type_127_init(p));
 
 #undef do_struct
@@ -289,12 +382,22 @@ smbios_type_0_init(void *start, const char *xen_version,
     struct smbios_type_0 *p = (struct smbios_type_0 *)start;
     static const char *smbios_release_date = __SMBIOS_DATE__;
     const char *s;
+    void *pts;
+    uint32_t length;
+
+    pts = get_smbios_pt_struct(0, &length);
+    if ( (pts != NULL)&&(length > 0) )
+    {
+        memcpy(start, pts, length);
+        p->header.handle = SMBIOS_HANDLE_TYPE0;
+        return (start + length);
+    }
 
     memset(p, 0, sizeof(*p));
 
     p->header.type = 0;
     p->header.length = sizeof(struct smbios_type_0);
-    p->header.handle = 0;
+    p->header.handle = SMBIOS_HANDLE_TYPE0;
 
     p->vendor_str = 1;
     p->version_str = 2;
@@ -315,11 +418,11 @@ smbios_type_0_init(void *start, const char *xen_version,
     p->embedded_controller_minor = 0xff;
 
     start += sizeof(struct smbios_type_0);
-    s = xenstore_read("bios-strings/bios-vendor", "Xen");
+    s = xenstore_read(HVM_XS_BIOS_VENDOR, "Xen");
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
-    s = xenstore_read("bios-strings/bios-version", xen_version);
+    s = xenstore_read(HVM_XS_BIOS_VERSION, xen_version);
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
@@ -338,12 +441,22 @@ smbios_type_1_init(void *start, const char *xen_version,
     char uuid_str[37];
     struct smbios_type_1 *p = (struct smbios_type_1 *)start;
     const char *s;
+    void *pts;
+    uint32_t length;
+
+    pts = get_smbios_pt_struct(1, &length);
+    if ( (pts != NULL)&&(length > 0) )
+    {
+        memcpy(start, pts, length);
+        p->header.handle = SMBIOS_HANDLE_TYPE1;
+        return (start + length);
+    }
 
     memset(p, 0, sizeof(*p));
 
     p->header.type = 1;
     p->header.length = sizeof(struct smbios_type_1);
-    p->header.handle = 0x100;
+    p->header.handle = SMBIOS_HANDLE_TYPE1;
 
     p->manufacturer_str = 1;
     p->product_name_str = 2;
@@ -358,20 +471,20 @@ smbios_type_1_init(void *start, const char *xen_version,
 
     start += sizeof(struct smbios_type_1);
     
-    s = xenstore_read("bios-strings/system-manufacturer", "Xen");
+    s = xenstore_read(HVM_XS_SYSTEM_MANUFACTURER, "Xen");
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
-    s = xenstore_read("bios-strings/system-product-name", "HVM domU");
+    s = xenstore_read(HVM_XS_SYSTEM_PRODUCT_NAME, "HVM domU");
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
-    s = xenstore_read("bios-strings/system-version", xen_version);
+    s = xenstore_read(HVM_XS_SYSTEM_VERSION, xen_version);
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
     uuid_to_string(uuid_str, uuid); 
-    s = xenstore_read("bios-strings/system-serial-number", uuid_str);
+    s = xenstore_read(HVM_XS_SYSTEM_SERIAL_NUMBER, uuid_str);
     strcpy((char *)start, s);
     start += strlen(s) + 1;
 
@@ -380,17 +493,58 @@ smbios_type_1_init(void *start, const char *xen_version,
     return start+1; 
 }
 
+/* Type 2 -- System Board */
+static void *
+smbios_type_2_init(void *start)
+{
+    struct smbios_type_2 *p = (struct smbios_type_2 *)start;
+    uint8_t *ptr;
+    void *pts;
+    uint32_t length;
+
+    pts = get_smbios_pt_struct(2, &length);
+    if ( (pts != NULL)&&(length > 0) )
+    {
+        memcpy(start, pts, length);
+        p->header.handle = SMBIOS_HANDLE_TYPE2;
+
+        /* Set current chassis handle if present */
+        if ( p->header.length > 13 )
+        {
+            ptr = ((uint8_t*)start) + 11;            
+            if ( *((uint16_t*)ptr) != 0 )
+                *((uint16_t*)ptr) = SMBIOS_HANDLE_TYPE3;
+        }
+
+        return (start + length);
+    }
+
+    /* Only present when passed in */
+    return start;
+}
+
 /* Type 3 -- System Enclosure */
 static void *
 smbios_type_3_init(void *start)
 {
     struct smbios_type_3 *p = (struct smbios_type_3 *)start;
+    const char *s;
+    void *pts;
+    uint32_t length;
+
+    pts = get_smbios_pt_struct(3, &length);
+    if ( (pts != NULL)&&(length > 0) )
+    {
+        memcpy(start, pts, length);
+        p->header.handle = SMBIOS_HANDLE_TYPE3;
+        return (start + length);
+    }
     
     memset(p, 0, sizeof(*p));
 
     p->header.type = 3;
     p->header.length = sizeof(struct smbios_type_3);
-    p->header.handle = 0x300;
+    p->header.handle = SMBIOS_HANDLE_TYPE3;
 
     p->manufacturer_str = 1;
     p->type = 0x01; /* other */
@@ -404,8 +558,19 @@ smbios_type_3_init(void *start)
 
     start += sizeof(struct smbios_type_3);
     
-    strcpy((char *)start, "Xen");
-    start += strlen("Xen") + 1;
+    s = xenstore_read(HVM_XS_ENCLOSURE_MANUFACTURER, "Xen");
+    strcpy((char *)start, s);
+    start += strlen(s) + 1;
+
+    /* No internal defaults for this if the value is not set */
+    s = xenstore_read(HVM_XS_ENCLOSURE_SERIAL_NUMBER, NULL);
+    if ( (s != NULL)&&(*s != '\0') )
+    {
+        strcpy((char *)start, s);
+        start += strlen(s) + 1;
+        p->serial_number_str = 2;
+    }
+
     *((uint8_t *)start) = 0;
     return start+1;
 }
@@ -423,7 +588,7 @@ smbios_type_4_init(
 
     p->header.type = 4;
     p->header.length = sizeof(struct smbios_type_4);
-    p->header.handle = 0x400 + cpu_number;
+    p->header.handle = SMBIOS_HANDLE_TYPE4 + cpu_number;
 
     p->socket_designation_str = 1;
     p->processor_type = 0x03; /* CPU */
@@ -465,13 +630,23 @@ static void *
 smbios_type_11_init(void *start) 
 {
     struct smbios_type_11 *p = (struct smbios_type_11 *)start;
-    char path[20] = "bios-strings/oem-XX";
+    char path[20];
     const char *s;
     int i;
+    void *pts;
+    uint32_t length;
+
+    pts = get_smbios_pt_struct(11, &length);
+    if ( (pts != NULL)&&(length > 0) )
+    {
+        memcpy(start, pts, length);
+        p->header.handle = SMBIOS_HANDLE_TYPE11;
+        return (start + length);
+    }
 
     p->header.type = 11;
     p->header.length = sizeof(struct smbios_type_11);
-    p->header.handle = 0xB00;
+    p->header.handle = SMBIOS_HANDLE_TYPE11;
 
     p->count = 0;
 
@@ -480,8 +655,7 @@ smbios_type_11_init(void *start)
     /* Pull out as many oem-* strings we find in xenstore */
     for ( i = 1; i < 100; i++ )
     {
-        path[(sizeof path) - 3] = '0' + ((i < 10) ? i : i / 10);
-        path[(sizeof path) - 2] = (i < 10) ? '\0' : '0' + (i % 10);
+        snprintf(path, sizeof(path), HVM_XS_OEM_STRINGS, i);
         if ( ((s = xenstore_read(path, NULL)) == NULL) || (*s == '\0') )
             break;
         strcpy((char *)start, s);
@@ -510,7 +684,7 @@ smbios_type_16_init(void *start, uint32_t memsize, int nr_mem_devs)
     memset(p, 0, sizeof(*p));
 
     p->header.type = 16;
-    p->header.handle = 0x1000;
+    p->header.handle = SMBIOS_HANDLE_TYPE16;
     p->header.length = sizeof(struct smbios_type_16);
     
     p->location = 0x01; /* other */
@@ -536,7 +710,7 @@ smbios_type_17_init(void *start, uint32_t memory_size_mb, int instance)
 
     p->header.type = 17;
     p->header.length = sizeof(struct smbios_type_17);
-    p->header.handle = 0x1100 + instance;
+    p->header.handle = SMBIOS_HANDLE_TYPE17 + instance;
 
     p->physical_memory_array_handle = 0x1000;
     p->total_width = 64;
@@ -571,7 +745,7 @@ smbios_type_19_init(void *start, uint32_t memory_size_mb, int instance)
 
     p->header.type = 19;
     p->header.length = sizeof(struct smbios_type_19);
-    p->header.handle = 0x1300 + instance;
+    p->header.handle = SMBIOS_HANDLE_TYPE19 + instance;
 
     p->starting_address = instance << 24;
     p->ending_address = p->starting_address + (memory_size_mb << 10) - 1;
@@ -593,7 +767,7 @@ smbios_type_20_init(void *start, uint32_t memory_size_mb, int instance)
 
     p->header.type = 20;
     p->header.length = sizeof(struct smbios_type_20);
-    p->header.handle = 0x1400 + instance;
+    p->header.handle = SMBIOS_HANDLE_TYPE20 + instance;
 
     p->starting_address = instance << 24;
     p->ending_address = p->starting_address + (memory_size_mb << 10) - 1;
@@ -609,6 +783,71 @@ smbios_type_20_init(void *start, uint32_t memory_size_mb, int instance)
     return start+2;
 }
 
+/* Type 22 -- Portable Battery */
+static void *
+smbios_type_22_init(void *start)
+{
+    struct smbios_type_22 *p = (struct smbios_type_22 *)start;
+    static const char *smbios_release_date = __SMBIOS_DATE__;
+    const char *s;
+    void *pts;
+    uint32_t length;
+
+    pts = get_smbios_pt_struct(22, &length);
+    if ( (pts != NULL)&&(length > 0) )
+    {
+        memcpy(start, pts, length);
+        p->header.handle = SMBIOS_HANDLE_TYPE22;
+        return (start + length);
+    }
+
+    s = xenstore_read(HVM_XS_SMBIOS_DEFAULT_BATTERY, "0");
+    if ( strncmp(s, "1", 1) != 0 )
+        return start;
+
+    memset(p, 0, sizeof(*p));
+
+    p->header.type = 22;
+    p->header.length = sizeof(struct smbios_type_22);
+    p->header.handle = SMBIOS_HANDLE_TYPE22;
+
+    p->location_str = 1;
+    p->manufacturer_str = 2;
+    p->manufacturer_date_str = 3;
+    p->serial_number_str = 0;
+    p->device_name_str = 4;
+    p->device_chemistry = 0x2; /* unknown */
+    p->device_capacity = 0; /* unknown */
+    p->device_voltage = 0; /* unknown */
+    p->sbds_version_number = 0;
+    p->max_error = 0xff; /* unknown */
+    p->sbds_serial_number = 0;
+    p->sbds_manufacturer_date = 0;
+    p->sbds_device_chemistry = 0;
+    p->design_capacity_multiplier = 0;
+    p->oem_specific = 0;
+
+    start += sizeof(struct smbios_type_22);
+
+    strcpy((char *)start, "Primary");
+    start += strlen("Primary") + 1;
+
+    s = xenstore_read(HVM_XS_BATTERY_MANUFACTURER, "Xen");
+    strcpy((char *)start, s);
+    start += strlen(s) + 1;
+
+    strcpy((char *)start, smbios_release_date);
+    start += strlen(smbios_release_date) + 1;
+
+    s = xenstore_read(HVM_XS_BATTERY_DEVICE_NAME, "XEN-VBAT");
+    strcpy((char *)start, s);
+    start += strlen(s) + 1;
+
+    *((uint8_t *)start) = 0;
+
+    return start+1; 
+}
+
 /* Type 32 -- System Boot Information */
 static void *
 smbios_type_32_init(void *start)
@@ -619,13 +858,65 @@ smbios_type_32_init(void *start)
 
     p->header.type = 32;
     p->header.length = sizeof(struct smbios_type_32);
-    p->header.handle = 0x2000;
+    p->header.handle = SMBIOS_HANDLE_TYPE32;
     memset(p->reserved, 0, 6);
     p->boot_status = 0; /* no errors detected */
     
     start += sizeof(struct smbios_type_32);
     *((uint16_t *)start) = 0;
     return start+2;
+}
+
+/* Type 39 -- Power Supply */
+static void *
+smbios_type_39_init(void *start)
+{
+    struct smbios_type_39 *p = (struct smbios_type_39 *)start;
+    void *pts;
+    uint32_t length;
+
+    pts = get_smbios_pt_struct(39, &length);
+    if ( (pts != NULL)&&(length > 0) )
+    {
+        memcpy(start, pts, length);
+        p->header.handle = SMBIOS_HANDLE_TYPE39;
+        return (start + length);
+    }
+
+    /* Only present when passed in */
+    return start;
+}
+
+static void *
+smbios_type_vendor_oem_init(void *start)
+{
+    uint32_t *sep = smbios_pt_addr;
+    uint32_t total = 0;
+    uint8_t *ptr;
+
+    if ( sep == NULL )
+        return start;
+
+    while ( total < smbios_pt_length )
+    {
+        ptr = (uint8_t*)(sep + 1);
+        if ( ptr[0] >= 128 )
+        {
+            /* Vendor/OEM table, copy it in. Note the handle values cannot
+             * be changed since it is unknown what is in each of these tables
+             * but they could contain handle references to other tables. This
+             * means a slight risk of collision with the tables above but that
+             * would have to be dealt with on a case by case basis.
+             */
+            memcpy(start, ptr, *sep);
+            start += *sep;
+        }
+
+        total += (*sep + sizeof(uint32_t));
+        sep = (uint32_t*)(ptr + *sep);
+    }
+
+    return start;
 }
 
 /* Type 127 -- End of Table */
@@ -638,7 +929,7 @@ smbios_type_127_init(void *start)
 
     p->header.type = 127;
     p->header.length = sizeof(struct smbios_type_127);
-    p->header.handle = 0x7f00;
+    p->header.handle = SMBIOS_HANDLE_TYPE127;
 
     start += sizeof(struct smbios_type_127);
     *((uint16_t *)start) = 0;

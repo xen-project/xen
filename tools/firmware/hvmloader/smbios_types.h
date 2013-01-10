@@ -84,6 +84,15 @@ struct smbios_type_1 {
     uint8_t family_str;
 } __attribute__ ((packed));
 
+/* SMBIOS type 2 - Base Board Information */
+struct smbios_type_2 {
+    struct smbios_structure_header header;
+    uint8_t manufacturer_str;
+    uint8_t product_name_str;
+    uint8_t version_str;
+    uint8_t serial_number_str;
+} __attribute__ ((packed));
+
 /* SMBIOS type 3 - System Enclosure */
 struct smbios_type_3 {
     struct smbios_structure_header header;
@@ -173,11 +182,49 @@ struct smbios_type_20 {
     uint8_t interleaved_data_depth;
 } __attribute__ ((packed));
 
+/* SMBIOS type 22 - Portable battery */
+struct smbios_type_22 {
+    struct smbios_structure_header header;
+    uint8_t location_str;
+    uint8_t manufacturer_str;
+    uint8_t manufacturer_date_str;
+    uint8_t serial_number_str;
+    uint8_t device_name_str;
+    uint8_t device_chemistry;
+    uint16_t device_capacity;
+    uint16_t device_voltage;
+    uint8_t sbds_version_number;
+    uint8_t max_error;
+    uint16_t sbds_serial_number;
+    uint16_t sbds_manufacturer_date;
+    uint8_t sbds_device_chemistry;
+    uint8_t design_capacity_multiplier;
+    uint32_t oem_specific;
+} __attribute__ ((packed));
+
 /* SMBIOS type 32 - System Boot Information */
 struct smbios_type_32 {
     struct smbios_structure_header header;
     uint8_t reserved[6];
     uint8_t boot_status;
+} __attribute__ ((packed));
+
+/* SMBIOS type 39 - Power Supply */
+struct smbios_type_39 {
+    struct smbios_structure_header header;
+    uint8_t power_unit_group;
+    uint8_t location_str;
+    uint8_t device_name_str;
+    uint8_t manufacturer_str;
+    uint8_t serial_number_str;
+    uint8_t asset_tag_number_str;
+    uint8_t model_part_number_str;
+    uint8_t revision_level_str;
+    uint16_t max_capacity;
+    uint16_t characteristics;
+    uint16_t input_voltage_probe_handle;
+    uint16_t cooling_device_handle;
+    uint16_t input_current_probe_handle;
 } __attribute__ ((packed));
 
 /* SMBIOS type 127 -- End-of-table */
