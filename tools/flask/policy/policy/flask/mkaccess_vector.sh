@@ -9,8 +9,8 @@ awk=$1
 shift
 
 # output files
-av_permissions="av_permissions.h"
-av_perm_to_string="av_perm_to_string.h"
+av_permissions="include/av_permissions.h"
+av_perm_to_string="include/av_perm_to_string.h"
 
 cat $* | $awk "
 BEGIN	{

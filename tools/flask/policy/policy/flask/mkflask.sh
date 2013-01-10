@@ -9,9 +9,9 @@ awk=$1
 shift 1
 
 # output file
-output_file="flask.h"
-debug_file="class_to_string.h"
-debug_file2="initial_sid_to_string.h"
+output_file="include/flask.h"
+debug_file="include/class_to_string.h"
+debug_file2="include/initial_sid_to_string.h"
 
 cat $* | $awk "
 BEGIN	{

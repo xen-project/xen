@@ -314,6 +314,11 @@ xen/include/xen/banner.h
 xen/include/xen/compile.h
 xen/tools/figlet/figlet
 xen/tools/symbols
+xen/xsm/flask/include/av_perm_to_string.h
+xen/xsm/flask/include/av_permissions.h
+xen/xsm/flask/include/class_to_string.h
+xen/xsm/flask/include/flask.h
+xen/xsm/flask/include/initial_sid_to_string.h
 xen/xen
 xen/xen-syms
 xen/xen.*

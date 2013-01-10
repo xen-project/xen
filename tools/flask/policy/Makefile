@@ -61,7 +61,7 @@ LOADPOLICY := $(SBINDIR)/flask-loadpolicy
 # policy source layout
 POLDIR := policy
 MODDIR := $(POLDIR)/modules
-FLASKDIR := $(POLDIR)/flask
+FLASKDIR := ../../../xen/xsm/flask/policy
 SECCLASS := $(FLASKDIR)/security_classes
 ISIDS := $(FLASKDIR)/initial_sids
 AVS := $(FLASKDIR)/access_vectors
