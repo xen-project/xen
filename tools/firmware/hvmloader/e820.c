@@ -142,11 +142,11 @@ int build_e820_table(struct e820entry *e820,
         nr++;
 
         e820[nr].addr = igd_opregion_base;
-        e820[nr].size = 2 * PAGE_SIZE;
+        e820[nr].size = IGD_OPREGION_PAGES * PAGE_SIZE;
         e820[nr].type = E820_NVS;
         nr++;
 
-        e820[nr].addr = igd_opregion_base + 2 * PAGE_SIZE;
+        e820[nr].addr = igd_opregion_base + IGD_OPREGION_PAGES * PAGE_SIZE;
         e820[nr].size = (uint32_t)-e820[nr].addr;
         e820[nr].type = E820_RESERVED;
         nr++;

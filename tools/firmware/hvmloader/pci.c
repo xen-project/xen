@@ -104,7 +104,7 @@ void pci_setup(void)
                 virtual_vga = VGA_pt;
                 if ( vendor_id == 0x8086 )
                 {
-                    igd_opregion_pgbase = mem_hole_alloc(2);
+                    igd_opregion_pgbase = mem_hole_alloc(IGD_OPREGION_PAGES);
                     /*
                      * Write the the OpRegion offset to give the opregion
                      * address to the device model. The device model will trap 
