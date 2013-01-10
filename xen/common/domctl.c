@@ -279,10 +279,8 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         }
         break;
     }
-#ifdef XSM_ENABLE
     case XEN_DOMCTL_getdomaininfo:
         break;
-#endif
     default:
         if ( !IS_PRIV(current->domain) )
             return -EPERM;

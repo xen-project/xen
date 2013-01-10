@@ -1550,7 +1550,7 @@ static struct xsm_operations flask_ops = {
     .cpupool_op = flask_cpupool_op,
     .sched_op = flask_sched_op,
 
-    .__do_xsm_op = do_flask_op,
+    .do_xsm_op = do_flask_op,
 
 #ifdef CONFIG_X86
     .shadow_control = flask_shadow_control,
