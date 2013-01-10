@@ -23,6 +23,9 @@
 #include "ssdt_pm.h"
 #include "../config.h"
 #include "../util.h"
+#include <xen/hvm/hvm_xs_strings.h>
+
+#define ACPI_MAX_SECONDARY_TABLES 16
 
 #define align16(sz)        (((sz) + 15) & ~15)
 #define fixed_strcpy(d, s) strncpy((d), (s), sizeof(d))
@@ -198,6 +201,52 @@ static struct acpi_20_waet *construct_waet(void)
     return waet;
 }
 
+static int construct_passthrough_tables(unsigned long *table_ptrs,
+                                        int nr_tables)
+{
+    const char *s;
+    uint8_t *acpi_pt_addr;
+    uint32_t acpi_pt_length;
+    struct acpi_header *header;
+    int nr_added;
+    int nr_max = (ACPI_MAX_SECONDARY_TABLES - nr_tables - 1);
+    uint32_t total = 0;
+    uint8_t *buffer;
+
+    s = xenstore_read(HVM_XS_ACPI_PT_ADDRESS, NULL);
+    if ( s == NULL )
+        return 0;    
+
+    acpi_pt_addr = (uint8_t*)(uint32_t)strtoll(s, NULL, 0);
+    if ( acpi_pt_addr == NULL )
+        return 0;
+
+    s = xenstore_read(HVM_XS_ACPI_PT_LENGTH, NULL);
+    if ( s == NULL )
+        return 0;
+
+    acpi_pt_length = (uint32_t)strtoll(s, NULL, 0);
+
+    for ( nr_added = 0; nr_added < nr_max; nr_added++ )
+    {        
+        if ( (acpi_pt_length - total) < sizeof(struct acpi_header) )
+            break;
+
+        header = (struct acpi_header*)acpi_pt_addr;
+
+        buffer = mem_alloc(header->length, 16);
+        if ( buffer == NULL )
+            break;
+        memcpy(buffer, header, header->length);
+
+        table_ptrs[nr_tables++] = (unsigned long)buffer;
+        total += header->length;
+        acpi_pt_addr += header->length;
+    }
+
+    return nr_added;
+}
+
 static int construct_secondary_tables(unsigned long *table_ptrs,
                                       struct acpi_info *info)
 {
@@ -293,6 +342,9 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
         }
     }
 
+    /* Load any additional tables passed through. */
+    nr_tables += construct_passthrough_tables(table_ptrs, nr_tables);
+
     table_ptrs[nr_tables] = 0;
     return nr_tables;
 }
@@ -327,7 +379,7 @@ void acpi_build_tables(struct acpi_config *config, unsigned int physical)
     struct acpi_10_fadt *fadt_10;
     struct acpi_20_facs *facs;
     unsigned char       *dsdt;
-    unsigned long        secondary_tables[16];
+    unsigned long        secondary_tables[ACPI_MAX_SECONDARY_TABLES];
     int                  nr_secondaries, i;
     unsigned long        vm_gid_addr;
 
