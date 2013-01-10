@@ -22,7 +22,7 @@
 #include <xenguest.h>
 
 int xc_hvm_build(xc_interface *xch, uint32_t domid,
-                 const struct xc_hvm_build_args *hvm_args)
+                 struct xc_hvm_build_args *hvm_args)
 {
     errno = ENOSYS;
     return -1;

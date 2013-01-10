@@ -211,11 +211,23 @@ int xc_linux_build_mem(xc_interface *xch,
                        unsigned int console_evtchn,
                        unsigned long *console_mfn);
 
+struct xc_hvm_firmware_module {
+    uint8_t  *data;
+    uint32_t  length;
+    uint64_t  guest_addr_out;
+};
+
 struct xc_hvm_build_args {
     uint64_t mem_size;           /* Memory size in bytes. */
     uint64_t mem_target;         /* Memory target in bytes. */
     uint64_t mmio_size;          /* Size of the MMIO hole in bytes. */
     const char *image_file_name; /* File name of the image to load. */
+
+    /* Extra ACPI tables passed to HVMLOADER */
+    struct xc_hvm_firmware_module acpi_module;
+
+    /* Extra SMBIOS structures passed to HVMLOADER */
+    struct xc_hvm_firmware_module smbios_module;
 };
 
 /**
@@ -228,7 +240,7 @@ struct xc_hvm_build_args {
  * are optional.
  */
 int xc_hvm_build(xc_interface *xch, uint32_t domid,
-                 const struct xc_hvm_build_args *hvm_args);
+                 struct xc_hvm_build_args *hvm_args);
 
 int xc_hvm_build_target_mem(xc_interface *xch,
                             uint32_t domid,
