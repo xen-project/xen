@@ -242,7 +242,7 @@ int physdev_unmap_pirq(domid_t domid, int pirq)
     if ( !IS_PRIV_FOR(current->domain, d) )
         goto free_domain;
 
-    ret = xsm_irq_permission(d, domain_pirq_to_irq(d, pirq), 0);
+    ret = xsm_unmap_domain_pirq(d, domain_pirq_to_irq(d, pirq));
     if ( ret )
         goto free_domain;
 

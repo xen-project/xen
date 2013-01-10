@@ -394,12 +394,22 @@ static XSM_INLINE int xsm_map_domain_pirq(struct domain *d, int irq, void *data)
     return 0;
 }
 
+static XSM_INLINE int xsm_unmap_domain_pirq(struct domain *d, int irq)
+{
+    return 0;
+}
+
 static XSM_INLINE int xsm_irq_permission(struct domain *d, int pirq, uint8_t allow)
 {
     return 0;
 }
 
 static XSM_INLINE int xsm_iomem_permission(struct domain *d, uint64_t s, uint64_t e, uint8_t allow)
+{
+    return 0;
+}
+
+static XSM_INLINE int xsm_iomem_mapping(struct domain *d, uint64_t s, uint64_t e, uint8_t allow)
 {
     return 0;
 }
@@ -585,7 +595,7 @@ static XSM_INLINE int xsm_bind_pt_irq(struct domain *d, struct xen_domctl_bind_p
     return 0;
 }
 
-static XSM_INLINE int xsm_unbind_pt_irq(struct domain *d)
+static XSM_INLINE int xsm_unbind_pt_irq(struct domain *d, struct xen_domctl_bind_pt_irq *bind)
 {
     return 0;
 }
@@ -606,6 +616,11 @@ static XSM_INLINE int xsm_vcpuextstate(struct domain *d, uint32_t cmd)
 }
 
 static XSM_INLINE int xsm_ioport_permission(struct domain *d, uint32_t s, uint32_t e, uint8_t allow)
+{
+    return 0;
+}
+
+static XSM_INLINE int xsm_ioport_mapping(struct domain *d, uint32_t s, uint32_t e, uint8_t allow)
 {
     return 0;
 }

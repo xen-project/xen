@@ -721,41 +721,39 @@ static int flask_map_domain_pirq (struct domain *d, int irq, void *data)
     return rc;
 }
 
-static int flask_irq_permission (struct domain *d, int irq, uint8_t access)
+static int flask_unmap_domain_pirq (struct domain *d, int irq)
 {
-    u32 perm;
-    u32 rsid;
+    u32 sid;
     int rc = -EPERM;
 
-    struct domain_security_struct *ssec, *tsec;
+    struct domain_security_struct *ssec;
     struct avc_audit_data ad;
 
-    rc = domain_has_perm(current->domain, d, SECCLASS_RESOURCE,
-                         resource_to_perm(access));
-
+    rc = domain_has_perm(current->domain, d, SECCLASS_RESOURCE, RESOURCE__REMOVE);
     if ( rc )
         return rc;
-
-    if ( access )
-        perm = RESOURCE__ADD_IRQ;
-    else
-        perm = RESOURCE__REMOVE_IRQ;
 
     ssec = current->domain->ssid;
-    tsec = d->ssid;
 
-    rc = get_irq_sid(irq, &rsid, &ad);
+    if ( irq < nr_static_irqs ) {
+        rc = get_irq_sid(irq, &sid, &ad);
+    } else {
+        /* It is currently not possible to check the specific MSI IRQ being
+         * removed, since we do not have the msi_info like map_domain_pirq */
+        return 0;
+    }
     if ( rc )
         return rc;
 
-    rc = avc_has_perm(ssec->sid, rsid, SECCLASS_RESOURCE, perm, &ad);
-    if ( rc )
-        return rc;
-
-    if ( access )
-        rc = avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, 
-                            RESOURCE__USE, &ad);
+    rc = avc_has_perm(ssec->sid, sid, SECCLASS_RESOURCE, RESOURCE__REMOVE_IRQ, &ad);
     return rc;
+}
+
+static int flask_irq_permission (struct domain *d, int pirq, uint8_t access)
+{
+    /* the PIRQ number is not useful; real IRQ is checked during mapping */
+    return domain_has_perm(current->domain, d, SECCLASS_RESOURCE,
+                           resource_to_perm(access));
 }
 
 struct iomem_has_perm_data {
@@ -1413,7 +1411,7 @@ static int flask_bind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *b
     return avc_has_perm(tsec->sid, rsid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
 }
 
-static int flask_unbind_pt_irq (struct domain *d)
+static int flask_unbind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq *bind)
 {
     return domain_has_perm(current->domain, d, SECCLASS_RESOURCE, RESOURCE__REMOVE);
 }
@@ -1533,6 +1531,7 @@ static struct xsm_operations flask_ops = {
     .show_irq_sid = flask_show_irq_sid,
 
     .map_domain_pirq = flask_map_domain_pirq,
+    .unmap_domain_pirq = flask_unmap_domain_pirq,
     .irq_permission = flask_irq_permission,
     .iomem_permission = flask_iomem_permission,
     .pci_config_permission = flask_pci_config_permission,

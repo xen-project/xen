@@ -656,6 +656,10 @@ long arch_do_domctl(
              !irq_access_permitted(current->domain, bind->machine_irq) )
             break;
 
+        ret = xsm_unbind_pt_irq(d, bind);
+        if ( ret )
+            break;
+
         if ( iommu_enabled )
         {
             spin_lock(&pcidevs_lock);
@@ -687,7 +691,7 @@ long arch_do_domctl(
              !iomem_access_permitted(current->domain, mfn, mfn + nr_mfns - 1) )
             break;
 
-        ret = xsm_iomem_permission(d, mfn, mfn + nr_mfns - 1, add);
+        ret = xsm_iomem_mapping(d, mfn, mfn + nr_mfns - 1, add);
         if ( ret )
             break;
 
@@ -765,7 +769,7 @@ long arch_do_domctl(
              !ioports_access_permitted(current->domain, fmp, fmp + np - 1) )
             break;
 
-        ret = xsm_ioport_permission(d, fmp, fmp + np - 1, add);
+        ret = xsm_ioport_mapping(d, fmp, fmp + np - 1, add);
         if ( ret )
             break;
 
