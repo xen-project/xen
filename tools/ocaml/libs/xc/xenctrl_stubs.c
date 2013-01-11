@@ -1085,11 +1085,10 @@ CAMLprim value stub_xc_domain_irq_permission(value xch, value domid,
 
 static uint32_t pci_dev_to_bdf(int domain, int bus, int slot, int func)
 {
-	uint32_t bdf = 0;
-	bdf |= (bus & 0xff) << 16;
-	bdf |= (slot & 0x1f) << 11;
-	bdf |= (func & 0x7) << 8;
-	return bdf;
+	return  ((uint32_t)domain & 0xffff) << 16 |
+		((uint32_t)bus    &   0xff) << 8  |
+		((uint32_t)slot   &   0x1f) << 3  |
+		((uint32_t)func   &    0x7);
 }
 
 CAMLprim value stub_xc_domain_test_assign_device(value xch, value domid, value desc)
