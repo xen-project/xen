@@ -172,7 +172,7 @@ static void run_helper(libxl__egc *egc, libxl__save_helper_state *shs,
     shs->stdout_what = GCSPRINTF("domain %"PRIu32" save/restore helper"
                                  " stdout pipe", domid);
 
-    *arg++ = getenv("LIBXL_SAVE_HELPER") ?: LIBEXEC "/" "libxl-save-helper";
+    *arg++ = getenv("LIBXL_SAVE_HELPER") ?: PRIVATE_BINDIR "/" "libxl-save-helper";
     *arg++ = mode_arg;
     const char **stream_fd_arg = arg++;
     for (i=0; i<num_argnums; i++)

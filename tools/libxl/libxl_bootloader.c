@@ -419,7 +419,7 @@ static void bootloader_disk_attached_cb(libxl__egc *egc,
         const char *bltmp;
         struct stat st;
 
-        bltmp = libxl__abs_path(gc, bootloader, libxl__libexec_path());
+        bltmp = libxl__abs_path(gc, bootloader, libxl__private_bindir_path());
         /* Check to see if the file exists in this location; if not,
          * fall back to checking the path */
         LOG(DEBUG, "Checking for bootloader in libexec path: %s", bltmp);
