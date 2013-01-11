@@ -484,6 +484,12 @@ int rcu_lock_remote_target_domain_by_id(domid_t dom, struct domain **d);
  */
 int rcu_lock_remote_domain_by_id(domid_t dom, struct domain **d);
 
+/*
+ * As rcu_lock_remote_domain_by_id() but will fail EINVAL if the domain is
+ * dying.
+ */
+int rcu_lock_live_remote_domain_by_id(domid_t dom, struct domain **d);
+
 /* Finish a RCU critical region started by rcu_lock_domain_by_id(). */
 static inline void rcu_unlock_domain(struct domain *d)
 {

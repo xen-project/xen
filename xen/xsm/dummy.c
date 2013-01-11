@@ -136,8 +136,11 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, hvm_set_isa_irq_level);
     set_to_dummy_if_null(ops, hvm_set_pci_link_route);
     set_to_dummy_if_null(ops, hvm_inject_msi);
-    set_to_dummy_if_null(ops, mem_event);
+    set_to_dummy_if_null(ops, mem_event_setup);
+    set_to_dummy_if_null(ops, mem_event_control);
+    set_to_dummy_if_null(ops, mem_event_op);
     set_to_dummy_if_null(ops, mem_sharing);
+    set_to_dummy_if_null(ops, mem_sharing_op);
     set_to_dummy_if_null(ops, apic);
     set_to_dummy_if_null(ops, xen_settime);
     set_to_dummy_if_null(ops, memtype);

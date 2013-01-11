@@ -1223,10 +1223,8 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_mem_event_op:
     {
-        ret = xsm_mem_event(d);
-        if ( !ret )
-            ret = mem_event_domctl(d, &domctl->u.mem_event_op,
-                                   guest_handle_cast(u_domctl, void));
+        ret = mem_event_domctl(d, &domctl->u.mem_event_op,
+                              guest_handle_cast(u_domctl, void));
         copyback = 1;
     }
     break;
@@ -1265,7 +1263,7 @@ long arch_do_domctl(
         if ( current->domain == d )
             break;
 
-        ret = xsm_mem_event(d);
+        ret = xsm_mem_event_setup(d);
         if ( !ret ) {
             p2m = p2m_get_hostp2m(d);
             p2m->access_required = domctl->u.access_required.access_required;

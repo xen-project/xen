@@ -1278,7 +1278,17 @@ static int flask_hvm_inject_msi(struct domain *d)
     return current_has_perm(d, SECCLASS_HVM, HVM__SEND_IRQ);
 }
 
-static int flask_mem_event(struct domain *d)
+static int flask_mem_event_setup(struct domain *d)
+{
+    return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
+}
+
+static int flask_mem_event_control(struct domain *d, int mode, int op)
+{
+    return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
+}
+
+static int flask_mem_event_op(struct domain *d, int op)
 {
     return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
 }
@@ -1286,6 +1296,14 @@ static int flask_mem_event(struct domain *d)
 static int flask_mem_sharing(struct domain *d)
 {
     return current_has_perm(d, SECCLASS_HVM, HVM__MEM_SHARING);
+}
+
+static int flask_mem_sharing_op(struct domain *d, struct domain *cd, int op)
+{
+    int rc = current_has_perm(cd, SECCLASS_HVM, HVM__MEM_SHARING);
+    if ( rc )
+        return rc;
+    return domain_has_perm(d, cd, SECCLASS_HVM, HVM__SHARE_MEM);
 }
 
 static int flask_apic(struct domain *d, int cmd)
@@ -1737,8 +1755,11 @@ static struct xsm_operations flask_ops = {
     .hvm_set_isa_irq_level = flask_hvm_set_isa_irq_level,
     .hvm_set_pci_link_route = flask_hvm_set_pci_link_route,
     .hvm_inject_msi = flask_hvm_inject_msi,
-    .mem_event = flask_mem_event,
+    .mem_event_setup = flask_mem_event_setup,
+    .mem_event_control = flask_mem_event_control,
+    .mem_event_op = flask_mem_event_op,
     .mem_sharing = flask_mem_sharing,
+    .mem_sharing_op = flask_mem_sharing_op,
     .apic = flask_apic,
     .xen_settime = flask_xen_settime,
     .memtype = flask_memtype,

@@ -551,13 +551,34 @@ static XSM_INLINE int xsm_hvm_inject_msi(struct domain *d)
     return 0;
 }
 
-static XSM_INLINE int xsm_mem_event(struct domain *d)
+static XSM_INLINE int xsm_mem_event_setup(struct domain *d)
 {
+    return 0;
+}
+
+static XSM_INLINE int xsm_mem_event_control(struct domain *d, int mode, int op)
+{
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+    return 0;
+}
+
+static XSM_INLINE int xsm_mem_event_op(struct domain *d, int op)
+{
+    if ( !IS_PRIV_FOR(current->domain, d) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_mem_sharing(struct domain *d)
 {
+    return 0;
+}
+
+static XSM_INLINE int xsm_mem_sharing_op(struct domain *d, struct domain *cd, int op)
+{
+    if ( !IS_PRIV_FOR(current->domain, cd) )
+        return -EPERM;
     return 0;
 }
 

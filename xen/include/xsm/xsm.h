@@ -151,8 +151,11 @@ struct xsm_operations {
     int (*hvm_set_isa_irq_level) (struct domain *d);
     int (*hvm_set_pci_link_route) (struct domain *d);
     int (*hvm_inject_msi) (struct domain *d);
-    int (*mem_event) (struct domain *d);
+    int (*mem_event_setup) (struct domain *d);
+    int (*mem_event_control) (struct domain *d, int mode, int op);
+    int (*mem_event_op) (struct domain *d, int op);
     int (*mem_sharing) (struct domain *d);
+    int (*mem_sharing_op) (struct domain *d, struct domain *cd, int op);
     int (*apic) (struct domain *d, int cmd);
     int (*xen_settime) (void);
     int (*memtype) (uint32_t access);
@@ -665,14 +668,29 @@ static inline int xsm_hvm_inject_msi (struct domain *d)
     return xsm_ops->hvm_inject_msi(d);
 }
 
-static inline int xsm_mem_event (struct domain *d)
+static inline int xsm_mem_event_setup (struct domain *d)
 {
-    return xsm_ops->mem_event(d);
+    return xsm_ops->mem_event_setup(d);
+}
+
+static inline int xsm_mem_event_control (struct domain *d, int mode, int op)
+{
+    return xsm_ops->mem_event_control(d, mode, op);
+}
+
+static inline int xsm_mem_event_op (struct domain *d, int op)
+{
+    return xsm_ops->mem_event_op(d, op);
 }
 
 static inline int xsm_mem_sharing (struct domain *d)
 {
     return xsm_ops->mem_sharing(d);
+}
+
+static inline int xsm_mem_sharing_op (struct domain *d, struct domain *cd, int op)
+{
+    return xsm_ops->mem_sharing_op(d, cd, op);
 }
 
 static inline int xsm_apic (struct domain *d, int cmd)

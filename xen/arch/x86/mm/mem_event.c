@@ -29,6 +29,7 @@
 #include <asm/mem_paging.h>
 #include <asm/mem_access.h>
 #include <asm/mem_sharing.h>
+#include <xsm/xsm.h>
 
 /* for public/io/ring.h macros */
 #define xen_mb()   mb()
@@ -439,34 +440,18 @@ static void mem_sharing_notification(struct vcpu *v, unsigned int port)
         mem_sharing_sharing_resume(v->domain);
 }
 
-struct domain *get_mem_event_op_target(uint32_t domain, int *rc)
-{
-    struct domain *d;
-
-    /* Get the target domain */
-    *rc = rcu_lock_remote_target_domain_by_id(domain, &d);
-    if ( *rc != 0 )
-        return NULL;
-
-    /* Not dying? */
-    if ( d->is_dying )
-    {
-        rcu_unlock_domain(d);
-        *rc = -EINVAL;
-        return NULL;
-    }
-    
-    return d;
-}
-
 int do_mem_event_op(int op, uint32_t domain, void *arg)
 {
     int ret;
     struct domain *d;
 
-    d = get_mem_event_op_target(domain, &ret);
-    if ( !d )
+    ret = rcu_lock_live_remote_domain_by_id(domain, &d);
+    if ( ret )
         return ret;
+
+    ret = xsm_mem_event_op(d, op);
+    if ( ret )
+        goto out;
 
     switch (op)
     {
@@ -483,6 +468,7 @@ int do_mem_event_op(int op, uint32_t domain, void *arg)
             ret = -ENOSYS;
     }
 
+ out:
     rcu_unlock_domain(d);
     return ret;
 }
@@ -516,6 +502,10 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 {
     int rc;
 
+    rc = xsm_mem_event_control(d, mec->mode, mec->op);
+    if ( rc )
+        return rc;
+
     if ( unlikely(d == current->domain) )
     {
         gdprintk(XENLOG_INFO, "Tried to do a memory event op on itself.\n");
@@ -536,13 +526,6 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
                  d->domain_id);
         return -EINVAL;
     }
-
-    /* TODO: XSM hook */
-#if 0
-    rc = xsm_mem_event_control(d, mec->op);
-    if ( rc )
-        return rc;
-#endif
 
     rc = -ENOSYS;
 

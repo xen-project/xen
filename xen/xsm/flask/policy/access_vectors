@@ -102,6 +102,7 @@ class hvm
     mem_sharing
     audit_p2m
     send_irq
+    share_mem
 }
 
 class event

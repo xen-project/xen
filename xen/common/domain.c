@@ -475,6 +475,21 @@ int rcu_lock_remote_domain_by_id(domid_t dom, struct domain **d)
     return 0;
 }
 
+int rcu_lock_live_remote_domain_by_id(domid_t dom, struct domain **d)
+{
+    int rv;
+    rv = rcu_lock_remote_domain_by_id(dom, d);
+    if ( rv )
+        return rv;
+    if ( (*d)->is_dying )
+    {
+        rcu_unlock_domain(*d);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
 int domain_kill(struct domain *d)
 {
     int rc = 0;

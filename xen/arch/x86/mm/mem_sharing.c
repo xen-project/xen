@@ -34,6 +34,7 @@
 #include <asm/atomic.h>
 #include <xen/rcupdate.h>
 #include <asm/event.h>
+#include <xsm/xsm.h>
 
 #include "mm-locks.h"
 
@@ -1345,9 +1346,17 @@ int mem_sharing_memop(struct domain *d, xen_mem_sharing_op_t *mec)
             if ( !mem_sharing_enabled(d) )
                 return -EINVAL;
 
-            cd = get_mem_event_op_target(mec->u.share.client_domain, &rc);
-            if ( !cd )
+            rc = rcu_lock_live_remote_domain_by_id(mec->u.share.client_domain,
+                                                   &cd);
+            if ( rc )
                 return rc;
+
+            rc = xsm_mem_sharing_op(d, cd, mec->op);
+            if ( rc )
+            {
+                rcu_unlock_domain(cd);
+                return rc;
+            }
 
             if ( !mem_sharing_enabled(cd) )
             {
@@ -1401,9 +1410,17 @@ int mem_sharing_memop(struct domain *d, xen_mem_sharing_op_t *mec)
             if ( !mem_sharing_enabled(d) )
                 return -EINVAL;
 
-            cd = get_mem_event_op_target(mec->u.share.client_domain, &rc);
-            if ( !cd )
+            rc = rcu_lock_live_remote_domain_by_id(mec->u.share.client_domain,
+                                                   &cd);
+            if ( rc )
                 return rc;
+
+            rc = xsm_mem_sharing_op(d, cd, mec->op);
+            if ( rc )
+            {
+                rcu_unlock_domain(cd);
+                return rc;
+            }
 
             if ( !mem_sharing_enabled(cd) )
             {
