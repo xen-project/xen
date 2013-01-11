@@ -36,9 +36,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, domctl);
     set_to_dummy_if_null(ops, sysctl);
     set_to_dummy_if_null(ops, readconsole);
-    set_to_dummy_if_null(ops, getcpuinfo);
-    set_to_dummy_if_null(ops, setpminfo);
-    set_to_dummy_if_null(ops, pm_op);
     set_to_dummy_if_null(ops, do_mca);
 
     set_to_dummy_if_null(ops, evtchn_unbound);
@@ -111,16 +108,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, mem_event_op);
     set_to_dummy_if_null(ops, mem_sharing_op);
     set_to_dummy_if_null(ops, apic);
-    set_to_dummy_if_null(ops, xen_settime);
-    set_to_dummy_if_null(ops, memtype);
-    set_to_dummy_if_null(ops, microcode);
-    set_to_dummy_if_null(ops, platform_quirk);
     set_to_dummy_if_null(ops, platform_op);
-    set_to_dummy_if_null(ops, firmware_info);
-    set_to_dummy_if_null(ops, efi_call);
-    set_to_dummy_if_null(ops, acpi_sleep);
-    set_to_dummy_if_null(ops, change_freq);
-    set_to_dummy_if_null(ops, getidletime);
     set_to_dummy_if_null(ops, machine_memory_map);
     set_to_dummy_if_null(ops, domain_memory_map);
     set_to_dummy_if_null(ops, mmu_update);

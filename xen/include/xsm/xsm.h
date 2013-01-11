@@ -47,9 +47,6 @@ struct xsm_operations {
     int (*domctl) (struct domain *d, int cmd);
     int (*sysctl) (int cmd);
     int (*readconsole) (uint32_t clear);
-    int (*getcpuinfo) (void);
-    int (*setpminfo) (void);
-    int (*pm_op) (void);
     int (*do_mca) (void);
 
     int (*evtchn_unbound) (struct domain *d, struct evtchn *chn, domid_t id2);
@@ -124,16 +121,8 @@ struct xsm_operations {
     int (*mem_event_op) (struct domain *d, int op);
     int (*mem_sharing_op) (struct domain *d, struct domain *cd, int op);
     int (*apic) (struct domain *d, int cmd);
-    int (*xen_settime) (void);
     int (*memtype) (uint32_t access);
-    int (*microcode) (void);
-    int (*platform_quirk) (uint32_t);
     int (*platform_op) (uint32_t cmd);
-    int (*firmware_info) (void);
-    int (*efi_call) (void);
-    int (*acpi_sleep) (void);
-    int (*change_freq) (void);
-    int (*getidletime) (void);
     int (*machine_memory_map) (void);
     int (*domain_memory_map) (struct domain *d);
 #define XSM_MMU_UPDATE_READ      1
@@ -192,21 +181,6 @@ static inline int xsm_sysctl (int cmd)
 static inline int xsm_readconsole (uint32_t clear)
 {
     return xsm_ops->readconsole(clear);
-}
-
-static inline int xsm_getcpuinfo(void)
-{
-    return xsm_ops->getcpuinfo();
-}
-
-static inline int xsm_setpminfo(void)
-{
-    return xsm_ops->setpminfo();
-}
-
-static inline int xsm_pm_op(void)
-{
-    return xsm_ops->pm_op();
 }
 
 static inline int xsm_do_mca(void)
@@ -511,54 +485,14 @@ static inline int xsm_apic (struct domain *d, int cmd)
     return xsm_ops->apic(d, cmd);
 }
 
-static inline int xsm_xen_settime (void)
-{
-    return xsm_ops->xen_settime();
-}
-
 static inline int xsm_memtype (uint32_t access)
 {
     return xsm_ops->memtype(access);
 }
 
-static inline int xsm_microcode (void)
-{
-    return xsm_ops->microcode();
-}
-
-static inline int xsm_platform_quirk (uint32_t quirk)
-{
-    return xsm_ops->platform_quirk(quirk);
-}
-
 static inline int xsm_platform_op (uint32_t op)
 {
     return xsm_ops->platform_op(op);
-}
-
-static inline int xsm_firmware_info (void)
-{
-    return xsm_ops->firmware_info();
-}
-
-static inline int xsm_efi_call (void)
-{
-    return xsm_ops->efi_call();
-}
-
-static inline int xsm_acpi_sleep (void)
-{
-    return xsm_ops->acpi_sleep();
-}
-
-static inline int xsm_change_freq (void)
-{
-    return xsm_ops->change_freq();
-}
-
-static inline int xsm_getidletime (void)
-{
-    return xsm_ops->getidletime();
 }
 
 static inline int xsm_machine_memory_map(void)

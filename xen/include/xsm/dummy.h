@@ -63,21 +63,6 @@ static XSM_INLINE int xsm_readconsole(uint32_t clear)
     return 0;
 }
 
-static XSM_INLINE int xsm_getcpuinfo(void)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_setpminfo(void)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_pm_op(void)
-{
-    return 0;
-}
-
 static XSM_INLINE int xsm_do_mca(void)
 {
     if ( !IS_PRIV(current->domain) )
@@ -436,57 +421,10 @@ static XSM_INLINE int xsm_apic(struct domain *d, int cmd)
     return 0;
 }
 
-static XSM_INLINE int xsm_xen_settime(void)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_memtype(uint32_t access)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_microcode(void)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_platform_quirk(uint32_t quirk)
-{
-    return 0;
-}
-
 static XSM_INLINE int xsm_platform_op(uint32_t op)
 {
     if ( !IS_PRIV(current->domain) )
         return -EPERM;
-    return 0;
-}
-
-static XSM_INLINE int xsm_firmware_info(void)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_efi_call(void)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_acpi_sleep(void)
-{
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-    return 0;
-}
-
-static XSM_INLINE int xsm_change_freq(void)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_getidletime(void)
-{
     return 0;
 }
 
