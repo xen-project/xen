@@ -144,6 +144,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, microcode);
     set_to_dummy_if_null(ops, physinfo);
     set_to_dummy_if_null(ops, platform_quirk);
+    set_to_dummy_if_null(ops, platform_op);
     set_to_dummy_if_null(ops, firmware_info);
     set_to_dummy_if_null(ops, efi_call);
     set_to_dummy_if_null(ops, acpi_sleep);

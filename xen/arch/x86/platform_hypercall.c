@@ -66,14 +66,15 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
     ret_t ret = 0;
     struct xen_platform_op curop, *op = &curop;
 
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
     if ( copy_from_guest(op, u_xenpf_op, 1) )
         return -EFAULT;
 
     if ( op->interface_version != XENPF_INTERFACE_VERSION )
         return -EACCES;
+
+    ret = xsm_platform_op(op->cmd);
+    if ( ret )
+        return ret;
 
     /*
      * Trylock here avoids deadlock with an existing platform critical section
@@ -512,6 +513,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
     case XENPF_get_cpu_version:
     {
         struct xenpf_pcpu_version *ver = &op->u.pcpu_version;
+
+        ret = xsm_getcpuinfo();
+        if ( ret )
+            break;
 
         if ( !get_cpu_maps() )
         {

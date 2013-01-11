@@ -159,6 +159,7 @@ struct xsm_operations {
     int (*microcode) (void);
     int (*physinfo) (void);
     int (*platform_quirk) (uint32_t);
+    int (*platform_op) (uint32_t cmd);
     int (*firmware_info) (void);
     int (*efi_call) (void);
     int (*acpi_sleep) (void);
@@ -702,6 +703,11 @@ static inline int xsm_physinfo (void)
 static inline int xsm_platform_quirk (uint32_t quirk)
 {
     return xsm_ops->platform_quirk(quirk);
+}
+
+static inline int xsm_platform_op (uint32_t op)
+{
+    return xsm_ops->platform_op(op);
 }
 
 static inline int xsm_firmware_info (void)

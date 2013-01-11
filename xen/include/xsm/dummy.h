@@ -593,6 +593,13 @@ static XSM_INLINE int xsm_platform_quirk(uint32_t quirk)
     return 0;
 }
 
+static XSM_INLINE int xsm_platform_op(uint32_t op)
+{
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+    return 0;
+}
+
 static XSM_INLINE int xsm_firmware_info(void)
 {
     return 0;

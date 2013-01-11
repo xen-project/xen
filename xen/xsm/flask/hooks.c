@@ -1316,6 +1316,38 @@ static int flask_platform_quirk(uint32_t quirk)
                         XEN__QUIRK, NULL);
 }
 
+static int flask_platform_op(uint32_t op)
+{
+    switch ( op )
+    {
+    case XENPF_settime:
+    case XENPF_add_memtype:
+    case XENPF_del_memtype:
+    case XENPF_read_memtype:
+    case XENPF_microcode_update:
+    case XENPF_platform_quirk:
+    case XENPF_firmware_info:
+    case XENPF_efi_runtime_call:
+    case XENPF_enter_acpi_sleep:
+    case XENPF_change_freq:
+    case XENPF_getidletime:
+    case XENPF_set_processor_pminfo:
+    case XENPF_get_cpuinfo:
+    case XENPF_get_cpu_version:
+    case XENPF_cpu_online:
+    case XENPF_cpu_offline:
+    case XENPF_cpu_hotadd:
+    case XENPF_mem_hotadd:
+        /* These operations have their own XSM hooks */
+        return 0;
+    case XENPF_core_parking:
+        return domain_has_xen(current->domain, XEN__PM_OP);
+    default:
+        printk("flask_platform_op: Unknown op %d\n", op);
+        return -EPERM;
+    }
+}
+
 static int flask_firmware_info(void)
 {
     return domain_has_xen(current->domain, XEN__FIRMWARE);
@@ -1687,6 +1719,7 @@ static struct xsm_operations flask_ops = {
     .microcode = flask_microcode,
     .physinfo = flask_physinfo,
     .platform_quirk = flask_platform_quirk,
+    .platform_op = flask_platform_op,
     .firmware_info = flask_firmware_info,
     .efi_call = flask_efi_call,
     .acpi_sleep = flask_acpi_sleep,
