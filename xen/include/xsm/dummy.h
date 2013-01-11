@@ -64,8 +64,6 @@ static XSM_INLINE int xsm_scheduler(struct domain *d)
 
 static XSM_INLINE int xsm_getdomaininfo(struct domain *d)
 {
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
     return 0;
 }
 
@@ -91,6 +89,20 @@ static XSM_INLINE int xsm_set_target(struct domain *d, struct domain *e)
 
 static XSM_INLINE int xsm_domctl(struct domain *d, int cmd)
 {
+    switch ( cmd )
+    {
+    case XEN_DOMCTL_ioport_mapping:
+    case XEN_DOMCTL_memory_mapping:
+    case XEN_DOMCTL_bind_pt_irq:
+    case XEN_DOMCTL_unbind_pt_irq: {
+        if ( !IS_PRIV_FOR(current->domain, d) )
+            return -EPERM;
+        break;
+    }
+    default:
+        if ( !IS_PRIV(current->domain) )
+            return -EPERM;
+    }
     return 0;
 }
 

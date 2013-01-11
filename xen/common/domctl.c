@@ -265,27 +265,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             return -ESRCH;
     }
 
-    switch ( op->cmd )
-    {
-    case XEN_DOMCTL_ioport_mapping:
-    case XEN_DOMCTL_memory_mapping:
-    case XEN_DOMCTL_bind_pt_irq:
-    case XEN_DOMCTL_unbind_pt_irq: {
-        bool_t is_priv = IS_PRIV_FOR(current->domain, d);
-        if ( !is_priv )
-        {
-            ret = -EPERM;
-            goto domctl_out_unlock_domonly;
-        }
-        break;
-    }
-    case XEN_DOMCTL_getdomaininfo:
-        break;
-    default:
-        if ( !IS_PRIV(current->domain) )
-            return -EPERM;
-        break;
-    }
+    ret = xsm_domctl(d, op->cmd);
+    if ( ret )
+        goto domctl_out_unlock_domonly;
 
     if ( !domctl_lock_acquire() )
     {
@@ -855,17 +837,13 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_subscribe:
     {
-        ret = xsm_domctl(d, op->cmd);
-        if ( !ret )
-            d->suspend_evtchn = op->u.subscribe.port;
+        d->suspend_evtchn = op->u.subscribe.port;
     }
     break;
 
     case XEN_DOMCTL_disable_migrate:
     {
-        ret = xsm_domctl(d, op->cmd);
-        if ( !ret )
-            d->disable_migrate = op->u.disable_migrate.disable;
+        d->disable_migrate = op->u.disable_migrate.disable;
     }
     break;
 

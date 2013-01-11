@@ -582,7 +582,90 @@ static int flask_set_target(struct domain *d, struct domain *e)
 
 static int flask_domctl(struct domain *d, int cmd)
 {
-    return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, DOMAIN__SET_MISC_INFO);
+    switch ( cmd )
+    {
+    /* These have individual XSM hooks (common/domctl.c) */
+    case XEN_DOMCTL_createdomain:
+    case XEN_DOMCTL_destroydomain:
+    case XEN_DOMCTL_pausedomain:
+    case XEN_DOMCTL_unpausedomain:
+    case XEN_DOMCTL_getdomaininfo:
+    case XEN_DOMCTL_setvcpuaffinity:
+    case XEN_DOMCTL_max_mem:
+    case XEN_DOMCTL_setvcpucontext:
+    case XEN_DOMCTL_getvcpucontext:
+    case XEN_DOMCTL_getvcpuinfo:
+    case XEN_DOMCTL_max_vcpus:
+    case XEN_DOMCTL_scheduler_op:
+    case XEN_DOMCTL_setdomainhandle:
+    case XEN_DOMCTL_setdebugging:
+    case XEN_DOMCTL_irq_permission:
+    case XEN_DOMCTL_iomem_permission:
+    case XEN_DOMCTL_settimeoffset:
+    case XEN_DOMCTL_getvcpuaffinity:
+    case XEN_DOMCTL_resumedomain:
+    case XEN_DOMCTL_set_target:
+    case XEN_DOMCTL_set_virq_handler:
+#ifdef CONFIG_X86
+    /* These have individual XSM hooks (arch/x86/domctl.c) */
+    case XEN_DOMCTL_shadow_op:
+    case XEN_DOMCTL_ioport_permission:
+    case XEN_DOMCTL_getpageframeinfo:
+    case XEN_DOMCTL_getpageframeinfo2:
+    case XEN_DOMCTL_getpageframeinfo3:
+    case XEN_DOMCTL_getmemlist:
+    case XEN_DOMCTL_hypercall_init:
+    case XEN_DOMCTL_sethvmcontext:
+    case XEN_DOMCTL_gethvmcontext:
+    case XEN_DOMCTL_gethvmcontext_partial:
+    case XEN_DOMCTL_set_address_size:
+    case XEN_DOMCTL_get_address_size:
+    case XEN_DOMCTL_set_machine_address_size:
+    case XEN_DOMCTL_get_machine_address_size:
+    case XEN_DOMCTL_sendtrigger:
+    case XEN_DOMCTL_bind_pt_irq:
+    case XEN_DOMCTL_unbind_pt_irq:
+    case XEN_DOMCTL_memory_mapping:
+    case XEN_DOMCTL_ioport_mapping:
+    case XEN_DOMCTL_pin_mem_cacheattr:
+    case XEN_DOMCTL_set_ext_vcpucontext:
+    case XEN_DOMCTL_get_ext_vcpucontext:
+    case XEN_DOMCTL_setvcpuextstate:
+    case XEN_DOMCTL_getvcpuextstate:
+    case XEN_DOMCTL_mem_event_op:
+    case XEN_DOMCTL_mem_sharing_op:
+    case XEN_DOMCTL_set_access_required:
+    /* These have individual XSM hooks (drivers/passthrough/iommu.c) */
+    case XEN_DOMCTL_get_device_group:
+    case XEN_DOMCTL_test_assign_device:
+    case XEN_DOMCTL_assign_device:
+    case XEN_DOMCTL_deassign_device:
+#endif
+        return 0;
+
+    case XEN_DOMCTL_subscribe:
+    case XEN_DOMCTL_disable_migrate:
+        return domain_has_perm(current->domain, d, SECCLASS_DOMAIN,
+                               DOMAIN__SET_MISC_INFO);
+
+    case XEN_DOMCTL_set_cpuid:
+    case XEN_DOMCTL_suppress_spurious_page_faults:
+    case XEN_DOMCTL_debug_op:
+    case XEN_DOMCTL_gettscinfo:
+    case XEN_DOMCTL_settscinfo:
+    case XEN_DOMCTL_audit_p2m:
+    case XEN_DOMCTL_gdbsx_guestmemio:
+    case XEN_DOMCTL_gdbsx_pausevcpu:
+    case XEN_DOMCTL_gdbsx_unpausevcpu:
+    case XEN_DOMCTL_gdbsx_domstatus:
+        /* TODO add per-subfunction hooks */
+        if ( !IS_PRIV(current->domain) )
+            return -EPERM;
+        return 0;
+    default:
+        printk("flask_domctl: Unknown op %d\n", cmd);
+        return -EPERM;
+    }
 }
 
 static int flask_set_virq_handler(struct domain *d, uint32_t virq)
