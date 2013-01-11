@@ -833,6 +833,7 @@ static void load_shadow_guest_state(struct vcpu *v)
     void *vvmcs = nvcpu->nv_vvmcx;
     int i;
     u32 control;
+    u64 cr_gh_mask, cr_read_shadow;
 
     /* vvmcs.gstate to shadow vmcs.gstate */
     for ( i = 0; i < ARRAY_SIZE(vmcs_gstate_field); i++ )
@@ -854,10 +855,20 @@ static void load_shadow_guest_state(struct vcpu *v)
     vvmcs_to_shadow(vvmcs, VM_ENTRY_EXCEPTION_ERROR_CODE);
     vvmcs_to_shadow(vvmcs, VM_ENTRY_INSTRUCTION_LEN);
 
-    vvmcs_to_shadow(vvmcs, CR0_READ_SHADOW);
-    vvmcs_to_shadow(vvmcs, CR4_READ_SHADOW);
-    vvmcs_to_shadow(vvmcs, CR0_GUEST_HOST_MASK);
-    vvmcs_to_shadow(vvmcs, CR4_GUEST_HOST_MASK);
+    /*
+     * While emulate CR0 and CR4 for nested virtualization, set the CR0/CR4
+     * guest host mask to 0xffffffff in shadow VMCS (follow the host L1 VMCS),
+     * then calculate the corresponding read shadow separately for CR0 and CR4.
+     */
+    cr_gh_mask = __get_vvmcs(vvmcs, CR0_GUEST_HOST_MASK);
+    cr_read_shadow = (__get_vvmcs(vvmcs, GUEST_CR0) & ~cr_gh_mask) |
+                     (__get_vvmcs(vvmcs, CR0_READ_SHADOW) & cr_gh_mask);
+    __vmwrite(CR0_READ_SHADOW, cr_read_shadow);
+
+    cr_gh_mask = __get_vvmcs(vvmcs, CR4_GUEST_HOST_MASK);
+    cr_read_shadow = (__get_vvmcs(vvmcs, GUEST_CR4) & ~cr_gh_mask) |
+                     (__get_vvmcs(vvmcs, CR4_READ_SHADOW) & cr_gh_mask);
+    __vmwrite(CR4_READ_SHADOW, cr_read_shadow);
 
     /* TODO: PDPTRs for nested ept */
     /* TODO: CR3 target control */
@@ -913,8 +924,6 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
 static void sync_vvmcs_guest_state(struct vcpu *v, struct cpu_user_regs *regs)
 {
     int i;
-    unsigned long mask;
-    unsigned long cr;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     void *vvmcs = nvcpu->nv_vvmcx;
 
@@ -924,23 +933,6 @@ static void sync_vvmcs_guest_state(struct vcpu *v, struct cpu_user_regs *regs)
     /* RIP, RSP are in user regs */
     __set_vvmcs(vvmcs, GUEST_RIP, regs->eip);
     __set_vvmcs(vvmcs, GUEST_RSP, regs->esp);
-
-    /* SDM 20.6.6: L2 guest execution may change GUEST CR0/CR4 */
-    mask = __get_vvmcs(vvmcs, CR0_GUEST_HOST_MASK);
-    if ( ~mask )
-    {
-        cr = __get_vvmcs(vvmcs, GUEST_CR0);
-        cr = (cr & mask) | (__vmread(GUEST_CR0) & ~mask);
-        __set_vvmcs(vvmcs, GUEST_CR0, cr);
-    }
-
-    mask = __get_vvmcs(vvmcs, CR4_GUEST_HOST_MASK);
-    if ( ~mask )
-    {
-        cr = __get_vvmcs(vvmcs, GUEST_CR4);
-        cr = (cr & mask) | (__vmread(GUEST_CR4) & ~mask);
-        __set_vvmcs(vvmcs, GUEST_CR4, cr);
-    }
 
     /* CR3 sync if exec doesn't want cr3 load exiting: i.e. nested EPT */
     if ( !(__n2_exec_control(v) & CPU_BASED_CR3_LOAD_EXITING) )
@@ -1745,8 +1737,94 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                 nvcpu->nv_vmexit_pending = 1;
         }
         else  /* CR0, CR4, CLTS, LMSW */
-            nvcpu->nv_vmexit_pending = 1;
+        {
+            /*
+             * While getting the VM exit for CR0/CR4 access, check if L1 VMM owns
+             * the bit.
+             * If so, inject the VM exit to L1 VMM.
+             * Otherwise, L0 will handle it and sync the value to L1 virtual VMCS.
+             */
+            unsigned long old_val, val, changed_bits;
+            switch ( VMX_CONTROL_REG_ACCESS_TYPE(exit_qualification) )
+            {
+            case VMX_CONTROL_REG_ACCESS_TYPE_MOV_TO_CR:
+            {
+                unsigned long gp = VMX_CONTROL_REG_ACCESS_GPR(exit_qualification);
+                unsigned long *reg;
 
+                if ( (reg = decode_register(gp, guest_cpu_user_regs(), 0)) == NULL )
+                {
+                    gdprintk(XENLOG_ERR, "invalid gpr: %lx\n", gp);
+                    break;
+                }
+                val = *reg;
+                if ( cr == 0 )
+                {
+                    u64 cr0_gh_mask = __get_vvmcs(nvcpu->nv_vvmcx, CR0_GUEST_HOST_MASK);
+
+                    old_val = __vmread(CR0_READ_SHADOW);
+                    changed_bits = old_val ^ val;
+                    if ( changed_bits & cr0_gh_mask )
+                        nvcpu->nv_vmexit_pending = 1;
+                    else
+                    {
+                        u64 guest_cr0 = __get_vvmcs(nvcpu->nv_vvmcx, GUEST_CR0);
+                        __set_vvmcs(nvcpu->nv_vvmcx, GUEST_CR0,
+                                    (guest_cr0 & cr0_gh_mask) | (val & ~cr0_gh_mask));
+                    }
+                }
+                else if ( cr == 4 )
+                {
+                    u64 cr4_gh_mask = __get_vvmcs(nvcpu->nv_vvmcx, CR4_GUEST_HOST_MASK);
+
+                    old_val = __vmread(CR4_READ_SHADOW);
+                    changed_bits = old_val ^ val;
+                    if ( changed_bits & cr4_gh_mask )
+                        nvcpu->nv_vmexit_pending = 1;
+                    else
+                    {
+                        u64 guest_cr4 = __get_vvmcs(nvcpu->nv_vvmcx, GUEST_CR4);
+                        __set_vvmcs(nvcpu->nv_vvmcx, GUEST_CR4,
+                                    (guest_cr4 & cr4_gh_mask) | (val & ~cr4_gh_mask));
+                    }
+                }
+                else
+                    nvcpu->nv_vmexit_pending = 1;
+                break;
+            }
+            case VMX_CONTROL_REG_ACCESS_TYPE_CLTS:
+            {
+                u64 cr0_gh_mask = __get_vvmcs(nvcpu->nv_vvmcx, CR0_GUEST_HOST_MASK);
+
+                if ( cr0_gh_mask & X86_CR0_TS )
+                    nvcpu->nv_vmexit_pending = 1;
+                else
+                {
+                    u64 guest_cr0 = __get_vvmcs(nvcpu->nv_vvmcx, GUEST_CR0);
+                    __set_vvmcs(nvcpu->nv_vvmcx, GUEST_CR0, (guest_cr0 & ~X86_CR0_TS));
+                }
+                break;
+            }
+            case VMX_CONTROL_REG_ACCESS_TYPE_LMSW:
+            {
+                u64 cr0_gh_mask = __get_vvmcs(nvcpu->nv_vvmcx, CR0_GUEST_HOST_MASK);
+
+                old_val = __vmread(CR0_READ_SHADOW) & 0xf;
+                val = (exit_qualification >> 16) & 0xf;
+                changed_bits = old_val ^ val;
+                if ( changed_bits & cr0_gh_mask )
+                    nvcpu->nv_vmexit_pending = 1;
+                else
+                {
+                    u64 guest_cr0 = __get_vvmcs(nvcpu->nv_vvmcx, GUEST_CR0);
+                    __set_vvmcs(nvcpu->nv_vvmcx, GUEST_CR0, (guest_cr0 & cr0_gh_mask) | (val & ~cr0_gh_mask));
+                }
+                break;
+            }
+            default:
+                break;
+            }
+        }
         break;
     }
     case EXIT_REASON_APIC_ACCESS:
