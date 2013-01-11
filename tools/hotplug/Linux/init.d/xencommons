@@ -27,6 +27,7 @@ fi
 test -f $xencommons_config/xencommons && . $xencommons_config/xencommons
 
 XENCONSOLED_PIDFILE=/var/run/xenconsoled.pid
+QEMU_PIDFILE=/var/run/qemu-dom0.pid
 shopt -s extglob
 
 # not running in Xen dom0 or domU
@@ -116,7 +117,7 @@ do_start () {
 	test "`uname`" != "NetBSD" || xenbackendd $XENBACKENDD_ARGS
 	echo Starting QEMU as disk backend for dom0
 	test -z "$QEMU_XEN" && QEMU_XEN=/usr/lib/xen/bin/qemu-system-i386
-	$QEMU_XEN -xen-domid 0 -xen-attach -name dom0 -nographic -M xenpv -daemonize -monitor /dev/null
+	$QEMU_XEN -xen-domid 0 -xen-attach -name dom0 -nographic -M xenpv -daemonize -monitor /dev/null -pidfile $QEMU_PIDFILE
 }
 do_stop () {
         echo Stopping xenconsoled
@@ -124,6 +125,13 @@ do_stop () {
 		kill $pid
 		while kill -9 $pid >/dev/null 2>&1; do sleep 0.1; done
 		rm -f $XENCONSOLED_PIDFILE
+	fi
+
+	echo Stopping QEMU
+	if read 2>/dev/null <$QEMU_PIDFILE pid; then
+		kill $pid
+		while kill -9 $pid >/dev/null 2>&1; do sleep 0.1; done
+		rm -f $QEMU_PIDFILE
 	fi
 
 	echo WARNING: Not stopping xenstored, as it cannot be restarted.
