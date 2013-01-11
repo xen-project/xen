@@ -47,9 +47,9 @@ define(`declare_build_label', `
 define(`create_domain_common', `
 	allow $1 $2:domain { create max_vcpus setdomainmaxmem setaddrsize
 			getdomaininfo hypercall setvcpucontext setextvcpucontext
-			scheduler getvcpuinfo getvcpuextstate getaddrsize
+			getscheduler getvcpuinfo getvcpuextstate getaddrsize
 			getvcpuaffinity setvcpuaffinity };
-	allow $1 $2:domain2 { set_cpuid settsc };
+	allow $1 $2:domain2 { set_cpuid settsc setscheduler };
 	allow $1 $2:security check_context;
 	allow $1 $2:shadow enable;
 	allow $1 $2:mmu { map_read map_write adjust memorymap physmap pinpage mmuext_op };
@@ -79,7 +79,7 @@ define(`create_domain_build_label', `
 define(`manage_domain', `
 	allow $1 $2:domain { getdomaininfo getvcpuinfo getvcpuaffinity
 			getaddrsize pause unpause trigger shutdown destroy
-			setvcpuaffinity setdomainmaxmem };
+			setvcpuaffinity setdomainmaxmem getscheduler };
 ')
 
 # migrate_domain_out(priv, target)

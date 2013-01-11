@@ -5,7 +5,6 @@
 
 class xen
 {
-	scheduler
 	settime
 	tbufcontrol
 	readconsole
@@ -34,9 +33,10 @@ class xen
 	mca_op
 	lockprof
 	cpupool_op
-	sched_op
 	tmem_op
 	tmem_control
+	getscheduler
+	setscheduler
 }
 
 class domain
@@ -51,7 +51,7 @@ class domain
     destroy
     setvcpuaffinity
 	getvcpuaffinity
-	scheduler
+	getscheduler
 	getdomaininfo
 	getvcpuinfo
 	getvcpucontext
@@ -85,6 +85,7 @@ class domain2
 	set_cpuid
 	gettsc
 	settsc
+	setscheduler
 }
 
 class hvm

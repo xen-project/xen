@@ -1006,7 +1006,11 @@ int sched_id(void)
 long sched_adjust(struct domain *d, struct xen_domctl_scheduler_op *op)
 {
     long ret;
-    
+
+    ret = xsm_domctl_scheduler_op(XSM_HOOK, d, op->cmd);
+    if ( ret )
+        return ret;
+
     if ( (op->sched_id != DOM2OP(d)->sched_id) ||
          ((op->cmd != XEN_DOMCTL_SCHEDOP_putinfo) &&
           (op->cmd != XEN_DOMCTL_SCHEDOP_getinfo)) )
@@ -1024,6 +1028,10 @@ long sched_adjust_global(struct xen_sysctl_scheduler_op *op)
 {
     struct cpupool *pool;
     int rc;
+
+    rc = xsm_sysctl_scheduler_op(XSM_HOOK, op->cmd);
+    if ( rc )
+        return rc;
 
     if ( (op->cmd != XEN_DOMCTL_SCHEDOP_putinfo) &&
          (op->cmd != XEN_DOMCTL_SCHEDOP_getinfo) )

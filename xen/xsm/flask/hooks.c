@@ -517,6 +517,38 @@ static int flask_getdomaininfo(struct domain *d)
     return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETDOMAININFO);
 }
 
+static int flask_domctl_scheduler_op(struct domain *d, int op)
+{
+    switch ( op )
+    {
+    case XEN_DOMCTL_SCHEDOP_putinfo:
+        return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__SETSCHEDULER);
+
+    case XEN_DOMCTL_SCHEDOP_getinfo:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETSCHEDULER);
+
+    default:
+        printk("flask_domctl_scheduler_op: Unknown op %d\n", op);
+        return -EPERM;
+    }
+}
+
+static int flask_sysctl_scheduler_op(int op)
+{
+    switch ( op )
+    {
+    case XEN_DOMCTL_SCHEDOP_putinfo:
+        return domain_has_xen(current->domain, XEN__SETSCHEDULER);
+
+    case XEN_DOMCTL_SCHEDOP_getinfo:
+        return domain_has_xen(current->domain, XEN__GETSCHEDULER);
+
+    default:
+        printk("flask_domctl_scheduler_op: Unknown op %d\n", op);
+        return -EPERM;
+    }
+}
+
 static int flask_set_target(struct domain *d, struct domain *t)
 {
     int rc;
@@ -548,6 +580,7 @@ static int flask_domctl(struct domain *d, int cmd)
     /* These have individual XSM hooks (common/domctl.c) */
     case XEN_DOMCTL_createdomain:
     case XEN_DOMCTL_getdomaininfo:
+    case XEN_DOMCTL_scheduler_op:
     case XEN_DOMCTL_irq_permission:
     case XEN_DOMCTL_iomem_permission:
     case XEN_DOMCTL_set_target:
@@ -585,9 +618,6 @@ static int flask_domctl(struct domain *d, int cmd)
 
     case XEN_DOMCTL_resumedomain:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__RESUME);
-
-    case XEN_DOMCTL_scheduler_op:
-        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SCHEDULER);
 
     case XEN_DOMCTL_max_vcpus:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__MAX_VCPUS);
@@ -704,6 +734,7 @@ static int flask_sysctl(int cmd)
     case XEN_SYSCTL_readconsole:
     case XEN_SYSCTL_getdomaininfolist:
     case XEN_SYSCTL_page_offline_op:
+    case XEN_SYSCTL_scheduler_op:
 #ifdef CONFIG_X86
     case XEN_SYSCTL_cpu_hotplug:
 #endif
@@ -713,7 +744,7 @@ static int flask_sysctl(int cmd)
         return domain_has_xen(current->domain, XEN__TBUFCONTROL);
 
     case XEN_SYSCTL_sched_id:
-        return domain_has_xen(current->domain, XEN__SCHEDULER);
+        return domain_has_xen(current->domain, XEN__GETSCHEDULER);
 
     case XEN_SYSCTL_perfc_op:
         return domain_has_xen(current->domain, XEN__PERFCONTROL);
@@ -738,9 +769,6 @@ static int flask_sysctl(int cmd)
 
     case XEN_SYSCTL_cpupool_op:
         return domain_has_xen(current->domain, XEN__CPUPOOL_OP);
-
-    case XEN_SYSCTL_scheduler_op:
-        return domain_has_xen(current->domain, XEN__SCHED_OP);
 
     case XEN_SYSCTL_physinfo:
     case XEN_SYSCTL_topologyinfo:
@@ -1408,6 +1436,8 @@ static struct xsm_operations flask_ops = {
     .security_domaininfo = flask_security_domaininfo,
     .domain_create = flask_domain_create,
     .getdomaininfo = flask_getdomaininfo,
+    .domctl_scheduler_op = flask_domctl_scheduler_op,
+    .sysctl_scheduler_op = flask_sysctl_scheduler_op,
     .set_target = flask_set_target,
     .domctl = flask_domctl,
     .sysctl = flask_sysctl,

@@ -32,6 +32,8 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, security_domaininfo);
     set_to_dummy_if_null(ops, domain_create);
     set_to_dummy_if_null(ops, getdomaininfo);
+    set_to_dummy_if_null(ops, domctl_scheduler_op);
+    set_to_dummy_if_null(ops, sysctl_scheduler_op);
     set_to_dummy_if_null(ops, set_target);
     set_to_dummy_if_null(ops, domctl);
     set_to_dummy_if_null(ops, sysctl);
