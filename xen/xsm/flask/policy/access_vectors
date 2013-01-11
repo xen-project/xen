@@ -142,6 +142,7 @@ class mmu
     memorymap
     remote_remap
 	mmuext_op
+	exchange
 }
 
 class shadow

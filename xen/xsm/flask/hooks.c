@@ -396,6 +396,11 @@ static int flask_set_pod_target(struct domain *d)
     return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETPODTARGET);
 }
 
+static int flask_memory_exchange(struct domain *d)
+{
+    return current_has_perm(d, SECCLASS_MMU, MMU__EXCHANGE);
+}
+
 static int flask_memory_adjust_reservation(struct domain *d1, struct domain *d2)
 {
     return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__ADJUST);
@@ -1686,6 +1691,7 @@ static struct xsm_operations flask_ops = {
 
     .get_pod_target = flask_get_pod_target,
     .set_pod_target = flask_set_pod_target,
+    .memory_exchange = flask_memory_exchange,
     .memory_adjust_reservation = flask_memory_adjust_reservation,
     .memory_stat_reservation = flask_memory_stat_reservation,
     .memory_pin_page = flask_memory_pin_page,

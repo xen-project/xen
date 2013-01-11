@@ -341,9 +341,19 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
         out_chunk_order = exch.in.extent_order - exch.out.extent_order;
     }
 
-    rc = rcu_lock_target_domain_by_id(exch.in.domid, &d);
-    if ( rc )
+    d = rcu_lock_domain_by_any_id(exch.in.domid);
+    if ( d == NULL )
+    {
+        rc = -ESRCH;
         goto fail_early;
+    }
+
+    rc = xsm_memory_exchange(d);
+    if ( rc )
+    {
+        rcu_unlock_domain(d);
+        goto fail_early;
+    }
 
     memflags |= MEMF_bits(domain_clamp_alloc_bitsize(
         d,

@@ -96,6 +96,7 @@ struct xsm_operations {
 
     int (*get_pod_target) (struct domain *d);
     int (*set_pod_target) (struct domain *d);
+    int (*memory_exchange) (struct domain *d);
     int (*memory_adjust_reservation) (struct domain *d1, struct domain *d2);
     int (*memory_stat_reservation) (struct domain *d1, struct domain *d2);
     int (*memory_pin_page) (struct domain *d1, struct domain *d2, struct page_info *page);
@@ -451,6 +452,11 @@ static inline int xsm_get_pod_target (struct domain *d)
 static inline int xsm_set_pod_target (struct domain *d)
 {
     return xsm_ops->set_pod_target(d);
+}
+
+static inline int xsm_memory_exchange (struct domain *d)
+{
+    return xsm_ops->memory_exchange(d);
 }
 
 static inline int xsm_memory_adjust_reservation (struct domain *d1, struct

@@ -235,6 +235,13 @@ static XSM_INLINE int xsm_grant_query_size(struct domain *d1, struct domain *d2)
     return 0;
 }
 
+static XSM_INLINE int xsm_memory_exchange(struct domain *d)
+{
+    if ( d != current->domain && !IS_PRIV_FOR(current->domain, d) )
+        return -EPERM;
+    return 0;
+}
+
 static XSM_INLINE int xsm_memory_adjust_reservation(struct domain *d1,
                                                             struct domain *d2)
 {

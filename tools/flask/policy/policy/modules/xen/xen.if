@@ -30,6 +30,7 @@ define(`declare_domain', `
 #   containing at most one domain. This is not enforced by policy.
 define(`declare_singleton_domain', `
 	type $1, domain_type`'ifelse(`$#', `1', `', `,shift($@)');
+	define(`$1_self', `$1')
 	type $1_channel, event_type;
 	type_transition $1 domain_type:event $1_channel;
 	declare_domain_common($1, $1)
@@ -161,6 +162,7 @@ define(`make_device_model', `
 # use_device(domain, device)
 #   Allow a device to be used by a domain
 define(`use_device', `
+    allow $1 $1_self:mmu exchange;
     allow $1 $2:resource use;
     allow $1 domio_t:mmu { map_read map_write };
 ')

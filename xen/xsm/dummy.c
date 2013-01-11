@@ -84,6 +84,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, get_pod_target);
     set_to_dummy_if_null(ops, set_pod_target);
 
+    set_to_dummy_if_null(ops, memory_exchange);
     set_to_dummy_if_null(ops, memory_adjust_reservation);
     set_to_dummy_if_null(ops, memory_stat_reservation);
     set_to_dummy_if_null(ops, memory_pin_page);
