@@ -577,6 +577,13 @@ static int flask_domain_settime(struct domain *d)
 
 static int flask_set_target(struct domain *d, struct domain *e)
 {
+    int rc;
+    rc = domain_has_perm(current->domain, d, SECCLASS_DOMAIN2, DOMAIN2__MAKE_PRIV_FOR);
+    if ( rc )
+        return rc;
+    rc = domain_has_perm(current->domain, e, SECCLASS_DOMAIN2, DOMAIN2__SET_AS_TARGET);
+    if ( rc )
+        return rc;
     return domain_has_perm(d, e, SECCLASS_DOMAIN, DOMAIN__SET_TARGET);
 }
 

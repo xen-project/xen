@@ -78,6 +78,8 @@ class domain2
 	relabelfrom
 	relabelto
 	relabelself
+	make_priv_for
+	set_as_target
 }
 
 class hvm
