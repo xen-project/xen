@@ -702,35 +702,55 @@ static int flask_sysctl(int cmd)
     {
     /* These have individual XSM hooks */
     case XEN_SYSCTL_readconsole:
-    case XEN_SYSCTL_tbuf_op:
-    case XEN_SYSCTL_sched_id:
-    case XEN_SYSCTL_perfc_op:
     case XEN_SYSCTL_getdomaininfolist:
-    case XEN_SYSCTL_debug_keys:
-    case XEN_SYSCTL_getcpuinfo:
-    case XEN_SYSCTL_availheap:
-    case XEN_SYSCTL_get_pmstat:
-    case XEN_SYSCTL_pm_op:
     case XEN_SYSCTL_page_offline_op:
-    case XEN_SYSCTL_lockprof_op:
-    case XEN_SYSCTL_cpupool_op:
-    case XEN_SYSCTL_scheduler_op:
 #ifdef CONFIG_X86
-    case XEN_SYSCTL_physinfo:
     case XEN_SYSCTL_cpu_hotplug:
-    case XEN_SYSCTL_topologyinfo:
-    case XEN_SYSCTL_numainfo:
 #endif
         return 0;
+
+    case XEN_SYSCTL_tbuf_op:
+        return domain_has_xen(current->domain, XEN__TBUFCONTROL);
+
+    case XEN_SYSCTL_sched_id:
+        return domain_has_xen(current->domain, XEN__SCHEDULER);
+
+    case XEN_SYSCTL_perfc_op:
+        return domain_has_xen(current->domain, XEN__PERFCONTROL);
+
+    case XEN_SYSCTL_debug_keys:
+        return domain_has_xen(current->domain, XEN__DEBUG);
+
+    case XEN_SYSCTL_getcpuinfo:
+        return domain_has_xen(current->domain, XEN__GETCPUINFO);
+
+    case XEN_SYSCTL_availheap:
+        return domain_has_xen(current->domain, XEN__HEAP);
+
+    case XEN_SYSCTL_get_pmstat:
+        return domain_has_xen(current->domain, XEN__PM_OP);
+
+    case XEN_SYSCTL_pm_op:
+        return domain_has_xen(current->domain, XEN__PM_OP);
+
+    case XEN_SYSCTL_lockprof_op:
+        return domain_has_xen(current->domain, XEN__LOCKPROF);
+
+    case XEN_SYSCTL_cpupool_op:
+        return domain_has_xen(current->domain, XEN__CPUPOOL_OP);
+
+    case XEN_SYSCTL_scheduler_op:
+        return domain_has_xen(current->domain, XEN__SCHED_OP);
+
+    case XEN_SYSCTL_physinfo:
+    case XEN_SYSCTL_topologyinfo:
+    case XEN_SYSCTL_numainfo:
+        return domain_has_xen(current->domain, XEN__PHYSINFO);
+
     default:
         printk("flask_sysctl: Unknown op %d\n", cmd);
         return -EPERM;
     }
-}
-
-static int flask_tbufcontrol(void)
-{
-    return domain_has_xen(current->domain, XEN__TBUFCONTROL);
 }
 
 static int flask_readconsole(uint32_t clear)
@@ -741,41 +761,6 @@ static int flask_readconsole(uint32_t clear)
         perms |= XEN__CLEARCONSOLE;
 
     return domain_has_xen(current->domain, perms);
-}
-
-static int flask_sched_id(void)
-{
-    return domain_has_xen(current->domain, XEN__SCHEDULER);
-}
-
-static int flask_debug_keys(void)
-{
-    return domain_has_xen(current->domain, XEN__DEBUG);
-}
-
-static int flask_getcpuinfo(void)
-{
-    return domain_has_xen(current->domain, XEN__GETCPUINFO);
-}
-
-static int flask_availheap(void)
-{
-    return domain_has_xen(current->domain, XEN__HEAP);
-}
-
-static int flask_get_pmstat(void)
-{
-    return domain_has_xen(current->domain, XEN__PM_OP);
-}
-
-static int flask_setpminfo(void)
-{
-    return domain_has_xen(current->domain, XEN__PM_OP);
-}
-
-static int flask_pm_op(void)
-{
-    return domain_has_xen(current->domain, XEN__PM_OP);
 }
 
 static int flask_do_mca(void)
@@ -1032,26 +1017,6 @@ static inline int flask_page_offline(uint32_t cmd)
     }
 }
 
-static inline int flask_lockprof(void)
-{
-    return domain_has_xen(current->domain, XEN__LOCKPROF);
-}
-
-static inline int flask_cpupool_op(void)
-{
-    return domain_has_xen(current->domain, XEN__CPUPOOL_OP);
-}
-
-static inline int flask_sched_op(void)
-{
-    return domain_has_xen(current->domain, XEN__SCHED_OP);
-}
-
-static int flask_perfcontrol(void)
-{
-    return domain_has_xen(current->domain, XEN__PERFCONTROL);
-}
-
 #ifdef CONFIG_X86
 static int flask_shadow_control(struct domain *d, uint32_t op)
 {
@@ -1244,11 +1209,6 @@ static int flask_microcode(void)
     return domain_has_xen(current->domain, XEN__MICROCODE);
 }
 
-static int flask_physinfo(void)
-{
-    return domain_has_xen(current->domain, XEN__PHYSINFO);
-}
-
 static int flask_platform_quirk(uint32_t quirk)
 {
     return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN, XEN__QUIRK, NULL);
@@ -1269,17 +1229,21 @@ static int flask_platform_op(uint32_t op)
     case XENPF_enter_acpi_sleep:
     case XENPF_change_freq:
     case XENPF_getidletime:
-    case XENPF_set_processor_pminfo:
-    case XENPF_get_cpuinfo:
-    case XENPF_get_cpu_version:
     case XENPF_cpu_online:
     case XENPF_cpu_offline:
     case XENPF_cpu_hotadd:
     case XENPF_mem_hotadd:
         /* These operations have their own XSM hooks */
         return 0;
+
+    case XENPF_set_processor_pminfo:
     case XENPF_core_parking:
         return domain_has_xen(current->domain, XEN__PM_OP);
+
+    case XENPF_get_cpu_version:
+    case XENPF_get_cpuinfo:
+        return domain_has_xen(current->domain, XEN__GETCPUINFO);
+
     default:
         printk("flask_platform_op: Unknown op %d\n", op);
         return -EPERM;
@@ -1475,16 +1439,7 @@ static struct xsm_operations flask_ops = {
     .set_target = flask_set_target,
     .domctl = flask_domctl,
     .sysctl = flask_sysctl,
-    .tbufcontrol = flask_tbufcontrol,
     .readconsole = flask_readconsole,
-    .sched_id = flask_sched_id,
-    .perfcontrol = flask_perfcontrol,
-    .debug_keys = flask_debug_keys,
-    .getcpuinfo = flask_getcpuinfo,
-    .availheap = flask_availheap,
-    .get_pmstat = flask_get_pmstat,
-    .setpminfo = flask_setpminfo,
-    .pm_op = flask_pm_op,
     .do_mca = flask_do_mca,
 
     .evtchn_unbound = flask_evtchn_unbound,
@@ -1539,9 +1494,6 @@ static struct xsm_operations flask_ops = {
     .resource_setup_misc = flask_resource_setup_misc,
 
     .page_offline = flask_page_offline,
-    .lockprof = flask_lockprof,
-    .cpupool_op = flask_cpupool_op,
-    .sched_op = flask_sched_op,
 
     .do_xsm_op = do_flask_op,
 
@@ -1559,7 +1511,6 @@ static struct xsm_operations flask_ops = {
     .xen_settime = flask_xen_settime,
     .memtype = flask_memtype,
     .microcode = flask_microcode,
-    .physinfo = flask_physinfo,
     .platform_quirk = flask_platform_quirk,
     .platform_op = flask_platform_op,
     .firmware_info = flask_firmware_info,

@@ -65,18 +65,10 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         break;
 
     case XEN_SYSCTL_tbuf_op:
-        ret = xsm_tbufcontrol();
-        if ( ret )
-            break;
-
         ret = tb_control(&op->u.tbuf_op);
         break;
     
     case XEN_SYSCTL_sched_id:
-        ret = xsm_sched_id();
-        if ( ret )
-            break;
-
         op->u.sched_id.sched_id = sched_id();
         break;
 
@@ -122,20 +114,12 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 
 #ifdef PERF_COUNTERS
     case XEN_SYSCTL_perfc_op:
-        ret = xsm_perfcontrol();
-        if ( ret )
-            break;
-
         ret = perfc_control(&op->u.perfc_op);
         break;
 #endif
 
 #ifdef LOCK_PROFILE
     case XEN_SYSCTL_lockprof_op:
-        ret = xsm_lockprof();
-        if ( ret )
-            break;
-
         ret = spinlock_profile_control(&op->u.lockprof_op);
         break;
 #endif
@@ -143,10 +127,6 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     {
         char c;
         uint32_t i;
-
-        ret = xsm_debug_keys();
-        if ( ret )
-            break;
 
         ret = -EFAULT;
         for ( i = 0; i < op->u.debug_keys.nr_keys; i++ )
@@ -167,10 +147,6 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 
         nr_cpus = min(op->u.getcpuinfo.max_cpus, nr_cpu_ids);
 
-        ret = xsm_getcpuinfo();
-        if ( ret )
-            break;
-
         ret = -EFAULT;
         for ( i = 0; i < nr_cpus; i++ )
         {
@@ -186,10 +162,6 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     break;
 
     case XEN_SYSCTL_availheap:
-        ret = xsm_availheap();
-        if ( ret )
-            break;
-
         op->u.availheap.avail_bytes = avail_domheap_pages_region(
             op->u.availheap.node,
             op->u.availheap.min_bitwidth,
@@ -199,18 +171,10 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 
 #ifdef HAS_ACPI
     case XEN_SYSCTL_get_pmstat:
-        ret = xsm_get_pmstat();
-        if ( ret )
-            break;
-
         ret = do_get_pm_info(&op->u.get_pmstat);
         break;
 
     case XEN_SYSCTL_pm_op:
-        ret = xsm_pm_op();
-        if ( ret )
-            break;
-
         ret = do_pm_op(&op->u.pm_op);
         if ( ret == -EAGAIN )
             copyback = 1;
@@ -278,18 +242,10 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     break;
 
     case XEN_SYSCTL_cpupool_op:
-        ret = xsm_cpupool_op();
-        if ( ret )
-            break;
-
         ret = cpupool_do_sysctl(&op->u.cpupool_op);
         break;
 
     case XEN_SYSCTL_scheduler_op:
-        ret = xsm_sched_op();
-        if ( ret )
-            break;
-
         ret = sched_adjust_global(&op->u.scheduler_op);
         break;
 

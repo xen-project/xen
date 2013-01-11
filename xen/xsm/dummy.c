@@ -35,14 +35,8 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, set_target);
     set_to_dummy_if_null(ops, domctl);
     set_to_dummy_if_null(ops, sysctl);
-    set_to_dummy_if_null(ops, tbufcontrol);
     set_to_dummy_if_null(ops, readconsole);
-    set_to_dummy_if_null(ops, sched_id);
-    set_to_dummy_if_null(ops, perfcontrol);
-    set_to_dummy_if_null(ops, debug_keys);
     set_to_dummy_if_null(ops, getcpuinfo);
-    set_to_dummy_if_null(ops, availheap);
-    set_to_dummy_if_null(ops, get_pmstat);
     set_to_dummy_if_null(ops, setpminfo);
     set_to_dummy_if_null(ops, pm_op);
     set_to_dummy_if_null(ops, do_mca);
@@ -103,9 +97,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, resource_setup_misc);
 
     set_to_dummy_if_null(ops, page_offline);
-    set_to_dummy_if_null(ops, lockprof);
-    set_to_dummy_if_null(ops, cpupool_op);
-    set_to_dummy_if_null(ops, sched_op);
 
     set_to_dummy_if_null(ops, do_xsm_op);
 
@@ -123,7 +114,6 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, xen_settime);
     set_to_dummy_if_null(ops, memtype);
     set_to_dummy_if_null(ops, microcode);
-    set_to_dummy_if_null(ops, physinfo);
     set_to_dummy_if_null(ops, platform_quirk);
     set_to_dummy_if_null(ops, platform_op);
     set_to_dummy_if_null(ops, firmware_info);
