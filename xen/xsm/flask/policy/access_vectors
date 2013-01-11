@@ -254,8 +254,6 @@ class event
     send
 # EVTCHNOP_status; same as _send
     status
-# <unused>
-    notify
 # when creating an interdomain event channel endpoint:
 #  source = the domain creating the channel (which might not be an endpoint)
 #  target = event channel label
@@ -309,16 +307,12 @@ class mmu
     adjust
 # XENMEM_{current,maximum}_reservation, XENMEM_maximum_gpfn
     stat
-# <unused>
-    translategp
 # mmu_update MMU_MACHPHYS_UPDATE
     updatemp
 # XENMEM_add_to_physmap, XENMEM_remove_from_physmap
     physmap
 # MMUEXT_PIN_L*_TABLE
     pinpage
-# <unused>
-    mfnlist
 # XENMEM_machine_memory_map (with target xen_t)
 # XENMEM_set_memory_map (with domain target)
     memorymap
