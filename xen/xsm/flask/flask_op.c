@@ -612,6 +612,15 @@ static int flask_relabel_domain(struct xen_flask_relabel *arg)
         goto out;
 
     dsec->sid = arg->sid;
+    dsec->self_sid = arg->sid;
+    security_transition_sid(dsec->sid, dsec->sid, SECCLASS_DOMAIN,
+                            &dsec->self_sid);
+    if ( d->target )
+    {
+        struct domain_security_struct *tsec = d->target->ssid;
+        security_transition_sid(tsec->sid, dsec->sid, SECCLASS_DOMAIN,
+                                &dsec->target_sid);
+    }
 
  out:
     rcu_unlock_domain(d);
