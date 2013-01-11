@@ -80,6 +80,9 @@ class domain2
 	relabelself
 	make_priv_for
 	set_as_target
+	set_cpuid
+	gettsc
+	settsc
 }
 
 class hvm
@@ -97,6 +100,8 @@ class hvm
     hvmctl
     mem_event
     mem_sharing
+    audit_p2m
+    send_irq
 }
 
 class event

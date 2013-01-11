@@ -29,6 +29,7 @@ define(`create_domain_common', `
 			getdomaininfo hypercall setvcpucontext setextvcpucontext
 			scheduler getvcpuinfo getvcpuextstate getaddrsize
 			getvcpuaffinity setvcpuaffinity };
+	allow $1 $2:domain2 { set_cpuid settsc };
 	allow $1 $2:security check_context;
 	allow $1 $2:shadow enable;
 	allow $1 $2:mmu {map_read map_write adjust memorymap physmap pinpage};
@@ -67,6 +68,7 @@ define(`migrate_domain_out', `
 	allow $1 $2:hvm { gethvmc getparam irqlevel };
 	allow $1 $2:mmu { stat pageinfo map_read };
 	allow $1 $2:domain { getaddrsize getvcpucontext getextvcpucontext getvcpuextstate pause destroy };
+	allow $1 $2:domain2 gettsc;
 ')
 
 ################################################################################
@@ -112,7 +114,7 @@ define(`device_model', `
 	domain_comms($1, $2)
 	allow $1 $2:domain { set_target shutdown };
 	allow $1 $2:mmu { map_read map_write adjust physmap };
-	allow $1 $2:hvm { getparam setparam trackdirtyvram hvmctl irqlevel pciroute };
+	allow $1 $2:hvm { getparam setparam trackdirtyvram hvmctl irqlevel pciroute cacheattr send_irq };
 ')
 ################################################################################
 #

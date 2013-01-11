@@ -650,25 +650,32 @@ static int flask_domctl(struct domain *d, int cmd)
 #endif
         return 0;
 
-    case XEN_DOMCTL_subscribe:
-    case XEN_DOMCTL_disable_migrate:
-        return domain_has_perm(current->domain, d, SECCLASS_DOMAIN,
-                               DOMAIN__SET_MISC_INFO);
-
-    case XEN_DOMCTL_set_cpuid:
-    case XEN_DOMCTL_suppress_spurious_page_faults:
     case XEN_DOMCTL_debug_op:
-    case XEN_DOMCTL_gettscinfo:
-    case XEN_DOMCTL_settscinfo:
-    case XEN_DOMCTL_audit_p2m:
     case XEN_DOMCTL_gdbsx_guestmemio:
     case XEN_DOMCTL_gdbsx_pausevcpu:
     case XEN_DOMCTL_gdbsx_unpausevcpu:
     case XEN_DOMCTL_gdbsx_domstatus:
-        /* TODO add per-subfunction hooks */
-        if ( !IS_PRIV(current->domain) )
-            return -EPERM;
-        return 0;
+        return domain_has_perm(current->domain, d, SECCLASS_DOMAIN,
+                               DOMAIN__SETDEBUGGING);
+
+    case XEN_DOMCTL_subscribe:
+    case XEN_DOMCTL_disable_migrate:
+    case XEN_DOMCTL_suppress_spurious_page_faults:
+        return domain_has_perm(current->domain, d, SECCLASS_DOMAIN,
+                               DOMAIN__SET_MISC_INFO);
+
+    case XEN_DOMCTL_set_cpuid:
+        return domain_has_perm(current->domain, d, SECCLASS_DOMAIN2, DOMAIN2__SET_CPUID);
+
+    case XEN_DOMCTL_gettscinfo:
+        return domain_has_perm(current->domain, d, SECCLASS_DOMAIN2, DOMAIN2__GETTSC);
+
+    case XEN_DOMCTL_settscinfo:
+        return domain_has_perm(current->domain, d, SECCLASS_DOMAIN2, DOMAIN2__SETTSC);
+
+    case XEN_DOMCTL_audit_p2m:
+        return domain_has_perm(current->domain, d, SECCLASS_HVM, HVM__AUDIT_P2M);
+
     default:
         printk("flask_domctl: Unknown op %d\n", cmd);
         return -EPERM;
@@ -922,6 +929,11 @@ static int flask_iomem_permission(struct domain *d, uint64_t start, uint64_t end
     return security_iterate_iomem_sids(start, end, _iomem_has_perm, &data);
 }
 
+static int flask_iomem_mapping(struct domain *d, uint64_t start, uint64_t end, uint8_t access)
+{
+    return flask_iomem_permission(d, start, end, access);
+}
+
 static int flask_pci_config_permission(struct domain *d, uint32_t machine_bdf, uint16_t start, uint16_t end, uint8_t access)
 {
     u32 rsid;
@@ -1129,7 +1141,6 @@ static int _ioport_has_perm(void *v, u32 sid, unsigned long start, unsigned long
     return avc_has_perm(data->tsec->sid, sid, SECCLASS_RESOURCE, RESOURCE__USE, &ad);
 }
 
-
 static int flask_ioport_permission(struct domain *d, uint32_t start, uint32_t end, uint8_t access)
 {
     int rc;
@@ -1150,6 +1161,11 @@ static int flask_ioport_permission(struct domain *d, uint32_t start, uint32_t en
     data.tsec = d->ssid;
 
     return security_iterate_ioport_sids(start, end, _ioport_has_perm, &data);
+}
+
+static int flask_ioport_mapping(struct domain *d, uint32_t start, uint32_t end, uint8_t access)
+{
+    return flask_ioport_permission(d, start, end, access);
 }
 
 static int flask_getpageframeinfo(struct domain *d)
@@ -1210,6 +1226,25 @@ static int flask_address_size(struct domain *d, uint32_t cmd)
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, perm);
 }
 
+static int flask_machine_address_size(struct domain *d, uint32_t cmd)
+{
+    u32 perm;
+
+    switch ( cmd )
+    {
+    case XEN_DOMCTL_set_machine_address_size:
+        perm = DOMAIN__SETADDRSIZE;
+        break;
+    case XEN_DOMCTL_get_machine_address_size:
+        perm = DOMAIN__GETADDRSIZE;
+        break;
+    default:
+        return -EPERM;
+    }
+
+    return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, perm);
+}
+
 static int flask_hvm_param(struct domain *d, unsigned long op)
 {
     u32 perm;
@@ -1245,6 +1280,11 @@ static int flask_hvm_set_isa_irq_level(struct domain *d)
 static int flask_hvm_set_pci_link_route(struct domain *d)
 {
     return domain_has_perm(current->domain, d, SECCLASS_HVM, HVM__PCIROUTE);
+}
+
+static int flask_hvm_inject_msi(struct domain *d)
+{
+    return domain_has_perm(current->domain, d, SECCLASS_HVM, HVM__SEND_IRQ);
 }
 
 static int flask_mem_event(struct domain *d)
@@ -1690,6 +1730,7 @@ static struct xsm_operations flask_ops = {
     .unmap_domain_pirq = flask_unmap_domain_pirq,
     .irq_permission = flask_irq_permission,
     .iomem_permission = flask_iomem_permission,
+    .iomem_mapping = flask_iomem_mapping,
     .pci_config_permission = flask_pci_config_permission,
 
     .resource_plug_core = flask_resource_plug_core,
@@ -1714,10 +1755,12 @@ static struct xsm_operations flask_ops = {
     .hypercall_init = flask_hypercall_init,
     .hvmcontext = flask_hvmcontext,
     .address_size = flask_address_size,
+    .machine_address_size = flask_machine_address_size,
     .hvm_param = flask_hvm_param,
     .hvm_set_pci_intx_level = flask_hvm_set_pci_intx_level,
     .hvm_set_isa_irq_level = flask_hvm_set_isa_irq_level,
     .hvm_set_pci_link_route = flask_hvm_set_pci_link_route,
+    .hvm_inject_msi = flask_hvm_inject_msi,
     .mem_event = flask_mem_event,
     .mem_sharing = flask_mem_sharing,
     .apic = flask_apic,
@@ -1750,6 +1793,7 @@ static struct xsm_operations flask_ops = {
     .ext_vcpucontext = flask_ext_vcpucontext,
     .vcpuextstate = flask_vcpuextstate,
     .ioport_permission = flask_ioport_permission,
+    .ioport_mapping = flask_ioport_mapping,
 #endif
 };
 
