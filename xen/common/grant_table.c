@@ -230,30 +230,6 @@ double_gt_unlock(struct grant_table *lgt, struct grant_table *rgt)
         spin_unlock(&rgt->lock);
 }
 
-static struct domain *gt_lock_target_domain_by_id(domid_t dom)
-{
-    struct domain *d;
-    int rc = GNTST_general_error;
-
-    switch ( rcu_lock_target_domain_by_id(dom, &d) )
-    {
-    case 0:
-        return d;
-
-    case -ESRCH:
-        gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
-        rc = GNTST_bad_domain;
-        break;
-
-    case -EPERM:
-        rc = GNTST_permission_denied;
-        break;
-    }
-
-    ASSERT(rc < 0 && -rc <= MAX_ERRNO);
-    return ERR_PTR(rc);
-}
-
 static inline int
 __get_maptrack_handle(
     struct grant_table *t)
@@ -576,7 +552,7 @@ __gnttab_map_grant_ref(
         return;
     }
 
-    rc = xsm_grant_mapref(ld, rd, op->flags);
+    rc = xsm_grant_mapref(XSM_HOOK, ld, rd, op->flags);
     if ( rc )
     {
         rcu_unlock_domain(rd);
@@ -896,7 +872,7 @@ __gnttab_unmap_common(
         return;
     }
 
-    rc = xsm_grant_unmapref(ld, rd);
+    rc = xsm_grant_unmapref(XSM_HOOK, ld, rd);
     if ( rc )
     {
         rcu_unlock_domain(rd);
@@ -1352,14 +1328,15 @@ gnttab_setup_table(
     if ( !guest_handle_okay(op.frame_list, op.nr_frames) )
         return -EFAULT;
 
-    d = gt_lock_target_domain_by_id(op.dom);
-    if ( IS_ERR(d) )
+    d = rcu_lock_domain_by_any_id(op.dom);
+    if ( d == NULL )
     {
-        op.status = PTR_ERR(d);
-        goto out1;
+        gdprintk(XENLOG_INFO, "Bad domid %d.\n", op.dom);
+        op.status = GNTST_bad_domain;
+        goto out2;
     }
 
-    if ( xsm_grant_setup(current->domain, d) )
+    if ( xsm_grant_setup(XSM_TARGET, current->domain, d) )
     {
         op.status = GNTST_permission_denied;
         goto out2;
@@ -1421,14 +1398,15 @@ gnttab_query_size(
         return -EFAULT;
     }
 
-    d = gt_lock_target_domain_by_id(op.dom);
-    if ( IS_ERR(d) )
+    d = rcu_lock_domain_by_any_id(op.dom);
+    if ( d == NULL )
     {
-        op.status = PTR_ERR(d);
+        gdprintk(XENLOG_INFO, "Bad domid %d.\n", op.dom);
+        op.status = GNTST_bad_domain;
         goto query_out;
     }
 
-    rc = xsm_grant_query_size(current->domain, d);
+    rc = xsm_grant_query_size(XSM_TARGET, current->domain, d);
     if ( rc )
     {
         op.status = GNTST_permission_denied;
@@ -1604,7 +1582,7 @@ gnttab_transfer(
             goto copyback;
         }
 
-        if ( xsm_grant_transfer(d, e) )
+        if ( xsm_grant_transfer(XSM_HOOK, d, e) )
         {
             put_gfn(d, gop.mfn);
             gop.status = GNTST_permission_denied;
@@ -2044,7 +2022,7 @@ __gnttab_copy(
         PIN_FAIL(error_out, GNTST_bad_domain,
                  "couldn't find %d\n", op->dest.domid);
 
-    rc = xsm_grant_copy(sd, dd);
+    rc = xsm_grant_copy(XSM_HOOK, sd, dd);
     if ( rc )
     {
         rc = GNTST_permission_denied;
@@ -2296,13 +2274,13 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
         return -EFAULT;
     }
 
-    d = gt_lock_target_domain_by_id(op.dom);
-    if ( IS_ERR(d) )
+    d = rcu_lock_domain_by_any_id(op.dom);
+    if ( d == NULL )
     {
-        op.status = PTR_ERR(d);
+        op.status = GNTST_bad_domain;
         goto out1;
     }
-    rc = xsm_grant_setup(current->domain, d);
+    rc = xsm_grant_setup(XSM_TARGET, current->domain, d);
     if ( rc ) {
         op.status = GNTST_permission_denied;
         goto out1;
@@ -2349,14 +2327,15 @@ gnttab_get_version(XEN_GUEST_HANDLE_PARAM(gnttab_get_version_t) uop)
     if ( copy_from_guest(&op, uop, 1) )
         return -EFAULT;
 
-    rc = rcu_lock_target_domain_by_id(op.dom, &d);
-    if ( rc < 0 )
-        return rc;
+    d = rcu_lock_domain_by_any_id(op.dom);
+    if ( d == NULL )
+        return -ESRCH;
 
-    if ( xsm_grant_query_size(current->domain, d) )
+    rc = xsm_grant_query_size(XSM_TARGET, current->domain, d);
+    if ( rc )
     {
         rcu_unlock_domain(d);
-        return -EPERM;
+        return rc;
     }
 
     op.version = d->grant_table->gt_version;

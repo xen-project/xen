@@ -68,9 +68,43 @@ HVM domains with stubdomain device models use two types (one per domain):
  - dm_dom_t is the device model for a domain with type domHVM_t
 
 One disadvantage of using type enforcement to enforce isolation is that a new
-type is needed for each group of domains. In addition, it is not possible to
-allow isolated_domU_t cannot to create loopback event channels without allowing
-two domains of type isolated_domU_t to communicate with one another.
+type is needed for each group of domains. The user field can be used to address
+this for the most common case of groups that can communicate internally but not
+externally; see "Users and roles" below.
+
+Type transitions
+----------------
+
+Xen defines a number of operations such as memory mapping that are necessary for
+a domain to perform on itself, but are also undesirable to allow a domain to
+perform on every other domain of the same label. While it is possible to address
+this by only creating one domain per type, this solution significantly limits
+the flexibility of the type system. Another method to address this issue is to
+duplicate the permission names for every operation that can be performed on the
+current domain or on other domains; however, this significantly increases the
+necessary number of permissions and complicates the XSM hooks. Instead, this is
+addressed by allowing a distinct type to be used for a domain's access to
+itself. The same applies for a device model domain's access to its designated
+target, allowing the IS_PRIV_FOR checks used in Xen's DAC model to be
+implemented in FLASK.
+
+Upon domain creation (or relabel), a type transition is computed using the
+domain's label as the source and target. The result of this computation is used
+as the target when the domain accesses itself. In the example policy, this
+computed type is the result of appending _self to a domain's type: domU_t_self
+for domU_t. If no type transition rule exists, the domain will continue to use
+its own label for both the source and target. An AVC message will look like:
+
+    scontext=system_u:system_r:domU_t tcontext=system_u:system_r:domU_t_self
+
+A similar type transition is done when a device model domain is associated with
+its target using the set_target operation. The transition is computed with the
+target domain as the source and the device model domain as the target: this
+ordering was chosen in order to preserve the original label for the target when
+no type transition rule exists. In the example policy, these computed types are
+the result of appending _target to the domain.
+
+Type transitions are also used to compute the labels of event channels.
 
 Users and roles
 ---------------
@@ -84,7 +118,8 @@ the customer_1 user.
 Access control rules involving users and roles are defined in the policy
 constraints file (tools/flask/policy/policy/constraints). The example policy
 provides constraints that prevent different users from communicating using
-grants or event channels, while still allowing communication with dom0.
+grants or event channels, while still allowing communication with the system_u
+user where dom0 resides.
 
 Resource Policy
 ---------------

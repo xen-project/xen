@@ -3388,7 +3388,7 @@ static int hvmop_set_pci_intx_level(
     if ( (op.domain > 0) || (op.bus > 0) || (op.device > 31) || (op.intx > 3) )
         return -EINVAL;
 
-    rc = rcu_lock_remote_target_domain_by_id(op.domid, &d);
+    rc = rcu_lock_remote_domain_by_id(op.domid, &d);
     if ( rc != 0 )
         return rc;
 
@@ -3396,7 +3396,7 @@ static int hvmop_set_pci_intx_level(
     if ( !is_hvm_domain(d) )
         goto out;
 
-    rc = xsm_hvm_set_pci_intx_level(d);
+    rc = xsm_hvm_set_pci_intx_level(XSM_DM_PRIV, d);
     if ( rc )
         goto out;
 
@@ -3555,7 +3555,7 @@ static int hvmop_set_isa_irq_level(
     if ( op.isa_irq > 15 )
         return -EINVAL;
 
-    rc = rcu_lock_remote_target_domain_by_id(op.domid, &d);
+    rc = rcu_lock_remote_domain_by_id(op.domid, &d);
     if ( rc != 0 )
         return rc;
 
@@ -3563,7 +3563,7 @@ static int hvmop_set_isa_irq_level(
     if ( !is_hvm_domain(d) )
         goto out;
 
-    rc = xsm_hvm_set_isa_irq_level(d);
+    rc = xsm_hvm_set_isa_irq_level(XSM_DM_PRIV, d);
     if ( rc )
         goto out;
 
@@ -3599,7 +3599,7 @@ static int hvmop_set_pci_link_route(
     if ( (op.link > 3) || (op.isa_irq > 15) )
         return -EINVAL;
 
-    rc = rcu_lock_remote_target_domain_by_id(op.domid, &d);
+    rc = rcu_lock_remote_domain_by_id(op.domid, &d);
     if ( rc != 0 )
         return rc;
 
@@ -3607,7 +3607,7 @@ static int hvmop_set_pci_link_route(
     if ( !is_hvm_domain(d) )
         goto out;
 
-    rc = xsm_hvm_set_pci_link_route(d);
+    rc = xsm_hvm_set_pci_link_route(XSM_DM_PRIV, d);
     if ( rc )
         goto out;
 
@@ -3629,7 +3629,7 @@ static int hvmop_inject_msi(
     if ( copy_from_guest(&op, uop, 1) )
         return -EFAULT;
 
-    rc = rcu_lock_remote_target_domain_by_id(op.domid, &d);
+    rc = rcu_lock_remote_domain_by_id(op.domid, &d);
     if ( rc != 0 )
         return rc;
 
@@ -3637,7 +3637,7 @@ static int hvmop_inject_msi(
     if ( !is_hvm_domain(d) )
         goto out;
 
-    rc = xsm_hvm_inject_msi(d);
+    rc = xsm_hvm_inject_msi(XSM_DM_PRIV, d);
     if ( rc )
         goto out;
 
@@ -3726,15 +3726,15 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( a.index >= HVM_NR_PARAMS )
             return -EINVAL;
 
-        rc = rcu_lock_target_domain_by_id(a.domid, &d);
-        if ( rc != 0 )
-            return rc;
+        d = rcu_lock_domain_by_any_id(a.domid);
+        if ( d == NULL )
+            return -ESRCH;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) )
             goto param_fail;
 
-        rc = xsm_hvm_param(d, op);
+        rc = xsm_hvm_param(XSM_TARGET, d, op);
         if ( rc )
             goto param_fail;
 
@@ -3972,7 +3972,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
 
-        rc = rcu_lock_remote_target_domain_by_id(a.domid, &d);
+        rc = rcu_lock_remote_domain_by_id(a.domid, &d);
         if ( rc != 0 )
             return rc;
 
@@ -3983,7 +3983,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( a.nr > GB(1) >> PAGE_SHIFT )
             goto param_fail2;
 
-        rc = xsm_hvm_param(d, op);
+        rc = xsm_hvm_param(XSM_TARGET, d, op);
         if ( rc )
             goto param_fail2;
 
@@ -4013,7 +4013,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
 
-        rc = rcu_lock_remote_target_domain_by_id(a.domid, &d);
+        rc = rcu_lock_remote_domain_by_id(a.domid, &d);
         if ( rc != 0 )
             return rc;
 
@@ -4021,7 +4021,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !is_hvm_domain(d) )
             goto param_fail3;
 
-        rc = xsm_hvm_param(d, op);
+        rc = xsm_hvm_param(XSM_TARGET, d, op);
         if ( rc )
             goto param_fail3;
 
@@ -4078,11 +4078,11 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
 
-        rc = rcu_lock_target_domain_by_id(a.domid, &d);
-        if ( rc != 0 )
-            return rc;
+        d = rcu_lock_domain_by_any_id(a.domid);
+        if ( d == NULL )
+            return -ESRCH;
 
-        rc = xsm_hvm_param(d, op);
+        rc = xsm_hvm_param(XSM_TARGET, d, op);
         if ( rc )
             goto param_fail_getmemtype;
 
@@ -4128,7 +4128,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
 
-        rc = rcu_lock_remote_target_domain_by_id(a.domid, &d);
+        rc = rcu_lock_remote_domain_by_id(a.domid, &d);
         if ( rc != 0 )
             return rc;
 
@@ -4136,7 +4136,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !is_hvm_domain(d) )
             goto param_fail4;
 
-        rc = xsm_hvm_param(d, op);
+        rc = xsm_hvm_param(XSM_TARGET, d, op);
         if ( rc )
             goto param_fail4;
 
@@ -4221,7 +4221,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
 
-        rc = rcu_lock_remote_target_domain_by_id(a.domid, &d);
+        rc = rcu_lock_remote_domain_by_id(a.domid, &d);
         if ( rc != 0 )
             return rc;
 
@@ -4229,7 +4229,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !is_hvm_domain(d) )
             goto param_fail5;
 
-        rc = xsm_hvm_param(d, op);
+        rc = xsm_hvm_param(XSM_TARGET, d, op);
         if ( rc )
             goto param_fail5;
 
@@ -4256,7 +4256,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
 
-        rc = rcu_lock_remote_target_domain_by_id(a.domid, &d);
+        rc = rcu_lock_remote_domain_by_id(a.domid, &d);
         if ( rc != 0 )
             return rc;
 
@@ -4264,7 +4264,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !is_hvm_domain(d) )
             goto param_fail6;
 
-        rc = xsm_hvm_param(d, op);
+        rc = xsm_hvm_param(XSM_TARGET, d, op);
         if ( rc )
             goto param_fail6;
 
@@ -4292,15 +4292,15 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&a, arg, 1) )
             return -EFAULT;
 
-        rc = rcu_lock_target_domain_by_id(a.domid, &d);
-        if ( rc != 0 )
-            return rc;
+        d = rcu_lock_domain_by_any_id(a.domid);
+        if ( d == NULL )
+            return -ESRCH;
 
         rc = -EINVAL;
         if ( !is_hvm_domain(d) || !paging_mode_shadow(d) )
             goto param_fail7;
 
-        rc = xsm_hvm_param(d, op);
+        rc = xsm_hvm_param(XSM_TARGET, d, op);
         if ( rc )
             goto param_fail7;
 
@@ -4346,7 +4346,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&tr, arg, 1 ) )
             return -EFAULT;
 
-        rc = rcu_lock_remote_target_domain_by_id(tr.domid, &d);
+        rc = rcu_lock_remote_domain_by_id(tr.domid, &d);
         if ( rc != 0 )
             return rc;
 
@@ -4354,7 +4354,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( !is_hvm_domain(d) )
             goto param_fail8;
 
-        rc = xsm_hvm_param(d, op);
+        rc = xsm_hvm_param(XSM_TARGET, d, op);
         if ( rc )
             goto param_fail8;
 

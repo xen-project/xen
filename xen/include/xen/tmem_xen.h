@@ -16,6 +16,7 @@
 #include <xen/guest_access.h> /* copy_from_guest */
 #include <xen/hash.h> /* hash_long */
 #include <xen/domain_page.h> /* __map_domain_page */
+#include <xsm/xsm.h> /* xsm_tmem_control */
 #include <public/tmem.h>
 #ifdef CONFIG_COMPAT
 #include <compat/tmem.h>
@@ -326,9 +327,14 @@ static inline bool_t tmh_set_client_from_id(
     return rc;
 }
 
+static inline bool_t tmh_current_permitted(void)
+{
+    return !xsm_tmem_op(XSM_HOOK);
+}
+
 static inline bool_t tmh_current_is_privileged(void)
 {
-    return IS_PRIV(current->domain);
+    return !xsm_tmem_control(XSM_PRIV);
 }
 
 static inline uint8_t tmh_get_first_byte(pfp_t *pfp)

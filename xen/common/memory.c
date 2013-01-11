@@ -341,9 +341,19 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
         out_chunk_order = exch.in.extent_order - exch.out.extent_order;
     }
 
-    rc = rcu_lock_target_domain_by_id(exch.in.domid, &d);
-    if ( rc )
+    d = rcu_lock_domain_by_any_id(exch.in.domid);
+    if ( d == NULL )
+    {
+        rc = -ESRCH;
         goto fail_early;
+    }
+
+    rc = xsm_memory_exchange(XSM_TARGET, d);
+    if ( rc )
+    {
+        rcu_unlock_domain(d);
+        goto fail_early;
+    }
 
     memflags |= MEMF_bits(domain_clamp_alloc_bitsize(
         d,
@@ -585,11 +595,12 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
              && (reservation.mem_flags & XENMEMF_populate_on_demand) )
             args.memflags |= MEMF_populate_on_demand;
 
-        if ( unlikely(rcu_lock_target_domain_by_id(reservation.domid, &d)) )
+        d = rcu_lock_domain_by_any_id(reservation.domid);
+        if ( d == NULL )
             return start_extent;
         args.domain = d;
 
-        rc = xsm_memory_adjust_reservation(current->domain, d);
+        rc = xsm_memory_adjust_reservation(XSM_TARGET, current->domain, d);
         if ( rc )
         {
             rcu_unlock_domain(d);
@@ -634,11 +645,11 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&domid, arg, 1) )
             return -EFAULT;
 
-        rc = rcu_lock_target_domain_by_id(domid, &d);
-        if ( rc )
-            return rc;
+        d = rcu_lock_domain_by_any_id(domid);
+        if ( d == NULL )
+            return -ESRCH;
 
-        rc = xsm_memory_stat_reservation(current->domain, d);
+        rc = xsm_memory_stat_reservation(XSM_TARGET, current->domain, d);
         if ( rc )
         {
             rcu_unlock_domain(d);
@@ -672,11 +683,11 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&xrfp, arg, 1) )
             return -EFAULT;
 
-        rc = rcu_lock_target_domain_by_id(xrfp.domid, &d);
-        if ( rc != 0 )
-            return rc;
+        d = rcu_lock_domain_by_any_id(xrfp.domid);
+        if ( d == NULL )
+            return -ESRCH;
 
-        if ( xsm_remove_from_physmap(current->domain, d) )
+        if ( xsm_remove_from_physmap(XSM_TARGET, current->domain, d) )
         {
             rcu_unlock_domain(d);
             return -EPERM;

@@ -165,9 +165,9 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     domid_t        dom = alloc->dom;
     long           rc;
 
-    rc = rcu_lock_target_domain_by_id(dom, &d);
-    if ( rc )
-        return rc;
+    d = rcu_lock_domain_by_any_id(dom);
+    if ( d == NULL )
+        return -ESRCH;
 
     spin_lock(&d->event_lock);
 
@@ -175,7 +175,7 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
         ERROR_EXIT_DOM(port, d);
     chn = evtchn_from_port(d, port);
 
-    rc = xsm_evtchn_unbound(d, chn, alloc->remote_dom);
+    rc = xsm_evtchn_unbound(XSM_TARGET, d, chn, alloc->remote_dom);
     if ( rc )
         goto out;
 
@@ -231,7 +231,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
          (rchn->u.unbound.remote_domid != ld->domain_id) )
         ERROR_EXIT_DOM(-EINVAL, rd);
 
-    rc = xsm_evtchn_interdomain(ld, lchn, rd, rchn);
+    rc = xsm_evtchn_interdomain(XSM_HOOK, ld, lchn, rd, rchn);
     if ( rc )
         goto out;
 
@@ -580,7 +580,7 @@ int evtchn_send(struct domain *d, unsigned int lport)
         return -EINVAL;
     }
 
-    ret = xsm_evtchn_send(ld, lchn);
+    ret = xsm_evtchn_send(XSM_HOOK, ld, lchn);
     if ( ret )
         goto out;
 
@@ -798,9 +798,9 @@ static long evtchn_status(evtchn_status_t *status)
     struct evtchn   *chn;
     long             rc = 0;
 
-    rc = rcu_lock_target_domain_by_id(dom, &d);
-    if ( rc )
-        return rc;
+    d = rcu_lock_domain_by_any_id(dom);
+    if ( d == NULL )
+        return -ESRCH;
 
     spin_lock(&d->event_lock);
 
@@ -812,7 +812,7 @@ static long evtchn_status(evtchn_status_t *status)
 
     chn = evtchn_from_port(d, port);
 
-    rc = xsm_evtchn_status(d, chn);
+    rc = xsm_evtchn_status(XSM_TARGET, d, chn);
     if ( rc )
         goto out;
 
@@ -950,11 +950,11 @@ static long evtchn_reset(evtchn_reset_t *r)
     struct domain *d;
     int i, rc;
 
-    rc = rcu_lock_target_domain_by_id(dom, &d);
-    if ( rc )
-        return rc;
+    d = rcu_lock_domain_by_any_id(dom);
+    if ( d == NULL )
+        return -ESRCH;
 
-    rc = xsm_evtchn_reset(current->domain, d);
+    rc = xsm_evtchn_reset(XSM_TARGET, current->domain, d);
     if ( rc )
         goto out;
 
@@ -1101,7 +1101,7 @@ int alloc_unbound_xen_event_channel(
         goto out;
     chn = evtchn_from_port(d, port);
 
-    rc = xsm_evtchn_unbound(d, chn, remote_domid);
+    rc = xsm_evtchn_unbound(XSM_TARGET, d, chn, remote_domid);
 
     chn->state = ECS_UNBOUND;
     chn->xen_consumer = get_xen_consumer(notification_fn);

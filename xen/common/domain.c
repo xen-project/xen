@@ -252,7 +252,7 @@ struct domain *domain_create(
 
     if ( !is_idle_domain(d) )
     {
-        if ( (err = xsm_domain_create(d, ssidref)) != 0 )
+        if ( (err = xsm_domain_create(XSM_HOOK, d, ssidref)) != 0 )
             goto fail;
 
         d->is_paused_by_controller = 1;
@@ -470,6 +470,21 @@ int rcu_lock_remote_domain_by_id(domid_t dom, struct domain **d)
     {
         rcu_unlock_domain(*d);
         return -EPERM;
+    }
+
+    return 0;
+}
+
+int rcu_lock_live_remote_domain_by_id(domid_t dom, struct domain **d)
+{
+    int rv;
+    rv = rcu_lock_remote_domain_by_id(dom, d);
+    if ( rv )
+        return rv;
+    if ( (*d)->is_dying )
+    {
+        rcu_unlock_domain(*d);
+        return -EINVAL;
     }
 
     return 0;

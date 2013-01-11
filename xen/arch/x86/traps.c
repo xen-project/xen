@@ -1643,7 +1643,7 @@ static int pci_cfg_ok(struct domain *d, int write, int size)
             start |= (d->arch.pci_cf8 >> 16) & 0xF00;
     }
     end = start + size - 1;
-    if (xsm_pci_config_permission(d, machine_bdf, start, end, write))
+    if (xsm_pci_config_permission(XSM_HOOK, d, machine_bdf, start, end, write))
         return 0;
     return 1;
 }

@@ -677,7 +677,7 @@ ret_t do_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         return -EPERM;
     }
 
-    ret = xsm_profile(current->domain, op);
+    ret = xsm_profile(XSM_HOOK, current->domain, op);
     if ( ret )
         return ret;
 

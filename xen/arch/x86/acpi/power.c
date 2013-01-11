@@ -239,7 +239,7 @@ static long enter_state_helper(void *data)
  */
 int acpi_enter_sleep(struct xenpf_enter_acpi_sleep *sleep)
 {
-    if ( !IS_PRIV(current->domain) || !acpi_sinfo.pm1a_cnt_blk.address )
+    if ( !acpi_sinfo.pm1a_cnt_blk.address )
         return -EPERM;
 
     /* Sanity check */

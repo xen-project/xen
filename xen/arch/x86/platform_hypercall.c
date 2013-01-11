@@ -66,14 +66,15 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
     ret_t ret = 0;
     struct xen_platform_op curop, *op = &curop;
 
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
     if ( copy_from_guest(op, u_xenpf_op, 1) )
         return -EFAULT;
 
     if ( op->interface_version != XENPF_INTERFACE_VERSION )
         return -EACCES;
+
+    ret = xsm_platform_op(XSM_PRIV, op->cmd);
+    if ( ret )
+        return ret;
 
     /*
      * Trylock here avoids deadlock with an existing platform critical section
@@ -89,10 +90,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
     {
     case XENPF_settime:
     {
-        ret = xsm_xen_settime();
-        if ( ret )
-            break;
-
         do_settime(op->u.settime.secs, 
                    op->u.settime.nsecs, 
                    op->u.settime.system_time);
@@ -102,10 +99,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 
     case XENPF_add_memtype:
     {
-        ret = xsm_memtype(op->cmd);
-        if ( ret )
-            break;
-
         ret = mtrr_add_page(
             op->u.add_memtype.mfn,
             op->u.add_memtype.nr_mfns,
@@ -125,10 +118,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 
     case XENPF_del_memtype:
     {
-        ret = xsm_memtype(op->cmd);
-        if ( ret )
-            break;
-
         if (op->u.del_memtype.handle == 0
             /* mtrr/main.c otherwise does a lookup */
             && (int)op->u.del_memtype.reg >= 0)
@@ -147,10 +136,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
         unsigned long mfn, nr_mfns;
         mtrr_type     type;
 
-        ret = xsm_memtype(op->cmd);
-        if ( ret )
-            break;
-
         ret = -EINVAL;
         if ( op->u.read_memtype.reg < num_var_ranges )
         {
@@ -167,10 +152,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
     case XENPF_microcode_update:
     {
         XEN_GUEST_HANDLE(const_void) data;
-
-        ret = xsm_microcode();
-        if ( ret )
-            break;
 
         guest_from_compat_handle(data, op->u.microcode.data);
 
@@ -199,10 +180,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
     {
         int quirk_id = op->u.platform_quirk.quirk_id;
 
-        ret = xsm_platform_quirk(quirk_id);
-        if ( ret )
-            break;
-
         switch ( quirk_id )
         {
         case QUIRK_NOIRQBALANCING:
@@ -224,10 +201,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
     break;
 
     case XENPF_firmware_info:
-        ret = xsm_firmware_info();
-        if ( ret )
-            break;
-
         switch ( op->u.firmware_info.type )
         {
         case XEN_FW_DISK_INFO: {
@@ -336,10 +309,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
         break;
 
     case XENPF_efi_runtime_call:
-        ret = xsm_efi_call();
-        if ( ret )
-            break;
-
         ret = efi_runtime_call(&op->u.efi_runtime_call);
         if ( ret == 0 &&
              __copy_field_to_guest(u_xenpf_op, op, u.efi_runtime_call) )
@@ -347,18 +316,10 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
         break;
 
     case XENPF_enter_acpi_sleep:
-        ret = xsm_acpi_sleep();
-        if ( ret )
-            break;
-
         ret = acpi_enter_sleep(&op->u.enter_acpi_sleep);
         break;
 
     case XENPF_change_freq:
-        ret = xsm_change_freq();
-        if ( ret )
-            break;
-
         ret = -ENOSYS;
         if ( cpufreq_controller != FREQCTL_dom0_kernel )
             break;
@@ -379,10 +340,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
         cpumask_var_t cpumap;
         XEN_GUEST_HANDLE(uint8) cpumap_bitmap;
         XEN_GUEST_HANDLE(uint64) idletimes;
-
-        ret = xsm_getidletime();
-        if ( ret )
-            break;
 
         ret = -ENOSYS;
         if ( cpufreq_controller != FREQCTL_dom0_kernel )
@@ -420,10 +377,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
     break;
 
     case XENPF_set_processor_pminfo:
-        ret = xsm_setpminfo();
-        if ( ret )
-            break;
-
         switch ( op->u.set_pminfo.type )
         {
         case XEN_PM_PX:
@@ -475,10 +428,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
         struct xenpf_pcpuinfo *g_info;
 
         g_info = &op->u.pcpu_info;
-
-        ret = xsm_getcpuinfo();
-        if ( ret )
-            break;
 
         if ( !get_cpu_maps() )
         {
@@ -549,7 +498,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
     {
         int cpu = op->u.cpu_ol.cpuid;
 
-        ret = xsm_resource_plug_core();
+        ret = xsm_resource_plug_core(XSM_HOOK);
         if ( ret )
             break;
 
@@ -565,10 +514,6 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
             break;
         }
 
-        ret = xsm_resource_plug_core();
-        if ( ret )
-            break;
-
         ret = continue_hypercall_on_cpu(
             0, cpu_up_helper, (void *)(unsigned long)cpu);
         break;
@@ -578,7 +523,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
     {
         int cpu = op->u.cpu_ol.cpuid;
 
-        ret = xsm_resource_unplug_core();
+        ret = xsm_resource_unplug_core(XSM_HOOK);
         if ( ret )
             break;
 
@@ -607,7 +552,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
     break;
 
     case XENPF_cpu_hotadd:
-        ret = xsm_resource_plug_core();
+        ret = xsm_resource_plug_core(XSM_HOOK);
         if ( ret )
             break;
 
@@ -617,7 +562,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
     break;
 
     case XENPF_mem_hotadd:
-        ret = xsm_resource_plug_core();
+        ret = xsm_resource_plug_core(XSM_HOOK);
         if ( ret )
             break;
 

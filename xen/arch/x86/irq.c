@@ -1853,8 +1853,7 @@ int map_domain_pirq(
     ASSERT(spin_is_locked(&d->event_lock));
 
     if ( !IS_PRIV(current->domain) &&
-         !(IS_PRIV_FOR(current->domain, d) &&
-           irq_access_permitted(current->domain, pirq)))
+         !irq_access_permitted(current->domain, pirq))
         return -EPERM;
 
     if ( pirq < 0 || pirq >= d->nr_pirqs || irq < 0 || irq >= nr_irqs )
@@ -1875,7 +1874,7 @@ int map_domain_pirq(
         return 0;
     }
 
-    ret = xsm_map_domain_pirq(d, irq, data);
+    ret = xsm_map_domain_pirq(XSM_HOOK, d, irq, data);
     if ( ret )
     {
         dprintk(XENLOG_G_ERR, "dom%d: could not permit access to irq %d mapping to pirq %d\n",

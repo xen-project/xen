@@ -5,15 +5,35 @@
 # Domain creation and setup
 #
 ################################################################################
+define(`declare_domain_common', `
+	allow $1 $2:grant { query setup };
+	allow $1 $2:mmu { adjust physmap map_read map_write stat pinpage updatemp mmuext_op };
+	allow $1 $2:hvm { getparam setparam };
+')
+
 # declare_domain(type, attrs...)
-#   Declare a type as a domain type, and allow basic domain setup
+#   Declare a domain type, along with associated _self and _channel types
+#   Allow the domain to perform basic operations on itself
 define(`declare_domain', `
 	type $1, domain_type`'ifelse(`$#', `1', `', `,shift($@)');
+	type $1_self, domain_type, domain_self_type;
+	type_transition $1 $1:domain $1_self;
 	type $1_channel, event_type;
 	type_transition $1 domain_type:event $1_channel;
-	allow $1 $1:grant { query setup };
-	allow $1 $1:mmu { adjust physmap map_read map_write stat pinpage };
-	allow $1 $1:hvm { getparam setparam };
+	declare_domain_common($1, $1_self)
+')
+
+# declare_singleton_domain(type, attrs...)
+#   Declare a domain type and associated _channel types.
+#   Note: Because the domain can perform basic operations on itself and any
+#   other domain of the same type, this constructor should be used for types
+#   containing at most one domain. This is not enforced by policy.
+define(`declare_singleton_domain', `
+	type $1, domain_type`'ifelse(`$#', `1', `', `,shift($@)');
+	define(`$1_self', `$1')
+	type $1_channel, event_type;
+	type_transition $1 domain_type:event $1_channel;
+	declare_domain_common($1, $1)
 ')
 
 # declare_build_label(type)
@@ -27,11 +47,12 @@ define(`declare_build_label', `
 define(`create_domain_common', `
 	allow $1 $2:domain { create max_vcpus setdomainmaxmem setaddrsize
 			getdomaininfo hypercall setvcpucontext setextvcpucontext
-			scheduler getvcpuinfo getvcpuextstate getaddrsize
+			getscheduler getvcpuinfo getvcpuextstate getaddrsize
 			getvcpuaffinity setvcpuaffinity };
+	allow $1 $2:domain2 { set_cpuid settsc setscheduler };
 	allow $1 $2:security check_context;
 	allow $1 $2:shadow enable;
-	allow $1 $2:mmu {map_read map_write adjust memorymap physmap pinpage};
+	allow $1 $2:mmu { map_read map_write adjust memorymap physmap pinpage mmuext_op };
 	allow $1 $2:grant setup;
 	allow $1 $2:hvm { cacheattr getparam hvmctl irqlevel pciroute sethvmc setparam pcilevel trackdirtyvram };
 ')
@@ -50,6 +71,7 @@ define(`create_domain_build_label', `
 	allow $1 $2_channel:event create;
 	allow $1 $2_building:domain2 relabelfrom;
 	allow $1 $2:domain2 relabelto;
+	allow $2_building $2:domain transition;
 ')
 
 # manage_domain(priv, target)
@@ -57,7 +79,7 @@ define(`create_domain_build_label', `
 define(`manage_domain', `
 	allow $1 $2:domain { getdomaininfo getvcpuinfo getvcpuaffinity
 			getaddrsize pause unpause trigger shutdown destroy
-			setvcpuaffinity setdomainmaxmem };
+			setvcpuaffinity setdomainmaxmem getscheduler };
 ')
 
 # migrate_domain_out(priv, target)
@@ -67,6 +89,7 @@ define(`migrate_domain_out', `
 	allow $1 $2:hvm { gethvmc getparam irqlevel };
 	allow $1 $2:mmu { stat pageinfo map_read };
 	allow $1 $2:domain { getaddrsize getvcpucontext getextvcpucontext getvcpuextstate pause destroy };
+	allow $1 $2:domain2 gettsc;
 ')
 
 ################################################################################
@@ -99,20 +122,36 @@ define(`domain_comms', `
 ')
 
 # domain_self_comms(domain)
-#   Allow a domain types to communicate with others of its type using grants
-#   and event channels (this includes event channels to DOMID_SELF)
+#   Allow a non-singleton domain type to communicate with itself using grants
+#   and event channels
 define(`domain_self_comms', `
-	create_channel($1, $1, $1_channel)
-	allow $1 $1:grant { map_read map_write copy unmap };
+	create_channel($1, $1_self, $1_channel)
+	allow $1 $1_self:grant { map_read map_write copy unmap };
 ')
 
 # device_model(dm_dom, hvm_dom)
 #   Define how a device model domain interacts with its target
 define(`device_model', `
-	domain_comms($1, $2)
-	allow $1 $2:domain { set_target shutdown };
-	allow $1 $2:mmu { map_read map_write adjust physmap };
-	allow $1 $2:hvm { getparam setparam trackdirtyvram hvmctl irqlevel pciroute };
+	type $2_target, domain_type, domain_target_type;
+	type_transition $2 $1:domain $2_target;
+	allow $1 $2:domain set_target;
+
+	type_transition $2_target domain_type:event $2_channel;
+	create_channel($1, $2_target, $1_channel)
+	create_channel($2, $1, $2_channel)
+	allow $1 $2_channel:event create;
+
+	allow $1 $2_target:domain shutdown;
+	allow $1 $2_target:mmu { map_read map_write adjust physmap };
+	allow $1 $2_target:hvm { getparam setparam trackdirtyvram hvmctl irqlevel pciroute cacheattr send_irq };
+')
+
+# make_device_model(priv, dm_dom, hvm_dom)
+#   Allow creation of a device model and HVM domain pair
+define(`make_device_model', `
+	device_model($2, $3)
+	allow $1 $2:domain2 make_priv_for;
+	allow $1 $3:domain2 set_as_target;
 ')
 ################################################################################
 #
@@ -123,8 +162,9 @@ define(`device_model', `
 # use_device(domain, device)
 #   Allow a device to be used by a domain
 define(`use_device', `
+    allow $1 $1_self:mmu exchange;
     allow $1 $2:resource use;
-    allow $1 $2:mmu { map_read map_write };
+    allow $1 domio_t:mmu { map_read map_write };
 ')
 
 # admin_device(domain, device)

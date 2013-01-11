@@ -2605,11 +2605,6 @@ static struct domain *get_pg_owner(domid_t domid)
         pg_owner = rcu_lock_domain(dom_io);
         break;
     case DOMID_XEN:
-        if ( !IS_PRIV(curr) )
-        {
-            MEM_LOG("Cannot set foreign dom");
-            break;
-        }
         pg_owner = rcu_lock_domain(dom_xen);
         break;
     default:
@@ -2617,12 +2612,6 @@ static struct domain *get_pg_owner(domid_t domid)
         {
             MEM_LOG("Unknown domain '%u'", domid);
             break;
-        }
-        if ( !IS_PRIV_FOR(curr, pg_owner) )
-        {
-            MEM_LOG("Cannot set foreign dom");
-            rcu_unlock_domain(pg_owner);
-            pg_owner = NULL;
         }
         break;
     }
@@ -2711,6 +2700,13 @@ long do_mmuext_op(
         goto out;
     }
 
+    rc = xsm_mmuext_op(XSM_TARGET, d, pg_owner);
+    if ( rc )
+    {
+        rcu_unlock_domain(pg_owner);
+        goto out;
+    }
+
     for ( i = 0; i < count; i++ )
     {
         if ( hypercall_preempt_check() )
@@ -2776,7 +2772,7 @@ long do_mmuext_op(
                 break;
             }
 
-            if ( (rc = xsm_memory_pin_page(d, pg_owner, page)) != 0 )
+            if ( (rc = xsm_memory_pin_page(XSM_HOOK, d, pg_owner, page)) != 0 )
             {
                 put_page_and_type(page);
                 okay = 0;
@@ -3153,6 +3149,8 @@ long do_mmu_update(
     struct vcpu *v = current;
     struct domain *d = v->domain, *pt_owner = d, *pg_owner;
     struct domain_mmap_cache mapcache;
+    uint32_t xsm_needed = 0;
+    uint32_t xsm_checked = 0;
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
@@ -3182,11 +3180,6 @@ long do_mmu_update(
         if ( (v = pt_owner->vcpu ? pt_owner->vcpu[0] : NULL) == NULL )
         {
             rc = -EINVAL;
-            goto out;
-        }
-        if ( !IS_PRIV_FOR(d, pt_owner) )
-        {
-            rc = -ESRCH;
             goto out;
         }
     }
@@ -3228,9 +3221,20 @@ long do_mmu_update(
         {
             p2m_type_t p2mt;
 
-            rc = xsm_mmu_normal_update(d, pt_owner, pg_owner, req.val);
-            if ( rc )
-                break;
+            xsm_needed |= XSM_MMU_NORMAL_UPDATE;
+            if ( get_pte_flags(req.val) & _PAGE_PRESENT )
+            {
+                xsm_needed |= XSM_MMU_UPDATE_READ;
+                if ( get_pte_flags(req.val) & _PAGE_RW )
+                    xsm_needed |= XSM_MMU_UPDATE_WRITE;
+            }
+            if ( xsm_needed != xsm_checked )
+            {
+                rc = xsm_mmu_update(XSM_TARGET, d, pt_owner, pg_owner, xsm_needed);
+                if ( rc )
+                    break;
+                xsm_checked = xsm_needed;
+            }
             rc = -EINVAL;
 
             req.ptr -= cmd;
@@ -3342,9 +3346,14 @@ long do_mmu_update(
             mfn = req.ptr >> PAGE_SHIFT;
             gpfn = req.val;
 
-            rc = xsm_mmu_machphys_update(d, pg_owner, mfn);
-            if ( rc )
-                break;
+            xsm_needed |= XSM_MMU_MACHPHYS_UPDATE;
+            if ( xsm_needed != xsm_checked )
+            {
+                rc = xsm_mmu_update(XSM_TARGET, d, NULL, pg_owner, xsm_needed);
+                if ( rc )
+                    break;
+                xsm_checked = xsm_needed;
+            }
 
             if ( unlikely(!get_page_from_pagenr(mfn, pg_owner)) )
             {
@@ -3908,7 +3917,7 @@ static int __do_update_va_mapping(
 
     perfc_incr(calls_to_update_va);
 
-    rc = xsm_update_va_mapping(d, pg_owner, val);
+    rc = xsm_update_va_mapping(XSM_TARGET, d, pg_owner, val);
     if ( rc )
         return rc;
 
@@ -4375,11 +4384,11 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&xatp, arg, 1) )
             return -EFAULT;
 
-        rc = rcu_lock_target_domain_by_id(xatp.domid, &d);
-        if ( rc != 0 )
-            return rc;
+        d = rcu_lock_domain_by_any_id(xatp.domid);
+        if ( d == NULL )
+            return -ESRCH;
 
-        if ( xsm_add_to_physmap(current->domain, d) )
+        if ( xsm_add_to_physmap(XSM_TARGET, current->domain, d) )
         {
             rcu_unlock_domain(d);
             return -EPERM;
@@ -4414,11 +4423,11 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( fmap.map.nr_entries > E820MAX )
             return -EINVAL;
 
-        rc = rcu_lock_target_domain_by_id(fmap.domid, &d);
-        if ( rc != 0 )
-            return rc;
+        d = rcu_lock_domain_by_any_id(fmap.domid);
+        if ( d == NULL )
+            return -ESRCH;
 
-        rc = xsm_domain_memory_map(d);
+        rc = xsm_domain_memory_map(XSM_TARGET, d);
         if ( rc )
         {
             rcu_unlock_domain(d);
@@ -4493,10 +4502,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         XEN_GUEST_HANDLE_PARAM(e820entry_t) buffer_param;
         unsigned int i;
 
-        if ( !IS_PRIV(current->domain) )
-            return -EINVAL;
-
-        rc = xsm_machine_memory_map();
+        rc = xsm_machine_memory_map(XSM_PRIV);
         if ( rc )
             return rc;
 
@@ -4572,21 +4578,17 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct domain *d;
         struct p2m_domain *p2m;
 
-        /* Support DOMID_SELF? */
-        if ( !IS_PRIV(current->domain) )
-            return -EPERM;
-
         if ( copy_from_guest(&target, arg, 1) )
             return -EFAULT;
 
-        rc = rcu_lock_target_domain_by_id(target.domid, &d);
-        if ( rc != 0 )
-            return rc;
+        d = rcu_lock_domain_by_any_id(target.domid);
+        if ( d == NULL )
+            return -ESRCH;
 
         if ( op == XENMEM_set_pod_target )
-            rc = xsm_set_pod_target(d);
+            rc = xsm_set_pod_target(XSM_PRIV, d);
         else
-            rc = xsm_get_pod_target(d);
+            rc = xsm_get_pod_target(XSM_PRIV, d);
 
         if ( rc != 0 )
             goto pod_target_out_unlock;

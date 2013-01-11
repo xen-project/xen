@@ -1293,10 +1293,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
     struct xen_mc_msrinject *mc_msrinject;
     struct xen_mc_mceinject *mc_mceinject;
 
-    if (!IS_PRIV(v->domain) )
-        return x86_mcerr(NULL, -EPERM);
-
-    ret = xsm_do_mca();
+    ret = xsm_do_mca(XSM_PRIV);
     if ( ret )
         return x86_mcerr(NULL, ret);
 

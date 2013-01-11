@@ -2644,6 +2644,9 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     if ( !tmem_initialized )
         return -ENODEV;
 
+    if ( !tmh_current_permitted() )
+        return -EPERM;
+
     total_tmem_ops++;
 
     if ( tmh_lock_all )

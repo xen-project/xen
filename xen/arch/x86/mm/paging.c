@@ -559,7 +559,7 @@ int paging_domctl(struct domain *d, xen_domctl_shadow_op_t *sc,
         return -EINVAL;
     }
 
-    rc = xsm_shadow_control(d, sc->op);
+    rc = xsm_shadow_control(XSM_HOOK, d, sc->op);
     if ( rc )
         return rc;
 

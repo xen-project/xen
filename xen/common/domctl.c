@@ -265,27 +265,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             return -ESRCH;
     }
 
-    switch ( op->cmd )
-    {
-    case XEN_DOMCTL_ioport_mapping:
-    case XEN_DOMCTL_memory_mapping:
-    case XEN_DOMCTL_bind_pt_irq:
-    case XEN_DOMCTL_unbind_pt_irq: {
-        bool_t is_priv = IS_PRIV_FOR(current->domain, d);
-        if ( !is_priv )
-        {
-            ret = -EPERM;
-            goto domctl_out_unlock_domonly;
-        }
-        break;
-    }
-    case XEN_DOMCTL_getdomaininfo:
-        break;
-    default:
-        if ( !IS_PRIV(current->domain) )
-            return -EPERM;
-        break;
-    }
+    ret = xsm_domctl(XSM_OTHER, d, op->cmd);
+    if ( ret )
+        goto domctl_out_unlock_domonly;
 
     if ( !domctl_lock_acquire() )
     {
@@ -307,10 +289,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         ret = -ESRCH;
         if ( d == NULL )
             break;
-
-        ret = xsm_setvcpucontext(d);
-        if ( ret )
-            goto svc_out;
 
         ret = -EINVAL;
         if ( (d == current->domain) || /* no domain_pause() */
@@ -358,10 +336,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_pausedomain:
     {
-        ret = xsm_pausedomain(d);
-        if ( ret )
-            break;
-
         ret = -EINVAL;
         if ( d != current->domain )
         {
@@ -373,10 +347,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_unpausedomain:
     {
-        ret = xsm_unpausedomain(d);
-        if ( ret )
-            break;
-
         domain_unpause_by_systemcontroller(d);
         ret = 0;
     }
@@ -384,10 +354,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_resumedomain:
     {
-        ret = xsm_resumedomain(d);
-        if ( ret )
-            break;
-
         domain_resume(d);
         ret = 0;
     }
@@ -468,10 +434,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( (d == current->domain) || /* no domain_pause() */
              (max > MAX_VIRT_CPUS) ||
              (is_hvm_domain(d) && (max > MAX_HVM_VCPUS)) )
-            break;
-
-        ret = xsm_max_vcpus(d);
-        if ( ret )
             break;
 
         /* Until Xenoprof can dynamically grow its vcpu-s array... */
@@ -556,7 +518,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_destroydomain:
     {
-        ret = xsm_destroydomain(d) ? : domain_kill(d);
+        ret = domain_kill(d);
     }
     break;
 
@@ -564,10 +526,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_getvcpuaffinity:
     {
         struct vcpu *v;
-
-        ret = xsm_vcpuaffinity(op->cmd, d);
-        if ( ret )
-            break;
 
         ret = -EINVAL;
         if ( op->u.vcpuaffinity.vcpu >= d->max_vcpus )
@@ -599,10 +557,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_scheduler_op:
     {
-        ret = xsm_scheduler(d);
-        if ( ret )
-            break;
-
         ret = sched_adjust(d, &op->u.scheduler_op);
         copyback = 1;
     }
@@ -625,7 +579,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             break;
         }
 
-        ret = xsm_getdomaininfo(d);
+        ret = xsm_getdomaininfo(XSM_HOOK, d);
         if ( ret )
             goto getdomaininfo_out;
 
@@ -644,10 +598,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     { 
         vcpu_guest_context_u c = { .nat = NULL };
         struct vcpu         *v;
-
-        ret = xsm_getvcpucontext(d);
-        if ( ret )
-            goto getvcpucontext_out;
 
         ret = -EINVAL;
         if ( op->u.vcpucontext.vcpu >= d->max_vcpus )
@@ -702,10 +652,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         struct vcpu   *v;
         struct vcpu_runstate_info runstate;
 
-        ret = xsm_getvcpuinfo(d);
-        if ( ret )
-            break;
-
         ret = -EINVAL;
         if ( op->u.getvcpuinfo.vcpu >= d->max_vcpus )
             break;
@@ -730,10 +676,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     {
         unsigned long new_max;
 
-        ret = xsm_setdomainmaxmem(d);
-        if ( ret )
-            break;
-
         ret = -EINVAL;
         new_max = op->u.max_mem.max_memkb >> (PAGE_SHIFT-10);
 
@@ -751,10 +693,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_setdomainhandle:
     {
-        ret = xsm_setdomainhandle(d);
-        if ( ret )
-            break;
-
         memcpy(d->handle, op->u.setdomainhandle.handle,
                sizeof(xen_domain_handle_t));
         ret = 0;
@@ -765,10 +703,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     {
         ret = -EINVAL;
         if ( d == current->domain ) /* no domain_pause() */
-            break;
-
-        ret = xsm_setdebugging(d);
-        if ( ret )
             break;
 
         domain_pause(d);
@@ -785,7 +719,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
         if ( pirq >= d->nr_pirqs )
             ret = -EINVAL;
-        else if ( xsm_irq_permission(d, pirq, allow) )
+        else if ( xsm_irq_permission(XSM_HOOK, d, pirq, allow) )
             ret = -EPERM;
         else if ( allow )
             ret = irq_permit_access(d, pirq);
@@ -804,7 +738,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( (mfn + nr_mfns - 1) < mfn ) /* wrap? */
             break;
 
-        if ( xsm_iomem_permission(d, mfn, mfn + nr_mfns - 1, allow) )
+        if ( xsm_iomem_permission(XSM_HOOK, d, mfn, mfn + nr_mfns - 1, allow) )
             ret = -EPERM;
         else if ( allow )
             ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
@@ -815,10 +749,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_settimeoffset:
     {
-        ret = xsm_domain_settime(d);
-        if ( ret )
-            break;
-
         domain_set_time_offset(d, op->u.settimeoffset.time_offset_seconds);
         ret = 0;
     }
@@ -840,7 +770,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             break;
         }
 
-        ret = xsm_set_target(d, e);
+        ret = xsm_set_target(XSM_HOOK, d, e);
         if ( ret ) {
             put_domain(e);
             break;
@@ -855,27 +785,20 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
     case XEN_DOMCTL_subscribe:
     {
-        ret = xsm_domctl(d, op->cmd);
-        if ( !ret )
-            d->suspend_evtchn = op->u.subscribe.port;
+        d->suspend_evtchn = op->u.subscribe.port;
     }
     break;
 
     case XEN_DOMCTL_disable_migrate:
     {
-        ret = xsm_domctl(d, op->cmd);
-        if ( !ret )
-            d->disable_migrate = op->u.disable_migrate.disable;
+        d->disable_migrate = op->u.disable_migrate.disable;
     }
     break;
 
     case XEN_DOMCTL_set_virq_handler:
     {
         uint32_t virq = op->u.set_virq_handler.virq;
-
-        ret = xsm_set_virq_handler(d, virq);
-        if ( !ret )
-            ret = set_global_virq_handler(d, virq);
+        ret = set_global_virq_handler(d, virq);
     }
     break;
 

@@ -852,10 +852,7 @@ static int do_kexec_op_internal(unsigned long op,
     unsigned long flags;
     int ret = -EINVAL;
 
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
-    ret = xsm_kexec();
+    ret = xsm_kexec(XSM_PRIV);
     if ( ret )
         return ret;
 

@@ -8,6 +8,8 @@
 ################################################################################
 attribute xen_type;
 attribute domain_type;
+attribute domain_self_type;
+attribute domain_target_type;
 attribute resource_type;
 attribute event_type;
 attribute mls_priv;
@@ -25,12 +27,12 @@ attribute mls_priv;
 type xen_t, xen_type, mls_priv;
 
 # Domain 0
-declare_domain(dom0_t, mls_priv);
+declare_singleton_domain(dom0_t, mls_priv);
 
-# Untracked I/O memory (pseudo-domain)
+# I/O memory (DOMID_IO pseudo-domain)
 type domio_t, xen_type;
 
-# Xen heap (pseudo-domain)
+# Xen heap (DOMID_XEN pseudo-domain)
 type domxen_t, xen_type;
 
 # Unlabeled objects
@@ -53,8 +55,8 @@ type device_t, resource_type;
 #
 ################################################################################
 allow dom0_t xen_t:xen { kexec readapic writeapic mtrr_read mtrr_add mtrr_del
-	scheduler physinfo heap quirk readconsole writeconsole settime getcpuinfo
-	microcode cpupool_op sched_op pm_op };
+	physinfo heap quirk readconsole writeconsole settime getcpuinfo
+	microcode cpupool_op pm_op tmem_control getscheduler setscheduler };
 allow dom0_t xen_t:mmu { memorymap };
 allow dom0_t security_t:security { check_context compute_av compute_create
 	compute_member load_policy compute_relabel compute_user setenforce
@@ -67,11 +69,13 @@ admin_device(dom0_t, device_t)
 admin_device(dom0_t, irq_t)
 admin_device(dom0_t, ioport_t)
 admin_device(dom0_t, iomem_t)
-allow dom0_t domio_t:mmu { map_read map_write };
 
-domain_self_comms(dom0_t)
+domain_comms(dom0_t, dom0_t)
 
 auditallow dom0_t security_t:security { load_policy setenforce setbool };
+
+# Allow all domains to use (unprivileged parts of) the tmem hypercall
+allow domain_type xen_t:xen tmem_op;
 
 ###############################################################################
 #
@@ -84,11 +88,14 @@ domain_self_comms(domU_t)
 create_domain(dom0_t, domU_t)
 manage_domain(dom0_t, domU_t)
 domain_comms(dom0_t, domU_t)
+domain_comms(domU_t, domU_t)
+domain_self_comms(domU_t)
 
 declare_domain(isolated_domU_t)
 create_domain(dom0_t, isolated_domU_t)
 manage_domain(dom0_t, isolated_domU_t)
 domain_comms(dom0_t, isolated_domU_t)
+domain_self_comms(isolated_domU_t)
 
 # Declare a boolean that denies creation of prot_domU_t domains
 gen_bool(prot_doms_locked, false)
@@ -98,6 +105,8 @@ if (!prot_doms_locked) {
 }
 domain_comms(dom0_t, prot_domU_t)
 domain_comms(domU_t, prot_domU_t)
+domain_comms(prot_domU_t, prot_domU_t)
+domain_self_comms(prot_domU_t)
 
 # domHVM_t is meant to be paired with a qemu-dm stub domain of type dm_dom_t
 declare_domain(domHVM_t)
@@ -110,7 +119,7 @@ declare_domain(dm_dom_t)
 create_domain(dom0_t, dm_dom_t)
 manage_domain(dom0_t, dm_dom_t)
 domain_comms(dom0_t, dm_dom_t)
-device_model(dm_dom_t, domHVM_t)
+make_device_model(dom0_t, dm_dom_t, domHVM_t)
 
 # nomigrate_t must be built via the nomigrate_t_building label; once built,
 # dom0 cannot read its memory.
