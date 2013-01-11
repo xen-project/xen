@@ -82,6 +82,7 @@ static int count_pgtables(struct xc_dom_image *dom, int pae,
 {
     int pages, extra_pages;
     xen_vaddr_t try_virt_end;
+    xen_pfn_t try_pfn_end;
 
     extra_pages = dom->alloc_bootstack ? 1 : 0;
     extra_pages += dom->extra_pages;
@@ -91,6 +92,17 @@ static int count_pgtables(struct xc_dom_image *dom, int pae,
     {
         try_virt_end = round_up(dom->virt_alloc_end + pages * PAGE_SIZE_X86,
                                 bits_to_mask(22)); /* 4MB alignment */
+
+        try_pfn_end = (try_virt_end - dom->parms.virt_base) >> PAGE_SHIFT_X86;
+
+        if ( try_pfn_end > dom->total_pages )
+        {
+            xc_dom_panic(dom->xch, XC_OUT_OF_MEMORY,
+                         "%s: not enough memory for initial mapping (%#"PRIpfn" > %#"PRIpfn")",
+                         __FUNCTION__, try_pfn_end, dom->total_pages);
+            return -ENOMEM;
+        }
+
         dom->pg_l4 =
             nr_page_tables(dom, dom->parms.virt_base, try_virt_end, l4_bits);
         dom->pg_l3 =

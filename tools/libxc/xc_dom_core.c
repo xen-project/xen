@@ -873,7 +873,8 @@ int xc_dom_build_image(struct xc_dom_image *dom)
         goto err;
     if ( dom->arch_hooks->count_pgtables )
     {
-        dom->arch_hooks->count_pgtables(dom);
+        if ( dom->arch_hooks->count_pgtables(dom) != 0 )
+            goto err;
         if ( (dom->pgtables > 0) &&
              (xc_dom_alloc_segment(dom, &dom->pgtables_seg, "page tables", 0,
                                    dom->pgtables * page_size) != 0) )
