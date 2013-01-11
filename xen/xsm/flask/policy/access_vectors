@@ -3,189 +3,440 @@
 #
 # class class_name { permission_name ... }
 
+# Class xen consists of dom0-only operations dealing with the hypervisor itself.
+# Unless otherwise specified, the source is the domain executing the hypercall,
+# and the target is the xen initial sid (type xen_t).
 class xen
 {
-	settime
-	tbufcontrol
-	readconsole
-	clearconsole
-	perfcontrol
-	mtrr_add
-	mtrr_del
-	mtrr_read
-	microcode
-	physinfo
-	quirk
+# XENPF_settime
+    settime
+# XEN_SYSCTL_tbuf_op
+    tbufcontrol
+# CONSOLEIO_read, XEN_SYSCTL_readconsole
+    readconsole
+# XEN_SYSCTL_readconsole with clear=1
+    clearconsole
+# XEN_SYSCTL_perfc_op
+    perfcontrol
+# XENPF_add_memtype
+    mtrr_add
+# XENPF_del_memtype
+    mtrr_del
+# XENPF_read_memtype
+    mtrr_read
+# XENPF_microcode_update
+    microcode
+# XEN_SYSCTL_physinfo, XEN_SYSCTL_topologyinfo, XEN_SYSCTL_numainfo
+    physinfo
+# XENPF_platform_quirk
+    quirk
+# CONSOLEIO_write
     writeconsole
+# PHYSDEVOP_apic_read, PHYSDEVOP_alloc_irq_vector
     readapic
+# PHYSDEVOP_apic_write
     writeapic
+# Most XENOPROF_*
     privprofile
+# XENOPROF_{init,enable_virq,disable_virq,get_buffer}
     nonprivprofile
+# kexec hypercall
     kexec
-	firmware
-	sleep
-	frequency
-	getidle
-	debug
-	getcpuinfo
-	heap
-	pm_op
-	mca_op
-	lockprof
-	cpupool_op
-	tmem_op
-	tmem_control
-	getscheduler
-	setscheduler
+# XENPF_firmware_info, XENPF_efi_runtime_call
+    firmware
+# XENPF_enter_acpi_sleep
+    sleep
+# XENPF_change_freq
+    frequency
+# XENPF_getidletime
+    getidle
+# XEN_SYSCTL_debug_keys
+    debug
+# XEN_SYSCTL_getcpuinfo, XENPF_get_cpu_version, XENPF_get_cpuinfo
+    getcpuinfo
+# XEN_SYSCTL_availheap
+    heap
+# XEN_SYSCTL_get_pmstat, XEN_SYSCTL_pm_op, XENPF_set_processor_pminfo,
+# XENPF_core_parking
+    pm_op
+# mca hypercall
+    mca_op
+# XEN_SYSCTL_lockprof_op
+    lockprof
+# XEN_SYSCTL_cpupool_op
+    cpupool_op
+# tmem hypercall (any access)
+    tmem_op
+# TMEM_CONTROL command of tmem hypercall
+    tmem_control
+# XEN_SYSCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_getinfo, XEN_SYSCTL_sched_id
+    getscheduler
+# XEN_SYSCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_putinfo
+    setscheduler
 }
 
+# Classes domain and domain2 consist of operations that a domain performs on
+# another domain or on itself.  Unless otherwise specified, the source is the
+# domain executing the hypercall, and the target is the domain being operated on
+# (which may result in a _self or _target type).
+#
+# transitions in class domain are used to produce the _self and _target types;
+# see docs/misc/xsm-flask.txt and the example XSM policy for details.
 class domain
 {
-	setvcpucontext
-	pause
-	unpause
+# XEN_DOMCTL_setvcpucontext
+    setvcpucontext
+# XEN_DOMCTL_pausedomain
+    pause
+# XEN_DOMCTL_unpausedomain
+    unpause
+# XEN_DOMCTL_resumedomain
     resume
+# XEN_DOMCTL_createdomain
     create
+# checked in FLASK_RELABEL_DOMAIN for any relabel operation:
+#  source = the old label of the domain
+#  target = the new label of the domain
+# see also the domain2 relabel{from,to,self} permissions
     transition
+# XEN_DOMCTL_max_vcpus
     max_vcpus
+# XEN_DOMCTL_destroydomain
     destroy
+# XEN_DOMCTL_setvcpuaffinity
     setvcpuaffinity
-	getvcpuaffinity
-	getscheduler
-	getdomaininfo
-	getvcpuinfo
-	getvcpucontext
-	setdomainmaxmem
-	setdomainhandle
-	setdebugging
-	hypercall
+# XEN_DOMCTL_getvcpuaffinity
+    getvcpuaffinity
+# XEN_DOMCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_getinfo
+    getscheduler
+# XEN_DOMCTL_getdomaininfo, XEN_SYSCTL_getdomaininfolist
+    getdomaininfo
+# XEN_DOMCTL_getvcpuinfo
+    getvcpuinfo
+# XEN_DOMCTL_getvcpucontext
+    getvcpucontext
+# XEN_DOMCTL_max_mem
+    setdomainmaxmem
+# XEN_DOMCTL_setdomainhandle
+    setdomainhandle
+# XEN_DOMCTL_setdebugging
+    setdebugging
+# XEN_DOMCTL_hypercall_init
+    hypercall
+# XEN_DOMCTL_settimeoffset
     settime
+# checked in XEN_DOMCTL_set_target:
+#  source = the new device model domain
+#  target = the new target domain
+# see also the domain2 make_priv_for and set_as_target checks
     set_target
+# SCHEDOP_remote_shutdown
     shutdown
+# XEN_DOMCTL_set{,_machine}_address_size
     setaddrsize
+# XEN_DOMCTL_get{,_machine}_address_size
     getaddrsize
-	trigger
-	getextvcpucontext
-	setextvcpucontext
-	getvcpuextstate
-	setvcpuextstate
-	getpodtarget
-	setpodtarget
-	set_misc_info
-	set_virq_handler
+# XEN_DOMCTL_sendtrigger
+    trigger
+# XEN_DOMCTL_get_ext_vcpucontext
+    getextvcpucontext
+# XEN_DOMCTL_set_ext_vcpucontext
+    setextvcpucontext
+# XEN_DOMCTL_getvcpuextstate
+    getvcpuextstate
+# XEN_DOMCTL_setvcpuextstate
+    setvcpuextstate
+# XENMEM_get_pod_target
+    getpodtarget
+# XENMEM_set_pod_target
+    setpodtarget
+# XEN_DOMCTL_subscribe, XEN_DOMCTL_disable_migrate,
+# XEN_DOMCTL_suppress_spurious_page_faults
+    set_misc_info
+# XEN_DOMCTL_set_virq_handler
+    set_virq_handler
 }
 
+# This is a continuation of class domain, since only 32 permissions can be
+# defined per class
 class domain2
 {
-	relabelfrom
-	relabelto
-	relabelself
-	make_priv_for
-	set_as_target
-	set_cpuid
-	gettsc
-	settsc
-	setscheduler
+# checked in FLASK_RELABEL_DOMAIN with non-DOMID_SELF:
+#  source = the domain making the hypercall
+#  target = the old label of the domain being relabeled
+    relabelfrom
+# checked in FLASK_RELABEL_DOMAIN with non-DOMID_SELF:
+#  source = the domain making the hypercall
+#  target = the new label of the domain being relabeled
+    relabelto
+# checked in FLASK_RELABEL_DOMAIN, only with DOMID_SELF:
+#  source = the old label of the domain
+#  target = the new label of the domain
+# see also domain__transition
+    relabelself
+# checked in XEN_DOMCTL_set_target:
+#  source = the domain making the hypercall
+#  target = the new device model domain
+    make_priv_for
+# checked in XEN_DOMCTL_set_target:
+#  source = the domain making the hypercall
+#  target = the new target domain
+    set_as_target
+# XEN_DOMCTL_set_cpuid
+    set_cpuid
+# XEN_DOMCTL_gettscinfo
+    gettsc
+# XEN_DOMCTL_settscinfo
+    settsc
+# XEN_DOMCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_putinfo
+    setscheduler
 }
 
+# Similar to class domain, but primarily contains domctls related to HVM domains
 class hvm
 {
+# XEN_DOMCTL_sethvmcontext
     sethvmc
+# XEN_DOMCTL_gethvmcontext, XEN_DOMCTL_gethvmcontext_partial
     gethvmc
+# HVMOP_set_param
     setparam
+# HVMOP_get_param
     getparam
+# HVMOP_set_pci_intx_level (also needs hvmctl)
     pcilevel
+# HVMOP_set_isa_irq_level
     irqlevel
+# HVMOP_set_pci_link_route
     pciroute
-	bind_irq
-	cacheattr
+    bind_irq
+# XEN_DOMCTL_pin_mem_cacheattr
+    cacheattr
+# HVMOP_track_dirty_vram
     trackdirtyvram
+# HVMOP_modified_memory, HVMOP_get_mem_type, HVMOP_set_mem_type,
+# HVMOP_set_mem_access, HVMOP_get_mem_access, HVMOP_pagetable_dying,
+# HVMOP_inject_trap
     hvmctl
+# XEN_DOMCTL_set_access_required
     mem_event
+# XEN_DOMCTL_mem_sharing_op and XENMEM_sharing_op_{share,add_physmap} with:
+#  source = the domain making the hypercall
+#  target = domain whose memory is being shared
     mem_sharing
+# XEN_DOMCTL_audit_p2m
     audit_p2m
+# HVMOP_inject_msi
     send_irq
+# checked in XENMEM_sharing_op_{share,add_physmap} with:
+#  source = domain whose memory is being shared
+#  target = client domain
     share_mem
 }
 
+# Class event describes event channels.  Interdomain event channels have their
+# own security label which is computed using a type transition between the
+# source and target domains.  Each endpoint has its own label, and the
+# permission checks must pass on both endpoints for an event channel to be
+# established.
 class event
 {
-	bind
-	send
-	status
-	notify
-	create
+# when creating an interdomain event channel endpoint:
+#  source = event channel label
+#  target = remote domain the event channel binds to.  This may be a _self or
+#           _target label if the endpoints are related as such.
+# This permission is checked when creating an unbound event channel and when the
+# interdomain event channel is established.
+    bind
+# EVTCHNOP_send:
+#  source = domain sending the event
+#  target = event channel label
+    send
+# EVTCHNOP_status; same as _send
+    status
+# <unused>
+    notify
+# when creating an interdomain event channel endpoint:
+#  source = the domain creating the channel (which might not be an endpoint)
+#  target = event channel label
+    create
+# EVTCHNOP_reset:
+#  source = domain making the hypercall
+#  target = domain whose event channels are being reset
     reset
 }
 
+# Class grant describes pages shared by grant mappings.  Pages use the security
+# label of their owning domain.
 class grant
 {
-	map_read
-	map_write
-	unmap
-	transfer
-	setup
+# GNTTABOP_map_grant_ref with any access
+    map_read
+# GNTTABOP_map_grant_ref with write access
+    map_write
+# GNTTABOP_unmap_grant_ref
+    unmap
+# GNTTABOP_transfer
+    transfer
+# GNTTABOP_setup_table, GNTTABOP_get_status_frames (target is commonly _self)
+    setup
+# GNTTABOP_copy
     copy
+# GNTTABOP_query_size, GNTTABOP_get_version
     query
 }
 
+# Class mmu describes pages of memory not accessed using grants.  Permissions
+# are checked using the domain ID used to access the page - the most common case
+# is a domain's own ID (the _self label).  Using DOMID_IO in the map command to
+# restrict the mapping to IO memory will result in the target being domio_t, and
+# migration uses read-only mappings with a target of DOMID_XEN (domxen_t).
 class mmu
 {
-	map_read
-	map_write
-	pageinfo
-	pagelist
+# checked when using mmu_update to map a page readably
+#  source = domain making the hypercall (which might not own the page table)
+#  target = domain whose pages are being mapped
+    map_read
+# checked when using mmu_update to map a page writably
+#  source = domain making the hypercall
+#  target = domain whose pages are being mapped
+    map_write
+# XEN_DOMCTL_getpageframeinfo*
+    pageinfo
+# XEN_DOMCTL_getmemlist
+    pagelist
+# XENMEM_{increase,decrease}_reservation, XENMEM_populate_physmap
     adjust
+# XENMEM_{current,maximum}_reservation, XENMEM_maximum_gpfn
     stat
+# <unused>
     translategp
-	updatemp
+# mmu_update MMU_MACHPHYS_UPDATE
+    updatemp
+# XENMEM_add_to_physmap, XENMEM_remove_from_physmap
     physmap
+# MMUEXT_PIN_L*_TABLE
     pinpage
+# <unused>
     mfnlist
+# XENMEM_machine_memory_map (with target xen_t)
+# XENMEM_set_memory_map (with domain target)
     memorymap
+# checked when using mmu_update to update the page tables of another domain
+#  source = domain making the hypercall
+#  target = domain whose page tables are being modified
     remote_remap
-	mmuext_op
-	exchange
+# the mmuext_op hypercall acting on the target domain
+    mmuext_op
+# XENMEM_exchange:
+#  source = domain making the hypercall
+#  target = domain whose pages are being exchanged
+    exchange
 }
 
+# control of the paging_domctl split by subop
 class shadow
 {
-	disable
-	enable
+# XEN_DOMCTL_SHADOW_OP_OFF
+    disable
+# enable, get/set allocation
+    enable
+# enable, read, and clean log
     logdirty
 }
 
+# Class resource is used to describe the resources used in hardware device
+# passthrough.  Resources include: hardware IRQs, MMIO regions, x86 I/O ports,
+# and PCI devices; see docs/misc/xsm-flask.txt for how to label them.
+#
+# Access to the legacy PCI configuration space on x86 via port 0xCF8/CFC
+# requires IS_PRIV, even with FLASK.  Writes to the BARs are checked as "setup",
+# while other reads/writes are "use"; the target is the PCI device whose
+# configuration space is being modified.  Accesses to the MMIO-based PCI express
+# configuration space described by the ACPI MCFG table are controlled as MMIO
+# accesses, and cannot special-case BAR writes.
+#
+# The {add,remove}_{irq,ioport,iomem,device} permissions use:
+#  source = domain making the hypercall
+#  target = resource's security label
 class resource
 {
-	add
-	remove
-	use
-	add_irq
-	remove_irq
-	add_ioport
-	remove_ioport
-	add_iomem
-	remove_iomem
-	stat_device
-	add_device
-	remove_device
-	plug
-	unplug
-	setup
+# checked when adding a resource to a domain:
+#  source = domain making the hypercall
+#  target = domain which will have access to the resource
+    add
+# checked when removing a resource from a domain:
+#  source = domain making the hypercall
+#  target = domain which will no longer have access to the resource
+    remove
+# checked when adding a resource to a domain:
+#  source = domain which will have access to the resource
+#  target = resource's security label
+# also checked when using some core Xen devices (target xen_t)
+    use
+# PHYSDEVOP_map_pirq and ioapic writes for dom0
+#  For GSI interrupts, the IRQ's label is indexed by the IRQ number
+#  For MSI interrupts, the label of the PCI device is used
+    add_irq
+# PHYSDEVOP_unmap_pirq:
+#  This is currently only checked for GSI interrupts
+    remove_irq
+# XEN_DOMCTL_ioport_permission, XEN_DOMCTL_ioport_mapping
+    add_ioport
+    remove_ioport
+# XEN_DOMCTL_iomem_permission, XEN_DOMCTL_memory_mapping
+    add_iomem
+    remove_iomem
+# XEN_DOMCTL_get_device_group, XEN_DOMCTL_test_assign_device:
+#  source = domain making the hypercall
+#  target = PCI device being queried
+    stat_device
+# XEN_DOMCTL_assign_device
+    add_device
+# XEN_DOMCTL_deassign_device
+    remove_device
+# checked for PCI hot and cold-plug hypercalls, with target as the PCI device
+# checked for CPU and memory hotplug with xen_t as the target
+    plug
+# checked for PCI hot-unplug hypercalls, with target as the PCI device
+# checked for CPU offlining with xen_t as the target
+    unplug
+# checked for PHYSDEVOP_restore_msi* (target PCI device)
+# checked for PHYSDEVOP_setup_gsi (target IRQ)
+# checked for PHYSDEVOP_pci_mmcfg_reserved (target xen_t)
+    setup
 }
 
+# Class security describes the FLASK security server itself; these operations
+# are accessed using the xsm_op hypercall.  The source is the domain invoking
+# the hypercall, and the target is security_t.
+#
+# Any domain with access to load_policy or setenforce must be trusted, since it
+# can bypass the rest of the security policy.
 class security
 {
-	compute_av
-	compute_create
-	compute_member
-	check_context
-	load_policy
-	compute_relabel
-	compute_user
-	setenforce
-	setbool
-	setsecparam
-        add_ocontext
-        del_ocontext
+# use the security server to compute an access check
+    compute_av
+# use the security server to compute a type transition
+    compute_create
+# use the security server to compute member selection
+    compute_member
+# sid <-> context string conversions
+    check_context
+# allow loading a new XSM/FLASK policy
+    load_policy
+# use the security server to compute an object relabel
+    compute_relabel
+# use the security server to list the SIDs reachable by a given user
+    compute_user
+# allow switching between enforcing and permissive mode
+    setenforce
+# allow changing policy booleans
+    setbool
+# allow changing security server configuration parmeters
+    setsecparam
+# add ocontext label definitions for resources
+    add_ocontext
+# remove ocontext label definitions for resources
+    del_ocontext
 }
