@@ -30,29 +30,14 @@ struct xsm_operations dummy_xsm_ops;
 void xsm_fixup_ops (struct xsm_operations *ops)
 {
     set_to_dummy_if_null(ops, security_domaininfo);
-    set_to_dummy_if_null(ops, setvcpucontext);
-    set_to_dummy_if_null(ops, pausedomain);
-    set_to_dummy_if_null(ops, unpausedomain);
-    set_to_dummy_if_null(ops, resumedomain);
     set_to_dummy_if_null(ops, domain_create);
-    set_to_dummy_if_null(ops, max_vcpus);
-    set_to_dummy_if_null(ops, destroydomain);
-    set_to_dummy_if_null(ops, vcpuaffinity);
-    set_to_dummy_if_null(ops, scheduler);
     set_to_dummy_if_null(ops, getdomaininfo);
-    set_to_dummy_if_null(ops, getvcpucontext);
-    set_to_dummy_if_null(ops, getvcpuinfo);
-    set_to_dummy_if_null(ops, domain_settime);
     set_to_dummy_if_null(ops, set_target);
     set_to_dummy_if_null(ops, domctl);
     set_to_dummy_if_null(ops, sysctl);
-    set_to_dummy_if_null(ops, set_virq_handler);
     set_to_dummy_if_null(ops, tbufcontrol);
     set_to_dummy_if_null(ops, readconsole);
     set_to_dummy_if_null(ops, sched_id);
-    set_to_dummy_if_null(ops, setdomainmaxmem);
-    set_to_dummy_if_null(ops, setdomainhandle);
-    set_to_dummy_if_null(ops, setdebugging);
     set_to_dummy_if_null(ops, perfcontrol);
     set_to_dummy_if_null(ops, debug_keys);
     set_to_dummy_if_null(ops, getcpuinfo);
@@ -126,21 +111,13 @@ void xsm_fixup_ops (struct xsm_operations *ops)
 
 #ifdef CONFIG_X86
     set_to_dummy_if_null(ops, shadow_control);
-    set_to_dummy_if_null(ops, getpageframeinfo);
-    set_to_dummy_if_null(ops, getmemlist);
-    set_to_dummy_if_null(ops, hypercall_init);
-    set_to_dummy_if_null(ops, hvmcontext);
-    set_to_dummy_if_null(ops, address_size);
-    set_to_dummy_if_null(ops, machine_address_size);
     set_to_dummy_if_null(ops, hvm_param);
     set_to_dummy_if_null(ops, hvm_set_pci_intx_level);
     set_to_dummy_if_null(ops, hvm_set_isa_irq_level);
     set_to_dummy_if_null(ops, hvm_set_pci_link_route);
     set_to_dummy_if_null(ops, hvm_inject_msi);
-    set_to_dummy_if_null(ops, mem_event_setup);
     set_to_dummy_if_null(ops, mem_event_control);
     set_to_dummy_if_null(ops, mem_event_op);
-    set_to_dummy_if_null(ops, mem_sharing);
     set_to_dummy_if_null(ops, mem_sharing_op);
     set_to_dummy_if_null(ops, apic);
     set_to_dummy_if_null(ops, xen_settime);
@@ -161,12 +138,8 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, update_va_mapping);
     set_to_dummy_if_null(ops, add_to_physmap);
     set_to_dummy_if_null(ops, remove_from_physmap);
-    set_to_dummy_if_null(ops, sendtrigger);
     set_to_dummy_if_null(ops, bind_pt_irq);
     set_to_dummy_if_null(ops, unbind_pt_irq);
-    set_to_dummy_if_null(ops, pin_mem_cacheattr);
-    set_to_dummy_if_null(ops, ext_vcpucontext);
-    set_to_dummy_if_null(ops, vcpuextstate);
     set_to_dummy_if_null(ops, ioport_permission);
     set_to_dummy_if_null(ops, ioport_mapping);
 #endif

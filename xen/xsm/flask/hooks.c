@@ -484,26 +484,6 @@ static void flask_security_domaininfo(struct domain *d,
     info->ssidref = domain_sid(d);
 }
 
-static int flask_setvcpucontext(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETVCPUCONTEXT);
-}
-
-static int flask_pausedomain(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__PAUSE);
-}
-
-static int flask_unpausedomain(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__UNPAUSE);
-}
-
-static int flask_resumedomain(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__RESUME);
-}
-
 static int flask_domain_create(struct domain *d, u32 ssidref)
 {
     int rc;
@@ -532,64 +512,9 @@ static int flask_domain_create(struct domain *d, u32 ssidref)
     return rc;
 }
 
-static int flask_max_vcpus(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__MAX_VCPUS);
-}
-
-static int flask_destroydomain(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__DESTROY);
-}
-
-static int flask_vcpuaffinity(int cmd, struct domain *d)
-{
-    u32 perm;
-
-    switch ( cmd )
-    {
-    case XEN_DOMCTL_setvcpuaffinity:
-        perm = DOMAIN__SETVCPUAFFINITY;
-        break;
-    case XEN_DOMCTL_getvcpuaffinity:
-        perm = DOMAIN__GETVCPUAFFINITY;
-        break;
-    default:
-        return -EPERM;
-    }
-
-    return current_has_perm(d, SECCLASS_DOMAIN, perm );
-}
-
-static int flask_scheduler(struct domain *d)
-{
-    int rc = 0;
-
-    rc = domain_has_xen(current->domain, XEN__SCHEDULER);
-    if ( rc )
-        return rc;
-
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SCHEDULER);
-}
-
 static int flask_getdomaininfo(struct domain *d)
 {
     return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETDOMAININFO);
-}
-
-static int flask_getvcpucontext(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETVCPUCONTEXT);
-}
-
-static int flask_getvcpuinfo(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETVCPUINFO);
-}
-
-static int flask_domain_settime(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETTIME);
 }
 
 static int flask_set_target(struct domain *d, struct domain *t)
@@ -622,55 +547,19 @@ static int flask_domctl(struct domain *d, int cmd)
     {
     /* These have individual XSM hooks (common/domctl.c) */
     case XEN_DOMCTL_createdomain:
-    case XEN_DOMCTL_destroydomain:
-    case XEN_DOMCTL_pausedomain:
-    case XEN_DOMCTL_unpausedomain:
     case XEN_DOMCTL_getdomaininfo:
-    case XEN_DOMCTL_setvcpuaffinity:
-    case XEN_DOMCTL_max_mem:
-    case XEN_DOMCTL_setvcpucontext:
-    case XEN_DOMCTL_getvcpucontext:
-    case XEN_DOMCTL_getvcpuinfo:
-    case XEN_DOMCTL_max_vcpus:
-    case XEN_DOMCTL_scheduler_op:
-    case XEN_DOMCTL_setdomainhandle:
-    case XEN_DOMCTL_setdebugging:
     case XEN_DOMCTL_irq_permission:
     case XEN_DOMCTL_iomem_permission:
-    case XEN_DOMCTL_settimeoffset:
-    case XEN_DOMCTL_getvcpuaffinity:
-    case XEN_DOMCTL_resumedomain:
     case XEN_DOMCTL_set_target:
-    case XEN_DOMCTL_set_virq_handler:
 #ifdef CONFIG_X86
     /* These have individual XSM hooks (arch/x86/domctl.c) */
     case XEN_DOMCTL_shadow_op:
     case XEN_DOMCTL_ioport_permission:
-    case XEN_DOMCTL_getpageframeinfo:
-    case XEN_DOMCTL_getpageframeinfo2:
-    case XEN_DOMCTL_getpageframeinfo3:
-    case XEN_DOMCTL_getmemlist:
-    case XEN_DOMCTL_hypercall_init:
-    case XEN_DOMCTL_sethvmcontext:
-    case XEN_DOMCTL_gethvmcontext:
-    case XEN_DOMCTL_gethvmcontext_partial:
-    case XEN_DOMCTL_set_address_size:
-    case XEN_DOMCTL_get_address_size:
-    case XEN_DOMCTL_set_machine_address_size:
-    case XEN_DOMCTL_get_machine_address_size:
-    case XEN_DOMCTL_sendtrigger:
     case XEN_DOMCTL_bind_pt_irq:
     case XEN_DOMCTL_unbind_pt_irq:
     case XEN_DOMCTL_memory_mapping:
     case XEN_DOMCTL_ioport_mapping:
-    case XEN_DOMCTL_pin_mem_cacheattr:
-    case XEN_DOMCTL_set_ext_vcpucontext:
-    case XEN_DOMCTL_get_ext_vcpucontext:
-    case XEN_DOMCTL_setvcpuextstate:
-    case XEN_DOMCTL_getvcpuextstate:
     case XEN_DOMCTL_mem_event_op:
-    case XEN_DOMCTL_mem_sharing_op:
-    case XEN_DOMCTL_set_access_required:
     /* These have individual XSM hooks (drivers/passthrough/iommu.c) */
     case XEN_DOMCTL_get_device_group:
     case XEN_DOMCTL_test_assign_device:
@@ -678,6 +567,101 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_deassign_device:
 #endif
         return 0;
+
+    case XEN_DOMCTL_destroydomain:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__DESTROY);
+
+    case XEN_DOMCTL_pausedomain:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__PAUSE);
+
+    case XEN_DOMCTL_unpausedomain:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__UNPAUSE);
+
+    case XEN_DOMCTL_setvcpuaffinity:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETVCPUAFFINITY);
+
+    case XEN_DOMCTL_getvcpuaffinity:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETVCPUAFFINITY);
+
+    case XEN_DOMCTL_resumedomain:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__RESUME);
+
+    case XEN_DOMCTL_scheduler_op:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SCHEDULER);
+
+    case XEN_DOMCTL_max_vcpus:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__MAX_VCPUS);
+
+    case XEN_DOMCTL_max_mem:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETDOMAINMAXMEM);
+
+    case XEN_DOMCTL_setdomainhandle:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETDOMAINHANDLE);
+
+    case XEN_DOMCTL_setvcpucontext:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETVCPUCONTEXT);
+
+    case XEN_DOMCTL_getvcpucontext:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETVCPUCONTEXT);
+
+    case XEN_DOMCTL_getvcpuinfo:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETVCPUINFO);
+
+    case XEN_DOMCTL_settimeoffset:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETTIME);
+
+    case XEN_DOMCTL_setdebugging:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETDEBUGGING);
+
+    case XEN_DOMCTL_getpageframeinfo:
+    case XEN_DOMCTL_getpageframeinfo2:
+    case XEN_DOMCTL_getpageframeinfo3:
+        return current_has_perm(d, SECCLASS_MMU, MMU__PAGEINFO);
+
+    case XEN_DOMCTL_getmemlist:
+        return current_has_perm(d, SECCLASS_MMU, MMU__PAGELIST);
+
+    case XEN_DOMCTL_hypercall_init:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__HYPERCALL);
+
+    case XEN_DOMCTL_sethvmcontext:
+        return current_has_perm(d, SECCLASS_HVM, HVM__SETHVMC);
+
+    case XEN_DOMCTL_gethvmcontext:
+    case XEN_DOMCTL_gethvmcontext_partial:
+        return current_has_perm(d, SECCLASS_HVM, HVM__GETHVMC);
+
+    case XEN_DOMCTL_set_address_size:
+    case XEN_DOMCTL_set_machine_address_size:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETADDRSIZE);
+
+    case XEN_DOMCTL_get_address_size:
+    case XEN_DOMCTL_get_machine_address_size:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETADDRSIZE);
+
+    case XEN_DOMCTL_mem_sharing_op:
+        return current_has_perm(d, SECCLASS_HVM, HVM__MEM_SHARING);
+
+    case XEN_DOMCTL_pin_mem_cacheattr:
+        return current_has_perm(d, SECCLASS_HVM, HVM__CACHEATTR);
+
+    case XEN_DOMCTL_set_ext_vcpucontext:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETEXTVCPUCONTEXT);
+
+    case XEN_DOMCTL_get_ext_vcpucontext:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETEXTVCPUCONTEXT);
+
+    case XEN_DOMCTL_setvcpuextstate:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETVCPUEXTSTATE);
+
+    case XEN_DOMCTL_getvcpuextstate:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETVCPUEXTSTATE);
+
+    case XEN_DOMCTL_sendtrigger:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__TRIGGER);
+
+    case XEN_DOMCTL_set_access_required:
+        return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
 
     case XEN_DOMCTL_debug_op:
     case XEN_DOMCTL_gdbsx_guestmemio:
@@ -690,6 +674,9 @@ static int flask_domctl(struct domain *d, int cmd)
     case XEN_DOMCTL_disable_migrate:
     case XEN_DOMCTL_suppress_spurious_page_faults:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SET_MISC_INFO);
+
+    case XEN_DOMCTL_set_virq_handler:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SET_VIRQ_HANDLER);
 
     case XEN_DOMCTL_set_cpuid:
         return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__SET_CPUID);
@@ -741,11 +728,6 @@ static int flask_sysctl(int cmd)
     }
 }
 
-static int flask_set_virq_handler(struct domain *d, uint32_t virq)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SET_VIRQ_HANDLER);
-}
-
 static int flask_tbufcontrol(void)
 {
     return domain_has_xen(current->domain, XEN__TBUFCONTROL);
@@ -764,21 +746,6 @@ static int flask_readconsole(uint32_t clear)
 static int flask_sched_id(void)
 {
     return domain_has_xen(current->domain, XEN__SCHEDULER);
-}
-
-static int flask_setdomainmaxmem(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETDOMAINMAXMEM);
-}
-
-static int flask_setdomainhandle(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETDOMAINHANDLE);
-}
-
-static int flask_setdebugging(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETDEBUGGING);
 }
 
 static int flask_debug_keys(void)
@@ -1165,82 +1132,6 @@ static int flask_ioport_mapping(struct domain *d, uint32_t start, uint32_t end, 
     return flask_ioport_permission(d, start, end, access);
 }
 
-static int flask_getpageframeinfo(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_MMU, MMU__PAGEINFO);
-}
-
-static int flask_getmemlist(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_MMU, MMU__PAGELIST);
-}
-
-static int flask_hypercall_init(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__HYPERCALL);
-}
-
-static int flask_hvmcontext(struct domain *d, uint32_t cmd)
-{
-    u32 perm;
-
-    switch ( cmd )
-    {
-    case XEN_DOMCTL_sethvmcontext:
-        perm = HVM__SETHVMC;
-        break;
-    case XEN_DOMCTL_gethvmcontext:
-    case XEN_DOMCTL_gethvmcontext_partial:
-        perm = HVM__GETHVMC;
-        break;
-    case HVMOP_track_dirty_vram:
-        perm = HVM__TRACKDIRTYVRAM;
-        break;
-    default:
-        return -EPERM;
-    }
-
-    return current_has_perm(d, SECCLASS_HVM, perm);
-}
-
-static int flask_address_size(struct domain *d, uint32_t cmd)
-{
-    u32 perm;
-
-    switch ( cmd )
-    {
-    case XEN_DOMCTL_set_address_size:
-        perm = DOMAIN__SETADDRSIZE;
-        break;
-    case XEN_DOMCTL_get_address_size:
-        perm = DOMAIN__GETADDRSIZE;
-        break;
-    default:
-        return -EPERM;
-    }
-
-    return current_has_perm(d, SECCLASS_DOMAIN, perm);
-}
-
-static int flask_machine_address_size(struct domain *d, uint32_t cmd)
-{
-    u32 perm;
-
-    switch ( cmd )
-    {
-    case XEN_DOMCTL_set_machine_address_size:
-        perm = DOMAIN__SETADDRSIZE;
-        break;
-    case XEN_DOMCTL_get_machine_address_size:
-        perm = DOMAIN__GETADDRSIZE;
-        break;
-    default:
-        return -EPERM;
-    }
-
-    return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, perm);
-}
-
 static int flask_hvm_param(struct domain *d, unsigned long op)
 {
     u32 perm;
@@ -1283,11 +1174,6 @@ static int flask_hvm_inject_msi(struct domain *d)
     return current_has_perm(d, SECCLASS_HVM, HVM__SEND_IRQ);
 }
 
-static int flask_mem_event_setup(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
-}
-
 static int flask_mem_event_control(struct domain *d, int mode, int op)
 {
     return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
@@ -1296,11 +1182,6 @@ static int flask_mem_event_control(struct domain *d, int mode, int op)
 static int flask_mem_event_op(struct domain *d, int op)
 {
     return current_has_perm(d, SECCLASS_HVM, HVM__MEM_EVENT);
-}
-
-static int flask_mem_sharing(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_HVM, HVM__MEM_SHARING);
 }
 
 static int flask_mem_sharing_op(struct domain *d, struct domain *cd, int op)
@@ -1490,11 +1371,6 @@ static int flask_remove_from_physmap(struct domain *d1, struct domain *d2)
     return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__PHYSMAP);
 }
 
-static int flask_sendtrigger(struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__TRIGGER);
-}
-
 static int flask_get_device_group(uint32_t machine_bdf)
 {
     u32 rsid;
@@ -1588,78 +1464,20 @@ static int flask_unbind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq 
 {
     return current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__REMOVE);
 }
-
-static int flask_pin_mem_cacheattr (struct domain *d)
-{
-    return current_has_perm(d, SECCLASS_HVM, HVM__CACHEATTR);
-}
-
-static int flask_ext_vcpucontext (struct domain *d, uint32_t cmd)
-{
-    u32 perm;
-
-    switch ( cmd )
-    {
-    case XEN_DOMCTL_set_ext_vcpucontext:
-        perm = DOMAIN__SETEXTVCPUCONTEXT;
-        break;
-    case XEN_DOMCTL_get_ext_vcpucontext:
-        perm = DOMAIN__GETEXTVCPUCONTEXT;
-        break;
-    default:
-        return -EPERM;
-    }
-
-    return current_has_perm(d, SECCLASS_DOMAIN, perm);
-}
-
-static int flask_vcpuextstate (struct domain *d, uint32_t cmd)
-{
-    u32 perm;
-
-    switch ( cmd )
-    {
-        case XEN_DOMCTL_setvcpuextstate:
-            perm = DOMAIN__SETVCPUEXTSTATE;
-        break;
-        case XEN_DOMCTL_getvcpuextstate:
-            perm = DOMAIN__GETVCPUEXTSTATE;
-        break;
-        default:
-            return -EPERM;
-    }
-
-    return current_has_perm(d, SECCLASS_DOMAIN, perm);
-}
 #endif
 
 long do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
 
 static struct xsm_operations flask_ops = {
     .security_domaininfo = flask_security_domaininfo,
-    .setvcpucontext = flask_setvcpucontext,
-    .pausedomain = flask_pausedomain,
-    .unpausedomain = flask_unpausedomain,    
-    .resumedomain = flask_resumedomain,    
     .domain_create = flask_domain_create,
-    .max_vcpus = flask_max_vcpus,
-    .destroydomain = flask_destroydomain,
-    .vcpuaffinity = flask_vcpuaffinity,
-    .scheduler = flask_scheduler,
     .getdomaininfo = flask_getdomaininfo,
-    .getvcpucontext = flask_getvcpucontext,
-    .getvcpuinfo = flask_getvcpuinfo,
-    .domain_settime = flask_domain_settime,
     .set_target = flask_set_target,
     .domctl = flask_domctl,
     .sysctl = flask_sysctl,
-    .set_virq_handler = flask_set_virq_handler,
     .tbufcontrol = flask_tbufcontrol,
     .readconsole = flask_readconsole,
     .sched_id = flask_sched_id,
-    .setdomainmaxmem = flask_setdomainmaxmem,
-    .setdomainhandle = flask_setdomainhandle,
-    .setdebugging = flask_setdebugging,
     .perfcontrol = flask_perfcontrol,
     .debug_keys = flask_debug_keys,
     .getcpuinfo = flask_getcpuinfo,
@@ -1729,21 +1547,13 @@ static struct xsm_operations flask_ops = {
 
 #ifdef CONFIG_X86
     .shadow_control = flask_shadow_control,
-    .getpageframeinfo = flask_getpageframeinfo,
-    .getmemlist = flask_getmemlist,
-    .hypercall_init = flask_hypercall_init,
-    .hvmcontext = flask_hvmcontext,
-    .address_size = flask_address_size,
-    .machine_address_size = flask_machine_address_size,
     .hvm_param = flask_hvm_param,
     .hvm_set_pci_intx_level = flask_hvm_set_pci_intx_level,
     .hvm_set_isa_irq_level = flask_hvm_set_isa_irq_level,
     .hvm_set_pci_link_route = flask_hvm_set_pci_link_route,
     .hvm_inject_msi = flask_hvm_inject_msi,
-    .mem_event_setup = flask_mem_event_setup,
     .mem_event_control = flask_mem_event_control,
     .mem_event_op = flask_mem_event_op,
-    .mem_sharing = flask_mem_sharing,
     .mem_sharing_op = flask_mem_sharing_op,
     .apic = flask_apic,
     .xen_settime = flask_xen_settime,
@@ -1764,16 +1574,12 @@ static struct xsm_operations flask_ops = {
     .update_va_mapping = flask_update_va_mapping,
     .add_to_physmap = flask_add_to_physmap,
     .remove_from_physmap = flask_remove_from_physmap,
-    .sendtrigger = flask_sendtrigger,
     .get_device_group = flask_get_device_group,
     .test_assign_device = flask_test_assign_device,
     .assign_device = flask_assign_device,
     .deassign_device = flask_deassign_device,
     .bind_pt_irq = flask_bind_pt_irq,
     .unbind_pt_irq = flask_unbind_pt_irq,
-    .pin_mem_cacheattr = flask_pin_mem_cacheattr,
-    .ext_vcpucontext = flask_ext_vcpucontext,
-    .vcpuextstate = flask_vcpuextstate,
     .ioport_permission = flask_ioport_permission,
     .ioport_mapping = flask_ioport_mapping,
 #endif

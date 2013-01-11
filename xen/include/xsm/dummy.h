@@ -17,67 +17,12 @@ static XSM_INLINE void xsm_security_domaininfo(struct domain *d,
     return;
 }
 
-static XSM_INLINE int xsm_setvcpucontext(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_pausedomain(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_unpausedomain(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_resumedomain(struct domain *d)
-{
-    return 0;
-}
-
 static XSM_INLINE int xsm_domain_create(struct domain *d, u32 ssidref)
 {
     return 0;
 }
 
-static XSM_INLINE int xsm_max_vcpus(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_destroydomain(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_vcpuaffinity(int cmd, struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_scheduler(struct domain *d)
-{
-    return 0;
-}
-
 static XSM_INLINE int xsm_getdomaininfo(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_getvcpucontext(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_getvcpuinfo(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_domain_settime(struct domain *d)
 {
     return 0;
 }
@@ -113,11 +58,6 @@ static XSM_INLINE int xsm_sysctl(int cmd)
     return 0;
 }
 
-static XSM_INLINE int xsm_set_virq_handler(struct domain *d, uint32_t virq)
-{
-    return 0;
-}
-
 static XSM_INLINE int xsm_tbufcontrol(void)
 {
     return 0;
@@ -129,21 +69,6 @@ static XSM_INLINE int xsm_readconsole(uint32_t clear)
 }
 
 static XSM_INLINE int xsm_sched_id(void)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_setdomainmaxmem(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_setdomainhandle(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_setdebugging(struct domain *d)
 {
     return 0;
 }
@@ -493,36 +418,6 @@ static XSM_INLINE int xsm_shadow_control(struct domain *d, uint32_t op)
     return 0;
 }
 
-static XSM_INLINE int xsm_getpageframeinfo(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_getmemlist(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_hypercall_init(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_hvmcontext(struct domain *d, uint32_t cmd)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_address_size(struct domain *d, uint32_t cmd)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_machine_address_size(struct domain *d, uint32_t cmd)
-{
-    return 0;
-}
-
 static XSM_INLINE int xsm_hvm_param(struct domain *d, unsigned long op)
 {
     if ( current->domain != d && !IS_PRIV_FOR(current->domain, d) )
@@ -558,11 +453,6 @@ static XSM_INLINE int xsm_hvm_inject_msi(struct domain *d)
     return 0;
 }
 
-static XSM_INLINE int xsm_mem_event_setup(struct domain *d)
-{
-    return 0;
-}
-
 static XSM_INLINE int xsm_mem_event_control(struct domain *d, int mode, int op)
 {
     if ( !IS_PRIV(current->domain) )
@@ -574,11 +464,6 @@ static XSM_INLINE int xsm_mem_event_op(struct domain *d, int op)
 {
     if ( !IS_PRIV_FOR(current->domain, d) )
         return -EPERM;
-    return 0;
-}
-
-static XSM_INLINE int xsm_mem_sharing(struct domain *d)
-{
     return 0;
 }
 
@@ -708,32 +593,12 @@ static XSM_INLINE int xsm_remove_from_physmap(struct domain *d1, struct domain *
     return 0;
 }
 
-static XSM_INLINE int xsm_sendtrigger(struct domain *d)
-{
-    return 0;
-}
-
 static XSM_INLINE int xsm_bind_pt_irq(struct domain *d, struct xen_domctl_bind_pt_irq *bind)
 {
     return 0;
 }
 
 static XSM_INLINE int xsm_unbind_pt_irq(struct domain *d, struct xen_domctl_bind_pt_irq *bind)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_pin_mem_cacheattr(struct domain *d)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_ext_vcpucontext(struct domain *d, uint32_t cmd)
-{
-    return 0;
-}
-
-static XSM_INLINE int xsm_vcpuextstate(struct domain *d, uint32_t cmd)
 {
     return 0;
 }

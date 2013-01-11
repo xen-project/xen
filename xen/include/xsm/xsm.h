@@ -41,29 +41,14 @@ extern xsm_initcall_t __xsm_initcall_start[], __xsm_initcall_end[];
 struct xsm_operations {
     void (*security_domaininfo) (struct domain *d,
                                         struct xen_domctl_getdomaininfo *info);
-    int (*setvcpucontext) (struct domain *d);
-    int (*pausedomain) (struct domain *d);
-    int (*unpausedomain) (struct domain *d);
-    int (*resumedomain) (struct domain *d);
     int (*domain_create) (struct domain *d, u32 ssidref);
-    int (*max_vcpus) (struct domain *d);
-    int (*destroydomain) (struct domain *d);
-    int (*vcpuaffinity) (int cmd, struct domain *d);
-    int (*scheduler) (struct domain *d);
     int (*getdomaininfo) (struct domain *d);
-    int (*getvcpucontext) (struct domain *d);
-    int (*getvcpuinfo) (struct domain *d);
-    int (*domain_settime) (struct domain *d);
     int (*set_target) (struct domain *d, struct domain *e);
     int (*domctl) (struct domain *d, int cmd);
     int (*sysctl) (int cmd);
-    int (*set_virq_handler) (struct domain *d, uint32_t virq);
     int (*tbufcontrol) (void);
     int (*readconsole) (uint32_t clear);
     int (*sched_id) (void);
-    int (*setdomainmaxmem) (struct domain *d);
-    int (*setdomainhandle) (struct domain *d);
-    int (*setdebugging) (struct domain *d);
     int (*perfcontrol) (void);
     int (*debug_keys) (void);
     int (*getcpuinfo) (void);
@@ -139,21 +124,13 @@ struct xsm_operations {
 
 #ifdef CONFIG_X86
     int (*shadow_control) (struct domain *d, uint32_t op);
-    int (*getpageframeinfo) (struct domain *d);
-    int (*getmemlist) (struct domain *d);
-    int (*hypercall_init) (struct domain *d);
-    int (*hvmcontext) (struct domain *d, uint32_t op);
-    int (*address_size) (struct domain *d, uint32_t op);
-    int (*machine_address_size) (struct domain *d, uint32_t op);
     int (*hvm_param) (struct domain *d, unsigned long op);
     int (*hvm_set_pci_intx_level) (struct domain *d);
     int (*hvm_set_isa_irq_level) (struct domain *d);
     int (*hvm_set_pci_link_route) (struct domain *d);
     int (*hvm_inject_msi) (struct domain *d);
-    int (*mem_event_setup) (struct domain *d);
     int (*mem_event_control) (struct domain *d, int mode, int op);
     int (*mem_event_op) (struct domain *d, int op);
-    int (*mem_sharing) (struct domain *d);
     int (*mem_sharing_op) (struct domain *d, struct domain *cd, int op);
     int (*apic) (struct domain *d, int cmd);
     int (*xen_settime) (void);
@@ -178,12 +155,8 @@ struct xsm_operations {
     int (*mmuext_op) (struct domain *d, struct domain *f);
     int (*update_va_mapping) (struct domain *d, struct domain *f, l1_pgentry_t pte);
     int (*add_to_physmap) (struct domain *d1, struct domain *d2);
-    int (*sendtrigger) (struct domain *d);
     int (*bind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
     int (*unbind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
-    int (*pin_mem_cacheattr) (struct domain *d);
-    int (*ext_vcpucontext) (struct domain *d, uint32_t cmd);
-    int (*vcpuextstate) (struct domain *d, uint32_t cmd);
     int (*ioport_permission) (struct domain *d, uint32_t s, uint32_t e, uint8_t allow);
     int (*ioport_mapping) (struct domain *d, uint32_t s, uint32_t e, uint8_t allow);
 #endif
@@ -201,69 +174,14 @@ static inline void xsm_security_domaininfo (struct domain *d,
     xsm_ops->security_domaininfo(d, info);
 }
 
-static inline int xsm_setvcpucontext(struct domain *d)
-{
-    return xsm_ops->setvcpucontext(d);
-}
-
-static inline int xsm_pausedomain (struct domain *d)
-{
-    return xsm_ops->pausedomain(d);
-}
-
-static inline int xsm_unpausedomain (struct domain *d)
-{
-    return xsm_ops->unpausedomain(d);
-}
-
-static inline int xsm_resumedomain (struct domain *d)
-{
-    return xsm_ops->resumedomain(d);
-}
-
 static inline int xsm_domain_create (struct domain *d, u32 ssidref)
 {
     return xsm_ops->domain_create(d, ssidref);
 }
 
-static inline int xsm_max_vcpus(struct domain *d)
-{
-    return xsm_ops->max_vcpus(d);
-}
-
-static inline int xsm_destroydomain (struct domain *d)
-{
-    return xsm_ops->destroydomain(d);
-}
-
-static inline int xsm_vcpuaffinity (int cmd, struct domain *d)
-{
-    return xsm_ops->vcpuaffinity(cmd, d);
-}
-
-static inline int xsm_scheduler (struct domain *d)
-{
-    return xsm_ops->scheduler(d);
-}
-
 static inline int xsm_getdomaininfo (struct domain *d)
 {
     return xsm_ops->getdomaininfo(d);
-}
-
-static inline int xsm_getvcpucontext (struct domain *d)
-{
-    return xsm_ops->getvcpucontext(d);
-}
-
-static inline int xsm_getvcpuinfo (struct domain *d)
-{
-    return xsm_ops->getvcpuinfo(d);
-}
-
-static inline int xsm_domain_settime (struct domain *d)
-{
-    return xsm_ops->domain_settime(d);
 }
 
 static inline int xsm_set_target (struct domain *d, struct domain *e)
@@ -281,11 +199,6 @@ static inline int xsm_sysctl (int cmd)
     return xsm_ops->sysctl(cmd);
 }
 
-static inline int xsm_set_virq_handler (struct domain *d, uint32_t virq)
-{
-    return xsm_ops->set_virq_handler(d, virq);
-}
-
 static inline int xsm_tbufcontrol (void)
 {
     return xsm_ops->tbufcontrol();
@@ -299,21 +212,6 @@ static inline int xsm_readconsole (uint32_t clear)
 static inline int xsm_sched_id (void)
 {
     return xsm_ops->sched_id();
-}
-
-static inline int xsm_setdomainmaxmem (struct domain *d)
-{
-    return xsm_ops->setdomainmaxmem(d);
-}
-
-static inline int xsm_setdomainhandle (struct domain *d)
-{
-    return xsm_ops->setdomainhandle(d);
-}
-
-static inline int xsm_setdebugging (struct domain *d)
-{
-    return xsm_ops->setdebugging(d);
 }
 
 static inline int xsm_perfcontrol (void)
@@ -623,36 +521,6 @@ static inline int xsm_shadow_control (struct domain *d, uint32_t op)
     return xsm_ops->shadow_control(d, op);
 }
 
-static inline int xsm_getpageframeinfo (struct domain *d)
-{
-    return xsm_ops->getpageframeinfo(d);
-}
-
-static inline int xsm_getmemlist (struct domain *d)
-{
-    return xsm_ops->getmemlist(d);
-}
-
-static inline int xsm_hypercall_init (struct domain *d)
-{
-    return xsm_ops->hypercall_init(d);
-}
-
-static inline int xsm_hvmcontext (struct domain *d, uint32_t cmd)
-{
-    return xsm_ops->hvmcontext(d, cmd);
-}
-
-static inline int xsm_address_size (struct domain *d, uint32_t cmd)
-{
-    return xsm_ops->address_size(d, cmd);
-}
-
-static inline int xsm_machine_address_size (struct domain *d, uint32_t cmd)
-{
-    return xsm_ops->machine_address_size(d, cmd);
-}
-
 static inline int xsm_hvm_param (struct domain *d, unsigned long op)
 {
     return xsm_ops->hvm_param(d, op);
@@ -678,11 +546,6 @@ static inline int xsm_hvm_inject_msi (struct domain *d)
     return xsm_ops->hvm_inject_msi(d);
 }
 
-static inline int xsm_mem_event_setup (struct domain *d)
-{
-    return xsm_ops->mem_event_setup(d);
-}
-
 static inline int xsm_mem_event_control (struct domain *d, int mode, int op)
 {
     return xsm_ops->mem_event_control(d, mode, op);
@@ -691,11 +554,6 @@ static inline int xsm_mem_event_control (struct domain *d, int mode, int op)
 static inline int xsm_mem_event_op (struct domain *d, int op)
 {
     return xsm_ops->mem_event_op(d, op);
-}
-
-static inline int xsm_mem_sharing (struct domain *d)
-{
-    return xsm_ops->mem_sharing(d);
 }
 
 static inline int xsm_mem_sharing_op (struct domain *d, struct domain *cd, int op)
@@ -795,11 +653,6 @@ static inline int xsm_add_to_physmap(struct domain *d1, struct domain *d2)
     return xsm_ops->add_to_physmap(d1, d2);
 }
 
-static inline int xsm_sendtrigger(struct domain *d)
-{
-    return xsm_ops->sendtrigger(d);
-}
-
 static inline int xsm_bind_pt_irq(struct domain *d, 
                                                 struct xen_domctl_bind_pt_irq *bind)
 {
@@ -810,20 +663,6 @@ static inline int xsm_unbind_pt_irq(struct domain *d,
                                                 struct xen_domctl_bind_pt_irq *bind)
 {
     return xsm_ops->unbind_pt_irq(d, bind);
-}
-
-static inline int xsm_pin_mem_cacheattr(struct domain *d)
-{
-    return xsm_ops->pin_mem_cacheattr(d);
-}
-
-static inline int xsm_ext_vcpucontext(struct domain *d, uint32_t cmd)
-{
-    return xsm_ops->ext_vcpucontext(d, cmd);
-}
-static inline int xsm_vcpuextstate(struct domain *d, uint32_t cmd)
-{
-    return xsm_ops->vcpuextstate(d, cmd);
 }
 
 static inline int xsm_ioport_permission (struct domain *d, uint32_t s, uint32_t e, uint8_t allow)
