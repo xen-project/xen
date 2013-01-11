@@ -1083,11 +1083,11 @@ CAMLprim value stub_xc_domain_irq_permission(value xch, value domid,
 	CAMLreturn(Val_unit);
 }
 
-static uint32_t pci_dev_to_bdf(int domain, int bus, int slot, int func)
+static uint32_t encode_sbdf(int domain, int bus, int dev, int func)
 {
 	return  ((uint32_t)domain & 0xffff) << 16 |
 		((uint32_t)bus    &   0xff) << 8  |
-		((uint32_t)slot   &   0x1f) << 3  |
+		((uint32_t)dev    &   0x1f) << 3  |
 		((uint32_t)func   &    0x7);
 }
 
@@ -1095,16 +1095,16 @@ CAMLprim value stub_xc_domain_test_assign_device(value xch, value domid, value d
 {
 	CAMLparam3(xch, domid, desc);
 	int ret;
-	int domain, bus, slot, func;
-	uint32_t bdf;
+	int domain, bus, dev, func;
+	uint32_t sbdf;
 
 	domain = Int_val(Field(desc, 0));
 	bus = Int_val(Field(desc, 1));
-	slot = Int_val(Field(desc, 2));
+	dev = Int_val(Field(desc, 2));
 	func = Int_val(Field(desc, 3));
-	bdf = pci_dev_to_bdf(domain, bus, slot, func);
+	sbdf = encode_sbdf(domain, bus, dev, func);
 
-	ret = xc_test_assign_device(_H(xch), _D(domid), bdf);
+	ret = xc_test_assign_device(_H(xch), _D(domid), sbdf);
 
 	CAMLreturn(Val_bool(ret == 0));
 }
@@ -1113,16 +1113,16 @@ CAMLprim value stub_xc_domain_assign_device(value xch, value domid, value desc)
 {
 	CAMLparam3(xch, domid, desc);
 	int ret;
-	int domain, bus, slot, func;
-	uint32_t bdf;
+	int domain, bus, dev, func;
+	uint32_t sbdf;
 
 	domain = Int_val(Field(desc, 0));
 	bus = Int_val(Field(desc, 1));
-	slot = Int_val(Field(desc, 2));
+	dev = Int_val(Field(desc, 2));
 	func = Int_val(Field(desc, 3));
-	bdf = pci_dev_to_bdf(domain, bus, slot, func);
+	sbdf = encode_sbdf(domain, bus, dev, func);
 
-	ret = xc_assign_device(_H(xch), _D(domid), bdf);
+	ret = xc_assign_device(_H(xch), _D(domid), sbdf);
 
 	if (ret < 0)
 		failwith_xc(_H(xch));
@@ -1133,16 +1133,16 @@ CAMLprim value stub_xc_domain_deassign_device(value xch, value domid, value desc
 {
 	CAMLparam3(xch, domid, desc);
 	int ret;
-	int domain, bus, slot, func;
-	uint32_t bdf;
+	int domain, bus, dev, func;
+	uint32_t sbdf;
 
 	domain = Int_val(Field(desc, 0));
 	bus = Int_val(Field(desc, 1));
-	slot = Int_val(Field(desc, 2));
+	dev = Int_val(Field(desc, 2));
 	func = Int_val(Field(desc, 3));
-	bdf = pci_dev_to_bdf(domain, bus, slot, func);
+	sbdf = encode_sbdf(domain, bus, dev, func);
 
-	ret = xc_deassign_device(_H(xch), _D(domid), bdf);
+	ret = xc_deassign_device(_H(xch), _D(domid), sbdf);
 
 	if (ret < 0)
 		failwith_xc(_H(xch));
