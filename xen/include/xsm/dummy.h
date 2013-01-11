@@ -46,15 +46,15 @@ void __xsm_action_mismatch_detected(void);
  * compile-time checks on the xsm_default_t argument to ensure that the behavior
  * of the dummy XSM module is the same as the behavior with XSM disabled.
  */
-#define XSM_INLINE inline
+#define XSM_INLINE always_inline
 #define XSM_DEFAULT_ARG xsm_default_t action,
 #define XSM_DEFAULT_VOID xsm_default_t action
 #define XSM_ASSERT_ACTION(def) LINKER_BUG_ON(def != action)
 
 #endif /* XSM_ENABLE */
 
-static inline int xsm_default_action(xsm_default_t action, struct domain *src,
-                                     struct domain *target)
+static always_inline int xsm_default_action(
+    xsm_default_t action, struct domain *src, struct domain *target)
 {
     switch ( action ) {
     case XSM_HOOK:
