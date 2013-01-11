@@ -194,6 +194,8 @@ static XSM_INLINE int xsm_grant_unmapref(struct domain *d1, struct domain *d2)
 
 static XSM_INLINE int xsm_grant_setup(struct domain *d1, struct domain *d2)
 {
+    if ( d1 != d2 && !IS_PRIV_FOR(d1, d2) )
+        return -EPERM;
     return 0;
 }
 
@@ -209,17 +211,23 @@ static XSM_INLINE int xsm_grant_copy(struct domain *d1, struct domain *d2)
 
 static XSM_INLINE int xsm_grant_query_size(struct domain *d1, struct domain *d2)
 {
+    if ( d1 != d2 && !IS_PRIV_FOR(d1, d2) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_memory_adjust_reservation(struct domain *d1,
                                                             struct domain *d2)
 {
+    if ( d1 != d2 && !IS_PRIV_FOR(d1, d2) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_memory_stat_reservation(struct domain *d1, struct domain *d2)
 {
+    if ( d1 != d2 && !IS_PRIV_FOR(d1, d2) )
+        return -EPERM;
     return 0;
 }
 
@@ -260,6 +268,8 @@ static XSM_INLINE int xsm_memory_pin_page(struct domain *d1, struct domain *d2,
 static XSM_INLINE int xsm_evtchn_unbound(struct domain *d, struct evtchn *chn,
                                          domid_t id2)
 {
+    if ( current->domain != d && !IS_PRIV_FOR(current->domain, d) )
+        return -EPERM;
     return 0;
 }
 
@@ -281,11 +291,15 @@ static XSM_INLINE int xsm_evtchn_send(struct domain *d, struct evtchn *chn)
 
 static XSM_INLINE int xsm_evtchn_status(struct domain *d, struct evtchn *chn)
 {
+    if ( current->domain != d && !IS_PRIV_FOR(current->domain, d) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_evtchn_reset(struct domain *d1, struct domain *d2)
 {
+    if ( d1 != d2 && !IS_PRIV_FOR(d1, d2) )
+        return -EPERM;
     return 0;
 }
 
@@ -306,11 +320,15 @@ static XSM_INLINE char *xsm_show_security_evtchn(struct domain *d, const struct 
 
 static XSM_INLINE int xsm_get_pod_target(struct domain *d)
 {
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_set_pod_target(struct domain *d)
 {
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
     return 0;
 }
 
@@ -481,26 +499,36 @@ static XSM_INLINE int xsm_machine_address_size(struct domain *d, uint32_t cmd)
 
 static XSM_INLINE int xsm_hvm_param(struct domain *d, unsigned long op)
 {
+    if ( current->domain != d && !IS_PRIV_FOR(current->domain, d) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_hvm_set_pci_intx_level(struct domain *d)
 {
+    if ( !IS_PRIV_FOR(current->domain, d) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_hvm_set_isa_irq_level(struct domain *d)
 {
+    if ( !IS_PRIV_FOR(current->domain, d) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_hvm_set_pci_link_route(struct domain *d)
 {
+    if ( !IS_PRIV_FOR(current->domain, d) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_hvm_inject_msi(struct domain *d)
 {
+    if ( !IS_PRIV_FOR(current->domain, d) )
+        return -EPERM;
     return 0;
 }
 
@@ -582,6 +610,8 @@ static XSM_INLINE int xsm_machine_memory_map(void)
 
 static XSM_INLINE int xsm_domain_memory_map(struct domain *d)
 {
+    if ( current->domain != d && !IS_PRIV_FOR(current->domain, d) )
+        return -EPERM;
     return 0;
 }
 
@@ -605,11 +635,15 @@ static XSM_INLINE int xsm_update_va_mapping(struct domain *d, struct domain *f,
 
 static XSM_INLINE int xsm_add_to_physmap(struct domain *d1, struct domain *d2)
 {
+    if ( d1 != d2 && !IS_PRIV_FOR(d1, d2) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_remove_from_physmap(struct domain *d1, struct domain *d2)
 {
+    if ( d1 != d2 && !IS_PRIV_FOR(d1, d2) )
+        return -EPERM;
     return 0;
 }
 

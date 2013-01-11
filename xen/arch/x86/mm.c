@@ -4375,9 +4375,9 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&xatp, arg, 1) )
             return -EFAULT;
 
-        rc = rcu_lock_target_domain_by_id(xatp.domid, &d);
-        if ( rc != 0 )
-            return rc;
+        d = rcu_lock_domain_by_any_id(xatp.domid);
+        if ( d == NULL )
+            return -ESRCH;
 
         if ( xsm_add_to_physmap(current->domain, d) )
         {
@@ -4414,9 +4414,9 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( fmap.map.nr_entries > E820MAX )
             return -EINVAL;
 
-        rc = rcu_lock_target_domain_by_id(fmap.domid, &d);
-        if ( rc != 0 )
-            return rc;
+        d = rcu_lock_domain_by_any_id(fmap.domid);
+        if ( d == NULL )
+            return -ESRCH;
 
         rc = xsm_domain_memory_map(d);
         if ( rc )
@@ -4569,16 +4569,12 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct domain *d;
         struct p2m_domain *p2m;
 
-        /* Support DOMID_SELF? */
-        if ( !IS_PRIV(current->domain) )
-            return -EPERM;
-
         if ( copy_from_guest(&target, arg, 1) )
             return -EFAULT;
 
-        rc = rcu_lock_target_domain_by_id(target.domid, &d);
-        if ( rc != 0 )
-            return rc;
+        d = rcu_lock_domain_by_any_id(target.domid);
+        if ( d == NULL )
+            return -ESRCH;
 
         if ( op == XENMEM_set_pod_target )
             rc = xsm_set_pod_target(d);

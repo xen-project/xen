@@ -165,9 +165,9 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     domid_t        dom = alloc->dom;
     long           rc;
 
-    rc = rcu_lock_target_domain_by_id(dom, &d);
-    if ( rc )
-        return rc;
+    d = rcu_lock_domain_by_any_id(dom);
+    if ( d == NULL )
+        return -ESRCH;
 
     spin_lock(&d->event_lock);
 
@@ -798,9 +798,9 @@ static long evtchn_status(evtchn_status_t *status)
     struct evtchn   *chn;
     long             rc = 0;
 
-    rc = rcu_lock_target_domain_by_id(dom, &d);
-    if ( rc )
-        return rc;
+    d = rcu_lock_domain_by_any_id(dom);
+    if ( d == NULL )
+        return -ESRCH;
 
     spin_lock(&d->event_lock);
 
@@ -950,9 +950,9 @@ static long evtchn_reset(evtchn_reset_t *r)
     struct domain *d;
     int i, rc;
 
-    rc = rcu_lock_target_domain_by_id(dom, &d);
-    if ( rc )
-        return rc;
+    d = rcu_lock_domain_by_any_id(dom);
+    if ( d == NULL )
+        return -ESRCH;
 
     rc = xsm_evtchn_reset(current->domain, d);
     if ( rc )

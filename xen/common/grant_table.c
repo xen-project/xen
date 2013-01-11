@@ -230,30 +230,6 @@ double_gt_unlock(struct grant_table *lgt, struct grant_table *rgt)
         spin_unlock(&rgt->lock);
 }
 
-static struct domain *gt_lock_target_domain_by_id(domid_t dom)
-{
-    struct domain *d;
-    int rc = GNTST_general_error;
-
-    switch ( rcu_lock_target_domain_by_id(dom, &d) )
-    {
-    case 0:
-        return d;
-
-    case -ESRCH:
-        gdprintk(XENLOG_INFO, "Bad domid %d.\n", dom);
-        rc = GNTST_bad_domain;
-        break;
-
-    case -EPERM:
-        rc = GNTST_permission_denied;
-        break;
-    }
-
-    ASSERT(rc < 0 && -rc <= MAX_ERRNO);
-    return ERR_PTR(rc);
-}
-
 static inline int
 __get_maptrack_handle(
     struct grant_table *t)
@@ -1352,11 +1328,12 @@ gnttab_setup_table(
     if ( !guest_handle_okay(op.frame_list, op.nr_frames) )
         return -EFAULT;
 
-    d = gt_lock_target_domain_by_id(op.dom);
-    if ( IS_ERR(d) )
+    d = rcu_lock_domain_by_any_id(op.dom);
+    if ( d == NULL )
     {
-        op.status = PTR_ERR(d);
-        goto out1;
+        gdprintk(XENLOG_INFO, "Bad domid %d.\n", op.dom);
+        op.status = GNTST_bad_domain;
+        goto out2;
     }
 
     if ( xsm_grant_setup(current->domain, d) )
@@ -1421,10 +1398,11 @@ gnttab_query_size(
         return -EFAULT;
     }
 
-    d = gt_lock_target_domain_by_id(op.dom);
-    if ( IS_ERR(d) )
+    d = rcu_lock_domain_by_any_id(op.dom);
+    if ( d == NULL )
     {
-        op.status = PTR_ERR(d);
+        gdprintk(XENLOG_INFO, "Bad domid %d.\n", op.dom);
+        op.status = GNTST_bad_domain;
         goto query_out;
     }
 
@@ -2296,10 +2274,10 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
         return -EFAULT;
     }
 
-    d = gt_lock_target_domain_by_id(op.dom);
-    if ( IS_ERR(d) )
+    d = rcu_lock_domain_by_any_id(op.dom);
+    if ( d == NULL )
     {
-        op.status = PTR_ERR(d);
+        op.status = GNTST_bad_domain;
         goto out1;
     }
     rc = xsm_grant_setup(current->domain, d);
@@ -2349,14 +2327,15 @@ gnttab_get_version(XEN_GUEST_HANDLE_PARAM(gnttab_get_version_t) uop)
     if ( copy_from_guest(&op, uop, 1) )
         return -EFAULT;
 
-    rc = rcu_lock_target_domain_by_id(op.dom, &d);
-    if ( rc < 0 )
-        return rc;
+    d = rcu_lock_domain_by_any_id(op.dom);
+    if ( d == NULL )
+        return -ESRCH;
 
-    if ( xsm_grant_query_size(current->domain, d) )
+    rc = xsm_grant_query_size(current->domain, d);
+    if ( rc )
     {
         rcu_unlock_domain(d);
-        return -EPERM;
+        return rc;
     }
 
     op.version = d->grant_table->gt_version;
