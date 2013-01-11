@@ -58,6 +58,7 @@ struct xsm_operations {
     int (*domain_settime) (struct domain *d);
     int (*set_target) (struct domain *d, struct domain *e);
     int (*domctl) (struct domain *d, int cmd);
+    int (*sysctl) (int cmd);
     int (*set_virq_handler) (struct domain *d, uint32_t virq);
     int (*tbufcontrol) (void);
     int (*readconsole) (uint32_t clear);
@@ -264,6 +265,11 @@ static inline int xsm_set_target (struct domain *d, struct domain *e)
 static inline int xsm_domctl (struct domain *d, int cmd)
 {
     return xsm_ops->domctl(d, cmd);
+}
+
+static inline int xsm_sysctl (int cmd)
+{
+    return xsm_ops->sysctl(cmd);
 }
 
 static inline int xsm_set_virq_handler (struct domain *d, uint32_t virq)

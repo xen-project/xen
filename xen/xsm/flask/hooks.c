@@ -668,6 +668,38 @@ static int flask_domctl(struct domain *d, int cmd)
     }
 }
 
+static int flask_sysctl(int cmd)
+{
+    switch ( cmd )
+    {
+    /* These have individual XSM hooks */
+    case XEN_SYSCTL_readconsole:
+    case XEN_SYSCTL_tbuf_op:
+    case XEN_SYSCTL_sched_id:
+    case XEN_SYSCTL_perfc_op:
+    case XEN_SYSCTL_getdomaininfolist:
+    case XEN_SYSCTL_debug_keys:
+    case XEN_SYSCTL_getcpuinfo:
+    case XEN_SYSCTL_availheap:
+    case XEN_SYSCTL_get_pmstat:
+    case XEN_SYSCTL_pm_op:
+    case XEN_SYSCTL_page_offline_op:
+    case XEN_SYSCTL_lockprof_op:
+    case XEN_SYSCTL_cpupool_op:
+    case XEN_SYSCTL_scheduler_op:
+#ifdef CONFIG_X86
+    case XEN_SYSCTL_physinfo:
+    case XEN_SYSCTL_cpu_hotplug:
+    case XEN_SYSCTL_topologyinfo:
+    case XEN_SYSCTL_numainfo:
+#endif
+        return 0;
+    default:
+        printk("flask_sysctl: Unknown op %d\n", cmd);
+        return -EPERM;
+    }
+}
+
 static int flask_set_virq_handler(struct domain *d, uint32_t virq)
 {
     return domain_has_perm(current->domain, d, SECCLASS_DOMAIN, DOMAIN__SET_VIRQ_HANDLER);
@@ -1563,6 +1595,7 @@ static struct xsm_operations flask_ops = {
     .domain_settime = flask_domain_settime,
     .set_target = flask_set_target,
     .domctl = flask_domctl,
+    .sysctl = flask_sysctl,
     .set_virq_handler = flask_set_virq_handler,
     .tbufcontrol = flask_tbufcontrol,
     .readconsole = flask_readconsole,

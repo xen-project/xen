@@ -45,6 +45,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, domain_settime);
     set_to_dummy_if_null(ops, set_target);
     set_to_dummy_if_null(ops, domctl);
+    set_to_dummy_if_null(ops, sysctl);
     set_to_dummy_if_null(ops, set_virq_handler);
     set_to_dummy_if_null(ops, tbufcontrol);
     set_to_dummy_if_null(ops, readconsole);

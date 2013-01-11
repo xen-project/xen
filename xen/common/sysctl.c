@@ -34,14 +34,15 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     struct xen_sysctl curop, *op = &curop;
     static DEFINE_SPINLOCK(sysctl_lock);
 
-    if ( !IS_PRIV(current->domain) )
-        return -EPERM;
-
     if ( copy_from_guest(op, u_sysctl, 1) )
         return -EFAULT;
 
     if ( op->interface_version != XEN_SYSCTL_INTERFACE_VERSION )
         return -EACCES;
+
+    ret = xsm_sysctl(op->cmd);
+    if ( ret )
+        return ret;
 
     /*
      * Trylock here avoids deadlock with an existing sysctl critical section

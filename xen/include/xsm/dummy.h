@@ -106,6 +106,13 @@ static XSM_INLINE int xsm_domctl(struct domain *d, int cmd)
     return 0;
 }
 
+static XSM_INLINE int xsm_sysctl(int cmd)
+{
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+    return 0;
+}
+
 static XSM_INLINE int xsm_set_virq_handler(struct domain *d, uint32_t virq)
 {
     return 0;
