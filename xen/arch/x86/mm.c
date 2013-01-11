@@ -4493,9 +4493,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         XEN_GUEST_HANDLE_PARAM(e820entry_t) buffer_param;
         unsigned int i;
 
-        if ( !IS_PRIV(current->domain) )
-            return -EINVAL;
-
         rc = xsm_machine_memory_map();
         if ( rc )
             return rc;

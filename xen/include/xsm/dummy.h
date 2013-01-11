@@ -161,6 +161,8 @@ static XSM_INLINE int xsm_pm_op(void)
 
 static XSM_INLINE int xsm_do_mca(void)
 {
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
     return 0;
 }
 
@@ -223,6 +225,10 @@ static XSM_INLINE int xsm_memory_stat_reservation(struct domain *d1, struct doma
 
 static XSM_INLINE int xsm_console_io(struct domain *d, int cmd)
 {
+#ifndef VERBOSE
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
+#endif
     return 0;
 }
 
@@ -233,11 +239,15 @@ static XSM_INLINE int xsm_profile(struct domain *d, int op)
 
 static XSM_INLINE int xsm_kexec(void)
 {
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_schedop_shutdown(struct domain *d1, struct domain *d2)
 {
+    if ( !IS_PRIV_FOR(d1, d2) )
+        return -EPERM;
     return 0;
 }
 
@@ -336,26 +346,36 @@ static XSM_INLINE int xsm_resource_unplug_core(void)
 
 static XSM_INLINE int xsm_resource_plug_pci(uint32_t machine_bdf)
 {
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_resource_unplug_pci(uint32_t machine_bdf)
 {
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_resource_setup_pci(uint32_t machine_bdf)
 {
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_resource_setup_gsi(int gsi)
 {
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
     return 0;
 }
 
 static XSM_INLINE int xsm_resource_setup_misc(void)
 {
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
     return 0;
 }
 
@@ -396,6 +416,8 @@ static XSM_INLINE int xsm_map_domain_pirq(struct domain *d, int irq, void *data)
 
 static XSM_INLINE int xsm_unmap_domain_pirq(struct domain *d, int irq)
 {
+    if ( !IS_PRIV_FOR(current->domain, d) )
+        return -EPERM;
     return 0;
 }
 
@@ -494,6 +516,8 @@ static XSM_INLINE int xsm_mem_sharing(struct domain *d)
 
 static XSM_INLINE int xsm_apic(struct domain *d, int cmd)
 {
+    if ( !IS_PRIV(d) )
+        return -EPERM;
     return 0;
 }
 
@@ -534,6 +558,8 @@ static XSM_INLINE int xsm_efi_call(void)
 
 static XSM_INLINE int xsm_acpi_sleep(void)
 {
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
     return 0;
 }
 
@@ -549,6 +575,8 @@ static XSM_INLINE int xsm_getidletime(void)
 
 static XSM_INLINE int xsm_machine_memory_map(void)
 {
+    if ( !IS_PRIV(current->domain) )
+        return -EPERM;
     return 0;
 }
 

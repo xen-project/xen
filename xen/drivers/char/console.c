@@ -406,12 +406,6 @@ long do_console_io(int cmd, int count, XEN_GUEST_HANDLE_PARAM(char) buffer)
     long rc;
     unsigned int idx, len;
 
-#ifndef VERBOSE
-    /* Only domain 0 may access the emergency console. */
-    if ( current->domain->domain_id != 0 )
-        return -EPERM;
-#endif
-
     rc = xsm_console_io(current->domain, cmd);
     if ( rc )
         return rc;

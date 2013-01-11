@@ -1141,10 +1141,11 @@ static int flask_apic(struct domain *d, int cmd)
 
     switch ( cmd )
     {
-    case PHYSDEVOP_APIC_READ:
+    case PHYSDEVOP_apic_read:
+    case PHYSDEVOP_alloc_irq_vector:
         perm = XEN__READAPIC;
         break;
-    case PHYSDEVOP_APIC_WRITE:
+    case PHYSDEVOP_apic_write:
         perm = XEN__WRITEAPIC;
         break;
     default:
