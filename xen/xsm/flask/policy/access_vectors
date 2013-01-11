@@ -35,6 +35,8 @@ class xen
 	lockprof
 	cpupool_op
 	sched_op
+	tmem_op
+	tmem_control
 }
 
 class domain

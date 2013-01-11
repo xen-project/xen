@@ -94,6 +94,8 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, resource_setup_misc);
 
     set_to_dummy_if_null(ops, page_offline);
+    set_to_dummy_if_null(ops, tmem_op);
+    set_to_dummy_if_null(ops, tmem_control);
 
     set_to_dummy_if_null(ops, do_xsm_op);
 

@@ -1017,6 +1017,16 @@ static inline int flask_page_offline(uint32_t cmd)
     }
 }
 
+static inline int flask_tmem_op(void)
+{
+    return domain_has_xen(current->domain, XEN__TMEM_OP);
+}
+
+static inline int flask_tmem_control(void)
+{
+    return domain_has_xen(current->domain, XEN__TMEM_CONTROL);
+}
+
 #ifdef CONFIG_X86
 static int flask_shadow_control(struct domain *d, uint32_t op)
 {
@@ -1456,6 +1466,8 @@ static struct xsm_operations flask_ops = {
     .resource_setup_misc = flask_resource_setup_misc,
 
     .page_offline = flask_page_offline,
+    .tmem_op = flask_tmem_op,
+    .tmem_control = flask_tmem_control,
 
     .do_xsm_op = do_flask_op,
 
