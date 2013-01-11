@@ -449,7 +449,7 @@ int do_mem_event_op(int op, uint32_t domain, void *arg)
     if ( ret )
         return ret;
 
-    ret = xsm_mem_event_op(d, op);
+    ret = xsm_mem_event_op(XSM_TARGET, d, op);
     if ( ret )
         goto out;
 
@@ -502,7 +502,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 {
     int rc;
 
-    rc = xsm_mem_event_control(d, mec->mode, mec->op);
+    rc = xsm_mem_event_control(XSM_PRIV, d, mec->mode, mec->op);
     if ( rc )
         return rc;
 

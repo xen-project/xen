@@ -348,7 +348,7 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
         goto fail_early;
     }
 
-    rc = xsm_memory_exchange(d);
+    rc = xsm_memory_exchange(XSM_TARGET, d);
     if ( rc )
     {
         rcu_unlock_domain(d);
@@ -600,7 +600,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return start_extent;
         args.domain = d;
 
-        rc = xsm_memory_adjust_reservation(current->domain, d);
+        rc = xsm_memory_adjust_reservation(XSM_TARGET, current->domain, d);
         if ( rc )
         {
             rcu_unlock_domain(d);
@@ -649,7 +649,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( d == NULL )
             return -ESRCH;
 
-        rc = xsm_memory_stat_reservation(current->domain, d);
+        rc = xsm_memory_stat_reservation(XSM_TARGET, current->domain, d);
         if ( rc )
         {
             rcu_unlock_domain(d);
@@ -687,7 +687,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( d == NULL )
             return -ESRCH;
 
-        if ( xsm_remove_from_physmap(current->domain, d) )
+        if ( xsm_remove_from_physmap(XSM_TARGET, current->domain, d) )
         {
             rcu_unlock_domain(d);
             return -EPERM;

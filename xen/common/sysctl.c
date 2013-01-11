@@ -40,7 +40,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     if ( op->interface_version != XEN_SYSCTL_INTERFACE_VERSION )
         return -EACCES;
 
-    ret = xsm_sysctl(op->cmd);
+    ret = xsm_sysctl(XSM_PRIV, op->cmd);
     if ( ret )
         return ret;
 
@@ -57,7 +57,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
     switch ( op->cmd )
     {
     case XEN_SYSCTL_readconsole:
-        ret = xsm_readconsole(op->u.readconsole.clear);
+        ret = xsm_readconsole(XSM_HOOK, op->u.readconsole.clear);
         if ( ret )
             break;
 
@@ -87,7 +87,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
             if ( num_domains == op->u.getdomaininfolist.max_domains )
                 break;
 
-            ret = xsm_getdomaininfo(d);
+            ret = xsm_getdomaininfo(XSM_HOOK, d);
             if ( ret )
                 continue;
 
@@ -186,7 +186,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         uint32_t *status, *ptr;
         unsigned long pfn;
 
-        ret = xsm_page_offline(op->u.page_offline.cmd);
+        ret = xsm_page_offline(XSM_HOOK, op->u.page_offline.cmd);
         if ( ret )
             break;
 

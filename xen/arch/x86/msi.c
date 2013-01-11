@@ -1016,7 +1016,7 @@ int pci_restore_msi_state(struct pci_dev *pdev)
     if (!pdev)
         return -EINVAL;
 
-    ret = xsm_resource_setup_pci((pdev->seg << 16) | (pdev->bus << 8) | pdev->devfn);
+    ret = xsm_resource_setup_pci(XSM_PRIV, (pdev->seg << 16) | (pdev->bus << 8) | pdev->devfn);
     if ( ret )
         return ret;
 

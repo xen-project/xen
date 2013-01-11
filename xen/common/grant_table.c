@@ -552,7 +552,7 @@ __gnttab_map_grant_ref(
         return;
     }
 
-    rc = xsm_grant_mapref(ld, rd, op->flags);
+    rc = xsm_grant_mapref(XSM_HOOK, ld, rd, op->flags);
     if ( rc )
     {
         rcu_unlock_domain(rd);
@@ -872,7 +872,7 @@ __gnttab_unmap_common(
         return;
     }
 
-    rc = xsm_grant_unmapref(ld, rd);
+    rc = xsm_grant_unmapref(XSM_HOOK, ld, rd);
     if ( rc )
     {
         rcu_unlock_domain(rd);
@@ -1336,7 +1336,7 @@ gnttab_setup_table(
         goto out2;
     }
 
-    if ( xsm_grant_setup(current->domain, d) )
+    if ( xsm_grant_setup(XSM_TARGET, current->domain, d) )
     {
         op.status = GNTST_permission_denied;
         goto out2;
@@ -1406,7 +1406,7 @@ gnttab_query_size(
         goto query_out;
     }
 
-    rc = xsm_grant_query_size(current->domain, d);
+    rc = xsm_grant_query_size(XSM_TARGET, current->domain, d);
     if ( rc )
     {
         op.status = GNTST_permission_denied;
@@ -1582,7 +1582,7 @@ gnttab_transfer(
             goto copyback;
         }
 
-        if ( xsm_grant_transfer(d, e) )
+        if ( xsm_grant_transfer(XSM_HOOK, d, e) )
         {
             put_gfn(d, gop.mfn);
             gop.status = GNTST_permission_denied;
@@ -2022,7 +2022,7 @@ __gnttab_copy(
         PIN_FAIL(error_out, GNTST_bad_domain,
                  "couldn't find %d\n", op->dest.domid);
 
-    rc = xsm_grant_copy(sd, dd);
+    rc = xsm_grant_copy(XSM_HOOK, sd, dd);
     if ( rc )
     {
         rc = GNTST_permission_denied;
@@ -2280,7 +2280,7 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE_PARAM(gnttab_get_status_frames_t) uop,
         op.status = GNTST_bad_domain;
         goto out1;
     }
-    rc = xsm_grant_setup(current->domain, d);
+    rc = xsm_grant_setup(XSM_TARGET, current->domain, d);
     if ( rc ) {
         op.status = GNTST_permission_denied;
         goto out1;
@@ -2331,7 +2331,7 @@ gnttab_get_version(XEN_GUEST_HANDLE_PARAM(gnttab_get_version_t) uop)
     if ( d == NULL )
         return -ESRCH;
 
-    rc = xsm_grant_query_size(current->domain, d);
+    rc = xsm_grant_query_size(XSM_TARGET, current->domain, d);
     if ( rc )
     {
         rcu_unlock_domain(d);

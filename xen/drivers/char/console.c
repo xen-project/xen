@@ -406,7 +406,7 @@ long do_console_io(int cmd, int count, XEN_GUEST_HANDLE_PARAM(char) buffer)
     long rc;
     unsigned int idx, len;
 
-    rc = xsm_console_io(current->domain, cmd);
+    rc = xsm_console_io(XSM_OTHER, current->domain, cmd);
     if ( rc )
         return rc;
 

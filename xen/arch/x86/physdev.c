@@ -232,7 +232,7 @@ int physdev_unmap_pirq(domid_t domid, int pirq)
             goto free_domain;
     }
 
-    ret = xsm_unmap_domain_pirq(d, domain_pirq_to_irq(d, pirq));
+    ret = xsm_unmap_domain_pirq(XSM_TARGET, d, domain_pirq_to_irq(d, pirq));
     if ( ret )
         goto free_domain;
 
@@ -423,7 +423,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         ret = -EFAULT;
         if ( copy_from_guest(&apic, arg, 1) != 0 )
             break;
-        ret = xsm_apic(v->domain, cmd);
+        ret = xsm_apic(XSM_PRIV, v->domain, cmd);
         if ( ret )
             break;
         ret = ioapic_guest_read(apic.apic_physbase, apic.reg, &apic.value);
@@ -437,7 +437,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         ret = -EFAULT;
         if ( copy_from_guest(&apic, arg, 1) != 0 )
             break;
-        ret = xsm_apic(v->domain, cmd);
+        ret = xsm_apic(XSM_PRIV, v->domain, cmd);
         if ( ret )
             break;
         ret = ioapic_guest_write(apic.apic_physbase, apic.reg, apic.value);
@@ -453,7 +453,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         /* Use the APIC check since this dummy hypercall should still only
          * be called by the domain with access to program the ioapic */
-        ret = xsm_apic(v->domain, cmd);
+        ret = xsm_apic(XSM_PRIV, v->domain, cmd);
         if ( ret )
             break;
 
@@ -578,7 +578,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case PHYSDEVOP_pci_mmcfg_reserved: {
         struct physdev_pci_mmcfg_reserved info;
 
-        ret = xsm_resource_setup_misc();
+        ret = xsm_resource_setup_misc(XSM_PRIV);
         if ( ret )
             break;
 
@@ -632,7 +632,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( setup_gsi.gsi < 0 || setup_gsi.gsi >= nr_irqs_gsi )
             break;
 
-        ret = xsm_resource_setup_gsi(setup_gsi.gsi);
+        ret = xsm_resource_setup_gsi(XSM_PRIV, setup_gsi.gsi);
         if ( ret )
             break;
 

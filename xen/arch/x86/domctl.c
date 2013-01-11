@@ -77,7 +77,7 @@ long arch_do_domctl(
 
         if ( np == 0 )
             ret = 0;
-        else if ( xsm_ioport_permission(d, fp, fp + np - 1, allow) )
+        else if ( xsm_ioport_permission(XSM_HOOK, d, fp, fp + np - 1, allow) )
             ret = -EPERM;
         else if ( allow )
             ret = ioports_permit_access(d, fp, fp + np - 1);
@@ -571,7 +571,7 @@ long arch_do_domctl(
         if ( !is_hvm_domain(d) )
             break;
 
-        ret = xsm_bind_pt_irq(d, bind);
+        ret = xsm_bind_pt_irq(XSM_HOOK, d, bind);
         if ( ret )
             break;
 
@@ -604,7 +604,7 @@ long arch_do_domctl(
              !irq_access_permitted(current->domain, bind->machine_irq) )
             break;
 
-        ret = xsm_unbind_pt_irq(d, bind);
+        ret = xsm_unbind_pt_irq(XSM_HOOK, d, bind);
         if ( ret )
             break;
 
@@ -639,7 +639,7 @@ long arch_do_domctl(
              !iomem_access_permitted(current->domain, mfn, mfn + nr_mfns - 1) )
             break;
 
-        ret = xsm_iomem_mapping(d, mfn, mfn + nr_mfns - 1, add);
+        ret = xsm_iomem_mapping(XSM_HOOK, d, mfn, mfn + nr_mfns - 1, add);
         if ( ret )
             break;
 
@@ -717,7 +717,7 @@ long arch_do_domctl(
              !ioports_access_permitted(current->domain, fmp, fmp + np - 1) )
             break;
 
-        ret = xsm_ioport_mapping(d, fmp, fmp + np - 1, add);
+        ret = xsm_ioport_mapping(XSM_HOOK, d, fmp, fmp + np - 1, add);
         if ( ret )
             break;
 

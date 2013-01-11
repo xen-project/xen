@@ -265,7 +265,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             return -ESRCH;
     }
 
-    ret = xsm_domctl(d, op->cmd);
+    ret = xsm_domctl(XSM_OTHER, d, op->cmd);
     if ( ret )
         goto domctl_out_unlock_domonly;
 
@@ -579,7 +579,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             break;
         }
 
-        ret = xsm_getdomaininfo(d);
+        ret = xsm_getdomaininfo(XSM_HOOK, d);
         if ( ret )
             goto getdomaininfo_out;
 
@@ -719,7 +719,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
         if ( pirq >= d->nr_pirqs )
             ret = -EINVAL;
-        else if ( xsm_irq_permission(d, pirq, allow) )
+        else if ( xsm_irq_permission(XSM_HOOK, d, pirq, allow) )
             ret = -EPERM;
         else if ( allow )
             ret = irq_permit_access(d, pirq);
@@ -738,7 +738,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         if ( (mfn + nr_mfns - 1) < mfn ) /* wrap? */
             break;
 
-        if ( xsm_iomem_permission(d, mfn, mfn + nr_mfns - 1, allow) )
+        if ( xsm_iomem_permission(XSM_HOOK, d, mfn, mfn + nr_mfns - 1, allow) )
             ret = -EPERM;
         else if ( allow )
             ret = iomem_permit_access(d, mfn, mfn + nr_mfns - 1);
@@ -770,7 +770,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             break;
         }
 
-        ret = xsm_set_target(d, e);
+        ret = xsm_set_target(XSM_HOOK, d, e);
         if ( ret ) {
             put_domain(e);
             break;

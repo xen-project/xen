@@ -1351,7 +1351,7 @@ int mem_sharing_memop(struct domain *d, xen_mem_sharing_op_t *mec)
             if ( rc )
                 return rc;
 
-            rc = xsm_mem_sharing_op(d, cd, mec->op);
+            rc = xsm_mem_sharing_op(XSM_TARGET, d, cd, mec->op);
             if ( rc )
             {
                 rcu_unlock_domain(cd);
@@ -1415,7 +1415,7 @@ int mem_sharing_memop(struct domain *d, xen_mem_sharing_op_t *mec)
             if ( rc )
                 return rc;
 
-            rc = xsm_mem_sharing_op(d, cd, mec->op);
+            rc = xsm_mem_sharing_op(XSM_TARGET, d, cd, mec->op);
             if ( rc )
             {
                 rcu_unlock_domain(cd);

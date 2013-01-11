@@ -252,7 +252,7 @@ struct domain *domain_create(
 
     if ( !is_idle_domain(d) )
     {
-        if ( (err = xsm_domain_create(d, ssidref)) != 0 )
+        if ( (err = xsm_domain_create(XSM_HOOK, d, ssidref)) != 0 )
             goto fail;
 
         d->is_paused_by_controller = 1;

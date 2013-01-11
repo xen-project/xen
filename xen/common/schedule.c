@@ -921,7 +921,7 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( d == NULL )
             break;
 
-        ret = xsm_schedop_shutdown(current->domain, d);
+        ret = xsm_schedop_shutdown(XSM_DM_PRIV, current->domain, d);
         if ( ret )
         {
             rcu_unlock_domain(d);
