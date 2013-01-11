@@ -141,6 +141,7 @@ class mmu
     mfnlist
     memorymap
     remote_remap
+	mmuext_op
 }
 
 class shadow

@@ -7,7 +7,7 @@
 ################################################################################
 define(`declare_domain_common', `
 	allow $1 $2:grant { query setup };
-	allow $1 $2:mmu { adjust physmap map_read map_write stat pinpage updatemp };
+	allow $1 $2:mmu { adjust physmap map_read map_write stat pinpage updatemp mmuext_op };
 	allow $1 $2:hvm { getparam setparam };
 ')
 
@@ -51,7 +51,7 @@ define(`create_domain_common', `
 	allow $1 $2:domain2 { set_cpuid settsc };
 	allow $1 $2:security check_context;
 	allow $1 $2:shadow enable;
-	allow $1 $2:mmu {map_read map_write adjust memorymap physmap pinpage};
+	allow $1 $2:mmu { map_read map_write adjust memorymap physmap pinpage mmuext_op };
 	allow $1 $2:grant setup;
 	allow $1 $2:hvm { cacheattr getparam hvmctl irqlevel pciroute sethvmc setparam pcilevel trackdirtyvram };
 ')
@@ -162,7 +162,7 @@ define(`make_device_model', `
 #   Allow a device to be used by a domain
 define(`use_device', `
     allow $1 $2:resource use;
-    allow $1 $2:mmu { map_read map_write };
+    allow $1 domio_t:mmu { map_read map_write };
 ')
 
 # admin_device(domain, device)

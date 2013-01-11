@@ -1435,65 +1435,44 @@ static int flask_domain_memory_map(struct domain *d)
     return current_has_perm(d, SECCLASS_MMU, MMU__MEMORYMAP);
 }
 
-static int domain_memory_perm(struct domain *d, struct domain *f, l1_pgentry_t pte)
+static int flask_mmu_update(struct domain *d, struct domain *t,
+                            struct domain *f, uint32_t flags)
 {
     int rc = 0;
-    u32 map_perms = MMU__MAP_READ;
-    unsigned long fgfn, fmfn;
-    p2m_type_t p2mt;
+    u32 map_perms = 0;
 
-    if ( !(l1e_get_flags(pte) & _PAGE_PRESENT) )
-        return 0;
-
-    if ( l1e_get_flags(pte) & _PAGE_RW )
-        map_perms |= MMU__MAP_WRITE;
-
-    fgfn = l1e_get_pfn(pte);
-    fmfn = mfn_x(get_gfn_query(f, fgfn, &p2mt));
-    put_gfn(f, fgfn);
-
-    if ( f->domain_id == DOMID_IO || !mfn_valid(fmfn) )
-    {
-        struct avc_audit_data ad;
-        u32 dsid, fsid;
-        rc = security_iomem_sid(fmfn, &fsid);
-        if ( rc )
-            return rc;
-        AVC_AUDIT_DATA_INIT(&ad, MEMORY);
-        ad.sdom = d;
-        ad.tdom = f;
-        ad.memory.pte = pte.l1;
-        ad.memory.mfn = fmfn;
-        dsid = domain_sid(d);
-        return avc_has_perm(dsid, fsid, SECCLASS_MMU, map_perms, &ad);
-    }
-
-    return domain_has_perm(d, f, SECCLASS_MMU, map_perms);
-}
-
-static int flask_mmu_normal_update(struct domain *d, struct domain *t,
-                                   struct domain *f, intpte_t fpte)
-{
-    int rc = 0;
-
-    if (d != t)
+    if ( t && d != t )
         rc = domain_has_perm(d, t, SECCLASS_MMU, MMU__REMOTE_REMAP);
     if ( rc )
         return rc;
 
-    return domain_memory_perm(d, f, l1e_from_intpte(fpte));
+    if ( flags & XSM_MMU_UPDATE_READ )
+        map_perms |= MMU__MAP_READ;
+    if ( flags & XSM_MMU_UPDATE_WRITE )
+        map_perms |= MMU__MAP_WRITE;
+    if ( flags & XSM_MMU_MACHPHYS_UPDATE )
+        map_perms |= MMU__UPDATEMP;
+
+    if ( map_perms )
+        rc = domain_has_perm(d, f, SECCLASS_MMU, map_perms);
+    return rc;
 }
 
-static int flask_mmu_machphys_update(struct domain *d1, struct domain *d2,
-                                     unsigned long mfn)
+static int flask_mmuext_op(struct domain *d, struct domain *f)
 {
-    return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__UPDATEMP);
+    return domain_has_perm(d, f, SECCLASS_MMU, MMU__MMUEXT_OP);
 }
 
 static int flask_update_va_mapping(struct domain *d, struct domain *f,
                                    l1_pgentry_t pte)
 {
-    return domain_memory_perm(d, f, pte);
+    u32 map_perms = MMU__MAP_READ;
+    if ( !(l1e_get_flags(pte) & _PAGE_PRESENT) )
+        return 0;
+    if ( l1e_get_flags(pte) & _PAGE_RW )
+        map_perms |= MMU__MAP_WRITE;
+
+    return domain_has_perm(d, f, SECCLASS_MMU, map_perms);
 }
 
 static int flask_add_to_physmap(struct domain *d1, struct domain *d2)
@@ -1774,8 +1753,8 @@ static struct xsm_operations flask_ops = {
     .getidletime = flask_getidletime,
     .machine_memory_map = flask_machine_memory_map,
     .domain_memory_map = flask_domain_memory_map,
-    .mmu_normal_update = flask_mmu_normal_update,
-    .mmu_machphys_update = flask_mmu_machphys_update,
+    .mmu_update = flask_mmu_update,
+    .mmuext_op = flask_mmuext_op,
     .update_va_mapping = flask_update_va_mapping,
     .add_to_physmap = flask_add_to_physmap,
     .remove_from_physmap = flask_remove_from_physmap,

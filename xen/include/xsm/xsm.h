@@ -27,8 +27,6 @@ typedef u32 xsm_magic_t;
 #define XSM_MAGIC 0x00000000
 #endif
 
-#ifdef XSM_ENABLE
-
 extern char *policy_buffer;
 extern u32 policy_size;
 
@@ -170,9 +168,13 @@ struct xsm_operations {
     int (*getidletime) (void);
     int (*machine_memory_map) (void);
     int (*domain_memory_map) (struct domain *d);
-    int (*mmu_normal_update) (struct domain *d, struct domain *t,
-                              struct domain *f, intpte_t fpte);
-    int (*mmu_machphys_update) (struct domain *d1, struct domain *d2, unsigned long mfn);
+#define XSM_MMU_UPDATE_READ      1
+#define XSM_MMU_UPDATE_WRITE     2
+#define XSM_MMU_NORMAL_UPDATE    4
+#define XSM_MMU_MACHPHYS_UPDATE  8
+    int (*mmu_update) (struct domain *d, struct domain *t,
+                       struct domain *f, uint32_t flags);
+    int (*mmuext_op) (struct domain *d, struct domain *f);
     int (*update_va_mapping) (struct domain *d, struct domain *f, l1_pgentry_t pte);
     int (*add_to_physmap) (struct domain *d1, struct domain *d2);
     int (*sendtrigger) (struct domain *d);
@@ -185,6 +187,8 @@ struct xsm_operations {
     int (*ioport_mapping) (struct domain *d, uint32_t s, uint32_t e, uint8_t allow);
 #endif
 };
+
+#ifdef XSM_ENABLE
 
 extern struct xsm_operations *xsm_ops;
 
@@ -763,16 +767,15 @@ static inline int xsm_domain_memory_map(struct domain *d)
     return xsm_ops->domain_memory_map(d);
 }
 
-static inline int xsm_mmu_normal_update (struct domain *d, struct domain *t,
-                                         struct domain *f, intpte_t fpte)
+static inline int xsm_mmu_update (struct domain *d, struct domain *t,
+                                  struct domain *f, uint32_t flags)
 {
-    return xsm_ops->mmu_normal_update(d, t, f, fpte);
+    return xsm_ops->mmu_update(d, t, f, flags);
 }
 
-static inline int xsm_mmu_machphys_update (struct domain *d1, struct domain *d2,
-                                           unsigned long mfn)
+static inline int xsm_mmuext_op (struct domain *d, struct domain *f)
 {
-    return xsm_ops->mmu_machphys_update(d1, d2, mfn);
+    return xsm_ops->mmuext_op(d, f);
 }
 
 static inline int xsm_update_va_mapping(struct domain *d, struct domain *f, 

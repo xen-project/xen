@@ -29,10 +29,10 @@ type xen_t, xen_type, mls_priv;
 # Domain 0
 declare_singleton_domain(dom0_t, mls_priv);
 
-# Untracked I/O memory (pseudo-domain)
+# I/O memory (DOMID_IO pseudo-domain)
 type domio_t, xen_type;
 
-# Xen heap (pseudo-domain)
+# Xen heap (DOMID_XEN pseudo-domain)
 type domxen_t, xen_type;
 
 # Unlabeled objects
@@ -69,7 +69,6 @@ admin_device(dom0_t, device_t)
 admin_device(dom0_t, irq_t)
 admin_device(dom0_t, ioport_t)
 admin_device(dom0_t, iomem_t)
-allow dom0_t domio_t:mmu { map_read map_write };
 
 domain_comms(dom0_t, dom0_t)
 

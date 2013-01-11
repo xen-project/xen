@@ -155,8 +155,8 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, getidletime);
     set_to_dummy_if_null(ops, machine_memory_map);
     set_to_dummy_if_null(ops, domain_memory_map);
-    set_to_dummy_if_null(ops, mmu_normal_update);
-    set_to_dummy_if_null(ops, mmu_machphys_update);
+    set_to_dummy_if_null(ops, mmu_update);
+    set_to_dummy_if_null(ops, mmuext_op);
     set_to_dummy_if_null(ops, update_va_mapping);
     set_to_dummy_if_null(ops, add_to_physmap);
     set_to_dummy_if_null(ops, remove_from_physmap);

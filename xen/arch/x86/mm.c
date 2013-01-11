@@ -2605,11 +2605,6 @@ static struct domain *get_pg_owner(domid_t domid)
         pg_owner = rcu_lock_domain(dom_io);
         break;
     case DOMID_XEN:
-        if ( !IS_PRIV(curr) )
-        {
-            MEM_LOG("Cannot set foreign dom");
-            break;
-        }
         pg_owner = rcu_lock_domain(dom_xen);
         break;
     default:
@@ -2617,12 +2612,6 @@ static struct domain *get_pg_owner(domid_t domid)
         {
             MEM_LOG("Unknown domain '%u'", domid);
             break;
-        }
-        if ( !IS_PRIV_FOR(curr, pg_owner) )
-        {
-            MEM_LOG("Cannot set foreign dom");
-            rcu_unlock_domain(pg_owner);
-            pg_owner = NULL;
         }
         break;
     }
@@ -2708,6 +2697,13 @@ long do_mmuext_op(
     if ( (pg_owner = get_pg_owner(foreigndom)) == NULL )
     {
         rc = -ESRCH;
+        goto out;
+    }
+
+    rc = xsm_mmuext_op(d, pg_owner);
+    if ( rc )
+    {
+        rcu_unlock_domain(pg_owner);
         goto out;
     }
 
@@ -3153,6 +3149,8 @@ long do_mmu_update(
     struct vcpu *v = current;
     struct domain *d = v->domain, *pt_owner = d, *pg_owner;
     struct domain_mmap_cache mapcache;
+    uint32_t xsm_needed = 0;
+    uint32_t xsm_checked = 0;
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
@@ -3182,11 +3180,6 @@ long do_mmu_update(
         if ( (v = pt_owner->vcpu ? pt_owner->vcpu[0] : NULL) == NULL )
         {
             rc = -EINVAL;
-            goto out;
-        }
-        if ( !IS_PRIV_FOR(d, pt_owner) )
-        {
-            rc = -ESRCH;
             goto out;
         }
     }
@@ -3228,9 +3221,20 @@ long do_mmu_update(
         {
             p2m_type_t p2mt;
 
-            rc = xsm_mmu_normal_update(d, pt_owner, pg_owner, req.val);
-            if ( rc )
-                break;
+            xsm_needed |= XSM_MMU_NORMAL_UPDATE;
+            if ( get_pte_flags(req.val) & _PAGE_PRESENT )
+            {
+                xsm_needed |= XSM_MMU_UPDATE_READ;
+                if ( get_pte_flags(req.val) & _PAGE_RW )
+                    xsm_needed |= XSM_MMU_UPDATE_WRITE;
+            }
+            if ( xsm_needed != xsm_checked )
+            {
+                rc = xsm_mmu_update(d, pt_owner, pg_owner, xsm_needed);
+                if ( rc )
+                    break;
+                xsm_checked = xsm_needed;
+            }
             rc = -EINVAL;
 
             req.ptr -= cmd;
@@ -3342,9 +3346,14 @@ long do_mmu_update(
             mfn = req.ptr >> PAGE_SHIFT;
             gpfn = req.val;
 
-            rc = xsm_mmu_machphys_update(d, pg_owner, mfn);
-            if ( rc )
-                break;
+            xsm_needed |= XSM_MMU_MACHPHYS_UPDATE;
+            if ( xsm_needed != xsm_checked )
+            {
+                rc = xsm_mmu_update(d, NULL, pg_owner, xsm_needed);
+                if ( rc )
+                    break;
+                xsm_checked = xsm_needed;
+            }
 
             if ( unlikely(!get_page_from_pagenr(mfn, pg_owner)) )
             {
