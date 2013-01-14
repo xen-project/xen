@@ -190,6 +190,7 @@ skip_clobber:
 
 /* %rbx: struct vcpu */
 test_all_events:
+        ASSERT_NOT_IN_ATOMIC
         cli                             # tests must not race interrupts
 /*test_softirqs:*/  
         movl  VCPU_processor(%rbx),%eax

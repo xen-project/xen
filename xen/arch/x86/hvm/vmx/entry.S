@@ -98,6 +98,7 @@ vmx_asm_vmexit_handler:
 vmx_asm_do_vmentry:
         call vmx_intr_assist
         call nvmx_switch_guest
+        ASSERT_NOT_IN_ATOMIC
 
         get_current(bx)
         cli

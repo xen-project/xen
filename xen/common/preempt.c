@@ -30,3 +30,9 @@ bool_t in_atomic(void)
 {
     return preempt_count() || in_irq() || !local_irq_is_enabled();
 }
+
+/* asm helper */
+void bug_if_in_atomic(void)
+{
+    BUG_ON(in_atomic());
+}

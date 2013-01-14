@@ -59,6 +59,14 @@ void ret_from_intr(void);
         GET_STACK_BASE(reg);                      \
         __GET_CURRENT(reg)
 
+#ifndef NDEBUG
+#define ASSERT_NOT_IN_ATOMIC                                             \
+    sti; /* sometimes called with interrupts disabled: safe to enable */ \
+    call bug_if_in_atomic
+#else
+#define ASSERT_NOT_IN_ATOMIC
+#endif
+
 #endif
 
 #endif /* __X86_ASM_DEFNS_H__ */

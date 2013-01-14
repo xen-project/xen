@@ -92,6 +92,7 @@ compat_skip_clobber:
 
 /* %rbx: struct vcpu */
 ENTRY(compat_test_all_events)
+        ASSERT_NOT_IN_ATOMIC
         cli                             # tests must not race interrupts
 /*compat_test_softirqs:*/
         movl  VCPU_processor(%rbx),%eax
