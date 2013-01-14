@@ -31,55 +31,48 @@
 #define STGI   .byte 0x0F,0x01,0xDC
 #define CLGI   .byte 0x0F,0x01,0xDD
 
-#define get_current(reg) GET_CURRENT(r(reg))
-        
-#define r(reg) %r##reg
-#define addr_of(lbl) lbl(%rip)
-#define call_with_regs(fn)                      \
-        mov  %rsp,%rdi;                         \
-        call fn;
-
 ENTRY(svm_asm_do_resume)
         call svm_intr_assist
-        call_with_regs(nsvm_vcpu_switch)
+        mov  %rsp,%rdi
+        call nsvm_vcpu_switch
         ASSERT_NOT_IN_ATOMIC
 
-        get_current(bx)
+        GET_CURRENT(%rbx)
         CLGI
 
-        mov  VCPU_processor(r(bx)),%eax
-        shl  $IRQSTAT_shift,r(ax)
-        lea  addr_of(irq_stat),r(dx)
-        testl $~0,(r(dx),r(ax),1)
+        mov  VCPU_processor(%rbx),%eax
+        shl  $IRQSTAT_shift,%rax
+        lea  irq_stat(%rip),%rdx
+        testl $~0,(%rdx,%rax,1)
         jnz  .Lsvm_process_softirqs
 
-        testb $0, VCPU_nsvm_hap_enabled(r(bx))
+        testb $0, VCPU_nsvm_hap_enabled(%rbx)
 UNLIKELY_START(nz, nsvm_hap)
-        mov  VCPU_nhvm_p2m(r(bx)),r(ax)
-        test r(ax),r(ax)
+        mov  VCPU_nhvm_p2m(%rbx),%rax
+        test %rax,%rax
         sete %al
-        andb VCPU_nhvm_guestmode(r(bx)),%al
+        andb VCPU_nhvm_guestmode(%rbx),%al
         jnz  .Lsvm_nsvm_no_p2m
 UNLIKELY_END(nsvm_hap)
 
         call svm_asid_handle_vmrun
 
-        cmpb $0,addr_of(tb_init_done)
+        cmpb $0,tb_init_done(%rip)
 UNLIKELY_START(nz, svm_trace)
         call svm_trace_vmentry
 UNLIKELY_END(svm_trace)
 
-        mov  VCPU_svm_vmcb(r(bx)),r(cx)
-        mov  UREGS_rax(r(sp)),r(ax)
-        mov  r(ax),VMCB_rax(r(cx))
-        mov  UREGS_rip(r(sp)),r(ax)
-        mov  r(ax),VMCB_rip(r(cx))
-        mov  UREGS_rsp(r(sp)),r(ax)
-        mov  r(ax),VMCB_rsp(r(cx))
-        mov  UREGS_eflags(r(sp)),r(ax)
-        mov  r(ax),VMCB_rflags(r(cx))
+        mov  VCPU_svm_vmcb(%rbx),%rcx
+        mov  UREGS_rax(%rsp),%rax
+        mov  %rax,VMCB_rax(%rcx)
+        mov  UREGS_rip(%rsp),%rax
+        mov  %rax,VMCB_rip(%rcx)
+        mov  UREGS_rsp(%rsp),%rax
+        mov  %rax,VMCB_rsp(%rcx)
+        mov  UREGS_eflags(%rsp),%rax
+        mov  %rax,VMCB_rflags(%rcx)
 
-        mov  VCPU_svm_vmcb_pa(r(bx)),r(ax)
+        mov  VCPU_svm_vmcb_pa(%rbx),%rax
 
         pop  %r15
         pop  %r14
@@ -115,35 +108,36 @@ UNLIKELY_END(svm_trace)
         push %r14
         push %r15
 
-        get_current(bx)
-        movb $0,VCPU_svm_vmcb_in_sync(r(bx))
-        mov  VCPU_svm_vmcb(r(bx)),r(cx)
-        mov  VMCB_rax(r(cx)),r(ax)
-        mov  r(ax),UREGS_rax(r(sp))
-        mov  VMCB_rip(r(cx)),r(ax)
-        mov  r(ax),UREGS_rip(r(sp))
-        mov  VMCB_rsp(r(cx)),r(ax)
-        mov  r(ax),UREGS_rsp(r(sp))
-        mov  VMCB_rflags(r(cx)),r(ax)
-        mov  r(ax),UREGS_eflags(r(sp))
+        GET_CURRENT(%rbx)
+        movb $0,VCPU_svm_vmcb_in_sync(%rbx)
+        mov  VCPU_svm_vmcb(%rbx),%rcx
+        mov  VMCB_rax(%rcx),%rax
+        mov  %rax,UREGS_rax(%rsp)
+        mov  VMCB_rip(%rcx),%rax
+        mov  %rax,UREGS_rip(%rsp)
+        mov  VMCB_rsp(%rcx),%rax
+        mov  %rax,UREGS_rsp(%rsp)
+        mov  VMCB_rflags(%rcx),%rax
+        mov  %rax,UREGS_eflags(%rsp)
 
 #ifndef NDEBUG
         mov  $0xbeef,%ax
-        mov  %ax,UREGS_error_code(r(sp))
-        mov  %ax,UREGS_entry_vector(r(sp))
-        mov  %ax,UREGS_saved_upcall_mask(r(sp))
-        mov  %ax,UREGS_cs(r(sp))
-        mov  %ax,UREGS_ds(r(sp))
-        mov  %ax,UREGS_es(r(sp))
-        mov  %ax,UREGS_fs(r(sp))
-        mov  %ax,UREGS_gs(r(sp))
-        mov  %ax,UREGS_ss(r(sp))
+        mov  %ax,UREGS_error_code(%rsp)
+        mov  %ax,UREGS_entry_vector(%rsp)
+        mov  %ax,UREGS_saved_upcall_mask(%rsp)
+        mov  %ax,UREGS_cs(%rsp)
+        mov  %ax,UREGS_ds(%rsp)
+        mov  %ax,UREGS_es(%rsp)
+        mov  %ax,UREGS_fs(%rsp)
+        mov  %ax,UREGS_gs(%rsp)
+        mov  %ax,UREGS_ss(%rsp)
 #endif
 
         STGI
 .globl svm_stgi_label
 svm_stgi_label:
-        call_with_regs(svm_vmexit_handler)
+        mov  %rsp,%rdi
+        call svm_vmexit_handler
         jmp  svm_asm_do_resume
 
 .Lsvm_process_softirqs:

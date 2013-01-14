@@ -36,14 +36,6 @@
 #define GUEST_RIP    0x681e
 #define GUEST_RFLAGS 0x6820
 
-#define get_current(reg) GET_CURRENT(r(reg))
-
-#define r(reg) %r##reg
-#define addr_of(lbl) lbl(%rip)
-#define call_with_regs(fn)                      \
-        mov  %rsp,%rdi;                         \
-        call fn;
-
         ALIGN
 .globl vmx_asm_vmexit_handler
 vmx_asm_vmexit_handler:
@@ -63,36 +55,37 @@ vmx_asm_vmexit_handler:
         push %r14
         push %r15
 
-        get_current(bx)
+        GET_CURRENT(%rbx)
 
-        movb $1,VCPU_vmx_launched(r(bx))
+        movb $1,VCPU_vmx_launched(%rbx)
 
-        lea  UREGS_rip(r(sp)),r(di)
+        lea  UREGS_rip(%rsp),%rdi
         mov  $GUEST_RIP,%eax
         /*VMREAD(UREGS_rip)*/
-        .byte 0x0f,0x78,0x07  /* vmread r(ax),(r(di)) */
+        .byte 0x0f,0x78,0x07  /* vmread %rax,(%rdi) */
         mov  $GUEST_RSP,%eax
         VMREAD(UREGS_rsp)
         mov  $GUEST_RFLAGS,%eax
         VMREAD(UREGS_eflags)
 
-        mov  %cr2,r(ax)
-        mov  r(ax),VCPU_hvm_guest_cr2(r(bx))
+        mov  %cr2,%rax
+        mov  %rax,VCPU_hvm_guest_cr2(%rbx)
 
 #ifndef NDEBUG
         mov  $0xbeef,%ax
-        mov  %ax,UREGS_error_code(r(sp))
-        mov  %ax,UREGS_entry_vector(r(sp))
-        mov  %ax,UREGS_saved_upcall_mask(r(sp))
-        mov  %ax,UREGS_cs(r(sp))
-        mov  %ax,UREGS_ds(r(sp))
-        mov  %ax,UREGS_es(r(sp))
-        mov  %ax,UREGS_fs(r(sp))
-        mov  %ax,UREGS_gs(r(sp))
-        mov  %ax,UREGS_ss(r(sp))
+        mov  %ax,UREGS_error_code(%rsp)
+        mov  %ax,UREGS_entry_vector(%rsp)
+        mov  %ax,UREGS_saved_upcall_mask(%rsp)
+        mov  %ax,UREGS_cs(%rsp)
+        mov  %ax,UREGS_ds(%rsp)
+        mov  %ax,UREGS_es(%rsp)
+        mov  %ax,UREGS_fs(%rsp)
+        mov  %ax,UREGS_gs(%rsp)
+        mov  %ax,UREGS_ss(%rsp)
 #endif
 
-        call_with_regs(vmx_vmexit_handler)
+        mov  %rsp,%rdi
+        call vmx_vmexit_handler
 
 .globl vmx_asm_do_vmentry
 vmx_asm_do_vmentry:
@@ -100,38 +93,39 @@ vmx_asm_do_vmentry:
         call nvmx_switch_guest
         ASSERT_NOT_IN_ATOMIC
 
-        get_current(bx)
+        GET_CURRENT(%rbx)
         cli
 
-        mov  VCPU_processor(r(bx)),%eax
-        shl  $IRQSTAT_shift,r(ax)
-        lea  addr_of(irq_stat),r(dx)
-        cmpl $0,(r(dx),r(ax),1)
+        mov  VCPU_processor(%rbx),%eax
+        shl  $IRQSTAT_shift,%rax
+        lea  irq_stat(%rip),%rdx
+        cmpl $0,(%rdx,%rax,1)
         jnz  .Lvmx_process_softirqs
 
-        testb $0xff,VCPU_vmx_emulate(r(bx))
+        testb $0xff,VCPU_vmx_emulate(%rbx)
         jnz .Lvmx_goto_emulator
-        testb $0xff,VCPU_vmx_realmode(r(bx))
+        testb $0xff,VCPU_vmx_realmode(%rbx)
 UNLIKELY_START(nz, realmode)
-        cmpw $0,VCPU_vm86_seg_mask(r(bx))
+        cmpw $0,VCPU_vm86_seg_mask(%rbx)
         jnz .Lvmx_goto_emulator
-        call_with_regs(vmx_enter_realmode) 
+        mov  %rsp,%rdi
+        call vmx_enter_realmode
 UNLIKELY_END(realmode)
 
         call vmx_vmenter_helper
-        mov  VCPU_hvm_guest_cr2(r(bx)),r(ax)
-        mov  r(ax),%cr2
+        mov  VCPU_hvm_guest_cr2(%rbx),%rax
+        mov  %rax,%cr2
 
-        lea  UREGS_rip(r(sp)),r(di)
+        lea  UREGS_rip(%rsp),%rdi
         mov  $GUEST_RIP,%eax
         /*VMWRITE(UREGS_rip)*/
-        .byte 0x0f,0x79,0x07  /* vmwrite (r(di)),r(ax) */
+        .byte 0x0f,0x79,0x07  /* vmwrite (%rdi),%rax */
         mov  $GUEST_RSP,%eax
         VMWRITE(UREGS_rsp)
         mov  $GUEST_RFLAGS,%eax
         VMWRITE(UREGS_eflags)
 
-        cmpb $0,VCPU_vmx_launched(r(bx))
+        cmpb $0,VCPU_vmx_launched(%rbx)
         pop  %r15
         pop  %r14
         pop  %r13
@@ -163,7 +157,8 @@ UNLIKELY_END(realmode)
 
 .Lvmx_goto_emulator:
         sti
-        call_with_regs(vmx_realmode)
+        mov  %rsp,%rdi
+        call vmx_realmode
         jmp  vmx_asm_do_vmentry
 
 .Lvmx_process_softirqs:
