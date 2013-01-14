@@ -211,7 +211,7 @@ void prepare_to_wait(struct waitqueue_head *wq)
     struct vcpu *curr = current;
     struct waitqueue_vcpu *wqv = curr->waitqueue_vcpu;
 
-    ASSERT(!in_atomic());
+    ASSERT_NOT_IN_ATOMIC();
     __prepare_to_wait(wqv);
 
     ASSERT(list_empty(&wqv->list));

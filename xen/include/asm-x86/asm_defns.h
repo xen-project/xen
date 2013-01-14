@@ -62,7 +62,7 @@ void ret_from_intr(void);
 #ifndef NDEBUG
 #define ASSERT_NOT_IN_ATOMIC                                             \
     sti; /* sometimes called with interrupts disabled: safe to enable */ \
-    call bug_if_in_atomic
+    call ASSERT_NOT_IN_ATOMIC
 #else
 #define ASSERT_NOT_IN_ATOMIC
 #endif

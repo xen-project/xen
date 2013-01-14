@@ -1086,7 +1086,7 @@ static void schedule(void)
     struct task_slice     next_slice;
     int cpu = smp_processor_id();
 
-    ASSERT(!in_atomic());
+    ASSERT_NOT_IN_ATOMIC();
 
     SCHED_STAT_CRANK(sched_run);
 

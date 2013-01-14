@@ -28,4 +28,10 @@ DECLARE_PER_CPU(unsigned int, __preempt_count);
 
 bool_t in_atomic(void);
 
+#ifndef NDEBUG
+void ASSERT_NOT_IN_ATOMIC(void);
+#else
+#define ASSERT_NOT_IN_ATOMIC() ((void)0)
+#endif
+
 #endif /* __XEN_PREEMPT_H__ */

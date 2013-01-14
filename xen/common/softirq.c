@@ -58,7 +58,7 @@ void process_pending_softirqs(void)
 
 asmlinkage void do_softirq(void)
 {
-    ASSERT(!in_atomic());
+    ASSERT_NOT_IN_ATOMIC();
     __do_softirq(0);
 }
 
