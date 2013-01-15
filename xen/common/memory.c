@@ -687,10 +687,11 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( d == NULL )
             return -ESRCH;
 
-        if ( xsm_remove_from_physmap(XSM_TARGET, current->domain, d) )
+        rc = xsm_remove_from_physmap(XSM_TARGET, current->domain, d);
+        if ( rc )
         {
             rcu_unlock_domain(d);
-            return -EPERM;
+            return rc;
         }
 
         domain_lock(d);
