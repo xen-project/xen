@@ -41,6 +41,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
         gdprintk(XENLOG_ERR, "nest: allocation for shadow vmcs failed\n");
 	goto out;
     }
+    nvmx->ept.enabled = 0;
     nvmx->vmxon_region_pa = 0;
     nvcpu->nv_vvmcx = NULL;
     nvcpu->nv_vvmcxaddr = VMCX_EADDR;
@@ -96,9 +97,11 @@ uint64_t nvmx_vcpu_guestcr3(struct vcpu *v)
 
 uint64_t nvmx_vcpu_eptp_base(struct vcpu *v)
 {
-    /* TODO */
-    ASSERT(0);
-    return 0;
+    uint64_t eptp_base;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+
+    eptp_base = __get_vvmcs(nvcpu->nv_vvmcx, EPT_POINTER);
+    return eptp_base & PAGE_MASK;
 }
 
 uint32_t nvmx_vcpu_asid(struct vcpu *v)
@@ -106,6 +109,13 @@ uint32_t nvmx_vcpu_asid(struct vcpu *v)
     /* TODO */
     ASSERT(0);
     return 0;
+}
+
+bool_t nvmx_ept_enabled(struct vcpu *v)
+{
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+
+    return !!(nvmx->ept.enabled);
 }
 
 static const enum x86_segment sreg_to_index[] = {
@@ -502,14 +512,16 @@ void nvmx_update_exec_control(struct vcpu *v, u32 host_cntrl)
 }
 
 void nvmx_update_secondary_exec_control(struct vcpu *v,
-                                            unsigned long value)
+                                        unsigned long host_cntrl)
 {
     u32 shadow_cntrl;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
 
     shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, SECONDARY_VM_EXEC_CONTROL);
-    shadow_cntrl |= value;
-    set_shadow_control(v, SECONDARY_VM_EXEC_CONTROL, shadow_cntrl);
+    nvmx->ept.enabled = !!(shadow_cntrl & SECONDARY_EXEC_ENABLE_EPT);
+    shadow_cntrl |= host_cntrl;
+    __vmwrite(SECONDARY_VM_EXEC_CONTROL, shadow_cntrl);
 }
 
 static void nvmx_update_pin_control(struct vcpu *v, unsigned long host_cntrl)
@@ -874,6 +886,16 @@ static void load_shadow_guest_state(struct vcpu *v)
     /* TODO: CR3 target control */
 }
 
+uint64_t get_shadow_eptp(struct vcpu *v)
+{
+    uint64_t np2m_base = nvmx_vcpu_eptp_base(v);
+    struct p2m_domain *p2m = p2m_get_nestedp2m(v, np2m_base);
+    struct ept_data *ept = &p2m->ept;
+
+    ept->asr = pagetable_get_pfn(p2m_get_pagetable(p2m));
+    return ept_get_eptp(ept);
+}
+
 static void virtual_vmentry(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -918,7 +940,10 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     /* updating host cr0 to sync TS bit */
     __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
 
-    /* TODO: EPT_POINTER */
+    /* Setup virtual ETP for L2 guest*/
+    if ( nestedhvm_paging_mode_hap(v) )
+        __vmwrite(EPT_POINTER, get_shadow_eptp(v));
+
 }
 
 static void sync_vvmcs_guest_state(struct vcpu *v, struct cpu_user_regs *regs)
@@ -952,8 +977,8 @@ static void sync_vvmcs_ro(struct vcpu *v)
     /* Adjust exit_reason/exit_qualifciation for violation case */
     if ( __get_vvmcs(vvmcs, VM_EXIT_REASON) == EXIT_REASON_EPT_VIOLATION )
     {
-        __set_vvmcs(vvmcs, EXIT_QUALIFICATION, nvmx->ept_exit.exit_qual);
-        __set_vvmcs(vvmcs, VM_EXIT_REASON, nvmx->ept_exit.exit_reason);
+        __set_vvmcs(vvmcs, EXIT_QUALIFICATION, nvmx->ept.exit_qual);
+        __set_vvmcs(vvmcs, VM_EXIT_REASON, nvmx->ept.exit_reason);
     }
 }
 
@@ -1520,8 +1545,8 @@ nvmx_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
     case EPT_TRANSLATE_VIOLATION:
     case EPT_TRANSLATE_MISCONFIG:
         rc = NESTEDHVM_PAGEFAULT_INJECT;
-        nvmx->ept_exit.exit_reason = exit_reason;
-        nvmx->ept_exit.exit_qual = exit_qual;
+        nvmx->ept.exit_reason = exit_reason;
+        nvmx->ept.exit_qual = exit_qual;
         break;
     case EPT_TRANSLATE_RETRY:
         rc = NESTEDHVM_PAGEFAULT_RETRY;

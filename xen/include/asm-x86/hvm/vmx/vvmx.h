@@ -33,9 +33,10 @@ struct nestedvmx {
         u32           error_code;
     } intr;
     struct {
+        bool_t   enabled;
         uint32_t exit_reason;
         uint32_t exit_qual;
-    } ept_exit;
+    } ept;
 };
 
 #define vcpu_2_nvmx(v)	(vcpu_nestedhvm(v).u.nvmx)
@@ -110,6 +111,8 @@ int nvmx_intercepts_exception(struct vcpu *v,
                               unsigned int trap, int error_code);
 void nvmx_domain_relinquish_resources(struct domain *d);
 
+bool_t nvmx_ept_enabled(struct vcpu *v);
+
 int nvmx_handle_vmxon(struct cpu_user_regs *regs);
 int nvmx_handle_vmxoff(struct cpu_user_regs *regs);
 
@@ -177,6 +180,8 @@ enum vvmcs_encoding_type {
 
 u64 __get_vvmcs(void *vvmcs, u32 vmcs_encoding);
 void __set_vvmcs(void *vvmcs, u32 vmcs_encoding, u64 val);
+
+uint64_t get_shadow_eptp(struct vcpu *v);
 
 void nvmx_destroy_vmcs(struct vcpu *v);
 int nvmx_handle_vmptrld(struct cpu_user_regs *regs);

@@ -1461,6 +1461,7 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .nhvm_vcpu_guestcr3   = nvmx_vcpu_guestcr3,
     .nhvm_vcpu_p2m_base   = nvmx_vcpu_eptp_base,
     .nhvm_vcpu_asid       = nvmx_vcpu_asid,
+    .nhvm_vmcx_hap_enabled = nvmx_ept_enabled,
     .nhvm_vmcx_guest_intercepts_trap = nvmx_intercepts_exception,
     .nhvm_vcpu_vmexit_trap = nvmx_vmexit_trap,
     .nhvm_intr_blocked    = nvmx_intr_blocked,
@@ -2003,6 +2004,7 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
     unsigned long gla, gfn = gpa >> PAGE_SHIFT;
     mfn_t mfn;
     p2m_type_t p2mt;
+    int ret;
     struct domain *d = current->domain;
 
     if ( tb_init_done )
@@ -2017,18 +2019,33 @@ static void ept_handle_violation(unsigned long qualification, paddr_t gpa)
         _d.gpa = gpa;
         _d.qualification = qualification;
         _d.mfn = mfn_x(get_gfn_query_unlocked(d, gfn, &_d.p2mt));
-        
+
         __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
 
-    if ( hvm_hap_nested_page_fault(gpa,
+    ret = hvm_hap_nested_page_fault(gpa,
                                    qualification & EPT_GLA_VALID       ? 1 : 0,
                                    qualification & EPT_GLA_VALID
                                      ? __vmread(GUEST_LINEAR_ADDRESS) : ~0ull,
                                    qualification & EPT_READ_VIOLATION  ? 1 : 0,
                                    qualification & EPT_WRITE_VIOLATION ? 1 : 0,
-                                   qualification & EPT_EXEC_VIOLATION  ? 1 : 0) )
+                                   qualification & EPT_EXEC_VIOLATION  ? 1 : 0);
+    switch ( ret )
+    {
+    case 0:         // Unhandled L1 EPT violation
+        break;
+    case 1:         // This violation is handled completly
+        /*Current nested EPT maybe flushed by other vcpus, so need
+         * to re-set its shadow EPTP pointer.
+         */
+        if ( nestedhvm_vcpu_in_guestmode(current) &&
+                        nestedhvm_paging_mode_hap(current ) )
+            __vmwrite(EPT_POINTER, get_shadow_eptp(current));
         return;
+    case -1:        // This vioaltion should be injected to L1 VMM
+        vcpu_nestedhvm(current).nv_vmexit_pending = 1;
+        return;
+    }
 
     /* Everything else is an error. */
     mfn = get_gfn_query_unlocked(d, gfn, &p2mt);
