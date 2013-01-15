@@ -1484,6 +1484,19 @@ int nvmx_msr_write_intercept(unsigned int msr, u64 msr_content)
     return 1;
 }
 
+/* This function uses L2_gpa to walk the P2M page table in L1. If the
+ * walk is successful, the translated value is returned in
+ * L1_gpa. The result value tells what to do next.
+ */
+int
+nvmx_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
+                     unsigned int *page_order,
+                     bool_t access_r, bool_t access_w, bool_t access_x)
+{
+    /*TODO:*/
+    return 0;
+}
+
 void nvmx_idtv_handling(void)
 {
     struct vcpu *v = current;

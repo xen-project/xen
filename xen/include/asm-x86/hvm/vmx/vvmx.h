@@ -108,6 +108,11 @@ void nvmx_domain_relinquish_resources(struct domain *d);
 
 int nvmx_handle_vmxon(struct cpu_user_regs *regs);
 int nvmx_handle_vmxoff(struct cpu_user_regs *regs);
+
+int
+nvmx_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
+                     unsigned int *page_order,
+                     bool_t access_r, bool_t access_w, bool_t access_x);
 /*
  * Virtual VMCS layout
  *

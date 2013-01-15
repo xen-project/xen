@@ -137,6 +137,22 @@ nestedhap_fix_p2m(struct vcpu *v, struct p2m_domain *p2m,
     }
 }
 
+/* This function uses L2_gpa to walk the P2M page table in L1. If the
+ * walk is successful, the translated value is returned in
+ * L1_gpa. The result value tells what to do next.
+ */
+static int
+nestedhap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
+                      unsigned int *page_order,
+                      bool_t access_r, bool_t access_w, bool_t access_x)
+{
+    ASSERT(hvm_funcs.nhvm_hap_walk_L1_p2m);
+
+    return hvm_funcs.nhvm_hap_walk_L1_p2m(v, L2_gpa, L1_gpa, page_order,
+        access_r, access_w, access_x);
+}
+
+
 /* This function uses L1_gpa to walk the P2M table in L0 hypervisor. If the
  * walk is successful, the translated value is returned in L0_gpa. The return 
  * value tells the upper level what to do.
@@ -174,36 +190,6 @@ nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa,
 out:
     __put_gfn(p2m, L1_gpa >> PAGE_SHIFT);
     return rc;
-}
-
-/* This function uses L2_gpa to walk the P2M page table in L1. If the 
- * walk is successful, the translated value is returned in
- * L1_gpa. The result value tells what to do next.
- */
-static int
-nestedhap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
-                      unsigned int *page_order,
-                      bool_t access_r, bool_t access_w, bool_t access_x)
-{
-    uint32_t pfec;
-    unsigned long nested_cr3, gfn;
-    
-    nested_cr3 = nhvm_vcpu_p2m_base(v);
-
-    pfec = PFEC_user_mode | PFEC_page_present;
-    if (access_w)
-        pfec |= PFEC_write_access;
-    if (access_x)
-        pfec |= PFEC_insn_fetch;
-
-    /* Walk the guest-supplied NPT table, just as if it were a pagetable */
-    gfn = paging_ga_to_gfn_cr3(v, nested_cr3, L2_gpa, &pfec, page_order);
-
-    if ( gfn == INVALID_GFN ) 
-        return NESTEDHVM_PAGEFAULT_INJECT;
-
-    *L1_gpa = (gfn << PAGE_SHIFT) + (L2_gpa & ~PAGE_MASK);
-    return NESTEDHVM_PAGEFAULT_DONE;
 }
 
 /*

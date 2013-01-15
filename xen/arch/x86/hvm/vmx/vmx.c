@@ -1511,7 +1511,8 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .nhvm_intr_blocked    = nvmx_intr_blocked,
     .nhvm_domain_relinquish_resources = nvmx_domain_relinquish_resources,
     .update_eoi_exit_bitmap = vmx_update_eoi_exit_bitmap,
-    .virtual_intr_delivery_enabled = vmx_virtual_intr_delivery_enabled
+    .virtual_intr_delivery_enabled = vmx_virtual_intr_delivery_enabled,
+    .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
 };
 
 struct hvm_function_table * __init start_vmx(void)
