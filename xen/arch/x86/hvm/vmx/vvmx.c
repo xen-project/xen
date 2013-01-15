@@ -42,6 +42,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
 	goto out;
     }
     nvmx->ept.enabled = 0;
+    nvmx->guest_vpid = 0;
     nvmx->vmxon_region_pa = 0;
     nvcpu->nv_vvmcx = NULL;
     nvcpu->nv_vvmcxaddr = VMCX_EADDR;
@@ -904,6 +905,16 @@ uint64_t get_shadow_eptp(struct vcpu *v)
     return ept_get_eptp(ept);
 }
 
+static bool_t nvmx_vpid_enabled(struct nestedvcpu *nvcpu)
+{
+    uint32_t second_cntl;
+
+    second_cntl = __get_vvmcs(nvcpu->nv_vvmcx, SECONDARY_VM_EXEC_CONTROL);
+    if ( second_cntl & SECONDARY_EXEC_ENABLE_VPID )
+        return 1;
+    return 0;
+}
+
 static void virtual_vmentry(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -951,6 +962,19 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     /* Setup virtual ETP for L2 guest*/
     if ( nestedhvm_paging_mode_hap(v) )
         __vmwrite(EPT_POINTER, get_shadow_eptp(v));
+
+    /* nested VPID support! */
+    if ( cpu_has_vmx_vpid && nvmx_vpid_enabled(nvcpu) )
+    {
+        struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+        uint32_t new_vpid =  __get_vvmcs(vvmcs, VIRTUAL_PROCESSOR_ID);
+
+        if ( nvmx->guest_vpid != new_vpid )
+        {
+            hvm_asid_flush_vcpu_asid(&vcpu_nestedhvm(v).nv_n2asid);
+            nvmx->guest_vpid = new_vpid;
+        }
+    }
 
 }
 
@@ -1224,7 +1248,7 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
     if ( vcpu_nestedhvm(v).nv_vvmcxaddr == VMCX_EADDR )
     {
         vmreturn (regs, VMFAIL_INVALID);
-        return X86EMUL_OKAY;        
+        return X86EMUL_OKAY;
     }
 
     launched = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx,
@@ -1426,6 +1450,31 @@ int nvmx_handle_invept(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 }
 
+int nvmx_handle_invvpid(struct cpu_user_regs *regs)
+{
+    struct vmx_inst_decoded decode;
+    unsigned long vpid;
+    int ret;
+
+    if ( (ret = decode_vmx_inst(regs, &decode, &vpid, 0)) != X86EMUL_OKAY )
+        return ret;
+
+    switch ( reg_read(regs, decode.reg2) )
+    {
+    /* Just invalidate all tlb entries for all types! */
+    case INVVPID_INDIVIDUAL_ADDR:
+    case INVVPID_SINGLE_CONTEXT:
+    case INVVPID_ALL_CONTEXT:
+        hvm_asid_flush_vcpu_asid(&vcpu_nestedhvm(current).nv_n2asid);
+        break;
+    default:
+        vmreturn(regs, VMFAIL_INVALID);
+        return X86EMUL_OKAY;
+    }
+
+    vmreturn(regs, VMSUCCEED);
+    return X86EMUL_OKAY;
+}
 
 #define __emul_value(enable1, default1) \
     ((enable1 | default1) << 32 | (default1))

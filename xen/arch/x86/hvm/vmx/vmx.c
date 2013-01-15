@@ -2585,10 +2585,14 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             update_guest_eip();
         break;
 
+    case EXIT_REASON_INVVPID:
+        if ( nvmx_handle_invvpid(regs) == X86EMUL_OKAY )
+            update_guest_eip();
+        break;
+
     case EXIT_REASON_MWAIT_INSTRUCTION:
     case EXIT_REASON_MONITOR_INSTRUCTION:
     case EXIT_REASON_GETSEC:
-    case EXIT_REASON_INVVPID:
         /*
          * We should never exit on GETSEC because CR4.SMXE is always 0 when
          * running in guest context, and the CPU checks that before getting
@@ -2706,8 +2710,11 @@ void vmx_vmenter_helper(void)
 
     if ( !cpu_has_vmx_vpid )
         goto out;
+    if ( nestedhvm_vcpu_in_guestmode(curr) )
+        p_asid = &vcpu_nestedhvm(curr).nv_n2asid;
+    else
+        p_asid = &curr->arch.hvm_vcpu.n1asid;
 
-    p_asid = &curr->arch.hvm_vcpu.n1asid;
     old_asid = p_asid->asid;
     need_flush = hvm_asid_handle_vmenter(p_asid);
     new_asid = p_asid->asid;

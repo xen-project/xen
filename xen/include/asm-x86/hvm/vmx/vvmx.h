@@ -37,6 +37,7 @@ struct nestedvmx {
         uint32_t exit_reason;
         uint32_t exit_qual;
     } ept;
+    uint32_t guest_vpid;
 };
 
 #define vcpu_2_nvmx(v)	(vcpu_nestedhvm(v).u.nvmx)
@@ -192,6 +193,7 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs);
 int nvmx_handle_vmresume(struct cpu_user_regs *regs);
 int nvmx_handle_vmlaunch(struct cpu_user_regs *regs);
 int nvmx_handle_invept(struct cpu_user_regs *regs);
+int nvmx_handle_invvpid(struct cpu_user_regs *regs);
 int nvmx_msr_read_intercept(unsigned int msr,
                                 u64 *msr_content);
 int nvmx_msr_write_intercept(unsigned int msr,
