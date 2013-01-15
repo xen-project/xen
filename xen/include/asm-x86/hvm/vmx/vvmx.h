@@ -123,7 +123,7 @@ int nvmx_handle_vmxoff(struct cpu_user_regs *regs);
 
 int
 nvmx_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
-                     unsigned int *page_order,
+                     unsigned int *page_order, uint8_t *p2m_acc,
                      bool_t access_r, bool_t access_w, bool_t access_x);
 /*
  * Virtual VMCS layout
@@ -208,7 +208,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
 
 int nept_translate_l2ga(struct vcpu *v, paddr_t l2ga,
                         unsigned int *page_order, uint32_t rwx_acc,
-                        unsigned long *l1gfn, uint64_t *exit_qual,
-                        uint32_t *exit_reason);
+                        unsigned long *l1gfn, uint8_t *p2m_acc,
+                        uint64_t *exit_qual, uint32_t *exit_reason);
 #endif /* __ASM_X86_HVM_VVMX_H__ */
 

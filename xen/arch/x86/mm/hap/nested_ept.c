@@ -224,8 +224,8 @@ out:
 
 int nept_translate_l2ga(struct vcpu *v, paddr_t l2ga,
                         unsigned int *page_order, uint32_t rwx_acc,
-                        unsigned long *l1gfn, uint64_t *exit_qual,
-                        uint32_t *exit_reason)
+                        unsigned long *l1gfn, uint8_t *p2m_acc,
+                        uint64_t *exit_qual, uint32_t *exit_reason)
 {
     uint32_t rc, rwx_bits = 0;
     ept_walk_t gw;
@@ -262,6 +262,7 @@ int nept_translate_l2ga(struct vcpu *v, paddr_t l2ga,
         if ( nept_permission_check(rwx_acc, rwx_bits) )
         {
             *l1gfn = gw.lxe[0].mfn;
+            *p2m_acc = (uint8_t)rwx_bits;
             break;
         }
         rc = EPT_TRANSLATE_VIOLATION;

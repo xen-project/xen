@@ -1532,7 +1532,7 @@ int nvmx_msr_write_intercept(unsigned int msr, u64 msr_content)
  */
 int
 nvmx_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
-                     unsigned int *page_order,
+                     unsigned int *page_order, uint8_t *p2m_acc,
                      bool_t access_r, bool_t access_w, bool_t access_x)
 {
     int rc;
@@ -1542,7 +1542,7 @@ nvmx_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
     uint32_t rwx_rights = (access_x << 2) | (access_w << 1) | access_r;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
 
-    rc = nept_translate_l2ga(v, L2_gpa, page_order, rwx_rights, &gfn,
+    rc = nept_translate_l2ga(v, L2_gpa, page_order, rwx_rights, &gfn, p2m_acc,
                              &exit_qual, &exit_reason);
     switch ( rc )
     {

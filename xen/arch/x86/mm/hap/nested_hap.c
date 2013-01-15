@@ -143,13 +143,13 @@ nestedhap_fix_p2m(struct vcpu *v, struct p2m_domain *p2m,
  */
 static int
 nestedhap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
-                      unsigned int *page_order,
+                      unsigned int *page_order, uint8_t *p2m_acc,
                       bool_t access_r, bool_t access_w, bool_t access_x)
 {
     ASSERT(hvm_funcs.nhvm_hap_walk_L1_p2m);
 
     return hvm_funcs.nhvm_hap_walk_L1_p2m(v, L2_gpa, L1_gpa, page_order,
-        access_r, access_w, access_x);
+        p2m_acc, access_r, access_w, access_x);
 }
 
 
@@ -159,16 +159,15 @@ nestedhap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
  */
 static int
 nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa,
-                      p2m_type_t *p2mt,
+                      p2m_type_t *p2mt, p2m_access_t *p2ma,
                       unsigned int *page_order,
                       bool_t access_r, bool_t access_w, bool_t access_x)
 {
     mfn_t mfn;
-    p2m_access_t p2ma;
     int rc;
 
     /* walk L0 P2M table */
-    mfn = get_gfn_type_access(p2m, L1_gpa >> PAGE_SHIFT, p2mt, &p2ma, 
+    mfn = get_gfn_type_access(p2m, L1_gpa >> PAGE_SHIFT, p2mt, p2ma,
                               0, page_order);
 
     rc = NESTEDHVM_PAGEFAULT_MMIO;
@@ -207,12 +206,14 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t *L2_gpa,
     struct p2m_domain *p2m, *nested_p2m;
     unsigned int page_order_21, page_order_10, page_order_20;
     p2m_type_t p2mt_10;
+    p2m_access_t p2ma_10 = p2m_access_rwx;
+    uint8_t p2ma_21 = p2m_access_rwx;
 
     p2m = p2m_get_hostp2m(d); /* L0 p2m */
     nested_p2m = p2m_get_nestedp2m(v, nhvm_vcpu_p2m_base(v));
 
     /* walk the L1 P2M table */
-    rv = nestedhap_walk_L1_p2m(v, *L2_gpa, &L1_gpa, &page_order_21,
+    rv = nestedhap_walk_L1_p2m(v, *L2_gpa, &L1_gpa, &page_order_21, &p2ma_21,
         access_r, access_w, access_x);
 
     /* let caller to handle these two cases */
@@ -230,7 +231,7 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t *L2_gpa,
 
     /* ==> we have to walk L0 P2M */
     rv = nestedhap_walk_L0_p2m(p2m, L1_gpa, &L0_gpa,
-        &p2mt_10, &page_order_10,
+        &p2mt_10, &p2ma_10, &page_order_10,
         access_r, access_w, access_x);
 
     /* let upper level caller to handle these two cases */
@@ -251,10 +252,30 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t *L2_gpa,
 
     page_order_20 = min(page_order_21, page_order_10);
 
+    ASSERT(p2ma_10 <= p2m_access_n2rwx);
+    /*NOTE: if assert fails, needs to handle new access type here */
+
+    switch ( p2ma_10 )
+    {
+    case p2m_access_n ... p2m_access_rwx:
+        break;
+    case p2m_access_rx2rw:
+        p2ma_10 = p2m_access_rx;
+        break;
+    case p2m_access_n2rwx:
+        p2ma_10 = p2m_access_n;
+        break;
+    default:
+        p2ma_10 = p2m_access_n;
+        /* For safety, remove all permissions. */
+        gdprintk(XENLOG_ERR, "Unhandled p2m access type:%d\n", p2ma_10);
+    }
+    /* Use minimal permission for nested p2m. */
+    p2ma_10 &= (p2m_access_t)p2ma_21;
+
     /* fix p2m_get_pagetable(nested_p2m) */
     nestedhap_fix_p2m(v, nested_p2m, *L2_gpa, L0_gpa, page_order_20,
-        p2mt_10,
-        p2m_access_rwx /* FIXME: Should use minimum permission. */);
+        p2mt_10, p2ma_10);
 
     return NESTEDHVM_PAGEFAULT_DONE;
 }

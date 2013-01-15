@@ -187,8 +187,8 @@ struct hvm_function_table {
     /*Walk nested p2m  */
     int (*nhvm_hap_walk_L1_p2m)(struct vcpu *v, paddr_t L2_gpa,
                                 paddr_t *L1_gpa, unsigned int *page_order,
-                                bool_t access_r, bool_t access_w,
-                                bool_t access_x);
+                                uint8_t *p2m_acc, bool_t access_r,
+                                bool_t access_w, bool_t access_x);
 };
 
 extern struct hvm_function_table hvm_funcs;
