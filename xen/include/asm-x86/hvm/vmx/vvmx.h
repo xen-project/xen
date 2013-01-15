@@ -209,6 +209,8 @@ u64 nvmx_get_tsc_offset(struct vcpu *v);
 int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                           unsigned int exit_reason);
 
+uint64_t nept_get_ept_vpid_cap(void);
+
 int nept_translate_l2ga(struct vcpu *v, paddr_t l2ga,
                         unsigned int *page_order, uint32_t rwx_acc,
                         unsigned long *l1gfn, uint8_t *p2m_acc,

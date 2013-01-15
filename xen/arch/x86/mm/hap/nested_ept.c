@@ -43,12 +43,17 @@
 #define EPT_MUST_RSV_BITS (((1ull << PADDR_BITS) - 1) & \
                            ~((1ull << paddr_bits) - 1))
 
-/*
- *TODO: Just leave it as 0 here for compile pass, will
- * define real capabilities in the subsequent patches.
- */
-#define NEPT_VPID_CAP_BITS 0
+#define NEPT_CAP_BITS       \
+        (VMX_EPT_INVEPT_ALL_CONTEXT | VMX_EPT_INVEPT_SINGLE_CONTEXT | \
+         VMX_EPT_INVEPT_INSTRUCTION | VMX_EPT_SUPERPAGE_1GB |         \
+         VMX_EPT_SUPERPAGE_2MB | VMX_EPT_MEMORY_TYPE_WB |             \
+         VMX_EPT_MEMORY_TYPE_UC | VMX_EPT_WALK_LENGTH_4_SUPPORTED |   \
+         VMX_EPT_EXEC_ONLY_SUPPORTED)
 
+#define NVPID_CAP_BITS \
+        (VMX_VPID_INVVPID_INSTRUCTION | VMX_VPID_INVVPID_INDIVIDUAL_ADDR | \
+         VMX_VPID_INVVPID_SINGLE_CONTEXT | VMX_VPID_INVVPID_ALL_CONTEXT |  \
+         VMX_VPID_INVVPID_SINGLE_CONTEXT_RETAINING_GLOBAL)
 
 #define NEPT_1G_ENTRY_FLAG (1 << 11)
 #define NEPT_2M_ENTRY_FLAG (1 << 10)
@@ -111,10 +116,15 @@ static bool_t nept_non_present_check(ept_entry_t e)
 
 uint64_t nept_get_ept_vpid_cap(void)
 {
-    uint64_t caps = NEPT_VPID_CAP_BITS;
+    uint64_t caps = 0;
 
+    if ( cpu_has_vmx_ept )
+        caps |= NEPT_CAP_BITS;
     if ( !cpu_has_vmx_ept_exec_only_supported )
         caps &= ~VMX_EPT_EXEC_ONLY_SUPPORTED;
+    if ( cpu_has_vmx_vpid )
+        caps |= NVPID_CAP_BITS;
+
     return caps;
 }
 

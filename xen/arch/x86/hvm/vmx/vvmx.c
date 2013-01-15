@@ -1513,6 +1513,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         break;
     case MSR_IA32_VMX_PROCBASED_CTLS:
     case MSR_IA32_VMX_TRUE_PROCBASED_CTLS:
+    {
+        u32 default1_bits = VMX_PROCBASED_CTLS_DEFAULT1;
         /* 1-seetings */
         data = CPU_BASED_HLT_EXITING |
                CPU_BASED_VIRTUAL_INTR_PENDING |
@@ -1535,12 +1537,21 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
                CPU_BASED_RDPMC_EXITING |
                CPU_BASED_TPR_SHADOW |
                CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
-        data = gen_vmx_msr(data, VMX_PROCBASED_CTLS_DEFAULT1, host_data);
+
+        if ( msr == MSR_IA32_VMX_TRUE_PROCBASED_CTLS )
+            default1_bits &= ~(CPU_BASED_CR3_LOAD_EXITING |
+                               CPU_BASED_CR3_STORE_EXITING |
+                               CPU_BASED_INVLPG_EXITING);
+
+        data = gen_vmx_msr(data, default1_bits, host_data);
         break;
+    }
     case MSR_IA32_VMX_PROCBASED_CTLS2:
         /* 1-seetings */
         data = SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING |
-               SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
+               SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
+               SECONDARY_EXEC_ENABLE_VPID |
+               SECONDARY_EXEC_ENABLE_EPT;
         data = gen_vmx_msr(data, 0, host_data);
         break;
     case MSR_IA32_VMX_EXIT_CTLS:
@@ -1593,6 +1604,9 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
     case MSR_IA32_VMX_MISC:
         /* Do not support CR3-target feature now */
         data = host_data & ~VMX_MISC_CR3_TARGET;
+        break;
+    case MSR_IA32_VMX_EPT_VPID_CAP:
+        data = nept_get_ept_vpid_cap();
         break;
     default:
         r = 0;
