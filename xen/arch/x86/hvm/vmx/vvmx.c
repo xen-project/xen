@@ -1393,6 +1393,40 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 }
 
+int nvmx_handle_invept(struct cpu_user_regs *regs)
+{
+    struct vmx_inst_decoded decode;
+    unsigned long eptp;
+    int ret;
+
+    if ( (ret = decode_vmx_inst(regs, &decode, &eptp, 0)) != X86EMUL_OKAY )
+        return ret;
+
+    switch ( reg_read(regs, decode.reg2) )
+    {
+    case INVEPT_SINGLE_CONTEXT:
+    {
+        struct p2m_domain *p2m = vcpu_nestedhvm(current).nv_p2m;
+        if ( p2m )
+        {
+            p2m_flush(current, p2m);
+            ept_sync_domain(p2m);
+        }
+        break;
+    }
+    case INVEPT_ALL_CONTEXT:
+        p2m_flush_nestedp2m(current->domain);
+        __invept(INVEPT_ALL_CONTEXT, 0, 0);
+        break;
+    default:
+        vmreturn(regs, VMFAIL_INVALID);
+        return X86EMUL_OKAY;
+    }
+    vmreturn(regs, VMSUCCEED);
+    return X86EMUL_OKAY;
+}
+
+
 #define __emul_value(enable1, default1) \
     ((enable1 | default1) << 32 | (default1))
 
