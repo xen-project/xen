@@ -291,9 +291,11 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
     int need_modify_vtd_table = 1;
     int vtd_pte_present = 0;
     int needs_sync = 1;
-    struct domain *d = p2m->domain;
     ept_entry_t old_entry = { .epte = 0 };
+    struct ept_data *ept = &p2m->ept;
+    struct domain *d = p2m->domain;
 
+    ASSERT(ept);
     /*
      * the caller must make sure:
      * 1. passing valid gfn and mfn at order boundary.
@@ -301,17 +303,17 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
      * 3. passing a valid order.
      */
     if ( ((gfn | mfn_x(mfn)) & ((1UL << order) - 1)) ||
-         ((u64)gfn >> ((ept_get_wl(d) + 1) * EPT_TABLE_ORDER)) ||
+         ((u64)gfn >> ((ept_get_wl(ept) + 1) * EPT_TABLE_ORDER)) ||
          (order % EPT_TABLE_ORDER) )
         return 0;
 
-    ASSERT((target == 2 && hvm_hap_has_1gb(d)) ||
-           (target == 1 && hvm_hap_has_2mb(d)) ||
+    ASSERT((target == 2 && hvm_hap_has_1gb()) ||
+           (target == 1 && hvm_hap_has_2mb()) ||
            (target == 0));
 
-    table = map_domain_page(ept_get_asr(d));
+    table = map_domain_page(pagetable_get_pfn(p2m_get_pagetable(p2m)));
 
-    for ( i = ept_get_wl(d); i > target; i-- )
+    for ( i = ept_get_wl(ept); i > target; i-- )
     {
         ret = ept_next_level(p2m, 0, &table, &gfn_remainder, i);
         if ( !ret )
@@ -439,9 +441,11 @@ out:
     unmap_domain_page(table);
 
     if ( needs_sync )
-        ept_sync_domain(p2m->domain);
+        ept_sync_domain(p2m);
 
-    if ( rv && iommu_enabled && need_iommu(p2m->domain) && need_modify_vtd_table )
+    /* For non-nested p2m, may need to change VT-d page table.*/
+    if ( rv && !p2m_is_nestedp2m(p2m) && iommu_enabled &&
+         need_iommu(p2m->domain) && need_modify_vtd_table )
     {
         if ( iommu_hap_pt_share )
             iommu_pte_flush(d, gfn, (u64*)ept_entry, order, vtd_pte_present);
@@ -488,14 +492,14 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
                            unsigned long gfn, p2m_type_t *t, p2m_access_t* a,
                            p2m_query_t q, unsigned int *page_order)
 {
-    struct domain *d = p2m->domain;
-    ept_entry_t *table = map_domain_page(ept_get_asr(d));
+    ept_entry_t *table = map_domain_page(pagetable_get_pfn(p2m_get_pagetable(p2m)));
     unsigned long gfn_remainder = gfn;
     ept_entry_t *ept_entry;
     u32 index;
     int i;
     int ret = 0;
     mfn_t mfn = _mfn(INVALID_MFN);
+    struct ept_data *ept = &p2m->ept;
 
     *t = p2m_mmio_dm;
     *a = p2m_access_n;
@@ -506,7 +510,7 @@ static mfn_t ept_get_entry(struct p2m_domain *p2m,
 
     /* Should check if gfn obeys GAW here. */
 
-    for ( i = ept_get_wl(d); i > 0; i-- )
+    for ( i = ept_get_wl(ept); i > 0; i-- )
     {
     retry:
         ret = ept_next_level(p2m, 1, &table, &gfn_remainder, i);
@@ -588,19 +592,20 @@ out:
 static ept_entry_t ept_get_entry_content(struct p2m_domain *p2m,
     unsigned long gfn, int *level)
 {
-    ept_entry_t *table = map_domain_page(ept_get_asr(p2m->domain));
+    ept_entry_t *table = map_domain_page(pagetable_get_pfn(p2m_get_pagetable(p2m)));
     unsigned long gfn_remainder = gfn;
     ept_entry_t *ept_entry;
     ept_entry_t content = { .epte = 0 };
     u32 index;
     int i;
     int ret=0;
+    struct ept_data *ept = &p2m->ept;
 
     /* This pfn is higher than the highest the p2m map currently holds */
     if ( gfn > p2m->max_mapped_pfn )
         goto out;
 
-    for ( i = ept_get_wl(p2m->domain); i > 0; i-- )
+    for ( i = ept_get_wl(ept); i > 0; i-- )
     {
         ret = ept_next_level(p2m, 1, &table, &gfn_remainder, i);
         if ( !ret || ret == GUEST_TABLE_POD_PAGE )
@@ -622,7 +627,8 @@ static ept_entry_t ept_get_entry_content(struct p2m_domain *p2m,
 void ept_walk_table(struct domain *d, unsigned long gfn)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    ept_entry_t *table = map_domain_page(ept_get_asr(d));
+    struct ept_data *ept = &p2m->ept;
+    ept_entry_t *table = map_domain_page(pagetable_get_pfn(p2m_get_pagetable(p2m)));
     unsigned long gfn_remainder = gfn;
 
     int i;
@@ -638,7 +644,7 @@ void ept_walk_table(struct domain *d, unsigned long gfn)
         goto out;
     }
 
-    for ( i = ept_get_wl(d); i >= 0; i-- )
+    for ( i = ept_get_wl(ept); i >= 0; i-- )
     {
         ept_entry_t *ept_entry, *next;
         u32 index;
@@ -778,24 +784,76 @@ static void ept_change_entry_type_page(mfn_t ept_page_mfn, int ept_page_level,
 static void ept_change_entry_type_global(struct p2m_domain *p2m,
                                          p2m_type_t ot, p2m_type_t nt)
 {
-    struct domain *d = p2m->domain;
-    if ( ept_get_asr(d) == 0 )
+    struct ept_data *ept = &p2m->ept;
+    if ( ept_get_asr(ept) == 0 )
         return;
 
     BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
     BUG_ON(ot != nt && (ot == p2m_mmio_direct || nt == p2m_mmio_direct));
 
-    ept_change_entry_type_page(_mfn(ept_get_asr(d)), ept_get_wl(d), ot, nt);
+    ept_change_entry_type_page(_mfn(ept_get_asr(ept)),
+                               ept_get_wl(ept), ot, nt);
 
-    ept_sync_domain(d);
+    ept_sync_domain(p2m);
 }
 
-void ept_p2m_init(struct p2m_domain *p2m)
+static void __ept_sync_domain(void *info)
 {
+    struct ept_data *ept = &((struct p2m_domain *)info)->ept;
+
+    __invept(INVEPT_SINGLE_CONTEXT, ept_get_eptp(ept), 0);
+}
+
+void ept_sync_domain(struct p2m_domain *p2m)
+{
+    struct domain *d = p2m->domain;
+    struct ept_data *ept = &p2m->ept;
+    /* Only if using EPT and this domain has some VCPUs to dirty. */
+    if ( !paging_mode_hap(d) || !d->vcpu || !d->vcpu[0] )
+        return;
+
+    ASSERT(local_irq_is_enabled());
+
+    /*
+     * Flush active cpus synchronously. Flush others the next time this domain
+     * is scheduled onto them. We accept the race of other CPUs adding to
+     * the ept_synced mask before on_selected_cpus() reads it, resulting in
+     * unnecessary extra flushes, to avoid allocating a cpumask_t on the stack.
+     */
+    cpumask_and(ept_get_synced_mask(ept),
+                d->domain_dirty_cpumask, &cpu_online_map);
+
+    on_selected_cpus(ept_get_synced_mask(ept),
+                     __ept_sync_domain, p2m, 1);
+}
+
+int ept_p2m_init(struct p2m_domain *p2m)
+{
+    struct ept_data *ept = &p2m->ept;
+
     p2m->set_entry = ept_set_entry;
     p2m->get_entry = ept_get_entry;
     p2m->change_entry_type_global = ept_change_entry_type_global;
     p2m->audit_p2m = NULL;
+
+    /* Set the memory type used when accessing EPT paging structures. */
+    ept->ept_mt = EPT_DEFAULT_MT;
+
+    /* set EPT page-walk length, now it's actual walk length - 1, i.e. 3 */
+    ept->ept_wl = 3;
+
+    if ( !zalloc_cpumask_var(&ept->synced_mask) )
+        return -ENOMEM;
+
+    on_each_cpu(__ept_sync_domain, p2m, 1);
+
+    return 0;
+}
+
+void ept_p2m_uninit(struct p2m_domain *p2m)
+{
+    struct ept_data *ept = &p2m->ept;
+    free_cpumask_var(ept->synced_mask);
 }
 
 static void ept_dump_p2m_table(unsigned char key)
@@ -811,6 +869,7 @@ static void ept_dump_p2m_table(unsigned char key)
     unsigned long gfn, gfn_remainder;
     unsigned long record_counter = 0;
     struct p2m_domain *p2m;
+    struct ept_data *ept;
 
     for_each_domain(d)
     {
@@ -818,15 +877,16 @@ static void ept_dump_p2m_table(unsigned char key)
             continue;
 
         p2m = p2m_get_hostp2m(d);
+        ept = &p2m->ept;
         printk("\ndomain%d EPT p2m table: \n", d->domain_id);
 
         for ( gfn = 0; gfn <= p2m->max_mapped_pfn; gfn += (1 << order) )
         {
             gfn_remainder = gfn;
             mfn = _mfn(INVALID_MFN);
-            table = map_domain_page(ept_get_asr(d));
+            table = map_domain_page(pagetable_get_pfn(p2m_get_pagetable(p2m)));
 
-            for ( i = ept_get_wl(d); i > 0; i-- )
+            for ( i = ept_get_wl(ept); i > 0; i-- )
             {
                 ret = ept_next_level(p2m, 1, &table, &gfn_remainder, i);
                 if ( ret != GUEST_TABLE_NORMAL_PAGE )

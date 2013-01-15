@@ -74,38 +74,19 @@ static void vmx_fpu_dirty_intercept(void);
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
 static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content);
 static void vmx_invlpg_intercept(unsigned long vaddr);
-static void __ept_sync_domain(void *info);
 
 static int vmx_domain_initialise(struct domain *d)
 {
     int rc;
 
-    /* Set the memory type used when accessing EPT paging structures. */
-    d->arch.hvm_domain.vmx.ept_control.ept_mt = EPT_DEFAULT_MT;
-
-    /* set EPT page-walk length, now it's actual walk length - 1, i.e. 3 */
-    d->arch.hvm_domain.vmx.ept_control.ept_wl = 3;
-
-    d->arch.hvm_domain.vmx.ept_control.asr  =
-        pagetable_get_pfn(p2m_get_pagetable(p2m_get_hostp2m(d)));
-
-    if ( !zalloc_cpumask_var(&d->arch.hvm_domain.vmx.ept_synced) )
-        return -ENOMEM;
-
     if ( (rc = vmx_alloc_vlapic_mapping(d)) != 0 )
-    {
-        free_cpumask_var(d->arch.hvm_domain.vmx.ept_synced);
         return rc;
-    }
 
     return 0;
 }
 
 static void vmx_domain_destroy(struct domain *d)
 {
-    if ( paging_mode_hap(d) )
-        on_each_cpu(__ept_sync_domain, d, 1);
-    free_cpumask_var(d->arch.hvm_domain.vmx.ept_synced);
     vmx_free_vlapic_mapping(d);
 }
 
@@ -641,6 +622,7 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
 {
     struct domain *d = v->domain;
     unsigned long old_cr4 = read_cr4(), new_cr4 = mmu_cr4_features;
+    struct ept_data *ept_data = &p2m_get_hostp2m(d)->ept;
 
     /* HOST_CR4 in VMCS is always mmu_cr4_features. Sync CR4 now. */
     if ( old_cr4 != new_cr4 )
@@ -650,10 +632,10 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
     {
         unsigned int cpu = smp_processor_id();
         /* Test-and-test-and-set this CPU in the EPT-is-synced mask. */
-        if ( !cpumask_test_cpu(cpu, d->arch.hvm_domain.vmx.ept_synced) &&
+        if ( !cpumask_test_cpu(cpu, ept_get_synced_mask(ept_data)) &&
              !cpumask_test_and_set_cpu(cpu,
-                                       d->arch.hvm_domain.vmx.ept_synced) )
-            __invept(INVEPT_SINGLE_CONTEXT, ept_get_eptp(d), 0);
+                                       ept_get_synced_mask(ept_data)) )
+            __invept(INVEPT_SINGLE_CONTEXT, ept_get_eptp(ept_data), 0);
     }
 
     vmx_restore_guest_msrs(v);
@@ -1214,33 +1196,6 @@ static void vmx_update_guest_efer(struct vcpu *v)
     if ( v == current )
         write_efer((read_efer() & ~EFER_SCE) |
                    (v->arch.hvm_vcpu.guest_efer & EFER_SCE));
-}
-
-static void __ept_sync_domain(void *info)
-{
-    struct domain *d = info;
-    __invept(INVEPT_SINGLE_CONTEXT, ept_get_eptp(d), 0);
-}
-
-void ept_sync_domain(struct domain *d)
-{
-    /* Only if using EPT and this domain has some VCPUs to dirty. */
-    if ( !paging_mode_hap(d) || !d->vcpu || !d->vcpu[0] )
-        return;
-
-    ASSERT(local_irq_is_enabled());
-
-    /*
-     * Flush active cpus synchronously. Flush others the next time this domain
-     * is scheduled onto them. We accept the race of other CPUs adding to
-     * the ept_synced mask before on_selected_cpus() reads it, resulting in
-     * unnecessary extra flushes, to avoid allocating a cpumask_t on the stack.
-     */
-    cpumask_and(d->arch.hvm_domain.vmx.ept_synced,
-                d->domain_dirty_cpumask, &cpu_online_map);
-
-    on_selected_cpus(d->arch.hvm_domain.vmx.ept_synced,
-                     __ept_sync_domain, d, 1);
 }
 
 void nvmx_enqueue_n2_exceptions(struct vcpu *v, 

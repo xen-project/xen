@@ -942,7 +942,13 @@ static int construct_vmcs(struct vcpu *v)
     }
 
     if ( paging_mode_hap(d) )
-        __vmwrite(EPT_POINTER, d->arch.hvm_domain.vmx.ept_control.eptp);
+    {
+        struct p2m_domain *p2m = p2m_get_hostp2m(d);
+        struct ept_data *ept = &p2m->ept;
+
+        ept->asr  = pagetable_get_pfn(p2m_get_pagetable(p2m));
+        __vmwrite(EPT_POINTER, ept_get_eptp(ept));
+    }
 
     if ( cpu_has_vmx_pat && paging_mode_hap(d) )
     {

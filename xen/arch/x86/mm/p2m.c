@@ -57,8 +57,10 @@ boolean_param("hap_2mb", opt_hap_2mb);
 
 
 /* Init the datastructures for later use by the p2m code */
-static void p2m_initialise(struct domain *d, struct p2m_domain *p2m)
+static int p2m_initialise(struct domain *d, struct p2m_domain *p2m)
 {
+    int ret = 0;
+
     mm_rwlock_init(&p2m->lock);
     mm_lock_init(&p2m->pod.lock);
     INIT_LIST_HEAD(&p2m->np2m_list);
@@ -72,27 +74,82 @@ static void p2m_initialise(struct domain *d, struct p2m_domain *p2m)
     p2m->np2m_base = P2M_BASE_EADDR;
 
     if ( hap_enabled(d) && cpu_has_vmx )
-        ept_p2m_init(p2m);
+        ret = ept_p2m_init(p2m);
     else
         p2m_pt_init(p2m);
 
-    return;
+    return ret;
 }
 
-static int
-p2m_init_nestedp2m(struct domain *d)
+static struct p2m_domain *p2m_init_one(struct domain *d)
+{
+    struct p2m_domain *p2m = xzalloc(struct p2m_domain);
+
+    if ( !p2m )
+        return NULL;
+
+    if ( !zalloc_cpumask_var(&p2m->dirty_cpumask) )
+        goto free_p2m;
+
+    if ( p2m_initialise(d, p2m) )
+        goto free_cpumask;
+    return p2m;
+
+free_cpumask:
+    free_cpumask_var(p2m->dirty_cpumask);
+free_p2m:
+    xfree(p2m);
+    return NULL;
+}
+
+static void p2m_free_one(struct p2m_domain *p2m)
+{
+    if ( hap_enabled(p2m->domain) && cpu_has_vmx )
+        ept_p2m_uninit(p2m);
+    free_cpumask_var(p2m->dirty_cpumask);
+    xfree(p2m);
+}
+
+static int p2m_init_hostp2m(struct domain *d)
+{
+    struct p2m_domain *p2m = p2m_init_one(d);
+
+    if ( p2m )
+    {
+        d->arch.p2m = p2m;
+        return 0;
+    }
+    return -ENOMEM;
+}
+
+static void p2m_teardown_hostp2m(struct domain *d)
+{
+    /* Iterate over all p2m tables per domain */
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+
+    if ( p2m )
+    {
+        p2m_free_one(p2m);
+        d->arch.p2m = NULL;
+    }
+}
+
+static void p2m_teardown_nestedp2m(struct domain *d);
+
+static int p2m_init_nestedp2m(struct domain *d)
 {
     uint8_t i;
     struct p2m_domain *p2m;
 
     mm_lock_init(&d->arch.nested_p2m_lock);
-    for (i = 0; i < MAX_NESTEDP2M; i++) {
-        d->arch.nested_p2m[i] = p2m = xzalloc(struct p2m_domain);
-        if (p2m == NULL)
+    for (i = 0; i < MAX_NESTEDP2M; i++)
+    {
+        d->arch.nested_p2m[i] = p2m = p2m_init_one(d);
+        if ( p2m == NULL )
+        {
+            p2m_teardown_nestedp2m(d);
             return -ENOMEM;
-        if ( !zalloc_cpumask_var(&p2m->dirty_cpumask) )
-            return -ENOMEM;
-        p2m_initialise(d, p2m);
+        }
         p2m->write_p2m_entry = nestedp2m_write_p2m_entry;
         list_add(&p2m->np2m_list, &p2m_get_hostp2m(d)->np2m_list);
     }
@@ -100,27 +157,37 @@ p2m_init_nestedp2m(struct domain *d)
     return 0;
 }
 
+static void p2m_teardown_nestedp2m(struct domain *d)
+{
+    uint8_t i;
+    struct p2m_domain *p2m;
+
+    for (i = 0; i < MAX_NESTEDP2M; i++)
+    {
+        if ( !d->arch.nested_p2m[i] )
+            continue;
+        p2m = d->arch.nested_p2m[i];
+        list_del(&p2m->np2m_list);
+        p2m_free_one(p2m);
+        d->arch.nested_p2m[i] = NULL;
+    }
+}
+
 int p2m_init(struct domain *d)
 {
-    struct p2m_domain *p2m;
     int rc;
 
-    p2m_get_hostp2m(d) = p2m = xzalloc(struct p2m_domain);
-    if ( p2m == NULL )
-        return -ENOMEM;
-    if ( !zalloc_cpumask_var(&p2m->dirty_cpumask) )
-    {
-        xfree(p2m);
-        return -ENOMEM;
-    }
-    p2m_initialise(d, p2m);
+    rc = p2m_init_hostp2m(d);
+    if ( rc )
+        return rc;
 
     /* Must initialise nestedp2m unconditionally
      * since nestedhvm_enabled(d) returns false here.
      * (p2m_init runs too early for HVM_PARAM_* options) */
     rc = p2m_init_nestedp2m(d);
-    if ( rc ) 
-        p2m_final_teardown(d);
+    if ( rc )
+        p2m_teardown_hostp2m(d);
+
     return rc;
 }
 
@@ -421,28 +488,12 @@ void p2m_teardown(struct p2m_domain *p2m)
     p2m_unlock(p2m);
 }
 
-static void p2m_teardown_nestedp2m(struct domain *d)
-{
-    uint8_t i;
-
-    for (i = 0; i < MAX_NESTEDP2M; i++) {
-        if ( !d->arch.nested_p2m[i] )
-            continue;
-        free_cpumask_var(d->arch.nested_p2m[i]->dirty_cpumask);
-        xfree(d->arch.nested_p2m[i]);
-        d->arch.nested_p2m[i] = NULL;
-    }
-}
-
 void p2m_final_teardown(struct domain *d)
 {
     /* Iterate over all p2m tables per domain */
-    if ( d->arch.p2m )
-    {
-        free_cpumask_var(d->arch.p2m->dirty_cpumask);
-        xfree(d->arch.p2m);
-        d->arch.p2m = NULL;
-    }
+    struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    if ( p2m )
+        p2m_teardown_hostp2m(d);
 
     /* We must teardown unconditionally because
      * we initialise them unconditionally.

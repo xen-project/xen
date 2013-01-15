@@ -277,6 +277,10 @@ struct p2m_domain {
         mm_lock_t        lock;         /* Locking of private pod structs,   *
                                         * not relying on the p2m lock.      */
     } pod;
+    union {
+        struct ept_data ept;
+        /* NPT-equivalent structure could be added here. */
+    };
 };
 
 /* get host p2m table */

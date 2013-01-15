@@ -363,7 +363,7 @@ static inline void ept_sync_all(void)
     __invept(INVEPT_ALL_CONTEXT, 0, 0);
 }
 
-void ept_sync_domain(struct domain *d);
+void ept_sync_domain(struct p2m_domain *p2m);
 
 static inline void vpid_sync_vcpu_gva(struct vcpu *v, unsigned long gva)
 {
@@ -425,11 +425,17 @@ void vmx_get_segment_register(struct vcpu *, enum x86_segment,
 void vmx_inject_extint(int trap);
 void vmx_inject_nmi(void);
 
-void ept_p2m_init(struct p2m_domain *p2m);
+int ept_p2m_init(struct p2m_domain *p2m);
+void ept_p2m_uninit(struct p2m_domain *p2m);
+
 void ept_walk_table(struct domain *d, unsigned long gfn);
 void setup_ept_dump(void);
 
 void update_guest_eip(void);
+
+int alloc_p2m_hap_data(struct p2m_domain *p2m);
+void free_p2m_hap_data(struct p2m_domain *p2m);
+void p2m_init_hap_data(struct p2m_domain *p2m);
 
 /* EPT violation qualifications definitions */
 #define _EPT_READ_VIOLATION         0

@@ -56,26 +56,27 @@ struct vmx_msr_state {
 
 #define EPT_DEFAULT_MT      MTRR_TYPE_WRBACK
 
-struct vmx_domain {
-    unsigned long apic_access_mfn;
+struct ept_data {
     union {
-        struct {
+    struct {
             u64 ept_mt :3,
                 ept_wl :3,
                 rsvd   :6,
                 asr    :52;
         };
         u64 eptp;
-    } ept_control;
-    cpumask_var_t ept_synced;
+    };
+    cpumask_var_t synced_mask;
 };
 
-#define ept_get_wl(d)   \
-    ((d)->arch.hvm_domain.vmx.ept_control.ept_wl)
-#define ept_get_asr(d)  \
-    ((d)->arch.hvm_domain.vmx.ept_control.asr)
-#define ept_get_eptp(d) \
-    ((d)->arch.hvm_domain.vmx.ept_control.eptp)
+struct vmx_domain {
+    unsigned long apic_access_mfn;
+};
+
+#define ept_get_wl(ept)   ((ept)->ept_wl)
+#define ept_get_asr(ept)  ((ept)->asr)
+#define ept_get_eptp(ept) ((ept)->eptp)
+#define ept_get_synced_mask(ept) ((ept)->synced_mask)
 
 struct arch_vmx_struct {
     /* Virtual address of VMCS. */
