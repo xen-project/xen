@@ -194,6 +194,7 @@ extern u32 vmx_secondary_exec_control;
 
 extern bool_t cpu_has_vmx_ins_outs_instr_info;
 
+#define VMX_EPT_EXEC_ONLY_SUPPORTED             0x00000001
 #define VMX_EPT_WALK_LENGTH_4_SUPPORTED         0x00000040
 #define VMX_EPT_MEMORY_TYPE_UC                  0x00000100
 #define VMX_EPT_MEMORY_TYPE_WB                  0x00004000

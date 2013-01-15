@@ -88,18 +88,15 @@ static uint32_t set_ad_bits(void *guest_p, void *walk_p, int set_dirty)
 
 /* If the map is non-NULL, we leave this function having 
  * acquired an extra ref on mfn_to_page(*mfn) */
-static inline void *map_domain_gfn(struct p2m_domain *p2m,
-                                   gfn_t gfn, 
-                                   mfn_t *mfn,
-                                   p2m_type_t *p2mt,
-                                   uint32_t *rc) 
+void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
+                     p2m_type_t *p2mt, p2m_query_t q, uint32_t *rc)
 {
     struct page_info *page;
     void *map;
 
     /* Translate the gfn, unsharing if shared */
     page = get_page_from_gfn_p2m(p2m->domain, p2m, gfn_x(gfn), p2mt, NULL,
-                                  P2M_ALLOC | P2M_UNSHARE);
+                                 q);
     if ( p2m_is_paging(*p2mt) )
     {
         ASSERT(!p2m_is_nestedp2m(p2m));
@@ -149,6 +146,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     uint32_t gflags, mflags, iflags, rc = 0;
     int smep;
     bool_t pse1G = 0, pse2M = 0;
+    p2m_query_t qt = P2M_ALLOC | P2M_UNSHARE;
 
     perfc_incr(guest_walk);
     memset(gw, 0, sizeof(*gw));
@@ -188,7 +186,8 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
     l3p = map_domain_gfn(p2m, 
                          guest_l4e_get_gfn(gw->l4e), 
                          &gw->l3mfn,
-                         &p2mt, 
+                         &p2mt,
+                         qt,
                          &rc); 
     if(l3p == NULL)
         goto out;
@@ -249,6 +248,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
                          guest_l3e_get_gfn(gw->l3e), 
                          &gw->l2mfn,
                          &p2mt, 
+                         qt,
                          &rc); 
     if(l2p == NULL)
         goto out;
@@ -322,6 +322,7 @@ guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m,
                              guest_l2e_get_gfn(gw->l2e), 
                              &gw->l1mfn,
                              &p2mt,
+                             qt,
                              &rc);
         if(l1p == NULL)
             goto out;

@@ -218,7 +218,7 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t *L2_gpa,
     /* let caller to handle these two cases */
     switch (rv) {
     case NESTEDHVM_PAGEFAULT_INJECT:
-        return rv;
+    case NESTEDHVM_PAGEFAULT_RETRY:
     case NESTEDHVM_PAGEFAULT_L1_ERROR:
         return rv;
     case NESTEDHVM_PAGEFAULT_DONE:

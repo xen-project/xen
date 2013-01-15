@@ -51,6 +51,22 @@ typedef union {
     u64 epte;
 } ept_entry_t;
 
+typedef struct {
+    /*use lxe[0] to save result */
+    ept_entry_t lxe[5];
+} ept_walk_t;
+
+typedef enum {
+    ept_access_n     = 0, /* No access permissions allowed */
+    ept_access_r     = 1, /* Read only */
+    ept_access_w     = 2, /* Write only */
+    ept_access_rw    = 3, /* Read & Write */
+    ept_access_x     = 4, /* Exec Only */
+    ept_access_rx    = 5, /* Read & Exec */
+    ept_access_wx    = 6, /* Write & Exec*/
+    ept_access_all   = 7, /* Full permissions */
+} ept_access_t;
+
 #define EPT_TABLE_ORDER         9
 #define EPTE_SUPER_PAGE_MASK    0x80
 #define EPTE_MFN_MASK           0xffffffffff000ULL
@@ -60,6 +76,17 @@ typedef union {
 #define EPTE_AVAIL1_SHIFT       8
 #define EPTE_EMT_SHIFT          3
 #define EPTE_IGMT_SHIFT         6
+#define EPTE_RWX_MASK           0x7
+#define EPTE_FLAG_MASK          0x7f
+
+#define EPT_EMT_UC              0
+#define EPT_EMT_WC              1
+#define EPT_EMT_RSV0            2
+#define EPT_EMT_RSV1            3
+#define EPT_EMT_WT              4
+#define EPT_EMT_WP              5
+#define EPT_EMT_WB              6
+#define EPT_EMT_RSV2            7
 
 void vmx_asm_vmexit_handler(struct cpu_user_regs);
 void vmx_asm_do_vmentry(void);
@@ -190,6 +217,9 @@ void vmx_update_secondary_exec_control(struct vcpu *v);
 #define MODRM_EAX_ECX   ".byte 0xc1\n" /* EAX, ECX */
 
 extern u64 vmx_ept_vpid_cap;
+
+#define cpu_has_vmx_ept_exec_only_supported        \
+    (vmx_ept_vpid_cap & VMX_EPT_EXEC_ONLY_SUPPORTED)
 
 #define cpu_has_vmx_ept_wl4_supported           \
     (vmx_ept_vpid_cap & VMX_EPT_WALK_LENGTH_4_SUPPORTED)
@@ -419,6 +449,7 @@ void update_guest_eip(void);
 #define _EPT_GLA_FAULT              8
 #define EPT_GLA_FAULT               (1UL<<_EPT_GLA_FAULT)
 
+#define EPT_L4_PAGETABLE_SHIFT      39
 #define EPT_PAGETABLE_ENTRIES       512
 
 #endif /* __ASM_X86_HVM_VMX_VMX_H__ */

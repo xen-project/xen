@@ -315,6 +315,10 @@ guest_walk_to_page_order(walk_t *gw)
 #define GPT_RENAME2(_n, _l) _n ## _ ## _l ## _levels
 #define GPT_RENAME(_n, _l) GPT_RENAME2(_n, _l)
 #define guest_walk_tables GPT_RENAME(guest_walk_tables, GUEST_PAGING_LEVELS)
+#define map_domain_gfn GPT_RENAME(map_domain_gfn, GUEST_PAGING_LEVELS)
+
+void *map_domain_gfn(struct p2m_domain *p2m, gfn_t gfn, mfn_t *mfn,
+                     p2m_type_t *p2mt, p2m_query_t q, uint32_t *rc);
 
 extern uint32_t 
 guest_walk_tables(struct vcpu *v, struct p2m_domain *p2m, unsigned long va,

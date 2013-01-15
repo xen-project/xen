@@ -32,6 +32,10 @@ struct nestedvmx {
         unsigned long intr_info;
         u32           error_code;
     } intr;
+    struct {
+        uint32_t exit_reason;
+        uint32_t exit_qual;
+    } ept_exit;
 };
 
 #define vcpu_2_nvmx(v)	(vcpu_nestedhvm(v).u.nvmx)
@@ -108,6 +112,11 @@ void nvmx_domain_relinquish_resources(struct domain *d);
 
 int nvmx_handle_vmxon(struct cpu_user_regs *regs);
 int nvmx_handle_vmxoff(struct cpu_user_regs *regs);
+
+#define EPT_TRANSLATE_SUCCEED       0
+#define EPT_TRANSLATE_VIOLATION     1
+#define EPT_TRANSLATE_MISCONFIG     2
+#define EPT_TRANSLATE_RETRY         3
 
 int
 nvmx_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
@@ -192,5 +201,9 @@ u64 nvmx_get_tsc_offset(struct vcpu *v);
 int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                           unsigned int exit_reason);
 
+int nept_translate_l2ga(struct vcpu *v, paddr_t l2ga,
+                        unsigned int *page_order, uint32_t rwx_acc,
+                        unsigned long *l1gfn, uint64_t *exit_qual,
+                        uint32_t *exit_reason);
 #endif /* __ASM_X86_HVM_VVMX_H__ */
 

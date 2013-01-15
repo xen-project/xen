@@ -1326,6 +1326,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
                                              access_r, access_w, access_x);
         switch (rv) {
         case NESTEDHVM_PAGEFAULT_DONE:
+        case NESTEDHVM_PAGEFAULT_RETRY:
             return 1;
         case NESTEDHVM_PAGEFAULT_L1_ERROR:
             /* An error occured while translating gpa from

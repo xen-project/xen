@@ -943,9 +943,18 @@ static void sync_vvmcs_ro(struct vcpu *v)
 {
     int i;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    void *vvmcs = nvcpu->nv_vvmcx;
 
     for ( i = 0; i < ARRAY_SIZE(vmcs_ro_field); i++ )
         shadow_to_vvmcs(nvcpu->nv_vvmcx, vmcs_ro_field[i]);
+
+    /* Adjust exit_reason/exit_qualifciation for violation case */
+    if ( __get_vvmcs(vvmcs, VM_EXIT_REASON) == EXIT_REASON_EPT_VIOLATION )
+    {
+        __set_vvmcs(vvmcs, EXIT_QUALIFICATION, nvmx->ept_exit.exit_qual);
+        __set_vvmcs(vvmcs, VM_EXIT_REASON, nvmx->ept_exit.exit_reason);
+    }
 }
 
 static void load_vvmcs_host_state(struct vcpu *v)
@@ -1493,8 +1502,37 @@ nvmx_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
                      unsigned int *page_order,
                      bool_t access_r, bool_t access_w, bool_t access_x)
 {
-    /*TODO:*/
-    return 0;
+    int rc;
+    unsigned long gfn;
+    uint64_t exit_qual = __vmread(EXIT_QUALIFICATION);
+    uint32_t exit_reason = EXIT_REASON_EPT_VIOLATION;
+    uint32_t rwx_rights = (access_x << 2) | (access_w << 1) | access_r;
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+
+    rc = nept_translate_l2ga(v, L2_gpa, page_order, rwx_rights, &gfn,
+                             &exit_qual, &exit_reason);
+    switch ( rc )
+    {
+    case EPT_TRANSLATE_SUCCEED:
+        *L1_gpa = (gfn << PAGE_SHIFT) + (L2_gpa & ~PAGE_MASK);
+        rc = NESTEDHVM_PAGEFAULT_DONE;
+        break;
+    case EPT_TRANSLATE_VIOLATION:
+    case EPT_TRANSLATE_MISCONFIG:
+        rc = NESTEDHVM_PAGEFAULT_INJECT;
+        nvmx->ept_exit.exit_reason = exit_reason;
+        nvmx->ept_exit.exit_qual = exit_qual;
+        break;
+    case EPT_TRANSLATE_RETRY:
+        rc = NESTEDHVM_PAGEFAULT_RETRY;
+        break;
+    default:
+        gdprintk(XENLOG_ERR, "GUEST EPT translation error!:%d\n", rc);
+        BUG();
+        break;
+    }
+
+    return rc;
 }
 
 void nvmx_idtv_handling(void)

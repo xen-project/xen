@@ -52,6 +52,7 @@ bool_t nestedhvm_vcpu_in_guestmode(struct vcpu *v);
 #define NESTEDHVM_PAGEFAULT_L1_ERROR   2
 #define NESTEDHVM_PAGEFAULT_L0_ERROR   3
 #define NESTEDHVM_PAGEFAULT_MMIO       4
+#define NESTEDHVM_PAGEFAULT_RETRY      5
 int nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t *L2_gpa,
     bool_t access_r, bool_t access_w, bool_t access_x);
 
