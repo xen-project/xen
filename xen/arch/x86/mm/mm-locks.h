@@ -249,7 +249,7 @@ declare_mm_order_constraint(per_page_sharing)
  * A per-domain lock that protects the mapping from nested-CR3 to 
  * nested-p2m.  In particular it covers:
  * - the array of nested-p2m tables, and all LRU activity therein; and
- * - setting the "cr3" field of any p2m table to a non-CR3_EADDR value. 
+ * - setting the "cr3" field of any p2m table to a non-P2M_BASE_EAADR value.
  *   (i.e. assigning a p2m table to be the shadow of that cr3 */
 
 /* PoD lock (per-p2m-table)

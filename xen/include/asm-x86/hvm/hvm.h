@@ -170,7 +170,7 @@ struct hvm_function_table {
                                 uint64_t exitcode);
     int (*nhvm_vcpu_vmexit_trap)(struct vcpu *v, struct hvm_trap *trap);
     uint64_t (*nhvm_vcpu_guestcr3)(struct vcpu *v);
-    uint64_t (*nhvm_vcpu_hostcr3)(struct vcpu *v);
+    uint64_t (*nhvm_vcpu_p2m_base)(struct vcpu *v);
     uint32_t (*nhvm_vcpu_asid)(struct vcpu *v);
     int (*nhvm_vmcx_guest_intercepts_trap)(struct vcpu *v, 
                                unsigned int trapnr, int errcode);
@@ -475,7 +475,7 @@ uint64_t nhvm_vcpu_guestcr3(struct vcpu *v);
 /* returns l1 guest's cr3 that points to the page table used to
  * translate l2 guest physical address to l1 guest physical address.
  */
-uint64_t nhvm_vcpu_hostcr3(struct vcpu *v);
+uint64_t nhvm_vcpu_p2m_base(struct vcpu *v);
 /* returns the asid number l1 guest wants to use to run the l2 guest */
 uint32_t nhvm_vcpu_asid(struct vcpu *v);
 

@@ -99,7 +99,7 @@ int nvmx_vcpu_initialise(struct vcpu *v);
 void nvmx_vcpu_destroy(struct vcpu *v);
 int nvmx_vcpu_reset(struct vcpu *v);
 uint64_t nvmx_vcpu_guestcr3(struct vcpu *v);
-uint64_t nvmx_vcpu_hostcr3(struct vcpu *v);
+uint64_t nvmx_vcpu_eptp_base(struct vcpu *v);
 uint32_t nvmx_vcpu_asid(struct vcpu *v);
 enum hvm_intblk nvmx_intr_blocked(struct vcpu *v);
 int nvmx_intercepts_exception(struct vcpu *v, 

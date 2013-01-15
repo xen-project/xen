@@ -69,7 +69,7 @@ static void p2m_initialise(struct domain *d, struct p2m_domain *p2m)
     p2m->domain = d;
     p2m->default_access = p2m_access_rwx;
 
-    p2m->cr3 = CR3_EADDR;
+    p2m->np2m_base = P2M_BASE_EADDR;
 
     if ( hap_enabled(d) && cpu_has_vmx )
         ept_p2m_init(p2m);
@@ -1433,7 +1433,7 @@ p2m_flush_table(struct p2m_domain *p2m)
     ASSERT(page_list_empty(&p2m->pod.single));
 
     /* This is no longer a valid nested p2m for any address space */
-    p2m->cr3 = CR3_EADDR;
+    p2m->np2m_base = P2M_BASE_EADDR;
     
     /* Zap the top level of the trie */
     top = mfn_to_page(pagetable_get_mfn(p2m_get_pagetable(p2m)));
@@ -1471,7 +1471,7 @@ p2m_flush_nestedp2m(struct domain *d)
 }
 
 struct p2m_domain *
-p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3)
+p2m_get_nestedp2m(struct vcpu *v, uint64_t np2m_base)
 {
     /* Use volatile to prevent gcc to cache nv->nv_p2m in a cpu register as
      * this may change within the loop by an other (v)cpu.
@@ -1480,8 +1480,8 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3)
     struct domain *d;
     struct p2m_domain *p2m;
 
-    /* Mask out low bits; this avoids collisions with CR3_EADDR */
-    cr3 &= ~(0xfffull);
+    /* Mask out low bits; this avoids collisions with P2M_BASE_EADDR */
+    np2m_base &= ~(0xfffull);
 
     if (nv->nv_flushp2m && nv->nv_p2m) {
         nv->nv_p2m = NULL;
@@ -1493,14 +1493,14 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3)
     if ( p2m ) 
     {
         p2m_lock(p2m);
-        if ( p2m->cr3 == cr3 || p2m->cr3 == CR3_EADDR )
+        if ( p2m->np2m_base == np2m_base || p2m->np2m_base == P2M_BASE_EADDR )
         {
             nv->nv_flushp2m = 0;
             p2m_getlru_nestedp2m(d, p2m);
             nv->nv_p2m = p2m;
-            if (p2m->cr3 == CR3_EADDR)
+            if ( p2m->np2m_base == P2M_BASE_EADDR )
                 hvm_asid_flush_vcpu(v);
-            p2m->cr3 = cr3;
+            p2m->np2m_base = np2m_base;
             cpumask_set_cpu(v->processor, p2m->dirty_cpumask);
             p2m_unlock(p2m);
             nestedp2m_unlock(d);
@@ -1515,7 +1515,7 @@ p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3)
     p2m_flush_table(p2m);
     p2m_lock(p2m);
     nv->nv_p2m = p2m;
-    p2m->cr3 = cr3;
+    p2m->np2m_base = np2m_base;
     nv->nv_flushp2m = 0;
     hvm_asid_flush_vcpu(v);
     cpumask_set_cpu(v->processor, p2m->dirty_cpumask);
@@ -1531,7 +1531,7 @@ p2m_get_p2m(struct vcpu *v)
     if (!nestedhvm_is_n2(v))
         return p2m_get_hostp2m(v->domain);
 
-    return p2m_get_nestedp2m(v, nhvm_vcpu_hostcr3(v));
+    return p2m_get_nestedp2m(v, nhvm_vcpu_p2m_base(v));
 }
 
 unsigned long paging_gva_to_gfn(struct vcpu *v,
@@ -1549,15 +1549,15 @@ unsigned long paging_gva_to_gfn(struct vcpu *v,
         struct p2m_domain *p2m;
         const struct paging_mode *mode;
         uint32_t pfec_21 = *pfec;
-        uint64_t ncr3 = nhvm_vcpu_hostcr3(v);
+        uint64_t np2m_base = nhvm_vcpu_p2m_base(v);
 
         /* translate l2 guest va into l2 guest gfn */
-        p2m = p2m_get_nestedp2m(v, ncr3);
+        p2m = p2m_get_nestedp2m(v, np2m_base);
         mode = paging_get_nestedmode(v);
         gfn = mode->gva_to_gfn(v, p2m, va, pfec);
 
         /* translate l2 guest gfn into l1 guest gfn */
-        return hostmode->p2m_ga_to_gfn(v, hostp2m, ncr3,
+        return hostmode->p2m_ga_to_gfn(v, hostp2m, np2m_base,
                                        gfn << PAGE_SHIFT, &pfec_21, NULL);
     }
 

@@ -197,17 +197,17 @@ struct p2m_domain {
 
     struct domain     *domain;   /* back pointer to domain */
 
-    /* Nested p2ms only: nested-CR3 value that this p2m shadows. 
-     * This can be cleared to CR3_EADDR under the per-p2m lock but
+    /* Nested p2ms only: nested p2m base value that this p2m shadows.
+     * This can be cleared to P2M_BASE_EADDR under the per-p2m lock but
      * needs both the per-p2m lock and the per-domain nestedp2m lock
      * to set it to any other value. */
-#define CR3_EADDR     (~0ULL)
-    uint64_t           cr3;
+#define P2M_BASE_EADDR     (~0ULL)
+    uint64_t           np2m_base;
 
     /* Nested p2ms: linked list of n2pms allocated to this domain. 
      * The host p2m hasolds the head of the list and the np2ms are 
      * threaded on in LRU order. */
-    struct list_head np2m_list; 
+    struct list_head   np2m_list;
 
 
     /* Host p2m: when this flag is set, don't flush all the nested-p2m 
@@ -282,11 +282,11 @@ struct p2m_domain {
 /* get host p2m table */
 #define p2m_get_hostp2m(d)      ((d)->arch.p2m)
 
-/* Get p2m table (re)usable for specified cr3.
+/* Get p2m table (re)usable for specified np2m base.
  * Automatically destroys and re-initializes a p2m if none found.
- * If cr3 == 0 then v->arch.hvm_vcpu.guest_cr[3] is used.
+ * If np2m_base == 0 then v->arch.hvm_vcpu.guest_cr[3] is used.
  */
-struct p2m_domain *p2m_get_nestedp2m(struct vcpu *v, uint64_t cr3);
+struct p2m_domain *p2m_get_nestedp2m(struct vcpu *v, uint64_t np2m_base);
 
 /* If vcpu is in host mode then behaviour matches p2m_get_hostp2m().
  * If vcpu is in guest mode then behaviour matches p2m_get_nestedp2m().

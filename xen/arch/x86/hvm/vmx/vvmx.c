@@ -94,7 +94,7 @@ uint64_t nvmx_vcpu_guestcr3(struct vcpu *v)
     return 0;
 }
 
-uint64_t nvmx_vcpu_hostcr3(struct vcpu *v)
+uint64_t nvmx_vcpu_eptp_base(struct vcpu *v)
 {
     /* TODO */
     ASSERT(0);

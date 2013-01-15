@@ -4538,10 +4538,10 @@ uint64_t nhvm_vcpu_guestcr3(struct vcpu *v)
     return -EOPNOTSUPP;
 }
 
-uint64_t nhvm_vcpu_hostcr3(struct vcpu *v)
+uint64_t nhvm_vcpu_p2m_base(struct vcpu *v)
 {
-    if (hvm_funcs.nhvm_vcpu_hostcr3)
-        return hvm_funcs.nhvm_vcpu_hostcr3(v);
+    if ( hvm_funcs.nhvm_vcpu_p2m_base )
+        return hvm_funcs.nhvm_vcpu_p2m_base(v);
     return -EOPNOTSUPP;
 }
 

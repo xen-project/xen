@@ -48,9 +48,11 @@
  *    1. If #NPF is from L1 guest, then we crash the guest VM (same as old 
  *       code)
  *    2. If #NPF is from L2 guest, then we continue from (3)
- *    3. Get h_cr3 from L1 guest. Map h_cr3 into L0 hypervisor address space.
- *    4. Walk the h_cr3 page table
- *    5.    - if not present, then we inject #NPF back to L1 guest and 
+ *    3. Get np2m base from L1 guest. Map np2m base into L0 hypervisor address
+ *       space.
+ *    4. Walk the np2m's  page table
+ *    5.    - if not present or permission check failure, then we inject #NPF
+ *            back to L1 guest and
  *            re-launch L1 guest (L1 guest will either treat this #NPF as MMIO,
  *            or fix its p2m table for L2 guest)
  *    6.    - if present, then we will get the a new translated value L1-GPA 
@@ -89,7 +91,7 @@ nestedp2m_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
 
     if (old_flags & _PAGE_PRESENT)
         flush_tlb_mask(p2m->dirty_cpumask);
-    
+
     paging_unlock(d);
 }
 
@@ -110,7 +112,7 @@ nestedhap_fix_p2m(struct vcpu *v, struct p2m_domain *p2m,
     /* If this p2m table has been flushed or recycled under our feet, 
      * leave it alone.  We'll pick up the right one as we try to 
      * vmenter the guest. */
-    if ( p2m->cr3 == nhvm_vcpu_hostcr3(v) )
+    if ( p2m->np2m_base == nhvm_vcpu_p2m_base(v) )
     {
         unsigned long gfn, mask;
         mfn_t mfn;
@@ -186,7 +188,7 @@ nestedhap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
     uint32_t pfec;
     unsigned long nested_cr3, gfn;
     
-    nested_cr3 = nhvm_vcpu_hostcr3(v);
+    nested_cr3 = nhvm_vcpu_p2m_base(v);
 
     pfec = PFEC_user_mode | PFEC_page_present;
     if (access_w)
@@ -221,7 +223,7 @@ nestedhvm_hap_nested_page_fault(struct vcpu *v, paddr_t *L2_gpa,
     p2m_type_t p2mt_10;
 
     p2m = p2m_get_hostp2m(d); /* L0 p2m */
-    nested_p2m = p2m_get_nestedp2m(v, nhvm_vcpu_hostcr3(v));
+    nested_p2m = p2m_get_nestedp2m(v, nhvm_vcpu_p2m_base(v));
 
     /* walk the L1 P2M table */
     rv = nestedhap_walk_L1_p2m(v, *L2_gpa, &L1_gpa, &page_order_21,
