@@ -882,7 +882,15 @@ static void load_shadow_guest_state(struct vcpu *v)
                      (__get_vvmcs(vvmcs, CR4_READ_SHADOW) & cr_gh_mask);
     __vmwrite(CR4_READ_SHADOW, cr_read_shadow);
 
-    /* TODO: PDPTRs for nested ept */
+    if ( nvmx_ept_enabled(v) && hvm_pae_enabled(v) &&
+         (v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
+    {
+        vvmcs_to_shadow(vvmcs, GUEST_PDPTR0);
+        vvmcs_to_shadow(vvmcs, GUEST_PDPTR1);
+        vvmcs_to_shadow(vvmcs, GUEST_PDPTR2);
+        vvmcs_to_shadow(vvmcs, GUEST_PDPTR3);
+    }
+
     /* TODO: CR3 target control */
 }
 
