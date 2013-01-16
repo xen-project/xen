@@ -220,9 +220,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 6a0cf3786f1964fdf5a17f88f26cb499f4e89c81
-# Thu Dec 6 12:35:58 2012 +0000
-# qemu-stubdom: prevent useless medium change
+QEMU_TAG ?= 4c2cae2a882db4d2a231b27b3b31a5bbec6dacbf
+# Sun Dec 2 20:11:22 2012 -0800
+# e1000: Discard packets that are too long if !SBP and !LPE
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
