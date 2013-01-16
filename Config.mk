@@ -214,7 +214,10 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.2.1
+QEMU_TAG ?= 48d332ba8ef0bd9754b9d16f9e5629b00f85d735
+# Author: Michael Contreras <michael@inetric.com>
+# Date:   Sun Dec 2 20:11:22 2012 -0800
+# e1000: Discard packets that are too long if !SBP and !LPE
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
