@@ -179,9 +179,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.1.4
-# Tue Nov 13 18:25:17 2012 +0000
-# mapcache: Fix invalidate if memory requested was not bucket aligned
+QEMU_TAG ?= b4e9b8169dedc0bcf0d3abe07642f761ac70aeea
+# Sun Dec 2 20:11:22 2012 -0800
+# e1000: Discard packets that are too long if !SBP and !LPE
 
 # Optional components
 XENSTAT_XENTOP     ?= y
