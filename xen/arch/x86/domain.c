@@ -748,7 +748,9 @@ int arch_set_info_guest(
 
     v->arch.vgc_flags = flags;
 
-    memcpy(v->arch.fpu_ctxt, &c.nat->fpu_ctxt, sizeof(c.nat->fpu_ctxt));
+    if ( flags & VGCF_I387_VALID )
+        memcpy(v->arch.fpu_ctxt, &c.nat->fpu_ctxt, sizeof(c.nat->fpu_ctxt));
+
     if ( !compat )
     {
         memcpy(&v->arch.user_regs, &c.nat->user_regs, sizeof(c.nat->user_regs));
