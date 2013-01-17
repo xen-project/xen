@@ -1,6 +1,9 @@
 pulling from ssh://xenbits.xen.org//home/xen/HG/staging/xen-unstable.hg
 searching for changes
 no changes found
+pulling from ssh://xenbits.xen.org//home/xen/HG/staging/xen-unstable.hg
+searching for changes
+no changes found
 # -*- mode: Makefile; -*-
 
 ifeq ($(filter /%,$(XEN_ROOT)),)
