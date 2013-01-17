@@ -1,6 +1,3 @@
-pulling from ssh://xenbits.xen.org//home/xen/HG/staging/xen-4.2-testing.hg
-searching for changes
-no changes found
 # -*- mode: Makefile; -*-
 
 ifeq ($(filter /%,$(XEN_ROOT)),)
