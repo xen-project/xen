@@ -2934,6 +2934,8 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
     hvm_cpuid(1, &cpuid[0], &cpuid[1], &cpuid[2], &cpuid[3]);
     mtrr = !!(cpuid[3] & cpufeat_mask(X86_FEATURE_MTRR));
 
+    hvm_memory_event_msr(msr, msr_content);
+
     switch ( msr )
     {
     case MSR_EFER:
@@ -3869,6 +3871,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 break;
             case HVM_PARAM_MEMORY_EVENT_INT3:
             case HVM_PARAM_MEMORY_EVENT_SINGLE_STEP:
+            case HVM_PARAM_MEMORY_EVENT_MSR:
                 if ( d == current->domain )
                 {
                     rc = -EPERM;
@@ -4490,6 +4493,14 @@ void hvm_memory_event_cr4(unsigned long value, unsigned long old)
                              .params[HVM_PARAM_MEMORY_EVENT_CR4],
                            MEM_EVENT_REASON_CR4,
                            value, old, 0, 0);
+}
+
+void hvm_memory_event_msr(unsigned long msr, unsigned long value)
+{
+    hvm_memory_event_traps(current->domain->arch.hvm_domain
+                             .params[HVM_PARAM_MEMORY_EVENT_MSR],
+                           MEM_EVENT_REASON_MSR,
+                           value, ~value, 1, msr);
 }
 
 int hvm_memory_event_int3(unsigned long gla) 

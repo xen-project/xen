@@ -454,6 +454,7 @@ int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
 void hvm_memory_event_cr0(unsigned long value, unsigned long old);
 void hvm_memory_event_cr3(unsigned long value, unsigned long old);
 void hvm_memory_event_cr4(unsigned long value, unsigned long old);
+void hvm_memory_event_msr(unsigned long msr, unsigned long value);
 /* Called for current VCPU on int3: returns -1 if no listener */
 int hvm_memory_event_int3(unsigned long gla);
 

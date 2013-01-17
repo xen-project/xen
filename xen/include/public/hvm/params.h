@@ -126,6 +126,7 @@
 #define HVM_PARAM_MEMORY_EVENT_CR4          22
 #define HVM_PARAM_MEMORY_EVENT_INT3         23
 #define HVM_PARAM_MEMORY_EVENT_SINGLE_STEP  25
+#define HVM_PARAM_MEMORY_EVENT_MSR          30
 
 #define HVMPME_MODE_MASK       (3 << 0)
 #define HVMPME_mode_disabled   0
@@ -141,6 +142,6 @@
 #define HVM_PARAM_ACCESS_RING_PFN   28
 #define HVM_PARAM_SHARING_RING_PFN  29
 
-#define HVM_NR_PARAMS          30
+#define HVM_NR_PARAMS          31
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */
