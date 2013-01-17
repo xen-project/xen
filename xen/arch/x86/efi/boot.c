@@ -1,5 +1,6 @@
 #include "efi.h"
 #include <efi/efiprot.h>
+#include <efi/efipciio.h>
 #include <public/xen.h>
 #include <xen/compile.h>
 #include <xen/ctype.h>
@@ -8,6 +9,7 @@
 #include <xen/keyhandler.h>
 #include <xen/lib.h>
 #include <xen/multiboot.h>
+#include <xen/pci_regs.h>
 #include <xen/pfn.h>
 #if EFI_PAGE_SIZE != PAGE_SIZE
 # error Cannot use xen/pfn.h here!
@@ -569,6 +571,92 @@ static void __init edd_put_string(u8 *dst, size_t n, const char *src)
        *dst++ = ' ';
 }
 #define edd_put_string(d, s) edd_put_string(d, ARRAY_SIZE(d), s)
+
+static void __init setup_efi_pci(void)
+{
+    EFI_STATUS status;
+    EFI_HANDLE *handles;
+    static EFI_GUID __initdata pci_guid = EFI_PCI_IO_PROTOCOL;
+    UINTN i, nr_pci, size = 0;
+    struct efi_pci_rom *last = NULL;
+
+    status = efi_bs->LocateHandle(ByProtocol, &pci_guid, NULL, &size, NULL);
+    if ( status == EFI_BUFFER_TOO_SMALL )
+        status = efi_bs->AllocatePool(EfiLoaderData, size, (void **)&handles);
+    if ( !EFI_ERROR(status) )
+        status = efi_bs->LocateHandle(ByProtocol, &pci_guid, NULL, &size,
+                                      handles);
+    if ( EFI_ERROR(status) )
+        size = 0;
+
+    nr_pci = size / sizeof(*handles);
+    for ( i = 0; i < nr_pci; ++i )
+    {
+        EFI_PCI_IO *pci = NULL;
+        u64 attributes;
+        struct efi_pci_rom *rom, *va;
+        UINTN segment, bus, device, function;
+
+        status = efi_bs->HandleProtocol(handles[i], &pci_guid, (void **)&pci);
+        if ( EFI_ERROR(status) || !pci || !pci->RomImage || !pci->RomSize )
+            continue;
+
+        status = pci->Attributes(pci, EfiPciIoAttributeOperationGet, 0,
+                                 &attributes);
+        if ( EFI_ERROR(status) ||
+             !(attributes & EFI_PCI_IO_ATTRIBUTE_EMBEDDED_ROM) ||
+             EFI_ERROR(pci->GetLocation(pci, &segment, &bus, &device,
+                       &function)) )
+            continue;
+
+        DisplayUint(segment, 4);
+        PrintStr(L":");
+        DisplayUint(bus, 2);
+        PrintStr(L":");
+        DisplayUint(device, 2);
+        PrintStr(L".");
+        DisplayUint(function, 1);
+        PrintStr(L": ROM: ");
+        DisplayUint(pci->RomSize, 0);
+        PrintStr(L" bytes at ");
+        DisplayUint((UINTN)pci->RomImage, 0);
+        PrintStr(newline);
+
+        size = pci->RomSize + sizeof(*rom);
+        status = efi_bs->AllocatePool(EfiRuntimeServicesData, size,
+                                      (void **)&rom);
+        if ( EFI_ERROR(status) )
+            continue;
+
+        rom->next = NULL;
+        rom->size = pci->RomSize;
+
+        status = pci->Pci.Read(pci, EfiPciIoWidthUint16, PCI_VENDOR_ID, 1,
+                               &rom->vendor);
+        if ( !EFI_ERROR(status) )
+            status = pci->Pci.Read(pci, EfiPciIoWidthUint16, PCI_DEVICE_ID, 1,
+                                   &rom->devid);
+        if ( EFI_ERROR(status) )
+        {
+            efi_bs->FreePool(rom);
+            continue;
+        }
+
+        rom->segment = segment;
+        rom->bus = bus;
+        rom->devfn = (device << 3) | function;
+        memcpy(rom->data, pci->RomImage, pci->RomSize);
+
+        va = (void *)rom + DIRECTMAP_VIRT_START;
+        if ( last )
+            last->next = va;
+        else
+            efi_pci_roms = va;
+        last = rom;
+    }
+
+    efi_bs->FreePool(handles);
+}
 
 static int __init set_color(u32 mask, int bpp, u8 *pos, u8 *sz)
 {
@@ -1139,6 +1227,9 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     if (efi.smbios != EFI_INVALID_TABLE_ADDR)
         dmi_efi_get_table((void *)(long)efi.smbios);
+
+    /* Collect PCI ROM contents. */
+    setup_efi_pci();
 
     /* Allocate space for trampoline (in first Mb). */
     cfg.addr = 0x100000;

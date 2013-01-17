@@ -9,6 +9,14 @@
 #include <xen/spinlock.h>
 #include <asm/page.h>
 
+struct efi_pci_rom {
+    const struct efi_pci_rom *next;
+    u16 vendor, devid, segment;
+    u8 bus, devfn;
+    unsigned long size;
+    unsigned char data[];
+};
+
 extern unsigned int efi_num_ct;
 extern EFI_CONFIGURATION_TABLE *efi_ct;
 
@@ -21,6 +29,8 @@ extern UINTN efi_memmap_size, efi_mdesc_size;
 extern void *efi_memmap;
 
 extern l4_pgentry_t *efi_l4_pgtable;
+
+extern const struct efi_pci_rom *efi_pci_roms;
 
 unsigned long efi_rs_enter(void);
 void efi_rs_leave(unsigned long);

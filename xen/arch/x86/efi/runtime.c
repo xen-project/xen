@@ -37,6 +37,8 @@ struct efi __read_mostly efi = {
 
 l4_pgentry_t *__read_mostly efi_l4_pgtable;
 
+const struct efi_pci_rom *__read_mostly efi_pci_roms;
+
 unsigned long efi_rs_enter(void)
 {
     unsigned long cr3 = read_cr3();
@@ -177,6 +179,29 @@ int efi_get_info(uint32_t idx, union xenpf_efi_info *info)
             }
         }
         return -ESRCH;
+    case XEN_FW_EFI_PCI_ROM: {
+        const struct efi_pci_rom *ent;
+
+        for ( ent = efi_pci_roms; ent; ent = ent->next )
+            if ( info->pci_rom.segment == ent->segment &&
+                 info->pci_rom.bus == ent->bus &&
+                 info->pci_rom.devfn == ent->devfn &&
+                 info->pci_rom.vendor == ent->vendor &&
+                 info->pci_rom.devid == ent->devid )
+            {
+                int rc = 0;
+
+                if ( info->pci_rom.size < ent->size )
+                    rc = -ENOSPC;
+                else if ( copy_to_guest(info->pci_rom.data,
+                                        ent->data, ent->size) )
+                    rc = -EFAULT;
+                info->pci_rom.size = ent->size;
+
+                return rc;
+            }
+        return -ESRCH;
+    }
     default:
         return -EINVAL;
     }
