@@ -1,3 +1,6 @@
+pulling from ssh://xenbits.xen.org//home/xen/HG/staging/xen-unstable.hg
+searching for changes
+no changes found
 # -*- mode: Makefile; -*-
 
 ifeq ($(filter /%,$(XEN_ROOT)),)
@@ -220,9 +223,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 4c2cae2a882db4d2a231b27b3b31a5bbec6dacbf
-# Sun Dec 2 20:11:22 2012 -0800
-# e1000: Discard packets that are too long if !SBP and !LPE
+QEMU_TAG ?= e33f918c19e393900b95a2bb6b10668dfe96a8f2
+# Wed Dec 5 13:31:30 2012 -0500
+# e1000: Discard oversized packets based on SBP|LPE
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
