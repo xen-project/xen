@@ -3201,10 +3201,10 @@ void do_nmi(struct cpu_user_regs *regs)
         reason = inb(0x61);
         if ( reason & 0x80 )
             pci_serr_error(regs);
-        else if ( reason & 0x40 )
+        if ( reason & 0x40 )
             io_check_error(regs);
-        else if ( !nmi_watchdog )
-            unknown_nmi_error(regs, (unsigned char)(reason&0xff));
+        if ( !(reason & 0xc0) && !nmi_watchdog )
+            unknown_nmi_error(regs, reason);
     }
 }
 
