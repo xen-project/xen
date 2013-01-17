@@ -613,7 +613,7 @@ def run_grub(file, entry, fs, cfg_args):
     # set the entry to boot as requested
     if entry is not None:
         idx = get_entry_idx(g.cf, entry)
-        if idx is not None and idx > 0 and idx < len(g.cf.images):
+        if idx is not None and idx >= 0 and idx < len(g.cf.images):
            sel = idx
 
     if sel == -1:
