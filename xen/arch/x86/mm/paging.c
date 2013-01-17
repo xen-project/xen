@@ -534,7 +534,8 @@ int paging_log_dirty_range(struct domain *d,
 
         size = ((nr + BITS_PER_LONG - 1) / BITS_PER_LONG) * sizeof (long);
         rv = 0;
-        for ( off = 0; !rv && off < size; off += sizeof zeroes )
+        off = 0;
+        while ( !rv && off < size )
         {
             int todo = min(size - off, (int) PAGE_SIZE);
             if ( copy_to_guest_offset(dirty_bitmap, off, zeroes, todo) )
