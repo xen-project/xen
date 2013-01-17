@@ -214,9 +214,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= abe5aac3cd62018fa15802b07f975aba14fa75f5
-# Wed Dec 5 13:31:30 2012 -0500
-# e1000: Discard oversized packets based on SBP|LPE
+QEMU_TAG ?= ad6cb8a6550d0f0550252db4e05c305086ea9a65
+# Thu Jan 17 15:52:16 2013 +0000
+# e1000: fix compile warning introduced by security fix, and debugging
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
