@@ -27,7 +27,6 @@
 #include <asm/p2m.h>
 #include <asm/hap.h>
 #include <asm/hvm/nestedhvm.h>
-#include <asm/dirty_vram.h>
 #include <xen/numa.h>
 #include <xsm/xsm.h>
 
@@ -193,11 +192,15 @@ int paging_log_dirty_disable(struct domain *d)
     return ret;
 }
 
-/* Given a guest mfn, mark a page as dirty */
+/* Mark a page as dirty */
 void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
 {
     unsigned long pfn;
     mfn_t gmfn;
+    int changed;
+    mfn_t mfn, *l4, *l3, *l2;
+    unsigned long *l1;
+    int i1, i2, i3, i4;
 
     gmfn = _mfn(guest_mfn);
 
@@ -207,19 +210,6 @@ void paging_mark_dirty(struct domain *d, unsigned long guest_mfn)
 
     /* We /really/ mean PFN here, even for non-translated guests. */
     pfn = get_gpfn_from_mfn(mfn_x(gmfn));
-    paging_mark_dirty_gpfn(d, pfn);
-}
-
-
-/* Given a guest pfn, mark a page as dirty */
-void paging_mark_dirty_gpfn(struct domain *d, unsigned long pfn)
-{
-    int changed;
-    mfn_t mfn, *l4, *l3, *l2;
-    unsigned long *l1;
-    int i1, i2, i3, i4;
-    dv_range_t *range;
-    
     /* Shared MFNs should NEVER be marked dirty */
     BUG_ON(SHARED_M2P(pfn));
 
@@ -238,11 +228,6 @@ void paging_mark_dirty_gpfn(struct domain *d, unsigned long pfn)
 
     /* Recursive: this is called from inside the shadow code */
     paging_lock_recursive(d);
-
-    d->arch.paging.log_dirty.dirty_count++;
-    range = dirty_vram_range_find_gfn(d, pfn);
-    if ( range )
-        range->dirty_count++;
 
     if ( unlikely(!mfn_valid(d->arch.paging.log_dirty.top)) ) 
     {
@@ -460,31 +445,7 @@ void paging_log_dirty_range(struct domain *d,
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
     int i;
     unsigned long pfn;
-    dv_range_t *range;
-    unsigned int range_dirty_count;
 
-    paging_lock(d);
-    range = dirty_vram_range_find_gfn(d, begin_pfn);
-    if ( !range )
-    {
-        paging_unlock(d);
-        goto out;
-    }
-    
-    range_dirty_count = range->dirty_count;
-    range->dirty_count = 0;
-
-    paging_unlock(d);
-    
-    if ( !range_dirty_count)
-        goto out;
-
-    PAGING_DEBUG(LOGDIRTY,
-                 "log-dirty-range: dom %u [%05lx:%05lx] range_dirty=%u\n",
-                 d->domain_id,
-                 begin_pfn,
-                 begin_pfn + nr,
-                 range_dirty_count);
     /*
      * Set l1e entries of P2M table to be read-only.
      *
@@ -499,17 +460,15 @@ void paging_log_dirty_range(struct domain *d,
 
     for ( i = 0, pfn = begin_pfn; pfn < begin_pfn + nr; i++, pfn++ )
     {
-        if ( p2m_change_type(d, pfn, p2m_ram_rw, p2m_ram_logdirty) ==
-             p2m_ram_rw )
+        p2m_type_t pt;
+        pt = p2m_change_type(d, pfn, p2m_ram_rw, p2m_ram_logdirty);
+        if ( pt == p2m_ram_rw )
             dirty_bitmap[i >> 3] |= (1 << (i & 7));
     }
 
     p2m_unlock(p2m);
 
     flush_tlb_mask(d->domain_dirty_cpumask);
-
- out:
-    return;
 }
 
 /* Note that this function takes three function pointers. Callers must supply

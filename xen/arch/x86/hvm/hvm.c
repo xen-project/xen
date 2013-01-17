@@ -57,7 +57,6 @@
 #include <asm/hvm/cacheattr.h>
 #include <asm/hvm/trace.h>
 #include <asm/hvm/nestedhvm.h>
-#include <asm/dirty_vram.h>
 #include <asm/mtrr.h>
 #include <asm/apic.h>
 #include <public/sched.h>
@@ -1437,11 +1436,8 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
          */
         if ( access_w )
         {
-            if ( p2m_change_type(v->domain, gfn, p2m_ram_logdirty,
-                                 p2m_ram_rw) == p2m_ram_logdirty )
-            {
-                paging_mark_dirty_gpfn(v->domain, gfn);
-            }
+            paging_mark_dirty(v->domain, mfn_x(mfn));
+            p2m_change_type(v->domain, gfn, p2m_ram_logdirty, p2m_ram_rw);
         }
         rc = 1;
         goto out_put_gfn;

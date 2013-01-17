@@ -741,23 +741,20 @@ void p2m_change_type_range(struct domain *d,
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
 
     BUG_ON(p2m_is_grant(ot) || p2m_is_grant(nt));
-    p2m_lock(p2m);
 
+    p2m_lock(p2m);
     p2m->defer_nested_flush = 1;
-    
+
     for ( gfn = start; gfn < end; gfn++ )
     {
         mfn = p2m->get_entry(p2m, gfn, &pt, &a, 0, NULL);
         if ( pt == ot )
-            set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, nt,
-                          p2m->default_access);
+            set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, nt, p2m->default_access);
     }
-    
-    p2m->defer_nested_flush = 0;
 
+    p2m->defer_nested_flush = 0;
     if ( nestedhvm_enabled(d) )
         p2m_flush_nestedp2m(d);
-
     p2m_unlock(p2m);
 }
 

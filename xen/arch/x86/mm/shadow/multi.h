@@ -66,12 +66,7 @@ SHADOW_INTERNAL_NAME(sh_rm_write_access_from_l1, GUEST_LEVELS)
 extern int
 SHADOW_INTERNAL_NAME(sh_rm_mappings_from_l1, GUEST_LEVELS)
     (struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn);
-extern int
-SHADOW_INTERNAL_NAME(sh_find_vram_mappings_in_l1, GUEST_LEVELS)
-     (struct vcpu *v, mfn_t sl1mfn, 
-      unsigned long begin_pfn,
-      unsigned long end_pfn,
-      int *removed);
+
 extern void
 SHADOW_INTERNAL_NAME(sh_clear_shadow_entry, GUEST_LEVELS)
     (struct vcpu *v, void *ep, mfn_t smfn);
