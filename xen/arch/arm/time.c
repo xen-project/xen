@@ -24,10 +24,13 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/softirq.h>
+#include <xen/sched.h>
 #include <xen/time.h>
 #include <xen/sched.h>
 #include <xen/event.h>
 #include <asm/system.h>
+#include <asm/time.h>
+#include <asm/gic.h>
 
 /*
  * Unfortunately the hypervisor timer interrupt appears to be buggy in
@@ -36,10 +39,11 @@
  */
 #define USE_HYP_TIMER 1
 
+uint64_t __read_mostly boot_count;
+
 /* For fine-grained timekeeping, we use the ARM "Generic Timer", a
  * register-mapped time source in the SoC. */
 static uint32_t __read_mostly cntfrq;      /* Ticks per second */
-static uint64_t __read_mostly boot_count;  /* Counter value at boot time */
 
 /*static inline*/ s_time_t ticks_to_ns(uint64_t ticks)
 {
@@ -155,6 +159,13 @@ static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
     }
 }
 
+static void vtimer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
+{
+    current->arch.virt_timer.ctl = READ_CP32(CNTV_CTL);
+    WRITE_CP32(current->arch.virt_timer.ctl | CNTx_CTL_MASK, CNTV_CTL);
+    vgic_vcpu_inject_irq(current, irq, 1);
+}
+
 /* Set up the timer interrupt on this CPU */
 void __cpuinit init_timer_interrupt(void)
 {
@@ -174,6 +185,7 @@ void __cpuinit init_timer_interrupt(void)
 
     /* XXX Need to find this IRQ number from devicetree? */
     request_irq(26, timer_interrupt, 0, "hyptimer", NULL);
+    request_irq(27, vtimer_interrupt, 0, "virtimer", NULL);
     request_irq(30, timer_interrupt, 0, "phytimer", NULL);
 }
 

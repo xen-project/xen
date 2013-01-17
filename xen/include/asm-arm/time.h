@@ -15,6 +15,9 @@ struct tm wallclock_time(void);
 /* Set up the timer interrupt on this CPU */
 extern void __cpuinit init_timer_interrupt(void);
 
+/* Counter value at boot time */
+extern uint64_t boot_count;
+
 #endif /* __ARM_TIME_H__ */
 /*
  * Local variables:

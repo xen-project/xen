@@ -22,6 +22,8 @@
 
 extern int vcpu_vtimer_init(struct vcpu *v);
 extern int vtimer_emulate(struct cpu_user_regs *regs, union hsr hsr);
+extern int virt_timer_save(struct vcpu *v);
+extern int virt_timer_restore(struct vcpu *v);
 
 #endif
 

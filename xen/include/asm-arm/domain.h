@@ -3,6 +3,7 @@
 
 #include <xen/config.h>
 #include <xen/cache.h>
+#include <xen/sched.h>
 #include <asm/page.h>
 #include <asm/p2m.h>
 #include <public/hvm/params.h>
@@ -69,6 +70,15 @@ struct arch_domain
 
 }  __cacheline_aligned;
 
+struct vtimer {
+        struct vcpu *v;
+        int irq;
+        struct timer timer;
+        uint32_t ctl;
+        s_time_t offset;
+        s_time_t cval;
+};
+
 struct arch_vcpu
 {
     struct {
@@ -118,11 +128,6 @@ struct arch_vcpu
     uint32_t teecr, teehbr;
     uint32_t joscr, jmcr;
 
-    /* Arch timers */
-    uint64_t cntvoff;
-    uint64_t cntv_cval;
-    uint32_t cntv_ctl;
-
     /* CP 15 */
     uint32_t csselr;
 
@@ -157,12 +162,8 @@ struct arch_vcpu
         spinlock_t lock;
     } vgic;
 
-    struct {
-        struct timer timer;
-        uint32_t ctl;
-        s_time_t offset;
-        s_time_t cval;
-    } vtimer;
+    struct vtimer phys_timer;
+    struct vtimer virt_timer;
 }  __cacheline_aligned;
 
 void vcpu_show_execution_state(struct vcpu *);

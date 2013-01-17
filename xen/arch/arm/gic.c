@@ -379,7 +379,9 @@ void gic_route_ppis(void)
     gic_route_irq(25, 1, 1u << smp_processor_id(), 0xa0);
     /* Hypervisor Timer */
     gic_route_irq(26, 1, 1u << smp_processor_id(), 0xa0);
-    /* Timer */
+    /* Virtual Timer */
+    gic_route_irq(27, 1, 1u << smp_processor_id(), 0xa0);
+    /* Physical Timer */
     gic_route_irq(30, 1, 1u << smp_processor_id(), 0xa0);
 }
 
