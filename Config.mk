@@ -179,9 +179,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= deb53183e0274a3eaae1577b0d47eb5ef1d8986c
-# Wed Dec 5 13:31:30 2012 -0500
-# e1000: Discard oversized packets based on SBP|LPE
+QEMU_TAG ?= 7a3a2aaa8fd1049fa0f033c5113e165900c84758
+# Thu Jan 17 15:52:16 2013 +0000
+# e1000: fix compile warning introduced by security fix, and debugging
 
 # Optional components
 XENSTAT_XENTOP     ?= y
