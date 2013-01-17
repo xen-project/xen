@@ -20,11 +20,12 @@ void compat_show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs,
     if ( v != current )
     {
         struct vcpu *vcpu;
+        unsigned long mfn;
 
         ASSERT(guest_kernel_mode(v, regs));
-        addr = read_cr3() >> PAGE_SHIFT;
+        mfn = read_cr3() >> PAGE_SHIFT;
         for_each_vcpu( v->domain, vcpu )
-            if ( pagetable_get_pfn(vcpu->arch.guest_table) == addr )
+            if ( pagetable_get_pfn(vcpu->arch.guest_table) == mfn )
                 break;
         if ( !vcpu )
         {
