@@ -352,11 +352,11 @@ fail:   PRINT("- Boot failed -\r\n")
  * Clobbers r0-r2 */
 init_uart:
         mov   r1, #0x0
-        str   r1, [r11, #0x24]       /* -> UARTIBRD (Baud divisor fraction) */
+        str   r1, [r11, #0x28]       /* -> UARTFBRD (Baud divisor fraction) */
         mov   r1, #0x4               /* 7.3728MHz / 0x4 == 16 * 115200 */
         str   r1, [r11, #0x24]       /* -> UARTIBRD (Baud divisor integer) */
         mov   r1, #0x60              /* 8n1 */
-        str   r1, [r11, #0x24]       /* -> UARTLCR_H (Line control) */
+        str   r1, [r11, #0x2C]       /* -> UARTLCR_H (Line control) */
         ldr   r1, =0x00000301        /* RXE | TXE | UARTEN */
         str   r1, [r11, #0x30]       /* -> UARTCR (Control Register) */
         adr   r0, 1f
