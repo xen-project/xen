@@ -75,7 +75,7 @@ static void print_xen_info(void)
 
 uint32_t *select_user_reg(struct cpu_user_regs *regs, int reg)
 {
-    BUG_ON( guest_mode(regs) );
+    BUG_ON( !guest_mode(regs) );
 
     /*
      * We rely heavily on the layout of cpu_user_regs to avoid having
