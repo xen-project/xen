@@ -422,11 +422,10 @@ void destroy_m2p_mapping(struct mem_hotadd_info *info)
  */
 static int setup_compat_m2p_table(struct mem_hotadd_info *info)
 {
-    unsigned long i, va, smap, emap, rwva, epfn = info->epfn;
+    unsigned long i, va, smap, emap, rwva, epfn = info->epfn, mfn;
     unsigned int n;
     l3_pgentry_t *l3_ro_mpt = NULL;
     l2_pgentry_t *l2_ro_mpt = NULL;
-    struct page_info *l1_pg;
     int err = 0;
 
     smap = info->spfn & (~((1UL << (L2_PAGETABLE_SHIFT - 2)) -1));
@@ -475,16 +474,16 @@ static int setup_compat_m2p_table(struct mem_hotadd_info *info)
         if ( n == CNT )
             continue;
 
-        l1_pg = mfn_to_page(alloc_hotadd_mfn(info));
-        err = map_pages_to_xen(rwva, page_to_mfn(l1_pg),
-                               1UL << PAGETABLE_ORDER,
+        mfn = alloc_hotadd_mfn(info);
+        err = map_pages_to_xen(rwva, mfn, 1UL << PAGETABLE_ORDER,
                                PAGE_HYPERVISOR);
         if ( err )
             break;
         /* Fill with INVALID_M2P_ENTRY. */
         memset((void *)rwva, 0xFF, 1UL << L2_PAGETABLE_SHIFT);
         /* NB. Cannot be GLOBAL as the ptes get copied into per-VM space. */
-        l2e_write(&l2_ro_mpt[l2_table_offset(va)], l2e_from_page(l1_pg, _PAGE_PSE|_PAGE_PRESENT));
+        l2e_write(&l2_ro_mpt[l2_table_offset(va)],
+                  l2e_from_pfn(mfn, _PAGE_PSE|_PAGE_PRESENT));
     }
 #undef CNT
 #undef MFN
@@ -501,7 +500,7 @@ static int setup_m2p_table(struct mem_hotadd_info *info)
     unsigned int n, memflags;
     l2_pgentry_t *l2_ro_mpt = NULL;
     l3_pgentry_t *l3_ro_mpt = NULL;
-    struct page_info *l1_pg, *l2_pg;
+    struct page_info *l2_pg;
     int ret = 0;
 
     ASSERT(l4e_get_flags(idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)])
@@ -544,15 +543,13 @@ static int setup_m2p_table(struct mem_hotadd_info *info)
         for ( n = 0; n < CNT; ++n)
             if ( mfn_valid(i + n * PDX_GROUP_COUNT) )
                 break;
-        if ( n == CNT )
-            l1_pg = NULL;
-        else
+        if ( n < CNT )
         {
-            l1_pg = mfn_to_page(alloc_hotadd_mfn(info));
+            unsigned long mfn = alloc_hotadd_mfn(info);
+
             ret = map_pages_to_xen(
                         RDWR_MPT_VIRT_START + i * sizeof(unsigned long),
-                        page_to_mfn(l1_pg),
-                        1UL << PAGETABLE_ORDER,
+                        mfn, 1UL << PAGETABLE_ORDER,
                         PAGE_HYPERVISOR);
             if ( ret )
                 goto error;
@@ -584,7 +581,7 @@ static int setup_m2p_table(struct mem_hotadd_info *info)
             }
 
             /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
-            l2e_write(l2_ro_mpt, l2e_from_page(l1_pg,
+            l2e_write(l2_ro_mpt, l2e_from_pfn(mfn,
                    /*_PAGE_GLOBAL|*/_PAGE_PSE|_PAGE_USER|_PAGE_PRESENT));
         }
         if ( !((unsigned long)l2_ro_mpt & ~PAGE_MASK) )
@@ -1548,8 +1545,6 @@ destroy_frametable:
     NODE_DATA(node)->node_start_pfn = old_node_start;
     NODE_DATA(node)->node_spanned_pages = old_node_span;
 
-    destroy_xen_mappings((unsigned long)mfn_to_virt(spfn),
-                         (unsigned long)mfn_to_virt(epfn));
     return ret;
 }
 

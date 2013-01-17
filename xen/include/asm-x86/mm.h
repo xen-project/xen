@@ -265,7 +265,6 @@ struct spage_info
     ((_p)->v.inuse._domain = (_d) ? virt_to_pdx(_d) : 0)
 
 #define maddr_get_owner(ma)   (page_get_owner(maddr_to_page((ma))))
-#define vaddr_get_owner(va)   (page_get_owner(virt_to_page((va))))
 
 #define XENSHARE_writable 0
 #define XENSHARE_readonly 1

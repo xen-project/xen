@@ -121,7 +121,6 @@ extern unsigned long xenheap_virt_end;
 #define page_set_owner(_p,_d) ((_p)->v.inuse.domain = (_d))
 
 #define maddr_get_owner(ma)   (page_get_owner(maddr_to_page((ma))))
-#define vaddr_get_owner(va)   (page_get_owner(virt_to_page((va))))
 
 #define XENSHARE_writable 0
 #define XENSHARE_readonly 1

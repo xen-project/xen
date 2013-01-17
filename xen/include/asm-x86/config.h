@@ -275,12 +275,8 @@ extern unsigned long xen_phys_start;
 /* GDT/LDT shadow mapping area. The first per-domain-mapping sub-area. */
 #define GDT_LDT_VCPU_SHIFT       5
 #define GDT_LDT_VCPU_VA_SHIFT    (GDT_LDT_VCPU_SHIFT + PAGE_SHIFT)
-#ifdef MAX_VIRT_CPUS
-#define GDT_LDT_MBYTES           (MAX_VIRT_CPUS >> (20-GDT_LDT_VCPU_VA_SHIFT))
-#else
 #define GDT_LDT_MBYTES           PERDOMAIN_MBYTES
 #define MAX_VIRT_CPUS            (GDT_LDT_MBYTES << (20-GDT_LDT_VCPU_VA_SHIFT))
-#endif
 #define GDT_LDT_VIRT_START       PERDOMAIN_VIRT_START
 #define GDT_LDT_VIRT_END         (GDT_LDT_VIRT_START + (GDT_LDT_MBYTES << 20))
 

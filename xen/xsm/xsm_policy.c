@@ -25,8 +25,9 @@
 char *__initdata policy_buffer = NULL;
 u32 __initdata policy_size = 0;
 
-int xsm_policy_init(unsigned long *module_map, const multiboot_info_t *mbi,
-                    void *(*bootstrap_map)(const module_t *))
+int __init xsm_policy_init(unsigned long *module_map,
+                           const multiboot_info_t *mbi,
+                           void *(*bootstrap_map)(const module_t *))
 {
     int i;
     module_t *mod = (module_t *)__va(mbi->mods_addr);

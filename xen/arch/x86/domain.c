@@ -1512,12 +1512,12 @@ static void __context_switch(void)
                                   per_cpu(compat_gdt_table, cpu);
     if ( need_full_gdt(n) )
     {
-        struct page_info *page = virt_to_page(gdt);
+        unsigned long mfn = virt_to_mfn(gdt);
         unsigned int i;
         for ( i = 0; i < NR_RESERVED_GDT_PAGES; i++ )
             l1e_write(n->arch.perdomain_ptes +
                       FIRST_RESERVED_GDT_PAGE + i,
-                      l1e_from_page(page + i, __PAGE_HYPERVISOR));
+                      l1e_from_pfn(mfn + i, __PAGE_HYPERVISOR));
     }
 
     if ( need_full_gdt(p) &&
