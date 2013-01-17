@@ -174,12 +174,36 @@ static hw_irq_controller gic_guest_irq_type = {
     .set_affinity = gic_irq_set_affinity,
 };
 
+/* needs to be called with gic.lock held */
+static void gic_set_irq_properties(unsigned int irq, bool_t level,
+        unsigned int cpu_mask, unsigned int priority)
+{
+    volatile unsigned char *bytereg;
+    uint32_t cfg, edgebit;
+
+    /* Set edge / level */
+    cfg = GICD[GICD_ICFGR + irq / 16];
+    edgebit = 2u << (2 * (irq % 16));
+    if ( level )
+        cfg &= ~edgebit;
+    else
+        cfg |= edgebit;
+    GICD[GICD_ICFGR + irq / 16] = cfg;
+
+    /* Set target CPU mask (RAZ/WI on uniprocessor) */
+    bytereg = (unsigned char *) (GICD + GICD_ITARGETSR);
+    bytereg[irq] = cpu_mask;
+
+    /* Set priority */
+    bytereg = (unsigned char *) (GICD + GICD_IPRIORITYR);
+    bytereg[irq] = priority;
+
+}
+
 /* Program the GIC to route an interrupt */
 static int gic_route_irq(unsigned int irq, bool_t level,
                          unsigned int cpu_mask, unsigned int priority)
 {
-    volatile unsigned char *bytereg;
-    uint32_t cfg, edgebit;
     struct irq_desc *desc = irq_to_desc(irq);
     unsigned long flags;
 
@@ -202,22 +226,7 @@ static int gic_route_irq(unsigned int irq, bool_t level,
     /* Disable interrupt */
     desc->handler->shutdown(desc);
 
-    /* Set edge / level */
-    cfg = GICD[GICD_ICFGR + irq / 16];
-    edgebit = 2u << (2 * (irq % 16));
-    if ( level )
-        cfg &= ~edgebit;
-    else
-        cfg |= edgebit;
-    GICD[GICD_ICFGR + irq / 16] = cfg;
-
-    /* Set target CPU mask (RAZ/WI on uniprocessor) */
-    bytereg = (unsigned char *) (GICD + GICD_ITARGETSR);
-    bytereg[irq] = cpu_mask;
-
-    /* Set priority */
-    bytereg = (unsigned char *) (GICD + GICD_IPRIORITYR);
-    bytereg[irq] = priority;
+    gic_set_irq_properties(irq, level, cpu_mask, priority);
 
     spin_unlock(&gic.lock);
     spin_unlock_irqrestore(&desc->lock, flags);
@@ -561,9 +570,12 @@ int gic_route_irq_to_guest(struct domain *d, unsigned int irq,
     action->name = devname;
 
     spin_lock_irqsave(&desc->lock, flags);
+    spin_lock(&gic.lock);
 
     desc->handler = &gic_guest_irq_type;
     desc->status |= IRQ_GUEST;
+
+    gic_set_irq_properties(irq, 1, 1u << smp_processor_id(), 0xa0);
 
     retval = __setup_irq(desc, irq, action);
     if (retval) {
@@ -572,6 +584,7 @@ int gic_route_irq_to_guest(struct domain *d, unsigned int irq,
     }
 
 out:
+    spin_unlock(&gic.lock);
     spin_unlock_irqrestore(&desc->lock, flags);
     return retval;
 }
