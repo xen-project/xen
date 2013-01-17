@@ -209,9 +209,9 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= b0855f925c6e2e0b21fbb03fab4b5fb5b6876871
 QEMU_UPSTREAM_REVISION ?= master
-SEABIOS_UPSTREAM_TAG ?= rel-1.6.3.2
-# Sun Mar 11 09:27:07 2012 -0400
-# Update version to 1.6.3.2
+SEABIOS_UPSTREAM_TAG ?= rel-1.7.1
+# Wed Aug 29 21:27:37 2012 -0400
+# Make iasl option check work with older versions of iasl.
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
