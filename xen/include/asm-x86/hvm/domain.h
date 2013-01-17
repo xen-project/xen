@@ -74,7 +74,7 @@ struct hvm_domain {
     struct list_head       pinned_cacheattr_ranges;
 
     /* VRAM dirty support. */
-    struct sh_dirty_vram *dirty_vram;
+    struct dv_dirty_vram  *dirty_vram;
 
     /* If one of vcpus of this domain is in no_fill_mode or
      * mtrr/pat between vcpus is not the same, set is_in_uc_mode

@@ -1563,15 +1563,23 @@ int xc_hvm_inject_msi(
     xc_interface *xch, domid_t dom, uint64_t addr, uint32_t data);
 
 /*
- * Track dirty bit changes in the VRAM area
+ * Track dirty bit changes in a VRAM region defined by
+ * [ first_pfn : first_pfn + nr - 1 ]
  *
  * All of this is done atomically:
- * - get the dirty bitmap since the last call
- * - set up dirty tracking area for period up to the next call
- * - clear the dirty tracking area.
+ * - gets the dirty bitmap since the last call, all zeroes for
+ *   the first call with some new region
+ * - sets up a dirty tracking region for period up to the next call
+ * - clears the specified dirty tracking region.
  *
- * Returns -ENODATA and does not fill bitmap if the area has changed since the
- * last call.
+ * Creating a new region causes any existing regions that it overlaps
+ * to be discarded.
+ *
+ * Specifying nr == 0 causes all regions to be discarded and
+ * disables dirty bit tracking.
+ *
+ * If nr is not a multiple of 64, only the first nr bits of bitmap
+ * are well defined.
  */
 int xc_hvm_track_dirty_vram(
     xc_interface *xch, domid_t dom,

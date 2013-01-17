@@ -57,10 +57,6 @@ void  hap_final_teardown(struct domain *d);
 void  hap_teardown(struct domain *d);
 void  hap_vcpu_init(struct vcpu *v);
 void  hap_logdirty_init(struct domain *d);
-int   hap_track_dirty_vram(struct domain *d,
-                           unsigned long begin_pfn,
-                           unsigned long nr,
-                           XEN_GUEST_HANDLE_64(uint8) dirty_bitmap);
 
 extern const struct paging_mode *hap_paging_get_mode(struct vcpu *);
 

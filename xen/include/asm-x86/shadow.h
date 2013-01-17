@@ -62,12 +62,6 @@ void shadow_vcpu_init(struct vcpu *v);
 /* Enable an arbitrary shadow mode.  Call once at domain creation. */
 int shadow_enable(struct domain *d, u32 mode);
 
-/* Enable VRAM dirty bit tracking. */
-int shadow_track_dirty_vram(struct domain *d,
-                            unsigned long first_pfn,
-                            unsigned long nr,
-                            XEN_GUEST_HANDLE_64(uint8) dirty_bitmap);
-
 /* Handler for shadow control ops: operations from user-space to enable
  * and disable ephemeral shadow modes (test mode and log-dirty mode) and
  * manipulate the log-dirty bitmap. */

@@ -154,8 +154,12 @@ void paging_log_dirty_init(struct domain *d,
                            int  (*disable_log_dirty)(struct domain *d),
                            void (*clean_dirty_bitmap)(struct domain *d));
 
-/* mark a page as dirty */
+/* mark a gmfn as dirty, a wrapper around marking a gpfn as dirty */
 void paging_mark_dirty(struct domain *d, unsigned long guest_mfn);
+
+/* mark a gpfn as dirty */
+void paging_mark_dirty_gpfn(struct domain *d, unsigned long gpfn);
+
 
 /* is this guest page dirty? 
  * This is called from inside paging code, with the paging lock held. */
@@ -182,15 +186,6 @@ int paging_mfn_is_dirty(struct domain *d, mfn_t gmfn);
 #else
 #define L4_LOGDIRTY_IDX(pfn) 0
 #endif
-
-/* VRAM dirty tracking support */
-struct sh_dirty_vram {
-    unsigned long begin_pfn;
-    unsigned long end_pfn;
-    paddr_t *sl1ma;
-    uint8_t *dirty_bitmap;
-    s_time_t last_dirty;
-};
 
 /*****************************************************************************
  * Entry points into the paging-assistance code */

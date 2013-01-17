@@ -35,6 +35,7 @@
 #include <asm/flushtlb.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/cacheattr.h>
+#include <asm/dirty_vram.h>
 #include <asm/mtrr.h>
 #include <asm/guest_pt.h>
 #include <public/sched.h>
@@ -149,6 +150,10 @@ delete_fl1_shadow_status(struct vcpu *v, gfn_t gfn, mfn_t smfn)
     SHADOW_PRINTK("gfn=%"SH_PRI_gfn", type=%08x, smfn=%05lx\n",
                    gfn_x(gfn), SH_type_fl1_shadow, mfn_x(smfn));
     ASSERT(mfn_to_page(smfn)->u.sh.head);
+
+    /* Removing any dv_paddr_links to the erstwhile shadow page */
+    dirty_vram_delete_shadow(v, gfn_x(gfn), SH_type_fl1_shadow, smfn);
+    
     shadow_hash_delete(v, gfn_x(gfn), SH_type_fl1_shadow, smfn);
 }
 
@@ -160,6 +165,10 @@ delete_shadow_status(struct vcpu *v, mfn_t gmfn, u32 shadow_type, mfn_t smfn)
                    v->domain->domain_id, v->vcpu_id,
                    mfn_x(gmfn), shadow_type, mfn_x(smfn));
     ASSERT(mfn_to_page(smfn)->u.sh.head);
+    
+    /* Removing any dv_paddr_links to the erstwhile shadow page */
+    dirty_vram_delete_shadow(v, mfn_x(gmfn), shadow_type, smfn);
+    
     shadow_hash_delete(v, mfn_x(gmfn), shadow_type, smfn);
     /* 32-on-64 PV guests don't own their l4 pages; see set_shadow_status */
     if ( !is_pv_32on64_vcpu(v) || shadow_type != SH_type_l4_64_shadow )
@@ -516,7 +525,6 @@ _sh_propagate(struct vcpu *v,
     guest_l1e_t guest_entry = { guest_intpte };
     shadow_l1e_t *sp = shadow_entry_ptr;
     struct domain *d = v->domain;
-    struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
     gfn_t target_gfn = guest_l1e_get_gfn(guest_entry);
     u32 pass_thru_flags;
     u32 gflags, sflags;
@@ -661,17 +669,6 @@ _sh_propagate(struct vcpu *v,
             else if ( !paging_mfn_is_dirty(d, target_mfn) )
                 sflags &= ~_PAGE_RW;
         }
-    }
-
-    if ( unlikely((level == 1) && dirty_vram
-            && dirty_vram->last_dirty == -1
-            && gfn_x(target_gfn) >= dirty_vram->begin_pfn
-            && gfn_x(target_gfn) < dirty_vram->end_pfn) )
-    {
-        if ( ft & FETCH_TYPE_WRITE )
-            dirty_vram->last_dirty = NOW();
-        else
-            sflags &= ~_PAGE_RW;
     }
 
     /* Read-only memory */
@@ -1072,101 +1069,60 @@ static int shadow_set_l2e(struct vcpu *v,
     return flags;
 }
 
-static inline void shadow_vram_get_l1e(shadow_l1e_t new_sl1e,
+/* shadow_vram_fix_l1e()
+ *
+ * Tests L1PTEs as they are modified, looking for when they start to (or
+ * cease to) point to frame buffer pages.  If the old and new gfns differ,
+ * calls dirty_vram_range_update() to updates the dirty_vram structures.
+ */
+static inline void shadow_vram_fix_l1e(shadow_l1e_t old_sl1e,
+                                       shadow_l1e_t new_sl1e,
                                        shadow_l1e_t *sl1e,
                                        mfn_t sl1mfn,
                                        struct domain *d)
 { 
-    mfn_t mfn = shadow_l1e_get_mfn(new_sl1e);
-    int flags = shadow_l1e_get_flags(new_sl1e);
-    unsigned long gfn;
-    struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
+    mfn_t new_mfn, old_mfn;
+    unsigned long new_gfn = INVALID_M2P_ENTRY, old_gfn = INVALID_M2P_ENTRY;
+    paddr_t sl1ma;
+    dv_dirty_vram_t *dirty_vram = d->arch.hvm_domain.dirty_vram;
 
-    if ( !dirty_vram         /* tracking disabled? */
-         || !(flags & _PAGE_RW) /* read-only mapping? */
-         || !mfn_valid(mfn) )   /* mfn can be invalid in mmio_direct */
+    if ( !dirty_vram )
         return;
 
-    gfn = mfn_to_gfn(d, mfn);
-    /* Page sharing not supported on shadow PTs */
-    BUG_ON(SHARED_M2P(gfn));
+    sl1ma = pfn_to_paddr(mfn_x(sl1mfn)) | ((unsigned long)sl1e & ~PAGE_MASK);
 
-    if ( (gfn >= dirty_vram->begin_pfn) && (gfn < dirty_vram->end_pfn) )
+    old_mfn = shadow_l1e_get_mfn(old_sl1e);
+
+    if ( !sh_l1e_is_magic(old_sl1e) &&
+         (l1e_get_flags(old_sl1e) & _PAGE_PRESENT) &&
+         mfn_valid(old_mfn))
     {
-        unsigned long i = gfn - dirty_vram->begin_pfn;
-        struct page_info *page = mfn_to_page(mfn);
-        
-        if ( (page->u.inuse.type_info & PGT_count_mask) == 1 )
-            /* Initial guest reference, record it */
-            dirty_vram->sl1ma[i] = pfn_to_paddr(mfn_x(sl1mfn))
-                | ((unsigned long)sl1e & ~PAGE_MASK);
+        old_gfn = mfn_to_gfn(d, old_mfn);
     }
-}
-
-static inline void shadow_vram_put_l1e(shadow_l1e_t old_sl1e,
-                                       shadow_l1e_t *sl1e,
-                                       mfn_t sl1mfn,
-                                       struct domain *d)
-{
-    mfn_t mfn = shadow_l1e_get_mfn(old_sl1e);
-    int flags = shadow_l1e_get_flags(old_sl1e);
-    unsigned long gfn;
-    struct sh_dirty_vram *dirty_vram = d->arch.hvm_domain.dirty_vram;
-
-    if ( !dirty_vram         /* tracking disabled? */
-         || !(flags & _PAGE_RW) /* read-only mapping? */
-         || !mfn_valid(mfn) )   /* mfn can be invalid in mmio_direct */
-        return;
-
-    gfn = mfn_to_gfn(d, mfn);
-    /* Page sharing not supported on shadow PTs */
-    BUG_ON(SHARED_M2P(gfn));
-
-    if ( (gfn >= dirty_vram->begin_pfn) && (gfn < dirty_vram->end_pfn) )
+    
+    new_mfn = shadow_l1e_get_mfn(new_sl1e);
+    if ( !sh_l1e_is_magic(new_sl1e) &&
+         (l1e_get_flags(new_sl1e) & _PAGE_PRESENT) &&
+         mfn_valid(new_mfn))
     {
-        unsigned long i = gfn - dirty_vram->begin_pfn;
-        struct page_info *page = mfn_to_page(mfn);
-        int dirty = 0;
-        paddr_t sl1ma = pfn_to_paddr(mfn_x(sl1mfn))
-            | ((unsigned long)sl1e & ~PAGE_MASK);
-
-        if ( (page->u.inuse.type_info & PGT_count_mask) == 1 )
-        {
-            /* Last reference */
-            if ( dirty_vram->sl1ma[i] == INVALID_PADDR ) {
-                /* We didn't know it was that one, let's say it is dirty */
-                dirty = 1;
-            }
-            else
-            {
-                ASSERT(dirty_vram->sl1ma[i] == sl1ma);
-                dirty_vram->sl1ma[i] = INVALID_PADDR;
-                if ( flags & _PAGE_DIRTY )
-                    dirty = 1;
-            }
-        }
-        else
-        {
-            /* We had more than one reference, just consider the page dirty. */
-            dirty = 1;
-            /* Check that it's not the one we recorded. */
-            if ( dirty_vram->sl1ma[i] == sl1ma )
-            {
-                /* Too bad, we remembered the wrong one... */
-                dirty_vram->sl1ma[i] = INVALID_PADDR;
-            }
-            else
-            {
-                /* Ok, our recorded sl1e is still pointing to this page, let's
-                 * just hope it will remain. */
-            }
-        }
-        if ( dirty )
-        {
-            dirty_vram->dirty_bitmap[i / 8] |= 1 << (i % 8);
-            dirty_vram->last_dirty = NOW();
-        }
+        new_gfn = mfn_to_gfn(d, new_mfn);
     }
+
+    if ( old_gfn == new_gfn ) return;
+
+    if ( VALID_M2P(old_gfn) )
+        if ( dirty_vram_range_update(d, old_gfn, sl1ma, 0/*clear*/) )
+        {
+            SHADOW_PRINTK("gfn %lx (mfn %lx) cleared vram pte\n",
+                          old_gfn, mfn_x(old_mfn));
+        }
+
+    if ( VALID_M2P(new_gfn) )
+        if ( dirty_vram_range_update(d, new_gfn, sl1ma, 1/*set*/) )
+        {
+            SHADOW_PRINTK("gfn %lx (mfn %lx) set vram pte\n",
+                          new_gfn, mfn_x(new_mfn));
+        }
 }
 
 static int shadow_set_l1e(struct vcpu *v, 
@@ -1211,11 +1167,12 @@ static int shadow_set_l1e(struct vcpu *v,
                 shadow_l1e_remove_flags(new_sl1e, _PAGE_RW);
                 /* fall through */
             case 0:
-                shadow_vram_get_l1e(new_sl1e, sl1e, sl1mfn, d);
                 break;
             }
         }
     } 
+
+    shadow_vram_fix_l1e(old_sl1e, new_sl1e, sl1e, sl1mfn, d);
 
     /* Write the new entry */
     shadow_write_entries(sl1e, &new_sl1e, 1, sl1mfn);
@@ -1231,7 +1188,6 @@ static int shadow_set_l1e(struct vcpu *v,
          * trigger a flush later. */
         if ( shadow_mode_refcounts(d) ) 
         {
-            shadow_vram_put_l1e(old_sl1e, sl1e, sl1mfn, d);
             shadow_put_page_from_l1e(old_sl1e, d);
             TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_SHADOW_L1_PUT_REF);
         } 
@@ -2018,7 +1974,6 @@ void sh_destroy_l1_shadow(struct vcpu *v, mfn_t smfn)
         SHADOW_FOREACH_L1E(sl1mfn, sl1e, 0, 0, {
             if ( (shadow_l1e_get_flags(*sl1e) & _PAGE_PRESENT)
                  && !sh_l1e_is_magic(*sl1e) ) {
-                shadow_vram_put_l1e(*sl1e, sl1e, sl1mfn, d);
                 shadow_put_page_from_l1e(*sl1e, d);
             }
         });
@@ -4334,6 +4289,37 @@ int sh_rm_mappings_from_l1(struct vcpu *v, mfn_t sl1mfn, mfn_t target_mfn)
         }
     });
     return done;
+}
+
+
+int sh_find_vram_mappings_in_l1(struct vcpu *v,
+                                mfn_t sl1mfn,
+                                unsigned long begin_pfn,
+                                unsigned long end_pfn,
+                                int *removed)
+/* Find all VRAM mappings in this shadow l1 table */
+{
+    struct domain *d = v->domain;
+    shadow_l1e_t *sl1e;
+    int done = 0;
+
+    /* only returns _PAGE_PRESENT entries */
+    SHADOW_FOREACH_L1E(sl1mfn, sl1e, 0, done, 
+    {
+        unsigned long gfn;
+        mfn_t gmfn = shadow_l1e_get_mfn(*sl1e);
+        if ( !mfn_valid(gmfn) )
+            continue;
+        gfn = mfn_to_gfn(d, gmfn);
+        if ( VALID_M2P(gfn) && (begin_pfn <= gfn) && (gfn < end_pfn) ) 
+        {
+            paddr_t sl1ma =
+                pfn_to_paddr(mfn_x(sl1mfn)) |
+                ( (unsigned long)sl1e & ~PAGE_MASK );
+            dirty_vram_range_update(v->domain, gfn, sl1ma, 1/*set*/);
+        }
+    });
+    return 0;
 }
 
 /**************************************************************************/
