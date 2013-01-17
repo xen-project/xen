@@ -236,6 +236,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_t);
 /* A batched version of add_to_physmap. */
 #define XENMEM_add_to_physmap_range 23
 struct xen_add_to_physmap_range {
+    /* IN */
     /* Which domain to change the mapping for. */
     domid_t domid;
     uint16_t space; /* => enum phys_map_space */
@@ -247,8 +248,13 @@ struct xen_add_to_physmap_range {
     /* Indexes into space being mapped. */
     XEN_GUEST_HANDLE(xen_ulong_t) idxs;
 
-    /* GPFN in domdwhere the source mapping page should appear. */
+    /* GPFN in domid where the source mapping page should appear. */
     XEN_GUEST_HANDLE(xen_pfn_t) gpfns;
+
+    /* OUT */
+
+    /* Per index error code. */
+    XEN_GUEST_HANDLE(int) errs;
 };
 typedef struct xen_add_to_physmap_range xen_add_to_physmap_range_t;
 DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_range_t);

@@ -612,6 +612,10 @@ static int xenmem_add_to_physmap_range(struct domain *d,
                                        xatpr->foreign_domid,
                                        idx, gpfn);
 
+        rc = copy_to_guest_offset(xatpr->errs, xatpr->size-1, &rc, 1);
+        if ( rc < 0 )
+            goto out;
+
         xatpr->size--;
 
         /* Check for continuation if it's not the last interation */
