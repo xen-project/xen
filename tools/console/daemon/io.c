@@ -24,6 +24,7 @@
 #include "io.h"
 #include <xenstore.h>
 #include <xen/io/console.h>
+#include <xen/grant_table.h>
 
 #include <stdlib.h>
 #include <errno.h>
@@ -66,6 +67,8 @@ extern int discard_overflowed_data;
 static int log_time_hv_needts = 1;
 static int log_time_guest_needts = 1;
 static int log_hv_fd = -1;
+
+static xc_gnttab *xcg_handle = NULL;
 
 static struct pollfd  *fds;
 static unsigned int current_array_size;
@@ -506,6 +509,18 @@ static int xs_gather(struct xs_handle *xs, const char *dir, ...)
 	va_end(ap);
 	return ret;
 }
+
+static void domain_unmap_interface(struct domain *dom)
+{
+	if (dom->interface == NULL)
+		return;
+	if (xcg_handle && dom->ring_ref == -1)
+		xc_gnttab_munmap(xcg_handle, dom->interface, 1);
+	else
+		munmap(dom->interface, getpagesize());
+	dom->interface = NULL;
+	dom->ring_ref = -1;
+}
  
 static int domain_create_ring(struct domain *dom)
 {
@@ -527,9 +542,19 @@ static int domain_create_ring(struct domain *dom)
 	}
 	free(type);
 
-	if (ring_ref != dom->ring_ref) {
-		if (dom->interface != NULL)
-			munmap(dom->interface, getpagesize());
+	/* If using ring_ref and it has changed, remap */
+	if (ring_ref != dom->ring_ref && dom->ring_ref != -1)
+		domain_unmap_interface(dom);
+
+	if (!dom->interface && xcg_handle) {
+		/* Prefer using grant table */
+		dom->interface = xc_gnttab_map_grant_ref(xcg_handle,
+			dom->domid, GNTTAB_RESERVED_CONSOLE,
+			PROT_READ|PROT_WRITE);
+		dom->ring_ref = -1;
+	}
+	if (!dom->interface) {
+		/* Fall back to xc_map_foreign_range */
 		dom->interface = xc_map_foreign_range(
 			xc, dom->domid, getpagesize(),
 			PROT_READ|PROT_WRITE,
@@ -725,9 +750,7 @@ static void shutdown_domain(struct domain *d)
 {
 	d->is_dead = true;
 	watch_domain(d, false);
-	if (d->interface != NULL)
-		munmap(d->interface, getpagesize());
-	d->interface = NULL;
+	domain_unmap_interface(d);
 	if (d->xce_handle != NULL)
 		xc_evtchn_close(d->xce_handle);
 	d->xce_handle = NULL;
@@ -735,7 +758,7 @@ static void shutdown_domain(struct domain *d)
 
 static unsigned enum_pass = 0;
 
-void enum_domains(void)
+static void enum_domains(void)
 {
 	int domid = 1;
 	xc_dominfo_t dominfo;
@@ -996,6 +1019,14 @@ void handle_io(void)
 		}
 	}
 
+	xcg_handle = xc_gnttab_open(NULL, 0);
+	if (xcg_handle == NULL) {
+		dolog(LOG_DEBUG, "Failed to open xcg handle: %d (%s)",
+		      errno, strerror(errno));
+	}
+
+	enum_domains();
+
 	for (;;) {
 		struct domain *d, *n;
 		int poll_timeout; /* timeout in milliseconds */
@@ -1164,6 +1195,10 @@ void handle_io(void)
 	if (xce_handle != NULL) {
 		xc_evtchn_close(xce_handle);
 		xce_handle = NULL;
+	}
+	if (xcg_handle != NULL) {
+		xc_gnttab_close(xcg_handle);
+		xcg_handle = NULL;
 	}
 	log_hv_evtchn = -1;
 }

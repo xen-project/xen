@@ -161,8 +161,6 @@ int main(int argc, char **argv)
 	if (!xen_setup())
 		exit(1);
 
-	enum_domains();
-
 	handle_io();
 
 	closelog();
