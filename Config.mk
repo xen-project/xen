@@ -1,3 +1,6 @@
+pulling from ssh://xenbits.xen.org//home/xen/HG/staging/xen-4.1-testing.hg
+searching for changes
+no changes found
 # -*- mode: Makefile; -*-
 
 # A debug build of Xen and tools?
@@ -179,9 +182,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= b4e9b8169dedc0bcf0d3abe07642f761ac70aeea
-# Sun Dec 2 20:11:22 2012 -0800
-# e1000: Discard packets that are too long if !SBP and !LPE
+QEMU_TAG ?= deb53183e0274a3eaae1577b0d47eb5ef1d8986c
+# Wed Dec 5 13:31:30 2012 -0500
+# e1000: Discard oversized packets based on SBP|LPE
 
 # Optional components
 XENSTAT_XENTOP     ?= y
