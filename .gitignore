@@ -112,6 +112,7 @@ stubdom/ocaml-*
 stubdom/lwip/
 stubdom/ioemu/
 stubdom/stubdompath.sh
+stubdom/vtpm/vtpm_manager.h
 tools/*/build/lib*/*.py
 tools/autom4te.cache
 tools/config.h

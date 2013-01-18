@@ -107,6 +107,7 @@
 ^stubdom/lwip/
 ^stubdom/ioemu/
 ^stubdom/stubdompath\.sh$
+^stubdom/vtpm/vtpm_manager\.h$
 ^tools/.*/build/lib.*/.*\.py$
 ^tools/blktap2/control/tap-ctl$
 ^tools/blktap2/drivers/img2qcow$
