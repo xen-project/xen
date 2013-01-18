@@ -6,44 +6,7 @@ export XEN_OS=MiniOS
 export stubdom=y
 export debug=y
 include $(XEN_ROOT)/Config.mk
-
-#ZLIB_URL?=http://www.zlib.net
-ZLIB_URL=$(XEN_EXTFILES_URL)
-ZLIB_VERSION=1.2.3
-
-#LIBPCI_URL?=http://www.kernel.org/pub/software/utils/pciutils
-LIBPCI_URL?=$(XEN_EXTFILES_URL)
-LIBPCI_VERSION=2.2.9
-
-#NEWLIB_URL?=ftp://sources.redhat.com/pub/newlib
-NEWLIB_URL?=$(XEN_EXTFILES_URL)
-NEWLIB_VERSION=1.16.0
-
-#LWIP_URL?=http://download.savannah.gnu.org/releases/lwip
-LWIP_URL?=$(XEN_EXTFILES_URL)
-LWIP_VERSION=1.3.0
-
-#GRUB_URL?=http://alpha.gnu.org/gnu/grub
-GRUB_URL?=$(XEN_EXTFILES_URL)
-GRUB_VERSION=0.97
-
-#OCAML_URL?=$(XEN_EXTFILES_URL)
-OCAML_URL?=http://caml.inria.fr/pub/distrib/ocaml-3.11
-OCAML_VERSION=3.11.0
-
-GMP_VERSION=4.3.2
-GMP_URL?=$(XEN_EXTFILES_URL)
-#GMP_URL?=ftp://ftp.gmplib.org/pub/gmp-$(GMP_VERSION)
-
-POLARSSL_VERSION=1.1.4
-POLARSSL_URL?=$(XEN_EXTFILES_URL)
-#POLARSSL_URL?=http://polarssl.org/code/releases
-
-TPMEMU_VERSION=0.7.4
-TPMEMU_URL?=$(XEN_EXTFILES_URL)
-#TPMEMU_URL?=http://download.berlios.de/tpm-emulator
-
-WGET=wget -c
+-include $(XEN_ROOT)/config/Stubdom.mk
 
 GNU_TARGET_ARCH:=$(XEN_TARGET_ARCH)
 ifeq ($(XEN_TARGET_ARCH),x86_32)
@@ -86,12 +49,12 @@ TARGET_CPPFLAGS += -I$(XEN_ROOT)/xen/include
 
 TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
 
-TARGETS=ioemu c caml grub xenstore vtpm vtpmmgr
+TARGETS=$(STUBDOM_TARGETS)
 
 .PHONY: all
 all: build
 ifeq ($(STUBDOM_SUPPORTED),1)
-build: genpath ioemu-stubdom c-stubdom pv-grub xenstore-stubdom
+build: genpath $(STUBDOM_BUILD)
 else
 build: genpath
 endif
@@ -241,11 +204,12 @@ tpm_emulator-$(TPMEMU_VERSION).tar.gz:
 	$(WGET) $(TPMEMU_URL)/$@
 
 tpm_emulator-$(XEN_TARGET_ARCH): tpm_emulator-$(TPMEMU_VERSION).tar.gz
+	@if [ ! -f "$(CMAKE)" ]; then echo "cmake not installed! Install it and then rerun ./configure!"; false; fi
 	tar xzf $<
 	mv tpm_emulator-$(TPMEMU_VERSION) $@
 	patch -d $@ -p1 < tpmemu-$(TPMEMU_VERSION).patch;
 	mkdir $@/build
-	cd $@/build; CC=${CC} cmake .. -DCMAKE_C_FLAGS:STRING="-std=c99 -DTPM_NO_EXTERN $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) -Wno-declaration-after-statement"
+	cd $@/build; CC=${CC} $(CMAKE) .. -DCMAKE_C_FLAGS:STRING="-std=c99 -DTPM_NO_EXTERN $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) -Wno-declaration-after-statement"
 	touch $@
 
 TPMEMU_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libtpm.a
@@ -466,8 +430,8 @@ c-stubdom: mini-os-$(XEN_TARGET_ARCH)-c lwip-$(XEN_TARGET_ARCH) libxc c
 vtpm-stubdom: mini-os-$(XEN_TARGET_ARCH)-vtpm vtpm
 	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/vtpm/minios.cfg" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS="$(CURDIR)/vtpm/vtpm.a" APP_LDLIBS="-ltpm -ltpm_crypto -lgmp"
 
-.PHONY: vtpmmgrdom
-vtpmmgrdom: mini-os-$(XEN_TARGET_ARCH)-vtpmmgr vtpmmgr
+.PHONY: vtpmmgr-stubdom
+vtpmmgr-stubdom: mini-os-$(XEN_TARGET_ARCH)-vtpmmgr vtpmmgr
 	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/vtpmmgr/minios.cfg" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS="$(CURDIR)/vtpmmgr/vtpmmgr.a" APP_LDLIBS="-lm"
 
 .PHONY: pv-grub
@@ -483,7 +447,7 @@ xenstore-stubdom: mini-os-$(XEN_TARGET_ARCH)-xenstore libxc xenstore
 #########
 
 ifeq ($(STUBDOM_SUPPORTED),1)
-install: genpath install-readme install-ioemu install-grub install-xenstore
+install: genpath install-readme $(STUBDOM_INSTALL)
 else
 install: genpath
 endif
@@ -503,6 +467,8 @@ install-grub: pv-grub
 	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
 	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-grub/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/pv-grub-$(XEN_TARGET_ARCH).gz"
 
+install-caml: caml-stubdom
+
 install-xenstore: xenstore-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
 	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-xenstore/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/xenstore-stubdom.gz"
@@ -511,9 +477,9 @@ install-vtpm: vtpm-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
 	$(INSTALL_PROG) mini-os-$(XEN_TARGET_ARCH)-vtpm/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/vtpm-stubdom.gz"
 
-install-vtpmmgr: vtpm-stubdom
+install-vtpmmgr: vtpmmgr-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
-	$(INSTALL_PROG) mini-os-$(XEN_TARGET_ARCH)-vtpmmgr/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/vtpmmgrdom.gz"
+	$(INSTALL_PROG) mini-os-$(XEN_TARGET_ARCH)-vtpmmgr/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/vtpmmgr-stubdom.gz"
 
 #######
 # clean
@@ -581,3 +547,9 @@ downloadclean: patchclean
 
 .PHONY: distclean
 distclean: downloadclean
+	-rm ../config/Stubdom.mk
+
+ifeq (,$(findstring clean,$(MAKECMDGOALS)))
+$(XEN_ROOT)/config/Stubdom.mk:
+	$(error You have to run ./configure before building or installing stubdom)
+endif

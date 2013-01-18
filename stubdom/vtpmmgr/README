@@ -4,7 +4,7 @@ November 12 2012
 Authors: Matthew Fioravante (JHUAPL),
 
 This document describes the operation and command line interface
-of vtpmmgrdom. See docs/misc/vtpm.txt for details on the
+of vtpmmgr-stubdom. See docs/misc/vtpm.txt for details on the
 vTPM subsystem as a whole.
 
 
@@ -12,7 +12,7 @@ vTPM subsystem as a whole.
 OPERATION
 ------------------------------
 
-The vtpmmgrdom implements a vTPM manager who has two major functions:
+The vtpmmgr-stubdom implements a vTPM manager who has two major functions:
 
  - Securely store encryption keys for each of the vTPMS
  - Regulate access to the hardware TPM for the entire system

@@ -89,7 +89,10 @@
 ^pristine-.*$
 ^ref-.*$
 ^tmp-.*$
+^stubdom/autom4te\.cache$
 ^stubdom/binutils-.*$
+^stubdom/config\.log$
+^stubdom/config\.status$
 ^stubdom/cross-root-.*$
 ^stubdom/gcc-.*$
 ^stubdom/include$

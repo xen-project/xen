@@ -2,3 +2,5 @@
 cd tools
 autoconf
 autoheader
+cd ../stubdom
+autoconf

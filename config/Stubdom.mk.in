@@ -1,0 +1,45 @@
+# Prefix and install folder
+prefix              := @prefix@
+PREFIX              := $(prefix)
+exec_prefix         := @exec_prefix@
+libdir              := @libdir@
+LIBDIR              := $(libdir)
+
+# Path Programs
+CMAKE               := @CMAKE@
+WGET                := @WGET@ -c
+
+# A debug build of stubdom? //FIXME: Someone make this do something
+debug               := @debug@
+vtpm = @vtpm@
+
+STUBDOM_TARGETS     := @STUBDOM_TARGETS@
+STUBDOM_BUILD       := @STUBDOM_BUILD@
+STUBDOM_INSTALL     := @STUBDOM_INSTALL@
+
+ZLIB_VERSION        := @ZLIB_VERSION@
+ZLIB_URL            := @ZLIB_URL@
+
+LIBPCI_VERSION      := @LIBPCI_VERSION@
+LIBPCI_URL          := @LIBPCI_URL@
+
+NEWLIB_VERSION      := @NEWLIB_VERSION@
+NEWLIB_URL          := @NEWLIB_URL@
+
+LWIP_VERSION        := @LWIP_VERSION@
+LWIP_URL            := @LWIP_URL@
+
+GRUB_VERSION        := @GRUB_VERSION@
+GRUB_URL            := @GRUB_URL@
+
+OCAML_VERSION       := @OCAML_VERSION@
+OCAML_URL           := @OCAML_URL@
+
+GMP_VERSION         := @GMP_VERSION@
+GMP_URL             := @GMP_URL@
+
+POLARSSL_VERSION    := @POLARSSL_VERSION@
+POLARSSL_URL        := @POLARSSL_URL@
+
+TPMEMU_VERSION      := @TPMEMU_VERSION@
+TPMEMU_URL          := @TPMEMU_URL@

@@ -20,7 +20,7 @@ chain of trust rooted in the hardware TPM to virtual machines in Xen. Each
 major component of vTPM is implemented as a separate domain, providing secure
 separation guaranteed by the hypervisor. The vTPM domains are implemented in
 mini-os to reduce memory and processor overhead.
-
+ 
 This mini-os vTPM subsystem was built on top of the previous vTPM
 work done by IBM and Intel corporation.
  
@@ -53,7 +53,7 @@ The architecture of vTPM is described below:
 | mini-os/tpmback  |
 |       |  ^       |
 |       v  |       |
-|   vtpmmgrdom     |
+| vtpmmgr-stubdom  |
 |       |  ^       |
 |       v  |       |
 | mini-os/tpm_tis  |
@@ -72,7 +72,7 @@ The architecture of vTPM is described below:
  * mini-os/tpmback: Mini-os TPM backend driver. The Linux frontend driver
                     connects to this backend driver to facilitate
                     communications between the Linux DomU and its vTPM. This
-                    driver is also used by vtpmmgrdom to communicate with
+                    driver is also used by vtpmmgr-stubdom to communicate with
                     vtpm-stubdom.
 
  * vtpm-stubdom: A mini-os stub domain that implements a vTPM. There is a
@@ -82,20 +82,20 @@ The architecture of vTPM is described below:
 
  * mini-os/tpmfront: Mini-os TPM frontend driver. The vTPM mini-os domain
                      vtpm-stubdom uses this driver to communicate with
-                     vtpmmgrdom. This driver could also be used separately to
+                     vtpmmgr-stubdom. This driver could also be used separately to
                      implement a mini-os domain that wishes to use a vTPM of
                      its own.
 
- * vtpmmgrdom: A mini-os domain that implements the vTPM manager.
+ * vtpmmgr-stubdom: A mini-os domain that implements the vTPM manager.
                There is only one vTPM manager and it should be running during
                the entire lifetime of the machine.  This domain regulates
                access to the physical TPM on the system and secures the
                persistent state of each vTPM.
 
  * mini-os/tpm_tis: Mini-os TPM version 1.2 TPM Interface Specification (TIS)
-                    driver. This driver used by vtpmmgrdom to talk directly to
+                    driver. This driver used by vtpmmgr-stubdom to talk directly to
                     the hardware TPM. Communication is facilitated by mapping
-                    hardware memory pages into vtpmmgrdom.
+                    hardware memory pages into vtpmmgr-stubdom.
 
  * Hardware TPM: The physical TPM that is soldered onto the motherboard.
 
@@ -143,21 +143,21 @@ encrypted data. The image does not require a filesystem
 and can live anywhere on the host disk. The image does not need
 to be large. 8 to 16 Mb should be sufficient.
 
-# dd if=/dev/zero of=/var/vtpmmgrdom.img bs=16M count=1
+# dd if=/dev/zero of=/var/vtpmmgr-stubdom.img bs=16M count=1
 
 Manager config file:
 --------------------
 
-The vTPM Manager domain (vtpmmgrdom) must be started like
+The vTPM Manager domain (vtpmmgr-stubdom) must be started like
 any other Xen virtual machine and requires a config file.
 The manager requires a disk image for storage and permission
 to access the hardware memory pages for the TPM. An
 example configuration looks like the following.
 
-kernel="/usr/lib/xen/boot/vtpmmgrdom.gz"
+kernel="/usr/lib/xen/boot/vtpmmgr-stubdom.gz"
 memory=16
-disk=["file:/var/vtpmmgrdom.img,hda,w"]
-name="vtpmmgrdom"
+disk=["file:/var/vtpmmgr-stubdom.img,hda,w"]
+name="vtpmmgr"
 iomem=["fed40,5"]
 
 The iomem line tells xl to allow access to the TPM
@@ -170,7 +170,7 @@ Starting and stopping the manager:
 The vTPM manager should be started at boot, you may wish to
 create an init script to do this.
 
-# xl create -c vtpmmgrdom.cfg
+# xl create -c vtpmmgr-stubdom.cfg
 
 Once initialization is complete you should see the following:
 INFO[VTPM]: Waiting for commands from vTPM's:
@@ -179,7 +179,7 @@ To shutdown the manager you must destroy it. To avoid data corruption,
 only destroy the manager when you see the above "Waiting for commands"
 message. This ensures the disk is in a consistent state.
 
-# xl destroy vtpmmgrdom
+# xl destroy vtpmmgr-stubdom
 
 ------------------------------
 VTPM AND LINUX PVM SETUP
@@ -211,10 +211,10 @@ kernel="/usr/lib/xen/boot/vtpm-stubdom.gz"
 memory=8
 disk=["file:/home/user/domu/vtpm.img,hda,w"]
 name="domu-vtpm"
-vtpm=["backend=vtpmmgrdom,uuid=ac0a5b9e-cbe2-4c07-b43b-1d69e46fb839"]
+vtpm=["backend=vtpmmgr,uuid=ac0a5b9e-cbe2-4c07-b43b-1d69e46fb839"]
 
 The vtpm= line sets up the tpm frontend driver. The backend must set
-to vtpmmgrdom. You are required to generate a uuid for this vtpm.
+to vtpmmgr. You are required to generate a uuid for this vtpm.
 You can use the uuidgen unix program or some other method to create a
 uuid. The uuid uniquely identifies this vtpm to manager.
 
@@ -273,7 +273,7 @@ The version command should return the following:
 
 You should also see the command being sent to the vtpm console as well
 as the vtpm saving its state. You should see the vtpm key being
-encrypted and stored on the vtpmmgrdom console.
+encrypted and stored on the vtpmmgr console.
 
 To shutdown the guest and its vtpm, you just have to shutdown the guest
 normally. As soon as the guest vm disconnects, the vtpm will shut itself

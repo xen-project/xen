@@ -93,7 +93,10 @@ patches/tmp/*
 pristine-*
 ref-*
 tmp-*
+stubdom/autom4te.cache
 stubdom/binutils-*
+stubdom/config.log
+stubdom/config.status
 stubdom/cross-root-*
 stubdom/gcc-*
 stubdom/include
@@ -123,6 +126,7 @@ tools/config.log
 tools/config.status
 tools/config.cache
 config/Tools.mk
+config/Stubdom.mk
 tools/blktap2/daemon/blktapctrl
 tools/blktap2/drivers/img2qcow
 tools/blktap2/drivers/lock-util
