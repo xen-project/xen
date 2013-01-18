@@ -220,8 +220,9 @@
 #define MSR_F10_MC4_MISC2		0xc0000409
 #define MSR_F10_MC4_MISC3		0xc000040A
 
-/* AMD Family10h MMU control MSRs */
-#define MSR_F10_BU_CFG                  0xc0011023
+/* AMD Family10h Bus Unit MSRs */
+#define MSR_F10_BU_CFG 		0xc0011023
+#define MSR_F10_BU_CFG2		0xc001102a
 
 /* Other AMD Fam10h MSRs */
 #define MSR_FAM10H_MMIO_CONF_BASE	0xc0010058
