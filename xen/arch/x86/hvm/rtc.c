@@ -399,10 +399,17 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
     case RTC_DAY_OF_MONTH:
     case RTC_MONTH:
     case RTC_YEAR:
-        s->hw.cmos_data[s->hw.cmos_index] = data;
-        /* if in set mode, do not update the time */
-        if ( !(s->hw.cmos_data[RTC_REG_B] & RTC_SET) )
+        /* if in set mode, just write the register */
+        if ( (s->hw.cmos_data[RTC_REG_B] & RTC_SET) )
+            s->hw.cmos_data[s->hw.cmos_index] = data;
+        else
+        {
+            /* Fetch the current time and update just this field. */
+            s->current_tm = gmtime(get_localtime(d));
+            rtc_copy_date(s);
+            s->hw.cmos_data[s->hw.cmos_index] = data;
             rtc_set_time(s);
+        }
         alarm_timer_update(s);
         break;
     case RTC_REG_A:
