@@ -65,6 +65,7 @@ disabled at compile time:
     * Development install of Ocaml (e.g. ocaml-nox and
       ocaml-findlib). Required to build ocaml components which
       includes the alternative ocaml xenstored.
+    * cmake (if building vtpm stub domains)
 
 Second, you need to acquire a suitable kernel for use in domain 0. If
 possible you should use a kernel provided by your OS distributor. If
