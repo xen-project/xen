@@ -109,6 +109,9 @@ stubdom/pciutils-*
 stubdom/zlib-*
 stubdom/grub-*
 stubdom/ocaml-*
+stubdom/polarssl-*
+stubdom/gmp-*
+stubdom/tpm_emulator-*
 stubdom/lwip/
 stubdom/ioemu/
 stubdom/stubdompath.sh

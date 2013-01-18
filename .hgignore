@@ -103,6 +103,9 @@
 ^stubdom/pciutils-.*$
 ^stubdom/zlib-.*$
 ^stubdom/grub-.*$
+^stubdom/polarssl-.*$
+^stubdom/gmp-.*$
+^stubdom/tpm_emulator-.*$
 ^stubdom/ocaml-.*$
 ^stubdom/lwip/
 ^stubdom/ioemu/

@@ -31,6 +31,18 @@ GRUB_VERSION=0.97
 OCAML_URL?=http://caml.inria.fr/pub/distrib/ocaml-3.11
 OCAML_VERSION=3.11.0
 
+GMP_VERSION=4.3.2
+GMP_URL?=$(XEN_EXTFILES_URL)
+#GMP_URL?=ftp://ftp.gmplib.org/pub/gmp-$(GMP_VERSION)
+
+POLARSSL_VERSION=1.1.4
+POLARSSL_URL?=$(XEN_EXTFILES_URL)
+#POLARSSL_URL?=http://polarssl.org/code/releases
+
+TPMEMU_VERSION=0.7.4
+TPMEMU_URL?=$(XEN_EXTFILES_URL)
+#TPMEMU_URL?=http://download.berlios.de/tpm-emulator
+
 WGET=wget -c
 
 GNU_TARGET_ARCH:=$(XEN_TARGET_ARCH)
@@ -74,7 +86,7 @@ TARGET_CPPFLAGS += -I$(XEN_ROOT)/xen/include
 
 TARGET_LDFLAGS += -nostdlib -L$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib
 
-TARGETS=ioemu c caml grub xenstore
+TARGETS=ioemu c caml grub xenstore vtpm vtpmmgr
 
 .PHONY: all
 all: build
@@ -174,6 +186,76 @@ lwip-$(XEN_TARGET_ARCH): lwip-$(LWIP_VERSION).tar.gz
 	mv lwip $@
 	patch -d $@ -p0 < lwip.patch-cvs
 	touch $@
+
+#############
+# cross-gmp
+#############
+gmp-$(GMP_VERSION).tar.bz2:
+	$(WGET) $(GMP_URL)/$@
+
+.PHONY: cross-gmp
+ifeq ($(XEN_TARGET_ARCH), x86_32)
+   GMPEXT=ABI=32
+endif
+gmp-$(XEN_TARGET_ARCH): gmp-$(GMP_VERSION).tar.bz2 $(NEWLIB_STAMPFILE)
+	tar xjf $<
+	mv gmp-$(GMP_VERSION) $@
+	#patch -d $@ -p0 < gmp.patch
+	cd $@; CPPFLAGS="-isystem $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include $(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" CC=$(CC) $(GMPEXT) ./configure --disable-shared --enable-static --disable-fft --without-readline --prefix=$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf
+	sed -i 's/#define HAVE_OBSTACK_VPRINTF 1/\/\/#define HAVE_OBSTACK_VPRINTF 1/' $@/config.h
+	touch $@
+
+GMP_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libgmp.a
+cross-gmp: $(GMP_STAMPFILE)
+$(GMP_STAMPFILE): gmp-$(XEN_TARGET_ARCH)
+	( cd $< && \
+	  $(MAKE) && \
+	  $(MAKE) DESTDIR= install )
+
+#############
+# cross-polarssl
+#############
+polarssl-$(POLARSSL_VERSION)-gpl.tgz:
+	$(WGET) $(POLARSSL_URL)/$@
+
+polarssl-$(XEN_TARGET_ARCH): polarssl-$(POLARSSL_VERSION)-gpl.tgz
+	tar xzf $<
+	mv polarssl-$(POLARSSL_VERSION) $@
+	patch -d $@ -p1 < polarssl.patch
+	touch $@
+
+POLARSSL_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libpolarssl.a
+cross-polarssl: $(POLARSSL_STAMPFILE)
+$(POLARSSL_STAMPFILE): polarssl-$(XEN_TARGET_ARCH) $(NEWLIB_STAMPFILE) lwip-$(XEN_TARGET_ARCH)
+	 ( cd $</library && \
+	   make CC="$(CC) $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) -I $(realpath $(MINI_OS)/include)" && \
+	   mkdir -p $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include && \
+	   cp -r ../include/* $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include && \
+	   mkdir -p $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib && \
+	   $(INSTALL_DATA) libpolarssl.a $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib/ )
+
+#############
+# cross-tpmemu
+#############
+tpm_emulator-$(TPMEMU_VERSION).tar.gz:
+	$(WGET) $(TPMEMU_URL)/$@
+
+tpm_emulator-$(XEN_TARGET_ARCH): tpm_emulator-$(TPMEMU_VERSION).tar.gz
+	tar xzf $<
+	mv tpm_emulator-$(TPMEMU_VERSION) $@
+	patch -d $@ -p1 < tpmemu-$(TPMEMU_VERSION).patch;
+	mkdir $@/build
+	cd $@/build; CC=${CC} cmake .. -DCMAKE_C_FLAGS:STRING="-std=c99 -DTPM_NO_EXTERN $(TARGET_CPPFLAGS) $(TARGET_CFLAGS) -Wno-declaration-after-statement"
+	touch $@
+
+TPMEMU_STAMPFILE=$(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libtpm.a
+$(TPMEMU_STAMPFILE): tpm_emulator-$(XEN_TARGET_ARCH) $(GMP_STAMPFILE)
+	( cd $</build && make VERBOSE=1 tpm_crypto tpm  )
+	cp $</build/crypto/libtpm_crypto.a $(CROSS_ROOT)/$(GNU_TARGET_ARCH)-xen-elf/lib/libtpm_crypto.a
+	cp $</build/tpm/libtpm.a $(TPMEMU_STAMPFILE)
+
+.PHONY: cross-tpmemu
+cross-tpmemu: $(TPMEMU_STAMPFILE)
 
 #############
 # Cross-ocaml
@@ -319,6 +401,24 @@ c: $(CROSS_ROOT)
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) 
 
 ######
+# VTPM
+######
+
+.PHONY: vtpm
+vtpm: cross-polarssl cross-tpmemu
+	make -C $(MINI_OS) links
+	XEN_TARGET_ARCH="$(XEN_TARGET_ARCH)" CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
+
+######
+# VTPMMGR
+######
+
+.PHONY: vtpmmgr
+vtpmmgr: cross-polarssl
+	make -C $(MINI_OS) links
+	XEN_TARGET_ARCH="$(XEN_TARGET_ARCH)" CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) -C $@
+
+######
 # Grub
 ######
 
@@ -362,6 +462,14 @@ caml-stubdom: mini-os-$(XEN_TARGET_ARCH)-caml lwip-$(XEN_TARGET_ARCH) libxc cros
 c-stubdom: mini-os-$(XEN_TARGET_ARCH)-c lwip-$(XEN_TARGET_ARCH) libxc c
 	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/c/minios.cfg" $(MAKE) DESTDIR= -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< LWIPDIR=$(CURDIR)/lwip-$(XEN_TARGET_ARCH) APP_OBJS=$(CURDIR)/c/main.a
 
+.PHONY: vtpm-stubdom
+vtpm-stubdom: mini-os-$(XEN_TARGET_ARCH)-vtpm vtpm
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/vtpm/minios.cfg" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS="$(CURDIR)/vtpm/vtpm.a" APP_LDLIBS="-ltpm -ltpm_crypto -lgmp"
+
+.PHONY: vtpmmgrdom
+vtpmmgrdom: mini-os-$(XEN_TARGET_ARCH)-vtpmmgr vtpmmgr
+	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/vtpmmgr/minios.cfg" $(MAKE) -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS="$(CURDIR)/vtpmmgr/vtpmmgr.a" APP_LDLIBS="-lm"
+
 .PHONY: pv-grub
 pv-grub: mini-os-$(XEN_TARGET_ARCH)-grub libxc grub
 	DEF_CPPFLAGS="$(TARGET_CPPFLAGS)" DEF_CFLAGS="$(TARGET_CFLAGS)" DEF_LDFLAGS="$(TARGET_LDFLAGS)" MINIOS_CONFIG="$(CURDIR)/grub/minios.cfg" $(MAKE) DESTDIR= -C $(MINI_OS) OBJ_DIR=$(CURDIR)/$< APP_OBJS=$(CURDIR)/grub-$(XEN_TARGET_ARCH)/main.a
@@ -399,6 +507,14 @@ install-xenstore: xenstore-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
 	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-xenstore/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/xenstore-stubdom.gz"
 
+install-vtpm: vtpm-stubdom
+	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
+	$(INSTALL_PROG) mini-os-$(XEN_TARGET_ARCH)-vtpm/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/vtpm-stubdom.gz"
+
+install-vtpmmgr: vtpm-stubdom
+	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
+	$(INSTALL_PROG) mini-os-$(XEN_TARGET_ARCH)-vtpmmgr/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/vtpmmgrdom.gz"
+
 #######
 # clean
 #######
@@ -411,8 +527,12 @@ clean:
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-caml
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-grub
 	rm -fr mini-os-$(XEN_TARGET_ARCH)-xenstore
+	rm -fr mini-os-$(XEN_TARGET_ARCH)-vtpm
+	rm -fr mini-os-$(XEN_TARGET_ARCH)-vtpmmgr
 	$(MAKE) DESTDIR= -C caml clean
 	$(MAKE) DESTDIR= -C c clean
+	$(MAKE) -C vtpm clean
+	$(MAKE) -C vtpmmgr clean
 	rm -fr grub-$(XEN_TARGET_ARCH)
 	rm -f $(STUBDOMPATH)
 	[ ! -d libxc-$(XEN_TARGET_ARCH) ] || $(MAKE) DESTDIR= -C libxc-$(XEN_TARGET_ARCH) clean
@@ -426,6 +546,10 @@ crossclean: clean
 	rm -fr newlib-$(XEN_TARGET_ARCH)
 	rm -fr zlib-$(XEN_TARGET_ARCH) pciutils-$(XEN_TARGET_ARCH)
 	rm -fr libxc-$(XEN_TARGET_ARCH) ioemu
+	rm -fr gmp-$(XEN_TARGET_ARCH)
+	rm -fr polarssl-$(XEN_TARGET_ARCH)
+	rm -fr openssl-$(XEN_TARGET_ARCH)
+	rm -fr tpm_emulator-$(XEN_TARGET_ARCH)
 	rm -f mk-headers-$(XEN_TARGET_ARCH)
 	rm -fr ocaml-$(XEN_TARGET_ARCH)
 	rm -fr include
@@ -434,6 +558,10 @@ crossclean: clean
 .PHONY: patchclean
 patchclean: crossclean
 	rm -fr newlib-$(NEWLIB_VERSION)
+	rm -fr gmp-$(XEN_TARGET_ARCH)
+	rm -fr polarssl-$(XEN_TARGET_ARCH)
+	rm -fr openssl-$(XEN_TARGET_ARCH)
+	rm -fr tpm_emulator-$(XEN_TARGET_ARCH)
 	rm -fr lwip-$(XEN_TARGET_ARCH)
 	rm -fr grub-upstream
 
@@ -442,10 +570,14 @@ patchclean: crossclean
 downloadclean: patchclean
 	rm -f newlib-$(NEWLIB_VERSION).tar.gz
 	rm -f zlib-$(ZLIB_VERSION).tar.gz
+	rm -f gmp-$(GMP_VERSION).tar.gz
+	rm -f tpm_emulator-$(TPMEMU_VERSION).tar.gz
 	rm -f pciutils-$(LIBPCI_VERSION).tar.bz2
 	rm -f grub-$(GRUB_VERSION).tar.gz
 	rm -f lwip-$(LWIP_VERSION).tar.gz
 	rm -f ocaml-$(OCAML_VERSION).tar.gz
+	rm -f polarssl-$(POLARSSL_VERSION)-gpl.tgz
+	rm -f openssl-$(POLARSSL_VERSION)-gpl.tgz
 
 .PHONY: distclean
 distclean: downloadclean
