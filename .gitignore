@@ -28,6 +28,11 @@ cscope.po.out
 dist
 stubdom/*.tar.gz
 
+autom4te.cache/
+config.log
+config.status
+config/Toplevel.mk
+
 build-*
 dist/*
 docs/*.aux

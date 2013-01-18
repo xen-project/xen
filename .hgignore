@@ -26,6 +26,10 @@
 ^\.pc
 (^|/)(tags|TAGS)$
 (^|/)(GTAGS|GPATH|GSYMS|GRTAGS)$
+^autom4te\.cache$
+^config\.log$
+^config\.status
+^config/Toplevel\.mk
 ^build-.*$
 ^dist/.*$
 ^docs/.*\.aux$
