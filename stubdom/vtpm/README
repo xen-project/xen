@@ -1,0 +1,75 @@
+Copyright (c) 2010-2012 United States Government, as represented by
+the Secretary of Defense.  All rights reserved.
+November 12 2012
+Authors: Matthew Fioravante (JHUAPL),
+
+This document describes the operation and command line interface
+of vtpm-stubdom. See docs/misc/vtpm.txt for details on the
+vTPM subsystem as a whole.
+
+
+------------------------------
+OPERATION
+------------------------------
+
+The vtpm-stubdom is a mini-OS domain that emulates a TPM for the guest OS to
+use. It is a small wrapper around the Berlios TPM emulator
+version 0.7.4. Commands are passed from the linux guest via the
+mini-os TPM backend driver. vTPM data is encrypted and stored via a disk image
+provided to the virtual machine. The key used to encrypt the data along
+with a hash of the vTPM's data is sent to the vTPM manager for secure storage
+and later retrieval.  The vTPM domain communicates with the manager using a
+mini-os tpm front/back device pair.
+
+------------------------------
+COMMAND LINE ARGUMENTS
+------------------------------
+
+Command line arguments are passed to the domain via the 'extra'
+parameter in the VM config file. Each parameter is separated
+by white space. For example:
+
+extra="foo=bar baz"
+
+List of Arguments:
+------------------
+
+loglevel=<LOG>: Controls the amount of logging printed to the console.
+	The possible values for <LOG> are:
+	 error
+	 info (default)
+	 debug
+
+clear: Start the Berlios emulator in "clear" mode. (default)
+
+save: Start the Berlios emulator in "save" mode.
+
+deactivated: Start the Berlios emulator in "deactivated" mode.
+	See the Berlios TPM emulator documentation for details
+	about the startup mode. For all normal use, always use clear
+	which is the default. You should not need to specify any of these.
+
+maintcmds=<1|0>: Enable to disable the TPM maintenance commands.
+	These commands are used by tpm manufacturers and thus
+	open a security hole. They are disabled by default.
+
+hwinitpcr=<PCRSPEC>: Initialize the virtual Platform Configuration Registers
+	(PCRs) with PCR values from the hardware TPM. Each pcr specified by
+	<PCRSPEC> will be initialized with the value of that same PCR in TPM
+	once at startup. By default all PCRs are zero initialized.
+	Value values of <PCRSPEC> are:
+	 all: copy all pcrs
+	 none: copy no pcrs (default)
+	 <N>: copy pcr n
+	 <X-Y>: copy pcrs x to y (inclusive)
+
+	These can also be combined by comma separation, for example:
+	 hwinitpcrs=5,12-16
+	will copy pcrs 5, 12, 13, 14, 15, and 16.
+
+------------------------------
+REFERENCES
+------------------------------
+
+Berlios TPM Emulator:
+http://tpm-emulator.berlios.de/
