@@ -18,6 +18,7 @@
 #ifndef __MULTIBOOT_H__
 #define __MULTIBOOT_H__
 
+#include "const.h"
 
 /*
  * Multiboot header structure.
@@ -31,17 +32,17 @@
 /* The magic number passed by a Multiboot-compliant boot loader. */
 #define MULTIBOOT_BOOTLOADER_MAGIC     0x2BADB002
 
-#define MBI_MEMLIMITS  (1u<< 0)
-#define MBI_BOOTDEV    (1u<< 1)
-#define MBI_CMDLINE    (1u<< 2)
-#define MBI_MODULES    (1u<< 3)
-#define MBI_AOUT_SYMS  (1u<< 4)
-#define MBI_ELF_SYMS   (1u<< 5)
-#define MBI_MEMMAP     (1u<< 6)
-#define MBI_DRIVES     (1u<< 7)
-#define MBI_BIOSCONFIG (1u<< 8)
-#define MBI_LOADERNAME (1u<< 9)
-#define MBI_APM        (1u<<10)
+#define MBI_MEMLIMITS  (_AC(1,u) << 0)
+#define MBI_BOOTDEV    (_AC(1,u) << 1)
+#define MBI_CMDLINE    (_AC(1,u) << 2)
+#define MBI_MODULES    (_AC(1,u) << 3)
+#define MBI_AOUT_SYMS  (_AC(1,u) << 4)
+#define MBI_ELF_SYMS   (_AC(1,u) << 5)
+#define MBI_MEMMAP     (_AC(1,u) << 6)
+#define MBI_DRIVES     (_AC(1,u) << 7)
+#define MBI_BIOSCONFIG (_AC(1,u) << 8)
+#define MBI_LOADERNAME (_AC(1,u) << 9)
+#define MBI_APM        (_AC(1,u) << 10)
 
 #ifndef __ASSEMBLY__
 

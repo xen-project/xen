@@ -88,6 +88,20 @@ __start:
         movzwl  0x413,%eax          /* use base memory size on failure */
         shl     $10-4,%eax
 1:
+        /*
+         * Compare the value in the BDA with the information from the
+         * multiboot structure (if available) and use the smallest.
+         */
+        testb   $MBI_MEMLIMITS,(%ebx)
+        jz      2f                  /* not available? BDA value will be fine */
+        mov     4(%ebx),%edx
+        cmp     $0x100,%edx         /* is the multiboot value too small? */
+        jb      2f                  /* if so, do not use it */
+        shl     $10-4,%edx
+        cmp     %eax,%edx           /* compare with BDA value */
+        cmovb   %edx,%eax           /* and use the smaller */
+
+2:      /* Reserve 64kb for the trampoline */
         sub     $0x1000,%eax
 
         /* From arch/x86/smpboot.c: start_eip had better be page-aligned! */
