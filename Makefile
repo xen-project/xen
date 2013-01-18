@@ -6,6 +6,11 @@
 .PHONY: all
 all: dist
 
+-include config/Toplevel.mk
+SUBSYSTEMS?=xen kernels tools stubdom docs
+TARGS_DIST=$(patsubst %, dist-%, $(SUBSYSTEMS))
+TARGS_INSTALL=$(patsubst %, install-%, $(SUBSYSTEMS))
+
 export XEN_ROOT=$(CURDIR)
 include Config.mk
 
@@ -15,7 +20,7 @@ include buildconfigs/Rules.mk
 
 # build and install everything into the standard system directories
 .PHONY: install
-install: install-xen install-kernels install-tools install-stubdom install-docs
+install: $(TARGS_INSTALL)
 
 .PHONY: build
 build: kernels
@@ -37,7 +42,7 @@ test:
 # build and install everything into local dist directory
 .PHONY: dist
 dist: DESTDIR=$(DISTDIR)/install
-dist: dist-xen dist-kernels dist-tools dist-stubdom dist-docs dist-misc
+dist: $(TARGS_DIST) dist-misc
 
 dist-misc:
 	$(INSTALL_DIR) $(DISTDIR)/
@@ -151,6 +156,7 @@ endif
 # clean, but blow away kernel build tree plus tarballs
 .PHONY: distclean
 distclean:
+	-rm config/Toplevel.mk
 	$(MAKE) -C xen distclean
 	$(MAKE) -C tools distclean
 	$(MAKE) -C stubdom distclean

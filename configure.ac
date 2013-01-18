@@ -6,7 +6,16 @@ AC_INIT([Xen Hypervisor], m4_esyscmd([./version.sh ./xen/Makefile]),
     [xen-devel@lists.xen.org], [xen], [http://www.xen.org/])
 AC_CONFIG_SRCDIR([./xen/common/kernel.c])
 AC_PREFIX_DEFAULT([/usr])
+AC_CONFIG_FILES([./config/Toplevel.mk])
 
-AC_CONFIG_SUBDIRS([tools stubdom])
+m4_include([m4/features.m4])
+m4_include([m4/subsystem.m4])
+
+AX_SUBSYSTEM_DEFAULT_ENABLE([xen])
+AX_SUBSYSTEM_DEFAULT_ENABLE([kernels])
+AX_SUBSYSTEM_DEFAULT_ENABLE([tools])
+AX_SUBSYSTEM_DEFAULT_ENABLE([stubdom])
+AX_SUBSYSTEM_DEFAULT_ENABLE([docs])
+AX_SUBSYSTEM_FINISH
 
 AC_OUTPUT()
