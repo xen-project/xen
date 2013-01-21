@@ -12,7 +12,7 @@
 XEN_ROOT=../..
 
 PSSL_DIR=../polarssl-$(XEN_TARGET_ARCH)/library
-PSSL_OBJS=aes.o sha1.o entropy.o ctr_drbg.o sha4.o
+PSSL_OBJS=aes.o sha1.o entropy.o ctr_drbg.o sha4.o padlock.o
 
 TARGET=vtpm.a
 OBJS=vtpm.o vtpm_cmd.o vtpmblk.o vtpm_pcrs.o

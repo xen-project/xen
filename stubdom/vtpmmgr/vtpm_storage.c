@@ -655,7 +655,7 @@ TPM_RESULT vtpm_storage_load_header(void)
 
    /* Validate the length of the output buffer */
    if(datalen < AES_KEY_SIZE + sizeof(UINT32)) {
-      vtpmlogerror(VTPM_LOG_VTPM, "Unbound AES key size (%d) was too small! expected (%ld)\n", datalen, AES_KEY_SIZE + sizeof(UINT32));
+      vtpmlogerror(VTPM_LOG_VTPM, "Unbound AES key size (%d) was too small! expected (%zu)\n", datalen, AES_KEY_SIZE + sizeof(UINT32));
       status = TPM_IOERROR;
       goto abort_egress;
    }
