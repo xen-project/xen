@@ -68,17 +68,55 @@ static void __init processor_id(void)
            READ_CP32(ID_ISAR3), READ_CP32(ID_ISAR4), READ_CP32(ID_ISAR5));
 }
 
+/*
+ * Returns the end address of the highest region in the range s..e
+ * with required size and alignment that does not conflict with the
+ * modules from first_mod to nr_modules.
+ *
+ * For non-recursive callers first_mod should normally be 1.
+ */
+static paddr_t __init consider_modules(paddr_t s, paddr_t e,
+                                       uint32_t size, paddr_t align,
+                                       int first_mod)
+{
+    const struct dt_module_info *mi = &early_info.modules;
+    int i;
+
+    s = (s+align-1) & ~(align-1);
+    e = e & ~(align-1);
+
+    if ( s > e ||  e - s < size )
+        return 0;
+
+    for ( i = first_mod; i <= mi->nr_mods; i++ )
+    {
+        paddr_t mod_s = mi->module[i].start;
+        paddr_t mod_e = mod_s + mi->module[i].size;
+
+        if ( s < mod_e && mod_s < e )
+        {
+            mod_e = consider_modules(mod_e, e, size, align, i+1);
+            if ( mod_e )
+                return mod_e;
+
+            return consider_modules(s, mod_s, size, align, i+1);
+        }
+    }
+
+    return e;
+}
+
 /**
  * get_xen_paddr - get physical address to relocate Xen to
  *
- * Xen is relocated to the top of RAM and aligned to a XEN_PADDR_ALIGN
- * boundary.
+ * Xen is relocated to as near to the top of RAM as possible and
+ * aligned to a XEN_PADDR_ALIGN boundary.
  */
 static paddr_t __init get_xen_paddr(void)
 {
     struct dt_mem_info *mi = &early_info.mem;
     paddr_t min_size;
-    paddr_t paddr = 0, t;
+    paddr_t paddr = 0;
     int i;
 
     min_size = (_end - _start + (XEN_PADDR_ALIGN-1)) & ~(XEN_PADDR_ALIGN-1);
@@ -86,16 +124,32 @@ static paddr_t __init get_xen_paddr(void)
     /* Find the highest bank with enough space. */
     for ( i = 0; i < mi->nr_banks; i++ )
     {
-        if ( mi->bank[i].size >= min_size )
+        const struct membank *bank = &mi->bank[i];
+        paddr_t s, e;
+
+        if ( bank->size >= min_size )
         {
-            t = mi->bank[i].start + mi->bank[i].size - min_size;
-            if ( t > paddr )
-                paddr = t;
+            e = consider_modules(bank->start, bank->start + bank->size,
+                                 min_size, XEN_PADDR_ALIGN, 1);
+            if ( !e )
+                continue;
+
+            s = e - min_size;
+
+            if ( s > paddr )
+                paddr = s;
         }
     }
 
     if ( !paddr )
         early_panic("Not enough memory to relocate Xen\n");
+
+    early_printk("Placing Xen at 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
+                 paddr, paddr + min_size);
+
+    /* Xen is module 0 */
+    early_info.modules.module[0].start = paddr;
+    early_info.modules.module[0].size = min_size;
 
     return paddr;
 }
