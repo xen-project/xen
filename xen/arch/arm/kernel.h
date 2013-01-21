@@ -22,6 +22,7 @@ struct kernel_info {
 
     union {
         struct {
+            paddr_t kernel_addr;
             paddr_t load_addr;
             paddr_t len;
         } zimage;
@@ -33,9 +34,19 @@ struct kernel_info {
     };
 
     void (*load)(struct kernel_info *info);
+    int load_attr;
 };
 
 int kernel_prepare(struct kernel_info *info);
 void kernel_load(struct kernel_info *info);
 
 #endif /* #ifdef __ARCH_ARM_KERNEL_H__ */
+
+/*
+ * Local variables:
+ * mode: C
+ * c-set-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

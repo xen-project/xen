@@ -22,6 +22,7 @@
 #define ZIMAGE_MAGIC_OFFSET 0x24
 #define ZIMAGE_START_OFFSET 0x28
 #define ZIMAGE_END_OFFSET   0x2c
+#define ZIMAGE_HEADER_LEN   0x30
 
 #define ZIMAGE_MAGIC 0x016f2818
 
@@ -65,40 +66,42 @@ void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len, int attrindx)
 static void kernel_zimage_load(struct kernel_info *info)
 {
     paddr_t load_addr = info->zimage.load_addr;
+    paddr_t paddr = info->zimage.kernel_addr;
+    paddr_t attr = info->load_attr;
     paddr_t len = info->zimage.len;
-    paddr_t flash = KERNEL_FLASH_ADDRESS;
-    void *src = (void *)FIXMAP_ADDR(FIXMAP_MISC);
     unsigned long offs;
 
-    printk("Loading %"PRIpaddr" byte zImage from flash %"PRIpaddr" to %"PRIpaddr"-%"PRIpaddr": [",
-           len, flash, load_addr, load_addr + len);
-    for ( offs = 0; offs < len; offs += PAGE_SIZE )
+    printk("Loading zImage from %"PRIpaddr" to %"PRIpaddr"-%"PRIpaddr"\n",
+           paddr, load_addr, load_addr + len);
+    for ( offs = 0; offs < len; )
     {
-        paddr_t ma = gvirt_to_maddr(load_addr + offs);
+        paddr_t s, l, ma = gvirt_to_maddr(load_addr + offs);
         void *dst = map_domain_page(ma>>PAGE_SHIFT);
 
-        if ( ( offs % (1<<20) ) == 0 )
-            printk(".");
+        s = offs & ~PAGE_MASK;
+        l = min(PAGE_SIZE - s, len);
 
-        set_fixmap(FIXMAP_MISC, (flash+offs) >> PAGE_SHIFT, DEV_SHARED);
-        memcpy(dst, src, PAGE_SIZE);
-        clear_fixmap(FIXMAP_MISC);
+        copy_from_paddr(dst + s, paddr + offs, l, attr);
 
         unmap_domain_page(dst);
+        offs += l;
     }
-    printk("]\n");
 }
 
 /**
  * Check the image is a zImage and return the load address and length
  */
-static int kernel_try_zimage_prepare(struct kernel_info *info)
+static int kernel_try_zimage_prepare(struct kernel_info *info,
+                                     paddr_t addr, paddr_t size)
 {
-    uint32_t *zimage = (void *)FIXMAP_ADDR(FIXMAP_MISC);
+    uint32_t zimage[ZIMAGE_HEADER_LEN/4];
     uint32_t start, end;
     struct minimal_dtb_header dtb_hdr;
 
-    set_fixmap(FIXMAP_MISC, KERNEL_FLASH_ADDRESS >> PAGE_SHIFT, DEV_SHARED);
+    if ( size < ZIMAGE_HEADER_LEN )
+        return -EINVAL;
+
+    copy_from_paddr(zimage, addr, sizeof(zimage), DEV_SHARED);
 
     if (zimage[ZIMAGE_MAGIC_OFFSET/4] != ZIMAGE_MAGIC)
         return -EINVAL;
@@ -106,15 +109,25 @@ static int kernel_try_zimage_prepare(struct kernel_info *info)
     start = zimage[ZIMAGE_START_OFFSET/4];
     end = zimage[ZIMAGE_END_OFFSET/4];
 
-    clear_fixmap(FIXMAP_MISC);
+    if ( (end - start) > size )
+        return -EINVAL;
 
     /*
      * Check for an appended DTB.
      */
-    copy_from_paddr(&dtb_hdr, KERNEL_FLASH_ADDRESS + end - start, sizeof(dtb_hdr), DEV_SHARED);
-    if (be32_to_cpu(dtb_hdr.magic) == DTB_MAGIC) {
-        end += be32_to_cpu(dtb_hdr.total_size);
+    if ( addr + end - start + sizeof(dtb_hdr) <= size )
+    {
+        copy_from_paddr(&dtb_hdr, addr + end - start,
+                        sizeof(dtb_hdr), DEV_SHARED);
+        if (be32_to_cpu(dtb_hdr.magic) == DTB_MAGIC) {
+            end += be32_to_cpu(dtb_hdr.total_size);
+
+            if ( end > addr + size )
+                return -EINVAL;
+        }
     }
+
+    info->zimage.kernel_addr = addr;
 
     /*
      * If start is zero, the zImage is position independent -- load it
@@ -142,25 +155,26 @@ static void kernel_elf_load(struct kernel_info *info)
     free_xenheap_pages(info->kernel_img, info->kernel_order);
 }
 
-static int kernel_try_elf_prepare(struct kernel_info *info)
+static int kernel_try_elf_prepare(struct kernel_info *info,
+                                  paddr_t addr, paddr_t size)
 {
     int rc;
 
-    info->kernel_order = get_order_from_bytes(KERNEL_FLASH_SIZE);
+    info->kernel_order = get_order_from_bytes(size);
     info->kernel_img = alloc_xenheap_pages(info->kernel_order, 0);
     if ( info->kernel_img == NULL )
         panic("Cannot allocate temporary buffer for kernel.\n");
 
-    copy_from_paddr(info->kernel_img, KERNEL_FLASH_ADDRESS, KERNEL_FLASH_SIZE, DEV_SHARED);
+    copy_from_paddr(info->kernel_img, addr, size, info->load_attr);
 
-    if ( (rc = elf_init(&info->elf.elf, info->kernel_img, KERNEL_FLASH_SIZE )) != 0 )
-        return rc;
+    if ( (rc = elf_init(&info->elf.elf, info->kernel_img, size )) != 0 )
+        goto err;
 #ifdef VERBOSE
     elf_set_verbose(&info->elf.elf);
 #endif
     elf_parse_binary(&info->elf.elf);
     if ( (rc = elf_xen_parse(&info->elf.elf, &info->elf.parms)) != 0 )
-        return rc;
+        goto err;
 
     /*
      * TODO: can the ELF header be used to find the physical address
@@ -170,15 +184,38 @@ static int kernel_try_elf_prepare(struct kernel_info *info)
     info->load = kernel_elf_load;
 
     return 0;
+err:
+    free_xenheap_pages(info->kernel_img, info->kernel_order);
+    return rc;
 }
 
 int kernel_prepare(struct kernel_info *info)
 {
     int rc;
 
-    rc = kernel_try_zimage_prepare(info);
+    paddr_t start, size;
+
+    if ( early_info.modules.nr_mods > 1 )
+        panic("Cannot handle dom0 initrd yet\n");
+
+    if ( early_info.modules.nr_mods < 1 )
+    {
+        printk("No boot modules found, trying flash\n");
+        start = KERNEL_FLASH_ADDRESS;
+        size = KERNEL_FLASH_SIZE;
+        info->load_attr = DEV_SHARED;
+    }
+    else
+    {
+        printk("Loading kernel from boot module 1\n");
+        start = early_info.modules.module[1].start;
+        size = early_info.modules.module[1].size;
+        info->load_attr = BUFFERABLE;
+    }
+
+    rc = kernel_try_zimage_prepare(info, start, size);
     if (rc < 0)
-        rc = kernel_try_elf_prepare(info);
+        rc = kernel_try_elf_prepare(info, start, size);
 
     return rc;
 }
