@@ -84,6 +84,9 @@ static void __init get_val(const u32 **cell, u32 cells, u64 *val)
 {
     *val = 0;
 
+    if ( cells > 2 )
+        early_panic("dtb value contains > 2 cells\n");
+
     while ( cells-- )
     {
         *val <<= 32;
