@@ -73,7 +73,8 @@ static void __init processor_id(void)
  * with required size and alignment that does not conflict with the
  * modules from first_mod to nr_modules.
  *
- * For non-recursive callers first_mod should normally be 1.
+ * For non-recursive callers first_mod should normally be 0 (all
+ * modules and Xen itself) or 1 (all modules but not Xen).
  */
 static paddr_t __init consider_modules(paddr_t s, paddr_t e,
                                        uint32_t size, paddr_t align,
@@ -105,6 +106,34 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
 
     return e;
 }
+
+/*
+ * Return the end of the non-module region starting at s. In other
+ * words return s the start of the next modules after s.
+ *
+ * Also returns the end of that module in *n.
+ */
+static paddr_t __init next_module(paddr_t s, paddr_t *n)
+{
+    struct dt_module_info *mi = &early_info.modules;
+    paddr_t lowest = ~(paddr_t)0;
+    int i;
+
+    for ( i = 0; i <= mi->nr_mods; i++ )
+    {
+        paddr_t mod_s = mi->module[i].start;
+        paddr_t mod_e = mod_s + mi->module[i].size;
+
+        if ( mod_s < s )
+            continue;
+        if ( mod_s > lowest )
+            continue;
+        lowest = mod_s;
+        *n = mod_e;
+    }
+    return lowest;
+}
+
 
 /**
  * get_xen_paddr - get physical address to relocate Xen to
@@ -159,6 +188,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     paddr_t ram_start;
     paddr_t ram_end;
     paddr_t ram_size;
+    paddr_t s, e;
     unsigned long ram_pages;
     unsigned long heap_pages, xenheap_pages, domheap_pages;
     unsigned long dtb_pages;
@@ -176,22 +206,37 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     ram_pages = ram_size >> PAGE_SHIFT;
 
     /*
-     * Calculate the sizes for the heaps using these constraints:
+     * Locate the xenheap using these constraints:
      *
-     *  - heaps must be 32 MiB aligned
-     *  - must not include Xen itself
-     *  - xen heap must be at most 1 GiB
+     *  - must be 32 MiB aligned
+     *  - must not include Xen itself or the boot modules
+     *  - must be at most 1 GiB
+     *  - must be at least 128M
      *
-     * XXX: needs a platform with at least 1GiB of RAM or the dom
-     * heap will be empty and no domains can be created.
+     * We try to allocate the largest xenheap possible within these
+     * constraints.
      */
-    heap_pages = (ram_size >> PAGE_SHIFT) - (32 << (20 - PAGE_SHIFT));
+    heap_pages = (ram_size >> PAGE_SHIFT);
     xenheap_pages = min(1ul << (30 - PAGE_SHIFT), heap_pages);
+
+    do
+    {
+        e = consider_modules(ram_start, ram_end, xenheap_pages<<PAGE_SHIFT,
+                             32<<20, 0);
+        if ( e )
+            break;
+
+        xenheap_pages >>= 1;
+    } while ( xenheap_pages > 128<<(20-PAGE_SHIFT) );
+
+    if ( ! e )
+        panic("Not not enough space for xenheap\n");
+
     domheap_pages = heap_pages - xenheap_pages;
 
     printk("Xen heap: %lu pages  Dom heap: %lu pages\n", xenheap_pages, domheap_pages);
 
-    setup_xenheap_mappings(ram_start >> PAGE_SHIFT, xenheap_pages);
+    setup_xenheap_mappings((e >> PAGE_SHIFT) - xenheap_pages, xenheap_pages);
 
     /*
      * Need a single mapped page for populating bootmem_region_list
@@ -215,8 +260,30 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     copy_from_paddr(device_tree_flattened, dtb_paddr, dtb_size, BUFFERABLE);
 
     /* Add non-xenheap memory */
-    init_boot_pages(pfn_to_paddr(xenheap_mfn_start + xenheap_pages),
-                    pfn_to_paddr(xenheap_mfn_start + xenheap_pages + domheap_pages));
+    s = ram_start;
+    while ( s < ram_end )
+    {
+        paddr_t n = ram_end;
+
+        e = next_module(s, &n);
+
+        if ( e == ~(paddr_t)0 )
+        {
+            e = n = ram_end;
+        }
+
+        /* Avoid the xenheap */
+        if ( s < ((xenheap_mfn_start+xenheap_pages) << PAGE_SHIFT)
+             && (xenheap_mfn_start << PAGE_SHIFT) < e )
+        {
+            e = pfn_to_paddr(xenheap_mfn_start);
+            n = pfn_to_paddr(xenheap_mfn_start+xenheap_pages);
+        }
+
+        init_boot_pages(s, e);
+
+        s = n;
+    }
 
     setup_frametable_mappings(ram_start, ram_end);
     max_page = PFN_DOWN(ram_end);
