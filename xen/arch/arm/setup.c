@@ -68,6 +68,22 @@ static void __init processor_id(void)
            READ_CP32(ID_ISAR3), READ_CP32(ID_ISAR4), READ_CP32(ID_ISAR5));
 }
 
+void __init discard_initial_modules(void)
+{
+    struct dt_module_info *mi = &early_info.modules;
+    int i;
+
+    for ( i = 1; i <= mi->nr_mods; i++ )
+    {
+        paddr_t s = mi->module[i].start;
+        paddr_t e = s + PAGE_ALIGN(mi->module[i].size);
+
+        init_domheap_pages(s, e);
+    }
+
+    mi->nr_mods = 0;
+}
+
 /*
  * Returns the end address of the highest region in the range s..e
  * with required size and alignment that does not conflict with the

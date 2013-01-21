@@ -10,6 +10,7 @@
 #include <xen/device_tree.h>
 #include <xen/libfdt/libfdt.h>
 #include <xen/guest_access.h>
+#include <asm/setup.h>
 
 #include <asm/gic.h>
 #include "kernel.h"
@@ -305,6 +306,8 @@ int construct_dom0(struct domain *d)
 
     dtb_load(&kinfo);
     kernel_load(&kinfo);
+
+    discard_initial_modules();
 
     clear_bit(_VPF_down, &v->pause_flags);
 
