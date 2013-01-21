@@ -15,6 +15,7 @@
 #define DEVICE_TREE_MAX_DEPTH 16
 
 #define NR_MEM_BANKS 8
+#define NR_MODULES 2
 
 struct membank {
     paddr_t start;
@@ -33,9 +34,22 @@ struct dt_gic_info {
     paddr_t gic_vcpu_addr;
 };
 
+struct dt_mb_module {
+    paddr_t start;
+    paddr_t size;
+    char cmdline[1024];
+};
+
+struct dt_module_info {
+    int nr_mods;
+    /* Module 0 is Xen itself, followed by the provided modules-proper */
+    struct dt_mb_module module[NR_MODULES + 1];
+};
+
 struct dt_early_info {
     struct dt_mem_info mem;
     struct dt_gic_info gic;
+    struct dt_module_info modules;
 };
 
 typedef int (*device_tree_node_func)(const void *fdt,
