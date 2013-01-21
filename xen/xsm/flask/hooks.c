@@ -1055,6 +1055,16 @@ static inline int flask_tmem_control(void)
     return domain_has_xen(current->domain, XEN__TMEM_CONTROL);
 }
 
+static int flask_add_to_physmap(struct domain *d1, struct domain *d2)
+{
+    return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__PHYSMAP);
+}
+
+static int flask_remove_from_physmap(struct domain *d1, struct domain *d2)
+{
+    return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__PHYSMAP);
+}
+
 #ifdef CONFIG_X86
 static int flask_shadow_control(struct domain *d, uint32_t op)
 {
@@ -1325,16 +1335,6 @@ static int flask_update_va_mapping(struct domain *d, struct domain *f,
     return domain_has_perm(d, f, SECCLASS_MMU, map_perms);
 }
 
-static int flask_add_to_physmap(struct domain *d1, struct domain *d2)
-{
-    return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__PHYSMAP);
-}
-
-static int flask_remove_from_physmap(struct domain *d1, struct domain *d2)
-{
-    return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__PHYSMAP);
-}
-
 static int flask_get_device_group(uint32_t machine_bdf)
 {
     u32 rsid;
@@ -1501,6 +1501,9 @@ static struct xsm_operations flask_ops = {
 
     .do_xsm_op = do_flask_op,
 
+    .add_to_physmap = flask_add_to_physmap,
+    .remove_from_physmap = flask_remove_from_physmap,
+
 #ifdef CONFIG_X86
     .shadow_control = flask_shadow_control,
     .hvm_param = flask_hvm_param,
@@ -1518,8 +1521,6 @@ static struct xsm_operations flask_ops = {
     .mmu_update = flask_mmu_update,
     .mmuext_op = flask_mmuext_op,
     .update_va_mapping = flask_update_va_mapping,
-    .add_to_physmap = flask_add_to_physmap,
-    .remove_from_physmap = flask_remove_from_physmap,
     .get_device_group = flask_get_device_group,
     .test_assign_device = flask_test_assign_device,
     .assign_device = flask_assign_device,

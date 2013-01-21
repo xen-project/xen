@@ -90,6 +90,7 @@ struct xsm_operations {
     int (*memory_adjust_reservation) (struct domain *d1, struct domain *d2);
     int (*memory_stat_reservation) (struct domain *d1, struct domain *d2);
     int (*memory_pin_page) (struct domain *d1, struct domain *d2, struct page_info *page);
+    int (*add_to_physmap) (struct domain *d1, struct domain *d2);
     int (*remove_from_physmap) (struct domain *d1, struct domain *d2);
 
     int (*console_io) (struct domain *d, int cmd);
@@ -149,7 +150,6 @@ struct xsm_operations {
                        struct domain *f, uint32_t flags);
     int (*mmuext_op) (struct domain *d, struct domain *f);
     int (*update_va_mapping) (struct domain *d, struct domain *f, l1_pgentry_t pte);
-    int (*add_to_physmap) (struct domain *d1, struct domain *d2);
     int (*bind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
     int (*unbind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
     int (*ioport_permission) (struct domain *d, uint32_t s, uint32_t e, uint8_t allow);
@@ -333,6 +333,11 @@ static inline int xsm_memory_pin_page(xsm_default_t def, struct domain *d1, stru
                                       struct page_info *page)
 {
     return xsm_ops->memory_pin_page(d1, d2, page);
+}
+
+static inline int xsm_add_to_physmap(xsm_default_t def, struct domain *d1, struct domain *d2)
+{
+    return xsm_ops->add_to_physmap(d1, d2);
 }
 
 static inline int xsm_remove_from_physmap(xsm_default_t def, struct domain *d1, struct domain *d2)
@@ -556,11 +561,6 @@ static inline int xsm_update_va_mapping(xsm_default_t def, struct domain *d, str
                                                             l1_pgentry_t pte)
 {
     return xsm_ops->update_va_mapping(d, f, pte);
-}
-
-static inline int xsm_add_to_physmap(xsm_default_t def, struct domain *d1, struct domain *d2)
-{
-    return xsm_ops->add_to_physmap(d1, d2);
 }
 
 static inline int xsm_bind_pt_irq(xsm_default_t def, struct domain *d,

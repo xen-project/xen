@@ -443,6 +443,18 @@ static XSM_INLINE int xsm_pci_config_permission(XSM_DEFAULT_ARG struct domain *d
     return xsm_default_action(action, current->domain, d);
 }
 
+static XSM_INLINE int xsm_add_to_physmap(XSM_DEFAULT_ARG struct domain *d1, struct domain *d2)
+{
+    XSM_ASSERT_ACTION(XSM_TARGET);
+    return xsm_default_action(action, d1, d2);
+}
+
+static XSM_INLINE int xsm_remove_from_physmap(XSM_DEFAULT_ARG struct domain *d1, struct domain *d2)
+{
+    XSM_ASSERT_ACTION(XSM_TARGET);
+    return xsm_default_action(action, d1, d2);
+}
+
 #ifdef CONFIG_X86
 static XSM_INLINE int xsm_shadow_control(XSM_DEFAULT_ARG struct domain *d, uint32_t op)
 {
@@ -542,18 +554,6 @@ static XSM_INLINE int xsm_update_va_mapping(XSM_DEFAULT_ARG struct domain *d, st
 {
     XSM_ASSERT_ACTION(XSM_TARGET);
     return xsm_default_action(action, d, f);
-}
-
-static XSM_INLINE int xsm_add_to_physmap(XSM_DEFAULT_ARG struct domain *d1, struct domain *d2)
-{
-    XSM_ASSERT_ACTION(XSM_TARGET);
-    return xsm_default_action(action, d1, d2);
-}
-
-static XSM_INLINE int xsm_remove_from_physmap(XSM_DEFAULT_ARG struct domain *d1, struct domain *d2)
-{
-    XSM_ASSERT_ACTION(XSM_TARGET);
-    return xsm_default_action(action, d1, d2);
 }
 
 static XSM_INLINE int xsm_bind_pt_irq(XSM_DEFAULT_ARG struct domain *d, struct xen_domctl_bind_pt_irq *bind)

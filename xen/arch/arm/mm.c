@@ -35,6 +35,7 @@
 #include <asm/current.h>
 #include <public/memory.h>
 #include <xen/sched.h>
+#include <xsm/xsm.h>
 
 struct domain *dom_xen, *dom_io, *dom_cow;
 
@@ -655,6 +656,13 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( rc != 0 )
             return rc;
 
+        rc = xsm_add_to_physmap(XSM_TARGET, current->domain, d);
+        if ( rc )
+        {
+            rcu_unlock_domain(d);
+            return rc;
+        }
+
         rc = xenmem_add_to_physmap_one(d, xatp.space, DOMID_INVALID,
                                        xatp.idx, xatp.gpfn);
 
@@ -674,6 +682,13 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         rc = rcu_lock_target_domain_by_id(xatpr.domid, &d);
         if ( rc != 0 )
             return rc;
+
+        rc = xsm_add_to_physmap(XSM_TARGET, current->domain, d);
+        if ( rc )
+        {
+            rcu_unlock_domain(d);
+            return rc;
+        }
 
         rc = xenmem_add_to_physmap_range(d, &xatpr);
 
