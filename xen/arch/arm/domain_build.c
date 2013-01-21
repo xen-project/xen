@@ -86,7 +86,12 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
                             int node, const char *name, int depth,
                             u32 address_cells, u32 size_cells)
 {
+    const char *bootargs = NULL;
     int prop;
+
+    if ( early_info.modules.nr_mods >= 1 &&
+         early_info.modules.module[1].cmdline[0] )
+        bootargs = &early_info.modules.module[1].cmdline[0];
 
     for ( prop = fdt_first_property_offset(fdt, node);
           prop >= 0;
@@ -104,15 +109,22 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
         prop_len  = fdt32_to_cpu(p->len);
 
         /*
-         * In chosen node: replace bootargs with value from
-         * xen,dom0-bootargs.
+         * In chosen node:
+         *
+         * * remember xen,dom0-bootargs if we don't already have
+         *   bootargs (from module #1, above).
+         * * remove bootargs and xen,dom0-bootargs.
          */
         if ( device_tree_node_matches(fdt, node, "chosen") )
         {
             if ( strcmp(prop_name, "bootargs") == 0 )
                 continue;
-            if ( strcmp(prop_name, "xen,dom0-bootargs") == 0 )
-                prop_name = "bootargs";
+            else if ( strcmp(prop_name, "xen,dom0-bootargs") == 0 )
+            {
+                if ( !bootargs )
+                    bootargs = prop_data;
+                continue;
+            }
         }
         /*
          * In a memory node: adjust reg property.
@@ -146,6 +158,14 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
 
         xfree(new_data);
     }
+
+    if ( device_tree_node_matches(fdt, node, "chosen") && bootargs )
+        fdt_property(kinfo->fdt, "bootargs", bootargs, strlen(bootargs) + 1);
+
+    /*
+     * XXX should populate /chosen/linux,initrd-{start,end} here if we
+     * have module[2]
+     */
 
     if ( prop == -FDT_ERR_NOTFOUND )
         return 0;
