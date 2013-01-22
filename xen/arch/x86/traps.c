@@ -3089,6 +3089,7 @@ static void nmi_mce_softirq(void)
 static void pci_serr_softirq(void)
 {
     printk("\n\nNMI - PCI system error (SERR)\n");
+    outb(inb(0x61) & 0x0b, 0x61); /* re-enable the PCI SERR error line. */
 }
 
 void async_exception_cleanup(struct vcpu *curr)
@@ -3135,9 +3136,20 @@ static void pci_serr_error(struct cpu_user_regs *regs)
 {
     outb((inb(0x61) & 0x0f) | 0x04, 0x61); /* clear-and-disable the PCI SERR error line. */
 
-    /* Would like to print a diagnostic here but can't call printk()
-       from NMI context -- raise a softirq instead. */
-    raise_softirq(PCI_SERR_SOFTIRQ);
+    switch ( opt_nmi[0] )
+    {
+    case 'd': /* 'dom0' */
+        nmi_dom0_report(_XEN_NMIREASON_pci_serr);
+    case 'i': /* 'ignore' */
+        /* Would like to print a diagnostic here but can't call printk()
+           from NMI context -- raise a softirq instead. */
+        raise_softirq(PCI_SERR_SOFTIRQ);
+        break;
+    default:  /* 'fatal' */
+        console_force_unlock();
+        printk("\n\nNMI - PCI system error (SERR)\n");
+        fatal_trap(TRAP_nmi, regs);
+    }
 }
 
 static void io_check_error(struct cpu_user_regs *regs)
