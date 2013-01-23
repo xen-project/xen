@@ -569,18 +569,20 @@ void nvmx_update_exception_bitmap(struct vcpu *v, unsigned long value)
 static void nvmx_update_apic_access_address(struct vcpu *v)
 {
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-    u64 apic_gpfn, apic_mfn;
     u32 ctrl;
-    void *apic_va;
 
     ctrl = __n2_secondary_exec_control(v);
     if ( ctrl & SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES )
     {
+        p2m_type_t p2mt;
+        unsigned long apic_gpfn;
+        struct page_info *apic_pg;
+
         apic_gpfn = __get_vvmcs(nvcpu->nv_vvmcx, APIC_ACCESS_ADDR) >> PAGE_SHIFT;
-        apic_va = hvm_map_guest_frame_ro(apic_gpfn);
-        apic_mfn = virt_to_mfn(apic_va);
-        __vmwrite(APIC_ACCESS_ADDR, (apic_mfn << PAGE_SHIFT));
-        hvm_unmap_guest_frame(apic_va); 
+        apic_pg = get_page_from_gfn(v->domain, apic_gpfn, &p2mt, P2M_ALLOC);
+        ASSERT(apic_pg && !p2m_is_paging(p2mt));
+        __vmwrite(APIC_ACCESS_ADDR, page_to_maddr(apic_pg));
+        put_page(apic_pg);
     }
     else
         __vmwrite(APIC_ACCESS_ADDR, 0);
@@ -589,18 +591,20 @@ static void nvmx_update_apic_access_address(struct vcpu *v)
 static void nvmx_update_virtual_apic_address(struct vcpu *v)
 {
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-    u64 vapic_gpfn, vapic_mfn;
     u32 ctrl;
-    void *vapic_va;
 
     ctrl = __n2_exec_control(v);
     if ( ctrl & CPU_BASED_TPR_SHADOW )
     {
+        p2m_type_t p2mt;
+        unsigned long vapic_gpfn;
+        struct page_info *vapic_pg;
+
         vapic_gpfn = __get_vvmcs(nvcpu->nv_vvmcx, VIRTUAL_APIC_PAGE_ADDR) >> PAGE_SHIFT;
-        vapic_va = hvm_map_guest_frame_ro(vapic_gpfn);
-        vapic_mfn = virt_to_mfn(vapic_va);
-        __vmwrite(VIRTUAL_APIC_PAGE_ADDR, (vapic_mfn << PAGE_SHIFT));
-        hvm_unmap_guest_frame(vapic_va); 
+        vapic_pg = get_page_from_gfn(v->domain, vapic_gpfn, &p2mt, P2M_ALLOC);
+        ASSERT(vapic_pg && !p2m_is_paging(p2mt));
+        __vmwrite(VIRTUAL_APIC_PAGE_ADDR, page_to_maddr(vapic_pg));
+        put_page(vapic_pg);
     }
     else
         __vmwrite(VIRTUAL_APIC_PAGE_ADDR, 0);
@@ -641,9 +645,9 @@ static void __map_msr_bitmap(struct vcpu *v)
     unsigned long gpa;
 
     if ( nvmx->msrbitmap )
-        hvm_unmap_guest_frame (nvmx->msrbitmap); 
+        hvm_unmap_guest_frame(nvmx->msrbitmap, 1);
     gpa = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, MSR_BITMAP);
-    nvmx->msrbitmap = hvm_map_guest_frame_ro(gpa >> PAGE_SHIFT);
+    nvmx->msrbitmap = hvm_map_guest_frame_ro(gpa >> PAGE_SHIFT, 1);
 }
 
 static void __map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
@@ -654,9 +658,9 @@ static void __map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
 
     index = vmcs_reg == IO_BITMAP_A ? 0 : 1;
     if (nvmx->iobitmap[index])
-        hvm_unmap_guest_frame (nvmx->iobitmap[index]); 
+        hvm_unmap_guest_frame(nvmx->iobitmap[index], 1);
     gpa = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, vmcs_reg);
-    nvmx->iobitmap[index] = hvm_map_guest_frame_ro(gpa >> PAGE_SHIFT);
+    nvmx->iobitmap[index] = hvm_map_guest_frame_ro(gpa >> PAGE_SHIFT, 1);
 }
 
 static inline void map_io_bitmap_all(struct vcpu *v)
@@ -673,17 +677,17 @@ static void nvmx_purge_vvmcs(struct vcpu *v)
 
     __clear_current_vvmcs(v);
     if ( nvcpu->nv_vvmcxaddr != VMCX_EADDR )
-        hvm_unmap_guest_frame(nvcpu->nv_vvmcx);
+        hvm_unmap_guest_frame(nvcpu->nv_vvmcx, 1);
     nvcpu->nv_vvmcx = NULL;
     nvcpu->nv_vvmcxaddr = VMCX_EADDR;
     for (i=0; i<2; i++) {
         if ( nvmx->iobitmap[i] ) {
-            hvm_unmap_guest_frame(nvmx->iobitmap[i]); 
+            hvm_unmap_guest_frame(nvmx->iobitmap[i], 1);
             nvmx->iobitmap[i] = NULL;
         }
     }
     if ( nvmx->msrbitmap ) {
-        hvm_unmap_guest_frame(nvmx->msrbitmap);
+        hvm_unmap_guest_frame(nvmx->msrbitmap, 1);
         nvmx->msrbitmap = NULL;
     }
 }
@@ -1289,7 +1293,7 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
 
     if ( nvcpu->nv_vvmcxaddr == VMCX_EADDR )
     {
-        nvcpu->nv_vvmcx = hvm_map_guest_frame_rw(gpa >> PAGE_SHIFT);
+        nvcpu->nv_vvmcx = hvm_map_guest_frame_rw(gpa >> PAGE_SHIFT, 1);
         nvcpu->nv_vvmcxaddr = gpa;
         map_io_bitmap_all (v);
         __map_msr_bitmap(v);
@@ -1350,10 +1354,10 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     else 
     {
         /* Even if this VMCS isn't the current one, we must clear it. */
-        vvmcs = hvm_map_guest_frame_rw(gpa >> PAGE_SHIFT);
+        vvmcs = hvm_map_guest_frame_rw(gpa >> PAGE_SHIFT, 0);
         if ( vvmcs ) 
             __set_vvmcs(vvmcs, NVMX_LAUNCH_STATE, 0);
-        hvm_unmap_guest_frame(vvmcs);
+        hvm_unmap_guest_frame(vvmcs, 0);
     }
 
     vmreturn(regs, VMSUCCEED);

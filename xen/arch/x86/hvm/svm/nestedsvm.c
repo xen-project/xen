@@ -69,15 +69,14 @@ int nestedsvm_vmcb_map(struct vcpu *v, uint64_t vmcbaddr)
     struct nestedvcpu *nv = &vcpu_nestedhvm(v);
 
     if (nv->nv_vvmcx != NULL && nv->nv_vvmcxaddr != vmcbaddr) {
-        ASSERT(nv->nv_vvmcx != NULL);
         ASSERT(nv->nv_vvmcxaddr != VMCX_EADDR);
-        hvm_unmap_guest_frame(nv->nv_vvmcx);
+        hvm_unmap_guest_frame(nv->nv_vvmcx, 1);
         nv->nv_vvmcx = NULL;
         nv->nv_vvmcxaddr = VMCX_EADDR;
     }
 
     if (nv->nv_vvmcx == NULL) {
-        nv->nv_vvmcx = hvm_map_guest_frame_rw(vmcbaddr >> PAGE_SHIFT);
+        nv->nv_vvmcx = hvm_map_guest_frame_rw(vmcbaddr >> PAGE_SHIFT, 1);
         if (nv->nv_vvmcx == NULL)
             return 0;
         nv->nv_vvmcxaddr = vmcbaddr;
@@ -141,6 +140,8 @@ void nsvm_vcpu_destroy(struct vcpu *v)
                            get_order_from_bytes(MSRPM_SIZE));
         svm->ns_merged_msrpm = NULL;
     }
+    hvm_unmap_guest_frame(nv->nv_vvmcx, 1);
+    nv->nv_vvmcx = NULL;
     if (nv->nv_n2vmcx) {
         free_vmcb(nv->nv_n2vmcx);
         nv->nv_n2vmcx = NULL;
@@ -358,11 +359,11 @@ static int nsvm_vmrun_permissionmap(struct vcpu *v, bool_t viopm)
     svm->ns_oiomap_pa = svm->ns_iomap_pa;
     svm->ns_iomap_pa = ns_vmcb->_iopm_base_pa;
 
-    ns_viomap = hvm_map_guest_frame_ro(svm->ns_iomap_pa >> PAGE_SHIFT);
+    ns_viomap = hvm_map_guest_frame_ro(svm->ns_iomap_pa >> PAGE_SHIFT, 0);
     ASSERT(ns_viomap != NULL);
     ioport_80 = test_bit(0x80, ns_viomap);
     ioport_ed = test_bit(0xed, ns_viomap);
-    hvm_unmap_guest_frame(ns_viomap);
+    hvm_unmap_guest_frame(ns_viomap, 0);
 
     svm->ns_iomap = nestedhvm_vcpu_iomap_get(ioport_80, ioport_ed);
 
@@ -888,7 +889,7 @@ nsvm_vmcb_guest_intercepts_ioio(paddr_t iopm_pa, uint64_t exitinfo1)
         break;
     }
 
-    io_bitmap = hvm_map_guest_frame_ro(gfn);
+    io_bitmap = hvm_map_guest_frame_ro(gfn, 0);
     if (io_bitmap == NULL) {
         gdprintk(XENLOG_ERR,
             "IOIO intercept: mapping of permission map failed\n");
@@ -896,7 +897,7 @@ nsvm_vmcb_guest_intercepts_ioio(paddr_t iopm_pa, uint64_t exitinfo1)
     }
 
     enabled = test_bit(port, io_bitmap);
-    hvm_unmap_guest_frame(io_bitmap);
+    hvm_unmap_guest_frame(io_bitmap, 0);
 
     if (!enabled)
         return NESTEDHVM_VMEXIT_HOST;

@@ -1966,7 +1966,8 @@ int hvm_virtual_to_linear_addr(
 
 /* On non-NULL return, we leave this function holding an additional 
  * ref on the underlying mfn, if any */
-static void *__hvm_map_guest_frame(unsigned long gfn, bool_t writable)
+static void *__hvm_map_guest_frame(unsigned long gfn, bool_t writable,
+                                   bool_t permanent)
 {
     void *map;
     p2m_type_t p2mt;
@@ -1991,28 +1992,41 @@ static void *__hvm_map_guest_frame(unsigned long gfn, bool_t writable)
     if ( writable )
         paging_mark_dirty(d, page_to_mfn(page));
 
-    map = __map_domain_page(page);
+    if ( !permanent )
+        return __map_domain_page(page);
+
+    map = __map_domain_page_global(page);
+    if ( !map )
+        put_page(page);
+
     return map;
 }
 
-void *hvm_map_guest_frame_rw(unsigned long gfn)
+void *hvm_map_guest_frame_rw(unsigned long gfn, bool_t permanent)
 {
-    return __hvm_map_guest_frame(gfn, 1);
+    return __hvm_map_guest_frame(gfn, 1, permanent);
 }
 
-void *hvm_map_guest_frame_ro(unsigned long gfn)
+void *hvm_map_guest_frame_ro(unsigned long gfn, bool_t permanent)
 {
-    return __hvm_map_guest_frame(gfn, 0);
+    return __hvm_map_guest_frame(gfn, 0, permanent);
 }
 
-void hvm_unmap_guest_frame(void *p)
+void hvm_unmap_guest_frame(void *p, bool_t permanent)
 {
-    if ( p )
-    {
-        unsigned long mfn = domain_page_map_to_mfn(p);
+    unsigned long mfn;
+
+    if ( !p )
+        return;
+
+    mfn = domain_page_map_to_mfn(p);
+
+    if ( !permanent )
         unmap_domain_page(p);
-        put_page(mfn_to_page(mfn));
-    }
+    else
+        unmap_domain_page_global(p);
+
+    put_page(mfn_to_page(mfn));
 }
 
 static void *hvm_map_entry(unsigned long va)
@@ -2038,7 +2052,7 @@ static void *hvm_map_entry(unsigned long va)
     if ( (pfec == PFEC_page_paged) || (pfec == PFEC_page_shared) )
         goto fail;
 
-    v = hvm_map_guest_frame_rw(gfn);
+    v = hvm_map_guest_frame_rw(gfn, 0);
     if ( v == NULL )
         goto fail;
 
@@ -2051,7 +2065,7 @@ static void *hvm_map_entry(unsigned long va)
 
 static void hvm_unmap_entry(void *p)
 {
-    hvm_unmap_guest_frame(p);
+    hvm_unmap_guest_frame(p, 0);
 }
 
 static int hvm_load_segment_selector(
