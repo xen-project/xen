@@ -393,7 +393,8 @@ static void tmh_persistent_pool_page_put(void *page_va)
     struct page_info *pi;
 
     ASSERT(IS_PAGE_ALIGNED(page_va));
-    pi = virt_to_page(page_va);
+    pi = mfn_to_page(domain_page_map_to_mfn(page_va));
+    unmap_domain_page(page_va);
     ASSERT(IS_VALID_PAGE(pi));
     _tmh_free_page_thispool(pi);
 }
@@ -441,39 +442,28 @@ static int cpu_callback(
     {
     case CPU_UP_PREPARE: {
         if ( per_cpu(dstmem, cpu) == NULL )
-        {
-            struct page_info *p = alloc_domheap_pages(0, dstmem_order, 0);
-            per_cpu(dstmem, cpu) = p ? page_to_virt(p) : NULL;
-        }
+            per_cpu(dstmem, cpu) = alloc_xenheap_pages(dstmem_order, 0);
         if ( per_cpu(workmem, cpu) == NULL )
-        {
-            struct page_info *p = alloc_domheap_pages(0, workmem_order, 0);
-            per_cpu(workmem, cpu) = p ? page_to_virt(p) : NULL;
-        }
+            per_cpu(workmem, cpu) = alloc_xenheap_pages(workmem_order, 0);
         if ( per_cpu(scratch_page, cpu) == NULL )
-        {
-            struct page_info *p = alloc_domheap_page(NULL, 0);
-            per_cpu(scratch_page, cpu) = p ? page_to_virt(p) : NULL;
-        }
+            per_cpu(scratch_page, cpu) = alloc_xenheap_page();
         break;
     }
     case CPU_DEAD:
     case CPU_UP_CANCELED: {
         if ( per_cpu(dstmem, cpu) != NULL )
         {
-            struct page_info *p = virt_to_page(per_cpu(dstmem, cpu));
-            free_domheap_pages(p, dstmem_order);
+            free_xenheap_pages(per_cpu(dstmem, cpu), dstmem_order);
             per_cpu(dstmem, cpu) = NULL;
         }
         if ( per_cpu(workmem, cpu) != NULL )
         {
-            struct page_info *p = virt_to_page(per_cpu(workmem, cpu));
-            free_domheap_pages(p, workmem_order);
+            free_xenheap_pages(per_cpu(workmem, cpu), workmem_order);
             per_cpu(workmem, cpu) = NULL;
         }
         if ( per_cpu(scratch_page, cpu) != NULL )
         {
-            free_domheap_page(virt_to_page(per_cpu(scratch_page, cpu)));
+            free_xenheap_page(per_cpu(scratch_page, cpu));
             per_cpu(scratch_page, cpu) = NULL;
         }
         break;
