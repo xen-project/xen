@@ -371,7 +371,7 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
 {
     RTCState *s = opaque;
     struct domain *d = vrtc_domain(s);
-    uint32_t orig;
+    uint32_t orig, mask;
 
     spin_lock(&s->lock);
 
@@ -442,12 +442,17 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
             if ( orig & RTC_SET )
                 rtc_set_time(s);
         }
-        /* if the interrupt is already set when the interrupt become
-         * enabled, raise an interrupt immediately*/
-        if ((data & RTC_UIE) && !(orig & RTC_UIE))
-            if (s->hw.cmos_data[RTC_REG_C] & RTC_UF)
+        /*
+         * If the interrupt is already set when the interrupt becomes
+         * enabled, raise an interrupt immediately.
+         * NB: RTC_{A,P,U}IE == RTC_{A,P,U}F respectively.
+         */
+        for ( mask = RTC_UIE; mask <= RTC_PIE; mask <<= 1 )
+            if ( (data & mask) && !(orig & mask) &&
+                 (s->hw.cmos_data[RTC_REG_C] & mask) )
             {
                 rtc_toggle_irq(s);
+                break;
             }
         s->hw.cmos_data[RTC_REG_B] = data;
         check_update_timer(s);
