@@ -65,22 +65,6 @@ int __mfn_valid(unsigned long mfn)
                            pdx_group_valid));
 }
 
-void *alloc_xen_pagetable(void)
-{
-    unsigned long mfn;
-
-    if ( system_state != SYS_STATE_early_boot )
-    {
-        struct page_info *pg = alloc_domheap_page(NULL, 0);
-
-        BUG_ON(!dom0 && !pg);
-        return pg ? page_to_virt(pg) : NULL;
-    }
-
-    mfn = alloc_boot_pages(1, 1);
-    return mfn_to_virt(mfn);
-}
-
 l3_pgentry_t *virt_to_xen_l3e(unsigned long v)
 {
     l4_pgentry_t *pl4e;
@@ -154,35 +138,45 @@ void *do_page_walk(struct vcpu *v, unsigned long addr)
     if ( is_hvm_vcpu(v) )
         return NULL;
 
-    l4t = mfn_to_virt(mfn);
+    l4t = map_domain_page(mfn);
     l4e = l4t[l4_table_offset(addr)];
-    mfn = l4e_get_pfn(l4e);
+    unmap_domain_page(l4t);
     if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
         return NULL;
 
-    l3t = mfn_to_virt(mfn);
+    l3t = map_l3t_from_l4e(l4e);
     l3e = l3t[l3_table_offset(addr)];
+    unmap_domain_page(l3t);
     mfn = l3e_get_pfn(l3e);
     if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) || !mfn_valid(mfn) )
         return NULL;
     if ( (l3e_get_flags(l3e) & _PAGE_PSE) )
-        return mfn_to_virt(mfn) + (addr & ((1UL << L3_PAGETABLE_SHIFT) - 1));
+    {
+        mfn += PFN_DOWN(addr & ((1UL << L3_PAGETABLE_SHIFT) - 1));
+        goto ret;
+    }
 
-    l2t = mfn_to_virt(mfn);
+    l2t = map_domain_page(mfn);
     l2e = l2t[l2_table_offset(addr)];
+    unmap_domain_page(l2t);
     mfn = l2e_get_pfn(l2e);
     if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) || !mfn_valid(mfn) )
         return NULL;
     if ( (l2e_get_flags(l2e) & _PAGE_PSE) )
-        return mfn_to_virt(mfn) + (addr & ((1UL << L2_PAGETABLE_SHIFT) - 1));
+    {
+        mfn += PFN_DOWN(addr & ((1UL << L2_PAGETABLE_SHIFT) - 1));
+        goto ret;
+    }
 
-    l1t = mfn_to_virt(mfn);
+    l1t = map_domain_page(mfn);
     l1e = l1t[l1_table_offset(addr)];
+    unmap_domain_page(l1t);
     mfn = l1e_get_pfn(l1e);
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) || !mfn_valid(mfn) )
         return NULL;
 
-    return mfn_to_virt(mfn) + (addr & ~PAGE_MASK);
+ ret:
+    return map_domain_page(mfn) + (addr & ~PAGE_MASK);
 }
 
 void __init pfn_pdx_hole_setup(unsigned long mask)
@@ -519,10 +513,9 @@ static int setup_compat_m2p_table(struct mem_hotadd_info *info)
 static int setup_m2p_table(struct mem_hotadd_info *info)
 {
     unsigned long i, va, smap, emap;
-    unsigned int n, memflags;
+    unsigned int n;
     l2_pgentry_t *l2_ro_mpt = NULL;
     l3_pgentry_t *l3_ro_mpt = NULL;
-    struct page_info *l2_pg;
     int ret = 0;
 
     ASSERT(l4e_get_flags(idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)])
@@ -560,7 +553,6 @@ static int setup_m2p_table(struct mem_hotadd_info *info)
         }
 
         va = RO_MPT_VIRT_START + i * sizeof(*machine_to_phys_mapping);
-        memflags = MEMF_node(phys_to_nid(i << PAGE_SHIFT));
 
         for ( n = 0; n < CNT; ++n)
             if ( mfn_valid(i + n * PDX_GROUP_COUNT) )
@@ -587,19 +579,18 @@ static int setup_m2p_table(struct mem_hotadd_info *info)
                   l2_table_offset(va);
             else
             {
-                l2_pg = alloc_domheap_page(NULL, memflags);
-
-                if (!l2_pg)
+                l2_ro_mpt = alloc_xen_pagetable();
+                if ( !l2_ro_mpt )
                 {
                     ret = -ENOMEM;
                     goto error;
                 }
 
-                l2_ro_mpt = page_to_virt(l2_pg);
                 clear_page(l2_ro_mpt);
                 l3e_write(&l3_ro_mpt[l3_table_offset(va)],
-                  l3e_from_page(l2_pg, __PAGE_HYPERVISOR | _PAGE_USER));
-               l2_ro_mpt += l2_table_offset(va);
+                          l3e_from_paddr(__pa(l2_ro_mpt),
+                                         __PAGE_HYPERVISOR | _PAGE_USER));
+                l2_ro_mpt += l2_table_offset(va);
             }
 
             /* NB. Cannot be GLOBAL as shadow_mode_translate reuses this area. */
@@ -762,12 +753,12 @@ void __init paging_init(void)
                  l4_table_offset(HIRO_COMPAT_MPT_VIRT_START));
     l3_ro_mpt = l4e_to_l3e(idle_pg_table[l4_table_offset(
         HIRO_COMPAT_MPT_VIRT_START)]);
-    if ( (l2_pg = alloc_domheap_page(NULL, 0)) == NULL )
+    if ( (l2_ro_mpt = alloc_xen_pagetable()) == NULL )
         goto nomem;
-    compat_idle_pg_table_l2 = l2_ro_mpt = page_to_virt(l2_pg);
+    compat_idle_pg_table_l2 = l2_ro_mpt;
     clear_page(l2_ro_mpt);
     l3e_write(&l3_ro_mpt[l3_table_offset(HIRO_COMPAT_MPT_VIRT_START)],
-              l3e_from_page(l2_pg, __PAGE_HYPERVISOR));
+              l3e_from_paddr(__pa(l2_ro_mpt), __PAGE_HYPERVISOR));
     l2_ro_mpt += l2_table_offset(HIRO_COMPAT_MPT_VIRT_START);
     /* Allocate and map the compatibility mode machine-to-phys table. */
     mpt_size = (mpt_size >> 1) + (1UL << (L2_PAGETABLE_SHIFT - 1));

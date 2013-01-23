@@ -1331,7 +1331,7 @@ static int alloc_l4_table(struct page_info *page, int preemptible)
 {
     struct domain *d = page_get_owner(page);
     unsigned long  pfn = page_to_mfn(page);
-    l4_pgentry_t  *pl4e = page_to_virt(page);
+    l4_pgentry_t  *pl4e = map_domain_page(pfn);
     unsigned int   i;
     int            rc = 0, partial = page->partial_pte;
 
@@ -1365,12 +1365,16 @@ static int alloc_l4_table(struct page_info *page, int preemptible)
                     put_page_from_l4e(pl4e[i], pfn, 0, 0);
         }
         if ( rc < 0 )
+        {
+            unmap_domain_page(pl4e);
             return rc;
+        }
 
         adjust_guest_l4e(pl4e[i], d);
     }
 
     init_guest_l4_table(pl4e, d);
+    unmap_domain_page(pl4e);
 
     return rc > 0 ? 0 : rc;
 }
@@ -1464,7 +1468,7 @@ static int free_l4_table(struct page_info *page, int preemptible)
 {
     struct domain *d = page_get_owner(page);
     unsigned long pfn = page_to_mfn(page);
-    l4_pgentry_t *pl4e = page_to_virt(page);
+    l4_pgentry_t *pl4e = map_domain_page(pfn);
     int rc = 0, partial = page->partial_pte;
     unsigned int  i = page->nr_validated_ptes - !partial;
 
@@ -1487,6 +1491,9 @@ static int free_l4_table(struct page_info *page, int preemptible)
         page->partial_pte = 0;
         rc = -EAGAIN;
     }
+
+    unmap_domain_page(pl4e);
+
     return rc > 0 ? 0 : rc;
 }
 
@@ -4983,15 +4990,23 @@ int mmio_ro_do_page_fault(struct vcpu *v, unsigned long addr,
     return rc != X86EMUL_UNHANDLEABLE ? EXCRET_fault_fixed : 0;
 }
 
+void *alloc_xen_pagetable(void)
+{
+    if ( system_state != SYS_STATE_early_boot )
+    {
+        void *ptr = alloc_xenheap_page();
+
+        BUG_ON(!dom0 && !ptr);
+        return ptr;
+    }
+
+    return mfn_to_virt(alloc_boot_pages(1, 1));
+}
+
 void free_xen_pagetable(void *v)
 {
-    if ( system_state == SYS_STATE_early_boot )
-        return;
-
-    if ( is_xen_heap_page(virt_to_page(v)) )
+    if ( system_state != SYS_STATE_early_boot )
         free_xenheap_page(v);
-    else
-        free_domheap_page(virt_to_page(v));
 }
 
 /* Convert to from superpage-mapping flags for map_pages_to_xen(). */

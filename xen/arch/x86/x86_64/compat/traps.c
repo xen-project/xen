@@ -56,6 +56,11 @@ void compat_show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs,
         printk(" %08x", addr);
         stack++;
     }
+    if ( mask == PAGE_SIZE )
+    {
+        BUILD_BUG_ON(PAGE_SIZE == STACK_SIZE);
+        unmap_domain_page(stack);
+    }
     if ( i == 0 )
         printk("Stack empty.");
     printk("\n");

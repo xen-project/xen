@@ -175,8 +175,9 @@ void show_page_walk(unsigned long addr)
 
     printk("Pagetable walk from %016lx:\n", addr);
 
-    l4t = mfn_to_virt(mfn);
+    l4t = map_domain_page(mfn);
     l4e = l4t[l4_table_offset(addr)];
+    unmap_domain_page(l4t);
     mfn = l4e_get_pfn(l4e);
     pfn = mfn_valid(mfn) && machine_to_phys_mapping_valid ?
           get_gpfn_from_mfn(mfn) : INVALID_M2P_ENTRY;
@@ -186,8 +187,9 @@ void show_page_walk(unsigned long addr)
          !mfn_valid(mfn) )
         return;
 
-    l3t = mfn_to_virt(mfn);
+    l3t = map_domain_page(mfn);
     l3e = l3t[l3_table_offset(addr)];
+    unmap_domain_page(l3t);
     mfn = l3e_get_pfn(l3e);
     pfn = mfn_valid(mfn) && machine_to_phys_mapping_valid ?
           get_gpfn_from_mfn(mfn) : INVALID_M2P_ENTRY;
@@ -199,8 +201,9 @@ void show_page_walk(unsigned long addr)
          !mfn_valid(mfn) )
         return;
 
-    l2t = mfn_to_virt(mfn);
+    l2t = map_domain_page(mfn);
     l2e = l2t[l2_table_offset(addr)];
+    unmap_domain_page(l2t);
     mfn = l2e_get_pfn(l2e);
     pfn = mfn_valid(mfn) && machine_to_phys_mapping_valid ?
           get_gpfn_from_mfn(mfn) : INVALID_M2P_ENTRY;
@@ -212,8 +215,9 @@ void show_page_walk(unsigned long addr)
          !mfn_valid(mfn) )
         return;
 
-    l1t = mfn_to_virt(mfn);
+    l1t = map_domain_page(mfn);
     l1e = l1t[l1_table_offset(addr)];
+    unmap_domain_page(l1t);
     mfn = l1e_get_pfn(l1e);
     pfn = mfn_valid(mfn) && machine_to_phys_mapping_valid ?
           get_gpfn_from_mfn(mfn) : INVALID_M2P_ENTRY;

@@ -98,8 +98,9 @@ dbg_pv_va2mfn(dbgva_t vaddr, struct domain *dp, uint64_t pgd3val)
 
     if ( pgd3val == 0 )
     {
-        l4t = mfn_to_virt(mfn);
+        l4t = map_domain_page(mfn);
         l4e = l4t[l4_table_offset(vaddr)];
+        unmap_domain_page(l4t);
         mfn = l4e_get_pfn(l4e);
         DBGP2("l4t:%p l4to:%lx l4e:%lx mfn:%lx\n", l4t, 
               l4_table_offset(vaddr), l4e, mfn);
@@ -109,20 +110,23 @@ dbg_pv_va2mfn(dbgva_t vaddr, struct domain *dp, uint64_t pgd3val)
             return INVALID_MFN;
         }
 
-        l3t = mfn_to_virt(mfn);
+        l3t = map_domain_page(mfn);
         l3e = l3t[l3_table_offset(vaddr)];
+        unmap_domain_page(l3t);
         mfn = l3e_get_pfn(l3e);
         DBGP2("l3t:%p l3to:%lx l3e:%lx mfn:%lx\n", l3t, 
               l3_table_offset(vaddr), l3e, mfn);
-        if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+        if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) ||
+             (l3e_get_flags(l3e) & _PAGE_PSE) )
         {
             DBGP1("l3 PAGE not present. vaddr:%lx cr3:%lx\n", vaddr, cr3);
             return INVALID_MFN;
         }
     }
 
-    l2t = mfn_to_virt(mfn);
+    l2t = map_domain_page(mfn);
     l2e = l2t[l2_table_offset(vaddr)];
+    unmap_domain_page(l2t);
     mfn = l2e_get_pfn(l2e);
     DBGP2("l2t:%p l2to:%lx l2e:%lx mfn:%lx\n", l2t, l2_table_offset(vaddr),
           l2e, mfn);
@@ -132,8 +136,9 @@ dbg_pv_va2mfn(dbgva_t vaddr, struct domain *dp, uint64_t pgd3val)
         DBGP1("l2 PAGE not present. vaddr:%lx cr3:%lx\n", vaddr, cr3);
         return INVALID_MFN;
     }
-    l1t = mfn_to_virt(mfn);
+    l1t = map_domain_page(mfn);
     l1e = l1t[l1_table_offset(vaddr)];
+    unmap_domain_page(l1t);
     mfn = l1e_get_pfn(l1e);
     DBGP2("l1t:%p l1to:%lx l1e:%lx mfn:%lx\n", l1t, l1_table_offset(vaddr),
           l1e, mfn);
