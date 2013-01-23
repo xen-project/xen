@@ -5204,12 +5204,9 @@ int map_pages_to_xen(
             /* Normal page mapping. */
             if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
             {
-                pl1e = alloc_xen_pagetable();
+                pl1e = virt_to_xen_l1e(virt);
                 if ( pl1e == NULL )
                     return -ENOMEM;
-                clear_page(pl1e);
-                l2e_write(pl2e, l2e_from_pfn(virt_to_mfn(pl1e),
-                                             __PAGE_HYPERVISOR));
             }
             else if ( l2e_get_flags(*pl2e) & _PAGE_PSE )
             {

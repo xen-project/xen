@@ -121,6 +121,28 @@ l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
     return l3e_to_l2e(*pl3e) + l2_table_offset(v);
 }
 
+l1_pgentry_t *virt_to_xen_l1e(unsigned long v)
+{
+    l2_pgentry_t *pl2e;
+
+    pl2e = virt_to_xen_l2e(v);
+    if ( !pl2e )
+        return NULL;
+
+    if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
+    {
+        l1_pgentry_t *pl1e = alloc_xen_pagetable();
+
+        if ( !pl1e )
+            return NULL;
+        clear_page(pl1e);
+        l2e_write(pl2e, l2e_from_paddr(__pa(pl1e), __PAGE_HYPERVISOR));
+    }
+
+    BUG_ON(l2e_get_flags(*pl2e) & _PAGE_PSE);
+    return l2e_to_l1e(*pl2e) + l1_table_offset(v);
+}
+
 void *do_page_walk(struct vcpu *v, unsigned long addr)
 {
     unsigned long mfn = pagetable_get_pfn(v->arch.guest_table);
