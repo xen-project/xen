@@ -2255,7 +2255,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             }
             else
             {
-                mfn = l4e_get_pfn(*(l4_pgentry_t *)__va(pagetable_get_paddr(v->arch.guest_table)));
+                l4_pgentry_t *pl4e =
+                    map_domain_page(pagetable_get_pfn(v->arch.guest_table));
+
+                mfn = l4e_get_pfn(*pl4e);
+                unmap_domain_page(pl4e);
                 *reg = compat_pfn_to_cr3(mfn_to_gmfn(
                     v->domain, mfn));
             }

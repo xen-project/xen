@@ -150,7 +150,7 @@ long arch_do_domctl(
                 ret = -ENOMEM;
                 break;
             }
-            arr = page_to_virt(page);
+            arr = __map_domain_page(page);
 
             for ( n = ret = 0; n < num; )
             {
@@ -220,7 +220,9 @@ long arch_do_domctl(
                 n += k;
             }
 
-            free_domheap_page(virt_to_page(arr));
+            page = mfn_to_page(domain_page_map_to_mfn(arr));
+            unmap_domain_page(arr);
+            free_domheap_page(page);
 
             break;
         }
@@ -1347,8 +1349,11 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
         }
         else
         {
-            l4_pgentry_t *l4e = __va(pagetable_get_paddr(v->arch.guest_table));
+            const l4_pgentry_t *l4e =
+                map_domain_page(pagetable_get_pfn(v->arch.guest_table));
+
             c.cmp->ctrlreg[3] = compat_pfn_to_cr3(l4e_get_pfn(*l4e));
+            unmap_domain_page(l4e);
 
             /* Merge shadow DR7 bits into real DR7. */
             c.cmp->debugreg[7] |= c.cmp->debugreg[5];

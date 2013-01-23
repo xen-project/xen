@@ -2538,14 +2538,18 @@ int new_guest_cr3(unsigned long mfn)
 
     if ( is_pv_32on64_domain(d) )
     {
+        unsigned long gt_mfn = pagetable_get_pfn(curr->arch.guest_table);
+        l4_pgentry_t *pl4e = map_domain_page(gt_mfn);
+
         okay = paging_mode_refcounts(d)
             ? 0 /* Old code was broken, but what should it be? */
             : mod_l4_entry(
-                    __va(pagetable_get_paddr(curr->arch.guest_table)),
+                    pl4e,
                     l4e_from_pfn(
                         mfn,
                         (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)),
-                    pagetable_get_pfn(curr->arch.guest_table), 0, 0, curr) == 0;
+                    gt_mfn, 0, 0, curr) == 0;
+        unmap_domain_page(pl4e);
         if ( unlikely(!okay) )
         {
             MEM_LOG("Error while installing new compat baseptr %lx", mfn);
