@@ -621,8 +621,10 @@ int __init construct_dom0(
         maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l3_page_table;
         l3start = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
     }
-    copy_page(l4tab, idle_pg_table);
-    l4tab[0] = l4e_empty(); /* zap trampoline mapping */
+    clear_page(l4tab);
+    for ( i = l4_table_offset(HYPERVISOR_VIRT_START);
+          i < l4_table_offset(HYPERVISOR_VIRT_END); ++i )
+        l4tab[i] = idle_pg_table[i];
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_paddr(__pa(l4start), __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
@@ -766,6 +768,7 @@ int __init construct_dom0(
 
     /* We run on dom0's page tables for the final part of the build process. */
     write_ptbase(v);
+    mapcache_override_current(v);
 
     /* Copy the OS image and free temporary buffer. */
     elf.dest = (void*)vkern_start;
@@ -782,6 +785,7 @@ int __init construct_dom0(
         if ( (parms.virt_hypercall < v_start) ||
              (parms.virt_hypercall >= v_end) )
         {
+            mapcache_override_current(NULL);
             write_ptbase(current);
             printk("Invalid HYPERCALL_PAGE field in ELF notes.\n");
             return -1;
@@ -811,6 +815,10 @@ int __init construct_dom0(
              elf_64bit(&elf) ? 64 : 32, parms.pae ? "p" : "");
 
     count = d->tot_pages;
+    l4start = map_domain_page(pagetable_get_pfn(v->arch.guest_table));
+    l3tab = NULL;
+    l2tab = NULL;
+    l1tab = NULL;
     /* Set up the phys->machine table if not part of the initial mapping. */
     if ( parms.p2m_base != UNSET_ADDR )
     {
@@ -825,6 +833,21 @@ int __init construct_dom0(
                                  >> PAGE_SHIFT) + 3 > nr_pages )
                 panic("Dom0 allocation too small for initial P->M table.\n");
 
+            if ( l1tab )
+            {
+                unmap_domain_page(l1tab);
+                l1tab = NULL;
+            }
+            if ( l2tab )
+            {
+                unmap_domain_page(l2tab);
+                l2tab = NULL;
+            }
+            if ( l3tab )
+            {
+                unmap_domain_page(l3tab);
+                l3tab = NULL;
+            }
             l4tab = l4start + l4_table_offset(va);
             if ( !l4e_get_intpte(*l4tab) )
             {
@@ -835,10 +858,11 @@ int __init construct_dom0(
                 page->count_info = PGC_allocated | 2;
                 page->u.inuse.type_info =
                     PGT_l3_page_table | PGT_validated | 1;
-                clear_page(page_to_virt(page));
+                l3tab = __map_domain_page(page);
+                clear_page(l3tab);
                 *l4tab = l4e_from_page(page, L4_PROT);
-            }
-            l3tab = page_to_virt(l4e_get_page(*l4tab));
+            } else
+                l3tab = map_domain_page(l4e_get_pfn(*l4tab));
             l3tab += l3_table_offset(va);
             if ( !l3e_get_intpte(*l3tab) )
             {
@@ -857,17 +881,16 @@ int __init construct_dom0(
                 }
                 if ( (page = alloc_domheap_page(d, 0)) == NULL )
                     break;
-                else
-                {
-                    /* No mapping, PGC_allocated + page-table page. */
-                    page->count_info = PGC_allocated | 2;
-                    page->u.inuse.type_info =
-                        PGT_l2_page_table | PGT_validated | 1;
-                    clear_page(page_to_virt(page));
-                    *l3tab = l3e_from_page(page, L3_PROT);
-                }
+                /* No mapping, PGC_allocated + page-table page. */
+                page->count_info = PGC_allocated | 2;
+                page->u.inuse.type_info =
+                    PGT_l2_page_table | PGT_validated | 1;
+                l2tab = __map_domain_page(page);
+                clear_page(l2tab);
+                *l3tab = l3e_from_page(page, L3_PROT);
             }
-            l2tab = page_to_virt(l3e_get_page(*l3tab));
+            else
+               l2tab = map_domain_page(l3e_get_pfn(*l3tab));
             l2tab += l2_table_offset(va);
             if ( !l2e_get_intpte(*l2tab) )
             {
@@ -887,17 +910,16 @@ int __init construct_dom0(
                 }
                 if ( (page = alloc_domheap_page(d, 0)) == NULL )
                     break;
-                else
-                {
-                    /* No mapping, PGC_allocated + page-table page. */
-                    page->count_info = PGC_allocated | 2;
-                    page->u.inuse.type_info =
-                        PGT_l1_page_table | PGT_validated | 1;
-                    clear_page(page_to_virt(page));
-                    *l2tab = l2e_from_page(page, L2_PROT);
-                }
+                /* No mapping, PGC_allocated + page-table page. */
+                page->count_info = PGC_allocated | 2;
+                page->u.inuse.type_info =
+                    PGT_l1_page_table | PGT_validated | 1;
+                l1tab = __map_domain_page(page);
+                clear_page(l1tab);
+                *l2tab = l2e_from_page(page, L2_PROT);
             }
-            l1tab = page_to_virt(l2e_get_page(*l2tab));
+            else
+                l1tab = map_domain_page(l2e_get_pfn(*l2tab));
             l1tab += l1_table_offset(va);
             BUG_ON(l1e_get_intpte(*l1tab));
             page = alloc_domheap_page(d, 0);
@@ -910,6 +932,14 @@ int __init construct_dom0(
         if ( !page )
             panic("Not enough RAM for DOM0 P->M table.\n");
     }
+
+    if ( l1tab )
+        unmap_domain_page(l1tab);
+    if ( l2tab )
+        unmap_domain_page(l2tab);
+    if ( l3tab )
+        unmap_domain_page(l3tab);
+    unmap_domain_page(l4start);
 
     /* Write the phys->machine and machine->phys table entries. */
     for ( pfn = 0; pfn < count; pfn++ )
@@ -1000,6 +1030,7 @@ int __init construct_dom0(
         xlat_start_info(si, XLAT_start_info_console_dom0);
 
     /* Return to idle domain's page tables. */
+    mapcache_override_current(NULL);
     write_ptbase(current);
 
     update_domain_wallclock_time(d);

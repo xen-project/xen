@@ -15,10 +15,12 @@
 #include <asm/flushtlb.h>
 #include <asm/hardirq.h>
 
+static struct vcpu *__read_mostly override;
+
 static inline struct vcpu *mapcache_current_vcpu(void)
 {
     /* In the common case we use the mapcache of the running VCPU. */
-    struct vcpu *v = current;
+    struct vcpu *v = override ?: current;
 
     /*
      * When current isn't properly set up yet, this is equivalent to
@@ -42,6 +44,11 @@ static inline struct vcpu *mapcache_current_vcpu(void)
     }
 
     return v;
+}
+
+void __init mapcache_override_current(struct vcpu *v)
+{
+    override = v;
 }
 
 #define mapcache_l2_entry(e) ((e) >> PAGETABLE_ORDER)
