@@ -105,7 +105,11 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
         return physdev_hvm_map_pirq(d, type, index, pirq_p);
     }
 
-    ret = rcu_lock_target_domain_by_id(domid, &d);
+    d = rcu_lock_domain_by_any_id(domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    ret = xsm_map_domain_pirq(XSM_TARGET, d);
     if ( ret )
         return ret;
 
@@ -218,9 +222,13 @@ int physdev_unmap_pirq(domid_t domid, int pirq)
     struct domain *d;
     int ret;
 
-    ret = rcu_lock_target_domain_by_id(domid, &d);
+    d = rcu_lock_domain_by_any_id(domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    ret = xsm_unmap_domain_pirq(XSM_TARGET, d);
     if ( ret )
-        return ret;
+        goto free_domain;
 
     if ( is_hvm_domain(d) )
     {
@@ -231,10 +239,6 @@ int physdev_unmap_pirq(domid_t domid, int pirq)
         if ( domid == DOMID_SELF || ret )
             goto free_domain;
     }
-
-    ret = xsm_unmap_domain_pirq(XSM_TARGET, d, domain_pirq_to_irq(d, pirq));
-    if ( ret )
-        goto free_domain;
 
     spin_lock(&pcidevs_lock);
     spin_lock(&d->event_lock);

@@ -818,17 +818,17 @@ static char *flask_show_irq_sid (int irq)
     return ctx;
 }
 
-static int flask_map_domain_pirq (struct domain *d, int irq, void *data)
+static int flask_map_domain_pirq (struct domain *d)
+{
+    return current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
+}
+
+static int flask_map_domain_irq (struct domain *d, int irq, void *data)
 {
     u32 sid, dsid;
     int rc = -EPERM;
     struct msi_info *msi = data;
     struct avc_audit_data ad;
-
-    rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__ADD);
-
-    if ( rc )
-        return rc;
 
     if ( irq >= nr_static_irqs && msi ) {
         u32 machine_bdf = (msi->seg << 16) | (msi->bus << 8) | msi->devfn;
@@ -851,22 +851,25 @@ static int flask_map_domain_pirq (struct domain *d, int irq, void *data)
     return rc;
 }
 
-static int flask_unmap_domain_pirq (struct domain *d, int irq)
+static int flask_unmap_domain_pirq (struct domain *d)
+{
+    return current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__REMOVE);
+}
+
+static int flask_unmap_domain_irq (struct domain *d, int irq, void *data)
 {
     u32 sid;
     int rc = -EPERM;
+    struct msi_info *msi = data;
     struct avc_audit_data ad;
 
-    rc = current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__REMOVE);
-    if ( rc )
-        return rc;
-
-    if ( irq < nr_static_irqs ) {
-        rc = get_irq_sid(irq, &sid, &ad);
+    if ( irq >= nr_static_irqs && msi ) {
+        u32 machine_bdf = (msi->seg << 16) | (msi->bus << 8) | msi->devfn;
+        AVC_AUDIT_DATA_INIT(&ad, DEV);
+        ad.device = machine_bdf;
+        rc = security_device_sid(machine_bdf, &sid);
     } else {
-        /* It is currently not possible to check the specific MSI IRQ being
-         * removed, since we do not have the msi_info like map_domain_pirq */
-        return 0;
+        rc = get_irq_sid(irq, &sid, &ad);
     }
     if ( rc )
         return rc;
@@ -1481,7 +1484,9 @@ static struct xsm_operations flask_ops = {
     .show_irq_sid = flask_show_irq_sid,
 
     .map_domain_pirq = flask_map_domain_pirq,
+    .map_domain_irq = flask_map_domain_irq,
     .unmap_domain_pirq = flask_unmap_domain_pirq,
+    .unmap_domain_irq = flask_unmap_domain_irq,
     .irq_permission = flask_irq_permission,
     .iomem_permission = flask_iomem_permission,
     .iomem_mapping = flask_iomem_mapping,

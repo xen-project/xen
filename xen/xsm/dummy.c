@@ -76,7 +76,9 @@ void xsm_fixup_ops (struct xsm_operations *ops)
 
     set_to_dummy_if_null(ops, show_irq_sid);
     set_to_dummy_if_null(ops, map_domain_pirq);
+    set_to_dummy_if_null(ops, map_domain_irq);
     set_to_dummy_if_null(ops, unmap_domain_pirq);
+    set_to_dummy_if_null(ops, unmap_domain_irq);
     set_to_dummy_if_null(ops, irq_permission);
     set_to_dummy_if_null(ops, iomem_permission);
     set_to_dummy_if_null(ops, iomem_mapping);

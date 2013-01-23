@@ -368,12 +368,11 @@ class resource
 #  target = resource's security label
 # also checked when using some core Xen devices (target xen_t)
     use
-# PHYSDEVOP_map_pirq and ioapic writes for dom0
+# PHYSDEVOP_map_pirq and ioapic writes for dom0, when acting on real IRQs
 #  For GSI interrupts, the IRQ's label is indexed by the IRQ number
 #  For MSI interrupts, the label of the PCI device is used
     add_irq
-# PHYSDEVOP_unmap_pirq:
-#  This is currently only checked for GSI interrupts
+# PHYSDEVOP_unmap_pirq (same as map, and only for real IRQs)
     remove_irq
 # XEN_DOMCTL_ioport_permission, XEN_DOMCTL_ioport_mapping
     add_ioport

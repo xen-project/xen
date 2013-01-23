@@ -101,8 +101,10 @@ struct xsm_operations {
     int (*schedop_shutdown) (struct domain *d1, struct domain *d2);
 
     char *(*show_irq_sid) (int irq);
-    int (*map_domain_pirq) (struct domain *d, int irq, void *data);
-    int (*unmap_domain_pirq) (struct domain *d, int irq);
+    int (*map_domain_pirq) (struct domain *d);
+    int (*map_domain_irq) (struct domain *d, int irq, void *data);
+    int (*unmap_domain_pirq) (struct domain *d);
+    int (*unmap_domain_irq) (struct domain *d, int irq, void *data);
     int (*irq_permission) (struct domain *d, int pirq, uint8_t allow);
     int (*iomem_permission) (struct domain *d, uint64_t s, uint64_t e, uint8_t allow);
     int (*iomem_mapping) (struct domain *d, uint64_t s, uint64_t e, uint8_t allow);
@@ -370,14 +372,24 @@ static inline char *xsm_show_irq_sid (int irq)
     return xsm_ops->show_irq_sid(irq);
 }
 
-static inline int xsm_map_domain_pirq (xsm_default_t def, struct domain *d, int irq, void *data)
+static inline int xsm_map_domain_pirq (xsm_default_t def, struct domain *d)
 {
-    return xsm_ops->map_domain_pirq(d, irq, data);
+    return xsm_ops->map_domain_pirq(d);
 }
 
-static inline int xsm_unmap_domain_pirq (xsm_default_t def, struct domain *d, int irq)
+static inline int xsm_map_domain_irq (xsm_default_t def, struct domain *d, int irq, void *data)
 {
-    return xsm_ops->unmap_domain_pirq(d, irq);
+    return xsm_ops->map_domain_irq(d, irq, data);
+}
+
+static inline int xsm_unmap_domain_pirq (xsm_default_t def, struct domain *d)
+{
+    return xsm_ops->unmap_domain_pirq(d);
+}
+
+static inline int xsm_unmap_domain_irq (xsm_default_t def, struct domain *d, int irq, void *data)
+{
+    return xsm_ops->unmap_domain_irq(d, irq, data);
 }
 
 static inline int xsm_irq_permission (xsm_default_t def, struct domain *d, int pirq, uint8_t allow)

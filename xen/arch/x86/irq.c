@@ -1874,7 +1874,7 @@ int map_domain_pirq(
         return 0;
     }
 
-    ret = xsm_map_domain_pirq(XSM_HOOK, d, irq, data);
+    ret = xsm_map_domain_irq(XSM_HOOK, d, irq, data);
     if ( ret )
     {
         dprintk(XENLOG_G_ERR, "dom%d: could not permit access to irq %d mapping to pirq %d\n",
@@ -1978,14 +1978,19 @@ int unmap_domain_pirq(struct domain *d, int pirq)
         goto done;
     }
 
+    desc = irq_to_desc(irq);
+    msi_desc = desc->msi_desc;
+
+    ret = xsm_unmap_domain_irq(XSM_HOOK, d, irq, msi_desc);
+    if ( ret )
+        goto done;
+
     forced_unbind = pirq_guest_force_unbind(d, info);
     if ( forced_unbind )
         dprintk(XENLOG_G_WARNING, "dom%d: forcing unbind of pirq %d\n",
                 d->domain_id, pirq);
 
-    desc = irq_to_desc(irq);
-
-    if ( (msi_desc = desc->msi_desc) != NULL )
+    if ( msi_desc != NULL )
         pci_disable_msi(msi_desc);
 
     spin_lock_irqsave(&desc->lock, flags);
