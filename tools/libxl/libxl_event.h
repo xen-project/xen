@@ -287,8 +287,10 @@ typedef struct libxl_osevent_hooks {
   int (*timeout_register)(void *user, void **for_app_registration_out,
                           struct timeval abs, void *for_libxl);
   int (*timeout_modify)(void *user, void **for_app_registration_update,
-                         struct timeval abs);
-  void (*timeout_deregister)(void *user, void *for_app_registration);
+                         struct timeval abs)
+      /* only ever called with abs={0,0}, meaning ASAP */;
+  void (*timeout_deregister)(void *user, void *for_app_registration)
+      /* will never be called */;
 } libxl_osevent_hooks;
 
 /* The application which calls register_fd_hooks promises to
@@ -336,6 +338,17 @@ typedef struct libxl_osevent_hooks {
  * (or *for_app_registration_update) by a successful call to
  * register (or modify), and pass it to subsequent calls to modify
  * or deregister.
+ *
+ * Note that the application must cope with a call from libxl to
+ * timeout_modify racing with its own call to
+ * libxl__osevent_occurred_timeout.  libxl guarantees that
+ * timeout_modify will only be called with abs={0,0} but the
+ * application must still ensure that libxl's attempt to cause the
+ * timeout to occur immediately is safely ignored even the timeout is
+ * actually already in the process of occurring.
+ *
+ * timeout_deregister is not used because it forms part of a
+ * deprecated unsafe mode of use of the API.
  *
  * osevent_register_hooks may be called only once for each libxl_ctx.
  * libxl may make calls to register/modify/deregister from within
