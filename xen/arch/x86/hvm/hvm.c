@@ -3862,6 +3862,11 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                     rc = -EINVAL;
                 break;
             case HVM_PARAM_NESTEDHVM:
+                if ( !IS_PRIV(current->domain) )
+                {
+                    rc = -EPERM;
+                    break;
+                }
 #ifdef __i386__
                 if ( a.value )
                     rc = -EINVAL;
