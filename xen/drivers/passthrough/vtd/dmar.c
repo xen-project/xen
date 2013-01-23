@@ -823,7 +823,18 @@ out:
 
 int __init acpi_dmar_init(void)
 {
-    acpi_get_table(ACPI_SIG_DMAR, 0, &dmar_table);
+    acpi_physical_address dmar_addr;
+    acpi_native_uint dmar_len;
+
+    if ( ACPI_SUCCESS(acpi_get_table_phys(ACPI_SIG_DMAR, 0,
+                                          &dmar_addr, &dmar_len)) )
+    {
+        map_pages_to_xen((unsigned long)__va(dmar_addr), PFN_DOWN(dmar_addr),
+                         PFN_UP(dmar_addr + dmar_len) - PFN_DOWN(dmar_addr),
+                         PAGE_HYPERVISOR);
+        dmar_table = __va(dmar_addr);
+    }
+
     return parse_dmar_table(acpi_parse_dmar);
 }
 
