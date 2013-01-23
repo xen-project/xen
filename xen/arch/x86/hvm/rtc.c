@@ -53,8 +53,9 @@ static inline int convert_hour(RTCState *s, int hour);
 static void rtc_periodic_cb(struct vcpu *v, void *opaque)
 {
     RTCState *s = opaque;
+
     spin_lock(&s->lock);
-    s->hw.cmos_data[RTC_REG_C] |= 0xc0;
+    s->hw.cmos_data[RTC_REG_C] |= RTC_PF | RTC_IRQF;
     spin_unlock(&s->lock);
 }
 
@@ -463,7 +464,7 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
 
 static inline int to_bcd(RTCState *s, int a)
 {
-    if ( s->hw.cmos_data[RTC_REG_B] & 0x04 )
+    if ( s->hw.cmos_data[RTC_REG_B] & RTC_DM_BINARY )
         return a;
     else
         return ((a / 10) << 4) | (a % 10);
@@ -471,7 +472,7 @@ static inline int to_bcd(RTCState *s, int a)
 
 static inline int from_bcd(RTCState *s, int a)
 {
-    if ( s->hw.cmos_data[RTC_REG_B] & 0x04 )
+    if ( s->hw.cmos_data[RTC_REG_B] & RTC_DM_BINARY )
         return a;
     else
         return ((a >> 4) * 10) + (a & 0x0f);
