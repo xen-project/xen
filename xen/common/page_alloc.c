@@ -255,6 +255,9 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
     unsigned long needed = (sizeof(**_heap) +
                             sizeof(**avail) * NR_ZONES +
                             PAGE_SIZE - 1) >> PAGE_SHIFT;
+#ifdef DIRECTMAP_VIRT_END
+    unsigned long eva = min(DIRECTMAP_VIRT_END, HYPERVISOR_VIRT_END);
+#endif
     int i, j;
 
     if ( !first_node_initialised )
@@ -266,14 +269,14 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
     }
 #ifdef DIRECTMAP_VIRT_END
     else if ( *use_tail && nr >= needed &&
-              (mfn + nr) <= (virt_to_mfn(DIRECTMAP_VIRT_END - 1) + 1) )
+              (mfn + nr) <= (virt_to_mfn(eva - 1) + 1) )
     {
         _heap[node] = mfn_to_virt(mfn + nr - needed);
         avail[node] = mfn_to_virt(mfn + nr - 1) +
                       PAGE_SIZE - sizeof(**avail) * NR_ZONES;
     }
     else if ( nr >= needed &&
-              (mfn + needed) <= (virt_to_mfn(DIRECTMAP_VIRT_END - 1) + 1) )
+              (mfn + needed) <= (virt_to_mfn(eva - 1) + 1) )
     {
         _heap[node] = mfn_to_virt(mfn);
         avail[node] = mfn_to_virt(mfn + needed - 1) +
@@ -1205,6 +1208,13 @@ void free_xenheap_pages(void *v, unsigned int order)
 
 #else
 
+static unsigned int __read_mostly xenheap_bits;
+
+void __init xenheap_max_mfn(unsigned long mfn)
+{
+    xenheap_bits = fls(mfn) + PAGE_SHIFT - 1;
+}
+
 void init_xenheap_pages(paddr_t ps, paddr_t pe)
 {
     init_domheap_pages(ps, pe);
@@ -1216,6 +1226,11 @@ void *alloc_xenheap_pages(unsigned int order, unsigned int memflags)
     unsigned int i;
 
     ASSERT(!in_irq());
+
+    if ( xenheap_bits && (memflags >> _MEMF_bits) > xenheap_bits )
+        memflags &= ~MEMF_bits(~0);
+    if ( !(memflags >> _MEMF_bits) )
+        memflags |= MEMF_bits(xenheap_bits);
 
     pg = alloc_domheap_pages(NULL, order, memflags);
     if ( unlikely(pg == NULL) )

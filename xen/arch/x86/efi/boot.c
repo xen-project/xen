@@ -1591,7 +1591,7 @@ void __init efi_init_memory(void)
 
     /* Insert Xen mappings. */
     for ( i = l4_table_offset(HYPERVISOR_VIRT_START);
-          i < l4_table_offset(HYPERVISOR_VIRT_END); ++i )
+          i < l4_table_offset(DIRECTMAP_VIRT_END); ++i )
         efi_l4_pgtable[i] = idle_pg_table[i];
 #endif
 }

@@ -43,6 +43,7 @@ void end_boot_allocator(void);
 
 /* Xen suballocator. These functions are interrupt-safe. */
 void init_xenheap_pages(paddr_t ps, paddr_t pe);
+void xenheap_max_mfn(unsigned long mfn);
 void *alloc_xenheap_pages(unsigned int order, unsigned int memflags);
 void free_xenheap_pages(void *v, unsigned int order);
 #define alloc_xenheap_page() (alloc_xenheap_pages(0,0))
@@ -111,7 +112,7 @@ struct page_list_head
 /* These must only have instances in struct page_info. */
 # define page_list_entry
 
-#define PAGE_LIST_NULL (~0)
+# define PAGE_LIST_NULL ((typeof(((struct page_info){}).list.next))~0)
 
 # if !defined(pdx_to_page) && !defined(page_to_pdx)
 #  if defined(__page_to_mfn) || defined(__mfn_to_page)

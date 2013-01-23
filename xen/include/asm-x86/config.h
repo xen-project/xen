@@ -163,8 +163,12 @@ extern unsigned char boot_edid_info[128];
  *    Page-frame information array.
  *  0xffff830000000000 - 0xffff87ffffffffff [5TB, 5*2^40 bytes, PML4:262-271]
  *    1:1 direct mapping of all physical memory.
- *  0xffff880000000000 - 0xffffffffffffffff [120TB, PML4:272-511]
- *    Guest-defined use.
+ *  0xffff880000000000 - 0xffffffffffffffff [120TB,             PML4:272-511]
+ *    PV: Guest-defined use.
+ *  0xffff880000000000 - 0xffffff7fffffffff [119.5TB,           PML4:272-510]
+ *    HVM/idle: continuation of 1:1 mapping
+ *  0xffffff8000000000 - 0xffffffffffffffff [512GB, 2^39 bytes  PML4:511]
+ *    HVM/idle: unused
  *
  * Compatibility guest area layout:
  *  0x0000000000000000 - 0x00000000f57fffff [3928MB,            PML4:0]
@@ -183,6 +187,8 @@ extern unsigned char boot_edid_info[128];
 #define ROOT_PAGETABLE_FIRST_XEN_SLOT 256
 #define ROOT_PAGETABLE_LAST_XEN_SLOT  271
 #define ROOT_PAGETABLE_XEN_SLOTS \
+    (L4_PAGETABLE_ENTRIES - ROOT_PAGETABLE_FIRST_XEN_SLOT - 1)
+#define ROOT_PAGETABLE_PV_XEN_SLOTS \
     (ROOT_PAGETABLE_LAST_XEN_SLOT - ROOT_PAGETABLE_FIRST_XEN_SLOT + 1)
 
 /* Hypervisor reserves PML4 slots 256 to 271 inclusive. */
@@ -241,9 +247,9 @@ extern unsigned char boot_edid_info[128];
 #define FRAMETABLE_SIZE         GB(128)
 #define FRAMETABLE_NR           (FRAMETABLE_SIZE / sizeof(*frame_table))
 #define FRAMETABLE_VIRT_START   (FRAMETABLE_VIRT_END - FRAMETABLE_SIZE)
-/* Slot 262-271: A direct 1:1 mapping of all of physical memory. */
+/* Slot 262-271/510: A direct 1:1 mapping of all of physical memory. */
 #define DIRECTMAP_VIRT_START    (PML4_ADDR(262))
-#define DIRECTMAP_SIZE          (PML4_ENTRY_BYTES*10)
+#define DIRECTMAP_SIZE          (PML4_ENTRY_BYTES * (511 - 262))
 #define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + DIRECTMAP_SIZE)
 
 #ifndef __ASSEMBLY__

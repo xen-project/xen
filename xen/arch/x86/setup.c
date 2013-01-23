@@ -25,6 +25,7 @@
 #include <xen/dmi.h>
 #include <xen/pfn.h>
 #include <xen/nodemask.h>
+#include <xen/tmem_xen.h> /* for opt_tmem only */
 #include <public/version.h>
 #include <compat/platform.h>
 #include <compat/xen.h>
@@ -380,6 +381,9 @@ static void __init setup_max_pdx(void)
 
     if ( max_pdx > FRAMETABLE_NR )
         max_pdx = FRAMETABLE_NR;
+
+    if ( max_pdx >= PAGE_LIST_NULL )
+        max_pdx = PAGE_LIST_NULL - 1;
 
     max_page = pdx_to_pfn(max_pdx - 1) + 1;
 }
@@ -1031,9 +1035,23 @@ void __init __start_xen(unsigned long mbi_p)
         /* Create new mappings /before/ passing memory to the allocator. */
         if ( map_e < e )
         {
-            map_pages_to_xen((unsigned long)__va(map_e), map_e >> PAGE_SHIFT,
-                             (e - map_e) >> PAGE_SHIFT, PAGE_HYPERVISOR);
-            init_boot_pages(map_e, e);
+            uint64_t limit = __pa(HYPERVISOR_VIRT_END - 1) + 1;
+            uint64_t end = min(e, limit);
+
+            if ( map_e < end )
+            {
+                map_pages_to_xen((unsigned long)__va(map_e), PFN_DOWN(map_e),
+                                 PFN_DOWN(end - map_e), PAGE_HYPERVISOR);
+                init_boot_pages(map_e, end);
+                map_e = end;
+            }
+        }
+        if ( map_e < e )
+        {
+            /* This range must not be passed to the boot allocator and
+             * must also not be mapped with _PAGE_GLOBAL. */
+            map_pages_to_xen((unsigned long)__va(map_e), PFN_DOWN(map_e),
+                             PFN_DOWN(e - map_e), __PAGE_HYPERVISOR);
         }
         if ( s < map_s )
         {
@@ -1103,6 +1121,35 @@ void __init __start_xen(unsigned long mbi_p)
 
     end_boot_allocator();
     system_state = SYS_STATE_boot;
+
+    if ( max_page - 1 > virt_to_mfn(HYPERVISOR_VIRT_END - 1) )
+    {
+        unsigned long limit = virt_to_mfn(HYPERVISOR_VIRT_END - 1);
+        uint64_t mask = PAGE_SIZE - 1;
+
+        xenheap_max_mfn(limit);
+
+        /* Pass the remaining memory to the allocator. */
+        for ( i = 0; i < boot_e820.nr_map; i++ )
+        {
+            uint64_t s, e;
+
+            s = (boot_e820.map[i].addr + mask) & ~mask;
+            e = (boot_e820.map[i].addr + boot_e820.map[i].size) & ~mask;
+            if ( PFN_DOWN(e) <= limit )
+                continue;
+            if ( PFN_DOWN(s) <= limit )
+                s = pfn_to_paddr(limit + 1);
+            init_domheap_pages(s, e);
+        }
+
+        if ( opt_tmem )
+        {
+           printk(XENLOG_WARNING
+                  "TMEM physical RAM limit exceeded, disabling TMEM\n");
+           opt_tmem = 0;
+        }
+    }
 
     vm_init();
     vesa_init();

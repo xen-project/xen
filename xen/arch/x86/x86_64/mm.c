@@ -1471,10 +1471,23 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
         return -EINVAL;
     }
 
-    ret =  map_pages_to_xen((unsigned long)mfn_to_virt(spfn), spfn,
-                            epfn - spfn, PAGE_HYPERVISOR);
-     if ( ret )
-        return ret;
+    i = virt_to_mfn(HYPERVISOR_VIRT_END - 1) + 1;
+    if ( spfn < i )
+    {
+        ret = map_pages_to_xen((unsigned long)mfn_to_virt(spfn), spfn,
+                               min(epfn, i) - spfn, PAGE_HYPERVISOR);
+        if ( ret )
+            return ret;
+    }
+    if ( i < epfn )
+    {
+        if ( i < spfn )
+            i = spfn;
+        ret = map_pages_to_xen((unsigned long)mfn_to_virt(i), i,
+                               epfn - i, __PAGE_HYPERVISOR);
+        if ( ret )
+            return ret;
+    }
 
     old_node_start = NODE_DATA(node)->node_start_pfn;
     old_node_span = NODE_DATA(node)->node_spanned_pages;
