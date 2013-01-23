@@ -1449,7 +1449,7 @@ void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
 
     /* Install the per-domain mappings for this domain */
     sl4e[shadow_l4_table_offset(PERDOMAIN_VIRT_START)] =
-        shadow_l4e_from_mfn(page_to_mfn(virt_to_page(d->arch.mm_perdomain_l3)),
+        shadow_l4e_from_mfn(page_to_mfn(d->arch.perdomain_l3_pg),
                             __PAGE_HYPERVISOR);
 
     /* Shadow linear mapping for 4-level shadows.  N.B. for 3-level

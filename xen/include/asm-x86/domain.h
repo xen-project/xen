@@ -241,9 +241,9 @@ struct pv_domain
 
 struct arch_domain
 {
-    struct page_info **mm_perdomain_pt_pages;
-    l2_pgentry_t *mm_perdomain_l2[PERDOMAIN_SLOTS];
-    l3_pgentry_t *mm_perdomain_l3;
+    void **perdomain_pts;
+    struct page_info *perdomain_l2_pg[PERDOMAIN_SLOTS];
+    struct page_info *perdomain_l3_pg;
 
     unsigned int hv_compat_vstart;
 
@@ -318,13 +318,11 @@ struct arch_domain
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
 #define has_arch_mmios(d)    (!rangeset_is_empty((d)->iomem_caps))
 
-#define perdomain_pt_pgidx(v) \
+#define perdomain_pt_idx(v) \
       ((v)->vcpu_id >> (PAGETABLE_ORDER - GDT_LDT_VCPU_SHIFT))
 #define perdomain_ptes(d, v) \
-    ((l1_pgentry_t *)page_to_virt((d)->arch.mm_perdomain_pt_pages \
-      [perdomain_pt_pgidx(v)]) + (((v)->vcpu_id << GDT_LDT_VCPU_SHIFT) & \
-                                  (L1_PAGETABLE_ENTRIES - 1)))
-#define perdomain_pt_page(d, n) ((d)->arch.mm_perdomain_pt_pages[n])
+    ((l1_pgentry_t *)(d)->arch.perdomain_pts[perdomain_pt_idx(v)] + \
+     (((v)->vcpu_id << GDT_LDT_VCPU_SHIFT) & (L1_PAGETABLE_ENTRIES - 1)))
 
 struct pv_vcpu
 {

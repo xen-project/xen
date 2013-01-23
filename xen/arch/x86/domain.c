@@ -289,9 +289,10 @@ static int setup_compat_l4(struct vcpu *v)
     /* This page needs to look like a pagetable so that it can be shadowed */
     pg->u.inuse.type_info = PGT_l4_page_table|PGT_validated|1;
 
-    l4tab = page_to_virt(pg);
+    l4tab = __map_domain_page(pg);
     clear_page(l4tab);
     init_guest_l4_table(l4tab, v->domain);
+    unmap_domain_page(l4tab);
 
     v->arch.guest_table = pagetable_from_page(pg);
     v->arch.guest_table_user = v->arch.guest_table;
@@ -383,17 +384,22 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.flags = TF_kernel_mode;
 
-    idx = perdomain_pt_pgidx(v);
-    if ( !perdomain_pt_page(d, idx) )
+    idx = perdomain_pt_idx(v);
+    if ( !d->arch.perdomain_pts[idx] )
     {
-        struct page_info *pg;
-        pg = alloc_domheap_page(NULL, MEMF_node(vcpu_to_node(v)));
-        if ( !pg )
+        void *pt;
+        l2_pgentry_t *l2tab;
+
+        pt = alloc_xenheap_pages(0, MEMF_node(vcpu_to_node(v)));
+        if ( !pt )
             return -ENOMEM;
-        clear_page(page_to_virt(pg));
-        perdomain_pt_page(d, idx) = pg;
-        d->arch.mm_perdomain_l2[0][l2_table_offset(PERDOMAIN_VIRT_START)+idx]
-            = l2e_from_page(pg, __PAGE_HYPERVISOR);
+        clear_page(pt);
+        d->arch.perdomain_pts[idx] = pt;
+
+        l2tab = __map_domain_page(d->arch.perdomain_l2_pg[0]);
+        l2tab[l2_table_offset(PERDOMAIN_VIRT_START) + idx]
+            = l2e_from_paddr(__pa(pt), __PAGE_HYPERVISOR);
+        unmap_domain_page(l2tab);
     }
 
     rc = mapcache_vcpu_init(v);
@@ -484,6 +490,7 @@ void vcpu_destroy(struct vcpu *v)
 int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
     struct page_info *pg;
+    l3_pgentry_t *l3tab;
     int i, paging_initialised = 0;
     int rc = -ENOMEM;
 
@@ -514,28 +521,29 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
                d->domain_id);
     }
 
-    BUILD_BUG_ON(PDPT_L2_ENTRIES * sizeof(*d->arch.mm_perdomain_pt_pages)
+    BUILD_BUG_ON(PDPT_L2_ENTRIES * sizeof(*d->arch.perdomain_pts)
                  != PAGE_SIZE);
-    pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
-    if ( !pg )
+    d->arch.perdomain_pts =
+        alloc_xenheap_pages(0, MEMF_node(domain_to_node(d)));
+    if ( !d->arch.perdomain_pts )
         goto fail;
-    d->arch.mm_perdomain_pt_pages = page_to_virt(pg);
-    clear_page(d->arch.mm_perdomain_pt_pages);
+    clear_page(d->arch.perdomain_pts);
 
     pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
     if ( pg == NULL )
         goto fail;
-    d->arch.mm_perdomain_l2[0] = page_to_virt(pg);
-    clear_page(d->arch.mm_perdomain_l2[0]);
+    d->arch.perdomain_l2_pg[0] = pg;
+    clear_domain_page(page_to_mfn(pg));
 
     pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
     if ( pg == NULL )
         goto fail;
-    d->arch.mm_perdomain_l3 = page_to_virt(pg);
-    clear_page(d->arch.mm_perdomain_l3);
-    d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] =
-        l3e_from_pfn(virt_to_mfn(d->arch.mm_perdomain_l2[0]),
-                     __PAGE_HYPERVISOR);
+    d->arch.perdomain_l3_pg = pg;
+    l3tab = __map_domain_page(pg);
+    clear_page(l3tab);
+    l3tab[l3_table_offset(PERDOMAIN_VIRT_START)] =
+        l3e_from_page(d->arch.perdomain_l2_pg[0], __PAGE_HYPERVISOR);
+    unmap_domain_page(l3tab);
 
     mapcache_domain_init(d);
 
@@ -611,12 +619,12 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     if ( paging_initialised )
         paging_final_teardown(d);
     mapcache_domain_exit(d);
-    if ( d->arch.mm_perdomain_l2[0] )
-        free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2[0]));
-    if ( d->arch.mm_perdomain_l3 )
-        free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
-    if ( d->arch.mm_perdomain_pt_pages )
-        free_domheap_page(virt_to_page(d->arch.mm_perdomain_pt_pages));
+    for ( i = 0; i < PERDOMAIN_SLOTS; ++i)
+        if ( d->arch.perdomain_l2_pg[i] )
+            free_domheap_page(d->arch.perdomain_l2_pg[i]);
+    if ( d->arch.perdomain_l3_pg )
+        free_domheap_page(d->arch.perdomain_l3_pg);
+    free_xenheap_page(d->arch.perdomain_pts);
     return rc;
 }
 
@@ -638,13 +646,12 @@ void arch_domain_destroy(struct domain *d)
     mapcache_domain_exit(d);
 
     for ( i = 0; i < PDPT_L2_ENTRIES; ++i )
-    {
-        if ( perdomain_pt_page(d, i) )
-            free_domheap_page(perdomain_pt_page(d, i));
-    }
-    free_domheap_page(virt_to_page(d->arch.mm_perdomain_pt_pages));
-    free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2[0]));
-    free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
+        free_xenheap_page(d->arch.perdomain_pts[i]);
+    free_xenheap_page(d->arch.perdomain_pts);
+    for ( i = 0; i < PERDOMAIN_SLOTS; ++i)
+        if ( d->arch.perdomain_l2_pg[i] )
+            free_domheap_page(d->arch.perdomain_l2_pg[i]);
+    free_domheap_page(d->arch.perdomain_l3_pg);
 
     free_xenheap_page(d->shared_info);
     cleanup_domain_irq_mapping(d);
@@ -810,9 +817,10 @@ int arch_set_info_guest(
                 fail |= xen_pfn_to_cr3(pfn) != c.nat->ctrlreg[1];
             }
         } else {
-            l4_pgentry_t *l4tab = __va(pfn_to_paddr(pfn));
+            l4_pgentry_t *l4tab = map_domain_page(pfn);
 
             pfn = l4e_get_pfn(*l4tab);
+            unmap_domain_page(l4tab);
             fail = compat_pfn_to_cr3(pfn) != c.cmp->ctrlreg[3];
         }
 
@@ -951,9 +959,10 @@ int arch_set_info_guest(
             return -EINVAL;
         }
 
-        l4tab = __va(pagetable_get_paddr(v->arch.guest_table));
+        l4tab = map_domain_page(pagetable_get_pfn(v->arch.guest_table));
         *l4tab = l4e_from_pfn(page_to_mfn(cr3_page),
             _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
+        unmap_domain_page(l4tab);
     }
 
     if ( v->vcpu_id == 0 )
@@ -1971,12 +1980,13 @@ static int relinquish_memory(
 static void vcpu_destroy_pagetables(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    unsigned long pfn;
+    unsigned long pfn = pagetable_get_pfn(v->arch.guest_table);
 
     if ( is_pv_32on64_vcpu(v) )
     {
-        pfn = l4e_get_pfn(*(l4_pgentry_t *)
-                          __va(pagetable_get_paddr(v->arch.guest_table)));
+        l4_pgentry_t *l4tab = map_domain_page(pfn);
+
+        pfn = l4e_get_pfn(*l4tab);
 
         if ( pfn != 0 )
         {
@@ -1986,15 +1996,12 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
                 put_page_and_type(mfn_to_page(pfn));
         }
 
-        l4e_write(
-            (l4_pgentry_t *)__va(pagetable_get_paddr(v->arch.guest_table)),
-            l4e_empty());
+        l4e_write(l4tab, l4e_empty());
 
         v->arch.cr3 = 0;
         return;
     }
 
-    pfn = pagetable_get_pfn(v->arch.guest_table);
     if ( pfn != 0 )
     {
         if ( paging_mode_refcounts(d) )

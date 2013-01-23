@@ -1322,9 +1322,9 @@ void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d)
            &idle_pg_table[ROOT_PAGETABLE_FIRST_XEN_SLOT],
            ROOT_PAGETABLE_XEN_SLOTS * sizeof(l4_pgentry_t));
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
-        l4e_from_pfn(virt_to_mfn(l4tab), __PAGE_HYPERVISOR);
+        l4e_from_pfn(domain_page_map_to_mfn(l4tab), __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_from_pfn(virt_to_mfn(d->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
+        l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR);
 }
 
 static int alloc_l4_table(struct page_info *page, int preemptible)

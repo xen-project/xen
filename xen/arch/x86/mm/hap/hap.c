@@ -369,7 +369,7 @@ static void hap_install_xen_entries_in_l4(struct vcpu *v, mfn_t l4mfn)
 
     /* Install the per-domain mappings for this domain */
     l4e[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_from_pfn(mfn_x(page_to_mfn(virt_to_page(d->arch.mm_perdomain_l3))),
+        l4e_from_pfn(mfn_x(page_to_mfn(d->arch.perdomain_l3_pg)),
                      __PAGE_HYPERVISOR);
 
     /* Install a linear mapping */

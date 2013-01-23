@@ -823,9 +823,8 @@ void __init setup_idle_pagetable(void)
 {
     /* Install per-domain mappings for idle domain. */
     l4e_write(&idle_pg_table[l4_table_offset(PERDOMAIN_VIRT_START)],
-              l4e_from_page(
-                  virt_to_page(idle_vcpu[0]->domain->arch.mm_perdomain_l3),
-                  __PAGE_HYPERVISOR));
+              l4e_from_page(idle_vcpu[0]->domain->arch.perdomain_l3_pg,
+                            __PAGE_HYPERVISOR));
 }
 
 void __init zap_low_mappings(void)
@@ -850,21 +849,18 @@ void *compat_arg_xlat_virt_base(void)
 int setup_compat_arg_xlat(struct vcpu *v)
 {
     unsigned int order = get_order_from_bytes(COMPAT_ARG_XLAT_SIZE);
-    struct page_info *pg;
 
-    pg = alloc_domheap_pages(NULL, order, 0);
-    if ( pg == NULL )
-        return -ENOMEM;
+    v->arch.compat_arg_xlat = alloc_xenheap_pages(order,
+                                                  MEMF_node(vcpu_to_node(v)));
 
-    v->arch.compat_arg_xlat = page_to_virt(pg);
-    return 0;
+    return v->arch.compat_arg_xlat ? 0 : -ENOMEM;
 }
 
 void free_compat_arg_xlat(struct vcpu *v)
 {
     unsigned int order = get_order_from_bytes(COMPAT_ARG_XLAT_SIZE);
-    if ( v->arch.compat_arg_xlat != NULL )
-        free_domheap_pages(virt_to_page(v->arch.compat_arg_xlat), order);
+
+    free_xenheap_pages(v->arch.compat_arg_xlat, order);
     v->arch.compat_arg_xlat = NULL;
 }
 
