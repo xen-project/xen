@@ -3862,6 +3862,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                     rc = -EINVAL;
                 break;
             case HVM_PARAM_NESTEDHVM:
+#ifdef __i386__
+                if ( a.value )
+                    rc = -EINVAL;
+#else
                 if ( a.value > 1 )
                     rc = -EINVAL;
                 if ( !is_hvm_domain(d) )
@@ -3876,6 +3880,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
                     for_each_vcpu(d, v)
                         if ( rc == 0 )
                             rc = nestedhvm_vcpu_initialise(v);
+#endif
                 break;
             case HVM_PARAM_BUFIOREQ_EVTCHN:
                 rc = -EINVAL;
