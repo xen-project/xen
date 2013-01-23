@@ -3239,8 +3239,10 @@ static hvm_hypercall_t *const hvm_hypercall64_table[NR_hypercalls] = {
     HYPERCALL(event_channel_op),
     HYPERCALL(sched_op),
     HYPERCALL(set_timer_op),
+    HYPERCALL(xsm_op),
     HYPERCALL(hvm_op),
     HYPERCALL(sysctl),
+    HYPERCALL(domctl),
     HYPERCALL(tmem_op)
 };
 
@@ -3256,8 +3258,10 @@ static hvm_hypercall_t *const hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(event_channel_op),
     COMPAT_CALL(sched_op),
     COMPAT_CALL(set_timer_op),
+    HYPERCALL(xsm_op),
     HYPERCALL(hvm_op),
     HYPERCALL(sysctl),
+    HYPERCALL(domctl),
     HYPERCALL(tmem_op)
 };
 
