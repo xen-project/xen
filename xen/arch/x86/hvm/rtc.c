@@ -430,7 +430,7 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
             /* set mode: reset UIP mode */
             s->hw.cmos_data[RTC_REG_A] &= ~RTC_UIP;
             /* adjust cmos before stopping */
-            if (!(s->hw.cmos_data[RTC_REG_B] & RTC_SET))
+            if (!(orig & RTC_SET))
             {
                 s->current_tm = gmtime(get_localtime(d));
                 rtc_copy_date(s);
@@ -439,12 +439,12 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
         else
         {
             /* if disabling set mode, update the time */
-            if ( s->hw.cmos_data[RTC_REG_B] & RTC_SET )
+            if ( orig & RTC_SET )
                 rtc_set_time(s);
         }
         /* if the interrupt is already set when the interrupt become
          * enabled, raise an interrupt immediately*/
-        if ((data & RTC_UIE) && !(s->hw.cmos_data[RTC_REG_B] & RTC_UIE))
+        if ((data & RTC_UIE) && !(orig & RTC_UIE))
             if (s->hw.cmos_data[RTC_REG_C] & RTC_UF)
             {
                 rtc_toggle_irq(s);
