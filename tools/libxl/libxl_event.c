@@ -167,15 +167,15 @@ static void time_insert_finite(libxl__gc *gc, libxl__ev_time *ev)
 }
 
 static int time_register_finite(libxl__gc *gc, libxl__ev_time *ev,
-                                struct timeval abs)
+                                struct timeval absolute)
 {
     int rc;
 
-    rc = OSEVENT_HOOK(timeout_register, &ev->for_app_reg, abs, ev);
+    rc = OSEVENT_HOOK(timeout_register, &ev->for_app_reg, absolute, ev);
     if (rc) return rc;
 
     ev->infinite = 0;
-    ev->abs = abs;
+    ev->abs = absolute;
     time_insert_finite(gc, ev);
 
     return 0;
@@ -202,16 +202,16 @@ static void time_done_debug(libxl__gc *gc, const char *func,
 
 int libxl__ev_time_register_abs(libxl__gc *gc, libxl__ev_time *ev,
                                 libxl__ev_time_callback *func,
-                                struct timeval abs)
+                                struct timeval absolute)
 {
     int rc;
 
     CTX_LOCK;
 
     DBG("ev_time=%p register abs=%lu.%06lu",
-        ev, (unsigned long)abs.tv_sec, (unsigned long)abs.tv_usec);
+        ev, (unsigned long)absolute.tv_sec, (unsigned long)absolute.tv_usec);
 
-    rc = time_register_finite(gc, ev, abs);
+    rc = time_register_finite(gc, ev, absolute);
     if (rc) goto out;
 
     ev->func = func;
@@ -228,7 +228,7 @@ int libxl__ev_time_register_rel(libxl__gc *gc, libxl__ev_time *ev,
                                 libxl__ev_time_callback *func,
                                 int milliseconds /* as for poll(2) */)
 {
-    struct timeval abs;
+    struct timeval absolute;
     int rc;
 
     CTX_LOCK;
@@ -238,10 +238,10 @@ int libxl__ev_time_register_rel(libxl__gc *gc, libxl__ev_time *ev,
     if (milliseconds < 0) {
         ev->infinite = 1;
     } else {
-        rc = time_rel_to_abs(gc, milliseconds, &abs);
+        rc = time_rel_to_abs(gc, milliseconds, &absolute);
         if (rc) goto out;
 
-        rc = time_register_finite(gc, ev, abs);
+        rc = time_register_finite(gc, ev, absolute);
         if (rc) goto out;
     }
 
@@ -255,26 +255,26 @@ int libxl__ev_time_register_rel(libxl__gc *gc, libxl__ev_time *ev,
 }
 
 int libxl__ev_time_modify_abs(libxl__gc *gc, libxl__ev_time *ev,
-                              struct timeval abs)
+                              struct timeval absolute)
 {
     int rc;
 
     CTX_LOCK;
 
     DBG("ev_time=%p modify abs==%lu.%06lu",
-        ev, (unsigned long)abs.tv_sec, (unsigned long)abs.tv_usec);
+        ev, (unsigned long)absolute.tv_sec, (unsigned long)absolute.tv_usec);
 
     assert(libxl__ev_time_isregistered(ev));
 
     if (ev->infinite) {
-        rc = time_register_finite(gc, ev, abs);
+        rc = time_register_finite(gc, ev, absolute);
         if (rc) goto out;
     } else {
-        rc = OSEVENT_HOOK(timeout_modify, &ev->for_app_reg, abs);
+        rc = OSEVENT_HOOK(timeout_modify, &ev->for_app_reg, absolute);
         if (rc) goto out;
 
         LIBXL_TAILQ_REMOVE(&CTX->etimes, ev, entry);
-        ev->abs = abs;
+        ev->abs = absolute;
         time_insert_finite(gc, ev);
     }
 
@@ -288,7 +288,7 @@ int libxl__ev_time_modify_abs(libxl__gc *gc, libxl__ev_time *ev,
 int libxl__ev_time_modify_rel(libxl__gc *gc, libxl__ev_time *ev,
                               int milliseconds)
 {
-    struct timeval abs;
+    struct timeval absolute;
     int rc;
 
     CTX_LOCK;
@@ -304,10 +304,10 @@ int libxl__ev_time_modify_rel(libxl__gc *gc, libxl__ev_time *ev,
         goto out;
     }
 
-    rc = time_rel_to_abs(gc, milliseconds, &abs);
+    rc = time_rel_to_abs(gc, milliseconds, &absolute);
     if (rc) goto out;
 
-    rc = libxl__ev_time_modify_abs(gc, ev, abs);
+    rc = libxl__ev_time_modify_abs(gc, ev, absolute);
     if (rc) goto out;
 
     rc = 0;
