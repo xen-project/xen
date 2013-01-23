@@ -622,13 +622,7 @@ int __init construct_dom0(
         l3start = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
     }
     clear_page(l4tab);
-    for ( i = l4_table_offset(HYPERVISOR_VIRT_START);
-          i < l4_table_offset(HYPERVISOR_VIRT_END); ++i )
-        l4tab[i] = idle_pg_table[i];
-    l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
-        l4e_from_paddr(__pa(l4start), __PAGE_HYPERVISOR);
-    l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_from_paddr(__pa(d->arch.mm_perdomain_l3), __PAGE_HYPERVISOR);
+    init_guest_l4_table(l4tab, d);
     v->arch.guest_table = pagetable_from_paddr(__pa(l4start));
     if ( is_pv_32on64_domain(d) )
         v->arch.guest_table_user = v->arch.guest_table;

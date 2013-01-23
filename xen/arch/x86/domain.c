@@ -290,13 +290,8 @@ static int setup_compat_l4(struct vcpu *v)
     pg->u.inuse.type_info = PGT_l4_page_table|PGT_validated|1;
 
     l4tab = page_to_virt(pg);
-    copy_page(l4tab, idle_pg_table);
-    l4tab[0] = l4e_empty();
-    l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
-        l4e_from_page(pg, __PAGE_HYPERVISOR);
-    l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
-        l4e_from_paddr(__pa(v->domain->arch.mm_perdomain_l3),
-                       __PAGE_HYPERVISOR);
+    clear_page(l4tab);
+    init_guest_l4_table(l4tab, v->domain);
 
     v->arch.guest_table = pagetable_from_page(pg);
     v->arch.guest_table_user = v->arch.guest_table;
