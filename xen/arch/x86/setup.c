@@ -378,8 +378,8 @@ static void __init setup_max_pdx(void)
     if ( max_pdx > (DIRECTMAP_SIZE >> PAGE_SHIFT) )
         max_pdx = DIRECTMAP_SIZE >> PAGE_SHIFT;
 
-    if ( max_pdx > FRAMETABLE_SIZE / sizeof(*frame_table) )
-        max_pdx = FRAMETABLE_SIZE / sizeof(*frame_table);
+    if ( max_pdx > FRAMETABLE_NR )
+        max_pdx = FRAMETABLE_NR;
 
     max_page = pdx_to_pfn(max_pdx - 1) + 1;
 }

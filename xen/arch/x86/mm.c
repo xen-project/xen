@@ -146,8 +146,7 @@ unsigned long max_page;
 unsigned long total_pages;
 
 unsigned long __read_mostly pdx_group_valid[BITS_TO_LONGS(
-    (FRAMETABLE_SIZE / sizeof(*frame_table) + PDX_GROUP_COUNT - 1)
-    / PDX_GROUP_COUNT)] = { [0] = 1 };
+    (FRAMETABLE_NR + PDX_GROUP_COUNT - 1) / PDX_GROUP_COUNT)] = { [0] = 1 };
 
 bool_t __read_mostly machine_to_phys_mapping_valid = 0;
 
@@ -218,7 +217,7 @@ static void __init init_spagetable(void)
     BUILD_BUG_ON(XEN_VIRT_END > SPAGETABLE_VIRT_START);
 
     init_frametable_chunk(spage_table,
-                          mem_hotplug ? (void *)SPAGETABLE_VIRT_END
+                          mem_hotplug ? spage_table + SPAGETABLE_NR
                                       : pdx_to_spage(max_pdx - 1) + 1);
 }
 

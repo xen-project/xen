@@ -958,7 +958,7 @@ static int extend_frame_table(struct mem_hotadd_info *info)
     nidx = cidx = pfn_to_pdx(spfn)/PDX_GROUP_COUNT;
 
     ASSERT( pfn_to_pdx(epfn) <= (DIRECTMAP_SIZE >> PAGE_SHIFT) &&
-         (pfn_to_pdx(epfn) <= FRAMETABLE_SIZE / sizeof(struct page_info)) );
+            pfn_to_pdx(epfn) <= FRAMETABLE_NR );
 
     if ( test_bit(cidx, pdx_group_valid) )
         cidx = find_next_zero_bit(pdx_group_valid, eidx, cidx);
@@ -1406,7 +1406,7 @@ int mem_hotadd_check(unsigned long spfn, unsigned long epfn)
     if ( (spfn >= epfn) )
         return 0;
 
-    if (pfn_to_pdx(epfn) > (FRAMETABLE_SIZE / sizeof(*frame_table)))
+    if (pfn_to_pdx(epfn) > FRAMETABLE_NR)
         return 0;
 
     if ( (spfn | epfn) & ((1UL << PAGETABLE_ORDER) - 1) )
