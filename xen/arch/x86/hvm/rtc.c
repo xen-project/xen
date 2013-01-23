@@ -50,6 +50,16 @@ static void rtc_set_time(RTCState *s);
 static inline int from_bcd(RTCState *s, int a);
 static inline int convert_hour(RTCState *s, int hour);
 
+static void rtc_toggle_irq(RTCState *s)
+{
+    struct domain *d = vrtc_domain(s);
+
+    ASSERT(spin_is_locked(&s->lock));
+    s->hw.cmos_data[RTC_REG_C] |= RTC_IRQF;
+    hvm_isa_irq_deassert(d, RTC_IRQ);
+    hvm_isa_irq_assert(d, RTC_IRQ);
+}
+
 static void rtc_periodic_cb(struct vcpu *v, void *opaque)
 {
     RTCState *s = opaque;
@@ -145,7 +155,6 @@ static void rtc_update_timer(void *opaque)
 static void rtc_update_timer2(void *opaque)
 {
     RTCState *s = opaque;
-    struct domain *d = vrtc_domain(s);
 
     spin_lock(&s->lock);
     if (!(s->hw.cmos_data[RTC_REG_B] & RTC_SET))
@@ -153,11 +162,7 @@ static void rtc_update_timer2(void *opaque)
         s->hw.cmos_data[RTC_REG_C] |= RTC_UF;
         s->hw.cmos_data[RTC_REG_A] &= ~RTC_UIP;
         if ((s->hw.cmos_data[RTC_REG_B] & RTC_UIE))
-        {
-            s->hw.cmos_data[RTC_REG_C] |= RTC_IRQF;
-            hvm_isa_irq_deassert(d, RTC_IRQ);
-            hvm_isa_irq_assert(d, RTC_IRQ);
-        }
+            rtc_toggle_irq(s);
         check_update_timer(s);
     }
     spin_unlock(&s->lock);
@@ -344,7 +349,6 @@ static void alarm_timer_update(RTCState *s)
 static void rtc_alarm_cb(void *opaque)
 {
     RTCState *s = opaque;
-    struct domain *d = vrtc_domain(s);
 
     spin_lock(&s->lock);
     if (!(s->hw.cmos_data[RTC_REG_B] & RTC_SET))
@@ -352,11 +356,7 @@ static void rtc_alarm_cb(void *opaque)
         s->hw.cmos_data[RTC_REG_C] |= RTC_AF;
         /* alarm interrupt */
         if (s->hw.cmos_data[RTC_REG_B] & RTC_AIE)
-        {
-            s->hw.cmos_data[RTC_REG_C] |= RTC_IRQF;
-            hvm_isa_irq_deassert(d, RTC_IRQ);
-            hvm_isa_irq_assert(d, RTC_IRQ);
-        }
+            rtc_toggle_irq(s);
         alarm_timer_update(s);
     }
     spin_unlock(&s->lock);
@@ -442,8 +442,7 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
         if ((data & RTC_UIE) && !(s->hw.cmos_data[RTC_REG_B] & RTC_UIE))
             if (s->hw.cmos_data[RTC_REG_C] & RTC_UF)
             {
-                hvm_isa_irq_deassert(d, RTC_IRQ);
-                hvm_isa_irq_assert(d, RTC_IRQ);
+                rtc_toggle_irq(s);
             }
         s->hw.cmos_data[RTC_REG_B] = data;
         if ( (data ^ orig) & RTC_PIE )
