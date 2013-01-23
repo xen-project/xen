@@ -76,10 +76,6 @@ int libxl__get_hotplug_script_info(libxl__gc *gc, libxl__device *dev,
     switch (dev->backend_kind) {
     case LIBXL__DEVICE_KIND_VBD:
     case LIBXL__DEVICE_KIND_VIF:
-        if (num_exec != 0) {
-            rc = 0;
-            goto out;
-        }
         rc = libxl__hotplug(gc, dev, args, action);
         if (!rc) rc = 1;
         break;
