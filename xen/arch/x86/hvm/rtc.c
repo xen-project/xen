@@ -196,13 +196,11 @@ static void alarm_timer_update(RTCState *s)
 
         alarm_sec = from_bcd(s, s->hw.cmos_data[RTC_SECONDS_ALARM]);
         alarm_min = from_bcd(s, s->hw.cmos_data[RTC_MINUTES_ALARM]);
-        alarm_hour = from_bcd(s, s->hw.cmos_data[RTC_HOURS_ALARM]);
-        alarm_hour = convert_hour(s, alarm_hour);
+        alarm_hour = convert_hour(s, s->hw.cmos_data[RTC_HOURS_ALARM]);
 
         cur_sec = from_bcd(s, s->hw.cmos_data[RTC_SECONDS]);
         cur_min = from_bcd(s, s->hw.cmos_data[RTC_MINUTES]);
-        cur_hour = from_bcd(s, s->hw.cmos_data[RTC_HOURS]);
-        cur_hour = convert_hour(s, cur_hour);
+        cur_hour = convert_hour(s, s->hw.cmos_data[RTC_HOURS]);
 
         next_update_time = USEC_PER_SEC - (get_localtime_us(d) % USEC_PER_SEC);
         next_update_time = next_update_time * NS_PER_USEC + NOW();
@@ -484,12 +482,14 @@ static inline int from_bcd(RTCState *s, int a)
 
 /* Hours in 12 hour mode are in 1-12 range, not 0-11.
  * So we need convert it before using it*/
-static inline int convert_hour(RTCState *s, int hour)
+static inline int convert_hour(RTCState *s, int raw)
 {
+    int hour = from_bcd(s, raw & 0x7f);
+
     if (!(s->hw.cmos_data[RTC_REG_B] & RTC_24H))
     {
         hour %= 12;
-        if (s->hw.cmos_data[RTC_HOURS] & 0x80)
+        if (raw & 0x80)
             hour += 12;
     }
     return hour;
@@ -508,8 +508,7 @@ static void rtc_set_time(RTCState *s)
     
     tm->tm_sec = from_bcd(s, s->hw.cmos_data[RTC_SECONDS]);
     tm->tm_min = from_bcd(s, s->hw.cmos_data[RTC_MINUTES]);
-    tm->tm_hour = from_bcd(s, s->hw.cmos_data[RTC_HOURS] & 0x7f);
-    tm->tm_hour = convert_hour(s, tm->tm_hour);
+    tm->tm_hour = convert_hour(s, s->hw.cmos_data[RTC_HOURS]);
     tm->tm_wday = from_bcd(s, s->hw.cmos_data[RTC_DAY_OF_WEEK]);
     tm->tm_mday = from_bcd(s, s->hw.cmos_data[RTC_DAY_OF_MONTH]);
     tm->tm_mon = from_bcd(s, s->hw.cmos_data[RTC_MONTH]) - 1;
