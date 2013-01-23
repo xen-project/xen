@@ -79,19 +79,26 @@ static void rtc_timer_update(RTCState *s)
     ASSERT(spin_is_locked(&s->lock));
 
     period_code = s->hw.cmos_data[RTC_REG_A] & RTC_RATE_SELECT;
-    if ( (period_code != 0) && (s->hw.cmos_data[RTC_REG_B] & RTC_PIE) )
+    switch ( s->hw.cmos_data[RTC_REG_A] & RTC_DIV_CTL )
     {
-        if ( period_code <= 2 )
+    case RTC_REF_CLCK_32KHZ:
+        if ( (period_code != 0) && (period_code <= 2) )
             period_code += 7;
-
-        period = 1 << (period_code - 1); /* period in 32 Khz cycles */
-        period = DIV_ROUND((period * 1000000000ULL), 32768); /* period in ns */
-        create_periodic_time(v, &s->pt, period, period, RTC_IRQ,
-                             rtc_periodic_cb, s);
-    }
-    else
-    {
+        /* fall through */
+    case RTC_REF_CLCK_1MHZ:
+    case RTC_REF_CLCK_4MHZ:
+        if ( period_code != 0 )
+        {
+            period = 1 << (period_code - 1); /* period in 32 Khz cycles */
+            period = DIV_ROUND(period * 1000000000ULL, 32768); /* in ns */
+            create_periodic_time(v, &s->pt, period, period, RTC_IRQ,
+                                 rtc_periodic_cb, s);
+            break;
+        }
+        /* fall through */
+    default:
         destroy_periodic_time(&s->pt);
+        break;
     }
 }
 
@@ -445,8 +452,6 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
                 rtc_toggle_irq(s);
             }
         s->hw.cmos_data[RTC_REG_B] = data;
-        if ( (data ^ orig) & RTC_PIE )
-            rtc_timer_update(s);
         check_update_timer(s);
         alarm_timer_update(s);
         break;
