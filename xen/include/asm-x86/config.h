@@ -27,6 +27,7 @@
 #define CONFIG_DISCONTIGMEM 1
 #define CONFIG_NUMA_EMU 1
 #define CONFIG_PAGEALLOC_MAX_ORDER (2 * PAGETABLE_ORDER)
+#define CONFIG_DOMAIN_PAGE 1
 
 /* Intel P4 currently has largest cache line (L2 line size is 128 bytes). */
 #define CONFIG_X86_L1_CACHE_SHIFT 7
@@ -147,12 +148,14 @@ extern unsigned char boot_edid_info[128];
  *  0xffff82c000000000 - 0xffff82c3ffffffff [16GB,  2^34 bytes, PML4:261]
  *    vmap()/ioremap()/fixmap area.
  *  0xffff82c400000000 - 0xffff82c43fffffff [1GB,   2^30 bytes, PML4:261]
- *    Compatibility machine-to-phys translation table.
+ *    Global domain page map area.
  *  0xffff82c440000000 - 0xffff82c47fffffff [1GB,   2^30 bytes, PML4:261]
- *    High read-only compatibility machine-to-phys translation table.
+ *    Compatibility machine-to-phys translation table.
  *  0xffff82c480000000 - 0xffff82c4bfffffff [1GB,   2^30 bytes, PML4:261]
+ *    High read-only compatibility machine-to-phys translation table.
+ *  0xffff82c4c0000000 - 0xffff82c4ffffffff [1GB,   2^30 bytes, PML4:261]
  *    Xen text, static data, bss.
- *  0xffff82c4c0000000 - 0xffff82dffbffffff [109GB - 64MB,      PML4:261]
+ *  0xffff82c500000000 - 0xffff82dffbffffff [108GB - 64MB,      PML4:261]
  *    Reserved for future use.
  *  0xffff82dffc000000 - 0xffff82dfffffffff [64MB,  2^26 bytes, PML4:261]
  *    Super-page information array.
@@ -201,18 +204,24 @@ extern unsigned char boot_edid_info[128];
 /* Slot 259: linear page table (shadow table). */
 #define SH_LINEAR_PT_VIRT_START (PML4_ADDR(259))
 #define SH_LINEAR_PT_VIRT_END   (SH_LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)
-/* Slot 260: per-domain mappings. */
+/* Slot 260: per-domain mappings (including map cache). */
 #define PERDOMAIN_VIRT_START    (PML4_ADDR(260))
-#define PERDOMAIN_VIRT_END      (PERDOMAIN_VIRT_START + (PERDOMAIN_MBYTES<<20))
-#define PERDOMAIN_MBYTES        (PML4_ENTRY_BYTES >> (20 + PAGETABLE_ORDER))
+#define PERDOMAIN_SLOT_MBYTES   (PML4_ENTRY_BYTES >> (20 + PAGETABLE_ORDER))
+#define PERDOMAIN_SLOTS         2
+#define PERDOMAIN_VIRT_SLOT(s)  (PERDOMAIN_VIRT_START + (s) * \
+                                 (PERDOMAIN_SLOT_MBYTES << 20))
 /* Slot 261: machine-to-phys conversion table (256GB). */
 #define RDWR_MPT_VIRT_START     (PML4_ADDR(261))
 #define RDWR_MPT_VIRT_END       (RDWR_MPT_VIRT_START + MPT_VIRT_SIZE)
 /* Slot 261: vmap()/ioremap()/fixmap area (16GB). */
 #define VMAP_VIRT_START         RDWR_MPT_VIRT_END
 #define VMAP_VIRT_END           (VMAP_VIRT_START + GB(16))
+/* Slot 261: global domain page map area (1GB). */
+#define GLOBALMAP_GBYTES        1
+#define GLOBALMAP_VIRT_START    VMAP_VIRT_END
+#define GLOBALMAP_VIRT_END      (GLOBALMAP_VIRT_START + (GLOBALMAP_GBYTES<<30))
 /* Slot 261: compatibility machine-to-phys conversion table (1GB). */
-#define RDWR_COMPAT_MPT_VIRT_START VMAP_VIRT_END
+#define RDWR_COMPAT_MPT_VIRT_START GLOBALMAP_VIRT_END
 #define RDWR_COMPAT_MPT_VIRT_END (RDWR_COMPAT_MPT_VIRT_START + GB(1))
 /* Slot 261: high read-only compat machine-to-phys conversion table (1GB). */
 #define HIRO_COMPAT_MPT_VIRT_START RDWR_COMPAT_MPT_VIRT_END
@@ -279,9 +288,9 @@ extern unsigned long xen_phys_start;
 /* GDT/LDT shadow mapping area. The first per-domain-mapping sub-area. */
 #define GDT_LDT_VCPU_SHIFT       5
 #define GDT_LDT_VCPU_VA_SHIFT    (GDT_LDT_VCPU_SHIFT + PAGE_SHIFT)
-#define GDT_LDT_MBYTES           PERDOMAIN_MBYTES
+#define GDT_LDT_MBYTES           PERDOMAIN_SLOT_MBYTES
 #define MAX_VIRT_CPUS            (GDT_LDT_MBYTES << (20-GDT_LDT_VCPU_VA_SHIFT))
-#define GDT_LDT_VIRT_START       PERDOMAIN_VIRT_START
+#define GDT_LDT_VIRT_START       PERDOMAIN_VIRT_SLOT(0)
 #define GDT_LDT_VIRT_END         (GDT_LDT_VIRT_START + (GDT_LDT_MBYTES << 20))
 
 /* The address of a particular VCPU's GDT or LDT. */
@@ -290,8 +299,16 @@ extern unsigned long xen_phys_start;
 #define LDT_VIRT_START(v)    \
     (GDT_VIRT_START(v) + (64*1024))
 
+/* map_domain_page() map cache. The last per-domain-mapping sub-area. */
+#define MAPCACHE_VCPU_ENTRIES    (CONFIG_PAGING_LEVELS * CONFIG_PAGING_LEVELS)
+#define MAPCACHE_ENTRIES         (MAX_VIRT_CPUS * MAPCACHE_VCPU_ENTRIES)
+#define MAPCACHE_SLOT            (PERDOMAIN_SLOTS - 1)
+#define MAPCACHE_VIRT_START      PERDOMAIN_VIRT_SLOT(MAPCACHE_SLOT)
+#define MAPCACHE_VIRT_END        (MAPCACHE_VIRT_START + \
+                                  MAPCACHE_ENTRIES * PAGE_SIZE)
+
 #define PDPT_L1_ENTRIES       \
-    ((PERDOMAIN_VIRT_END - PERDOMAIN_VIRT_START) >> PAGE_SHIFT)
+    ((PERDOMAIN_VIRT_SLOT(PERDOMAIN_SLOTS - 1) - PERDOMAIN_VIRT_START) >> PAGE_SHIFT)
 #define PDPT_L2_ENTRIES       \
     ((PDPT_L1_ENTRIES + (1 << PAGETABLE_ORDER) - 1) >> PAGETABLE_ORDER)
 

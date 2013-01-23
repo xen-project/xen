@@ -2661,9 +2661,6 @@ static inline int vcpumask_to_pcpumask(
     }
 }
 
-#define fixmap_domain_page(mfn) mfn_to_virt(mfn)
-#define fixunmap_domain_page(ptr) ((void)(ptr))
-
 long do_mmuext_op(
     XEN_GUEST_HANDLE_PARAM(mmuext_op_t) uops,
     unsigned int count,
@@ -2983,7 +2980,6 @@ long do_mmuext_op(
 
         case MMUEXT_CLEAR_PAGE: {
             struct page_info *page;
-            unsigned char *ptr;
 
             page = get_page_from_gfn(d, op.arg1.mfn, NULL, P2M_ALLOC);
             if ( !page || !get_page_type(page, PGT_writable_page) )
@@ -2998,9 +2994,7 @@ long do_mmuext_op(
             /* A page is dirtied when it's being cleared. */
             paging_mark_dirty(d, page_to_mfn(page));
 
-            ptr = fixmap_domain_page(page_to_mfn(page));
-            clear_page(ptr);
-            fixunmap_domain_page(ptr);
+            clear_domain_page(page_to_mfn(page));
 
             put_page_and_type(page);
             break;
@@ -3008,8 +3002,6 @@ long do_mmuext_op(
 
         case MMUEXT_COPY_PAGE:
         {
-            const unsigned char *src;
-            unsigned char *dst;
             struct page_info *src_page, *dst_page;
 
             src_page = get_page_from_gfn(d, op.arg2.src_mfn, NULL, P2M_ALLOC);
@@ -3034,11 +3026,7 @@ long do_mmuext_op(
             /* A page is dirtied when it's being copied to. */
             paging_mark_dirty(d, page_to_mfn(dst_page));
 
-            src = __map_domain_page(src_page);
-            dst = fixmap_domain_page(page_to_mfn(dst_page));
-            copy_page(dst, src);
-            fixunmap_domain_page(dst);
-            unmap_domain_page(src);
+            copy_domain_page(page_to_mfn(dst_page), page_to_mfn(src_page));
 
             put_page_and_type(dst_page);
             put_page(src_page);

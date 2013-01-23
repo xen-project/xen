@@ -25,11 +25,16 @@ void *map_domain_page(unsigned long mfn);
  */
 void unmap_domain_page(const void *va);
 
+/*
+ * Clear a given page frame, or copy between two of them.
+ */
+void clear_domain_page(unsigned long mfn);
+void copy_domain_page(unsigned long dmfn, unsigned long smfn);
 
 /* 
  * Given a VA from map_domain_page(), return its underlying MFN.
  */
-unsigned long domain_page_map_to_mfn(void *va);
+unsigned long domain_page_map_to_mfn(const void *va);
 
 /*
  * Similar to the above calls, except the mapping is accessible in all
@@ -107,6 +112,9 @@ domain_mmap_cache_destroy(struct domain_mmap_cache *cache)
 #define map_domain_page(mfn)                mfn_to_virt(mfn)
 #define __map_domain_page(pg)               page_to_virt(pg)
 #define unmap_domain_page(va)               ((void)(va))
+#define clear_domain_page(mfn)              clear_page(mfn_to_virt(mfn))
+#define copy_domain_page(dmfn, smfn)        copy_page(mfn_to_virt(dmfn), \
+                                                      mfn_to_virt(smfn))
 #define domain_page_map_to_mfn(va)          virt_to_mfn((unsigned long)(va))
 
 #define map_domain_page_global(mfn)         mfn_to_virt(mfn)

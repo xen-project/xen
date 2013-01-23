@@ -397,9 +397,13 @@ int vcpu_initialise(struct vcpu *v)
             return -ENOMEM;
         clear_page(page_to_virt(pg));
         perdomain_pt_page(d, idx) = pg;
-        d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)+idx]
+        d->arch.mm_perdomain_l2[0][l2_table_offset(PERDOMAIN_VIRT_START)+idx]
             = l2e_from_page(pg, __PAGE_HYPERVISOR);
     }
+
+    rc = mapcache_vcpu_init(v);
+    if ( rc )
+        return rc;
 
     paging_vcpu_init(v);
 
@@ -526,8 +530,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
     if ( pg == NULL )
         goto fail;
-    d->arch.mm_perdomain_l2 = page_to_virt(pg);
-    clear_page(d->arch.mm_perdomain_l2);
+    d->arch.mm_perdomain_l2[0] = page_to_virt(pg);
+    clear_page(d->arch.mm_perdomain_l2[0]);
 
     pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
     if ( pg == NULL )
@@ -535,8 +539,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     d->arch.mm_perdomain_l3 = page_to_virt(pg);
     clear_page(d->arch.mm_perdomain_l3);
     d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] =
-        l3e_from_page(virt_to_page(d->arch.mm_perdomain_l2),
-                            __PAGE_HYPERVISOR);
+        l3e_from_pfn(virt_to_mfn(d->arch.mm_perdomain_l2[0]),
+                     __PAGE_HYPERVISOR);
+
+    mapcache_domain_init(d);
 
     HYPERVISOR_COMPAT_VIRT_START(d) =
         is_hvm_domain(d) ? ~0u : __HYPERVISOR_COMPAT_VIRT_START;
@@ -609,8 +615,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     free_xenheap_page(d->shared_info);
     if ( paging_initialised )
         paging_final_teardown(d);
-    if ( d->arch.mm_perdomain_l2 )
-        free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
+    mapcache_domain_exit(d);
+    if ( d->arch.mm_perdomain_l2[0] )
+        free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2[0]));
     if ( d->arch.mm_perdomain_l3 )
         free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
     if ( d->arch.mm_perdomain_pt_pages )
@@ -633,13 +640,15 @@ void arch_domain_destroy(struct domain *d)
 
     paging_final_teardown(d);
 
+    mapcache_domain_exit(d);
+
     for ( i = 0; i < PDPT_L2_ENTRIES; ++i )
     {
         if ( perdomain_pt_page(d, i) )
             free_domheap_page(perdomain_pt_page(d, i));
     }
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_pt_pages));
-    free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2));
+    free_domheap_page(virt_to_page(d->arch.mm_perdomain_l2[0]));
     free_domheap_page(virt_to_page(d->arch.mm_perdomain_l3));
 
     free_xenheap_page(d->shared_info);

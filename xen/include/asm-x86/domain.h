@@ -39,7 +39,7 @@ struct trap_bounce {
 
 #define MAPHASH_ENTRIES 8
 #define MAPHASH_HASHFN(pfn) ((pfn) & (MAPHASH_ENTRIES-1))
-#define MAPHASHENT_NOTINUSE ((u16)~0U)
+#define MAPHASHENT_NOTINUSE ((u32)~0U)
 struct mapcache_vcpu {
     /* Shadow of mapcache_domain.epoch. */
     unsigned int shadow_epoch;
@@ -47,16 +47,15 @@ struct mapcache_vcpu {
     /* Lock-free per-VCPU hash of recently-used mappings. */
     struct vcpu_maphash_entry {
         unsigned long mfn;
-        uint16_t      idx;
-        uint16_t      refcnt;
+        uint32_t      idx;
+        uint32_t      refcnt;
     } hash[MAPHASH_ENTRIES];
 };
 
-#define MAPCACHE_ORDER   10
-#define MAPCACHE_ENTRIES (1 << MAPCACHE_ORDER)
 struct mapcache_domain {
     /* The PTEs that provide the mappings, and a cursor into the array. */
-    l1_pgentry_t *l1tab;
+    l1_pgentry_t **l1tab;
+    unsigned int entries;
     unsigned int cursor;
 
     /* Protects map_domain_page(). */
@@ -67,12 +66,13 @@ struct mapcache_domain {
     u32 tlbflush_timestamp;
 
     /* Which mappings are in use, and which are garbage to reap next epoch? */
-    unsigned long inuse[BITS_TO_LONGS(MAPCACHE_ENTRIES)];
-    unsigned long garbage[BITS_TO_LONGS(MAPCACHE_ENTRIES)];
+    unsigned long *inuse;
+    unsigned long *garbage;
 };
 
-void mapcache_domain_init(struct domain *);
-void mapcache_vcpu_init(struct vcpu *);
+int mapcache_domain_init(struct domain *);
+void mapcache_domain_exit(struct domain *);
+int mapcache_vcpu_init(struct vcpu *);
 
 /* x86/64: toggle guest between kernel and user modes. */
 void toggle_guest_mode(struct vcpu *);
@@ -229,6 +229,9 @@ struct pv_domain
      * unmask the event channel */
     bool_t auto_unmask;
 
+    /* map_domain_page() mapping cache. */
+    struct mapcache_domain mapcache;
+
     /* Pseudophysical e820 map (XENMEM_memory_map).  */
     spinlock_t e820_lock;
     struct e820entry *e820;
@@ -238,7 +241,7 @@ struct pv_domain
 struct arch_domain
 {
     struct page_info **mm_perdomain_pt_pages;
-    l2_pgentry_t *mm_perdomain_l2;
+    l2_pgentry_t *mm_perdomain_l2[PERDOMAIN_SLOTS];
     l3_pgentry_t *mm_perdomain_l3;
 
     unsigned int hv_compat_vstart;
@@ -324,6 +327,9 @@ struct arch_domain
 
 struct pv_vcpu
 {
+    /* map_domain_page() mapping cache. */
+    struct mapcache_vcpu mapcache;
+
     struct trap_info *trap_ctxt;
 
     unsigned long gdt_frames[FIRST_RESERVED_GDT_PAGE];

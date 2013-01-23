@@ -19,6 +19,7 @@ obj-bin-y += dmi_scan.init.o
 obj-y += domctl.o
 obj-y += domain.o
 obj-bin-y += domain_build.init.o
+obj-y += domain_page.o
 obj-y += e820.o
 obj-y += extable.o
 obj-y += flushtlb.o
