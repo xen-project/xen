@@ -173,11 +173,12 @@ static int libxl__hotplug_nic(libxl__gc *gc, libxl__device *dev,
     (*args)[nr++] = script;
 
     if (nictype == LIBXL_NIC_TYPE_VIF_IOEMU && num_exec) {
-        (*args)[nr++] = action == DEVICE_CONNECT ? "add" : "remove";
+        (*args)[nr++] = (char *) libxl__device_action_to_string(action);
         (*args)[nr++] = "type_if=tap";
         (*args)[nr++] = NULL;
     } else {
-        (*args)[nr++] = action == DEVICE_CONNECT ? "online" : "offline";
+        (*args)[nr++] = action == LIBXL__DEVICE_ACTION_ADD ? "online" :
+                                                             "offline";
         (*args)[nr++] = "type_if=vif";
         (*args)[nr++] = NULL;
     }
@@ -213,7 +214,7 @@ static int libxl__hotplug_disk(libxl__gc *gc, libxl__device *dev,
     const int arraysize = 3;
     GCNEW_ARRAY(*args, arraysize);
     (*args)[nr++] = script;
-    (*args)[nr++] = action == DEVICE_CONNECT ? "add" : "remove";
+    (*args)[nr++] = (char *) libxl__device_action_to_string(action);
     (*args)[nr++] = NULL;
     assert(nr == arraysize);
 

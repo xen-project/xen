@@ -614,7 +614,7 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
                     continue;
                 }
                 aodev = libxl__multidev_prepare(multidev);
-                aodev->action = DEVICE_DISCONNECT;
+                aodev->action = LIBXL__DEVICE_ACTION_REMOVE;
                 aodev->dev = dev;
                 aodev->force = drs->force;
                 libxl__initiate_device_remove(egc, aodev);
@@ -849,7 +849,8 @@ static void device_backend_callback(libxl__egc *egc, libxl__ev_devstate *ds,
 
     device_backend_cleanup(gc, aodev);
 
-    if (rc == ERROR_TIMEDOUT && aodev->action == DEVICE_DISCONNECT &&
+    if (rc == ERROR_TIMEDOUT &&
+        aodev->action == LIBXL__DEVICE_ACTION_REMOVE &&
         !aodev->force) {
         aodev->force = 1;
         libxl__initiate_device_remove(egc, aodev);
@@ -858,7 +859,7 @@ static void device_backend_callback(libxl__egc *egc, libxl__ev_devstate *ds,
 
     if (rc) {
         LOG(ERROR, "unable to %s device with path %s",
-                   aodev->action == DEVICE_CONNECT ? "connect" : "disconnect",
+                   libxl__device_action_to_string(aodev->action),
                    libxl__device_backend_path(gc, aodev->dev));
         goto out;
     }
@@ -981,7 +982,7 @@ static void device_hotplug_child_death_cb(libxl__egc *egc,
         if (hotplug_error)
             LOG(ERROR, "script: %s", hotplug_error);
         aodev->rc = ERROR_FAIL;
-        if (aodev->action == DEVICE_CONNECT)
+        if (aodev->action == LIBXL__DEVICE_ACTION_ADD)
             /*
              * Only fail on device connection, on disconnection
              * ignore error, and continue with the remove process
@@ -1011,7 +1012,7 @@ static void device_hotplug_done(libxl__egc *egc, libxl__ao_device *aodev)
     device_hotplug_clean(gc, aodev);
 
     /* Clean xenstore if it's a disconnection */
-    if (aodev->action == DEVICE_DISCONNECT) {
+    if (aodev->action == LIBXL__DEVICE_ACTION_REMOVE) {
         rc = libxl__device_destroy(gc, aodev->dev);
         if (!aodev->rc)
             aodev->rc = rc;

@@ -33,3 +33,8 @@ libxl__device_console = Struct("device_console", [
     ("consback", libxl__console_backend),
     ("output", string),
     ])
+
+libxl__device_action = Enumeration("device_action", [
+    (1, "ADD"),
+    (2, "REMOVE"),
+    ])

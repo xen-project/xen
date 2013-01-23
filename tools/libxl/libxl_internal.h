@@ -1833,12 +1833,6 @@ _hidden const char *libxl__run_dir_path(void);
 
 /*----- device addition/removal -----*/
 
-/* Action to perform (either connect or disconnect) */
-typedef enum {
-    DEVICE_CONNECT,
-    DEVICE_DISCONNECT
-} libxl__device_action;
-
 typedef struct libxl__ao_device libxl__ao_device;
 typedef struct libxl__multidev libxl__multidev;
 typedef void libxl__device_callback(libxl__egc*, libxl__ao_device*);

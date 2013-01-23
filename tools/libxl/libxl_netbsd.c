@@ -50,7 +50,7 @@ static int libxl__hotplug(libxl__gc *gc, libxl__device *dev, char ***args,
     GCNEW_ARRAY(*args, arraysize);
     (*args)[nr++] = script;
     (*args)[nr++] = be_path;
-    (*args)[nr++] = GCSPRINTF("%d", action == DEVICE_CONNECT ?
+    (*args)[nr++] = GCSPRINTF("%d", action == LIBXL__DEVICE_ACTION_ADD ?
                                     XenbusStateInitWait : XenbusStateClosed);
     (*args)[nr++] = NULL;
     assert(nr == arraysize);
