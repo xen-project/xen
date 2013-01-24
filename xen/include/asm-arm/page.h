@@ -316,16 +316,20 @@ static inline void flush_xen_data_tlb(void)
 }
 
 /*
- * Flush one VA's hypervisor mappings from the data TLB. This is not
+ * Flush a range of VA's hypervisor mappings from the data TLB. This is not
  * sufficient when changing code mappings or for self modifying code.
  */
-static inline void flush_xen_data_tlb_va(unsigned long va)
+static inline void flush_xen_data_tlb_range_va(unsigned long va, unsigned long size)
 {
-    asm volatile("dsb;" /* Ensure preceding are visible */
-                 STORE_CP32(0, TLBIMVAH)
-                 "dsb;" /* Ensure completion of the TLB flush */
-                 "isb;"
-                 : : "r" (va) : "memory");
+    unsigned long end = va + size;
+    dsb(); /* Ensure preceding are visible */
+    while ( va < end ) {
+        asm volatile(STORE_CP32(0, TLBIMVAH)
+                     : : "r" (va) : "memory");
+        va += PAGE_SIZE;
+    }
+    dsb(); /* Ensure completion of the TLB flush */
+    isb();
 }
 
 /* Flush all non-hypervisor mappings from the TLB */

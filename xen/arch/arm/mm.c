@@ -114,7 +114,7 @@ void set_fixmap(unsigned map, unsigned long mfn, unsigned attributes)
     pte.pt.ai = attributes;
     pte.pt.xn = 1;
     write_pte(xen_fixmap + third_table_offset(FIXMAP_ADDR(map)), pte);
-    flush_xen_data_tlb_va(FIXMAP_ADDR(map));
+    flush_xen_data_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
 }
 
 /* Remove a mapping from a fixmap entry */
@@ -122,7 +122,7 @@ void clear_fixmap(unsigned map)
 {
     lpae_t pte = {0};
     write_pte(xen_fixmap + third_table_offset(FIXMAP_ADDR(map)), pte);
-    flush_xen_data_tlb_va(FIXMAP_ADDR(map));
+    flush_xen_data_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
 }
 
 /* Map a page of domheap memory */
@@ -186,7 +186,7 @@ void *map_domain_page(unsigned long mfn)
      * We may not have flushed this specific subpage at map time,
      * since we only flush the 4k page not the superpage
      */
-    flush_xen_data_tlb_va(va);
+    flush_xen_data_tlb_range_va(va, PAGE_SIZE);
 
     return (void *)va;
 }
@@ -246,7 +246,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     dest_va = BOOT_MISC_VIRT_START;
     pte = mfn_to_xen_entry(xen_paddr >> PAGE_SHIFT);
     write_pte(xen_second + second_table_offset(dest_va), pte);
-    flush_xen_data_tlb_va(dest_va);
+    flush_xen_data_tlb_range_va(dest_va, PAGE_SIZE);
 
     /* Calculate virt-to-phys offset for the new location */
     phys_offset = xen_paddr - (unsigned long) _start;
