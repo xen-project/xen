@@ -192,10 +192,13 @@ static inline void *maddr_to_virt(paddr_t ma)
     return (void *)(unsigned long) ma + XENHEAP_VIRT_START;
 }
 
-static inline paddr_t gvirt_to_maddr(uint32_t va)
+static inline int gvirt_to_maddr(uint32_t va, paddr_t *pa)
 {
-    uint64_t par = gva_to_par(va);
-    return (par & PADDR_MASK & PAGE_MASK) | ((unsigned long) va & ~PAGE_MASK);
+    uint64_t par = gva_to_ma_par(va);
+    if ( par & PAR_F )
+        return -EFAULT;
+    *pa = (par & PADDR_MASK & PAGE_MASK) | ((unsigned long) va & ~PAGE_MASK);
+    return 0;
 }
 
 /* Convert between Xen-heap virtual addresses and machine addresses. */

@@ -231,7 +231,7 @@ union hsr {
 #ifndef __ASSEMBLY__
 extern uint32_t hyp_traps_vector[8];
 
-void panic_PAR(uint64_t par, const char *when);
+void panic_PAR(uint64_t par);
 
 void show_execution_state(struct cpu_user_regs *regs);
 void show_registers(struct cpu_user_regs *regs);

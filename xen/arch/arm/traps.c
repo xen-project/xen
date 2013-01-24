@@ -200,32 +200,22 @@ static const char *fsc_level_str(int level)
     }
 }
 
-void panic_PAR(uint64_t par, const char *when)
+void panic_PAR(uint64_t par)
 {
-    if ( par & PAR_F )
-    {
-        const char *msg;
-        int level = -1;
-        int stage = par & PAR_STAGE2 ? 2 : 1;
-        int second_in_first = !!(par & PAR_STAGE21);
+    const char *msg;
+    int level = -1;
+    int stage = par & PAR_STAGE2 ? 2 : 1;
+    int second_in_first = !!(par & PAR_STAGE21);
 
-        msg = decode_fsc( (par&PAR_FSC_MASK) >> PAR_FSC_SHIFT, &level);
+    msg = decode_fsc( (par&PAR_FSC_MASK) >> PAR_FSC_SHIFT, &level);
 
-        printk("PAR: %010"PRIx64": %s stage %d%s%s\n",
-               par, msg,
-               stage,
-               second_in_first ? " during second stage lookup" : "",
-               fsc_level_str(level));
-    }
-    else
-    {
-        printk("PAR: %010"PRIx64": paddr:%010"PRIx64
-               " attr %"PRIx64" sh %"PRIx64" %s\n",
-               par, par & PADDR_MASK, par >> PAR_MAIR_SHIFT,
-               (par & PAR_SH_MASK) >> PAR_SH_SHIFT,
-               (par & PAR_NS) ? "Non-Secure" : "Secure");
-    }
-    panic("Error during %s-to-physical address translation\n", when);
+    printk("PAR: %010"PRIx64": %s stage %d%s%s\n",
+           par, msg,
+           stage,
+           second_in_first ? " during second stage lookup" : "",
+           fsc_level_str(level));
+
+    panic("Error during Hypervisor-to-physical address translation\n");
 }
 
 struct reg_ctxt {
@@ -721,7 +711,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
                                      struct hsr_dabt dabt)
 {
     const char *msg;
-    int level = -1;
+    int rc, level = -1;
     mmio_info_t info;
 
     info.dabt = dabt;
@@ -730,7 +720,9 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     if (dabt.s1ptw)
         goto bad_data_abort;
 
-    info.gpa = gva_to_ipa(info.gva);
+    rc = gva_to_ipa(info.gva, &info.gpa);
+    if ( rc == -EFAULT )
+        goto bad_data_abort;
 
     if (handle_mmio(&info))
     {
@@ -742,6 +734,7 @@ bad_data_abort:
 
     msg = decode_fsc( dabt.dfsc, &level);
 
+    /* XXX inject a suitable fault into the guest */
     printk("Guest data abort: %s%s%s\n"
            "    gva=%"PRIx32"\n",
            msg, dabt.s1ptw ? " S2 during S1" : "",
@@ -761,7 +754,7 @@ bad_data_abort:
     else
         dump_guest_s1_walk(current->domain, info.gva);
     show_execution_state(regs);
-    panic("Unhandled guest data abort\n");
+    domain_crash_synchronous();
 }
 
 asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)

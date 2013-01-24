@@ -2,6 +2,7 @@
 #define __ARM_PAGE_H__
 
 #include <xen/config.h>
+#include <xen/errno.h>
 #include <public/xen.h>
 #include <asm/processor.h>
 
@@ -366,13 +367,13 @@ static inline uint64_t va_to_par(uint32_t va)
     if ( par & PAR_F )
     {
         dump_hyp_walk(va);
-        panic_PAR(par, "Hypervisor");
+        panic_PAR(par);
     }
     return par;
 }
 
 /* Ask the MMU to translate a Guest VA for us */
-static inline uint64_t __gva_to_par(uint32_t va)
+static inline uint64_t gva_to_ma_par(uint32_t va)
 {
     uint64_t par, tmp;
     tmp = READ_CP64(PAR);
@@ -382,15 +383,7 @@ static inline uint64_t __gva_to_par(uint32_t va)
     WRITE_CP64(tmp, PAR);
     return par;
 }
-static inline uint64_t gva_to_par(uint32_t va)
-{
-    uint64_t par = __gva_to_par(va);
-    /* It is not OK to call this with an invalid VA */
-    /* XXX harsh for a guest address... */
-    if ( par & PAR_F ) panic_PAR(par, "Guest");
-    return par;
-}
-static inline uint64_t __gva_to_ipa(uint32_t va)
+static inline uint64_t gva_to_ipa_par(uint32_t va)
 {
     uint64_t par, tmp;
     tmp = READ_CP64(PAR);
@@ -400,14 +393,16 @@ static inline uint64_t __gva_to_ipa(uint32_t va)
     WRITE_CP64(tmp, PAR);
     return par;
 }
-static inline uint64_t gva_to_ipa(uint32_t va)
+
+static inline int gva_to_ipa(uint32_t va, paddr_t *paddr)
 {
-    uint64_t par = __gva_to_ipa(va);
-    /* It is not OK to call this with an invalid VA */
-    /* XXX harsh for a guest address... */
-    if ( par & PAR_F ) panic_PAR(par, "Guest");
-    return (par & PADDR_MASK & PAGE_MASK) | ((unsigned long) va & ~PAGE_MASK);
+    uint64_t par = gva_to_ipa_par(va);
+    if ( par & PAR_F )
+        return -EFAULT;
+    *paddr = (par & PADDR_MASK & PAGE_MASK) | ((unsigned long) va & ~PAGE_MASK);
+    return 0;
 }
+
 /* Bits in the PAR returned by va_to_par */
 #define PAR_FAULT 0x1
 

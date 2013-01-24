@@ -76,11 +76,21 @@ static void kernel_zimage_load(struct kernel_info *info)
            paddr, load_addr, load_addr + len);
     for ( offs = 0; offs < len; )
     {
-        paddr_t s, l, ma = gvirt_to_maddr(load_addr + offs);
-        void *dst = map_domain_page(ma>>PAGE_SHIFT);
+        int rc;
+        paddr_t s, l, ma;
+        void *dst;
 
         s = offs & ~PAGE_MASK;
         l = min(PAGE_SIZE - s, len);
+
+        rc = gvirt_to_maddr(load_addr + offs, &ma);
+        if ( rc )
+        {
+            panic("\nUnable to map translate guest address\n");
+            return;
+        }
+
+        dst = map_domain_page(ma>>PAGE_SHIFT);
 
         copy_from_paddr(dst + s, paddr + offs, l, attr);
 

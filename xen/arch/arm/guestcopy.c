@@ -12,10 +12,16 @@ unsigned long raw_copy_to_guest(void *to, const void *from, unsigned len)
 
     while ( len )
     {
-        paddr_t g = gvirt_to_maddr((uint32_t) to);
-        void *p = map_domain_page(g>>PAGE_SHIFT);
+        int rc;
+        paddr_t g;
+        void *p;
         unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
 
+        rc = gvirt_to_maddr((uint32_t) to, &g);
+        if ( rc )
+            return rc;
+
+        p = map_domain_page(g>>PAGE_SHIFT);
         p += offset;
         memcpy(p, from, size);
 
@@ -36,10 +42,16 @@ unsigned long raw_clear_guest(void *to, unsigned len)
 
     while ( len )
     {
-        paddr_t g = gvirt_to_maddr((uint32_t) to);
-        void *p = map_domain_page(g>>PAGE_SHIFT);
+        int rc;
+        paddr_t g;
+        void *p;
         unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
 
+        rc = gvirt_to_maddr((uint32_t) to, &g);
+        if ( rc )
+            return rc;
+
+        p = map_domain_page(g>>PAGE_SHIFT);
         p += offset;
         memset(p, 0x00, size);
 
@@ -56,10 +68,16 @@ unsigned long raw_copy_from_guest(void *to, const void __user *from, unsigned le
 {
     while ( len )
     {
-        paddr_t g = gvirt_to_maddr((uint32_t) from & PAGE_MASK);
-        void *p = map_domain_page(g>>PAGE_SHIFT);
+        int rc;
+        paddr_t g;
+        void *p;
         unsigned size = min(len, (unsigned)(PAGE_SIZE - ((unsigned)from & (~PAGE_MASK))));
 
+        rc = gvirt_to_maddr((uint32_t) from & PAGE_MASK, &g);
+        if ( rc )
+            return rc;
+
+        p = map_domain_page(g>>PAGE_SHIFT);
         p += ((unsigned long)from & (~PAGE_MASK));
 
         memcpy(to, p, size);
