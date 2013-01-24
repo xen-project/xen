@@ -11,9 +11,6 @@
 
 XEN_ROOT=../..
 
-PSSL_DIR=../polarssl-$(XEN_TARGET_ARCH)/library
-PSSL_OBJS=aes.o sha1.o entropy.o ctr_drbg.o bignum.o sha4.o havege.o timing.o entropy_poll.o padlock.o
-
 TARGET=vtpmmgr.a
 OBJS=vtpmmgr.o vtpm_cmd_handler.o vtpm_storage.o init.o tpmrsa.o tpm.o log.o
 
@@ -22,7 +19,7 @@ CFLAGS+=-Wno-declaration-after-statement -Wno-unused-label
 
 build: $(TARGET)
 $(TARGET): $(OBJS)
-	ar -rcs $@ $^ $(foreach obj,$(PSSL_OBJS),$(PSSL_DIR)/$(obj))
+	ar -rcs $@ $^
 
 clean:
 	rm -f $(TARGET) $(OBJS)
