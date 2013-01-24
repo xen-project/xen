@@ -308,10 +308,10 @@ void discard_file_cache(xc_interface *xch, int fd, int flush);
 struct xc_mmu {
     mmu_update_t updates[MAX_MMU_UPDATES];
     int          idx;
-    domid_t      subject;
+    unsigned int subject;
 };
 /* Structure returned by xc_alloc_mmu_updates must be free()'ed by caller. */
-struct xc_mmu *xc_alloc_mmu_updates(xc_interface *xch, domid_t dom);
+struct xc_mmu *xc_alloc_mmu_updates(xc_interface *xch, unsigned int subject);
 int xc_add_mmu_update(xc_interface *xch, struct xc_mmu *mmu,
                    unsigned long long ptr, unsigned long long val);
 int xc_flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu);

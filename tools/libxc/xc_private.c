@@ -478,13 +478,13 @@ static int flush_mmu_updates(xc_interface *xch, struct xc_mmu *mmu)
     return err;
 }
 
-struct xc_mmu *xc_alloc_mmu_updates(xc_interface *xch, domid_t dom)
+struct xc_mmu *xc_alloc_mmu_updates(xc_interface *xch, unsigned int subject)
 {
     struct xc_mmu *mmu = malloc(sizeof(*mmu));
     if ( mmu == NULL )
         return mmu;
     mmu->idx     = 0;
-    mmu->subject = dom;
+    mmu->subject = subject;
     return mmu;
 }
 
