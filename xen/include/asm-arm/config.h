@@ -60,6 +60,8 @@
  *  6M  -  8M   Early boot misc (see below)
  *
  * 32M - 128M   Frametable: 24 bytes per page for 16GB of RAM
+ * 256M -  1G   VMAP: ioremap and early_ioremap use this virtual address
+ *                    space
  *
  *  1G -   2G   Xenheap: always-mapped memory
  *  2G -   4G   Domheap: on-demand-mapped
@@ -73,9 +75,11 @@
 #define FIXMAP_ADDR(n)        (mk_unsigned_long(0x00400000) + (n) * PAGE_SIZE)
 #define BOOT_MISC_VIRT_START   mk_unsigned_long(0x00600000)
 #define FRAMETABLE_VIRT_START  mk_unsigned_long(0x02000000)
+#define EARLY_VMAP_VIRT_START  mk_unsigned_long(0x10000000)
 #define XENHEAP_VIRT_START     mk_unsigned_long(0x40000000)
 #define DOMHEAP_VIRT_START     mk_unsigned_long(0x80000000)
 
+#define EARLY_VMAP_VIRT_END    XENHEAP_VIRT_START
 #define HYPERVISOR_VIRT_START  XEN_VIRT_START
 
 #define DOMHEAP_ENTRIES        1024  /* 1024 2MB mapping slots */

@@ -394,6 +394,38 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     frametable_virt_end = FRAMETABLE_VIRT_START + (nr_pages * sizeof(struct page_info));
 }
 
+/* Map the physical memory range start -  start + len into virtual
+ * memory and return the virtual address of the mapping.
+ * start has to be 2MB aligned.
+ * len has to be < EARLY_VMAP_VIRT_END - EARLY_VMAP_VIRT_START.
+ */
+void* __init early_ioremap(paddr_t start, size_t len, unsigned attributes)
+{
+    static unsigned long virt_start = EARLY_VMAP_VIRT_START;
+    unsigned long ret_addr = virt_start;
+    paddr_t end = start + len;
+
+    ASSERT(!(start & (~SECOND_MASK)));
+    ASSERT(!(virt_start & (~SECOND_MASK)));
+
+    /* The range we need to map is too big */
+    if ( virt_start + len >= EARLY_VMAP_VIRT_END )
+        return NULL;
+
+    while ( start < end )
+    {
+        lpae_t e = mfn_to_xen_entry(start >> PAGE_SHIFT);
+        e.pt.ai = attributes;
+        write_pte(xen_second + second_table_offset(virt_start), e);
+
+        start += SECOND_SIZE;
+        virt_start += SECOND_SIZE;
+    }
+    flush_xen_data_tlb_range_va(ret_addr, len);
+
+    return (void*)ret_addr;
+}
+
 enum mg { mg_clear, mg_ro, mg_rw, mg_rx };
 static void set_pte_flags_on_range(const char *p, unsigned long l, enum mg mg)
 {

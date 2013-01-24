@@ -149,7 +149,8 @@ extern void setup_frametable_mappings(paddr_t ps, paddr_t pe);
 extern void set_fixmap(unsigned map, unsigned long mfn, unsigned attributes);
 /* Remove a mapping from a fixmap entry */
 extern void clear_fixmap(unsigned map);
-
+/* map a 2MB aligned physical range in virtual memory. */
+void* early_ioremap(paddr_t start, size_t len, unsigned attributes);
 
 #define mfn_valid(mfn)        ({                                              \
     unsigned long __m_f_n = (mfn);                                            \
