@@ -269,15 +269,18 @@ struct hvm_hw_cpu_compat {
 };
 
 static inline int _hvm_hw_fix_cpu(void *h) {
-    struct hvm_hw_cpu *new=h;
-    struct hvm_hw_cpu_compat *old=h;
+
+    union hvm_hw_cpu_union {
+        struct hvm_hw_cpu nat;
+        struct hvm_hw_cpu_compat cmp;
+    } *ucpu = (union hvm_hw_cpu_union *)h;
 
     /* If we copy from the end backwards, we should
      * be able to do the modification in-place */
-    new->error_code=old->error_code;
-    new->pending_event=old->pending_event;
-    new->tsc=old->tsc;
-    new->msr_tsc_aux=0;
+    ucpu->nat.error_code = ucpu->cmp.error_code;
+    ucpu->nat.pending_event = ucpu->cmp.pending_event;
+    ucpu->nat.tsc = ucpu->cmp.tsc;
+    ucpu->nat.msr_tsc_aux = 0;
 
     return 0;
 }
