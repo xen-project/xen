@@ -246,7 +246,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     dest_va = BOOT_MISC_VIRT_START;
     pte = mfn_to_xen_entry(xen_paddr >> PAGE_SHIFT);
     write_pte(xen_second + second_table_offset(dest_va), pte);
-    flush_xen_data_tlb_range_va(dest_va, PAGE_SIZE);
+    flush_xen_data_tlb_range_va(dest_va, SECOND_SIZE);
 
     /* Calculate virt-to-phys offset for the new location */
     phys_offset = xen_paddr - (unsigned long) _start;
