@@ -136,6 +136,8 @@ typedef struct libxl__gc libxl__gc;
 typedef struct libxl__egc libxl__egc;
 typedef struct libxl__ao libxl__ao;
 typedef struct libxl__aop_occurred libxl__aop_occurred;
+typedef struct libxl__osevent_hook_nexus libxl__osevent_hook_nexus;
+typedef struct libxl__osevent_hook_nexi libxl__osevent_hook_nexi;
 
 _hidden void libxl__alloc_failed(libxl_ctx *, const char *func,
                          size_t nmemb, size_t size) __attribute__((noreturn));
@@ -163,7 +165,7 @@ struct libxl__ev_fd {
     libxl__ev_fd_callback *func;
     /* remainder is private for libxl__ev_fd... */
     LIBXL_LIST_ENTRY(libxl__ev_fd) entry;
-    void *for_app_reg;
+    libxl__osevent_hook_nexus *nexus;
 };
 
 
@@ -178,7 +180,7 @@ struct libxl__ev_time {
     int infinite; /* not registered in list or with app if infinite */
     LIBXL_TAILQ_ENTRY(libxl__ev_time) entry;
     struct timeval abs;
-    void *for_app_reg;
+    libxl__osevent_hook_nexus *nexus;
 };
 
 typedef struct libxl__ev_xswatch libxl__ev_xswatch;
@@ -329,6 +331,8 @@ struct libxl__ctx {
     libxl__poller poller_app; /* libxl_osevent_beforepoll and _afterpoll */
     LIBXL_LIST_HEAD(, libxl__poller) pollers_event, pollers_idle;
 
+    LIBXL_SLIST_HEAD(libxl__osevent_hook_nexi, libxl__osevent_hook_nexus)
+        hook_fd_nexi_idle, hook_timeout_nexi_idle;
     LIBXL_LIST_HEAD(, libxl__ev_fd) efds;
     LIBXL_TAILQ_HEAD(, libxl__ev_time) etimes;
 

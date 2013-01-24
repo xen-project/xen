@@ -38,23 +38,131 @@
  * The application's registration hooks should be called ONLY via
  * these macros, with the ctx locked.  Likewise all the "occurred"
  * entrypoints from the application should assert(!in_hook);
+ *
+ * During the hook call - including while the arguments are being
+ * evaluated - ev->nexus is guaranteed to be valid and refer to the
+ * nexus which is being used for this event registration.  The
+ * arguments should specify ev->nexus for the for_libxl argument and
+ * ev->nexus->for_app_reg (or a pointer to it) for for_app_reg.
  */
-#define OSEVENT_HOOK_INTERN(retval, hookname, ...) do {                      \
-    if (CTX->osevent_hooks) {                                                \
-        CTX->osevent_in_hook++;                                              \
-        retval CTX->osevent_hooks->hookname(CTX->osevent_user, __VA_ARGS__); \
-        CTX->osevent_in_hook--;                                              \
-    }                                                                        \
+#define OSEVENT_HOOK_INTERN(retval, failedp, evkind, hookop, nexusop, ...) do { \
+    if (CTX->osevent_hooks) {                                           \
+        CTX->osevent_in_hook++;                                         \
+        libxl__osevent_hook_nexi *nexi = &CTX->hook_##evkind##_nexi_idle; \
+        osevent_hook_pre_##nexusop(gc, ev, nexi, &ev->nexus);            \
+        retval CTX->osevent_hooks->evkind##_##hookop                    \
+            (CTX->osevent_user, __VA_ARGS__);                           \
+        if ((failedp))                                                  \
+            osevent_hook_failed_##nexusop(gc, ev, nexi, &ev->nexus);     \
+        CTX->osevent_in_hook--;                                         \
+    }                                                                   \
 } while (0)
 
-#define OSEVENT_HOOK(hookname, ...) ({                                       \
-    int osevent_hook_rc = 0;                                                 \
-    OSEVENT_HOOK_INTERN(osevent_hook_rc = , hookname, __VA_ARGS__);          \
-    osevent_hook_rc;                                                         \
+#define OSEVENT_HOOK(evkind, hookop, nexusop, ...) ({                   \
+    int osevent_hook_rc = 0;                                    \
+    OSEVENT_HOOK_INTERN(osevent_hook_rc =, !!osevent_hook_rc,   \
+                        evkind, hookop, nexusop, __VA_ARGS__);          \
+    osevent_hook_rc;                                            \
 })
 
-#define OSEVENT_HOOK_VOID(hookname, ...) \
-    OSEVENT_HOOK_INTERN(/* void */, hookname, __VA_ARGS__)
+#define OSEVENT_HOOK_VOID(evkind, hookop, nexusop, ...)                         \
+    OSEVENT_HOOK_INTERN(/* void */, 0, evkind, hookop, nexusop, __VA_ARGS__)
+
+/*
+ * The application's calls to libxl_osevent_occurred_... may be
+ * indefinitely delayed with respect to the rest of the program (since
+ * they are not necessarily called with any lock held).  So the
+ * for_libxl value we receive may be (almost) arbitrarily old.  All we
+ * know is that it came from this ctx.
+ *
+ * Therefore we may not free the object referred to by any for_libxl
+ * value until we free the whole libxl_ctx.  And if we reuse it we
+ * must be able to tell when an old use turns up, and discard the
+ * stale event.
+ *
+ * Thus we cannot use the ev directly as the for_libxl value - we need
+ * a layer of indirection.
+ *
+ * We do this by keeping a pool of libxl__osevent_hook_nexus structs,
+ * and use pointers to them as for_libxl values.  In fact, there are
+ * two pools: one for fds and one for timeouts.  This ensures that we
+ * don't risk a type error when we upcast nexus->ev.  In each nexus
+ * the ev is either null or points to a valid libxl__ev_time or
+ * libxl__ev_fd, as applicable.
+ *
+ * We /do/ allow ourselves to reassociate an old nexus with a new ev
+ * as otherwise we would have to leak nexi.  (This reassociation
+ * might, of course, be an old ev being reused for a new purpose so
+ * simply comparing the ev pointer is not sufficient.)  Thus the
+ * libxl_osevent_occurred functions need to check that the condition
+ * allegedly signalled by this event actually exists.
+ *
+ * The nexi and the lists are all protected by the ctx lock.
+ */
+
+struct libxl__osevent_hook_nexus {
+    void *ev;
+    void *for_app_reg;
+    LIBXL_SLIST_ENTRY(libxl__osevent_hook_nexus) next;
+};
+
+static void *osevent_ev_from_hook_nexus(libxl_ctx *ctx,
+           libxl__osevent_hook_nexus *nexus /* pass  void *for_libxl */)
+{
+    return nexus->ev;
+}
+
+static void osevent_release_nexus(libxl__gc *gc,
+                                  libxl__osevent_hook_nexi *nexi_idle,
+                                  libxl__osevent_hook_nexus *nexus)
+{
+    nexus->ev = 0;
+    LIBXL_SLIST_INSERT_HEAD(nexi_idle, nexus, next);
+}
+
+/*----- OSEVENT* hook functions for nexusop "alloc" -----*/
+static void osevent_hook_pre_alloc(libxl__gc *gc, void *ev,
+                                   libxl__osevent_hook_nexi *nexi_idle,
+                                   libxl__osevent_hook_nexus **nexus_r)
+{
+    libxl__osevent_hook_nexus *nexus = LIBXL_SLIST_FIRST(nexi_idle);
+    if (nexus) {
+        LIBXL_SLIST_REMOVE_HEAD(nexi_idle, next);
+    } else {
+        nexus = libxl__zalloc(NOGC, sizeof(*nexus));
+    }
+    nexus->ev = ev;
+    *nexus_r = nexus;
+}
+static void osevent_hook_failed_alloc(libxl__gc *gc, void *ev,
+                                      libxl__osevent_hook_nexi *nexi_idle,
+                                      libxl__osevent_hook_nexus **nexus)
+{
+    osevent_release_nexus(gc, nexi_idle, *nexus);
+}
+
+/*----- OSEVENT* hook functions for nexusop "release" -----*/
+static void osevent_hook_pre_release(libxl__gc *gc, void *ev,
+                                     libxl__osevent_hook_nexi *nexi_idle,
+                                     libxl__osevent_hook_nexus **nexus)
+{
+    osevent_release_nexus(gc, nexi_idle, *nexus);
+}
+static void osevent_hook_failed_release(libxl__gc *gc, void *ev,
+                                        libxl__osevent_hook_nexi *nexi_idle,
+                                        libxl__osevent_hook_nexus **nexus)
+{
+    abort();
+}
+
+/*----- OSEVENT* hook functions for nexusop "noop" -----*/
+static void osevent_hook_pre_noop(libxl__gc *gc, void *ev,
+                                  libxl__osevent_hook_nexi *nexi_idle,
+                                  libxl__osevent_hook_nexus **nexus) { }
+static void osevent_hook_failed_noop(libxl__gc *gc, void *ev,
+                                     libxl__osevent_hook_nexi *nexi_idle,
+                                     libxl__osevent_hook_nexus **nexus) { }
+
 
 /*
  * fd events
@@ -72,7 +180,8 @@ int libxl__ev_fd_register(libxl__gc *gc, libxl__ev_fd *ev,
 
     DBG("ev_fd=%p register fd=%d events=%x", ev, fd, events);
 
-    rc = OSEVENT_HOOK(fd_register, fd, &ev->for_app_reg, events, ev);
+    rc = OSEVENT_HOOK(fd,register, alloc, fd, &ev->nexus->for_app_reg,
+                      events, ev->nexus);
     if (rc) goto out;
 
     ev->fd = fd;
@@ -97,7 +206,7 @@ int libxl__ev_fd_modify(libxl__gc *gc, libxl__ev_fd *ev, short events)
 
     DBG("ev_fd=%p modify fd=%d events=%x", ev, ev->fd, events);
 
-    rc = OSEVENT_HOOK(fd_modify, ev->fd, &ev->for_app_reg, events);
+    rc = OSEVENT_HOOK(fd,modify, noop, ev->fd, &ev->nexus->for_app_reg, events);
     if (rc) goto out;
 
     ev->events = events;
@@ -119,7 +228,7 @@ void libxl__ev_fd_deregister(libxl__gc *gc, libxl__ev_fd *ev)
 
     DBG("ev_fd=%p deregister fd=%d", ev, ev->fd);
 
-    OSEVENT_HOOK_VOID(fd_deregister, ev->fd, ev->for_app_reg);
+    OSEVENT_HOOK_VOID(fd,deregister, release, ev->fd, ev->nexus->for_app_reg);
     LIBXL_LIST_REMOVE(ev, entry);
     ev->fd = -1;
 
@@ -171,7 +280,8 @@ static int time_register_finite(libxl__gc *gc, libxl__ev_time *ev,
 {
     int rc;
 
-    rc = OSEVENT_HOOK(timeout_register, &ev->for_app_reg, absolute, ev);
+    rc = OSEVENT_HOOK(timeout,register, alloc, &ev->nexus->for_app_reg,
+                      absolute, ev->nexus);
     if (rc) return rc;
 
     ev->infinite = 0;
@@ -184,7 +294,7 @@ static int time_register_finite(libxl__gc *gc, libxl__ev_time *ev,
 static void time_deregister(libxl__gc *gc, libxl__ev_time *ev)
 {
     if (!ev->infinite) {
-        OSEVENT_HOOK_VOID(timeout_deregister, ev->for_app_reg);
+        OSEVENT_HOOK_VOID(timeout,deregister, release, ev->nexus->for_app_reg);
         LIBXL_TAILQ_REMOVE(&CTX->etimes, ev, entry);
     }
 }
@@ -270,7 +380,8 @@ int libxl__ev_time_modify_abs(libxl__gc *gc, libxl__ev_time *ev,
         rc = time_register_finite(gc, ev, absolute);
         if (rc) goto out;
     } else {
-        rc = OSEVENT_HOOK(timeout_modify, &ev->for_app_reg, absolute);
+        rc = OSEVENT_HOOK(timeout,modify, noop,
+                          &ev->nexus->for_app_reg, absolute);
         if (rc) goto out;
 
         LIBXL_TAILQ_REMOVE(&CTX->etimes, ev, entry);
@@ -1010,35 +1121,54 @@ void libxl_osevent_register_hooks(libxl_ctx *ctx,
 
 
 void libxl_osevent_occurred_fd(libxl_ctx *ctx, void *for_libxl,
-                               int fd, short events, short revents)
+                               int fd, short events_ign, short revents_ign)
 {
-    libxl__ev_fd *ev = for_libxl;
-
     EGC_INIT(ctx);
     CTX_LOCK;
     assert(!CTX->osevent_in_hook);
 
-    assert(fd == ev->fd);
-    revents &= ev->events;
-    if (revents)
-        ev->func(egc, ev, fd, ev->events, revents);
+    libxl__ev_fd *ev = osevent_ev_from_hook_nexus(ctx, for_libxl);
+    if (!ev) goto out;
+    if (ev->fd != fd) goto out;
 
+    struct pollfd check;
+    for (;;) {
+        check.fd = fd;
+        check.events = ev->events;
+        int r = poll(&check, 1, 0);
+        if (!r)
+            goto out;
+        if (r==1)
+            break;
+        assert(r<0);
+        if (errno != EINTR) {
+            LIBXL__EVENT_DISASTER(egc, "failed poll to check for fd", errno, 0);
+            goto out;
+        }
+    }
+
+    if (check.revents)
+        ev->func(egc, ev, fd, ev->events, check.revents);
+
+ out:
     CTX_UNLOCK;
     EGC_FREE;
 }
 
 void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl)
 {
-    libxl__ev_time *ev = for_libxl;
-
     EGC_INIT(ctx);
     CTX_LOCK;
     assert(!CTX->osevent_in_hook);
 
+    libxl__ev_time *ev = osevent_ev_from_hook_nexus(ctx, for_libxl);
+    if (!ev) goto out;
     assert(!ev->infinite);
+
     LIBXL_TAILQ_REMOVE(&CTX->etimes, ev, entry);
     ev->func(egc, ev, &ev->abs);
 
+ out:
     CTX_UNLOCK;
     EGC_FREE;
 }
