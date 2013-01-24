@@ -418,8 +418,14 @@ static inline uint64_t gva_to_ipa(uint32_t va)
 #define LPAE_ENTRY_MASK (LPAE_ENTRIES - 1)
 
 #define THIRD_SHIFT  PAGE_SHIFT
+#define THIRD_SIZE   (1u << THIRD_SHIFT)
+#define THIRD_MASK   (~(THIRD_SIZE - 1))
 #define SECOND_SHIFT (THIRD_SHIFT + LPAE_SHIFT)
+#define SECOND_SIZE  (1u << SECOND_SHIFT)
+#define SECOND_MASK  (~(SECOND_SIZE - 1))
 #define FIRST_SHIFT  (SECOND_SHIFT + LPAE_SHIFT)
+#define FIRST_SIZE   (1u << FIRST_SHIFT)
+#define FIRST_MASK   (~(FIRST_SIZE - 1))
 
 /* Calculate the offsets into the pagetables for a given VA */
 #define first_linear_offset(va) (va >> FIRST_SHIFT)
