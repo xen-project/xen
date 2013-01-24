@@ -267,18 +267,11 @@ static int time_rel_to_abs(libxl__gc *gc, int ms, struct timeval *abs_out)
     return 0;
 }
 
-static void time_insert_finite(libxl__gc *gc, libxl__ev_time *ev)
-{
-    libxl__ev_time *evsearch;
-    LIBXL_TAILQ_INSERT_SORTED(&CTX->etimes, entry, ev, evsearch, /*empty*/,
-                              timercmp(&ev->abs, &evsearch->abs, >));
-    ev->infinite = 0;
-}
-
 static int time_register_finite(libxl__gc *gc, libxl__ev_time *ev,
                                 struct timeval absolute)
 {
     int rc;
+    libxl__ev_time *evsearch;
 
     rc = OSEVENT_HOOK(timeout,register, alloc, &ev->nexus->for_app_reg,
                       absolute, ev->nexus);
@@ -286,7 +279,8 @@ static int time_register_finite(libxl__gc *gc, libxl__ev_time *ev,
 
     ev->infinite = 0;
     ev->abs = absolute;
-    time_insert_finite(gc, ev);
+    LIBXL_TAILQ_INSERT_SORTED(&CTX->etimes, entry, ev, evsearch, /*empty*/,
+                              timercmp(&ev->abs, &evsearch->abs, >));
 
     return 0;
 }
@@ -294,7 +288,12 @@ static int time_register_finite(libxl__gc *gc, libxl__ev_time *ev,
 static void time_deregister(libxl__gc *gc, libxl__ev_time *ev)
 {
     if (!ev->infinite) {
-        OSEVENT_HOOK_VOID(timeout,deregister, release, ev->nexus->for_app_reg);
+        struct timeval right_away = { 0, 0 };
+        if (ev->nexus) /* only set if app provided hooks */
+            ev->nexus->ev = 0;
+        OSEVENT_HOOK_VOID(timeout,modify,
+                          noop /* release nexus in _occurred_ */,
+                          &ev->nexus->for_app_reg, right_away);
         LIBXL_TAILQ_REMOVE(&CTX->etimes, ev, entry);
     }
 }
@@ -358,70 +357,6 @@ int libxl__ev_time_register_rel(libxl__gc *gc, libxl__ev_time *ev,
     ev->func = func;
     rc = 0;
 
- out:
-    time_done_debug(gc,__func__,ev,rc);
-    CTX_UNLOCK;
-    return rc;
-}
-
-int libxl__ev_time_modify_abs(libxl__gc *gc, libxl__ev_time *ev,
-                              struct timeval absolute)
-{
-    int rc;
-
-    CTX_LOCK;
-
-    DBG("ev_time=%p modify abs==%lu.%06lu",
-        ev, (unsigned long)absolute.tv_sec, (unsigned long)absolute.tv_usec);
-
-    assert(libxl__ev_time_isregistered(ev));
-
-    if (ev->infinite) {
-        rc = time_register_finite(gc, ev, absolute);
-        if (rc) goto out;
-    } else {
-        rc = OSEVENT_HOOK(timeout,modify, noop,
-                          &ev->nexus->for_app_reg, absolute);
-        if (rc) goto out;
-
-        LIBXL_TAILQ_REMOVE(&CTX->etimes, ev, entry);
-        ev->abs = absolute;
-        time_insert_finite(gc, ev);
-    }
-
-    rc = 0;
- out:
-    time_done_debug(gc,__func__,ev,rc);
-    CTX_UNLOCK;
-    return rc;
-}
-
-int libxl__ev_time_modify_rel(libxl__gc *gc, libxl__ev_time *ev,
-                              int milliseconds)
-{
-    struct timeval absolute;
-    int rc;
-
-    CTX_LOCK;
-
-    DBG("ev_time=%p modify ms=%d", ev, milliseconds);
-
-    assert(libxl__ev_time_isregistered(ev));
-
-    if (milliseconds < 0) {
-        time_deregister(gc, ev);
-        ev->infinite = 1;
-        rc = 0;
-        goto out;
-    }
-
-    rc = time_rel_to_abs(gc, milliseconds, &absolute);
-    if (rc) goto out;
-
-    rc = libxl__ev_time_modify_abs(gc, ev, absolute);
-    if (rc) goto out;
-
-    rc = 0;
  out:
     time_done_debug(gc,__func__,ev,rc);
     CTX_UNLOCK;
@@ -1161,7 +1096,11 @@ void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl)
     CTX_LOCK;
     assert(!CTX->osevent_in_hook);
 
-    libxl__ev_time *ev = osevent_ev_from_hook_nexus(ctx, for_libxl);
+    libxl__osevent_hook_nexus *nexus = for_libxl;
+    libxl__ev_time *ev = osevent_ev_from_hook_nexus(ctx, nexus);
+
+    osevent_release_nexus(gc, &CTX->hook_timeout_nexi_idle, nexus);
+
     if (!ev) goto out;
     assert(!ev->infinite);
 
