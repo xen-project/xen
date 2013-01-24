@@ -7,6 +7,7 @@
 #
 
 HAS_DEVICE_TREE := y
+HAS_VIDEO := y
 
 CFLAGS += -fno-builtin -fno-common -Wredundant-decls
 CFLAGS += -iwithprefix include -Werror -Wno-pointer-arith -pipe

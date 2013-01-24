@@ -21,7 +21,7 @@ static unsigned char *video;
 
 static void vga_text_puts(const char *s);
 static void vga_noop_puts(const char *s) {}
-void (*vga_puts)(const char *) = vga_noop_puts;
+void (*video_puts)(const char *) = vga_noop_puts;
 
 /*
  * 'vga=<mode-specifier>[,keep]' where <mode-specifier> is one of:
@@ -62,7 +62,7 @@ void vesa_endboot(bool_t keep);
 #define vesa_endboot(x)   ((void)0)
 #endif
 
-void __init vga_init(void)
+void __init video_init(void)
 {
     char *p;
 
@@ -85,7 +85,7 @@ void __init vga_init(void)
         columns = vga_console_info.u.text_mode_3.columns;
         lines   = vga_console_info.u.text_mode_3.rows;
         memset(video, 0, columns * lines * 2);
-        vga_puts = vga_text_puts;
+        video_puts = vga_text_puts;
         break;
     case XEN_VGATYPE_VESA_LFB:
     case XEN_VGATYPE_EFI_LFB:
@@ -97,16 +97,16 @@ void __init vga_init(void)
     }
 }
 
-void __init vga_endboot(void)
+void __init video_endboot(void)
 {
-    if ( vga_puts == vga_noop_puts )
+    if ( video_puts == vga_noop_puts )
         return;
 
     printk("Xen is %s VGA console.\n",
            vgacon_keep ? "keeping" : "relinquishing");
 
     if ( !vgacon_keep )
-        vga_puts = vga_noop_puts;
+        video_puts = vga_noop_puts;
     else
     {
         int bus, devfn;

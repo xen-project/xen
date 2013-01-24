@@ -108,7 +108,7 @@ void __init vesa_init(void)
 
     memset(lfb, 0, vram_remap);
 
-    vga_puts = vesa_redraw_puts;
+    video_puts = vesa_redraw_puts;
 
     printk(XENLOG_INFO "vesafb: framebuffer at %#x, mapped to 0x%p, "
            "using %uk, total %uk\n",
@@ -193,7 +193,7 @@ void __init vesa_endboot(bool_t keep)
     if ( keep )
     {
         xpos = 0;
-        vga_puts = vesa_scroll_puts;
+        video_puts = vesa_scroll_puts;
     }
     else
     {

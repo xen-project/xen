@@ -21,7 +21,7 @@
 #include <xen/delay.h>
 #include <xen/guest_access.h>
 #include <xen/shutdown.h>
-#include <xen/vga.h>
+#include <xen/video.h>
 #include <xen/kexec.h>
 #include <asm/debugger.h>
 #include <asm/div64.h>
@@ -297,7 +297,7 @@ static void dump_console_ring_key(unsigned char key)
     buf[sofar] = '\0';
 
     sercon_puts(buf);
-    vga_puts(buf);
+    video_puts(buf);
 
     free_xenheap_pages(buf, order);
 }
@@ -383,7 +383,7 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
         spin_lock_irq(&console_lock);
 
         sercon_puts(kbuf);
-        vga_puts(kbuf);
+        video_puts(kbuf);
 
         if ( opt_console_to_ring )
         {
@@ -458,7 +458,7 @@ static void __putstr(const char *str)
     ASSERT(spin_is_locked(&console_lock));
 
     sercon_puts(str);
-    vga_puts(str);
+    video_puts(str);
 
     if ( !console_locks_busted )
     {
@@ -586,7 +586,7 @@ void __init console_init_preirq(void)
         if ( *p == ',' )
             p++;
         if ( !strncmp(p, "vga", 3) )
-            vga_init();
+            video_init();
         else if ( !strncmp(p, "none", 4) )
             continue;
         else if ( (sh = serial_parse_handle(p)) >= 0 )
@@ -688,7 +688,7 @@ void __init console_endboot(void)
         printk("\n");
     }
 
-    vga_endboot();
+    video_endboot();
 
     /*
      * If user specifies so, we fool the switch routine to redirect input

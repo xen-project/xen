@@ -3,6 +3,7 @@
 
 HAS_ACPI := y
 HAS_VGA  := y
+HAS_VIDEO  := y
 HAS_CPUFREQ := y
 HAS_PCI := y
 HAS_PASSTHROUGH := y

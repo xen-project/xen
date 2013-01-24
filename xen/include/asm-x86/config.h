@@ -40,6 +40,7 @@
 #define CONFIG_ACPI_CSTATE 1
 
 #define CONFIG_VGA 1
+#define CONFIG_VIDEO 1
 
 #define CONFIG_HOTPLUG 1
 #define CONFIG_HOTPLUG_CPU 1

@@ -9,17 +9,10 @@
 #ifndef _XEN_VGA_H
 #define _XEN_VGA_H
 
-#include <public/xen.h>
+#include <xen/video.h>
 
 #ifdef CONFIG_VGA
 extern struct xen_vga_console_info vga_console_info;
-void vga_init(void);
-void vga_endboot(void);
-extern void (*vga_puts)(const char *);
-#else
-#define vga_init()    ((void)0)
-#define vga_endboot() ((void)0)
-#define vga_puts(s)   ((void)0)
 #endif
 
 #endif /* _XEN_VGA_H */
