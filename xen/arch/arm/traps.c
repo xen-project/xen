@@ -68,7 +68,7 @@ static void print_xen_info(void)
     debug = 'y';
 #endif
 
-    printk("----[ Xen-%d.%d%s  x86_64  debug=%c  %s ]----\n",
+    printk("----[ Xen-%d.%d%s  arm32  debug=%c  %s ]----\n",
            xen_major_version(), xen_minor_version(), xen_extra_version(),
            debug, print_tainted(taint_str));
 }
