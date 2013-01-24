@@ -680,7 +680,7 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&xatp, arg, 1) )
             return -EFAULT;
 
-        /* This one is only supported by add_to_physmap_range */
+        /* Foreign mapping is only supported by add_to_physmap_range */
         if ( xatp.space == XENMAPSPACE_gmfn_foreign )
             return -EINVAL;
 
@@ -710,6 +710,10 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         if ( copy_from_guest(&xatpr, arg, 1) )
             return -EFAULT;
+
+        /* This mapspace is redundant for this hypercall */
+        if ( xatpr.space == XENMAPSPACE_gmfn_range )
+            return -EINVAL;
 
         rc = rcu_lock_target_domain_by_id(xatpr.domid, &d);
         if ( rc != 0 )
