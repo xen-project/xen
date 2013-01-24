@@ -423,10 +423,7 @@ static int canonicalize_pagetable(struct save_ctx *ctx,
     ** reserved hypervisor mappings. This depends on the current
     ** page table type as well as the number of paging levels.
     */
-    xen_start = xen_end = pte_last = PAGE_SIZE / ((ctx->pt_levels == 2) ? 4 : 8);
-
-    if ( (ctx->pt_levels == 2) && (type == XEN_DOMCTL_PFINFO_L2TAB) )
-        xen_start = (ctx->hvirt_start >> L2_PAGETABLE_SHIFT);
+    xen_start = xen_end = pte_last = PAGE_SIZE / 8;
 
     if ( (ctx->pt_levels == 3) && (type == XEN_DOMCTL_PFINFO_L3TAB) )
         xen_start = L3_PAGETABLE_ENTRIES_PAE;
@@ -474,10 +471,7 @@ static int canonicalize_pagetable(struct save_ctx *ctx,
     {
         unsigned long pfn, mfn;
 
-        if ( ctx->pt_levels == 2 )
-            pte = ((const uint32_t*)spage)[i];
-        else
-            pte = ((const uint64_t*)spage)[i];
+        pte = ((const uint64_t*)spage)[i];
 
         if ( (i >= xen_start) && (i < xen_end) )
             pte = 0;
@@ -515,10 +509,7 @@ static int canonicalize_pagetable(struct save_ctx *ctx,
                 pte &= ~(_PAGE_USER|_PAGE_RW|_PAGE_ACCESSED);
         }
 
-        if ( ctx->pt_levels == 2 )
-            ((uint32_t*)dpage)[i] = pte;
-        else
-            ((uint64_t*)dpage)[i] = pte;
+        ((uint64_t*)dpage)[i] = pte;
     }
 
     return race;

@@ -84,38 +84,12 @@ unsigned long csum_page (void * page);
 #define L3_PAGETABLE_ENTRIES_X86_64  512
 #define L4_PAGETABLE_ENTRIES_X86_64  512
 
-#if defined(__i386__)
-#define L1_PAGETABLE_SHIFT     L1_PAGETABLE_SHIFT_I386
-#define L2_PAGETABLE_SHIFT     L2_PAGETABLE_SHIFT_I386
-#define L1_PAGETABLE_ENTRIES   L1_PAGETABLE_ENTRIES_I386
-#define L2_PAGETABLE_ENTRIES   L2_PAGETABLE_ENTRIES_I386
-#elif defined(__x86_64__)
-#define L1_PAGETABLE_SHIFT     L1_PAGETABLE_SHIFT_X86_64
-#define L2_PAGETABLE_SHIFT     L2_PAGETABLE_SHIFT_X86_64
-#define L3_PAGETABLE_SHIFT     L3_PAGETABLE_SHIFT_X86_64
-#define L4_PAGETABLE_SHIFT     L4_PAGETABLE_SHIFT_X86_64
-#define L1_PAGETABLE_ENTRIES   L1_PAGETABLE_ENTRIES_X86_64
-#define L2_PAGETABLE_ENTRIES   L2_PAGETABLE_ENTRIES_X86_64
-#define L3_PAGETABLE_ENTRIES   L3_PAGETABLE_ENTRIES_X86_64
-#define L4_PAGETABLE_ENTRIES   L4_PAGETABLE_ENTRIES_X86_64
-#endif
-
 typedef uint32_t l1_pgentry_32_t;
 typedef uint32_t l2_pgentry_32_t;
 typedef uint64_t l1_pgentry_64_t;
 typedef uint64_t l2_pgentry_64_t;
 typedef uint64_t l3_pgentry_64_t;
 typedef uint64_t l4_pgentry_64_t;
-
-#if defined(__i386__)
-typedef l1_pgentry_32_t l1_pgentry_t;
-typedef l2_pgentry_32_t l2_pgentry_t;
-#elif defined(__x86_64__)
-typedef l1_pgentry_64_t l1_pgentry_t;
-typedef l2_pgentry_64_t l2_pgentry_t;
-typedef l3_pgentry_64_t l3_pgentry_t;
-typedef l4_pgentry_64_t l4_pgentry_t;
-#endif
 
 #define l1_table_offset_i386(_a) \
   (((_a) >> L1_PAGETABLE_SHIFT_I386) & (L1_PAGETABLE_ENTRIES_I386 - 1))
@@ -137,16 +111,6 @@ typedef l4_pgentry_64_t l4_pgentry_t;
   (((_a) >> L3_PAGETABLE_SHIFT_X86_64) & (L3_PAGETABLE_ENTRIES_X86_64 - 1))
 #define l4_table_offset_x86_64(_a) \
   (((_a) >> L4_PAGETABLE_SHIFT_X86_64) & (L4_PAGETABLE_ENTRIES_X86_64 - 1))
-
-#if defined(__i386__)
-#define l1_table_offset(_a) l1_table_offset_i386(_a)
-#define l2_table_offset(_a) l2_table_offset_i386(_a)
-#elif defined(__x86_64__)
-#define l1_table_offset(_a) l1_table_offset_x86_64(_a)
-#define l2_table_offset(_a) l2_table_offset_x86_64(_a)
-#define l3_table_offset(_a) l3_table_offset_x86_64(_a)
-#define l4_table_offset(_a) l4_table_offset_x86_64(_a)
-#endif
 
 #define PAGE_SHIFT_ARM          12
 #define PAGE_SIZE_ARM           (1UL << PAGE_SHIFT_ARM)

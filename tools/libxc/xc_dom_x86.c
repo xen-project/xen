@@ -133,11 +133,6 @@ static int count_pgtables(struct xc_dom_image *dom, int pae,
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L3_PROT (_PAGE_PRESENT)
 
-static int count_pgtables_x86_32(struct xc_dom_image *dom)
-{
-    return count_pgtables(dom, 0, 0, 0, 32, L2_PAGETABLE_SHIFT_I386);
-}
-
 static int count_pgtables_x86_32_pae(struct xc_dom_image *dom)
 {
     return count_pgtables(dom, 1, 0, 32,
@@ -145,43 +140,6 @@ static int count_pgtables_x86_32_pae(struct xc_dom_image *dom)
 }
 
 #define pfn_to_paddr(pfn) ((xen_paddr_t)(pfn) << PAGE_SHIFT_X86)
-
-static int setup_pgtables_x86_32(struct xc_dom_image *dom)
-{
-    xen_pfn_t l2pfn = dom->pgtables_seg.pfn;
-    xen_pfn_t l1pfn = dom->pgtables_seg.pfn + dom->pg_l2;
-    l2_pgentry_32_t *l2tab = xc_dom_pfn_to_ptr(dom, l2pfn, 1);
-    l1_pgentry_32_t *l1tab = NULL;
-    unsigned long l2off, l1off;
-    xen_vaddr_t addr;
-    xen_pfn_t pgpfn;
-
-    for ( addr = dom->parms.virt_base; addr < dom->virt_pgtab_end;
-          addr += PAGE_SIZE_X86 )
-    {
-        if ( l1tab == NULL )
-        {
-            /* get L1 tab, make L2 entry */
-            l1tab = xc_dom_pfn_to_ptr(dom, l1pfn, 1);
-            l2off = l2_table_offset_i386(addr);
-            l2tab[l2off] =
-                pfn_to_paddr(xc_dom_p2m_guest(dom, l1pfn)) | L2_PROT;
-            l1pfn++;
-        }
-
-        /* make L1 entry */
-        l1off = l1_table_offset_i386(addr);
-        pgpfn = (addr - dom->parms.virt_base) >> PAGE_SHIFT_X86;
-        l1tab[l1off] =
-            pfn_to_paddr(xc_dom_p2m_guest(dom, pgpfn)) | L1_PROT;
-        if ( (addr >= dom->pgtables_seg.vstart) && 
-             (addr < dom->pgtables_seg.vend) )
-            l1tab[l1off] &= ~_PAGE_RW; /* page tables are r/o */
-        if ( l1off == (L1_PAGETABLE_ENTRIES_I386 - 1) )
-            l1tab = NULL;
-    }
-    return 0;
-}
 
 /*
  * Move the l3 page table page below 4G for guests which do not
@@ -248,8 +206,8 @@ static xen_pfn_t move_l3_below_4G(struct xc_dom_image *dom,
 static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
 {
     xen_pfn_t l3pfn = dom->pgtables_seg.pfn;
-    xen_pfn_t l2pfn = dom->pgtables_seg.pfn + dom->pg_l3;
-    xen_pfn_t l1pfn = dom->pgtables_seg.pfn + dom->pg_l3 + dom->pg_l2;
+    xen_pfn_t l2pfn = l3pfn + dom->pg_l3;
+    xen_pfn_t l1pfn = l2pfn + dom->pg_l2;
     l3_pgentry_64_t *l3tab;
     l2_pgentry_64_t *l2tab = NULL;
     l1_pgentry_64_t *l1tab = NULL;
@@ -344,10 +302,9 @@ static int count_pgtables_x86_64(struct xc_dom_image *dom)
 static int setup_pgtables_x86_64(struct xc_dom_image *dom)
 {
     xen_pfn_t l4pfn = dom->pgtables_seg.pfn;
-    xen_pfn_t l3pfn = dom->pgtables_seg.pfn + dom->pg_l4;
-    xen_pfn_t l2pfn = dom->pgtables_seg.pfn + dom->pg_l4 + dom->pg_l3;
-    xen_pfn_t l1pfn =
-        dom->pgtables_seg.pfn + dom->pg_l4 + dom->pg_l3 + dom->pg_l2;
+    xen_pfn_t l3pfn = l4pfn + dom->pg_l4;
+    xen_pfn_t l2pfn = l3pfn + dom->pg_l3;
+    xen_pfn_t l1pfn = l2pfn + dom->pg_l2;
     l4_pgentry_64_t *l4tab = xc_dom_pfn_to_ptr(dom, l4pfn, 1);
     l3_pgentry_64_t *l3tab = NULL;
     l2_pgentry_64_t *l2tab = NULL;
@@ -620,18 +577,6 @@ static int vcpu_x86_64(struct xc_dom_image *dom, void *ptr)
 
 /* ------------------------------------------------------------------------ */
 
-static struct xc_dom_arch xc_dom_32 = {
-    .guest_type = "xen-3.0-x86_32",
-    .native_protocol = XEN_IO_PROTO_ABI_X86_32,
-    .page_shift = PAGE_SHIFT_X86,
-    .sizeof_pfn = 4,
-    .alloc_magic_pages = alloc_magic_pages,
-    .count_pgtables = count_pgtables_x86_32,
-    .setup_pgtables = setup_pgtables_x86_32,
-    .start_info = start_info_x86_32,
-    .shared_info = shared_info_x86_32,
-    .vcpu = vcpu_x86_32,
-};
 static struct xc_dom_arch xc_dom_32_pae = {
     .guest_type = "xen-3.0-x86_32p",
     .native_protocol = XEN_IO_PROTO_ABI_X86_32,
@@ -660,7 +605,6 @@ static struct xc_dom_arch xc_dom_64 = {
 
 static void __init register_arch_hooks(void)
 {
-    xc_dom_register_arch_hooks(&xc_dom_32);
     xc_dom_register_arch_hooks(&xc_dom_32_pae);
     xc_dom_register_arch_hooks(&xc_dom_64);
 }

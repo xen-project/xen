@@ -172,15 +172,12 @@ static int uncanonicalize_pagetable(
     uint64_t pte;
     struct domain_info_context *dinfo = &ctx->dinfo;
 
-    pte_last = PAGE_SIZE / ((ctx->pt_levels == 2)? 4 : 8);
+    pte_last = PAGE_SIZE / 8;
 
     /* First pass: work out how many (if any) MFNs we need to alloc */
     for ( i = 0; i < pte_last; i++ )
     {
-        if ( ctx->pt_levels == 2 )
-            pte = ((uint32_t *)page)[i];
-        else
-            pte = ((uint64_t *)page)[i];
+        pte = ((uint64_t *)page)[i];
 
         /* XXX SMH: below needs fixing for PROT_NONE etc */
         if ( !(pte & _PAGE_PRESENT) )
@@ -226,10 +223,7 @@ static int uncanonicalize_pagetable(
     nr_mfns = 0;
     for ( i = 0; i < pte_last; i++ )
     {
-        if ( ctx->pt_levels == 2 )
-            pte = ((uint32_t *)page)[i];
-        else
-            pte = ((uint64_t *)page)[i];
+        pte = ((uint64_t *)page)[i];
         
         /* XXX SMH: below needs fixing for PROT_NONE etc */
         if ( !(pte & _PAGE_PRESENT) )
@@ -243,10 +237,7 @@ static int uncanonicalize_pagetable(
         pte &= ~MADDR_MASK_X86;
         pte |= (uint64_t)ctx->p2m[pfn] << PAGE_SHIFT;
 
-        if ( ctx->pt_levels == 2 )
-            ((uint32_t *)page)[i] = (uint32_t)pte;
-        else
-            ((uint64_t *)page)[i] = (uint64_t)pte;
+        ((uint64_t *)page)[i] = (uint64_t)pte;
     }
 
     return 1;
@@ -304,8 +295,7 @@ static xen_pfn_t *load_p2m_frame_list(
                 if ( chunk_bytes == sizeof (ctxt.x32) )
                 {
                     dinfo->guest_width = 4;
-                    if ( ctx->pt_levels > 2 ) 
-                        ctx->pt_levels = 3; 
+                    ctx->pt_levels = 3;
                 }
                 else if ( chunk_bytes == sizeof (ctxt.x64) )
                 {
@@ -1508,7 +1498,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
      * assume the guest will be the same as we are.  We'll fix that later
      * if we discover otherwise. */
     dinfo->guest_width = sizeof(unsigned long);
-    ctx->pt_levels = (dinfo->guest_width == 8) ? 4 : (ctx->pt_levels == 2) ? 2 : 3; 
+    ctx->pt_levels = (dinfo->guest_width == 8) ? 4 : 3;
     
     if ( !hvm ) 
     {

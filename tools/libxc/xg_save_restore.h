@@ -334,8 +334,6 @@ static inline int get_platform_info(xc_interface *xch, uint32_t dom,
         *pt_levels = ( (*guest_width == 8) ? 4 : 3 );
     else if (strstr(xen_caps, "xen-3.0-x86_32p"))
         *pt_levels = 3;
-    else if (strstr(xen_caps, "xen-3.0-x86_32"))
-        *pt_levels = 2;
     else
         return 0;
 
