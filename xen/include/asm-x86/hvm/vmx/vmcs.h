@@ -81,6 +81,8 @@ struct vmx_domain {
 struct arch_vmx_struct {
     /* Virtual address of VMCS. */
     struct vmcs_struct  *vmcs;
+    /* VMCS shadow machine address. */
+    paddr_t             vmcs_shadow_maddr;
 
     /* Protects remote usage of VMCS (VMPTRLD/VMCLEAR). */
     spinlock_t           vmcs_lock;
@@ -125,6 +127,10 @@ struct arch_vmx_struct {
     /* Remember EFLAGS while in virtual 8086 mode */
     uint32_t             vm86_saved_eflags;
     int                  hostenv_migrated;
+
+    /* Bitmap to control vmexit policy for Non-root VMREAD/VMWRITE */
+    struct page_info     *vmread_bitmap;
+    struct page_info     *vmwrite_bitmap;
 };
 
 int vmx_create_vmcs(struct vcpu *v);
@@ -191,6 +197,7 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY    0x00000200
 #define SECONDARY_EXEC_PAUSE_LOOP_EXITING       0x00000400
 #define SECONDARY_EXEC_ENABLE_INVPCID           0x00001000
+#define SECONDARY_EXEC_ENABLE_VMCS_SHADOWING    0x00004000
 extern u32 vmx_secondary_exec_control;
 
 extern bool_t cpu_has_vmx_ins_outs_instr_info;
@@ -204,6 +211,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
 #define VMX_EPT_INVEPT_INSTRUCTION              0x00100000
 #define VMX_EPT_INVEPT_SINGLE_CONTEXT           0x02000000
 #define VMX_EPT_INVEPT_ALL_CONTEXT              0x04000000
+
+#define VMX_MISC_VMWRITE_ALL                    0x20000000
 
 #define VMX_VPID_INVVPID_INSTRUCTION                        0x100000000ULL
 #define VMX_VPID_INVVPID_INDIVIDUAL_ADDR                    0x10000000000ULL
@@ -244,7 +253,10 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_secondary_exec_control & SECONDARY_EXEC_APIC_REGISTER_VIRT)
 #define cpu_has_vmx_virtual_intr_delivery \
     (vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY)
-#define cpu_has_vmx_vmcs_shadowing 0
+#define cpu_has_vmx_vmcs_shadowing \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VMCS_SHADOWING)
+
+#define VMCS_RID_TYPE_MASK              0x80000000
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define VMX_INTR_SHADOW_STI             0x00000001
@@ -305,6 +317,10 @@ enum vmcs_field {
     EOI_EXIT_BITMAP2_HIGH           = 0x00002021,
     EOI_EXIT_BITMAP3                = 0x00002022,
     EOI_EXIT_BITMAP3_HIGH           = 0x00002023,
+    VMREAD_BITMAP                   = 0x00002026,
+    VMREAD_BITMAP_HIGH              = 0x00002027,
+    VMWRITE_BITMAP                  = 0x00002028,
+    VMWRITE_BITMAP_HIGH             = 0x00002029,
     GUEST_PHYSICAL_ADDRESS          = 0x00002400,
     GUEST_PHYSICAL_ADDRESS_HIGH     = 0x00002401,
     VMCS_LINK_POINTER               = 0x00002800,

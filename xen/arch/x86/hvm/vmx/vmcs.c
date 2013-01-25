@@ -92,6 +92,7 @@ static void __init vmx_display_features(void)
     P(cpu_has_vmx_unrestricted_guest, "Unrestricted Guest");
     P(cpu_has_vmx_apic_reg_virt, "APIC Register Virtualization");
     P(cpu_has_vmx_virtual_intr_delivery, "Virtual Interrupt Delivery");
+    P(cpu_has_vmx_vmcs_shadowing, "VMCS shadowing");
 #undef P
 
     if ( !printed )
@@ -133,6 +134,7 @@ static int vmx_init_vmcs_config(void)
     u32 _vmx_cpu_based_exec_control;
     u32 _vmx_secondary_exec_control = 0;
     u64 _vmx_ept_vpid_cap = 0;
+    u64 _vmx_misc_cap = 0;
     u32 _vmx_vmexit_control;
     u32 _vmx_vmentry_control;
     bool_t mismatch = 0;
@@ -180,6 +182,9 @@ static int vmx_init_vmcs_config(void)
                SECONDARY_EXEC_ENABLE_RDTSCP |
                SECONDARY_EXEC_PAUSE_LOOP_EXITING |
                SECONDARY_EXEC_ENABLE_INVPCID);
+        rdmsrl(MSR_IA32_VMX_MISC, _vmx_misc_cap);
+        if ( _vmx_misc_cap & VMX_MISC_VMWRITE_ALL )
+            opt |= SECONDARY_EXEC_ENABLE_VMCS_SHADOWING;
         if ( opt_vpid_enabled )
             opt |= SECONDARY_EXEC_ENABLE_VPID;
         if ( opt_unrestricted_guest_enabled )
@@ -383,6 +388,8 @@ static void __vmx_clear_vmcs(void *info)
     if ( arch_vmx->active_cpu == smp_processor_id() )
     {
         __vmpclear(virt_to_maddr(arch_vmx->vmcs));
+        if ( arch_vmx->vmcs_shadow_maddr )
+            __vmpclear(arch_vmx->vmcs_shadow_maddr);
 
         arch_vmx->active_cpu = -1;
         arch_vmx->launched   = 0;
@@ -720,6 +727,8 @@ void vmx_vmcs_switch(struct vmcs_struct *from, struct vmcs_struct *to)
     spin_lock(&vmx->vmcs_lock);
 
     __vmpclear(virt_to_maddr(from));
+    if ( vmx->vmcs_shadow_maddr )
+        __vmpclear(vmx->vmcs_shadow_maddr);
     __vmptrld(virt_to_maddr(to));
 
     vmx->vmcs = to;

@@ -64,6 +64,48 @@ int nvmx_vcpu_initialise(struct vcpu *v)
         gdprintk(XENLOG_ERR, "nest: allocation for shadow vmcs failed\n");
 	goto out;
     }
+
+    /* non-root VMREAD/VMWRITE bitmap. */
+    if ( cpu_has_vmx_vmcs_shadowing )
+    {
+        struct page_info *vmread_bitmap, *vmwrite_bitmap;
+        unsigned long *vr, *vw;
+
+        vmread_bitmap = alloc_domheap_page(NULL, 0);
+        if ( !vmread_bitmap )
+        {
+            gdprintk(XENLOG_ERR, "nest: allocation for vmread bitmap failed\n");
+            goto out1;
+        }
+        v->arch.hvm_vmx.vmread_bitmap = vmread_bitmap;
+
+        vmwrite_bitmap = alloc_domheap_page(NULL, 0);
+        if ( !vmwrite_bitmap )
+        {
+            gdprintk(XENLOG_ERR, "nest: allocation for vmwrite bitmap failed\n");
+            goto out2;
+        }
+        v->arch.hvm_vmx.vmwrite_bitmap = vmwrite_bitmap;
+
+        vr = __map_domain_page(vmread_bitmap);
+        vw = __map_domain_page(vmwrite_bitmap);
+
+        clear_page(vr);
+        clear_page(vw);
+
+        /*
+         * For the following 4 encodings, we need to handle them in VMM.
+         * Let them vmexit as usual.
+         */
+        set_bit(IO_BITMAP_A, vw);
+        set_bit(IO_BITMAP_A_HIGH, vw);
+        set_bit(IO_BITMAP_B, vw);
+        set_bit(IO_BITMAP_B_HIGH, vw);
+
+        unmap_domain_page(vr);
+        unmap_domain_page(vw);
+    }
+
     nvmx->ept.enabled = 0;
     nvmx->guest_vpid = 0;
     nvmx->vmxon_region_pa = 0;
@@ -76,6 +118,10 @@ int nvmx_vcpu_initialise(struct vcpu *v)
     nvmx->msrbitmap = NULL;
     INIT_LIST_HEAD(&nvmx->launched_list);
     return 0;
+out2:
+    free_domheap_page(v->arch.hvm_vmx.vmread_bitmap);
+out1:
+    free_xenheap_page(nvcpu->nv_n2vmcx);
 out:
     return -ENOMEM;
 }
@@ -106,6 +152,11 @@ void nvmx_vcpu_destroy(struct vcpu *v)
         list_del(&item->node);
         xfree(item);
     }
+
+    if ( v->arch.hvm_vmx.vmread_bitmap )
+        free_domheap_page(v->arch.hvm_vmx.vmread_bitmap);
+    if ( v->arch.hvm_vmx.vmwrite_bitmap )
+        free_domheap_page(v->arch.hvm_vmx.vmwrite_bitmap);
 }
  
 void nvmx_domain_relinquish_resources(struct domain *d)
@@ -1035,6 +1086,32 @@ static bool_t nvmx_vpid_enabled(struct nestedvcpu *nvcpu)
     return 0;
 }
 
+static void nvmx_set_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
+{
+    unsigned long vvmcs_mfn = domain_page_map_to_mfn(vvmcs);
+    paddr_t vvmcs_maddr = vvmcs_mfn << PAGE_SHIFT;
+
+    __vmpclear(vvmcs_maddr);
+    vvmcs->vmcs_revision_id |= VMCS_RID_TYPE_MASK;
+    v->arch.hvm_vmx.vmcs_shadow_maddr = vvmcs_maddr;
+    __vmwrite(VMCS_LINK_POINTER, vvmcs_maddr);
+    __vmwrite(VMREAD_BITMAP, page_to_maddr(v->arch.hvm_vmx.vmread_bitmap));
+    __vmwrite(VMWRITE_BITMAP, page_to_maddr(v->arch.hvm_vmx.vmwrite_bitmap));
+}
+
+static void nvmx_clear_vmcs_pointer(struct vcpu *v, struct vmcs_struct *vvmcs)
+{
+    unsigned long vvmcs_mfn = domain_page_map_to_mfn(vvmcs);
+    paddr_t vvmcs_maddr = vvmcs_mfn << PAGE_SHIFT;
+
+    __vmpclear(vvmcs_maddr);
+    vvmcs->vmcs_revision_id &= ~VMCS_RID_TYPE_MASK;
+    v->arch.hvm_vmx.vmcs_shadow_maddr = 0;
+    __vmwrite(VMCS_LINK_POINTER, ~0ul);
+    __vmwrite(VMREAD_BITMAP, 0);
+    __vmwrite(VMWRITE_BITMAP, 0);
+}
+
 static void virtual_vmentry(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
@@ -1475,6 +1552,9 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
         __map_msr_bitmap(v);
     }
 
+    if ( cpu_has_vmx_vmcs_shadowing )
+        nvmx_set_vmcs_pointer(v, nvcpu->nv_vvmcx);
+
     vmreturn(regs, VMSUCCEED);
 
 out:
@@ -1525,6 +1605,8 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     
     if ( gpa == nvcpu->nv_vvmcxaddr ) 
     {
+        if ( cpu_has_vmx_vmcs_shadowing )
+            nvmx_clear_vmcs_pointer(v, nvcpu->nv_vvmcx);
         clear_vvmcs_launched(&nvmx->launched_list,
             domain_page_map_to_mfn(nvcpu->nv_vvmcx));
         nvmx_purge_vvmcs(v);
