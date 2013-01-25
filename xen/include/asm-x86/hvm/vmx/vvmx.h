@@ -23,6 +23,11 @@
 #ifndef __ASM_X86_HVM_VVMX_H__
 #define __ASM_X86_HVM_VVMX_H__
 
+struct vvmcs_list {
+    unsigned long vvmcs_mfn;
+    struct list_head node;
+};
+
 struct nestedvmx {
     paddr_t    vmxon_region_pa;
     void       *iobitmap[2];		/* map (va) of L1 guest I/O bitmap */
@@ -38,6 +43,7 @@ struct nestedvmx {
         uint32_t exit_qual;
     } ept;
     uint32_t guest_vpid;
+    struct list_head launched_list;
 };
 
 #define vcpu_2_nvmx(v)	(vcpu_nestedhvm(v).u.nvmx)

@@ -51,6 +51,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
     nvmx->iobitmap[0] = NULL;
     nvmx->iobitmap[1] = NULL;
     nvmx->msrbitmap = NULL;
+    INIT_LIST_HEAD(&nvmx->launched_list);
     return 0;
 out:
     return -ENOMEM;
@@ -58,7 +59,9 @@ out:
  
 void nvmx_vcpu_destroy(struct vcpu *v)
 {
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    struct vvmcs_list *item, *n;
 
     /* 
      * When destroying the vcpu, it may be running on behalf of L2 guest.
@@ -73,6 +76,12 @@ void nvmx_vcpu_destroy(struct vcpu *v)
         __vmpclear(virt_to_maddr(nvcpu->nv_n2vmcx));
         free_xenheap_page(nvcpu->nv_n2vmcx);
         nvcpu->nv_n2vmcx = NULL;
+    }
+
+    list_for_each_entry_safe(item, n, &nvmx->launched_list, node)
+    {
+        list_del(&item->node);
+        xfree(item);
     }
 }
  
@@ -1202,6 +1211,62 @@ int nvmx_handle_vmxoff(struct cpu_user_regs *regs)
     return X86EMUL_OKAY;
 }
 
+static bool_t vvmcs_launched(struct list_head *launched_list,
+                             unsigned long vvmcs_mfn)
+{
+    struct vvmcs_list *vvmcs;
+    struct list_head *pos;
+    bool_t launched = 0;
+
+    list_for_each(pos, launched_list)
+    {
+        vvmcs = list_entry(pos, struct vvmcs_list, node);
+        if ( vvmcs_mfn == vvmcs->vvmcs_mfn )
+        {
+            launched = 1;
+            break;
+        }
+    }
+
+    return launched;
+}
+
+static int set_vvmcs_launched(struct list_head *launched_list,
+                              unsigned long vvmcs_mfn)
+{
+    struct vvmcs_list *vvmcs;
+
+    if ( vvmcs_launched(launched_list, vvmcs_mfn) )
+        return 0;
+
+    vvmcs = xzalloc(struct vvmcs_list);
+    if ( !vvmcs )
+        return -ENOMEM;
+
+    vvmcs->vvmcs_mfn = vvmcs_mfn;
+    list_add(&vvmcs->node, launched_list);
+
+    return 0;
+}
+
+static void clear_vvmcs_launched(struct list_head *launched_list,
+                                 paddr_t vvmcs_mfn)
+{
+    struct vvmcs_list *vvmcs;
+    struct list_head *pos;
+
+    list_for_each(pos, launched_list)
+    {
+        vvmcs = list_entry(pos, struct vvmcs_list, node);
+        if ( vvmcs_mfn == vvmcs->vvmcs_mfn )
+        {
+            list_del(&vvmcs->node);
+            xfree(vvmcs);
+            break;
+        }
+    }
+}
+
 int nvmx_vmresume(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
@@ -1225,8 +1290,10 @@ int nvmx_vmresume(struct vcpu *v, struct cpu_user_regs *regs)
 
 int nvmx_handle_vmresume(struct cpu_user_regs *regs)
 {
-    int launched;
+    bool_t launched;
     struct vcpu *v = current;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
 
     if ( vcpu_nestedhvm(v).nv_vvmcxaddr == VMCX_EADDR )
     {
@@ -1234,8 +1301,8 @@ int nvmx_handle_vmresume(struct cpu_user_regs *regs)
         return X86EMUL_OKAY;        
     }
 
-    launched = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx,
-                           NVMX_LAUNCH_STATE);
+    launched = vvmcs_launched(&nvmx->launched_list,
+                   domain_page_map_to_mfn(nvcpu->nv_vvmcx));
     if ( !launched ) {
        vmreturn (regs, VMFAIL_VALID);
        return X86EMUL_OKAY;
@@ -1245,9 +1312,11 @@ int nvmx_handle_vmresume(struct cpu_user_regs *regs)
 
 int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
 {
-    int launched;
+    bool_t launched;
     int rc;
     struct vcpu *v = current;
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
 
     if ( vcpu_nestedhvm(v).nv_vvmcxaddr == VMCX_EADDR )
     {
@@ -1255,8 +1324,8 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
         return X86EMUL_OKAY;
     }
 
-    launched = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx,
-                           NVMX_LAUNCH_STATE);
+    launched = vvmcs_launched(&nvmx->launched_list,
+                   domain_page_map_to_mfn(nvcpu->nv_vvmcx));
     if ( launched ) {
        vmreturn (regs, VMFAIL_VALID);
        return X86EMUL_OKAY;
@@ -1264,8 +1333,11 @@ int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
     else {
         rc = nvmx_vmresume(v,regs);
         if ( rc == X86EMUL_OKAY )
-            __set_vvmcs(vcpu_nestedhvm(v).nv_vvmcx,
-                        NVMX_LAUNCH_STATE, 1);
+        {
+            if ( set_vvmcs_launched(&nvmx->launched_list,
+                    domain_page_map_to_mfn(nvcpu->nv_vvmcx)) < 0 )
+                return X86EMUL_UNHANDLEABLE;
+        }
     }
     return rc;
 }
@@ -1332,6 +1404,7 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct vmx_inst_decoded decode;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     unsigned long gpa = 0;
     void *vvmcs;
     int rc;
@@ -1348,7 +1421,8 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     
     if ( gpa == nvcpu->nv_vvmcxaddr ) 
     {
-        __set_vvmcs(nvcpu->nv_vvmcx, NVMX_LAUNCH_STATE, 0);
+        clear_vvmcs_launched(&nvmx->launched_list,
+            domain_page_map_to_mfn(nvcpu->nv_vvmcx));
         nvmx_purge_vvmcs(v);
     }
     else 
@@ -1356,7 +1430,8 @@ int nvmx_handle_vmclear(struct cpu_user_regs *regs)
         /* Even if this VMCS isn't the current one, we must clear it. */
         vvmcs = hvm_map_guest_frame_rw(gpa >> PAGE_SHIFT, 0);
         if ( vvmcs ) 
-            __set_vvmcs(vvmcs, NVMX_LAUNCH_STATE, 0);
+            clear_vvmcs_launched(&nvmx->launched_list,
+                domain_page_map_to_mfn(vvmcs));
         hvm_unmap_guest_frame(vvmcs, 0);
     }
 
