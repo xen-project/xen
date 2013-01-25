@@ -409,6 +409,7 @@ void libxl__prepare_ao_device(libxl__ao *ao, libxl__ao_device *aodev)
     aodev->ao = ao;
     aodev->rc = 0;
     aodev->dev = NULL;
+    aodev->num_exec = 0;
     /* Initialize timer for QEMU Bodge and hotplug execution */
     libxl__ev_time_init(&aodev->timeout);
     aodev->active = 1;
