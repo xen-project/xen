@@ -1,7 +1,7 @@
 
 XEN_ROOT=$(CURDIR)/../..
 include $(XEN_ROOT)/Config.mk
-include $(XEN_ROOT)/docs/Docs.mk
+-include $(XEN_ROOT)/config/Docs.mk
 
 TARGETS= network-bridge.png network-basic.png
 

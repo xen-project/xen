@@ -1,0 +1,13 @@
+# Prefix and install folder
+prefix              := @prefix@
+PREFIX              := $(prefix)
+exec_prefix         := @exec_prefix@
+libdir              := @libdir@
+LIBDIR              := $(libdir)
+
+# Tools
+FIG2DEV             := @FIG2DEV@
+POD2MAN             := @POD2MAN@
+POD2HTML            := @POD2HTML@
+POD2TEXT            := @POD2TEXT@
+MARKDOWN            := @MARKDOWN@

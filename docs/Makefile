@@ -2,7 +2,7 @@
 
 XEN_ROOT=$(CURDIR)/..
 include $(XEN_ROOT)/Config.mk
-include $(XEN_ROOT)/docs/Docs.mk
+-include $(XEN_ROOT)/config/Docs.mk
 
 VERSION		= xen-unstable
 
@@ -32,21 +32,27 @@ html: $(DOC_HTML) html/index.html
 
 .PHONY: txt
 txt:
-	@if which $(POD2TEXT) 1>/dev/null 2>/dev/null; then \
-	$(MAKE) $(DOC_TXT); else              \
-	echo "pod2text not installed; skipping text outputs."; fi
+ifdef POD2TEXT
+	$(MAKE) $(DOC_TXT)
+else
+	@echo "pod2text not installed; skipping text outputs."
+endif
 
 .PHONY: figs
 figs:
-	@set -e ; if which $(FIG2DEV) 1>/dev/null 2>/dev/null; then \
-	set -x; $(MAKE) -C figs ; else                   \
-	echo "fig2dev (transfig) not installed; skipping figs."; fi
+ifdef FIG2DEV
+	set -x; $(MAKE) -C figs
+else
+	@echo "fig2dev (transfig) not installed; skipping figs."
+endif
 
 .PHONY: man-pages
 man-pages:
-	@if which $(POD2MAN) 1>/dev/null 2>/dev/null; then \
-	$(MAKE) $(DOC_MAN1) $(DOC_MAN5); else              \
-	echo "pod2man not installed; skipping man-pages."; fi
+ifdef POD2MAN
+	$(MAKE) $(DOC_MAN1) $(DOC_MAN5)
+else
+	@echo "pod2man not installed; skipping man-pages."
+endif
 
 man1/%.1: man/%.pod.1 Makefile
 	$(INSTALL_DIR) $(@D)
@@ -69,6 +75,8 @@ clean:
 
 .PHONY: distclean
 distclean: clean
+	rm -rf ../config/Docs.mk config.log config.status config.cache \
+		autom4te.cache
 
 .PHONY: install
 install: all
@@ -84,30 +92,40 @@ html/index.html: $(DOC_HTML) ./gen-html-index INDEX
 	perl -w -- ./gen-html-index -i INDEX html $(DOC_HTML)
 
 html/%.html: %.markdown
-	@$(INSTALL_DIR) $(@D)
-	@set -e ; if which $(MARKDOWN) 1>/dev/null 2>/dev/null; then \
-	echo "Running markdown to generate $*.html ... "; \
+	$(INSTALL_DIR) $(@D)
+ifdef MARKDOWN
+	@echo "Running markdown to generate $*.html ... "
 	$(MARKDOWN) $< > $@.tmp ; \
-	$(call move-if-changed,$@.tmp,$@) ; else \
-	echo "markdown not installed; skipping $*.html."; fi
+	$(call move-if-changed,$@.tmp,$@)
+else
+	@echo "markdown not installed; skipping $*.html."
+endif
 
 html/%.txt: %.txt
-	@$(INSTALL_DIR) $(@D)
+	$(INSTALL_DIR) $(@D)
 	cp $< $@
 
 html/man/%.1.html: man/%.pod.1 Makefile
 	$(INSTALL_DIR) $(@D)
+ifdef POD2HTML
 	$(POD2HTML) --infile=$< --outfile=$@.tmp
 	$(call move-if-changed,$@.tmp,$@)
+else
+	@echo "pod2html not installed; skipping $<."
+endif
 
 html/man/%.5.html: man/%.pod.5 Makefile
 	$(INSTALL_DIR) $(@D)
+ifdef POD2HTML
 	$(POD2HTML) --infile=$< --outfile=$@.tmp
 	$(call move-if-changed,$@.tmp,$@)
+else
+	@echo "pod2html not installed; skipping $<."
+endif
 
 html/hypercall/index.html: ./xen-headers
 	rm -rf $(@D)
-	@$(INSTALL_DIR) $(@D)
+	$(INSTALL_DIR) $(@D)
 	./xen-headers -O $(@D) \
 		-T 'arch-x86_64 - Xen public headers' \
 		-X arch-ia64 -X arch-x86_32 -X xen-x86_32 -X arch-arm \
@@ -127,11 +145,23 @@ txt/%.txt: %.markdown
 
 txt/man/%.1.txt: man/%.pod.1 Makefile
 	$(INSTALL_DIR) $(@D)
+ifdef POD2TEXT
 	$(POD2TEXT) $< $@.tmp
 	$(call move-if-changed,$@.tmp,$@)
+else
+	@echo "pod2text not installed; skipping $<."
+endif
 
 txt/man/%.5.txt: man/%.pod.5 Makefile
 	$(INSTALL_DIR) $(@D)
+ifdef POD2TEXT
 	$(POD2TEXT) $< $@.tmp
 	$(call move-if-changed,$@.tmp,$@)
+else
+	@echo "pod2text not installed; skipping $<."
+endif
 
+ifeq (,$(findstring clean,$(MAKECMDGOALS)))
+$(XEN_ROOT)/config/Docs.mk:
+	$(error You have to run ./configure before building docs)
+endif

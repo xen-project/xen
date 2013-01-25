@@ -35,6 +35,9 @@ config/Toplevel.mk
 
 build-*
 dist/*
+docs/autom4te.cache/
+docs/config.log
+docs/config.status
 docs/*.aux
 docs/*.dvi
 docs/*.log
@@ -132,6 +135,7 @@ tools/config.status
 tools/config.cache
 config/Tools.mk
 config/Stubdom.mk
+config/Docs.mk
 tools/blktap2/daemon/blktapctrl
 tools/blktap2/drivers/img2qcow
 tools/blktap2/drivers/lock-util

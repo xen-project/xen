@@ -32,6 +32,10 @@
 ^config/Toplevel\.mk
 ^build-.*$
 ^dist/.*$
+^docs/autom4te\.cache$
+^docs/config\.log$
+^docs/config\.status
+^docs/config/Toplevel\.mk
 ^docs/.*\.aux$
 ^docs/.*\.dvi$
 ^docs/.*\.log$
@@ -322,6 +326,8 @@
 ^tools/config\.status$
 ^tools/config\.cache$
 ^config/Tools\.mk$
+^config/Stubdom\.mk$
+^config/Docs\.mk$
 ^xen/\.banner.*$
 ^xen/BLOG$
 ^xen/System.map$
