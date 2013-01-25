@@ -175,7 +175,7 @@ static int vvmcs_offset(u32 width, u32 type, u32 index)
     return offset;
 }
 
-u64 __get_vvmcs(void *vvmcs, u32 vmcs_encoding)
+u64 __get_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding)
 {
     union vmcs_encoding enc;
     u64 *content = (u64 *) vvmcs;
@@ -205,7 +205,12 @@ u64 __get_vvmcs(void *vvmcs, u32 vmcs_encoding)
     return res;
 }
 
-void __set_vvmcs(void *vvmcs, u32 vmcs_encoding, u64 val)
+u64 __get_vvmcs_real(void *vvmcs, u32 vmcs_encoding)
+{
+    return virtual_vmcs_vmread(vvmcs, vmcs_encoding);
+}
+
+void __set_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding, u64 val)
 {
     union vmcs_encoding enc;
     u64 *content = (u64 *) vvmcs;
@@ -239,6 +244,11 @@ void __set_vvmcs(void *vvmcs, u32 vmcs_encoding, u64 val)
     }
 
     content[offset] = res;
+}
+
+void __set_vvmcs_real(void *vvmcs, u32 vmcs_encoding, u64 val)
+{
+    virtual_vmcs_vmwrite(vvmcs, vmcs_encoding, val);
 }
 
 static unsigned long reg_read(struct cpu_user_regs *regs,
@@ -1567,10 +1577,11 @@ int nvmx_handle_invvpid(struct cpu_user_regs *regs)
  */
 int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
 {
+    struct vcpu *v = current;
     u64 data = 0, host_data = 0;
     int r = 1;
 
-    if ( !nestedhvm_enabled(current->domain) )
+    if ( !nestedhvm_enabled(v->domain) )
         return 0;
 
     rdmsrl(msr, host_data);
@@ -1580,7 +1591,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
      */
     switch (msr) {
     case MSR_IA32_VMX_BASIC:
-        data = (host_data & (~0ul << 32)) | VVMCS_REVISION;
+        data = (host_data & (~0ul << 32)) |
+               ((v->arch.hvm_vmx.vmcs)->vmcs_revision_id);
         break;
     case MSR_IA32_VMX_PINBASED_CTLS:
     case MSR_IA32_VMX_TRUE_PINBASED_CTLS:

@@ -244,6 +244,7 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_secondary_exec_control & SECONDARY_EXEC_APIC_REGISTER_VIRT)
 #define cpu_has_vmx_virtual_intr_delivery \
     (vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY)
+#define cpu_has_vmx_vmcs_shadowing 0
 
 /* GUEST_INTERRUPTIBILITY_INFO flags. */
 #define VMX_INTR_SHADOW_STI             0x00000001
@@ -436,6 +437,10 @@ void vmx_vmcs_switch(struct vmcs_struct *from, struct vmcs_struct *to);
 void vmx_set_eoi_exit_bitmap(struct vcpu *v, u8 vector);
 void vmx_clear_eoi_exit_bitmap(struct vcpu *v, u8 vector);
 int vmx_check_msr_bitmap(unsigned long *msr_bitmap, u32 msr, int access_type);
+void virtual_vmcs_enter(void *vvmcs);
+void virtual_vmcs_exit(void *vvmcs);
+u64 virtual_vmcs_vmread(void *vvmcs, u32 vmcs_encoding);
+void virtual_vmcs_vmwrite(void *vvmcs, u32 vmcs_encoding, u64 val);
 
 #endif /* ASM_X86_HVM_VMX_VMCS_H__ */
 

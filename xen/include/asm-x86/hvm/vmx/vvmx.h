@@ -152,8 +152,6 @@ nvmx_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
  *
  */
 
-#define VVMCS_REVISION 0x40000001u
-
 struct vvmcs_header {
     u32 revision;
     u32 abort;
@@ -185,8 +183,18 @@ enum vvmcs_encoding_type {
     VVMCS_TYPE_HSTATE,
 };
 
-u64 __get_vvmcs(void *vvmcs, u32 vmcs_encoding);
-void __set_vvmcs(void *vvmcs, u32 vmcs_encoding, u64 val);
+u64 __get_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding);
+u64 __get_vvmcs_real(void *vvmcs, u32 vmcs_encoding);
+void __set_vvmcs_virtual(void *vvmcs, u32 vmcs_encoding, u64 val);
+void __set_vvmcs_real(void *vvmcs, u32 vmcs_encoding, u64 val);
+
+#define __get_vvmcs(_vvmcs, _vmcs_encoding) \
+  (cpu_has_vmx_vmcs_shadowing ? __get_vvmcs_real(_vvmcs, _vmcs_encoding) \
+                              : __get_vvmcs_virtual(_vvmcs, _vmcs_encoding))
+
+#define __set_vvmcs(_vvmcs, _vmcs_encoding, _val) \
+  (cpu_has_vmx_vmcs_shadowing ? __set_vvmcs_real(_vvmcs, _vmcs_encoding, _val) \
+                              : __set_vvmcs_virtual(_vvmcs, _vmcs_encoding, _val))
 
 uint64_t get_shadow_eptp(struct vcpu *v);
 

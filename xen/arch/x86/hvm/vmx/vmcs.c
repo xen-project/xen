@@ -725,6 +725,35 @@ void vmx_vmcs_switch(struct vmcs_struct *from, struct vmcs_struct *to)
     spin_unlock(&vmx->vmcs_lock);
 }
 
+void virtual_vmcs_enter(void *vvmcs)
+{
+    __vmptrld(pfn_to_paddr(domain_page_map_to_mfn(vvmcs)));
+}
+
+void virtual_vmcs_exit(void *vvmcs)
+{
+    __vmpclear(pfn_to_paddr(domain_page_map_to_mfn(vvmcs)));
+    __vmptrld(virt_to_maddr(this_cpu(current_vmcs)));
+}
+
+u64 virtual_vmcs_vmread(void *vvmcs, u32 vmcs_encoding)
+{
+    u64 res;
+
+    virtual_vmcs_enter(vvmcs);
+    res = __vmread(vmcs_encoding);
+    virtual_vmcs_exit(vvmcs);
+
+    return res;
+}
+
+void virtual_vmcs_vmwrite(void *vvmcs, u32 vmcs_encoding, u64 val)
+{
+    virtual_vmcs_enter(vvmcs);
+    __vmwrite(vmcs_encoding, val);
+    virtual_vmcs_exit(vvmcs);
+}
+
 static int construct_vmcs(struct vcpu *v)
 {
     struct domain *d = v->domain;
