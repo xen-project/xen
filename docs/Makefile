@@ -27,9 +27,6 @@ all: build
 .PHONY: build
 build: html txt man-pages figs
 
-.PHONY: dev-docs
-dev-docs: python-dev-docs
-
 .PHONY: html
 html: $(DOC_HTML) html/index.html
 
@@ -44,15 +41,6 @@ figs:
 	@set -e ; if which $(FIG2DEV) 1>/dev/null 2>/dev/null; then \
 	set -x; $(MAKE) -C figs ; else                   \
 	echo "fig2dev (transfig) not installed; skipping figs."; fi
-
-.PHONY: python-dev-docs
-python-dev-docs:
-	@mkdir -v -p api/tools/python
-	@set -e ; if which $(DOXYGEN) 1>/dev/null 2>/dev/null; then \
-        echo "Running doxygen to generate Python tools APIs ... "; \
-	$(DOXYGEN) Doxyfile;                                       \
-	$(MAKE) -C api/tools/python/latex ; else                   \
-        echo "Doxygen not installed; skipping python-dev-docs."; fi
 
 .PHONY: man-pages
 man-pages:
@@ -76,7 +64,6 @@ clean:
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
 	rm -rf *.ilg *.log *.ind *.toc *.bak core
 	rm -rf html txt
-	rm -rf api
 	rm -rf man5
 	rm -rf man1
 
