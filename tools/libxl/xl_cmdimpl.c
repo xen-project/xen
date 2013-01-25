@@ -2326,6 +2326,10 @@ static int64_t parse_mem_size_kb(const char *mem)
 
 #define COMMON_LONG_OPTS {"help", 0, 0, 'h'}
 
+/*
+ * Callers should use SWITCH_FOREACH_OPT in preference to calling this
+ * directly.
+ */
 static int def_getopt(int argc, char * const argv[],
                       const char *optstring,
                       const struct option *longopts,
@@ -2364,6 +2368,66 @@ static int def_getopt(int argc, char * const argv[],
     return -1;
 }
 
+/*
+ * Wraps def_getopt into a convenient loop+switch to process all
+ * arguments. This macro is intended to be called from main_XXX().
+ *
+ *   SWITCH_FOREACH_OPT(int *opt, const char *opts,
+ *                      const struct option *longopts,
+ *                      const char *commandname,
+ *                      int num_opts_req) { ...
+ *
+ * opt:               pointer to an int variable, holds the current option
+ *                    during processing.
+ * opts:              short options, as per getopt_long(3)'s optstring argument.
+ * longopts:          long options, as per getopt_long(3)'s longopts argument.
+ *                    May be null.
+ * commandname:       name of this command, for usage string.
+ * num_required_opts: number of non-option command line parameters
+ *                    which are required.
+ *
+ * In addition the calling context is expected to contain variables
+ * "argc" and "argv" in the conventional C-style:
+ *   main(int argc, char **argv)
+ * manner.
+ *
+ * Callers should treat SWITCH_FOREACH_OPT as they would a switch
+ * statement over the value of `opt`. Each option given in `opts` (or
+ * `lopts`) should be handled by a case statement as if it were inside
+ * a switch statement.
+ *
+ * In addition to the options provided in opts callers must handle
+ * two additional pseudo options:
+ *  0 -- generated if the user passes a -h option. help will be printed,
+ *       caller should immediately return 0.
+ *  2 -- generated if the user does not provided `num_required_opts`
+ *       non-option arguments, caller should immediately return 2.
+ *
+ * Example:
+ *
+ * int main_foo(int argc, char **argv) {
+ *     int opt;
+ *
+ *     SWITCH_FOREACH_OPT(opt, "blah", NULL, "foo", 0) {
+ *     case 0: case2:
+ *          return opt;
+ *      case 'b':
+ *          ... handle b option...
+ *          break;
+ *      case 'l':
+ *          ... handle l option ...
+ *          break;
+ *      case etc etc...
+ *      }
+ *      ... do something useful with the options ...
+ * }
+ */
+#define SWITCH_FOREACH_OPT(opt, opts, longopts,                         \
+                           commandname, num_required_opts)              \
+    while (((opt) = def_getopt(argc, argv, (opts), (longopts),          \
+                                (commandname), (num_required_opts))) != -1) \
+        switch (opt)
+
 static int set_memory_max(uint32_t domid, const char *mem)
 {
     int64_t memorykb;
@@ -2387,8 +2451,10 @@ int main_memmax(int argc, char **argv)
     char *mem;
     int rc;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "mem-max", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "mem-max", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     domid = find_domain(argv[optind]);
     mem = argv[optind + 1];
@@ -2421,8 +2487,10 @@ int main_memset(int argc, char **argv)
     int opt = 0;
     const char *mem;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "mem-set", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "mem-set", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     domid = find_domain(argv[optind]);
     mem = argv[optind + 1];
@@ -2460,8 +2528,10 @@ int main_cd_eject(int argc, char **argv)
     int opt = 0;
     const char *virtdev;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "cd-eject", 2)) != -1)
-        return opt;
+    SWITCH_FOREACH_OPT(opt, "", NULL, "cd-eject", 2) {
+        case 0: case 2:
+            return opt;
+    }
 
     domid = find_domain(argv[optind]);
     virtdev = argv[optind + 1];
@@ -2477,8 +2547,10 @@ int main_cd_insert(int argc, char **argv)
     const char *virtdev;
     char *file = NULL; /* modified by cd_insert tokenising it */
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "cd-insert", 3)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "cd-insert", 3) {
+    case 0: case 2:
         return opt;
+    }
 
     domid = find_domain(argv[optind]);
     virtdev = argv[optind + 1];
@@ -2494,24 +2566,22 @@ int main_console(int argc, char **argv)
     int opt = 0, num = 0;
     libxl_console_type type = 0;
 
-    while ((opt = def_getopt(argc, argv, "n:t:", NULL, "console", 1)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 't':
-            if (!strcmp(optarg, "pv"))
-                type = LIBXL_CONSOLE_TYPE_PV;
-            else if (!strcmp(optarg, "serial"))
-                type = LIBXL_CONSOLE_TYPE_SERIAL;
-            else {
-                fprintf(stderr, "console type supported are: pv, serial\n");
-                return 2;
-            }
-            break;
-        case 'n':
-            num = atoi(optarg);
-            break;
+    SWITCH_FOREACH_OPT(opt, "n:t:", NULL, "console", 1) {
+    case 0: case 2:
+        return opt;
+    case 't':
+        if (!strcmp(optarg, "pv"))
+            type = LIBXL_CONSOLE_TYPE_PV;
+        else if (!strcmp(optarg, "serial"))
+            type = LIBXL_CONSOLE_TYPE_SERIAL;
+        else {
+            fprintf(stderr, "console type supported are: pv, serial\n");
+            return 2;
         }
+        break;
+    case 'n':
+        num = atoi(optarg);
+        break;
     }
 
     domid = find_domain(argv[optind]);
@@ -2534,14 +2604,12 @@ int main_vncviewer(int argc, char **argv)
     uint32_t domid;
     int opt, autopass = 0;
 
-    while ((opt = def_getopt(argc, argv, "ah", opts, "vncviewer", 1)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'a':
-            autopass = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "ah", opts, "vncviewer", 1) {
+    case 0: case 2:
+        return opt;
+    case 'a':
+        autopass = 1;
+        break;
     }
 
     domid = find_domain(argv[optind]);
@@ -2574,8 +2642,10 @@ int main_pcilist(int argc, char **argv)
     uint32_t domid;
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "pci-list", 1)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "pci-list", 1) {
+    case 0: case 2:
         return opt;
+    }
 
     domid = find_domain(argv[optind]);
 
@@ -2613,14 +2683,12 @@ int main_pcidetach(int argc, char **argv)
     int force = 0;
     const char *bdf = NULL;
 
-    while ((opt = def_getopt(argc, argv, "f", NULL, "pci-detach", 2)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'f':
-            force = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "f", NULL, "pci-detach", 2) {
+    case 0: case 2:
+        return opt;
+    case 'f':
+        force = 1;
+        break;
     }
 
     domid = find_domain(argv[optind]);
@@ -2655,8 +2723,10 @@ int main_pciattach(int argc, char **argv)
     int opt;
     const char *bdf = NULL, *vs = NULL;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "pci-attach", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "pci-attach", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     domid = find_domain(argv[optind]);
     bdf = argv[optind + 1];
@@ -2689,8 +2759,10 @@ int main_pciassignable_list(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "pci-assignable-list", 0)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "pci-assignable-list", 0) {
+    case 0: case 2:
         return opt;
+    }
 
     pciassignable_list();
     return 0;
@@ -2721,11 +2793,9 @@ int main_pciassignable_add(int argc, char **argv)
     int opt;
     const char *bdf = NULL;
 
-    while ((opt = def_getopt(argc, argv, "", NULL, "pci-assignable-add", 1)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        }
+    SWITCH_FOREACH_OPT(opt, "", NULL, "pci-assignable-add", 1) {
+    case 0: case 2:
+        return opt;
     }
 
     bdf = argv[optind];
@@ -2760,14 +2830,12 @@ int main_pciassignable_remove(int argc, char **argv)
     const char *bdf = NULL;
     int rebind = 0;
 
-    while ((opt = def_getopt(argc, argv, "r", NULL, "pci-assignable-remove", 1)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'r':
-            rebind=1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "r", NULL, "pci-assignable-remove", 1) {
+    case 0: case 2:
+        return opt;
+    case 'r':
+        rebind=1;
+        break;
     }
 
     bdf = argv[optind];
@@ -3578,34 +3646,31 @@ int main_restore(int argc, char **argv)
         {0, 0, 0, 0}
     };
 
-    while ((opt = def_getopt(argc, argv, "FhcpdeVA",
-                             opts, "restore", 1)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'c':
-            console_autoconnect = 1;
-            break;
-        case 'p':
-            paused = 1;
-            break;
-        case 'd':
-            debug = 1;
-            break;
-        case 'F':
-            daemonize = 0;
-            break;
-        case 'e':
-            daemonize = 0;
-            monitor = 0;
-            break;
-        case 'V':
-            vnc = 1;
-            break;
-        case 'A':
-            vnc = vncautopass = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "FhcpdeVA", opts, "restore", 1) {
+    case 0: case 2:
+        return opt;
+    case 'c':
+        console_autoconnect = 1;
+        break;
+    case 'p':
+        paused = 1;
+        break;
+    case 'd':
+        debug = 1;
+        break;
+    case 'F':
+        daemonize = 0;
+        break;
+    case 'e':
+        daemonize = 0;
+        monitor = 0;
+        break;
+    case 'V':
+        vnc = 1;
+        break;
+    case 'A':
+        vnc = vncautopass = 1;
+        break;
     }
 
     if (argc-optind == 1) {
@@ -3642,24 +3707,22 @@ int main_migrate_receive(int argc, char **argv)
     int debug = 0, daemonize = 1, monitor = 1, remus = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "Fedr", NULL, "migrate-receive", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'F':
-            daemonize = 0;
-            break;
-        case 'e':
-            daemonize = 0;
-            monitor = 0;
-            break;
-        case 'd':
-            debug = 1;
-            break;
-        case 'r':
-            remus = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "Fedr", NULL, "migrate-receive", 0) {
+    case 0: case 2:
+        return opt;
+    case 'F':
+        daemonize = 0;
+        break;
+    case 'e':
+        daemonize = 0;
+        monitor = 0;
+        break;
+    case 'd':
+        debug = 1;
+        break;
+    case 'r':
+        remus = 1;
+        break;
     }
 
     if (argc-optind != 0) {
@@ -3681,14 +3744,12 @@ int main_save(int argc, char **argv)
     int checkpoint = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "c", NULL, "save", 2)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'c':
-            checkpoint = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "c", NULL, "save", 2) {
+    case 0: case 2:
+        return opt;
+    case 'c':
+        checkpoint = 1;
+        break;
     }
 
     if (argc-optind > 3) {
@@ -3714,27 +3775,25 @@ int main_migrate(int argc, char **argv)
     char *host;
     int opt, daemonize = 1, monitor = 1, debug = 0;
 
-    while ((opt = def_getopt(argc, argv, "FC:s:ed", NULL, "migrate", 2)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'C':
-            config_filename = optarg;
-            break;
-        case 's':
-            ssh_command = optarg;
-            break;
-        case 'F':
-            daemonize = 0;
-            break;
-        case 'e':
-            daemonize = 0;
-            monitor = 0;
-            break;
-        case 'd':
-            debug = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "FC:s:ed", NULL, "migrate", 2) {
+    case 0: case 2:
+        return opt;
+    case 'C':
+        config_filename = optarg;
+        break;
+    case 's':
+        ssh_command = optarg;
+        break;
+    case 'F':
+        daemonize = 0;
+        break;
+    case 'e':
+        daemonize = 0;
+        monitor = 0;
+        break;
+    case 'd':
+        debug = 1;
+        break;
     }
 
     domid = find_domain(argv[optind]);
@@ -3758,8 +3817,10 @@ int main_dump_core(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "dump-core", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "dump-core", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     core_dump_domain(find_domain(argv[optind]), argv[optind + 1]);
     return 0;
@@ -3769,8 +3830,10 @@ int main_pause(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "pause", 1)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "pause", 1) {
+    case 0: case 2:
         return opt;
+    }
 
     pause_domain(find_domain(argv[optind]));
 
@@ -3781,8 +3844,10 @@ int main_unpause(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "unpause", 1)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "unpause", 1) {
+    case 0: case 2:
         return opt;
+    }
 
     unpause_domain(find_domain(argv[optind]));
 
@@ -3793,8 +3858,10 @@ int main_destroy(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "destroy", 1)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "destroy", 1) {
+    case 0: case 2:
         return opt;
+    }
 
     destroy_domain(find_domain(argv[optind]));
     return 0;
@@ -3816,20 +3883,18 @@ static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
         {0, 0, 0, 0}
     };
 
-    while ((opt = def_getopt(argc, argv, "awF", opts, what, 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'a':
-            all = 1;
-            break;
-        case 'w':
-            wait_for_it = 1;
-            break;
-        case 'F':
-            fallback_trigger = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "awF", opts, what, 0) {
+    case 0: case 2:
+        return opt;
+    case 'a':
+        all = 1;
+        break;
+    case 'w':
+        wait_for_it = 1;
+        break;
+    case 'F':
+        fallback_trigger = 1;
+        break;
     }
 
     if (!argv[optind] && !all) {
@@ -3900,23 +3965,18 @@ int main_list(int argc, char **argv)
     libxl_dominfo *info, *info_free=0;
     int nb_domain, rc;
 
-    while ((opt = def_getopt(argc, argv, "lvhZ", opts, "list", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'l':
-            details = 1;
-            break;
-        case 'h':
-            help("list");
-            return 0;
-        case 'v':
-            verbose = 1;
-            break;
-        case 'Z':
-            context = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "lvhZ", opts, "list", 0) {
+    case 0: case 2:
+        return opt;
+    case 'l':
+        details = 1;
+        break;
+    case 'v':
+        verbose = 1;
+        break;
+    case 'Z':
+        context = 1;
+        break;
     }
 
     if (optind >= argc) {
@@ -3962,8 +4022,10 @@ int main_vm_list(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "vm-list", 0)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "vm-list", 0) {
+    case 0: case 2:
         return opt;
+    }
 
     list_vm();
     return 0;
@@ -3993,45 +4055,40 @@ int main_create(int argc, char **argv)
         argc--; argv++;
     }
 
-    while ((opt = def_getopt(argc, argv, "Fhnqf:pcdeVA", opts, "create", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'f':
-            filename = optarg;
-            break;
-        case 'p':
-            paused = 1;
-            break;
-        case 'c':
-            console_autoconnect = 1;
-            break;
-        case 'd':
-            debug = 1;
-            break;
-        case 'F':
-            daemonize = 0;
-            break;
-        case 'e':
-            daemonize = 0;
-            monitor = 0;
-            break;
-        case 'h':
-            help("create");
-            return 0;
-        case 'n':
-            dryrun_only = 1;
-            break;
-        case 'q':
-            quiet = 1;
-            break;
-        case 'V':
-            vnc = 1;
-            break;
-        case 'A':
-            vnc = vncautopass = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "Fhnqf:pcdeVA", opts, "create", 0) {
+    case 0: case 2:
+        return opt;
+    case 'f':
+        filename = optarg;
+        break;
+    case 'p':
+        paused = 1;
+        break;
+    case 'c':
+        console_autoconnect = 1;
+        break;
+    case 'd':
+        debug = 1;
+        break;
+    case 'F':
+        daemonize = 0;
+        break;
+    case 'e':
+        daemonize = 0;
+        monitor = 0;
+        break;
+    case 'n':
+        dryrun_only = 1;
+        break;
+    case 'q':
+        quiet = 1;
+        break;
+    case 'V':
+        vnc = 1;
+        break;
+    case 'A':
+        vnc = vncautopass = 1;
+        break;
     }
 
     extra_config[0] = '\0';
@@ -4099,17 +4156,15 @@ int main_config_update(int argc, char **argv)
         argc--; argv++;
     }
 
-    while ((opt = def_getopt(argc, argv, "dhqf:", opts, "config_update", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'd':
-            debug = 1;
-            break;
-        case 'f':
-            filename = optarg;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "dhqf:", opts, "config_update", 0) {
+    case 0: case 2:
+        return opt;
+    case 'd':
+        debug = 1;
+        break;
+    case 'f':
+        filename = optarg;
+        break;
     }
 
     extra_config[0] = '\0';
@@ -4197,8 +4252,11 @@ int main_button_press(int argc, char **argv)
     fprintf(stderr, "WARNING: \"button-press\" is deprecated. "
             "Please use \"trigger\"\n");
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "button-press", 2)) != -1)
+
+    SWITCH_FOREACH_OPT(opt, "", NULL, "button-press", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     button_press(find_domain(argv[optind]), argv[optind + 1]);
 
@@ -4338,8 +4396,10 @@ int main_vcpulist(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "cpu-list", 0)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "cpu-list", 0) {
+    case 0: case 2:
         return opt;
+    }
 
     vcpulist(argc - optind, argv + optind);
     return 0;
@@ -4399,8 +4459,10 @@ int main_vcpupin(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "vcpu-pin", 3)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "vcpu-pin", 3) {
+    case 0: case 2:
         return opt;
+    }
 
     vcpupin(find_domain(argv[optind]), argv[optind+1] , argv[optind+2]);
     return 0;
@@ -4435,8 +4497,10 @@ int main_vcpuset(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "vcpu-set", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "vcpu-set", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     vcpuset(find_domain(argv[optind]), argv[optind+1]);
     return 0;
@@ -4618,14 +4682,12 @@ int main_info(int argc, char **argv)
     };
     int numa = 0;
 
-    while ((opt = def_getopt(argc, argv, "hn", opts, "info", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'n':
-            numa = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "hn", opts, "info", 0) {
+    case 0: case 2:
+        return opt;
+    case 'n':
+        numa = 1;
+        break;
     }
 
     print_info(numa);
@@ -4659,8 +4721,10 @@ int main_sharing(int argc, char **argv)
     libxl_dominfo *info, *info_free = NULL;
     int nb_domain, rc;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "sharing", 0)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "sharing", 0) {
+    case 0: case 2:
         return opt;
+    }
 
     if (optind >= argc) {
         info = libxl_list_domain(ctx, &nb_domain);
@@ -4940,36 +5004,34 @@ int main_sched_credit(int argc, char **argv)
         {0, 0, 0, 0}
     };
 
-    while ((opt = def_getopt(argc, argv, "d:w:c:p:t:r:hs", opts, "sched-credit", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'd':
-            dom = optarg;
-            break;
-        case 'w':
-            weight = strtol(optarg, NULL, 10);
-            opt_w = 1;
-            break;
-        case 'c':
-            cap = strtol(optarg, NULL, 10);
-            opt_c = 1;
-            break;
-        case 't':
-            tslice = strtol(optarg, NULL, 10);
-            opt_t = 1;
-            break;
-        case 'r':
-            ratelimit = strtol(optarg, NULL, 10);
-            opt_r = 1;
-            break;
-        case 's':
-            opt_s = 1;
-            break;
-        case 'p':
-            cpupool = optarg;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "d:w:c:p:t:r:hs", opts, "sched-credit", 0) {
+    case 0: case 2:
+        return opt;
+    case 'd':
+        dom = optarg;
+        break;
+    case 'w':
+        weight = strtol(optarg, NULL, 10);
+        opt_w = 1;
+        break;
+    case 'c':
+        cap = strtol(optarg, NULL, 10);
+        opt_c = 1;
+        break;
+    case 't':
+        tslice = strtol(optarg, NULL, 10);
+        opt_t = 1;
+        break;
+    case 'r':
+        ratelimit = strtol(optarg, NULL, 10);
+        opt_r = 1;
+        break;
+    case 's':
+        opt_s = 1;
+        break;
+    case 'p':
+        cpupool = optarg;
+        break;
     }
 
     if ((cpupool || opt_s) && (dom || opt_w || opt_c)) {
@@ -5059,21 +5121,19 @@ int main_sched_credit2(int argc, char **argv)
         {0, 0, 0, 0}
     };
 
-    while ((opt = def_getopt(argc, argv, "d:w:p:h", opts, "sched-credit2", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'd':
-            dom = optarg;
-            break;
-        case 'w':
-            weight = strtol(optarg, NULL, 10);
-            opt_w = 1;
-            break;
-        case 'p':
-            cpupool = optarg;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "d:w:p:h", opts, "sched-credit2", 0) {
+    case 0: case 2:
+        return opt;
+    case 'd':
+        dom = optarg;
+        break;
+    case 'w':
+        weight = strtol(optarg, NULL, 10);
+        opt_w = 1;
+        break;
+    case 'p':
+        cpupool = optarg;
+        break;
     }
 
     if (cpupool && (dom || opt_w)) {
@@ -5134,37 +5194,35 @@ int main_sched_sedf(int argc, char **argv)
         {0, 0, 0, 0}
     };
 
-    while ((opt = def_getopt(argc, argv, "d:p:s:l:e:w:c:h", opts, "sched-sedf", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'd':
-            dom = optarg;
-            break;
-        case 'p':
-            period = strtol(optarg, NULL, 10);
-            opt_p = 1;
-            break;
-        case 's':
-            slice = strtol(optarg, NULL, 10);
-            opt_s = 1;
-            break;
-        case 'l':
-            latency = strtol(optarg, NULL, 10);
-            opt_l = 1;
-            break;
-        case 'e':
-            extra = strtol(optarg, NULL, 10);
-            opt_e = 1;
-            break;
-        case 'w':
-            weight = strtol(optarg, NULL, 10);
-            opt_w = 1;
-            break;
-        case 'c':
-            cpupool = optarg;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "d:p:s:l:e:w:c:h", opts, "sched-sedf", 0) {
+    case 0: case 2:
+        return opt;
+    case 'd':
+        dom = optarg;
+        break;
+    case 'p':
+        period = strtol(optarg, NULL, 10);
+        opt_p = 1;
+        break;
+    case 's':
+        slice = strtol(optarg, NULL, 10);
+        opt_s = 1;
+        break;
+    case 'l':
+        latency = strtol(optarg, NULL, 10);
+        opt_l = 1;
+        break;
+    case 'e':
+        extra = strtol(optarg, NULL, 10);
+        opt_e = 1;
+        break;
+    case 'w':
+        weight = strtol(optarg, NULL, 10);
+        opt_w = 1;
+        break;
+    case 'c':
+        cpupool = optarg;
+        break;
     }
 
     if (cpupool && (dom || opt_p || opt_s || opt_l || opt_e || opt_w)) {
@@ -5231,8 +5289,10 @@ int main_domid(int argc, char **argv)
     int opt;
     const char *domname = NULL;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "domid", 1)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "domid", 1) {
+    case 0: case 2:
         return opt;
+    }
 
     domname = argv[optind];
 
@@ -5253,8 +5313,10 @@ int main_domname(int argc, char **argv)
     char *domname = NULL;
     char *endptr = NULL;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "domname", 1)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "domname", 1) {
+    case 0: case 2:
         return opt;
+    }
 
     domid = strtol(argv[optind], &endptr, 10);
     if (domid == 0 && !strcmp(endptr, argv[optind])) {
@@ -5281,8 +5343,10 @@ int main_rename(int argc, char **argv)
     int opt;
     const char *dom, *new_name;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "rename", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "rename", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     dom = argv[optind++];
     new_name = argv[optind];
@@ -5305,8 +5369,10 @@ int main_trigger(int argc, char **argv)
     const char *trigger_name = NULL;
     libxl_trigger trigger;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "trigger", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "trigger", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     domid = find_domain(argv[optind++]);
 
@@ -5335,8 +5401,10 @@ int main_sysrq(int argc, char **argv)
     int opt;
     const char *sysrq = NULL;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "sysrq", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "sysrq", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     domid = find_domain(argv[optind++]);
 
@@ -5358,8 +5426,10 @@ int main_debug_keys(int argc, char **argv)
     int opt;
     char *keys;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "debug-keys", 1)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "debug-keys", 1) {
+    case 0: case 2:
         return opt;
+    }
 
     keys = argv[optind];
 
@@ -5378,14 +5448,12 @@ int main_dmesg(int argc, char **argv)
     char *line;
     int opt, ret = 1;
 
-    while ((opt = def_getopt(argc, argv, "c", NULL, "dmesg", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'c':
-            clear = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "c", NULL, "dmesg", 0) {
+    case 0: case 2:
+        return opt;
+    case 'c':
+        clear = 1;
+        break;
     }
 
     cr = libxl_xen_console_read_start(ctx, clear);
@@ -5404,8 +5472,10 @@ int main_top(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "top", 0)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "top", 0) {
+    case 0: case 2:
         return opt;
+    }
 
     return system("xentop");
 }
@@ -5421,8 +5491,10 @@ int main_networkattach(int argc, char **argv)
     int i;
     unsigned int val;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "network-attach", 1)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "network-attach", 1) {
+    case 0: case 2:
         return opt;
+    }
 
     if (argc-optind > 11) {
         help("network-attach");
@@ -5508,8 +5580,10 @@ int main_networklist(int argc, char **argv)
     libxl_nicinfo nicinfo;
     int nb, i;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "network-list", 1)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "network-list", 1) {
+    case 0: case 2:
         return opt;
+    }
 
     /*      Idx  BE   MAC   Hdl  Sta  evch txr/rxr  BE-path */
     printf("%-3s %-2s %-17s %-6s %-5s %-6s %5s/%-5s %-30s\n",
@@ -5545,8 +5619,10 @@ int main_networkdetach(int argc, char **argv)
     int opt;
     libxl_device_nic nic;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "network-detach", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "network-detach", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     domid = find_domain(argv[optind]);
 
@@ -5576,8 +5652,10 @@ int main_blockattach(int argc, char **argv)
     libxl_device_disk disk = { 0 };
     XLU_Config *config = 0;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "block-attach", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "block-attach", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     if (domain_qualifier_to_domid(argv[optind], &fe_domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
@@ -5611,8 +5689,10 @@ int main_blocklist(int argc, char **argv)
     libxl_device_disk *disks;
     libxl_diskinfo diskinfo;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "block-list", 1)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "block-list", 1) {
+    case 0: case 2:
         return opt;
+    }
 
     printf("%-5s %-3s %-6s %-5s %-6s %-8s %-30s\n",
            "Vdev", "BE", "handle", "state", "evt-ch", "ring-ref", "BE-path");
@@ -5647,8 +5727,10 @@ int main_blockdetach(int argc, char **argv)
     int opt, rc = 0;
     libxl_device_disk disk;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "block-detach", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "block-detach", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     domid = find_domain(argv[optind]);
 
@@ -5672,8 +5754,10 @@ int main_vtpmattach(int argc, char **argv)
     unsigned int val;
     uint32_t domid;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "vtpm-attach", 1)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "vtpm-attach", 1) {
+    case 0: case 2:
         return opt;
+    }
 
     if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
@@ -5725,8 +5809,10 @@ int main_vtpmlist(int argc, char **argv)
     libxl_vtpminfo vtpminfo;
     int nb, i;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "vtpm-list", 1)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "vtpm-list", 1) {
+    case 0: case 2:
         return opt;
+    }
 
     /*      Idx  BE   UUID   Hdl  Sta  evch rref  BE-path */
     printf("%-3s %-2s %-36s %-6s %-5s %-6s %-5s %-10s\n",
@@ -5765,8 +5851,10 @@ int main_vtpmdetach(int argc, char **argv)
     libxl_device_vtpm vtpm;
     libxl_uuid uuid;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "vtpm-detach", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "vtpm-detach", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     domid = find_domain(argv[optind]);
 
@@ -5957,14 +6045,12 @@ int main_uptime(int argc, char **argv)
     int nb_doms = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "s", NULL, "uptime", 1)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 's':
-            short_mode = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "s", NULL, "uptime", 1) {
+    case 0: case 2:
+        return opt;
+    case 's':
+        short_mode = 1;
+        break;
     }
 
     for (;(dom = argv[optind]) != NULL; nb_doms++,optind++)
@@ -5984,17 +6070,15 @@ int main_tmem_list(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "al", NULL, "tmem-list", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'l':
-            use_long = 1;
-            break;
-        case 'a':
-            all = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "al", NULL, "tmem-list", 0) {
+    case 0: case 2:
+        return opt;
+    case 'l':
+        use_long = 1;
+        break;
+    case 'a':
+        all = 1;
+        break;
     }
 
     dom = argv[optind];
@@ -6025,14 +6109,12 @@ int main_tmem_freeze(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "a", NULL, "tmem-freeze", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'a':
-            all = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "a", NULL, "tmem-freeze", 0) {
+    case 0: case 2:
+        return opt;
+    case 'a':
+        all = 1;
+        break;
     }
 
     dom = argv[optind];
@@ -6058,14 +6140,12 @@ int main_tmem_thaw(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "a", NULL, "tmem-thaw", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'a':
-            all = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "a", NULL, "tmem-thaw", 0) {
+    case 0: case 2:
+        return opt;
+    case 'a':
+        all = 1;
+        break;
     }
 
     dom = argv[optind];
@@ -6093,26 +6173,24 @@ int main_tmem_set(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "aw:c:p:", NULL, "tmem-set", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'a':
-            all = 1;
-            break;
-        case 'w':
-            weight = strtol(optarg, NULL, 10);
-            opt_w = 1;
-            break;
-        case 'c':
-            cap = strtol(optarg, NULL, 10);
-            opt_c = 1;
-            break;
-        case 'p':
-            compress = strtol(optarg, NULL, 10);
-            opt_p = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "aw:c:p:", NULL, "tmem-set", 0) {
+    case 0: case 2:
+        return opt;
+    case 'a':
+        all = 1;
+        break;
+    case 'w':
+        weight = strtol(optarg, NULL, 10);
+        opt_w = 1;
+        break;
+    case 'c':
+        cap = strtol(optarg, NULL, 10);
+        opt_c = 1;
+        break;
+    case 'p':
+        compress = strtol(optarg, NULL, 10);
+        opt_p = 1;
+        break;
     }
 
     dom = argv[optind];
@@ -6154,20 +6232,18 @@ int main_tmem_shared_auth(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "au:A:", NULL, "tmem-shared-auth", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'a':
-            all = 1;
-            break;
-        case 'u':
-            uuid = optarg;
-            break;
-        case 'A':
-            autharg = optarg;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "au:A:", NULL, "tmem-shared-auth", 0) {
+    case 0: case 2:
+        return opt;
+    case 'a':
+        all = 1;
+        break;
+    case 'u':
+        uuid = optarg;
+        break;
+    case 'A':
+        autharg = optarg;
+        break;
     }
 
     dom = argv[optind];
@@ -6204,8 +6280,10 @@ int main_tmem_freeable(int argc, char **argv)
     int opt;
     int mb;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "tmem-freeable", 0)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "tmem-freeale", 0) {
+    case 0: case 2:
         return opt;
+    }
 
     mb = libxl_tmem_freeable(ctx);
     if (mb == -1)
@@ -6244,17 +6322,15 @@ int main_cpupoolcreate(int argc, char **argv)
     libxl_cputopology *topology;
     int rc = -ERROR_FAIL;
 
-    while ((opt = def_getopt(argc, argv, "hnf:", opts, "cpupool-create", 0)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-        case 'f':
-            filename = optarg;
-            break;
-        case 'n':
-            dryrun_only = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "hnf:", opts, "cpupool-create", 0) {
+    case 0: case 2:
+        return opt;
+    case 'f':
+        filename = optarg;
+        break;
+    case 'n':
+        dryrun_only = 1;
+        break;
     }
 
     memset(extra_config, 0, sizeof(extra_config));
@@ -6429,14 +6505,12 @@ int main_cpupoollist(int argc, char **argv)
     char *name;
     int ret = 0;
 
-    while ((opt = def_getopt(argc, argv, "hc", opts, "cpupool-list", 1)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            break;
-        case 'c':
-            opt_cpus = 1;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "hc", opts, "cpupool-list", 1) {
+    case 0: case 2:
+        break;
+    case 'c':
+        opt_cpus = 1;
+        break;
     }
 
     if (optind < argc) {
@@ -6496,8 +6570,10 @@ int main_cpupooldestroy(int argc, char **argv)
     const char *pool;
     uint32_t poolid;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "cpupool-destroy", 1)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "cpupool-destroy", 1) {
+    case 0: case 2:
         return opt;
+    }
 
     pool = argv[optind];
 
@@ -6517,8 +6593,10 @@ int main_cpupoolrename(int argc, char **argv)
     const char *new_name;
     uint32_t poolid;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "cpupool-rename", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "cpupool-rename", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     pool = argv[optind++];
 
@@ -6547,8 +6625,10 @@ int main_cpupoolcpuadd(int argc, char **argv)
     int node;
     int n;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "cpupool-cpu-add", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "cpupool-cpu-add", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     pool = argv[optind++];
     node = -1;
@@ -6591,8 +6671,10 @@ int main_cpupoolcpuremove(int argc, char **argv)
     int node;
     int n;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "cpupool-cpu-remove", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "cpupool-cpu-remove", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     pool = argv[optind++];
     node = -1;
@@ -6634,8 +6716,10 @@ int main_cpupoolmigrate(int argc, char **argv)
     const char *dom;
     uint32_t domid;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "cpupool-migrate", 2)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "cpupool-migrate", 2) {
+    case 0: case 2:
         return opt;
+    }
 
     dom = argv[optind++];
     pool = argv[optind];
@@ -6674,8 +6758,11 @@ int main_cpupoolnumasplit(int argc, char **argv)
     libxl_cputopology *topology;
     libxl_dominfo info;
 
-    if ((opt = def_getopt(argc, argv, "", NULL, "cpupool-numa-split", 0)) != -1)
+    SWITCH_FOREACH_OPT(opt, "", NULL, "cpupool-numa-split", 0) {
+    case 0: case 2:
         return opt;
+    }
+
     ret = 0;
 
     poolinfo = libxl_list_cpupool(ctx, &n_pools);
@@ -6927,27 +7014,24 @@ int main_remus(int argc, char **argv)
     r_info.blackhole = 0;
     r_info.compression = 1;
 
-    while ((opt = def_getopt(argc, argv, "bui:s:e", NULL, "remus", 2)) != -1) {
-        switch (opt) {
-        case 0: case 2:
-            return opt;
-
-        case 'i':
-	    r_info.interval = atoi(optarg);
-            break;
-        case 'b':
-            r_info.blackhole = 1;
-            break;
-        case 'u':
-	    r_info.compression = 0;
-            break;
-        case 's':
-            ssh_command = optarg;
-            break;
-        case 'e':
-            daemonize = 0;
-            break;
-        }
+    SWITCH_FOREACH_OPT(opt, "bui:s:e", NULL, "remus", 2) {
+    case 0: case 2:
+        return opt;
+    case 'i':
+        r_info.interval = atoi(optarg);
+        break;
+    case 'b':
+        r_info.blackhole = 1;
+        break;
+    case 'u':
+        r_info.compression = 0;
+        break;
+    case 's':
+        ssh_command = optarg;
+        break;
+    case 'e':
+        daemonize = 0;
+        break;
     }
 
     domid = find_domain(argv[optind]);
