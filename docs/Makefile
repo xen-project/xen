@@ -26,10 +26,6 @@ all: build
 
 .PHONY: build
 build: html txt man-pages figs
-	@if which $(DOT) 1>/dev/null 2>/dev/null ; then              \
-	$(MAKE) -C xen-api build ; else                              \
-        echo "Graphviz (dot) not installed; skipping xen-api." ; fi
-	rm -f *.aux *.dvi *.bbl *.blg *.glo *.idx *.ilg *.log *.ind *.toc
 
 .PHONY: dev-docs
 dev-docs: python-dev-docs
@@ -76,7 +72,6 @@ man5/%.5: man/%.pod.5 Makefile
 
 .PHONY: clean
 clean:
-	$(MAKE) -C xen-api clean
 	$(MAKE) -C figs clean
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
 	rm -rf *.ilg *.log *.ind *.toc *.bak core
@@ -92,8 +87,6 @@ distclean: clean
 install: all
 	rm -rf $(DESTDIR)$(DOCDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)
-
-	$(MAKE) -C xen-api install
 
 	$(INSTALL_DIR) $(DESTDIR)$(MANDIR)
 	cp -dR man1 $(DESTDIR)$(MANDIR)
