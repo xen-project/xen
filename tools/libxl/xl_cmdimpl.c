@@ -2324,18 +2324,33 @@ static int64_t parse_mem_size_kb(const char *mem)
     return kbytes;
 }
 
-static int def_getopt(int argc, char * const argv[], const char *optstring,
+#define COMMON_LONG_OPTS {"help", 0, 0, 'h'}
+
+static int def_getopt(int argc, char * const argv[],
+                      const char *optstring,
+                      const struct option *longopts,
                       const char* helpstr, int reqargs)
 {
     int opt;
+    const struct option def_options[] = {
+        COMMON_LONG_OPTS,
+        {0, 0, 0, 0}
+    };
+
+    if (!longopts)
+        longopts = def_options;
 
     opterr = 0;
-    while ((opt = getopt(argc, argv, optstring)) == '?') {
+    while ((opt = getopt_long(argc, argv, optstring, longopts, NULL)) == '?') {
         if (optopt == 'h') {
             help(helpstr);
             return 0;
         }
         fprintf(stderr, "option `%c' not supported.\n", optopt);
+    }
+    if (opt == 'h') {
+        help(helpstr);
+        return 0;
     }
     if (opt != -1)
         return opt;
@@ -2372,7 +2387,7 @@ int main_memmax(int argc, char **argv)
     char *mem;
     int rc;
 
-    if ((opt = def_getopt(argc, argv, "", "mem-max", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "mem-max", 2)) != -1)
         return opt;
 
     domid = find_domain(argv[optind]);
@@ -2406,7 +2421,7 @@ int main_memset(int argc, char **argv)
     int opt = 0;
     const char *mem;
 
-    if ((opt = def_getopt(argc, argv, "", "mem-set", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "mem-set", 2)) != -1)
         return opt;
 
     domid = find_domain(argv[optind]);
@@ -2445,7 +2460,7 @@ int main_cd_eject(int argc, char **argv)
     int opt = 0;
     const char *virtdev;
 
-    if ((opt = def_getopt(argc, argv, "", "cd-eject", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "cd-eject", 2)) != -1)
         return opt;
 
     domid = find_domain(argv[optind]);
@@ -2462,7 +2477,7 @@ int main_cd_insert(int argc, char **argv)
     const char *virtdev;
     char *file = NULL; /* modified by cd_insert tokenising it */
 
-    if ((opt = def_getopt(argc, argv, "", "cd-insert", 3)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "cd-insert", 3)) != -1)
         return opt;
 
     domid = find_domain(argv[optind]);
@@ -2479,7 +2494,7 @@ int main_console(int argc, char **argv)
     int opt = 0, num = 0;
     libxl_console_type type = 0;
 
-    while ((opt = def_getopt(argc, argv, "n:t:", "console", 1)) != -1) {
+    while ((opt = def_getopt(argc, argv, "n:t:", NULL, "console", 1)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -2510,36 +2525,23 @@ int main_console(int argc, char **argv)
 
 int main_vncviewer(int argc, char **argv)
 {
-    static const struct option long_options[] = {
+    static const struct option opts[] = {
         {"autopass", 0, 0, 'a'},
         {"vncviewer-autopass", 0, 0, 'a'},
-        {"help", 0, 0, 'h'},
+        COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
     uint32_t domid;
     int opt, autopass = 0;
 
-    while (1) {
-        opt = getopt_long(argc, argv, "ah", long_options, NULL);
-        if (opt == -1)
-            break;
-
+    while ((opt = def_getopt(argc, argv, "ah", opts, "vncviewer", 1)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'a':
             autopass = 1;
             break;
-        case 'h':
-            help("vncviewer");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
-            break;
         }
-    }
-
-    if (argc - optind != 1) {
-        help("vncviewer");
-        return 2;
     }
 
     domid = find_domain(argv[optind]);
@@ -2572,7 +2574,7 @@ int main_pcilist(int argc, char **argv)
     uint32_t domid;
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", "pci-list", 1)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "pci-list", 1)) != -1)
         return opt;
 
     domid = find_domain(argv[optind]);
@@ -2611,7 +2613,7 @@ int main_pcidetach(int argc, char **argv)
     int force = 0;
     const char *bdf = NULL;
 
-    while ((opt = def_getopt(argc, argv, "f", "pci-detach", 2)) != -1) {
+    while ((opt = def_getopt(argc, argv, "f", NULL, "pci-detach", 2)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -2653,7 +2655,7 @@ int main_pciattach(int argc, char **argv)
     int opt;
     const char *bdf = NULL, *vs = NULL;
 
-    if ((opt = def_getopt(argc, argv, "", "pci-attach", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "pci-attach", 2)) != -1)
         return opt;
 
     domid = find_domain(argv[optind]);
@@ -2687,7 +2689,7 @@ int main_pciassignable_list(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", "pci-assignable-list", 0)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "pci-assignable-list", 0)) != -1)
         return opt;
 
     pciassignable_list();
@@ -2719,7 +2721,7 @@ int main_pciassignable_add(int argc, char **argv)
     int opt;
     const char *bdf = NULL;
 
-    while ((opt = def_getopt(argc, argv, "", "pci-assignable-add", 1)) != -1) {
+    while ((opt = def_getopt(argc, argv, "", NULL, "pci-assignable-add", 1)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -2758,7 +2760,7 @@ int main_pciassignable_remove(int argc, char **argv)
     const char *bdf = NULL;
     int rebind = 0;
 
-    while ((opt = def_getopt(argc, argv, "r", "pci-assignable-remove", 1)) != -1) {
+    while ((opt = def_getopt(argc, argv, "r", NULL, "pci-assignable-remove", 1)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -3569,24 +3571,18 @@ int main_restore(int argc, char **argv)
     int paused = 0, debug = 0, daemonize = 1, monitor = 1,
         console_autoconnect = 0, vnc = 0, vncautopass = 0;
     int opt, rc;
-    int option_index = 0;
-    static struct option long_options[] = {
+    static struct option opts[] = {
         {"vncviewer", 0, 0, 'V'},
         {"vncviewer-autopass", 0, 0, 'A'},
+        COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
 
-    while (1) {
-        opt = getopt_long(argc, argv, "FhcpdeVA", long_options, &option_index);
-        if (opt == -1)
-            break;
-
+    while ((opt = def_getopt(argc, argv, "FhcpdeVA",
+                             opts, "restore", 1)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
-        case 'h':
-            help("restore");
-            return 2;
         case 'c':
             console_autoconnect = 1;
             break;
@@ -3646,7 +3642,7 @@ int main_migrate_receive(int argc, char **argv)
     int debug = 0, daemonize = 1, monitor = 1, remus = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "Fedr", "migrate-receive", 0)) != -1) {
+    while ((opt = def_getopt(argc, argv, "Fedr", NULL, "migrate-receive", 0)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -3685,7 +3681,7 @@ int main_save(int argc, char **argv)
     int checkpoint = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "c", "save", 2)) != -1) {
+    while ((opt = def_getopt(argc, argv, "c", NULL, "save", 2)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -3718,7 +3714,7 @@ int main_migrate(int argc, char **argv)
     char *host;
     int opt, daemonize = 1, monitor = 1, debug = 0;
 
-    while ((opt = def_getopt(argc, argv, "FC:s:ed", "migrate", 2)) != -1) {
+    while ((opt = def_getopt(argc, argv, "FC:s:ed", NULL, "migrate", 2)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -3762,7 +3758,7 @@ int main_dump_core(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", "dump-core", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "dump-core", 2)) != -1)
         return opt;
 
     core_dump_domain(find_domain(argv[optind]), argv[optind + 1]);
@@ -3773,7 +3769,7 @@ int main_pause(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", "pause", 1)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "pause", 1)) != -1)
         return opt;
 
     pause_domain(find_domain(argv[optind]));
@@ -3785,7 +3781,7 @@ int main_unpause(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", "unpause", 1)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "unpause", 1)) != -1)
         return opt;
 
     unpause_domain(find_domain(argv[optind]));
@@ -3797,7 +3793,7 @@ int main_destroy(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", "destroy", 1)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "destroy", 1)) != -1)
         return opt;
 
     destroy_domain(find_domain(argv[optind]));
@@ -3806,19 +3802,21 @@ int main_destroy(int argc, char **argv)
 
 static int main_shutdown_or_reboot(int do_reboot, int argc, char **argv)
 {
+    const char *what = do_reboot ? "reboot" : "shutdown";
     void (*fn)(uint32_t domid,
                libxl_evgen_domain_death **, libxl_ev_user, int) =
         do_reboot ? &reboot_domain : &shutdown_domain;
     int opt, i, nb_domain;
     int wait_for_it = 0, all =0;
     int fallback_trigger = 0;
-    static struct option long_options[] = {
+    static struct option opts[] = {
         {"all", 0, 0, 'a'},
         {"wait", 0, 0, 'w'},
+        COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
 
-    while ((opt = getopt_long(argc, argv, "awF", long_options, NULL)) != -1) {
+    while ((opt = def_getopt(argc, argv, "awF", opts, what, 0)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -3890,12 +3888,11 @@ int main_list(int argc, char **argv)
     int opt, verbose = 0;
     int context = 0;
     int details = 0;
-    int option_index = 0;
-    static struct option long_options[] = {
+    static struct option opts[] = {
         {"long", 0, 0, 'l'},
-        {"help", 0, 0, 'h'},
         {"verbose", 0, 0, 'v'},
         {"context", 0, 0, 'Z'},
+        COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
 
@@ -3903,12 +3900,10 @@ int main_list(int argc, char **argv)
     libxl_dominfo *info, *info_free=0;
     int nb_domain, rc;
 
-    while (1) {
-        opt = getopt_long(argc, argv, "lvhZ", long_options, &option_index);
-        if (opt == -1)
-            break;
-
+    while ((opt = def_getopt(argc, argv, "lvhZ", opts, "list", 0)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'l':
             details = 1;
             break;
@@ -3920,9 +3915,6 @@ int main_list(int argc, char **argv)
             break;
         case 'Z':
             context = 1;
-            break;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -3970,7 +3962,7 @@ int main_vm_list(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", "vm-list", 0)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "vm-list", 0)) != -1)
         return opt;
 
     list_vm();
@@ -3986,14 +3978,13 @@ int main_create(int argc, char **argv)
     int paused = 0, debug = 0, daemonize = 1, console_autoconnect = 0,
         quiet = 0, monitor = 1, vnc = 0, vncautopass = 0;
     int opt, rc;
-    int option_index = 0;
-    static struct option long_options[] = {
+    static struct option opts[] = {
         {"dryrun", 0, 0, 'n'},
         {"quiet", 0, 0, 'q'},
-        {"help", 0, 0, 'h'},
         {"defconfig", 1, 0, 'f'},
         {"vncviewer", 0, 0, 'V'},
         {"vncviewer-autopass", 0, 0, 'A'},
+        COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
 
@@ -4002,12 +3993,10 @@ int main_create(int argc, char **argv)
         argc--; argv++;
     }
 
-    while (1) {
-        opt = getopt_long(argc, argv, "Fhnqf:pcdeVA", long_options, &option_index);
-        if (opt == -1)
-            break;
-
+    while ((opt = def_getopt(argc, argv, "Fhnqf:pcdeVA", opts, "create", 0)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'f':
             filename = optarg;
             break;
@@ -4041,9 +4030,6 @@ int main_create(int argc, char **argv)
             break;
         case 'A':
             vnc = vncautopass = 1;
-            break;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -4092,11 +4078,10 @@ int main_config_update(int argc, char **argv)
     int config_len = 0;
     libxl_domain_config d_config;
     int opt, rc;
-    int option_index = 0;
     int debug = 0;
-    static struct option long_options[] = {
-        {"help", 0, 0, 'h'},
+    static struct option opts[] = {
         {"defconfig", 1, 0, 'f'},
+        COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
 
@@ -4114,23 +4099,15 @@ int main_config_update(int argc, char **argv)
         argc--; argv++;
     }
 
-    while (1) {
-        opt = getopt_long(argc, argv, "dhqf:", long_options, &option_index);
-        if (opt == -1)
-            break;
-
+    while ((opt = def_getopt(argc, argv, "dhqf:", opts, "config_update", 0)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'd':
             debug = 1;
             break;
         case 'f':
             filename = optarg;
-            break;
-        case 'h':
-            help("create");
-            return 0;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -4220,7 +4197,7 @@ int main_button_press(int argc, char **argv)
     fprintf(stderr, "WARNING: \"button-press\" is deprecated. "
             "Please use \"trigger\"\n");
 
-    if ((opt = def_getopt(argc, argv, "", "button-press", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "button-press", 2)) != -1)
         return opt;
 
     button_press(find_domain(argv[optind]), argv[optind + 1]);
@@ -4361,7 +4338,7 @@ int main_vcpulist(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", "cpu-list", 0)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "cpu-list", 0)) != -1)
         return opt;
 
     vcpulist(argc - optind, argv + optind);
@@ -4422,7 +4399,7 @@ int main_vcpupin(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", "vcpu-pin", 3)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "vcpu-pin", 3)) != -1)
         return opt;
 
     vcpupin(find_domain(argv[optind]), argv[optind+1] , argv[optind+2]);
@@ -4458,7 +4435,7 @@ int main_vcpuset(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", "vcpu-set", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "vcpu-set", 2)) != -1)
         return opt;
 
     vcpuset(find_domain(argv[optind]), argv[optind+1]);
@@ -4634,24 +4611,19 @@ static void print_info(int numa)
 int main_info(int argc, char **argv)
 {
     int opt;
-    int option_index = 0;
-    static struct option long_options[] = {
-        {"help", 0, 0, 'h'},
+    static struct option opts[] = {
         {"numa", 0, 0, 'n'},
+        COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
     int numa = 0;
 
-    while ((opt = getopt_long(argc, argv, "hn", long_options, &option_index)) != -1) {
+    while ((opt = def_getopt(argc, argv, "hn", opts, "info", 0)) != -1) {
         switch (opt) {
-        case 'h':
-            help("info");
-            return 0;
+        case 0: case 2:
+            return opt;
         case 'n':
             numa = 1;
-            break;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -4687,7 +4659,7 @@ int main_sharing(int argc, char **argv)
     libxl_dominfo *info, *info_free = NULL;
     int nb_domain, rc;
 
-    if ((opt = def_getopt(argc, argv, "", "sharing", 0)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "sharing", 0)) != -1)
         return opt;
 
     if (optind >= argc) {
@@ -4956,8 +4928,7 @@ int main_sched_credit(int argc, char **argv)
     int opt_s = 0;
     int tslice = 0, opt_t = 0, ratelimit = 0, opt_r = 0;
     int opt, rc;
-    int option_index = 0;
-    static struct option long_options[] = {
+    static struct option opts[] = {
         {"domain", 1, 0, 'd'},
         {"weight", 1, 0, 'w'},
         {"cap", 1, 0, 'c'},
@@ -4965,15 +4936,11 @@ int main_sched_credit(int argc, char **argv)
         {"tslice_ms", 1, 0, 't'},
         {"ratelimit_us", 1, 0, 'r'},
         {"cpupool", 1, 0, 'p'},
-        {"help", 0, 0, 'h'},
+        COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
 
-    while (1) {
-        opt = getopt_long(argc, argv, "d:w:c:p:t:r:hs", long_options,
-                          &option_index);
-        if (opt == -1)
-            break;
+    while ((opt = def_getopt(argc, argv, "d:w:c:p:t:r:hs", opts, "sched-credit", 0)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -5002,9 +4969,6 @@ int main_sched_credit(int argc, char **argv)
         case 'p':
             cpupool = optarg;
             break;
-        case 'h':
-            help("sched-credit");
-            return 0;
         }
     }
 
@@ -5087,19 +5051,15 @@ int main_sched_credit2(int argc, char **argv)
     const char *cpupool = NULL;
     int weight = 256, opt_w = 0;
     int opt, rc;
-    int option_index = 0;
-    static struct option long_options[] = {
+    static struct option opts[] = {
         {"domain", 1, 0, 'd'},
         {"weight", 1, 0, 'w'},
         {"cpupool", 1, 0, 'p'},
-        {"help", 0, 0, 'h'},
+        COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
 
-    while (1) {
-        opt = getopt_long(argc, argv, "d:w:p:h", long_options, &option_index);
-        if (opt == -1)
-            break;
+    while ((opt = def_getopt(argc, argv, "d:w:p:h", opts, "sched-credit2", 0)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -5113,9 +5073,6 @@ int main_sched_credit2(int argc, char **argv)
         case 'p':
             cpupool = optarg;
             break;
-        case 'h':
-            help("sched-credit");
-            return 0;
         }
     }
 
@@ -5166,23 +5123,18 @@ int main_sched_sedf(int argc, char **argv)
     int extra = 0, opt_e = 0;
     int weight = 0, opt_w = 0;
     int opt, rc;
-    int option_index = 0;
-    static struct option long_options[] = {
+    static struct option opts[] = {
         {"period", 1, 0, 'p'},
         {"slice", 1, 0, 's'},
         {"latency", 1, 0, 'l'},
         {"extra", 1, 0, 'e'},
         {"weight", 1, 0, 'w'},
         {"cpupool", 1, 0, 'c'},
-        {"help", 0, 0, 'h'},
+        COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
 
-    while (1) {
-        opt = getopt_long(argc, argv, "d:p:s:l:e:w:c:h", long_options,
-                          &option_index);
-        if (opt == -1)
-            break;
+    while ((opt = def_getopt(argc, argv, "d:p:s:l:e:w:c:h", opts, "sched-sedf", 0)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -5212,9 +5164,6 @@ int main_sched_sedf(int argc, char **argv)
         case 'c':
             cpupool = optarg;
             break;
-        case 'h':
-            help("sched-sedf");
-            return 0;
         }
     }
 
@@ -5282,7 +5231,7 @@ int main_domid(int argc, char **argv)
     int opt;
     const char *domname = NULL;
 
-    if ((opt = def_getopt(argc, argv, "", "domid", 1)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "domid", 1)) != -1)
         return opt;
 
     domname = argv[optind];
@@ -5304,7 +5253,7 @@ int main_domname(int argc, char **argv)
     char *domname = NULL;
     char *endptr = NULL;
 
-    if ((opt = def_getopt(argc, argv, "", "domname", 1)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "domname", 1)) != -1)
         return opt;
 
     domid = strtol(argv[optind], &endptr, 10);
@@ -5332,7 +5281,7 @@ int main_rename(int argc, char **argv)
     int opt;
     const char *dom, *new_name;
 
-    if ((opt = def_getopt(argc, argv, "", "rename", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "rename", 2)) != -1)
         return opt;
 
     dom = argv[optind++];
@@ -5356,7 +5305,7 @@ int main_trigger(int argc, char **argv)
     const char *trigger_name = NULL;
     libxl_trigger trigger;
 
-    if ((opt = def_getopt(argc, argv, "", "trigger", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "trigger", 2)) != -1)
         return opt;
 
     domid = find_domain(argv[optind++]);
@@ -5386,7 +5335,7 @@ int main_sysrq(int argc, char **argv)
     int opt;
     const char *sysrq = NULL;
 
-    if ((opt = def_getopt(argc, argv, "", "sysrq", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "sysrq", 2)) != -1)
         return opt;
 
     domid = find_domain(argv[optind++]);
@@ -5409,7 +5358,7 @@ int main_debug_keys(int argc, char **argv)
     int opt;
     char *keys;
 
-    if ((opt = def_getopt(argc, argv, "", "debug-keys", 1)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "debug-keys", 1)) != -1)
         return opt;
 
     keys = argv[optind];
@@ -5429,7 +5378,7 @@ int main_dmesg(int argc, char **argv)
     char *line;
     int opt, ret = 1;
 
-    while ((opt = def_getopt(argc, argv, "c", "dmesg", 0)) != -1) {
+    while ((opt = def_getopt(argc, argv, "c", NULL, "dmesg", 0)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -5455,7 +5404,7 @@ int main_top(int argc, char **argv)
 {
     int opt;
 
-    if ((opt = def_getopt(argc, argv, "", "top", 0)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "top", 0)) != -1)
         return opt;
 
     return system("xentop");
@@ -5472,7 +5421,7 @@ int main_networkattach(int argc, char **argv)
     int i;
     unsigned int val;
 
-    if ((opt = def_getopt(argc, argv, "", "network-attach", 1)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "network-attach", 1)) != -1)
         return opt;
 
     if (argc-optind > 11) {
@@ -5559,7 +5508,7 @@ int main_networklist(int argc, char **argv)
     libxl_nicinfo nicinfo;
     int nb, i;
 
-    if ((opt = def_getopt(argc, argv, "", "network-list", 1)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "network-list", 1)) != -1)
         return opt;
 
     /*      Idx  BE   MAC   Hdl  Sta  evch txr/rxr  BE-path */
@@ -5596,7 +5545,7 @@ int main_networkdetach(int argc, char **argv)
     int opt;
     libxl_device_nic nic;
 
-    if ((opt = def_getopt(argc, argv, "", "network-detach", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "network-detach", 2)) != -1)
         return opt;
 
     domid = find_domain(argv[optind]);
@@ -5627,7 +5576,7 @@ int main_blockattach(int argc, char **argv)
     libxl_device_disk disk = { 0 };
     XLU_Config *config = 0;
 
-    if ((opt = def_getopt(argc, argv, "", "block-attach", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "block-attach", 2)) != -1)
         return opt;
 
     if (domain_qualifier_to_domid(argv[optind], &fe_domid, 0) < 0) {
@@ -5662,7 +5611,7 @@ int main_blocklist(int argc, char **argv)
     libxl_device_disk *disks;
     libxl_diskinfo diskinfo;
 
-    if ((opt = def_getopt(argc, argv, "", "block-list", 1)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "block-list", 1)) != -1)
         return opt;
 
     printf("%-5s %-3s %-6s %-5s %-6s %-8s %-30s\n",
@@ -5698,7 +5647,7 @@ int main_blockdetach(int argc, char **argv)
     int opt, rc = 0;
     libxl_device_disk disk;
 
-    if ((opt = def_getopt(argc, argv, "", "block-detach", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "block-detach", 2)) != -1)
         return opt;
 
     domid = find_domain(argv[optind]);
@@ -5723,7 +5672,7 @@ int main_vtpmattach(int argc, char **argv)
     unsigned int val;
     uint32_t domid;
 
-    if ((opt = def_getopt(argc, argv, "", "vtpm-attach", 1)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "vtpm-attach", 1)) != -1)
         return opt;
 
     if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
@@ -5776,7 +5725,7 @@ int main_vtpmlist(int argc, char **argv)
     libxl_vtpminfo vtpminfo;
     int nb, i;
 
-    if ((opt = def_getopt(argc, argv, "", "vtpm-list", 1)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "vtpm-list", 1)) != -1)
         return opt;
 
     /*      Idx  BE   UUID   Hdl  Sta  evch rref  BE-path */
@@ -5816,7 +5765,7 @@ int main_vtpmdetach(int argc, char **argv)
     libxl_device_vtpm vtpm;
     libxl_uuid uuid;
 
-    if ((opt = def_getopt(argc, argv, "", "vtpm-detach", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "vtpm-detach", 2)) != -1)
         return opt;
 
     domid = find_domain(argv[optind]);
@@ -6008,7 +5957,7 @@ int main_uptime(int argc, char **argv)
     int nb_doms = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "s", "uptime", 1)) != -1) {
+    while ((opt = def_getopt(argc, argv, "s", NULL, "uptime", 1)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -6035,7 +5984,7 @@ int main_tmem_list(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "al", "tmem-list", 0)) != -1) {
+    while ((opt = def_getopt(argc, argv, "al", NULL, "tmem-list", 0)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -6076,7 +6025,7 @@ int main_tmem_freeze(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "a", "tmem-freeze", 0)) != -1) {
+    while ((opt = def_getopt(argc, argv, "a", NULL, "tmem-freeze", 0)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -6109,7 +6058,7 @@ int main_tmem_thaw(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "a", "tmem-thaw", 0)) != -1) {
+    while ((opt = def_getopt(argc, argv, "a", NULL, "tmem-thaw", 0)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -6144,7 +6093,7 @@ int main_tmem_set(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "aw:c:p:", "tmem-set", 0)) != -1) {
+    while ((opt = def_getopt(argc, argv, "aw:c:p:", NULL, "tmem-set", 0)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -6205,7 +6154,7 @@ int main_tmem_shared_auth(int argc, char **argv)
     int all = 0;
     int opt;
 
-    while ((opt = def_getopt(argc, argv, "au:A:", "tmem-shared-auth", 0)) != -1) {
+    while ((opt = def_getopt(argc, argv, "au:A:", NULL, "tmem-shared-auth", 0)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
@@ -6255,7 +6204,7 @@ int main_tmem_freeable(int argc, char **argv)
     int opt;
     int mb;
 
-    if ((opt = def_getopt(argc, argv, "", "tmem-freeable", 0)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "tmem-freeable", 0)) != -1)
         return opt;
 
     mb = libxl_tmem_freeable(ctx);
@@ -6272,11 +6221,10 @@ int main_cpupoolcreate(int argc, char **argv)
     const char *p;
     char extra_config[1024];
     int opt;
-    int option_index = 0;
-    static struct option long_options[] = {
-        {"help", 0, 0, 'h'},
+    static struct option opts[] = {
         {"defconfig", 1, 0, 'f'},
         {"dryrun", 0, 0, 'n'},
+        COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
     int ret;
@@ -6294,25 +6242,17 @@ int main_cpupoolcreate(int argc, char **argv)
     libxl_bitmap cpumap;
     libxl_uuid uuid;
     libxl_cputopology *topology;
-    int rc = -ERROR_FAIL; 
+    int rc = -ERROR_FAIL;
 
-    while (1) {
-        opt = getopt_long(argc, argv, "hnf:", long_options, &option_index);
-        if (opt == -1)
-            break;
-
+    while ((opt = def_getopt(argc, argv, "hnf:", opts, "cpupool-create", 0)) != -1) {
         switch (opt) {
+        case 0: case 2:
+            return opt;
         case 'f':
             filename = optarg;
             break;
-        case 'h':
-            help("cpupool-create");
-            return 0;
         case 'n':
             dryrun_only = 1;
-            break;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
@@ -6476,10 +6416,9 @@ out:
 int main_cpupoollist(int argc, char **argv)
 {
     int opt;
-    int option_index = 0;
-    static struct option long_options[] = {
-        {"help", 0, 0, 'h'},
+    static struct option opts[] = {
         {"cpus", 0, 0, 'c'},
+        COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
     int opt_cpus = 0;
@@ -6490,28 +6429,16 @@ int main_cpupoollist(int argc, char **argv)
     char *name;
     int ret = 0;
 
-    while (1) {
-        opt = getopt_long(argc, argv, "hc", long_options, &option_index);
-        if (opt == -1)
-            break;
-
+    while ((opt = def_getopt(argc, argv, "hc", opts, "cpupool-list", 1)) != -1) {
         switch (opt) {
-        case 'h':
-            help("cpupool-list");
-            return 0;
+        case 0: case 2:
+            break;
         case 'c':
             opt_cpus = 1;
-            break;
-        default:
-            fprintf(stderr, "option `%c' not supported.\n", optopt);
             break;
         }
     }
 
-    if ((optind + 1) < argc) {
-        help("cpupool-list");
-        return -ERROR_FAIL;
-    }
     if (optind < argc) {
         pool = argv[optind];
         if (libxl_name_to_cpupoolid(ctx, pool, &poolid)) {
@@ -6569,7 +6496,7 @@ int main_cpupooldestroy(int argc, char **argv)
     const char *pool;
     uint32_t poolid;
 
-    if ((opt = def_getopt(argc, argv, "", "cpupool-destroy", 1)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "cpupool-destroy", 1)) != -1)
         return opt;
 
     pool = argv[optind];
@@ -6590,7 +6517,7 @@ int main_cpupoolrename(int argc, char **argv)
     const char *new_name;
     uint32_t poolid;
 
-    if ((opt = def_getopt(argc, argv, "", "cpupool-rename", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "cpupool-rename", 2)) != -1)
         return opt;
 
     pool = argv[optind++];
@@ -6620,7 +6547,7 @@ int main_cpupoolcpuadd(int argc, char **argv)
     int node;
     int n;
 
-    if ((opt = def_getopt(argc, argv, "", "cpupool-cpu-add", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "cpupool-cpu-add", 2)) != -1)
         return opt;
 
     pool = argv[optind++];
@@ -6664,7 +6591,7 @@ int main_cpupoolcpuremove(int argc, char **argv)
     int node;
     int n;
 
-    if ((opt = def_getopt(argc, argv, "", "cpupool-cpu-remove", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "cpupool-cpu-remove", 2)) != -1)
         return opt;
 
     pool = argv[optind++];
@@ -6707,7 +6634,7 @@ int main_cpupoolmigrate(int argc, char **argv)
     const char *dom;
     uint32_t domid;
 
-    if ((opt = def_getopt(argc, argv, "", "cpupool-migrate", 2)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "cpupool-migrate", 2)) != -1)
         return opt;
 
     dom = argv[optind++];
@@ -6747,7 +6674,7 @@ int main_cpupoolnumasplit(int argc, char **argv)
     libxl_cputopology *topology;
     libxl_dominfo info;
 
-    if ((opt = def_getopt(argc, argv, "", "cpupool-numa-split", 0)) != -1)
+    if ((opt = def_getopt(argc, argv, "", NULL, "cpupool-numa-split", 0)) != -1)
         return opt;
     ret = 0;
 
@@ -7000,7 +6927,7 @@ int main_remus(int argc, char **argv)
     r_info.blackhole = 0;
     r_info.compression = 1;
 
-    while ((opt = def_getopt(argc, argv, "bui:s:e", "remus", 2)) != -1) {
+    while ((opt = def_getopt(argc, argv, "bui:s:e", NULL, "remus", 2)) != -1) {
         switch (opt) {
         case 0: case 2:
             return opt;
