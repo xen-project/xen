@@ -470,8 +470,8 @@ install-grub: pv-grub
 install-caml: caml-stubdom
 
 install-xenstore: xenstore-stubdom
-	$(INSTALL_DIR) "$(DESTDIR)/usr/lib/xen/boot"
-	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-xenstore/mini-os.gz "$(DESTDIR)/usr/lib/xen/boot/xenstore-stubdom.gz"
+	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
+	$(INSTALL_DATA) mini-os-$(XEN_TARGET_ARCH)-xenstore/mini-os.gz "$(DESTDIR)$(XENFIRMWAREDIR)/xenstore-stubdom.gz"
 
 install-vtpm: vtpm-stubdom
 	$(INSTALL_DIR) "$(DESTDIR)$(XENFIRMWAREDIR)"
