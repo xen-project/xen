@@ -31,6 +31,7 @@
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
+#include <asm/hvm/vmx/vvmx.h>
 #include <asm/hvm/vmx/vmcs.h>
 #include <asm/flushtlb.h>
 #include <xen/event.h>
@@ -423,6 +424,13 @@ static void vmx_load_vmcs(struct vcpu *v)
 
 int vmx_cpu_up_prepare(unsigned int cpu)
 {
+    /*
+     * If nvmx_cpu_up_prepare() failed, do not return failure and just fallback
+     * to legacy mode for vvmcs synchronization.
+     */
+    if ( nvmx_cpu_up_prepare(cpu) != 0 )
+        printk("CPU%d: Could not allocate virtual VMCS buffer.\n", cpu);
+
     if ( per_cpu(vmxon_region, cpu) != NULL )
         return 0;
 
@@ -431,6 +439,7 @@ int vmx_cpu_up_prepare(unsigned int cpu)
         return 0;
 
     printk("CPU%d: Could not allocate host VMCS\n", cpu);
+    nvmx_cpu_dead(cpu);
     return -ENOMEM;
 }
 
@@ -438,6 +447,7 @@ void vmx_cpu_dead(unsigned int cpu)
 {
     vmx_free_vmcs(per_cpu(vmxon_region, cpu));
     per_cpu(vmxon_region, cpu) = NULL;
+    nvmx_cpu_dead(cpu);
 }
 
 int vmx_cpu_up(void)

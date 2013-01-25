@@ -28,7 +28,30 @@
 #include <asm/hvm/vmx/vvmx.h>
 #include <asm/hvm/nestedhvm.h>
 
+static DEFINE_PER_CPU(u64 *, vvmcs_buf);
+
 static void nvmx_purge_vvmcs(struct vcpu *v);
+
+#define VMCS_BUF_SIZE 100
+
+int nvmx_cpu_up_prepare(unsigned int cpu)
+{
+    if ( per_cpu(vvmcs_buf, cpu) != NULL )
+        return 0;
+
+    per_cpu(vvmcs_buf, cpu) = xzalloc_array(u64, VMCS_BUF_SIZE);
+
+    if ( per_cpu(vvmcs_buf, cpu) != NULL )
+        return 0;
+
+    return -ENOMEM;
+}
+
+void nvmx_cpu_dead(unsigned int cpu)
+{
+    xfree(per_cpu(vvmcs_buf, cpu));
+    per_cpu(vvmcs_buf, cpu) = NULL;
+}
 
 int nvmx_vcpu_initialise(struct vcpu *v)
 {
@@ -834,6 +857,40 @@ static void vvmcs_to_shadow(void *vvmcs, unsigned int field)
     __vmwrite(field, value);
 }
 
+static void vvmcs_to_shadow_bulk(struct vcpu *v, unsigned int n,
+                                 const u16 *field)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    void *vvmcs = nvcpu->nv_vvmcx;
+    u64 *value = this_cpu(vvmcs_buf);
+    unsigned int i;
+
+    if ( !cpu_has_vmx_vmcs_shadowing )
+        goto fallback;
+
+    if ( !value || n > VMCS_BUF_SIZE )
+    {
+        gdprintk(XENLOG_DEBUG, "vmcs sync fall back to non-bulk mode, \
+                 buffer: %p, buffer size: %d, fields number: %d.\n",
+                 value, VMCS_BUF_SIZE, n);
+        goto fallback;
+    }
+
+    virtual_vmcs_enter(vvmcs);
+    for ( i = 0; i < n; i++ )
+        value[i] = __vmread(field[i]);
+    virtual_vmcs_exit(vvmcs);
+
+    for ( i = 0; i < n; i++ )
+        __vmwrite(field[i], value[i]);
+
+    return;
+
+fallback:
+    for ( i = 0; i < n; i++ )
+        vvmcs_to_shadow(vvmcs, field[i]);
+}
+
 static void shadow_to_vvmcs(void *vvmcs, unsigned int field)
 {
     u64 value;
@@ -842,6 +899,40 @@ static void shadow_to_vvmcs(void *vvmcs, unsigned int field)
     value = __vmread_safe(field, &rc);
     if ( !rc )
         __set_vvmcs(vvmcs, field, value);
+}
+
+static void shadow_to_vvmcs_bulk(struct vcpu *v, unsigned int n,
+                                 const u16 *field)
+{
+    struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
+    void *vvmcs = nvcpu->nv_vvmcx;
+    u64 *value = this_cpu(vvmcs_buf);
+    unsigned int i;
+
+    if ( !cpu_has_vmx_vmcs_shadowing )
+        goto fallback;
+
+    if ( !value || n > VMCS_BUF_SIZE )
+    {
+        gdprintk(XENLOG_DEBUG, "vmcs sync fall back to non-bulk mode, \
+                 buffer: %p, buffer size: %d, fields number: %d.\n",
+                 value, VMCS_BUF_SIZE, n);
+        goto fallback;
+    }
+
+    for ( i = 0; i < n; i++ )
+        value[i] = __vmread(field[i]);
+
+    virtual_vmcs_enter(vvmcs);
+    for ( i = 0; i < n; i++ )
+        __vmwrite(field[i], value[i]);
+    virtual_vmcs_exit(vvmcs);
+
+    return;
+
+fallback:
+    for ( i = 0; i < n; i++ )
+        shadow_to_vvmcs(vvmcs, field[i]);
 }
 
 static void load_shadow_control(struct vcpu *v)
@@ -867,13 +958,18 @@ static void load_shadow_guest_state(struct vcpu *v)
 {
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     void *vvmcs = nvcpu->nv_vvmcx;
-    int i;
     u32 control;
     u64 cr_gh_mask, cr_read_shadow;
 
+    static const u16 vmentry_fields[] = {
+        VM_ENTRY_INTR_INFO,
+        VM_ENTRY_EXCEPTION_ERROR_CODE,
+        VM_ENTRY_INSTRUCTION_LEN,
+    };
+
     /* vvmcs.gstate to shadow vmcs.gstate */
-    for ( i = 0; i < ARRAY_SIZE(vmcs_gstate_field); i++ )
-        vvmcs_to_shadow(vvmcs, vmcs_gstate_field[i]);
+    vvmcs_to_shadow_bulk(v, ARRAY_SIZE(vmcs_gstate_field),
+                         vmcs_gstate_field);
 
     hvm_set_cr0(__get_vvmcs(vvmcs, GUEST_CR0));
     hvm_set_cr4(__get_vvmcs(vvmcs, GUEST_CR4));
@@ -887,9 +983,7 @@ static void load_shadow_guest_state(struct vcpu *v)
 
     hvm_funcs.set_tsc_offset(v, v->arch.hvm_vcpu.cache_tsc_offset);
 
-    vvmcs_to_shadow(vvmcs, VM_ENTRY_INTR_INFO);
-    vvmcs_to_shadow(vvmcs, VM_ENTRY_EXCEPTION_ERROR_CODE);
-    vvmcs_to_shadow(vvmcs, VM_ENTRY_INSTRUCTION_LEN);
+    vvmcs_to_shadow_bulk(v, ARRAY_SIZE(vmentry_fields), vmentry_fields);
 
     /*
      * While emulate CR0 and CR4 for nested virtualization, set the CR0/CR4
@@ -909,10 +1003,13 @@ static void load_shadow_guest_state(struct vcpu *v)
     if ( nvmx_ept_enabled(v) && hvm_pae_enabled(v) &&
          (v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
     {
-        vvmcs_to_shadow(vvmcs, GUEST_PDPTR0);
-        vvmcs_to_shadow(vvmcs, GUEST_PDPTR1);
-        vvmcs_to_shadow(vvmcs, GUEST_PDPTR2);
-        vvmcs_to_shadow(vvmcs, GUEST_PDPTR3);
+        static const u16 gpdptr_fields[] = {
+            GUEST_PDPTR0,
+            GUEST_PDPTR1,
+            GUEST_PDPTR2,
+            GUEST_PDPTR3,
+        };
+        vvmcs_to_shadow_bulk(v, ARRAY_SIZE(gpdptr_fields), gpdptr_fields);
     }
 
     /* TODO: CR3 target control */
@@ -1003,13 +1100,12 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
 
 static void sync_vvmcs_guest_state(struct vcpu *v, struct cpu_user_regs *regs)
 {
-    int i;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     void *vvmcs = nvcpu->nv_vvmcx;
 
     /* copy shadow vmcs.gstate back to vvmcs.gstate */
-    for ( i = 0; i < ARRAY_SIZE(vmcs_gstate_field); i++ )
-        shadow_to_vvmcs(vvmcs, vmcs_gstate_field[i]);
+    shadow_to_vvmcs_bulk(v, ARRAY_SIZE(vmcs_gstate_field),
+                         vmcs_gstate_field);
     /* RIP, RSP are in user regs */
     __set_vvmcs(vvmcs, GUEST_RIP, regs->eip);
     __set_vvmcs(vvmcs, GUEST_RSP, regs->esp);
@@ -1021,13 +1117,11 @@ static void sync_vvmcs_guest_state(struct vcpu *v, struct cpu_user_regs *regs)
 
 static void sync_vvmcs_ro(struct vcpu *v)
 {
-    int i;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     void *vvmcs = nvcpu->nv_vvmcx;
 
-    for ( i = 0; i < ARRAY_SIZE(vmcs_ro_field); i++ )
-        shadow_to_vvmcs(nvcpu->nv_vvmcx, vmcs_ro_field[i]);
+    shadow_to_vvmcs_bulk(v, ARRAY_SIZE(vmcs_ro_field), vmcs_ro_field);
 
     /* Adjust exit_reason/exit_qualifciation for violation case */
     if ( __get_vvmcs(vvmcs, VM_EXIT_REASON) == EXIT_REASON_EPT_VIOLATION )

@@ -229,5 +229,7 @@ int nept_translate_l2ga(struct vcpu *v, paddr_t l2ga,
                         unsigned int *page_order, uint32_t rwx_acc,
                         unsigned long *l1gfn, uint8_t *p2m_acc,
                         uint64_t *exit_qual, uint32_t *exit_reason);
+int nvmx_cpu_up_prepare(unsigned int cpu);
+void nvmx_cpu_dead(unsigned int cpu);
 #endif /* __ASM_X86_HVM_VVMX_H__ */
 
