@@ -167,6 +167,7 @@ endif
 	rm -rf dist patches/tmp
 	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done
 	rm -rf patches/*/.makedep
+	rm -rf config.log config.status config.cache autom4te.cache
 
 # Linux name for GNU distclean
 .PHONY: mrproper

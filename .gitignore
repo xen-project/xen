@@ -31,6 +31,7 @@ stubdom/*.tar.gz
 autom4te.cache/
 config.log
 config.status
+config.cache
 config/Toplevel.mk
 
 build-*
@@ -101,10 +102,11 @@ patches/tmp/*
 pristine-*
 ref-*
 tmp-*
-stubdom/autom4te.cache
+stubdom/autom4te.cache/
 stubdom/binutils-*
 stubdom/config.log
 stubdom/config.status
+stubdom/config.cache
 stubdom/cross-root-*
 stubdom/gcc-*
 stubdom/include
@@ -128,7 +130,7 @@ stubdom/ioemu/
 stubdom/stubdompath.sh
 stubdom/vtpm/vtpm_manager.h
 tools/*/build/lib*/*.py
-tools/autom4te.cache
+tools/autom4te.cache/
 tools/config.h
 tools/config.log
 tools/config.status

@@ -28,8 +28,9 @@
 (^|/)(GTAGS|GPATH|GSYMS|GRTAGS)$
 ^autom4te\.cache$
 ^config\.log$
-^config\.status
-^config/Toplevel\.mk
+^config\.status$
+^config\.cache$
+^config/Toplevel\.mk$
 ^build-.*$
 ^dist/.*$
 ^docs/autom4te\.cache$
@@ -101,6 +102,7 @@
 ^stubdom/binutils-.*$
 ^stubdom/config\.log$
 ^stubdom/config\.status$
+^stubdom/config\.cache$
 ^stubdom/cross-root-.*$
 ^stubdom/gcc-.*$
 ^stubdom/include$
