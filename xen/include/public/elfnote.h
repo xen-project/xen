@@ -28,6 +28,8 @@
 #define __XEN_PUBLIC_ELFNOTE_H__
 
 /*
+ * `incontents 200 elfnotes ELF notes
+ *
  * The notes should live in a PT_NOTE segment and have "Xen" in the
  * name field.
  *
