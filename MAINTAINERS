@@ -108,7 +108,6 @@ F:	xen/drivers/cpufreq/
 
 AMD IOMMU
 M:	Wei Wang <weiwang.dd@gmail.com>
-M:	Wei Huang <wei.huang2@amd.com>
 S:	Maintained
 F:	xen/drivers/passthrough/amd/
 
@@ -116,7 +115,6 @@ AMD SVM
 M:	Andre Przywara <osp@andrep.de>
 M:	Christoph Egger <Christoph_Egger@gmx.de>
 M:	Boris Ostrovsky <boris.ostrovsky@amd.com>
-M:	Wei Huang <wei.huang2@amd.com>
 S:	Supported
 F:	xen/arch/x86/hvm/svm/
 
