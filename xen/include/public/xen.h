@@ -622,6 +622,7 @@ typedef struct vcpu_info vcpu_info_t;
 #endif
 
 /*
+ * `incontents 200 startofday_shared Start-of-day shared data structure
  * Xen/kernel shared data -- pointer provided in start_info.
  *
  * This structure is defined to be both smaller than a page, and the
