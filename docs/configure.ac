@@ -6,6 +6,7 @@ AC_INIT([Xen Hypervisor Documentation], m4_esyscmd([../version.sh ../xen/Makefil
     [xen-devel@lists.xen.org], [xen], [http://www.xen.org/])
 AC_CONFIG_SRCDIR([misc/xen-command-line.markdown])
 AC_CONFIG_FILES([../config/Docs.mk])
+AC_PREFIX_DEFAULT([/usr])
 AC_CONFIG_AUX_DIR([../])
 
 # M4 Macro includes

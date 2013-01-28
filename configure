@@ -557,6 +557,7 @@ PACKAGE_BUGREPORT='xen-devel@lists.xen.org'
 PACKAGE_URL='http://www.xen.org/'
 
 ac_unique_file="./xen/common/kernel.c"
+ac_default_prefix=/usr
 enable_option_checking=no
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
@@ -1669,6 +1670,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 ac_config_files="$ac_config_files ./config/Toplevel.mk"
+
 
 
 

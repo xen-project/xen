@@ -7,6 +7,7 @@ AC_INIT([Xen Hypervisor Tools], m4_esyscmd([../version.sh ../xen/Makefile]),
 AC_CONFIG_SRCDIR([libxl/libxl.c])
 AC_CONFIG_FILES([../config/Tools.mk])
 AC_CONFIG_HEADERS([config.h])
+AC_PREFIX_DEFAULT([/usr])
 AC_CONFIG_AUX_DIR([../])
 
 # Check if CFLAGS, LDFLAGS, LIBS, CPPFLAGS or CPP is set and print a warning

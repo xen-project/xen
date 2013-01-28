@@ -6,6 +6,7 @@ AC_INIT([Xen Hypervisor Stub Domains], m4_esyscmd([../version.sh ../xen/Makefile
     [xen-devel@lists.xen.org], [xen], [http://www.xen.org/])
 AC_CONFIG_SRCDIR([../extras/mini-os/kernel.c])
 AC_CONFIG_FILES([../config/Stubdom.mk])
+AC_PREFIX_DEFAULT([/usr])
 AC_CONFIG_AUX_DIR([../])
 
 # M4 Macro includes

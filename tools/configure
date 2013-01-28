@@ -558,6 +558,7 @@ PACKAGE_BUGREPORT='xen-devel@lists.xen.org'
 PACKAGE_URL='http://www.xen.org/'
 
 ac_unique_file="libxl/libxl.c"
+ac_default_prefix=/usr
 # Factoring default headers for most tests.
 ac_includes_default="\
 #include <stdio.h>
@@ -2143,6 +2144,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 ac_config_files="$ac_config_files ../config/Tools.mk"
 
 ac_config_headers="$ac_config_headers config.h"
+
 
 ac_aux_dir=
 for ac_dir in ../ "$srcdir"/../; do
