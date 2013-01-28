@@ -208,6 +208,18 @@ void unmap_domain_page(const void *va)
     local_irq_restore(flags);
 }
 
+unsigned long domain_page_map_to_mfn(const void *va)
+{
+    lpae_t *map = xen_second + second_linear_offset(DOMHEAP_VIRT_START);
+    int slot = ((unsigned long) va - DOMHEAP_VIRT_START) >> SECOND_SHIFT;
+    unsigned long offset = ((unsigned long)va>>THIRD_SHIFT) & LPAE_ENTRY_MASK;
+
+    ASSERT(slot >= 0 && slot < DOMHEAP_ENTRIES);
+    ASSERT(map[slot].pt.avail != 0);
+
+    return map[slot].pt.base + offset;
+}
+
 void __init arch_init_memory(void)
 {
     /*
