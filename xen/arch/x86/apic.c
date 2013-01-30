@@ -1042,7 +1042,7 @@ __next:
  *****************************************************************************/
 
 /* used for system time scaling */
-static u32 __read_mostly bus_scale; /* scaling factor convert ns to bus cycles */
+static u32 __read_mostly bus_scale; /* scaling factor: ns -> bus cycles */
 
 /*
  * The timer chip is already set up at HZ interrupts per second here,

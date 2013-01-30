@@ -98,8 +98,10 @@ static DEFINE_SPINLOCK(console_lock);
 
 static int __read_mostly xenlog_upper_thresh = XENLOG_UPPER_THRESHOLD;
 static int __read_mostly xenlog_lower_thresh = XENLOG_LOWER_THRESHOLD;
-static int __read_mostly xenlog_guest_upper_thresh = XENLOG_GUEST_UPPER_THRESHOLD;
-static int __read_mostly xenlog_guest_lower_thresh = XENLOG_GUEST_LOWER_THRESHOLD;
+static int __read_mostly xenlog_guest_upper_thresh =
+    XENLOG_GUEST_UPPER_THRESHOLD;
+static int __read_mostly xenlog_guest_lower_thresh =
+    XENLOG_GUEST_LOWER_THRESHOLD;
 
 static void parse_loglvl(char *s);
 static void parse_guest_loglvl(char *s);
@@ -309,7 +311,7 @@ static struct keyhandler dump_console_ring_keyhandler = {
 
 /* CTRL-<switch_char> switches input direction between Xen and DOM0. */
 #define switch_code (opt_conswitch[0]-'a'+1)
-static int __read_mostly xen_rx = 1; /* FALSE => serial input passed to domain 0. */
+static int __read_mostly xen_rx = 1; /* FALSE => input passed to domain 0. */
 
 static void switch_serial_input(void)
 {
@@ -625,7 +627,7 @@ void __init console_init_preirq(void)
 void __init console_init_postirq(void)
 {
     char *ring;
-    unsigned int i, order;
+    unsigned int i, order, memflags;
 
     serial_init_postirq();
 
@@ -633,7 +635,8 @@ void __init console_init_postirq(void)
         opt_conring_size = num_present_cpus() << (9 + xenlog_lower_thresh);
 
     order = get_order_from_bytes(max(opt_conring_size, conring_size));
-    while ( (ring = alloc_xenheap_pages(order, MEMF_bits(crashinfo_maxaddr_bits))) == NULL )
+    memflags = MEMF_bits(crashinfo_maxaddr_bits);
+    while ( (ring = alloc_xenheap_pages(order, memflags)) == NULL )
     {
         BUG_ON(order == 0);
         order--;
