@@ -1068,20 +1068,18 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
 
         if ( paging_mode_hap(v->domain) )
         {
-            /* We manage GUEST_CR3 when guest CR0.PE is zero or when cr3 memevents are on */            
+            /* Manage GUEST_CR3 when CR0.PE=0. */
             uint32_t cr3_ctls = (CPU_BASED_CR3_LOAD_EXITING |
                                  CPU_BASED_CR3_STORE_EXITING);
             v->arch.hvm_vmx.exec_control &= ~cr3_ctls;
             if ( !hvm_paging_enabled(v) )
                 v->arch.hvm_vmx.exec_control |= cr3_ctls;
 
+            /* Trap CR3 updates if CR3 memory events are enabled. */
             if ( v->domain->arch.hvm_domain.params[HVM_PARAM_MEMORY_EVENT_CR3] )
                 v->arch.hvm_vmx.exec_control |= CPU_BASED_CR3_LOAD_EXITING;
 
             vmx_update_cpu_exec_control(v);
-
-            /* Changing CR0.PE can change some bits in real CR4. */
-            vmx_update_guest_cr(v, 4);
         }
 
         if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
@@ -1111,8 +1109,6 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
             {
                 for ( s = x86_seg_cs ; s <= x86_seg_tr ; s++ )
                     vmx_set_segment_register(v, s, &reg[s]);
-                v->arch.hvm_vcpu.hw_cr[4] |= X86_CR4_VME;
-                __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
                 v->arch.hvm_vmx.exception_bitmap = 0xffffffff;
                 vmx_update_exception_bitmap(v);
             }
@@ -1122,10 +1118,6 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
                     if ( !(v->arch.hvm_vmx.vm86_segment_mask & (1<<s)) )
                         vmx_set_segment_register(
                             v, s, &v->arch.hvm_vmx.vm86_saved_seg[s]);
-                v->arch.hvm_vcpu.hw_cr[4] =
-                    ((v->arch.hvm_vcpu.hw_cr[4] & ~X86_CR4_VME)
-                     |(v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_VME));
-                __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
                 v->arch.hvm_vmx.exception_bitmap = HVM_TRAP_MASK
                           | (paging_mode_hap(v->domain) ?
                              0 : (1U << TRAP_page_fault))
@@ -1139,6 +1131,9 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
             v->arch.hvm_vcpu.guest_cr[0] | hw_cr0_mask;
         __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
         __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
+
+        /* Changing CR0 can change some bits in real CR4. */
+        vmx_update_guest_cr(v, 4);
         break;
     }
     case 2:
