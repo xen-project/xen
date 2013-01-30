@@ -1068,6 +1068,28 @@ static int flask_remove_from_physmap(struct domain *d1, struct domain *d2)
     return domain_has_perm(d1, d2, SECCLASS_MMU, MMU__PHYSMAP);
 }
 
+static int flask_hvm_param(struct domain *d, unsigned long op)
+{
+    u32 perm;
+
+    switch ( op )
+    {
+    case HVMOP_set_param:
+        perm = HVM__SETPARAM;
+        break;
+    case HVMOP_get_param:
+        perm = HVM__GETPARAM;
+        break;
+    case HVMOP_track_dirty_vram:
+        perm = HVM__TRACKDIRTYVRAM;
+        break;
+    default:
+        perm = HVM__HVMCTL;
+    }
+
+    return current_has_perm(d, SECCLASS_HVM, perm);
+}
+
 #ifdef CONFIG_X86
 static int flask_shadow_control(struct domain *d, uint32_t op)
 {
@@ -1146,28 +1168,6 @@ static int flask_ioport_permission(struct domain *d, uint32_t start, uint32_t en
 static int flask_ioport_mapping(struct domain *d, uint32_t start, uint32_t end, uint8_t access)
 {
     return flask_ioport_permission(d, start, end, access);
-}
-
-static int flask_hvm_param(struct domain *d, unsigned long op)
-{
-    u32 perm;
-
-    switch ( op )
-    {
-    case HVMOP_set_param:
-        perm = HVM__SETPARAM;
-        break;
-    case HVMOP_get_param:
-        perm = HVM__GETPARAM;
-        break;
-    case HVMOP_track_dirty_vram:
-        perm = HVM__TRACKDIRTYVRAM;
-        break;
-    default:
-        perm = HVM__HVMCTL;
-    }
-
-    return current_has_perm(d, SECCLASS_HVM, perm);
 }
 
 static int flask_hvm_set_pci_intx_level(struct domain *d)
@@ -1503,6 +1503,7 @@ static struct xsm_operations flask_ops = {
     .page_offline = flask_page_offline,
     .tmem_op = flask_tmem_op,
     .tmem_control = flask_tmem_control,
+    .hvm_param = flask_hvm_param,
 
     .do_xsm_op = do_flask_op,
 
@@ -1511,7 +1512,6 @@ static struct xsm_operations flask_ops = {
 
 #ifdef CONFIG_X86
     .shadow_control = flask_shadow_control,
-    .hvm_param = flask_hvm_param,
     .hvm_set_pci_intx_level = flask_hvm_set_pci_intx_level,
     .hvm_set_isa_irq_level = flask_hvm_set_isa_irq_level,
     .hvm_set_pci_link_route = flask_hvm_set_pci_link_route,

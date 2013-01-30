@@ -30,9 +30,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( a.index >= HVM_NR_PARAMS )
             return -EINVAL;
 
-        rc = rcu_lock_target_domain_by_id(a.domid, &d);
-        if ( rc != 0 )
-            return rc;
+        d = rcu_lock_domain_by_any_id(a.domid);
+        if ( d == NULL )
+            return -ESRCH;
+
+        rc = xsm_hvm_param(XSM_TARGET, d, op);
+        if ( rc )
+            goto param_fail;
 
         if ( op == HVMOP_set_param )
         {
@@ -44,6 +48,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             rc = copy_to_guest(arg, &a, 1) ? -EFAULT : 0;
         }
 
+    param_fail:
         rcu_unlock_domain(d);
         break;
     }

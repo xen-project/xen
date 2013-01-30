@@ -129,9 +129,10 @@ struct xsm_operations {
 
     long (*do_xsm_op) (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op);
 
+    int (*hvm_param) (struct domain *d, unsigned long op);
+
 #ifdef CONFIG_X86
     int (*shadow_control) (struct domain *d, uint32_t op);
-    int (*hvm_param) (struct domain *d, unsigned long op);
     int (*hvm_set_pci_intx_level) (struct domain *d);
     int (*hvm_set_isa_irq_level) (struct domain *d);
     int (*hvm_set_pci_link_route) (struct domain *d);
@@ -487,15 +488,15 @@ static inline long xsm_do_xsm_op (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
     return xsm_ops->do_xsm_op(op);
 }
 
+static inline int xsm_hvm_param (xsm_default_t def, struct domain *d, unsigned long op)
+{
+    return xsm_ops->hvm_param(d, op);
+}
+
 #ifdef CONFIG_X86
 static inline int xsm_shadow_control (xsm_default_t def, struct domain *d, uint32_t op)
 {
     return xsm_ops->shadow_control(d, op);
-}
-
-static inline int xsm_hvm_param (xsm_default_t def, struct domain *d, unsigned long op)
-{
-    return xsm_ops->hvm_param(d, op);
 }
 
 static inline int xsm_hvm_set_pci_intx_level (xsm_default_t def, struct domain *d)
