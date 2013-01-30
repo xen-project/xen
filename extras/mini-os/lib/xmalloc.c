@@ -267,7 +267,12 @@ void xfree(const void *p)
     /* spin_unlock_irqrestore(&freelist_lock, flags); */
 }
 
-void *_realloc(void *ptr, size_t size)
+void *malloc(size_t size)
+{
+    return _xmalloc(size, DEFAULT_ALIGN);
+}
+
+void *realloc(void *ptr, size_t size)
 {
     void *new;
     struct xmalloc_hdr *hdr;
@@ -295,6 +300,11 @@ void *_realloc(void *ptr, size_t size)
     xfree(ptr);
 
     return new;
+}
+
+void free(void *ptr)
+{
+    xfree(ptr);
 }
 #endif
 

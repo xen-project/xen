@@ -12,4 +12,8 @@
 
 #include <arch_wordsize.h>
 
+#define BYTE_ORDER __BYTE_ORDER
+#define BIG_ENDIAN __BIG_ENDIAN
+#define LITTLE_ENDIAN __LITTLE_ENDIAN
+
 #endif	/* endian.h */

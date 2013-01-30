@@ -14,16 +14,16 @@
 #include <limits.h>
 
 #define DEFAULT_ALIGN (sizeof(unsigned long))
-#define malloc(size) _xmalloc(size, DEFAULT_ALIGN)
-#define free(ptr) xfree(ptr)
-#define realloc(ptr, size) _realloc(ptr, size)
 
-/* Free any of the above. */
+extern void *malloc(size_t size);
+extern void *realloc(void *ptr, size_t size);
+extern void free(void *ptr);
+
+/* Free memory from any xmalloc*() call. */
 extern void xfree(const void *);
 
 /* Underlying functions */
 extern void *_xmalloc(size_t size, size_t align);
-extern void *_realloc(void *ptr, size_t size);
 
 #endif
 

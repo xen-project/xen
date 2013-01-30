@@ -19,7 +19,7 @@ This includes:
 
 - to build it just type make.
 
-- to build it with TCP/IP support, download LWIP 1.3 source code and type
+- to build it with TCP/IP support, download LWIP 1.3.2 source code and type
 
   make LWIPDIR=/path/to/lwip/source
 
