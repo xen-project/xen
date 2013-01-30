@@ -62,15 +62,10 @@ asmlinkage void __div0(void)
 static void print_xen_info(void)
 {
     char taint_str[TAINT_STRING_MAX_LEN];
-    char debug = 'n';
-
-#ifndef NDEBUG
-    debug = 'y';
-#endif
 
     printk("----[ Xen-%d.%d%s  arm32  debug=%c  %s ]----\n",
            xen_major_version(), xen_minor_version(), xen_extra_version(),
-           debug, print_tainted(taint_str));
+           debug_build() ? 'y' : 'n', print_tainted(taint_str));
 }
 
 uint32_t *select_user_reg(struct cpu_user_regs *regs, int reg)

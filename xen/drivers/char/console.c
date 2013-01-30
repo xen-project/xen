@@ -577,11 +577,6 @@ void __init console_init_preirq(void)
 {
     char *p;
     int sh;
-#ifndef NDEBUG
-    char debug = 'y';
-#else
-    char debug = 'n';
-#endif
 
     serial_init_preirq();
 
@@ -616,7 +611,7 @@ void __init console_init_preirq(void)
     printk("Xen version %d.%d%s (%s@%s) (%s) debug=%c %s\n",
            xen_major_version(), xen_minor_version(), xen_extra_version(),
            xen_compile_by(), xen_compile_domain(),
-           xen_compiler(), debug, xen_compile_date());
+           xen_compiler(), debug_build() ? 'y' : 'n', xen_compile_date());
     printk("Latest ChangeSet: %s\n", xen_changeset());
 
     if ( opt_sync_console )

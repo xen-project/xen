@@ -28,15 +28,10 @@
 static void print_xen_info(void)
 {
     char taint_str[TAINT_STRING_MAX_LEN];
-    char debug = 'n';
-
-#ifndef NDEBUG
-    debug = 'y';
-#endif
 
     printk("----[ Xen-%d.%d%s  x86_64  debug=%c  %s ]----\n",
            xen_major_version(), xen_minor_version(), xen_extra_version(),
-           debug, print_tainted(taint_str));
+           debug_build() ? 'y' : 'n', print_tainted(taint_str));
 }
 
 enum context { CTXT_hypervisor, CTXT_pv_guest, CTXT_hvm_guest };
