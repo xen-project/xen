@@ -1705,7 +1705,7 @@ int nvmx_handle_invept(struct cpu_user_regs *regs)
     {
     case INVEPT_SINGLE_CONTEXT:
     {
-        struct p2m_domain *p2m = vcpu_nestedhvm(current).nv_p2m;
+        struct p2m_domain *p2m = p2m_get_nestedp2m(current, eptp);
         if ( p2m )
         {
             p2m_flush(current, p2m);
