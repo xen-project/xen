@@ -1076,6 +1076,14 @@ uint64_t get_shadow_eptp(struct vcpu *v)
     return ept_get_eptp(ept);
 }
 
+static uint64_t get_host_eptp(struct vcpu *v)
+{
+    struct domain *d = v->domain;
+    struct ept_data *ept_data = &p2m_get_hostp2m(d)->ept;
+
+    return ept_get_eptp(ept_data);
+}
+
 static bool_t nvmx_vpid_enabled(struct nestedvcpu *nvcpu)
 {
     uint32_t second_cntl;
@@ -1159,6 +1167,8 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     /* Setup virtual ETP for L2 guest*/
     if ( nestedhvm_paging_mode_hap(v) )
         __vmwrite(EPT_POINTER, get_shadow_eptp(v));
+    else
+        __vmwrite(EPT_POINTER, get_host_eptp(v));
 
     /* nested VPID support! */
     if ( cpu_has_vmx_vpid && nvmx_vpid_enabled(nvcpu) )
