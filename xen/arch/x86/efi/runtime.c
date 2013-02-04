@@ -189,16 +189,9 @@ int efi_get_info(uint32_t idx, union xenpf_efi_info *info)
                  info->pci_rom.vendor == ent->vendor &&
                  info->pci_rom.devid == ent->devid )
             {
-                int rc = 0;
-
-                if ( info->pci_rom.size < ent->size )
-                    rc = -ENOSPC;
-                else if ( copy_to_guest(info->pci_rom.data,
-                                        ent->data, ent->size) )
-                    rc = -EFAULT;
+                info->pci_rom.address = __pa(ent->data);
                 info->pci_rom.size = ent->size;
-
-                return rc;
+                return 0;
             }
         return -ESRCH;
     }

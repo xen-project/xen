@@ -274,9 +274,9 @@ struct xenpf_firmware_info {
                 uint8_t devfn;
                 uint16_t vendor;
                 uint16_t devid;
-                /* IN/OUT variables */
+                /* OUT variables */
+                uint64_t address;
                 xen_ulong_t size;
-                XEN_GUEST_HANDLE(void) data;
             } pci_rom;
         } efi_info; /* XEN_FW_EFI_INFO */
 
