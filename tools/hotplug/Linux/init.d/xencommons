@@ -117,7 +117,9 @@ do_start () {
 	test "`uname`" != "NetBSD" || xenbackendd $XENBACKENDD_ARGS
 	echo Starting QEMU as disk backend for dom0
 	test -z "$QEMU_XEN" && QEMU_XEN=/usr/lib/xen/bin/qemu-system-i386
-	$QEMU_XEN -xen-domid 0 -xen-attach -name dom0 -nographic -M xenpv -daemonize -monitor /dev/null -pidfile $QEMU_PIDFILE
+	$QEMU_XEN -xen-domid 0 -xen-attach -name dom0 -nographic -M xenpv -daemonize \
+		-monitor /dev/null -serial /dev/null -parallel /dev/null \
+		-pidfile $QEMU_PIDFILE
 }
 do_stop () {
         echo Stopping xenconsoled
