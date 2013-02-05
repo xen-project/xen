@@ -1677,9 +1677,6 @@ int map_domain_pirq(
         d->arch.pirq_irq[pirq] = irq;
         d->arch.irq_pirq[irq] = pirq;
         spin_unlock_irqrestore(&desc->lock, flags);
-
-        if ( opt_irq_vector_map == OPT_IRQ_VECTOR_MAP_PERDEV )
-            printk(XENLOG_INFO "Per-device vector maps for GSIs not implemented yet.\n");
     }
 
 done:
