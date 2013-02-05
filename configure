@@ -568,6 +568,14 @@ tools
 kernels
 xen
 subdirs
+host_os
+host_vendor
+host_cpu
+host
+build_os
+build_vendor
+build_cpu
+build
 target_alias
 host_alias
 build_alias
@@ -1220,6 +1228,10 @@ Fine tuning of the installation directories:
 _ACEOF
 
   cat <<\_ACEOF
+
+System types:
+  --build=BUILD     configure for building on BUILD [guessed]
+  --host=HOST       cross-compile to build programs to run on HOST [BUILD]
 _ACEOF
 fi
 
@@ -1236,7 +1248,7 @@ Optional Features:
   --disable-xen           Disable build and install of xen
   --disable-kernels       Disable build and install of kernels
   --disable-tools         Disable build and install of tools
-  --disable-stubdom       Disable build and install of stubdom
+  --enable-stubdom        Enable build and install of stubdom
   --disable-docs          Disable build and install of docs
 
 Report bugs to <xen-devel@lists.xen.org>.
@@ -1673,20 +1685,6 @@ ac_config_files="$ac_config_files ./config/Toplevel.mk"
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ac_aux_dir=
 for ac_dir in "$srcdir" "$srcdir/.." "$srcdir/../.."; do
   if test -f "$ac_dir/install-sh"; then
@@ -1716,22 +1714,151 @@ ac_config_sub="$SHELL $ac_aux_dir/config.sub"  # Please don't use this var.
 ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 
+# Make sure we can run config.sub.
+$SHELL "$ac_aux_dir/config.sub" sun4 >/dev/null 2>&1 ||
+  as_fn_error $? "cannot run $SHELL $ac_aux_dir/config.sub" "$LINENO" 5
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking build system type" >&5
+$as_echo_n "checking build system type... " >&6; }
+if test "${ac_cv_build+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_build_alias=$build_alias
+test "x$ac_build_alias" = x &&
+  ac_build_alias=`$SHELL "$ac_aux_dir/config.guess"`
+test "x$ac_build_alias" = x &&
+  as_fn_error $? "cannot guess build type; you must specify one" "$LINENO" 5
+ac_cv_build=`$SHELL "$ac_aux_dir/config.sub" $ac_build_alias` ||
+  as_fn_error $? "$SHELL $ac_aux_dir/config.sub $ac_build_alias failed" "$LINENO" 5
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_build" >&5
+$as_echo "$ac_cv_build" >&6; }
+case $ac_cv_build in
+*-*-*) ;;
+*) as_fn_error $? "invalid value of canonical build" "$LINENO" 5 ;;
+esac
+build=$ac_cv_build
+ac_save_IFS=$IFS; IFS='-'
+set x $ac_cv_build
+shift
+build_cpu=$1
+build_vendor=$2
+shift; shift
+# Remember, the first character of IFS is used to create $*,
+# except with old shells:
+build_os=$*
+IFS=$ac_save_IFS
+case $build_os in *\ *) build_os=`echo "$build_os" | sed 's/ /-/g'`;; esac
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking host system type" >&5
+$as_echo_n "checking host system type... " >&6; }
+if test "${ac_cv_host+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "x$host_alias" = x; then
+  ac_cv_host=$ac_cv_build
+else
+  ac_cv_host=`$SHELL "$ac_aux_dir/config.sub" $host_alias` ||
+    as_fn_error $? "$SHELL $ac_aux_dir/config.sub $host_alias failed" "$LINENO" 5
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_host" >&5
+$as_echo "$ac_cv_host" >&6; }
+case $ac_cv_host in
+*-*-*) ;;
+*) as_fn_error $? "invalid value of canonical host" "$LINENO" 5 ;;
+esac
+host=$ac_cv_host
+ac_save_IFS=$IFS; IFS='-'
+set x $ac_cv_host
+shift
+host_cpu=$1
+host_vendor=$2
+shift; shift
+# Remember, the first character of IFS is used to create $*,
+# except with old shells:
+host_os=$*
+IFS=$ac_save_IFS
+case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+case "$host_cpu" in
+    i[3456]86|x86_64)
+        arch_enable_stubdom=y
+        ;;
+    *)
+        arch_enable_stubdom=n
+        ;;
+esac
+
 
 
 
 # Check whether --enable-xen was given.
 if test "${enable_xen+set}" = set; then :
   enableval=$enable_xen;
-xen=n
 
-else
+if test "x$enableval" = "xyes"; then :
+
 
 xen=y
 SUBSYSTEMS="$SUBSYSTEMS xen"
+
+
+else
+
+if test "x$enableval" = "xno"; then :
+
+
+xen=n
+
+
+fi
+
+fi
+
+
+else
+
+
+xen=y
+SUBSYSTEMS="$SUBSYSTEMS xen"
+
+
+fi
+
+
 if test -e "xen/configure"; then :
 
-subdirs="$subdirs xen"
-
+if test "x$xen" = "xy" || test "x$xen" = "x" ; then
+    subdirs="$subdirs xen"
 
 fi
 
@@ -1743,16 +1870,41 @@ fi
 # Check whether --enable-kernels was given.
 if test "${enable_kernels+set}" = set; then :
   enableval=$enable_kernels;
-kernels=n
 
-else
+if test "x$enableval" = "xyes"; then :
+
 
 kernels=y
 SUBSYSTEMS="$SUBSYSTEMS kernels"
+
+
+else
+
+if test "x$enableval" = "xno"; then :
+
+
+kernels=n
+
+
+fi
+
+fi
+
+
+else
+
+
+kernels=y
+SUBSYSTEMS="$SUBSYSTEMS kernels"
+
+
+fi
+
+
 if test -e "kernels/configure"; then :
 
-subdirs="$subdirs kernels"
-
+if test "x$kernels" = "xy" || test "x$kernels" = "x" ; then
+    subdirs="$subdirs kernels"
 
 fi
 
@@ -1764,16 +1916,41 @@ fi
 # Check whether --enable-tools was given.
 if test "${enable_tools+set}" = set; then :
   enableval=$enable_tools;
-tools=n
 
-else
+if test "x$enableval" = "xyes"; then :
+
 
 tools=y
 SUBSYSTEMS="$SUBSYSTEMS tools"
+
+
+else
+
+if test "x$enableval" = "xno"; then :
+
+
+tools=n
+
+
+fi
+
+fi
+
+
+else
+
+
+tools=y
+SUBSYSTEMS="$SUBSYSTEMS tools"
+
+
+fi
+
+
 if test -e "tools/configure"; then :
 
-subdirs="$subdirs tools"
-
+if test "x$tools" = "xy" || test "x$tools" = "x" ; then
+    subdirs="$subdirs tools"
 
 fi
 
@@ -1785,46 +1962,111 @@ fi
 # Check whether --enable-stubdom was given.
 if test "${enable_stubdom+set}" = set; then :
   enableval=$enable_stubdom;
-stubdom=n
 
-else
+if test "x$enableval" = "xyes"; then :
+
 
 stubdom=y
 SUBSYSTEMS="$SUBSYSTEMS stubdom"
+
+
+else
+
+if test "x$enableval" = "xno"; then :
+
+
+stubdom=n
+
+
+fi
+
+fi
+
+
+else
+
+if test "x$arch_enable_stubdom" = "xy"; then :
+
+
+stubdom=y
+SUBSYSTEMS="$SUBSYSTEMS stubdom"
+
+
+else
+
+
+stubdom=n
+
+
+fi
+
 if test -e "stubdom/configure"; then :
 
-subdirs="$subdirs stubdom"
-
-
-fi
+if test "x$stubdom" = "xy" || test "x$stubdom" = "x" ; then
+    subdirs="$subdirs stubdom"
 
 fi
 
+fi
+
+
+
+fi
 
 
 
 # Check whether --enable-docs was given.
 if test "${enable_docs+set}" = set; then :
   enableval=$enable_docs;
-docs=n
 
-else
+if test "x$enableval" = "xyes"; then :
+
 
 docs=y
 SUBSYSTEMS="$SUBSYSTEMS docs"
+
+
+else
+
+if test "x$enableval" = "xno"; then :
+
+
+docs=n
+
+
+fi
+
+fi
+
+
+else
+
+
+docs=y
+SUBSYSTEMS="$SUBSYSTEMS docs"
+
+
+fi
+
+
 if test -e "docs/configure"; then :
 
-subdirs="$subdirs docs"
-
-
-fi
+if test "x$docs" = "xy" || test "x$docs" = "x" ; then
+    subdirs="$subdirs docs"
 
 fi
 
+fi
 
 
 
 
+
+
+echo "Will build the following subsystems:"
+for x in $SUBSYSTEMS; do
+	echo "  $x"
+done
 
 
 cat >confcache <<\_ACEOF
