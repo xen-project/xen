@@ -22,6 +22,7 @@
 #include <xen/errno.h>
 #include <xen/acpi.h>
 #include <asm/apicdef.h>
+#include <asm/io_apic.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 
@@ -637,6 +638,7 @@ static u16 __init parse_ivhd_device_special(
     u16 header_length, u16 block_length, struct amd_iommu *iommu)
 {
     u16 dev_length, bdf;
+    int apic;
 
     dev_length = sizeof(*special);
     if ( header_length < (block_length + dev_length) )
@@ -657,9 +659,53 @@ static u16 __init parse_ivhd_device_special(
     switch ( special->variety )
     {
     case ACPI_IVHD_IOAPIC:
-    /* set device id of ioapic */
-        ioapic_sbdf[special->handle].bdf = bdf;
-        ioapic_sbdf[special->handle].seg = seg;
+        /*
+         * Some BIOSes have IOAPIC broken entries so we check for IVRS
+         * consistency here --- whether entry's IOAPIC ID is valid and
+         * whether there are conflicting/duplicated entries.
+         */
+        for ( apic = 0; apic < nr_ioapics; apic++ )
+        {
+            if ( IO_APIC_ID(apic) != special->handle )
+                continue;
+
+            if ( ioapic_sbdf[special->handle].pin_setup )
+            {
+                if ( ioapic_sbdf[special->handle].bdf == bdf &&
+                     ioapic_sbdf[special->handle].seg == seg )
+                    AMD_IOMMU_DEBUG("IVHD Warning: Duplicate IO-APIC %#x entries\n",
+                                    special->handle);
+                else
+                {
+                    printk(XENLOG_ERR "IVHD Error: Conflicting IO-APIC %#x entries\n",
+                           special->handle);
+                    if ( amd_iommu_perdev_intremap )
+                        return 0;
+                }
+            }
+            else
+            {
+                /* set device id of ioapic */
+                ioapic_sbdf[special->handle].bdf = bdf;
+                ioapic_sbdf[special->handle].seg = seg;
+
+                ioapic_sbdf[special->handle].pin_setup = xzalloc_array(
+                    unsigned long, BITS_TO_LONGS(nr_ioapic_entries[apic]));
+                if ( nr_ioapic_entries[apic] &&
+                     !ioapic_sbdf[IO_APIC_ID(apic)].pin_setup )
+                {
+                    printk(XENLOG_ERR "IVHD Error: Out of memory\n");
+                    return 0;
+                }
+            }
+            break;
+        }
+        if ( apic == nr_ioapics )
+        {
+            printk(XENLOG_ERR "IVHD Error: Invalid IO-APIC %#x\n",
+                   special->handle);
+            return 0;
+        }
         break;
     case ACPI_IVHD_HPET:
         /* set device id of hpet */

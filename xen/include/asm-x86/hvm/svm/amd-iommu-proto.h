@@ -101,6 +101,7 @@ int amd_setup_hpet_msi(struct msi_desc *msi_desc);
 
 extern struct ioapic_sbdf {
     u16 bdf, seg;
+    unsigned long *pin_setup;
 } ioapic_sbdf[MAX_IO_APICS];
 extern void *shared_intremap_table;
 
