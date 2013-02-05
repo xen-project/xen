@@ -437,20 +437,17 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
 fail:
     d->is_dying = DOMDYING_dead;
-    free_xenheap_page(d->shared_info);
-
-    p2m_teardown(d);
-
-    domain_vgic_free(d);
-    domain_uart0_free(d);
+    arch_domain_destroy(d);
 
     return rc;
 }
 
 void arch_domain_destroy(struct domain *d)
 {
-    /* p2m_destroy */
-    /* domain_vgic_destroy */
+    p2m_teardown(d);
+    domain_vgic_free(d);
+    domain_uart0_free(d);
+    free_xenheap_page(d->shared_info);
 }
 
 static int is_guest_psr(uint32_t psr)
