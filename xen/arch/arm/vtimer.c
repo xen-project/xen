@@ -65,6 +65,12 @@ int vcpu_vtimer_init(struct vcpu *v)
     return 0;
 }
 
+void vcpu_timer_destroy(struct vcpu *v)
+{
+    kill_timer(&v->arch.virt_timer.timer);
+    kill_timer(&v->arch.phys_timer.timer);
+}
+
 int virt_timer_save(struct vcpu *v)
 {
     v->arch.virt_timer.ctl = READ_CP32(CNTV_CTL);

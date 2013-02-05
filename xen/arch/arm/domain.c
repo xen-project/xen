@@ -399,6 +399,7 @@ int vcpu_initialise(struct vcpu *v)
 
 void vcpu_destroy(struct vcpu *v)
 {
+    vcpu_timer_destroy(v);
     free_xenheap_pages(v->arch.stack, STACK_ORDER);
 }
 
