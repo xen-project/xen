@@ -8,6 +8,7 @@
 #include <xen/bitops.h>
 
 #include <asm/current.h>
+#include <asm/event.h>
 #include <asm/regs.h>
 #include <asm/p2m.h>
 #include <asm/irq.h>
@@ -514,11 +515,51 @@ void arch_vcpu_reset(struct vcpu *v)
     vcpu_end_shutdown_deferral(v);
 }
 
+static int relinquish_memory(struct domain *d, struct page_list_head *list)
+{
+    struct page_info *page, *tmp;
+    int               ret = 0;
+
+    /* Use a recursive lock, as we may enter 'free_domheap_page'. */
+    spin_lock_recursive(&d->page_alloc_lock);
+
+    page_list_for_each_safe( page, tmp, list )
+    {
+        /* Grab a reference to the page so it won't disappear from under us. */
+        if ( unlikely(!get_page(page, d)) )
+            /* Couldn't get a reference -- someone is freeing this page. */
+            BUG();
+
+        if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
+            put_page(page);
+
+        put_page(page);
+
+        if ( hypercall_preempt_check() )
+        {
+            ret = -EAGAIN;
+            goto out;
+        }
+    }
+
+  out:
+    spin_unlock_recursive(&d->page_alloc_lock);
+    return ret;
+}
+
 int domain_relinquish_resources(struct domain *d)
 {
-    /* XXX teardown pagetables, free pages etc */
-    ASSERT(0);
-    return 0;
+    int ret = 0;
+
+    ret = relinquish_memory(d, &d->xenpage_list);
+    if ( ret )
+        return ret;
+
+    ret = relinquish_memory(d, &d->page_list);
+    if ( ret )
+        return ret;
+
+    return ret;
 }
 
 void arch_dump_domain_info(struct domain *d)
