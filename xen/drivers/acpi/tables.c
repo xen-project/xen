@@ -265,7 +265,7 @@ acpi_table_parse_madt(enum acpi_madt_type id,
  * @handler: handler to run
  *
  * Scan the ACPI System Descriptor Table (STD) for a table matching @id,
- * run @handler on it.  Return 0 if table found, return on if not.
+ * run @handler on it.
  */
 int __init acpi_table_parse(char *id, acpi_table_handler handler)
 {
@@ -280,8 +280,7 @@ int __init acpi_table_parse(char *id, acpi_table_handler handler)
 		acpi_get_table(id, 0, &table);
 
 	if (table) {
-		handler(table);
-		return 0;
+		return handler(table);
 	} else
 		return 1;
 }
