@@ -6,7 +6,6 @@ AC_INIT([Xen Hypervisor], m4_esyscmd([./version.sh ./xen/Makefile]),
     [xen-devel@lists.xen.org], [xen], [http://www.xen.org/])
 AC_CONFIG_SRCDIR([./xen/common/kernel.c])
 AC_CONFIG_FILES([./config/Toplevel.mk])
-AC_PREFIX_DEFAULT([/usr])
 
 AC_CANONICAL_HOST
 

@@ -557,7 +557,6 @@ PACKAGE_BUGREPORT='xen-devel@lists.xen.org'
 PACKAGE_URL='http://www.xen.org/'
 
 ac_unique_file="misc/xen-command-line.markdown"
-ac_default_prefix=/usr
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 MARKDOWN
@@ -1663,7 +1662,6 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 ac_config_files="$ac_config_files ../config/Docs.mk"
-
 
 ac_aux_dir=
 for ac_dir in ../ "$srcdir"/../; do
