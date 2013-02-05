@@ -7,6 +7,7 @@ OCAMLMKLIB ?= ocamlmklib
 OCAMLDEP ?= ocamldep
 OCAMLLEX ?= ocamllex
 OCAMLYACC ?= ocamlyacc
+OCAMLFIND ?= ocamlfind
 
 CFLAGS += -fPIC -Werror -I$(shell ocamlc -where)
 
@@ -16,6 +17,6 @@ OCAMLCFLAGS += -g $(OCAMLINCLUDE) -w F -warn-error F
 
 VERSION := 4.1
 
-OCAMLDESTDIR ?= $(DESTDIR)$(shell ocamlfind printconf destdir)
+OCAMLDESTDIR ?= $(DESTDIR)$(shell $(OCAMLFIND) printconf destdir)
 
 o= >$@.new && mv -f $@.new $@

@@ -36,12 +36,12 @@ xenstore.cmo : $(foreach obj, $(OBJS), $(obj).cmo)
 .PHONY: install
 install: $(LIBS) META
 	mkdir -p $(OCAMLDESTDIR)
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xenstore
-	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore xenstore META $(LIBS) xenstore.cmo xenstore.cmi xenstore.cmx *.a 
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenstore
+	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xenstore META $(LIBS) xenstore.cmo xenstore.cmi xenstore.cmx *.a
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xenstore
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenstore
 
 include $(TOPLEVEL)/Makefile.rules
 

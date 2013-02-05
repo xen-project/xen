@@ -56,11 +56,11 @@ libs: $(LIBS)
 .PHONY: install
 install: $(LIBS) META
 	mkdir -p $(OCAMLDESTDIR)
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xenlight
-	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore xenlight META $(INTF) $(LIBS) *.a *.so *.cmx
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenlight
+	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xenlight META $(INTF) $(LIBS) *.a *.so *.cmx
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xenlight
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenlight
 
 include $(TOPLEVEL)/Makefile.rules

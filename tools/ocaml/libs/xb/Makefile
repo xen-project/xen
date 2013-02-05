@@ -45,11 +45,11 @@ xenbus.cmo : $(foreach obj, $(OBJS), $(obj).cmo)
 .PHONY: install
 install: $(LIBS) META
 	mkdir -p $(OCAMLDESTDIR)
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xenbus
-	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore xenbus META $(LIBS) xenbus.cmo xenbus.cmi xenbus.cmx *.a *.so 
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenbus
+	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xenbus META $(LIBS) xenbus.cmo xenbus.cmi xenbus.cmx *.a *.so
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xenbus
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenbus
 
 include $(TOPLEVEL)/Makefile.rules

@@ -19,12 +19,12 @@ OCAML_LIBRARY = xenmmap
 .PHONY: install
 install: $(LIBS) META
 	mkdir -p $(OCAMLDESTDIR)
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xenmmap
-	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore xenmmap META $(INTF) $(LIBS) *.a *.so *.cmx
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenmmap
+	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xenmmap META $(INTF) $(LIBS) *.a *.so *.cmx
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xenmmap
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenmmap
 
 include $(TOPLEVEL)/Makefile.rules
 

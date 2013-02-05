@@ -86,7 +86,8 @@ AS_IF([test "x$xapi" = "xy"], [
 ])
 AS_IF([test "x$ocamltools" = "xy"], [
     AC_PROG_OCAML
-    AS_IF([test "x$OCAMLC" = "xno"], [
+    AC_PROG_FINDLIB
+    AS_IF([test "x$OCAMLC" = "xno" || test "x$OCAMLFIND" = "xno"], [
         AS_IF([test "x$enable_ocamltools" = "xyes"], [
             AC_MSG_ERROR([Ocaml tools enabled, but unable to find Ocaml])])
         ocamltools="n"

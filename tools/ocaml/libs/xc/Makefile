@@ -23,11 +23,11 @@ libs: $(LIBS)
 .PHONY: install
 install: $(LIBS) META
 	mkdir -p $(OCAMLDESTDIR)
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xenctrl
-	ocamlfind install -destdir $(OCAMLDESTDIR) -ldconf ignore xenctrl META $(INTF) $(LIBS) *.a *.so *.cmx
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenctrl
+	$(OCAMLFIND) install -destdir $(OCAMLDESTDIR) -ldconf ignore xenctrl META $(INTF) $(LIBS) *.a *.so *.cmx
 
 .PHONY: uninstall
 uninstall:
-	ocamlfind remove -destdir $(OCAMLDESTDIR) xenctrl
+	$(OCAMLFIND) remove -destdir $(OCAMLDESTDIR) xenctrl
 
 include $(TOPLEVEL)/Makefile.rules
