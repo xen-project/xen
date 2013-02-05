@@ -17,7 +17,9 @@
 ### END INIT INFO
 #
 
-DAEMON=/usr/sbin/xenwatchdogd
+. /etc/xen/scripts/hotplugpath.sh
+
+DAEMON=${SBINDIR}/xenwatchdogd
 base=$(basename $DAEMON)
 
 # Source function library.

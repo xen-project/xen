@@ -18,6 +18,8 @@
 # Description:       Starts and stops the daemons neeeded for xl/xend
 ### END INIT INFO
 
+. /etc/xen/scripts/hotplugpath.sh
+
 if [ -d /etc/sysconfig ]; then
 	xencommons_config=/etc/sysconfig
 else
@@ -72,7 +74,7 @@ do_start () {
 	modprobe blktap2 2>/dev/null || modprobe blktap 2>/dev/null
 	mkdir -p /var/run/xen
 
-	if ! `xenstore-read -s / >/dev/null 2>&1`
+	if ! `${BINDIR}/xenstore-read -s / >/dev/null 2>&1`
 	then
 		test -z "$XENSTORED_ROOTDIR" && XENSTORED_ROOTDIR="/var/lib/xenstored"
 		rm -f "$XENSTORED_ROOTDIR"/tdb* &>/dev/null
@@ -81,19 +83,19 @@ do_start () {
 		if [ -n "$XENSTORED" ] ; then
 		    echo -n Starting $XENSTORED...
 		    $XENSTORED --pid-file /var/run/xenstored.pid $XENSTORED_ARGS
-		elif [ -x /usr/sbin/oxenstored ] ; then
+		elif [ -x ${SBINDIR}/oxenstored ] ; then
 		    echo -n Starting oxenstored...
-		    /usr/sbin/oxenstored --pid-file /var/run/xenstored.pid $XENSTORED_ARGS
-		elif [ -x /usr/sbin/xenstored ] ; then
+		    ${SBINDIR}/oxenstored --pid-file /var/run/xenstored.pid $XENSTORED_ARGS
+		elif [ -x ${SBINDIR}/xenstored ] ; then
 		    echo -n Starting C xenstored...
-		    /usr/sbin/xenstored --pid-file /var/run/xenstored.pid $XENSTORED_ARGS
+		    ${SBINDIR}/xenstored --pid-file /var/run/xenstored.pid $XENSTORED_ARGS
 		else
 		    echo "No xenstored found"
 		    exit 1
 		fi
 
 		# Wait for xenstored to actually come up, timing out after 30 seconds
-                while [ $time -lt $timeout ] && ! `xenstore-read -s / >/dev/null 2>&1` ; do
+                while [ $time -lt $timeout ] && ! `${BINDIR}/xenstore-read -s / >/dev/null 2>&1` ; do
                     echo -n .
 		    time=$(($time+1))
                     sleep 1
@@ -107,16 +109,14 @@ do_start () {
 		fi
 
 		echo Setting domain 0 name...
-		xenstore-write "/local/domain/0/name" "Domain-0"
+		${BINDIR}/xenstore-write "/local/domain/0/name" "Domain-0"
 	fi
 
 	echo Starting xenconsoled...
 	test -z "$XENCONSOLED_TRACE" || XENCONSOLED_ARGS=" --log=$XENCONSOLED_TRACE"
-	xenconsoled --pid-file=$XENCONSOLED_PIDFILE $XENCONSOLED_ARGS
-	test -z "$XENBACKENDD_DEBUG" || XENBACKENDD_ARGS="-d"
-	test "`uname`" != "NetBSD" || xenbackendd $XENBACKENDD_ARGS
+	${SBINDIR}/xenconsoled --pid-file=$XENCONSOLED_PIDFILE $XENCONSOLED_ARGS
 	echo Starting QEMU as disk backend for dom0
-	test -z "$QEMU_XEN" && QEMU_XEN=/usr/lib/xen/bin/qemu-system-i386
+	test -z "$QEMU_XEN" && QEMU_XEN="${LIBEXEC}/qemu-system-i386"
 	$QEMU_XEN -xen-domid 0 -xen-attach -name dom0 -nographic -M xenpv -daemonize \
 		-monitor /dev/null -serial /dev/null -parallel /dev/null \
 		-pidfile $QEMU_PIDFILE
@@ -144,7 +144,7 @@ case "$1" in
 	do_start
 	;;
   status)
-        xenstore-read -s /
+        ${BINDIR}/xenstore-read -s /
 	;;
   stop)
 	do_stop

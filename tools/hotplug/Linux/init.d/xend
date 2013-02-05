@@ -18,6 +18,8 @@
 # Description:       Starts and stops the Xen control daemon.
 ### END INIT INFO
 
+. /etc/xen/scripts/hotplugpath.sh
+
 shopt -s extglob
 
 # Wait for Xend to be up
@@ -25,12 +27,12 @@ function await_daemons_up
 {
 	i=1
 	rets=10
-	xend status
+	${SBINDIR}/xend status
 	while [ $? -ne 0 -a $i -lt $rets ]; do
 	    sleep 1
 	    echo -n .
 	    i=$(($i + 1))
-	    xend status
+	    ${SBINDIR}/xend status
 	done
 }
 
@@ -48,21 +50,21 @@ case "$1" in
 	else
 		touch /var/lock/xend
 	fi
-	xend start
+	${SBINDIR}/xend start
 	await_daemons_up
 	;;
   stop)
-	xend stop
+	${SBINDIR}/xend stop
 	rm -f /var/lock/subsys/xend /var/lock/xend
 	;;
   status)
-	xend status
+	${SBINDIR}/xend status
 	;;
   reload)
-        xend reload
+        ${SBINDIR}/xend reload
         ;;
   restart|force-reload)
-	xend restart
+	${SBINDIR}/xend restart
 	await_daemons_up
 	;;
   *)

@@ -27,11 +27,13 @@
 #                    boots / shuts down.
 ### END INIT INFO
 
-CMD=xm
+. /etc/xen/scripts/hotplugpath.sh
+
+CMD=${SBINDIR}/xm
 $CMD list &> /dev/null
 if test $? -ne 0
 then
-	CMD=xl
+	CMD=${SBINDIR}/xl
 fi
 
 $CMD list &> /dev/null
