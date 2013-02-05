@@ -5,6 +5,8 @@
 #include <xen/guest_access.h>
 #include <xen/sched.h>
 
+#include <xsm/xsm.h>
+
 #include <public/xen.h>
 #include <public/hvm/params.h>
 #include <public/hvm/hvm_op.h>
