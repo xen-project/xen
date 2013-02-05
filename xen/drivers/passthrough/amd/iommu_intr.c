@@ -27,7 +27,7 @@
 #define INTREMAP_LENGTH 0xB
 #define INTREMAP_ENTRIES (1 << INTREMAP_LENGTH)
 
-int ioapic_bdf[MAX_IO_APICS];
+struct ioapic_bdf ioapic_bdf[MAX_IO_APICS];
 extern struct ivrs_mappings *ivrs_mappings;
 extern unsigned short ivrs_bdf_entries;
 void *shared_intremap_table;
@@ -117,12 +117,12 @@ void invalidate_interrupt_table(struct amd_iommu *iommu, u16 device_id)
 static void update_intremap_entry_from_ioapic(
     int bdf,
     struct amd_iommu *iommu,
-    struct IO_APIC_route_entry *ioapic_rte)
+    const struct IO_APIC_route_entry *rte,
+    const struct IO_APIC_route_entry *old_rte)
 {
     unsigned long flags;
     u32* entry;
     u8 delivery_mode, dest, vector, dest_mode;
-    struct IO_APIC_route_entry *rte = ioapic_rte;
     int req_id;
     spinlock_t *lock;
     int offset;
@@ -138,6 +138,14 @@ static void update_intremap_entry_from_ioapic(
     spin_lock_irqsave(lock, flags);
 
     offset = get_intremap_offset(vector, delivery_mode);
+    if ( old_rte )
+    {
+        int old_offset = get_intremap_offset(old_rte->vector,
+                                             old_rte->delivery_mode);
+
+        if ( offset != old_offset )
+            free_intremap_entry(bdf, old_offset);
+    }
     entry = (u32*)get_intremap_entry(req_id, offset);
     update_intremap_entry(entry, vector, delivery_mode, dest_mode, dest);
 
@@ -176,7 +184,7 @@ int __init amd_iommu_setup_ioapic_remapping(void)
                 continue;
 
             /* get device id of ioapic devices */
-            bdf = ioapic_bdf[IO_APIC_ID(apic)];
+            bdf = ioapic_bdf[IO_APIC_ID(apic)].bdf;
             iommu = find_iommu_for_device(bdf);
             if ( !iommu )
             {
@@ -207,6 +215,7 @@ int __init amd_iommu_setup_ioapic_remapping(void)
                 flush_command_buffer(iommu);
                 spin_unlock_irqrestore(&iommu->lock, flags);
             }
+            set_bit(pin, ioapic_bdf[IO_APIC_ID(apic)].pin_setup);
         }
     }
     return 0;
@@ -218,6 +227,7 @@ void amd_iommu_ioapic_update_ire(
     struct IO_APIC_route_entry old_rte = { 0 };
     struct IO_APIC_route_entry new_rte = { 0 };
     unsigned int rte_lo = (reg & 1) ? reg - 1 : reg;
+    unsigned int pin = (reg - 0x10) / 2;
     int saved_mask, bdf;
     struct amd_iommu *iommu;
 
@@ -228,7 +238,7 @@ void amd_iommu_ioapic_update_ire(
     }
 
     /* get device id of ioapic devices */
-    bdf = ioapic_bdf[IO_APIC_ID(apic)];
+    bdf = ioapic_bdf[IO_APIC_ID(apic)].bdf;
     iommu = find_iommu_for_device(bdf);
     if ( !iommu )
     {
@@ -254,6 +264,14 @@ void amd_iommu_ioapic_update_ire(
         *(((u32 *)&new_rte) + 1) = value;
     }
 
+    if ( new_rte.mask &&
+         !test_bit(pin, ioapic_bdf[IO_APIC_ID(apic)].pin_setup) )
+    {
+        ASSERT(saved_mask);
+        __io_apic_write(apic, reg, value);
+        return;
+    }
+
     /* mask the interrupt while we change the intremap table */
     if ( !saved_mask )
     {
@@ -262,7 +280,11 @@ void amd_iommu_ioapic_update_ire(
     }
 
     /* Update interrupt remapping entry */
-    update_intremap_entry_from_ioapic(bdf, iommu, &new_rte);
+    update_intremap_entry_from_ioapic(
+        bdf, iommu, &new_rte,
+        test_and_set_bit(pin,
+                         ioapic_bdf[IO_APIC_ID(apic)].pin_setup) ? &old_rte
+                                                                 : NULL);
 
     /* Forward write access to IO-APIC RTE */
     __io_apic_write(apic, reg, value);
@@ -372,6 +394,12 @@ void amd_iommu_msi_msg_update_ire(
                        (pdev->bus << 8) | pdev->devfn);
         return;
     }
+
+    if ( msi_desc->remap_index >= 0 )
+        update_intremap_entry_from_msi_msg(iommu, pdev, msi_desc, NULL);
+
+    if ( !msg )
+        return;
 
     update_intremap_entry_from_msi_msg(iommu, pdev, msi_desc, msg);
 }

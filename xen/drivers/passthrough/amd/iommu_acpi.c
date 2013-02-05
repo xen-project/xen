@@ -21,6 +21,7 @@
 #include <xen/config.h>
 #include <xen/errno.h>
 #include <asm/apicdef.h>
+#include <asm/io_apic.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm/hvm/svm/amd-iommu-acpi.h>
@@ -29,7 +30,6 @@ extern unsigned long amd_iommu_page_entries;
 extern unsigned short ivrs_bdf_entries;
 extern struct ivrs_mappings *ivrs_mappings;
 extern unsigned short last_bdf;
-extern int ioapic_bdf[MAX_IO_APICS];
 extern void *shared_intremap_table;
 
 static void add_ivrs_mapping_entry(
@@ -636,6 +636,7 @@ static u16 __init parse_ivhd_device_special(
     u16 header_length, u16 block_length, struct amd_iommu *iommu)
 {
     u16 dev_length, bdf;
+    int apic;
 
     dev_length = sizeof(struct acpi_ivhd_device_special);
     if ( header_length < (block_length + dev_length) )
@@ -652,9 +653,58 @@ static u16 __init parse_ivhd_device_special(
     }
 
     add_ivrs_mapping_entry(bdf, bdf, ivhd_device->header.flags, iommu);
-    /* set device id of ioapic */
-    ioapic_bdf[ivhd_device->special.handle] = bdf;
-    return dev_length;
+
+    if ( ivhd_device->special.variety != 1 /* ACPI_IVHD_IOAPIC */ )
+    {
+        if ( ivhd_device->special.variety != 2 /* ACPI_IVHD_HPET */ )
+            printk(XENLOG_ERR "Unrecognized IVHD special variety %#x\n",
+                   ivhd_device->special.variety);
+        return dev_length;
+    }
+
+    /*
+     * Some BIOSes have IOAPIC broken entries so we check for IVRS
+     * consistency here --- whether entry's IOAPIC ID is valid and
+     * whether there are conflicting/duplicated entries.
+     */
+    for ( apic = 0; apic < nr_ioapics; apic++ )
+    {
+        if ( IO_APIC_ID(apic) != ivhd_device->special.handle )
+            continue;
+
+        if ( ioapic_bdf[ivhd_device->special.handle].pin_setup )
+        {
+            if ( ioapic_bdf[ivhd_device->special.handle].bdf == bdf )
+                AMD_IOMMU_DEBUG("IVHD Warning: Duplicate IO-APIC %#x entries\n",
+                                ivhd_device->special.handle);
+            else
+            {
+                printk(XENLOG_ERR "IVHD Error: Conflicting IO-APIC %#x entries\n",
+                       ivhd_device->special.handle);
+                if ( amd_iommu_perdev_intremap )
+                    return 0;
+            }
+        }
+        else
+        {
+            /* set device id of ioapic */
+            ioapic_bdf[ivhd_device->special.handle].bdf = bdf;
+
+            ioapic_bdf[ivhd_device->special.handle].pin_setup = xzalloc_array(
+                unsigned long, BITS_TO_LONGS(nr_ioapic_registers[apic]));
+            if ( nr_ioapic_registers[apic] &&
+                 !ioapic_bdf[IO_APIC_ID(apic)].pin_setup )
+            {
+                printk(XENLOG_ERR "IVHD Error: Out of memory\n");
+                return 0;
+            }
+        }
+        return dev_length;
+    }
+
+    printk(XENLOG_ERR "IVHD Error: Invalid IO-APIC %#x\n",
+           ivhd_device->special.handle);
+    return 0;
 }
 
 static int __init parse_ivhd_block(struct acpi_ivhd_block_header *ivhd_block)

@@ -88,6 +88,11 @@ void amd_iommu_read_msi_from_ire(
 unsigned int amd_iommu_read_ioapic_from_ire(
     unsigned int apic, unsigned int reg);
 
+extern struct ioapic_bdf {
+    u16 bdf;
+    unsigned long *pin_setup;
+} ioapic_bdf[];
+
 /* power management support */
 void amd_iommu_resume(void);
 void amd_iommu_suspend(void);
