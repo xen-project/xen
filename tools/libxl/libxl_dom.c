@@ -1238,9 +1238,9 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
         abort();
     }
 
-    dss->xcflags = (live) ? XCFLAGS_LIVE : 0
-          | (debug) ? XCFLAGS_DEBUG : 0
-          | (dss->hvm) ? XCFLAGS_HVM : 0;
+    dss->xcflags = (live ? XCFLAGS_LIVE : 0)
+          | (debug ? XCFLAGS_DEBUG : 0)
+          | (dss->hvm ? XCFLAGS_HVM : 0);
 
     dss->suspend_eventchn = -1;
     dss->guest_responded = 0;
