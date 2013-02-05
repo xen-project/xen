@@ -208,6 +208,8 @@ int __init amd_iov_detect(void)
     {
         printk("AMD-Vi: Not overriding irq_vector_map setting\n");
     }
+    if ( !amd_iommu_perdev_intremap )
+        printk(XENLOG_WARNING "AMD-Vi: Using global interrupt remap table is not recommended (see XSA-36)!\n");
     return scan_pci_devices();
 }
 

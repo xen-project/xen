@@ -53,7 +53,7 @@ bool_t __read_mostly iommu_qinval = 1;
 bool_t __read_mostly iommu_intremap = 1;
 bool_t __read_mostly iommu_hap_pt_share = 1;
 bool_t __read_mostly iommu_debug;
-bool_t __read_mostly amd_iommu_perdev_intremap;
+bool_t __read_mostly amd_iommu_perdev_intremap = 1;
 
 DEFINE_PER_CPU(bool_t, iommu_dont_flush_iotlb);
 
