@@ -100,6 +100,7 @@ void amd_iommu_read_msi_from_ire(
 
 extern struct ioapic_sbdf {
     u16 bdf, seg;
+    unsigned long *pin_setup;
 } ioapic_sbdf[MAX_IO_APICS];
 extern void *shared_intremap_table;
 
