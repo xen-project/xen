@@ -1120,11 +1120,44 @@ static int __init amd_iommu_setup_device_table(
     return 0;
 }
 
+/* Check whether SP5100 SATA Combined mode is on */
+static bool_t __init amd_sp5100_erratum28(void)
+{
+    u32 bus, id;
+    u16 vendor_id, dev_id;
+    u8 byte;
+
+    for (bus = 0; bus < 256; bus++)
+    {
+        id = pci_conf_read32(0, bus, 0x14, 0, PCI_VENDOR_ID);
+
+        vendor_id = id & 0xffff;
+        dev_id = (id >> 16) & 0xffff;
+
+        /* SP5100 SMBus module sets Combined mode on */
+        if (vendor_id != 0x1002 || dev_id != 0x4385)
+            continue;
+
+        byte = pci_conf_read8(0, bus, 0x14, 0, 0xad);
+        if ( (byte >> 3) & 1 )
+        {
+            printk(XENLOG_WARNING "AMD-Vi: SP5100 erratum 28 detected, disabling IOMMU.\n"
+                   "If possible, disable SATA Combined mode in BIOS or contact your vendor for BIOS update.\n");
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 int __init amd_iommu_init(void)
 {
     struct amd_iommu *iommu;
 
     BUG_ON( !iommu_found() );
+
+    if ( amd_iommu_perdev_intremap && amd_sp5100_erratum28() )
+        goto error_out;
 
     ivrs_bdf_entries = amd_iommu_get_ivrs_dev_entries();
 
