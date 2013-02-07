@@ -27,8 +27,15 @@ external header_size: unit -> int = "stub_header_size"
 external header_of_string_internal: string -> int * int * int * int
          = "stub_header_of_string"
 
+let xenstore_payload_max = 4096 (* xen/include/public/io/xs_wire.h *)
+
 let of_string s =
 	let tid, rid, opint, dlen = header_of_string_internal s in
+	(* A packet which is bigger than xenstore_payload_max is illegal.
+	   This will leave the guest connection is a bad state and will
+	   be hard to recover from without restarting the connection
+	   (ie rebooting the guest) *)
+	let dlen = min xenstore_payload_max dlen in
 	{
 		tid = tid;
 		rid = rid;
@@ -38,6 +45,7 @@ let of_string s =
 	}
 
 let append pkt s sz =
+	if pkt.len > 4096 then failwith "Buffer.add: cannot grow buffer";
 	Buffer.add_string pkt.buf (String.sub s 0 sz)
 
 let to_complete pkt =
