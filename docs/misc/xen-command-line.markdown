@@ -546,6 +546,12 @@ Paging (HAP).
 ### hvm\_port80
 > `= <boolean>`
 
+### highmem-start
+> `= <size>`
+
+Specify the memory boundary past which memory will be treated as highmem (x86
+debug hypervisor only).
+
 ### idle\_latency\_factor
 > `= <integer>`
 

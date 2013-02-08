@@ -43,4 +43,10 @@ void microcode_grab_module(
 
 extern uint8_t kbd_shift_flags;
 
+#ifdef NDEBUG
+# define highmem_start 0
+#else
+extern unsigned long highmem_start;
+#endif
+
 #endif

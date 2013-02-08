@@ -66,8 +66,10 @@ void *map_domain_page(unsigned long mfn)
     struct mapcache_vcpu *vcache;
     struct vcpu_maphash_entry *hashent;
 
+#ifdef NDEBUG
     if ( mfn <= PFN_DOWN(__pa(HYPERVISOR_VIRT_END - 1)) )
         return mfn_to_virt(mfn);
+#endif
 
     v = mapcache_current_vcpu();
     if ( !v || is_hvm_vcpu(v) )
@@ -249,8 +251,10 @@ int mapcache_domain_init(struct domain *d)
     if ( is_hvm_domain(d) || is_idle_domain(d) )
         return 0;
 
+#ifdef NDEBUG
     if ( !mem_hotplug && max_page <= PFN_DOWN(__pa(HYPERVISOR_VIRT_END - 1)) )
         return 0;
+#endif
 
     dcache->l1tab = xzalloc_array(l1_pgentry_t *, MAPCACHE_L2_ENTRIES + 1);
     d->arch.perdomain_l2_pg[MAPCACHE_SLOT] = alloc_domheap_page(NULL, memf);
@@ -418,8 +422,10 @@ void *map_domain_page_global(unsigned long mfn)
 
     ASSERT(!in_irq() && local_irq_is_enabled());
 
+#ifdef NDEBUG
     if ( mfn <= PFN_DOWN(__pa(HYPERVISOR_VIRT_END - 1)) )
         return mfn_to_virt(mfn);
+#endif
 
     spin_lock(&globalmap_lock);
 

@@ -82,6 +82,11 @@ boolean_param("noapic", skip_ioapic_setup);
 s8 __read_mostly xen_cpuidle = -1;
 boolean_param("cpuidle", xen_cpuidle);
 
+#ifndef NDEBUG
+unsigned long __initdata highmem_start;
+size_param("highmem-start", highmem_start);
+#endif
+
 cpumask_t __read_mostly cpu_present_map;
 
 unsigned long __read_mostly xen_phys_start;
@@ -788,6 +793,14 @@ void __init __start_xen(unsigned long mbi_p)
     modules_headroom = bzimage_headroom(bootstrap_map(mod), mod->mod_end);
     bootstrap_map(NULL);
 
+#ifndef highmem_start
+    /* Don't allow split below 4Gb. */
+    if ( highmem_start < GB(4) )
+        highmem_start = 0;
+    else /* align to L3 entry boundary */
+        highmem_start &= ~((1UL << L3_PAGETABLE_SHIFT) - 1);
+#endif
+
     for ( i = boot_e820.nr_map-1; i >= 0; i-- )
     {
         uint64_t s, e, mask = (1UL << L2_PAGETABLE_SHIFT) - 1;
@@ -916,6 +929,9 @@ void __init __start_xen(unsigned long mbi_p)
             /* Don't overlap with other modules. */
             end = consider_modules(s, e, size, mod, mbi->mods_count, j);
 
+            if ( highmem_start && end > highmem_start )
+                continue;
+
             if ( s < end &&
                  (headroom ||
                   ((end - size) >> PAGE_SHIFT) > mod[j].mod_start) )
@@ -957,6 +973,8 @@ void __init __start_xen(unsigned long mbi_p)
     kexec_reserve_area(&boot_e820);
 
     setup_max_pdx();
+    if ( highmem_start )
+        xenheap_max_mfn(PFN_DOWN(highmem_start));
 
     /*
      * Walk every RAM region and map it in its entirety (on x86/64, at least)
@@ -1128,7 +1146,8 @@ void __init __start_xen(unsigned long mbi_p)
         unsigned long limit = virt_to_mfn(HYPERVISOR_VIRT_END - 1);
         uint64_t mask = PAGE_SIZE - 1;
 
-        xenheap_max_mfn(limit);
+        if ( !highmem_start )
+            xenheap_max_mfn(limit);
 
         /* Pass the remaining memory to the allocator. */
         for ( i = 0; i < boot_e820.nr_map; i++ )

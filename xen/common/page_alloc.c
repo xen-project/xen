@@ -45,6 +45,7 @@
 #include <asm/flushtlb.h>
 #ifdef CONFIG_X86
 #include <asm/p2m.h>
+#include <asm/setup.h> /* for highmem_start only */
 #else
 #define p2m_pod_offline_or_broken_hit(pg) 0
 #define p2m_pod_offline_or_broken_replace(pg) BUG_ON(pg != NULL)
@@ -203,6 +204,25 @@ unsigned long __init alloc_boot_pages(
         pg = (r->e - nr_pfns) & ~(pfn_align - 1);
         if ( pg < r->s )
             continue;
+
+#if defined(CONFIG_X86) && !defined(NDEBUG)
+        /*
+         * Filtering pfn_align == 1 since the only allocations using a bigger
+         * alignment are the ones used for setting up the frame table chunks.
+         * Those allocations get remapped anyway, i.e. them not having 1:1
+         * mappings always accessible is not a problem.
+         */
+        if ( highmem_start && pfn_align == 1 &&
+             r->e > PFN_DOWN(highmem_start) )
+        {
+            pg = r->s;
+            if ( pg + nr_pfns > PFN_DOWN(highmem_start) )
+                continue;
+            r->s = pg + nr_pfns;
+            return pg;
+        }
+#endif
+
         _e = r->e;
         r->e = pg;
         bootmem_region_add(pg + nr_pfns, _e);

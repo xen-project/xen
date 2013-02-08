@@ -250,6 +250,14 @@ void __init init_frametable(void)
         init_spagetable();
 }
 
+#ifndef NDEBUG
+static unsigned int __read_mostly root_pgt_pv_xen_slots
+    = ROOT_PAGETABLE_PV_XEN_SLOTS;
+static l4_pgentry_t __read_mostly split_l4e;
+#else
+#define root_pgt_pv_xen_slots ROOT_PAGETABLE_PV_XEN_SLOTS
+#endif
+
 void __init arch_init_memory(void)
 {
     unsigned long i, pfn, rstart_pfn, rend_pfn, iostart_pfn, ioend_pfn;
@@ -344,6 +352,40 @@ void __init arch_init_memory(void)
     efi_init_memory();
 
     mem_sharing_init();
+
+#ifndef NDEBUG
+    if ( highmem_start )
+    {
+        unsigned long split_va = (unsigned long)__va(highmem_start);
+
+        if ( split_va < HYPERVISOR_VIRT_END &&
+             split_va - 1 == (unsigned long)__va(highmem_start - 1) )
+        {
+            root_pgt_pv_xen_slots = l4_table_offset(split_va) -
+                                    ROOT_PAGETABLE_FIRST_XEN_SLOT;
+            ASSERT(root_pgt_pv_xen_slots < ROOT_PAGETABLE_PV_XEN_SLOTS);
+            if ( l4_table_offset(split_va) == l4_table_offset(split_va - 1) )
+            {
+                l3_pgentry_t *l3tab = alloc_xen_pagetable();
+
+                if ( l3tab )
+                {
+                    const l3_pgentry_t *l3idle =
+                        l4e_to_l3e(idle_pg_table[l4_table_offset(split_va)]);
+
+                    for ( i = 0; i < l3_table_offset(split_va); ++i )
+                        l3tab[i] = l3idle[i];
+                    for ( ; i <= L3_PAGETABLE_ENTRIES; ++i )
+                        l3tab[i] = l3e_empty();
+                    split_l4e = l4e_from_pfn(virt_to_mfn(l3tab),
+                                             __PAGE_HYPERVISOR);
+                }
+                else
+                    ++root_pgt_pv_xen_slots;
+            }
+        }
+    }
+#endif
 }
 
 int page_is_ram_type(unsigned long mfn, unsigned long mem_type)
@@ -1320,7 +1362,12 @@ void init_guest_l4_table(l4_pgentry_t l4tab[], const struct domain *d)
     /* Xen private mappings. */
     memcpy(&l4tab[ROOT_PAGETABLE_FIRST_XEN_SLOT],
            &idle_pg_table[ROOT_PAGETABLE_FIRST_XEN_SLOT],
-           ROOT_PAGETABLE_PV_XEN_SLOTS * sizeof(l4_pgentry_t));
+           root_pgt_pv_xen_slots * sizeof(l4_pgentry_t));
+#ifndef NDEBUG
+    if ( l4e_get_intpte(split_l4e) )
+        l4tab[ROOT_PAGETABLE_FIRST_XEN_SLOT + root_pgt_pv_xen_slots] =
+            split_l4e;
+#endif
     l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_pfn(domain_page_map_to_mfn(l4tab), __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
