@@ -78,6 +78,10 @@ struct hvm_function_table hvm_funcs __read_mostly;
 unsigned long __attribute__ ((__section__ (".bss.page_aligned")))
     hvm_io_bitmap[3*PAGE_SIZE/BYTES_PER_LONG];
 
+/* Xen command-line option to enable HAP */
+static bool_t __initdata opt_hap_enabled = 1;
+boolean_param("hap", opt_hap_enabled);
+
 static int cpu_callback(
     struct notifier_block *nfb, unsigned long action, void *hcpu)
 {
@@ -123,7 +127,14 @@ static int __init hvm_enable(void)
     hvm_enabled = 1;
 
     printk("HVM: %s enabled\n", hvm_funcs.name);
-    if ( hvm_funcs.hap_supported )
+    if ( !hvm_funcs.hap_supported )
+        printk("HVM: Hardware Assisted Paging (HAP) not detected\n");
+    else if ( !opt_hap_enabled )
+    {
+        hvm_funcs.hap_supported = 0;
+        printk("HVM: Hardware Assisted Paging (HAP) detected but disabled\n");
+    }
+    else
     {
         printk("HVM: Hardware Assisted Paging (HAP) detected\n");
         printk("HVM: HAP page sizes: 4kB");

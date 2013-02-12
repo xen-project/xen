@@ -521,6 +521,14 @@ more importance will be printed.
 The optional `<rate-limited level>` option instructs which severities
 should be rate limited.
 
+### hap
+> `= <boolean>`
+
+> Default: `true`
+
+Flag to globally enable or disable support for Hardware Assisted
+Paging (HAP)
+
 ### hap\_1gb
 > `= <boolean>`
 
@@ -534,7 +542,7 @@ Paging (HAP).
 
 > Default: `true`
 
-Flag to enable 1 GB host page table support for Hardware Assisted
+Flag to enable 2 MB host page table support for Hardware Assisted
 Paging (HAP).
 
 ### hpetbroadcast
