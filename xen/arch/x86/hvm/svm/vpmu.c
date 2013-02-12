@@ -314,6 +314,7 @@ static int amd_vpmu_initialise(struct vcpu *v)
 	 case 0x10:
 	 case 0x12:
 	 case 0x14:
+	 case 0x16:
 	 default:
 	     num_counters = F10H_NUM_COUNTERS;
 	     counters = AMD_F10H_COUNTERS;
@@ -375,6 +376,7 @@ int svm_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
     case 0x12:
     case 0x14:
     case 0x15:
+    case 0x16:
         ret = amd_vpmu_initialise(v);
         if ( !ret )
             vpmu->arch_vpmu_ops = &amd_vpmu_ops;

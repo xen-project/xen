@@ -415,6 +415,10 @@ static int __init nmi_init(void)
                                 model = &op_amd_fam15h_spec;
                                 cpu_type = "x86-64/family15h";
                                 break;
+			case 0x16:
+				model = &op_athlon_spec;
+				cpu_type = "x86-64/family16h";
+				break;
 			}
 			break;
 
