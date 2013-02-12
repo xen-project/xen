@@ -534,6 +534,19 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	}
 #endif
 
+	if (c->x86 == 0x10) {
+		/*
+		 * On family 10h BIOS may not have properly enabled WC+
+		 * support, causing it to be converted to CD memtype. This may
+		 * result in performance degradation for certain nested-paging
+		 * guests. Prevent this conversion by clearing bit 24 in
+		 * MSR_F10_BU_CFG2.
+		 */
+		rdmsrl(MSR_F10_BU_CFG2, value);
+		value &= ~(1ULL << 24);
+		wrmsrl(MSR_F10_BU_CFG2, value);
+	}
+
 	/*
 	 * Family 0x12 and above processors have APIC timer
 	 * running in deep C states.
