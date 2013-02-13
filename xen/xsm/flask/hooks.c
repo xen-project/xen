@@ -110,7 +110,7 @@ static int get_irq_sid(int irq, u32 *sid, struct avc_audit_data *ad)
         }
         return security_irq_sid(irq, sid);
     }
-    if ( desc->msi_desc ) {
+    if ( desc->msi_desc && desc->msi_desc->dev ) {
         struct pci_dev *dev = desc->msi_desc->dev;
         u32 sbdf = (dev->seg << 16) | (dev->bus << 8) | dev->devfn;
         if (ad) {
