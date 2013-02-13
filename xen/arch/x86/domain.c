@@ -1997,6 +1997,7 @@ static void vcpu_destroy_pagetables(struct vcpu *v)
         }
 
         l4e_write(l4tab, l4e_empty());
+        unmap_domain_page(l4tab);
 
         v->arch.cr3 = 0;
         return;
