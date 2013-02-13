@@ -51,19 +51,57 @@ type device_t, resource_type;
 
 ################################################################################
 #
-# Rules required to boot the hypervisor and dom0
+# Allow dom0 access to all sysctls, devices, and the security server.
+#
+# While this could be written more briefly using wildcards, the permissions are
+# listed out to make removing specific permissions simpler.
 #
 ################################################################################
-allow dom0_t xen_t:xen { kexec readapic writeapic mtrr_read mtrr_add mtrr_del
-	physinfo heap quirk readconsole writeconsole settime getcpuinfo
-	microcode cpupool_op pm_op tmem_control getscheduler setscheduler };
-allow dom0_t xen_t:mmu { memorymap };
-allow dom0_t security_t:security { check_context compute_av compute_create
-	compute_member load_policy compute_relabel compute_user setenforce
-	setbool setsecparam add_ocontext del_ocontext };
+allow dom0_t xen_t:xen {
+	settime tbufcontrol readconsole clearconsole perfcontrol mtrr_add
+	mtrr_del mtrr_read microcode physinfo quirk writeconsole readapic
+	writeapic privprofile nonprivprofile kexec firmware sleep frequency
+	getidle debug getcpuinfo heap pm_op mca_op lockprof cpupool_op tmem_op
+	tmem_control getscheduler setscheduler
+};
+allow dom0_t xen_t:mmu memorymap;
 
-allow dom0_t dom0_t:domain { getdomaininfo getvcpuinfo getvcpuaffinity };
+# Allow dom0 to use these domctls on itself. For domctls acting on other
+# domains, see the definitions of create_domain and manage_domain.
+allow dom0_t dom0_t:domain {
+	setvcpucontext max_vcpus setvcpuaffinity getvcpuaffinity getscheduler
+	getdomaininfo getvcpuinfo getvcpucontext setdomainmaxmem setdomainhandle
+	setdebugging hypercall settime setaddrsize getaddrsize trigger
+	getextvcpucontext setextvcpucontext getvcpuextstate setvcpuextstate
+	getpodtarget setpodtarget set_misc_info set_virq_handler
+};
+allow dom0_t dom0_t:domain2 {
+	set_cpuid gettsc settsc setscheduler
+};
 allow dom0_t dom0_t:resource { add remove };
+
+# These permissions allow using the FLASK security server to compute access
+# checks locally, which could be used by a domain or service (such as xenstore)
+# that does not have its own security server to make access decisions based on
+# Xen's security policy.
+allow dom0_t security_t:security {
+	compute_av compute_create compute_member compute_relabel compute_user
+};
+
+# Allow string/SID conversions (for "xl list -Z" and similar)
+allow dom0_t security_t:security check_context;
+
+# Allow flask-label-pci to add and change labels
+allow dom0_t security_t:security { add_ocontext del_ocontext };
+
+# Allow performance parameters of the security server to be tweaked
+allow dom0_t security_t:security setsecparam;
+
+# Allow changing the security policy
+allow dom0_t security_t:security { load_policy setenforce setbool };
+
+# Audit policy change events even when they are allowed
+auditallow dom0_t security_t:security { load_policy setenforce setbool };
 
 admin_device(dom0_t, device_t)
 admin_device(dom0_t, irq_t)
@@ -71,8 +109,6 @@ admin_device(dom0_t, ioport_t)
 admin_device(dom0_t, iomem_t)
 
 domain_comms(dom0_t, dom0_t)
-
-auditallow dom0_t security_t:security { load_policy setenforce setbool };
 
 # Allow all domains to use (unprivileged parts of) the tmem hypercall
 allow domain_type xen_t:xen tmem_op;
