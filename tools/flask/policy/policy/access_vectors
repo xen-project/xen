@@ -1,0 +1,24 @@
+# Locally defined access vectors
+#
+# Define access vectors for the security classes defined in security_classes
+#
+
+# Note: this is an example; the xenstore daemon provided with Xen does
+# not yet include XSM support, and the exact permissions may be defined
+# differently if such support is added.
+class xenstore {
+	# read from keys owned by the target domain (if permissions allow)
+	read
+	# write to keys owned by the target domain (if permissions allow)
+	write
+	# change permissions of a key owned by the target domain
+	chmod
+	# change the owner of a key which was owned by the target domain
+	chown_from
+	# change the owner of a key to the target domain
+	chown_to
+	# access a key owned by the target domain without permission
+	override
+	# introduce a domain
+	introduce
+}

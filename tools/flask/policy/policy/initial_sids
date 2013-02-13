@@ -1,4 +1,6 @@
-# Labels for initial SIDs
+# Labels for initial SIDs. These initial SIDs are used by the hypervisor for
+# objects created before the policy is loaded or for objects that do not have a
+# label defined in some other manner.
 
 sid xen gen_context(system_u:system_r:xen_t,s0)
 sid dom0 gen_context(system_u:system_r:dom0_t,s0)

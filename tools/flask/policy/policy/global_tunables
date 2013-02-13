@@ -1,6 +1,5 @@
 #
-# This file is for the declaration of global tunables.
-# To change the default value at build time, the booleans.conf
-# file should be used.
+# This file is for the declaration of global policy tunables, booleans,
+# and other components not defined within a specific policy module.
 #
 

@@ -1,0 +1,8 @@
+# Locally defined security classes
+#
+# These classes are not used by the hypervisor, but may be used by domains or
+# daemons that need to make access control decisions using the hypervisor's
+# security policy.
+#
+# Access vectors for these classes must be defined in the access_vectors file.
+class xenstore
