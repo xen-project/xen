@@ -28,6 +28,7 @@ m4_include([../m4/path_or_fail.m4])
 m4_include([../m4/python_version.m4])
 m4_include([../m4/python_devel.m4])
 m4_include([../m4/ocaml.m4])
+m4_include([../m4/checkpolicy.m4])
 m4_include([../m4/set_cflags_ldflags.m4])
 m4_include([../m4/uuid.m4])
 m4_include([../m4/pkg.m4])
@@ -42,6 +43,7 @@ AX_ARG_DEFAULT_DISABLE([githttp], [Download GIT repositories via HTTP])
 AX_ARG_DEFAULT_ENABLE([monitors], [Disable xenstat and xentop monitoring tools])
 AX_ARG_DEFAULT_DISABLE([xenapi], [Enable Xen API Bindings])
 AX_ARG_DEFAULT_ENABLE([ocamltools], [Disable Ocaml tools])
+AX_ARG_DEFAULT_ENABLE([xsmpolicy], [Disable XSM policy compilation])
 AX_ARG_DEFAULT_DISABLE([miniterm], [Enable miniterm])
 AX_ARG_DEFAULT_DISABLE([lomount], [Enable lomount])
 AX_ARG_DEFAULT_DISABLE([ovmf], [Enable OVMF])
@@ -91,6 +93,14 @@ AS_IF([test "x$ocamltools" = "xy"], [
         AS_IF([test "x$enable_ocamltools" = "xyes"], [
             AC_MSG_ERROR([Ocaml tools enabled, but unable to find Ocaml])])
         ocamltools="n"
+    ])
+])
+AS_IF([test "x$xsmpolicy" = "xy"], [
+    AC_PROG_CHECKPOLICY
+    AS_IF([test "x$CHECKPOLICY" = "xno"], [
+        AS_IF([test "x$enable_xsmpolicy" = "xyes"], [
+            AC_MSG_ERROR([XSM policy compilation enabled, but unable to find checkpolicy])])
+        xsmpolicy="n"
     ])
 ])
 AX_PATH_PROG_OR_FAIL([BASH], [bash])

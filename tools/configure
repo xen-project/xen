@@ -620,6 +620,7 @@ GREP
 CPP
 pyconfig
 PYTHONPATH
+CHECKPOLICY
 OCAMLFIND
 OCAMLBUILD
 OCAMLDOC
@@ -667,6 +668,7 @@ rombios
 ovmf
 lomount
 miniterm
+xsmpolicy
 ocamltools
 xenapi
 monitors
@@ -724,6 +726,7 @@ enable_githttp
 enable_monitors
 enable_xenapi
 enable_ocamltools
+enable_xsmpolicy
 enable_miniterm
 enable_lomount
 enable_ovmf
@@ -1382,6 +1385,7 @@ Optional Features:
                           is ENABLED)
   --enable-xenapi         Enable Xen API Bindings (default is DISABLED)
   --disable-ocamltools    Disable Ocaml tools (default is ENABLED)
+  --disable-xsmpolicy     Disable XSM policy compilation (default is ENABLED)
   --enable-miniterm       Enable miniterm (default is DISABLED)
   --enable-lomount        Enable lomount (default is DISABLED)
   --enable-ovmf           Enable OVMF (default is DISABLED)
@@ -2308,6 +2312,8 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 
 
+
+
 # pkg.m4 - Macros to locate and utilise pkg-config.            -*- Autoconf -*-
 # serial 1 (pkg-config-0.24)
 #
@@ -2485,6 +2491,29 @@ elif test -z $ax_cv_ocamltools; then :
 
 fi
 ocamltools=$ax_cv_ocamltools
+
+
+
+# Check whether --enable-xsmpolicy was given.
+if test "${enable_xsmpolicy+set}" = set; then :
+  enableval=$enable_xsmpolicy;
+fi
+
+
+if test "x$enable_xsmpolicy" = "xno"; then :
+
+    ax_cv_xsmpolicy="n"
+
+elif test "x$enable_xsmpolicy" = "xyes"; then :
+
+    ax_cv_xsmpolicy="y"
+
+elif test -z $ax_cv_xsmpolicy; then :
+
+    ax_cv_xsmpolicy="y"
+
+fi
+xsmpolicy=$ax_cv_xsmpolicy
 
 
 
@@ -4900,6 +4929,120 @@ fi
             as_fn_error $? "Ocaml tools enabled, but unable to find Ocaml" "$LINENO" 5
 fi
         ocamltools="n"
+
+fi
+
+fi
+if test "x$xsmpolicy" = "xy"; then :
+
+      # check for a checkpolicy binary with support for -t xen
+  if test -n "$ac_tool_prefix"; then
+  # Extract the first word of "${ac_tool_prefix}checkpolicy", so it can be a program name with args.
+set dummy ${ac_tool_prefix}checkpolicy; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if test "${ac_cv_prog_CHECKPOLICY+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$CHECKPOLICY"; then
+  ac_cv_prog_CHECKPOLICY="$CHECKPOLICY" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_prog_CHECKPOLICY="${ac_tool_prefix}checkpolicy"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+CHECKPOLICY=$ac_cv_prog_CHECKPOLICY
+if test -n "$CHECKPOLICY"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $CHECKPOLICY" >&5
+$as_echo "$CHECKPOLICY" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+fi
+if test -z "$ac_cv_prog_CHECKPOLICY"; then
+  ac_ct_CHECKPOLICY=$CHECKPOLICY
+  # Extract the first word of "checkpolicy", so it can be a program name with args.
+set dummy checkpolicy; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if test "${ac_cv_prog_ac_ct_CHECKPOLICY+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$ac_ct_CHECKPOLICY"; then
+  ac_cv_prog_ac_ct_CHECKPOLICY="$ac_ct_CHECKPOLICY" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_prog_ac_ct_CHECKPOLICY="checkpolicy"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+ac_ct_CHECKPOLICY=$ac_cv_prog_ac_ct_CHECKPOLICY
+if test -n "$ac_ct_CHECKPOLICY"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_ct_CHECKPOLICY" >&5
+$as_echo "$ac_ct_CHECKPOLICY" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+  if test "x$ac_ct_CHECKPOLICY" = x; then
+    CHECKPOLICY="no"
+  else
+    case $cross_compiling:$ac_tool_warned in
+yes:)
+{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
+$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
+ac_tool_warned=yes ;;
+esac
+    CHECKPOLICY=$ac_ct_CHECKPOLICY
+  fi
+else
+  CHECKPOLICY="$ac_cv_prog_CHECKPOLICY"
+fi
+
+
+  if test "$CHECKPOLICY" != "no"; then
+     CHECKPOLICYHELP=`$CHECKPOLICY -h | grep xen`
+     if test "$CHECKPOLICYHELP" = ""; then
+        CHECKPOLICY=no
+     fi
+  fi
+
+    if test "x$CHECKPOLICY" = "xno"; then :
+
+        if test "x$enable_xsmpolicy" = "xyes"; then :
+
+            as_fn_error $? "XSM policy compilation enabled, but unable to find checkpolicy" "$LINENO" 5
+fi
+        xsmpolicy="n"
 
 fi
 

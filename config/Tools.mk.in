@@ -46,6 +46,7 @@ GIT_HTTP            := @githttp@
 XENSTAT_XENTOP      := @monitors@
 LIBXENAPI_BINDINGS  := @xenapi@
 OCAML_TOOLS         := @ocamltools@
+FLASK_POLICY        := @xsmpolicy@
 CONFIG_MINITERM     := @miniterm@
 CONFIG_LOMOUNT      := @lomount@
 CONFIG_OVMF         := @ovmf@
