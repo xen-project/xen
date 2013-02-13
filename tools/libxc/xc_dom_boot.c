@@ -266,7 +266,7 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
         return rc;
 
     /* let the vm run */
-    memset(ctxt, 0, sizeof(ctxt));
+    memset(ctxt, 0, sizeof(*ctxt));
     if ( (rc = dom->arch_hooks->vcpu(dom, ctxt)) != 0 )
         return rc;
     xc_dom_unmap_all(dom);

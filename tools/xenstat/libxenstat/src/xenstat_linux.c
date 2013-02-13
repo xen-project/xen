@@ -113,7 +113,7 @@ int parseNetDevLine(char *line, char *iface, unsigned long long *rxBytes, unsign
 
 	/* Initialize all variables called has passed as non-NULL to zeros */
 	if (iface != NULL)
-		memset(iface, 0, sizeof(iface));
+		memset(iface, 0, sizeof(*iface));
 	if (rxBytes != NULL)
 		*rxBytes = 0;
 	if (rxPackets != NULL)
