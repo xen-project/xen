@@ -596,6 +596,42 @@ struct xen_sysctl_scheduler_op {
 typedef struct xen_sysctl_scheduler_op xen_sysctl_scheduler_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_scheduler_op_t);
 
+/* XEN_SYSCTL_coverage_op */
+/*
+ * Get total size of information, to help allocate
+ * the buffer. The pointer points to a 32 bit value.
+ */
+#define XEN_SYSCTL_COVERAGE_get_total_size 0
+
+/*
+ * Read coverage information in a single run
+ * You must use a tool to split them.
+ */
+#define XEN_SYSCTL_COVERAGE_read           1
+
+/*
+ * Reset all the coverage counters to 0
+ * No parameters.
+ */
+#define XEN_SYSCTL_COVERAGE_reset          2
+
+/*
+ * Like XEN_SYSCTL_COVERAGE_read but reset also
+ * counters to 0 in a single call.
+ */
+#define XEN_SYSCTL_COVERAGE_read_and_reset 3
+
+struct xen_sysctl_coverage_op {
+    uint32_t cmd;        /* XEN_SYSCTL_COVERAGE_* */
+    union {
+        uint32_t total_size; /* OUT */
+        XEN_GUEST_HANDLE_64(uint8)  raw_info;   /* OUT */
+    } u;
+};
+typedef struct xen_sysctl_coverage_op xen_sysctl_coverage_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_coverage_op_t);
+
+
 struct xen_sysctl {
     uint32_t cmd;
 #define XEN_SYSCTL_readconsole                    1
@@ -616,6 +652,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_numainfo                      17
 #define XEN_SYSCTL_cpupool_op                    18
 #define XEN_SYSCTL_scheduler_op                  19
+#define XEN_SYSCTL_coverage_op                   20
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_readconsole       readconsole;
@@ -636,6 +673,7 @@ struct xen_sysctl {
         struct xen_sysctl_lockprof_op       lockprof_op;
         struct xen_sysctl_cpupool_op        cpupool_op;
         struct xen_sysctl_scheduler_op      scheduler_op;
+        struct xen_sysctl_coverage_op       coverage_op;
         uint8_t                             pad[128];
     } u;
 };

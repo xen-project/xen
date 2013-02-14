@@ -14,6 +14,8 @@
 #ifndef __XEN_GCOV_H__
 #define __XEN_GCOV_H__ __XEN_GCOV_H__
 
+#include <public/sysctl.h>
+
 /*
  * Profiling data types used for gcc 3.4 and above - these are defined by
  * gcc and need to be kept as close to the original definition as possible to
@@ -80,5 +82,12 @@ struct gcov_info
     struct gcov_ctr_info      counts[0];
 };
 
+
+/**
+ * Sysctl operations for coverage
+ */
+#ifdef TEST_COVERAGE
+int sysctl_coverage_op(xen_sysctl_coverage_op_t *op);
+#endif
 
 #endif /* __XEN_GCOV_H__ */
