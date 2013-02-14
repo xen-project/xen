@@ -442,6 +442,8 @@ void __init start_xen(unsigned long boot_phys_offset,
        scrub_heap_pages();
     */
 
+    init_constructors();
+
     console_endboot();
 
     /* Hide UART from DOM0 if we're using it */

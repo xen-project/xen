@@ -1378,6 +1378,8 @@ void __init __start_xen(unsigned long mbi_p)
 
     init_trace_bufs();
 
+    init_constructors();
+
     console_endboot();
 
     /* Hide UART from DOM0 if we're using it */

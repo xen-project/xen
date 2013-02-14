@@ -2,6 +2,7 @@
 #include <xen/ctype.h>
 #include <xen/lib.h>
 #include <xen/types.h>
+#include <xen/init.h>
 #include <asm/byteorder.h>
 
 /* for ctype.h */
@@ -476,6 +477,19 @@ unsigned long long parse_size_and_unit(const char *s, const char **ps)
         *ps = s1;
 
     return ret;
+}
+
+extern const struct
+{
+    unsigned long count;
+    void (*funcs[1])(void);
+} __CTOR_LIST__;
+
+void __init init_constructors(void)
+{
+    unsigned long n;
+    for ( n = 0; n < __CTOR_LIST__.count; ++n )
+        __CTOR_LIST__.funcs[n]();
 }
 
 /*

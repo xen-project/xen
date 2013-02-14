@@ -127,4 +127,6 @@ extern void add_taint(unsigned);
 struct cpu_user_regs;
 void dump_execstate(struct cpu_user_regs *);
 
+void init_constructors(void);
+
 #endif /* __LIB_H__ */

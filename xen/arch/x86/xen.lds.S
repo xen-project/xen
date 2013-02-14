@@ -108,6 +108,13 @@ SECTIONS
        __trampoline_seg_start = .;
        *(.trampoline_seg)
        __trampoline_seg_stop = .;
+
+       . = ALIGN(8);
+       __CTOR_LIST__ = .;
+       QUAD((__CTOR_END__ - __CTOR_LIST__) / 8 - 2)
+       *(.ctors)
+       QUAD(0)
+       __CTOR_END__ = .;
   } :text
   . = ALIGN(32);
   .init.setup : {
