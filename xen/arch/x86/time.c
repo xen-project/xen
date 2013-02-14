@@ -127,7 +127,7 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
         delta <<= scale->shift;
 
     asm (
-        "mul %2 ; shrd $32,%1,%0"
+        "mulq %2 ; shrd $32,%1,%0"
         : "=a" (product), "=d" (delta)
         : "rm" (delta), "0" ((u64)scale->mul_frac) );
 
