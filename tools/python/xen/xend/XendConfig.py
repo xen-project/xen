@@ -1124,6 +1124,10 @@ class XendConfig(dict):
         else:
             for name, typ in XENAPI_CFG_TYPES.items():
                 if name in self and self[name] not in (None, []):
+                    # Skip cpuid and cpuid_check.  Custom conversion
+                    # methods for these are called below.
+                    if name in ("cpuid", "cpuid_check"):
+                        continue
                     if typ == dict:
                         s = self[name].items()
                     elif typ == list:
