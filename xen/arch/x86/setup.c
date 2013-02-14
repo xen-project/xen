@@ -838,8 +838,8 @@ void __init __start_xen(unsigned long mbi_p)
             l4_pgentry_t *pl4e;
             l3_pgentry_t *pl3e;
             l2_pgentry_t *pl2e;
+            uint64_t load_start;
             int i, j, k;
-            void *dst;
 
             /* Select relocation address. */
             e = end - reloc_size;
@@ -852,11 +852,9 @@ void __init __start_xen(unsigned long mbi_p)
              * with a barrier(). After this we must *not* modify static/global
              * data until after we have switched to the relocated pagetables!
              */
+            load_start = (unsigned long)_start - XEN_VIRT_START;
             barrier();
-            dst = move_memory(e, 0, (unsigned long)&_end - XEN_VIRT_START, 1);
-
-            /* Poison low 1MB to detect stray pointers to physical 0-1MB. */
-            memset(dst, 0x55, 1U << 20);
+            move_memory(e + load_start, load_start, _end - _start, 1);
 
             /* Walk initial pagetables, relocating page directory entries. */
             pl4e = __va(__pa(idle_pg_table));
