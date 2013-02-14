@@ -229,6 +229,7 @@ tools/misc/gtraceview
 tools/misc/gtracestat
 tools/misc/xenlockprof
 tools/misc/lowmemd
+tools/misc/xencov
 tools/pygrub/build/*
 tools/python/build/*
 tools/python/xen/util/path.py
