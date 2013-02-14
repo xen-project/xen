@@ -13,9 +13,18 @@
 #define DEFINE_SPINLOCK(x) spinlock_t x = SPIN_LOCK_UNLOCKED
 #endif
 
-#if defined(_LINUX_INIT_H) && !defined(__init)
+#ifdef _LINUX_INIT_H
+
+#ifndef __init
 #define __init
 #endif
+
+#ifndef __devinit
+#define __devinit
+#define __devinitdata
+#endif
+
+#endif /* _LINUX_INIT_H */
 
 #if defined(__LINUX_CACHE_H) && !defined(__read_mostly)
 #define __read_mostly
