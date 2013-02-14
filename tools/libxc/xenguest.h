@@ -103,6 +103,8 @@ struct restore_callbacks {
 /**
  * This function will restore a saved domain.
  *
+ * Domain is restored in a suspended state ready to be unpaused.
+ *
  * @parm xch a handle to an open hypervisor interface
  * @parm fd the file descriptor to restore a domain from
  * @parm dom the id of the domain
