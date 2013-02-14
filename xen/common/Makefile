@@ -59,5 +59,7 @@ subdir-$(CONFIG_COMPAT) += compat
 
 subdir-$(x86_64) += hvm
 
+subdir-$(coverage) += gcov
+
 subdir-y += libelf
 subdir-$(HAS_DEVICE_TREE) += libfdt

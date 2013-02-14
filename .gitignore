@@ -13,6 +13,8 @@
 *.tmp
 *.spot
 *.spit
+*.gcno
+*.gcda
 TAGS
 GTAGS
 GRTAGS

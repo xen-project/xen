@@ -17,6 +17,8 @@
 .*\.rej$
 .*\.spot$
 .*\.spit$
+.*\.gcno$
+.*\.gcda$
 .*/a\.out$
 .*/Modules\.symvers$
 .*/cscope\..*$
