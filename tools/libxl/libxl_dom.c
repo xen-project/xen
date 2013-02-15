@@ -21,6 +21,7 @@
 
 #include <xc_dom.h>
 #include <xen/hvm/hvm_info_table.h>
+#include <xen/hvm/hvm_xs_strings.h>
 
 libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
 {
@@ -510,11 +511,61 @@ static int hvm_build_set_params(xc_interface *handle, uint32_t domid,
     return 0;
 }
 
-static const char *libxl__domain_firmware(libxl__gc *gc,
-                                          libxl_domain_build_info *info)
+static int hvm_build_set_xs_values(libxl__gc *gc,
+                                   uint32_t domid,
+                                   struct xc_hvm_build_args *args)
+{
+    char *path = NULL;
+    int ret = 0;
+
+    if (args->smbios_module.guest_addr_out) {
+        path = GCSPRINTF("/local/domain/%d/"HVM_XS_SMBIOS_PT_ADDRESS, domid);
+
+        ret = libxl__xs_write(gc, XBT_NULL, path, "0x%"PRIx64,
+                              args->smbios_module.guest_addr_out);
+        if (ret)
+            goto err;
+
+        path = GCSPRINTF("/local/domain/%d/"HVM_XS_SMBIOS_PT_LENGTH, domid);
+
+        ret = libxl__xs_write(gc, XBT_NULL, path, "0x%x",
+                              args->smbios_module.length);
+        if (ret)
+            goto err;
+    }
+
+    if (args->acpi_module.guest_addr_out) {
+        path = GCSPRINTF("/local/domain/%d/"HVM_XS_ACPI_PT_ADDRESS, domid);
+
+        ret = libxl__xs_write(gc, XBT_NULL, path, "0x%"PRIx64,
+                              args->acpi_module.guest_addr_out);
+        if (ret)
+            goto err;
+
+        path = GCSPRINTF("/local/domain/%d/"HVM_XS_ACPI_PT_LENGTH, domid);
+
+        ret = libxl__xs_write(gc, XBT_NULL, path, "0x%x",
+                              args->acpi_module.length);
+        if (ret)
+            goto err;
+    }
+
+    return 0;
+
+err:
+    LOG(ERROR, "failed to write firmware xenstore value, err: %d", ret);
+    return ret;
+}
+
+static int libxl__domain_firmware(libxl__gc *gc,
+                                  libxl_domain_build_info *info,
+                                  struct xc_hvm_build_args *args)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     const char *firmware;
+    int e, rc = ERROR_FAIL;
+    int datalen = 0;
+    void *data;
 
     if (info->u.hvm.firmware)
         firmware = info->u.hvm.firmware;
@@ -528,13 +579,52 @@ static const char *libxl__domain_firmware(libxl__gc *gc,
             firmware = "hvmloader";
             break;
         default:
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "invalid device model version %d",
-                       info->device_model_version);
-            return NULL;
+            LOG(ERROR, "invalid device model version %d",
+                info->device_model_version);
+            return ERROR_FAIL;
             break;
         }
     }
-    return libxl__abs_path(gc, firmware, libxl__xenfirmwaredir_path());
+    args->image_file_name = libxl__abs_path(gc, firmware,
+                                            libxl__xenfirmwaredir_path());
+
+    if (info->u.hvm.smbios_firmware) {
+        data = NULL;
+        e = libxl_read_file_contents(ctx, info->u.hvm.smbios_firmware,
+                                     &data, &datalen);
+        if (e) {
+            LOGEV(ERROR, e, "failed to read SMBIOS firmware file %s",
+                info->u.hvm.smbios_firmware);
+            goto out;
+        }
+        libxl__ptr_add(gc, data);
+        if (datalen) {
+            /* Only accept non-empty files */
+            args->smbios_module.data = data;
+            args->smbios_module.length = (uint32_t)datalen;
+        }
+    }
+
+    if (info->u.hvm.acpi_firmware) {
+        data = NULL;
+        e = libxl_read_file_contents(ctx, info->u.hvm.acpi_firmware,
+                                     &data, &datalen);
+        if (e) {
+            LOGEV(ERROR, e, "failed to read ACPI firmware file %s",
+                info->u.hvm.acpi_firmware);
+            goto out;
+        }
+        libxl__ptr_add(gc, data);
+        if (datalen) {
+            /* Only accept non-empty files */
+            args->acpi_module.data = data;
+            args->acpi_module.length = (uint32_t)datalen;
+        }
+    }
+
+    return 0;
+out:
+    return rc;
 }
 
 int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
@@ -544,10 +634,6 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     struct xc_hvm_build_args args = {};
     int ret, rc = ERROR_FAIL;
-    const char *firmware = libxl__domain_firmware(gc, info);
-
-    if (!firmware)
-        goto out;
 
     memset(&args, 0, sizeof(struct xc_hvm_build_args));
     /* The params from the configuration file are in Mb, which are then
@@ -557,22 +643,34 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
      */
     args.mem_size = (uint64_t)(info->max_memkb - info->video_memkb) << 10;
     args.mem_target = (uint64_t)(info->target_memkb - info->video_memkb) << 10;
-    args.image_file_name = firmware;
+
+    if (libxl__domain_firmware(gc, info, &args)) {
+        LOG(ERROR, "initializing domain firmware failed");
+        goto out;
+    }
 
     ret = xc_hvm_build(ctx->xch, domid, &args);
     if (ret) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, ret, "hvm building failed");
+        LOGEV(ERROR, ret, "hvm building failed");
         goto out;
     }
+
     ret = hvm_build_set_params(ctx->xch, domid, info, state->store_port,
                                &state->store_mfn, state->console_port,
                                &state->console_mfn, state->store_domid,
                                state->console_domid);
     if (ret) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, ret, "hvm build set params failed");
+        LOGEV(ERROR, ret, "hvm build set params failed");
         goto out;
     }
-    rc = 0;
+
+    ret = hvm_build_set_xs_values(gc, domid, &args);
+    if (ret) {
+        LOG(ERROR, "hvm build set xenstore values failed (ret=%d)", ret);
+        goto out;
+    }
+
+    return 0;
 out:
     return rc;
 }
@@ -634,7 +732,7 @@ int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
 
     memcpy(&count, ptr, sizeof(count));
     ptr += sizeof(count);
- 
+
     if (size < sizeof(version) + sizeof(count) +
             count * (sizeof(struct libxl__physmap_info))) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "wrong size");
@@ -848,7 +946,7 @@ static void switch_logdirty_xswatch(libxl__egc *egc, libxl__ev_xswatch *watch,
         rc = libxl__xs_rm_checked(gc, t, lds->ret_path);
         if (rc) goto out;
 
-        rc = libxl__xs_transaction_commit(gc, &t); 
+        rc = libxl__xs_transaction_commit(gc, &t);
         if (!rc) break;
         if (rc<0) goto out;
     }
@@ -1320,7 +1418,7 @@ void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
     if (type == LIBXL_DOMAIN_TYPE_HVM) {
         rc = libxl__domain_suspend_device_model(gc, dss);
         if (rc) goto out;
-        
+
         libxl__domain_save_device_model(egc, dss, domain_suspend_done);
         return;
     }

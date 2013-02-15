@@ -829,6 +829,25 @@ libxl: 'host,tm=0,sse3=0'
 More info about the CPUID instruction can be found in the processor manuals, and
 in Wikipedia: L<http://en.wikipedia.org/wiki/CPUID>
 
+=item B<acpi_firmware="STRING">
+
+Specify a path to a file that contains extra ACPI firmware tables to pass in to
+a guest. The file can contain several tables in their binary AML form
+concatenated together. Each table self describes its length so no additional
+information is needed. These tables will be added to the ACPI table set in the
+guest. Note that existing tables cannot be overridden by this feature. For
+example this cannot be used to override tables like DSDT, FADT, etc.
+
+=item B<smbios_firmware="STRING">
+
+Specify a path to a file that contains extra SMBIOS firmware structures to pass
+in to a guest. The file can contain a set DMTF predefined structures which will
+override the internal defaults. Not all predefined structures can be overridden,
+only the following types: 0, 1, 2, 3, 11, 22, 39. The file can also contain any
+number of vendor defined SMBIOS structures (type 128 - 255). Since SMBIOS
+structures do not present their overall size, each entry in the file must be
+preceded by a 32b integer indicating the size of the next structure.
+
 =back 
 
 =head3 Guest Virtual Time Controls

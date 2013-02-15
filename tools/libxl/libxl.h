@@ -68,6 +68,13 @@
  */
 
 /*
+ * LIBXL_HAVE_FIRMWARE_PASSTHROUGH indicates the feature for
+ * passing in SMBIOS and ACPI firmware to HVM guests is present
+ * in the library.
+ */
+#define LIBXL_HAVE_FIRMWARE_PASSTHROUGH 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
