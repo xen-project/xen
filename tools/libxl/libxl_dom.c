@@ -202,9 +202,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
               libxl_domain_build_info *info, libxl__domain_build_state *state)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    int tsc_mode;
     char *xs_domid, *con_domid;
-    uint32_t rtc_timeoffset;
 
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
 
@@ -233,49 +231,6 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus, &info->cpumap);
 
     xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + LIBXL_MAXMEM_CONSTANT);
-    if (info->type == LIBXL_DOMAIN_TYPE_PV)
-        xc_domain_set_memmap_limit(ctx->xch, domid,
-                (info->max_memkb + info->u.pv.slack_memkb));
-    switch (info->tsc_mode) {
-    case LIBXL_TSC_MODE_DEFAULT:
-        tsc_mode = 0;
-        break;
-    case LIBXL_TSC_MODE_ALWAYS_EMULATE:
-        tsc_mode = 1;
-        break;
-    case LIBXL_TSC_MODE_NATIVE:
-        tsc_mode = 2;
-        break;
-    case LIBXL_TSC_MODE_NATIVE_PARAVIRT:
-        tsc_mode = 3;
-        break;
-    default:
-        abort();
-    }
-    xc_domain_set_tsc_info(ctx->xch, domid, tsc_mode, 0, 0, 0);
-    if (libxl_defbool_val(info->disable_migrate))
-        xc_domain_disable_migrate(ctx->xch, domid);
-
-    rtc_timeoffset = info->rtc_timeoffset;
-    if (libxl_defbool_val(info->localtime)) {
-        time_t t;
-        struct tm *tm;
-
-        t = time(NULL);
-        tm = localtime(&t);
-
-        rtc_timeoffset += tm->tm_gmtoff;
-    }
-
-    if (rtc_timeoffset)
-        xc_domain_set_time_offset(ctx->xch, domid, rtc_timeoffset);
-
-    if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
-        unsigned long shadow;
-        shadow = (info->shadow_memkb + 1023) / 1024;
-        xc_shadow_control(ctx->xch, domid, XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION, NULL, 0, &shadow, 0, NULL);
-    }
-
     xs_domid = xs_read(ctx->xsh, XBT_NULL, "/tool/xenstored/domid", NULL);
     state->store_domid = xs_domid ? atoi(xs_domid) : 0;
     free(xs_domid);
@@ -442,8 +397,13 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
         goto out;
     }
 
-    state->console_mfn = xc_dom_p2m_host(dom, dom->console_pfn);
-    state->store_mfn = xc_dom_p2m_host(dom, dom->xenstore_pfn);
+    if (xc_dom_feature_translated(dom)) {
+        state->console_mfn = dom->console_pfn;
+        state->store_mfn = dom->xenstore_pfn;
+    } else {
+        state->console_mfn = xc_dom_p2m_host(dom, dom->console_pfn);
+        state->store_mfn = xc_dom_p2m_host(dom, dom->xenstore_pfn);
+    }
 
     libxl__file_reference_unmap(&state->pv_kernel);
     libxl__file_reference_unmap(&state->pv_ramdisk);
