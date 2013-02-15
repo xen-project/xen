@@ -112,19 +112,14 @@ extern unsigned char boot_edid_info[128];
 
 #define CONFIG_COMPAT 1
 
+#include <xen/const.h>
+
 #define PML4_ENTRY_BITS  39
-#ifndef __ASSEMBLY__
-#define PML4_ENTRY_BYTES (1UL << PML4_ENTRY_BITS)
-#define PML4_ADDR(_slot)                             \
-    ((((_slot ## UL) >> 8) * 0xffff000000000000UL) | \
-     (_slot ## UL << PML4_ENTRY_BITS))
-#define GB(_gb) (_gb ## UL << 30)
-#else
-#define PML4_ENTRY_BYTES (1 << PML4_ENTRY_BITS)
-#define PML4_ADDR(_slot)                             \
-    (((_slot >> 8) * 0xffff000000000000) | (_slot << PML4_ENTRY_BITS))
-#define GB(_gb) (_gb << 30)
-#endif
+#define PML4_ENTRY_BYTES (_AC(1,UL) << PML4_ENTRY_BITS)
+#define PML4_ADDR(_slot)                              \
+    (((_AC(_slot, UL) >> 8) * _AC(0xffff000000000000,UL)) | \
+     (_AC(_slot, UL) << PML4_ENTRY_BITS))
+#define GB(_gb) (_AC(_gb, UL) << 30)
 
 /*
  * Memory layout:
@@ -242,7 +237,7 @@ extern unsigned char boot_edid_info[128];
                                                           PAGE_SHIFT)) + 1)
 #define SPAGETABLE_SIZE         (SPAGETABLE_NR * sizeof(struct spage_info))
 #define SPAGETABLE_VIRT_START   ((SPAGETABLE_VIRT_END - SPAGETABLE_SIZE) & \
-                                 (-1UL << SUPERPAGE_SHIFT))
+                                 (_AC(-1,UL) << SUPERPAGE_SHIFT))
 /* Slot 261: page-frame information array (128GB). */
 #define FRAMETABLE_VIRT_END     DIRECTMAP_VIRT_START
 #define FRAMETABLE_SIZE         GB(128)
