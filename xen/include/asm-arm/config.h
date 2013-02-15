@@ -19,6 +19,8 @@
 
 #define CONFIG_DOMAIN_PAGE 1
 
+#define CONFIG_VIDEO 1
+
 #define OPT_CONSOLE_STR "com1"
 
 #ifdef MAX_PHYS_CPUS
