@@ -748,6 +748,8 @@ extern void dump_runq(unsigned char key);
 
 #define num_cpupool_cpus(c) cpumask_weight((c)->cpu_valid)
 
+void arch_do_physinfo(xen_sysctl_physinfo_t *pi);
+
 #endif /* __SCHED_H__ */
 
 /*

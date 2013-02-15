@@ -43,16 +43,16 @@ uint64_t __read_mostly boot_count;
 
 /* For fine-grained timekeeping, we use the ARM "Generic Timer", a
  * register-mapped time source in the SoC. */
-static uint32_t __read_mostly cntfrq;      /* Ticks per second */
+unsigned long __read_mostly cpu_khz;  /* CPU clock frequency in kHz. */
 
 /*static inline*/ s_time_t ticks_to_ns(uint64_t ticks)
 {
-    return muldiv64(ticks, SECONDS(1), cntfrq);
+    return muldiv64(ticks, SECONDS(1), 1000 * cpu_khz);
 }
 
 /*static inline*/ uint64_t ns_to_ticks(s_time_t ns)
 {
-    return muldiv64(ns, cntfrq, SECONDS(1));
+    return muldiv64(ns, 1000 * cpu_khz, SECONDS(1));
 }
 
 /* TODO: On a real system the firmware would have set the frequency in
@@ -93,9 +93,9 @@ int __init init_xen_time(void)
     if ( (READ_CP32(ID_PFR1) & ID_PFR1_GT_MASK) != ID_PFR1_GT_v1 )
         panic("CPU does not support the Generic Timer v1 interface.\n");
 
-    cntfrq = READ_CP32(CNTFRQ);
+    cpu_khz = READ_CP32(CNTFRQ) / 1000;
     boot_count = READ_CP64(CNTPCT);
-    printk("Using generic timer at %"PRIu32" Hz\n", cntfrq);
+    printk("Using generic timer at %lu KHz\n", cpu_khz);
 
     return 0;
 }

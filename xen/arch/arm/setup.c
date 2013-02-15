@@ -219,7 +219,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     ram_start = early_info.mem.bank[0].start;
     ram_size  = early_info.mem.bank[0].size;
     ram_end = ram_start + ram_size;
-    ram_pages = ram_size >> PAGE_SHIFT;
+    total_pages = ram_pages = ram_size >> PAGE_SHIFT;
 
     /*
      * Locate the xenheap using these constraints:

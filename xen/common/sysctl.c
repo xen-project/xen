@@ -249,6 +249,115 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         ret = sched_adjust_global(&op->u.scheduler_op);
         break;
 
+    case XEN_SYSCTL_physinfo:
+    {
+        xen_sysctl_physinfo_t *pi = &op->u.physinfo;
+
+        memset(pi, 0, sizeof(*pi));
+        pi->threads_per_core =
+            cpumask_weight(per_cpu(cpu_sibling_mask, 0));
+        pi->cores_per_socket =
+            cpumask_weight(per_cpu(cpu_core_mask, 0)) / pi->threads_per_core;
+        pi->nr_cpus = num_online_cpus();
+        pi->nr_nodes = num_online_nodes();
+        pi->max_node_id = MAX_NUMNODES-1;
+        pi->max_cpu_id = nr_cpu_ids - 1;
+        pi->total_pages = total_pages;
+        pi->free_pages = avail_domheap_pages();
+        pi->scrub_pages = 0;
+        pi->cpu_khz = cpu_khz;
+        arch_do_physinfo(pi);
+
+        if ( copy_to_guest(u_sysctl, op, 1) )
+            ret = -EFAULT;
+    }
+    break;
+
+    case XEN_SYSCTL_numainfo:
+    {
+        uint32_t i, j, max_node_index, last_online_node;
+        xen_sysctl_numainfo_t *ni = &op->u.numainfo;
+
+        last_online_node = last_node(node_online_map);
+        max_node_index = min_t(uint32_t, ni->max_node_index, last_online_node);
+        ni->max_node_index = last_online_node;
+
+        for ( i = 0; i <= max_node_index; i++ )
+        {
+            if ( !guest_handle_is_null(ni->node_to_memsize) )
+            {
+                uint64_t memsize = node_online(i) ?
+                                   node_spanned_pages(i) << PAGE_SHIFT : 0ul;
+                if ( copy_to_guest_offset(ni->node_to_memsize, i, &memsize, 1) )
+                    break;
+            }
+            if ( !guest_handle_is_null(ni->node_to_memfree) )
+            {
+                uint64_t memfree = node_online(i) ?
+                                   avail_node_heap_pages(i) << PAGE_SHIFT : 0ul;
+                if ( copy_to_guest_offset(ni->node_to_memfree, i, &memfree, 1) )
+                    break;
+            }
+
+            if ( !guest_handle_is_null(ni->node_to_node_distance) )
+            {
+                for ( j = 0; j <= max_node_index; j++)
+                {
+                    uint32_t distance = ~0u;
+                    if ( node_online(i) && node_online(j) )
+                        distance = __node_distance(i, j);
+                    if ( copy_to_guest_offset(
+                        ni->node_to_node_distance,
+                        i*(max_node_index+1) + j, &distance, 1) )
+                        break;
+                }
+                if ( j <= max_node_index )
+                    break;
+            }
+        }
+
+        ret = ((i <= max_node_index) || copy_to_guest(u_sysctl, op, 1))
+            ? -EFAULT : 0;
+    }
+    break;
+
+    case XEN_SYSCTL_topologyinfo:
+    {
+        uint32_t i, max_cpu_index, last_online_cpu;
+        xen_sysctl_topologyinfo_t *ti = &op->u.topologyinfo;
+
+        last_online_cpu = cpumask_last(&cpu_online_map);
+        max_cpu_index = min_t(uint32_t, ti->max_cpu_index, last_online_cpu);
+        ti->max_cpu_index = last_online_cpu;
+
+        for ( i = 0; i <= max_cpu_index; i++ )
+        {
+            if ( !guest_handle_is_null(ti->cpu_to_core) )
+            {
+                uint32_t core = cpu_online(i) ? cpu_to_core(i) : ~0u;
+                if ( copy_to_guest_offset(ti->cpu_to_core, i, &core, 1) )
+                    break;
+            }
+            if ( !guest_handle_is_null(ti->cpu_to_socket) )
+            {
+                uint32_t socket = cpu_online(i) ? cpu_to_socket(i) : ~0u;
+                if ( copy_to_guest_offset(ti->cpu_to_socket, i, &socket, 1) )
+                    break;
+            }
+            if ( !guest_handle_is_null(ti->cpu_to_node) )
+            {
+                uint32_t node = cpu_online(i) ? cpu_to_node(i) : ~0u;
+                if ( copy_to_guest_offset(ti->cpu_to_node, i, &node, 1) )
+                    break;
+            }
+        }
+
+        ret = ((i <= max_cpu_index) || copy_to_guest(u_sysctl, op, 1))
+            ? -EFAULT : 0;
+    }
+    break;
+
+
     default:
         ret = arch_do_sysctl(op, u_sysctl);
         copyback = 0;
