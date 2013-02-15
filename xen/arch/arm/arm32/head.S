@@ -73,7 +73,7 @@ past_zImage:
 
         /* Save the bootloader arguments in less-clobberable registers */
         /* No need to save r1 == Unused ARM-linux machine type */
-        mov   r8, r2                 /* r8 := ATAG base address */
+        mov   r8, r2                 /* r8 := DTB base address */
 
         /* Find out where we are */
         ldr   r0, =start
@@ -334,7 +334,7 @@ launch:
         add   sp, #STACK_SIZE        /* (which grows down from the top). */
         sub   sp, #CPUINFO_sizeof    /* Make room for CPU save record */
         mov   r0, r10                /* Marshal args: - phys_offset */
-        mov   r1, r8                 /*               - ATAG address */
+        mov   r1, r8                 /*               - DTB address */
         movs  r2, r12                /*               - CPU ID */
         beq   start_xen              /* and disappear into the land of C */
         b     start_secondary        /* (to the appropriate entry point) */

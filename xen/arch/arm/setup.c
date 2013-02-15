@@ -329,7 +329,7 @@ void __init setup_cache(void)
 
 /* C entry point for boot CPU */
 void __init start_xen(unsigned long boot_phys_offset,
-                      unsigned long atag_paddr,
+                      unsigned long fdt_paddr,
                       unsigned long cpuid)
 {
     void *fdt;
@@ -341,7 +341,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     smp_clear_cpu_maps();
 
     fdt = (void *)BOOT_MISC_VIRT_START
-        + (atag_paddr & ((1 << SECOND_SHIFT) - 1));
+        + (fdt_paddr & ((1 << SECOND_SHIFT) - 1));
     fdt_size = device_tree_early_init(fdt);
 
     cpus = smp_get_max_cpus();
@@ -365,7 +365,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
 
-    setup_mm(atag_paddr, fdt_size);
+    setup_mm(fdt_paddr, fdt_size);
 
     /* Setup Hyp vector base */
     WRITE_CP32((uint32_t) hyp_traps_vector, HVBAR);
