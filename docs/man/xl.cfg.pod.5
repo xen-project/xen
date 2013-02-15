@@ -998,7 +998,7 @@ option (see below).
 The default amount of video ram for stdvga is 8MB which is sufficient
 for e.g. 1600x1200 at 32bpp.
 
-When using the emulated Cirrus graphics card (B<stdvga=0>)
+When using the emulated Cirrus graphics card (B<vga="cirrus">)
 the amount of video ram is fixed at 4MB which is sufficient
 for 1024x768 at 32 bpp.
 
@@ -1014,6 +1014,12 @@ emulated graphics device. The default is false which means to emulate
 a Cirrus Logic GD5446 VGA card. If your guest supports VBE 2.0 or
 later (e.g. Windows XP onwards) then you should enable this.
 stdvga supports more video ram and bigger resolutions than Cirrus.
+This option is deprecated, use vga="stdvga" instead.
+
+=item B<vga="STRING">
+
+Selects the emulated video card (stdvga|cirrus).
+The default is cirrus.
 
 =item B<vnc=BOOLEAN>
 
