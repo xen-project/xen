@@ -41,6 +41,9 @@ struct domain *dom_xen, *dom_io, *dom_cow;
 
 /* Static start-of-day pagetables that we use before the allocators are up */
 lpae_t xen_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+/* N.B. The second-level table is 4 contiguous pages long, and covers
+ * all addresses from 0 to 0xffffffff.  Offsets into it are calculated
+ * with second_linear_offset(), not second_table_offset(). */
 lpae_t xen_second[LPAE_ENTRIES*4] __attribute__((__aligned__(4096*4)));
 lpae_t xen_fixmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 static lpae_t xen_xenmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
