@@ -19,7 +19,7 @@ static inline void flush_tlb_local(void)
 {
     dsb();
 
-    WRITE_CP32((uint32_t) 0, TLBIALLIS);
+    WRITE_CP32((uint32_t) 0, TLBIALL);
 
     dsb();
     isb();
@@ -30,7 +30,7 @@ static inline void flush_tlb_all_local(void)
 {
     dsb();
 
-    WRITE_CP32((uint32_t) 0, TLBIALLNSNHIS);
+    WRITE_CP32((uint32_t) 0, TLBIALLNSNH);
 
     dsb();
     isb();
