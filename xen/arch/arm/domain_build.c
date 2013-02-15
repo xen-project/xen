@@ -349,7 +349,7 @@ int construct_dom0(struct domain *d)
  */
 
     regs->r0 = 0; /* SBZ */
-    regs->r1 = 2272; /* Machine NR: Versatile Express */
+    regs->r1 = 0xffffffff; /* We use DTB therefore no machine id */
     regs->r2 = kinfo.dtb_paddr;
 
     WRITE_CP32(SCTLR_BASE, SCTLR);
