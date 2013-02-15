@@ -40,7 +40,8 @@ static void phys_timer_expired(void *data)
 static void virt_timer_expired(void *data)
 {
     struct vtimer *t = data;
-    vcpu_wake(t->v);
+    t->ctl |= CNTx_CTL_MASK;
+    vgic_vcpu_inject_irq(t->v, 27, 1);
 }
  
 int vcpu_vtimer_init(struct vcpu *v)
@@ -73,6 +74,9 @@ void vcpu_timer_destroy(struct vcpu *v)
 
 int virt_timer_save(struct vcpu *v)
 {
+    if ( is_idle_domain(v->domain) )
+        return 0;
+
     v->arch.virt_timer.ctl = READ_CP32(CNTV_CTL);
     WRITE_CP32(v->arch.virt_timer.ctl & ~CNTx_CTL_ENABLE, CNTV_CTL);
     v->arch.virt_timer.cval = READ_CP64(CNTV_CVAL);
@@ -86,9 +90,11 @@ int virt_timer_save(struct vcpu *v)
 
 int virt_timer_restore(struct vcpu *v)
 {
+    if ( is_idle_domain(v->domain) )
+        return 0;
+
     stop_timer(&v->arch.virt_timer.timer);
 
-    WRITE_CP32(v->arch.virt_timer.ctl & ~CNTx_CTL_ENABLE, CNTV_CTL);
     WRITE_CP64(v->arch.virt_timer.offset, CNTVOFF);
     WRITE_CP64(v->arch.virt_timer.cval, CNTV_CVAL);
     WRITE_CP32(v->arch.virt_timer.ctl, CNTV_CTL);
