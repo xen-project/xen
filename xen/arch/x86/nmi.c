@@ -18,6 +18,7 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/irq.h>
+#include <xen/nmi.h>
 #include <xen/delay.h>
 #include <xen/time.h>
 #include <xen/sched.h>

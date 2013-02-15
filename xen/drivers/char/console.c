@@ -20,6 +20,7 @@
 #include <xen/keyhandler.h>
 #include <xen/delay.h>
 #include <xen/guest_access.h>
+#include <xen/nmi.h>
 #include <xen/shutdown.h>
 #include <xen/video.h>
 #include <xen/kexec.h>

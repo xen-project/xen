@@ -16,6 +16,7 @@
 #include <xen/ctype.h>
 #include <xen/perfc.h>
 #include <xen/mm.h>
+#include <xen/nmi.h>
 #include <xen/init.h>
 #include <asm/debugger.h>
 #include <asm/div64.h>

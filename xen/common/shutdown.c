@@ -4,6 +4,7 @@
 #include <xen/sched.h>
 #include <xen/domain.h>
 #include <xen/delay.h>
+#include <xen/nmi.h>
 #include <xen/shutdown.h>
 #include <xen/console.h>
 #ifdef CONFIG_KEXEC

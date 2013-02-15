@@ -318,10 +318,4 @@ extern unsigned long xen_phys_start;
 
 #define ARCH_CRASH_SAVE_VMCOREINFO
 
-#ifndef __ASSEMBLY__
-extern void watchdog_disable(void);
-extern void watchdog_enable(void);
-extern void watchdog_setup(void);
-#endif
-
 #endif /* __X86_CONFIG_H__ */

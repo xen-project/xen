@@ -41,4 +41,8 @@ long register_guest_nmi_callback(unsigned long address);
  */
 long unregister_guest_nmi_callback(void);
 
+void watchdog_disable(void);
+void watchdog_enable(void);
+void watchdog_setup(void);
+
 #endif /* ASM_NMI_H */
