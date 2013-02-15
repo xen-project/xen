@@ -145,7 +145,7 @@ struct cmd_spec cmd_table[] = {
     },
     { "migrate",
       &main_migrate, 0, 1,
-      "Save a domain state to restore later",
+      "Migrate a domain to another host",
       "[options] <Domain> <host>",
       "-h              Print this help.\n"
       "-C <config>     Send <config> instead of config file from creation.\n"
