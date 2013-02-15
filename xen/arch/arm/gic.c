@@ -477,8 +477,9 @@ void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
 {
     int i;
     struct pending_irq *iter, *n;
+    unsigned long flags;
 
-    spin_lock_irq(&gic.lock);
+    spin_lock_irqsave(&gic.lock, flags);
 
     if ( v->is_running && list_empty(&v->arch.vgic.lr_pending) )
     {
@@ -505,7 +506,7 @@ void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
     list_add_tail(&n->lr_queue, &v->arch.vgic.lr_pending);
 
 out:
-    spin_unlock_irq(&gic.lock);
+    spin_unlock_irqrestore(&gic.lock, flags);
     return;
 }
 
