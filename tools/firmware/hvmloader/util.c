@@ -315,23 +315,15 @@ cpuid(uint32_t idx, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
         : "0" (idx) );
 }
 
+static const char hex_digits[] = "0123456789abcdef";
+
 /* Write a two-character hex representation of 'byte' to digits[].
    Pre-condition: sizeof(digits) >= 2 */
 void
 byte_to_hex(char *digits, uint8_t byte)
 {
-    uint8_t nybbel = byte >> 4;
-
-    if ( nybbel > 9 )
-        digits[0] = 'a' + nybbel-10;
-    else
-        digits[0] = '0' + nybbel;
-
-    nybbel = byte & 0x0f;
-    if ( nybbel > 9 )
-        digits[1] = 'a' + nybbel-10;
-    else
-        digits[1] = '0' + nybbel;
+    digits[0] = hex_digits[byte >> 4];
+    digits[1] = hex_digits[byte & 0x0f];
 }
 
 /* Convert an array of 16 unsigned bytes to a DCE/OSF formatted UUID
@@ -518,13 +510,13 @@ void pci_write(uint32_t devfn, uint32_t reg, uint32_t len, uint32_t val)
     }
 }
 
-static char *printnum(char *p, unsigned long num, int base)
+static char *printnum(char *p, unsigned long num, unsigned base)
 {
     unsigned long n;
 
     if ( (n = num/base) > 0 )
         p = printnum(p, n, base);
-    *p++ = "0123456789abcdef"[(int)(num % base)];
+    *p++ = hex_digits[num % base];
     *p = '\0';
     return p;
 }
