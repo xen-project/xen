@@ -23,11 +23,12 @@
 #ifndef XENGUEST_H
 #define XENGUEST_H
 
-#define XCFLAGS_LIVE      1
-#define XCFLAGS_DEBUG     2
-#define XCFLAGS_HVM       4
-#define XCFLAGS_STDVGA    8
-#define XCFLAGS_CHECKPOINT_COMPRESS    16
+#define XCFLAGS_LIVE      (1 << 0)
+#define XCFLAGS_DEBUG     (1 << 1)
+#define XCFLAGS_HVM       (1 << 2)
+#define XCFLAGS_STDVGA    (1 << 3)
+#define XCFLAGS_CHECKPOINT_COMPRESS    (1 << 4)
+
 #define X86_64_B_SIZE   64 
 #define X86_32_B_SIZE   32
 
