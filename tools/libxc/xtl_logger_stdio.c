@@ -89,7 +89,7 @@ static void stdiostream_progress(struct xentoollog_logger *logger_in,
     int newpel, extra_erase;
     xentoollog_level this_level;
 
-    if (!(lg->flags & XTL_STDIOSTREAM_HIDE_PROGRESS))
+    if (lg->flags & XTL_STDIOSTREAM_HIDE_PROGRESS)
         return;
 
     if (percent < lg->progress_last_percent) {
