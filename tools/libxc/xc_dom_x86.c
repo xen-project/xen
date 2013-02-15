@@ -822,6 +822,11 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
     return 0;
 }
 
+int xc_dom_feature_translated(struct xc_dom_image *dom)
+{
+    return elf_xen_feature_get(XENFEAT_auto_translated_physmap, dom->f_active);
+}
+
 /*
  * Local variables:
  * mode: C

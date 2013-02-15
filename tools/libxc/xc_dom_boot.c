@@ -416,19 +416,16 @@ int xc_dom_gnttab_hvm_seed(xc_interface *xch, domid_t domid,
 
 int xc_dom_gnttab_init(struct xc_dom_image *dom)
 {
-    xen_pfn_t console_gmfn;
-    xen_pfn_t xenstore_gmfn;
-    int autotranslated;
-
-    autotranslated = xc_dom_feature_translated(dom);
-    console_gmfn = autotranslated ?
-           dom->console_pfn : xc_dom_p2m_host(dom, dom->console_pfn);
-    xenstore_gmfn = autotranslated ?
-           dom->xenstore_pfn : xc_dom_p2m_host(dom, dom->xenstore_pfn);
-
-    return xc_dom_gnttab_seed(dom->xch, dom->guest_domid,
-                              console_gmfn, xenstore_gmfn,
-                              dom->console_domid, dom->xenstore_domid);
+    if ( xc_dom_feature_translated(dom) ) {
+        return xc_dom_gnttab_hvm_seed(dom->xch, dom->guest_domid,
+                                      dom->console_pfn, dom->xenstore_pfn,
+                                      dom->console_domid, dom->xenstore_domid);
+    } else {
+        return xc_dom_gnttab_seed(dom->xch, dom->guest_domid,
+                                  xc_dom_p2m_host(dom, dom->console_pfn),
+                                  xc_dom_p2m_host(dom, dom->xenstore_pfn),
+                                  dom->console_domid, dom->xenstore_domid);
+    }
 }
 
 /*

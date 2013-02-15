@@ -51,7 +51,7 @@ static int setup_pgtables_arm(struct xc_dom_image *dom)
 static int alloc_magic_pages(struct xc_dom_image *dom)
 {
     int rc, i;
-    xen_pfn_t store_pfn, console_pfn, p2m[NR_MAGIC_PAGES];
+    xen_pfn_t p2m[NR_MAGIC_PAGES];
 
     DOMPRINTF_CALLED(dom->xch);
 
@@ -64,15 +64,20 @@ static int alloc_magic_pages(struct xc_dom_image *dom)
     if ( rc < 0 )
         return rc;
 
-    console_pfn = dom->rambase_pfn + dom->total_pages + CONSOLE_PFN_OFFSET;
-    store_pfn = dom->rambase_pfn + dom->total_pages + XENSTORE_PFN_OFFSET;
+    dom->console_pfn = dom->rambase_pfn + dom->total_pages + CONSOLE_PFN_OFFSET;
+    dom->xenstore_pfn = dom->rambase_pfn + dom->total_pages + XENSTORE_PFN_OFFSET;
 
-    xc_clear_domain_page(dom->xch, dom->guest_domid, console_pfn);
-    xc_clear_domain_page(dom->xch, dom->guest_domid, store_pfn);
+    xc_clear_domain_page(dom->xch, dom->guest_domid, dom->console_pfn);
+    xc_clear_domain_page(dom->xch, dom->guest_domid, dom->xenstore_pfn);
     xc_set_hvm_param(dom->xch, dom->guest_domid, HVM_PARAM_CONSOLE_PFN,
-            console_pfn);
+            dom->console_pfn);
     xc_set_hvm_param(dom->xch, dom->guest_domid, HVM_PARAM_STORE_PFN,
-            store_pfn);
+            dom->xenstore_pfn);
+    /* allocated by toolstack */
+    xc_set_hvm_param(dom->xch, dom->guest_domid, HVM_PARAM_CONSOLE_EVTCHN,
+            dom->console_evtchn);
+    xc_set_hvm_param(dom->xch, dom->guest_domid, HVM_PARAM_STORE_EVTCHN,
+            dom->xenstore_evtchn);
 
     return 0;
 }
@@ -194,6 +199,11 @@ int arch_setup_bootlate(struct xc_dom_image *dom)
      *   setup shared info
      */
     return 0;
+}
+
+int xc_dom_feature_translated(struct xc_dom_image *dom)
+{
+    return 1;
 }
 
 /*

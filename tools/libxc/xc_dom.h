@@ -250,6 +250,7 @@ int xc_dom_gnttab_seed(xc_interface *xch, domid_t domid,
                        xen_pfn_t xenstore_gmfn,
                        domid_t console_domid,
                        domid_t xenstore_domid);
+int xc_dom_feature_translated(struct xc_dom_image *dom);
 
 /* --- debugging bits ---------------------------------------------- */
 
@@ -310,11 +311,6 @@ static inline void *xc_dom_vaddr_to_ptr(struct xc_dom_image *dom,
     unsigned int offset = (vaddr - dom->parms.virt_base) % page_size;
     void *ptr = xc_dom_pfn_to_ptr(dom, page, 0);
     return (ptr ? (ptr + offset) : NULL);
-}
-
-static inline int xc_dom_feature_translated(struct xc_dom_image *dom)
-{
-    return elf_xen_feature_get(XENFEAT_auto_translated_physmap, dom->f_active);
 }
 
 static inline xen_pfn_t xc_dom_p2m_host(struct xc_dom_image *dom, xen_pfn_t pfn)
