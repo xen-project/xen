@@ -166,16 +166,14 @@ static int switch_qemu_logdirty(int domid, unsigned int enable, void *data)
 int
 main(int argc, char **argv)
 {
-    unsigned int maxit, max_f;
+    unsigned int maxit, max_f, lflags;
     int io_fd, ret, port;
     struct save_callbacks callbacks;
+    xentoollog_level lvl;
+    xentoollog_logger *l;
 
     if (argc != 6)
         errx(1, "usage: %s iofd domid maxit maxf flags", argv[0]);
-
-    si.xch = xc_interface_open(0,0,0);
-    if (!si.xch)
-        errx(1, "failed to open control interface");
 
     io_fd = atoi(argv[1]);
     si.domid = atoi(argv[2]);
@@ -184,6 +182,13 @@ main(int argc, char **argv)
     si.flags = atoi(argv[5]);
 
     si.suspend_evtchn = -1;
+
+    lvl = si.flags & XCFLAGS_DEBUG ? XTL_DEBUG: XTL_DETAIL;
+    lflags = XTL_STDIOSTREAM_HIDE_PROGRESS;
+    l = (xentoollog_logger *)xtl_createlogger_stdiostream(stderr, lvl, lflags);
+    si.xch = xc_interface_open(l, 0, 0);
+    if (!si.xch)
+        errx(1, "failed to open control interface");
 
     si.xce = xc_evtchn_open(NULL, 0);
     if (si.xce == NULL)
