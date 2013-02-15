@@ -1456,6 +1456,8 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     struct restore_ctx *ctx = &_ctx;
     struct domain_info_context *dinfo = &ctx->dinfo;
 
+    DPRINTF("%s: starting restore of new domid %u", __func__, dom);
+
     pagebuf_init(&pagebuf);
     memset(&tailbuf, 0, sizeof(tailbuf));
     tailbuf.ishvm = hvm;
@@ -1485,7 +1487,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         PERROR("read: p2m_size");
         goto out;
     }
-    DPRINTF("xc_domain_restore start: p2m_size = %lx\n", dinfo->p2m_size);
+    DPRINTF("%s: p2m_size = %lx\n", __func__, dinfo->p2m_size);
 
     if ( !get_platform_info(xch, dom,
                             &ctx->max_mfn, &ctx->hvirt_start, &ctx->pt_levels, &dinfo->guest_width) )
@@ -2300,7 +2302,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
     fcntl(io_fd, F_SETFL, orig_io_fd_flags);
 
-    DPRINTF("Restore exit with rc=%d\n", rc);
+    DPRINTF("Restore exit of domid %u with rc=%d\n", dom, rc);
 
     return rc;
 }

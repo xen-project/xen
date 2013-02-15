@@ -184,7 +184,7 @@ main(int argc, char **argv)
     si.suspend_evtchn = -1;
 
     lvl = si.flags & XCFLAGS_DEBUG ? XTL_DEBUG: XTL_DETAIL;
-    lflags = XTL_STDIOSTREAM_HIDE_PROGRESS;
+    lflags = XTL_STDIOSTREAM_SHOW_PID | XTL_STDIOSTREAM_HIDE_PROGRESS;
     l = (xentoollog_logger *)xtl_createlogger_stdiostream(stderr, lvl, lflags);
     si.xch = xc_interface_open(l, 0, 0);
     if (!si.xch)

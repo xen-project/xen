@@ -888,6 +888,8 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
 
     int completed = 0;
 
+    DPRINTF("%s: starting save of domid %u", __func__, dom);
+
     if ( hvm && !callbacks->switch_qemu_logdirty )
     {
         ERROR("No switch_qemu_logdirty callback provided.");
@@ -2121,7 +2123,7 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     free(pfn_err);
     free(to_fix);
 
-    DPRINTF("Save exit rc=%d\n",rc);
+    DPRINTF("Save exit of domid %u with rc=%d\n", dom, rc);
 
     return !!rc;
 }

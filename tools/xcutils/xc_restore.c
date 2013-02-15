@@ -19,17 +19,22 @@ int
 main(int argc, char **argv)
 {
     unsigned int domid, store_evtchn, console_evtchn;
-    unsigned int hvm, pae, apic;
+    unsigned int hvm, pae, apic, lflags;
     xc_interface *xch;
     int io_fd, ret;
     int superpages;
     unsigned long store_mfn, console_mfn;
+    xentoollog_level lvl;
+    xentoollog_logger *l;
 
     if ( (argc != 8) && (argc != 9) )
         errx(1, "usage: %s iofd domid store_evtchn "
              "console_evtchn hvm pae apic [superpages]", argv[0]);
 
-    xch = xc_interface_open(0,0,0);
+    lvl = XTL_DETAIL;
+    lflags = XTL_STDIOSTREAM_SHOW_PID | XTL_STDIOSTREAM_HIDE_PROGRESS;
+    l = (xentoollog_logger *)xtl_createlogger_stdiostream(stderr, lvl, lflags);
+    xch = xc_interface_open(l, 0, 0);
     if ( !xch )
         errx(1, "failed to open control interface");
 
