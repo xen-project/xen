@@ -2000,6 +2000,9 @@ stubdom=n
 
 fi
 
+fi
+
+
 if test -e "stubdom/configure"; then :
 
 if test "x$stubdom" = "xy" || test "x$stubdom" = "x" ; then
@@ -2009,9 +2012,6 @@ fi
 
 fi
 
-
-
-fi
 
 
 
