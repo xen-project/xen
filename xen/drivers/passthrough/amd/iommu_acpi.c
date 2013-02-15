@@ -346,9 +346,8 @@ static int __init parse_ivmd_block(struct acpi_ivmd_block_header *ivmd_block)
     base = start_addr & PAGE_MASK;
     limit = (start_addr + mem_length - 1) & PAGE_MASK;
 
-    AMD_IOMMU_DEBUG("IVMD Block: Type 0x%x\n",ivmd_block->header.type);
-    AMD_IOMMU_DEBUG(" Start_Addr_Phys 0x%lx\n", start_addr);
-    AMD_IOMMU_DEBUG(" Mem_Length 0x%lx\n", mem_length);
+    AMD_IOMMU_DEBUG("IVMD Block: type %#x phys %#lx len %#lx\n",
+                    ivmd_block->header.type, start_addr, mem_length);
 
     if ( get_field_from_byte(ivmd_block->header.flags,
                              AMD_IOMMU_ACPI_EXCLUSION_RANGE_MASK,
@@ -550,8 +549,8 @@ static u16 __init parse_ivhd_device_alias_range(
         return 0;
     }
 
-    AMD_IOMMU_DEBUG(" Dev_Id Range: 0x%x -> 0x%x\n", first_bdf, last_bdf);
-    AMD_IOMMU_DEBUG(" Dev_Id Alias: 0x%x\n", alias_id);
+    AMD_IOMMU_DEBUG(" Dev_Id Range: %#x -> %#x alias %#x\n",
+                    first_bdf, last_bdf, alias_id);
 
     for ( bdf = first_bdf; bdf <= last_bdf; bdf++ )
         add_ivrs_mapping_entry(bdf, alias_id, ivhd_device->header.flags, iommu);
@@ -652,6 +651,9 @@ static u16 __init parse_ivhd_device_special(
         return 0;
     }
 
+    AMD_IOMMU_DEBUG("IVHD Special: %02x:%02x.%u variety %#x handle %#x\n",
+                    PCI_BUS(bdf), PCI_SLOT(bdf), PCI_FUNC(bdf),
+                    ivhd_device->special.variety, ivhd_device->special.handle);
     add_ivrs_mapping_entry(bdf, bdf, ivhd_device->header.flags, iommu);
 
     if ( ivhd_device->special.variety != 1 /* ACPI_IVHD_IOAPIC */ )
@@ -737,10 +739,9 @@ static int __init parse_ivhd_block(struct acpi_ivhd_block_header *ivhd_block)
         ivhd_device = (union acpi_ivhd_device *)
             ((u8 *)ivhd_block + block_length);
 
-        AMD_IOMMU_DEBUG( "IVHD Device Entry:\n");
-        AMD_IOMMU_DEBUG( " Type 0x%x\n", ivhd_device->header.type);
-        AMD_IOMMU_DEBUG( " Dev_Id 0x%x\n", ivhd_device->header.dev_id);
-        AMD_IOMMU_DEBUG( " Flags 0x%x\n", ivhd_device->header.flags);
+        AMD_IOMMU_DEBUG("IVHD Device Entry: type %#x id %#x flags %#x\n",
+                        ivhd_device->header.type, ivhd_device->header.dev_id,
+                        ivhd_device->header.flags);
 
         switch ( ivhd_device->header.type )
         {
@@ -867,6 +868,7 @@ static int __init parse_ivrs_table(struct acpi_table_header *_table)
 {
     struct acpi_ivrs_block_header *ivrs_block;
     unsigned long length;
+    unsigned int apic;
     int error = 0;
     struct acpi_table_header *table = (struct acpi_table_header *)_table;
 
@@ -882,11 +884,9 @@ static int __init parse_ivrs_table(struct acpi_table_header *_table)
         ivrs_block = (struct acpi_ivrs_block_header *)
             ((u8 *)table + length);
 
-        AMD_IOMMU_DEBUG("IVRS Block:\n");
-        AMD_IOMMU_DEBUG(" Type 0x%x\n", ivrs_block->type);
-        AMD_IOMMU_DEBUG(" Flags 0x%x\n", ivrs_block->flags);
-        AMD_IOMMU_DEBUG(" Length 0x%x\n", ivrs_block->length);
-        AMD_IOMMU_DEBUG(" Dev_Id 0x%x\n", ivrs_block->dev_id);
+        AMD_IOMMU_DEBUG("IVRS Block: type %#x flags %#x len %#x id %#x\n",
+                        ivrs_block->type, ivrs_block->flags,
+                        ivrs_block->length, ivrs_block->dev_id);
 
         if ( table->length < (length + ivrs_block->length) )
         {
@@ -899,6 +899,29 @@ static int __init parse_ivrs_table(struct acpi_table_header *_table)
 
         error = parse_ivrs_block(ivrs_block);
         length += ivrs_block->length;
+    }
+
+    /* Each IO-APIC must have been mentioned in the table. */
+    for ( apic = 0; !error && apic < nr_ioapics; ++apic )
+    {
+        if ( !nr_ioapic_registers[apic] ||
+             ioapic_bdf[IO_APIC_ID(apic)].pin_setup )
+            continue;
+
+        printk(XENLOG_ERR "IVHD Error: no information for IO-APIC %#x\n",
+               IO_APIC_ID(apic));
+        if ( amd_iommu_perdev_intremap )
+            error = -ENXIO;
+        else
+        {
+            ioapic_bdf[IO_APIC_ID(apic)].pin_setup = xzalloc_array(
+                unsigned long, BITS_TO_LONGS(nr_ioapic_registers[apic]));
+            if ( !ioapic_bdf[IO_APIC_ID(apic)].pin_setup )
+            {
+                printk(XENLOG_ERR "IVHD Error: Out of memory\n");
+                error = -ENOMEM;
+            }
+        }
     }
 
     return error;
