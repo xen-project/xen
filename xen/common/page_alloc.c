@@ -182,12 +182,6 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
         else if ( *p != '\0' )
             break;
 
-        if ( bad_epfn == bad_spfn )
-            printk("Marking page %lx as bad\n", bad_spfn);
-        else
-            printk("Marking pages %lx through %lx as bad\n",
-                   bad_spfn, bad_epfn);
-
         bootmem_region_zap(bad_spfn, bad_epfn+1);
     }
 }

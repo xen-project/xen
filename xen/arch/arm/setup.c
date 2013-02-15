@@ -246,11 +246,11 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     } while ( xenheap_pages > 128<<(20-PAGE_SHIFT) );
 
     if ( ! e )
-        panic("Not not enough space for xenheap\n");
+        early_panic("Not not enough space for xenheap\n");
 
     domheap_pages = heap_pages - xenheap_pages;
 
-    printk("Xen heap: %lu pages  Dom heap: %lu pages\n", xenheap_pages, domheap_pages);
+    early_printk("Xen heap: %lu pages  Dom heap: %lu pages\n", xenheap_pages, domheap_pages);
 
     setup_xenheap_mappings((e >> PAGE_SHIFT) - xenheap_pages, xenheap_pages);
 
@@ -348,6 +348,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     cmdline_parse(device_tree_bootargs(fdt));
 
     setup_pagetables(boot_phys_offset, get_xen_paddr());
+    setup_mm(fdt_paddr, fdt_size);
 
 #ifdef EARLY_UART_ADDRESS
     /* TODO Need to get device tree or command line for UART address */
@@ -364,8 +365,6 @@ void __init start_xen(unsigned long boot_phys_offset,
     set_processor_id(0); /* needed early, for smp_processor_id() */
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
-
-    setup_mm(fdt_paddr, fdt_size);
 
     /* Setup Hyp vector base */
     WRITE_CP32((uint32_t) hyp_traps_vector, HVBAR);
