@@ -39,6 +39,7 @@ struct arch_domain
 {
     struct p2m_domain p2m;
     struct hvm_domain hvm_domain;
+    xen_pfn_t *grant_table_gpfn;
 
     struct {
         /*

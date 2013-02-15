@@ -595,6 +595,8 @@ static int xenmem_add_to_physmap_one(
             if ( idx < nr_grant_frames(d->grant_table) )
                 mfn = virt_to_mfn(d->grant_table->shared_raw[idx]);
         }
+        
+        d->arch.grant_table_gpfn[idx] = gpfn;
 
         spin_unlock(&d->grant_table->lock);
         break;

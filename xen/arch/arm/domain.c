@@ -6,6 +6,7 @@
 #include <xen/wait.h>
 #include <xen/errno.h>
 #include <xen/bitops.h>
+#include <xen/grant_table.h>
 
 #include <asm/current.h>
 #include <asm/event.h>
@@ -329,11 +330,13 @@ struct domain *alloc_domain_struct(void)
     d = alloc_xenheap_pages(0, 0);
     if ( d != NULL )
         clear_page(d);
+    d->arch.grant_table_gpfn = xmalloc_array(xen_pfn_t, max_nr_grant_frames);
     return d;
 }
 
 void free_domain_struct(struct domain *d)
 {
+    xfree(d->arch.grant_table_gpfn);
     free_xenheap_page(d);
 }
 

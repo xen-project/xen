@@ -15,14 +15,23 @@ int replace_grant_host_mapping(unsigned long gpaddr, unsigned long mfn,
         unsigned long new_gpaddr, unsigned int flags);
 void gnttab_mark_dirty(struct domain *d, unsigned long l);
 #define gnttab_create_status_page(d, t, i) do {} while (0)
-#define gnttab_create_shared_page(d, t, i) do {} while (0)
-#define gnttab_shared_gmfn(d, t, i) (0)
 #define gnttab_status_gmfn(d, t, i) (0)
 #define gnttab_release_host_mappings(domain) 1
 static inline int replace_grant_supported(void)
 {
     return 1;
 }
+
+#define gnttab_create_shared_page(d, t, i)                               \
+    do {                                                                 \
+        share_xen_page_with_guest(                                       \
+            virt_to_page((char *)(t)->shared_raw[i]),                    \
+            (d), XENSHARE_writable);                                     \
+    } while ( 0 )
+
+#define gnttab_shared_gmfn(d, t, i)                                      \
+    ( ((i >= nr_grant_frames(d->grant_table)) &&                         \
+     (i < max_nr_grant_frames)) ? 0 : (d->arch.grant_table_gpfn[i]))
 
 #endif /* __ASM_GRANT_TABLE_H__ */
 /*
