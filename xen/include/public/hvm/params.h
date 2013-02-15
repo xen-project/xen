@@ -142,6 +142,9 @@
 #define HVM_PARAM_ACCESS_RING_PFN   28
 #define HVM_PARAM_SHARING_RING_PFN  29
 
-#define HVM_NR_PARAMS          31
+/* SHUTDOWN_* action in case of a triple fault */
+#define HVM_PARAM_TRIPLE_FAULT_REASON 31
+
+#define HVM_NR_PARAMS          32
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

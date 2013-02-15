@@ -540,6 +540,7 @@ int hvm_domain_initialise(struct domain *d)
     hvm_init_guest_time(d);
 
     d->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] = 1;
+    d->arch.hvm_domain.params[HVM_PARAM_TRIPLE_FAULT_REASON] = SHUTDOWN_reboot;
 
     hvm_init_cacheattr_region_list(d);
 
@@ -1244,9 +1245,13 @@ void hvm_hlt(unsigned long rflags)
 void hvm_triple_fault(void)
 {
     struct vcpu *v = current;
+    struct domain *d = v->domain;
+    u8 reason = d->arch.hvm_domain.params[HVM_PARAM_TRIPLE_FAULT_REASON];
+
     gdprintk(XENLOG_INFO, "Triple fault on VCPU%d - "
-             "invoking HVM system reset.\n", v->vcpu_id);
-    domain_shutdown(v->domain, SHUTDOWN_reboot);
+             "invoking HVM shutdown action %"PRIu8".\n",
+             v->vcpu_id, reason);
+    domain_shutdown(d, reason);
 }
 
 void hvm_inject_trap(struct hvm_trap *trap)
@@ -3928,6 +3933,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 break;
             case HVM_PARAM_BUFIOREQ_EVTCHN:
                 rc = -EINVAL;
+                break;
+            case HVM_PARAM_TRIPLE_FAULT_REASON:
+                if ( a.value > SHUTDOWN_MAX )
+                    rc = -EINVAL;
                 break;
             }
 

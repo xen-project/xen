@@ -158,6 +158,7 @@ DEFINE_XEN_GUEST_HANDLE(sched_watchdog_t);
 #define SHUTDOWN_suspend    2  /* Clean up, save suspend info, kill.         */
 #define SHUTDOWN_crash      3  /* Tell controller we've crashed.             */
 #define SHUTDOWN_watchdog   4  /* Restart because watchdog time expired.     */
+#define SHUTDOWN_MAX        4  /* Maximum valid shutdown reason.             */
 /* ` } */
 
 #endif /* __XEN_PUBLIC_SCHED_H__ */
