@@ -757,6 +757,10 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         return rc;
     }
+    /* XXX: memsharing not working yet */
+    case XENMEM_get_sharing_shared_pages:
+    case XENMEM_get_sharing_freed_pages:
+        return 0;
 
     default:
         return -ENOSYS;
