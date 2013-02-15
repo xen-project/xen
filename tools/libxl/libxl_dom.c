@@ -542,17 +542,24 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
               libxl__domain_build_state *state)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
+    struct xc_hvm_build_args args = {};
     int ret, rc = ERROR_FAIL;
     const char *firmware = libxl__domain_firmware(gc, info);
 
     if (!firmware)
         goto out;
-    ret = xc_hvm_build_target_mem(
-        ctx->xch,
-        domid,
-        (info->max_memkb - info->video_memkb) / 1024,
-        (info->target_memkb - info->video_memkb) / 1024,
-        firmware);
+
+    memset(&args, 0, sizeof(struct xc_hvm_build_args));
+    /* The params from the configuration file are in Mb, which are then
+     * multiplied by 1 Kb. This was then divided off when calling
+     * the old xc_hvm_build_target_mem() which then turned them to bytes.
+     * Do all this in one step here...
+     */
+    args.mem_size = (uint64_t)(info->max_memkb - info->video_memkb) << 10;
+    args.mem_target = (uint64_t)(info->target_memkb - info->video_memkb) << 10;
+    args.image_file_name = firmware;
+
+    ret = xc_hvm_build(ctx->xch, domid, &args);
     if (ret) {
         LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, ret, "hvm building failed");
         goto out;
