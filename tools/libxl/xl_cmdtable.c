@@ -153,7 +153,8 @@ struct cmd_spec cmd_table[] = {
       "                to sh. If empty, run <host> instead of ssh <host> xl\n"
       "                migrate-receive [-d -e]\n"
       "-e              Do not wait in the background (on <host>) for the death\n"
-      "                of the domain."
+      "                of the domain.\n"
+      "--debug         Print huge (!) amount of debug during the migration process."
     },
     { "dump-core",
       &main_dump_core, 0, 1,

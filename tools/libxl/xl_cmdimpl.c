@@ -3331,7 +3331,7 @@ static void migrate_do_preamble(int send_fd, int recv_fd, pid_t child,
 
 }
 
-static void migrate_domain(uint32_t domid, const char *rune,
+static void migrate_domain(uint32_t domid, const char *rune, int debug,
                            const char *override_config_file)
 {
     pid_t child = -1;
@@ -3340,7 +3340,7 @@ static void migrate_domain(uint32_t domid, const char *rune,
     char *away_domname;
     char rc_buf;
     uint8_t *config_data;
-    int config_len;
+    int config_len, flags = LIBXL_SUSPEND_LIVE;
 
     save_domain_core_begin(domid, override_config_file,
                            &config_data, &config_len);
@@ -3358,7 +3358,9 @@ static void migrate_domain(uint32_t domid, const char *rune,
 
     xtl_stdiostream_adjust_flags(logger, XTL_STDIOSTREAM_HIDE_PROGRESS, 0);
 
-    rc = libxl_domain_suspend(ctx, domid, send_fd, LIBXL_SUSPEND_LIVE, NULL);
+    if (debug)
+        flags |= LIBXL_SUSPEND_DEBUG;
+    rc = libxl_domain_suspend(ctx, domid, send_fd, flags, NULL);
     if (rc) {
         fprintf(stderr, "migration sender: libxl_domain_suspend failed"
                 " (rc=%d)\n", rc);
@@ -3751,8 +3753,13 @@ int main_migrate(int argc, char **argv)
     char *rune = NULL;
     char *host;
     int opt, daemonize = 1, monitor = 1, debug = 0;
+    static struct option opts[] = {
+        {"debug", 0, 0, 0x100},
+        COMMON_LONG_OPTS,
+        {0, 0, 0, 0}
+    };
 
-    SWITCH_FOREACH_OPT(opt, "FC:s:ed", NULL, "migrate", 2) {
+    SWITCH_FOREACH_OPT(opt, "FC:s:e", opts, "migrate", 2) {
     case 'C':
         config_filename = optarg;
         break;
@@ -3766,7 +3773,7 @@ int main_migrate(int argc, char **argv)
         daemonize = 0;
         monitor = 0;
         break;
-    case 'd':
+    case 0x100:
         debug = 1;
         break;
     }
@@ -3784,7 +3791,7 @@ int main_migrate(int argc, char **argv)
             return 1;
     }
 
-    migrate_domain(domid, rune, config_filename);
+    migrate_domain(domid, rune, debug, config_filename);
     return 0;
 }
 
