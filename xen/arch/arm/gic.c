@@ -592,16 +592,22 @@ out:
 /* Accept an interrupt from the GIC and dispatch its handler */
 void gic_interrupt(struct cpu_user_regs *regs, int is_fiq)
 {
-    uint32_t intack = GICC[GICC_IAR];
-    unsigned int irq = intack & GICC_IA_IRQ;
+    uint32_t intack;
+    unsigned int irq;
 
-    local_irq_enable();
 
-    if ( irq == 1023 )
-        /* Spurious interrupt */
-        return;
+    do  {
+        intack = GICC[GICC_IAR];
+        irq = intack & GICC_IA_IRQ;
+        local_irq_enable();
 
-    do_IRQ(regs, irq, is_fiq);
+        if (likely(irq < 1021))
+            do_IRQ(regs, irq, is_fiq);
+        else
+            break;
+
+        local_irq_disable();
+    } while (1);
 }
 
 int gicv_setup(struct domain *d)
