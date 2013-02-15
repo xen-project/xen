@@ -430,6 +430,12 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             break;
         case LIBXL_VGA_INTERFACE_TYPE_CIRRUS:
             flexarray_vappend(dm_args, "-vga", "cirrus", NULL);
+            if (b_info->video_memkb) {
+                flexarray_vappend(dm_args, "-global",
+                libxl__sprintf(gc, "vga.vram_size_mb=%d",
+                libxl__sizekb_to_mb(b_info->video_memkb)),
+                NULL);
+            }
             break;
         }
 

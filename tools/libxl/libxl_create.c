@@ -197,8 +197,24 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     case LIBXL_DOMAIN_TYPE_HVM:
         if (b_info->shadow_memkb == LIBXL_MEMKB_DEFAULT)
             b_info->shadow_memkb = 0;
-        if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
+
+        if (b_info->u.hvm.vga.kind == LIBXL_VGA_INTERFACE_TYPE_STD &&
+            b_info->device_model_version ==
+            LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
+                if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
+                    b_info->video_memkb = 16 * 1024;
+                else if (b_info->video_memkb < (16 * 1024) ){
+                    LOG(ERROR,
+                    "videoram must be at least 16 mb with stdvga");
+                    return ERROR_INVAL;
+                }
+        } else if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
             b_info->video_memkb = 8 * 1024;
+        else if (b_info->video_memkb < (8 * 1024) ){
+            LOG(ERROR,"videoram must be at least 8 mb");
+            return ERROR_INVAL;
+        }
+
         if (b_info->u.hvm.timer_mode == LIBXL_TIMER_MODE_DEFAULT)
             b_info->u.hvm.timer_mode =
                 LIBXL_TIMER_MODE_NO_DELAY_FOR_MISSED_TICKS;
