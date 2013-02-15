@@ -140,7 +140,7 @@ u32 device_tree_get_u32(const void *fdt, int node, const char *prop_name)
  * Any nodes nested at DEVICE_TREE_MAX_DEPTH or deeper are ignored.
  *
  * Returns 0 if all nodes were iterated over successfully.  If @func
- * returns a negative value, that value is returned immediately.
+ * returns a value different from 0, that value is returned immediately.
  */
 int device_tree_for_each_node(const void *fdt,
                               device_tree_node_func func, void *data)
@@ -169,10 +169,62 @@ int device_tree_for_each_node(const void *fdt,
 
         ret = func(fdt, node, name, depth,
                    address_cells[depth-1], size_cells[depth-1], data);
-        if ( ret < 0 )
+        if ( ret != 0 )
             return ret;
     }
     return 0;
+}
+
+struct find_compat {
+    const char *compatible;
+    int found;
+    int node;
+    int depth;
+    u32 address_cells;
+    u32 size_cells;
+};
+
+static int _find_compatible_node(const void *fdt,
+                             int node, const char *name, int depth,
+                             u32 address_cells, u32 size_cells,
+                             void *data)
+{
+    struct find_compat *c = (struct find_compat *) data;
+
+    if (  c->found  )
+        return 1;
+
+    if ( device_tree_node_compatible(fdt, node, c->compatible) )
+    {
+        c->found = 1;
+        c->node = node;
+        c->depth = depth;
+        c->address_cells = address_cells;
+        c->size_cells = size_cells;
+        return 1;
+    }
+    return 0;
+}
+
+int find_compatible_node(const char *compatible, int *node, int *depth,
+                u32 *address_cells, u32 *size_cells)
+{
+    int ret;
+    struct find_compat c;
+    c.compatible = compatible;
+    c.found = 0;
+
+    ret = device_tree_for_each_node(device_tree_flattened, _find_compatible_node, &c);
+    if ( !c.found )
+        return ret;
+    else
+    {
+        *node = c.node;
+        *depth = c.depth;
+        *address_cells = c.address_cells;
+        *size_cells = c.size_cells;
+        return 1;
+    }
 }
 
 /**
