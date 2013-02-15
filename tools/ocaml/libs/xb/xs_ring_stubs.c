@@ -45,10 +45,10 @@ static int xs_ring_read(struct mmap_interface *interface,
 	cons = *(volatile uint32*)&intf->req_cons;
 	prod = *(volatile uint32*)&intf->req_prod;
 	xen_mb();
-	cons = MASK_XENSTORE_IDX(cons);
-	prod = MASK_XENSTORE_IDX(prod);
 	if (prod == cons)
 		return 0;
+	cons = MASK_XENSTORE_IDX(cons);
+	prod = MASK_XENSTORE_IDX(prod);
 	if (prod > cons)
 		to_read = prod - cons;
 	else
