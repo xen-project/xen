@@ -81,6 +81,17 @@ static void stdiostream_vmessage(xentoollog_logger *logger_in,
     fflush(lg->f);
 }
 
+static void stdiostream_message(struct xentoollog_logger *logger_in,
+                                xentoollog_level level,
+                                const char *context,
+                                const char *format, ...)
+{
+    va_list al;
+    va_start(al,format);
+    stdiostream_vmessage(logger_in, level, -1, context, format, al);
+    va_end(al);
+}
+
 static void stdiostream_progress(struct xentoollog_logger *logger_in,
                                  const char *context,
                                  const char *doing_what, int percent,
@@ -105,10 +116,17 @@ static void stdiostream_progress(struct xentoollog_logger *logger_in,
     if (this_level < lg->min_level)
         return;
 
+    lg->progress_last_percent = percent;
+
+    if (isatty(fileno(lg->f)) <= 0) {
+        stdiostream_message(logger_in, this_level, context,
+                            "%s: %lu/%lu  %3d%%",
+                            doing_what, done, total, percent);
+        return;
+    }
+
     if (lg->progress_erase_len)
         putc('\r', lg->f);
-
-    lg->progress_last_percent = percent;
 
     newpel = fprintf(lg->f, "%s%s" "%s: %lu/%lu  %3d%%%s",
                      context?context:"", context?": ":"",
