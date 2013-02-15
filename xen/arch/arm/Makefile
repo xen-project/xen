@@ -1,4 +1,5 @@
 subdir-$(arm32) += arm32
+subdir-y += platforms
 
 obj-y += early_printk.o
 obj-y += domain.o

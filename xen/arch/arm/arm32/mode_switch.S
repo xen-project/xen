@@ -19,7 +19,7 @@
 
 #include <asm/config.h>
 #include <asm/page.h>
-#include <asm/platform_vexpress.h>
+#include <asm/platforms/vexpress.h>
 #include <asm/asm_defns.h>
 #include <asm/gic.h>
 
