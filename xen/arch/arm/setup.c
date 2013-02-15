@@ -329,7 +329,6 @@ void __init setup_cache(void)
 
 /* C entry point for boot CPU */
 void __init start_xen(unsigned long boot_phys_offset,
-                      unsigned long arm_type,
                       unsigned long atag_paddr,
                       unsigned long cpuid)
 {

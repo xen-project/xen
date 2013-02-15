@@ -132,7 +132,6 @@ make_cpus_ready(unsigned int max_cpus, unsigned long boot_phys_offset)
 
 /* Boot the current CPU */
 void __cpuinit start_secondary(unsigned long boot_phys_offset,
-                               unsigned long arm_type,
                                unsigned long atag_paddr,
                                unsigned long cpuid)
 {
