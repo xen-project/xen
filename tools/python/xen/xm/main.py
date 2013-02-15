@@ -164,7 +164,7 @@ SUBCOMMAND_HELP = {
     'vcpu-pin'    : ('<Domain> <VCPU|all> <CPUs|all>',
                      'Set which CPUs a VCPU can use.'),
     'vcpu-set'    : ('<Domain> <vCPUs>',
-                     'Set the number of active VCPUs for allowed for the'
+                     'Set the number of active VCPUs allowed for the'
                      ' domain.'),
     #usb
     'usb-add'     : ('<domain> <[host:bus.addr] [host:vendor_id:product_id]>','Add the usb device to FV VM.'),
