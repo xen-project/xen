@@ -31,8 +31,7 @@ libxl_domain_type libxl__domain_type(libxl__gc *gc, uint32_t domid)
 
     ret = xc_domain_getinfolist(ctx->xch, domid, 1, &info);
     if (ret != 1 || info.domain != domid) {
-        LIBXL__LOG(CTX, LIBXL__LOG_ERROR,
-                   "unable to get domain type for domid=%"PRIu32, domid);
+        LOG(ERROR, "unable to get domain type for domid=%"PRIu32, domid);
         return LIBXL_DOMAIN_TYPE_INVALID;
     }
     if (info.flags & XEN_DOMINF_hvm_guest)
@@ -313,20 +312,19 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
 
     ents = libxl__calloc(gc, 12 + (info->max_vcpus * 2) + 2, sizeof(char *));
     ents[0] = "memory/static-max";
-    ents[1] = libxl__sprintf(gc, "%"PRId64, info->max_memkb);
+    ents[1] = GCSPRINTF("%"PRId64, info->max_memkb);
     ents[2] = "memory/target";
-    ents[3] = libxl__sprintf(gc, "%"PRId64,
-                             info->target_memkb - info->video_memkb);
+    ents[3] = GCSPRINTF("%"PRId64, info->target_memkb - info->video_memkb);
     ents[4] = "memory/videoram";
-    ents[5] = libxl__sprintf(gc, "%"PRId64, info->video_memkb);
+    ents[5] = GCSPRINTF("%"PRId64, info->video_memkb);
     ents[6] = "domid";
-    ents[7] = libxl__sprintf(gc, "%d", domid);
+    ents[7] = GCSPRINTF("%d", domid);
     ents[8] = "store/port";
-    ents[9] = libxl__sprintf(gc, "%"PRIu32, state->store_port);
+    ents[9] = GCSPRINTF("%"PRIu32, state->store_port);
     ents[10] = "store/ring-ref";
-    ents[11] = libxl__sprintf(gc, "%lu", state->store_mfn);
+    ents[11] = GCSPRINTF("%lu", state->store_mfn);
     for (i = 0; i < info->max_vcpus; i++) {
-        ents[12+(i*2)]   = libxl__sprintf(gc, "cpu/%d/availability", i);
+        ents[12+(i*2)]   = GCSPRINTF("cpu/%d/availability", i);
         ents[12+(i*2)+1] = libxl_bitmap_test(&info->avail_vcpus, i)
                             ? "online" : "offline";
     }
@@ -335,7 +333,7 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     if (info->type == LIBXL_DOMAIN_TYPE_HVM) {
         hvm_ents = libxl__calloc(gc, 3, sizeof(char *));
         hvm_ents[0] = "hvmloader/generation-id-address";
-        hvm_ents[1] = libxl__sprintf(gc, "0x%lx", state->vm_generationid_addr);
+        hvm_ents[1] = GCSPRINTF("0x%lx", state->vm_generationid_addr);
     }
 
     dom_path = libxl__xs_get_dompath(gc, domid);
@@ -343,7 +341,7 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
         return ERROR_FAIL;
     }
 
-    vm_path = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/vm", dom_path), NULL);
+    vm_path = xs_read(ctx->xsh, XBT_NULL, GCSPRINTF("%s/vm", dom_path), NULL);
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
 
@@ -374,7 +372,7 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
 
     dom = xc_dom_allocate(ctx->xch, state->pv_cmdline, info->u.pv.features);
     if (!dom) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_allocate failed");
+        LOGE(ERROR, "xc_dom_allocate failed");
         return ERROR_FAIL;
     }
 
@@ -384,13 +382,13 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
                                 state->pv_kernel.data,
                                 state->pv_kernel.size);
         if ( ret != 0) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_kernel_mem failed");
+            LOGE(ERROR, "xc_dom_kernel_mem failed");
             goto out;
         }
     } else {
         ret = xc_dom_kernel_file(dom, state->pv_kernel.path);
         if ( ret != 0) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_kernel_file failed");
+            LOGE(ERROR, "xc_dom_kernel_file failed");
             goto out;
         }
     }
@@ -398,12 +396,12 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
     if ( state->pv_ramdisk.path && strlen(state->pv_ramdisk.path) ) {
         if (state->pv_ramdisk.mapped) {
             if ( (ret = xc_dom_ramdisk_mem(dom, state->pv_ramdisk.data, state->pv_ramdisk.size)) != 0 ) {
-                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_ramdisk_mem failed");
+                LOGE(ERROR, "xc_dom_ramdisk_mem failed");
                 goto out;
             }
         } else {
             if ( (ret = xc_dom_ramdisk_file(dom, state->pv_ramdisk.path)) != 0 ) {
-                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_ramdisk_file failed");
+                LOGE(ERROR, "xc_dom_ramdisk_file failed");
                 goto out;
             }
         }
@@ -416,31 +414,31 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
     dom->xenstore_domid = state->store_domid;
 
     if ( (ret = xc_dom_boot_xen_init(dom, ctx->xch, domid)) != 0 ) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_boot_xen_init failed");
+        LOGE(ERROR, "xc_dom_boot_xen_init failed");
         goto out;
     }
     if ( (ret = xc_dom_parse_image(dom)) != 0 ) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_parse_image failed");
+        LOGE(ERROR, "xc_dom_parse_image failed");
         goto out;
     }
     if ( (ret = xc_dom_mem_init(dom, info->target_memkb / 1024)) != 0 ) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_mem_init failed");
+        LOGE(ERROR, "xc_dom_mem_init failed");
         goto out;
     }
     if ( (ret = xc_dom_boot_mem_init(dom)) != 0 ) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_boot_mem_init failed");
+        LOGE(ERROR, "xc_dom_boot_mem_init failed");
         goto out;
     }
     if ( (ret = xc_dom_build_image(dom)) != 0 ) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_build_image failed");
+        LOGE(ERROR, "xc_dom_build_image failed");
         goto out;
     }
     if ( (ret = xc_dom_boot_image(dom)) != 0 ) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_boot_image failed");
+        LOGE(ERROR, "xc_dom_boot_image failed");
         goto out;
     }
     if ( (ret = xc_dom_gnttab_init(dom)) != 0 ) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xc_dom_gnttab_init failed");
+        LOGE(ERROR, "xc_dom_gnttab_init failed");
         goto out;
     }
 
@@ -679,8 +677,7 @@ int libxl__qemu_traditional_cmd(libxl__gc *gc, uint32_t domid,
                                 const char *cmd)
 {
     char *path = NULL;
-    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/command",
-                          domid);
+    path = GCSPRINTF("/local/domain/0/device-model/%d/command", domid);
     return libxl__xs_write(gc, XBT_NULL, path, "%s", cmd);
 }
 
@@ -697,8 +694,7 @@ struct libxl__physmap_info {
 static inline char *restore_helper(libxl__gc *gc, uint32_t domid,
         uint64_t phys_offset, char *node)
 {
-    return libxl__sprintf(gc,
-            "/local/domain/0/device-model/%d/physmap/%"PRIx64"/%s",
+    return GCSPRINTF("/local/domain/0/device-model/%d/physmap/%"PRIx64"/%s",
             domid, phys_offset, node);
 }
 
@@ -708,7 +704,6 @@ int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
     libxl__save_helper_state *shs = user;
     libxl__domain_create_state *dcs = CONTAINER_OF(shs, *dcs, shs);
     STATE_AO_GC(dcs->ao);
-    libxl_ctx *ctx = CTX;
     int i, ret;
     const uint8_t *ptr = buf;
     uint32_t count = 0, version = 0;
@@ -718,7 +713,7 @@ int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
     LOG(DEBUG,"domain=%"PRIu32" toolstack data size=%"PRIu32, domid, size);
 
     if (size < sizeof(version) + sizeof(count)) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "wrong size");
+        LOG(ERROR, "wrong size");
         return -1;
     }
 
@@ -726,7 +721,7 @@ int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
     ptr += sizeof(version);
 
     if (version != TOOLSTACK_SAVE_VERSION) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "wrong version");
+        LOG(ERROR, "wrong version");
         return -1;
     }
 
@@ -735,7 +730,7 @@ int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
 
     if (size < sizeof(version) + sizeof(count) +
             count * (sizeof(struct libxl__physmap_info))) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "wrong size");
+        LOG(ERROR, "wrong size");
         return -1;
     }
 
@@ -984,15 +979,13 @@ static void switch_logdirty_done(libxl__egc *egc,
 int libxl__domain_suspend_device_model(libxl__gc *gc,
                                        libxl__domain_suspend_state *dss)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     int ret = 0;
     uint32_t const domid = dss->domid;
     const char *const filename = dss->dm_savefile;
 
     switch (libxl__device_model_version_running(gc, domid)) {
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
-        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG,
-                   "Saving device model state to %s", filename);
+        LOG(DEBUG, "Saving device model state to %s", filename);
         libxl__qemu_traditional_cmd(gc, domid, "save");
         libxl__wait_for_device_model(gc, domid, "paused", NULL, NULL, NULL);
         break;
@@ -1168,8 +1161,7 @@ int libxl__domain_suspend_common_callback(void *user)
 static inline char *physmap_path(libxl__gc *gc, uint32_t domid,
         char *phys_offset, char *node)
 {
-    return libxl__sprintf(gc,
-            "/local/domain/0/device-model/%d/physmap/%s/%s",
+    return GCSPRINTF("/local/domain/0/device-model/%d/physmap/%s/%s",
             domid, phys_offset, node);
 }
 
@@ -1186,7 +1178,7 @@ int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
     char **entries = NULL;
     struct libxl__physmap_info *pi;
 
-    entries = libxl__xs_directory(gc, 0, libxl__sprintf(gc,
+    entries = libxl__xs_directory(gc, 0, GCSPRINTF(
                 "/local/domain/0/device-model/%d/physmap", domid), &num);
     count = num;
 
@@ -1327,7 +1319,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
         char *path;
         char *addr;
 
-        path = libxl__sprintf(gc, "%s/hvmloader/generation-id-address",
+        path = GCSPRINTF("%s/hvmloader/generation-id-address",
                               libxl__xs_get_dompath(gc, domid));
         addr = libxl__xs_read(gc, XBT_NULL, path);
 
@@ -1541,10 +1533,7 @@ static void domain_suspend_done(libxl__egc *egc,
 
 char *libxl__uuid2string(libxl__gc *gc, const libxl_uuid uuid)
 {
-    char *s = libxl__sprintf(gc, LIBXL_UUID_FMT, LIBXL_UUID_BYTES(uuid));
-    if (!s)
-        LIBXL__LOG(libxl__gc_owner(gc), LIBXL__LOG_ERROR, "cannot allocate for uuid");
-    return s;
+    return GCSPRINTF(LIBXL_UUID_FMT, LIBXL_UUID_BYTES(uuid));
 }
 
 static const char *userdata_path(libxl__gc *gc, uint32_t domid,
@@ -1552,34 +1541,27 @@ static const char *userdata_path(libxl__gc *gc, uint32_t domid,
                                       const char *wh)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    char *path, *uuid_string;
+    char *uuid_string;
     libxl_dominfo info;
     int rc;
 
     rc = libxl_domain_info(ctx, &info, domid);
     if (rc) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unable to find domain info"
-                     " for domain %"PRIu32, domid);
+        LOGE(ERROR, "unable to find domain info for domain %"PRIu32, domid);
         return NULL;
     }
-    uuid_string = libxl__sprintf(gc, LIBXL_UUID_FMT, LIBXL_UUID_BYTES(info.uuid));
+    uuid_string = GCSPRINTF(LIBXL_UUID_FMT, LIBXL_UUID_BYTES(info.uuid));
 
-    path = libxl__sprintf(gc, "/var/lib/xen/"
-                         "userdata-%s.%u.%s.%s",
-                         wh, domid, uuid_string, userdata_userid);
-    if (!path)
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unable to allocate for"
-                     " userdata path");
-    return path;
+    return GCSPRINTF("/var/lib/xen/userdata-%s.%u.%s.%s",
+                     wh, domid, uuid_string, userdata_userid);
 }
 
 static int userdata_delete(libxl__gc *gc, const char *path)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     int r;
     r = unlink(path);
     if (r) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "remove failed for %s", path);
+        LOGE(ERROR, "remove failed for %s", path);
         return errno;
     }
     return 0;
@@ -1587,7 +1569,6 @@ static int userdata_delete(libxl__gc *gc, const char *path)
 
 void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     const char *pattern;
     glob_t gl;
     int r, i;
@@ -1603,7 +1584,7 @@ void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid)
     if (r == GLOB_NOMATCH)
         goto out;
     if (r)
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "glob failed for %s", pattern);
+        LOGE(ERROR, "glob failed for %s", pattern);
 
     for (i=0; i<gl.gl_pathc; i++) {
         userdata_delete(gc, gl.gl_pathv[i]);
