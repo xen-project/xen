@@ -406,6 +406,9 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         int ioemu_nics = 0;
 
+        /* Disable useless empty floppy drive */
+        flexarray_vappend(dm_args, "-global", "isa-fdc.driveA=", NULL);
+
         if (b_info->u.hvm.serial) {
             flexarray_vappend(dm_args, "-serial", b_info->u.hvm.serial, NULL);
         }
