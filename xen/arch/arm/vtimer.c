@@ -80,7 +80,8 @@ int virt_timer_save(struct vcpu *v)
     v->arch.virt_timer.ctl = READ_SYSREG32(CNTV_CTL_EL0);
     WRITE_SYSREG32(v->arch.virt_timer.ctl & ~CNTx_CTL_ENABLE, CNTV_CTL_EL0);
     v->arch.virt_timer.cval = READ_SYSREG64(CNTV_CVAL_EL0);
-    if ( v->arch.virt_timer.ctl & CNTx_CTL_ENABLE )
+    if ( (v->arch.virt_timer.ctl & CNTx_CTL_ENABLE) &&
+         !(v->arch.virt_timer.ctl & CNTx_CTL_MASK))
     {
         set_timer(&v->arch.virt_timer.timer, ticks_to_ns(v->arch.virt_timer.cval +
                   v->arch.virt_timer.offset - boot_count));
