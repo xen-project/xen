@@ -1,5 +1,6 @@
 #include <xen/config.h>
 #include <xen/init.h>
+#include <xen/compile.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/domain_page.h>
@@ -34,7 +35,7 @@ custom_param("dom0_mem", parse_dom0_mem);
  * are added (yet) but one terminating reserve map entry (16 bytes) is
  * added.
  */
-#define DOM0_FDT_EXTRA_SIZE (sizeof(struct fdt_reserve_entry))
+#define DOM0_FDT_EXTRA_SIZE (128 + sizeof(struct fdt_reserve_entry))
 
 struct vcpu *__init alloc_dom0_vcpu0(void)
 {
@@ -186,6 +187,13 @@ static int fdt_next_dom0_node(const void *fdt, int node,
         if ( depth >= DEVICE_TREE_MAX_DEPTH )
             break;
 
+        /* Skip /hypervisor/ node. We will inject our own. */
+        if ( fdt_node_check_compatible(fdt, node, "xen,xen" ) == 0 )
+        {
+            printk("Device-tree contains \"xen,xen\" node. Ignoring.\n");
+            continue;
+        }
+
         /* Skip multiboot subnodes */
         if ( fdt_node_check_compatible(fdt, node,
                                        "xen,multiboot-module" ) == 0 )
@@ -197,6 +205,48 @@ static int fdt_next_dom0_node(const void *fdt, int node,
 
     *depth_out = depth;
     return node;
+}
+
+static void make_hypervisor_node(void *fdt, int addrcells, int sizecells)
+{
+    const char compat[] =
+        "xen,xen-"__stringify(XEN_VERSION)"."__stringify(XEN_SUBVERSION)"\0"
+        "xen,xen";
+    u32 reg[4];
+    u32 intr[3];
+    u32 *cell;
+
+    /*
+     * Sanity-check address sizes, since addresses and sizes which do
+     * not take up exactly 4 or 8 bytes are not supported.
+     */
+    if ((addrcells != 1 && addrcells != 2) ||
+        (sizecells != 1 && sizecells != 2))
+        panic("Cannot cope with this size");
+
+    /* See linux Documentation/devicetree/bindings/arm/xen.txt */
+    fdt_begin_node(fdt, "hypervisor");
+
+    /* Cannot use fdt_property_string due to embedded nulls */
+    fdt_property(fdt, "compatible", compat, sizeof(compat) + 1);
+
+    /* reg 0 is grant table space */
+    cell = &reg[0];
+    device_tree_set_reg(&cell, addrcells, sizecells, 0xb0000000, 0x20000);
+    fdt_property(fdt, "reg", reg,
+                 sizeof(reg[0]) * (addrcells + sizecells));
+
+    /*
+     * interrupts is evtchn upcall  <1 15 0xf08>
+     * See linux Documentation/devicetree/bindings/arm/gic.txt
+     */
+    intr[0] = cpu_to_fdt32(1); /* is a PPI */
+    intr[1] = cpu_to_fdt32(VGIC_IRQ_EVTCHN_CALLBACK - 16); /* PPIs start at 16 */
+    intr[2] = cpu_to_fdt32(0xf08); /* Active-low level-sensitive */
+
+    fdt_property(fdt, "interrupts", intr, sizeof(intr[0]) * 3);
+
+    fdt_end_node(fdt);
 }
 
 static int write_nodes(struct domain *d, struct kernel_info *kinfo,
@@ -244,9 +294,12 @@ static int write_nodes(struct domain *d, struct kernel_info *kinfo,
         last_depth = depth;
     }
 
-    while ( last_depth-- >= 0 )
+    while ( last_depth-- >= 1 )
         fdt_end_node(kinfo->fdt);
 
+    make_hypervisor_node(kinfo->fdt, address_cells[0], size_cells[0]);
+
+    fdt_end_node(kinfo->fdt);
     return 0;
 }
 
