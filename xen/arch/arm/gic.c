@@ -657,6 +657,33 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
     }
 }
 
+void gic_dump_info(struct vcpu *v)
+{
+    int i;
+    struct pending_irq *p;
+
+    printk("GICH_LRs (vcpu %d) mask=%llx\n", v->vcpu_id, v->arch.lr_mask);
+    if ( v == current )
+    {
+        for ( i = 0; i < nr_lrs; i++ )
+            printk("   HW_LR[%d]=%x\n", i, GICH[GICH_LR + i]);
+    } else {
+        for ( i = 0; i < nr_lrs; i++ )
+            printk("   VCPU_LR[%d]=%x\n", i, v->arch.gic_lr[i]);
+    }
+
+    list_for_each_entry ( p, &v->arch.vgic.inflight_irqs, inflight )
+    {
+        printk("Inflight irq=%d\n", p->irq);
+    }
+
+    list_for_each_entry( p, &v->arch.vgic.lr_pending, lr_queue )
+    {
+        printk("Pending irq=%d\n", p->irq);
+    }
+
+}
+
 void __cpuinit init_maintenance_interrupt(void)
 {
     request_irq(25, maintenance_interrupt, 0, "irq-maintenance", NULL);
