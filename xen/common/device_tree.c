@@ -393,6 +393,48 @@ static void __init process_gic_node(const void *fdt, int node,
     early_info.gic.gic_vcpu_addr = start;
 }
 
+static void __init process_multiboot_node(const void *fdt, int node,
+                                          const char *name,
+                                          u32 address_cells, u32 size_cells)
+{
+    const struct fdt_property *prop;
+    const u32 *cell;
+    int nr;
+    struct dt_mb_module *mod;
+    int len;
+
+    if ( fdt_node_check_compatible(fdt, node, "xen,linux-zimage") == 0 )
+        nr = 1;
+    else if ( fdt_node_check_compatible(fdt, node, "xen,linux-initrd") == 0)
+        nr = 2;
+    else
+        early_panic("%s not a known xen multiboot type\n", name);
+
+    mod = &early_info.modules.module[nr];
+
+    prop = fdt_get_property(fdt, node, "reg", NULL);
+    if ( !prop )
+        early_panic("node %s missing `reg' property\n", name);
+
+    cell = (const u32 *)prop->data;
+    device_tree_get_reg(&cell, address_cells, size_cells,
+                        &mod->start, &mod->size);
+
+    prop = fdt_get_property(fdt, node, "bootargs", &len);
+    if ( prop )
+    {
+        if ( len > sizeof(mod->cmdline) )
+            early_panic("module %d command line too long\n", nr);
+
+        safe_strcpy(mod->cmdline, prop->data);
+    }
+    else
+        mod->cmdline[0] = 0;
+
+    if ( nr > early_info.modules.nr_mods )
+        early_info.modules.nr_mods = nr;
+}
+
 static int __init early_scan_node(const void *fdt,
                                   int node, const char *name, int depth,
                                   u32 address_cells, u32 size_cells,
@@ -404,6 +446,8 @@ static int __init early_scan_node(const void *fdt,
         process_cpu_node(fdt, node, name, address_cells, size_cells);
     else if ( device_tree_node_compatible(fdt, node, "arm,cortex-a15-gic") )
         process_gic_node(fdt, node, name, address_cells, size_cells);
+    else if ( device_tree_node_compatible(fdt, node, "xen,multiboot-module" ) )
+        process_multiboot_node(fdt, node, name, address_cells, size_cells);
 
     return 0;
 }
@@ -411,12 +455,20 @@ static int __init early_scan_node(const void *fdt,
 static void __init early_print_info(void)
 {
     struct dt_mem_info *mi = &early_info.mem;
+    struct dt_module_info *mods = &early_info.modules;
     int i;
 
     for ( i = 0; i < mi->nr_banks; i++ )
-        early_printk("RAM: %016llx - %016llx\n",
+        early_printk("RAM: %"PRIpaddr" - %"PRIpaddr"\n",
                      mi->bank[i].start,
                      mi->bank[i].start + mi->bank[i].size - 1);
+    early_printk("\n");
+    for ( i = 1 ; i < mods->nr_mods + 1; i++ )
+        early_printk("MODULE[%d]: %"PRIpaddr" - %"PRIpaddr" %s\n",
+                     i,
+                     mods->module[i].start,
+                     mods->module[i].start + mods->module[i].size,
+                     mods->module[i].cmdline);
 }
 
 /**

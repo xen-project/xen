@@ -1,0 +1,25 @@
+Xen is passed the dom0 kernel and initrd via a reference in the /chosen
+node of the device tree.
+
+Each node has the form /chosen/modules/module@<N> and contains the following
+properties:
+
+- compatible
+
+	Must be:
+
+		"xen,<type>", "xen,multiboot-module"
+
+	where <type> must be one of:
+
+	- "linux-zimage" -- the dom0 kernel
+	- "linux-initrd" -- the dom0 ramdisk
+
+- reg
+
+	Specifies the physical address of the module in RAM and the
+	length of the module.
+
+- bootargs (optional)
+
+	Command line associated with this module
