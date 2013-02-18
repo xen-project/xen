@@ -32,8 +32,8 @@ struct amd_iommu *find_iommu_for_device(int seg, int bdf)
 {
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(seg);
 
-    BUG_ON ( bdf >= ivrs_bdf_entries );
-    return ivrs_mappings ? ivrs_mappings[bdf].iommu : NULL;
+    return ivrs_mappings && bdf < ivrs_bdf_entries ? ivrs_mappings[bdf].iommu
+                                                   : NULL;
 }
 
 /*
