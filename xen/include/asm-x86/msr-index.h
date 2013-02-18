@@ -300,7 +300,10 @@
 #define MSR_IA32_APICBASE_BASE		(0xfffff<<12)
 #define MSR_IA32_APICBASE_MSR           0x800
 #define MSR_IA32_APICTPR_MSR            0x808
+#define MSR_IA32_APICPPR_MSR            0x80a
 #define MSR_IA32_APICEOI_MSR            0x80b
+#define MSR_IA32_APICTMICT_MSR          0x838
+#define MSR_IA32_APICTMCCT_MSR          0x839
 #define MSR_IA32_APICSELF_MSR           0x83f
 
 #define MSR_IA32_UCODE_WRITE		0x00000079

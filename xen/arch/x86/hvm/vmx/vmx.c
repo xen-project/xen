@@ -1889,18 +1889,63 @@ static void vmx_install_vlapic_mapping(struct vcpu *v)
 
 void vmx_vlapic_msr_changed(struct vcpu *v)
 {
+    int virtualize_x2apic_mode;
     struct vlapic *vlapic = vcpu_vlapic(v);
 
-    if ( !cpu_has_vmx_virtualize_apic_accesses )
+    virtualize_x2apic_mode = ( (cpu_has_vmx_apic_reg_virt ||
+                                cpu_has_vmx_virtual_intr_delivery) &&
+                               cpu_has_vmx_virtualize_x2apic_mode );
+
+    if ( !cpu_has_vmx_virtualize_apic_accesses &&
+         !virtualize_x2apic_mode )
         return;
 
     vmx_vmcs_enter(v);
     v->arch.hvm_vmx.secondary_exec_control &=
-        ~SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
+        ~(SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
+          SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE);
     if ( !vlapic_hw_disabled(vlapic) &&
          (vlapic_base_address(vlapic) == APIC_DEFAULT_PHYS_BASE) )
-        v->arch.hvm_vmx.secondary_exec_control |=
-            SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
+    {
+        unsigned int msr;
+
+        if ( virtualize_x2apic_mode && vlapic_x2apic_mode(vlapic) )
+        {
+            v->arch.hvm_vmx.secondary_exec_control |=
+                SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE;
+            if ( cpu_has_vmx_apic_reg_virt )
+            {
+                for ( msr = MSR_IA32_APICBASE_MSR;
+                      msr <= MSR_IA32_APICBASE_MSR + 0xff; msr++ )
+                    vmx_disable_intercept_for_msr(v, msr, MSR_TYPE_R);
+
+                vmx_enable_intercept_for_msr(v, MSR_IA32_APICPPR_MSR,
+                                             MSR_TYPE_R);
+                vmx_enable_intercept_for_msr(v, MSR_IA32_APICTMICT_MSR,
+                                             MSR_TYPE_R);
+                vmx_enable_intercept_for_msr(v, MSR_IA32_APICTMCCT_MSR,
+                                             MSR_TYPE_R);
+            }
+            if ( cpu_has_vmx_virtual_intr_delivery )
+            {
+                vmx_disable_intercept_for_msr(v, MSR_IA32_APICTPR_MSR,
+                                              MSR_TYPE_W);
+                vmx_disable_intercept_for_msr(v, MSR_IA32_APICEOI_MSR,
+                                              MSR_TYPE_W);
+                vmx_disable_intercept_for_msr(v, MSR_IA32_APICSELF_MSR,
+                                              MSR_TYPE_W);
+            }
+        }
+        else
+        {
+            v->arch.hvm_vmx.secondary_exec_control |=
+                SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
+            for ( msr = MSR_IA32_APICBASE_MSR;
+                  msr <= MSR_IA32_APICBASE_MSR + 0xff; msr++ )
+                vmx_enable_intercept_for_msr(v, msr,
+                                             MSR_TYPE_R | MSR_TYPE_W);
+        }
+    }
     vmx_update_secondary_exec_control(v);
     vmx_vmcs_exit(v);
 }

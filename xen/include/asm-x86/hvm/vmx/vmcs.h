@@ -190,6 +190,7 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_ENABLE_EPT               0x00000002
 #define SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING 0x00000004
 #define SECONDARY_EXEC_ENABLE_RDTSCP            0x00000008
+#define SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE   0x00000010
 #define SECONDARY_EXEC_ENABLE_VPID              0x00000020
 #define SECONDARY_EXEC_WBINVD_EXITING           0x00000040
 #define SECONDARY_EXEC_UNRESTRICTED_GUEST       0x00000080
@@ -253,6 +254,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_secondary_exec_control & SECONDARY_EXEC_APIC_REGISTER_VIRT)
 #define cpu_has_vmx_virtual_intr_delivery \
     (vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY)
+#define cpu_has_vmx_virtualize_x2apic_mode \
+    (vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE)
 #define cpu_has_vmx_vmcs_shadowing \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VMCS_SHADOWING)
 
@@ -449,6 +452,7 @@ enum vmcs_field {
 #define MSR_TYPE_R 1
 #define MSR_TYPE_W 2
 void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
+void vmx_enable_intercept_for_msr(struct vcpu *v, u32 msr, int type);
 int vmx_read_guest_msr(u32 msr, u64 *val);
 int vmx_write_guest_msr(u32 msr, u64 val);
 int vmx_add_guest_msr(u32 msr);

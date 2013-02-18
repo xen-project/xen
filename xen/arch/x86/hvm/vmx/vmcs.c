@@ -196,7 +196,8 @@ static int vmx_init_vmcs_config(void)
          */
         if ( _vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW )
             opt |= SECONDARY_EXEC_APIC_REGISTER_VIRT |
-                   SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY;
+                   SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
+                   SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE;
 
 
         _vmx_secondary_exec_control = adjust_vmx_controls(
@@ -675,19 +676,60 @@ void vmx_disable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
      */
     if ( msr <= 0x1fff )
     {
-        if (type & MSR_TYPE_R)
-            __clear_bit(msr, msr_bitmap + 0x000/BYTES_PER_LONG); /* read-low */
-        if (type & MSR_TYPE_W)
-            __clear_bit(msr, msr_bitmap + 0x800/BYTES_PER_LONG); /* write-low */
+        if ( type & MSR_TYPE_R )
+            clear_bit(msr, msr_bitmap + 0x000/BYTES_PER_LONG); /* read-low */
+        if ( type & MSR_TYPE_W )
+            clear_bit(msr, msr_bitmap + 0x800/BYTES_PER_LONG); /* write-low */
     }
     else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
     {
         msr &= 0x1fff;
-        if (type & MSR_TYPE_R)
-            __clear_bit(msr, msr_bitmap + 0x400/BYTES_PER_LONG); /* read-high */
-        if (type & MSR_TYPE_W)
-            __clear_bit(msr, msr_bitmap + 0xc00/BYTES_PER_LONG); /* write-high */
+        if ( type & MSR_TYPE_R )
+            clear_bit(msr, msr_bitmap + 0x400/BYTES_PER_LONG); /* read-high */
+        if ( type & MSR_TYPE_W )
+            clear_bit(msr, msr_bitmap + 0xc00/BYTES_PER_LONG); /* write-high */
     }
+    else
+        HVM_DBG_LOG(DBG_LEVEL_0,
+                   "msr %x is out of the control range"
+                   "0x00000000-0x00001fff and 0xc0000000-0xc0001fff"
+                   "RDMSR or WRMSR will cause a VM exit", msr); 
+
+}
+
+void vmx_enable_intercept_for_msr(struct vcpu *v, u32 msr, int type)
+{
+    unsigned long *msr_bitmap = v->arch.hvm_vmx.msr_bitmap;
+
+    /* VMX MSR bitmap supported? */
+    if ( msr_bitmap == NULL )
+        return;
+
+    /*
+     * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address). Early manuals
+     * have the write-low and read-high bitmap offsets the wrong way round.
+     * We can control MSRs 0x00000000-0x00001fff and 0xc0000000-0xc0001fff.
+     */
+    if ( msr <= 0x1fff )
+    {
+        if ( type & MSR_TYPE_R )
+            set_bit(msr, msr_bitmap + 0x000/BYTES_PER_LONG); /* read-low */
+        if ( type & MSR_TYPE_W )
+            set_bit(msr, msr_bitmap + 0x800/BYTES_PER_LONG); /* write-low */
+    }
+    else if ( (msr >= 0xc0000000) && (msr <= 0xc0001fff) )
+    {
+        msr &= 0x1fff;
+        if ( type & MSR_TYPE_R )
+            set_bit(msr, msr_bitmap + 0x400/BYTES_PER_LONG); /* read-high */
+        if ( type & MSR_TYPE_W )
+            set_bit(msr, msr_bitmap + 0xc00/BYTES_PER_LONG); /* write-high */
+    }
+    else
+        HVM_DBG_LOG(DBG_LEVEL_0,
+                   "msr %x is out of the control range"
+                   "0x00000000-0x00001fff and 0xc0000000-0xc0001fff"
+                   "RDMSR or WRMSR will cause a VM exit", msr); 
 }
 
 /*
@@ -812,6 +854,10 @@ static int construct_vmcs(struct vcpu *v)
         vmentry_ctl &= ~VM_ENTRY_LOAD_GUEST_PAT;
     }
 
+    /* Disable Virtualize x2APIC mode by default. */
+    v->arch.hvm_vmx.secondary_exec_control &=
+        ~SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE;
+
     /* Do not enable Monitor Trap Flag unless start single step debug */
     v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
 
@@ -848,18 +894,6 @@ static int construct_vmcs(struct vcpu *v)
         vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_EIP, MSR_TYPE_R | MSR_TYPE_W);
         if ( cpu_has_vmx_pat && paging_mode_hap(d) )
             vmx_disable_intercept_for_msr(v, MSR_IA32_CR_PAT, MSR_TYPE_R | MSR_TYPE_W);
-        if ( cpu_has_vmx_apic_reg_virt )
-        {
-            int msr;
-            for (msr = MSR_IA32_APICBASE_MSR; msr <= MSR_IA32_APICBASE_MSR + 0xff; msr++)
-                vmx_disable_intercept_for_msr(v, msr, MSR_TYPE_R);
-        }
-        if ( cpu_has_vmx_virtual_intr_delivery )
-        {
-            vmx_disable_intercept_for_msr(v, MSR_IA32_APICTPR_MSR, MSR_TYPE_W);
-            vmx_disable_intercept_for_msr(v, MSR_IA32_APICEOI_MSR, MSR_TYPE_W);
-            vmx_disable_intercept_for_msr(v, MSR_IA32_APICSELF_MSR, MSR_TYPE_W);
-        }
     }
 
     /* I/O access bitmap. */
