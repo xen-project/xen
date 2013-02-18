@@ -183,6 +183,7 @@ struct hvm_function_table {
     /* Virtual interrupt delivery */
     void (*update_eoi_exit_bitmap)(struct vcpu *v, u8 vector, u8 trig);
     int (*virtual_intr_delivery_enabled)(void);
+    void (*process_isr)(int isr, struct vcpu *v);
 
     /*Walk nested p2m  */
     int (*nhvm_hap_walk_L1_p2m)(struct vcpu *v, paddr_t L2_gpa,

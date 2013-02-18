@@ -290,8 +290,8 @@ void vmx_intr_assist(void)
             vmx_set_eoi_exit_bitmap(v, pt_vector);
 
         /* we need update the RVI field */
-        status &= ~(unsigned long)0x0FF;
-        status |= (unsigned long)0x0FF & 
+        status &= ~VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK;
+        status |= VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK &
                     intack.vector;
         __vmwrite(GUEST_INTR_STATUS, status);
         if (v->arch.hvm_vmx.eoi_exitmap_changed) {

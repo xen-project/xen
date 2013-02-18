@@ -270,6 +270,10 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
  */
 #define VMX_BASIC_DEFAULT1_ZERO		(1ULL << 55)
 
+/* Guest interrupt status */
+#define VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK  0x0FF
+#define VMX_GUEST_INTR_STATUS_SVI_OFFSET        8
+
 /* VMCS field encodings. */
 enum vmcs_field {
     VIRTUAL_PROCESSOR_ID            = 0x00000000,

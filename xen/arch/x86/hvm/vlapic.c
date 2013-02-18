@@ -1198,6 +1198,9 @@ static int lapic_load_regs(struct domain *d, hvm_domain_context_t *h)
     if ( hvm_load_entry(LAPIC_REGS, h, s->regs) != 0 ) 
         return -EINVAL;
 
+    if ( hvm_funcs.process_isr )
+        hvm_funcs.process_isr(vlapic_find_highest_isr(s), v);
+
     vlapic_adjust_i8259_target(d);
     lapic_rearm(s);
     return 0;

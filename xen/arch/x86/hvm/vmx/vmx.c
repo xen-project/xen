@@ -1421,6 +1421,29 @@ static int vmx_virtual_intr_delivery_enabled(void)
     return cpu_has_vmx_virtual_intr_delivery;
 }
 
+static void vmx_process_isr(int isr, struct vcpu *v)
+{
+    unsigned long status;
+    u8 old;
+
+    if ( !cpu_has_vmx_virtual_intr_delivery )
+        return;
+
+    if ( isr < 0 )
+        isr = 0;
+
+    vmx_vmcs_enter(v);
+    status = __vmread(GUEST_INTR_STATUS);
+    old = status >> VMX_GUEST_INTR_STATUS_SVI_OFFSET;
+    if ( isr != old )
+    {
+        status &= VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK;
+        status |= isr << VMX_GUEST_INTR_STATUS_SVI_OFFSET;
+        __vmwrite(GUEST_INTR_STATUS, status);
+    }
+    vmx_vmcs_exit(v);
+}
+
 static struct hvm_function_table __read_mostly vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -1470,6 +1493,7 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .nhvm_domain_relinquish_resources = nvmx_domain_relinquish_resources,
     .update_eoi_exit_bitmap = vmx_update_eoi_exit_bitmap,
     .virtual_intr_delivery_enabled = vmx_virtual_intr_delivery_enabled,
+    .process_isr          = vmx_process_isr,
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
 };
 
