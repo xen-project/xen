@@ -195,11 +195,16 @@ static int write_nodes(struct domain *d, struct kernel_info *kinfo,
             continue;
         }
 
+        /* We cannot handle descending more than one level at a time */
+        ASSERT( depth <= last_depth + 1 );
+
         while ( last_depth-- >= depth )
             fdt_end_node(kinfo->fdt);
 
-        address_cells[depth] = device_tree_get_u32(fdt, node, "#address-cells");
-        size_cells[depth] = device_tree_get_u32(fdt, node, "#size-cells");
+        address_cells[depth] = device_tree_get_u32(fdt, node, "#address-cells",
+                                    depth > 0 ? address_cells[depth-1] : 0);
+        size_cells[depth] = device_tree_get_u32(fdt, node, "#size-cells",
+                                    depth > 0 ? size_cells[depth-1] : 0);
 
         fdt_begin_node(kinfo->fdt, name);
 

@@ -66,7 +66,8 @@ void device_tree_get_reg(const u32 **cell, u32 address_cells, u32 size_cells,
                          u64 *start, u64 *size);
 void device_tree_set_reg(u32 **cell, u32 address_cells, u32 size_cells,
                          u64 start, u64 size);
-u32 device_tree_get_u32(const void *fdt, int node, const char *prop_name);
+u32 device_tree_get_u32(const void *fdt, int node, const char *prop_name,
+			u32 dflt);
 bool_t device_tree_node_matches(const void *fdt, int node, const char *match);
 bool_t device_tree_node_compatible(const void *fdt, int node, const char *match);
 int find_compatible_node(const char *compatible, int *node, int *depth,

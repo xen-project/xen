@@ -120,13 +120,14 @@ void device_tree_set_reg(u32 **cell, u32 address_cells, u32 size_cells,
     set_val(cell, size_cells, size);
 }
 
-u32 device_tree_get_u32(const void *fdt, int node, const char *prop_name)
+u32 device_tree_get_u32(const void *fdt, int node, const char *prop_name,
+                        u32 dflt)
 {
     const struct fdt_property *prop;
 
     prop = fdt_get_property(fdt, node, prop_name, NULL);
     if ( !prop || prop->len < sizeof(u32) )
-        return 0; /* default to 0 */
+        return dflt;
 
     return fdt32_to_cpu(*(uint32_t*)prop->data);
 }
@@ -164,8 +165,11 @@ int device_tree_for_each_node(const void *fdt,
             continue;
         }
 
-        address_cells[depth] = device_tree_get_u32(fdt, node, "#address-cells");
-        size_cells[depth] = device_tree_get_u32(fdt, node, "#size-cells");
+        address_cells[depth] = device_tree_get_u32(fdt, node, "#address-cells",
+                                depth > 0 ? address_cells[depth-1] : 0);
+        size_cells[depth] = device_tree_get_u32(fdt, node, "#size-cells",
+                                depth > 0 ? size_cells[depth-1] : 0);
+
 
         ret = func(fdt, node, name, depth,
                    address_cells[depth-1], size_cells[depth-1], data);
