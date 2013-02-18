@@ -172,6 +172,33 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
     return prop;
 }
 
+/* Returns the next node in fdt (starting from offset) which should be
+ * passed through to dom0.
+ */
+static int fdt_next_dom0_node(const void *fdt, int node,
+                              int *depth_out)
+{
+    int depth = *depth_out;
+
+    while ( (node = fdt_next_node(fdt, node, &depth)) &&
+            node >= 0 && depth >= 0 )
+    {
+        if ( depth >= DEVICE_TREE_MAX_DEPTH )
+            break;
+
+        /* Skip multiboot subnodes */
+        if ( fdt_node_check_compatible(fdt, node,
+                                       "xen,multiboot-module" ) == 0 )
+            continue;
+
+        /* We've arrived at a node which dom0 is interested in. */
+        break;
+    }
+
+    *depth_out = depth;
+    return node;
+}
+
 static int write_nodes(struct domain *d, struct kernel_info *kinfo,
                        const void *fdt)
 {
@@ -183,7 +210,7 @@ static int write_nodes(struct domain *d, struct kernel_info *kinfo,
 
     for ( node = 0, depth = 0;
           node >= 0 && depth >= 0;
-          node = fdt_next_node(fdt, node, &depth) )
+          node = fdt_next_dom0_node(fdt, node, &depth) )
     {
         const char *name;
 
@@ -191,7 +218,8 @@ static int write_nodes(struct domain *d, struct kernel_info *kinfo,
 
         if ( depth >= DEVICE_TREE_MAX_DEPTH )
         {
-            printk("warning: node `%s' is nested too deep\n", name);
+            printk("warning: node `%s' is nested too deep (%d)\n",
+                   name, depth);
             continue;
         }
 
