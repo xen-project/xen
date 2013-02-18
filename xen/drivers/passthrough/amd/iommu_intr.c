@@ -144,7 +144,7 @@ static void update_intremap_entry_from_ioapic(
 
 int __init amd_iommu_setup_ioapic_remapping(void)
 {
-    struct IO_APIC_route_entry rte = {0};
+    struct IO_APIC_route_entry rte;
     unsigned long flags;
     u32* entry;
     int apic, pin;
@@ -159,9 +159,7 @@ int __init amd_iommu_setup_ioapic_remapping(void)
     {
         for ( pin = 0; pin < nr_ioapic_entries[apic]; pin++ )
         {
-            *(((int *)&rte) + 1) = io_apic_read(apic, 0x11 + 2 * pin);
-            *(((int *)&rte) + 0) = io_apic_read(apic, 0x10 + 2 * pin);
-
+            rte = __ioapic_read_entry(apic, pin, 1);
             if ( rte.mask == 1 )
                 continue;
 
