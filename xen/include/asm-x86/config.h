@@ -91,6 +91,9 @@
 /* Primary stack is restricted to 8kB by guard pages. */
 #define PRIMARY_STACK_SIZE 8192
 
+/* Return value for zero-size _xmalloc(), distinguished from NULL. */
+#define ZERO_BLOCK_PTR ((void *)0xBAD0BAD0BAD0BAD0UL)
+
 #ifndef __ASSEMBLY__
 extern unsigned long trampoline_phys;
 #define bootsym_phys(sym)                                 \

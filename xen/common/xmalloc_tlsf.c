@@ -26,6 +26,7 @@
 #include <xen/config.h>
 #include <xen/irq.h>
 #include <xen/mm.h>
+#include <xen/pfn.h>
 #include <asm/time.h>
 
 #define MAX_POOL_NAME_LEN       16
@@ -524,25 +525,30 @@ static void xmalloc_pool_put(void *p)
     free_xenheap_page(p);
 }
 
-static void *xmalloc_whole_pages(unsigned long size)
+static void *xmalloc_whole_pages(unsigned long size, unsigned long align)
 {
-    struct bhdr *b;
-    unsigned int i, pageorder = get_order_from_bytes(size + BHDR_OVERHEAD);
-    char *p;
+    unsigned int i, order = get_order_from_bytes(size);
+    void *res, *p;
 
-    b = alloc_xenheap_pages(pageorder, 0);
-    if ( b == NULL )
+    if ( align > size )
+        get_order_from_bytes(align);
+
+    res = alloc_xenheap_pages(order, 0);
+    if ( res == NULL )
         return NULL;
 
-    b->size = PAGE_ALIGN(size + BHDR_OVERHEAD);
-    for ( p = (char *)b + b->size, i = 0; i < pageorder; ++i )
+    for ( p = res + PAGE_ALIGN(size), i = 0; i < order; ++i )
         if ( (unsigned long)p & (PAGE_SIZE << i) )
         {
             free_xenheap_pages(p, i);
             p += PAGE_SIZE << i;
         }
 
-    return (void *)b->ptr.buffer;
+    PFN_ORDER(virt_to_page(res)) = PFN_UP(size);
+    /* Check that there was no truncation: */
+    ASSERT(PFN_ORDER(virt_to_page(res)) == PFN_UP(size));
+
+    return res;
 }
 
 static void tlsf_init(void)
@@ -559,12 +565,20 @@ static void tlsf_init(void)
  * xmalloc()
  */
 
+#ifndef ZERO_BLOCK_PTR
+/* Return value for zero-size allocation, distinguished from NULL. */
+#define ZERO_BLOCK_PTR ((void *)-1L)
+#endif
+
 void *_xmalloc(unsigned long size, unsigned long align)
 {
     void *p = NULL;
     u32 pad;
 
     ASSERT(!in_irq());
+
+    if ( !size )
+        return ZERO_BLOCK_PTR;
 
     ASSERT((align & (align - 1)) == 0);
     if ( align < MEM_ALIGN )
@@ -577,7 +591,7 @@ void *_xmalloc(unsigned long size, unsigned long align)
     if ( size < PAGE_SIZE )
         p = xmem_pool_alloc(size, xenpool);
     if ( p == NULL )
-        p = xmalloc_whole_pages(size);
+        return xmalloc_whole_pages(size - align + MEM_ALIGN, align);
 
     /* Add alignment padding. */
     if ( (pad = -(long)p & (align - 1)) != 0 )
@@ -604,10 +618,27 @@ void xfree(void *p)
 {
     struct bhdr *b;
 
-    if ( p == NULL )
+    if ( p == NULL || p == ZERO_BLOCK_PTR )
         return;
 
     ASSERT(!in_irq());
+
+    if ( !((unsigned long)p & (PAGE_SIZE - 1)) )
+    {
+        unsigned long size = PFN_ORDER(virt_to_page(p));
+        unsigned int i, order = get_order_from_pages(size);
+
+        BUG_ON((unsigned long)p & ((PAGE_SIZE << order) - 1));
+        for ( i = 0; ; ++i )
+        {
+            if ( !(size & (1 << i)) )
+                continue;
+            size -= 1 << i;
+            free_xenheap_pages(p + (size << PAGE_SHIFT), i);
+            if ( i + 1 >= order )
+                return;
+        }
+    }
 
     /* Strip alignment padding. */
     b = (struct bhdr *)((char *) p - BHDR_OVERHEAD);
@@ -618,21 +649,5 @@ void xfree(void *p)
         ASSERT(!(b->size & 1));
     }
 
-    if ( b->size >= PAGE_SIZE )
-    {
-        unsigned int i, order = get_order_from_bytes(b->size);
-
-        BUG_ON((unsigned long)b & ((PAGE_SIZE << order) - 1));
-        for ( i = 0; ; ++i )
-        {
-            if ( !(b->size & (PAGE_SIZE << i)) )
-                continue;
-            b->size -= PAGE_SIZE << i;
-            free_xenheap_pages((void *)b + b->size, i);
-            if ( i + 1 >= order )
-                break;
-        }
-    }
-    else
-        xmem_pool_free(p, xenpool);
+    xmem_pool_free(p, xenpool);
 }

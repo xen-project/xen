@@ -369,13 +369,6 @@ int switch_compat(struct domain *d)
     return -ENOMEM;
 }
 
-static inline bool_t standalone_trap_ctxt(struct vcpu *v)
-{
-    BUILD_BUG_ON(NR_VECTORS * sizeof(*v->arch.pv_vcpu.trap_ctxt) > PAGE_SIZE);
-    return NR_VECTORS * sizeof(*v->arch.pv_vcpu.trap_ctxt) + sizeof(*v)
-           > PAGE_SIZE;
-}
-
 int vcpu_initialise(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -427,19 +420,15 @@ int vcpu_initialise(struct vcpu *v)
 
     if ( !is_idle_domain(d) )
     {
-        if ( standalone_trap_ctxt(v) )
+        BUILD_BUG_ON(NR_VECTORS * sizeof(*v->arch.pv_vcpu.trap_ctxt) >
+                     PAGE_SIZE);
+        v->arch.pv_vcpu.trap_ctxt = xzalloc_array(struct trap_info,
+                                                  NR_VECTORS);
+        if ( !v->arch.pv_vcpu.trap_ctxt )
         {
-            v->arch.pv_vcpu.trap_ctxt = alloc_xenheap_page();
-            if ( !v->arch.pv_vcpu.trap_ctxt )
-            {
-                rc = -ENOMEM;
-                goto done;
-            }
-            clear_page(v->arch.pv_vcpu.trap_ctxt);
+            rc = -ENOMEM;
+            goto done;
         }
-        else
-            v->arch.pv_vcpu.trap_ctxt = (void *)v + PAGE_SIZE -
-                NR_VECTORS * sizeof(*v->arch.pv_vcpu.trap_ctxt);
 
         /* PV guests by default have a 100Hz ticker. */
         v->periodic_period = MILLISECS(10);
@@ -467,8 +456,8 @@ int vcpu_initialise(struct vcpu *v)
     {
         vcpu_destroy_fpu(v);
 
-        if ( !is_hvm_domain(d) && standalone_trap_ctxt(v) )
-            free_xenheap_page(v->arch.pv_vcpu.trap_ctxt);
+        if ( !is_hvm_domain(d) )
+            xfree(v->arch.pv_vcpu.trap_ctxt);
     }
 
     return rc;
@@ -483,8 +472,8 @@ void vcpu_destroy(struct vcpu *v)
 
     if ( is_hvm_vcpu(v) )
         hvm_vcpu_destroy(v);
-    else if ( standalone_trap_ctxt(v) )
-        free_xenheap_page(v->arch.pv_vcpu.trap_ctxt);
+    else
+        xfree(v->arch.pv_vcpu.trap_ctxt);
 }
 
 int arch_domain_create(struct domain *d, unsigned int domcr_flags)
