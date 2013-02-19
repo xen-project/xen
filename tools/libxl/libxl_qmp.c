@@ -871,6 +871,7 @@ int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename)
 {
     libxl__json_object *args = NULL;
 
+    qmp_parameters_add_string(gc, &args, "filename", (char *)filename);
     return qmp_run_command(gc, domid, "xen-save-devices-state", args,
                            NULL, NULL);
 }
