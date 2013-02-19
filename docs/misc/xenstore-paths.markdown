@@ -164,6 +164,12 @@ Various platform properties.
 * acpi_s3 -- is ACPI S3 support enabled for this domain
 * acpi_s4 -- is ACPI S4 support enabled for this domain
 
+#### ~/platform/generation-id = INTEGER ":" INTEGER [HVM,INTERNAL]
+
+Two 64 bit values that represent the Windows Generation ID.
+Is used by the BIOS initializer to get this value.
+If not present or "0:0" (all zeroes) device will not be present to the machine.
+
 ### Frontend device paths
 
 Paravirtual device frontends are generally specified by their own

@@ -349,24 +349,45 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
     return nr_tables;
 }
 
-unsigned long new_vm_gid(void)
+/**
+ * Allocate and initialize Windows Generation ID
+ * If value is not present in the XenStore or if all zeroes
+ * the device will be not active
+ *
+ * Return 0 if memory failure, != 0 if success
+ */
+static int new_vm_gid(struct acpi_info *acpi_info)
 {
-    uint64_t gid;
-    unsigned char *buf;
-    char addr[11];
+    uint64_t vm_gid[2], *buf;
+    char addr[12];
+    const char * s;
+    char *end;
 
-    buf = mem_alloc(8, 8);
-    if (!buf) return 0;
+    acpi_info->vm_gid_addr = 0;
 
+    /* read ID and check for 0 */
+    s = xenstore_read("platform/generation-id", "0:0");
+    vm_gid[0] = strtoll(s, &end, 0);
+    vm_gid[1] = 0;
+    if ( end && end[0] == ':' )
+        vm_gid[1] = strtoll(end+1, NULL, 0);
+    if ( !vm_gid[0] && !vm_gid[1] )
+        return 1;
+
+    /* copy to allocate BIOS memory */
+    buf = (uint64_t *) mem_alloc(sizeof(vm_gid), 8);
+    if ( !buf )
+        return 0;
+    memcpy(buf, vm_gid, sizeof(vm_gid));
+
+    /* set into ACPI table and XenStore the address */
+    acpi_info->vm_gid_addr = virt_to_phys(buf);
     if ( snprintf(addr, sizeof(addr), "0x%lx", virt_to_phys(buf))
          >= sizeof(addr) )
         return 0;
     xenstore_write("hvmloader/generation-id-address", addr);
 
-    gid = strtoll(xenstore_read("platform/generation-id", "0"), NULL, 0);
-    *(uint64_t *)buf = gid;
-
-    return virt_to_phys(buf);    
+    return 1;
 }
 
 void acpi_build_tables(struct acpi_config *config, unsigned int physical)
@@ -381,7 +402,6 @@ void acpi_build_tables(struct acpi_config *config, unsigned int physical)
     unsigned char       *dsdt;
     unsigned long        secondary_tables[ACPI_MAX_SECONDARY_TABLES];
     int                  nr_secondaries, i;
-    unsigned long        vm_gid_addr;
 
     /* Allocate and initialise the acpi info area. */
     mem_hole_populate_ram(ACPI_INFO_PHYSICAL_ADDRESS >> PAGE_SHIFT, 1);
@@ -494,8 +514,8 @@ void acpi_build_tables(struct acpi_config *config, unsigned int physical)
                  offsetof(struct acpi_20_rsdp, extended_checksum),
                  sizeof(struct acpi_20_rsdp));
 
-    vm_gid_addr = new_vm_gid();
-    if (!vm_gid_addr) goto oom;
+    if ( !new_vm_gid(acpi_info) )
+        goto oom;
 
     acpi_info->com1_present = uart_exists(0x3f8);
     acpi_info->com2_present = uart_exists(0x2f8);
@@ -503,7 +523,6 @@ void acpi_build_tables(struct acpi_config *config, unsigned int physical)
     acpi_info->hpet_present = hpet_exists(ACPI_HPET_ADDRESS);
     acpi_info->pci_min = pci_mem_start;
     acpi_info->pci_len = pci_mem_end - pci_mem_start;
-    acpi_info->vm_gid_addr = vm_gid_addr;
 
     return;
 
