@@ -411,8 +411,7 @@ static int json_callback_boolean(void *opaque, int boolean)
 
     DEBUG_GEN_VALUE(ctx, bool, boolean);
 
-    if ((obj = libxl__json_object_alloc(ctx->gc,
-                                 boolean ? JSON_TRUE : JSON_FALSE)) == NULL)
+    if ((obj = libxl__json_object_alloc(ctx->gc, JSON_BOOL)) == NULL)
         return 0;
 
     if (libxl__json_object_append_to(ctx->gc, obj, ctx->current) == -1) {
