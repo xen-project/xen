@@ -397,6 +397,31 @@ DefinitionBlock ("DSDT.aml", "DSDT", 2, "Xen", "HVM", 0)
                         IRQNoFlags () {7}
                     })
                 }
+
+                Device(VGID) {
+                    Name(_HID, EisaId ("XEN0000"))
+                    Name(_UID, 0x00)
+                    Name(_CID, "VM_Gen_Counter")
+                    Name(_DDN, "VM_Gen_Counter")
+                    Method(_STA, 0, NotSerialized)
+                    {
+                        If(LEqual(\_SB.VGIA, 0x00000000)) {
+                            Return(0x00)
+                        } Else {
+                            Return(0x0F)
+                        }
+                    }
+                    Name(PKG, Package ()
+                    {
+                        0x00000000,
+                        0x00000000
+                    })
+                    Method(ADDR, 0, NotSerialized)
+                    {
+                        Store(\_SB.VGIA, Index(PKG, 0))
+                        Return(PKG)
+                    }
+                }
             }
         }
     }
