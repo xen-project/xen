@@ -96,8 +96,8 @@ struct vtimer {
         int irq;
         struct timer timer;
         uint32_t ctl;
-        s_time_t offset;
-        s_time_t cval;
+        uint64_t offset;
+        uint64_t cval;
 };
 
 struct arch_vcpu
