@@ -501,7 +501,7 @@ clean:
 	$(MAKE) -C vtpmmgr clean
 	rm -fr grub-$(XEN_TARGET_ARCH)
 	rm -f $(STUBDOMPATH)
-	[ ! -d libxc-$(XEN_TARGET_ARCH) ] || $(MAKE) DESTDIR= -C libxc-$(XEN_TARGET_ARCH) clean
+	[ ! -e libxc-$(XEN_TARGET_ARCH)/Makefile ] || $(MAKE) DESTDIR= -C libxc-$(XEN_TARGET_ARCH) clean
 	-[ ! -d ioemu ] || $(MAKE) DESTDIR= -C ioemu clean
 	-[ ! -d xenstore ] || $(MAKE) DESTDIR= -C xenstore clean
 
