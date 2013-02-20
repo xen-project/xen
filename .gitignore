@@ -173,7 +173,7 @@ tools/firmware/extboot/extboot.img
 tools/firmware/extboot/signrom
 tools/firmware/hvmloader/acpi/mk_dsdt
 tools/firmware/hvmloader/acpi/dsdt*.c
-tools/firmware/hvmloader/acpi/dsdt*.asl
+tools/firmware/hvmloader/acpi/dsdt_*.asl
 tools/firmware/hvmloader/acpi/ssdt_*.h
 tools/firmware/hvmloader/hvmloader
 tools/firmware/hvmloader/roms.h
