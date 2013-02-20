@@ -130,6 +130,7 @@ libxl_shutdown_reason = Enumeration("shutdown_reason", [
 libxl_vga_interface_type = Enumeration("vga_interface_type", [
     (1, "CIRRUS"),
     (2, "STD"),
+    (3, "QXL"),
     ], init_val = 0)
 
 #

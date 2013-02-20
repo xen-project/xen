@@ -1476,14 +1476,13 @@ skip_vfb:
     if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         if (!xlu_cfg_get_string (config, "vga", &buf, 0)) {
             if (!strcmp(buf, "stdvga")) {
-                b_info->u.hvm.vga.kind
-                = LIBXL_VGA_INTERFACE_TYPE_STD;
+                b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_STD;
             } else if (!strcmp(buf, "cirrus")) {
-                b_info->u.hvm.vga.kind
-                = LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
+                b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
+            } else if (!strcmp(buf, "qxl")) {
+                b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_QXL;
             } else {
-                fprintf(stderr,
-                "Unknown vga \"%s\" specified\n", buf);
+                fprintf(stderr, "Unknown vga \"%s\" specified\n", buf);
                 exit(1);
             }
         } else if (!xlu_cfg_get_long(config, "stdvga", &l, 0))

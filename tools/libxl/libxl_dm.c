@@ -181,6 +181,8 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
             break;
         case LIBXL_VGA_INTERFACE_TYPE_CIRRUS:
             break;
+        case LIBXL_VGA_INTERFACE_TYPE_QXL:
+            break;
         }
 
         if (b_info->u.hvm.boot) {
@@ -435,9 +437,19 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_vappend(dm_args, "-vga", "cirrus", NULL);
             if (b_info->video_memkb) {
                 flexarray_vappend(dm_args, "-global",
-                libxl__sprintf(gc, "vga.vram_size_mb=%d",
-                libxl__sizekb_to_mb(b_info->video_memkb)),
-                NULL);
+                    GCSPRINTF("vga.vram_size_mb=%d",
+                    libxl__sizekb_to_mb(b_info->video_memkb)), NULL);
+            }
+            break;
+        case LIBXL_VGA_INTERFACE_TYPE_QXL:
+            /* QXL have 2 ram regions, ram and vram */
+            flexarray_vappend(dm_args, "-vga", "qxl", NULL);
+            if (b_info->video_memkb) {
+                flexarray_vappend(dm_args, "-global",
+                    GCSPRINTF("qxl-vga.vram_size_mb=%lu",
+                    (b_info->video_memkb/2/1024)), "-global",
+                    GCSPRINTF("qxl-vga.ram_size_mb=%lu",
+                    (b_info->video_memkb/2/1024)), NULL);
             }
             break;
         }

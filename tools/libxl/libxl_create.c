@@ -198,14 +198,29 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         if (b_info->shadow_memkb == LIBXL_MEMKB_DEFAULT)
             b_info->shadow_memkb = 0;
 
+        if (b_info->u.hvm.vga.kind == LIBXL_VGA_INTERFACE_TYPE_QXL) {
+            if (b_info->device_model_version ==
+               LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
+                if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT) {
+                    b_info->video_memkb = (128 * 1024);
+                } else if (b_info->video_memkb < (128 * 1024)) {
+                    LOG(ERROR,
+                        "128 Mib videoram is the minimum for qxl default");
+                    return ERROR_INVAL;
+                }
+            } else {
+                LOG(ERROR,"qemu upstream required for qxl vga");
+                return ERROR_INVAL;
+            }
+        }
+
         if (b_info->u.hvm.vga.kind == LIBXL_VGA_INTERFACE_TYPE_STD &&
             b_info->device_model_version ==
             LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN) {
                 if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
                     b_info->video_memkb = 16 * 1024;
                 else if (b_info->video_memkb < (16 * 1024) ){
-                    LOG(ERROR,
-                    "videoram must be at least 16 mb with stdvga");
+                    LOG(ERROR, "videoram must be at least 16 mb with stdvga");
                     return ERROR_INVAL;
                 }
         } else if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
