@@ -221,9 +221,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 2a1354d655d816feaad7dbdb8364f40a208439c1
-# Thu Jan 17 15:52:16 2013 +0000
-# e1000: fix compile warning introduced by security fix, and debugging
+QEMU_TAG ?= 3b7917bce51cdf433924d295edcfe84f407bd1f7
+# Wed Feb 20 15:40:13 2013 +0000
+# cpu_ioreq_pio, cpu_ioreq_move: introduce read_phys_req_item, write_phys_reqm
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
