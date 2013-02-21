@@ -4564,6 +4564,7 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v,
                                 struct sh_emulate_ctxt *sh_ctxt)
 {
     unsigned long gfn;
+    struct page_info *page;
     mfn_t mfn;
     p2m_type_t p2mt;
     uint32_t pfec = PFEC_page_present | PFEC_write_access;
@@ -4581,22 +4582,31 @@ static mfn_t emulate_gva_to_mfn(struct vcpu *v,
 
     /* Translate the GFN to an MFN */
     ASSERT(!paging_locked_by_me(v->domain));
-    mfn = get_gfn(v->domain, _gfn(gfn), &p2mt);
-        
+
+    page = get_page_from_gfn(v->domain, gfn, &p2mt, P2M_ALLOC);
+
+    /* Sanity checking */
+    if ( page == NULL )
+    {
+        return _mfn(BAD_GFN_TO_MFN);
+    }
     if ( p2m_is_readonly(p2mt) )
     {
-        put_gfn(v->domain, gfn);
+        put_page(page);
         return _mfn(READONLY_GFN);
     }
     if ( !p2m_is_ram(p2mt) )
     {
-        put_gfn(v->domain, gfn);
+        put_page(page);
         return _mfn(BAD_GFN_TO_MFN);
     }
-
+    mfn = page_to_mfn(page);
     ASSERT(mfn_valid(mfn));
+
     v->arch.paging.last_write_was_pt = !!sh_mfn_is_a_page_table(mfn);
-    put_gfn(v->domain, gfn);
+    /* Note shadow cannot page out or unshare this mfn, so the map won't
+     * disappear. Otherwise, caller must hold onto page until done. */
+    put_page(page);
     return mfn;
 }
 
