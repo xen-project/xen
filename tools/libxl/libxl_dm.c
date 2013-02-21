@@ -446,9 +446,9 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_vappend(dm_args, "-vga", "qxl", NULL);
             if (b_info->video_memkb) {
                 flexarray_vappend(dm_args, "-global",
-                    GCSPRINTF("qxl-vga.vram_size_mb=%lu",
+                    GCSPRINTF("qxl-vga.vram_size_mb=%"PRIu64,
                     (b_info->video_memkb/2/1024)), "-global",
-                    GCSPRINTF("qxl-vga.ram_size_mb=%lu",
+                    GCSPRINTF("qxl-vga.ram_size_mb=%"PRIu64,
                     (b_info->video_memkb/2/1024)), NULL);
             }
             break;
