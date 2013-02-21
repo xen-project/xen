@@ -359,7 +359,7 @@ static inline u32 sh_l1e_mmio_get_flags(shadow_l1e_t sl1e)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

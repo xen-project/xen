@@ -63,7 +63,7 @@ int mem_access_send_req(struct domain *d, mem_event_request_t *req)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

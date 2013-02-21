@@ -72,7 +72,7 @@ int mem_event_domctl(struct domain *d, xen_domctl_mem_event_op_t *mec,
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

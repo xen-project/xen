@@ -420,7 +420,7 @@ guest_get_eff_kern_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

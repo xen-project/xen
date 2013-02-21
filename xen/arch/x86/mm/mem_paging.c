@@ -63,7 +63,7 @@ int mem_paging_memop(struct domain *d, xen_mem_event_op_t *mec)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

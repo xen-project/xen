@@ -97,7 +97,7 @@ s_time_t align_timer(s_time_t firsttick, uint64_t period);
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

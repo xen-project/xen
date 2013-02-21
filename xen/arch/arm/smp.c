@@ -31,7 +31,7 @@ void smp_send_event_check_mask(const cpumask_t *mask)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

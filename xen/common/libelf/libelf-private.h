@@ -91,7 +91,7 @@ do { strncpy((d),(s),sizeof((d))-1);            \
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

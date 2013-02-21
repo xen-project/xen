@@ -42,7 +42,7 @@ static inline void svm_asid_g_invlpg(struct vcpu *v, unsigned long g_vaddr)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

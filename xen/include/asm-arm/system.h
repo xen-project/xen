@@ -197,7 +197,7 @@ extern struct vcpu *__context_switch(struct vcpu *prev, struct vcpu *next);
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

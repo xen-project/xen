@@ -275,7 +275,7 @@ int perfc_control(xen_sysctl_perfc_op_t *pc)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

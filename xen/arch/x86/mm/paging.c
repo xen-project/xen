@@ -731,7 +731,7 @@ void paging_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

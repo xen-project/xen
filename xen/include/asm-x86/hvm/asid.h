@@ -46,7 +46,7 @@ bool_t hvm_asid_handle_vmenter(struct hvm_vcpu_asid *asid);
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

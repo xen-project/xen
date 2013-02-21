@@ -28,7 +28,7 @@ extern void domain_uart0_free(struct domain *d);
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

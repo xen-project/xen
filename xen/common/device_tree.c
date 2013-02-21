@@ -440,7 +440,7 @@ size_t __init device_tree_early_init(const void *fdt)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

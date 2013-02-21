@@ -435,7 +435,7 @@ int xc_flask_relabel_domain(xc_interface *xch, int domid, uint32_t sid)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

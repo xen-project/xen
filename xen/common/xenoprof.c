@@ -913,7 +913,7 @@ ret_t do_xenoprof_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

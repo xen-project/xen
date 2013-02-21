@@ -40,7 +40,7 @@ extern uint32_t *select_user_reg(struct cpu_user_regs *regs, int reg);
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

@@ -112,7 +112,7 @@ static inline int get_page_and_type(struct page_info *page,
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

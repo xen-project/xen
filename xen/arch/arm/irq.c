@@ -223,7 +223,7 @@ void pirq_set_affinity(struct domain *d, int pirq, const cpumask_t *mask)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

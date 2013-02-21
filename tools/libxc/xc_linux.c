@@ -70,7 +70,7 @@ void *xc_memalign(xc_interface *xch, size_t alignment, size_t size)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

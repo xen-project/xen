@@ -261,7 +261,7 @@ int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

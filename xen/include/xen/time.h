@@ -75,7 +75,7 @@ void domain_set_time_offset(struct domain *d, int32_t time_offset_seconds);
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

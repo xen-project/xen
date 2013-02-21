@@ -312,7 +312,7 @@ void _hvm_read_entry(struct hvm_domain_context *h,
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

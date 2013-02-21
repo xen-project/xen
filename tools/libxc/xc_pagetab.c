@@ -106,7 +106,7 @@ unsigned long xc_translate_foreign_address(xc_interface *xch, uint32_t dom,
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

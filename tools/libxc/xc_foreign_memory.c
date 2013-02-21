@@ -124,7 +124,7 @@ void *xc_map_foreign_bulk_compat(xc_interface *xch, xc_osdep_handle h,
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

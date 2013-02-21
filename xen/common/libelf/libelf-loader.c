@@ -313,7 +313,7 @@ uint64_t elf_lookup_addr(struct elf_binary * elf, const char *symbol)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

@@ -443,7 +443,7 @@ static inline int gva_to_ipa(uint32_t va, paddr_t *paddr)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

@@ -82,7 +82,7 @@ gdb_arch_resume(struct cpu_user_regs *regs,
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * End:

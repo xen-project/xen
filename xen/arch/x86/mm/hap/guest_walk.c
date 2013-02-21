@@ -142,7 +142,7 @@ unsigned long hap_p2m_ga_to_gfn(GUEST_PAGING_LEVELS)(
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

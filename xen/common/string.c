@@ -438,7 +438,7 @@ void *memchr(const void *s, int c, size_t n)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 8
  * tab-width: 8
  * indent-tabs-mode: t

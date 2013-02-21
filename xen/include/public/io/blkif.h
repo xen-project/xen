@@ -542,7 +542,7 @@ DEFINE_RING_TYPES(blkif, struct blkif_request, struct blkif_response);
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

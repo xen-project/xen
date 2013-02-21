@@ -33,7 +33,7 @@ int vexpress_syscfg(int write, int function, int device, uint32_t *data);
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

@@ -82,7 +82,7 @@ static inline void elf_core_save_regs(ELF_Gregset *core_regs,
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

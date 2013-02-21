@@ -273,7 +273,7 @@ int __init bzimage_parse(char *image_base, char **image_start, unsigned long *im
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

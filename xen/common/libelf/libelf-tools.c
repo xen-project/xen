@@ -276,7 +276,7 @@ int elf_phdr_is_loadable(struct elf_binary *elf, const elf_phdr * phdr)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

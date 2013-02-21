@@ -92,7 +92,7 @@ unsigned long raw_copy_from_guest(void *to, const void __user *from, unsigned le
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

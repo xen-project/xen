@@ -1533,7 +1533,7 @@ int xc_domain_set_virq_handler(xc_interface *xch, uint32_t domid, int virq)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

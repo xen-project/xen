@@ -755,7 +755,7 @@ void arch_do_physinfo(xen_sysctl_physinfo_t *pi);
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

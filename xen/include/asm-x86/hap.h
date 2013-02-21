@@ -69,7 +69,7 @@ extern const struct paging_mode *hap_paging_get_mode(struct vcpu *);
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

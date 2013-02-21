@@ -825,7 +825,7 @@ static inline int sh_check_page_has_no_refs(struct page_info *page)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

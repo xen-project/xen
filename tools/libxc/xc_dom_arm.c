@@ -209,7 +209,7 @@ int xc_dom_feature_translated(struct xc_dom_image *dom)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

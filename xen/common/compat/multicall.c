@@ -43,7 +43,7 @@ static void __trace_multicall_call(multicall_entry_t *call)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

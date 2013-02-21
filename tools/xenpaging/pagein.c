@@ -73,7 +73,7 @@ void create_page_in_thread(struct xenpaging *paging)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End: 

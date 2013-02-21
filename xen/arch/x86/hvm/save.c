@@ -76,7 +76,7 @@ int arch_hvm_load(struct domain *d, struct hvm_save_header *hdr)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

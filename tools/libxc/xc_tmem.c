@@ -521,7 +521,7 @@ int xc_tmem_restore_extra(xc_interface *xch, int dom, int io_fd)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

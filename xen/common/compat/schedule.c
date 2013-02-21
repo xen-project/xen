@@ -43,7 +43,7 @@ int compat_set_timer_op(u32 lo, s32 hi)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

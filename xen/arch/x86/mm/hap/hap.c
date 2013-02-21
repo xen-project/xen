@@ -769,7 +769,7 @@ static const struct paging_mode hap_paging_long_mode = {
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

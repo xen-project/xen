@@ -103,7 +103,7 @@ int xc_mem_paging_load(xc_interface *xch, domid_t domain_id,
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End: 

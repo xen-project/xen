@@ -52,7 +52,7 @@ xc_core_arch_context_get_shdr(xc_interface *xch,
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

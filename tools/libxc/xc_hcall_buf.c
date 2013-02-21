@@ -231,7 +231,7 @@ void xc__hypercall_bounce_post(xc_interface *xch, xc_hypercall_buffer_t *b)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

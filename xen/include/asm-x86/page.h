@@ -382,7 +382,7 @@ perms_strictly_increased(uint32_t old_flags, uint32_t new_flags)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

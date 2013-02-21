@@ -21,7 +21,7 @@ int machine_kexec_get_xen(xen_kexec_range_t *range)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

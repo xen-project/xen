@@ -593,7 +593,7 @@ void vcpu_mark_events_pending(struct vcpu *v)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

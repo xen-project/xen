@@ -148,7 +148,7 @@ int nestedsvm_vcpu_interrupt(struct vcpu *v, const struct hvm_intack intack);
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

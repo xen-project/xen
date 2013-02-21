@@ -256,7 +256,7 @@ void __init pl011_init(int index, unsigned long register_base_address)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

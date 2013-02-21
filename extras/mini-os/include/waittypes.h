@@ -24,7 +24,7 @@ MINIOS_STAILQ_HEAD(wait_queue_head, struct wait_queue);
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

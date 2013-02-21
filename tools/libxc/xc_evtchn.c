@@ -126,7 +126,7 @@ int xc_evtchn_unmask(xc_evtchn *xce, evtchn_port_t port)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
