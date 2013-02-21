@@ -218,8 +218,7 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
         return _mfn(gfn);
     }
 
-    /* For now only perform locking on hap domains */
-    if ( locked && (hap_enabled(p2m->domain)) )
+    if ( locked )
         /* Grab the lock here, don't release until put_gfn */
         gfn_lock(p2m, gfn, 0);
 
@@ -248,8 +247,7 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn,
 
 void __put_gfn(struct p2m_domain *p2m, unsigned long gfn)
 {
-    if ( !p2m || !paging_mode_translate(p2m->domain) 
-              || !hap_enabled(p2m->domain) )
+    if ( !p2m || !paging_mode_translate(p2m->domain) )
         /* Nothing to do in this case */
         return;
 
