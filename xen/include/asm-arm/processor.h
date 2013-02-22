@@ -99,11 +99,11 @@ union hsr {
         unsigned long ec:6;    /* Exception Class */
     };
 
+    /* reg, reg0, reg1 are 4 bits on AArch32, the fifth bit is sbzp. */
     struct hsr_cp32 {
         unsigned long read:1;  /* Direction */
         unsigned long crm:4;   /* CRm */
-        unsigned long reg:4;   /* Rt */
-        unsigned long sbzp:1;
+        unsigned long reg:5;   /* Rt */
         unsigned long crn:4;   /* CRn */
         unsigned long op1:3;   /* Op1 */
         unsigned long op2:3;   /* Op2 */
@@ -116,10 +116,9 @@ union hsr {
     struct hsr_cp64 {
         unsigned long read:1;   /* Direction */
         unsigned long crm:4;    /* CRm */
-        unsigned long reg1:4;   /* Rt1 */
-        unsigned long sbzp1:1;
-        unsigned long reg2:4;   /* Rt2 */
-        unsigned long sbzp2:2;
+        unsigned long reg1:5;   /* Rt1 */
+        unsigned long reg2:5;   /* Rt2 */
+        unsigned long sbzp2:1;
         unsigned long op1:4;   /* Op1 */
         unsigned long cc:4;    /* Condition Code */
         unsigned long ccvalid:1;/* CC Valid */
@@ -133,9 +132,14 @@ union hsr {
         unsigned long s1ptw:1; /* */
         unsigned long cache:1; /* Cache Maintenance */
         unsigned long eat:1;   /* External Abort Type */
+#ifdef CONFIG_ARM_32
         unsigned long sbzp0:6;
-        unsigned long reg:4;   /* Register */
-        unsigned long sbzp1:1;
+#else
+        unsigned long sbzp0:4;
+        unsigned long ar:1;    /* Acquire Release */
+        unsigned long sf:1;    /* Sixty Four bit register */
+#endif
+        unsigned long reg:5;   /* Register */
         unsigned long sign:1;  /* Sign extend */
         unsigned long size:2;  /* Access Size */
         unsigned long valid:1; /* Syndrome Valid */
