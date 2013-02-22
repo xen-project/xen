@@ -203,7 +203,7 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-4.2-testing.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= b0855f925c6e2e0b21fbb03fab4b5fb5b6876871
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.2.1
+QEMU_UPSTREAM_REVISION ?= eccc68722696864fc4823f048c7be58d11281b97
 SEABIOS_UPSTREAM_TAG ?= rel-1.6.3.2
 # Sun Mar 11 09:27:07 2012 -0400
 # Update version to 1.6.3.2
