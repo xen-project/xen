@@ -3,40 +3,12 @@
 
 #include <xen/stringify.h>
 
-/* Co-processor registers */
-
-/* Layout as used in assembly, with src/dest registers mixed in */
-#define __CP32(r, coproc, opc1, crn, crm, opc2) coproc, opc1, r, crn, crm, opc2
-#define __CP64(r1, r2, coproc, opc, crm) coproc, opc, r1, r2, crm
-#define CP32(r, name...) __CP32(r, name)
-#define CP64(r, name...) __CP64(r, name)
-
-/* Stringified for inline assembly */
-#define LOAD_CP32(r, name...)  "mrc " __stringify(CP32(%r, name)) ";"
-#define STORE_CP32(r, name...) "mcr " __stringify(CP32(%r, name)) ";"
-#define LOAD_CP64(r, name...)  "mrrc " __stringify(CP64(%r, %H##r, name)) ";"
-#define STORE_CP64(r, name...) "mcrr " __stringify(CP64(%r, %H##r, name)) ";"
-
-/* C wrappers */
-#define READ_CP32(name...) ({                                   \
-    register uint32_t _r;                                       \
-    asm volatile(LOAD_CP32(0, name) : "=r" (_r));               \
-    _r; })
-
-#define WRITE_CP32(v, name...) do {                             \
-    register uint32_t _r = (v);                                 \
-    asm volatile(STORE_CP32(0, name) : : "r" (_r));             \
-} while (0)
-
-#define READ_CP64(name...) ({                                   \
-    register uint64_t _r;                                       \
-    asm volatile(LOAD_CP64(0, name) : "=r" (_r));               \
-    _r; })
-
-#define WRITE_CP64(v, name...) do {                             \
-    register uint64_t _r = (v);                                 \
-    asm volatile(STORE_CP64(0, name) : : "r" (_r));             \
-} while (0)
+/*
+ * AArch32 Co-processor registers.
+ *
+ * Note that AArch64 requires many of these definitions in order to
+ * support 32-bit guests.
+ */
 
 #define __HSR_CPREG_c0  0
 #define __HSR_CPREG_c1  1

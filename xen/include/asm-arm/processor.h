@@ -225,8 +225,13 @@ union hsr {
 #define ID_PFR1_GT_MASK  0x000F0000  /* Generic Timer interface support */
 #define ID_PFR1_GT_v1    0x00010000
 
-#define MSR(reg,val)        asm volatile ("msr "#reg", %0\n" : : "r" (val))
-#define MRS(val,reg)        asm volatile ("mrs %0,"#reg"\n" : "=r" (v))
+#if defined(CONFIG_ARM_32)
+# include <asm/arm32/processor.h>
+#elif defined(CONFIG_ARM_64)
+# include <asm/arm64/processor.h>
+#else
+# error "unknown ARM variant"
+#endif
 
 #ifndef __ASSEMBLY__
 extern uint32_t hyp_traps_vector[8];
