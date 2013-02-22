@@ -250,6 +250,14 @@ static inline void write_pte(lpae_t *p, lpae_t pte)
         : : "r" (pte.bits), "r" (p) : "memory");
 }
 
+#if defined(CONFIG_ARM_32)
+# include <asm/arm32/page.h>
+#elif defined(CONFIG_ARM_64)
+# include <asm/arm64/page.h>
+#else
+# error "unknown ARM variant"
+#endif
+
 /* Architectural minimum cacheline size is 4 32-bit words. */
 #define MIN_CACHELINE_BYTES 16
 /* Actual cacheline size on the boot CPU. */
@@ -281,65 +289,6 @@ static inline void flush_xen_dcache_va_range(void *p, unsigned long size)
             "dsb;"   /* Finish flush before continuing */               \
             : : "r" (_p), "m" (*_p));                                   \
 } while (0)
-
-
-/*
- * Flush all hypervisor mappings from the TLB and branch predictor.
- * This is needed after changing Xen code mappings.
- *
- * The caller needs to issue the necessary DSB and D-cache flushes
- * before calling flush_xen_text_tlb.
- */
-static inline void flush_xen_text_tlb(void)
-{
-    register unsigned long r0 asm ("r0");
-    asm volatile (
-        "isb;"                        /* Ensure synchronization with previous changes to text */
-        STORE_CP32(0, TLBIALLH)       /* Flush hypervisor TLB */
-        STORE_CP32(0, ICIALLU)        /* Flush I-cache */
-        STORE_CP32(0, BPIALL)         /* Flush branch predictor */
-        "dsb;"                        /* Ensure completion of TLB+BP flush */
-        "isb;"
-        : : "r" (r0) /*dummy*/ : "memory");
-}
-
-/*
- * Flush all hypervisor mappings from the data TLB. This is not
- * sufficient when changing code mappings or for self modifying code.
- */
-static inline void flush_xen_data_tlb(void)
-{
-    register unsigned long r0 asm ("r0");
-    asm volatile("dsb;" /* Ensure preceding are visible */
-                 STORE_CP32(0, TLBIALLH)
-                 "dsb;" /* Ensure completion of the TLB flush */
-                 "isb;"
-                 : : "r" (r0) /* dummy */: "memory");
-}
-
-/*
- * Flush a range of VA's hypervisor mappings from the data TLB. This is not
- * sufficient when changing code mappings or for self modifying code.
- */
-static inline void flush_xen_data_tlb_range_va(unsigned long va, unsigned long size)
-{
-    unsigned long end = va + size;
-    dsb(); /* Ensure preceding are visible */
-    while ( va < end ) {
-        asm volatile(STORE_CP32(0, TLBIMVAH)
-                     : : "r" (va) : "memory");
-        va += PAGE_SIZE;
-    }
-    dsb(); /* Ensure completion of the TLB flush */
-    isb();
-}
-
-/* Flush all non-hypervisor mappings from the TLB */
-static inline void flush_guest_tlb(void)
-{
-    register unsigned long r0 asm ("r0");
-    WRITE_CP32(r0 /* dummy */, TLBIALLNSNH);
-}
 
 /* Print a walk of an arbitrary page table */
 void dump_pt_walk(lpae_t *table, paddr_t addr);
