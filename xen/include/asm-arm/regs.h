@@ -13,9 +13,15 @@
 #define svc_mode(r)     psr_mode((r)->cpsr,PSR_MODE_SVC)
 #define mon_mode(r)     psr_mode((r)->cpsr,PSR_MODE_MON)
 #define abt_mode(r)     psr_mode((r)->cpsr,PSR_MODE_ABT)
-#define hyp_mode(r)     psr_mode((r)->cpsr,PSR_MODE_HYP)
 #define und_mode(r)     psr_mode((r)->cpsr,PSR_MODE_UND)
 #define sys_mode(r)     psr_mode((r)->cpsr,PSR_MODE_SYS)
+
+#ifdef CONFIG_ARM_32
+#define hyp_mode(r)     psr_mode((r)->cpsr,PSR_MODE_HYP)
+#else
+#define hyp_mode(r)     (psr_mode((r)->cpsr,PSR_MODE_EL2h) || \
+                         psr_mode((r)->cpsr,PSR_MODE_EL2t))
+#endif
 
 #define guest_mode(r)                                                         \
 ({                                                                            \
