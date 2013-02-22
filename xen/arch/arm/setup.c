@@ -56,6 +56,11 @@ static void __init init_idle_domain(void)
 
 static void __init processor_id(void)
 {
+
+    /* Setup the virtual ID to match the physical */
+    WRITE_SYSREG32(READ_SYSREG32(MIDR_EL1), VPIDR_EL2);
+    WRITE_SYSREG(READ_SYSREG(MPIDR_EL1), VMPIDR_EL2);
+
 #if defined(CONFIG_ARM_64)
     printk("64-bit Processor Features: %016"PRIx64" %016"PRIx64"\n",
            READ_SYSREG64(ID_AA64PFR0_EL1), READ_SYSREG64(ID_AA64PFR1_EL1));

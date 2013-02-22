@@ -95,6 +95,8 @@
 #define CCSIDR          p15,1,c0,c0,0   /* Cache Size ID Registers */
 #define CLIDR           p15,1,c0,c0,1   /* Cache Level ID Register */
 #define CSSELR          p15,2,c0,c0,0   /* Cache Size Selection Register */
+#define VPIDR           p15,4,c0,c0,0   /* Virtualization Processor ID Register */
+#define VMPIDR          p15,4,c0,c0,5   /* Virtualization Multiprocessor ID Register */
 
 /* CP15 CR1: System Control Registers */
 #define SCTLR           p15,0,c1,c0,0   /* System Control Register */
@@ -278,6 +280,10 @@
 #define VBAR_EL2                HVBAR
 #define VTCR_EL2                VTCR
 #define VTTBR_EL2               VTTBR
+#define MIDR_EL1                MIDR
+#define VPIDR_EL2               VPIDR
+#define MPIDR_EL1               MPIDR
+#define VMPIDR_EL2              VMPIDR
 
 #endif
 
