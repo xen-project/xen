@@ -675,6 +675,28 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, unsigned long iss)
 #endif
 }
 
+void do_multicall_call(struct multicall_entry *multi)
+{
+    arm_hypercall_fn_t call = NULL;
+
+    if ( multi->op >= ARRAY_SIZE(arm_hypercall_table) )
+    {
+        multi->result = -ENOSYS;
+        return;
+    }
+
+    call = arm_hypercall_table[multi->op].fn;
+    if ( call == NULL )
+    {
+        multi->result = -ENOSYS;
+        return;
+    }
+
+    multi->result = call(multi->args[0], multi->args[1],
+                        multi->args[2], multi->args[3],
+                        multi->args[4]);
+}
+
 static void do_cp15_32(struct cpu_user_regs *regs,
                        union hsr hsr)
 {
