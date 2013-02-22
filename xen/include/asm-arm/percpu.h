@@ -11,18 +11,17 @@ void percpu_init_areas(void);
     __section(".bss.percpu" #suffix)                            \
     __typeof__(type) per_cpu_##name
 
-
 #define per_cpu(var, cpu)  \
     (*RELOC_HIDE(&per_cpu__##var, __per_cpu_offset[cpu]))
 #define __get_cpu_var(var) \
-    (*RELOC_HIDE(&per_cpu__##var, READ_CP32(HTPIDR)))
+    (*RELOC_HIDE(&per_cpu__##var, READ_SYSREG(TPIDR_EL2)))
 
 #define DECLARE_PER_CPU(type, name) extern __typeof__(type) per_cpu__##name
 
 DECLARE_PER_CPU(unsigned int, cpu_id);
 #define get_processor_id()    (this_cpu(cpu_id))
 #define set_processor_id(id)  do {                      \
-    WRITE_CP32(__per_cpu_offset[id], HTPIDR);           \
+    WRITE_SYSREG(__per_cpu_offset[id], TPIDR_EL2);      \
     this_cpu(cpu_id) = (id);                            \
 } while(0)
 #endif

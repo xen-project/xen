@@ -244,6 +244,7 @@
 #define ID_PFR0_EL1             ID_PFR0
 #define ID_PFR1_EL1             ID_PFR1
 #define SCTLR_EL2               HSCTLR
+#define TPIDR_EL2               HTPIDR
 #define TTBR0_EL2               HTTBR
 #define VBAR_EL2                HVBAR
 #define VTCR_EL2                VTCR
