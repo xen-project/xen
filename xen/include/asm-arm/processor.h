@@ -91,6 +91,123 @@
 #define HSR_EC_DATA_ABORT_HYP       0x25
 
 #ifndef __ASSEMBLY__
+
+#include <xen/types.h>
+
+struct cpuinfo_arm {
+    union {
+        uint32_t bits;
+        struct {
+            unsigned long revision:4;
+            unsigned long part_number:12;
+            unsigned long architecture:4;
+            unsigned long variant:4;
+            unsigned long implementer:8;
+        };
+    } midr;
+    union {
+        register_t bits;
+        struct {
+            unsigned long aff0:8;
+            unsigned long aff1:8;
+            unsigned long aff2:8;
+            unsigned long mt:1; /* Multi-thread, iff MP == 1 */
+            unsigned long __res0:5;
+            unsigned long up:1; /* UP system, iff MP == 1 */
+            unsigned long mp:1; /* MP extensions */
+
+#ifdef CONFIG_ARM_64
+            unsigned long aff3:8;
+            unsigned long __res1:24;
+#endif
+        };
+    } mpidr;
+
+#ifdef CONFIG_ARM_64
+    /* 64-bit CPUID registers. */
+    union {
+        uint64_t bits[2];
+        struct {
+            unsigned long el0:4;
+            unsigned long el1:4;
+            unsigned long el2:4;
+            unsigned long el3:4;
+            unsigned long fp:4;   /* Floating Point */
+            unsigned long simd:4; /* Advanced SIMD */
+            unsigned long __res0:8;
+
+            unsigned long __res1;
+        };
+    } pfr64;
+
+    struct {
+        uint64_t bits[2];
+    } dbg64;
+
+    struct {
+        uint64_t bits[2];
+    } aux64;
+
+    struct {
+        uint64_t bits[2];
+    } mm64;
+
+    struct {
+        uint64_t bits[2];
+    } isa64;
+
+#endif
+
+    /*
+     * 32-bit CPUID registers. On ARMv8 these describe the properties
+     * when running in 32-bit mode.
+     */
+    union {
+        uint32_t bits[2];
+        struct {
+            unsigned long arm:4;
+            unsigned long thumb:4;
+            unsigned long jazelle:4;
+            unsigned long thumbee:4;
+            unsigned long __res0:16;
+
+            unsigned long progmodel:4;
+            unsigned long security:4;
+            unsigned long mprofile:4;
+            unsigned long virt:4;
+            unsigned long gentimer:4;
+            unsigned long __res1:12;
+        };
+    } pfr32;
+
+    struct {
+        uint32_t bits[1];
+    } dbg32;
+
+    struct {
+        uint32_t bits[1];
+    } aux32;
+
+    struct {
+        uint32_t bits[4];
+    } mm32;
+
+    struct {
+        uint32_t bits[6];
+    } isa32;
+};
+
+/*
+ * capabilities of CPUs
+ */
+
+extern struct cpuinfo_arm boot_cpu_data;
+
+extern void identify_cpu(struct cpuinfo_arm *);
+
+extern struct cpuinfo_arm cpu_data[];
+#define current_cpu_data cpu_data[smp_processor_id()]
+
 union hsr {
     uint32_t bits;
     struct {
@@ -225,10 +342,6 @@ union hsr {
 #define CNTx_CTL_MASK     (1u<<1)  /* Mask IRQ */
 #define CNTx_CTL_PENDING  (1u<<2)  /* IRQ pending */
 
-/* CPUID bits */
-#define ID_PFR1_GT_MASK  0x000F0000  /* Generic Timer interface support */
-#define ID_PFR1_GT_v1    0x00010000
-
 #if defined(CONFIG_ARM_32)
 # include <asm/arm32/processor.h>
 #elif defined(CONFIG_ARM_64)
@@ -259,6 +372,10 @@ void vcpu_regs_hyp_to_user(const struct vcpu *vcpu,
                            struct vcpu_guest_core_regs *regs);
 void vcpu_regs_user_to_hyp(struct vcpu *vcpu,
                            const struct vcpu_guest_core_regs *regs);
+
+struct cpuinfo_x86 {
+    uint32_t pfr32[2];
+};
 
 #endif /* __ASSEMBLY__ */
 #endif /* __ASM_ARM_PROCESSOR_H */

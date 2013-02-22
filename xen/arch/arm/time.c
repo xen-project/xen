@@ -31,6 +31,7 @@
 #include <asm/system.h>
 #include <asm/time.h>
 #include <asm/gic.h>
+#include <asm/cpufeature.h>
 
 /*
  * Unfortunately the hypervisor timer interrupt appears to be buggy in
@@ -90,10 +91,8 @@ static uint32_t calibrate_timer(void)
 int __init init_xen_time(void)
 {
     /* Check that this CPU supports the Generic Timer interface */
-#if defined(CONFIG_ARM_32)
-    if ( (READ_CP32(ID_PFR1) & ID_PFR1_GT_MASK) != ID_PFR1_GT_v1 )
+    if ( !cpu_has_gentimer )
         panic("CPU does not support the Generic Timer v1 interface.\n");
-#endif
 
     cpu_khz = READ_SYSREG32(CNTFRQ_EL0) / 1000;
     boot_count = READ_SYSREG64(CNTPCT_EL0);

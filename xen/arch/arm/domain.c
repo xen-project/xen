@@ -1,3 +1,14 @@
+/*
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
@@ -13,6 +24,7 @@
 #include <asm/regs.h>
 #include <asm/p2m.h>
 #include <asm/irq.h>
+#include <asm/cpufeature.h>
 
 #include <asm/gic.h>
 #include "vtimer.h"
@@ -58,11 +70,13 @@ static void ctxt_switch_from(struct vcpu *p)
     /* Arch timer */
     virt_timer_save(p);
 
-#if defined(CONFIG_ARM_32)
-    /* XXX only save these if ThumbEE e.g. ID_PFR0.THUMB_EE_SUPPORT */
-    p->arch.teecr = READ_CP32(TEECR);
-    p->arch.teehbr = READ_CP32(TEEHBR);
+    if ( is_pv32_domain(p->domain) && cpu_has_thumbee )
+    {
+        p->arch.teecr = READ_SYSREG32(TEECR32_EL1);
+        p->arch.teehbr = READ_SYSREG32(TEEHBR32_EL1);
+    }
 
+#ifdef CONFIG_ARM_32
     p->arch.joscr = READ_CP32(JOSCR);
     p->arch.jmcr = READ_CP32(JMCR);
 #endif
@@ -121,6 +135,9 @@ static void ctxt_switch_to(struct vcpu *n)
     p2m_load_VTTBR(n->domain);
     isb();
 
+    WRITE_SYSREG32(n->domain->arch.vpidr, VPIDR_EL2);
+    WRITE_SYSREG(n->domain->arch.vmpidr, VMPIDR_EL2);
+
     /* VGIC */
     gic_restore_state(n);
 
@@ -169,11 +186,13 @@ static void ctxt_switch_to(struct vcpu *n)
     WRITE_SYSREG(n->arch.tpidrro_el0, TPIDRRO_EL0);
     WRITE_SYSREG(n->arch.tpidr_el1, TPIDR_EL1);
 
-#if defined(CONFIG_ARM_32)
-    /* XXX only restore these if ThumbEE e.g. ID_PFR0.THUMB_EE_SUPPORT */
-    WRITE_CP32(n->arch.teecr, TEECR);
-    WRITE_CP32(n->arch.teehbr, TEEHBR);
+    if ( is_pv32_domain(n->domain) && cpu_has_thumbee )
+    {
+        WRITE_SYSREG32(n->arch.teecr, TEECR32_EL1);
+        WRITE_SYSREG32(n->arch.teehbr, TEEHBR32_EL1);
+    }
 
+#ifdef CONFIG_ARM_32
     WRITE_CP32(n->arch.joscr, JOSCR);
     WRITE_CP32(n->arch.jmcr, JMCR);
 #endif
@@ -446,6 +465,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
     if ( (d->shared_info = alloc_xenheap_pages(0, 0)) == NULL )
         goto fail;
+
+    /* Default the virtual ID to match the physical */
+    d->arch.vpidr = boot_cpu_data.midr.bits;
+    d->arch.vmpidr = boot_cpu_data.mpidr.bits;
 
     clear_page(d->shared_info);
     share_xen_page_with_guest(

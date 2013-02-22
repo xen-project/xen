@@ -40,6 +40,9 @@
 #include <asm/vfp.h>
 #include <asm/early_printk.h>
 #include <asm/gic.h>
+#include <asm/cpufeature.h>
+
+struct cpuinfo_arm __read_mostly boot_cpu_data;
 
 static __used void init_done(void)
 {
@@ -54,41 +57,93 @@ static void __init init_idle_domain(void)
     /* TODO: setup_idle_pagetable(); */
 }
 
+static const char * __initdata processor_implementers[] = {
+    ['A'] = "ARM Limited",
+    ['D'] = "Digital Equipment Corp",
+    ['M'] = "Motorola, Freescale Semiconductor Inc.",
+    ['Q'] = "Qualcomm Inc.",
+    ['V'] = "Marvell Semiconductor Inc.",
+    ['i'] = "Intel Corporation",
+};
+
 static void __init processor_id(void)
 {
+    const char *implementer = "Unknown";
+    struct cpuinfo_arm *c = &boot_cpu_data;
 
-    /* Setup the virtual ID to match the physical */
-    WRITE_SYSREG32(READ_SYSREG32(MIDR_EL1), VPIDR_EL2);
-    WRITE_SYSREG(READ_SYSREG(MPIDR_EL1), VMPIDR_EL2);
+    identify_cpu(c);
+    current_cpu_data = *c;
+
+    if ( c->midr.implementer < ARRAY_SIZE(processor_implementers) &&
+         processor_implementers[c->midr.implementer] )
+        implementer = processor_implementers[c->midr.implementer];
+
+    if ( c->midr.architecture != 0xf )
+        printk("Huh, cpu architecture %x, expected 0xf (defined by cpuid)\n",
+               c->midr.architecture);
+
+    printk("Processor: \"%s\", variant: 0x%x, part 0x%03x, rev 0x%x\n",
+           implementer, c->midr.variant, c->midr.part_number, c->midr.revision);
 
 #if defined(CONFIG_ARM_64)
-    printk("64-bit Processor Features: %016"PRIx64" %016"PRIx64"\n",
-           READ_SYSREG64(ID_AA64PFR0_EL1), READ_SYSREG64(ID_AA64PFR1_EL1));
-    printk("64-bit Debug Features: %016"PRIx64" %016"PRIx64"\n",
-           READ_SYSREG64(ID_AA64DFR0_EL1), READ_SYSREG64(ID_AA64DFR1_EL1));
-    printk("64-bit Auxiliary Features: %016"PRIx64" %016"PRIx64"\n",
-           READ_SYSREG64(ID_AA64AFR0_EL1), READ_SYSREG64(ID_AA64AFR1_EL1));
-    printk("64-bit Memory Model Features: %016"PRIx64" %016"PRIx64"\n",
-           READ_SYSREG64(ID_AA64MMFR0_EL1), READ_SYSREG64(ID_AA64MMFR1_EL1));
-    printk("64-bit ISA Features:  %016"PRIx64" %016"PRIx64"\n",
-           READ_SYSREG64(ID_AA64ISAR0_EL1), READ_SYSREG64(ID_AA64ISAR1_EL1));
+    printk("64-bit Execution:\n");
+    printk("  Processor Features: %016"PRIx64" %016"PRIx64"\n",
+           boot_cpu_data.pfr64.bits[0], boot_cpu_data.pfr64.bits[1]);
+    printk("    Exception Levels: EL3:%s EL2:%s EL1:%s EL0:%s\n",
+           cpu_has_el3_32 ? "64+32" : cpu_has_el3_64 ? "64" : "No",
+           cpu_has_el2_32 ? "64+32" : cpu_has_el2_64 ? "64" : "No",
+           cpu_has_el1_32 ? "64+32" : cpu_has_el1_64 ? "64" : "No",
+           cpu_has_el0_32 ? "64+32" : cpu_has_el0_64 ? "64" : "No");
+    printk("    Extensions:%s%s\n",
+           cpu_has_fp ? " FloatingPoint" : "",
+           cpu_has_simd ? " AdvancedSIMD" : "");
+
+    printk("  Debug Features: %016"PRIx64" %016"PRIx64"\n",
+           boot_cpu_data.dbg64.bits[0], boot_cpu_data.dbg64.bits[1]);
+    printk("  Auxiliary Features: %016"PRIx64" %016"PRIx64"\n",
+           boot_cpu_data.aux64.bits[0], boot_cpu_data.aux64.bits[1]);
+    printk("  Memory Model Features: %016"PRIx64" %016"PRIx64"\n",
+           boot_cpu_data.mm64.bits[0], boot_cpu_data.mm64.bits[1]);
+    printk("  ISA Features:  %016"PRIx64" %016"PRIx64"\n",
+           boot_cpu_data.isa64.bits[0], boot_cpu_data.isa64.bits[1]);
 #endif
+
     /*
      * On AArch64 these refer to the capabilities when running in
      * AArch32 mode.
      */
-    printk("32-bit Processor Features: %08x %08x\n",
-           READ_SYSREG32(ID_PFR0_EL1), READ_SYSREG32(ID_PFR1_EL1));
-    printk("32-bit Debug Features: %08x\n", READ_SYSREG32(ID_DFR0_EL1));
-    printk("32-bit Auxiliary Features: %08x\n", READ_SYSREG32(ID_AFR0_EL1));
-    printk("32-bit Memory Model Features: %08x %08x %08x %08x\n",
-           READ_SYSREG32(ID_MMFR0_EL1), READ_SYSREG32(ID_MMFR1_EL1),
-           READ_SYSREG32(ID_MMFR2_EL1), READ_SYSREG32(ID_MMFR3_EL1));
-    printk("32-bit ISA Features: %08x %08x %08x %08x %08x %08x\n",
-           READ_SYSREG32(ID_ISAR0_EL1), READ_SYSREG32(ID_ISAR1_EL1),
-           READ_SYSREG32(ID_ISAR2_EL1), READ_SYSREG32(ID_ISAR3_EL1),
-           READ_SYSREG32(ID_ISAR4_EL1), READ_SYSREG32(ID_ISAR5_EL1));
+    if ( cpu_has_aarch32 )
+    {
+        printk("32-bit Execution:\n");
+        printk("  Processor Features: %08"PRIx32":%08"PRIx32"\n",
+               boot_cpu_data.pfr32.bits[0], boot_cpu_data.pfr32.bits[1]);
+        printk("    Instruction Sets:%s%s%s%s%s\n",
+               cpu_has_aarch32 ? " AArch32" : "",
+               cpu_has_thumb ? " Thumb" : "",
+               cpu_has_thumb2 ? " Thumb-2" : "",
+               cpu_has_thumbee ? " ThumbEE" : "",
+               cpu_has_jazelle ? " Jazelle" : "");
+        printk("    Extensions:%s%s\n",
+               cpu_has_gentimer ? " GenericTimer" : "",
+               cpu_has_security ? " Security" : "");
 
+        printk("  Debug Features: %08"PRIx32"\n",
+               boot_cpu_data.dbg32.bits[0]);
+        printk("  Auxiliary Features: %08"PRIx32"\n",
+               boot_cpu_data.aux32.bits[0]);
+        printk("  Memory Model Features: "
+               "%08"PRIx32" %08"PRIx32" %08"PRIx32" %08"PRIx32"\n",
+               boot_cpu_data.mm32.bits[0], boot_cpu_data.mm32.bits[1],
+               boot_cpu_data.mm32.bits[2], boot_cpu_data.mm32.bits[3]);
+        printk(" ISA Features: %08x %08x %08x %08x %08x %08x\n",
+               boot_cpu_data.isa32.bits[0], boot_cpu_data.isa32.bits[1],
+               boot_cpu_data.isa32.bits[2], boot_cpu_data.isa32.bits[3],
+               boot_cpu_data.isa32.bits[4], boot_cpu_data.isa32.bits[5]);
+    }
+    else
+    {
+        printk("32-bit Execution: Unsupported\n");
+    }
 }
 
 void __init discard_initial_modules(void)
@@ -379,6 +434,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     console_init_preirq();
 #endif
 
+    processor_id();
+
     init_xen_time();
 
     gic_init();
@@ -399,8 +456,6 @@ void __init start_xen(unsigned long boot_phys_offset,
      * T0SZ=(1)1000 = -8 (40 bit physical addresses)
      */
     WRITE_SYSREG32(0x80002558, VTCR_EL2); isb();
-
-    processor_id();
 
     enable_vfp();
 

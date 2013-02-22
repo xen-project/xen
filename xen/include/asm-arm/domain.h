@@ -57,6 +57,10 @@ struct arch_domain
     struct hvm_domain hvm_domain;
     xen_pfn_t *grant_table_gpfn;
 
+    /* Virtual CPUID */
+    uint32_t vpidr;
+    register_t vmpidr;
+
     struct {
         /*
          * Covers access to other members of this struct _except_ for
@@ -166,8 +170,12 @@ struct arch_vcpu
     register_t tpidr_el1;
     register_t tpidrro_el0;
 
+    uint32_t teecr, teehbr; /* ThumbEE, 32-bit guests only */
 #ifdef CONFIG_ARM_32
-    uint32_t teecr, teehbr;
+    /*
+     * ARMv8 only supports a trivial implementation on Jazelle when in AArch32
+     * mode and therefore has no extended control registers.
+     */
     uint32_t joscr, jmcr;
 #endif
 

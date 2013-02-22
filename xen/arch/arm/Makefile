@@ -3,6 +3,7 @@ subdir-$(arm64) += arm64
 subdir-y += platforms
 
 obj-y += early_printk.o
+obj-y += cpu.o
 obj-y += domain.o
 obj-y += domctl.o
 obj-y += sysctl.o

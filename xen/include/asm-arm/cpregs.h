@@ -265,10 +265,14 @@
 #define ID_PFR0_EL1             ID_PFR0
 #define ID_PFR1_EL1             ID_PFR1
 #define IFSR32_EL2              IFSR
+#define MIDR_EL1                MIDR
+#define MPIDR_EL1               MPIDR
 #define PAR_EL1                 PAR
 #define SCTLR_EL1               SCTLR
 #define SCTLR_EL2               HSCTLR
 #define TCR_EL1                 TTBCR
+#define TEECR32_EL1             TEECR
+#define TEEHBR32_EL1            TEEHBR
 #define TPIDRRO_EL0             TPIDRURO
 #define TPIDR_EL0               TPIDRURW
 #define TPIDR_EL1               TPIDRPRW
@@ -278,13 +282,10 @@
 #define TTBR1_EL1               TTBR1
 #define VBAR_EL1                VBAR
 #define VBAR_EL2                HVBAR
+#define VMPIDR_EL2              VMPIDR
+#define VPIDR_EL2               VPIDR
 #define VTCR_EL2                VTCR
 #define VTTBR_EL2               VTTBR
-#define MIDR_EL1                MIDR
-#define VPIDR_EL2               VPIDR
-#define MPIDR_EL1               MPIDR
-#define VMPIDR_EL2              VMPIDR
-
 #endif
 
 #endif

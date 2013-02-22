@@ -38,6 +38,8 @@ EXPORT_SYMBOL(cpu_online_map);
 cpumask_t cpu_possible_map;
 EXPORT_SYMBOL(cpu_possible_map);
 
+struct cpuinfo_arm cpu_data[NR_CPUS];
+
 /* Fake one node for now. See also include/asm-arm/numa.h */
 nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
 
@@ -136,10 +138,15 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
                                unsigned long fdt_paddr,
                                unsigned long cpuid)
 {
+    struct cpuinfo_arm *c = cpu_data + cpuid;
+
     memset(get_cpu_info(), 0, sizeof (struct cpu_info));
 
     /* TODO: handle boards where CPUIDs are not contiguous */
     set_processor_id(cpuid);
+
+    *c = boot_cpu_data;
+    identify_cpu(c);
 
     /* Setup Hyp vector base */
     WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
