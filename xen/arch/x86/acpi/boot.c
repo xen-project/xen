@@ -328,6 +328,9 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 	struct acpi_table_facs *facs = NULL;
 	uint64_t facs_pa;
 
+	if (fadt->flags & ACPI_FADT_HW_REDUCED)
+		goto bad;
+
 	acpi_fadt_copy_address(pm1a_cnt, pm1a_control, pm1_control);
 	acpi_fadt_copy_address(pm1b_cnt, pm1b_control, pm1_control);
 	acpi_fadt_copy_address(pm1a_evt, pm1a_event, pm1_event);
@@ -351,6 +354,8 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 		       fadt->facs, facs_pa);
 		facs_pa = (uint64_t)fadt->facs;
 	}
+	if (!facs_pa)
+		goto bad;
 
 	facs = (struct acpi_table_facs *)
 		__acpi_map_table(facs_pa, sizeof(struct acpi_table_facs));

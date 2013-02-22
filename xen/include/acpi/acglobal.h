@@ -78,6 +78,13 @@ ACPI_EXTERN struct acpi_table_fadt acpi_gbl_FADT;
 ACPI_EXTERN struct acpi_generic_address acpi_gbl_xpm1a_enable;
 ACPI_EXTERN struct acpi_generic_address acpi_gbl_xpm1b_enable;
 
+/*
+ * ACPI 5.0 introduces the concept of a "reduced hardware platform", meaning
+ * that the ACPI hardware is no longer required. A flag in the FADT indicates
+ * a reduced HW machine, and that flag is duplicated here for convenience.
+ */
+ACPI_EXTERN u8 acpi_gbl_reduced_hardware;
+
 /*****************************************************************************
  *
  * Miscellaneous globals
