@@ -23,6 +23,9 @@ static inline void write_pte(lpae_t *p, lpae_t pte)
         : : "r" (pte.bits), "r" (p) : "memory");
 }
 
+/* Inline ASM to flush dcache on register R (may be an inline asm operand) */
+#define __flush_xen_dcache_one(R) STORE_CP32(R, DCCMVAC)
+
 /*
  * Flush all hypervisor mappings from the TLB and branch predictor.
  * This is needed after changing Xen code mappings.

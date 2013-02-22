@@ -251,7 +251,7 @@ static inline void flush_xen_dcache_va_range(void *p, unsigned long size)
     void *end;
     dsb();           /* So the CPU issues all writes to the range */
     for ( end = p + size; p < end; p += cacheline_bytes )
-        WRITE_CP32((uint32_t) p, DCCMVAC);
+        asm volatile (__flush_xen_dcache_one(0) : : "r" (p));
     dsb();           /* So we know the flushes happen before continuing */
 }
 
@@ -264,9 +264,9 @@ static inline void flush_xen_dcache_va_range(void *p, unsigned long size)
         flush_xen_dcache_va_range(_p, sizeof(x));                       \
     else                                                                \
         asm volatile (                                                  \
-            "dsb;"   /* Finish all earlier writes */                    \
-            STORE_CP32(0, DCCMVAC)                                      \
-            "dsb;"   /* Finish flush before continuing */               \
+            "dsb sy;"   /* Finish all earlier writes */                 \
+            __flush_xen_dcache_one(0)                                   \
+            "dsb sy;"   /* Finish flush before continuing */            \
             : : "r" (_p), "m" (*_p));                                   \
 } while (0)
 
