@@ -76,9 +76,9 @@ static uint32_t calibrate_timer(void)
     sec = rtc[0] + 1;
     do {} while ( rtc[0] != sec );
     // Now time a few seconds
-    start = READ_CP64(CNTPCT);
+    start = READ_SYSREG64(CNTPCT_EL0);
     do {} while ( rtc[0] < sec + 32 );
-    end = READ_CP64(CNTPCT);
+    end = READ_SYSREG64(CNTPCT_EL0);
     printk("done.\n");
 
     clear_fixmap(FIXMAP_MISC);
@@ -90,11 +90,13 @@ static uint32_t calibrate_timer(void)
 int __init init_xen_time(void)
 {
     /* Check that this CPU supports the Generic Timer interface */
+#if defined(CONFIG_ARM_32)
     if ( (READ_CP32(ID_PFR1) & ID_PFR1_GT_MASK) != ID_PFR1_GT_v1 )
         panic("CPU does not support the Generic Timer v1 interface.\n");
+#endif
 
-    cpu_khz = READ_CP32(CNTFRQ) / 1000;
-    boot_count = READ_CP64(CNTPCT);
+    cpu_khz = READ_SYSREG32(CNTFRQ_EL0) / 1000;
+    boot_count = READ_SYSREG64(CNTPCT_EL0);
     printk("Using generic timer at %lu KHz\n", cpu_khz);
 
     return 0;
@@ -103,7 +105,7 @@ int __init init_xen_time(void)
 /* Return number of nanoseconds since boot */
 s_time_t get_s_time(void)
 {
-    uint64_t ticks = READ_CP64(CNTPCT) - boot_count;
+    uint64_t ticks = READ_SYSREG64(CNTPCT_EL0) - boot_count;
     return ticks_to_ns(ticks);
 }
 
@@ -117,20 +119,20 @@ int reprogram_timer(s_time_t timeout)
     if ( timeout == 0 )
     {
 #if USE_HYP_TIMER
-        WRITE_CP32(0, CNTHP_CTL);
+        WRITE_SYSREG32(0, CNTHP_CTL_EL2);
 #else
-        WRITE_CP32(0, CNTP_CTL);
+        WRITE_SYSREG32(0, CNTP_CTL_EL0);
 #endif
         return 1;
     }
 
     deadline = ns_to_ticks(timeout) + boot_count;
 #if USE_HYP_TIMER
-    WRITE_CP64(deadline, CNTHP_CVAL);
-    WRITE_CP32(CNTx_CTL_ENABLE, CNTHP_CTL);
+    WRITE_SYSREG64(deadline, CNTHP_CVAL_EL2);
+    WRITE_SYSREG32(CNTx_CTL_ENABLE, CNTHP_CTL_EL2);
 #else
-    WRITE_CP64(deadline, CNTP_CVAL);
-    WRITE_CP32(CNTx_CTL_ENABLE, CNTP_CTL);
+    WRITE_SYSREG64(deadline, CNTP_CVAL_EL0);
+    WRITE_SYSREG32(CNTx_CTL_ENABLE, CNTP_CTL_EL0);
 #endif
     isb();
 
@@ -142,27 +144,27 @@ int reprogram_timer(s_time_t timeout)
 /* Handle the firing timer */
 static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
-    if ( irq == 26 && READ_CP32(CNTHP_CTL) & CNTx_CTL_PENDING )
+    if ( irq == 26 && READ_SYSREG32(CNTHP_CTL_EL2) & CNTx_CTL_PENDING )
     {
         /* Signal the generic timer code to do its work */
         raise_softirq(TIMER_SOFTIRQ);
         /* Disable the timer to avoid more interrupts */
-        WRITE_CP32(0, CNTHP_CTL);
+        WRITE_SYSREG32(0, CNTHP_CTL_EL2);
     }
 
-    if (irq == 30 && READ_CP32(CNTP_CTL) & CNTx_CTL_PENDING )
+    if (irq == 30 && READ_SYSREG32(CNTP_CTL_EL0) & CNTx_CTL_PENDING )
     {
         /* Signal the generic timer code to do its work */
         raise_softirq(TIMER_SOFTIRQ);
         /* Disable the timer to avoid more interrupts */
-        WRITE_CP32(0, CNTP_CTL);
+        WRITE_SYSREG32(0, CNTP_CTL_EL0);
     }
 }
 
 static void vtimer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
-    current->arch.virt_timer.ctl = READ_CP32(CNTV_CTL);
-    WRITE_CP32(current->arch.virt_timer.ctl | CNTx_CTL_MASK, CNTV_CTL);
+    current->arch.virt_timer.ctl = READ_SYSREG32(CNTV_CTL_EL0);
+    WRITE_SYSREG32(current->arch.virt_timer.ctl | CNTx_CTL_MASK, CNTV_CTL_EL0);
     vgic_vcpu_inject_irq(current, irq, 1);
 }
 
@@ -170,17 +172,17 @@ static void vtimer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 void __cpuinit init_timer_interrupt(void)
 {
     /* Sensible defaults */
-    WRITE_CP64(0, CNTVOFF);     /* No VM-specific offset */
-    WRITE_CP32(0, CNTKCTL);     /* No user-mode access */
+    WRITE_SYSREG64(0, CNTVOFF_EL2);     /* No VM-specific offset */
+    WRITE_SYSREG32(0, CNTKCTL_EL1);     /* No user-mode access */
 #if USE_HYP_TIMER
     /* Do not let the VMs program the physical timer, only read the physical counter */
-    WRITE_CP32(CNTHCTL_PA, CNTHCTL);
+    WRITE_SYSREG32(CNTHCTL_PA, CNTHCTL_EL2);
 #else
     /* Cannot let VMs access physical counter if we are using it */
-    WRITE_CP32(0, CNTHCTL);
+    WRITE_SYSREG32(0, CNTHCTL_EL2);
 #endif
-    WRITE_CP32(0, CNTP_CTL);    /* Physical timer disabled */
-    WRITE_CP32(0, CNTHP_CTL);   /* Hypervisor's timer disabled */
+    WRITE_SYSREG32(0, CNTP_CTL_EL0);    /* Physical timer disabled */
+    WRITE_SYSREG32(0, CNTHP_CTL_EL2);   /* Hypervisor's timer disabled */
     isb();
 
     /* XXX Need to find this IRQ number from devicetree? */
