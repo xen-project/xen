@@ -92,7 +92,7 @@ static int uart0_mmio_read(struct vcpu *v, mmio_info_t *info)
 {
     struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
-    uint32_t *r = select_user_reg(regs, dabt.reg);
+    register_t *r = select_user_reg(regs, dabt.reg);
     int offset = (int)(info->gpa - UART0_START);
 
     switch ( offset )
@@ -114,7 +114,7 @@ static int uart0_mmio_write(struct vcpu *v, mmio_info_t *info)
 {
     struct hsr_dabt dabt = info->dabt;
     struct cpu_user_regs *regs = guest_cpu_user_regs();
-    uint32_t *r = select_user_reg(regs, dabt.reg);
+    register_t *r = select_user_reg(regs, dabt.reg);
     int offset = (int)(info->gpa - UART0_START);
 
     switch ( offset )
@@ -127,7 +127,7 @@ static int uart0_mmio_write(struct vcpu *v, mmio_info_t *info)
         /* Silently ignore */
         return 1;
     default:
-        printk("VPL011: unhandled write r%d=%"PRIx32" offset %#08x\n",
+        printk("VPL011: unhandled write r%d=%"PRIregister" offset %#08x\n",
                dabt.reg, *r, offset);
         domain_crash_synchronous();
     }

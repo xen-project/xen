@@ -68,7 +68,7 @@ static void print_xen_info(void)
            debug_build() ? 'y' : 'n', print_tainted(taint_str));
 }
 
-uint32_t *select_user_reg(struct cpu_user_regs *regs, int reg)
+register_t *select_user_reg(struct cpu_user_regs *regs, int reg)
 {
     BUG_ON( !guest_mode(regs) );
 
@@ -81,20 +81,20 @@ uint32_t *select_user_reg(struct cpu_user_regs *regs, int reg)
 
     switch ( reg ) {
     case 0 ... 7: /* Unbanked registers */
-        BUILD_BUG_ON(REGOFFS(r0) + 7*sizeof(uint32_t) != REGOFFS(r7));
+        BUILD_BUG_ON(REGOFFS(r0) + 7*sizeof(register_t) != REGOFFS(r7));
         return &regs->r0 + reg;
     case 8 ... 12: /* Register banked in FIQ mode */
-        BUILD_BUG_ON(REGOFFS(r8_fiq) + 4*sizeof(uint32_t) != REGOFFS(r12_fiq));
+        BUILD_BUG_ON(REGOFFS(r8_fiq) + 4*sizeof(register_t) != REGOFFS(r12_fiq));
         if ( fiq_mode(regs) )
             return &regs->r8_fiq + reg - 8;
         else
             return &regs->r8 + reg - 8;
     case 13 ... 14: /* Banked SP + LR registers */
-        BUILD_BUG_ON(REGOFFS(sp_fiq) + 1*sizeof(uint32_t) != REGOFFS(lr_fiq));
-        BUILD_BUG_ON(REGOFFS(sp_irq) + 1*sizeof(uint32_t) != REGOFFS(lr_irq));
-        BUILD_BUG_ON(REGOFFS(sp_svc) + 1*sizeof(uint32_t) != REGOFFS(lr_svc));
-        BUILD_BUG_ON(REGOFFS(sp_abt) + 1*sizeof(uint32_t) != REGOFFS(lr_abt));
-        BUILD_BUG_ON(REGOFFS(sp_und) + 1*sizeof(uint32_t) != REGOFFS(lr_und));
+        BUILD_BUG_ON(REGOFFS(sp_fiq) + 1*sizeof(register_t) != REGOFFS(lr_fiq));
+        BUILD_BUG_ON(REGOFFS(sp_irq) + 1*sizeof(register_t) != REGOFFS(lr_irq));
+        BUILD_BUG_ON(REGOFFS(sp_svc) + 1*sizeof(register_t) != REGOFFS(lr_svc));
+        BUILD_BUG_ON(REGOFFS(sp_abt) + 1*sizeof(register_t) != REGOFFS(lr_abt));
+        BUILD_BUG_ON(REGOFFS(sp_und) + 1*sizeof(register_t) != REGOFFS(lr_und));
         switch ( regs->cpsr & PSR_MODE_MASK )
         {
         case PSR_MODE_USR:
@@ -315,11 +315,11 @@ static void show_guest_stack(struct cpu_user_regs *regs)
     printk("GUEST STACK GOES HERE\n");
 }
 
-#define STACK_BEFORE_EXCEPTION(regs) ((uint32_t*)(regs)->sp)
+#define STACK_BEFORE_EXCEPTION(regs) ((register_t*)(regs)->sp)
 
 static void show_trace(struct cpu_user_regs *regs)
 {
-    uint32_t *frame, next, addr, low, high;
+    register_t *frame, next, addr, low, high;
 
     printk("Xen call trace:\n   ");
 
@@ -327,7 +327,7 @@ static void show_trace(struct cpu_user_regs *regs)
     print_symbol(" %s\n   ", regs->pc);
 
     /* Bounds for range of valid frame pointer. */
-    low  = (uint32_t)(STACK_BEFORE_EXCEPTION(regs)/* - 2*/);
+    low  = (register_t)(STACK_BEFORE_EXCEPTION(regs)/* - 2*/);
     high = (low & ~(STACK_SIZE - 1)) +
         (STACK_SIZE - sizeof(struct cpu_info));
 
@@ -356,7 +356,7 @@ static void show_trace(struct cpu_user_regs *regs)
             break;
         {
             /* Ordinary stack frame. */
-            frame = (uint32_t *)next;
+            frame = (register_t *)next;
             next  = frame[-1];
             addr  = frame[0];
         }
@@ -364,7 +364,7 @@ static void show_trace(struct cpu_user_regs *regs)
         printk("[<%p>]", _p(addr));
         print_symbol(" %s\n   ", addr);
 
-        low = (uint32_t)&frame[1];
+        low = (register_t)&frame[1];
     }
 
     printk("\n");
@@ -372,7 +372,7 @@ static void show_trace(struct cpu_user_regs *regs)
 
 void show_stack(struct cpu_user_regs *regs)
 {
-    uint32_t *stack = STACK_BEFORE_EXCEPTION(regs), addr;
+    register_t *stack = STACK_BEFORE_EXCEPTION(regs), addr;
     int i;
 
     if ( guest_mode(regs) )
@@ -486,20 +486,22 @@ static arm_hypercall_t arm_hypercall_table[] = {
 
 static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 {
-    uint32_t reg, *r;
+    register_t *r;
+    uint32_t reg;
     uint32_t domid = current->domain->domain_id;
     switch ( code ) {
     case 0xe0 ... 0xef:
         reg = code - 0xe0;
         r = select_user_reg(regs, reg);
-        printk("DOM%d: R%d = %#010"PRIx32" at %#010"PRIx32"\n",
+        printk("DOM%d: R%d = 0x%"PRIregister" at 0x%"PRIvaddr"\n",
                domid, reg, *r, regs->pc);
         break;
     case 0xfd:
-        printk("DOM%d: Reached %#010"PRIx32"\n", domid, regs->pc);
+        printk("DOM%d: Reached %"PRIvaddr"\n", domid, regs->pc);
         break;
     case 0xfe:
-        printk("%c", (char)(regs->r0 & 0xff));
+        r = select_user_reg(regs, 0);
+        printk("%c", (char)(*r & 0xff));
         break;
     case 0xff:
         printk("DOM%d: DEBUG\n", domid);
@@ -561,7 +563,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
                        union hsr hsr)
 {
     struct hsr_cp32 cp32 = hsr.cp32;
-    uint32_t *r = select_user_reg(regs, cp32.reg);
+    uint32_t *r = (uint32_t*)select_user_reg(regs, cp32.reg);
 
     if ( !cp32.ccvalid ) {
         dprintk(XENLOG_ERR, "cp_15(32): need to handle invalid condition codes\n");
@@ -607,7 +609,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
         BUG_ON(!vtimer_emulate(regs, hsr));
         break;
     default:
-        printk("%s p15, %d, r%d, cr%d, cr%d, %d @ %#08x\n",
+        printk("%s p15, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
                cp32.read ? "mrc" : "mcr",
                cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
         panic("unhandled 32-bit CP15 access %#x\n", hsr.bits & HSR_CP32_REGS_MASK);
@@ -637,7 +639,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
         BUG_ON(!vtimer_emulate(regs, hsr));
         break;
     default:
-        printk("%s p15, %d, r%d, r%d, cr%d @ %#08x\n",
+        printk("%s p15, %d, r%d, r%d, cr%d @ 0x%"PRIregister"\n",
                cp64.read ? "mrrc" : "mcrr",
                cp64.op1, cp64.reg1, cp64.reg2, cp64.crm, regs->pc);
         panic("unhandled 64-bit CP15 access %#x\n", hsr.bits & HSR_CP64_REGS_MASK);

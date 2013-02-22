@@ -34,7 +34,7 @@
  * Returns a pointer to the given register value in regs, taking the
  * processor mode (CPSR) into account.
  */
-extern uint32_t *select_user_reg(struct cpu_user_regs *regs, int reg);
+extern register_t *select_user_reg(struct cpu_user_regs *regs, int reg);
 
 #endif /* __ARM_REGS_H__ */
 /*

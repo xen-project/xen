@@ -41,6 +41,8 @@ typedef u32 vaddr_t;
 typedef u64 paddr_t;
 #define INVALID_PADDR (~0ULL)
 #define PRIpaddr "016llx"
+typedef u32 register_t;
+#define PRIregister "x"
 #elif defined (CONFIG_ARM_64)
 typedef signed long s64;
 typedef unsigned long u64;
@@ -49,6 +51,8 @@ typedef u64 vaddr_t;
 typedef u64 paddr_t;
 #define INVALID_PADDR (~0UL)
 #define PRIpaddr "016lx"
+typedef u64 register_t;
+#define PRIregister "lx"
 #endif
 
 typedef unsigned long size_t;

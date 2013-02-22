@@ -268,7 +268,7 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 
 static void dtb_load(struct kernel_info *kinfo)
 {
-    void * __user dtb_virt = (void *)(u32)kinfo->dtb_paddr;
+    void * __user dtb_virt = (void *)(register_t)kinfo->dtb_paddr;
 
     raw_copy_to_guest(dtb_virt, kinfo->fdt, fdt_totalsize(kinfo->fdt));
     xfree(kinfo->fdt);

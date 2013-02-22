@@ -105,7 +105,7 @@ static int vtimer_emulate_32(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct vcpu *v = current;
     struct hsr_cp32 cp32 = hsr.cp32;
-    uint32_t *r = select_user_reg(regs, cp32.reg);
+    uint32_t *r = (uint32_t *)select_user_reg(regs, cp32.reg);
     s_time_t now;
 
     switch ( hsr.bits & HSR_CP32_REGS_MASK )
@@ -157,8 +157,8 @@ static int vtimer_emulate_64(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct vcpu *v = current;
     struct hsr_cp64 cp64 = hsr.cp64;
-    uint32_t *r1 = select_user_reg(regs, cp64.reg1);
-    uint32_t *r2 = select_user_reg(regs, cp64.reg2);
+    uint32_t *r1 = (uint32_t *)select_user_reg(regs, cp64.reg1);
+    uint32_t *r2 = (uint32_t *)select_user_reg(regs, cp64.reg2);
     uint64_t ticks;
     s_time_t now;
 
