@@ -30,9 +30,6 @@
 #include <xen/smp.h>
 #include <asm/mach-default/mach_mpparse.h>
 
-static bool_t __initdata x2apic_phys; /* By default we use logical cluster mode. */
-boolean_param("x2apic_phys", x2apic_phys);
-
 static DEFINE_PER_CPU_READ_MOSTLY(u32, cpu_2_logical_apicid);
 static DEFINE_PER_CPU_READ_MOSTLY(cpumask_t *, cluster_cpus);
 static cpumask_t *cluster_cpus_spare;
@@ -223,8 +220,14 @@ static struct notifier_block x2apic_cpu_nfb = {
    .notifier_call = update_clusterinfo
 };
 
+static s8 __initdata x2apic_phys = -1; /* By default we use logical cluster mode. */
+boolean_param("x2apic_phys", x2apic_phys);
+
 const struct genapic *__init apic_x2apic_probe(void)
 {
+    if ( x2apic_phys < 0 )
+        x2apic_phys = !!(acpi_gbl_FADT.flags & ACPI_FADT_APIC_PHYSICAL);
+
     if ( x2apic_phys )
         return &apic_x2apic_phys;
 

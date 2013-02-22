@@ -639,6 +639,13 @@ limit is ignored by Xen.
 
 Specify if the MMConfig space should be enabled.
 
+### msi
+> `= <boolean>`
+
+> Default: `true`
+
+Force Xen to (not) use PCI-MSI, even if ACPI FADT says otherwise.
+
 ### mwait-idle
 > `= <boolean>`
 

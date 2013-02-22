@@ -1087,5 +1087,8 @@ int __init amd_iommu_get_ivrs_dev_entries(void)
 
 int __init amd_iommu_update_ivrs_mapping_acpi(void)
 {
+    if ( unlikely(acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_MSI) )
+        return -EPERM;
+
     return acpi_table_parse(ACPI_SIG_IVRS, parse_ivrs_table);
 }

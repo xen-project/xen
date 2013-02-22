@@ -2115,6 +2115,12 @@ int __init intel_vtd_setup(void)
         goto error;
     }
 
+    if ( unlikely(acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_MSI) )
+    {
+        ret = -EPERM;
+        goto error;
+    }
+
     platform_quirks_init();
 
     /* We enable the following features only if they are supported by all VT-d

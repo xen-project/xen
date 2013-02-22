@@ -32,6 +32,9 @@
 #include <xen/iommu.h>
 #include <xsm/xsm.h>
 
+static s8 __read_mostly use_msi = -1;
+boolean_param("msi", use_msi);
+
 /* bitmap indicate which fixed map is free */
 static DEFINE_SPINLOCK(msix_fixmap_lock);
 static DECLARE_BITMAP(msix_fixmap_pages, FIX_MSIX_MAX_PAGES);
@@ -968,6 +971,9 @@ int pci_enable_msi(struct msi_info *msi, struct msi_desc **desc)
 {
     ASSERT(spin_is_locked(&pcidevs_lock));
 
+    if ( !use_msi )
+        return -EPERM;
+
     return  msi->table_base ? __pci_enable_msix(msi, desc) :
         __pci_enable_msi(msi, desc);
 }
@@ -1013,7 +1019,10 @@ int pci_restore_msi_state(struct pci_dev *pdev)
 
     ASSERT(spin_is_locked(&pcidevs_lock));
 
-    if (!pdev)
+    if ( !use_msi )
+        return -EOPNOTSUPP;
+
+    if ( !pdev )
         return -EINVAL;
 
     ret = xsm_resource_setup_pci(XSM_PRIV, (pdev->seg << 16) | (pdev->bus << 8) | pdev->devfn);
@@ -1072,7 +1081,7 @@ unsigned int pci_msix_get_table_len(struct pci_dev *pdev)
     func = PCI_FUNC(pdev->devfn);
 
     pos = pci_find_cap_offset(seg, bus, slot, func, PCI_CAP_ID_MSIX);
-    if ( !pos )
+    if ( !pos || !use_msi )
         return 0;
 
     control = pci_conf_read16(seg, bus, slot, func, msix_control_reg(pos));
@@ -1109,6 +1118,11 @@ static struct notifier_block msi_cpu_nfb = {
 
 void __init early_msi_init(void)
 {
+    if ( use_msi < 0 )
+        use_msi = !(acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_MSI);
+    if ( !use_msi )
+        return;
+
     register_cpu_notifier(&msi_cpu_nfb);
     if ( msi_cpu_callback(&msi_cpu_nfb, CPU_UP_PREPARE, NULL) &
          NOTIFY_STOP_MASK )

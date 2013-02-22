@@ -381,6 +381,9 @@ static void __init hpet_fsb_cap_lookup(void)
     u32 id;
     unsigned int i, num_chs;
 
+    if ( unlikely(acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_MSI) )
+        return;
+
     id = hpet_read32(HPET_ID);
 
     num_chs = ((id & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT);
