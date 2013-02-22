@@ -62,13 +62,14 @@ static void acpi_tb_validate_fadt(void);
 
 typedef struct acpi_fadt_info {
 	char *name;
-	u8 target;
-	u8 source;
-	u8 length;
+	u16 target;
+	u16 source;
+	u16 length;
 	u8 type;
 
 } acpi_fadt_info;
 
+#define ACPI_FADT_OPTIONAL          0
 #define ACPI_FADT_REQUIRED          1
 #define ACPI_FADT_SEPARATE_LENGTH   2
 
@@ -79,7 +80,7 @@ static struct acpi_fadt_info __initdata fadt_info_table[] = {
 
 	{"Pm1bEventBlock", ACPI_FADT_OFFSET(xpm1b_event_block),
 	 ACPI_FADT_OFFSET(pm1b_event_block),
-	 ACPI_FADT_OFFSET(pm1_event_length), 0},
+	 ACPI_FADT_OFFSET(pm1_event_length), ACPI_FADT_OPTIONAL},
 
 	{"Pm1aControlBlock", ACPI_FADT_OFFSET(xpm1a_control_block),
 	 ACPI_FADT_OFFSET(pm1a_control_block),
@@ -87,7 +88,7 @@ static struct acpi_fadt_info __initdata fadt_info_table[] = {
 
 	{"Pm1bControlBlock", ACPI_FADT_OFFSET(xpm1b_control_block),
 	 ACPI_FADT_OFFSET(pm1b_control_block),
-	 ACPI_FADT_OFFSET(pm1_control_length), 0},
+	 ACPI_FADT_OFFSET(pm1_control_length), ACPI_FADT_OPTIONAL},
 
 	{"Pm2ControlBlock", ACPI_FADT_OFFSET(xpm2_control_block),
 	 ACPI_FADT_OFFSET(pm2_control_block),
