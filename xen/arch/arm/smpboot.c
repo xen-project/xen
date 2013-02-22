@@ -142,7 +142,7 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
     set_processor_id(cpuid);
 
     /* Setup Hyp vector base */
-    WRITE_CP32((register_t) hyp_traps_vector, HVBAR);
+    WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
 
     mmu_init_secondary_cpu();
     enable_vfp();

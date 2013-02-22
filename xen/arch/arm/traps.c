@@ -628,7 +628,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
 
 }
 
-void dump_guest_s1_walk(struct domain *d, uint32_t addr)
+void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
 {
     uint32_t ttbcr = READ_CP32(TTBCR);
     uint32_t ttbr0 = READ_CP32(TTBR0);
@@ -636,7 +636,7 @@ void dump_guest_s1_walk(struct domain *d, uint32_t addr)
     uint32_t offset;
     uint32_t *first = NULL, *second = NULL;
 
-    printk("dom%d VA 0x%08"PRIx32"\n", d->domain_id, addr);
+    printk("dom%d VA 0x%08"PRIvaddr"\n", d->domain_id, addr);
     printk("    TTBCR: 0x%08"PRIx32"\n", ttbcr);
     printk("    TTBR0: 0x%08"PRIx32" = 0x%"PRIpaddr"\n",
            ttbr0, p2m_lookup(d, ttbr0 & PAGE_MASK));
@@ -692,7 +692,11 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     mmio_info_t info;
 
     info.dabt = dabt;
+#ifdef CONFIG_ARM_32
     info.gva = READ_CP32(HDFAR);
+#else
+    info.gva = READ_SYSREG64(FAR_EL2);
+#endif
 
     if (dabt.s1ptw)
         goto bad_data_abort;
@@ -713,7 +717,7 @@ bad_data_abort:
 
     /* XXX inject a suitable fault into the guest */
     printk("Guest data abort: %s%s%s\n"
-           "    gva=%"PRIx32"\n",
+           "    gva=%"PRIvaddr"\n",
            msg, dabt.s1ptw ? " S2 during S1" : "",
            fsc_level_str(level),
            info.gva);
@@ -736,13 +740,17 @@ bad_data_abort:
 
 asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
 {
-    union hsr hsr = { .bits = READ_CP32(HSR) };
+    union hsr hsr = { .bits = READ_SYSREG32(ESR_EL2) };
 
     switch (hsr.ec) {
     case HSR_EC_CP15_32:
+        if ( ! is_pv32_domain(current->domain) )
+            goto bad_trap;
         do_cp15_32(regs, hsr);
         break;
     case HSR_EC_CP15_64:
+        if ( ! is_pv32_domain(current->domain) )
+            goto bad_trap;
         do_cp15_64(regs, hsr);
         break;
     case HSR_EC_HVC:
@@ -754,6 +762,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         do_trap_data_abort_guest(regs, hsr.dabt);
         break;
     default:
+ bad_trap:
         printk("Hypervisor Trap. HSR=0x%x EC=0x%x IL=%x Syndrome=%"PRIx32"\n",
                hsr.bits, hsr.ec, hsr.len, hsr.iss);
         do_unexpected_trap("Hypervisor", regs);

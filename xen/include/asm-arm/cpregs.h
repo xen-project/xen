@@ -228,6 +228,7 @@
 #define CCSIDR_EL1              CCSIDR
 #define CLIDR_EL1               CLIDR
 #define CSSELR_EL1              CSSELR
+#define ESR_EL2                 HSR
 #define ID_AFR0_EL1             ID_AFR0
 #define ID_DFR0_EL1             ID_DFR0
 #define ID_ISAR0_EL1            ID_ISAR0

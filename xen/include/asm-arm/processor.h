@@ -238,7 +238,7 @@ union hsr {
 #endif
 
 #ifndef __ASSEMBLY__
-extern uint32_t hyp_traps_vector[8];
+extern uint32_t hyp_traps_vector[];
 
 void panic_PAR(uint64_t par);
 
