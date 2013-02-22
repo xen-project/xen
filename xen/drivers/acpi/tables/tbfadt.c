@@ -222,12 +222,13 @@ void __init acpi_tb_create_local_fadt(struct acpi_table_header *table, u32 lengt
 
 	/*
 	 * Check if the FADT is larger than the largest table that we expect
-	 * (the ACPI 2.0/3.0 version). If so, truncate the table, and issue
+	 * (the ACPI 5.0 version). If so, truncate the table, and issue
 	 * a warning.
 	 */
 	if (length > sizeof(struct acpi_table_fadt)) {
 		ACPI_WARNING((AE_INFO,
-			      "FADT (revision %u) is longer than ACPI 2.0 version, truncating length 0x%X to 0x%zX",
+			      "FADT (revision %u) is longer than ACPI 5.0 version,"
+			      " truncating length %u to %zu",
 			      table->revision, (unsigned)length,
 			      sizeof(struct acpi_table_fadt)));
 	}
