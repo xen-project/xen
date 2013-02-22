@@ -43,7 +43,7 @@ static void virt_timer_expired(void *data)
     t->ctl |= CNTx_CTL_MASK;
     vgic_vcpu_inject_irq(t->v, 27, 1);
 }
- 
+
 int vcpu_vtimer_init(struct vcpu *v)
 {
     struct vtimer *t = &v->arch.phys_timer;
@@ -58,7 +58,7 @@ int vcpu_vtimer_init(struct vcpu *v)
     t = &v->arch.virt_timer;
     init_timer(&t->timer, virt_timer_expired, t, smp_processor_id());
     t->ctl = 0;
-    t->offset = READ_CP64(CNTVCT) + READ_CP64(CNTVOFF);
+    t->offset = READ_SYSREG64(CNTVCT_EL0) + READ_SYSREG64(CNTVOFF_EL2);
     t->cval = 0;
     t->irq = 27;
     t->v = v;
@@ -77,9 +77,9 @@ int virt_timer_save(struct vcpu *v)
     if ( is_idle_domain(v->domain) )
         return 0;
 
-    v->arch.virt_timer.ctl = READ_CP32(CNTV_CTL);
-    WRITE_CP32(v->arch.virt_timer.ctl & ~CNTx_CTL_ENABLE, CNTV_CTL);
-    v->arch.virt_timer.cval = READ_CP64(CNTV_CVAL);
+    v->arch.virt_timer.ctl = READ_SYSREG32(CNTV_CTL_EL0);
+    WRITE_SYSREG32(v->arch.virt_timer.ctl & ~CNTx_CTL_ENABLE, CNTV_CTL_EL0);
+    v->arch.virt_timer.cval = READ_SYSREG64(CNTV_CVAL_EL0);
     if ( v->arch.virt_timer.ctl & CNTx_CTL_ENABLE )
     {
         set_timer(&v->arch.virt_timer.timer, ticks_to_ns(v->arch.virt_timer.cval +
@@ -95,12 +95,12 @@ int virt_timer_restore(struct vcpu *v)
 
     stop_timer(&v->arch.virt_timer.timer);
 
-    WRITE_CP64(v->arch.virt_timer.offset, CNTVOFF);
-    WRITE_CP64(v->arch.virt_timer.cval, CNTV_CVAL);
-    WRITE_CP32(v->arch.virt_timer.ctl, CNTV_CTL);
+    WRITE_SYSREG64(v->arch.virt_timer.offset, CNTVOFF_EL2);
+    WRITE_SYSREG64(v->arch.virt_timer.cval, CNTV_CVAL_EL0);
+    WRITE_SYSREG32(v->arch.virt_timer.ctl, CNTV_CTL_EL0);
     return 0;
 }
- 
+
 static int vtimer_emulate_32(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct vcpu *v = current;
@@ -186,6 +186,9 @@ static int vtimer_emulate_64(struct cpu_user_regs *regs, union hsr hsr)
 
 int vtimer_emulate(struct cpu_user_regs *regs, union hsr hsr)
 {
+    if ( !is_pv32_domain(current->domain) )
+        return -EINVAL;
+
     switch (hsr.ec) {
     case HSR_EC_CP15_32:
         return vtimer_emulate_32(regs, hsr);
