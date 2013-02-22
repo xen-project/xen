@@ -72,6 +72,7 @@ register_t *select_user_reg(struct cpu_user_regs *regs, int reg)
 {
     BUG_ON( !guest_mode(regs) );
 
+#ifdef CONFIG_ARM_32
     /*
      * We rely heavily on the layout of cpu_user_regs to avoid having
      * to handle all of the registers individually. Use BUILD_BUG_ON to
@@ -124,6 +125,15 @@ register_t *select_user_reg(struct cpu_user_regs *regs, int reg)
         BUG();
     }
 #undef REGOFFS
+#else
+    /* In 64 bit the syndrome register contains the AArch64 register
+     * number even if the trap was from AArch32 mode. Except that
+     * AArch32 R15 (PC) is encoded as 0b11111.
+     */
+    if ( reg == 0x1f /* && is aarch32 guest */)
+        return &regs->pc;
+    return &regs->x0 + reg;
+#endif
 }
 
 static const char *decode_fsc(uint32_t fsc, int *level)
