@@ -172,6 +172,8 @@ typedef uint64_t xen_callback_t;
 
 /* 0-4: Mode */
 #define PSR_MODE_MASK 0x1f
+
+/* 32 bit modes */
 #define PSR_MODE_USR 0x10
 #define PSR_MODE_FIQ 0x11
 #define PSR_MODE_IRQ 0x12
@@ -181,6 +183,18 @@ typedef uint64_t xen_callback_t;
 #define PSR_MODE_HYP 0x1a
 #define PSR_MODE_UND 0x1b
 #define PSR_MODE_SYS 0x1f
+
+/* 64 bit modes */
+#ifdef CONFIG_ARM_64
+#define PSR_MODE_BIT  0x10 /* Set iff AArch32 */
+#define PSR_MODE_EL3h 0x0d
+#define PSR_MODE_EL3t 0x0c
+#define PSR_MODE_EL2h 0x09
+#define PSR_MODE_EL2t 0x08
+#define PSR_MODE_EL1h 0x05
+#define PSR_MODE_EL1t 0x04
+#define PSR_MODE_EL0t 0x00
+#endif
 
 #define PSR_THUMB       (1<<5)        /* Thumb Mode enable */
 #define PSR_FIQ_MASK    (1<<6)        /* Fast Interrupt mask */

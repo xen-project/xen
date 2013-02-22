@@ -27,6 +27,12 @@ arm32 := y
 arm64 := n
 endif
 
+ifeq ($(TARGET_SUBARCH),arm64)
+CFLAGS += -mcpu=generic
+arm32 := n
+arm64 := y
+endif
+
 ifneq ($(call cc-option,$(CC),-fvisibility=hidden,n),n)
 CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
 endif

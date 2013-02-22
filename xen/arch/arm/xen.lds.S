@@ -11,7 +11,13 @@
 
 ENTRY(start)
 
-OUTPUT_ARCH(arm)
+#if defined(__arm__)
+#define FORMAT arm
+#elif defined(__aarch64__)
+#define FORMAT aarch64
+#endif
+
+OUTPUT_ARCH(FORMAT)
 
 PHDRS
 {

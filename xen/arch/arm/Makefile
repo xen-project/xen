@@ -1,4 +1,5 @@
 subdir-$(arm32) += arm32
+subdir-$(arm64) += arm64
 subdir-y += platforms
 
 obj-y += early_printk.o

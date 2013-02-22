@@ -38,6 +38,7 @@
  */
 #define MAIR0VAL 0xeeaa4400
 #define MAIR1VAL 0xff000004
+#define MAIRVAL (MAIR0VAL|MAIR1VAL<<32)
 
 /*
  * Attribute Indexes.
