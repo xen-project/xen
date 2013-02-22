@@ -133,6 +133,50 @@ static always_inline unsigned long __cmpxchg(
     ((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)(o),            \
                                    (unsigned long)(n),sizeof(*(ptr))))
 
+#define local_irq_disable() asm volatile ( "cpsid i @ local_irq_disable\n" : : : "cc" )
+#define local_irq_enable()  asm volatile ( "cpsie i @ local_irq_enable\n" : : : "cc" )
+
+#define local_save_flags(x)                                      \
+({                                                               \
+    BUILD_BUG_ON(sizeof(x) != sizeof(long));                     \
+    asm volatile ( "mrs %0, cpsr     @ local_save_flags\n"       \
+                  : "=r" (x) :: "memory", "cc" );                \
+})
+#define local_irq_save(x)                                        \
+({                                                               \
+    local_save_flags(x);                                         \
+    local_irq_disable();                                         \
+})
+#define local_irq_restore(x)                                     \
+({                                                               \
+    BUILD_BUG_ON(sizeof(x) != sizeof(long));                     \
+    asm volatile (                                               \
+            "msr     cpsr_c, %0      @ local_irq_restore\n"      \
+            :                                                    \
+            : "r" (flags)                                        \
+            : "memory", "cc");                                   \
+})
+
+static inline int local_irq_is_enabled(void)
+{
+    unsigned long flags;
+    local_save_flags(flags);
+    return !(flags & PSR_IRQ_MASK);
+}
+
+#define local_fiq_enable()  __asm__("cpsie f   @ __stf\n" : : : "memory", "cc")
+#define local_fiq_disable() __asm__("cpsid f   @ __clf\n" : : : "memory", "cc")
+
+#define local_abort_enable() __asm__("cpsie a  @ __sta\n" : : : "memory", "cc")
+#define local_abort_disable() __asm__("cpsid a @ __sta\n" : : : "memory", "cc")
+
+static inline int local_fiq_is_enabled(void)
+{
+    unsigned long flags;
+    local_save_flags(flags);
+    return !(flags & PSR_FIQ_MASK);
+}
+
 #endif
 /*
  * Local variables:
