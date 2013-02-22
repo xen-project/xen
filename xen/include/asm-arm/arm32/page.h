@@ -3,6 +3,26 @@
 
 #ifndef __ASSEMBLY__
 
+/* Write a pagetable entry.
+ *
+ * If the table entry is changing a text mapping, it is responsibility
+ * of the caller to issue an ISB after write_pte.
+ */
+static inline void write_pte(lpae_t *p, lpae_t pte)
+{
+    asm volatile (
+        /* Ensure any writes have completed with the old mappings. */
+        "dsb;"
+        /* Safely write the entry (STRD is atomic on CPUs that support LPAE) */
+        "strd %0, %H0, [%1];"
+        "dsb;"
+        /* Push this cacheline to the PoC so the rest of the system sees it. */
+        STORE_CP32(1, DCCMVAC)
+        /* Ensure that the data flush is completed before proceeding */
+        "dsb;"
+        : : "r" (pte.bits), "r" (p) : "memory");
+}
+
 /*
  * Flush all hypervisor mappings from the TLB and branch predictor.
  * This is needed after changing Xen code mappings.
