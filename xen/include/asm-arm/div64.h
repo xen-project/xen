@@ -21,6 +21,19 @@
  * calling convention for arguments and results (beware).
  */
 
+
+#if BITS_PER_LONG == 64
+
+# define do_div(n,base) ({                                      \
+        uint32_t __base = (base);                               \
+        uint32_t __rem;                                         \
+        __rem = ((uint64_t)(n)) % __base;                       \
+        (n) = ((uint64_t)(n)) / __base;                         \
+        __rem;                                                  \
+ })
+
+#elif BITS_PER_LONG == 32
+
 #ifdef __ARMEB__
 #define __xh "r0"
 #define __xl "r1"
@@ -222,7 +235,9 @@
 	__nr;								\
 })
 
-#endif
+#endif /* GCC version */
+
+#endif /* BITS_PER_LONG */
 
 #endif
 /*
