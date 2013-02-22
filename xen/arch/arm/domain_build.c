@@ -68,7 +68,7 @@ static int set_memory_reg(struct domain *d, struct kernel_info *kinfo,
             size = kinfo->unassigned_mem;
         device_tree_set_reg(&new_cell, address_cells, size_cells, start, size);
 
-        printk("Populate P2M %#llx->%#llx\n", start, start + size);
+        printk("Populate P2M %#"PRIx64"->%#"PRIx64"\n", start, start + size);
         p2m_populate_ram(d, start, start + size);
         kinfo->mem.bank[kinfo->mem.nr_banks].start = start;
         kinfo->mem.bank[kinfo->mem.nr_banks].size = size;
@@ -268,7 +268,7 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 
 static void dtb_load(struct kernel_info *kinfo)
 {
-    void * __user dtb_virt = (void *)(register_t)kinfo->dtb_paddr;
+    void * __user dtb_virt = (void * __user)(register_t)kinfo->dtb_paddr;
 
     raw_copy_to_guest(dtb_virt, kinfo->fdt, fdt_totalsize(kinfo->fdt));
     xfree(kinfo->fdt);
@@ -319,7 +319,8 @@ int construct_dom0(struct domain *d)
     gic_route_irq_to_guest(d, 47, "eth");
 
     /* Enable second stage translation */
-    WRITE_CP32(READ_CP32(HCR) | HCR_VM, HCR); isb();
+    WRITE_SYSREG(READ_SYSREG(HCR_EL2) | HCR_VM, HCR_EL2);
+    isb();
 
     /* The following loads use the domain's p2m */
     p2m_load_VTTBR(d);
@@ -337,24 +338,40 @@ int construct_dom0(struct domain *d)
 
     regs->cpsr = PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_SVC;
 
-/* FROM LINUX head.S
+#ifdef CONFIG_ARM_64
+    d->arch.type = kinfo.type;
+#endif
 
- * Kernel startup entry point.
- * ---------------------------
- *
- * This is normally called from the decompressor code.  The requirements
- * are: MMU = off, D-cache = off, I-cache = dont care, r0 = 0,
- * r1 = machine nr, r2 = atags or dtb pointer.
- *...
- */
+    if ( is_pv32_domain(d) )
+    {
+        /* FROM LINUX head.S
+         *
+         * Kernel startup entry point.
+         * ---------------------------
+         *
+         * This is normally called from the decompressor code.  The requirements
+         * are: MMU = off, D-cache = off, I-cache = dont care, r0 = 0,
+         * r1 = machine nr, r2 = atags or dtb pointer.
+         *...
+         */
+        regs->r0 = 0; /* SBZ */
+        regs->r1 = 0xffffffff; /* We use DTB therefore no machine id */
+        regs->r2 = kinfo.dtb_paddr;
+    }
+#ifdef CONFIG_ARM_64
+    else
+    {
+        /* From linux/Documentation/arm64/booting.txt */
+        regs->x0 = kinfo.dtb_paddr;
+        regs->x1 = 0; /* Reserved for future use */
+        regs->x2 = 0; /* Reserved for future use */
+        regs->x3 = 0; /* Reserved for future use */
+    }
+#endif
 
-    regs->r0 = 0; /* SBZ */
-    regs->r1 = 0xffffffff; /* We use DTB therefore no machine id */
-    regs->r2 = kinfo.dtb_paddr;
+    v->arch.sctlr = SCTLR_BASE;
 
-    WRITE_CP32(SCTLR_BASE, SCTLR);
-
-    WRITE_CP32(HCR_PTW|HCR_BSU_OUTER|HCR_AMO|HCR_IMO|HCR_VM, HCR);
+    WRITE_SYSREG(HCR_PTW|HCR_BSU_OUTER|HCR_AMO|HCR_IMO|HCR_VM, HCR_EL2);
     isb();
 
     local_abort_enable();
