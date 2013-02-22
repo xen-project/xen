@@ -780,8 +780,8 @@ static void do_cp15_64(struct cpu_user_regs *regs,
 
 void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
 {
-    uint32_t ttbcr = READ_CP32(TTBCR);
-    uint64_t ttbr0 = READ_CP64(TTBR0);
+    uint32_t ttbcr = READ_SYSREG32(TCR_EL1);
+    uint64_t ttbr0 = READ_SYSREG64(TTBR0_EL1);
     paddr_t paddr;
     uint32_t offset;
     uint32_t *first = NULL, *second = NULL;
