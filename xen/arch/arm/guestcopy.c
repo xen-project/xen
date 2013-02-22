@@ -8,7 +8,7 @@
 unsigned long raw_copy_to_guest(void *to, const void *from, unsigned len)
 {
     /* XXX needs to handle faults */
-    unsigned offset = ((unsigned long)to & ~PAGE_MASK);
+    unsigned offset = (vaddr_t)to & ~PAGE_MASK;
 
     while ( len )
     {
@@ -17,7 +17,7 @@ unsigned long raw_copy_to_guest(void *to, const void *from, unsigned len)
         void *p;
         unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
 
-        rc = gvirt_to_maddr((uint32_t) to, &g);
+        rc = gvirt_to_maddr((vaddr_t) to, &g);
         if ( rc )
             return rc;
 
@@ -38,7 +38,7 @@ unsigned long raw_copy_to_guest(void *to, const void *from, unsigned len)
 unsigned long raw_clear_guest(void *to, unsigned len)
 {
     /* XXX needs to handle faults */
-    unsigned offset = ((unsigned long)to & ~PAGE_MASK);
+    unsigned offset = (vaddr_t)to & ~PAGE_MASK;
 
     while ( len )
     {
@@ -47,7 +47,7 @@ unsigned long raw_clear_guest(void *to, unsigned len)
         void *p;
         unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
 
-        rc = gvirt_to_maddr((uint32_t) to, &g);
+        rc = gvirt_to_maddr((vaddr_t) to, &g);
         if ( rc )
             return rc;
 
@@ -66,19 +66,21 @@ unsigned long raw_clear_guest(void *to, unsigned len)
 
 unsigned long raw_copy_from_guest(void *to, const void __user *from, unsigned len)
 {
+    unsigned offset = (vaddr_t)from & ~PAGE_MASK;
+
     while ( len )
     {
         int rc;
         paddr_t g;
         void *p;
-        unsigned size = min(len, (unsigned)(PAGE_SIZE - ((unsigned)from & (~PAGE_MASK))));
+        unsigned size = min(len, (unsigned)(PAGE_SIZE - offset));
 
-        rc = gvirt_to_maddr((uint32_t) from & PAGE_MASK, &g);
+        rc = gvirt_to_maddr((vaddr_t) from & PAGE_MASK, &g);
         if ( rc )
             return rc;
 
         p = map_domain_page(g>>PAGE_SHIFT);
-        p += ((unsigned long)from & (~PAGE_MASK));
+        p += ((vaddr_t)from & (~PAGE_MASK));
 
         memcpy(to, p, size);
 

@@ -26,7 +26,7 @@
 typedef struct
 {
     struct hsr_dabt dabt;
-    uint32_t gva;
+    vaddr_t gva;
     paddr_t gpa;
 } mmio_info_t;
 

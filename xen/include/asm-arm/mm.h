@@ -181,8 +181,8 @@ void* early_ioremap(paddr_t start, size_t len, unsigned attributes);
 
 static inline paddr_t virt_to_maddr(const void *va)
 {
-    uint64_t par = va_to_par((uint32_t)va);
-    return (par & PADDR_MASK & PAGE_MASK) | ((unsigned long) va & ~PAGE_MASK);
+    uint64_t par = va_to_par((vaddr_t)va);
+    return (par & PADDR_MASK & PAGE_MASK) | ((vaddr_t) va & ~PAGE_MASK);
 }
 
 static inline void *maddr_to_virt(paddr_t ma)
@@ -192,7 +192,7 @@ static inline void *maddr_to_virt(paddr_t ma)
     return (void *)(unsigned long) ma + XENHEAP_VIRT_START;
 }
 
-static inline int gvirt_to_maddr(uint32_t va, paddr_t *pa)
+static inline int gvirt_to_maddr(vaddr_t va, paddr_t *pa)
 {
     uint64_t par = gva_to_ma_par(va);
     if ( par & PAR_F )
