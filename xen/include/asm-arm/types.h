@@ -15,8 +15,13 @@ typedef __signed__ int __s32;
 typedef unsigned int __u32;
 
 #if defined(__GNUC__) && !defined(__STRICT_ANSI__)
+#if defined(CONFIG_ARM_32)
 typedef __signed__ long long __s64;
 typedef unsigned long long __u64;
+#elif defined (CONFIG_ARM_64)
+typedef __signed__ long __s64;
+typedef unsigned long __u64;
+#endif
 #endif
 
 typedef signed char s8;
@@ -28,11 +33,19 @@ typedef unsigned short u16;
 typedef signed int s32;
 typedef unsigned int u32;
 
+#if defined(CONFIG_ARM_32)
 typedef signed long long s64;
 typedef unsigned long long u64;
 typedef u64 paddr_t;
 #define INVALID_PADDR (~0ULL)
 #define PRIpaddr "016llx"
+#elif defined (CONFIG_ARM_64)
+typedef signed long s64;
+typedef unsigned long u64;
+typedef u64 paddr_t;
+#define INVALID_PADDR (~0UL)
+#define PRIpaddr "016lx"
+#endif
 
 typedef unsigned long size_t;
 
@@ -41,10 +54,6 @@ typedef char bool_t;
 #define test_and_clear_bool(b) xchg(&(b), 0)
 
 #endif /* __ASSEMBLY__ */
-
-#define BITS_PER_LONG 32
-#define BYTES_PER_LONG 4
-#define LONG_BYTEORDER 2
 
 #endif /* __ARM_TYPES_H__ */
 /*

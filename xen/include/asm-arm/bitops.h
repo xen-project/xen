@@ -9,28 +9,14 @@
 #ifndef _ARM_BITOPS_H
 #define _ARM_BITOPS_H
 
-extern void _set_bit(int nr, volatile void * p);
-extern void _clear_bit(int nr, volatile void * p);
-extern void _change_bit(int nr, volatile void * p);
-extern int _test_and_set_bit(int nr, volatile void * p);
-extern int _test_and_clear_bit(int nr, volatile void * p);
-extern int _test_and_change_bit(int nr, volatile void * p);
-
-#define set_bit(n,p)              _set_bit(n,p)
-#define clear_bit(n,p)            _clear_bit(n,p)
-#define change_bit(n,p)           _change_bit(n,p)
-#define test_and_set_bit(n,p)     _test_and_set_bit(n,p)
-#define test_and_clear_bit(n,p)   _test_and_clear_bit(n,p)
-#define test_and_change_bit(n,p)  _test_and_change_bit(n,p)
-
 /*
  * Non-atomic bit manipulation.
  *
  * Implemented using atomics to be interrupt safe. Could alternatively
  * implement with local interrupt masking.
  */
-#define __set_bit(n,p)            _set_bit(n,p)
-#define __clear_bit(n,p)          _clear_bit(n,p)
+#define __set_bit(n,p)            set_bit(n,p)
+#define __clear_bit(n,p)          clear_bit(n,p)
 
 #define BIT(nr)                 (1UL << (nr))
 #define BIT_MASK(nr)            (1UL << ((nr) % BITS_PER_LONG))
@@ -39,6 +25,14 @@ extern int _test_and_change_bit(int nr, volatile void * p);
 
 #define ADDR (*(volatile long *) addr)
 #define CONST_ADDR (*(const volatile long *) addr)
+
+#if defined(CONFIG_ARM_32)
+# include <asm/arm32/bitops.h>
+#elif defined(CONFIG_ARM_64)
+# include <asm/arm64/bitops.h>
+#else
+# error "unknown ARM variant"
+#endif
 
 /**
  * __test_and_set_bit - Set a bit and return its old value
@@ -104,42 +98,6 @@ static inline int test_bit(int nr, const volatile void *addr)
         return 1UL & (p[BIT_WORD(nr)] >> (nr & (BITS_PER_LONG-1)));
 }
 
-/*
- * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
- */
-extern int _find_first_zero_bit_le(const void * p, unsigned size);
-extern int _find_next_zero_bit_le(const void * p, int size, int offset);
-extern int _find_first_bit_le(const unsigned long *p, unsigned size);
-extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
-
-/*
- * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
- */
-extern int _find_first_zero_bit_be(const void * p, unsigned size);
-extern int _find_next_zero_bit_be(const void * p, int size, int offset);
-extern int _find_first_bit_be(const unsigned long *p, unsigned size);
-extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
-
-#ifndef __ARMEB__
-/*
- * These are the little endian, atomic definitions.
- */
-#define find_first_zero_bit(p,sz)	_find_first_zero_bit_le(p,sz)
-#define find_next_zero_bit(p,sz,off)	_find_next_zero_bit_le(p,sz,off)
-#define find_first_bit(p,sz)		_find_first_bit_le(p,sz)
-#define find_next_bit(p,sz,off)		_find_next_bit_le(p,sz,off)
-
-#else
-/*
- * These are the big endian, atomic definitions.
- */
-#define find_first_zero_bit(p,sz)	_find_first_zero_bit_be(p,sz)
-#define find_next_zero_bit(p,sz,off)	_find_next_zero_bit_be(p,sz,off)
-#define find_first_bit(p,sz)		_find_first_bit_be(p,sz)
-#define find_next_bit(p,sz,off)		_find_next_bit_be(p,sz,off)
-
-#endif
-
 static inline int constant_fls(int x)
 {
         int r = 32;
@@ -182,9 +140,10 @@ static inline int fls(int x)
                return constant_fls(x);
 
         asm("clz\t%0, %1" : "=r" (ret) : "r" (x));
-        ret = 32 - ret;
+        ret = BITS_PER_LONG - ret;
         return ret;
 }
+
 
 #define ffs(x) ({ unsigned long __t = (x); fls(__t & -__t); })
 

@@ -7,6 +7,21 @@
 #ifndef __ARM_CONFIG_H__
 #define __ARM_CONFIG_H__
 
+#if defined(__aarch64__)
+# define CONFIG_ARM_64 1
+#elif defined(__arm__)
+# define CONFIG_ARM_32 1
+#endif
+
+#if defined(CONFIG_ARM_64)
+# define LONG_BYTEORDER 3
+#else
+# define LONG_BYTEORDER 2
+#endif
+
+#define BYTES_PER_LONG (1 << LONG_BYTEORDER)
+#define BITS_PER_LONG (BYTES_PER_LONG << 3)
+
 #define CONFIG_PAGING_ASSISTANCE 1
 
 #define CONFIG_PAGING_LEVELS 3
