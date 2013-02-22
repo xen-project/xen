@@ -17,11 +17,15 @@ header = {};
 footer = {};
 
 #arm
-inttypes["arm"] = {
+inttypes["arm32"] = {
     "unsigned long" : "uint32_t",
     "long"          : "uint32_t",
     "xen_pfn_t"     : "uint64_t",
 };
+header["arm32"] = """
+#define __arm___ARM32 1
+""";
+
 
 # x86_32
 inttypes["x86_32"] = {

@@ -1,5 +1,5 @@
 
-structs                   |     arm  x86_32  x86_64
+structs                   |   arm32  x86_32  x86_64
 
 start_info                |       -    1112    1168
 trap_info                 |       -       8      16

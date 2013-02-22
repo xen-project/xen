@@ -366,7 +366,7 @@ tools/include/xen-foreign/checker.c
 tools/include/xen-foreign/structs.pyc
 tools/include/xen-foreign/x86_32.h
 tools/include/xen-foreign/x86_64.h
-tools/include/xen-foreign/arm.h
+tools/include/xen-foreign/arm32.h
 
 .git
 tools/misc/xen-hptool
