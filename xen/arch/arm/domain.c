@@ -387,8 +387,8 @@ int vcpu_initialise(struct vcpu *v)
                                            - sizeof(struct cpu_info));
 
     memset(&v->arch.saved_context, 0, sizeof(v->arch.saved_context));
-    v->arch.saved_context.sp = (uint32_t)v->arch.cpu_info;
-    v->arch.saved_context.pc = (uint32_t)continue_new_vcpu;
+    v->arch.saved_context.sp = (register_t)v->arch.cpu_info;
+    v->arch.saved_context.pc = (register_t)continue_new_vcpu;
 
     /* Idle VCPUs don't need the rest of this setup */
     if ( is_idle_vcpu(v) )

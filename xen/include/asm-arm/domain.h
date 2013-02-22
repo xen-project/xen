@@ -99,16 +99,29 @@ struct vtimer {
 struct arch_vcpu
 {
     struct {
-        uint32_t    r4;
-        uint32_t    r5;
-        uint32_t    r6;
-        uint32_t    r7;
-        uint32_t    r8;
-        uint32_t    r9;
-        uint32_t    sl;
-        uint32_t    fp;
-        uint32_t    sp;
-        uint32_t    pc;
+#ifdef CONFIG_ARM_32
+        register_t r4;
+        register_t r5;
+        register_t r6;
+        register_t r7;
+        register_t r8;
+        register_t r9;
+        register_t sl;
+#else
+        register_t x19;
+        register_t x20;
+        register_t x21;
+        register_t x22;
+        register_t x23;
+        register_t x24;
+        register_t x25;
+        register_t x26;
+        register_t x27;
+        register_t x28;
+#endif
+        register_t fp;
+        register_t sp;
+        register_t pc;
     } saved_context;
 
     void *stack;
