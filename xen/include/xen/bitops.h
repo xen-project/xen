@@ -175,4 +175,11 @@ static inline __u32 ror32(__u32 word, unsigned int shift)
     return (word >> shift) | (word << (32 - shift));
 }
 
+/* base-2 logarithm */
+#define __L2(_x)  (((_x) & 0x00000002) ?   1 : 0)
+#define __L4(_x)  (((_x) & 0x0000000c) ? ( 2 + __L2( (_x)>> 2)) : __L2( _x))
+#define __L8(_x)  (((_x) & 0x000000f0) ? ( 4 + __L4( (_x)>> 4)) : __L4( _x))
+#define __L16(_x) (((_x) & 0x0000ff00) ? ( 8 + __L8( (_x)>> 8)) : __L8( _x))
+#define LOG_2(_x) (((_x) & 0xffff0000) ? (16 + __L16((_x)>>16)) : __L16(_x))
+
 #endif
