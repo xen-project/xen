@@ -193,6 +193,13 @@ static int alloc_xenoprof_struct(
     unsigned max_max_samples;
     int i;
 
+    nvcpu = 0;
+    for_each_vcpu ( d, v )
+        nvcpu++;
+
+    if ( !nvcpu )
+        return -EINVAL;
+
     d->xenoprof = xzalloc(struct xenoprof);
     if ( d->xenoprof == NULL )
     {
@@ -208,10 +215,6 @@ static int alloc_xenoprof_struct(
         printk("alloc_xenoprof_struct(): vcpu array allocation failed\n");
         return -ENOMEM;
     }
-
-    nvcpu = 0;
-    for_each_vcpu ( d, v )
-        nvcpu++;
 
     bufsize = sizeof(struct xenoprof_buf);
     i = sizeof(struct event_log);
