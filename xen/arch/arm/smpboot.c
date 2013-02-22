@@ -122,7 +122,8 @@ make_cpus_ready(unsigned int max_cpus, unsigned long boot_phys_offset)
         /* TODO: handle boards where CPUIDs are not contiguous */
         *gate = i;
         flush_xen_dcache(*gate);
-        asm volatile("isb; sev");
+        isb();
+        sev();
         /* And wait for it to respond */
         while ( ready_cpus < i )
             smp_rmb();
@@ -204,8 +205,8 @@ void stop_cpu(void)
     /* Make sure the write happens before we sleep forever */
     dsb();
     isb();
-    while ( 1 ) 
-        asm volatile("wfi");
+    while ( 1 )
+        wfi();
 }
 
 /* Bring up a remote CPU */
@@ -220,7 +221,8 @@ int __cpu_up(unsigned int cpu)
     /* we need to make sure that the change to smp_up_cpu is visible to
      * secondary cpus with D-cache off */
     flush_xen_dcache(smp_up_cpu);
-    asm volatile("isb; sev");
+    isb();
+    sev();
 
     while ( !cpu_online(cpu) )
     {
