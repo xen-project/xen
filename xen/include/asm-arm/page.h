@@ -274,7 +274,7 @@ static inline void flush_xen_dcache_va_range(void *p, unsigned long size)
 void dump_pt_walk(lpae_t *table, paddr_t addr);
 
 /* Print a walk of the hypervisor's page tables for a virtual addr. */
-extern void dump_hyp_walk(uint32_t addr);
+extern void dump_hyp_walk(vaddr_t addr);
 /* Print a walk of the p2m for a domain for a physical address. */
 extern void dump_p2m_lookup(struct domain *d, paddr_t addr);
 
@@ -326,9 +326,11 @@ static inline int gva_to_ipa(vaddr_t va, paddr_t *paddr)
 #define first_linear_offset(va) (va >> FIRST_SHIFT)
 #define second_linear_offset(va) (va >> SECOND_SHIFT)
 #define third_linear_offset(va) (va >> THIRD_SHIFT)
-#define first_table_offset(va) (first_linear_offset(va))
-#define second_table_offset(va) (second_linear_offset(va) & LPAE_ENTRY_MASK)
-#define third_table_offset(va) (third_linear_offset(va) & LPAE_ENTRY_MASK)
+
+#define TABLE_OFFSET(offs) ((unsigned int)(offs) & LPAE_ENTRY_MASK)
+#define first_table_offset(va)  TABLE_OFFSET(first_linear_offset(va))
+#define second_table_offset(va) TABLE_OFFSET(second_linear_offset(va))
+#define third_table_offset(va)  TABLE_OFFSET(third_linear_offset(va))
 
 #define clear_page(page)memset((void *)(page), 0, PAGE_SIZE)
 

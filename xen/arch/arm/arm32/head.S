@@ -292,7 +292,7 @@ paging:
 
         /* Non-boot CPUs need to move on to the relocated pagetables */
         mov   r0, #0
-        ldr   r4, =boot_httbr        /* VA of HTTBR value stashed by CPU 0 */
+        ldr   r4, =boot_ttbr         /* VA of HTTBR value stashed by CPU 0 */
         add   r4, r4, r10            /* PA of it */
         ldrd  r4, r5, [r4]           /* Actual value */
         dsb

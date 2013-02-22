@@ -40,7 +40,11 @@
 struct domain *dom_xen, *dom_io, *dom_cow;
 
 /* Static start-of-day pagetables that we use before the allocators are up */
+/* xen_pgtable == root of the trie (zeroeth level on 64-bit, first on 32-bit) */
 lpae_t xen_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+#ifdef CONFIG_ARM_64
+lpae_t xen_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+#endif
 /* N.B. The second-level table is 4 contiguous pages long, and covers
  * all addresses from 0 to 0xffffffff.  Offsets into it are calculated
  * with second_linear_offset(), not second_table_offset(). */
@@ -49,7 +53,7 @@ lpae_t xen_fixmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 static lpae_t xen_xenmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 
 /* Non-boot CPUs use this to find the correct pagetables. */
-uint64_t boot_httbr;
+uint64_t boot_ttbr;
 
 static paddr_t phys_offset;
 
@@ -73,24 +77,21 @@ void dump_pt_walk(lpae_t *first, paddr_t addr)
     if ( first_table_offset(addr) >= LPAE_ENTRIES )
         return;
 
-    printk("1ST[0x%llx] = 0x%"PRIpaddr"\n",
-           first_table_offset(addr),
+    printk("1ST[0x%x] = 0x%"PRIpaddr"\n", first_table_offset(addr),
            first[first_table_offset(addr)].bits);
     if ( !first[first_table_offset(addr)].walk.valid ||
          !first[first_table_offset(addr)].walk.table )
         goto done;
 
     second = map_domain_page(first[first_table_offset(addr)].walk.base);
-    printk("2ND[0x%llx] = 0x%"PRIpaddr"\n",
-           second_table_offset(addr),
+    printk("2ND[0x%x] = 0x%"PRIpaddr"\n", second_table_offset(addr),
            second[second_table_offset(addr)].bits);
     if ( !second[second_table_offset(addr)].walk.valid ||
          !second[second_table_offset(addr)].walk.table )
         goto done;
 
     third = map_domain_page(second[second_table_offset(addr)].walk.base);
-    printk("3RD[0x%llx] = 0x%"PRIpaddr"\n",
-           third_table_offset(addr),
+    printk("3RD[0x%x] = 0x%"PRIpaddr"\n", third_table_offset(addr),
            third[third_table_offset(addr)].bits);
 
 done:
@@ -99,14 +100,14 @@ done:
 
 }
 
-void dump_hyp_walk(uint32_t addr)
+void dump_hyp_walk(vaddr_t addr)
 {
-    uint64_t httbr = READ_CP64(HTTBR);
+    uint64_t ttbr = READ_SYSREG64(TTBR0_EL2);
 
-    printk("Walking Hypervisor VA 0x%08"PRIx32" via HTTBR 0x%016"PRIx64"\n",
-           addr, httbr);
+    printk("Walking Hypervisor VA 0x%"PRIvaddr" via TTBR 0x%016"PRIx64"\n",
+           addr, ttbr);
 
-    BUG_ON( (lpae_t *)(unsigned long)(httbr - phys_offset) != xen_pgtable );
+    BUG_ON( (lpae_t *)(unsigned long)(ttbr - phys_offset) != xen_pgtable );
     dump_pt_walk(xen_pgtable, addr);
 }
 
@@ -135,7 +136,7 @@ void *map_domain_page(unsigned long mfn)
     unsigned long flags;
     lpae_t *map = xen_second + second_linear_offset(DOMHEAP_VIRT_START);
     unsigned long slot_mfn = mfn & ~LPAE_ENTRY_MASK;
-    uint32_t va;
+    vaddr_t va;
     lpae_t pte;
     int i, slot;
 
@@ -275,26 +276,31 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 
     /* Update the copy of xen_pgtable to use the new paddrs */
     p = (void *) xen_pgtable + dest_va - (unsigned long) _start;
+#ifdef CONFIG_ARM_64
+    p[0].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
+    p = (void *) xen_first + dest_va - (unsigned long) _start;
+#endif
     for ( i = 0; i < 4; i++)
         p[i].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
+
     p = (void *) xen_second + dest_va - (unsigned long) _start;
     if ( boot_phys_offset != 0 )
     {
         /* Remove the old identity mapping of the boot paddr */
-        unsigned long va = (unsigned long)_start + boot_phys_offset;
+        vaddr_t va = (vaddr_t)_start + boot_phys_offset;
         p[second_linear_offset(va)].bits = 0;
     }
     for ( i = 0; i < 4 * LPAE_ENTRIES; i++)
         if ( p[i].pt.valid )
-                p[i].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
+            p[i].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
 
     /* Change pagetables to the copy in the relocated Xen */
-    boot_httbr = (unsigned long) xen_pgtable + phys_offset;
-    flush_xen_dcache(boot_httbr);
+    boot_ttbr = (uintptr_t) xen_pgtable + phys_offset;
+    flush_xen_dcache(boot_ttbr);
     flush_xen_dcache_va_range((void*)dest_va, _end - _start);
     flush_xen_text_tlb();
 
-    WRITE_CP64(boot_httbr, HTTBR); /* Change translation base */
+    WRITE_SYSREG64(boot_ttbr, TTBR0_EL2);
     dsb();                         /* Ensure visibility of HTTBR update */
     flush_xen_text_tlb();
 
@@ -339,7 +345,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     /* TLBFLUSH and ISB would be needed here, but wait until we set WXN */
 
     /* From now on, no mapping may be both writable and executable. */
-    WRITE_CP32(READ_CP32(HSCTLR) | SCTLR_WXN, HSCTLR);
+    WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);
     /* Flush everything after setting WXN bit. */
     flush_xen_text_tlb();
 }
@@ -348,7 +354,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 void __cpuinit mmu_init_secondary_cpu(void)
 {
     /* From now on, no mapping may be both writable and executable. */
-    WRITE_CP32(READ_CP32(HSCTLR) | SCTLR_WXN, HSCTLR);
+    WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);
     flush_xen_text_tlb();
 }
 
