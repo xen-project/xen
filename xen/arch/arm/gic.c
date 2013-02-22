@@ -267,7 +267,7 @@ static void __init gic_dist_init(void)
 
     /* Disable all global interrupts */
     for ( i = 32; i < gic.lines; i += 32 )
-        GICD[GICD_ICENABLER + i / 32] = ~0ul;
+        GICD[GICD_ICENABLER + i / 32] = (uint32_t)~0ul;
 
     /* Turn on the distributor */
     GICD[GICD_CTLR] = GICD_CTL_ENABLE;
@@ -530,18 +530,16 @@ static void gic_restore_pending_irqs(struct vcpu *v)
 
 static void gic_inject_irq_start(void)
 {
-    uint32_t hcr;
-    hcr = READ_CP32(HCR);
-    WRITE_CP32(hcr | HCR_VI, HCR);
+    register_t hcr = READ_SYSREG(HCR_EL2);
+    WRITE_SYSREG(hcr | HCR_VI, HCR_EL2);
     isb();
 }
 
 static void gic_inject_irq_stop(void)
 {
-    uint32_t hcr;
-    hcr = READ_CP32(HCR);
+    register_t hcr = READ_SYSREG(HCR_EL2);
     if (hcr & HCR_VI) {
-        WRITE_CP32(hcr & ~HCR_VI, HCR);
+        WRITE_SYSREG(hcr & ~HCR_VI, HCR_EL2);
         isb();
     }
 }
