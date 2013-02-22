@@ -214,12 +214,19 @@ void panic_PAR(uint64_t par)
 }
 
 struct reg_ctxt {
-    uint32_t sctlr, ttbcr;
+    uint32_t sctlr, tcr;
     uint64_t ttbr0, ttbr1;
+#ifdef CONFIG_ARM_32
+    uint32_t dfar, ifar;
+#else
+    uint64_t far;
+#endif
 };
-static void _show_registers(struct cpu_user_regs *regs,
-                            struct reg_ctxt *ctxt,
-                            int guest_mode)
+
+static void show_registers_32(struct cpu_user_regs *regs,
+                              struct reg_ctxt *ctxt,
+                              int guest_mode,
+                              const struct vcpu *v)
 {
     static const char *mode_strings[] = {
        [PSR_MODE_USR] = "USR",
@@ -233,25 +240,34 @@ static void _show_registers(struct cpu_user_regs *regs,
        [PSR_MODE_SYS] = "SYS"
     };
 
-    print_xen_info();
-    printk("CPU:    %d\n", smp_processor_id());
+#ifdef CONFIG_ARM_64
+    printk("PC:     %08"PRIx32"\n", regs->pc32);
+#else
     printk("PC:     %08"PRIx32, regs->pc);
     if ( !guest_mode )
-            print_symbol(" %s", regs->pc);
+        print_symbol(" %s", regs->pc);
     printk("\n");
-    printk("CPSR:   %08"PRIx32" MODE:%s\n", regs->cpsr,
-           mode_strings[regs->cpsr & PSR_MODE_MASK]);
+#endif
+    printk("CPSR:   %08"PRIx32" MODE:%s%s\n", regs->cpsr,
+           guest_mode ? "32-bit Guest " : "Hypervisor",
+           guest_mode ? mode_strings[regs->cpsr & PSR_MODE_MASK] : "");
     printk("     R0: %08"PRIx32" R1: %08"PRIx32" R2: %08"PRIx32" R3: %08"PRIx32"\n",
            regs->r0, regs->r1, regs->r2, regs->r3);
     printk("     R4: %08"PRIx32" R5: %08"PRIx32" R6: %08"PRIx32" R7: %08"PRIx32"\n",
            regs->r4, regs->r5, regs->r6, regs->r7);
     printk("     R8: %08"PRIx32" R9: %08"PRIx32" R10:%08"PRIx32" R11:%08"PRIx32" R12:%08"PRIx32"\n",
-           regs->r8, regs->r9, regs->r10, regs->r11, regs->r12);
+           regs->r8, regs->r9, regs->r10,
+#ifdef CONFIG_ARM_64
+           regs->r11,
+#else
+           regs->fp,
+#endif
+           regs->r12);
 
     if ( guest_mode )
     {
-        printk("USR: SP: %08"PRIx32" LR: %08"PRIx32" CPSR:%08"PRIx32"\n",
-               regs->sp_usr, regs->lr_usr, regs->cpsr);
+        printk("USR: SP: %08"PRIx32" LR: %08"PRIregister"\n",
+               regs->sp_usr, regs->lr);
         printk("SVC: SP: %08"PRIx32" LR: %08"PRIx32" SPSR:%08"PRIx32"\n",
                regs->sp_svc, regs->lr_svc, regs->spsr_svc);
         printk("ABT: SP: %08"PRIx32" LR: %08"PRIx32" SPSR:%08"PRIx32"\n",
@@ -264,50 +280,160 @@ static void _show_registers(struct cpu_user_regs *regs,
                regs->sp_fiq, regs->lr_fiq, regs->spsr_fiq);
         printk("FIQ: R8: %08"PRIx32" R9: %08"PRIx32" R10:%08"PRIx32" R11:%08"PRIx32" R12:%08"PRIx32"\n",
                regs->r8_fiq, regs->r9_fiq, regs->r10_fiq, regs->r11_fiq, regs->r11_fiq);
-        printk("\n");
-        printk("TTBR0 %010"PRIx64" TTBR1 %010"PRIx64" TTBCR %08"PRIx32"\n",
-               ctxt->ttbr0, ctxt->ttbr1, ctxt->ttbcr);
+    }
+#ifndef CONFIG_ARM_64
+    else
+    {
+        printk("HYP: SP: %08"PRIx32" LR: %08"PRIregister"\n", regs->sp, regs->lr);
+    }
+#endif
+    printk("\n");
+
+    if ( guest_mode )
+    {
+        printk("TTBR0 %010"PRIx64" TTBR1 %010"PRIx64" TCR %08"PRIx32"\n",
+               ctxt->ttbr0, ctxt->ttbr1, ctxt->tcr);
         printk("SCTLR %08"PRIx32"\n", ctxt->sctlr);
-        printk("VTTBR %010"PRIx64"\n", READ_CP64(VTTBR));
+        printk("IFAR %08"PRIx32" DFAR %08"PRIx32"\n",
+#ifdef CONFIG_ARM_64
+               (uint32_t)(ctxt->far >> 32),
+               (uint32_t)(ctxt->far & 0xffffffff)
+#else
+               ctxt->ifar, ctxt->dfar
+#endif
+            );
         printk("\n");
+    }
+}
+
+#ifdef CONFIG_ARM_64
+static void show_registers_64(struct cpu_user_regs *regs,
+                              struct reg_ctxt *ctxt,
+                              int guest_mode,
+                              const struct vcpu *v)
+{
+    printk("PC:     %016"PRIx64, regs->pc);
+    if ( !guest_mode )
+        print_symbol(" %s", regs->pc);
+    printk("\n");
+    printk("SP:     %08"PRIx64"\n", regs->sp);
+    printk("CPSR:   %08"PRIx32" MODE:%s\n", regs->cpsr,
+           guest_mode ? "64-bit Guest" : "Hypervisor");
+    printk("     X0: %016"PRIx64"  X1: %016"PRIx64"  X2: %016"PRIx64"\n",
+           regs->x0, regs->x1, regs->x2);
+    printk("     X3: %016"PRIx64"  X4: %016"PRIx64"  X5: %016"PRIx64"\n",
+           regs->x3, regs->x4, regs->x5);
+    printk("     X6: %016"PRIx64"  X7: %016"PRIx64"  X8: %016"PRIx64"\n",
+           regs->x6, regs->x7, regs->x8);
+    printk("     X9: %016"PRIx64" X10: %016"PRIx64" X11: %016"PRIx64"\n",
+           regs->x9, regs->x10, regs->x11);
+    printk("    X12: %016"PRIx64" X13: %016"PRIx64" X14: %016"PRIx64"\n",
+           regs->x12, regs->x13, regs->x14);
+    printk("    X15: %016"PRIx64" X16: %016"PRIx64" X17: %016"PRIx64"\n",
+           regs->x15, regs->x16, regs->x17);
+    printk("    X18: %016"PRIx64" X19: %016"PRIx64" X20: %016"PRIx64"\n",
+           regs->x18, regs->x19, regs->x20);
+    printk("    X21: %016"PRIx64" X22: %016"PRIx64" X23: %016"PRIx64"\n",
+           regs->x21, regs->x22, regs->x23);
+    printk("    X24: %016"PRIx64" X25: %016"PRIx64" X26: %016"PRIx64"\n",
+           regs->x24, regs->x25, regs->x26);
+    printk("    X27: %016"PRIx64" X28: %016"PRIx64" X29: %016"PRIx64"\n",
+           regs->x27, regs->x28, regs->lr);
+    printk("\n");
+
+    if ( guest_mode )
+    {
+        printk("SCTLR_EL1: %08"PRIx32"\n", ctxt->sctlr);
+        printk("  TCR_EL1: %08"PRIx32"\n", ctxt->tcr);
+        printk("TTBR0_EL1: %010"PRIx64"\n", ctxt->ttbr0);
+        printk("TTBR1_EL1: %010"PRIx64"\n", ctxt->ttbr1);
+        printk("  FAR_EL1: %010"PRIx64"\n", ctxt->far);
+        printk("\n");
+    }
+}
+#endif
+
+static void _show_registers(struct cpu_user_regs *regs,
+                            struct reg_ctxt *ctxt,
+                            int guest_mode,
+                            const struct vcpu *v)
+{
+    print_xen_info();
+
+    printk("CPU:    %d\n", smp_processor_id());
+
+    if ( guest_mode )
+    {
+        if ( is_pv32_domain(v->domain) )
+            show_registers_32(regs, ctxt, guest_mode, v);
+#ifdef CONFIG_ARM_64
+        else if ( is_pv64_domain(v->domain) )
+            show_registers_64(regs, ctxt, guest_mode, v);
+#endif
     }
     else
     {
-        printk("     SP: %08"PRIx32" LR: %08"PRIx32"\n", regs->sp, regs->lr);
-        printk("\n");
+#ifdef CONFIG_ARM_64
+        show_registers_64(regs, ctxt, guest_mode, v);
+#else
+        show_registers_32(regs, ctxt, guest_mode, v);
+#endif
     }
 
+#ifdef CONFIG_ARM_32
     printk("HTTBR %"PRIx64"\n", READ_CP64(HTTBR));
     printk("HDFAR %"PRIx32"\n", READ_CP32(HDFAR));
     printk("HIFAR %"PRIx32"\n", READ_CP32(HIFAR));
     printk("HPFAR %"PRIx32"\n", READ_CP32(HPFAR));
     printk("HCR %08"PRIx32"\n", READ_CP32(HCR));
     printk("HSR   %"PRIx32"\n", READ_CP32(HSR));
+    printk("VTTBR %010"PRIx64"\n", READ_CP64(VTTBR));
     printk("\n");
 
     printk("DFSR %"PRIx32" DFAR %"PRIx32"\n", READ_CP32(DFSR), READ_CP32(DFAR));
     printk("IFSR %"PRIx32" IFAR %"PRIx32"\n", READ_CP32(IFSR), READ_CP32(IFAR));
     printk("\n");
+#else
+    printk("TTBR0_EL2: %"PRIx64"\n", READ_SYSREG64(TTBR0_EL2));
+    printk("  FAR_EL2: %"PRIx64"\n", READ_SYSREG64(FAR_EL2));
+    printk("HPFAR_EL2: %"PRIx64"\n", READ_SYSREG64(HPFAR_EL2));
+    printk("  HCR_EL2: %"PRIx64"\n", READ_SYSREG64(HCR_EL2));
+    printk("  ESR_EL2: %"PRIx64"\n", READ_SYSREG64(ESR_EL2));
+    printk("VTTBR_EL2: %"PRIx64"\n", READ_SYSREG64(VTTBR_EL2));
+    printk("\n");
+#endif
 }
 
 void show_registers(struct cpu_user_regs *regs)
 {
     struct reg_ctxt ctxt;
-    ctxt.sctlr = READ_CP32(SCTLR);
-    ctxt.ttbcr = READ_CP32(TTBCR);
-    ctxt.ttbr0 = READ_CP64(TTBR0);
-    ctxt.ttbr1 = READ_CP64(TTBR1);
-    _show_registers(regs, &ctxt, guest_mode(regs));
+    ctxt.sctlr = READ_SYSREG(SCTLR_EL1);
+    ctxt.tcr = READ_SYSREG(TCR_EL1);
+    ctxt.ttbr0 = READ_SYSREG64(TTBR0_EL1);
+    ctxt.ttbr1 = READ_SYSREG64(TTBR1_EL1);
+#ifdef CONFIG_ARM_32
+    ctxt.dfar = READ_CP32(DFAR);
+    ctxt.ifar = READ_CP32(IFAR);
+#else
+    ctxt.far = READ_SYSREG(FAR_EL1);
+#endif
+    _show_registers(regs, &ctxt, guest_mode(regs), current);
 }
 
 void vcpu_show_registers(const struct vcpu *v)
 {
     struct reg_ctxt ctxt;
     ctxt.sctlr = v->arch.sctlr;
-    ctxt.ttbcr = v->arch.ttbcr;
+    ctxt.tcr = v->arch.ttbcr;
     ctxt.ttbr0 = v->arch.ttbr0;
     ctxt.ttbr1 = v->arch.ttbr1;
-    _show_registers(&v->arch.cpu_info->guest_cpu_user_regs, &ctxt, 1);
+#ifdef CONFIG_ARM_32
+    ctxt.dfar = v->arch.dfar;
+    ctxt.ifar = v->arch.ifar;
+#else
+    ctxt.far = v->arch.far;
+#endif
+    _show_registers(&v->arch.cpu_info->guest_cpu_user_regs, &ctxt, 1, v);
 }
 
 static void show_guest_stack(struct cpu_user_regs *regs)
