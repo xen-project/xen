@@ -106,9 +106,9 @@
 #define HCR             p15,4,c1,c1,0   /* Hyp. Configuration Register */
 
 /* CP15 CR2: Translation Table Base and Control Registers */
-#define TTBR0           p15,0,c2,c0,0   /* Translation Table Base Reg. 0 */
-#define TTBR1           p15,0,c2,c0,1   /* Translation Table Base Reg. 1 */
 #define TTBCR           p15,0,c2,c0,2   /* Translatation Table Base Control Register */
+#define TTBR0           p15,0,c2        /* Translation Table Base Reg. 0 */
+#define TTBR1           p15,1,c2        /* Translation Table Base Reg. 1 */
 #define HTTBR           p15,4,c2        /* Hyp. Translation Table Base Register */
 #define HTCR            p15,4,c2,c0,2   /* Hyp. Translation Control Register */
 #define VTCR            p15,4,c2,c1,2   /* Virtualization Translation Control Register */
@@ -225,10 +225,17 @@
 /* Aliases of AArch64 names for use in common code when building for AArch32 */
 #ifdef CONFIG_ARM_32
 /* Alphabetically... */
+#define ACTLR_EL1               ACTLR
+#define AFSR0_EL1               ADFSR
+#define AFSR1_EL1               AIFSR
 #define CCSIDR_EL1              CCSIDR
 #define CLIDR_EL1               CLIDR
+#define CONTEXTIDR_EL1          CONTEXTIDR
+#define CPACR_EL1               CPACR
 #define CSSELR_EL1              CSSELR
+#define DACR32_EL2              DACR
 #define ESR_EL2                 HSR
+#define HCR_EL2                 HCR
 #define ID_AFR0_EL1             ID_AFR0
 #define ID_DFR0_EL1             ID_DFR0
 #define ID_ISAR0_EL1            ID_ISAR0
@@ -243,9 +250,19 @@
 #define ID_MMFR3_EL1            ID_MMFR3
 #define ID_PFR0_EL1             ID_PFR0
 #define ID_PFR1_EL1             ID_PFR1
+#define IFSR32_EL2              IFSR
+#define PAR_EL1                 PAR
+#define SCTLR_EL1               SCTLR
 #define SCTLR_EL2               HSCTLR
+#define TCR_EL1                 TTBCR
+#define TPIDRRO_EL0             TPIDRURO
+#define TPIDR_EL0               TPIDRURW
+#define TPIDR_EL1               TPIDRPRW
 #define TPIDR_EL2               HTPIDR
+#define TTBR0_EL1               TTBR0
 #define TTBR0_EL2               HTTBR
+#define TTBR1_EL1               TTBR1
+#define VBAR_EL1                VBAR
 #define VBAR_EL2                HVBAR
 #define VTCR_EL2                VTCR
 

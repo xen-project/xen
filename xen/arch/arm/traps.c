@@ -214,8 +214,8 @@ void panic_PAR(uint64_t par)
 }
 
 struct reg_ctxt {
-    uint32_t sctlr;
-    uint32_t ttbr0, ttbr1, ttbcr;
+    uint32_t sctlr, ttbcr;
+    uint64_t ttbr0, ttbr1;
 };
 static void _show_registers(struct cpu_user_regs *regs,
                             struct reg_ctxt *ctxt,
@@ -265,7 +265,7 @@ static void _show_registers(struct cpu_user_regs *regs,
         printk("FIQ: R8: %08"PRIx32" R9: %08"PRIx32" R10:%08"PRIx32" R11:%08"PRIx32" R12:%08"PRIx32"\n",
                regs->r8_fiq, regs->r9_fiq, regs->r10_fiq, regs->r11_fiq, regs->r11_fiq);
         printk("\n");
-        printk("TTBR0 %08"PRIx32" TTBR1 %08"PRIx32" TTBCR %08"PRIx32"\n",
+        printk("TTBR0 %010"PRIx64" TTBR1 %010"PRIx64" TTBCR %08"PRIx32"\n",
                ctxt->ttbr0, ctxt->ttbr1, ctxt->ttbcr);
         printk("SCTLR %08"PRIx32"\n", ctxt->sctlr);
         printk("VTTBR %010"PRIx64"\n", READ_CP64(VTTBR));
@@ -295,8 +295,8 @@ void show_registers(struct cpu_user_regs *regs)
     struct reg_ctxt ctxt;
     ctxt.sctlr = READ_CP32(SCTLR);
     ctxt.ttbcr = READ_CP32(TTBCR);
-    ctxt.ttbr0 = READ_CP32(TTBR0);
-    ctxt.ttbr1 = READ_CP32(TTBR1);
+    ctxt.ttbr0 = READ_CP64(TTBR0);
+    ctxt.ttbr1 = READ_CP64(TTBR1);
     _show_registers(regs, &ctxt, guest_mode(regs));
 }
 
@@ -631,14 +631,14 @@ static void do_cp15_64(struct cpu_user_regs *regs,
 void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
 {
     uint32_t ttbcr = READ_CP32(TTBCR);
-    uint32_t ttbr0 = READ_CP32(TTBR0);
+    uint64_t ttbr0 = READ_CP64(TTBR0);
     paddr_t paddr;
     uint32_t offset;
     uint32_t *first = NULL, *second = NULL;
 
     printk("dom%d VA 0x%08"PRIvaddr"\n", d->domain_id, addr);
     printk("    TTBCR: 0x%08"PRIx32"\n", ttbcr);
-    printk("    TTBR0: 0x%08"PRIx32" = 0x%"PRIpaddr"\n",
+    printk("    TTBR0: 0x%010"PRIx64" = 0x%"PRIpaddr"\n",
            ttbr0, p2m_lookup(d, ttbr0 & PAGE_MASK));
 
     if ( ttbcr & TTBCR_EAE )

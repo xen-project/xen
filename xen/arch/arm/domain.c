@@ -43,55 +43,67 @@ void idle_loop(void)
 static void ctxt_switch_from(struct vcpu *p)
 {
     /* CP 15 */
-    p->arch.csselr = READ_CP32(CSSELR);
+    p->arch.csselr = READ_SYSREG(CSSELR_EL1);
 
     /* Control Registers */
-    p->arch.actlr = READ_CP32(ACTLR);
-    p->arch.sctlr = READ_CP32(SCTLR);
-    p->arch.cpacr = READ_CP32(CPACR);
+    p->arch.actlr = READ_SYSREG(ACTLR_EL1);
+    p->arch.sctlr = READ_SYSREG(SCTLR_EL1);
+    p->arch.cpacr = READ_SYSREG(CPACR_EL1);
 
-    p->arch.contextidr = READ_CP32(CONTEXTIDR);
-    p->arch.tpidrurw = READ_CP32(TPIDRURW);
-    p->arch.tpidruro = READ_CP32(TPIDRURO);
-    p->arch.tpidrprw = READ_CP32(TPIDRPRW);
+    p->arch.contextidr = READ_SYSREG(CONTEXTIDR_EL1);
+    p->arch.tpidr_el0 = READ_SYSREG(TPIDR_EL0);
+    p->arch.tpidrro_el0 = READ_SYSREG(TPIDRRO_EL0);
+    p->arch.tpidr_el1 = READ_SYSREG(TPIDR_EL1);
 
     /* Arch timer */
     virt_timer_save(p);
 
+#if defined(CONFIG_ARM_32)
     /* XXX only save these if ThumbEE e.g. ID_PFR0.THUMB_EE_SUPPORT */
     p->arch.teecr = READ_CP32(TEECR);
     p->arch.teehbr = READ_CP32(TEEHBR);
 
     p->arch.joscr = READ_CP32(JOSCR);
     p->arch.jmcr = READ_CP32(JMCR);
+#endif
 
     isb();
 
     /* MMU */
-    p->arch.vbar = READ_CP32(VBAR);
-    p->arch.ttbcr = READ_CP32(TTBCR);
-    /* XXX save 64 bit TTBR if guest is LPAE */
-    p->arch.ttbr0 = READ_CP32(TTBR0);
-    p->arch.ttbr1 = READ_CP32(TTBR1);
-
-    p->arch.dacr = READ_CP32(DACR);
-    p->arch.par = READ_CP64(PAR);
+    p->arch.vbar = READ_SYSREG(VBAR_EL1);
+    p->arch.ttbcr = READ_SYSREG(TCR_EL1);
+    p->arch.ttbr0 = READ_SYSREG64(TTBR0_EL1);
+    p->arch.ttbr1 = READ_SYSREG64(TTBR1_EL1);
+    if ( is_pv32_domain(p->domain) )
+        p->arch.dacr = READ_SYSREG(DACR32_EL2);
+    p->arch.par = READ_SYSREG64(PAR_EL1);
+#if defined(CONFIG_ARM_32)
     p->arch.mair0 = READ_CP32(MAIR0);
     p->arch.mair1 = READ_CP32(MAIR1);
+#else
+    p->arch.mair = READ_SYSREG64(MAIR_EL1);
+#endif
 
     /* Fault Status */
+#if defined(CONFIG_ARM_32)
     p->arch.dfar = READ_CP32(DFAR);
     p->arch.ifar = READ_CP32(IFAR);
     p->arch.dfsr = READ_CP32(DFSR);
-    p->arch.ifsr = READ_CP32(IFSR);
-    p->arch.adfsr = READ_CP32(ADFSR);
-    p->arch.aifsr = READ_CP32(AIFSR);
+#elif defined(CONFIG_ARM_64)
+    p->arch.far = READ_SYSREG64(FAR_EL1);
+    p->arch.esr = READ_SYSREG64(ESR_EL1);
+#endif
+
+    if ( is_pv32_domain(p->domain) )
+        p->arch.ifsr  = READ_SYSREG(IFSR32_EL2);
+    p->arch.afsr0 = READ_SYSREG(AFSR0_EL1);
+    p->arch.afsr1 = READ_SYSREG(AFSR1_EL1);
 
     /* XXX MPU */
 
     /* XXX VFP */
 
-    /* XXX VGIC */
+    /* VGIC */
     gic_save_state(p);
 
     isb();
@@ -100,16 +112,16 @@ static void ctxt_switch_from(struct vcpu *p)
 
 static void ctxt_switch_to(struct vcpu *n)
 {
-    uint32_t hcr;
+    register_t hcr;
 
-    hcr = READ_CP32(HCR);
-    WRITE_CP32(hcr & ~HCR_VM, HCR);
+    hcr = READ_SYSREG(HCR_EL2);
+    WRITE_SYSREG(hcr & ~HCR_VM, HCR_EL2);
     isb();
 
     p2m_load_VTTBR(n->domain);
     isb();
 
-    /* XXX VGIC */
+    /* VGIC */
     gic_restore_state(n);
 
     /* XXX VFP */
@@ -117,51 +129,62 @@ static void ctxt_switch_to(struct vcpu *n)
     /* XXX MPU */
 
     /* Fault Status */
+#if defined(CONFIG_ARM_32)
     WRITE_CP32(n->arch.dfar, DFAR);
     WRITE_CP32(n->arch.ifar, IFAR);
     WRITE_CP32(n->arch.dfsr, DFSR);
-    WRITE_CP32(n->arch.ifsr, IFSR);
-    WRITE_CP32(n->arch.adfsr, ADFSR);
-    WRITE_CP32(n->arch.aifsr, AIFSR);
+#elif defined(CONFIG_ARM_64)
+    WRITE_SYSREG64(n->arch.far, FAR_EL1);
+    WRITE_SYSREG64(n->arch.esr, ESR_EL1);
+#endif
+
+    if ( is_pv32_domain(n->domain) )
+        WRITE_SYSREG(n->arch.ifsr, IFSR32_EL2);
+    WRITE_SYSREG(n->arch.afsr0, AFSR0_EL1);
+    WRITE_SYSREG(n->arch.afsr1, AFSR1_EL1);
 
     /* MMU */
-    WRITE_CP32(n->arch.vbar, VBAR);
-    WRITE_CP32(n->arch.ttbcr, TTBCR);
-    /* XXX restore 64 bit TTBR if guest is LPAE */
-    WRITE_CP32(n->arch.ttbr0, TTBR0);
-    WRITE_CP32(n->arch.ttbr1, TTBR1);
-
-    WRITE_CP32(n->arch.dacr, DACR);
-    WRITE_CP64(n->arch.par, PAR);
+    WRITE_SYSREG(n->arch.vbar, VBAR_EL1);
+    WRITE_SYSREG(n->arch.ttbcr, TCR_EL1);
+    WRITE_SYSREG64(n->arch.ttbr0, TTBR0_EL1);
+    WRITE_SYSREG64(n->arch.ttbr1, TTBR1_EL1);
+    if ( is_pv32_domain(n->domain) )
+        WRITE_SYSREG(n->arch.dacr, DACR32_EL2);
+    WRITE_SYSREG64(n->arch.par, PAR_EL1);
+#if defined(CONFIG_ARM_32)
     WRITE_CP32(n->arch.mair0, MAIR0);
     WRITE_CP32(n->arch.mair1, MAIR1);
+#elif defined(CONFIG_ARM_64)
+    WRITE_SYSREG64(n->arch.mair, MAIR_EL1);
+#endif
     isb();
 
     /* Control Registers */
-    WRITE_CP32(n->arch.actlr, ACTLR);
-    WRITE_CP32(n->arch.sctlr, SCTLR);
-    WRITE_CP32(n->arch.cpacr, CPACR);
+    WRITE_SYSREG(n->arch.actlr, ACTLR_EL1);
+    WRITE_SYSREG(n->arch.sctlr, SCTLR_EL1);
+    WRITE_SYSREG(n->arch.cpacr, CPACR_EL1);
 
-    WRITE_CP32(n->arch.contextidr, CONTEXTIDR);
-    WRITE_CP32(n->arch.tpidrurw, TPIDRURW);
-    WRITE_CP32(n->arch.tpidruro, TPIDRURO);
-    WRITE_CP32(n->arch.tpidrprw, TPIDRPRW);
+    WRITE_SYSREG(n->arch.contextidr, CONTEXTIDR_EL1);
+    WRITE_SYSREG(n->arch.tpidr_el0, TPIDR_EL0);
+    WRITE_SYSREG(n->arch.tpidrro_el0, TPIDRRO_EL0);
+    WRITE_SYSREG(n->arch.tpidr_el1, TPIDR_EL1);
 
+#if defined(CONFIG_ARM_32)
     /* XXX only restore these if ThumbEE e.g. ID_PFR0.THUMB_EE_SUPPORT */
     WRITE_CP32(n->arch.teecr, TEECR);
     WRITE_CP32(n->arch.teehbr, TEEHBR);
 
     WRITE_CP32(n->arch.joscr, JOSCR);
     WRITE_CP32(n->arch.jmcr, JMCR);
-
+#endif
     isb();
 
     /* CP 15 */
-    WRITE_CP32(n->arch.csselr, CSSELR);
+    WRITE_SYSREG(n->arch.csselr, CSSELR_EL1);
 
     isb();
 
-    WRITE_CP32(hcr, HCR);
+    WRITE_SYSREG(hcr, HCR_EL2);
     isb();
 
     /* This is could trigger an hardware interrupt from the virtual

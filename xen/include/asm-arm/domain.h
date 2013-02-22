@@ -133,30 +133,43 @@ struct arch_vcpu
     struct cpu_info *cpu_info;
 
     /* Fault Status */
+#ifdef CONFIG_ARM_32
+    uint32_t dfsr;
     uint32_t dfar, ifar;
-    uint32_t dfsr, ifsr;
-    uint32_t adfsr, aifsr;
+#else
+    uint64_t far;
+    uint32_t esr;
+#endif
+
+    uint32_t ifsr; /* 32-bit guests only */
+    uint32_t afsr0, afsr1;
 
     /* MMU */
-    uint32_t vbar;
+    register_t vbar;
     uint32_t ttbcr;
-    uint32_t ttbr0, ttbr1;
+    uint64_t ttbr0, ttbr1;
 
-    uint32_t dacr;
+    uint32_t dacr; /* 32-bit guests only */
     uint64_t par;
+#ifdef CONFIG_ARM_32
     uint32_t mair0, mair1;
+#else
+    uint64_t mair;
+#endif
 
     /* Control Registers */
     uint32_t actlr, sctlr;
     uint32_t cpacr;
 
     uint32_t contextidr;
-    uint32_t tpidrurw;
-    uint32_t tpidruro;
-    uint32_t tpidrprw;
+    register_t tpidr_el0;
+    register_t tpidr_el1;
+    register_t tpidrro_el0;
 
+#ifdef CONFIG_ARM_32
     uint32_t teecr, teehbr;
     uint32_t joscr, jmcr;
+#endif
 
     /* CP 15 */
     uint32_t csselr;
