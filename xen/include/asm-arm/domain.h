@@ -35,8 +35,24 @@ struct hvm_domain
     uint64_t              params[HVM_NR_PARAMS];
 }  __cacheline_aligned;
 
+#ifdef CONFIG_ARM_64
+enum domain_type {
+    DOMAIN_PV32,
+    DOMAIN_PV64,
+};
+#define is_pv32_domain(d) ((d)->arch.type == DOMAIN_PV32)
+#define is_pv64_domain(d) ((d)->arch.type == DOMAIN_PV64)
+#else
+#define is_pv32_domain(d) (1)
+#define is_pv64_domain(d) (0)
+#endif
+
 struct arch_domain
 {
+#ifdef CONFIG_ARM_64
+    enum domain_type type;
+#endif
+
     struct p2m_domain p2m;
     struct hvm_domain hvm_domain;
     xen_pfn_t *grant_table_gpfn;

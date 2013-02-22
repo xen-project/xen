@@ -228,6 +228,10 @@ int kernel_prepare(struct kernel_info *info)
     if (rc < 0)
         rc = kernel_try_elf_prepare(info, start, size);
 
+#ifdef CONFIG_ARM_64
+    info->type = DOMAIN_PV32; /* No 64-bit guest support yet */
+#endif
+
     return rc;
 }
 

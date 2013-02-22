@@ -10,6 +10,10 @@
 #include <xen/device_tree.h>
 
 struct kernel_info {
+#ifdef CONFIG_ARM_64
+    enum domain_type type;
+#endif
+
     void *fdt; /* flat device tree */
     paddr_t unassigned_mem; /* RAM not (yet) assigned to a bank */
     struct dt_mem_info mem;
