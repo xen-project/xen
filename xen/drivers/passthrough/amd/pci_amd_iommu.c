@@ -30,8 +30,7 @@ extern struct ivrs_mappings *ivrs_mappings;
 
 struct amd_iommu *find_iommu_for_device(int bdf)
 {
-    BUG_ON ( bdf >= ivrs_bdf_entries );
-    return ivrs_mappings[bdf].iommu;
+    return bdf < ivrs_bdf_entries ? ivrs_mappings[bdf].iommu : NULL;
 }
 
 /*
