@@ -3,6 +3,9 @@
 
 #include <xen/types.h>
 
+
+#ifdef CONFIG_ARM_32
+
 #define FPEXC_EN (1u << 30)
 
 /* Save and restore FP state.
@@ -17,12 +20,17 @@
     asm volatile ("fmxr fp" #reg ", %0" : : "r" (val)); \
 } while (0)
 
-
 /* Start-of-day: Turn on VFP */
 static inline void enable_vfp(void)
 {
     WRITE_FP(exc, READ_FP(exc) | FPEXC_EN);
 }
+#else
+static inline void enable_vfp(void)
+{
+    /* Always enable on 64-bit */
+}
+#endif
 
 #endif
 /*
