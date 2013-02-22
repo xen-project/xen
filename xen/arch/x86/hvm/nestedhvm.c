@@ -87,7 +87,7 @@ nestedhvm_vcpu_initialise(struct vcpu *v)
 void
 nestedhvm_vcpu_destroy(struct vcpu *v)
 {
-    if ( nestedhvm_enabled(v->domain) && hvm_funcs.nhvm_vcpu_destroy )
+    if ( hvm_funcs.nhvm_vcpu_destroy )
         hvm_funcs.nhvm_vcpu_destroy(v);
 }
 

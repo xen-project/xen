@@ -62,7 +62,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
     if ( !nvcpu->nv_n2vmcx )
     {
         gdprintk(XENLOG_ERR, "nest: allocation for shadow vmcs failed\n");
-	goto out;
+        return -ENOMEM;
     }
 
     /* non-root VMREAD/VMWRITE bitmap. */
@@ -75,7 +75,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
         if ( !vmread_bitmap )
         {
             gdprintk(XENLOG_ERR, "nest: allocation for vmread bitmap failed\n");
-            goto out1;
+            return -ENOMEM;
         }
         v->arch.hvm_vmx.vmread_bitmap = vmread_bitmap;
 
@@ -83,7 +83,7 @@ int nvmx_vcpu_initialise(struct vcpu *v)
         if ( !vmwrite_bitmap )
         {
             gdprintk(XENLOG_ERR, "nest: allocation for vmwrite bitmap failed\n");
-            goto out2;
+            return -ENOMEM;
         }
         v->arch.hvm_vmx.vmwrite_bitmap = vmwrite_bitmap;
 
@@ -118,12 +118,6 @@ int nvmx_vcpu_initialise(struct vcpu *v)
     nvmx->msrbitmap = NULL;
     INIT_LIST_HEAD(&nvmx->launched_list);
     return 0;
-out2:
-    free_domheap_page(v->arch.hvm_vmx.vmread_bitmap);
-out1:
-    free_xenheap_page(nvcpu->nv_n2vmcx);
-out:
-    return -ENOMEM;
 }
  
 void nvmx_vcpu_destroy(struct vcpu *v)
@@ -147,16 +141,24 @@ void nvmx_vcpu_destroy(struct vcpu *v)
         nvcpu->nv_n2vmcx = NULL;
     }
 
-    list_for_each_entry_safe(item, n, &nvmx->launched_list, node)
-    {
-        list_del(&item->node);
-        xfree(item);
-    }
+    /* Must also cope with nvmx_vcpu_initialise() not having got called. */
+    if ( nvmx->launched_list.next )
+        list_for_each_entry_safe(item, n, &nvmx->launched_list, node)
+        {
+            list_del(&item->node);
+            xfree(item);
+        }
 
     if ( v->arch.hvm_vmx.vmread_bitmap )
+    {
         free_domheap_page(v->arch.hvm_vmx.vmread_bitmap);
+        v->arch.hvm_vmx.vmread_bitmap = NULL;
+    }
     if ( v->arch.hvm_vmx.vmwrite_bitmap )
+    {
         free_domheap_page(v->arch.hvm_vmx.vmwrite_bitmap);
+        v->arch.hvm_vmx.vmwrite_bitmap = NULL;
+    }
 }
  
 void nvmx_domain_relinquish_resources(struct domain *d)

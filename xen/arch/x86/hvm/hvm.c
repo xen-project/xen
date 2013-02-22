@@ -3918,18 +3918,20 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                 }
                 if ( a.value > 1 )
                     rc = -EINVAL;
-                if ( !is_hvm_domain(d) )
-                    rc = -EINVAL;
                 /* Remove the check below once we have
                  * shadow-on-shadow.
                  */
                 if ( cpu_has_svm && !paging_mode_hap(d) && a.value )
                     rc = -EINVAL;
                 /* Set up NHVM state for any vcpus that are already up */
-                if ( !d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM] )
+                if ( a.value &&
+                     !d->arch.hvm_domain.params[HVM_PARAM_NESTEDHVM] )
                     for_each_vcpu(d, v)
                         if ( rc == 0 )
                             rc = nestedhvm_vcpu_initialise(v);
+                if ( !a.value || rc )
+                    for_each_vcpu(d, v)
+                        nestedhvm_vcpu_destroy(v);
                 break;
             case HVM_PARAM_BUFIOREQ_EVTCHN:
                 rc = -EINVAL;
