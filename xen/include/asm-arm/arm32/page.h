@@ -77,6 +77,40 @@ static inline void flush_xen_data_tlb_range_va(unsigned long va, unsigned long s
     isb();
 }
 
+/* Ask the MMU to translate a VA for us */
+static inline uint64_t __va_to_par(vaddr_t va)
+{
+    uint64_t par, tmp;
+    tmp = READ_CP64(PAR);
+    WRITE_CP32(va, ATS1HR);
+    isb(); /* Ensure result is available. */
+    par = READ_CP64(PAR);
+    WRITE_CP64(tmp, PAR);
+    return par;
+}
+
+/* Ask the MMU to translate a Guest VA for us */
+static inline uint64_t gva_to_ma_par(vaddr_t va)
+{
+    uint64_t par, tmp;
+    tmp = READ_CP64(PAR);
+    WRITE_CP32(va, ATS12NSOPR);
+    isb(); /* Ensure result is available. */
+    par = READ_CP64(PAR);
+    WRITE_CP64(tmp, PAR);
+    return par;
+}
+static inline uint64_t gva_to_ipa_par(vaddr_t va)
+{
+    uint64_t par, tmp;
+    tmp = READ_CP64(PAR);
+    WRITE_CP32(va, ATS1CPR);
+    isb(); /* Ensure result is available. */
+    par = READ_CP64(PAR);
+    WRITE_CP64(tmp, PAR);
+    return par;
+}
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* __ARM_ARM32_PAGE_H__ */

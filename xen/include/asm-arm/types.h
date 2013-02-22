@@ -36,12 +36,16 @@ typedef unsigned int u32;
 #if defined(CONFIG_ARM_32)
 typedef signed long long s64;
 typedef unsigned long long u64;
+typedef u32 vaddr_t;
+#define PRIvaddr PRIx32
 typedef u64 paddr_t;
 #define INVALID_PADDR (~0ULL)
 #define PRIpaddr "016llx"
 #elif defined (CONFIG_ARM_64)
 typedef signed long s64;
 typedef unsigned long u64;
+typedef u64 vaddr_t;
+#define PRIvaddr PRIx64
 typedef u64 paddr_t;
 #define INVALID_PADDR (~0UL)
 #define PRIpaddr "016lx"

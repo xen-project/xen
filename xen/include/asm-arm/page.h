@@ -278,19 +278,7 @@ extern void dump_hyp_walk(uint32_t addr);
 /* Print a walk of the p2m for a domain for a physical address. */
 extern void dump_p2m_lookup(struct domain *d, paddr_t addr);
 
-/* Ask the MMU to translate a VA for us */
-static inline uint64_t __va_to_par(uint32_t va)
-{
-    uint64_t par, tmp;
-    tmp = READ_CP64(PAR);
-    WRITE_CP32(va, ATS1HR);
-    isb(); /* Ensure result is available. */
-    par = READ_CP64(PAR);
-    WRITE_CP64(tmp, PAR);
-    return par;
-}
-
-static inline uint64_t va_to_par(uint32_t va)
+static inline uint64_t va_to_par(vaddr_t va)
 {
     uint64_t par = __va_to_par(va);
     /* It is not OK to call this with an invalid VA */
@@ -302,29 +290,7 @@ static inline uint64_t va_to_par(uint32_t va)
     return par;
 }
 
-/* Ask the MMU to translate a Guest VA for us */
-static inline uint64_t gva_to_ma_par(uint32_t va)
-{
-    uint64_t par, tmp;
-    tmp = READ_CP64(PAR);
-    WRITE_CP32(va, ATS12NSOPR);
-    isb(); /* Ensure result is available. */
-    par = READ_CP64(PAR);
-    WRITE_CP64(tmp, PAR);
-    return par;
-}
-static inline uint64_t gva_to_ipa_par(uint32_t va)
-{
-    uint64_t par, tmp;
-    tmp = READ_CP64(PAR);
-    WRITE_CP32(va, ATS1CPR);
-    isb(); /* Ensure result is available. */
-    par = READ_CP64(PAR);
-    WRITE_CP64(tmp, PAR);
-    return par;
-}
-
-static inline int gva_to_ipa(uint32_t va, paddr_t *paddr)
+static inline int gva_to_ipa(vaddr_t va, paddr_t *paddr)
 {
     uint64_t par = gva_to_ipa_par(va);
     if ( par & PAR_F )
