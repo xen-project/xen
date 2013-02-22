@@ -192,6 +192,13 @@ static int alloc_xenoprof_struct(
     unsigned max_max_samples;
     int i;
 
+    nvcpu = 0;
+    for_each_vcpu ( d, v )
+        nvcpu++;
+
+    if ( !nvcpu )
+        return -EINVAL;
+
     d->xenoprof = xmalloc(struct xenoprof);
 
     if ( d->xenoprof == NULL )
@@ -212,10 +219,6 @@ static int alloc_xenoprof_struct(
     }
 
     memset(d->xenoprof->vcpu, 0, d->max_vcpus * sizeof(*d->xenoprof->vcpu));
-
-    nvcpu = 0;
-    for_each_vcpu ( d, v )
-        nvcpu++;
 
     bufsize = sizeof(struct xenoprof_buf);
     i = sizeof(struct event_log);
