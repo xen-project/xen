@@ -3,6 +3,7 @@
 
 #include <xen/config.h>
 
+#if defined(CONFIG_ARM_32)
 #define __HAVE_ARCH_MEMCPY
 extern void * memcpy(void *, const void *, __kernel_size_t);
 
@@ -26,6 +27,8 @@ extern void __memzero(void *ptr, __kernel_size_t n);
                 }                                                       \
                 (__p);                                                  \
         })
+
+#endif
 
 #endif /* __ARM_STRING_H__ */
 /*
