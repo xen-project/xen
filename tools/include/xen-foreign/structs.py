@@ -14,6 +14,7 @@ structs = [ "start_info",
             "shared_info" ];
 
 defines = [ "__arm__",
+            "__aarch64__",
             "__i386__",
             "__x86_64__",
 

@@ -27,6 +27,16 @@ header["arm32"] = """
 #define __arm___ARM32 1
 """;
 
+inttypes["arm64"] = {
+    "unsigned long" : "__danger_unsigned_long_on_arm64",
+    "long"          : "__danger_long_on_arm64",
+    "xen_pfn_t"     : "uint64_t",
+    "xen_ulong_t"   : "uint64_t",
+};
+header["arm64"] = """
+#define __aarch64___ARM64 1
+""";
+
 # x86_32
 inttypes["x86_32"] = {
     "unsigned long" : "uint32_t",
@@ -59,6 +69,9 @@ header["x86_64"] = """
 #endif
 #define __x86_64___X86_64 1
 """;
+footer["x86_64"] = """
+#undef __DECL_REG
+"""
 
 ###########################################################################
 # main
