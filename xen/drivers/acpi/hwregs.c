@@ -365,6 +365,14 @@ acpi_hw_register_read(u32 register_id, u32 * return_value)
 		    acpi_os_read_port(acpi_gbl_FADT.smi_command, &value1, 8);
 		break;
 
+	case ACPI_REGISTER_SLEEP_STATUS:
+
+		status =
+		    acpi_hw_low_level_read(acpi_gbl_FADT.sleep_status.bit_width,
+					   &value1,
+					   &acpi_gbl_FADT.sleep_status);
+		break;
+
 	default:
 		ACPI_DEBUG_PRINT((AE_INFO, "Unknown Register ID: %X", register_id));
 		status = AE_BAD_PARAMETER;
@@ -523,6 +531,14 @@ acpi_status acpi_hw_register_write(u32 register_id, u32 value)
 
 		status =
 		    acpi_os_write_port(acpi_gbl_FADT.smi_command, value, 8);
+		break;
+
+	case ACPI_REGISTER_SLEEP_CONTROL:
+
+		status =
+		    acpi_hw_low_level_write(acpi_gbl_FADT.sleep_control.bit_width,
+					    value,
+					    &acpi_gbl_FADT.sleep_control);
 		break;
 
 	default:

@@ -310,14 +310,15 @@ static int __init acpi_invalidate_bgrt(struct acpi_table_header *table)
 
 #ifdef CONFIG_ACPI_SLEEP
 #define acpi_fadt_copy_address(dst, src, len) do {			\
-	if (fadt->header.revision >= FADT2_REVISION_ID)			\
+	if (fadt->header.revision >= FADT2_REVISION_ID &&		\
+	    fadt->header.length >= ACPI_FADT_V2_SIZE)			\
 		acpi_sinfo.dst##_blk = fadt->x##src##_block;		\
 	if (!acpi_sinfo.dst##_blk.address) {				\
 		acpi_sinfo.dst##_blk.address      = fadt->src##_block;	\
 		acpi_sinfo.dst##_blk.space_id     = ACPI_ADR_SPACE_SYSTEM_IO; \
 		acpi_sinfo.dst##_blk.bit_width    = fadt->len##_length << 3; \
 		acpi_sinfo.dst##_blk.bit_offset   = 0;			\
-		acpi_sinfo.dst##_blk.access_width = 0;			\
+		acpi_sinfo.dst##_blk.access_width = fadt->len##_length;	\
 	} \
 } while (0)
 
@@ -328,6 +329,41 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 	struct acpi_table_facs *facs = NULL;
 	uint64_t facs_pa;
 
+	if (fadt->header.revision >= 5 &&
+	    fadt->header.length >= ACPI_FADT_V5_SIZE) {
+		acpi_sinfo.sleep_control = fadt->sleep_control;
+		acpi_sinfo.sleep_status = fadt->sleep_status;
+
+		printk(KERN_INFO PREFIX
+		       "v5 SLEEP INFO: control[%d:%"PRIx64"],"
+		       " status[%d:%"PRIx64"]\n",
+		       acpi_sinfo.sleep_control.space_id,
+		       acpi_sinfo.sleep_control.address,
+		       acpi_sinfo.sleep_status.space_id,
+		       acpi_sinfo.sleep_status.address);
+
+		if ((fadt->sleep_control.address &&
+		     (fadt->sleep_control.bit_offset ||
+		      fadt->sleep_control.bit_width !=
+		      fadt->sleep_control.access_width * 8)) ||
+		    (fadt->sleep_status.address &&
+		     (fadt->sleep_status.bit_offset ||
+		      fadt->sleep_status.bit_width !=
+		      fadt->sleep_status.access_width * 8))) {
+			printk(KERN_WARNING PREFIX
+			       "Invalid sleep control/status register data:"
+			       " %#x:%#x:%#x %#x:%#x:%#x\n",
+			       fadt->sleep_control.bit_offset,
+			       fadt->sleep_control.bit_width,
+			       fadt->sleep_control.access_width,
+			       fadt->sleep_status.bit_offset,
+			       fadt->sleep_status.bit_width,
+			       fadt->sleep_status.access_width);
+			fadt->sleep_control.address = 0;
+			fadt->sleep_status.address = 0;
+		}
+	}
+
 	if (fadt->flags & ACPI_FADT_HW_REDUCED)
 		goto bad;
 
@@ -337,7 +373,7 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 	acpi_fadt_copy_address(pm1b_evt, pm1b_event, pm1_event);
 
 	printk(KERN_INFO PREFIX
-	       "ACPI SLEEP INFO: pm1x_cnt[%"PRIx64",%"PRIx64"], "
+	       "SLEEP INFO: pm1x_cnt[%"PRIx64",%"PRIx64"], "
 	       "pm1x_evt[%"PRIx64",%"PRIx64"]\n",
 	       acpi_sinfo.pm1a_cnt_blk.address,
 	       acpi_sinfo.pm1b_cnt_blk.address,
@@ -384,11 +420,14 @@ acpi_fadt_parse_sleep_info(struct acpi_table_fadt *fadt)
 	acpi_sinfo.vector_width = 32;
 
 	printk(KERN_INFO PREFIX
-	       "                 wakeup_vec[%"PRIx64"], vec_size[%x]\n",
+	       "            wakeup_vec[%"PRIx64"], vec_size[%x]\n",
 	       acpi_sinfo.wakeup_vector, acpi_sinfo.vector_width);
 	return;
 bad:
-	memset(&acpi_sinfo, 0, sizeof(acpi_sinfo));
+	memset(&acpi_sinfo, 0,
+	       offsetof(struct acpi_sleep_info, sleep_control));
+	memset(&acpi_sinfo.sleep_status + 1, 0,
+	       (long)(&acpi_sinfo + 1) - (long)(&acpi_sinfo.sleep_status + 1));
 }
 #endif
 

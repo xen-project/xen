@@ -128,6 +128,8 @@ struct acpi_bit_register_info {
 #define ACPI_REGISTER_PM_TIMER                  0x07
 #define ACPI_REGISTER_PROCESSOR_BLOCK           0x08
 #define ACPI_REGISTER_SMI_COMMAND_BLOCK         0x09
+#define ACPI_REGISTER_SLEEP_CONTROL             0x0a
+#define ACPI_REGISTER_SLEEP_STATUS              0x0b
 
 /* Masks used to access the bit_registers */
 
