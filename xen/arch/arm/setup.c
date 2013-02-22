@@ -56,16 +56,34 @@ static void __init init_idle_domain(void)
 
 static void __init processor_id(void)
 {
-    printk("Processor Features: %08x %08x\n",
-           READ_CP32(ID_PFR0), READ_CP32(ID_PFR0));
-    printk("Debug Features: %08x\n", READ_CP32(ID_DFR0));
-    printk("Auxiliary Features: %08x\n", READ_CP32(ID_AFR0));
-    printk("Memory Model Features: %08x %08x %08x %08x\n",
-           READ_CP32(ID_MMFR0), READ_CP32(ID_MMFR1),
-           READ_CP32(ID_MMFR2), READ_CP32(ID_MMFR3));
-    printk("ISA Features: %08x %08x %08x %08x %08x %08x\n",
-           READ_CP32(ID_ISAR0), READ_CP32(ID_ISAR1), READ_CP32(ID_ISAR2),
-           READ_CP32(ID_ISAR3), READ_CP32(ID_ISAR4), READ_CP32(ID_ISAR5));
+#if defined(CONFIG_ARM_64)
+    printk("64-bit Processor Features: %016"PRIx64" %016"PRIx64"\n",
+           READ_SYSREG64(ID_AA64PFR0_EL1), READ_SYSREG64(ID_AA64PFR1_EL1));
+    printk("64-bit Debug Features: %016"PRIx64" %016"PRIx64"\n",
+           READ_SYSREG64(ID_AA64DFR0_EL1), READ_SYSREG64(ID_AA64DFR1_EL1));
+    printk("64-bit Auxiliary Features: %016"PRIx64" %016"PRIx64"\n",
+           READ_SYSREG64(ID_AA64AFR0_EL1), READ_SYSREG64(ID_AA64AFR1_EL1));
+    printk("64-bit Memory Model Features: %016"PRIx64" %016"PRIx64"\n",
+           READ_SYSREG64(ID_AA64MMFR0_EL1), READ_SYSREG64(ID_AA64MMFR1_EL1));
+    printk("64-bit ISA Features:  %016"PRIx64" %016"PRIx64"\n",
+           READ_SYSREG64(ID_AA64ISAR0_EL1), READ_SYSREG64(ID_AA64ISAR1_EL1));
+#endif
+    /*
+     * On AArch64 these refer to the capabilities when running in
+     * AArch32 mode.
+     */
+    printk("32-bit Processor Features: %08x %08x\n",
+           READ_SYSREG32(ID_PFR0_EL1), READ_SYSREG32(ID_PFR1_EL1));
+    printk("32-bit Debug Features: %08x\n", READ_SYSREG32(ID_DFR0_EL1));
+    printk("32-bit Auxiliary Features: %08x\n", READ_SYSREG32(ID_AFR0_EL1));
+    printk("32-bit Memory Model Features: %08x %08x %08x %08x\n",
+           READ_SYSREG32(ID_MMFR0_EL1), READ_SYSREG32(ID_MMFR1_EL1),
+           READ_SYSREG32(ID_MMFR2_EL1), READ_SYSREG32(ID_MMFR3_EL1));
+    printk("32-bit ISA Features: %08x %08x %08x %08x %08x %08x\n",
+           READ_SYSREG32(ID_ISAR0_EL1), READ_SYSREG32(ID_ISAR1_EL1),
+           READ_SYSREG32(ID_ISAR2_EL1), READ_SYSREG32(ID_ISAR3_EL1),
+           READ_SYSREG32(ID_ISAR4_EL1), READ_SYSREG32(ID_ISAR5_EL1));
+
 }
 
 void __init discard_initial_modules(void)
@@ -250,7 +268,8 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     domheap_pages = heap_pages - xenheap_pages;
 
-    early_printk("Xen heap: %lu pages  Dom heap: %lu pages\n", xenheap_pages, domheap_pages);
+    early_printk("Xen heap: %lu pages  Dom heap: %lu pages\n",
+                 xenheap_pages, domheap_pages);
 
     setup_xenheap_mappings((e >> PAGE_SHIFT) - xenheap_pages, xenheap_pages);
 
@@ -320,8 +339,8 @@ void __init setup_cache(void)
     uint32_t ccsid;
 
     /* Read the cache size ID register for the level-0 data cache */
-    WRITE_CP32(0, CSSELR);
-    ccsid = READ_CP32(CCSIDR);
+    WRITE_SYSREG32(0, CSSELR_EL1);
+    ccsid = READ_SYSREG32(CCSIDR_EL1);
 
     /* Low 3 bits are log2(cacheline size in words) - 2. */
     cacheline_bytes = 1U << (4 + (ccsid & 0x7));
@@ -366,16 +385,15 @@ void __init start_xen(unsigned long boot_phys_offset,
     idle_vcpu[0] = current;
 
     /* Setup Hyp vector base */
-    WRITE_CP32((uint32_t) hyp_traps_vector, HVBAR);
-    printk("Set hyp vector base to %"PRIx32" (expected %p)\n",
-           READ_CP32(HVBAR), hyp_traps_vector);
+    WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
+    isb();
 
     /* Setup Stage 2 address translation */
     /* SH0=00, ORGN0=IRGN0=01
      * SL0=01 (Level-1)
      * T0SZ=(1)1000 = -8 (40 bit physical addresses)
      */
-    WRITE_CP32(0x80002558, VTCR); isb();
+    WRITE_SYSREG32(0x80002558, VTCR_EL2); isb();
 
     processor_id();
 
@@ -455,7 +473,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     /* Switch on to the dynamically allocated stack for the idle vcpu
      * since the static one we're running on is about to be freed. */
-    memcpy(idle_vcpu[0]->arch.cpu_info, get_cpu_info(), 
+    memcpy(idle_vcpu[0]->arch.cpu_info, get_cpu_info(),
            sizeof(struct cpu_info));
     switch_stack_and_jump(idle_vcpu[0]->arch.cpu_info, init_done);
 }

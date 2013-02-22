@@ -222,6 +222,31 @@
 
 /* CP15 CR15: Implementation Defined Registers */
 
+/* Aliases of AArch64 names for use in common code when building for AArch32 */
+#ifdef CONFIG_ARM_32
+/* Alphabetically... */
+#define CCSIDR_EL1              CCSIDR
+#define CLIDR_EL1               CLIDR
+#define CSSELR_EL1              CSSELR
+#define ID_AFR0_EL1             ID_AFR0
+#define ID_DFR0_EL1             ID_DFR0
+#define ID_ISAR0_EL1            ID_ISAR0
+#define ID_ISAR1_EL1            ID_ISAR1
+#define ID_ISAR2_EL1            ID_ISAR2
+#define ID_ISAR3_EL1            ID_ISAR3
+#define ID_ISAR4_EL1            ID_ISAR4
+#define ID_ISAR5_EL1            ID_ISAR5
+#define ID_MMFR0_EL1            ID_MMFR0
+#define ID_MMFR1_EL1            ID_MMFR1
+#define ID_MMFR2_EL1            ID_MMFR2
+#define ID_MMFR3_EL1            ID_MMFR3
+#define ID_PFR0_EL1             ID_PFR0
+#define ID_PFR1_EL1             ID_PFR1
+#define VBAR_EL2                HVBAR
+#define VTCR_EL2                VTCR
+
+#endif
+
 #endif
 /*
  * Local variables:
