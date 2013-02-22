@@ -91,12 +91,10 @@ SECTIONS
        *(.init.data.rel)
        *(.init.data.rel.*)
 
-       . = ALIGN(4);
-       __CTOR_LIST__ = .;
-       LONG((__CTOR_END__ - __CTOR_LIST__) / 4 - 2)
-       *(.ctors)
-       LONG(0)
-       __CTOR_END__ = .;
+       . = ALIGN(8);
+       __ctors_start = .;
+       *(.init_array)
+       __ctors_end = .;
   } :text
   . = ALIGN(32);
   .init.setup : {

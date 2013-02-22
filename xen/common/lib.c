@@ -479,17 +479,14 @@ unsigned long long parse_size_and_unit(const char *s, const char **ps)
     return ret;
 }
 
-extern const struct
-{
-    unsigned long count;
-    void (*funcs[1])(void);
-} __CTOR_LIST__;
+typedef void (*ctor_func_t)(void);
+extern const ctor_func_t __ctors_start[], __ctors_end[];
 
 void __init init_constructors(void)
 {
-    unsigned long n;
-    for ( n = 0; n < __CTOR_LIST__.count; ++n )
-        __CTOR_LIST__.funcs[n]();
+    const ctor_func_t *f;
+    for ( f = __ctors_start; f < __ctors_end; ++f )
+        (*f)();
 }
 
 /*
