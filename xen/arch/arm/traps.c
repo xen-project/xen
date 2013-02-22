@@ -423,31 +423,11 @@ void vcpu_show_execution_state(struct vcpu *v)
     vcpu_unpause(v);
 }
 
-static void do_unexpected_trap(const char *msg, struct cpu_user_regs *regs)
+void do_unexpected_trap(const char *msg, struct cpu_user_regs *regs)
 {
     printk("Unexpected Trap: %s\n", msg);
     show_execution_state(regs);
     while(1);
-}
-
-asmlinkage void do_trap_undefined_instruction(struct cpu_user_regs *regs)
-{
-    do_unexpected_trap("Undefined Instruction", regs);
-}
-
-asmlinkage void do_trap_supervisor_call(struct cpu_user_regs *regs)
-{
-    do_unexpected_trap("Supervisor Call", regs);
-}
-
-asmlinkage void do_trap_prefetch_abort(struct cpu_user_regs *regs)
-{
-    do_unexpected_trap("Prefetch Abort", regs);
-}
-
-asmlinkage void do_trap_data_abort(struct cpu_user_regs *regs)
-{
-    do_unexpected_trap("Data Abort", regs);
 }
 
 unsigned long do_arch_0(unsigned int cmd, unsigned long long value)
