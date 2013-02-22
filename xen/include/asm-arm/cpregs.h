@@ -277,6 +277,7 @@
 #define VBAR_EL1                VBAR
 #define VBAR_EL2                HVBAR
 #define VTCR_EL2                VTCR
+#define VTTBR_EL2               VTTBR
 
 #endif
 

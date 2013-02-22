@@ -29,7 +29,7 @@ void p2m_load_VTTBR(struct domain *d)
 
     vttbr |= ((uint64_t)p2m->vmid&0xff)<<48;
 
-    WRITE_CP64(vttbr, VTTBR);
+    WRITE_SYSREG64(vttbr, VTTBR_EL2);
     isb(); /* Ensure update is visible */
 }
 
