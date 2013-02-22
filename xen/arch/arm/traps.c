@@ -700,16 +700,16 @@ static void do_cp15_32(struct cpu_user_regs *regs,
                     "attempt to write to read-only register CLIDR\n");
             domain_crash_synchronous();
         }
-        *r = READ_CP32(CLIDR);
+        *r = READ_SYSREG32(CLIDR_EL1);
         break;
     case HSR_CPREG32(CCSIDR):
         if ( !cp32.read )
         {
             dprintk(XENLOG_ERR,
-                    "attempt to write to read-only register CSSIDR\n");
+                    "attempt to write to read-only register CCSIDR\n");
             domain_crash_synchronous();
         }
-        *r = READ_CP32(CCSIDR);
+        *r = READ_SYSREG32(CCSIDR_EL1);
         break;
     case HSR_CPREG32(DCCISW):
         if ( cp32.read )
@@ -718,7 +718,11 @@ static void do_cp15_32(struct cpu_user_regs *regs,
                     "attempt to read from write-only register DCCISW\n");
             domain_crash_synchronous();
         }
+#ifdef CONFIG_ARM_32
         WRITE_CP32(*r, DCCISW);
+#else
+        asm volatile("dc cisw, %0;" : : "r" (*r) : "memory");
+#endif
         break;
     case HSR_CPREG32(CNTP_CTL):
     case HSR_CPREG32(CNTP_TVAL):
