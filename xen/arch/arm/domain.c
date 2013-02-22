@@ -486,7 +486,7 @@ int arch_set_info_guest(
     struct vcpu *v, vcpu_guest_context_u c)
 {
     struct vcpu_guest_context *ctxt = c.nat;
-    struct cpu_user_regs *regs = &c.nat->user_regs;
+    struct vcpu_guest_core_regs *regs = &c.nat->user_regs;
 
     if ( !is_guest_psr(regs->cpsr) )
         return -EINVAL;
@@ -502,7 +502,7 @@ int arch_set_info_guest(
     if ( regs->spsr_fiq && !is_guest_psr(regs->spsr_fiq) )
         return -EINVAL;
 
-    v->arch.cpu_info->guest_cpu_user_regs = *regs;
+    vcpu_regs_user_to_hyp(v, regs);
 
     v->arch.sctlr = ctxt->sctlr;
     v->arch.ttbr0 = ctxt->ttbr0;

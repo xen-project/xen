@@ -20,9 +20,9 @@ long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
 {
     struct vcpu_guest_context *ctxt = c.nat;
-    struct cpu_user_regs *regs = &c.nat->user_regs;
+    struct vcpu_guest_core_regs *regs = &c.nat->user_regs;
 
-    *regs = v->arch.cpu_info->guest_cpu_user_regs;
+    vcpu_regs_hyp_to_user(v, regs);
 
     ctxt->sctlr = v->arch.sctlr;
     ctxt->ttbr0 = v->arch.ttbr0;

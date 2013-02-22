@@ -6,6 +6,7 @@
 #include <public/xen.h>
 
 #include <asm/percpu.h>
+#include <asm/processor.h>
 
 #ifndef __ASSEMBLY__
 

@@ -1,6 +1,58 @@
 #ifndef __ASM_ARM_ARM32_PROCESSOR_H
 #define __ASM_ARM_ARM32_PROCESSOR_H
 
+#ifndef __ASSEMBLY__
+/* On stack VCPU state */
+struct cpu_user_regs
+{
+    uint32_t r0;
+    uint32_t r1;
+    uint32_t r2;
+    uint32_t r3;
+    uint32_t r4;
+    uint32_t r5;
+    uint32_t r6;
+    uint32_t r7;
+    uint32_t r8;
+    uint32_t r9;
+    uint32_t r10;
+    union {
+        uint32_t r11;
+        uint32_t fp;
+    };
+    uint32_t r12;
+
+    uint32_t sp; /* r13 - SP: Valid for Hyp. frames only, o/w banked (see below) */
+
+    /* r14 - LR: is the same physical register as LR_usr */
+    union {
+        uint32_t lr; /* r14 - LR: Valid for Hyp. Same physical register as lr_usr. */
+
+        uint32_t lr_usr;
+    };
+
+    uint32_t pc; /* Return IP */
+    uint32_t cpsr; /* Return mode */
+    uint32_t pad0; /* Doubleword-align the kernel half of the frame */
+
+    /* Outer guest frame only from here on... */
+
+    uint32_t sp_usr; /* LR_usr is the same register as LR, see above */
+
+    uint32_t sp_irq, lr_irq;
+    uint32_t sp_svc, lr_svc;
+    uint32_t sp_abt, lr_abt;
+    uint32_t sp_und, lr_und;
+
+    uint32_t r8_fiq, r9_fiq, r10_fiq, r11_fiq, r12_fiq;
+    uint32_t sp_fiq, lr_fiq;
+
+    uint32_t spsr_svc, spsr_abt, spsr_und, spsr_irq, spsr_fiq;
+
+    uint32_t pad1; /* Doubleword-align the user half of the frame */
+};
+#endif
+
 /* Layout as used in assembly, with src/dest registers mixed in */
 #define __CP32(r, coproc, opc1, crn, crm, opc2) coproc, opc1, r, crn, crm, opc2
 #define __CP64(r1, r2, coproc, opc, crm) coproc, opc, r1, r2, crm

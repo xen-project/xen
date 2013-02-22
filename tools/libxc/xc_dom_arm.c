@@ -107,17 +107,17 @@ static int vcpu_arm(struct xc_dom_image *dom, void *ptr)
     /* clear everything */
     memset(ctxt, 0, sizeof(*ctxt));
 
-    ctxt->user_regs.pc = dom->parms.virt_entry;
+    ctxt->user_regs.pc32 = dom->parms.virt_entry;
 
     /* Linux boot protocol. See linux.Documentation/arm/Booting. */
-    ctxt->user_regs.r0 = 0; /* SBZ */
+    ctxt->user_regs.r0_usr = 0; /* SBZ */
     /* Machine ID: We use DTB therefore no machine id */
-    ctxt->user_regs.r1 = 0xffffffff;
+    ctxt->user_regs.r1_usr = 0xffffffff;
     /* ATAGS/DTB: We currently require that the guest kernel to be
      * using CONFIG_ARM_APPENDED_DTB. Ensure that r2 does not look
      * like a valid pointer to a set of ATAGS or a DTB.
      */
-    ctxt->user_regs.r2 = 0xffffffff;
+    ctxt->user_regs.r2_usr = 0xffffffff;
 
     ctxt->sctlr = /* #define SCTLR_BASE */0x00c50078;
 
@@ -130,7 +130,7 @@ static int vcpu_arm(struct xc_dom_image *dom, void *ptr)
     ctxt->flags = VGCF_online;
 
     DOMPRINTF("Initial state CPSR %#"PRIx32" PC %#"PRIx32,
-           ctxt->user_regs.cpsr, ctxt->user_regs.pc);
+           ctxt->user_regs.cpsr, ctxt->user_regs.pc32);
 
     return 0;
 }

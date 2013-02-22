@@ -253,6 +253,11 @@ void show_registers(struct cpu_user_regs *regs);
 #define cpu_to_core(_cpu)   (0)
 #define cpu_to_socket(_cpu) (0)
 
+void vcpu_regs_hyp_to_user(const struct vcpu *vcpu,
+                           struct vcpu_guest_core_regs *regs);
+void vcpu_regs_user_to_hyp(struct vcpu *vcpu,
+                           const struct vcpu_guest_core_regs *regs);
+
 #endif /* __ASSEMBLY__ */
 #endif /* __ASM_ARM_PROCESSOR_H */
 /*

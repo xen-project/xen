@@ -25,7 +25,15 @@ inttypes["arm32"] = {
 };
 header["arm32"] = """
 #define __arm___ARM32 1
+#if defined(__GNUC__) && !defined(__STRICT_ANSI__)
+# define __DECL_REG(n64, n32) union { uint64_t n64; uint32_t n32; }
+#else
+# define __DECL_REG(n64, n32) uint64_t n64
+#endif
 """;
+footer["arm32"] = """
+#undef __DECL_REG
+"""
 
 inttypes["arm64"] = {
     "unsigned long" : "__danger_unsigned_long_on_arm64",
@@ -35,7 +43,15 @@ inttypes["arm64"] = {
 };
 header["arm64"] = """
 #define __aarch64___ARM64 1
+#if defined(__GNUC__) && !defined(__STRICT_ANSI__)
+# define __DECL_REG(n64, n32) union { uint64_t n64; uint32_t n32; }
+#else
+# define __DECL_REG(n64, n32) uint64_t n64
+#endif
 """;
+footer["arm64"] = """
+#undef __DECL_REG
+"""
 
 # x86_32
 inttypes["x86_32"] = {
