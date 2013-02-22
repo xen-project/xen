@@ -63,8 +63,13 @@ static void print_xen_info(void)
 {
     char taint_str[TAINT_STRING_MAX_LEN];
 
-    printk("----[ Xen-%d.%d%s  arm32  debug=%c  %s ]----\n",
+    printk("----[ Xen-%d.%d%s  %s  debug=%c  %s ]----\n",
            xen_major_version(), xen_minor_version(), xen_extra_version(),
+#ifdef CONFIG_ARM_32
+           "arm32",
+#else
+           "arm64",
+#endif
            debug_build() ? 'y' : 'n', print_tainted(taint_str));
 }
 
