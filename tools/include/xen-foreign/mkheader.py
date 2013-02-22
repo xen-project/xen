@@ -21,17 +21,18 @@ inttypes["arm32"] = {
     "unsigned long" : "uint32_t",
     "long"          : "uint32_t",
     "xen_pfn_t"     : "uint64_t",
+    "xen_ulong_t"   : "uint64_t",
 };
 header["arm32"] = """
 #define __arm___ARM32 1
 """;
-
 
 # x86_32
 inttypes["x86_32"] = {
     "unsigned long" : "uint32_t",
     "long"          : "uint32_t",
     "xen_pfn_t"     : "uint32_t",
+    "xen_ulong_t"   : "uint32_t",
 };
 header["x86_32"] = """
 #define __i386___X86_32 1
@@ -46,6 +47,7 @@ inttypes["x86_64"] = {
     "unsigned long" : "__align8__ uint64_t",
     "long"          : "__align8__ uint64_t",
     "xen_pfn_t"     : "__align8__ uint64_t",
+    "xen_ulong_t"   : "__align8__ uint64_t",
 };
 header["x86_64"] = """
 #if defined(__GNUC__) && !defined(__STRICT_ANSI__)
