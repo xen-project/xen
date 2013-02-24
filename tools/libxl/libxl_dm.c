@@ -458,7 +458,7 @@ static int libxl_create_stubdom(libxl_ctx *ctx,
     libxl_domain_create_info c_info;
     libxl_domain_build_info b_info;
     libxl_domain_build_state state;
-    uint32_t domid;
+    uint32_t domid = 0;
     char **args;
     struct xs_permissions perm[2];
     xs_transaction_t t;
