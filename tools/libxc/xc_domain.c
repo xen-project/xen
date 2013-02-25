@@ -234,6 +234,7 @@ int xc_domain_getinfo(xc_interface *xch,
 
         info->ssidref  = domctl.u.getdomaininfo.ssidref;
         info->nr_pages = domctl.u.getdomaininfo.tot_pages;
+        info->nr_outstanding_pages = domctl.u.getdomaininfo.outstanding_pages;
         info->nr_shared_pages = domctl.u.getdomaininfo.shr_pages;
         info->nr_paged_pages = domctl.u.getdomaininfo.paged_pages;
         info->max_memkb = domctl.u.getdomaininfo.max_pages << (PAGE_SHIFT-10);
