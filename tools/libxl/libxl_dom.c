@@ -417,7 +417,7 @@ out:
 static unsigned long timer_mode(const libxl_domain_build_info *info)
 {
     const libxl_timer_mode mode = info->u.hvm.timer_mode;
-    assert(mode != LIBXL_TIMER_MODE_DELAY_FOR_MISSED_TICKS &&
+    assert(mode >= LIBXL_TIMER_MODE_DELAY_FOR_MISSED_TICKS &&
            mode <= LIBXL_TIMER_MODE_ONE_MISSED_TICK_PENDING);
     return ((unsigned long)mode);
 }
