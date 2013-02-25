@@ -224,9 +224,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= bd9e97271db5edc07e3e0d45bdf6ccd5a9bba3de
-# Fri Feb 22 18:04:40 2013 +0000
-# passthrough: Correctly expose PCH ISA bridge for IGD passthrough
+QEMU_TAG ?= 5ae58eaa967495fce99b727422054c58750d252b
+# Mon Feb 25 16:44:20 2013 +0000
+# Revert "passthrough: Correctly expose PCH ISA bridge for IGD passthrough"
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
