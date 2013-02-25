@@ -776,6 +776,7 @@ out:
 }
 
 #ifdef CONFIG_X86
+#include <asm/fixmap.h>
 #include <asm/tboot.h>
 /* ACPI tables may not be DMA protected by tboot, so use DMAR copy */
 /* SINIT saved in SinitMleData in TXT heap (which is DMA protected) */
@@ -792,12 +793,26 @@ int __init acpi_dmar_init(void)
     if ( ACPI_SUCCESS(acpi_get_table_phys(ACPI_SIG_DMAR, 0,
                                           &dmar_addr, &dmar_len)) )
     {
+#ifdef CONFIG_X86_32
+        if ( dmar_addr + dmar_len > (DIRECTMAP_MBYTES << 20) )
+        {
+            unsigned long offset = dmar_addr & (PAGE_SIZE - 1);
+            unsigned long mapped_size = PAGE_SIZE - offset;
+
+            set_fixmap(FIX_DMAR_ZAP_LO, dmar_addr);
+            if ( mapped_size < sizeof(*dmar_table) )
+                set_fixmap(FIX_DMAR_ZAP_HI, dmar_addr + PAGE_SIZE);
+            dmar_table = (void *)fix_to_virt(FIX_DMAR_ZAP_LO) + offset;
+            goto exit;
+        }
+#endif
         map_pages_to_xen((unsigned long)__va(dmar_addr), PFN_DOWN(dmar_addr),
                          PFN_UP(dmar_addr + dmar_len) - PFN_DOWN(dmar_addr),
                          PAGE_HYPERVISOR);
         dmar_table = __va(dmar_addr);
     }
 
+ exit: __attribute__((__unused__))
     return parse_dmar_table(acpi_parse_dmar);
 }
 
