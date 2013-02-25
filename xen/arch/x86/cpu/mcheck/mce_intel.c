@@ -200,7 +200,7 @@ intel_get_extended_msrs(struct mcinfo_global *mig, struct mc_info *mi)
     }
 
     /* this function will called when CAP(9).MCG_EXT_P = 1 */
-    memset(&mc_ext, 0, sizeof(struct mcinfo_extended));
+    memset(mc_ext, 0, sizeof(*mc_ext));
     mc_ext->common.type = MC_TYPE_EXTENDED;
     mc_ext->common.size = sizeof(struct mcinfo_extended);
 
