@@ -252,6 +252,7 @@ static int setup_guest(xc_interface *xch,
     unsigned long stat_normal_pages = 0, stat_2mb_pages = 0, 
         stat_1gb_pages = 0;
     int pod_mode = 0;
+    int claim_enabled = args->claim_enabled;
 
     if ( nr_pages > target_pages )
         pod_mode = XENMEMF_populate_on_demand;
@@ -329,6 +330,16 @@ static int setup_guest(xc_interface *xch,
         xch, dom, 0xa0, 0, pod_mode, &page_array[0x00]);
     cur_pages = 0xc0;
     stat_normal_pages = 0xc0;
+
+    /* try to claim pages for early warning of insufficient memory available */
+    if ( claim_enabled ) {
+        rc = xc_domain_claim_pages(xch, dom, nr_pages - cur_pages);
+        if ( rc != 0 )
+        {
+            PERROR("Could not allocate memory for HVM guest as we cannot claim memory!");
+            goto error_out;
+        }
+    }
     while ( (rc == 0) && (nr_pages > cur_pages) )
     {
         /* Clip count to maximum 1GB extent. */
@@ -506,12 +517,16 @@ static int setup_guest(xc_interface *xch,
         munmap(page0, PAGE_SIZE);
     }
 
-    free(page_array);
-    return 0;
-
+    rc = 0;
+    goto out;
  error_out:
+    rc = -1;
+ out:
+    /* ensure no unclaimed pages are left unused */
+    xc_domain_claim_pages(xch, dom, 0 /* cancels the claim */);
+
     free(page_array);
-    return -1;
+    return rc;
 }
 
 /* xc_hvm_build:

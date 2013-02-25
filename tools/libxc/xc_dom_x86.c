@@ -706,6 +706,13 @@ int arch_setup_meminit(struct xc_dom_image *dom)
     }
     else
     {
+        /* try to claim pages for early warning of insufficient memory avail */
+        if ( dom->claim_enabled ) {
+            rc = xc_domain_claim_pages(dom->xch, dom->guest_domid,
+                                       dom->total_pages);
+            if ( rc )
+                return rc;
+        }
         /* setup initial p2m */
         for ( pfn = 0; pfn < dom->total_pages; pfn++ )
             dom->p2m_host[pfn] = pfn;
@@ -722,6 +729,11 @@ int arch_setup_meminit(struct xc_dom_image *dom)
                 dom->xch, dom->guest_domid, allocsz,
                 0, 0, &dom->p2m_host[i]);
         }
+
+        /* Ensure no unclaimed pages are left unused.
+         * OK to call if hadn't done the earlier claim call. */
+        (void)xc_domain_claim_pages(dom->xch, dom->guest_domid,
+                                    0 /* cancels the claim */);
     }
 
     return rc;

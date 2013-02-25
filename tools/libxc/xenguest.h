@@ -231,6 +231,8 @@ struct xc_hvm_build_args {
 
     /* Extra SMBIOS structures passed to HVMLOADER */
     struct xc_hvm_firmware_module smbios_module;
+    /* Whether to use claim hypercall (1 - enable, 0 - disable). */
+    int claim_enabled;
 };
 
 /**
