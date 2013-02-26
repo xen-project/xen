@@ -193,8 +193,9 @@ F:	xen/include/xen/iommu.h
 
 LINUX (PV_OPS)
 M:	Jeremy Fitzhardinge <jeremy@goop.org>
+M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 S:	Supported
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/jeremy/xen.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/konrad/xen.git
 
 LINUX (XCP)
 M:	Ian Campbell <ian.campbell@citrix.com>
