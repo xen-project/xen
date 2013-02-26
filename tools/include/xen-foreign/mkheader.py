@@ -20,15 +20,18 @@ footer = {};
 inttypes["arm32"] = {
     "unsigned long" : "uint32_t",
     "long"          : "uint32_t",
-    "xen_pfn_t"     : "uint64_t",
-    "xen_ulong_t"   : "uint64_t",
+    "xen_pfn_t"     : "__align8__ uint64_t",
+    "xen_ulong_t"   : "__align8__ uint64_t",
+    "uint64_t"      : "__align8__ uint64_t",
 };
 header["arm32"] = """
 #define __arm___ARM32 1
 #if defined(__GNUC__) && !defined(__STRICT_ANSI__)
 # define __DECL_REG(n64, n32) union { uint64_t n64; uint32_t n32; }
+# define __align8__ __attribute__((aligned (8)))
 #else
 # define __DECL_REG(n64, n32) uint64_t n64
+# define __align8__ FIXME
 #endif
 """;
 footer["arm32"] = """
@@ -38,15 +41,18 @@ footer["arm32"] = """
 inttypes["arm64"] = {
     "unsigned long" : "__danger_unsigned_long_on_arm64",
     "long"          : "__danger_long_on_arm64",
-    "xen_pfn_t"     : "uint64_t",
-    "xen_ulong_t"   : "uint64_t",
+    "xen_pfn_t"     : "__align8__ uint64_t",
+    "xen_ulong_t"   : "__align8__ uint64_t",
+    "uint64_t"      : "__align8__ uint64_t",
 };
 header["arm64"] = """
 #define __aarch64___ARM64 1
 #if defined(__GNUC__) && !defined(__STRICT_ANSI__)
 # define __DECL_REG(n64, n32) union { uint64_t n64; uint32_t n32; }
+# define __align8__ __attribute__((aligned (8)))
 #else
 # define __DECL_REG(n64, n32) uint64_t n64
+# define __align8__ FIXME
 #endif
 """;
 footer["arm64"] = """
