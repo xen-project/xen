@@ -28,12 +28,38 @@
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include "../ats.h"
 
+static bool_t __read_mostly init_done;
+
 struct amd_iommu *find_iommu_for_device(int seg, int bdf)
 {
     struct ivrs_mappings *ivrs_mappings = get_ivrs_mappings(seg);
 
-    return ivrs_mappings && bdf < ivrs_bdf_entries ? ivrs_mappings[bdf].iommu
-                                                   : NULL;
+    if ( !ivrs_mappings || bdf >= ivrs_bdf_entries )
+        return NULL;
+
+    if ( unlikely(!ivrs_mappings[bdf].iommu) && likely(init_done) )
+    {
+        unsigned int bd0 = bdf & ~PCI_FUNC(~0);
+
+        if ( ivrs_mappings[bd0].iommu )
+        {
+            struct ivrs_mappings tmp = ivrs_mappings[bd0];
+
+            tmp.iommu = NULL;
+            if ( tmp.dte_requestor_id == bd0 )
+                tmp.dte_requestor_id = bdf;
+            ivrs_mappings[bdf] = tmp;
+
+            printk(XENLOG_WARNING "%04x:%02x:%02x.%u not found in ACPI tables;"
+                   " using same IOMMU as function 0\n",
+                   seg, PCI_BUS(bdf), PCI_SLOT(bdf), PCI_FUNC(bdf));
+
+            /* write iommu field last */
+            ivrs_mappings[bdf].iommu = ivrs_mappings[bd0].iommu;
+        }
+    }
+
+    return ivrs_mappings[bdf].iommu;
 }
 
 /*
@@ -178,6 +204,8 @@ int __init amd_iov_detect(void)
         printk("AMD-Vi: Error initialization\n");
         return -ENODEV;
     }
+
+    init_done = 1;
 
     /*
      * AMD IOMMUs don't distinguish between vectors destined for

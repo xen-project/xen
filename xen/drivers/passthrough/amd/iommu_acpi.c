@@ -54,8 +54,6 @@ union acpi_ivhd_device {
    struct acpi_ivrs_device8c special;
 };
 
-static unsigned short __initdata last_bdf;
-
 static void __init add_ivrs_mapping_entry(
     u16 bdf, u16 alias_id, u8 flags, struct amd_iommu *iommu)
 {
@@ -991,6 +989,7 @@ static int __init get_last_bdf_ivhd(
 {
     const union acpi_ivhd_device *ivhd_device;
     u16 block_length, dev_length;
+    int last_bdf = 0;
 
     if ( ivhd_block->header.length < sizeof(*ivhd_block) )
     {
@@ -1051,27 +1050,34 @@ static int __init get_last_bdf_ivhd(
             return -ENODEV;
     }
 
-    return 0;
+    return last_bdf;
 }
 
 static int __init get_last_bdf_acpi(struct acpi_table_header *table)
 {
     const struct acpi_ivrs_header *ivrs_block;
     unsigned long length = sizeof(struct acpi_table_ivrs);
+    int last_bdf = 0;
 
     while ( table->length > (length + sizeof(*ivrs_block)) )
     {
         ivrs_block = (struct acpi_ivrs_header *)((u8 *)table + length);
         if ( table->length < (length + ivrs_block->length) )
             return -ENODEV;
-        if ( ivrs_block->type == ACPI_IVRS_TYPE_HARDWARE &&
-             get_last_bdf_ivhd(
+        if ( ivrs_block->type == ACPI_IVRS_TYPE_HARDWARE )
+        {
+            int ret = get_last_bdf_ivhd(
                  container_of(ivrs_block, const struct acpi_ivrs_hardware,
-                              header)) != 0 )
-            return -ENODEV;
+                              header));
+
+            if ( ret < 0 )
+                return ret;
+            UPDATE_LAST_BDF(ret);
+        }
         length += ivrs_block->length;
     }
-   return 0;
+
+    return last_bdf;
 }
 
 int __init amd_iommu_detect_acpi(void)
@@ -1081,8 +1087,9 @@ int __init amd_iommu_detect_acpi(void)
 
 int __init amd_iommu_get_ivrs_dev_entries(void)
 {
-    acpi_table_parse(ACPI_SIG_IVRS, get_last_bdf_acpi);
-    return last_bdf + 1;
+    int ret = acpi_table_parse(ACPI_SIG_IVRS, get_last_bdf_acpi);
+
+    return ret < 0 ? ret : (ret | PCI_FUNC(~0)) + 1;
 }
 
 int __init amd_iommu_update_ivrs_mapping_acpi(void)

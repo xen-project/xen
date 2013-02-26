@@ -125,7 +125,7 @@ struct ivrs_mappings {
     u8 device_flags;
 };
 
-extern unsigned short ivrs_bdf_entries;
+extern unsigned int ivrs_bdf_entries;
 
 struct ivrs_mappings *get_ivrs_mappings(u16 seg);
 int iterate_ivrs_mappings(int (*)(u16 seg, struct ivrs_mappings *));
