@@ -644,7 +644,6 @@ static void intel_init_cmci(struct cpuinfo_x86 *c)
 {
     u32 l, apic;
     int cpu = smp_processor_id();
-    static uint8_t cmci_apic_vector;
 
     if (!mce_available(c) || !cmci_support) {
         if (opt_cpu_info)

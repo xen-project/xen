@@ -37,6 +37,8 @@ enum mcheck_type {
 	mcheck_intel
 };
 
+extern uint8_t cmci_apic_vector;
+
 /* Init functions */
 enum mcheck_type amd_mcheck_init(struct cpuinfo_x86 *c);
 enum mcheck_type intel_mcheck_init(struct cpuinfo_x86 *c, bool_t bsp);
