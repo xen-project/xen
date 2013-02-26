@@ -192,7 +192,6 @@ X:	xen/drivers/passthrough/vtd/
 F:	xen/include/xen/iommu.h
 
 LINUX (PV_OPS)
-M:	Jeremy Fitzhardinge <jeremy@goop.org>
 M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 S:	Supported
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/konrad/xen.git
