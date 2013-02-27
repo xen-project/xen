@@ -22,6 +22,9 @@
 #define BYTES_PER_LONG (1 << LONG_BYTEORDER)
 #define BITS_PER_LONG (BYTES_PER_LONG << 3)
 
+/* xen_ulong_t is always 64 bits */
+#define BITS_PER_XEN_ULONG 64
+
 #define CONFIG_PAGING_ASSISTANCE 1
 
 #define CONFIG_PAGING_LEVELS 3

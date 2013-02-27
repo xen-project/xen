@@ -46,9 +46,9 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_compat_t);
 extern struct domain *dom0;
 
 #ifndef CONFIG_COMPAT
-#define BITS_PER_EVTCHN_WORD(d) BITS_PER_LONG
+#define BITS_PER_EVTCHN_WORD(d) BITS_PER_XEN_ULONG
 #else
-#define BITS_PER_EVTCHN_WORD(d) (has_32bit_shinfo(d) ? 32 : BITS_PER_LONG)
+#define BITS_PER_EVTCHN_WORD(d) (has_32bit_shinfo(d) ? 32 : BITS_PER_XEN_ULONG)
 #endif
 #define MAX_EVTCHNS(d) (BITS_PER_EVTCHN_WORD(d) * BITS_PER_EVTCHN_WORD(d))
 #define EVTCHNS_PER_BUCKET 128
