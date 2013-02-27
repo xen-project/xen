@@ -137,9 +137,11 @@ world:
 	$(MAKE) kdelete
 	$(MAKE) dist
 
-# Package a build in a .deb file
-.PHONY: deb
-deb: dist
+# Package a build in a debball file, that is inside a .deb format
+# container to allow for easy and clean removal. This is not intended
+# to be a full featured policy compliant .deb package.
+.PHONY: debball
+debball: dist
 	fakeroot sh ./tools/misc/mkdeb $(XEN_ROOT) $$($(MAKE) -C xen xenversion | grep -v :)
 
 # clean doesn't do a kclean
