@@ -35,6 +35,7 @@ struct xentoollog_logger_stdiostream {
     xentoollog_level min_level;
     unsigned flags;
     int progress_erase_len, progress_last_percent;
+    int tty;
 };
 
 static void progress_erase(xentoollog_logger_stdiostream *lg) {
@@ -118,7 +119,7 @@ static void stdiostream_progress(struct xentoollog_logger *logger_in,
 
     lg->progress_last_percent = percent;
 
-    if (isatty(fileno(lg->f)) <= 0) {
+    if (!lg->tty) {
         stdiostream_message(logger_in, this_level, context,
                             "%s: %lu/%lu  %3d%%",
                             doing_what, done, total, percent);
@@ -166,6 +167,7 @@ xentoollog_logger_stdiostream *xtl_createlogger_stdiostream
     newlogger.f = f;
     newlogger.min_level = min_level;
     newlogger.flags = flags;
+    newlogger.tty = isatty(fileno(newlogger.f)) > 0;
 
     if (newlogger.flags & XTL_STDIOSTREAM_SHOW_DATE) tzset();
 
