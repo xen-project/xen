@@ -53,8 +53,7 @@ struct mapcache_vcpu {
 };
 
 struct mapcache_domain {
-    /* The PTEs that provide the mappings, and a cursor into the array. */
-    l1_pgentry_t **l1tab;
+    /* The number of array entries, and a cursor into the array. */
     unsigned int entries;
     unsigned int cursor;
 
@@ -71,7 +70,6 @@ struct mapcache_domain {
 };
 
 int mapcache_domain_init(struct domain *);
-void mapcache_domain_exit(struct domain *);
 int mapcache_vcpu_init(struct vcpu *);
 void mapcache_override_current(struct vcpu *);
 

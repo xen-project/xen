@@ -585,7 +585,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     free_xenheap_page(d->shared_info);
     if ( paging_initialised )
         paging_final_teardown(d);
-    mapcache_domain_exit(d);
     free_perdomain_mappings(d);
     if ( !is_hvm_domain(d) )
         free_xenheap_page(d->arch.pv_domain.gdt_ldt_l1tab);
@@ -604,8 +603,6 @@ void arch_domain_destroy(struct domain *d)
         iommu_domain_destroy(d);
 
     paging_final_teardown(d);
-
-    mapcache_domain_exit(d);
 
     free_perdomain_mappings(d);
     if ( !is_hvm_domain(d) )

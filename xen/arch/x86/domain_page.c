@@ -53,9 +53,8 @@ void __init mapcache_override_current(struct vcpu *v)
 
 #define mapcache_l2_entry(e) ((e) >> PAGETABLE_ORDER)
 #define MAPCACHE_L2_ENTRIES (mapcache_l2_entry(MAPCACHE_ENTRIES - 1) + 1)
-#define DCACHE_L1ENT(dc, idx) \
-    ((dc)->l1tab[(idx) >> PAGETABLE_ORDER] \
-                [(idx) & ((1 << PAGETABLE_ORDER) - 1)])
+#define MAPCACHE_L1ENT(idx) \
+    __linear_l1_table[l1_linear_offset(MAPCACHE_VIRT_START + pfn_to_paddr(idx))]
 
 void *map_domain_page(unsigned long mfn)
 {
@@ -77,7 +76,7 @@ void *map_domain_page(unsigned long mfn)
 
     dcache = &v->domain->arch.pv_domain.mapcache;
     vcache = &v->arch.pv_vcpu.mapcache;
-    if ( !dcache->l1tab )
+    if ( !dcache->inuse )
         return mfn_to_virt(mfn);
 
     perfc_incr(map_domain_page_count);
@@ -91,7 +90,7 @@ void *map_domain_page(unsigned long mfn)
         ASSERT(idx < dcache->entries);
         hashent->refcnt++;
         ASSERT(hashent->refcnt);
-        ASSERT(l1e_get_pfn(DCACHE_L1ENT(dcache, idx)) == mfn);
+        ASSERT(l1e_get_pfn(MAPCACHE_L1ENT(idx)) == mfn);
         goto out;
     }
 
@@ -131,9 +130,8 @@ void *map_domain_page(unsigned long mfn)
                 if ( hashent->idx != MAPHASHENT_NOTINUSE && !hashent->refcnt )
                 {
                     idx = hashent->idx;
-                    ASSERT(l1e_get_pfn(DCACHE_L1ENT(dcache, idx)) ==
-                           hashent->mfn);
-                    l1e_write(&DCACHE_L1ENT(dcache, idx), l1e_empty());
+                    ASSERT(l1e_get_pfn(MAPCACHE_L1ENT(idx)) == hashent->mfn);
+                    l1e_write(&MAPCACHE_L1ENT(idx), l1e_empty());
                     hashent->idx = MAPHASHENT_NOTINUSE;
                     hashent->mfn = ~0UL;
                     break;
@@ -156,8 +154,7 @@ void *map_domain_page(unsigned long mfn)
 
     spin_unlock(&dcache->lock);
 
-    l1e_write(&DCACHE_L1ENT(dcache, idx),
-              l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
+    l1e_write(&MAPCACHE_L1ENT(idx), l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
 
  out:
     local_irq_restore(flags);
@@ -181,10 +178,10 @@ void unmap_domain_page(const void *ptr)
     ASSERT(v && !is_hvm_vcpu(v));
 
     dcache = &v->domain->arch.pv_domain.mapcache;
-    ASSERT(dcache->l1tab);
+    ASSERT(dcache->inuse);
 
     idx = PFN_DOWN(va - MAPCACHE_VIRT_START);
-    mfn = l1e_get_pfn(DCACHE_L1ENT(dcache, idx));
+    mfn = l1e_get_pfn(MAPCACHE_L1ENT(idx));
     hashent = &v->arch.pv_vcpu.mapcache.hash[MAPHASH_HASHFN(mfn)];
 
     local_irq_save(flags);
@@ -200,9 +197,9 @@ void unmap_domain_page(const void *ptr)
         if ( hashent->idx != MAPHASHENT_NOTINUSE )
         {
             /* /First/, zap the PTE. */
-            ASSERT(l1e_get_pfn(DCACHE_L1ENT(dcache, hashent->idx)) ==
+            ASSERT(l1e_get_pfn(MAPCACHE_L1ENT(hashent->idx)) ==
                    hashent->mfn);
-            l1e_write(&DCACHE_L1ENT(dcache, hashent->idx), l1e_empty());
+            l1e_write(&MAPCACHE_L1ENT(hashent->idx), l1e_empty());
             /* /Second/, mark as garbage. */
             set_bit(hashent->idx, dcache->garbage);
         }
@@ -214,7 +211,7 @@ void unmap_domain_page(const void *ptr)
     else
     {
         /* /First/, zap the PTE. */
-        l1e_write(&DCACHE_L1ENT(dcache, idx), l1e_empty());
+        l1e_write(&MAPCACHE_L1ENT(idx), l1e_empty());
         /* /Second/, mark as garbage. */
         set_bit(idx, dcache->garbage);
     }
@@ -253,10 +250,6 @@ int mapcache_domain_init(struct domain *d)
         return 0;
 #endif
 
-    dcache->l1tab = xzalloc_array(l1_pgentry_t *, MAPCACHE_L2_ENTRIES);
-    if ( !dcache->l1tab )
-        return -ENOMEM;
-
     BUILD_BUG_ON(MAPCACHE_VIRT_END + PAGE_SIZE * (3 +
                  2 * PFN_UP(BITS_TO_LONGS(MAPCACHE_ENTRIES) * sizeof(long))) >
                  MAPCACHE_VIRT_START + (PERDOMAIN_SLOT_MBYTES << 20));
@@ -272,16 +265,6 @@ int mapcache_domain_init(struct domain *d)
                                     NIL(l1_pgentry_t *), NULL);
 }
 
-void mapcache_domain_exit(struct domain *d)
-{
-    struct mapcache_domain *dcache = &d->arch.pv_domain.mapcache;
-
-    if ( is_hvm_domain(d) )
-        return;
-
-    xfree(dcache->l1tab);
-}
-
 int mapcache_vcpu_init(struct vcpu *v)
 {
     struct domain *d = v->domain;
@@ -290,7 +273,7 @@ int mapcache_vcpu_init(struct vcpu *v)
     unsigned int ents = d->max_vcpus * MAPCACHE_VCPU_ENTRIES;
     unsigned int nr = PFN_UP(BITS_TO_LONGS(ents) * sizeof(long));
 
-    if ( is_hvm_vcpu(v) || !dcache->l1tab )
+    if ( is_hvm_vcpu(v) || !dcache->inuse )
         return 0;
 
     if ( ents > dcache->entries )
@@ -298,7 +281,7 @@ int mapcache_vcpu_init(struct vcpu *v)
         /* Populate page tables. */
         int rc = create_perdomain_mapping(d, MAPCACHE_VIRT_START,
                                           d->max_vcpus * MAPCACHE_VCPU_ENTRIES,
-                                          dcache->l1tab, NULL);
+                                          NIL(l1_pgentry_t *), NULL);
 
         /* Populate bit maps. */
         if ( !rc )
