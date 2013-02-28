@@ -304,18 +304,12 @@ extern unsigned long xen_phys_start;
 #define LDT_VIRT_START(v)    \
     (GDT_VIRT_START(v) + (64*1024))
 
-/* map_domain_page() map cache. The last per-domain-mapping sub-area. */
+/* map_domain_page() map cache. The second per-domain-mapping sub-area. */
 #define MAPCACHE_VCPU_ENTRIES    (CONFIG_PAGING_LEVELS * CONFIG_PAGING_LEVELS)
 #define MAPCACHE_ENTRIES         (MAX_VIRT_CPUS * MAPCACHE_VCPU_ENTRIES)
-#define MAPCACHE_SLOT            (PERDOMAIN_SLOTS - 1)
-#define MAPCACHE_VIRT_START      PERDOMAIN_VIRT_SLOT(MAPCACHE_SLOT)
+#define MAPCACHE_VIRT_START      PERDOMAIN_VIRT_SLOT(1)
 #define MAPCACHE_VIRT_END        (MAPCACHE_VIRT_START + \
                                   MAPCACHE_ENTRIES * PAGE_SIZE)
-
-#define PDPT_L1_ENTRIES       \
-    ((PERDOMAIN_VIRT_SLOT(PERDOMAIN_SLOTS - 1) - PERDOMAIN_VIRT_START) >> PAGE_SHIFT)
-#define PDPT_L2_ENTRIES       \
-    ((PDPT_L1_ENTRIES + (1 << PAGETABLE_ORDER) - 1) >> PAGETABLE_ORDER)
 
 #define ELFSIZE 64
 

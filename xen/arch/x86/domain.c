@@ -372,36 +372,15 @@ int switch_compat(struct domain *d)
 int vcpu_initialise(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    unsigned int idx;
     int rc;
 
     v->arch.flags = TF_kernel_mode;
-
-    idx = perdomain_pt_idx(v);
-    if ( !d->arch.perdomain_pts[idx] )
-    {
-        void *pt;
-        l2_pgentry_t *l2tab;
-
-        pt = alloc_xenheap_pages(0, MEMF_node(vcpu_to_node(v)));
-        if ( !pt )
-            return -ENOMEM;
-        clear_page(pt);
-        d->arch.perdomain_pts[idx] = pt;
-
-        l2tab = __map_domain_page(d->arch.perdomain_l2_pg[0]);
-        l2tab[l2_table_offset(PERDOMAIN_VIRT_START) + idx]
-            = l2e_from_paddr(__pa(pt), __PAGE_HYPERVISOR);
-        unmap_domain_page(l2tab);
-    }
 
     rc = mapcache_vcpu_init(v);
     if ( rc )
         return rc;
 
     paging_vcpu_init(v);
-
-    v->arch.perdomain_ptes = perdomain_ptes(d, v);
 
     if ( (rc = vcpu_init_fpu(v)) != 0 )
         return rc;
@@ -420,6 +399,12 @@ int vcpu_initialise(struct vcpu *v)
 
     if ( !is_idle_domain(d) )
     {
+        rc = create_perdomain_mapping(d, GDT_VIRT_START(v),
+                                      1 << GDT_LDT_VCPU_SHIFT,
+                                      d->arch.pv_domain.gdt_ldt_l1tab, NULL);
+        if ( rc )
+            goto done;
+
         BUILD_BUG_ON(NR_VECTORS * sizeof(*v->arch.pv_vcpu.trap_ctxt) >
                      PAGE_SIZE);
         v->arch.pv_vcpu.trap_ctxt = xzalloc_array(struct trap_info,
@@ -478,8 +463,6 @@ void vcpu_destroy(struct vcpu *v)
 
 int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
-    struct page_info *pg;
-    l3_pgentry_t *l3tab;
     int i, paging_initialised = 0;
     int rc = -ENOMEM;
 
@@ -510,29 +493,24 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
                d->domain_id);
     }
 
-    BUILD_BUG_ON(PDPT_L2_ENTRIES * sizeof(*d->arch.perdomain_pts)
-                 != PAGE_SIZE);
-    d->arch.perdomain_pts =
-        alloc_xenheap_pages(0, MEMF_node(domain_to_node(d)));
-    if ( !d->arch.perdomain_pts )
-        goto fail;
-    clear_page(d->arch.perdomain_pts);
+    if ( is_hvm_domain(d) )
+        rc = create_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0, NULL, NULL);
+    else if ( is_idle_domain(d) )
+        rc = 0;
+    else
+    {
+        d->arch.pv_domain.gdt_ldt_l1tab =
+            alloc_xenheap_pages(0, MEMF_node(domain_to_node(d)));
+        if ( !d->arch.pv_domain.gdt_ldt_l1tab )
+            goto fail;
+        clear_page(d->arch.pv_domain.gdt_ldt_l1tab);
 
-    pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
-    if ( pg == NULL )
+        rc = create_perdomain_mapping(d, GDT_LDT_VIRT_START,
+                                      GDT_LDT_MBYTES << (20 - PAGE_SHIFT),
+                                      NULL, NULL);
+    }
+    if ( rc )
         goto fail;
-    d->arch.perdomain_l2_pg[0] = pg;
-    clear_domain_page(page_to_mfn(pg));
-
-    pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
-    if ( pg == NULL )
-        goto fail;
-    d->arch.perdomain_l3_pg = pg;
-    l3tab = __map_domain_page(pg);
-    clear_page(l3tab);
-    l3tab[l3_table_offset(PERDOMAIN_VIRT_START)] =
-        l3e_from_page(d->arch.perdomain_l2_pg[0], __PAGE_HYPERVISOR);
-    unmap_domain_page(l3tab);
 
     mapcache_domain_init(d);
 
@@ -608,19 +586,14 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     if ( paging_initialised )
         paging_final_teardown(d);
     mapcache_domain_exit(d);
-    for ( i = 0; i < PERDOMAIN_SLOTS; ++i)
-        if ( d->arch.perdomain_l2_pg[i] )
-            free_domheap_page(d->arch.perdomain_l2_pg[i]);
-    if ( d->arch.perdomain_l3_pg )
-        free_domheap_page(d->arch.perdomain_l3_pg);
-    free_xenheap_page(d->arch.perdomain_pts);
+    free_perdomain_mappings(d);
+    if ( !is_hvm_domain(d) )
+        free_xenheap_page(d->arch.pv_domain.gdt_ldt_l1tab);
     return rc;
 }
 
 void arch_domain_destroy(struct domain *d)
 {
-    unsigned int i;
-
     if ( is_hvm_domain(d) )
         hvm_domain_destroy(d);
     else
@@ -634,13 +607,9 @@ void arch_domain_destroy(struct domain *d)
 
     mapcache_domain_exit(d);
 
-    for ( i = 0; i < PDPT_L2_ENTRIES; ++i )
-        free_xenheap_page(d->arch.perdomain_pts[i]);
-    free_xenheap_page(d->arch.perdomain_pts);
-    for ( i = 0; i < PERDOMAIN_SLOTS; ++i)
-        if ( d->arch.perdomain_l2_pg[i] )
-            free_domheap_page(d->arch.perdomain_l2_pg[i]);
-    free_domheap_page(d->arch.perdomain_l3_pg);
+    free_perdomain_mappings(d);
+    if ( !is_hvm_domain(d) )
+        free_xenheap_page(d->arch.pv_domain.gdt_ldt_l1tab);
 
     free_xenheap_page(d->shared_info);
     cleanup_domain_irq_mapping(d);
@@ -1515,10 +1484,11 @@ static void __context_switch(void)
     if ( need_full_gdt(n) )
     {
         unsigned long mfn = virt_to_mfn(gdt);
+        l1_pgentry_t *pl1e = gdt_ldt_ptes(n->domain, n);
         unsigned int i;
+
         for ( i = 0; i < NR_RESERVED_GDT_PAGES; i++ )
-            l1e_write(n->arch.perdomain_ptes +
-                      FIRST_RESERVED_GDT_PAGE + i,
+            l1e_write(pl1e + FIRST_RESERVED_GDT_PAGE + i,
                       l1e_from_pfn(mfn + i, __PAGE_HYPERVISOR));
     }
 

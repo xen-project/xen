@@ -243,10 +243,7 @@ void copy_domain_page(unsigned long dmfn, unsigned long smfn)
 int mapcache_domain_init(struct domain *d)
 {
     struct mapcache_domain *dcache = &d->arch.pv_domain.mapcache;
-    l3_pgentry_t *l3tab;
-    l2_pgentry_t *l2tab;
-    unsigned int i, bitmap_pages, memf = MEMF_node(domain_to_node(d));
-    unsigned long *end;
+    unsigned int bitmap_pages;
 
     if ( is_hvm_domain(d) || is_idle_domain(d) )
         return 0;
@@ -256,48 +253,23 @@ int mapcache_domain_init(struct domain *d)
         return 0;
 #endif
 
-    dcache->l1tab = xzalloc_array(l1_pgentry_t *, MAPCACHE_L2_ENTRIES + 1);
-    d->arch.perdomain_l2_pg[MAPCACHE_SLOT] = alloc_domheap_page(NULL, memf);
-    if ( !dcache->l1tab || !d->arch.perdomain_l2_pg[MAPCACHE_SLOT] )
+    dcache->l1tab = xzalloc_array(l1_pgentry_t *, MAPCACHE_L2_ENTRIES);
+    if ( !dcache->l1tab )
         return -ENOMEM;
 
-    clear_domain_page(page_to_mfn(d->arch.perdomain_l2_pg[MAPCACHE_SLOT]));
-    l3tab = __map_domain_page(d->arch.perdomain_l3_pg);
-    l3tab[l3_table_offset(MAPCACHE_VIRT_START)] =
-        l3e_from_page(d->arch.perdomain_l2_pg[MAPCACHE_SLOT],
-                      __PAGE_HYPERVISOR);
-    unmap_domain_page(l3tab);
-
-    l2tab = __map_domain_page(d->arch.perdomain_l2_pg[MAPCACHE_SLOT]);
-
-    BUILD_BUG_ON(MAPCACHE_VIRT_END + 3 +
-                 2 * PFN_UP(BITS_TO_LONGS(MAPCACHE_ENTRIES) * sizeof(long)) >
+    BUILD_BUG_ON(MAPCACHE_VIRT_END + PAGE_SIZE * (3 +
+                 2 * PFN_UP(BITS_TO_LONGS(MAPCACHE_ENTRIES) * sizeof(long))) >
                  MAPCACHE_VIRT_START + (PERDOMAIN_SLOT_MBYTES << 20));
     bitmap_pages = PFN_UP(BITS_TO_LONGS(MAPCACHE_ENTRIES) * sizeof(long));
     dcache->inuse = (void *)MAPCACHE_VIRT_END + PAGE_SIZE;
     dcache->garbage = dcache->inuse +
                       (bitmap_pages + 1) * PAGE_SIZE / sizeof(long);
-    end = dcache->garbage + bitmap_pages * PAGE_SIZE / sizeof(long);
-
-    for ( i = l2_table_offset((unsigned long)dcache->inuse);
-          i <= l2_table_offset((unsigned long)(end - 1)); ++i )
-    {
-        ASSERT(i <= MAPCACHE_L2_ENTRIES);
-        dcache->l1tab[i] = alloc_xenheap_pages(0, memf);
-        if ( !dcache->l1tab[i] )
-        {
-            unmap_domain_page(l2tab);
-            return -ENOMEM;
-        }
-        clear_page(dcache->l1tab[i]);
-        l2tab[i] = l2e_from_paddr(__pa(dcache->l1tab[i]), __PAGE_HYPERVISOR);
-    }
-
-    unmap_domain_page(l2tab);
 
     spin_lock_init(&dcache->lock);
 
-    return 0;
+    return create_perdomain_mapping(d, (unsigned long)dcache->inuse,
+                                    2 * bitmap_pages + 1,
+                                    NIL(l1_pgentry_t *), NULL);
 }
 
 void mapcache_domain_exit(struct domain *d)
@@ -307,93 +279,40 @@ void mapcache_domain_exit(struct domain *d)
     if ( is_hvm_domain(d) )
         return;
 
-    if ( dcache->l1tab )
-    {
-        unsigned long i;
-
-        for ( i = (unsigned long)dcache->inuse; ; i += PAGE_SIZE )
-        {
-            l1_pgentry_t *pl1e;
-
-            if ( l2_table_offset(i) > MAPCACHE_L2_ENTRIES ||
-                 !dcache->l1tab[l2_table_offset(i)] )
-                break;
-
-            pl1e = &dcache->l1tab[l2_table_offset(i)][l1_table_offset(i)];
-            if ( l1e_get_flags(*pl1e) )
-                free_domheap_page(l1e_get_page(*pl1e));
-        }
-
-        for ( i = 0; i < MAPCACHE_L2_ENTRIES + 1; ++i )
-            free_xenheap_page(dcache->l1tab[i]);
-
-        xfree(dcache->l1tab);
-    }
+    xfree(dcache->l1tab);
 }
 
 int mapcache_vcpu_init(struct vcpu *v)
 {
     struct domain *d = v->domain;
     struct mapcache_domain *dcache = &d->arch.pv_domain.mapcache;
-    l2_pgentry_t *l2tab;
     unsigned long i;
-    unsigned int memf = MEMF_node(vcpu_to_node(v));
+    unsigned int ents = d->max_vcpus * MAPCACHE_VCPU_ENTRIES;
+    unsigned int nr = PFN_UP(BITS_TO_LONGS(ents) * sizeof(long));
 
     if ( is_hvm_vcpu(v) || !dcache->l1tab )
         return 0;
 
-    l2tab = __map_domain_page(d->arch.perdomain_l2_pg[MAPCACHE_SLOT]);
-
-    while ( dcache->entries < d->max_vcpus * MAPCACHE_VCPU_ENTRIES )
+    if ( ents > dcache->entries )
     {
-        unsigned int ents = dcache->entries + MAPCACHE_VCPU_ENTRIES;
-        l1_pgentry_t *pl1e;
-
         /* Populate page tables. */
-        if ( !dcache->l1tab[i = mapcache_l2_entry(ents - 1)] )
-        {
-            dcache->l1tab[i] = alloc_xenheap_pages(0, memf);
-            if ( !dcache->l1tab[i] )
-            {
-                unmap_domain_page(l2tab);
-                return -ENOMEM;
-            }
-            clear_page(dcache->l1tab[i]);
-            l2tab[i] = l2e_from_paddr(__pa(dcache->l1tab[i]),
-                                      __PAGE_HYPERVISOR);
-        }
+        int rc = create_perdomain_mapping(d, MAPCACHE_VIRT_START,
+                                          d->max_vcpus * MAPCACHE_VCPU_ENTRIES,
+                                          dcache->l1tab, NULL);
 
         /* Populate bit maps. */
-        i = (unsigned long)(dcache->inuse + BITS_TO_LONGS(ents));
-        pl1e = &dcache->l1tab[l2_table_offset(i)][l1_table_offset(i)];
-        if ( !l1e_get_flags(*pl1e) )
-        {
-            struct page_info *pg = alloc_domheap_page(NULL, memf);
+        if ( !rc )
+            rc = create_perdomain_mapping(d, (unsigned long)dcache->inuse,
+                                          nr, NULL, NIL(struct page_info *));
+        if ( !rc )
+            rc = create_perdomain_mapping(d, (unsigned long)dcache->garbage,
+                                          nr, NULL, NIL(struct page_info *));
 
-            if ( pg )
-            {
-                clear_domain_page(page_to_mfn(pg));
-                *pl1e = l1e_from_page(pg, __PAGE_HYPERVISOR);
-                pg = alloc_domheap_page(NULL, memf);
-            }
-            if ( !pg )
-            {
-                unmap_domain_page(l2tab);
-                return -ENOMEM;
-            }
-
-            i = (unsigned long)(dcache->garbage + BITS_TO_LONGS(ents));
-            pl1e = &dcache->l1tab[l2_table_offset(i)][l1_table_offset(i)];
-            ASSERT(!l1e_get_flags(*pl1e));
-
-            clear_domain_page(page_to_mfn(pg));
-            *pl1e = l1e_from_page(pg, __PAGE_HYPERVISOR);
-        }
+        if ( rc )
+            return rc;
 
         dcache->entries = ents;
     }
-
-    unmap_domain_page(l2tab);
 
     /* Mark all maphash entries as not in use. */
     BUILD_BUG_ON(MAPHASHENT_NOTINUSE < MAPCACHE_ENTRIES);

@@ -223,6 +223,8 @@ struct time_scale {
 
 struct pv_domain
 {
+    l1_pgentry_t **gdt_ldt_l1tab;
+
     /* Shared page for notifying that explicit PIRQ EOI is required. */
     unsigned long *pirq_eoi_map;
     unsigned long pirq_eoi_map_mfn;
@@ -241,8 +243,6 @@ struct pv_domain
 
 struct arch_domain
 {
-    void **perdomain_pts;
-    struct page_info *perdomain_l2_pg[PERDOMAIN_SLOTS];
     struct page_info *perdomain_l3_pg;
 
     unsigned int hv_compat_vstart;
@@ -318,10 +318,10 @@ struct arch_domain
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
 #define has_arch_mmios(d)    (!rangeset_is_empty((d)->iomem_caps))
 
-#define perdomain_pt_idx(v) \
+#define gdt_ldt_pt_idx(v) \
       ((v)->vcpu_id >> (PAGETABLE_ORDER - GDT_LDT_VCPU_SHIFT))
-#define perdomain_ptes(d, v) \
-    ((l1_pgentry_t *)(d)->arch.perdomain_pts[perdomain_pt_idx(v)] + \
+#define gdt_ldt_ptes(d, v) \
+    ((d)->arch.pv_domain.gdt_ldt_l1tab[gdt_ldt_pt_idx(v)] + \
      (((v)->vcpu_id << GDT_LDT_VCPU_SHIFT) & (L1_PAGETABLE_ENTRIES - 1)))
 
 struct pv_vcpu
@@ -405,12 +405,6 @@ struct arch_vcpu
         struct pv_vcpu pv_vcpu;
         struct hvm_vcpu hvm_vcpu;
     };
-
-    /*
-     * Every domain has a L1 pagetable of its own. Per-domain mappings
-     * are put in this table (eg. the current GDT is mapped here).
-     */
-    l1_pgentry_t *perdomain_ptes;
 
     pagetable_t guest_table_user;       /* (MFN) x86/64 user-space pagetable */
     pagetable_t guest_table;            /* (MFN) guest notion of cr3 */

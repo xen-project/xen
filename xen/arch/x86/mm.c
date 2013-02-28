@@ -511,6 +511,7 @@ void update_cr3(struct vcpu *v)
 
 static void invalidate_shadow_ldt(struct vcpu *v, int flush)
 {
+    l1_pgentry_t *pl1e;
     int i;
     unsigned long pfn;
     struct page_info *page;
@@ -523,12 +524,13 @@ static void invalidate_shadow_ldt(struct vcpu *v, int flush)
         goto out;
 
     v->arch.pv_vcpu.shadow_ldt_mapcnt = 0;
+    pl1e = gdt_ldt_ptes(v->domain, v);
 
     for ( i = 16; i < 32; i++ )
     {
-        pfn = l1e_get_pfn(v->arch.perdomain_ptes[i]);
+        pfn = l1e_get_pfn(pl1e[i]);
         if ( pfn == 0 ) continue;
-        l1e_write(&v->arch.perdomain_ptes[i], l1e_empty());
+        l1e_write(&pl1e[i], l1e_empty());
         page = mfn_to_page(pfn);
         ASSERT_PAGE_IS_TYPE(page, PGT_seg_desc_page);
         ASSERT_PAGE_IS_DOMAIN(page, v->domain);
@@ -596,7 +598,7 @@ int map_ldt_shadow_page(unsigned int off)
     nl1e = l1e_from_pfn(page_to_mfn(page), l1e_get_flags(l1e) | _PAGE_RW);
 
     spin_lock(&v->arch.pv_vcpu.shadow_ldt_lock);
-    l1e_write(&v->arch.perdomain_ptes[off + 16], nl1e);
+    l1e_write(&gdt_ldt_ptes(d, v)[off + 16], nl1e);
     v->arch.pv_vcpu.shadow_ldt_mapcnt++;
     spin_unlock(&v->arch.pv_vcpu.shadow_ldt_lock);
 
@@ -4073,15 +4075,17 @@ long do_update_va_mapping_otherdomain(unsigned long va, u64 val64,
 
 void destroy_gdt(struct vcpu *v)
 {
+    l1_pgentry_t *pl1e;
     int i;
     unsigned long pfn;
 
     v->arch.pv_vcpu.gdt_ents = 0;
+    pl1e = gdt_ldt_ptes(v->domain, v);
     for ( i = 0; i < FIRST_RESERVED_GDT_PAGE; i++ )
     {
-        if ( (pfn = l1e_get_pfn(v->arch.perdomain_ptes[i])) != 0 )
+        if ( (pfn = l1e_get_pfn(pl1e[i])) != 0 )
             put_page_and_type(mfn_to_page(pfn));
-        l1e_write(&v->arch.perdomain_ptes[i], l1e_empty());
+        l1e_write(&pl1e[i], l1e_empty());
         v->arch.pv_vcpu.gdt_frames[i] = 0;
     }
 }
@@ -4092,6 +4096,7 @@ long set_gdt(struct vcpu *v,
              unsigned int entries)
 {
     struct domain *d = v->domain;
+    l1_pgentry_t *pl1e;
     /* NB. There are 512 8-byte entries per GDT page. */
     int i, nr_pages = (entries + 511) / 512;
     unsigned long mfn, *pfns;
@@ -4124,11 +4129,11 @@ long set_gdt(struct vcpu *v,
 
     /* Install the new GDT. */
     v->arch.pv_vcpu.gdt_ents = entries;
+    pl1e = gdt_ldt_ptes(d, v);
     for ( i = 0; i < nr_pages; i++ )
     {
         v->arch.pv_vcpu.gdt_frames[i] = frames[i];
-        l1e_write(&v->arch.perdomain_ptes[i],
-                  l1e_from_pfn(frames[i], __PAGE_HYPERVISOR));
+        l1e_write(&pl1e[i], l1e_from_pfn(frames[i], __PAGE_HYPERVISOR));
     }
 
     xfree(pfns);
@@ -5526,6 +5531,175 @@ void __iomem *ioremap(paddr_t pa, size_t len)
     }
 
     return (void __force __iomem *)va;
+}
+
+int create_perdomain_mapping(struct domain *d, unsigned long va,
+                             unsigned int nr, l1_pgentry_t **pl1tab,
+                             struct page_info **ppg)
+{
+    struct page_info *pg;
+    l3_pgentry_t *l3tab;
+    l2_pgentry_t *l2tab;
+    l1_pgentry_t *l1tab;
+    unsigned int memf = MEMF_node(domain_to_node(d));
+    int rc = 0;
+
+    ASSERT(va >= PERDOMAIN_VIRT_START &&
+           va < PERDOMAIN_VIRT_SLOT(PERDOMAIN_SLOTS));
+
+    if ( !d->arch.perdomain_l3_pg )
+    {
+        pg = alloc_domheap_page(NULL, MEMF_node(domain_to_node(d)));
+        if ( !pg )
+            return -ENOMEM;
+        l3tab = __map_domain_page(pg);
+        clear_page(l3tab);
+        d->arch.perdomain_l3_pg = pg;
+        if ( !nr )
+        {
+            unmap_domain_page(l3tab);
+            return 0;
+        }
+    }
+    else if ( !nr )
+        return 0;
+    else
+        l3tab = __map_domain_page(d->arch.perdomain_l3_pg);
+
+    ASSERT(!l3_table_offset(va ^ (va + nr * PAGE_SIZE - 1)));
+
+    if ( !(l3e_get_flags(l3tab[l3_table_offset(va)]) & _PAGE_PRESENT) )
+    {
+        pg = alloc_domheap_page(NULL, memf);
+        if ( !pg )
+        {
+            unmap_domain_page(l3tab);
+            return -ENOMEM;
+        }
+        l2tab = __map_domain_page(pg);
+        clear_page(l2tab);
+        l3tab[l3_table_offset(va)] = l3e_from_page(pg, __PAGE_HYPERVISOR);
+    }
+    else
+        l2tab = map_domain_page(l3e_get_pfn(l3tab[l3_table_offset(va)]));
+
+    unmap_domain_page(l3tab);
+
+    if ( !pl1tab && !ppg )
+    {
+        unmap_domain_page(l2tab);
+        return 0;
+    }
+
+    for ( l1tab = NULL; !rc && nr--; )
+    {
+        l2_pgentry_t *pl2e = l2tab + l2_table_offset(va);
+
+        if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
+        {
+            if ( pl1tab && !IS_NIL(pl1tab) )
+            {
+                l1tab = alloc_xenheap_pages(0, memf);
+                if ( !l1tab )
+                {
+                    rc = -ENOMEM;
+                    break;
+                }
+                ASSERT(!pl1tab[l2_table_offset(va)]);
+                pl1tab[l2_table_offset(va)] = l1tab;
+                pg = virt_to_page(l1tab);
+            }
+            else
+            {
+                pg = alloc_domheap_page(NULL, memf);
+                if ( !pg )
+                {
+                    rc = -ENOMEM;
+                    break;
+                }
+                l1tab = __map_domain_page(pg);
+            }
+            clear_page(l1tab);
+            *pl2e = l2e_from_page(pg, __PAGE_HYPERVISOR);
+        }
+        else if ( !l1tab )
+            l1tab = map_domain_page(l2e_get_pfn(*pl2e));
+
+        if ( ppg &&
+             !(l1e_get_flags(l1tab[l1_table_offset(va)]) & _PAGE_PRESENT) )
+        {
+            pg = alloc_domheap_page(NULL, memf);
+            if ( pg )
+            {
+                clear_domain_page(page_to_mfn(pg));
+                if ( !IS_NIL(ppg) )
+                    *ppg++ = pg;
+                l1tab[l1_table_offset(va)] =
+                    l1e_from_page(pg, __PAGE_HYPERVISOR | _PAGE_AVAIL0);
+                l2e_add_flags(*pl2e, _PAGE_AVAIL0);
+            }
+            else
+                rc = -ENOMEM;
+        }
+
+        va += PAGE_SIZE;
+        if ( rc || !nr || !l1_table_offset(va) )
+        {
+            /* Note that this is a no-op for the alloc_xenheap_page() case. */
+            unmap_domain_page(l1tab);
+            l1tab = NULL;
+        }
+    }
+
+    ASSERT(!l1tab);
+    unmap_domain_page(l2tab);
+
+    return rc;
+}
+
+void free_perdomain_mappings(struct domain *d)
+{
+    l3_pgentry_t *l3tab = __map_domain_page(d->arch.perdomain_l3_pg);
+    unsigned int i;
+
+    for ( i = 0; i < PERDOMAIN_SLOTS; ++i)
+        if ( l3e_get_flags(l3tab[i]) & _PAGE_PRESENT )
+        {
+            struct page_info *l2pg = l3e_get_page(l3tab[i]);
+            l2_pgentry_t *l2tab = __map_domain_page(l2pg);
+            unsigned int j;
+
+            for ( j = 0; j < L2_PAGETABLE_ENTRIES; ++j )
+                if ( l2e_get_flags(l2tab[j]) & _PAGE_PRESENT )
+                {
+                    struct page_info *l1pg = l2e_get_page(l2tab[j]);
+
+                    if ( l2e_get_flags(l2tab[j]) & _PAGE_AVAIL0 )
+                    {
+                        l1_pgentry_t *l1tab = __map_domain_page(l1pg);
+                        unsigned int k;
+
+                        for ( k = 0; k < L1_PAGETABLE_ENTRIES; ++k )
+                            if ( (l1e_get_flags(l1tab[k]) &
+                                  (_PAGE_PRESENT | _PAGE_AVAIL0)) ==
+                                 (_PAGE_PRESENT | _PAGE_AVAIL0) )
+                                free_domheap_page(l1e_get_page(l1tab[k]));
+
+                        unmap_domain_page(l1tab);
+                    }
+
+                    if ( is_xen_heap_page(l1pg) )
+                        free_xenheap_page(page_to_virt(l1pg));
+                    else
+                        free_domheap_page(l1pg);
+                }
+
+            unmap_domain_page(l2tab);
+            free_domheap_page(l2pg);
+        }
+
+    unmap_domain_page(l3tab);
+    free_domheap_page(d->arch.perdomain_l3_pg);
 }
 
 #ifdef MEMORY_GUARD
