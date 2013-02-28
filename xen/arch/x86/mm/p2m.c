@@ -488,15 +488,13 @@ void p2m_teardown(struct p2m_domain *p2m)
 
 void p2m_final_teardown(struct domain *d)
 {
-    /* Iterate over all p2m tables per domain */
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    if ( p2m )
-        p2m_teardown_hostp2m(d);
-
     /* We must teardown unconditionally because
      * we initialise them unconditionally.
      */
     p2m_teardown_nestedp2m(d);
+
+    /* Iterate over all p2m tables per domain */
+    p2m_teardown_hostp2m(d);
 }
 
 
