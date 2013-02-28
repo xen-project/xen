@@ -19,6 +19,7 @@
 #include <xen/sched-if.h>
 #include <xen/softirq.h>
 #include <asm/atomic.h>
+#include <asm/div64.h>
 #include <xen/errno.h>
 #include <xen/keyhandler.h>
 #include <xen/trace.h>
@@ -136,6 +137,7 @@ struct csched_vcpu {
     struct csched_dom *sdom;
     struct vcpu *vcpu;
     atomic_t credit;
+    unsigned int residual;
     s_time_t start_time;   /* When we were scheduled (used for credit) */
     uint16_t flags;
     int16_t pri;
@@ -242,6 +244,7 @@ __runq_remove(struct csched_vcpu *svc)
 static void burn_credits(struct csched_vcpu *svc, s_time_t now)
 {
     s_time_t delta;
+    uint64_t val;
     unsigned int credits;
 
     /* Assert svc is current */
@@ -250,7 +253,10 @@ static void burn_credits(struct csched_vcpu *svc, s_time_t now)
     if ( (delta = now - svc->start_time) <= 0 )
         return;
 
-    credits = (delta*CSCHED_CREDITS_PER_MSEC + MILLISECS(1)/2) / MILLISECS(1);
+    val = delta * CSCHED_CREDITS_PER_MSEC + svc->residual;
+    svc->residual = do_div(val, MILLISECS(1));
+    credits = val;
+    ASSERT(credits == val); /* make sure we haven't truncated val */
     atomic_sub(credits, &svc->credit);
     svc->start_time += (credits * MILLISECS(1)) / CSCHED_CREDITS_PER_MSEC;
 }
