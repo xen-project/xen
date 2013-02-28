@@ -5657,6 +5657,59 @@ int create_perdomain_mapping(struct domain *d, unsigned long va,
     return rc;
 }
 
+void destroy_perdomain_mapping(struct domain *d, unsigned long va,
+                               unsigned int nr)
+{
+    const l3_pgentry_t *l3tab, *pl3e;
+
+    ASSERT(va >= PERDOMAIN_VIRT_START &&
+           va < PERDOMAIN_VIRT_SLOT(PERDOMAIN_SLOTS));
+    ASSERT(!l3_table_offset(va ^ (va + nr * PAGE_SIZE - 1)));
+
+    if ( !d->arch.perdomain_l3_pg )
+        return;
+
+    l3tab = __map_domain_page(d->arch.perdomain_l3_pg);
+    pl3e = l3tab + l3_table_offset(va);
+
+    if ( l3e_get_flags(*pl3e) & _PAGE_PRESENT )
+    {
+        const l2_pgentry_t *l2tab = map_domain_page(l3e_get_pfn(*pl3e));
+        const l2_pgentry_t *pl2e = l2tab + l2_table_offset(va);
+        unsigned int i = l1_table_offset(va);
+
+        while ( nr )
+        {
+            if ( l2e_get_flags(*pl2e) & _PAGE_PRESENT )
+            {
+                l1_pgentry_t *l1tab = map_domain_page(l2e_get_pfn(*pl2e));
+
+                for ( ; nr && i < L1_PAGETABLE_ENTRIES; --nr, ++i )
+                {
+                    if ( (l1e_get_flags(l1tab[i]) &
+                          (_PAGE_PRESENT | _PAGE_AVAIL0)) ==
+                         (_PAGE_PRESENT | _PAGE_AVAIL0) )
+                        free_domheap_page(l1e_get_page(l1tab[i]));
+                    l1tab[i] = l1e_empty();
+                }
+
+                unmap_domain_page(l1tab);
+            }
+            else if ( nr + i < L1_PAGETABLE_ENTRIES )
+                break;
+            else
+                nr -= L1_PAGETABLE_ENTRIES - i;
+
+            ++pl2e;
+            i = 0;
+        }
+
+        unmap_domain_page(l2tab);
+    }
+
+    unmap_domain_page(l3tab);
+}
+
 void free_perdomain_mappings(struct domain *d)
 {
     l3_pgentry_t *l3tab = __map_domain_page(d->arch.perdomain_l3_pg);

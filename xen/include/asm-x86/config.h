@@ -212,7 +212,7 @@ extern unsigned char boot_edid_info[128];
 /* Slot 260: per-domain mappings (including map cache). */
 #define PERDOMAIN_VIRT_START    (PML4_ADDR(260))
 #define PERDOMAIN_SLOT_MBYTES   (PML4_ENTRY_BYTES >> (20 + PAGETABLE_ORDER))
-#define PERDOMAIN_SLOTS         2
+#define PERDOMAIN_SLOTS         3
 #define PERDOMAIN_VIRT_SLOT(s)  (PERDOMAIN_VIRT_START + (s) * \
                                  (PERDOMAIN_SLOT_MBYTES << 20))
 /* Slot 261: machine-to-phys conversion table (256GB). */
@@ -310,6 +310,13 @@ extern unsigned long xen_phys_start;
 #define MAPCACHE_VIRT_START      PERDOMAIN_VIRT_SLOT(1)
 #define MAPCACHE_VIRT_END        (MAPCACHE_VIRT_START + \
                                   MAPCACHE_ENTRIES * PAGE_SIZE)
+
+/* Argument translation area. The third per-domain-mapping sub-area. */
+#define ARG_XLAT_VIRT_START      PERDOMAIN_VIRT_SLOT(2)
+/* Allow for at least one guard page (COMPAT_ARG_XLAT_SIZE being 2 pages): */
+#define ARG_XLAT_VA_SHIFT        (2 + PAGE_SHIFT)
+#define ARG_XLAT_START(v)        \
+    (ARG_XLAT_VIRT_START + ((v)->vcpu_id << ARG_XLAT_VA_SHIFT))
 
 #define ELFSIZE 64
 

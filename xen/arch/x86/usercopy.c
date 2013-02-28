@@ -6,8 +6,8 @@
  * Copyright 2002 Andi Kleen <ak@suse.de>
  */
 
-#include <xen/config.h>
 #include <xen/lib.h>
+#include <xen/sched.h>
 #include <asm/uaccess.h>
 
 unsigned long __copy_to_user_ll(void __user *to, const void *from, unsigned n)

@@ -1,16 +1,15 @@
 #ifndef __X86_64_UACCESS_H
 #define __X86_64_UACCESS_H
 
-#define COMPAT_ARG_XLAT_VIRT_BASE compat_arg_xlat_virt_base()
+#define COMPAT_ARG_XLAT_VIRT_BASE ((void *)ARG_XLAT_START(current))
 #define COMPAT_ARG_XLAT_SIZE      (2*PAGE_SIZE)
 struct vcpu;
-void *compat_arg_xlat_virt_base(void);
 int setup_compat_arg_xlat(struct vcpu *v);
 void free_compat_arg_xlat(struct vcpu *v);
 #define is_compat_arg_xlat_range(addr, size) ({                               \
     unsigned long __off;                                                      \
     __off = (unsigned long)(addr) - (unsigned long)COMPAT_ARG_XLAT_VIRT_BASE; \
-    (__off <= COMPAT_ARG_XLAT_SIZE) &&                                        \
+    (__off < COMPAT_ARG_XLAT_SIZE) &&                                         \
     ((__off + (unsigned long)(size)) <= COMPAT_ARG_XLAT_SIZE);                \
 })
 

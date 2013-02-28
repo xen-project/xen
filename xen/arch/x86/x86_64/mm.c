@@ -832,27 +832,17 @@ void __init zap_low_mappings(void)
                      __PAGE_HYPERVISOR);
 }
 
-void *compat_arg_xlat_virt_base(void)
-{
-    return current->arch.compat_arg_xlat;
-}
-
 int setup_compat_arg_xlat(struct vcpu *v)
 {
-    unsigned int order = get_order_from_bytes(COMPAT_ARG_XLAT_SIZE);
-
-    v->arch.compat_arg_xlat = alloc_xenheap_pages(order,
-                                                  MEMF_node(vcpu_to_node(v)));
-
-    return v->arch.compat_arg_xlat ? 0 : -ENOMEM;
+    return create_perdomain_mapping(v->domain, ARG_XLAT_START(v),
+                                    PFN_UP(COMPAT_ARG_XLAT_SIZE),
+                                    NULL, NIL(struct page_info *));
 }
 
 void free_compat_arg_xlat(struct vcpu *v)
 {
-    unsigned int order = get_order_from_bytes(COMPAT_ARG_XLAT_SIZE);
-
-    free_xenheap_pages(v->arch.compat_arg_xlat, order);
-    v->arch.compat_arg_xlat = NULL;
+    destroy_perdomain_mapping(v->domain, ARG_XLAT_START(v),
+                              PFN_UP(COMPAT_ARG_XLAT_SIZE));
 }
 
 void cleanup_frame_table(struct mem_hotadd_info *info)

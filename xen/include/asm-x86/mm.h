@@ -579,6 +579,8 @@ int map_ldt_shadow_page(unsigned int);
 int create_perdomain_mapping(struct domain *, unsigned long va,
                              unsigned int nr, l1_pgentry_t **,
                              struct page_info **);
+void destroy_perdomain_mapping(struct domain *, unsigned long va,
+                               unsigned int nr);
 void free_perdomain_mappings(struct domain *);
 
 extern int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm);
