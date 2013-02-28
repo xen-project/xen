@@ -2313,6 +2313,13 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vector = intr_info & INTR_INFO_VECTOR_MASK;
         if ( vector == TRAP_machine_check )
             do_machine_check(regs);
+        if ( vector == TRAP_nmi
+             && ((intr_info & INTR_INFO_INTR_TYPE_MASK) ==
+                 (X86_EVENTTYPE_NMI << 8)) )
+        {
+            do_nmi(regs);
+            enable_nmis();
+        }
         break;
     case EXIT_REASON_MCE_DURING_VMENTRY:
         do_machine_check(regs);
@@ -2486,7 +2493,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
                  (X86_EVENTTYPE_NMI << 8) )
                 goto exit_and_crash;
             HVMTRACE_0D(NMI);
-            self_nmi(); /* Real NMI, vector 2: normal processing. */
+            /* Already handled above. */
             break;
         case TRAP_machine_check:
             HVMTRACE_0D(MCE);
