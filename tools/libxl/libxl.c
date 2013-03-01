@@ -528,6 +528,7 @@ static void xcinfo2xlinfo(const xc_domaininfo_t *xcinfo,
     else
         xlinfo->shutdown_reason  = ~0;
 
+    xlinfo->outstanding_memkb = PAGE_TO_MEMKB(xcinfo->outstanding_pages);
     xlinfo->current_memkb = PAGE_TO_MEMKB(xcinfo->tot_pages);
     xlinfo->shared_memkb = PAGE_TO_MEMKB(xcinfo->shr_pages);
     xlinfo->paged_memkb = PAGE_TO_MEMKB(xcinfo->paged_pages);

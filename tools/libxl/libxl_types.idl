@@ -196,6 +196,7 @@ libxl_dominfo = Struct("dominfo",[
     # Otherwise set to a value guaranteed not to clash with any valid
     # LIBXL_SHUTDOWN_REASON_* constant.
     ("shutdown_reason", libxl_shutdown_reason),
+    ("outstanding_memkb",  MemKB),
     ("current_memkb",   MemKB),
     ("shared_memkb", MemKB),
     ("paged_memkb", MemKB),
