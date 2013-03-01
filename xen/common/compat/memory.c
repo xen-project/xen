@@ -172,7 +172,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
                 if ( order_delta >= 0 )
                     nat.xchg->out.nr_extents = end_extent >> order_delta;
                 else
-                    nat.xchg->out.nr_extents = end_extent << order_delta;
+                    nat.xchg->out.nr_extents = end_extent << -order_delta;
                 ++split;
             }
 
