@@ -133,7 +133,7 @@ static int calculate_tbuf_size(unsigned int pages, uint16_t t_info_first_offset)
      * The array of mfns for the highest cpu can start at the maximum value
      * mfn_offset can hold. So reduce the number of cpus and also the mfn_offset.
      */
-    max_mfn_offset -= t_info_first_offset - 1;
+    max_mfn_offset -= t_info_first_offset;
     max_cpus--;
     if ( max_cpus )
         max_mfn_offset /= max_cpus;
