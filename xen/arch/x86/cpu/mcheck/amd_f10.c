@@ -62,14 +62,13 @@ amd_f10_handler(struct mc_info *mi, uint16_t bank, uint64_t status)
 	if (!(status & MCi_STATUS_MISCV))
 		return NULL;
 
-	mc_ext = x86_mcinfo_reserve(mi, sizeof(struct mcinfo_extended));
+	mc_ext = x86_mcinfo_reserve(mi, sizeof(*mc_ext));
 	if (!mc_ext)
 	{
 		mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
 		return NULL;
 	}
 
-	memset(mc_ext, 0, sizeof(*mc_ext));
 	mc_ext->common.type = MC_TYPE_EXTENDED;
 	mc_ext->common.size = sizeof(*mc_ext);
 	mc_ext->mc_msrs = 3;

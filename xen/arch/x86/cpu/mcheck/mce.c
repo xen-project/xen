@@ -200,14 +200,13 @@ static void mca_init_bank(enum mca_source who,
     if (!mi)
         return;
 
-    mib = x86_mcinfo_reserve(mi, sizeof(struct mcinfo_bank));
+    mib = x86_mcinfo_reserve(mi, sizeof(*mib));
     if (!mib)
     {
         mi->flags |= MCINFO_FLAGS_UNCOMPLETE;
         return;
     }
 
-    memset(mib, 0, sizeof (struct mcinfo_bank));
     mib->mc_status = mca_rdmsr(MSR_IA32_MCx_STATUS(bank));
 
     mib->common.type = MC_TYPE_BANK;
@@ -247,7 +246,6 @@ static int mca_init_global(uint32_t flags, struct mcinfo_global *mig)
     struct domain *d;
 
     /* Set global information */
-    memset(mig, 0, sizeof (struct mcinfo_global));
     mig->common.type = MC_TYPE_GLOBAL;
     mig->common.size = sizeof (struct mcinfo_global);
     status = mca_rdmsr(MSR_IA32_MCG_STATUS);
@@ -349,7 +347,7 @@ mcheck_mca_logout(enum mca_source who, struct mca_banks *bankmask,
             if ( (mctc = mctelem_reserve(which)) != NULL ) {
                 mci = mctelem_dataptr(mctc);
                 mcinfo_clear(mci);
-                mig = x86_mcinfo_reserve(mci, sizeof(struct mcinfo_global));
+                mig = x86_mcinfo_reserve(mci, sizeof(*mig));
                 /* mc_info should at least hold up the global information */
                 ASSERT(mig);
                 mca_init_global(mc_flags, mig);
@@ -820,7 +818,7 @@ void *x86_mcinfo_reserve(struct mc_info *mi, int size)
     /* there's enough space. add entry. */
     x86_mcinfo_nentries(mi)++;
 
-    return mic_index;
+    return memset(mic_index, 0, size);
 }
 
 void *x86_mcinfo_add(struct mc_info *mi, void *mcinfo)
