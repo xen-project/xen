@@ -195,8 +195,8 @@ test_all_events:
         cli                             # tests must not race interrupts
 /*test_softirqs:*/  
         movl  VCPU_processor(%rbx),%eax
-        shl   $IRQSTAT_shift,%rax
-        leaq  irq_stat(%rip),%rcx
+        shll  $IRQSTAT_shift,%eax
+        leaq  irq_stat+IRQSTAT_softirq_pending(%rip),%rcx
         cmpl  $0,(%rcx,%rax,1)
         jne   process_softirqs
         testb $1,VCPU_mce_pending(%rbx)
@@ -643,7 +643,7 @@ handle_ist_exception:
         /* Send an IPI to ourselves to cover for the lack of event checking. */
         movl  VCPU_processor(%rbx),%eax
         shll  $IRQSTAT_shift,%eax
-        leaq  irq_stat(%rip),%rcx
+        leaq  irq_stat+IRQSTAT_softirq_pending(%rip),%rcx
         cmpl  $0,(%rcx,%rax,1)
         je    1f
         movl  $EVENT_CHECK_VECTOR,%edi

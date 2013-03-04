@@ -97,8 +97,8 @@ vmx_asm_do_vmentry:
         cli
 
         mov  VCPU_processor(%rbx),%eax
-        shl  $IRQSTAT_shift,%rax
-        lea  irq_stat(%rip),%rdx
+        shl  $IRQSTAT_shift,%eax
+        lea  irq_stat+IRQSTAT_softirq_pending(%rip),%rdx
         cmpl $0,(%rdx,%rax,1)
         jnz  .Lvmx_process_softirqs
 

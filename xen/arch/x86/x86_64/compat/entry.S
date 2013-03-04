@@ -96,10 +96,10 @@ ENTRY(compat_test_all_events)
         cli                             # tests must not race interrupts
 /*compat_test_softirqs:*/
         movl  VCPU_processor(%rbx),%eax
-        shlq  $IRQSTAT_shift,%rax
-        leaq  irq_stat(%rip),%rcx
-        testl $~0,(%rcx,%rax,1)
-        jnz   compat_process_softirqs
+        shll  $IRQSTAT_shift,%eax
+        leaq  irq_stat+IRQSTAT_softirq_pending(%rip),%rcx
+        cmpl  $0,(%rcx,%rax,1)
+        jne   compat_process_softirqs
         testb $1,VCPU_mce_pending(%rbx)
         jnz   compat_process_mce
 .Lcompat_test_guest_nmi:

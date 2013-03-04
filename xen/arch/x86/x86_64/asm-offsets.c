@@ -156,6 +156,7 @@ void __dummy__(void)
 #endif
 
     DEFINE(IRQSTAT_shift, LOG_2(sizeof(irq_cpustat_t)));
+    OFFSET(IRQSTAT_softirq_pending, irq_cpustat_t, __softirq_pending);
     BLANK();
 
     OFFSET(CPUINFO86_ext_features, struct cpuinfo_x86, x86_capability[1]);

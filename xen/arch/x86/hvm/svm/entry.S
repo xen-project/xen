@@ -41,10 +41,10 @@ ENTRY(svm_asm_do_resume)
         CLGI
 
         mov  VCPU_processor(%rbx),%eax
-        shl  $IRQSTAT_shift,%rax
-        lea  irq_stat(%rip),%rdx
-        testl $~0,(%rdx,%rax,1)
-        jnz  .Lsvm_process_softirqs
+        shl  $IRQSTAT_shift,%eax
+        lea  irq_stat+IRQSTAT_softirq_pending(%rip),%rdx
+        cmpl $0,(%rdx,%rax,1)
+        jne  .Lsvm_process_softirqs
 
         testb $0, VCPU_nsvm_hap_enabled(%rbx)
 UNLIKELY_START(nz, nsvm_hap)
