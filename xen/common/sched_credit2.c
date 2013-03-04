@@ -21,7 +21,7 @@
 #include <xen/perfc.h>
 #include <xen/sched-if.h>
 #include <xen/softirq.h>
-#include <asm/atomic.h>
+#include <asm/div64.h>
 #include <xen/errno.h>
 #include <xen/trace.h>
 #include <xen/cpu.h>
@@ -205,7 +205,7 @@ struct csched_runqueue_data {
 
     struct list_head runq; /* Ordered list of runnable vms */
     struct list_head svc;  /* List of all vcpus assigned to this runqueue */
-    int max_weight;
+    unsigned int max_weight;
 
     cpumask_t idle,        /* Currently idle */
         tickled;           /* Another cpu in the queue is already targeted for this one */
@@ -244,7 +244,8 @@ struct csched_vcpu {
     struct csched_dom *sdom;
     struct vcpu *vcpu;
 
-    int weight;
+    unsigned int weight;
+    unsigned int residual;
 
     int credit;
     s_time_t start_time; /* When we were scheduled (used for credit) */
@@ -271,11 +272,19 @@ struct csched_dom {
 
 /*
  * Time-to-credit, credit-to-time.
+ * 
+ * We keep track of the "residual" time to make sure that frequent short
+ * schedules still get accounted for in the end.
+ *
  * FIXME: Do pre-calculated division?
  */
-static s_time_t t2c(struct csched_runqueue_data *rqd, s_time_t time, struct csched_vcpu *svc)
+static void t2c_update(struct csched_runqueue_data *rqd, s_time_t time,
+                          struct csched_vcpu *svc)
 {
-    return time * rqd->max_weight / svc->weight;
+    uint64_t val = time * rqd->max_weight + svc->residual;
+
+    svc->residual = do_div(val, svc->weight);
+    svc->credit -= val;
 }
 
 static s_time_t c2t(struct csched_runqueue_data *rqd, s_time_t credit, struct csched_vcpu *svc)
@@ -636,8 +645,7 @@ void burn_credits(struct csched_runqueue_data *rqd, struct csched_vcpu *svc, s_t
     delta = now - svc->start_time;
 
     if ( delta > 0 ) {
-        /* This will round down; should we consider rounding up...? */
-        svc->credit -= t2c(rqd, delta, svc);
+        t2c_update(rqd, delta, svc);
         svc->start_time = now;
 
         d2printk("b d%dv%d c%d\n",
