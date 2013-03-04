@@ -397,7 +397,8 @@ static int sedf_pick_cpu(const struct scheduler *ops, struct vcpu *v)
 
     online = cpupool_scheduler_cpumask(v->domain->cpupool);
     cpumask_and(&online_affinity, v->cpu_affinity, online);
-    return cpumask_first(&online_affinity);
+    return cpumask_cycle(v->vcpu_id % cpumask_weight(&online_affinity) - 1,
+                         &online_affinity);
 }
 
 /*
