@@ -433,7 +433,7 @@ unsigned long domain_get_maximum_gpfn(struct domain *d)
     if ( is_hvm_domain(d) )
         return p2m_get_hostp2m(d)->max_mapped_pfn;
     /* NB. PV guests specify nr_pfns rather than max_pfn so we adjust here. */
-    return arch_get_max_pfn(d) - 1;
+    return (arch_get_max_pfn(d) ?: 1) - 1;
 }
 
 void share_xen_page_with_guest(

@@ -15,7 +15,8 @@ CHECK_TYPE(domid);
 
 int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
 {
-    int rc, split, op = cmd & MEMOP_CMD_MASK;
+    int split, op = cmd & MEMOP_CMD_MASK;
+    long rc;
     unsigned int start_extent = cmd >> MEMOP_EXTENT_SHIFT;
 
     do
@@ -204,7 +205,7 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
 
         rc = do_memory_op(cmd, nat.hnd);
         if ( rc < 0 )
-            return rc;
+            break;
 
         cmd = 0;
         if ( hypercall_xlat_continuation(&cmd, 0x02, nat.hnd, compat) )
@@ -325,6 +326,12 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             return hypercall_create_continuation(
                 __HYPERVISOR_memory_op, "ih", cmd, compat);
     } while ( split > 0 );
+
+    if ( unlikely(rc > INT_MAX) )
+        return INT_MAX;
+
+    if ( unlikely(rc < INT_MIN) )
+        return INT_MIN;
 
     return rc;
 }
