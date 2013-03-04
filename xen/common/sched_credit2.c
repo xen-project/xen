@@ -1505,30 +1505,56 @@ csched_dom_destroy(const struct scheduler *ops, struct domain *dom)
 static s_time_t
 csched_runtime(const struct scheduler *ops, int cpu, struct csched_vcpu *snext)
 {
-    s_time_t time = CSCHED_MAX_TIMER;
+    s_time_t time; 
+    int rt_credit; /* Proposed runtime measured in credits */
     struct csched_runqueue_data *rqd = RQD(ops, cpu);
     struct list_head *runq = &rqd->runq;
 
     if ( is_idle_vcpu(snext->vcpu) )
         return CSCHED_MAX_TIMER;
 
-    /* Basic time */
-    time = c2t(rqd, snext->credit, snext);
+    /* General algorithm:
+     * 1) Run until snext's credit will be 0
+     * 2) But if someone is waiting, run until snext's credit is equal
+     * to his
+     * 3) But never run longer than MAX_TIMER or shorter than MIN_TIMER.
+     */
 
-    /* Next guy on runqueue */
+    /* 1) Basic time: Run until credit is 0. */
+    rt_credit = snext->credit;
+
+    /* 2) If there's someone waiting whose credit is positive,
+     * run until your credit ~= his */
     if ( ! list_empty(runq) )
     {
-        struct csched_vcpu *svc = __runq_elem(runq->next);
-        s_time_t ntime;
+        struct csched_vcpu *swait = __runq_elem(runq->next);
 
-        if ( ! is_idle_vcpu(svc->vcpu) )
+        if ( ! is_idle_vcpu(swait->vcpu)
+             && swait->credit > 0 )
         {
-            ntime = c2t(rqd, snext->credit - svc->credit, snext);
-
-            if ( time > ntime )
-                time = ntime;
+            rt_credit = snext->credit - swait->credit;
         }
     }
+
+    /*
+     * snext is about to be scheduled; so:
+     *
+     * 1. if snext->credit were less than 0 when it was taken off the
+     * runqueue, then csched_schedule() should have called
+     * reset_credit().  So at this point snext->credit must be greater
+     * than 0.
+     *
+     * 2. snext's credit must be greater than or equal to anyone else
+     * in the queue, so snext->credit - swait->credit must be greater
+     * than or equal to 0.
+     */
+    ASSERT(rt_credit >= 0);
+
+    /* FIXME: See if we can eliminate this conversion if we know time
+     * will be outside (MIN,MAX).  Probably requires pre-calculating
+     * credit values of MIN,MAX per vcpu, since each vcpu burns credit
+     * at a different rate. */
+    time = c2t(rqd, rt_credit, snext);
 
     /* Check limits */
     if ( time < CSCHED_MIN_TIMER )
