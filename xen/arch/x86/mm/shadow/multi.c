@@ -4621,7 +4621,6 @@ static void *emulate_map_dest(struct vcpu *v,
                               u32 bytes,
                               struct sh_emulate_ctxt *sh_ctxt)
 {
-    unsigned long offset;
     void *map = NULL;
 
     sh_ctxt->mfn1 = emulate_gva_to_mfn(v, vaddr, sh_ctxt);
@@ -4653,6 +4652,8 @@ static void *emulate_map_dest(struct vcpu *v,
     }
     else 
     {
+        unsigned long mfns[2];
+
         /* Cross-page emulated writes are only supported for HVM guests; 
          * PV guests ought to know better */
         if ( !is_hvm_vcpu(v) )
@@ -4670,17 +4671,11 @@ static void *emulate_map_dest(struct vcpu *v,
         /* Cross-page writes mean probably not a pagetable */
         sh_remove_shadows(v, sh_ctxt->mfn2, 0, 0 /* Slow, can fail */ );
         
-        /* Hack: we map the pages into the vcpu's LDT space, since we
-         * know that we're not going to need the LDT for HVM guests, 
-         * and only HVM guests are allowed unaligned writes. */
-        ASSERT(is_hvm_vcpu(v));
-        map = (void *)LDT_VIRT_START(v);
-        offset = l1_linear_offset((unsigned long) map);
-        l1e_write(&__linear_l1_table[offset],
-                  l1e_from_pfn(mfn_x(sh_ctxt->mfn1), __PAGE_HYPERVISOR));
-        l1e_write(&__linear_l1_table[offset + 1],
-                  l1e_from_pfn(mfn_x(sh_ctxt->mfn2), __PAGE_HYPERVISOR));
-        flush_tlb_local();
+        mfns[0] = mfn_x(sh_ctxt->mfn1);
+        mfns[1] = mfn_x(sh_ctxt->mfn2);
+        map = vmap(mfns, 2);
+        if ( !map )
+            return MAPPING_UNHANDLEABLE;
         map += (vaddr & ~PAGE_MASK);
     }
 
@@ -4758,14 +4753,8 @@ static void emulate_unmap_dest(struct vcpu *v,
 
     if ( unlikely(mfn_valid(sh_ctxt->mfn2)) )
     {
-        unsigned long offset;
         paging_mark_dirty(v->domain, mfn_x(sh_ctxt->mfn2));
-        /* Undo the hacky two-frame contiguous map. */
-        ASSERT(((unsigned long) addr & PAGE_MASK) == LDT_VIRT_START(v));
-        offset = l1_linear_offset((unsigned long) addr);
-        l1e_write(&__linear_l1_table[offset], l1e_empty());
-        l1e_write(&__linear_l1_table[offset + 1], l1e_empty());
-        flush_tlb_all();
+        vunmap((void *)((unsigned long)addr & PAGE_MASK));
     }
     else 
         sh_unmap_domain_page(addr);
