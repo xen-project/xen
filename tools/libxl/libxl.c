@@ -2032,7 +2032,7 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
     STATE_AO_GC(aodev->ao);
     flexarray_t *front = NULL;
     flexarray_t *back = NULL;
-    char *dev, *script;
+    char *dev = NULL, *script;
     libxl__device *device;
     int rc;
     libxl_ctx *ctx = gc->owner;
@@ -2095,12 +2095,15 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
                 break;
 
             case LIBXL_DISK_BACKEND_TAP:
-                dev = libxl__blktap_devpath(gc, disk->pdev_path, disk->format);
-                if (!dev) {
-                    LOG(ERROR, "failed to get blktap devpath for %p\n",
-                        disk->pdev_path);
-                    rc = ERROR_FAIL;
-                    goto out;
+                if (dev == NULL) {
+                    dev = libxl__blktap_devpath(gc, disk->pdev_path,
+                                                disk->format);
+                    if (!dev) {
+                        LOG(ERROR, "failed to get blktap devpath for %p\n",
+                            disk->pdev_path);
+                        rc = ERROR_FAIL;
+                        goto out;
+                    }
                 }
                 flexarray_append(back, "tapdisk-params");
                 flexarray_append(back, libxl__sprintf(gc, "%s:%s",
