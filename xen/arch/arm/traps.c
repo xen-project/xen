@@ -52,6 +52,17 @@ integer_param("debug_stack_lines", debug_stack_lines);
 
 #define stack_words_per_line 8
 
+
+void __cpuinit init_traps(void)
+{
+    /* Setup Hyp vector base */
+    WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
+
+    /* Setup hypervisor traps */
+    WRITE_SYSREG(HCR_PTW|HCR_BSU_OUTER|HCR_AMO|HCR_IMO|HCR_VM, HCR_EL2);
+    isb();
+}
+
 asmlinkage void __div0(void)
 {
     printk("Division by zero in hypervisor.\n");

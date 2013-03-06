@@ -251,6 +251,16 @@ void __init arch_init_memory(void)
     BUG_ON(IS_ERR(dom_cow));
 }
 
+void __cpuinit setup_virt_paging(void)
+{
+    /* Setup Stage 2 address translation */
+    /* SH0=00, ORGN0=IRGN0=01
+     * SL0=01 (Level-1)
+     * T0SZ=(1)1000 = -8 (40 bit physical addresses)
+     */
+    WRITE_SYSREG32(0x80002558, VTCR_EL2); isb();
+}
+
 /* Boot-time pagetable setup.
  * Changes here may need matching changes in head.S */
 void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
