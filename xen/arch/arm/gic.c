@@ -667,7 +667,7 @@ void gic_dump_info(struct vcpu *v)
     int i;
     struct pending_irq *p;
 
-    printk("GICH_LRs (vcpu %d) mask=%llx\n", v->vcpu_id, v->arch.lr_mask);
+    printk("GICH_LRs (vcpu %d) mask=%"PRIx64"\n", v->vcpu_id, v->arch.lr_mask);
     if ( v == current )
     {
         for ( i = 0; i < nr_lrs; i++ )
