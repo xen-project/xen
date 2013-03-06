@@ -286,7 +286,7 @@ static int vgic_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
         return 1;
 
     case GICD_NSACR ... GICD_NSACRN:
-        /* We do not implement securty extensions for guests, read zero */
+        /* We do not implement security extensions for guests, read zero */
         goto read_as_zero;
 
     case GICD_SGIR:
@@ -396,7 +396,7 @@ static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         goto write_ignore;
 
     case GICD_IGROUPR ... GICD_IGROUPRN:
-        /* We do not implement securty extensions for guests, write ignore */
+        /* We do not implement security extensions for guests, write ignore */
         goto write_ignore;
 
     case GICD_ISENABLER ... GICD_ISENABLERN:
@@ -494,7 +494,7 @@ static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         return 1;
 
     case GICD_NSACR ... GICD_NSACRN:
-        /* We do not implement securty extensions for guests, write ignore */
+        /* We do not implement security extensions for guests, write ignore */
         goto write_ignore;
 
     case GICD_SGIR:
