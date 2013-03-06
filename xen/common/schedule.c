@@ -30,6 +30,7 @@
 #include <xen/mm.h>
 #include <xen/err.h>
 #include <xen/guest_access.h>
+#include <xen/hypercall.h>
 #include <xen/multicall.h>
 #include <xen/cpu.h>
 #include <xen/preempt.h>

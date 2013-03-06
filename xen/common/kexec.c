@@ -15,6 +15,7 @@
 #include <xen/nmi.h>
 #include <xen/sched.h>
 #include <xen/types.h>
+#include <xen/hypercall.h>
 #include <xen/kexec.h>
 #include <xen/keyhandler.h>
 #include <public/kexec.h>

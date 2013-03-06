@@ -126,8 +126,7 @@ do_hvm_op(
 extern long
 do_kexec_op(
     unsigned long op,
-    int arg1,
-    XEN_GUEST_HANDLE_PARAM(void) arg);
+    XEN_GUEST_HANDLE_PARAM(void) uarg);
 
 extern long
 do_xsm_op(
@@ -174,7 +173,8 @@ compat_sched_op(
 
 extern int
 compat_set_timer_op(
-    s_time_t timeout);
+    u32 lo,
+    s32 hi);
 
 #endif
 
