@@ -111,7 +111,7 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
 
     ret = xsm_map_domain_pirq(XSM_TARGET, d);
     if ( ret )
-        return ret;
+        goto free_domain;
 
     /* Verify or get irq. */
     switch ( type )
