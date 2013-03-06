@@ -577,7 +577,7 @@ void vcpu_show_execution_state(struct vcpu *v)
 
 void do_unexpected_trap(const char *msg, struct cpu_user_regs *regs)
 {
-    printk("Unexpected Trap: %s\n", msg);
+    printk("CPU%d: Unexpected Trap: %s\n", smp_processor_id(), msg);
     show_execution_state(regs);
     while(1);
 }
