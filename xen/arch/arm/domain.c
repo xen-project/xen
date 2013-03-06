@@ -436,6 +436,8 @@ int vcpu_initialise(struct vcpu *v)
     if ( is_idle_vcpu(v) )
         return rc;
 
+    v->arch.sctlr = SCTLR_BASE;
+
     if ( (rc = vcpu_vgic_init(v)) != 0 )
         return rc;
 

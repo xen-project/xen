@@ -455,8 +455,6 @@ int construct_dom0(struct domain *d)
     }
 #endif
 
-    v->arch.sctlr = SCTLR_BASE;
-
     WRITE_SYSREG(HCR_PTW|HCR_BSU_OUTER|HCR_AMO|HCR_IMO|HCR_VM, HCR_EL2);
     isb();
 
