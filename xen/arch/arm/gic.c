@@ -513,17 +513,18 @@ static void gic_restore_pending_irqs(struct vcpu *v)
 {
     int i;
     struct pending_irq *p, *t;
+    unsigned long flags;
 
     list_for_each_entry_safe ( p, t, &v->arch.vgic.lr_pending, lr_queue )
     {
         i = find_first_zero_bit(&this_cpu(lr_mask), nr_lrs);
         if ( i >= nr_lrs ) return;
 
-        spin_lock_irq(&gic.lock);
+        spin_lock_irqsave(&gic.lock, flags);
         gic_set_lr(i, p->irq, GICH_LR_PENDING, p->priority);
         list_del_init(&p->lr_queue);
         set_bit(i, &this_cpu(lr_mask));
-        spin_unlock_irq(&gic.lock);
+        spin_unlock_irqrestore(&gic.lock, flags);
     }
 
 }
@@ -546,6 +547,10 @@ static void gic_inject_irq_stop(void)
 
 void gic_inject(void)
 {
+    if ( vcpu_info(current, evtchn_upcall_pending) )
+        vgic_vcpu_inject_irq(current, VGIC_IRQ_EVTCHN_CALLBACK, 1);
+
+    gic_restore_pending_irqs(current);
     if (!this_cpu(lr_mask))
         gic_inject_irq_stop();
     else
