@@ -651,7 +651,7 @@ static struct domain *create_domain(int domid)
 		return NULL;
 	}
 
-	dom = (struct domain *)malloc(sizeof(struct domain));
+	dom = calloc(1, sizeof *dom);
 	if (dom == NULL) {
 		dolog(LOG_ERR, "Out of memory %s:%s():L%d",
 		      __FILE__, __FUNCTION__, __LINE__);
@@ -672,21 +672,11 @@ static struct domain *create_domain(int domid)
 	dom->slave_fd = -1;
 	dom->log_fd = -1;
 
-	dom->is_dead = false;
-	dom->buffer.data = 0;
-	dom->buffer.consumed = 0;
-	dom->buffer.size = 0;
-	dom->buffer.capacity = 0;
-	dom->buffer.max_capacity = 0;
-	dom->event_count = 0;
 	dom->next_period = ((long long)ts.tv_sec * 1000) + (ts.tv_nsec / 1000000) + RATE_LIMIT_PERIOD;
-	dom->next = NULL;
 
 	dom->ring_ref = -1;
 	dom->local_port = -1;
 	dom->remote_port = -1;
-	dom->interface = NULL;
-	dom->xce_handle = NULL;
 
 	if (!watch_domain(dom, true))
 		goto out;
