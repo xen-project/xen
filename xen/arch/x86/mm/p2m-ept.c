@@ -401,8 +401,9 @@ ept_set_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 
         /* then move to the level we want to make real changes */
         for ( ; i > target; i-- )
-            ept_next_level(p2m, 0, &table, &gfn_remainder, i);
-
+            if ( !ept_next_level(p2m, 0, &table, &gfn_remainder, i) )
+                break;
+        /* We just installed the pages we need. */
         ASSERT(i == target);
 
         index = gfn_remainder >> (i * EPT_TABLE_ORDER);
@@ -704,6 +705,7 @@ void ept_change_entry_emt_with_range(struct domain *d,
     mfn_t mfn;
     int order = 0;
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
+    int rc;
 
     p2m_lock(p2m);
     for ( gfn = start_gfn; gfn <= end_gfn; gfn++ )
@@ -732,7 +734,11 @@ void ept_change_entry_emt_with_range(struct domain *d,
                     order = level * EPT_TABLE_ORDER;
                     if ( need_modify_ept_entry(p2m, gfn, mfn, 
                           e.ipat, e.emt, e.sa_p2mt) )
-                        ept_set_entry(p2m, gfn, mfn, order, e.sa_p2mt, e.access);
+                    {
+                        rc = ept_set_entry(p2m, gfn, mfn, order,
+                                           e.sa_p2mt, e.access);
+                        ASSERT(rc);
+                    }
                     gfn += trunk;
                     break;
                 }
@@ -741,8 +747,12 @@ void ept_change_entry_emt_with_range(struct domain *d,
         }
         else /* gfn assigned with 4k */
         {
-            if ( need_modify_ept_entry(p2m, gfn, mfn, e.ipat, e.emt, e.sa_p2mt) )
-                ept_set_entry(p2m, gfn, mfn, order, e.sa_p2mt, e.access);
+            if ( need_modify_ept_entry(p2m, gfn, mfn,
+                                       e.ipat, e.emt, e.sa_p2mt) )
+            {
+                rc = ept_set_entry(p2m, gfn, mfn, order, e.sa_p2mt, e.access);
+                ASSERT(rc);
+            }
         }
     }
     p2m_unlock(p2m);
