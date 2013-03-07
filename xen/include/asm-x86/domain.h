@@ -98,23 +98,23 @@ struct shadow_domain {
     /* 1-to-1 map for use when HVM vcpus have paging disabled */
     pagetable_t unpaged_pagetable;
 
+    /* reflect guest table dirty status, incremented by write
+     * emulation and remove write permission */
+    atomic_t gtable_dirty_version;
+
     /* Shadow hashtable */
     struct page_info **hash_table;
-    int hash_walking;  /* Some function is walking the hash table */
+    bool_t hash_walking;  /* Some function is walking the hash table */
 
     /* Fast MMIO path heuristic */
-    int has_fast_mmio_entries;
-
-    /* reflect guest table dirty status, incremented by write
-     * emulation and remove write permission
-     */
-    atomic_t          gtable_dirty_version;
+    bool_t has_fast_mmio_entries;
 
     /* OOS */
-    int oos_active;
-    int oos_off;
+    bool_t oos_active;
+    bool_t oos_off;
 
-    int pagetable_dying_op;
+    /* Has this domain ever used HVMOP_pagetable_dying? */
+    bool_t pagetable_dying_op;
 };
 
 struct shadow_vcpu {
@@ -142,7 +142,7 @@ struct shadow_vcpu {
         unsigned long off[SHADOW_OOS_FIXUPS];
     } oos_fixup[SHADOW_OOS_PAGES];
 
-    int pagetable_dying;
+    bool_t pagetable_dying;
 };
 
 /************************************************/
