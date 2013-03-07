@@ -40,7 +40,14 @@ static struct dmi_system_id __initdata bigsmp_dmi_table[] = {
 
 static __init int probe_bigsmp(void)
 { 
-	if (!def_to_bigsmp)
+	/*
+	 * We don't implement cluster mode, so force use of
+	 * physical mode in both cases.
+	 */
+	if (acpi_gbl_FADT.flags &
+	    (ACPI_FADT_APIC_CLUSTER | ACPI_FADT_APIC_PHYSICAL))
+		def_to_bigsmp = 1;
+	else if (!def_to_bigsmp)
 		dmi_check_system(bigsmp_dmi_table);
 	return def_to_bigsmp;
 } 
