@@ -646,7 +646,7 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
          * to myself.
          */
         if (irr  & (1 << (vector % 32))) {
-            genapic->send_IPI_self(IRQ_MOVE_CLEANUP_VECTOR);
+            send_IPI_self(IRQ_MOVE_CLEANUP_VECTOR);
             TRACE_3D(TRC_HW_IRQ_MOVE_CLEANUP_DELAY,
                      irq, vector, smp_processor_id());
             goto unlock;
@@ -692,7 +692,7 @@ static void send_cleanup_vector(struct irq_desc *desc)
 
     cpumask_and(&cleanup_mask, desc->arch.old_cpu_mask, &cpu_online_map);
     desc->arch.move_cleanup_count = cpumask_weight(&cleanup_mask);
-    genapic->send_IPI_mask(&cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
+    send_IPI_mask(&cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
 
     desc->arch.move_in_progress = 0;
 }

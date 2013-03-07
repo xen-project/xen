@@ -30,6 +30,7 @@ bool_t __read_mostly mce_broadcast = 0;
 bool_t is_mc_panic;
 unsigned int __read_mostly nr_mce_banks;
 unsigned int __read_mostly firstbank;
+uint8_t __read_mostly cmci_apic_vector;
 
 static void intpose_init(void);
 static void mcinfo_clear(struct mc_info *);
@@ -1277,12 +1278,6 @@ static void x86_mc_mceinject(void *data)
     __asm__ __volatile__("int $0x12");
 }
 
-static void x86_cmci_inject(void *data)
-{
-    printk("Simulating CMCI on cpu %d\n", smp_processor_id());
-    __asm__ __volatile__("int $0xf7");
-}
-
 #if BITS_PER_LONG == 64
 
 #define ID2COOKIE(id) ((mctelem_cookie_t)(id))
@@ -1568,11 +1563,15 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
             on_selected_cpus(cpumap, x86_mc_mceinject, NULL, 1);
             break;
         case XEN_MC_INJECT_TYPE_CMCI:
-            if ( !cmci_support )
+            if ( !cmci_apic_vector )
                 ret = x86_mcerr(
                     "No CMCI supported in platform\n", -EINVAL);
             else
-                on_selected_cpus(cpumap, x86_cmci_inject, NULL, 1);
+            {
+                if ( cpumask_test_cpu(smp_processor_id(), cpumap) )
+                    send_IPI_self(cmci_apic_vector);
+                send_IPI_mask(cpumap, cmci_apic_vector);
+            }
             break;
         default:
             ret = x86_mcerr("Wrong mca type\n", -EINVAL);
