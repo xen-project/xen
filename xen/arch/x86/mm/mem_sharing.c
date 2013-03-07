@@ -1273,6 +1273,8 @@ int relinquish_shared_pages(struct domain *d)
         p2m_access_t a;
         p2m_type_t t;
         mfn_t mfn;
+        int set_rc;
+
         if ( atomic_read(&d->shr_pages) == 0 )
             break;
         mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, NULL);
@@ -1281,10 +1283,12 @@ int relinquish_shared_pages(struct domain *d)
             /* Does not fail with ENOMEM given the DESTROY flag */
             BUG_ON(__mem_sharing_unshare_page(d, gfn, 
                     MEM_SHARING_DESTROY_GFN));
-            /* Clear out the p2m entry so no one else may try to 
-             * unshare */
-            p2m->set_entry(p2m, gfn, _mfn(0), PAGE_ORDER_4K,
-                            p2m_invalid, p2m_access_rwx);
+            /* Clear out the p2m entry so no one else may try to
+             * unshare.  Must succeed: we just read the old entry and
+             * we hold the p2m lock. */
+            set_rc = p2m->set_entry(p2m, gfn, _mfn(0), PAGE_ORDER_4K,
+                                    p2m_invalid, p2m_access_rwx);
+            ASSERT(set_rc != 0);
             count++;
         }
 
