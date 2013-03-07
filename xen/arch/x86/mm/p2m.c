@@ -1262,21 +1262,27 @@ bool_t p2m_mem_access_check(paddr_t gpa, bool_t gla_valid, unsigned long gla,
     p2m_type_t p2mt;
     p2m_access_t p2ma;
     mem_event_request_t *req;
+    int rc;
 
-    /* First, handle rx2rw conversion automatically */
+    /* First, handle rx2rw conversion automatically.
+     * These calls to p2m->set_entry() must succeed: we have the gfn
+     * locked and just did a successful get_entry(). */
     gfn_lock(p2m, gfn, 0);
     mfn = p2m->get_entry(p2m, gfn, &p2mt, &p2ma, 0, NULL);
 
     if ( access_w && p2ma == p2m_access_rx2rw ) 
     {
-        p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rw);
+        rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rw);
+        ASSERT(rc);
         gfn_unlock(p2m, gfn, 0);
         return 1;
     }
     else if ( p2ma == p2m_access_n2rwx )
     {
         ASSERT(access_w || access_r || access_x);
-        p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rwx);
+        rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K,
+                            p2mt, p2m_access_rwx);
+        ASSERT(rc);
     }
     gfn_unlock(p2m, gfn, 0);
 
@@ -1294,13 +1300,18 @@ bool_t p2m_mem_access_check(paddr_t gpa, bool_t gla_valid, unsigned long gla,
         }
         else
         {
+            gfn_lock(p2m, gfn, 0);
+            mfn = p2m->get_entry(p2m, gfn, &p2mt, &p2ma, 0, NULL);
             if ( p2ma != p2m_access_n2rwx )
             {
-                /* A listener is not required, so clear the access restrictions */
-                gfn_lock(p2m, gfn, 0);
-                p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2mt, p2m_access_rwx);
-                gfn_unlock(p2m, gfn, 0);
+                /* A listener is not required, so clear the access
+                 * restrictions.  This set must succeed: we have the
+                 * gfn locked and just did a successful get_entry(). */
+                rc = p2m->set_entry(p2m, gfn, mfn, PAGE_ORDER_4K,
+                                    p2mt, p2m_access_rwx);
+                ASSERT(rc);
             }
+            gfn_unlock(p2m, gfn, 0);
             return 1;
         }
     }
