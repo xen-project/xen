@@ -1591,10 +1591,16 @@ shadow_alloc_p2m_page(struct domain *d)
     if ( d->arch.paging.shadow.total_pages 
          < shadow_min_acceptable_pages(d) + 1 )
     {
+        if ( !d->arch.paging.p2m_alloc_failed )
+        {
+            d->arch.paging.p2m_alloc_failed = 1;
+            dprintk(XENLOG_ERR, "d%i failed to allocate from shadow pool",
+                    d->domain_id);
+        }
         paging_unlock(d);
         return NULL;
     }
- 
+
     shadow_prealloc(d, SH_type_p2m_table, 1);
     pg = mfn_to_page(shadow_alloc(d, SH_type_p2m_table, 0));
     d->arch.paging.shadow.p2m_pages++;

@@ -190,6 +190,8 @@ struct paging_domain {
      * (used by p2m and log-dirty code for their tries) */
     struct page_info * (*alloc_page)(struct domain *d);
     void (*free_page)(struct domain *d, struct page_info *pg);
+    /* Has that pool ever run out of memory? */
+    bool_t p2m_alloc_failed;
 };
 
 struct paging_vcpu {
