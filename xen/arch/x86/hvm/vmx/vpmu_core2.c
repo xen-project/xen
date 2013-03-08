@@ -739,26 +739,26 @@ int vmx_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
         switch ( cpu_model )
         {
         /* Core2: */
-        case 15: /* original 65 nm celeron/pentium/core2/xeon, "Merom"/"Conroe" */
-        case 22: /* single-core 65 nm celeron/core2solo "Merom-L"/"Conroe-L" */
-        case 23: /* 45 nm celeron/core2/xeon "Penryn"/"Wolfdale" */
-        case 29: /* six-core 45 nm xeon "Dunnington" */
+        case 0x0f: /* original 65 nm celeron/pentium/core2/xeon, "Merom"/"Conroe" */
+        case 0x16: /* single-core 65 nm celeron/core2solo "Merom-L"/"Conroe-L" */
+        case 0x17: /* 45 nm celeron/core2/xeon "Penryn"/"Wolfdale" */
+        case 0x1d: /* six-core 45 nm xeon "Dunnington" */
 
-        case 42: /* SandyBridge */
-        case 45: /* SandyBridge, "Romley-EP" */
+        case 0x2a: /* SandyBridge */
+        case 0x2d: /* SandyBridge, "Romley-EP" */
 
         /* Nehalem: */
-        case 26: /* 45 nm nehalem, "Bloomfield" */
-        case 30: /* 45 nm nehalem, "Lynnfield", "Clarksfield", "Jasper Forest" */
-        case 46: /* 45 nm nehalem-ex, "Beckton" */
+        case 0x1a: /* 45 nm nehalem, "Bloomfield" */
+        case 0x1e: /* 45 nm nehalem, "Lynnfield", "Clarksfield", "Jasper Forest" */
+        case 0x2e: /* 45 nm nehalem-ex, "Beckton" */
 
         /* Westmere: */
-        case 37: /* 32 nm nehalem, "Clarkdale", "Arrandale" */
-        case 44: /* 32 nm nehalem, "Gulftown", "Westmere-EP" */
-        case 47: /* 32 nm Westmere-EX */
+        case 0x25: /* 32 nm nehalem, "Clarkdale", "Arrandale" */
+        case 0x2c: /* 32 nm nehalem, "Gulftown", "Westmere-EP" */
+        case 0x27: /* 32 nm Westmere-EX */
 
-        case 58: /* IvyBridge */
-        case 62: /* IvyBridge EP */
+        case 0x3a: /* IvyBridge */
+        case 0x3e: /* IvyBridge EP */
             ret = core2_vpmu_initialise(v, vpmu_flags);
             if ( !ret )
                 vpmu->arch_vpmu_ops = &core2_vpmu_ops;
