@@ -108,13 +108,17 @@ F:	xen/drivers/cpufreq/
 
 AMD IOMMU
 M:	Wei Wang <weiwang.dd@gmail.com>
+M:	Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+M:	Jacob Shin <jacob.shin@amd.com>
 S:	Maintained
 F:	xen/drivers/passthrough/amd/
 
 AMD SVM
 M:	Andre Przywara <osp@andrep.de>
 M:	Christoph Egger <Christoph_Egger@gmx.de>
-M:	Boris Ostrovsky <boris.ostrovsky@amd.com>
+M:	Boris Ostrovsky <boris.ostrovsky@oracle.com>
+M:	Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+M:	Jacob Shin <jacob.shin@amd.com>
 S:	Supported
 F:	xen/arch/x86/hvm/svm/
 
