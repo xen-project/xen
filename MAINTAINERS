@@ -114,7 +114,6 @@ S:	Maintained
 F:	xen/drivers/passthrough/amd/
 
 AMD SVM
-M:	Andre Przywara <osp@andrep.de>
 M:	Christoph Egger <Christoph_Egger@gmx.de>
 M:	Boris Ostrovsky <boris.ostrovsky@oracle.com>
 M:	Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
