@@ -659,8 +659,8 @@ static u64 read_pci_mem_bar(u16 seg, u8 bus, u8 slot, u8 func, u8 bir, int vf)
  * @entries: pointer to an array of struct msix_entry entries
  * @nvec: number of @entries
  *
- * Setup the MSI-X capability structure of device function with a
- * single MSI-X irq. A return of zero indicates the successful setup of
+ * Setup the MSI-X capability structure of device function with the requested
+ * number MSI-X irqs. A return of zero indicates the successful setup of
  * requested MSI-X entries with allocated irqs or non-zero for otherwise.
  **/
 static int msix_capability_init(struct pci_dev *dev,
@@ -668,86 +668,69 @@ static int msix_capability_init(struct pci_dev *dev,
                                 struct msi_desc **desc,
                                 unsigned int nr_entries)
 {
-    struct msi_desc *entry;
-    int pos;
+    struct msi_desc *entry = NULL;
+    int pos, vf;
     u16 control;
-    u64 table_paddr, entry_paddr;
-    u32 table_offset, entry_offset;
-    u8 bir;
-    void __iomem *base;
-    int idx;
+    u64 table_paddr;
+    u32 table_offset;
+    u8 bir, pbus, pslot, pfunc;
     u16 seg = dev->seg;
     u8 bus = dev->bus;
     u8 slot = PCI_SLOT(dev->devfn);
     u8 func = PCI_FUNC(dev->devfn);
 
     ASSERT(spin_is_locked(&pcidevs_lock));
-    ASSERT(desc);
 
     pos = pci_find_cap_offset(seg, bus, slot, func, PCI_CAP_ID_MSIX);
     control = pci_conf_read16(seg, bus, slot, func, msix_control_reg(pos));
     msix_set_enable(dev, 0);/* Ensure msix is disabled as I set it up */
 
-    /* MSI-X Table Initialization */
-    entry = alloc_msi_entry();
-    if ( !entry )
-        return -ENOMEM;
+    if ( desc )
+    {
+        entry = alloc_msi_entry();
+        if ( !entry )
+            return -ENOMEM;
+        ASSERT(msi);
+    }
 
-    /* Request & Map MSI-X table region */
+    /* Locate MSI-X table region */
     table_offset = pci_conf_read32(seg, bus, slot, func,
                                    msix_table_offset_reg(pos));
     bir = (u8)(table_offset & PCI_MSIX_BIRMASK);
     table_offset &= ~PCI_MSIX_BIRMASK;
-    entry_offset = msi->entry_nr * PCI_MSIX_ENTRY_SIZE;
 
-    table_paddr = msi->table_base + table_offset;
-    entry_paddr = table_paddr + entry_offset;
-    idx = msix_get_fixmap(dev, table_paddr, entry_paddr);
-    if ( idx < 0 )
+    if ( !dev->info.is_virtfn )
     {
-        xfree(entry);
-        return idx;
+        pbus = bus;
+        pslot = slot;
+        pfunc = func;
+        vf = -1;
     }
-    base = (void *)(fix_to_virt(idx) +
-        ((unsigned long)entry_paddr & ((1UL << PAGE_SHIFT) - 1)));
-
-    entry->msi_attrib.type = PCI_CAP_ID_MSIX;
-    entry->msi_attrib.is_64 = 1;
-    entry->msi_attrib.entry_nr = msi->entry_nr;
-    entry->msi_attrib.maskbit = 1;
-    entry->msi_attrib.masked = 1;
-    entry->msi_attrib.pos = pos;
-    entry->irq = msi->irq;
-    entry->dev = dev;
-    entry->mask_base = base;
-
-    list_add_tail(&entry->list, &dev->msi_list);
-
-    if ( !dev->msix_nr_entries )
+    else
     {
-        u8 pbus, pslot, pfunc;
-        int vf;
+        pbus = dev->info.physfn.bus;
+        pslot = PCI_SLOT(dev->info.physfn.devfn);
+        pfunc = PCI_FUNC(dev->info.physfn.devfn);
+        vf = PCI_BDF2(dev->bus, dev->devfn);
+    }
+
+    table_paddr = read_pci_mem_bar(seg, pbus, pslot, pfunc, bir, vf);
+    WARN_ON(msi && msi->table_base != table_paddr);
+    if ( !table_paddr )
+    {
+        if ( !msi || !msi->table_base )
+        {
+            xfree(entry);
+            return -ENXIO;
+        }
+        table_paddr = msi->table_base;
+    }
+    table_paddr += table_offset;
+
+    if ( !dev->msix_used_entries )
+    {
         u64 pba_paddr;
         u32 pba_offset;
-
-        if ( !dev->info.is_virtfn )
-        {
-            pbus = bus;
-            pslot = slot;
-            pfunc = func;
-            vf = -1;
-        }
-        else
-        {
-            pbus = dev->info.physfn.bus;
-            pslot = PCI_SLOT(dev->info.physfn.devfn);
-            pfunc = PCI_FUNC(dev->info.physfn.devfn);
-            vf = PCI_BDF2(dev->bus, dev->devfn);
-        }
-
-        ASSERT(!dev->msix_used_entries);
-        WARN_ON(msi->table_base !=
-                read_pci_mem_bar(seg, pbus, pslot, pfunc, bir, vf));
 
         dev->msix_nr_entries = nr_entries;
         dev->msix_table.first = PFN_DOWN(table_paddr);
@@ -768,7 +751,42 @@ static int msix_capability_init(struct pci_dev *dev,
                                       BITS_TO_LONGS(nr_entries) - 1);
         WARN_ON(rangeset_overlaps_range(mmio_ro_ranges, dev->msix_pba.first,
                                         dev->msix_pba.last));
+    }
 
+    if ( entry )
+    {
+        /* Map MSI-X table region */
+        u64 entry_paddr = table_paddr + msi->entry_nr * PCI_MSIX_ENTRY_SIZE;
+        int idx = msix_get_fixmap(dev, table_paddr, entry_paddr);
+        void __iomem *base;
+
+        if ( idx < 0 )
+        {
+            xfree(entry);
+            return idx;
+        }
+        base = (void *)(fix_to_virt(idx) +
+                        ((unsigned long)entry_paddr & (PAGE_SIZE - 1)));
+
+        /* Mask interrupt here */
+        writel(1, base + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET);
+
+        entry->msi_attrib.type = PCI_CAP_ID_MSIX;
+        entry->msi_attrib.is_64 = 1;
+        entry->msi_attrib.entry_nr = msi->entry_nr;
+        entry->msi_attrib.maskbit = 1;
+        entry->msi_attrib.masked = 1;
+        entry->msi_attrib.pos = pos;
+        entry->irq = msi->irq;
+        entry->dev = dev;
+        entry->mask_base = base;
+
+        list_add_tail(&entry->list, &dev->msi_list);
+        *desc = entry;
+    }
+
+    if ( !dev->msix_used_entries )
+    {
         if ( rangeset_add_range(mmio_ro_ranges, dev->msix_table.first,
                                 dev->msix_table.last) )
             WARN();
@@ -779,7 +797,7 @@ static int msix_capability_init(struct pci_dev *dev,
         if ( dev->domain )
             p2m_change_entry_type_global(dev->domain,
                                          p2m_mmio_direct, p2m_mmio_direct);
-        if ( !dev->domain || !paging_mode_translate(dev->domain) )
+        if ( desc && (!dev->domain || !paging_mode_translate(dev->domain)) )
         {
             struct domain *d = dev->domain;
 
@@ -793,6 +811,13 @@ static int msix_capability_init(struct pci_dev *dev,
                         break;
             if ( d )
             {
+                if ( !IS_PRIV(d) && dev->msix_warned != d->domain_id )
+                {
+                    dev->msix_warned = d->domain_id;
+                    printk(XENLOG_ERR
+                           "Potentially insecure use of MSI-X on %04x:%02x:%02x.%u by Dom%d\n",
+                           seg, bus, slot, func, d->domain_id);
+                }
                 /* XXX How to deal with existing mappings? */
             }
         }
@@ -801,10 +826,6 @@ static int msix_capability_init(struct pci_dev *dev,
     WARN_ON(dev->msix_table.first != (table_paddr >> PAGE_SHIFT));
     ++dev->msix_used_entries;
 
-    /* Mask interrupt here */
-    writel(1, entry->mask_base + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET);
-
-    *desc = entry;
     /* Restore MSI-X enabled bits */
     pci_conf_write16(seg, bus, slot, func, msix_control_reg(pos), control);
 
@@ -929,6 +950,19 @@ static int __pci_enable_msix(struct msi_info *msi, struct msi_desc **desc)
     return status;
 }
 
+static void _pci_cleanup_msix(struct pci_dev *dev)
+{
+    if ( !--dev->msix_used_entries )
+    {
+        if ( rangeset_remove_range(mmio_ro_ranges, dev->msix_table.first,
+                                   dev->msix_table.last) )
+            WARN();
+        if ( rangeset_remove_range(mmio_ro_ranges, dev->msix_pba.first,
+                                   dev->msix_pba.last) )
+            WARN();
+    }
+}
+
 static void __pci_disable_msix(struct msi_desc *entry)
 {
     struct pci_dev *dev;
@@ -952,15 +986,45 @@ static void __pci_disable_msix(struct msi_desc *entry)
 
     pci_conf_write16(seg, bus, slot, func, msix_control_reg(pos), control);
 
-    if ( !--dev->msix_used_entries )
+    _pci_cleanup_msix(dev);
+}
+
+int pci_prepare_msix(u16 seg, u8 bus, u8 devfn, bool_t off)
+{
+    int rc;
+    struct pci_dev *pdev;
+    u8 slot = PCI_SLOT(devfn), func = PCI_FUNC(devfn);
+    unsigned int pos = pci_find_cap_offset(seg, bus, slot, func,
+                                           PCI_CAP_ID_MSIX);
+
+    if ( !use_msi )
+        return 0;
+
+    if ( !pos )
+        return -ENODEV;
+
+    spin_lock(&pcidevs_lock);
+    pdev = pci_get_pdev(seg, bus, devfn);
+    if ( !pdev )
+        rc = -ENODEV;
+    else if ( pdev->msix_used_entries != !!off )
+        rc = -EBUSY;
+    else if ( off )
     {
-        if ( rangeset_remove_range(mmio_ro_ranges, dev->msix_table.first,
-                                  dev->msix_table.last) )
-            WARN();
-        if ( rangeset_remove_range(mmio_ro_ranges, dev->msix_pba.first,
-                                   dev->msix_pba.last) )
-            WARN();
+        _pci_cleanup_msix(pdev);
+        rc = 0;
     }
+    else
+    {
+        u16 control = pci_conf_read16(seg, bus, slot, func,
+                                      msix_control_reg(pos));
+
+        rc = msix_capability_init(pdev, NULL, NULL,
+                                  multi_msix_capable(control));
+    }
+    spin_unlock(&pcidevs_lock);
+
+    return rc;
 }
 
 /*
