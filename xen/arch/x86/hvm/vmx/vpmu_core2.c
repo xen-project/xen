@@ -738,14 +738,25 @@ int vmx_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
     {
         switch ( cpu_model )
         {
+        /* Core2: */
         case 15: /* original 65 nm celeron/pentium/core2/xeon, "Merom"/"Conroe" */
+        case 22: /* single-core 65 nm celeron/core2solo "Merom-L"/"Conroe-L" */
         case 23: /* 45 nm celeron/core2/xeon "Penryn"/"Wolfdale" */
-        case 26: /* 45 nm nehalem, "Bloomfield" */
         case 29: /* six-core 45 nm xeon "Dunnington" */
+
         case 42: /* SandyBridge */
         case 45: /* SandyBridge, "Romley-EP" */
+
+        /* Nehalem: */
+        case 26: /* 45 nm nehalem, "Bloomfield" */
+        case 30: /* 45 nm nehalem, "Lynnfield", "Clarksfield", "Jasper Forest" */
         case 46: /* 45 nm nehalem-ex, "Beckton" */
-        case 47: /* 32 nm Xeon E7 */
+
+        /* Westmere: */
+        case 37: /* 32 nm nehalem, "Clarkdale", "Arrandale" */
+        case 44: /* 32 nm nehalem, "Gulftown", "Westmere-EP" */
+        case 47: /* 32 nm Westmere-EX */
+
         case 58: /* IvyBridge */
         case 62: /* IvyBridge EP */
             ret = core2_vpmu_initialise(v, vpmu_flags);
