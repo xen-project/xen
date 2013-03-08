@@ -114,7 +114,6 @@ S:	Maintained
 F:	xen/drivers/passthrough/amd/
 
 AMD SVM
-M:	Christoph Egger <Christoph_Egger@gmx.de>
 M:	Boris Ostrovsky <boris.ostrovsky@oracle.com>
 M:	Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 M:	Jacob Shin <jacob.shin@amd.com>
@@ -205,7 +204,7 @@ S:	Supported
 T:	hg http://xenbits.xen.org/XCP/linux-2.6.*.pq.hg
 
 MACHINE CHECK (MCA) & RAS
-M:	Christoph Egger <Christoph_Egger@gmx.de>
+M:	Christoph Egger <chegger@amazon.de>
 M:	Yunhong Jiang <yunhong.jiang@intel.com>
 S:	Supported
 F:	xen/arch/x86/cpu/mcheck/
