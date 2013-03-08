@@ -530,7 +530,7 @@ fastcall void smp_irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
          * to myself.
          */
         if (irr  & (1 << (vector % 32))) {
-            genapic->send_IPI_self(IRQ_MOVE_CLEANUP_VECTOR);
+            send_IPI_self(IRQ_MOVE_CLEANUP_VECTOR);
             goto unlock;
         }
         __get_cpu_var(vector_irq)[vector] = -1;
@@ -556,7 +556,7 @@ static void send_cleanup_vector(struct irq_cfg *cfg)
 
     cpus_and(cleanup_mask, cfg->old_cpu_mask, cpu_online_map);
     cfg->move_cleanup_count = cpus_weight(cleanup_mask);
-    genapic->send_IPI_mask(&cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
+    send_IPI_mask(&cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
 
     cfg->move_in_progress = 0;
 }

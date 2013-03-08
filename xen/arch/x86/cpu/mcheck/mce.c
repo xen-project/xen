@@ -1253,12 +1253,6 @@ static void x86_mc_mceinject(void *data)
     __asm__ __volatile__("int $0x12");
 }
 
-static void x86_cmci_inject(void *data)
-{
-    printk("Simulating CMCI on cpu %d\n", smp_processor_id());
-    __asm__ __volatile__("int $0xf7");
-}
-
 #if BITS_PER_LONG == 64
 
 #define ID2COOKIE(id) ((mctelem_cookie_t)(id))
@@ -1541,7 +1535,9 @@ long do_mca(XEN_GUEST_HANDLE(xen_mc_t) u_xen_mc)
             if ( !cmci_support )
                 return x86_mcerr(
                     "No CMCI supported in platform\n", -EINVAL);
-            on_selected_cpus(&cpumap, x86_cmci_inject, NULL, 1);
+            if ( cpu_isset(smp_processor_id(), cpumap) )
+                send_IPI_self(CMCI_APIC_VECTOR);
+            send_IPI_mask(&cpumap, CMCI_APIC_VECTOR);
             break;
         default:
             return x86_mcerr("Wrong mca type\n", -EINVAL);

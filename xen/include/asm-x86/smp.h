@@ -30,7 +30,8 @@ DECLARE_PER_CPU(cpumask_t, cpu_core_map);
 
 void smp_send_nmi_allbutself(void);
 
-void  send_IPI_mask(const cpumask_t *mask, int vector);
+void send_IPI_mask(const cpumask_t *, int vector);
+void send_IPI_self(int vector);
 
 extern void (*mtrr_hook) (void);
 
