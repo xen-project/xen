@@ -118,33 +118,43 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         flexarray_vappend(dm_args, "-domain-name", c_info->name, NULL);
 
     if (vnc) {
-        char *vncarg;
-        if (vnc->display) {
-            if (vnc->listen && strchr(vnc->listen, ':') == NULL) {
-                vncarg = libxl__sprintf(gc, "%s:%d",
-                                  vnc->listen,
-                                  vnc->display);
-            } else {
-                vncarg = libxl__sprintf(gc, "127.0.0.1:%d", vnc->display);
-            }
-        } else if (vnc->listen) {
+        char *vncarg = NULL;
+
+        flexarray_append(dm_args, "-vnc");
+
+        /*
+         * If vnc->listen is present and contains a :, and
+         *  - vnc->display is 0, use vnc->listen
+         *  - vnc->display is non-zero, be confused
+         * If vnc->listen is present but doesn't, use vnc->listen:vnc->display.
+         * If vnc->listen is not present, use 127.0.0.1:vnc->display
+         * (Remembering that vnc->display already defaults to 0.)
+         */
+        if (vnc->listen) {
             if (strchr(vnc->listen, ':') != NULL) {
+                if (vnc->display) {
+                    LOG(ERROR, "vncdisplay set, vnclisten contains display");
+                    return NULL;
+                }
                 vncarg = vnc->listen;
             } else {
-                vncarg = libxl__sprintf(gc, "%s:0", vnc->listen);
+                vncarg = libxl__sprintf(gc, "%s:%d", vnc->listen,
+                                        vnc->display);
             }
-        } else {
-            vncarg = "127.0.0.1:0";
-        }
-        if (vnc->passwd && (vnc->passwd[0] != '\0'))
+        } else
+            vncarg = libxl__sprintf(gc, "127.0.0.1:%d", vnc->display);
+
+        if (vnc->passwd && vnc->passwd[0]) {
             vncarg = libxl__sprintf(gc, "%s,password", vncarg);
-        flexarray_append(dm_args, "-vnc");
+        }
+
         flexarray_append(dm_args, vncarg);
 
         if (libxl_defbool_val(vnc->findunused)) {
             flexarray_append(dm_args, "-vncunused");
         }
     }
+
     if (sdl) {
         flexarray_append(dm_args, "-sdl");
         if (!libxl_defbool_val(sdl->opengl)) {
@@ -361,37 +371,48 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     if (c_info->name) {
         flexarray_vappend(dm_args, "-name", c_info->name, NULL);
     }
+
     if (vnc) {
-        int display = 0;
-        const char *addr = "127.0.0.1";
         char *vncarg = NULL;
 
         flexarray_append(dm_args, "-vnc");
 
-        if (vnc->display) {
-            display = vnc->display;
-            if (vnc->listen && strchr(vnc->listen, ':') == NULL) {
-                addr = vnc->listen;
+        /*
+         * If vnc->listen is present and contains a :, and
+         *  - vnc->display is 0, use vnc->listen
+         *  - vnc->display is non-zero, be confused
+         * If vnc->listen is present but doesn't, use vnc->listen:vnc->display.
+         * If vnc->listen is not present, use 127.0.0.1:vnc->display
+         * (Remembering that vnc->display already defaults to 0.)
+         */
+        if (vnc->listen) {
+            if (strchr(vnc->listen, ':') != NULL) {
+                if (vnc->display) {
+                    LOG(ERROR, "vncdisplay set, vnclisten contains display");
+                    return NULL;
+                }
+                vncarg = vnc->listen;
+            } else {
+                vncarg = libxl__sprintf(gc, "%s:%d", vnc->listen,
+                                        vnc->display);
             }
-        } else if (vnc->listen) {
-            addr = vnc->listen;
-        }
+        } else
+            vncarg = libxl__sprintf(gc, "127.0.0.1:%d", vnc->display);
 
-        if (strchr(addr, ':') != NULL)
-            vncarg = libxl__sprintf(gc, "%s", addr);
-        else
-            vncarg = libxl__sprintf(gc, "%s:%d", addr, display);
         if (vnc->passwd && vnc->passwd[0]) {
             vncarg = libxl__sprintf(gc, "%s,password", vncarg);
         }
+
         if (libxl_defbool_val(vnc->findunused)) {
             /* This option asks to QEMU to try this number of port before to
              * give up.  So QEMU will try ports between $display and $display +
              * 99.  This option needs to be the last one of the vnc options. */
             vncarg = libxl__sprintf(gc, "%s,to=99", vncarg);
         }
+
         flexarray_append(dm_args, vncarg);
     }
+
     if (sdl) {
         flexarray_append(dm_args, "-sdl");
         /* XXX sdl->{display,xauthority} into $DISPLAY/$XAUTHORITY */
