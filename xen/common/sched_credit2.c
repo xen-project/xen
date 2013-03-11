@@ -588,38 +588,70 @@ no_tickle:
 /*
  * Credit-related code
  */
-static void reset_credit(const struct scheduler *ops, int cpu, s_time_t now)
+static void reset_credit(const struct scheduler *ops, int cpu, s_time_t now,
+                         struct csched_vcpu *snext)
 {
     struct csched_runqueue_data *rqd = RQD(ops, cpu);
     struct list_head *iter;
+    int m;
+
+    /*
+     * Under normal circumstances, snext->credit should never be less
+     * than -CSCHED_MIN_TIMER.  However, under some circumstances, a
+     * vcpu with low credits may be allowed to run long enough that
+     * its credits are actually less than -CSCHED_CREDIT_INIT.
+     * (Instances have been observed, for example, where a vcpu with
+     * 200us of credit was allowed to run for 11ms, giving it -10.8ms
+     * of credit.  Thus it was still negative even after the reset.)
+     *
+     * If this is the case for snext, we simply want to keep moving
+     * everyone up until it is in the black again.  This fair because
+     * none of the other vcpus want to run at the moment.
+     *
+     * Rather than looping, however, we just calculate a multiplier,
+     * avoiding an integer division and multiplication in the common
+     * case.
+     */
+    m = 1;
+    if ( snext->credit < -CSCHED_CREDIT_INIT )
+        m += (-snext->credit) / CSCHED_CREDIT_INIT;
 
     list_for_each( iter, &rqd->svc )
     {
-        struct csched_vcpu * svc = list_entry(iter, struct csched_vcpu, rqd_elem);
-
+        struct csched_vcpu * svc;
         int start_credit;
+
+        svc = list_entry(iter, struct csched_vcpu, rqd_elem);
 
         BUG_ON( is_idle_vcpu(svc->vcpu) );
         BUG_ON( svc->rqd != rqd );
 
         start_credit = svc->credit;
 
+        /* And add INIT * m, avoiding integer multiplication in the
+         * common case. */
+        if ( likely(m==1) )
+            svc->credit += CSCHED_CREDIT_INIT;
+        else
+            svc->credit += m * CSCHED_CREDIT_INIT;
+
         /* "Clip" credits to max carryover */
-        if ( svc->credit > CSCHED_CARRYOVER_MAX )
-            svc->credit = CSCHED_CARRYOVER_MAX;
-        /* And add INIT */
-        svc->credit += CSCHED_CREDIT_INIT;
+        if ( svc->credit > CSCHED_CREDIT_INIT + CSCHED_CARRYOVER_MAX )
+            svc->credit = CSCHED_CREDIT_INIT + CSCHED_CARRYOVER_MAX;
+
         svc->start_time = now;
 
         /* TRACE */ {
             struct {
                 unsigned dom:16,vcpu:16;
                 unsigned credit_start, credit_end;
+                unsigned multiplier;
             } d;
             d.dom = svc->vcpu->domain->domain_id;
             d.vcpu = svc->vcpu->vcpu_id;
             d.credit_start = start_credit;
             d.credit_end = svc->credit;
+            d.multiplier = m;
             trace_var(TRC_CSCHED2_CREDIT_RESET, 1,
                       sizeof(d),
                       (unsigned char *)&d);
@@ -1732,7 +1764,7 @@ csched_schedule(
         /* Check for the reset condition */
         if ( snext->credit <= CSCHED_CREDIT_RESET )
         {
-            reset_credit(ops, cpu, now);
+            reset_credit(ops, cpu, now, snext);
             balance_load(ops, cpu, now);
         }
 
