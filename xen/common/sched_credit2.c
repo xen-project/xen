@@ -1544,31 +1544,24 @@ csched_runtime(const struct scheduler *ops, int cpu, struct csched_vcpu *snext)
         }
     }
 
-    /*
-     * snext is about to be scheduled; so:
-     *
-     * 1. if snext->credit were less than 0 when it was taken off the
-     * runqueue, then csched_schedule() should have called
-     * reset_credit().  So at this point snext->credit must be greater
-     * than 0.
-     *
-     * 2. snext's credit must be greater than or equal to anyone else
-     * in the queue, so snext->credit - swait->credit must be greater
-     * than or equal to 0.
-     */
-    ASSERT(rt_credit >= 0);
-
-    /* FIXME: See if we can eliminate this conversion if we know time
-     * will be outside (MIN,MAX).  Probably requires pre-calculating
-     * credit values of MIN,MAX per vcpu, since each vcpu burns credit
-     * at a different rate. */
-    time = c2t(rqd, rt_credit, snext);
-
-    /* Check limits */
-    if ( time < CSCHED_MIN_TIMER )
+    /* The next guy may actually have a higher credit, if we've tried to
+     * avoid migrating him from a different cpu.  DTRT.  */
+    if ( rt_credit <= 0 )
         time = CSCHED_MIN_TIMER;
-    else if ( time > CSCHED_MAX_TIMER )
-        time = CSCHED_MAX_TIMER;
+    else
+    {
+        /* FIXME: See if we can eliminate this conversion if we know time
+         * will be outside (MIN,MAX).  Probably requires pre-calculating
+         * credit values of MIN,MAX per vcpu, since each vcpu burns credit
+         * at a different rate. */
+        time = c2t(rqd, rt_credit, snext);
+
+        /* Check limits */
+        if ( time < CSCHED_MIN_TIMER )
+            time = CSCHED_MIN_TIMER;
+        else if ( time > CSCHED_MAX_TIMER )
+            time = CSCHED_MAX_TIMER;
+    }
 
     return time;
 }
