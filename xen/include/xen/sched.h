@@ -242,6 +242,7 @@ struct domain
     struct page_list_head page_list;  /* linked list */
     struct page_list_head xenpage_list; /* linked list (size xenheap_pages) */
     unsigned int     tot_pages;       /* number of pages currently possesed */
+    unsigned int     outstanding_pages; /* pages claimed but not possessed  */
     unsigned int     max_pages;       /* maximum value for tot_pages        */
     atomic_t         shr_pages;       /* number of shared pages             */
     atomic_t         paged_pages;     /* number of paged-out pages          */

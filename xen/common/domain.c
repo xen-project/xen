@@ -507,6 +507,7 @@ int domain_kill(struct domain *d)
         evtchn_destroy(d);
         gnttab_release_mappings(d);
         tmem_destroy(d->tmem);
+        domain_set_outstanding_pages(d, 0);
         d->tmem = NULL;
         /* fallthrough */
     case DOMDYING_dying:

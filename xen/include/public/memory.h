@@ -68,6 +68,8 @@ struct xen_memory_reservation {
      *   IN:  GPFN bases of extents to populate with memory
      *   OUT: GMFN bases of extents that were allocated
      *   (NB. This command also updates the mach_to_phys translation table)
+     * XENMEM_claim_pages:
+     *   IN: must be zero
      */
     XEN_GUEST_HANDLE(xen_pfn_t) extent_start;
 
@@ -430,10 +432,39 @@ typedef struct xen_mem_sharing_op xen_mem_sharing_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_mem_sharing_op_t);
 
 /*
- * Reserve ops for future/out-of-tree "claim" patches (Oracle)
+ * Attempt to stake a claim for a domain on a quantity of pages
+ * of system RAM, but _not_ assign specific pageframes.  Only
+ * arithmetic is performed so the hypercall is very fast and need
+ * not be preemptible, thus sidestepping time-of-check-time-of-use
+ * races for memory allocation.  Returns 0 if the hypervisor page
+ * allocator has atomically and successfully claimed the requested
+ * number of pages, else non-zero.
+ *
+ * Any domain may have only one active claim.  When sufficient memory
+ * has been allocated to resolve the claim, the claim silently expires.
+ * Claiming zero pages effectively resets any outstanding claim and
+ * is always successful.
+ *
+ * Note that a valid claim may be staked even after memory has been
+ * allocated for a domain.  In this case, the claim is not incremental,
+ * i.e. if the domain's tot_pages is 3, and a claim is staked for 10,
+ * only 7 additional pages are claimed.
+ *
+ * Caller must be privileged or the hypercall fails.
  */
 #define XENMEM_claim_pages                  24
-#define XENMEM_get_unclaimed_pages          25
+
+/*
+ * XENMEM_claim_pages flags - the are no flags at this time.
+ * The zero value is appropiate.
+ */
+
+/*
+ * Get the number of pages currently claimed (but not yet "possessed")
+ * across all domains.  The caller must be privileged but otherwise
+ * the call never fails.
+ */
+#define XENMEM_get_outstanding_pages        25
 
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 

@@ -711,6 +711,39 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
     }
 
+    case XENMEM_claim_pages:
+        if ( !IS_PRIV(current->domain) )
+            return -EPERM;
+
+        if ( copy_from_guest(&reservation, arg, 1) )
+            return -EFAULT;
+
+        if ( !guest_handle_is_null(reservation.extent_start) )
+            return -EINVAL;
+
+        if ( reservation.extent_order != 0 )
+            return -EINVAL;
+
+        if ( reservation.mem_flags != 0 )
+            return -EINVAL;
+
+        d = rcu_lock_domain_by_id(reservation.domid);
+        if ( d == NULL )
+            return -EINVAL;
+
+        rc = domain_set_outstanding_pages(d, reservation.nr_extents);
+
+        rcu_unlock_domain(d);
+
+        break;
+
+    case XENMEM_get_outstanding_pages:
+        if ( !IS_PRIV(current->domain) )
+            return -EPERM;
+
+        rc = get_outstanding_claims();
+        break;
+
     default:
         rc = arch_memory_op(op, arg);
         break;
