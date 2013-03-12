@@ -75,6 +75,7 @@ extern void unmask_msi_irq(unsigned int irq);
 extern void set_msi_affinity(unsigned int vector, cpumask_t mask);
 extern int pci_enable_msi(struct msi_info *msi, struct msi_desc **desc);
 extern void pci_disable_msi(struct msi_desc *desc);
+extern int pci_prepare_msix(u8 bus, u8 devfn, bool_t off);
 extern void pci_cleanup_msi(struct pci_dev *pdev);
 extern int setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc, int irq);
 extern void teardown_msi_irq(int irq);

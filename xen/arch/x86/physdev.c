@@ -548,6 +548,20 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
         break;
     }
 
+    case PHYSDEVOP_prepare_msix:
+    case PHYSDEVOP_release_msix: {
+        struct physdev_pci_device dev;
+
+        if ( copy_from_guest(&dev, arg, 1) )
+            ret = -EFAULT;
+        else if ( dev.seg )
+            ret = -EOPNOTSUPP;
+        else
+            ret = pci_prepare_msix(dev.bus, dev.devfn,
+                                   cmd != PHYSDEVOP_prepare_msix);
+        break;
+    }
+
     case PHYSDEVOP_restore_msi: {
         struct physdev_restore_msi restore_msi;
         struct pci_dev *pdev;

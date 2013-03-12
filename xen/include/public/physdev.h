@@ -264,6 +264,21 @@ typedef struct physdev_get_free_pirq physdev_get_free_pirq_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_get_free_pirq_t);
 
 /*
+ * Dom0 should use these two to announce MMIO resources assigned to
+ * MSI-X capable devices won't (prepare) or may (release) change.
+ */
+#define PHYSDEVOP_prepare_msix          30
+#define PHYSDEVOP_release_msix          31
+struct physdev_pci_device {
+    /* IN */
+    uint16_t seg;
+    uint8_t bus;
+    uint8_t devfn;
+};
+typedef struct physdev_pci_device physdev_pci_device_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_t);
+
+/*
  * Notify that some PIRQ-bound event channels have been unmasked.
  * ** This command is obsolete since interface version 0x00030202 and is **
  * ** unsupported by newer versions of Xen.                              **
