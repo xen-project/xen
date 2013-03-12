@@ -628,7 +628,8 @@ int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity)
     old_affinity = v->cpu_affinity;
     v->cpu_affinity = *affinity;
     *affinity = old_affinity;
-    if ( !cpu_isset(v->processor, v->cpu_affinity) )
+    if ( VCPU2OP(v)->sched_id == XEN_SCHEDULER_SEDF ||
+         !cpu_isset(v->processor, v->cpu_affinity) )
         set_bit(_VPF_migrating, &v->pause_flags);
 
     vcpu_schedule_unlock_irq(v);

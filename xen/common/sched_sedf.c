@@ -452,7 +452,8 @@ static int sedf_pick_cpu(const struct scheduler *ops, struct vcpu *v)
 
     online = SEDF_CPUONLINE(v->domain->cpupool);
     cpus_and(online_affinity, v->cpu_affinity, *online);
-    return first_cpu(online_affinity);
+    return cycle_cpu(v->vcpu_id % cpus_weight(online_affinity) - 1,
+                     online_affinity);
 }
 
 /*
