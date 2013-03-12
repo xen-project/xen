@@ -607,6 +607,10 @@ static void core2_vpmu_do_cpuid(unsigned int input,
         {
             /* Switch on the 'Debug Store' feature in CPUID.EAX[1]:EDX[21] */
             *edx |= cpufeat_mask(X86_FEATURE_DS);
+            if ( cpu_has(&current_cpu_data, X86_FEATURE_DTES64) )
+                *ecx |= cpufeat_mask(X86_FEATURE_DTES64);
+            if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
+                *ecx |= cpufeat_mask(X86_FEATURE_DSCPL);
         }
     }
 }
