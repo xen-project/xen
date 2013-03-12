@@ -147,6 +147,51 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
     return 0;
 }
 
+static void amd_fixup_frequency(struct xen_processor_px *px)
+{
+    u32 hi, lo, fid, did;
+    int index = px->control & 0x00000007;
+    const struct cpuinfo_x86 *c = &current_cpu_data;
+
+    if ((c->x86 != 0x10 || c->x86_model >= 10) && c->x86 != 0x11)
+        return;
+
+    rdmsr(MSR_PSTATE_DEF_BASE + index, lo, hi);
+    /*
+     * MSR C001_0064+:
+     * Bit 63: PstateEn. Read-write. If set, the P-state is valid.
+     */
+    if (!(hi & (1U << 31)))
+        return;
+
+    fid = lo & 0x3f;
+    did = (lo >> 6) & 7;
+    if (c->x86 == 0x10)
+        px->core_frequency = (100 * (fid + 16)) >> did;
+    else
+        px->core_frequency = (100 * (fid + 8)) >> did;
+}
+
+struct amd_cpu_data {
+    struct processor_performance *perf;
+    u32 max_hw_pstate;
+};
+
+static void get_cpu_data(void *arg)
+{
+    struct amd_cpu_data *data = arg;
+    struct processor_performance *perf = data->perf;
+    uint64_t msr_content;
+    unsigned int i;
+
+    rdmsrl(MSR_PSTATE_CUR_LIMIT, msr_content);
+    data->max_hw_pstate = (msr_content & HW_PSTATE_MAX_MASK) >>
+                          HW_PSTATE_MAX_SHIFT;
+
+    for (i = 0; i < perf->state_count && i <= data->max_hw_pstate; i++)
+        amd_fixup_frequency(&perf->states[i]);
+}
+
 static int powernow_cpufreq_verify(struct cpufreq_policy *policy)
 {
     struct acpi_cpufreq_data *data;
@@ -193,8 +238,7 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
     struct acpi_cpufreq_data *data;
     unsigned int result = 0;
     struct processor_performance *perf;
-    u32 max_hw_pstate;
-    uint64_t msr_content;
+    struct amd_cpu_data info;
     struct cpuinfo_x86 *c = &cpu_data[policy->cpu];
 
     data = xzalloc(struct acpi_cpufreq_data);
@@ -205,7 +249,7 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     data->acpi_data = &processor_pminfo[cpu]->perf;
 
-    perf = data->acpi_data;
+    info.perf = perf = data->acpi_data;
     policy->shared_type = perf->shared_type;
 
     if (policy->shared_type == CPUFREQ_SHARED_TYPE_ALL ||
@@ -227,8 +271,6 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
         result = -ENODEV;
         goto err_unreg;
     }
-    rdmsrl(MSR_PSTATE_CUR_LIMIT, msr_content);
-    max_hw_pstate = (msr_content & HW_PSTATE_MAX_MASK) >> HW_PSTATE_MAX_SHIFT;
 
     if (perf->control_register.space_id != perf->status_register.space_id) {
         result = -ENODEV;
@@ -253,8 +295,10 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     policy->governor = cpufreq_opt_governor ? : CPUFREQ_DEFAULT_GOVERNOR;
 
+    on_selected_cpus(cpumask_of(cpu), get_cpu_data, &info, 1);
+
     /* table init */
-    for (i = 0; i < perf->state_count && i <= max_hw_pstate; i++) {
+    for (i = 0; i < perf->state_count && i <= info.max_hw_pstate; i++) {
         if (i > 0 && perf->states[i].core_frequency >=
             data->freq_table[valid_states-1].frequency / 1000)
             continue;
