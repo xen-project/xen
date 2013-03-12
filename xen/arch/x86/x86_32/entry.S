@@ -621,6 +621,14 @@ ENTRY(machine_check)
         pushl $TRAP_machine_check<<16
         jmp   handle_nmi_mce
 
+/* Enable NMIs.  No special register assumptions. All registers are preserved. */
+ENTRY(enable_nmis)
+        /* Set up stack frame */
+        pushf          # EFLAGS
+        push  %cs      # CS
+        push  $.Lret   # EIP
+        iret           # Disable the hardware NMI latch
+
 ENTRY(setup_vm86_frame)
         mov %ecx,%ds
         mov %ecx,%es
@@ -634,7 +642,7 @@ ENTRY(setup_vm86_frame)
         .endm
         copy_vm86_words
         addl $16,%esp
-        ret
+.Lret:  ret
 
 .section .rodata, "a", @progbits
 

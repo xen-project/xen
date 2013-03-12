@@ -643,6 +643,22 @@ ENTRY(machine_check)
         movl  $TRAP_machine_check,4(%rsp)
         jmp   handle_ist_exception
 
+/* Enable NMIs.  No special register assumptions. Only %rax is not preserved. */
+ENTRY(enable_nmis)
+        movq  %rsp, %rax /* Grab RSP before pushing */
+
+        /* Set up stack frame */
+        pushq $0               /* SS */
+        pushq %rax             /* RSP */
+        pushfq                 /* RFLAGS */
+        pushq $__HYPERVISOR_CS /* CS */
+        leaq  1f(%rip),%rax
+        pushq %rax             /* RIP */
+
+        iretq /* Disable the hardware NMI latch */
+1:
+        retq
+
 .section .rodata, "a", @progbits
 
 ENTRY(exception_table)

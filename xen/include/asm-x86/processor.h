@@ -584,6 +584,8 @@ DECLARE_TRAP_HANDLER(alignment_check);
 DECLARE_TRAP_HANDLER(spurious_interrupt_bug);
 #undef DECLARE_TRAP_HANDLER
 
+void enable_nmis(void);
+
 void syscall_enter(void);
 void sysenter_entry(void);
 void sysenter_eflags_saved(void);
