@@ -58,8 +58,8 @@
 /*
  * Flags
  */
-#define CSCHED_FLAG_VCPU_PARKED    0x0001  /* VCPU over capped credits */
-#define CSCHED_FLAG_VCPU_YIELD     0x0002  /* VCPU yielding */
+#define CSCHED_FLAG_VCPU_PARKED    0x0  /* VCPU over capped credits */
+#define CSCHED_FLAG_VCPU_YIELD     0x1  /* VCPU yielding */
 
 
 /*
@@ -134,7 +134,7 @@ struct csched_vcpu {
     struct vcpu *vcpu;
     atomic_t credit;
     s_time_t start_time;   /* When we were scheduled (used for credit) */
-    uint16_t flags;
+    unsigned flags;
     int16_t pri;
 #ifdef CSCHED_STATS
     struct {
@@ -215,7 +215,7 @@ __runq_insert(unsigned int cpu, struct csched_vcpu *svc)
     /* If the vcpu yielded, try to put it behind one lower-priority
      * runnable vcpu if we can.  The next runq_sort will bring it forward
      * within 30ms if the queue too long. */
-    if ( svc->flags & CSCHED_FLAG_VCPU_YIELD
+    if ( test_bit(CSCHED_FLAG_VCPU_YIELD, &svc->flags)
          && __runq_elem(iter)->pri > CSCHED_PRI_IDLE )
     {
         iter=iter->next;
@@ -777,7 +777,7 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
      * those.
      */
     if ( svc->pri == CSCHED_PRI_TS_UNDER &&
-         !(svc->flags & CSCHED_FLAG_VCPU_PARKED) )
+         !test_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags) )
     {
         svc->pri = CSCHED_PRI_TS_BOOST;
     }
@@ -790,12 +790,12 @@ csched_vcpu_wake(const struct scheduler *ops, struct vcpu *vc)
 static void
 csched_vcpu_yield(const struct scheduler *ops, struct vcpu *vc)
 {
-    struct csched_vcpu * const sv = CSCHED_VCPU(vc);
+    struct csched_vcpu * const svc = CSCHED_VCPU(vc);
 
     if ( !sched_credit_default_yield )
     {
         /* Let the scheduler know that this vcpu is trying to yield */
-        sv->flags |= CSCHED_FLAG_VCPU_YIELD;
+        set_bit(CSCHED_FLAG_VCPU_YIELD, &svc->flags);
     }
 }
 
@@ -1090,11 +1090,10 @@ csched_acct(void* dummy)
                 /* Park running VCPUs of capped-out domains */
                 if ( sdom->cap != 0U &&
                      credit < -credit_cap &&
-                     !(svc->flags & CSCHED_FLAG_VCPU_PARKED) )
+                     !test_and_set_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags) )
                 {
                     CSCHED_STAT_CRANK(vcpu_park);
                     vcpu_pause_nosync(svc->vcpu);
-                    svc->flags |= CSCHED_FLAG_VCPU_PARKED;
                 }
 
                 /* Lower bound on credits */
@@ -1110,7 +1109,7 @@ csched_acct(void* dummy)
                 svc->pri = CSCHED_PRI_TS_UNDER;
 
                 /* Unpark any capped domains whose credits go positive */
-                if ( svc->flags & CSCHED_FLAG_VCPU_PARKED)
+                if ( test_and_clear_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags) )
                 {
                     /*
                      * It's important to unset the flag AFTER the unpause()
@@ -1119,7 +1118,6 @@ csched_acct(void* dummy)
                      */
                     CSCHED_STAT_CRANK(vcpu_unpark);
                     vcpu_unpause(svc->vcpu);
-                    svc->flags &= ~CSCHED_FLAG_VCPU_PARKED;
                 }
 
                 /* Upper bound on credits means VCPU stops earning */
@@ -1378,8 +1376,7 @@ csched_schedule(
     /*
      * Clear YIELD flag before scheduling out
      */
-    if ( scurr->flags & CSCHED_FLAG_VCPU_YIELD )
-        scurr->flags &= ~(CSCHED_FLAG_VCPU_YIELD);
+    clear_bit(CSCHED_FLAG_VCPU_YIELD, &scurr->flags);
 
     /*
      * SMP Load balance:
