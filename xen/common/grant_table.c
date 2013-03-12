@@ -2262,7 +2262,7 @@ gnttab_get_status_frames(XEN_GUEST_HANDLE(gnttab_get_status_frames_t) uop,
     rc = xsm_grant_setup(current->domain, d);
     if ( rc ) {
         op.status = GNTST_permission_denied;
-        goto out1;
+        goto out2;
     }
 
     gt = d->grant_table;
