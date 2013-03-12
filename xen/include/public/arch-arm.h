@@ -33,20 +33,31 @@
  * A hypercall is issued using the ARM HVC instruction.
  *
  * A hypercall can take up to 5 arguments. These are passed in
- * registers, the first argument in r0, the second argument in r1, the
- * third in r2, the forth in r3 and the fifth in r4.
+ * registers, the first argument in x0/r0 (for arm64/arm32 guests
+ * respectively irrespective of whether the underlying hypervisor is
+ * 32- or 64-bit), the second argument in x1/r1, the third in x2/r2,
+ * the forth in x3/r3 and the fifth in x4/r4.
  *
- * The hypercall number is passed in r12.
+ * The hypercall number is passed in r12 (arm) or x16 (arm64). In both
+ * cases the relevant ARM procedure calling convention specifies this
+ * is an inter-procedure-call scratch register (e.g. for use in linker
+ * stubs). This use does not conflict with use during a hypercall.
  *
  * The HVC ISS must contain a Xen specific TAG: XEN_HYPERCALL_TAG.
  *
- * The return value is in r0.
+ * The return value is in x0/r0.
  *
- * The hypercall will clobber r12 and the argument registers used by
- * that hypercall (except r0 which is the return value) i.e. a 2
- * argument hypercall will clobber r1 and a 4 argument hypercall will
- * clobber r1, r2 and r3.
+ * The hypercall will clobber x16/r12 and the argument registers used
+ * by that hypercall (except r0 which is the return value) i.e. in
+ * addition to x16/r12 a 2 argument hypercall will clobber x1/r1 and a
+ * 4 argument hypercall will clobber x1/r1, x2/r2 and x3/r3.
  *
+ * Parameter structs passed to hypercalls are laid out according to
+ * the Procedure Call Standard for the ARM Architecture (AAPCS, AKA
+ * EABI) and Procedure Call Standard for the ARM 64-bit Architecture
+ * (AAPCS64). Where there is a conflict the 64-bit standard should be
+ * used regardless of guest type. Structures which are passed as
+ * hypercall arguments are always little endian.
  */
 
 #define XEN_HYPERCALL_TAG   0XEA1
