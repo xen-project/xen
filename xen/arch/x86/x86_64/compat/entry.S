@@ -172,7 +172,7 @@ compat_bad_hypercall:
         jmp  compat_test_all_events
 
 /* %rbx: struct vcpu, interrupts disabled */
-compat_restore_all_guest:
+ENTRY(compat_restore_all_guest)
         ASSERT_INTERRUPTS_DISABLED
         RESTORE_ALL
         addq  $8,%rsp
