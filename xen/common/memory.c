@@ -505,14 +505,13 @@ static long memory_exchange(XEN_GUEST_HANDLE(xen_memory_exchange_t) arg)
 long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE(void) arg)
 {
     struct domain *d;
-    int rc, op;
+    long rc;
     unsigned int address_bits;
     unsigned long start_extent;
     struct xen_memory_reservation reservation;
     struct memop_args args;
     domid_t domid;
-
-    op = cmd & MEMOP_CMD_MASK;
+    int op = cmd & MEMOP_CMD_MASK;
 
     switch ( op )
     {
