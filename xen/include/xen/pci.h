@@ -57,6 +57,7 @@ struct pci_dev {
     int msix_table_refcnt[MAX_MSIX_TABLE_PAGES];
     int msix_table_idx[MAX_MSIX_TABLE_PAGES];
     spinlock_t msix_table_lock;
+    domid_t msix_warned;
 
     struct domain *domain;
     const u16 seg;
