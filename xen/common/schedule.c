@@ -227,7 +227,7 @@ int sched_init_vcpu(struct vcpu *v, unsigned int processor)
     if ( v->sched_priv == NULL )
         return 1;
 
-    SCHED_OP(VCPU2OP(v), insert_vcpu, v);
+    SCHED_OP(DOM2OP(d), insert_vcpu, v);
 
     return 0;
 }
@@ -238,6 +238,9 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
     unsigned int new_p;
     void **vcpu_priv;
     void *domdata;
+    void *vcpudata;
+    struct scheduler *old_ops;
+    void *old_domdata;
 
     domdata = SCHED_OP(c->sched, alloc_domdata, d);
     if ( domdata == NULL )
@@ -269,15 +272,25 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
 
     domain_pause(d);
 
+    old_ops = DOM2OP(d);
+    old_domdata = d->sched_priv;
+
+    for_each_vcpu ( d, v )
+    {
+        SCHED_OP(old_ops, remove_vcpu, v);
+    }
+
+    d->cpupool = c;
+    d->sched_priv = domdata;
+
     new_p = first_cpu(c->cpu_valid);
     for_each_vcpu ( d, v )
     {
+        vcpudata = v->sched_priv;
+
         migrate_timer(&v->periodic_timer, new_p);
         migrate_timer(&v->singleshot_timer, new_p);
         migrate_timer(&v->poll_timer, new_p);
-
-        SCHED_OP(VCPU2OP(v), remove_vcpu, v);
-        SCHED_OP(VCPU2OP(v), free_vdata, v->sched_priv);
 
         cpus_setall(v->cpu_affinity);
         v->processor = new_p;
@@ -286,15 +299,15 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
 
         new_p = cycle_cpu(new_p, c->cpu_valid);
 
-        SCHED_OP(VCPU2OP(v), insert_vcpu, v);
+        SCHED_OP(c->sched, insert_vcpu, v);
+
+        SCHED_OP(old_ops, free_vdata, vcpudata);
     }
     domain_update_node_affinity(d);
 
-    d->cpupool = c;
-    SCHED_OP(DOM2OP(d), free_domdata, d->sched_priv);
-    d->sched_priv = domdata;
-
     domain_unpause(d);
+
+    SCHED_OP(old_ops, free_domdata, old_domdata);
 
     xfree(vcpu_priv);
 
