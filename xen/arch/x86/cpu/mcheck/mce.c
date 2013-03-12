@@ -1065,13 +1065,15 @@ static void intpose_add(unsigned int cpu_nr, uint64_t msr, uint64_t val)
     printk("intpose_add: interpose array full - request dropped\n");
 }
 
-void intpose_inval(unsigned int cpu_nr, uint64_t msr)
+bool_t intpose_inval(unsigned int cpu_nr, uint64_t msr)
 {
-    struct intpose_ent *ent;
+    struct intpose_ent *ent = intpose_lookup(cpu_nr, msr, NULL);
 
-    if ((ent = intpose_lookup(cpu_nr, msr, NULL)) != NULL) {
-        ent->cpu_nr = -1;
-    }
+    if ( !ent )
+        return 0;
+
+    ent->cpu_nr = -1;
+    return 1;
 }
 
 #define IS_MCA_BANKREG(r) \

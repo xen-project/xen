@@ -77,7 +77,7 @@ extern void mce_recoverable_register(mce_recoverable_t);
 /* Read an MSR, checking for an interposed value first */
 extern struct intpose_ent *intpose_lookup(unsigned int, uint64_t,
     uint64_t *);
-extern void intpose_inval(unsigned int, uint64_t);
+extern bool_t intpose_inval(unsigned int, uint64_t);
 
 static inline uint64_t mca_rdmsr(unsigned int msr)
 {
@@ -89,9 +89,9 @@ static inline uint64_t mca_rdmsr(unsigned int msr)
 
 /* Write an MSR, invalidating any interposed value */
 #define mca_wrmsr(msr, val) do { \
-       intpose_inval(smp_processor_id(), msr); \
-       wrmsrl(msr, val); \
-} while (0)
+    if ( !intpose_inval(smp_processor_id(), msr) ) \
+        wrmsrl(msr, val); \
+} while ( 0 )
 
 
 /* Utility function to "logout" all architectural MCA telemetry from the MCA
