@@ -11,6 +11,7 @@
 #include <asm/apicdef.h>
 #include <asm/page.h>
 #include <public/xen.h>
+#include <irq_vectors.h>
 
         ALIGN
 /* %rbx: struct vcpu */
@@ -617,6 +618,9 @@ ENTRY(early_page_fault)
         jmp   restore_all_xen
         .popsection
 
+ENTRY(nmi)
+        pushq $0
+        movl  $TRAP_nmi,4(%rsp)
 handle_ist_exception:
         SAVE_ALL
         testb $3,UREGS_cs(%rsp)
@@ -631,12 +635,25 @@ handle_ist_exception:
         movl  UREGS_entry_vector(%rsp),%eax
         leaq  exception_table(%rip),%rdx
         callq *(%rdx,%rax,8)
-        jmp   ret_from_intr
+        cmpb  $TRAP_nmi,UREGS_entry_vector(%rsp)
+        jne   ret_from_intr
 
-ENTRY(nmi)
-        pushq $0
-        movl  $TRAP_nmi,4(%rsp)
-        jmp   handle_ist_exception
+        /* We want to get straight to the IRET on the NMI exit path. */
+        testb $3,UREGS_cs(%rsp)
+        jz    restore_all_xen
+        GET_CURRENT(%rbx)
+        /* Send an IPI to ourselves to cover for the lack of event checking. */
+        movl  VCPU_processor(%rbx),%eax
+        shll  $IRQSTAT_shift,%eax
+        leaq  irq_stat(%rip),%rcx
+        cmpl  $0,(%rcx,%rax,1)
+        je    1f
+        movl  $EVENT_CHECK_VECTOR,%edi
+        call  send_IPI_self
+1:      movq  VCPU_domain(%rbx),%rax
+        cmpb  $0,DOMAIN_is_32bit_pv(%rax)
+        je    restore_all_guest
+        jmp   compat_restore_all_guest
 
 ENTRY(machine_check)
         pushq $0

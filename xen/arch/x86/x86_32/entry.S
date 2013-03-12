@@ -60,6 +60,7 @@
 #include <asm/apicdef.h>
 #include <asm/page.h>
 #include <public/xen.h>
+#include <irq_vectors.h>
 
         ALIGN
 restore_all_guest:
@@ -561,6 +562,8 @@ ENTRY(early_page_fault)
         jmp   restore_all_xen
         .popsection
 
+ENTRY(nmi)
+        pushl $TRAP_nmi<<16
 handle_nmi_mce:
 #ifdef CONFIG_X86_SUPERVISOR_MODE_KERNEL
         # NMI/MCE entry protocol is incompatible with guest kernel in ring 0.
@@ -581,7 +584,24 @@ handle_nmi_mce:
          * cases we have put guest DS/ES on the guest stack frame, which will
          * be detected by SAVE_ALL(), or we have rolled back restore_guest.
          */
-        jmp   ret_from_intr
+        cmpb  $TRAP_nmi,UREGS_entry_vector(%esp)
+        jne   ret_from_intr
+        /* We want to get straight to the IRET on the NMI exit path. */
+        GET_CURRENT(%ebx)
+        movl  UREGS_eflags(%esp),%eax
+        movb  UREGS_cs(%esp),%al
+        testl $(3|X86_EFLAGS_VM),%eax
+        jz    restore_all_xen
+        /* Send an IPI to ourselves to cover for the lack of event checking. */
+        movl  VCPU_processor(%ebx),%eax
+        shll  $IRQSTAT_shift,%eax
+        cmpl  $0,irq_stat(%eax)
+        je    restore_all_guest
+        pushl $EVENT_CHECK_VECTOR
+        call  send_IPI_self
+        addl  $4,%esp
+        jmp   restore_all_guest
+
 .Lnmi_mce_xen:
         /* Check the outer (guest) context for %ds/%es state validity. */
         GET_CPUINFO_FIELD(CPUINFO_guest_cpu_user_regs,%ebx)
@@ -612,10 +632,6 @@ handle_nmi_mce:
         mov   %ecx,%es
         jmp   .Lnmi_mce_common
 #endif /* !CONFIG_X86_SUPERVISOR_MODE_KERNEL */
-
-ENTRY(nmi)
-        pushl $TRAP_nmi<<16
-        jmp   handle_nmi_mce
 
 ENTRY(machine_check)
         pushl $TRAP_machine_check<<16
