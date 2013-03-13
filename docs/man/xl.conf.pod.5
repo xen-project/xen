@@ -76,9 +76,11 @@ Configures the default hotplug script used by virtual network devices.
 
 Default: C</etc/xen/scripts/vif-bridge>
 
-=item B<defaultbridge="NAME">
+=item B<vif.default.bridge="NAME">
 
 Configures the default bridge to set for virtual network devices.
+
+The old B<defaultbridge> option is deprecated and should not be used.
 
 Default: C<xenbr0>
 
