@@ -1210,6 +1210,14 @@ static void parse_config_data(const char *config_source,
                     parse_vif_rate(&config, (p2 + 1), nic);
                 } else if (!strcmp(p, "accel")) {
                     fprintf(stderr, "the accel parameter for vifs is currently not supported\n");
+                } else if (!strcmp(p, "netdev")) {
+                    fprintf(stderr, "the netdev parameter is deprecated, "
+                                    "please use gatewaydev instead\n");
+                    free(nic->gatewaydev);
+                    nic->gatewaydev = strdup(p2 + 1);
+                } else if (!strcmp(p, "gatewaydev")) {
+                    free(nic->gatewaydev);
+                    nic->gatewaydev = strdup(p2 + 1);
                 }
             } while ((p = strtok(NULL, ",")) != NULL);
 skip_nic:
@@ -5494,6 +5502,12 @@ int main_networkattach(int argc, char **argv)
             }
         } else if (MATCH_OPTION("bridge", *argv, oparg)) {
             replace_string(&nic.bridge, oparg);
+        } else if (MATCH_OPTION("netdev", *argv, oparg)) {
+            fprintf(stderr, "the netdev parameter is deprecated, "
+                            "please use gatewaydev instead\n");
+            replace_string(&nic.gatewaydev, oparg);
+        } else if (MATCH_OPTION("gatewaydev", *argv, oparg)) {
+            replace_string(&nic.gatewaydev, oparg);
         } else if (MATCH_OPTION("ip", *argv, oparg)) {
             replace_string(&nic.ip, oparg);
         } else if (MATCH_OPTION("script", *argv, oparg)) {

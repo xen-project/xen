@@ -67,6 +67,15 @@ added to. The default is `xenbr0`. The bridge must be configured using
 your distribution's network configuration tools. See the [wiki][net]
 for guidance and examples.
 
+### gatewaydev
+
+Specifies the name of the network interface which has an IP and which
+is in the network the VIF should communicate with. This is used in the host
+by the vif-route hotplug script. See [wiki][vifroute] for guidance and
+examples.
+
+NOTE: netdev is a deprecated alias of this option.
+
 ### type
 
 This keyword is valid for HVM guests only.
@@ -158,3 +167,4 @@ on the underlying netback implementation.
 
 [oui]: http://en.wikipedia.org/wiki/Organizationally_Unique_Identifier
 [net]: http://wiki.xen.org/wiki/HostConfiguration/Networking
+[vifroute]: http://wiki.xen.org/wiki/Vif-route
