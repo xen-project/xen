@@ -96,8 +96,17 @@ static void parse_global_config(const char *configfile,
      * different device kinds.
      */
 
-    if (!xlu_cfg_get_string (config, "vifscript", &buf, 0))
+    if (!xlu_cfg_get_string (config, "vifscript", &buf, 0)) {
+        fprintf(stderr, "the global config option vifscript is deprecated, "
+                        "please switch to vif.default.script\n");
+        free(default_vifscript);
         default_vifscript = strdup(buf);
+    }
+
+    if (!xlu_cfg_get_string (config, "vif.default.script", &buf, 0)) {
+        free(default_vifscript);
+        default_vifscript = strdup(buf);
+    }
 
     if (!xlu_cfg_get_string (config, "defaultbridge", &buf, 0)) {
         fprintf(stderr, "the global config option defaultbridge is deprecated, "
