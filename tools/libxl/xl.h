@@ -148,6 +148,7 @@ extern int dryrun_only;
 extern char *lockfile;
 extern char *default_vifscript;
 extern char *default_bridge;
+extern char *default_gatewaydev;
 extern char *blkdev_start;
 
 enum output_format {

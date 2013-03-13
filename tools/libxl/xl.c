@@ -43,6 +43,7 @@ int run_hotplug_scripts = 1;
 char *lockfile;
 char *default_vifscript = NULL;
 char *default_bridge = NULL;
+char *default_gatewaydev = NULL;
 enum output_format default_output_format = OUTPUT_FORMAT_JSON;
 
 static xentoollog_level minmsglevel = XTL_PROGRESS;
@@ -85,11 +86,24 @@ static void parse_global_config(const char *configfile,
         exit(1);
     }
 
+    /*
+     * For global options that are related to a specific type of device
+     * we use the following nomenclature:
+     *
+     * <device type>.default.<option name>
+     *
+     * This allows us to keep the default options classified for the
+     * different device kinds.
+     */
+
     if (!xlu_cfg_get_string (config, "vifscript", &buf, 0))
         default_vifscript = strdup(buf);
 
     if (!xlu_cfg_get_string (config, "defaultbridge", &buf, 0))
 	default_bridge = strdup(buf);
+
+    if (!xlu_cfg_get_string (config, "vif.default.gatewaydev", &buf, 0))
+        default_gatewaydev = strdup(buf);
 
     if (!xlu_cfg_get_string (config, "output_format", &buf, 0)) {
         if (!strcmp(buf, "json"))

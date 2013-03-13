@@ -1146,6 +1146,11 @@ static void parse_config_data(const char *config_source,
                 nic->bridge = strdup(default_bridge);
             }
 
+            if (default_gatewaydev) {
+                free(nic->gatewaydev);
+                nic->gatewaydev = strdup(default_gatewaydev);
+            }
+
             p = strtok(buf2, ",");
             if (!p)
                 goto skip_nic;
