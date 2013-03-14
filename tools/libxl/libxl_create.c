@@ -105,8 +105,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     libxl_defbool_setdefault(&b_info->device_model_stubdomain, false);
 
     if (!b_info->device_model_version) {
-        if (b_info->type == LIBXL_DOMAIN_TYPE_HVM)
-            if (libxl_defbool_val(info->device_model_stubdomain)) {
+        if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
+            if (libxl_defbool_val(b_info->device_model_stubdomain)) {
                 b_info->device_model_version =
                     LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL;
             } else {
