@@ -165,7 +165,7 @@ static void _disable_8259A_irq(unsigned int irq)
         outb(cached_A1,0xA1);
     else
         outb(cached_21,0x21);
-    per_cpu(vector_irq, 0)[LEGACY_VECTOR(irq)] = -1;
+    per_cpu(vector_irq, 0)[LEGACY_VECTOR(irq)] = ~irq;
     spin_unlock_irqrestore(&i8259A_lock, flags);
 }
 

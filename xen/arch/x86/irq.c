@@ -227,7 +227,7 @@ static void __clear_irq_vector(int irq)
 
     for_each_cpu(cpu, &tmp_mask) {
         ASSERT( per_cpu(vector_irq, cpu)[vector] == irq );
-        per_cpu(vector_irq, cpu)[vector] = -1;
+        per_cpu(vector_irq, cpu)[vector] = ~irq;
     }
 
     desc->arch.vector = IRQ_VECTOR_UNASSIGNED;
@@ -253,8 +253,8 @@ static void __clear_irq_vector(int irq)
     for_each_cpu(cpu, &tmp_mask) {
         ASSERT( per_cpu(vector_irq, cpu)[old_vector] == irq );
         TRACE_3D(TRC_HW_IRQ_MOVE_FINISH, irq, old_vector, cpu);
-        per_cpu(vector_irq, cpu)[old_vector] = -1;
-     }
+        per_cpu(vector_irq, cpu)[old_vector] = ~irq;
+    }
 
     desc->arch.old_vector = IRQ_VECTOR_UNASSIGNED;
     cpumask_clear(desc->arch.old_cpu_mask);
@@ -334,7 +334,7 @@ int __init init_irq_data(void)
     int irq, vector;
 
     for (vector = 0; vector < NR_VECTORS; ++vector)
-        this_cpu(vector_irq)[vector] = -1;
+        this_cpu(vector_irq)[vector] = INT_MIN;
 
     irq_desc = xzalloc_array(struct irq_desc, nr_irqs);
     
@@ -489,7 +489,7 @@ next:
             goto next;
 
         for_each_cpu(new_cpu, &tmp_mask)
-            if (per_cpu(vector_irq, new_cpu)[vector] != -1)
+            if (per_cpu(vector_irq, new_cpu)[vector] >= 0)
                 goto next;
         /* Found one! */
         current_vector = vector;
@@ -551,7 +551,7 @@ void __setup_vector_irq(int cpu)
 
     /* Clear vector_irq */
     for (vector = 0; vector < NR_VECTORS; ++vector)
-        per_cpu(vector_irq, cpu)[vector] = -1;
+        per_cpu(vector_irq, cpu)[vector] = INT_MIN;
     /* Mark the inuse vectors */
     for (irq = 0; irq < nr_irqs; ++irq) {
         struct irq_desc *desc = irq_to_desc(irq);
@@ -622,7 +622,7 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
         struct irq_desc *desc;
         irq = __get_cpu_var(vector_irq)[vector];
 
-        if (irq == -1)
+        if ((int)irq < 0)
             continue;
 
         desc = irq_to_desc(irq);
@@ -655,7 +655,7 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
         TRACE_3D(TRC_HW_IRQ_MOVE_CLEANUP,
                  irq, vector, smp_processor_id());
 
-        __get_cpu_var(vector_irq)[vector] = -1;
+        __get_cpu_var(vector_irq)[vector] = ~irq;
         desc->arch.move_cleanup_count--;
 
         if ( desc->arch.move_cleanup_count == 0 )
@@ -819,8 +819,22 @@ void do_IRQ(struct cpu_user_regs *regs)
             if ( ! ( vector >= FIRST_LEGACY_VECTOR &&
                      vector <= LAST_LEGACY_VECTOR &&
                      bogus_8259A_irq(vector - FIRST_LEGACY_VECTOR) ) )
+            {
                 printk("CPU%u: No irq handler for vector %02x (IRQ %d%s)\n",
                        smp_processor_id(), vector, irq, kind);
+                desc = irq_to_desc(~irq);
+                if ( ~irq < nr_irqs && irq_desc_initialized(desc) )
+                {
+                    spin_lock(&desc->lock);
+                    printk("IRQ%d a=%04lx[%04lx,%04lx] v=%02x[%02x] t=%-15s s=%08x\n",
+                           ~irq, *cpumask_bits(desc->affinity),
+                           *cpumask_bits(desc->arch.cpu_mask),
+                           *cpumask_bits(desc->arch.old_cpu_mask),
+                           desc->arch.vector, desc->arch.old_vector,
+                           desc->handler->typename, desc->status);
+                    spin_unlock(&desc->lock);
+                }
+            }
             TRACE_1D(TRC_HW_IRQ_UNMAPPED_VECTOR, vector);
         }
         goto out_no_unlock;
