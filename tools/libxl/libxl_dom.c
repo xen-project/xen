@@ -18,6 +18,7 @@
 #include <glob.h>
 
 #include "libxl_internal.h"
+#include "libxl_arch.h"
 
 #include <xc_dom.h>
 #include <xen/hvm/hvm_info_table.h>
@@ -199,10 +200,12 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
 }
 
 int libxl__build_pre(libxl__gc *gc, uint32_t domid,
-              libxl_domain_build_info *info, libxl__domain_build_state *state)
+              libxl_domain_config *d_config, libxl__domain_build_state *state)
 {
+    libxl_domain_build_info *const info = &d_config->b_info;
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *xs_domid, *con_domid;
+    int rc;
 
     xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
 
@@ -216,7 +219,6 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
      * whatever that turns out to be.
      */
     if (libxl_defbool_val(info->numa_placement)) {
-        int rc;
 
         if (!libxl_bitmap_is_full(&info->cpumap)) {
             LOG(ERROR, "Can run NUMA placement only if no vcpu "
@@ -243,7 +245,9 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     state->console_port = xc_evtchn_alloc_unbound(ctx->xch, domid, state->console_domid);
     state->vm_generationid_addr = 0;
 
-    return 0;
+    rc = libxl__arch_domain_create(gc, d_config, domid);
+
+    return rc;
 }
 
 int libxl__build_post(libxl__gc *gc, uint32_t domid,

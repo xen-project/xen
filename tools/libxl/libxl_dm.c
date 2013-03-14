@@ -849,7 +849,7 @@ void libxl__spawn_stub_dm(libxl__egc *egc, libxl__stub_dm_spawn_state *sdss)
     if (ret)
         goto out;
     uint32_t dm_domid = sdss->pvqemu.guest_domid;
-    ret = libxl__domain_build(gc, &dm_config->b_info, dm_domid, stubdom_state);
+    ret = libxl__domain_build(gc, dm_config, dm_domid, stubdom_state);
     if (ret)
         goto out;
 

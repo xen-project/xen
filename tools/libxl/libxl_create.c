@@ -315,15 +315,16 @@ static int init_console_info(libxl__device_console *console, int dev_num)
 }
 
 int libxl__domain_build(libxl__gc *gc,
-                        libxl_domain_build_info *info,
+                        libxl_domain_config *d_config,
                         uint32_t domid,
                         libxl__domain_build_state *state)
 {
+    libxl_domain_build_info *const info = &d_config->b_info;
     char **vments = NULL, **localents = NULL;
     struct timeval start_time;
     int i, ret;
 
-    ret = libxl__build_pre(gc, domid, info, state);
+    ret = libxl__build_pre(gc, domid, d_config, state);
     if (ret)
         goto out;
 
@@ -750,14 +751,14 @@ static void domcreate_bootloader_done(libxl__egc *egc,
     dcs->dmss.callback = domcreate_devmodel_started;
 
     if ( restore_fd < 0 ) {
-        rc = libxl__domain_build(gc, &d_config->b_info, domid, state);
+        rc = libxl__domain_build(gc, d_config, domid, state);
         domcreate_rebuild_done(egc, dcs, rc);
         return;
     }
 
     /* Restore */
 
-    rc = libxl__build_pre(gc, domid, info, state);
+    rc = libxl__build_pre(gc, domid, d_config, state);
     if (rc)
         goto out;
 
@@ -1169,7 +1170,6 @@ static void domcreate_attach_pci(libxl__egc *egc, libxl__multidev *multidev,
         }
     }
 
-    libxl__arch_domain_create(gc, d_config, domid);
     domcreate_console_available(egc, dcs);
 
     domcreate_complete(egc, dcs, 0);

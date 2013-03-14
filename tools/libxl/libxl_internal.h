@@ -884,7 +884,8 @@ typedef struct {
 } libxl__domain_build_state;
 
 _hidden int libxl__build_pre(libxl__gc *gc, uint32_t domid,
-              libxl_domain_build_info *info, libxl__domain_build_state *state);
+              libxl_domain_config * const d_config,
+              libxl__domain_build_state *state);
 _hidden int libxl__build_post(libxl__gc *gc, uint32_t domid,
                libxl_domain_build_info *info, libxl__domain_build_state *state,
                char **vms_ents, char **local_ents);
@@ -1278,7 +1279,7 @@ _hidden int libxl__domain_make(libxl__gc *gc,
                                uint32_t *domid);
 
 _hidden int libxl__domain_build(libxl__gc *gc,
-                                libxl_domain_build_info *info,
+                                libxl_domain_config *d_config,
                                 uint32_t domid,
                                 libxl__domain_build_state *state);
 
