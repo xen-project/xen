@@ -166,6 +166,6 @@ AC_CHECK_LIB([iconv], [libiconv_open], [libiconv="y"], [libiconv="n"])
 AC_SUBST(libiconv)
 
 # Checks for header files.
-AC_CHECK_HEADERS([yajl/yajl_version.h])
+AC_CHECK_HEADERS([yajl/yajl_version.h sys/eventfd.h])
 
 AC_OUTPUT()

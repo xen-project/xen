@@ -29,6 +29,7 @@
 #ifndef __LIBAIO_COMPAT
 #define __LIBAIO_COMPAT
 
+#include "../../config.h"
 #include <libaio.h>
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -50,6 +51,16 @@ static inline void __io_set_eventfd(struct iocb *iocb, int eventfd)
 	c->resfd = eventfd;
 }
 
+#ifdef HAVE_SYS_EVENTFD_H
+
+#include <sys/eventfd.h>
+
+static inline int tapdisk_sys_eventfd(int initval)
+{
+	return eventfd(initval, 0);
+}
+
+#else /* Fallback */
 #ifndef SYS_eventfd
 #ifndef __NR_eventfd
 # if defined(__alpha__)
@@ -88,5 +99,6 @@ static inline int tapdisk_sys_eventfd(int initval)
 {
 	return syscall(SYS_eventfd, initval, 0);
 }
+#endif
 
 #endif /* __LIBAIO_COMPAT */

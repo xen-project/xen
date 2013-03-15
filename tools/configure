@@ -7817,12 +7817,13 @@ fi
 
 
 # Checks for header files.
-for ac_header in yajl/yajl_version.h
+for ac_header in yajl/yajl_version.h sys/eventfd.h
 do :
-  ac_fn_c_check_header_mongrel "$LINENO" "yajl/yajl_version.h" "ac_cv_header_yajl_yajl_version_h" "$ac_includes_default"
-if test "x$ac_cv_header_yajl_yajl_version_h" = x""yes; then :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
   cat >>confdefs.h <<_ACEOF
-#define HAVE_YAJL_YAJL_VERSION_H 1
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
 _ACEOF
 
 fi
