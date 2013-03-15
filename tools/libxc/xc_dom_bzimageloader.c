@@ -187,11 +187,10 @@ static int xc_try_bzip2_decode(
 
 #include <lzma.h>
 
-static int xc_try_lzma_decode(
-    struct xc_dom_image *dom, void **blob, size_t *size)
+static int _xc_try_lzma_decode(
+    struct xc_dom_image *dom, void **blob, size_t *size,
+    lzma_stream *stream, lzma_ret ret, const char *what)
 {
-    lzma_stream stream = LZMA_STREAM_INIT;
-    lzma_ret ret;
     lzma_action action = LZMA_RUN;
     unsigned char *out_buf;
     unsigned char *tmp_buf;
@@ -201,14 +200,13 @@ static int xc_try_lzma_decode(
 
     if ( dom->kernel_size == 0)
     {
-        DOMPRINTF("LZMA: Input is 0 size");
+        DOMPRINTF("%s: Input is 0 size", what);
         return -1;
     }
 
-    ret = lzma_alone_decoder(&stream, 128*1024*1024);
     if ( ret != LZMA_OK )
     {
-        DOMPRINTF("LZMA: Failed to init stream decoder");
+        DOMPRINTF("%s: Failed to init decoder", what);
         return -1;
     }
 
@@ -220,22 +218,22 @@ static int xc_try_lzma_decode(
     out_buf = malloc(outsize);
     if ( out_buf == NULL )
     {
-        DOMPRINTF("LZMA: Failed to alloc memory");
+        DOMPRINTF("%s: Failed to alloc memory", what);
         goto lzma_cleanup;
     }
 
-    stream.next_in = dom->kernel_blob;
-    stream.avail_in = dom->kernel_size;
+    stream->next_in = dom->kernel_blob;
+    stream->avail_in = dom->kernel_size;
 
-    stream.next_out = out_buf;
-    stream.avail_out = dom->kernel_size;
+    stream->next_out = out_buf;
+    stream->avail_out = dom->kernel_size;
 
     for ( ; ; )
     {
-        ret = lzma_code(&stream, action);
+        ret = lzma_code(stream, action);
         if ( ret == LZMA_STREAM_END )
         {
-            DOMPRINTF("LZMA: Saw data stream end");
+            DOMPRINTF("%s: Saw data stream end", what);
             retval = 0;
             break;
         }
@@ -272,25 +270,25 @@ static int xc_try_lzma_decode(
                 msg = "Internal program error (bug)";
                 break;
             }
-            DOMPRINTF("%s: LZMA decompression error %s",
-                      __FUNCTION__, msg);
+            DOMPRINTF("%s: %s decompression error %s",
+                      __FUNCTION__, what, msg);
             free(out_buf);
             goto lzma_cleanup;
         }
 
-        if ( stream.avail_out == 0 )
+        if ( stream->avail_out == 0 )
         {
             /* Protect against output buffer overflow */
             if ( outsize > SIZE_MAX / 2 )
             {
-                DOMPRINTF("LZMA: output buffer overflow");
+                DOMPRINTF("%s: output buffer overflow", what);
                 free(out_buf);
                 goto lzma_cleanup;
             }
 
             if ( xc_dom_kernel_check_size(dom, outsize * 2) )
             {
-                DOMPRINTF("LZMA: output too large");
+                DOMPRINTF("%s: output too large", what);
                 free(out_buf);
                 goto lzma_cleanup;
             }
@@ -298,31 +296,60 @@ static int xc_try_lzma_decode(
             tmp_buf = realloc(out_buf, outsize * 2);
             if ( tmp_buf == NULL )
             {
-                DOMPRINTF("LZMA: Failed to realloc memory");
+                DOMPRINTF("%s: Failed to realloc memory", what);
                 free(out_buf);
                 goto lzma_cleanup;
             }
             out_buf = tmp_buf;
 
-            stream.next_out = out_buf + outsize;
-            stream.avail_out = (outsize * 2) - outsize;
+            stream->next_out = out_buf + outsize;
+            stream->avail_out = (outsize * 2) - outsize;
             outsize *= 2;
         }
     }
 
-    DOMPRINTF("%s: LZMA decompress OK, 0x%zx -> 0x%zx",
-              __FUNCTION__, *size, (size_t)stream.total_out);
+    DOMPRINTF("%s: %s decompress OK, 0x%zx -> 0x%zx",
+              __FUNCTION__, what, *size, (size_t)stream->total_out);
 
     *blob = out_buf;
-    *size = stream.total_out;
+    *size = stream->total_out;
 
  lzma_cleanup:
-    lzma_end(&stream);
+    lzma_end(stream);
 
     return retval;
 }
 
+/* 128 Mb is the minimum size (half-way) documented to work for all inputs. */
+#define LZMA_BLOCK_SIZE (128*1024*1024)
+
+static int xc_try_xz_decode(
+    struct xc_dom_image *dom, void **blob, size_t *size)
+{
+    lzma_stream stream = LZMA_STREAM_INIT;
+    lzma_ret ret = lzma_stream_decoder(&stream, LZMA_BLOCK_SIZE, 0);
+
+    return _xc_try_lzma_decode(dom, blob, size, &stream, ret, "XZ");
+}
+
+static int xc_try_lzma_decode(
+    struct xc_dom_image *dom, void **blob, size_t *size)
+{
+    lzma_stream stream = LZMA_STREAM_INIT;
+    lzma_ret ret = lzma_alone_decoder(&stream, LZMA_BLOCK_SIZE);
+
+    return _xc_try_lzma_decode(dom, blob, size, &stream, ret, "LZMA");
+}
+
 #else /* !defined(HAVE_LZMA) */
+
+static int xc_try_xz_decode(
+    struct xc_dom_image *dom, void **blob, size_t *size)
+{
+    DOMPRINTF("%s: XZ decompress support unavailable",
+              __FUNCTION__);
+    return -1;
+}
 
 static int xc_try_lzma_decode(
     struct xc_dom_image *dom, void **blob, size_t *size)
@@ -655,6 +682,17 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
         {
             xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
                          "%s unable to BZIP2 decompress kernel",
+                         __FUNCTION__);
+            return -EINVAL;
+        }
+    }
+    else if ( check_magic(dom, "\3757zXZ", 6) )
+    {
+        ret = xc_try_xz_decode(dom, &dom->kernel_blob, &dom->kernel_size);
+        if ( ret < 0 )
+        {
+            xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
+                         "%s unable to XZ decompress kernel",
                          __FUNCTION__);
             return -EINVAL;
         }
