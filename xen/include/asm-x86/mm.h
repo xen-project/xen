@@ -573,8 +573,8 @@ int donate_page(
 
 int map_ldt_shadow_page(unsigned int);
 
-#define NIL(type) ((type *)NULL - 1)
-#define IS_NIL(ptr) (!((ptr) + 1))
+#define NIL(type) ((type *)-sizeof(type))
+#define IS_NIL(ptr) (!((uintptr_t)(ptr) + sizeof(*(ptr))))
 
 int create_perdomain_mapping(struct domain *, unsigned long va,
                              unsigned int nr, l1_pgentry_t **,
