@@ -224,9 +224,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 5ae58eaa967495fce99b727422054c58750d252b
-# Mon Feb 25 16:44:20 2013 +0000
-# Revert "passthrough: Correctly expose PCH ISA bridge for IGD passthrough"
+QEMU_TAG ?= b86eb6bb95e67d22185967657c97fb6a2f131198
+# Fri Mar 15 18:25:15 2013 +0000
+# xen: Disable use of O_DIRECT by default as it results in crashes.
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
