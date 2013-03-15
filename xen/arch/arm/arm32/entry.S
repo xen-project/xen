@@ -1,5 +1,6 @@
 #include <xen/config.h>
 #include <asm/asm_defns.h>
+#include <asm/regs.h>
 #include <public/xen.h>
 
 #define SAVE_ONE_BANKED(reg)    mrs r11, reg; str r11, [sp, #UREGS_##reg]

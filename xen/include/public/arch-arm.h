@@ -206,9 +206,6 @@ typedef uint64_t xen_callback_t;
 
 /* PSR bits (CPSR, SPSR)*/
 
-/* 0-4: Mode */
-#define PSR_MODE_MASK 0x1f
-
 /* 32 bit modes */
 #define PSR_MODE_USR 0x10
 #define PSR_MODE_FIQ 0x11
