@@ -704,6 +704,7 @@ Sample output looks as follows:
  total_memory           : 6141
  free_memory            : 4274
  free_cpus              : 0
+ outstanding_claims     : 0
  xen_major              : 4
  xen_minor              : 2
  xen_extra              : -unstable
@@ -737,6 +738,15 @@ the feature bits returned by the cpuid command on x86 platforms.
 =item B<free_memory>
 
 Available memory (in MB) not allocated to Xen, or any other domains.
+
+=item B<outstanding_claims>
+
+When a claim call is done (see L<xl.conf>) a reservation for a specific
+amount of pages is set and also a global value is incremented. This
+global value (outstanding_claims) is then reduced as the domain's memory
+is populated and eventually reaches zero. Most of the time the value will
+be zero, but if you are launching multiple guests, and B<claim_mode> is
+enabled, this value can increase/decrease.
 
 =item B<xen_caps>
 

@@ -4666,6 +4666,29 @@ static void output_topologyinfo(void)
     return;
 }
 
+static void output_claim(void)
+{
+    long l;
+
+    /*
+     * Note that the xl.c (which calls us) has already read from the
+     * global configuration the 'claim_mode' value.
+     */
+    if (!libxl_defbool_val(claim_mode))
+        return;
+
+    l = libxl_get_claiminfo(ctx);
+    if (l < 0) {
+        fprintf(stderr, "libxl_get_claiminfo failed. errno: %d (%s)\n",
+                errno, strerror(errno));
+        return;
+    }
+
+    printf("outstanding_claims     : %ld\n", l);
+
+    return;
+}
+
 static void print_info(int numa)
 {
     output_nodeinfo();
@@ -4676,6 +4699,7 @@ static void print_info(int numa)
         output_topologyinfo();
         output_numainfo();
     }
+    output_claim();
 
     output_xeninfo();
 
