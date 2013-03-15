@@ -21,6 +21,16 @@ APPEND_INCLUDES and APPEND_LIB instead when possible.])
 
 AC_CANONICAL_HOST
 
+AC_SYS_LARGEFILE
+
+case $ac_cv_sys_file_offset_bits in #(
+  no | unknown) ;;
+  *)
+  FILE_OFFSET_BITS=$ac_cv_sys_file_offset_bits
+;;
+esac
+AC_SUBST(FILE_OFFSET_BITS)
+
 # M4 Macro includes
 m4_include([../m4/savevar.m4])
 m4_include([../m4/features.m4])
