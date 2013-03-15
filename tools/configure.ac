@@ -121,7 +121,11 @@ AS_IF([echo "$PYTHON" | grep -q "^/"], [
 [AC_MSG_ERROR([PYTHON specified, but is not an absolute path])])
 AX_PATH_PROG_OR_FAIL([PYTHONPATH], [$PYTHON])
 AX_CHECK_PYTHON_VERSION([2], [3])
- AX_CHECK_PYTHON_DEVEL()
+
+AS_IF([test "$cross_compiling" != yes], [
+    AX_CHECK_PYTHON_DEVEL()
+])
+
 AX_PATH_PROG_OR_FAIL([XGETTEXT], [xgettext])
 dnl as86, ld86, bcc and iasl are only required when the host system is x86*.
 dnl "host" here means the platform on which the hypervisor and tools is

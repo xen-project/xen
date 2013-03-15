@@ -5911,7 +5911,8 @@ else
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 fi
- ac_ext=c
+
+ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
@@ -6308,6 +6309,8 @@ fi
 done
 
 
+if test "$cross_compiling" != yes; then :
+
 
 ac_previous_cppflags=$CPPFLAGS
 ac_previous_ldflags=$LDFLAGS
@@ -6438,6 +6441,9 @@ fi
 
 CPPFLAGS=$ac_previous_cppflags
 LDLFAGS=$ac_previous_ldflags
+
+
+fi
 
 # Extract the first word of "xgettext", so it can be a program name with args.
 set dummy xgettext; ac_word=$2
