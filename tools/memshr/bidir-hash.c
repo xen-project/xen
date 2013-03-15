@@ -100,22 +100,13 @@ int            __hash_iterator(struct __hash *h,
                         void *d);
 static void      hash_resize(struct __hash *h);
 
-#if defined(__ia64__)
-#define ia64_fetchadd4_rel(p, inc) do {                         \
-    uint64_t ia64_intri_res;                                    \
-    asm volatile ("fetchadd4.rel %0=[%1],%2"                    \
-                : "=r"(ia64_intri_res) : "r"(p), "i" (inc)      \
-                : "memory");                                    \
-} while (0)
-static inline void atomic_inc(uint32_t *v) { ia64_fetchadd4_rel(v, 1); }
-static inline void atomic_dec(uint32_t *v) { ia64_fetchadd4_rel(v, -1); }
-#elif defined(__arm__)
+#if defined(__arm__)
 static inline void atomic_inc(uint32_t *v)
 {
         unsigned long tmp;
         int result;
 
-        __asm__ __volatile__("@ atomic_add\n"
+        __asm__ __volatile__("@ atomic_inc\n"
 "1:     ldrex   %0, [%3]\n"
 "       add     %0, %0, #1\n"
 "       strex   %1, %0, [%3]\n"
@@ -130,7 +121,7 @@ static inline void atomic_dec(uint32_t *v)
         unsigned long tmp;
         int result;
 
-        __asm__ __volatile__("@ atomic_sub\n"
+        __asm__ __volatile__("@ atomic_dec\n"
 "1:     ldrex   %0, [%3]\n"
 "       sub     %0, %0, #1\n"
 "       strex   %1, %0, [%3]\n"
@@ -140,6 +131,39 @@ static inline void atomic_dec(uint32_t *v)
         : "r" (v)
         : "cc");
 }
+
+#elif defined(__aarch64__)
+
+static inline void atomic_inc(uint32_t *v)
+{
+        unsigned long tmp;
+        int result;
+
+        asm volatile("// atomic_inc\n"
+"1:     ldxr    %w0, [%3]\n"
+"       add     %w0, %w0, #1\n"
+"       stxr    %w1, %w0, [%3]\n"
+"       cbnz    %w1, 1b"
+        : "=&r" (result), "=&r" (tmp), "+o" (v)
+        : "r" (v)
+        : "cc");
+}
+
+static inline void atomic_dec(uint32_t *v)
+{
+        unsigned long tmp;
+        int result;
+
+        asm volatile("// atomic_dec\n"
+"1:     ldxr    %w0, [%3]\n"
+"       sub     %w0, %w0, #1\n"
+"       stxr    %w1, %w0, [%3]\n"
+"       cbnz    %w1, 1b"
+        : "=&r" (result), "=&r" (tmp), "+o" (v)
+        : "r" (v)
+        : "cc");
+}
+
 #else /* __x86__ */
 static inline void atomic_inc(uint32_t *v)
 {
