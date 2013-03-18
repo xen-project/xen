@@ -213,6 +213,11 @@ M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 S:	Supported
 F:	extras/mini-os/
 
+OCAML TOOLS
+M:	David Scott <dave.scott@eu.citrix.com>
+S:	Supported
+F:	tools/ocaml/
+
 QEMU-DM
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
 S:	Supported
