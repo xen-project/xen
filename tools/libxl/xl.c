@@ -46,6 +46,7 @@ char *default_vifscript = NULL;
 char *default_bridge = NULL;
 char *default_gatewaydev = NULL;
 enum output_format default_output_format = OUTPUT_FORMAT_JSON;
+libxl_defbool claim_mode;
 
 static xentoollog_level minmsglevel = XTL_PROGRESS;
 
@@ -168,6 +169,10 @@ static void parse_global_config(const char *configfile,
     }
     if (!xlu_cfg_get_string (config, "blkdev_start", &buf, 0))
         blkdev_start = strdup(buf);
+
+    libxl_defbool_setdefault(&claim_mode, false);
+    (void)xlu_cfg_get_defbool (config, "claim_mode", &claim_mode, 0);
+
     xlu_cfg_destroy(config);
 }
 

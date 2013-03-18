@@ -115,6 +115,47 @@ Configures the name of the first block device to be used for temporary
 block device allocations by the toolstack.
 The default choice is "xvda".
 
+=item B<claim_mode=BOOLEAN>
+
+If this option is enabled then when a guest is created there will be an
+guarantee that there is memory available for the guest. This is an
+particularly acute problem on hosts with memory over-provisioned guests
+that use tmem and have self-balloon enabled (which is the default
+option). The self-balloon mechanism can deflate/inflate the balloon
+quickly and the amount of free memory (which C<xl info> can show) is
+stale the moment it is printed. When claim is enabled a reservation for
+the amount of memory (see 'memory' in xl.conf(5)) is set, which is then
+reduced as the domain's memory is populated and eventually reaches zero.
+
+If the reservation cannot be meet the guest creation fails immediately
+instead of taking seconds/minutes (depending on the size of the guest)
+while the guest is populated.
+
+Note that to enable tmem type guests, one needs to provide C<tmem> on the
+Xen hypervisor argument and as well on the Linux kernel command line.
+
+Note that the claim call is not attempted if C<superpages> option is
+used in the guest config (see xl.cfg(5)).
+
+Default: C<0>
+
+=over 4
+
+=item C<0>
+
+No claim is made. Memory population during guest creation will be
+attempted as normal and may fail due to memory exhaustion.
+
+=item C<1>
+
+Normal memory and freeable pool of ephemeral pages (tmem) is used when
+calculating whether there is enough memory free to launch a guest.
+This guarantees immediate feedback whether the guest can be launched due
+to memory exhaustion (which can take a long time to find out if launching
+massively huge guests).
+
+=back
+
 =back
 
 =head1 SEE ALSO

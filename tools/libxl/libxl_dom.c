@@ -371,6 +371,7 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
     dom->console_domid = state->console_domid;
     dom->xenstore_evtchn = state->store_port;
     dom->xenstore_domid = state->store_domid;
+    dom->claim_enabled = libxl_defbool_val(info->claim_mode);
 
     if ( (ret = xc_dom_boot_xen_init(dom, ctx->xch, domid)) != 0 ) {
         LOGE(ERROR, "xc_dom_boot_xen_init failed");
@@ -605,7 +606,7 @@ int libxl__build_hvm(libxl__gc *gc, uint32_t domid,
      */
     args.mem_size = (uint64_t)(info->max_memkb - info->video_memkb) << 10;
     args.mem_target = (uint64_t)(info->target_memkb - info->video_memkb) << 10;
-
+    args.claim_enabled = libxl_defbool_val(info->claim_mode);
     if (libxl__domain_firmware(gc, info, &args)) {
         LOG(ERROR, "initializing domain firmware failed");
         goto out;

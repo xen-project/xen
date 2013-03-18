@@ -595,7 +595,6 @@ int libxl_wait_for_free_memory(libxl_ctx *ctx, uint32_t domid, uint32_t memory_k
 /* wait for the memory target of a domain to be reached */
 int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs);
 
-
 int libxl_vncviewer_exec(libxl_ctx *ctx, uint32_t domid, int autopass);
 int libxl_console_exec(libxl_ctx *ctx, uint32_t domid, int cons_num, libxl_console_type type);
 /* libxl_primary_console_exec finds the domid and console number

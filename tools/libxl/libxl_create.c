@@ -196,6 +196,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
     if (b_info->target_memkb == LIBXL_MEMKB_DEFAULT)
         b_info->target_memkb = b_info->max_memkb;
 
+    libxl_defbool_setdefault(&b_info->claim_mode, false);
+
     libxl_defbool_setdefault(&b_info->localtime, false);
 
     libxl_defbool_setdefault(&b_info->disable_migrate, false);
