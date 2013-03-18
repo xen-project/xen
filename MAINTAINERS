@@ -107,7 +107,6 @@ F:	xen/drivers/acpi/
 F:	xen/drivers/cpufreq/
 
 AMD IOMMU
-M:	Wei Wang <weiwang.dd@gmail.com>
 M:	Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 M:	Jacob Shin <jacob.shin@amd.com>
 S:	Maintained
