@@ -10,7 +10,7 @@ all: ovmf.bin
 .PHONY: ovmf.bin
 ovmf.bin:
 	OvmfPkg/build.sh -a X64
-	cp Build/OvmfX64/DEBUG_GCC44/FV/OVMF.fd ovmf.bin
+	cp Build/OvmfX64/DEBUG_GCC*/FV/OVMF.fd ovmf.bin
 
 .PHONY: clean
 clean:
