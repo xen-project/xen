@@ -826,7 +826,7 @@ void do_IRQ(struct cpu_user_regs *regs)
                 if ( ~irq < nr_irqs && irq_desc_initialized(desc) )
                 {
                     spin_lock(&desc->lock);
-                    printk("IRQ%d a=%04lx[%04lx,%04lx] v=%02x[%02x] t=%-15s s=%08x\n",
+                    printk("IRQ%d a=%04lx[%04lx,%04lx] v=%02x[%02x] t=%s s=%08x\n",
                            ~irq, *cpumask_bits(desc->affinity),
                            *cpumask_bits(desc->arch.cpu_mask),
                            *cpumask_bits(desc->arch.old_cpu_mask),

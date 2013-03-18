@@ -466,7 +466,9 @@ static void set_channel_irq_affinity(const struct hpet_event_channel *ch)
 
     ASSERT(!local_irq_is_enabled());
     spin_lock(&desc->lock);
+    hpet_msi_mask(desc);
     hpet_msi_set_affinity(desc, cpumask_of(ch->cpu));
+    hpet_msi_unmask(desc);
     spin_unlock(&desc->lock);
 }
 
