@@ -87,7 +87,7 @@ struct buffer {
 struct domain {
 	int domid;
 	int master_fd;
-	struct pollfd *master_pollfd;
+	int master_pollfd_idx;
 	int slave_fd;
 	int log_fd;
 	bool is_dead;
@@ -99,7 +99,7 @@ struct domain {
 	evtchn_port_or_error_t local_port;
 	evtchn_port_or_error_t remote_port;
 	xc_evtchn *xce_handle;
-	struct pollfd *xce_pollfd;
+	int xce_pollfd_idx;
 	struct xencons_interface *interface;
 	int event_count;
 	long long next_period;
@@ -669,8 +669,10 @@ static struct domain *create_domain(int domid)
 	strcat(dom->conspath, "/console");
 
 	dom->master_fd = -1;
+	dom->master_pollfd_idx = -1;
 	dom->slave_fd = -1;
 	dom->log_fd = -1;
+	dom->xce_pollfd_idx = -1;
 
 	dom->next_period = ((long long)ts.tv_sec * 1000) + (ts.tv_nsec / 1000000) + RATE_LIMIT_PERIOD;
 
@@ -944,9 +946,10 @@ static void handle_log_reload(void)
 	}
 }
 
-static struct pollfd *set_fds(int fd, short events)
+/* Returns index inside fds array if succees, -1 if fail */
+static int set_fds(int fd, short events)
 {
-	struct pollfd *ret;
+	int ret;
 	if (current_array_size < nr_fds + 1) {
 		struct pollfd  *new_fds = NULL;
 		unsigned long newsize;
@@ -968,27 +971,28 @@ static struct pollfd *set_fds(int fd, short events)
 
 	fds[nr_fds].fd = fd;
 	fds[nr_fds].events = events;
-	ret = &fds[nr_fds];
+	ret = nr_fds;
 	nr_fds++;
 
 	return ret;
 fail:
 	dolog(LOG_ERR, "realloc failed, ignoring fd %d\n", fd);
-	return NULL;
+	return -1;
 }
 
 static void reset_fds(void)
 {
 	nr_fds = 0;
-	memset(fds, 0, sizeof(struct pollfd) * current_array_size);
+	if (fds)
+		memset(fds, 0, sizeof(struct pollfd) * current_array_size);
 }
 
 void handle_io(void)
 {
 	int ret;
 	evtchn_port_or_error_t log_hv_evtchn = -1;
-	struct pollfd *xce_pollfd = NULL;
-	struct pollfd *xs_pollfd = NULL;
+	int xce_pollfd_idx = -1;
+	int xs_pollfd_idx = -1;
 	xc_evtchn *xce_handle = NULL;
 
 	if (log_hv) {
@@ -1025,11 +1029,11 @@ void handle_io(void)
 
 		reset_fds();
 
-		xs_pollfd = set_fds(xs_fileno(xs), POLLIN|POLLPRI);
+		xs_pollfd_idx = set_fds(xs_fileno(xs), POLLIN|POLLPRI);
 
 		if (log_hv)
-			xce_pollfd = set_fds(xc_evtchn_fd(xce_handle),
-					     POLLIN|POLLPRI);
+			xce_pollfd_idx = set_fds(xc_evtchn_fd(xce_handle),
+						 POLLIN|POLLPRI);
 
 		if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0)
 			return;
@@ -1064,8 +1068,8 @@ void handle_io(void)
 				    !d->buffer.max_capacity ||
 				    d->buffer.size < d->buffer.max_capacity) {
 					int evtchn_fd = xc_evtchn_fd(d->xce_handle);
-					d->xce_pollfd = set_fds(evtchn_fd,
-								POLLIN|POLLPRI);
+					d->xce_pollfd_idx = set_fds(evtchn_fd,
+								    POLLIN|POLLPRI);
 				}
 			}
 
@@ -1078,7 +1082,7 @@ void handle_io(void)
 					events |= POLLOUT;
 
 				if (events)
-					d->master_pollfd =
+					d->master_pollfd_idx =
 						set_fds(d->master_fd,
 							events|POLLPRI);
 			}
@@ -1110,61 +1114,61 @@ void handle_io(void)
 			break;
 		}
 
-		if (log_hv && xce_pollfd) {
-			if (xce_pollfd->revents & ~(POLLIN|POLLOUT|POLLPRI)) {
+		if (log_hv && xce_pollfd_idx != -1) {
+			if (fds[xce_pollfd_idx].revents & ~(POLLIN|POLLOUT|POLLPRI)) {
 				dolog(LOG_ERR,
 				      "Failure in poll xce_handle: %d (%s)",
 				      errno, strerror(errno));
 				break;
-			} else if (xce_pollfd->revents & POLLIN)
+			} else if (fds[xce_pollfd_idx].revents & POLLIN)
 				handle_hv_logs(xce_handle);
 
-			xce_pollfd = NULL;
+			xce_pollfd_idx = -1;
 		}
 
 		if (ret <= 0)
 			continue;
 
-		if (xs_pollfd) {
-			if (xs_pollfd->revents & ~(POLLIN|POLLOUT|POLLPRI)) {
+		if (xs_pollfd_idx != -1) {
+			if (fds[xs_pollfd_idx].revents & ~(POLLIN|POLLOUT|POLLPRI)) {
 				dolog(LOG_ERR,
 				      "Failure in poll xs_handle: %d (%s)",
 				      errno, strerror(errno));
 				break;
-			} else if (xs_pollfd->revents & POLLIN)
+			} else if (fds[xs_pollfd_idx].revents & POLLIN)
 				handle_xs();
 
-			xs_pollfd = NULL;
+			xs_pollfd_idx = -1;
 		}
 
 		for (d = dom_head; d; d = n) {
 			n = d->next;
 			if (d->event_count < RATE_LIMIT_ALLOWANCE) {
 				if (d->xce_handle != NULL &&
-				    d->xce_pollfd &&
-				    !(d->xce_pollfd->revents &
+				    d->xce_pollfd_idx != -1 &&
+				    !(fds[d->xce_pollfd_idx].revents &
 				      ~(POLLIN|POLLOUT|POLLPRI)) &&
-				      (d->xce_pollfd->revents &
+				      (fds[d->xce_pollfd_idx].revents &
 				       POLLIN))
 				    handle_ring_read(d);
 			}
 
-			if (d->master_fd != -1 && d->master_pollfd) {
-				if (d->master_pollfd->revents &
+			if (d->master_fd != -1 && d->master_pollfd_idx != -1) {
+				if (fds[d->master_pollfd_idx].revents &
 				    ~(POLLIN|POLLOUT|POLLPRI))
 					domain_handle_broken_tty(d,
 						   domain_is_valid(d->domid));
 				else {
-					if (d->master_pollfd->revents &
+					if (fds[d->master_pollfd_idx].revents &
 					    POLLIN)
 						handle_tty_read(d);
-					if (d->master_pollfd->revents &
+					if (fds[d->master_pollfd_idx].revents &
 					    POLLOUT)
 						handle_tty_write(d);
 				}
 			}
 
-			d->xce_pollfd = d->master_pollfd = NULL;
+			d->xce_pollfd_idx = d->master_pollfd_idx = -1;
 
 			if (d->last_seen != enum_pass)
 				shutdown_domain(d);
