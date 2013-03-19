@@ -275,7 +275,7 @@ let init_access_log post_rotate = match !access_log_destination with
 	| Syslog facility ->
 		access_logger := Some (make_syslog_logger facility)
 
-let access_logging ~con ~tid ?(data="") access_type =
+let access_logging ~con ~tid ?(data="") ~level access_type =
         try
 		maybe
 			(fun logger ->
@@ -285,18 +285,18 @@ let access_logging ~con ~tid ?(data="") access_type =
 				let data = sanitize_data data in
 				let prefix = prefix !access_log_destination date in
 				let msg = Printf.sprintf "%s %s %s %s" prefix tid access_type data in
-				logger.write msg)
+				logger.write ~level msg)
 			!access_logger
 	with _ -> ()
 
-let new_connection = access_logging Newconn
-let end_connection = access_logging Endconn
+let new_connection = access_logging ~level:Debug Newconn
+let end_connection = access_logging ~level:Debug Endconn
 let read_coalesce ~tid ~con data =
 	if !access_log_read_ops
-	then access_logging Coalesce ~tid ~con ~data:("read "^data)
-let write_coalesce data = access_logging Coalesce ~data:("write "^data)
-let conflict = access_logging Conflict
-let commit = access_logging Commit
+        then access_logging Coalesce ~tid ~con ~data:("read "^data) ~level:Debug
+let write_coalesce data = access_logging Coalesce ~data:("write "^data) ~level:Debug
+let conflict = access_logging Conflict ~level:Debug
+let commit = access_logging Commit ~level:Debug
 
 let xb_op ~tid ~con ~ty data =
 	let print = match ty with
@@ -306,21 +306,21 @@ let xb_op ~tid ~con ~ty data =
 		| Xenbus.Xb.Op.Introduce | Xenbus.Xb.Op.Release | Xenbus.Xb.Op.Getdomainpath | Xenbus.Xb.Op.Isintroduced | Xenbus.Xb.Op.Resume ->
 			!access_log_special_ops
 		| _ -> true in
-	if print then access_logging ~tid ~con ~data (XbOp ty)
+	if print then access_logging ~tid ~con ~data (XbOp ty) ~level:Info
 
 let start_transaction ~tid ~con = 
 	if !access_log_transaction_ops && tid <> 0
-	then access_logging ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_start)
+	then access_logging ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_start) ~level:Debug
 
 let end_transaction ~tid ~con = 
 	if !access_log_transaction_ops && tid <> 0
-	then access_logging ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_end)
+	then access_logging ~tid ~con (XbOp Xenbus.Xb.Op.Transaction_end) ~level:Debug
 
 let xb_answer ~tid ~con ~ty data =
-	let print = match ty with
-		| Xenbus.Xb.Op.Error when String.startswith "ENOENT " data -> !access_log_read_ops
-		| Xenbus.Xb.Op.Error -> true
-		| Xenbus.Xb.Op.Watchevent -> true
-		| _ -> false
+	let print, level = match ty with
+		| Xenbus.Xb.Op.Error when String.startswith "ENOENT" data -> !access_log_read_ops , Warn
+		| Xenbus.Xb.Op.Error -> true , Warn
+		| Xenbus.Xb.Op.Watchevent -> true , Info
+		| _ -> false, Debug
 	in
-	if print then access_logging ~tid ~con ~data (XbOp ty)
+	if print then access_logging ~tid ~con ~data (XbOp ty) ~level
