@@ -781,11 +781,11 @@ int __init erst_init(void)
 	status = acpi_get_table(ACPI_SIG_ERST, 0,
 				(struct acpi_table_header **)&erst_tab);
 	if (status == AE_NOT_FOUND) {
-		printk(KERN_ERR "Table is not found!\n");
+		printk(KERN_INFO "ERST table was not found\n");
 		return -ENODEV;
 	} else if (ACPI_FAILURE(status)) {
 		const char *msg = acpi_format_exception(status);
-		printk(KERN_ERR "Failed to get table, %s\n", msg);
+		printk(KERN_WARNING "Failed to get ERST table: %s\n", msg);
 		return -EINVAL;
 	}
 
