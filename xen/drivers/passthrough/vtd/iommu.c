@@ -2131,7 +2131,8 @@ int __init intel_vtd_setup(void)
     {
         iommu = drhd->iommu;
 
-        printk("Intel VT-d supported page sizes: 4kB");
+        printk("Intel VT-d iommu %"PRIu32" supported page sizes: 4kB",
+               iommu->index);
         if (cap_sps_2mb(iommu->cap))
             printk(", 2MB");
 
