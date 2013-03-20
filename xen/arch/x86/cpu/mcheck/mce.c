@@ -1204,11 +1204,6 @@ static void x86_mc_mceinject(void *data)
 #define ID2COOKIE(id) ((mctelem_cookie_t)(id))
 #define COOKIE2ID(c) ((uint64_t)(c))
 
-#elif BITS_PER_LONG == 32
-
-#define ID2COOKIE(id) ((mctelem_cookie_t)(uint32_t)((id) & 0xffffffffU))
-#define COOKIE2ID(c) ((uint64_t)(uint32_t)(c))
-
 #elif defined(BITS_PER_LONG)
 #error BITS_PER_LONG has unexpected value
 #else

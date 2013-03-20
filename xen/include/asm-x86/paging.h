@@ -176,12 +176,8 @@ int paging_mfn_is_dirty(struct domain *d, mfn_t gmfn);
                               (LOGDIRTY_NODE_ENTRIES-1))
 #define L3_LOGDIRTY_IDX(pfn) (((pfn) >> (PAGE_SHIFT+3+PAGETABLE_ORDER)) & \
                               (LOGDIRTY_NODE_ENTRIES-1))
-#if BITS_PER_LONG == 64
 #define L4_LOGDIRTY_IDX(pfn) (((pfn) >> (PAGE_SHIFT+3+PAGETABLE_ORDER*2)) & \
                               (LOGDIRTY_NODE_ENTRIES-1))
-#else
-#define L4_LOGDIRTY_IDX(pfn) 0
-#endif
 
 /* VRAM dirty tracking support */
 struct sh_dirty_vram {
