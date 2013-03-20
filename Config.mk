@@ -180,7 +180,7 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 7a3a2aaa8fd1049fa0f033c5113e165900c84758
+QEMU_TAG ?= xen-4.1.5-rc1
 # Thu Jan 17 15:52:16 2013 +0000
 # e1000: fix compile warning introduced by security fix, and debugging
 
