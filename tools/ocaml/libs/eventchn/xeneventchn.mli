@@ -23,14 +23,13 @@ type t
 val to_int: t -> int
 val of_int: int -> t
 
-external init : unit -> handle = "stub_eventchn_init"
-external fd: handle -> Unix.file_descr = "stub_eventchn_fd"
+val init: unit -> handle
+val fd: handle -> Unix.file_descr
 
-external notify : handle -> t -> unit = "stub_eventchn_notify"
-external bind_interdomain : handle -> int -> int -> t
-  = "stub_eventchn_bind_interdomain"
-external bind_dom_exc_virq : handle -> t = "stub_eventchn_bind_dom_exc_virq"
-external unbind : handle -> t -> unit = "stub_eventchn_unbind"
-external pending : handle -> t = "stub_eventchn_pending"
-external unmask : handle -> t -> unit
-  = "stub_eventchn_unmask"
+val notify : handle -> t -> unit
+val bind_interdomain : handle -> int -> int -> t
+
+val bind_dom_exc_virq : handle -> t
+val unbind : handle -> t -> unit
+val pending : handle -> t
+val unmask : handle -> t -> unit
