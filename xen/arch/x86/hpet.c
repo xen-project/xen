@@ -171,13 +171,14 @@ static void handle_hpet_broadcast(struct hpet_event_channel *ch)
     cpumask_t mask;
     s_time_t now, next_event;
     unsigned int cpu;
+    unsigned long flags;
 
-    spin_lock_irq(&ch->lock);
+    spin_lock_irqsave(&ch->lock, flags);
 
 again:
     ch->next_event = STIME_MAX;
 
-    spin_unlock_irq(&ch->lock);
+    spin_unlock_irqrestore(&ch->lock, flags);
 
     next_event = STIME_MAX;
     cpumask_clear(&mask);
@@ -205,13 +206,13 @@ again:
 
     if ( next_event != STIME_MAX )
     {
-        spin_lock_irq(&ch->lock);
+        spin_lock_irqsave(&ch->lock, flags);
 
         if ( next_event < ch->next_event &&
              reprogram_hpet_evt_channel(ch, next_event, now, 0) )
             goto again;
 
-        spin_unlock_irq(&ch->lock);
+        spin_unlock_irqrestore(&ch->lock, flags);
     }
 }
 
@@ -460,7 +461,7 @@ static struct hpet_event_channel *hpet_get_channel(unsigned int cpu)
     return ch;
 }
 
-static void set_channel_irq_affinity(const struct hpet_event_channel *ch)
+static void set_channel_irq_affinity(struct hpet_event_channel *ch)
 {
     struct irq_desc *desc = irq_to_desc(ch->msi.irq);
 
@@ -470,12 +471,19 @@ static void set_channel_irq_affinity(const struct hpet_event_channel *ch)
     hpet_msi_set_affinity(desc, cpumask_of(ch->cpu));
     hpet_msi_unmask(desc);
     spin_unlock(&desc->lock);
+
+    spin_unlock(&ch->lock);
+
+    /* We may have missed an interrupt due to the temporary masking. */
+    if ( ch->event_handler && ch->next_event < NOW() )
+        ch->event_handler(ch);
 }
 
 static void hpet_attach_channel(unsigned int cpu,
                                 struct hpet_event_channel *ch)
 {
-    ASSERT(spin_is_locked(&ch->lock));
+    ASSERT(!local_irq_is_enabled());
+    spin_lock(&ch->lock);
 
     per_cpu(cpu_bc_channel, cpu) = ch;
 
@@ -484,31 +492,34 @@ static void hpet_attach_channel(unsigned int cpu,
         ch->cpu = cpu;
 
     if ( ch->cpu != cpu )
-        return;
-
-    set_channel_irq_affinity(ch);
+        spin_unlock(&ch->lock);
+    else
+        set_channel_irq_affinity(ch);
 }
 
 static void hpet_detach_channel(unsigned int cpu,
                                 struct hpet_event_channel *ch)
 {
-    ASSERT(spin_is_locked(&ch->lock));
+    spin_lock_irq(&ch->lock);
+
     ASSERT(ch == per_cpu(cpu_bc_channel, cpu));
 
     per_cpu(cpu_bc_channel, cpu) = NULL;
 
     if ( cpu != ch->cpu )
-        return;
-
-    if ( cpumask_empty(ch->cpumask) )
+        spin_unlock_irq(&ch->lock);
+    else if ( cpumask_empty(ch->cpumask) )
     {
         ch->cpu = -1;
         clear_bit(HPET_EVT_USED_BIT, &ch->flags);
-        return;
+        spin_unlock_irq(&ch->lock);
     }
-
-    ch->cpu = cpumask_first(ch->cpumask);
-    set_channel_irq_affinity(ch);
+    else
+    {
+        ch->cpu = cpumask_first(ch->cpumask);
+        set_channel_irq_affinity(ch);
+        local_irq_enable();
+    }
 }
 
 #include <asm/mc146818rtc.h>
@@ -686,11 +697,7 @@ void hpet_broadcast_enter(void)
     ASSERT(!local_irq_is_enabled());
 
     if ( !(ch->flags & HPET_EVT_LEGACY) )
-    {
-        spin_lock(&ch->lock);
         hpet_attach_channel(cpu, ch);
-        spin_unlock(&ch->lock);
-    }
 
     /* Disable LAPIC timer interrupts. */
     disable_APIC_timer();
@@ -722,11 +729,7 @@ void hpet_broadcast_exit(void)
     cpumask_clear_cpu(cpu, ch->cpumask);
 
     if ( !(ch->flags & HPET_EVT_LEGACY) )
-    {
-        spin_lock_irq(&ch->lock);
         hpet_detach_channel(cpu, ch);
-        spin_unlock_irq(&ch->lock);
-    }
 }
 
 int hpet_broadcast_is_available(void)
