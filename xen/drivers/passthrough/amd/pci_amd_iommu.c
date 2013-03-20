@@ -317,6 +317,9 @@ static void __init amd_iommu_dom0_init(struct domain *d)
             if ( mfn_valid(pfn) )
                 amd_iommu_map_page(d, pfn, pfn, 
                                    IOMMUF_readable|IOMMUF_writable);
+
+            if ( !(i & 0xfffff) )
+                process_pending_softirqs();
         }
     }
 
