@@ -300,7 +300,7 @@ let _ =
 		and handle_eventchn fd =
 			let port = Event.pending eventchn in
 			finally (fun () ->
-				if port = eventchn.Event.virq_port then (
+				if Some port = eventchn.Event.virq_port then (
 					let (notify, deaddom) = Domains.cleanup xc domains in
 					List.iter (Connections.del_domain cons) deaddom;
 					if deaddom <> [] || notify then

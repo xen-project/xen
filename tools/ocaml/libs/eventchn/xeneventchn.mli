@@ -18,14 +18,19 @@ exception Error of string
 
 type handle
 
+type t
+
+val to_int: t -> int
+val of_int: int -> t
+
 external init : unit -> handle = "stub_eventchn_init"
 external fd: handle -> Unix.file_descr = "stub_eventchn_fd"
 
-external notify : handle -> int -> unit = "stub_eventchn_notify"
-external bind_interdomain : handle -> int -> int -> int
+external notify : handle -> t -> unit = "stub_eventchn_notify"
+external bind_interdomain : handle -> int -> int -> t
   = "stub_eventchn_bind_interdomain"
-external bind_dom_exc_virq : handle -> int = "stub_eventchn_bind_dom_exc_virq"
-external unbind : handle -> int -> unit = "stub_eventchn_unbind"
-external pending : handle -> int = "stub_eventchn_pending"
-external unmask : handle -> int -> unit
+external bind_dom_exc_virq : handle -> t = "stub_eventchn_bind_dom_exc_virq"
+external unbind : handle -> t -> unit = "stub_eventchn_unbind"
+external pending : handle -> t = "stub_eventchn_pending"
+external unmask : handle -> t -> unit
   = "stub_eventchn_unmask"

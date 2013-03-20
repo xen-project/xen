@@ -17,12 +17,12 @@
 (**************** high level binding ****************)
 type t = {
 	handle: Xeneventchn.handle;
-	mutable virq_port: int;
+	mutable virq_port: Xeneventchn.t option;
 }
 
-let init () = { handle = Xeneventchn.init (); virq_port = -1; }
+let init () = { handle = Xeneventchn.init (); virq_port = None; }
 let fd eventchn = Xeneventchn.fd eventchn.handle
-let bind_dom_exc_virq eventchn = eventchn.virq_port <- Xeneventchn.bind_dom_exc_virq eventchn.handle
+let bind_dom_exc_virq eventchn = eventchn.virq_port <- Some (Xeneventchn.bind_dom_exc_virq eventchn.handle)
 let bind_interdomain eventchn domid port = Xeneventchn.bind_interdomain eventchn.handle domid port
 let unbind eventchn port = Xeneventchn.unbind eventchn.handle port
 let notify eventchn port = Xeneventchn.notify eventchn.handle port
