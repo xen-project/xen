@@ -14,8 +14,6 @@
  * GNU Lesser General Public License for more details.
  *)
 
-exception Error of string
-
 type handle
 
 external init: unit -> handle = "stub_eventchn_init"
@@ -32,5 +30,3 @@ external unmask: handle -> int -> unit = "stub_eventchn_unmask"
 
 let to_int x = x
 let of_int x = x
-
-let _ = Callback.register_exception "eventchn.error" (Error "register_callback")

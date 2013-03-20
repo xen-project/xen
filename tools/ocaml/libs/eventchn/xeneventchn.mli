@@ -16,8 +16,6 @@
 
 (** Event channel bindings: see tools/libxc/xenctrl.h *)
 
-exception Error of string
-
 type handle
 (** An initialised event channel interface. *)
 
