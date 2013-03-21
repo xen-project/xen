@@ -830,6 +830,17 @@ unsigned char* tpmback_get_uuid(domid_t domid, unsigned int handle)
    return tpmif->uuid;
 }
 
+int tpmback_get_peercontext(domid_t domid, unsigned int handle, void* buffer, int buflen)
+{
+   tpmif_t* tpmif;
+   if((tpmif = get_tpmif(domid, handle)) == NULL) {
+      TPMBACK_DEBUG("get_uuid() failed, %u/%u is an invalid frontend\n", (unsigned int) domid, handle);
+      return -1;
+   }
+
+   return evtchn_get_peercontext(tpmif->evtchn, buffer, buflen);
+}
+
 static void event_listener(void)
 {
    const char* bepath = "backend/vtpm";

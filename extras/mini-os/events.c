@@ -21,6 +21,7 @@
 #include <mini-os/hypervisor.h>
 #include <mini-os/events.h>
 #include <mini-os/lib.h>
+#include <xen/xsm/flask_op.h>
 
 #define NR_EVS 1024
 
@@ -257,6 +258,27 @@ int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
     *local_port = bind_evtchn(port, handler, data);
     return rc;
 }
+
+int evtchn_get_peercontext(evtchn_port_t local_port, char *ctx, int size)
+{
+    int rc;
+    uint32_t sid;
+    struct xen_flask_op op;
+    op.cmd = FLASK_GET_PEER_SID;
+    op.interface_version = XEN_FLASK_INTERFACE_VERSION;
+    op.u.peersid.evtchn = local_port;
+    rc = _hypercall1(int, xsm_op, &op);
+    if (rc)
+        return rc;
+    sid = op.u.peersid.sid;
+    op.cmd = FLASK_SID_TO_CONTEXT;
+    op.u.sid_context.sid = sid;
+    op.u.sid_context.size = size;
+    set_xen_guest_handle(op.u.sid_context.context, ctx);
+    rc = _hypercall1(int, xsm_op, &op);
+    return rc;
+}
+
 
 /*
  * Local variables:

@@ -99,4 +99,6 @@ void* tpmback_get_opaque(domid_t domid, unsigned int handle);
 /* Returns zero if successful, nonzero on failure (no such frontend) */
 int tpmback_set_opaque(domid_t domid, unsigned int handle, void* opaque);
 
+/* Get the XSM context of the given domain (using the tpmback event channel) */
+int tpmback_get_peercontext(domid_t domid, unsigned int handle, void* buffer, int buflen);
 #endif
