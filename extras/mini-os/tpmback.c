@@ -92,6 +92,7 @@ struct tpmif {
    enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
 
    unsigned char uuid[16];
+   void* opaque;
 
    /* state flags */
    int flags;
@@ -391,6 +392,7 @@ inline tpmif_t* __init_tpmif(domid_t domid, unsigned int handle)
    tpmif->status = DISCONNECTED;
    tpmif->page = NULL;
    tpmif->flags = 0;
+   tpmif->opaque = NULL;
    memset(tpmif->uuid, 0, sizeof(tpmif->uuid));
    return tpmif;
 }
@@ -794,6 +796,29 @@ static void generate_backend_events(const char* path)
    return;
 }
 
+void* tpmback_get_opaque(domid_t domid, unsigned int handle)
+{
+   tpmif_t* tpmif;
+   if((tpmif = get_tpmif(domid, handle)) == NULL) {
+      TPMBACK_DEBUG("get_opaque() failed, %u/%u is an invalid frontend\n", (unsigned int) domid, handle);
+      return NULL;
+   }
+
+   return tpmif->opaque;
+}
+
+int tpmback_set_opaque(domid_t domid, unsigned int handle, void *opaque)
+{
+   tpmif_t* tpmif;
+   if((tpmif = get_tpmif(domid, handle)) == NULL) {
+      TPMBACK_DEBUG("set_opaque() failed, %u/%u is an invalid frontend\n", (unsigned int) domid, handle);
+      return -1;
+   }
+
+   tpmif->opaque = opaque;
+   return 0;
+}
+
 unsigned char* tpmback_get_uuid(domid_t domid, unsigned int handle)
 {
    tpmif_t* tpmif;
@@ -890,12 +915,12 @@ void shutdown_tpmback(void)
    schedule();
 }
 
-inline void init_tpmcmd(tpmcmd_t* tpmcmd, domid_t domid, unsigned int handle, unsigned char uuid[16])
+static void init_tpmcmd(tpmcmd_t* tpmcmd, domid_t domid, unsigned int handle, void *opaque)
 {
    tpmcmd->domid = domid;
    tpmcmd->locality = -1;
    tpmcmd->handle = handle;
-   memcpy(tpmcmd->uuid, uuid, sizeof(tpmcmd->uuid));
+   tpmcmd->opaque = opaque;
    tpmcmd->req = NULL;
    tpmcmd->req_len = 0;
    tpmcmd->resp = NULL;
@@ -917,7 +942,7 @@ tpmcmd_t* get_request(tpmif_t* tpmif) {
    if((cmd = malloc(sizeof(*cmd))) == NULL) {
       goto error;
    }
-   init_tpmcmd(cmd, tpmif->domid, tpmif->handle, tpmif->uuid);
+   init_tpmcmd(cmd, tpmif->domid, tpmif->handle, tpmif->opaque);
 
    shr = tpmif->page;
    cmd->req_len = shr->length;

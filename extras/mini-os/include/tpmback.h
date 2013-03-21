@@ -45,10 +45,10 @@ struct tpmcmd {
    domid_t domid;		/* Domid of the frontend */
    uint8_t locality;    /* Locality requested by the frontend */
    unsigned int handle;	/* Handle of the frontend */
-   unsigned char uuid[16];			/* uuid of the tpm interface */
+   void *opaque;        /* Opaque pointer taken from the tpmback instance */
 
-   unsigned int req_len;		/* Size of the command in buf - set by tpmback driver */
    uint8_t* req;			/* tpm command bits, allocated by driver, DON'T FREE IT */
+   unsigned int req_len;		/* Size of the command in buf - set by tpmback driver */
    unsigned int resp_len;	/* Size of the outgoing command,
 				   you set this before passing the cmd object to tpmback_resp */
    uint8_t* resp;		/* Buffer for response - YOU MUST ALLOCATE IT, YOU MUST ALSO FREE IT */
@@ -93,5 +93,10 @@ int tpmback_num_frontends(void);
 /* Returns the uuid of the specified frontend, NULL on error.
  * The return value is internally allocated, so don't free it */
 unsigned char* tpmback_get_uuid(domid_t domid, unsigned int handle);
+
+/* Get and set the opaque pointer for a tpmback instance */
+void* tpmback_get_opaque(domid_t domid, unsigned int handle);
+/* Returns zero if successful, nonzero on failure (no such frontend) */
+int tpmback_set_opaque(domid_t domid, unsigned int handle, void* opaque);
 
 #endif

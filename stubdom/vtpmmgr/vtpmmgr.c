@@ -61,7 +61,7 @@ void main_loop(void) {
       tpmcmd->resp = respbuf;
 
       /* Process the command */
-      vtpmmgr_handle_cmd(tpmcmd->uuid, tpmcmd);
+      vtpmmgr_handle_cmd(tpmcmd->opaque, tpmcmd);
 
       /* Send response */
       tpmback_resp(tpmcmd);

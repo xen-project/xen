@@ -436,6 +436,12 @@ egress:
    return status;
 }
 
+/* Set up the opaque field to contain a pointer to the UUID */
+static void set_opaque_to_uuid(domid_t domid, unsigned int handle)
+{
+   tpmback_set_opaque(domid, handle, tpmback_get_uuid(domid, handle));
+}
+
 TPM_RESULT vtpmmgr_init(int argc, char** argv) {
    TPM_RESULT status = TPM_SUCCESS;
 
@@ -462,7 +468,7 @@ TPM_RESULT vtpmmgr_init(int argc, char** argv) {
    }
 
    //Setup tpmback device
-   init_tpmback(NULL, NULL);
+   init_tpmback(set_opaque_to_uuid, NULL);
 
    //Setup tpm access
    switch(opts.tpmdriver) {
