@@ -162,6 +162,7 @@ ifeq ($(XEN_TARGET_ARCH), x86_32)
 endif
 gmp-$(XEN_TARGET_ARCH): gmp-$(GMP_VERSION).tar.bz2 $(NEWLIB_STAMPFILE)
 	tar xjf $<
+	rm $@ -rf || :
 	mv gmp-$(GMP_VERSION) $@
 	#patch -d $@ -p0 < gmp.patch
 	cd $@; CPPFLAGS="-isystem $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/include $(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" CC=$(CC) $(GMPEXT) ./configure --disable-shared --enable-static --disable-fft --without-readline --prefix=$(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf
