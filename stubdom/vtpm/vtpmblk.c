@@ -26,6 +26,7 @@
 
 static struct blkfront_dev* blkdev = NULL;
 static int blkfront_fd = -1;
+static uint64_t slot_size = 0;
 
 int init_vtpmblk(struct tpmfront_dev* tpmfront_dev)
 {
@@ -45,6 +46,8 @@ int init_vtpmblk(struct tpmfront_dev* tpmfront_dev)
       goto error;
    }
 
+   slot_size = blkinfo.sectors * blkinfo.sector_size / 2;
+
    return 0;
 error:
    shutdown_blkfront(blkdev);
@@ -59,15 +62,20 @@ void shutdown_vtpmblk(void)
    blkdev = NULL;
 }
 
-int write_vtpmblk_raw(uint8_t *data, size_t data_length)
+static int write_vtpmblk_raw(uint8_t *data, size_t data_length, int slot)
 {
    int rc;
    uint32_t lenbuf;
-   debug("Begin Write data=%p len=%u", data, data_length);
+   debug("Begin Write data=%p len=%u slot=%u ssize=%u", data, data_length, slot, slot_size);
+
+   if (data_length > slot_size - 4) {
+      error("vtpm data cannot fit in data slot (%d/%d).", data_length, slot_size - 4);
+      return -1;
+   }
 
    lenbuf = cpu_to_be32((uint32_t)data_length);
 
-   lseek(blkfront_fd, 0, SEEK_SET);
+   lseek(blkfront_fd, slot * slot_size, SEEK_SET);
    if((rc = write(blkfront_fd, (uint8_t*)&lenbuf, 4)) != 4) {
       error("write(length) failed! error was %s", strerror(errno));
       return -1;
@@ -82,12 +90,12 @@ int write_vtpmblk_raw(uint8_t *data, size_t data_length)
    return 0;
 }
 
-int read_vtpmblk_raw(uint8_t **data, size_t *data_length)
+static int read_vtpmblk_raw(uint8_t **data, size_t *data_length, int slot)
 {
    int rc;
    uint32_t lenbuf;
 
-   lseek(blkfront_fd, 0, SEEK_SET);
+   lseek(blkfront_fd, slot * slot_size, SEEK_SET);
    if(( rc = read(blkfront_fd, (uint8_t*)&lenbuf, 4)) != 4) {
       error("read(length) failed! error was %s", strerror(errno));
       return -1;
@@ -97,6 +105,10 @@ int read_vtpmblk_raw(uint8_t **data, size_t *data_length)
       error("read 0 data_length for NVM");
       return -1;
    }
+   if(*data_length > slot_size - 4) {
+      error("read invalid data_length for NVM");
+      return -1;
+   }
 
    *data = tpm_malloc(*data_length);
    if((rc = read(blkfront_fd, *data, *data_length)) != *data_length) {
@@ -104,7 +116,7 @@ int read_vtpmblk_raw(uint8_t **data, size_t *data_length)
       return -1;
    }
 
-   info("Read %u bytes from NVM persistent storage", *data_length);
+   info("Read %u bytes from NVM persistent storage (slot %d)", *data_length, slot);
    return 0;
 }
 
@@ -221,6 +233,9 @@ egress:
    return rc;
 }
 
+/* Current active state slot, or -1 if no valid saved state exists */
+static int active_slot = -1;
+
 int write_vtpmblk(struct tpmfront_dev* tpmfront_dev, uint8_t* data, size_t data_length) {
    int rc;
    uint8_t* cipher = NULL;
@@ -228,12 +243,17 @@ int write_vtpmblk(struct tpmfront_dev* tpmfront_dev, uint8_t* data, size_t data_
    uint8_t hashkey[HASHKEYSZ];
    uint8_t* symkey = hashkey + HASHSZ;
 
+   /* Switch to the other slot. Note that in a new vTPM, the read will not
+	* succeed, so active_slot will be -1 and we will write to slot 0.
+	*/
+   active_slot = !active_slot;
+
    /* Encrypt the data */
    if((rc = encrypt_vtpmblk(data, data_length, &cipher, &cipher_len, symkey))) {
       goto abort_egress;
    }
    /* Write to disk */
-   if((rc = write_vtpmblk_raw(cipher, cipher_len))) {
+   if((rc = write_vtpmblk_raw(cipher, cipher_len, active_slot))) {
       goto abort_egress;
    }
    /* Get sha1 hash of data */
@@ -256,7 +276,8 @@ int read_vtpmblk(struct tpmfront_dev* tpmfront_dev, uint8_t** data, size_t *data
    size_t cipher_len = 0;
    size_t keysize;
    uint8_t* hashkey = NULL;
-   uint8_t hash[HASHSZ];
+   uint8_t hash0[HASHSZ];
+   uint8_t hash1[HASHSZ];
    uint8_t* symkey;
 
    /* Retreive the hash and the key from the manager */
@@ -270,14 +291,32 @@ int read_vtpmblk(struct tpmfront_dev* tpmfront_dev, uint8_t** data, size_t *data
    }
    symkey = hashkey + HASHSZ;
 
-   /* Read from disk now */
-   if((rc = read_vtpmblk_raw(&cipher, &cipher_len))) {
+   active_slot = 0;
+   debug("Reading slot 0 from disk\n");
+   if((rc = read_vtpmblk_raw(&cipher, &cipher_len, 0))) {
       goto abort_egress;
    }
 
    /* Compute the hash of the cipher text and compare */
-   sha1(cipher, cipher_len, hash);
-   if(memcmp(hash, hashkey, HASHSZ)) {
+   sha1(cipher, cipher_len, hash0);
+   if(!memcmp(hash0, hashkey, HASHSZ))
+      goto valid;
+
+   free(cipher);
+   cipher = NULL;
+
+   active_slot = 1;
+   debug("Reading slot 1 from disk (offset=%u)\n", slot_size);
+   if((rc = read_vtpmblk_raw(&cipher, &cipher_len, 1))) {
+      goto abort_egress;
+   }
+
+   /* Compute the hash of the cipher text and compare */
+   sha1(cipher, cipher_len, hash1);
+   if(!memcmp(hash1, hashkey, HASHSZ))
+      goto valid;
+
+   {
       int i;
       error("NVM Storage Checksum failed!");
       printf("Expected: ");
@@ -285,14 +324,20 @@ int read_vtpmblk(struct tpmfront_dev* tpmfront_dev, uint8_t** data, size_t *data
 	 printf("%02hhX ", hashkey[i]);
       }
       printf("\n");
-      printf("Actual:   ");
+      printf("Slot 0:   ");
       for(i = 0; i < HASHSZ; ++i) {
-	 printf("%02hhX ", hash[i]);
+	 printf("%02hhX ", hash0[i]);
+      }
+      printf("\n");
+      printf("Slot 1:   ");
+      for(i = 0; i < HASHSZ; ++i) {
+	 printf("%02hhX ", hash1[i]);
       }
       printf("\n");
       rc = -1;
       goto abort_egress;
    }
+valid:
 
    /* Decrypt the blob */
    if((rc = decrypt_vtpmblk(cipher, cipher_len, data, data_length, symkey))) {
@@ -300,6 +345,7 @@ int read_vtpmblk(struct tpmfront_dev* tpmfront_dev, uint8_t** data, size_t *data
    }
    goto egress;
 abort_egress:
+   active_slot = -1;
 egress:
    free(cipher);
    free(hashkey);
