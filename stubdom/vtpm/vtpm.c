@@ -139,6 +139,35 @@ int check_ordinal(tpmcmd_t* tpmcmd) {
    return true;
 }
 
+struct locality_item {
+	char* lbl;
+	uint8_t mask[32];
+};
+#define MAX_CLIENT_LOCALITIES 16
+static struct locality_item client_locality[MAX_CLIENT_LOCALITIES];
+static int nr_client_localities = 0;
+
+static void *generate_locality_mask(domid_t domid, unsigned int handle)
+{
+   char label[512];
+   int i;
+   if (tpmback_get_peercontext(domid, handle, label, sizeof(label)))
+      BUG();
+   for(i=0; i < nr_client_localities; i++) {
+      if (!strcmp(client_locality[i].lbl, label))
+         goto found;
+      if (client_locality[i].lbl[0] == '*') {
+	 char * f = strstr(label, 1 + client_locality[i].lbl);
+	 if (!strcmp(f, 1 + client_locality[i].lbl))
+	    goto found;
+      }
+   }
+   return NULL;
+ found:
+   tpmback_set_opaque(domid, handle, client_locality[i].mask);
+   return client_locality[i].mask;
+}
+
 static void main_loop(void) {
    tpmcmd_t* tpmcmd = NULL;
    int res = -1;
@@ -164,11 +193,24 @@ static void main_loop(void) {
    while(tpmcmd) {
       /* Handle the request */
       if(tpmcmd->req_len) {
+	 uint8_t* locality_mask = tpmcmd->opaque;
+	 uint8_t locality_bit = (1 << (tpmcmd->locality & 7));
+	 int locality_byte = tpmcmd->locality >> 3;
 	 tpmcmd->resp = NULL;
 	 tpmcmd->resp_len = 0;
 
-         /* First check for disabled ordinals */
-         if(!check_ordinal(tpmcmd)) {
+	 if (nr_client_localities && !locality_mask)
+	    locality_mask = generate_locality_mask(tpmcmd->domid, tpmcmd->handle);
+	 if (nr_client_localities && !locality_mask) {
+            error("Unknown client label in tpm_handle_command");
+            create_error_response(tpmcmd, TPM_FAIL);
+	 }
+	 else if (nr_client_localities && !(locality_mask[locality_byte] & locality_bit)) {
+            error("Invalid locality (%d) for client in tpm_handle_command", tpmcmd->locality);
+            create_error_response(tpmcmd, TPM_FAIL);
+	 }
+         /* Check for disabled ordinals */
+         else if(!check_ordinal(tpmcmd)) {
             create_error_response(tpmcmd, TPM_BAD_ORDINAL);
          }
          /* If not disabled, do the command */
@@ -272,6 +314,36 @@ int parse_cmd_line(int argc, char** argv)
             }
             pch = strtok(NULL, ",");
          }
+      }
+      else if(!strncmp(argv[i], "locality=", 9)) {
+        char *lbl = argv[i] + 9;
+	char *pch = strchr(lbl, '=');
+	uint8_t* locality_mask = client_locality[nr_client_localities].mask;
+	if (pch == NULL) {
+		 error("Invalid locality specification: %s", lbl);
+		 return -1;
+	}
+	if (nr_client_localities == MAX_CLIENT_LOCALITIES) {
+		error("Too many locality specifications");
+		return -1;
+	}
+	client_locality[nr_client_localities].lbl = lbl;
+	memset(locality_mask, 0, 32);
+	nr_client_localities++;
+	*pch = 0;
+	pch = strtok(pch + 1, ",");
+	while (pch != NULL) {
+		unsigned int loc;
+		if (sscanf(pch, "%u", &loc) == 1 && loc < 256) {
+			uint8_t locality_bit = (1 << (loc & 7));
+			int locality_byte = loc >> 3;
+			locality_mask[locality_byte] |= locality_bit;
+		} else {
+			error("Invalid locality item: %s", pch);
+			return -1;
+		}
+		pch = strtok(NULL, ",");
+	}
       }
       else {
 	 error("Invalid command line option `%s'", argv[i]);
