@@ -183,7 +183,7 @@ static void main_loop(void) {
          }
          /* If not disabled, do the command */
          else {
-            if((res = tpm_handle_command(tpmcmd->req, tpmcmd->req_len, &tpmcmd->resp, &tpmcmd->resp_len)) != 0) {
+            if((res = tpm_handle_command(tpmcmd->req, tpmcmd->req_len, &tpmcmd->resp, &tpmcmd->resp_len, tpmcmd->locality)) != 0) {
                error("tpm_handle_command() failed");
                create_error_response(tpmcmd, TPM_FAIL);
             }
