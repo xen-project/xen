@@ -141,8 +141,6 @@ int check_ordinal(tpmcmd_t* tpmcmd) {
 
 static void main_loop(void) {
    tpmcmd_t* tpmcmd = NULL;
-   domid_t domid;		/* Domid of frontend */
-   unsigned int handle;	/* handle of frontend */
    int res = -1;
 
    info("VTPM Initializing\n");
@@ -162,15 +160,7 @@ static void main_loop(void) {
       goto abort_postpcrs;
    }
 
-   /* Wait for the frontend domain to connect */
-   info("Waiting for frontend domain to connect..");
-   if(tpmback_wait_for_frontend_connect(&domid, &handle) == 0) {
-      info("VTPM attached to Frontend %u/%u", (unsigned int) domid, handle);
-   } else {
-      error("Unable to attach to a frontend");
-   }
-
-   tpmcmd = tpmback_req(domid, handle);
+   tpmcmd = tpmback_req_any();
    while(tpmcmd) {
       /* Handle the request */
       if(tpmcmd->req_len) {
@@ -194,7 +184,7 @@ static void main_loop(void) {
       tpmback_resp(tpmcmd);
 
       /* Wait for the next request */
-      tpmcmd = tpmback_req(domid, handle);
+      tpmcmd = tpmback_req_any();
 
    }
 
