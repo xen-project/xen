@@ -462,7 +462,7 @@ TPM_RESULT vtpmmgr_init(int argc, char** argv) {
    }
 
    //Setup tpmback device
-   init_tpmback();
+   init_tpmback(NULL, NULL);
 
    //Setup tpm access
    switch(opts.tpmdriver) {

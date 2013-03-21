@@ -56,7 +56,7 @@ struct tpmcmd {
 typedef struct tpmcmd tpmcmd_t;
 
 /* Initialize the tpm backend driver */
-void init_tpmback(void);
+void init_tpmback(void (*open_cb)(domid_t, unsigned int), void (*close_cb)(domid_t, unsigned int));
 
 /* Shutdown tpm backend driver */
 void shutdown_tpmback(void);
@@ -93,15 +93,5 @@ int tpmback_num_frontends(void);
 /* Returns the uuid of the specified frontend, NULL on error.
  * The return value is internally allocated, so don't free it */
 unsigned char* tpmback_get_uuid(domid_t domid, unsigned int handle);
-
-/* Specify a function to call when a new tpm device connects */
-void tpmback_set_open_callback(void (*cb)(domid_t, unsigned int));
-
-/* Specify a function to call when a tpm device disconnects */
-void tpmback_set_close_callback(void (*cb)(domid_t, unsigned int));
-
-//Not Implemented
-void tpmback_set_suspend_callback(void (*cb)(domid_t, unsigned int));
-void tpmback_set_resume_callback(void (*cb)(domid_t, unsigned int));
 
 #endif

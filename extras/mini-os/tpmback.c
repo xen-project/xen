@@ -114,8 +114,6 @@ struct tpmback_dev {
    /* Callbacks */
    void (*open_callback)(domid_t, unsigned int);
    void (*close_callback)(domid_t, unsigned int);
-   void (*suspend_callback)(domid_t, unsigned int);
-   void (*resume_callback)(domid_t, unsigned int);
 };
 typedef struct tpmback_dev tpmback_dev_t;
 
@@ -131,8 +129,6 @@ static tpmback_dev_t gtpmdev = {
    .events = NULL,
    .open_callback = NULL,
    .close_callback = NULL,
-   .suspend_callback = NULL,
-   .resume_callback = NULL,
 };
 struct wait_queue_head waitq;
 int globalinit = 0;
@@ -809,23 +805,6 @@ unsigned char* tpmback_get_uuid(domid_t domid, unsigned int handle)
    return tpmif->uuid;
 }
 
-void tpmback_set_open_callback(void (*cb)(domid_t, unsigned int))
-{
-   gtpmdev.open_callback = cb;
-}
-void tpmback_set_close_callback(void (*cb)(domid_t, unsigned int))
-{
-   gtpmdev.close_callback = cb;
-}
-void tpmback_set_suspend_callback(void (*cb)(domid_t, unsigned int))
-{
-   gtpmdev.suspend_callback = cb;
-}
-void tpmback_set_resume_callback(void (*cb)(domid_t, unsigned int))
-{
-   gtpmdev.resume_callback = cb;
-}
-
 static void event_listener(void)
 {
    const char* bepath = "backend/vtpm";
@@ -872,7 +851,7 @@ void event_thread(void* p) {
    event_listener();
 }
 
-void init_tpmback(void)
+void init_tpmback(void (*open_cb)(domid_t, unsigned int), void (*close_cb)(domid_t, unsigned int))
 {
    if(!globalinit) {
       init_waitqueue_head(&waitq);
@@ -884,8 +863,8 @@ void init_tpmback(void)
    gtpmdev.num_tpms = 0;
    gtpmdev.flags = 0;
 
-   gtpmdev.open_callback = gtpmdev.close_callback = NULL;
-   gtpmdev.suspend_callback = gtpmdev.resume_callback = NULL;
+   gtpmdev.open_callback = open_cb;
+   gtpmdev.close_callback = close_cb;
 
    eventthread = create_thread("tpmback-listener", event_thread, NULL);
 
@@ -893,10 +872,6 @@ void init_tpmback(void)
 
 void shutdown_tpmback(void)
 {
-   /* Disable callbacks */
-   gtpmdev.open_callback = gtpmdev.close_callback = NULL;
-   gtpmdev.suspend_callback = gtpmdev.resume_callback = NULL;
-
    TPMBACK_LOG("Shutting down tpm backend\n");
    /* Set the quit flag */
    gtpmdev.flags = TPMIF_CLOSED;

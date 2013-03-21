@@ -367,7 +367,7 @@ int main(int argc, char **argv)
    }
 
    /* Initialize devices */
-   init_tpmback();
+   init_tpmback(NULL, NULL);
    if((tpmfront_dev = init_tpmfront(NULL)) == NULL) {
       error("Unable to initialize tpmfront device");
       goto abort_posttpmfront;
