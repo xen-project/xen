@@ -156,6 +156,9 @@ static int wait_for_backend_closed(xenbus_event_queue* events, char* path)
 	 case XenbusStateClosed:
 	    TPMFRONT_LOG("Backend Closed\n");
 	    return 0;
+	 case XenbusStateInitWait:
+	    TPMFRONT_LOG("Backend Closed (waiting for reconnect)\n");
+	    return 0;
 	 default:
 	    xenbus_wait_for_watch(events);
       }
@@ -339,10 +342,10 @@ void shutdown_tpmfront(struct tpmfront_dev* dev)
    TPMFRONT_LOG("Shutting down tpmfront\n");
    /* disconnect */
    if(dev->state == XenbusStateConnected) {
-      dev->state = XenbusStateClosing;
-      //FIXME: Transaction for this?
       /* Tell backend we are closing */
+      dev->state = XenbusStateClosing;
       if((err = xenbus_printf(XBT_NIL, dev->nodename, "state", "%u", (unsigned int) dev->state))) {
+	 TPMFRONT_ERR("Unable to write to %s, error was %s", dev->nodename, err);
 	 free(err);
       }
 
@@ -365,6 +368,13 @@ void shutdown_tpmfront(struct tpmfront_dev* dev)
 
       /* Wait for the backend to close and unmap shared pages, ignore any errors */
       wait_for_backend_state_changed(dev, XenbusStateClosed);
+
+      /* Prepare for a later reopen (possibly by a kexec'd kernel) */
+      dev->state = XenbusStateInitialising;
+      if((err = xenbus_printf(XBT_NIL, dev->nodename, "state", "%u", (unsigned int) dev->state))) {
+	 TPMFRONT_ERR("Unable to write to %s, error was %s", dev->nodename, err);
+	 free(err);
+      }
 
       /* Close event channel and unmap shared page */
       mask_evtchn(dev->evtchn);

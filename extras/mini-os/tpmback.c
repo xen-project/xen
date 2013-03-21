@@ -645,6 +645,24 @@ error_post_map:
    return -1;
 }
 
+static void disconnect_fe(tpmif_t* tpmif)
+{
+   if (tpmif->status == CONNECTED) {
+      tpmif->status = DISCONNECTING;
+      mask_evtchn(tpmif->evtchn);
+
+      if(gntmap_munmap(&gtpmdev.map, (unsigned long)tpmif->page, 1)) {
+	 TPMBACK_ERR("%u/%u Error occured while trying to unmap shared page\n", (unsigned int) tpmif->domid, tpmif->handle);
+      }
+
+      unbind_evtchn(tpmif->evtchn);
+   }
+   tpmif->status = DISCONNECTED;
+   tpmif_change_state(tpmif, XenbusStateInitWait);
+
+   TPMBACK_LOG("Frontend %u/%u disconnected\n", (unsigned int) tpmif->domid, tpmif->handle);
+}
+
 static int frontend_changed(tpmif_t* tpmif)
 {
    int state = xenbus_read_integer(tpmif->fe_state_path);
@@ -671,8 +689,11 @@ static int frontend_changed(tpmif_t* tpmif)
 	 tpmif_change_state(tpmif, XenbusStateClosing);
 	 break;
 
-      case XenbusStateUnknown: /* keep it here */
       case XenbusStateClosed:
+         disconnect_fe(tpmif);
+	 break;
+
+      case XenbusStateUnknown: /* keep it here */
 	 free_tpmif(tpmif);
 	 break;
 
