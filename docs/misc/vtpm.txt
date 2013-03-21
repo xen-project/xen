@@ -1,7 +1,7 @@
 Copyright (c) 2010-2012 United States Government, as represented by
 the Secretary of Defense.  All rights reserved.
 November 12 2012
-Authors: Matthew Fioravante (JHUAPL),
+Authors: Matthew Fioravante (JHUAPL), Daniel De Graaf (NSA)
 
 This document describes the virtual Trusted Platform Module (vTPM) subsystem
 for Xen. The reader is assumed to have familiarity with building and installing
@@ -15,7 +15,8 @@ operating system (a DomU).  This allows programs to interact with a TPM in a
 virtual system the same way they interact with a TPM on the physical system.
 Each guest gets its own unique, emulated, software TPM.  However, each of the
 vTPM's secrets (Keys, NVRAM, etc) are managed by a vTPM Manager domain, which
-seals the secrets to the Physical TPM.  Thus, the vTPM subsystem extends the
+seals the secrets to the Physical TPM.  If the process of creating each of these
+domains (manager, vTPM, and guest) is trusted, the vTPM subsystem extends the
 chain of trust rooted in the hardware TPM to virtual machines in Xen. Each
 major component of vTPM is implemented as a separate domain, providing secure
 separation guaranteed by the hypervisor. The vTPM domains are implemented in
@@ -119,14 +120,17 @@ the stubdom tree.
 Compiling the LINUX dom0 kernel:
 --------------------------------
 
-The Linux dom0 kernel has no special prerequisites.
+The Linux dom0 kernel should not try accessing the TPM while the vTPM
+Manager domain is accessing it; the simplest way to accomplish this is
+to ensure the kernel is compiled without a driver for the TPM, or avoid
+loading the driver by blacklisting the module.
 
 Compiling the LINUX domU kernel:
 --------------------------------
 
-The domU kernel used by domains with vtpms must
-include the xen-tpmfront.ko driver. It can be built
-directly into the kernel or as a module.
+The domU kernel used by domains with vtpms must include the xen-tpmfront.ko
+driver. It can be built directly into the kernel or as a module; however, some
+features such as IMA require the TPM to be built in to the kernel.
 
 CONFIG_TCG_TPM=y
 CONFIG_TCG_XEN=y
@@ -160,9 +164,10 @@ disk=["file:/var/vtpmmgr-stubdom.img,hda,w"]
 name="vtpmmgr"
 iomem=["fed40,5"]
 
-The iomem line tells xl to allow access to the TPM
-IO memory pages, which are 5 pages that start at
-0xfed40000.
+The iomem line tells xl to allow access to all of the TPM IO memory
+pages, which are 5 pages (one per locality) that start at 0xfed40000. By
+default, the TPM manager uses locality 0 (so only the page at 0xfed40 is
+needed); this can be changed on the domain's command line.
 
 Starting and stopping the manager:
 ----------------------------------
@@ -283,6 +288,24 @@ On guest:
 # shutdown -h now
 
 You may wish to write a script to start your vtpm and guest together.
+
+------------------------------
+INTEGRATION WITH PV-GRUB
+------------------------------
+
+The vTPM currently starts up with all PCRs set to their default values (all
+zeros for the lower 16).  This means that any decisions about the
+trustworthiness of the created domain must be made based on the environment that
+created the vTPM and the domU; for example, a system that only constructs images
+using a trusted configuration and guest kernel be able to provide guarantees
+about the guests and any measurements done that kernel (such as the IMA TCB
+log).  Guests wishing to use a custom kernel in such a secure environment are
+often started using the pv-grub bootloader as the kernel, which then can load
+the untrusted kernel without needing to parse an untrusted filesystem and kernel
+in dom0.  If the pv-grub stub domain succeeds in connecting to a vTPM, it will
+extend the hash of the kernel that it boots into PCR #4, and will extend the
+command line and initrd into PCR #5 before booting so that a domU booted in this
+way can attest to its early boot state.
 
 ------------------------------
 MORE INFORMATION

@@ -400,7 +400,7 @@ grub-upstream: grub-$(GRUB_VERSION).tar.gz
 	done
 
 .PHONY: grub
-grub: grub-upstream $(CROSS_ROOT)
+grub: cross-polarssl grub-upstream $(CROSS_ROOT)
 	mkdir -p grub-$(XEN_TARGET_ARCH)
 	CPPFLAGS="$(TARGET_CPPFLAGS)" CFLAGS="$(TARGET_CFLAGS)" $(MAKE) DESTDIR= -C $@ OBJ_DIR=$(CURDIR)/grub-$(XEN_TARGET_ARCH)
 

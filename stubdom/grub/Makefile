@@ -60,6 +60,7 @@ NETBOOT_SOURCES:=$(addprefix netboot/,$(NETBOOT_SOURCES))
 $(BOOT): DEF_CPPFLAGS+=-D__ASSEMBLY__
 
 PV_GRUB_SOURCES = kexec.c mini-os.c
+PV_GRUB_SOURCES += ../polarssl-$(XEN_TARGET_ARCH)/library/sha1.o
 
 SOURCES = $(NETBOOT_SOURCES) $(STAGE2_SOURCES) $(PV_GRUB_SOURCES)
 

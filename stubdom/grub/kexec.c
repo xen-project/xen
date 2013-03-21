@@ -28,7 +28,9 @@
 #include <blkfront.h>
 #include <netfront.h>
 #include <fbfront.h>
+#include <tpmfront.h>
 #include <shared.h>
+#include <byteswap.h>
 
 #include "mini-os.h"
 
@@ -53,6 +55,22 @@ static unsigned long allocated;
 
 int pin_table(xc_interface *xc_handle, unsigned int type, unsigned long mfn,
               domid_t dom);
+
+#define TPM_TAG_RQU_COMMAND 0xC1
+#define TPM_ORD_Extend 20
+
+struct pcr_extend_cmd {
+	uint16_t tag;
+	uint32_t size;
+	uint32_t ord;
+
+	uint32_t pcr;
+	unsigned char hash[20];
+} __attribute__((packed));
+
+/* Not imported from polarssl's header since the prototype unhelpfully defines
+ * the input as unsigned char, which causes pointer type mismatches */
+void sha1(const void *input, size_t ilen, unsigned char output[20]);
 
 /* We need mfn to appear as target_pfn, so exchange with the MFN there */
 static void do_exchange(struct xc_dom_image *dom, xen_pfn_t target_pfn, xen_pfn_t source_mfn)
@@ -117,6 +135,40 @@ int kexec_allocate(struct xc_dom_image *dom, xen_vaddr_t up_to)
     return 0;
 }
 
+static void tpm_hash2pcr(struct xc_dom_image *dom, char *cmdline)
+{
+	struct tpmfront_dev* tpm = init_tpmfront(NULL);
+	uint8_t *resp;
+	size_t resplen = 0;
+	struct pcr_extend_cmd cmd;
+
+	/* If all guests have access to a vTPM, it may be useful to replace this
+	 * with ASSERT(tpm) to prevent configuration errors from allowing a guest
+	 * to boot without a TPM (or with a TPM that has not been sent any
+	 * measurements, which could allow forging the measurements).
+	 */
+	if (!tpm)
+		return;
+
+	cmd.tag = bswap_16(TPM_TAG_RQU_COMMAND);
+	cmd.size = bswap_32(sizeof(cmd));
+	cmd.ord = bswap_32(TPM_ORD_Extend);
+	cmd.pcr = bswap_32(4); // PCR #4 for kernel
+	sha1(dom->kernel_blob, dom->kernel_size, cmd.hash);
+
+	tpmfront_cmd(tpm, (void*)&cmd, sizeof(cmd), &resp, &resplen);
+
+	cmd.pcr = bswap_32(5); // PCR #5 for cmdline
+	sha1(cmdline, strlen(cmdline), cmd.hash);
+	tpmfront_cmd(tpm, (void*)&cmd, sizeof(cmd), &resp, &resplen);
+
+	cmd.pcr = bswap_32(5); // PCR #5 for initrd
+	sha1(dom->ramdisk_blob, dom->ramdisk_size, cmd.hash);
+	tpmfront_cmd(tpm, (void*)&cmd, sizeof(cmd), &resp, &resplen);
+
+	shutdown_tpmfront(tpm);
+}
+
 void kexec(void *kernel, long kernel_size, void *module, long module_size, char *cmdline, unsigned long flags)
 {
     struct xc_dom_image *dom;
@@ -150,6 +202,8 @@ void kexec(void *kernel, long kernel_size, void *module, long module_size, char 
     dom->flags = flags;
     dom->console_evtchn = start_info.console.domU.evtchn;
     dom->xenstore_evtchn = start_info.store_evtchn;
+
+    tpm_hash2pcr(dom, cmdline);
 
     if ( (rc = xc_dom_boot_xen_init(dom, xc_handle, domid)) != 0 ) {
         grub_printf("xc_dom_boot_xen_init returned %d\n", rc);
