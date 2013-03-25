@@ -244,6 +244,29 @@ void vtd_ops_postamble_quirk(struct iommu* iommu)
     }
 }
 
+/* 5500/5520/X58 Chipset Interrupt remapping errata, for stepping B-3.
+ * Fixed in stepping C-2. */
+static void __init tylersburg_intremap_quirk(void)
+{
+    uint32_t bus, device;
+    uint8_t rev;
+
+    for ( bus = 0; bus < 0x100; bus++ )
+    {
+        /* Match on System Management Registers on Device 20 Function 0 */
+        device = pci_conf_read32(0, bus, 20, 0, PCI_VENDOR_ID);
+        rev = pci_conf_read8(0, bus, 20, 0, PCI_REVISION_ID);
+
+        if ( rev == 0x13 && device == 0x342e8086 )
+        {
+            printk(XENLOG_WARNING VTDPREFIX
+                   "Disabling IOMMU due to Intel 5500/5520/X58 Chipset errata #47, #53\n");
+            iommu_enable = 0;
+            break;
+        }
+    }
+}
+
 /* initialize platform identification flags */
 void __init platform_quirks_init(void)
 {
@@ -264,6 +287,10 @@ void __init platform_quirks_init(void)
 
     /* ioremap IGD MMIO+0x2000 page */
     map_igd_reg();
+
+    /* Tylersburg interrupt remap quirk */
+    if ( iommu_intremap )
+        tylersburg_intremap_quirk();
 }
 
 /*

@@ -2125,6 +2125,11 @@ int __init intel_vtd_setup(void)
     }
 
     platform_quirks_init();
+    if ( !iommu_enable )
+    {
+        ret = -ENODEV;
+        goto error;
+    }
 
     /* We enable the following features only if they are supported by all VT-d
      * engines: Snoop Control, DMA passthrough, Queued Invalidation and
