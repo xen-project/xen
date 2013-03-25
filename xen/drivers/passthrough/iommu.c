@@ -470,6 +470,8 @@ int __init iommu_setup(void)
         rc = iommu_hardware_setup();
         iommu_enabled = (rc == 0);
     }
+    if ( !iommu_enabled )
+        iommu_intremap = 0;
 
     if ( (force_iommu && !iommu_enabled) ||
          (force_intremap && !iommu_intremap) )
@@ -484,9 +486,12 @@ int __init iommu_setup(void)
     }
     printk("I/O virtualisation %sabled\n", iommu_enabled ? "en" : "dis");
     if ( iommu_enabled )
+    {
         printk(" - Dom0 mode: %s\n",
                iommu_passthrough ? "Passthrough" :
                iommu_dom0_strict ? "Strict" : "Relaxed");
+        printk("Interrupt remapping %sabled\n", iommu_intremap ? "en" : "dis");
+    }
 
     return rc;
 }

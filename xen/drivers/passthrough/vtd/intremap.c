@@ -373,7 +373,7 @@ unsigned int io_apic_read_remap_rte(
     struct iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
     struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
 
-    if ( !ir_ctrl || !ir_ctrl->iremap_maddr || !ir_ctrl->iremap_num ||
+    if ( !ir_ctrl->iremap_num ||
         ( (index = apic_pin_2_ir_idx[apic][ioapic_pin]) < 0 ) )
         return __io_apic_read(apic, reg);
 
@@ -396,14 +396,7 @@ void io_apic_write_remap_rte(
     struct IO_APIC_route_remap_entry *remap_rte;
     unsigned int rte_upper = (reg & 1) ? 1 : 0;
     struct iommu *iommu = ioapic_to_iommu(IO_APIC_ID(apic));
-    struct ir_ctrl *ir_ctrl = iommu_ir_ctrl(iommu);
     int saved_mask;
-
-    if ( !ir_ctrl || !ir_ctrl->iremap_maddr )
-    {
-        __io_apic_write(apic, reg, value);
-        return;
-    }
 
     old_rte = __ioapic_read_entry(apic, ioapic_pin, 1);
 
@@ -653,20 +646,11 @@ void msi_msg_read_remap_rte(
 {
     struct pci_dev *pdev = msi_desc->dev;
     struct acpi_drhd_unit *drhd = NULL;
-    struct iommu *iommu = NULL;
-    struct ir_ctrl *ir_ctrl;
 
     drhd = pdev ? acpi_find_matched_drhd_unit(pdev)
                 : hpet_to_drhd(msi_desc->hpet_id);
-    if ( !drhd )
-        return;
-    iommu = drhd->iommu;
-
-    ir_ctrl = iommu_ir_ctrl(iommu);
-    if ( !ir_ctrl || !ir_ctrl->iremap_maddr )
-        return;
-
-    remap_entry_to_msi_msg(iommu, msg);
+    if ( drhd )
+        remap_entry_to_msi_msg(drhd->iommu, msg);
 }
 
 void msi_msg_write_remap_rte(
@@ -674,20 +658,11 @@ void msi_msg_write_remap_rte(
 {
     struct pci_dev *pdev = msi_desc->dev;
     struct acpi_drhd_unit *drhd = NULL;
-    struct iommu *iommu = NULL;
-    struct ir_ctrl *ir_ctrl;
 
     drhd = pdev ? acpi_find_matched_drhd_unit(pdev)
                 : hpet_to_drhd(msi_desc->hpet_id);
-    if ( !drhd )
-        return;
-    iommu = drhd->iommu;
-
-    ir_ctrl = iommu_ir_ctrl(iommu);
-    if ( !ir_ctrl || !ir_ctrl->iremap_maddr )
-        return;
-
-    msi_msg_to_remap_entry(iommu, pdev, msi_desc, msg);
+    if ( drhd )
+        msi_msg_to_remap_entry(drhd->iommu, pdev, msi_desc, msg);
 }
 
 int __init intel_setup_hpet_msi(struct msi_desc *msi_desc)

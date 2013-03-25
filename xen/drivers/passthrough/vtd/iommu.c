@@ -2065,6 +2065,9 @@ static int init_vtd_hw(void)
                 break;
             }
         }
+        if ( !iommu_intremap )
+            for_each_drhd_unit ( drhd )
+                disable_intremap(drhd->iommu);
     }
 
     /*

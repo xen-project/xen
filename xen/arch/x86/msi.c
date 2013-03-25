@@ -210,7 +210,7 @@ static void read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
         BUG();
     }
 
-    if ( iommu_enabled )
+    if ( iommu_intremap )
         iommu_read_msi_from_ire(entry, msg);
 }
 
@@ -218,7 +218,7 @@ static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
 {
     entry->msg = *msg;
 
-    if ( iommu_enabled )
+    if ( iommu_intremap )
     {
         ASSERT(msg != &entry->msg);
         iommu_update_ire_from_msi(entry, msg);
@@ -492,7 +492,7 @@ int msi_free_irq(struct msi_desc *entry)
     }
 
     /* Free the unused IRTE if intr remap enabled */
-    if ( iommu_enabled )
+    if ( iommu_intremap )
         iommu_update_ire_from_msi(entry, NULL);
 
     list_del(&entry->list);
