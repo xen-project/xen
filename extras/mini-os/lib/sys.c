@@ -31,6 +31,7 @@
 #include <tpm_tis.h>
 #include <xenbus.h>
 #include <xenstore.h>
+#include <poll.h>
 
 #include <sys/types.h>
 #include <sys/unistd.h>
@@ -678,6 +679,29 @@ static void dump_set(int nfds, fd_set *readfds, fd_set *writefds, fd_set *except
 #define dump_set(nfds, readfds, writefds, exceptfds, timeout)
 #endif
 
+#ifdef LIBC_DEBUG
+static void dump_pollfds(struct pollfd *pfd, int nfds, int timeout)
+{
+    int i, comma, fd;
+
+    printk("[");
+    comma = 0;
+    for (i = 0; i < nfds; i++) {
+        fd = pfd[i].fd;
+        if (comma)
+            printk(", ");
+        printk("%d(%c)/%02x", fd, file_types[files[fd].type],
+            pfd[i].events);
+            comma = 1;
+    }
+    printk("]");
+
+    printk(", %d, %d", nfds, timeout);
+}
+#else
+#define dump_pollfds(pfds, nfds, timeout)
+#endif
+
 /* Just poll without blocking */
 static int select_poll(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds)
 {
@@ -981,6 +1005,98 @@ out:
 #endif
     remove_waiter(console_w, console_queue);
     return ret;
+}
+
+/* Wrap around select */
+int poll(struct pollfd _pfd[], nfds_t _nfds, int _timeout)
+{
+    int n, ret;
+    int i, fd;
+    struct timeval _timeo, *timeo = NULL;
+    fd_set rfds, wfds, efds;
+    int max_fd = -1;
+
+    DEBUG("poll(");
+    dump_pollfds(_pfd, _nfds, _timeout);
+    DEBUG(")\n");
+
+    FD_ZERO(&rfds);
+    FD_ZERO(&wfds);
+    FD_ZERO(&efds);
+
+    n = 0;
+
+    for (i = 0; i < _nfds; i++) {
+        fd = _pfd[i].fd;
+        _pfd[i].revents = 0;
+
+        /* fd < 0, revents = 0, which is already set */
+        if (fd < 0) continue;
+
+        /* fd is invalid, revents = POLLNVAL, increment counter */
+        if (fd >= NOFILE || files[fd].type == FTYPE_NONE) {
+            n++;
+            _pfd[i].revents |= POLLNVAL;
+            continue;
+        }
+
+        /* normal case, map POLL* into readfds and writefds:
+         * POLLIN  -> readfds
+         * POLLOUT -> writefds
+         * POLL*   -> none
+         */
+        if (_pfd[i].events & POLLIN)
+            FD_SET(fd, &rfds);
+        if (_pfd[i].events & POLLOUT)
+            FD_SET(fd, &wfds);
+        /* always set exceptfds */
+        FD_SET(fd, &efds);
+        if (fd > max_fd)
+            max_fd = fd;
+    }
+
+    /* should never sleep when we already have events */
+    if (n) {
+        _timeo.tv_sec  = 0;
+        _timeo.tv_usec = 0;
+        timeo = &_timeo;
+    } else if (_timeout >= 0) {
+        /* normal case, construct _timeout, might sleep */
+        _timeo.tv_sec  = _timeout / 1000;
+        _timeo.tv_usec = (_timeout % 1000) * 1000;
+        timeo = &_timeo;
+    } else {
+        /* _timeout < 0, block forever */
+        timeo = NULL;
+    }
+
+
+    ret = select(max_fd+1, &rfds, &wfds, &efds, timeo);
+    /* error in select, just return, errno is set by select() */
+    if (ret < 0)
+        return ret;
+
+    for (i = 0; i < _nfds; i++) {
+        fd = _pfd[i].fd;
+
+        /* the revents has already been set for all error case */
+        if (fd < 0 || fd >= NOFILE || files[fd].type == FTYPE_NONE)
+            continue;
+
+        if (FD_ISSET(fd, &rfds) || FD_ISSET(fd, &wfds) || FD_ISSET(fd, &efds))
+            n++;
+        if (FD_ISSET(fd, &efds)) {
+            /* anything bad happens we set POLLERR */
+            _pfd[i].revents |= POLLERR;
+            continue;
+        }
+        if (FD_ISSET(fd, &rfds))
+            _pfd[i].revents |= POLLIN;
+        if (FD_ISSET(fd, &wfds))
+            _pfd[i].revents |= POLLOUT;
+    }
+
+    return n;
 }
 
 #ifdef HAVE_LWIP
@@ -1360,7 +1476,6 @@ unsupported_function(int, tcgetattr, 0);
 unsupported_function(int, grantpt, -1);
 unsupported_function(int, unlockpt, -1);
 unsupported_function(char *, ptsname, NULL);
-unsupported_function(int, poll, -1);
 
 /* net/if.h */
 unsupported_function_log(unsigned int, if_nametoindex, -1);
