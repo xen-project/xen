@@ -659,6 +659,8 @@ static u16 __init parse_ivhd_device_special(
     switch ( special->variety )
     {
     case ACPI_IVHD_IOAPIC:
+        if ( !iommu_intremap )
+            break;
         /*
          * Some BIOSes have IOAPIC broken entries so we check for IVRS
          * consistency here --- whether entry's IOAPIC ID is valid and
@@ -921,7 +923,7 @@ static int __init parse_ivrs_table(struct acpi_table_header *table)
     }
 
     /* Each IO-APIC must have been mentioned in the table. */
-    for ( apic = 0; !error && apic < nr_ioapics; ++apic )
+    for ( apic = 0; !error && iommu_intremap && apic < nr_ioapics; ++apic )
     {
         if ( !nr_ioapic_entries[apic] ||
              ioapic_sbdf[IO_APIC_ID(apic)].pin_setup )

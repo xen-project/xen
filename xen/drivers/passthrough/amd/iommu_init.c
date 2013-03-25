@@ -1194,7 +1194,8 @@ int __init amd_iommu_init(void)
 
     BUG_ON( !iommu_found() );
 
-    if ( amd_iommu_perdev_intremap && amd_sp5100_erratum28() )
+    if ( iommu_intremap && amd_iommu_perdev_intremap &&
+         amd_sp5100_erratum28() )
         goto error_out;
 
     ivrs_bdf_entries = amd_iommu_get_ivrs_dev_entries();
@@ -1211,7 +1212,7 @@ int __init amd_iommu_init(void)
         goto error_out;
 
     /* initialize io-apic interrupt remapping entries */
-    if ( amd_iommu_setup_ioapic_remapping() != 0 )
+    if ( iommu_intremap && amd_iommu_setup_ioapic_remapping() != 0 )
         goto error_out;
 
     /* allocate and initialize a global device table shared by all iommus */
