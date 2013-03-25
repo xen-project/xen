@@ -25,6 +25,7 @@
 0x00028004  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_wake       [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
 0x00028005  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_yield          [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
 0x00028006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_block          [ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
+0x00022006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_block          [ dom:vcpu = 0x%(1)08x, domid = 0x%(2)08x ]
 0x00028007  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  domain_shutdown	  [ domid = 0x%(1)08x, edomid = 0x%(2)08x, reason = 0x%(3)08x ]
 0x00028008  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_ctl
 0x00028009  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  sched_adjdom      [ domid = 0x%(1)08x ]
