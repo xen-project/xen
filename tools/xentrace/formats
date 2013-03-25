@@ -141,3 +141,12 @@
 0x00801001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  cpu_freq_change [ %(1)dMHz -> %(2)dMHz ]
 0x00801002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  cpu_idle_entry  [ C0 -> C%(1)d, acpi_pm_tick = %(2)d, expected = %(3)dus, predicted = %(4)dus ]
 0x00801003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  cpu_idle_exit   [ C%(1)d -> C0, acpi_pm_tick = %(2)d, irq = %(3)d %(4)d %(5)d %(6)d ]
+
+0x00802001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  cleanup_move_delayed [ irq = %(1)d, vector 0x%(2)x on CPU%(3)d ]
+0x00802002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  cleanup_move [ irq = %(1)d, vector 0x%(2)x on CPU%(3)d ]
+0x00802003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  bind_vector [ irq = %(1)d = vector 0x%(2)x, CPU mask: 0x%(3)08x ]
+0x00802004  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  clear_vector [ irq = %(1)d = vector 0x%(2)x, CPU mask: 0x%(3)08x ]
+0x00802005  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  move_vector [ irq = %(1)d had vector 0x%(2)x on CPU%(3)d ]
+0x00802006  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  assign_vector [ irq = %(1)d = vector 0x%(2)x, CPU mask: 0x%(3)08x ]
+0x00802007  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  bogus_vector [ 0x%(1)x ]
+0x00802008  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  do_irq [ irq = %(1)d, began = %(2)dus, ended = %(3)dus ]
