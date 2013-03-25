@@ -139,5 +139,5 @@
 0x0040f10f  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  shadow_emulate_resync_only        [ gfn = 0x%(2)08x%(1)08x ]
 
 0x00801001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  cpu_freq_change [ %(1)dMHz -> %(2)dMHz ]
-0x00802001  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  cpu_idle_entry  [ C0 -> C%(1)d, acpi_pm_tick = %(2)d, expected = %(3)dus, predicted = %(4)dus ]
-0x00802002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  cpu_idle_exit   [ C%(1)d -> C0, acpi_pm_tick = %(2)d, irq = %(3)d %(4)d %(5)d %(6)d ]
+0x00801002  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  cpu_idle_entry  [ C0 -> C%(1)d, acpi_pm_tick = %(2)d, expected = %(3)dus, predicted = %(4)dus ]
+0x00801003  CPU%(cpu)d  %(tsc)d (+%(reltsc)8d)  cpu_idle_exit   [ C%(1)d -> C0, acpi_pm_tick = %(2)d, irq = %(3)d %(4)d %(5)d %(6)d ]
