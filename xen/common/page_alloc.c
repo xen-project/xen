@@ -152,6 +152,10 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
 {
     unsigned long bad_spfn, bad_epfn;
     const char *p;
+#ifdef CONFIG_X86
+    const unsigned long *badpage = NULL;
+    unsigned int i, array_size;
+#endif
 
     ps = round_pgup(ps);
     pe = round_pgdown(pe);
@@ -161,6 +165,25 @@ void __init init_boot_pages(paddr_t ps, paddr_t pe)
     first_valid_mfn = min_t(unsigned long, ps >> PAGE_SHIFT, first_valid_mfn);
 
     bootmem_region_add(ps >> PAGE_SHIFT, pe >> PAGE_SHIFT);
+
+#ifdef CONFIG_X86
+    /* 
+     * Here we put platform-specific memory range workarounds, i.e.
+     * memory known to be corrupt or otherwise in need to be reserved on
+     * specific platforms.
+     * We get these certain pages and remove them from memory region list.
+     */
+    badpage = get_platform_badpages(&array_size);
+    if ( badpage )
+    {
+        for ( i = 0; i < array_size; i++ )
+        {
+            bootmem_region_zap(*badpage >> PAGE_SHIFT,
+                               (*badpage >> PAGE_SHIFT) + 1);
+            badpage++;
+        }
+    }
+#endif
 
     /* Check new pages against the bad-page list. */
     p = opt_badpage;

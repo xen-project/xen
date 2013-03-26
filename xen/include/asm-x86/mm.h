@@ -322,6 +322,7 @@ int is_iomem_page(unsigned long mfn);
 
 void clear_superpage_mark(struct page_info *page);
 
+const unsigned long *get_platform_badpages(unsigned int *array_size);
 /* Per page locks:
  * page_lock() is used for two purposes: pte serialization, and memory sharing.
  *

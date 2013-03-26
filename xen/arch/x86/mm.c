@@ -121,6 +121,7 @@
 #include <xen/trace.h>
 #include <asm/setup.h>
 #include <asm/fixmap.h>
+#include <asm/pci.h>
 
 /* Mapping of the fixmap space needed early. */
 l1_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
@@ -5822,6 +5823,25 @@ void arch_dump_shared_mem_info(void)
     printk("Shared frames %u -- Saved frames %u\n",
             mem_sharing_get_nr_shared_mfns(),
             mem_sharing_get_nr_saved_mfns());
+}
+
+const unsigned long *__init get_platform_badpages(unsigned int *array_size)
+{
+    u32 igd_id;
+    static unsigned long __initdata bad_pages[] = {
+        0x20050000,
+        0x20110000,
+        0x20130000,
+        0x20138000,
+        0x40004000,
+    };
+
+    *array_size = ARRAY_SIZE(bad_pages);
+    igd_id = pci_conf_read32(0, 0, 2, 0, 0);
+    if ( !IS_SNB_GFX(igd_id) )
+        return NULL;
+
+    return bad_pages;
 }
 
 /*

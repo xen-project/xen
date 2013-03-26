@@ -31,6 +31,7 @@
 #include <xen/keyhandler.h>
 #include <asm/msi.h>
 #include <asm/irq.h>
+#include <asm/pci.h>
 #include <mach_apic.h>
 #include "iommu.h"
 #include "dmar.h"
@@ -47,7 +48,6 @@
 #define IS_CTG(id)    (id == 0x2a408086)
 #define IS_ILK(id)    (id == 0x00408086 || id == 0x00448086 || id== 0x00628086 || id == 0x006A8086)
 #define IS_CPT(id)    (id == 0x01008086 || id == 0x01048086)
-#define IS_SNB_GFX(id) (id == 0x01068086 || id == 0x01168086 || id == 0x01268086 || id == 0x01028086 || id == 0x01128086 || id == 0x01228086 || id == 0x010A8086)
 
 static u32 __read_mostly ioh_id;
 static u32 __initdata igd_id;
