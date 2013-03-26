@@ -731,12 +731,72 @@ struct arch_vpmu_ops core2_vpmu_ops = {
     .arch_vpmu_load = core2_vpmu_load
 };
 
+/*
+ * See Intel SDM Vol 2a Instruction Set Referenc for CPUID instruction.
+ * cpuid 0xa - Architectural Performance Monitoring Leaf
+ * Register eax
+ */
+#define X86_FEATURE_PMU_VER_OFF   0  /* Version ID */
+#define FEATURE_PMU_VER_BITS      8  /* 8 bits 0..7 */
+#define X86_FEATURE_NUM_GEN_OFF   8  /* Number of general pmu registers */
+#define FEATURE_NUM_GEN_BITS      8  /* 8 bits 8..15 */
+#define X86_FEATURE_GEN_WIDTH_OFF 16 /* Width of general pmu registers */
+#define FEATURE_GEN_WIDTH_BITS    8  /* 8 bits 16..23 */
+/* Register edx */
+#define X86_FEATURE_NUM_FIX_OFF   0  /* Number of fixed pmu registers */
+#define FEATURE_NUM_FIX_BITS      5  /* 5 bits 0..4 */
+#define X86_FEATURE_FIX_WIDTH_OFF 5  /* Width of fixed pmu registers */
+#define FEATURE_FIX_WIDTH_BITS    8  /* 8 bits 5..12 */
+
+static void core2_no_vpmu_do_cpuid(unsigned int input,
+                                unsigned int *eax, unsigned int *ebx,
+                                unsigned int *ecx, unsigned int *edx)
+{
+    /*
+     * As in this case the vpmu is not enabled reset some bits in the
+     * architectural performance monitoring related part.
+     */
+    if ( input == 0xa )
+    {
+        *eax &= ~(((1 << FEATURE_PMU_VER_BITS) -1) << X86_FEATURE_PMU_VER_OFF);
+        *eax &= ~(((1 << FEATURE_NUM_GEN_BITS) -1) << X86_FEATURE_NUM_GEN_OFF);
+        *eax &= ~(((1 << FEATURE_GEN_WIDTH_BITS) -1) << X86_FEATURE_GEN_WIDTH_OFF);
+
+        *edx &= ~(((1 << FEATURE_NUM_FIX_BITS) -1) << X86_FEATURE_NUM_FIX_OFF);
+        *edx &= ~(((1 << FEATURE_FIX_WIDTH_BITS) -1) << X86_FEATURE_FIX_WIDTH_OFF);
+    }
+}
+
+/*
+ * If its a vpmu msr set it to 0.
+ */
+static int core2_no_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
+{
+    int type = -1, index = -1;
+    if ( !is_core2_vpmu_msr(msr, &type, &index) )
+        return 0;
+    *msr_content = 0;
+    return 1;
+}
+
+/*
+ * These functions are used in case vpmu is not enabled.
+ */
+struct arch_vpmu_ops core2_no_vpmu_ops = {
+    .do_rdmsr = core2_no_vpmu_do_rdmsr,
+    .do_cpuid = core2_no_vpmu_do_cpuid,
+};
+
 int vmx_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t family = current_cpu_data.x86;
     uint8_t cpu_model = current_cpu_data.x86_model;
     int ret = 0;
+
+    vpmu->arch_vpmu_ops = &core2_no_vpmu_ops;
+    if ( !vpmu_flags )
+        return 0;
 
     if ( family == 6 )
     {

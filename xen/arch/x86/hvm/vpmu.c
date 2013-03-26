@@ -67,7 +67,7 @@ int vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(current);
 
-    if ( vpmu->arch_vpmu_ops )
+    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->do_wrmsr )
         return vpmu->arch_vpmu_ops->do_wrmsr(msr, msr_content);
     return 0;
 }
@@ -76,7 +76,7 @@ int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(current);
 
-    if ( vpmu->arch_vpmu_ops )
+    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->do_rdmsr )
         return vpmu->arch_vpmu_ops->do_rdmsr(msr, msr_content);
     return 0;
 }
@@ -85,7 +85,7 @@ int vpmu_do_interrupt(struct cpu_user_regs *regs)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(current);
 
-    if ( vpmu->arch_vpmu_ops )
+    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->do_interrupt )
         return vpmu->arch_vpmu_ops->do_interrupt(regs);
     return 0;
 }
@@ -104,7 +104,7 @@ void vpmu_save(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    if ( vpmu->arch_vpmu_ops )
+    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_save )
         vpmu->arch_vpmu_ops->arch_vpmu_save(v);
 }
 
@@ -112,7 +112,7 @@ void vpmu_load(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    if ( vpmu->arch_vpmu_ops )
+    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_load )
         vpmu->arch_vpmu_ops->arch_vpmu_load(v);
 }
 
@@ -120,9 +120,6 @@ void vpmu_initialise(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     uint8_t vendor = current_cpu_data.x86_vendor;
-
-    if ( !opt_vpmu_enabled )
-        return;
 
     if ( vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
         vpmu_destroy(v);
@@ -153,7 +150,7 @@ void vpmu_destroy(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    if ( vpmu->arch_vpmu_ops )
+    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_destroy )
         vpmu->arch_vpmu_ops->arch_vpmu_destroy(v);
 }
 

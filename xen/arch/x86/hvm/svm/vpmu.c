@@ -370,6 +370,10 @@ int svm_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
     uint8_t family = current_cpu_data.x86;
     int ret = 0;
 
+    /* vpmu enabled? */
+    if ( !vpmu_flags )
+        return 0;
+
     switch ( family )
     {
     case 0x10:
