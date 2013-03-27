@@ -398,9 +398,6 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
         long len;
         unsigned char *data;
 
-        if ( op->misc )
-            return -EINVAL;
-
         len = gwstrlen(guest_handle_cast(op->u.set_variable.name, CHAR16));
         if ( len < 0 )
             return len;
