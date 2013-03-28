@@ -738,19 +738,6 @@ static int __init erst_check_table(struct acpi_table_erst *erst_tab)
 
 	switch (erst_tab->header_length) {
 	case sizeof(*erst_tab) - sizeof(erst_tab->header):
-#ifdef CONFIG_X86
-		/* XXX
-		 * While the rest of the ERST code appears to work on Intel
-		 * systems with properly sized tables, various AMD systems
-		 * appear to get hung (at boot time) by allowing this. Until
-		 * someone with access to suitable hardware can debug this,
-		 * disable the rest of the code by considering this case
-		 * invalid.
-		 */
-		if (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL)
-			return -EINVAL;
-		/* fall through */
-#endif
 	/*
 	 * While invalid per specification, there are (early?) systems
 	 * indicating the full header size here, so accept that value too.
