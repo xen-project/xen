@@ -50,14 +50,25 @@ static void rtc_set_time(RTCState *s);
 static inline int from_bcd(RTCState *s, int a);
 static inline int convert_hour(RTCState *s, int hour);
 
-static void rtc_toggle_irq(RTCState *s)
+static void rtc_update_irq(RTCState *s)
 {
     struct domain *d = vrtc_domain(s);
+    uint8_t irqf;
 
     ASSERT(spin_is_locked(&s->lock));
-    s->hw.cmos_data[RTC_REG_C] |= RTC_IRQF;
+
+    /* IRQ is raised if any source is both raised & enabled */
+    irqf = (s->hw.cmos_data[RTC_REG_B]
+            & s->hw.cmos_data[RTC_REG_C]
+            & (RTC_PF|RTC_AF|RTC_UF))
+        ? RTC_IRQF : 0;
+
+    s->hw.cmos_data[RTC_REG_C] &= ~RTC_IRQF;
+    s->hw.cmos_data[RTC_REG_C] |= irqf;
+
     hvm_isa_irq_deassert(d, RTC_IRQ);
-    hvm_isa_irq_assert(d, RTC_IRQ);
+    if ( irqf )
+        hvm_isa_irq_assert(d, RTC_IRQ);
 }
 
 void rtc_periodic_interrupt(void *opaque)
@@ -68,8 +79,7 @@ void rtc_periodic_interrupt(void *opaque)
     if ( !(s->hw.cmos_data[RTC_REG_C] & RTC_PF) )
     {
         s->hw.cmos_data[RTC_REG_C] |= RTC_PF;
-        if ( s->hw.cmos_data[RTC_REG_B] & RTC_PIE )
-            rtc_toggle_irq(s);
+        rtc_update_irq(s);
     }
     else if ( ++(s->pt_dead_ticks) >= 10 )
     {
@@ -187,8 +197,7 @@ static void rtc_update_timer2(void *opaque)
     {
         s->hw.cmos_data[RTC_REG_C] |= RTC_UF;
         s->hw.cmos_data[RTC_REG_A] &= ~RTC_UIP;
-        if ((s->hw.cmos_data[RTC_REG_B] & RTC_UIE))
-            rtc_toggle_irq(s);
+        rtc_update_irq(s);
         check_update_timer(s);
     }
     spin_unlock(&s->lock);
@@ -378,9 +387,7 @@ static void rtc_alarm_cb(void *opaque)
     if (!(s->hw.cmos_data[RTC_REG_B] & RTC_SET))
     {
         s->hw.cmos_data[RTC_REG_C] |= RTC_AF;
-        /* alarm interrupt */
-        if (s->hw.cmos_data[RTC_REG_B] & RTC_AIE)
-            rtc_toggle_irq(s);
+        rtc_update_irq(s);
         alarm_timer_update(s);
     }
     spin_unlock(&s->lock);
@@ -390,7 +397,7 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
 {
     RTCState *s = opaque;
     struct domain *d = vrtc_domain(s);
-    uint32_t orig, mask;
+    uint32_t orig;
 
     spin_lock(&s->lock);
 
@@ -464,15 +471,8 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
         /*
          * If the interrupt is already set when the interrupt becomes
          * enabled, raise an interrupt immediately.
-         * NB: RTC_{A,P,U}IE == RTC_{A,P,U}F respectively.
          */
-        for ( mask = RTC_UIE; mask <= RTC_PIE; mask <<= 1 )
-            if ( (data & mask) && !(orig & mask) &&
-                 (s->hw.cmos_data[RTC_REG_C] & mask) )
-            {
-                rtc_toggle_irq(s);
-                break;
-            }
+        rtc_update_irq(s);
         s->hw.cmos_data[RTC_REG_B] = data;
         if ( (data ^ orig) & RTC_SET )
             check_update_timer(s);
@@ -628,8 +628,8 @@ static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
         break;
     case RTC_REG_C:
         ret = s->hw.cmos_data[s->hw.cmos_index];
-        hvm_isa_irq_deassert(vrtc_domain(s), RTC_IRQ);
         s->hw.cmos_data[RTC_REG_C] = 0x00;
+        rtc_update_irq(s);
         check_update_timer(s);
         alarm_timer_update(s);
         rtc_timer_update(s);
