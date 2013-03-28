@@ -240,8 +240,8 @@ int wrmsr_viridian_regs(uint32_t idx, uint64_t val)
         eax &= ~(1 << 12);
         edx &= 0xff000000;
         vlapic_set_reg(vlapic, APIC_ICR2, edx);
-        if ( vlapic_ipi(vlapic, eax, edx) == X86EMUL_OKAY )
-            vlapic_set_reg(vlapic, APIC_ICR, eax);
+        vlapic_ipi(vlapic, eax, edx);
+        vlapic_set_reg(vlapic, APIC_ICR, eax);
         break;
     }
 

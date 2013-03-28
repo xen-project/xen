@@ -62,8 +62,7 @@ struct vlapic {
     struct page_info         *regs_page;
     /* INIT-SIPI-SIPI work gets deferred to a tasklet. */
     struct {
-        struct vcpu          *target;
-        uint32_t             icr;
+        uint32_t             icr, dest;
         struct tasklet       tasklet;
     } init_sipi;
 };
@@ -102,7 +101,7 @@ void vlapic_adjust_i8259_target(struct domain *d);
 void vlapic_EOI_set(struct vlapic *vlapic);
 void vlapic_handle_EOI_induced_exit(struct vlapic *vlapic, int vector);
 
-int vlapic_ipi(struct vlapic *vlapic, uint32_t icr_low, uint32_t icr_high);
+void vlapic_ipi(struct vlapic *vlapic, uint32_t icr_low, uint32_t icr_high);
 
 int vlapic_apicv_write(struct vcpu *v, unsigned int offset);
 

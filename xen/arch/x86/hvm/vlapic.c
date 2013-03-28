@@ -243,18 +243,22 @@ bool_t vlapic_match_dest(
     return 0;
 }
 
-static void vlapic_init_sipi_action(unsigned long _vcpu)
+static void vlapic_init_sipi_one(struct vcpu *target, uint32_t icr)
 {
-    struct vcpu *origin = (struct vcpu *)_vcpu;
-    struct vcpu *target = vcpu_vlapic(origin)->init_sipi.target;
-    uint32_t icr = vcpu_vlapic(origin)->init_sipi.icr;
-
     vcpu_pause(target);
 
     switch ( icr & APIC_MODE_MASK )
     {
     case APIC_DM_INIT: {
         bool_t fpu_initialised;
+        /* No work on INIT de-assert for P4-type APIC. */
+        if ( (icr & (APIC_INT_LEVELTRIG | APIC_INT_ASSERT)) ==
+             APIC_INT_LEVELTRIG )
+            break;
+        /* Nothing to do if the VCPU is already reset. */
+        if ( !target->is_initialised )
+            break;
+        hvm_vcpu_down(target);
         domain_lock(target->domain);
         /* Reset necessary VCPU state. This does not include FPU state. */
         fpu_initialised = target->fpu_initialised;
@@ -276,36 +280,36 @@ static void vlapic_init_sipi_action(unsigned long _vcpu)
     }
 
     vcpu_unpause(target);
+}
 
-    vcpu_vlapic(origin)->init_sipi.target = NULL;
+static void vlapic_init_sipi_action(unsigned long _vcpu)
+{
+    struct vcpu *origin = (struct vcpu *)_vcpu;
+    uint32_t icr = vcpu_vlapic(origin)->init_sipi.icr;
+    uint32_t dest = vcpu_vlapic(origin)->init_sipi.dest;
+    uint32_t short_hand = icr & APIC_SHORT_MASK;
+    uint32_t dest_mode  = !!(icr & APIC_DEST_MASK);
+    struct vcpu *v;
+
+    if ( icr == 0 )
+        return;
+
+    for_each_vcpu ( origin->domain, v )
+    {
+        if ( vlapic_match_dest(vcpu_vlapic(v), vcpu_vlapic(origin),
+                               short_hand, dest, dest_mode) )
+            vlapic_init_sipi_one(v, icr);
+    }
+
+    vcpu_vlapic(origin)->init_sipi.icr = 0;
     vcpu_unpause(origin);
 }
 
-static int vlapic_schedule_init_sipi_tasklet(struct vcpu *target, uint32_t icr)
-{
-    struct vcpu *origin = current;
-
-    if ( vcpu_vlapic(origin)->init_sipi.target != NULL )
-    {
-        WARN(); /* should be impossible but don't BUG, just in case */
-        return X86EMUL_UNHANDLEABLE;
-    }
-
-    vcpu_pause_nosync(origin);
-
-    vcpu_vlapic(origin)->init_sipi.target = target;
-    vcpu_vlapic(origin)->init_sipi.icr = icr;
-    tasklet_schedule(&vcpu_vlapic(origin)->init_sipi.tasklet);
-
-    return X86EMUL_RETRY;
-}
-
 /* Add a pending IRQ into lapic. */
-static int vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
+static void vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     uint8_t vector = (uint8_t)icr_low;
-    int rc = X86EMUL_OKAY;
 
     switch ( icr_low & APIC_MODE_MASK )
     {
@@ -339,31 +343,15 @@ static int vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
         break;
 
     case APIC_DM_INIT:
-        /* No work on INIT de-assert for P4-type APIC. */
-        if ( (icr_low & (APIC_INT_LEVELTRIG | APIC_INT_ASSERT)) ==
-             APIC_INT_LEVELTRIG )
-            break;
-        /* Nothing to do if the VCPU is already reset. */
-        if ( !v->is_initialised )
-            break;
-        hvm_vcpu_down(v);
-        rc = vlapic_schedule_init_sipi_tasklet(v, icr_low);
-        break;
-
     case APIC_DM_STARTUP:
-        /* Nothing to do if the VCPU is already initialised. */
-        if ( v->is_initialised )
-            break;
-        rc = vlapic_schedule_init_sipi_tasklet(v, icr_low);
-        break;
+        /* Handled in vlapic_ipi(). */
+        BUG();
 
     default:
         gdprintk(XENLOG_ERR, "TODO: unsupported delivery mode in ICR %x\n",
                  icr_low);
         domain_crash(v->domain);
     }
-
-    return rc;
 }
 
 struct vlapic *vlapic_lowest_prio(
@@ -421,15 +409,12 @@ void vlapic_handle_EOI_induced_exit(struct vlapic *vlapic, int vector)
     hvm_dpci_msi_eoi(current->domain, vector);
 }
 
-int vlapic_ipi(
+void vlapic_ipi(
     struct vlapic *vlapic, uint32_t icr_low, uint32_t icr_high)
 {
     unsigned int dest;
     unsigned int short_hand = icr_low & APIC_SHORT_MASK;
     unsigned int dest_mode  = !!(icr_low & APIC_DEST_MASK);
-    struct vlapic *target;
-    struct vcpu *v;
-    int rc = X86EMUL_OKAY;
 
     HVM_DBG_LOG(DBG_LEVEL_VLAPIC, "icr = 0x%08x:%08x", icr_high, icr_low);
 
@@ -437,25 +422,40 @@ int vlapic_ipi(
             ? icr_high
             : GET_xAPIC_DEST_FIELD(icr_high));
 
-    if ( (icr_low & APIC_MODE_MASK) == APIC_DM_LOWEST )
+    switch ( icr_low & APIC_MODE_MASK )
     {
-        target = vlapic_lowest_prio(vlapic_domain(vlapic), vlapic,
-                                    short_hand, dest, dest_mode);
-        if ( target != NULL )
-            rc = vlapic_accept_irq(vlapic_vcpu(target), icr_low);
-        return rc;
-    }
-
-    for_each_vcpu ( vlapic_domain(vlapic), v )
-    {
-        if ( vlapic_match_dest(vcpu_vlapic(v), vlapic,
-                               short_hand, dest, dest_mode) )
-                rc = vlapic_accept_irq(v, icr_low);
-        if ( rc != X86EMUL_OKAY )
+    case APIC_DM_INIT:
+    case APIC_DM_STARTUP:
+        if ( vlapic->init_sipi.icr != 0 )
+        {
+            WARN(); /* should be impossible but don't BUG, just in case */
             break;
+        }
+        vcpu_pause_nosync(vlapic_vcpu(vlapic));
+        vlapic->init_sipi.icr = icr_low;
+        vlapic->init_sipi.dest = dest;
+        tasklet_schedule(&vlapic->init_sipi.tasklet);
+        break;
+
+    case APIC_DM_LOWEST: {
+        struct vlapic *target = vlapic_lowest_prio(
+            vlapic_domain(vlapic), vlapic, short_hand, dest, dest_mode);
+        if ( target != NULL )
+            vlapic_accept_irq(vlapic_vcpu(target), icr_low);
+        break;
     }
 
-    return rc;
+    default: {
+        struct vcpu *v;
+        for_each_vcpu ( vlapic_domain(vlapic), v )
+        {
+            if ( vlapic_match_dest(vcpu_vlapic(v), vlapic,
+                                   short_hand, dest, dest_mode) )
+                vlapic_accept_irq(v, icr_low);
+        }
+        break;
+    }
+    }
 }
 
 static uint32_t vlapic_get_tmcct(struct vlapic *vlapic)
@@ -688,9 +688,8 @@ static int vlapic_reg_write(struct vcpu *v,
 
     case APIC_ICR:
         val &= ~(1 << 12); /* always clear the pending bit */
-        rc = vlapic_ipi(vlapic, val, vlapic_get_reg(vlapic, APIC_ICR2));
-        if ( rc == X86EMUL_OKAY )
-            vlapic_set_reg(vlapic, APIC_ICR, val);
+        vlapic_ipi(vlapic, val, vlapic_get_reg(vlapic, APIC_ICR2));
+        vlapic_set_reg(vlapic, APIC_ICR, val);
         break;
 
     case APIC_ICR2:

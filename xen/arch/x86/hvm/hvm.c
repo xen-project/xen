@@ -3461,8 +3461,6 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     struct domain *d = v->domain;
     struct segment_register reg;
 
-    BUG_ON(vcpu_runnable(v));
-
     domain_lock(d);
 
     if ( v->is_initialised )
