@@ -680,10 +680,9 @@ static int vlapic_reg_write(struct vcpu *v,
         break;
 
     case APIC_SELF_IPI:
-        if ( vlapic_x2apic_mode(vlapic) )
-            vlapic_reg_write(v, APIC_ICR, 0x40000 | (val & 0xff));
-        else
-            rc = X86EMUL_UNHANDLEABLE;
+        rc = vlapic_x2apic_mode(vlapic)
+            ? vlapic_reg_write(v, APIC_ICR, 0x40000 | (val & 0xff))
+            : X86EMUL_UNHANDLEABLE;
         break;
 
     case APIC_ICR:
@@ -836,28 +835,25 @@ static int vlapic_write(struct vcpu *v, unsigned long address,
 int vlapic_apicv_write(struct vcpu *v, unsigned int offset)
 {
     uint32_t val = vlapic_get_reg(vcpu_vlapic(v), offset);
-
-    vlapic_reg_write(v, offset, val);
-    return 0;
+    return vlapic_reg_write(v, offset, val);
 }
 
 int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
     uint32_t offset = (msr - MSR_IA32_APICBASE_MSR) << 4;
-    int rc;
 
     if ( !vlapic_x2apic_mode(vlapic) )
-        return 1;
+        return X86EMUL_UNHANDLEABLE;
 
     if ( offset == APIC_ICR )
-        if ( vlapic_reg_write(v, APIC_ICR2 , (uint32_t)(msr_content >> 32)) )
-            return 1;
+    {
+        int rc = vlapic_reg_write(v, APIC_ICR2, (uint32_t)(msr_content >> 32));
+        if ( rc )
+            return rc;
+    }
 
-    rc = vlapic_reg_write(v, offset, (uint32_t)msr_content);
-
-    /* X86EMUL_RETRY for SIPI */
-    return ((rc != X86EMUL_OKAY) && (rc != X86EMUL_RETRY));
+    return vlapic_reg_write(v, offset, (uint32_t)msr_content);
 }
 
 static int vlapic_range(struct vcpu *v, unsigned long addr)
