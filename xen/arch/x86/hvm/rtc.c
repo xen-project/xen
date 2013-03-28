@@ -65,16 +65,17 @@ void rtc_periodic_interrupt(void *opaque)
     RTCState *s = opaque;
 
     spin_lock(&s->lock);
-    if ( s->hw.cmos_data[RTC_REG_C] & RTC_PF )
-    {
-        destroy_periodic_time(&s->pt);
-        s->pt_code = 0;
-    }
-    else
+    if ( !(s->hw.cmos_data[RTC_REG_C] & RTC_PF) )
     {
         s->hw.cmos_data[RTC_REG_C] |= RTC_PF;
         if ( s->hw.cmos_data[RTC_REG_B] & RTC_PIE )
             rtc_toggle_irq(s);
+    }
+    else if ( ++(s->pt_dead_ticks) >= 10 )
+    {
+        /* VM is ignoring its RTC; no point in running the timer */
+        destroy_periodic_time(&s->pt);
+        s->pt_code = 0;
     }
     spin_unlock(&s->lock);
 }
@@ -87,6 +88,8 @@ static void rtc_timer_update(RTCState *s)
     struct vcpu *v = vrtc_vcpu(s);
 
     ASSERT(spin_is_locked(&s->lock));
+
+    s->pt_dead_ticks = 0;
 
     period_code = s->hw.cmos_data[RTC_REG_A] & RTC_RATE_SELECT;
     switch ( s->hw.cmos_data[RTC_REG_A] & RTC_DIV_CTL )
