@@ -66,7 +66,10 @@ void rtc_periodic_interrupt(void *opaque)
 
     spin_lock(&s->lock);
     if ( s->hw.cmos_data[RTC_REG_C] & RTC_PF )
+    {
         destroy_periodic_time(&s->pt);
+        s->pt_code = 0;
+    }
     else
     {
         s->hw.cmos_data[RTC_REG_C] |= RTC_PF;
@@ -96,15 +99,21 @@ static void rtc_timer_update(RTCState *s)
     case RTC_REF_CLCK_4MHZ:
         if ( period_code != 0 )
         {
-            period = 1 << (period_code - 1); /* period in 32 Khz cycles */
-            period = DIV_ROUND(period * 1000000000ULL, 32768); /* in ns */
-            delta = period - ((NOW() - s->start_time) % period);
-            create_periodic_time(v, &s->pt, delta, period, RTC_IRQ, NULL, s);
+            if ( period_code != s->pt_code )
+            {
+                s->pt_code = period_code;
+                period = 1 << (period_code - 1); /* period in 32 Khz cycles */
+                period = DIV_ROUND(period * 1000000000ULL, 32768); /* in ns */
+                delta = period - ((NOW() - s->start_time) % period);
+                create_periodic_time(v, &s->pt, delta, period,
+                                     RTC_IRQ, NULL, s);
+            }
             break;
         }
         /* fall through */
     default:
         destroy_periodic_time(&s->pt);
+        s->pt_code = 0;
         break;
     }
 }
@@ -716,6 +725,7 @@ void rtc_reset(struct domain *d)
     RTCState *s = domain_vrtc(d);
 
     destroy_periodic_time(&s->pt);
+    s->pt_code = 0;
     s->pt.source = PTSRC_isa;
 }
 
