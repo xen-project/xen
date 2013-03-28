@@ -189,7 +189,7 @@ skip_bss:
 
         /* Set up the HTCR:
          * PT walks use Outer-Shareable accesses,
-         * PT walks are write-back, no-write-allocate in both cache levels,
+         * PT walks are write-back, write-allocate in both cache levels,
          * Full 32-bit address space goes through this table. */
         ldr   r0, =0x80002500
         mcr   CP32(r0, HTCR)

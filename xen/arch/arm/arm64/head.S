@@ -173,7 +173,7 @@ skip_bss:
          * PASize -- 4G
          * Top byte is used
          * PT walks use Outer-Shareable accesses,
-         * PT walks are write-back, no-write-allocate in both cache levels,
+         * PT walks are write-back, write-allocate in both cache levels,
          * Full 64-bit address space goes through this table. */
         ldr   x0, =0x80802500
         msr   tcr_el2, x0
