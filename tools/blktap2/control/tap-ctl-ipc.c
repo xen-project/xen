@@ -71,8 +71,11 @@ tap_ctl_read_message(int fd, tapdisk_message_t *message, int timeout)
 		}
 		else if (FD_ISSET(fd, &readfds)) {
 			ret = read(fd, message + offset, len - offset);
-			if (ret <= 0)
+			if (ret <= 0) {
+				if (errno == EINTR)
+					continue;
 				break;
+			}
 			offset += ret;
 		} else
 			break;
@@ -124,8 +127,11 @@ tap_ctl_write_message(int fd, tapdisk_message_t *message, int timeout)
 		}
 		else if (FD_ISSET(fd, &writefds)) {
 			ret = write(fd, message + offset, len - offset);
-			if (ret <= 0)
+			if (ret <= 0) {
+				if (errno == EINTR)
+					continue;
 				break;
+			}
 			offset += ret;
 		} else
 			break;
