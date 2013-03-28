@@ -80,7 +80,7 @@ void rtc_periodic_interrupt(void *opaque)
  * RTC_RATE_SELECT settings */
 static void rtc_timer_update(RTCState *s)
 {
-    int period_code, period;
+    int period_code, period, delta;
     struct vcpu *v = vrtc_vcpu(s);
 
     ASSERT(spin_is_locked(&s->lock));
@@ -98,7 +98,8 @@ static void rtc_timer_update(RTCState *s)
         {
             period = 1 << (period_code - 1); /* period in 32 Khz cycles */
             period = DIV_ROUND(period * 1000000000ULL, 32768); /* in ns */
-            create_periodic_time(v, &s->pt, period, period, RTC_IRQ, NULL, s);
+            delta = period - ((NOW() - s->start_time) % period);
+            create_periodic_time(v, &s->pt, delta, period, RTC_IRQ, NULL, s);
             break;
         }
         /* fall through */
@@ -740,6 +741,7 @@ void rtc_init(struct domain *d)
     s->hw.cmos_data[RTC_REG_D] = RTC_VRT;
 
     s->current_tm = gmtime(get_localtime(d));
+    s->start_time = NOW();
 
     rtc_copy_date(s);
 

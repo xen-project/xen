@@ -104,8 +104,9 @@ typedef struct RTCState {
     struct hvm_hw_rtc hw;
     /* RTC's idea of the current time */
     struct tm current_tm;
+    /* periodic timer */
+    s_time_t start_time;
     /* second update */
-    int64_t next_second_time;
     struct periodic_time pt;
     /* update-ended timer */
     struct timer update_timer;
