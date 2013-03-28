@@ -28,6 +28,20 @@
 #define __XEN_PUBLIC_FEATURES_H__
 
 /*
+ * `incontents 200 elfnotes_features XEN_ELFNOTE_FEATURES
+ *
+ * The list of all the features the guest supports. They are set by
+ * parsing the XEN_ELFNOTE_FEATURES and XEN_ELFNOTE_SUPPORTED_FEATURES
+ * string. The format is the  feature names (as given here without the
+ * "XENFEAT_" prefix) separated by '|' characters.
+ * If a feature is required for the kernel to function then the feature name
+ * must be preceded by a '!' character.
+ *
+ * Note that if XEN_ELFNOTE_SUPPORTED_FEATURES is used, then in the
+ * XENFEAT_dom0 MUST be set if the guest is to be booted as dom0,
+ */
+
+/*
  * If set, the guest does not need to write-protect its pagetables, and can
  * update them via direct writes.
  */

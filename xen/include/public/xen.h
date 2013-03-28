@@ -622,6 +622,7 @@ typedef struct vcpu_info vcpu_info_t;
 #endif
 
 /*
+ * `incontents 200 startofday_shared Start-of-day shared data structure
  * Xen/kernel shared data -- pointer provided in start_info.
  *
  * This structure is defined to be both smaller than a page, and the
@@ -692,7 +693,7 @@ typedef struct shared_info shared_info_t;
  *      c. list of allocated page frames [mfn_list, nr_pages]
  *         (unless relocated due to XEN_ELFNOTE_INIT_P2M)
  *      d. start_info_t structure        [register ESI (x86)]
- *      e. bootstrap page tables         [pt_base, CR3 (x86)]
+ *      e. bootstrap page tables         [pt_base and CR3 (x86)]
  *      f. bootstrap stack               [register ESP (x86)]
  *  4. Bootstrap elements are packed together, but each is 4kB-aligned.
  *  5. The initial ram disk may be omitted.
@@ -704,6 +705,16 @@ typedef struct shared_info shared_info_t;
  *  8. There is guaranteed to be at least 512kB padding after the final
  *     bootstrap element. If necessary, the bootstrap virtual region is
  *     extended by an extra 4MB to ensure this.
+ *
+ * Note: Prior to 25833:bb85bbccb1c9. ("x86/32-on-64 adjust Dom0 initial page
+ * table layout") a bug caused the pt_base (3.e above) and cr3 to not point
+ * to the start of the guest page tables (it was offset by two pages).
+ * This only manifested itself on 32-on-64 dom0 kernels and not 32-on-64 domU
+ * or 64-bit kernels of any colour. The page tables for a 32-on-64 dom0 got
+ * allocated in the order: 'first L1','first L2', 'first L3', so the offset
+ * to the page table base is by two pages back. The initial domain if it is
+ * 32-bit and runs under a 64-bit hypervisor should _NOT_ use two of the
+ * pages preceding pt_base and mark them as reserved/unused.
  */
 
 #define MAX_GUEST_CMDLINE 1024
@@ -778,7 +789,14 @@ struct xen_multiboot_mod_list
     /* Unused, must be zero */
     uint32_t pad;
 };
-
+/*
+ * `incontents 200 startofday_dom0_console Dom0_console
+ *
+ * The console structure in start_info.console.dom0
+ *
+ * This structure includes a variety of information required to
+ * have a working VGA/VESA console.
+ */
 typedef struct dom0_vga_console_info {
     uint8_t video_type; /* DOM0_VGA_CONSOLE_??? */
 #define XEN_VGATYPE_TEXT_MODE_3 0x03

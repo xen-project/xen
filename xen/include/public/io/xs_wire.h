@@ -103,7 +103,10 @@ enum xs_watch_type
     XS_WATCH_TOKEN
 };
 
-/* Inter-domain shared memory communications. */
+/*
+ * `incontents 150 xenstore_struct XenStore wire protocol.
+ *
+ * Inter-domain shared memory communications. */
 #define XENSTORE_RING_SIZE 1024
 typedef uint32_t XENSTORE_RING_IDX;
 #define MASK_XENSTORE_IDX(idx) ((idx) & (XENSTORE_RING_SIZE-1))
