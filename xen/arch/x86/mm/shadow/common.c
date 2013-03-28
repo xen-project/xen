@@ -2437,10 +2437,13 @@ int sh_remove_all_mappings(struct vcpu *v, mfn_t gmfn)
     {
         /* Don't complain if we're in HVM and there are some extra mappings: 
          * The qemu helper process has an untyped mapping of this dom's RAM 
-         * and the HVM restore program takes another. */
+         * and the HVM restore program takes another.
+         * Also allow one typed refcount for xenheap pages, to match
+         * share_xen_page_with_guest(). */
         if ( !(shadow_mode_external(v->domain)
                && (page->count_info & PGC_count_mask) <= 3
-               && (page->u.inuse.type_info & PGT_count_mask) == 0) )
+               && ((page->u.inuse.type_info & PGT_count_mask)
+                   == !!is_xen_heap_page(page))) )
         {
             SHADOW_ERROR("can't find all mappings of mfn %lx: "
                           "c=%08lx t=%08lx\n", mfn_x(gmfn), 
