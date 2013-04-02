@@ -120,6 +120,7 @@
 #include <xen/trace.h>
 #include <asm/setup.h>
 #include <asm/fixmap.h>
+#include <asm/pci.h>
 
 /*
  * Mapping of first 2 or 4 megabytes of memory. This is mapped with 4kB
@@ -5848,6 +5849,25 @@ void arch_dump_shared_mem_info(void)
 {
 }
 #endif
+
+const unsigned long *__init get_platform_badpages(unsigned int *array_size)
+{
+    u32 igd_id;
+    static unsigned long __initdata bad_pages[] = {
+        0x20050000,
+        0x20110000,
+        0x20130000,
+        0x20138000,
+        0x40004000,
+    };
+
+    *array_size = ARRAY_SIZE(bad_pages);
+    igd_id = pci_conf_read32(0, 0, 2, 0, 0);
+    if ( !IS_SNB_GFX(igd_id) )
+        return NULL;
+
+    return bad_pages;
+}
 
 /*
  * Local variables:
