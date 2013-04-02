@@ -330,6 +330,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("usbdevice",        string),
                                        ("soundhw",          string),
                                        ("xen_platform_pci", libxl_defbool),
+                                       ("usbdevice_list",   libxl_string_list),
                                        ])),
                  ("pv", Struct(None, [("kernel", string),
                                       ("slack_memkb", MemKB),

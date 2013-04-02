@@ -198,11 +198,28 @@ static char ** libxl__build_device_model_args_old(libxl__gc *gc,
         if (b_info->u.hvm.boot) {
             flexarray_vappend(dm_args, "-boot", b_info->u.hvm.boot, NULL);
         }
-        if (libxl_defbool_val(b_info->u.hvm.usb) || b_info->u.hvm.usbdevice) {
+        if (libxl_defbool_val(b_info->u.hvm.usb)
+            || b_info->u.hvm.usbdevice
+            || b_info->u.hvm.usbdevice_list) {
+            if ( b_info->u.hvm.usbdevice && b_info->u.hvm.usbdevice_list )
+            {
+                LOG(ERROR, "%s: Both usbdevice and usbdevice_list set",
+                    __func__);
+                return NULL;
+            }
             flexarray_append(dm_args, "-usb");
             if (b_info->u.hvm.usbdevice) {
                 flexarray_vappend(dm_args,
                                   "-usbdevice", b_info->u.hvm.usbdevice, NULL);
+            } else if (b_info->u.hvm.usbdevice_list) {
+                char **p;
+                for (p = b_info->u.hvm.usbdevice_list;
+                     *p;
+                     p++) {
+                    flexarray_vappend(dm_args,
+                                      "-usbdevice",
+                                      *p, NULL);
+                }
             }
         }
         if (b_info->u.hvm.soundhw) {
@@ -479,11 +496,28 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_vappend(dm_args, "-boot",
                     libxl__sprintf(gc, "order=%s", b_info->u.hvm.boot), NULL);
         }
-        if (libxl_defbool_val(b_info->u.hvm.usb) || b_info->u.hvm.usbdevice) {
+        if (libxl_defbool_val(b_info->u.hvm.usb)
+            || b_info->u.hvm.usbdevice
+            || b_info->u.hvm.usbdevice_list) {
+            if ( b_info->u.hvm.usbdevice && b_info->u.hvm.usbdevice_list )
+            {
+                LOG(ERROR, "%s: Both usbdevice and usbdevice_list set",
+                    __func__);
+                return NULL;
+            }
             flexarray_append(dm_args, "-usb");
             if (b_info->u.hvm.usbdevice) {
                 flexarray_vappend(dm_args,
                                   "-usbdevice", b_info->u.hvm.usbdevice, NULL);
+            } else if (b_info->u.hvm.usbdevice_list) {
+                char **p;
+                for (p = b_info->u.hvm.usbdevice_list;
+                     *p;
+                     p++) {
+                    flexarray_vappend(dm_args,
+                                      "-usbdevice",
+                                      *p, NULL);
+                }
             }
         }
         if (b_info->u.hvm.soundhw) {

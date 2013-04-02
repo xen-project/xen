@@ -273,6 +273,22 @@
 #endif
 #endif
 
+/*
+ * LIBXL_HAVE_BUILDINFO_USBDEVICE_LIST
+ *
+ * If this is defined, then the libxl_domain_build_info structure will
+ * contain hvm.usbdevice_list, a libxl_string_list type that contains
+ * a list of USB devices to specify on the qemu command-line.
+ *
+ * If it is set, callers may use either hvm.usbdevice or
+ * hvm.usbdevice_list, but not both; if both are set, libxl will
+ * throw an error.
+ *
+ * If this is not defined, callers can only use hvm.usbdevice.  Note
+ * that this means only one device can be added at domain build time.
+ */
+#define LIBXL_HAVE_BUILDINFO_USBDEVICE_LIST 1
+
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who
  * do not #include libxl_internal.h, are fine. */
