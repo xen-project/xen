@@ -21,6 +21,7 @@
 #include <xen/sched.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
+#include <xen/softirq.h>
 #include <asm/hvm/iommu.h>
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
@@ -271,6 +272,9 @@ static void __init amd_iommu_dom0_init(struct domain *d)
              * a pfn_valid() check would seem desirable here.
              */
             amd_iommu_map_page(d, pfn, pfn, IOMMUF_readable|IOMMUF_writable);
+
+            if ( !(i & 0xfffff) )
+                process_pending_softirqs();
         }
     }
 
