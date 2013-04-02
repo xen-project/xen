@@ -127,4 +127,9 @@ int msixtbl_pt_register(struct domain *d, int pirq, uint64_t gtable);
 void msixtbl_pt_unregister(struct domain *d, int pirq);
 void pci_enable_acs(struct pci_dev *pdev);
 
+#define IS_SNB_GFX(id) (id == 0x01068086 || id == 0x01168086 \
+                        || id == 0x01268086 || id == 0x01028086 \
+                        || id == 0x01128086 || id == 0x01228086 \
+                        || id == 0x010A8086 )
+
 #endif /* __XEN_PCI_H__ */

@@ -113,6 +113,7 @@
 #include <public/memory.h>
 #include <public/sched.h>
 #include <xsm/xsm.h>
+#include <xen/pci.h>
 #include <xen/trace.h>
 #include <asm/setup.h>
 #include <asm/fixmap.h>
@@ -5691,6 +5692,25 @@ void memguard_unguard_stack(void *p)
     p = (void *)((unsigned long)p + STACK_SIZE -
                  PRIMARY_STACK_SIZE - PAGE_SIZE);
     memguard_unguard_range(p, PAGE_SIZE);
+}
+
+const unsigned long *__init get_platform_badpages(unsigned int *array_size)
+{
+    u32 igd_id;
+    static unsigned long __initdata bad_pages[] = {
+        0x20050000,
+        0x20110000,
+        0x20130000,
+        0x20138000,
+        0x40004000,
+    };
+
+    *array_size = ARRAY_SIZE(bad_pages);
+    igd_id = pci_conf_read32(0, 2, 0, 0);
+    if ( !IS_SNB_GFX(igd_id) )
+        return NULL;
+
+    return bad_pages;
 }
 
 /*
