@@ -1145,17 +1145,27 @@ device.
 
 =item B<usb=BOOLEAN>
 
-Enables or disables a USB bus in the guest.
+Enables or disables an emulated USB bus in the guest.
 
-=item B<usbdevice=DEVICE>
+=item B<usbdevice=[ "DEVICE", "DEVICE", ...]>
 
-Adds B<DEVICE> to the USB bus. The USB bus must also be enabled using
-B<usb=1>. The most common use for this option is B<usbdevice=tablet>
-which adds pointer device using absolute coordinates. Such devices
-function better than relative coordinate devices (such as a standard
-mouse) since many methods of exporting guest graphics (such as VNC)
-work better in this mode. Note that this is independent of the actual
-pointer device you are using on the host/client side.
+Adds B<DEVICE>s to the emulated USB bus. The USB bus must also be
+enabled using B<usb=1>. The most common use for this option is
+B<usbdevice=['tablet']> which adds pointer device using absolute
+coordinates. Such devices function better than relative coordinate
+devices (such as a standard mouse) since many methods of exporting
+guest graphics (such as VNC) work better in this mode. Note that this
+is independent of the actual pointer device you are using on the
+host/client side.
+
+Host devices can also be passed through in this way, by specifying
+host:USBID, where USBID is of the form xxxx:yyyy.  The USBID can
+typically be found by using lsusb or usb-devices.
+
+The form usbdevice=DEVICE is also accepted for backwards compatibility.
+
+More valid options can be found in the "usbdevice" section of the qemu
+documentation.
 
 =back
 

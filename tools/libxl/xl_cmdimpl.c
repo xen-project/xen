@@ -1533,8 +1533,24 @@ skip_vfb:
         xlu_cfg_replace_string (config, "serial", &b_info->u.hvm.serial, 0);
         xlu_cfg_replace_string (config, "boot", &b_info->u.hvm.boot, 0);
         xlu_cfg_get_defbool(config, "usb", &b_info->u.hvm.usb, 0);
-        xlu_cfg_replace_string (config, "usbdevice",
-                                &b_info->u.hvm.usbdevice, 0);
+        switch (xlu_cfg_get_list_as_string_list(config, "usbdevice",
+                                                &b_info->u.hvm.usbdevice_list,
+                                                1))
+        {
+
+        case 0: break; /* Success */
+        case ESRCH: break; /* Option not present */
+        case EINVAL:
+            /* If it's not a valid list, try reading it as an atom,
+             * falling through to an error if it fails */
+            if (!xlu_cfg_replace_string(config, "usbdevice",
+                                        &b_info->u.hvm.usbdevice, 0))
+                break;
+            /* FALLTHRU */
+        default:
+            fprintf(stderr,"xl: Unable to parse usbdevice.\n");
+            exit(-ERROR_FAIL);
+        }
         xlu_cfg_replace_string (config, "soundhw", &b_info->u.hvm.soundhw, 0);
         xlu_cfg_get_defbool(config, "xen_platform_pci",
                             &b_info->u.hvm.xen_platform_pci, 0);
