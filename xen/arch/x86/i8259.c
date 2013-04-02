@@ -416,6 +416,8 @@ void __init init_IRQ(void)
     for (irq = 0; platform_legacy_irq(irq); irq++) {
         struct irq_desc *desc = irq_to_desc(irq);
         
+        if ( irq == 2 ) /* IRQ2 doesn't exist */
+            continue;
         desc->handler = &i8259A_irq_type;
         per_cpu(vector_irq, cpu)[FIRST_LEGACY_VECTOR + irq] = irq;
         cpumask_copy(desc->arch.cpu_mask, cpumask_of(cpu));

@@ -616,13 +616,18 @@ void irq_move_cleanup_interrupt(struct cpu_user_regs *regs)
     ack_APIC_irq();
 
     me = smp_processor_id();
-    for (vector = FIRST_DYNAMIC_VECTOR; vector < NR_VECTORS; vector++) {
+    for ( vector = FIRST_DYNAMIC_VECTOR;
+          vector <= LAST_HIPRIORITY_VECTOR; vector++)
+    {
         unsigned int irq;
         unsigned int irr;
         struct irq_desc *desc;
         irq = __get_cpu_var(vector_irq)[vector];
 
         if ((int)irq < 0)
+            continue;
+
+        if ( vector >= FIRST_LEGACY_VECTOR && vector <= LAST_LEGACY_VECTOR )
             continue;
 
         desc = irq_to_desc(irq);
