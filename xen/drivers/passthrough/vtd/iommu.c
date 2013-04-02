@@ -2151,6 +2151,8 @@ int __init intel_vtd_setup(void)
         return -ENODEV;
 
     platform_quirks_init();
+    if ( !iommu_enabled )
+        return -ENODEV;
 
     irq_to_iommu = xmalloc_array(struct iommu*, nr_irqs);
     BUG_ON(!irq_to_iommu);
