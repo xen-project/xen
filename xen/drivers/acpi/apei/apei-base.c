@@ -154,9 +154,10 @@ int apei_exec_noop(struct apei_exec_context *ctx,
  * Interpret the specified action. Go through whole action table,
  * execute all instructions belong to the action.
  */
-int apei_exec_run(struct apei_exec_context *ctx, u8 action)
+int __apei_exec_run(struct apei_exec_context *ctx, u8 action,
+		    bool_t optional)
 {
-	int rc;
+	int rc = -ENOENT;
 	u32 i, ip;
 	struct acpi_whea_header *entry;
 	apei_exec_ins_func_t run;
@@ -195,7 +196,7 @@ rewind:
 			goto rewind;
 	}
 
-	return 0;
+	return !optional && rc < 0 ? rc : 0;
 }
 
 typedef int (*apei_exec_entry_func_t)(struct apei_exec_context *ctx,
