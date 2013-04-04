@@ -1162,11 +1162,14 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         {
             v->arch.hvm_vcpu.hw_cr[4] |= X86_CR4_PSE;
             v->arch.hvm_vcpu.hw_cr[4] &= ~X86_CR4_PAE;
+        }
+        if ( !hvm_paging_enabled(v) )
+        {
             /*
              * SMEP is disabled if CPU is in non-paging mode in hardware.
              * However Xen always uses paging mode to emulate guest non-paging
-             * mode with HAP. To emulate this behavior, SMEP needs to be 
-             * manually disabled when guest switches to non-paging mode.
+             * mode. To emulate this behavior, SMEP needs to be manually
+             * disabled when guest VCPU is in non-paging mode.
              */
             v->arch.hvm_vcpu.hw_cr[4] &= ~X86_CR4_SMEP;
         }
