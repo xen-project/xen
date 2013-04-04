@@ -38,7 +38,7 @@
 xentoollog_logger_stdiostream *logger;
 int dryrun_only;
 int force_execution;
-int autoballoon = 1;
+int autoballoon = -1;
 char *blkdev_start;
 int run_hotplug_scripts = 1;
 char *lockfile;
@@ -99,10 +99,12 @@ static void parse_global_config(const char *configfile,
         else if (!strcmp(buf, "off") || !strcmp(buf, "0"))
             autoballoon = 0;
         else if (!strcmp(buf, "auto"))
-            autoballoon = auto_autoballoon();
+            autoballoon = -1;
         else
             fprintf(stderr, "invalid autoballoon option");
     }
+    if (autoballoon == -1)
+        autoballoon = auto_autoballoon();
 
     if (!xlu_cfg_get_long (config, "run_hotplug_scripts", &l, 0))
         run_hotplug_scripts = l;
