@@ -70,6 +70,7 @@ void gic_save_state(struct vcpu *v)
         v->arch.gic_lr[i] = GICH[GICH_LR + i];
     v->arch.lr_mask = this_cpu(lr_mask);
     spin_unlock_irq(&gic.lock);
+    v->arch.gic_apr = GICH[GICH_APR];
     /* Disable until next VCPU scheduled */
     GICH[GICH_HCR] = 0;
     isb();
@@ -87,6 +88,7 @@ void gic_restore_state(struct vcpu *v)
     for ( i=0; i<nr_lrs; i++)
         GICH[GICH_LR + i] = v->arch.gic_lr[i];
     spin_unlock_irq(&gic.lock);
+    GICH[GICH_APR] = v->arch.gic_apr;
     GICH[GICH_HCR] = GICH_HCR_EN;
     isb();
 
