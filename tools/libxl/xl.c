@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <regex.h>
 
 #include "libxl.h"
 #include "libxl_utils.h"
@@ -48,6 +49,29 @@ enum output_format default_output_format = OUTPUT_FORMAT_JSON;
 
 static xentoollog_level minmsglevel = XTL_PROGRESS;
 
+/* Get autoballoon option based on presence of dom0_mem Xen command
+   line option. */
+static int auto_autoballoon(void)
+{
+    const libxl_version_info *info;
+    regex_t regex;
+    int ret;
+
+    info = libxl_get_version_info(ctx);
+    if (!info)
+        return 1; /* default to on */
+
+    ret = regcomp(&regex,
+                  "(^| )dom0_mem=((|min:|max:)[0-9]+[bBkKmMgG]?,?)+($| )",
+                  REG_NOSUB | REG_EXTENDED);
+    if (ret)
+        return 1;
+
+    ret = regexec(&regex, info->commandline, 0, NULL, 0);
+    regfree(&regex);
+    return ret == REG_NOMATCH;
+}
+
 static void parse_global_config(const char *configfile,
                               const char *configfile_data,
                               int configfile_len)
@@ -69,8 +93,16 @@ static void parse_global_config(const char *configfile,
         exit(1);
     }
 
-    if (!xlu_cfg_get_long (config, "autoballoon", &l, 0))
-        autoballoon = l;
+    if (!xlu_cfg_get_string(config, "autoballoon", &buf, 0)) {
+        if (!strcmp(buf, "on") || !strcmp(buf, "1"))
+            autoballoon = 1;
+        else if (!strcmp(buf, "off") || !strcmp(buf, "0"))
+            autoballoon = 0;
+        else if (!strcmp(buf, "auto"))
+            autoballoon = auto_autoballoon();
+        else
+            fprintf(stderr, "invalid autoballoon option");
+    }
 
     if (!xlu_cfg_get_long (config, "run_hotplug_scripts", &l, 0))
         run_hotplug_scripts = l;

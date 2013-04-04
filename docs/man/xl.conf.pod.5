@@ -45,15 +45,22 @@ The semantics of each C<KEY> defines which form of C<VALUE> is required.
 
 =over 4
 
-=item B<autoballoon=BOOLEAN>
+=item B<autoballoon="off"|"on"|"auto">
 
-If disabled then C<xl> will not attempt to reduce the amount of memory
-assigned to domain 0 in order to create free memory when starting a
-new domain. You are strongly recommended to set this to C<0>
-(C<False>) if you use the C<dom0_mem> hypervisor command line to
-reduce the amount of memory given to domain 0 by default.
+If set to "on" then C<xl> will automatically reduce the amount of
+memory assigned to domain 0 in order to free memory for new domains.
 
-Default: C<1>
+If set to "off" then C<xl> will not automatically reduce the amount of
+domain 0 memory.
+
+If set to "auto" then auto-ballooning will be disabled if the
+C<dom0_mem> option was provided on the Xen command line.
+
+You are strongly recommended to set this to C<"off"> (or C<"auto">) if
+you use the C<dom0_mem> hypervisor command line to reduce the amount
+of memory given to domain 0 by default.
+
+Default: C<"on">
 
 =item B<run_hotplug_scripts=BOOLEAN>
 
