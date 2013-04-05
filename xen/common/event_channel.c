@@ -140,7 +140,6 @@ static int get_free_port(struct domain *d)
     chn = xzalloc_array(struct evtchn, EVTCHNS_PER_BUCKET);
     if ( unlikely(chn == NULL) )
         return -ENOMEM;
-    bucket_from_port(d, port) = chn;
 
     for ( i = 0; i < EVTCHNS_PER_BUCKET; i++ )
     {
@@ -152,6 +151,8 @@ static int get_free_port(struct domain *d)
             return -ENOMEM;
         }
     }
+
+    bucket_from_port(d, port) = chn;
 
     return port;
 }
