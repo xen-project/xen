@@ -1,6 +1,9 @@
 import socket, struct
 
 import netlink
+import platform
+
+kernelversion = platform.platform(terse=True).split("-")[1].split(".")
 
 qdisc_kinds = {}
 
@@ -146,13 +149,18 @@ class CfifoQdisc(Qdisc):
 
 qdisc_kinds['cfifo'] = CfifoQdisc
 
-TC_PLUG_CHECKPOINT = 0
-TC_PLUG_RELEASE = 1
+TC_PLUG_BUFFER = 0
+TC_PLUG_RELEASE_ONE = 1
 
 class PlugQdisc(Qdisc):
-    fmt = 'I'
 
     def __init__(self, qdict=None):
+        if int(kernelversion[0]) >= 3 and int(kernelversion[1]) >= 4:
+            self.fmt = 'iI'
+            self.limit = 10000
+        else:
+            self.fmt = 'I'
+
         if not qdict:
             qdict = {'kind': 'plug',
                      'handle': TC_H_ROOT}
@@ -161,7 +169,10 @@ class PlugQdisc(Qdisc):
         self.action = 0
 
     def pack(self):
-        return struct.pack(self.fmt, self.action)
+        if int(kernelversion[0]) >= 3 and int(kernelversion[1]) >= 4:
+            return struct.pack(self.fmt, self.action, self.limit)
+        else:
+            return struct.pack(self.fmt, self.action)
 
     def parse(self, args):
         if not args:
@@ -169,9 +180,9 @@ class PlugQdisc(Qdisc):
         arg = args[0]
 
         if arg == 'checkpoint':
-            self.action = TC_PLUG_CHECKPOINT
+            self.action = TC_PLUG_BUFFER
         elif arg == 'release':
-            self.action = TC_PLUG_RELEASE
+            self.action = TC_PLUG_RELEASE_ONE
         else:
             raise QdiscException('unknown action')
 

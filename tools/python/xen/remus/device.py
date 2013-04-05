@@ -332,12 +332,12 @@ class BufferedNIC(CheckpointedDevice):
         if not self.installed:
             self.install()
 
-        self._sendqmsg(qdisc.TC_PLUG_CHECKPOINT)
+        self._sendqmsg(qdisc.TC_PLUG_BUFFER)
 
     def commit(self):
         '''Called when checkpoint has been acknowledged by
         the backup'''
-        self._sendqmsg(qdisc.TC_PLUG_RELEASE)
+        self._sendqmsg(qdisc.TC_PLUG_RELEASE_ONE)
 
     # private
     def _sendqmsg(self, action):
