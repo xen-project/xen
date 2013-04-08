@@ -101,7 +101,7 @@ static void handle_pmc_quirk(u64 msr_content)
     }
 }
 
-static const u32 core2_counters_msr[] = {
+static const u32 core2_fix_counters_msr[] = {
     MSR_CORE_PERF_FIXED_CTR0,
     MSR_CORE_PERF_FIXED_CTR1,
     MSR_CORE_PERF_FIXED_CTR2
@@ -119,13 +119,13 @@ struct pmumsr {
     const u32 *msr;
 };
 
-static const struct pmumsr core2_counters = {
-    3,
-    core2_counters_msr
+static const struct pmumsr core2_fix_counters = {
+    VPMU_CORE2_NUM_FIXED,
+    core2_fix_counters_msr
 };
 
 static const struct pmumsr core2_ctrls = {
-    3,
+    VPMU_CORE2_NUM_CTRLS,
     core2_ctrls_msr
 };
 static int arch_pmc_cnt;
@@ -162,16 +162,16 @@ static int is_core2_vpmu_msr(u32 msr_index, int *type, int *index)
 {
     int i;
 
-    for ( i = 0; i < core2_counters.num; i++ )
+    for ( i = 0; i < core2_fix_counters.num; i++ )
     {
-        if ( core2_counters.msr[i] == msr_index )
+        if ( core2_fix_counters.msr[i] == msr_index )
         {
             *type = MSR_TYPE_COUNTER;
             *index = i;
             return 1;
         }
     }
-    
+
     for ( i = 0; i < core2_ctrls.num; i++ )
     {
         if ( core2_ctrls.msr[i] == msr_index )
@@ -214,10 +214,10 @@ static void core2_vpmu_set_msr_bitmap(unsigned long *msr_bitmap)
     int i;
 
     /* Allow Read/Write PMU Counters MSR Directly. */
-    for ( i = 0; i < core2_counters.num; i++ )
+    for ( i = 0; i < core2_fix_counters.num; i++ )
     {
-        clear_bit(msraddr_to_bitpos(core2_counters.msr[i]), msr_bitmap);
-        clear_bit(msraddr_to_bitpos(core2_counters.msr[i]),
+        clear_bit(msraddr_to_bitpos(core2_fix_counters.msr[i]), msr_bitmap);
+        clear_bit(msraddr_to_bitpos(core2_fix_counters.msr[i]),
                   msr_bitmap + 0x800/BYTES_PER_LONG);
     }
     for ( i = 0; i < core2_get_pmc_count(); i++ )
@@ -238,10 +238,10 @@ static void core2_vpmu_unset_msr_bitmap(unsigned long *msr_bitmap)
 {
     int i;
 
-    for ( i = 0; i < core2_counters.num; i++ )
+    for ( i = 0; i < core2_fix_counters.num; i++ )
     {
-        set_bit(msraddr_to_bitpos(core2_counters.msr[i]), msr_bitmap);
-        set_bit(msraddr_to_bitpos(core2_counters.msr[i]),
+        set_bit(msraddr_to_bitpos(core2_fix_counters.msr[i]), msr_bitmap);
+        set_bit(msraddr_to_bitpos(core2_fix_counters.msr[i]),
                 msr_bitmap + 0x800/BYTES_PER_LONG);
     }
     for ( i = 0; i < core2_get_pmc_count(); i++ )
@@ -261,8 +261,8 @@ static inline void __core2_vpmu_save(struct vcpu *v)
     int i;
     struct core2_vpmu_context *core2_vpmu_cxt = vcpu_vpmu(v)->context;
 
-    for ( i = 0; i < core2_counters.num; i++ )
-        rdmsrl(core2_counters.msr[i], core2_vpmu_cxt->counters[i]);
+    for ( i = 0; i < core2_fix_counters.num; i++ )
+        rdmsrl(core2_fix_counters.msr[i], core2_vpmu_cxt->fix_counters[i]);
     for ( i = 0; i < core2_get_pmc_count(); i++ )
         rdmsrl(MSR_IA32_PERFCTR0+i, core2_vpmu_cxt->arch_msr_pair[i].counter);
     core2_vpmu_cxt->hw_lapic_lvtpc = apic_read(APIC_LVTPC);
@@ -292,8 +292,8 @@ static inline void __core2_vpmu_load(struct vcpu *v)
     int i;
     struct core2_vpmu_context *core2_vpmu_cxt = vcpu_vpmu(v)->context;
 
-    for ( i = 0; i < core2_counters.num; i++ )
-        wrmsrl(core2_counters.msr[i], core2_vpmu_cxt->counters[i]);
+    for ( i = 0; i < core2_fix_counters.num; i++ )
+        wrmsrl(core2_fix_counters.msr[i], core2_vpmu_cxt->fix_counters[i]);
     for ( i = 0; i < core2_get_pmc_count(); i++ )
         wrmsrl(MSR_IA32_PERFCTR0+i, core2_vpmu_cxt->arch_msr_pair[i].counter);
 
@@ -474,7 +474,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
 
         rdmsrl(MSR_CORE_PERF_FIXED_CTR_CTRL, non_global_ctrl);
         global_ctrl = msr_content >> 32;
-        for ( i = 0; i < 3; i++ )
+        for ( i = 0; i < core2_fix_counters.num; i++ )
         {
             core2_vpmu_cxt->pmu_enable->fixed_ctr_enable[i] =
                 (global_ctrl & 1) & ((non_global_ctrl & 0x3)? 1: 0);
@@ -486,7 +486,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
         non_global_ctrl = msr_content;
         vmx_read_guest_msr(MSR_CORE_PERF_GLOBAL_CTRL, &global_ctrl);
         global_ctrl >>= 32;
-        for ( i = 0; i < 3; i++ )
+        for ( i = 0; i < core2_fix_counters.num; i++ )
         {
             core2_vpmu_cxt->pmu_enable->fixed_ctr_enable[i] =
                 (global_ctrl & 1) & ((non_global_ctrl & 0x3)? 1: 0);
@@ -502,7 +502,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
                 (global_ctrl >> tmp) & (msr_content >> 22) & 1;
     }
 
-    for ( i = 0; i < 3; i++ )
+    for ( i = 0; i < core2_fix_counters.num; i++ )
         pmu_enable |= core2_vpmu_cxt->pmu_enable->fixed_ctr_enable[i];
     for ( i = 0; i < core2_get_pmc_count(); i++ )
         pmu_enable |= core2_vpmu_cxt->pmu_enable->arch_pmc_enable[i];
