@@ -2093,6 +2093,9 @@ void arch_dump_domain_info(struct domain *d)
 void arch_dump_vcpu_info(struct vcpu *v)
 {
     paging_dump_vcpu_info(v);
+
+    if ( is_hvm_vcpu(v) )
+        vpmu_dump(v);
 }
 
 void domain_cpuid(

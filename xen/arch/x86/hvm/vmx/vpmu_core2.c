@@ -133,6 +133,16 @@ static const u32 core2_fix_counters_msr[] = {
     MSR_CORE_PERF_FIXED_CTR2
 };
 
+/*
+ * MSR_CORE_PERF_FIXED_CTR_CTRL contains the configuration of all fixed
+ * counters. 4 bits for every counter.
+ */
+#define FIXED_CTR_CTRL_BITS 4
+#define FIXED_CTR_CTRL_MASK ((1 << FIXED_CTR_CTRL_BITS) - 1)
+
+/* The index into the core2_ctrls_msr[] of this MSR used in core2_vpmu_dump() */
+#define MSR_CORE_PERF_FIXED_CTR_CTRL_IDX 0
+
 /* Core 2 Non-architectual Performance Control MSRs. */
 static const u32 core2_ctrls_msr[] = {
     MSR_CORE_PERF_FIXED_CTR_CTRL,
@@ -508,7 +518,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
         {
             core2_vpmu_cxt->pmu_enable->fixed_ctr_enable[i] =
                 (global_ctrl & 1) & ((non_global_ctrl & 0x3)? 1: 0);
-            non_global_ctrl >>= 4;
+            non_global_ctrl >>= FIXED_CTR_CTRL_BITS;
             global_ctrl >>= 1;
         }
         break;
@@ -565,7 +575,7 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
             if  ( msr == MSR_IA32_DS_AREA )
                 break;
             /* 4 bits per counter, currently 3 fixed counters implemented. */
-            mask = ~((1ull << (3 * 4)) - 1);
+            mask = ~((1ull << (VPMU_CORE2_NUM_FIXED * FIXED_CTR_CTRL_BITS)) - 1);
             if (msr_content & mask)
                 inject_gp = 1;
             break;
@@ -642,6 +652,52 @@ static void core2_vpmu_do_cpuid(unsigned int input,
             if ( cpu_has(&current_cpu_data, X86_FEATURE_DSCPL) )
                 *ecx |= cpufeat_mask(X86_FEATURE_DSCPL);
         }
+    }
+}
+
+/* Dump vpmu info on console, called in the context of keyhandler 'q'. */
+static void core2_vpmu_dump(struct vcpu *v)
+{
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    int i, num;
+    struct core2_vpmu_context *core2_vpmu_cxt = NULL;
+    u64 val;
+
+    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
+         return;
+
+    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) )
+    {
+        if ( vpmu_set(vpmu, VPMU_CONTEXT_LOADED) )
+            printk("    vPMU loaded\n");
+        else
+            printk("    vPMU allocated\n");
+        return;
+    }
+
+    printk("    vPMU running\n");
+    core2_vpmu_cxt = vpmu->context;
+    num = core2_get_pmc_count();
+    /* Print the contents of the counter and its configuration msr. */
+    for ( i = 0; i < num; i++ )
+    {
+        struct arch_msr_pair* msr_pair = core2_vpmu_cxt->arch_msr_pair;
+        if ( core2_vpmu_cxt->pmu_enable->arch_pmc_enable[i] )
+            printk("      general_%d: 0x%016lx ctrl: 0x%016lx\n",
+                             i, msr_pair[i].counter, msr_pair[i].control);
+    }
+    /*
+     * The configuration of the fixed counter is 4 bits each in the
+     * MSR_CORE_PERF_FIXED_CTR_CTRL.
+     */
+    val = core2_vpmu_cxt->ctrls[MSR_CORE_PERF_FIXED_CTR_CTRL_IDX];
+    for ( i = 0; i < core2_fix_counters.num; i++ )
+    {
+        if ( core2_vpmu_cxt->pmu_enable->fixed_ctr_enable[i] )
+            printk("      fixed_%d:   0x%016lx ctrl: 0x%lx\n",
+                             i, core2_vpmu_cxt->fix_counters[i],
+                             val & FIXED_CTR_CTRL_MASK);
+        val >>= FIXED_CTR_CTRL_BITS;
     }
 }
 
@@ -758,7 +814,8 @@ struct arch_vpmu_ops core2_vpmu_ops = {
     .do_cpuid = core2_vpmu_do_cpuid,
     .arch_vpmu_destroy = core2_vpmu_destroy,
     .arch_vpmu_save = core2_vpmu_save,
-    .arch_vpmu_load = core2_vpmu_load
+    .arch_vpmu_load = core2_vpmu_load,
+    .arch_vpmu_dump = core2_vpmu_dump
 };
 
 static void core2_no_vpmu_do_cpuid(unsigned int input,

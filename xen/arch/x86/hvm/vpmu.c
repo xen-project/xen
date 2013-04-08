@@ -154,3 +154,12 @@ void vpmu_destroy(struct vcpu *v)
         vpmu->arch_vpmu_ops->arch_vpmu_destroy(v);
 }
 
+/* Dump some vpmu informations on console. Used in keyhandler dump_domains(). */
+void vpmu_dump(struct vcpu *v)
+{
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+
+    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_dump )
+        vpmu->arch_vpmu_ops->arch_vpmu_dump(v);
+}
+

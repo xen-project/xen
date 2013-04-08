@@ -54,6 +54,7 @@ struct arch_vpmu_ops {
     void (*arch_vpmu_destroy)(struct vcpu *v);
     void (*arch_vpmu_save)(struct vcpu *v);
     void (*arch_vpmu_load)(struct vcpu *v);
+    void (*arch_vpmu_dump)(struct vcpu *v);
 };
 
 int vmx_vpmu_initialise(struct vcpu *, unsigned int flags);
@@ -87,6 +88,7 @@ void vpmu_initialise(struct vcpu *v);
 void vpmu_destroy(struct vcpu *v);
 void vpmu_save(struct vcpu *v);
 void vpmu_load(struct vcpu *v);
+void vpmu_dump(struct vcpu *v);
 
 extern int acquire_pmu_ownership(int pmu_ownership);
 extern void release_pmu_ownership(int pmu_ownership);
