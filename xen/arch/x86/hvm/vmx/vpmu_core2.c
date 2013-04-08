@@ -39,6 +39,32 @@
 #include <asm/hvm/vmx/vpmu_core2.h>
 
 /*
+ * See Intel SDM Vol 2a Instruction Set Reference chapter 3 for CPUID
+ * instruction.
+ * cpuid 0xa - Architectural Performance Monitoring Leaf
+ * Register eax
+ */
+#define PMU_VERSION_SHIFT        0  /* Version ID */
+#define PMU_VERSION_BITS         8  /* 8 bits 0..7 */
+#define PMU_VERSION_MASK         (((1 << PMU_VERSION_BITS) - 1) << PMU_VERSION_SHIFT)
+
+#define PMU_GENERAL_NR_SHIFT     8  /* Number of general pmu registers */
+#define PMU_GENERAL_NR_BITS      8  /* 8 bits 8..15 */
+#define PMU_GENERAL_NR_MASK      (((1 << PMU_GENERAL_NR_BITS) - 1) << PMU_GENERAL_NR_SHIFT)
+
+#define PMU_GENERAL_WIDTH_SHIFT 16  /* Width of general pmu registers */
+#define PMU_GENERAL_WIDTH_BITS   8  /* 8 bits 16..23 */
+#define PMU_GENERAL_WIDTH_MASK  (((1 << PMU_GENERAL_WIDTH_BITS) - 1) << PMU_GENERAL_WIDTH_SHIFT)
+/* Register edx */
+#define PMU_FIXED_NR_SHIFT       0  /* Number of fixed pmu registers */
+#define PMU_FIXED_NR_BITS        5  /* 5 bits 0..4 */
+#define PMU_FIXED_NR_MASK        (((1 << PMU_FIXED_NR_BITS) -1) << PMU_FIXED_NR_SHIFT)
+
+#define PMU_FIXED_WIDTH_SHIFT    5  /* Width of fixed pmu registers */
+#define PMU_FIXED_WIDTH_BITS     8  /* 8 bits 5..12 */
+#define PMU_FIXED_WIDTH_MASK     (((1 << PMU_FIXED_WIDTH_BITS) -1) << PMU_FIXED_WIDTH_SHIFT)
+
+/*
  * QUIRK to workaround an issue on Nehalem processors currently seen
  * on family 6 cpus E5520 (model 26) and X7542 (model 46).
  * The issue leads to endless PMC interrupt loops on the processor.
@@ -130,6 +156,9 @@ static const struct pmumsr core2_ctrls = {
 };
 static int arch_pmc_cnt;
 
+/*
+ * Read the number of general counters via CPUID.EAX[0xa].EAX[8..15]
+ */
 static int core2_get_pmc_count(void)
 {
     u32 eax, ebx, ecx, edx;
@@ -137,7 +166,7 @@ static int core2_get_pmc_count(void)
     if ( arch_pmc_cnt == 0 )
     {
         cpuid(0xa, &eax, &ebx, &ecx, &edx);
-        arch_pmc_cnt = (eax & 0xff00) >> 8;
+        arch_pmc_cnt = (eax & PMU_GENERAL_NR_MASK) >> PMU_GENERAL_NR_SHIFT;
     }
 
     return arch_pmc_cnt;
@@ -154,8 +183,9 @@ static u64 core2_calc_intial_glb_ctrl_msr(void)
 static int core2_get_bitwidth_fix_count(void)
 {
     u32 eax, ebx, ecx, edx;
+
     cpuid(0xa, &eax, &ebx, &ecx, &edx);
-    return ((edx & 0x1fe0) >> 5);
+    return ((edx & PMU_FIXED_WIDTH_MASK) >> PMU_FIXED_WIDTH_SHIFT);
 }
 
 static int is_core2_vpmu_msr(u32 msr_index, int *type, int *index)
@@ -731,23 +761,6 @@ struct arch_vpmu_ops core2_vpmu_ops = {
     .arch_vpmu_load = core2_vpmu_load
 };
 
-/*
- * See Intel SDM Vol 2a Instruction Set Referenc for CPUID instruction.
- * cpuid 0xa - Architectural Performance Monitoring Leaf
- * Register eax
- */
-#define X86_FEATURE_PMU_VER_OFF   0  /* Version ID */
-#define FEATURE_PMU_VER_BITS      8  /* 8 bits 0..7 */
-#define X86_FEATURE_NUM_GEN_OFF   8  /* Number of general pmu registers */
-#define FEATURE_NUM_GEN_BITS      8  /* 8 bits 8..15 */
-#define X86_FEATURE_GEN_WIDTH_OFF 16 /* Width of general pmu registers */
-#define FEATURE_GEN_WIDTH_BITS    8  /* 8 bits 16..23 */
-/* Register edx */
-#define X86_FEATURE_NUM_FIX_OFF   0  /* Number of fixed pmu registers */
-#define FEATURE_NUM_FIX_BITS      5  /* 5 bits 0..4 */
-#define X86_FEATURE_FIX_WIDTH_OFF 5  /* Width of fixed pmu registers */
-#define FEATURE_FIX_WIDTH_BITS    8  /* 8 bits 5..12 */
-
 static void core2_no_vpmu_do_cpuid(unsigned int input,
                                 unsigned int *eax, unsigned int *ebx,
                                 unsigned int *ecx, unsigned int *edx)
@@ -758,12 +771,12 @@ static void core2_no_vpmu_do_cpuid(unsigned int input,
      */
     if ( input == 0xa )
     {
-        *eax &= ~(((1 << FEATURE_PMU_VER_BITS) -1) << X86_FEATURE_PMU_VER_OFF);
-        *eax &= ~(((1 << FEATURE_NUM_GEN_BITS) -1) << X86_FEATURE_NUM_GEN_OFF);
-        *eax &= ~(((1 << FEATURE_GEN_WIDTH_BITS) -1) << X86_FEATURE_GEN_WIDTH_OFF);
+        *eax &= ~PMU_VERSION_MASK;
+        *eax &= ~PMU_GENERAL_NR_MASK;
+        *eax &= ~PMU_GENERAL_WIDTH_MASK;
 
-        *edx &= ~(((1 << FEATURE_NUM_FIX_BITS) -1) << X86_FEATURE_NUM_FIX_OFF);
-        *edx &= ~(((1 << FEATURE_FIX_WIDTH_BITS) -1) << X86_FEATURE_FIX_WIDTH_OFF);
+        *edx &= ~PMU_FIXED_NR_MASK;
+        *edx &= ~PMU_FIXED_WIDTH_MASK;
     }
 }
 
