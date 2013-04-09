@@ -545,6 +545,38 @@ void vcpu_force_reschedule(struct vcpu *v)
     }
 }
 
+void restore_vcpu_affinity(struct domain *d)
+{
+    struct vcpu *v;
+
+    for_each_vcpu ( d, v )
+    {
+        vcpu_schedule_lock_irq(v);
+
+        if ( v->affinity_broken )
+        {
+            printk(XENLOG_DEBUG "Restoring affinity for d%dv%d\n",
+                   d->domain_id, v->vcpu_id);
+            cpus_copy(v->cpu_affinity, v->cpu_affinity_saved);
+            v->affinity_broken = 0;
+        }
+
+        if ( v->processor == smp_processor_id() )
+        {
+            set_bit(_VPF_migrating, &v->pause_flags);
+            vcpu_schedule_unlock_irq(v);
+            vcpu_sleep_nosync(v);
+            vcpu_migrate(v);
+        }
+        else
+        {
+            vcpu_schedule_unlock_irq(v);
+        }
+    }
+
+    domain_update_node_affinity(d);
+}
+
 /*
  * This function is used by cpu_hotplug code from stop_machine context
  * and from cpupools to switch schedulers on a cpu.
@@ -559,7 +591,7 @@ int cpu_disable_scheduler(unsigned int cpu)
     bool_t affinity_broken;
 
     c = per_cpu(cpupool, cpu);
-    if ( (c == NULL) || (system_state == SYS_STATE_suspend) )
+    if ( c == NULL )
         return ret;
 
     for_each_domain ( d )
@@ -577,8 +609,15 @@ int cpu_disable_scheduler(unsigned int cpu)
             if ( cpus_empty(online_affinity) &&
                  cpu_isset(cpu, v->cpu_affinity) )
             {
-                printk("Breaking vcpu affinity for domain %d vcpu %d\n",
-                        v->domain->domain_id, v->vcpu_id);
+                printk(XENLOG_DEBUG "Breaking affinity for d%dv%d\n",
+                        d->domain_id, v->vcpu_id);
+
+                if (system_state == SYS_STATE_suspend)
+                {
+                    cpus_copy(v->cpu_affinity_saved, v->cpu_affinity);
+                    v->affinity_broken = 1;
+                }
+
                 cpus_setall(v->cpu_affinity);
                 affinity_broken = 1;
             }

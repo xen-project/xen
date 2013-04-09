@@ -143,6 +143,9 @@ struct vcpu
     bool_t           defer_shutdown;
     /* VCPU is paused following shutdown request (d->is_shutting_down)? */
     bool_t           paused_for_shutdown;
+    /* VCPU need affinity restored */
+    bool_t           affinity_broken;
+
 
     /*
      * > 0: a single port is being polled;
@@ -165,6 +168,8 @@ struct vcpu
     cpumask_t        cpu_affinity;
     /* Used to change affinity temporarily. */
     cpumask_t        cpu_affinity_tmp;
+    /* Used to restore affinity across S3. */
+    cpumask_t        cpu_affinity_saved;
 
     /* Bitmask of CPUs which are holding onto this VCPU's state. */
     cpumask_t        vcpu_dirty_cpumask;
@@ -619,6 +624,7 @@ int schedule_cpu_switch(unsigned int cpu, struct cpupool *c);
 void vcpu_force_reschedule(struct vcpu *v);
 int cpu_disable_scheduler(unsigned int cpu);
 int vcpu_set_affinity(struct vcpu *v, cpumask_t *affinity);
+void restore_vcpu_affinity(struct domain *d);
 
 void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate);
 uint64_t get_cpu_idle_time(unsigned int cpu);
