@@ -43,6 +43,23 @@
 static char __initdata opt_clocksource[10];
 string_param("clocksource", opt_clocksource);
 
+static int opt_log_time;//temp
+static unsigned int opt_log_time_start;//temp
+static void __init setup_log_time(char *str) {//temp
+ if(!str || !*str) {
+  opt_log_time = -1;
+  opt_log_time_start = -1;
+  return;
+ }
+ opt_log_time = simple_strtoul(str, (const char **)&str, 0);
+ if(*str == ',') {
+  opt_log_time_start = simple_strtoul(str + 1, NULL, 0);
+  if(opt_log_time_start && opt_log_time > 0)
+   opt_log_time = -opt_log_time;
+ }
+}
+custom_param("log_time", setup_log_time);//temp
+
 unsigned long __read_mostly cpu_khz;  /* CPU clock frequency in kHz. */
 DEFINE_SPINLOCK(rtc_lock);
 unsigned long pit0_ticks;
@@ -121,6 +138,7 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
 {
     u64 product;
 
+BUG_ON((s64)delta < 0);//temp
     if ( scale->shift < 0 )
         delta >>= -scale->shift;
     else
@@ -527,12 +545,13 @@ static void plt_overflow(void *unused)
 {
     int i;
     u64 count;
+u64 delta;//temp
     s_time_t now, plt_now, plt_wrap;
 
     spin_lock_irq(&platform_timer_lock);
 
     count = plt_src.read_counter();
-    plt_stamp64 += (count - plt_stamp) & plt_mask;
+    plt_stamp64 += delta = (count - plt_stamp) & plt_mask;
     plt_stamp = count;
 
     now = NOW();
@@ -549,11 +568,21 @@ static void plt_overflow(void *unused)
     {
         static bool_t warned_once;
         if ( !test_and_set_bool(warned_once) )
+{//temp
             printk("Platform timer appears to have unexpectedly wrapped "
                    "%u%s times.\n", i, (i == 10) ? " or more" : "");
+ printk("PLT: n=%012"PRIx64" pn=%012"PRIx64" pm=%012"PRIx64" pw=%012"PRIx64"\n", now, plt_now, plt_mask, plt_wrap);
+}
     }
 
     spin_unlock_irq(&platform_timer_lock);
+if(opt_log_time) printk("PLT: c=%012"PRIx64" d=%06"PRIx64" s=%012"PRIx64"\n", count, delta, plt_stamp64);//temp
+if(opt_log_time > 0) {//temp
+ --opt_log_time;
+} else if (opt_log_time < 0 && !--opt_log_time_start) {
+ opt_log_time = -opt_log_time;
+}
+WARN_ON(platform_timer_stamp && delta < (6 << (plt_src.counter_bits - 4)));//temp
 
     set_timer(&plt_overflow_timer, NOW() + plt_overflow_period);
 }
@@ -568,6 +597,7 @@ static s_time_t read_platform_stime(void)
     spin_lock(&platform_timer_lock);
     count = plt_stamp64 + ((plt_src.read_counter() - plt_stamp) & plt_mask);
     stime = __read_platform_stime(count);
+BUG_ON((u64)stime >> 55);//temp
     spin_unlock(&platform_timer_lock);
 
     return stime;
@@ -582,9 +612,11 @@ static void platform_time_calibration(void)
     spin_lock_irqsave(&platform_timer_lock, flags);
     count = plt_stamp64 + ((plt_src.read_counter() - plt_stamp) & plt_mask);
     stamp = __read_platform_stime(count);
+BUG_ON((u64)stamp >> 55);//temp
     stime_platform_stamp = stamp;
     platform_timer_stamp = count;
     spin_unlock_irqrestore(&platform_timer_lock, flags);
+if(opt_log_time) printk("PLT: s=%012"PRIx64" c=%012"PRIx64"\n", stamp, count);//temp
 }
 
 static void resume_platform_timer(void)
@@ -651,6 +683,7 @@ static void __init init_platform_timer(void)
 
     printk("Platform timer is %s %s\n",
            freq_string(pts->frequency), pts->name);
+if(opt_log_time) printk("PLT: m=%08x s=%d o=%012"PRIx64"\n", plt_scale.mul_frac, plt_scale.shift, plt_overflow_period);//temp
 }
 
 u64 stime2tsc(s_time_t stime)
@@ -1034,7 +1067,12 @@ static void local_time_calibration(void)
         t->local_tsc_stamp    = c->local_tsc_stamp;
         t->stime_local_stamp  = c->stime_master_stamp;
         t->stime_master_stamp = c->stime_master_stamp;
+curr_local_stime = c->stime_local_stamp;//temp
         local_irq_enable();
+if(opt_log_time > 0) {//temp
+ printk("UPD%02x: t=%012"PRIx64" l=%012"PRIx64" m=%012"PRIx64"\n",
+        smp_processor_id(), t->local_tsc_stamp, curr_local_stime, t->stime_master_stamp);
+}
         update_vcpu_system_time(current);
         goto out;
     }
@@ -1050,14 +1088,14 @@ static void local_time_calibration(void)
     curr_master_stime = c->stime_master_stamp;
     local_irq_enable();
 
-#if 0
-    printk("PRE%d: tsc=%"PRIu64" stime=%"PRIu64" master=%"PRIu64"\n",
+if(opt_log_time > 0) {//temp #if 0
+    printk("PRE%02x: t=%012"PRIx64" l=%012"PRIx64" m=%012"PRIx64"\n",
            smp_processor_id(), prev_tsc, prev_local_stime, prev_master_stime);
-    printk("CUR%d: tsc=%"PRIu64" stime=%"PRIu64" master=%"PRIu64
+    printk("CUR%02x: t=%012"PRIx64" l=%012"PRIx64" m=%012"PRIx64
            " -> %"PRId64"\n",
            smp_processor_id(), curr_tsc, curr_local_stime, curr_master_stime,
            curr_master_stime - curr_local_stime);
-#endif
+}//temp #endif
 
     /* Local time warps forward if it lags behind master time. */
     if ( curr_local_stime < curr_master_stime )
@@ -1124,10 +1162,10 @@ static void local_time_calibration(void)
     if ( error_factor != 0 )
         calibration_mul_frac = mul_frac(calibration_mul_frac, error_factor);
 
-#if 0
-    printk("---%d: %08x %08x %d\n", smp_processor_id(),
-           error_factor, calibration_mul_frac, tsc_shift);
-#endif
+if(opt_log_time > 0) {//temp #if 0
+    printk("NEW%02x: e=%08x m=%08x s=%d\n",
+           smp_processor_id(), error_factor, calibration_mul_frac, tsc_shift);
+}//temp #endif
 
     /* Record new timestamp information, atomically w.r.t. interrupts. */
     local_irq_disable();
@@ -1475,6 +1513,7 @@ int __init init_xen_time(void)
         /* If TSCs are not marked as 'reliable', re-sync during rendezvous. */
         if ( !boot_cpu_has(X86_FEATURE_TSC_RELIABLE) )
             time_calibration_rendezvous_fn = time_calibration_tsc_rendezvous;
+printk("Using %s rendezvous\n", boot_cpu_has(X86_FEATURE_TSC_RELIABLE) ? "standard" : "TSC");//temp
     }
 
     open_softirq(TIME_CALIBRATE_SOFTIRQ, local_time_calibration);
@@ -1502,6 +1541,7 @@ void __init early_time_init(void)
     u64 tmp = init_pit_and_calibrate_tsc();
 
     set_time_scale(&this_cpu(cpu_time).tsc_scale, tmp);
+if(opt_log_time) printk("INI: m=%08x s=%d\n", this_cpu(cpu_time).tsc_scale.mul_frac, this_cpu(cpu_time).tsc_scale.shift);//temp
 
     do_div(tmp, 1000);
     cpu_khz = (unsigned long)tmp;
