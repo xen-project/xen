@@ -246,7 +246,7 @@ struct spage_info
 #endif
 
 #if defined(__i386__)
-#define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
+#define is_xen_heap_page(page) is_xen_heap_mfn(__page_to_mfn(page))
 #define is_xen_heap_mfn(mfn) ({                         \
     unsigned long _mfn = (mfn);                         \
     (_mfn < paddr_to_pfn(xenheap_phys_end));            \
