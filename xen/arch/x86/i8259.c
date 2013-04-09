@@ -395,6 +395,8 @@ void __init init_IRQ(void)
         struct irq_desc *desc = irq_to_desc(irq);
         struct irq_cfg *cfg = desc->chip_data;
         
+        if ( irq == 2 ) /* IRQ2 doesn't exist */
+            continue;
         desc->handler = &i8259A_irq_type;
         per_cpu(vector_irq, cpu)[FIRST_LEGACY_VECTOR + irq] = irq;
         cfg->cpu_mask= cpumask_of_cpu(cpu);
