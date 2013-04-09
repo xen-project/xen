@@ -96,7 +96,10 @@ static void thaw_domains(void)
 
     rcu_read_lock(&domlist_read_lock);
     for_each_domain ( d )
+    {
+        restore_vcpu_affinity(d);
         domain_unpause(d);
+    }
     rcu_read_unlock(&domlist_read_lock);
 }
 

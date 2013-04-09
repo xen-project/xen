@@ -126,6 +126,7 @@ struct vcpu *alloc_vcpu(
 
     if ( !zalloc_cpumask_var(&v->cpu_affinity) ||
          !zalloc_cpumask_var(&v->cpu_affinity_tmp) ||
+         !zalloc_cpumask_var(&v->cpu_affinity_saved) ||
          !zalloc_cpumask_var(&v->vcpu_dirty_cpumask) )
         goto fail_free;
 
@@ -155,6 +156,7 @@ struct vcpu *alloc_vcpu(
  fail_free:
         free_cpumask_var(v->cpu_affinity);
         free_cpumask_var(v->cpu_affinity_tmp);
+        free_cpumask_var(v->cpu_affinity_saved);
         free_cpumask_var(v->vcpu_dirty_cpumask);
         free_vcpu_struct(v);
         return NULL;
