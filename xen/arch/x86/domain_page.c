@@ -354,9 +354,10 @@ void *map_domain_page_global(unsigned long mfn)
     set_bit(idx, inuse);
     inuse_cursor = idx + 1;
 
+    pl1e = virt_to_xen_l1e(va);
+
     spin_unlock(&globalmap_lock);
 
-    pl1e = virt_to_xen_l1e(va);
     if ( !pl1e )
         return NULL;
     l1e_write(pl1e, l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
