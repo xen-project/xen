@@ -52,7 +52,7 @@ void xlu__cfg_yyset_column(int  column_no, yyscan_t yyscanner);
 
 %%
 
-[a-z][_0-9a-z]*         {
+[a-z][._0-9a-z]*         {
                           yylval->string= xlu__cfgl_strdup(ctx,yytext);
                           GOT(IDENT);
                         }
