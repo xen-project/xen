@@ -4477,7 +4477,7 @@ $as_echo "no" >&6; }
 fi
 
 
-if test x"${PERL}" == x"no"
+if test x"${PERL}" = x"no"
 then
     as_fn_error $? "Unable to find perl, please install perl" "$LINENO" 5
 fi
@@ -4524,7 +4524,7 @@ $as_echo "no" >&6; }
 fi
 
 
-if test x"${CURL}" == x"no"
+if test x"${CURL}" = x"no"
 then
     as_fn_error $? "Unable to find curl-config, please install curl-config" "$LINENO" 5
 fi
@@ -4569,7 +4569,7 @@ $as_echo "no" >&6; }
 fi
 
 
-if test x"${XML}" == x"no"
+if test x"${XML}" = x"no"
 then
     as_fn_error $? "Unable to find xml2-config, please install xml2-config" "$LINENO" 5
 fi
@@ -5837,7 +5837,7 @@ $as_echo "no" >&6; }
 fi
 
 
-if test x"${BASH}" == x"no"
+if test x"${BASH}" = x"no"
 then
     as_fn_error $? "Unable to find bash, please install bash" "$LINENO" 5
 fi
@@ -5892,7 +5892,7 @@ $as_echo "no" >&6; }
 fi
 
 
-if test x"${PYTHONPATH}" == x"no"
+if test x"${PYTHONPATH}" = x"no"
 then
     as_fn_error $? "Unable to find $PYTHON, please install $PYTHON" "$LINENO" 5
 fi
@@ -6355,7 +6355,7 @@ $as_echo "no" >&6; }
 fi
 
 
-if test x"$pyconfig" == x"no"; then :
+if test x"$pyconfig" = x"no"; then :
 
         CPPFLAGS="$CFLAGS `$PYTHON -c 'import distutils.sysconfig; \
         print "-I" + distutils.sysconfig.get_config_var("INCLUDEPY")'`"
@@ -6484,7 +6484,7 @@ $as_echo "no" >&6; }
 fi
 
 
-if test x"${XGETTEXT}" == x"no"
+if test x"${XGETTEXT}" = x"no"
 then
     as_fn_error $? "Unable to find xgettext, please install xgettext" "$LINENO" 5
 fi
@@ -6531,7 +6531,7 @@ $as_echo "no" >&6; }
 fi
 
 
-if test x"${AS86}" == x"no"
+if test x"${AS86}" = x"no"
 then
     as_fn_error $? "Unable to find as86, please install as86" "$LINENO" 5
 fi
@@ -6576,7 +6576,7 @@ $as_echo "no" >&6; }
 fi
 
 
-if test x"${LD86}" == x"no"
+if test x"${LD86}" = x"no"
 then
     as_fn_error $? "Unable to find ld86, please install ld86" "$LINENO" 5
 fi
@@ -6621,7 +6621,7 @@ $as_echo "no" >&6; }
 fi
 
 
-if test x"${BCC}" == x"no"
+if test x"${BCC}" = x"no"
 then
     as_fn_error $? "Unable to find bcc, please install bcc" "$LINENO" 5
 fi
@@ -6666,7 +6666,7 @@ $as_echo "no" >&6; }
 fi
 
 
-if test x"${IASL}" == x"no"
+if test x"${IASL}" = x"no"
 then
     as_fn_error $? "Unable to find iasl, please install iasl" "$LINENO" 5
 fi

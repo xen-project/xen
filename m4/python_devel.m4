@@ -4,7 +4,7 @@ ac_previous_ldflags=$LDFLAGS
 ac_python_version=`$PYTHON -c 'import distutils.sysconfig; \
     print distutils.sysconfig.get_config_var("VERSION")'`
 AC_PATH_PROG([pyconfig], [$PYTHON-config], [no])
-AS_IF([test x"$pyconfig" == x"no"], [
+AS_IF([test x"$pyconfig" = x"no"], [
     dnl For those that don't have python-config
     CPPFLAGS="$CFLAGS `$PYTHON -c 'import distutils.sysconfig; \
         print "-I" + distutils.sysconfig.get_config_var("INCLUDEPY")'`"

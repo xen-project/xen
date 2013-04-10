@@ -3119,7 +3119,7 @@ $as_echo "no" >&6; }
 fi
 
 
-if test x"${WGET}" == x"no"
+if test x"${WGET}" = x"no"
 then
     as_fn_error $? "Unable to find wget, please install wget" "$LINENO" 5
 fi
@@ -3168,7 +3168,7 @@ $as_echo "no" >&6; }
 fi
 
 
-if test x"${CMAKE}" == x"no"
+if test x"${CMAKE}" = x"no"
 then
     as_fn_error $? "Unable to find cmake, please install cmake" "$LINENO" 5
 fi
