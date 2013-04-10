@@ -17,6 +17,7 @@
 #include <xen/compat.h>
 #include <xen/iocap.h>
 #include <xen/iommu.h>
+#include <xen/symbols.h>
 #include <xen/trace.h>
 #include <xsm/xsm.h>
 #include <asm/msi.h>
@@ -2094,9 +2095,7 @@ static void dump_irqs(unsigned char key)
         if ( ssid )
             printk("Z=%-25s ", ssid);
 
-        if ( !(desc->status & IRQ_GUEST) )
-            printk("mapped, unbound\n");
-        else
+        if ( desc->status & IRQ_GUEST )
         {
             action = (irq_guest_action_t *)desc->action;
 
@@ -2124,6 +2123,10 @@ static void dump_irqs(unsigned char key)
 
             printk("\n");
         }
+        else if ( desc->action )
+            print_symbol("%s\n", (unsigned long)desc->action->handler);
+        else
+            printk("mapped, unbound\n");
 
         spin_unlock_irqrestore(&desc->lock, flags);
 
