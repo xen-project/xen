@@ -83,6 +83,7 @@ int main_vtpmattach(int argc, char **argv);
 int main_vtpmlist(int argc, char **argv);
 int main_vtpmdetach(int argc, char **argv);
 int main_uptime(int argc, char **argv);
+int main_claims(int argc, char **argv);
 int main_tmem_list(int argc, char **argv);
 int main_tmem_freeze(int argc, char **argv);
 int main_tmem_thaw(int argc, char **argv);

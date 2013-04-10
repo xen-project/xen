@@ -780,6 +780,29 @@ explanatory.
 
 Prints the current uptime of the domains running.
 
+=item B<claims>
+
+Prints information about outstanding claims by the guests. This provides
+the outstanding claims and currently populated memory count for the guests.
+These values added up reflect the global outstanding claim value, which
+is provided via the I<info> argument, B<outstanding_claims> value.
+The B<Mem> column has the cumulative value of outstanding claims and
+the total amount of memory that has been right now allocated to the guest.
+
+B<EXAMPLE>
+
+An example format for the list is as follows:
+
+ Name                                        ID   Mem VCPUs      State   Time(s)  Claimed
+ Domain-0                                     0  2047     4     r-----      19.7     0
+ OL5                                          2  2048     1     --p---       0.0   847
+ OL6                                          3  1024     4     r-----       5.9     0
+ Windows_XP                                   4  2047     1     --p---       0.0  1989
+
+In which it can be seen that the OL5 guest still has 847MB of claimed
+memory (out of the total 2048MB where 1191MB has been allocated to
+the guest).
+
 =back
 
 =head1 SCHEDULER SUBCOMMANDS

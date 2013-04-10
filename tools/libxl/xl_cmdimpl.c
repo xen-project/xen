@@ -3061,7 +3061,8 @@ out:
     }
 }
 
-static void list_domains(int verbose, int context, const libxl_dominfo *info, int nb_domain)
+static void list_domains(int verbose, int context, int claim,
+                         const libxl_dominfo *info, int nb_domain)
 {
     int i;
     static const char shutdown_reason_letters[]= "-rscw";
@@ -3069,6 +3070,7 @@ static void list_domains(int verbose, int context, const libxl_dominfo *info, in
     printf("Name                                        ID   Mem VCPUs\tState\tTime(s)");
     if (verbose) printf("   UUID                            Reason-Code\tSecurity Label");
     if (context && !verbose) printf("   Security Label");
+    if (claim) printf("  Claimed");
     printf("\n");
     for (i = 0; i < nb_domain; i++) {
         char *domname;
@@ -3078,7 +3080,8 @@ static void list_domains(int verbose, int context, const libxl_dominfo *info, in
         printf("%-40s %5d %5lu %5d     %c%c%c%c%c%c  %8.1f",
                 domname,
                 info[i].domid,
-                (unsigned long) (info[i].current_memkb / 1024),
+                (unsigned long) ((info[i].current_memkb +
+                    info[i].outstanding_memkb)/ 1024),
                 info[i].vcpu_online,
                 info[i].running ? 'r' : '-',
                 info[i].blocked ? 'b' : '-',
@@ -3095,6 +3098,8 @@ static void list_domains(int verbose, int context, const libxl_dominfo *info, in
             if (info[i].shutdown) printf(" %8x", shutdown_reason);
             else printf(" %8s", "-");
         }
+        if (claim)
+            printf(" %5lu", (unsigned long)info[i].outstanding_memkb / 1024);
         if (verbose || context) {
             int rc;
             size_t size;
@@ -4029,7 +4034,7 @@ int main_list(int argc, char **argv)
     if (details)
         list_domains_details(info, nb_domain);
     else
-        list_domains(verbose, context, info, nb_domain);
+        list_domains(verbose, context, 0 /* claim */, info, nb_domain);
 
     if (info_free)
         libxl_dominfo_list_free(info, nb_domain);
@@ -4742,7 +4747,8 @@ static void sharing(const libxl_dominfo *info, int nb_domain)
         printf("%-40s %5d %5lu  %5lu\n",
                 domname,
                 info[i].domid,
-                (unsigned long) (info[i].current_memkb / 1024),
+                (unsigned long) ((info[i].current_memkb +
+                    info[i].outstanding_memkb) / 1024),
                 (unsigned long) (info[i].shared_memkb / 1024));
         free(domname);
     }
@@ -5925,6 +5931,32 @@ static char *uptime_to_string(unsigned long uptime, int short_mode)
     if (ret < 0)
         return NULL;
     return time_string;
+}
+
+int main_claims(int argc, char **argv)
+{
+    libxl_dominfo *info;
+    int opt;
+    int nb_domain;
+
+    SWITCH_FOREACH_OPT(opt, "", NULL, "claims", 0) {
+        /* No options */
+    }
+
+    if (!libxl_defbool_val(claim_mode))
+        fprintf(stderr, "claim_mode not enabled (see man xl.conf).\n");
+
+    info = libxl_list_domain(ctx, &nb_domain);
+    if (!info) {
+        fprintf(stderr, "libxl_domain_infolist failed.\n");
+        return 1;
+    }
+
+    list_domains(0 /* verbose */, 0 /* context */, 1 /* claim */,
+                 info, nb_domain);
+
+    libxl_dominfo_list_free(info, nb_domain);
+    return 0;
 }
 
 static char *current_time_to_string(time_t now)

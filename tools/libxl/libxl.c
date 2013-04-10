@@ -3865,9 +3865,9 @@ int libxl_wait_for_memory_target(libxl_ctx *ctx, uint32_t domid, int wait_secs)
         rc = libxl_domain_info(ctx, &info, domid);
         if (rc < 0)
             return rc;
-    } while (wait_secs > 0 && info.current_memkb > target_memkb);
+    } while (wait_secs > 0 && (info.current_memkb + info.outstanding_memkb) > target_memkb);
 
-    if (info.current_memkb <= target_memkb)
+    if ((info.current_memkb + info.outstanding_memkb) <= target_memkb)
         rc = 0;
     else
         rc = ERROR_FAIL;
