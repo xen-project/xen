@@ -60,7 +60,7 @@ NMI_MASK = 0x80000000
 
 #define RDI 112
 #define ORIG_RAX 120       /* + error_code */ 
-#define EFLAGS 144
+#define RFLAGS 144
 
 
 /* Macros */
@@ -185,18 +185,17 @@ ENTRY(hypervisor_callback2)
 	decl %gs:0
 
 error_exit:
-	RESTORE_REST
-
 retint_kernel:
-retint_restore_args:
-	movl EFLAGS-6*8(%rsp), %eax
-	shr $9, %eax			# EAX[0] == IRET_EFLAGS.IF
+	movl RFLAGS(%rsp), %eax
+	shr $9, %eax			# EAX[0] == IRET_RFLAGS.IF
 	XEN_GET_VCPU_INFO(%rsi)
 	andb evtchn_upcall_mask(%rsi),%al
-	andb $1,%al			# EAX[0] == IRET_EFLAGS.IF & event_mask
+	andb $1,%al			# EAX[0] == IRET_RFLAGS.IF & event_mask
 	jnz restore_all_enable_events	#        != 0 => enable event delivery
 	XEN_PUT_VCPU_INFO(%rsi)
 
+retint_restore_args:
+	RESTORE_REST
 	RESTORE_ALL
 	HYPERVISOR_IRET 0
 
@@ -207,12 +206,13 @@ scrit:	/**** START OF CRITICAL REGION ****/
 	XEN_TEST_PENDING(%rsi)
 	jnz  14f			# process more events if necessary...
 	XEN_PUT_VCPU_INFO(%rsi)
+
+	RESTORE_REST
 	RESTORE_ALL
 	HYPERVISOR_IRET 0
 
 14:	XEN_LOCKED_BLOCK_EVENTS(%rsi)
 	XEN_PUT_VCPU_INFO(%rsi)
-	SAVE_REST
 	movq %rsp,%rdi                  # set the argument again
 	jmp  11b
 ecrit:  /**** END OF CRITICAL REGION ****/
