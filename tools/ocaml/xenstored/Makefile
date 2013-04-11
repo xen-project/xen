@@ -8,6 +8,11 @@ OCAMLINCLUDE += \
 	-I $(OCAML_TOPLEVEL)/libs/xc \
 	-I $(OCAML_TOPLEVEL)/libs/eventchn
 
+LIBS = syslog.cma syslog.cmxa
+syslog_OBJS = syslog
+syslog_C_OBJS = syslog_stubs
+OCAML_LIBRARY = syslog
+
 OBJS = define \
 	stdext \
 	trie \
@@ -29,9 +34,11 @@ OBJS = define \
 	process \
 	xenstored
 
-INTF = symbol.cmi trie.cmi
+INTF = symbol.cmi trie.cmi syslog.cmi
+
 XENSTOREDLIBS = \
 	unix.cmxa \
+	-ccopt -L -ccopt . syslog.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/mmap $(OCAML_TOPLEVEL)/libs/mmap/xenmmap.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/eventchn $(OCAML_TOPLEVEL)/libs/eventchn/xeneventchn.cmxa \
 	-ccopt -L -ccopt $(OCAML_TOPLEVEL)/libs/xc $(OCAML_TOPLEVEL)/libs/xc/xenctrl.cmxa \
@@ -45,9 +52,11 @@ oxenstored_OBJS = $(OBJS)
 
 OCAML_PROGRAM = oxenstored
 
-all: $(INTF) $(PROGRAMS)
+all: $(INTF) $(LIBS) $(PROGRAMS)
 
 bins: $(PROGRAMS)
+
+libs: $(LIBS)
 
 install: all
 	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)

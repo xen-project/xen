@@ -87,13 +87,13 @@ let parse_config filename =
 		("quota-maxsize", Config.Set_int Quota.maxsize);
 		("test-eagain", Config.Set_bool Transaction.test_eagain);
 		("persistent", Config.Set_bool Disk.enable);
-		("xenstored-log-file", Config.Set_string Logging.xenstored_log_file);
+		("xenstored-log-file", Config.String Logging.set_xenstored_log_destination);
 		("xenstored-log-level", Config.String
 			(fun s -> Logging.xenstored_log_level := Logging.level_of_string s));
 		("xenstored-log-nb-files", Config.Set_int Logging.xenstored_log_nb_files);
 		("xenstored-log-nb-lines", Config.Set_int Logging.xenstored_log_nb_lines);
 		("xenstored-log-nb-chars", Config.Set_int Logging.xenstored_log_nb_chars);
-		("access-log-file", Config.Set_string Logging.access_log_file);
+		("access-log-file", Config.String Logging.set_access_log_destination);
 		("access-log-nb-files", Config.Set_int Logging.access_log_nb_files);
 		("access-log-nb-lines", Config.Set_int Logging.access_log_nb_lines);
 		("access-log-nb-chars", Config.Set_int Logging.access_log_nb_chars);
