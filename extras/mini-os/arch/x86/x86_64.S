@@ -36,6 +36,22 @@ hypercall_page:
         .org 0x3000
 
 
+#define XEN_GET_VCPU_INFO(reg)	movq HYPERVISOR_shared_info,reg
+#define XEN_PUT_VCPU_INFO(reg)
+#define XEN_PUT_VCPU_INFO_fixup
+#define XEN_LOCKED_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
+#define XEN_LOCKED_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
+#define XEN_TEST_PENDING(reg)	testb $0xFF,evtchn_upcall_pending(reg)
+
+#define XEN_BLOCK_EVENTS(reg)	XEN_GET_VCPU_INFO(reg)			; \
+                    			XEN_LOCKED_BLOCK_EVENTS(reg)	; \
+    				            XEN_PUT_VCPU_INFO(reg)
+
+#define XEN_UNBLOCK_EVENTS(reg)	XEN_GET_VCPU_INFO(reg)			; \
+                				XEN_LOCKED_UNBLOCK_EVENTS(reg)	; \
+    			            	XEN_PUT_VCPU_INFO(reg)
+
+
 /* Offsets into shared_info_t. */                
 #define evtchn_upcall_pending		/* 0 */
 #define evtchn_upcall_mask		1
@@ -45,6 +61,27 @@ NMI_MASK = 0x80000000
 #define RDI 112
 #define ORIG_RAX 120       /* + error_code */ 
 #define EFLAGS 144
+
+
+/* Macros */
+.macro zeroentry sym
+	movq (%rsp),%rcx
+	movq 8(%rsp),%r11
+	addq $0x10,%rsp /* skip rcx and r11 */
+	pushq $0	/* push error code/oldrax */
+	pushq %rax	/* push real oldrax to the rdi slot */
+	leaq  \sym(%rip),%rax
+	jmp error_entry
+.endm
+
+.macro errorentry sym
+	movq (%rsp),%rcx
+	movq 8(%rsp),%r11
+	addq $0x10,%rsp /* rsp points to the error code */
+	pushq %rax
+	leaq  \sym(%rip),%rax
+	jmp error_entry
+.endm
 
 .macro RESTORE_ALL
 	movq (%rsp),%r11
@@ -130,42 +167,10 @@ error_call_handler:
 	call *%rax
 	jmp error_exit
 
-.macro zeroentry sym
-	movq (%rsp),%rcx
-	movq 8(%rsp),%r11
-	addq $0x10,%rsp /* skip rcx and r11 */
-	pushq $0	/* push error code/oldrax */ 
-	pushq %rax	/* push real oldrax to the rdi slot */ 
-	leaq  \sym(%rip),%rax
-	jmp error_entry
-.endm	
 
-.macro errorentry sym
-	movq (%rsp),%rcx
-	movq 8(%rsp),%r11
-	addq $0x10,%rsp /* rsp points to the error code */
-	pushq %rax
-	leaq  \sym(%rip),%rax
-	jmp error_entry
-.endm
-
-#define XEN_GET_VCPU_INFO(reg)	movq HYPERVISOR_shared_info,reg
-#define XEN_PUT_VCPU_INFO(reg)
-#define XEN_PUT_VCPU_INFO_fixup
-#define XEN_LOCKED_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
-#define XEN_LOCKED_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
-#define XEN_TEST_PENDING(reg)	testb $0xFF,evtchn_upcall_pending(reg)
-
-#define XEN_BLOCK_EVENTS(reg)	XEN_GET_VCPU_INFO(reg)			; \
-                    			XEN_LOCKED_BLOCK_EVENTS(reg)	; \
-    				            XEN_PUT_VCPU_INFO(reg)
-
-#define XEN_UNBLOCK_EVENTS(reg)	XEN_GET_VCPU_INFO(reg)			; \
-                				XEN_LOCKED_UNBLOCK_EVENTS(reg)	; \
-    			            	XEN_PUT_VCPU_INFO(reg)
-
-
-
+/*
+ * Xen event (virtual interrupt) entry point.
+ */
 ENTRY(hypervisor_callback)
 	zeroentry hypervisor_callback2
 
@@ -178,7 +183,23 @@ ENTRY(hypervisor_callback2)
 	call do_hypervisor_callback
 	popq %rsp
 	decl %gs:0
-	jmp error_exit
+
+error_exit:
+	RESTORE_REST
+	XEN_BLOCK_EVENTS(%rsi)		
+
+retint_kernel:
+retint_restore_args:
+	movl EFLAGS-6*8(%rsp), %eax
+	shr $9, %eax			# EAX[0] == IRET_EFLAGS.IF
+	XEN_GET_VCPU_INFO(%rsi)
+	andb evtchn_upcall_mask(%rsi),%al
+	andb $1,%al			# EAX[0] == IRET_EFLAGS.IF & event_mask
+	jnz restore_all_enable_events	#        != 0 => enable event delivery
+	XEN_PUT_VCPU_INFO(%rsi)
+
+	RESTORE_ALL
+	HYPERVISOR_IRET 0
 
 restore_all_enable_events:
 	XEN_UNBLOCK_EVENTS(%rsi)        # %rsi is already set up...
@@ -196,26 +217,6 @@ scrit:	/**** START OF CRITICAL REGION ****/
 	movq %rsp,%rdi                  # set the argument again
 	jmp  11b
 ecrit:  /**** END OF CRITICAL REGION ****/
-
-
-retint_kernel:
-retint_restore_args:
-	movl EFLAGS-6*8(%rsp), %eax
-	shr $9, %eax			# EAX[0] == IRET_EFLAGS.IF
-	XEN_GET_VCPU_INFO(%rsi)
-	andb evtchn_upcall_mask(%rsi),%al
-	andb $1,%al			# EAX[0] == IRET_EFLAGS.IF & event_mask
-	jnz restore_all_enable_events	#        != 0 => enable event delivery
-	XEN_PUT_VCPU_INFO(%rsi)
-
-	RESTORE_ALL
-	HYPERVISOR_IRET 0
-
-
-error_exit:
-	RESTORE_REST
-	XEN_BLOCK_EVENTS(%rsi)		
-	jmp retint_kernel
 
 
 
