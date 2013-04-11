@@ -57,10 +57,15 @@ hypercall_page:
 #define evtchn_upcall_mask		1
 
 NMI_MASK = 0x80000000
+KERNEL_CS_MASK = 0xfc
 
-#define RDI 112
-#define ORIG_RAX 120       /* + error_code */ 
-#define RFLAGS 144
+#define RAX       80
+#define RDI      112
+#define ORIG_RAX 120       /* + error_code */
+#define RIP      128
+#define CS       136
+#define RFLAGS   144
+#define RSP      152
 
 
 /* Macros */
@@ -176,6 +181,14 @@ ENTRY(hypervisor_callback)
 
 ENTRY(hypervisor_callback2)
 	movq %rdi, %rsp
+
+	/* check against event re-entrant */
+	movq RIP(%rsp),%rax
+	cmpq $scrit,%rax
+	jb 11f
+	cmpq $ecrit,%rax
+	jb  critical_region_fixup
+
 11:	movq %gs:8,%rax
 	incl %gs:0
 	cmovzq %rax,%rsp
@@ -200,22 +213,68 @@ retint_restore_args:
 	HYPERVISOR_IRET 0
 
 restore_all_enable_events:
-	XEN_UNBLOCK_EVENTS(%rsi)        # %rsi is already set up...
-
-scrit:	/**** START OF CRITICAL REGION ****/
-	XEN_TEST_PENDING(%rsi)
-	jnz  14f			# process more events if necessary...
-	XEN_PUT_VCPU_INFO(%rsi)
-
 	RESTORE_REST
 	RESTORE_ALL
-	HYPERVISOR_IRET 0
+	pushq %rax                      # save rax for it will be clobbered later
+	RSP_OFFSET=8                    # record the stack frame layout changes
+	XEN_GET_VCPU_INFO(%rax)         # safe to use rax since it is saved
+	XEN_UNBLOCK_EVENTS(%rax)
 
-14:	XEN_LOCKED_BLOCK_EVENTS(%rsi)
-	XEN_PUT_VCPU_INFO(%rsi)
-	movq %rsp,%rdi                  # set the argument again
-	jmp  11b
+scrit:	/**** START OF CRITICAL REGION ****/
+	XEN_TEST_PENDING(%rax)
+	jz 12f
+	XEN_LOCKED_BLOCK_EVENTS(%rax)   # if pending, mask events and handle
+	                                # by jumping to hypervisor_prologue
+12:	popq %rax                       # all registers restored from this point
+
+restore_end:
+	jnz hypervisor_prologue         # safe to jump out of critical region
+	                                # because events are masked if ZF = 0
+	HYPERVISOR_IRET 0
 ecrit:  /**** END OF CRITICAL REGION ****/
+
+# Set up the stack as Xen does before calling event callback
+hypervisor_prologue:
+	pushq %r11
+	pushq %rcx
+	jmp hypervisor_callback
+
+# [How we do the fixup]. We want to merge the current stack frame with the
+# just-interrupted frame. How we do this depends on where in the critical
+# region the interrupted handler was executing, and so if rax has been
+# restored. We determine by comparing interrupted rip with "restore_end".
+# We always copy all registers below RIP from the current stack frame
+# to the end of the previous activation frame so that we can continue
+# as if we've never even reached 11 running in the old activation frame.
+
+critical_region_fixup:
+	# Set up source and destination region pointers
+	leaq RIP(%rsp),%rsi   # esi points at end of src region
+	# Acquire interrupted rsp which was saved-on-stack. This points to
+	# the end of dst region. Note that it is not necessarily current rsp
+	# plus 0xb0, because the second interrupt might align the stack frame.
+	movq RSP(%rsp),%rdi   # edi points at end of dst region
+
+	cmpq $restore_end,%rax
+	jae  13f
+
+	# If interrupted rip is before restore_end
+	# then rax hasn't been restored yet
+	movq (%rdi),%rax
+	movq %rax, RAX(%rsp)  # save rax
+	addq $RSP_OFFSET,%rdi
+
+	# Set up the copy
+13:	movq $RIP,%rcx
+	shr  $3,%rcx          # convert bytes into count of 64-bit entities
+15:	subq $8,%rsi          # pre-decrementing copy loop
+	subq $8,%rdi
+	movq (%rsi),%rax
+	movq %rax,(%rdi)
+	loop 15b
+16:	movq %rdi,%rsp        # final rdi is top of merged stack
+	andb $KERNEL_CS_MASK,CS(%rsp)      # CS might have changed
+	jmp  11b
 
 
 
