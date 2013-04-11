@@ -37,9 +37,7 @@ struct tpmfront_dev {
    grant_ref_t ring_ref;
    evtchn_port_t evtchn;
 
-   tpmif_tx_interface_t* tx;
-
-   void** pages;
+   vtpm_shared_page_t *page;
 
    domid_t bedomid;
    char* nodename;
@@ -76,6 +74,9 @@ void shutdown_tpmfront(struct tpmfront_dev* dev);
  * returns 0 on success, non zero on failure.
  * */
 int tpmfront_cmd(struct tpmfront_dev* dev, uint8_t* req, size_t reqlen, uint8_t** resp, size_t* resplen);
+
+/* Set the locality used for communicating with a vTPM */
+int tpmfront_set_locality(struct tpmfront_dev* dev, int locality);
 
 #ifdef HAVE_LIBC
 #include <sys/stat.h>

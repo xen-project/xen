@@ -86,10 +86,7 @@ struct tpmif {
    evtchn_port_t evtchn;
 
    /* Shared page */
-   tpmif_tx_interface_t* tx;
-
-   /* pointer to TPMIF_RX_RING_SIZE pages */
-   void** pages;
+   vtpm_shared_page_t *page;
 
    enum xenbus_state state;
    enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
@@ -266,6 +263,7 @@ int insert_tpmif(tpmif_t* tpmif)
    unsigned int i, j;
    tpmif_t* tmp;
    char* err;
+   char path[512];
 
    local_irq_save(flags);
 
@@ -303,6 +301,16 @@ int insert_tpmif(tpmif_t* tpmif)
 
    local_irq_restore(flags);
 
+   snprintf(path, 512, "backend/vtpm/%u/%u/feature-protocol-v2", (unsigned int) tpmif->domid, tpmif->handle);
+   if ((err = xenbus_write(XBT_NIL, path, "1")))
+   {
+      /* if we got an error here we should carefully remove the interface and then return */
+      TPMBACK_ERR("Unable to write feature-protocol-v2 node: %s\n", err);
+      free(err);
+      remove_tpmif(tpmif);
+      goto error_post_irq;
+   }
+
    /*Listen for state changes on the new interface */
    if((err = xenbus_watch_path_token(XBT_NIL, tpmif->fe_state_path, tpmif->fe_state_path, &gtpmdev.events)))
    {
@@ -312,7 +320,6 @@ int insert_tpmif(tpmif_t* tpmif)
       remove_tpmif(tpmif);
       goto error_post_irq;
    }
-
    return 0;
 error:
    local_irq_restore(flags);
@@ -386,8 +393,7 @@ inline tpmif_t* __init_tpmif(domid_t domid, unsigned int handle)
    tpmif->fe_state_path = NULL;
    tpmif->state = XenbusStateInitialising;
    tpmif->status = DISCONNECTED;
-   tpmif->tx = NULL;
-   tpmif->pages = NULL;
+   tpmif->page = NULL;
    tpmif->flags = 0;
    memset(tpmif->uuid, 0, sizeof(tpmif->uuid));
    return tpmif;
@@ -395,9 +401,6 @@ inline tpmif_t* __init_tpmif(domid_t domid, unsigned int handle)
 
 void __free_tpmif(tpmif_t* tpmif)
 {
-   if(tpmif->pages) {
-      free(tpmif->pages);
-   }
    if(tpmif->fe_path) {
       free(tpmif->fe_path);
    }
@@ -429,12 +432,6 @@ tpmif_t* new_tpmif(domid_t domid, unsigned int handle)
       TPMBACK_ERR("Error reading %s\n", path);
       goto error;
    }
-
-   /* allocate pages to be used for shared mapping */
-   if((tpmif->pages = malloc(sizeof(void*) * TPMIF_TX_RING_SIZE)) == NULL) {
-      goto error;
-   }
-   memset(tpmif->pages, 0, sizeof(void*) * TPMIF_TX_RING_SIZE);
 
    if(tpmif_change_state(tpmif, XenbusStateInitWait)) {
       goto error;
@@ -486,7 +483,7 @@ void free_tpmif(tpmif_t* tpmif)
       tpmif->status = DISCONNECTING;
       mask_evtchn(tpmif->evtchn);
 
-      if(gntmap_munmap(&gtpmdev.map, (unsigned long)tpmif->tx, 1)) {
+      if(gntmap_munmap(&gtpmdev.map, (unsigned long)tpmif->page, 1)) {
 	 TPMBACK_ERR("%u/%u Error occured while trying to unmap shared page\n", (unsigned int) tpmif->domid, tpmif->handle);
       }
 
@@ -529,15 +526,28 @@ void free_tpmif(tpmif_t* tpmif)
 void tpmback_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
 {
    tpmif_t* tpmif = (tpmif_t*) data;
-   tpmif_tx_request_t* tx = &tpmif->tx->ring[0].req;
-   /* Throw away 0 size events, these can trigger from event channel unmasking */
-   if(tx->size == 0)
+   vtpm_shared_page_t* pg = tpmif->page;
+
+   switch (pg->state)
+   {
+   case VTPM_STATE_SUBMIT:
+      TPMBACK_DEBUG("EVENT CHANNEL FIRE %u/%u\n", (unsigned int) tpmif->domid, tpmif->handle);
+      tpmif_req_ready(tpmif);
+      wake_up(&waitq);
+      break;
+   case VTPM_STATE_CANCEL:
+      /* If we are busy with a request, do nothing */
+      if (tpmif->flags & TPMIF_REQ_READY)
+         return;
+      /* Acknowledge the cancellation if we are idle */
+      pg->state = VTPM_STATE_IDLE;
+      wmb();
+      notify_remote_via_evtchn(tpmif->evtchn);
       return;
-
-   TPMBACK_DEBUG("EVENT CHANNEL FIRE %u/%u\n", (unsigned int) tpmif->domid, tpmif->handle);
-   tpmif_req_ready(tpmif);
-   wake_up(&waitq);
-
+   default:
+      /* Spurious wakeup; do nothing */
+      return;
+   }
 }
 
 /* Connect to frontend */
@@ -584,12 +594,25 @@ int connect_fe(tpmif_t* tpmif)
    }
    free(value);
 
+   /* Check that protocol v2 is being used */
+   snprintf(path, 512, "%s/feature-protocol-v2", tpmif->fe_path);
+   if((err = xenbus_read(XBT_NIL, path, &value))) {
+      TPMBACK_ERR("Unable to read %s during tpmback initialization! error = %s\n", path, err);
+      free(err);
+      return -1;
+   }
+   if(strcmp(value, "1")) {
+      TPMBACK_ERR("%s has an invalid value (%s)\n", path, value);
+      free(value);
+      return -1;
+   }
+   free(value);
+
    domid = tpmif->domid;
-   if((tpmif->tx = gntmap_map_grant_refs(&gtpmdev.map, 1, &domid, 0, &ringref, PROT_READ | PROT_WRITE)) == NULL) {
+   if((tpmif->page = gntmap_map_grant_refs(&gtpmdev.map, 1, &domid, 0, &ringref, PROT_READ | PROT_WRITE)) == NULL) {
       TPMBACK_ERR("Failed to map grant reference %u/%u\n", (unsigned int) tpmif->domid, tpmif->handle);
       return -1;
    }
-   memset(tpmif->tx, 0, PAGE_SIZE);
 
    /*Bind the event channel */
    if((evtchn_bind_interdomain(tpmif->domid, evtchn, tpmback_handler, tpmif, &tpmif->evtchn)))
@@ -618,7 +641,7 @@ error_post_evtchn:
    mask_evtchn(tpmif->evtchn);
    unbind_evtchn(tpmif->evtchn);
 error_post_map:
-   gntmap_munmap(&gtpmdev.map, (unsigned long)tpmif->tx, 1);
+   gntmap_munmap(&gtpmdev.map, (unsigned long)tpmif->page, 1);
    return -1;
 }
 
@@ -633,9 +656,9 @@ static int frontend_changed(tpmif_t* tpmif)
 
    switch (state) {
       case XenbusStateInitialising:
-      case XenbusStateInitialised:
 	 break;
 
+      case XenbusStateInitialised:
       case XenbusStateConnected:
 	 if(connect_fe(tpmif)) {
 	    TPMBACK_ERR("Failed to connect to front end %u/%u\n", (unsigned int) tpmif->domid, tpmif->handle);
@@ -874,6 +897,7 @@ void shutdown_tpmback(void)
 inline void init_tpmcmd(tpmcmd_t* tpmcmd, domid_t domid, unsigned int handle, unsigned char uuid[16])
 {
    tpmcmd->domid = domid;
+   tpmcmd->locality = -1;
    tpmcmd->handle = handle;
    memcpy(tpmcmd->uuid, uuid, sizeof(tpmcmd->uuid));
    tpmcmd->req = NULL;
@@ -884,12 +908,12 @@ inline void init_tpmcmd(tpmcmd_t* tpmcmd, domid_t domid, unsigned int handle, un
 
 tpmcmd_t* get_request(tpmif_t* tpmif) {
    tpmcmd_t* cmd;
-   tpmif_tx_request_t* tx;
-   int offset;
-   int tocopy;
-   int i;
-   uint32_t domid;
+   vtpm_shared_page_t* shr;
+   unsigned int offset;
    int flags;
+#ifdef TPMBACK_PRINT_DEBUG
+   int i;
+#endif
 
    local_irq_save(flags);
 
@@ -899,35 +923,22 @@ tpmcmd_t* get_request(tpmif_t* tpmif) {
    }
    init_tpmcmd(cmd, tpmif->domid, tpmif->handle, tpmif->uuid);
 
-   tx = &tpmif->tx->ring[0].req;
-   cmd->req_len = tx->size;
+   shr = tpmif->page;
+   cmd->req_len = shr->length;
+   cmd->locality = shr->locality;
+   offset = sizeof(*shr) + 4*shr->nr_extra_pages;
+   if (offset > PAGE_SIZE || offset + cmd->req_len > PAGE_SIZE) {
+      TPMBACK_ERR("%u/%u Command size too long for shared page!\n", (unsigned int) tpmif->domid, tpmif->handle);
+      goto error;
+   }
    /* Allocate the buffer */
    if(cmd->req_len) {
       if((cmd->req = malloc(cmd->req_len)) == NULL) {
 	 goto error;
       }
    }
-   /* Copy the bits from the shared pages */
-   offset = 0;
-   for(i = 0; i < TPMIF_TX_RING_SIZE && offset < cmd->req_len; ++i) {
-      tx = &tpmif->tx->ring[i].req;
-
-      /* Map the page with the data */
-      domid = (uint32_t)tpmif->domid;
-      if((tpmif->pages[i] = gntmap_map_grant_refs(&gtpmdev.map, 1, &domid, 0, &tx->ref, PROT_READ)) == NULL) {
-	 TPMBACK_ERR("%u/%u Unable to map shared page during read!\n", (unsigned int) tpmif->domid, tpmif->handle);
-	 goto error;
-      }
-
-      /* do the copy now */
-      tocopy = min(cmd->req_len - offset, PAGE_SIZE);
-      memcpy(&cmd->req[offset], tpmif->pages[i], tocopy);
-      offset += tocopy;
-
-      /* release the page */
-      gntmap_munmap(&gtpmdev.map, (unsigned long)tpmif->pages[i], 1);
-
-   }
+   /* Copy the bits from the shared page(s) */
+   memcpy(cmd->req, offset + (uint8_t*)shr, cmd->req_len);
 
 #ifdef TPMBACK_PRINT_DEBUG
    TPMBACK_DEBUG("Received Tpm Command from %u/%u of size %u", (unsigned int) tpmif->domid, tpmif->handle, cmd->req_len);
@@ -958,38 +969,24 @@ error:
 
 void send_response(tpmcmd_t* cmd, tpmif_t* tpmif)
 {
-   tpmif_tx_request_t* tx;
-   int offset;
-   int i;
-   uint32_t domid;
-   int tocopy;
+   vtpm_shared_page_t* shr;
+   unsigned int offset;
    int flags;
+#ifdef TPMBACK_PRINT_DEBUG
+int i;
+#endif
 
    local_irq_save(flags);
 
-   tx = &tpmif->tx->ring[0].req;
-   tx->size = cmd->resp_len;
+   shr = tpmif->page;
+   shr->length = cmd->resp_len;
 
-   offset = 0;
-   for(i = 0; i < TPMIF_TX_RING_SIZE && offset < cmd->resp_len; ++i) {
-      tx = &tpmif->tx->ring[i].req;
-
-      /* Map the page with the data */
-      domid = (uint32_t)tpmif->domid;
-      if((tpmif->pages[i] = gntmap_map_grant_refs(&gtpmdev.map, 1, &domid, 0, &tx->ref, PROT_WRITE)) == NULL) {
-	 TPMBACK_ERR("%u/%u Unable to map shared page during write!\n", (unsigned int) tpmif->domid, tpmif->handle);
-	 goto error;
-      }
-
-      /* do the copy now */
-      tocopy = min(cmd->resp_len - offset, PAGE_SIZE);
-      memcpy(tpmif->pages[i], &cmd->resp[offset], tocopy);
-      offset += tocopy;
-
-      /* release the page */
-      gntmap_munmap(&gtpmdev.map, (unsigned long)tpmif->pages[i], 1);
-
+   offset = sizeof(*shr) + 4*shr->nr_extra_pages;
+   if (offset > PAGE_SIZE || offset + cmd->resp_len > PAGE_SIZE) {
+      TPMBACK_ERR("%u/%u Command size too long for shared page!\n", (unsigned int) tpmif->domid, tpmif->handle);
+      goto error;
    }
+   memcpy(offset + (uint8_t*)shr, cmd->resp, cmd->resp_len);
 
 #ifdef TPMBACK_PRINT_DEBUG
    TPMBACK_DEBUG("Sent response to %u/%u of size %u", (unsigned int) tpmif->domid, tpmif->handle, cmd->resp_len);
@@ -1003,6 +1000,9 @@ void send_response(tpmcmd_t* cmd, tpmif_t* tpmif)
 #endif
    /* clear the ready flag and send the event channel notice to the frontend */
    tpmif_req_finished(tpmif);
+   barrier();
+   shr->state = VTPM_STATE_FINISH;
+   wmb();
    notify_remote_via_evtchn(tpmif->evtchn);
 error:
    local_irq_restore(flags);

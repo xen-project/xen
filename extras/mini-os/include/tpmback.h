@@ -43,6 +43,7 @@
 
 struct tpmcmd {
    domid_t domid;		/* Domid of the frontend */
+   uint8_t locality;    /* Locality requested by the frontend */
    unsigned int handle;	/* Handle of the frontend */
    unsigned char uuid[16];			/* uuid of the tpm interface */
 

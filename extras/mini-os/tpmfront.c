@@ -47,8 +47,18 @@
 
 void tpmfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data) {
    struct tpmfront_dev* dev = (struct tpmfront_dev*) data;
+   vtpm_shared_page_t* shr = dev->page;
    /*If we get a response when we didnt make a request, just ignore it */
    if(!dev->waiting) {
+      return;
+   }
+
+   switch (shr->state) {
+   case VTPM_STATE_FINISH: /* request was completed */
+   case VTPM_STATE_IDLE:   /* request was cancelled */
+      break;
+   default:
+      /* Spurious wakeup; do nothing, request is still pending */
       return;
    }
 
@@ -176,7 +186,7 @@ static int wait_for_backend_state_changed(struct tpmfront_dev* dev, XenbusState 
 	 ret = wait_for_backend_closed(&events, path);
 	 break;
       default:
-	 break;
+         TPMFRONT_ERR("Bad wait state %d, ignoring\n", state);
    }
 
    if((err = xenbus_unwatch_path_token(XBT_NIL, path, path))) {
@@ -190,13 +200,13 @@ static int tpmfront_connect(struct tpmfront_dev* dev)
 {
    char* err;
    /* Create shared page */
-   dev->tx = (tpmif_tx_interface_t*) alloc_page();
-   if(dev->tx == NULL) {
+   dev->page = (vtpm_shared_page_t*) alloc_page();
+   if(dev->page == NULL) {
       TPMFRONT_ERR("Unable to allocate page for shared memory\n");
       goto error;
    }
-   memset(dev->tx, 0, PAGE_SIZE);
-   dev->ring_ref = gnttab_grant_access(dev->bedomid, virt_to_mfn(dev->tx), 0);
+   memset(dev->page, 0, PAGE_SIZE);
+   dev->ring_ref = gnttab_grant_access(dev->bedomid, virt_to_mfn(dev->page), 0);
    TPMFRONT_DEBUG("grant ref is %lu\n", (unsigned long) dev->ring_ref);
 
    /*Create event channel */
@@ -228,7 +238,7 @@ error_postevtchn:
       unbind_evtchn(dev->evtchn);
 error_postmap:
       gnttab_end_access(dev->ring_ref);
-      free_page(dev->tx);
+      free_page(dev->page);
 error:
    return -1;
 }
@@ -240,7 +250,6 @@ struct tpmfront_dev* init_tpmfront(const char* _nodename)
    char path[512];
    char* value, *err;
    unsigned long long ival;
-   int i;
 
    printk("============= Init TPM Front ================\n");
 
@@ -279,6 +288,15 @@ struct tpmfront_dev* init_tpmfront(const char* _nodename)
       goto error;
    }
 
+   /* Publish protocol v2 feature */
+   snprintf(path, 512, "%s/feature-protocol-v2", dev->nodename);
+   if ((err = xenbus_write(XBT_NIL, path, "1")))
+   {
+      TPMFRONT_ERR("Unable to write feature-protocol-v2 node: %s\n", err);
+      free(err);
+      goto error;
+   }
+
    /* Create and publish grant reference and event channel */
    if (tpmfront_connect(dev)) {
       goto error;
@@ -289,18 +307,19 @@ struct tpmfront_dev* init_tpmfront(const char* _nodename)
       goto error;
    }
 
-   /* Allocate pages that will contain the messages */
-   dev->pages = malloc(sizeof(void*) * TPMIF_TX_RING_SIZE);
-   if(dev->pages == NULL) {
+   /* Ensure backend is also using protocol v2 */
+   snprintf(path, 512, "%s/feature-protocol-v2", dev->bepath);
+   if((err = xenbus_read(XBT_NIL, path, &value))) {
+      TPMFRONT_ERR("Unable to read %s during tpmfront initialization! error = %s\n", path, err);
+      free(err);
       goto error;
    }
-   memset(dev->pages, 0, sizeof(void*) * TPMIF_TX_RING_SIZE);
-   for(i = 0; i < TPMIF_TX_RING_SIZE; ++i) {
-      dev->pages[i] = (void*)alloc_page();
-      if(dev->pages[i] == NULL) {
-	 goto error;
-      }
+   if(strcmp(value, "1")) {
+      TPMFRONT_ERR("%s has an invalid value (%s)\n", path, value);
+      free(value);
+      goto error;
    }
+   free(value);
 
    TPMFRONT_LOG("Initialization Completed successfully\n");
 
@@ -314,8 +333,6 @@ void shutdown_tpmfront(struct tpmfront_dev* dev)
 {
    char* err;
    char path[512];
-   int i;
-   tpmif_tx_request_t* tx;
    if(dev == NULL) {
       return;
    }
@@ -349,27 +366,12 @@ void shutdown_tpmfront(struct tpmfront_dev* dev)
       /* Wait for the backend to close and unmap shared pages, ignore any errors */
       wait_for_backend_state_changed(dev, XenbusStateClosed);
 
-      /* Cleanup any shared pages */
-      if(dev->pages) {
-	 for(i = 0; i < TPMIF_TX_RING_SIZE; ++i) {
-	    if(dev->pages[i]) {
-	       tx = &dev->tx->ring[i].req;
-	       if(tx->ref != 0) {
-		  gnttab_end_access(tx->ref);
-	       }
-	       free_page(dev->pages[i]);
-	    }
-	 }
-	 free(dev->pages);
-      }
-
       /* Close event channel and unmap shared page */
       mask_evtchn(dev->evtchn);
       unbind_evtchn(dev->evtchn);
       gnttab_end_access(dev->ring_ref);
 
-      free_page(dev->tx);
-
+      free_page(dev->page);
    }
 
    /* Cleanup memory usage */
@@ -387,13 +389,17 @@ void shutdown_tpmfront(struct tpmfront_dev* dev)
 
 int tpmfront_send(struct tpmfront_dev* dev, const uint8_t* msg, size_t length)
 {
+   unsigned int offset;
+   vtpm_shared_page_t* shr = NULL;
+#ifdef TPMFRONT_PRINT_DEBUG
    int i;
-   tpmif_tx_request_t* tx = NULL;
+#endif
    /* Error Checking */
    if(dev == NULL || dev->state != XenbusStateConnected) {
       TPMFRONT_ERR("Tried to send message through disconnected frontend\n");
       return -1;
    }
+   shr = dev->page;
 
 #ifdef TPMFRONT_PRINT_DEBUG
    TPMFRONT_DEBUG("Sending Msg to backend size=%u", (unsigned int) length);
@@ -407,19 +413,16 @@ int tpmfront_send(struct tpmfront_dev* dev, const uint8_t* msg, size_t length)
 #endif
 
    /* Copy to shared pages now */
-   for(i = 0; length > 0 && i < TPMIF_TX_RING_SIZE; ++i) {
-      /* Share the page */
-      tx = &dev->tx->ring[i].req;
-      tx->unused = 0;
-      tx->addr = virt_to_mach(dev->pages[i]);
-      tx->ref = gnttab_grant_access(dev->bedomid, virt_to_mfn(dev->pages[i]), 0);
-      /* Copy the bits to the page */
-      tx->size = length > PAGE_SIZE ? PAGE_SIZE : length;
-      memcpy(dev->pages[i], &msg[i * PAGE_SIZE], tx->size);
-
-      /* Update counters */
-      length -= tx->size;
+   offset = sizeof(*shr);
+   if (length + offset > PAGE_SIZE) {
+      TPMFRONT_ERR("Message too long for shared page\n");
+      return -1;
    }
+   memcpy(offset + (uint8_t*)shr, msg, length);
+   shr->length = length;
+   barrier();
+   shr->state = VTPM_STATE_SUBMIT;
+
    dev->waiting = 1;
    dev->resplen = 0;
 #ifdef HAVE_LIBC
@@ -429,49 +432,50 @@ int tpmfront_send(struct tpmfront_dev* dev, const uint8_t* msg, size_t length)
       files[dev->fd].tpmfront.offset = 0;
    }
 #endif
+   wmb();
    notify_remote_via_evtchn(dev->evtchn);
    return 0;
 }
 int tpmfront_recv(struct tpmfront_dev* dev, uint8_t** msg, size_t *length)
 {
-   tpmif_tx_request_t* tx;
-   int i;
+   unsigned int offset;
+   vtpm_shared_page_t* shr = NULL;
+#ifdef TPMFRONT_PRINT_DEBUG
+int i;
+#endif
    if(dev == NULL || dev->state != XenbusStateConnected) {
       TPMFRONT_ERR("Tried to receive message from disconnected frontend\n");
       return -1;
    }
    /*Wait for the response */
    wait_event(dev->waitq, (!dev->waiting));
+   shr = dev->page;
 
    /* Initialize */
    *msg = NULL;
    *length = 0;
+   offset = sizeof(*shr);
 
-   /* special case, just quit */
-   tx = &dev->tx->ring[0].req;
-   if(tx->size == 0 ) {
-       goto quit;
+   if (shr->state != VTPM_STATE_FINISH)
+      goto quit;
+
+   *length = shr->length;
+
+   if (*length + offset > PAGE_SIZE) {
+      TPMFRONT_ERR("Reply too long for shared page\n");
+      return -1;
    }
-   /* Get the total size */
-   tx = &dev->tx->ring[0].req;
-   for(i = 0; i < TPMIF_TX_RING_SIZE && tx->size > 0; ++i) {
-      tx = &dev->tx->ring[i].req;
-      *length += tx->size;
-   }
+
    /* Alloc the buffer */
    if(dev->respbuf) {
       free(dev->respbuf);
    }
    *msg = dev->respbuf = malloc(*length);
    dev->resplen = *length;
+
    /* Copy the bits */
-   tx = &dev->tx->ring[0].req;
-   for(i = 0; i < TPMIF_TX_RING_SIZE && tx->size > 0; ++i) {
-      tx = &dev->tx->ring[i].req;
-      memcpy(&(*msg)[i * PAGE_SIZE], dev->pages[i], tx->size);
-      gnttab_end_access(tx->ref);
-      tx->ref = 0;
-   }
+   memcpy(*msg, offset + (uint8_t*)shr, *length);
+
 #ifdef TPMFRONT_PRINT_DEBUG
    TPMFRONT_DEBUG("Received response from backend size=%u", (unsigned int) *length);
    for(i = 0; i < *length; ++i) {
@@ -501,6 +505,14 @@ int tpmfront_cmd(struct tpmfront_dev* dev, uint8_t* req, size_t reqlen, uint8_t*
       return rc;
    }
 
+   return 0;
+}
+
+int tpmfront_set_locality(struct tpmfront_dev* dev, int locality)
+{
+   if (!dev || !dev->page)
+      return -1;
+   dev->page->locality = locality;
    return 0;
 }
 
