@@ -59,6 +59,25 @@ NMI_MASK = 0x80000000
 	addq $9*8+8,%rsp
 .endm	
 
+.macro RESTORE_REST
+	movq (%rsp),%r15
+	movq 1*8(%rsp),%r14
+	movq 2*8(%rsp),%r13
+	movq 3*8(%rsp),%r12
+	movq 4*8(%rsp),%rbp
+	movq 5*8(%rsp),%rbx
+	addq $6*8,%rsp
+.endm
+
+.macro SAVE_REST
+	subq $6*8,%rsp
+	movq %rbx,5*8(%rsp)
+	movq %rbp,4*8(%rsp)
+	movq %r12,3*8(%rsp)
+	movq %r13,2*8(%rsp)
+	movq %r14,1*8(%rsp)
+	movq %r15,(%rsp)
+.endm
 
 .macro HYPERVISOR_IRET flag
 	testl $NMI_MASK,2*8(%rsp)
@@ -173,13 +192,7 @@ scrit:	/**** START OF CRITICAL REGION ****/
 
 14:	XEN_LOCKED_BLOCK_EVENTS(%rsi)
 	XEN_PUT_VCPU_INFO(%rsi)
-	subq $6*8,%rsp
-	movq %rbx,5*8(%rsp)
-	movq %rbp,4*8(%rsp)
-	movq %r12,3*8(%rsp)
-	movq %r13,2*8(%rsp)
-	movq %r14,1*8(%rsp)
-	movq %r15,(%rsp)
+	SAVE_REST
 	movq %rsp,%rdi                  # set the argument again
 	jmp  11b
 ecrit:  /**** END OF CRITICAL REGION ****/
@@ -199,14 +212,8 @@ retint_restore_args:
 	HYPERVISOR_IRET 0
 
 
-error_exit:		
-	movq (%rsp),%r15
-	movq 1*8(%rsp),%r14
-	movq 2*8(%rsp),%r13
-	movq 3*8(%rsp),%r12
-	movq 4*8(%rsp),%rbp
-	movq 5*8(%rsp),%rbx
-	addq $6*8,%rsp
+error_exit:
+	RESTORE_REST
 	XEN_BLOCK_EVENTS(%rsi)		
 	jmp retint_kernel
 
