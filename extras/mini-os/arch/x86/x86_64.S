@@ -78,6 +78,7 @@ NMI_MASK = 0x80000000
 	jmp  hypercall_page + (__HYPERVISOR_iret * 32)
 .endm
 
+
 /*
  * Exception entry point. This expects an error code/orig_rax on the stack
  * and the exception handler in %rax.	
@@ -103,7 +104,7 @@ ENTRY(error_entry)
 	movq %r15,(%rsp) 
 
 error_call_handler:
-	movq %rdi, RDI(%rsp)            
+	movq %rdi, RDI(%rsp)
 	movq %rsp,%rdi
 	movq ORIG_RAX(%rsp),%rsi	# get error code 
 	movq $-1,ORIG_RAX(%rsp)
@@ -111,9 +112,9 @@ error_call_handler:
 	jmp error_exit
 
 .macro zeroentry sym
-    movq (%rsp),%rcx
-    movq 8(%rsp),%r11
-    addq $0x10,%rsp /* skip rcx and r11 */
+	movq (%rsp),%rcx
+	movq 8(%rsp),%r11
+	addq $0x10,%rsp /* skip rcx and r11 */
 	pushq $0	/* push error code/oldrax */ 
 	pushq %rax	/* push real oldrax to the rdi slot */ 
 	leaq  \sym(%rip),%rax
@@ -121,9 +122,9 @@ error_call_handler:
 .endm	
 
 .macro errorentry sym
-        movq (%rsp),%rcx
-        movq 8(%rsp),%r11
-        addq $0x10,%rsp /* rsp points to the error code */
+	movq (%rsp),%rcx
+	movq 8(%rsp),%r11
+	addq $0x10,%rsp /* rsp points to the error code */
 	pushq %rax
 	leaq  \sym(%rip),%rax
 	jmp error_entry
@@ -147,39 +148,39 @@ error_call_handler:
 
 
 ENTRY(hypervisor_callback)
-    zeroentry hypervisor_callback2
+	zeroentry hypervisor_callback2
 
 ENTRY(hypervisor_callback2)
-        movq %rdi, %rsp 
-11:     movq %gs:8,%rax
-        incl %gs:0
-        cmovzq %rax,%rsp
-        pushq %rdi
-        call do_hypervisor_callback 
-        popq %rsp
-        decl %gs:0
-        jmp error_exit
+	movq %rdi, %rsp
+11:	movq %gs:8,%rax
+	incl %gs:0
+	cmovzq %rax,%rsp
+	pushq %rdi
+	call do_hypervisor_callback
+	popq %rsp
+	decl %gs:0
+	jmp error_exit
 
-restore_all_enable_events:  
+restore_all_enable_events:
 	XEN_UNBLOCK_EVENTS(%rsi)        # %rsi is already set up...
 
 scrit:	/**** START OF CRITICAL REGION ****/
 	XEN_TEST_PENDING(%rsi)
 	jnz  14f			# process more events if necessary...
 	XEN_PUT_VCPU_INFO(%rsi)
-        RESTORE_ALL
-        HYPERVISOR_IRET 0
-        
+	RESTORE_ALL
+	HYPERVISOR_IRET 0
+
 14:	XEN_LOCKED_BLOCK_EVENTS(%rsi)
 	XEN_PUT_VCPU_INFO(%rsi)
 	subq $6*8,%rsp
-	movq %rbx,5*8(%rsp) 
-	movq %rbp,4*8(%rsp) 
-	movq %r12,3*8(%rsp) 
-	movq %r13,2*8(%rsp) 
-	movq %r14,1*8(%rsp) 
-	movq %r15,(%rsp) 
-        movq %rsp,%rdi                  # set the argument again
+	movq %rbx,5*8(%rsp)
+	movq %rbp,4*8(%rsp)
+	movq %r12,3*8(%rsp)
+	movq %r13,2*8(%rsp)
+	movq %r14,1*8(%rsp)
+	movq %r15,(%rsp)
+	movq %rsp,%rdi                  # set the argument again
 	jmp  11b
 ecrit:  /**** END OF CRITICAL REGION ****/
 
@@ -193,7 +194,7 @@ retint_restore_args:
 	andb $1,%al			# EAX[0] == IRET_EFLAGS.IF & event_mask
 	jnz restore_all_enable_events	#        != 0 => enable event delivery
 	XEN_PUT_VCPU_INFO(%rsi)
-		
+
 	RESTORE_ALL
 	HYPERVISOR_IRET 0
 
