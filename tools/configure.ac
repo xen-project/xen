@@ -21,6 +21,16 @@ APPEND_INCLUDES and APPEND_LIB instead when possible.])
 
 AC_CANONICAL_HOST
 
+AC_SYS_LARGEFILE
+
+case $ac_cv_sys_file_offset_bits in #(
+  no | unknown) ;;
+  *)
+  FILE_OFFSET_BITS=$ac_cv_sys_file_offset_bits
+;;
+esac
+AC_SUBST(FILE_OFFSET_BITS)
+
 # M4 Macro includes
 m4_include([../m4/savevar.m4])
 m4_include([../m4/features.m4])
@@ -111,7 +121,11 @@ AS_IF([echo "$PYTHON" | grep -q "^/"], [
 [AC_MSG_ERROR([PYTHON specified, but is not an absolute path])])
 AX_PATH_PROG_OR_FAIL([PYTHONPATH], [$PYTHON])
 AX_CHECK_PYTHON_VERSION([2], [3])
- AX_CHECK_PYTHON_DEVEL()
+
+AS_IF([test "$cross_compiling" != yes], [
+    AX_CHECK_PYTHON_DEVEL()
+])
+
 AX_PATH_PROG_OR_FAIL([XGETTEXT], [xgettext])
 dnl as86, ld86, bcc and iasl are only required when the host system is x86*.
 dnl "host" here means the platform on which the hypervisor and tools is
@@ -156,6 +170,6 @@ AC_CHECK_LIB([iconv], [libiconv_open], [libiconv="y"], [libiconv="n"])
 AC_SUBST(libiconv)
 
 # Checks for header files.
-AC_CHECK_HEADERS([yajl/yajl_version.h])
+AC_CHECK_HEADERS([yajl/yajl_version.h sys/eventfd.h])
 
 AC_OUTPUT()

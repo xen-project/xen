@@ -14,12 +14,13 @@
  * GNU Lesser General Public License for more details.
  *)
 
-exception Error of string
-
 type handle
 
 external init: unit -> handle = "stub_eventchn_init"
 external fd: handle -> Unix.file_descr = "stub_eventchn_fd"
+
+type t = int
+
 external notify: handle -> int -> unit = "stub_eventchn_notify"
 external bind_interdomain: handle -> int -> int -> int = "stub_eventchn_bind_interdomain"
 external bind_dom_exc_virq: handle -> int = "stub_eventchn_bind_dom_exc_virq"
@@ -27,4 +28,5 @@ external unbind: handle -> int -> unit = "stub_eventchn_unbind"
 external pending: handle -> int = "stub_eventchn_pending"
 external unmask: handle -> int -> unit = "stub_eventchn_unmask"
 
-let _ = Callback.register_exception "eventchn.error" (Error "register_callback")
+let to_int x = x
+let of_int x = x

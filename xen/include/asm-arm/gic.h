@@ -157,6 +157,9 @@ extern int gicv_setup(struct domain *d);
 extern void gic_save_state(struct vcpu *v);
 extern void gic_restore_state(struct vcpu *v);
 
+/* print useful debug info */
+extern void gic_dump_info(struct vcpu *v);
+
 #endif /* __ASSEMBLY__ */
 #endif
 

@@ -33,8 +33,8 @@ static void phys_timer_expired(void *data)
 {
     struct vtimer *t = data;
     t->ctl |= CNTx_CTL_PENDING;
-    t->ctl &= ~CNTx_CTL_MASK;
-    vgic_vcpu_inject_irq(t->v, 30, 1);
+    if ( !(t->ctl & CNTx_CTL_MASK) )
+        vgic_vcpu_inject_irq(t->v, 30, 1);
 }
 
 static void virt_timer_expired(void *data)
@@ -80,7 +80,8 @@ int virt_timer_save(struct vcpu *v)
     v->arch.virt_timer.ctl = READ_SYSREG32(CNTV_CTL_EL0);
     WRITE_SYSREG32(v->arch.virt_timer.ctl & ~CNTx_CTL_ENABLE, CNTV_CTL_EL0);
     v->arch.virt_timer.cval = READ_SYSREG64(CNTV_CVAL_EL0);
-    if ( v->arch.virt_timer.ctl & CNTx_CTL_ENABLE )
+    if ( (v->arch.virt_timer.ctl & CNTx_CTL_ENABLE) &&
+         !(v->arch.virt_timer.ctl & CNTx_CTL_MASK))
     {
         set_timer(&v->arch.virt_timer.timer, ticks_to_ns(v->arch.virt_timer.cval +
                   v->arch.virt_timer.offset - boot_count));
@@ -117,7 +118,10 @@ static int vtimer_emulate_32(struct cpu_user_regs *regs, union hsr hsr)
         }
         else
         {
-            v->arch.phys_timer.ctl = *r;
+            uint32_t ctl = *r & ~CNTx_CTL_PENDING;
+            if ( ctl & CNTx_CTL_ENABLE )
+                ctl |= v->arch.phys_timer.ctl & CNTx_CTL_PENDING;
+            v->arch.phys_timer.ctl = ctl;
 
             if ( v->arch.phys_timer.ctl & CNTx_CTL_ENABLE )
             {
@@ -141,6 +145,7 @@ static int vtimer_emulate_32(struct cpu_user_regs *regs, union hsr hsr)
             v->arch.phys_timer.cval = now + ticks_to_ns(*r);
             if ( v->arch.phys_timer.ctl & CNTx_CTL_ENABLE )
             {
+                v->arch.phys_timer.ctl &= ~CNTx_CTL_PENDING;
                 set_timer(&v->arch.phys_timer.timer,
                           v->arch.phys_timer.cval + v->arch.phys_timer.offset);
             }

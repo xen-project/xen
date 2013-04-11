@@ -14,18 +14,49 @@
  * GNU Lesser General Public License for more details.
  *)
 
-exception Error of string
+(** Event channel bindings: see tools/libxc/xenctrl.h *)
 
 type handle
+(** An initialised event channel interface. *)
 
-external init : unit -> handle = "stub_eventchn_init"
-external fd: handle -> Unix.file_descr = "stub_eventchn_fd"
+type t
+(** A local event channel. *)
 
-external notify : handle -> int -> unit = "stub_eventchn_notify"
-external bind_interdomain : handle -> int -> int -> int
-  = "stub_eventchn_bind_interdomain"
-external bind_dom_exc_virq : handle -> int = "stub_eventchn_bind_dom_exc_virq"
-external unbind : handle -> int -> unit = "stub_eventchn_unbind"
-external pending : handle -> int = "stub_eventchn_pending"
-external unmask : handle -> int -> unit
-  = "stub_eventchn_unmask"
+val to_int: t -> int
+
+val of_int: int -> t
+
+val init: unit -> handle
+(** Return an initialised event channel interface. On error it
+    will throw a Failure exception. *)
+
+val fd: handle -> Unix.file_descr
+(** Return a file descriptor suitable for Unix.select. When
+    the descriptor becomes readable, it is safe to call 'pending'.
+    On error it will throw a Failure exception. *)
+
+val notify : handle -> t -> unit
+(** Notify the given event channel. On error it will throw a
+    Failure exception. *)
+
+val bind_interdomain : handle -> int -> int -> t
+(** [bind_interdomain h domid remote_port] returns a local event
+    channel connected to domid:remote_port. On error it will
+    throw a Failure exception. *)
+
+val bind_dom_exc_virq : handle -> t
+(** Binds a local event channel to the VIRQ_DOM_EXC
+    (domain exception VIRQ). On error it will throw a Failure
+    exception. *)
+
+val unbind : handle -> t -> unit
+(** Unbinds the given event channel. On error it will throw a
+    Failure exception. *)
+
+val pending : handle -> t
+(** Returns the next event channel to become pending. On error it
+    will throw a Failure exception. *)
+
+val unmask : handle -> t -> unit
+(** Unmasks the given event channel. On error it will throw a
+    Failure exception. *)

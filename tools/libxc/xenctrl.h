@@ -79,6 +79,10 @@
 #define xen_mb()   asm volatile ("dmb" : : : "memory")
 #define xen_rmb()  asm volatile ("dmb" : : : "memory")
 #define xen_wmb()  asm volatile ("dmb" : : : "memory")
+#elif defined(__aarch64__)
+#define xen_mb()   asm volatile ("dmb sy" : : : "memory")
+#define xen_rmb()  asm volatile ("dmb sy" : : : "memory")
+#define xen_wmb()  asm volatile ("dmb sy" : : : "memory")
 #else
 #error "Define barriers"
 #endif

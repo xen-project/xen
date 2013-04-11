@@ -513,17 +513,18 @@ static void gic_restore_pending_irqs(struct vcpu *v)
 {
     int i;
     struct pending_irq *p, *t;
+    unsigned long flags;
 
     list_for_each_entry_safe ( p, t, &v->arch.vgic.lr_pending, lr_queue )
     {
         i = find_first_zero_bit(&this_cpu(lr_mask), nr_lrs);
         if ( i >= nr_lrs ) return;
 
-        spin_lock_irq(&gic.lock);
+        spin_lock_irqsave(&gic.lock, flags);
         gic_set_lr(i, p->irq, GICH_LR_PENDING, p->priority);
         list_del_init(&p->lr_queue);
         set_bit(i, &this_cpu(lr_mask));
-        spin_unlock_irq(&gic.lock);
+        spin_unlock_irqrestore(&gic.lock, flags);
     }
 
 }
@@ -546,6 +547,10 @@ static void gic_inject_irq_stop(void)
 
 void gic_inject(void)
 {
+    if ( vcpu_info(current, evtchn_upcall_pending) )
+        vgic_vcpu_inject_irq(current, VGIC_IRQ_EVTCHN_CALLBACK, 1);
+
+    gic_restore_pending_irqs(current);
     if (!this_cpu(lr_mask))
         gic_inject_irq_stop();
     else
@@ -655,6 +660,33 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
 
         i++;
     }
+}
+
+void gic_dump_info(struct vcpu *v)
+{
+    int i;
+    struct pending_irq *p;
+
+    printk("GICH_LRs (vcpu %d) mask=%"PRIx64"\n", v->vcpu_id, v->arch.lr_mask);
+    if ( v == current )
+    {
+        for ( i = 0; i < nr_lrs; i++ )
+            printk("   HW_LR[%d]=%x\n", i, GICH[GICH_LR + i]);
+    } else {
+        for ( i = 0; i < nr_lrs; i++ )
+            printk("   VCPU_LR[%d]=%x\n", i, v->arch.gic_lr[i]);
+    }
+
+    list_for_each_entry ( p, &v->arch.vgic.inflight_irqs, inflight )
+    {
+        printk("Inflight irq=%d\n", p->irq);
+    }
+
+    list_for_each_entry( p, &v->arch.vgic.lr_pending, lr_queue )
+    {
+        printk("Pending irq=%d\n", p->irq);
+    }
+
 }
 
 void __cpuinit init_maintenance_interrupt(void)

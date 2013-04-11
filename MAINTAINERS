@@ -213,6 +213,11 @@ M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 S:	Supported
 F:	extras/mini-os/
 
+OCAML TOOLS
+M:	David Scott <dave.scott@eu.citrix.com>
+S:	Supported
+F:	tools/ocaml/
+
 QEMU-DM
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
 S:	Supported
@@ -276,14 +281,10 @@ T:	hg http://xenbits.xen.org/linux-2.6.18-xen.hg
 F:	drivers/xen/usb*/
 
 VTPM
-M:	Matthew Fioravante <matthew.fioravante@jhuapl.edu>
+M:	Daniel De Graaf <dgdegra@tycho.nsa.gov>
 S:	Supported
-F:	extras/minios-os/tpmfront.c
-F:	extras/minios-os/tpmback.c
-F:	extras/minios-os/tpm-tis.c
-F:	extras/minios-os/include/tpmfront.h
-F:	extras/minios-os/include/tpmback.h
-F:	extras/minios-os/include/tpm-tis.h
+F:	extras/mini-os/tpm*
+F:	extras/mini-os/include/tpm*
 F:	stubdom/vtpm/
 F:	stubdom/vtpmmgr/
 F:	docs/misc/vtpm.txt

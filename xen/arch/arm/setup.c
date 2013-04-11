@@ -446,16 +446,9 @@ void __init start_xen(unsigned long boot_phys_offset,
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
 
-    /* Setup Hyp vector base */
-    WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
-    isb();
+    init_traps();
 
-    /* Setup Stage 2 address translation */
-    /* SH0=00, ORGN0=IRGN0=01
-     * SL0=01 (Level-1)
-     * T0SZ=(1)1000 = -8 (40 bit physical addresses)
-     */
-    WRITE_SYSREG32(0x80002558, VTCR_EL2); isb();
+    setup_virt_paging();
 
     enable_vfp();
 

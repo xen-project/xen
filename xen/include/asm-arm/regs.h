@@ -1,6 +1,10 @@
 #ifndef __ARM_REGS_H__
 #define __ARM_REGS_H__
 
+#define PSR_MODE_MASK 0x1f
+
+#ifndef __ASSEMBLY__
+
 #include <xen/types.h>
 #include <public/xen.h>
 #include <asm/processor.h>
@@ -41,6 +45,8 @@
  * processor mode (CPSR) into account.
  */
 extern register_t *select_user_reg(struct cpu_user_regs *regs, int reg);
+
+#endif
 
 #endif /* __ARM_REGS_H__ */
 /*

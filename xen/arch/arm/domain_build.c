@@ -404,10 +404,6 @@ int construct_dom0(struct domain *d)
     gic_route_irq_to_guest(d, 46, "lcd");
     gic_route_irq_to_guest(d, 47, "eth");
 
-    /* Enable second stage translation */
-    WRITE_SYSREG(READ_SYSREG(HCR_EL2) | HCR_VM, HCR_EL2);
-    isb();
-
     /* The following loads use the domain's p2m */
     p2m_load_VTTBR(d);
 
@@ -454,11 +450,6 @@ int construct_dom0(struct domain *d)
         regs->x3 = 0; /* Reserved for future use */
     }
 #endif
-
-    v->arch.sctlr = SCTLR_BASE;
-
-    WRITE_SYSREG(HCR_PTW|HCR_BSU_OUTER|HCR_AMO|HCR_IMO|HCR_VM, HCR_EL2);
-    isb();
 
     local_abort_enable();
 

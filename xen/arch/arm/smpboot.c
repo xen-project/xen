@@ -148,8 +148,9 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
     *c = boot_cpu_data;
     identify_cpu(c);
 
-    /* Setup Hyp vector base */
-    WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
+    init_traps();
+
+    setup_virt_paging();
 
     mmu_init_secondary_cpu();
     enable_vfp();
@@ -177,7 +178,7 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
 
     local_irq_enable();
 
-    dprintk(XENLOG_DEBUG, "CPU %u booted.\n", smp_processor_id());
+    printk(XENLOG_DEBUG "CPU %u booted.\n", smp_processor_id());
 
     startup_cpu_idle_loop();
 }

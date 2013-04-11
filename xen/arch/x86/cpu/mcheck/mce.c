@@ -1117,6 +1117,15 @@ static int x86_mc_msrinject_verify(struct xen_mc_msrinject *mci)
             case MSR_IA32_MCG_STATUS:
                 break;
 
+            case MSR_F10_MC4_MISC1:
+            case MSR_F10_MC4_MISC2:
+            case MSR_F10_MC4_MISC3:
+                if (c->x86_vendor != X86_VENDOR_AMD)
+                    reason = "only supported on AMD";
+                else if (c->x86 < 0x10)
+                    reason = "only supported on AMD Fam10h+";
+                break;
+
                 /* MSRs that the HV will take care of */
             case MSR_K8_HWCR:
                 if (c->x86_vendor == X86_VENDOR_AMD)

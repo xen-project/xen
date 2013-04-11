@@ -100,6 +100,10 @@ struct msi_desc {
 
 	union {
 		void __iomem *mask_base;/* va for the entry in mask table */
+		struct {
+			unsigned int nvec;/* number of vectors            */
+			unsigned int mpos;/* location of mask register    */
+		} msi;
 		unsigned int hpet_id;   /* HPET (dev is NULL)             */
 	};
 	struct pci_dev *dev;

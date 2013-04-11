@@ -348,18 +348,16 @@ static void msi_set_mask_bit(struct irq_desc *desc, int flag)
     switch (entry->msi_attrib.type) {
     case PCI_CAP_ID_MSI:
         if (entry->msi_attrib.maskbit) {
-            int pos;
             u32 mask_bits;
             u16 seg = entry->dev->seg;
             u8 bus = entry->dev->bus;
             u8 slot = PCI_SLOT(entry->dev->devfn);
             u8 func = PCI_FUNC(entry->dev->devfn);
 
-            pos = (long)entry->mask_base;
-            mask_bits = pci_conf_read32(seg, bus, slot, func, pos);
+            mask_bits = pci_conf_read32(seg, bus, slot, func, entry->msi.mpos);
             mask_bits &= ~(1);
             mask_bits |= flag;
-            pci_conf_write32(seg, bus, slot, func, pos, mask_bits);
+            pci_conf_write32(seg, bus, slot, func, entry->msi.mpos, mask_bits);
         }
         break;
     case PCI_CAP_ID_MSIX:
@@ -385,7 +383,7 @@ static int msi_get_mask_bit(const struct msi_desc *entry)
         return pci_conf_read32(entry->dev->seg, entry->dev->bus,
                                PCI_SLOT(entry->dev->devfn),
                                PCI_FUNC(entry->dev->devfn),
-                               (unsigned long)entry->mask_base) & 1;
+                               entry->msi.mpos) & 1;
     case PCI_CAP_ID_MSIX:
         return readl(entry->mask_base + PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET) & 1;
     }
@@ -530,6 +528,7 @@ static int msi_capability_init(struct pci_dev *dev,
 {
     struct msi_desc *entry;
     int pos;
+    unsigned int maxvec, mpos;
     u16 control, seg = dev->seg;
     u8 bus = dev->bus;
     u8 slot = PCI_SLOT(dev->devfn);
@@ -538,6 +537,9 @@ static int msi_capability_init(struct pci_dev *dev,
     ASSERT(spin_is_locked(&pcidevs_lock));
     pos = pci_find_cap_offset(seg, bus, slot, func, PCI_CAP_ID_MSI);
     control = pci_conf_read16(seg, bus, slot, func, msi_control_reg(pos));
+    maxvec = multi_msi_capable(control);
+    control &= ~PCI_MSI_FLAGS_QSIZE;
+
     /* MSI Entry Initialization */
     msi_set_enable(dev, 0); /* Ensure msi is disabled as I set it up */
 
@@ -551,23 +553,20 @@ static int msi_capability_init(struct pci_dev *dev,
     entry->msi_attrib.maskbit = is_mask_bit_support(control);
     entry->msi_attrib.masked = 1;
     entry->msi_attrib.pos = pos;
+    mpos = msi_mask_bits_reg(pos, is_64bit_address(control));
+    entry->msi.nvec = 1;
     entry->irq = irq;
     if ( is_mask_bit_support(control) )
-        entry->mask_base = (void __iomem *)(long)msi_mask_bits_reg(pos,
-                                                                   is_64bit_address(control));
+        entry->msi.mpos = mpos;
     entry->dev = dev;
     if ( entry->msi_attrib.maskbit )
     {
-        unsigned int maskbits, temp;
+        u32 maskbits;
+
         /* All MSIs are unmasked by default, Mask them all */
-        maskbits = pci_conf_read32(seg, bus, slot, func,
-                                   msi_mask_bits_reg(pos, is_64bit_address(control)));
-        temp = (1 << multi_msi_capable(control));
-        temp = ((temp - 1) & ~temp);
-        maskbits |= temp;
-        pci_conf_write32(seg, bus, slot, func,
-                         msi_mask_bits_reg(pos, is_64bit_address(control)),
-                         maskbits);
+        maskbits = pci_conf_read32(seg, bus, slot, func, mpos);
+        maskbits |= ~(u32)0 >> (32 - maxvec);
+        pci_conf_write32(seg, bus, slot, func, mpos, maskbits);
     }
     list_add_tail(&entry->list, &dev->msi_list);
 
@@ -1204,7 +1203,7 @@ static void dump_msi(unsigned char key)
         struct irq_desc *desc = irq_to_desc(irq);
         const struct msi_desc *entry;
         u32 addr, data, dest32;
-        char mask;
+        signed char mask;
         struct msi_attrib attr;
         unsigned long flags;
         const char *type = "???";
@@ -1239,12 +1238,16 @@ static void dump_msi(unsigned char key)
         dest32 = entry->msg.dest32;
         attr = entry->msi_attrib;
         if ( entry->msi_attrib.type )
-            mask = msi_get_mask_bit(entry) ? '1' : '0';
+            mask = msi_get_mask_bit(entry);
         else
-            mask = '?';
+            mask = -1;
 
         spin_unlock_irqrestore(&desc->lock, flags);
 
+        if ( mask >= 0 )
+            mask += '0';
+        else
+            mask = '?';
         printk(" %-6s%4u vec=%02x%7s%6s%3sassert%5s%7s"
                " dest=%08x mask=%d/%d/%c\n",
                type, irq,
