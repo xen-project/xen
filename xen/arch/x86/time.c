@@ -854,7 +854,16 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
         if ( is_hvm_domain(d) )
         {
             struct pl_time *pl = &v->domain->arch.hvm_domain.pl_time;
+
             stime += pl->stime_offset + v->arch.hvm_vcpu.stime_offset;
+            if ( (s64)stime < 0 )
+            {
+                printk(XENLOG_G_WARNING "d%dv%d: bogus time %" PRId64
+                       " (offsets %" PRId64 "/%" PRId64 ")\n",
+                       d->domain_id, v->vcpu_id, stime,
+		       pl->stime_offset, v->arch.hvm_vcpu.stime_offset);
+                stime = 0;
+            }
         }
         tsc_stamp = gtime_to_gtsc(d, stime);
     }
