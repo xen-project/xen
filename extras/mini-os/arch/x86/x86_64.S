@@ -186,7 +186,6 @@ ENTRY(hypervisor_callback2)
 
 error_exit:
 	RESTORE_REST
-	XEN_BLOCK_EVENTS(%rsi)		
 
 retint_kernel:
 retint_restore_args:
