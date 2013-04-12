@@ -126,6 +126,8 @@ quickly and the amount of free memory (which C<xl info> can show) is
 stale the moment it is printed. When claim is enabled a reservation for
 the amount of memory (see 'memory' in xl.conf(5)) is set, which is then
 reduced as the domain's memory is populated and eventually reaches zero.
+The free memory in C<xl info> is the combination of the hypervisor's
+free heap memory minus the outstanding claims value.
 
 If the reservation cannot be meet the guest creation fails immediately
 instead of taking seconds/minutes (depending on the size of the guest)

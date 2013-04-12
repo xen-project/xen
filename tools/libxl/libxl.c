@@ -4068,8 +4068,8 @@ uint64_t libxl_get_claiminfo(libxl_ctx *ctx)
                             "xc_domain_get_outstanding_pages failed.");
         return ERROR_FAIL;
     }
-    /* In MB */
-    return (l >> 8);
+    /* In pages */
+    return l;
 }
 
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)

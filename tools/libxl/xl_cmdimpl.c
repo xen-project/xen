@@ -4575,12 +4575,21 @@ static void output_physinfo(void)
     unsigned int i;
     libxl_bitmap cpumap;
     int n = 0;
+    long claims = 0;
 
     if (libxl_get_physinfo(ctx, &info) != 0) {
         fprintf(stderr, "libxl_physinfo failed.\n");
         return;
     }
-
+    /*
+     * Don't bother checking "claim_mode" as user might have turned it off
+     * and we have outstanding claims.
+     */
+    if ((claims = libxl_get_claiminfo(ctx)) < 0){
+        fprintf(stderr, "libxl_get_claiminfo failed. errno: %d (%s)\n",
+                errno, strerror(errno));
+        return;
+    }
     printf("nr_cpus                : %d\n", info.nr_cpus);
     printf("max_cpu_id             : %d\n", info.max_cpu_id);
     printf("nr_nodes               : %d\n", info.nr_nodes);
@@ -4600,10 +4609,16 @@ static void output_physinfo(void)
     if (vinfo) {
         i = (1 << 20) / vinfo->pagesize;
         printf("total_memory           : %"PRIu64"\n", info.total_pages / i);
-        printf("free_memory            : %"PRIu64"\n", info.free_pages / i);
+        printf("free_memory            : %"PRIu64"\n", (info.free_pages - claims) / i);
         printf("sharing_freed_memory   : %"PRIu64"\n", info.sharing_freed_pages / i);
         printf("sharing_used_memory    : %"PRIu64"\n", info.sharing_used_frames / i);
     }
+    /*
+     * Only if enabled (claim_mode=1) or there are outstanding claims.
+     */
+    if (libxl_defbool_val(claim_mode) || claims)
+        printf("outstanding_claims     : %ld\n", claims / i);
+
     if (!libxl_get_freecpus(ctx, &cpumap)) {
         libxl_for_each_bit(i, cpumap)
             if (libxl_bitmap_test(&cpumap, i))
@@ -4611,7 +4626,6 @@ static void output_physinfo(void)
         printf("free_cpus              : %d\n", n);
         free(cpumap.map);
     }
-
     libxl_physinfo_dispose(&info);
     return;
 }
@@ -4671,29 +4685,6 @@ static void output_topologyinfo(void)
     return;
 }
 
-static void output_claim(void)
-{
-    long l;
-
-    /*
-     * Note that the xl.c (which calls us) has already read from the
-     * global configuration the 'claim_mode' value.
-     */
-    if (!libxl_defbool_val(claim_mode))
-        return;
-
-    l = libxl_get_claiminfo(ctx);
-    if (l < 0) {
-        fprintf(stderr, "libxl_get_claiminfo failed. errno: %d (%s)\n",
-                errno, strerror(errno));
-        return;
-    }
-
-    printf("outstanding_claims     : %ld\n", l);
-
-    return;
-}
-
 static void print_info(int numa)
 {
     output_nodeinfo();
@@ -4704,8 +4695,6 @@ static void print_info(int numa)
         output_topologyinfo();
         output_numainfo();
     }
-    output_claim();
-
     output_xeninfo();
 
     printf("xend_config_format     : 4\n");
