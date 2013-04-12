@@ -64,7 +64,7 @@ struct symbol {
 
 guest_word_t kernel_stext, kernel_etext, kernel_sinittext, kernel_einittext, kernel_hypercallpage;
 
-#if defined (__i386__) 
+#if defined (__i386__)
 unsigned long long kernel_start = 0xc0000000;
 #else
 unsigned long long kernel_start = 0xffffffff80000000UL;
@@ -380,11 +380,11 @@ static void print_ctx_64(vcpu_guest_context_x86_64_t *ctx)
 
 static void print_ctx(vcpu_guest_context_any_t *ctx)
 {
-    if (ctxt_word_size == 4) 
+    if (ctxt_word_size == 4)
         print_ctx_32(&ctx->x32);
     else if (guest_word_size == 4)
         print_ctx_32on64(&ctx->x64);
-    else 
+    else
         print_ctx_64(&ctx->x64);
 }
 
@@ -400,7 +400,7 @@ static guest_word_t instr_pointer(vcpu_guest_context_any_t *ctx)
         if ( !guest_protected_mode )
             r += ctx->x32.user_regs.cs << NONPROT_MODE_SEGMENT_SHIFT;
     }
-    else 
+    else
         r = ctx->x64.user_regs.rip;
 
     return r;
@@ -416,17 +416,17 @@ static guest_word_t stack_pointer(vcpu_guest_context_any_t *ctx)
         if ( !guest_protected_mode )
             r += ctx->x32.user_regs.ss << NONPROT_MODE_SEGMENT_SHIFT;
     }
-    else 
+    else
         r = ctx->x64.user_regs.rsp;
-    
+
     return r;
 }
 
 static guest_word_t frame_pointer(vcpu_guest_context_any_t *ctx)
 {
-    if (ctxt_word_size == 4) 
+    if (ctxt_word_size == 4)
         return ctx->x32.user_regs.ebp;
-    else 
+    else
         return ctx->x64.user_regs.rbp;
 }
 
@@ -515,7 +515,7 @@ static int print_stack(vcpu_guest_context_any_t *ctx, int vcpu, int width)
     int i;
 
     stack_limit = ((stack_pointer(ctx) + XC_PAGE_SIZE)
-                   & ~((guest_word_t) XC_PAGE_SIZE - 1)); 
+                   & ~((guest_word_t) XC_PAGE_SIZE - 1));
     printf("\n");
     printf("Stack:\n");
     for (i=1; i<5 && stack < stack_limit; i++) {
