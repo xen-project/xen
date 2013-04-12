@@ -412,6 +412,7 @@ int construct_dom0(struct domain *d)
 
     discard_initial_modules();
 
+    v->is_initialised = 1;
     clear_bit(_VPF_down, &v->pause_flags);
 
     memset(regs, 0, sizeof(*regs));
