@@ -1850,6 +1850,8 @@ libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx, uint32_t domid, int *n
                 GCSPRINTF("%s/%s/backend",
                    fe_path, *dir));
 
+          libxl_device_vtpm_init(vtpm);
+
           vtpm->devid = atoi(*dir);
 
           tmp = libxl__xs_read(gc, XBT_NULL,
@@ -1953,7 +1955,7 @@ int libxl_devid_to_device_vtpm(libxl_ctx *ctx,
     if (!vtpms)
         return ERROR_FAIL;
 
-    memset(vtpm, 0, sizeof (libxl_device_vtpm));
+    libxl_device_vtpm_init(vtpm);
     rc = 1;
     for (i = 0; i < nb; ++i) {
         if(devid == vtpms[i].devid) {
@@ -2932,7 +2934,7 @@ static void libxl__device_nic_from_xs_be(libxl__gc *gc,
     char *tmp;
     int rc;
 
-    memset(nic, 0, sizeof(*nic));
+    libxl_device_nic_init(nic);
 
     tmp = xs_read(ctx->xsh, XBT_NULL,
                   libxl__sprintf(gc, "%s/handle", be_path), &len);
@@ -2971,7 +2973,7 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     char *dompath, *path;
     int rc = ERROR_FAIL;
 
-    memset(nic, 0, sizeof (libxl_device_nic));
+    libxl_device_nic_init(nic);
     dompath = libxl__xs_get_dompath(gc, domid);
     if (!dompath)
         goto out;
