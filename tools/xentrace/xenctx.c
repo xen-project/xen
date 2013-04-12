@@ -54,6 +54,11 @@ int guest_protected_mode = 1;
 typedef uint64_t guest_word_t;
 #define FMT_32B_WORD "%08llx"
 #define FMT_64B_WORD "%016llx"
+#elif defined(__aarch64__)
+#define NO_TRANSLATION
+typedef uint64_t guest_word_t;
+#define FMT_32B_WORD "%08lx"
+#define FMT_64B_WORD "%016lx"
 #endif
 
 struct symbol {
@@ -430,12 +435,140 @@ static guest_word_t frame_pointer(vcpu_guest_context_any_t *ctx)
         return ctx->x64.user_regs.rbp;
 }
 
-#elif defined(__arm__)
-static void print_ctx(vcpu_guest_context_any_t *ctx)
+#elif defined(__arm__) || defined(__aarch64__)
+
+static void print_ctx_32(vcpu_guest_context_t *ctx)
 {
-    /* XXX: properly implement this */
-    print_symbol(0);
+    vcpu_guest_core_regs_t *regs = &ctx->user_regs;
+
+    printf("PC:       %08"PRIx32" ", regs->pc32);
+    print_symbol(regs->pc32);
+    printf("\n");
+    printf("CPSR:     %08"PRIx32"\n", regs->cpsr);
+    printf("USR:               SP:%08"PRIx32" LR:%08"PRIx32"\n",
+           regs->sp_usr, regs->lr_usr);
+    printf("SVC: SPSR:%08"PRIx32" SP:%08"PRIx32" LR:%08"PRIx32"\n",
+           regs->spsr_svc, regs->sp_svc, regs->lr_svc);
+    printf("FIQ: SPSR:%08"PRIx32" SP:%08"PRIx32" LR:%08"PRIx32"\n",
+           regs->spsr_fiq, regs->sp_fiq, regs->lr_fiq);
+    printf("IRQ: SPSR:%08"PRIx32" SP:%08"PRIx32" LR:%08"PRIx32"\n",
+           regs->spsr_irq, regs->sp_irq, regs->lr_irq);
+    printf("ABT: SPSR:%08"PRIx32" SP:%08"PRIx32" LR:%08"PRIx32"\n",
+           regs->spsr_abt, regs->sp_abt, regs->lr_abt);
+    printf("UND: SPSR:%08"PRIx32" SP:%08"PRIx32" LR:%08"PRIx32"\n",
+           regs->spsr_und, regs->sp_und, regs->lr_und);
+
+    printf("\n");
+    printf(" r0_usr: %08"PRIx32"\t", regs->r0_usr);
+    printf(" r1_usr: %08"PRIx32"\t", regs->r1_usr);
+    printf(" r2_usr: %08"PRIx32"\n", regs->r2_usr);
+
+    printf(" r3_usr: %08"PRIx32"\t", regs->r3_usr);
+    printf(" r4_usr: %08"PRIx32"\t", regs->r4_usr);
+    printf(" r5_usr: %08"PRIx32"\n", regs->r5_usr);
+
+    printf(" r6_usr: %08"PRIx32"\t", regs->r6_usr);
+    printf(" r7_usr: %08"PRIx32"\t", regs->r7_usr);
+    printf(" r8_usr: %08"PRIx32"\n", regs->r8_usr);
+
+    printf(" r9_usr: %08"PRIx32"\t", regs->r9_usr);
+    printf("r10_usr: %08"PRIx32"\t", regs->r10_usr);
+    printf("r11_usr: %08"PRIx32"\n", regs->r11_usr);
+
+    printf("r12_usr: %08"PRIx32"\n", regs->r12_usr);
+    printf("\n");
+
+    printf(" r8_fiq: %08"PRIx32"\n", regs->r8_fiq);
+
+    printf(" r9_fiq: %08"PRIx32"\t", regs->r9_fiq);
+    printf("r10_fiq: %08"PRIx32"\t", regs->r10_fiq);
+    printf("r11_fiq: %08"PRIx32"\n", regs->r11_fiq);
+
+    printf("r12_fiq: %08"PRIx32"\n", regs->r12_fiq);
+    printf("\n");
 }
+
+#ifdef __aarch64__
+static void print_ctx_64(vcpu_guest_context_t *ctx)
+{
+    vcpu_guest_core_regs_t *regs = &ctx->user_regs;
+
+    printf("PC:       %016"PRIx64" ", regs->pc64);
+    print_symbol(regs->pc64);
+    printf("\n");
+
+    printf("LR:       %016"PRIx64"zn", regs->x30);
+    printf("ELR_EL1:  %016"PRIx64"\n", regs->elr_el1);
+
+    printf("CPSR:     %08"PRIx32"\n", regs->cpsr);
+    printf("SPSR_EL1: %08"PRIx32"\n", regs->spsr_el1);
+
+    printf("SP_EL0:   %016"PRIx64"\n", regs->sp_el0);
+    printf("SP_EL1:   %016"PRIx64"\n", regs->sp_el1);
+
+    printf("\n");
+    printf(" x0: %016"PRIx64"\t", regs->x0);
+    printf(" x1: %016"PRIx64"\t", regs->x1);
+    printf(" x2: %016"PRIx64"\n", regs->x2);
+
+    printf(" x3: %016"PRIx64"\t", regs->x3);
+    printf(" x4: %016"PRIx64"\t", regs->x4);
+    printf(" x5: %016"PRIx64"\n", regs->x5);
+
+    printf(" x6: %016"PRIx64"\t", regs->x6);
+    printf(" x7: %016"PRIx64"\t", regs->x7);
+    printf(" x8: %016"PRIx64"\n", regs->x8);
+
+    printf(" x9: %016"PRIx64"\t", regs->x9);
+    printf("x10: %016"PRIx64"\t", regs->x10);
+    printf("x11: %016"PRIx64"\n", regs->x11);
+
+    printf("x12: %016"PRIx64"\t", regs->x12);
+    printf("x13: %016"PRIx64"\t", regs->x13);
+    printf("x14: %016"PRIx64"\n", regs->x14);
+
+    printf("x15: %016"PRIx64"\t", regs->x15);
+    printf("x16: %016"PRIx64"\t", regs->x16);
+    printf("x17: %016"PRIx64"\n", regs->x17);
+
+    printf("x18: %016"PRIx64"\t", regs->x18);
+    printf("x19: %016"PRIx64"\t", regs->x19);
+    printf("x20: %016"PRIx64"\n", regs->x20);
+
+    printf("x21: %016"PRIx64"\t", regs->x21);
+    printf("x22: %016"PRIx64"\t", regs->x22);
+    printf("x23: %016"PRIx64"\n", regs->x23);
+
+    printf("x24: %016"PRIx64"\t", regs->x24);
+    printf("x25: %016"PRIx64"\t", regs->x25);
+    printf("x26: %016"PRIx64"\n", regs->x26);
+
+    printf("x27: %016"PRIx64"\t", regs->x27);
+    printf("x28: %016"PRIx64"\t", regs->x28);
+    printf("x29: %016"PRIx64"\n", regs->x29);
+    printf("\n");
+}
+#endif /* __aarch64__ */
+
+static void print_ctx(vcpu_guest_context_any_t *ctx_any)
+{
+    vcpu_guest_context_t *ctx = &ctx_any->c;
+
+#ifdef __aarch64__
+    if (ctx->user_regs.cpsr & PSR_MODE_BIT)
+        print_ctx_32(ctx);
+    else
+        print_ctx_64(ctx);
+#else
+    print_ctx_32(ctx);
+#endif
+
+    printf("SCTLR: %08"PRIx32"\n", ctx->sctlr);
+    printf("TTBCR: %08"PRIx32"\n", ctx->ttbcr);
+    printf("TTBR0: %016"PRIx64"\n", ctx->ttbr0);
+    printf("TTBR1: %016"PRIx64"\n", ctx->ttbr1);
+}
+
 #endif
 
 #ifndef NO_TRANSLATION
