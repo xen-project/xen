@@ -308,6 +308,14 @@ S:	Supported
 F:	tools/xentrace/
 F:	xen/common/trace.c
 
+XSM/FLASK
+M:  Daniel De Graaf <dgdegra@tycho.nsa.gov>
+S:  Supported
+F:  tools/flask/
+F:  xen/include/xsm/
+F:  xen/xsm/
+F:  docs/misc/xsm-flask.txt
+
 THE REST
 M:	Keir Fraser <keir@xen.org>
 L:	xen-devel@lists.xen.org
