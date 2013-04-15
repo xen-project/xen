@@ -197,20 +197,9 @@ static inline void context_restore(struct vcpu *v)
     struct amd_vpmu_context *ctxt = vpmu->context;
 
     for ( i = 0; i < num_counters; i++ )
-        wrmsrl(ctrls[i], ctxt->ctrls[i]);
-
-    for ( i = 0; i < num_counters; i++ )
     {
         wrmsrl(counters[i], ctxt->counters[i]);
-
-        /* Force an interrupt to allow guest reset the counter,
-        if the value is positive */
-        if ( is_overflowed(ctxt->counters[i]) && (ctxt->counters[i] > 0) )
-        {
-            gdprintk(XENLOG_WARNING, "VPMU: Force a performance counter "
-                "overflow interrupt!\n");
-            amd_vpmu_do_interrupt(0);
-        }
+        wrmsrl(ctrls[i], ctxt->ctrls[i]);
     }
 }
 
@@ -223,8 +212,8 @@ static void amd_vpmu_restore(struct vcpu *v)
            vpmu_is_set(vpmu, VPMU_RUNNING)) )
         return;
 
-    context_restore(v);
     apic_write(APIC_LVTPC, ctxt->hw_lapic_lvtpc);
+    context_restore(v);
 
     vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
 }
@@ -236,10 +225,11 @@ static inline void context_save(struct vcpu *v)
     struct amd_vpmu_context *ctxt = vpmu->context;
 
     for ( i = 0; i < num_counters; i++ )
-        rdmsrl(counters[i], ctxt->counters[i]);
-
-    for ( i = 0; i < num_counters; i++ )
+    {
         rdmsrl(ctrls[i], ctxt->ctrls[i]);
+        wrmsrl(ctrls[i], 0);
+        rdmsrl(counters[i], ctxt->counters[i]);
+    }
 }
 
 static void amd_vpmu_save(struct vcpu *v)
