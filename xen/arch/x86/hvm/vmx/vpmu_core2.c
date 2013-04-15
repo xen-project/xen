@@ -893,6 +893,7 @@ int vmx_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
 
         case 0x3a: /* IvyBridge */
         case 0x3e: /* IvyBridge EP */
+        case 0x3c: /* Haswell */
             ret = core2_vpmu_initialise(v, vpmu_flags);
             if ( !ret )
                 vpmu->arch_vpmu_ops = &core2_vpmu_ops;
