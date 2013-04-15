@@ -225,6 +225,8 @@ static void amd_vpmu_restore(struct vcpu *v)
 
     context_restore(v);
     apic_write(APIC_LVTPC, ctxt->hw_lapic_lvtpc);
+
+    vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
 }
 
 static inline void context_save(struct vcpu *v)
@@ -246,7 +248,7 @@ static void amd_vpmu_save(struct vcpu *v)
     struct amd_vpmu_context *ctx = vpmu->context;
 
     if ( !(vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) &&
-           vpmu_is_set(vpmu, VPMU_RUNNING)) )
+           vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED)) )
         return;
 
     context_save(v);
@@ -256,6 +258,7 @@ static void amd_vpmu_save(struct vcpu *v)
 
     ctx->hw_lapic_lvtpc = apic_read(APIC_LVTPC);
     apic_write(APIC_LVTPC,  ctx->hw_lapic_lvtpc | APIC_LVT_MASKED);
+    vpmu_reset(vpmu, VPMU_CONTEXT_LOADED);
 }
 
 static void context_update(unsigned int msr, u64 msr_content)
@@ -318,6 +321,12 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
         release_pmu_ownship(PMU_OWNER_HVM);
     }
 
+    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
+    {
+        context_restore(v);
+        vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
+    }
+
     /* Update vpmu context immediately */
     context_update(msr, msr_content);
 
@@ -328,7 +337,17 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
 
 static int amd_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 {
+    struct vcpu *v = current;
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+
+    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
+    {
+        context_restore(v);
+        vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
+    }
+
     rdmsrl(msr, *msr_content);
+
     return 1;
 }
 
