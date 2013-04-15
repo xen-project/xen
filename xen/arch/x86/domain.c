@@ -1535,8 +1535,14 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     if (prev != next)
         update_runstate_area(prev);
 
-    if ( is_hvm_vcpu(prev) && !list_empty(&prev->arch.hvm_vcpu.tm_list) )
-        pt_save_timer(prev);
+    if ( is_hvm_vcpu(prev) )
+    {
+        if (prev != next)
+            vpmu_save(prev);
+
+        if ( !list_empty(&prev->arch.hvm_vcpu.tm_list) )
+            pt_save_timer(prev);
+    }
 
     local_irq_disable();
 
@@ -1573,6 +1579,10 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         set_cpuid_faulting(!is_hvm_vcpu(next) &&
                            (next->domain->domain_id != 0));
     }
+
+    if (is_hvm_vcpu(next) && (prev != next) )
+        /* Must be done with interrupts enabled */
+        vpmu_load(next);
 
     context_saved(prev);
 

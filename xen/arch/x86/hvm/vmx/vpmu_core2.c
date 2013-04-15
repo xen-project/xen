@@ -307,9 +307,15 @@ static inline void __core2_vpmu_save(struct vcpu *v)
         rdmsrl(MSR_IA32_PERFCTR0+i, core2_vpmu_cxt->arch_msr_pair[i].counter);
 }
 
-static void core2_vpmu_save(struct vcpu *v)
+static int core2_vpmu_save(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
+
+    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_SAVE) )
+        return 0;
+
+    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) ) 
+        return 0;
 
     __core2_vpmu_save(v);
 
@@ -317,7 +323,7 @@ static void core2_vpmu_save(struct vcpu *v)
     if ( !vpmu_is_set(vpmu, VPMU_RUNNING) && cpu_has_vmx_msr_bitmap )
         core2_vpmu_unset_msr_bitmap(v->arch.hvm_vmx.msr_bitmap);
 
-    return;
+    return 1;
 }
 
 static inline void __core2_vpmu_load(struct vcpu *v)
@@ -338,6 +344,11 @@ static inline void __core2_vpmu_load(struct vcpu *v)
 
 static void core2_vpmu_load(struct vcpu *v)
 {
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+
+    if ( vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
+        return;
+
     __core2_vpmu_load(v);
 }
 
@@ -539,9 +550,15 @@ static int core2_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
     /* Setup LVTPC in local apic */
     if ( vpmu_is_set(vpmu, VPMU_RUNNING) &&
          is_vlapic_lvtpc_enabled(vcpu_vlapic(v)) )
+    {
         apic_write_around(APIC_LVTPC, PMU_APIC_VECTOR);
+        vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR;
+    }
     else
+    {
         apic_write_around(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
+        vpmu->hw_lapic_lvtpc = PMU_APIC_VECTOR | APIC_LVT_MASKED;
+    }
 
     core2_vpmu_save_msr_context(v, type, index, msr_content);
     if ( type != MSR_TYPE_GLOBAL )
@@ -616,6 +633,7 @@ static int core2_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
         else
             return 0;
     }
+
     return 1;
 }
 
@@ -710,7 +728,8 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
     }
 
     /* HW sets the MASK bit when performance counter interrupt occurs*/
-    apic_write_around(APIC_LVTPC, apic_read(APIC_LVTPC) & ~APIC_LVT_MASKED);
+    vpmu->hw_lapic_lvtpc = apic_read(APIC_LVTPC) & ~APIC_LVT_MASKED;
+    apic_write_around(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
 
     return 1;
 }

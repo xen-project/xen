@@ -52,7 +52,7 @@ struct arch_vpmu_ops {
                      unsigned int *eax, unsigned int *ebx,
                      unsigned int *ecx, unsigned int *edx);
     void (*arch_vpmu_destroy)(struct vcpu *v);
-    void (*arch_vpmu_save)(struct vcpu *v);
+    int (*arch_vpmu_save)(struct vcpu *v);
     void (*arch_vpmu_load)(struct vcpu *v);
     void (*arch_vpmu_dump)(struct vcpu *v);
 };
@@ -62,17 +62,23 @@ int svm_vpmu_initialise(struct vcpu *, unsigned int flags);
 
 struct vpmu_struct {
     u32 flags;
+    u32 last_pcpu;
     u32 hw_lapic_lvtpc;
     void *context;
     struct arch_vpmu_ops *arch_vpmu_ops;
 };
 
+/* VPMU states */
 #define VPMU_CONTEXT_ALLOCATED              0x1
 #define VPMU_CONTEXT_LOADED                 0x2
 #define VPMU_RUNNING                        0x4
-#define VPMU_PASSIVE_DOMAIN_ALLOCATED       0x8
-#define VPMU_CPU_HAS_DS                     0x10 /* Has Debug Store */
-#define VPMU_CPU_HAS_BTS                    0x20 /* Has Branch Trace Store */
+#define VPMU_CONTEXT_SAVE                   0x8   /* Force context save */
+#define VPMU_FROZEN                         0x10  /* Stop counters while VCPU is not running */
+#define VPMU_PASSIVE_DOMAIN_ALLOCATED       0x20
+
+/* VPMU features */
+#define VPMU_CPU_HAS_DS                     0x100 /* Has Debug Store */
+#define VPMU_CPU_HAS_BTS                    0x200 /* Has Branch Trace Store */
 
 
 #define vpmu_set(_vpmu, _x)    ((_vpmu)->flags |= (_x))

@@ -615,7 +615,6 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
     vmx_save_guest_msrs(v);
     vmx_restore_host_msrs();
     vmx_save_dr(v);
-    vpmu_save(v);
 }
 
 static void vmx_ctxt_switch_to(struct vcpu *v)
@@ -640,7 +639,6 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
 
     vmx_restore_guest_msrs(v);
     vmx_restore_dr(v);
-    vpmu_load(v);
 }
 
 

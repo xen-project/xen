@@ -18,7 +18,6 @@
  *
  * Author: Haitao Shan <haitao.shan@intel.com>
  */
-
 #include <xen/config.h>
 #include <xen/sched.h>
 #include <xen/xenoprof.h>
@@ -41,6 +40,8 @@
 static unsigned int __read_mostly opt_vpmu_enabled;
 static void parse_vpmu_param(char *s);
 custom_param("vpmu", parse_vpmu_param);
+
+static DEFINE_PER_CPU(struct vcpu *, last_vcpu);
 
 static void __init parse_vpmu_param(char *s)
 {
@@ -121,30 +122,90 @@ void vpmu_do_cpuid(unsigned int input,
         vpmu->arch_vpmu_ops->do_cpuid(input, eax, ebx, ecx, edx);
 }
 
+static void vpmu_save_force(void *arg)
+{
+    struct vcpu *v = (struct vcpu *)arg;
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+
+    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
+        return;
+
+    if ( vpmu->arch_vpmu_ops )
+        (void)vpmu->arch_vpmu_ops->arch_vpmu_save(v);
+
+    vpmu_reset(vpmu, VPMU_CONTEXT_SAVE);
+
+    per_cpu(last_vcpu, smp_processor_id()) = NULL;
+}
+
 void vpmu_save(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    int pcpu = smp_processor_id();
 
     if ( !(vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) &&
            vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED)) )
        return;
 
+    vpmu->last_pcpu = pcpu;
+    per_cpu(last_vcpu, pcpu) = v;
+
     if ( vpmu->arch_vpmu_ops )
-        vpmu->arch_vpmu_ops->arch_vpmu_save(v);
+        if ( vpmu->arch_vpmu_ops->arch_vpmu_save(v) )
+            vpmu_reset(vpmu, VPMU_CONTEXT_LOADED);
 
-    vpmu->hw_lapic_lvtpc = apic_read(APIC_LVTPC);
     apic_write(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
-
-    vpmu_reset(vpmu, VPMU_CONTEXT_LOADED);
 }
 
 void vpmu_load(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    int pcpu = smp_processor_id();
+    struct vcpu *prev = NULL;
+
+    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
+        return;
+
+    /* First time this VCPU is running here */
+    if ( vpmu->last_pcpu != pcpu )
+    {
+        /*
+         * Get the context from last pcpu that we ran on. Note that if another
+         * VCPU is running there it must have saved this VPCU's context before
+         * startig to run (see below).
+         * There should be no race since remote pcpu will disable interrupts
+         * before saving the context.
+         */
+        if ( vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
+        {
+            vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
+            on_selected_cpus(cpumask_of(vpmu->last_pcpu),
+                             vpmu_save_force, (void *)v, 1);
+            vpmu_reset(vpmu, VPMU_CONTEXT_LOADED);
+        }
+    } 
+
+    /* Prevent forced context save from remote CPU */
+    local_irq_disable();
+
+    prev = per_cpu(last_vcpu, pcpu);
+
+    if ( prev != v && prev )
+    {
+        vpmu = vcpu_vpmu(prev);
+
+        /* Someone ran here before us */
+        vpmu_set(vpmu, VPMU_CONTEXT_SAVE);
+        vpmu_save_force(prev);
+        vpmu_reset(vpmu, VPMU_CONTEXT_LOADED);
+
+        vpmu = vcpu_vpmu(v);
+    }
+
+    local_irq_enable();
 
     /* Only when PMU is counting, we load PMU context immediately. */
-    if ( !(vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) &&
-           vpmu_is_set(vpmu, VPMU_RUNNING)) )
+    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) )
         return;
 
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_load )

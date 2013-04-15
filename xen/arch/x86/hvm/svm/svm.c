@@ -860,7 +860,6 @@ static void svm_ctxt_switch_from(struct vcpu *v)
     svm_fpu_leave(v);
 
     svm_save_dr(v);
-    vpmu_save(v);
     svm_lwp_save(v);
     svm_tsc_ratio_save(v);
 
@@ -901,7 +900,6 @@ static void svm_ctxt_switch_to(struct vcpu *v)
     svm_vmsave(per_cpu(root_vmcb, cpu));
     svm_vmload(vmcb);
     vmcb->cleanbits.bytes = 0;
-    vpmu_load(v);
     svm_lwp_load(v);
     svm_tsc_ratio_load(v);
 
