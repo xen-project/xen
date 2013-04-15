@@ -90,6 +90,25 @@ int libxl_name_to_domid(libxl_ctx *ctx, const char *name,
     return ret;
 }
 
+int libxl_domain_qualifier_to_domid(libxl_ctx *ctx, const char *name,
+                                    uint32_t *domid)
+{
+    int i, rv;
+    for (i=0; name[i]; i++) {
+        if (!isdigit(name[i])) {
+            goto nondigit_found;
+        }
+    }
+    *domid = strtoul(name, NULL, 10);
+    return 0;
+
+ nondigit_found:
+    /* this could also check for uuids */
+    rv = libxl_name_to_domid(ctx, name, domid);
+    return rv;
+}
+
+
 char *libxl_cpupoolid_to_name(libxl_ctx *ctx, uint32_t poolid)
 {
     unsigned int len;

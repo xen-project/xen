@@ -162,29 +162,6 @@ static int qualifier_to_id(const char *p, uint32_t *id_r)
     return 1;
 }
 
-static int domain_qualifier_to_domid(const char *p, uint32_t *domid_r,
-                                     int *was_name_r)
-{
-    int was_name, rc;
-
-    was_name = qualifier_to_id(p, domid_r);
-    if (was_name_r)
-        *was_name_r = was_name;
-
-    if (was_name) {
-        rc = libxl_name_to_domid(ctx, p, domid_r);
-        if (rc)
-            return rc;
-    } else {
-        rc = libxl_domain_info(ctx, NULL, *domid_r);
-        /* error only if domain does not exist */
-        if (rc == ERROR_INVAL)
-            return rc;
-    }
-
-    return 0;
-}
-
 static int cpupool_qualifier_to_cpupoolid(const char *p, uint32_t *poolid_r,
                                      int *was_name_r)
 {
@@ -199,14 +176,14 @@ static uint32_t find_domain(const char *p) __attribute__((warn_unused_result));
 static uint32_t find_domain(const char *p)
 {
     uint32_t domid;
-    int rc, was_name;
+    int rc;
 
-    rc = domain_qualifier_to_domid(p, &domid, &was_name);
+    rc = libxl_domain_qualifier_to_domid(ctx, p, &domid);
     if (rc) {
         fprintf(stderr, "%s is an invalid domain identifier (rc=%d)\n", p, rc);
         exit(2);
     }
-    common_domname = was_name ? p : libxl_domid_to_name(ctx, domid);
+    common_domname = libxl_domid_to_name(ctx, domid);
     return domid;
 }
 
@@ -1097,12 +1074,7 @@ static void parse_config_data(const char *config_source,
                      break;
                   *p2 = '\0';
                   if (!strcmp(p, "backend")) {
-                     if(domain_qualifier_to_domid(p2 + 1, &(vtpm->backend_domid), 0))
-                     {
-                        fprintf(stderr,
-                              "Specified vtpm backend domain `%s' does not exist!\n", p2 + 1);
-                        exit(1);
-                     }
+                     vtpm->backend_domname = strdup(p2 + 1);
                      got_backend = true;
                   } else if(!strcmp(p, "uuid")) {
                      if( libxl_uuid_from_string(&vtpm->uuid, p2 + 1) ) {
@@ -1202,17 +1174,7 @@ static void parse_config_data(const char *config_source,
                     free(nic->ifname);
                     nic->ifname = strdup(p2 + 1);
                 } else if (!strcmp(p, "backend")) {
-                    if(libxl_name_to_domid(ctx, (p2 + 1), &(nic->backend_domid))) {
-                        fprintf(stderr, "Specified backend domain does not exist, defaulting to Dom0\n");
-                        nic->backend_domid = 0;
-                    }
-                    if (nic->backend_domid != 0 && run_hotplug_scripts) {
-                        fprintf(stderr, "ERROR: the vif 'backend=' option "
-                                "cannot be used in conjunction with "
-                                "run_hotplug_scripts, please set "
-                                "run_hotplug_scripts to 0 in xl.conf\n");
-                        exit(EXIT_FAILURE);
-                    }
+                    nic->backend_domname = strdup(p2 + 1);
                 } else if (!strcmp(p, "rate")) {
                     parse_vif_rate(&config, (p2 + 1), nic);
                 } else if (!strcmp(p, "accel")) {
@@ -2557,8 +2519,6 @@ static void cd_insert(uint32_t domid, const char *virtdev, char *phys)
     }
 
     parse_disk_config(&config, buf, &disk);
-
-    disk.backend_domid = 0;
 
     libxl_cdrom_insert(ctx, domid, &disk, NULL);
 
@@ -5596,11 +5556,7 @@ int main_networkattach(int argc, char **argv)
         } else if (MATCH_OPTION("script", *argv, oparg)) {
             replace_string(&nic.script, oparg);
         } else if (MATCH_OPTION("backend", *argv, oparg)) {
-            if(libxl_name_to_domid(ctx, oparg, &val)) {
-                fprintf(stderr, "Specified backend domain does not exist, defaulting to Dom0\n");
-                val = 0;
-            }
-            nic.backend_domid = val;
+            replace_string(&nic.backend_domname, oparg);
         } else if (MATCH_OPTION("vifname", *argv, oparg)) {
             replace_string(&nic.ifname, oparg);
         } else if (MATCH_OPTION("model", *argv, oparg)) {
@@ -5705,15 +5661,15 @@ int main_networkdetach(int argc, char **argv)
 int main_blockattach(int argc, char **argv)
 {
     int opt;
-    uint32_t fe_domid, be_domid = 0;
-    libxl_device_disk disk = { 0 };
+    uint32_t fe_domid;
+    libxl_device_disk disk;
     XLU_Config *config = 0;
 
     SWITCH_FOREACH_OPT(opt, "", NULL, "block-attach", 2) {
         /* No options */
     }
 
-    if (domain_qualifier_to_domid(argv[optind], &fe_domid, 0) < 0) {
+    if (libxl_domain_qualifier_to_domid(ctx, argv[optind], &fe_domid) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
@@ -5721,8 +5677,6 @@ int main_blockattach(int argc, char **argv)
 
     parse_disk_config_multistring
         (&config, argc-optind, (const char* const*)argv + optind, &disk);
-
-    disk.backend_domid = be_domid;
 
     if (dryrun_only) {
         char *json = libxl_device_disk_to_json(ctx, &disk);
@@ -5753,7 +5707,7 @@ int main_blocklist(int argc, char **argv)
            "Vdev", "BE", "handle", "state", "evt-ch", "ring-ref", "BE-path");
     for (argv += optind, argc -= optind; argc > 0; --argc, ++argv) {
         uint32_t domid;
-        if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
+        if (libxl_domain_qualifier_to_domid(ctx, *argv, &domid) < 0) {
             fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
             continue;
         }
@@ -5805,14 +5759,13 @@ int main_vtpmattach(int argc, char **argv)
     int opt;
     libxl_device_vtpm vtpm;
     char *oparg;
-    unsigned int val;
     uint32_t domid;
 
     SWITCH_FOREACH_OPT(opt, "", NULL, "vtpm-attach", 1) {
         /* No options */
     }
 
-    if (domain_qualifier_to_domid(argv[optind], &domid, 0) < 0) {
+    if (libxl_domain_qualifier_to_domid(ctx, argv[optind], &domid) < 0) {
         fprintf(stderr, "%s is an invalid domain identifier\n", argv[optind]);
         return 1;
     }
@@ -5826,12 +5779,7 @@ int main_vtpmattach(int argc, char **argv)
                 return 1;
             }
         } else if (MATCH_OPTION("backend", *argv, oparg)) {
-            if(domain_qualifier_to_domid(oparg, &val, 0)) {
-                fprintf(stderr,
-                      "Specified backend domain does not exist, defaulting to Dom0\n");
-                val = 0;
-            }
-            vtpm.backend_domid = val;
+            replace_string(&vtpm.backend_domname, oparg);
         } else {
             fprintf(stderr, "unrecognized argument `%s'\n", *argv);
             return 1;
@@ -5871,7 +5819,7 @@ int main_vtpmlist(int argc, char **argv)
            "Idx", "BE", "Uuid", "handle", "state", "evt-ch", "ring-ref", "BE-path");
     for (argv += optind, argc -= optind; argc > 0; --argc, ++argv) {
         uint32_t domid;
-        if (domain_qualifier_to_domid(*argv, &domid, 0) < 0) {
+        if (libxl_domain_qualifier_to_domid(ctx, *argv, &domid) < 0) {
             fprintf(stderr, "%s is an invalid domain identifier\n", *argv);
             continue;
         }
@@ -6779,7 +6727,7 @@ int main_cpupoolmigrate(int argc, char **argv)
     dom = argv[optind++];
     pool = argv[optind];
 
-    if (domain_qualifier_to_domid(dom, &domid, NULL) ||
+    if (libxl_domain_qualifier_to_domid(ctx, dom, &domid) ||
         !libxl_domid_to_name(ctx, domid)) {
         fprintf(stderr, "unknown domain \'%s\'\n", dom);
         return -ERROR_FAIL;

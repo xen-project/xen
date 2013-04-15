@@ -344,7 +344,7 @@ extern int xlu__disk_yylex (yyscan_t yyscanner);
 #undef YY_DECL
 #endif
 
-#line 255 "libxlu_disk_l.l"
+#line 256 "libxlu_disk_l.l"
 
 #line 350 "libxlu_disk_l.h"
 #undef xlu__disk_yyIN_HEADER

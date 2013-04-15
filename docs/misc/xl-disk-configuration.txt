@@ -139,6 +139,18 @@ cdrom
 Convenience alias for "devtype=cdrom".
 
 
+backend=<domain-name>
+---------------------
+
+Description:           Designates a backend domain for the device
+Supported values:      Valid domain names
+Mandatory:             No
+
+Specifies the backend domain which this device should attach to. This
+defaults to domain 0. Specifying another domain requires setting up a
+driver domain which is outside the scope of this document.
+
+
 backendtype=<backend-type>
 --------------------------
 

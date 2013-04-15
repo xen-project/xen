@@ -296,6 +296,18 @@
  */
 #define LIBXL_HAVE_BUILDINFO_USBDEVICE_LIST 1
 
+/*
+ * LIBXL_HAVE_DEVICE_BACKEND_DOMNAME
+ *
+ * If this is defined, libxl_device_* structures containing a backend_domid
+ * field also contain a backend_domname field.  If backend_domname is set, it is
+ * resolved to a domain ID when the device is used and takes precedence over the
+ * backend_domid field.
+ *
+ * If this is not defined, the backend_domname field does not exist.
+ */
+#define LIBXL_HAVE_DEVICE_BACKEND_DOMNAME 1
+
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who
  * do not #include libxl_internal.h, are fine. */

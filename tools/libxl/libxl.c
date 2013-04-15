@@ -1731,13 +1731,23 @@ static int libxl__device_nextid(libxl__gc *gc, uint32_t domid, char *device)
     return nextid;
 }
 
+static int libxl__resolve_domid(libxl__gc *gc, const char *name,
+                                uint32_t *domid)
+{
+    if (!name)
+        return 0;
+    return libxl_domain_qualifier_to_domid(CTX, name, domid);
+}
+
 /******************************************************************************/
 int libxl__device_vtpm_setdefault(libxl__gc *gc, libxl_device_vtpm *vtpm)
 {
-   if(libxl_uuid_is_nil(&vtpm->uuid)) {
-      libxl_uuid_generate(&vtpm->uuid);
-   }
-   return 0;
+    int rc;
+    if (libxl_uuid_is_nil(&vtpm->uuid)) {
+        libxl_uuid_generate(&vtpm->uuid);
+    }
+    rc = libxl__resolve_domid(gc, vtpm->backend_domname, &vtpm->backend_domid);
+    return rc;
 }
 
 static int libxl__device_from_vtpm(libxl__gc *gc, uint32_t domid,
@@ -1969,6 +1979,7 @@ int libxl__device_disk_setdefault(libxl__gc *gc, libxl_device_disk *disk)
     rc = libxl__device_disk_set_backend(gc, disk);
     if (rc) return rc;
 
+    rc = libxl__resolve_domid(gc, disk->backend_domname, &disk->backend_domid);
     return rc;
 }
 
@@ -2740,6 +2751,7 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
                                  uint32_t domid)
 {
     int run_hotplug_scripts;
+    int rc;
 
     if (!nic->mtu)
         nic->mtu = 1492;
@@ -2800,7 +2812,8 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
         abort();
     }
 
-    return 0;
+    rc = libxl__resolve_domid(gc, nic->backend_domname, &nic->backend_domid);
+    return rc;
 }
 
 static int libxl__device_from_nic(libxl__gc *gc, uint32_t domid,
@@ -3157,7 +3170,9 @@ out:
 
 int libxl__device_vkb_setdefault(libxl__gc *gc, libxl_device_vkb *vkb)
 {
-    return 0;
+    int rc;
+    rc = libxl__resolve_domid(gc, vkb->backend_domname, &vkb->backend_domid);
+    return rc;
 }
 
 static int libxl__device_from_vkb(libxl__gc *gc, uint32_t domid,
@@ -3241,6 +3256,8 @@ out:
 
 int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb)
 {
+    int rc;
+
     libxl_defbool_setdefault(&vfb->vnc.enable, true);
     if (libxl_defbool_val(vfb->vnc.enable)) {
         if (!vfb->vnc.listen) {
@@ -3256,7 +3273,8 @@ int libxl__device_vfb_setdefault(libxl__gc *gc, libxl_device_vfb *vfb)
     libxl_defbool_setdefault(&vfb->sdl.enable, false);
     libxl_defbool_setdefault(&vfb->sdl.opengl, false);
 
-    return 0;
+    rc = libxl__resolve_domid(gc, vfb->backend_domname, &vfb->backend_domid);
+    return rc;
 }
 
 static int libxl__device_from_vfb(libxl__gc *gc, uint32_t domid,

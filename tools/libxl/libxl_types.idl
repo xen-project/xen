@@ -351,6 +351,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
 
 libxl_device_vfb = Struct("device_vfb", [
     ("backend_domid", libxl_domid),
+    ("backend_domname",string),
     ("devid",         libxl_devid),
     ("vnc",           libxl_vnc_info),
     ("sdl",           libxl_sdl_info),
@@ -360,11 +361,13 @@ libxl_device_vfb = Struct("device_vfb", [
 
 libxl_device_vkb = Struct("device_vkb", [
     ("backend_domid", libxl_domid),
+    ("backend_domname", string),
     ("devid", libxl_devid),
     ])
 
 libxl_device_disk = Struct("device_disk", [
     ("backend_domid", libxl_domid),
+    ("backend_domname", string),
     ("pdev_path", string),
     ("vdev", string),
     ("backend", libxl_disk_backend),
@@ -377,6 +380,7 @@ libxl_device_disk = Struct("device_disk", [
 
 libxl_device_nic = Struct("device_nic", [
     ("backend_domid", libxl_domid),
+    ("backend_domname", string),
     ("devid", libxl_devid),
     ("mtu", integer),
     ("model", string),
@@ -405,6 +409,7 @@ libxl_device_pci = Struct("device_pci", [
 
 libxl_device_vtpm = Struct("device_vtpm", [
     ("backend_domid",    libxl_domid),
+    ("backend_domname",  string),
     ("devid",            libxl_devid),
     ("uuid",             libxl_uuid),
 ])
