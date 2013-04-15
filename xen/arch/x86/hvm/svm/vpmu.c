@@ -414,13 +414,53 @@ static void amd_vpmu_destroy(struct vcpu *v)
     }
 }
 
+/* VPMU part of the 'q' keyhandler */
+static void amd_vpmu_dump(struct vcpu *v)
+{
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    struct amd_vpmu_context *ctxt = vpmu->context;
+    unsigned int i;
+
+    printk("    VPMU state: 0x%x ", vpmu->flags);
+    if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
+    {
+         printk("\n");
+         return;
+    }
+
+    printk("(");
+    if ( vpmu_is_set(vpmu, VPMU_PASSIVE_DOMAIN_ALLOCATED) )
+        printk("PASSIVE_DOMAIN_ALLOCATED, ");
+    if ( vpmu_is_set(vpmu, VPMU_FROZEN) )
+        printk("FROZEN, ");
+    if ( vpmu_is_set(vpmu, VPMU_CONTEXT_SAVE) )
+        printk("SAVE, ");
+    if ( vpmu_is_set(vpmu, VPMU_RUNNING) )
+        printk("RUNNING, ");
+    if ( vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
+        printk("LOADED, ");
+    printk("ALLOCATED)\n");
+
+    for ( i = 0; i < num_counters; i++ )
+    {
+        uint64_t ctrl, cntr;
+
+        rdmsrl(ctrls[i], ctrl);
+        rdmsrl(counters[i], cntr);
+        printk("      0x%08x: 0x%lx (0x%lx in HW)    0x%08x: 0x%lx (0x%lx in HW)\n",
+            ctrls[i], ctxt->ctrls[i], ctrl,
+            counters[i], ctxt->counters[i], cntr);
+    }
+}
+
 struct arch_vpmu_ops amd_vpmu_ops = {
     .do_wrmsr = amd_vpmu_do_wrmsr,
     .do_rdmsr = amd_vpmu_do_rdmsr,
     .do_interrupt = amd_vpmu_do_interrupt,
     .arch_vpmu_destroy = amd_vpmu_destroy,
     .arch_vpmu_save = amd_vpmu_save,
-    .arch_vpmu_load = amd_vpmu_load
+    .arch_vpmu_load = amd_vpmu_load,
+    .arch_vpmu_dump = amd_vpmu_dump
 };
 
 int svm_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
