@@ -173,7 +173,7 @@ static int amd_vpmu_do_interrupt(struct cpu_user_regs *regs)
     return 1;
 }
 
-static inline void context_restore(struct vcpu *v)
+static inline void context_load(struct vcpu *v)
 {
     unsigned int i;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
@@ -186,7 +186,7 @@ static inline void context_restore(struct vcpu *v)
     }
 }
 
-static void amd_vpmu_restore(struct vcpu *v)
+static void amd_vpmu_load(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct amd_vpmu_context *ctxt = vpmu->context;
@@ -203,7 +203,7 @@ static void amd_vpmu_restore(struct vcpu *v)
         return;
     }
 
-    context_restore(v);
+    context_load(v);
 }
 
 static inline void context_save(struct vcpu *v)
@@ -262,12 +262,18 @@ static void context_update(unsigned int msr, u64 msr_content)
     }
 
     for ( i = 0; i < num_counters; i++ )
-        if ( msr == counters[i] )
+    {
+       if ( msr == ctrls[i] )
+       {
+           ctxt->ctrls[i] = msr_content;
+           return;
+       }
+        else if (msr == counters[i] )
+        {
             ctxt->counters[i] = msr_content;
-
-    for ( i = 0; i < num_counters; i++ )
-        if ( msr == ctrls[i] )
-            ctxt->ctrls[i] = msr_content;
+            return;
+        }
+    }
 }
 
 static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
@@ -311,7 +317,7 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
     if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED)
         || vpmu_is_set(vpmu, VPMU_FROZEN) )
     {
-        context_restore(v);
+        context_load(v);
         vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
         vpmu_reset(vpmu, VPMU_FROZEN);
     }
@@ -332,7 +338,7 @@ static int amd_vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
     if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED)
         || vpmu_is_set(vpmu, VPMU_FROZEN) )
     {
-        context_restore(v);
+        context_load(v);
         vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
         vpmu_reset(vpmu, VPMU_FROZEN);
     }
@@ -414,7 +420,7 @@ struct arch_vpmu_ops amd_vpmu_ops = {
     .do_interrupt = amd_vpmu_do_interrupt,
     .arch_vpmu_destroy = amd_vpmu_destroy,
     .arch_vpmu_save = amd_vpmu_save,
-    .arch_vpmu_load = amd_vpmu_restore
+    .arch_vpmu_load = amd_vpmu_load
 };
 
 int svm_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
