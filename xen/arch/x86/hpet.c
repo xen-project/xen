@@ -254,13 +254,22 @@ static void hpet_msi_mask(struct irq_desc *desc)
     ch->msi.msi_attrib.masked = 1;
 }
 
-static void hpet_msi_write(struct hpet_event_channel *ch, struct msi_msg *msg)
+static int hpet_msi_write(struct hpet_event_channel *ch, struct msi_msg *msg)
 {
     ch->msi.msg = *msg;
+
     if ( iommu_intremap )
-        iommu_update_ire_from_msi(&ch->msi, msg);
+    {
+        int rc = iommu_update_ire_from_msi(&ch->msi, msg);
+
+        if ( rc )
+            return rc;
+    }
+
     hpet_write32(msg->data, HPET_Tn_ROUTE(ch->idx));
     hpet_write32(msg->address_lo, HPET_Tn_ROUTE(ch->idx) + 4);
+
+    return 0;
 }
 
 static void __maybe_unused
@@ -318,12 +327,12 @@ static hw_irq_controller hpet_msi_type = {
     .set_affinity   = hpet_msi_set_affinity,
 };
 
-static void __hpet_setup_msi_irq(struct irq_desc *desc)
+static int __hpet_setup_msi_irq(struct irq_desc *desc)
 {
     struct msi_msg msg;
 
     msi_compose_msg(desc, &msg);
-    hpet_msi_write(desc->action->dev_id, &msg);
+    return hpet_msi_write(desc->action->dev_id, &msg);
 }
 
 static int __init hpet_setup_msi_irq(struct hpet_event_channel *ch)
@@ -347,6 +356,8 @@ static int __init hpet_setup_msi_irq(struct hpet_event_channel *ch)
 
     desc->handler = &hpet_msi_type;
     ret = request_irq(ch->msi.irq, hpet_interrupt_handler, 0, "HPET", ch);
+    if ( ret >= 0 )
+        ret = __hpet_setup_msi_irq(desc);
     if ( ret < 0 )
     {
         if ( iommu_intremap )
@@ -354,7 +365,6 @@ static int __init hpet_setup_msi_irq(struct hpet_event_channel *ch)
         return ret;
     }
 
-    __hpet_setup_msi_irq(desc);
     desc->msi_desc = &ch->msi;
 
     return 0;

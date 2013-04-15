@@ -90,7 +90,7 @@ void io_apic_write_remap_rte(unsigned int apic,
 struct msi_desc;
 struct msi_msg;
 void msi_msg_read_remap_rte(struct msi_desc *, struct msi_msg *);
-void msi_msg_write_remap_rte(struct msi_desc *, struct msi_msg *);
+int msi_msg_write_remap_rte(struct msi_desc *, struct msi_msg *);
 
 int intel_setup_hpet_msi(struct msi_desc *);
 

@@ -93,7 +93,7 @@ void *amd_iommu_alloc_intremap_table(void);
 int amd_iommu_free_intremap_table(u16 seg, struct ivrs_mappings *);
 void amd_iommu_ioapic_update_ire(
     unsigned int apic, unsigned int reg, unsigned int value);
-void amd_iommu_msi_msg_update_ire(
+int amd_iommu_msi_msg_update_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg);
 void amd_iommu_read_msi_from_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg);

@@ -214,14 +214,18 @@ static void read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
         iommu_read_msi_from_ire(entry, msg);
 }
 
-static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
+static int write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
 {
     entry->msg = *msg;
 
     if ( iommu_intremap )
     {
+        int rc;
+
         ASSERT(msg != &entry->msg);
-        iommu_update_ire_from_msi(entry, msg);
+        rc = iommu_update_ire_from_msi(entry, msg);
+        if ( rc )
+            return rc;
     }
 
     switch ( entry->msi_attrib.type )
@@ -264,6 +268,8 @@ static void write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
     default:
         BUG();
     }
+
+    return 0;
 }
 
 void set_msi_affinity(struct irq_desc *desc, const cpumask_t *mask)
@@ -464,19 +470,15 @@ static struct msi_desc* alloc_msi_entry(void)
     return entry;
 }
 
-void setup_msi_handler(struct irq_desc *desc, struct msi_desc *msidesc)
-{
-    desc->msi_desc = msidesc;
-    desc->handler = msi_maskable_irq(msidesc) ? &pci_msi_maskable
-                                              : &pci_msi_nonmaskable;
-}
-
-void setup_msi_irq(struct irq_desc *desc)
+int setup_msi_irq(struct irq_desc *desc, struct msi_desc *msidesc)
 {
     struct msi_msg msg;
 
+    desc->msi_desc = msidesc;
+    desc->handler = msi_maskable_irq(msidesc) ? &pci_msi_maskable
+                                              : &pci_msi_nonmaskable;
     msi_compose_msg(desc, &msg);
-    write_msi_msg(desc->msi_desc, &msg);
+    return write_msi_msg(msidesc, &msg);
 }
 
 int msi_free_irq(struct msi_desc *entry)

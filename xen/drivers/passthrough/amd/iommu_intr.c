@@ -17,6 +17,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
+#include <xen/err.h>
 #include <xen/sched.h>
 #include <xen/hvm/iommu.h>
 #include <asm/amd-iommu.h>
@@ -359,25 +360,35 @@ done:
     }
 }
 
-void amd_iommu_msi_msg_update_ire(
+static struct amd_iommu *_find_iommu_for_device(int seg, int bdf)
+{
+    struct amd_iommu *iommu = find_iommu_for_device(seg, bdf);
+
+    if ( iommu )
+        return iommu;
+
+    list_for_each_entry ( iommu, &amd_iommu_head, list )
+        if ( iommu->seg == seg && iommu->bdf == bdf )
+            return NULL;
+
+    AMD_IOMMU_DEBUG("No IOMMU for MSI dev = %04x:%02x:%02x.%u\n",
+                    seg, PCI_BUS(bdf), PCI_SLOT(bdf), PCI_FUNC(bdf));
+    return ERR_PTR(-EINVAL);
+}
+
+int amd_iommu_msi_msg_update_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
     struct pci_dev *pdev = msi_desc->dev;
     int bdf, seg;
     struct amd_iommu *iommu;
 
-    if ( !iommu_intremap )
-        return;
-
     bdf = pdev ? PCI_BDF2(pdev->bus, pdev->devfn) : hpet_sbdf.bdf;
     seg = pdev ? pdev->seg : hpet_sbdf.seg;
 
-    iommu = find_iommu_for_device(seg, bdf);
-    if ( !iommu )
-    {
-        AMD_IOMMU_DEBUG("Fail to find iommu for MSI device id = %#x\n", bdf);
-        return;
-    }
+    iommu = _find_iommu_for_device(seg, bdf);
+    if ( IS_ERR_OR_NULL(iommu) )
+        return PTR_ERR(iommu);
 
     if ( msi_desc->remap_index >= 0 )
     {
@@ -395,7 +406,7 @@ void amd_iommu_msi_msg_update_ire(
     }
 
     if ( !msg )
-        return;
+        return 0;
 
     do {
         update_intremap_entry_from_msi_msg(iommu, bdf, &msi_desc->remap_index,
@@ -404,6 +415,8 @@ void amd_iommu_msi_msg_update_ire(
             break;
         bdf += pdev->phantom_stride;
     } while ( PCI_SLOT(bdf) == PCI_SLOT(pdev->devfn) );
+
+    return 0;
 }
 
 void amd_iommu_read_msi_from_ire(

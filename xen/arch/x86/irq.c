@@ -1938,7 +1938,14 @@ int map_domain_pirq(
         if ( desc->handler != &no_irq_type )
             dprintk(XENLOG_G_ERR, "dom%d: irq %d in use\n",
                     d->domain_id, irq);
-        setup_msi_handler(desc, msi_desc);
+
+        ret = setup_msi_irq(desc, msi_desc);
+        if ( ret )
+        {
+            spin_unlock_irqrestore(&desc->lock, flags);
+            pci_disable_msi(msi_desc);
+            goto done;
+        }
 
         if ( opt_irq_vector_map == OPT_IRQ_VECTOR_MAP_PERDEV
              && !desc->arch.used_vectors )
@@ -1954,7 +1961,6 @@ int map_domain_pirq(
         }
 
         set_domain_irq_pirq(d, irq, info);
-        setup_msi_irq(desc);
         spin_unlock_irqrestore(&desc->lock, flags);
     }
     else

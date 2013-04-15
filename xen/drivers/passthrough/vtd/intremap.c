@@ -653,7 +653,7 @@ void msi_msg_read_remap_rte(
         remap_entry_to_msi_msg(drhd->iommu, msg);
 }
 
-void msi_msg_write_remap_rte(
+int msi_msg_write_remap_rte(
     struct msi_desc *msi_desc, struct msi_msg *msg)
 {
     struct pci_dev *pdev = msi_desc->dev;
@@ -661,8 +661,8 @@ void msi_msg_write_remap_rte(
 
     drhd = pdev ? acpi_find_matched_drhd_unit(pdev)
                 : hpet_to_drhd(msi_desc->hpet_id);
-    if ( drhd )
-        msi_msg_to_remap_entry(drhd->iommu, pdev, msi_desc, msg);
+    return drhd ? msi_msg_to_remap_entry(drhd->iommu, pdev, msi_desc, msg)
+                : -EINVAL;
 }
 
 int __init intel_setup_hpet_msi(struct msi_desc *msi_desc)

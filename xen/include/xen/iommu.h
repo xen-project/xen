@@ -106,7 +106,7 @@ struct iommu_ops {
 			   u8 devfn, struct pci_dev *);
     int (*get_device_group_id)(u16 seg, u8 bus, u8 devfn);
     void (*update_ire_from_apic)(unsigned int apic, unsigned int reg, unsigned int value);
-    void (*update_ire_from_msi)(struct msi_desc *msi_desc, struct msi_msg *msg);
+    int (*update_ire_from_msi)(struct msi_desc *msi_desc, struct msi_msg *msg);
     void (*read_msi_from_ire)(struct msi_desc *msi_desc, struct msi_msg *msg);
     unsigned int (*read_apic_from_ire)(unsigned int apic, unsigned int reg);
     int (*setup_hpet_msi)(struct msi_desc *);
@@ -120,7 +120,7 @@ struct iommu_ops {
 };
 
 void iommu_update_ire_from_apic(unsigned int apic, unsigned int reg, unsigned int value);
-void iommu_update_ire_from_msi(struct msi_desc *msi_desc, struct msi_msg *msg);
+int iommu_update_ire_from_msi(struct msi_desc *msi_desc, struct msi_msg *msg);
 void iommu_read_msi_from_ire(struct msi_desc *msi_desc, struct msi_msg *msg);
 unsigned int iommu_read_apic_from_ire(unsigned int apic, unsigned int reg);
 int iommu_setup_hpet_msi(struct msi_desc *);
