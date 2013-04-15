@@ -137,7 +137,7 @@ svm_msrbit(unsigned long *msr_bitmap, uint32_t msr)
     return msr_bit;
 }
 
-void svm_intercept_msr(struct vcpu *v, uint32_t msr, int enable)
+void svm_intercept_msr(struct vcpu *v, uint32_t msr, int flags)
 {
     unsigned long *msr_bit;
 
@@ -145,16 +145,15 @@ void svm_intercept_msr(struct vcpu *v, uint32_t msr, int enable)
     BUG_ON(msr_bit == NULL);
     msr &= 0x1fff;
 
-    if ( enable )
-    {
-        __set_bit(msr * 2, msr_bit);
-        __set_bit(msr * 2 + 1, msr_bit);
-    }
+    if ( flags & MSR_INTERCEPT_READ )
+         __set_bit(msr * 2, msr_bit);
     else
-    {
-        __clear_bit(msr * 2, msr_bit);
+         __clear_bit(msr * 2, msr_bit);
+
+    if ( flags & MSR_INTERCEPT_WRITE )
+        __set_bit(msr * 2 + 1, msr_bit);
+    else
         __clear_bit(msr * 2 + 1, msr_bit);
-    }
 }
 
 static void svm_save_dr(struct vcpu *v)
