@@ -88,6 +88,7 @@ struct amd_vpmu_context {
     u64 counters[MAX_NUM_COUNTERS];
     u64 ctrls[MAX_NUM_COUNTERS];
     u32 hw_lapic_lvtpc;
+    bool_t msr_bitmap_set;
 };
 
 static inline int get_pmu_reg_type(u32 addr)
@@ -136,6 +137,36 @@ static inline u32 get_fam15h_addr(u32 addr)
     }
 
     return addr;
+}
+
+static void amd_vpmu_set_msr_bitmap(struct vcpu *v)
+{
+    unsigned int i;
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    struct amd_vpmu_context *ctxt = vpmu->context;
+
+    for ( i = 0; i < num_counters; i++ )
+    {
+        svm_intercept_msr(v, counters[i], MSR_INTERCEPT_NONE);
+        svm_intercept_msr(v, ctrls[i], MSR_INTERCEPT_WRITE);
+    }
+
+    ctxt->msr_bitmap_set = 1;
+}
+
+static void amd_vpmu_unset_msr_bitmap(struct vcpu *v)
+{
+    unsigned int i;
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    struct amd_vpmu_context *ctxt = vpmu->context;
+
+    for ( i = 0; i < num_counters; i++ )
+    {
+        svm_intercept_msr(v, counters[i], MSR_INTERCEPT_RW);
+        svm_intercept_msr(v, ctrls[i], MSR_INTERCEPT_RW);
+    }
+
+    ctxt->msr_bitmap_set = 0;
 }
 
 static int amd_vpmu_do_interrupt(struct cpu_user_regs *regs)
@@ -219,6 +250,10 @@ static void amd_vpmu_save(struct vcpu *v)
         return;
 
     context_save(v);
+
+    if ( !vpmu_is_set(vpmu, VPMU_RUNNING) && ctx->msr_bitmap_set )
+        amd_vpmu_unset_msr_bitmap(v);
+
     ctx->hw_lapic_lvtpc = apic_read(APIC_LVTPC);
     apic_write(APIC_LVTPC,  ctx->hw_lapic_lvtpc | APIC_LVT_MASKED);
 }
@@ -267,6 +302,9 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
             return 1;
         vpmu_set(vpmu, VPMU_RUNNING);
         apic_write(APIC_LVTPC, PMU_APIC_VECTOR);
+
+        if ( !((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
+            amd_vpmu_set_msr_bitmap(v);
     }
 
     /* stop saving & restore if guest stops first counter */
@@ -275,6 +313,8 @@ static int amd_vpmu_do_wrmsr(unsigned int msr, uint64_t msr_content)
     {
         apic_write(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
         vpmu_reset(vpmu, VPMU_RUNNING);
+        if ( ((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
+            amd_vpmu_unset_msr_bitmap(v);
         release_pmu_ownship(PMU_OWNER_HVM);
     }
 
@@ -344,6 +384,9 @@ static void amd_vpmu_destroy(struct vcpu *v)
 
     if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
         return;
+
+    if ( ((struct amd_vpmu_context *)vpmu->context)->msr_bitmap_set )
+        amd_vpmu_unset_msr_bitmap(v);
 
     xfree(vpmu->context);
     vpmu_reset(vpmu, VPMU_CONTEXT_ALLOCATED);

@@ -1052,8 +1052,8 @@ static int svm_vcpu_initialise(struct vcpu *v)
 
 static void svm_vcpu_destroy(struct vcpu *v)
 {
-    svm_destroy_vmcb(v);
     vpmu_destroy(v);
+    svm_destroy_vmcb(v);
     passive_domain_destroy(v);
 }
 
