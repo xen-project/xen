@@ -44,7 +44,6 @@ struct core2_vpmu_context {
     u64 fix_counters[VPMU_CORE2_NUM_FIXED];
     u64 ctrls[VPMU_CORE2_NUM_CTRLS];
     u64 global_ovf_status;
-    u32 hw_lapic_lvtpc;
     struct arch_msr_pair arch_msr_pair[1];
 };
 

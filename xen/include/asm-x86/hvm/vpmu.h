@@ -62,6 +62,7 @@ int svm_vpmu_initialise(struct vcpu *, unsigned int flags);
 
 struct vpmu_struct {
     u32 flags;
+    u32 hw_lapic_lvtpc;
     void *context;
     struct arch_vpmu_ops *arch_vpmu_ops;
 };

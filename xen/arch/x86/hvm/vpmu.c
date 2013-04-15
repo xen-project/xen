@@ -31,7 +31,7 @@
 #include <asm/hvm/vpmu.h>
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
-
+#include <asm/apic.h>
 
 /*
  * "vpmu" :     vpmu generally enabled
@@ -83,10 +83,31 @@ int vpmu_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 
 int vpmu_do_interrupt(struct cpu_user_regs *regs)
 {
-    struct vpmu_struct *vpmu = vcpu_vpmu(current);
+    struct vcpu *v = current;
+    struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->do_interrupt )
-        return vpmu->arch_vpmu_ops->do_interrupt(regs);
+    if ( vpmu->arch_vpmu_ops )
+    {
+        struct vlapic *vlapic = vcpu_vlapic(v);
+        u32 vlapic_lvtpc;
+        unsigned char int_vec;
+
+        if ( !vpmu->arch_vpmu_ops->do_interrupt(regs) )
+            return 0;
+
+        if ( !is_vlapic_lvtpc_enabled(vlapic) )
+            return 1;
+
+        vlapic_lvtpc = vlapic_get_reg(vlapic, APIC_LVTPC);
+        int_vec = vlapic_lvtpc & APIC_VECTOR_MASK;
+
+        if ( GET_APIC_DELIVERY_MODE(vlapic_lvtpc) == APIC_MODE_FIXED )
+            vlapic_set_irq(vcpu_vlapic(v), int_vec, 0);
+        else
+            v->nmi_pending = 1;
+        return 1;
+    }
+
     return 0;
 }
 
@@ -104,16 +125,35 @@ void vpmu_save(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
-    if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_save )
+    if ( !(vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) &&
+           vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED)) )
+       return;
+
+    if ( vpmu->arch_vpmu_ops )
         vpmu->arch_vpmu_ops->arch_vpmu_save(v);
+
+    vpmu->hw_lapic_lvtpc = apic_read(APIC_LVTPC);
+    apic_write(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
+
+    vpmu_reset(vpmu, VPMU_CONTEXT_LOADED);
 }
 
 void vpmu_load(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
 
+    /* Only when PMU is counting, we load PMU context immediately. */
+    if ( !(vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) &&
+           vpmu_is_set(vpmu, VPMU_RUNNING)) )
+        return;
+
     if ( vpmu->arch_vpmu_ops && vpmu->arch_vpmu_ops->arch_vpmu_load )
+    {
+        apic_write_around(APIC_LVTPC, vpmu->hw_lapic_lvtpc);
         vpmu->arch_vpmu_ops->arch_vpmu_load(v);
+    }
+
+    vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
 }
 
 void vpmu_initialise(struct vcpu *v)

@@ -305,17 +305,11 @@ static inline void __core2_vpmu_save(struct vcpu *v)
         rdmsrl(core2_fix_counters.msr[i], core2_vpmu_cxt->fix_counters[i]);
     for ( i = 0; i < core2_get_pmc_count(); i++ )
         rdmsrl(MSR_IA32_PERFCTR0+i, core2_vpmu_cxt->arch_msr_pair[i].counter);
-    core2_vpmu_cxt->hw_lapic_lvtpc = apic_read(APIC_LVTPC);
-    apic_write(APIC_LVTPC, PMU_APIC_VECTOR | APIC_LVT_MASKED);
 }
 
 static void core2_vpmu_save(struct vcpu *v)
 {
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
-
-    if ( !(vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) &&
-           vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED)) )
-        return;
 
     __core2_vpmu_save(v);
 
@@ -323,7 +317,6 @@ static void core2_vpmu_save(struct vcpu *v)
     if ( !vpmu_is_set(vpmu, VPMU_RUNNING) && cpu_has_vmx_msr_bitmap )
         core2_vpmu_unset_msr_bitmap(v->arch.hvm_vmx.msr_bitmap);
 
-    vpmu_reset(vpmu, VPMU_CONTEXT_LOADED);
     return;
 }
 
@@ -341,20 +334,11 @@ static inline void __core2_vpmu_load(struct vcpu *v)
         wrmsrl(core2_ctrls.msr[i], core2_vpmu_cxt->ctrls[i]);
     for ( i = 0; i < core2_get_pmc_count(); i++ )
         wrmsrl(MSR_P6_EVNTSEL0+i, core2_vpmu_cxt->arch_msr_pair[i].control);
-
-    apic_write_around(APIC_LVTPC, core2_vpmu_cxt->hw_lapic_lvtpc);
 }
 
 static void core2_vpmu_load(struct vcpu *v)
 {
-    struct vpmu_struct *vpmu = vcpu_vpmu(v);
-
-    /* Only when PMU is counting, we load PMU context immediately. */
-    if ( !(vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) &&
-           vpmu_is_set(vpmu, VPMU_RUNNING)) )
-        return;
     __core2_vpmu_load(v);
-    vpmu_set(vpmu, VPMU_CONTEXT_LOADED);
 }
 
 static int core2_vpmu_alloc_resource(struct vcpu *v)
@@ -705,11 +689,8 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     u64 msr_content;
-    u32 vlapic_lvtpc;
-    unsigned char int_vec;
     struct vpmu_struct *vpmu = vcpu_vpmu(v);
     struct core2_vpmu_context *core2_vpmu_cxt = vpmu->context;
-    struct vlapic *vlapic = vcpu_vlapic(v);
 
     rdmsrl(MSR_CORE_PERF_GLOBAL_STATUS, msr_content);
     if ( msr_content )
@@ -728,18 +709,9 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
             return 0;
     }
 
+    /* HW sets the MASK bit when performance counter interrupt occurs*/
     apic_write_around(APIC_LVTPC, apic_read(APIC_LVTPC) & ~APIC_LVT_MASKED);
 
-    if ( !is_vlapic_lvtpc_enabled(vlapic) )
-        return 1;
-
-    vlapic_lvtpc = vlapic_get_reg(vlapic, APIC_LVTPC);
-    int_vec = vlapic_lvtpc & APIC_VECTOR_MASK;
-    vlapic_set_reg(vlapic, APIC_LVTPC, vlapic_lvtpc | APIC_LVT_MASKED);
-    if ( GET_APIC_DELIVERY_MODE(vlapic_lvtpc) == APIC_MODE_FIXED )
-        vlapic_set_irq(vcpu_vlapic(v), int_vec, 0);
-    else
-        v->nmi_pending = 1;
     return 1;
 }
 
