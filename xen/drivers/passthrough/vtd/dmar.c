@@ -283,8 +283,7 @@ static int __init scope_device_count(const void *start, const void *end)
     while ( start < end )
     {
         scope = start;
-        if ( (scope->length < MIN_SCOPE_LEN) ||
-             (scope->entry_type >= ACPI_DMAR_SCOPE_TYPE_RESERVED) )
+        if ( scope->length < MIN_SCOPE_LEN )
         {
             dprintk(XENLOG_WARNING VTDPREFIX, "Invalid device scope.\n");
             return -EINVAL;
@@ -409,6 +408,13 @@ static int __init acpi_parse_dev_scope(
             }
 
             break;
+
+        default:
+            if ( iommu_verbose )
+                printk(XENLOG_WARNING VTDPREFIX "Unknown scope type %#x\n",
+                       acpi_scope->entry_type);
+            start += acpi_scope->length;
+            continue;
         }
         scope->devices[didx++] = PCI_BDF(bus, path->dev, path->fn);
         start += acpi_scope->length;
