@@ -421,10 +421,12 @@ void __cpuinit gic_init_secondary_cpu(void)
 /* Shut down the per-CPU GIC interface */
 void gic_disable_cpu(void)
 {
-    spin_lock_irq(&gic.lock);
+    ASSERT(!local_irq_is_enabled());
+
+    spin_lock(&gic.lock);
     gic_cpu_disable();
     gic_hyp_disable();
-    spin_unlock_irq(&gic.lock);
+    spin_unlock(&gic.lock);
 }
 
 void gic_route_ppis(void)
