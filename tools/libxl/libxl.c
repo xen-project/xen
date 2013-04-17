@@ -4183,6 +4183,26 @@ int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,
     return rc;
 }
 
+int libxl_domain_set_nodeaffinity(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_bitmap *nodemap)
+{
+    if (xc_domain_node_setaffinity(ctx->xch, domid, nodemap->map)) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "setting node affinity");
+        return ERROR_FAIL;
+    }
+    return 0;
+}
+
+int libxl_domain_get_nodeaffinity(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_bitmap *nodemap)
+{
+    if (xc_domain_node_getaffinity(ctx->xch, domid, nodemap->map)) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting node affinity");
+        return ERROR_FAIL;
+    }
+    return 0;
+}
+
 int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap)
 {
     GC_INIT(ctx);

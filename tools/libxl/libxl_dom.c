@@ -230,6 +230,7 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
         if (rc)
             return rc;
     }
+    libxl_domain_set_nodeaffinity(ctx, domid, &info->nodemap);
     libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus, &info->cpumap);
 
     xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + LIBXL_MAXMEM_CONSTANT);

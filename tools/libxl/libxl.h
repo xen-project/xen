@@ -75,6 +75,13 @@
 #define LIBXL_HAVE_FIRMWARE_PASSTHROUGH 1
 
 /*
+ * LIBXL_HAVE_DOMAIN_NODEAFFINITY indicates that a 'nodemap' field
+ * (of libxl_bitmap type) is present in libxl_domain_build_info,
+ * containing the node-affinity for the domain.
+ */
+#define LIBXL_HAVE_DOMAIN_NODEAFFINITY 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility
@@ -884,6 +891,10 @@ int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
                            libxl_bitmap *cpumap);
 int libxl_set_vcpuaffinity_all(libxl_ctx *ctx, uint32_t domid,
                                unsigned int max_vcpus, libxl_bitmap *cpumap);
+int libxl_domain_set_nodeaffinity(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_bitmap *nodemap);
+int libxl_domain_get_nodeaffinity(libxl_ctx *ctx, uint32_t domid,
+                                  libxl_bitmap *nodemap);
 int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap);
 
 libxl_scheduler libxl_get_scheduler(libxl_ctx *ctx);
