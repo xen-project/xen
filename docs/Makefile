@@ -84,9 +84,9 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(DOCDIR)
 
 	$(INSTALL_DIR) $(DESTDIR)$(MANDIR)
-	cp -dR man1 $(DESTDIR)$(MANDIR)
-	cp -dR man5 $(DESTDIR)$(MANDIR)
-	[ ! -d html ] || cp -dR html $(DESTDIR)$(DOCDIR)
+	cp -R man1 $(DESTDIR)$(MANDIR)
+	cp -R man5 $(DESTDIR)$(MANDIR)
+	[ ! -d html ] || cp -R html $(DESTDIR)$(DOCDIR)
 
 html/index.html: $(DOC_HTML) ./gen-html-index INDEX
 	perl -w -- ./gen-html-index -i INDEX html $(DOC_HTML)
