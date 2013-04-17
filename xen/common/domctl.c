@@ -117,6 +117,20 @@ int xenctl_bitmap_to_cpumask(cpumask_var_t *cpumask,
     return err;
 }
 
+int nodemask_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_nodemap,
+                              const nodemask_t *nodemask)
+{
+    return bitmap_to_xenctl_bitmap(xenctl_nodemap, nodes_addr(*nodemask),
+                                   MAX_NUMNODES);
+}
+
+int xenctl_bitmap_to_nodemask(nodemask_t *nodemask,
+                              const struct xenctl_bitmap *xenctl_nodemap)
+{
+    return xenctl_bitmap_to_bitmap(nodes_addr(*nodemask), xenctl_nodemap,
+                                   MAX_NUMNODES);
+}
+
 static inline int is_free_domid(domid_t dom)
 {
     struct domain *d;
