@@ -532,6 +532,21 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
     if ( vc->processor == cpu && IS_RUNQ_IDLE(cpu) )
         cpumask_set_cpu(cpu, &idlers);
     cpumask_and(&cpus, &cpus, &idlers);
+
+    /*
+     * It is important that cpu points to an idle processor, if a suitable
+     * one exists (and we can use cpus to check and, possibly, choose a new
+     * CPU, as we just &&-ed it with idlers). In fact, if we are on SMT, and
+     * cpu points to a busy thread with an idle sibling, both the threads
+     * will be considered the same, from the "idleness" calculation point
+     * of view", preventing vcpu from being moved to the thread that is
+     * actually idle.
+     *
+     * Notice that cpumask_test_cpu() is quicker than cpumask_empty(), so
+     * we check for it first.
+     */
+    if ( !cpumask_test_cpu(cpu, &cpus) && !cpumask_empty(&cpus) )
+        cpu = cpumask_cycle(cpu, &cpus);
     cpumask_clear_cpu(cpu, &cpus);
 
     while ( !cpumask_empty(&cpus) )
