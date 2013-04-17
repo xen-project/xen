@@ -3061,16 +3061,97 @@ out:
     }
 }
 
-static void list_domains(int verbose, int context, int claim,
+/* If map is not full, prints it and returns 0. Returns 1 otherwise. */
+static int print_bitmap(uint8_t *map, int maplen, FILE *stream)
+{
+    int i;
+    uint8_t pmap = 0, bitmask = 0;
+    int firstset = 0, state = 0;
+
+    for (i = 0; i < maplen; i++) {
+        if (i % 8 == 0) {
+            pmap = *map++;
+            bitmask = 1;
+        } else bitmask <<= 1;
+
+        switch (state) {
+        case 0:
+        case 2:
+            if ((pmap & bitmask) != 0) {
+                firstset = i;
+                state++;
+            }
+            continue;
+        case 1:
+        case 3:
+            if ((pmap & bitmask) == 0) {
+                fprintf(stream, "%s%d", state > 1 ? "," : "", firstset);
+                if (i - 1 > firstset)
+                    fprintf(stream, "-%d", i - 1);
+                state = 2;
+            }
+            continue;
+        }
+    }
+    switch (state) {
+        case 0:
+            fprintf(stream, "none");
+            break;
+        case 2:
+            break;
+        case 1:
+            if (firstset == 0)
+                return 1;
+        case 3:
+            fprintf(stream, "%s%d", state > 1 ? "," : "", firstset);
+            if (i - 1 > firstset)
+                fprintf(stream, "-%d", i - 1);
+            break;
+    }
+
+    return 0;
+}
+
+static void print_cpumap(uint8_t *map, int maplen, FILE *stream)
+{
+    if (print_bitmap(map, maplen, stream))
+        fprintf(stream, "any cpu");
+}
+
+static void print_nodemap(uint8_t *map, int maplen, FILE *stream)
+{
+    if (print_bitmap(map, maplen, stream))
+        fprintf(stream, "any node");
+}
+
+static void list_domains(int verbose, int context, int claim, int numa,
                          const libxl_dominfo *info, int nb_domain)
 {
     int i;
     static const char shutdown_reason_letters[]= "-rscw";
+    libxl_bitmap nodemap;
+    libxl_physinfo physinfo;
+
+    libxl_bitmap_init(&nodemap);
+    libxl_physinfo_init(&physinfo);
 
     printf("Name                                        ID   Mem VCPUs\tState\tTime(s)");
     if (verbose) printf("   UUID                            Reason-Code\tSecurity Label");
     if (context && !verbose) printf("   Security Label");
     if (claim) printf("  Claimed");
+    if (numa) {
+        if (libxl_node_bitmap_alloc(ctx, &nodemap, 0)) {
+            fprintf(stderr, "libxl_node_bitmap_alloc_failed.\n");
+            exit(1);
+        }
+        if (libxl_get_physinfo(ctx, &physinfo) != 0) {
+            fprintf(stderr, "libxl_physinfo failed.\n");
+            libxl_bitmap_dispose(&nodemap);
+            exit(1);
+        }
+
+        printf(" NODE Affinity");
+    }
     printf("\n");
     for (i = 0; i < nb_domain; i++) {
         char *domname;
@@ -3103,18 +3184,23 @@ static void list_domains(int verbose, int context, int claim,
         if (verbose || context) {
             int rc;
             size_t size;
-            char *buf;
+            char *buf = NULL;
             rc = libxl_flask_sid_to_context(ctx, info[i].ssidref, &buf,
                                             &size);
-            if (rc < 0)
-                printf("  -");
-            else {
-                printf("  %s", buf);
-                free(buf);
-            }
+            printf(" %16s", rc < 0 ? "-" : buf);
+            free(buf);
+        }
+        if (numa) {
+            libxl_domain_get_nodeaffinity(ctx, info[i].domid, &nodemap);
+
+            putchar(' ');
+            print_nodemap(nodemap.map, physinfo.nr_nodes, stdout);
         }
         putchar('\n');
     }
+
+    libxl_bitmap_dispose(&nodemap);
+    libxl_physinfo_dispose(&physinfo);
 }
 
 static void list_vm(void)
@@ -3981,10 +4067,12 @@ int main_list(int argc, char **argv)
     int opt, verbose = 0;
     int context = 0;
     int details = 0;
+    int numa = 0;
     static struct option opts[] = {
         {"long", 0, 0, 'l'},
         {"verbose", 0, 0, 'v'},
         {"context", 0, 0, 'Z'},
+        {"numa", 0, 0, 'n'},
         COMMON_LONG_OPTS,
         {0, 0, 0, 0}
     };
@@ -3993,7 +4081,7 @@ int main_list(int argc, char **argv)
     libxl_dominfo *info, *info_free=0;
     int nb_domain, rc;
 
-    SWITCH_FOREACH_OPT(opt, "lvhZ", opts, "list", 0) {
+    SWITCH_FOREACH_OPT(opt, "lvhZn", opts, "list", 0) {
     case 'l':
         details = 1;
         break;
@@ -4002,6 +4090,9 @@ int main_list(int argc, char **argv)
         break;
     case 'Z':
         context = 1;
+        break;
+    case 'n':
+        numa = 1;
         break;
     }
 
@@ -4034,7 +4125,7 @@ int main_list(int argc, char **argv)
     if (details)
         list_domains_details(info, nb_domain);
     else
-        list_domains(verbose, context, 0 /* claim */, info, nb_domain);
+        list_domains(verbose, context, 0 /* claim */, numa, info, nb_domain);
 
     if (info_free)
         libxl_dominfo_list_free(info, nb_domain);
@@ -4283,56 +4374,6 @@ int main_button_press(int argc, char **argv)
     return 0;
 }
 
-static void print_bitmap(uint8_t *map, int maplen, FILE *stream)
-{
-    int i;
-    uint8_t pmap = 0, bitmask = 0;
-    int firstset = 0, state = 0;
-
-    for (i = 0; i < maplen; i++) {
-        if (i % 8 == 0) {
-            pmap = *map++;
-            bitmask = 1;
-        } else bitmask <<= 1;
-
-        switch (state) {
-        case 0:
-        case 2:
-            if ((pmap & bitmask) != 0) {
-                firstset = i;
-                state++;
-            }
-            continue;
-        case 1:
-        case 3:
-            if ((pmap & bitmask) == 0) {
-                fprintf(stream, "%s%d", state > 1 ? "," : "", firstset);
-                if (i - 1 > firstset)
-                    fprintf(stream, "-%d", i - 1);
-                state = 2;
-            }
-            continue;
-        }
-    }
-    switch (state) {
-        case 0:
-            fprintf(stream, "none");
-            break;
-        case 2:
-            break;
-        case 1:
-            if (firstset == 0) {
-                fprintf(stream, "any cpu");
-                break;
-            }
-        case 3:
-            fprintf(stream, "%s%d", state > 1 ? "," : "", firstset);
-            if (i - 1 > firstset)
-                fprintf(stream, "-%d", i - 1);
-            break;
-    }
-}
-
 static void print_vcpuinfo(uint32_t tdomid,
                            const libxl_vcpuinfo *vcpuinfo,
                            uint32_t nr_cpus)
@@ -4356,7 +4397,7 @@ static void print_vcpuinfo(uint32_t tdomid,
     /*      TIM */
     printf("%9.1f  ", ((float)vcpuinfo->vcpu_time / 1e9));
     /* CPU AFFINITY */
-    print_bitmap(vcpuinfo->cpumap.map, nr_cpus, stdout);
+    print_cpumap(vcpuinfo->cpumap.map, nr_cpus, stdout);
     printf("\n");
 }
 
@@ -5942,7 +5983,7 @@ int main_claims(int argc, char **argv)
     }
 
     list_domains(0 /* verbose */, 0 /* context */, 1 /* claim */,
-                 info, nb_domain);
+                 0 /* numa */, info, nb_domain);
 
     libxl_dominfo_list_free(info, nb_domain);
     return 0;

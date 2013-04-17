@@ -50,7 +50,8 @@ struct cmd_spec cmd_table[] = {
       "[options] [Domain]\n",
       "-l, --long              Output all VM details\n"
       "-v, --verbose           Prints out UUIDs and security context\n"
-      "-Z, --context           Prints out security context"
+      "-Z, --context           Prints out security context\n"
+      "-n, --numa              Prints out NUMA node affinity"
     },
     { "destroy",
       &main_destroy, 0, 1,
