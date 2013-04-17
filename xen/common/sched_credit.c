@@ -112,6 +112,12 @@
 
 
 /*
+ * Node Balancing
+ */
+#define CSCHED_BALANCE_NODE_AFFINITY    0
+#define CSCHED_BALANCE_CPU_AFFINITY     1
+
+/*
  * Boot parameters
  */
 static int __read_mostly sched_credit_tslice_ms = CSCHED_DEFAULT_TSLICE_MS;
@@ -126,7 +132,18 @@ struct csched_pcpu {
     struct timer ticker;
     unsigned int tick;
     unsigned int idle_bias;
+    /* Store this here to avoid having too many cpumask_var_t-s on stack */
+    cpumask_var_t balance_mask;
 };
+
+/*
+ * Convenience macro for accessing the per-PCPU cpumask we need for
+ * implementing the two steps (vcpu and node affinity) balancing logic.
+ * It is stored in csched_pcpu so that serialization is not an issue,
+ * as there is a csched_pcpu for each PCPU and we always hold the
+ * runqueue spin-lock when using this.
+ */
+#define csched_balance_mask (CSCHED_PCPU(smp_processor_id())->balance_mask)
 
 /*
  * Virtual CPU
@@ -161,6 +178,9 @@ struct csched_dom {
     struct list_head active_vcpu;
     struct list_head active_sdom_elem;
     struct domain *dom;
+    /* cpumask translated from the domain's node-affinity.
+     * Basically, the CPUs we prefer to be scheduled on. */
+    cpumask_var_t node_affinity_cpumask;
     uint16_t active_vcpu_count;
     uint16_t weight;
     uint16_t cap;
@@ -241,6 +261,35 @@ __runq_remove(struct csched_vcpu *svc)
     list_del_init(&svc->runq_elem);
 }
 
+#define for_each_csched_balance_step(step) \
+    for ( (step) = 0; (step) <= CSCHED_BALANCE_CPU_AFFINITY; (step)++ )
+
+
+/*
+ * vcpu-affinity balancing is always necessary and must never be skipped.
+ * OTOH, if a domain's node-affinity spans all the nodes, we can safely
+ * avoid dealing with node-affinity entirely.
+ */
+#define __vcpu_has_node_affinity(vc) \
+    ( !cpumask_full(CSCHED_DOM(vc->domain)->node_affinity_cpumask) )
+
+/*
+ * Each csched-balance step uses its own cpumask. This function determines
+ * which one (given the step) and copies it in mask. For the node-affinity
+ * balancing step, the pcpus that are not part of vc's vcpu-affinity are
+ * filtered out from the result, to avoid running a vcpu where it would
+ * like, but is not allowed to!
+ */
+static void
+csched_balance_cpumask(const struct vcpu *vc, int step, cpumask_t *mask)
+{
+    if ( step == CSCHED_BALANCE_NODE_AFFINITY )
+        cpumask_and(mask, CSCHED_DOM(vc->domain)->node_affinity_cpumask,
+                    vc->cpu_affinity);
+    else /* step == CSCHED_BALANCE_CPU_AFFINITY */
+        cpumask_copy(mask, vc->cpu_affinity);
+}
+
 static void burn_credits(struct csched_vcpu *svc, s_time_t now)
 {
     s_time_t delta;
@@ -272,12 +321,12 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
     struct csched_vcpu * const cur = CSCHED_VCPU(curr_on_cpu(cpu));
     struct csched_private *prv = CSCHED_PRIV(per_cpu(scheduler, cpu));
     cpumask_t mask, idle_mask;
-    int idlers_empty;
+    int balance_step, idlers_empty;
 
     ASSERT(cur);
     cpumask_clear(&mask);
-
     idlers_empty = cpumask_empty(prv->idlers);
+
 
     /*
      * If the pcpu is idle, or there are no idlers and the new
@@ -297,41 +346,70 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
     }
     else if ( !idlers_empty )
     {
-        /* Check whether or not there are idlers that can run new */
-        cpumask_and(&idle_mask, prv->idlers, new->vcpu->cpu_affinity);
-
         /*
-         * If there are no suitable idlers for new, and it's higher
-         * priority than cur, ask the scheduler to migrate cur away.
-         * We have to act like this (instead of just waking some of
-         * the idlers suitable for cur) because cur is running.
-         *
-         * If there are suitable idlers for new, no matter priorities,
-         * leave cur alone (as it is running and is, likely, cache-hot)
-         * and wake some of them (which is waking up and so is, likely,
-         * cache cold anyway).
+         * Node and vcpu-affinity balancing loop. For vcpus without
+         * a useful node-affinity, consider vcpu-affinity only.
          */
-        if ( cpumask_empty(&idle_mask) && new->pri > cur->pri )
+        for_each_csched_balance_step( balance_step )
         {
-            SCHED_STAT_CRANK(tickle_idlers_none);
-            SCHED_VCPU_STAT_CRANK(cur, kicked_away);
-            SCHED_VCPU_STAT_CRANK(cur, migrate_r);
-            SCHED_STAT_CRANK(migrate_kicked_away);
-            set_bit(_VPF_migrating, &cur->vcpu->pause_flags);
-            cpumask_set_cpu(cpu, &mask);
-        }
-        else if ( !cpumask_empty(&idle_mask) )
-        {
-            /* Which of the idlers suitable for new shall we wake up? */
-            SCHED_STAT_CRANK(tickle_idlers_some);
-            if ( opt_tickle_one_idle )
+            int new_idlers_empty;
+
+            if ( balance_step == CSCHED_BALANCE_NODE_AFFINITY
+                 && !__vcpu_has_node_affinity(new->vcpu) )
+                continue;
+
+            /* Are there idlers suitable for new (for this balance step)? */
+            csched_balance_cpumask(new->vcpu, balance_step,
+                                   csched_balance_mask);
+            cpumask_and(&idle_mask, prv->idlers, csched_balance_mask);
+            new_idlers_empty = cpumask_empty(&idle_mask);
+
+            /*
+             * Let's not be too harsh! If there aren't idlers suitable
+             * for new in its node-affinity mask, make sure we check its
+             * vcpu-affinity as well, before taking final decisions.
+             */
+            if ( new_idlers_empty
+                 && balance_step == CSCHED_BALANCE_NODE_AFFINITY )
+                continue;
+
+            /*
+             * If there are no suitable idlers for new, and it's higher
+             * priority than cur, ask the scheduler to migrate cur away.
+             * We have to act like this (instead of just waking some of
+             * the idlers suitable for cur) because cur is running.
+             *
+             * If there are suitable idlers for new, no matter priorities,
+             * leave cur alone (as it is running and is, likely, cache-hot)
+             * and wake some of them (which is waking up and so is, likely,
+             * cache cold anyway).
+             */
+            if ( new_idlers_empty && new->pri > cur->pri )
             {
-                this_cpu(last_tickle_cpu) =
-                    cpumask_cycle(this_cpu(last_tickle_cpu), &idle_mask);
-                cpumask_set_cpu(this_cpu(last_tickle_cpu), &mask);
+                SCHED_STAT_CRANK(tickle_idlers_none);
+                SCHED_VCPU_STAT_CRANK(cur, kicked_away);
+                SCHED_VCPU_STAT_CRANK(cur, migrate_r);
+                SCHED_STAT_CRANK(migrate_kicked_away);
+                set_bit(_VPF_migrating, &cur->vcpu->pause_flags);
+                cpumask_set_cpu(cpu, &mask);
             }
-            else
-                cpumask_or(&mask, &mask, &idle_mask);
+            else if ( !new_idlers_empty )
+            {
+                /* Which of the idlers suitable for new shall we wake up? */
+                SCHED_STAT_CRANK(tickle_idlers_some);
+                if ( opt_tickle_one_idle )
+                {
+                    this_cpu(last_tickle_cpu) =
+                        cpumask_cycle(this_cpu(last_tickle_cpu), &idle_mask);
+                    cpumask_set_cpu(this_cpu(last_tickle_cpu), &mask);
+                }
+                else
+                    cpumask_or(&mask, &mask, &idle_mask);
+            }
+
+            /* Did we find anyone? */
+            if ( !cpumask_empty(&mask) )
+                break;
         }
     }
 
@@ -376,6 +454,7 @@ csched_free_pdata(const struct scheduler *ops, void *pcpu, int cpu)
 
     spin_unlock_irqrestore(&prv->lock, flags);
 
+    free_cpumask_var(spc->balance_mask);
     xfree(spc);
 }
 
@@ -390,6 +469,12 @@ csched_alloc_pdata(const struct scheduler *ops, int cpu)
     spc = xzalloc(struct csched_pcpu);
     if ( spc == NULL )
         return NULL;
+
+    if ( !alloc_cpumask_var(&spc->balance_mask) )
+    {
+        xfree(spc);
+        return NULL;
+    }
 
     spin_lock_irqsave(&prv->lock, flags);
 
@@ -481,15 +566,16 @@ __csched_vcpu_is_cache_hot(struct vcpu *v)
 }
 
 static inline int
-__csched_vcpu_is_migrateable(struct vcpu *vc, int dest_cpu)
+__csched_vcpu_is_migrateable(struct vcpu *vc, int dest_cpu, cpumask_t *mask)
 {
     /*
      * Don't pick up work that's in the peer's scheduling tail or hot on
-     * peer PCPU. Only pick up work that's allowed to run on our CPU.
+     * peer PCPU. Only pick up work that prefers and/or is allowed to run
+     * on our CPU.
      */
     return !vc->is_running &&
            !__csched_vcpu_is_cache_hot(vc) &&
-           cpumask_test_cpu(dest_cpu, vc->cpu_affinity);
+           cpumask_test_cpu(dest_cpu, mask);
 }
 
 static int
@@ -499,100 +585,114 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
     cpumask_t idlers;
     cpumask_t *online;
     struct csched_pcpu *spc = NULL;
-    int cpu;
+    int cpu = vc->processor;
+    int balance_step;
 
-    /*
-     * Pick from online CPUs in VCPU's affinity mask, giving a
-     * preference to its current processor if it's in there.
-     */
     online = cpupool_scheduler_cpumask(vc->domain->cpupool);
-    cpumask_and(&cpus, online, vc->cpu_affinity);
-    cpu = cpumask_test_cpu(vc->processor, &cpus)
-            ? vc->processor
-            : cpumask_cycle(vc->processor, &cpus);
-    ASSERT( !cpumask_empty(&cpus) && cpumask_test_cpu(cpu, &cpus) );
-
-    /*
-     * Try to find an idle processor within the above constraints.
-     *
-     * In multi-core and multi-threaded CPUs, not all idle execution
-     * vehicles are equal!
-     *
-     * We give preference to the idle execution vehicle with the most
-     * idling neighbours in its grouping. This distributes work across
-     * distinct cores first and guarantees we don't do something stupid
-     * like run two VCPUs on co-hyperthreads while there are idle cores
-     * or sockets.
-     *
-     * Notice that, when computing the "idleness" of cpu, we may want to
-     * discount vc. That is, iff vc is the currently running and the only
-     * runnable vcpu on cpu, we add cpu to the idlers.
-     */
-    cpumask_and(&idlers, &cpu_online_map, CSCHED_PRIV(ops)->idlers);
-    if ( vc->processor == cpu && IS_RUNQ_IDLE(cpu) )
-        cpumask_set_cpu(cpu, &idlers);
-    cpumask_and(&cpus, &cpus, &idlers);
-
-    /*
-     * It is important that cpu points to an idle processor, if a suitable
-     * one exists (and we can use cpus to check and, possibly, choose a new
-     * CPU, as we just &&-ed it with idlers). In fact, if we are on SMT, and
-     * cpu points to a busy thread with an idle sibling, both the threads
-     * will be considered the same, from the "idleness" calculation point
-     * of view", preventing vcpu from being moved to the thread that is
-     * actually idle.
-     *
-     * Notice that cpumask_test_cpu() is quicker than cpumask_empty(), so
-     * we check for it first.
-     */
-    if ( !cpumask_test_cpu(cpu, &cpus) && !cpumask_empty(&cpus) )
-        cpu = cpumask_cycle(cpu, &cpus);
-    cpumask_clear_cpu(cpu, &cpus);
-
-    while ( !cpumask_empty(&cpus) )
+    for_each_csched_balance_step( balance_step )
     {
-        cpumask_t cpu_idlers;
-        cpumask_t nxt_idlers;
-        int nxt, weight_cpu, weight_nxt;
-        int migrate_factor;
+        if ( balance_step == CSCHED_BALANCE_NODE_AFFINITY
+             && !__vcpu_has_node_affinity(vc) )
+            continue;
 
-        nxt = cpumask_cycle(cpu, &cpus);
+        /* Pick an online CPU from the proper affinity mask */
+        csched_balance_cpumask(vc, balance_step, &cpus);
+        cpumask_and(&cpus, &cpus, online);
 
-        if ( cpumask_test_cpu(cpu, per_cpu(cpu_core_mask, nxt)) )
+        /* If present, prefer vc's current processor */
+        cpu = cpumask_test_cpu(vc->processor, &cpus)
+                ? vc->processor
+                : cpumask_cycle(vc->processor, &cpus);
+        ASSERT( !cpumask_empty(&cpus) && cpumask_test_cpu(cpu, &cpus) );
+
+        /*
+         * Try to find an idle processor within the above constraints.
+         *
+         * In multi-core and multi-threaded CPUs, not all idle execution
+         * vehicles are equal!
+         *
+         * We give preference to the idle execution vehicle with the most
+         * idling neighbours in its grouping. This distributes work across
+         * distinct cores first and guarantees we don't do something stupid
+         * like run two VCPUs on co-hyperthreads while there are idle cores
+         * or sockets.
+         *
+         * Notice that, when computing the "idleness" of cpu, we may want to
+         * discount vc. That is, iff vc is the currently running and the only
+         * runnable vcpu on cpu, we add cpu to the idlers.
+         */
+        cpumask_and(&idlers, &cpu_online_map, CSCHED_PRIV(ops)->idlers);
+        if ( vc->processor == cpu && IS_RUNQ_IDLE(cpu) )
+            cpumask_set_cpu(cpu, &idlers);
+        cpumask_and(&cpus, &cpus, &idlers);
+
+        /*
+         * It is important that cpu points to an idle processor, if a suitable
+         * one exists (and we can use cpus to check and, possibly, choose a new
+         * CPU, as we just &&-ed it with idlers). In fact, if we are on SMT, and
+         * cpu points to a busy thread with an idle sibling, both the threads
+         * will be considered the same, from the "idleness" calculation point
+         * of view", preventing vcpu from being moved to the thread that is
+         * actually idle.
+         *
+         * Notice that cpumask_test_cpu() is quicker than cpumask_empty(), so
+         * we check for it first.
+         */
+        if ( !cpumask_test_cpu(cpu, &cpus) && !cpumask_empty(&cpus) )
+            cpu = cpumask_cycle(cpu, &cpus);
+        cpumask_clear_cpu(cpu, &cpus);
+
+        while ( !cpumask_empty(&cpus) )
         {
-            /* We're on the same socket, so check the busy-ness of threads.
-             * Migrate if # of idlers is less at all */
-            ASSERT( cpumask_test_cpu(nxt, per_cpu(cpu_core_mask, cpu)) );
-            migrate_factor = 1;
-            cpumask_and(&cpu_idlers, &idlers, per_cpu(cpu_sibling_mask, cpu));
-            cpumask_and(&nxt_idlers, &idlers, per_cpu(cpu_sibling_mask, nxt));
-        }
-        else
-        {
-            /* We're on different sockets, so check the busy-ness of cores.
-             * Migrate only if the other core is twice as idle */
-            ASSERT( !cpumask_test_cpu(nxt, per_cpu(cpu_core_mask, cpu)) );
-            migrate_factor = 2;
-            cpumask_and(&cpu_idlers, &idlers, per_cpu(cpu_core_mask, cpu));
-            cpumask_and(&nxt_idlers, &idlers, per_cpu(cpu_core_mask, nxt));
+            cpumask_t cpu_idlers;
+            cpumask_t nxt_idlers;
+            int nxt, weight_cpu, weight_nxt;
+            int migrate_factor;
+
+            nxt = cpumask_cycle(cpu, &cpus);
+
+            if ( cpumask_test_cpu(cpu, per_cpu(cpu_core_mask, nxt)) )
+            {
+                /* We're on the same socket, so check the busy-ness of threads.
+                 * Migrate if # of idlers is less at all */
+                ASSERT( cpumask_test_cpu(nxt, per_cpu(cpu_core_mask, cpu)) );
+                migrate_factor = 1;
+                cpumask_and(&cpu_idlers, &idlers, per_cpu(cpu_sibling_mask,
+                            cpu));
+                cpumask_and(&nxt_idlers, &idlers, per_cpu(cpu_sibling_mask,
+                            nxt));
+            }
+            else
+            {
+                /* We're on different sockets, so check the busy-ness of cores.
+                 * Migrate only if the other core is twice as idle */
+                ASSERT( !cpumask_test_cpu(nxt, per_cpu(cpu_core_mask, cpu)) );
+                migrate_factor = 2;
+                cpumask_and(&cpu_idlers, &idlers, per_cpu(cpu_core_mask, cpu));
+                cpumask_and(&nxt_idlers, &idlers, per_cpu(cpu_core_mask, nxt));
+            }
+
+            weight_cpu = cpumask_weight(&cpu_idlers);
+            weight_nxt = cpumask_weight(&nxt_idlers);
+            /* smt_power_savings: consolidate work rather than spreading it */
+            if ( sched_smt_power_savings ?
+                 weight_cpu > weight_nxt :
+                 weight_cpu * migrate_factor < weight_nxt )
+            {
+                cpumask_and(&nxt_idlers, &cpus, &nxt_idlers);
+                spc = CSCHED_PCPU(nxt);
+                cpu = cpumask_cycle(spc->idle_bias, &nxt_idlers);
+                cpumask_andnot(&cpus, &cpus, per_cpu(cpu_sibling_mask, cpu));
+            }
+            else
+            {
+                cpumask_andnot(&cpus, &cpus, &nxt_idlers);
+            }
         }
 
-        weight_cpu = cpumask_weight(&cpu_idlers);
-        weight_nxt = cpumask_weight(&nxt_idlers);
-        /* smt_power_savings: consolidate work rather than spreading it */
-        if ( sched_smt_power_savings ?
-             weight_cpu > weight_nxt :
-             weight_cpu * migrate_factor < weight_nxt )
-        {
-            cpumask_and(&nxt_idlers, &cpus, &nxt_idlers);
-            spc = CSCHED_PCPU(nxt);
-            cpu = cpumask_cycle(spc->idle_bias, &nxt_idlers);
-            cpumask_andnot(&cpus, &cpus, per_cpu(cpu_sibling_mask, cpu));
-        }
-        else
-        {
-            cpumask_andnot(&cpus, &cpus, &nxt_idlers);
-        }
+        /* Stop if cpu is idle */
+        if ( cpumask_test_cpu(cpu, &idlers) )
+            break;
     }
 
     if ( commit && spc )
@@ -934,6 +1034,13 @@ csched_alloc_domdata(const struct scheduler *ops, struct domain *dom)
     if ( sdom == NULL )
         return NULL;
 
+    if ( !alloc_cpumask_var(&sdom->node_affinity_cpumask) )
+    {
+        xfree(sdom);
+        return NULL;
+    }
+    cpumask_setall(sdom->node_affinity_cpumask);
+
     /* Initialize credit and weight */
     INIT_LIST_HEAD(&sdom->active_vcpu);
     sdom->active_vcpu_count = 0;
@@ -965,6 +1072,9 @@ csched_dom_init(const struct scheduler *ops, struct domain *dom)
 static void
 csched_free_domdata(const struct scheduler *ops, void *data)
 {
+    struct csched_dom *sdom = data;
+
+    free_cpumask_var(sdom->node_affinity_cpumask);
     xfree(data);
 }
 
@@ -1259,7 +1369,7 @@ csched_tick(void *_cpu)
 }
 
 static struct csched_vcpu *
-csched_runq_steal(int peer_cpu, int cpu, int pri)
+csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
 {
     const struct csched_pcpu * const peer_pcpu = CSCHED_PCPU(peer_cpu);
     const struct vcpu * const peer_vcpu = curr_on_cpu(peer_cpu);
@@ -1284,11 +1394,28 @@ csched_runq_steal(int peer_cpu, int cpu, int pri)
             if ( speer->pri <= pri )
                 break;
 
-            /* Is this VCPU is runnable on our PCPU? */
+            /* Is this VCPU runnable on our PCPU? */
             vc = speer->vcpu;
             BUG_ON( is_idle_vcpu(vc) );
 
-            if (__csched_vcpu_is_migrateable(vc, cpu))
+            /*
+             * If the vcpu has no useful node-affinity, skip this vcpu.
+             * In fact, what we want is to check if we have any node-affine
+             * work to steal, before starting to look at vcpu-affine work.
+             *
+             * Notice that, if not even one vCPU on this runq has a useful
+             * node-affinity, we could have avoid considering this runq for
+             * a node balancing step in the first place. This, for instance,
+             * can be implemented by taking note of on what runq there are
+             * vCPUs with useful node-affinities in some sort of bitmap
+             * or counter.
+             */
+            if ( balance_step == CSCHED_BALANCE_NODE_AFFINITY
+                 && !__vcpu_has_node_affinity(vc) )
+                continue;
+
+            csched_balance_cpumask(vc, balance_step, csched_balance_mask);
+            if ( __csched_vcpu_is_migrateable(vc, cpu, csched_balance_mask) )
             {
                 /* We got a candidate. Grab it! */
                 TRACE_3D(TRC_CSCHED_STOLEN_VCPU, peer_cpu,
@@ -1314,7 +1441,8 @@ csched_load_balance(struct csched_private *prv, int cpu,
     struct csched_vcpu *speer;
     cpumask_t workers;
     cpumask_t *online;
-    int peer_cpu;
+    int peer_cpu, peer_node, bstep;
+    int node = cpu_to_node(cpu);
 
     BUG_ON( cpu != snext->vcpu->processor );
     online = cpupool_scheduler_cpumask(per_cpu(cpupool, cpu));
@@ -1331,42 +1459,68 @@ csched_load_balance(struct csched_private *prv, int cpu,
         SCHED_STAT_CRANK(load_balance_other);
 
     /*
-     * Peek at non-idling CPUs in the system, starting with our
-     * immediate neighbour.
+     * Let's look around for work to steal, taking both vcpu-affinity
+     * and node-affinity into account. More specifically, we check all
+     * the non-idle CPUs' runq, looking for:
+     *  1. any node-affine work to steal first,
+     *  2. if not finding anything, any vcpu-affine work to steal.
      */
-    cpumask_andnot(&workers, online, prv->idlers);
-    cpumask_clear_cpu(cpu, &workers);
-    peer_cpu = cpu;
-
-    while ( !cpumask_empty(&workers) )
+    for_each_csched_balance_step( bstep )
     {
-        peer_cpu = cpumask_cycle(peer_cpu, &workers);
-        cpumask_clear_cpu(peer_cpu, &workers);
-
         /*
-         * Get ahold of the scheduler lock for this peer CPU.
-         *
-         * Note: We don't spin on this lock but simply try it. Spinning could
-         * cause a deadlock if the peer CPU is also load balancing and trying
-         * to lock this CPU.
+         * We peek at the non-idling CPUs in a node-wise fashion. In fact,
+         * it is more likely that we find some node-affine work on our same
+         * node, not to mention that migrating vcpus within the same node
+         * could well expected to be cheaper than across-nodes (memory
+         * stays local, there might be some node-wide cache[s], etc.).
          */
-        if ( !pcpu_schedule_trylock(peer_cpu) )
+        peer_node = node;
+        do
         {
-            SCHED_STAT_CRANK(steal_trylock_failed);
-            continue;
-        }
+            /* Find out what the !idle are in this node */
+            cpumask_andnot(&workers, online, prv->idlers);
+            cpumask_and(&workers, &workers, &node_to_cpumask(peer_node));
+            cpumask_clear_cpu(cpu, &workers);
 
-        /*
-         * Any work over there to steal?
-         */
-        speer = cpumask_test_cpu(peer_cpu, online) ?
-            csched_runq_steal(peer_cpu, cpu, snext->pri) : NULL;
-        pcpu_schedule_unlock(peer_cpu);
-        if ( speer != NULL )
-        {
-            *stolen = 1;
-            return speer;
-        }
+            if ( cpumask_empty(&workers) )
+                goto next_node;
+
+            peer_cpu = cpumask_first(&workers);
+            do
+            {
+                /*
+                 * Get ahold of the scheduler lock for this peer CPU.
+                 *
+                 * Note: We don't spin on this lock but simply try it. Spinning
+                 * could cause a deadlock if the peer CPU is also load
+                 * balancing and trying to lock this CPU.
+                 */
+                if ( !pcpu_schedule_trylock(peer_cpu) )
+                {
+                    SCHED_STAT_CRANK(steal_trylock_failed);
+                    peer_cpu = cpumask_cycle(peer_cpu, &workers);
+                    continue;
+                }
+
+                /* Any work over there to steal? */
+                speer = cpumask_test_cpu(peer_cpu, online) ?
+                    csched_runq_steal(peer_cpu, cpu, snext->pri, bstep) : NULL;
+                pcpu_schedule_unlock(peer_cpu);
+
+                /* As soon as one vcpu is found, balancing ends */
+                if ( speer != NULL )
+                {
+                    *stolen = 1;
+                    return speer;
+                }
+
+                peer_cpu = cpumask_cycle(peer_cpu, &workers);
+
+            } while( peer_cpu != cpumask_first(&workers) );
+
+ next_node:
+            peer_node = cycle_node(peer_node, node_online_map);
+        } while( peer_node != node );
     }
 
  out:
