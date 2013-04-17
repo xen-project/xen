@@ -584,9 +584,14 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
     struct pending_irq *iter, *n = irq_to_pending(v, irq);
     unsigned long flags;
 
-    /* irq still pending */
+    spin_lock_irqsave(&v->arch.vgic.lock, flags);
+
+    /* irq already pending */
     if (!list_empty(&n->inflight))
+    {
+        spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
         return;
+    }
 
     priority = byte_read(rank->ipriority[REG_RANK_INDEX(8, idx)], 0, byte);
 
@@ -601,17 +606,16 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
     if ( rank->ienable & (1 << (irq % 32)) )
         gic_set_guest_irq(v, irq, GICH_LR_PENDING, priority);
 
-    spin_lock_irqsave(&v->arch.vgic.lock, flags);
     list_for_each_entry ( iter, &v->arch.vgic.inflight_irqs, inflight )
     {
         if ( iter->priority > priority )
         {
             list_add_tail(&n->inflight, &iter->inflight);
-            spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
-            return;
+            goto out;
         }
     }
     list_add_tail(&n->inflight, &v->arch.vgic.inflight_irqs);
+out:
     spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
     /* we have a new higher priority irq, inject it into the guest */
 }
