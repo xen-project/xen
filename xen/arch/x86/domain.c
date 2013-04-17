@@ -387,13 +387,14 @@ int vcpu_initialise(struct vcpu *v)
 
     vmce_init_vcpu(v);
 
+    v->arch.vcpu_info_mfn = INVALID_MFN;
+
     if ( is_hvm_domain(d) )
     {
         rc = hvm_vcpu_initialise(v);
         goto done;
     }
 
-    v->arch.pv_vcpu.vcpu_info_mfn = INVALID_MFN;
 
     spin_lock_init(&v->arch.pv_vcpu.shadow_ldt_lock);
 
@@ -963,14 +964,14 @@ unmap_vcpu_info(struct vcpu *v)
 {
     unsigned long mfn;
 
-    if ( v->arch.pv_vcpu.vcpu_info_mfn == INVALID_MFN )
+    if ( v->arch.vcpu_info_mfn == INVALID_MFN )
         return;
 
-    mfn = v->arch.pv_vcpu.vcpu_info_mfn;
+    mfn = v->arch.vcpu_info_mfn;
     unmap_domain_page_global(v->vcpu_info);
 
     v->vcpu_info = &dummy_vcpu_info;
-    v->arch.pv_vcpu.vcpu_info_mfn = INVALID_MFN;
+    v->arch.vcpu_info_mfn = INVALID_MFN;
 
     put_page_and_type(mfn_to_page(mfn));
 }
@@ -993,7 +994,7 @@ map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
     if ( offset > (PAGE_SIZE - sizeof(vcpu_info_t)) )
         return -EINVAL;
 
-    if ( v->arch.pv_vcpu.vcpu_info_mfn != INVALID_MFN )
+    if ( v->arch.vcpu_info_mfn != INVALID_MFN )
         return -EINVAL;
 
     /* Run this command on yourself or on other offline VCPUS. */
@@ -1030,7 +1031,7 @@ map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
     }
 
     v->vcpu_info = new_info;
-    v->arch.pv_vcpu.vcpu_info_mfn = page_to_mfn(page);
+    v->arch.vcpu_info_mfn = page_to_mfn(page);
 
     /* Set new vcpu_info pointer /before/ setting pending flags. */
     wmb();
