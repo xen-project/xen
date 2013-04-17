@@ -224,6 +224,7 @@ struct domain *domain_create(
 
     spin_lock_init(&d->node_affinity_lock);
     d->node_affinity = NODE_MASK_ALL;
+    d->auto_node_affinity = 1;
 
     spin_lock_init(&d->shutdown_lock);
     d->shutdown_code = -1;
@@ -364,15 +365,66 @@ void domain_update_node_affinity(struct domain *d)
         cpumask_or(cpumask, cpumask, online_affinity);
     }
 
-    for_each_online_node ( node )
-        if ( cpumask_intersects(&node_to_cpumask(node), cpumask) )
-            node_set(node, nodemask);
+    if ( d->auto_node_affinity )
+    {
+        /* Node-affinity is automaically computed from all vcpu-affinities */
+        for_each_online_node ( node )
+            if ( cpumask_intersects(&node_to_cpumask(node), cpumask) )
+                node_set(node, nodemask);
 
-    d->node_affinity = nodemask;
+        d->node_affinity = nodemask;
+    }
+    else
+    {
+        /* Node-affinity is provided by someone else, just filter out cpus
+         * that are either offline or not in the affinity of any vcpus. */
+        nodemask = d->node_affinity;
+        for_each_node_mask ( node, d->node_affinity )
+            if ( !cpumask_intersects(&node_to_cpumask(node), cpumask) )
+                node_clear(node, nodemask);//d->node_affinity);
+
+        /* Avoid loosing track of node-affinity because of a bad
+         * vcpu-affinity has been specified. */
+        if ( !nodes_empty(nodemask) )
+            d->node_affinity = nodemask;
+    }
+
+    sched_set_node_affinity(d, &d->node_affinity);
+
     spin_unlock(&d->node_affinity_lock);
 
     free_cpumask_var(online_affinity);
     free_cpumask_var(cpumask);
+}
+
+
+int domain_set_node_affinity(struct domain *d, const nodemask_t *affinity)
+{
+    /* Being affine with no nodes is just wrong */
+    if ( nodes_empty(*affinity) )
+        return -EINVAL;
+
+    spin_lock(&d->node_affinity_lock);
+
+    /*
+     * Being/becoming explicitly affine to all nodes is not particularly
+     * useful. Let's take it as the `reset node affinity` command.
+     */
+    if ( nodes_full(*affinity) )
+    {
+        d->auto_node_affinity = 1;
+        goto out;
+    }
+
+    d->auto_node_affinity = 0;
+    d->node_affinity = *affinity;
+
+out:
+    spin_unlock(&d->node_affinity_lock);
+
+    domain_update_node_affinity(d);
+
+    return 0;
 }
 
 

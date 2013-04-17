@@ -261,17 +261,50 @@ __runq_remove(struct csched_vcpu *svc)
     list_del_init(&svc->runq_elem);
 }
 
+/*
+ * Translates node-affinity mask into a cpumask, so that we can use it during
+ * actual scheduling. That of course will contain all the cpus from all the
+ * set nodes in the original node-affinity mask.
+ *
+ * Note that any serialization needed to access mask safely is complete
+ * responsibility of the caller of this function/hook.
+ */
+static void csched_set_node_affinity(
+    const struct scheduler *ops,
+    struct domain *d,
+    nodemask_t *mask)
+{
+    struct csched_dom *sdom;
+    int node;
+
+    /* Skip idle domain since it doesn't even have a node_affinity_cpumask */
+    if ( unlikely(is_idle_domain(d)) )
+        return;
+
+    sdom = CSCHED_DOM(d);
+    cpumask_clear(sdom->node_affinity_cpumask);
+    for_each_node_mask( node, *mask )
+        cpumask_or(sdom->node_affinity_cpumask, sdom->node_affinity_cpumask,
+                   &node_to_cpumask(node));
+}
+
 #define for_each_csched_balance_step(step) \
     for ( (step) = 0; (step) <= CSCHED_BALANCE_CPU_AFFINITY; (step)++ )
 
 
 /*
  * vcpu-affinity balancing is always necessary and must never be skipped.
- * OTOH, if a domain's node-affinity spans all the nodes, we can safely
- * avoid dealing with node-affinity entirely.
+ * OTOH, if a domain's node-affinity is said to be automatically computed
+ * (or if it just spans all the nodes), we can safely avoid dealing with
+ * node-affinity entirely. Ah, node-affinity is also deemed meaningless
+ * in case it has empty intersection with the vcpu's vcpu-affinity, as it
+ * would mean trying to schedule it on _no_ pcpu!
  */
-#define __vcpu_has_node_affinity(vc) \
-    ( !cpumask_full(CSCHED_DOM(vc->domain)->node_affinity_cpumask) )
+#define __vcpu_has_node_affinity(vc)                                          \
+    ( !(cpumask_full(CSCHED_DOM(vc->domain)->node_affinity_cpumask)           \
+        || !cpumask_intersects(vc->cpu_affinity,                              \
+                               CSCHED_DOM(vc->domain)->node_affinity_cpumask) \
+        || vc->domain->auto_node_affinity == 1) )
 
 /*
  * Each csched-balance step uses its own cpumask. This function determines
@@ -284,8 +317,13 @@ static void
 csched_balance_cpumask(const struct vcpu *vc, int step, cpumask_t *mask)
 {
     if ( step == CSCHED_BALANCE_NODE_AFFINITY )
+    {
         cpumask_and(mask, CSCHED_DOM(vc->domain)->node_affinity_cpumask,
                     vc->cpu_affinity);
+
+        if ( unlikely(cpumask_empty(mask)) )
+            cpumask_copy(mask, vc->cpu_affinity);
+    }
     else /* step == CSCHED_BALANCE_CPU_AFFINITY */
         cpumask_copy(mask, vc->cpu_affinity);
 }
@@ -1897,6 +1935,8 @@ const struct scheduler sched_credit_def = {
 
     .adjust         = csched_dom_cntl,
     .adjust_global  = csched_sys_cntl,
+
+    .set_node_affinity  = csched_set_node_affinity,
 
     .pick_cpu       = csched_cpu_pick,
     .do_schedule    = csched_schedule,

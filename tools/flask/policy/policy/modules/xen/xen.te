@@ -69,7 +69,7 @@ allow dom0_t xen_t:mmu memorymap;
 # Allow dom0 to use these domctls on itself. For domctls acting on other
 # domains, see the definitions of create_domain and manage_domain.
 allow dom0_t dom0_t:domain {
-	setvcpucontext max_vcpus setvcpuaffinity getvcpuaffinity getscheduler
+	setvcpucontext max_vcpus setaffinity getaffinity getscheduler
 	getdomaininfo getvcpuinfo getvcpucontext setdomainmaxmem setdomainhandle
 	setdebugging hypercall settime setaddrsize getaddrsize trigger
 	getextvcpucontext setextvcpucontext getvcpuextstate setvcpuextstate

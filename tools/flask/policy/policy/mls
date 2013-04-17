@@ -70,11 +70,11 @@ mlsconstrain domain transition
 	(( h1 dom h2 ) and (( l1 eq l2 ) or (t1 == mls_priv)));
 
 # all the domain "read" ops
-mlsconstrain domain { getvcpuaffinity getdomaininfo getvcpuinfo getvcpucontext getaddrsize getextvcpucontext }
+mlsconstrain domain { getaffinity getdomaininfo getvcpuinfo getvcpucontext getaddrsize getextvcpucontext }
 	((l1 dom l2) or (t1 == mls_priv));
 
 # all the domain "write" ops
-mlsconstrain domain { setvcpucontext pause unpause resume create max_vcpus destroy setvcpuaffinity scheduler setdomainmaxmem setdomainhandle setdebugging hypercall settime set_target shutdown setaddrsize trigger setextvcpucontext }
+mlsconstrain domain { setvcpucontext pause unpause resume create max_vcpus destroy setaffinity scheduler setdomainmaxmem setdomainhandle setdebugging hypercall settime set_target shutdown setaddrsize trigger setextvcpucontext }
 	((l1 eq l2) or (t1 == mls_priv));
 
 # This is incomplete - similar constraints must be written for all classes

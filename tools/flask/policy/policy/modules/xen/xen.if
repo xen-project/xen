@@ -48,7 +48,7 @@ define(`create_domain_common', `
 	allow $1 $2:domain { create max_vcpus setdomainmaxmem setaddrsize
 			getdomaininfo hypercall setvcpucontext setextvcpucontext
 			getscheduler getvcpuinfo getvcpuextstate getaddrsize
-			getvcpuaffinity setvcpuaffinity };
+			getaffinity setaffinity };
 	allow $1 $2:domain2 { set_cpuid settsc setscheduler };
 	allow $1 $2:security check_context;
 	allow $1 $2:shadow enable;
@@ -77,9 +77,9 @@ define(`create_domain_build_label', `
 # manage_domain(priv, target)
 #   Allow managing a running domain
 define(`manage_domain', `
-	allow $1 $2:domain { getdomaininfo getvcpuinfo getvcpuaffinity
+	allow $1 $2:domain { getdomaininfo getvcpuinfo getaffinity
 			getaddrsize pause unpause trigger shutdown destroy
-			setvcpuaffinity setdomainmaxmem getscheduler };
+			setaffinity setdomainmaxmem getscheduler };
 ')
 
 # migrate_domain_out(priv, target)

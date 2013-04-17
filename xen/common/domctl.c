@@ -560,6 +560,23 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     }
     break;
 
+    case XEN_DOMCTL_setnodeaffinity:
+    {
+        nodemask_t new_affinity;
+
+        ret = xenctl_bitmap_to_nodemask(&new_affinity,
+                                        &op->u.nodeaffinity.nodemap);
+        if ( !ret )
+            ret = domain_set_node_affinity(d, &new_affinity);
+    }
+    break;
+    case XEN_DOMCTL_getnodeaffinity:
+    {
+        ret = nodemask_to_xenctl_bitmap(&op->u.nodeaffinity.nodemap,
+                                        &d->node_affinity);
+    }
+    break;
+
     case XEN_DOMCTL_setvcpuaffinity:
     case XEN_DOMCTL_getvcpuaffinity:
     {

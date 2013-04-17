@@ -638,6 +638,11 @@ int cpu_disable_scheduler(unsigned int cpu)
     return ret;
 }
 
+void sched_set_node_affinity(struct domain *d, nodemask_t *mask)
+{
+    SCHED_OP(DOM2OP(d), set_node_affinity, d, mask);
+}
+
 int vcpu_set_affinity(struct vcpu *v, const cpumask_t *affinity)
 {
     cpumask_t online_affinity;

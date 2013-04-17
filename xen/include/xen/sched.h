@@ -288,6 +288,8 @@ struct domain
     /* Does this guest need iommu mappings? */
     bool_t           need_iommu;
 #endif
+    /* is node-affinity automatically computed? */
+    bool_t           auto_node_affinity;
     /* Is this guest fully privileged (aka dom0)? */
     bool_t           is_privileged;
     /* Which guest this guest has privileges on */
@@ -365,7 +367,10 @@ struct domain
     /* Various mem_events */
     struct mem_event_per_domain *mem_event;
 
-    /* Currently computed from union of all vcpu cpu-affinity masks. */
+    /*
+     * Can be specified by the user. If that is not the case, it is
+     * computed from the union of all the vcpu cpu-affinity masks.
+     */
     nodemask_t node_affinity;
     unsigned int last_alloc_node;
     spinlock_t node_affinity_lock;
@@ -435,6 +440,7 @@ static inline void get_knownalive_domain(struct domain *d)
     ASSERT(!(atomic_read(&d->refcnt) & DOMAIN_DESTROYED));
 }
 
+int domain_set_node_affinity(struct domain *d, const nodemask_t *affinity);
 void domain_update_node_affinity(struct domain *d);
 
 struct domain *domain_create(
@@ -555,6 +561,7 @@ void sched_destroy_domain(struct domain *d);
 int sched_move_domain(struct domain *d, struct cpupool *c);
 long sched_adjust(struct domain *, struct xen_domctl_scheduler_op *);
 long sched_adjust_global(struct xen_sysctl_scheduler_op *);
+void sched_set_node_affinity(struct domain *, nodemask_t *);
 int  sched_id(void);
 void sched_tick_suspend(void);
 void sched_tick_resume(void);

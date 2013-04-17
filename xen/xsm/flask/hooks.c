@@ -611,10 +611,12 @@ static int flask_domctl(struct domain *d, int cmd)
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__UNPAUSE);
 
     case XEN_DOMCTL_setvcpuaffinity:
-        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETVCPUAFFINITY);
+    case XEN_DOMCTL_setnodeaffinity:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__SETAFFINITY);
 
     case XEN_DOMCTL_getvcpuaffinity:
-        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETVCPUAFFINITY);
+    case XEN_DOMCTL_getnodeaffinity:
+        return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__GETAFFINITY);
 
     case XEN_DOMCTL_resumedomain:
         return current_has_perm(d, SECCLASS_DOMAIN, DOMAIN__RESUME);

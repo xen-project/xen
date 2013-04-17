@@ -280,6 +280,16 @@ typedef struct xen_domctl_getvcpuinfo xen_domctl_getvcpuinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_getvcpuinfo_t);
 
 
+/* Get/set the NUMA node(s) with which the guest has affinity with. */
+/* XEN_DOMCTL_setnodeaffinity */
+/* XEN_DOMCTL_getnodeaffinity */
+struct xen_domctl_nodeaffinity {
+    struct xenctl_bitmap nodemap;/* IN */
+};
+typedef struct xen_domctl_nodeaffinity xen_domctl_nodeaffinity_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_nodeaffinity_t);
+
+
 /* Get/set which physical cpus a vcpu can execute on. */
 /* XEN_DOMCTL_setvcpuaffinity */
 /* XEN_DOMCTL_getvcpuaffinity */
@@ -908,6 +918,8 @@ struct xen_domctl {
 #define XEN_DOMCTL_audit_p2m                     65
 #define XEN_DOMCTL_set_virq_handler              66
 #define XEN_DOMCTL_set_broken_page_p2m           67
+#define XEN_DOMCTL_setnodeaffinity               68
+#define XEN_DOMCTL_getnodeaffinity               69
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -921,6 +933,7 @@ struct xen_domctl {
         struct xen_domctl_getpageframeinfo  getpageframeinfo;
         struct xen_domctl_getpageframeinfo2 getpageframeinfo2;
         struct xen_domctl_getpageframeinfo3 getpageframeinfo3;
+        struct xen_domctl_nodeaffinity      nodeaffinity;
         struct xen_domctl_vcpuaffinity      vcpuaffinity;
         struct xen_domctl_shadow_op         shadow_op;
         struct xen_domctl_max_mem           max_mem;

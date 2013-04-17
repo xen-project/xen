@@ -104,9 +104,11 @@ class domain
 # XEN_DOMCTL_destroydomain
     destroy
 # XEN_DOMCTL_setvcpuaffinity
-    setvcpuaffinity
+# XEN_DOMCTL_setnodeaffinity
+    setaffinity
 # XEN_DOMCTL_getvcpuaffinity
-    getvcpuaffinity
+# XEN_DOMCTL_getnodeaffinity
+    getaffinity
 # XEN_DOMCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_getinfo
     getscheduler
 # XEN_DOMCTL_getdomaininfo, XEN_SYSCTL_getdomaininfolist

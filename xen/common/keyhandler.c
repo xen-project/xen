@@ -218,6 +218,14 @@ static void cpuset_print(char *set, int size, const cpumask_t *mask)
     *set++ = '\0';
 }
 
+static void nodeset_print(char *set, int size, const nodemask_t *mask)
+{
+    *set++ = '[';
+    set += nodelist_scnprintf(set, size-2, mask);
+    *set++ = ']';
+    *set++ = '\0';
+}
+
 static void periodic_timer_print(char *str, int size, uint64_t period)
 {
     if ( period == 0 )
@@ -273,6 +281,9 @@ static void dump_domains(unsigned char key)
 
         dump_pageframe_info(d);
                
+        nodeset_print(tmpstr, sizeof(tmpstr), &d->node_affinity);
+        printk("NODE affinity for domain %d: %s\n", d->domain_id, tmpstr);
+
         printk("VCPU information and callbacks for domain %u:\n",
                d->domain_id);
         for_each_vcpu ( d, v )

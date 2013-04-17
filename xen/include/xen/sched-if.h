@@ -184,6 +184,8 @@ struct scheduler {
                                     struct xen_domctl_scheduler_op *);
     int          (*adjust_global)  (const struct scheduler *,
                                     struct xen_sysctl_scheduler_op *);
+    void         (*set_node_affinity) (const struct scheduler *,
+                                       struct domain *, nodemask_t *);
     void         (*dump_settings)  (const struct scheduler *);
     void         (*dump_cpu_state) (const struct scheduler *, int);
 

@@ -8,8 +8,9 @@
  * See detailed comments in the file linux/bitmap.h describing the
  * data type on which these nodemasks are based.
  *
- * For details of nodemask_scnprintf() and nodemask_parse(),
- * see bitmap_scnprintf() and bitmap_parse() in lib/bitmap.c.
+ * For details of nodemask_scnprintf(), nodelist_scnpintf() and
+ * nodemask_parse(), see bitmap_scnprintf() and bitmap_parse()
+ * in lib/bitmap.c.
  *
  * The available nodemask operations are:
  *
@@ -50,6 +51,7 @@
  * unsigned long *nodes_addr(mask)	Array of unsigned long's in mask
  *
  * int nodemask_scnprintf(buf, len, mask) Format nodemask for printing
+ * int nodelist_scnprintf(buf, len, mask) Format nodemask as a list for printing
  * int nodemask_parse(ubuf, ulen, mask)	Parse ascii string as nodemask
  *
  * for_each_node_mask(node, mask)	for-loop node over mask
@@ -291,6 +293,14 @@ static inline int __cycle_node(int n, const nodemask_t *maskp, int nbits)
 } })
 
 #define nodes_addr(src) ((src).bits)
+
+#define nodelist_scnprintf(buf, len, src) \
+			__nodelist_scnprintf((buf), (len), (src), MAX_NUMNODES)
+static inline int __nodelist_scnprintf(char *buf, int len,
+					const nodemask_t *srcp, int nbits)
+{
+	return bitmap_scnlistprintf(buf, len, srcp->bits, nbits);
+}
 
 #if 0
 #define nodemask_scnprintf(buf, len, src) \
