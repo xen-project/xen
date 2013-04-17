@@ -51,6 +51,13 @@
 #define GICD_SPENDSGIRN (0xF2C/4)
 #define GICD_ICPIDR2    (0xFE8/4)
 
+#define GICD_SGI_TARGET_LIST   (0UL<<24)
+#define GICD_SGI_TARGET_OTHERS (1UL<<24)
+#define GICD_SGI_TARGET_SELF   (2UL<<24)
+#define GICD_SGI_TARGET_SHIFT  (16)
+#define GICD_SGI_TARGET_MASK   (0xFFUL<<GICD_SGI_TARGET_SHIFT)
+#define GICD_SGI_GROUP1        (1UL<<15)
+
 #define GICC_CTLR       (0x0000/4)
 #define GICC_PMR        (0x0004/4)
 #define GICC_BPR        (0x0008/4)
@@ -83,8 +90,9 @@
 #define GICC_CTL_ENABLE 0x1
 #define GICC_CTL_EOI    (0x1 << 9)
 
-#define GICC_IA_IRQ     0x03ff
-#define GICC_IA_CPU     0x1c00
+#define GICC_IA_IRQ       0x03ff
+#define GICC_IA_CPU_MASK  0x1c00
+#define GICC_IA_CPU_SHIFT 10
 
 #define GICH_HCR_EN       (1 << 0)
 #define GICH_HCR_UIE      (1 << 1)
@@ -156,6 +164,16 @@ extern int gicv_setup(struct domain *d);
 /* Context switch */
 extern void gic_save_state(struct vcpu *v);
 extern void gic_restore_state(struct vcpu *v);
+
+/* SGI (AKA IPIs) */
+enum gic_sgi {
+    GIC_SGI_EVENT_CHECK = 0,
+    GIC_SGI_DUMP_STATE  = 1,
+};
+extern void send_SGI_mask(const cpumask_t *cpumask, enum gic_sgi sgi);
+extern void send_SGI_one(unsigned int cpu, enum gic_sgi sgi);
+extern void send_SGI_self(enum gic_sgi sgi);
+extern void send_SGI_allbutself(enum gic_sgi sgi);
 
 /* print useful debug info */
 extern void gic_dump_info(struct vcpu *v);

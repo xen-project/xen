@@ -43,7 +43,7 @@ kick_cpus:
         mov   r2, #0x1
         str   r2, [r0, #(GICD_CTLR * 4)]      /* enable distributor */
         mov   r2, #0xfe0000
-        str   r2, [r0, #(GICD_SGIR * 4)]      /* send IPI to everybody */
+        str   r2, [r0, #(GICD_SGIR * 4)]      /* send IPI to everybody, SGI0 = Event check */
         dsb
         str   r2, [r0, #(GICD_CTLR * 4)]      /* disable distributor */
         mov   pc, lr

@@ -358,10 +358,52 @@ void __init gic_init(void)
     spin_unlock(&gic.lock);
 }
 
+void send_SGI_mask(const cpumask_t *cpumask, enum gic_sgi sgi)
+{
+    unsigned long mask = cpumask_bits(cpumask)[0];
+
+    ASSERT(sgi < 16); /* There are only 16 SGIs */
+
+    mask &= cpumask_bits(&cpu_online_map)[0];
+
+    ASSERT(mask < 0x100); /* The target bitmap only supports 8 CPUs */
+
+    dsb();
+
+    GICD[GICD_SGIR] = GICD_SGI_TARGET_LIST
+        | (mask<<GICD_SGI_TARGET_SHIFT)
+        | sgi;
+}
+
+void send_SGI_one(unsigned int cpu, enum gic_sgi sgi)
+{
+    ASSERT(cpu < 7);  /* Targets bitmap only supports 8 CPUs */
+    send_SGI_mask(cpumask_of(cpu), sgi);
+}
+
+void send_SGI_self(enum gic_sgi sgi)
+{
+    ASSERT(sgi < 16); /* There are only 16 SGIs */
+
+    dsb();
+
+    GICD[GICD_SGIR] = GICD_SGI_TARGET_SELF
+        | sgi;
+}
+
+void send_SGI_allbutself(enum gic_sgi sgi)
+{
+   ASSERT(sgi < 16); /* There are only 16 SGIs */
+
+   dsb();
+
+   GICD[GICD_SGIR] = GICD_SGI_TARGET_OTHERS
+       | sgi;
+}
+
 void smp_send_state_dump(unsigned int cpu)
 {
-    printk("WARNING: unable to send state dump request to CPU%d\n", cpu);
-    /* XXX TODO -- send an SGI */
+    send_SGI_one(cpu, GIC_SGI_DUMP_STATE);
 }
 
 /* Set up the per-CPU parts of the GIC for a secondary CPU */
@@ -594,6 +636,28 @@ out:
     return retval;
 }
 
+static void do_sgi(struct cpu_user_regs *regs, int othercpu, enum gic_sgi sgi)
+{
+    /* Lower the priority */
+    GICC[GICC_EOIR] = sgi;
+
+    switch (sgi)
+    {
+    case GIC_SGI_EVENT_CHECK:
+        /* Nothing to do, will check for events on return path */
+        break;
+    case GIC_SGI_DUMP_STATE:
+        dump_execstate(regs);
+        break;
+    default:
+        panic("Unhandled SGI %d on CPU%d\n", sgi, smp_processor_id());
+        break;
+    }
+
+    /* Deactivate */
+    GICC[GICC_DIR] = sgi;
+}
+
 /* Accept an interrupt from the GIC and dispatch its handler */
 void gic_interrupt(struct cpu_user_regs *regs, int is_fiq)
 {
@@ -604,14 +668,23 @@ void gic_interrupt(struct cpu_user_regs *regs, int is_fiq)
     do  {
         intack = GICC[GICC_IAR];
         irq = intack & GICC_IA_IRQ;
-        local_irq_enable();
 
-        if (likely(irq < 1021))
+        if ( likely(irq >= 16 && irq < 1021) )
+        {
+            local_irq_enable();
             do_IRQ(regs, irq, is_fiq);
+            local_irq_disable();
+        }
+        else if (unlikely(irq < 16))
+        {
+            unsigned int cpu = (intack & GICC_IA_CPU_MASK) >> GICC_IA_CPU_SHIFT;
+            do_sgi(regs, cpu, irq);
+        }
         else
+        {
+            local_irq_disable();
             break;
-
-        local_irq_disable();
+        }
     } while (1);
 }
 
