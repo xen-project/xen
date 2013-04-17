@@ -110,6 +110,83 @@ int xc_domain_shutdown(xc_interface *xch,
 }
 
 
+int xc_domain_node_setaffinity(xc_interface *xch,
+                               uint32_t domid,
+                               xc_nodemap_t nodemap)
+{
+    DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BUFFER(uint8_t, local);
+    int ret = -1;
+    int nodesize;
+
+    nodesize = xc_get_nodemap_size(xch);
+    if (!nodesize)
+    {
+        PERROR("Could not get number of nodes");
+        goto out;
+    }
+
+    local = xc_hypercall_buffer_alloc(xch, local, nodesize);
+    if ( local == NULL )
+    {
+        PERROR("Could not allocate memory for setnodeaffinity domctl hypercall");
+        goto out;
+    }
+
+    domctl.cmd = XEN_DOMCTL_setnodeaffinity;
+    domctl.domain = (domid_t)domid;
+
+    memcpy(local, nodemap, nodesize);
+    set_xen_guest_handle(domctl.u.nodeaffinity.nodemap.bitmap, local);
+    domctl.u.nodeaffinity.nodemap.nr_bits = nodesize * 8;
+
+    ret = do_domctl(xch, &domctl);
+
+    xc_hypercall_buffer_free(xch, local);
+
+ out:
+    return ret;
+}
+
+int xc_domain_node_getaffinity(xc_interface *xch,
+                               uint32_t domid,
+                               xc_nodemap_t nodemap)
+{
+    DECLARE_DOMCTL;
+    DECLARE_HYPERCALL_BUFFER(uint8_t, local);
+    int ret = -1;
+    int nodesize;
+
+    nodesize = xc_get_nodemap_size(xch);
+    if (!nodesize)
+    {
+        PERROR("Could not get number of nodes");
+        goto out;
+    }
+
+    local = xc_hypercall_buffer_alloc(xch, local, nodesize);
+    if ( local == NULL )
+    {
+        PERROR("Could not allocate memory for getnodeaffinity domctl hypercall");
+        goto out;
+    }
+
+    domctl.cmd = XEN_DOMCTL_getnodeaffinity;
+    domctl.domain = (domid_t)domid;
+
+    set_xen_guest_handle(domctl.u.nodeaffinity.nodemap.bitmap, local);
+    domctl.u.nodeaffinity.nodemap.nr_bits = nodesize * 8;
+
+    ret = do_domctl(xch, &domctl);
+
+    memcpy(nodemap, local, nodesize);
+
+    xc_hypercall_buffer_free(xch, local);
+
+ out:
+    return ret;
+}
+
 int xc_vcpu_setaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,

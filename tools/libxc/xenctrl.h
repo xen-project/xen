@@ -526,6 +526,32 @@ int xc_watchdog(xc_interface *xch,
 		uint32_t id,
 		uint32_t timeout);
 
+/**
+ * This function explicitly sets the host NUMA nodes the domain will
+ * have affinity with.
+ *
+ * @parm xch a handle to an open hypervisor interface.
+ * @parm domid the domain id one wants to set the affinity of.
+ * @parm nodemap the map of the affine nodes.
+ * @return 0 on success, -1 on failure.
+ */
+int xc_domain_node_setaffinity(xc_interface *xch,
+                               uint32_t domind,
+                               xc_nodemap_t nodemap);
+
+/**
+ * This function retrieves the host NUMA nodes the domain has
+ * affinity with.
+ *
+ * @parm xch a handle to an open hypervisor interface.
+ * @parm domid the domain id one wants to get the node affinity of.
+ * @parm nodemap the map of the affine nodes.
+ * @return 0 on success, -1 on failure.
+ */
+int xc_domain_node_getaffinity(xc_interface *xch,
+                               uint32_t domind,
+                               xc_nodemap_t nodemap);
+
 int xc_vcpu_setaffinity(xc_interface *xch,
                         uint32_t domid,
                         int vcpu,
