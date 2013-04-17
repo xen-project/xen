@@ -134,13 +134,13 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
 {
     int found;
     libxl__numa_candidate candidate;
-    libxl_bitmap candidate_nodemap;
+    libxl_bitmap cpupool_nodemap;
     libxl_cpupoolinfo cpupool_info;
     int i, cpupool, rc = 0;
     uint32_t memkb;
 
     libxl__numa_candidate_init(&candidate);
-    libxl_bitmap_init(&candidate_nodemap);
+    libxl_bitmap_init(&cpupool_nodemap);
 
     /*
      * Extract the cpumap from the cpupool the domain belong to. In fact,
@@ -157,7 +157,7 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
     rc = libxl_domain_need_memory(CTX, info, &memkb);
     if (rc)
         goto out;
-    if (libxl_node_bitmap_alloc(CTX, &candidate_nodemap, 0)) {
+    if (libxl_node_bitmap_alloc(CTX, &cpupool_nodemap, 0)) {
         rc = ERROR_FAIL;
         goto out;
     }
@@ -175,17 +175,19 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
     if (found == 0)
         goto out;
 
-    /* Map the candidate's node map to the domain's info->cpumap */
-    libxl__numa_candidate_get_nodemap(gc, &candidate, &candidate_nodemap);
-    rc = libxl_nodemap_to_cpumap(CTX, &candidate_nodemap, &info->cpumap);
+    /* Map the candidate's node map to the domain's info->nodemap */
+    libxl__numa_candidate_get_nodemap(gc, &candidate, &info->nodemap);
+
+    /* Avoid trying to set the affinity to nodes that might be in the
+     * candidate's nodemap but out of our cpupool. */
+    rc = libxl_cpumap_to_nodemap(CTX, &cpupool_info.cpumap,
+                                 &cpupool_nodemap);
     if (rc)
         goto out;
 
-    /* Avoid trying to set the affinity to cpus that might be in the
-     * nodemap but not in our cpupool. */
-    libxl_for_each_set_bit(i, info->cpumap) {
-        if (!libxl_bitmap_test(&cpupool_info.cpumap, i))
-            libxl_bitmap_reset(&info->cpumap, i);
+    libxl_for_each_set_bit(i, info->nodemap) {
+        if (!libxl_bitmap_test(&cpupool_nodemap, i))
+            libxl_bitmap_reset(&info->nodemap, i);
     }
 
     LOG(DETAIL, "NUMA placement candidate with %d nodes, %d cpus and "
@@ -194,7 +196,7 @@ static int numa_place_domain(libxl__gc *gc, uint32_t domid,
 
  out:
     libxl__numa_candidate_dispose(&candidate);
-    libxl_bitmap_dispose(&candidate_nodemap);
+    libxl_bitmap_dispose(&cpupool_nodemap);
     libxl_cpupoolinfo_dispose(&cpupool_info);
     return rc;
 }
@@ -212,10 +214,10 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     /*
      * Check if the domain has any CPU affinity. If not, try to build
      * up one. In case numa_place_domain() find at least a suitable
-     * candidate, it will affect info->cpumap accordingly; if it
+     * candidate, it will affect info->nodemap accordingly; if it
      * does not, it just leaves it as it is. This means (unless
      * some weird error manifests) the subsequent call to
-     * libxl_set_vcpuaffinity_all() will do the actual placement,
+     * libxl_domain_set_nodeaffinity() will do the actual placement,
      * whatever that turns out to be.
      */
     if (libxl_defbool_val(info->numa_placement)) {

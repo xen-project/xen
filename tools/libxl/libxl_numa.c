@@ -184,7 +184,7 @@ static int nr_vcpus_on_nodes(libxl__gc *gc, libxl_cputopology *tinfo,
                              int vcpus_on_node[])
 {
     libxl_dominfo *dinfo = NULL;
-    libxl_bitmap nodes_counted;
+    libxl_bitmap dom_nodemap, nodes_counted;
     int nr_doms, nr_cpus;
     int i, j, k;
 
@@ -197,6 +197,12 @@ static int nr_vcpus_on_nodes(libxl__gc *gc, libxl_cputopology *tinfo,
         return ERROR_FAIL;
     }
 
+    if (libxl_node_bitmap_alloc(CTX, &dom_nodemap, 0) < 0) {
+        libxl_bitmap_dispose(&nodes_counted);
+        libxl_dominfo_list_free(dinfo, nr_doms);
+        return ERROR_FAIL;
+    }
+
     for (i = 0; i < nr_doms; i++) {
         libxl_vcpuinfo *vinfo;
         int nr_dom_vcpus;
@@ -205,14 +211,21 @@ static int nr_vcpus_on_nodes(libxl__gc *gc, libxl_cputopology *tinfo,
         if (vinfo == NULL)
             continue;
 
+        /* Retrieve the domain's node-affinity map */
+        libxl_domain_get_nodeaffinity(CTX, dinfo[i].domid, &dom_nodemap);
+
         for (j = 0; j < nr_dom_vcpus; j++) {
-            /* For each vcpu of each domain, increment the elements of
-             * the array corresponding to the nodes where the vcpu runs */
+            /*
+             * For each vcpu of each domain, it must have both vcpu-affinity
+             * and node-affinity to (a pcpu belonging to) a certain node to
+             * cause an increment in the corresponding element of the array.
+             */
             libxl_bitmap_set_none(&nodes_counted);
             libxl_for_each_set_bit(k, vinfo[j].cpumap) {
                 int node = tinfo[k].node;
 
                 if (libxl_bitmap_test(suitable_cpumap, k) &&
+                    libxl_bitmap_test(&dom_nodemap, node) &&
                     !libxl_bitmap_test(&nodes_counted, node)) {
                     libxl_bitmap_set(&nodes_counted, node);
                     vcpus_on_node[node]++;
@@ -223,6 +236,7 @@ static int nr_vcpus_on_nodes(libxl__gc *gc, libxl_cputopology *tinfo,
         libxl_vcpuinfo_list_free(vinfo, nr_dom_vcpus);
     }
 
+    libxl_bitmap_dispose(&dom_nodemap);
     libxl_bitmap_dispose(&nodes_counted);
     libxl_dominfo_list_free(dinfo, nr_doms);
     return 0;
