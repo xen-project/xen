@@ -165,22 +165,34 @@ static uint32_t nodemap_to_free_memkb(libxl_numainfo *ninfo,
     return free_memkb;
 }
 
-/* Retrieve the number of vcpus able to run on the cpus of the nodes
- * that are part of the nodemap. */
-static int nodemap_to_nr_vcpus(libxl__gc *gc, libxl_cputopology *tinfo,
+/* Retrieve the number of vcpus able to run on the nodes in nodemap */
+static int nodemap_to_nr_vcpus(libxl__gc *gc, int vcpus_on_node[],
                                const libxl_bitmap *nodemap)
 {
+    int i, nr_vcpus = 0;
+
+    libxl_for_each_set_bit(i, *nodemap)
+        nr_vcpus += vcpus_on_node[i];
+
+    return nr_vcpus;
+}
+
+/* Number of vcpus able to run on the cpus of the various nodes
+ * (reported by filling the array vcpus_on_node[]). */
+static int nr_vcpus_on_nodes(libxl__gc *gc, libxl_cputopology *tinfo,
+                             const libxl_bitmap *suitable_cpumap,
+                             int vcpus_on_node[])
+{
     libxl_dominfo *dinfo = NULL;
-    libxl_bitmap vcpu_nodemap;
+    libxl_bitmap nodes_counted;
     int nr_doms, nr_cpus;
-    int nr_vcpus = 0;
     int i, j, k;
 
     dinfo = libxl_list_domain(CTX, &nr_doms);
     if (dinfo == NULL)
         return ERROR_FAIL;
 
-    if (libxl_node_bitmap_alloc(CTX, &vcpu_nodemap, 0) < 0) {
+    if (libxl_node_bitmap_alloc(CTX, &nodes_counted, 0) < 0) {
         libxl_dominfo_list_free(dinfo, nr_doms);
         return ERROR_FAIL;
     }
@@ -193,19 +205,17 @@ static int nodemap_to_nr_vcpus(libxl__gc *gc, libxl_cputopology *tinfo,
         if (vinfo == NULL)
             continue;
 
-        /* For each vcpu of each domain ... */
         for (j = 0; j < nr_dom_vcpus; j++) {
+            /* For each vcpu of each domain, increment the elements of
+             * the array corresponding to the nodes where the vcpu runs */
+            libxl_bitmap_set_none(&nodes_counted);
+            libxl_for_each_set_bit(k, vinfo[j].cpumap) {
+                int node = tinfo[k].node;
 
-            /* Build up a map telling on which nodes the vcpu is runnable on */
-            libxl_bitmap_set_none(&vcpu_nodemap);
-            libxl_for_each_set_bit(k, vinfo[j].cpumap)
-                libxl_bitmap_set(&vcpu_nodemap, tinfo[k].node);
-
-            /* And check if that map has any intersection with our nodemap */
-            libxl_for_each_set_bit(k, vcpu_nodemap) {
-                if (libxl_bitmap_test(nodemap, k)) {
-                    nr_vcpus++;
-                    break;
+                if (libxl_bitmap_test(suitable_cpumap, k) &&
+                    !libxl_bitmap_test(&nodes_counted, node)) {
+                    libxl_bitmap_set(&nodes_counted, node);
+                    vcpus_on_node[node]++;
                 }
             }
         }
@@ -213,9 +223,9 @@ static int nodemap_to_nr_vcpus(libxl__gc *gc, libxl_cputopology *tinfo,
         libxl_vcpuinfo_list_free(vinfo, nr_dom_vcpus);
     }
 
-    libxl_bitmap_dispose(&vcpu_nodemap);
+    libxl_bitmap_dispose(&nodes_counted);
     libxl_dominfo_list_free(dinfo, nr_doms);
-    return nr_vcpus;
+    return 0;
 }
 
 /*
@@ -270,7 +280,7 @@ int libxl__get_numa_candidate(libxl__gc *gc,
     libxl_numainfo *ninfo = NULL;
     int nr_nodes = 0, nr_suit_nodes, nr_cpus = 0;
     libxl_bitmap suitable_nodemap, nodemap;
-    int rc = 0;
+    int *vcpus_on_node, rc = 0;
 
     libxl_bitmap_init(&nodemap);
     libxl_bitmap_init(&suitable_nodemap);
@@ -280,6 +290,8 @@ int libxl__get_numa_candidate(libxl__gc *gc,
     ninfo = libxl_get_numainfo(CTX, &nr_nodes);
     if (ninfo == NULL)
         return ERROR_FAIL;
+
+    GCNEW_ARRAY(vcpus_on_node, nr_nodes);
 
     /*
      * The good thing about this solution is that it is based on heuristics
@@ -326,6 +338,19 @@ int libxl__get_numa_candidate(libxl__gc *gc,
     if (rc)
         goto out;
     rc = libxl_cpumap_to_nodemap(CTX, suitable_cpumap, &suitable_nodemap);
+    if (rc)
+        goto out;
+
+    /*
+     * Later on, we will try to figure out how many vcpus are runnable on
+     * each candidate (as a part of choosing the best one of them). That
+     * requires going through all the vcpus of all the domains and check
+     * their affinities. So, instead of doing that for each candidate,
+     * let's count here the number of vcpus runnable on each node, so that
+     * all we have to do later is summing up the right elements of the
+     * vcpus_on_node array.
+     */
+    rc = nr_vcpus_on_nodes(gc, tinfo, suitable_cpumap, vcpus_on_node);
     if (rc)
         goto out;
 
@@ -414,7 +439,8 @@ int libxl__get_numa_candidate(libxl__gc *gc,
              * current best one (if any).
              */
             libxl__numa_candidate_put_nodemap(gc, &new_cndt, &nodemap);
-            new_cndt.nr_vcpus = nodemap_to_nr_vcpus(gc, tinfo, &nodemap);
+            new_cndt.nr_vcpus = nodemap_to_nr_vcpus(gc, vcpus_on_node,
+                                                    &nodemap);
             new_cndt.free_memkb = nodes_free_memkb;
             new_cndt.nr_nodes = libxl_bitmap_count_set(&nodemap);
             new_cndt.nr_cpus = nodes_cpus;
