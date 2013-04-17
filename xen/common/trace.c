@@ -384,7 +384,7 @@ int tb_control(xen_sysctl_tbuf_op_t *tbc)
     {
         cpumask_var_t mask;
 
-        rc = xenctl_cpumap_to_cpumask(&mask, &tbc->cpu_mask);
+        rc = xenctl_bitmap_to_cpumask(&mask, &tbc->cpu_mask);
         if ( !rc )
         {
             cpumask_copy(&tb_cpu_mask, mask);

@@ -71,7 +71,7 @@ struct xen_sysctl_tbuf_op {
 #define XEN_SYSCTL_TBUFOP_disable      5
     uint32_t cmd;
     /* IN/OUT variables */
-    struct xenctl_cpumap cpu_mask;
+    struct xenctl_bitmap cpu_mask;
     uint32_t             evt_mask;
     /* OUT variables */
     uint64_aligned_t buffer_mfn;
@@ -532,7 +532,7 @@ struct xen_sysctl_cpupool_op {
     uint32_t domid;       /* IN: M              */
     uint32_t cpu;         /* IN: AR             */
     uint32_t n_dom;       /*            OUT: I  */
-    struct xenctl_cpumap cpumap; /*     OUT: IF */
+    struct xenctl_bitmap cpumap; /*     OUT: IF */
 };
 typedef struct xen_sysctl_cpupool_op xen_sysctl_cpupool_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpupool_op_t);

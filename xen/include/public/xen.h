@@ -869,9 +869,9 @@ __DEFINE_XEN_GUEST_HANDLE(uint64, uint64_t);
 #endif
 
 #ifndef __ASSEMBLY__
-struct xenctl_cpumap {
+struct xenctl_bitmap {
     XEN_GUEST_HANDLE_64(uint8) bitmap;
-    uint32_t nr_cpus;
+    uint32_t nr_bits;
 };
 #endif
 

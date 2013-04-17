@@ -493,7 +493,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
         op->cpupool_id = c->cpupool_id;
         op->sched_id = c->sched->sched_id;
         op->n_dom = c->n_dom;
-        ret = cpumask_to_xenctl_cpumap(&op->cpumap, c->cpu_valid);
+        ret = cpumask_to_xenctl_bitmap(&op->cpumap, c->cpu_valid);
         cpupool_put(c);
     }
     break;
@@ -588,7 +588,7 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
 
     case XEN_SYSCTL_CPUPOOL_OP_FREEINFO:
     {
-        ret = cpumask_to_xenctl_cpumap(
+        ret = cpumask_to_xenctl_bitmap(
             &op->cpumap, &cpupool_free_cpus);
     }
     break;

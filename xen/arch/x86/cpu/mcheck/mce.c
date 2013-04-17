@@ -1453,8 +1453,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
             cpumap = &cpu_online_map;
         else
         {
-            ret = xenctl_cpumap_to_cpumask(&cmv,
-                                           &op->u.mc_inject_v2.cpumap);
+            ret = xenctl_bitmap_to_cpumask(&cmv, &op->u.mc_inject_v2.cpumap);
             if ( ret )
                 break;
             cpumap = cmv;

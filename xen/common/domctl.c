@@ -32,28 +32,29 @@
 static DEFINE_SPINLOCK(domctl_lock);
 DEFINE_SPINLOCK(vcpu_alloc_lock);
 
-int cpumask_to_xenctl_cpumap(
-    struct xenctl_cpumap *xenctl_cpumap, const cpumask_t *cpumask)
+int bitmap_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_bitmap,
+                            const unsigned long *bitmap,
+                            unsigned int nbits)
 {
     unsigned int guest_bytes, copy_bytes, i;
     uint8_t zero = 0;
     int err = 0;
-    uint8_t *bytemap = xmalloc_array(uint8_t, (nr_cpu_ids + 7) / 8);
+    uint8_t *bytemap = xmalloc_array(uint8_t, (nbits + 7) / 8);
 
     if ( !bytemap )
         return -ENOMEM;
 
-    guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
-    copy_bytes  = min_t(unsigned int, guest_bytes, (nr_cpu_ids + 7) / 8);
+    guest_bytes = (xenctl_bitmap->nr_bits + 7) / 8;
+    copy_bytes  = min_t(unsigned int, guest_bytes, (nbits + 7) / 8);
 
-    bitmap_long_to_byte(bytemap, cpumask_bits(cpumask), nr_cpu_ids);
+    bitmap_long_to_byte(bytemap, bitmap, nbits);
 
     if ( copy_bytes != 0 )
-        if ( copy_to_guest(xenctl_cpumap->bitmap, bytemap, copy_bytes) )
+        if ( copy_to_guest(xenctl_bitmap->bitmap, bytemap, copy_bytes) )
             err = -EFAULT;
 
     for ( i = copy_bytes; !err && i < guest_bytes; i++ )
-        if ( copy_to_guest_offset(xenctl_cpumap->bitmap, i, &zero, 1) )
+        if ( copy_to_guest_offset(xenctl_bitmap->bitmap, i, &zero, 1) )
             err = -EFAULT;
 
     xfree(bytemap);
@@ -61,35 +62,57 @@ int cpumask_to_xenctl_cpumap(
     return err;
 }
 
-int xenctl_cpumap_to_cpumask(
-    cpumask_var_t *cpumask, const struct xenctl_cpumap *xenctl_cpumap)
+int xenctl_bitmap_to_bitmap(unsigned long *bitmap,
+                            const struct xenctl_bitmap *xenctl_bitmap,
+                            unsigned int nbits)
 {
     unsigned int guest_bytes, copy_bytes;
     int err = 0;
-    uint8_t *bytemap = xzalloc_array(uint8_t, (nr_cpu_ids + 7) / 8);
+    uint8_t *bytemap = xzalloc_array(uint8_t, (nbits + 7) / 8);
 
     if ( !bytemap )
         return -ENOMEM;
 
-    guest_bytes = (xenctl_cpumap->nr_cpus + 7) / 8;
-    copy_bytes  = min_t(unsigned int, guest_bytes, (nr_cpu_ids + 7) / 8);
+    guest_bytes = (xenctl_bitmap->nr_bits + 7) / 8;
+    copy_bytes  = min_t(unsigned int, guest_bytes, (nbits + 7) / 8);
 
     if ( copy_bytes != 0 )
     {
-        if ( copy_from_guest(bytemap, xenctl_cpumap->bitmap, copy_bytes) )
+        if ( copy_from_guest(bytemap, xenctl_bitmap->bitmap, copy_bytes) )
             err = -EFAULT;
-        if ( (xenctl_cpumap->nr_cpus & 7) && (guest_bytes == copy_bytes) )
-            bytemap[guest_bytes-1] &= ~(0xff << (xenctl_cpumap->nr_cpus & 7));
+        if ( (xenctl_bitmap->nr_bits & 7) && (guest_bytes == copy_bytes) )
+            bytemap[guest_bytes-1] &= ~(0xff << (xenctl_bitmap->nr_bits & 7));
     }
 
-    if ( err )
-        /* nothing */;
-    else if ( alloc_cpumask_var(cpumask) )
-        bitmap_byte_to_long(cpumask_bits(*cpumask), bytemap, nr_cpu_ids);
-    else
-        err = -ENOMEM;
+    if ( !err )
+        bitmap_byte_to_long(bitmap, bytemap, nbits);
 
     xfree(bytemap);
+
+    return err;
+}
+
+int cpumask_to_xenctl_bitmap(struct xenctl_bitmap *xenctl_cpumap,
+                             const cpumask_t *cpumask)
+{
+    return bitmap_to_xenctl_bitmap(xenctl_cpumap, cpumask_bits(cpumask),
+                                   nr_cpu_ids);
+}
+
+int xenctl_bitmap_to_cpumask(cpumask_var_t *cpumask,
+                             const struct xenctl_bitmap *xenctl_cpumap)
+{
+    int err = 0;
+
+    if ( alloc_cpumask_var(cpumask) ) {
+        err = xenctl_bitmap_to_bitmap(cpumask_bits(*cpumask), xenctl_cpumap,
+                                      nr_cpu_ids);
+        /* In case of error, cleanup is up to us, as the caller won't care! */
+        if ( err )
+            free_cpumask_var(*cpumask);
+    }
+    else
+        err = -ENOMEM;
 
     return err;
 }
@@ -540,7 +563,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         {
             cpumask_var_t new_affinity;
 
-            ret = xenctl_cpumap_to_cpumask(
+            ret = xenctl_bitmap_to_cpumask(
                 &new_affinity, &op->u.vcpuaffinity.cpumap);
             if ( !ret )
             {
@@ -550,7 +573,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         }
         else
         {
-            ret = cpumask_to_xenctl_cpumap(
+            ret = cpumask_to_xenctl_bitmap(
                 &op->u.vcpuaffinity.cpumap, v->cpu_affinity);
         }
     }

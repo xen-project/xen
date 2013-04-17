@@ -142,7 +142,7 @@ int xc_vcpu_setaffinity(xc_interface *xch,
 
     set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
 
-    domctl.u.vcpuaffinity.cpumap.nr_cpus = cpusize * 8;
+    domctl.u.vcpuaffinity.cpumap.nr_bits = cpusize * 8;
 
     ret = do_domctl(xch, &domctl);
 
@@ -182,7 +182,7 @@ int xc_vcpu_getaffinity(xc_interface *xch,
     domctl.u.vcpuaffinity.vcpu = vcpu;
 
     set_xen_guest_handle(domctl.u.vcpuaffinity.cpumap.bitmap, local);
-    domctl.u.vcpuaffinity.cpumap.nr_cpus = cpusize * 8;
+    domctl.u.vcpuaffinity.cpumap.nr_bits = cpusize * 8;
 
     ret = do_domctl(xch, &domctl);
 

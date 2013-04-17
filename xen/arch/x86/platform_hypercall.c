@@ -336,7 +336,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
     {
         uint32_t cpu;
         uint64_t idletime, now = NOW();
-        struct xenctl_cpumap ctlmap;
+        struct xenctl_bitmap ctlmap;
         cpumask_var_t cpumap;
         XEN_GUEST_HANDLE(uint8) cpumap_bitmap;
         XEN_GUEST_HANDLE(uint64) idletimes;
@@ -345,11 +345,11 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
         if ( cpufreq_controller != FREQCTL_dom0_kernel )
             break;
 
-        ctlmap.nr_cpus  = op->u.getidletime.cpumap_nr_cpus;
+        ctlmap.nr_bits  = op->u.getidletime.cpumap_nr_cpus;
         guest_from_compat_handle(cpumap_bitmap,
                                  op->u.getidletime.cpumap_bitmap);
         ctlmap.bitmap.p = cpumap_bitmap.p; /* handle -> handle_64 conversion */
-        if ( (ret = xenctl_cpumap_to_cpumask(&cpumap, &ctlmap)) != 0 )
+        if ( (ret = xenctl_bitmap_to_cpumask(&cpumap, &ctlmap)) != 0 )
             goto out;
         guest_from_compat_handle(idletimes, op->u.getidletime.idletime);
 
@@ -368,7 +368,7 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 
         op->u.getidletime.now = now;
         if ( ret == 0 )
-            ret = cpumask_to_xenctl_cpumap(&ctlmap, cpumap);
+            ret = cpumask_to_xenctl_bitmap(&ctlmap, cpumap);
         free_cpumask_var(cpumap);
 
         if ( ret == 0 && __copy_field_to_guest(u_xenpf_op, op, u.getidletime) )

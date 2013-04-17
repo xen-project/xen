@@ -161,7 +161,7 @@ static int inject_cmci(xc_interface *xc_handle, int cpu_nr)
 
     mc.u.mc_inject_v2.flags |= XEN_MC_INJECT_CPU_BROADCAST;
     mc.u.mc_inject_v2.flags |= XEN_MC_INJECT_TYPE_CMCI;
-    mc.u.mc_inject_v2.cpumap.nr_cpus = nr_cpus;
+    mc.u.mc_inject_v2.cpumap.nr_bits = nr_cpus;
 
     return xc_mca_op(xc_handle, &mc);
 }

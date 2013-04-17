@@ -424,8 +424,8 @@ extern cpumask_t cpu_present_map;
 #define for_each_present_cpu(cpu)  for_each_cpu(cpu, &cpu_present_map)
 
 /* Copy to/from cpumap provided by control tools. */
-struct xenctl_cpumap;
-int cpumask_to_xenctl_cpumap(struct xenctl_cpumap *, const cpumask_t *);
-int xenctl_cpumap_to_cpumask(cpumask_var_t *, const struct xenctl_cpumap *);
+struct xenctl_bitmap;
+int cpumask_to_xenctl_bitmap(struct xenctl_bitmap *, const cpumask_t *);
+int xenctl_bitmap_to_cpumask(cpumask_var_t *, const struct xenctl_bitmap *);
 
 #endif /* __XEN_CPUMASK_H */

@@ -285,7 +285,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_getvcpuinfo_t);
 /* XEN_DOMCTL_getvcpuaffinity */
 struct xen_domctl_vcpuaffinity {
     uint32_t  vcpu;              /* IN */
-    struct xenctl_cpumap cpumap; /* IN/OUT */
+    struct xenctl_bitmap cpumap; /* IN/OUT */
 };
 typedef struct xen_domctl_vcpuaffinity xen_domctl_vcpuaffinity_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_vcpuaffinity_t);
