@@ -307,7 +307,7 @@ paging:
         dsb   sy
         ldr   x0, =smp_up_cpu
         ldr   x1, [x0]               /* Which CPU is being booted? */
-        cmp   x1, x12                /* Is it us? */
+        cmp   x1, x22                /* Is it us? */
         b.ne  1b
 
 launch:
