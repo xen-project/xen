@@ -21,6 +21,7 @@
 
 #include <asm/hvm/io.h>
 #include <asm/hvm/vpmu.h>
+#include <irq_vectors.h>
 
 extern void vmcs_dump_vcpu(struct vcpu *v);
 extern void setup_vmcs_dump(void);
@@ -73,6 +74,12 @@ struct vmx_domain {
     unsigned long apic_access_mfn;
 };
 
+struct pi_desc {
+    DECLARE_BITMAP(pir, NR_VECTORS);
+    u32 control;
+    u32 rsvd[7];
+} __attribute__ ((aligned (64)));
+
 #define ept_get_wl(ept)   ((ept)->ept_wl)
 #define ept_get_asr(ept)  ((ept)->asr)
 #define ept_get_eptp(ept) ((ept)->eptp)
@@ -113,6 +120,7 @@ struct arch_vmx_struct {
 
     uint32_t             eoi_exitmap_changed;
     uint64_t             eoi_exit_bitmap[4];
+    struct pi_desc       pi_desc;
 
     unsigned long        host_cr0;
 

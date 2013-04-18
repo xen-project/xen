@@ -75,6 +75,8 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
 static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content);
 static void vmx_invlpg_intercept(unsigned long vaddr);
 
+uint8_t __read_mostly posted_intr_vector;
+
 static int vmx_domain_initialise(struct domain *d)
 {
     int rc;
@@ -1521,6 +1523,9 @@ struct hvm_function_table * __init start_vmx(void)
 
         setup_ept_dump();
     }
+ 
+    if ( cpu_has_vmx_posted_intr_processing )
+        alloc_direct_apic_vector(&posted_intr_vector, event_check_interrupt);
 
     setup_vmcs_dump();
 

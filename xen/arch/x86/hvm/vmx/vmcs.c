@@ -926,6 +926,12 @@ static int construct_vmcs(struct vcpu *v)
         __vmwrite(GUEST_INTR_STATUS, 0);
     }
 
+    if ( cpu_has_vmx_posted_intr_processing )
+    {
+        __vmwrite(PI_DESC_ADDR, virt_to_maddr(&v->arch.hvm_vmx.pi_desc));
+        __vmwrite(POSTED_INTR_NOTIFICATION_VECTOR, posted_intr_vector);
+    }
+
     /* Host data selectors. */
     __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);
     __vmwrite(HOST_DS_SELECTOR, __HYPERVISOR_DS);

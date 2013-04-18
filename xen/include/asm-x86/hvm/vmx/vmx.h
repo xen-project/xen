@@ -217,6 +217,7 @@ void vmx_update_secondary_exec_control(struct vcpu *v);
 #define MODRM_EAX_ECX   ".byte 0xc1\n" /* EAX, ECX */
 
 extern u64 vmx_ept_vpid_cap;
+extern uint8_t posted_intr_vector;
 
 #define cpu_has_vmx_ept_exec_only_supported        \
     (vmx_ept_vpid_cap & VMX_EPT_EXEC_ONLY_SUPPORTED)
