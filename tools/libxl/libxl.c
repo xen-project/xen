@@ -1864,7 +1864,7 @@ libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx, uint32_t domid, int *n
 
     fe_path = libxl__sprintf(gc, "%s/device/vtpm", libxl__xs_get_dompath(gc, domid));
     dir = libxl__xs_directory(gc, XBT_NULL, fe_path, &ndirs);
-    if(dir) {
+    if (dir && ndirs) {
        vtpms = malloc(sizeof(*vtpms) * ndirs);
        libxl_device_vtpm* vtpm;
        libxl_device_vtpm* end = vtpms + ndirs;
@@ -2371,7 +2371,7 @@ static int libxl__append_disk_list_of_type(libxl__gc *gc,
     be_path = libxl__sprintf(gc, "%s/backend/%s/%d",
                              libxl__xs_get_dompath(gc, 0), type, domid);
     dir = libxl__xs_directory(gc, XBT_NULL, be_path, &n);
-    if (dir) {
+    if (dir && n) {
         libxl_device_disk *tmp;
         tmp = realloc(*disks, sizeof (libxl_device_disk) * (*ndisks + n));
         if (tmp == NULL)
@@ -3060,7 +3060,7 @@ static int libxl__append_nic_list_of_type(libxl__gc *gc,
     be_path = libxl__sprintf(gc, "%s/backend/%s/%d",
                              libxl__xs_get_dompath(gc, 0), type, domid);
     dir = libxl__xs_directory(gc, XBT_NULL, be_path, &n);
-    if (dir) {
+    if (dir && n) {
         libxl_device_nic *tmp;
         tmp = realloc(*nics, sizeof (libxl_device_nic) * (*nnics + n));
         if (tmp == NULL)
