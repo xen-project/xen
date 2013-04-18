@@ -90,24 +90,6 @@ static const unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
     ((vlapic_get_reg(vlapic, APIC_LVTT) & APIC_TIMER_MODE_MASK) \
      == APIC_TIMER_MODE_TSC_DEADLINE)
 
-
-/*
- * Generic APIC bitmap vector update & search routines.
- */
-
-#define VEC_POS(v) ((v)%32)
-#define REG_POS(v) (((v)/32) * 0x10)
-#define vlapic_test_and_set_vector(vec, bitmap)                         \
-    test_and_set_bit(VEC_POS(vec),                                      \
-                     (unsigned long *)((bitmap) + REG_POS(vec)))
-#define vlapic_test_and_clear_vector(vec, bitmap)                       \
-    test_and_clear_bit(VEC_POS(vec),                                    \
-                       (unsigned long *)((bitmap) + REG_POS(vec)))
-#define vlapic_set_vector(vec, bitmap)                                  \
-    set_bit(VEC_POS(vec), (unsigned long *)((bitmap) + REG_POS(vec)))
-#define vlapic_clear_vector(vec, bitmap)                                \
-    clear_bit(VEC_POS(vec), (unsigned long *)((bitmap) + REG_POS(vec)))
-
 static int vlapic_find_highest_vector(void *bitmap)
 {
     uint32_t *word = bitmap;

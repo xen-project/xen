@@ -55,6 +55,7 @@
 #include <asm/debugger.h>
 #include <asm/apic.h>
 #include <asm/hvm/nestedhvm.h>
+#include <asm/event.h>
 
 enum handler_return { HNDL_done, HNDL_unhandled, HNDL_exception_raised };
 
@@ -1447,6 +1448,60 @@ static void vmx_process_isr(int isr, struct vcpu *v)
     vmx_vmcs_exit(v);
 }
 
+static void __vmx_deliver_posted_interrupt(struct vcpu *v)
+{
+    bool_t running = v->is_running;
+
+    vcpu_unblock(v);
+    if ( running && (in_irq() || (v != current)) )
+    {
+        unsigned int cpu = v->processor;
+
+        if ( !test_and_set_bit(VCPU_KICK_SOFTIRQ, &softirq_pending(cpu))
+             && (cpu != smp_processor_id()) )
+            send_IPI_mask(cpumask_of(cpu), posted_intr_vector);
+    }
+}
+
+static void vmx_deliver_posted_intr(struct vcpu *v, u8 vector)
+{
+    if ( pi_test_and_set_pir(vector, &v->arch.hvm_vmx.pi_desc) )
+        return;
+
+    if ( unlikely(v->arch.hvm_vmx.eoi_exitmap_changed) )
+    {
+        /*
+         * If EOI exitbitmap needs to changed or notification vector
+         * can't be allocated, interrupt will not be injected till
+         * VMEntry as it used to be.
+         */
+        pi_set_on(&v->arch.hvm_vmx.pi_desc);
+    }
+    else if ( !pi_test_and_set_on(&v->arch.hvm_vmx.pi_desc) )
+    {
+        __vmx_deliver_posted_interrupt(v);
+        return;
+    }
+
+    vcpu_kick(v);
+}
+
+static void vmx_sync_pir_to_irr(struct vcpu *v)
+{
+    struct vlapic *vlapic = vcpu_vlapic(v);
+    unsigned int group, i;
+    DECLARE_BITMAP(pending_intr, NR_VECTORS);
+
+    if ( !pi_test_and_clear_on(&v->arch.hvm_vmx.pi_desc) )
+        return;
+
+    for ( group = 0; group < ARRAY_SIZE(pending_intr); group++ )
+        pending_intr[group] = pi_get_pir(&v->arch.hvm_vmx.pi_desc, group);
+
+    for_each_set_bit(i, pending_intr, NR_VECTORS)
+        vlapic_set_vector(i, &vlapic->regs->data[APIC_IRR]);
+}
+
 static struct hvm_function_table __read_mostly vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -1497,6 +1552,8 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .update_eoi_exit_bitmap = vmx_update_eoi_exit_bitmap,
     .virtual_intr_delivery_enabled = vmx_virtual_intr_delivery_enabled,
     .process_isr          = vmx_process_isr,
+    .deliver_posted_intr  = vmx_deliver_posted_intr,
+    .sync_pir_to_irr      = vmx_sync_pir_to_irr,
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
 };
 
@@ -1526,6 +1583,11 @@ struct hvm_function_table * __init start_vmx(void)
  
     if ( cpu_has_vmx_posted_intr_processing )
         alloc_direct_apic_vector(&posted_intr_vector, event_check_interrupt);
+    else
+    {
+        hvm_funcs.deliver_posted_intr = NULL;
+        hvm_funcs.sync_pir_to_irr = NULL;
+    }
 
     setup_vmcs_dump();
 

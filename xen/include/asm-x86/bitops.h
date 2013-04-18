@@ -367,6 +367,16 @@ static inline unsigned int __scanbit(unsigned long val, unsigned long max)
   ((off)+(__scanbit(~(((*(const unsigned long *)addr)) >> (off)), size))) : \
   __find_next_zero_bit(addr,size,off)))
 
+/**
+ * for_each_set_bit - iterate over every set bit in a memory region
+ * @bit: The integer iterator
+ * @addr: The address to base the search on
+ * @size: The maximum size to search
+ */
+#define for_each_set_bit(bit, addr, size)               \
+    for ( (bit) = find_first_bit(addr, size);           \
+          (bit) < (size);                               \
+          (bit) = find_next_bit(addr, size, (bit) + 1) )
 
 /**
  * find_first_set_bit - find the first set bit in @word
