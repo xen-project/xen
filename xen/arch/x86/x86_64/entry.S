@@ -282,7 +282,14 @@ sysenter_eflags_saved:
         cmpb  $0,VCPU_sysenter_disables_events(%rbx)
         movq  VCPU_sysenter_addr(%rbx),%rax
         setne %cl
+        testl $X86_EFLAGS_NT,UREGS_eflags(%rsp)
         leaq  VCPU_trap_bounce(%rbx),%rdx
+UNLIKELY_START(nz, sysenter_nt_set)
+        pushfq
+        andl  $~X86_EFLAGS_NT,(%rsp)
+        popfq
+        xorl  %eax,%eax
+UNLIKELY_END(sysenter_nt_set)
         testq %rax,%rax
         leal  (,%rcx,TBF_INTERRUPT),%ecx
 UNLIKELY_START(z, sysenter_gpf)
