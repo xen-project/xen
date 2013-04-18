@@ -645,8 +645,7 @@ long arch_do_domctl(
             break;
 
         ret = -EPERM;
-        if ( !IS_PRIV(current->domain) &&
-             !iomem_access_permitted(current->domain, mfn, mfn + nr_mfns - 1) )
+        if ( !iomem_access_permitted(current->domain, mfn, mfn + nr_mfns - 1) )
             break;
 
         ret = xsm_iomem_mapping(XSM_HOOK, d, mfn, mfn + nr_mfns - 1, add);
@@ -723,8 +722,7 @@ long arch_do_domctl(
         }
 
         ret = -EPERM;
-        if ( !IS_PRIV(current->domain) &&
-             !ioports_access_permitted(current->domain, fmp, fmp + np - 1) )
+        if ( !ioports_access_permitted(current->domain, fmp, fmp + np - 1) )
             break;
 
         ret = xsm_ioport_mapping(XSM_HOOK, d, fmp, fmp + np - 1, add);
