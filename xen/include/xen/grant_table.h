@@ -32,7 +32,7 @@
 struct active_grant_entry {
     u32           pin;    /* Reference count information.             */
     domid_t       domid;  /* Domain being granted access.             */
-    domid_t       trans_dom;
+    struct domain *trans_domain;
     uint32_t      trans_gref;
     unsigned long frame;  /* Frame being granted.                     */
     unsigned long gfn;    /* Guest's idea of the frame being granted. */
