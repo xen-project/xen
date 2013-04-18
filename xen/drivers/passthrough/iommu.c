@@ -436,7 +436,7 @@ void iommu_crash_shutdown(void)
     const struct iommu_ops *ops = iommu_get_ops();
     if ( iommu_enabled )
         ops->crash_shutdown();
-    iommu_enabled = 0;
+    iommu_enabled = iommu_intremap = 0;
 }
 
 /*
