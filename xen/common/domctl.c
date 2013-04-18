@@ -25,6 +25,7 @@
 #include <xen/paging.h>
 #include <xen/hypercall.h>
 #include <asm/current.h>
+#include <asm/irq.h>
 #include <asm/page.h>
 #include <public/domctl.h>
 #include <xsm/xsm.h>
@@ -777,9 +778,9 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         else if ( xsm_irq_permission(XSM_HOOK, d, pirq, allow) )
             ret = -EPERM;
         else if ( allow )
-            ret = irq_permit_access(d, pirq);
+            ret = pirq_permit_access(d, pirq);
         else
-            ret = irq_deny_access(d, pirq);
+            ret = pirq_deny_access(d, pirq);
     }
     break;
 

@@ -966,14 +966,16 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
     }
 
     for (i = 0; i < d_config->b_info.num_irqs; i++) {
-        uint32_t irq = d_config->b_info.irqs[i];
+        int irq = d_config->b_info.irqs[i];
 
-        LOG(DEBUG, "dom%d irq %"PRIx32, domid, irq);
+        LOG(DEBUG, "dom%d irq %d", domid, irq);
 
-        ret = xc_domain_irq_permission(CTX->xch, domid, irq, 1);
+        ret = irq >= 0 ? xc_physdev_map_pirq(CTX->xch, domid, irq, &irq)
+                       : -EOVERFLOW;
+        if (!ret)
+            ret = xc_domain_irq_permission(CTX->xch, domid, irq, 1);
         if (ret < 0) {
-            LOGE(ERROR,
-                 "failed give dom%d access to irq %"PRId32, domid, irq);
+            LOGE(ERROR, "failed give dom%d access to irq %d", domid, irq);
             ret = ERROR_FAIL;
         }
     }

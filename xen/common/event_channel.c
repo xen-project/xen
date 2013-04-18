@@ -369,7 +369,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     if ( (pirq < 0) || (pirq >= d->nr_pirqs) )
         return -EINVAL;
 
-    if ( !is_hvm_domain(d) && !irq_access_permitted(d, pirq) )
+    if ( !is_hvm_domain(d) && !pirq_access_permitted(d, pirq) )
         return -EPERM;
 
     spin_lock(&d->event_lock);
