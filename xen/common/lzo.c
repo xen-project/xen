@@ -68,7 +68,10 @@
  *  Richard Purdie <rpurdie@openedhand.com>
  */
 
+#ifdef __XEN__
 #include <xen/types.h>
+#endif
+
 #include <xen/lzo.h>
 #define get_unaligned(_p) (*(_p))
 #define put_unaligned(_val,_p) (*(_p)=_val)

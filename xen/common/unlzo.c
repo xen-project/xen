@@ -32,7 +32,10 @@
 
 #include "decompress.h"
 #include <xen/lzo.h>
+
+#ifdef __XEN__
 #include <asm/byteorder.h>
+#endif
 
 #if 1 /* ndef CONFIG_??? */
 static inline u16 INIT get_unaligned_be16(void *p)

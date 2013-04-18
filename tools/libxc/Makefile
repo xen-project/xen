@@ -68,6 +68,14 @@ GUEST_SRCS-$(CONFIG_X86)     += xc_hvm_build_x86.c
 GUEST_SRCS-$(CONFIG_ARM)     += xc_dom_arm.c
 GUEST_SRCS-$(CONFIG_ARM)     += xc_hvm_build_arm.c
 
+ifeq ($(CONFIG_LIBXC_MINIOS),y)
+GUEST_SRCS-y                 += xc_dom_decompress_unsafe.c
+GUEST_SRCS-y                 += xc_dom_decompress_unsafe_bzip2.c
+GUEST_SRCS-y                 += xc_dom_decompress_unsafe_lzma.c
+GUEST_SRCS-y                 += xc_dom_decompress_unsafe_lzo1x.c
+GUEST_SRCS-y                 += xc_dom_decompress_unsafe_xz.c
+endif
+
 OSDEP_SRCS-y                 += xenctrl_osdep_ENOSYS.c
 
 -include $(XEN_TARGET_ARCH)/Makefile

@@ -54,7 +54,9 @@ static long long INIT read_int(unsigned char *ptr, int size)
  * Copyright (c) 1999-2005  Igor Pavlov
  */
 
+#ifdef __XEN__
 #include <xen/compiler.h>
+#endif
 
 #define LZMA_IOBUF_SIZE	0x10000
 

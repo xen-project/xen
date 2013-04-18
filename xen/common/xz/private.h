@@ -10,8 +10,11 @@
 #ifndef XZ_PRIVATE_H
 #define XZ_PRIVATE_H
 
+#ifdef __XEN__
 #include <xen/kernel.h>
 #include <asm/byteorder.h>
+#endif
+
 #define get_le32(p) le32_to_cpup((const uint32_t *)(p))
 
 #if 1 /* ndef CONFIG_??? */
