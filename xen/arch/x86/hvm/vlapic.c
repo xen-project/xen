@@ -119,6 +119,9 @@ static void vlapic_clear_irr(int vector, struct vlapic *vlapic)
 
 static int vlapic_find_highest_irr(struct vlapic *vlapic)
 {
+    if ( hvm_funcs.sync_pir_to_irr )
+        hvm_funcs.sync_pir_to_irr(vlapic_vcpu(vlapic));
+
     return vlapic_find_highest_vector(&vlapic->regs->data[APIC_IRR]);
 }
 
@@ -132,8 +135,9 @@ void vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
     if ( hvm_funcs.update_eoi_exit_bitmap )
         hvm_funcs.update_eoi_exit_bitmap(target, vec, trig);
 
-    /* We may need to wake up target vcpu, besides set pending bit here */
-    if ( !vlapic_test_and_set_irr(vec, vlapic) )
+    if ( hvm_funcs.deliver_posted_intr )
+        hvm_funcs.deliver_posted_intr(target, vec);
+    else if ( !vlapic_test_and_set_irr(vec, vlapic) )
         vcpu_kick(target);
 }
 
