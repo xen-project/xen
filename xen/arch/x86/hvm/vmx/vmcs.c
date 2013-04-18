@@ -92,6 +92,7 @@ static void __init vmx_display_features(void)
     P(cpu_has_vmx_unrestricted_guest, "Unrestricted Guest");
     P(cpu_has_vmx_apic_reg_virt, "APIC Register Virtualization");
     P(cpu_has_vmx_virtual_intr_delivery, "Virtual Interrupt Delivery");
+    P(cpu_has_vmx_posted_intr_processing, "Posted Interrupt Processing");
     P(cpu_has_vmx_vmcs_shadowing, "VMCS shadowing");
 #undef P
 
@@ -143,7 +144,8 @@ static int vmx_init_vmcs_config(void)
 
     min = (PIN_BASED_EXT_INTR_MASK |
            PIN_BASED_NMI_EXITING);
-    opt = PIN_BASED_VIRTUAL_NMIS;
+    opt = (PIN_BASED_VIRTUAL_NMIS |
+           PIN_BASED_POSTED_INTERRUPT);
     _vmx_pin_based_exec_control = adjust_vmx_controls(
         "Pin-Based Exec Control", min, opt,
         MSR_IA32_VMX_PINBASED_CTLS, &mismatch);
@@ -268,6 +270,14 @@ static int vmx_init_vmcs_config(void)
     min |= VM_EXIT_IA32E_MODE;
     _vmx_vmexit_control = adjust_vmx_controls(
         "VMExit Control", min, opt, MSR_IA32_VMX_EXIT_CTLS, &mismatch);
+
+    /*
+     * "Process posted interrupt" can be set only when "virtual-interrupt
+     * delivery" and "acknowledge interrupt on exit" is set
+     */
+    if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY)
+          || !(_vmx_vmexit_control & VM_EXIT_ACK_INTR_ON_EXIT) )
+        _vmx_pin_based_exec_control  &= ~ PIN_BASED_POSTED_INTERRUPT;
 
     min = 0;
     opt = VM_ENTRY_LOAD_GUEST_PAT;

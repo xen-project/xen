@@ -165,6 +165,7 @@ extern u32 vmx_cpu_based_exec_control;
 #define PIN_BASED_NMI_EXITING           0x00000008
 #define PIN_BASED_VIRTUAL_NMIS          0x00000020
 #define PIN_BASED_PREEMPT_TIMER         0x00000040
+#define PIN_BASED_POSTED_INTERRUPT      0x00000080
 extern u32 vmx_pin_based_exec_control;
 
 #define VM_EXIT_SAVE_DEBUG_CNTRLS       0x00000004
@@ -256,6 +257,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
     (vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY)
 #define cpu_has_vmx_virtualize_x2apic_mode \
     (vmx_secondary_exec_control & SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE)
+#define cpu_has_vmx_posted_intr_processing \
+    (vmx_pin_based_exec_control & PIN_BASED_POSTED_INTERRUPT)
 #define cpu_has_vmx_vmcs_shadowing \
     (vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_VMCS_SHADOWING)
 
@@ -280,6 +283,7 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
 /* VMCS field encodings. */
 enum vmcs_field {
     VIRTUAL_PROCESSOR_ID            = 0x00000000,
+    POSTED_INTR_NOTIFICATION_VECTOR = 0x00000002,
     GUEST_ES_SELECTOR               = 0x00000800,
     GUEST_CS_SELECTOR               = 0x00000802,
     GUEST_SS_SELECTOR               = 0x00000804,
@@ -314,6 +318,8 @@ enum vmcs_field {
     VIRTUAL_APIC_PAGE_ADDR_HIGH     = 0x00002013,
     APIC_ACCESS_ADDR                = 0x00002014,
     APIC_ACCESS_ADDR_HIGH           = 0x00002015,
+    PI_DESC_ADDR                    = 0x00002016,
+    PI_DESC_ADDR_HIGH               = 0x00002017,
     EPT_POINTER                     = 0x0000201a,
     EPT_POINTER_HIGH                = 0x0000201b,
     EOI_EXIT_BITMAP0                = 0x0000201c,
