@@ -73,6 +73,12 @@ class IRQController(DevController):
        
         pirq = get_param('irq')
 
+        rc = xc.physdev_map_pirq(domid = self.getDomid(),
+                                 index = pirq,
+                                 pirq  = pirq)
+        if rc < 0:
+            raise VmError('irq: Failed to map irq %x' % (pirq))
+
         rc = xc.domain_irq_permission(domid        = self.getDomid(),
                                       pirq         = pirq,
                                       allow_access = True)
@@ -81,12 +87,6 @@ class IRQController(DevController):
             #todo non-fatal
             raise VmError(
                 'irq: Failed to configure irq: %d' % (pirq))
-        rc = xc.physdev_map_pirq(domid = self.getDomid(),
-                                index = pirq,
-                                pirq  = pirq)
-        if rc < 0:
-            raise VmError(
-                'irq: Failed to map irq %x' % (pirq))
         back = dict([(k, config[k]) for k in self.valid_cfg if k in config])
         return (self.allocateDeviceID(), back, {})
 
