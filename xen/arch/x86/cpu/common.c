@@ -715,8 +715,11 @@ void __cpuinit cpu_init(void)
 #if defined(CONFIG_X86_32)
 	t->ss0  = __HYPERVISOR_DS;
 	t->esp0 = get_stack_bottom();
-	if ( supervisor_mode_kernel && cpu_has_sep )
+	if ( cpu_has_sep ) {
+	    wrmsr(MSR_IA32_SYSENTER_CS, 0, 0);
+	    if ( supervisor_mode_kernel )
 		wrmsr(MSR_IA32_SYSENTER_ESP, &t->esp1, 0);
+	}
 #elif defined(CONFIG_X86_64)
 	/* Bottom-of-stack must be 16-byte aligned! */
 	BUG_ON((get_stack_bottom() & 15) != 0);
