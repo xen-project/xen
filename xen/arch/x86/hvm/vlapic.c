@@ -122,16 +122,19 @@ static int vlapic_find_highest_irr(struct vlapic *vlapic)
     return vlapic_find_highest_vector(&vlapic->regs->data[APIC_IRR]);
 }
 
-int vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
+void vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig)
 {
+    struct vcpu *target = vlapic_vcpu(vlapic);
+
     if ( trig )
         vlapic_set_vector(vec, &vlapic->regs->data[APIC_TMR]);
 
     if ( hvm_funcs.update_eoi_exit_bitmap )
-        hvm_funcs.update_eoi_exit_bitmap(vlapic_vcpu(vlapic), vec ,trig);
+        hvm_funcs.update_eoi_exit_bitmap(target, vec, trig);
 
     /* We may need to wake up target vcpu, besides set pending bit here */
-    return !vlapic_test_and_set_irr(vec, vlapic);
+    if ( !vlapic_test_and_set_irr(vec, vlapic) )
+        vcpu_kick(target);
 }
 
 static int vlapic_find_highest_isr(struct vlapic *vlapic)
@@ -297,9 +300,8 @@ static void vlapic_accept_irq(struct vcpu *v, uint32_t icr_low)
     {
     case APIC_DM_FIXED:
     case APIC_DM_LOWEST:
-        if ( vlapic_enabled(vlapic) &&
-             !vlapic_test_and_set_irr(vector, vlapic) )
-            vcpu_kick(v);
+        if ( vlapic_enabled(vlapic) )
+            vlapic_set_irq(vlapic, vector, 0);
         break;
 
     case APIC_DM_REMRD:

@@ -57,8 +57,7 @@ static void vmsi_inj_irq(
     {
     case dest_Fixed:
     case dest_LowestPrio:
-        if ( vlapic_set_irq(target, vector, trig_mode) )
-            vcpu_kick(vlapic_vcpu(target));
+        vlapic_set_irq(target, vector, trig_mode);
         break;
     default:
         gdprintk(XENLOG_WARNING, "error delivery mode %d\n", delivery_mode);

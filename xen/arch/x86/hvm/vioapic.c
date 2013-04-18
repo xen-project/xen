@@ -263,8 +263,7 @@ static void ioapic_inj_irq(
     ASSERT((delivery_mode == dest_Fixed) ||
            (delivery_mode == dest_LowestPrio));
 
-    if ( vlapic_set_irq(target, vector, trig_mode) )
-        vcpu_kick(vlapic_vcpu(target));
+    vlapic_set_irq(target, vector, trig_mode);
 }
 
 static inline int pit_channel0_enabled(void)
