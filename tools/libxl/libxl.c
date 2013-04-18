@@ -2572,7 +2572,8 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
             goto out_free;
         }
         if (!(l = libxl__xs_directory(gc, XBT_NULL,
-                                     libxl__sprintf(gc, "%s/device/vif", dompath), &nb))) {
+                                     libxl__sprintf(gc, "%s/device/vif", dompath), &nb)) ||
+            nb == 0) {
             nic->devid = 0;
         } else {
             nic->devid = strtoul(l[nb - 1], NULL, 10) + 1;
