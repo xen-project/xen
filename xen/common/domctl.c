@@ -854,9 +854,9 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
         if ( pirq >= d->nr_pirqs )
             ret = -EINVAL;
         else if ( op->u.irq_permission.allow_access )
-            ret = irq_permit_access(d, pirq);
+            ret = pirq_permit_access(d, pirq);
         else
-            ret = irq_deny_access(d, pirq);
+            ret = pirq_deny_access(d, pirq);
 
         rcu_unlock_domain(d);
     }

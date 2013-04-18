@@ -147,7 +147,7 @@ static int physdev_map_pirq(struct physdev_map_pirq *map)
         if ( irq == -1 )
             irq = create_irq();
 
-        if ( irq < 0 || irq >= nr_irqs )
+        if ( irq < nr_irqs_gsi || irq >= nr_irqs )
         {
             dprintk(XENLOG_G_ERR, "dom%d: can't create irq for msi!\n",
                     d->domain_id);

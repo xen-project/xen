@@ -174,6 +174,15 @@ int create_irq(void)
 out:
      spin_unlock_irqrestore(&vector_lock, flags);
 
+    if ( irq > 0 && dom0 )
+    {
+        ret = irq_permit_access(dom0, irq);
+        if ( ret )
+            printk(XENLOG_G_ERR
+                   "Could not grant Dom0 access to IRQ%d (error %d)\n",
+                   irq, ret);
+    }
+
     return irq;
 }
 
@@ -258,6 +267,17 @@ void clear_irq_vector(int irq)
 void destroy_irq(unsigned int irq)
 {
     BUG_ON(!MSI_IRQ(irq));
+
+    if ( dom0 )
+    {
+        int err = irq_deny_access(dom0, irq);
+
+        if ( err )
+            printk(XENLOG_G_ERR
+                   "Could not revoke Dom0 access to IRQ%u (error %d)\n",
+                   irq, err);
+    }
+
     dynamic_irq_cleanup(irq);
     clear_irq_vector(irq);
 }
@@ -1604,7 +1624,7 @@ int map_domain_pirq(
 
     if ( !IS_PRIV(current->domain) &&
          !(IS_PRIV_FOR(current->domain, d) &&
-           irq_access_permitted(current->domain, pirq)))
+           irq_access_permitted(current->domain, irq)))
         return -EPERM;
 
     if ( pirq < 0 || pirq >= d->nr_pirqs || irq < 0 || irq >= nr_irqs )
@@ -1625,11 +1645,12 @@ int map_domain_pirq(
         return 0;
     }
 
-    ret = irq_permit_access(d, pirq);
+    ret = irq_permit_access(d, irq);
     if ( ret )
     {
-        dprintk(XENLOG_G_ERR, "dom%d: could not permit access to irq %d\n",
-                d->domain_id, pirq);
+        printk(XENLOG_G_ERR
+               "dom%d: could not permit access to IRQ%d (pirq %d)\n",
+               d->domain_id, irq, pirq);
         return ret;
     }
 
@@ -1651,8 +1672,14 @@ int map_domain_pirq(
         spin_lock_irqsave(&desc->lock, flags);
 
         if ( desc->handler != &no_irq_type )
+        {
+            spin_unlock_irqrestore(&desc->lock, flags);
             dprintk(XENLOG_G_ERR, "dom%d: irq %d in use\n",
                     d->domain_id, irq);
+            pci_disable_msi(msi_desc);
+            ret = -EBUSY;
+            goto done;
+        }
         desc->handler = &pci_msi_type;
         if ( opt_irq_vector_map == OPT_IRQ_VECTOR_MAP_PERDEV
              && !desc->chip_data->used_vectors )
@@ -1680,6 +1707,10 @@ int map_domain_pirq(
     }
 
 done:
+    if ( ret && irq_deny_access(d, irq) )
+        printk(XENLOG_G_ERR
+               "dom%d: could not revoke access to IRQ%d (pirq %d)\n",
+               d->domain_id, irq, pirq);
     return ret;
 }
 
@@ -1736,10 +1767,11 @@ int unmap_domain_pirq(struct domain *d, int pirq)
     if (msi_desc)
         msi_free_irq(msi_desc);
 
-    ret = irq_deny_access(d, pirq);
+    ret = irq_deny_access(d, irq);
     if ( ret )
-        dprintk(XENLOG_G_ERR, "dom%d: could not deny access to irq %d\n",
-                d->domain_id, pirq);
+        printk(XENLOG_G_ERR
+               "dom%d: could not deny access to IRQ%d (pirq %d)\n",
+               d->domain_id, irq, pirq);
 
     if ( desc->handler == &pci_msi_type )
         desc->handler = &no_irq_type;
