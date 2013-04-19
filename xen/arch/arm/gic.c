@@ -64,12 +64,15 @@ irq_desc_t *__irq_to_desc(int irq)
 void gic_save_state(struct vcpu *v)
 {
     int i;
+    ASSERT(!local_irq_is_enabled());
 
-    spin_lock_irq(&gic.lock);
+    /* No need for spinlocks here because interrupts are disabled around
+     * this call and it only accesses struct vcpu fields that cannot be
+     * accessed simultaneously by another pCPU.
+     */
     for ( i=0; i<nr_lrs; i++)
         v->arch.gic_lr[i] = GICH[GICH_LR + i];
     v->arch.lr_mask = this_cpu(lr_mask);
-    spin_unlock_irq(&gic.lock);
     v->arch.gic_apr = GICH[GICH_APR];
     /* Disable until next VCPU scheduled */
     GICH[GICH_HCR] = 0;
@@ -524,7 +527,7 @@ void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
 
     spin_lock_irqsave(&gic.lock, flags);
 
-    if ( v->is_running && list_empty(&v->arch.vgic.lr_pending) )
+    if ( v == current && list_empty(&v->arch.vgic.lr_pending) )
     {
         i = find_first_zero_bit(&this_cpu(lr_mask), nr_lrs);
         if (i < nr_lrs) {

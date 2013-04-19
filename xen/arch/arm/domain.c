@@ -213,10 +213,9 @@ static void ctxt_switch_to(struct vcpu *n)
 
 static void schedule_tail(struct vcpu *prev)
 {
-    /* Re-enable interrupts before restoring state which may fault. */
-    local_irq_enable();
-
     ctxt_switch_from(prev);
+
+    local_irq_enable();
 
     /* TODO
        update_runstate_area(current);
