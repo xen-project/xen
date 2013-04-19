@@ -1207,7 +1207,7 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
             goto out_free;
         }
         if (!(l = libxl__xs_directory(&gc, XBT_NULL,
-                                     libxl__sprintf(gc, "%s/device/vif", dompath), &nb)) ||
+                                      libxl__sprintf(&gc, "%s/device/vif", dompath), &nb)) ||
             nb == 0) {
             nic->devid = 0;
         } else {
