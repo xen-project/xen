@@ -1585,8 +1585,8 @@ struct hvm_function_table * __init start_vmx(void)
         alloc_direct_apic_vector(&posted_intr_vector, event_check_interrupt);
     else
     {
-        hvm_funcs.deliver_posted_intr = NULL;
-        hvm_funcs.sync_pir_to_irr = NULL;
+        vmx_function_table.deliver_posted_intr = NULL;
+        vmx_function_table.sync_pir_to_irr = NULL;
     }
 
     setup_vmcs_dump();
