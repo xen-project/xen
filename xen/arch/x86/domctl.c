@@ -565,9 +565,8 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_bind_pt_irq:
     {
-        xen_domctl_bind_pt_irq_t * bind;
-
-        bind = &(domctl->u.bind_pt_irq);
+        xen_domctl_bind_pt_irq_t *bind = &domctl->u.bind_pt_irq;
+        int irq;
 
         ret = -EINVAL;
         if ( !is_hvm_domain(d) )
@@ -577,14 +576,10 @@ long arch_do_domctl(
         if ( ret )
             break;
 
+        irq = domain_pirq_to_irq(d, bind->machine_irq);
         ret = -EPERM;
-        if ( !IS_PRIV(current->domain) )
-        {
-            int irq = domain_pirq_to_irq(d, bind->machine_irq);
-
-            if ( irq <= 0 || !irq_access_permitted(current->domain, irq) )
-                break;
-        }
+        if ( irq <= 0 || !irq_access_permitted(current->domain, irq) )
+            break;
 
         ret = -ESRCH;
         if ( iommu_enabled )
@@ -601,18 +596,12 @@ long arch_do_domctl(
 
     case XEN_DOMCTL_unbind_pt_irq:
     {
-        xen_domctl_bind_pt_irq_t * bind;
-
-        bind = &(domctl->u.bind_pt_irq);
+        xen_domctl_bind_pt_irq_t *bind = &domctl->u.bind_pt_irq;
+        int irq = domain_pirq_to_irq(d, bind->machine_irq);
 
         ret = -EPERM;
-        if ( !IS_PRIV(current->domain) )
-        {
-            int irq = domain_pirq_to_irq(d, bind->machine_irq);
-
-            if ( irq <= 0 || !irq_access_permitted(current->domain, irq) )
-                break;
-        }
+        if ( irq <= 0 || !irq_access_permitted(current->domain, irq) )
+            break;
 
         ret = xsm_unbind_pt_irq(XSM_HOOK, d, bind);
         if ( ret )
