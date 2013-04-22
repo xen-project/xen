@@ -30,7 +30,7 @@ install: build
 
 .PHONY: clean
 clean:
-	rm -f $(DEPS)
+	$(RM) *.a *.so *.o $(DEPS) xenbackendd
 
 xenbackendd: xenbackendd.o
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS) $(APPEND_LDFLAGS)
