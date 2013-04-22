@@ -28,6 +28,10 @@ UINTN __read_mostly efi_memmap_size;
 UINTN __read_mostly efi_mdesc_size;
 void *__read_mostly efi_memmap;
 
+UINT64 __read_mostly efi_boot_max_var_store_size;
+UINT64 __read_mostly efi_boot_remain_var_store_size;
+UINT64 __read_mostly efi_boot_max_var_size;
+
 struct efi __read_mostly efi = {
 	.acpi   = EFI_INVALID_TABLE_ADDR,
 	.acpi20 = EFI_INVALID_TABLE_ADDR,
@@ -464,6 +468,35 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
     break;
 
     case XEN_EFI_query_variable_info:
+        if ( op->misc & ~XEN_EFI_VARINFO_BOOT_SNAPSHOT )
+            return -EINVAL;
+
+        if ( op->misc & XEN_EFI_VARINFO_BOOT_SNAPSHOT )
+        {
+            if ( (op->u.query_variable_info.attr
+                  & ~EFI_VARIABLE_APPEND_WRITE) !=
+                 (EFI_VARIABLE_NON_VOLATILE |
+                  EFI_VARIABLE_BOOTSERVICE_ACCESS |
+                  EFI_VARIABLE_RUNTIME_ACCESS) )
+                return -EINVAL;
+
+            op->u.query_variable_info.max_store_size =
+                efi_boot_max_var_store_size;
+            op->u.query_variable_info.remain_store_size =
+                efi_boot_remain_var_store_size;
+            if ( efi_boot_max_var_store_size )
+            {
+                op->u.query_variable_info.max_size = efi_boot_max_var_size;
+                status = EFI_SUCCESS;
+            }
+            else
+            {
+                op->u.query_variable_info.max_size = 0;
+                status = efi_boot_max_var_size;
+            }
+            break;
+        }
+
         cr3 = efi_rs_enter();
         if ( (efi_rs->Hdr.Revision >> 16) < 2 )
         {
@@ -480,6 +513,9 @@ int efi_runtime_call(struct xenpf_efi_runtime_call *op)
 
     case XEN_EFI_query_capsule_capabilities:
     case XEN_EFI_update_capsule:
+        if ( op->misc )
+            return -EINVAL;
+
         cr3 = efi_rs_enter();
         if ( (efi_rs->Hdr.Revision >> 16) < 2 )
         {

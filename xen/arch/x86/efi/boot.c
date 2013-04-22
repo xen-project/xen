@@ -1240,6 +1240,23 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     /* Collect PCI ROM contents. */
     setup_efi_pci();
 
+    /* Get snapshot of variable store parameters. */
+    status = efi_rs->QueryVariableInfo(EFI_VARIABLE_NON_VOLATILE |
+                                       EFI_VARIABLE_BOOTSERVICE_ACCESS |
+                                       EFI_VARIABLE_RUNTIME_ACCESS,
+                                       &efi_boot_max_var_store_size,
+                                       &efi_boot_remain_var_store_size,
+                                       &efi_boot_max_var_size);
+    if ( EFI_ERROR(status) )
+    {
+        efi_boot_max_var_store_size = 0;
+        efi_boot_remain_var_store_size = 0;
+        efi_boot_max_var_size = status;
+        PrintStr(L"Warning: Could not query variable store: ");
+        DisplayUint(status, 0);
+        PrintStr(newline);
+    }
+
     /* Allocate space for trampoline (in first Mb). */
     cfg.addr = 0x100000;
     cfg.size = trampoline_end - trampoline_start;

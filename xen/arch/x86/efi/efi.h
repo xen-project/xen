@@ -32,5 +32,8 @@ extern l4_pgentry_t *efi_l4_pgtable;
 
 extern const struct efi_pci_rom *efi_pci_roms;
 
+extern UINT64 efi_boot_max_var_store_size, efi_boot_remain_var_store_size,
+              efi_boot_max_var_size;
+
 unsigned long efi_rs_enter(void);
 void efi_rs_leave(unsigned long);
