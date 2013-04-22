@@ -234,6 +234,15 @@ static void __init PrintErrMesg(const CHAR16 *mesg, EFI_STATUS ErrCode)
     case EFI_VOLUME_FULL:
         mesg = L"Volume is full";
         break;
+    case EFI_SECURITY_VIOLATION:
+        mesg = L"Security violation";
+        break;
+    case EFI_CRC_ERROR:
+        mesg = L"CRC error";
+        break;
+    case EFI_COMPROMISED_DATA:
+        mesg = L"Compromised data";
+        break;
     default:
         PrintErr(L"ErrCode: ");
         DisplayUint(ErrCode, 0);

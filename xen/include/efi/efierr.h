@@ -50,6 +50,13 @@ Revision History
 #define EFI_ICMP_ERROR                  EFIERR(22)
 #define EFI_TFTP_ERROR                  EFIERR(23)
 #define EFI_PROTOCOL_ERROR              EFIERR(24)
+#define EFI_INCOMPATIBLE_VERSION        EFIERR(25)
+#define EFI_SECURITY_VIOLATION          EFIERR(26)
+#define EFI_CRC_ERROR                   EFIERR(27)
+#define EFI_END_OF_MEDIA                EFIERR(28)
+#define EFI_END_OF_FILE                 EFIERR(31)
+#define EFI_INVALID_LANGUAGE            EFIERR(32)
+#define EFI_COMPROMISED_DATA            EFIERR(33)
 
 #define EFI_WARN_UNKOWN_GLYPH           EFIWARN(1)
 #define EFI_WARN_DELETE_FAILURE         EFIWARN(2)
