@@ -108,6 +108,16 @@ static const struct cpuidle_state {
 #define CPUIDLE_FLAG_TLB_FLUSHED	0x10000
 
 /*
+ * MWAIT takes an 8-bit "hint" in EAX "suggesting"
+ * the C-state (top nibble) and sub-state (bottom nibble)
+ * 0x00 means "MWAIT(C1)", 0x10 means "MWAIT(C2)" etc.
+ *
+ * We store the hint at the top of our "flags" for each state.
+ */
+#define flg2MWAIT(flags) (((flags) >> 24) & 0xFF)
+#define MWAIT2flg(eax) ((eax & 0xFF) << 24)
+
+/*
  * States are indexed by the cstate number,
  * which is also the index into the MWAIT hint array.
  * Thus C0 is a dummy.
@@ -116,18 +126,19 @@ static const struct cpuidle_state nehalem_cstates[MWAIT_MAX_NUM_CSTATES] = {
 	{ /* MWAIT C0 */ },
 	{ /* MWAIT C1 */
 		.name = "C1-NHM",
+		.flags = MWAIT2flg(0x00),
 		.exit_latency = 3,
 		.target_residency = 6,
 	},
 	{ /* MWAIT C2 */
 		.name = "C3-NHM",
-		.flags = CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 20,
 		.target_residency = 80,
 	},
 	{ /* MWAIT C3 */
 		.name = "C6-NHM",
-		.flags = CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 200,
 		.target_residency = 800,
 	}
@@ -137,24 +148,25 @@ static const struct cpuidle_state snb_cstates[MWAIT_MAX_NUM_CSTATES] = {
 	{ /* MWAIT C0 */ },
 	{ /* MWAIT C1 */
 		.name = "C1-SNB",
+		.flags = MWAIT2flg(0x00),
 		.exit_latency = 1,
 		.target_residency = 1,
 	},
 	{ /* MWAIT C2 */
 		.name = "C3-SNB",
-		.flags = CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 80,
 		.target_residency = 211,
 	},
 	{ /* MWAIT C3 */
 		.name = "C6-SNB",
-		.flags = CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 104,
 		.target_residency = 345,
 	},
 	{ /* MWAIT C4 */
 		.name = "C7-SNB",
-		.flags = CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x30) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 109,
 		.target_residency = 345,
 	}
@@ -164,24 +176,25 @@ static const struct cpuidle_state ivb_cstates[MWAIT_MAX_NUM_CSTATES] = {
 	{ /* MWAIT C0 */ },
 	{ /* MWAIT C1 */
 		.name = "C1-IVB",
+		.flags = MWAIT2flg(0x00),
 		.exit_latency = 1,
 		.target_residency = 1,
 	},
 	{ /* MWAIT C2 */
 		.name = "C3-IVB",
-		.flags = CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 59,
 		.target_residency = 156,
 	},
 	{ /* MWAIT C3 */
 		.name = "C6-IVB",
-		.flags = CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 80,
 		.target_residency = 300,
 	},
 	{ /* MWAIT C4 */
 		.name = "C7-IVB",
-		.flags = CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x30) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 87,
 		.target_residency = 300,
 	}
@@ -191,43 +204,31 @@ static const struct cpuidle_state atom_cstates[MWAIT_MAX_NUM_CSTATES] = {
 	{ /* MWAIT C0 */ },
 	{ /* MWAIT C1 */
 		.name = "C1-ATM",
+		.flags = MWAIT2flg(0x00),
 		.exit_latency = 1,
 		.target_residency = 4,
 	},
 	{ /* MWAIT C2 */
 		.name = "C2-ATM",
+		.flags = MWAIT2flg(0x10),
 		.exit_latency = 20,
 		.target_residency = 80,
 	},
 	{ /* MWAIT C3 */ },
 	{ /* MWAIT C4 */
 		.name = "C4-ATM",
-		.flags = CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x30) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 100,
 		.target_residency = 400,
 	},
 	{ /* MWAIT C5 */ },
 	{ /* MWAIT C6 */
 		.name = "C6-ATM",
-		.flags = CPUIDLE_FLAG_TLB_FLUSHED,
+		.flags = MWAIT2flg(0x52) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 140,
 		.target_residency = 560,
 	}
 };
-
-static u32 get_driver_data(unsigned int cstate)
-{
-	static const u32 driver_data[] = {
-		[1] /* MWAIT C1 */ = 0x00,
-		[2] /* MWAIT C2 */ = 0x10,
-		[3] /* MWAIT C3 */ = 0x20,
-		[4] /* MWAIT C4 */ = 0x30,
-		[5] /* MWAIT C5 */ = 0x40,
-		[6] /* MWAIT C6 */ = 0x52,
-	};
-
-	return driver_data[cstate < ARRAY_SIZE(driver_data) ? cstate : 0];
-}
 
 static void mwait_idle(void)
 {
@@ -477,7 +478,7 @@ static int mwait_idle_cpu_init(struct notifier_block *nfb,
 
 		cx = dev->states + dev->count;
 		cx->type = cstate;
-		cx->address = get_driver_data(cstate);
+		cx->address = flg2MWAIT(cpuidle_state_table[cstate].flags);
 		cx->entry_method = ACPI_CSTATE_EM_FFH;
 		cx->latency = cpuidle_state_table[cstate].exit_latency;
 		cx->target_residency =
