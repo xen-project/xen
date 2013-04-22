@@ -1,3 +1,5 @@
+#ifdef __XEN__
+
 #include <xen/config.h>
 #include <xen/cache.h>
 #include <xen/decompress.h>
@@ -15,3 +17,14 @@
 
 #define large_malloc xmalloc_bytes
 #define large_free xfree
+
+#else
+
+#define STATIC static
+#define INIT
+#define INITDATA
+
+#define large_malloc malloc
+#define large_free free
+
+#endif

@@ -35,6 +35,8 @@
 #include "xg_private.h"
 #include "xc_dom.h"
 
+#ifndef __MINIOS__
+
 #if defined(HAVE_BZLIB)
 
 #include <bzlib.h>
@@ -561,6 +563,15 @@ static int xc_try_lzo1x_decode(
 }
 
 #endif
+
+#else /* __MINIOS__ */
+
+int xc_try_bzip2_decode(struct xc_dom_image *dom, void **blob, size_t *size);
+int xc_try_lzma_decode(struct xc_dom_image *dom, void **blob, size_t *size);
+int xc_try_lzo1x_decode(struct xc_dom_image *dom, void **blob, size_t *size);
+int xc_try_xz_decode(struct xc_dom_image *dom, void **blob, size_t *size);
+
+#endif /* !__MINIOS__ */
 
 struct setup_header {
     uint8_t  _pad0[0x1f1];  /* skip uninteresting stuff */
