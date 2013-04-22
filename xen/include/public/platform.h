@@ -184,6 +184,7 @@ struct xenpf_efi_runtime_call {
             struct xenpf_efi_guid vendor_guid;
         } get_next_variable_name;
 
+#define XEN_EFI_VARINFO_BOOT_SNAPSHOT       0x00000001
         struct {
             uint32_t attr;
             uint64_t max_store_size;
