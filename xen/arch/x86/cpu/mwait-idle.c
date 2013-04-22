@@ -200,6 +200,34 @@ static const struct cpuidle_state ivb_cstates[MWAIT_MAX_NUM_CSTATES] = {
 	}
 };
 
+static const struct cpuidle_state hsw_cstates[MWAIT_MAX_NUM_CSTATES] = {
+	{ /* MWAIT C0 */ },
+	{ /* MWAIT C1 */
+		.name = "C1-HSW",
+		.flags = MWAIT2flg(0x00),
+		.exit_latency = 2,
+		.target_residency = 2,
+	},
+	{ /* MWAIT C2 */
+		.name = "C3-HSW",
+		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 33,
+		.target_residency = 100,
+	},
+	{ /* MWAIT C3 */
+		.name = "C6-HSW",
+		.flags = MWAIT2flg(0x20) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 133,
+		.target_residency = 400,
+	},
+	{ /* MWAIT C4 */
+		.name = "C7s-HSW",
+		.flags = MWAIT2flg(0x32) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 166,
+		.target_residency = 500,
+	},
+};
+
 static const struct cpuidle_state atom_cstates[MWAIT_MAX_NUM_CSTATES] = {
 	{ /* MWAIT C0 */ },
 	{ /* MWAIT C1 */
@@ -348,6 +376,10 @@ static const struct idle_cpu idle_cpu_ivb = {
 	.state_table = ivb_cstates,
 };
 
+static const struct idle_cpu idle_cpu_hsw = {
+	.state_table = hsw_cstates,
+};
+
 #define ICPU(model, cpu) { 6, model, &idle_cpu_##cpu }
 
 static struct intel_idle_id {
@@ -367,6 +399,10 @@ static struct intel_idle_id {
 	ICPU(0x2d, snb),
 	ICPU(0x3a, ivb),
 	ICPU(0x3e, ivb),
+	ICPU(0x3c, hsw),
+	ICPU(0x3f, hsw),
+	ICPU(0x45, hsw),
+	ICPU(0x46, hsw),
 	{}
 };
 
