@@ -188,6 +188,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 	fi; \
 	cd qemu-xen-dir; \
 	$$source/configure --enable-xen --target-list=i386-softmmu \
+		--prefix=$(PREFIX) \
 		--source-path=$$source \
 		--extra-cflags="-I$(XEN_ROOT)/tools/include \
 		-I$(XEN_ROOT)/tools/libxc \
