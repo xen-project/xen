@@ -815,7 +815,7 @@ get_page_from_l1e(
          * minor hack can go away.
          */
         if ( (real_pg_owner == NULL) || (pg_owner == l1e_owner) ||
-             !IS_PRIV_FOR(pg_owner, real_pg_owner) )
+             xsm_priv_mapping(XSM_TARGET, pg_owner, real_pg_owner) )
         {
             MEM_LOG("pg_owner %d l1e_owner %d, but real_pg_owner %d",
                     pg_owner->domain_id, l1e_owner->domain_id,

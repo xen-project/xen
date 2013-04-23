@@ -1345,6 +1345,11 @@ static int flask_update_va_mapping(struct domain *d, struct domain *f,
     return domain_has_perm(d, f, SECCLASS_MMU, map_perms);
 }
 
+static int flask_priv_mapping(struct domain *d, struct domain *t)
+{
+    return domain_has_perm(d, t, SECCLASS_MMU, MMU__TARGET_HACK);
+}
+
 static int flask_get_device_group(uint32_t machine_bdf)
 {
     u32 rsid;
@@ -1534,6 +1539,7 @@ static struct xsm_operations flask_ops = {
     .mmu_update = flask_mmu_update,
     .mmuext_op = flask_mmuext_op,
     .update_va_mapping = flask_update_va_mapping,
+    .priv_mapping = flask_priv_mapping,
     .get_device_group = flask_get_device_group,
     .test_assign_device = flask_test_assign_device,
     .assign_device = flask_assign_device,

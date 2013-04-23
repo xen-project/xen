@@ -1117,9 +1117,6 @@ guest_physmap_mark_populate_on_demand(struct domain *d, unsigned long gfn,
     mfn_t omfn;
     int rc = 0;
 
-    if ( !IS_PRIV_FOR(current->domain, d) )
-        return -EPERM;
-
     if ( !paging_mode_translate(d) )
         return -EINVAL;
 

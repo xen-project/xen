@@ -29,6 +29,7 @@
 #include <xen/perfc.h>
 #include <xen/domain_page.h>
 #include <xen/iocap.h>
+#include <xsm/xsm.h>
 #include <asm/page.h>
 #include <asm/current.h>
 #include <asm/shadow.h>
@@ -849,14 +850,16 @@ shadow_get_page_from_l1e(shadow_l1e_t sl1e, struct domain *d, p2m_type_t type)
          !shadow_mode_translate(d) &&
          mfn_valid(mfn = shadow_l1e_get_mfn(sl1e)) &&
          (owner = page_get_owner(mfn_to_page(mfn))) &&
-         (d != owner) &&
-         IS_PRIV_FOR(d, owner))
+         (d != owner) )
     {
-        res = get_page_from_l1e(sl1e, d, owner);
-        SHADOW_PRINTK("privileged domain %d installs map of mfn %05lx "
-                       "which is owned by domain %d: %s\n",
-                       d->domain_id, mfn_x(mfn), owner->domain_id,
-                       res >= 0 ? "success" : "failed");
+        res = xsm_priv_mapping(XSM_TARGET, d, owner);
+        if ( !res ) {
+            res = get_page_from_l1e(sl1e, d, owner);
+            SHADOW_PRINTK("privileged domain %d installs map of mfn %05lx "
+                           "which is owned by domain %d: %s\n",
+                           d->domain_id, mfn_x(mfn), owner->domain_id,
+                           res >= 0 ? "success" : "failed");
+        }
     }
 
     /* Okay, it might still be a grant mapping PTE.  Try it. */

@@ -154,6 +154,7 @@ struct xsm_operations {
                        struct domain *f, uint32_t flags);
     int (*mmuext_op) (struct domain *d, struct domain *f);
     int (*update_va_mapping) (struct domain *d, struct domain *f, l1_pgentry_t pte);
+    int (*priv_mapping) (struct domain *d, struct domain *t);
     int (*bind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
     int (*unbind_pt_irq) (struct domain *d, struct xen_domctl_bind_pt_irq *bind);
     int (*ioport_permission) (struct domain *d, uint32_t s, uint32_t e, uint8_t allow);
@@ -580,6 +581,11 @@ static inline int xsm_update_va_mapping(xsm_default_t def, struct domain *d, str
                                                             l1_pgentry_t pte)
 {
     return xsm_ops->update_va_mapping(d, f, pte);
+}
+
+static inline int xsm_priv_mapping(xsm_default_t def, struct domain *d, struct domain *t)
+{
+    return xsm_ops->priv_mapping(d, t);
 }
 
 static inline int xsm_bind_pt_irq(xsm_default_t def, struct domain *d,

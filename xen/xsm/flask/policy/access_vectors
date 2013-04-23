@@ -330,6 +330,9 @@ class mmu
 #  source = domain making the hypercall
 #  target = domain whose pages are being exchanged
     exchange
+# Allow a privileged domain to install a map of a page it does not own.  Used
+# for stub domain device models with the PV framebuffer.
+    target_hack
 }
 
 # control of the paging_domctl split by subop

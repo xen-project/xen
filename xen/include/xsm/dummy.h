@@ -574,6 +574,12 @@ static XSM_INLINE int xsm_update_va_mapping(XSM_DEFAULT_ARG struct domain *d, st
     return xsm_default_action(action, d, f);
 }
 
+static XSM_INLINE int xsm_priv_mapping(XSM_DEFAULT_ARG struct domain *d, struct domain *t)
+{
+    XSM_ASSERT_ACTION(XSM_TARGET);
+    return xsm_default_action(action, d, t);
+}
+
 static XSM_INLINE int xsm_bind_pt_irq(XSM_DEFAULT_ARG struct domain *d, struct xen_domctl_bind_pt_irq *bind)
 {
     XSM_ASSERT_ACTION(XSM_HOOK);
