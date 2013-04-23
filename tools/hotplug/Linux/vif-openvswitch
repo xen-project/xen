@@ -1,0 +1,113 @@
+#!/bin/bash
+#============================================================================
+# ${XEN_SCRIPT_DIR}/vif-openvswitch
+#
+# Script for configuring a vif in openvswitch mode.
+# The hotplugging system will call this script if it is specified either in
+# the device configuration given to Xend, or the default Xend configuration
+# in ${XEN_CONFIG_DIR}/xend-config.sxp.  If the script is specified in
+# neither of those places, then this script is the default.
+#
+# Usage:
+# vif-openvswitch (add|remove|online|offline)
+#
+# Environment vars:
+# vif         vif interface name (required).
+# XENBUS_PATH path to this device's details in the XenStore (required).
+#
+# Read from the store:
+# bridge  openvswitch to add the vif to (required).
+# ip      list of IP networks for the vif, space-separated (optional).
+#
+# up:
+# Enslaves the vif interface to the bridge and adds iptables rules
+# for its ip addresses (if any).
+#
+# down:
+# Removes the vif interface from the bridge and removes the iptables
+# rules for its ip addresses (if any).
+#============================================================================
+
+dir=$(dirname "$0")
+. "$dir/vif-common.sh"
+
+check_tools()
+{
+    if ! command -v ovs-vsctl > /dev/null 2>&1; then
+        fatal "Unable to find ovs-vsctl tool"
+    fi
+    if ! command -v ip > /dev/null 2>&1; then
+        fatal "Unable to find ip tool"
+    fi
+}
+openvswitch_external_id() {
+    local dev=$1
+    local key=$2
+    local value=$3
+
+    echo "-- set interface $dev external-ids:\"$key\"=\"$value\""
+}
+
+openvswitch_external_id_all() {
+    local dev=$1
+    local frontend_id=$(xenstore_read "$XENBUS_PATH/frontend-id")
+    local vm_path=$(xenstore_read "/local/domain/${frontend_id}/vm")
+    local name=$(xenstore_read "${vm_path}/name")
+    openvswitch_external_id $dev "xen-vm-name" "$name"
+    local uuid=$(xenstore_read "${vm_path}/uuid")
+    openvswitch_external_id $dev "xen-vm-uuid" "$uuid"
+    local mac=$(xenstore_read "$XENBUS_PATH/mac")
+    openvswitch_external_id $dev "attached-mac" "$mac"
+}
+
+add_to_openvswitch () {
+    local dev=$1
+    local bridge="$(xenstore_read_default "$XENBUS_PATH/bridge" "$bridge")"
+    local tag trunk
+
+    if [[ $bridge =~ ^([^.:]+)(\.([[:digit:]]+))?(:([[:digit:]]+(:[[:digit:]]+)*))?$ ]]; then
+        bridge="${BASH_REMATCH[1]}"
+        tag="${BASH_REMATCH[3]}"
+        trunk="${BASH_REMATCH[5]//:/,}"
+    else
+        fatal "No valid bridge was specified"
+    fi
+
+    if [ $trunk ]; then
+        local trunk_arg="trunk=$trunk"
+    fi
+
+    if [ $tag ]; then
+        local tag_arg="tag=$tag"
+    fi
+
+    local vif_details="$(openvswitch_external_id_all $dev)"
+
+    do_or_die ovs-vsctl --timeout=30 \
+        -- --if-exists del-port $dev \
+        -- add-port "$bridge" $dev $tag_arg $trunk_arg $vif_details
+    do_or_die ip link set $dev up
+}
+
+case "$command" in
+    add|online)
+        check_tools
+        setup_virtual_bridge_port $dev
+        add_to_openvswitch $dev
+        ;;
+
+    remove|offline)
+        do_without_error ovs-vsctl --timeout=30 \
+            -- --if-exists del-port $dev
+        do_without_error ip link set $dev down
+        ;;
+esac
+
+if [ "$type_if" = vif ]; then
+    handle_iptable
+fi
+
+log debug "Successful vif-openvswitch $command for $dev."
+if [ "$type_if" = vif -a "$command" = "online" ]; then
+    success
+fi

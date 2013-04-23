@@ -13,6 +13,7 @@ XENCOMMONS_SYSCONFIG = init.d/sysconfig.xencommons
 XEN_SCRIPTS = network-bridge vif-bridge
 XEN_SCRIPTS += network-route vif-route
 XEN_SCRIPTS += network-nat vif-nat
+XEN_SCRIPTS += vif-openvswitch
 XEN_SCRIPTS += vif2
 XEN_SCRIPTS += vif-setup
 XEN_SCRIPTS += block
