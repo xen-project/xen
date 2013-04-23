@@ -3909,11 +3909,9 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
                     rc = -EINVAL;
                 break;
             case HVM_PARAM_NESTEDHVM:
-                if ( !IS_PRIV(current->domain) )
-                {
-                    rc = -EPERM;
+                rc = xsm_hvm_param_nested(XSM_PRIV, d);
+                if ( rc )
                     break;
-                }
                 if ( a.value > 1 )
                     rc = -EINVAL;
                 /* Remove the check below once we have

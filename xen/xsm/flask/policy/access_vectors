@@ -234,6 +234,8 @@ class hvm
 #  source = domain whose memory is being shared
 #  target = client domain
     share_mem
+# HVMOP_set_param setting HVM_PARAM_NESTEDHVM
+    nested
 }
 
 # Class event describes event channels.  Interdomain event channels have their

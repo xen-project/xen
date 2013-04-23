@@ -1092,6 +1092,11 @@ static int flask_hvm_param(struct domain *d, unsigned long op)
     return current_has_perm(d, SECCLASS_HVM, perm);
 }
 
+static int flask_hvm_param_nested(struct domain *d)
+{
+    return current_has_perm(d, SECCLASS_HVM, HVM__NESTED);
+}
+
 #ifdef CONFIG_X86
 static int flask_shadow_control(struct domain *d, uint32_t op)
 {
@@ -1506,6 +1511,7 @@ static struct xsm_operations flask_ops = {
     .tmem_op = flask_tmem_op,
     .tmem_control = flask_tmem_control,
     .hvm_param = flask_hvm_param,
+    .hvm_param_nested = flask_hvm_param_nested,
 
     .do_xsm_op = do_flask_op,
 

@@ -130,6 +130,7 @@ struct xsm_operations {
     long (*do_xsm_op) (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op);
 
     int (*hvm_param) (struct domain *d, unsigned long op);
+    int (*hvm_param_nested) (struct domain *d);
 
 #ifdef CONFIG_X86
     int (*shadow_control) (struct domain *d, uint32_t op);
@@ -491,6 +492,11 @@ static inline long xsm_do_xsm_op (XEN_GUEST_HANDLE_PARAM(xsm_op_t) op)
 static inline int xsm_hvm_param (xsm_default_t def, struct domain *d, unsigned long op)
 {
     return xsm_ops->hvm_param(d, op);
+}
+
+static inline int xsm_hvm_param_nested (xsm_default_t def, struct domain *d)
+{
+    return xsm_ops->hvm_param_nested(d);
 }
 
 #ifdef CONFIG_X86
