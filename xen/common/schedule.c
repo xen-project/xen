@@ -677,11 +677,10 @@ int vcpu_set_affinity(struct vcpu *v, const cpumask_t *affinity)
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
-static long do_block(void)
+void vcpu_block(void)
 {
     struct vcpu *v = current;
 
-    local_event_delivery_enable();
     set_bit(_VPF_blocked, &v->pause_flags);
 
     /* Check for events /after/ blocking: avoids wakeup waiting race. */
@@ -694,8 +693,12 @@ static long do_block(void)
         TRACE_2D(TRC_SCHED_BLOCK, v->domain->domain_id, v->vcpu_id);
         raise_softirq(SCHEDULE_SOFTIRQ);
     }
+}
 
-    return 0;
+static void vcpu_block_enable_events(void)
+{
+    local_event_delivery_enable();
+    vcpu_block();
 }
 
 static long do_poll(struct sched_poll *sched_poll)
@@ -870,7 +873,7 @@ long do_sched_op_compat(int cmd, unsigned long arg)
 
     case SCHEDOP_block:
     {
-        ret = do_block();
+        vcpu_block_enable_events();
         break;
     }
 
@@ -907,7 +910,7 @@ ret_t do_sched_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case SCHEDOP_block:
     {
-        ret = do_block();
+        vcpu_block_enable_events();
         break;
     }
 

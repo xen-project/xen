@@ -690,6 +690,7 @@ static inline int vcpu_runnable(struct vcpu *v)
              atomic_read(&v->domain->pause_count));
 }
 
+void vcpu_block(void);
 void vcpu_unblock(struct vcpu *v);
 void vcpu_pause(struct vcpu *v);
 void vcpu_pause_nosync(struct vcpu *v);
