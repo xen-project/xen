@@ -576,12 +576,8 @@ int cpupool_do_sysctl(struct xen_sysctl_cpupool_op *op)
     {
         struct domain *d;
 
-        ret = -EINVAL;
-        if ( op->domid == 0 )
-            break;
-        ret = -ESRCH;
-        d = rcu_lock_domain_by_id(op->domid);
-        if ( d == NULL )
+        ret = rcu_lock_remote_domain_by_id(op->domid, &d);
+        if ( ret )
             break;
         if ( d->cpupool == NULL )
         {
