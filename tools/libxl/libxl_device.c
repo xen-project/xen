@@ -236,7 +236,9 @@ int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
             return ERROR_INVAL;
         }
         memset(&a.stab, 0, sizeof(a.stab));
-    } else if (!disk->script) {
+    } else if (disk->backend == LIBXL_DISK_BACKEND_PHY &&
+               disk->backend_domid == LIBXL_TOOLSTACK_DOMID &&
+               !disk->script) {
         if (stat(disk->pdev_path, &a.stab)) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Disk vdev=%s "
                              "failed to stat: %s",
