@@ -29,9 +29,12 @@ endif
 
 ALL_TARGETS = libxenstore.so libxenstore.a clients xs_tdb_dump xenstored
 
+ifeq ($(CONFIG_Linux),y)
+ALL_TARGETS += init-xenstore-domain
+endif
+
 ifdef CONFIG_STUBDOM
 CFLAGS += -DNO_SOCKETS=1
-ALL_TARGETS += init-xenstore-domain
 endif
 
 .PHONY: all

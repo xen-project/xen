@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -69,7 +70,7 @@ int main(int argc, char** argv)
 	xc_interface *xch;
 	struct xs_handle *xsh;
 	char buf[16];
-	int rv;
+	int rv, fd;
 
 	if (argc != 4) {
 		printf("Use: %s <xenstore-kernel> <memory_mb> <flask-label>\n", argv[0]);
@@ -89,6 +90,15 @@ int main(int argc, char** argv)
 	rv = snprintf(buf, 16, "%d", domid);
 	xs_write(xsh, XBT_NULL, "/tool/xenstored/domid", buf, rv);
 	xs_daemon_close(xsh);
+
+	fd = creat("/var/run/xenstored.pid", 0666);
+	if (fd < 0)
+		return 3;
+	rv = snprintf(buf, 16, "domid:%d\n", domid);
+	rv = write(fd, buf, rv);
+	close(fd);
+	if (rv < 0)
+		return 3;
 
 	return 0;
 }
