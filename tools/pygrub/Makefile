@@ -14,7 +14,8 @@ install: all
 		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" \
 		--install-scripts=$(PRIVATE_BINDIR) --force
 	$(INSTALL_DIR) $(DESTDIR)/var/run/xend/boot
-	set -e; if [ "`readlink -f $(DESTDIR)/$(BINDIR)`" != \
+	set -e; if [ $(BINDIR) != $(PRIVATE_BINDIR) -a \
+	             "`readlink -f $(DESTDIR)/$(BINDIR)`" != \
 	             "`readlink -f $(PRIVATE_BINDIR)`" ]; then \
 	    ln -sf $(PRIVATE_BINDIR)/pygrub $(DESTDIR)/$(BINDIR); \
 	fi
