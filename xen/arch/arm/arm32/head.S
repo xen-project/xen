@@ -206,7 +206,7 @@ skip_bss:
         mcr   CP32(r0, HSCTLR)
 
         /* Write Xen's PT's paddr into the HTTBR */
-        ldr   r4, =xen_pgtable
+        ldr   r4, =boot_pgtable
         add   r4, r4, r10            /* r4 := paddr (xen_pagetable) */
         mov   r5, #0                 /* r4:r5 is paddr (xen_pagetable) */
         mcrr  CP64(r4, r5, HTTBR)

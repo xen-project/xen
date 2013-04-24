@@ -40,10 +40,10 @@
 struct domain *dom_xen, *dom_io, *dom_cow;
 
 /* Static start-of-day pagetables that we use before the allocators are up */
-/* xen_pgtable == root of the trie (zeroeth level on 64-bit, first on 32-bit) */
-lpae_t xen_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+/* boot_pgtable == root of the trie (zeroeth level on 64-bit, first on 32-bit) */
+lpae_t boot_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 #ifdef CONFIG_ARM_64
-lpae_t xen_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+lpae_t boot_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 #endif
 /* N.B. The second-level table is 4 contiguous pages long, and covers
  * all addresses from 0 to 0xffffffff.  Offsets into it are calculated
@@ -51,6 +51,10 @@ lpae_t xen_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 lpae_t xen_second[LPAE_ENTRIES*4] __attribute__((__aligned__(4096*4)));
 lpae_t xen_fixmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 static lpae_t xen_xenmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+
+/* boot_pgtable becomes the boot processors pagetable, eventually this will
+ * become a per-cpu variable */
+#define xen_pgtable boot_pgtable
 
 /* Non-boot CPUs use this to find the correct pagetables. */
 uint64_t boot_ttbr;
@@ -284,11 +288,11 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     /* Beware!  Any state we modify between now and the PT switch may be
      * discarded when we switch over to the copy. */
 
-    /* Update the copy of xen_pgtable to use the new paddrs */
-    p = (void *) xen_pgtable + dest_va - (unsigned long) _start;
+    /* Update the copy of boot_pgtable to use the new paddrs */
+    p = (void *) boot_pgtable + dest_va - (unsigned long) _start;
 #ifdef CONFIG_ARM_64
     p[0].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
-    p = (void *) xen_first + dest_va - (unsigned long) _start;
+    p = (void *) boot_first + dest_va - (unsigned long) _start;
 #endif
     for ( i = 0; i < 4; i++)
         p[i].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
@@ -305,7 +309,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
             p[i].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
 
     /* Change pagetables to the copy in the relocated Xen */
-    boot_ttbr = (uintptr_t) xen_pgtable + phys_offset;
+    boot_ttbr = (uintptr_t) boot_pgtable + phys_offset;
     flush_xen_dcache(boot_ttbr);
     flush_xen_dcache_va_range((void*)dest_va, _end - _start);
     flush_xen_text_tlb();

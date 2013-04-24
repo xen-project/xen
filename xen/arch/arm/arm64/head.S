@@ -190,14 +190,14 @@ skip_bss:
         msr   SCTLR_EL2, x0
 
         /* Write Xen's PT's paddr into the HTTBR */
-        ldr   x4, =xen_pgtable
+        ldr   x4, =boot_pgtable
         add   x4, x4, x20            /* x4 := paddr (xen_pagetable) */
         msr   TTBR0_EL2, x4
 
         /* Non-boot CPUs don't need to rebuild the pagetable */
         cbnz  x22, pt_ready
 
-        ldr   x1, =xen_first
+        ldr   x1, =boot_first
         add   x1, x1, x20            /* x1 := paddr (xen_first) */
         mov   x3, #PT_PT             /* x2 := table map of xen_first */
         orr   x2, x1, x3             /* (+ rights for linear PT) */
