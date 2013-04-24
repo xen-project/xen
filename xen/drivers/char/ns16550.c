@@ -45,6 +45,7 @@ static struct ns16550 {
     struct irqaction irqaction;
     /* UART with no IRQ line: periodically-polled I/O. */
     struct timer timer;
+    struct timer resume_timer;
     unsigned int timeout_ms;
     bool_t intr_works;
     /* PCI card parameters. */
@@ -122,6 +123,10 @@ static struct ns16550 {
 
 /* Frequency of external clock source. This definition assumes PC platform. */
 #define UART_CLOCK_HZ   1843200
+
+/* Resume retry settings */
+#define RESUME_DELAY    MILLISECS(10)
+#define RESUME_RETRIES  100
 
 static char ns_read_reg(struct ns16550 *uart, int reg)
 {
@@ -351,7 +356,7 @@ static void ns16550_suspend(struct serial_port *port)
                                   uart->ps_bdf[2], PCI_COMMAND);
 }
 
-static void ns16550_resume(struct serial_port *port)
+static void _ns16550_resume(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
 
@@ -365,6 +370,54 @@ static void ns16550_resume(struct serial_port *port)
 
     ns16550_setup_preirq(port->uart);
     ns16550_setup_postirq(port->uart);
+}
+
+static int ns16550_ioport_invalid(struct ns16550 *uart)
+{
+    return ((((unsigned char)ns_read_reg(uart, LSR)) == 0xff) &&
+            (((unsigned char)ns_read_reg(uart, MCR)) == 0xff) &&
+            (((unsigned char)ns_read_reg(uart, IER)) == 0xff) &&
+            (((unsigned char)ns_read_reg(uart, IIR)) == 0xff) &&
+            (((unsigned char)ns_read_reg(uart, LCR)) == 0xff));
+}
+
+static int delayed_resume_tries;
+static void ns16550_delayed_resume(void *data)
+{
+    struct serial_port *port = data;
+    struct ns16550 *uart = port->uart;
+
+    if ( ns16550_ioport_invalid(port->uart) && delayed_resume_tries-- )
+        set_timer(&uart->resume_timer, NOW() + RESUME_DELAY);
+    else
+        _ns16550_resume(port);
+}
+
+static void ns16550_resume(struct serial_port *port)
+{
+    struct ns16550 *uart = port->uart;
+
+    /*
+     * Check for ioport access, before fully resuming operation.
+     * On some systems, there is a SuperIO card that provides
+     * this legacy ioport on the LPC bus.
+     *
+     * We need to wait for dom0's ACPI processing to run the proper
+     * AML to re-initialize the chip, before we can use the card again.
+     *
+     * This may cause a small amount of garbage to be written
+     * to the serial log while we wait patiently for that AML to
+     * be executed. However, this is preferable to spinning in an
+     * infinite loop, as seen on a Lenovo T430, when serial was enabled.
+     */
+    if ( ns16550_ioport_invalid(uart) )
+    {
+        delayed_resume_tries = RESUME_RETRIES;
+        init_timer(&uart->resume_timer, ns16550_delayed_resume, port, 0);
+        set_timer(&uart->resume_timer, NOW() + RESUME_DELAY);
+    }
+    else
+        _ns16550_resume(port);
 }
 
 #ifdef CONFIG_X86
