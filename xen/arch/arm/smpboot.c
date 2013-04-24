@@ -220,6 +220,12 @@ void stop_cpu(void)
 /* Bring up a remote CPU */
 int __cpu_up(unsigned int cpu)
 {
+    int rc;
+
+    rc = init_secondary_pagetables(cpu);
+    if ( rc < 0 )
+        return rc;
+
     /* Tell the remote CPU which stack to boot on. */
     init_stack = idle_vcpu[cpu]->arch.stack;
 

@@ -39,22 +39,48 @@
 
 struct domain *dom_xen, *dom_io, *dom_cow;
 
-/* Static start-of-day pagetables that we use before the allocators are up */
-/* boot_pgtable == root of the trie (zeroeth level on 64-bit, first on 32-bit) */
+/* Static start-of-day pagetables that we use before the
+ * allocators are up. These go on to become the boot CPU's real pagetables.
+ */
 lpae_t boot_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 #ifdef CONFIG_ARM_64
 lpae_t boot_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 #endif
-/* N.B. The second-level table is 4 contiguous pages long, and covers
- * all addresses from 0 to 0xffffffff.  Offsets into it are calculated
- * with second_linear_offset(), not second_table_offset(). */
+
+/*
+ * xen_pgtable and xen_dommap are per-PCPU and are allocated before
+ * bringing up each CPU. On 64-bit a first level table is also allocated.
+ *
+ * xen_second, xen_fixmap and xen_xenmap are shared between all PCPUs.
+ */
+
+/* Per-CPU pagetable pages */
+/* xen_pgtable == root of the trie (zeroeth level on 64-bit, first on 32-bit) */
+static DEFINE_PER_CPU(lpae_t *, xen_pgtable);
+/* xen_dommap == pages used by map_domain_page, these pages contain
+ * the second level pagetables which mapp the domheap region
+ * DOMHEAP_VIRT_START...DOMHEAP_VIRT_END in 2MB chunks. */
+static DEFINE_PER_CPU(lpae_t *, xen_dommap);
+
+/* Common pagetable leaves */
+/* Second level page tables.
+ *
+ * The second-level table is 2 contiguous pages long, and covers all
+ * addresses from 0 to 0x7fffffff. Offsets into it are calculated
+ * with second_linear_offset(), not second_table_offset().
+ *
+ * Addresses 0x80000000 to 0xffffffff are covered by the per-cpu
+ * xen_domheap mappings described above. However we allocate 4 pages
+ * here for use in the boot page tables and the second two pages
+ * become the boot CPUs xen_dommap pages.
+ */
 lpae_t xen_second[LPAE_ENTRIES*4] __attribute__((__aligned__(4096*4)));
+/* First level page table used for fixmap */
 lpae_t xen_fixmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+/* First level page table used to map Xen itself with the XN bit set
+ * as appropriate. */
 static lpae_t xen_xenmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 
-/* boot_pgtable becomes the boot processors pagetable, eventually this will
- * become a per-cpu variable */
-#define xen_pgtable boot_pgtable
 
 /* Non-boot CPUs use this to find the correct pagetables. */
 uint64_t boot_ttbr;
@@ -118,12 +144,17 @@ done:
 void dump_hyp_walk(vaddr_t addr)
 {
     uint64_t ttbr = READ_SYSREG64(TTBR0_EL2);
+    lpae_t *pgtable = this_cpu(xen_pgtable);
 
-    printk("Walking Hypervisor VA 0x%"PRIvaddr" via TTBR 0x%016"PRIx64"\n",
-           addr, ttbr);
+    printk("Walking Hypervisor VA 0x%"PRIvaddr" "
+           "on CPU%d via TTBR 0x%016"PRIx64"\n",
+           addr, smp_processor_id(), ttbr);
 
-    BUG_ON( (lpae_t *)(unsigned long)(ttbr - phys_offset) != xen_pgtable );
-    dump_pt_walk(xen_pgtable, addr);
+    if ( smp_processor_id() == 0 )
+        BUG_ON( (lpae_t *)(unsigned long)(ttbr - phys_offset) != pgtable );
+    else
+        BUG_ON( virt_to_maddr(pgtable) != ttbr );
+    dump_pt_walk(pgtable, addr);
 }
 
 /* Map a 4k page in a fixmap entry */
@@ -149,7 +180,7 @@ void clear_fixmap(unsigned map)
 void *map_domain_page(unsigned long mfn)
 {
     unsigned long flags;
-    lpae_t *map = xen_second + second_linear_offset(DOMHEAP_VIRT_START);
+    lpae_t *map = this_cpu(xen_dommap);
     unsigned long slot_mfn = mfn & ~LPAE_ENTRY_MASK;
     vaddr_t va;
     lpae_t pte;
@@ -215,7 +246,7 @@ void *map_domain_page(unsigned long mfn)
 void unmap_domain_page(const void *va)
 {
     unsigned long flags;
-    lpae_t *map = xen_second + second_linear_offset(DOMHEAP_VIRT_START);
+    lpae_t *map = this_cpu(xen_dommap);
     int slot = ((unsigned long) va - DOMHEAP_VIRT_START) >> SECOND_SHIFT;
 
     local_irq_save(flags);
@@ -230,7 +261,7 @@ void unmap_domain_page(const void *va)
 
 unsigned long domain_page_map_to_mfn(const void *va)
 {
-    lpae_t *map = xen_second + second_linear_offset(DOMHEAP_VIRT_START);
+    lpae_t *map = this_cpu(xen_dommap);
     int slot = ((unsigned long) va - DOMHEAP_VIRT_START) >> SECOND_SHIFT;
     unsigned long offset = ((unsigned long)va>>THIRD_SHIFT) & LPAE_ENTRY_MASK;
 
@@ -275,6 +306,16 @@ void __cpuinit setup_virt_paging(void)
      */
     WRITE_SYSREG32(0x80002558, VTCR_EL2); isb();
 }
+
+/* This needs to be a macro to stop the compiler spilling to the stack
+ * which will change when we change pagetables */
+#define WRITE_TTBR(ttbr)                                                \
+    flush_xen_text_tlb();                                               \
+    WRITE_SYSREG64(ttbr, TTBR0_EL2);                                    \
+    dsb(); /* ensure memory accesses do not cross over the TTBR0 write */ \
+    /* flush_xen_text_tlb contains an initial isb which ensures the     \
+     * write to TTBR0 has completed. */                                 \
+    flush_xen_text_tlb()
 
 /* Boot-time pagetable setup.
  * Changes here may need matching changes in head.S */
@@ -323,11 +364,8 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     boot_ttbr = (uintptr_t) boot_pgtable + phys_offset;
     flush_xen_dcache(boot_ttbr);
     flush_xen_dcache_va_range((void*)dest_va, _end - _start);
-    flush_xen_text_tlb();
 
-    WRITE_SYSREG64(boot_ttbr, TTBR0_EL2);
-    dsb();                         /* Ensure visibility of HTTBR update */
-    flush_xen_text_tlb();
+    WRITE_TTBR(boot_ttbr);
 
     /* Undo the temporary map */
     pte.bits = 0;
@@ -373,11 +411,87 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);
     /* Flush everything after setting WXN bit. */
     flush_xen_text_tlb();
+
+    per_cpu(xen_pgtable, 0) = boot_pgtable;
+    per_cpu(xen_dommap, 0) = xen_second +
+        second_linear_offset(DOMHEAP_VIRT_START);
+
+    /* Some of these slots may have been used during start of day and/or
+     * relocation. Make sure they are clear now. */
+    memset(this_cpu(xen_dommap), 0, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
+    flush_xen_dcache_va_range(this_cpu(xen_dommap),
+                              DOMHEAP_SECOND_PAGES*PAGE_SIZE);
+}
+
+int init_secondary_pagetables(int cpu)
+{
+    lpae_t *root, *first, *domheap, pte;
+    int i;
+
+    root = alloc_xenheap_page();
+#ifdef CONFIG_ARM_64
+    first = alloc_xenheap_page();
+#else
+    first = root; /* root == first level on 32-bit 3-level trie */
+#endif
+    domheap = alloc_xenheap_pages(get_order_from_pages(DOMHEAP_SECOND_PAGES), 0);
+
+    if ( root == NULL || domheap == NULL || first == NULL )
+    {
+        printk("Not enough free memory for secondary CPU%d pagetables\n", cpu);
+        free_xenheap_pages(domheap, get_order_from_pages(DOMHEAP_SECOND_PAGES));
+#ifdef CONFIG_ARM_64
+        free_xenheap_page(first);
+#endif
+        free_xenheap_page(root);
+        return -ENOMEM;
+    }
+
+    /* Initialise root pagetable from root of boot tables */
+    memcpy(root, boot_pgtable, PAGE_SIZE);
+
+#ifdef CONFIG_ARM_64
+    /* Initialise first pagetable from first level of boot tables, and
+     * hook into the new root. */
+    memcpy(first, boot_first, PAGE_SIZE);
+    pte = mfn_to_xen_entry(virt_to_mfn(first));
+    pte.pt.table = 1;
+    write_pte(root, pte);
+#endif
+
+    /* Ensure the domheap has no stray mappings */
+    memset(domheap, 0, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
+
+    /* Update the first level mapping to reference the local CPUs
+     * domheap mapping pages. */
+    for ( i = 0; i < DOMHEAP_SECOND_PAGES; i++ )
+    {
+        pte = mfn_to_xen_entry(virt_to_mfn(domheap+i*LPAE_ENTRIES));
+        pte.pt.table = 1;
+        write_pte(&first[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)], pte);
+    }
+
+    flush_xen_dcache_va_range(root, PAGE_SIZE);
+#ifdef CONFIG_ARM_64
+    flush_xen_dcache_va_range(first, PAGE_SIZE);
+#endif
+    flush_xen_dcache_va_range(domheap, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
+
+    per_cpu(xen_pgtable, cpu) = root;
+    per_cpu(xen_dommap, cpu) = domheap;
+
+    return 0;
 }
 
 /* MMU setup for secondary CPUS (which already have paging enabled) */
 void __cpuinit mmu_init_secondary_cpu(void)
 {
+    uint64_t ttbr;
+
+    /* Change to this CPU's pagetables */
+    ttbr = (uintptr_t)virt_to_maddr(this_cpu(xen_pgtable));
+    WRITE_TTBR(ttbr);
+
     /* From now on, no mapping may be both writable and executable. */
     WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);
     flush_xen_text_tlb();
