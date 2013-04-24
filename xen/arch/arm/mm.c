@@ -74,6 +74,17 @@ unsigned long total_pages;
 
 extern char __init_begin[], __init_end[];
 
+/* Checking VA memory layout alignment. */
+static inline void check_memory_layout_alignment_constraints(void) {
+    /* 2MB aligned regions */
+    BUILD_BUG_ON(XEN_VIRT_START & ~SECOND_MASK);
+    BUILD_BUG_ON(FIXMAP_ADDR(0) & ~SECOND_MASK);
+    BUILD_BUG_ON(BOOT_MISC_VIRT_START & ~SECOND_MASK);
+    /* 1GB aligned regions */
+    BUILD_BUG_ON(XENHEAP_VIRT_START & ~FIRST_MASK);
+    BUILD_BUG_ON(DOMHEAP_VIRT_START & ~FIRST_MASK);
+}
+
 void dump_pt_walk(lpae_t *first, paddr_t addr)
 {
     lpae_t *second = NULL, *third = NULL;
