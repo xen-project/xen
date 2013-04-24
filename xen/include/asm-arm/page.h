@@ -323,9 +323,9 @@ static inline int gva_to_ipa(vaddr_t va, paddr_t *paddr)
 #define FIRST_MASK   (~(FIRST_SIZE - 1))
 
 /* Calculate the offsets into the pagetables for a given VA */
-#define first_linear_offset(va) (va >> FIRST_SHIFT)
-#define second_linear_offset(va) (va >> SECOND_SHIFT)
-#define third_linear_offset(va) (va >> THIRD_SHIFT)
+#define first_linear_offset(va) ((va) >> FIRST_SHIFT)
+#define second_linear_offset(va) ((va) >> SECOND_SHIFT)
+#define third_linear_offset(va) ((va) >> THIRD_SHIFT)
 
 #define TABLE_OFFSET(offs) ((unsigned int)(offs) & LPAE_ENTRY_MASK)
 #define first_table_offset(va)  TABLE_OFFSET(first_linear_offset(va))
