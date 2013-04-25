@@ -175,6 +175,7 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
     wmb();
 
     local_irq_enable();
+    local_abort_enable();
 
     printk(XENLOG_DEBUG "CPU %u booted.\n", smp_processor_id());
 

@@ -633,8 +633,6 @@ int construct_dom0(struct domain *d)
         }
     }
 
-    local_abort_enable();
-
     return 0;
 }
 
