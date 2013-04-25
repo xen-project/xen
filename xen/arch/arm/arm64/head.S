@@ -388,6 +388,6 @@ init_uart:
 .global early_puts
 early_puts:
 puts:
-putn:   mov   pc, lr
+putn:   ret
 
 #endif /* EARLY_UART_ADDRESS */
