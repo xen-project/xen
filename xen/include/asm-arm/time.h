@@ -11,6 +11,18 @@ static inline cycles_t get_cycles (void)
 struct tm;
 struct tm wallclock_time(void);
 
+/* List of timer's IRQ */
+enum timer_ppi
+{
+    TIMER_PHYS_SECURE_PPI = 0,
+    TIMER_PHYS_NONSECURE_PPI = 1,
+    TIMER_VIRT_PPI = 2,
+    TIMER_HYP_PPI = 3,
+    MAX_TIMER_PPI = 4,
+};
+
+/* Route timer's IRQ on this CPU */
+extern void __cpuinit route_timer_interrupt(void);
 
 /* Set up the timer interrupt on this CPU */
 extern void __cpuinit init_timer_interrupt(void);

@@ -488,15 +488,10 @@ void gic_disable_cpu(void)
 
 void gic_route_ppis(void)
 {
-    /* XXX should get these from DT */
     /* GIC maintenance */
     gic_route_dt_irq(&gic.maintenance, 1u << smp_processor_id(), 0xa0);
-    /* Hypervisor Timer */
-    gic_route_irq(26, 1, 1u << smp_processor_id(), 0xa0);
-    /* Virtual Timer */
-    gic_route_irq(27, 1, 1u << smp_processor_id(), 0xa0);
-    /* Physical Timer */
-    gic_route_irq(30, 1, 1u << smp_processor_id(), 0xa0);
+    /* Route timer interrupt */
+    route_timer_interrupt();
 }
 
 void gic_route_spis(void)

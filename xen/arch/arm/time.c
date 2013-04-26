@@ -19,6 +19,7 @@
 
 #include <xen/config.h>
 #include <xen/console.h>
+#include <xen/device_tree.h>
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/lib.h>
@@ -45,6 +46,8 @@ uint64_t __read_mostly boot_count;
 /* For fine-grained timekeeping, we use the ARM "Generic Timer", a
  * register-mapped time source in the SoC. */
 unsigned long __read_mostly cpu_khz;  /* CPU clock frequency in kHz. */
+
+static struct dt_irq timer_irq[MAX_TIMER_PPI];
 
 /*static inline*/ s_time_t ticks_to_ns(uint64_t ticks)
 {
@@ -90,6 +93,29 @@ static uint32_t calibrate_timer(void)
 /* Set up the timer on the boot CPU */
 int __init init_xen_time(void)
 {
+    struct dt_device_node *dev;
+    int res;
+    unsigned int i;
+
+    dev = dt_find_compatible_node(NULL, NULL, "arm,armv7-timer");
+    if ( !dev )
+        panic("Unable to find a compatible timer in the device tree\n");
+
+    dt_device_set_used_by(dev, DOMID_XEN);
+
+    /* Retrieve all IRQs for the timer */
+    for ( i = TIMER_PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++ )
+    {
+        res = dt_device_get_irq(dev, i, &timer_irq[i]);
+        if ( res )
+            panic("Timer: Unable to retrieve IRQ %u from the device tree\n", i);
+    }
+
+    printk("Generic Timer IRQ: phys=%u hyp=%u virt=%u\n",
+           timer_irq[TIMER_PHYS_NONSECURE_PPI].irq,
+           timer_irq[TIMER_HYP_PPI].irq,
+           timer_irq[TIMER_VIRT_PPI].irq);
+
     /* Check that this CPU supports the Generic Timer interface */
     if ( !cpu_has_gentimer )
         panic("CPU does not support the Generic Timer v1 interface.\n");
@@ -143,7 +169,8 @@ int reprogram_timer(s_time_t timeout)
 /* Handle the firing timer */
 static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
-    if ( irq == 26 && READ_SYSREG32(CNTHP_CTL_EL2) & CNTx_CTL_PENDING )
+    if ( irq == (timer_irq[TIMER_HYP_PPI].irq) &&
+         READ_SYSREG32(CNTHP_CTL_EL2) & CNTx_CTL_PENDING )
     {
         /* Signal the generic timer code to do its work */
         raise_softirq(TIMER_SOFTIRQ);
@@ -151,7 +178,8 @@ static void timer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
         WRITE_SYSREG32(0, CNTHP_CTL_EL2);
     }
 
-    if (irq == 30 && READ_SYSREG32(CNTP_CTL_EL0) & CNTx_CTL_PENDING )
+    if ( irq == (timer_irq[TIMER_PHYS_NONSECURE_PPI].irq) &&
+         READ_SYSREG32(CNTP_CTL_EL0) & CNTx_CTL_PENDING )
     {
         /* Signal the generic timer code to do its work */
         raise_softirq(TIMER_SOFTIRQ);
@@ -165,6 +193,17 @@ static void vtimer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
     current->arch.virt_timer.ctl = READ_SYSREG32(CNTV_CTL_EL0);
     WRITE_SYSREG32(current->arch.virt_timer.ctl | CNTx_CTL_MASK, CNTV_CTL_EL0);
     vgic_vcpu_inject_irq(current, irq, 1);
+}
+
+/* Route timer's IRQ on this CPU */
+void __cpuinit route_timer_interrupt(void)
+{
+    gic_route_dt_irq(&timer_irq[TIMER_PHYS_NONSECURE_PPI],
+                     1u << smp_processor_id(), 0xa0);
+    gic_route_dt_irq(&timer_irq[TIMER_HYP_PPI],
+                     1u << smp_processor_id(), 0xa0);
+    gic_route_dt_irq(&timer_irq[TIMER_VIRT_PPI],
+                     1u << smp_processor_id(), 0xa0);
 }
 
 /* Set up the timer interrupt on this CPU */
@@ -184,10 +223,12 @@ void __cpuinit init_timer_interrupt(void)
     WRITE_SYSREG32(0, CNTHP_CTL_EL2);   /* Hypervisor's timer disabled */
     isb();
 
-    /* XXX Need to find this IRQ number from devicetree? */
-    request_irq(26, timer_interrupt, 0, "hyptimer", NULL);
-    request_irq(27, vtimer_interrupt, 0, "virtimer", NULL);
-    request_irq(30, timer_interrupt, 0, "phytimer", NULL);
+    request_dt_irq(&timer_irq[TIMER_HYP_PPI], timer_interrupt, 0,
+                   "hyptimer", NULL);
+    request_dt_irq(&timer_irq[TIMER_VIRT_PPI], vtimer_interrupt, 0,
+                   "virtimer", NULL);
+    request_dt_irq(&timer_irq[TIMER_PHYS_NONSECURE_PPI], timer_interrupt, 0,
+                   "phytimer", NULL);
 }
 
 /* Wait a set number of microseconds */
