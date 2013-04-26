@@ -672,6 +672,16 @@ int xc_domain_hvm_setcontext(xc_interface *xch,
                              uint32_t size);
 
 /**
+ * This function will return guest IO ABI protocol
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * @parm domid the domain to get IO ABI protocol for
+ * @return guest protocol on success, NULL on failure
+ */
+const char *xc_domain_get_native_protocol(xc_interface *xch,
+                                          uint32_t domid);
+
+/**
  * This function returns information about the execution context of a
  * particular vcpu of a domain.
  *

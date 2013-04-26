@@ -29,6 +29,13 @@
 #define CONSOLE_PFN_OFFSET 0
 #define XENSTORE_PFN_OFFSET 1
 
+/* get guest IO ABI protocol */
+const char *xc_domain_get_native_protocol(xc_interface *xch,
+                                          uint32_t domid)
+{
+    return XEN_IO_PROTO_ABI_ARM;
+}
+
 /* ------------------------------------------------------------------------ */
 /*
  * arm guests are hybrid and start off with paging disabled, therefore no

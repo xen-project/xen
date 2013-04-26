@@ -2052,6 +2052,12 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
     libxl_ctx *ctx = gc->owner;
     xs_transaction_t t = XBT_NULL;
 
+    libxl_domain_type type = libxl__domain_type(gc, domid);
+    if (type == LIBXL_DOMAIN_TYPE_INVALID) {
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
         if (rc) goto out;
@@ -2169,6 +2175,23 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
         flexarray_append(front, libxl__sprintf(gc, "%d", device->devid));
         flexarray_append(front, "device-type");
         flexarray_append(front, disk->is_cdrom ? "cdrom" : "disk");
+
+        /*
+         * Old PV kernel disk frontends before 2.6.26 rely on tool stack to
+         * write disk native protocol to frontend node. Xend does this, port
+         * this behaviour to xl.
+         *
+         * New kernels write this node themselves. In that case it just
+         * overwrites an existing node which is OK.
+         */
+        if (type == LIBXL_DOMAIN_TYPE_PV) {
+            const char *protocol =
+                xc_domain_get_native_protocol(ctx->xch, domid);
+            if (protocol) {
+                flexarray_append(front, "protocol");
+                flexarray_append(front, libxl__strdup(gc, protocol));
+            }
+        }
 
         libxl__device_generic_add(gc, t, device,
                             libxl__xs_kvs_of_flexarray(gc, back, back->count),

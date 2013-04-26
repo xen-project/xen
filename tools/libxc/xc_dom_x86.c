@@ -47,6 +47,40 @@
 #define round_down(addr, mask)   ((addr) & ~(mask))
 #define round_up(addr, mask)     ((addr) | (mask))
 
+/* get guest IO ABI protocol */
+const char *xc_domain_get_native_protocol(xc_interface *xch,
+                                          uint32_t domid)
+{
+    int ret;
+    uint32_t guest_width;
+    const char *protocol;
+    DECLARE_DOMCTL;
+
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.domain = domid;
+    domctl.cmd = XEN_DOMCTL_get_address_size;
+
+    ret = do_domctl(xch, &domctl);
+
+    if ( ret )
+        return NULL;
+
+    guest_width = domctl.u.address_size.size;
+
+    switch (guest_width) {
+    case 32: /* 32 bit guest */
+        protocol = XEN_IO_PROTO_ABI_X86_32;
+        break;
+    case 64: /* 64 bit guest */
+        protocol = XEN_IO_PROTO_ABI_X86_64;
+        break;
+    default:
+        protocol = NULL;
+    }
+
+    return protocol;
+}
+
 static unsigned long
 nr_page_tables(struct xc_dom_image *dom,
                xen_vaddr_t start, xen_vaddr_t end, unsigned long bits)
