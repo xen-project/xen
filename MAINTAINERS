@@ -210,6 +210,7 @@ F:	xen/arch/x86/cpu/mcheck/
 
 MINI-OS
 M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
 S:	Supported
 F:	extras/mini-os/
 
@@ -249,6 +250,7 @@ T:	git git://xenbits.xen.org/seabios.git
 
 STUB DOMAINS
 M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+M:	Samuel Thibault <samuel.thibault@ens-lyon.org>
 S:	Supported
 F:	stubdom/
 
