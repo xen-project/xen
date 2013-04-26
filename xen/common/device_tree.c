@@ -72,7 +72,8 @@ static LIST_HEAD(aliases_lookup);
 # define dt_dprintk(fmt, args...) do {} while ( 0 )
 #endif
 
-bool_t device_tree_node_matches(const void *fdt, int node, const char *match)
+bool_t __init device_tree_node_matches(const void *fdt, int node,
+                                       const char *match)
 {
     const char *name;
     size_t match_len;
@@ -86,7 +87,8 @@ bool_t device_tree_node_matches(const void *fdt, int node, const char *match)
         && (name[match_len] == '@' || name[match_len] == '\0');
 }
 
-bool_t device_tree_type_matches(const void *fdt, int node, const char *match)
+bool_t __init device_tree_type_matches(const void *fdt, int node,
+                                       const char *match)
 {
     const void *prop;
 
@@ -94,20 +96,24 @@ bool_t device_tree_type_matches(const void *fdt, int node, const char *match)
     if ( prop == NULL )
         return 0;
 
-    return !strcmp(prop, match);
+    return !dt_node_cmp(prop, match);
 }
 
-bool_t device_tree_node_compatible(const void *fdt, int node, const char *match)
+bool_t __init device_tree_node_compatible(const void *fdt, int node,
+                                          const char *match)
 {
     int len, l;
+    int mlen;
     const void *prop;
+
+    mlen = strlen(match);
 
     prop = fdt_getprop(fdt, node, "compatible", &len);
     if ( prop == NULL )
         return 0;
 
     while ( len > 0 ) {
-        if ( !strcmp(prop, match) )
+        if ( !dt_compat_cmp(prop, match, mlen) )
             return 1;
         l = strlen(prop) + 1;
         prop += l;
@@ -117,7 +123,7 @@ bool_t device_tree_node_compatible(const void *fdt, int node, const char *match)
     return 0;
 }
 
-static int device_tree_nr_reg_ranges(const struct fdt_property *prop,
+static __init int device_tree_nr_reg_ranges(const struct fdt_property *prop,
         u32 address_cells, u32 size_cells)
 {
     u32 reg_cells = address_cells + size_cells;
@@ -138,14 +144,14 @@ static void __init get_val(const u32 **cell, u32 cells, u64 *val)
     }
 }
 
-void device_tree_get_reg(const u32 **cell, u32 address_cells, u32 size_cells,
-                         u64 *start, u64 *size)
+void __init device_tree_get_reg(const u32 **cell, u32 address_cells,
+                                u32 size_cells, u64 *start, u64 *size)
 {
     get_val(cell, address_cells, start);
     get_val(cell, size_cells, size);
 }
 
-static void set_val(u32 **cell, u32 cells, u64 val)
+static void __init set_val(u32 **cell, u32 cells, u64 val)
 {
     u32 c = cells;
 
@@ -157,15 +163,15 @@ static void set_val(u32 **cell, u32 cells, u64 val)
     (*cell) += cells;
 }
 
-void device_tree_set_reg(u32 **cell, u32 address_cells, u32 size_cells,
-                         u64 start, u64 size)
+void __init device_tree_set_reg(u32 **cell, u32 address_cells, u32 size_cells,
+                                u64 start, u64 size)
 {
     set_val(cell, address_cells, start);
     set_val(cell, size_cells, size);
 }
 
-u32 device_tree_get_u32(const void *fdt, int node, const char *prop_name,
-                        u32 dflt)
+u32 __init device_tree_get_u32(const void *fdt, int node, const char *prop_name,
+                               u32 dflt)
 {
     const struct fdt_property *prop;
 
@@ -187,8 +193,8 @@ u32 device_tree_get_u32(const void *fdt, int node, const char *prop_name,
  * Returns 0 if all nodes were iterated over successfully.  If @func
  * returns a value different from 0, that value is returned immediately.
  */
-int device_tree_for_each_node(const void *fdt,
-                              device_tree_node_func func, void *data)
+int __init device_tree_for_each_node(const void *fdt,
+                                     device_tree_node_func func, void *data)
 {
     int node;
     int depth;
@@ -254,8 +260,8 @@ static int _find_compatible_node(const void *fdt,
     return 0;
 }
 
-int find_compatible_node(const char *compatible, int *node, int *depth,
-                u32 *address_cells, u32 *size_cells)
+int __init find_compatible_node(const char *compatible, int *node, int *depth,
+                                u32 *address_cells, u32 *size_cells)
 {
     int ret;
     struct find_compat c;
@@ -327,7 +333,7 @@ static int dump_node(const void *fdt, int node, const char *name, int depth,
  * device_tree_dump - print a text representation of a device tree
  * @fdt: flat device tree to print
  */
-void device_tree_dump(const void *fdt)
+void __init device_tree_dump(const void *fdt)
 {
     device_tree_for_each_node(fdt, dump_node, NULL);
 }
@@ -579,6 +585,54 @@ const void *dt_get_property(const struct dt_device_node *np,
     return pp ? pp->value : NULL;
 }
 
+bool_t dt_device_is_compatible(const struct dt_device_node *device,
+                               const char *compat)
+{
+    const char* cp;
+    u32 cplen, l;
+
+    cp = dt_get_property(device, "compatible", &cplen);
+    if ( cp == NULL )
+        return 0;
+    while ( cplen > 0 )
+    {
+        if ( dt_compat_cmp(cp, compat, strlen(compat)) == 0 )
+            return 1;
+        l = strlen(cp) + 1;
+        cp += l;
+        cplen -= l;
+    }
+
+    return 0;
+}
+
+bool_t dt_machine_is_compatible(const char *compat)
+{
+    const struct dt_device_node *root;
+    bool_t rc = 0;
+
+    root = dt_find_node_by_path("/");
+    if ( root )
+    {
+        rc = dt_device_is_compatible(root, compat);
+    }
+    return rc;
+}
+
+struct dt_device_node *dt_find_node_by_name(struct dt_device_node *from,
+                                            const char *name)
+{
+    struct dt_device_node *np;
+    struct dt_device_node *dt;
+
+    dt = from ? from->allnext : dt_host;
+    for_each_device_node(dt, np)
+        if ( np->name && (dt_node_cmp(np->name, name) == 0) )
+            break;
+
+    return np;
+}
+
 struct dt_device_node *dt_find_node_by_path(const char *path)
 {
     struct dt_device_node *np;
@@ -588,6 +642,78 @@ struct dt_device_node *dt_find_node_by_path(const char *path)
             break;
 
     return np;
+}
+
+struct dt_device_node *dt_find_node_by_alias(const char *alias)
+{
+    const struct dt_alias_prop *app;
+
+    list_for_each_entry( app, &aliases_lookup, link )
+    {
+        if ( !strcmp(app->alias, alias) )
+            return app->np;
+    }
+
+    return NULL;
+}
+
+const struct dt_device_node *dt_get_parent(const struct dt_device_node *node)
+{
+    if ( !node )
+        return NULL;
+
+    return node->parent;
+}
+
+struct dt_device_node *
+dt_find_compatible_node(struct dt_device_node *from,
+                        const char *type,
+                        const char *compatible)
+{
+    struct dt_device_node *np;
+    struct dt_device_node *dt;
+
+    dt = from ? from->allnext : dt_host;
+    for_each_device_node(dt, np)
+    {
+        if ( type
+             && !(np->type && (dt_node_cmp(np->type, type) == 0)) )
+            continue;
+        if ( dt_device_is_compatible(np, compatible) )
+            break;
+    }
+
+    return np;
+}
+
+int dt_n_addr_cells(const struct dt_device_node *np)
+{
+    const __be32 *ip;
+
+    do {
+        if ( np->parent )
+            np = np->parent;
+        ip = dt_get_property(np, "#address-cells", NULL);
+        if ( ip )
+            return be32_to_cpup(ip);
+    } while ( np->parent );
+    /* No #address-cells property for the root node */
+    return DT_ROOT_NODE_ADDR_CELLS_DEFAULT;
+}
+
+int dt_n_size_cells(const struct dt_device_node *np)
+{
+    const __be32 *ip;
+
+    do {
+        if ( np->parent )
+            np = np->parent;
+        ip = dt_get_property(np, "#size-cells", NULL);
+        if ( ip )
+            return be32_to_cpup(ip);
+    } while ( np->parent );
+    /* No #address-cells property for the root node */
+    return DT_ROOT_NODE_SIZE_CELLS_DEFAULT;
 }
 
 /**
