@@ -28,6 +28,7 @@ obj-y += vgic.o
 obj-y += vtimer.o
 obj-y += vpl011.o
 obj-y += hvm.o
+obj-y += device.o
 
 #obj-bin-y += ....o
 
