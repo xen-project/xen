@@ -238,6 +238,17 @@ static int gic_route_irq(unsigned int irq, bool_t level,
     return 0;
 }
 
+/* Program the GIC to route an interrupt with a dt_irq */
+void gic_route_dt_irq(const struct dt_irq *irq, unsigned int cpu_mask,
+                      unsigned int priority)
+{
+    bool_t level;
+
+    level = dt_irq_is_level_triggered(irq);
+
+    gic_route_irq(irq->irq, level, cpu_mask, priority);
+}
+
 static void __init gic_dist_init(void)
 {
     uint32_t type;
