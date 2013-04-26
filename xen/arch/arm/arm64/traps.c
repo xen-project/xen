@@ -49,7 +49,7 @@ asmlinkage void do_bad_mode(struct cpu_user_regs *regs, int reason)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

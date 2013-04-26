@@ -144,7 +144,7 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

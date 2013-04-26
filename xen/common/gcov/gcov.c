@@ -217,7 +217,7 @@ int sysctl_coverage_op(xen_sysctl_coverage_op_t *op)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

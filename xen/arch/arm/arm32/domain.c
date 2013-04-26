@@ -44,7 +44,7 @@ void vcpu_regs_user_to_hyp(struct vcpu *vcpu,
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:

@@ -118,7 +118,7 @@ static inline void _raw_write_unlock(raw_rwlock_t *rw)
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * indent-tabs-mode: nil
  * End:
