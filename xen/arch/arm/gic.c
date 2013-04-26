@@ -53,7 +53,7 @@ static irq_desc_t irq_desc[NR_IRQS];
 static DEFINE_PER_CPU(irq_desc_t[NR_LOCAL_IRQS], local_irq_desc);
 static DEFINE_PER_CPU(uint64_t, lr_mask);
 
-unsigned nr_lrs;
+static unsigned nr_lrs;
 
 irq_desc_t *__irq_to_desc(int irq)
 {
