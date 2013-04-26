@@ -45,6 +45,7 @@ static struct {
     paddr_t hbase;       /* Address of virtual interface registers */
     paddr_t vbase;       /* Address of virtual cpu interface registers */
     unsigned int lines;  /* Number of interrupts (SPIs + PPIs + SGIs) */
+    struct dt_irq maintenance; /* IRQ maintenance */
     unsigned int cpus;
     spinlock_t lock;
 } gic;
@@ -352,28 +353,53 @@ int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
 /* Set up the GIC */
 void __init gic_init(void)
 {
+    struct dt_device_node *node;
+    int res;
+
+    node = dt_find_interrupt_controller("arm,cortex-a15-gic");
+    if ( !node )
+        panic("Unable to find compatible GIC in the device tree\n");
+
+    dt_device_set_used_by(node, DOMID_XEN);
+
+    res = dt_device_get_address(node, 0, &gic.dbase, NULL);
+    if ( res || !gic.dbase || (gic.dbase & ~PAGE_MASK) )
+        panic("GIC: Cannot find a valid address for the distributor\n");
+
+    res = dt_device_get_address(node, 1, &gic.cbase, NULL);
+    if ( res || !gic.cbase || (gic.cbase & ~PAGE_MASK) )
+        panic("GIC: Cannot find a valid address for the CPU\n");
+
+    res = dt_device_get_address(node, 2, &gic.hbase, NULL);
+    if ( res || !gic.hbase || (gic.hbase & ~PAGE_MASK) )
+        panic("GIC: Cannot find a valid address for the hypervisor\n");
+
+    res = dt_device_get_address(node, 3, &gic.vbase, NULL);
+    if ( res || !gic.vbase || (gic.vbase & ~PAGE_MASK) )
+        panic("GIC: Cannot find a valid address for the virtual CPU\n");
+
+    res = dt_device_get_irq(node, 0, &gic.maintenance);
+    if ( res )
+        panic("GIC: Cannot find the maintenance IRQ\n");
+
+    /* Set the GIC as the primary interrupt controller */
+    dt_interrupt_controller = node;
+
+    /* TODO: Add check on distributor, cpu size */
+
     printk("GIC initialization:\n"
               "        gic_dist_addr=%"PRIpaddr"\n"
               "        gic_cpu_addr=%"PRIpaddr"\n"
               "        gic_hyp_addr=%"PRIpaddr"\n"
-              "        gic_vcpu_addr=%"PRIpaddr"\n",
-              early_info.gic.gic_dist_addr, early_info.gic.gic_cpu_addr,
-              early_info.gic.gic_hyp_addr, early_info.gic.gic_vcpu_addr);
-    if ( !early_info.gic.gic_dist_addr ||
-         !early_info.gic.gic_cpu_addr ||
-         !early_info.gic.gic_hyp_addr ||
-         !early_info.gic.gic_vcpu_addr )
-        panic("the physical address of one of the GIC interfaces is missing\n");
-    if ( (early_info.gic.gic_dist_addr & ~PAGE_MASK) ||
-         (early_info.gic.gic_cpu_addr & ~PAGE_MASK) ||
-         (early_info.gic.gic_hyp_addr & ~PAGE_MASK) ||
-         (early_info.gic.gic_vcpu_addr & ~PAGE_MASK) )
+              "        gic_vcpu_addr=%"PRIpaddr"\n"
+              "        gic_maintenance_irq=%u\n",
+              gic.dbase, gic.cbase, gic.hbase, gic.vbase,
+              gic.maintenance.irq);
+
+    if ( (gic.dbase & ~PAGE_MASK) || (gic.cbase & ~PAGE_MASK) ||
+         (gic.hbase & ~PAGE_MASK) || (gic.vbase & ~PAGE_MASK) )
         panic("GIC interfaces not page aligned.\n");
 
-    gic.dbase = early_info.gic.gic_dist_addr;
-    gic.cbase = early_info.gic.gic_cpu_addr;
-    gic.hbase = early_info.gic.gic_hyp_addr;
-    gic.vbase = early_info.gic.gic_vcpu_addr;
     set_fixmap(FIXMAP_GICD, gic.dbase >> PAGE_SHIFT, DEV_SHARED);
     BUILD_BUG_ON(FIXMAP_ADDR(FIXMAP_GICC1) !=
                  FIXMAP_ADDR(FIXMAP_GICC2)-PAGE_SIZE);
@@ -464,7 +490,7 @@ void gic_route_ppis(void)
 {
     /* XXX should get these from DT */
     /* GIC maintenance */
-    gic_route_irq(25, 1, 1u << smp_processor_id(), 0xa0);
+    gic_route_dt_irq(&gic.maintenance, 1u << smp_processor_id(), 0xa0);
     /* Hypervisor Timer */
     gic_route_irq(26, 1, 1u << smp_processor_id(), 0xa0);
     /* Virtual Timer */
@@ -852,7 +878,8 @@ void gic_dump_info(struct vcpu *v)
 
 void __cpuinit init_maintenance_interrupt(void)
 {
-    request_irq(25, maintenance_interrupt, 0, "irq-maintenance", NULL);
+    request_dt_irq(&gic.maintenance, maintenance_interrupt,
+                   0, "irq-maintenance", NULL);
 }
 
 /*

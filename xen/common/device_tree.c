@@ -434,46 +434,6 @@ static void __init process_cpu_node(const void *fdt, int node,
     cpumask_set_cpu(start, &cpu_possible_map);
 }
 
-static void __init process_gic_node(const void *fdt, int node,
-                                    const char *name,
-                                    u32 address_cells, u32 size_cells)
-{
-    const struct fdt_property *prop;
-    const u32 *cell;
-    paddr_t start, size;
-    int interfaces;
-
-    if ( address_cells < 1 || size_cells < 1 )
-    {
-        early_printk("fdt: node `%s': invalid #address-cells or #size-cells",
-                     name);
-        return;
-    }
-
-    prop = fdt_get_property(fdt, node, "reg", NULL);
-    if ( !prop )
-    {
-        early_printk("fdt: node `%s': missing `reg' property\n", name);
-        return;
-    }
-
-    cell = (const u32 *)prop->data;
-    interfaces = device_tree_nr_reg_ranges(prop, address_cells, size_cells);
-    if ( interfaces < 4 )
-    {
-        early_printk("fdt: node `%s': not enough ranges\n", name);
-        return;
-    }
-    device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
-    early_info.gic.gic_dist_addr = start;
-    device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
-    early_info.gic.gic_cpu_addr = start;
-    device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
-    early_info.gic.gic_hyp_addr = start;
-    device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
-    early_info.gic.gic_vcpu_addr = start;
-}
-
 static void __init process_multiboot_node(const void *fdt, int node,
                                           const char *name,
                                           u32 address_cells, u32 size_cells)
@@ -525,8 +485,6 @@ static int __init early_scan_node(const void *fdt,
         process_memory_node(fdt, node, name, address_cells, size_cells);
     else if ( device_tree_type_matches(fdt, node, "cpu") )
         process_cpu_node(fdt, node, name, address_cells, size_cells);
-    else if ( device_tree_node_compatible(fdt, node, "arm,cortex-a15-gic") )
-        process_gic_node(fdt, node, name, address_cells, size_cells);
     else if ( device_tree_node_compatible(fdt, node, "xen,multiboot-module" ) )
         process_multiboot_node(fdt, node, name, address_cells, size_cells);
 
