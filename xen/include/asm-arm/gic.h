@@ -189,6 +189,10 @@ extern void send_SGI_allbutself(enum gic_sgi sgi);
 /* print useful debug info */
 extern void gic_dump_info(struct vcpu *v);
 
+/* IRQ translation function for the device tree */
+int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
+                  unsigned int *out_hwirq, unsigned int *out_type);
+
 #endif /* __ASSEMBLY__ */
 #endif
 

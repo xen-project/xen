@@ -329,6 +329,26 @@ static void __cpuinit gic_hyp_disable(void)
     GICH[GICH_HCR] = 0;
 }
 
+int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
+                  unsigned int *out_hwirq,
+                  unsigned int *out_type)
+{
+    if ( intsize < 3 )
+        return -EINVAL;
+
+    /* Get the interrupt number and add 16 to skip over SGIs */
+    *out_hwirq = intspec[1] + 16;
+
+    /* For SPIs, we need to add 16 more to get the GIC irq ID number */
+    if ( !intspec[0] )
+        *out_hwirq += 16;
+
+    if ( out_type )
+        *out_type = intspec[2] & DT_IRQ_TYPE_SENSE_MASK;
+
+    return 0;
+}
+
 /* Set up the GIC */
 void __init gic_init(void)
 {
