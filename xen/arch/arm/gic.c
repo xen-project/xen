@@ -24,6 +24,7 @@
 #include <xen/irq.h>
 #include <xen/sched.h>
 #include <xen/errno.h>
+#include <xen/serial.h>
 #include <xen/softirq.h>
 #include <xen/list.h>
 #include <xen/device_tree.h>
@@ -501,9 +502,20 @@ void gic_route_ppis(void)
 
 void gic_route_spis(void)
 {
+    int seridx;
+    const struct dt_irq *irq;
+
     /* XXX should get these from DT */
     /* UART */
     gic_route_irq(37, 0, 1u << smp_processor_id(), 0xa0);
+
+    for ( seridx = 0; seridx <= SERHND_IDX; seridx++ )
+    {
+        if ( (irq = serial_dt_irq(seridx)) == NULL )
+            continue;
+
+        gic_route_dt_irq(irq, 1u << smp_processor_id(), 0xa0);
+    }
 }
 
 void __init release_irq(unsigned int irq)
