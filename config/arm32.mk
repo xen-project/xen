@@ -13,9 +13,6 @@ HAS_PL011 := y
 HAS_EXYNOS4210 := y
 
 # Use only if calling $(LD) directly.
-#LDFLAGS_DIRECT_OpenBSD = _obsd
-#LDFLAGS_DIRECT_FreeBSD = _fbsd
-LDFLAGS_DIRECT_Linux = _linux
-LDFLAGS_DIRECT += -marmelf$(LDFLAGS_DIRECT_$(XEN_OS))_eabi
+LDFLAGS_DIRECT += -EL
 
 CONFIG_LOAD_ADDRESS ?= 0x80000000

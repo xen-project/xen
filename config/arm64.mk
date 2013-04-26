@@ -9,6 +9,6 @@ CFLAGS += #-marm -march= -mcpu= etc
 HAS_PL011 := y
 
 # Use only if calling $(LD) directly.
-LDFLAGS_DIRECT += -maarch64elf
+LDFLAGS_DIRECT += -EL
 
 CONFIG_LOAD_ADDRESS ?= 0x80000000
