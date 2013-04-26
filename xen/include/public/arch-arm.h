@@ -218,7 +218,7 @@ typedef uint64_t xen_callback_t;
 #define PSR_MODE_SYS 0x1f
 
 /* 64 bit modes */
-#ifdef CONFIG_ARM_64
+#ifdef __aarch64__
 #define PSR_MODE_BIT  0x10 /* Set iff AArch32 */
 #define PSR_MODE_EL3h 0x0d
 #define PSR_MODE_EL3t 0x0c
