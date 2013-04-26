@@ -10,6 +10,10 @@
 #ifndef __XEN_DEVICE_TREE_H__
 #define __XEN_DEVICE_TREE_H__
 
+#include <asm/byteorder.h>
+#include <public/xen.h>
+#include <xen/init.h>
+#include <xen/string.h>
 #include <xen/types.h>
 
 #define DEVICE_TREE_MAX_DEPTH 16
@@ -52,6 +56,49 @@ struct dt_early_info {
     struct dt_module_info modules;
 };
 
+typedef u32 dt_phandle;
+
+/**
+ * dt_property - describe a property for a device
+ * @name: name of the property
+ * @length: size of the value
+ * @value: pointer to data contained in the property
+ * @next: pointer to the next property of a specific node
+ */
+struct dt_property {
+    const char *name;
+    u32 length;
+    void *value;
+    struct dt_property *next;
+};
+
+/**
+ * dt_device_node - describe a node in the device tree
+ * @name: name of the node
+ * @type: type of the node (ie: memory, cpu, ...)
+ * @full_name: full name, it's composed of all the ascendant name separate by /
+ * @used_by: who owns the node? (ie: xen, dom0...)
+ * @properties: list of properties for the node
+ * @child: pointer to the first child
+ * @sibling: pointer to the next sibling
+ * @allnext: pointer to the next in list of all nodes
+ */
+struct dt_device_node {
+    const char *name;
+    const char *type;
+    dt_phandle phandle;
+    char *full_name;
+    domid_t used_by; /* By default it's used by dom0 */
+
+    struct dt_property *properties;
+    struct dt_device_node *parent;
+    struct dt_device_node *child;
+    struct dt_device_node *sibling;
+    struct dt_device_node *next; /* TODO: Remove it. Only use to know the last children */
+    struct dt_device_node *allnext;
+
+};
+
 typedef int (*device_tree_node_func)(const void *fdt,
                                      int node, const char *name, int depth,
                                      u32 address_cells, u32 size_cells,
@@ -77,4 +124,46 @@ int device_tree_for_each_node(const void *fdt,
 const char *device_tree_bootargs(const void *fdt);
 void device_tree_dump(const void *fdt);
 
+/**
+ * dt_unflatten_host_device_tree - Unflatten the host device tree
+ *
+ * Create a hierarchical device tree for the host DTB to be able
+ * to retrieve parents.
+ */
+void __init dt_unflatten_host_device_tree(void);
+
+/**
+ * Host device tree
+ * DO NOT modify it!
+ */
+extern struct dt_device_node *dt_host;
+
+#define dt_node_cmp(s1, s2) strcmp((s1), (s2))
+#define dt_compat_cmp(s1, s2, l) strnicmp((s1), (s2), l)
+
+#define for_each_property_of_node(dn, pp)                   \
+    for ( pp = dn->properties; pp != NULL; pp = pp->next )
+
+#define for_each_device_node(dt, dn)                         \
+    for ( dn = dt; dn != NULL; dn = dn->allnext )
+
+static inline const char *dt_node_full_name(const struct dt_device_node *np)
+{
+    return (np && np->full_name) ? np->full_name : "<no-node>";
+}
+
+/**
+ * Find a property with a given name for a given node
+ * and return the value.
+ */
+const void *dt_get_property(const struct dt_device_node *np,
+                            const char *name, u32 *lenp);
+
+/**
+ * dt_find_node_by_path - Find a node matching a full DT path
+ * @path: The full path to match
+ *
+ * Returns a node pointer.
+ */
+struct dt_device_node *dt_find_node_by_path(const char *path);
 #endif

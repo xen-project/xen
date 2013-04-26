@@ -430,6 +430,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     setup_mm(fdt_paddr, fdt_size);
 
     vm_init();
+    dt_unflatten_host_device_tree();
 
 #ifdef EARLY_UART_ADDRESS
     /* TODO Need to get device tree or command line for UART address */
