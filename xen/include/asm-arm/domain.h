@@ -88,13 +88,16 @@ struct arch_domain
          */
         spinlock_t lock;
         int ctlr;
-        int nr_lines;
+        int nr_lines; /* Number of SPIs */
         struct vgic_irq_rank *shared_irqs;
         /*
          * SPIs are domain global, SGIs and PPIs are per-VCPU and stored in
          * struct arch_vcpu.
          */
         struct pending_irq *pending_irqs;
+        /* Base address for guest GIC */
+        paddr_t dbase; /* Distributor base address */
+        paddr_t cbase; /* CPU base address */
     } vgic;
 
     struct vpl011 {

@@ -30,8 +30,6 @@
 #include "io.h"
 #include <asm/gic.h>
 
-#define VGIC_DISTR_BASE_ADDRESS 0x000000002c001000
-
 #define REG(n) (n/4)
 
 /* Number of ranks of interrupt registers for a domain */
@@ -80,7 +78,15 @@ int domain_vgic_init(struct domain *d)
     int i;
 
     d->arch.vgic.ctlr = 0;
-    d->arch.vgic.nr_lines = 32;
+
+    /* Currently nr_lines in vgic and gic doesn't have the same meanings
+     * Here nr_lines = number of SPIs
+     */
+    if ( d->domain_id == 0 )
+        d->arch.vgic.nr_lines = gic_number_lines() - 32;
+    else
+        d->arch.vgic.nr_lines = 0; /* We don't need SPIs for the guest */
+
     d->arch.vgic.shared_irqs =
         xmalloc_array(struct vgic_irq_rank, DOMAIN_NR_RANKS(d));
     d->arch.vgic.pending_irqs =
@@ -163,7 +169,7 @@ static int vgic_distr_mmio_read(struct vcpu *v, mmio_info_t *info)
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     register_t *r = select_user_reg(regs, dabt.reg);
     struct vgic_irq_rank *rank;
-    int offset = (int)(info->gpa - VGIC_DISTR_BASE_ADDRESS);
+    int offset = (int)(info->gpa - v->domain->arch.vgic.dbase);
     int gicd_reg = REG(offset);
 
     switch ( gicd_reg )
@@ -440,7 +446,7 @@ static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     register_t *r = select_user_reg(regs, dabt.reg);
     struct vgic_irq_rank *rank;
-    int offset = (int)(info->gpa - VGIC_DISTR_BASE_ADDRESS);
+    int offset = (int)(info->gpa - v->domain->arch.vgic.dbase);
     int gicd_reg = REG(offset);
     uint32_t tr;
 
@@ -620,7 +626,9 @@ write_ignore:
 
 static int vgic_distr_mmio_check(struct vcpu *v, paddr_t addr)
 {
-    return addr >= VGIC_DISTR_BASE_ADDRESS && addr < (VGIC_DISTR_BASE_ADDRESS+PAGE_SIZE);
+    struct domain *d = v->domain;
+
+    return (addr >= (d->arch.vgic.dbase)) && (addr < (d->arch.vgic.dbase + PAGE_SIZE));
 }
 
 const struct mmio_handler vgic_distr_mmio_handler = {

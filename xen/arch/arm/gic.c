@@ -56,6 +56,11 @@ static DEFINE_PER_CPU(uint64_t, lr_mask);
 
 static unsigned nr_lrs;
 
+unsigned int gic_number_lines(void)
+{
+    return gic.lines;
+}
+
 irq_desc_t *__irq_to_desc(int irq)
 {
     if (irq < NR_LOCAL_IRQS) return &this_cpu(local_irq_desc)[irq];
@@ -775,11 +780,21 @@ void gic_interrupt(struct cpu_user_regs *regs, int is_fiq)
 
 int gicv_setup(struct domain *d)
 {
+    /* TODO: Retrieve distributor and CPU guest base address from the
+     * guest DTS
+     * For the moment we use dom0 DTS
+     */
+    d->arch.vgic.dbase = gic.dbase;
+    d->arch.vgic.cbase = gic.cbase;
+
+
+    d->arch.vgic.nr_lines = 0;
+
     /* map the gic virtual cpu interface in the gic cpu interface region of
      * the guest */
-    return map_mmio_regions(d, gic.cbase,
-                        gic.cbase + (2 * PAGE_SIZE) - 1,
-                        gic.vbase);
+    return map_mmio_regions(d, d->arch.vgic.cbase,
+                            d->arch.vgic.cbase + (2 * PAGE_SIZE) - 1,
+                            gic.vbase);
 }
 
 static void gic_irq_eoi(void *info)
