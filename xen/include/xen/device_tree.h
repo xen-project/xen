@@ -272,6 +272,28 @@ struct dt_device_node *dt_find_node_by_path(const char *path);
 const struct dt_device_node *dt_get_parent(const struct dt_device_node *node);
 
 /**
+ * dt_device_get_address - Resolve an address for a device
+ * @device: the device whose address is to be resolved
+ * @index: index of the address to resolve
+ * @addr: address filled by this function
+ * @size: size filled by this function
+ *
+ * This function resolves an address, walking the tree, for a give
+ * device-tree node. It returns 0 on success.
+ */
+int dt_device_get_address(const struct dt_device_node *dev, int index,
+                          u64 *addr, u64 *size);
+
+/**
+ * dt_number_of_address - Get the number of addresses for a device
+ * @device: the device whose number of address is to be retrieved
+ *
+ * Return the number of address for this device or 0 if there is no
+ * address or an error occurred.
+ */
+unsigned int dt_number_of_address(const struct dt_device_node *device);
+
+/**
  * dt_n_size_cells - Helper to retrieve the number of cell for the size
  * @np: node to get the value
  *

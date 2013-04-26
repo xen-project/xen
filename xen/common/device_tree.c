@@ -68,9 +68,37 @@ static LIST_HEAD(aliases_lookup);
 
 #ifdef DEBUG_DT
 # define dt_dprintk(fmt, args...) dt_printk(XENLOG_DEBUG fmt, ##args)
+static void dt_dump_addr(const char *s, const __be32 *addr, int na)
+{
+    dt_dprintk("%s", s);
+    while ( na-- )
+        dt_dprintk(" %08x", be32_to_cpu(*(addr++)));
+    dt_dprintk("\n");
+}
 #else
 # define dt_dprintk(fmt, args...) do {} while ( 0 )
+static void dt_dump_addr(const char *s, const __be32 *addr, int na) { }
 #endif
+
+#define DT_BAD_ADDR ((u64)-1)
+
+/* Max address size we deal with */
+#define DT_MAX_ADDR_CELLS 4
+#define DT_CHECK_ADDR_COUNT(na) ((na) > 0 && (na) <= DT_MAX_ADDR_CELLS)
+#define DT_CHECK_COUNTS(na, ns) (DT_CHECK_ADDR_COUNT(na) && (ns) > 0)
+
+/* Callbacks for bus specific translators */
+struct dt_bus
+{
+    const char *name;
+    const char *addresses;
+    int (*match)(const struct dt_device_node *parent);
+    void (*count_cells)(const struct dt_device_node *child,
+                        int *addrc, int *sizec);
+    u64 (*map)(__be32 *addr, const __be32 *range, int na, int ns, int pna);
+    int (*translate)(__be32 *addr, u64 offset, int na);
+    unsigned int (*get_flags)(const __be32 *addr);
+};
 
 bool_t __init device_tree_node_matches(const void *fdt, int node,
                                        const char *match)
@@ -714,6 +742,321 @@ int dt_n_size_cells(const struct dt_device_node *np)
     } while ( np->parent );
     /* No #address-cells property for the root node */
     return DT_ROOT_NODE_SIZE_CELLS_DEFAULT;
+}
+
+/*
+ * Default translator (generic bus)
+ */
+static void dt_bus_default_count_cells(const struct dt_device_node *dev,
+                                int *addrc, int *sizec)
+{
+    if ( addrc )
+        *addrc = dt_n_addr_cells(dev);
+    if ( sizec )
+        *sizec = dt_n_size_cells(dev);
+}
+
+static u64 dt_bus_default_map(__be32 *addr, const __be32 *range,
+                              int na, int ns, int pna)
+{
+    u64 cp, s, da;
+
+    cp = dt_read_number(range, na);
+    s = dt_read_number(range + na + pna, ns);
+    da = dt_read_number(addr, na);
+
+    dt_dprintk("DT: default map, cp=%llx, s=%llx, da=%llx\n",
+               (unsigned long long)cp, (unsigned long long)s,
+               (unsigned long long)da);
+
+    /*
+     * If the number of address cells is larger than 2 we assume the
+     * mapping doesn't specify a physical address. Rather, the address
+     * specifies an identifier that must match exactly.
+     */
+    if ( na > 2 && memcmp(range, addr, na * 4) != 0 )
+        return DT_BAD_ADDR;
+
+    if ( da < cp || da >= (cp + s) )
+        return DT_BAD_ADDR;
+    return da - cp;
+}
+
+static int dt_bus_default_translate(__be32 *addr, u64 offset, int na)
+{
+    u64 a = dt_read_number(addr, na);
+
+    memset(addr, 0, na * 4);
+    a += offset;
+    if ( na > 1 )
+        addr[na - 2] = cpu_to_be32(a >> 32);
+    addr[na - 1] = cpu_to_be32(a & 0xffffffffu);
+
+    return 0;
+}
+static unsigned int dt_bus_default_get_flags(const __be32 *addr)
+{
+    /* TODO: Return the type of memory (device, ...) for caching
+     * attribute during mapping */
+    return 0;
+}
+
+/*
+ * Array of bus specific translators
+ */
+static const struct dt_bus dt_busses[] =
+{
+    /* Default */
+    {
+        .name = "default",
+        .addresses = "reg",
+        .match = NULL,
+        .count_cells = dt_bus_default_count_cells,
+        .map = dt_bus_default_map,
+        .translate = dt_bus_default_translate,
+        .get_flags = dt_bus_default_get_flags,
+    },
+};
+
+static const struct dt_bus *dt_match_bus(const struct dt_device_node *np)
+{
+    int i;
+
+    for ( i = 0; i < ARRAY_SIZE(dt_busses); i++ )
+        if ( !dt_busses[i].match || dt_busses[i].match(np) )
+            return &dt_busses[i];
+    BUG();
+
+    return NULL;
+}
+
+static const __be32 *dt_get_address(const struct dt_device_node *dev,
+                                    int index, u64 *size,
+                                    unsigned int *flags)
+{
+    const __be32 *prop;
+    u32 psize;
+    const struct dt_device_node *parent;
+    const struct dt_bus *bus;
+    int onesize, i, na, ns;
+
+    /* Get parent & match bus type */
+    parent = dt_get_parent(dev);
+    if ( parent == NULL )
+        return NULL;
+    bus = dt_match_bus(parent);
+    bus->count_cells(dev, &na, &ns);
+
+    if ( !DT_CHECK_ADDR_COUNT(na) )
+        return NULL;
+
+    /* Get "reg" or "assigned-addresses" property */
+    prop = dt_get_property(dev, bus->addresses, &psize);
+    if ( prop == NULL )
+        return NULL;
+    psize /= 4;
+
+    onesize = na + ns;
+    for ( i = 0; psize >= onesize; psize -= onesize, prop += onesize, i++ )
+    {
+        if ( i == index )
+        {
+            if ( size )
+                *size = dt_read_number(prop + na, ns);
+            if ( flags )
+                *flags = bus->get_flags(prop);
+            return prop;
+        }
+    }
+    return NULL;
+}
+
+static int dt_translate_one(const struct dt_device_node *parent,
+                            const struct dt_bus *bus,
+                            const struct dt_bus *pbus,
+                            __be32 *addr, int na, int ns,
+                            int pna, const char *rprop)
+{
+    const __be32 *ranges;
+    unsigned int rlen;
+    int rone;
+    u64 offset = DT_BAD_ADDR;
+
+    ranges = dt_get_property(parent, rprop, &rlen);
+    if ( ranges == NULL )
+    {
+        dt_printk(XENLOG_ERR "DT: no ranges; cannot translate\n");
+        return 1;
+    }
+    if ( ranges == NULL || rlen == 0 )
+    {
+        offset = dt_read_number(addr, na);
+        memset(addr, 0, pna * 4);
+        dt_dprintk("DT: empty ranges; 1:1 translation\n");
+        goto finish;
+    }
+
+    dt_dprintk("DT: walking ranges...\n");
+
+    /* Now walk through the ranges */
+    rlen /= 4;
+    rone = na + pna + ns;
+    for ( ; rlen >= rone; rlen -= rone, ranges += rone )
+    {
+        offset = bus->map(addr, ranges, na, ns, pna);
+        if ( offset != DT_BAD_ADDR )
+            break;
+    }
+    if ( offset == DT_BAD_ADDR )
+    {
+        dt_dprintk("DT: not found !\n");
+        return 1;
+    }
+    memcpy(addr, ranges + na, 4 * pna);
+
+finish:
+    dt_dump_addr("DT: parent translation for:", addr, pna);
+    dt_dprintk("DT: with offset: %llx\n", (unsigned long long)offset);
+
+    /* Translate it into parent bus space */
+    return pbus->translate(addr, offset, pna);
+}
+
+/*
+ * Translate an address from the device-tree into a CPU physical address,
+ * this walks up the tree and applies the various bus mappings on the
+ * way.
+ *
+ * Note: We consider that crossing any level with #size-cells == 0 to mean
+ * that translation is impossible (that is we are not dealing with a value
+ * that can be mapped to a cpu physical address). This is not really specified
+ * that way, but this is traditionally the way IBM at least do things
+ */
+static u64 __dt_translate_address(const struct dt_device_node *dev,
+                                  const __be32 *in_addr, const char *rprop)
+{
+    const struct dt_device_node *parent = NULL;
+    const struct dt_bus *bus, *pbus;
+    __be32 addr[DT_MAX_ADDR_CELLS];
+    int na, ns, pna, pns;
+    u64 result = DT_BAD_ADDR;
+
+    dt_dprintk("DT: ** translation for device %s **\n", dev->full_name);
+
+    /* Get parent & match bus type */
+    parent = dt_get_parent(dev);
+    if ( parent == NULL )
+        goto bail;
+    bus = dt_match_bus(parent);
+
+    /* Count address cells & copy address locally */
+    bus->count_cells(dev, &na, &ns);
+    if ( !DT_CHECK_COUNTS(na, ns) )
+    {
+        dt_printk(XENLOG_ERR "dt_parse: Bad cell count for %s\n",
+                  dev->full_name);
+        goto bail;
+    }
+    memcpy(addr, in_addr, na * 4);
+
+    dt_dprintk("DT: bus is %s (na=%d, ns=%d) on %s\n",
+               bus->name, na, ns, parent->full_name);
+    dt_dump_addr("DT: translating address:", addr, na);
+
+    /* Translate */
+    for ( ;; )
+    {
+        /* Switch to parent bus */
+        dev = parent;
+        parent = dt_get_parent(dev);
+
+        /* If root, we have finished */
+        if ( parent == NULL )
+        {
+            dt_dprintk("DT: reached root node\n");
+            result = dt_read_number(addr, na);
+            break;
+        }
+
+        /* Get new parent bus and counts */
+        pbus = dt_match_bus(parent);
+        pbus->count_cells(dev, &pna, &pns);
+        if ( !DT_CHECK_COUNTS(pna, pns) )
+        {
+            printk(XENLOG_ERR "dt_parse: Bad cell count for %s\n",
+                   dev->full_name);
+            break;
+        }
+
+        dt_dprintk("DT: parent bus is %s (na=%d, ns=%d) on %s\n",
+                   pbus->name, pna, pns, parent->full_name);
+
+        /* Apply bus translation */
+        if ( dt_translate_one(dev, bus, pbus, addr, na, ns, pna, rprop) )
+            break;
+
+        /* Complete the move up one level */
+        na = pna;
+        ns = pns;
+        bus = pbus;
+
+        dt_dump_addr("DT: one level translation:", addr, na);
+    }
+
+bail:
+    return result;
+}
+
+/* dt_device_address - Translate device tree address and return it */
+int dt_device_get_address(const struct dt_device_node *dev, int index,
+                          u64 *addr, u64 *size)
+{
+    const __be32 *addrp;
+    unsigned int flags;
+
+    addrp = dt_get_address(dev, index, size, &flags);
+    if ( addrp == NULL )
+        return -EINVAL;
+
+    if ( !addr )
+        return -EINVAL;
+
+    *addr = __dt_translate_address(dev, addrp, "ranges");
+
+    if ( *addr == DT_BAD_ADDR )
+        return -EINVAL;
+
+    return 0;
+}
+
+unsigned int dt_number_of_address(const struct dt_device_node *dev)
+{
+    const __be32 *prop;
+    u32 psize;
+    const struct dt_device_node *parent;
+    const struct dt_bus *bus;
+    int onesize, na, ns;
+
+    /* Get parent & match bus type */
+    parent = dt_get_parent(dev);
+    if ( parent == NULL )
+        return 0;
+
+    bus = dt_match_bus(parent);
+    bus->count_cells(dev, &na, &ns);
+
+    if ( !DT_CHECK_COUNTS(na, ns) )
+        return 0;
+
+    /* Get "reg" or "assigned-addresses" property */
+    prop = dt_get_property(dev, bus->addresses, &psize);
+    if ( prop == NULL )
+        return 0;
+
+    psize /= 4;
+    onesize = na + ns;
+
+    return (psize / onesize);
 }
 
 /**
