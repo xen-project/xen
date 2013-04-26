@@ -273,9 +273,9 @@
 #include <libxl_uuid.h>
 #include <_libxl_list.h>
 
-/* API compatibility. Only 0x040200 is supported at this time. */
+/* API compatibility. */
 #ifdef LIBXL_API_VERSION
-#if LIBXL_API_VERSION != 0x040200
+#if LIBXL_API_VERSION != 0x040200 && LIBXL_API_VERSION != 0x040300
 #error Unknown LIBXL_API_VERSION
 #endif
 #endif
@@ -307,6 +307,16 @@
  * If this is not defined, the backend_domname field does not exist.
  */
 #define LIBXL_HAVE_DEVICE_BACKEND_DOMNAME 1
+
+/*
+ * LIBXL_HAVE_NONCONST_EVENT_OCCURS_EVENT_ARG
+ *
+ * This argument was erroneously "const" in the 4.2 release despite
+ * the requirement for the callback to free the event.
+ */
+#if LIBXL_API_VERSION != 0x040200
+#define LIBXL_HAVE_NONCONST_EVENT_OCCURS_EVENT_ARG 1
+#endif
 
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who

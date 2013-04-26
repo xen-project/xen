@@ -64,7 +64,11 @@ void libxl_event_free(libxl_ctx *ctx, libxl_event *event);
 
 typedef struct libxl_event_hooks {
     uint64_t event_occurs_mask;
-    void (*event_occurs)(void *user, const libxl_event *event);
+    void (*event_occurs)(void *user,
+#ifndef LIBXL_HAVE_NONCONST_EVENT_OCCURS_EVENT_ARG
+                         const
+#endif
+                         libxl_event *event);
     void (*disaster)(void *user, libxl_event_type type,
                      const char *msg, int errnoval);
 } libxl_event_hooks;
