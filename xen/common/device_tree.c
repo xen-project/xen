@@ -27,8 +27,11 @@
 
 struct dt_early_info __initdata early_info;
 void *device_tree_flattened;
+dt_irq_xlate_func dt_irq_xlate;
 /* Host device tree */
 struct dt_device_node *dt_host;
+/* Interrupt controller node*/
+const struct dt_device_node *dt_interrupt_controller;
 
 /**
  * struct dt_alias_prop - Alias property in 'aliases' node
@@ -1029,6 +1032,81 @@ int dt_device_get_address(const struct dt_device_node *dev, int index,
     return 0;
 }
 
+/**
+ * dt_find_node_by_phandle - Find a node given a phandle
+ * @handle: phandle of the node to find
+ *
+ * Returns a node pointer.
+ */
+static const struct dt_device_node *dt_find_node_by_phandle(dt_phandle handle)
+{
+    const struct dt_device_node *np;
+
+    for_each_device_node(dt_host, np)
+        if ( np->phandle == handle )
+            break;
+
+    return np;
+}
+
+/**
+ * dt_irq_find_parent - Given a device node, find its interrupt parent node
+ * @child: pointer to device node
+ *
+ * Returns a pointer to the interrupt parent node, or NULL if the interrupt
+ * parent could not be determined.
+ */
+static const struct dt_device_node *
+dt_irq_find_parent(const struct dt_device_node *child)
+{
+    const struct dt_device_node *p;
+    const __be32 *parp;
+
+    do
+    {
+        parp = dt_get_property(child, "interrupt-parent", NULL);
+        if ( parp == NULL )
+            p = dt_get_parent(child);
+        else
+            p = dt_find_node_by_phandle(be32_to_cpup(parp));
+        child = p;
+    } while ( p && dt_get_property(p, "#interrupt-cells", NULL) == NULL );
+
+    return p;
+}
+
+unsigned int dt_number_of_irq(const struct dt_device_node *device)
+{
+    const struct dt_device_node *p;
+    const __be32 *intspec, *tmp;
+    u32 intsize, intlen;
+
+    dt_dprintk("dt_irq_number: dev=%s\n", device->full_name);
+
+    /* Get the interrupts property */
+    intspec = dt_get_property(device, "interrupts", &intlen);
+    if ( intspec == NULL )
+        return 0;
+    intlen /= sizeof(*intspec);
+
+    dt_dprintk(" intspec=%d intlen=%d\n", be32_to_cpup(intspec), intlen);
+
+    /* Look for the interrupt parent. */
+    p = dt_irq_find_parent(device);
+    if ( p == NULL )
+        return 0;
+
+    /* Get size of interrupt specifier */
+    tmp = dt_get_property(p, "#interrupt-cells", NULL);
+    if ( tmp == NULL )
+        return 0;
+    intsize = be32_to_cpu(*tmp);
+
+    dt_dprintk(" intsize=%d intlen=%d\n", intsize, intlen);
+
+    return (intlen / intsize);
+}
+
 unsigned int dt_number_of_address(const struct dt_device_node *dev)
 {
     const __be32 *prop;
@@ -1057,6 +1135,274 @@ unsigned int dt_number_of_address(const struct dt_device_node *dev)
     onesize = na + ns;
 
     return (psize / onesize);
+}
+
+/**
+ * dt_irq_map_raw - Low level interrupt tree parsing
+ * @parent:     the device interrupt parent
+ * @intspec:    interrupt specifier ("interrupts" property of the device)
+ * @ointsize:   size of the passed in interrupt specifier
+ * @addr:       address specifier (start of "reg" property of the device)
+ * @oirq:       structure dt_raw_irq filled by this function
+ *
+ * Returns 0 on success and a negative number on error
+ *
+ * This function is a low-level interrupt tree walking function. It
+ * can be used to do a partial walk with synthesized reg and interrupts
+ * properties, for example when resolving PCI interrupts when no device
+ * node exist for the parent.
+ */
+static int dt_irq_map_raw(const struct dt_device_node *parent,
+                          const __be32 *intspec, u32 ointsize,
+                          const __be32 *addr,
+                          struct dt_raw_irq *oirq)
+{
+    const struct dt_device_node *ipar, *tnode, *old = NULL, *newpar = NULL;
+    const __be32 *tmp, *imap, *imask;
+    u32 intsize = 1, addrsize, newintsize = 0, newaddrsize = 0;
+    u32 imaplen;
+    int match, i;
+
+    dt_dprintk("dt_irq_map_raw: par=%s,intspec=[0x%08x 0x%08x...],ointsize=%d\n",
+               parent->full_name, be32_to_cpup(intspec),
+               be32_to_cpup(intspec + 1), ointsize);
+
+    ipar = parent;
+
+    /* First get the #interrupt-cells property of the current cursor
+     * that tells us how to interpret the passed-in intspec. If there
+     * is none, we are nice and just walk up the tree
+     */
+    do {
+        tmp = dt_get_property(ipar, "#interrupt-cells", NULL);
+        if ( tmp != NULL )
+        {
+            intsize = be32_to_cpu(*tmp);
+            break;
+        }
+        tnode = ipar;
+        ipar = dt_irq_find_parent(ipar);
+    } while ( ipar );
+    if ( ipar == NULL )
+    {
+        dt_dprintk(" -> no parent found !\n");
+        goto fail;
+    }
+
+    dt_dprintk("dt_irq_map_raw: ipar=%s, size=%d\n", ipar->full_name, intsize);
+
+    if ( ointsize != intsize )
+        return -EINVAL;
+
+    /* Look for this #address-cells. We have to implement the old linux
+     * trick of looking for the parent here as some device-trees rely on it
+     */
+    old = ipar;
+    do {
+        tmp = dt_get_property(old, "#address-cells", NULL);
+        tnode = dt_get_parent(old);
+        old = tnode;
+    } while ( old && tmp == NULL );
+
+    old = NULL;
+    addrsize = (tmp == NULL) ? 2 : be32_to_cpu(*tmp);
+
+    dt_dprintk(" -> addrsize=%d\n", addrsize);
+
+    /* Now start the actual "proper" walk of the interrupt tree */
+    while ( ipar != NULL )
+    {
+        /* Now check if cursor is an interrupt-controller and if it is
+         * then we are done
+         */
+        if ( dt_get_property(ipar, "interrupt-controller", NULL) != NULL )
+        {
+            dt_dprintk(" -> got it !\n");
+            if ( intsize > DT_MAX_IRQ_SPEC )
+            {
+                dt_dprintk(" -> intsize(%u) greater than DT_MAX_IRQ_SPEC(%u)\n",
+                           intsize, DT_MAX_IRQ_SPEC);
+                goto fail;
+            }
+            for ( i = 0; i < intsize; i++ )
+                oirq->specifier[i] = dt_read_number(intspec + i, 1);
+            oirq->size = intsize;
+            oirq->controller = ipar;
+            return 0;
+        }
+
+        /* Now look for an interrupt-map */
+        imap = dt_get_property(ipar, "interrupt-map", &imaplen);
+        /* No interrupt map, check for an interrupt parent */
+        if ( imap == NULL )
+        {
+            dt_dprintk(" -> no map, getting parent\n");
+            newpar = dt_irq_find_parent(ipar);
+            goto skiplevel;
+        }
+        imaplen /= sizeof(u32);
+
+        /* Look for a mask */
+        imask = dt_get_property(ipar, "interrupt-map-mask", NULL);
+
+        /* If we were passed no "reg" property and we attempt to parse
+         * an interrupt-map, then #address-cells must be 0.
+         * Fail if it's not.
+         */
+        if ( addr == NULL && addrsize != 0 )
+        {
+            dt_dprintk(" -> no reg passed in when needed !\n");
+            goto fail;
+        }
+
+        /* Parse interrupt-map */
+        match = 0;
+        while ( imaplen > (addrsize + intsize + 1) && !match )
+        {
+            /* Compare specifiers */
+            match = 1;
+            for ( i = 0; i < addrsize && match; ++i )
+            {
+                __be32 mask = imask ? imask[i] : cpu_to_be32(0xffffffffu);
+                match = ((addr[i] ^ imap[i]) & mask) == 0;
+            }
+            for ( ; i < (addrsize + intsize) && match; ++i )
+            {
+                __be32 mask = imask ? imask[i] : cpu_to_be32(0xffffffffu);
+                match = ((intspec[i-addrsize] ^ imap[i]) & mask) == 0;
+            }
+            imap += addrsize + intsize;
+            imaplen -= addrsize + intsize;
+
+            dt_dprintk(" -> match=%d (imaplen=%d)\n", match, imaplen);
+
+            /* Get the interrupt parent */
+            newpar = dt_find_node_by_phandle(be32_to_cpup(imap));
+            imap++;
+            --imaplen;
+
+            /* Check if not found */
+            if ( newpar == NULL )
+            {
+                dt_dprintk(" -> imap parent not found !\n");
+                goto fail;
+            }
+
+            /* Get #interrupt-cells and #address-cells of new
+             * parent
+             */
+            tmp = dt_get_property(newpar, "#interrupt-cells", NULL);
+            if ( tmp == NULL )
+            {
+                dt_dprintk(" -> parent lacks #interrupt-cells!\n");
+                goto fail;
+            }
+            newintsize = be32_to_cpu(*tmp);
+            tmp = dt_get_property(newpar, "#address-cells", NULL);
+            newaddrsize = (tmp == NULL) ? 0 : be32_to_cpu(*tmp);
+
+            dt_dprintk(" -> newintsize=%d, newaddrsize=%d\n",
+                       newintsize, newaddrsize);
+
+            /* Check for malformed properties */
+            if ( imaplen < (newaddrsize + newintsize) )
+                goto fail;
+
+            imap += newaddrsize + newintsize;
+            imaplen -= newaddrsize + newintsize;
+
+            dt_dprintk(" -> imaplen=%d\n", imaplen);
+        }
+        if ( !match )
+            goto fail;
+
+        old = newpar;
+        addrsize = newaddrsize;
+        intsize = newintsize;
+        intspec = imap - intsize;
+        addr = intspec - addrsize;
+
+    skiplevel:
+        /* Iterate again with new parent */
+        dt_dprintk(" -> new parent: %s\n", dt_node_full_name(newpar));
+        ipar = newpar;
+        newpar = NULL;
+    }
+fail:
+    return -EINVAL;
+}
+
+int dt_device_get_raw_irq(const struct dt_device_node *device, int index,
+                          struct dt_raw_irq *out_irq)
+{
+    const struct dt_device_node *p;
+    const __be32 *intspec, *tmp, *addr;
+    u32 intsize, intlen;
+    int res = -EINVAL;
+
+    dt_dprintk("dt_device_get_raw_irq: dev=%s, index=%d\n",
+               device->full_name, index);
+
+    /* Get the interrupts property */
+    intspec = dt_get_property(device, "interrupts", &intlen);
+    if ( intspec == NULL )
+        return -EINVAL;
+    intlen /= sizeof(*intspec);
+
+    dt_dprintk(" intspec=%d intlen=%d\n", be32_to_cpup(intspec), intlen);
+
+    /* Get the reg property (if any) */
+    addr = dt_get_property(device, "reg", NULL);
+
+    /* Look for the interrupt parent. */
+    p = dt_irq_find_parent(device);
+    if ( p == NULL )
+        return -EINVAL;
+
+    /* Get size of interrupt specifier */
+    tmp = dt_get_property(p, "#interrupt-cells", NULL);
+    if ( tmp == NULL )
+        goto out;
+    intsize = be32_to_cpu(*tmp);
+
+    dt_dprintk(" intsize=%d intlen=%d\n", intsize, intlen);
+
+    /* Check index */
+    if ( (index + 1) * intsize > intlen )
+        goto out;
+
+    /* Get new specifier and map it */
+    res = dt_irq_map_raw(p, intspec + index * intsize, intsize,
+                         addr, out_irq);
+    if ( res )
+        goto out;
+out:
+    return res;
+}
+
+int dt_irq_translate(const struct dt_raw_irq *raw,
+                     struct dt_irq *out_irq)
+{
+    ASSERT(dt_irq_xlate != NULL);
+
+    /* TODO: Retrieve the right irq_xlate. This is only work for the gic */
+
+    return dt_irq_xlate(raw->specifier, raw->size,
+                        &out_irq->irq, &out_irq->type);
+}
+
+int dt_device_get_irq(const struct dt_device_node *device, int index,
+                      struct dt_irq *out_irq)
+{
+    struct dt_raw_irq raw;
+    int res;
+
+    res = dt_device_get_raw_irq(device, index, &raw);
+
+    if ( res )
+        return res;
+
+    return dt_irq_translate(&raw, out_irq);
 }
 
 /**
@@ -1399,6 +1745,22 @@ static void __init dt_alias_scan(void)
         ap->alias = start;
         dt_alias_add(ap, np, id, start, len);
     }
+}
+
+struct dt_device_node * __init dt_find_interrupt_controller(const char *compat)
+{
+    struct dt_device_node *np = NULL;
+
+    while ( (np = dt_find_compatible_node(np, NULL, compat)) )
+    {
+        if ( !dt_find_property(np, "interrupt-controller", NULL) )
+            continue;
+
+        if ( dt_get_parent(np) )
+            break;
+    }
+
+    return np;
 }
 
 void __init dt_unflatten_host_device_tree(void)

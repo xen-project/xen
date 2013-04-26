@@ -99,6 +99,67 @@ struct dt_device_node {
 
 };
 
+/**
+ * IRQ line type.
+ *
+ * DT_IRQ_TYPE_NONE            - default, unspecified type
+ * DT_IRQ_TYPE_EDGE_RISING     - rising edge triggered
+ * DT_IRQ_TYPE_EDGE_FALLING    - falling edge triggered
+ * DT_IRQ_TYPE_EDGE_BOTH       - rising and falling edge triggered
+ * DT_IRQ_TYPE_LEVEL_HIGH      - high level triggered
+ * DT_IRQ_TYPE_LEVEL_LOW       - low level triggered
+ * DT_IRQ_TYPE_LEVEL_MASK      - Mask to filter out the level bits
+ * DT_IRQ_TYPE_SENSE_MASK      - Mask for all the above bits
+ */
+#define DT_IRQ_TYPE_NONE           0x00000000
+#define DT_IRQ_TYPE_EDGE_RISING    0x00000001
+#define DT_IRQ_TYPE_EDGE_FALLING   0x00000002
+#define DT_IRQ_TYPE_EDGE_BOTH                           \
+    (DT_IRQ_TYPE_EDGE_FALLING | DT_IRQ_TYPE_EDGE_RISING)
+#define DT_IRQ_TYPE_LEVEL_HIGH     0x00000004
+#define DT_IRQ_TYPE_LEVEL_LOW      0x00000008
+#define DT_IRQ_TYPE_LEVEL_MASK                          \
+    (DT_IRQ_TYPE_LEVEL_LOW | DT_IRQ_TYPE_LEVEL_HIGH)
+#define DT_IRQ_TYPE_SENSE_MASK     0x0000000f
+
+/**
+ * dt_irq - describe an IRQ in the device tree
+ * @irq: IRQ number
+ * @type: IRQ type (see DT_IRQ_TYPE_*)
+ *
+ * This structure is returned when an interrupt is mapped.
+ */
+struct dt_irq {
+    unsigned int irq;
+    unsigned int type;
+};
+
+/* If type == DT_IRQ_TYPE_NONE, assume we use level triggered */
+static inline bool_t dt_irq_is_level_triggered(const struct dt_irq *irq)
+{
+    unsigned int type = irq->type;
+
+    return (type & DT_IRQ_TYPE_LEVEL_MASK) || (type == DT_IRQ_TYPE_NONE);
+}
+
+/**
+ * dt_raw_irq - container for device_node/irq_specifier for an irq controller
+ * @controller: pointer to interrupt controller deivce tree node
+ * @size: size of interrupt specifier
+ * @specifier: array of cells @size long specifying the specific interrupt
+ *
+ * This structure is returned when an interrupt is mapped but not translated.
+ */
+#define DT_MAX_IRQ_SPEC     4 /* We handle specifiers of at most 4 cells */
+struct dt_raw_irq {
+    const struct dt_device_node *controller;
+    u32 size;
+    u32 specifier[DT_MAX_IRQ_SPEC];
+};
+
+#define dt_irq(irq) ((irq)->irq)
+#define dt_irq_flags(irq) ((irq)->flags)
+
 typedef int (*device_tree_node_func)(const void *fdt,
                                      int node, const char *name, int depth,
                                      u32 address_cells, u32 size_cells,
@@ -136,10 +197,39 @@ void __init device_tree_dump(const void *fdt);
 void __init dt_unflatten_host_device_tree(void);
 
 /**
+ * IRQ translation callback
+ * TODO: For the moment we assume that we only have ONE
+ * interrupt-controller.
+ */
+typedef int (*dt_irq_xlate_func)(const u32 *intspec, unsigned int intsize,
+                                 unsigned int *out_hwirq,
+                                 unsigned int *out_type);
+extern dt_irq_xlate_func dt_irq_xlate;
+
+/**
  * Host device tree
  * DO NOT modify it!
  */
 extern struct dt_device_node *dt_host;
+
+/**
+ * Primary interrupt controller
+ * Exynos SOC has an interrupt combiner, interrupt has no physical
+ * meaning when it's not connected to the primary controller.
+ * We will only map interrupt whose parent controller is
+ * dt_interrupt_controller. It should always be a GIC.
+ * TODO: Handle multiple GIC
+ */
+extern const struct dt_device_node *dt_interrupt_controller;
+
+/**
+ * Find the interrupt controller
+ * For the moment we handle only one interrupt controller: the first
+ * one without parent which is compatible with the string "compat".
+ *
+ * If found, return the interrupt controller device node.
+ */
+struct dt_device_node * __init dt_find_interrupt_controller(const char *compat);
 
 #define dt_node_cmp(s1, s2) strcmp((s1), (s2))
 #define dt_compat_cmp(s1, s2, l) strnicmp((s1), (s2), l)
@@ -285,6 +375,15 @@ int dt_device_get_address(const struct dt_device_node *dev, int index,
                           u64 *addr, u64 *size);
 
 /**
+ * dt_number_of_irq - Get the number of IRQ for a device
+ * @device: the device whose number of interrupt is to be retrieved
+ *
+ * Return the number of irq for this device or 0 if there is no
+ * interrupt or an error occurred.
+ */
+unsigned int dt_number_of_irq(const struct dt_device_node *device);
+
+/**
  * dt_number_of_address - Get the number of addresses for a device
  * @device: the device whose number of address is to be retrieved
  *
@@ -292,6 +391,37 @@ int dt_device_get_address(const struct dt_device_node *dev, int index,
  * address or an error occurred.
  */
 unsigned int dt_number_of_address(const struct dt_device_node *device);
+
+/**
+ * dt_device_get_irq - Resolve an interrupt for a device
+ * @device: the device whose interrupt is to be resolved
+ * @index: index of the interrupt to resolve
+ * @out_irq: structure dt_irq filled by this function
+ *
+ * This function resolves an interrupt, walking the tree, for a given
+ * device-tree node. It's the high level pendant to dt_device_get_raw_irq().
+ */
+int dt_device_get_irq(const struct dt_device_node *device, int index,
+                      struct dt_irq *irq);
+
+/**
+ * dt_device_get_raw_irq - Resolve an interrupt for a device without translation
+ * @device: the device whose interrupt is to be resolved
+ * @index: index of the interrupt to resolve
+ * @out_irq: structure dt_raw_irq filled by this function
+ *
+ * This function resolves an interrupt for a device, no translation is
+ * made. dt_irq_translate can be called after.
+ */
+int dt_device_get_raw_irq(const struct dt_device_node *device, int index,
+                          struct dt_raw_irq *irq);
+
+/**
+ * dt_irq_translate - Translate an irq
+ * @raw: IRQ to translate (raw format)
+ * @out_irq: structure dt_irq filled by this function
+ */
+int dt_irq_translate(const struct dt_raw_irq *raw, struct dt_irq *out_irq);
 
 /**
  * dt_n_size_cells - Helper to retrieve the number of cell for the size
