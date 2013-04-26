@@ -550,7 +550,7 @@ bad_width:
 
 write_ignore:
     if ( dabt.size != 2 ) goto bad_width;
-    return 0;
+    return 1;
 }
 
 static int vgic_distr_mmio_check(struct vcpu *v, paddr_t addr)
