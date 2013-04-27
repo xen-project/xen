@@ -1855,7 +1855,7 @@ libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx, uint32_t domid, int *n
           vtpm->devid = atoi(*dir);
 
           tmp = libxl__xs_read(gc, XBT_NULL,
-                GCSPRINTF("%s/%s/backend_id",
+                GCSPRINTF("%s/%s/backend-id",
                    fe_path, *dir));
           vtpm->backend_domid = atoi(tmp);
 
