@@ -42,6 +42,7 @@
 #include <asm/early_printk.h>
 #include <asm/gic.h>
 #include <asm/cpufeature.h>
+#include <asm/platform.h>
 
 struct cpuinfo_arm __read_mostly boot_cpu_data;
 
@@ -439,6 +440,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     system_state = SYS_STATE_boot;
 
     processor_id();
+
+    platform_init();
 
     init_xen_time();
 

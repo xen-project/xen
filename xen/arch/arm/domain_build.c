@@ -12,6 +12,7 @@
 #include <xen/libfdt/libfdt.h>
 #include <xen/guest_access.h>
 #include <asm/setup.h>
+#include <asm/platform.h>
 
 #include <asm/gic.h>
 #include <xen/irq.h>
@@ -513,6 +514,9 @@ int construct_dom0(struct domain *d)
         return rc;
 
     map_devices_from_device_tree(d);
+    rc = platform_specific_mapping(d);
+    if ( rc < 0 )
+        return rc;
 
     /* The following loads use the domain's p2m */
     p2m_load_VTTBR(d);

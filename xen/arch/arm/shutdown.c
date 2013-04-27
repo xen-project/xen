@@ -5,6 +5,7 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/smp.h>
+#include <asm/platform.h>
 
 static void raw_machine_reset(void)
 {
@@ -21,6 +22,7 @@ static void raw_machine_reset(void)
     dsb(); isb();
     clear_fixmap(FIXMAP_MISC);
 #endif
+    platform_reset();
 }
 
 static void halt_this_cpu(void *arg)

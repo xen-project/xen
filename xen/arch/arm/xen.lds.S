@@ -77,6 +77,13 @@ SECTIONS
 #endif
 
   . = ALIGN(8);
+  .arch.info : {
+      _splatform = .;
+      *(.arch.info)
+      _eplatform = .;
+  } :text
+
+  . = ALIGN(8);
   .dev.info : {
       _sdevice = .;
       *(.dev.info)

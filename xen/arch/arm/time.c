@@ -33,6 +33,7 @@
 #include <asm/time.h>
 #include <asm/gic.h>
 #include <asm/cpufeature.h>
+#include <asm/platform.h>
 
 /*
  * Unfortunately the hypervisor timer interrupt appears to be buggy in
@@ -123,11 +124,16 @@ int __init init_xen_time(void)
            timer_irq[TIMER_HYP_PPI].irq,
            timer_irq[TIMER_VIRT_PPI].irq);
 
+    res = platform_init_time();
+    if ( res )
+        return res;
+
     /* Check that this CPU supports the Generic Timer interface */
     if ( !cpu_has_gentimer )
         panic("CPU does not support the Generic Timer v1 interface.\n");
 
     cpu_khz = READ_SYSREG32(CNTFRQ_EL0) / 1000;
+
     boot_count = READ_SYSREG64(CNTPCT_EL0);
     printk("Using generic timer at %lu KHz\n", cpu_khz);
 
