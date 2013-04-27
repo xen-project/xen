@@ -62,6 +62,43 @@ struct vcpu *__init alloc_dom0_vcpu0(void)
     return alloc_vcpu(dom0, 0, 0);
 }
 
+static int set_memory_reg_11(struct domain *d, struct kernel_info *kinfo,
+                             const void *fdt, const u32 *cell, int len,
+                             int address_cells, int size_cells, u32 *new_cell)
+{
+    int reg_size = (address_cells + size_cells) * sizeof(*cell);
+    paddr_t start;
+    paddr_t size;
+    struct page_info *pg;
+    unsigned int order = get_order_from_bytes(dom0_mem);
+    int res;
+    paddr_t spfn;
+
+    pg = alloc_domheap_pages(d, order, 0);
+    if ( !pg )
+        panic("Failed to allocate contiguous memory for dom0\n");
+
+    spfn = page_to_mfn(pg);
+    start = spfn << PAGE_SHIFT;
+    size = (1 << order) << PAGE_SHIFT;
+
+    // 1:1 mapping
+    printk("Populate P2M %#"PRIx64"->%#"PRIx64" (1:1 mapping for dom0)\n",
+           start, start + size);
+    res = guest_physmap_add_page(d, spfn, spfn, order);
+
+    if ( res )
+        panic("Unable to add pages in DOM0: %d\n", res);
+
+    device_tree_set_reg(&new_cell, address_cells, size_cells, start, size);
+
+    kinfo->mem.bank[0].start = start;
+    kinfo->mem.bank[0].size = size;
+    kinfo->mem.nr_banks = 1;
+
+    return reg_size;
+}
+
 static int set_memory_reg(struct domain *d, struct kernel_info *kinfo,
                           const void *fdt, const u32 *cell, int len,
                           int address_cells, int size_cells, u32 *new_cell)
@@ -70,6 +107,10 @@ static int set_memory_reg(struct domain *d, struct kernel_info *kinfo,
     int l = 0;
     u64 start;
     u64 size;
+
+    if ( platform_has_quirk(PLATFORM_QUIRK_DOM0_MAPPING_11) )
+        return set_memory_reg_11(d, kinfo, fdt, cell, len, address_cells,
+                                 size_cells, new_cell);
 
     while ( kinfo->unassigned_mem > 0 && l + reg_size <= len
             && kinfo->mem.nr_banks < NR_MEM_BANKS )
