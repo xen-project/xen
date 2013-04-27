@@ -436,8 +436,9 @@ void __init start_xen(unsigned long boot_phys_offset,
 #ifdef EARLY_UART_ADDRESS
     /* TODO Need to get device tree or command line for UART address */
     pl011_init(0, FIXMAP_ADDR(FIXMAP_CONSOLE));
-    console_init_preirq();
 #endif
+    dt_uart_init();
+    console_init_preirq();
 
     system_state = SYS_STATE_boot;
 

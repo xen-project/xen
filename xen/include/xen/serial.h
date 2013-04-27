@@ -9,6 +9,7 @@
 #ifndef __XEN_SERIAL_H__
 #define __XEN_SERIAL_H__
 
+#include <xen/init.h>
 #include <xen/spinlock.h>
 
 struct cpu_user_regs;
@@ -76,10 +77,11 @@ struct uart_driver {
 };
 
 /* 'Serial handles' are composed from the following fields. */
-#define SERHND_IDX      (3<<0) /* COM1, COM2, or DBGP?                    */
+#define SERHND_IDX      (3<<0) /* COM1, COM2, DBGP, DTUART?               */
 # define SERHND_COM1    (0<<0)
 # define SERHND_COM2    (1<<0)
 # define SERHND_DBGP    (2<<0)
+# define SERHND_DTUART  (0<<0) /* Steal SERHND_COM1 value */
 #define SERHND_HI       (1<<2) /* Mux/demux each transferred char by MSB. */
 #define SERHND_LO       (1<<3) /* Ditto, except that the MSB is cleared.  */
 #define SERHND_COOKED   (1<<4) /* Newline/carriage-return translation?    */
@@ -156,6 +158,7 @@ void ns16550_init(int index, struct ns16550_defaults *defaults);
 void ehci_dbgp_init(void);
 
 void pl011_init(int index, unsigned long register_base_address);
+void __init dt_uart_init(void);
 
 struct physdev_dbgp_op;
 int dbgp_op(const struct physdev_dbgp_op *);

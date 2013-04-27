@@ -39,7 +39,7 @@
 
 #define CONFIG_VIDEO 1
 
-#define OPT_CONSOLE_STR "com1"
+#define OPT_CONSOLE_STR "dtuart"
 
 #ifdef MAX_PHYS_CPUS
 #define NR_CPUS MAX_PHYS_CPUS

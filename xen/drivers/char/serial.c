@@ -271,6 +271,12 @@ int __init serial_parse_handle(char *conf)
         goto common;
     }
 
+    if ( !strncmp(conf, "dtuart", 5) )
+    {
+        handle = SERHND_DTUART;
+        goto common;
+    }
+
     if ( strncmp(conf, "com", 3) )
         goto fail;
 
