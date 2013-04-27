@@ -157,7 +157,6 @@ struct ns16550_defaults {
 void ns16550_init(int index, struct ns16550_defaults *defaults);
 void ehci_dbgp_init(void);
 
-void pl011_init(int index, unsigned long register_base_address);
 void __init dt_uart_init(void);
 
 struct physdev_dbgp_op;

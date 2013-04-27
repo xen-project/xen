@@ -505,10 +505,6 @@ void gic_route_spis(void)
     int seridx;
     const struct dt_irq *irq;
 
-    /* XXX should get these from DT */
-    /* UART */
-    gic_route_irq(37, 0, 1u << smp_processor_id(), 0xa0);
-
     for ( seridx = 0; seridx <= SERHND_IDX; seridx++ )
     {
         if ( (irq = serial_dt_irq(seridx)) == NULL )

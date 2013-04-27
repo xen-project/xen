@@ -433,10 +433,6 @@ void __init start_xen(unsigned long boot_phys_offset,
     dt_unflatten_host_device_tree();
     dt_irq_xlate = gic_irq_xlate;
 
-#ifdef EARLY_UART_ADDRESS
-    /* TODO Need to get device tree or command line for UART address */
-    pl011_init(0, FIXMAP_ADDR(FIXMAP_CONSOLE));
-#endif
     dt_uart_init();
     console_init_preirq();
 

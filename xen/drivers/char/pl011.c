@@ -22,9 +22,16 @@
 #include <xen/serial.h>
 #include <xen/init.h>
 #include <xen/irq.h>
+#include <asm/early_printk.h>
+#include <xen/device_tree.h>
+#include <xen/errno.h>
+#include <asm/device.h>
+#include <xen/mm.h>
+#include <xen/vmap.h>
 
 static struct pl011 {
-    unsigned int baud, clock_hz, data_bits, parity, stop_bits, irq;
+    unsigned int baud, clock_hz, data_bits, parity, stop_bits;
+    struct dt_irq irq;
     volatile uint32_t *regs;
     /* UART with IRQ line: interrupt-driven I/O. */
     struct irqaction irqaction;
@@ -32,7 +39,7 @@ static struct pl011 {
     /* struct timer timer; */
     /* unsigned int timeout_ms; */
     /* bool_t probing, intr_works; */
-} pl011_com[2] = {{0}};
+} pl011_com = {0};
 
 /* PL011 register addresses */
 #define DR     (0x00/4)
@@ -163,13 +170,13 @@ static void __init pl011_init_postirq(struct serial_port *port)
     struct pl011 *uart = port->uart;
     int rc;
 
-    if ( uart->irq > 0 )
+    if ( uart->irq.irq > 0 )
     {
         uart->irqaction.handler = pl011_interrupt;
         uart->irqaction.name    = "pl011";
         uart->irqaction.dev_id  = port;
-        if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
-            printk("ERROR: Failed to allocate pl011 IRQ %d\n", uart->irq);
+        if ( (rc = setup_dt_irq(&uart->irq, &uart->irqaction)) != 0 )
+            printk("ERROR: Failed to allocate pl011 IRQ %d\n", uart->irq.irq);
     }
 
     /* Clear pending error interrupts */
@@ -215,7 +222,14 @@ static int pl011_getc(struct serial_port *port, char *pc)
 static int __init pl011_irq(struct serial_port *port)
 {
     struct pl011 *uart = port->uart;
-    return ((uart->irq > 0) ? uart->irq : -1);
+    return ((uart->irq.irq > 0) ? uart->irq.irq : -1);
+}
+
+static const struct dt_irq __init *pl011_dt_irq(struct serial_port *port)
+{
+    struct pl011 *uart = port->uart;
+
+    return &uart->irq;
 }
 
 static struct uart_driver __read_mostly pl011_driver = {
@@ -227,31 +241,73 @@ static struct uart_driver __read_mostly pl011_driver = {
     .tx_ready     = pl011_tx_ready,
     .putc         = pl011_putc,
     .getc         = pl011_getc,
-    .irq          = pl011_irq
+    .irq          = pl011_irq,
+    .dt_irq_get   = pl011_dt_irq,
 };
 
-/* TODO: Parse UART config from device-tree or command-line */
-
-void __init pl011_init(int index, unsigned long register_base_address)
+/* TODO: Parse UART config from the command line */
+static int __init pl011_uart_init(struct dt_device_node *dev,
+                                  const void *data)
 {
+    const char *config = data;
     struct pl011 *uart;
+    int res;
+    u64 addr, size;
 
-    if ( (index < 0) || (index > 1) )
-        return;
+    if ( strcmp(config, "") )
+    {
+        early_printk("WARNING: UART configuration is not supported\n");
+    }
 
-    uart = &pl011_com[index];
+    uart = &pl011_com;
 
     uart->clock_hz  = 0x16e3600;
     uart->baud      = 38400;
     uart->data_bits = 8;
     uart->parity    = PARITY_NONE;
     uart->stop_bits = 1;
-    uart->irq       = 37; /* TODO Need to find this from devicetree */
-    uart->regs      = (uint32_t *) register_base_address;
+
+    res = dt_device_get_address(dev, 0, &addr, &size);
+    if ( res )
+    {
+        early_printk("pl011: Unable to retrieve the base"
+                     " address of the UART\n");
+        return res;
+    }
+
+    uart->regs = ioremap_attr(addr, size, PAGE_HYPERVISOR_NOCACHE);
+    if ( !uart->regs )
+    {
+        early_printk("pl011: Unable to map the UART memory\n");
+
+        return -ENOMEM;
+    }
+
+    res = dt_device_get_irq(dev, 0, &uart->irq);
+    if ( res )
+    {
+        early_printk("pl011: Unable to retrieve the IRQ\n");
+        return res;
+    }
 
     /* Register with generic serial driver. */
-    serial_register_uart(uart - pl011_com, &pl011_driver, uart);
+    serial_register_uart(SERHND_DTUART, &pl011_driver, uart);
+
+    dt_device_set_used_by(dev, DOMID_XEN);
+
+    return 0;
 }
+
+static const char const *pl011_dt_compat[] __initdata =
+{
+    "arm,pl011",
+    NULL
+};
+
+DT_DEVICE_START(pl011, "PL011 UART", DEVICE_SERIAL)
+        .compatible = pl011_dt_compat,
+        .init = pl011_uart_init,
+DT_DEVICE_END
 
 /*
  * Local variables:
