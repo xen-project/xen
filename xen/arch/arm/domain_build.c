@@ -14,6 +14,7 @@
 #include <asm/setup.h>
 
 #include <asm/gic.h>
+#include <xen/irq.h>
 #include "kernel.h"
 
 static unsigned int __initdata opt_dom0_max_vcpus;
@@ -29,6 +30,14 @@ static void __init parse_dom0_mem(const char *s)
         dom0_mem = DOM0_MEM_DEFAULT;
 }
 custom_param("dom0_mem", parse_dom0_mem);
+
+//#define DEBUG_DT
+
+#ifdef DEBUG_DT
+# define DPRINT(fmt, args...) printk(XENLOG_DEBUG fmt, ##args)
+#else
+# define DPRINT(fmt, args...) do {} while ( 0 )
+#endif
 
 /*
  * Amount of extra space required to dom0's device tree.  No new nodes
@@ -303,6 +312,124 @@ static int write_nodes(struct domain *d, struct kernel_info *kinfo,
     return 0;
 }
 
+/* Map the device in the domain */
+static int map_device(struct domain *d, const struct dt_device_node *dev)
+{
+    unsigned int nirq;
+    unsigned int naddr;
+    unsigned int i;
+    int res;
+    struct dt_irq irq;
+    struct dt_raw_irq rirq;
+    u64 addr, size;
+
+    nirq = dt_number_of_irq(dev);
+    naddr = dt_number_of_address(dev);
+
+    DPRINT("%s nirq = %d naddr = %u\n", dt_node_full_name(dev), nirq, naddr);
+
+    /* Map IRQs */
+    for ( i = 0; i < nirq; i++ )
+    {
+        res = dt_device_get_raw_irq(dev, i, &rirq);
+        if ( res )
+        {
+            printk(XENLOG_ERR "Unable to retrieve irq %u for %s\n",
+                   i, dt_node_full_name(dev));
+            return res;
+        }
+
+        /*
+         * Don't map IRQ that have no physical meaning
+         * ie: IRQ whose controller is not the GIC
+         */
+        if ( rirq.controller != dt_interrupt_controller )
+        {
+            DPRINT("irq %u not connected to primary controller."
+                   "Connected to %s\n", i, dt_node_full_name(rirq.controller));
+            continue;
+        }
+
+        res = dt_irq_translate(&rirq, &irq);
+        if ( res )
+        {
+            printk(XENLOG_ERR "Unable to translate irq %u for %s\n",
+                   i, dt_node_full_name(dev));
+            return res;
+        }
+
+        DPRINT("irq %u = %u type = 0x%x\n", i, irq.irq, irq.type);
+        /* Don't check return because the IRQ can be use by multiple device */
+        gic_route_irq_to_guest(d, &irq, dt_node_name(dev));
+    }
+
+    /* Map the address ranges */
+    for ( i = 0; i < naddr; i++ )
+    {
+        res = dt_device_get_address(dev, i, &addr, &size);
+        if ( res )
+        {
+            printk(XENLOG_ERR "Unable to retrieve address %u for %s\n",
+                   i, dt_node_full_name(dev));
+            return res;
+        }
+
+        DPRINT("addr %u = 0x%"PRIx64" - 0x%"PRIx64"\n",
+               i, addr, addr + size - 1);
+
+        res = map_mmio_regions(d, addr & PAGE_MASK,
+                               PAGE_ALIGN(addr + size) - 1,
+                               addr & PAGE_MASK);
+        if ( res )
+        {
+            printk(XENLOG_ERR "Unable to map 0x%"PRIx64
+                   " - 0x%"PRIx64" in dom0\n",
+                   addr & PAGE_MASK, PAGE_ALIGN(addr + size) - 1);
+            return res;
+        }
+    }
+
+    return 0;
+}
+
+static int handle_node(struct domain *d, const struct dt_device_node *np)
+{
+    const struct dt_device_node *child;
+    int res;
+
+    DPRINT("handle %s\n", dt_node_full_name(np));
+
+    /* Skip theses nodes and the sub-nodes */
+    if ( dt_device_is_compatible(np, "xen,xen") ||
+         dt_device_type_is_equal(np, "memory") ||
+         !strcmp("/chosen", dt_node_full_name(np)) )
+        return 0;
+
+    if ( dt_device_used_by(np) != DOMID_XEN )
+    {
+        res = map_device(d, np);
+
+        if ( res )
+            return res;
+    }
+
+    for ( child = np->child; child != NULL; child = child->sibling )
+    {
+        res = handle_node(d, child);
+        if ( res )
+            return res;
+    }
+
+    return 0;
+}
+
+static int map_devices_from_device_tree(struct domain *d)
+{
+    ASSERT(dt_host && (dt_host->sibling == NULL));
+
+    return handle_node(d, dt_host);
+}
+
 static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 {
     void *fdt;
@@ -385,24 +512,7 @@ int construct_dom0(struct domain *d)
     if ( rc < 0 )
         return rc;
 
-    printk("Map CS2 MMIO regions 1:1 in the P2M %#llx->%#llx\n", 0x18000000ULL, 0x1BFFFFFFULL);
-    map_mmio_regions(d, 0x18000000, 0x1BFFFFFF, 0x18000000);
-    printk("Map CS3 MMIO regions 1:1 in the P2M %#llx->%#llx\n", 0x1C000000ULL, 0x1FFFFFFFULL);
-    map_mmio_regions(d, 0x1C000000, 0x1FFFFFFF, 0x1C000000);
-
-    printk("Routing peripheral interrupts to guest\n");
-    /* TODO Get from device tree */
-    gic_route_irq_to_guest(d, 34, "timer0");
-    /*gic_route_irq_to_guest(d, 37, "uart0"); -- XXX used by Xen*/
-    gic_route_irq_to_guest(d, 38, "uart1");
-    gic_route_irq_to_guest(d, 39, "uart2");
-    gic_route_irq_to_guest(d, 40, "uart3");
-    gic_route_irq_to_guest(d, 41, "mmc0-1");
-    gic_route_irq_to_guest(d, 42, "mmc0-2");
-    gic_route_irq_to_guest(d, 44, "keyboard");
-    gic_route_irq_to_guest(d, 45, "mouse");
-    gic_route_irq_to_guest(d, 46, "lcd");
-    gic_route_irq_to_guest(d, 47, "eth");
+    map_devices_from_device_tree(d);
 
     /* The following loads use the domain's p2m */
     p2m_load_VTTBR(d);

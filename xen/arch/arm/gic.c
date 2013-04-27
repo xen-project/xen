@@ -696,13 +696,14 @@ void gic_inject(void)
         gic_inject_irq_start();
 }
 
-int gic_route_irq_to_guest(struct domain *d, unsigned int irq,
+int gic_route_irq_to_guest(struct domain *d, const struct dt_irq *irq,
                            const char * devname)
 {
     struct irqaction *action;
-    struct irq_desc *desc = irq_to_desc(irq);
+    struct irq_desc *desc = irq_to_desc(irq->irq);
     unsigned long flags;
     int retval;
+    bool_t level;
 
     action = xmalloc(struct irqaction);
     if (!action)
@@ -710,6 +711,7 @@ int gic_route_irq_to_guest(struct domain *d, unsigned int irq,
 
     action->dev_id = d;
     action->name = devname;
+    action->free_on_release = 1;
 
     spin_lock_irqsave(&desc->lock, flags);
     spin_lock(&gic.lock);
@@ -717,9 +719,11 @@ int gic_route_irq_to_guest(struct domain *d, unsigned int irq,
     desc->handler = &gic_guest_irq_type;
     desc->status |= IRQ_GUEST;
 
-    gic_set_irq_properties(irq, 1, 1u << smp_processor_id(), 0xa0);
+    level = dt_irq_is_level_triggered(irq);
 
-    retval = __setup_irq(desc, irq, action);
+    gic_set_irq_properties(irq->irq, level, 1u << smp_processor_id(), 0xa0);
+
+    retval = __setup_irq(desc, irq->irq, action);
     if (retval) {
         xfree(action);
         goto out;

@@ -157,7 +157,8 @@ extern int gic_events_need_delivery(void);
 extern void __cpuinit init_maintenance_interrupt(void);
 extern void gic_set_guest_irq(struct vcpu *v, unsigned int irq,
         unsigned int state, unsigned int priority);
-extern int gic_route_irq_to_guest(struct domain *d, unsigned int irq,
+extern int gic_route_irq_to_guest(struct domain *d,
+                                  const struct dt_irq *irq,
                                   const char * devname);
 
 /* Accept an interrupt from the GIC and dispatch its handler */
