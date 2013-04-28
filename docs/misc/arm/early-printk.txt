@@ -1,0 +1,14 @@
+How to enable early printk
+
+Early printk can only be enabled if debug=y. You may want to enable it if
+you are debbuging code that executes before the console is initialized.
+
+Note that selecting this option will limit Xen to a single UART definition.
+Attempting to boot Xen image on a different platform *will not work*, so this
+option should not be enable for Xens that are intended to be portable.
+
+CONFIG_EARLY_PRINTK=mach
+where mach is the name of the machine:
+  - vexpress: printk with pl011 for versatile express
+
+By default early printk is disabled.

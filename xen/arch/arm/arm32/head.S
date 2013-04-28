@@ -32,9 +32,13 @@
 #define PT_UPPER(x) (PT_##x & 0xf00)
 #define PT_LOWER(x) (PT_##x & 0x0ff)
 
+#if (defined (EARLY_PRINTK)) && (defined (EARLY_PRINTK_INC))
+#include EARLY_PRINTK_INC
+#endif
+
 /* Macro to print a string to the UART, if there is one.
  * Clobbers r0-r3. */
-#ifdef EARLY_UART_ADDRESS
+#ifdef EARLY_PRINTK
 #define PRINT(_s)       \
         adr   r0, 98f ; \
         bl    puts    ; \
@@ -42,9 +46,9 @@
 98:     .asciz _s     ; \
         .align 2      ; \
 99:
-#else
+#else /* EARLY_PRINTK */
 #define PRINT(s)
-#endif
+#endif /* !EARLY_PRINTK */
 
         .arm
 
@@ -106,8 +110,8 @@ past_zImage:
         bne   1b
 
 boot_cpu:
-#ifdef EARLY_UART_ADDRESS
-        ldr   r11, =EARLY_UART_ADDRESS  /* r11 := UART base address */
+#ifdef EARLY_PRINTK
+        ldr   r11, =EARLY_UART_BASE_ADDRESS  /* r11 := UART base address */
         teq   r12, #0                   /* CPU 0 sets up the UART too */
         bleq  init_uart
         PRINT("- CPU ")
@@ -216,7 +220,7 @@ skip_bss:
         bne   pt_ready
 
         /* console fixmap */
-#ifdef EARLY_UART_ADDRESS
+#if defined(EARLY_PRINTK)
         ldr   r1, =xen_fixmap
         add   r1, r1, r10            /* r1 := paddr (xen_fixmap) */
         mov   r3, #0
@@ -279,7 +283,7 @@ pt_ready:
 paging:
 
 
-#ifdef EARLY_UART_ADDRESS
+#ifdef EARLY_PRINTK
         /* Use a virtual address to access the UART. */
         ldr   r11, =FIXMAP_ADDR(FIXMAP_CONSOLE)
 #endif
@@ -345,49 +349,42 @@ fail:   PRINT("- Boot failed -\r\n")
 1:      wfe
         b     1b
 
-#ifdef EARLY_UART_ADDRESS
 
-/* Bring up the UART. Specific to the PL011 UART.
+#ifdef EARLY_PRINTK
+/* Bring up the UART.
+ * r11: Early UART base address
  * Clobbers r0-r2 */
 init_uart:
-        mov   r1, #0x0
-        str   r1, [r11, #0x28]       /* -> UARTFBRD (Baud divisor fraction) */
-        mov   r1, #0x4               /* 7.3728MHz / 0x4 == 16 * 115200 */
-        str   r1, [r11, #0x24]       /* -> UARTIBRD (Baud divisor integer) */
-        mov   r1, #0x60              /* 8n1 */
-        str   r1, [r11, #0x2C]       /* -> UARTLCR_H (Line control) */
-        ldr   r1, =0x00000301        /* RXE | TXE | UARTEN */
-        str   r1, [r11, #0x30]       /* -> UARTCR (Control Register) */
+        early_uart_init r11, r1, r2
         adr   r0, 1f
-        b     puts
+        b     puts                  /* Jump to puts */
 1:      .asciz "- UART enabled -\r\n"
         .align 4
 
-/* Print early debug messages.  Specific to the PL011 UART.
+/* Print early debug messages.
  * r0: Nul-terminated string to print.
- * Clobbers r0-r2 */
+ * r11: Early UART base address
+ * Clobbers r0-r1 */
 puts:
-        ldr   r2, [r11, #0x18]       /* <- UARTFR (Flag register) */
-        tst   r2, #0x8               /* Check BUSY bit */
-        bne   puts                   /* Wait for the UART to be ready */
-        ldrb  r2, [r0], #1           /* Load next char */
-        teq   r2, #0                 /* Exit on nul */
+        early_uart_ready r11, r1
+        ldrb  r1, [r0], #1           /* Load next char */
+        teq   r1, #0                 /* Exit on nul */
         moveq pc, lr
-        str   r2, [r11]              /* -> UARTDR (Data Register) */
-        b     puts
+        early_uart_transmit r11, r1
+        b puts
 
 /* Print a 32-bit number in hex.  Specific to the PL011 UART.
  * r0: Number to print.
- * clobbers r0-r3 */
+ * r11: Early UART base address
+ * Clobbers r0-r3 */
 putn:
         adr   r1, hex
         mov   r3, #8
-1:      ldr   r2, [r11, #0x18]       /* <- UARTFR (Flag register) */
-        tst   r2, #0x8               /* Check BUSY bit */
-        bne   1b                     /* Wait for the UART to be ready */
+1:
+        early_uart_ready r11, r2
         and   r2, r0, #0xf0000000    /* Mask off the top nybble */
         ldrb  r2, [r1, r2, lsr #28]  /* Convert to a char */
-        str   r2, [r11]              /* -> UARTDR (Data Register) */
+        early_uart_transmit r11, r2
         lsl   r0, #4                 /* Roll it through one nybble at a time */
         subs  r3, r3, #1
         bne   1b
@@ -396,7 +393,7 @@ putn:
 hex:    .ascii "0123456789abcdef"
         .align 2
 
-#else  /* EARLY_UART_ADDRESS */
+#else  /* EARLY_PRINTK */
 
 init_uart:
 .global early_puts
@@ -404,7 +401,7 @@ early_puts:
 puts:
 putn:   mov   pc, lr
 
-#endif /* EARLY_UART_ADDRESS */
+#endif /* !EARLY_PRINTK */
 
 /*
  * Local variables:

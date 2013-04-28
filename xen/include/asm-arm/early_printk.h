@@ -12,7 +12,7 @@
 
 #include <xen/config.h>
 
-#ifdef EARLY_UART_ADDRESS
+#ifdef EARLY_PRINTK
 
 void early_printk(const char *fmt, ...);
 void early_panic(const char *fmt, ...) __attribute__((noreturn));

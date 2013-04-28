@@ -15,19 +15,7 @@
 #include <xen/string.h>
 #include <asm/early_printk.h>
 
-#ifdef EARLY_UART_ADDRESS
-
-void __init early_putch(char c)
-{
-    volatile uint32_t *r;
-
-    r = (uint32_t *)(XEN_VIRT_START + (1 << 21));
-
-    /* XXX: assuming a PL011 UART. */
-    while(*(r + 0x6) & 0x8)
-        ;
-    *r = c;
-}
+void early_putch(char c);
 
 /* Early printk buffer */
 static char __initdata buf[512];
@@ -68,5 +56,3 @@ early_panic(const char *fmt, ...)
 
     while(1);
 }
-
-#endif /* #ifdef EARLY_UART_ADDRESS */

@@ -141,8 +141,6 @@ extern unsigned long frametable_virt_end;
 #define watchdog_disable() ((void)0)
 #define watchdog_enable()  ((void)0)
 
-/* Board-specific: base address of PL011 UART */
-#define EARLY_UART_ADDRESS 0x1c090000
 /* Board-specific: base address of GIC + its regs */
 #define GIC_BASE_ADDRESS 0x2c000000
 #define GIC_DR_OFFSET 0x1000

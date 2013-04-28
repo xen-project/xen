@@ -36,3 +36,21 @@ endif
 ifneq ($(call cc-option,$(CC),-fvisibility=hidden,n),n)
 CFLAGS += -DGCC_HAS_VISIBILITY_ATTRIBUTE
 endif
+
+EARLY_PRINTK := n
+
+ifeq ($(debug),y)
+
+# Early printk for versatile express
+# TODO handle UART base address from make command line
+ifeq ($(CONFIG_EARLY_PRINTK), vexpress)
+EARLY_PRINTK_INC := pl011
+endif
+
+ifneq ($(EARLY_PRINTK_INC),)
+EARLY_PRINTK := y
+endif
+
+CFLAGS-$(EARLY_PRINTK) += -DEARLY_PRINTK
+CFLAGS-$(EARLY_PRINTK) += -DEARLY_PRINTK_INC=\"debug-$(EARLY_PRINTK_INC).inc\"
+endif

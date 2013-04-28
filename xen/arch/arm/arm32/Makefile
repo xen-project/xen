@@ -6,3 +6,5 @@ obj-y += proc-ca15.o
 
 obj-y += traps.o
 obj-y += domain.o
+
+obj-$(EARLY_PRINTK) += debug.o

@@ -2,7 +2,7 @@ subdir-$(arm32) += arm32
 subdir-$(arm64) += arm64
 subdir-y += platforms
 
-obj-y += early_printk.o
+obj-$(EARLY_PRINTK) += early_printk.o
 obj-y += cpu.o
 obj-y += domain.o
 obj-y += psci.o
