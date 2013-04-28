@@ -21,6 +21,7 @@
 #include <asm/config.h>
 #include <asm/page.h>
 #include <asm/asm_defns.h>
+#include <asm/platforms/vexpress.h>
 
 /* Get up a CPU into EL2.  Clobbers x0-x3.
  *
@@ -53,18 +54,18 @@ enter_el2_mode:
          */
         cbnz    x22, 1f
 
-        ldr     x1, =(GIC_BASE_ADDRESS+GIC_DR_OFFSET) // GICD_CTLR
+        ldr     x1, =(V2M_GIC_BASE_ADDRESS+GIC_DR_OFFSET) // GICD_CTLR
         mov     w0, #3                          // EnableGrp0 | EnableGrp1
         str     w0, [x1]
 
-1:      ldr     x1, =(GIC_BASE_ADDRESS+GIC_DR_OFFSET+0x80) // GICD_IGROUPR
+1:      ldr     x1, =(V2M_GIC_BASE_ADDRESS+GIC_DR_OFFSET+0x80) // GICD_IGROUPR
         mov     w0, #~0                         // Grp1 interrupts
         str     w0, [x1], #4
         b.ne    2f                              // Only local interrupts for secondary CPUs
         str     w0, [x1], #4
         str     w0, [x1], #4
 
-2:      ldr     x1, =(GIC_BASE_ADDRESS+GIC_CR_OFFSET) // GICC_CTLR
+2:      ldr     x1, =(V2M_GIC_BASE_ADDRESS+GIC_CR_OFFSET) // GICC_CTLR
         ldr     w0, [x1]
         mov     w0, #3                          // EnableGrp0 | EnableGrp1
         str     w0, [x1]
