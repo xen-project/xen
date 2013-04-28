@@ -76,7 +76,7 @@ past_zImage:
         cpsid aif                    /* Disable all interrupts */
 
         /* Save the bootloader arguments in less-clobberable registers */
-        /* No need to save r1 == Unused ARM-linux machine type */
+        mov   r5, r1                 /* r5: ARM-linux machine type */
         mov   r8, r2                 /* r8 := DTB base address */
 
         /* Find out where we are */
@@ -119,10 +119,24 @@ boot_cpu:
         bl    putn
         PRINT(" booting -\r\n")
 #endif
+        /* Secondary CPUs doesn't have machine ID
+         *  - Store machine ID on boot CPU
+         *  - Load machine ID on secondary CPUs
+         * Machine ID is needed in kick_cpus and enter_hyp_mode */
+        ldr   r0, =machine_id           /* VA of machine_id */
+        add   r0, r0, r10               /* PA of machine_id */
+        teq   r12, #0
+        streq r5, [r0]                  /* On boot CPU save machine ID */
+        ldrne r5, [r0]                  /* If non boot cpu r5 := machine ID */
 
         /* Wake up secondary cpus */
         teq   r12, #0
         bleq  kick_cpus
+
+        PRINT("- Machine ID ")
+        mov   r0, r5
+        bl    putn
+        PRINT(" -\r\n")
 
         /* Check that this CPU has Hyp mode */
         mrc   CP32(r0, ID_PFR1)
@@ -402,6 +416,9 @@ puts:
 putn:   mov   pc, lr
 
 #endif /* !EARLY_PRINTK */
+
+/* Place holder for machine ID */
+machine_id: .word 0x0
 
 /*
  * Local variables:

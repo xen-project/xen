@@ -32,6 +32,17 @@
 int vexpress_syscfg(int write, int function, int device, uint32_t *data);
 #endif
 
+/* Constants below is only used in assembly because the DTS is not yet parsed */
+#ifdef __ASSEMBLY__
+
+/* GIC base address */
+#define V2M_GIC_BASE_ADDRESS        0x2c000000
+
+/* Timer's frequency */
+#define V2M_TIMER_FREQUENCY         0x5f5e100 /* 100 Mhz */
+
+#endif /* __ASSEMBLY__ */
+
 #endif /* __ASM_ARM_PLATFORMS_VEXPRESS_H */
 /*
  * Local variables:
