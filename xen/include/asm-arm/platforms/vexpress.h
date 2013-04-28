@@ -23,6 +23,9 @@
 #define V2M_SYS_CFG_OSC4      4
 #define V2M_SYS_CFG_OSC5      5
 
+/* Board-specific: base address of system controller */
+#define SP810_ADDRESS 0x1C020000
+
 #ifndef __ASSEMBLY__
 #include <xen/inttypes.h>
 

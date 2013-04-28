@@ -18,7 +18,9 @@
  */
 
 #include <asm/platforms/vexpress.h>
+#include <asm/platform.h>
 #include <xen/mm.h>
+#include <xen/vmap.h>
 
 #define DCC_SHIFT      26
 #define FUNCTION_SHIFT 20
@@ -89,6 +91,44 @@ out:
     clear_fixmap(FIXMAP_MISC);
     return ret;
 }
+
+/*
+ * TODO: Get base address from the device tree
+ * See arm,vexpress-reset node
+ */
+static void vexpress_reset(void)
+{
+    void __iomem *sp810;
+
+    /* Use the SP810 system controller to force a reset */
+    sp810 = ioremap_nocache(SP810_ADDRESS, PAGE_SIZE);
+
+    if ( !sp810 )
+    {
+        dprintk(XENLOG_ERR, "Unable to map SP810\n");
+        return;
+    }
+
+    /* switch to slow mode */
+    iowritel(sp810, 0x3);
+    dsb(); isb();
+    /* writing any value to SCSYSSTAT reg will reset the system */
+    iowritel(sp810 + 4, 0x1);
+    dsb(); isb();
+
+    iounmap(sp810);
+}
+
+static const char const *vexpress_dt_compat[] __initdata =
+{
+    "arm,vexpress",
+    NULL
+};
+
+PLATFORM_START(vexpress, "VERSATILE EXPRESS")
+    .compatible = vexpress_dt_compat,
+    .reset = vexpress_reset,
+PLATFORM_END
 
 /*
  * Local variables:
