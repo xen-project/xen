@@ -8,6 +8,7 @@ CONFIG_ARM_$(XEN_OS) := y
 CFLAGS += -marm
 
 HAS_PL011 := y
+HAS_EXYNOS4210 := y
 
 # Use only if calling $(LD) directly.
 #LDFLAGS_DIRECT_OpenBSD = _obsd
