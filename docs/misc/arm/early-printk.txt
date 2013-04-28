@@ -10,5 +10,6 @@ option should not be enable for Xens that are intended to be portable.
 CONFIG_EARLY_PRINTK=mach
 where mach is the name of the machine:
   - vexpress: printk with pl011 for versatile express
+  - exynos5250: printk with the second UART
 
 By default early printk is disabled.

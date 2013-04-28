@@ -46,6 +46,9 @@ ifeq ($(debug),y)
 ifeq ($(CONFIG_EARLY_PRINTK), vexpress)
 EARLY_PRINTK_INC := pl011
 endif
+ifeq ($(CONFIG_EARLY_PRINTK), exynos5250)
+EARLY_PRINTK_INC := exynos4210
+endif
 
 ifneq ($(EARLY_PRINTK_INC),)
 EARLY_PRINTK := y
