@@ -45,7 +45,7 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
     struct domain *d;
     unsigned long mfn, gfn;
     uint32_t status;
-    uint16_t vmce_vcpuid;
+    int vmce_vcpuid;
 
     if (!mc_check_addr(bank->mc_status, bank->mc_misc, MC_ADDR_PHYSICAL)) {
         dprintk(XENLOG_WARNING,
