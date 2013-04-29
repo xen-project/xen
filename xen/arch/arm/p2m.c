@@ -133,7 +133,7 @@ static int create_p2m_entries(struct domain *d,
                      paddr_t maddr,
                      int mattr)
 {
-    int rc;
+    int rc, flush;
     struct p2m_domain *p2m = &d->arch.p2m;
     lpae_t *first = NULL, *second = NULL, *third = NULL;
     paddr_t addr;
@@ -186,10 +186,8 @@ static int create_p2m_entries(struct domain *d,
             third = map_domain_page(second[second_table_offset(addr)].p2m.base);
             cur_second_offset = second_table_offset(addr);
         }
-        /* else: third already valid */
 
-        if ( third[third_table_offset(addr)].p2m.valid )
-            flush_tlb_all_local();
+        flush = third[third_table_offset(addr)].p2m.valid;
 
         /* Allocate a new RAM page and attach */
         switch (op) {
@@ -226,6 +224,9 @@ static int create_p2m_entries(struct domain *d,
                 }
                 break;
         }
+
+        if ( flush )
+            flush_tlb_all_local();
     }
 
     rc = 0;
