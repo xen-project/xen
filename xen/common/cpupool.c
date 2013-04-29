@@ -41,16 +41,28 @@ static struct cpupool *alloc_cpupool_struct(void)
 {
     struct cpupool *c = xzalloc(struct cpupool);
 
-    if ( c && zalloc_cpumask_var(&c->cpu_valid) )
-        return c;
-    xfree(c);
-    return NULL;
+    if ( !c || !zalloc_cpumask_var(&c->cpu_valid) )
+    {
+        xfree(c);
+        c = NULL;
+    }
+    else if ( !zalloc_cpumask_var(&c->cpu_suspended) )
+    {
+        free_cpumask_var(c->cpu_valid);
+        xfree(c);
+        c = NULL;
+    }
+
+    return c;
 }
 
 static void free_cpupool_struct(struct cpupool *c)
 {
     if ( c )
+    {
+        free_cpumask_var(c->cpu_suspended);
         free_cpumask_var(c->cpu_valid);
+    }
     xfree(c);
 }
 
@@ -417,14 +429,32 @@ void cpupool_rm_domain(struct domain *d)
 
 /*
  * called to add a new cpu to pool admin
- * we add a hotplugged cpu to the cpupool0 to be able to add it to dom0
+ * we add a hotplugged cpu to the cpupool0 to be able to add it to dom0,
+ * unless we are resuming from S3, in which case we put the cpu back
+ * in the cpupool it was in prior to suspend.
  */
 static void cpupool_cpu_add(unsigned int cpu)
 {
     spin_lock(&cpupool_lock);
     cpumask_clear_cpu(cpu, &cpupool_locked_cpus);
     cpumask_set_cpu(cpu, &cpupool_free_cpus);
-    cpupool_assign_cpu_locked(cpupool0, cpu);
+
+    if ( system_state == SYS_STATE_resume )
+    {
+        struct cpupool **c;
+
+        for_each_cpupool(c)
+        {
+            if ( cpumask_test_cpu(cpu, (*c)->cpu_suspended ) )
+            {
+                cpupool_assign_cpu_locked(*c, cpu);
+                cpumask_clear_cpu(cpu, (*c)->cpu_suspended);
+            }
+        }
+    }
+
+    if ( cpumask_test_cpu(cpu, &cpupool_free_cpus) )
+        cpupool_assign_cpu_locked(cpupool0, cpu);
     spin_unlock(&cpupool_lock);
 }
 
@@ -436,7 +466,7 @@ static void cpupool_cpu_add(unsigned int cpu)
 static int cpupool_cpu_remove(unsigned int cpu)
 {
     int ret = 0;
-	
+
     spin_lock(&cpupool_lock);
     if ( !cpumask_test_cpu(cpu, cpupool0->cpu_valid))
         ret = -EBUSY;
@@ -633,9 +663,14 @@ static int cpu_callback(
     unsigned int cpu = (unsigned long)hcpu;
     int rc = 0;
 
-    if ( (system_state == SYS_STATE_suspend) ||
-         (system_state == SYS_STATE_resume) )
-        goto out;
+    if ( system_state == SYS_STATE_suspend )
+    {
+        struct cpupool **c;
+
+        for_each_cpupool(c)
+            if ( cpumask_test_cpu(cpu, (*c)->cpu_valid ) )
+                cpumask_set_cpu(cpu, (*c)->cpu_suspended);
+    }
 
     switch ( action )
     {
@@ -650,7 +685,6 @@ static int cpu_callback(
         break;
     }
 
-out:
     return !rc ? NOTIFY_DONE : notifier_from_errno(rc);
 }
 
