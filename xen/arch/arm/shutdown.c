@@ -25,7 +25,6 @@ static void raw_machine_reset(void)
 
 static void halt_this_cpu(void *arg)
 {
-    __cpu_disable();
     stop_cpu();
 }
 
