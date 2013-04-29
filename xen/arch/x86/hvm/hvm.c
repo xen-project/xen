@@ -113,7 +113,7 @@ static struct notifier_block cpu_nfb = {
 
 static int __init hvm_enable(void)
 {
-    struct hvm_function_table *fns = NULL;
+    const struct hvm_function_table *fns = NULL;
 
     if ( cpu_has_vmx )
         fns = start_vmx();
@@ -126,8 +126,8 @@ static int __init hvm_enable(void)
     hvm_funcs = *fns;
     hvm_enabled = 1;
 
-    printk("HVM: %s enabled\n", hvm_funcs.name);
-    if ( !hvm_funcs.hap_supported )
+    printk("HVM: %s enabled\n", fns->name);
+    if ( !fns->hap_supported )
         printk("HVM: Hardware Assisted Paging (HAP) not detected\n");
     else if ( !opt_hap_enabled )
     {
@@ -138,9 +138,9 @@ static int __init hvm_enable(void)
     {
         printk("HVM: Hardware Assisted Paging (HAP) detected\n");
         printk("HVM: HAP page sizes: 4kB");
-        if ( hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_2MB )
+        if ( fns->hap_capabilities & HVM_HAP_SUPERPAGE_2MB )
             printk(", 2MB%s", opt_hap_2mb ? "" : " [disabled]");
-        if ( hvm_funcs.hap_capabilities & HVM_HAP_SUPERPAGE_1GB )
+        if ( fns->hap_capabilities & HVM_HAP_SUPERPAGE_1GB )
             printk(", 1GB%s", opt_hap_1gb ? "" : " [disabled]");
         printk("\n");
     }

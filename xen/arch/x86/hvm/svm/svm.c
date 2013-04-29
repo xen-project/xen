@@ -1233,7 +1233,7 @@ static int svm_cpu_up(void)
     return 0;
 }
 
-struct hvm_function_table * __init start_svm(void)
+const struct hvm_function_table * __init start_svm(void)
 {
     bool_t printed = 0;
 
@@ -1958,7 +1958,7 @@ static void svm_invlpg_intercept(unsigned long vaddr)
     svm_asid_g_invlpg(curr, vaddr);
 }
 
-static struct hvm_function_table __read_mostly svm_function_table = {
+static struct hvm_function_table __initdata svm_function_table = {
     .name                 = "SVM",
     .cpu_up_prepare       = svm_cpu_up_prepare,
     .cpu_dead             = svm_cpu_dead,
