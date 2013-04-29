@@ -44,7 +44,7 @@ static struct {
     paddr_t cbase;       /* Address of CPU interface registers */
     paddr_t hbase;       /* Address of virtual interface registers */
     paddr_t vbase;       /* Address of virtual cpu interface registers */
-    unsigned int lines;
+    unsigned int lines;  /* Number of interrupts (SPIs + PPIs + SGIs) */
     unsigned int cpus;
     spinlock_t lock;
 } gic;
@@ -214,7 +214,7 @@ static int gic_route_irq(unsigned int irq, bool_t level,
 
     ASSERT(!(cpu_mask & ~0xff));  /* Targets bitmap only supports 8 CPUs */
     ASSERT(priority <= 0xff);     /* Only 8 bits of priority */
-    ASSERT(irq < gic.lines + 32); /* Can't route interrupts that don't exist */
+    ASSERT(irq < gic.lines);      /* Can't route interrupts that don't exist */
 
     spin_lock_irqsave(&desc->lock, flags);
     spin_lock(&gic.lock);
@@ -251,7 +251,7 @@ static void __init gic_dist_init(void)
     GICD[GICD_CTLR] = 0;
 
     type = GICD[GICD_TYPER];
-    gic.lines = 32 * (type & GICD_TYPE_LINES);
+    gic.lines = 32 * ((type & GICD_TYPE_LINES) + 1);
     gic.cpus = 1 + ((type & GICD_TYPE_CPUS) >> 5);
     printk("GIC: %d lines, %d cpu%s%s (IID %8.8x).\n",
            gic.lines, gic.cpus, (gic.cpus == 1) ? "" : "s",
