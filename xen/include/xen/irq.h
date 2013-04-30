@@ -65,10 +65,10 @@ struct msi_desc;
  * whether it is disabled etc etc.
  */
 typedef struct irq_desc {
-    unsigned int status;		/* IRQ status */
+    unsigned int status;        /* IRQ status */
     hw_irq_controller *handler;
     struct msi_desc   *msi_desc;
-    struct irqaction *action;	/* IRQ action list */
+    struct irqaction *action;   /* IRQ action list */
     int irq;
     spinlock_t lock;
     struct arch_irq_desc arch;
