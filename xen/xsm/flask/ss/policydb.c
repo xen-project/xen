@@ -1737,7 +1737,7 @@ int policydb_read(struct policydb *p, void *fp)
     if ( len != strlen(POLICYDB_STRING) )
     {
         printk(KERN_ERR "Flask:  policydb string length %d does not "
-               "match expected length %lu\n",
+               "match expected length %zu\n",
                len, strlen(POLICYDB_STRING));
         goto bad;
     }
