@@ -1978,10 +1978,10 @@ int libxl__device_disk_setdefault(libxl__gc *gc, libxl_device_disk *disk)
 {
     int rc;
 
-    rc = libxl__device_disk_set_backend(gc, disk);
-    if (rc) return rc;
-
     rc = libxl__resolve_domid(gc, disk->backend_domname, &disk->backend_domid);
+    if (rc < 0) return rc;
+
+    rc = libxl__device_disk_set_backend(gc, disk);
     return rc;
 }
 
@@ -2812,6 +2812,10 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
         LOG(ERROR, "unable to get current hotplug scripts execution setting");
         return run_hotplug_scripts;
     }
+
+    rc = libxl__resolve_domid(gc, nic->backend_domname, &nic->backend_domid);
+    if (rc < 0) return rc;
+
     if (nic->backend_domid != LIBXL_TOOLSTACK_DOMID && run_hotplug_scripts) {
         LOG(ERROR, "cannot use a backend domain different than %d if"
                    "hotplug scripts are executed from libxl",
@@ -2837,7 +2841,6 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
         abort();
     }
 
-    rc = libxl__resolve_domid(gc, nic->backend_domname, &nic->backend_domid);
     return rc;
 }
 
