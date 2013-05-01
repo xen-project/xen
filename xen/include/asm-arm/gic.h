@@ -143,6 +143,7 @@ extern void gic_route_ppis(void);
 extern void gic_route_spis(void);
 
 extern void gic_inject(void);
+extern int gic_events_need_delivery(void);
 
 extern void __cpuinit init_maintenance_interrupt(void);
 extern void gic_set_guest_irq(struct vcpu *v, unsigned int irq,

@@ -618,6 +618,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
 out:
     spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
     /* we have a new higher priority irq, inject it into the guest */
+    vcpu_unblock(v);
 }
 
 /*

@@ -592,13 +592,19 @@ static void gic_inject_irq_stop(void)
     }
 }
 
+int gic_events_need_delivery(void)
+{
+    return (!list_empty(&current->arch.vgic.lr_pending) ||
+            this_cpu(lr_mask));
+}
+
 void gic_inject(void)
 {
     if ( vcpu_info(current, evtchn_upcall_pending) )
         vgic_vcpu_inject_irq(current, VGIC_IRQ_EVTCHN_CALLBACK, 1);
 
     gic_restore_pending_irqs(current);
-    if (!this_cpu(lr_mask))
+    if (!gic_events_need_delivery())
         gic_inject_irq_stop();
     else
         gic_inject_irq_start();

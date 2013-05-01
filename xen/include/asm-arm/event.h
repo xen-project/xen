@@ -1,27 +1,50 @@
 #ifndef __ASM_EVENT_H__
 #define __ASM_EVENT_H__
 
+#include <asm/gic.h>
+#include <asm/domain.h>
+
 void vcpu_kick(struct vcpu *v);
 void vcpu_mark_events_pending(struct vcpu *v);
 
+static inline int local_events_need_delivery_nomask(void)
+{
+    struct pending_irq *p = irq_to_pending(current, VGIC_IRQ_EVTCHN_CALLBACK);
+
+    /* XXX: if the first interrupt has already been delivered, we should
+     * check whether any other interrupts with priority higher than the
+     * one in GICV_IAR are in the lr_pending queue or in the LR
+     * registers and return 1 only in that case.
+     * In practice the guest interrupt handler should run with
+     * interrupts disabled so this shouldn't be a problem in the general
+     * case.
+     */
+    if ( gic_events_need_delivery() )
+        return 1;
+
+    if ( vcpu_info(current, evtchn_upcall_pending) &&
+        list_empty(&p->inflight) )
+        return 1;
+
+    return 0;
+}
+
 static inline int local_events_need_delivery(void)
 {
-    /* TODO
-     * return (vcpu_info(v, evtchn_upcall_pending) &&
-                        !vcpu_info(v, evtchn_upcall_mask)); */
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+
+    /* guest IRQs are masked */
+    if ( (regs->cpsr & PSR_IRQ_MASK) )
         return 0;
+    return local_events_need_delivery_nomask();
 }
 
 int local_event_delivery_is_enabled(void);
 
-static inline void local_event_delivery_disable(void)
-{
-    /* TODO current->vcpu_info->evtchn_upcall_mask = 1; */
-}
-
 static inline void local_event_delivery_enable(void)
 {
-    /* TODO current->vcpu_info->evtchn_upcall_mask = 0; */
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    regs->cpsr &= ~PSR_IRQ_MASK;
 }
 
 /* No arch specific virq definition now. Default to global. */
