@@ -1105,6 +1105,34 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
     }
 
+    case VCPUOP_register_runstate_memory_area:
+    {
+        struct vcpu_register_runstate_memory_area area;
+        struct vcpu_runstate_info runstate;
+
+        rc = -EFAULT;
+        if ( copy_from_guest(&area, arg, 1) )
+            break;
+
+        if ( !guest_handle_okay(area.addr.h, 1) )
+            break;
+
+        rc = 0;
+        runstate_guest(v) = area.addr.h;
+
+        if ( v == current )
+        {
+            __copy_to_guest(runstate_guest(v), &v->runstate, 1);
+        }
+        else
+        {
+            vcpu_runstate_get(v, &runstate);
+            __copy_to_guest(runstate_guest(v), &runstate, 1);
+        }
+
+        break;
+    }
+
 #ifdef VCPU_TRAP_NMI
     case VCPUOP_send_nmi:
         if ( !guest_handle_is_null(arg) )

@@ -966,34 +966,6 @@ arch_do_vcpu_op(
 
     switch ( cmd )
     {
-    case VCPUOP_register_runstate_memory_area:
-    {
-        struct vcpu_register_runstate_memory_area area;
-        struct vcpu_runstate_info runstate;
-
-        rc = -EFAULT;
-        if ( copy_from_guest(&area, arg, 1) )
-            break;
-
-        if ( !guest_handle_okay(area.addr.h, 1) )
-            break;
-
-        rc = 0;
-        runstate_guest(v) = area.addr.h;
-
-        if ( v == current )
-        {
-            __copy_to_guest(runstate_guest(v), &v->runstate, 1);
-        }
-        else
-        {
-            vcpu_runstate_get(v, &runstate);
-            __copy_to_guest(runstate_guest(v), &runstate, 1);
-        }
-
-        break;
-    }
-
     /*
      * XXX Disable for 4.0.0: __update_vcpu_system_time() writes to the given
      * virtual address even when running in another domain's address space.
