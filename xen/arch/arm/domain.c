@@ -22,6 +22,7 @@
 
 #include <asm/current.h>
 #include <asm/event.h>
+#include <asm/guest_access.h>
 #include <asm/regs.h>
 #include <asm/p2m.h>
 #include <asm/irq.h>
@@ -212,16 +213,25 @@ static void ctxt_switch_to(struct vcpu *n)
     virt_timer_restore(n);
 }
 
+/* Update per-VCPU guest runstate shared memory area (if registered). */
+static void update_runstate_area(struct vcpu *v)
+{
+    if ( guest_handle_is_null(runstate_guest(v)) )
+        return;
+
+    __copy_to_guest(runstate_guest(v), &v->runstate, 1);
+}
+
 static void schedule_tail(struct vcpu *prev)
 {
     ctxt_switch_from(prev);
 
     local_irq_enable();
 
-    /* TODO
-       update_runstate_area(current);
-    */
     ctxt_switch_to(current);
+
+    if ( prev != current )
+        update_runstate_area(current);
 }
 
 static void continue_new_vcpu(struct vcpu *prev)
@@ -241,9 +251,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     ASSERT(prev != next);
     ASSERT(cpumask_empty(next->vcpu_dirty_cpumask));
 
-    /* TODO
-       update_runstate_area(prev);
-    */
+    if ( prev != next )
+        update_runstate_area(prev);
 
     local_irq_disable();
 
@@ -639,6 +648,7 @@ long do_arm_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
     switch ( cmd )
     {
         case VCPUOP_register_vcpu_info:
+        case VCPUOP_register_runstate_memory_area:
             return do_vcpu_op(cmd, vcpuid, arg);
         default:
             return -EINVAL;
