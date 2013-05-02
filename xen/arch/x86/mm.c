@@ -151,6 +151,8 @@ unsigned long __read_mostly pdx_group_valid[BITS_TO_LONGS(
 
 bool_t __read_mostly machine_to_phys_mapping_valid = 0;
 
+struct rangeset *__read_mostly mmio_ro_ranges;
+
 #define PAGE_CACHE_ATTRS (_PAGE_PAT|_PAGE_PCD|_PAGE_PWT)
 
 bool_t __read_mostly opt_allow_superpage;

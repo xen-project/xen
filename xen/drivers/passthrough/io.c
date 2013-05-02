@@ -27,8 +27,6 @@
 #include <xen/hvm/irq.h>
 #include <xen/tasklet.h>
 
-struct rangeset *__read_mostly mmio_ro_ranges;
-
 static void hvm_dirq_assist(unsigned long _d);
 
 bool_t pt_irq_need_timer(uint32_t flags)

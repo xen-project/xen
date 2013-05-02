@@ -1114,7 +1114,7 @@ int __init construct_dom0(
     for ( i = 0; i < nr_ioapics; i++ )
     {
         mfn = paddr_to_pfn(mp_ioapics[i].mpc_apicaddr);
-        if ( smp_found_config )
+        if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
             rc |= iomem_deny_access(dom0, mfn, mfn);
     }
 

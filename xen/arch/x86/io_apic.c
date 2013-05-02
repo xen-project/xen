@@ -2507,6 +2507,11 @@ void __init init_ioapic_mappings(void)
             reg_01.raw = io_apic_read(i, 1);
             nr_ioapic_entries[i] = reg_01.bits.entries + 1;
             nr_irqs_gsi += nr_ioapic_entries[i];
+
+            if ( rangeset_add_singleton(mmio_ro_ranges,
+                                        ioapic_phys >> PAGE_SHIFT) )
+                printk(KERN_ERR "Failed to mark IO-APIC page %lx read-only\n",
+                       ioapic_phys);
         }
     }
 

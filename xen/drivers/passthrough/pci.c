@@ -105,8 +105,6 @@ void __init pt_pci_init(void)
     radix_tree_init(&pci_segments);
     if ( !alloc_pseg(0) )
         panic("Could not initialize PCI segment 0\n");
-    mmio_ro_ranges = rangeset_new(NULL, "r/o mmio ranges",
-                                  RANGESETF_prettyprint_hex);
 }
 
 int __init pci_add_segment(u16 seg)

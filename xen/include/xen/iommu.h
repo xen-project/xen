@@ -37,8 +37,6 @@ extern bool_t amd_iommu_perdev_intremap;
 /* Does this domain have a P2M table we can use as its IOMMU pagetable? */
 #define iommu_use_hap_pt(d) (hap_enabled(d) && iommu_hap_pt_share)
 
-extern struct rangeset *mmio_ro_ranges;
-
 #define domain_hvm_iommu(d)     (&d->arch.hvm_domain.hvm_iommu)
 
 #define MAX_IOMMUS 32

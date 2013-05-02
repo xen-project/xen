@@ -500,6 +500,8 @@ extern bool_t machine_to_phys_mapping_valid;
         _set_gpfn_from_mfn(mfn, pfn);           \
 } while (0)
 
+extern struct rangeset *mmio_ro_ranges;
+
 #define get_gpfn_from_mfn(mfn)      (machine_to_phys_mapping[(mfn)])
 
 #define mfn_to_gmfn(_d, mfn)                            \
