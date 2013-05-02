@@ -468,12 +468,14 @@ static int rtc_ioport_write(void *opaque, uint32_t addr, uint32_t data)
             if ( orig & RTC_SET )
                 rtc_set_time(s);
         }
+        s->hw.cmos_data[RTC_REG_B] = data;
         /*
          * If the interrupt is already set when the interrupt becomes
          * enabled, raise an interrupt immediately.
          */
         rtc_update_irq(s);
-        s->hw.cmos_data[RTC_REG_B] = data;
+        if ( (data & RTC_PIE) && !(orig & RTC_PIE) )
+            rtc_timer_update(s);
         if ( (data ^ orig) & RTC_SET )
             check_update_timer(s);
         if ( (data ^ orig) & (RTC_24H | RTC_DM_BINARY | RTC_SET) )
