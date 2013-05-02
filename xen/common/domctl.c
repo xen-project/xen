@@ -332,13 +332,15 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         ret = -EINVAL;
         if ( (d == current->domain) || /* no domain_pause() */
              (vcpu >= d->max_vcpus) || ((v = d->vcpu[vcpu]) == NULL) )
-            goto svc_out;
+            break;
 
         if ( guest_handle_is_null(op->u.vcpucontext.ctxt) )
         {
-            vcpu_reset(v);
-            ret = 0;
-            goto svc_out;
+            ret = vcpu_reset(v);
+            if ( ret == -EAGAIN )
+                ret = hypercall_create_continuation(
+                          __HYPERVISOR_domctl, "h", u_domctl);
+            break;
         }
 
 #ifdef CONFIG_COMPAT
@@ -347,7 +349,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 #endif
         ret = -ENOMEM;
         if ( (c.nat = alloc_vcpu_guest_context()) == NULL )
-            goto svc_out;
+            break;
 
 #ifdef CONFIG_COMPAT
         if ( !is_pv_32on64_vcpu(v) )
@@ -368,7 +370,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
             domain_unpause(d);
         }
 
-    svc_out:
         free_vcpu_guest_context(c.nat);
     }
     break;

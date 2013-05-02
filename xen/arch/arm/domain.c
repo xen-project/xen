@@ -566,9 +566,10 @@ int arch_set_info_guest(
     return 0;
 }
 
-void arch_vcpu_reset(struct vcpu *v)
+int arch_vcpu_reset(struct vcpu *v)
 {
     vcpu_end_shutdown_deferral(v);
+    return 0;
 }
 
 static int relinquish_memory(struct domain *d, struct page_list_head *list)

@@ -682,6 +682,9 @@ static inline struct domain *next_domain_in_cpupool(
  /* VCPU is blocked due to missing mem_sharing ring. */
 #define _VPF_mem_sharing     6
 #define VPF_mem_sharing      (1UL<<_VPF_mem_sharing)
+ /* VCPU is being reset. */
+#define _VPF_in_reset        7
+#define VPF_in_reset         (1UL<<_VPF_in_reset)
 
 static inline int vcpu_runnable(struct vcpu *v)
 {
