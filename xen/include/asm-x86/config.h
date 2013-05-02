@@ -273,8 +273,6 @@ extern unsigned char boot_edid_info[128];
 
 #endif
 
-#define PGT_base_page_table     PGT_l4_page_table
-
 #define __HYPERVISOR_CS64 0xe008
 #define __HYPERVISOR_CS32 0xe038
 #define __HYPERVISOR_CS   __HYPERVISOR_CS64

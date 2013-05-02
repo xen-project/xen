@@ -2318,7 +2318,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         case 3: {/* Write CR3 */
             unsigned long gfn;
             struct page_info *page;
-            domain_lock(v->domain);
+
             gfn = !is_pv_32on64_vcpu(v)
                 ? xen_cr3_to_pfn(*reg) : compat_cr3_to_pfn(*reg);
             page = get_page_from_gfn(v->domain, gfn, NULL, P2M_ALLOC);
@@ -2329,7 +2329,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             }
             else
                 rc = -EINVAL;
-            domain_unlock(v->domain);
+
             switch ( rc )
             {
             case 0:

@@ -2077,19 +2077,17 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
 
     /* No need for atomic update of type_info here: noone else updates it. */
     wmb();
-    if ( rc == -EAGAIN )
+    switch ( rc )
     {
-        get_page_light(page);
-        page->u.inuse.type_info |= PGT_partial;
-    }
-    else if ( rc == -EINTR )
-    {
+    case 0:
+        page->u.inuse.type_info |= PGT_validated;
+        break;
+    case -EINTR:
         ASSERT((page->u.inuse.type_info &
                 (PGT_count_mask|PGT_validated|PGT_partial)) == 1);
         page->u.inuse.type_info &= ~PGT_count_mask;
-    }
-    else if ( rc )
-    {
+        break;
+    default:
         ASSERT(rc < 0);
         MEM_LOG("Error while validating mfn %lx (pfn %lx) for type %"
                 PRtype_info ": caf=%08lx taf=%" PRtype_info,
@@ -2101,13 +2099,11 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
         {
             ASSERT((page->u.inuse.type_info &
                     (PGT_count_mask | PGT_validated)) == 1);
+    case -EAGAIN:
             get_page_light(page);
             page->u.inuse.type_info |= PGT_partial;
         }
-    }
-    else
-    {
-        page->u.inuse.type_info |= PGT_validated;
+        break;
     }
 
     return rc;
@@ -2886,7 +2882,7 @@ long do_mmuext_op(
 {
     struct mmuext_op op;
     unsigned long type;
-    unsigned int i = 0, done = 0;
+    unsigned int i, done = 0;
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
     struct domain *pg_owner;
@@ -2919,22 +2915,16 @@ long do_mmuext_op(
         perfc_incr(calls_to_mmuext_op);
 
     if ( unlikely(!guest_handle_okay(uops, count)) )
-    {
-        rc = -EFAULT;
-        goto out;
-    }
+        return -EFAULT;
 
     if ( (pg_owner = get_pg_owner(foreigndom)) == NULL )
-    {
-        rc = -ESRCH;
-        goto out;
-    }
+        return -ESRCH;
 
     rc = xsm_mmuext_op(XSM_TARGET, d, pg_owner);
     if ( rc )
     {
-        rcu_unlock_domain(pg_owner);
-        goto out;
+        put_pg_owner(pg_owner);
+        return rc;
     }
 
     for ( i = 0; i < count; i++ )
@@ -3406,7 +3396,6 @@ long do_mmuext_op(
 
     perfc_add(num_mmuext_ops, i);
 
- out:
     /* Add incremental work we have done to the @done output parameter. */
     if ( unlikely(!guest_handle_is_null(pdone)) )
     {
@@ -3462,22 +3451,17 @@ long do_mmu_update(
         perfc_incr(calls_to_mmu_update);
 
     if ( unlikely(!guest_handle_okay(ureqs, count)) )
-    {
-        rc = -EFAULT;
-        goto out;
-    }
+        return -EFAULT;
 
     if ( (pt_dom = foreigndom >> 16) != 0 )
     {
         /* Pagetables belong to a foreign domain (PFD). */
         if ( (pt_owner = rcu_lock_domain_by_id(pt_dom - 1)) == NULL )
-        {
-            rc = -EINVAL;
-            goto out;
-        }
+            return -EINVAL;
+
         if ( pt_owner == d )
             rcu_unlock_domain(pt_owner);
-        if ( (v = pt_owner->vcpu ? pt_owner->vcpu[0] : NULL) == NULL )
+        else if ( !pt_owner->vcpu || (v = pt_owner->vcpu[0]) == NULL )
         {
             rc = -EINVAL;
             goto out;
