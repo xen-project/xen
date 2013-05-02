@@ -272,8 +272,9 @@ int pt_update_irq(struct vcpu *v)
      * IRR is returned and used to set eoi_exit_bitmap for virtual
      * interrupt delivery case. Otherwise return -1 to do nothing.  
      */ 
-    if ( vlapic_accept_pic_intr(v) &&
-         (&v->domain->arch.hvm_domain)->vpic[0].int_output )
+    if ( !is_lapic &&
+         platform_legacy_irq(irq) && vlapic_accept_pic_intr(v) &&
+         (&v->domain->arch.hvm_domain)->vpic[irq >> 3].int_output )
         return -1;
     else 
         return pt_irq_vector(earliest_pt, hvm_intsrc_lapic);
