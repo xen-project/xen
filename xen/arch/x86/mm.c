@@ -1241,7 +1241,16 @@ static int put_page_from_l3e(l3_pgentry_t l3e, unsigned long pfn,
 #endif
 
     if ( unlikely(partial > 0) )
+    {
+        ASSERT(preemptible >= 0);
         return __put_page_type(l3e_get_page(l3e), preemptible);
+    }
+
+    if ( preemptible < 0 )
+    {
+        current->arch.old_guest_table = l3e_get_page(l3e);
+        return 0;
+    }
 
     return put_page_and_type_preemptible(l3e_get_page(l3e), preemptible);
 }
@@ -1254,7 +1263,17 @@ static int put_page_from_l4e(l4_pgentry_t l4e, unsigned long pfn,
          (l4e_get_pfn(l4e) != pfn) )
     {
         if ( unlikely(partial > 0) )
+        {
+            ASSERT(preemptible >= 0);
             return __put_page_type(l4e_get_page(l4e), preemptible);
+        }
+
+        if ( preemptible < 0 )
+        {
+            current->arch.old_guest_table = l4e_get_page(l4e);
+            return 0;
+        }
+
         return put_page_and_type_preemptible(l4e_get_page(l4e), preemptible);
     }
     return 1;
@@ -1549,12 +1568,17 @@ static int alloc_l3_table(struct page_info *page, int preemptible)
     if ( rc < 0 && rc != -EAGAIN && rc != -EINTR )
     {
         MEM_LOG("Failure in alloc_l3_table: entry %d", i);
+        if ( i )
+        {
+            page->nr_validated_ptes = i;
+            page->partial_pte = 0;
+            current->arch.old_guest_table = page;
+        }
         while ( i-- > 0 )
         {
             if ( !is_guest_l3_slot(i) )
                 continue;
             unadjust_guest_l3e(pl3e[i], d);
-            put_page_from_l3e(pl3e[i], pfn, 0, 0);
         }
     }
 
@@ -1584,21 +1608,23 @@ static int alloc_l4_table(struct page_info *page, int preemptible)
             page->nr_validated_ptes = i;
             page->partial_pte = partial ?: 1;
         }
-        else if ( rc == -EINTR )
+        else if ( rc < 0 )
         {
+            if ( rc != -EINTR )
+                MEM_LOG("Failure in alloc_l4_table: entry %d", i);
             if ( i )
             {
                 page->nr_validated_ptes = i;
                 page->partial_pte = 0;
-                rc = -EAGAIN;
+                if ( rc == -EINTR )
+                    rc = -EAGAIN;
+                else
+                {
+                    if ( current->arch.old_guest_table )
+                        page->nr_validated_ptes++;
+                    current->arch.old_guest_table = page;
+                }
             }
-        }
-        else if ( rc < 0 )
-        {
-            MEM_LOG("Failure in alloc_l4_table: entry %d", i);
-            while ( i-- > 0 )
-                if ( is_guest_l4_slot(d, i) )
-                    put_page_from_l4e(pl4e[i], pfn, 0, 0);
         }
         if ( rc < 0 )
             return rc;
@@ -2047,7 +2073,7 @@ static int mod_l3_entry(l3_pgentry_t *pl3e,
         pae_flush_pgd(pfn, pgentry_ptr_to_slot(pl3e), nl3e);
     }
 
-    put_page_from_l3e(ol3e, pfn, 0, 0);
+    put_page_from_l3e(ol3e, pfn, 0, -preemptible);
     return rc;
 }
 
@@ -2110,7 +2136,7 @@ static int mod_l4_entry(l4_pgentry_t *pl4e,
         return -EFAULT;
     }
 
-    put_page_from_l4e(ol4e, pfn, 0, 0);
+    put_page_from_l4e(ol4e, pfn, 0, -preemptible);
     return rc;
 }
 
@@ -2268,7 +2294,15 @@ static int alloc_page_type(struct page_info *page, unsigned long type,
                 PRtype_info ": caf=%08lx taf=%" PRtype_info,
                 page_to_mfn(page), get_gpfn_from_mfn(page_to_mfn(page)),
                 type, page->count_info, page->u.inuse.type_info);
-        page->u.inuse.type_info = 0;
+        if ( page != current->arch.old_guest_table )
+            page->u.inuse.type_info = 0;
+        else
+        {
+            ASSERT((page->u.inuse.type_info &
+                    (PGT_count_mask | PGT_validated)) == 1);
+            get_page_light(page);
+            page->u.inuse.type_info |= PGT_partial;
+        }
     }
     else
     {
@@ -3218,20 +3252,16 @@ long do_mmuext_op(
             }
 
             if ( (rc = xsm_memory_pin_page(d, pg_owner, page)) != 0 )
-            {
-                put_page_and_type(page);
                 okay = 0;
-                break;
-            }
-
-            if ( unlikely(test_and_set_bit(_PGT_pinned,
-                                           &page->u.inuse.type_info)) )
+            else if ( unlikely(test_and_set_bit(_PGT_pinned,
+                                                &page->u.inuse.type_info)) )
             {
                 MEM_LOG("Mfn %lx already pinned", page_to_mfn(page));
-                put_page_and_type(page);
                 okay = 0;
-                break;
             }
+
+            if ( unlikely(!okay) )
+                goto pin_drop;
 
             /* A page is dirtied when its pin status is set. */
             paging_mark_dirty(pg_owner, page_to_mfn(page));
@@ -3246,7 +3276,13 @@ long do_mmuext_op(
                                                &page->u.inuse.type_info));
                 spin_unlock(&pg_owner->page_alloc_lock);
                 if ( drop_ref )
-                    put_page_and_type(page);
+                {
+        pin_drop:
+                    if ( type == PGT_l1_page_table )
+                        put_page_and_type(page);
+                    else
+                        curr->arch.old_guest_table = page;
+                }
             }
 
             break;
@@ -3652,11 +3688,28 @@ long do_mmu_update(
     void *va;
     unsigned long gpfn, gmfn, mfn;
     struct page_info *page;
-    int rc = 0, i = 0;
-    unsigned int cmd, done = 0, pt_dom;
-    struct vcpu *v = current;
+    unsigned int cmd, i = 0, done = 0, pt_dom;
+    struct vcpu *curr = current, *v = curr;
     struct domain *d = v->domain, *pt_owner = d, *pg_owner;
     struct domain_mmap_cache mapcache;
+    int rc = put_old_guest_table(curr);
+
+    if ( unlikely(rc) )
+    {
+        if ( likely(rc == -EAGAIN) )
+            rc = hypercall_create_continuation(
+                     __HYPERVISOR_mmu_update, "hihi", ureqs, count, pdone,
+                     foreigndom);
+        return rc;
+    }
+
+    if ( unlikely(count == MMU_UPDATE_PREEMPTED) &&
+         likely(guest_handle_is_null(ureqs)) )
+    {
+        /* See the curr->arch.old_guest_table related
+         * hypercall_create_continuation() below. */
+        return (int)foreigndom;
+    }
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
@@ -3705,7 +3758,7 @@ long do_mmu_update(
 
     for ( i = 0; i < count; i++ )
     {
-        if ( hypercall_preempt_check() )
+        if ( curr->arch.old_guest_table || hypercall_preempt_check() )
         {
             rc = -EAGAIN;
             break;
@@ -3886,9 +3939,27 @@ long do_mmu_update(
     }
 
     if ( rc == -EAGAIN )
+    {
+        ASSERT(i < count);
         rc = hypercall_create_continuation(
             __HYPERVISOR_mmu_update, "hihi",
             ureqs, (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
+    }
+    else if ( curr->arch.old_guest_table )
+    {
+        XEN_GUEST_HANDLE(void) null;
+
+        ASSERT(rc || i == count);
+        set_xen_guest_handle(null, NULL);
+        /*
+         * In order to have a way to communicate the final return value to
+         * our continuation, we pass this in place of "foreigndom", building
+         * on the fact that this argument isn't needed anymore.
+         */
+        rc = hypercall_create_continuation(
+                __HYPERVISOR_mmu_update, "hihi", null,
+                MMU_UPDATE_PREEMPTED, null, rc);
+    }
 
     put_pg_owner(pg_owner);
 
