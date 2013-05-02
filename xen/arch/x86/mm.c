@@ -3200,29 +3200,55 @@ long do_mmuext_op(
             unsigned long old_mfn, mfn;
 
             mfn = gmfn_to_mfn(d, op.arg1.mfn);
+            old_mfn = pagetable_get_pfn(curr->arch.guest_table_user);
+            /*
+             * This is particularly important when getting restarted after the
+             * previous attempt got preempted in the put-old-MFN phase.
+             */
+            if ( old_mfn == mfn )
+                break;
+
             if ( mfn != 0 )
             {
                 if ( paging_mode_refcounts(d) )
                     okay = get_page_from_pagenr(mfn, d);
                 else
-                    okay = !get_page_and_type_from_pagenr(
-                        mfn, PGT_root_page_table, d, 0, 0);
+                {
+                    rc = get_page_and_type_from_pagenr(
+                        mfn, PGT_root_page_table, d, 0, 1);
+                    okay = !rc;
+                }
                 if ( unlikely(!okay) )
                 {
-                    MEM_LOG("Error while installing new mfn %lx", mfn);
+                    if ( rc == -EINTR )
+                        rc = -EAGAIN;
+                    else if ( rc != -EAGAIN )
+                        MEM_LOG("Error while installing new mfn %lx", mfn);
                     break;
                 }
             }
 
-            old_mfn = pagetable_get_pfn(curr->arch.guest_table_user);
             curr->arch.guest_table_user = pagetable_from_pfn(mfn);
 
             if ( old_mfn != 0 )
             {
+                struct page_info *page = mfn_to_page(old_mfn);
+
                 if ( paging_mode_refcounts(d) )
-                    put_page(mfn_to_page(old_mfn));
+                    put_page(page);
                 else
-                    put_page_and_type(mfn_to_page(old_mfn));
+                    switch ( rc = put_page_and_type_preemptible(page, 1) )
+                    {
+                    case -EINTR:
+                        rc = -EAGAIN;
+                    case -EAGAIN:
+                        curr->arch.old_guest_table = page;
+                        okay = 0;
+                        break;
+                    default:
+                        BUG_ON(rc);
+                        break;
+                    }
             }
 
             break;
