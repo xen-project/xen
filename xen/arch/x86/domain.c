@@ -71,8 +71,6 @@ void (*dead_idle) (void) __read_mostly = default_dead_idle;
 static void paravirt_ctxt_switch_from(struct vcpu *v);
 static void paravirt_ctxt_switch_to(struct vcpu *v);
 
-static void vcpu_destroy_pagetables(struct vcpu *v);
-
 static void default_idle(void)
 {
     local_irq_disable();
@@ -946,7 +944,7 @@ void arch_vcpu_reset(struct vcpu *v)
     if ( !is_hvm_vcpu(v) )
     {
         destroy_gdt(v);
-        vcpu_destroy_pagetables(v);
+        vcpu_destroy_pagetables(v, 0);
     }
     else
     {
@@ -1944,58 +1942,6 @@ static int relinquish_memory(
     return ret;
 }
 
-static void vcpu_destroy_pagetables(struct vcpu *v)
-{
-    struct domain *d = v->domain;
-    unsigned long pfn = pagetable_get_pfn(v->arch.guest_table);
-
-    if ( is_pv_32on64_vcpu(v) )
-    {
-        l4_pgentry_t *l4tab = map_domain_page(pfn);
-
-        pfn = l4e_get_pfn(*l4tab);
-
-        if ( pfn != 0 )
-        {
-            if ( paging_mode_refcounts(d) )
-                put_page(mfn_to_page(pfn));
-            else
-                put_page_and_type(mfn_to_page(pfn));
-        }
-
-        l4e_write(l4tab, l4e_empty());
-        unmap_domain_page(l4tab);
-
-        v->arch.cr3 = 0;
-        return;
-    }
-
-    if ( pfn != 0 )
-    {
-        if ( paging_mode_refcounts(d) )
-            put_page(mfn_to_page(pfn));
-        else
-            put_page_and_type(mfn_to_page(pfn));
-        v->arch.guest_table = pagetable_null();
-    }
-
-    /* Drop ref to guest_table_user (from MMUEXT_NEW_USER_BASEPTR) */
-    pfn = pagetable_get_pfn(v->arch.guest_table_user);
-    if ( pfn != 0 )
-    {
-        if ( !is_pv_32bit_vcpu(v) )
-        {
-            if ( paging_mode_refcounts(d) )
-                put_page(mfn_to_page(pfn));
-            else
-                put_page_and_type(mfn_to_page(pfn));
-        }
-        v->arch.guest_table_user = pagetable_null();
-    }
-
-    v->arch.cr3 = 0;
-}
-
 int domain_relinquish_resources(struct domain *d)
 {
     int ret;
@@ -2014,7 +1960,9 @@ int domain_relinquish_resources(struct domain *d)
         /* Drop the in-use references to page-table bases. */
         for_each_vcpu ( d, v )
         {
-            vcpu_destroy_pagetables(v);
+            ret = vcpu_destroy_pagetables(v, 1);
+            if ( ret )
+                return ret;
 
             unmap_vcpu_info(v);
         }

@@ -365,7 +365,7 @@ int compat_mmuext_op(XEN_GUEST_HANDLE_PARAM(mmuext_op_compat_t) cmp_uops,
                                     : mcs->call.args[1];
                 unsigned int left = arg1 & ~MMU_UPDATE_PREEMPTED;
 
-                BUG_ON(left == arg1);
+                BUG_ON(left == arg1 && left != i);
                 BUG_ON(left > count);
                 guest_handle_add_offset(nat_ops, i - left);
                 guest_handle_subtract_offset(cmp_uops, left);
