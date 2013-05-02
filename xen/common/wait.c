@@ -145,7 +145,7 @@ static void __prepare_to_wait(struct waitqueue_vcpu *wqv)
         "push %%rax; push %%rbx; push %%rdx; "
         "push %%rbp; push %%r8; push %%r9; push %%r10; push %%r11; "
         "push %%r12; push %%r13; push %%r14; push %%r15; call 1f; "
-        "1: addq $2f-1b,(%%rsp); sub %%esp,%%ecx; cmp %3,%%ecx; jbe 3f; "
+        "1: addq $2f-1b,(%%rsp); sub %%esp,%%ecx; cmp %3,%%ecx; ja 3f; "
         "mov %%rsp,%%rsi; 2: rep movsb; mov %%rsp,%%rsi; 3: pop %%rax; "
         "pop %%r15; pop %%r14; pop %%r13; pop %%r12; "
         "pop %%r11; pop %%r10; pop %%r9; pop %%r8; "
