@@ -437,12 +437,9 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
     {
         unsigned int sq;
 
+    case DEV_TYPE_PCIe_ENDPOINT:
     case DEV_TYPE_PCIe_BRIDGE:
     case DEV_TYPE_PCIe2PCI_BRIDGE:
-    case DEV_TYPE_LEGACY_PCI_BRIDGE:
-        break;
-
-    case DEV_TYPE_PCIe_ENDPOINT:
         switch ( pdev->phantom_stride )
         {
         case 1: sq = SQ_13_IGNORE_3; break;
@@ -454,6 +451,8 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
         break;
 
     case DEV_TYPE_PCI:
+    case DEV_TYPE_LEGACY_PCI_BRIDGE:
+    case DEV_TYPE_PCI2PCIe_BRIDGE:
         ret = find_upstream_bridge(seg, &bus, &devfn, &secbus);
         if ( ret == 0 ) /* integrated PCI device */
         {
@@ -465,10 +464,15 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
             if ( pdev_type(seg, bus, devfn) == DEV_TYPE_PCIe2PCI_BRIDGE )
                 set_ire_sid(ire, SVT_VERIFY_BUS, SQ_ALL_16,
                             (bus << 8) | pdev->bus);
-            else if ( pdev_type(seg, bus, devfn) == DEV_TYPE_LEGACY_PCI_BRIDGE )
+            else
                 set_ire_sid(ire, SVT_VERIFY_SID_SQ, SQ_ALL_16,
                             PCI_BDF2(bus, devfn));
         }
+        else
+            dprintk(XENLOG_WARNING VTDPREFIX,
+                    "d%d: no upstream bridge for %04x:%02x:%02x.%u\n",
+                    pdev->domain->domain_id,
+                    seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
         break;
 
     default:
