@@ -858,6 +858,9 @@ int arch_set_info_guest(
 
     if ( !v->is_initialised )
     {
+        if ( !compat && !(flags & VGCF_in_kernel) && !c.nat->ctrlreg[1] )
+            return -EINVAL;
+
         v->arch.pv_vcpu.ldt_base = c(ldt_base);
         v->arch.pv_vcpu.ldt_ents = c(ldt_ents);
     }
@@ -955,24 +958,44 @@ int arch_set_info_guest(
     if ( rc != 0 )
         return rc;
 
+    set_bit(_VPF_in_reset, &v->pause_flags);
+
     if ( !compat )
-    {
         cr3_gfn = xen_cr3_to_pfn(c.nat->ctrlreg[3]);
-        cr3_page = get_page_from_gfn(d, cr3_gfn, NULL, P2M_ALLOC);
+#ifdef CONFIG_COMPAT
+    else
+        cr3_gfn = compat_cr3_to_pfn(c.cmp->ctrlreg[3]);
+#endif
+    cr3_page = get_page_from_gfn(d, cr3_gfn, NULL, P2M_ALLOC);
 
-        if ( !cr3_page )
-        {
-            destroy_gdt(v);
-            return -EINVAL;
-        }
-        if ( !paging_mode_refcounts(d)
-             && !get_page_type(cr3_page, PGT_base_page_table) )
-        {
-            put_page(cr3_page);
-            destroy_gdt(v);
-            return -EINVAL;
-        }
-
+    if ( !cr3_page )
+        rc = -EINVAL;
+    else if ( paging_mode_refcounts(d) )
+        /* nothing */;
+    else if ( cr3_page == v->arch.old_guest_table )
+    {
+        v->arch.old_guest_table = NULL;
+        put_page(cr3_page);
+    }
+    else
+    {
+        /*
+         * Since v->arch.guest_table{,_user} are both NULL, this effectively
+         * is just a call to put_old_guest_table().
+         */
+        if ( !compat )
+            rc = vcpu_destroy_pagetables(v);
+        if ( !rc )
+            rc = get_page_type_preemptible(cr3_page,
+                                           !compat ? PGT_root_page_table
+                                                   : PGT_l3_page_table);
+        if ( rc == -EINTR )
+            rc = -EAGAIN;
+    }
+    if ( rc )
+        /* handled below */;
+    else if ( !compat )
+    {
         v->arch.guest_table = pagetable_from_page(cr3_page);
 #ifdef __x86_64__
         if ( c.nat->ctrlreg[1] )
@@ -980,56 +1003,44 @@ int arch_set_info_guest(
             cr3_gfn = xen_cr3_to_pfn(c.nat->ctrlreg[1]);
             cr3_page = get_page_from_gfn(d, cr3_gfn, NULL, P2M_ALLOC);
 
-            if ( !cr3_page ||
-                 (!paging_mode_refcounts(d)
-                  && !get_page_type(cr3_page, PGT_base_page_table)) )
+            if ( !cr3_page )
+                rc = -EINVAL;
+            else if ( !paging_mode_refcounts(d) )
             {
-                if (cr3_page)
-                    put_page(cr3_page);
-                cr3_page = pagetable_get_page(v->arch.guest_table);
-                v->arch.guest_table = pagetable_null();
-                if ( paging_mode_refcounts(d) )
-                    put_page(cr3_page);
-                else
-                    put_page_and_type(cr3_page);
-                destroy_gdt(v);
-                return -EINVAL;
+                rc = get_page_type_preemptible(cr3_page, PGT_root_page_table);
+                switch ( rc )
+                {
+                case -EINTR:
+                    rc = -EAGAIN;
+                case -EAGAIN:
+                    v->arch.old_guest_table =
+                        pagetable_get_page(v->arch.guest_table);
+                    v->arch.guest_table = pagetable_null();
+                    break;
+                }
             }
-
-            v->arch.guest_table_user = pagetable_from_page(cr3_page);
-        }
-        else if ( !(flags & VGCF_in_kernel) )
-        {
-            destroy_gdt(v);
-            return -EINVAL;
+            if ( !rc )
+               v->arch.guest_table_user = pagetable_from_page(cr3_page);
         }
     }
     else
     {
         l4_pgentry_t *l4tab;
 
-        cr3_gfn = compat_cr3_to_pfn(c.cmp->ctrlreg[3]);
-        cr3_page = get_page_from_gfn(d, cr3_gfn, NULL, P2M_ALLOC);
-
-        if ( !cr3_page)
-        {
-            destroy_gdt(v);
-            return -EINVAL;
-        }
-
-        if (!paging_mode_refcounts(d)
-            && !get_page_type(cr3_page, PGT_l3_page_table) )
-        {
-            put_page(cr3_page);
-            destroy_gdt(v);
-            return -EINVAL;
-        }
-
         l4tab = __va(pagetable_get_paddr(v->arch.guest_table));
         *l4tab = l4e_from_pfn(page_to_mfn(cr3_page),
             _PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED);
 #endif
     }
+    if ( rc )
+    {
+        if ( cr3_page )
+            put_page(cr3_page);
+        destroy_gdt(v);
+        return rc;
+    }
+
+    clear_bit(_VPF_in_reset, &v->pause_flags);
 
     if ( v->vcpu_id == 0 )
         update_domain_wallclock_time(d);

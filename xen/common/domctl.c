@@ -339,6 +339,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
             domain_pause(d);
             ret = arch_set_info_guest(v, c);
             domain_unpause(d);
+
+            if ( ret == -EAGAIN )
+                ret = hypercall_create_continuation(
+                          __HYPERVISOR_domctl, "h", u_domctl);
         }
 
     svc_out:

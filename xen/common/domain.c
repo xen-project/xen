@@ -849,6 +849,11 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
         domain_unlock(d);
 
         free_vcpu_guest_context(ctxt);
+
+        if ( rc == -EAGAIN )
+            rc = hypercall_create_continuation(__HYPERVISOR_vcpu_op, "iih",
+                                               cmd, vcpuid, arg);
+
         break;
 
     case VCPUOP_up: {
