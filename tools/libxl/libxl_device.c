@@ -178,6 +178,12 @@ static int disk_try_backend(disk_try_backend_args *a,
     case LIBXL_DISK_BACKEND_TAP:
         if (a->disk->script) goto bad_script;
 
+        if (a->disk->is_cdrom) {
+            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend tap"
+                       " unsuitable for cdroms",
+                       a->disk->vdev);
+            return 0;
+        }
         if (!libxl__blktap_enabled(a->gc)) {
             LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend tap"
                        " unsuitable because blktap not available",
