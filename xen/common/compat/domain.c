@@ -50,6 +50,10 @@ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
         rc = v->is_initialised ? -EEXIST : arch_set_info_guest(v, cmp_ctxt);
         domain_unlock(d);
 
+        if ( rc == -EAGAIN )
+            rc = hypercall_create_continuation(__HYPERVISOR_vcpu_op, "iih",
+                                               cmd, vcpuid, arg);
+
         xfree(cmp_ctxt);
         break;
     }
