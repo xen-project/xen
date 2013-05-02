@@ -15,7 +15,7 @@ struct vcpu *alloc_vcpu(
 int boot_vcpu(
     struct domain *d, int vcpuid, vcpu_guest_context_u ctxt);
 struct vcpu *alloc_dom0_vcpu0(void);
-void vcpu_reset(struct vcpu *v);
+int vcpu_reset(struct vcpu *);
 
 struct xen_domctl_getdomaininfo;
 void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info);
@@ -57,7 +57,7 @@ void arch_dump_vcpu_info(struct vcpu *v);
 
 void arch_dump_domain_info(struct domain *d);
 
-void arch_vcpu_reset(struct vcpu *v);
+int arch_vcpu_reset(struct vcpu *);
 
 bool_t domctl_lock_acquire(void);
 void domctl_lock_release(void);

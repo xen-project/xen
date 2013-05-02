@@ -3083,8 +3083,11 @@ static void hvm_s3_suspend(struct domain *d)
 
     for_each_vcpu ( d, v )
     {
+        int rc;
+
         vlapic_reset(vcpu_vlapic(v));
-        vcpu_reset(v);
+        rc = vcpu_reset(v);
+        ASSERT(!rc);
     }
 
     vpic_reset(d);

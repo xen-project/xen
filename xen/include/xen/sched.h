@@ -597,6 +597,9 @@ extern struct domain *domain_list;
  /* VCPU is blocked on memory-event ring. */
 #define _VPF_mem_event       4
 #define VPF_mem_event        (1UL<<_VPF_mem_event)
+ /* VCPU is being reset. */
+#define _VPF_in_reset        7
+#define VPF_in_reset         (1UL<<_VPF_in_reset)
 
 static inline int vcpu_runnable(struct vcpu *v)
 {

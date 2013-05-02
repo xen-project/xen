@@ -252,10 +252,13 @@ static void vlapic_init_sipi_action(unsigned long _vcpu)
     {
     case APIC_DM_INIT: {
         bool_t fpu_initialised;
+        int rc;
+
         domain_lock(target->domain);
         /* Reset necessary VCPU state. This does not include FPU state. */
         fpu_initialised = target->fpu_initialised;
-        vcpu_reset(target);
+        rc = vcpu_reset(target);
+        ASSERT(!rc);
         target->fpu_initialised = fpu_initialised;
         vlapic_reset(vcpu_vlapic(target));
         domain_unlock(target->domain);

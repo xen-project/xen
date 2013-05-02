@@ -902,17 +902,16 @@ int arch_set_info_guest(
 #undef c
 }
 
-void arch_vcpu_reset(struct vcpu *v)
+int arch_vcpu_reset(struct vcpu *v)
 {
     if ( !is_hvm_vcpu(v) )
     {
         destroy_gdt(v);
-        vcpu_destroy_pagetables(v, 0);
+        return vcpu_destroy_pagetables(v);
     }
-    else
-    {
-        vcpu_end_shutdown_deferral(v);
-    }
+
+    vcpu_end_shutdown_deferral(v);
+    return 0;
 }
 
 /* 
@@ -1933,7 +1932,7 @@ int domain_relinquish_resources(struct domain *d)
         for_each_vcpu ( d, v )
         {
             /* Drop the in-use references to page-table bases. */
-            ret = vcpu_destroy_pagetables(v, 1);
+            ret = vcpu_destroy_pagetables(v);
             if ( ret )
                 return ret;
 

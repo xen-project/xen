@@ -770,14 +770,18 @@ int boot_vcpu(struct domain *d, int vcpuid, vcpu_guest_context_u ctxt)
     return arch_set_info_guest(v, ctxt);
 }
 
-void vcpu_reset(struct vcpu *v)
+int vcpu_reset(struct vcpu *v)
 {
     struct domain *d = v->domain;
+    int rc;
 
     vcpu_pause(v);
     domain_lock(d);
 
-    arch_vcpu_reset(v);
+    set_bit(_VPF_in_reset, &v->pause_flags);
+    rc = arch_vcpu_reset(v);
+    if ( rc )
+        goto out_unlock;
 
     set_bit(_VPF_down, &v->pause_flags);
 
@@ -793,9 +797,13 @@ void vcpu_reset(struct vcpu *v)
 #endif
     cpus_clear(v->cpu_affinity_tmp);
     clear_bit(_VPF_blocked, &v->pause_flags);
+    clear_bit(_VPF_in_reset, &v->pause_flags);
 
+ out_unlock:
     domain_unlock(v->domain);
     vcpu_unpause(v);
+
+    return rc;
 }
 
 
