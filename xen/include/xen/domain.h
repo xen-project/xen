@@ -13,7 +13,7 @@ typedef union {
 struct vcpu *alloc_vcpu(
     struct domain *d, unsigned int vcpu_id, unsigned int cpu_id);
 struct vcpu *alloc_dom0_vcpu0(void);
-void vcpu_reset(struct vcpu *v);
+int vcpu_reset(struct vcpu *);
 
 struct xen_domctl_getdomaininfo;
 void getdomaininfo(struct domain *d, struct xen_domctl_getdomaininfo *info);
@@ -67,7 +67,7 @@ void arch_dump_vcpu_info(struct vcpu *v);
 
 void arch_dump_domain_info(struct domain *d);
 
-void arch_vcpu_reset(struct vcpu *v);
+int arch_vcpu_reset(struct vcpu *);
 
 extern spinlock_t vcpu_alloc_lock;
 bool_t domctl_lock_acquire(void);

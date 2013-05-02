@@ -307,8 +307,10 @@ long do_domctl(XEN_GUEST_HANDLE(xen_domctl_t) u_domctl)
 
         if ( guest_handle_is_null(op->u.vcpucontext.ctxt) )
         {
-            vcpu_reset(v);
-            ret = 0;
+            ret = vcpu_reset(v);
+            if ( ret == -EAGAIN )
+                ret = hypercall_create_continuation(
+                          __HYPERVISOR_domctl, "h", u_domctl);
             goto svc_out;
         }
 

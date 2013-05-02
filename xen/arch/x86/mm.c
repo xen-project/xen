@@ -2827,7 +2827,7 @@ static int put_old_guest_table(struct vcpu *v)
     return rc;
 }
 
-int vcpu_destroy_pagetables(struct vcpu *v, bool_t preemptible)
+int vcpu_destroy_pagetables(struct vcpu *v)
 {
     unsigned long mfn = pagetable_get_pfn(v->arch.guest_table);
     struct page_info *page;
@@ -2847,7 +2847,7 @@ int vcpu_destroy_pagetables(struct vcpu *v, bool_t preemptible)
         if ( paging_mode_refcounts(v->domain) )
             put_page(page);
         else
-            rc = put_page_and_type_preemptible(page, preemptible);
+            rc = put_page_and_type_preemptible(page, 1);
     }
 
 #ifdef __x86_64__
@@ -2873,7 +2873,7 @@ int vcpu_destroy_pagetables(struct vcpu *v, bool_t preemptible)
             if ( paging_mode_refcounts(v->domain) )
                 put_page(page);
             else
-                rc = put_page_and_type_preemptible(page, preemptible);
+                rc = put_page_and_type_preemptible(page, 1);
         }
         if ( !rc )
             v->arch.guest_table_user = pagetable_null();
