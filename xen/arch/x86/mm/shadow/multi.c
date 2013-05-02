@@ -1305,26 +1305,23 @@ do {                                                                    \
 
 #if GUEST_PAGING_LEVELS == 2
 
-/* 32-bit l2 on PAE/64: four pages, touch every second entry, and avoid Xen */
+/* 32-bit l2 on PAE/64: four pages, touch every second entry */
 #define SHADOW_FOREACH_L2E(_sl2mfn, _sl2e, _gl2p, _done, _dom, _code)     \
 do {                                                                      \
     int _i, _j, __done = 0;                                               \
-    int _xen = !shadow_mode_external(_dom);                               \
-    ASSERT(mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2_32_shadow);\
+    ASSERT(shadow_mode_external(_dom));                                   \
+    ASSERT(mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2_32_shadow);      \
     for ( _j = 0; _j < 4 && !__done; _j++ )                               \
     {                                                                     \
         shadow_l2e_t *_sp = sh_map_domain_page(_sl2mfn);                  \
         for ( _i = 0; _i < SHADOW_L2_PAGETABLE_ENTRIES; _i += 2 )         \
-            if ( (!(_xen))                                                \
-                 || ((_j * SHADOW_L2_PAGETABLE_ENTRIES) + _i)             \
-                 < (HYPERVISOR_VIRT_START >> SHADOW_L2_PAGETABLE_SHIFT) ) \
-            {                                                             \
-                (_sl2e) = _sp + _i;                                       \
-                if ( shadow_l2e_get_flags(*(_sl2e)) & _PAGE_PRESENT )     \
-                    {_code}                                               \
-                if ( (__done = (_done)) ) break;                          \
-                increment_ptr_to_guest_entry(_gl2p);                      \
-            }                                                             \
+        {                                                                 \
+            (_sl2e) = _sp + _i;                                           \
+            if ( shadow_l2e_get_flags(*(_sl2e)) & _PAGE_PRESENT )         \
+                {_code}                                                   \
+            if ( (__done = (_done)) ) break;                              \
+            increment_ptr_to_guest_entry(_gl2p);                          \
+        }                                                                 \
         sh_unmap_domain_page(_sp);                                        \
         if ( _j < 3 ) _sl2mfn = sh_next_page(_sl2mfn);                    \
     }                                                                     \
@@ -1332,26 +1329,22 @@ do {                                                                      \
 
 #elif GUEST_PAGING_LEVELS == 3
 
-/* PAE: if it's an l2h, don't touch Xen mappings */
+/* PAE: touch all entries */
 #define SHADOW_FOREACH_L2E(_sl2mfn, _sl2e, _gl2p, _done, _dom, _code)      \
 do {                                                                       \
     int _i;                                                                \
-    int _xen = !shadow_mode_external(_dom);                                \
     shadow_l2e_t *_sp = sh_map_domain_page((_sl2mfn));                     \
-    ASSERT(mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2_pae_shadow \
-           || mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2h_pae_shadow);\
+    ASSERT(shadow_mode_external(_dom));                                    \
+    ASSERT(mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2_pae_shadow        \
+           || mfn_to_page(_sl2mfn)->u.sh.type == SH_type_l2h_pae_shadow);  \
     for ( _i = 0; _i < SHADOW_L2_PAGETABLE_ENTRIES; _i++ )                 \
-        if ( (!(_xen))                                                     \
-             || mfn_to_page(_sl2mfn)->u.sh.type != SH_type_l2h_pae_shadow\
-             || ((_i + (3 * SHADOW_L2_PAGETABLE_ENTRIES))                  \
-                 < (HYPERVISOR_VIRT_START >> SHADOW_L2_PAGETABLE_SHIFT)) ) \
-        {                                                                  \
-            (_sl2e) = _sp + _i;                                            \
-            if ( shadow_l2e_get_flags(*(_sl2e)) & _PAGE_PRESENT )          \
-                {_code}                                                    \
-            if ( _done ) break;                                            \
-            increment_ptr_to_guest_entry(_gl2p);                           \
-        }                                                                  \
+    {                                                                      \
+        (_sl2e) = _sp + _i;                                                \
+        if ( shadow_l2e_get_flags(*(_sl2e)) & _PAGE_PRESENT )              \
+            {_code}                                                        \
+        if ( _done ) break;                                                \
+        increment_ptr_to_guest_entry(_gl2p);                               \
+    }                                                                      \
     sh_unmap_domain_page(_sp);                                             \
 } while (0)
 
