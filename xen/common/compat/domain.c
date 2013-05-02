@@ -52,6 +52,10 @@ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE(void) arg)
             rc = boot_vcpu(d, vcpuid, cmp_ctxt);
         domain_unlock(d);
 
+        if ( rc == -EAGAIN )
+            rc = hypercall_create_continuation(__HYPERVISOR_vcpu_op, "iih",
+                                               cmd, vcpuid, arg);
+
         xfree(cmp_ctxt);
         break;
     }
