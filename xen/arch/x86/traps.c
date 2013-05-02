@@ -2317,8 +2317,15 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 rc = new_guest_cr3(gmfn_to_mfn(v->domain, compat_cr3_to_pfn(*reg)));
 #endif
             domain_unlock(v->domain);
-            if ( rc == 0 ) /* not okay */
+            switch ( rc )
+            {
+            case 0:
+                break;
+            case -EAGAIN: /* retry after preemption */
+                goto skip;
+            default:      /* not okay */
                 goto fail;
+            }
             break;
 
         case 4: /* Write CR4 */
