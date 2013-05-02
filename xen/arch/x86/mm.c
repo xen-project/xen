@@ -2859,6 +2859,14 @@ long do_mmuext_op(
         return rc;
     }
 
+    if ( unlikely(count == MMU_UPDATE_PREEMPTED) &&
+         likely(guest_handle_is_null(uops)) )
+    {
+        /* See the curr->arch.old_guest_table related
+         * hypercall_create_continuation() below. */
+        return (int)foreigndom;
+    }
+
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
         count &= ~MMU_UPDATE_PREEMPTED;
@@ -2889,7 +2897,7 @@ long do_mmuext_op(
 
     for ( i = 0; i < count; i++ )
     {
-        if ( hypercall_preempt_check() )
+        if ( curr->arch.old_guest_table || hypercall_preempt_check() )
         {
             rc = -EAGAIN;
             break;
@@ -3009,7 +3017,17 @@ long do_mmuext_op(
                 break;
             }
 
-            put_page_and_type(page);
+            switch ( rc = put_page_and_type_preemptible(page, 1) )
+            {
+            case -EINTR:
+            case -EAGAIN:
+                curr->arch.old_guest_table = page;
+                rc = 0;
+                break;
+            default:
+                BUG_ON(rc);
+                break;
+            }
             put_page(page);
 
             /* A page is dirtied when its pin status is cleared. */
@@ -3318,9 +3336,27 @@ long do_mmuext_op(
     }
 
     if ( rc == -EAGAIN )
+    {
+        ASSERT(i < count);
         rc = hypercall_create_continuation(
             __HYPERVISOR_mmuext_op, "hihi",
             uops, (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
+    }
+    else if ( curr->arch.old_guest_table )
+    {
+        XEN_GUEST_HANDLE_PARAM(void) null;
+
+        ASSERT(rc || i == count);
+        set_xen_guest_handle(null, NULL);
+        /*
+         * In order to have a way to communicate the final return value to
+         * our continuation, we pass this in place of "foreigndom", building
+         * on the fact that this argument isn't needed anymore.
+         */
+        rc = hypercall_create_continuation(
+                __HYPERVISOR_mmuext_op, "hihi", null,
+                MMU_UPDATE_PREEMPTED, null, rc);
+    }
 
     put_pg_owner(pg_owner);
 
