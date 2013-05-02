@@ -2013,7 +2013,11 @@ int domain_relinquish_resources(struct domain *d)
 
         /* Drop the in-use references to page-table bases. */
         for_each_vcpu ( d, v )
+        {
             vcpu_destroy_pagetables(v);
+
+            unmap_vcpu_info(v);
+        }
 
         if ( !is_hvm_domain(d) )
         {
@@ -2025,8 +2029,6 @@ int domain_relinquish_resources(struct domain *d)
                  * mappings.
                  */
                 destroy_gdt(v);
-
-                unmap_vcpu_info(v);
             }
 
             if ( d->arch.pv_domain.pirq_eoi_map != NULL )
