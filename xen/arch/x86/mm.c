@@ -2725,6 +2725,82 @@ static void put_superpage(unsigned long mfn)
 
 #endif
 
+static int put_old_guest_table(struct vcpu *v)
+{
+    int rc;
+
+    if ( !v->arch.old_guest_table )
+        return 0;
+
+    switch ( rc = put_page_and_type_preemptible(v->arch.old_guest_table, 1) )
+    {
+    case -EINTR:
+    case -EAGAIN:
+        return -EAGAIN;
+    }
+
+    v->arch.old_guest_table = NULL;
+
+    return rc;
+}
+
+int vcpu_destroy_pagetables(struct vcpu *v, bool_t preemptible)
+{
+    unsigned long mfn = pagetable_get_pfn(v->arch.guest_table);
+    struct page_info *page;
+    int rc = put_old_guest_table(v);
+
+    if ( rc )
+        return rc;
+
+#ifdef __x86_64__
+    if ( is_pv_32on64_vcpu(v) )
+        mfn = l4e_get_pfn(*(l4_pgentry_t *)mfn_to_virt(mfn));
+#endif
+
+    if ( mfn )
+    {
+        page = mfn_to_page(mfn);
+        if ( paging_mode_refcounts(v->domain) )
+            put_page(page);
+        else
+            rc = put_page_and_type_preemptible(page, preemptible);
+    }
+
+#ifdef __x86_64__
+    if ( is_pv_32on64_vcpu(v) )
+    {
+        if ( !rc )
+            l4e_write(
+                (l4_pgentry_t *)__va(pagetable_get_paddr(v->arch.guest_table)),
+                l4e_empty());
+    }
+    else
+#endif
+    if ( !rc )
+    {
+        v->arch.guest_table = pagetable_null();
+
+#ifdef __x86_64__
+        /* Drop ref to guest_table_user (from MMUEXT_NEW_USER_BASEPTR) */
+        mfn = pagetable_get_pfn(v->arch.guest_table_user);
+        if ( mfn )
+        {
+            page = mfn_to_page(mfn);
+            if ( paging_mode_refcounts(v->domain) )
+                put_page(page);
+            else
+                rc = put_page_and_type_preemptible(page, preemptible);
+        }
+        if ( !rc )
+            v->arch.guest_table_user = pagetable_null();
+#endif
+    }
+
+    v->arch.cr3 = 0;
+
+    return rc;
+}
 
 int new_guest_cr3(unsigned long mfn)
 {
@@ -2911,12 +2987,21 @@ long do_mmuext_op(
     unsigned int foreigndom)
 {
     struct mmuext_op op;
-    int rc = 0, i = 0, okay;
     unsigned long type;
-    unsigned int done = 0;
+    unsigned int i = 0, done = 0;
     struct vcpu *curr = current;
     struct domain *d = curr->domain;
     struct domain *pg_owner;
+    int okay, rc = put_old_guest_table(curr);
+
+    if ( unlikely(rc) )
+    {
+        if ( likely(rc == -EAGAIN) )
+            rc = hypercall_create_continuation(
+                     __HYPERVISOR_mmuext_op, "hihi", uops, count, pdone,
+                     foreigndom);
+        return rc;
+    }
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
