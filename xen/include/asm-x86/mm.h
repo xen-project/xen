@@ -364,15 +364,10 @@ static inline void put_page_and_type(struct page_info *page)
     put_page(page);
 }
 
-static inline int put_page_and_type_preemptible(struct page_info *page,
-                                                int preemptible)
+static inline int put_page_and_type_preemptible(struct page_info *page)
 {
-    int rc = 0;
+    int rc = put_page_type_preemptible(page);
 
-    if ( preemptible )
-        rc = put_page_type_preemptible(page);
-    else
-        put_page_type(page);
     if ( likely(rc == 0) )
         put_page(page);
     return rc;

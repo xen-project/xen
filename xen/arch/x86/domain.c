@@ -1859,7 +1859,7 @@ static int relinquish_memory(
         }
 
         if ( test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
-            ret = put_page_and_type_preemptible(page, 1);
+            ret = put_page_and_type_preemptible(page);
         switch ( ret )
         {
         case 0:
