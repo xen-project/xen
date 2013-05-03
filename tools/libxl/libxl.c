@@ -2104,7 +2104,8 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
                  * responsible for this since the block device may not
                  * exist yet.
                  */
-                if (!disk->script) {
+                if (!disk->script &&
+                    disk->backend_domid == LIBXL_TOOLSTACK_DOMID) {
                     int major, minor;
                     libxl__device_physdisk_major_minor(dev, &major, &minor);
                     flexarray_append_pair(back, "physical-device",
