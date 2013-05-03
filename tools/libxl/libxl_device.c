@@ -161,6 +161,12 @@ static int disk_try_backend(disk_try_backend_args *a,
             goto bad_format;
         }
 
+        if (a->disk->backend_domid != LIBXL_TOOLSTACK_DOMID) {
+            LOG(DEBUG, "Disk vdev=%s, is using a storage driver domain, "
+                       "skipping physical device check", a->disk->vdev);
+            return backend;
+        }
+
         if (a->disk->script) {
             LOG(DEBUG, "Disk vdev=%s, uses script=... assuming phy backend",
                 a->disk->vdev);
