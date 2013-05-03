@@ -970,8 +970,8 @@ void __init x2apic_bsp_setup(void)
             panic("Interrupt remapping could not be enabled while "
                   "x2APIC is already enabled by BIOS!\n");
 
-        printk("Would not enable x2APIC due to interrupt remapping "
-               "cannot be enabled.\n");
+        printk(XENLOG_ERR
+               "Failed to enable Interrupt Remapping: Will not enable x2APIC.\n");
         goto restore_out;
     }
 
