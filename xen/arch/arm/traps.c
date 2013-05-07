@@ -61,7 +61,7 @@ void __cpuinit init_traps(void)
     WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
 
     /* Setup hypervisor traps */
-    WRITE_SYSREG(HCR_PTW|HCR_BSU_OUTER|HCR_AMO|HCR_IMO|HCR_VM|HCR_TWI, HCR_EL2);
+    WRITE_SYSREG(HCR_PTW|HCR_BSU_OUTER|HCR_AMO|HCR_IMO|HCR_VM|HCR_TWI|HCR_TSC, HCR_EL2);
     isb();
 }
 
@@ -239,6 +239,54 @@ void panic_PAR(uint64_t par)
            fsc_level_str(level));
 
     panic("Error during Hypervisor-to-physical address translation\n");
+}
+
+static void cpsr_switch_mode(struct cpu_user_regs *regs, int mode)
+{
+    uint32_t sctlr = READ_SYSREG32(SCTLR_EL1);
+
+    regs->cpsr &= ~(PSR_MODE_MASK|PSR_IT_MASK|PSR_JAZELLE|PSR_BIG_ENDIAN|PSR_THUMB);
+
+    regs->cpsr |= mode;
+    regs->cpsr |= PSR_IRQ_MASK;
+    if (sctlr & SCTLR_TE)
+        regs->cpsr |= PSR_THUMB;
+    if (sctlr & SCTLR_EE)
+        regs->cpsr |= PSR_BIG_ENDIAN;
+}
+
+static vaddr_t exception_handler(vaddr_t offset)
+{
+    uint32_t sctlr = READ_SYSREG32(SCTLR_EL1);
+
+    if (sctlr & SCTLR_V)
+        return 0xffff0000 + offset;
+    else /* always have security exceptions */
+        return READ_SYSREG(VBAR_EL1) + offset;
+}
+
+/* Injects an Undefined Instruction exception into the current vcpu,
+ * PC is the exact address of the faulting instruction (without
+ * pipeline adjustments). See TakeUndefInstrException pseudocode in
+ * ARM.
+ */
+static void inject_undef_exception(struct cpu_user_regs *regs,
+                                   register_t preferred_return)
+{
+    uint32_t spsr = regs->cpsr;
+    int is_thumb = (regs->cpsr & PSR_THUMB);
+    /* Saved PC points to the instruction past the faulting instruction. */
+    uint32_t return_offset = is_thumb ? 2 : 4;
+
+    /* Update processor mode */
+    cpsr_switch_mode(regs, PSR_MODE_UND);
+
+    /* Update banked registers */
+    regs->spsr_und = spsr;
+    regs->lr_und = preferred_return + return_offset;
+
+    /* Branch to exception vector */
+    regs->pc32 = exception_handler(VECTOR32_UND);
 }
 
 struct reg_ctxt {
@@ -955,6 +1003,12 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         if ( ! is_pv32_domain(current->domain) )
             goto bad_trap;
         do_cp15_64(regs, hsr);
+        break;
+    case HSR_EC_SMC:
+        /* PC32 already contains the preferred exception return
+         * address, so no need to adjust here.
+         */
+        inject_undef_exception(regs, regs->pc32);
         break;
     case HSR_EC_HVC:
         if ( (hsr.iss & 0xff00) == 0xff00 )

@@ -31,7 +31,9 @@ struct cpu_user_regs
         uint32_t lr_usr;
     };
 
-    uint32_t pc; /* Return IP */
+    union {  /* Return IP, pc32 is used to allow code to be common with 64-bit */
+        uint32_t pc, pc32;
+    };
     uint32_t cpsr; /* Return mode */
     uint32_t pad0; /* Doubleword-align the kernel half of the frame */
 

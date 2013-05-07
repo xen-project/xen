@@ -85,6 +85,7 @@
 #define HSR_EC_CP14_64              0x0c
 #define HSR_EC_SVC                  0x11
 #define HSR_EC_HVC                  0x12
+#define HSR_EC_SMC                  0x13
 #define HSR_EC_INSTR_ABORT_GUEST    0x20
 #define HSR_EC_INSTR_ABORT_HYP      0x21
 #define HSR_EC_DATA_ABORT_GUEST     0x24
@@ -341,6 +342,13 @@ union hsr {
 #define CNTx_CTL_ENABLE   (1u<<0)  /* Enable timer */
 #define CNTx_CTL_MASK     (1u<<1)  /* Mask IRQ */
 #define CNTx_CTL_PENDING  (1u<<2)  /* IRQ pending */
+
+/* Exception Vector offsets */
+#define VECTOR32_RST  0
+#define VECTOR32_UND  4
+#define VECTOR32_SVC  8
+#define VECTOR32_PABT 12
+#define VECTOR32_DABT 16
 
 #if defined(CONFIG_ARM_32)
 # include <asm/arm32/processor.h>
