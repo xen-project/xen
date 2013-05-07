@@ -12,7 +12,7 @@
 #endif
 
 #ifndef __ASSEMBLY__
-#include <asm/bitops.h>
+#include <xen/bitops.h>
 #include <asm/mpspec.h>
 #endif
 

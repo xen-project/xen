@@ -16,7 +16,7 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/desc.h>
-#include <asm/bitops.h>
+#include <xen/bitops.h>
 #include <xen/delay.h>
 #include <asm/apic.h>
 #include <asm/asm_defns.h>

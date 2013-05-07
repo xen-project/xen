@@ -22,7 +22,7 @@
 #include <xen/efi.h>
 #include <xen/sched.h>
 
-#include <asm/bitops.h>
+#include <xen/bitops.h>
 #include <asm/smp.h>
 #include <asm/acpi.h>
 #include <asm/mtrr.h>

@@ -2,7 +2,7 @@
 #define __ASM_SYSTEM_H
 
 #include <xen/lib.h>
-#include <asm/bitops.h>
+#include <xen/bitops.h>
 
 #define read_segment_register(name)                             \
 ({  u16 __sel;                                                  \

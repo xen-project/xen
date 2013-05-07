@@ -52,7 +52,7 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
-#include <asm/bitops.h>
+#include <xen/bitops.h>
 #include <asm/desc.h>
 #include <asm/debugreg.h>
 #include <asm/smp.h>

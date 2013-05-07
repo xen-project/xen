@@ -13,7 +13,7 @@ enum {
 
 #include <xen/lib.h>
 #include <xen/smp.h>
-#include <asm/bitops.h>
+#include <xen/bitops.h>
 #include <asm/current.h>
 #include <asm/hardirq.h>
 #include <asm/softirq.h>

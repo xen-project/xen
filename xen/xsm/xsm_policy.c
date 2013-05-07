@@ -20,7 +20,7 @@
 
 #include <xsm/xsm.h>
 #include <xen/multiboot.h>
-#include <asm/bitops.h>
+#include <xen/bitops.h>
 
 char *__initdata policy_buffer = NULL;
 u32 __initdata policy_size = 0;

@@ -29,7 +29,7 @@
 #include <public/version.h>
 #include <compat/platform.h>
 #include <compat/xen.h>
-#include <asm/bitops.h>
+#include <xen/bitops.h>
 #include <asm/smp.h>
 #include <asm/processor.h>
 #include <asm/mpspec.h>
