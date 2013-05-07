@@ -54,7 +54,7 @@ class xen
     debug
 # XEN_SYSCTL_getcpuinfo, XENPF_get_cpu_version, XENPF_get_cpuinfo
     getcpuinfo
-# XEN_SYSCTL_availheap
+# XEN_SYSCTL_availheap, XENMEM_get_outstanding_pages
     heap
 # XEN_SYSCTL_get_pmstat, XEN_SYSCTL_pm_op, XENPF_set_processor_pminfo,
 # XENPF_core_parking
@@ -192,6 +192,8 @@ class domain2
     settsc
 # XEN_DOMCTL_scheduler_op with XEN_DOMCTL_SCHEDOP_putinfo
     setscheduler
+# XENMEM_claim_pages
+    setclaim
 }
 
 # Similar to class domain, but primarily contains domctls related to HVM domains

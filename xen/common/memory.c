@@ -712,9 +712,6 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     }
 
     case XENMEM_claim_pages:
-        if ( !IS_PRIV(current->domain) )
-            return -EPERM;
-
         if ( copy_from_guest(&reservation, arg, 1) )
             return -EFAULT;
 
@@ -731,17 +728,21 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( d == NULL )
             return -EINVAL;
 
-        rc = domain_set_outstanding_pages(d, reservation.nr_extents);
+        rc = xsm_claim_pages(XSM_PRIV, d);
+
+        if ( !rc )
+            rc = domain_set_outstanding_pages(d, reservation.nr_extents);
 
         rcu_unlock_domain(d);
 
         break;
 
     case XENMEM_get_outstanding_pages:
-        if ( !IS_PRIV(current->domain) )
-            return -EPERM;
+        rc = xsm_xenmem_get_outstanding_pages(XSM_PRIV);
 
-        rc = get_outstanding_claims();
+        if ( !rc )
+            rc = get_outstanding_claims();
+
         break;
 
     default:

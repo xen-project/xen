@@ -92,6 +92,8 @@ struct xsm_operations {
     int (*memory_pin_page) (struct domain *d1, struct domain *d2, struct page_info *page);
     int (*add_to_physmap) (struct domain *d1, struct domain *d2);
     int (*remove_from_physmap) (struct domain *d1, struct domain *d2);
+    int (*claim_pages) (struct domain *d);
+    int (*xenmem_get_outstanding_pages) (void);
 
     int (*console_io) (struct domain *d, int cmd);
 
@@ -348,6 +350,16 @@ static inline int xsm_add_to_physmap(xsm_default_t def, struct domain *d1, struc
 static inline int xsm_remove_from_physmap(xsm_default_t def, struct domain *d1, struct domain *d2)
 {
     return xsm_ops->remove_from_physmap(d1, d2);
+}
+
+static inline int xsm_claim_pages(xsm_default_t def, struct domain *d)
+{
+    return xsm_ops->claim_pages(d);
+}
+
+static inline int xsm_xenmem_get_outstanding_pages(xsm_default_t def)
+{
+    return xsm_ops->xenmem_get_outstanding_pages();
 }
 
 static inline int xsm_console_io (xsm_default_t def, struct domain *d, int cmd)

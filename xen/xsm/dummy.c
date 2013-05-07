@@ -66,6 +66,8 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, memory_adjust_reservation);
     set_to_dummy_if_null(ops, memory_stat_reservation);
     set_to_dummy_if_null(ops, memory_pin_page);
+    set_to_dummy_if_null(ops, claim_pages);
+    set_to_dummy_if_null(ops, xenmem_get_outstanding_pages);
 
     set_to_dummy_if_null(ops, console_io);
 

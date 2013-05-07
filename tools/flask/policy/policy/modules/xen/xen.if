@@ -49,7 +49,7 @@ define(`create_domain_common', `
 			getdomaininfo hypercall setvcpucontext setextvcpucontext
 			getscheduler getvcpuinfo getvcpuextstate getaddrsize
 			getaffinity setaffinity };
-	allow $1 $2:domain2 { set_cpuid settsc setscheduler };
+	allow $1 $2:domain2 { set_cpuid settsc setscheduler setclaim };
 	allow $1 $2:security check_context;
 	allow $1 $2:shadow enable;
 	allow $1 $2:mmu { map_read map_write adjust memorymap physmap pinpage mmuext_op };
