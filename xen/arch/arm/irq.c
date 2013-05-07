@@ -97,13 +97,6 @@ int __init request_dt_irq(const struct dt_irq *irq,
         void (*handler)(int, void *, struct cpu_user_regs *),
         unsigned long irqflags, const char *devname, void *dev_id)
 {
-    return request_irq(irq->irq, handler, irqflags, devname, dev_id);
-}
-
-int __init request_irq(unsigned int irq,
-        void (*handler)(int, void *, struct cpu_user_regs *),
-        unsigned long irqflags, const char * devname, void *dev_id)
-{
     struct irqaction *action;
     int retval;
 
@@ -113,7 +106,7 @@ int __init request_irq(unsigned int irq,
      * which interrupt is which (messes up the interrupt freeing
      * logic etc).
      */
-    if (irq >= nr_irqs)
+    if (irq->irq >= nr_irqs)
         return -EINVAL;
     if (!handler)
         return -EINVAL;
@@ -127,7 +120,7 @@ int __init request_irq(unsigned int irq,
     action->dev_id = dev_id;
     action->free_on_release = 1;
 
-    retval = setup_irq(irq, action);
+    retval = setup_dt_irq(irq, action);
     if (retval)
         xfree(action);
 
