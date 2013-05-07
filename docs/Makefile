@@ -68,7 +68,7 @@ man5/%.5: man/%.pod.5 Makefile
 clean:
 	$(MAKE) -C figs clean
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
-	rm -rf *.ilg *.log *.ind *.toc *.bak core
+	rm -rf *.ilg *.log *.ind *.toc *.bak *.tmp core
 	rm -rf html txt
 	rm -rf man5
 	rm -rf man1
