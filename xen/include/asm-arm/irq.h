@@ -2,6 +2,7 @@
 #define _ASM_HW_IRQ_H
 
 #include <xen/config.h>
+#include <xen/device_tree.h>
 
 #define NR_VECTORS 256 /* XXX */
 
@@ -26,6 +27,7 @@ struct irq_cfg {
 #define nr_static_irqs NR_IRQS
 
 struct irq_desc;
+struct irqaction;
 
 struct irq_desc *__irq_to_desc(int irq);
 
@@ -37,6 +39,8 @@ void do_IRQ(struct cpu_user_regs *regs, unsigned int irq, int is_fiq);
 
 void init_IRQ(void);
 void init_secondary_IRQ(void);
+
+int __init setup_dt_irq(const struct dt_irq *irq, struct irqaction *new);
 
 #endif /* _ASM_HW_IRQ_H */
 /*

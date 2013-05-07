@@ -521,6 +521,11 @@ static int __setup_irq(struct irq_desc *desc, unsigned int irq,
     return 0;
 }
 
+int __init setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
+{
+    return setup_irq(irq->irq, new);
+}
+
 int __init setup_irq(unsigned int irq, struct irqaction *new)
 {
     int rc;
