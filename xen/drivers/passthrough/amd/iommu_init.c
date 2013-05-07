@@ -775,9 +775,16 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
     control = pci_conf_read16(iommu->seg, PCI_BUS(iommu->bdf),
                               PCI_SLOT(iommu->bdf), PCI_FUNC(iommu->bdf),
                               iommu->msi.msi_attrib.pos + PCI_MSI_FLAGS);
-    iommu->msi.msi_attrib.maskbit = !!(control & PCI_MSI_FLAGS_MASKBIT);
-    desc->handler = control & PCI_MSI_FLAGS_MASKBIT ?
-                    &iommu_maskable_msi_type : &iommu_msi_type;
+    iommu->msi.msi.nvec = 1;
+    if ( is_mask_bit_support(control) )
+    {
+        iommu->msi.msi_attrib.maskbit = 1;
+        iommu->msi.msi.mpos = msi_mask_bits_reg(iommu->msi.msi_attrib.pos,
+                                                is_64bit_address(control));
+        desc->handler = &iommu_maskable_msi_type;
+    }
+    else
+        desc->handler = &iommu_msi_type;
     ret = request_irq(irq, iommu_interrupt_handler, 0, "amd_iommu", iommu);
     if ( ret )
     {
