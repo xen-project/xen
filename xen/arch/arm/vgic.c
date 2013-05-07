@@ -17,6 +17,7 @@
  * GNU General Public License for more details.
  */
 
+#include <xen/bitops.h>
 #include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/init.h>
@@ -368,6 +369,71 @@ static void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
     }
 }
 
+static inline int is_vcpu_running(struct domain *d, int vcpuid)
+{
+    struct vcpu *v;
+
+    if ( vcpuid >= d->max_vcpus )
+        return 0;
+
+    v = d->vcpu[vcpuid];
+    if ( v == NULL )
+        return 0;
+    if (test_bit(_VPF_down, &v->pause_flags) )
+        return 0;
+
+    return 1;
+}
+
+static int vgic_to_sgi(struct vcpu *v, register_t sgir)
+{
+    struct domain *d = v->domain;
+    int virtual_irq;
+    int filter;
+    int vcpuid;
+    int i;
+    unsigned long vcpu_mask = 0;
+
+    ASSERT(d->max_vcpus < 8*sizeof(vcpu_mask));
+
+    filter = (sgir & GICD_SGI_TARGET_LIST_MASK);
+    virtual_irq = (sgir & GICD_SGI_INTID_MASK);
+    ASSERT( virtual_irq < 16 );
+
+    switch ( filter )
+    {
+        case GICD_SGI_TARGET_LIST:
+            vcpu_mask = (sgir & GICD_SGI_TARGET_MASK) >> GICD_SGI_TARGET_SHIFT;
+            break;
+        case GICD_SGI_TARGET_OTHERS:
+            for ( i = 0; i < d->max_vcpus; i++ )
+            {
+                if ( i != current->vcpu_id && is_vcpu_running(d, i) )
+                    set_bit(i, &vcpu_mask);
+            }
+            break;
+        case GICD_SGI_TARGET_SELF:
+            set_bit(current->vcpu_id, &vcpu_mask);
+            break;
+        default:
+            gdprintk(XENLOG_WARNING, "vGICD: unhandled GICD_SGIR write %"PRIregister" with wrong TargetListFilter field\n",
+                     sgir);
+            return 0;
+    }
+
+    for_each_set_bit( vcpuid, &vcpu_mask, d->max_vcpus )
+    {
+        if ( !is_vcpu_running(d, vcpuid) )
+        {
+            gdprintk(XENLOG_WARNING, "vGICD: GICD_SGIR write r=%"PRIregister" vcpu_mask=%lx, wrong CPUTargetList\n",
+                     sgir, vcpu_mask);
+            continue;
+        }
+        vgic_vcpu_inject_irq(d->vcpu[vcpuid], virtual_irq, 1);
+    }
+    return 1;
+}
+
 static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
 {
     struct hsr_dabt dabt = info->dabt;
@@ -498,10 +564,9 @@ static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         goto write_ignore;
 
     case GICD_SGIR:
-        if ( dabt.size != 2 ) goto bad_width;
-        printk("vGICD: unhandled write %#"PRIregister" to ICFGR%d\n",
-               *r, gicd_reg - GICD_ICFGR);
-        return 0;
+        if ( dabt.size != 2 )
+            goto bad_width;
+        return vgic_to_sgi(v, *r);
 
     case GICD_CPENDSGIR ... GICD_CPENDSGIRN:
         if ( dabt.size != 0 && dabt.size != 2 ) goto bad_width;
