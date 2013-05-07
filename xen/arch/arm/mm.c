@@ -560,31 +560,40 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
  * start has to be 2MB aligned.
  * len has to be < EARLY_VMAP_VIRT_END - EARLY_VMAP_VIRT_START.
  */
+static __initdata unsigned long early_vmap_start = EARLY_VMAP_VIRT_END;
 void* __init early_ioremap(paddr_t start, size_t len, unsigned attributes)
 {
-    static unsigned long virt_start = EARLY_VMAP_VIRT_START;
-    unsigned long ret_addr = virt_start;
     paddr_t end = start + len;
+    unsigned long map_start;
+
+    len = (len + SECOND_SIZE - 1) & ~SECOND_MASK;
+    early_vmap_start -= len;
 
     ASSERT(!(start & (~SECOND_MASK)));
-    ASSERT(!(virt_start & (~SECOND_MASK)));
+    ASSERT(!(early_vmap_start & (~SECOND_MASK)));
 
     /* The range we need to map is too big */
-    if ( virt_start + len >= EARLY_VMAP_VIRT_END )
+    if ( early_vmap_start >= EARLY_VMAP_VIRT_START )
         return NULL;
 
+    map_start = early_vmap_start;
     while ( start < end )
     {
         lpae_t e = mfn_to_xen_entry(start >> PAGE_SHIFT);
         e.pt.ai = attributes;
-        write_pte(xen_second + second_table_offset(virt_start), e);
+        write_pte(xen_second + second_table_offset(map_start), e);
 
         start += SECOND_SIZE;
-        virt_start += SECOND_SIZE;
+        map_start += SECOND_SIZE;
     }
-    flush_xen_data_tlb_range_va(ret_addr, len);
+    flush_xen_data_tlb_range_va(early_vmap_start, len);
 
-    return (void*)ret_addr;
+    return (void*)early_vmap_start;
+}
+
+void *__init arch_vmap_virt_end(void)
+{
+    return (void *)early_vmap_start;
 }
 
 enum mg { mg_clear, mg_ro, mg_rw, mg_rx };
