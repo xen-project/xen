@@ -557,20 +557,15 @@ static int __setup_irq(struct irq_desc *desc, unsigned int irq,
 
 int __init setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
 {
-    return setup_irq(irq->irq, new);
-}
-
-int __init setup_irq(unsigned int irq, struct irqaction *new)
-{
     int rc;
     unsigned long flags;
     struct irq_desc *desc;
 
-    desc = irq_to_desc(irq);
+    desc = irq_to_desc(irq->irq);
 
     spin_lock_irqsave(&desc->lock, flags);
 
-    rc = __setup_irq(desc, irq, new);
+    rc = __setup_irq(desc, irq->irq, new);
 
     spin_unlock_irqrestore(&desc->lock, flags);
 
