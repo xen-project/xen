@@ -38,7 +38,7 @@ install: build
 clean:
 	$(RM) -f $(DEPS)
 	$(RM) -f xenbaked xenbaked.o
-	$(RM) -f xentrace_setmake setmask.o
+	$(RM) -f xentrace_setmask setmask.o
 
 xenbaked: xenbaked.o Makefile
 	$(CC) $(LDFLAGS) $< -o $@ $(LDLIBS) $(APPEND_LDFLAGS)
