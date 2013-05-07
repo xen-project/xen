@@ -29,6 +29,6 @@ vtpm_manager.h:
 	ln -s ../vtpmmgr/vtpm_manager.h vtpm_manager.h
 
 clean:
-	-rm $(TARGET) $(OBJS) vtpm_manager.h
+	rm -f $(TARGET) $(OBJS) vtpm_manager.h
 
 .PHONY: clean
