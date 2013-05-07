@@ -812,7 +812,7 @@ static int msix_capability_init(struct pci_dev *dev,
                         break;
             if ( d )
             {
-                if ( !IS_PRIV(d) && dev->msix_warned != d->domain_id )
+                if ( !is_hardware_domain(d) && dev->msix_warned != d->domain_id )
                 {
                     dev->msix_warned = d->domain_id;
                     printk(XENLOG_ERR

@@ -60,17 +60,23 @@ static always_inline int xsm_default_action(
     case XSM_HOOK:
         return 0;
     case XSM_DM_PRIV:
-        if ( !IS_PRIV_FOR(src, target) )
-            return -EPERM;
-        return 0;
+        if ( src->is_privileged )
+            return 0;
+        if ( target && src->target == target )
+            return 0;
+        return -EPERM;
     case XSM_TARGET:
-        if ( src != target && !IS_PRIV_FOR(src, target) )
-            return -EPERM;
-        return 0;
+        if ( src == target )
+            return 0;
+        if ( src->is_privileged )
+            return 0;
+        if ( target && src->target == target )
+            return 0;
+        return -EPERM;
     case XSM_PRIV:
-        if ( !IS_PRIV(src) )
-            return -EPERM;
-        return 0;
+        if ( src->is_privileged )
+            return 0;
+        return -EPERM;
     default:
         LINKER_BUG_ON(1);
         return -EPERM;
@@ -567,10 +573,12 @@ static XSM_INLINE int xsm_domain_memory_map(XSM_DEFAULT_ARG struct domain *d)
 static XSM_INLINE int xsm_mmu_update(XSM_DEFAULT_ARG struct domain *d, struct domain *t,
                                      struct domain *f, uint32_t flags)
 {
+    int rc;
     XSM_ASSERT_ACTION(XSM_TARGET);
-    if ( t && d != t && !IS_PRIV_FOR(d, t) )
-        return -EPERM;
-    return xsm_default_action(action, d, f);
+    rc = xsm_default_action(action, d, f);
+    if ( t && !rc )
+        rc = xsm_default_action(action, d, t);
+    return rc;
 }
 
 static XSM_INLINE int xsm_mmuext_op(XSM_DEFAULT_ARG struct domain *d, struct domain *f)

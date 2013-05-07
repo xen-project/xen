@@ -128,7 +128,7 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
         irq = domain_pirq_to_irq(current->domain, *index);
         if ( irq <= 0 )
         {
-            if ( IS_PRIV(current->domain) )
+            if ( is_hardware_domain(current->domain) )
                 irq = *index;
             else {
                 dprintk(XENLOG_G_ERR, "dom%d: map pirq with incorrect irq!\n",
@@ -691,7 +691,7 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case PHYSDEVOP_dbgp_op: {
         struct physdev_dbgp_op op;
 
-        if ( !IS_PRIV(v->domain) )
+        if ( !is_hardware_domain(v->domain) )
             ret = -EPERM;
         else if ( copy_from_guest(&op, arg, 1) )
             ret = -EFAULT;

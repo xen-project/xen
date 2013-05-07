@@ -661,7 +661,7 @@ long arch_do_domctl(
                     while ( i-- )
                         clear_mmio_p2m_entry(d, gfn + i);
                     if ( iomem_deny_access(d, mfn, mfn + nr_mfns - 1) &&
-                         IS_PRIV(current->domain) )
+                         is_hardware_domain(current->domain) )
                         printk(XENLOG_ERR
                                "memory_map: failed to deny dom%d access to [%lx,%lx]\n",
                                d->domain_id, mfn, mfn + nr_mfns - 1);
@@ -680,7 +680,7 @@ long arch_do_domctl(
             ret = iomem_deny_access(d, mfn, mfn + nr_mfns - 1);
             if ( !ret && add )
                 ret = -EIO;
-            if ( ret && IS_PRIV(current->domain) )
+            if ( ret && is_hardware_domain(current->domain) )
                 printk(XENLOG_ERR
                        "memory_map: error %ld %s dom%d access to [%lx,%lx]\n",
                        ret, add ? "removing" : "denying", d->domain_id,
@@ -767,7 +767,7 @@ long arch_do_domctl(
                     break;
                 }
             ret = ioports_deny_access(d, fmp, fmp + np - 1);
-            if ( ret && IS_PRIV(current->domain) )
+            if ( ret && is_hardware_domain(current->domain) )
                 printk(XENLOG_ERR
                        "ioport_map: error %ld denying dom%d access to [%x,%x]\n",
                        ret, d->domain_id, fmp, fmp + np - 1);
