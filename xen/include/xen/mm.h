@@ -48,6 +48,13 @@ void *alloc_xenheap_pages(unsigned int order, unsigned int memflags);
 void free_xenheap_pages(void *v, unsigned int order);
 #define alloc_xenheap_page() (alloc_xenheap_pages(0,0))
 #define free_xenheap_page(v) (free_xenheap_pages(v,0))
+/* Map machine page range in Xen virtual address space. */
+int map_pages_to_xen(
+    unsigned long virt,
+    unsigned long mfn,
+    unsigned long nr_mfns,
+    unsigned int flags);
+void destroy_xen_mappings(unsigned long v, unsigned long e);
 
 /* Claim handling */
 unsigned long domain_adjust_tot_pages(struct domain *d, long pages);

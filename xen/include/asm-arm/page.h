@@ -58,6 +58,9 @@
 #define DEV_WC        BUFFERABLE
 #define DEV_CACHED    WRITEBACK
 
+#define PAGE_HYPERVISOR         (MATTR_MEM)
+#define MAP_SMALL_PAGES         PAGE_HYPERVISOR
+
 /*
  * Stage 2 Memory Type.
  *

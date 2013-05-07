@@ -34,6 +34,7 @@
 #include <xen/keyhandler.h>
 #include <xen/cpu.h>
 #include <xen/pfn.h>
+#include <xen/vmap.h>
 #include <asm/page.h>
 #include <asm/current.h>
 #include <asm/setup.h>
@@ -479,6 +480,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     initialize_keytable();
 
     console_init_postirq();
+
+    vm_init();
 
     do_presmp_initcalls();
 

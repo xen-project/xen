@@ -33,6 +33,7 @@
 #include <xen/err.h>
 #include <asm/page.h>
 #include <asm/current.h>
+#include <asm/flushtlb.h>
 #include <public/memory.h>
 #include <xen/sched.h>
 #include <xsm/xsm.h>
@@ -558,9 +559,9 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
 /* Map the physical memory range start -  start + len into virtual
  * memory and return the virtual address of the mapping.
  * start has to be 2MB aligned.
- * len has to be < EARLY_VMAP_VIRT_END - EARLY_VMAP_VIRT_START.
+ * len has to be < VMAP_VIRT_END - VMAP_VIRT_START.
  */
-static __initdata unsigned long early_vmap_start = EARLY_VMAP_VIRT_END;
+static __initdata unsigned long early_vmap_start = VMAP_VIRT_END;
 void* __init early_ioremap(paddr_t start, size_t len, unsigned attributes)
 {
     paddr_t end = start + len;
@@ -573,7 +574,7 @@ void* __init early_ioremap(paddr_t start, size_t len, unsigned attributes)
     ASSERT(!(early_vmap_start & (~SECOND_MASK)));
 
     /* The range we need to map is too big */
-    if ( early_vmap_start >= EARLY_VMAP_VIRT_START )
+    if ( early_vmap_start >= VMAP_VIRT_START )
         return NULL;
 
     map_start = early_vmap_start;
@@ -594,6 +595,99 @@ void* __init early_ioremap(paddr_t start, size_t len, unsigned attributes)
 void *__init arch_vmap_virt_end(void)
 {
     return (void *)early_vmap_start;
+}
+
+static int create_xen_table(lpae_t *entry)
+{
+    void *p;
+    lpae_t pte;
+
+    p = alloc_xenheap_page();
+    if ( p == NULL )
+        return -ENOMEM;
+    clear_page(p);
+    pte = mfn_to_xen_entry(virt_to_mfn(p));
+    pte.pt.table = 1;
+    write_pte(entry, pte);
+    return 0;
+}
+
+enum xenmap_operation {
+    INSERT,
+    REMOVE
+};
+
+static int create_xen_entries(enum xenmap_operation op,
+                              unsigned long virt,
+                              unsigned long mfn,
+                              unsigned long nr_mfns)
+{
+    int rc;
+    unsigned long addr = virt, addr_end = addr + nr_mfns * PAGE_SIZE;
+    lpae_t pte;
+    lpae_t *third = NULL;
+
+    for(; addr < addr_end; addr += PAGE_SIZE, mfn++)
+    {
+        if ( !xen_second[second_linear_offset(addr)].pt.valid ||
+             !xen_second[second_linear_offset(addr)].pt.table )
+        {
+            rc = create_xen_table(&xen_second[second_linear_offset(addr)]);
+            if ( rc < 0 ) {
+                printk("create_xen_entries: L2 failed\n");
+                goto out;
+            }
+        }
+
+        BUG_ON(!xen_second[second_linear_offset(addr)].pt.valid);
+
+        third = __va(pfn_to_paddr(xen_second[second_linear_offset(addr)].pt.base));
+
+        switch ( op ) {
+            case INSERT:
+                if ( third[third_table_offset(addr)].pt.valid )
+                {
+                    printk("create_xen_entries: trying to replace an existing mapping addr=%lx mfn=%lx\n",
+                           addr, mfn);
+                    return -EINVAL;
+                }
+                pte = mfn_to_xen_entry(mfn);
+                pte.pt.table = 1;
+                write_pte(&third[third_table_offset(addr)], pte);
+                break;
+            case REMOVE:
+                if ( !third[third_table_offset(addr)].pt.valid )
+                {
+                    printk("create_xen_entries: trying to remove a non-existing mapping addr=%lx\n",
+                           addr);
+                    return -EINVAL;
+                }
+                pte.bits = 0;
+                write_pte(&third[third_table_offset(addr)], pte);
+                break;
+            default:
+                BUG();
+        }
+    }
+    flush_xen_data_tlb_range_va(virt, PAGE_SIZE * nr_mfns);
+
+    rc = 0;
+
+out:
+    return rc;
+}
+
+int map_pages_to_xen(unsigned long virt,
+                     unsigned long mfn,
+                     unsigned long nr_mfns,
+                     unsigned int flags)
+{
+    ASSERT(flags == PAGE_HYPERVISOR);
+    return create_xen_entries(INSERT, virt, mfn, nr_mfns);
+}
+void destroy_xen_mappings(unsigned long v, unsigned long e)
+{
+    create_xen_entries(REMOVE, v, 0, (e - v) >> PAGE_SHIFT);
 }
 
 enum mg { mg_clear, mg_ro, mg_rw, mg_rx };

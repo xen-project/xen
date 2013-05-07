@@ -338,14 +338,6 @@ l3_pgentry_t *virt_to_xen_l3e(unsigned long v);
 
 extern void set_pdx_range(unsigned long smfn, unsigned long emfn);
 
-/* Map machine page range in Xen virtual address space. */
-int map_pages_to_xen(
-    unsigned long virt,
-    unsigned long mfn,
-    unsigned long nr_mfns,
-    unsigned int flags);
-void destroy_xen_mappings(unsigned long v, unsigned long e);
-
 /* Convert between PAT/PCD/PWT embedded in PTE flags and 3-bit cacheattr. */
 static inline uint32_t pte_flags_to_cacheattr(uint32_t flags)
 {

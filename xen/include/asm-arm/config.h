@@ -95,12 +95,12 @@
 #define FIXMAP_ADDR(n)        (mk_unsigned_long(0x00400000) + (n) * PAGE_SIZE)
 #define BOOT_MISC_VIRT_START   mk_unsigned_long(0x00600000)
 #define FRAMETABLE_VIRT_START  mk_unsigned_long(0x02000000)
-#define EARLY_VMAP_VIRT_START  mk_unsigned_long(0x10000000)
+#define VMAP_VIRT_START        mk_unsigned_long(0x10000000)
 #define XENHEAP_VIRT_START     mk_unsigned_long(0x40000000)
 #define DOMHEAP_VIRT_START     mk_unsigned_long(0x80000000)
 #define DOMHEAP_VIRT_END       mk_unsigned_long(0xffffffff)
 
-#define EARLY_VMAP_VIRT_END    XENHEAP_VIRT_START
+#define VMAP_VIRT_END          XENHEAP_VIRT_START
 #define HYPERVISOR_VIRT_START  XEN_VIRT_START
 
 #define DOMHEAP_ENTRIES        1024  /* 1024 2MB mapping slots */
