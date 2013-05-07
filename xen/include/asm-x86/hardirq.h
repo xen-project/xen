@@ -3,6 +3,7 @@
 
 #include <xen/config.h>
 #include <xen/cache.h>
+#include <xen/types.h>
 
 typedef struct {
 	unsigned int __softirq_pending;

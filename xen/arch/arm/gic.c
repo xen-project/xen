@@ -658,6 +658,9 @@ static void do_sgi(struct cpu_user_regs *regs, int othercpu, enum gic_sgi sgi)
     case GIC_SGI_DUMP_STATE:
         dump_execstate(regs);
         break;
+    case GIC_SGI_CALL_FUNCTION:
+        smp_call_function_interrupt();
+        break;
     default:
         panic("Unhandled SGI %d on CPU%d\n", sgi, smp_processor_id());
         break;

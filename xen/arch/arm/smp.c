@@ -11,17 +11,14 @@ void flush_tlb_mask(const cpumask_t *mask)
     flush_xen_data_tlb();
 }
 
-void smp_call_function(
-    void (*func) (void *info),
-    void *info,
-    int wait)
-{
-    printk("%s not implmented\n", __func__);
-}
-
 void smp_send_event_check_mask(const cpumask_t *mask)
 {
     send_SGI_mask(mask, GIC_SGI_EVENT_CHECK);
+}
+
+void smp_send_call_function_mask(const cpumask_t *mask)
+{
+    send_SGI_mask(mask, GIC_SGI_CALL_FUNCTION);
 }
 
 /*

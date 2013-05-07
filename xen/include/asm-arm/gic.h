@@ -173,6 +173,7 @@ extern void gic_restore_state(struct vcpu *v);
 enum gic_sgi {
     GIC_SGI_EVENT_CHECK = 0,
     GIC_SGI_DUMP_STATE  = 1,
+    GIC_SGI_CALL_FUNCTION = 2,
 };
 extern void send_SGI_mask(const cpumask_t *cpumask, enum gic_sgi sgi);
 extern void send_SGI_one(unsigned int cpu, enum gic_sgi sgi);

@@ -269,67 +269,16 @@ void smp_send_event_check_mask(const cpumask_t *mask)
     send_IPI_mask(mask, EVENT_CHECK_VECTOR);
 }
 
-/*
- * Structure and data for smp_call_function()/on_selected_cpus().
- */
-
-static void __smp_call_function_interrupt(void);
-static DEFINE_SPINLOCK(call_lock);
-static struct call_data_struct {
-    void (*func) (void *info);
-    void *info;
-    int wait;
-    cpumask_t selected;
-} call_data;
-
-void smp_call_function(
-    void (*func) (void *info),
-    void *info,
-    int wait)
+void smp_send_call_function_mask(const cpumask_t *mask)
 {
-    cpumask_t allbutself;
+    send_IPI_mask(mask, CALL_FUNCTION_VECTOR);
 
-    cpumask_andnot(&allbutself, &cpu_online_map,
-                   cpumask_of(smp_processor_id()));
-    on_selected_cpus(&allbutself, func, info, wait);
-}
-
-void on_selected_cpus(
-    const cpumask_t *selected,
-    void (*func) (void *info),
-    void *info,
-    int wait)
-{
-    unsigned int nr_cpus;
-
-    ASSERT(local_irq_is_enabled());
-
-    spin_lock(&call_lock);
-
-    cpumask_copy(&call_data.selected, selected);
-
-    nr_cpus = cpumask_weight(&call_data.selected);
-    if ( nr_cpus == 0 )
-        goto out;
-
-    call_data.func = func;
-    call_data.info = info;
-    call_data.wait = wait;
-
-    send_IPI_mask(&call_data.selected, CALL_FUNCTION_VECTOR);
-
-    if ( cpumask_test_cpu(smp_processor_id(), &call_data.selected) )
+    if ( cpumask_test_cpu(smp_processor_id(), mask) )
     {
         local_irq_disable();
-        __smp_call_function_interrupt();
+        smp_call_function_interrupt();
         local_irq_enable();
     }
-
-    while ( !cpumask_empty(&call_data.selected) )
-        cpu_relax();
-
- out:
-    spin_unlock(&call_lock);
 }
 
 void __stop_this_cpu(void)
@@ -390,36 +339,9 @@ void event_check_interrupt(struct cpu_user_regs *regs)
     this_cpu(irq_count)++;
 }
 
-static void __smp_call_function_interrupt(void)
-{
-    void (*func)(void *info) = call_data.func;
-    void *info = call_data.info;
-    unsigned int cpu = smp_processor_id();
-
-    if ( !cpumask_test_cpu(cpu, &call_data.selected) )
-        return;
-
-    irq_enter();
-
-    if ( call_data.wait )
-    {
-        (*func)(info);
-        mb();
-        cpumask_clear_cpu(cpu, &call_data.selected);
-    }
-    else
-    {
-        mb();
-        cpumask_clear_cpu(cpu, &call_data.selected);
-        (*func)(info);
-    }
-
-    irq_exit();
-}
-
 void call_function_interrupt(struct cpu_user_regs *regs)
 {
     ack_APIC_irq();
     perfc_incr(ipis);
-    __smp_call_function_interrupt();
+    smp_call_function_interrupt();
 }

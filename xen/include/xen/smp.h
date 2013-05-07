@@ -58,6 +58,13 @@ static inline void on_each_cpu(
     on_selected_cpus(&cpu_online_map, func, info, wait);
 }
 
+/*
+ * Call a function on the current CPU
+ */
+void smp_call_function_interrupt(void);
+
+void smp_send_call_function_mask(const cpumask_t *mask);
+
 #define smp_processor_id() raw_smp_processor_id()
 
 int alloc_cpu_id(void);
