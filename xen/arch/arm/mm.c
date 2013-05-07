@@ -36,6 +36,7 @@
 #include <asm/flushtlb.h>
 #include <public/memory.h>
 #include <xen/sched.h>
+#include <xen/vmap.h>
 #include <xsm/xsm.h>
 
 struct domain *dom_xen, *dom_io, *dom_cow;
@@ -175,6 +176,16 @@ void clear_fixmap(unsigned map)
     lpae_t pte = {0};
     write_pte(xen_fixmap + third_table_offset(FIXMAP_ADDR(map)), pte);
     flush_xen_data_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
+}
+
+void *map_domain_page_global(unsigned long mfn)
+{
+    return vmap(&mfn, 1);
+}
+
+void unmap_domain_page_global(const void *va)
+{
+    vunmap(va);
 }
 
 /* Map a page of domheap memory */
