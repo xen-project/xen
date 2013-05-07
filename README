@@ -1,9 +1,9 @@
 #################################
- __  __            _  _    ____  
- \ \/ /___ _ __   | || |  |___ \ 
-  \  // _ \ '_ \  | || |_   __) |
-  /  \  __/ | | | |__   _| / __/ 
- /_/\_\___|_| |_|    |_|(_)_____|
+__  __            _  _    _____                
+\ \/ /___ _ __   | || |  |___ /       _ __ ___ 
+ \  // _ \ '_ \  | || |_   |_ \ _____| '__/ __|
+ /  \  __/ | | | |__   _| ___) |_____| | | (__ 
+/_/\_\___|_| |_|    |_|(_)____/      |_|  \___|
                              
 #################################
 
@@ -18,11 +18,6 @@ Laboratory, as part of the UK-EPSRC funded XenoServers project.  Xen
 is freely-distributable Open Source software, released under the GNU
 GPL. Since its initial public release, Xen has grown a large
 development community, spearheaded by xen.org (http://www.xen.org).
-
-The 4.2 release offers excellent performance, hardware support and
-enterprise-grade features such as x86_32-PAE, x86_64, SMP guests and
-live relocation of VMs. Ports to Linux, NetBSD, FreeBSD and Solaris
-are available from the community.
 
 This file contains some quick-start instructions to install Xen on
 your system. For more information see http:/www.xen.org/ and
