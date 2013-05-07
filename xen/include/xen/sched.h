@@ -477,20 +477,6 @@ struct domain *rcu_lock_domain_by_id(domid_t dom);
 struct domain *rcu_lock_domain_by_any_id(domid_t dom);
 
 /*
- * As above function, but accounts for current domain context:
- *  - Translates target DOMID_SELF into caller's domain id; and
- *  - Checks that caller has permission to act on the target domain.
- */
-int rcu_lock_target_domain_by_id(domid_t dom, struct domain **d);
-
-/*
- * As rcu_lock_target_domain_by_id(), but will fail EPERM rather than resolve
- * to local domain. Successful return always resolves to a remote domain that
- * the local domain is privileged to control.
- */
-int rcu_lock_remote_target_domain_by_id(domid_t dom, struct domain **d);
-
-/*
  * As rcu_lock_domain_by_id(), but will fail EPERM or ESRCH rather than resolve
  * to local domain.
  */
