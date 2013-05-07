@@ -2088,7 +2088,16 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
             case HNDL_unhandled:
                 if ( (vmx_write_guest_msr(msr, msr_content) != 0) &&
                      !is_last_branch_msr(msr) )
-                    wrmsr_hypervisor_regs(msr, msr_content);
+                    switch ( wrmsr_hypervisor_regs(msr, msr_content) )
+                    {
+                    case -EAGAIN:
+                        return X86EMUL_RETRY;
+                    case 0:
+                    case 1:
+                        break;
+                    default:
+                        goto gp_fault;
+                    }
                 break;
             case HNDL_exception_raised:
                 return X86EMUL_EXCEPTION;

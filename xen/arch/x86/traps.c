@@ -634,6 +634,7 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
         unsigned long gmfn = val >> 12;
         unsigned int idx  = val & 0xfff;
         struct page_info *page;
+        p2m_type_t t;
 
         if ( idx > 0 )
         {
@@ -643,15 +644,22 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
             return 0;
         }
 
-        page = get_page_from_gfn(d, gmfn, NULL, P2M_ALLOC);
+        page = get_page_from_gfn(d, gmfn, &t, P2M_ALLOC);
 
         if ( !page || !get_page_type(page, PGT_writable_page) )
         {
             if ( page )
                 put_page(page);
+
+            if ( p2m_is_paging(t) )
+            {
+                p2m_mem_paging_populate(d, gmfn);
+                return -EAGAIN;
+            }
+
             gdprintk(XENLOG_WARNING,
                      "Bad GMFN %lx (MFN %lx) to MSR %08x\n",
-                     gmfn, page_to_mfn(page), base + idx);
+                     gmfn, page ? page_to_mfn(page) : -1UL, base);
             return 0;
         }
 
@@ -2490,7 +2498,7 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                 goto fail;
             break;
         default:
-            if ( wrmsr_hypervisor_regs(regs->ecx, msr_content) )
+            if ( wrmsr_hypervisor_regs(regs->ecx, msr_content) == 1 )
                 break;
 
             rc = vmce_wrmsr(regs->ecx, msr_content);

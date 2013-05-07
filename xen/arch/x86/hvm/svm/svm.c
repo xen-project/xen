@@ -1569,7 +1569,7 @@ static int svm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 
 static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
-    int ret;
+    int ret, result = X86EMUL_OKAY;
     struct vcpu *v = current;
     struct vmcb_struct *vmcb = v->arch.hvm_svm.vmcb;
     int sync = 0;
@@ -1682,14 +1682,24 @@ static int svm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
         if ( wrmsr_viridian_regs(msr, msr_content) )
             break;
 
-        wrmsr_hypervisor_regs(msr, msr_content);
+        switch ( wrmsr_hypervisor_regs(msr, msr_content) )
+        {
+        case -EAGAIN:
+            result = X86EMUL_RETRY;
+            break;
+        case 0:
+        case 1:
+            break;
+        default:
+            goto gpf;
+        }
         break;
     }
 
     if ( sync )
         svm_vmload(vmcb);
 
-    return X86EMUL_OKAY;
+    return result;
 
  gpf:
     hvm_inject_hw_exception(TRAP_gp_fault, 0);
