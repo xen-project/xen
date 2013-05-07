@@ -304,11 +304,6 @@ mk-headers-$(XEN_TARGET_ARCH): ioemu/linkfarm.stamp
 	  ln -sf $(XEN_ROOT)/tools/libxc/*.h . && \
 	  ln -sf $(XEN_ROOT)/tools/libxc/*.c . && \
 	  ln -sf $(XEN_ROOT)/tools/libxc/Makefile . )
-	mkdir -p libxc-$(XEN_TARGET_ARCH)/$(XEN_TARGET_ARCH)
-	[ -h libxc-$(XEN_TARGET_ARCH)/$(XEN_TARGET_ARCH) ] || ( cd libxc-$(XEN_TARGET_ARCH)/$(XEN_TARGET_ARCH) && \
-	  ln -sf $(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/*.c . && \
-	  ln -sf $(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/*.h . && \
-	  ln -sf $(XEN_ROOT)/tools/libxc/$(XEN_TARGET_ARCH)/Makefile . )
 	mkdir -p xenstore
 	[ -h xenstore/Makefile ] || ( cd xenstore && \
 	  ln -sf $(XEN_ROOT)/tools/xenstore/*.c . && \
