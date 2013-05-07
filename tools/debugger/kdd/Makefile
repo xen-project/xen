@@ -14,7 +14,7 @@ kdd: $(OBJS)
 
 .PHONY: clean
 clean:
-	rm -f $(OBJS) kdd
+	rm -f $(OBJS) $(DEPS) kdd
 
 .PHONY: install
 install: all
