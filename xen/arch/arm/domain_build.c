@@ -363,7 +363,7 @@ static void dtb_load(struct kernel_info *kinfo)
 int construct_dom0(struct domain *d)
 {
     struct kernel_info kinfo = {};
-    int rc;
+    int rc, i, cpu;
 
     struct vcpu *v = d->vcpu[0];
     struct cpu_user_regs *regs = &v->arch.cpu_info->guest_cpu_user_regs;
@@ -451,6 +451,16 @@ int construct_dom0(struct domain *d)
         regs->x3 = 0; /* Reserved for future use */
     }
 #endif
+
+    for ( i = 1, cpu = 0; i < d->max_vcpus; i++ )
+    {
+        cpu = cpumask_cycle(cpu, &cpu_online_map);
+        if ( alloc_vcpu(d, i, cpu) == NULL )
+        {
+            printk("Failed to allocate dom0 vcpu %d on pcpu %d\n", i, cpu);
+            break;
+        }
+    }
 
     local_abort_enable();
 
