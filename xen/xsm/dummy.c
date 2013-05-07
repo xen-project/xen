@@ -132,4 +132,7 @@ void xsm_fixup_ops (struct xsm_operations *ops)
     set_to_dummy_if_null(ops, ioport_permission);
     set_to_dummy_if_null(ops, ioport_mapping);
 #endif
+#ifdef CONFIG_ARM
+    set_to_dummy_if_null(ops, map_gmfn_foreign);
+#endif
 }

@@ -162,6 +162,9 @@ struct xsm_operations {
     int (*ioport_permission) (struct domain *d, uint32_t s, uint32_t e, uint8_t allow);
     int (*ioport_mapping) (struct domain *d, uint32_t s, uint32_t e, uint8_t allow);
 #endif
+#ifdef CONFIG_ARM
+    int (*map_gmfn_foreign) (struct domain *d, struct domain *t);
+#endif
 };
 
 #ifdef XSM_ENABLE
@@ -622,6 +625,14 @@ static inline int xsm_ioport_mapping (xsm_default_t def, struct domain *d, uint3
     return xsm_ops->ioport_mapping(d, s, e, allow);
 }
 #endif /* CONFIG_X86 */
+
+#ifdef CONFIG_ARM
+static inline int xsm_map_gmfn_foreign (struct domain *d, struct domain *t)
+{
+    return xsm_ops->map_gmfn_foreign(d, t);
+}
+#endif /* CONFIG_ARM */
+
 #endif /* XSM_NO_WRAPPERS */
 
 extern int xsm_init(unsigned long *module_map, const multiboot_info_t *mbi,

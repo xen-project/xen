@@ -753,9 +753,16 @@ static int xenmem_add_to_physmap_one(
     {
         paddr_t maddr;
         struct domain *od;
-        rc = rcu_lock_target_domain_by_id(foreign_domid, &od);
-        if ( rc < 0 )
+        od = rcu_lock_domain_by_any_id(foreign_domid);
+        if ( od == NULL )
+            return -ESRCH;
+
+        rc = xsm_map_gmfn_foreign(XSM_TARGET, d, od);
+        if ( rc )
+        {
+            rcu_unlock_domain(od);
             return rc;
+        }
 
         maddr = p2m_lookup(od, idx << PAGE_SHIFT);
         if ( maddr == INVALID_PADDR )
@@ -847,9 +854,9 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( xatp.space == XENMAPSPACE_gmfn_foreign )
             return -EINVAL;
 
-        rc = rcu_lock_target_domain_by_id(xatp.domid, &d);
-        if ( rc != 0 )
-            return rc;
+        d = rcu_lock_domain_by_any_id(xatp.domid);
+        if ( d == NULL )
+            return -ESRCH;
 
         rc = xsm_add_to_physmap(XSM_TARGET, current->domain, d);
         if ( rc )
@@ -878,9 +885,9 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( xatpr.space == XENMAPSPACE_gmfn_range )
             return -EINVAL;
 
-        rc = rcu_lock_target_domain_by_id(xatpr.domid, &d);
-        if ( rc != 0 )
-            return rc;
+        d = rcu_lock_domain_by_any_id(xatpr.domid);
+        if ( d == NULL )
+            return -ESRCH;
 
         rc = xsm_add_to_physmap(XSM_TARGET, current->domain, d);
         if ( rc )

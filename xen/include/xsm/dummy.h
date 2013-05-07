@@ -616,4 +616,12 @@ static XSM_INLINE int xsm_ioport_mapping(XSM_DEFAULT_ARG struct domain *d, uint3
     return xsm_default_action(action, current->domain, d);
 }
 
+#endif /* CONFIG_X86 */
+
+#ifdef CONFIG_ARM
+static XSM_INLINE int xsm_map_gmfn_foreign(XSM_DEFAULT_ARG struct domain *d, struct domain *t)
+{
+    XSM_ASSERT_ACTION(XSM_TARGET);
+    return xsm_default_action(action, d, t);
+}
 #endif

@@ -1454,6 +1454,13 @@ static int flask_unbind_pt_irq (struct domain *d, struct xen_domctl_bind_pt_irq 
 {
     return current_has_perm(d, SECCLASS_RESOURCE, RESOURCE__REMOVE);
 }
+#endif /* CONFIG_X86 */
+
+#ifdef CONFIG_ARM
+static int flask_map_gmfn_foreign(struct domain *d, struct domain *t)
+{
+    return domain_has_perm(d, t, SECCLASS_MMU, MMU__MAP_READ | MMU__MAP_WRITE);
+}
 #endif
 
 long do_flask_op(XEN_GUEST_HANDLE_PARAM(xsm_op_t) u_flask_op);
@@ -1561,6 +1568,9 @@ static struct xsm_operations flask_ops = {
     .unbind_pt_irq = flask_unbind_pt_irq,
     .ioport_permission = flask_ioport_permission,
     .ioport_mapping = flask_ioport_mapping,
+#endif
+#ifdef CONFIG_ARM
+    .map_gmfn_foreign = flask_map_gmfn_foreign,
 #endif
 };
 
