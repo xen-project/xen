@@ -139,7 +139,7 @@ endif
 
 .PHONY: clean
 clean:
-	rm -f $(SHLIB) $(SHLIB_LINKS) $(OBJECTS-y) \
+	rm -f $(LIB) $(SHLIB) $(SHLIB_LINKS) $(OBJECTS-y) \
 	      $(BINDINGS) $(BINDINGSRC) $(DEPS)
 
 -include $(DEPS)
