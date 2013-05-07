@@ -2,7 +2,7 @@ XEN_ROOT=$(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
 MAJOR = 3.0
-MINOR = 2
+MINOR = 3
 
 CFLAGS += -Werror
 CFLAGS += -I.
