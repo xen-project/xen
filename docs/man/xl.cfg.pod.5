@@ -460,12 +460,13 @@ Specifies that MSI-INTx translation should be turned on for the PCI
 device. When enabled, MSI-INTx translation will always enable MSI on
 the PCI device regardless whether the guest uses INTx or MSI. Some
 device drivers, such as NVIDIA's, detect an inconsistency and do not
-function when this option is enabled. Therefore the default is 0.
+function when this option is enabled. Therefore the default is false (0).
 
 =item B<power_mgmt=BOOLEAN>
 
 (HVM only) Specifies that the VM should be able to program the
-D0-D3hot power management states for the PCI device. 0 by default.
+D0-D3hot power management states for the PCI device. False (0) by
+default.
 
 =back
 
@@ -600,7 +601,7 @@ specific what meaning this has).
 =item B<e820_host=BOOLEAN>
 
 Selects whether to expose the host e820 (memory map) to the guest via
-the virtual e820. When this option is false the guest pseudo-physical
+the virtual e820. When this option is false (0) the guest pseudo-physical
 address space consists of a single contiguous RAM region. When this
 option is specified the virtual e820 instead reflects the host e820
 and contains the same PCI holes. The total amount of RAM represented
@@ -612,8 +613,8 @@ opportunity to set aside the required part of its pseudo-physical
 address space in order to provide address space to map passedthrough
 PCI devices. It is guest Operating System dependent whether this
 option is required, specifically it is required when using a mainline
-Linux ("pvops") kernel. This option defaults to true if any PCI
-passthrough devices are configured and false otherwise. If you do not
+Linux ("pvops") kernel. This option defaults to true (1) if any PCI
+passthrough devices are configured and false (0) otherwise. If you do not
 configure any passthrough devices at domain creation time but expect
 to hotplug devices later then you should set this option. Conversely
 if your particular guest kernel does not require this behaviour then
@@ -737,12 +738,12 @@ disable ACPI for compatibility with some guest Operating Systems.
 =item B<acpi_s3=BOOLEAN>
 
 Include the S3 (suspend-to-ram) power state in the virtual firmware
-ACPI table. 1 by default.
+ACPI table. True (1) by default.
 
 =item B<acpi_s4=BOOLEAN>
 
 Include S4 (suspend-to-disk) power state in the virtual firmware ACPI
-table. 1 by default.
+table. True (1) by default.
 
 =item B<apic=BOOLEAN>
 
@@ -895,11 +896,12 @@ Please see F<docs/misc/tscmode.txt> for more information on this option.
 
 =item B<localtime=BOOLEAN>
 
-Set the real time clock to local time or to UTC. 0 by default, i.e. set to UTC.
+Set the real time clock to local time or to UTC. False (0) by default,
+i.e. set to UTC.
 
 =item B<rtc_timeoffset=SECONDS>
 
-Set the real time clock offset in seconds. 0 by default.
+Set the real time clock offset in seconds. False (0) by default.
 
 
 =item B<vpt_align=BOOLEAN>
@@ -907,7 +909,7 @@ Set the real time clock offset in seconds. 0 by default.
 Specifies that periodic Virtual Platform Timers should be aligned to
 reduce guest interrupts. Enabling this option can reduce power
 consumption, especially when a guest uses a high timer interrupt
-frequency (HZ) values. The default is 1.
+frequency (HZ) values. The default is true (1).
 
 =item B<timer_mode=MODE>
 
@@ -1009,7 +1011,7 @@ If B<videoram> is set less than 128MB, an error will be triggered.
 =item B<stdvga=BOOLEAN>
 
 Select a standard VGA card with VBE (VESA BIOS Extensions) as the
-emulated graphics device. The default is false which means to emulate
+emulated graphics device. The default is false (0) which means to emulate
 a Cirrus Logic GD5446 VGA card. If your guest supports VBE 2.0 or
 later (e.g. Windows XP onwards) then you should enable this.
 stdvga supports more video ram and bigger resolutions than Cirrus.
@@ -1071,7 +1073,7 @@ Simple DirectMedia Layer). The default is not to enable this mode.
 
 Enable OpenGL acceleration of the SDL display. Only effects machines
 using B<device_model_version="qemu-xen-traditional"> and only if the
-device-model was compiled with OpenGL support. 0 by default.
+device-model was compiled with OpenGL support. False (0) by default.
 
 =item B<nographic=BOOLEAN>
 
@@ -1112,7 +1114,7 @@ have not been supported.
 =item B<spicedisable_ticketing=BOOLEAN>
 
 Enable client connection without password. When disabled, spicepasswd
-must be set. The default is 0.
+must be set. The default is false (0).
 
 =item B<spicepasswd="PASSWORD">
 
@@ -1120,7 +1122,7 @@ Specify the ticket password which is used by a client for connection.
 
 =item B<spiceagent_mouse=BOOLEAN>
 
-Whether SPICE agent is used for client mouse mode. The default is true
+Whether SPICE agent is used for client mouse mode. The default is true (1)
 (turn on)
 
 =back
