@@ -546,8 +546,7 @@ downloadclean: patchclean
 
 .PHONY: distclean
 distclean: downloadclean
-	-rm ../config/Stubdom.mk
-	rm -rf config.log config.status config.cache autom4te.cache
+	rm -rf config.log config.status config.cache autom4te.cache ../config/Stubdom.mk
 
 ifeq (,$(findstring clean,$(MAKECMDGOALS)))
 $(XEN_ROOT)/config/Stubdom.mk:

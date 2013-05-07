@@ -29,7 +29,7 @@ LINUX_VER3  := $(LINUX_SERIES).$(word 3, $(subst ., ,$(LINUX_VER)))
 .PHONY: _build
 _build: build
 
-include buildconfigs/src.$(XEN_LINUX_SOURCE)
+-include buildconfigs/src.$(XEN_LINUX_SOURCE)
 
 LINUX_ARCH = $$(sh buildconfigs/select-linux-arch $(LINUX_SRCDIR))
 IMAGE_PATH = $$(sh buildconfigs/select-linux-image $(LINUX_DIR) $(LINUX_ARCH) $(IMAGE_TARGET))

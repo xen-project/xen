@@ -158,7 +158,7 @@ endif
 # clean, but blow away kernel build tree plus tarballs
 .PHONY: distclean
 distclean:
-	-rm config/Toplevel.mk
+	rm -f config/Toplevel.mk
 	$(MAKE) -C xen distclean
 	$(MAKE) -C tools distclean
 	$(MAKE) -C stubdom distclean
