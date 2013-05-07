@@ -515,7 +515,7 @@ crossclean: clean
 	rm -fr $(CROSS_ROOT)
 	rm -fr newlib-$(XEN_TARGET_ARCH)
 	rm -fr zlib-$(XEN_TARGET_ARCH) pciutils-$(XEN_TARGET_ARCH)
-	rm -fr libxc-$(XEN_TARGET_ARCH) ioemu
+	rm -fr libxc-$(XEN_TARGET_ARCH) ioemu xenstore
 	rm -fr gmp-$(XEN_TARGET_ARCH)
 	rm -fr polarssl-$(XEN_TARGET_ARCH)
 	rm -fr openssl-$(XEN_TARGET_ARCH)
