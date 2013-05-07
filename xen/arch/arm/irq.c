@@ -93,6 +93,13 @@ void __cpuinit init_secondary_IRQ(void)
     BUG_ON(init_local_irq_data() < 0);
 }
 
+int __init request_dt_irq(const struct dt_irq *irq,
+        void (*handler)(int, void *, struct cpu_user_regs *),
+        unsigned long irqflags, const char *devname, void *dev_id)
+{
+    return request_irq(irq->irq, handler, irqflags, devname, dev_id);
+}
+
 int __init request_irq(unsigned int irq,
         void (*handler)(int, void *, struct cpu_user_regs *),
         unsigned long irqflags, const char * devname, void *dev_id)
