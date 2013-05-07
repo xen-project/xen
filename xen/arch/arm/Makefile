@@ -5,6 +5,7 @@ subdir-y += platforms
 obj-y += early_printk.o
 obj-y += cpu.o
 obj-y += domain.o
+obj-y += psci.o
 obj-y += domctl.o
 obj-y += sysctl.o
 obj-y += domain_build.o

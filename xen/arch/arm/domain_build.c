@@ -419,7 +419,7 @@ int construct_dom0(struct domain *d)
 
     regs->pc = (uint32_t)kinfo.entry;
 
-    regs->cpsr = PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_SVC;
+    regs->cpsr = PSR_GUEST_INIT;
 
 #ifdef CONFIG_ARM_64
     d->arch.type = kinfo.type;

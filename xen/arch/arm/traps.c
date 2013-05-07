@@ -34,6 +34,7 @@
 #include <asm/event.h>
 #include <asm/regs.h>
 #include <asm/cpregs.h>
+#include <asm/psci.h>
 
 #include "io.h"
 #include "vtimer.h"
@@ -666,6 +667,29 @@ static arm_hypercall_t arm_hypercall_table[] = {
     HYPERCALL(grant_table_op, 3),
 };
 
+#define __PSCI_cpu_suspend 0
+#define __PSCI_cpu_off     1
+#define __PSCI_cpu_on      2
+#define __PSCI_migrate     3
+
+typedef int (*arm_psci_fn_t)(uint32_t, register_t);
+
+typedef struct {
+    arm_psci_fn_t fn;
+    int nr_args;
+} arm_psci_t;
+
+#define PSCI(_name, _nr_args)                                  \
+    [ __PSCI_ ## _name ] =  {                                  \
+        .fn = (arm_psci_fn_t) &do_psci_ ## _name,              \
+        .nr_args = _nr_args,                                   \
+    }
+
+static arm_psci_t arm_psci_table[] = {
+    PSCI(cpu_off, 1),
+    PSCI(cpu_on, 2),
+};
+
 static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 {
     register_t *r;
@@ -693,6 +717,25 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
         panic("DOM%d: Unhandled debug trap %#x\n", domid, code);
         break;
     }
+}
+
+static void do_trap_psci(struct cpu_user_regs *regs)
+{
+    arm_psci_fn_t psci_call = NULL;
+
+    if ( regs->r0 >= ARRAY_SIZE(arm_psci_table) )
+    {
+        domain_crash_synchronous();
+        return;
+    }
+
+    psci_call = arm_psci_table[regs->r0].fn;
+    if ( psci_call == NULL )
+    {
+        domain_crash_synchronous();
+        return;
+    }
+    regs->r0 = psci_call(regs->r1, regs->r2);
 }
 
 static void do_trap_hypercall(struct cpu_user_regs *regs, unsigned long iss)
@@ -1013,6 +1056,8 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
     case HSR_EC_HVC:
         if ( (hsr.iss & 0xff00) == 0xff00 )
             return do_debug_trap(regs, hsr.iss & 0x00ff);
+        if ( hsr.iss == 0 )
+            return do_trap_psci(regs);
         do_trap_hypercall(regs, hsr.iss);
         break;
     case HSR_EC_DATA_ABORT_GUEST:
