@@ -15,6 +15,7 @@ struct arch_pirq
 
 struct irq_cfg {
 #define arch_irq_desc irq_cfg
+    int eoi_cpu;
 };
 
 #define NR_LOCAL_IRQS	32
