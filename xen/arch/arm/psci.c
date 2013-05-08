@@ -15,6 +15,7 @@
 #include <xen/types.h>
 
 #include <asm/current.h>
+#include <asm/gic.h>
 #include <asm/psci.h>
 
 int do_psci_cpu_on(uint32_t vcpuid, register_t entry_point)
@@ -32,6 +33,8 @@ int do_psci_cpu_on(uint32_t vcpuid, register_t entry_point)
 
     if ( (ctxt = alloc_vcpu_guest_context()) == NULL )
         return PSCI_DENIED;
+
+    vgic_clear_pending_irqs(v);
 
     memset(ctxt, 0, sizeof(*ctxt));
     ctxt->user_regs.pc64 = (u64) entry_point;

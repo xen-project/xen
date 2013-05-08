@@ -641,6 +641,18 @@ struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq)
     return n;
 }
 
+void vgic_clear_pending_irqs(struct vcpu *v)
+{
+    struct pending_irq *p, *t;
+    unsigned long flags;
+
+    spin_lock_irqsave(&v->arch.vgic.lock, flags);
+    list_for_each_entry_safe ( p, t, &v->arch.vgic.inflight_irqs, inflight )
+        list_del_init(&p->inflight);
+    gic_clear_pending_irqs(v);
+    spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
+}
+
 void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
 {
     int idx = irq >> 2, byte = irq & 0x3;
@@ -652,8 +664,8 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
 
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
 
-    /* irq already pending */
-    if (!list_empty(&n->inflight))
+    /* vcpu offline or irq already pending */
+    if (test_bit(_VPF_down, &v->pause_flags) || !list_empty(&n->inflight))
     {
         spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
         return;

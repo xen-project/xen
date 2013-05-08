@@ -576,6 +576,18 @@ static void gic_restore_pending_irqs(struct vcpu *v)
 
 }
 
+void gic_clear_pending_irqs(struct vcpu *v)
+{
+    struct pending_irq *p, *t;
+    unsigned long flags;
+
+    spin_lock_irqsave(&gic.lock, flags);
+    v->arch.lr_mask = 0;
+    list_for_each_entry_safe ( p, t, &v->arch.vgic.lr_pending, lr_queue )
+        list_del_init(&p->lr_queue);
+    spin_unlock_irqrestore(&gic.lock, flags);
+}
+
 static void gic_inject_irq_start(void)
 {
     register_t hcr = READ_SYSREG(HCR_EL2);
