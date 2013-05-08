@@ -10,6 +10,7 @@
  * GNU General Public License for more details.
  */
 #include <xen/config.h>
+#include <xen/hypercall.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/sched.h>
@@ -626,6 +627,18 @@ void arch_dump_domain_info(struct domain *d)
     for_each_vcpu ( d, v )
     {
         gic_dump_info(v);
+    }
+}
+
+
+long do_arm_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
+{
+    switch ( cmd )
+    {
+        case VCPUOP_register_vcpu_info:
+            return do_vcpu_op(cmd, vcpuid, arg);
+        default:
+            return -EINVAL;
     }
 }
 

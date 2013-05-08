@@ -653,6 +653,11 @@ typedef struct {
         .nr_args = _nr_args,                                         \
     }
 
+#define HYPERCALL_ARM(_name, _nr_args)                        \
+    [ __HYPERVISOR_ ## _name ] =  {                                  \
+        .fn = (arm_hypercall_fn_t) &do_arm_ ## _name,                \
+        .nr_args = _nr_args,                                         \
+    }
 static arm_hypercall_t arm_hypercall_table[] = {
     HYPERCALL(memory_op, 2),
     HYPERCALL(domctl, 1),
@@ -665,6 +670,7 @@ static arm_hypercall_t arm_hypercall_table[] = {
     HYPERCALL(sysctl, 2),
     HYPERCALL(hvm_op, 2),
     HYPERCALL(grant_table_op, 3),
+    HYPERCALL_ARM(vcpu_op, 3),
 };
 
 #define __PSCI_cpu_suspend 0

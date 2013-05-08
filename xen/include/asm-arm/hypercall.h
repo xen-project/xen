@@ -4,6 +4,8 @@
 #include <public/domctl.h> /* for arch_do_domctl */
 int do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 
+long do_arm_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg);
+
 #endif /* __ASM_ARM_HYPERCALL_H__ */
 /*
  * Local variables:
