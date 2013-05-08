@@ -47,8 +47,7 @@ static void virt_timer_expired(void *data)
 int vcpu_domain_init(struct domain *d)
 {
     d->arch.phys_timer_base.offset = NOW();
-    d->arch.virt_timer_base.offset = READ_SYSREG64(CNTVCT_EL0) +
-                                     READ_SYSREG64(CNTVOFF_EL2);
+    d->arch.virt_timer_base.offset = READ_SYSREG64(CNTPCT_EL0);
     return 0;
 }
 
