@@ -38,6 +38,7 @@
 #include <xen/sched.h>
 #include <xen/vmap.h>
 #include <xsm/xsm.h>
+#include <xen/pfn.h>
 
 struct domain *dom_xen, *dom_io, *dom_cow;
 
@@ -567,45 +568,22 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     frametable_virt_end = FRAMETABLE_VIRT_START + (nr_pages * sizeof(struct page_info));
 }
 
-/* Map the physical memory range start -  start + len into virtual
- * memory and return the virtual address of the mapping.
- * start has to be 2MB aligned.
- * len has to be < VMAP_VIRT_END - VMAP_VIRT_START.
- */
-static __initdata unsigned long early_vmap_start = VMAP_VIRT_END;
-void* __init early_ioremap(paddr_t start, size_t len, unsigned attributes)
-{
-    paddr_t end = start + len;
-    unsigned long map_start;
-
-    len = (len + SECOND_SIZE - 1) & ~SECOND_MASK;
-    early_vmap_start -= len;
-
-    ASSERT(!(start & (~SECOND_MASK)));
-    ASSERT(!(early_vmap_start & (~SECOND_MASK)));
-
-    /* The range we need to map is too big */
-    if ( early_vmap_start >= VMAP_VIRT_START )
-        return NULL;
-
-    map_start = early_vmap_start;
-    while ( start < end )
-    {
-        lpae_t e = mfn_to_xen_entry(start >> PAGE_SHIFT);
-        e.pt.ai = attributes;
-        write_pte(xen_second + second_table_offset(map_start), e);
-
-        start += SECOND_SIZE;
-        map_start += SECOND_SIZE;
-    }
-    flush_xen_data_tlb_range_va(early_vmap_start, len);
-
-    return (void*)early_vmap_start;
-}
-
 void *__init arch_vmap_virt_end(void)
 {
-    return (void *)early_vmap_start;
+    return (void *)VMAP_VIRT_END;
+}
+
+/*
+ * This function should only be used to remap device address ranges
+ * TODO: add a check to verify this assumption
+ */
+void *ioremap_attr(paddr_t pa, size_t len, unsigned int attributes)
+{
+    unsigned long pfn = PFN_DOWN(pa);
+    unsigned int offs = pa & (PAGE_SIZE - 1);
+    unsigned int nr = PFN_UP(offs + len);
+
+    return (__vmap(&pfn, nr, 1, 1, attributes) + offs);
 }
 
 static int create_xen_table(lpae_t *entry)

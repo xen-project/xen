@@ -429,6 +429,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     setup_pagetables(boot_phys_offset, get_xen_paddr());
     setup_mm(fdt_paddr, fdt_size);
 
+    vm_init();
+
 #ifdef EARLY_UART_ADDRESS
     /* TODO Need to get device tree or command line for UART address */
     pl011_init(0, FIXMAP_ADDR(FIXMAP_CONSOLE));
@@ -482,8 +484,6 @@ void __init start_xen(unsigned long boot_phys_offset,
     initialize_keytable();
 
     console_init_postirq();
-
-    vm_init();
 
     do_presmp_initcalls();
 

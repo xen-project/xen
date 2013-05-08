@@ -211,7 +211,7 @@ void __init video_init(void)
 
     printk(KERN_INFO "Initializing HDLCD driver\n");
 
-    lfb = early_ioremap(framebuffer_start, framebuffer_size, DEV_WC);
+    lfb = ioremap_wc(framebuffer_start, framebuffer_size);
     if ( !lfb )
     {
         printk(KERN_ERR "Couldn't map the framebuffer\n");
