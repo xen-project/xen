@@ -648,6 +648,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
     struct vgic_irq_rank *rank = vgic_irq_rank(v, 8, idx);
     struct pending_irq *iter, *n = irq_to_pending(v, irq);
     unsigned long flags;
+    bool_t running;
 
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
 
@@ -683,7 +684,10 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
 out:
     spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
     /* we have a new higher priority irq, inject it into the guest */
+    running = v->is_running;
     vcpu_unblock(v);
+    if ( running && v != current )
+        smp_send_event_check_mask(cpumask_of(v->processor));
 }
 
 /*
