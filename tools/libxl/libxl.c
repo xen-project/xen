@@ -1861,11 +1861,12 @@ libxl_device_vtpm *libxl_device_vtpm_list(libxl_ctx *ctx, uint32_t domid, int *n
           vtpm->backend_domid = atoi(tmp);
 
           tmp = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/uuid", be_path));
-          if(tmp) {
-             if(libxl_uuid_from_string(&(vtpm->uuid), tmp)) {
-                LOG(ERROR, "%s/uuid is a malformed uuid?? (%s) Probably a bug!!\n", be_path, tmp);
-                exit(1);
-             }
+          if (tmp) {
+              if(libxl_uuid_from_string(&(vtpm->uuid), tmp)) {
+                  LOG(ERROR, "%s/uuid is a malformed uuid?? (%s) Probably a bug!!\n", be_path, tmp);
+                  free(vtpms);
+                  return NULL;
+              }
           }
        }
     }
