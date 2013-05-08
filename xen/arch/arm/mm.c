@@ -631,7 +631,8 @@ enum xenmap_operation {
 static int create_xen_entries(enum xenmap_operation op,
                               unsigned long virt,
                               unsigned long mfn,
-                              unsigned long nr_mfns)
+                              unsigned long nr_mfns,
+                              unsigned int ai)
 {
     int rc;
     unsigned long addr = virt, addr_end = addr + nr_mfns * PAGE_SIZE;
@@ -664,6 +665,7 @@ static int create_xen_entries(enum xenmap_operation op,
                 }
                 pte = mfn_to_xen_entry(mfn);
                 pte.pt.table = 1;
+                pte.pt.ai = ai;
                 write_pte(&third[third_table_offset(addr)], pte);
                 break;
             case REMOVE:
@@ -693,12 +695,11 @@ int map_pages_to_xen(unsigned long virt,
                      unsigned long nr_mfns,
                      unsigned int flags)
 {
-    ASSERT(flags == PAGE_HYPERVISOR);
-    return create_xen_entries(INSERT, virt, mfn, nr_mfns);
+    return create_xen_entries(INSERT, virt, mfn, nr_mfns, flags);
 }
 void destroy_xen_mappings(unsigned long v, unsigned long e)
 {
-    create_xen_entries(REMOVE, v, 0, (e - v) >> PAGE_SHIFT);
+    create_xen_entries(REMOVE, v, 0, (e - v) >> PAGE_SHIFT, 0);
 }
 
 enum mg { mg_clear, mg_ro, mg_rw, mg_rx };
