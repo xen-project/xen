@@ -44,13 +44,20 @@ static void virt_timer_expired(void *data)
     vgic_vcpu_inject_irq(t->v, 27, 1);
 }
 
+int vcpu_domain_init(struct domain *d)
+{
+    d->arch.phys_timer_base.offset = NOW();
+    d->arch.virt_timer_base.offset = READ_SYSREG64(CNTVCT_EL0) +
+                                     READ_SYSREG64(CNTVOFF_EL2);
+    return 0;
+}
+
 int vcpu_vtimer_init(struct vcpu *v)
 {
     struct vtimer *t = &v->arch.phys_timer;
 
     init_timer(&t->timer, phys_timer_expired, t, v->processor);
     t->ctl = 0;
-    t->offset = NOW();
     t->cval = NOW();
     t->irq = 30;
     t->v = v;
@@ -58,7 +65,6 @@ int vcpu_vtimer_init(struct vcpu *v)
     t = &v->arch.virt_timer;
     init_timer(&t->timer, virt_timer_expired, t, v->processor);
     t->ctl = 0;
-    t->offset = READ_SYSREG64(CNTVCT_EL0) + READ_SYSREG64(CNTVOFF_EL2);
     t->cval = 0;
     t->irq = 27;
     t->v = v;
@@ -84,7 +90,7 @@ int virt_timer_save(struct vcpu *v)
          !(v->arch.virt_timer.ctl & CNTx_CTL_MASK))
     {
         set_timer(&v->arch.virt_timer.timer, ticks_to_ns(v->arch.virt_timer.cval +
-                  v->arch.virt_timer.offset - boot_count));
+                  v->domain->arch.virt_timer_base.offset - boot_count));
     }
     return 0;
 }
@@ -98,7 +104,7 @@ int virt_timer_restore(struct vcpu *v)
     migrate_timer(&v->arch.virt_timer.timer, v->processor);
     migrate_timer(&v->arch.phys_timer.timer, v->processor);
 
-    WRITE_SYSREG64(v->arch.virt_timer.offset, CNTVOFF_EL2);
+    WRITE_SYSREG64(v->domain->arch.virt_timer_base.offset, CNTVOFF_EL2);
     WRITE_SYSREG64(v->arch.virt_timer.cval, CNTV_CVAL_EL0);
     WRITE_SYSREG32(v->arch.virt_timer.ctl, CNTV_CTL_EL0);
     return 0;
@@ -128,7 +134,8 @@ static int vtimer_emulate_32(struct cpu_user_regs *regs, union hsr hsr)
             if ( v->arch.phys_timer.ctl & CNTx_CTL_ENABLE )
             {
                 set_timer(&v->arch.phys_timer.timer,
-                          v->arch.phys_timer.cval + v->arch.phys_timer.offset);
+                          v->arch.phys_timer.cval +
+                          v->domain->arch.phys_timer_base.offset);
             }
             else
                 stop_timer(&v->arch.phys_timer.timer);
@@ -137,7 +144,7 @@ static int vtimer_emulate_32(struct cpu_user_regs *regs, union hsr hsr)
         return 1;
 
     case HSR_CPREG32(CNTP_TVAL):
-        now = NOW() - v->arch.phys_timer.offset;
+        now = NOW() - v->domain->arch.phys_timer_base.offset;
         if ( cp32.read )
         {
             *r = (uint32_t)(ns_to_ticks(v->arch.phys_timer.cval - now) & 0xffffffffull);
@@ -149,7 +156,8 @@ static int vtimer_emulate_32(struct cpu_user_regs *regs, union hsr hsr)
             {
                 v->arch.phys_timer.ctl &= ~CNTx_CTL_PENDING;
                 set_timer(&v->arch.phys_timer.timer,
-                          v->arch.phys_timer.cval + v->arch.phys_timer.offset);
+                          v->arch.phys_timer.cval +
+                          v->domain->arch.phys_timer_base.offset);
             }
         }
 
@@ -174,7 +182,7 @@ static int vtimer_emulate_64(struct cpu_user_regs *regs, union hsr hsr)
     case HSR_CPREG64(CNTPCT):
         if ( cp64.read )
         {
-            now = NOW() - v->arch.phys_timer.offset;
+            now = NOW() - v->domain->arch.phys_timer_base.offset;
             ticks = ns_to_ticks(now);
             *r1 = (uint32_t)(ticks & 0xffffffff);
             *r2 = (uint32_t)(ticks >> 32);

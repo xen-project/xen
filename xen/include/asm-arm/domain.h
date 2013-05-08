@@ -47,6 +47,14 @@ enum domain_type {
 #define is_pv64_domain(d) (0)
 #endif
 
+struct vtimer {
+        struct vcpu *v;
+        int irq;
+        struct timer timer;
+        uint32_t ctl;
+        uint64_t cval;
+};
+
 struct arch_domain
 {
 #ifdef CONFIG_ARM_64
@@ -60,6 +68,13 @@ struct arch_domain
     /* Virtual CPUID */
     uint32_t vpidr;
     register_t vmpidr;
+
+    struct {
+        uint64_t offset;
+    } phys_timer_base;
+    struct {
+        uint64_t offset;
+    } virt_timer_base;
 
     struct {
         /*
@@ -90,15 +105,6 @@ struct arch_domain
     } uart0;
 
 }  __cacheline_aligned;
-
-struct vtimer {
-        struct vcpu *v;
-        int irq;
-        struct timer timer;
-        uint32_t ctl;
-        uint64_t offset;
-        uint64_t cval;
-};
 
 struct arch_vcpu
 {

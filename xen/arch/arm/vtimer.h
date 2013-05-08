@@ -20,6 +20,7 @@
 #ifndef __ARCH_ARM_VTIMER_H__
 #define __ARCH_ARM_VTIMER_H__
 
+extern int vcpu_domain_init(struct domain *d);
 extern int vcpu_vtimer_init(struct vcpu *v);
 extern int vtimer_emulate(struct cpu_user_regs *regs, union hsr hsr);
 extern int virt_timer_save(struct vcpu *v);
