@@ -126,7 +126,7 @@ include/xen/compile.h: include/xen/compile.h.in .banner
 	    -e 's/@@version@@/$(XEN_VERSION)/g' \
 	    -e 's/@@subversion@@/$(XEN_SUBVERSION)/g' \
 	    -e 's/@@extraversion@@/$(XEN_EXTRAVERSION)/g' \
-	    -e 's!@@changeset@@!$(shell ((hg parents --template "{date|date} {rev}:{node|short}" >/dev/null && hg parents --template "{date|date} {rev}:{node|short}") || echo "unavailable") 2>/dev/null)!g' \
+	    -e 's!@@changeset@@!$(shell tools/scmversion $(XEN_ROOT) || echo "unavailable")!g' \
 	    < include/xen/compile.h.in > $@.new
 	@grep \" .banner >> $@.new
 	@grep -v \" .banner
