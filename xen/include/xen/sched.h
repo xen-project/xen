@@ -192,6 +192,9 @@ struct vcpu
 
     struct waitqueue_vcpu *waitqueue_vcpu;
 
+    /* Guest-specified relocation of vcpu_info. */
+    unsigned long vcpu_info_mfn;
+
     struct arch_vcpu arch;
 };
 

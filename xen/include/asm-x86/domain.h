@@ -436,9 +436,6 @@ struct arch_vcpu
 
     struct paging_vcpu paging;
 
-    /* Guest-specified relocation of vcpu_info. */
-    unsigned long vcpu_info_mfn;
-
     uint32_t gdbsx_vcpu_event;
 
     /* A secondary copy of the vcpu time info. */

@@ -33,6 +33,7 @@
 #include <xen/xenoprof.h>
 #include <xen/irq.h>
 #include <asm/debugger.h>
+#include <asm/p2m.h>
 #include <asm/processor.h>
 #include <public/sched.h>
 #include <public/sysctl.h>
@@ -142,6 +143,7 @@ struct vcpu *alloc_vcpu(
         v->vcpu_info = ((vcpu_id < XEN_LEGACY_MAX_VCPUS)
                         ? (vcpu_info_t *)&shared_info(d, vcpu_info[vcpu_id])
                         : &dummy_vcpu_info);
+        v->vcpu_info_mfn = INVALID_MFN;
         init_waitqueue_vcpu(v);
     }
 
@@ -513,6 +515,7 @@ int rcu_lock_live_remote_domain_by_id(domid_t dom, struct domain **d)
 int domain_kill(struct domain *d)
 {
     int rc = 0;
+    struct vcpu *v;
 
     if ( d == current->domain )
         return -EINVAL;
@@ -537,6 +540,8 @@ int domain_kill(struct domain *d)
             BUG_ON(rc != -EAGAIN);
             break;
         }
+        for_each_vcpu ( d, v )
+            unmap_vcpu_info(v);
         d->is_dying = DOMDYING_dead;
         /* Mem event cleanup has to go here because the rings 
          * have to be put before we call put_domain. */
@@ -870,6 +875,96 @@ int vcpu_reset(struct vcpu *v)
     return rc;
 }
 
+/*
+ * Map a guest page in and point the vcpu_info pointer at it.  This
+ * makes sure that the vcpu_info is always pointing at a valid piece
+ * of memory, and it sets a pending event to make sure that a pending
+ * event doesn't get missed.
+ */
+int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
+{
+    struct domain *d = v->domain;
+    void *mapping;
+    vcpu_info_t *new_info;
+    struct page_info *page;
+    int i;
+
+    if ( offset > (PAGE_SIZE - sizeof(vcpu_info_t)) )
+        return -EINVAL;
+
+    if ( v->vcpu_info_mfn != INVALID_MFN )
+        return -EINVAL;
+
+    /* Run this command on yourself or on other offline VCPUS. */
+    if ( (v != current) && !test_bit(_VPF_down, &v->pause_flags) )
+        return -EINVAL;
+
+    page = get_page_from_gfn(d, gfn, NULL, P2M_ALLOC);
+    if ( !page )
+        return -EINVAL;
+
+    if ( !get_page_type(page, PGT_writable_page) )
+    {
+        put_page(page);
+        return -EINVAL;
+    }
+
+    mapping = __map_domain_page_global(page);
+    if ( mapping == NULL )
+    {
+        put_page_and_type(page);
+        return -ENOMEM;
+    }
+
+    new_info = (vcpu_info_t *)(mapping + offset);
+
+    if ( v->vcpu_info == &dummy_vcpu_info )
+    {
+        memset(new_info, 0, sizeof(*new_info));
+        __vcpu_info(v, new_info, evtchn_upcall_mask) = 1;
+    }
+    else
+    {
+        memcpy(new_info, v->vcpu_info, sizeof(*new_info));
+    }
+
+    v->vcpu_info = new_info;
+    v->vcpu_info_mfn = page_to_mfn(page);
+
+    /* Set new vcpu_info pointer /before/ setting pending flags. */
+    wmb();
+
+    /*
+     * Mark everything as being pending just to make sure nothing gets
+     * lost.  The domain will get a spurious event, but it can cope.
+     */
+    vcpu_info(v, evtchn_upcall_pending) = 1;
+    for ( i = 0; i < BITS_PER_EVTCHN_WORD(d); i++ )
+        set_bit(i, &vcpu_info(v, evtchn_pending_sel));
+
+    return 0;
+}
+
+/*
+ * Unmap the vcpu info page if the guest decided to place it somewhere
+ * else.  This is only used from arch_domain_destroy, so there's no
+ * need to do anything clever.
+ */
+void unmap_vcpu_info(struct vcpu *v)
+{
+    unsigned long mfn;
+
+    if ( v->vcpu_info_mfn == INVALID_MFN )
+        return;
+
+    mfn = v->vcpu_info_mfn;
+    unmap_domain_page_global(v->vcpu_info);
+
+    v->vcpu_info = &dummy_vcpu_info;
+    v->vcpu_info_mfn = INVALID_MFN;
+
+    put_page_and_type(mfn_to_page(mfn));
+}
 
 long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
@@ -993,6 +1088,22 @@ long do_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
         stop_timer(&v->singleshot_timer);
 
         break;
+
+    case VCPUOP_register_vcpu_info:
+    {
+        struct domain *d = v->domain;
+        struct vcpu_register_vcpu_info info;
+
+        rc = -EFAULT;
+        if ( copy_from_guest(&info, arg, 1) )
+            break;
+
+        domain_lock(d);
+        rc = map_vcpu_info(v, info.mfn, info.offset);
+        domain_unlock(d);
+
+        break;
+    }
 
 #ifdef VCPU_TRAP_NMI
     case VCPUOP_send_nmi:

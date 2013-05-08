@@ -52,6 +52,9 @@ void free_pirq_struct(void *);
 int  vcpu_initialise(struct vcpu *v);
 void vcpu_destroy(struct vcpu *v);
 
+int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset);
+void unmap_vcpu_info(struct vcpu *v);
+
 int arch_domain_create(struct domain *d, unsigned int domcr_flags);
 
 void arch_domain_destroy(struct domain *d);
