@@ -48,7 +48,7 @@ int vcpu_vtimer_init(struct vcpu *v)
 {
     struct vtimer *t = &v->arch.phys_timer;
 
-    init_timer(&t->timer, phys_timer_expired, t, smp_processor_id());
+    init_timer(&t->timer, phys_timer_expired, t, v->processor);
     t->ctl = 0;
     t->offset = NOW();
     t->cval = NOW();
@@ -56,7 +56,7 @@ int vcpu_vtimer_init(struct vcpu *v)
     t->v = v;
 
     t = &v->arch.virt_timer;
-    init_timer(&t->timer, virt_timer_expired, t, smp_processor_id());
+    init_timer(&t->timer, virt_timer_expired, t, v->processor);
     t->ctl = 0;
     t->offset = READ_SYSREG64(CNTVCT_EL0) + READ_SYSREG64(CNTVOFF_EL2);
     t->cval = 0;
@@ -95,6 +95,8 @@ int virt_timer_restore(struct vcpu *v)
         return 0;
 
     stop_timer(&v->arch.virt_timer.timer);
+    migrate_timer(&v->arch.virt_timer.timer, v->processor);
+    migrate_timer(&v->arch.phys_timer.timer, v->processor);
 
     WRITE_SYSREG64(v->arch.virt_timer.offset, CNTVOFF_EL2);
     WRITE_SYSREG64(v->arch.virt_timer.cval, CNTV_CVAL_EL0);
