@@ -34,14 +34,14 @@ static void phys_timer_expired(void *data)
     struct vtimer *t = data;
     t->ctl |= CNTx_CTL_PENDING;
     if ( !(t->ctl & CNTx_CTL_MASK) )
-        vgic_vcpu_inject_irq(t->v, 30, 1);
+        vgic_vcpu_inject_irq(t->v, t->irq, 1);
 }
 
 static void virt_timer_expired(void *data)
 {
     struct vtimer *t = data;
     t->ctl |= CNTx_CTL_MASK;
-    vgic_vcpu_inject_irq(t->v, 27, 1);
+    vgic_vcpu_inject_irq(t->v, t->irq, 1);
 }
 
 int vcpu_domain_init(struct domain *d)
@@ -55,17 +55,20 @@ int vcpu_vtimer_init(struct vcpu *v)
 {
     struct vtimer *t = &v->arch.phys_timer;
 
+    /* TODO: Retrieve physical and virtual timer IRQ from the guest
+     * DT. For the moment we use dom0 DT
+     */
+
     init_timer(&t->timer, phys_timer_expired, t, v->processor);
     t->ctl = 0;
     t->cval = NOW();
-    t->irq = 30;
+    t->irq = timer_dt_irq(TIMER_PHYS_NONSECURE_PPI)->irq;
     t->v = v;
 
     t = &v->arch.virt_timer;
     init_timer(&t->timer, virt_timer_expired, t, v->processor);
     t->ctl = 0;
-    t->cval = 0;
-    t->irq = 27;
+    t->irq = timer_dt_irq(TIMER_VIRT_PPI)->irq;
     t->v = v;
 
     return 0;
