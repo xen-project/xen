@@ -1361,6 +1361,17 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
         }
     }
 
+    /* For the benefit of 32-bit WinXP (& older Windows) on AMD CPUs,
+     * a fast path for LAPIC accesses, skipping the p2m lookup. */
+    if ( !nestedhvm_vcpu_in_guestmode(v)
+         && gfn == PFN_DOWN(vlapic_base_address(vcpu_vlapic(v))) )
+    {
+        if ( !handle_mmio() )
+            hvm_inject_hw_exception(TRAP_gp_fault, 0);
+        rc = 1;
+        goto out;
+    }
+
     p2m = p2m_get_hostp2m(v->domain);
     mfn = get_gfn_type_access(p2m, gfn, &p2mt, &p2ma, 
                               P2M_ALLOC | (access_w ? P2M_UNSHARE : 0), NULL);
@@ -2470,6 +2481,12 @@ static enum hvm_copy_result __hvm_copy(
         {
             gfn = addr >> PAGE_SHIFT;
         }
+
+        /* For the benefit of 32-bit WinXP (& older Windows) on AMD CPUs,
+         * a fast path for LAPIC accesses, skipping the p2m lookup. */
+        if ( !nestedhvm_vcpu_in_guestmode(curr)
+             && gfn == PFN_DOWN(vlapic_base_address(vcpu_vlapic(curr))) )
+            return HVMCOPY_bad_gfn_to_mfn;
 
         page = get_page_from_gfn(curr->domain, gfn, &p2mt, P2M_UNSHARE);
 
