@@ -2,6 +2,7 @@
 *.orig
 *.rej
 *~
+*.swp
 *.o
 *.d
 *.opic
