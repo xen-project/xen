@@ -30,7 +30,7 @@ typedef struct {
 
 #define spin_is_locked(x)	arch_spin_is_locked(x)
 
-#define spin_unlock_wait(x)	do { barrier(); } while(spin_is_locked(x))
+#define spin_unlock_wait(x)	arch_spin_unlock_wait(x)
 
 
 #define _spin_trylock(lock)     ({_raw_spin_trylock(lock) ? \
