@@ -181,7 +181,7 @@ struct cmd_spec cmd_table[] = {
     { "cd-insert",
       &main_cd_insert, 1, 1,
       "Insert a cdrom into a guest's cd drive",
-      "<Domain> <VirtualDevice> <type:path>",
+      "<Domain> <VirtualDevice> <path>",
     },
     { "cd-eject",
       &main_cd_eject, 1, 1,
