@@ -20,7 +20,7 @@ void early_panic(const char *fmt, ...) __attribute__((noreturn));
 #else
 
 static inline void early_printk(const char *fmt, ...) {}
-static inline void early_panic(const char *fmt, ...) {}
+static inline void  __attribute__((noreturn)) early_panic(const char *fmt, ...) {while(1);}
 
 #endif
 
