@@ -213,9 +213,9 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= b0855f925c6e2e0b21fbb03fab4b5fb5b6876871
 QEMU_UPSTREAM_REVISION ?= qemu-xen-4.3.0-rc1
-SEABIOS_UPSTREAM_TAG ?= rel-1.7.1
-# Wed Aug 29 21:27:37 2012 -0400
-# Make iasl option check work with older versions of iasl.
+SEABIOS_UPSTREAM_TAG ?= 30ef08fb25af278ba012efd8b2c0050c108be54d
+# Sun Feb 10 21:06:14 2013 -0500
+# Update tools/acpi_extract.py to handle iasl 20130117 release.
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
