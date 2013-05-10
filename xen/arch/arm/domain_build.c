@@ -407,8 +407,9 @@ int construct_dom0(struct domain *d)
     /* The following loads use the domain's p2m */
     p2m_load_VTTBR(d);
 
-    dtb_load(&kinfo);
+    kinfo.dtb_paddr = kinfo.zimage.load_addr + kinfo.zimage.len;
     kernel_load(&kinfo);
+    dtb_load(&kinfo);
 
     discard_initial_modules();
 
