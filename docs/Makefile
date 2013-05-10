@@ -1,5 +1,3 @@
-#!/usr/bin/make -f
-
 XEN_ROOT=$(CURDIR)/..
 include $(XEN_ROOT)/Config.mk
 -include $(XEN_ROOT)/config/Docs.mk
@@ -75,7 +73,7 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	rm -rf ../config/Docs.mk config.log config.status config.cache \
+	rm -rf $(XEN_ROOT)/config/Docs.mk config.log config.status config.cache \
 		autom4te.cache
 
 .PHONY: install
@@ -88,8 +86,8 @@ install: all
 	cp -R man5 $(DESTDIR)$(MANDIR)
 	[ ! -d html ] || cp -R html $(DESTDIR)$(DOCDIR)
 
-html/index.html: $(DOC_HTML) ./gen-html-index INDEX
-	perl -w -- ./gen-html-index -i INDEX html $(DOC_HTML)
+html/index.html: $(DOC_HTML) $(CURDIR)/gen-html-index INDEX
+	$(PERL) -w -- $(CURDIR)/gen-html-index -i INDEX html $(DOC_HTML)
 
 html/%.html: %.markdown
 	$(INSTALL_DIR) $(@D)
@@ -123,13 +121,13 @@ else
 	@echo "pod2html not installed; skipping $<."
 endif
 
-html/hypercall/index.html: ./xen-headers
+html/hypercall/index.html: $(CURDIR)/xen-headers
 	rm -rf $(@D)
 	$(INSTALL_DIR) $(@D)
-	./xen-headers -O $(@D) \
+	$(PERL) -w $(CURDIR)/xen-headers -O $(@D) \
 		-T 'arch-x86_64 - Xen public headers' \
 		-X arch-x86_32 -X xen-x86_32 -X arch-arm \
-		../xen include/public include/xen/errno.h
+		$(XEN_ROOT)/xen include/public include/xen/errno.h
 
 -include html/hypercall/.deps
 

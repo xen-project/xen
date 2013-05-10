@@ -11,3 +11,4 @@ POD2MAN             := @POD2MAN@
 POD2HTML            := @POD2HTML@
 POD2TEXT            := @POD2TEXT@
 MARKDOWN            := @MARKDOWN@
+PERL                := @PERL@
