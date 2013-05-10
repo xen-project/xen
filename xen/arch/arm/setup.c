@@ -435,6 +435,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     console_init_preirq();
 #endif
 
+    system_state = SYS_STATE_boot;
+
     processor_id();
 
     init_xen_time();
