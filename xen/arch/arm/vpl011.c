@@ -85,7 +85,9 @@ static void uart0_print_char(char c)
 
 static int uart0_mmio_check(struct vcpu *v, paddr_t addr)
 {
-    return addr >= UART0_START && addr < UART0_END;
+    struct domain *d = v->domain;
+
+    return d->domain_id != 0 && addr >= UART0_START && addr < UART0_END;
 }
 
 static int uart0_mmio_read(struct vcpu *v, mmio_info_t *info)
