@@ -31,8 +31,8 @@ install: all
 	$(INSTALL_DATA) fsimage_plugin.h $(DESTDIR)$(INCLUDEDIR)
 	$(INSTALL_DATA) fsimage_grub.h $(DESTDIR)$(INCLUDEDIR)
 
-clean distclean:
-	rm -f $(PIC_OBJS) $(LIB) $(DEPS)
+clean distclean::
+	rm -f $(LIB)
 
 libfsimage.so: libfsimage.so.$(MAJOR)
 	ln -sf $< $@
