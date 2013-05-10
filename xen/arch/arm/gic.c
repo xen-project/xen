@@ -723,7 +723,7 @@ int gicv_setup(struct domain *d)
 
 static void gic_irq_eoi(void *info)
 {
-    int virq = (int) info;
+    int virq = (uintptr_t) info;
     GICC[GICC_DIR] = virq;
 }
 
@@ -773,9 +773,10 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
             /* this is not racy because we can't receive another irq of the
              * same type until we EOI it.  */
             if ( cpu == smp_processor_id() )
-                gic_irq_eoi((void*)virq);
+                gic_irq_eoi((void*)(uintptr_t)virq);
             else
-                on_selected_cpus(cpumask_of(cpu), gic_irq_eoi, (void*)virq, 0);
+                on_selected_cpus(cpumask_of(cpu),
+                                 gic_irq_eoi, (void*)(uintptr_t)virq, 0);
         }
 
         i++;
