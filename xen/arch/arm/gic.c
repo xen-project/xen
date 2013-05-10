@@ -510,7 +510,9 @@ static inline void gic_set_lr(int lr, unsigned int virtual_irq,
 {
     int maintenance_int = GICH_LR_MAINTENANCE_IRQ;
 
-    BUG_ON(lr > nr_lrs);
+    BUG_ON(lr >= nr_lrs);
+    BUG_ON(lr < 0);
+    BUG_ON(state & ~(GICH_LR_STATE_MASK<<GICH_LR_STATE_SHIFT));
 
     GICH[GICH_LR + lr] = state |
         maintenance_int |
