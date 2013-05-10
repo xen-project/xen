@@ -43,7 +43,6 @@
 #define GICD_ICFGRN     (0xCFC/4)
 #define GICD_NSACR      (0xE00/4)
 #define GICD_NSACRN     (0xEFC/4)
-#define GICD_ICPIDR2    (0xFE8/4)
 #define GICD_SGIR       (0xF00/4)
 #define GICD_CPENDSGIR  (0xF10/4)
 #define GICD_CPENDSGIRN (0xF1C/4)
