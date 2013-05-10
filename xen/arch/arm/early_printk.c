@@ -29,6 +29,9 @@ void __init early_putch(char c)
     *r = c;
 }
 
+/* Early printk buffer */
+static char __initdata buf[512];
+
 static void __init early_puts(const char *s)
 {
     while (*s != '\0') {
@@ -41,8 +44,6 @@ static void __init early_puts(const char *s)
 
 static void __init early_vprintk(const char *fmt, va_list args)
 {
-    char buf[80];
-
     vsnprintf(buf, sizeof(buf), fmt, args);
     early_puts(buf);
 }
