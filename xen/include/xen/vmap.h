@@ -2,6 +2,7 @@
 #define __XEN_VMAP_H__
 
 #include <xen/types.h>
+#include <asm/page.h>
 
 void *vm_alloc(unsigned int nr, unsigned int align);
 void vm_free(const void *);
@@ -15,7 +16,9 @@ void __iomem *ioremap(paddr_t, size_t);
 
 static inline void iounmap(void __iomem *va)
 {
-    vunmap((void __force *)va);
+    unsigned long addr = (unsigned long)(void __force *)va;
+
+    vunmap((void *)(addr & PAGE_MASK));
 }
 
 void vm_init(void);
