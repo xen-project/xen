@@ -27,9 +27,9 @@
 /* Print a character on the UART - this function is called by C
  * x0: character to print */
 early_putch:
-        ldr   x23, =FIXMAP_ADDR(FIXMAP_CONSOLE)
-        early_uart_ready x23, 1
-        early_uart_transmit x23, w0
+        ldr   x15, =FIXMAP_ADDR(FIXMAP_CONSOLE)
+        early_uart_ready x15, 1
+        early_uart_transmit x15, w0
         ret
 
 /*
