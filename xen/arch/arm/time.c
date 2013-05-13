@@ -107,6 +107,8 @@ int __init init_xen_time(void)
 
     dev = dt_find_compatible_node(NULL, NULL, "arm,armv7-timer");
     if ( !dev )
+        dev = dt_find_compatible_node(NULL, NULL, "arm,armv8-timer");
+    if ( !dev )
         panic("Unable to find a compatible timer in the device tree\n");
 
     dt_device_set_used_by(dev, DOMID_XEN);
