@@ -68,7 +68,7 @@ $(eval $(genpath-target))
 ##############
 
 newlib-$(NEWLIB_VERSION).tar.gz:
-	$(WGET) $(NEWLIB_URL)/$@
+	$(FETCHER) $@ $(NEWLIB_URL)/$@
 
 newlib-$(NEWLIB_VERSION): newlib-$(NEWLIB_VERSION).tar.gz
 	tar xzf $<
@@ -94,7 +94,7 @@ $(NEWLIB_STAMPFILE): mk-headers-$(XEN_TARGET_ARCH) newlib-$(NEWLIB_VERSION)
 ############
 
 zlib-$(ZLIB_VERSION).tar.gz:
-	$(WGET) $(ZLIB_URL)/$@
+	$(FETCHER) $@ $(ZLIB_URL)/$@
 
 zlib-$(XEN_TARGET_ARCH): zlib-$(ZLIB_VERSION).tar.gz 
 	tar xzf $<
@@ -114,7 +114,7 @@ $(ZLIB_STAMPFILE): zlib-$(XEN_TARGET_ARCH) $(NEWLIB_STAMPFILE)
 ##############
 
 pciutils-$(LIBPCI_VERSION).tar.bz2:
-	$(WGET) $(LIBPCI_URL)/$@
+	$(FETCHER) $@ $(LIBPCI_URL)/$@
 
 pciutils-$(XEN_TARGET_ARCH): pciutils-$(LIBPCI_VERSION).tar.bz2
 	tar xjf $<
@@ -142,7 +142,7 @@ $(LIBPCI_STAMPFILE): pciutils-$(XEN_TARGET_ARCH) $(NEWLIB_STAMPFILE) $(ZLIB_STAM
 ######
 
 lwip-$(LWIP_VERSION).tar.gz:
-	$(WGET) $(LWIP_URL)/$@
+	$(FETCHER) $@ $(LWIP_URL)/$@
 
 lwip-$(XEN_TARGET_ARCH): lwip-$(LWIP_VERSION).tar.gz
 	tar xzf $<
@@ -154,7 +154,7 @@ lwip-$(XEN_TARGET_ARCH): lwip-$(LWIP_VERSION).tar.gz
 # cross-gmp
 #############
 gmp-$(GMP_VERSION).tar.bz2:
-	$(WGET) $(GMP_URL)/$@
+	$(FETCHER) $@ $(GMP_URL)/$@
 
 .PHONY: cross-gmp
 ifeq ($(XEN_TARGET_ARCH), x86_32)
@@ -180,7 +180,7 @@ $(GMP_STAMPFILE): gmp-$(XEN_TARGET_ARCH)
 # cross-polarssl
 #############
 polarssl-$(POLARSSL_VERSION)-gpl.tgz:
-	$(WGET) $(POLARSSL_URL)/$@
+	$(FETCHER) $@ $(POLARSSL_URL)/$@
 
 polarssl-$(XEN_TARGET_ARCH): polarssl-$(POLARSSL_VERSION)-gpl.tgz
 	tar xzf $<
@@ -202,7 +202,7 @@ $(POLARSSL_STAMPFILE): polarssl-$(XEN_TARGET_ARCH) $(NEWLIB_STAMPFILE) lwip-$(XE
 # cross-tpmemu
 #############
 tpm_emulator-$(TPMEMU_VERSION).tar.gz:
-	$(WGET) $(TPMEMU_URL)/$@
+	$(FETCHER) $@ $(TPMEMU_URL)/$@
 
 tpm_emulator-$(XEN_TARGET_ARCH): tpm_emulator-$(TPMEMU_VERSION).tar.gz
 	@if [ ! -f "$(CMAKE)" ]; then echo "cmake not installed! Install it and then rerun ./configure!"; false; fi
@@ -232,7 +232,7 @@ CAMLLIB = $(CROSS_PREFIX)/$(GNU_TARGET_ARCH)-xen-elf/lib/ocaml
 OCAML_STAMPFILE=$(CAMLLIB)/.dirstamp
 
 ocaml-$(OCAML_VERSION).tar.gz:
-	$(WGET) $(OCAML_URL)/$@
+	$(FETCHER) $@ $(OCAML_URL)/$@
 
 ocaml-$(XEN_TARGET_ARCH)/.dirstamp: ocaml-$(OCAML_VERSION).tar.gz ocaml.patch
 	tar xzf $<
@@ -385,7 +385,7 @@ vtpmmgr: cross-polarssl
 ######
 
 grub-$(GRUB_VERSION).tar.gz:
-	$(WGET) $(GRUB_URL)/$@
+	$(FETCHER) $@ $(GRUB_URL)/$@
 
 grub-upstream: grub-$(GRUB_VERSION).tar.gz
 	tar xzf $<

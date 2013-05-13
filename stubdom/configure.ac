@@ -13,6 +13,7 @@ m4_include([../m4/stubdom.m4])
 m4_include([../m4/features.m4])
 m4_include([../m4/path_or_fail.m4])
 m4_include([../m4/depends.m4])
+m4_include([../m4/fetcher.m4])
 
 # Enable/disable stub domains
 AX_STUBDOM_DEFAULT_ENABLE([ioemu-stubdom], [ioemu])
@@ -27,13 +28,12 @@ AX_ARG_DEFAULT_ENABLE([debug], [Disable debug build of stubdom])
 AX_ARG_DEFAULT_ENABLE([extfiles], [Use xen extfiles repository for libraries])
 
 AC_ARG_VAR([CMAKE], [Path to the cmake program])
-AC_ARG_VAR([WGET], [Path to wget program])
+AX_CHECK_FETCHER
 
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
-AX_PATH_PROG_OR_FAIL([WGET], [wget])
 
 # Checks for programs that depend on a feature
 AX_DEPENDS_PATH_PROG([vtpm], [CMAKE], [cmake])

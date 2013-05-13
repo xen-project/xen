@@ -7,7 +7,7 @@ LIBDIR              := $(libdir)
 
 # Path Programs
 CMAKE               := @CMAKE@
-WGET                := @WGET@ -c
+FETCHER             := @FETCHER@
 
 # A debug build of stubdom? //FIXME: Someone make this do something
 debug               := @debug@
