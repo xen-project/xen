@@ -487,6 +487,7 @@ libxl_physinfo = Struct("physinfo", [
     ("total_pages", uint64),
     ("free_pages", uint64),
     ("scrub_pages", uint64),
+    ("outstanding_pages", uint64),
     ("sharing_freed_pages", uint64),
     ("sharing_used_frames", uint64),
 

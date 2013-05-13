@@ -3942,6 +3942,7 @@ int libxl_get_physinfo(libxl_ctx *ctx, libxl_physinfo *physinfo)
     physinfo->total_pages = xcphysinfo.total_pages;
     physinfo->free_pages = xcphysinfo.free_pages;
     physinfo->scrub_pages = xcphysinfo.scrub_pages;
+    physinfo->outstanding_pages = xcphysinfo.outstanding_pages;
     l = xc_sharing_freed_pages(ctx->xch);
     if (l == -ENOSYS) {
         l = 0;
@@ -4103,20 +4104,6 @@ libxl_numainfo *libxl_get_numainfo(libxl_ctx *ctx, int *nr)
  out:
     GC_FREE;
     return ret;
-}
-
-uint64_t libxl_get_claiminfo(libxl_ctx *ctx)
-{
-    long l;
-
-    l = xc_domain_get_outstanding_pages(ctx->xch);
-    if (l < 0) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_WARNING, l,
-                            "xc_domain_get_outstanding_pages failed.");
-        return ERROR_FAIL;
-    }
-    /* In pages */
-    return l;
 }
 
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)

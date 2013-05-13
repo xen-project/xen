@@ -459,13 +459,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_sharing_op_t);
  * The zero value is appropiate.
  */
 
-/*
- * Get the number of pages currently claimed (but not yet "possessed")
- * across all domains.  The caller must be privileged but otherwise
- * the call never fails.
- */
-#define XENMEM_get_outstanding_pages        25
-
 #endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */

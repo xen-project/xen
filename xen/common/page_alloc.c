@@ -380,9 +380,12 @@ out:
     return ret;
 }
 
-long get_outstanding_claims(void)
+void get_outstanding_claims(uint64_t *free_pages, uint64_t *outstanding_pages)
 {
-    return outstanding_claims;
+    spin_lock(&heap_lock);
+    *outstanding_pages = outstanding_claims;
+    *free_pages =  avail_domheap_pages();
+    spin_unlock(&heap_lock);
 }
 
 static unsigned long init_node_heap(int node, unsigned long mfn,

@@ -422,12 +422,6 @@ static int flask_claim_pages(struct domain *d)
     return current_has_perm(d, SECCLASS_DOMAIN2, DOMAIN2__SETCLAIM);
 }
 
-static int flask_xenmem_get_outstanding_pages(void)
-{
-    return avc_current_has_perm(SECINITSID_XEN, SECCLASS_XEN,
-                                XEN__HEAP, NULL);
-}
-
 static int flask_console_io(struct domain *d, int cmd)
 {
     u32 perm;
@@ -1504,7 +1498,6 @@ static struct xsm_operations flask_ops = {
     .memory_stat_reservation = flask_memory_stat_reservation,
     .memory_pin_page = flask_memory_pin_page,
     .claim_pages = flask_claim_pages,
-    .xenmem_get_outstanding_pages = flask_xenmem_get_outstanding_pages,
 
     .console_io = flask_console_io,
 

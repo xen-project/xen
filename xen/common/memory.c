@@ -737,14 +737,6 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
         break;
 
-    case XENMEM_get_outstanding_pages:
-        rc = xsm_xenmem_get_outstanding_pages(XSM_PRIV);
-
-        if ( !rc )
-            rc = get_outstanding_claims();
-
-        break;
-
     default:
         rc = arch_memory_op(op, arg);
         break;

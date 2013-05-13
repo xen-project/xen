@@ -34,7 +34,7 @@
 #include "xen.h"
 #include "domctl.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x00000009
+#define XEN_SYSCTL_INTERFACE_VERSION 0x0000000A
 
 /*
  * Read console content from Xen buffer ring.
@@ -101,6 +101,7 @@ struct xen_sysctl_physinfo {
     uint64_aligned_t total_pages;
     uint64_aligned_t free_pages;
     uint64_aligned_t scrub_pages;
+    uint64_aligned_t outstanding_pages;
     uint32_t hw_cap[8];
 
     /* XEN_SYSCTL_PHYSCAP_??? */

@@ -4576,19 +4576,9 @@ static void output_physinfo(void)
     unsigned int i;
     libxl_bitmap cpumap;
     int n = 0;
-    long claims = 0;
 
     if (libxl_get_physinfo(ctx, &info) != 0) {
         fprintf(stderr, "libxl_physinfo failed.\n");
-        return;
-    }
-    /*
-     * Don't bother checking "claim_mode" as user might have turned it off
-     * and we have outstanding claims.
-     */
-    if ((claims = libxl_get_claiminfo(ctx)) < 0){
-        fprintf(stderr, "libxl_get_claiminfo failed. errno: %d (%s)\n",
-                errno, strerror(errno));
         return;
     }
     printf("nr_cpus                : %d\n", info.nr_cpus);
@@ -4610,15 +4600,15 @@ static void output_physinfo(void)
     if (vinfo) {
         i = (1 << 20) / vinfo->pagesize;
         printf("total_memory           : %"PRIu64"\n", info.total_pages / i);
-        printf("free_memory            : %"PRIu64"\n", (info.free_pages - claims) / i);
+        printf("free_memory            : %"PRIu64"\n", (info.free_pages - info.outstanding_pages) / i);
         printf("sharing_freed_memory   : %"PRIu64"\n", info.sharing_freed_pages / i);
         printf("sharing_used_memory    : %"PRIu64"\n", info.sharing_used_frames / i);
     }
     /*
      * Only if enabled (claim_mode=1) or there are outstanding claims.
      */
-    if (libxl_defbool_val(claim_mode) || claims)
-        printf("outstanding_claims     : %ld\n", claims / i);
+    if (libxl_defbool_val(claim_mode) || info.outstanding_pages)
+        printf("outstanding_claims     : %"PRIu64"\n", info.outstanding_pages / i);
 
     if (!libxl_get_freecpus(ctx, &cpumap)) {
         libxl_for_each_bit(i, cpumap)

@@ -873,15 +873,6 @@ int xc_domain_claim_pages(xc_interface *xch,
         err = errno = 0;
     return err;
 }
-unsigned long xc_domain_get_outstanding_pages(xc_interface *xch)
-{
-    long ret = do_memory_op(xch, XENMEM_get_outstanding_pages, NULL, 0);
-
-    /* Ignore it if the hypervisor does not support the call. */
-    if (ret == -1 && errno == ENOSYS)
-        ret = errno = 0;
-    return ret;
-}
 
 int xc_domain_populate_physmap(xc_interface *xch,
                                uint32_t domid,

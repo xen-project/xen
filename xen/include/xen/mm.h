@@ -59,7 +59,7 @@ void destroy_xen_mappings(unsigned long v, unsigned long e);
 /* Claim handling */
 unsigned long domain_adjust_tot_pages(struct domain *d, long pages);
 int domain_set_outstanding_pages(struct domain *d, unsigned long pages);
-long get_outstanding_claims(void);
+void get_outstanding_claims(uint64_t *free_pages, uint64_t *outstanding_pages);
 
 /* Domain suballocator. These functions are *not* interrupt-safe.*/
 void init_domheap_pages(paddr_t ps, paddr_t pe);

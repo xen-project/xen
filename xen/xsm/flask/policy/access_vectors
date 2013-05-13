@@ -54,7 +54,7 @@ class xen
     debug
 # XEN_SYSCTL_getcpuinfo, XENPF_get_cpu_version, XENPF_get_cpuinfo
     getcpuinfo
-# XEN_SYSCTL_availheap, XENMEM_get_outstanding_pages
+# XEN_SYSCTL_availheap
     heap
 # XEN_SYSCTL_get_pmstat, XEN_SYSCTL_pm_op, XENPF_set_processor_pminfo,
 # XENPF_core_parking
