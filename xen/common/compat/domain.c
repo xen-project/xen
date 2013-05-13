@@ -15,6 +15,14 @@
 CHECK_vcpu_set_periodic_timer;
 #undef xen_vcpu_set_periodic_timer
 
+#define xen_vcpu_info vcpu_info
+CHECK_SIZE_(struct, vcpu_info);
+#undef xen_vcpu_info
+
+#define xen_vcpu_register_vcpu_info vcpu_register_vcpu_info
+CHECK_vcpu_register_vcpu_info;
+#undef xen_vcpu_register_vcpu_info
+
 int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct domain *d = current->domain;
@@ -64,6 +72,7 @@ int compat_vcpu_op(int cmd, int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
     case VCPUOP_set_periodic_timer:
     case VCPUOP_stop_periodic_timer:
     case VCPUOP_stop_singleshot_timer:
+    case VCPUOP_register_vcpu_info:
     case VCPUOP_send_nmi:
         rc = do_vcpu_op(cmd, vcpuid, arg);
         break;

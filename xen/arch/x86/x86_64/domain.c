@@ -9,14 +9,6 @@
 #include <xen/hypercall.h>
 #include <compat/vcpu.h>
 
-#define xen_vcpu_info vcpu_info
-CHECK_SIZE_(struct, vcpu_info);
-#undef xen_vcpu_info
-
-#define xen_vcpu_register_vcpu_info vcpu_register_vcpu_info
-CHECK_vcpu_register_vcpu_info;
-#undef xen_vcpu_register_vcpu_info
-
 #define xen_vcpu_get_physid vcpu_get_physid
 CHECK_vcpu_get_physid;
 #undef xen_vcpu_get_physid
@@ -63,7 +55,6 @@ arch_compat_vcpu_op(
         break;
     }
 
-    case VCPUOP_register_vcpu_info:
     case VCPUOP_get_physid:
         rc = arch_do_vcpu_op(cmd, v, arg);
         break;
