@@ -4487,7 +4487,7 @@ int main_vcpupin(int argc, char **argv)
     return 0;
 }
 
-static void vcpuset(uint32_t domid, const char* nr_vcpus)
+static void vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
 {
     char *endptr;
     unsigned int max_vcpus, i;
@@ -4499,7 +4499,22 @@ static void vcpuset(uint32_t domid, const char* nr_vcpus)
         return;
     }
 
-    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
+    /*
+     * Maximum amount of vCPUS the guest is allowed to set is limited
+     * by the host's amount of pCPUs.
+     */
+    if (check_host) {
+        unsigned int host_cpu = libxl_get_max_cpus(ctx);
+        if (max_vcpus > host_cpu) {
+            fprintf(stderr, "You are overcommmitting! You have %d physical " \
+                    " CPUs and want %d vCPUs! Aborting, use --ignore-host to " \
+                    " continue\n", host_cpu, max_vcpus);
+            return;
+        }
+        /* NB: This also limits how many are set in the bitmap */
+        max_vcpus = (max_vcpus > host_cpu ? host_cpu : max_vcpus);
+    }
+    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, max_vcpus)) {
         fprintf(stderr, "libxl_cpu_bitmap_alloc failed\n");
         return;
     }
@@ -4514,13 +4529,21 @@ static void vcpuset(uint32_t domid, const char* nr_vcpus)
 
 int main_vcpuset(int argc, char **argv)
 {
-    int opt;
+    static struct option opts[] = {
+        {"ignore-host", 0, 0, 'i'},
+        {0, 0, 0, 0}
+    };
+    int opt, check_host = 1;
 
-    SWITCH_FOREACH_OPT(opt, "", NULL, "vcpu-set", 2) {
-        /* No options */
+    SWITCH_FOREACH_OPT(opt, "i", opts, "vcpu-set", 2) {
+    case 'i':
+        check_host = 0;
+        break;
+    default:
+        break;
     }
 
-    vcpuset(find_domain(argv[optind]), argv[optind+1]);
+    vcpuset(find_domain(argv[optind]), argv[optind + 1], check_host);
     return 0;
 }
 
