@@ -734,7 +734,7 @@ static void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_long (config, "maxmem", &l, 0))
         b_info->max_memkb = l * 1024;
 
-    b_info->claim_mode = claim_mode;
+    libxl_defbool_set(&b_info->claim_mode, claim_mode);
 
     if (xlu_cfg_get_string (config, "on_poweroff", &buf, 0))
         buf = "destroy";
@@ -4607,7 +4607,7 @@ static void output_physinfo(void)
     /*
      * Only if enabled (claim_mode=1) or there are outstanding claims.
      */
-    if (libxl_defbool_val(claim_mode) || info.outstanding_pages)
+    if (claim_mode || info.outstanding_pages)
         printf("outstanding_claims     : %"PRIu64"\n", info.outstanding_pages / i);
 
     if (!libxl_get_freecpus(ctx, &cpumap)) {
@@ -5911,7 +5911,7 @@ int main_claims(int argc, char **argv)
         /* No options */
     }
 
-    if (!libxl_defbool_val(claim_mode))
+    if (!claim_mode)
         fprintf(stderr, "claim_mode not enabled (see man xl.conf).\n");
 
     info = libxl_list_domain(ctx, &nb_domain);
