@@ -82,3 +82,10 @@ enter_el2_mode:
         mov     x1, #0x3c9                      // EL2_SP1 | D | A | I | F
         msr     spsr_el3, x1
         eret
+
+/*
+ * Local variables:
+ * mode: ASM
+ * indent-tabs-mode: nil
+ * End:
+ */

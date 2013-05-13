@@ -384,3 +384,10 @@ puts:
 putn:   ret
 
 #endif /* EARLY_PRINTK */
+
+/*
+ * Local variables:
+ * mode: ASM
+ * indent-tabs-mode: nil
+ * End:
+ */

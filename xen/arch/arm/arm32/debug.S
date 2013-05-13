@@ -31,3 +31,10 @@ early_putch:
         early_uart_ready r1, r2
         early_uart_transmit r1, r0
         mov   pc, lr
+
+/*
+ * Local variables:
+ * mode: ASM
+ * indent-tabs-mode: nil
+ * End:
+ */
