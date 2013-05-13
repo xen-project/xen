@@ -4603,13 +4603,8 @@ static void output_physinfo(void)
         printf("free_memory            : %"PRIu64"\n", (info.free_pages - info.outstanding_pages) / i);
         printf("sharing_freed_memory   : %"PRIu64"\n", info.sharing_freed_pages / i);
         printf("sharing_used_memory    : %"PRIu64"\n", info.sharing_used_frames / i);
-    }
-    /*
-     * Only if enabled (claim_mode=1) or there are outstanding claims.
-     */
-    if (claim_mode || info.outstanding_pages)
         printf("outstanding_claims     : %"PRIu64"\n", info.outstanding_pages / i);
-
+    }
     if (!libxl_get_freecpus(ctx, &cpumap)) {
         libxl_for_each_bit(i, cpumap)
             if (libxl_bitmap_test(&cpumap, i))
