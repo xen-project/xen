@@ -8,6 +8,7 @@
 #include <xen/init.h>
 #include <xen/keyhandler.h>
 #include <xen/lib.h>
+#include <xen/mm.h>
 #include <xen/multiboot.h>
 #include <xen/pci_regs.h>
 #include <xen/pfn.h>
@@ -22,7 +23,6 @@
 #define __ASSEMBLY__ /* avoid pulling in ACPI stuff (conflicts with EFI) */
 #include <asm/fixmap.h>
 #undef __ASSEMBLY__
-#include <asm/mm.h>
 #include <asm/msr.h>
 #include <asm/processor.h>
 
