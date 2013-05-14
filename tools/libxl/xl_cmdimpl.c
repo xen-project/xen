@@ -2505,25 +2505,45 @@ int main_memset(int argc, char **argv)
     return 0;
 }
 
-static void cd_insert(uint32_t domid, const char *virtdev, char *phys)
+static int cd_insert(uint32_t domid, const char *virtdev, char *phys)
 {
     libxl_device_disk disk; /* we don't free disk's contents */
     char *buf = NULL;
     XLU_Config *config = 0;
+    struct stat b;
+    int rc = 0;
 
 
     if (asprintf(&buf, "vdev=%s,access=r,devtype=cdrom,target=%s",
                  virtdev, phys ? phys : "") < 0) {
         fprintf(stderr, "out of memory\n");
-        return;
+        rc = 1;
+        goto out;
     }
 
     parse_disk_config(&config, buf, &disk);
 
-    libxl_cdrom_insert(ctx, domid, &disk, NULL);
+    /* ATM the existence of the backing file is not checked for qdisk
+     * in libxl_cdrom_insert() because RAW is used for remote
+     * protocols as well as plain files.  This will ideally be changed
+     * for 4.4, but this work-around fixes the problem of "cd-insert"
+     * returning success for non-existent files. */
+    if (disk.format != LIBXL_DISK_FORMAT_EMPTY
+        && stat(disk.pdev_path, &b)) {
+        fprintf(stderr, "Cannot stat file: %s\n",
+                disk.pdev_path);
+        rc = 1;
+        goto out;
+    }
 
+    if (libxl_cdrom_insert(ctx, domid, &disk, NULL))
+        rc=1;
+
+out:
     libxl_device_disk_dispose(&disk);
     free(buf);
+
+    return rc;
 }
 
 int main_cd_eject(int argc, char **argv)
@@ -2539,8 +2559,7 @@ int main_cd_eject(int argc, char **argv)
     domid = find_domain(argv[optind]);
     virtdev = argv[optind + 1];
 
-    cd_insert(domid, virtdev, NULL);
-    return 0;
+    return cd_insert(domid, virtdev, NULL);
 }
 
 int main_cd_insert(int argc, char **argv)
