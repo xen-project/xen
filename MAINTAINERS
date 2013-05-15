@@ -97,14 +97,12 @@ Maintainers List (try to look for most precise areas first)
 
 		-----------------------------------
 
-ACPI & POWER MANAGEMENT
-M:	Winston Wang <winston.l.wang@intel.com>
-M:	Gang Wei <gang.wei@intel.com>
+ACPI
 M:	Jan Beulich <jbeulich@suse.com>
 S:	Supported
 F:	xen/arch/x86/acpi/
 F:	xen/drivers/acpi/
-F:	xen/drivers/cpufreq/
+F:	xen/include/acpi/
 
 AMD IOMMU
 M:	Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
@@ -218,6 +216,16 @@ OCAML TOOLS
 M:	David Scott <dave.scott@eu.citrix.com>
 S:	Supported
 F:	tools/ocaml/
+
+POWER MANAGEMENT
+M:	Jan Beulich <jbeulich@suse.com>
+M:	Liu Jinsong <jinsong.liu@intel.com>
+S:	Supported
+F:	xen/arch/x86/acpi/
+X:	xen/arch/x86/acpi/boot.c
+X:	xen/arch/x86/acpi/lib.c
+F:	xen/drivers/cpufreq/
+F:	xen/include/acpi/cpufreq/
 
 QEMU-DM
 M:	Ian Jackson <ian.jackson@eu.citrix.com>
