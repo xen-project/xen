@@ -604,13 +604,13 @@ _sh_propagate(struct vcpu *v,
         else if ( d->arch.hvm_domain.is_in_uc_mode )
             sflags |= pat_type_2_pte_flags(PAT_TYPE_UNCACHABLE);
         else
-            if ( iomem_access_permitted(d, mfn_x(target_mfn), mfn_x(target_mfn) + 1) )
+            if ( iomem_access_permitted(d, mfn_x(target_mfn), mfn_x(target_mfn)) )
             {
                 if ( p2mt == p2m_mmio_direct )
                     sflags |= get_pat_flags(v,
                             gflags,
                             gfn_to_paddr(target_gfn),
-                            ((paddr_t)mfn_x(target_mfn)) << PAGE_SHIFT,
+                            pfn_to_paddr(mfn_x(target_mfn)),
                             MTRR_TYPE_UNCACHABLE); 
                 else if ( iommu_snoop )
                     sflags |= pat_type_2_pte_flags(PAT_TYPE_WRBACK);
@@ -618,7 +618,7 @@ _sh_propagate(struct vcpu *v,
                     sflags |= get_pat_flags(v,
                             gflags,
                             gfn_to_paddr(target_gfn),
-                            ((paddr_t)mfn_x(target_mfn)) << PAGE_SHIFT,
+                            pfn_to_paddr(mfn_x(target_mfn)),
                             NO_HARDCODE_MEM_TYPE);
             }
     }
