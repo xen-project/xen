@@ -204,7 +204,7 @@ T:	hg http://xenbits.xen.org/XCP/linux-2.6.*.pq.hg
 
 MACHINE CHECK (MCA) & RAS
 M:	Christoph Egger <chegger@amazon.de>
-M:	Yunhong Jiang <yunhong.jiang@intel.com>
+M:	Liu Jinsong <jinsong.liu@intel.com>
 S:	Supported
 F:	xen/arch/x86/cpu/mcheck/
 
