@@ -33,6 +33,15 @@ const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid)
     return libxl__sprintf(gc, "/var/lib/xen/qemu-save.%d", domid);
 }
 
+static const char *qemu_xen_path(libxl__gc *gc)
+{
+#ifdef QEMU_XEN_PATH
+    return QEMU_XEN_PATH;
+#else
+    return libxl__abs_path(gc, "qemu-system-i386", libxl__libexec_path());
+#endif
+}
+
 const char *libxl__domain_device_model(libxl__gc *gc,
                                        const libxl_domain_build_info *info)
 {
@@ -50,7 +59,7 @@ const char *libxl__domain_device_model(libxl__gc *gc,
             dm = libxl__abs_path(gc, "qemu-dm", libxl__libexec_path());
             break;
         case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
-            dm = libxl__abs_path(gc, "qemu-system-i386", libxl__libexec_path());
+            dm = qemu_xen_path(gc);
             break;
         default:
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR,

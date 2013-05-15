@@ -76,6 +76,27 @@ AC_DEFINE([HAVE_QEMU_TRADITIONAL], [1], [Qemu traditional enabled])
 ])
 AC_SUBST(qemu_traditional)
 
+AC_ARG_WITH([system-qemu],
+    AS_HELP_STRING([--with-system-qemu@<:@=PATH@:>@],
+       [Use system supplied qemu PATH or qemu (taken from $PATH) as qemu-xen
+        device model instead of building and installing our own version]),[
+    case $withval in
+    yes) qemu_xen=n ; qemu_xen_path=qemu ;;
+    no)  qemu_xen=y ; qemu_xen_path= ;;
+    *)   qemu_xen=n ; qemu_xen_path=$withval ;;
+    esac
+],[
+    case "$host_cpu" in
+        i[[3456]]86|x86_64)
+           qemu_xen=y;;
+        *) qemu_xen=n;;
+    esac
+])
+AS_IF([test "x$qemu_xen" = "xn"], [
+    AC_DEFINE_UNQUOTED([QEMU_XEN_PATH], ["$qemu_xen_path"], [Qemu Xen path])
+])
+AC_SUBST(qemu_xen)
+
 AC_ARG_VAR([PREPEND_INCLUDES],
     [List of include folders to prepend to CFLAGS (without -I)])
 AC_ARG_VAR([PREPEND_LIB],

@@ -654,6 +654,7 @@ APPEND_LIB
 APPEND_INCLUDES
 PREPEND_LIB
 PREPEND_INCLUDES
+qemu_xen
 qemu_traditional
 blktap1
 xend
@@ -736,6 +737,7 @@ enable_debug
 enable_xend
 enable_blktap1
 enable_qemu_traditional
+with_system_qemu
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1399,6 +1401,14 @@ Optional Features:
   --enable-qemu-traditional
                           Enable qemu traditional device model, (DEFAULT is on
                           for x86, otherwise off)
+
+Optional Packages:
+  --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
+  --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
+  --with-system-qemu[=PATH]
+                          Use system supplied qemu PATH or qemu (taken from
+                          $PATH) as qemu-xen device model instead of building
+                          and installing our own version
 
 Some influential environment variables:
   CC          C compiler command
@@ -3681,6 +3691,37 @@ $as_echo "#define HAVE_QEMU_TRADITIONAL 1" >>confdefs.h
 else
 
     qemu_traditional=n
+
+fi
+
+
+
+# Check whether --with-system-qemu was given.
+if test "${with_system_qemu+set}" = set; then :
+  withval=$with_system_qemu;
+    case $withval in
+    yes) qemu_xen=n ; qemu_xen_path=qemu ;;
+    no)  qemu_xen=y ; qemu_xen_path= ;;
+    *)   qemu_xen=n ; qemu_xen_path=$withval ;;
+    esac
+
+else
+
+    case "$host_cpu" in
+        i[3456]86|x86_64)
+           qemu_xen=y;;
+        *) qemu_xen=n;;
+    esac
+
+fi
+
+if test "x$qemu_xen" = "xn"; then :
+
+
+cat >>confdefs.h <<_ACEOF
+#define QEMU_XEN_PATH "$qemu_xen_path"
+_ACEOF
+
 
 fi
 

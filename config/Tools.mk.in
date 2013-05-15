@@ -51,6 +51,7 @@ CONFIG_OVMF         := @ovmf@
 CONFIG_ROMBIOS      := @rombios@
 CONFIG_SEABIOS      := @seabios@
 CONFIG_QEMU_TRAD    := @qemu_traditional@
+CONFIG_QEMU_XEN     := @qemu_xen@
 CONFIG_XEND         := @xend@
 CONFIG_BLKTAP1      := @blktap1@
 

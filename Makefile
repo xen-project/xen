@@ -84,8 +84,19 @@ tools/qemu-xen-traditional-dir-force-update:
 	$(MAKE) -C tools qemu-xen-traditional-dir-force-update
 endif
 
+ifeq ($(CONFIG_QEMU_XEN),y)
+QEMU_XEN_DIR_TGT := tools/qemu-xen-dir
+
+tools/qemu-xen-dir:
+	$(MAKE) -C tools qemu-xen-dir-find
+
+.PHONY: tools/qemu-xen-dir-force-update
+tools/qemu-xen-dir-force-update:
+	$(MAKE) -C tools qemu-xen-dir-force-update
+endif
+
 ifeq ($(CONFIG_IOEMU),y)
-install-tools: $(QEMU_TRAD_DIR_TARGET) tools/qemu-xen-dir
+install-tools: $(QEMU_TRAD_DIR_TARGET) $(QEMU_XEN_DIR_TARGET)
 endif
 
 .PHONY: install-kernels
@@ -98,13 +109,6 @@ install-stubdom: $(QEMU_TRAD_DIR_TARGET) install-tools
 ifeq (x86_64,$(XEN_TARGET_ARCH))
 	XEN_TARGET_ARCH=x86_32 $(MAKE) -C stubdom install-grub
 endif
-
-tools/qemu-xen-dir:
-	$(MAKE) -C tools qemu-xen-dir-find
-
-.PHONY: tools/qemu-xen-dir-force-update
-tools/qemu-xen-dir-force-update:
-	$(MAKE) -C tools qemu-xen-dir-force-update
 
 .PHONY: tools/firmware/seabios-dir-force-update
 tools/firmware/seabios-dir-force-update:
