@@ -133,6 +133,37 @@ static void add_pin_to_irq(unsigned int irq, int apic, int pin)
     share_vector_maps(irq_2_pin[irq].apic, apic);
 }
 
+static void remove_pin_from_irq(unsigned int irq, int apic, int pin)
+{
+    struct irq_pin_list *entry, *prev;
+
+    for (entry = &irq_2_pin[irq]; ; entry = &irq_2_pin[entry->next]) {
+        if ((entry->apic == apic) && (entry->pin == pin))
+            break;
+        BUG_ON(!entry->next);
+    }
+
+    entry->pin = entry->apic = -1;
+
+    if (entry != &irq_2_pin[irq]) {
+        /* Removed entry is not at head of list. */
+        prev = &irq_2_pin[irq];
+        while (&irq_2_pin[prev->next] != entry)
+            prev = &irq_2_pin[prev->next];
+        prev->next = entry->next;
+    } else if (entry->next) {
+        /* Removed entry is at head of multi-item list. */
+        prev  = entry;
+        entry = &irq_2_pin[entry->next];
+        *prev = *entry;
+        entry->pin = entry->apic = -1;
+    } else
+        return;
+
+    entry->next = irq_2_pin_free_entry;
+    irq_2_pin_free_entry = entry - irq_2_pin;
+}
+
 /*
  * Reroute an IRQ to a different pin.
  */
@@ -2280,7 +2311,7 @@ int ioapic_guest_read(unsigned long physbase, unsigned int reg, u32 *pval)
 
 int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
 {
-    int apic, pin, irq, ret, vector, pirq;
+    int apic, pin, irq, ret, pirq;
     struct IO_APIC_route_entry rte = { 0 };
     unsigned long flags;
     struct irq_desc *desc;
@@ -2348,13 +2379,25 @@ int ioapic_guest_write(unsigned long physbase, unsigned int reg, u32 val)
         return 0;
     }
 
-    if ( desc->arch.vector <= 0 || desc->arch.vector > LAST_DYNAMIC_VECTOR ) {
-        add_pin_to_irq(irq, apic, pin);
-        vector = assign_irq_vector(irq, NULL);
-        if ( vector < 0 )
-            return vector;
+    if ( desc->arch.vector <= 0 || desc->arch.vector > LAST_DYNAMIC_VECTOR )
+    {
+        int vector = desc->arch.vector;
 
-        printk(XENLOG_INFO "allocated vector %02x for irq %d\n", vector, irq);
+        if ( vector < FIRST_HIPRIORITY_VECTOR )
+            add_pin_to_irq(irq, apic, pin);
+        else
+            desc->arch.vector = IRQ_VECTOR_UNASSIGNED;
+        ret = assign_irq_vector(irq, NULL);
+        if ( ret < 0 )
+        {
+            if ( vector < FIRST_HIPRIORITY_VECTOR )
+                remove_pin_from_irq(irq, apic, pin);
+            else
+                desc->arch.vector = vector;
+            return ret;
+        }
+
+        printk(XENLOG_INFO "allocated vector %02x for irq %d\n", ret, irq);
     }
     spin_lock(&dom0->event_lock);
     ret = map_domain_pirq(dom0, pirq, irq,
