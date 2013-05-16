@@ -279,7 +279,7 @@ static void make_hypervisor_node(void *fdt, int addrcells, int sizecells)
     fdt_begin_node(fdt, "hypervisor");
 
     /* Cannot use fdt_property_string due to embedded nulls */
-    fdt_property(fdt, "compatible", compat, sizeof(compat) + 1);
+    fdt_property(fdt, "compatible", compat, sizeof(compat));
 
     /* reg 0 is grant table space */
     cell = &reg[0];
