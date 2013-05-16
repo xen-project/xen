@@ -8,7 +8,6 @@ int vmce_init(struct cpuinfo_x86 *c);
 #define dom0_vmce_enabled() (dom0 && dom0->max_vcpus && dom0->vcpu[0] \
         && guest_enabled_event(dom0->vcpu[0], VIRQ_MCA))
 
-int is_vmce_ready(struct mcinfo_bank *bank, struct domain *d);
 int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn);
 
 int vmce_intel_rdmsr(const struct vcpu *, uint32_t msr, uint64_t *val);

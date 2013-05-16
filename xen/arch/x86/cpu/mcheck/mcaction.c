@@ -83,12 +83,6 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
                 ASSERT(d);
                 gfn = get_gpfn_from_mfn((bank->mc_addr) >> PAGE_SHIFT);
 
-                if ( !is_vmce_ready(bank, d) )
-                {
-                    printk("DOM%d not ready for vMCE\n", d->domain_id);
-                    goto vmce_failed;
-                }
-
                 if ( unmmap_broken_page(d, _mfn(mfn), gfn) )
                 {
                     printk("Unmap broken memory %lx for DOM%d failed\n",
