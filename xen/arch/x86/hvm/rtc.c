@@ -67,11 +67,13 @@ static void rtc_update_irq(RTCState *s)
     hvm_isa_irq_assert(vrtc_domain(s), RTC_IRQ);
 }
 
-void rtc_periodic_interrupt(void *opaque)
+bool_t rtc_periodic_interrupt(void *opaque)
 {
     RTCState *s = opaque;
+    bool_t ret;
 
     spin_lock(&s->lock);
+    ret = !(s->hw.cmos_data[RTC_REG_C] & RTC_IRQF);
     if ( !(s->hw.cmos_data[RTC_REG_C] & RTC_PF) )
     {
         s->hw.cmos_data[RTC_REG_C] |= RTC_PF;
@@ -83,7 +85,11 @@ void rtc_periodic_interrupt(void *opaque)
         destroy_periodic_time(&s->pt);
         s->pt_code = 0;
     }
+    if ( !(s->hw.cmos_data[RTC_REG_C] & RTC_IRQF) )
+        ret = 0;
     spin_unlock(&s->lock);
+
+    return ret;
 }
 
 /* Enable/configure/disable the periodic timer based on the RTC_PIE and

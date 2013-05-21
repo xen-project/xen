@@ -216,18 +216,23 @@ static void pt_timer_fn(void *data)
 int pt_update_irq(struct vcpu *v)
 {
     struct list_head *head = &v->arch.hvm_vcpu.tm_list;
-    struct periodic_time *pt, *temp, *earliest_pt = NULL;
-    uint64_t max_lag = -1ULL;
+    struct periodic_time *pt, *temp, *earliest_pt;
+    uint64_t max_lag;
     int irq, is_lapic;
     void *pt_priv;
 
+ rescan:
     spin_lock(&v->arch.hvm_vcpu.tm_lock);
 
+ rescan_locked:
+    earliest_pt = NULL;
+    max_lag = -1ULL;
     list_for_each_entry_safe ( pt, temp, head, list )
     {
         if ( pt->pending_intr_nr )
         {
-            if ( pt_irq_masked(pt) )
+            /* RTC code takes care of disabling the timer itself. */
+            if ( (pt->irq != RTC_IRQ || !pt->priv) && pt_irq_masked(pt) )
             {
                 /* suspend timer emulation */
                 list_del(&pt->list);
@@ -260,7 +265,41 @@ int pt_update_irq(struct vcpu *v)
     if ( is_lapic )
         vlapic_set_irq(vcpu_vlapic(v), irq, 0);
     else if ( irq == RTC_IRQ && pt_priv )
-        rtc_periodic_interrupt(pt_priv);
+    {
+        if ( !rtc_periodic_interrupt(pt_priv) )
+            irq = -1;
+
+        pt_lock(earliest_pt);
+
+        if ( irq < 0 && earliest_pt->pending_intr_nr )
+        {
+            /*
+             * RTC periodic timer runs without the corresponding interrupt
+             * being enabled - need to mimic enough of pt_intr_post() to keep
+             * things going.
+             */
+            earliest_pt->pending_intr_nr = 0;
+            earliest_pt->irq_issued = 0;
+            set_timer(&earliest_pt->timer, earliest_pt->scheduled);
+        }
+        else if ( irq >= 0 && pt_irq_masked(earliest_pt) )
+        {
+            if ( earliest_pt->on_list )
+            {
+                /* suspend timer emulation */
+                list_del(&earliest_pt->list);
+                earliest_pt->on_list = 0;
+            }
+            irq = -1;
+        }
+
+        /* Avoid dropping the lock if we can. */
+        if ( irq < 0 && v == earliest_pt->vcpu )
+            goto rescan_locked;
+        pt_unlock(earliest_pt);
+        if ( irq < 0 )
+            goto rescan;
+    }
     else
     {
         hvm_isa_irq_deassert(v->domain, irq);
