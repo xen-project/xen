@@ -224,9 +224,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= f62079cd7de6ec37f48dfc80fb5906f49fecd6f6
-# Tue May 14 18:48:49 2013 +0100
-# piix4acpi, xen, hotplug: Fix race with ACPI AML code and hotplug.
+QEMU_TAG ?= 70992304dc8c5fc67d876e0f8e3dfaa82be955a1
+# Tue May 21 14:57:23 2013 +0100
+# Signed-off-by: Olaf Hering <olaf@aepfle.de>
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
