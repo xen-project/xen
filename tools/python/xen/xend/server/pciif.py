@@ -340,7 +340,7 @@ class PciController(DevController):
                 raise VmError(('pci: failed to configure I/O memory on device '+
                             '%s - errno=%d')%(dev.name,rc))
 
-        if not self.vm.info.is_hvm() and dev.irq:
+        if dev.irq > 0:
             rc = xc.physdev_map_pirq(domid = fe_domid,
                                    index = dev.irq,
                                    pirq  = dev.irq)

@@ -49,7 +49,7 @@ int xc_physdev_map_pirq(xc_interface *xch,
     map.domid = domid;
     map.type = MAP_PIRQ_TYPE_GSI;
     map.index = index;
-    map.pirq = *pirq;
+    map.pirq = *pirq < 0 ? index : *pirq;
 
     rc = do_physdev_op(xch, PHYSDEVOP_map_pirq, &map, sizeof(map));
 
