@@ -52,23 +52,19 @@ static inline int convert_hour(RTCState *s, int hour);
 
 static void rtc_update_irq(RTCState *s)
 {
-    struct domain *d = vrtc_domain(s);
-    uint8_t irqf;
-
     ASSERT(spin_is_locked(&s->lock));
 
+    if ( s->hw.cmos_data[RTC_REG_C] & RTC_IRQF )
+        return;
+
     /* IRQ is raised if any source is both raised & enabled */
-    irqf = (s->hw.cmos_data[RTC_REG_B]
-            & s->hw.cmos_data[RTC_REG_C]
-            & (RTC_PF|RTC_AF|RTC_UF))
-        ? RTC_IRQF : 0;
+    if ( !(s->hw.cmos_data[RTC_REG_B] &
+           s->hw.cmos_data[RTC_REG_C] &
+           (RTC_PF | RTC_AF | RTC_UF)) )
+        return;
 
-    s->hw.cmos_data[RTC_REG_C] &= ~RTC_IRQF;
-    s->hw.cmos_data[RTC_REG_C] |= irqf;
-
-    hvm_isa_irq_deassert(d, RTC_IRQ);
-    if ( irqf )
-        hvm_isa_irq_assert(d, RTC_IRQ);
+    s->hw.cmos_data[RTC_REG_C] |= RTC_IRQF;
+    hvm_isa_irq_assert(vrtc_domain(s), RTC_IRQ);
 }
 
 void rtc_periodic_interrupt(void *opaque)
@@ -631,6 +627,8 @@ static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
     case RTC_REG_C:
         ret = s->hw.cmos_data[s->hw.cmos_index];
         s->hw.cmos_data[RTC_REG_C] = 0x00;
+        if ( ret & RTC_IRQF )
+            hvm_isa_irq_deassert(d, RTC_IRQ);
         rtc_update_irq(s);
         check_update_timer(s);
         alarm_timer_update(s);
