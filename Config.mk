@@ -224,9 +224,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.3.0-rc1
-# Fri Mar 15 18:25:15 2013 +0000
-# xen: Disable use of O_DIRECT by default as it results in crashes.
+QEMU_TAG ?= f62079cd7de6ec37f48dfc80fb5906f49fecd6f6
+# Tue May 14 18:48:49 2013 +0100
+# piix4acpi, xen, hotplug: Fix race with ACPI AML code and hotplug.
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
