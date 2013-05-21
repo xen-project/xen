@@ -45,6 +45,15 @@
 #define epoch_year     1900
 #define get_year(x)    (x + epoch_year)
 
+enum rtc_mode {
+   rtc_mode_no_ack,
+   rtc_mode_strict
+};
+
+/* This must be in sync with how hvmloader sets the ACPI WAET flags. */
+#define mode_is(d, m) ((void)(d), rtc_mode_##m == rtc_mode_no_ack)
+#define rtc_mode_is(s, m) mode_is(vrtc_domain(s), m)
+
 static void rtc_copy_date(RTCState *s);
 static void rtc_set_time(RTCState *s);
 static inline int from_bcd(RTCState *s, int a);
@@ -54,7 +63,7 @@ static void rtc_update_irq(RTCState *s)
 {
     ASSERT(spin_is_locked(&s->lock));
 
-    if ( s->hw.cmos_data[RTC_REG_C] & RTC_IRQF )
+    if ( rtc_mode_is(s, strict) && (s->hw.cmos_data[RTC_REG_C] & RTC_IRQF) )
         return;
 
     /* IRQ is raised if any source is both raised & enabled */
@@ -64,6 +73,8 @@ static void rtc_update_irq(RTCState *s)
         return;
 
     s->hw.cmos_data[RTC_REG_C] |= RTC_IRQF;
+    if ( rtc_mode_is(s, no_ack) )
+        hvm_isa_irq_deassert(vrtc_domain(s), RTC_IRQ);
     hvm_isa_irq_assert(vrtc_domain(s), RTC_IRQ);
 }
 
@@ -73,8 +84,8 @@ bool_t rtc_periodic_interrupt(void *opaque)
     bool_t ret;
 
     spin_lock(&s->lock);
-    ret = !(s->hw.cmos_data[RTC_REG_C] & RTC_IRQF);
-    if ( !(s->hw.cmos_data[RTC_REG_C] & RTC_PF) )
+    ret = rtc_mode_is(s, no_ack) || !(s->hw.cmos_data[RTC_REG_C] & RTC_IRQF);
+    if ( rtc_mode_is(s, no_ack) || !(s->hw.cmos_data[RTC_REG_C] & RTC_PF) )
     {
         s->hw.cmos_data[RTC_REG_C] |= RTC_PF;
         rtc_update_irq(s);
@@ -633,7 +644,7 @@ static uint32_t rtc_ioport_read(RTCState *s, uint32_t addr)
     case RTC_REG_C:
         ret = s->hw.cmos_data[s->hw.cmos_index];
         s->hw.cmos_data[RTC_REG_C] = 0x00;
-        if ( ret & RTC_IRQF )
+        if ( (ret & RTC_IRQF) && !rtc_mode_is(s, no_ack) )
             hvm_isa_irq_deassert(d, RTC_IRQ);
         rtc_update_irq(s);
         check_update_timer(s);

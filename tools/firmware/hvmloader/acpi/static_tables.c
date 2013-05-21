@@ -136,11 +136,15 @@ struct acpi_20_rsdp Rsdp = {
     .length    = sizeof(struct acpi_20_rsdp)
 };
 
-#define ACPI_WAET_RTC_GOOD      0x00000001
-#define ACPI_WAET_PM_TIMER_GOOD 0x00000002
+#define ACPI_WAET_RTC_NO_ACK        (1<<0) /* RTC requires no int acknowledge */
+#define ACPI_WAET_TIMER_ONE_READ    (1<<1) /* PM timer requires only one read */
 
-#define ACPI_WAET_FLAGS (ACPI_WAET_RTC_GOOD | \
-                         ACPI_WAET_PM_TIMER_GOOD)
+/*
+ * The state of the RTC flag getting passed to the guest must be in
+ * sync with the mode selection in the hypervisor RTC emulation code.
+ */
+#define ACPI_WAET_FLAGS (ACPI_WAET_RTC_NO_ACK | \
+                         ACPI_WAET_TIMER_ONE_READ)
 
 struct acpi_20_waet Waet = {
     .header = {
