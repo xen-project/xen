@@ -62,7 +62,7 @@ SHLIB_libxenlight  = -Wl,-rpath-link=$(XEN_XENLIGHT)
 CFLAGS += -D__XEN_TOOLS__
 
 # Get gcc to generate the dependencies for us.
-CFLAGS += -MMD -MF .$(@F).d
+CFLAGS += -MMD -MF .$(if $(filter-out .,$(@D)),$(subst /,@,$(@D))@)$(@F).d
 DEPS = .*.d
 
 ifneq ($(FILE_OFFSET_BITS),)
