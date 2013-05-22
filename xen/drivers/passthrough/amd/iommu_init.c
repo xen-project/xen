@@ -154,6 +154,11 @@ static void register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu)
                          IOMMU_CMD_BUFFER_LENGTH_MASK,
                          IOMMU_CMD_BUFFER_LENGTH_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_CMD_BUFFER_BASE_HIGH_OFFSET);
+
+    /* Reset head/tail pointer. SR56x0 Erratum 64 means this might not happen
+     * automatically for us. */
+    writeq(0, iommu->mmio_base + IOMMU_CMD_BUFFER_HEAD_OFFSET);
+    writeq(0, iommu->mmio_base + IOMMU_CMD_BUFFER_TAIL_OFFSET);
 }
 
 static void register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu)
@@ -182,6 +187,11 @@ static void register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu)
                         IOMMU_EVENT_LOG_LENGTH_MASK,
                         IOMMU_EVENT_LOG_LENGTH_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_EVENT_LOG_BASE_HIGH_OFFSET);
+
+    /* Reset head/tail pointer. SR56x0 Erratum 64 means this might not happen
+     * automatically for us. */
+    writeq(0, iommu->mmio_base + IOMMU_EVENT_LOG_HEAD_OFFSET);
+    writeq(0, iommu->mmio_base + IOMMU_EVENT_LOG_TAIL_OFFSET);
 }
 
 static void register_iommu_ppr_log_in_mmio_space(struct amd_iommu *iommu)
@@ -210,6 +220,9 @@ static void register_iommu_ppr_log_in_mmio_space(struct amd_iommu *iommu)
                         IOMMU_PPR_LOG_LENGTH_MASK,
                         IOMMU_PPR_LOG_LENGTH_SHIFT, &entry);
     writel(entry, iommu->mmio_base + IOMMU_PPR_LOG_BASE_HIGH_OFFSET);
+
+    writeq(0, iommu->mmio_base + IOMMU_PPR_LOG_HEAD_OFFSET);
+    writeq(0, iommu->mmio_base + IOMMU_PPR_LOG_TAIL_OFFSET);
 }
 
 
