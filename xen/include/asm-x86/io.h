@@ -5,12 +5,14 @@
 #include <xen/types.h>
 #include <asm/page.h>
 
-#define readb(x) (*(volatile char *)(x))
-#define readw(x) (*(volatile short *)(x))
-#define readl(x) (*(volatile int *)(x))
-#define writeb(d,x) (*(volatile char *)(x) = (d))
-#define writew(d,x) (*(volatile short *)(x) = (d))
-#define writel(d,x) (*(volatile int *)(x) = (d))
+#define readb(x) (*(volatile uint8_t  *)(x))
+#define readw(x) (*(volatile uint16_t *)(x))
+#define readl(x) (*(volatile uint32_t *)(x))
+#define readq(x) (*(volatile uint64_t *)(x))
+#define writeb(d,x) (*(volatile uint8_t  *)(x) = (d))
+#define writew(d,x) (*(volatile uint16_t *)(x) = (d))
+#define writel(d,x) (*(volatile uint32_t *)(x) = (d))
+#define writeq(d,x) (*(volatile uint64_t *)(x) = (d))
 
 #define __OUT1(s,x) \
 static inline void out##s(unsigned x value, unsigned short port) {
