@@ -226,9 +226,9 @@ static void schedule_tail(struct vcpu *prev)
 {
     ctxt_switch_from(prev);
 
-    local_irq_enable();
-
     ctxt_switch_to(current);
+
+    local_irq_enable();
 
     if ( prev != current )
         update_runstate_area(current);

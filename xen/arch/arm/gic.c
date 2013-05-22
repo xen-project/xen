@@ -93,11 +93,9 @@ void gic_restore_state(struct vcpu *v)
     if ( is_idle_vcpu(v) )
         return;
 
-    spin_lock_irq(&gic.lock);
     this_cpu(lr_mask) = v->arch.lr_mask;
     for ( i=0; i<nr_lrs; i++)
         GICH[GICH_LR + i] = v->arch.gic_lr[i];
-    spin_unlock_irq(&gic.lock);
     GICH[GICH_APR] = v->arch.gic_apr;
     GICH[GICH_HCR] = GICH_HCR_EN;
     isb();
