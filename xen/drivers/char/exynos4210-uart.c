@@ -328,6 +328,7 @@ static int __init exynos4210_uart_init(struct dt_device_node *dev,
     if ( !uart->regs )
     {
         early_printk("exynos4210: Unable to map the UART memory\n");
+        return -ENOMEM;
     }
     res = dt_device_get_irq(dev, 0, &uart->irq);
     if ( res )
