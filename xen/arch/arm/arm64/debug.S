@@ -32,6 +32,13 @@ early_putch:
         early_uart_transmit x15, w0
         ret
 
+.globl early_flush
+/* Flush the UART - this function is called by C */
+early_flush:
+        ldr   x15, =FIXMAP_ADDR(FIXMAP_CONSOLE)  /* x15 := VA UART base address */
+        early_uart_ready x15, 1
+        ret
+
 /*
  * Local variables:
  * mode: ASM

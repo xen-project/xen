@@ -16,6 +16,7 @@
 #include <asm/early_printk.h>
 
 void early_putch(char c);
+void early_flush(void);
 
 /* Early printk buffer */
 static char __initdata buf[512];
@@ -34,6 +35,12 @@ static void __init early_vprintk(const char *fmt, va_list args)
 {
     vsnprintf(buf, sizeof(buf), fmt, args);
     early_puts(buf);
+
+    /*
+     * Wait the UART has finished to transfer all characters before
+     * to continue. This will avoid lost characters if Xen abort.
+     */
+    early_flush();
 }
 
 void __init early_printk(const char *fmt, ...)
