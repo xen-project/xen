@@ -1241,12 +1241,14 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     setup_efi_pci();
 
     /* Get snapshot of variable store parameters. */
-    status = efi_rs->QueryVariableInfo(EFI_VARIABLE_NON_VOLATILE |
+    status = (efi_rs->Hdr.Revision >> 16) >= 2 ?
+             efi_rs->QueryVariableInfo(EFI_VARIABLE_NON_VOLATILE |
                                        EFI_VARIABLE_BOOTSERVICE_ACCESS |
                                        EFI_VARIABLE_RUNTIME_ACCESS,
                                        &efi_boot_max_var_store_size,
                                        &efi_boot_remain_var_store_size,
-                                       &efi_boot_max_var_size);
+                                       &efi_boot_max_var_size) :
+             EFI_INCOMPATIBLE_VERSION;
     if ( EFI_ERROR(status) )
     {
         efi_boot_max_var_store_size = 0;
