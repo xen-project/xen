@@ -1,0 +1,189 @@
+#!/usr/bin/perl
+
+# xencov_split - split coverage information from Xen
+#
+# Copyright (C) 2013  - Citrix Systems
+# -----
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+use strict;
+use File::Path qw(mkpath);
+
+# some magic constants
+my $magic = 0x67636461;
+my $ctrBase = 0x01a10000;
+
+my $xenMagic = 0x58544346;	# file header
+my $xenTagFunc = 0x58544366;	# functions tag
+my $xenTagCount0 = 0x58544330;	# counter 0 tag
+my $xenTagEnd = 0x5854432e;	# end file
+
+# open input file
+if ($ARGV[0]) {
+	my $fn = $ARGV[0];
+	open(IN, '<', $fn) or die "opening file \"$fn\"";
+} else {
+	open(IN, '<&STDIN') or die "redirecting input";
+}
+
+my $pos = 0;
+
+sub getRaw($)
+{
+    my $l = shift;
+    die 'got no data to read' if $l < 0;
+    my $res = '';
+    do {
+        my $data;
+        my $r = read(IN, $data, $l);
+        die "error $! reading data from input at position $pos" if !defined($r);
+        die "unexpected end of file at position $pos" if !$r;
+        $l -= $r;
+        $pos += $r;
+        $res .= $data;
+    } while ($l > 0);
+    return $res;
+}
+
+sub get32()
+{
+    return unpack('V', getRaw(4));
+}
+
+sub get64()
+{
+    # This is returned as raw data as some Perl version could not
+    # support 64 bit integer
+    # This is ok for little endian machines
+    return getRaw(8);
+}
+
+sub align()
+{
+    my $l = $pos & 7;
+    getRaw(8-$l) if $l;
+}
+
+# read a string prefixed by length
+sub getS()
+{
+    my $l = get32();
+    my $res = getRaw($l);
+    align();
+    return $res;
+}
+
+sub parseFunctions($)
+{
+    my $numCounters = shift;
+    my $num = get32();
+
+    my @funcs;
+    for my $n (1..$num) {
+        my @data;
+        my $ident = get32();
+        my $checksum = get32();
+        for my $n (1..$numCounters) {
+            push @data, get32(); # number of counters for a type
+        }
+        push @funcs, [$ident, $checksum, \@data];
+    }
+    align();
+    return @funcs;
+}
+
+sub parseCounters($)
+{
+    my $tag = shift;
+    die sprintf("wrong tag 0x%08x pos $pos (0x%08x)", $tag, $pos) if $tag < $xenTagCount0;
+    $tag -= $xenTagCount0;
+    die sprintf('wrong tag 0x%08x', $tag) if $tag > 5;
+    my $data = '';
+
+    my $num = get32();
+    for my $n (1..$num) {
+        $data .= get64();
+    }
+    align();
+    return [$tag, $data];
+}
+
+
+sub parseFile()
+{
+    my $ver = get32();
+    my $stamp = get32();
+    my $fn = getS();
+    align();
+
+    my $numCounters;
+
+    print "got file $fn\n";
+    die if $fn !~ m,^(/.*?)[^/]+\.gcda$,;
+    mkpath(".$1");
+    open(OUT, '>', ".$fn") or die;
+
+    print OUT pack('VVV', $magic, $ver, $stamp);
+
+    # read counters of file
+    my @ctrs;
+    my @funcs;
+    my $tag;
+    for (;;) {
+        $tag = get32();
+        last if ($tag == $xenMagic || $tag == $xenTagEnd);
+        if ($tag == $xenTagFunc) {
+            die if scalar(@funcs);
+            @funcs = parseFunctions(scalar(@ctrs));
+            next;
+        }
+
+        # must be a counter
+        push @ctrs, parseCounters($tag);
+        ++$numCounters;
+    }
+
+    # print all functions
+    for my $f (@funcs) {
+        # tag tag_len ident checksum
+        print OUT pack('VVVV', 0x01000000, 2, $f->[0], $f->[1]);
+        # all counts
+        my $n = 0;
+        for my $c (@{$f->[2]}) {
+            my ($type, $data) = @{$ctrs[$n]};
+            print OUT pack('VV', $ctrBase + 0x20000 * $type, $c*2);
+            die "--$c--$type--$data--" if length($data) < $c * 8;
+            print OUT substr($data, 0, $c * 8);
+            $ctrs[$n] = [$type, substr($data, $c * 8)];
+            ++$n;
+        }
+    }
+    close(OUT);
+
+    return $tag;
+}
+
+my $tag = get32();
+die 'no coverage or wrong file format' if $tag != $xenMagic;
+for (;;) {
+    if ($tag == $xenMagic) {
+        $tag = parseFile();
+    } elsif ($tag == $xenTagEnd) {
+        last;
+    } else {
+        die "wrong tag $tag";
+    }
+}
