@@ -45,7 +45,7 @@ X11_LDPATH = -L/usr/X11R6/$(LIBLEAFDIR)
 CFLAGS += -D__XEN_TOOLS__
 
 # Get gcc to generate the dependencies for us.
-CFLAGS += -MMD -MF .$(@F).d
+CFLAGS += -MMD -MF .$(if $(filter-out .,$(@D)),$(subst /,@,$(@D))@)$(@F).d
 DEPS = .*.d
 
 ifneq ($(XEN_OS),NetBSD)
