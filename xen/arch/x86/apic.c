@@ -1474,7 +1474,7 @@ enum apic_mode current_local_apic_mode(void)
 
     /* Reading EXTD bit from the MSR is only valid if CPUID
      * says so, else reserved */
-    if ( cpu_has(&current_cpu_data, X86_FEATURE_X2APIC)
+    if ( boot_cpu_has(X86_FEATURE_X2APIC)
          && (msr_contents & MSR_IA32_APICBASE_EXTD) )
         return APIC_MODE_X2APIC;
 
