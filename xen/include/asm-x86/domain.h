@@ -420,9 +420,6 @@ struct pv_vcpu
     /* Current LDT details. */
     unsigned long shadow_ldt_mapcnt;
     spinlock_t shadow_ldt_lock;
-
-    /* Guest-specified relocation of vcpu_info. */
-    unsigned long vcpu_info_mfn;
 };
 
 struct arch_vcpu
@@ -494,6 +491,9 @@ struct arch_vcpu
     uint64_t mcg_cap;
     
     struct paging_vcpu paging;
+
+    /* Guest-specified relocation of vcpu_info. */
+    unsigned long vcpu_info_mfn;
 
 #ifdef CONFIG_X86_32
     /* map_domain_page() mapping cache. */
