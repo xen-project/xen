@@ -48,8 +48,6 @@ int __read_mostly *irq_status = NULL;
 #define IRQ_USED        (1)
 #define IRQ_RSVD        (2)
 
-#define IRQ_VECTOR_UNASSIGNED (0)
-
 static DECLARE_BITMAP(used_vectors, NR_VECTORS);
 
 struct irq_cfg __read_mostly *irq_cfg = NULL;
