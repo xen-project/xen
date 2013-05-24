@@ -38,9 +38,9 @@
         orr   \rd, \rd, #(0x7<<8)
         str   \rd, [\rc, #0x558]
 
-        mov   \rc, #4
+        mov   \rc, #(100000000 / EARLY_PRINTK_BAUD % 16)
         str   \rc, [\rb, #UFRACVAL]     /* -> UFRACVAL (Baud divisor fraction) */
-        mov   \rc, #53
+        mov   \rc, #(100000000 / EARLY_PRINTK_BAUD / 16 - 1)
         str   \rc, [\rb, #UBRDIV]       /* -> UBRDIV (Baud divisor integer) */
         mov   \rc, #3                   /* 8n1 */
         str   \rc, [\rb, #ULCON]        /* -> (Line control) */

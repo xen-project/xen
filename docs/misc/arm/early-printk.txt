@@ -12,4 +12,7 @@ where mach is the name of the machine:
   - vexpress: printk with pl011 for versatile express
   - exynos5250: printk with the second UART
 
+The baud rate is hardcoded in xen/arch/arm/Rules.mk,
+see there when adding support for new machines.
+
 By default early printk is disabled.

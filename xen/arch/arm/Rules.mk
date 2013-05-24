@@ -45,9 +45,11 @@ ifeq ($(debug),y)
 # TODO handle UART base address from make command line
 ifeq ($(CONFIG_EARLY_PRINTK), vexpress)
 EARLY_PRINTK_INC := pl011
+EARLY_PRINTK_BAUD := 38400
 endif
 ifeq ($(CONFIG_EARLY_PRINTK), exynos5250)
 EARLY_PRINTK_INC := exynos4210
+EARLY_PRINTK_BAUD := 115200
 endif
 
 ifneq ($(EARLY_PRINTK_INC),)
@@ -56,4 +58,5 @@ endif
 
 CFLAGS-$(EARLY_PRINTK) += -DEARLY_PRINTK
 CFLAGS-$(EARLY_PRINTK) += -DEARLY_PRINTK_INC=\"debug-$(EARLY_PRINTK_INC).inc\"
+CFLAGS-$(EARLY_PRINTK) += -DEARLY_PRINTK_BAUD=$(EARLY_PRINTK_BAUD)
 endif

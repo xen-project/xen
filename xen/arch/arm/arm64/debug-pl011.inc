@@ -24,9 +24,9 @@
  * xb: register which containts the UART base address
  * c: scratch register number */
 .macro early_uart_init xb, c
-        mov   x\c, #0x0
+        mov   x\c, #(7372800 / EARLY_PRINTK_BAUD % 16)
         strh  w\c, [\xb, #0x28]      /* -> UARTFBRD (Baud divisor fraction) */
-        mov   x\c, #0x4              /* 7.3728MHz / 0x4 == 16 * 115200 */
+        mov   x\c, #(7372800 / EARLY_PRINTK_BAUD / 16)
         strh  w\c, [\xb, #0x24]      /* -> UARTIBRD (Baud divisor integer) */
         mov   x\c, #0x60             /* 8n1 */
         str   w\c, [\xb, #0x2C]      /* -> UARTLCR_H (Line control) */
