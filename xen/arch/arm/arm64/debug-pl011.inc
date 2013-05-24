@@ -18,8 +18,6 @@
 
 #include <asm/asm_defns.h>
 
-#define EARLY_UART_BASE_ADDRESS 0x1c090000
-
 /* PL011 UART initialization
  * xb: register which containts the UART base address
  * c: scratch register number */

@@ -12,7 +12,7 @@ where mach is the name of the machine:
   - vexpress: printk with pl011 for versatile express
   - exynos5250: printk with the second UART
 
-The baud rate is hardcoded in xen/arch/arm/Rules.mk,
+The base address and baud rate is hardcoded in xen/arch/arm/Rules.mk,
 see there when adding support for new machines.
 If not explicitly requested with "EARLY_PRINTK_INIT_UART := y" in Rules.mk,
 the code will not try to initialize the UART, so that bootloader or

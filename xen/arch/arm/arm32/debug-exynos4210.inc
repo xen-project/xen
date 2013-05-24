@@ -18,8 +18,6 @@
 
 #include <asm/exynos4210-uart.h>
 
-#define EARLY_UART_BASE_ADDRESS 0x12c20000
-
 /* Exynos 5 UART initialization
  * rb: register which contains the UART base address
  * rc: scratch register 1

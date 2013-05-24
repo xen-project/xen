@@ -16,8 +16,6 @@
  * GNU General Public License for more details.
  */
 
-#define EARLY_UART_BASE_ADDRESS 0x1c090000
-
 /* PL011 UART initialization
  * rb: register which contains the UART base address
  * rc: scratch register 1
