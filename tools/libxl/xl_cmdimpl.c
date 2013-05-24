@@ -1456,8 +1456,6 @@ skip_vfb:
                 b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_STD;
             } else if (!strcmp(buf, "cirrus")) {
                 b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
-            } else if (!strcmp(buf, "qxl")) {
-                b_info->u.hvm.vga.kind = LIBXL_VGA_INTERFACE_TYPE_QXL;
             } else {
                 fprintf(stderr, "Unknown vga \"%s\" specified\n", buf);
                 exit(1);

@@ -1005,9 +1005,6 @@ the amount of video ram is fixed at 4MB which is sufficient
 for 1024x768 at 32 bpp and videoram option is currently working
 only when using the upstream qemu-xen device-model.
 
-For B<qxl> vga, the default is both default and minimal 128MB.
-If B<videoram> is set less than 128MB, an error will be triggered.
-
 =item B<stdvga=BOOLEAN>
 
 Select a standard VGA card with VBE (VESA BIOS Extensions) as the
@@ -1019,13 +1016,8 @@ This option is deprecated, use vga="stdvga" instead.
 
 =item B<vga="STRING">
 
-Selects the emulated video card (stdvga|cirrus|qxl).
+Selects the emulated video card (stdvga|cirrus).
 The default is cirrus.
-
-In general, QXL should work with the Spice remote display protocol
-for acceleration, and QXL driver is necessary in guest in this case.
-QXL can also work with the VNC protocol, but it will be like a standard
-VGA without acceleration.
 
 =item B<vnc=BOOLEAN>
 
