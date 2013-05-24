@@ -14,5 +14,9 @@ where mach is the name of the machine:
 
 The baud rate is hardcoded in xen/arch/arm/Rules.mk,
 see there when adding support for new machines.
+If not explicitly requested with "EARLY_PRINTK_INIT_UART := y" in Rules.mk,
+the code will not try to initialize the UART, so that bootloader or
+firmware settings can be used for maximum compatibility. The baud rate
+parameter is ignored in this case.
 
 By default early printk is disabled.

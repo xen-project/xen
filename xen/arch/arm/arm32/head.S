@@ -369,7 +369,9 @@ fail:   PRINT("- Boot failed -\r\n")
  * r11: Early UART base address
  * Clobbers r0-r2 */
 init_uart:
+#ifdef EARLY_PRINTK_INIT_UART
         early_uart_init r11, r1, r2
+#endif
         adr   r0, 1f
         b     puts                  /* Jump to puts */
 1:      .asciz "- UART enabled -\r\n"

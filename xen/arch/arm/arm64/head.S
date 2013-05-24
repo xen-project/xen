@@ -116,7 +116,9 @@ boot_cpu:
 #ifdef EARLY_PRINTK
         ldr   x23, =EARLY_UART_BASE_ADDRESS /* x23 := UART base address */
         cbnz  x22, 1f
+#ifdef EARLY_PRINTK_INIT_UART
         bl    init_uart                 /* CPU 0 sets up the UART too */
+#endif
 1:      PRINT("- CPU ")
         mov   x0, x22
         bl    putn
