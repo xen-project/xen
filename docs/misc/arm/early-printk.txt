@@ -11,6 +11,7 @@ CONFIG_EARLY_PRINTK=mach
 where mach is the name of the machine:
   - vexpress: printk with pl011 for versatile express
   - exynos5250: printk with the second UART
+  - midway: printk with the pl011 on Calxeda Midway processors
   - fastmodel: printk on ARM Fastmodel software emulators
 
 The base address and baud rate is hardcoded in xen/arch/arm/Rules.mk,
