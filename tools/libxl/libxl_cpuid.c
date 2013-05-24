@@ -99,8 +99,11 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"popcnt",       0x00000001, NA, CPUID_REG_ECX, 23,  1},
         {"movbe",        0x00000001, NA, CPUID_REG_ECX, 22,  1},
         {"x2apic",       0x00000001, NA, CPUID_REG_ECX, 21,  1},
+        /* Linux uses sse4_{1,2}.  Keep sse4.{1,2} for compatibility */
         {"sse4.2",       0x00000001, NA, CPUID_REG_ECX, 20,  1},
+        {"sse4_2",       0x00000001, NA, CPUID_REG_ECX, 20,  1},
         {"sse4.1",       0x00000001, NA, CPUID_REG_ECX, 19,  1},
+        {"sse4_1",       0x00000001, NA, CPUID_REG_ECX, 19,  1},
         {"dca",          0x00000001, NA, CPUID_REG_ECX, 18,  1},
         {"pdcm",         0x00000001, NA, CPUID_REG_ECX, 15,  1},
         {"xtpr",         0x00000001, NA, CPUID_REG_ECX, 14,  1},
