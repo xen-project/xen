@@ -182,7 +182,7 @@ static int e820_sanitize(libxl_ctx *ctx, struct e820entry src[],
         idx++;
     }
     /* At this point we have the mapped RAM + E820 entries from src. */
-    if (balloon_kb) {
+    if (balloon_kb || delta_kb) {
         /* and if we truncated the RAM region, then add it to the end. */
         e820[idx].type = E820_RAM;
         e820[idx].addr = (uint64_t)(1ULL << 32) > last ?
