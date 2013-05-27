@@ -966,11 +966,6 @@ arch_do_vcpu_op(
 
     switch ( cmd )
     {
-    /*
-     * XXX Disable for 4.0.0: __update_vcpu_system_time() writes to the given
-     * virtual address even when running in another domain's address space.
-     */
-#if 0
     case VCPUOP_register_vcpu_time_memory_area:
     {
         struct vcpu_register_time_memory_area area;
@@ -989,7 +984,6 @@ arch_do_vcpu_op(
 
         break;
     }
-#endif
 
     case VCPUOP_get_physid:
     {
@@ -1456,6 +1450,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     if (prev != next)
         update_runstate_area(next);
+
+    /* Ensure that the vcpu has an up-to-date time base. */
+    update_vcpu_system_time(next);
 
     schedule_tail(next);
     BUG();

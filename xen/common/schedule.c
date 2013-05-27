@@ -1231,8 +1231,6 @@ static void schedule(void)
     if ( next_slice.migrated )
         evtchn_move_pirqs(next);
 
-    /* Ensure that the domain has an up-to-date time base. */
-    update_vcpu_system_time(next);
     vcpu_periodic_timer_work(next);
 
     context_switch(prev, next);

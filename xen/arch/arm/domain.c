@@ -232,6 +232,9 @@ static void schedule_tail(struct vcpu *prev)
 
     if ( prev != current )
         update_runstate_area(current);
+
+    /* Ensure that the vcpu has an up-to-date time base. */
+    update_vcpu_system_time(current);
 }
 
 static void continue_new_vcpu(struct vcpu *prev)
