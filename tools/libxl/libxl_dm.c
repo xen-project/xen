@@ -533,8 +533,8 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                 nr_set_cpus = libxl_bitmap_count_set(&b_info->avail_vcpus);
 
                 flexarray_append(dm_args, libxl__sprintf(gc, "%d,maxcpus=%d",
-                                                         b_info->max_vcpus,
-                                                         nr_set_cpus));
+                                                         nr_set_cpus,
+                                                         b_info->max_vcpus));
             } else
                 flexarray_append(dm_args, libxl__sprintf(gc, "%d",
                                                          b_info->max_vcpus));
