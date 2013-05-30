@@ -95,7 +95,7 @@ int libxl_domain_qualifier_to_domid(libxl_ctx *ctx, const char *name,
 {
     int i, rv;
     for (i=0; name[i]; i++) {
-        if (!isdigit(name[i])) {
+        if (!CTYPE(isdigit, name[i])) {
             goto nondigit_found;
         }
     }
