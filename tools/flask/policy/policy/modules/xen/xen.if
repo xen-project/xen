@@ -143,7 +143,7 @@ define(`device_model', `
 	allow $1 $2_channel:event create;
 
 	allow $1 $2_target:domain shutdown;
-	allow $1 $2_target:mmu { map_read map_write adjust physmap };
+	allow $1 $2_target:mmu { map_read map_write adjust physmap target_hack };
 	allow $1 $2_target:hvm { getparam setparam trackdirtyvram hvmctl irqlevel pciroute cacheattr send_irq };
 ')
 
