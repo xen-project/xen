@@ -65,8 +65,7 @@
 #define PMU_FIXED_WIDTH_MASK     (((1 << PMU_FIXED_WIDTH_BITS) -1) << PMU_FIXED_WIDTH_SHIFT)
 
 /*
- * QUIRK to workaround an issue on Nehalem processors currently seen
- * on family 6 cpus E5520 (model 26) and X7542 (model 46).
+ * QUIRK to workaround an issue on various family 6 cpus.
  * The issue leads to endless PMC interrupt loops on the processor.
  * If the interrupt handler is running and a pmc reaches the value 0, this
  * value remains forever and it triggers immediately a new interrupt after
@@ -79,15 +78,10 @@ bool_t __read_mostly is_pmc_quirk;
 
 static void check_pmc_quirk(void)
 {
-    u8 family = current_cpu_data.x86;
-    u8 cpu_model = current_cpu_data.x86_model;
-    is_pmc_quirk = 0;
-    if ( family == 6 )
-    {
-        if ( cpu_model == 47 || cpu_model == 46 || cpu_model == 42 ||
-             cpu_model == 26 )
-            is_pmc_quirk = 1;
-    }
+    if ( current_cpu_data.x86 == 6 )
+        is_pmc_quirk = 1;
+    else
+        is_pmc_quirk = 0;    
 }
 
 static int core2_get_pmc_count(void);
