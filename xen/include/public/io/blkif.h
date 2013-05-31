@@ -208,12 +208,17 @@
  * sector-size
  *      Values:         <uint32_t>
  *
- *      The native sector size, in bytes, of the backend device.
+ *      The logical sector size, in bytes, of the backend device.
+ *
+ * physical-sector-size
+ *      Values:         <uint32_t>
+ *
+ *      The physical sector size, in bytes, of the backend device.
  *
  * sectors
  *      Values:         <uint64_t>
  *
- *      The size of the backend device, expressed in units of its native
+ *      The size of the backend device, expressed in units of its logical
  *      sector size ("sector-size").
  *
  *****************************************************************************
@@ -473,8 +478,9 @@
  * NB. first_sect and last_sect in blkif_request_segment, as well as
  * sector_number in blkif_request, are always expressed in 512-byte units.
  * However they must be properly aligned to the real sector size of the
- * physical disk, which is reported in the "sector-size" node in the backend
- * xenbus info. Also the xenbus "sectors" node is expressed in 512-byte units.
+ * physical disk, which is reported in the "physical-sector-size" node in
+ * the backend xenbus info. Also the xenbus "sectors" node is expressed in
+ * 512-byte units.
  */
 struct blkif_request_segment {
     grant_ref_t gref;        /* reference to I/O buffer frame        */
