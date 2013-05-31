@@ -197,11 +197,23 @@ int create_irq(int node)
     return irq;
 }
 
-static void dynamic_irq_cleanup(unsigned int irq)
+void destroy_irq(unsigned int irq)
 {
     struct irq_desc *desc = irq_to_desc(irq);
     unsigned long flags;
     struct irqaction *action;
+
+    BUG_ON(!MSI_IRQ(irq));
+
+    if ( dom0 )
+    {
+        int err = irq_deny_access(dom0, irq);
+
+        if ( err )
+            printk(XENLOG_G_ERR
+                   "Could not revoke Dom0 access to IRQ%u (error %d)\n",
+                   irq, err);
+    }
 
     spin_lock_irqsave(&desc->lock, flags);
     desc->status  |= IRQ_DISABLED;
@@ -210,16 +222,19 @@ static void dynamic_irq_cleanup(unsigned int irq)
     action = desc->action;
     desc->action  = NULL;
     desc->msi_desc = NULL;
-    desc->handler = &no_irq_type;
-    desc->arch.used_vectors = NULL;
     cpumask_setall(desc->affinity);
     spin_unlock_irqrestore(&desc->lock, flags);
 
     /* Wait to make sure it's not being used on another CPU */
     do { smp_mb(); } while ( desc->status & IRQ_INPROGRESS );
 
-    if (action)
-        xfree(action);
+    spin_lock_irqsave(&desc->lock, flags);
+    desc->handler = &no_irq_type;
+    clear_irq_vector(irq);
+    desc->arch.used_vectors = NULL;
+    spin_unlock_irqrestore(&desc->lock, flags);
+
+    xfree(action);
 }
 
 static void __clear_irq_vector(int irq)
@@ -284,24 +299,6 @@ void clear_irq_vector(int irq)
     spin_lock_irqsave(&vector_lock, flags);
     __clear_irq_vector(irq);
     spin_unlock_irqrestore(&vector_lock, flags);
-}
-
-void destroy_irq(unsigned int irq)
-{
-    BUG_ON(!MSI_IRQ(irq));
-
-    if ( dom0 )
-    {
-        int err = irq_deny_access(dom0, irq);
-
-        if ( err )
-            printk(XENLOG_G_ERR
-                   "Could not revoke Dom0 access to IRQ%u (error %d)\n",
-                   irq, err);
-    }
-
-    dynamic_irq_cleanup(irq);
-    clear_irq_vector(irq);
 }
 
 int irq_to_vector(int irq)
