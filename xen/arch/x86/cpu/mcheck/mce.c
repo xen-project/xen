@@ -652,7 +652,14 @@ int mca_cap_init(void)
     }
     nr_mce_banks = msr_content & MCG_CAP_COUNT;
 
-    /* mcabanks_alloc depends on nr_mcebanks */
+    if (!nr_mce_banks)
+    {
+        printk(XENLOG_INFO "CPU%u: No MCE banks present. "
+               "Machine check support disabled\n", smp_processor_id());
+        return -ENODEV;
+    }
+
+    /* mcabanks_alloc depends on nr_mce_banks */
     if (!mca_allbanks)
     {
         int i;
