@@ -5,7 +5,7 @@
  *
  */
 
-#include <xen/config.h>
+#include <xen/percpu.h>
 #include <xen/sched.h>
 #include <asm/current.h>
 #include <asm/processor.h>
@@ -27,24 +27,34 @@ u32 xsave_cntxt_size;
 u64 xfeature_mask;
 
 /* Cached xcr0 for fast read */
-DEFINE_PER_CPU(uint64_t, xcr0);
+static DEFINE_PER_CPU(uint64_t, xcr0);
 
 /* Because XCR0 is cached for each CPU, xsetbv() is not exposed. Users should 
  * use set_xcr0() instead.
  */
-static inline void xsetbv(u32 index, u64 xfeatures)
+static inline bool_t xsetbv(u32 index, u64 xfeatures)
 {
     u32 hi = xfeatures >> 32;
     u32 lo = (u32)xfeatures;
 
-    asm volatile (".byte 0x0f,0x01,0xd1" :: "c" (index),
-            "a" (lo), "d" (hi));
+    asm volatile ( "1: .byte 0x0f,0x01,0xd1\n"
+                   "3:                     \n"
+                   ".section .fixup,\"ax\" \n"
+                   "2: xor %0,%0           \n"
+                   "   jmp 3b              \n"
+                   ".previous              \n"
+                   _ASM_EXTABLE(1b, 2b)
+                   : "+a" (lo)
+                   : "c" (index), "d" (hi));
+    return lo != 0;
 }
 
-void set_xcr0(u64 xfeatures)
+bool_t set_xcr0(u64 xfeatures)
 {
+    if ( !xsetbv(XCR_XFEATURE_ENABLED_MASK, xfeatures) )
+        return 0;
     this_cpu(xcr0) = xfeatures;
-    xsetbv(XCR_XFEATURE_ENABLED_MASK, xfeatures);
+    return 1;
 }
 
 uint64_t get_xcr0(void)
@@ -236,7 +246,8 @@ void xstate_init(void)
      * Set CR4_OSXSAVE and run "cpuid" to get xsave_cntxt_size.
      */
     set_in_cr4(X86_CR4_OSXSAVE);
-    set_xcr0((((u64)edx << 32) | eax) & XCNTXT_MASK);
+    if ( !set_xcr0((((u64)edx << 32) | eax) & XCNTXT_MASK) )
+        BUG();
     cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
 
     if ( cpu == 0 )
@@ -260,6 +271,28 @@ void xstate_init(void)
         BUG_ON(xsave_cntxt_size != ebx);
         BUG_ON(xfeature_mask != (xfeature_mask & XCNTXT_MASK));
     }
+}
+
+int handle_xsetbv(u32 index, u64 new_bv)
+{
+    struct vcpu *curr = current;
+
+    if ( index != XCR_XFEATURE_ENABLED_MASK )
+        return -EOPNOTSUPP;
+
+    if ( (new_bv & ~xfeature_mask) || !(new_bv & XSTATE_FP) )
+        return -EINVAL;
+
+    if ( (new_bv & XSTATE_YMM) && !(new_bv & XSTATE_SSE) )
+        return -EINVAL;
+
+    if ( !set_xcr0(new_bv) )
+        return -EFAULT;
+
+    curr->arch.xcr0 = new_bv;
+    curr->arch.xcr0_accum |= new_bv;
+
+    return 0;
 }
 
 /*

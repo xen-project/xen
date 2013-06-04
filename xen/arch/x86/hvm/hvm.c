@@ -1513,24 +1513,16 @@ out:
     return rc;
 }
 
-int hvm_handle_xsetbv(u64 new_bv)
+int hvm_handle_xsetbv(u32 index, u64 new_bv)
 {
-    struct vcpu *v = current;
     struct segment_register sreg;
 
-    hvm_get_segment_register(v, x86_seg_ss, &sreg);
+    hvm_get_segment_register(current, x86_seg_ss, &sreg);
     if ( sreg.attr.fields.dpl != 0 )
         goto err;
 
-    if ( ((new_bv ^ xfeature_mask) & ~xfeature_mask) || !(new_bv & 1) )
+    if ( handle_xsetbv(index, new_bv) )
         goto err;
-
-    if ( (xfeature_mask & XSTATE_YMM & new_bv) && !(new_bv & XSTATE_SSE) )
-        goto err;
-
-    v->arch.xcr0 = new_bv;
-    v->arch.xcr0_accum |= new_bv;
-    set_xcr0(new_bv);
 
     return 0;
 err:

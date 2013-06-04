@@ -2827,12 +2827,10 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_XSETBV:
-    {
-        u64 new_bv = (((u64)regs->edx) << 32) | regs->eax;
-        if ( hvm_handle_xsetbv(new_bv) == 0 )
+        if ( hvm_handle_xsetbv(regs->ecx,
+                               (regs->rdx << 32) | regs->_eax) == 0 )
             update_guest_eip(); /* Safe: XSETBV */
         break;
-    }
 
     case EXIT_REASON_APIC_WRITE:
         if ( vmx_handle_apic_write() )

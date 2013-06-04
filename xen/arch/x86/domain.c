@@ -1332,8 +1332,9 @@ static void __context_switch(void)
     if ( !is_idle_vcpu(n) )
     {
         memcpy(stack_regs, &n->arch.user_regs, CTXT_SWITCH_STACK_BYTES);
-        if ( xsave_enabled(n) && n->arch.xcr0 != get_xcr0() )
-            set_xcr0(n->arch.xcr0);
+        if ( xsave_enabled(n) && n->arch.xcr0 != get_xcr0() &&
+             !set_xcr0(n->arch.xcr0) )
+            BUG();
         vcpu_restore_fpu_eager(n);
         n->arch.ctxt_switch_to(n);
     }

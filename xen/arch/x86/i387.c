@@ -36,13 +36,17 @@ static void fpu_init(void)
 /* Restore x87 extended state */
 static inline void fpu_xrstor(struct vcpu *v, uint64_t mask)
 {
+    bool_t ok;
+
     /*
      * XCR0 normally represents what guest OS set. In case of Xen itself, 
      * we set all supported feature mask before doing save/restore.
      */
-    set_xcr0(v->arch.xcr0_accum);
+    ok = set_xcr0(v->arch.xcr0_accum);
+    ASSERT(ok);
     xrstor(v, mask);
-    set_xcr0(v->arch.xcr0);
+    ok = set_xcr0(v->arch.xcr0);
+    ASSERT(ok);
 }
 
 /* Restor x87 FPU, MMX, SSE and SSE2 state */
@@ -118,12 +122,16 @@ static inline void fpu_frstor(struct vcpu *v)
 /* Save x87 extended state */
 static inline void fpu_xsave(struct vcpu *v)
 {
+    bool_t ok;
+
     /* XCR0 normally represents what guest OS set. In case of Xen itself,
      * we set all accumulated feature mask before doing save/restore.
      */
-    set_xcr0(v->arch.xcr0_accum);
+    ok = set_xcr0(v->arch.xcr0_accum);
+    ASSERT(ok);
     xsave(v, v->arch.nonlazy_xstate_used ? XSTATE_ALL : XSTATE_LAZY);
-    set_xcr0(v->arch.xcr0);    
+    ok = set_xcr0(v->arch.xcr0);
+    ASSERT(ok);
 }
 
 /* Save x87 FPU, MMX, SSE and SSE2 state */

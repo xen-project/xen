@@ -9,7 +9,6 @@
 #define __ASM_XSTATE_H
 
 #include <xen/types.h>
-#include <xen/percpu.h>
 
 #define FCW_DEFAULT               0x037f
 #define MXCSR_DEFAULT             0x1f80
@@ -33,9 +32,6 @@
 #define XSTATE_ALL     (~0)
 #define XSTATE_NONLAZY (XSTATE_LWP)
 #define XSTATE_LAZY    (XSTATE_ALL & ~XSTATE_NONLAZY)
-
-/* extended state variables */
-DECLARE_PER_CPU(uint64_t, xcr0);
 
 extern unsigned int xsave_cntxt_size;
 extern u64 xfeature_mask;
@@ -75,11 +71,12 @@ struct xsave_struct
 } __attribute__ ((packed, aligned (64)));
 
 /* extended state operations */
-void set_xcr0(u64 xfeatures);
+bool_t __must_check set_xcr0(u64 xfeatures);
 uint64_t get_xcr0(void);
 void xsave(struct vcpu *v, uint64_t mask);
 void xrstor(struct vcpu *v, uint64_t mask);
 bool_t xsave_enabled(const struct vcpu *v);
+int __must_check handle_xsetbv(u32 index, u64 new_bv);
 
 /* extended state init and cleanup functions */
 void xstate_free_save_area(struct vcpu *v);

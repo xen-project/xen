@@ -128,7 +128,7 @@ void hvm_triple_fault(void);
 
 void hvm_rdtsc_intercept(struct cpu_user_regs *regs);
 
-int hvm_handle_xsetbv(u64 new_bv);
+int __must_check hvm_handle_xsetbv(u32 index, u64 new_bv);
 
 /* These functions all return X86EMUL return codes. */
 int hvm_set_efer(uint64_t value);

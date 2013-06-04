@@ -2198,25 +2198,9 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
             if ( !guest_kernel_mode(v, regs) )
                 goto fail;
 
-            switch ( (u32)regs->ecx )
-            {
-                case XCR_XFEATURE_ENABLED_MASK:
-                    /* bit 0 of XCR0 must be set and reserved bit must not be set */
-                    if ( !(new_xfeature & XSTATE_FP) || (new_xfeature & ~xfeature_mask) )
-                        goto fail;
+            if ( handle_xsetbv(regs->ecx, new_xfeature) )
+                goto fail;
 
-                    /* YMM state takes SSE state as prerequisite. */
-                    if ( (xfeature_mask & new_xfeature & XSTATE_YMM) &&
-                         !(new_xfeature & XSTATE_SSE) )
-                        goto fail;
-
-                    v->arch.xcr0 = new_xfeature;
-                    v->arch.xcr0_accum |= new_xfeature;
-                    set_xcr0(new_xfeature);
-                    break;
-                default:
-                    goto fail;
-            }
             break;
         }
         default:
