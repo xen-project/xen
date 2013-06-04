@@ -55,28 +55,53 @@ static inline void fpu_fxrstor(struct vcpu *v)
      * possibility, which may occur if the block was passed to us by control
      * tools or through VCPUOP_initialise, by silently clearing the block.
      */
-    asm volatile (
-        /* See above for why the operands/constraints are this way. */
-        "1: " REX64_PREFIX "fxrstor (%2)\n"
-        ".section .fixup,\"ax\"   \n"
-        "2: push %%"__OP"ax       \n"
-        "   push %%"__OP"cx       \n"
-        "   push %%"__OP"di       \n"
-        "   lea  %0,%%"__OP"di    \n"
-        "   mov  %1,%%ecx         \n"
-        "   xor  %%eax,%%eax      \n"
-        "   rep ; stosl           \n"
-        "   pop  %%"__OP"di       \n"
-        "   pop  %%"__OP"cx       \n"
-        "   pop  %%"__OP"ax       \n"
-        "   jmp  1b               \n"
-        ".previous                \n"
-        _ASM_EXTABLE(1b, 2b)
-        : 
-        : "m" (*fpu_ctxt),
-          "i" (sizeof(v->arch.xsave_area->fpu_sse)/4)
-          ,"cdaSDb" (fpu_ctxt)
-        );
+    switch ( __builtin_expect(fpu_ctxt[FPU_WORD_SIZE_OFFSET], 8) )
+    {
+    default:
+        asm volatile (
+            /* See below for why the operands/constraints are this way. */
+            "1: " REX64_PREFIX "fxrstor (%2)\n"
+            ".section .fixup,\"ax\"   \n"
+            "2: push %%"__OP"ax       \n"
+            "   push %%"__OP"cx       \n"
+            "   push %%"__OP"di       \n"
+            "   mov  %2,%%"__OP"di    \n"
+            "   mov  %1,%%ecx         \n"
+            "   xor  %%eax,%%eax      \n"
+            "   rep ; stosl           \n"
+            "   pop  %%"__OP"di       \n"
+            "   pop  %%"__OP"cx       \n"
+            "   pop  %%"__OP"ax       \n"
+            "   jmp  1b               \n"
+            ".previous                \n"
+            _ASM_EXTABLE(1b, 2b)
+            :
+            : "m" (*fpu_ctxt),
+              "i" (sizeof(v->arch.xsave_area->fpu_sse) / 4),
+              "cdaSDb" (fpu_ctxt) );
+        break;
+    case 4: case 2:
+        asm volatile (
+            "1: fxrstor %0         \n"
+            ".section .fixup,\"ax\"\n"
+            "2: push %%"__OP"ax    \n"
+            "   push %%"__OP"cx    \n"
+            "   push %%"__OP"di    \n"
+            "   lea  %0,%%"__OP"di \n"
+            "   mov  %1,%%ecx      \n"
+            "   xor  %%eax,%%eax   \n"
+            "   rep ; stosl        \n"
+            "   pop  %%"__OP"di    \n"
+            "   pop  %%"__OP"cx    \n"
+            "   pop  %%"__OP"ax    \n"
+            "   jmp  1b            \n"
+            ".previous             \n"
+            _ASM_EXTABLE(1b, 2b)
+            :
+            : "m" (*fpu_ctxt),
+              "i" (sizeof(v->arch.xsave_area->fpu_sse) / 4) );
+        break;
+    }
 }
 
 /* Restore x87 extended state */
@@ -104,19 +129,49 @@ static inline void fpu_xsave(struct vcpu *v)
 /* Save x87 FPU, MMX, SSE and SSE2 state */
 static inline void fpu_fxsave(struct vcpu *v)
 {
-    char *fpu_ctxt = v->arch.fpu_ctxt;
+    typeof(v->arch.xsave_area->fpu_sse) *fpu_ctxt = v->arch.fpu_ctxt;
+    int word_size = cpu_has_fpu_sel ? 8 : 0;
 
-    /*
-     * The only way to force fxsaveq on a wide range of gas versions. On 
-     * older versions the rex64 prefix works only if we force an
-     * addressing mode that doesn't require extended registers.
-     */
-    asm volatile (
-        REX64_PREFIX "fxsave (%1)"
-        : "=m" (*fpu_ctxt) : "cdaSDb" (fpu_ctxt) );
+    if ( !is_pv_32bit_vcpu(v) )
+    {
+        /*
+         * The only way to force fxsaveq on a wide range of gas versions.
+         * On older versions the rex64 prefix works only if we force an
+         * addressing mode that doesn't require extended registers.
+         */
+        asm volatile ( REX64_PREFIX "fxsave (%1)"
+                       : "=m" (*fpu_ctxt) : "cdaSDb" (fpu_ctxt) );
+
+        /*
+         * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
+         * is pending.
+         */
+        if ( !(fpu_ctxt->fsw & 0x0080) &&
+             boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+            word_size = -1;
+
+        if ( word_size > 0 &&
+             !((fpu_ctxt->fip.addr | fpu_ctxt->fdp.addr) >> 32) )
+        {
+            struct ix87_env fpu_env;
+
+            asm volatile ( "fnstenv %0" : "=m" (fpu_env) );
+            fpu_ctxt->fip.sel = fpu_env.fcs;
+            fpu_ctxt->fdp.sel = fpu_env.fds;
+            word_size = 4;
+        }
+    }
+    else
+    {
+        asm volatile ( "fxsave %0" : "=m" (*fpu_ctxt) );
+        word_size = 4;
+    }
+
+    if ( word_size >= 0 )
+        fpu_ctxt->x[FPU_WORD_SIZE_OFFSET] = word_size;
     
     /* Clear exception flags if FSW.ES is set. */
-    if ( unlikely(fpu_ctxt[2] & 0x80) )
+    if ( unlikely(fpu_ctxt->fsw & 0x0080) )
         asm volatile ("fnclex");
     
     /*

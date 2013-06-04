@@ -147,6 +147,7 @@
 #define X86_FEATURE_ERMS	(7*32+ 9) /* Enhanced REP MOVSB/STOSB */
 #define X86_FEATURE_INVPCID	(7*32+10) /* Invalidate Process Context ID */
 #define X86_FEATURE_RTM 	(7*32+11) /* Restricted Transactional Memory */
+#define X86_FEATURE_NO_FPU_SEL 	(7*32+13) /* FPU CS/DS stored as zero */
 
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
@@ -183,6 +184,7 @@
 #define cpu_has_fsgsbase	boot_cpu_has(X86_FEATURE_FSGSBASE)
 
 #define cpu_has_smep            boot_cpu_has(X86_FEATURE_SMEP)
+#define cpu_has_fpu_sel         (!boot_cpu_has(X86_FEATURE_NO_FPU_SEL))
 
 #define cpu_has_ffxsr           ((boot_cpu_data.x86_vendor == X86_VENDOR_AMD) \
                                  && boot_cpu_has(X86_FEATURE_FFXSR))

@@ -10,6 +10,7 @@
 #include <asm/current.h>
 #include <asm/processor.h>
 #include <asm/hvm/support.h>
+#include <asm/i387.h>
 #include <asm/xstate.h>
 #include <asm/asm_defns.h>
 
@@ -56,26 +57,59 @@ void xsave(struct vcpu *v, uint64_t mask)
     struct xsave_struct *ptr = v->arch.xsave_area;
     uint32_t hmask = mask >> 32;
     uint32_t lmask = mask;
+    int word_size = mask & XSTATE_FP ? (cpu_has_fpu_sel ? 8 : 0) : -1;
 
-    if ( cpu_has_xsaveopt )
-        asm volatile (
-            ".byte " REX_PREFIX "0x0f,0xae,0x37"
-            :
-            : "a" (lmask), "d" (hmask), "D"(ptr)
-            : "memory" );
+    if ( word_size <= 0 || !is_pv_32bit_vcpu(v) )
+    {
+        if ( cpu_has_xsaveopt )
+            asm volatile ( ".byte 0x48,0x0f,0xae,0x37"
+                           : "=m" (*ptr)
+                           : "a" (lmask), "d" (hmask), "D" (ptr) );
+        else
+            asm volatile ( ".byte 0x48,0x0f,0xae,0x27"
+                           : "=m" (*ptr)
+                           : "a" (lmask), "d" (hmask), "D" (ptr) );
+
+        if ( !(mask & ptr->xsave_hdr.xstate_bv & XSTATE_FP) ||
+             /*
+              * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
+              * is pending.
+              */
+             (!(ptr->fpu_sse.fsw & 0x0080) &&
+              boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
+            return;
+
+        if ( word_size > 0 &&
+             !((ptr->fpu_sse.fip.addr | ptr->fpu_sse.fdp.addr) >> 32) )
+        {
+            struct ix87_env fpu_env;
+
+            asm volatile ( "fnstenv %0" : "=m" (fpu_env) );
+            ptr->fpu_sse.fip.sel = fpu_env.fcs;
+            ptr->fpu_sse.fdp.sel = fpu_env.fds;
+            word_size = 4;
+        }
+    }
     else
-        asm volatile (
-            ".byte " REX_PREFIX "0x0f,0xae,0x27"
-            :
-            : "a" (lmask), "d" (hmask), "D"(ptr)
-            : "memory" );
+    {
+        if ( cpu_has_xsaveopt )
+            asm volatile ( ".byte 0x0f,0xae,0x37"
+                           : "=m" (*ptr)
+                           : "a" (lmask), "d" (hmask), "D" (ptr) );
+        else
+            asm volatile ( ".byte 0x0f,0xae,0x27"
+                           : "=m" (*ptr)
+                           : "a" (lmask), "d" (hmask), "D" (ptr) );
+        word_size = 4;
+    }
+    if ( word_size >= 0 )
+        ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] = word_size;
 }
 
 void xrstor(struct vcpu *v, uint64_t mask)
 {
     uint32_t hmask = mask >> 32;
     uint32_t lmask = mask;
-
     struct xsave_struct *ptr = v->arch.xsave_area;
 
     /*
@@ -98,20 +132,41 @@ void xrstor(struct vcpu *v, uint64_t mask)
      * possibility, which may occur if the block was passed to us by control
      * tools or through VCPUOP_initialise, by silently clearing the block.
      */
-    asm volatile ( "1: .byte " REX_PREFIX "0x0f,0xae,0x2f\n"
-                   ".section .fixup,\"ax\"\n"
-                   "2: mov %5,%%ecx       \n"
-                   "   xor %1,%1          \n"
-                   "   rep stosb          \n"
-                   "   lea %2,%0          \n"
-                   "   mov %3,%1          \n"
-                   "   jmp 1b             \n"
-                   ".previous             \n"
-                   _ASM_EXTABLE(1b, 2b)
-                   : "+&D" (ptr), "+&a" (lmask)
-                   : "m" (*ptr), "g" (lmask), "d" (hmask),
-                     "m" (xsave_cntxt_size)
-                   : "ecx" );
+    switch ( __builtin_expect(ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET], 8) )
+    {
+    default:
+        asm volatile ( "1: .byte 0x48,0x0f,0xae,0x2f\n"
+                       ".section .fixup,\"ax\"      \n"
+                       "2: mov %5,%%ecx             \n"
+                       "   xor %1,%1                \n"
+                       "   rep stosb                \n"
+                       "   lea %2,%0                \n"
+                       "   mov %3,%1                \n"
+                       "   jmp 1b                   \n"
+                       ".previous                   \n"
+                       _ASM_EXTABLE(1b, 2b)
+                       : "+&D" (ptr), "+&a" (lmask)
+                       : "m" (*ptr), "g" (lmask), "d" (hmask),
+                         "m" (xsave_cntxt_size)
+                       : "ecx" );
+        break;
+    case 4: case 2:
+        asm volatile ( "1: .byte 0x0f,0xae,0x2f\n"
+                       ".section .fixup,\"ax\" \n"
+                       "2: mov %5,%%ecx        \n"
+                       "   xor %1,%1           \n"
+                       "   rep stosb           \n"
+                       "   lea %2,%0           \n"
+                       "   mov %3,%1           \n"
+                       "   jmp 1b              \n"
+                       ".previous              \n"
+                       _ASM_EXTABLE(1b, 2b)
+                       : "+&D" (ptr), "+&a" (lmask)
+                       : "m" (*ptr), "g" (lmask), "d" (hmask),
+                         "m" (xsave_cntxt_size)
+                       : "ecx" );
+        break;
+    }
 }
 
 bool_t xsave_enabled(const struct vcpu *v)

@@ -34,8 +34,6 @@
 #define XSTATE_NONLAZY (XSTATE_LWP)
 #define XSTATE_LAZY    (XSTATE_ALL & ~XSTATE_NONLAZY)
 
-#define REX_PREFIX     "0x48, "
-
 /* extended state variables */
 DECLARE_PER_CPU(uint64_t, xcr0);
 
