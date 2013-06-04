@@ -2205,6 +2205,11 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                     if ( !(new_xfeature & XSTATE_FP) || (new_xfeature & ~xfeature_mask) )
                         goto fail;
 
+                    /* YMM state takes SSE state as prerequisite. */
+                    if ( (xfeature_mask & new_xfeature & XSTATE_YMM) &&
+                         !(new_xfeature & XSTATE_SSE) )
+                        goto fail;
+
                     v->arch.xcr0 = new_xfeature;
                     v->arch.xcr0_accum |= new_xfeature;
                     set_xcr0(new_xfeature);
