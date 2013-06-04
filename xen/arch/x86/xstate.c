@@ -78,6 +78,21 @@ void xrstor(struct vcpu *v, uint64_t mask)
 
     struct xsave_struct *ptr = v->arch.xsave_area;
 
+    /*
+     * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
+     * is pending. Clear the x87 state here by setting it to fixed
+     * values. The hypervisor data segment can be sometimes 0 and
+     * sometimes new user value. Both should be ok. Use the FPU saved
+     * data block as a safe address because it should be in L1.
+     */
+    if ( (mask & ptr->xsave_hdr.xstate_bv & XSTATE_FP) &&
+         !(ptr->fpu_sse.fsw & 0x0080) &&
+         boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+        asm volatile ( "fnclex\n\t"        /* clear exceptions */
+                       "ffree %%st(7)\n\t" /* clear stack tag */
+                       "fildl %0"          /* load to clear state */
+                       : : "m" (ptr->fpu_sse) );
+
     asm volatile (
         ".byte " REX_PREFIX "0x0f,0xae,0x2f"
         :
