@@ -519,7 +519,41 @@ static void show_guest_stack(struct cpu_user_regs *regs)
 }
 
 #define STACK_BEFORE_EXCEPTION(regs) ((register_t*)(regs)->sp)
-
+#ifdef CONFIG_ARM_32
+/* Frame pointer points to the return address:
+ * (largest address)
+ * | cpu_info
+ * | [...]                                   |
+ * | return addr      <-----------------,    |
+ * | fp --------------------------------+----'
+ * | [...]                              |
+ * | return addr      <------------,    |
+ * | fp ---------------------------+----'
+ * | [...]                         |
+ * | return addr      <- regs->fp  |
+ * | fp ---------------------------'
+ * |
+ * v (smallest address, sp)
+ */
+#define STACK_FRAME_BASE(fp)       ((register_t*)(fp) - 1)
+#else
+/* Frame pointer points to the next frame:
+ * (largest address)
+ * | cpu_info
+ * | [...]                                   |
+ * | return addr                             |
+ * | fp <-------------------------------, >--'
+ * | [...]                              |
+ * | return addr                        |
+ * | fp <--------------------------, >--'
+ * | [...]                         |
+ * | return addr      <- regs->fp  |
+ * | fp ---------------------------'
+ * |
+ * v (smallest address, sp)
+ */
+#define STACK_FRAME_BASE(fp)       ((register_t*)(fp))
+#endif
 static void show_trace(struct cpu_user_regs *regs)
 {
     register_t *frame, next, addr, low, high;
@@ -527,28 +561,14 @@ static void show_trace(struct cpu_user_regs *regs)
     printk("Xen call trace:\n   ");
 
     printk("[<%p>]", _p(regs->pc));
-    print_symbol(" %s\n   ", regs->pc);
+    print_symbol(" %s (PC)\n   ", regs->pc);
+    printk("[<%p>]", _p(regs->lr));
+    print_symbol(" %s (LR)\n   ", regs->lr);
 
     /* Bounds for range of valid frame pointer. */
-    low  = (register_t)(STACK_BEFORE_EXCEPTION(regs)/* - 2*/);
+    low  = (register_t)(STACK_BEFORE_EXCEPTION(regs));
     high = (low & ~(STACK_SIZE - 1)) +
         (STACK_SIZE - sizeof(struct cpu_info));
-
-    /* Frame:
-     * (largest address)
-     * | cpu_info
-     * | [...]                                   |
-     * | return addr      <-----------------,    |
-     * | fp --------------------------------+----'
-     * | [...]                              |
-     * | return addr      <------------,    |
-     * | fp ---------------------------+----'
-     * | [...]                         |
-     * | return addr      <- regs->fp  |
-     * | fp ---------------------------'
-     * |
-     * v (smallest address, sp)
-     */
 
     /* The initial frame pointer. */
     next = regs->fp;
@@ -557,12 +577,11 @@ static void show_trace(struct cpu_user_regs *regs)
     {
         if ( (next < low) || (next >= high) )
             break;
-        {
-            /* Ordinary stack frame. */
-            frame = (register_t *)next;
-            next  = frame[-1];
-            addr  = frame[0];
-        }
+
+        /* Ordinary stack frame. */
+        frame = STACK_FRAME_BASE(next);
+        next  = frame[0];
+        addr  = frame[1];
 
         printk("[<%p>]", _p(addr));
         print_symbol(" %s\n   ", addr);
