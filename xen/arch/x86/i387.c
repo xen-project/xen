@@ -59,10 +59,25 @@ static void xrstor(struct vcpu *v)
                        "fildl %0"          /* load to clear state */
                        : : "m" (ptr->fpu_sse) );
 
-    asm volatile (
-        ".byte " REX_PREFIX "0x0f,0xae,0x2f"
-        :
-        : "m" (*ptr), "a" (-1), "d" (-1), "D"(ptr) );
+    /*
+     * XRSTOR can fault if passed a corrupted data block. We handle this
+     * possibility, which may occur if the block was passed to us by control
+     * tools or through VCPUOP_initialise, by silently clearing the block.
+     */
+    asm volatile ( "1: .byte " REX_PREFIX "0x0f,0xae,0x2f\n"
+                   ".section .fixup,\"ax\"\n"
+                   "2: mov %4,%%ecx       \n"
+                   "   xor %1,%1          \n"
+                   "   rep stosb          \n"
+                   "   lea %3,%0          \n"
+                   "   dec %1             \n"
+                   "   jmp 1b             \n"
+                   ".previous             \n"
+                   _ASM_EXTABLE(1b, 2b)
+                   : "+&D" (ptr)
+                   : "a" (-1), "d" (-1), "m" (*ptr),
+                     "m" (xsave_cntxt_size)
+                   : "ecx" );
 }
 
 static void load_mxcsr(unsigned long val)
@@ -196,7 +211,7 @@ static void restore_fpu(struct vcpu *v)
     /*
      * FXRSTOR can fault if passed a corrupted data block. We handle this
      * possibility, which may occur if the block was passed to us by control
-     * tools, by silently clearing the block.
+     * tools or through VCPUOP_initialise, by silently clearing the block.
      */
     if ( cpu_has_fxsr )
     {
