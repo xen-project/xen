@@ -53,7 +53,7 @@ static inline void fpu_fxrstor(struct vcpu *v)
     /*
      * FXRSTOR can fault if passed a corrupted data block. We handle this
      * possibility, which may occur if the block was passed to us by control
-     * tools, by silently clearing the block.
+     * tools or through VCPUOP_initialise, by silently clearing the block.
      */
     asm volatile (
         /* See above for why the operands/constraints are this way. */

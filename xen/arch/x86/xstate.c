@@ -93,10 +93,25 @@ void xrstor(struct vcpu *v, uint64_t mask)
                        "fildl %0"          /* load to clear state */
                        : : "m" (ptr->fpu_sse) );
 
-    asm volatile (
-        ".byte " REX_PREFIX "0x0f,0xae,0x2f"
-        :
-        : "m" (*ptr), "a" (lmask), "d" (hmask), "D"(ptr) );
+    /*
+     * XRSTOR can fault if passed a corrupted data block. We handle this
+     * possibility, which may occur if the block was passed to us by control
+     * tools or through VCPUOP_initialise, by silently clearing the block.
+     */
+    asm volatile ( "1: .byte " REX_PREFIX "0x0f,0xae,0x2f\n"
+                   ".section .fixup,\"ax\"\n"
+                   "2: mov %5,%%ecx       \n"
+                   "   xor %1,%1          \n"
+                   "   rep stosb          \n"
+                   "   lea %2,%0          \n"
+                   "   mov %3,%1          \n"
+                   "   jmp 1b             \n"
+                   ".previous             \n"
+                   _ASM_EXTABLE(1b, 2b)
+                   : "+&D" (ptr), "+&a" (lmask)
+                   : "m" (*ptr), "g" (lmask), "d" (hmask),
+                     "m" (xsave_cntxt_size)
+                   : "ecx" );
 }
 
 bool_t xsave_enabled(const struct vcpu *v)
