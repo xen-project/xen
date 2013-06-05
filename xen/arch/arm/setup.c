@@ -323,6 +323,14 @@ static paddr_t __init get_xen_paddr(void)
             if ( !e )
                 continue;
 
+#ifdef CONFIG_ARM_32
+            /* Xen must be under 4GB */
+            if ( e > 0x100000000ULL )
+                e = 0x100000000ULL;
+            if ( e < bank->start )
+                continue;
+#endif
+
             s = e - min_size;
 
             if ( s > paddr )
