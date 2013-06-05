@@ -57,7 +57,19 @@ u64 hvm_get_guest_time(struct vcpu *v)
 
 void hvm_set_guest_time(struct vcpu *v, u64 guest_time)
 {
-    v->arch.hvm_vcpu.stime_offset += guest_time - hvm_get_guest_time(v);
+    u64 offset = guest_time - hvm_get_guest_time(v);
+
+    if ( offset )
+    {
+        v->arch.hvm_vcpu.stime_offset += offset;
+        /*
+         * If hvm_vcpu.stime_offset is updated make sure to
+         * also update vcpu time, since this value is used to
+         * calculate the TSC.
+         */
+        if ( v == current )
+            update_vcpu_system_time(v);
+    }
 }
 
 static int pt_irq_vector(struct periodic_time *pt, enum hvm_intsrc src)
