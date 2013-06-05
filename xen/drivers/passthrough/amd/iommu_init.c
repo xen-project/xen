@@ -154,11 +154,6 @@ static void register_iommu_cmd_buffer_in_mmio_space(struct amd_iommu *iommu)
                          IOMMU_CMD_BUFFER_LENGTH_MASK,
                          IOMMU_CMD_BUFFER_LENGTH_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_CMD_BUFFER_BASE_HIGH_OFFSET);
-
-    /* Reset head/tail pointer. SR56x0 Erratum 64 means this might not happen
-     * automatically for us. */
-    writeq(0, iommu->mmio_base + IOMMU_CMD_BUFFER_HEAD_OFFSET);
-    writeq(0, iommu->mmio_base + IOMMU_CMD_BUFFER_TAIL_OFFSET);
 }
 
 static void register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu)
@@ -187,11 +182,6 @@ static void register_iommu_event_log_in_mmio_space(struct amd_iommu *iommu)
                         IOMMU_EVENT_LOG_LENGTH_MASK,
                         IOMMU_EVENT_LOG_LENGTH_SHIFT, &entry);
     writel(entry, iommu->mmio_base+IOMMU_EVENT_LOG_BASE_HIGH_OFFSET);
-
-    /* Reset head/tail pointer. SR56x0 Erratum 64 means this might not happen
-     * automatically for us. */
-    writeq(0, iommu->mmio_base + IOMMU_EVENT_LOG_HEAD_OFFSET);
-    writeq(0, iommu->mmio_base + IOMMU_EVENT_LOG_TAIL_OFFSET);
 }
 
 static void register_iommu_ppr_log_in_mmio_space(struct amd_iommu *iommu)
@@ -220,9 +210,6 @@ static void register_iommu_ppr_log_in_mmio_space(struct amd_iommu *iommu)
                         IOMMU_PPR_LOG_LENGTH_MASK,
                         IOMMU_PPR_LOG_LENGTH_SHIFT, &entry);
     writel(entry, iommu->mmio_base + IOMMU_PPR_LOG_BASE_HIGH_OFFSET);
-
-    writeq(0, iommu->mmio_base + IOMMU_PPR_LOG_HEAD_OFFSET);
-    writeq(0, iommu->mmio_base + IOMMU_PPR_LOG_TAIL_OFFSET);
 }
 
 
@@ -267,8 +254,8 @@ static void set_iommu_command_buffer_control(struct amd_iommu *iommu,
     /*reset head and tail pointer manually before enablement */
     if ( enable )
     {
-        writel(0x0, iommu->mmio_base + IOMMU_CMD_BUFFER_HEAD_OFFSET);
-        writel(0x0, iommu->mmio_base + IOMMU_CMD_BUFFER_TAIL_OFFSET);
+        writeq(0, iommu->mmio_base + IOMMU_CMD_BUFFER_HEAD_OFFSET);
+        writeq(0, iommu->mmio_base + IOMMU_CMD_BUFFER_TAIL_OFFSET);
 
         iommu_set_bit(&entry, IOMMU_CONTROL_COMMAND_BUFFER_ENABLE_SHIFT);
     }
@@ -326,8 +313,8 @@ static void set_iommu_event_log_control(struct amd_iommu *iommu,
     /*reset head and tail pointer manually before enablement */
     if ( enable )
     {
-        writel(0x0, iommu->mmio_base + IOMMU_EVENT_LOG_HEAD_OFFSET);
-        writel(0x0, iommu->mmio_base + IOMMU_EVENT_LOG_TAIL_OFFSET);
+        writeq(0, iommu->mmio_base + IOMMU_EVENT_LOG_HEAD_OFFSET);
+        writeq(0, iommu->mmio_base + IOMMU_EVENT_LOG_TAIL_OFFSET);
 
         iommu_set_bit(&entry, IOMMU_CONTROL_EVENT_LOG_INT_SHIFT);
         iommu_set_bit(&entry, IOMMU_CONTROL_EVENT_LOG_ENABLE_SHIFT);
@@ -353,8 +340,8 @@ static void set_iommu_ppr_log_control(struct amd_iommu *iommu,
     /*reset head and tail pointer manually before enablement */
     if ( enable )
     {
-        writel(0x0, iommu->mmio_base + IOMMU_PPR_LOG_HEAD_OFFSET);
-        writel(0x0, iommu->mmio_base + IOMMU_PPR_LOG_TAIL_OFFSET);
+        writeq(0, iommu->mmio_base + IOMMU_PPR_LOG_HEAD_OFFSET);
+        writeq(0, iommu->mmio_base + IOMMU_PPR_LOG_TAIL_OFFSET);
 
         iommu_set_bit(&entry, IOMMU_CONTROL_PPR_ENABLE_SHIFT);
         iommu_set_bit(&entry, IOMMU_CONTROL_PPR_INT_SHIFT);
