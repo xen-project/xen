@@ -318,6 +318,24 @@
 #define LIBXL_HAVE_NONCONST_EVENT_OCCURS_EVENT_ARG 1
 #endif
 
+/*
+ * LIBXL_HAVE_PHYSINFO_OUTSTANDING_PAGES
+ *
+ * If this is defined, libxl_physinfo structure will contain an uint64 field
+ * called outstanding_pages, containing the number of pages claimed but not
+ * yet allocated for all domains.
+ */
+#define LIBXL_HAVE_PHYSINFO_OUTSTANDING_PAGES 1
+
+/*
+ * LIBXL_HAVE_DOMINFO_OUTSTANDING_MEMKB 1
+ *
+ * If this is defined, libxl_dominfo will contain a MemKB type field called
+ * outstanding_memkb, containing the amount of claimed but not yet allocated
+ * memory for a specific domain.
+ */
+#define LIBXL_HAVE_DOMINFO_OUTSTANDING_MEMKB 1
+
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who
  * do not #include libxl_internal.h, are fine. */
