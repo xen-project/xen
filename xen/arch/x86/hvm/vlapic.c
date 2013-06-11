@@ -582,8 +582,19 @@ int hvm_x2apic_msr_read(struct vcpu *v, unsigned int msr, uint64_t *msr_content)
         return 1;
 
     vlapic_read_aligned(vlapic, offset, &low);
-    if ( offset == APIC_ICR )
+    switch ( offset )
+    {
+    case APIC_ID:
+        low = GET_xAPIC_ID(low);
+        break;
+
+    case APIC_ICR:
         vlapic_read_aligned(vlapic, APIC_ICR2, &high);
+        break;
+
+    case APIC_ICR2:
+        return 1;
+    }
 
     *msr_content = (((uint64_t)high) << 32) | low;
     return 0;
@@ -837,11 +848,17 @@ int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
     if ( !vlapic_x2apic_mode(vlapic) )
         return X86EMUL_UNHANDLEABLE;
 
-    if ( offset == APIC_ICR )
+    switch ( offset )
     {
-        int rc = vlapic_reg_write(v, APIC_ICR2, (uint32_t)(msr_content >> 32));
+        int rc;
+
+    case APIC_ICR:
+        rc = vlapic_reg_write(v, APIC_ICR2, (uint32_t)(msr_content >> 32));
         if ( rc )
             return rc;
+
+    case APIC_ICR2:
+        return X86EMUL_UNHANDLEABLE;
     }
 
     return vlapic_reg_write(v, offset, (uint32_t)msr_content);
