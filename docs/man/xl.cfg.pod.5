@@ -153,6 +153,19 @@ The cap is expressed in percentage of one physical CPU:
 The default, 0, means there is no upper cap.
 Honoured by the credit and credit2 schedulers.
 
+NB: Many systems have features that will scale down the computing
+power of a cpu that is not 100% utilized.  This can be in the
+operating system, but can also sometimes be below the operating system
+in the BIOS.  If you set a cap such that individual cores are running
+at less than 100%, this may have an impact on the performance of your
+workload over and above the impact of the cap. For example, if your
+processor runs at 2GHz, and you cap a vm at 50%, the power management
+system may also reduce the clock speed to 1GHz; the effect will be
+that your VM gets 25% of the available power (50% of 1GHz) rather than
+50% (50% of 2GHz).  If you are not getting the performance you expect,
+look at performance and cpufreq options in your operating system and
+your BIOS.
+
 =item B<period=NANOSECONDS>
 
 The normal EDF scheduling usage in nanoseconds. This means every period
