@@ -24,7 +24,6 @@
 #include <unistd.h>
 #include <errno.h>
 #include <err.h>
-#include <sys/mman.h>
 
 static xc_interface *gcov_xch = NULL;
 
@@ -35,16 +34,17 @@ static void gcov_init(void)
         err(1, "opening interface");
 }
 
-int gcov_get_info(int op, struct xen_sysctl *sys, void *ptr)
+int gcov_get_info(int op, struct xen_sysctl *sys, struct xc_hypercall_buffer *ptr)
 {
     struct xen_sysctl_coverage_op *cov;
+    DECLARE_HYPERCALL_BUFFER_ARGUMENT(ptr);
 
     memset(sys, 0, sizeof(*sys));
     sys->cmd = XEN_SYSCTL_coverage_op;
 
     cov = &sys->u.coverage_op;
     cov->cmd = op;
-    cov->u.raw_info.p = ptr;
+    set_xen_guest_handle(cov->u.raw_info, ptr);
 
     return xc_sysctl(gcov_xch, sys);
 }
@@ -52,10 +52,8 @@ int gcov_get_info(int op, struct xen_sysctl *sys, void *ptr)
 static void gcov_read(const char *fn, int reset)
 {
     struct xen_sysctl sys;
-    unsigned page_size = sysconf(_SC_PAGESIZE);
     uint32_t total_len;
-    uint8_t *p;
-    size_t size;
+    DECLARE_HYPERCALL_BUFFER(uint8_t, p);
     FILE *f;
     int op = reset ? XEN_SYSCTL_COVERAGE_read_and_reset :
                      XEN_SYSCTL_COVERAGE_read;
@@ -71,16 +69,13 @@ static void gcov_read(const char *fn, int reset)
         errx(1, "coverage size too big %u bytes\n", total_len);
 
     /* allocate */
-    size = total_len + page_size;
-    size -= (size % page_size);
-    p = mmap(0, size, PROT_WRITE|PROT_READ,
-             MAP_PRIVATE|MAP_ANON|MAP_LOCKED, -1, 0);
-    if ( p == (uint8_t *) -1 )
-        err(1, "mapping memory for coverage");
+    p = xc_hypercall_buffer_alloc(gcov_xch, p, total_len);
+    if ( p == NULL )
+        err(1, "allocating memory for coverage");
 
     /* get data */
     memset(p, 0, total_len);
-    if ( gcov_get_info(op, &sys, p) < 0 )
+    if ( gcov_get_info(op, &sys, HYPERCALL_BUFFER(p)) < 0 )
         err(1, "getting coverage information");
 
     /* write to a file */
@@ -94,6 +89,7 @@ static void gcov_read(const char *fn, int reset)
         err(1, "writing coverage to file");
     if (f != stdout)
         fclose(f);
+    xc_hypercall_buffer_free(gcov_xch, p);
 }
 
 static void gcov_reset(void)
