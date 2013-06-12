@@ -810,14 +810,6 @@ void __init paging_init(void)
     panic("Not enough memory for m2p table\n");    
 }
 
-void __init setup_idle_pagetable(void)
-{
-    /* Install per-domain mappings for idle domain. */
-    l4e_write(&idle_pg_table[l4_table_offset(PERDOMAIN_VIRT_START)],
-              l4e_from_page(idle_vcpu[0]->domain->arch.perdomain_l3_pg,
-                            __PAGE_HYPERVISOR));
-}
-
 void __init zap_low_mappings(void)
 {
     BUG_ON(num_online_cpus() != 1);

@@ -286,7 +286,6 @@ extern l2_pgentry_t l2_identmap[4*L2_PAGETABLE_ENTRIES];
 extern l1_pgentry_t l1_identmap[L1_PAGETABLE_ENTRIES],
     l1_fixmap[L1_PAGETABLE_ENTRIES];
 void paging_init(void);
-void setup_idle_pagetable(void);
 #endif /* !defined(__ASSEMBLY__) */
 
 #define _PAGE_PRESENT  _AC(0x001,U)
