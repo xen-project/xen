@@ -110,16 +110,17 @@ void *map_domain_page(unsigned long mfn)
     idx = find_next_zero_bit(dcache->inuse, dcache->entries, dcache->cursor);
     if ( unlikely(idx >= dcache->entries) )
     {
-        unsigned long accum = 0;
+        unsigned long accum = 0, prev = 0;
 
         /* /First/, clean the garbage map and update the inuse list. */
         for ( i = 0; i < BITS_TO_LONGS(dcache->entries); i++ )
         {
+            accum |= prev;
             dcache->inuse[i] &= ~xchg(&dcache->garbage[i], 0);
-            accum |= ~dcache->inuse[i];
+            prev = ~dcache->inuse[i];
         }
 
-        if ( accum )
+        if ( accum | (prev & BITMAP_LAST_WORD_MASK(dcache->entries)) )
             idx = find_first_zero_bit(dcache->inuse, dcache->entries);
         else
         {
@@ -279,8 +280,7 @@ int mapcache_vcpu_init(struct vcpu *v)
     if ( ents > dcache->entries )
     {
         /* Populate page tables. */
-        int rc = create_perdomain_mapping(d, MAPCACHE_VIRT_START,
-                                          d->max_vcpus * MAPCACHE_VCPU_ENTRIES,
+        int rc = create_perdomain_mapping(d, MAPCACHE_VIRT_START, ents,
                                           NIL(l1_pgentry_t *), NULL);
 
         /* Populate bit maps. */
