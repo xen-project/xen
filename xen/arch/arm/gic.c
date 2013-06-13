@@ -280,7 +280,7 @@ static void __init gic_dist_init(void)
 
     /* Route all global IRQs to this CPU */
     for ( i = 32; i < gic.lines; i += 4 )
-        GICD[GICD_ICFGR + i / 4] = cpumask;
+        GICD[GICD_ITARGETSR + i / 4] = cpumask;
 
     /* Default priority for global interrupts */
     for ( i = 32; i < gic.lines; i += 4 )
