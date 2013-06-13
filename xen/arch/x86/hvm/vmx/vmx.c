@@ -2743,12 +2743,10 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_XSETBV:
-    {
-        u64 new_bv = (((u64)regs->edx) << 32) | regs->eax;
-        if ( hvm_handle_xsetbv(new_bv) == 0 )
+        if ( hvm_handle_xsetbv(regs->ecx,
+                               ((u64)regs->edx << 32) | (u32)regs->eax) == 0 )
             update_guest_eip(); /* Safe: XSETBV */
         break;
-    }
 
     case EXIT_REASON_ACCESS_GDTR_OR_IDTR:
     case EXIT_REASON_ACCESS_LDTR_OR_TR:

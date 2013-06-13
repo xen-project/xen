@@ -2389,7 +2389,8 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     case VMEXIT_XSETBV:
         if ( (inst_len = __get_instruction_length(current, INSTR_XSETBV))==0 )
             break;
-        if ( hvm_handle_xsetbv((((u64)regs->edx) << 32) | regs->eax) == 0 )
+        if ( hvm_handle_xsetbv(regs->ecx,
+                               ((u64)regs->edx << 32) | (u32)regs->eax) == 0 )
             __update_guest_eip(regs, inst_len);
         break;
 
