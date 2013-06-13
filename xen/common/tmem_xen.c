@@ -385,7 +385,7 @@ static void *tmh_persistent_pool_page_get(unsigned long size)
     if ( (pi = _tmh_alloc_page_thispool(d)) == NULL )
         return NULL;
     ASSERT(IS_VALID_PAGE(pi));
-    return __map_domain_page(pi);
+    return page_to_virt(pi);
 }
 
 static void tmh_persistent_pool_page_put(void *page_va)
@@ -393,8 +393,7 @@ static void tmh_persistent_pool_page_put(void *page_va)
     struct page_info *pi;
 
     ASSERT(IS_PAGE_ALIGNED(page_va));
-    pi = mfn_to_page(domain_page_map_to_mfn(page_va));
-    unmap_domain_page(page_va);
+    pi = mfn_to_page(virt_to_mfn(page_va));
     ASSERT(IS_VALID_PAGE(pi));
     _tmh_free_page_thispool(pi);
 }
