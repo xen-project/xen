@@ -14,6 +14,27 @@
 #include <xen/types.h>
 #include <xen/percpu.h>
 
+/* Byte offset of the stored word size within the FXSAVE area/portion. */
+#define FPU_WORD_SIZE_OFFSET 511
+
+struct ix87_state {
+    struct ix87_env {
+        uint16_t fcw, _res0;
+        uint16_t fsw, _res1;
+        uint16_t ftw, _res2;
+        uint32_t fip;
+        uint16_t fcs;
+        uint16_t fop;
+        uint32_t fdp;
+        uint16_t fds, _res6;
+    } env;
+    struct ix87_reg {
+        uint64_t mantissa;
+        uint16_t exponent:15;
+        uint16_t sign:1;
+    } __attribute__((__packed__)) r[8];
+};
+
 void vcpu_restore_fpu_eager(struct vcpu *v);
 void vcpu_restore_fpu_lazy(struct vcpu *v);
 void vcpu_save_fpu(struct vcpu *v);
