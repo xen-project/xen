@@ -52,7 +52,7 @@ vpath %.c ../../xen/common/libelf
 CFLAGS += -I../../xen/common/libelf
 
 GUEST_SRCS-y += libelf-tools.c libelf-loader.c
-GUEST_SRCS-y += libelf-dominfo.c libelf-relocate.c
+GUEST_SRCS-y += libelf-dominfo.c
 
 # new domain builder
 GUEST_SRCS-y                 += xc_dom_core.c xc_dom_boot.c
