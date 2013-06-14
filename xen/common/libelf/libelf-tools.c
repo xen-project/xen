@@ -67,10 +67,10 @@ int elf_phdr_count(struct elf_binary *elf)
     return elf_uval(elf, elf->ehdr, e_phnum);
 }
 
-const elf_shdr *elf_shdr_by_name(struct elf_binary *elf, const char *name)
+ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_name(struct elf_binary *elf, const char *name)
 {
     uint64_t count = elf_shdr_count(elf);
-    const elf_shdr *shdr;
+    ELF_HANDLE_DECL(elf_shdr) shdr;
     const char *sname;
     int i;
 
@@ -81,76 +81,80 @@ const elf_shdr *elf_shdr_by_name(struct elf_binary *elf, const char *name)
         if ( sname && !strcmp(sname, name) )
             return shdr;
     }
-    return NULL;
+    return ELF_INVALID_HANDLE(elf_shdr);
 }
 
-const elf_shdr *elf_shdr_by_index(struct elf_binary *elf, int index)
+ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_index(struct elf_binary *elf, int index)
 {
     uint64_t count = elf_shdr_count(elf);
-    const void *ptr;
+    ELF_PTRVAL_CONST_VOID ptr;
 
     if ( index >= count )
-        return NULL;
+        return ELF_INVALID_HANDLE(elf_shdr);
 
-    ptr = (elf->image
+    ptr = (ELF_IMAGE_BASE(elf)
            + elf_uval(elf, elf->ehdr, e_shoff)
            + elf_uval(elf, elf->ehdr, e_shentsize) * index);
-    return ptr;
+    return ELF_MAKE_HANDLE(elf_shdr, ptr);
 }
 
-const elf_phdr *elf_phdr_by_index(struct elf_binary *elf, int index)
+ELF_HANDLE_DECL(elf_phdr) elf_phdr_by_index(struct elf_binary *elf, int index)
 {
     uint64_t count = elf_uval(elf, elf->ehdr, e_phnum);
-    const void *ptr;
+    ELF_PTRVAL_CONST_VOID ptr;
 
     if ( index >= count )
-        return NULL;
+        return ELF_INVALID_HANDLE(elf_phdr);
 
-    ptr = (elf->image
+    ptr = (ELF_IMAGE_BASE(elf)
            + elf_uval(elf, elf->ehdr, e_phoff)
            + elf_uval(elf, elf->ehdr, e_phentsize) * index);
-    return ptr;
+    return ELF_MAKE_HANDLE(elf_phdr, ptr);
 }
 
-const char *elf_section_name(struct elf_binary *elf, const elf_shdr * shdr)
+
+const char *elf_section_name(struct elf_binary *elf,
+                             ELF_HANDLE_DECL(elf_shdr) shdr)
 {
-    if ( elf->sec_strtab == NULL )
+    if ( ELF_PTRVAL_INVALID(elf->sec_strtab) )
         return "unknown";
+
     return elf->sec_strtab + elf_uval(elf, shdr, sh_name);
 }
 
-const void *elf_section_start(struct elf_binary *elf, const elf_shdr * shdr)
+ELF_PTRVAL_CONST_VOID elf_section_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr)
 {
-    return elf->image + elf_uval(elf, shdr, sh_offset);
+    return ELF_IMAGE_BASE(elf) + elf_uval(elf, shdr, sh_offset);
 }
 
-const void *elf_section_end(struct elf_binary *elf, const elf_shdr * shdr)
+ELF_PTRVAL_CONST_VOID elf_section_end(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr)
 {
-    return elf->image
+    return ELF_IMAGE_BASE(elf)
         + elf_uval(elf, shdr, sh_offset) + elf_uval(elf, shdr, sh_size);
 }
 
-const void *elf_segment_start(struct elf_binary *elf, const elf_phdr * phdr)
+ELF_PTRVAL_CONST_VOID elf_segment_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr)
 {
-    return elf->image + elf_uval(elf, phdr, p_offset);
+    return ELF_IMAGE_BASE(elf)
+        + elf_uval(elf, phdr, p_offset);
 }
 
-const void *elf_segment_end(struct elf_binary *elf, const elf_phdr * phdr)
+ELF_PTRVAL_CONST_VOID elf_segment_end(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr)
 {
-    return elf->image
+    return ELF_IMAGE_BASE(elf)
         + elf_uval(elf, phdr, p_offset) + elf_uval(elf, phdr, p_filesz);
 }
 
-const elf_sym *elf_sym_by_name(struct elf_binary *elf, const char *symbol)
+ELF_HANDLE_DECL(elf_sym) elf_sym_by_name(struct elf_binary *elf, const char *symbol)
 {
-    const void *ptr = elf_section_start(elf, elf->sym_tab);
-    const void *end = elf_section_end(elf, elf->sym_tab);
-    const elf_sym *sym;
+    ELF_PTRVAL_CONST_VOID ptr = elf_section_start(elf, elf->sym_tab);
+    ELF_PTRVAL_CONST_VOID end = elf_section_end(elf, elf->sym_tab);
+    ELF_HANDLE_DECL(elf_sym) sym;
     uint64_t info, name;
 
     for ( ; ptr < end; ptr += elf_size(elf, sym) )
     {
-        sym = ptr;
+        sym = ELF_MAKE_HANDLE(elf_sym, ptr);
         info = elf_uval(elf, sym, st_info);
         name = elf_uval(elf, sym, st_name);
         if ( ELF32_ST_BIND(info) != STB_GLOBAL )
@@ -159,33 +163,33 @@ const elf_sym *elf_sym_by_name(struct elf_binary *elf, const char *symbol)
             continue;
         return sym;
     }
-    return NULL;
+    return ELF_INVALID_HANDLE(elf_sym);
 }
 
-const elf_sym *elf_sym_by_index(struct elf_binary *elf, int index)
+ELF_HANDLE_DECL(elf_sym) elf_sym_by_index(struct elf_binary *elf, int index)
 {
-    const void *ptr = elf_section_start(elf, elf->sym_tab);
-    const elf_sym *sym;
+    ELF_PTRVAL_CONST_VOID ptr = elf_section_start(elf, elf->sym_tab);
+    ELF_HANDLE_DECL(elf_sym) sym;
 
-    sym = ptr + index * elf_size(elf, sym);
+    sym = ELF_MAKE_HANDLE(elf_sym, ptr + index * elf_size(elf, sym));
     return sym;
 }
 
-const char *elf_note_name(struct elf_binary *elf, const elf_note * note)
+const char *elf_note_name(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note)
 {
-    return (void *)note + elf_size(elf, note);
+    return ELF_HANDLE_PTRVAL(note) + elf_size(elf, note);
 }
 
-const void *elf_note_desc(struct elf_binary *elf, const elf_note * note)
+ELF_PTRVAL_CONST_VOID elf_note_desc(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note)
 {
     int namesz = (elf_uval(elf, note, namesz) + 3) & ~3;
 
-    return (void *)note + elf_size(elf, note) + namesz;
+    return ELF_HANDLE_PTRVAL(note) + elf_size(elf, note) + namesz;
 }
 
-uint64_t elf_note_numeric(struct elf_binary *elf, const elf_note * note)
+uint64_t elf_note_numeric(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note)
 {
-    const void *desc = elf_note_desc(elf, note);
+    ELF_PTRVAL_CONST_VOID desc = elf_note_desc(elf, note);
     int descsz = elf_uval(elf, note, descsz);
 
     switch (descsz)
@@ -200,10 +204,10 @@ uint64_t elf_note_numeric(struct elf_binary *elf, const elf_note * note)
     }
 }
 
-uint64_t elf_note_numeric_array(struct elf_binary *elf, const elf_note *note,
+uint64_t elf_note_numeric_array(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note,
                                 unsigned int unitsz, unsigned int idx)
 {
-    const void *desc = elf_note_desc(elf, note);
+    ELF_PTRVAL_CONST_VOID desc = elf_note_desc(elf, note);
     int descsz = elf_uval(elf, note, descsz);
 
     if ( descsz % unitsz || idx >= descsz / unitsz )
@@ -220,12 +224,12 @@ uint64_t elf_note_numeric_array(struct elf_binary *elf, const elf_note *note,
     }
 }
 
-const elf_note *elf_note_next(struct elf_binary *elf, const elf_note * note)
+ELF_HANDLE_DECL(elf_note) elf_note_next(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note)
 {
     int namesz = (elf_uval(elf, note, namesz) + 3) & ~3;
     int descsz = (elf_uval(elf, note, descsz) + 3) & ~3;
 
-    return (void *)note + elf_size(elf, note) + namesz + descsz;
+    return ELF_MAKE_HANDLE(elf_note, ELF_HANDLE_PTRVAL(note) + elf_size(elf, note) + namesz + descsz);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -234,10 +238,10 @@ int elf_is_elfbinary(const void *image)
 {
     const Elf32_Ehdr *ehdr = image;
 
-    return IS_ELF(*ehdr);
+    return IS_ELF(*ehdr); /* fixme unchecked */
 }
 
-int elf_phdr_is_loadable(struct elf_binary *elf, const elf_phdr * phdr)
+int elf_phdr_is_loadable(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr)
 {
     uint64_t p_type = elf_uval(elf, phdr, p_type);
     uint64_t p_flags = elf_uval(elf, phdr, p_flags);

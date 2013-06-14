@@ -61,13 +61,13 @@ struct setup_header {
 } __attribute__((packed));
 
 static void print_string_note(const char *prefix, struct elf_binary *elf,
-			      const elf_note *note)
+			      ELF_HANDLE_DECL(elf_note) note)
 {
 	printf("%s: %s\n", prefix, (char*)elf_note_desc(elf, note));
 }
 
 static void print_numeric_note(const char *prefix, struct elf_binary *elf,
-			       const elf_note *note)
+			       ELF_HANDLE_DECL(elf_note) note)
 {
 	uint64_t value = elf_note_numeric(elf, note);
 	int descsz = elf_uval(elf, note, descsz);
@@ -98,12 +98,12 @@ static void print_l1_mfn_valid_note(const char *prefix, struct elf_binary *elf,
 
 }
 
-static int print_notes(struct elf_binary *elf, const elf_note *start, const elf_note *end)
+static int print_notes(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) start, ELF_HANDLE_DECL(elf_note) end)
 {
-	const elf_note *note;
+	ELF_HANDLE_DECL(elf_note) note;
 	int notes_found = 0;
 
-	for ( note = start; note < end; note = elf_note_next(elf, note) )
+	for ( note = start; ELF_HANDLE_PTRVAL(note) < ELF_HANDLE_PTRVAL(end); note = elf_note_next(elf, note) )
 	{
 		if (0 != strcmp(elf_note_name(elf, note), "Xen"))
 			continue;
@@ -170,7 +170,7 @@ int main(int argc, char **argv)
 	void *image,*tmp;
 	struct stat st;
 	struct elf_binary elf;
-	const elf_shdr *shdr;
+	ELF_HANDLE_DECL(elf_shdr) shdr;
 	int notes_found = 0;
 
 	struct setup_header *hdr;
@@ -257,7 +257,7 @@ int main(int argc, char **argv)
 	count = elf_phdr_count(&elf);
 	for ( h=0; h < count; h++)
 	{
-		const elf_phdr *phdr;
+		ELF_HANDLE_DECL(elf_phdr) phdr;
 		phdr = elf_phdr_by_index(&elf, h);
 		if (elf_uval(&elf, phdr, p_type) != PT_NOTE)
 			continue;
@@ -269,8 +269,8 @@ int main(int argc, char **argv)
 			continue;
 
 		notes_found = print_notes(&elf,
-					  elf_segment_start(&elf, phdr),
-					  elf_segment_end(&elf, phdr));
+					  ELF_MAKE_HANDLE(elf_note, elf_segment_start(&elf, phdr)),
+					  ELF_MAKE_HANDLE(elf_note, elf_segment_end(&elf, phdr)));
 	}
 
 	if ( notes_found == 0 )
@@ -278,13 +278,13 @@ int main(int argc, char **argv)
 		count = elf_shdr_count(&elf);
 		for ( h=0; h < count; h++)
 		{
-			const elf_shdr *shdr;
+			ELF_HANDLE_DECL(elf_shdr) shdr;
 			shdr = elf_shdr_by_index(&elf, h);
 			if (elf_uval(&elf, shdr, sh_type) != SHT_NOTE)
 				continue;
 			notes_found = print_notes(&elf,
-						  elf_section_start(&elf, shdr),
-						  elf_section_end(&elf, shdr));
+						  ELF_MAKE_HANDLE(elf_note, elf_section_start(&elf, shdr)),
+						  ELF_MAKE_HANDLE(elf_note, elf_section_end(&elf, shdr)));
 			if ( notes_found )
 				fprintf(stderr, "using notes from SHT_NOTE section\n");
 
@@ -292,7 +292,7 @@ int main(int argc, char **argv)
 	}
 
 	shdr = elf_shdr_by_name(&elf, "__xen_guest");
-	if (shdr)
+	if (ELF_HANDLE_VALID(shdr))
 		printf("__xen_guest: %s\n", (char*)elf_section_start(&elf, shdr));
 
 	return 0;
