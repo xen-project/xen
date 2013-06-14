@@ -1243,6 +1243,11 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
 
     /* Map relevant mfns */
     pfn_err = calloc(j, sizeof(*pfn_err));
+    if ( pfn_err == NULL )
+    {
+        PERROR("allocation for pfn_err failed");
+        return -1;
+    }
     region_base = xc_map_foreign_bulk(
         xch, dom, PROT_WRITE, region_mfn, pfn_err, j);
 
@@ -1532,8 +1537,16 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     region_mfn = malloc(ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
     ctx->p2m_batch = malloc(ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
     if (!ctx->hvm && ctx->superpages)
+    {
         ctx->p2m_saved_batch =
             malloc(ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT));
+        if ( ctx->p2m_saved_batch == NULL )
+        {
+            ERROR("saved batch memory alloc failed");
+            errno = ENOMEM;
+            goto out;
+        }
+    }
 
     if ( (ctx->p2m == NULL) || (pfn_type == NULL) ||
          (region_mfn == NULL) || (ctx->p2m_batch == NULL) )

@@ -327,6 +327,8 @@ static elf_errorstatus xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
         return rc;
 
     elf = xc_dom_malloc(dom, sizeof(*elf));
+    if ( elf == NULL )
+        return -1;
     dom->private_loader = elf;
     rc = elf_init(elf, dom->kernel_blob, dom->kernel_size);
     xc_elf_set_logfile(dom->xch, elf, 1);

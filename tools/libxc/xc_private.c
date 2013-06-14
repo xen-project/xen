@@ -771,6 +771,8 @@ const char *xc_strerror(xc_interface *xch, int errcode)
         errbuf = pthread_getspecific(errbuf_pkey);
         if (errbuf == NULL) {
             errbuf = malloc(XS_BUFSIZE);
+            if ( errbuf == NULL )
+                return "(failed to allocate errbuf)";
             pthread_setspecific(errbuf_pkey, errbuf);
         }
 

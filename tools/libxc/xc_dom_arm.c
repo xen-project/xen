@@ -170,6 +170,8 @@ int arch_setup_meminit(struct xc_dom_image *dom)
     dom->shadow_enabled = 1;
 
     dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * dom->total_pages);
+    if ( dom->p2m_host == NULL )
+        return -EINVAL;
 
     /* setup initial p2m */
     for ( pfn = 0; pfn < dom->total_pages; pfn++ )

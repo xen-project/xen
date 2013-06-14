@@ -760,6 +760,9 @@ int arch_setup_meminit(struct xc_dom_image *dom)
     }
 
     dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * dom->total_pages);
+    if ( dom->p2m_host == NULL )
+        return -EINVAL;
+
     if ( dom->superpages )
     {
         int count = dom->total_pages >> SUPERPAGE_PFN_SHIFT;

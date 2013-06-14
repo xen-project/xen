@@ -120,9 +120,17 @@ void *xc_dom_malloc(struct xc_dom_image *dom, size_t size)
 {
     struct xc_dom_mem *block;
 
+    if ( size > SIZE_MAX - sizeof(*block) )
+    {
+        DOMPRINTF("%s: unreasonable allocation size", __FUNCTION__);
+        return NULL;
+    }
     block = malloc(sizeof(*block) + size);
     if ( block == NULL )
+    {
+        DOMPRINTF("%s: allocation failed", __FUNCTION__);
         return NULL;
+    }
     memset(block, 0, sizeof(*block) + size);
     block->next = dom->memblocks;
     dom->memblocks = block;
@@ -138,7 +146,10 @@ void *xc_dom_malloc_page_aligned(struct xc_dom_image *dom, size_t size)
 
     block = malloc(sizeof(*block));
     if ( block == NULL )
+    {
+        DOMPRINTF("%s: allocation failed", __FUNCTION__);
         return NULL;
+    }
     memset(block, 0, sizeof(*block));
     block->mmap_len = size;
     block->mmap_ptr = mmap(NULL, block->mmap_len,
@@ -146,6 +157,7 @@ void *xc_dom_malloc_page_aligned(struct xc_dom_image *dom, size_t size)
                            -1, 0);
     if ( block->mmap_ptr == MAP_FAILED )
     {
+        DOMPRINTF("%s: mmap failed", __FUNCTION__);
         free(block);
         return NULL;
     }
@@ -202,6 +214,7 @@ void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
         close(fd);
     if ( block != NULL )
         free(block);
+    DOMPRINTF("%s: failed (on file `%s')", __FUNCTION__, filename);
     return NULL;
 }
 
