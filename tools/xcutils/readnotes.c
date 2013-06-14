@@ -77,22 +77,23 @@ static void print_numeric_note(const char *prefix, struct elf_binary *elf,
 }
 
 static void print_l1_mfn_valid_note(const char *prefix, struct elf_binary *elf,
-				    const elf_note *note)
+				    ELF_HANDLE_DECL(elf_note) note)
 {
 	int descsz = elf_uval(elf, note, descsz);
-	const uint32_t *desc32 = elf_note_desc(elf, note);
-	const uint64_t *desc64 = elf_note_desc(elf, note);
+	ELF_PTRVAL_CONST_VOID desc = elf_note_desc(elf, note);
 
 	/* XXX should be able to cope with a list of values. */
 	switch ( descsz / 2 )
 	{
 	case 8:
 		printf("%s: mask=%#"PRIx64" value=%#"PRIx64"\n", prefix,
-		       desc64[0], desc64[1]);
+		       elf_access_unsigned(elf, desc, 0, 8),
+		       elf_access_unsigned(elf, desc, 8, 8));
 		break;
 	case 4:
 		printf("%s: mask=%#"PRIx32" value=%#"PRIx32"\n", prefix,
-		       desc32[0],desc32[1]);
+		       (uint32_t)elf_access_unsigned(elf, desc, 0, 4),
+		       (uint32_t)elf_access_unsigned(elf, desc, 4, 4));
 		break;
 	}
 
