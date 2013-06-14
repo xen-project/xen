@@ -378,6 +378,8 @@ static void *linux_privcmd_map_foreign_range(xc_interface *xch, xc_osdep_handle 
 
     num = (size + XC_PAGE_SIZE - 1) >> XC_PAGE_SHIFT;
     arr = calloc(num, sizeof(xen_pfn_t));
+    if ( arr == NULL )
+        return NULL;
 
     for ( i = 0; i < num; i++ )
         arr[i] = mfn + i;
@@ -402,6 +404,8 @@ static void *linux_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handle
     num_per_entry = chunksize >> XC_PAGE_SHIFT;
     num = num_per_entry * nentries;
     arr = calloc(num, sizeof(xen_pfn_t));
+    if ( arr == NULL )
+        return NULL;
 
     for ( i = 0; i < nentries; i++ )
         for ( j = 0; j < num_per_entry; j++ )

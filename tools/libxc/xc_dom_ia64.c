@@ -188,6 +188,12 @@ int arch_setup_meminit(struct xc_dom_image *dom)
 
     /* setup initial p2m */
     dom->p2m_host = xc_dom_malloc(dom, sizeof(xen_pfn_t) * nbr);
+    if ( dom->p2m_host == NULL )
+    {
+        DOMPRINTF("%s: xc_dom_malloc failed for p2m_host",
+                  __FUNCTION__);
+        return -1;
+    }
     for ( pfn = 0; pfn < nbr; pfn++ )
         dom->p2m_host[pfn] = start + pfn;
 

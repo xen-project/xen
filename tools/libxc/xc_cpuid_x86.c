@@ -589,6 +589,8 @@ static int xc_cpuid_do_domctl(
 static char *alloc_str(void)
 {
     char *s = malloc(33);
+    if ( s == NULL )
+        return s;
     memset(s, 0, 33);
     return s;
 }
@@ -600,6 +602,8 @@ void xc_cpuid_to_str(const unsigned int *regs, char **strs)
     for ( i = 0; i < 4; i++ )
     {
         strs[i] = alloc_str();
+        if ( strs[i] == NULL )
+            continue;
         for ( j = 0; j < 32; j++ )
             strs[i][j] = !!((regs[i] & (1U << (31 - j)))) ? '1' : '0';
     }
@@ -680,7 +684,7 @@ int xc_cpuid_check(
     const char **config,
     char **config_transformed)
 {
-    int i, j;
+    int i, j, rc;
     unsigned int regs[4];
 
     memset(config_transformed, 0, 4 * sizeof(*config_transformed));
@@ -692,6 +696,11 @@ int xc_cpuid_check(
         if ( config[i] == NULL )
             continue;
         config_transformed[i] = alloc_str();
+        if ( config_transformed[i] == NULL )
+        {
+            rc = -ENOMEM;
+            goto fail_rc;
+        }
         for ( j = 0; j < 32; j++ )
         {
             unsigned char val = !!((regs[i] & (1U << (31 - j))));
@@ -708,12 +717,14 @@ int xc_cpuid_check(
     return 0;
 
  fail:
+    rc = -EPERM;
+ fail_rc:
     for ( i = 0; i < 4; i++ )
     {
         free(config_transformed[i]);
         config_transformed[i] = NULL;
     }
-    return -EPERM;
+    return rc;
 }
 
 /*
@@ -758,6 +769,11 @@ int xc_cpuid_set(
         }
         
         config_transformed[i] = alloc_str();
+        if ( config_transformed[i] == NULL )
+        {
+            rc = -ENOMEM;
+            goto fail;
+        }
 
         for ( j = 0; j < 32; j++ )
         {
