@@ -34,7 +34,7 @@
 /* ------------------------------------------------------------------------ */
 
 static void log_callback(struct elf_binary *elf, void *caller_data,
-                         int iserr, const char *fmt, va_list al) {
+                         bool iserr, const char *fmt, va_list al) {
     xc_interface *xch = caller_data;
 
     xc_reportv(xch,
@@ -46,7 +46,7 @@ static void log_callback(struct elf_binary *elf, void *caller_data,
 
 void xc_elf_set_logfile(xc_interface *xch, struct elf_binary *elf,
                         int verbose) {
-    elf_set_log(elf, log_callback, xch, verbose);
+    elf_set_log(elf, log_callback, xch, verbose /* convert to bool */);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -82,7 +82,7 @@ static char *xc_dom_guest_type(struct xc_dom_image *dom,
 /* ------------------------------------------------------------------------ */
 /* parse elf binary                                                         */
 
-static int check_elf_kernel(struct xc_dom_image *dom, int verbose)
+static int check_elf_kernel(struct xc_dom_image *dom, bool verbose)
 {
     if ( dom->kernel_blob == NULL )
     {
@@ -110,7 +110,7 @@ static int xc_dom_probe_elf_kernel(struct xc_dom_image *dom)
 }
 
 static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
-                                  struct elf_binary *elf, int load)
+                                  struct elf_binary *elf, bool load)
 {
     struct elf_binary syms;
     ELF_HANDLE_DECL_NONCONST(elf_shdr) shdr; ELF_HANDLE_DECL(elf_shdr) shdr2;

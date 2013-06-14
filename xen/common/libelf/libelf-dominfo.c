@@ -101,7 +101,7 @@ int elf_xen_parse_note(struct elf_binary *elf,
 /* *INDENT-OFF* */
     static const struct {
         char *name;
-        int str;
+        bool str;
     } note_desc[] = {
         [XEN_ELFNOTE_ENTRY] = { "ENTRY", 0},
         [XEN_ELFNOTE_HYPERCALL_PAGE] = { "HYPERCALL_PAGE", 0},
