@@ -108,7 +108,8 @@ void elf_set_log(struct elf_binary *elf, elf_log_callback *log_callback,
     elf->verbose = verbose;
 }
 
-static int elf_load_image(void *dst, const void *src, uint64_t filesz, uint64_t memsz)
+static int elf_load_image(struct elf_binary *elf,
+                          void *dst, const void *src, uint64_t filesz, uint64_t memsz)
 {
     memcpy(dst, src, filesz);
     memset(dst + filesz, 0, memsz - filesz);
@@ -122,7 +123,8 @@ void elf_set_verbose(struct elf_binary *elf)
     elf->verbose = 1;
 }
 
-static int elf_load_image(void *dst, const void *src, uint64_t filesz, uint64_t memsz)
+static int elf_load_image(struct elf_binary *elf,
+                          void *dst, const void *src, uint64_t filesz, uint64_t memsz)
 {
     int rc;
     if ( filesz > ULONG_MAX || memsz > ULONG_MAX )
@@ -279,7 +281,7 @@ int elf_load_binary(struct elf_binary *elf)
         dest = elf_get_ptr(elf, paddr);
         elf_msg(elf, "%s: phdr %" PRIu64 " at 0x%p -> 0x%p\n",
                 __func__, i, dest, dest + filesz);
-        if ( elf_load_image(dest, elf->image + offset, filesz, memsz) != 0 )
+        if ( elf_load_image(elf, dest, elf->image + offset, filesz, memsz) != 0 )
             return -1;
     }
 
