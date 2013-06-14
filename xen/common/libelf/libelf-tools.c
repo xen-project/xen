@@ -119,7 +119,7 @@ const char *elf_section_name(struct elf_binary *elf,
     if ( ELF_PTRVAL_INVALID(elf->sec_strtab) )
         return "unknown";
 
-    return elf->sec_strtab + elf_uval(elf, shdr, sh_name);
+    return elf_strval(elf, elf->sec_strtab + elf_uval(elf, shdr, sh_name));
 }
 
 ELF_PTRVAL_CONST_VOID elf_section_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr)
@@ -151,6 +151,7 @@ ELF_HANDLE_DECL(elf_sym) elf_sym_by_name(struct elf_binary *elf, const char *sym
     ELF_PTRVAL_CONST_VOID end = elf_section_end(elf, elf->sym_tab);
     ELF_HANDLE_DECL(elf_sym) sym;
     uint64_t info, name;
+    const char *sym_name;
 
     for ( ; ptr < end; ptr += elf_size(elf, sym) )
     {
@@ -159,7 +160,10 @@ ELF_HANDLE_DECL(elf_sym) elf_sym_by_name(struct elf_binary *elf, const char *sym
         name = elf_uval(elf, sym, st_name);
         if ( ELF32_ST_BIND(info) != STB_GLOBAL )
             continue;
-        if ( strcmp(elf->sym_strtab + name, symbol) )
+        sym_name = elf_strval(elf, elf->sym_strtab + name);
+        if ( sym_name == NULL ) /* out of range, oops */
+            return ELF_INVALID_HANDLE(elf_sym);
+        if ( strcmp(sym_name, symbol) )
             continue;
         return sym;
     }
@@ -177,7 +181,7 @@ ELF_HANDLE_DECL(elf_sym) elf_sym_by_index(struct elf_binary *elf, int index)
 
 const char *elf_note_name(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note)
 {
-    return ELF_HANDLE_PTRVAL(note) + elf_size(elf, note);
+    return elf_strval(elf, ELF_HANDLE_PTRVAL(note) + elf_size(elf, note));
 }
 
 ELF_PTRVAL_CONST_VOID elf_note_desc(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note)
