@@ -284,6 +284,11 @@ size_t xc_dom_check_gzip(xc_interface *xch, void *blob, size_t ziplen)
     unsigned char *gzlen;
     size_t unziplen;
 
+    if ( ziplen < 6 )
+        /* Too small.  We need (i.e. the subsequent code relies on)
+         * 2 bytes for the magic number plus 4 bytes length. */
+        return 0;
+
     if ( strncmp(blob, "\037\213", 2) )
         /* not gzipped */
         return 0;
