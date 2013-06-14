@@ -2,6 +2,8 @@ obj-y := libelf.o
 
 SECTIONS := text data rodata $(foreach n,1 2 4 8,rodata.str1.$(n)) $(foreach r,rel rel.ro,data.$(r) data.$(r).local)
 
+CFLAGS += -Wno-pointer-sign
+
 libelf.o: libelf-temp.o Makefile
 	$(OBJCOPY) $(foreach s,$(SECTIONS),--rename-section .$(s)=.init.$(s)) $< $@
 

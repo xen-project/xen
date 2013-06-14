@@ -20,7 +20,7 @@
 
 /* ------------------------------------------------------------------------ */
 
-int elf_init(struct elf_binary *elf, const char *image_input, size_t size)
+elf_errorstatus elf_init(struct elf_binary *elf, const char *image_input, size_t size)
 {
     ELF_HANDLE_DECL(elf_shdr) shdr;
     uint64_t i, count, section, offset;
@@ -121,7 +121,7 @@ void elf_parse_bsdsyms(struct elf_binary *elf, uint64_t pstart)
 {
     uint64_t sz;
     ELF_HANDLE_DECL(elf_shdr) shdr;
-    int i, type;
+    unsigned i, type;
 
     if ( !ELF_HANDLE_VALID(elf->sym_tab) )
         return;
@@ -157,7 +157,7 @@ static void elf_load_bsdsyms(struct elf_binary *elf)
     ELF_PTRVAL_VOID symbase;
     ELF_PTRVAL_VOID symtab_addr;
     ELF_HANDLE_DECL_NONCONST(elf_shdr) shdr;
-    int i, type;
+    unsigned i, type;
 
     if ( !elf->bsd_symtab_pstart )
         return;
@@ -190,7 +190,7 @@ do {                                            \
     elf_memcpy_safe(elf, ELF_HANDLE_PTRVAL(shdr),
                     ELF_IMAGE_BASE(elf) + elf_uval(elf, elf->ehdr, e_shoff),
                     sz);
-    maxva = ELF_OBSOLETE_VOIDP_CAST elf_round_up(elf, (long)maxva + sz);
+    maxva = ELF_OBSOLETE_VOIDP_CAST elf_round_up(elf, (unsigned long)maxva + sz);
 
     for ( i = 0; i < elf_shdr_count(elf); i++ )
     {
@@ -203,10 +203,10 @@ do {                                            \
              elf_memcpy_safe(elf, maxva, elf_section_start(elf, shdr), sz);
              /* Mangled to be based on ELF header location. */
              elf_hdr_elm(elf, shdr, sh_offset, maxva - symtab_addr);
-             maxva = ELF_OBSOLETE_VOIDP_CAST elf_round_up(elf, (long)maxva + sz);
+             maxva = ELF_OBSOLETE_VOIDP_CAST elf_round_up(elf, (unsigned long)maxva + sz);
         }
         shdr = ELF_MAKE_HANDLE(elf_shdr, ELF_HANDLE_PTRVAL(shdr) +
-                            (long)elf_uval(elf, elf->ehdr, e_shentsize));
+                            (unsigned long)elf_uval(elf, elf->ehdr, e_shentsize));
     }
 
     /* Write down the actual sym size. */
