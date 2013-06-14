@@ -332,11 +332,14 @@ ELF_HANDLE_DECL(elf_note) elf_note_next(struct elf_binary *elf, ELF_HANDLE_DECL(
 
 /* ------------------------------------------------------------------------ */
 
-int elf_is_elfbinary(const void *image)
+int elf_is_elfbinary(const void *image_start, size_t image_size)
 {
-    const Elf32_Ehdr *ehdr = image;
+    const Elf32_Ehdr *ehdr = image_start;
 
-    return IS_ELF(*ehdr); /* fixme unchecked */
+    if ( image_size < sizeof(*ehdr) )
+        return 0;
+
+    return IS_ELF(*ehdr);
 }
 
 int elf_phdr_is_loadable(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr)

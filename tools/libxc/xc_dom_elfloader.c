@@ -93,7 +93,7 @@ static int check_elf_kernel(struct xc_dom_image *dom, int verbose)
         return -EINVAL;
     }
 
-    if ( !elf_is_elfbinary(dom->kernel_blob) )
+    if ( !elf_is_elfbinary(dom->kernel_blob, dom->kernel_size) )
     {
         if ( verbose )
             xc_dom_panic(dom->xch,
