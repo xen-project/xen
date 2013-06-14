@@ -1556,6 +1556,12 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                     mfn = ctx->p2m[pfn];
                     buf = xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                                PROT_READ | PROT_WRITE, mfn);
+                    if ( buf == NULL )
+                    {
+                        ERROR("xc_map_foreign_range for generation id"
+                              " buffer failed");
+                        goto out;
+                    }
 
                     generationid = *(unsigned long long *)(buf + offset);
                     *(unsigned long long *)(buf + offset) = generationid + 1;
@@ -1713,6 +1719,11 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                 l3tab = (uint64_t *)
                     xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                          PROT_READ, ctx->p2m[i]);
+                if ( l3tab == NULL )
+                {
+                    PERROR("xc_map_foreign_range failed (for l3tab)");
+                    goto out;
+                }
 
                 for ( j = 0; j < 4; j++ )
                     l3ptes[j] = l3tab[j];
@@ -1739,6 +1750,11 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                 l3tab = (uint64_t *)
                     xc_map_foreign_range(xch, dom, PAGE_SIZE,
                                          PROT_READ | PROT_WRITE, ctx->p2m[i]);
+                if ( l3tab == NULL )
+                {
+                    PERROR("xc_map_foreign_range failed (for l3tab, 2nd)");
+                    goto out;
+                }
 
                 for ( j = 0; j < 4; j++ )
                     l3tab[j] = l3ptes[j];
@@ -1909,6 +1925,12 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
             SET_FIELD(ctxt, user_regs.edx, mfn);
             start_info = xc_map_foreign_range(
                 xch, dom, PAGE_SIZE, PROT_READ | PROT_WRITE, mfn);
+            if ( start_info == NULL )
+            {
+                PERROR("xc_map_foreign_range failed (for start_info)");
+                goto out;
+            }
+
             SET_FIELD(start_info, nr_pages, dinfo->p2m_size);
             SET_FIELD(start_info, shared_info, shared_info_frame<<PAGE_SHIFT);
             SET_FIELD(start_info, flags, 0);
@@ -2056,6 +2078,11 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     /* Restore contents of shared-info page. No checking needed. */
     new_shared_info = xc_map_foreign_range(
         xch, dom, PAGE_SIZE, PROT_WRITE, shared_info_frame);
+    if ( new_shared_info == NULL )
+    {
+        PERROR("xc_map_foreign_range failed (for new_shared_info)");
+        goto out;
+    }
 
     /* restore saved vcpu_info and arch specific info */
     MEMCPY_FIELD(new_shared_info, old_shared_info, vcpu_info);
