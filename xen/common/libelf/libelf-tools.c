@@ -31,7 +31,7 @@ const char *elf_check_broken(const struct elf_binary *elf)
     return elf->broken;
 }
 
-static int elf_ptrval_in_range(elf_ptrval ptrval, uint64_t size,
+static bool elf_ptrval_in_range(elf_ptrval ptrval, uint64_t size,
                                const void *region, uint64_t regionsize)
     /*
      * Returns true if the putative memory area [ptrval,ptrval+size>
@@ -53,7 +53,7 @@ static int elf_ptrval_in_range(elf_ptrval ptrval, uint64_t size,
     return 1;
 }
 
-int elf_access_ok(struct elf_binary * elf,
+bool elf_access_ok(struct elf_binary * elf,
                   uint64_t ptrval, size_t size)
 {
     if ( elf_ptrval_in_range(ptrval, size, elf->image_base, elf->size) )
@@ -92,7 +92,7 @@ uint64_t elf_access_unsigned(struct elf_binary * elf, elf_ptrval base,
                              uint64_t moreoffset, size_t size)
 {
     elf_ptrval ptrval = base + moreoffset;
-    int need_swap = elf_swap(elf);
+    bool need_swap = elf_swap(elf);
     const uint8_t *u8;
     const uint16_t *u16;
     const uint32_t *u32;
@@ -332,7 +332,7 @@ ELF_HANDLE_DECL(elf_note) elf_note_next(struct elf_binary *elf, ELF_HANDLE_DECL(
 
 /* ------------------------------------------------------------------------ */
 
-int elf_is_elfbinary(const void *image_start, size_t image_size)
+bool elf_is_elfbinary(const void *image_start, size_t image_size)
 {
     const Elf32_Ehdr *ehdr = image_start;
 
@@ -342,7 +342,7 @@ int elf_is_elfbinary(const void *image_start, size_t image_size)
     return IS_ELF(*ehdr);
 }
 
-int elf_phdr_is_loadable(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr)
+bool elf_phdr_is_loadable(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr)
 {
     uint64_t p_type = elf_uval(elf, phdr, p_type);
     uint64_t p_flags = elf_uval(elf, phdr, p_flags);

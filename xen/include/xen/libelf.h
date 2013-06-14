@@ -29,6 +29,8 @@
 #error define architectural endianness
 #endif
 
+#include <stdbool.h>
+
 #undef ELFSIZE
 #include "elfstructs.h"
 #ifdef __XEN__
@@ -42,7 +44,7 @@
 
 struct elf_binary;
 typedef void elf_log_callback(struct elf_binary*, void *caller_data,
-                              int iserr, const char *fmt, va_list al);
+                              bool iserr, const char *fmt, va_list al);
 
 #endif
 
@@ -237,7 +239,7 @@ struct elf_binary {
     elf_log_callback *log_callback;
     void *log_caller_data;
 #endif
-    int verbose;
+    bool verbose;
     const char *broken;
 };
 
@@ -301,8 +303,8 @@ void elf_memset_safe(struct elf_binary*, elf_ptrval dst, int c, size_t);
    * outside permitted areas.
    */
 
-int elf_access_ok(struct elf_binary * elf,
-                  uint64_t ptrval, size_t size);
+bool elf_access_ok(struct elf_binary * elf,
+                   uint64_t ptrval, size_t size);
 
 #define elf_store_val(elf, type, ptr, val)                              \
     ({                                                                  \
@@ -351,9 +353,9 @@ uint64_t elf_note_numeric_array(struct elf_binary *, ELF_HANDLE_DECL(elf_note),
 ELF_HANDLE_DECL(elf_note) elf_note_next(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note);
 
 /* (Only) checks that the image has the right magic number. */
-int elf_is_elfbinary(const void *image_start, size_t image_size);
+bool elf_is_elfbinary(const void *image_start, size_t image_size);
 
-int elf_phdr_is_loadable(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr);
+bool elf_phdr_is_loadable(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr);
 
 /* ------------------------------------------------------------------------ */
 /* xc_libelf_loader.c                                                       */
@@ -367,7 +369,7 @@ int elf_init(struct elf_binary *elf, const char *image, size_t size);
 void elf_set_verbose(struct elf_binary *elf);
 #else
 void elf_set_log(struct elf_binary *elf, elf_log_callback*,
-                 void *log_caller_pointer, int verbose);
+                 void *log_caller_pointer, bool verbose);
 #endif
 
 void elf_parse_binary(struct elf_binary *elf);
@@ -419,7 +421,7 @@ struct elf_dom_parms {
     char xen_ver[16];
     char loader[16];
     int pae;
-    int bsd_symtab;
+    bool bsd_symtab;
     uint64_t virt_base;
     uint64_t virt_entry;
     uint64_t virt_hypercall;

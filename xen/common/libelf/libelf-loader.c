@@ -92,7 +92,7 @@ int elf_init(struct elf_binary *elf, const char *image_input, size_t size)
 }
 
 #ifndef __XEN__
-void elf_call_log_callback(struct elf_binary *elf, int iserr,
+void elf_call_log_callback(struct elf_binary *elf, bool iserr,
                            const char *fmt,...) {
     va_list al;
 
@@ -107,7 +107,7 @@ void elf_call_log_callback(struct elf_binary *elf, int iserr,
 }
     
 void elf_set_log(struct elf_binary *elf, elf_log_callback *log_callback,
-                 void *log_caller_data, int verbose)
+                 void *log_caller_data, bool verbose)
 {
     elf->log_callback = log_callback;
     elf->log_caller_data = log_caller_data;

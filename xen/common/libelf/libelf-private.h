@@ -77,7 +77,7 @@
 #define elf_err(elf, fmt, args ... )                    \
     elf_call_log_callback(elf, 1, fmt , ## args );
 
-void elf_call_log_callback(struct elf_binary*, int iserr, const char *fmt,...);
+void elf_call_log_callback(struct elf_binary*, bool iserr, const char *fmt,...);
 
 #define safe_strcpy(d,s)                        \
 do { strncpy((d),(s),sizeof((d))-1);            \
