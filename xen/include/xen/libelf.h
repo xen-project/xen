@@ -136,23 +136,12 @@ struct elf_binary {
                            offsetof(typeof(*(str)),e32.elem),           \
                            sizeof((str)->e32.elem)))
 
-#define elf_sval(elf, str, elem)                                        \
-    ((ELFCLASS64 == (elf)->class)                                       \
-     ? elf_access_signed((elf), (str),                                  \
-                         offsetof(typeof(*(str)),e64.elem),             \
-                         sizeof((str)->e64.elem))                       \
-     : elf_access_signed((elf), (str),                                  \
-                         offsetof(typeof(*(str)),e32.elem),             \
-                         sizeof((str)->e32.elem)))
-
 #define elf_size(elf, str)                              \
     ((ELFCLASS64 == (elf)->class)                       \
      ? sizeof((str)->e64) : sizeof((str)->e32))
 
 uint64_t elf_access_unsigned(struct elf_binary *elf, const void *ptr,
                              uint64_t offset, size_t size);
-int64_t elf_access_signed(struct elf_binary *elf, const void *ptr,
-                          uint64_t offset, size_t size);
 
 uint64_t elf_round_up(struct elf_binary *elf, uint64_t addr);
 
