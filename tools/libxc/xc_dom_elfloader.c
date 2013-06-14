@@ -128,20 +128,30 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
 
     if ( load )
     {
-        size_t allow_size; /* will be used in a forthcoming XSA-55 patch */
+        char *hdr_ptr;
+        size_t allow_size;
+
         if ( !dom->bsd_symtab_start )
             return 0;
         size = dom->kernel_seg.vend - dom->bsd_symtab_start;
-        hdr  = xc_dom_vaddr_to_ptr(dom, dom->bsd_symtab_start, &allow_size);
-        *(int *)hdr = size - sizeof(int);
+        hdr_ptr = xc_dom_vaddr_to_ptr(dom, dom->bsd_symtab_start, &allow_size);
+        elf->caller_xdest_base = hdr_ptr;
+        elf->caller_xdest_size = allow_size;
+        hdr = ELF_REALPTR2PTRVAL(hdr_ptr);
+        elf_store_val(elf, int, hdr, size - sizeof(int));
     }
     else
     {
+        char *hdr_ptr;
+
         size = sizeof(int) + elf_size(elf, elf->ehdr) +
             elf_shdr_count(elf) * elf_size(elf, shdr);
-        hdr = xc_dom_malloc(dom, size);
-        if ( hdr == NULL )
+        hdr_ptr = xc_dom_malloc(dom, size);
+        if ( hdr_ptr == NULL )
             return 0;
+        elf->caller_xdest_base = hdr_ptr;
+        elf->caller_xdest_size = size;
+        hdr = ELF_REALPTR2PTRVAL(hdr_ptr);
         dom->bsd_symtab_start = elf_round_up(elf, dom->kernel_seg.vend);
     }
 
@@ -169,8 +179,31 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
         ehdr->e_shoff = elf_size(elf, elf->ehdr);
         ehdr->e_shstrndx = SHN_UNDEF;
     }
-    if ( elf_init(&syms, hdr + sizeof(int), size - sizeof(int)) )
+    if ( elf->caller_xdest_size < sizeof(int) )
+    {
+        DOMPRINTF("%s/%s: header size %"PRIx64" too small",
+                  __FUNCTION__, load ? "load" : "parse",
+                  (uint64_t)elf->caller_xdest_size);
         return -1;
+    }
+    if ( elf_init(&syms, elf->caller_xdest_base + sizeof(int),
+                  elf->caller_xdest_size - sizeof(int)) )
+        return -1;
+
+    /*
+     * The caller_xdest_{base,size} and dest_{base,size} need to
+     * remain valid so long as each struct elf_image does.  The
+     * principle we adopt is that these values are set when the
+     * memory is allocated or mapped, and cleared when (and if)
+     * they are unmapped.
+     *
+     * Mappings of the guest are normally undone by xc_dom_unmap_all
+     * (directly or via xc_dom_release).  We do not explicitly clear
+     * these because in fact that happens only at the end of
+     * xc_dom_boot_image, at which time all of these ELF loading
+     * functions have returned.  No relevant struct elf_binary*
+     * escapes this file.
+     */
 
     xc_elf_set_logfile(dom->xch, &syms, 1);
 
@@ -310,8 +343,10 @@ static int xc_dom_load_elf_kernel(struct xc_dom_image *dom)
 {
     struct elf_binary *elf = dom->private_loader;
     int rc;
+    xen_pfn_t pages;
 
-    elf->dest = xc_dom_seg_to_ptr(dom, &dom->kernel_seg);
+    elf->dest_base = xc_dom_seg_to_ptr_pages(dom, &dom->kernel_seg, &pages);
+    elf->dest_size = pages * XC_DOM_PAGE_SIZE(dom);
     rc = elf_load_binary(elf);
     if ( rc < 0 )
     {

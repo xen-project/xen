@@ -20,28 +20,100 @@
 
 /* ------------------------------------------------------------------------ */
 
-uint64_t elf_access_unsigned(struct elf_binary * elf, const void *ptr,
-                             uint64_t offset, size_t size)
+void elf_mark_broken(struct elf_binary *elf, const char *msg)
 {
+    if ( elf->broken == NULL )
+        elf->broken = msg;
+}
+
+const char *elf_check_broken(const struct elf_binary *elf)
+{
+    return elf->broken;
+}
+
+static int elf_ptrval_in_range(elf_ptrval ptrval, uint64_t size,
+                               const void *region, uint64_t regionsize)
+    /*
+     * Returns true if the putative memory area [ptrval,ptrval+size>
+     * is completely inside the region [region,region+regionsize>.
+     *
+     * ptrval and size are the untrusted inputs to be checked.
+     * region and regionsize are trusted and must be correct and valid,
+     * although it is OK for region to perhaps be maliciously NULL
+     * (but not some other malicious value).
+     */
+{
+    elf_ptrval regionp = (elf_ptrval)region;
+
+    if ( (region == NULL) ||
+         (ptrval < regionp) ||              /* start is before region */
+         (ptrval > regionp + regionsize) || /* start is after region */
+         (size > regionsize - (ptrval - regionp)) ) /* too big */
+        return 0;
+    return 1;
+}
+
+int elf_access_ok(struct elf_binary * elf,
+                  uint64_t ptrval, size_t size)
+{
+    if ( elf_ptrval_in_range(ptrval, size, elf->image_base, elf->size) )
+        return 1;
+    if ( elf_ptrval_in_range(ptrval, size, elf->dest_base, elf->dest_size) )
+        return 1;
+    if ( elf_ptrval_in_range(ptrval, size,
+                             elf->caller_xdest_base, elf->caller_xdest_size) )
+        return 1;
+    elf_mark_broken(elf, "out of range access");
+    return 0;
+}
+
+void elf_memcpy_safe(struct elf_binary *elf, elf_ptrval dst,
+                     elf_ptrval src, size_t size)
+{
+    if ( elf_access_ok(elf, dst, size) &&
+         elf_access_ok(elf, src, size) )
+    {
+        /* use memmove because these checks do not prove that the
+         * regions don't overlap and overlapping regions grant
+         * permission for compiler malice */
+        elf_memmove_unchecked(ELF_UNSAFE_PTR(dst), ELF_UNSAFE_PTR(src), size);
+    }
+}
+
+void elf_memset_safe(struct elf_binary *elf, elf_ptrval dst, int c, size_t size)
+{
+    if ( elf_access_ok(elf, dst, size) )
+    {
+        elf_memset_unchecked(ELF_UNSAFE_PTR(dst), c, size);
+    }
+}
+
+uint64_t elf_access_unsigned(struct elf_binary * elf, elf_ptrval base,
+                             uint64_t moreoffset, size_t size)
+{
+    elf_ptrval ptrval = base + moreoffset;
     int need_swap = elf_swap(elf);
     const uint8_t *u8;
     const uint16_t *u16;
     const uint32_t *u32;
     const uint64_t *u64;
 
+    if ( !elf_access_ok(elf, ptrval, size) )
+        return 0;
+
     switch ( size )
     {
     case 1:
-        u8 = ptr + offset;
+        u8 = (const void*)ptrval;
         return *u8;
     case 2:
-        u16 = ptr + offset;
+        u16 = (const void*)ptrval;
         return need_swap ? bswap_16(*u16) : *u16;
     case 4:
-        u32 = ptr + offset;
+        u32 = (const void*)ptrval;
         return need_swap ? bswap_32(*u32) : *u32;
     case 8:
-        u64 = ptr + offset;
+        u64 = (const void*)ptrval;
         return need_swap ? bswap_64(*u64) : *u64;
     default:
         return 0;
@@ -120,6 +192,28 @@ const char *elf_section_name(struct elf_binary *elf,
         return "unknown";
 
     return elf_strval(elf, elf->sec_strtab + elf_uval(elf, shdr, sh_name));
+}
+
+const char *elf_strval(struct elf_binary *elf, elf_ptrval start)
+{
+    uint64_t length;
+
+    for ( length = 0; ; length++ ) {
+        if ( !elf_access_ok(elf, start + length, 1) )
+            return NULL;
+        if ( !elf_access_unsigned(elf, start, length, 1) )
+            /* ok */
+            return ELF_UNSAFE_PTR(start);
+    }
+}
+
+const char *elf_strfmt(struct elf_binary *elf, elf_ptrval start)
+{
+    const char *str = elf_strval(elf, start);
+
+    if ( str == NULL )
+        return "(invalid)";
+    return str;
 }
 
 ELF_PTRVAL_CONST_VOID elf_section_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr)

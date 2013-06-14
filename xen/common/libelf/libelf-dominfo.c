@@ -254,7 +254,7 @@ int elf_xen_parse_guest_info(struct elf_binary *elf,
     int len;
 
     h = parms->guest_info;
-#define STAR(h) (*(h))
+#define STAR(h) (elf_access_unsigned(elf, (h), 0, 1))
     while ( STAR(h) )
     {
         elf_memset_unchecked(name, 0, sizeof(name));

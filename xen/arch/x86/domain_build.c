@@ -765,7 +765,8 @@ int __init construct_dom0(
     mapcache_override_current(v);
 
     /* Copy the OS image and free temporary buffer. */
-    elf.dest = (void*)vkern_start;
+    elf.dest_base = (void*)vkern_start;
+    elf.dest_size = vkern_end - vkern_start;
     rc = elf_load_binary(&elf);
     if ( rc < 0 )
     {
