@@ -114,9 +114,9 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
                                   struct elf_binary *elf, bool load)
 {
     struct elf_binary syms;
-    ELF_HANDLE_DECL_NONCONST(elf_shdr) shdr; ELF_HANDLE_DECL(elf_shdr) shdr2;
+    ELF_HANDLE_DECL(elf_shdr) shdr; ELF_HANDLE_DECL(elf_shdr) shdr2;
     xen_vaddr_t symtab, maxaddr;
-    ELF_PTRVAL_CHAR hdr;
+    elf_ptrval hdr;
     size_t size;
     unsigned h, count, type, i, tables = 0;
     unsigned long *strtab_referenced = NULL;
@@ -240,7 +240,7 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
 
     for ( h = 0; h < count; h++ )
     {
-        shdr = ELF_OBSOLETE_VOIDP_CAST elf_shdr_by_index(&syms, h);
+        shdr = elf_shdr_by_index(&syms, h);
         if ( !elf_access_ok(elf, ELF_HANDLE_PTRVAL(shdr), 1) )
             /* input has an insane section header count field */
             break;
@@ -276,7 +276,7 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
             if ( load )
             {
                 shdr2 = elf_shdr_by_index(elf, h);
-                elf_memcpy_safe(elf, ELF_OBSOLETE_VOIDP_CAST elf_section_start(&syms, shdr),
+                elf_memcpy_safe(elf, elf_section_start(&syms, shdr),
                        elf_section_start(elf, shdr2),
                        size);
             }

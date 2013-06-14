@@ -220,8 +220,8 @@ elf_errorstatus elf_xen_parse_note(struct elf_binary *elf,
 
 static unsigned elf_xen_parse_notes(struct elf_binary *elf,
                                struct elf_dom_parms *parms,
-                               ELF_PTRVAL_CONST_VOID start,
-                               ELF_PTRVAL_CONST_VOID end,
+                               elf_ptrval start,
+                               elf_ptrval end,
                                unsigned *total_note_count)
 {
     unsigned xen_elfnotes = 0;
@@ -258,7 +258,7 @@ static unsigned elf_xen_parse_notes(struct elf_binary *elf,
 elf_errorstatus elf_xen_parse_guest_info(struct elf_binary *elf,
                              struct elf_dom_parms *parms)
 {
-    ELF_PTRVAL_CONST_CHAR h;
+    elf_ptrval h;
     unsigned char name[32], value[128];
     unsigned len;
 

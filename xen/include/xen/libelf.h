@@ -61,13 +61,8 @@ typedef void elf_log_callback(struct elf_binary*, void *caller_data,
 /*
  * We abstract away the pointerness of these pointers, replacing
  * various void*, char* and struct* with the following:
- *   PTRVAL      A pointer to a byte; one can do pointer arithmetic
+ *   elf_ptrval  A pointer to a byte; one can do pointer arithmetic
  *               on this.
- *               This replaces variables which were char*,void*
- *               and their const versions, so we provide four
- *               different obsolete declaration macros:
- *                   ELF_PTRVAL_{,CONST}{VOID,CHAR}
- *               New code can simply use the elf_ptrval typedef.
  *   HANDLE      A pointer to a struct.  There is one of these types
  *               for each pointer type - that is, for each "structname".
  *               In the arguments to the various HANDLE macros, structname
@@ -76,8 +71,6 @@ typedef void elf_log_callback(struct elf_binary*, void *caller_data,
  *               pointers.  In the current code attempts to do so will
  *               compile, but in the next patch this will become a
  *               compile error.
- *               We also provide a second declaration macro for
- *               pointers which were to const; this is obsolete.
  */
 
 typedef uintptr_t elf_ptrval;
@@ -85,14 +78,8 @@ typedef uintptr_t elf_ptrval;
 #define ELF_REALPTR2PTRVAL(realpointer) ((elf_ptrval)(realpointer))
   /* Converts an actual C pointer into a PTRVAL */
 
-#define ELF_HANDLE_DECL_NONCONST(structname) structname##_handle /*obsolete*/
 #define ELF_HANDLE_DECL(structname)          structname##_handle
   /* Provides a type declaration for a HANDLE. */
-
-#define ELF_PTRVAL_VOID              elf_ptrval /*obsolete*/
-#define ELF_PTRVAL_CHAR              elf_ptrval /*obsolete*/
-#define ELF_PTRVAL_CONST_VOID        elf_ptrval /*obsolete*/
-#define ELF_PTRVAL_CONST_CHAR        elf_ptrval /*obsolete*/
 
 #ifdef __XEN__
 # define ELF_PRPTRVAL "lu"
@@ -123,17 +110,6 @@ typedef uintptr_t elf_ptrval;
 
 #define ELF_HANDLE_PTRVAL(handleval)      ((handleval).ptrval)
   /* Converts a HANDLE to a PTRVAL. */
-
-#define ELF_OBSOLETE_VOIDP_CAST /*empty*/
-  /*
-   * In some places the old code used to need to
-   *  - cast away const (the existing code uses const a fair
-   *    bit but actually sometimes wants to write to its input)
-   *    from a PTRVAL.
-   *  - convert an integer representing a pointer to a PTRVAL
-   * Nowadays all of these re uintptr_ts so there is no const problem
-   * and no need for any casting.
-   */
 
 #define ELF_UNSAFE_PTR(ptrval) ((void*)(elf_ptrval)(ptrval))
   /*
@@ -212,7 +188,7 @@ struct elf_binary {
     char data;
 
     ELF_HANDLE_DECL(elf_ehdr) ehdr;
-    ELF_PTRVAL_CONST_CHAR sec_strtab;
+    elf_ptrval sec_strtab;
     ELF_HANDLE_DECL(elf_shdr) sym_tab;
     uint64_t sym_strtab;
 
@@ -290,7 +266,7 @@ struct elf_binary {
    * str should be a HANDLE.
    */
 
-uint64_t elf_access_unsigned(struct elf_binary *elf, ELF_PTRVAL_CONST_VOID ptr,
+uint64_t elf_access_unsigned(struct elf_binary *elf, elf_ptrval ptr,
                              uint64_t offset, size_t size);
   /* Reads a field at arbitrary offset and alignemnt */
 
@@ -342,17 +318,17 @@ ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_index(struct elf_binary *elf, unsigned ind
 ELF_HANDLE_DECL(elf_phdr) elf_phdr_by_index(struct elf_binary *elf, unsigned index);
 
 const char *elf_section_name(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr); /* might return NULL if inputs are invalid */
-ELF_PTRVAL_CONST_VOID elf_section_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr);
-ELF_PTRVAL_CONST_VOID elf_section_end(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr);
+elf_ptrval elf_section_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr);
+elf_ptrval elf_section_end(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr);
 
-ELF_PTRVAL_CONST_VOID elf_segment_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr);
-ELF_PTRVAL_CONST_VOID elf_segment_end(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr);
+elf_ptrval elf_segment_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr);
+elf_ptrval elf_segment_end(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr);
 
 ELF_HANDLE_DECL(elf_sym) elf_sym_by_name(struct elf_binary *elf, const char *symbol);
 ELF_HANDLE_DECL(elf_sym) elf_sym_by_index(struct elf_binary *elf, unsigned index);
 
 const char *elf_note_name(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note); /* may return NULL */
-ELF_PTRVAL_CONST_VOID elf_note_desc(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note);
+elf_ptrval elf_note_desc(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note);
 uint64_t elf_note_numeric(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note);
 uint64_t elf_note_numeric_array(struct elf_binary *, ELF_HANDLE_DECL(elf_note),
                                 unsigned int unitsz, unsigned int idx);
@@ -391,7 +367,7 @@ void elf_set_log(struct elf_binary *elf, elf_log_callback*,
 void elf_parse_binary(struct elf_binary *elf);
 elf_errorstatus elf_load_binary(struct elf_binary *elf);
 
-ELF_PTRVAL_VOID elf_get_ptr(struct elf_binary *elf, unsigned long addr);
+elf_ptrval elf_get_ptr(struct elf_binary *elf, unsigned long addr);
 uint64_t elf_lookup_addr(struct elf_binary *elf, const char *symbol);
 
 void elf_parse_bsdsyms(struct elf_binary *elf, uint64_t pstart); /* private */
@@ -426,9 +402,9 @@ struct xen_elfnote {
 
 struct elf_dom_parms {
     /* raw */
-    ELF_PTRVAL_CONST_CHAR guest_info;
-    ELF_PTRVAL_CONST_VOID elf_note_start;
-    ELF_PTRVAL_CONST_VOID elf_note_end;
+    elf_ptrval guest_info;
+    elf_ptrval elf_note_start;
+    elf_ptrval elf_note_end;
     struct xen_elfnote elf_notes[XEN_ELFNOTE_MAX + 1];
 
     /* parsed */

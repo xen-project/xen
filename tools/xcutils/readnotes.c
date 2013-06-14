@@ -80,7 +80,7 @@ static void print_l1_mfn_valid_note(const char *prefix, struct elf_binary *elf,
 				    ELF_HANDLE_DECL(elf_note) note)
 {
 	unsigned descsz = elf_uval(elf, note, descsz);
-	ELF_PTRVAL_CONST_VOID desc = elf_note_desc(elf, note);
+	elf_ptrval desc = elf_note_desc(elf, note);
 
 	/* XXX should be able to cope with a list of values. */
 	switch ( descsz / 2 )
