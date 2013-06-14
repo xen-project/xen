@@ -171,6 +171,8 @@ static int kernel_try_elf_prepare(struct kernel_info *info,
 {
     int rc;
 
+    memset(&info->elf.elf, 0, sizeof(info->elf.elf));
+
     info->kernel_order = get_order_from_bytes(size);
     info->kernel_img = alloc_xenheap_pages(info->kernel_order, 0);
     if ( info->kernel_img == NULL )
@@ -194,8 +196,16 @@ static int kernel_try_elf_prepare(struct kernel_info *info,
     info->entry = info->elf.parms.virt_entry;
     info->load = kernel_elf_load;
 
+    if ( elf_check_broken(&info->elf.elf) )
+        printk("Xen: warning: ELF kernel broken: %s\n",
+               elf_check_broken(&info->elf.elf));
+
     return 0;
 err:
+    if ( elf_check_broken(&info->elf.elf) )
+        printk("Xen: ELF kernel broken: %s\n",
+               elf_check_broken(&info->elf.elf));
+
     free_xenheap_pages(info->kernel_img, info->kernel_order);
     return rc;
 }

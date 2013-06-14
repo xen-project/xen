@@ -524,6 +524,9 @@ static int setup_guest(xc_interface *xch,
  error_out:
     rc = -1;
  out:
+    if ( elf_check_broken(&elf) )
+        ERROR("HVM ELF broken: %s", elf_check_broken(&elf));
+
     /* ensure no unclaimed pages are left unused */
     xc_domain_claim_pages(xch, dom, 0 /* cancels the claim */);
 

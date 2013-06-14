@@ -274,6 +274,13 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
             elf_store_field(elf, shdr, e32.sh_name, 0);
     }
 
+    if ( elf_check_broken(&syms) )
+        DOMPRINTF("%s: symbols ELF broken: %s", __FUNCTION__,
+                  elf_check_broken(&syms));
+    if ( elf_check_broken(elf) )
+        DOMPRINTF("%s: ELF broken: %s", __FUNCTION__,
+                  elf_check_broken(elf));
+
     if ( tables == 0 )
     {
         DOMPRINTF("%s: no symbol table present", __FUNCTION__);
@@ -310,19 +317,23 @@ static int xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
     {
         xc_dom_panic(dom->xch, XC_INVALID_KERNEL, "%s: ELF image"
                      " has no shstrtab", __FUNCTION__);
-        return -EINVAL;
+        rc = -EINVAL;
+        goto out;
     }
 
     /* parse binary and get xen meta info */
     elf_parse_binary(elf);
     if ( (rc = elf_xen_parse(elf, &dom->parms)) != 0 )
-        return rc;
+    {
+        goto out;
+    }
 
     if ( elf_xen_feature_get(XENFEAT_dom0, dom->parms.f_required) )
     {
         xc_dom_panic(dom->xch, XC_INVALID_KERNEL, "%s: Kernel does not"
                      " support unprivileged (DomU) operation", __FUNCTION__);
-        return -EINVAL;
+        rc = -EINVAL;
+        goto out;
     }
 
     /* find kernel segment */
@@ -336,7 +347,13 @@ static int xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
     DOMPRINTF("%s: %s: 0x%" PRIx64 " -> 0x%" PRIx64 "",
               __FUNCTION__, dom->guest_type,
               dom->kernel_seg.vstart, dom->kernel_seg.vend);
-    return 0;
+    rc = 0;
+out:
+    if ( elf_check_broken(elf) )
+        DOMPRINTF("%s: ELF broken: %s", __FUNCTION__,
+                  elf_check_broken(elf));
+
+    return rc;
 }
 
 static int xc_dom_load_elf_kernel(struct xc_dom_image *dom)
