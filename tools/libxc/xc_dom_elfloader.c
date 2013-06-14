@@ -137,6 +137,12 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
             return 0;
         size = dom->kernel_seg.vend - dom->bsd_symtab_start;
         hdr_ptr = xc_dom_vaddr_to_ptr(dom, dom->bsd_symtab_start, &allow_size);
+        if ( hdr_ptr == NULL )
+        {
+            DOMPRINTF("%s/load: xc_dom_vaddr_to_ptr(dom,dom->bsd_symtab_start"
+                      " => NULL", __FUNCTION__);
+            return -1;
+        }
         elf->caller_xdest_base = hdr_ptr;
         elf->caller_xdest_size = allow_size;
         hdr = ELF_REALPTR2PTRVAL(hdr_ptr);
@@ -382,7 +388,14 @@ static elf_errorstatus xc_dom_load_elf_kernel(struct xc_dom_image *dom)
     xen_pfn_t pages;
 
     elf->dest_base = xc_dom_seg_to_ptr_pages(dom, &dom->kernel_seg, &pages);
+    if ( elf->dest_base == NULL )
+    {
+        DOMPRINTF("%s: xc_dom_vaddr_to_ptr(dom,dom->kernel_seg)"
+                  " => NULL", __FUNCTION__);
+        return -1;
+    }
     elf->dest_size = pages * XC_DOM_PAGE_SIZE(dom);
+
     rc = elf_load_binary(elf);
     if ( rc < 0 )
     {

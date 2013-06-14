@@ -140,6 +140,12 @@ static int xc_dom_load_zimage_kernel(struct xc_dom_image *dom)
     DOMPRINTF_CALLED(dom->xch);
 
     dst = xc_dom_seg_to_ptr(dom, &dom->kernel_seg);
+    if ( dst == NULL )
+    {
+        DOMPRINTF("%s: xc_dom_seg_to_ptr(dom, &dom->kernel_seg) => NULL",
+                  __func__);
+        return -1;
+    }
 
     DOMPRINTF("%s: kernel sed %#"PRIx64"-%#"PRIx64,
               __func__, dom->kernel_seg.vstart, dom->kernel_seg.vend);

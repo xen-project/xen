@@ -277,6 +277,12 @@ static int xc_dom_load_bin_kernel(struct xc_dom_image *dom)
     DOMPRINTF("  bss_size:  0x%" PRIx32 "", bss_size);
 
     dest = xc_dom_vaddr_to_ptr(dom, dom->kernel_seg.vstart, &dest_size);
+    if ( dest == NULL )
+    {
+        DOMPRINTF("%s: xc_dom_vaddr_to_ptr(dom, dom->kernel_seg.vstart)"
+                  " => NULL", __FUNCTION__);
+        return -EINVAL;
+    }
 
     if ( dest_size < text_size ||
          dest_size - text_size < bss_size )

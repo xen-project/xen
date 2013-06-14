@@ -714,6 +714,11 @@ int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
 
         new_p = xc_map_foreign_range(xch, domid, PAGE_SIZE,
                                      PROT_READ|PROT_WRITE, new_mfn);
+        if ( new_p == NULL )
+        {
+            ERROR("failed to map new_p for copy, guest may be broken?");
+            goto failed;
+        }
         memcpy(new_p, backup, PAGE_SIZE);
         munmap(new_p, PAGE_SIZE);
         mops.arg1.mfn = new_mfn;

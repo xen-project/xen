@@ -870,6 +870,12 @@ int xc_dom_build_image(struct xc_dom_image *dom)
                                   ramdisklen) != 0 )
             goto err;
         ramdiskmap = xc_dom_seg_to_ptr(dom, &dom->ramdisk_seg);
+        if ( ramdiskmap == NULL )
+        {
+            DOMPRINTF("%s: xc_dom_seg_to_ptr(dom, &dom->ramdisk_seg) => NULL",
+                      __FUNCTION__);
+            goto err;
+        }
         if ( unziplen )
         {
             if ( xc_dom_do_gunzip(dom->xch,
