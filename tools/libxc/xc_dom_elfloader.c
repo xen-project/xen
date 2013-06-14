@@ -28,6 +28,7 @@
 
 #include "xg_private.h"
 #include "xc_dom.h"
+#include "xc_bitops.h"
 
 #define XEN_VER "xen-3.0"
 
@@ -118,6 +119,7 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
     ELF_PTRVAL_CHAR hdr;
     size_t size;
     unsigned h, count, type, i, tables = 0;
+    unsigned long *strtab_referenced = NULL;
 
     if ( elf_swap(elf) )
     {
@@ -218,22 +220,35 @@ static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
               symtab, maxaddr);
 
     count = elf_shdr_count(&syms);
+    /* elf_shdr_count guarantees that count is reasonable */
+
+    strtab_referenced = xc_dom_malloc(dom, bitmap_size(count));
+    if ( strtab_referenced == NULL )
+        return -1;
+    bitmap_clear(strtab_referenced, count);
+    /* Note the symtabs @h linked to by any strtab @i. */
+    for ( i = 0; i < count; i++ )
+    {
+        shdr2 = elf_shdr_by_index(&syms, i);
+        if ( elf_uval(&syms, shdr2, sh_type) == SHT_SYMTAB )
+        {
+            h = elf_uval(&syms, shdr2, sh_link);
+            if (h < count)
+                set_bit(h, strtab_referenced);
+        }
+    }
+
     for ( h = 0; h < count; h++ )
     {
         shdr = ELF_OBSOLETE_VOIDP_CAST elf_shdr_by_index(&syms, h);
+        if ( !elf_access_ok(elf, ELF_HANDLE_PTRVAL(shdr), 1) )
+            /* input has an insane section header count field */
+            break;
         type = elf_uval(&syms, shdr, sh_type);
         if ( type == SHT_STRTAB )
         {
-            /* Look for a strtab @i linked to symtab @h. */
-            for ( i = 0; i < count; i++ )
-            {
-                shdr2 = elf_shdr_by_index(&syms, i);
-                if ( (elf_uval(&syms, shdr2, sh_type) == SHT_SYMTAB) &&
-                     (elf_uval(&syms, shdr2, sh_link) == h) )
-                    break;
-            }
             /* Skip symtab @h if we found no corresponding strtab @i. */
-            if ( i == count )
+            if ( !test_bit(h, strtab_referenced) )
             {
                 if ( elf_64bit(&syms) )
                     elf_store_field(elf, shdr, e64.sh_offset, 0);

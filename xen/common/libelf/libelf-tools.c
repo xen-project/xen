@@ -131,7 +131,16 @@ uint64_t elf_round_up(struct elf_binary *elf, uint64_t addr)
 
 unsigned elf_shdr_count(struct elf_binary *elf)
 {
-    return elf_uval(elf, elf->ehdr, e_shnum);
+    unsigned count = elf_uval(elf, elf->ehdr, e_shnum);
+    uint64_t max = elf->size / sizeof(Elf32_Shdr);
+    if (max > ~(unsigned)0)
+        max = ~(unsigned)0; /* Xen doesn't have limits.h :-/ */
+    if (count > max)
+    {
+        elf_mark_broken(elf, "far too many section headers");
+        count = max;
+    }
+    return count;
 }
 
 unsigned elf_phdr_count(struct elf_binary *elf)
@@ -149,6 +158,9 @@ ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_name(struct elf_binary *elf, const char *n
     for ( i = 0; i < count; i++ )
     {
         shdr = elf_shdr_by_index(elf, i);
+        if ( !elf_access_ok(elf, ELF_HANDLE_PTRVAL(shdr), 1) )
+            /* input has an insane section header count field */
+            break;
         sname = elf_section_name(elf, shdr);
         if ( sname && !strcmp(sname, name) )
             return shdr;
@@ -204,6 +216,11 @@ const char *elf_strval(struct elf_binary *elf, elf_ptrval start)
         if ( !elf_access_unsigned(elf, start, length, 1) )
             /* ok */
             return ELF_UNSAFE_PTR(start);
+        if ( length >= ELF_MAX_STRING_LENGTH )
+        {
+            elf_mark_broken(elf, "excessively long string");
+            return NULL;
+        }
     }
 }
 
@@ -327,7 +344,14 @@ ELF_HANDLE_DECL(elf_note) elf_note_next(struct elf_binary *elf, ELF_HANDLE_DECL(
     unsigned namesz = (elf_uval(elf, note, namesz) + 3) & ~3;
     unsigned descsz = (elf_uval(elf, note, descsz) + 3) & ~3;
 
-    return ELF_MAKE_HANDLE(elf_note, ELF_HANDLE_PTRVAL(note) + elf_size(elf, note) + namesz + descsz);
+    elf_ptrval ptrval = ELF_HANDLE_PTRVAL(note)
+        + elf_size(elf, note) + namesz + descsz;
+
+    if ( ( ptrval <= ELF_HANDLE_PTRVAL(note) || /* wrapped or stuck */
+           !elf_access_ok(elf, ELF_HANDLE_PTRVAL(note), 1) ) )
+        ptrval = ELF_MAX_PTRVAL; /* terminate caller's loop */
+
+    return ELF_MAKE_HANDLE(elf_note, ptrval);
 }
 
 /* ------------------------------------------------------------------------ */

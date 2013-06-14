@@ -75,6 +75,9 @@ elf_errorstatus elf_init(struct elf_binary *elf, const char *image_input, size_t
     for ( i = 0; i < count; i++ )
     {
         shdr = elf_shdr_by_index(elf, i);
+        if ( !elf_access_ok(elf, ELF_HANDLE_PTRVAL(shdr), 1) )
+            /* input has an insane section header count field */
+            break;
         if ( elf_uval(elf, shdr, sh_type) != SHT_SYMTAB )
             continue;
         elf->sym_tab = shdr;
@@ -170,6 +173,9 @@ void elf_parse_bsdsyms(struct elf_binary *elf, uint64_t pstart)
     for ( i = 0; i < elf_shdr_count(elf); i++ )
     {
         shdr = elf_shdr_by_index(elf, i);
+        if ( !elf_access_ok(elf, ELF_HANDLE_PTRVAL(shdr), 1) )
+            /* input has an insane section header count field */
+            break;
         type = elf_uval(elf, shdr, sh_type);
         if ( (type == SHT_STRTAB) || (type == SHT_SYMTAB) )
             sz = elf_round_up(elf, sz + elf_uval(elf, shdr, sh_size));
@@ -224,6 +230,9 @@ do {                                            \
 
     for ( i = 0; i < elf_shdr_count(elf); i++ )
     {
+        elf_ptrval old_shdr_p;
+        elf_ptrval new_shdr_p;
+
         type = elf_uval(elf, shdr, sh_type);
         if ( (type == SHT_STRTAB) || (type == SHT_SYMTAB) )
         {
@@ -235,8 +244,16 @@ do {                                            \
              elf_hdr_elm(elf, shdr, sh_offset, maxva - symtab_addr);
              maxva = ELF_OBSOLETE_VOIDP_CAST elf_round_up(elf, (unsigned long)maxva + sz);
         }
-        shdr = ELF_MAKE_HANDLE(elf_shdr, ELF_HANDLE_PTRVAL(shdr) +
-                            (unsigned long)elf_uval(elf, elf->ehdr, e_shentsize));
+        old_shdr_p = ELF_HANDLE_PTRVAL(shdr);
+        new_shdr_p = old_shdr_p + elf_uval(elf, elf->ehdr, e_shentsize);
+        if ( new_shdr_p <= old_shdr_p ) /* wrapped or stuck */
+        {
+            elf_mark_broken(elf, "bad section header length");
+            break;
+        }
+        if ( !elf_access_ok(elf, new_shdr_p, 1) ) /* outside image */
+            break;
+        shdr = ELF_MAKE_HANDLE(elf_shdr, new_shdr_p);
     }
 
     /* Write down the actual sym size. */
@@ -256,6 +273,9 @@ void elf_parse_binary(struct elf_binary *elf)
     for ( i = 0; i < count; i++ )
     {
         phdr = elf_phdr_by_index(elf, i);
+        if ( !elf_access_ok(elf, ELF_HANDLE_PTRVAL(phdr), 1) )
+            /* input has an insane program header count field */
+            break;
         if ( !elf_phdr_is_loadable(elf, phdr) )
             continue;
         paddr = elf_uval(elf, phdr, p_paddr);
@@ -278,11 +298,20 @@ elf_errorstatus elf_load_binary(struct elf_binary *elf)
     ELF_HANDLE_DECL(elf_phdr) phdr;
     uint64_t i, count, paddr, offset, filesz, memsz;
     ELF_PTRVAL_VOID dest;
+    /*
+     * Let bizarre ELFs write the output image up to twice; this
+     * calculation is just to ensure our copying loop is no worse than
+     * O(domain_size).
+     */
+    uint64_t remain_allow_copy = (uint64_t)elf->dest_size * 2;
 
     count = elf_uval(elf, elf->ehdr, e_phnum);
     for ( i = 0; i < count; i++ )
     {
         phdr = elf_phdr_by_index(elf, i);
+        if ( !elf_access_ok(elf, ELF_HANDLE_PTRVAL(phdr), 1) )
+            /* input has an insane program header count field */
+            break;
         if ( !elf_phdr_is_loadable(elf, phdr) )
             continue;
         paddr = elf_uval(elf, phdr, p_paddr);
@@ -290,6 +319,20 @@ elf_errorstatus elf_load_binary(struct elf_binary *elf)
         filesz = elf_uval(elf, phdr, p_filesz);
         memsz = elf_uval(elf, phdr, p_memsz);
         dest = elf_get_ptr(elf, paddr);
+
+        /*
+         * We need to check that the input image doesn't have us copy
+         * the whole image zillions of times, as that could lead to
+         * O(n^2) time behaviour and possible DoS by a malicous ELF.
+         */
+        if ( remain_allow_copy < memsz )
+        {
+            elf_mark_broken(elf, "program segments total to more"
+                            " than the input image size");
+            break;
+        }
+        remain_allow_copy -= memsz;
+
         elf_msg(elf, "%s: phdr %" PRIu64 " at 0x%"ELF_PRPTRVAL" -> 0x%"ELF_PRPTRVAL"\n",
                 __func__, i, dest, (ELF_PTRVAL_VOID)(dest + filesz));
         if ( elf_load_image(elf, dest, ELF_IMAGE_BASE(elf) + offset, filesz, memsz) != 0 )
