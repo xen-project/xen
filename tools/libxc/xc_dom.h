@@ -294,14 +294,27 @@ void *xc_dom_pfn_to_ptr(struct xc_dom_image *dom, xen_pfn_t first,
 void xc_dom_unmap_one(struct xc_dom_image *dom, xen_pfn_t pfn);
 void xc_dom_unmap_all(struct xc_dom_image *dom);
 
-static inline void *xc_dom_seg_to_ptr(struct xc_dom_image *dom,
-                                      struct xc_dom_seg *seg)
+static inline void *xc_dom_seg_to_ptr_pages(struct xc_dom_image *dom,
+                                      struct xc_dom_seg *seg,
+                                      xen_pfn_t *pages_out)
 {
     xen_vaddr_t segsize = seg->vend - seg->vstart;
     unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
     xen_pfn_t pages = (segsize + page_size - 1) / page_size;
+    void *retval;
 
-    return xc_dom_pfn_to_ptr(dom, seg->pfn, pages);
+    retval = xc_dom_pfn_to_ptr(dom, seg->pfn, pages);
+
+    *pages_out = retval ? pages : 0;
+    return retval;
+}
+
+static inline void *xc_dom_seg_to_ptr(struct xc_dom_image *dom,
+                                      struct xc_dom_seg *seg)
+{
+    xen_pfn_t dummy;
+
+    return xc_dom_seg_to_ptr_pages(dom, seg, &dummy);
 }
 
 static inline void *xc_dom_vaddr_to_ptr(struct xc_dom_image *dom,
