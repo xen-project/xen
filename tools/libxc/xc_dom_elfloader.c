@@ -82,7 +82,7 @@ static char *xc_dom_guest_type(struct xc_dom_image *dom,
 /* ------------------------------------------------------------------------ */
 /* parse elf binary                                                         */
 
-static int check_elf_kernel(struct xc_dom_image *dom, bool verbose)
+static elf_negerrnoval check_elf_kernel(struct xc_dom_image *dom, bool verbose)
 {
     if ( dom->kernel_blob == NULL )
     {
@@ -104,12 +104,12 @@ static int check_elf_kernel(struct xc_dom_image *dom, bool verbose)
     return 0;
 }
 
-static int xc_dom_probe_elf_kernel(struct xc_dom_image *dom)
+static elf_negerrnoval xc_dom_probe_elf_kernel(struct xc_dom_image *dom)
 {
     return check_elf_kernel(dom, 0);
 }
 
-static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
+static elf_errorstatus xc_dom_load_elf_symtab(struct xc_dom_image *dom,
                                   struct elf_binary *elf, bool load)
 {
     struct elf_binary syms;
@@ -117,7 +117,7 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
     xen_vaddr_t symtab, maxaddr;
     ELF_PTRVAL_CHAR hdr;
     size_t size;
-    int h, count, type, i, tables = 0;
+    unsigned h, count, type, i, tables = 0;
 
     if ( elf_swap(elf) )
     {
@@ -138,13 +138,13 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
         elf->caller_xdest_base = hdr_ptr;
         elf->caller_xdest_size = allow_size;
         hdr = ELF_REALPTR2PTRVAL(hdr_ptr);
-        elf_store_val(elf, int, hdr, size - sizeof(int));
+        elf_store_val(elf, unsigned, hdr, size - sizeof(unsigned));
     }
     else
     {
         char *hdr_ptr;
 
-        size = sizeof(int) + elf_size(elf, elf->ehdr) +
+        size = sizeof(unsigned) + elf_size(elf, elf->ehdr) +
             elf_shdr_count(elf) * elf_size(elf, shdr);
         hdr_ptr = xc_dom_malloc(dom, size);
         if ( hdr_ptr == NULL )
@@ -155,15 +155,15 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
         dom->bsd_symtab_start = elf_round_up(elf, dom->kernel_seg.vend);
     }
 
-    elf_memcpy_safe(elf, hdr + sizeof(int),
+    elf_memcpy_safe(elf, hdr + sizeof(unsigned),
            ELF_IMAGE_BASE(elf),
            elf_size(elf, elf->ehdr));
-    elf_memcpy_safe(elf, hdr + sizeof(int) + elf_size(elf, elf->ehdr),
+    elf_memcpy_safe(elf, hdr + sizeof(unsigned) + elf_size(elf, elf->ehdr),
            ELF_IMAGE_BASE(elf) + elf_uval(elf, elf->ehdr, e_shoff),
            elf_shdr_count(elf) * elf_size(elf, shdr));
     if ( elf_64bit(elf) )
     {
-        Elf64_Ehdr *ehdr = (Elf64_Ehdr *)(hdr + sizeof(int));
+        Elf64_Ehdr *ehdr = (Elf64_Ehdr *)(hdr + sizeof(unsigned));
         ehdr->e_phoff = 0;
         ehdr->e_phentsize = 0;
         ehdr->e_phnum = 0;
@@ -172,22 +172,22 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
     }
     else
     {
-        Elf32_Ehdr *ehdr = (Elf32_Ehdr *)(hdr + sizeof(int));
+        Elf32_Ehdr *ehdr = (Elf32_Ehdr *)(hdr + sizeof(unsigned));
         ehdr->e_phoff = 0;
         ehdr->e_phentsize = 0;
         ehdr->e_phnum = 0;
         ehdr->e_shoff = elf_size(elf, elf->ehdr);
         ehdr->e_shstrndx = SHN_UNDEF;
     }
-    if ( elf->caller_xdest_size < sizeof(int) )
+    if ( elf->caller_xdest_size < sizeof(unsigned) )
     {
         DOMPRINTF("%s/%s: header size %"PRIx64" too small",
                   __FUNCTION__, load ? "load" : "parse",
                   (uint64_t)elf->caller_xdest_size);
         return -1;
     }
-    if ( elf_init(&syms, elf->caller_xdest_base + sizeof(int),
-                  elf->caller_xdest_size - sizeof(int)) )
+    if ( elf_init(&syms, elf->caller_xdest_base + sizeof(unsigned),
+                  elf->caller_xdest_size - sizeof(unsigned)) )
         return -1;
 
     /*
@@ -207,7 +207,7 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
 
     xc_elf_set_logfile(dom->xch, &syms, 1);
 
-    symtab = dom->bsd_symtab_start + sizeof(int);
+    symtab = dom->bsd_symtab_start + sizeof(unsigned);
     maxaddr = elf_round_up(&syms, symtab + elf_size(&syms, syms.ehdr) +
                            elf_shdr_count(&syms) * elf_size(&syms, shdr));
 
@@ -253,7 +253,7 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
             size = elf_uval(&syms, shdr, sh_size);
             maxaddr = elf_round_up(&syms, maxaddr + size);
             tables++;
-            DOMPRINTF("%s: h=%d %s, size=0x%zx, maxaddr=0x%" PRIx64 "",
+            DOMPRINTF("%s: h=%u %s, size=0x%zx, maxaddr=0x%" PRIx64 "",
                       __FUNCTION__, h,
                       type == SHT_SYMTAB ? "symtab" : "strtab",
                       size, maxaddr);
@@ -292,10 +292,14 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
     return 0;
 }
 
-static int xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
+static elf_errorstatus xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
+    /*
+     * This function sometimes returns -1 for error and sometimes
+     * an errno value.  ?!?!
+     */
 {
     struct elf_binary *elf;
-    int rc;
+    elf_errorstatus rc;
 
     rc = check_elf_kernel(dom, 1);
     if ( rc != 0 )
@@ -356,10 +360,10 @@ out:
     return rc;
 }
 
-static int xc_dom_load_elf_kernel(struct xc_dom_image *dom)
+static elf_errorstatus xc_dom_load_elf_kernel(struct xc_dom_image *dom)
 {
     struct elf_binary *elf = dom->private_loader;
-    int rc;
+    elf_errorstatus rc;
     xen_pfn_t pages;
 
     elf->dest_base = xc_dom_seg_to_ptr_pages(dom, &dom->kernel_seg, &pages);

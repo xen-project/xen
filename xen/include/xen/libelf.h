@@ -31,6 +31,9 @@
 
 #include <stdbool.h>
 
+typedef int elf_errorstatus; /* 0: ok; -ve (normally -1): error */
+typedef int elf_negerrnoval; /* 0: ok; -EFOO: error */
+
 #undef ELFSIZE
 #include "elfstructs.h"
 #ifdef __XEN__
@@ -328,12 +331,12 @@ bool elf_access_ok(struct elf_binary * elf,
 /* ------------------------------------------------------------------------ */
 /* xc_libelf_tools.c                                                        */
 
-int elf_shdr_count(struct elf_binary *elf);
-int elf_phdr_count(struct elf_binary *elf);
+unsigned elf_shdr_count(struct elf_binary *elf);
+unsigned elf_phdr_count(struct elf_binary *elf);
 
 ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_name(struct elf_binary *elf, const char *name);
-ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_index(struct elf_binary *elf, int index);
-ELF_HANDLE_DECL(elf_phdr) elf_phdr_by_index(struct elf_binary *elf, int index);
+ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_index(struct elf_binary *elf, unsigned index);
+ELF_HANDLE_DECL(elf_phdr) elf_phdr_by_index(struct elf_binary *elf, unsigned index);
 
 const char *elf_section_name(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr); /* might return NULL if inputs are invalid */
 ELF_PTRVAL_CONST_VOID elf_section_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr);
@@ -343,7 +346,7 @@ ELF_PTRVAL_CONST_VOID elf_segment_start(struct elf_binary *elf, ELF_HANDLE_DECL(
 ELF_PTRVAL_CONST_VOID elf_segment_end(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr);
 
 ELF_HANDLE_DECL(elf_sym) elf_sym_by_name(struct elf_binary *elf, const char *symbol);
-ELF_HANDLE_DECL(elf_sym) elf_sym_by_index(struct elf_binary *elf, int index);
+ELF_HANDLE_DECL(elf_sym) elf_sym_by_index(struct elf_binary *elf, unsigned index);
 
 const char *elf_note_name(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note); /* may return NULL */
 ELF_PTRVAL_CONST_VOID elf_note_desc(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note);
@@ -360,7 +363,7 @@ bool elf_phdr_is_loadable(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr
 /* ------------------------------------------------------------------------ */
 /* xc_libelf_loader.c                                                       */
 
-int elf_init(struct elf_binary *elf, const char *image, size_t size);
+elf_errorstatus elf_init(struct elf_binary *elf, const char *image, size_t size);
   /*
    * image and size must be correct.  They will be recorded in
    * *elf, and must remain valid while the elf is in use.
@@ -373,7 +376,7 @@ void elf_set_log(struct elf_binary *elf, elf_log_callback*,
 #endif
 
 void elf_parse_binary(struct elf_binary *elf);
-int elf_load_binary(struct elf_binary *elf);
+elf_errorstatus elf_load_binary(struct elf_binary *elf);
 
 ELF_PTRVAL_VOID elf_get_ptr(struct elf_binary *elf, unsigned long addr);
 uint64_t elf_lookup_addr(struct elf_binary *elf, const char *symbol);
@@ -386,7 +389,7 @@ const char *elf_check_broken(const struct elf_binary *elf); /* NULL means OK */
 /* ------------------------------------------------------------------------ */
 /* xc_libelf_relocate.c                                                     */
 
-int elf_reloc(struct elf_binary *elf);
+elf_errorstatus elf_reloc(struct elf_binary *elf);
 
 /* ------------------------------------------------------------------------ */
 /* xc_libelf_dominfo.c                                                      */
@@ -420,7 +423,7 @@ struct elf_dom_parms {
     char guest_ver[16];
     char xen_ver[16];
     char loader[16];
-    int pae;
+    int pae; /* some kind of enum apparently */
     bool bsd_symtab;
     uint64_t virt_base;
     uint64_t virt_entry;

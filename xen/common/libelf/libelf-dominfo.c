@@ -29,15 +29,15 @@ static const char *const elf_xen_feature_names[] = {
     [XENFEAT_pae_pgdir_above_4gb] = "pae_pgdir_above_4gb",
     [XENFEAT_dom0] = "dom0"
 };
-static const int elf_xen_features =
+static const unsigned elf_xen_features =
 sizeof(elf_xen_feature_names) / sizeof(elf_xen_feature_names[0]);
 
-int elf_xen_parse_features(const char *features,
+elf_errorstatus elf_xen_parse_features(const char *features,
                            uint32_t *supported,
                            uint32_t *required)
 {
-    char feature[64];
-    int pos, len, i;
+    unsigned char feature[64];
+    unsigned pos, len, i;
 
     if ( features == NULL )
         return 0;
@@ -94,7 +94,7 @@ int elf_xen_parse_features(const char *features,
 /* ------------------------------------------------------------------------ */
 /* xen elf notes                                                            */
 
-int elf_xen_parse_note(struct elf_binary *elf,
+elf_errorstatus elf_xen_parse_note(struct elf_binary *elf,
                        struct elf_dom_parms *parms,
                        ELF_HANDLE_DECL(elf_note) note)
 {
@@ -125,7 +125,7 @@ int elf_xen_parse_note(struct elf_binary *elf,
     const char *str = NULL;
     uint64_t val = 0;
     unsigned int i;
-    int type = elf_uval(elf, note, type);
+    unsigned type = elf_uval(elf, note, type);
 
     if ( (type >= sizeof(note_desc) / sizeof(note_desc[0])) ||
          (note_desc[type].name == NULL) )
@@ -216,12 +216,14 @@ int elf_xen_parse_note(struct elf_binary *elf,
     return 0;
 }
 
-static int elf_xen_parse_notes(struct elf_binary *elf,
+#define ELF_NOTE_INVALID (~0U)
+
+static unsigned elf_xen_parse_notes(struct elf_binary *elf,
                                struct elf_dom_parms *parms,
                                ELF_PTRVAL_CONST_VOID start,
                                ELF_PTRVAL_CONST_VOID end)
 {
-    int xen_elfnotes = 0;
+    unsigned xen_elfnotes = 0;
     ELF_HANDLE_DECL(elf_note) note;
     const char *note_name;
 
@@ -237,7 +239,7 @@ static int elf_xen_parse_notes(struct elf_binary *elf,
         if ( strcmp(note_name, "Xen") )
             continue;
         if ( elf_xen_parse_note(elf, parms, note) )
-            return -1;
+            return ELF_NOTE_INVALID;
         xen_elfnotes++;
     }
     return xen_elfnotes;
@@ -246,12 +248,12 @@ static int elf_xen_parse_notes(struct elf_binary *elf,
 /* ------------------------------------------------------------------------ */
 /* __xen_guest section                                                      */
 
-int elf_xen_parse_guest_info(struct elf_binary *elf,
+elf_errorstatus elf_xen_parse_guest_info(struct elf_binary *elf,
                              struct elf_dom_parms *parms)
 {
     ELF_PTRVAL_CONST_CHAR h;
-    char name[32], value[128];
-    int len;
+    unsigned char name[32], value[128];
+    unsigned len;
 
     h = parms->guest_info;
 #define STAR(h) (elf_access_unsigned(elf, (h), 0, 1))
@@ -334,13 +336,13 @@ int elf_xen_parse_guest_info(struct elf_binary *elf,
 /* ------------------------------------------------------------------------ */
 /* sanity checks                                                            */
 
-static int elf_xen_note_check(struct elf_binary *elf,
+static elf_errorstatus elf_xen_note_check(struct elf_binary *elf,
                               struct elf_dom_parms *parms)
 {
     if ( (ELF_PTRVAL_INVALID(parms->elf_note_start)) &&
          (ELF_PTRVAL_INVALID(parms->guest_info)) )
     {
-        int machine = elf_uval(elf, elf->ehdr, e_machine);
+        unsigned machine = elf_uval(elf, elf->ehdr, e_machine);
         if ( (machine == EM_386) || (machine == EM_X86_64) )
         {
             elf_err(elf, "%s: ERROR: Not a Xen-ELF image: "
@@ -378,7 +380,7 @@ static int elf_xen_note_check(struct elf_binary *elf,
     return 0;
 }
 
-static int elf_xen_addr_calc_check(struct elf_binary *elf,
+static elf_errorstatus elf_xen_addr_calc_check(struct elf_binary *elf,
                                    struct elf_dom_parms *parms)
 {
     if ( (parms->elf_paddr_offset != UNSET_ADDR) &&
@@ -464,13 +466,13 @@ static int elf_xen_addr_calc_check(struct elf_binary *elf,
 /* ------------------------------------------------------------------------ */
 /* glue it all together ...                                                 */
 
-int elf_xen_parse(struct elf_binary *elf,
+elf_errorstatus elf_xen_parse(struct elf_binary *elf,
                   struct elf_dom_parms *parms)
 {
     ELF_HANDLE_DECL(elf_shdr) shdr;
     ELF_HANDLE_DECL(elf_phdr) phdr;
-    int xen_elfnotes = 0;
-    int i, count, rc;
+    unsigned xen_elfnotes = 0;
+    unsigned i, count, more_notes;
 
     elf_memset_unchecked(parms, 0, sizeof(*parms));
     parms->virt_base = UNSET_ADDR;
@@ -495,13 +497,13 @@ int elf_xen_parse(struct elf_binary *elf,
         if (elf_uval(elf, phdr, p_offset) == 0)
              continue;
 
-        rc = elf_xen_parse_notes(elf, parms,
+        more_notes = elf_xen_parse_notes(elf, parms,
                                  elf_segment_start(elf, phdr),
                                  elf_segment_end(elf, phdr));
-        if ( rc == -1 )
+        if ( more_notes == ELF_NOTE_INVALID )
             return -1;
 
-        xen_elfnotes += rc;
+        xen_elfnotes += more_notes;
     }
 
     /*
@@ -518,17 +520,17 @@ int elf_xen_parse(struct elf_binary *elf,
             if ( elf_uval(elf, shdr, sh_type) != SHT_NOTE )
                 continue;
 
-            rc = elf_xen_parse_notes(elf, parms,
+            more_notes = elf_xen_parse_notes(elf, parms,
                                      elf_section_start(elf, shdr),
                                      elf_section_end(elf, shdr));
 
-            if ( rc == -1 )
+            if ( more_notes == ELF_NOTE_INVALID )
                 return -1;
 
-            if ( xen_elfnotes == 0 && rc > 0 )
+            if ( xen_elfnotes == 0 && more_notes > 0 )
                 elf_msg(elf, "%s: using notes from SHT_NOTE section\n", __FUNCTION__);
 
-            xen_elfnotes += rc;
+            xen_elfnotes += more_notes;
         }
 
     }

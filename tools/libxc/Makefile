@@ -51,8 +51,13 @@ endif
 vpath %.c ../../xen/common/libelf
 CFLAGS += -I../../xen/common/libelf
 
-GUEST_SRCS-y += libelf-tools.c libelf-loader.c
-GUEST_SRCS-y += libelf-dominfo.c
+ELF_SRCS-y += libelf-tools.c libelf-loader.c
+ELF_SRCS-y += libelf-dominfo.c
+
+GUEST_SRCS-y += $(ELF_SRCS-y)
+
+$(patsubst %.c,%.o,$(ELF_SRCS-y)): CFLAGS += -Wno-pointer-sign
+$(patsubst %.c,%.opic,$(ELF_SRCS-y)): CFLAGS += -Wno-pointer-sign
 
 # new domain builder
 GUEST_SRCS-y                 += xc_dom_core.c xc_dom_boot.c

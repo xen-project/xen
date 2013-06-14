@@ -155,9 +155,10 @@ struct xc_dom_image {
 
 struct xc_dom_loader {
     char *name;
-    int (*probe) (struct xc_dom_image * dom);
-    int (*parser) (struct xc_dom_image * dom);
-    int (*loader) (struct xc_dom_image * dom);
+    /* Sadly the error returns from these functions are not consistent: */
+    elf_negerrnoval (*probe) (struct xc_dom_image * dom);
+    elf_negerrnoval (*parser) (struct xc_dom_image * dom);
+    elf_errorstatus (*loader) (struct xc_dom_image * dom);
 
     struct xc_dom_loader *next;
 };
