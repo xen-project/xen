@@ -16,6 +16,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#ifdef __XEN__
+#include <asm/guest_access.h>
+#endif
+
 #include "libelf-private.h"
 
 /* ------------------------------------------------------------------------ */
@@ -116,7 +120,6 @@ static int elf_load_image(struct elf_binary *elf,
     return 0;
 }
 #else
-#include <asm/guest_access.h>
 
 void elf_set_verbose(struct elf_binary *elf)
 {
