@@ -44,7 +44,7 @@ int elf_xen_parse_features(const char *features,
 
     for ( pos = 0; features[pos] != '\0'; pos += len )
     {
-        memset(feature, 0, sizeof(feature));
+        elf_memset_unchecked(feature, 0, sizeof(feature));
         for ( len = 0;; len++ )
         {
             if ( len >= sizeof(feature)-1 )
@@ -96,7 +96,7 @@ int elf_xen_parse_features(const char *features,
 
 int elf_xen_parse_note(struct elf_binary *elf,
                        struct elf_dom_parms *parms,
-                       const elf_note *note)
+                       ELF_HANDLE_DECL(elf_note) note)
 {
 /* *INDENT-OFF* */
     static const struct {
@@ -215,15 +215,16 @@ int elf_xen_parse_note(struct elf_binary *elf,
 
 static int elf_xen_parse_notes(struct elf_binary *elf,
                                struct elf_dom_parms *parms,
-                               const void *start, const void *end)
+                               ELF_PTRVAL_CONST_VOID start,
+                               ELF_PTRVAL_CONST_VOID end)
 {
     int xen_elfnotes = 0;
-    const elf_note *note;
+    ELF_HANDLE_DECL(elf_note) note;
 
     parms->elf_note_start = start;
     parms->elf_note_end   = end;
-    for ( note = parms->elf_note_start;
-          (void *)note < parms->elf_note_end;
+    for ( note = ELF_MAKE_HANDLE(elf_note, parms->elf_note_start);
+          ELF_HANDLE_PTRVAL(note) < parms->elf_note_end;
           note = elf_note_next(elf, note) )
     {
         if ( strcmp(elf_note_name(elf, note), "Xen") )
@@ -241,45 +242,46 @@ static int elf_xen_parse_notes(struct elf_binary *elf,
 int elf_xen_parse_guest_info(struct elf_binary *elf,
                              struct elf_dom_parms *parms)
 {
-    const char *h;
+    ELF_PTRVAL_CONST_CHAR h;
     char name[32], value[128];
     int len;
 
     h = parms->guest_info;
-    while ( *h )
+#define STAR(h) (*(h))
+    while ( STAR(h) )
     {
-        memset(name, 0, sizeof(name));
-        memset(value, 0, sizeof(value));
+        elf_memset_unchecked(name, 0, sizeof(name));
+        elf_memset_unchecked(value, 0, sizeof(value));
         for ( len = 0;; len++, h++ )
         {
             if ( len >= sizeof(name)-1 )
                 break;
-            if ( *h == '\0' )
+            if ( STAR(h) == '\0' )
                 break;
-            if ( *h == ',' )
+            if ( STAR(h) == ',' )
             {
                 h++;
                 break;
             }
-            if ( *h == '=' )
+            if ( STAR(h) == '=' )
             {
                 h++;
                 for ( len = 0;; len++, h++ )
                 {
                     if ( len >= sizeof(value)-1 )
                         break;
-                    if ( *h == '\0' )
+                    if ( STAR(h) == '\0' )
                         break;
-                    if ( *h == ',' )
+                    if ( STAR(h) == ',' )
                     {
                         h++;
                         break;
                     }
-                    value[len] = *h;
+                    value[len] = STAR(h);
                 }
                 break;
             }
-            name[len] = *h;
+            name[len] = STAR(h);
         }
         elf_msg(elf, "%s: %s=\"%s\"\n", __FUNCTION__, name, value);
 
@@ -328,7 +330,8 @@ int elf_xen_parse_guest_info(struct elf_binary *elf,
 static int elf_xen_note_check(struct elf_binary *elf,
                               struct elf_dom_parms *parms)
 {
-    if ( (parms->elf_note_start == NULL) && (parms->guest_info == NULL) )
+    if ( (ELF_PTRVAL_INVALID(parms->elf_note_start)) &&
+         (ELF_PTRVAL_INVALID(parms->guest_info)) )
     {
         int machine = elf_uval(elf, elf->ehdr, e_machine);
         if ( (machine == EM_386) || (machine == EM_X86_64) )
@@ -457,12 +460,12 @@ static int elf_xen_addr_calc_check(struct elf_binary *elf,
 int elf_xen_parse(struct elf_binary *elf,
                   struct elf_dom_parms *parms)
 {
-    const elf_shdr *shdr;
-    const elf_phdr *phdr;
+    ELF_HANDLE_DECL(elf_shdr) shdr;
+    ELF_HANDLE_DECL(elf_phdr) phdr;
     int xen_elfnotes = 0;
     int i, count, rc;
 
-    memset(parms, 0, sizeof(*parms));
+    elf_memset_unchecked(parms, 0, sizeof(*parms));
     parms->virt_base = UNSET_ADDR;
     parms->virt_entry = UNSET_ADDR;
     parms->virt_hypercall = UNSET_ADDR;
@@ -532,11 +535,11 @@ int elf_xen_parse(struct elf_binary *elf,
         for ( i = 0; i < count; i++ )
         {
             shdr = elf_shdr_by_name(elf, "__xen_guest");
-            if ( shdr )
+            if ( ELF_HANDLE_VALID(shdr) )
             {
                 parms->guest_info = elf_section_start(elf, shdr);
-                parms->elf_note_start = NULL;
-                parms->elf_note_end   = NULL;
+                parms->elf_note_start = ELF_INVALID_PTRVAL;
+                parms->elf_note_end   = ELF_INVALID_PTRVAL;
                 elf_msg(elf, "%s: __xen_guest: \"%s\"\n", __FUNCTION__,
                         parms->guest_info);
                 elf_xen_parse_guest_info(elf, parms);

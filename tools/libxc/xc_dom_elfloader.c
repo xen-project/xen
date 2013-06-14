@@ -113,9 +113,9 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
                                   struct elf_binary *elf, int load)
 {
     struct elf_binary syms;
-    const elf_shdr *shdr, *shdr2;
+    ELF_HANDLE_DECL_NONCONST(elf_shdr) shdr; ELF_HANDLE_DECL(elf_shdr) shdr2;
     xen_vaddr_t symtab, maxaddr;
-    char *hdr;
+    ELF_PTRVAL_CHAR hdr;
     size_t size;
     int h, count, type, i, tables = 0;
 
@@ -145,11 +145,11 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
         dom->bsd_symtab_start = elf_round_up(elf, dom->kernel_seg.vend);
     }
 
-    memcpy(hdr + sizeof(int),
-           elf->image,
+    elf_memcpy_safe(elf, hdr + sizeof(int),
+           ELF_IMAGE_BASE(elf),
            elf_size(elf, elf->ehdr));
-    memcpy(hdr + sizeof(int) + elf_size(elf, elf->ehdr),
-           elf->image + elf_uval(elf, elf->ehdr, e_shoff),
+    elf_memcpy_safe(elf, hdr + sizeof(int) + elf_size(elf, elf->ehdr),
+           ELF_IMAGE_BASE(elf) + elf_uval(elf, elf->ehdr, e_shoff),
            elf_shdr_count(elf) * elf_size(elf, shdr));
     if ( elf_64bit(elf) )
     {
@@ -187,7 +187,7 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
     count = elf_shdr_count(&syms);
     for ( h = 0; h < count; h++ )
     {
-        shdr = elf_shdr_by_index(&syms, h);
+        shdr = ELF_OBSOLETE_VOIDP_CAST elf_shdr_by_index(&syms, h);
         type = elf_uval(&syms, shdr, sh_type);
         if ( type == SHT_STRTAB )
         {
@@ -203,9 +203,9 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
             if ( i == count )
             {
                 if ( elf_64bit(&syms) )
-                    *(Elf64_Off*)(&shdr->e64.sh_offset) = 0;
+                    elf_store_field(elf, shdr, e64.sh_offset, 0);
                 else
-                    *(Elf32_Off*)(&shdr->e32.sh_offset) = 0;
+                    elf_store_field(elf, shdr, e32.sh_offset, 0);
                 continue;
             }
         }
@@ -214,9 +214,9 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
         {
             /* Mangled to be based on ELF header location. */
             if ( elf_64bit(&syms) )
-                *(Elf64_Off*)(&shdr->e64.sh_offset) = maxaddr - symtab;
+                elf_store_field(elf, shdr, e64.sh_offset, maxaddr - symtab);
             else
-                *(Elf32_Off*)(&shdr->e32.sh_offset) = maxaddr - symtab;
+                elf_store_field(elf, shdr, e32.sh_offset, maxaddr - symtab);
             size = elf_uval(&syms, shdr, sh_size);
             maxaddr = elf_round_up(&syms, maxaddr + size);
             tables++;
@@ -228,7 +228,7 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
             if ( load )
             {
                 shdr2 = elf_shdr_by_index(elf, h);
-                memcpy((void*)elf_section_start(&syms, shdr),
+                elf_memcpy_safe(elf, ELF_OBSOLETE_VOIDP_CAST elf_section_start(&syms, shdr),
                        elf_section_start(elf, shdr2),
                        size);
             }
@@ -236,9 +236,9 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
 
         /* Name is NULL. */
         if ( elf_64bit(&syms) )
-            *(Elf64_Word*)(&shdr->e64.sh_name) = 0;
+            elf_store_field(elf, shdr, e64.sh_name, 0);
         else
-            *(Elf32_Word*)(&shdr->e32.sh_name) = 0;
+            elf_store_field(elf, shdr, e32.sh_name, 0);
     }
 
     if ( tables == 0 )
@@ -273,7 +273,7 @@ static int xc_dom_parse_elf_kernel(struct xc_dom_image *dom)
     }
 
     /* Find the section-header strings table. */
-    if ( elf->sec_strtab == NULL )
+    if ( ELF_PTRVAL_INVALID(elf->sec_strtab) )
     {
         xc_dom_panic(dom->xch, XC_INVALID_KERNEL, "%s: ELF image"
                      " has no shstrtab", __FUNCTION__);

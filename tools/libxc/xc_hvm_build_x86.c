@@ -143,7 +143,7 @@ static int loadelfimage(xc_interface *xch, struct elf_binary *elf,
     if ( elf->dest == NULL )
         goto err;
 
-    elf->dest += elf->pstart & (PAGE_SIZE - 1);
+    ELF_ADVANCE_DEST(elf, elf->pstart & (PAGE_SIZE - 1));
 
     /* Load the initial elf image. */
     rc = elf_load_binary(elf);
