@@ -118,7 +118,7 @@ void elf_set_log(struct elf_binary *elf, elf_log_callback *log_callback,
 }
 
 static elf_errorstatus elf_load_image(struct elf_binary *elf,
-                          ELF_PTRVAL_VOID dst, ELF_PTRVAL_CONST_VOID src,
+                          elf_ptrval dst, elf_ptrval src,
                           uint64_t filesz, uint64_t memsz)
 {
     elf_memcpy_safe(elf, dst, src, filesz);
@@ -132,7 +132,7 @@ void elf_set_verbose(struct elf_binary *elf)
     elf->verbose = 1;
 }
 
-static elf_errorstatus elf_load_image(struct elf_binary *elf, ELF_PTRVAL_VOID dst, ELF_PTRVAL_CONST_VOID src, uint64_t filesz, uint64_t memsz)
+static elf_errorstatus elf_load_image(struct elf_binary *elf, elf_ptrval dst, elf_ptrval src, uint64_t filesz, uint64_t memsz)
 {
     elf_errorstatus rc;
     if ( filesz > ULONG_MAX || memsz > ULONG_MAX )
@@ -187,12 +187,12 @@ void elf_parse_bsdsyms(struct elf_binary *elf, uint64_t pstart)
 
 static void elf_load_bsdsyms(struct elf_binary *elf)
 {
-    ELF_HANDLE_DECL_NONCONST(elf_ehdr) sym_ehdr;
+    ELF_HANDLE_DECL(elf_ehdr) sym_ehdr;
     unsigned long sz;
-    ELF_PTRVAL_VOID maxva;
-    ELF_PTRVAL_VOID symbase;
-    ELF_PTRVAL_VOID symtab_addr;
-    ELF_HANDLE_DECL_NONCONST(elf_shdr) shdr;
+    elf_ptrval maxva;
+    elf_ptrval symbase;
+    elf_ptrval symtab_addr;
+    ELF_HANDLE_DECL(elf_shdr) shdr;
     unsigned i, type;
 
     if ( !elf->bsd_symtab_pstart )
@@ -226,7 +226,7 @@ do {                                            \
     elf_memcpy_safe(elf, ELF_HANDLE_PTRVAL(shdr),
                     ELF_IMAGE_BASE(elf) + elf_uval(elf, elf->ehdr, e_shoff),
                     sz);
-    maxva = ELF_OBSOLETE_VOIDP_CAST elf_round_up(elf, (unsigned long)maxva + sz);
+    maxva = elf_round_up(elf, (unsigned long)maxva + sz);
 
     for ( i = 0; i < elf_shdr_count(elf); i++ )
     {
@@ -242,7 +242,7 @@ do {                                            \
              elf_memcpy_safe(elf, maxva, elf_section_start(elf, shdr), sz);
              /* Mangled to be based on ELF header location. */
              elf_hdr_elm(elf, shdr, sh_offset, maxva - symtab_addr);
-             maxva = ELF_OBSOLETE_VOIDP_CAST elf_round_up(elf, (unsigned long)maxva + sz);
+             maxva = elf_round_up(elf, (unsigned long)maxva + sz);
         }
         old_shdr_p = ELF_HANDLE_PTRVAL(shdr);
         new_shdr_p = old_shdr_p + elf_uval(elf, elf->ehdr, e_shentsize);
@@ -297,7 +297,7 @@ elf_errorstatus elf_load_binary(struct elf_binary *elf)
 {
     ELF_HANDLE_DECL(elf_phdr) phdr;
     uint64_t i, count, paddr, offset, filesz, memsz;
-    ELF_PTRVAL_VOID dest;
+    elf_ptrval dest;
     /*
      * Let bizarre ELFs write the output image up to twice; this
      * calculation is just to ensure our copying loop is no worse than
@@ -334,7 +334,7 @@ elf_errorstatus elf_load_binary(struct elf_binary *elf)
         remain_allow_copy -= memsz;
 
         elf_msg(elf, "%s: phdr %" PRIu64 " at 0x%"ELF_PRPTRVAL" -> 0x%"ELF_PRPTRVAL"\n",
-                __func__, i, dest, (ELF_PTRVAL_VOID)(dest + filesz));
+                __func__, i, dest, (elf_ptrval)(dest + filesz));
         if ( elf_load_image(elf, dest, ELF_IMAGE_BASE(elf) + offset, filesz, memsz) != 0 )
             return -1;
     }
@@ -343,7 +343,7 @@ elf_errorstatus elf_load_binary(struct elf_binary *elf)
     return 0;
 }
 
-ELF_PTRVAL_VOID elf_get_ptr(struct elf_binary *elf, unsigned long addr)
+elf_ptrval elf_get_ptr(struct elf_binary *elf, unsigned long addr)
 {
     return ELF_REALPTR2PTRVAL(elf->dest_base) + addr - elf->pstart;
 }

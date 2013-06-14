@@ -171,7 +171,7 @@ ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_name(struct elf_binary *elf, const char *n
 ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_index(struct elf_binary *elf, unsigned index)
 {
     uint64_t count = elf_shdr_count(elf);
-    ELF_PTRVAL_CONST_VOID ptr;
+    elf_ptrval ptr;
 
     if ( index >= count )
         return ELF_INVALID_HANDLE(elf_shdr);
@@ -185,7 +185,7 @@ ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_index(struct elf_binary *elf, unsigned ind
 ELF_HANDLE_DECL(elf_phdr) elf_phdr_by_index(struct elf_binary *elf, unsigned index)
 {
     uint64_t count = elf_uval(elf, elf->ehdr, e_phnum);
-    ELF_PTRVAL_CONST_VOID ptr;
+    elf_ptrval ptr;
 
     if ( index >= count )
         return ELF_INVALID_HANDLE(elf_phdr);
@@ -233,24 +233,24 @@ const char *elf_strfmt(struct elf_binary *elf, elf_ptrval start)
     return str;
 }
 
-ELF_PTRVAL_CONST_VOID elf_section_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr)
+elf_ptrval elf_section_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr)
 {
     return ELF_IMAGE_BASE(elf) + elf_uval(elf, shdr, sh_offset);
 }
 
-ELF_PTRVAL_CONST_VOID elf_section_end(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr)
+elf_ptrval elf_section_end(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr)
 {
     return ELF_IMAGE_BASE(elf)
         + elf_uval(elf, shdr, sh_offset) + elf_uval(elf, shdr, sh_size);
 }
 
-ELF_PTRVAL_CONST_VOID elf_segment_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr)
+elf_ptrval elf_segment_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr)
 {
     return ELF_IMAGE_BASE(elf)
         + elf_uval(elf, phdr, p_offset);
 }
 
-ELF_PTRVAL_CONST_VOID elf_segment_end(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr)
+elf_ptrval elf_segment_end(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr)
 {
     return ELF_IMAGE_BASE(elf)
         + elf_uval(elf, phdr, p_offset) + elf_uval(elf, phdr, p_filesz);
@@ -258,8 +258,8 @@ ELF_PTRVAL_CONST_VOID elf_segment_end(struct elf_binary *elf, ELF_HANDLE_DECL(el
 
 ELF_HANDLE_DECL(elf_sym) elf_sym_by_name(struct elf_binary *elf, const char *symbol)
 {
-    ELF_PTRVAL_CONST_VOID ptr = elf_section_start(elf, elf->sym_tab);
-    ELF_PTRVAL_CONST_VOID end = elf_section_end(elf, elf->sym_tab);
+    elf_ptrval ptr = elf_section_start(elf, elf->sym_tab);
+    elf_ptrval end = elf_section_end(elf, elf->sym_tab);
     ELF_HANDLE_DECL(elf_sym) sym;
     uint64_t info, name;
     const char *sym_name;
@@ -283,7 +283,7 @@ ELF_HANDLE_DECL(elf_sym) elf_sym_by_name(struct elf_binary *elf, const char *sym
 
 ELF_HANDLE_DECL(elf_sym) elf_sym_by_index(struct elf_binary *elf, unsigned index)
 {
-    ELF_PTRVAL_CONST_VOID ptr = elf_section_start(elf, elf->sym_tab);
+    elf_ptrval ptr = elf_section_start(elf, elf->sym_tab);
     ELF_HANDLE_DECL(elf_sym) sym;
 
     sym = ELF_MAKE_HANDLE(elf_sym, ptr + index * elf_size(elf, sym));
@@ -295,7 +295,7 @@ const char *elf_note_name(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note
     return elf_strval(elf, ELF_HANDLE_PTRVAL(note) + elf_size(elf, note));
 }
 
-ELF_PTRVAL_CONST_VOID elf_note_desc(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note)
+elf_ptrval elf_note_desc(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note)
 {
     unsigned namesz = (elf_uval(elf, note, namesz) + 3) & ~3;
 
@@ -304,7 +304,7 @@ ELF_PTRVAL_CONST_VOID elf_note_desc(struct elf_binary *elf, ELF_HANDLE_DECL(elf_
 
 uint64_t elf_note_numeric(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note)
 {
-    ELF_PTRVAL_CONST_VOID desc = elf_note_desc(elf, note);
+    elf_ptrval desc = elf_note_desc(elf, note);
     unsigned descsz = elf_uval(elf, note, descsz);
 
     switch (descsz)
@@ -322,7 +322,7 @@ uint64_t elf_note_numeric(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note
 uint64_t elf_note_numeric_array(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note,
                                 unsigned int unitsz, unsigned int idx)
 {
-    ELF_PTRVAL_CONST_VOID desc = elf_note_desc(elf, note);
+    elf_ptrval desc = elf_note_desc(elf, note);
     unsigned descsz = elf_uval(elf, note, descsz);
 
     if ( descsz % unitsz || idx >= descsz / unitsz )
