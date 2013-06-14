@@ -142,7 +142,7 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
         hdr = xc_dom_malloc(dom, size);
         if ( hdr == NULL )
             return 0;
-        dom->bsd_symtab_start = elf_round_up(&syms, dom->kernel_seg.vend);
+        dom->bsd_symtab_start = elf_round_up(elf, dom->kernel_seg.vend);
     }
 
     memcpy(hdr + sizeof(int),
