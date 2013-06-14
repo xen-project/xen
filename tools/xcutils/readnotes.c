@@ -70,7 +70,7 @@ static void print_numeric_note(const char *prefix, struct elf_binary *elf,
 			       ELF_HANDLE_DECL(elf_note) note)
 {
 	uint64_t value = elf_note_numeric(elf, note);
-	int descsz = elf_uval(elf, note, descsz);
+	unsigned descsz = elf_uval(elf, note, descsz);
 
 	printf("%s: %#*" PRIx64 " (%d bytes)\n",
 	       prefix, 2+2*descsz, value, descsz);
@@ -79,7 +79,7 @@ static void print_numeric_note(const char *prefix, struct elf_binary *elf,
 static void print_l1_mfn_valid_note(const char *prefix, struct elf_binary *elf,
 				    ELF_HANDLE_DECL(elf_note) note)
 {
-	int descsz = elf_uval(elf, note, descsz);
+	unsigned descsz = elf_uval(elf, note, descsz);
 	ELF_PTRVAL_CONST_VOID desc = elf_note_desc(elf, note);
 
 	/* XXX should be able to cope with a list of values. */
@@ -99,10 +99,10 @@ static void print_l1_mfn_valid_note(const char *prefix, struct elf_binary *elf,
 
 }
 
-static int print_notes(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) start, ELF_HANDLE_DECL(elf_note) end)
+static unsigned print_notes(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) start, ELF_HANDLE_DECL(elf_note) end)
 {
 	ELF_HANDLE_DECL(elf_note) note;
-	int notes_found = 0;
+	unsigned notes_found = 0;
 	const char *this_note_name;
 
 	for ( note = start; ELF_HANDLE_PTRVAL(note) < ELF_HANDLE_PTRVAL(end); note = elf_note_next(elf, note) )
@@ -161,7 +161,7 @@ static int print_notes(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) start, 
 			break;
 		default:
 			printf("unknown note type %#x\n",
-			       (int)elf_uval(elf, note, type));
+			       (unsigned)elf_uval(elf, note, type));
 			break;
 		}
 	}
@@ -171,12 +171,13 @@ static int print_notes(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) start, 
 int main(int argc, char **argv)
 {
 	const char *f;
-	int fd,h,size,usize,count;
+	int fd;
+	unsigned h,size,usize,count;
 	void *image,*tmp;
 	struct stat st;
 	struct elf_binary elf;
 	ELF_HANDLE_DECL(elf_shdr) shdr;
-	int notes_found = 0;
+	unsigned notes_found = 0;
 
 	struct setup_header *hdr;
 	uint64_t payload_offset, payload_length;
