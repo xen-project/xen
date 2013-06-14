@@ -63,7 +63,7 @@ struct setup_header {
 static void print_string_note(const char *prefix, struct elf_binary *elf,
 			      ELF_HANDLE_DECL(elf_note) note)
 {
-	printf("%s: %s\n", prefix, (char*)elf_note_desc(elf, note));
+	printf("%s: %s\n", prefix, elf_strfmt(elf, elf_note_desc(elf, note)));
 }
 
 static void print_numeric_note(const char *prefix, struct elf_binary *elf,
@@ -103,10 +103,14 @@ static int print_notes(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) start, 
 {
 	ELF_HANDLE_DECL(elf_note) note;
 	int notes_found = 0;
+	const char *this_note_name;
 
 	for ( note = start; ELF_HANDLE_PTRVAL(note) < ELF_HANDLE_PTRVAL(end); note = elf_note_next(elf, note) )
 	{
-		if (0 != strcmp(elf_note_name(elf, note), "Xen"))
+		this_note_name = elf_note_name(elf, note);
+		if (NULL == this_note_name)
+			continue;
+		if (0 != strcmp(this_note_name, "Xen"))
 			continue;
 
 		notes_found++;
@@ -294,7 +298,8 @@ int main(int argc, char **argv)
 
 	shdr = elf_shdr_by_name(&elf, "__xen_guest");
 	if (ELF_HANDLE_VALID(shdr))
-		printf("__xen_guest: %s\n", (char*)elf_section_start(&elf, shdr));
+		printf("__xen_guest: %s\n",
+                       elf_strfmt(&elf, elf_section_start(&elf, shdr)));
 
 	return 0;
 }

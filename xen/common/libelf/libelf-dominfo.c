@@ -137,7 +137,10 @@ int elf_xen_parse_note(struct elf_binary *elf,
 
     if ( note_desc[type].str )
     {
-        str = elf_note_desc(elf, note);
+        str = elf_strval(elf, elf_note_desc(elf, note));
+        if (str == NULL)
+            /* elf_strval will mark elf broken if it fails so no need to log */
+            return 0;
         elf_msg(elf, "%s: %s = \"%s\"\n", __FUNCTION__,
                 note_desc[type].name, str);
         parms->elf_notes[type].type = XEN_ENT_STR;
@@ -220,6 +223,7 @@ static int elf_xen_parse_notes(struct elf_binary *elf,
 {
     int xen_elfnotes = 0;
     ELF_HANDLE_DECL(elf_note) note;
+    const char *note_name;
 
     parms->elf_note_start = start;
     parms->elf_note_end   = end;
@@ -227,7 +231,10 @@ static int elf_xen_parse_notes(struct elf_binary *elf,
           ELF_HANDLE_PTRVAL(note) < parms->elf_note_end;
           note = elf_note_next(elf, note) )
     {
-        if ( strcmp(elf_note_name(elf, note), "Xen") )
+        note_name = elf_note_name(elf, note);
+        if ( note_name == NULL )
+            continue;
+        if ( strcmp(note_name, "Xen") )
             continue;
         if ( elf_xen_parse_note(elf, parms, note) )
             return -1;
@@ -541,7 +548,7 @@ int elf_xen_parse(struct elf_binary *elf,
                 parms->elf_note_start = ELF_INVALID_PTRVAL;
                 parms->elf_note_end   = ELF_INVALID_PTRVAL;
                 elf_msg(elf, "%s: __xen_guest: \"%s\"\n", __FUNCTION__,
-                        parms->guest_info);
+                        elf_strfmt(elf, parms->guest_info));
                 elf_xen_parse_guest_info(elf, parms);
                 break;
             }

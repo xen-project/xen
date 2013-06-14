@@ -252,6 +252,9 @@ uint64_t elf_access_unsigned(struct elf_binary *elf, ELF_PTRVAL_CONST_VOID ptr,
 uint64_t elf_round_up(struct elf_binary *elf, uint64_t addr);
 
 
+#define elf_strval(elf,x) ((const char*)(x)) /* may return NULL in the future */
+#define elf_strfmt(elf,x) ((const char*)(x)) /* will return (invalid) instead */
+
 #define elf_memcpy_safe(elf, dst, src, sz) memcpy((dst),(src),(sz))
 #define elf_memset_safe(elf, dst, c, sz)   memset((dst),(c),(sz))
   /*
@@ -279,7 +282,7 @@ ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_name(struct elf_binary *elf, const char *n
 ELF_HANDLE_DECL(elf_shdr) elf_shdr_by_index(struct elf_binary *elf, int index);
 ELF_HANDLE_DECL(elf_phdr) elf_phdr_by_index(struct elf_binary *elf, int index);
 
-const char *elf_section_name(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr);
+const char *elf_section_name(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr); /* might return NULL if inputs are invalid */
 ELF_PTRVAL_CONST_VOID elf_section_start(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr);
 ELF_PTRVAL_CONST_VOID elf_section_end(struct elf_binary *elf, ELF_HANDLE_DECL(elf_shdr) shdr);
 
@@ -289,7 +292,7 @@ ELF_PTRVAL_CONST_VOID elf_segment_end(struct elf_binary *elf, ELF_HANDLE_DECL(el
 ELF_HANDLE_DECL(elf_sym) elf_sym_by_name(struct elf_binary *elf, const char *symbol);
 ELF_HANDLE_DECL(elf_sym) elf_sym_by_index(struct elf_binary *elf, int index);
 
-const char *elf_note_name(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note);
+const char *elf_note_name(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note); /* may return NULL */
 ELF_PTRVAL_CONST_VOID elf_note_desc(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note);
 uint64_t elf_note_numeric(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note);
 uint64_t elf_note_numeric_array(struct elf_binary *, ELF_HANDLE_DECL(elf_note),
