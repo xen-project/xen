@@ -51,6 +51,9 @@ typedef void elf_log_callback(struct elf_binary*, void *caller_data,
 
 #endif
 
+#define ELF_MAX_STRING_LENGTH 4096
+#define ELF_MAX_TOTAL_NOTE_COUNT 65536
+
 /* ------------------------------------------------------------------------ */
 
 /* Macros for accessing the input image and output area. */
@@ -353,6 +356,16 @@ ELF_PTRVAL_CONST_VOID elf_note_desc(struct elf_binary *elf, ELF_HANDLE_DECL(elf_
 uint64_t elf_note_numeric(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note);
 uint64_t elf_note_numeric_array(struct elf_binary *, ELF_HANDLE_DECL(elf_note),
                                 unsigned int unitsz, unsigned int idx);
+
+/*
+ * If you use elf_note_next in a loop, you must put a nontrivial upper
+ * bound on the returned value as part of your loop condition.  In
+ * some cases elf_note_next will substitute ELF_PTRVAL_MAX as return
+ * value to indicate that the iteration isn't going well (for example,
+ * the putative "next" value would be earlier in memory).  In this
+ * case the caller's loop must terminate.  Checking against the
+ * end of the notes segment with a strict inequality is sufficient.
+ */
 ELF_HANDLE_DECL(elf_note) elf_note_next(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note);
 
 /* (Only) checks that the image has the right magic number. */

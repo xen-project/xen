@@ -221,7 +221,8 @@ elf_errorstatus elf_xen_parse_note(struct elf_binary *elf,
 static unsigned elf_xen_parse_notes(struct elf_binary *elf,
                                struct elf_dom_parms *parms,
                                ELF_PTRVAL_CONST_VOID start,
-                               ELF_PTRVAL_CONST_VOID end)
+                               ELF_PTRVAL_CONST_VOID end,
+                               unsigned *total_note_count)
 {
     unsigned xen_elfnotes = 0;
     ELF_HANDLE_DECL(elf_note) note;
@@ -233,6 +234,12 @@ static unsigned elf_xen_parse_notes(struct elf_binary *elf,
           ELF_HANDLE_PTRVAL(note) < parms->elf_note_end;
           note = elf_note_next(elf, note) )
     {
+        if ( *total_note_count >= ELF_MAX_TOTAL_NOTE_COUNT )
+        {
+            elf_mark_broken(elf, "too many ELF notes");
+            break;
+        }
+        (*total_note_count)++;
         note_name = elf_note_name(elf, note);
         if ( note_name == NULL )
             continue;
@@ -473,6 +480,7 @@ elf_errorstatus elf_xen_parse(struct elf_binary *elf,
     ELF_HANDLE_DECL(elf_phdr) phdr;
     unsigned xen_elfnotes = 0;
     unsigned i, count, more_notes;
+    unsigned total_note_count = 0;
 
     elf_memset_unchecked(parms, 0, sizeof(*parms));
     parms->virt_base = UNSET_ADDR;
@@ -487,6 +495,9 @@ elf_errorstatus elf_xen_parse(struct elf_binary *elf,
     for ( i = 0; i < count; i++ )
     {
         phdr = elf_phdr_by_index(elf, i);
+        if ( !elf_access_ok(elf, ELF_HANDLE_PTRVAL(phdr), 1) )
+            /* input has an insane program header count field */
+            break;
         if ( elf_uval(elf, phdr, p_type) != PT_NOTE )
             continue;
 
@@ -499,7 +510,8 @@ elf_errorstatus elf_xen_parse(struct elf_binary *elf,
 
         more_notes = elf_xen_parse_notes(elf, parms,
                                  elf_segment_start(elf, phdr),
-                                 elf_segment_end(elf, phdr));
+                                 elf_segment_end(elf, phdr),
+                                 &total_note_count);
         if ( more_notes == ELF_NOTE_INVALID )
             return -1;
 
@@ -516,13 +528,17 @@ elf_errorstatus elf_xen_parse(struct elf_binary *elf,
         for ( i = 0; i < count; i++ )
         {
             shdr = elf_shdr_by_index(elf, i);
+            if ( !elf_access_ok(elf, ELF_HANDLE_PTRVAL(shdr), 1) )
+                /* input has an insane section header count field */
+                break;
 
             if ( elf_uval(elf, shdr, sh_type) != SHT_NOTE )
                 continue;
 
             more_notes = elf_xen_parse_notes(elf, parms,
                                      elf_section_start(elf, shdr),
-                                     elf_section_end(elf, shdr));
+                                     elf_section_end(elf, shdr),
+                                     &total_note_count);
 
             if ( more_notes == ELF_NOTE_INVALID )
                 return -1;
@@ -540,20 +556,15 @@ elf_errorstatus elf_xen_parse(struct elf_binary *elf,
      */
     if ( xen_elfnotes == 0 )
     {
-        count = elf_shdr_count(elf);
-        for ( i = 0; i < count; i++ )
+        shdr = elf_shdr_by_name(elf, "__xen_guest");
+        if ( ELF_HANDLE_VALID(shdr) )
         {
-            shdr = elf_shdr_by_name(elf, "__xen_guest");
-            if ( ELF_HANDLE_VALID(shdr) )
-            {
-                parms->guest_info = elf_section_start(elf, shdr);
-                parms->elf_note_start = ELF_INVALID_PTRVAL;
-                parms->elf_note_end   = ELF_INVALID_PTRVAL;
-                elf_msg(elf, "%s: __xen_guest: \"%s\"\n", __FUNCTION__,
-                        elf_strfmt(elf, parms->guest_info));
-                elf_xen_parse_guest_info(elf, parms);
-                break;
-            }
+            parms->guest_info = elf_section_start(elf, shdr);
+            parms->elf_note_start = ELF_INVALID_PTRVAL;
+            parms->elf_note_end   = ELF_INVALID_PTRVAL;
+            elf_msg(elf, "%s: __xen_guest: \"%s\"\n", __FUNCTION__,
+                    elf_strfmt(elf, parms->guest_info));
+            elf_xen_parse_guest_info(elf, parms);
         }
     }
 
