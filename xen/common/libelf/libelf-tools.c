@@ -48,34 +48,6 @@ uint64_t elf_access_unsigned(struct elf_binary * elf, const void *ptr,
     }
 }
 
-int64_t elf_access_signed(struct elf_binary *elf, const void *ptr,
-                          uint64_t offset, size_t size)
-{
-    int need_swap = elf_swap(elf);
-    const int8_t *s8;
-    const int16_t *s16;
-    const int32_t *s32;
-    const int64_t *s64;
-
-    switch ( size )
-    {
-    case 1:
-        s8 = ptr + offset;
-        return *s8;
-    case 2:
-        s16 = ptr + offset;
-        return need_swap ? bswap_16(*s16) : *s16;
-    case 4:
-        s32 = ptr + offset;
-        return need_swap ? bswap_32(*s32) : *s32;
-    case 8:
-        s64 = ptr + offset;
-        return need_swap ? bswap_64(*s64) : *s64;
-    default:
-        return 0;
-    }
-}
-
 uint64_t elf_round_up(struct elf_binary *elf, uint64_t addr)
 {
     int elf_round = (elf_64bit(elf) ? 8 : 4) - 1;
