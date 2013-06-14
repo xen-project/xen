@@ -403,11 +403,16 @@ static int setup_guest(xc_interface *xch,
         munmap(page0, PAGE_SIZE);
     }
 
+    if ( elf_check_broken(&elf) )
+        ERROR("HVM ELF broken: %s", elf_check_broken(&elf));
+
     free(page_array);
     return 0;
 
  error_out:
     free(page_array);
+    if ( elf_check_broken(&elf) )
+        ERROR("HVM ELF broken, failing: %s", elf_check_broken(&elf));
     return -1;
 }
 

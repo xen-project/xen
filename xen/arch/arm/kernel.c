@@ -146,6 +146,8 @@ static int kernel_try_elf_prepare(struct kernel_info *info)
 {
     int rc;
 
+    memset(&info->elf.elf, 0, sizeof(info->elf.elf));
+
     info->kernel_order = get_order_from_bytes(KERNEL_FLASH_SIZE);
     info->kernel_img = alloc_xenheap_pages(info->kernel_order, 0);
     if ( info->kernel_img == NULL )
@@ -160,7 +162,7 @@ static int kernel_try_elf_prepare(struct kernel_info *info)
 #endif
     elf_parse_binary(&info->elf.elf);
     if ( (rc = elf_xen_parse(&info->elf.elf, &info->elf.parms)) != 0 )
-        return rc;
+        goto err;
 
     /*
      * TODO: can the ELF header be used to find the physical address
@@ -169,7 +171,18 @@ static int kernel_try_elf_prepare(struct kernel_info *info)
     info->entry = info->elf.parms.virt_entry;
     info->load = kernel_elf_load;
 
+    if ( elf_check_broken(&info->elf.elf) )
+        printk("Xen: warning: ELF kernel broken: %s\n",
+               elf_check_broken(&info->elf.elf));
+
     return 0;
+
+err:
+    if ( elf_check_broken(&info->elf.elf) )
+        printk("Xen: ELF kernel broken: %s\n",
+               elf_check_broken(&info->elf.elf));
+
+    return rc;
 }
 
 int kernel_prepare(struct kernel_info *info)

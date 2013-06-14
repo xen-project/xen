@@ -301,6 +301,9 @@ int main(int argc, char **argv)
 		printf("__xen_guest: %s\n",
                        elf_strfmt(&elf, elf_section_start(&elf, shdr)));
 
+	if (elf_check_broken(&elf))
+		printf("warning: broken ELF: %s\n", elf_check_broken(&elf));
+
 	return 0;
 }
 

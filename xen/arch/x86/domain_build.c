@@ -374,7 +374,7 @@ int __init construct_dom0(
 #endif
     elf_parse_binary(&elf);
     if ( (rc = elf_xen_parse(&elf, &parms)) != 0 )
-        return rc;
+        goto out;
 
     /* compatibility check */
     compatible = 0;
@@ -413,14 +413,16 @@ int __init construct_dom0(
     if ( !compatible )
     {
         printk("Mismatch between Xen and DOM0 kernel\n");
-        return -EINVAL;
+        rc = -EINVAL;
+        goto out;
     }
 
     if ( parms.elf_notes[XEN_ELFNOTE_SUPPORTED_FEATURES].type != XEN_ENT_NONE &&
          !test_bit(XENFEAT_dom0, parms.f_supported) )
     {
         printk("Kernel does not support Dom0 operation\n");
-        return -EINVAL;
+        rc = -EINVAL;
+        goto out;
     }
 
 #if defined(__x86_64__)
@@ -734,7 +736,8 @@ int __init construct_dom0(
          (v_end > HYPERVISOR_COMPAT_VIRT_START(d)) )
     {
         printk("DOM0 image overlaps with Xen private area.\n");
-        return -EINVAL;
+        rc = -EINVAL;
+        goto out;
     }
 
     if ( is_pv_32on64_domain(d) )
@@ -914,7 +917,7 @@ int __init construct_dom0(
     if ( rc < 0 )
     {
         printk("Failed to load the kernel binary\n");
-        return rc;
+        goto out;
     }
     bootstrap_map(NULL);
 
@@ -925,7 +928,8 @@ int __init construct_dom0(
         {
             write_ptbase(current);
             printk("Invalid HYPERCALL_PAGE field in ELF notes.\n");
-            return -1;
+            rc = -1;
+            goto out;
         }
         hypercall_page_initialise(
             d, (void *)(unsigned long)parms.virt_hypercall);
@@ -1272,9 +1276,19 @@ int __init construct_dom0(
 
     BUG_ON(rc != 0);
 
-    iommu_dom0_init(dom0);
+    if ( elf_check_broken(&elf) )
+        printk(" Xen warning: dom0 kernel broken ELF: %s\n",
+               elf_check_broken(&elf));
 
+    iommu_dom0_init(dom0);
     return 0;
+
+out:
+    if ( elf_check_broken(&elf) )
+        printk(" Xen dom0 kernel broken ELF: %s\n",
+               elf_check_broken(&elf));
+
+    return rc;
 }
 
 /*
