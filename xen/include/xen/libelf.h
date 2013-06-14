@@ -350,7 +350,9 @@ ELF_PTRVAL_CONST_VOID elf_note_desc(struct elf_binary *elf, ELF_HANDLE_DECL(elf_
 uint64_t elf_note_numeric(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note);
 ELF_HANDLE_DECL(elf_note) elf_note_next(struct elf_binary *elf, ELF_HANDLE_DECL(elf_note) note);
 
-int elf_is_elfbinary(const void *image);
+/* (Only) checks that the image has the right magic number. */
+int elf_is_elfbinary(const void *image_start, size_t image_size);
+
 int elf_phdr_is_loadable(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr);
 
 /* ------------------------------------------------------------------------ */
