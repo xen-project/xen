@@ -351,9 +351,18 @@ int xc_dom_try_gunzip(struct xc_dom_image *dom, void **blob, size_t * size)
 void *xc_dom_pfn_to_ptr(struct xc_dom_image *dom, xen_pfn_t pfn,
                         xen_pfn_t count)
 {
+    xen_pfn_t count_out_dummy;
+    return xc_dom_pfn_to_ptr_retcount(dom, pfn, count, &count_out_dummy);
+}
+
+void *xc_dom_pfn_to_ptr_retcount(struct xc_dom_image *dom, xen_pfn_t pfn,
+                                 xen_pfn_t count, xen_pfn_t *count_out)
+{
     struct xc_dom_phys *phys;
     unsigned int page_shift = XC_DOM_PAGE_SHIFT(dom);
     char *mode = "unset";
+
+    *count_out = 0;
 
     if ( pfn > dom->total_pages ||    /* multiple checks to avoid overflows */
          count > dom->total_pages ||
@@ -384,6 +393,7 @@ void *xc_dom_pfn_to_ptr(struct xc_dom_image *dom, xen_pfn_t pfn,
                           phys->count);
                 return NULL;
             }
+            *count_out = count;
         }
         else
         {
@@ -391,6 +401,9 @@ void *xc_dom_pfn_to_ptr(struct xc_dom_image *dom, xen_pfn_t pfn,
                just hand out a pointer to it */
             if ( pfn < phys->first )
                 continue;
+            if ( pfn >= phys->first + phys->count )
+                continue;
+            *count_out = phys->count - (pfn - phys->first);
         }
         return phys->ptr + ((pfn - phys->first) << page_shift);
     }
