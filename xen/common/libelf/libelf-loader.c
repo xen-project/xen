@@ -29,7 +29,7 @@ int elf_init(struct elf_binary *elf, const char *image_input, size_t size)
     ELF_HANDLE_DECL(elf_shdr) shdr;
     uint64_t i, count, section, offset;
 
-    if ( !elf_is_elfbinary(image_input) )
+    if ( !elf_is_elfbinary(image_input, size) )
     {
         elf_err(elf, "%s: not an ELF binary\n", __FUNCTION__);
         return -1;

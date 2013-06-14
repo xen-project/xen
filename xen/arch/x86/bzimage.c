@@ -220,7 +220,7 @@ unsigned long __init bzimage_headroom(char *image_start,
         image_length = hdr->payload_length;
     }
 
-    if ( elf_is_elfbinary(image_start) )
+    if ( elf_is_elfbinary(image_start, image_length) )
         return 0;
 
     orig_image_len = image_length;
@@ -251,7 +251,7 @@ int __init bzimage_parse(char *image_base, char **image_start, unsigned long *im
         *image_len = hdr->payload_length;
     }
 
-    if ( elf_is_elfbinary(*image_start) )
+    if ( elf_is_elfbinary(*image_start, *image_len) )
         return 0;
 
     BUG_ON(!(image_base < *image_start));
