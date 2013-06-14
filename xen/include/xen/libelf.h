@@ -57,8 +57,9 @@ typedef void elf_log_callback(struct elf_binary*, void *caller_data,
  *               on this.
  *               This replaces variables which were char*,void*
  *               and their const versions, so we provide four
- *               different declaration macros:
+ *               different obsolete declaration macros:
  *                   ELF_PTRVAL_{,CONST}{VOID,CHAR}
+ *               New code can simply use the elf_ptrval typedef.
  *   HANDLE      A pointer to a struct.  There is one of these types
  *               for each pointer type - that is, for each "structname".
  *               In the arguments to the various HANDLE macros, structname
@@ -67,54 +68,66 @@ typedef void elf_log_callback(struct elf_binary*, void *caller_data,
  *               pointers.  In the current code attempts to do so will
  *               compile, but in the next patch this will become a
  *               compile error.
- *               We provide two declaration macros for const and
- *               non-const pointers.
+ *               We also provide a second declaration macro for
+ *               pointers which were to const; this is obsolete.
  */
 
-#define ELF_REALPTR2PTRVAL(realpointer) (realpointer)
+typedef uintptr_t elf_ptrval;
+
+#define ELF_REALPTR2PTRVAL(realpointer) ((elf_ptrval)(realpointer))
   /* Converts an actual C pointer into a PTRVAL */
 
-#define ELF_HANDLE_DECL_NONCONST(structname)  structname *
-#define ELF_HANDLE_DECL(structname)           const structname *
+#define ELF_HANDLE_DECL_NONCONST(structname) structname##_handle /*obsolete*/
+#define ELF_HANDLE_DECL(structname)          structname##_handle
   /* Provides a type declaration for a HANDLE. */
-  /* May only be used to declare ONE variable at a time */
 
-#define ELF_PTRVAL_VOID         void *
-#define ELF_PTRVAL_CHAR         char *
-#define ELF_PTRVAL_CONST_VOID   const void *
-#define ELF_PTRVAL_CONST_CHAR   const char *
-  /* Provides a type declaration for a PTRVAL. */
-  /* May only be used to declare ONE variable at a time */
+#define ELF_PTRVAL_VOID              elf_ptrval /*obsolete*/
+#define ELF_PTRVAL_CHAR              elf_ptrval /*obsolete*/
+#define ELF_PTRVAL_CONST_VOID        elf_ptrval /*obsolete*/
+#define ELF_PTRVAL_CONST_CHAR        elf_ptrval /*obsolete*/
 
-#define ELF_DEFINE_HANDLE(structname) /* empty */
+#ifdef __XEN__
+# define ELF_PRPTRVAL "lu"
+  /*
+   * PRIuPTR is misdefined in xen/include/xen/inttypes.h, on 32-bit,
+   * to "u", when in fact uintptr_t is an unsigned long.
+   */
+#else
+# define ELF_PRPTRVAL PRIuPTR
+#endif
+  /* printf format a la PRId... for a PTRVAL */
+
+#define ELF_DEFINE_HANDLE(structname)                                   \
+    typedef union {                                                     \
+        elf_ptrval ptrval;                                              \
+        const structname *typeonly; /* for sizeof, offsetof, &c only */ \
+    } structname##_handle;
   /*
    * This must be invoked for each HANDLE type to define
    * the actual C type used for that kind of HANDLE.
    */
 
-#define ELF_PRPTRVAL "p"
-  /* printf format a la PRId... for a PTRVAL */
-
-#define ELF_MAKE_HANDLE(structname, ptrval) (ptrval)
+#define ELF_MAKE_HANDLE(structname, ptrval)    ((structname##_handle){ ptrval })
   /* Converts a PTRVAL to a HANDLE */
 
-#define ELF_IMAGE_BASE(elf) ((elf)->image)
+#define ELF_IMAGE_BASE(elf)    ((elf_ptrval)(elf)->image_base)
   /* Returns the base of the image as a PTRVAL. */
 
-#define ELF_HANDLE_PTRVAL(handleval) ((void*)(handleval))
+#define ELF_HANDLE_PTRVAL(handleval)      ((handleval).ptrval)
   /* Converts a HANDLE to a PTRVAL. */
 
-#define ELF_OBSOLETE_VOIDP_CAST (void*)(uintptr_t)
+#define ELF_OBSOLETE_VOIDP_CAST /*empty*/
   /*
-   * In some places the existing code needs to
+   * In some places the old code used to need to
    *  - cast away const (the existing code uses const a fair
    *    bit but actually sometimes wants to write to its input)
    *    from a PTRVAL.
    *  - convert an integer representing a pointer to a PTRVAL
-   * This macro provides a suitable cast.
+   * Nowadays all of these re uintptr_ts so there is no const problem
+   * and no need for any casting.
    */
 
-#define ELF_UNSAFE_PTR(ptrval) ((void*)(uintptr_t)(ptrval))
+#define ELF_UNSAFE_PTR(ptrval) ((void*)(elf_ptrval)(ptrval))
   /*
    * Turns a PTRVAL into an actual C pointer.  Before this is done
    * the caller must have ensured that the PTRVAL does in fact point
@@ -122,18 +135,21 @@ typedef void elf_log_callback(struct elf_binary*, void *caller_data,
    */
 
 /* PTRVALs can be INVALID (ie, NULL). */
-#define ELF_INVALID_PTRVAL            (NULL)        /* returns NULL PTRVAL */
+#define ELF_INVALID_PTRVAL    ((elf_ptrval)0)       /* returns NULL PTRVAL */
 #define ELF_INVALID_HANDLE(structname)		    /* returns NULL handle */ \
     ELF_MAKE_HANDLE(structname, ELF_INVALID_PTRVAL)
-#define ELF_PTRVAL_VALID(ptrval)      (ptrval)            /* }            */
-#define ELF_HANDLE_VALID(handleval)   (handleval)         /* } predicates */
-#define ELF_PTRVAL_INVALID(ptrval)    ((ptrval) == NULL)  /* }            */
+#define ELF_PTRVAL_VALID(ptrval)    (!!(ptrval))            /* }            */
+#define ELF_HANDLE_VALID(handleval) (!!(handleval).ptrval)  /* } predicates */
+#define ELF_PTRVAL_INVALID(ptrval)  (!ELF_PTRVAL_VALID((ptrval))) /* }      */
+
+#define ELF_MAX_PTRVAL        (~(elf_ptrval)0)
+  /* PTRVAL value guaranteed to compare > to any valid PTRVAL */
 
 /* For internal use by other macros here */
 #define ELF__HANDLE_FIELD_TYPE(handleval, elm) \
-  typeof((handleval)->elm)
+  typeof((handleval).typeonly->elm)
 #define ELF__HANDLE_FIELD_OFFSET(handleval, elm) \
-  offsetof(typeof(*(handleval)),elm)
+  offsetof(typeof(*(handleval).typeonly),elm)
 
 
 /* ------------------------------------------------------------------------ */
@@ -182,7 +198,7 @@ ELF_DEFINE_HANDLE(elf_note)
 
 struct elf_binary {
     /* elf binary */
-    const char *image;
+    const void *image_base;
     size_t size;
     char class;
     char data;
@@ -190,10 +206,16 @@ struct elf_binary {
     ELF_HANDLE_DECL(elf_ehdr) ehdr;
     ELF_PTRVAL_CONST_CHAR sec_strtab;
     ELF_HANDLE_DECL(elf_shdr) sym_tab;
-    ELF_PTRVAL_CONST_CHAR sym_strtab;
+    uint64_t sym_strtab;
 
     /* loaded to */
-    char *dest;
+    /*
+     * dest_base and dest_size are trusted and must be correct;
+     * whenever dest_size is not 0, both of these must be valid
+     * so long as the struct elf_binary is in use.
+     */
+    char *dest_base;
+    size_t dest_size;
     uint64_t pstart;
     uint64_t pend;
     uint64_t reloc_offset;
@@ -201,12 +223,22 @@ struct elf_binary {
     uint64_t bsd_symtab_pstart;
     uint64_t bsd_symtab_pend;
 
+    /*
+     * caller's other acceptable destination
+     *
+     * Again, these are trusted and must be valid (or 0) so long
+     * as the struct elf_binary is in use.
+     */
+    void *caller_xdest_base;
+    uint64_t caller_xdest_size;
+
 #ifndef __XEN__
     /* misc */
     elf_log_callback *log_callback;
     void *log_caller_data;
 #endif
     int verbose;
+    const char *broken;
 };
 
 /* ------------------------------------------------------------------------ */
@@ -224,22 +256,27 @@ struct elf_binary {
 #define elf_lsb(elf)   (ELFDATA2LSB == (elf)->data)
 #define elf_swap(elf)  (NATIVE_ELFDATA != (elf)->data)
 
-#define elf_uval(elf, str, elem)                                        \
-    ((ELFCLASS64 == (elf)->class)                                       \
-     ? elf_access_unsigned((elf), (str),                                \
-                           offsetof(typeof(*(str)),e64.elem),           \
-                           sizeof((str)->e64.elem))                     \
-     : elf_access_unsigned((elf), (str),                                \
-                           offsetof(typeof(*(str)),e32.elem),           \
-                           sizeof((str)->e32.elem)))
+#define elf_uval_3264(elf, handle, elem)                                \
+    elf_access_unsigned((elf), (handle).ptrval,                         \
+                           offsetof(typeof(*(handle).typeonly),elem),    \
+                           sizeof((handle).typeonly->elem))
+
+#define elf_uval(elf, handle, elem)             \
+    ((ELFCLASS64 == (elf)->class)               \
+     ? elf_uval_3264(elf, handle, e64.elem)     \
+     : elf_uval_3264(elf, handle, e32.elem))
   /*
    * Reads an unsigned field in a header structure in the ELF.
    * str is a HANDLE, and elem is the field name in it.
    */
 
-#define elf_size(elf, str)                              \
+
+#define elf_size(elf, handle_or_handletype) ({          \
+    typeof(handle_or_handletype) elf_size__dummy;       \
     ((ELFCLASS64 == (elf)->class)                       \
-     ? sizeof((str)->e64) : sizeof((str)->e32))
+     ? sizeof(elf_size__dummy.typeonly->e64)             \
+     : sizeof(elf_size__dummy.typeonly->e32));           \
+})
   /*
    * Returns the size of the substructure for the appropriate 32/64-bitness.
    * str should be a HANDLE.
@@ -251,23 +288,37 @@ uint64_t elf_access_unsigned(struct elf_binary *elf, ELF_PTRVAL_CONST_VOID ptr,
 
 uint64_t elf_round_up(struct elf_binary *elf, uint64_t addr);
 
+const char *elf_strval(struct elf_binary *elf, elf_ptrval start);
+  /* may return NULL if the string is out of range etc. */
 
-#define elf_strval(elf,x) ((const char*)(x)) /* may return NULL in the future */
-#define elf_strfmt(elf,x) ((const char*)(x)) /* will return (invalid) instead */
+const char *elf_strfmt(struct elf_binary *elf, elf_ptrval start);
+  /* like elf_strval but returns "(invalid)" instead of NULL */
 
-#define elf_memcpy_safe(elf, dst, src, sz) memcpy((dst),(src),(sz))
-#define elf_memset_safe(elf, dst, c, sz)   memset((dst),(c),(sz))
+void elf_memcpy_safe(struct elf_binary*, elf_ptrval dst, elf_ptrval src, size_t);
+void elf_memset_safe(struct elf_binary*, elf_ptrval dst, int c, size_t);
   /*
-   * Versions of memcpy and memset which will (in the next patch)
-   * arrange never to write outside permitted areas.
+   * Versions of memcpy and memset which arrange never to write
+   * outside permitted areas.
    */
 
-#define elf_store_val(elf, type, ptr, val)   (*(type*)(ptr) = (val))
+int elf_access_ok(struct elf_binary * elf,
+                  uint64_t ptrval, size_t size);
+
+#define elf_store_val(elf, type, ptr, val)                              \
+    ({                                                                  \
+        typeof(type) elf_store__val = (val);                            \
+        elf_ptrval elf_store__targ = ptr;                               \
+        if (elf_access_ok((elf), elf_store__targ,                       \
+                          sizeof(elf_store__val))) {			\
+            elf_memcpy_unchecked((void*)elf_store__targ, &elf_store__val, \
+                             sizeof(elf_store__val));                   \
+        }                                                               \
+    })									\
   /* Stores a value at a particular PTRVAL. */
 
-#define elf_store_field(elf, hdr, elm, val)                     \
-    (elf_store_val((elf), ELF__HANDLE_FIELD_TYPE(hdr, elm),     \
-                   &((hdr)->elm),                               \
+#define elf_store_field(elf, hdr, elm, val)                             \
+    (elf_store_val((elf), ELF__HANDLE_FIELD_TYPE(hdr, elm),                   \
+                   ELF_HANDLE_PTRVAL(hdr) + ELF__HANDLE_FIELD_OFFSET(hdr, elm), \
                    (val)))
   /* Stores a 32/64-bit field.  hdr is a HANDLE and elm is the field name. */
 
@@ -306,6 +357,10 @@ int elf_phdr_is_loadable(struct elf_binary *elf, ELF_HANDLE_DECL(elf_phdr) phdr)
 /* xc_libelf_loader.c                                                       */
 
 int elf_init(struct elf_binary *elf, const char *image, size_t size);
+  /*
+   * image and size must be correct.  They will be recorded in
+   * *elf, and must remain valid while the elf is in use.
+   */
 #ifdef __XEN__
 void elf_set_verbose(struct elf_binary *elf);
 #else
@@ -320,6 +375,9 @@ ELF_PTRVAL_VOID elf_get_ptr(struct elf_binary *elf, unsigned long addr);
 uint64_t elf_lookup_addr(struct elf_binary *elf, const char *symbol);
 
 void elf_parse_bsdsyms(struct elf_binary *elf, uint64_t pstart); /* private */
+
+void elf_mark_broken(struct elf_binary *elf, const char *msg);
+const char *elf_check_broken(const struct elf_binary *elf); /* NULL means OK */
 
 /* ------------------------------------------------------------------------ */
 /* xc_libelf_relocate.c                                                     */
@@ -395,16 +453,38 @@ int elf_xen_parse_guest_info(struct elf_binary *elf,
 int elf_xen_parse(struct elf_binary *elf,
                   struct elf_dom_parms *parms);
 
-#define elf_memcpy_unchecked memcpy
-#define elf_memset_unchecked memset
+static inline void *elf_memcpy_unchecked(void *dest, const void *src, size_t n)
+    { return memcpy(dest, src, n); }
+static inline void *elf_memmove_unchecked(void *dest, const void *src, size_t n)
+    { return memmove(dest, src, n); }
+static inline void *elf_memset_unchecked(void *s, int c, size_t n)
+    { return memset(s, c, n); }
   /*
-   * Unsafe versions of memcpy and memset which take actual C
-   * pointers.  These are just like real memcpy and memset.
+   * Unsafe versions of memcpy, memmove memset which take actual C
+   * pointers.  These are just like the real functions.
+   * We provide these so that in libelf-private.h we can #define
+   * memcpy, memset and memmove to undefined MISTAKE things.
    */
 
 
-#define ELF_ADVANCE_DEST(elf, amount)  elf->dest += (amount)
-  /* Advances past amount bytes of the current destination area. */
+/* Advances past amount bytes of the current destination area. */
+static inline void ELF_ADVANCE_DEST(struct elf_binary *elf, uint64_t amount)
+{
+    if ( elf->dest_base == NULL )
+    {
+        elf_mark_broken(elf, "advancing in null image");
+    }
+    else if ( elf->dest_size >= amount )
+    {
+        elf->dest_base += amount;
+        elf->dest_size -= amount;
+    }
+    else
+    {
+        elf->dest_size = 0;
+        elf_mark_broken(elf, "advancing past end (image very short?)");
+    }
+}
 
 
 #endif /* __XEN_LIBELF_H__ */

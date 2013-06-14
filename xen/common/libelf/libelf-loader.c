@@ -24,23 +24,25 @@
 
 /* ------------------------------------------------------------------------ */
 
-int elf_init(struct elf_binary *elf, const char *image, size_t size)
+int elf_init(struct elf_binary *elf, const char *image_input, size_t size)
 {
     ELF_HANDLE_DECL(elf_shdr) shdr;
     uint64_t i, count, section, offset;
 
-    if ( !elf_is_elfbinary(image) )
+    if ( !elf_is_elfbinary(image_input) )
     {
         elf_err(elf, "%s: not an ELF binary\n", __FUNCTION__);
         return -1;
     }
 
     elf_memset_unchecked(elf, 0, sizeof(*elf));
-    elf->image = image;
+    elf->image_base = image_input;
     elf->size = size;
-    elf->ehdr = (elf_ehdr *)image;
-    elf->class = elf->ehdr->e32.e_ident[EI_CLASS];
-    elf->data = elf->ehdr->e32.e_ident[EI_DATA];
+    elf->ehdr = ELF_MAKE_HANDLE(elf_ehdr, (elf_ptrval)image_input);
+    elf->class = elf_uval_3264(elf, elf->ehdr, e32.e_ident[EI_CLASS]);
+    elf->data = elf_uval_3264(elf, elf->ehdr, e32.e_ident[EI_DATA]);
+    elf->caller_xdest_base = NULL;
+    elf->caller_xdest_size = 0;
 
     /* Sanity check phdr. */
     offset = elf_uval(elf, elf->ehdr, e_phoff) +
@@ -300,7 +302,7 @@ int elf_load_binary(struct elf_binary *elf)
 
 ELF_PTRVAL_VOID elf_get_ptr(struct elf_binary *elf, unsigned long addr)
 {
-    return elf->dest + addr - elf->pstart;
+    return ELF_REALPTR2PTRVAL(elf->dest_base) + addr - elf->pstart;
 }
 
 uint64_t elf_lookup_addr(struct elf_binary * elf, const char *symbol)

@@ -104,11 +104,12 @@ static int loadelfimage(
     for ( i = 0; i < pages; i++ )
         entries[i].mfn = parray[(elf->pstart >> PAGE_SHIFT) + i];
 
-    elf->dest = xc_map_foreign_ranges(
+    elf->dest_base = xc_map_foreign_ranges(
         xch, dom, pages << PAGE_SHIFT, PROT_READ | PROT_WRITE, 1 << PAGE_SHIFT,
         entries, pages);
-    if ( elf->dest == NULL )
+    if ( elf->dest_base == NULL )
         goto err;
+    elf->dest_size = pages * PAGE_SIZE;
 
     ELF_ADVANCE_DEST(elf, elf->pstart & (PAGE_SIZE - 1));
 
@@ -117,8 +118,9 @@ static int loadelfimage(
     if ( rc < 0 )
         PERROR("Failed to load elf binary\n");
 
-    munmap(elf->dest, pages << PAGE_SHIFT);
-    elf->dest = NULL;
+    munmap(elf->dest_base, pages << PAGE_SHIFT);
+    elf->dest_base = NULL;
+    elf->dest_size = 0;
 
  err:
     free(entries);
