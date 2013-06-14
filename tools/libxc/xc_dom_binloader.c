@@ -123,10 +123,13 @@ static struct xen_bin_image_table *find_table(struct xc_dom_image *dom)
     uint32_t *probe_ptr;
     uint32_t *probe_end;
 
+    if ( dom->kernel_size < sizeof(*table) )
+        return NULL;
     probe_ptr = dom->kernel_blob;
-    probe_end = dom->kernel_blob + dom->kernel_size - sizeof(*table);
-    if ( (void*)probe_end > (dom->kernel_blob + 8192) )
+    if ( dom->kernel_size > (8192 + sizeof(*table)) )
         probe_end = dom->kernel_blob + 8192;
+    else
+        probe_end = dom->kernel_blob + dom->kernel_size - sizeof(*table);
 
     for ( table = NULL; probe_ptr < probe_end; probe_ptr++ )
     {
@@ -279,6 +282,14 @@ static int xc_dom_load_bin_kernel(struct xc_dom_image *dom)
          dest_size - text_size < bss_size )
     {
         DOMPRINTF("%s: mapped region is too small for image", __FUNCTION__);
+        return -EINVAL;
+    }
+
+    if ( image_size < skip ||
+         image_size - skip < text_size )
+    {
+        DOMPRINTF("%s: image is too small for declared text size",
+                  __FUNCTION__);
         return -EINVAL;
     }
 
