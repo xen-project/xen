@@ -60,6 +60,12 @@ int start_info_ia64(struct xc_dom_image *dom)
 
     DOMPRINTF_CALLED(dom->xch);
 
+    if ( start_info == NULL )
+    {
+        DOMPRINTF("%s: xc_dom_pfn_to_ptr failed on start_info", __FUNCTION__);
+        return -1; /* our caller throws away our return value :-/ */
+    }
+
     memset(start_info, 0, sizeof(*start_info));
     sprintf(start_info->magic, dom->guest_type);
     start_info->flags = dom->flags;

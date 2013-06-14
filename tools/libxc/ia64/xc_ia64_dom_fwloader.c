@@ -60,6 +60,8 @@ static int xc_dom_load_fw_kernel(struct xc_dom_image *dom)
     unsigned long i;
 
     dest = xc_dom_vaddr_to_ptr(dom, dom->kernel_seg.vstart);
+    if ( dest == NULL )
+        return -1;
     memcpy(dest, dom->kernel_blob, FW_SIZE);
 
     /* Synchronize cache.  */
