@@ -291,6 +291,8 @@ int xc_dom_alloc_segment(struct xc_dom_image *dom,
 
 void *xc_dom_pfn_to_ptr(struct xc_dom_image *dom, xen_pfn_t first,
                         xen_pfn_t count);
+void *xc_dom_pfn_to_ptr_retcount(struct xc_dom_image *dom, xen_pfn_t first,
+                                 xen_pfn_t count, xen_pfn_t *count_out);
 void xc_dom_unmap_one(struct xc_dom_image *dom, xen_pfn_t pfn);
 void xc_dom_unmap_all(struct xc_dom_image *dom);
 
@@ -318,13 +320,21 @@ static inline void *xc_dom_seg_to_ptr(struct xc_dom_image *dom,
 }
 
 static inline void *xc_dom_vaddr_to_ptr(struct xc_dom_image *dom,
-                                        xen_vaddr_t vaddr)
+                                        xen_vaddr_t vaddr,
+                                        size_t *safe_region_out)
 {
     unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
     xen_pfn_t page = (vaddr - dom->parms.virt_base) / page_size;
     unsigned int offset = (vaddr - dom->parms.virt_base) % page_size;
-    void *ptr = xc_dom_pfn_to_ptr(dom, page, 0);
-    return (ptr ? (ptr + offset) : NULL);
+    xen_pfn_t safe_region_count;
+    void *ptr;
+
+    *safe_region_out = 0;
+    ptr = xc_dom_pfn_to_ptr_retcount(dom, page, 0, &safe_region_count);
+    if ( ptr == NULL )
+        return ptr;
+    *safe_region_out = (safe_region_count << XC_DOM_PAGE_SHIFT(dom)) - offset;
+    return ptr;
 }
 
 static inline xen_pfn_t xc_dom_p2m_host(struct xc_dom_image *dom, xen_pfn_t pfn)

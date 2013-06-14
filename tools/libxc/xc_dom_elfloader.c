@@ -128,10 +128,11 @@ static int xc_dom_load_elf_symtab(struct xc_dom_image *dom,
 
     if ( load )
     {
+        size_t allow_size; /* will be used in a forthcoming XSA-55 patch */
         if ( !dom->bsd_symtab_start )
             return 0;
         size = dom->kernel_seg.vend - dom->bsd_symtab_start;
-        hdr  = xc_dom_vaddr_to_ptr(dom, dom->bsd_symtab_start);
+        hdr  = xc_dom_vaddr_to_ptr(dom, dom->bsd_symtab_start, &allow_size);
         *(int *)hdr = size - sizeof(int);
     }
     else
