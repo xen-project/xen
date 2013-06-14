@@ -511,7 +511,8 @@ int xc_dom_alloc_segment(struct xc_dom_image *dom,
     seg->vstart = start;
     seg->pfn = (seg->vstart - dom->parms.virt_base) / page_size;
 
-    if ( pages > dom->total_pages || /* double test avoids overflow probs */
+    if ( pages > dom->total_pages || /* multiple test avoids overflow probs */
+         seg->pfn > dom->total_pages ||
          pages > dom->total_pages - seg->pfn)
     {
         xc_dom_panic(dom->xch, XC_OUT_OF_MEMORY,
