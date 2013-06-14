@@ -284,6 +284,8 @@ int xc_flask_access(xc_interface *xc_handle, const char *scon, const char *tcon,
         MAX_SHORT_DEC_LEN + 1 +
         sizeof(req)*2 + 1;
     buf = malloc(bufLen);
+    if ( buf == NULL )
+        return -ENOMEM;
     snprintf(buf, bufLen, "%s %s %hu %x", scon, tcon, tclass, req);
 
     op.cmd = FLASK_ACCESS;

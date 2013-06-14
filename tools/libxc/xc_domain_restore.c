@@ -967,6 +967,11 @@ static int apply_batch(xc_interface *xch, uint32_t dom, struct restore_ctx *ctx,
 
     /* Map relevant mfns */
     pfn_err = calloc(j, sizeof(*pfn_err));
+    if ( pfn_err == NULL )
+    {
+        PERROR("allocation for pfn_err failed");
+        return -1;
+    }
     region_base = xc_map_foreign_bulk(
         xch, dom, PROT_WRITE, region_mfn, pfn_err, j);
 
