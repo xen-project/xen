@@ -159,7 +159,9 @@ static int kernel_try_zimage_prepare(struct kernel_info *info,
 static void kernel_elf_load(struct kernel_info *info)
 {
     printk("Loading ELF image into guest memory\n");
-    info->elf.elf.dest = (void*)(unsigned long)info->elf.parms.virt_kstart;
+    info->elf.elf.dest_base = (void*)(unsigned long)info->elf.parms.virt_kstart;
+    info->elf.elf.dest_size =
+         info->elf.parms.virt_kend - info->elf.parms.virt_kstart;
     elf_load_binary(&info->elf.elf);
 
     printk("Free temporary kernel buffer\n");
