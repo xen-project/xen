@@ -6,6 +6,7 @@
 #include <xen/sched.h>
 #include <asm/page.h>
 #include <asm/p2m.h>
+#include <asm/vfp.h>
 #include <public/hvm/params.h>
 
 /* Represents state corresponding to a block of 32 interrupts */
@@ -187,6 +188,9 @@ struct arch_vcpu
      */
     uint32_t joscr, jmcr;
 #endif
+
+    /* Float-pointer */
+    struct vfp_state vfp;
 
     /* CP 15 */
     uint32_t csselr;

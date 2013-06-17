@@ -27,6 +27,7 @@
 #include <asm/p2m.h>
 #include <asm/irq.h>
 #include <asm/cpufeature.h>
+#include <asm/vfp.h>
 
 #include <asm/gic.h>
 #include "vtimer.h"
@@ -117,7 +118,8 @@ static void ctxt_switch_from(struct vcpu *p)
 
     /* XXX MPU */
 
-    /* XXX VFP */
+    /* VFP */
+    vfp_save_state(p);
 
     /* VGIC */
     gic_save_state(p);
@@ -143,7 +145,8 @@ static void ctxt_switch_to(struct vcpu *n)
     /* VGIC */
     gic_restore_state(n);
 
-    /* XXX VFP */
+    /* VFP */
+    vfp_restore_state(n);
 
     /* XXX MPU */
 

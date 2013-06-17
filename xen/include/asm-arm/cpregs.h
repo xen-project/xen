@@ -60,6 +60,15 @@
  * arguments, which are cp,opc1,crn,crm,opc2.
  */
 
+/* Coprocessor 10 */
+
+#define FPSID           p10,7,c0,c0,0   /* Floating-Point System ID Register */
+#define FPSCR           p10,7,c1,c0,0   /* Floating-Point Status and Control Register */
+#define MVFR0           p10,7,c7,c0,0   /* Media and VFP Feature Register 0 */
+#define FPEXC           p10,7,c8,c0,0   /* Floating-Point Exception Control Register */
+#define FPINST          p10,7,c9,c0,0   /* Floating-Point Instruction Register */
+#define FPINST2         p10,7,c10,c0,0  /* Floating-point Instruction Register 2 */
+
 /* Coprocessor 14 */
 
 /* CP14 CR0: */
