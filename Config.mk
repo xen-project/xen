@@ -224,9 +224,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 70992304dc8c5fc67d876e0f8e3dfaa82be955a1
-# Tue May 21 14:57:23 2013 +0100
-# Signed-off-by: Olaf Hering <olaf@aepfle.de>
+QEMU_TAG ?= 13c144d96e825f145e5b37f97e5f6210c2c645e9
+# Mon Jun 17 17:39:51 2013 +0100
+# qemu-xen-traditional: disable docs
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
