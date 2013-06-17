@@ -19,6 +19,16 @@ is freely-distributable Open Source software, released under the GNU
 GPL. Since its initial public release, Xen has grown a large
 development community, spearheaded by xen.org (http://www.xen.org).
 
+The 4.3 release offers a number of improvements, including NUMA
+scheduling affinity, openvswitch integration, and defaulting to
+qemu-xen rather than qemu-traditional for non-stubdom guests.
+(qemu-xen is kept very close to the upstream project.)  We also have a
+number of updates to vTPM, and improvements to XSM and Flask to allow
+greater disaggregation.  Additionally, 4.3 contains a basic version of
+Xen for the new ARM server architecture, both 32- and 64-bit.  And as
+always, there are a number of performance, stability, and security
+improvements under-the hood.
+
 This file contains some quick-start instructions to install Xen on
 your system. For more information see http:/www.xen.org/ and
 http://wiki.xen.org/
