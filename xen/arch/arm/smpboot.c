@@ -28,7 +28,6 @@
 #include <xen/softirq.h>
 #include <xen/timer.h>
 #include <xen/irq.h>
-#include <asm/vfp.h>
 #include <asm/gic.h>
 
 cpumask_t cpu_online_map;
@@ -153,7 +152,6 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
     setup_virt_paging();
 
     mmu_init_secondary_cpu();
-    enable_vfp();
 
     gic_init_secondary_cpu();
 

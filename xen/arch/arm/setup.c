@@ -38,7 +38,6 @@
 #include <asm/page.h>
 #include <asm/current.h>
 #include <asm/setup.h>
-#include <asm/vfp.h>
 #include <asm/early_printk.h>
 #include <asm/gic.h>
 #include <asm/cpufeature.h>
@@ -456,8 +455,6 @@ void __init start_xen(unsigned long boot_phys_offset,
     init_traps();
 
     setup_virt_paging();
-
-    enable_vfp();
 
     softirq_init();
 

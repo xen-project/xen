@@ -22,7 +22,7 @@ arm := y
 ifeq ($(TARGET_SUBARCH),arm32)
 # Prevent floating-point variables from creeping into Xen.
 CFLAGS += -msoft-float
-CFLAGS += -mcpu=cortex-a15 -mfpu=vfpv3 -mfloat-abi=softfp
+CFLAGS += -mcpu=cortex-a15
 arm32 := y
 arm64 := n
 endif
