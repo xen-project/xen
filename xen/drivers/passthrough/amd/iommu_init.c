@@ -748,7 +748,7 @@ static void iommu_interrupt_handler(int irq, void *dev_id,
 static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
 {
     int irq, ret;
-    struct irq_desc *desc;
+    hw_irq_controller *handler;
     unsigned long flags;
     u16 control;
 
@@ -759,7 +759,6 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
         return 0;
     }
 
-    desc = irq_to_desc(irq);
     spin_lock_irqsave(&pcidevs_lock, flags);
     iommu->msi.dev = pci_get_pdev(iommu->seg, PCI_BUS(iommu->bdf),
                                   PCI_DEVFN2(iommu->bdf));
@@ -771,7 +770,6 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
                         PCI_SLOT(iommu->bdf), PCI_FUNC(iommu->bdf));
         return 0;
     }
-    desc->msi_desc = &iommu->msi;
     control = pci_conf_read16(iommu->seg, PCI_BUS(iommu->bdf),
                               PCI_SLOT(iommu->bdf), PCI_FUNC(iommu->bdf),
                               iommu->msi.msi_attrib.pos + PCI_MSI_FLAGS);
@@ -781,14 +779,15 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
         iommu->msi.msi_attrib.maskbit = 1;
         iommu->msi.msi.mpos = msi_mask_bits_reg(iommu->msi.msi_attrib.pos,
                                                 is_64bit_address(control));
-        desc->handler = &iommu_maskable_msi_type;
+        handler = &iommu_maskable_msi_type;
     }
     else
-        desc->handler = &iommu_msi_type;
-    ret = request_irq(irq, iommu_interrupt_handler, 0, "amd_iommu", iommu);
+        handler = &iommu_msi_type;
+    ret = __setup_msi_irq(irq_to_desc(irq), &iommu->msi, handler);
+    if ( !ret )
+        ret = request_irq(irq, iommu_interrupt_handler, 0, "amd_iommu", iommu);
     if ( ret )
     {
-        desc->handler = &no_irq_type;
         destroy_irq(irq);
         AMD_IOMMU_DEBUG("can't request irq\n");
         return 0;

@@ -472,11 +472,18 @@ static struct msi_desc* alloc_msi_entry(void)
 
 int setup_msi_irq(struct irq_desc *desc, struct msi_desc *msidesc)
 {
+    return __setup_msi_irq(desc, msidesc,
+                           msi_maskable_irq(msidesc) ? &pci_msi_maskable
+                                                     : &pci_msi_nonmaskable);
+}
+
+int __setup_msi_irq(struct irq_desc *desc, struct msi_desc *msidesc,
+                    hw_irq_controller *handler)
+{
     struct msi_msg msg;
 
     desc->msi_desc = msidesc;
-    desc->handler = msi_maskable_irq(msidesc) ? &pci_msi_maskable
-                                              : &pci_msi_nonmaskable;
+    desc->handler = handler;
     msi_compose_msg(desc, &msg);
     return write_msi_msg(msidesc, &msg);
 }
