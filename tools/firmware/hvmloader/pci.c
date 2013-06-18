@@ -27,6 +27,8 @@
 
 #include <xen/memory.h>
 #include <xen/hvm/ioreq.h>
+#include <xen/hvm/hvm_xs_strings.h>
+#include <stdbool.h>
 
 unsigned long pci_mem_start = PCI_MEM_START;
 unsigned long pci_mem_end = PCI_MEM_END;
@@ -56,6 +58,32 @@ void pci_setup(void)
         uint64_t bar_sz;
     } *bars = (struct bars *)scratch_start;
     unsigned int i, nr_bars = 0;
+
+    const char *s;
+    /*
+     * Do we allow hvmloader to relocate guest memory in order to
+     * increase the size of the lowmem MMIO hole?  Defaulting to 1
+     * here will mean that non-libxl toolstacks (including xend and
+     * home-grown ones) means that those using qemu-xen will still
+     * experience the memory relocation bug described below; but it
+     * also means that those using qemu-traditional will *not*
+     * experience any change; and it also means that there is a
+     * work-around for those using qemu-xen, namely switching to
+     * qemu-traditional.
+     *
+     * If we defaulted to 0, and failing to resize the hole caused any
+     * problems with qemu-traditional, then there is no work-around.
+     *
+     * Since xend can only use qemu-traditional, I think this is the
+     * option that will have the least impact.
+     */
+    bool allow_memory_relocate = 1;
+
+    s = xenstore_read(HVM_XS_ALLOW_MEMORY_RELOCATE, NULL);
+    if ( s )
+        allow_memory_relocate = strtoll(s, NULL, 0);
+    printf("Relocating guest memory for lowmem MMIO space %s\n",
+           allow_memory_relocate?"enabled":"disabled");
 
     /* Program PCI-ISA bridge with appropriate link routes. */
     isa_irq = 0;
@@ -208,8 +236,25 @@ void pci_setup(void)
         pci_writew(devfn, PCI_COMMAND, cmd);
     }
 
-    while ( (mmio_total > (pci_mem_end - pci_mem_start)) &&
-            ((pci_mem_start << 1) != 0) )
+    /*
+     * At the moment qemu-xen can't deal with relocated memory regions.
+     * It's too close to the release to make a proper fix; for now,
+     * only allow the MMIO hole to grow large enough to move guest memory
+     * if we're running qemu-traditional.  Items that don't fit will be
+     * relocated into the 64-bit address space.
+     *
+     * This loop now does the following:
+     * - If allow_memory_relocate, increase the MMIO hole until it's
+     *   big enough, or until it's 2GiB
+     * - If !allow_memory_relocate, increase the MMIO hole until it's
+     *   big enough, or until it's 2GiB, or until it overlaps guest
+     *   memory
+     */
+    while ( (mmio_total > (pci_mem_end - pci_mem_start)) 
+            && ((pci_mem_start << 1) != 0)
+            && (allow_memory_relocate
+                || (((pci_mem_start << 1) >> PAGE_SHIFT)
+                    >= hvm_info->low_mem_pgend)) )
         pci_mem_start <<= 1;
 
     if ( mmio_total > (pci_mem_end - pci_mem_start) )
