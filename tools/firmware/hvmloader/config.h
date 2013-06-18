@@ -55,7 +55,6 @@ extern struct bios_config ovmf_config;
 /* MMIO hole: Hardcoded defaults, which can be dynamically expanded. */
 #define PCI_MEM_START       0xf0000000
 #define PCI_MEM_END         0xfc000000
-#define PCI_MIN_BIG_BAR_SIZE          0x20000000
 
 extern unsigned long pci_mem_start, pci_mem_end;
 

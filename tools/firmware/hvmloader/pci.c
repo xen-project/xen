@@ -295,9 +295,8 @@ void pci_setup(void)
         if ( (bar_data & PCI_BASE_ADDRESS_SPACE) ==
              PCI_BASE_ADDRESS_SPACE_MEMORY )
         {
-            /* Mapping high memory if PCI deivce is 64 bits bar and the bar size
-               is larger than 512M */
-            if (using_64bar && (bar_sz > PCI_MIN_BIG_BAR_SIZE)) {
+            /* Mapping high memory if PCI device is 64 bits bar */
+            if ( using_64bar ) {
                 if ( high_mem_resource.base & (bar_sz - 1) )
                     high_mem_resource.base = high_mem_resource.base - 
                         (high_mem_resource.base & (bar_sz - 1)) + bar_sz;
