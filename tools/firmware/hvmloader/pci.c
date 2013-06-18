@@ -213,7 +213,7 @@ void pci_setup(void)
             ((pci_mem_start << 1) != 0) )
         pci_mem_start <<= 1;
 
-    if ( (pci_mem_start << 1) != 0 )
+    if ( mmio_total > (pci_mem_end - pci_mem_start) )
     {
         printf("Low MMIO hole not large enough for all devices,"
                " relocating some BARs to 64-bit\n");
