@@ -271,6 +271,11 @@ void pci_setup(void)
         bar_sz  = bars[i].bar_sz;
 
         /*
+         * Relocate to high memory if the total amount of MMIO needed
+         * is more than the low MMIO available.  Because devices are
+         * processed in order of bar_sz, this will preferentially
+         * relocate larger devices to high memory first.
+         *
          * NB: The code here is rather fragile, as the check here to see
          * whether bar_sz will fit in the low MMIO region doesn't match the
          * real check made below, which involves aligning the base offset of the
@@ -284,7 +289,7 @@ void pci_setup(void)
          * Should either of those two conditions change, this code will break.
          */
         using_64bar = bars[i].is_64bar && bar64_relocate
-            && (bar_sz > (mem_resource.max - mem_resource.base));
+            && (mmio_total > (mem_resource.max - mem_resource.base));
         bar_data = pci_readl(devfn, bar_reg);
 
         if ( (bar_data & PCI_BASE_ADDRESS_SPACE) ==
@@ -306,6 +311,7 @@ void pci_setup(void)
                 resource = &mem_resource;
                 bar_data &= ~PCI_BASE_ADDRESS_MEM_MASK;
             }
+            mmio_total -= bar_sz;
         }
         else
         {
