@@ -42,7 +42,6 @@ void pci_setup(void)
     uint32_t vga_devfn = 256;
     uint16_t class, vendor_id, device_id;
     unsigned int bar, pin, link, isa_irq;
-    int64_t mmio_left;
 
     /* Resources assignable to PCI devices via BARs. */
     struct resource {
@@ -264,8 +263,6 @@ void pci_setup(void)
     io_resource.base = 0xc000;
     io_resource.max = 0x10000;
 
-    mmio_left = pci_mem_end - pci_mem_start;
-
     /* Assign iomem and ioport resources in descending order of size. */
     for ( i = 0; i < nr_bars; i++ )
     {
@@ -273,7 +270,21 @@ void pci_setup(void)
         bar_reg = bars[i].bar_reg;
         bar_sz  = bars[i].bar_sz;
 
-        using_64bar = bars[i].is_64bar && bar64_relocate && (mmio_left < bar_sz);
+        /*
+         * NB: The code here is rather fragile, as the check here to see
+         * whether bar_sz will fit in the low MMIO region doesn't match the
+         * real check made below, which involves aligning the base offset of the
+         * bar with the size of the bar itself.  As it happens, this will always
+         * be satisfied because:
+         * - The first one will succeed because the MMIO hole can only start at
+         *   0x{f,e,c,8}00000000.  If it fits, it will be aligned properly.
+         * - All subsequent ones will be aligned because the list is ordered
+         *   large to small, and bar_sz is always a power of 2. (At least
+         *   the code here assumes it to be.)
+         * Should either of those two conditions change, this code will break.
+         */
+        using_64bar = bars[i].is_64bar && bar64_relocate
+            && (bar_sz > (mem_resource.max - mem_resource.base));
         bar_data = pci_readl(devfn, bar_reg);
 
         if ( (bar_data & PCI_BASE_ADDRESS_SPACE) ==
@@ -295,7 +306,6 @@ void pci_setup(void)
                 resource = &mem_resource;
                 bar_data &= ~PCI_BASE_ADDRESS_MEM_MASK;
             }
-            mmio_left -= bar_sz;
         }
         else
         {
