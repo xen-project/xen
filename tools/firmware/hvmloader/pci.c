@@ -246,7 +246,18 @@ void pci_setup(void)
         hvm_info->high_mem_pgend += nr_pages;
     }
 
-    high_mem_resource.base = ((uint64_t)hvm_info->high_mem_pgend) << PAGE_SHIFT; 
+    high_mem_resource.base = ((uint64_t)hvm_info->high_mem_pgend) << PAGE_SHIFT;
+    if ( high_mem_resource.base < 1ull << 32 )
+    {
+        if ( hvm_info->high_mem_pgend != 0 )
+            printf("WARNING: hvm_info->high_mem_pgend %x"
+                   " does not point into high memory!",
+                   hvm_info->high_mem_pgend);
+        high_mem_resource.base = 1ull << 32;
+    }
+    printf("%sRAM in high memory; setting high_mem resource base to "PRIllx"\n",
+           hvm_info->high_mem_pgend?"":"No ",
+           PRIllx_arg(high_mem_resource.base));
     high_mem_resource.max = 1ull << cpu_phys_addr();
     mem_resource.base = pci_mem_start;
     mem_resource.max = pci_mem_end;
