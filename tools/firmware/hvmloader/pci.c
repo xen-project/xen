@@ -214,7 +214,11 @@ void pci_setup(void)
         pci_mem_start <<= 1;
 
     if ( (pci_mem_start << 1) != 0 )
+    {
+        printf("Low MMIO hole not large enough for all devices,"
+               " relocating some BARs to 64-bit\n");
         bar64_relocate = 1;
+    }
 
     /* Relocate RAM that overlaps PCI space (in 64k-page chunks). */
     while ( (pci_mem_start >> PAGE_SHIFT) < hvm_info->low_mem_pgend )
@@ -227,6 +231,11 @@ void pci_setup(void)
         if ( hvm_info->high_mem_pgend == 0 )
             hvm_info->high_mem_pgend = 1ull << (32 - PAGE_SHIFT);
         hvm_info->low_mem_pgend -= nr_pages;
+        printf("Relocating 0x%x pages from "PRIllx" to "PRIllx\
+               " for lowmem MMIO hole\n",
+               nr_pages,
+               PRIllx_arg(((uint64_t)hvm_info->low_mem_pgend)<<PAGE_SHIFT),
+               PRIllx_arg(((uint64_t)hvm_info->high_mem_pgend)<<PAGE_SHIFT));
         xatp.domid = DOMID_SELF;
         xatp.space = XENMAPSPACE_gmfn_range;
         xatp.idx   = hvm_info->low_mem_pgend;
@@ -301,10 +310,10 @@ void pci_setup(void)
         pci_writel(devfn, bar_reg, bar_data);
         if (using_64bar)
             pci_writel(devfn, bar_reg + 4, bar_data_upper);
-        printf("pci dev %02x:%x bar %02x size "PRIllx": %08x\n",
+        printf("pci dev %02x:%x bar %02x size "PRIllx": %x%08x\n",
                devfn>>3, devfn&7, bar_reg,
                PRIllx_arg(bar_sz),
-               bar_data);
+               bar_data_upper, bar_data);
 			
 
         /* Now enable the memory or I/O mapping. */
