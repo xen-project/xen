@@ -290,8 +290,9 @@ void pci_setup(void)
 
         if ( (base < resource->base) || (base > resource->max) )
         {
-            printf("pci dev %02x:%x bar %02x size %llx: no space for "
-                   "resource!\n", devfn>>3, devfn&7, bar_reg, bar_sz);
+            printf("pci dev %02x:%x bar %02x size "PRIllx": no space for "
+                   "resource!\n", devfn>>3, devfn&7, bar_reg,
+                   PRIllx_arg(bar_sz));
             continue;
         }
 
@@ -300,8 +301,10 @@ void pci_setup(void)
         pci_writel(devfn, bar_reg, bar_data);
         if (using_64bar)
             pci_writel(devfn, bar_reg + 4, bar_data_upper);
-        printf("pci dev %02x:%x bar %02x size %llx: %08x\n",
-               devfn>>3, devfn&7, bar_reg, bar_sz, bar_data);
+        printf("pci dev %02x:%x bar %02x size "PRIllx": %08x\n",
+               devfn>>3, devfn&7, bar_reg,
+               PRIllx_arg(bar_sz),
+               bar_data);
 			
 
         /* Now enable the memory or I/O mapping. */

@@ -168,6 +168,8 @@ void byte_to_hex(char *digits, uint8_t byte);
 void uuid_to_string(char *dest, uint8_t *uuid);
 
 /* Debug output */
+#define PRIllx "%x%08x"
+#define PRIllx_arg(ll) (uint32_t)((ll)>>32), (uint32_t)(ll)
 int printf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 int vprintf(const char *fmt, va_list ap);
 
