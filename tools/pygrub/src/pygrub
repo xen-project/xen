@@ -712,7 +712,7 @@ if __name__ == "__main__":
     sel = None
     
     def usage():
-        print >> sys.stderr, "Usage: %s [-q|--quiet] [-i|--interactive] [-l|--list-entries] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] [--output-directory=] [--output-format=sxp|simple|simple0] <image>" %(sys.argv[0],)
+        print >> sys.stderr, "Usage: %s [-q|--quiet] [-i|--interactive] [-l|--list-entries] [-n|--not-really] [--output=] [--kernel=] [--ramdisk=] [--args=] [--entry=] [--output-directory=] [--output-format=sxp|simple|simple0] [--offset=] <image>" %(sys.argv[0],)
 
     def copy_from_image(fs, file_to_read, file_type, output_directory,
                         not_really):
@@ -748,7 +748,7 @@ if __name__ == "__main__":
     try:
         opts, args = getopt.gnu_getopt(sys.argv[1:], 'qilnh::',
                                    ["quiet", "interactive", "list-entries", "not-really", "help",
-                                    "output=", "output-format=", "output-directory=",
+                                    "output=", "output-format=", "output-directory=", "offset=",
                                     "entry=", "kernel=", 
                                     "ramdisk=", "args=", "isconfig", "debug"])
     except getopt.GetoptError:
@@ -765,6 +765,7 @@ if __name__ == "__main__":
     interactive = True
     list_entries = False
     isconfig = False
+    part_offs = None
     debug = False
     not_really = False
     output_format = "sxp"
@@ -797,6 +798,13 @@ if __name__ == "__main__":
             incfg["ramdisk"] = a
         elif o in ("--args",):
             incfg["args"] = a
+        elif o in ("--offset",):
+            try:
+                part_offs = [ int(a) ]
+            except ValueError:
+                print "offset value must be an integer"
+                usage()
+                sys.exit(1)
         elif o in ("--entry",):
             entry = a
             # specifying the entry to boot implies non-interactive
@@ -807,7 +815,7 @@ if __name__ == "__main__":
             debug = True
         elif o in ("--output-format",):
             if a not in ["sxp", "simple", "simple0"]:
-                print "unkonwn output format %s" % a
+                print "unknown output format %s" % a
                 usage()
                 sys.exit(1)
             output_format = a
@@ -840,7 +848,8 @@ if __name__ == "__main__":
         bootfsoptions = ""
 
     # get list of offsets into file which start partitions
-    part_offs = get_partition_offsets(file)
+    if part_offs is None:
+        part_offs = get_partition_offsets(file)
 
     for offset in part_offs:
         try:
