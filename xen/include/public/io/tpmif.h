@@ -75,15 +75,15 @@ typedef struct tpmif_tx_interface tpmif_tx_interface_t;
  * the backend only processes commands as requested by the frontend.
  *
  * The frontend sends a request to the TPM by populating the shared page with
- * the request packet, changing the state to VTPM_STATE_SUBMIT, and sending
+ * the request packet, changing the state to TPMIF_STATE_SUBMIT, and sending
  * and event channel notification. When the backend is finished, it will set
- * the state to VTPM_STATE_FINISH and send an event channel notification.
+ * the state to TPMIF_STATE_FINISH and send an event channel notification.
  *
  * In order to allow long-running commands to be canceled, the frontend can
- * at any time change the state to VTPM_STATE_CANCEL and send a notification.
- * The TPM can either finish the command (changing state to VTPM_STATE_FINISH)
- * or can cancel the command and change the state to VTPM_STATE_IDLE. The TPM
- * can also change the state to VTPM_STATE_IDLE instead of VTPM_STATE_FINISH
+ * at any time change the state to TPMIF_STATE_CANCEL and send a notification.
+ * The TPM can either finish the command (changing state to TPMIF_STATE_FINISH)
+ * or can cancel the command and change the state to TPMIF_STATE_IDLE. The TPM
+ * can also change the state to TPMIF_STATE_IDLE instead of TPMIF_STATE_FINISH
  * if another reason for cancellation is required - for example, a physical
  * TPM may cancel a command if the interface is seized by another locality.
  *
@@ -91,11 +91,11 @@ typedef struct tpmif_tx_interface tpmif_tx_interface_t;
  * http://www.trustedcomputinggroup.org/resources/tpm_main_specification
  */
 
-enum vtpm_state {
-    VTPM_STATE_IDLE,         /* no contents / vTPM idle / cancel complete */
-    VTPM_STATE_SUBMIT,       /* request ready / vTPM working */
-    VTPM_STATE_FINISH,       /* response ready / vTPM idle */
-    VTPM_STATE_CANCEL,       /* cancel requested / vTPM working */
+enum tpmif_state {
+    TPMIF_STATE_IDLE,        /* no contents / vTPM idle / cancel complete */
+    TPMIF_STATE_SUBMIT,      /* request ready / vTPM working */
+    TPMIF_STATE_FINISH,      /* response ready / vTPM idle */
+    TPMIF_STATE_CANCEL,      /* cancel requested / vTPM working */
 };
 /* Note: The backend should only change state to IDLE or FINISH, while the
  * frontend should only change to SUBMIT or CANCEL. Status changes do not need
@@ -107,7 +107,7 @@ enum vtpm_state {
  *
  *  Offset               Contents
  *  =================================================
- *  0                    struct vtpm_shared_page
+ *  0                    struct tpmif_shared_page
  *  16                   [optional] List of grant IDs
  *  16+4*nr_extra_pages  TPM packet data
  *
@@ -118,17 +118,17 @@ enum vtpm_state {
  * frontend should verify that the TPM supports such large requests by querying
  * the TPM_CAP_PROP_INPUT_BUFFER property from the TPM.
  */
-struct vtpm_shared_page {
+struct tpmif_shared_page {
     uint32_t length;         /* request/response length in bytes */
 
-    uint8_t state;           /* enum vtpm_state */
+    uint8_t state;           /* enum tpmif_state */
     uint8_t locality;        /* for the current request */
     uint8_t pad;             /* should be zero */
 
     uint8_t nr_extra_pages;  /* extra pages for long packets; may be zero */
     uint32_t extra_pages[0]; /* grant IDs; length is actually nr_extra_pages */
 };
-typedef struct vtpm_shared_page vtpm_shared_page_t;
+typedef struct tpmif_shared_page tpmif_shared_page_t;
 
 #endif
 

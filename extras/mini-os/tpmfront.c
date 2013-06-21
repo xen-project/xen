@@ -47,15 +47,15 @@
 
 void tpmfront_handler(evtchn_port_t port, struct pt_regs *regs, void *data) {
    struct tpmfront_dev* dev = (struct tpmfront_dev*) data;
-   vtpm_shared_page_t* shr = dev->page;
+   tpmif_shared_page_t *shr = dev->page;
    /*If we get a response when we didnt make a request, just ignore it */
    if(!dev->waiting) {
       return;
    }
 
    switch (shr->state) {
-   case VTPM_STATE_FINISH: /* request was completed */
-   case VTPM_STATE_IDLE:   /* request was cancelled */
+   case TPMIF_STATE_FINISH: /* request was completed */
+   case TPMIF_STATE_IDLE:   /* request was cancelled */
       break;
    default:
       /* Spurious wakeup; do nothing, request is still pending */
@@ -203,7 +203,7 @@ static int tpmfront_connect(struct tpmfront_dev* dev)
 {
    char* err;
    /* Create shared page */
-   dev->page = (vtpm_shared_page_t*) alloc_page();
+   dev->page = (tpmif_shared_page_t *)alloc_page();
    if(dev->page == NULL) {
       TPMFRONT_ERR("Unable to allocate page for shared memory\n");
       goto error;
@@ -400,7 +400,7 @@ void shutdown_tpmfront(struct tpmfront_dev* dev)
 int tpmfront_send(struct tpmfront_dev* dev, const uint8_t* msg, size_t length)
 {
    unsigned int offset;
-   vtpm_shared_page_t* shr = NULL;
+   tpmif_shared_page_t *shr = NULL;
 #ifdef TPMFRONT_PRINT_DEBUG
    int i;
 #endif
@@ -431,7 +431,7 @@ int tpmfront_send(struct tpmfront_dev* dev, const uint8_t* msg, size_t length)
    memcpy(offset + (uint8_t*)shr, msg, length);
    shr->length = length;
    barrier();
-   shr->state = VTPM_STATE_SUBMIT;
+   shr->state = TPMIF_STATE_SUBMIT;
 
    dev->waiting = 1;
    dev->resplen = 0;
@@ -449,7 +449,7 @@ int tpmfront_send(struct tpmfront_dev* dev, const uint8_t* msg, size_t length)
 int tpmfront_recv(struct tpmfront_dev* dev, uint8_t** msg, size_t *length)
 {
    unsigned int offset;
-   vtpm_shared_page_t* shr = NULL;
+   tpmif_shared_page_t *shr = NULL;
 #ifdef TPMFRONT_PRINT_DEBUG
 int i;
 #endif
@@ -466,7 +466,7 @@ int i;
    *length = 0;
    offset = sizeof(*shr);
 
-   if (shr->state != VTPM_STATE_FINISH)
+   if (shr->state != TPMIF_STATE_FINISH)
       goto quit;
 
    *length = shr->length;

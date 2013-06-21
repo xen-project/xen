@@ -37,7 +37,7 @@ struct tpmfront_dev {
    grant_ref_t ring_ref;
    evtchn_port_t evtchn;
 
-   vtpm_shared_page_t *page;
+   tpmif_shared_page_t *page;
 
    domid_t bedomid;
    char* nodename;

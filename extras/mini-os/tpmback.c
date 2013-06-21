@@ -86,7 +86,7 @@ struct tpmif {
    evtchn_port_t evtchn;
 
    /* Shared page */
-   vtpm_shared_page_t *page;
+   tpmif_shared_page_t *page;
 
    enum xenbus_state state;
    enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
@@ -524,21 +524,21 @@ void free_tpmif(tpmif_t* tpmif)
 void tpmback_handler(evtchn_port_t port, struct pt_regs *regs, void *data)
 {
    tpmif_t* tpmif = (tpmif_t*) data;
-   vtpm_shared_page_t* pg = tpmif->page;
+   tpmif_shared_page_t *pg = tpmif->page;
 
    switch (pg->state)
    {
-   case VTPM_STATE_SUBMIT:
+   case TPMIF_STATE_SUBMIT:
       TPMBACK_DEBUG("EVENT CHANNEL FIRE %u/%u\n", (unsigned int) tpmif->domid, tpmif->handle);
       tpmif_req_ready(tpmif);
       wake_up(&waitq);
       break;
-   case VTPM_STATE_CANCEL:
+   case TPMIF_STATE_CANCEL:
       /* If we are busy with a request, do nothing */
       if (tpmif->flags & TPMIF_REQ_READY)
          return;
       /* Acknowledge the cancellation if we are idle */
-      pg->state = VTPM_STATE_IDLE;
+      pg->state = TPMIF_STATE_IDLE;
       wmb();
       notify_remote_via_evtchn(tpmif->evtchn);
       return;
@@ -940,7 +940,7 @@ static void init_tpmcmd(tpmcmd_t* tpmcmd, domid_t domid, unsigned int handle, vo
 
 tpmcmd_t* get_request(tpmif_t* tpmif) {
    tpmcmd_t* cmd;
-   vtpm_shared_page_t* shr;
+   tpmif_shared_page_t *shr;
    unsigned int offset;
    int flags;
 #ifdef TPMBACK_PRINT_DEBUG
@@ -1001,7 +1001,7 @@ error:
 
 void send_response(tpmcmd_t* cmd, tpmif_t* tpmif)
 {
-   vtpm_shared_page_t* shr;
+   tpmif_shared_page_t *shr;
    unsigned int offset;
    int flags;
 #ifdef TPMBACK_PRINT_DEBUG
@@ -1033,7 +1033,7 @@ int i;
    /* clear the ready flag and send the event channel notice to the frontend */
    tpmif_req_finished(tpmif);
    barrier();
-   shr->state = VTPM_STATE_FINISH;
+   shr->state = TPMIF_STATE_FINISH;
    wmb();
    notify_remote_via_evtchn(tpmif->evtchn);
 error:
