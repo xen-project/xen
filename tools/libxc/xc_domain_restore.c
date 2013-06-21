@@ -2335,6 +2335,9 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     free(mmu);
     free(ctx->p2m);
     free(pfn_type);
+    free(region_mfn);
+    free(ctx->p2m_batch);
+    pagebuf_free(&pagebuf);
     tailbuf_free(&tailbuf);
 
     /* discard cache for save file  */
