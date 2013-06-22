@@ -206,7 +206,7 @@ rdnames()
     done
 }
 
-LIST_GREP='((domain\|(domid\|(name\|^{$\|"name":\|"domid":'
+LIST_GREP='(domain\|(domid\|(name\|^    {$\|"name":\|"domid":'
 parseln()
 {
     if [[ "$1" =~ '(domain' ]] || [[ "$1" = "{" ]]; then
@@ -237,7 +237,7 @@ is_running()
 		RC=0
 		;;
 	esac
-    done < <($CMD list -l | grep $LIST_GREP)
+    done < <($CMD list -l | grep "$LIST_GREP")
     return $RC
 }
 
@@ -319,7 +319,7 @@ all_zombies()
 	if test "$state" != "-b---d" -a "$state" != "-----d"; then
 	    return 1;
 	fi
-    done < <($CMD list -l | grep $LIST_GREP)
+    done < <($CMD list -l | grep "$LIST_GREP")
     return 0
 }
 
@@ -450,7 +450,7 @@ stop()
 	    fi
 	    kill $WDOG_PID >/dev/null 2>&1
 	fi
-    done < <($CMD list -l | grep $LIST_GREP)
+    done < <($CMD list -l | grep "$LIST_GREP")
 
     # NB. this shuts down ALL Xen domains (politely), not just the ones in
     # AUTODIR/*
@@ -487,7 +487,7 @@ check_domain_up()
 		return 0
 		;;
 	esac
-    done < <($CMD list -l | grep $LIST_GREP)
+    done < <($CMD list -l | grep "$LIST_GREP")
     return 1
 }
 
