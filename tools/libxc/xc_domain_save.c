@@ -139,6 +139,13 @@ static int outbuf_init(xc_interface *xch, struct outbuf* ob, size_t size)
     return 0;
 }
 
+static int outbuf_free(struct outbuf *ob)
+{
+    free(ob->buf);
+    ob->buf = NULL;
+    return 0;
+}
+
 static inline int outbuf_write(xc_interface *xch,
                                struct outbuf* ob, void* buf, size_t len)
 {
@@ -2122,6 +2129,8 @@ int xc_domain_save(xc_interface *xch, int io_fd, uint32_t dom, uint32_t max_iter
     free(pfn_batch);
     free(pfn_err);
     free(to_fix);
+    free(hvm_buf);
+    outbuf_free(&ob_pagebuf);
 
     DPRINTF("Save exit of domid %u with rc=%d\n", dom, rc);
 
