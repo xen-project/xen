@@ -41,8 +41,10 @@ char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int length)
     return kvs;
 }
 
-int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
-                     const char *dir, char *kvs[])
+int libxl__xs_writev_perms(libxl__gc *gc, xs_transaction_t t,
+                           const char *dir, char *kvs[],
+                           struct xs_permissions *perms,
+                           unsigned int num_perms)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *path;
@@ -56,9 +58,17 @@ int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
         if (path && kvs[i + 1]) {
             int length = strlen(kvs[i + 1]);
             xs_write(ctx->xsh, t, path, kvs[i + 1], length);
+            if (perms)
+                xs_set_permissions(ctx->xsh, t, path, perms, num_perms);
         }
     }
     return 0;
+}
+
+int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
+                     const char *dir, char *kvs[])
+{
+    return libxl__xs_writev_perms(gc, t, dir, kvs, NULL, 0);
 }
 
 int libxl__xs_writev_atonce(libxl__gc *gc,

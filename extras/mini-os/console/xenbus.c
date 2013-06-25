@@ -122,12 +122,6 @@ again:
         goto abort_transaction;
     }
 
-    err = xenbus_printf(xbt, nodename, "type", "%s", "ioemu");
-    if (err) {
-        message = "writing type";
-        goto abort_transaction;
-    }
-
     snprintf(path, sizeof(path), "%s/state", nodename);
     err = xenbus_switch_state(xbt, path, XenbusStateConnected);
     if (err) {

@@ -519,6 +519,11 @@ _hidden char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int
 /* treats kvs as pairs of keys and values and writes each to dir. */
 _hidden int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
                              const char *dir, char **kvs);
+/* as writev but also sets the permissions on each path */
+_hidden int libxl__xs_writev_perms(libxl__gc *gc, xs_transaction_t t,
+                                   const char *dir, char *kvs[],
+                                   struct xs_permissions *perms,
+                                   unsigned int num_perms);
 /* _atonce creates a transaction and writes all keys at once */
 _hidden int libxl__xs_writev_atonce(libxl__gc *gc,
                              const char *dir, char **kvs);
@@ -933,7 +938,7 @@ _hidden int libxl__device_console_add(libxl__gc *gc, uint32_t domid,
                                       libxl__domain_build_state *state);
 
 _hidden int libxl__device_generic_add(libxl__gc *gc, xs_transaction_t t,
-        libxl__device *device, char **bents, char **fents);
+        libxl__device *device, char **bents, char **fents, char **ro_fents);
 _hidden char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device);
 _hidden char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device);
 _hidden int libxl__parse_backend_path(libxl__gc *gc, const char *path,
