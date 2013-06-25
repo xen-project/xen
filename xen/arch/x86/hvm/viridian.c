@@ -87,8 +87,9 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
         if ( (d->arch.hvm_domain.viridian.guest_os_id.raw == 0) ||
              (d->arch.hvm_domain.viridian.guest_os_id.fields.os < 4) )
             break;
-        *eax = (CPUID4A_MSR_BASED_APIC |
-                CPUID4A_RELAX_TIMER_INT);
+        *eax = CPUID4A_RELAX_TIMER_INT;
+        if ( !cpu_has_vmx_apic_reg_virt )
+            *eax |= CPUID4A_MSR_BASED_APIC;
         *ebx = 2047; /* long spin count */
         break;
     }
