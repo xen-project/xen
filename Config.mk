@@ -213,9 +213,9 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= b0855f925c6e2e0b21fbb03fab4b5fb5b6876871
 QEMU_UPSTREAM_REVISION ?= 79c097d5fe7cb0b4788ed509240cde7e210650bf
-SEABIOS_UPSTREAM_TAG ?= 30ef08fb25af278ba012efd8b2c0050c108be54d
-# Sun Feb 10 21:06:14 2013 -0500
-# Update tools/acpi_extract.py to handle iasl 20130117 release.
+SEABIOS_UPSTREAM_TAG ?= 3a28511b46f0c2af5fae1b6ed2b0c19d7913cee3
+# Wed Jun 26 16:30:45 2013 +0100
+# xen: Don't perform SMP setup.
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
