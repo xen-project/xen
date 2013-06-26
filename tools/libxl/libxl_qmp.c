@@ -668,6 +668,18 @@ static void qmp_parameters_add_bool(libxl__gc *gc,
     qmp_parameters_common_add(gc, param, name, obj);
 }
 
+static void qmp_parameters_add_integer(libxl__gc *gc,
+                                       libxl__json_object **param,
+                                       const char *name, const int i)
+{
+    libxl__json_object *obj;
+
+    obj = libxl__json_object_alloc(gc, JSON_INTEGER);
+    obj->u.i = i;
+
+    qmp_parameters_common_add(gc, param, name, obj);
+}
+
 #define QMP_PARAMETERS_SPRINTF(args, name, format, ...) \
     qmp_parameters_add_string(gc, args, name, \
                               libxl__sprintf(gc, format, __VA_ARGS__))
@@ -927,6 +939,15 @@ int libxl__qmp_insert_cdrom(libxl__gc *gc, int domid,
         qmp_parameters_add_string(gc, &args, "target", disk->pdev_path);
         return qmp_run_command(gc, domid, "change", args, NULL, NULL);
     }
+}
+
+int libxl__qmp_cpu_add(libxl__gc *gc, int domid, int idx)
+{
+    libxl__json_object *args = NULL;
+
+    qmp_parameters_add_integer(gc, &args, "id", idx);
+
+    return qmp_run_command(gc, domid, "cpu-add", args, NULL, NULL);
 }
 
 int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,

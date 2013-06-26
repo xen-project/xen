@@ -1417,6 +1417,8 @@ _hidden int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename);
 /* Set dirty bitmap logging status */
 _hidden int libxl__qmp_set_global_dirty_log(libxl__gc *gc, int domid, bool enable);
 _hidden int libxl__qmp_insert_cdrom(libxl__gc *gc, int domid, const libxl_device_disk *disk);
+/* Add a virtual CPU */
+_hidden int libxl__qmp_cpu_add(libxl__gc *gc, int domid, int index);
 /* close and free the QMP handler */
 _hidden void libxl__qmp_close(libxl__qmp_handler *qmp);
 /* remove the socket file, if the file has already been removed,
