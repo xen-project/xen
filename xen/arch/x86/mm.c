@@ -682,7 +682,8 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
           get_page_type_preemptible(page, type) :
           (get_page_type(page, type) ? 0 : -EINVAL));
 
-    if ( unlikely(rc) && partial >= 0 )
+    if ( unlikely(rc) && partial >= 0 &&
+         (!preemptible || page != current->arch.old_guest_table) )
         put_page(page);
 
     return rc;
@@ -2555,6 +2556,7 @@ int put_page_type_preemptible(struct page_info *page)
 
 int get_page_type_preemptible(struct page_info *page, unsigned long type)
 {
+    ASSERT(!current->arch.old_guest_table);
     return __get_page_type(page, type, 1);
 }
 
@@ -2765,7 +2767,7 @@ static void put_superpage(unsigned long mfn)
 
 #endif
 
-static int put_old_guest_table(struct vcpu *v)
+int put_old_guest_table(struct vcpu *v)
 {
     int rc;
 

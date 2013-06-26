@@ -798,6 +798,10 @@ int arch_set_info_guest(
     if ( v->vcpu_id == 0 )
         d->vm_assist = c(vm_assist);
 
+    rc = put_old_guest_table(current);
+    if ( rc )
+        return rc;
+
     if ( !compat )
         rc = (int)set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
 #ifdef CONFIG_COMPAT
@@ -840,18 +844,24 @@ int arch_set_info_guest(
     }
     else
     {
-        /*
-         * Since v->arch.guest_table{,_user} are both NULL, this effectively
-         * is just a call to put_old_guest_table().
-         */
         if ( !compat )
-            rc = vcpu_destroy_pagetables(v);
+            rc = put_old_guest_table(v);
         if ( !rc )
             rc = get_page_type_preemptible(cr3_page,
                                            !compat ? PGT_root_page_table
                                                    : PGT_l3_page_table);
-        if ( rc == -EINTR )
+        switch ( rc )
+        {
+        case -EINTR:
             rc = -EAGAIN;
+        case -EAGAIN:
+        case 0:
+            break;
+        default:
+            if ( cr3_page == current->arch.old_guest_table )
+                cr3_page = NULL;
+            break;
+        }
     }
 
     if ( rc )
@@ -882,6 +892,11 @@ int arch_set_info_guest(
                     v->arch.old_guest_table =
                         pagetable_get_page(v->arch.guest_table);
                     v->arch.guest_table = pagetable_null();
+                    break;
+                default:
+                    if ( cr3_page == current->arch.old_guest_table )
+                        cr3_page = NULL;
+                case 0:
                     break;
                 }
             }
