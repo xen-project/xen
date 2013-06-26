@@ -123,6 +123,7 @@ static int xc_dom_parse_zimage_kernel(struct xc_dom_image *dom)
     dom->kernel_seg.vend   = v_end;
 
     dom->parms.virt_entry = entry_addr;
+    dom->parms.virt_base = rambase;
 
     dom->guest_type = "xen-3.0-armv7l";
     DOMPRINTF("%s: %s: RAM starts at %"PRI_xen_pfn,

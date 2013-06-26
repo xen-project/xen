@@ -488,6 +488,7 @@ int xc_dom_alloc_segment(struct xc_dom_image *dom,
 {
     unsigned int page_size = XC_DOM_PAGE_SIZE(dom);
     xen_pfn_t pages = (size + page_size - 1) / page_size;
+    xen_pfn_t pfn;
     void *ptr;
 
     if ( start == 0 )
@@ -509,16 +510,17 @@ int xc_dom_alloc_segment(struct xc_dom_image *dom,
     }
 
     seg->vstart = start;
-    seg->pfn = (seg->vstart - dom->parms.virt_base) / page_size;
+    pfn = (seg->vstart - dom->parms.virt_base) / page_size;
+    seg->pfn = pfn + dom->rambase_pfn;
 
     if ( pages > dom->total_pages || /* multiple test avoids overflow probs */
-         seg->pfn > dom->total_pages ||
-         pages > dom->total_pages - seg->pfn)
+         pfn > dom->total_pages ||
+         pages > dom->total_pages - pfn)
     {
         xc_dom_panic(dom->xch, XC_OUT_OF_MEMORY,
                      "%s: segment %s too large (0x%"PRIpfn" > "
                      "0x%"PRIpfn" - 0x%"PRIpfn" pages)",
-                     __FUNCTION__, name, pages, dom->total_pages, seg->pfn);
+                     __FUNCTION__, name, pages, dom->total_pages, pfn);
         return -1;
     }
 
