@@ -4247,33 +4247,73 @@ int libxl_domain_get_nodeaffinity(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap)
+static int libxl__set_vcpuonline_xenstore(libxl__gc *gc, uint32_t domid,
+                                         libxl_bitmap *cpumap)
 {
-    GC_INIT(ctx);
     libxl_dominfo info;
     char *dompath;
     xs_transaction_t t;
     int i, rc = ERROR_FAIL;
 
-    if (libxl_domain_info(ctx, &info, domid) < 0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain info list");
+    if (libxl_domain_info(CTX, &info, domid) < 0) {
+        LOGE(ERROR, "getting domain info list");
         goto out;
     }
     if (!(dompath = libxl__xs_get_dompath(gc, domid)))
         goto out;
 
 retry_transaction:
-    t = xs_transaction_start(ctx->xsh);
+    t = xs_transaction_start(CTX->xsh);
     for (i = 0; i <= info.vcpu_max_id; i++)
         libxl__xs_write(gc, t,
                        libxl__sprintf(gc, "%s/cpu/%u/availability", dompath, i),
                        "%s", libxl_bitmap_test(cpumap, i) ? "online" : "offline");
-    if (!xs_transaction_end(ctx->xsh, t, 0)) {
+    if (!xs_transaction_end(CTX->xsh, t, 0)) {
         if (errno == EAGAIN)
             goto retry_transaction;
     } else
         rc = 0;
 out:
+    return rc;
+}
+
+static int libxl__set_vcpuonline_qmp(libxl__gc *gc, uint32_t domid,
+                                     libxl_bitmap *cpumap)
+{
+    libxl_dominfo info;
+    int i;
+
+    if (libxl_domain_info(CTX, &info, domid) < 0) {
+        LOGE(ERROR, "getting domain info list");
+        return ERROR_FAIL;
+    }
+    for (i = 0; i <= info.vcpu_max_id; i++) {
+        if (libxl_bitmap_test(cpumap, i)) {
+            /* Return value is ignore because it does not tell anything useful
+             * on the completion of the command.
+             * (For instance, "CPU already plugged-in" give the same return
+             * value as "command not supported".)
+             */
+            libxl__qmp_cpu_add(gc, domid, i);
+        }
+    }
+    return 0;
+}
+
+int libxl_set_vcpuonline(libxl_ctx *ctx, uint32_t domid, libxl_bitmap *cpumap)
+{
+    GC_INIT(ctx);
+    int rc;
+    switch (libxl__device_model_version_running(gc, domid)) {
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+        rc = libxl__set_vcpuonline_xenstore(gc, domid, cpumap);
+        break;
+    case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+        rc = libxl__set_vcpuonline_qmp(gc, domid, cpumap);
+        break;
+    default:
+        rc = ERROR_INVAL;
+    }
     GC_FREE;
     return rc;
 }
