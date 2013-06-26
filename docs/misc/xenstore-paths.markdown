@@ -152,6 +152,14 @@ path with an empty value which the guest may choose to overwrite.
 The hexadecimal representation of the address of the domain's
 "generation id".
 
+#### ~/hvmloader/allow-memory-relocate = ("1"|"0") [HVM,INTERNAL]
+
+If the default low MMIO hole (below 4GiB) is not big enough for all
+the devices, this indicates if hvmloader should relocate guest memory
+into the high memory region (above 4GiB).  If "1", hvmloader will
+relocate memory as needed, until 2GiB is reached; if "0", hvmloader
+will not relocate guest memory.
+
 #### ~/hvmloader/bios = ("rombios"|"seabios"|"OVMF") [HVM,INTERNAL]
 
 The BIOS used by this domain.
