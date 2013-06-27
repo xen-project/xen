@@ -477,6 +477,7 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
     void *fdt;
     int new_size;
     int ret;
+    paddr_t end;
 
     kinfo->unassigned_mem = dom0_mem;
 
@@ -502,16 +503,25 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
         goto err;
 
     /*
-     * Put the device tree at the beginning of the first bank.  It
-     * must be below 4 GiB.
+     * DTB must be load below 4GiB and far enough from linux (Linux uses
+     * the space after it to decompress)
+     * Load the DTB at the end of the first bank, while ensuring it is
+     * also below 4G
      */
-    kinfo->dtb_paddr = kinfo->mem.bank[0].start + 0x100;
-    if ( kinfo->dtb_paddr + fdt_totalsize(kinfo->fdt) > (1ull << 32) )
+    end = kinfo->mem.bank[0].start + kinfo->mem.bank[0].size;
+    end = MIN(1ull << 32, end);
+    kinfo->dtb_paddr = end - fdt_totalsize(kinfo->fdt);
+    /* Align the address to 2Mb. Linux only requires 4 byte alignment */
+    kinfo->dtb_paddr &= ~((2 << 20) - 1);
+
+    if ( fdt_totalsize(kinfo->fdt) > end )
     {
-        printk("Not enough memory below 4 GiB for the device tree.");
+        printk(XENLOG_ERR "Not enough memory in the first bank for "
+               "the device tree.");
         ret = -FDT_ERR_XEN(EINVAL);
         goto err;
     }
+
 
     return 0;
 
@@ -524,6 +534,9 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 static void dtb_load(struct kernel_info *kinfo)
 {
     void * __user dtb_virt = (void * __user)(register_t)kinfo->dtb_paddr;
+
+    printk("Loading dom0 DTB to 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
+           kinfo->dtb_paddr, kinfo->dtb_paddr + fdt_totalsize(kinfo->fdt));
 
     raw_copy_to_guest(dtb_virt, kinfo->fdt, fdt_totalsize(kinfo->fdt));
     xfree(kinfo->fdt);
@@ -559,10 +572,12 @@ int construct_dom0(struct domain *d)
     if ( rc < 0 )
         return rc;
 
+    if ( kinfo.check_overlap )
+        kinfo.check_overlap(&kinfo);
+
     /* The following loads use the domain's p2m */
     p2m_load_VTTBR(d);
 
-    kinfo.dtb_paddr = kinfo.zimage.load_addr + kinfo.zimage.len;
     kernel_load(&kinfo);
     dtb_load(&kinfo);
 

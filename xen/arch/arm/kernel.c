@@ -12,6 +12,7 @@
 #include <xen/sched.h>
 #include <asm/byteorder.h>
 #include <asm/setup.h>
+#include <xen/libfdt/libfdt.h>
 
 #include "kernel.h"
 
@@ -62,6 +63,21 @@ void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len, int attrindx)
     }
 
     clear_fixmap(FIXMAP_MISC);
+}
+
+static void kernel_zimage_check_overlap(struct kernel_info *info)
+{
+    paddr_t zimage_start = info->zimage.load_addr;
+    paddr_t zimage_end = info->zimage.load_addr + info->zimage.len;
+    paddr_t dtb_start = info->dtb_paddr;
+    paddr_t dtb_end = info->dtb_paddr + fdt_totalsize(info->fdt);
+
+    if ( (dtb_start > zimage_end) || (dtb_end < zimage_start) )
+        return;
+
+    panic(XENLOG_ERR "The kernel(0x%"PRIpaddr"-0x%"PRIpaddr
+          ") is overlapping the DTB(0x%"PRIpaddr"-0x%"PRIpaddr")\n",
+          zimage_start, zimage_end, dtb_start, dtb_end);
 }
 
 static void kernel_zimage_load(struct kernel_info *info)
@@ -152,6 +168,7 @@ static int kernel_try_zimage_prepare(struct kernel_info *info,
 
     info->entry = info->zimage.load_addr;
     info->load = kernel_zimage_load;
+    info->check_overlap = kernel_zimage_check_overlap;
 
     return 0;
 }
@@ -197,6 +214,7 @@ static int kernel_try_elf_prepare(struct kernel_info *info,
      */
     info->entry = info->elf.parms.virt_entry;
     info->load = kernel_elf_load;
+    info->check_overlap = NULL;
 
     if ( elf_check_broken(&info->elf.elf) )
         printk("Xen: warning: ELF kernel broken: %s\n",

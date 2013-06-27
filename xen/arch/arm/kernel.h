@@ -38,6 +38,8 @@ struct kernel_info {
     };
 
     void (*load)(struct kernel_info *info);
+    /* Callback to check overlap between the kernel and the device tree */
+    void (*check_overlap)(struct kernel_info *kinfo);
     int load_attr;
 };
 
