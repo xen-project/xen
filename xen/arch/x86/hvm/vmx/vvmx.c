@@ -864,6 +864,13 @@ static const u16 vmcs_gstate_field[] = {
     GUEST_SYSENTER_EIP,
 };
 
+static const u16 gpdptr_fields[] = {
+    GUEST_PDPTR0,
+    GUEST_PDPTR1,
+    GUEST_PDPTR2,
+    GUEST_PDPTR3,
+};
+
 /*
  * Context: shadow -> virtual VMCS
  */
@@ -1053,18 +1060,6 @@ static void load_shadow_guest_state(struct vcpu *v)
                      (__get_vvmcs(vvmcs, CR4_READ_SHADOW) & cr_gh_mask);
     __vmwrite(CR4_READ_SHADOW, cr_read_shadow);
 
-    if ( nvmx_ept_enabled(v) && hvm_pae_enabled(v) &&
-         (v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
-    {
-        static const u16 gpdptr_fields[] = {
-            GUEST_PDPTR0,
-            GUEST_PDPTR1,
-            GUEST_PDPTR2,
-            GUEST_PDPTR3,
-        };
-        vvmcs_to_shadow_bulk(v, ARRAY_SIZE(gpdptr_fields), gpdptr_fields);
-    }
-
     /* TODO: CR3 target control */
 }
 
@@ -1158,6 +1153,10 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
 
     if ( lm_l1 != lm_l2 )
         paging_update_paging_modes(v);
+
+    if ( nvmx_ept_enabled(v) && hvm_pae_enabled(v) &&
+         !(v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
+        vvmcs_to_shadow_bulk(v, ARRAY_SIZE(gpdptr_fields), gpdptr_fields);
 
     regs->eip = __get_vvmcs(vvmcs, GUEST_RIP);
     regs->esp = __get_vvmcs(vvmcs, GUEST_RSP);
@@ -1293,6 +1292,10 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     sync_vvmcs_ro(v);
     sync_vvmcs_guest_state(v, regs);
     sync_exception_state(v);
+
+    if ( nvmx_ept_enabled(v) && hvm_pae_enabled(v) &&
+         !(v->arch.hvm_vcpu.guest_efer & EFER_LMA) )
+        shadow_to_vvmcs_bulk(v, ARRAY_SIZE(gpdptr_fields), gpdptr_fields);
 
     vmx_vmcs_switch(v->arch.hvm_vmx.vmcs, nvcpu->nv_n1vmcx);
 
