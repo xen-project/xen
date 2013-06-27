@@ -966,8 +966,8 @@ typedef struct evtchn_status xc_evtchn_status_t;
 int xc_evtchn_status(xc_interface *xch, xc_evtchn_status_t *status);
 
 /*
- * Return a handle to the event channel driver, or -1 on failure, in which case
- * errno will be set appropriately.
+ * Return a handle to the event channel driver, or NULL on failure, in
+ * which case errno will be set appropriately.
  *
  * Note:
  * After fork a child process must not use any opened xc evtchn
