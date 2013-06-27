@@ -88,7 +88,7 @@ int domain_vgic_init(struct domain *d)
         d->arch.vgic.nr_lines = 0; /* We don't need SPIs for the guest */
 
     d->arch.vgic.shared_irqs =
-        xmalloc_array(struct vgic_irq_rank, DOMAIN_NR_RANKS(d));
+        xzalloc_array(struct vgic_irq_rank, DOMAIN_NR_RANKS(d));
     d->arch.vgic.pending_irqs =
         xzalloc_array(struct pending_irq, d->arch.vgic.nr_lines);
     for (i=0; i<d->arch.vgic.nr_lines; i++)
