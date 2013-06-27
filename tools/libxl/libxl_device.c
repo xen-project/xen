@@ -62,12 +62,13 @@ char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device)
 }
 
 int libxl__device_generic_add(libxl_ctx *ctx, libxl__device *device,
-                             char **bents, char **fents)
+                              char **bents, char **fents, char **ro_fents)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
     char *frontend_path, *backend_path;
     xs_transaction_t t;
     struct xs_permissions frontend_perms[2];
+    struct xs_permissions ro_frontend_perms[2];
     struct xs_permissions backend_perms[2];
     int rc;
 
@@ -84,21 +85,36 @@ int libxl__device_generic_add(libxl_ctx *ctx, libxl__device *device,
     frontend_perms[1].id = device->backend_domid;
     frontend_perms[1].perms = XS_PERM_READ;
 
-    backend_perms[0].id = device->backend_domid;
-    backend_perms[0].perms = XS_PERM_NONE;
-    backend_perms[1].id = device->domid;
-    backend_perms[1].perms = XS_PERM_READ;
+    ro_frontend_perms[0].id = backend_perms[0].id = device->backend_domid;
+    ro_frontend_perms[0].perms = backend_perms[0].perms = XS_PERM_NONE;
+    ro_frontend_perms[1].id = backend_perms[1].id = device->domid;
+    ro_frontend_perms[1].perms = backend_perms[1].perms = XS_PERM_READ;
 
 retry_transaction:
     t = xs_transaction_start(ctx->xsh);
     /* FIXME: read frontend_path and check state before removing stuff */
 
-    if (fents) {
+    if (fents || ro_fents) {
         xs_rm(ctx->xsh, t, frontend_path);
         xs_mkdir(ctx->xsh, t, frontend_path);
-        xs_set_permissions(ctx->xsh, t, frontend_path, frontend_perms, ARRAY_SIZE(frontend_perms));
+        /* Console 0 is a special case. It doesn't use the regular PV
+         * state machine but also the frontend directory has
+         * historically contained other information, such as the
+         * vnc-port, which we don't want the guest fiddling with.
+         */
+        if (device->kind == DEVICE_CONSOLE && device->devid == 0)
+            xs_set_permissions(ctx->xsh, t, frontend_path,
+                               ro_frontend_perms, ARRAY_SIZE(ro_frontend_perms));
+        else
+            xs_set_permissions(ctx->xsh, t, frontend_path,
+                               frontend_perms, ARRAY_SIZE(frontend_perms));
         xs_write(ctx->xsh, t, libxl__sprintf(&gc, "%s/backend", frontend_path), backend_path, strlen(backend_path));
-        libxl__xs_writev(&gc, t, frontend_path, fents);
+        if (fents)
+            libxl__xs_writev_perms(&gc, t, frontend_path, fents,
+                                   frontend_perms, ARRAY_SIZE(frontend_perms));
+        if (ro_fents)
+            libxl__xs_writev_perms(&gc, t, frontend_path, ro_fents,
+                                   ro_frontend_perms, ARRAY_SIZE(ro_frontend_perms));
     }
 
     if (bents) {

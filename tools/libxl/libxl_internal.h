@@ -143,6 +143,11 @@ _hidden char **libxl__xs_kvs_of_flexarray(libxl__gc *gc, flexarray_t *array, int
 
 _hidden int libxl__xs_writev(libxl__gc *gc, xs_transaction_t t,
                     char *dir, char **kvs);
+/* as writev but also sets the permissions on each path */
+_hidden int libxl__xs_writev_perms(libxl__gc *gc, xs_transaction_t t,
+                                   char *dir, char *kvs[],
+                                   struct xs_permissions *perms,
+                                   unsigned int num_perms);
 _hidden int libxl__xs_write(libxl__gc *gc, xs_transaction_t t,
                    char *path, char *fmt, ...) PRINTF_ATTRIBUTE(4, 5);
    /* Each fn returns 0 on success.
@@ -185,7 +190,7 @@ _hidden int libxl__device_physdisk_major_minor(const char *physpath, int *major,
 _hidden int libxl__device_disk_dev_number(const char *virtpath);
 
 _hidden int libxl__device_generic_add(libxl_ctx *ctx, libxl__device *device,
-                             char **bents, char **fents);
+                                      char **bents, char **fents, char **ro_fents);
 _hidden char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device);
 _hidden char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device);
 _hidden int libxl__device_del(libxl_ctx *ctx, libxl__device *dev, int wait);

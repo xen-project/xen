@@ -1036,8 +1036,9 @@ int libxl_device_disk_add(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *dis
     }
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(&gc, back, back->count),
-                             libxl__xs_kvs_of_flexarray(&gc, front, front->count));
+                              libxl__xs_kvs_of_flexarray(&gc, back, back->count),
+                              libxl__xs_kvs_of_flexarray(&gc, front, front->count),
+                              NULL);
 
     rc = 0;
 
@@ -1266,8 +1267,9 @@ int libxl_device_nic_add(libxl_ctx *ctx, uint32_t domid, libxl_device_nic *nic)
     }
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(&gc, back, back->count),
-                             libxl__xs_kvs_of_flexarray(&gc, front, front->count));
+                              libxl__xs_kvs_of_flexarray(&gc, back, back->count),
+                              libxl__xs_kvs_of_flexarray(&gc, front, front->count),
+                              NULL);
 
     /* FIXME: wait for plug */
     rc = 0;
@@ -1478,8 +1480,9 @@ int libxl_device_net2_add(libxl_ctx *ctx, uint32_t domid, libxl_device_net2 *net
     flexarray_append(front, "1");
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(&gc, back, back->count),
-                             libxl__xs_kvs_of_flexarray(&gc, front, front->count));
+                              libxl__xs_kvs_of_flexarray(&gc, back, back->count),
+                              libxl__xs_kvs_of_flexarray(&gc, front, front->count),
+                              NULL);
 
     /* FIXME: wait for plug */
     rc = 0;
@@ -1571,13 +1574,18 @@ int libxl_device_net2_del(libxl_ctx *ctx, libxl_device_net2 *net2, int wait)
 int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_console *console)
 {
     libxl__gc gc = LIBXL_INIT_GC(ctx);
-    flexarray_t *front;
+    flexarray_t *front, *ro_front;
     flexarray_t *back;
     libxl__device device;
     int rc;
 
     front = flexarray_make(16, 1);
     if (!front) {
+        rc = ERROR_NOMEM;
+        goto out;
+    }
+    ro_front = flexarray_make(16, 1);
+    if (!ro_front) {
         rc = ERROR_NOMEM;
         goto out;
     }
@@ -1607,25 +1615,27 @@ int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_consol
 
     flexarray_append(front, "backend-id");
     flexarray_append(front, libxl__sprintf(&gc, "%d", console->backend_domid));
-    flexarray_append(front, "limit");
-    flexarray_append(front, libxl__sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT));
-    flexarray_append(front, "type");
+    flexarray_append(ro_front, "limit");
+    flexarray_append(ro_front, libxl__sprintf(&gc, "%d", LIBXL_XENCONSOLE_LIMIT));
+    flexarray_append(ro_front, "type");
     if (console->consback == LIBXL_CONSBACK_XENCONSOLED)
-        flexarray_append(front, "xenconsoled");
+        flexarray_append(ro_front, "xenconsoled");
     else
-        flexarray_append(front, "ioemu");
-    flexarray_append(front, "output");
-    flexarray_append(front, console->output);
+        flexarray_append(ro_front, "ioemu");
+    flexarray_append(ro_front, "output");
+    flexarray_append(ro_front, console->output);
+    flexarray_append(ro_front, "tty");
+    flexarray_append(ro_front, "");
 
     if (device.devid == 0) {
         if (console->build_state == NULL) {
             rc = ERROR_INVAL;
             goto out_free;
         }
-        flexarray_append(front, "port");
-        flexarray_append(front, libxl__sprintf(&gc, "%"PRIu32, console->build_state->console_port));
-        flexarray_append(front, "ring-ref");
-        flexarray_append(front, libxl__sprintf(&gc, "%lu", console->build_state->console_mfn));
+        flexarray_append(ro_front, "port");
+        flexarray_append(ro_front, libxl__sprintf(&gc, "%"PRIu32, console->build_state->console_port));
+        flexarray_append(ro_front, "ring-ref");
+        flexarray_append(ro_front, libxl__sprintf(&gc, "%lu", console->build_state->console_mfn));
     } else {
         flexarray_append(front, "state");
         flexarray_append(front, libxl__sprintf(&gc, "%d", 1));
@@ -1634,11 +1644,13 @@ int libxl_device_console_add(libxl_ctx *ctx, uint32_t domid, libxl_device_consol
     }
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(&gc, back, back->count),
-                             libxl__xs_kvs_of_flexarray(&gc, front, front->count));
+                              libxl__xs_kvs_of_flexarray(&gc, back, back->count),
+                              libxl__xs_kvs_of_flexarray(&gc, front, front->count),
+                              libxl__xs_kvs_of_flexarray(&gc, ro_front, ro_front->count));
     rc = 0;
 out_free:
     flexarray_free(back);
+    flexarray_free(ro_front);
     flexarray_free(front);
 out:
     libxl__free_all(&gc);
@@ -1693,8 +1705,9 @@ int libxl_device_vkb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vkb *vkb)
     flexarray_append(front, libxl__sprintf(&gc, "%d", 1));
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(&gc, back, back->count),
-                             libxl__xs_kvs_of_flexarray(&gc, front, front->count));
+                              libxl__xs_kvs_of_flexarray(&gc, back, back->count),
+                              libxl__xs_kvs_of_flexarray(&gc, front, front->count),
+                              NULL);
     rc = 0;
 out_free:
     flexarray_free(back);
@@ -1921,8 +1934,9 @@ int libxl_device_vfb_add(libxl_ctx *ctx, uint32_t domid, libxl_device_vfb *vfb)
     flexarray_append_pair(front, "state", libxl__sprintf(&gc, "%d", 1));
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(&gc, back, back->count),
-                             libxl__xs_kvs_of_flexarray(&gc, front, front->count));
+                              libxl__xs_kvs_of_flexarray(&gc, back, back->count),
+                              libxl__xs_kvs_of_flexarray(&gc, front, front->count),
+                              NULL);
     rc = 0;
 out_free:
     flexarray_free(front);

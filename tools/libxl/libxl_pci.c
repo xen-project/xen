@@ -274,8 +274,9 @@ static int libxl_create_pci_backend(libxl__gc *gc, uint32_t domid, libxl_device_
     flexarray_append_pair(front, "state", libxl__sprintf(gc, "%d", 1));
 
     libxl__device_generic_add(ctx, &device,
-                             libxl__xs_kvs_of_flexarray(gc, back, back->count),
-                             libxl__xs_kvs_of_flexarray(gc, front, front->count));
+                              libxl__xs_kvs_of_flexarray(gc, back, back->count),
+                              libxl__xs_kvs_of_flexarray(gc, front, front->count),
+                              NULL);
 
 out:
     if (back)
