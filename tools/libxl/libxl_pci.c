@@ -106,7 +106,8 @@ int libxl__create_pci_backend(libxl__gc *gc, uint32_t domid,
 
     libxl__device_generic_add(gc, XBT_NULL, &device,
                               libxl__xs_kvs_of_flexarray(gc, back, back->count),
-                              libxl__xs_kvs_of_flexarray(gc, front, front->count));
+                              libxl__xs_kvs_of_flexarray(gc, front, front->count),
+                              NULL);
 
 out:
     if (back)
