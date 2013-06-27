@@ -223,8 +223,19 @@ int __init amd_iov_detect(void)
     {
         if ( amd_iommu_perdev_intremap )
         {
-            printk("AMD-Vi: Enabling per-device vector maps\n");
-            opt_irq_vector_map = OPT_IRQ_VECTOR_MAP_PERDEV;
+            /* Per-device vector map logic is broken for devices with multiple
+             * MSI-X interrupts (and would also be for multiple MSI, if Xen
+             * supported it).
+             *
+             * Until this is fixed, use global vector tables as far as the irq
+             * logic is concerned to avoid the buggy behaviour of per-device
+             * maps in map_domain_pirq(), and use per-device tables as far as
+             * intremap code is concerned to avoid the security issue.
+             */
+            printk(XENLOG_WARNING "AMD-Vi: per-device vector map logic is broken.  "
+                   "Using per-device-global maps instead until a fix is found.\n");
+
+            opt_irq_vector_map = OPT_IRQ_VECTOR_MAP_GLOBAL;
         }
         else
         {
@@ -235,6 +246,10 @@ int __init amd_iov_detect(void)
     else
     {
         printk("AMD-Vi: Not overriding irq_vector_map setting\n");
+
+        if ( opt_irq_vector_map != OPT_IRQ_VECTOR_MAP_GLOBAL )
+            printk(XENLOG_WARNING "AMD-Vi: per-device vector map logic is broken.  "
+                   "Use irq_vector_map=global to work around.\n");
     }
     if ( !amd_iommu_perdev_intremap )
         printk(XENLOG_WARNING "AMD-Vi: Using global interrupt remap table is not recommended (see XSA-36)!\n");
