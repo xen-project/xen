@@ -117,12 +117,10 @@ static unsigned int gic_irq_startup(struct irq_desc *desc)
 
 static void gic_irq_shutdown(struct irq_desc *desc)
 {
-    uint32_t enabler;
     int irq = desc->irq;
 
     /* Disable routing */
-    enabler = GICD[GICD_ICENABLER + irq / 32];
-    GICD[GICD_ICENABLER + irq / 32] = enabler | (1u << (irq % 32));
+    GICD[GICD_ICENABLER + irq / 32] = (1u << (irq % 32));
 }
 
 static void gic_irq_enable(struct irq_desc *desc)
