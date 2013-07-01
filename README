@@ -127,7 +127,7 @@ performed with root privileges.]
    version of udev scripts, for example), but make dist includes all
    versions of those scripts, so that you can copy the dist directory
    to another machine and install from that distribution.
-   
+
 Python Runtime Libraries
 ========================
 
