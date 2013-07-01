@@ -212,7 +212,7 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-4.3-testing.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= b0855f925c6e2e0b21fbb03fab4b5fb5b6876871
-QEMU_UPSTREAM_REVISION ?= 1c514a7734b7f98625a0d18d5e8ee7581f26e50c
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.3.0
 SEABIOS_UPSTREAM_TAG ?= 3a28511b46f0c2af5fae1b6ed2b0c19d7913cee3
 # Wed Jun 26 16:30:45 2013 +0100
 # xen: Don't perform SMP setup.
@@ -224,7 +224,7 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 13c144d96e825f145e5b37f97e5f6210c2c645e9
+QEMU_TAG ?= xen-4.3.0
 # Mon Jun 17 17:39:51 2013 +0100
 # qemu-xen-traditional: disable docs
 
