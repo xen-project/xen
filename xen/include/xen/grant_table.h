@@ -64,9 +64,6 @@ struct grant_mapping {
     domid_t  domid;         /* granting domain */
 };
 
-/* Fairly arbitrary. [POLICY] */
-#define MAPTRACK_MAX_ENTRIES 16384
-
 /* Per-domain grant information. */
 struct grant_table {
     /* Table size. Number of frames shared with guest */
