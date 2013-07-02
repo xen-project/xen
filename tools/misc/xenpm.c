@@ -31,10 +31,6 @@
 
 #define ARRAY_SIZE(a) (sizeof (a) / sizeof ((a)[0]))
 
-#define CPUFREQ_TURBO_DISABLED      -1
-#define CPUFREQ_TURBO_UNSUPPORTED   0
-#define CPUFREQ_TURBO_ENABLED       1
-
 static xc_interface *xc_handle;
 static unsigned int max_cpu_nr;
 
@@ -699,13 +695,9 @@ static void print_cpufreq_para(int cpuid, struct xc_get_cpufreq_para *p_cpufreq)
            p_cpufreq->scaling_max_freq,
            p_cpufreq->scaling_min_freq,
            p_cpufreq->scaling_cur_freq);
-    if (p_cpufreq->turbo_enabled != CPUFREQ_TURBO_UNSUPPORTED) {
-           printf("turbo mode           : ");
-           if (p_cpufreq->turbo_enabled == CPUFREQ_TURBO_ENABLED)
-               printf("enabled\n");
-           else
-               printf("disabled\n");
-    }
+
+    printf("turbo mode           : %s\n",
+           p_cpufreq->turbo_enabled ? "enabled" : "disabled or n/a");
     printf("\n");
 }
 
