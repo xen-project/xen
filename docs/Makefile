@@ -2,7 +2,7 @@ XEN_ROOT=$(CURDIR)/..
 include $(XEN_ROOT)/Config.mk
 -include $(XEN_ROOT)/config/Docs.mk
 
-VERSION		= xen-unstable
+VERSION		:= $(shell $(MAKE) -C $(XEN_ROOT)/xen --no-print-directory xenversion)
 
 DOC_MAN5SRC	:= $(wildcard man/*.pod.5)
 DOC_MAN1SRC	:= $(wildcard man/*.pod.1)
