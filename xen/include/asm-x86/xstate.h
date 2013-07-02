@@ -11,6 +11,7 @@
 #include <xen/types.h>
 
 #define FCW_DEFAULT               0x037f
+#define FCW_RESET                 0x0040
 #define MXCSR_DEFAULT             0x1f80
 
 #define XSTATE_CPUID              0x0000000d

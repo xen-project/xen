@@ -712,7 +712,11 @@ int arch_set_info_guest(
     v->arch.vgc_flags = flags;
 
     if ( flags & VGCF_I387_VALID )
+    {
         memcpy(v->arch.fpu_ctxt, &c.nat->fpu_ctxt, sizeof(c.nat->fpu_ctxt));
+        if ( v->arch.xsave_area )
+             v->arch.xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
+    }
 
     if ( !compat )
     {

@@ -204,9 +204,13 @@ int xstate_alloc_save_area(struct vcpu *v)
     if ( save_area == NULL )
         return -ENOMEM;
 
+    /*
+     * Set the memory image to default values, but don't force the context
+     * to be loaded from memory (i.e. keep save_area->xsave_hdr.xstate_bv
+     * clear).
+     */
     save_area->fpu_sse.fcw = FCW_DEFAULT;
     save_area->fpu_sse.mxcsr = MXCSR_DEFAULT;
-    save_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
 
     v->arch.xsave_area = save_area;
     v->arch.xcr0 = XSTATE_FP_SSE;

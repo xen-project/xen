@@ -3466,6 +3466,7 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
 {
     struct domain *d = v->domain;
     struct segment_register reg;
+    typeof(v->arch.xsave_area->fpu_sse) *fpu_ctxt = v->arch.fpu_ctxt;
 
     domain_lock(d);
 
@@ -3479,7 +3480,12 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
         v->arch.guest_table = pagetable_null();
     }
 
-    memset(v->arch.fpu_ctxt, 0, sizeof(v->arch.xsave_area->fpu_sse));
+    memset(fpu_ctxt, 0, sizeof(*fpu_ctxt));
+    fpu_ctxt->fcw = FCW_RESET;
+    fpu_ctxt->mxcsr = MXCSR_DEFAULT;
+    if ( v->arch.xsave_area )
+        v->arch.xsave_area->xsave_hdr.xstate_bv = XSTATE_FP;
+
     v->arch.vgc_flags = VGCF_online;
     memset(&v->arch.user_regs, 0, sizeof(v->arch.user_regs));
     v->arch.user_regs.eflags = 2;
