@@ -636,6 +636,14 @@ static void iommu_check_event_log(struct amd_iommu *iommu)
         }
     }
 
+    /*
+     * Workaround for erratum787:
+     * Re-check to make sure the bit has been cleared.
+     */
+    entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+    if ( entry & IOMMU_STATUS_EVENT_LOG_INT_MASK )
+        tasklet_schedule(&amd_iommu_irq_tasklet);
+
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
 
@@ -716,6 +724,14 @@ static void iommu_check_ppr_log(struct amd_iommu *iommu)
             tasklet_schedule(&amd_iommu_irq_tasklet);
         }
     }
+
+    /*
+     * Workaround for erratum787:
+     * Re-check to make sure the bit has been cleared.
+     */
+    entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+    if ( entry & IOMMU_STATUS_PPR_LOG_INT_MASK )
+        tasklet_schedule(&amd_iommu_irq_tasklet);
 
     spin_unlock_irqrestore(&iommu->lock, flags);
 }
