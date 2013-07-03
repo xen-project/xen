@@ -1,0 +1,31 @@
+PCI vendor ID 0x5853 has been reserved for use by Xen systems in order to
+advertise certain virtual hardware to guest virtual machines. The primary
+use of this is with device ID 0x0001 to advertise the Xen Platform PCI
+device - the presence of this virtual device enables a guest Operating
+System (subject to the availability of suitable drivers) to make use of
+paravirtualisation features such as disk and network devices etc.
+
+Some Xen vendors wish to provide alternative and/or additional guest drivers
+that can bind to virtual devices. This may be done using the Xen PCI vendor
+ID of 0x5853 and Xen-vendor/device specific PCI device IDs. This file
+records reservations made within the device ID range in order to avoid
+multiple Xen vendors using conflicting IDs.
+
+Guidelines
+ 1. A vendor may request a range of device IDs by submitting a patch to
+    this file.
+ 2. Vendor allocations should be in the range 0xc000-0xfffe to reduce the
+    possibility of clashes with community IDs assigned from the bottom up.
+ 3. The vendor is responsible for allocations within the range and should
+    try to record specific device IDs in PCI ID databases such as
+    http://pciids.sourceforge.net and http//www.pcidatabase.com
+
+Reservations
+============
+
+    range     | vendor/product
+--------------+--------------------------------------------------------------
+0x0001        | (Xen Platform PCI device)
+0x0002        | Citrix XenServer (grandfathered allocation for XenServer 6.1)
+0xc000-0xc0ff | Citrix XenServer
+0xc100-0xc1ff | Citrix XenClient
