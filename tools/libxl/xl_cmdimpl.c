@@ -3266,7 +3266,7 @@ static void save_domain_core_writeconfig(int fd, const char *source,
 }
 
 static int save_domain(uint32_t domid, const char *filename, int checkpoint,
-                const char *override_config_file)
+                            int leavepaused, const char *override_config_file)
 {
     int fd;
     uint8_t *config_data;
@@ -3290,11 +3290,15 @@ static int save_domain(uint32_t domid, const char *filename, int checkpoint,
     int rc = libxl_domain_suspend(ctx, domid, fd, 0, NULL);
     close(fd);
 
-    if (rc < 0)
+    if (rc < 0) {
         fprintf(stderr, "Failed to save domain, resuming domain\n");
-
-    if (checkpoint || rc < 0)
         libxl_domain_resume(ctx, domid, 1, 0);
+    }
+    else if (leavepaused || checkpoint) {
+        if (leavepaused)
+            libxl_domain_pause(ctx, domid);
+        libxl_domain_resume(ctx, domid, 1, 0);
+    }
     else
         libxl_domain_destroy(ctx, domid, 0);
 
@@ -3838,11 +3842,15 @@ int main_save(int argc, char **argv)
     const char *filename;
     const char *config_filename = NULL;
     int checkpoint = 0;
+    int leavepaused = 0;
     int opt;
 
-    SWITCH_FOREACH_OPT(opt, "c", NULL, "save", 2) {
+    SWITCH_FOREACH_OPT(opt, "cp", NULL, "save", 2) {
     case 'c':
         checkpoint = 1;
+        break;
+    case 'p':
+        leavepaused = 1;
         break;
     }
 
@@ -3856,7 +3864,7 @@ int main_save(int argc, char **argv)
     if ( argc - optind >= 3 )
         config_filename = argv[optind + 2];
 
-    save_domain(domid, filename, checkpoint, config_filename);
+    save_domain(domid, filename, checkpoint, leavepaused, config_filename);
     return 0;
 }
 

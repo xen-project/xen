@@ -504,7 +504,7 @@ Pass VNC password to vncviewer via stdin.
 
 Saves a running domain to a state file so that it can be restored
 later.  Once saved, the domain will no longer be running on the
-system, unless the -c option is used.
+system, unless the -c or -p options are used.
 B<xl restore> restores from this checkpoint file.
 Passing a config file argument allows the user to manually select the VM config
 file used to create the domain.
@@ -514,6 +514,10 @@ file used to create the domain.
 =item B<-c>
 
 Leave domain running after creating the snapshot.
+
+=item B<-p>
+
+Leave domain paused after creating the snapshot.
 
 =back
 
