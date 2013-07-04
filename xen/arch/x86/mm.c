@@ -1278,7 +1278,8 @@ static int alloc_l2_table(struct page_info *page, unsigned long type,
 
     for ( i = page->nr_validated_ptes; i < L2_PAGETABLE_ENTRIES; i++ )
     {
-        if ( preemptible && i && hypercall_preempt_check() )
+        if ( preemptible && i > page->nr_validated_ptes
+             && hypercall_preempt_check() )
         {
             page->nr_validated_ptes = i;
             rc = -EAGAIN;
