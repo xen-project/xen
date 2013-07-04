@@ -1,0 +1,62 @@
+=head1 NAME
+
+xenstore-chmod - set the permissions of a Xenstore key
+
+=head1 SYNOPSIS
+
+B<xenstore-chmod> [I<OPTION>]... [I<KEY>] [I<PERM>]...
+
+=head1 DESCRIPTION
+
+Sets the permissions of the Xenstore I<KEY>.
+
+I<PERM> has the format I<LD>, where I<L> is a letter for the type of
+permission and I<D> is the corresponding domain ID.
+
+The types of permission are:
+
+=over
+
+=item B<r>
+
+read
+
+=item B<w>
+
+write
+
+=item B<b>
+
+read and write (both)
+
+=item B<n>
+
+no access
+
+=back
+
+The first permission entry is the domain owning the key (the owner)
+I<and> the permissions for any domain not explicitly listed in
+subsequent entries.  The key owner always has full access (read,
+write, and set permissions).
+
+=over
+
+=item B<-r>
+
+Apply the permissions to the key and all its I<children>.
+
+=item B<-s>
+
+Connect to the Xenstore daemon using a local socket only.
+
+=item B<-u>
+
+Apply the permissions to the key and all its I<parents>.
+
+=back
+
+=head1 BUGS
+
+Send bugs to xen-devel@lists.xen.org, see
+http://wiki.xen.org/xenwiki/ReportingBugs on how to send bug reports.
