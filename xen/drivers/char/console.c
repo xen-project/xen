@@ -648,7 +648,7 @@ void __init console_init_postirq(void)
     for ( i = conringc ; i != conringp; i++ )
         ring[i & (opt_conring_size - 1)] = conring[i & (conring_size - 1)];
     conring = ring;
-    wmb(); /* Allow users of console_force_unlock() to see larger buffer. */
+    smp_wmb(); /* Allow users of console_force_unlock() to see larger buffer. */
     conring_size = opt_conring_size;
     spin_unlock_irq(&console_lock);
 

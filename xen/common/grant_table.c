@@ -426,7 +426,7 @@ static int _set_status_v2(domid_t  domid,
 
     /* Make sure guest sees status update before checking if flags are
        still valid */
-    mb();
+    smp_mb();
 
     scombo.word = *(u32 *)shah;
     barrier();
@@ -1670,7 +1670,7 @@ gnttab_transfer(
             guest_physmap_add_page(e, sha->full_page.frame, mfn, 0);
             sha->full_page.frame = mfn;
         }
-        wmb();
+        smp_wmb();
         shared_entry_header(e->grant_table, gop.ref)->flags |=
             GTF_transfer_completed;
 

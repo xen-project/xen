@@ -255,7 +255,7 @@ static int alloc_trace_bufs(unsigned int pages)
     opt_tbuf_size = pages;
 
     printk("xentrace: initialised\n");
-    wmb(); /* above must be visible before tb_init_done flag set */
+    smp_wmb(); /* above must be visible before tb_init_done flag set */
     tb_init_done = 1;
 
     return 0;
@@ -414,7 +414,7 @@ int tb_control(xen_sysctl_tbuf_op_t *tbc)
         int i;
 
         tb_init_done = 0;
-        wmb();
+        smp_wmb();
         /* Clear any lost-record info so we don't get phantom lost records next time we
          * start tracing.  Grab the lock to make sure we're not racing anyone.  After this
          * hypercall returns, no more records should be placed into the buffers. */
@@ -607,7 +607,7 @@ static inline void __insert_record(struct t_buf *buf,
         memcpy(next_page, (char *)rec + remaining, rec_size - remaining);
     }
 
-    wmb();
+    smp_wmb();
 
     next += rec_size;
     if ( next >= 2*data_size )
@@ -718,7 +718,7 @@ void __trace_var(u32 event, bool_t cycles, unsigned int extra,
         return;
 
     /* Read tb_init_done /before/ t_bufs. */
-    rmb();
+    smp_rmb();
 
     spin_lock_irqsave(&this_cpu(t_lock), flags);
 

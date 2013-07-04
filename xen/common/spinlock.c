@@ -218,7 +218,7 @@ void _spin_barrier(spinlock_t *lock)
     u64      loop = 0;
 
     check_barrier(&lock->debug);
-    do { mb(); loop++;} while ( _raw_spin_is_locked(&lock->raw) );
+    do { smp_mb(); loop++;} while ( _raw_spin_is_locked(&lock->raw) );
     if ((loop > 1) && lock->profile)
     {
         lock->profile->time_block += NOW() - block;
@@ -226,9 +226,9 @@ void _spin_barrier(spinlock_t *lock)
     }
 #else
     check_barrier(&lock->debug);
-    do { mb(); } while ( _raw_spin_is_locked(&lock->raw) );
+    do { smp_mb(); } while ( _raw_spin_is_locked(&lock->raw) );
 #endif
-    mb();
+    smp_mb();
 }
 
 int _spin_trylock_recursive(spinlock_t *lock)

@@ -79,13 +79,13 @@ int sidtab_insert(struct sidtab *s, u32 sid, struct context *context)
     if ( prev )
     {
         newnode->next = prev->next;
-        wmb();
+        smp_wmb();
         prev->next = newnode;
     }
     else
     {
         newnode->next = s->htable[hvalue];
-        wmb();
+        smp_wmb();
         s->htable[hvalue] = newnode;
     }
 

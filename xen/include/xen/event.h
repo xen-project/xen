@@ -85,7 +85,7 @@ void notify_via_xen_event_channel(struct domain *ld, int lport);
         if ( condition )                                                \
             break;                                                      \
         set_bit(_VPF_blocked_in_xen, &current->pause_flags);            \
-        mb(); /* set blocked status /then/ re-evaluate condition */     \
+        smp_mb(); /* set blocked status /then/ re-evaluate condition */ \
         if ( condition )                                                \
         {                                                               \
             clear_bit(_VPF_blocked_in_xen, &current->pause_flags);      \
@@ -99,7 +99,7 @@ void notify_via_xen_event_channel(struct domain *ld, int lport);
     do {                                                                \
         set_bit(_VPF_blocked_in_xen, &current->pause_flags);            \
         raise_softirq(SCHEDULE_SOFTIRQ);                                \
-        mb(); /* set blocked status /then/ caller does his work */      \
+        smp_mb(); /* set blocked status /then/ caller does his work */  \
     } while ( 0 )
 
 #endif /* __XEN_EVENT_H__ */

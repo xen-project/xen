@@ -1472,7 +1472,7 @@ int assign_pages(
         ASSERT(page_get_owner(&pg[i]) == NULL);
         ASSERT((pg[i].count_info & ~(PGC_allocated | 1)) == 0);
         page_set_owner(&pg[i], d);
-        wmb(); /* Domain pointer must be visible before updating refcnt. */
+        smp_wmb(); /* Domain pointer must be visible before updating refcnt. */
         pg[i].count_info = PGC_allocated | 1;
         page_list_add_tail(&pg[i], &d->page_list);
     }

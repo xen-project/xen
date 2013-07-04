@@ -89,12 +89,12 @@ void smp_call_function_interrupt(void)
     if ( call_data.wait )
     {
         (*func)(info);
-        mb();
+        smp_mb();
         cpumask_clear_cpu(cpu, &call_data.selected);
     }
     else
     {
-        mb();
+        smp_mb();
         cpumask_clear_cpu(cpu, &call_data.selected);
         (*func)(info);
     }

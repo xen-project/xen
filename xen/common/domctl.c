@@ -533,7 +533,7 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 
             /* Install vcpu array /then/ update max_vcpus. */
             d->vcpu = vcpus;
-            wmb();
+            smp_wmb();
             d->max_vcpus = max;
         }
 
