@@ -844,9 +844,6 @@ static int flask_hvmcontext(struct domain *d, uint32_t cmd)
     case XEN_DOMCTL_gethvmcontext_partial:
         perm = HVM__GETHVMC;
         break;
-    case HVMOP_track_dirty_vram:
-        perm = HVM__TRACKDIRTYVRAM;
-        break;
     default:
         return -EPERM;
     }
@@ -884,6 +881,9 @@ static int flask_hvm_param(struct domain *d, unsigned long op)
         break;
     case HVMOP_get_param:
         perm = HVM__GETPARAM;
+        break;
+    case HVMOP_track_dirty_vram:
+        perm = HVM__TRACKDIRTYVRAM;
         break;
     default:
         return -EPERM;
