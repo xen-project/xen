@@ -90,10 +90,10 @@ static const unsigned int vlapic_lvt_mask[VLAPIC_LVT_NUM] =
     ((vlapic_get_reg(vlapic, APIC_LVTT) & APIC_TIMER_MODE_MASK) \
      == APIC_TIMER_MODE_TSC_DEADLINE)
 
-static int vlapic_find_highest_vector(void *bitmap)
+static int vlapic_find_highest_vector(const void *bitmap)
 {
-    uint32_t *word = bitmap;
-    int word_offset = MAX_VECTOR / 32;
+    const uint32_t *word = bitmap;
+    unsigned int word_offset = NR_VECTORS / 32;
 
     /* Work backwards through the bitmap (first 32-bit word in every four). */
     while ( (word_offset != 0) && (word[(--word_offset)*4] == 0) )

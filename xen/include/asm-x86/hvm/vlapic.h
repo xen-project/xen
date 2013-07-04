@@ -26,8 +26,6 @@
 #include <public/hvm/ioreq.h>
 #include <asm/hvm/vpt.h>
 
-#define MAX_VECTOR      256
-
 #define vcpu_vlapic(x)   (&(x)->arch.hvm_vcpu.vlapic)
 #define vlapic_vcpu(x)   (container_of((x), struct vcpu, arch.hvm_vcpu.vlapic))
 #define vlapic_domain(x) (vlapic_vcpu(x)->domain)
