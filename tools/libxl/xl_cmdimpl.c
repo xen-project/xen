@@ -2809,7 +2809,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         if (default_output_format == OUTPUT_FORMAT_JSON)
             s = printf_info_one_json(hand, info[i].domid, &d_config);
         else
-            printf_info_sexp(domid, &d_config);
+            printf_info_sexp(info[i].domid, &d_config);
         libxl_domain_config_dispose(&d_config);
         free(data);
         free(config_source);
