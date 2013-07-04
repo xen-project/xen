@@ -1,0 +1,62 @@
+=head1 NAME
+
+xenstore-ls - list Xenstore keys and values
+
+=head1 SYNOPSIS
+
+B<xenstore-ls> [I<OPTION>]... [I<PATH>]...
+
+=head1 DESCRIPTION
+
+List keys, values and permissions of one or more Xenstore I<PATH>s,
+using a nested, tree-like view.
+
+=over
+
+=item B<-f>
+
+Show the full path for all keys.
+
+=item B<-p>
+
+Show permissions of all the listed keys as comma separated list.  The
+format of each permission is I<LD>, where I<L> is a letter for the
+type of permission and I<D> is the corresponding domain ID.
+
+The types of permission are:
+
+=over
+
+=item B<r>
+
+read
+
+=item B<w>
+
+write
+
+=item B<b>
+
+read and write (both)
+
+=item B<n>
+
+no access
+
+=back
+
+The first permission entry is the domain owning the key (the owner)
+I<and> the permissions for any domain not explicitly listed in
+subsequent entries.  The key owner always has full access (read,
+write, and set permissions).
+
+=item B<-s>
+
+Connect to the Xenstore daemon using a local socket only.
+
+=back
+
+=head1 BUGS
+
+Send bugs to xen-devel@lists.xen.org, see
+http://wiki.xen.org/xenwiki/ReportingBugs on how to send bug reports.
