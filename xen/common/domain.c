@@ -958,7 +958,8 @@ void unmap_vcpu_info(struct vcpu *v)
         return;
 
     mfn = v->vcpu_info_mfn;
-    unmap_domain_page_global(v->vcpu_info);
+    unmap_domain_page_global((void *)
+                             ((unsigned long)v->vcpu_info & PAGE_MASK));
 
     v->vcpu_info = &dummy_vcpu_info;
     v->vcpu_info_mfn = INVALID_MFN;

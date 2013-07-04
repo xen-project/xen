@@ -11,6 +11,7 @@
 #include <xen/perfc.h>
 #include <xen/pfn.h>
 #include <xen/sched.h>
+#include <xen/vmap.h>
 #include <asm/current.h>
 #include <asm/flushtlb.h>
 #include <asm/hardirq.h>
@@ -310,18 +311,8 @@ int mapcache_vcpu_init(struct vcpu *v)
     return 0;
 }
 
-#define GLOBALMAP_BITS (GLOBALMAP_GBYTES << (30 - PAGE_SHIFT))
-static unsigned long inuse[BITS_TO_LONGS(GLOBALMAP_BITS)];
-static unsigned long garbage[BITS_TO_LONGS(GLOBALMAP_BITS)];
-static unsigned int inuse_cursor;
-static DEFINE_SPINLOCK(globalmap_lock);
-
 void *map_domain_page_global(unsigned long mfn)
 {
-    l1_pgentry_t *pl1e;
-    unsigned int idx, i;
-    unsigned long va;
-
     ASSERT(!in_irq() && local_irq_is_enabled());
 
 #ifdef NDEBUG
@@ -329,59 +320,19 @@ void *map_domain_page_global(unsigned long mfn)
         return mfn_to_virt(mfn);
 #endif
 
-    spin_lock(&globalmap_lock);
-
-    idx = find_next_zero_bit(inuse, GLOBALMAP_BITS, inuse_cursor);
-    va = GLOBALMAP_VIRT_START + pfn_to_paddr(idx);
-    if ( unlikely(va >= GLOBALMAP_VIRT_END) )
-    {
-        /* /First/, clean the garbage map and update the inuse list. */
-        for ( i = 0; i < ARRAY_SIZE(garbage); i++ )
-            inuse[i] &= ~xchg(&garbage[i], 0);
-
-        /* /Second/, flush all TLBs to get rid of stale garbage mappings. */
-        flush_tlb_all();
-
-        idx = find_first_zero_bit(inuse, GLOBALMAP_BITS);
-        va = GLOBALMAP_VIRT_START + pfn_to_paddr(idx);
-        if ( unlikely(va >= GLOBALMAP_VIRT_END) )
-        {
-            spin_unlock(&globalmap_lock);
-            return NULL;
-        }
-    }
-
-    set_bit(idx, inuse);
-    inuse_cursor = idx + 1;
-
-    pl1e = virt_to_xen_l1e(va);
-
-    spin_unlock(&globalmap_lock);
-
-    if ( !pl1e )
-        return NULL;
-    l1e_write(pl1e, l1e_from_pfn(mfn, __PAGE_HYPERVISOR));
-
-    return (void *)va;
+    return vmap(&mfn, 1);
 }
 
 void unmap_domain_page_global(const void *ptr)
 {
     unsigned long va = (unsigned long)ptr;
-    l1_pgentry_t *pl1e;
 
     if ( va >= DIRECTMAP_VIRT_START )
         return;
 
-    ASSERT(va >= GLOBALMAP_VIRT_START && va < GLOBALMAP_VIRT_END);
+    ASSERT(va >= VMAP_VIRT_START && va < VMAP_VIRT_END);
 
-    /* /First/, we zap the PTE. */
-    pl1e = virt_to_xen_l1e(va);
-    BUG_ON(!pl1e);
-    l1e_write(pl1e, l1e_empty());
-
-    /* /Second/, we add to the garbage map. */
-    set_bit(PFN_DOWN(va - GLOBALMAP_VIRT_START), garbage);
+    vunmap(ptr);
 }
 
 /* Translate a map-domain-page'd address to the underlying MFN */
@@ -393,7 +344,7 @@ unsigned long domain_page_map_to_mfn(const void *ptr)
     if ( va >= DIRECTMAP_VIRT_START )
         return virt_to_mfn(ptr);
 
-    if ( va >= GLOBALMAP_VIRT_START && va < GLOBALMAP_VIRT_END )
+    if ( va >= VMAP_VIRT_START && va < VMAP_VIRT_END )
     {
         pl1e = virt_to_xen_l1e(va);
         BUG_ON(!pl1e);
