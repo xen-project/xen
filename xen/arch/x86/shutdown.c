@@ -32,6 +32,7 @@ enum reboot_type {
         BOOT_KBD = 'k',
         BOOT_ACPI = 'a',
         BOOT_BIOS = 'b',
+        BOOT_CF9 = 'p',
 };
 
 static long no_idt[2];
@@ -45,6 +46,7 @@ static int reboot_mode;
  * triple Force a triple fault (init)
  * kbd    Use the keyboard controller. cold reset (default)
  * acpi   Use the RESET_REG in the FADT
+ * pci    Use the so-called "PCI reset register", CF9
  */
 static enum reboot_type reboot_type = BOOT_ACPI;
 static void __init set_reboot_type(char *str)
@@ -66,6 +68,7 @@ static void __init set_reboot_type(char *str)
         case 'a':
         case 'k':
         case 't':
+        case 'p':
             reboot_type = *str;
             break;
         }
@@ -100,6 +103,358 @@ void machine_halt(void)
     smp_call_function(__machine_halt, NULL, 0);
     __machine_halt(NULL);
 }
+
+static int __init override_reboot(struct dmi_system_id *d)
+{
+    enum reboot_type type = (long)d->driver_data;
+
+    if ( reboot_type != type )
+    {
+        static const char *__initdata msg[] =
+        {
+            [BOOT_BIOS] = "BIOS",
+            [BOOT_KBD]  = "keyboard controller",
+            [BOOT_CF9]  = "PCI",
+        };
+
+        reboot_type = type;
+        ASSERT(type >= 0 && type < ARRAY_SIZE(msg) && msg[type]);
+        printk("%s series board detected. Selecting %s reboot method.\n",
+               d->ident, msg[type]);
+    }
+    return 0;
+}
+
+static struct dmi_system_id __initdata reboot_dmi_table[] = {
+    {    /* Handle problems with rebooting on Dell E520's */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell E520",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Dell DM061"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell 1300's */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell PowerEdge 1300",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+            DMI_MATCH(DMI_PRODUCT_NAME, "PowerEdge 1300/"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell 300's */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell PowerEdge 300",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+            DMI_MATCH(DMI_PRODUCT_NAME, "PowerEdge 300/"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell Optiplex 745's SFF */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell OptiPlex 745",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 745"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell Optiplex 745's DFF */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell OptiPlex 745",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 745"),
+            DMI_MATCH(DMI_BOARD_NAME, "0MM599"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell Optiplex 745 with 0KW626 */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell OptiPlex 745",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 745"),
+            DMI_MATCH(DMI_BOARD_NAME, "0KW626"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell Optiplex 330 with 0KP561 */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell OptiPlex 330",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 330"),
+            DMI_MATCH(DMI_BOARD_NAME, "0KP561"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell Optiplex 360 with 0T656F */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell OptiPlex 360",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 360"),
+            DMI_MATCH(DMI_BOARD_NAME, "0T656F"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell OptiPlex 760 with 0G919G */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell OptiPlex 760",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 760"),
+            DMI_MATCH(DMI_BOARD_NAME, "0G919G"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell 2400's */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell PowerEdge 2400",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+            DMI_MATCH(DMI_PRODUCT_NAME, "PowerEdge 2400"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell T5400's */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell Precision T5400",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Precision WorkStation T5400"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell T7400's */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell Precision T7400",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Precision WorkStation T7400"),
+        },
+    },
+    {    /* Handle problems with rebooting on HP laptops */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "HP Compaq Laptop",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Hewlett-Packard"),
+            DMI_MATCH(DMI_PRODUCT_NAME, "HP Compaq"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell XPS710 */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell XPS710",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Dell XPS710"),
+        },
+    },
+    {    /* Handle problems with rebooting on Dell DXP061 */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Dell DXP061",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Dell DXP061"),
+        },
+    },
+    {    /* Handle problems with rebooting on Sony VGN-Z540N */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "Sony VGN-Z540N",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Sony Corporation"),
+            DMI_MATCH(DMI_PRODUCT_NAME, "VGN-Z540N"),
+        },
+    },
+    {    /* Handle problems with rebooting on ASUS P4S800 */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_BIOS,
+        .ident = "ASUS P4S800",
+        .matches = {
+            DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
+            DMI_MATCH(DMI_BOARD_NAME, "P4S800"),
+        },
+    },
+    {    /* Handle reboot issue on Acer Aspire one */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_KBD,
+        .ident = "Acer Aspire One A110",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+            DMI_MATCH(DMI_PRODUCT_NAME, "AOA110"),
+        },
+    },
+    {    /* Handle problems with rebooting on Apple MacBook5 */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Apple MacBook5",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Apple Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "MacBook5"),
+        },
+    },
+    {    /* Handle problems with rebooting on Apple MacBookPro5 */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Apple MacBookPro5",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Apple Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "MacBookPro5"),
+        },
+    },
+    {    /* Handle problems with rebooting on Apple Macmini3,1 */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Apple Macmini3,1",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Apple Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Macmini3,1"),
+        },
+    },
+    {    /* Handle problems with rebooting on the iMac9,1. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Apple iMac9,1",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Apple Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "iMac9,1"),
+        },
+    },
+    {    /* Handle problems with rebooting on the Latitude E6320. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Dell Latitude E6320",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Latitude E6320"),
+        },
+    },
+    {    /* Handle problems with rebooting on the Latitude E5420. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Dell Latitude E5420",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Latitude E5420"),
+        },
+    },
+    {       /* Handle problems with rebooting on the Latitude E6220. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Dell Latitude E6220",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Latitude E6220"),
+        },
+    },
+    {    /* Handle problems with rebooting on the Latitude E6420. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Dell Latitude E6420",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Latitude E6420"),
+        },
+    },
+    {    /* Handle problems with rebooting on the OptiPlex 990. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Dell OptiPlex 990",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 990"),
+        },
+    },
+    {    /* Handle problems with rebooting on the Precision M6600. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Dell OptiPlex 990",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Precision M6600"),
+        },
+    },
+    {    /* Handle problems with rebooting on the Latitude E6520. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Dell Latitude E6520",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Latitude E6520"),
+        },
+    },
+    {       /* Handle problems with rebooting on the OptiPlex 790. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Dell OptiPlex 790",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 790"),
+        },
+    },
+    {    /* Handle problems with rebooting on the OptiPlex 990. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Dell OptiPlex 990",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 990"),
+        },
+    },
+    {    /* Handle problems with rebooting on the OptiPlex 390. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Dell OptiPlex 390",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 390"),
+        },
+    },
+    {    /* Handle problems with rebooting on the Latitude E6320. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Dell Latitude E6320",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Latitude E6320"),
+        },
+    },
+    {    /* Handle problems with rebooting on the Latitude E6420. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Dell Latitude E6420",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Latitude E6420"),
+        },
+    },
+    {    /* Handle problems with rebooting on the Latitude E6520. */
+        .callback = override_reboot,
+        .driver_data = (void *)(long)BOOT_CF9,
+        .ident = "Dell Latitude E6520",
+        .matches = {
+            DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+            DMI_MATCH(DMI_PRODUCT_NAME, "Latitude E6520"),
+        },
+    },
+    { }
+};
+
+static int __init reboot_init(void)
+{
+    dmi_check_system(reboot_dmi_table);
+    return 0;
+}
+__initcall(reboot_init);
 
 static void __machine_restart(void *pdelay)
 {
@@ -182,6 +537,16 @@ void machine_restart(unsigned int delay_millisecs)
         case BOOT_ACPI:
             acpi_reboot();
             reboot_type = BOOT_KBD;
+            break;
+        case BOOT_CF9:
+            {
+                u8 cf9 = inb(0xcf9) & ~6;
+                outb(cf9|2, 0xcf9); /* Request hard reset */
+                udelay(50);
+                outb(cf9|6, 0xcf9); /* Actually do the reset */
+                udelay(50);
+            }
+            reboot_type = BOOT_ACPI;
             break;
         }
     }
