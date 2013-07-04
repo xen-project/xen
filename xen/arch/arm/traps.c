@@ -62,7 +62,8 @@ void __cpuinit init_traps(void)
     WRITE_SYSREG((vaddr_t)hyp_traps_vector, VBAR_EL2);
 
     /* Setup hypervisor traps */
-    WRITE_SYSREG(HCR_PTW|HCR_BSU_OUTER|HCR_AMO|HCR_IMO|HCR_VM|HCR_TWI|HCR_TSC, HCR_EL2);
+    WRITE_SYSREG(HCR_PTW|HCR_BSU_OUTER|HCR_AMO|HCR_IMO|HCR_VM|HCR_TWI|HCR_TSC|
+                 HCR_TAC, HCR_EL2);
     isb();
 }
 
@@ -836,6 +837,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
 {
     struct hsr_cp32 cp32 = hsr.cp32;
     uint32_t *r = (uint32_t*)select_user_reg(regs, cp32.reg);
+    struct vcpu *v = current;
 
     if ( !cp32.ccvalid ) {
         dprintk(XENLOG_ERR, "cp_15(32): need to handle invalid condition codes\n");
@@ -888,6 +890,10 @@ static void do_cp15_32(struct cpu_user_regs *regs,
                     "failed emulation of 32-bit vtimer CP register access\n");
             domain_crash_synchronous();
         }
+        break;
+    case HSR_CPREG32(ACTLR):
+        if ( cp32.read )
+           *r = v->arch.actlr;
         break;
     default:
         printk("%s p15, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",

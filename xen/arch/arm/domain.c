@@ -28,6 +28,7 @@
 #include <asm/irq.h>
 #include <asm/cpufeature.h>
 #include <asm/vfp.h>
+#include <asm/processor-ca15.h>
 
 #include <asm/gic.h>
 #include "vtimer.h"
@@ -61,7 +62,6 @@ static void ctxt_switch_from(struct vcpu *p)
     p->arch.csselr = READ_SYSREG(CSSELR_EL1);
 
     /* Control Registers */
-    p->arch.actlr = READ_SYSREG(ACTLR_EL1);
     p->arch.sctlr = READ_SYSREG(SCTLR_EL1);
     p->arch.cpacr = READ_SYSREG(CPACR_EL1);
 
@@ -182,7 +182,6 @@ static void ctxt_switch_to(struct vcpu *n)
     isb();
 
     /* Control Registers */
-    WRITE_SYSREG(n->arch.actlr, ACTLR_EL1);
     WRITE_SYSREG(n->arch.sctlr, SCTLR_EL1);
     WRITE_SYSREG(n->arch.cpacr, CPACR_EL1);
 
@@ -452,6 +451,12 @@ int vcpu_initialise(struct vcpu *v)
         return rc;
 
     v->arch.sctlr = SCTLR_BASE;
+    v->arch.actlr = READ_SYSREG32(ACTLR_EL1);
+    /* XXX: Handle other than CA15 cpus */
+    if ( v->domain->max_vcpus > 1 )
+        v->arch.actlr |= ACTLR_CA15_SMP;
+    else
+        v->arch.actlr &= ~ACTLR_CA15_SMP;
 
     if ( (rc = vcpu_vgic_init(v)) != 0 )
         return rc;
