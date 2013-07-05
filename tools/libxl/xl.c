@@ -45,6 +45,7 @@ char *lockfile;
 char *default_vifscript = NULL;
 char *default_bridge = NULL;
 char *default_gatewaydev = NULL;
+char *default_vifbackend = NULL;
 enum output_format default_output_format = OUTPUT_FORMAT_JSON;
 int claim_mode = 1;
 
@@ -157,6 +158,9 @@ static void parse_global_config(const char *configfile,
 
     if (!xlu_cfg_get_string (config, "vif.default.gatewaydev", &buf, 0))
         default_gatewaydev = strdup(buf);
+
+    if (!xlu_cfg_get_string (config, "vif.default.backend", &buf, 0))
+        default_vifbackend = strdup(buf);
 
     if (!xlu_cfg_get_string (config, "output_format", &buf, 0)) {
         if (!strcmp(buf, "json"))

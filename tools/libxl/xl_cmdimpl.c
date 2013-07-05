@@ -1125,6 +1125,11 @@ static void parse_config_data(const char *config_source,
                 nic->gatewaydev = strdup(default_gatewaydev);
             }
 
+            if (default_vifbackend) {
+                free(nic->backend_domname);
+                nic->backend_domname = strdup(default_vifbackend);
+            }
+
             p = strtok(buf2, ",");
             if (!p)
                 goto skip_nic;
@@ -1174,6 +1179,7 @@ static void parse_config_data(const char *config_source,
                     free(nic->ifname);
                     nic->ifname = strdup(p2 + 1);
                 } else if (!strcmp(p, "backend")) {
+                    free(nic->backend_domname);
                     nic->backend_domname = strdup(p2 + 1);
                 } else if (!strcmp(p, "rate")) {
                     parse_vif_rate(&config, (p2 + 1), nic);
