@@ -131,10 +131,8 @@ specified IP address to be used by the guest (blocking all others).
 ### backend
 
 Specifies the backend domain which this device should attach to. This
-defaults to domain 0. This option does not work if `run_hotplug_scripts`
-is not disabled in xl.conf (see xl.conf(5) man page for more information
-on this option). Specifying another domain requires setting up a driver
-domain which is outside the scope of this document.
+defaults to domain 0.  Specifying another domain requires setting up a
+driver domain which is outside the scope of this document.
 
 ### rate
 

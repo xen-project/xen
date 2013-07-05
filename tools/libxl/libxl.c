@@ -2820,13 +2820,6 @@ int libxl__device_nic_setdefault(libxl__gc *gc, libxl_device_nic *nic,
     rc = libxl__resolve_domid(gc, nic->backend_domname, &nic->backend_domid);
     if (rc < 0) return rc;
 
-    if (nic->backend_domid != LIBXL_TOOLSTACK_DOMID && run_hotplug_scripts) {
-        LOG(ERROR, "cannot use a backend domain different than %d if"
-                   "hotplug scripts are executed from libxl",
-                   LIBXL_TOOLSTACK_DOMID);
-        return ERROR_FAIL;
-    }
-
     switch (libxl__domain_type(gc, domid)) {
     case LIBXL_DOMAIN_TYPE_HVM:
         if (!nic->nictype)
