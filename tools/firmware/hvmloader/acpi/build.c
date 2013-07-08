@@ -268,11 +268,13 @@ static int construct_secondary_tables(unsigned long *table_ptrs,
         table_ptrs[nr_tables++] = (unsigned long)madt;
     }
 
-    /* HPET. Always included in DSDT, so always include it here too. */
-    /* (And it's unconditionally required by Windows SVVP tests.) */
-    hpet = construct_hpet();
-    if (!hpet) return -1;
-    table_ptrs[nr_tables++] = (unsigned long)hpet;
+    /* HPET. */
+    if ( hpet_exists(ACPI_HPET_ADDRESS) )
+    {
+        hpet = construct_hpet();
+        if (!hpet) return -1;
+        table_ptrs[nr_tables++] = (unsigned long)hpet;
+    }
 
     /* WAET. */
     waet = construct_waet();
