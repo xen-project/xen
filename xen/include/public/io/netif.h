@@ -206,7 +206,7 @@ struct netif_rx_response {
     uint16_t id;
     uint16_t offset;       /* Offset in page of start of received packet  */
     uint16_t flags;        /* NETRXF_* */
-    int16_t  status;       /* -ve: BLKIF_RSP_* ; +ve: Rx'ed pkt size. */
+    int16_t  status;       /* -ve: NETIF_RSP_* ; +ve: Rx'ed pkt size. */
 };
 typedef struct netif_rx_response netif_rx_response_t;
 
