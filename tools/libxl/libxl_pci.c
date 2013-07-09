@@ -786,6 +786,18 @@ int libxl__device_pci_add(libxl_ctx *ctx, uint32_t domid, libxl_device_pci *pcid
     int num_assigned, i, rc;
     int stubdomid = 0;
 
+    if (libxl__domain_is_hvm(ctx, domid)) {
+        rc = xc_test_assign_device(ctx->xch, domid, pcidev_value(pcidev));
+        if (rc) {
+            LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                       "PCI device %04x:%02x:%02x.%u %s?",
+                       pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func,
+                       errno == ENOSYS ? "cannot be assigned - no IOMMU"
+                                       : "already assigned to a different guest");
+            goto out;
+        }
+    }
+
     if (!libxl_pcidev_assignable(ctx, pcidev)) {
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "PCI device %x:%x:%x.%x is not assignable",
                    pcidev->domain, pcidev->bus, pcidev->dev, pcidev->func);
