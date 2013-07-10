@@ -1492,7 +1492,7 @@ static struct keyhandler vmcs_dump_keyhandler = {
     .desc = "dump Intel's VMCS"
 };
 
-void setup_vmcs_dump(void)
+void __init setup_vmcs_dump(void)
 {
     register_keyhandler('v', &vmcs_dump_keyhandler);
 }

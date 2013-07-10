@@ -310,7 +310,7 @@ static struct keyhandler vmcb_dump_keyhandler = {
     .desc = "dump AMD-V VMCBs"
 };
 
-void setup_vmcb_dump(void)
+void __init setup_vmcb_dump(void)
 {
     register_keyhandler('v', &vmcb_dump_keyhandler);
 }
