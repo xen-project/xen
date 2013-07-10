@@ -195,7 +195,7 @@ _MAP:
 .PHONY: FORCE
 FORCE:
 
-%.o %.i: %.c FORCE
+%.o %.i %.s: %.c FORCE
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C $(*D) $(@F)
 
 %.o %.s: %.S FORCE

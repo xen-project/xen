@@ -177,6 +177,9 @@ $(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): %.init.o: %.o Makefile
 %.i: %.c Makefile
 	$(CPP) $(CFLAGS) $< -o $@
 
+%.s: %.c Makefile
+	$(CC) $(CFLAGS) -S $< -o $@
+
 # -std=gnu{89,99} gets confused by # as an end-of-line comment marker
 %.s: %.S Makefile
 	$(CPP) $(AFLAGS) $< -o $@
