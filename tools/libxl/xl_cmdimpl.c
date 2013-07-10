@@ -4582,6 +4582,8 @@ static void output_xeninfo(void)
     printf("xen_major              : %d\n", info->xen_version_major);
     printf("xen_minor              : %d\n", info->xen_version_minor);
     printf("xen_extra              : %s\n", info->xen_version_extra);
+    printf("xen_version            : %d.%d%s\n", info->xen_version_major,
+           info->xen_version_minor, info->xen_version_extra);
     printf("xen_caps               : %s\n", info->capabilities);
     printf("xen_scheduler          : %s\n", libxl_scheduler_to_string(sched));
     printf("xen_pagesize           : %u\n", info->pagesize);
