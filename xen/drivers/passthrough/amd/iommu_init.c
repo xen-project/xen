@@ -336,11 +336,9 @@ static void amd_iommu_reset_event_log(struct amd_iommu *iommu)
     /* read event log for debugging */
     amd_iommu_read_event_log(iommu);
 
-    /*clear overflow bit */
-    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
-                         IOMMU_STATUS_EVENT_OVERFLOW_MASK,
-                         IOMMU_STATUS_EVENT_OVERFLOW_SHIFT, &entry);
-    writel(entry, iommu->mmio_base+IOMMU_STATUS_MMIO_OFFSET);
+    /* RW1C overflow bit */
+    writel(IOMMU_STATUS_EVENT_OVERFLOW_MASK,
+           iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
 
     /*reset event log base address */
     iommu->event_log_head = 0;
@@ -564,6 +562,11 @@ static void do_amd_iommu_irq(unsigned long data)
         int of;
 
         spin_lock_irqsave(&iommu->lock, flags);
+
+        /* RW1C interrupt status bit */
+        writel(IOMMU_STATUS_EVENT_LOG_INT_MASK,
+               iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+
         amd_iommu_read_event_log(iommu);
 
         /* check event overflow */
@@ -575,13 +578,21 @@ static void do_amd_iommu_irq(unsigned long data)
         /* reset event log if event overflow */
         if ( of )
             amd_iommu_reset_event_log(iommu);
+        else
+        {
+            entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+            if ( !(entry & IOMMU_CONTROL_EVENT_LOG_INT_MASK) )
+            {
+                entry |= IOMMU_CONTROL_EVENT_LOG_INT_MASK;
+                writel(entry, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+                /*
+                 * Re-schedule the tasklet to handle eventual log entries added
+                 * between reading the log above and re-enabling the interrupt.
+                 */
+                tasklet_schedule(&amd_iommu_irq_tasklet);
+            }
+        }
 
-        /* reset interrupt status bit */
-        entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
-        set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, entry,
-                             IOMMU_STATUS_EVENT_LOG_INT_MASK,
-                             IOMMU_STATUS_EVENT_LOG_INT_SHIFT, &entry);
-        writel(entry, iommu->mmio_base+IOMMU_STATUS_MMIO_OFFSET);
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
 }
@@ -595,12 +606,13 @@ static void amd_iommu_page_fault(int irq, void *dev_id,
 
     spin_lock_irqsave(&iommu->lock, flags);
 
-    /* Silence interrupts from both event logging */
-    entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
-    set_field_in_reg_u32(IOMMU_CONTROL_DISABLED, entry,
-                         IOMMU_STATUS_EVENT_LOG_INT_MASK,
-                         IOMMU_STATUS_EVENT_LOG_INT_SHIFT, &entry);
-    writel(entry, iommu->mmio_base+IOMMU_STATUS_MMIO_OFFSET);
+    /*
+     * Silence interrupts from both event and PPR by clearing the
+     * enable logging bits in the control register
+     */
+    entry = readl(iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
+    entry &= ~IOMMU_CONTROL_EVENT_LOG_INT_MASK;
+    writel(entry, iommu->mmio_base + IOMMU_CONTROL_MMIO_OFFSET);
 
     spin_unlock_irqrestore(&iommu->lock, flags);
 
