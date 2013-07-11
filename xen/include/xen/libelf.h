@@ -76,14 +76,14 @@ typedef void elf_log_callback(struct elf_binary*, void *caller_data,
 #ifdef __XEN__
 # ifdef __i386__
 typedef uint32_t elf_uintptr_t;
-#  define ELF_PRPTRVAL PRIu32
+#  define ELF_PRPTRVAL PRIx32
 # else
 typedef uint64_t elf_uintptr_t;
-#  define ELF_PRPTRVAL PRIu64
+#  define ELF_PRPTRVAL PRIx64
 # endif
 #else
 typedef uintptr_t elf_uintptr_t;
-# define ELF_PRPTRVAL PRIuPTR
+# define ELF_PRPTRVAL PRIxPTR
 #endif
 
 typedef elf_uintptr_t elf_ptrval;
