@@ -3910,6 +3910,7 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE(void) arg)
             v->arch.hvm_vcpu.inject_trap       = tr.trap;
             v->arch.hvm_vcpu.inject_error_code = tr.error_code;
             v->arch.hvm_vcpu.inject_cr2        = tr.cr2;
+            rc = 0;
         }
 
     param_fail8:
