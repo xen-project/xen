@@ -593,6 +593,14 @@ static void do_amd_iommu_irq(unsigned long data)
             }
         }
 
+        /*
+         * Workaround for erratum787:
+         * Re-check to make sure the bit has been cleared.
+         */
+        entry = readl(iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+        if ( entry & IOMMU_STATUS_EVENT_LOG_INT_MASK )
+            tasklet_schedule(&amd_iommu_irq_tasklet);
+
         spin_unlock_irqrestore(&iommu->lock, flags);
     }
 }
