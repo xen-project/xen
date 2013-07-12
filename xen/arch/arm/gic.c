@@ -522,6 +522,7 @@ void __init release_irq(unsigned int irq)
     action = desc->action;
     desc->action  = NULL;
     desc->status |= IRQ_DISABLED;
+    desc->status &= ~IRQ_GUEST;
 
     spin_lock(&gic.lock);
     desc->handler->shutdown(desc);
