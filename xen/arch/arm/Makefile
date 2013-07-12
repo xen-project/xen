@@ -40,19 +40,14 @@ endif
 
 ALL_OBJS := $(TARGET_SUBARCH)/head.o $(ALL_OBJS)
 
-$(TARGET): $(TARGET)-syms $(TARGET).bin
+$(TARGET): $(TARGET)-syms $(TARGET).axf
+	$(OBJCOPY) -O binary -S $< $@
+
+$(TARGET).axf: $(TARGET)-syms
 	# XXX: VE model loads by VMA so instead of
 	# making a proper ELF we link with LMA == VMA and adjust crudely
 	$(OBJCOPY) --change-addresses +0x80000000 $< $@
 	$(STRIP) $@
-
-#
-$(TARGET).bin: $(TARGET)-syms
-	$(OBJCOPY) -O binary -S $< $@
-
-#$(TARGET): $(TARGET)-syms $(efi-y) boot/mkelf32
-#	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000 \
-#	`$(NM) -nr $(TARGET)-syms | head -n 1 | sed -e 's/^\([^ ]*\).*/0x\1/'`
 
 ifeq ($(lto),y)
 # Gather all LTO objects together
@@ -97,3 +92,4 @@ dtb.o: $(CONFIG_DTB_FILE)
 clean::
 	rm -f asm-offsets.s xen.lds
 	rm -f $(BASEDIR)/.xen-syms.[0-9]*
+	rm -f $(TARGET).axf
