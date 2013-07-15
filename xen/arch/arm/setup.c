@@ -288,16 +288,27 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     unsigned long heap_pages, xenheap_pages, domheap_pages;
     unsigned long dtb_pages;
     unsigned long boot_mfn_start, boot_mfn_end;
+    int i = 0;
 
-    /*
-     * TODO: only using the first RAM bank for now.  The heaps and the
-     * frame table assume RAM is physically contiguous.
-     */
-    if ( early_info.mem.nr_banks > 1 )
-        early_printk("WARNING: Only using first bank of memory\n");
+    /* TODO: Handle non-contiguous memory bank */
+    if ( !early_info.mem.nr_banks )
+        early_panic("No memory bank\n");
     ram_start = early_info.mem.bank[0].start;
     ram_size  = early_info.mem.bank[0].size;
     ram_end = ram_start + ram_size;
+
+    for ( i = 1; i < early_info.mem.nr_banks; i++ )
+    {
+        if ( ram_end != early_info.mem.bank[i].start )
+            break;
+
+        ram_size += early_info.mem.bank[i].size;
+        ram_end += early_info.mem.bank[i].size;
+    }
+
+    if ( i != early_info.mem.nr_banks )
+        early_printk("WARNING: some memory banks are not used\n");
+
     total_pages = ram_pages = ram_size >> PAGE_SHIFT;
 
     /*
