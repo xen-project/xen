@@ -332,8 +332,6 @@ void paging_init(void);
 void *alloc_xen_pagetable(void);
 void free_xen_pagetable(void *v);
 l1_pgentry_t *virt_to_xen_l1e(unsigned long v);
-l2_pgentry_t *virt_to_xen_l2e(unsigned long v);
-l3_pgentry_t *virt_to_xen_l3e(unsigned long v);
 
 extern void set_pdx_range(unsigned long smfn, unsigned long emfn);
 

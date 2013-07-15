@@ -100,7 +100,6 @@ static int msix_get_fixmap(struct pci_dev *dev, u64 table_paddr,
 static void msix_put_fixmap(struct pci_dev *dev, int idx)
 {
     int i;
-    unsigned long start;
 
     spin_lock(&dev->msix_table_lock);
     for ( i = 0; i < MAX_MSIX_TABLE_PAGES; i++ )
@@ -113,8 +112,7 @@ static void msix_put_fixmap(struct pci_dev *dev, int idx)
 
     if ( --dev->msix_table_refcnt[i] == 0 )
     {
-        start = fix_to_virt(idx);
-        destroy_xen_mappings(start, start + PAGE_SIZE);
+        __set_fixmap(idx, 0, 0);
         msix_fixmap_free(idx);
         dev->msix_table_idx[i] = 0;
     }

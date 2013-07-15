@@ -65,68 +65,6 @@ int __mfn_valid(unsigned long mfn)
                            pdx_group_valid));
 }
 
-l3_pgentry_t *virt_to_xen_l3e(unsigned long v)
-{
-    l4_pgentry_t *pl4e;
-
-    pl4e = &idle_pg_table[l4_table_offset(v)];
-    if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )
-    {
-        l3_pgentry_t *pl3e = alloc_xen_pagetable();
-
-        if ( !pl3e )
-            return NULL;
-        clear_page(pl3e);
-        l4e_write(pl4e, l4e_from_paddr(__pa(pl3e), __PAGE_HYPERVISOR));
-    }
-    
-    return l4e_to_l3e(*pl4e) + l3_table_offset(v);
-}
-
-l2_pgentry_t *virt_to_xen_l2e(unsigned long v)
-{
-    l3_pgentry_t *pl3e;
-
-    pl3e = virt_to_xen_l3e(v);
-    if ( !pl3e )
-        return NULL;
-
-    if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
-    {
-        l2_pgentry_t *pl2e = alloc_xen_pagetable();
-
-        if ( !pl2e )
-            return NULL;
-        clear_page(pl2e);
-        l3e_write(pl3e, l3e_from_paddr(__pa(pl2e), __PAGE_HYPERVISOR));
-    }
-
-    BUG_ON(l3e_get_flags(*pl3e) & _PAGE_PSE);
-    return l3e_to_l2e(*pl3e) + l2_table_offset(v);
-}
-
-l1_pgentry_t *virt_to_xen_l1e(unsigned long v)
-{
-    l2_pgentry_t *pl2e;
-
-    pl2e = virt_to_xen_l2e(v);
-    if ( !pl2e )
-        return NULL;
-
-    if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
-    {
-        l1_pgentry_t *pl1e = alloc_xen_pagetable();
-
-        if ( !pl1e )
-            return NULL;
-        clear_page(pl1e);
-        l2e_write(pl2e, l2e_from_paddr(__pa(pl1e), __PAGE_HYPERVISOR));
-    }
-
-    BUG_ON(l2e_get_flags(*pl2e) & _PAGE_PSE);
-    return l2e_to_l1e(*pl2e) + l1_table_offset(v);
-}
-
 void *do_page_walk(struct vcpu *v, unsigned long addr)
 {
     unsigned long mfn = pagetable_get_pfn(v->arch.guest_table);
