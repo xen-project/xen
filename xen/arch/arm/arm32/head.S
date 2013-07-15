@@ -20,6 +20,7 @@
 #include <asm/config.h>
 #include <asm/page.h>
 #include <asm/processor-ca15.h>
+#include <asm/processor-ca7.h>
 #include <asm/asm_defns.h>
 
 #define ZIMAGE_MAGIC_NUMBER 0x016f2818
@@ -185,18 +186,36 @@ hyp:
         blo   1b
 
 skip_bss:
-
         PRINT("- Setting up control registers -\r\n")
 
-        /* Read CPU ID */
-        mrc   CP32(r0, MIDR)
-        ldr   r1, =(MIDR_MASK)
-        and   r0, r0, r1
-        /* Is this a Cortex A15? */
-        ldr   r1, =(CORTEX_A15_ID)
-        teq   r0, r1
-        bleq  cortex_a15_init
+        /* Get processor specific proc info into r1 */
+        mrc   CP32(r0, MIDR)                /* r0 := our cpu id */
+        ldr   r1, = __proc_info_start
+        add   r1, r1, r10                   /* r1 := paddr of table (start) */
+        ldr   r2, = __proc_info_end
+        add   r2, r2, r10                   /* r2 := paddr of table (end) */
+1:      ldr   r3, [r1, #PROCINFO_cpu_mask]
+        and   r4, r0, r3                    /* r4 := our cpu id with mask */
+        ldr   r3, [r1, #PROCINFO_cpu_val]   /* r3 := cpu val in current proc info */
+        teq   r4, r3
+        beq   2f                            /* Match => exit, or try next proc info */
+        add   r1, r1, #PROCINFO_sizeof
+        cmp   r1, r2
+        blo   1b
+        mov   r4, r0
+        PRINT("- Missing processor info: ")
+        mov   r0, r4
+        bl    putn
+        PRINT(" -\r\n")
+        b     fail
 
+2:
+        /* Jump to cpu_init */
+        ldr   r1, [r1, #PROCINFO_cpu_init]  /* r1 := vaddr(init func) */
+        adr   lr, cpu_init_done             /* Save return address */
+        add   pc, r1, r10                   /* Call paddr(init func) */
+
+cpu_init_done:
         /* Set up memory attribute type tables */
         ldr   r0, =MAIR0VAL
         ldr   r1, =MAIR1VAL

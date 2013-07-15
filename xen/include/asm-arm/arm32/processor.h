@@ -1,6 +1,8 @@
 #ifndef __ASM_ARM_ARM32_PROCESSOR_H
 #define __ASM_ARM_ARM32_PROCESSOR_H
 
+#define ACTLR_V7_SMP    (1<<6)
+
 #ifndef __ASSEMBLY__
 /* On stack VCPU state */
 struct cpu_user_regs

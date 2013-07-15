@@ -116,6 +116,11 @@ SECTIONS
        *(.init.setup)
        __setup_end = .;
   } :text
+  .init.proc.info : {
+       __proc_info_start = .;
+       *(.init.proc.info)
+       __proc_info_end = .;
+  } :text
   .initcall.init : {
        __initcall_start = .;
        *(.initcallpresmp.init)
