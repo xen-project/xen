@@ -104,7 +104,11 @@ enter_hyp_mode:
          * memory-mapped control registers live, we can't find out the
          * right frequency. */
         mcr   CP32(r0, CNTFRQ)
-        ldr   r0, =0x40c00           /* SMP, c11, c10 in non-secure mode */
+
+        mrc   CP32(r0,NSACR)
+        ldr   r4, =0x3fff            /* Allow access to all co-processors in NS mode */
+        orr   r0, r0, r4
+        orr   r0, r0, #(1<<18)       /* CA7/CA15: Allow access to ACTLR.SMP in NS mode */
         mcr   CP32(r0, NSACR)
 
         add   r0, r1, #GIC_DR_OFFSET
@@ -143,9 +147,6 @@ skip_spis:
         mov   r0, #0
         mcr   CP32(r0, FCSEIDR)
         mcr   CP32(r0, CONTEXTIDR)
-        /* Allow non-secure access to coprocessors, FIQs, VFP and NEON */
-        ldr   r1, =0x3fff            /* 14 CP bits set, all others clear */
-        mcr   CP32(r1, NSACR)
 
         mrs   r0, cpsr               /* Copy the CPSR */
         add   r0, r0, #0x4           /* 0x16 (Monitor) -> 0x1a (Hyp) */
