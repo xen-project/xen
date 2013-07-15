@@ -464,10 +464,7 @@
 #define IOMMU_CONTROL_DISABLED	0
 #define IOMMU_CONTROL_ENABLED	1
 
-#define MMIO_PAGES_PER_IOMMU        (IOMMU_MMIO_REGION_LENGTH / PAGE_SIZE_4K)
-#define IOMMU_PAGES                 (MMIO_PAGES_PER_IOMMU * MAX_AMD_IOMMUS)
 #define DEFAULT_DOMAIN_ADDRESS_WIDTH    48
-#define MAX_AMD_IOMMUS                  32
 
 /* interrupt remapping table */
 #define INT_REMAP_INDEX_DM_MASK         0x1C00

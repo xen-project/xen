@@ -48,19 +48,10 @@ static int iommu_has_ht_flag(struct amd_iommu *iommu, u8 mask)
 
 static int __init map_iommu_mmio_region(struct amd_iommu *iommu)
 {
-    unsigned long mfn;
-
-    if ( nr_amd_iommus > MAX_AMD_IOMMUS )
-    {
-        AMD_IOMMU_DEBUG("nr_amd_iommus %d > MAX_IOMMUS\n", nr_amd_iommus);
+    iommu->mmio_base = ioremap(iommu->mmio_base_phys,
+                               IOMMU_MMIO_REGION_LENGTH);
+    if ( !iommu->mmio_base )
         return -ENOMEM;
-    }
-
-    iommu->mmio_base = (void *)fix_to_virt(
-        FIX_IOMMU_MMIO_BASE_0 + nr_amd_iommus * MMIO_PAGES_PER_IOMMU);
-    mfn = (unsigned long)(iommu->mmio_base_phys >> PAGE_SHIFT);
-    map_pages_to_xen((unsigned long)iommu->mmio_base, mfn,
-                     MMIO_PAGES_PER_IOMMU, PAGE_HYPERVISOR_NOCACHE);
 
     memset(iommu->mmio_base, 0, IOMMU_MMIO_REGION_LENGTH);
 
