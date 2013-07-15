@@ -75,11 +75,9 @@ static void flush_command_buffer(struct amd_iommu *iommu)
     u32 cmd[4], status;
     int loop_count, comp_wait;
 
-    /* clear 'ComWaitInt' in status register (WIC) */
-    set_field_in_reg_u32(IOMMU_CONTROL_ENABLED, 0,
-                         IOMMU_STATUS_COMP_WAIT_INT_MASK,
-                         IOMMU_STATUS_COMP_WAIT_INT_SHIFT, &status);
-    writel(status, iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+    /* RW1C 'ComWaitInt' in status register */
+    writel(IOMMU_STATUS_COMP_WAIT_INT_MASK,
+           iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
 
     /* send an empty COMPLETION_WAIT command to flush command buffer */
     cmd[3] = cmd[2] = 0;
@@ -103,9 +101,9 @@ static void flush_command_buffer(struct amd_iommu *iommu)
 
     if ( comp_wait )
     {
-        /* clear 'ComWaitInt' in status register (WIC) */
-        status &= IOMMU_STATUS_COMP_WAIT_INT_MASK;
-        writel(status, iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
+        /* RW1C 'ComWaitInt' in status register */
+        writel(IOMMU_STATUS_COMP_WAIT_INT_MASK,
+               iommu->mmio_base + IOMMU_STATUS_MMIO_OFFSET);
         return;
     }
     AMD_IOMMU_DEBUG("Warning: ComWaitInt bit did not assert!\n");
