@@ -1142,14 +1142,15 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
         return -ENOMEM;
     }
     iommu->intel->drhd = drhd;
+    drhd->iommu = iommu;
 
-    iommu->reg = map_to_nocache_virt(nr_iommus, drhd->address);
+    iommu->reg = ioremap(drhd->address, PAGE_SIZE);
+    if ( !iommu->reg )
+        return -ENOMEM;
     iommu->index = nr_iommus++;
 
     iommu->cap = dmar_readq(iommu->reg, DMAR_CAP_REG);
     iommu->ecap = dmar_readq(iommu->reg, DMAR_ECAP_REG);
-
-    drhd->iommu = iommu;
 
     if ( iommu_verbose )
     {

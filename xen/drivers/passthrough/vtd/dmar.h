@@ -127,8 +127,6 @@ do {                                                \
     }                                                           \
 } while (0)
 
-void *map_to_nocache_virt(int nr_iommus, u64 maddr);
-
 int vtd_hw_check(void);
 void disable_pmr(struct iommu *iommu);
 int is_usb_device(u16 seg, u8 bus, u8 devfn);
