@@ -19,6 +19,7 @@
 #include <xen/iocap.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
+#include <xen/ns16550-uart.h>
 #include <asm/io.h>
 #ifdef CONFIG_X86
 #include <asm/fixmap.h>
@@ -58,76 +59,6 @@ static struct ns16550 {
     u8 bar_idx;
 } ns16550_com[2] = { { 0 } };
 
-/* Register offsets */
-#define RBR             0x00    /* receive buffer       */
-#define THR             0x00    /* transmit holding     */
-#define IER             0x01    /* interrupt enable     */
-#define IIR             0x02    /* interrupt identity   */
-#define FCR             0x02    /* FIFO control         */
-#define LCR             0x03    /* line control         */
-#define MCR             0x04    /* Modem control        */
-#define LSR             0x05    /* line status          */
-#define MSR             0x06    /* Modem status         */
-#define DLL             0x00    /* divisor latch (ls) (DLAB=1) */
-#define DLM             0x01    /* divisor latch (ms) (DLAB=1) */
-
-/* Interrupt Enable Register */
-#define IER_ERDAI       0x01    /* rx data recv'd       */
-#define IER_ETHREI      0x02    /* tx reg. empty        */
-#define IER_ELSI        0x04    /* rx line status       */
-#define IER_EMSI        0x08    /* MODEM status         */
-
-/* Interrupt Identification Register */
-#define IIR_NOINT       0x01    /* no interrupt pending */
-#define IIR_IMASK       0x06    /* interrupt identity:  */
-#define IIR_LSI         0x06    /*  - rx line status    */
-#define IIR_RDAI        0x04    /*  - rx data recv'd    */
-#define IIR_THREI       0x02    /*  - tx reg. empty     */
-#define IIR_MSI         0x00    /*  - MODEM status      */
-
-/* FIFO Control Register */
-#define FCR_ENABLE      0x01    /* enable FIFO          */
-#define FCR_CLRX        0x02    /* clear Rx FIFO        */
-#define FCR_CLTX        0x04    /* clear Tx FIFO        */
-#define FCR_DMA         0x10    /* enter DMA mode       */
-#define FCR_TRG1        0x00    /* Rx FIFO trig lev 1   */
-#define FCR_TRG4        0x40    /* Rx FIFO trig lev 4   */
-#define FCR_TRG8        0x80    /* Rx FIFO trig lev 8   */
-#define FCR_TRG14       0xc0    /* Rx FIFO trig lev 14  */
-
-/* Line Control Register */
-#define LCR_DLAB        0x80    /* Divisor Latch Access */
-
-/* Modem Control Register */
-#define MCR_DTR         0x01    /* Data Terminal Ready  */
-#define MCR_RTS         0x02    /* Request to Send      */
-#define MCR_OUT2        0x08    /* OUT2: interrupt mask */
-#define MCR_LOOP        0x10    /* Enable loopback test mode */
-
-/* Line Status Register */
-#define LSR_DR          0x01    /* Data ready           */
-#define LSR_OE          0x02    /* Overrun              */
-#define LSR_PE          0x04    /* Parity error         */
-#define LSR_FE          0x08    /* Framing error        */
-#define LSR_BI          0x10    /* Break                */
-#define LSR_THRE        0x20    /* Xmit hold reg empty  */
-#define LSR_TEMT        0x40    /* Xmitter empty        */
-#define LSR_ERR         0x80    /* Error                */
-
-/* These parity settings can be ORed directly into the LCR. */
-#define PARITY_NONE     (0<<3)
-#define PARITY_ODD      (1<<3)
-#define PARITY_EVEN     (3<<3)
-#define PARITY_MARK     (5<<3)
-#define PARITY_SPACE    (7<<3)
-
-/* Frequency of external clock source. This definition assumes PC platform. */
-#define UART_CLOCK_HZ   1843200
-
-/* Resume retry settings */
-#define RESUME_DELAY    MILLISECS(10)
-#define RESUME_RETRIES  100
-
 static char ns_read_reg(struct ns16550 *uart, int reg)
 {
     if ( uart->remapped_io_base == NULL )
@@ -150,12 +81,12 @@ static void ns16550_interrupt(
 
     uart->intr_works = 1;
 
-    while ( !(ns_read_reg(uart, IIR) & IIR_NOINT) )
+    while ( !(ns_read_reg(uart, UART_IIR) & UART_IIR_NOINT) )
     {
-        char lsr = ns_read_reg(uart, LSR);
-        if ( lsr & LSR_THRE )
+        char lsr = ns_read_reg(uart, UART_LSR);
+        if ( lsr & UART_LSR_THRE )
             serial_tx_interrupt(port, regs);
-        if ( lsr & LSR_DR )
+        if ( lsr & UART_LSR_DR )
             serial_rx_interrupt(port, regs);
     }
 }
@@ -171,10 +102,10 @@ static void __ns16550_poll(struct cpu_user_regs *regs)
     if ( uart->intr_works )
         return; /* Interrupts work - no more polling */
 
-    while ( ns_read_reg(uart, LSR) & LSR_DR )
+    while ( ns_read_reg(uart, UART_LSR) & UART_LSR_DR )
         serial_rx_interrupt(port, regs);
 
-    if ( ns_read_reg(uart, LSR) & LSR_THRE )
+    if ( ns_read_reg(uart, UART_LSR) & UART_LSR_THRE )
         serial_tx_interrupt(port, regs);
 
     set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
@@ -194,23 +125,23 @@ static unsigned int ns16550_tx_ready(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
 
-    return ns_read_reg(uart, LSR) & LSR_THRE ? uart->fifo_size : 0;
+    return ns_read_reg(uart, UART_LSR) & UART_LSR_THRE ? uart->fifo_size : 0;
 }
 
 static void ns16550_putc(struct serial_port *port, char c)
 {
     struct ns16550 *uart = port->uart;
-    ns_write_reg(uart, THR, c);
+    ns_write_reg(uart, UART_THR, c);
 }
 
 static int ns16550_getc(struct serial_port *port, char *pc)
 {
     struct ns16550 *uart = port->uart;
 
-    if ( !(ns_read_reg(uart, LSR) & LSR_DR) )
+    if ( !(ns_read_reg(uart, UART_LSR) & UART_LSR_DR) )
         return 0;
 
-    *pc = ns_read_reg(uart, RBR);
+    *pc = ns_read_reg(uart, UART_RBR);
     return 1;
 }
 
@@ -244,31 +175,32 @@ static void ns16550_setup_preirq(struct ns16550 *uart)
     lcr = (uart->data_bits - 5) | ((uart->stop_bits - 1) << 2) | uart->parity;
 
     /* No interrupts. */
-    ns_write_reg(uart, IER, 0);
+    ns_write_reg(uart, UART_IER, 0);
 
     /* Line control and baud-rate generator. */
-    ns_write_reg(uart, LCR, lcr | LCR_DLAB);
+    ns_write_reg(uart, UART_LCR, lcr | UART_LCR_DLAB);
     if ( uart->baud != BAUD_AUTO )
     {
         /* Baud rate specified: program it into the divisor latch. */
         divisor = uart->clock_hz / (uart->baud << 4);
-        ns_write_reg(uart, DLL, (char)divisor);
-        ns_write_reg(uart, DLM, (char)(divisor >> 8));
+        ns_write_reg(uart, UART_DLL, (char)divisor);
+        ns_write_reg(uart, UART_DLM, (char)(divisor >> 8));
     }
     else
     {
         /* Baud rate already set: read it out from the divisor latch. */
-        divisor  = ns_read_reg(uart, DLL);
-        divisor |= ns_read_reg(uart, DLM) << 8;
+        divisor  = ns_read_reg(uart, UART_DLL);
+        divisor |= ns_read_reg(uart, UART_DLM) << 8;
         uart->baud = uart->clock_hz / (divisor << 4);
     }
-    ns_write_reg(uart, LCR, lcr);
+    ns_write_reg(uart, UART_LCR, lcr);
 
     /* No flow ctrl: DTR and RTS are both wedged high to keep remote happy. */
-    ns_write_reg(uart, MCR, MCR_DTR | MCR_RTS);
+    ns_write_reg(uart, UART_MCR, UART_MCR_DTR | UART_MCR_RTS);
 
     /* Enable and clear the FIFOs. Set a large trigger threshold. */
-    ns_write_reg(uart, FCR, FCR_ENABLE | FCR_CLRX | FCR_CLTX | FCR_TRG14);
+    ns_write_reg(uart, UART_FCR,
+                 UART_FCR_ENABLE | UART_FCR_CLRX | UART_FCR_CLTX | UART_FCR_TRG14);
 }
 
 static void __init ns16550_init_preirq(struct serial_port *port)
@@ -292,8 +224,8 @@ static void __init ns16550_init_preirq(struct serial_port *port)
     ns16550_setup_preirq(uart);
 
     /* Check this really is a 16550+. Otherwise we have no FIFOs. */
-    if ( ((ns_read_reg(uart, IIR) & 0xc0) == 0xc0) &&
-         ((ns_read_reg(uart, FCR) & FCR_TRG14) == FCR_TRG14) )
+    if ( ((ns_read_reg(uart, UART_IIR) & 0xc0) == 0xc0) &&
+         ((ns_read_reg(uart, UART_FCR) & UART_FCR_TRG14) == UART_FCR_TRG14) )
         uart->fifo_size = 16;
 }
 
@@ -302,10 +234,11 @@ static void ns16550_setup_postirq(struct ns16550 *uart)
     if ( uart->irq > 0 )
     {
         /* Master interrupt enable; also keep DTR/RTS asserted. */
-        ns_write_reg(uart, MCR, MCR_OUT2 | MCR_DTR | MCR_RTS);
+        ns_write_reg(uart,
+                     UART_MCR, UART_MCR_OUT2 | UART_MCR_DTR | UART_MCR_RTS);
 
         /* Enable receive and transmit interrupts. */
-        ns_write_reg(uart, IER, IER_ERDAI | IER_ETHREI);
+        ns_write_reg(uart, UART_IER, UART_IER_ERDAI | UART_IER_ETHREI);
     }
 
     if ( uart->irq >= 0 )
@@ -374,11 +307,11 @@ static void _ns16550_resume(struct serial_port *port)
 
 static int ns16550_ioport_invalid(struct ns16550 *uart)
 {
-    return ((((unsigned char)ns_read_reg(uart, LSR)) == 0xff) &&
-            (((unsigned char)ns_read_reg(uart, MCR)) == 0xff) &&
-            (((unsigned char)ns_read_reg(uart, IER)) == 0xff) &&
-            (((unsigned char)ns_read_reg(uart, IIR)) == 0xff) &&
-            (((unsigned char)ns_read_reg(uart, LCR)) == 0xff));
+    return ((((unsigned char)ns_read_reg(uart, UART_LSR)) == 0xff) &&
+            (((unsigned char)ns_read_reg(uart, UART_MCR)) == 0xff) &&
+            (((unsigned char)ns_read_reg(uart, UART_IER)) == 0xff) &&
+            (((unsigned char)ns_read_reg(uart, UART_IIR)) == 0xff) &&
+            (((unsigned char)ns_read_reg(uart, UART_LCR)) == 0xff));
 }
 
 static int delayed_resume_tries;
@@ -457,15 +390,15 @@ static int __init parse_parity_char(int c)
     switch ( c )
     {
     case 'n':
-        return PARITY_NONE;
+        return UART_PARITY_NONE;
     case 'o': 
-        return PARITY_ODD;
+        return UART_PARITY_ODD;
     case 'e': 
-        return PARITY_EVEN;
+        return UART_PARITY_EVEN;
     case 'm': 
-        return PARITY_MARK;
+        return UART_PARITY_MARK;
     case 's': 
-        return PARITY_SPACE;
+        return UART_PARITY_SPACE;
     }
     return 0;
 }
@@ -500,17 +433,17 @@ static int __init check_existence(struct ns16550 *uart)
      * Do a simple existence test first; if we fail this,
      * there's no point trying anything else.
      */
-    scratch = ns_read_reg(uart, IER);
-    ns_write_reg(uart, IER, 0);
+    scratch = ns_read_reg(uart, UART_IER);
+    ns_write_reg(uart, UART_IER, 0);
 
     /*
      * Mask out IER[7:4] bits for test as some UARTs (e.g. TL
      * 16C754B) allow only to modify them if an EFR bit is set.
      */
-    scratch2 = ns_read_reg(uart, IER) & 0x0f;
-    ns_write_reg(uart, IER, 0x0F);
-    scratch3 = ns_read_reg(uart, IER) & 0x0f;
-    ns_write_reg(uart, IER, scratch);
+    scratch2 = ns_read_reg(uart, UART_IER) & 0x0f;
+    ns_write_reg(uart,UART_IER, 0x0F);
+    scratch3 = ns_read_reg(uart, UART_IER) & 0x0f;
+    ns_write_reg(uart, UART_IER, scratch);
     if ( (scratch2 != 0) || (scratch3 != 0x0F) )
         return 0;
 
@@ -518,8 +451,8 @@ static int __init check_existence(struct ns16550 *uart)
      * Check to see if a UART is really there.
      * Use loopback test mode.
      */
-    ns_write_reg(uart, MCR, MCR_LOOP | 0x0A);
-    status = ns_read_reg(uart, MSR) & 0xF0;
+    ns_write_reg(uart, UART_MCR, UART_MCR_LOOP | 0x0A);
+    status = ns_read_reg(uart, UART_MSR) & 0xF0;
     return (status == 0x90);
 }
 
