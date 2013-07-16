@@ -367,6 +367,9 @@ static void hypercall_page_initialise_ring1_kernel(void *hypercall_page)
 
     for ( i = 0; i < (PAGE_SIZE / 32); i++ )
     {
+        if ( i == __HYPERVISOR_iret )
+            continue;
+
         p = (char *)(hypercall_page + (i * 32));
         *(u8  *)(p+ 0) = 0xb8;    /* mov  $<i>,%eax */
         *(u32 *)(p+ 1) = i;

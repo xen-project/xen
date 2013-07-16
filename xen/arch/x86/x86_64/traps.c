@@ -590,6 +590,9 @@ static void hypercall_page_initialise_ring3_kernel(void *hypercall_page)
     /* Fill in all the transfer points with template machine code. */
     for ( i = 0; i < (PAGE_SIZE / 32); i++ )
     {
+        if ( i == __HYPERVISOR_iret )
+            continue;
+
         p = (char *)(hypercall_page + (i * 32));
         *(u8  *)(p+ 0) = 0x51;    /* push %rcx */
         *(u16 *)(p+ 1) = 0x5341;  /* push %r11 */
@@ -602,8 +605,8 @@ static void hypercall_page_initialise_ring3_kernel(void *hypercall_page)
     }
 
     /*
-     * HYPERVISOR_iret is special because it doesn't return and expects a 
-     * special stack frame. Guests jump at this transfer point instead of 
+     * HYPERVISOR_iret is special because it doesn't return and expects a
+     * special stack frame. Guests jump at this transfer point instead of
      * calling it.
      */
     p = (char *)(hypercall_page + (__HYPERVISOR_iret * 32));
