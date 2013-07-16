@@ -119,6 +119,7 @@ struct ivrs_mappings {
 
     /* per device interrupt remapping table */
     void *intremap_table;
+    unsigned long *intremap_inuse;
     spinlock_t intremap_lock;
 
     /* ivhd device data settings */

@@ -89,10 +89,12 @@ struct amd_iommu *find_iommu_for_device(int seg, int bdf);
 
 /* interrupt remapping */
 int amd_iommu_setup_ioapic_remapping(void);
-void *amd_iommu_alloc_intremap_table(void);
+void *amd_iommu_alloc_intremap_table(unsigned long **);
 int amd_iommu_free_intremap_table(u16 seg, struct ivrs_mappings *);
 void amd_iommu_ioapic_update_ire(
     unsigned int apic, unsigned int reg, unsigned int value);
+unsigned int amd_iommu_read_ioapic_from_ire(
+    unsigned int apic, unsigned int reg);
 int amd_iommu_msi_msg_update_ire(
     struct msi_desc *msi_desc, struct msi_msg *msg);
 void amd_iommu_read_msi_from_ire(
@@ -101,14 +103,16 @@ int amd_setup_hpet_msi(struct msi_desc *msi_desc);
 
 extern struct ioapic_sbdf {
     u16 bdf, seg;
-    unsigned long *pin_setup;
+    u16 *pin_2_idx;
 } ioapic_sbdf[MAX_IO_APICS];
-extern void *shared_intremap_table;
 
 extern struct hpet_sbdf {
     u16 bdf, seg, id;
     struct amd_iommu *iommu;
 } hpet_sbdf;
+
+extern void *shared_intremap_table;
+extern unsigned long *shared_intremap_inuse;
 
 /* power management support */
 void amd_iommu_resume(void);

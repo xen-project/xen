@@ -72,12 +72,15 @@ static void __init add_ivrs_mapping_entry(
          /* allocate per-device interrupt remapping table */
          if ( amd_iommu_perdev_intremap )
              ivrs_mappings[alias_id].intremap_table =
-                amd_iommu_alloc_intremap_table();
+                amd_iommu_alloc_intremap_table(
+                    &ivrs_mappings[alias_id].intremap_inuse);
          else
          {
              if ( shared_intremap_table == NULL  )
-                 shared_intremap_table = amd_iommu_alloc_intremap_table();
+                 shared_intremap_table = amd_iommu_alloc_intremap_table(
+                     &shared_intremap_inuse);
              ivrs_mappings[alias_id].intremap_table = shared_intremap_table;
+             ivrs_mappings[alias_id].intremap_inuse = shared_intremap_inuse;
          }
     }
     /* assgin iommu hardware */
@@ -671,7 +674,7 @@ static u16 __init parse_ivhd_device_special(
             if ( IO_APIC_ID(apic) != special->handle )
                 continue;
 
-            if ( ioapic_sbdf[special->handle].pin_setup )
+            if ( ioapic_sbdf[special->handle].pin_2_idx )
             {
                 if ( ioapic_sbdf[special->handle].bdf == bdf &&
                      ioapic_sbdf[special->handle].seg == seg )
@@ -691,14 +694,17 @@ static u16 __init parse_ivhd_device_special(
                 ioapic_sbdf[special->handle].bdf = bdf;
                 ioapic_sbdf[special->handle].seg = seg;
 
-                ioapic_sbdf[special->handle].pin_setup = xzalloc_array(
-                    unsigned long, BITS_TO_LONGS(nr_ioapic_entries[apic]));
+                ioapic_sbdf[special->handle].pin_2_idx = xmalloc_array(
+                    u16, nr_ioapic_entries[apic]);
                 if ( nr_ioapic_entries[apic] &&
-                     !ioapic_sbdf[IO_APIC_ID(apic)].pin_setup )
+                     !ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx )
                 {
                     printk(XENLOG_ERR "IVHD Error: Out of memory\n");
                     return 0;
                 }
+                memset(ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx, -1,
+                       nr_ioapic_entries[apic] *
+                       sizeof(*ioapic_sbdf->pin_2_idx));
             }
             break;
         }
@@ -926,7 +932,7 @@ static int __init parse_ivrs_table(struct acpi_table_header *table)
     for ( apic = 0; !error && iommu_intremap && apic < nr_ioapics; ++apic )
     {
         if ( !nr_ioapic_entries[apic] ||
-             ioapic_sbdf[IO_APIC_ID(apic)].pin_setup )
+             ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx )
             continue;
 
         printk(XENLOG_ERR "IVHD Error: no information for IO-APIC %#x\n",
@@ -935,13 +941,15 @@ static int __init parse_ivrs_table(struct acpi_table_header *table)
             error = -ENXIO;
         else
         {
-            ioapic_sbdf[IO_APIC_ID(apic)].pin_setup = xzalloc_array(
-                unsigned long, BITS_TO_LONGS(nr_ioapic_entries[apic]));
-            if ( !ioapic_sbdf[IO_APIC_ID(apic)].pin_setup )
+            ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx = xmalloc_array(
+                u16, nr_ioapic_entries[apic]);
+            if ( !ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx )
             {
                 printk(XENLOG_ERR "IVHD Error: Out of memory\n");
                 error = -ENOMEM;
             }
+            memset(ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx, -1,
+                   nr_ioapic_entries[apic] * sizeof(*ioapic_sbdf->pin_2_idx));
         }
     }
 
