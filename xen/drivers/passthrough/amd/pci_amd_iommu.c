@@ -207,50 +207,6 @@ int __init amd_iov_detect(void)
 
     init_done = 1;
 
-    /*
-     * AMD IOMMUs don't distinguish between vectors destined for
-     * different cpus when doing interrupt remapping.  This means
-     * that interrupts going through the same intremap table
-     * can't share the same vector.
-     *
-     * If irq_vector_map isn't specified, choose a sensible default:
-     * - If we're using per-device interemap tables, per-device
-     *   vector non-sharing maps
-     * - If we're using a global interemap table, global vector
-     *   non-sharing map
-     */
-    if ( opt_irq_vector_map == OPT_IRQ_VECTOR_MAP_DEFAULT )
-    {
-        if ( amd_iommu_perdev_intremap )
-        {
-            /* Per-device vector map logic is broken for devices with multiple
-             * MSI-X interrupts (and would also be for multiple MSI, if Xen
-             * supported it).
-             *
-             * Until this is fixed, use global vector tables as far as the irq
-             * logic is concerned to avoid the buggy behaviour of per-device
-             * maps in map_domain_pirq(), and use per-device tables as far as
-             * intremap code is concerned to avoid the security issue.
-             */
-            printk(XENLOG_WARNING "AMD-Vi: per-device vector map logic is broken.  "
-                   "Using per-device-global maps instead until a fix is found.\n");
-
-            opt_irq_vector_map = OPT_IRQ_VECTOR_MAP_GLOBAL;
-        }
-        else
-        {
-            printk("AMD-Vi: Enabling global vector map\n");
-            opt_irq_vector_map = OPT_IRQ_VECTOR_MAP_GLOBAL;
-        }
-    }
-    else
-    {
-        printk("AMD-Vi: Not overriding irq_vector_map setting\n");
-
-        if ( opt_irq_vector_map != OPT_IRQ_VECTOR_MAP_GLOBAL )
-            printk(XENLOG_WARNING "AMD-Vi: per-device vector map logic is broken.  "
-                   "Use irq_vector_map=global to work around.\n");
-    }
     if ( !amd_iommu_perdev_intremap )
         printk(XENLOG_WARNING "AMD-Vi: Using global interrupt remap table is not recommended (see XSA-36)!\n");
     return scan_pci_devices();
