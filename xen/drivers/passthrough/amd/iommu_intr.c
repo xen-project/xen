@@ -47,13 +47,33 @@ static int get_intremap_requestor_id(int seg, int bdf)
     return get_ivrs_mappings(seg)[bdf].dte_requestor_id;
 }
 
-static unsigned int alloc_intremap_entry(int seg, int bdf)
+static unsigned int alloc_intremap_entry(int seg, int bdf, unsigned int nr)
 {
     unsigned long *inuse = get_ivrs_mappings(seg)[bdf].intremap_inuse;
     unsigned int slot = find_first_zero_bit(inuse, INTREMAP_ENTRIES);
 
-    if ( slot < INTREMAP_ENTRIES )
-        __set_bit(slot, inuse);
+    for ( ; ; )
+    {
+        unsigned int end;
+
+        if ( slot >= INTREMAP_ENTRIES )
+            break;
+        end = find_next_bit(inuse, INTREMAP_ENTRIES, slot + 1);
+        if ( end > INTREMAP_ENTRIES )
+            end = INTREMAP_ENTRIES;
+        slot = (slot + nr - 1) & ~(nr - 1);
+        if ( slot + nr <= end )
+        {
+            while ( nr-- )
+                __set_bit(slot + nr, inuse);
+            break;
+        }
+        slot = (end + nr) & ~(nr - 1);
+        if ( slot >= INTREMAP_ENTRIES )
+            break;
+        slot = find_next_zero_bit(inuse, INTREMAP_ENTRIES, slot);
+    }
+
     return slot;
 }
 
@@ -138,7 +158,7 @@ static int update_intremap_entry_from_ioapic(
     offset = *index;
     if ( offset >= INTREMAP_ENTRIES )
     {
-        offset = alloc_intremap_entry(iommu->seg, req_id);
+        offset = alloc_intremap_entry(iommu->seg, req_id, 1);
         if ( offset >= INTREMAP_ENTRIES )
         {
             spin_unlock_irqrestore(lock, flags);
@@ -221,7 +241,7 @@ int __init amd_iommu_setup_ioapic_remapping(void)
             dest = rte.dest.logical.logical_dest;
 
             spin_lock_irqsave(lock, flags);
-            offset = alloc_intremap_entry(seg, req_id);
+            offset = alloc_intremap_entry(seg, req_id, 1);
             BUG_ON(offset >= INTREMAP_ENTRIES);
             entry = get_intremap_entry(iommu->seg, req_id, offset);
             update_intremap_entry(entry, vector,
@@ -355,7 +375,7 @@ unsigned int amd_iommu_read_ioapic_from_ire(
 }
 
 static int update_intremap_entry_from_msi_msg(
-    struct amd_iommu *iommu, u16 bdf,
+    struct amd_iommu *iommu, u16 bdf, unsigned int nr,
     int *remap_index, const struct msi_msg *msg, u32 *data)
 {
     unsigned long flags;
@@ -363,7 +383,7 @@ static int update_intremap_entry_from_msi_msg(
     u16 req_id, alias_id;
     u8 delivery_mode, dest, vector, dest_mode;
     spinlock_t *lock;
-    unsigned int offset;
+    unsigned int offset, i;
 
     req_id = get_dma_requestor_id(iommu->seg, bdf);
     alias_id = get_intremap_requestor_id(iommu->seg, bdf);
@@ -372,7 +392,8 @@ static int update_intremap_entry_from_msi_msg(
     {
         lock = get_intremap_lock(iommu->seg, req_id);
         spin_lock_irqsave(lock, flags);
-        free_intremap_entry(iommu->seg, req_id, *remap_index);
+        for ( i = 0; i < nr; ++i )
+            free_intremap_entry(iommu->seg, req_id, *remap_index + i);
         spin_unlock_irqrestore(lock, flags);
         goto done;
     }
@@ -387,7 +408,8 @@ static int update_intremap_entry_from_msi_msg(
     offset = *remap_index;
     if ( offset >= INTREMAP_ENTRIES )
     {
-        offset = alloc_intremap_entry(iommu->seg, bdf);
+        ASSERT(nr);
+        offset = alloc_intremap_entry(iommu->seg, bdf, nr);
         if ( offset >= INTREMAP_ENTRIES )
         {
             spin_unlock_irqrestore(lock, flags);
@@ -453,6 +475,7 @@ int amd_iommu_msi_msg_update_ire(
     struct pci_dev *pdev = msi_desc->dev;
     int bdf, seg, rc;
     struct amd_iommu *iommu;
+    unsigned int i, nr = 1;
     u32 data;
 
     bdf = pdev ? PCI_BDF2(pdev->bus, pdev->devfn) : hpet_sbdf.bdf;
@@ -462,10 +485,13 @@ int amd_iommu_msi_msg_update_ire(
     if ( IS_ERR_OR_NULL(iommu) )
         return PTR_ERR(iommu);
 
+    if ( msi_desc->msi_attrib.type == PCI_CAP_ID_MSI )
+        nr = msi_desc->msi.nvec;
+
     if ( msi_desc->remap_index >= 0 && !msg )
     {
         do {
-            update_intremap_entry_from_msi_msg(iommu, bdf,
+            update_intremap_entry_from_msi_msg(iommu, bdf, nr,
                                                &msi_desc->remap_index,
                                                NULL, NULL);
             if ( !pdev || !pdev->phantom_stride )
@@ -473,7 +499,8 @@ int amd_iommu_msi_msg_update_ire(
             bdf += pdev->phantom_stride;
         } while ( PCI_SLOT(bdf) == PCI_SLOT(pdev->devfn) );
 
-        msi_desc->remap_index = -1;
+        for ( i = 0; i < nr; ++i )
+            msi_desc[i].remap_index = -1;
         if ( pdev )
             bdf = PCI_BDF2(pdev->bus, pdev->devfn);
     }
@@ -482,13 +509,17 @@ int amd_iommu_msi_msg_update_ire(
         return 0;
 
     do {
-        rc = update_intremap_entry_from_msi_msg(iommu, bdf,
+        rc = update_intremap_entry_from_msi_msg(iommu, bdf, nr,
                                                 &msi_desc->remap_index,
                                                 msg, &data);
         if ( rc || !pdev || !pdev->phantom_stride )
             break;
         bdf += pdev->phantom_stride;
     } while ( PCI_SLOT(bdf) == PCI_SLOT(pdev->devfn) );
+
+    if ( !rc )
+        for ( i = 1; i < nr; ++i )
+            msi_desc[i].remap_index = msi_desc->remap_index + i;
 
     msg->data = data;
     return rc;
@@ -507,6 +538,14 @@ void amd_iommu_read_msi_from_ire(
         return;
 
     entry = get_intremap_entry(seg, get_dma_requestor_id(seg, bdf), offset);
+
+    if ( msi_desc->msi_attrib.type == PCI_CAP_ID_MSI )
+    {
+        int nr = msi_desc->msi_attrib.entry_nr;
+
+        ASSERT(!(offset & (msi_desc[-nr].msi.nvec - 1)));
+        offset |= nr;
+    }
 
     msg->data &= ~(INTREMAP_ENTRIES - 1);
     msg->data |= get_field_from_reg_u32(*entry,
