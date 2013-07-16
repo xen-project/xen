@@ -23,6 +23,7 @@
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 #include <asm/io_apic.h>
+#include <xen/keyhandler.h>
 
 #define INTREMAP_TABLE_ORDER    1
 #define INTREMAP_LENGTH 0xB
@@ -33,6 +34,14 @@ struct hpet_sbdf hpet_sbdf;
 void *shared_intremap_table;
 unsigned long *shared_intremap_inuse;
 static DEFINE_SPINLOCK(shared_intremap_lock);
+
+static void dump_intremap_tables(unsigned char key);
+
+static struct keyhandler dump_intremap = {
+    .diagnostic = 0,
+    .u.fn = dump_intremap_tables,
+    .desc = "dump IOMMU intremap tables"
+};
 
 static spinlock_t* get_intremap_lock(int seg, int req_id)
 {
@@ -260,6 +269,9 @@ int __init amd_iommu_setup_ioapic_remapping(void)
             }
         }
     }
+
+    register_keyhandler('V', &dump_intremap);
+
     return 0;
 }
 
@@ -591,4 +603,53 @@ int __init amd_setup_hpet_msi(struct msi_desc *msi_desc)
     }
 
     return 0;
+}
+
+static void dump_intremap_table(const u32 *table)
+{
+    u32 count;
+
+    if ( !table )
+        return;
+
+    for ( count = 0; count < INTREMAP_ENTRIES; count++ )
+    {
+        if ( !table[count] )
+            continue;
+        printk("    IRTE[%03x] %08x\n", count, table[count]);
+    }
+}
+
+static int dump_intremap_mapping(u16 seg, struct ivrs_mappings *ivrs_mapping)
+{
+    unsigned long flags;
+
+    if ( !ivrs_mapping )
+        return 0;
+
+    printk("  %04x:%02x:%02x:%u:\n", seg,
+           PCI_BUS(ivrs_mapping->dte_requestor_id),
+           PCI_SLOT(ivrs_mapping->dte_requestor_id),
+           PCI_FUNC(ivrs_mapping->dte_requestor_id));
+
+    spin_lock_irqsave(&(ivrs_mapping->intremap_lock), flags);
+    dump_intremap_table(ivrs_mapping->intremap_table);
+    spin_unlock_irqrestore(&(ivrs_mapping->intremap_lock), flags);
+
+    return 0;
+}
+
+static void dump_intremap_tables(unsigned char key)
+{
+    unsigned long flags;
+
+    printk("--- Dumping Per-dev IOMMU Interrupt Remapping Table ---\n");
+
+    iterate_ivrs_entries(dump_intremap_mapping);
+
+    printk("--- Dumping Shared IOMMU Interrupt Remapping Table ---\n");
+
+    spin_lock_irqsave(&shared_intremap_lock, flags);
+    dump_intremap_table(shared_intremap_table);
+    spin_unlock_irqrestore(&shared_intremap_lock, flags);
 }
