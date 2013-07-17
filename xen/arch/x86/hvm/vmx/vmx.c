@@ -1414,13 +1414,10 @@ static void vmx_set_info_guest(struct vcpu *v)
 
 static void vmx_update_eoi_exit_bitmap(struct vcpu *v, u8 vector, u8 trig)
 {
-    if ( cpu_has_vmx_virtual_intr_delivery )
-    {
-        if (trig)
-            vmx_set_eoi_exit_bitmap(v, vector);
-        else
-            vmx_clear_eoi_exit_bitmap(v, vector);
-    }
+    if ( trig )
+        vmx_set_eoi_exit_bitmap(v, vector);
+    else
+        vmx_clear_eoi_exit_bitmap(v, vector);
 }
 
 static int vmx_virtual_intr_delivery_enabled(void)
@@ -1432,9 +1429,6 @@ static void vmx_process_isr(int isr, struct vcpu *v)
 {
     unsigned long status;
     u8 old;
-
-    if ( !cpu_has_vmx_virtual_intr_delivery )
-        return;
 
     if ( isr < 0 )
         isr = 0;
@@ -1595,7 +1589,11 @@ const struct hvm_function_table * __init start_vmx(void)
     }
 
     if ( !cpu_has_vmx_virtual_intr_delivery )
+    {
+        vmx_function_table.update_eoi_exit_bitmap = NULL;
+        vmx_function_table.process_isr = NULL;
         vmx_function_table.handle_eoi = NULL;
+    }
 
     if ( cpu_has_vmx_posted_intr_processing )
         alloc_direct_apic_vector(&posted_intr_vector, event_check_interrupt);
