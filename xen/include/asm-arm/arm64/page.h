@@ -11,10 +11,6 @@ static inline void write_pte(lpae_t *p, lpae_t pte)
         "dsb sy;"
         "str %0, [%1];"         /* Write the entry */
         "dsb sy;"
-        /* Push this cacheline to the PoC so the rest of the system sees it. */
-        "dc cvac, %1;"
-        /* Ensure that the data flush is completed before proceeding */
-        "dsb sy;"
         : : "r" (pte.bits), "r" (p) : "memory");
 }
 
