@@ -386,6 +386,9 @@ void vlapic_EOI_set(struct vlapic *vlapic)
 
     vlapic_clear_vector(vector, &vlapic->regs->data[APIC_ISR]);
 
+    if ( hvm_funcs.handle_eoi )
+        hvm_funcs.handle_eoi(vector);
+
     if ( vlapic_test_and_clear_vector(vector, &vlapic->regs->data[APIC_TMR]) )
         vioapic_update_EOI(vlapic_domain(vlapic), vector);
 

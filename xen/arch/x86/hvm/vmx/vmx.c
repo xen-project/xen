@@ -1505,6 +1505,15 @@ static void vmx_sync_pir_to_irr(struct vcpu *v)
         vlapic_set_vector(i, &vlapic->regs->data[APIC_IRR]);
 }
 
+static void vmx_handle_eoi(u8 vector)
+{
+    unsigned long status = __vmread(GUEST_INTR_STATUS);
+
+    /* We need to clear the SVI field. */
+    status &= VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK;
+    __vmwrite(GUEST_INTR_STATUS, status);
+}
+
 static struct hvm_function_table __initdata vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -1557,6 +1566,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .process_isr          = vmx_process_isr,
     .deliver_posted_intr  = vmx_deliver_posted_intr,
     .sync_pir_to_irr      = vmx_sync_pir_to_irr,
+    .handle_eoi           = vmx_handle_eoi,
     .nhvm_hap_walk_L1_p2m = nvmx_hap_walk_L1_p2m,
 };
 
@@ -1583,7 +1593,10 @@ const struct hvm_function_table * __init start_vmx(void)
 
         setup_ept_dump();
     }
- 
+
+    if ( !cpu_has_vmx_virtual_intr_delivery )
+        vmx_function_table.handle_eoi = NULL;
+
     if ( cpu_has_vmx_posted_intr_processing )
         alloc_direct_apic_vector(&posted_intr_vector, event_check_interrupt);
     else
