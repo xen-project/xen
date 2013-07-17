@@ -177,6 +177,7 @@ void *__vmap(const unsigned long *mfn, unsigned int granularity,
     void *va = vm_alloc(nr * granularity, align);
     unsigned long cur = (unsigned long)va;
 
+printk("vmap(%p:%#x)\n", va, nr * granularity);//temp
     for ( ; va && nr--; ++mfn, cur += PAGE_SIZE * granularity )
     {
         if ( map_pages_to_xen(cur, *mfn, granularity, flags) )
@@ -196,9 +197,14 @@ void *vmap(const unsigned long *mfn, unsigned int nr)
 
 void vunmap(const void *va)
 {
+#ifndef _PAGE_NONE
     unsigned long addr = (unsigned long)va;
 
     destroy_xen_mappings(addr, addr + PAGE_SIZE * vm_size(va));
+#else /* Avoid tearing down intermediate page tables. */
+printk("vunmap(%p:%#x)\n", va, vm_size(va));//temp
+    map_pages_to_xen((unsigned long)va, 0, vm_size(va), _PAGE_NONE);
+#endif
     vm_free(va);
 }
 #endif
