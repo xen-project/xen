@@ -180,9 +180,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.1.5
-# Thu Jan 17 15:52:16 2013 +0000
-# e1000: fix compile warning introduced by security fix, and debugging
+QEMU_TAG ?= 4904cdf6166687198fc29cb30ca0fa09f316486f
+# Tue May 14 18:48:49 2013 +0100
+# piix4acpi, xen, hotplug: Fix race with ACPI AML code and hotplug.
 
 # Optional components
 XENSTAT_XENTOP     ?= y
