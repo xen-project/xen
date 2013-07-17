@@ -111,7 +111,7 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
     return 1;
 }
 
-void dump_guest_os_id(struct domain *d)
+static void dump_guest_os_id(const struct domain *d)
 {
     gdprintk(XENLOG_INFO, "GUEST_OS_ID:\n");
     gdprintk(XENLOG_INFO, "\tvendor: %x\n",
@@ -128,7 +128,7 @@ void dump_guest_os_id(struct domain *d)
             d->arch.hvm_domain.viridian.guest_os_id.fields.build_number);
 }
 
-void dump_hypercall(struct domain *d)
+static void dump_hypercall(const struct domain *d)
 {
     gdprintk(XENLOG_INFO, "HYPERCALL:\n");
     gdprintk(XENLOG_INFO, "\tenabled: %x\n",
@@ -137,7 +137,7 @@ void dump_hypercall(struct domain *d)
             (unsigned long)d->arch.hvm_domain.viridian.hypercall_gpa.fields.pfn);
 }
 
-void dump_apic_assist(struct vcpu *v)
+static void dump_apic_assist(const struct vcpu *v)
 {
     gdprintk(XENLOG_INFO, "APIC_ASSIST[%d]:\n", v->vcpu_id);
     gdprintk(XENLOG_INFO, "\tenabled: %x\n",
@@ -180,7 +180,7 @@ static void enable_hypercall_page(struct domain *d)
     put_page_and_type(page);
 }
 
-void initialize_apic_assist(struct vcpu *v)
+static void initialize_apic_assist(struct vcpu *v)
 {
     struct domain *d = v->domain;
     unsigned long gmfn = v->arch.hvm_vcpu.viridian.apic_assist.fields.pfn;
