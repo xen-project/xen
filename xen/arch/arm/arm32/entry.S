@@ -117,6 +117,7 @@ ENTRY(return_to_hypervisor)
         msr SPSR_hyp, r11
         pop {r0-r12}
         add sp, #(UREGS_SP_usr - UREGS_sp); /* SP, LR, SPSR, PC */
+        clrex
         eret
 
 /*
