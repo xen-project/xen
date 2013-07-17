@@ -215,9 +215,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.2.2
-# Thu Jan 17 15:52:16 2013 +0000
-# e1000: fix compile warning introduced by security fix, and debugging
+QEMU_TAG ?= 1c15498ae8cb29c4417b00f238f1737653711431
+# Tue May 14 18:48:49 2013 +0100
+# piix4acpi, xen, hotplug: Fix race with ACPI AML code and hotplug.
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
