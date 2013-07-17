@@ -41,6 +41,11 @@
 #define CPUID4A_MSR_BASED_APIC  (1 << 3)
 #define CPUID4A_RELAX_TIMER_INT (1 << 5)
 
+/* Viridian CPUID 4000006, Implementation HW features detected and in use. */
+#define CPUID6A_APIC_OVERLAY    (1 << 0)
+#define CPUID6A_MSR_BITMAPS     (1 << 1)
+#define CPUID6A_NESTED_PAGING   (1 << 3)
+
 int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
                           unsigned int *ebx, unsigned int *ecx,
                           unsigned int *edx)
@@ -91,6 +96,15 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
         if ( !cpu_has_vmx_apic_reg_virt )
             *eax |= CPUID4A_MSR_BASED_APIC;
         *ebx = 2047; /* long spin count */
+        break;
+    case 6:
+        /* Detected and in use hardware features. */
+        if ( cpu_has_vmx_virtualize_apic_accesses )
+            *eax |= CPUID6A_APIC_OVERLAY;
+        if ( cpu_has_vmx_msr_bitmap || (read_efer() & EFER_SVME) )
+            *eax |= CPUID6A_MSR_BITMAPS;
+        if ( hap_enabled(d) )
+            *eax |= CPUID6A_NESTED_PAGING;
         break;
     }
 
