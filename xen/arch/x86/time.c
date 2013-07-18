@@ -931,6 +931,7 @@ void domain_set_time_offset(struct domain *d, int32_t time_offset_seconds)
     d->time_offset_seconds = time_offset_seconds;
     if ( is_hvm_domain(d) )
         rtc_update_clock(d);
+    update_domain_wallclock_time(d);
 }
 
 int cpu_frequency_change(u64 freq)
