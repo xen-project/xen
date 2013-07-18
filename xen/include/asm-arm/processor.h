@@ -3,6 +3,15 @@
 
 #include <asm/cpregs.h>
 
+/* MIDR Main ID Register */
+#define MIDR_MASK    0xff0ffff0
+
+/* MPIDR Multiprocessor Affinity Register */
+#define MPIDR_UP            (1 << 30)
+#define MPIDR_SMP           (1 << 31)
+#define MPIDR_AFF0_SHIFT    (0)
+#define MPIDR_AFF0_MASK     (0xff << MPIDR_AFF0_SHIFT)
+
 /* TTBCR Translation Table Base Control Register */
 #define TTBCR_EAE    0x80000000
 #define TTBCR_N_MASK 0x07

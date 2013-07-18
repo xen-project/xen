@@ -68,7 +68,6 @@ struct arch_domain
 
     /* Virtual CPUID */
     uint32_t vpidr;
-    register_t vmpidr;
 
     struct {
         uint64_t offset;
@@ -194,6 +193,7 @@ struct arch_vcpu
 
     /* CP 15 */
     uint32_t csselr;
+    register_t vmpidr;
 
     uint32_t gic_hcr, gic_vmcr, gic_apr;
     uint32_t gic_lr[64];

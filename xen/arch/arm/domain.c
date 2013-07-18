@@ -140,7 +140,7 @@ static void ctxt_switch_to(struct vcpu *n)
     isb();
 
     WRITE_SYSREG32(n->domain->arch.vpidr, VPIDR_EL2);
-    WRITE_SYSREG(n->domain->arch.vmpidr, VMPIDR_EL2);
+    WRITE_SYSREG(n->arch.vmpidr, VMPIDR_EL2);
 
     /* VGIC */
     gic_restore_state(n);
@@ -451,7 +451,14 @@ int vcpu_initialise(struct vcpu *v)
         return rc;
 
     v->arch.sctlr = SCTLR_BASE;
+    /*
+     * By default exposes an SMP system with AFF0 set to the VCPU ID
+     * TODO: Handle multi-threading processor and cluster
+     */
+    v->arch.vmpidr = MPIDR_SMP | (v->vcpu_id << MPIDR_AFF0_SHIFT);
+
     v->arch.actlr = READ_SYSREG32(ACTLR_EL1);
+
     /* XXX: Handle other than CA15 cpus */
     if ( v->domain->max_vcpus > 1 )
         v->arch.actlr |= ACTLR_CA15_SMP;
@@ -490,7 +497,6 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
     /* Default the virtual ID to match the physical */
     d->arch.vpidr = boot_cpu_data.midr.bits;
-    d->arch.vmpidr = boot_cpu_data.mpidr.bits;
 
     clear_page(d->shared_info);
     share_xen_page_with_guest(
