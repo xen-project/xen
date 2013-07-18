@@ -34,10 +34,10 @@ _build: $(TARGET).gz
 .PHONY: _install
 _install: $(TARGET).gz
 	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
-	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_FULLVERSION).gz
-	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION).gz
-	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).gz
-	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION).gz $(DESTDIR)/boot/$(notdir $(TARGET)).gz
+	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_FULLVERSION)
+	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION) $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION)
+	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION) $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION)
+	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION) $(DESTDIR)/boot/$(notdir $(TARGET))
 	$(INSTALL_DATA) $(TARGET)-syms $(DESTDIR)/boot/$(notdir $(TARGET))-syms-$(XEN_FULLVERSION)
 	if [ -r $(TARGET).efi -a -n '$(EFI_DIR)' ]; then \
 		[ -d $(DESTDIR)$(EFI_DIR) ] || $(INSTALL_DIR) $(DESTDIR)$(EFI_DIR); \
@@ -56,10 +56,10 @@ _install: $(TARGET).gz
 _uninstall: D=$(DESTDIR)
 _uninstall: T=$(notdir $(TARGET))
 _uninstall:
-	rm -f $(D)/boot/$(T)-$(XEN_FULLVERSION).gz
-	rm -f $(D)/boot/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION).gz
-	rm -f $(D)/boot/$(T)-$(XEN_VERSION).gz
-	rm -f $(D)/boot/$(T).gz
+	rm -f $(D)/boot/$(T)-$(XEN_FULLVERSION)
+	rm -f $(D)/boot/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)
+	rm -f $(D)/boot/$(T)-$(XEN_VERSION)
+	rm -f $(D)/boot/$(T)
 	rm -f $(D)/boot/$(T)-syms-$(XEN_FULLVERSION)
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_FULLVERSION).efi
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION).efi
