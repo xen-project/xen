@@ -5441,6 +5441,15 @@ int map_pages_to_xen(
     l1_pgentry_t *pl1e, ol1e;
     unsigned int  i;
 
+#define flush_flags(oldf) do {                 \
+    unsigned int o_ = (oldf);                  \
+    if ( (o_) & _PAGE_GLOBAL )                 \
+        flush_flags |= FLUSH_TLB_GLOBAL;       \
+    if ( (flags & _PAGE_PRESENT) &&            \
+         (((o_) ^ flags) & PAGE_CACHE_ATTRS) ) \
+        flush_flags |= FLUSH_CACHE;            \
+} while (0)
+
     while ( nr_mfns != 0 )
     {
         l3_pgentry_t ol3e, *pl3e = virt_to_xen_l3e(virt);
@@ -5465,11 +5474,7 @@ int map_pages_to_xen(
 
                 if ( l3e_get_flags(ol3e) & _PAGE_PSE )
                 {
-                    if ( l3e_get_flags(ol3e) & _PAGE_GLOBAL )
-                        flush_flags |= FLUSH_TLB_GLOBAL;
-                    if ( (lNf_to_l1f(l3e_get_flags(ol3e)) ^ flags) &
-                         PAGE_CACHE_ATTRS )
-                        flush_flags |= FLUSH_CACHE;
+                    flush_flags(lNf_to_l1f(l3e_get_flags(ol3e)));
                     flush_area(virt, flush_flags);
                 }
                 else
@@ -5481,27 +5486,14 @@ int map_pages_to_xen(
                         if ( !(l2e_get_flags(ol2e) & _PAGE_PRESENT) )
                             continue;
                         if ( l2e_get_flags(ol2e) & _PAGE_PSE )
-                        {
-                            if ( l2e_get_flags(ol2e) & _PAGE_GLOBAL )
-                                flush_flags |= FLUSH_TLB_GLOBAL;
-                            if ( (lNf_to_l1f(l2e_get_flags(ol2e)) ^ flags) &
-                                 PAGE_CACHE_ATTRS )
-                                flush_flags |= FLUSH_CACHE;
-                        }
+                            flush_flags(lNf_to_l1f(l2e_get_flags(ol2e)));
                         else
                         {
                             unsigned int j;
 
                             pl1e = l2e_to_l1e(ol2e);
                             for ( j = 0; j < L1_PAGETABLE_ENTRIES; j++ )
-                            {
-                                ol1e = pl1e[j];
-                                if ( l1e_get_flags(ol1e) & _PAGE_GLOBAL )
-                                    flush_flags |= FLUSH_TLB_GLOBAL;
-                                if ( (l1e_get_flags(ol1e) ^ flags) &
-                                     PAGE_CACHE_ATTRS )
-                                    flush_flags |= FLUSH_CACHE;
-                            }
+                                flush_flags(l1e_get_flags(pl1e[j]));
                         }
                     }
                     flush_area(virt, flush_flags);
@@ -5595,24 +5587,14 @@ int map_pages_to_xen(
 
                 if ( l2e_get_flags(ol2e) & _PAGE_PSE )
                 {
-                    if ( l2e_get_flags(ol2e) & _PAGE_GLOBAL )
-                        flush_flags |= FLUSH_TLB_GLOBAL;
-                    if ( (lNf_to_l1f(l2e_get_flags(ol2e)) ^ flags) &
-                         PAGE_CACHE_ATTRS )
-                        flush_flags |= FLUSH_CACHE;
+                    flush_flags(lNf_to_l1f(l2e_get_flags(ol2e)));
                     flush_area(virt, flush_flags);
                 }
                 else
                 {
                     pl1e = l2e_to_l1e(ol2e);
                     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
-                    {
-                        if ( l1e_get_flags(pl1e[i]) & _PAGE_GLOBAL )
-                            flush_flags |= FLUSH_TLB_GLOBAL;
-                        if ( (l1e_get_flags(pl1e[i]) ^ flags) &
-                             PAGE_CACHE_ATTRS )
-                            flush_flags |= FLUSH_CACHE;
-                    }
+                        flush_flags(l1e_get_flags(pl1e[i]));
                     flush_area(virt, flush_flags);
                     free_xen_pagetable(pl1e);
                 }
@@ -5687,10 +5669,8 @@ int map_pages_to_xen(
             if ( (l1e_get_flags(ol1e) & _PAGE_PRESENT) )
             {
                 unsigned int flush_flags = FLUSH_TLB | FLUSH_ORDER(0);
-                if ( l1e_get_flags(ol1e) & _PAGE_GLOBAL )
-                    flush_flags |= FLUSH_TLB_GLOBAL;
-                if ( (l1e_get_flags(ol1e) ^ flags) & PAGE_CACHE_ATTRS )
-                    flush_flags |= FLUSH_CACHE;
+
+                flush_flags(l1e_get_flags(ol1e));
                 flush_area(virt, flush_flags);
             }
 
@@ -5765,6 +5745,8 @@ int map_pages_to_xen(
                 spin_unlock(&map_pgdir_lock);
         }
     }
+
+#undef flush_flags
 
     return 0;
 }
@@ -5907,6 +5889,8 @@ void destroy_xen_mappings(unsigned long s, unsigned long e)
 
     flush_area(NULL, FLUSH_TLB_GLOBAL);
 }
+
+#undef flush_area
 
 void __set_fixmap(
     enum fixed_addresses idx, unsigned long mfn, unsigned long flags)
