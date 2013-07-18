@@ -29,14 +29,14 @@ else
 endif
 
 .PHONY: _build
-_build: $(TARGET).gz
+_build: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 
 .PHONY: _install
 _install: D=$(DESTDIR)
 _install: T=$(notdir $(TARGET))
-_install: $(TARGET).gz
+_install: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 	[ -d $(D)/boot ] || $(INSTALL_DIR) $(D)/boot
-	$(INSTALL_DATA) $(TARGET).gz $(D)/boot/$(T)-$(XEN_FULLVERSION)
+	$(INSTALL_DATA) $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX) $(D)/boot/$(T)-$(XEN_FULLVERSION)
 	ln -f -s $(T)-$(XEN_FULLVERSION) $(D)/boot/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)
 	ln -f -s $(T)-$(XEN_FULLVERSION) $(D)/boot/$(T)-$(XEN_VERSION)
 	ln -f -s $(T)-$(XEN_FULLVERSION) $(D)/boot/$(T)

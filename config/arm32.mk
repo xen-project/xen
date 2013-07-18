@@ -2,6 +2,8 @@ CONFIG_ARM := y
 CONFIG_ARM_32 := y
 CONFIG_ARM_$(XEN_OS) := y
 
+CONFIG_XEN_INSTALL_SUFFIX :=
+
 # -march= -mcpu=
 
 # Explicitly specifiy 32-bit ARM ISA since toolchain default can be -mthumb:
