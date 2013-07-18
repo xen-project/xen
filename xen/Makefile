@@ -32,22 +32,24 @@ endif
 _build: $(TARGET).gz
 
 .PHONY: _install
+_install: D=$(DESTDIR)
+_install: T=$(notdir $(TARGET))
 _install: $(TARGET).gz
-	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
-	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_FULLVERSION)
-	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION) $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION)
-	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION) $(DESTDIR)/boot/$(notdir $(TARGET))-$(XEN_VERSION)
-	ln -f -s $(notdir $(TARGET))-$(XEN_FULLVERSION) $(DESTDIR)/boot/$(notdir $(TARGET))
-	$(INSTALL_DATA) $(TARGET)-syms $(DESTDIR)/boot/$(notdir $(TARGET))-syms-$(XEN_FULLVERSION)
+	[ -d $(D)/boot ] || $(INSTALL_DIR) $(D)/boot
+	$(INSTALL_DATA) $(TARGET).gz $(D)/boot/$(T)-$(XEN_FULLVERSION)
+	ln -f -s $(T)-$(XEN_FULLVERSION) $(D)/boot/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)
+	ln -f -s $(T)-$(XEN_FULLVERSION) $(D)/boot/$(T)-$(XEN_VERSION)
+	ln -f -s $(T)-$(XEN_FULLVERSION) $(D)/boot/$(T)
+	$(INSTALL_DATA) $(TARGET)-syms $(D)/boot/$(T)-syms-$(XEN_FULLVERSION)
 	if [ -r $(TARGET).efi -a -n '$(EFI_DIR)' ]; then \
-		[ -d $(DESTDIR)$(EFI_DIR) ] || $(INSTALL_DIR) $(DESTDIR)$(EFI_DIR); \
-		$(INSTALL_DATA) $(TARGET).efi $(DESTDIR)$(EFI_DIR)/$(notdir $(TARGET))-$(XEN_FULLVERSION).efi; \
-		ln -sf $(notdir $(TARGET))-$(XEN_FULLVERSION).efi $(DESTDIR)$(EFI_DIR)/$(notdir $(TARGET))-$(XEN_VERSION).$(XEN_SUBVERSION).efi; \
-		ln -sf $(notdir $(TARGET))-$(XEN_FULLVERSION).efi $(DESTDIR)$(EFI_DIR)/$(notdir $(TARGET))-$(XEN_VERSION).efi; \
-		ln -sf $(notdir $(TARGET))-$(XEN_FULLVERSION).efi $(DESTDIR)$(EFI_DIR)/$(notdir $(TARGET)).efi; \
+		[ -d $(D)$(EFI_DIR) ] || $(INSTALL_DIR) $(D)$(EFI_DIR); \
+		$(INSTALL_DATA) $(TARGET).efi $(D)$(EFI_DIR)/$(T)-$(XEN_FULLVERSION).efi; \
+		ln -sf $(T)-$(XEN_FULLVERSION).efi $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION).efi; \
+		ln -sf $(T)-$(XEN_FULLVERSION).efi $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).efi; \
+		ln -sf $(T)-$(XEN_FULLVERSION).efi $(D)$(EFI_DIR)/$(T).efi; \
 		if [ -n '$(EFI_MOUNTPOINT)' -a -n '$(EFI_VENDOR)' ]; then \
-			$(INSTALL_DATA) $(TARGET).efi $(DESTDIR)$(EFI_MOUNTPOINT)/efi/$(EFI_VENDOR)/$(notdir $(TARGET))-$(XEN_FULLVERSION).efi; \
-		elif [ "$(DESTDIR)" = "$(patsubst $(shell cd $(XEN_ROOT) && pwd)/%,%,$(DESTDIR))" ]; then \
+			$(INSTALL_DATA) $(TARGET).efi $(D)$(EFI_MOUNTPOINT)/efi/$(EFI_VENDOR)/$(T)-$(XEN_FULLVERSION).efi; \
+		elif [ "$(D)" = "$(patsubst $(shell cd $(XEN_ROOT) && pwd)/%,%,$(D))" ]; then \
 			echo 'EFI installation only partially done (EFI_VENDOR not set)' >&2; \
 		fi; \
 	fi
