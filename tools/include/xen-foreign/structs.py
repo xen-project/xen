@@ -19,6 +19,8 @@ defines = [ "__arm__",
             "__i386__",
             "__x86_64__",
 
+            "XEN_HAVE_PV_GUEST_ENTRY",
+
             # arm
             # None
 

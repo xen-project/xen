@@ -257,14 +257,16 @@ struct vcpu_guest_context {
 typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 
-struct arch_vcpu_info { };
+struct arch_vcpu_info {
+};
 typedef struct arch_vcpu_info arch_vcpu_info_t;
 
-struct arch_shared_info { };
+struct arch_shared_info {
+};
 typedef struct arch_shared_info arch_shared_info_t;
 typedef uint64_t xen_callback_t;
 
-#endif /* ifndef __ASSEMBLY __ */
+#endif
 
 /* PSR bits (CPSR, SPSR)*/
 

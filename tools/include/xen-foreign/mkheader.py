@@ -18,8 +18,8 @@ footer = {};
 
 #arm
 inttypes["arm32"] = {
-    "unsigned long" : "uint32_t",
-    "long"          : "uint32_t",
+    "unsigned long" : "__danger_unsigned_long_on_arm32",
+    "long"          : "__danger_long_on_arm32",
     "xen_pfn_t"     : "__align8__ uint64_t",
     "xen_ulong_t"   : "__align8__ uint64_t",
     "uint64_t"      : "__align8__ uint64_t",
@@ -124,6 +124,8 @@ if arch in header:
     output += header[arch];
     output += "\n";
 
+defined = {}
+
 # add defines to output
 for line in re.findall("#define[^\n]+", input):
     for define in defines:
@@ -131,6 +133,7 @@ for line in re.findall("#define[^\n]+", input):
         match = re.search(regex, line);
         if None == match:
             continue;
+        defined[define] = 1
         if define.upper()[0] == define[0]:
             replace = define + "_" + arch.upper();
         else:
@@ -156,12 +159,13 @@ for union in unions:
 
 # add structs to output
 for struct in structs:
-    regex = "struct\s+%s\s*\{(.*?)\n\};" % struct;
+    regex = "(?:#ifdef ([A-Z_]+))?\nstruct\s+%s\s*\{(.*?)\n\};" % struct;
     match = re.search(regex, input, re.S)
-    if None == match:
+    if None == match or \
+           (match.group(1) is not None and match.group(1) not in defined):
         output += "#define %s_has_no_%s 1\n" % (arch, struct);
     else:
-        output += "struct %s_%s {%s\n};\n" % (struct, arch, match.group(1));
+        output += "struct %s_%s {%s\n};\n" % (struct, arch, match.group(2));
         output += "typedef struct %s_%s %s_%s_t;\n" % (struct, arch, struct, arch);
     output += "\n";
 

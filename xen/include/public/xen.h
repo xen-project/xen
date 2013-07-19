@@ -717,7 +717,6 @@ typedef struct shared_info shared_info_t;
  * pages preceding pt_base and mark them as reserved/unused.
  */
 #ifdef XEN_HAVE_PV_GUEST_ENTRY
-#define MAX_GUEST_CMDLINE 1024
 struct start_info {
     /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.    */
     char magic[32];             /* "xen-<version>-<platform>".            */
@@ -744,6 +743,7 @@ struct start_info {
                                 /* (PFN of pre-loaded module if           */
                                 /*  SIF_MOD_START_PFN set in flags).      */
     unsigned long mod_len;      /* Size (bytes) of pre-loaded module.     */
+#define MAX_GUEST_CMDLINE 1024
     int8_t cmd_line[MAX_GUEST_CMDLINE];
     /* The pfn range here covers both page table and p->m table frames.   */
     unsigned long first_p2m_pfn;/* 1st pfn forming initial P->M table.    */
