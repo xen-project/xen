@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import sys;
-from structs import structs;
+from structs import structs, compat_arches;
 
 # command line arguments
 outfile = sys.argv[1];
@@ -37,10 +37,27 @@ for struct in structs:
     f.write('\tprintf("%%-25s |", "%s");\n' % struct);
     for a in archs:
         s = struct + "_" + a;
+        if compat_arches.has_key(a):
+            compat = compat_arches[a]
+            c = struct + "_" + compat;
+        else:
+            compat = None
         f.write('#ifdef %s_has_no_%s\n' % (a, struct));
-        f.write('\tprintf("%8s", "-");\n');
+        f.write('\tprintf("%8s",\n');
+        if compat:
+            f.write('# ifndef %s_has_no_%s\n' % (compat, struct));
+            f.write('\t\t"!"\n');
+            f.write('# else\n')
+            f.write('\t\t"-"\n');
+            f.write('# endif\n')
+        else:
+            f.write('\t\t"-"\n');
+        f.write('\t);\n')
         f.write("#else\n");
         f.write('\tprintf("%%8zd", sizeof(struct %s));\n' % s);
+        if compat:
+            f.write('\tif (sizeof(struct %s) != sizeof(struct %s))\n' % (s, c))
+            f.write('\t\tprintf("!");\n')
         f.write("#endif\n");
 
     f.write('\tprintf("\\n");\n\n');
