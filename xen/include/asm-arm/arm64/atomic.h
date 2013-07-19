@@ -33,12 +33,12 @@ static inline void atomic_add(int i, atomic_t *v)
 	int result;
 
 	asm volatile("// atomic_add\n"
-"1:	ldxr	%w0, [%3]\n"
-"	add	%w0, %w0, %w4\n"
-"	stxr	%w1, %w0, [%3]\n"
+"1:	ldxr	%w0, %2\n"
+"	add	%w0, %w0, %w3\n"
+"	stxr	%w1, %w0, %2\n"
 "	cbnz	%w1, 1b"
-	: "=&r" (result), "=&r" (tmp), "+o" (v->counter)
-	: "r" (&v->counter), "Ir" (i)
+	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)
+	: "Ir" (i)
 	: "cc");
 }
 
@@ -48,13 +48,13 @@ static inline int atomic_add_return(int i, atomic_t *v)
 	int result;
 
 	asm volatile("// atomic_add_return\n"
-"1:	ldaxr	%w0, [%3]\n"
-"	add	%w0, %w0, %w4\n"
-"	stlxr	%w1, %w0, [%3]\n"
+"1:	ldaxr	%w0, %2\n"
+"	add	%w0, %w0, %w3\n"
+"	stlxr	%w1, %w0, %2\n"
 "	cbnz	%w1, 1b"
-	: "=&r" (result), "=&r" (tmp), "+o" (v->counter)
-	: "r" (&v->counter), "Ir" (i)
-	: "cc");
+	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)
+	: "Ir" (i)
+	: "cc", "memory");
 
 	return result;
 }
@@ -65,12 +65,12 @@ static inline void atomic_sub(int i, atomic_t *v)
 	int result;
 
 	asm volatile("// atomic_sub\n"
-"1:	ldxr	%w0, [%3]\n"
-"	sub	%w0, %w0, %w4\n"
-"	stxr	%w1, %w0, [%3]\n"
+"1:	ldxr	%w0, %2\n"
+"	sub	%w0, %w0, %w3\n"
+"	stxr	%w1, %w0, %2\n"
 "	cbnz	%w1, 1b"
-	: "=&r" (result), "=&r" (tmp), "+o" (v->counter)
-	: "r" (&v->counter), "Ir" (i)
+	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)
+	: "Ir" (i)
 	: "cc");
 }
 
@@ -80,13 +80,13 @@ static inline int atomic_sub_return(int i, atomic_t *v)
 	int result;
 
 	asm volatile("// atomic_sub_return\n"
-"1:	ldaxr	%w0, [%3]\n"
-"	sub	%w0, %w0, %w4\n"
-"	stlxr	%w1, %w0, [%3]\n"
+"1:	ldaxr	%w0, %2\n"
+"	sub	%w0, %w0, %w3\n"
+"	stlxr	%w1, %w0, %2\n"
 "	cbnz	%w1, 1b"
-	: "=&r" (result), "=&r" (tmp), "+o" (v->counter)
-	: "r" (&v->counter), "Ir" (i)
-	: "cc");
+	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)
+	: "Ir" (i)
+	: "cc", "memory");
 
 	return result;
 }
@@ -97,15 +97,15 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
 	int oldval;
 
 	asm volatile("// atomic_cmpxchg\n"
-"1:	ldaxr	%w1, [%3]\n"
-"	cmp	%w1, %w4\n"
+"1:	ldaxr	%w1, %2\n"
+"	cmp	%w1, %w3\n"
 "	b.ne	2f\n"
-"	stlxr	%w0, %w5, [%3]\n"
+"	stlxr	%w0, %w4, %2\n"
 "	cbnz	%w0, 1b\n"
 "2:"
-	: "=&r" (tmp), "=&r" (oldval), "+o" (ptr->counter)
-	: "r" (&ptr->counter), "Ir" (old), "r" (new)
-	: "cc");
+	: "=&r" (tmp), "=&r" (oldval), "+Q" (ptr->counter)
+	: "Ir" (old), "r" (new)
+	: "cc", "memory");
 
 	return oldval;
 }
@@ -115,12 +115,12 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
 	unsigned long tmp, tmp2;
 
 	asm volatile("// atomic_clear_mask\n"
-"1:	ldxr	%0, [%3]\n"
-"	bic	%0, %0, %4\n"
-"	stxr	%w1, %0, [%3]\n"
+"1:	ldxr	%0, %2\n"
+"	bic	%0, %0, %3\n"
+"	stxr	%w1, %0, %2\n"
 "	cbnz	%w1, 1b"
-	: "=&r" (tmp), "=&r" (tmp2), "+o" (*addr)
-	: "r" (addr), "Ir" (mask)
+	: "=&r" (tmp), "=&r" (tmp2), "+Q" (*addr)
+	: "Ir" (mask)
 	: "cc");
 }
 
