@@ -70,6 +70,8 @@ typedef unsigned long xen_pfn_t;
 #define PRI_xen_pfn "lx"
 #endif
 
+#define XEN_HAVE_PV_GUEST_ENTRY 1
+
 /*
  * `incontents 200 segdesc Segment Descriptor Tables
  */

@@ -716,7 +716,7 @@ typedef struct shared_info shared_info_t;
  * 32-bit and runs under a 64-bit hypervisor should _NOT_ use two of the
  * pages preceding pt_base and mark them as reserved/unused.
  */
-
+#ifdef XEN_HAVE_PV_GUEST_ENTRY
 #define MAX_GUEST_CMDLINE 1024
 struct start_info {
     /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.    */
@@ -756,6 +756,7 @@ typedef struct start_info start_info_t;
 #define console_mfn    console.domU.mfn
 #define console_evtchn console.domU.evtchn
 #endif
+#endif /* XEN_HAVE_PV_GUEST_ENTRY */
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */

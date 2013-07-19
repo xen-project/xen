@@ -408,15 +408,14 @@ typedef union
     shared_info_t s;
 } shared_info_any_t;
 
+#if defined(__i386__) || defined(__x86_64__)
 typedef union
 {
-#if defined(__i386__) || defined(__x86_64__)
     start_info_x86_64_t x64;
     start_info_x86_32_t x32;
-#endif
     start_info_t s;
 } start_info_any_t;
-
+#endif
 
 int xc_domain_create(xc_interface *xch,
                      uint32_t ssidref,
