@@ -46,7 +46,7 @@ char *default_vifscript = NULL;
 char *default_bridge = NULL;
 char *default_gatewaydev = NULL;
 enum output_format default_output_format = OUTPUT_FORMAT_JSON;
-int claim_mode = 0;
+int claim_mode = 1;
 
 static xentoollog_level minmsglevel = XTL_PROGRESS;
 
