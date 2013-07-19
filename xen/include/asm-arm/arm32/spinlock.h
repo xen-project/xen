@@ -34,17 +34,20 @@ static always_inline void _raw_spin_unlock(raw_spinlock_t *lock)
 
 static always_inline int _raw_spin_trylock(raw_spinlock_t *lock)
 {
-    unsigned long tmp;
+    unsigned long contended, res;
 
-    __asm__ __volatile__(
-"   ldrex   %0, [%1]\n"
-"   teq     %0, #0\n"
-"   strexeq %0, %2, [%1]"
-    : "=&r" (tmp)
-    : "r" (&lock->lock), "r" (1)
-    : "cc");
+    do {
+        __asm__ __volatile__(
+    "   ldrex   %0, [%2]\n"
+    "   teq     %0, #0\n"
+    "   strexeq %1, %3, [%2]\n"
+    "   movne   %1, #0\n"
+        : "=&r" (contended), "=r" (res)
+        : "r" (&lock->lock), "r" (1)
+        : "cc");
+    } while (res);
 
-    if (tmp == 0) {
+    if (!contended) {
         smp_mb();
         return 1;
     } else {
