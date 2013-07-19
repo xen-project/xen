@@ -612,7 +612,11 @@ struct vcpu_info {
      * to block: this avoids wakeup-waiting races.
      */
     uint8_t evtchn_upcall_pending;
+#ifdef XEN_HAVE_PV_UPCALL_MASK
     uint8_t evtchn_upcall_mask;
+#else /* XEN_HAVE_PV_UPCALL_MASK */
+    uint8_t pad0;
+#endif /* XEN_HAVE_PV_UPCALL_MASK */
     xen_ulong_t evtchn_pending_sel;
     struct arch_vcpu_info arch;
     struct vcpu_time_info time;

@@ -921,7 +921,9 @@ int map_vcpu_info(struct vcpu *v, unsigned long gfn, unsigned offset)
     if ( v->vcpu_info == &dummy_vcpu_info )
     {
         memset(new_info, 0, sizeof(*new_info));
+#ifdef XEN_HAVE_PV_UPCALL_MASK
         __vcpu_info(v, new_info, evtchn_upcall_mask) = 1;
+#endif
     }
     else
     {

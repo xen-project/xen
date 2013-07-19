@@ -72,6 +72,8 @@ typedef unsigned long xen_pfn_t;
 
 #define XEN_HAVE_PV_GUEST_ENTRY 1
 
+#define XEN_HAVE_PV_UPCALL_MASK 1
+
 /*
  * `incontents 200 segdesc Segment Descriptor Tables
  */

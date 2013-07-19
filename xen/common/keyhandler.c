@@ -293,7 +293,7 @@ static void dump_domains(unsigned char key)
                    v->vcpu_id, v->processor,
                    v->is_running ? 'T':'F', v->poll_evtchn,
                    vcpu_info(v, evtchn_upcall_pending),
-                   vcpu_info(v, evtchn_upcall_mask));
+                   !vcpu_event_delivery_is_enabled(v));
             cpuset_print(tmpstr, sizeof(tmpstr), v->vcpu_dirty_cpumask);
             printk("dirty_cpus=%s ", tmpstr);
             cpuset_print(tmpstr, sizeof(tmpstr), v->cpu_affinity);
