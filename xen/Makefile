@@ -34,12 +34,13 @@ _build: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 .PHONY: _install
 _install: D=$(DESTDIR)
 _install: T=$(notdir $(TARGET))
+_install: Z=$(CONFIG_XEN_INSTALL_SUFFIX)
 _install: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 	[ -d $(D)/boot ] || $(INSTALL_DIR) $(D)/boot
-	$(INSTALL_DATA) $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX) $(D)/boot/$(T)-$(XEN_FULLVERSION)
-	ln -f -s $(T)-$(XEN_FULLVERSION) $(D)/boot/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)
-	ln -f -s $(T)-$(XEN_FULLVERSION) $(D)/boot/$(T)-$(XEN_VERSION)
-	ln -f -s $(T)-$(XEN_FULLVERSION) $(D)/boot/$(T)
+	$(INSTALL_DATA) $(TARGET)$(Z) $(D)/boot/$(T)-$(XEN_FULLVERSION)$(Z)
+	ln -f -s $(T)-$(XEN_FULLVERSION)$(Z) $(D)/boot/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)$(Z)
+	ln -f -s $(T)-$(XEN_FULLVERSION)$(Z) $(D)/boot/$(T)-$(XEN_VERSION)$(Z)
+	ln -f -s $(T)-$(XEN_FULLVERSION)$(Z) $(D)/boot/$(T)$(Z)
 	$(INSTALL_DATA) $(TARGET)-syms $(D)/boot/$(T)-syms-$(XEN_FULLVERSION)
 	if [ -r $(TARGET).efi -a -n '$(EFI_DIR)' ]; then \
 		[ -d $(D)$(EFI_DIR) ] || $(INSTALL_DIR) $(D)$(EFI_DIR); \
@@ -57,11 +58,12 @@ _install: $(TARGET)$(CONFIG_XEN_INSTALL_SUFFIX)
 .PHONY: _uninstall
 _uninstall: D=$(DESTDIR)
 _uninstall: T=$(notdir $(TARGET))
+_uninstall: Z=$(CONFIG_XEN_INSTALL_SUFFIX)
 _uninstall:
-	rm -f $(D)/boot/$(T)-$(XEN_FULLVERSION)
-	rm -f $(D)/boot/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)
-	rm -f $(D)/boot/$(T)-$(XEN_VERSION)
-	rm -f $(D)/boot/$(T)
+	rm -f $(D)/boot/$(T)-$(XEN_FULLVERSION)$(Z)
+	rm -f $(D)/boot/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION)$(Z)
+	rm -f $(D)/boot/$(T)-$(XEN_VERSION)$(Z)
+	rm -f $(D)/boot/$(T)$(Z)
 	rm -f $(D)/boot/$(T)-syms-$(XEN_FULLVERSION)
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_FULLVERSION).efi
 	rm -f $(D)$(EFI_DIR)/$(T)-$(XEN_VERSION).$(XEN_SUBVERSION).efi
