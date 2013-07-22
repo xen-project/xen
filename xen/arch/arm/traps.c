@@ -653,12 +653,6 @@ void do_unexpected_trap(const char *msg, struct cpu_user_regs *regs)
     while(1);
 }
 
-unsigned long do_arch_0(unsigned int cmd, unsigned long long value)
-{
-        printk("do_arch_0 cmd=%x arg=%llx\n", cmd, value);
-        return 0;
-}
-
 typedef unsigned long (*arm_hypercall_fn_t)(
     unsigned int, unsigned int, unsigned int, unsigned int, unsigned int);
 
@@ -681,7 +675,6 @@ typedef struct {
 static arm_hypercall_t arm_hypercall_table[] = {
     HYPERCALL(memory_op, 2),
     HYPERCALL(domctl, 1),
-    HYPERCALL(arch_0, 2),
     HYPERCALL(sched_op, 2),
     HYPERCALL(console_io, 3),
     HYPERCALL(xen_version, 2),
