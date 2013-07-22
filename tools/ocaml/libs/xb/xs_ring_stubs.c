@@ -45,6 +45,10 @@ static int xs_ring_read(struct mmap_interface *interface,
 	cons = *(volatile uint32*)&intf->req_cons;
 	prod = *(volatile uint32*)&intf->req_prod;
 	xen_mb();
+
+	if ((prod - cons) > XENSTORE_RING_SIZE)
+	    return -1;
+
 	if (prod == cons)
 		return 0;
 	cons = MASK_XENSTORE_IDX(cons);
@@ -94,7 +98,7 @@ CAMLprim value ml_interface_read(value interface, value buffer, value len)
 	res = xs_ring_read(GET_C_STRUCT(interface),
 	                   String_val(buffer), Int_val(len));
 	if (res == -1)
-		caml_failwith("huh");
+		caml_failwith("bad connection");
 	result = Val_int(res);
 	CAMLreturn(result);
 }

@@ -374,7 +374,17 @@ let write_answer_log ~ty ~tid ~con ~data =
 	Logging.xb_answer ~ty ~tid ~con:(Connection.get_domstr con) data
 
 let do_input store cons doms con =
-	if Connection.do_input con then (
+	let newpacket =
+		try
+			Connection.do_input con
+		with Failure exp ->
+			error "caught exception %s" exp;
+			error "got a bad client %s" (sprintf "%-8s" (Connection.get_domstr con));
+			Connection.mark_as_bad con;
+			false
+	in
+
+	if newpacket then (
 		let packet = Connection.pop_in con in
 		let tid, rid, ty, data = Xenbus.Xb.Packet.unpack packet in
 		(* As we don't log IO, do not call an unnecessary sanitize_data 
