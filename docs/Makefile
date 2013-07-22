@@ -4,6 +4,8 @@ include $(XEN_ROOT)/Config.mk
 
 VERSION		:= $(shell $(MAKE) -C $(XEN_ROOT)/xen --no-print-directory xenversion)
 
+DOC_ARCHES      := arm x86_32 x86_64
+
 DOC_MAN5SRC	:= $(wildcard man/*.pod.5)
 DOC_MAN1SRC	:= $(wildcard man/*.pod.1)
 DOC_MAN1	:= $(patsubst man/%.pod.1,man1/%.1,$(DOC_MAN1SRC))
@@ -13,7 +15,8 @@ DOC_HTML	:= $(patsubst %.markdown,html/%.html,$(DOC_MARKDOWN)) \
 		   $(patsubst man/%.pod.1,html/man/%.1.html,$(DOC_MAN1SRC)) \
 		   $(patsubst man/%.pod.5,html/man/%.5.html,$(DOC_MAN5SRC)) \
 		   $(patsubst %.txt,html/%.txt,$(wildcard misc/*.txt)) \
-		   html/hypercall/index.html
+		   html/hypercall/index.html \
+		   $(patsubst %,html/hypercall-%/index.html,$(DOC_ARCHES))
 DOC_TXT         := $(patsubst %.txt,txt/%.txt,$(wildcard misc/*.txt)) \
 		   $(patsubst %.markdown,txt/%.txt,$(DOC_MARKDOWN)) \
 		   $(patsubst man/%.pod.1,txt/man/%.1.txt,$(DOC_MAN1SRC)) \
@@ -121,15 +124,23 @@ else
 	@echo "pod2html not installed; skipping $<."
 endif
 
-html/hypercall/index.html: $(CURDIR)/xen-headers
+# For non-x86 arches exclude the subarch whole x86 arch.
+$(foreach i,$(filter-out x86_32 x86_64,$(DOC_ARCHES)),html/hypercall-$(i)/index.html): EXTRA_EXCLUDE := -X arch-x86
+
+html/hypercall-%/index.html: $(CURDIR)/xen-headers Makefile
 	rm -rf $(@D)
 	$(INSTALL_DIR) $(@D)
 	$(PERL) -w $(CURDIR)/xen-headers -O $(@D) \
-		-T 'arch-x86_64 - Xen public headers' \
-		-X arch-x86_32 -X xen-x86_32 -X arch-arm \
+		-T 'arch-$* - Xen public headers' \
+		$(patsubst %,-X arch-%,$(filter-out $*,$(DOC_ARCHES))) \
+		$(patsubst %,-X xen-%,$(filter-out $*,$(DOC_ARCHES))) \
+		$(EXTRA_EXCLUDE) \
 		$(XEN_ROOT)/xen include/public include/xen/errno.h
 
--include html/hypercall/.deps
+html/hypercall/index.html: html/hypercall-x86_64/index.html
+	ln -nfs hypercall-x86_64 html/hypercall
+
+-include $(wildcard html/hypercall-*/.deps)
 
 txt/%.txt: %.txt
 	$(INSTALL_DIR) $(@D)
