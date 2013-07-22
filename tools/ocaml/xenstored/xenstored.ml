@@ -50,9 +50,10 @@ let process_connection_fds store cons domains rset wset =
 
 let process_domains store cons domains =
 	let do_io_domain domain =
-		let con = Connections.find_domain cons (Domain.get_id domain) in
-		Process.do_input store cons domains con;
-		Process.do_output store cons domains con in
+		if not (Domain.is_bad_domain domain) then
+			let con = Connections.find_domain cons (Domain.get_id domain) in
+				Process.do_input store cons domains con;
+				Process.do_output store cons domains con in
 	Domains.iter domains do_io_domain
 
 let sigusr1_handler store =

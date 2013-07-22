@@ -27,6 +27,7 @@ type t =
 	interface: Xenmmap.mmap_interface;
 	eventchn: Event.t;
 	mutable port: Xeneventchn.t option;
+	mutable bad_client: bool;
 }
 
 let get_path dom = "/local/domain/" ^ (sprintf "%u" dom.id)
@@ -34,6 +35,9 @@ let get_id domain = domain.id
 let get_interface d = d.interface
 let get_mfn d = d.mfn
 let get_remote_port d = d.remote_port
+
+let is_bad_domain domain = domain.bad_client
+let mark_as_bad domain = domain.bad_client <- true
 
 let string_of_port = function
 | None -> "None"
@@ -68,7 +72,8 @@ let make id mfn remote_port interface eventchn = {
 	remote_port = remote_port;
 	interface = interface;
 	eventchn = eventchn;
-	port = None
+	port = None;
+	bad_client = false
 }
 
 let is_dom0 d = d.id = 0
