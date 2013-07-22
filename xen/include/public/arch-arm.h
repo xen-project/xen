@@ -27,8 +27,8 @@
 #ifndef __XEN_PUBLIC_ARCH_ARM_H__
 #define __XEN_PUBLIC_ARCH_ARM_H__
 
-/* hypercall calling convention
- * ----------------------------
+/*
+ * `incontents 50 arm_abi Hypercall Calling Convention
  *
  * A hypercall is issued using the ARM HVC instruction.
  *
@@ -58,6 +58,68 @@
  * (AAPCS64). Where there is a conflict the 64-bit standard should be
  * used regardless of guest type. Structures which are passed as
  * hypercall arguments are always little endian.
+ */
+
+/*
+ * `incontents 55 arm_hcall Supported Hypercalls
+ *
+ * Xen on ARM makes extensive use of hardware facilities and therefore
+ * only a subset of the potential hypercalls are required.
+ *
+ * Since ARM uses second stage paging any machine/physical addresses
+ * passed to hypercalls are Guest Physical Addresses (Intermediate
+ * Physical Addresses) unless otherwise noted.
+ *
+ * The following hypercalls (and sub operations) are supported on the
+ * ARM platform. Other hypercalls should be considered
+ * unavailable/unsupported.
+ *
+ *  HYPERVISOR_memory_op
+ *   All generic sub-operations.
+ *
+ *   In addition the following arch specific sub-ops:
+ *    * XENMEM_add_to_physmap
+ *    * XENMEM_add_to_physmap_range
+ *
+ *  HYPERVISOR_domctl
+ *   All generic sub-operations, with the exception of:
+ *    * XEN_DOMCTL_iomem_permission (not yet implemented)
+ *    * XEN_DOMCTL_irq_permission (not yet implemented)
+ *
+ *  HYPERVISOR_sched_op
+ *   All generic sub-operations, with the exception of:
+ *    * SCHEDOP_block -- prefer wfi hardware instruction
+ *
+ *  HYPERVISOR_console_io
+ *   All generic sub-operations
+ *
+ *  HYPERVISOR_xen_version
+ *   All generic sub-operations
+ *
+ *  HYPERVISOR_event_channel_op
+ *   All generic sub-operations
+ *
+ *  HYPERVISOR_physdev_op
+ *   No sub-operations are currenty supported
+ *
+ *  HYPERVISOR_sysctl
+ *   All generic sub-operations, with the exception of:
+ *    * XEN_SYSCTL_page_offline_op
+ *    * XEN_SYSCTL_get_pmstat
+ *    * XEN_SYSCTL_pm_op
+ *
+ *  HYPERVISOR_hvm_op
+ *   Exactly these sub-operations are supported:
+ *    * HVMOP_set_param
+ *    * HVMOP_get_param
+ *
+ *  HYPERVISOR_grant_table_op
+ *   All generic sub-operations
+ *
+ *  HYPERVISOR_vcpu_op
+ *   Exactly these sub-operations are supported:
+ *    * VCPUOP_register_vcpu_info
+ *    * VCPUOP_register_runstate_memory_area
  */
 
 #define XEN_HYPERCALL_TAG   0XEA1
