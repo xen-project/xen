@@ -121,7 +121,8 @@ static int set_memory_reg(struct domain *d, struct kernel_info *kinfo,
         device_tree_set_reg(&new_cell, address_cells, size_cells, start, size);
 
         printk("Populate P2M %#"PRIx64"->%#"PRIx64"\n", start, start + size);
-        p2m_populate_ram(d, start, start + size);
+        if ( p2m_populate_ram(d, start, start + size) < 0 )
+            panic("Failed to populate P2M\n");
         kinfo->mem.bank[kinfo->mem.nr_banks].start = start;
         kinfo->mem.bank[kinfo->mem.nr_banks].size = size;
         kinfo->mem.nr_banks++;
