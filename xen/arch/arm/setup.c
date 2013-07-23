@@ -316,14 +316,14 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
      *
      *  - must be 32 MiB aligned
      *  - must not include Xen itself or the boot modules
-     *  - must be at most 1 GiB
+     *  - must be at most 1/8 the total RAM in the system
      *  - must be at least 128M
      *
      * We try to allocate the largest xenheap possible within these
      * constraints.
      */
     heap_pages = (ram_size >> PAGE_SHIFT);
-    xenheap_pages = min(1ul << (30 - PAGE_SHIFT), heap_pages);
+    xenheap_pages = max(heap_pages/8, 128UL<<(20-PAGE_SHIFT));
 
     do
     {
