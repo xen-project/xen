@@ -428,6 +428,9 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     setup_cache();
 
+    percpu_init_areas();
+    set_processor_id(0); /* needed early, for smp_processor_id() */
+
     smp_clear_cpu_maps();
 
     device_tree_flattened = (void *)BOOT_MISC_VIRT_START
@@ -458,8 +461,6 @@ void __init start_xen(unsigned long boot_phys_offset,
     gic_init();
     make_cpus_ready(cpus, boot_phys_offset);
 
-    percpu_init_areas();
-    set_processor_id(0); /* needed early, for smp_processor_id() */
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;
 
