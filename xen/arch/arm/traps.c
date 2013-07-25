@@ -1010,6 +1010,10 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     if ( rc == -EFAULT )
         goto bad_data_abort;
 
+    /* XXX: Decode the instruction if ISS is not valid */
+    if ( !dabt.valid )
+        goto bad_data_abort;
+
     if (handle_mmio(&info))
     {
         regs->pc += dabt.len ? 4 : 2;
