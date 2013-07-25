@@ -24,11 +24,16 @@ int do_psci_cpu_on(uint32_t vcpuid, register_t entry_point)
     struct domain *d = current->domain;
     struct vcpu_guest_context *ctxt;
     int rc;
+    int is_thumb = entry_point & 1;
 
     if ( (vcpuid < 0) || (vcpuid >= MAX_VIRT_CPUS) )
         return PSCI_EINVAL;
 
     if ( vcpuid >= d->max_vcpus || (v = d->vcpu[vcpuid]) == NULL )
+        return PSCI_EINVAL;
+
+    /* THUMB set is not allowed with 64-bit domain */
+    if ( is_pv64_domain(d) && is_thumb )
         return PSCI_EINVAL;
 
     if ( (ctxt = alloc_vcpu_guest_context()) == NULL )
@@ -43,6 +48,9 @@ int do_psci_cpu_on(uint32_t vcpuid, register_t entry_point)
     ctxt->ttbr1 = 0;
     ctxt->ttbcr = 0; /* Defined Reset Value */
     ctxt->user_regs.cpsr = PSR_GUEST_INIT;
+    /* Start the VCPU with THUMB set if it's requested by the kernel */
+    if ( is_thumb )
+        ctxt->user_regs.cpsr |= PSR_THUMB;
     ctxt->flags = VGCF_online;
 
     domain_lock(d);
