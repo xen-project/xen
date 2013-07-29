@@ -251,11 +251,11 @@ union hsr {
         unsigned long reg1:5;   /* Rt1 */
         unsigned long reg2:5;   /* Rt2 */
         unsigned long sbzp2:1;
-        unsigned long op1:4;   /* Op1 */
-        unsigned long cc:4;    /* Condition Code */
+        unsigned long op1:4;    /* Op1 */
+        unsigned long cc:4;     /* Condition Code */
         unsigned long ccvalid:1;/* CC Valid */
-        unsigned long len:1;   /* Instruction length */
-        unsigned long ec:6;    /* Exception Class */
+        unsigned long len:1;    /* Instruction length */
+        unsigned long ec:6;     /* Exception Class */
     } cp64; /* HSR_EC_CP15_64, HSR_EC_CP14_64 */
 
 #ifdef CONFIG_ARM_64
