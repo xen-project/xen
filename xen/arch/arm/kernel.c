@@ -27,6 +27,8 @@
 
 #define ZIMAGE32_MAGIC 0x016f2818
 
+#define ZIMAGE64_MAGIC 0x14000008
+
 struct minimal_dtb_header {
     uint32_t magic;
     uint32_t total_size;
@@ -115,6 +117,58 @@ static void kernel_zimage_load(struct kernel_info *info)
     }
 }
 
+#ifdef CONFIG_ARM_64
+/*
+ * Check if the image is a 64-bit zImage and setup kernel_info
+ */
+static int kernel_try_zimage64_prepare(struct kernel_info *info,
+                                     paddr_t addr, paddr_t size)
+{
+    /* linux/Documentation/arm64/booting.txt */
+    struct {
+        uint32_t magic;
+        uint32_t res0;
+        uint64_t text_offset;  /* Image load offset */
+        uint64_t res1;
+        uint64_t res2;
+    } zimage;
+    uint64_t start, end;
+
+    if ( size < sizeof(zimage) )
+        return -EINVAL;
+
+    copy_from_paddr(&zimage, addr, sizeof(zimage), DEV_SHARED);
+
+    if (zimage.magic != ZIMAGE64_MAGIC)
+        return -EINVAL;
+
+    /* Currently there is no length in the header, so just use the size */
+    start = 0;
+    end = size;
+
+    /*
+     * Given the above this check is a bit pointless, but leave it
+     * here in case someone adds a length field in the future.
+     */
+    if ( (end - start) > size )
+        return -EINVAL;
+
+    info->zimage.kernel_addr = addr;
+
+    info->zimage.load_addr = info->mem.bank[0].start
+        + zimage.text_offset;
+    info->zimage.len = end - start;
+
+    info->entry = info->zimage.load_addr;
+    info->load = kernel_zimage_load;
+    info->check_overlap = kernel_zimage_check_overlap;
+
+    info->type = DOMAIN_PV64;
+
+    return 0;
+}
+#endif
+
 /*
  * Check if the image is a 32-bit zImage and setup kernel_info
  */
@@ -170,6 +224,10 @@ static int kernel_try_zimage32_prepare(struct kernel_info *info,
     info->load = kernel_zimage_load;
     info->check_overlap = kernel_zimage_check_overlap;
 
+#ifdef CONFIG_ARM_64
+    info->type = DOMAIN_PV32;
+#endif
+
     return 0;
 }
 
@@ -207,6 +265,19 @@ static int kernel_try_elf_prepare(struct kernel_info *info,
     elf_parse_binary(&info->elf.elf);
     if ( (rc = elf_xen_parse(&info->elf.elf, &info->elf.parms)) != 0 )
         goto err;
+
+#ifdef CONFIG_ARM_64
+    if ( elf_32bit(&info->elf.elf) )
+        info->type = DOMAIN_PV32;
+    else if ( elf_64bit(&info->elf.elf) )
+        info->type = DOMAIN_PV64;
+    else
+    {
+        printk("Unknown ELF class\n");
+        rc = -EINVAL;
+        goto err;
+    }
+#endif
 
     /*
      * TODO: can the ELF header be used to find the physical address
@@ -254,13 +325,13 @@ int kernel_prepare(struct kernel_info *info)
         info->load_attr = BUFFERABLE;
     }
 
-    rc = kernel_try_zimage32_prepare(info, start, size);
+#ifdef CONFIG_ARM_64
+    rc = kernel_try_zimage64_prepare(info, start, size);
+    if (rc < 0)
+#endif
+        rc = kernel_try_zimage32_prepare(info, start, size);
     if (rc < 0)
         rc = kernel_try_elf_prepare(info, start, size);
-
-#ifdef CONFIG_ARM_64
-    info->type = DOMAIN_PV32; /* No 64-bit guest support yet */
-#endif
 
     return rc;
 }
