@@ -790,8 +790,8 @@ void do_unexpected_trap(const char *msg, struct cpu_user_regs *regs)
     while(1);
 }
 
-typedef unsigned long (*arm_hypercall_fn_t)(
-    unsigned int, unsigned int, unsigned int, unsigned int, unsigned int);
+typedef register_t (*arm_hypercall_fn_t)(
+    register_t, register_t, register_t, register_t, register_t);
 
 typedef struct {
     arm_hypercall_fn_t fn;
@@ -846,6 +846,7 @@ static arm_psci_t arm_psci_table[] = {
     PSCI(cpu_on, 2),
 };
 
+#ifndef NDEBUG
 static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 {
     register_t *r;
@@ -874,6 +875,7 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
         break;
     }
 }
+#endif
 
 static void do_trap_psci(struct cpu_user_regs *regs)
 {
@@ -894,30 +896,49 @@ static void do_trap_psci(struct cpu_user_regs *regs)
     regs->r0 = psci_call(regs->r1, regs->r2);
 }
 
-static void do_trap_hypercall(struct cpu_user_regs *regs, unsigned long iss)
+#ifdef CONFIG_ARM_64
+#define HYPERCALL_RESULT_REG(r) (r)->x0
+#define HYPERCALL_ARG1(r) (r)->x0
+#define HYPERCALL_ARG2(r) (r)->x1
+#define HYPERCALL_ARG3(r) (r)->x2
+#define HYPERCALL_ARG4(r) (r)->x3
+#define HYPERCALL_ARG5(r) (r)->x4
+#define HYPERCALL_ARGS(r) (r)->x0, (r)->x1, (r)->x2, (r)->x3, (r)->x4
+#else
+#define HYPERCALL_RESULT_REG(r) (r)->r0
+#define HYPERCALL_ARG1(r) (r)->r0
+#define HYPERCALL_ARG2(r) (r)->r1
+#define HYPERCALL_ARG3(r) (r)->r2
+#define HYPERCALL_ARG4(r) (r)->r3
+#define HYPERCALL_ARG5(r) (r)->r4
+#define HYPERCALL_ARGS(r) (r)->r0, (r)->r1, (r)->r2, (r)->r3, (r)->r4
+#endif
+
+static void do_trap_hypercall(struct cpu_user_regs *regs, register_t *nr,
+                              unsigned long iss)
 {
     arm_hypercall_fn_t call = NULL;
 #ifndef NDEBUG
-    uint32_t orig_pc = regs->pc;
+    register_t orig_pc = regs->pc;
 #endif
 
     if ( iss != XEN_HYPERCALL_TAG )
         domain_crash_synchronous();
 
-    if ( regs->r12 >= ARRAY_SIZE(arm_hypercall_table) )
+    if ( *nr >= ARRAY_SIZE(arm_hypercall_table) )
     {
-        regs->r0 = -ENOSYS;
+        HYPERCALL_RESULT_REG(regs) = -ENOSYS;
         return;
     }
 
-    call = arm_hypercall_table[regs->r12].fn;
+    call = arm_hypercall_table[*nr].fn;
     if ( call == NULL )
     {
-        regs->r0 = -ENOSYS;
+        HYPERCALL_RESULT_REG(regs) = -ENOSYS;
         return;
     }
 
-    regs->r0 = call(regs->r0, regs->r1, regs->r2, regs->r3, regs->r4);
+    HYPERCALL_RESULT_REG(regs) = call(HYPERCALL_ARGS(regs));
 
 #ifndef NDEBUG
     /*
@@ -926,16 +947,16 @@ static void do_trap_hypercall(struct cpu_user_regs *regs, unsigned long iss)
      */
     if ( orig_pc == regs->pc )
     {
-        switch ( arm_hypercall_table[regs->r12].nr_args ) {
-        case 5: regs->r4 = 0xDEADBEEF;
-        case 4: regs->r3 = 0xDEADBEEF;
-        case 3: regs->r2 = 0xDEADBEEF;
-        case 2: regs->r1 = 0xDEADBEEF;
-        case 1: /* Don't clobber r0 -- it's the return value */
+        switch ( arm_hypercall_table[*nr].nr_args ) {
+        case 5: HYPERCALL_ARG5(regs) = 0xDEADBEEF;
+        case 4: HYPERCALL_ARG4(regs) = 0xDEADBEEF;
+        case 3: HYPERCALL_ARG3(regs) = 0xDEADBEEF;
+        case 2: HYPERCALL_ARG2(regs) = 0xDEADBEEF;
+        case 1: /* Don't clobber x0/r0 -- it's the return value */
             break;
         default: BUG();
         }
-        regs->r12 = 0xDEADBEEF;
+        *nr = 0xDEADBEEF;
     }
 #endif
 }
@@ -1218,13 +1239,26 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
          */
         inject_undef_exception(regs, regs->pc32);
         break;
-    case HSR_EC_HVC:
+    case HSR_EC_HVC32:
+#ifndef NDEBUG
         if ( (hsr.iss & 0xff00) == 0xff00 )
             return do_debug_trap(regs, hsr.iss & 0x00ff);
+#endif
         if ( hsr.iss == 0 )
             return do_trap_psci(regs);
-        do_trap_hypercall(regs, hsr.iss);
+        do_trap_hypercall(regs, (register_t *)&regs->r12, hsr.iss);
         break;
+#ifdef CONFIG_ARM_64
+    case HSR_EC_HVC64:
+#ifndef NDEBUG
+        if ( (hsr.iss & 0xff00) == 0xff00 )
+            return do_debug_trap(regs, hsr.iss & 0x00ff);
+#endif
+        if ( hsr.iss == 0 )
+            return do_trap_psci(regs);
+        do_trap_hypercall(regs, &regs->x16, hsr.iss);
+        break;
+#endif
     case HSR_EC_DATA_ABORT_GUEST:
         do_trap_data_abort_guest(regs, hsr.dabt);
         break;

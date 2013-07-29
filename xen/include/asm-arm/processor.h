@@ -92,9 +92,12 @@
 #define HSR_EC_JAZELLE              0x09
 #define HSR_EC_BXJ                  0x0a
 #define HSR_EC_CP14_64              0x0c
-#define HSR_EC_SVC                  0x11
-#define HSR_EC_HVC                  0x12
+#define HSR_EC_SVC32                0x11
+#define HSR_EC_HVC32                0x12
 #define HSR_EC_SMC                  0x13
+#ifdef CONFIG_ARM_64
+#define HSR_EC_HVC64                0x16
+#endif
 #define HSR_EC_INSTR_ABORT_GUEST    0x20
 #define HSR_EC_INSTR_ABORT_HYP      0x21
 #define HSR_EC_DATA_ABORT_GUEST     0x24
