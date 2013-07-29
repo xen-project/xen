@@ -1007,6 +1007,116 @@ void do_multicall_call(struct multicall_entry *multi)
                         multi->args[4]);
 }
 
+/*
+ * stolen from arch/arm/kernel/opcodes.c
+ *
+ * condition code lookup table
+ * index into the table is test code: EQ, NE, ... LT, GT, AL, NV
+ *
+ * bit position in short is condition code: NZCV
+ */
+static const unsigned short cc_map[16] = {
+        0xF0F0,                 /* EQ == Z set            */
+        0x0F0F,                 /* NE                     */
+        0xCCCC,                 /* CS == C set            */
+        0x3333,                 /* CC                     */
+        0xFF00,                 /* MI == N set            */
+        0x00FF,                 /* PL                     */
+        0xAAAA,                 /* VS == V set            */
+        0x5555,                 /* VC                     */
+        0x0C0C,                 /* HI == C set && Z clear */
+        0xF3F3,                 /* LS == C clear || Z set */
+        0xAA55,                 /* GE == (N==V)           */
+        0x55AA,                 /* LT == (N!=V)           */
+        0x0A05,                 /* GT == (!Z && (N==V))   */
+        0xF5FA,                 /* LE == (Z || (N!=V))    */
+        0xFFFF,                 /* AL always              */
+        0                       /* NV                     */
+};
+
+static int check_conditional_instr(struct cpu_user_regs *regs, union hsr hsr)
+{
+    unsigned long cpsr, cpsr_cond;
+    int cond;
+
+    /* Unconditional Exception classes */
+    if ( hsr.ec >= 0x10 )
+        return 1;
+
+    /* Check for valid condition in hsr */
+    cond = hsr.cond.ccvalid ? hsr.cond.cc : -1;
+
+    /* Unconditional instruction */
+    if ( cond == 0xe )
+        return 1;
+
+    cpsr = regs->cpsr;
+
+    /* If cc is not valid then we need to examine the IT state */
+    if ( cond < 0 )
+    {
+        unsigned long it;
+
+        BUG_ON( !is_pv32_domain(current->domain) || !(cpsr&PSR_THUMB) );
+
+        it = ( (cpsr >> (10-2)) & 0xfc) | ((cpsr >> 25) & 0x3 );
+
+        /* it == 0 => unconditional. */
+        if ( it == 0 )
+            return 1;
+
+        /* The cond for this instruction works out as the top 4 bits. */
+        cond =  ( it >> 4 );
+    }
+
+    cpsr_cond = cpsr >> 28;
+
+    if ( !((cc_map[cond] >> cpsr_cond) & 1) )
+        return 0;
+
+    return 1;
+}
+
+static void advance_pc(struct cpu_user_regs *regs, union hsr hsr)
+{
+    unsigned long itbits, cond, cpsr = regs->cpsr;
+
+    /* PSR_IT_MASK bits can only be set for 32-bit processors in Thumb mode. */
+    BUG_ON( (!is_pv32_domain(current->domain)||!(cpsr&PSR_THUMB))
+            && (cpsr&PSR_IT_MASK) );
+
+    if ( is_pv32_domain(current->domain) && (cpsr&PSR_IT_MASK) )
+    {
+        /* The ITSTATE[7:0] block is contained in CPSR[15:10],CPSR[26:25]
+         *
+         * ITSTATE[7:5] are the condition code
+         * ITSTATE[4:0] are the IT bits
+         *
+         * If the condition is non-zero then the IT state machine is
+         * advanced by shifting the IT bits left.
+         *
+         * See A2-51 and B1-1148 of DDI 0406C.b.
+         */
+        cond = (cpsr & 0xe000) >> 13;
+        itbits = (cpsr & 0x1c00) >> (10 - 2);
+        itbits |= (cpsr & (0x3 << 25)) >> 25;
+
+        if ( (itbits & 0x7) == 0 )
+            itbits = cond = 0;
+        else
+            itbits = (itbits << 1) & 0x1f;
+
+        cpsr &= ~PSR_IT_MASK;
+        cpsr |= cond << 13;
+        cpsr |= (itbits & 0x1c) << (10 - 2);
+        cpsr |= (itbits & 0x3) << 25;
+
+        regs->cpsr = cpsr;
+    }
+
+    regs->pc += hsr.len ? 4 : 2;
+}
+
 static void do_cp15_32(struct cpu_user_regs *regs,
                        union hsr hsr)
 {
@@ -1014,14 +1124,10 @@ static void do_cp15_32(struct cpu_user_regs *regs,
     uint32_t *r = (uint32_t*)select_user_reg(regs, cp32.reg);
     struct vcpu *v = current;
 
-    if ( !cp32.ccvalid ) {
-        dprintk(XENLOG_ERR, "cp_15(32): need to handle invalid condition codes\n");
-        domain_crash_synchronous();
-    }
-    if ( cp32.cc != 0xe ) {
-        dprintk(XENLOG_ERR, "cp_15(32): need to handle condition codes %x\n",
-                cp32.cc);
-        domain_crash_synchronous();
+    if ( !check_conditional_instr(regs, hsr) )
+    {
+        advance_pc(regs, hsr);
+        return;
     }
 
     switch ( hsr.bits & HSR_CP32_REGS_MASK )
@@ -1076,8 +1182,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
                cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
         panic("unhandled 32-bit CP15 access %#x\n", hsr.bits & HSR_CP32_REGS_MASK);
     }
-    regs->pc += cp32.len ? 4 : 2;
-
+    advance_pc(regs, hsr);
 }
 
 static void do_cp15_64(struct cpu_user_regs *regs,
@@ -1085,14 +1190,10 @@ static void do_cp15_64(struct cpu_user_regs *regs,
 {
     struct hsr_cp64 cp64 = hsr.cp64;
 
-    if ( !cp64.ccvalid ) {
-        dprintk(XENLOG_ERR, "cp_15(64): need to handle invalid condition codes\n");
-        domain_crash_synchronous();
-    }
-    if ( cp64.cc != 0xe ) {
-        dprintk(XENLOG_ERR, "cp_15(64): need to handle condition codes %x\n",
-                cp64.cc);
-        domain_crash_synchronous();
+    if ( !check_conditional_instr(regs, hsr) )
+    {
+        advance_pc(regs, hsr);
+        return;
     }
 
     switch ( hsr.bits & HSR_CP64_REGS_MASK )
@@ -1111,8 +1212,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
                cp64.op1, cp64.reg1, cp64.reg2, cp64.crm, regs->pc);
         panic("unhandled 64-bit CP15 access %#x\n", hsr.bits & HSR_CP64_REGS_MASK);
     }
-    regs->pc += cp64.len ? 4 : 2;
-
+    advance_pc(regs, hsr);
 }
 
 #ifdef CONFIG_ARM_64
@@ -1205,11 +1305,18 @@ done:
 }
 
 static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
-                                     struct hsr_dabt dabt)
+                                     union hsr hsr)
 {
+    struct hsr_dabt dabt = hsr.dabt;
     const char *msg;
     int rc, level = -1;
     mmio_info_t info;
+
+    if ( !check_conditional_instr(regs, hsr) )
+    {
+        advance_pc(regs, hsr);
+        return;
+    }
 
     info.dabt = dabt;
 #ifdef CONFIG_ARM_32
@@ -1231,7 +1338,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
 
     if (handle_mmio(&info))
     {
-        regs->pc += dabt.len ? 4 : 2;
+        advance_pc(regs, hsr);
         return;
     }
 
@@ -1268,6 +1375,11 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
 
     switch (hsr.ec) {
     case HSR_EC_WFI_WFE:
+        if ( !check_conditional_instr(regs, hsr) )
+        {
+            advance_pc(regs, hsr);
+            return;
+        }
         /* at the moment we only trap WFI */
         vcpu_block();
         /* The ARM spec declares that even if local irqs are masked in
@@ -1278,7 +1390,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
          */
         if ( local_events_need_delivery_nomask() )
             vcpu_unblock(current);
-        regs->pc += hsr.len ? 4 : 2;
+        advance_pc(regs, hsr);
         break;
     case HSR_EC_CP15_32:
         if ( ! is_pv32_domain(current->domain) )
@@ -1323,7 +1435,7 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
 #endif
 
     case HSR_EC_DATA_ABORT_GUEST:
-        do_trap_data_abort_guest(regs, hsr.dabt);
+        do_trap_data_abort_guest(regs, hsr);
         break;
     default:
  bad_trap:

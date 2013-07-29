@@ -237,6 +237,15 @@ union hsr {
         unsigned long ec:6;    /* Exception Class */
     };
 
+    /* Common to all conditional exception classes (0x0N, except 0x00). */
+    struct hsr_cond {
+        unsigned long iss:20;  /* Instruction Specific Syndrome */
+        unsigned long cc:4;    /* Condition Code */
+        unsigned long ccvalid:1;/* CC Valid */
+        unsigned long len:1;   /* Instruction length */
+        unsigned long ec:6;    /* Exception Class */
+    } cond;
+
     /* reg, reg0, reg1 are 4 bits on AArch32, the fifth bit is sbzp. */
     struct hsr_cp32 {
         unsigned long read:1;  /* Direction */
