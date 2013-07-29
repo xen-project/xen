@@ -4596,11 +4596,6 @@ static int xenmem_add_to_physmap_once(
         return -EINVAL;
     }
 
-    domain_lock(d);
-
-    if ( page )
-        put_page(page);
-
     /* Remove previously mapped page if it was present. */
     prev_mfn = mfn_x(get_gfn(d, xatp->gpfn, &p2mt));
     if ( mfn_valid(prev_mfn) )
@@ -4631,7 +4626,9 @@ static int xenmem_add_to_physmap_once(
     if ( xatp->space == XENMAPSPACE_gmfn ||
          xatp->space == XENMAPSPACE_gmfn_range )
         put_gfn(d, gfn);
-    domain_unlock(d);
+
+    if ( page )
+        put_page(page);
 
     return rc;
 }

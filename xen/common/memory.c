@@ -693,8 +693,6 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return rc;
         }
 
-        domain_lock(d);
-
         page = get_page_from_gfn(d, xrfp.gpfn, NULL, P2M_ALLOC);
         if ( page )
         {
@@ -703,8 +701,6 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         }
         else
             rc = -ENOENT;
-
-        domain_unlock(d);
 
         rcu_unlock_domain(d);
 

@@ -875,12 +875,8 @@ static int xenmem_add_to_physmap_one(
         return -ENOSYS;
     }
 
-    domain_lock(d);
-
     /* Map at new location. */
     rc = guest_physmap_add_page(d, gpfn, mfn, 0);
-
-    domain_unlock(d);
 
     return rc;
 }
