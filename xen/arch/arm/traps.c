@@ -57,10 +57,15 @@ static inline void check_stack_alignment_constraints(void) {
 #endif
 }
 
+#ifdef CONFIG_ARM_32
 static int debug_stack_lines = 20;
-integer_param("debug_stack_lines", debug_stack_lines);
-
 #define stack_words_per_line 8
+#else
+static int debug_stack_lines = 40;
+#define stack_words_per_line 4
+#endif
+
+integer_param("debug_stack_lines", debug_stack_lines);
 
 
 void __cpuinit init_traps(void)
