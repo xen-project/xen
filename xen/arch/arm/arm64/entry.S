@@ -56,6 +56,38 @@ lr      .req    x30             // link register
 
         .endm
 
+        .macro  exit_guest, compat
+
+        add     x21, sp, #UREGS_SPSR_el1
+        ldr     x23, [x21]
+        msr     SPSR_el1, x23
+
+        .if \compat == 0 /* Aarch64 mode */
+
+        add     x21, sp, #UREGS_SP_el0
+        ldr     x22, [x21]
+        msr     SP_el0, x22
+
+        add     x21, sp, #UREGS_SP_el1
+        ldp     x22, x23, [x21]
+        msr     SP_el1, x22
+        msr     ELR_el1, x23
+
+        .else            /* Aarch32 mode */
+
+        add     x21, sp, #UREGS_SPSR_fiq
+        ldp     w22, w23, [x21]
+        msr     SPSR_fiq, x22
+        msr     SPSR_irq, x23
+
+        add     x21, sp, #UREGS_SPSR_und
+        ldp     w22, w23, [x21]
+        msr     SPSR_und, x22
+        msr     SPSR_abt, x23
+
+        .endif
+
+        .endm
 /*
  * Save state on entry to hypervisor, restore on exit
  */
@@ -101,6 +133,8 @@ lr      .req    x30             // link register
         .if \hyp == 0         /* Guest mode */
 
         bl      leave_hypervisor_tail /* Disables interrupts on return */
+
+        exit_guest \compat
 
         .endif
 
@@ -155,11 +189,16 @@ hyp_irq:
 
 guest_sync:
         entry   hyp=0, compat=0
-        invalid BAD_SYNC /* No AArch64 guest support yet */
+        msr     daifclr, #2
+        mov     x0, sp
+        bl      do_trap_hypervisor
+        exit    hyp=0, compat=0
 
 guest_irq:
         entry   hyp=0, compat=0
-        invalid BAD_IRQ /* No AArch64 guest support yet */
+        mov     x0, sp
+        bl      do_trap_irq
+        exit    hyp=0, compat=0
 
 guest_fiq_invalid:
         entry   hyp=0, compat=0
