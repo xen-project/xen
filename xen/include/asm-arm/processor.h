@@ -50,38 +50,38 @@
 #define PSR_GUEST_INIT  (PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK)
 
 /* HCR Hyp Configuration Register */
-#define HCR_RW          (1<<31) /* ARM64 only */
-#define HCR_TGE         (1<<27)
-#define HCR_TVM         (1<<26)
-#define HCR_TTLB        (1<<25)
-#define HCR_TPU         (1<<24)
-#define HCR_TPC         (1<<23)
-#define HCR_TSW         (1<<22)
-#define HCR_TAC         (1<<21)
-#define HCR_TIDCP       (1<<20)
-#define HCR_TSC         (1<<19)
-#define HCR_TID3        (1<<18)
-#define HCR_TID2        (1<<17)
-#define HCR_TID1        (1<<16)
-#define HCR_TID0        (1<<15)
-#define HCR_TWE         (1<<14)
-#define HCR_TWI         (1<<13)
-#define HCR_DC          (1<<12)
-#define HCR_BSU_MASK    (3<<10)
+#define HCR_RW          (1<<31) /* Register Width, ARM64 only */
+#define HCR_TGE         (1<<27) /* Trap General Exceptions */
+#define HCR_TVM         (1<<26) /* Trap Virtual Memory Controls */
+#define HCR_TTLB        (1<<25) /* Trap TLB Maintenance Operations */
+#define HCR_TPU         (1<<24) /* Trap Cache Maintenance Operations to PoU */
+#define HCR_TPC         (1<<23) /* Trap Cache Maintenance Operations to PoC */
+#define HCR_TSW         (1<<22) /* Trap Set/Way Cache Maintenance Operations */
+#define HCR_TAC         (1<<21) /* Trap ACTLR Accesses */
+#define HCR_TIDCP       (1<<20) /* Trap lockdown */
+#define HCR_TSC         (1<<19) /* Trap SMC instruction */
+#define HCR_TID3        (1<<18) /* Trap ID Register Group 3 */
+#define HCR_TID2        (1<<17) /* Trap ID Register Group 2 */
+#define HCR_TID1        (1<<16) /* Trap ID Register Group 1 */
+#define HCR_TID0        (1<<15) /* Trap ID Register Group 0 */
+#define HCR_TWE         (1<<14) /* Trap WFE instruction */
+#define HCR_TWI         (1<<13) /* Trap WFI instruction */
+#define HCR_DC          (1<<12) /* Default cacheable */
+#define HCR_BSU_MASK    (3<<10) /* Barrier Shareability Upgrade */
 #define HCR_BSU_NONE     (0<<10)
 #define HCR_BSU_INNER    (1<<10)
 #define HCR_BSU_OUTER    (2<<10)
 #define HCR_BSU_FULL     (3<<10)
-#define HCR_FB          (1<<9)
-#define HCR_VA          (1<<8)
-#define HCR_VI          (1<<7)
-#define HCR_VF          (1<<6)
-#define HCR_AMO         (1<<5)
-#define HCR_IMO         (1<<4)
-#define HCR_FMO         (1<<3)
-#define HCR_PTW         (1<<2)
-#define HCR_SWIO        (1<<1)
-#define HCR_VM          (1<<0)
+#define HCR_FB          (1<<9) /* Force Broadcast of Cache/BP/TLB operations */
+#define HCR_VA          (1<<8) /* Virtual Asynchronous Abort */
+#define HCR_VI          (1<<7) /* Virtual IRQ */
+#define HCR_VF          (1<<6) /* Virtual FIQ */
+#define HCR_AMO         (1<<5) /* Override CPSR.A */
+#define HCR_IMO         (1<<4) /* Override CPSR.I */
+#define HCR_FMO         (1<<3) /* Override CPSR.F */
+#define HCR_PTW         (1<<2) /* Protected Walk */
+#define HCR_SWIO        (1<<1) /* Set/Way Invalidation Override */
+#define HCR_VM          (1<<0) /* Virtual MMU Enable */
 
 #define HSR_EC_WFI_WFE              0x01
 #define HSR_EC_CP15_32              0x03
