@@ -39,7 +39,7 @@ void __dummy__(void)
    OFFSET(UREGS_SP_el1, struct cpu_user_regs, sp_el1);
    OFFSET(UREGS_ELR_el1, struct cpu_user_regs, elr_el1);
 
-   OFFSET(UREGS_kernel_sizeof, struct cpu_user_regs, cpsr);
+   OFFSET(UREGS_kernel_sizeof, struct cpu_user_regs, spsr_el1);
    DEFINE(UREGS_user_sizeof, sizeof(struct cpu_user_regs));
    BLANK();
 

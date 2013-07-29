@@ -51,6 +51,7 @@ struct cpu_user_regs
     __DECL_REG(x27,          r11_fiq);
     __DECL_REG(x28,          r12_fiq);
     __DECL_REG(/* x29 */ fp, /* r13_fiq */ sp_fiq);
+
     __DECL_REG(/* x30 */ lr, /* r14_fiq */ lr_fiq);
 
     register_t sp; /* Valid for hypervisor frames */
@@ -59,7 +60,7 @@ struct cpu_user_regs
     __DECL_REG(pc,           pc32);             /* ELR_EL2 */
     uint32_t cpsr;                              /* SPSR_EL2 */
 
-    uint64_t pad0;
+    uint32_t pad0; /* Align end of kernel frame. */
 
     /* Outer guest frame only from here on... */
 
@@ -68,7 +69,7 @@ struct cpu_user_regs
         uint32_t spsr_svc;       /* AArch32 */
     };
 
-    uint32_t pad1; /* Align */
+    uint32_t pad1; /* Doubleword-align the user half of the frame */
 
     /* AArch32 guests only */
     uint32_t spsr_fiq, spsr_irq, spsr_und, spsr_abt;
@@ -76,8 +77,6 @@ struct cpu_user_regs
     /* AArch64 guests only */
     uint64_t sp_el0;
     uint64_t sp_el1, elr_el1;
-
-    uint64_t pad2; /* Doubleword-align the user half of the frame */
 };
 
 #undef __DECL_REG

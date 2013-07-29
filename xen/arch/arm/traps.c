@@ -45,9 +45,16 @@
  * entry.S) and struct cpu_info (which lives at the bottom of a Xen
  * stack) must be doubleword-aligned in size.  */
 static inline void check_stack_alignment_constraints(void) {
+#ifdef CONFIG_ARM_64
+    BUILD_BUG_ON((sizeof (struct cpu_user_regs)) & 0xf);
+    BUILD_BUG_ON((offsetof(struct cpu_user_regs, spsr_el1)) & 0xf);
+    BUILD_BUG_ON((offsetof(struct cpu_user_regs, lr)) & 0xf);
+    BUILD_BUG_ON((sizeof (struct cpu_info)) & 0xf);
+#else
     BUILD_BUG_ON((sizeof (struct cpu_user_regs)) & 0x7);
     BUILD_BUG_ON((offsetof(struct cpu_user_regs, sp_usr)) & 0x7);
     BUILD_BUG_ON((sizeof (struct cpu_info)) & 0x7);
+#endif
 }
 
 static int debug_stack_lines = 20;

@@ -434,6 +434,8 @@ int vcpu_initialise(struct vcpu *v)
 {
     int rc = 0;
 
+    BUILD_BUG_ON( sizeof(struct cpu_info) > STACK_SIZE );
+
     v->arch.stack = alloc_xenheap_pages(STACK_ORDER, MEMF_node(vcpu_to_node(v)));
     if ( v->arch.stack == NULL )
         return -ENOMEM;

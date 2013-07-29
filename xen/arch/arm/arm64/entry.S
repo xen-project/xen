@@ -35,7 +35,7 @@ lr      .req    x30             // link register
         mrs     x22, SP_el0
         str     x22, [x21]
 
-        add     x21, sp, #UREGS_ELR_el1
+        add     x21, sp, #UREGS_SP_el1
         mrs     x22, SP_el1
         mrs     x23, ELR_el1
         stp     x22, x23, [x21]
@@ -60,7 +60,7 @@ lr      .req    x30             // link register
  * Save state on entry to hypervisor
  */
         .macro  entry, hyp, compat
-        sub     sp, sp, #(UREGS_SPSR_el1 - UREGS_SP)
+        sub     sp, sp, #(UREGS_SPSR_el1 - UREGS_LR) /* CPSR, PC, SP, LR */
         push    x28, x29
         push    x26, x27
         push    x24, x25
@@ -79,7 +79,7 @@ lr      .req    x30             // link register
 
         .if \hyp == 1        /* Hypervisor mode */
 
-        add     x21, sp, #(UREGS_X0 - UREGS_SP)
+        add     x21, sp, #UREGS_kernel_sizeof
 
         .else                /* Guest mode */
 
@@ -214,7 +214,8 @@ ENTRY(return_to_hypervisor)
         pop     x26, x27
         pop     x28, x29
 
-        ldr     lr, [sp], #(UREGS_SPSR_el1 - UREGS_SP)
+        ldr     lr, [sp], #(UREGS_SPSR_el1 - UREGS_LR) /* CPSR, PC, SP, LR */
+
         eret
 
 /*
