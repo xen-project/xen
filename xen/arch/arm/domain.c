@@ -207,6 +207,11 @@ static void ctxt_switch_to(struct vcpu *n)
 
     isb();
 
+    if ( is_pv32_domain(n->domain) )
+        hcr &= ~HCR_RW;
+    else
+        hcr |= HCR_RW;
+
     WRITE_SYSREG(hcr, HCR_EL2);
     isb();
 

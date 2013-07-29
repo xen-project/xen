@@ -49,6 +49,7 @@
 #define PSR_GUEST_INIT  (PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK)
 
 /* HCR Hyp Configuration Register */
+#define HCR_RW          (1<<31) /* ARM64 only */
 #define HCR_TGE         (1<<27)
 #define HCR_TVM         (1<<26)
 #define HCR_TTLB        (1<<25)
