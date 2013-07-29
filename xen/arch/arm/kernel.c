@@ -20,12 +20,12 @@
 #define KERNEL_FLASH_ADDRESS 0x00000000UL
 #define KERNEL_FLASH_SIZE    0x00800000UL
 
-#define ZIMAGE_MAGIC_OFFSET 0x24
-#define ZIMAGE_START_OFFSET 0x28
-#define ZIMAGE_END_OFFSET   0x2c
-#define ZIMAGE_HEADER_LEN   0x30
+#define ZIMAGE32_MAGIC_OFFSET 0x24
+#define ZIMAGE32_START_OFFSET 0x28
+#define ZIMAGE32_END_OFFSET   0x2c
+#define ZIMAGE32_HEADER_LEN   0x30
 
-#define ZIMAGE_MAGIC 0x016f2818
+#define ZIMAGE32_MAGIC 0x016f2818
 
 struct minimal_dtb_header {
     uint32_t magic;
@@ -115,26 +115,26 @@ static void kernel_zimage_load(struct kernel_info *info)
     }
 }
 
-/**
- * Check the image is a zImage and return the load address and length
+/*
+ * Check if the image is a 32-bit zImage and setup kernel_info
  */
-static int kernel_try_zimage_prepare(struct kernel_info *info,
+static int kernel_try_zimage32_prepare(struct kernel_info *info,
                                      paddr_t addr, paddr_t size)
 {
-    uint32_t zimage[ZIMAGE_HEADER_LEN/4];
+    uint32_t zimage[ZIMAGE32_HEADER_LEN/4];
     uint32_t start, end;
     struct minimal_dtb_header dtb_hdr;
 
-    if ( size < ZIMAGE_HEADER_LEN )
+    if ( size < ZIMAGE32_HEADER_LEN )
         return -EINVAL;
 
     copy_from_paddr(zimage, addr, sizeof(zimage), DEV_SHARED);
 
-    if (zimage[ZIMAGE_MAGIC_OFFSET/4] != ZIMAGE_MAGIC)
+    if (zimage[ZIMAGE32_MAGIC_OFFSET/4] != ZIMAGE32_MAGIC)
         return -EINVAL;
 
-    start = zimage[ZIMAGE_START_OFFSET/4];
-    end = zimage[ZIMAGE_END_OFFSET/4];
+    start = zimage[ZIMAGE32_START_OFFSET/4];
+    end = zimage[ZIMAGE32_END_OFFSET/4];
 
     if ( (end - start) > size )
         return -EINVAL;
@@ -254,7 +254,7 @@ int kernel_prepare(struct kernel_info *info)
         info->load_attr = BUFFERABLE;
     }
 
-    rc = kernel_try_zimage_prepare(info, start, size);
+    rc = kernel_try_zimage32_prepare(info, start, size);
     if (rc < 0)
         rc = kernel_try_elf_prepare(info, start, size);
 
