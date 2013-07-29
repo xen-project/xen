@@ -57,7 +57,7 @@ lr      .req    x30             // link register
         .endm
 
 /*
- * Save state on entry to hypervisor
+ * Save state on entry to hypervisor, restore on exit
  */
         .macro  entry, hyp, compat
         sub     sp, sp, #(UREGS_SPSR_el1 - UREGS_LR) /* CPSR, PC, SP, LR */
@@ -93,6 +93,18 @@ lr      .req    x30             // link register
         mrs     x22, elr_el2
         mrs     x23, spsr_el2
         stp     x22, x23, [sp, #UREGS_PC]
+
+        .endm
+
+        .macro  exit, hyp, compat
+
+        .if \hyp == 0         /* Guest mode */
+
+        bl      leave_hypervisor_tail /* Disables interrupts on return */
+
+        .endif
+
+        b       return_from_trap
 
         .endm
 
@@ -133,13 +145,13 @@ hyp_sync:
         msr     daifclr, #2
         mov     x0, sp
         bl      do_trap_hypervisor
-        b       return_to_hypervisor
+        exit    hyp=1
 
 hyp_irq:
         entry   hyp=1
         mov     x0, sp
         bl      do_trap_irq
-        b       return_to_hypervisor
+        exit    hyp=1
 
 guest_sync:
         entry   hyp=0, compat=0
@@ -162,13 +174,13 @@ guest_sync_compat:
         msr     daifclr, #2
         mov     x0, sp
         bl      do_trap_hypervisor
-        b       return_to_guest
+        exit    hyp=0, compat=1
 
 guest_irq_compat:
         entry   hyp=0, compat=1
         mov     x0, sp
         bl      do_trap_irq
-        b       return_to_guest
+        exit    hyp=0, compat=1
 
 guest_fiq_invalid_compat:
         entry   hyp=0, compat=1
@@ -178,18 +190,12 @@ guest_error_invalid_compat:
         entry   hyp=0, compat=1
         invalid BAD_ERROR
 
-ENTRY(return_to_new_vcpu)
-        ldr     x21, [sp, #UREGS_CPSR]
-        and     x21, x21, #PSR_MODE_MASK
-        /* Returning to EL2? */
-        cmp     x21, #PSR_MODE_EL2t
-        ccmp    x21, #PSR_MODE_EL2h, #0x4, ne
-        b.eq    return_to_hypervisor /* Yes */
-        /* Fall thru */
-return_to_guest:
-        bl      leave_hypervisor_tail /* Disables interrupts on return */
-        /* Fall thru */
-return_to_hypervisor:
+ENTRY(return_to_new_vcpu32)
+        exit    hyp=0, compat=1
+ENTRY(return_to_new_vcpu64)
+        exit    hyp=0, compat=0
+
+return_from_trap:
         msr     daifset, #2 /* Mask interrupts */
 
         ldp     x21, x22, [sp, #UREGS_PC]       // load ELR, SPSR

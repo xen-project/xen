@@ -87,7 +87,7 @@ DEFINE_TRAP_ENTRY_NOIRQ(fiq)
 
 return_from_trap:
         mov sp, r11
-ENTRY(return_to_new_vcpu)
+ENTRY(return_to_new_vcpu32)
         ldr r11, [sp, #UREGS_cpsr]
         and r11, #PSR_MODE_MASK
         cmp r11, #PSR_MODE_HYP

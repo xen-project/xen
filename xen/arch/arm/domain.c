@@ -250,9 +250,13 @@ static void continue_new_vcpu(struct vcpu *prev)
 
     if ( is_idle_vcpu(current) )
         reset_stack_and_jump(idle_loop);
+    else if is_pv32_domain(current->domain)
+        /* check_wakeup_from_wait(); */
+        reset_stack_and_jump(return_to_new_vcpu32);
     else
         /* check_wakeup_from_wait(); */
-        reset_stack_and_jump(return_to_new_vcpu);
+        reset_stack_and_jump(return_to_new_vcpu64);
+
 }
 
 void context_switch(struct vcpu *prev, struct vcpu *next)
