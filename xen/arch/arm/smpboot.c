@@ -137,15 +137,13 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
                                unsigned long fdt_paddr,
                                unsigned long cpuid)
 {
-    struct cpuinfo_arm *c = cpu_data + cpuid;
-
     memset(get_cpu_info(), 0, sizeof (struct cpu_info));
 
     /* TODO: handle boards where CPUIDs are not contiguous */
     set_processor_id(cpuid);
 
-    *c = boot_cpu_data;
-    identify_cpu(c);
+    current_cpu_data = boot_cpu_data;
+    identify_cpu(&current_cpu_data);
 
     init_traps();
 
