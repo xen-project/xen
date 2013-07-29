@@ -23,13 +23,10 @@ void dump_p2m_lookup(struct domain *d, paddr_t addr)
 
 void p2m_load_VTTBR(struct domain *d)
 {
-    struct p2m_domain *p2m = &d->arch.p2m;
-    paddr_t maddr = page_to_maddr(p2m->first_level);
-    uint64_t vttbr = maddr;
-
-    vttbr |= ((uint64_t)p2m->vmid&0xff)<<48;
-
-    WRITE_SYSREG64(vttbr, VTTBR_EL2);
+    if ( is_idle_domain(d) )
+        return;
+    BUG_ON(!d->arch.vttbr);
+    WRITE_SYSREG64(d->arch.vttbr, VTTBR_EL2);
     isb(); /* Ensure update is visible */
 }
 
@@ -301,6 +298,9 @@ int p2m_alloc_table(struct domain *d)
 
     p2m->first_level = page;
 
+    d->arch.vttbr = page_to_maddr(p2m->first_level)
+        | ((uint64_t)p2m->vmid&0xff)<<48;
+
     spin_unlock(&p2m->lock);
 
     return 0;
@@ -331,6 +331,8 @@ int p2m_init(struct domain *d)
     /* XXX allocate properly */
     /* Zero is reserved */
     p2m->vmid = d->domain_id + 1;
+
+    d->arch.vttbr = 0;
 
     p2m->first_level = NULL;
 

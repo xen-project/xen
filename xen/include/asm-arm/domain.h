@@ -62,7 +62,10 @@ struct arch_domain
     enum domain_type type;
 #endif
 
+    /* Virtual MMU */
     struct p2m_domain p2m;
+    uint64_t vttbr;
+
     struct hvm_domain hvm_domain;
     xen_pfn_t *grant_table_gpfn;
 
