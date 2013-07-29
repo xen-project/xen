@@ -589,9 +589,7 @@ int construct_dom0(struct domain *d)
 
     memset(regs, 0, sizeof(*regs));
 
-    regs->pc = (uint32_t)kinfo.entry;
-
-    regs->cpsr = PSR_GUEST_INIT;
+    regs->pc = (register_t)kinfo.entry;
 
 #ifdef CONFIG_ARM_64
     d->arch.type = kinfo.type;
@@ -599,6 +597,11 @@ int construct_dom0(struct domain *d)
 
     if ( is_pv32_domain(d) )
     {
+        regs->cpsr = PSR_GUEST_INIT|PSR_MODE_SVC;
+
+        /* Pretend to be a Cortex A15 */
+        d->arch.vpidr = 0x410fc0f0;
+
         /* FROM LINUX head.S
          *
          * Kernel startup entry point.
@@ -616,6 +619,7 @@ int construct_dom0(struct domain *d)
 #ifdef CONFIG_ARM_64
     else
     {
+        regs->cpsr = PSR_GUEST_INIT|PSR_MODE_EL1h;
         /* From linux/Documentation/arm64/booting.txt */
         regs->x0 = kinfo.dtb_paddr;
         regs->x1 = 0; /* Reserved for future use */

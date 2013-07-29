@@ -46,6 +46,8 @@
 #define SCTLR_BASE        0x00c50078
 #define HSCTLR_BASE       0x30c51878
 
+#define PSR_GUEST_INIT  (PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK)
+
 /* HCR Hyp Configuration Register */
 #define HCR_TGE         (1<<27)
 #define HCR_TVM         (1<<26)

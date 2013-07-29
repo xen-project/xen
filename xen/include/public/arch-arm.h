@@ -237,8 +237,6 @@ typedef uint64_t xen_callback_t;
 #define PSR_IT_MASK     (0x0600fc00)  /* Thumb If-Then Mask */
 #define PSR_JAZELLE     (1<<24)       /* Jazelle Mode */
 
-#define PSR_GUEST_INIT  (PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_SVC)
-
 #endif /*  __XEN_PUBLIC_ARCH_ARM_H__ */
 
 /*
