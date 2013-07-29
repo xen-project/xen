@@ -574,9 +574,81 @@ void vcpu_show_registers(const struct vcpu *v)
     _show_registers(&v->arch.cpu_info->guest_cpu_user_regs, &ctxt, 1, v);
 }
 
-static void show_guest_stack(struct cpu_user_regs *regs)
+static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
 {
-    printk("GUEST STACK GOES HERE\n");
+    int i;
+    vaddr_t sp;
+    paddr_t stack_phys;
+    void *mapped;
+    unsigned long *stack, addr;
+
+    switch ( regs->cpsr & PSR_MODE_MASK )
+    {
+    case PSR_MODE_USR:
+    case PSR_MODE_SYS:
+#ifdef CONFIG_ARM_64
+    case PSR_MODE_EL0t:
+#endif
+        printk("No stack trace for guest user-mode\n");
+        return;
+
+    case PSR_MODE_FIQ:
+    case PSR_MODE_IRQ:
+    case PSR_MODE_SVC:
+    case PSR_MODE_ABT:
+    case PSR_MODE_UND:
+        printk("No stack trace for 32-bit guest kernel-mode\n");
+        return;
+
+#ifdef CONFIG_ARM_64
+    case PSR_MODE_EL1t:
+        sp = regs->sp_el0;
+        break;
+    case PSR_MODE_EL1h:
+        sp = regs->sp_el1;
+        break;
+#endif
+
+    case PSR_MODE_HYP:
+    case PSR_MODE_MON:
+#ifdef CONFIG_ARM_64
+    case PSR_MODE_EL3h:
+    case PSR_MODE_EL3t:
+    case PSR_MODE_EL2h:
+    case PSR_MODE_EL2t:
+#endif
+    default:
+        BUG();
+        return;
+    }
+
+    printk("Guest stack trace from sp=%"PRIvaddr":\n  ", sp);
+
+    if ( gvirt_to_maddr(sp, &stack_phys) )
+    {
+        printk("Failed to convert stack to physical address\n");
+        return;
+    }
+
+    mapped = map_domain_page(stack_phys >> PAGE_SHIFT);
+
+    stack = mapped + (sp & ~PAGE_MASK);
+
+    for ( i = 0; i < (debug_stack_lines*stack_words_per_line); i++ )
+    {
+        if ( (((long)stack - 1) ^ ((long)(stack + 1) - 1)) & PAGE_SIZE )
+            break;
+        addr = *stack;
+        if ( (i != 0) && ((i % stack_words_per_line) == 0) )
+            printk("\n  ");
+        printk(" %p", _p(addr));
+        stack++;
+    }
+    if ( i == 0 )
+        printk("Stack empty.");
+    printk("\n");
+    unmap_domain_page(mapped);
+
 }
 
 #define STACK_BEFORE_EXCEPTION(regs) ((register_t*)(regs)->sp)
@@ -659,7 +731,7 @@ void show_stack(struct cpu_user_regs *regs)
     int i;
 
     if ( guest_mode(regs) )
-        return show_guest_stack(regs);
+        return show_guest_stack(current, regs);
 
     printk("Xen stack trace from sp=%p:\n  ", stack);
 
@@ -701,7 +773,7 @@ void vcpu_show_execution_state(struct vcpu *v)
 
     vcpu_show_registers(v);
     if ( !usr_mode(&v->arch.cpu_info->guest_cpu_user_regs) )
-        show_guest_stack(&v->arch.cpu_info->guest_cpu_user_regs);
+        show_guest_stack(v, &v->arch.cpu_info->guest_cpu_user_regs);
 
     vcpu_unpause(v);
 }
