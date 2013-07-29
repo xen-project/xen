@@ -1091,6 +1091,39 @@ static void do_cp15_64(struct cpu_user_regs *regs,
 
 }
 
+#ifdef CONFIG_ARM_64
+static void do_sysreg(struct cpu_user_regs *regs,
+                      union hsr hsr)
+{
+    struct hsr_sysreg sysreg = hsr.sysreg;
+
+    switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
+    {
+    case CNTP_CTL_EL0:
+    case CNTP_TVAL_EL0:
+        if ( !vtimer_emulate(regs, hsr) )
+        {
+            dprintk(XENLOG_ERR,
+                    "failed emulation of 64-bit vtimer sysreg access\n");
+            domain_crash_synchronous();
+        }
+        break;
+    default:
+        printk("%s %d, %d, c%d, c%d, %d %s x%d @ 0x%"PRIregister"\n",
+               sysreg.read ? "mrs" : "msr",
+               sysreg.op0, sysreg.op1,
+               sysreg.crn, sysreg.crm,
+               sysreg.op2,
+               sysreg.read ? "=>" : "<=",
+               sysreg.reg, regs->pc);
+        panic("unhandled 64-bit sysreg access %#x\n",
+              hsr.bits & HSR_SYSREG_REGS_MASK);
+    }
+
+    regs->pc += 4;
+}
+#endif
+
 void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
 {
     uint32_t ttbcr = READ_SYSREG32(TCR_EL1);
@@ -1258,7 +1291,13 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
             return do_trap_psci(regs);
         do_trap_hypercall(regs, &regs->x16, hsr.iss);
         break;
+    case HSR_EC_SYSREG:
+        if ( is_pv32_domain(current->domain) )
+            goto bad_trap;
+        do_sysreg(regs, hsr);
+        break;
 #endif
+
     case HSR_EC_DATA_ABORT_GUEST:
         do_trap_data_abort_guest(regs, hsr.dabt);
         break;

@@ -2,6 +2,7 @@
 #define __ASM_ARM_PROCESSOR_H
 
 #include <asm/cpregs.h>
+#include <asm/sysregs.h>
 
 /* MIDR Main ID Register */
 #define MIDR_MASK    0xff0ffff0
@@ -97,6 +98,7 @@
 #define HSR_EC_SMC                  0x13
 #ifdef CONFIG_ARM_64
 #define HSR_EC_HVC64                0x16
+#define HSR_EC_SYSREG               0x18
 #endif
 #define HSR_EC_INSTR_ABORT_GUEST    0x20
 #define HSR_EC_INSTR_ABORT_HYP      0x21
@@ -256,6 +258,21 @@ union hsr {
         unsigned long ec:6;    /* Exception Class */
     } cp64; /* HSR_EC_CP15_64, HSR_EC_CP14_64 */
 
+#ifdef CONFIG_ARM_64
+    struct hsr_sysreg {
+        unsigned long read:1;   /* Direction */
+        unsigned long crm:4;    /* CRm */
+        unsigned long reg:5;    /* Rt */
+        unsigned long crn:4;    /* CRn */
+        unsigned long op1:3;    /* Op1 */
+        unsigned long op2:3;    /* Op2 */
+        unsigned long op0:2;    /* Op0 */
+        unsigned long res0:3;
+        unsigned long len:1;    /* Instruction length */
+        unsigned long ec:6;
+    } sysreg; /* HSR_EC_SYSREG */
+#endif
+
     struct hsr_dabt {
         unsigned long dfsc:6;  /* Data Fault Status Code */
         unsigned long write:1; /* Write / not Read */
@@ -297,6 +314,21 @@ union hsr {
 #define HSR_CP64_CRM_MASK (0x0000001e)
 #define HSR_CP64_CRM_SHIFT (1)
 #define HSR_CP64_REGS_MASK (HSR_CP64_OP1_MASK|HSR_CP64_CRM_MASK)
+
+/* HSR.EC == HSR_SYSREG */
+#define HSR_SYSREG_OP0_MASK (0x00300000)
+#define HSR_SYSREG_OP0_SHIFT (20)
+#define HSR_SYSREG_OP1_MASK (0x0001c000)
+#define HSR_SYSREG_OP1_SHIFT (14)
+#define HSR_SYSREG_CRN_MASK (0x00003800)
+#define HSR_SYSREG_CRN_SHIFT (10)
+#define HSR_SYSREG_CRM_MASK (0x0000001e)
+#define HSR_SYSREG_CRM_SHIFT (1)
+#define HSR_SYSREG_OP2_MASK (0x000e0000)
+#define HSR_SYSREG_OP2_SHIFT (17)
+#define HSR_SYSREG_REGS_MASK (HSR_SYSREG_OP0_MASK|HSR_SYSREG_OP1_MASK|\
+                              HSR_SYSREG_CRN_MASK|HSR_SYSREG_CRM_MASK|\
+                              HSR_SYSREG_OP2_MASK)
 
 /* Physical Address Register */
 #define PAR_F           (1<<0)
