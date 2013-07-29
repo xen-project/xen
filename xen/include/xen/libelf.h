@@ -39,11 +39,13 @@ typedef int elf_negerrnoval; /* 0: ok; -EFOO: error */
 #ifdef __XEN__
 #include <public/elfnote.h>
 #include <public/features.h>
+#include <xen/string.h>
 #else
 #include <xen/elfnote.h>
 #include <xen/features.h>
 
 #include <stdarg.h>
+#include <string.h>
 
 struct elf_binary;
 typedef void elf_log_callback(struct elf_binary*, void *caller_data,

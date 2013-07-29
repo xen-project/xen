@@ -2,6 +2,7 @@
 #undef putchar
 #include <ctype.h>
 #include <string.h>
+#include <kernel.h>
 #define debug _debug
 #define grub_halt(a) do_exit()
 #define printf grub_printf
