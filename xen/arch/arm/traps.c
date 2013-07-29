@@ -284,24 +284,48 @@ static vaddr_t exception_handler(vaddr_t offset)
  * pipeline adjustments). See TakeUndefInstrException pseudocode in
  * ARM.
  */
-static void inject_undef_exception(struct cpu_user_regs *regs,
-                                   register_t preferred_return)
+static void inject_undef32_exception(struct cpu_user_regs *regs)
 {
     uint32_t spsr = regs->cpsr;
     int is_thumb = (regs->cpsr & PSR_THUMB);
     /* Saved PC points to the instruction past the faulting instruction. */
     uint32_t return_offset = is_thumb ? 2 : 4;
 
+    BUG_ON( !is_pv32_domain(current->domain) );
+
     /* Update processor mode */
     cpsr_switch_mode(regs, PSR_MODE_UND);
 
     /* Update banked registers */
     regs->spsr_und = spsr;
-    regs->lr_und = preferred_return + return_offset;
+    regs->lr_und = regs->pc32 + return_offset;
 
     /* Branch to exception vector */
     regs->pc32 = exception_handler(VECTOR32_UND);
 }
+
+#ifdef CONFIG_ARM_64
+/* Inject an undefined exception into a 64 bit guest */
+static void inject_undef64_exception(struct cpu_user_regs *regs, int instr_len)
+{
+    union hsr esr = {
+        .iss = 0,
+        .len = instr_len,
+        .ec = HSR_EC_UNKNOWN,
+    };
+
+    BUG_ON( is_pv32_domain(current->domain) );
+
+    regs->spsr_el1 = regs->cpsr;
+    regs->elr_el1 = regs->pc;
+
+    regs->cpsr = PSR_MODE_EL1h | PSR_ABT_MASK | PSR_FIQ_MASK | \
+        PSR_IRQ_MASK | PSR_DBG_MASK;
+    regs->pc = READ_SYSREG(VBAR_EL1) + VECTOR64_CURRENT_SPx_SYNC;
+
+    WRITE_SYSREG32(esr.bits, ESR_EL1);
+}
+#endif
 
 struct reg_ctxt {
     /* Guest-side state */
@@ -1266,11 +1290,8 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
             goto bad_trap;
         do_cp15_64(regs, hsr);
         break;
-    case HSR_EC_SMC:
-        /* PC32 already contains the preferred exception return
-         * address, so no need to adjust here.
-         */
-        inject_undef_exception(regs, regs->pc32);
+    case HSR_EC_SMC32:
+        inject_undef32_exception(regs);
         break;
     case HSR_EC_HVC32:
 #ifndef NDEBUG
@@ -1290,6 +1311,9 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         if ( hsr.iss == 0 )
             return do_trap_psci(regs);
         do_trap_hypercall(regs, &regs->x16, hsr.iss);
+        break;
+    case HSR_EC_SMC64:
+        inject_undef64_exception(regs, hsr.len);
         break;
     case HSR_EC_SYSREG:
         if ( is_pv32_domain(current->domain) )

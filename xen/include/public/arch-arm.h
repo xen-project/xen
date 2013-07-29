@@ -234,6 +234,9 @@ typedef uint64_t xen_callback_t;
 #define PSR_IRQ_MASK    (1<<7)        /* Interrupt mask */
 #define PSR_ABT_MASK    (1<<8)        /* Asynchronous Abort mask */
 #define PSR_BIG_ENDIAN  (1<<9)        /* Big Endian Mode */
+#ifdef __aarch64__ /* For Aarch64 bit 9 is repurposed. */
+#define PSR_DBG_MASK    (1<<9)
+#endif
 #define PSR_IT_MASK     (0x0600fc00)  /* Thumb If-Then Mask */
 #define PSR_JAZELLE     (1<<24)       /* Jazelle Mode */
 

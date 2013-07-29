@@ -83,6 +83,7 @@
 #define HCR_SWIO        (1<<1) /* Set/Way Invalidation Override */
 #define HCR_VM          (1<<0) /* Virtual MMU Enable */
 
+#define HSR_EC_UNKNOWN              0x00
 #define HSR_EC_WFI_WFE              0x01
 #define HSR_EC_CP15_32              0x03
 #define HSR_EC_CP15_64              0x04
@@ -95,9 +96,10 @@
 #define HSR_EC_CP14_64              0x0c
 #define HSR_EC_SVC32                0x11
 #define HSR_EC_HVC32                0x12
-#define HSR_EC_SMC                  0x13
+#define HSR_EC_SMC32                0x13
 #ifdef CONFIG_ARM_64
 #define HSR_EC_HVC64                0x16
+#define HSR_EC_SMC64                0x17
 #define HSR_EC_SYSREG               0x18
 #endif
 #define HSR_EC_INSTR_ABORT_GUEST    0x20
@@ -388,11 +390,21 @@ union hsr {
 #define CNTx_CTL_PENDING  (1u<<2)  /* IRQ pending */
 
 /* Exception Vector offsets */
+/* ... ARM32 */
 #define VECTOR32_RST  0
 #define VECTOR32_UND  4
 #define VECTOR32_SVC  8
 #define VECTOR32_PABT 12
 #define VECTOR32_DABT 16
+/* ... ARM64 */
+#define VECTOR64_CURRENT_SP0_SYNC  0x000
+#define VECTOR64_CURRENT_SP0_IRQ   0x080
+#define VECTOR64_CURRENT_SP0_FIQ   0x100
+#define VECTOR64_CURRENT_SP0_ERROR 0x180
+#define VECTOR64_CURRENT_SPx_SYNC  0x200
+#define VECTOR64_CURRENT_SPx_IRQ   0x280
+#define VECTOR64_CURRENT_SPx_FIQ   0x300
+#define VECTOR64_CURRENT_SPx_ERROR 0x380
 
 #if defined(CONFIG_ARM_32)
 # include <asm/arm32/processor.h>
