@@ -26,7 +26,7 @@ lr      .req    x30             // link register
         .macro  entry_guest, compat
 
         add     x21, sp, #UREGS_SPSR_el1
-        mrs     x23, SPSR_EL1
+        mrs     x23, SPSR_el1
         str     x23, [x21]
 
         .if \compat == 0 /* Aarch64 mode */
@@ -40,16 +40,16 @@ lr      .req    x30             // link register
         mrs     x23, ELR_el1
         stp     x22, x23, [x21]
 
-        .else             /* Aarch32 mode */
+        .else            /* Aarch32 mode */
 
         add     x21, sp, #UREGS_SPSR_fiq
-        mrs     x22, spsr_fiq
-        mrs     x23, spsr_irq
+        mrs     x22, SPSR_fiq
+        mrs     x23, SPSR_irq
         stp     w22, w23, [x21]
 
         add     x21, sp, #UREGS_SPSR_und
-        mrs     x22, spsr_und
-        mrs     x23, spsr_abt
+        mrs     x22, SPSR_und
+        mrs     x23, SPSR_abt
         stp     w22, w23, [x21]
 
         .endif
@@ -186,10 +186,10 @@ ENTRY(return_to_new_vcpu)
         ccmp    x21, #PSR_MODE_EL2h, #0x4, ne
         b.eq    return_to_hypervisor /* Yes */
         /* Fall thru */
-ENTRY(return_to_guest)
+return_to_guest:
         bl      leave_hypervisor_tail /* Disables interrupts on return */
         /* Fall thru */
-ENTRY(return_to_hypervisor)
+return_to_hypervisor:
         msr     daifset, #2 /* Mask interrupts */
 
         ldp     x21, x22, [sp, #UREGS_PC]       // load ELR, SPSR
