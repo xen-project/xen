@@ -47,7 +47,11 @@
 #define SCTLR_BASE        0x00c50078
 #define HSCTLR_BASE       0x30c51878
 
-#define PSR_GUEST_INIT  (PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK)
+#define PSR_GUEST32_INIT  (PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_SVC)
+
+#ifdef CONFIG_ARM_64
+#define PSR_GUEST64_INIT (PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_EL1h)
+#endif
 
 /* HCR Hyp Configuration Register */
 #define HCR_RW          (1<<31) /* Register Width, ARM64 only */

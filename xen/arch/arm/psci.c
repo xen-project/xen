@@ -47,7 +47,13 @@ int do_psci_cpu_on(uint32_t vcpuid, register_t entry_point)
     ctxt->ttbr0 = 0;
     ctxt->ttbr1 = 0;
     ctxt->ttbcr = 0; /* Defined Reset Value */
-    ctxt->user_regs.cpsr = PSR_GUEST_INIT;
+    if ( is_pv32_domain(d) )
+        ctxt->user_regs.cpsr = PSR_GUEST32_INIT;
+#ifdef CONFIG_ARM_64
+    else
+        ctxt->user_regs.cpsr = PSR_GUEST64_INIT;
+#endif
+
     /* Start the VCPU with THUMB set if it's requested by the kernel */
     if ( is_thumb )
         ctxt->user_regs.cpsr |= PSR_THUMB;
