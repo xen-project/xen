@@ -599,9 +599,6 @@ int construct_dom0(struct domain *d)
     {
         regs->cpsr = PSR_GUEST32_INIT;
 
-        /* Pretend to be a Cortex A15 */
-        d->arch.vpidr = 0x410fc0f0;
-
         /* FROM LINUX head.S
          *
          * Kernel startup entry point.
