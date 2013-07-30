@@ -8,7 +8,7 @@ endif
 SUBDIRS-y :=
 SUBDIRS-y += include
 SUBDIRS-y += libxc
-SUBDIRS-y += flask
+SUBDIRS-$(FLASK_ENABLE) += flask
 SUBDIRS-y += xenstore
 SUBDIRS-y += misc
 SUBDIRS-y += examples
