@@ -16,8 +16,8 @@ SUBDIRS-y += console
 SUBDIRS-y += xenmon
 SUBDIRS-y += xenstat
 SUBDIRS-$(CONFIG_Linux) += memshr 
-ifeq ($(CONFIG_X86),y)
-SUBDIRS-$(CONFIG_Linux) += blktap
+ifeq ($(CONFIG_X86)$(CONFIG_Linux),yy)
+SUBDIRS-$(CONFIG_BLKTAP1) += blktap
 endif
 SUBDIRS-$(CONFIG_Linux) += blktap2
 SUBDIRS-$(CONFIG_NetBSD) += blktap2

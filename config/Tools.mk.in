@@ -51,6 +51,7 @@ CONFIG_OVMF         := @ovmf@
 CONFIG_ROMBIOS      := @rombios@
 CONFIG_SEABIOS      := @seabios@
 CONFIG_XEND         := @xend@
+CONFIG_BLKTAP1      := @blktap1@
 
 #System options
 ZLIB                := @zlib@

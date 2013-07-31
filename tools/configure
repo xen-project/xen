@@ -654,6 +654,7 @@ APPEND_LIB
 APPEND_INCLUDES
 PREPEND_LIB
 PREPEND_INCLUDES
+blktap1
 xend
 debug
 seabios
@@ -732,6 +733,7 @@ enable_rombios
 enable_seabios
 enable_debug
 enable_xend
+enable_blktap1
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1391,6 +1393,7 @@ Optional Features:
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
   --disable-debug         Disable debug build of tools (default is ENABLED)
   --disable-xend          Disable xend toolstack (default is ENABLED)
+  --enable-blktap1        Disable blktap1 tools (default is DISABLED)
 
 Some influential environment variables:
   CC          C compiler command
@@ -3625,6 +3628,29 @@ elif test -z $ax_cv_xend; then :
 
 fi
 xend=$ax_cv_xend
+
+
+
+# Check whether --enable-blktap1 was given.
+if test "${enable_blktap1+set}" = set; then :
+  enableval=$enable_blktap1;
+fi
+
+
+if test "x$enable_blktap1" = "xno"; then :
+
+    ax_cv_blktap1="n"
+
+elif test "x$enable_blktap1" = "xyes"; then :
+
+    ax_cv_blktap1="y"
+
+elif test -z $ax_cv_blktap1; then :
+
+    ax_cv_blktap1="n"
+
+fi
+blktap1=$ax_cv_blktap1
 
 
 
