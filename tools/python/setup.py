@@ -132,7 +132,6 @@ setup(name            = 'xen',
       description     = 'Xen',
       packages        = ['xen',
                          'xen.lowlevel',
-                         'xen.sv',
                          ] + xend_packages,
       ext_package = "xen.lowlevel",
       ext_modules = modules
