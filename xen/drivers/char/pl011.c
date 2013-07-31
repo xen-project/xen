@@ -32,7 +32,7 @@
 static struct pl011 {
     unsigned int baud, clock_hz, data_bits, parity, stop_bits;
     struct dt_irq irq;
-    volatile uint32_t *regs;
+    void __iomem *regs;
     /* UART with IRQ line: interrupt-driven I/O. */
     struct irqaction irqaction;
     /* /\* UART with no IRQ line: periodically-polled I/O. *\/ */
@@ -42,20 +42,20 @@ static struct pl011 {
 } pl011_com = {0};
 
 /* PL011 register addresses */
-#define DR     (0x00/4)
-#define RSR    (0x04/4)
-#define FR     (0x18/4)
-#define ILPR   (0x20/4)
-#define IBRD   (0x24/4)
-#define FBRD   (0x28/4)
-#define LCR_H  (0x2c/4)
-#define CR     (0x30/4)
-#define IFLS   (0x34/4)
-#define IMSC   (0x38/4)
-#define RIS    (0x3c/4)
-#define MIS    (0x40/4)
-#define ICR    (0x44/4)
-#define DMACR  (0x48/4)
+#define DR     (0x00)
+#define RSR    (0x04)
+#define FR     (0x18)
+#define ILPR   (0x20)
+#define IBRD   (0x24)
+#define FBRD   (0x28)
+#define LCR_H  (0x2c)
+#define CR     (0x30)
+#define IFLS   (0x34)
+#define IMSC   (0x38)
+#define RIS    (0x3c)
+#define MIS    (0x40)
+#define ICR    (0x44)
+#define DMACR  (0x48)
 
 /* CR bits */
 #define RXE    (1<<9) /* Receive enable */
@@ -95,17 +95,20 @@ static struct pl011 {
 #define PARITY_MARK  (PEN|SPS)
 #define PARITY_SPACE (PEN|EPS|SPS)
 
+#define pl011_read(uart, off)           ioreadl((uart)->regs + (off))
+#define pl011_write(uart, off,val)      iowritel((uart)->regs + (off), (val))
+
 static void pl011_interrupt(int irq, void *data, struct cpu_user_regs *regs)
 {
     struct serial_port *port = data;
     struct pl011 *uart = port->uart;
-    unsigned int status = uart->regs[MIS];
+    unsigned int status = pl011_read(uart, MIS);
 
     if ( status )
     {
         do
         {
-            uart->regs[ICR] = status & ~(TXI|RTI|RXI);
+            pl011_write(uart, ICR, status & ~(TXI|RTI|RXI));
 
             if ( status & (RTI|RXI) )
                 serial_rx_interrupt(port, regs);
@@ -118,7 +121,7 @@ static void pl011_interrupt(int irq, void *data, struct cpu_user_regs *regs)
             if ( status & (TXI) )
                 serial_tx_interrupt(port, regs);
 
-            status = uart->regs[MIS];
+            status = pl011_read(uart, MIS);
         } while (status != 0);
     }
 }
@@ -129,40 +132,39 @@ static void __init pl011_init_preirq(struct serial_port *port)
     unsigned int divisor;
 
     /* No interrupts, please. */
-    uart->regs[IMSC] = ALLI;
+    pl011_write(uart, IMSC, ALLI);
 
     /* Definitely no DMA */
-    uart->regs[DMACR] = 0x0;
+    pl011_write(uart, DMACR, 0x0);
 
     /* Line control and baud-rate generator. */
     if ( uart->baud != BAUD_AUTO )
     {
         /* Baud rate specified: program it into the divisor latch. */
         divisor = (uart->clock_hz << 2) / uart->baud; /* clk << 6 / bd << 4 */
-        uart->regs[FBRD] = divisor & 0x3f;
-        uart->regs[IBRD] = divisor >> 6;
+        pl011_write(uart, FBRD, divisor & 0x3f);
+        pl011_write(uart, IBRD, divisor >> 6);
     }
     else
     {
         /* Baud rate already set: read it out from the divisor latch. */
-        divisor = (uart->regs[IBRD] << 6) | uart->regs[FBRD];
+        divisor = (pl011_read(uart, IBRD) << 6) | (pl011_read(uart, FBRD));
         uart->baud = (uart->clock_hz << 2) / divisor;
     }
     /* This write must follow FBRD and IBRD writes. */
-    uart->regs[LCR_H] = ( (uart->data_bits - 5) << 5
-                          | FEN
-                          | ((uart->stop_bits - 1) << 3)
-                          | uart->parity );
-
+    pl011_write(uart, LCR_H, (uart->data_bits - 5) << 5
+                            | FEN
+                            | ((uart->stop_bits - 1) << 3)
+                            | uart->parity);
     /* Clear errors */
-    uart->regs[RSR] = 0;
+    pl011_write(uart, RSR, 0);
 
     /* Mask and clear the interrupts */
-    uart->regs[IMSC] = ALLI;
-    uart->regs[ICR] = ALLI;
+    pl011_write(uart, IMSC, ALLI);
+    pl011_write(uart, ICR, ALLI);
 
     /* Enable the UART for RX and TX; no flow ctrl */
-    uart->regs[CR] = RXE | TXE | UARTEN;
+    pl011_write(uart, CR, RXE | TXE | UARTEN);
 }
 
 static void __init pl011_init_postirq(struct serial_port *port)
@@ -180,10 +182,10 @@ static void __init pl011_init_postirq(struct serial_port *port)
     }
 
     /* Clear pending error interrupts */
-    uart->regs[ICR] = OEI|BEI|PEI|FEI;
+    pl011_write(uart, ICR, OEI|BEI|PEI|FEI);
 
     /* Unmask interrupts */
-    uart->regs[IMSC] = RTI|DSRMI|DCDMI|CTSMI|RIMI;
+    pl011_write(uart, IMSC, RTI|DSRMI|DCDMI|CTSMI|RIMI);
 }
 
 static void pl011_suspend(struct serial_port *port)
@@ -199,23 +201,25 @@ static void pl011_resume(struct serial_port *port)
 static unsigned int pl011_tx_ready(struct serial_port *port)
 {
     struct pl011 *uart = port->uart;
-    return uart->regs[FR] & TXFE ? 16 : 0;
+
+    return ((pl011_read(uart, FR) & TXFE) ? 16 : 0);
 }
 
 static void pl011_putc(struct serial_port *port, char c)
 {
     struct pl011 *uart = port->uart;
-    uart->regs[DR] = (uint32_t) (unsigned char) c;
+
+    pl011_write(uart, DR, (uint32_t)(unsigned char)c);
 }
 
 static int pl011_getc(struct serial_port *port, char *pc)
 {
     struct pl011 *uart = port->uart;
 
-    if ( uart->regs[FR] & RXFE )
+    if ( pl011_read(uart, FR) & RXFE )
         return 0;
 
-    *pc = uart->regs[DR] & 0xff;
+    *pc = pl011_read(uart, DR) & 0xff;
     return 1;
 }
 
