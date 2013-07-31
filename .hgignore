@@ -201,8 +201,6 @@
 ^tools/libxl/_libxl\.api-for-check
 ^tools/libxl/libxl\.api-ok
 ^tools/libvchan/vchan-node[12]$
-^tools/libaio/src/.*\.ol$
-^tools/libaio/src/.*\.os$
 ^tools/misc/cpuperf/cpuperf-perfcntr$
 ^tools/misc/cpuperf/cpuperf-xen$
 ^tools/misc/lomount/lomount$

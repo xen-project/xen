@@ -1,10 +1,6 @@
 XEN_ROOT = $(CURDIR)/..
 include $(XEN_ROOT)/tools/Rules.mk
 
-ifneq ($(CONFIG_SYSTEM_LIBAIO),y)
-SUBDIRS-libaio := libaio
-endif
-
 SUBDIRS-y :=
 SUBDIRS-y += include
 SUBDIRS-y += libxc
@@ -19,13 +15,11 @@ SUBDIRS-$(CONFIG_X86) += firmware
 SUBDIRS-y += console
 SUBDIRS-y += xenmon
 SUBDIRS-y += xenstat
-SUBDIRS-$(CONFIG_Linux) += $(SUBDIRS-libaio)
 SUBDIRS-$(CONFIG_Linux) += memshr 
 ifeq ($(CONFIG_X86),y)
 SUBDIRS-$(CONFIG_Linux) += blktap
 endif
 SUBDIRS-$(CONFIG_Linux) += blktap2
-SUBDIRS-$(CONFIG_NetBSD) += $(SUBDIRS-libaio)
 SUBDIRS-$(CONFIG_NetBSD) += blktap2
 SUBDIRS-$(CONFIG_NetBSD) += xenbackendd
 SUBDIRS-y += libfsimage

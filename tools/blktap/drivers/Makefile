@@ -27,13 +27,7 @@ CFLAGS += -I $(MEMSHR_DIR)
 MEMSHRLIBS += $(MEMSHR_DIR)/libmemshr.a
 endif
 
-ifneq ($(CONFIG_SYSTEM_LIBAIO),y)
-LIBAIO_DIR   = ../../libaio/src
-CFLAGS      += -I $(LIBAIO_DIR)
-AIOLIBS     := $(LIBAIO_DIR)/libaio.a
-else
 AIOLIBS     := -laio
-endif
 
 CFLAGS += $(PTHREAD_CFLAGS)
 LDFLAGS += $(PTHREAD_LDFLAGS)

@@ -7375,9 +7375,14 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_aio_io_setup" >&5
 $as_echo "$ac_cv_lib_aio_io_setup" >&6; }
 if test "x$ac_cv_lib_aio_io_setup" = x""yes; then :
-  system_aio="y"
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBAIO 1
+_ACEOF
+
+  LIBS="-laio $LIBS"
+
 else
-  system_aio="n"
+  as_fn_error $? "Could not find libaio" "$LINENO" 5
 fi
 
 

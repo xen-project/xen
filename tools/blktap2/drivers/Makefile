@@ -28,14 +28,7 @@ REMUS-OBJS  += hashtable.o
 REMUS-OBJS  += hashtable_itr.o
 REMUS-OBJS  += hashtable_utility.o
 
-ifneq ($(CONFIG_SYSTEM_LIBAIO),y)
-CFLAGS    += -I $(LIBAIO_DIR)
-LIBAIO_DIR = $(XEN_ROOT)/tools/libaio/src
-tapdisk2 tapdisk-stream tapdisk-diff $(QCOW_UTIL): AIOLIBS := $(LIBAIO_DIR)/libaio.a 
-tapdisk-client tapdisk-stream tapdisk-diff $(QCOW_UTIL): CFLAGS  += -I$(LIBAIO_DIR)
-else
 tapdisk2 tapdisk-stream tapdisk-diff $(QCOW_UTIL): AIOLIBS := -laio
-endif
 
 MEMSHRLIBS :=
 ifeq ($(CONFIG_Linux), __fixme__)
