@@ -14,7 +14,6 @@ TARGETS-$(CONFIG_X86) += xen-detect xen-hvmctx xen-hvmcrash xen-lowmemd
 TARGETS-$(CONFIG_MIGRATE) += xen-hptool
 TARGETS := $(TARGETS-y)
 
-SUBDIRS-$(CONFIG_LOMOUNT) += lomount
 SUBDIRS := $(SUBDIRS-y)
 
 INSTALL_BIN-y := xencons xencov_split

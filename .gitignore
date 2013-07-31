@@ -210,7 +210,6 @@ tools/libxl/_libxl.api-for-check
 tools/libxl/*.api-ok
 tools/misc/cpuperf/cpuperf-perfcntr
 tools/misc/cpuperf/cpuperf-xen
-tools/misc/lomount/lomount
 tools/misc/mbootpack/bin2c
 tools/misc/mbootpack/bootsect
 tools/misc/mbootpack/bzimage_header.c

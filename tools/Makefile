@@ -68,7 +68,6 @@ install: subdirs-install
 .PHONY: uninstall
 uninstall: D=$(DESTDIR)
 uninstall:
-	rm -rf $(D)$(LIBDIR)/xen* $(D)$(BINDIR)/lomount
 	rm -rf $(D)$(BINDIR)/cpuperf-perfcntr $(D)$(BINDIR)/cpuperf-xen
 	rm -rf $(D)$(BINDIR)/xc_shadow
 	rm -rf $(D)$(BINDIR)/pygrub

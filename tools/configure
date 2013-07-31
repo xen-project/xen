@@ -659,7 +659,6 @@ debug
 seabios
 rombios
 ovmf
-lomount
 xsmpolicy
 ocamltools
 xenapi
@@ -728,7 +727,6 @@ enable_monitors
 enable_xenapi
 enable_ocamltools
 enable_xsmpolicy
-enable_lomount
 enable_ovmf
 enable_rombios
 enable_seabios
@@ -1388,7 +1386,6 @@ Optional Features:
   --enable-xenapi         Enable Xen API Bindings (default is DISABLED)
   --disable-ocamltools    Disable Ocaml tools (default is ENABLED)
   --disable-xsmpolicy     Disable XSM policy compilation (default is ENABLED)
-  --enable-lomount        Enable lomount (default is DISABLED)
   --enable-ovmf           Enable OVMF (default is DISABLED)
   --disable-rombios       Disable ROM BIOS (default is ENABLED)
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
@@ -3513,29 +3510,6 @@ elif test -z $ax_cv_xsmpolicy; then :
 
 fi
 xsmpolicy=$ax_cv_xsmpolicy
-
-
-
-# Check whether --enable-lomount was given.
-if test "${enable_lomount+set}" = set; then :
-  enableval=$enable_lomount;
-fi
-
-
-if test "x$enable_lomount" = "xno"; then :
-
-    ax_cv_lomount="n"
-
-elif test "x$enable_lomount" = "xyes"; then :
-
-    ax_cv_lomount="y"
-
-elif test -z $ax_cv_lomount; then :
-
-    ax_cv_lomount="n"
-
-fi
-lomount=$ax_cv_lomount
 
 
 
