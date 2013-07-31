@@ -23,6 +23,10 @@ install: install-dtd
 	CC="$(CC)" CFLAGS="$(CFLAGS)" $(PYTHON) setup.py install \
 		$(PYTHON_PREFIX_ARG) --root="$(DESTDIR)" --force
 
+	$(INSTALL_DIR) $(DESTDIR)$(SBINDIR)
+	$(INSTALL_PYTHON_PROG) xen/xm/xm $(DESTDIR)$(SBINDIR)/xm
+	$(INSTALL_PYTHON_PROG) xen/xend/xend $(DESTDIR)$(SBINDIR)/xend
+
 install-dtd: all
 	$(INSTALL_DIR) $(DESTDIR)$(SHAREDIR)/xen
 	$(INSTALL_DATA) xen/xm/create.dtd $(DESTDIR)$(SHAREDIR)/xen
