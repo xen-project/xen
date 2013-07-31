@@ -660,7 +660,6 @@ seabios
 rombios
 ovmf
 lomount
-miniterm
 xsmpolicy
 ocamltools
 xenapi
@@ -729,7 +728,6 @@ enable_monitors
 enable_xenapi
 enable_ocamltools
 enable_xsmpolicy
-enable_miniterm
 enable_lomount
 enable_ovmf
 enable_rombios
@@ -1390,7 +1388,6 @@ Optional Features:
   --enable-xenapi         Enable Xen API Bindings (default is DISABLED)
   --disable-ocamltools    Disable Ocaml tools (default is ENABLED)
   --disable-xsmpolicy     Disable XSM policy compilation (default is ENABLED)
-  --enable-miniterm       Enable miniterm (default is DISABLED)
   --enable-lomount        Enable lomount (default is DISABLED)
   --enable-ovmf           Enable OVMF (default is DISABLED)
   --disable-rombios       Disable ROM BIOS (default is ENABLED)
@@ -3516,29 +3513,6 @@ elif test -z $ax_cv_xsmpolicy; then :
 
 fi
 xsmpolicy=$ax_cv_xsmpolicy
-
-
-
-# Check whether --enable-miniterm was given.
-if test "${enable_miniterm+set}" = set; then :
-  enableval=$enable_miniterm;
-fi
-
-
-if test "x$enable_miniterm" = "xno"; then :
-
-    ax_cv_miniterm="n"
-
-elif test "x$enable_miniterm" = "xyes"; then :
-
-    ax_cv_miniterm="y"
-
-elif test -z $ax_cv_miniterm; then :
-
-    ax_cv_miniterm="n"
-
-fi
-miniterm=$ax_cv_miniterm
 
 
 

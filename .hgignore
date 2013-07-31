@@ -209,7 +209,6 @@
 ^tools/misc/mbootpack/bzimage_header\.c$
 ^tools/misc/mbootpack/mbootpack$
 ^tools/misc/mbootpack/setup$
-^tools/misc/miniterm/miniterm$
 ^tools/misc/xc_shadow$
 ^tools/misc/xen_cpuperf$
 ^tools/misc/xen-detect$
