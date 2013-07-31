@@ -654,6 +654,7 @@ APPEND_LIB
 APPEND_INCLUDES
 PREPEND_LIB
 PREPEND_INCLUDES
+xend
 debug
 seabios
 rombios
@@ -734,6 +735,7 @@ enable_ovmf
 enable_rombios
 enable_seabios
 enable_debug
+enable_xend
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1394,6 +1396,7 @@ Optional Features:
   --disable-rombios       Disable ROM BIOS (default is ENABLED)
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
   --disable-debug         Disable debug build of tools (default is ENABLED)
+  --disable-xend          Disable xend toolstack (default is ENABLED)
 
 Some influential environment variables:
   CC          C compiler command
@@ -3651,6 +3654,29 @@ elif test -z $ax_cv_debug; then :
 
 fi
 debug=$ax_cv_debug
+
+
+
+# Check whether --enable-xend was given.
+if test "${enable_xend+set}" = set; then :
+  enableval=$enable_xend;
+fi
+
+
+if test "x$enable_xend" = "xno"; then :
+
+    ax_cv_xend="n"
+
+elif test "x$enable_xend" = "xyes"; then :
+
+    ax_cv_xend="y"
+
+elif test -z $ax_cv_xend; then :
+
+    ax_cv_xend="y"
+
+fi
+xend=$ax_cv_xend
 
 
 

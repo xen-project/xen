@@ -52,6 +52,7 @@ CONFIG_LOMOUNT      := @lomount@
 CONFIG_OVMF         := @ovmf@
 CONFIG_ROMBIOS      := @rombios@
 CONFIG_SEABIOS      := @seabios@
+CONFIG_XEND         := @xend@
 
 #System options
 CONFIG_SYSTEM_LIBAIO:= @system_aio@

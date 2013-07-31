@@ -1,6 +1,6 @@
 
 from distutils.core import setup, Extension
-import os
+import os, sys
 
 XEN_ROOT = "../.."
 
@@ -95,11 +95,19 @@ if plat == 'SunOS':
 if plat == 'Linux':
     modules.extend([ checkpoint, netlink ])
 
-setup(name            = 'xen',
-      version         = '3.0',
-      description     = 'Xen',
-      packages        = ['xen',
-                         'xen.lowlevel',
+enable_xend = True
+new_argv = []
+for arg in sys.argv:
+    if arg == "--xend=y":
+        enable_xend = True
+    elif arg == "--xend=n":
+        enable_xend = False
+    else:
+        new_argv.append(arg)
+sys.argv = new_argv
+
+if enable_xend:
+    xend_packages = [
                          'xen.util',
                          'xen.util.xsm',
                          'xen.util.xsm.dummy',
@@ -110,14 +118,23 @@ setup(name            = 'xen',
                          'xen.xend.xenstore',
                          'xen.xm',
                          'xen.web',
-                         'xen.sv',
-                         'xen.xsview',
                          'xen.remus',
                          'xen.xend.tests',
                          'xen.xend.server.tests',
                          'xen.xend.xenstore.tests',
                          'xen.xm.tests'
-                         ],
+    ]
+else:
+    xend_packages = []
+
+setup(name            = 'xen',
+      version         = '3.0',
+      description     = 'Xen',
+      packages        = ['xen',
+                         'xen.lowlevel',
+                         'xen.sv',
+                         'xen.xsview',
+                         ] + xend_packages,
       ext_package = "xen.lowlevel",
       ext_modules = modules
       )
