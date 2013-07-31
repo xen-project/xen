@@ -485,9 +485,15 @@ disable it (edid=no). This option should not normally be required
 except for debugging purposes.
 
 ### extra\_guest\_irqs
-> `= <number>`
+> `= [<domU number>][,<dom0 number>]`
 
-Increase the number of PIRQs available for the guest. The default is 32. 
+> Default: `32,256`
+
+Change the number of PIRQs available for guests.  The optional first number is
+common for all domUs, while the optional second number (preceded by a comma)
+is for dom0.  Changing the setting for domU has no impact on dom0 and vice
+versa.  For example to change dom0 without changing domU, use
+`extra_guest_irqs=,512`
 
 ### flask\_enabled
 > `= <integer>`
