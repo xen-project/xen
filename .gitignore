@@ -210,11 +210,6 @@ tools/libxl/_libxl.api-for-check
 tools/libxl/*.api-ok
 tools/misc/cpuperf/cpuperf-perfcntr
 tools/misc/cpuperf/cpuperf-xen
-tools/misc/mbootpack/bin2c
-tools/misc/mbootpack/bootsect
-tools/misc/mbootpack/bzimage_header.c
-tools/misc/mbootpack/mbootpack
-tools/misc/mbootpack/setup
 tools/misc/xc_shadow
 tools/misc/xen_cpuperf
 tools/misc/xen-detect
@@ -244,15 +239,6 @@ tools/tests/regression/build/*
 tools/tests/regression/downloads/*
 tools/tests/mem-sharing/memshrtool
 tools/tests/mce-test/tools/xen-mceinj
-tools/vnet/Make.local
-tools/vnet/build/*
-tools/vnet/gc
-tools/vnet/gc*/*
-tools/vnet/vnet-module/*.ko
-tools/vnet/vnet-module/.*.cmd
-tools/vnet/vnet-module/.tmp_versions/*
-tools/vnet/vnet-module/vnet_module.mod.*
-tools/vnet/vnetd/vnetd
 tools/vtpm/tpm_emulator-*.tar.gz
 tools/vtpm/tpm_emulator/*
 tools/vtpm/vtpm/*
@@ -306,7 +292,6 @@ tools/xm-test/lib/XmTestReport/xmtest.py
 tools/xm-test/tests/*.test
 tools/ocaml-xenstored*
 xen/.banner*
-xen/BLOG
 xen/System.map
 xen/arch/arm/asm-offsets.s
 xen/arch/arm/xen.lds

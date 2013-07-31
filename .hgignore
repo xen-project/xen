@@ -203,11 +203,6 @@
 ^tools/libvchan/vchan-node[12]$
 ^tools/misc/cpuperf/cpuperf-perfcntr$
 ^tools/misc/cpuperf/cpuperf-xen$
-^tools/misc/mbootpack/bin2c$
-^tools/misc/mbootpack/bootsect$
-^tools/misc/mbootpack/bzimage_header\.c$
-^tools/misc/mbootpack/mbootpack$
-^tools/misc/mbootpack/setup$
 ^tools/misc/xc_shadow$
 ^tools/misc/xen_cpuperf$
 ^tools/misc/xen-detect$
@@ -242,15 +237,6 @@
 ^tools/tests/xen-access/xen-access$
 ^tools/tests/mem-sharing/memshrtool$
 ^tools/tests/mce-test/tools/xen-mceinj$
-^tools/vnet/Make.local$
-^tools/vnet/build/.*$
-^tools/vnet/gc$
-^tools/vnet/gc.*/.*$
-^tools/vnet/vnet-module/.*\.ko$
-^tools/vnet/vnet-module/\..*\.cmd$
-^tools/vnet/vnet-module/\.tmp_versions/.*$
-^tools/vnet/vnet-module/vnet_module\.mod\..*$
-^tools/vnet/vnetd/vnetd$
 ^tools/vtpm/tpm_emulator-.*\.tar\.gz$
 ^tools/vtpm/tpm_emulator/.*$
 ^tools/vtpm/vtpm/.*$
@@ -331,7 +317,6 @@
 ^config/Stubdom\.mk$
 ^config/Docs\.mk$
 ^xen/\.banner.*$
-^xen/BLOG$
 ^xen/System.map$
 ^xen/arch/arm/asm-offsets\.s$
 ^xen/arch/arm/xen\.lds$
