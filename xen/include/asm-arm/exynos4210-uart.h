@@ -88,6 +88,7 @@
 
 /* UTRSTAT */
 #define UTRSTAT_TXFE            (1 << 1)
+#define UTRSTAT_TXE             (1 << 2)
 
 /* URHX */
 #define URXH_DATA_MASK  (0xff)

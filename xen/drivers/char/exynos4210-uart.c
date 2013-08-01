@@ -33,6 +33,7 @@ static struct exynos4210_uart {
     struct dt_irq irq;
     void *regs;
     struct irqaction irqaction;
+    struct vuart_info vuart;
 } exynos4210_com = {0};
 
 /* These parity settings can be ORed directly into the ULCON. */
@@ -281,6 +282,13 @@ static const struct dt_irq __init *exynos4210_uart_dt_irq(struct serial_port *po
     return &uart->irq;
 }
 
+static const struct vuart_info *exynos4210_vuart_info(struct serial_port *port)
+{
+    struct exynos4210_uart *uart = port->uart;
+
+    return &uart->vuart;
+}
+
 static struct uart_driver __read_mostly exynos4210_uart_driver = {
     .init_preirq  = exynos4210_uart_init_preirq,
     .init_postirq = exynos4210_uart_init_postirq,
@@ -292,6 +300,7 @@ static struct uart_driver __read_mostly exynos4210_uart_driver = {
     .getc         = exynos4210_uart_getc,
     .irq          = exynos4210_uart_irq,
     .dt_irq_get   = exynos4210_uart_dt_irq,
+    .vuart_info   = exynos4210_vuart_info,
 };
 
 /* TODO: Parse UART config from the command line */
@@ -336,6 +345,12 @@ static int __init exynos4210_uart_init(struct dt_device_node *dev,
         early_printk("exynos4210: Unable to retrieve the IRQ\n");
         return res;
     }
+
+    uart->vuart.base_addr = addr;
+    uart->vuart.size = size;
+    uart->vuart.data_off = UTXH;
+    uart->vuart.status_off = UTRSTAT;
+    uart->vuart.status = UTRSTAT_TXE | UTRSTAT_TXFE;
 
     /* Register with generic serial driver. */
     serial_register_uart(SERHND_DTUART, &exynos4210_uart_driver, uart);
