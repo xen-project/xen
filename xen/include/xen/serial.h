@@ -32,6 +32,14 @@ enum serial_port_state {
     serial_initialized
 };
 
+struct vuart_info {
+    paddr_t base_addr;          /* Base address of the UART */
+    unsigned long size;         /* Size of the memory region */
+    unsigned long data_off;     /* Data register offset */
+    unsigned long status_off;   /* Status register offset */
+    unsigned long status;       /* Ready status value */
+};
+
 struct serial_port {
     /* Uart-driver parameters. */
     struct uart_driver *driver;
@@ -74,6 +82,8 @@ struct uart_driver {
     int  (*irq)(struct serial_port *);
     /* Get IRQ device node for this port's serial line: returns NULL if none. */
     const struct dt_irq *(*dt_irq_get)(struct serial_port *);
+    /* Get serial information */
+    const struct vuart_info *(*vuart_info)(struct serial_port *);
 };
 
 /* 'Serial handles' are composed from the following fields. */
@@ -126,6 +136,9 @@ int serial_irq(int idx);
 
 /* Return irq device node for specified serial port (identified by index). */
 const struct dt_irq *serial_dt_irq(int idx);
+
+/* Retrieve basic UART information to emulate it (base address, size...) */
+const struct vuart_info* serial_vuart_info(int idx);
 
 /* Serial suspend/resume. */
 void serial_suspend(void);

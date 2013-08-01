@@ -497,6 +497,14 @@ const struct dt_irq __init *serial_dt_irq(int idx)
     return NULL;
 }
 
+const struct vuart_info *serial_vuart_info(int idx)
+{
+    if ( (idx >= 0) && (idx < ARRAY_SIZE(com)) &&
+         com[idx].driver && com[idx].driver->vuart_info )
+        return com[idx].driver->vuart_info(&com[idx]);
+
+    return NULL;
+}
 
 void serial_suspend(void)
 {
