@@ -87,7 +87,7 @@
 #define UFSTAT_RX_COUNT_MASK    (0xff << UFSTAT_RX_COUNT_SHIFT)
 
 /* UTRSTAT */
-#define UTRSTAT_TX_EMPTY        (1 << 1)
+#define UTRSTAT_TXFE            (1 << 1)
 
 /* URHX */
 #define URXH_DATA_MASK  (0xff)

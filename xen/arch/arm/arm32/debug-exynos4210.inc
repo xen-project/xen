@@ -56,7 +56,7 @@
 .macro early_uart_ready rb rc
 1:
         ldr   \rc, [\rb, #UTRSTAT]   /* <- UTRSTAT (Flag register) */
-        tst   \rc, #UTRSTAT_TX_EMPTY /* Check BUSY bit */
+        tst   \rc, #UTRSTAT_TXFE     /* Check BUSY bit */
         beq   1b                     /* Wait for the UART to be ready */
 .endm
 
