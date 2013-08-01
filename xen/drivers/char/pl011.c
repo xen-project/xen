@@ -36,6 +36,7 @@ static struct pl011 {
     void __iomem *regs;
     /* UART with IRQ line: interrupt-driven I/O. */
     struct irqaction irqaction;
+    struct vuart_info vuart;
     /* /\* UART with no IRQ line: periodically-polled I/O. *\/ */
     /* struct timer timer; */
     /* unsigned int timeout_ms; */
@@ -190,6 +191,13 @@ static const struct dt_irq __init *pl011_dt_irq(struct serial_port *port)
     return &uart->irq;
 }
 
+static const struct vuart_info *pl011_vuart(struct serial_port *port)
+{
+    struct pl011 *uart = port->uart;
+
+    return &uart->vuart;
+}
+
 static struct uart_driver __read_mostly pl011_driver = {
     .init_preirq  = pl011_init_preirq,
     .init_postirq = pl011_init_postirq,
@@ -201,6 +209,7 @@ static struct uart_driver __read_mostly pl011_driver = {
     .getc         = pl011_getc,
     .irq          = pl011_irq,
     .dt_irq_get   = pl011_dt_irq,
+    .vuart_info   = pl011_vuart,
 };
 
 /* TODO: Parse UART config from the command line */
@@ -247,6 +256,12 @@ static int __init pl011_uart_init(struct dt_device_node *dev,
         early_printk("pl011: Unable to retrieve the IRQ\n");
         return res;
     }
+
+    uart->vuart.base_addr = addr;
+    uart->vuart.size = size;
+    uart->vuart.data_off = DR;
+    uart->vuart.status_off = FR;
+    uart->vuart.status = 0;
 
     /* Register with generic serial driver. */
     serial_register_uart(SERHND_DTUART, &pl011_driver, uart);
