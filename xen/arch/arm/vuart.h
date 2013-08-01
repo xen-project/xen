@@ -1,7 +1,7 @@
 /*
- * xen/arch/arm/vpl011.h
+ * xen/arch/arm/vuart.h
  *
- * ARM PL011 Emulation Support
+ * Virtual UART Emulation Support
  *
  * Ian Campbell <ian.campbell@citrix.com>
  * Copyright (c) 2012 Citrix Systems.
@@ -17,13 +17,13 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __ARCH_ARM_VPL011_H__
-#define __ARCH_ARM_VPL011_H__
+#ifndef __ARCH_ARM_VUART_H__
+#define __ARCH_ARM_VUART_H__
 
-extern int domain_uart0_init(struct domain *d);
-extern void domain_uart0_free(struct domain *d);
+int domain_vuart_init(struct domain *d);
+void domain_vuart_free(struct domain *d);
 
-#endif
+#endif /* __ARCH_ARM_VUART_H__ */
 
 /*
  * Local variables:

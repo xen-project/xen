@@ -32,7 +32,7 @@
 
 #include <asm/gic.h>
 #include "vtimer.h"
-#include "vpl011.h"
+#include "vuart.h"
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
 
@@ -525,8 +525,12 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     if ( (rc = vcpu_domain_init(d)) != 0 )
         goto fail;
 
-    /* Domain 0 gets a real UART not an emulated one */
-    if ( d->domain_id && (rc = domain_uart0_init(d)) != 0 )
+    /*
+     * Virtual UART is only used by linux early printk and decompress code.
+     * Only use it for dom0 because the linux kernel may not support
+     * multi-platform.
+     */
+    if ( (d->domain_id == 0) && (rc = domain_vuart_init(d)) )
         goto fail;
 
     return 0;
@@ -542,7 +546,7 @@ void arch_domain_destroy(struct domain *d)
 {
     p2m_teardown(d);
     domain_vgic_free(d);
-    domain_uart0_free(d);
+    domain_vuart_free(d);
     free_xenheap_page(d->shared_info);
 }
 

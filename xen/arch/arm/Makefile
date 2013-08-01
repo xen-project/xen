@@ -27,7 +27,7 @@ obj-y += shutdown.o
 obj-y += traps.o
 obj-y += vgic.o
 obj-y += vtimer.o
-obj-y += vpl011.o
+obj-y += vuart.o
 obj-y += hvm.o
 obj-y += device.o
 

@@ -8,6 +8,7 @@
 #include <asm/p2m.h>
 #include <asm/vfp.h>
 #include <public/hvm/params.h>
+#include <xen/serial.h>
 
 /* Represents state corresponding to a block of 32 interrupts */
 struct vgic_irq_rank {
@@ -103,12 +104,13 @@ struct arch_domain
         paddr_t cbase; /* CPU base address */
     } vgic;
 
-    struct vpl011 {
-#define VPL011_BUF_SIZE 128
-        char                  *buf;
-        int                    idx;
-        spinlock_t             lock;
-    } uart0;
+    struct vuart {
+#define VUART_BUF_SIZE 128
+        char                        *buf;
+        int                         idx;
+        const struct vuart_info     *info;
+        spinlock_t                  lock;
+    } vuart;
 
 }  __cacheline_aligned;
 
