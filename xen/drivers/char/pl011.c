@@ -28,6 +28,7 @@
 #include <asm/device.h>
 #include <xen/mm.h>
 #include <xen/vmap.h>
+#include <asm/pl011-uart.h>
 
 static struct pl011 {
     unsigned int baud, clock_hz, data_bits, parity, stop_bits;
@@ -40,53 +41,6 @@ static struct pl011 {
     /* unsigned int timeout_ms; */
     /* bool_t probing, intr_works; */
 } pl011_com = {0};
-
-/* PL011 register addresses */
-#define DR     (0x00)
-#define RSR    (0x04)
-#define FR     (0x18)
-#define ILPR   (0x20)
-#define IBRD   (0x24)
-#define FBRD   (0x28)
-#define LCR_H  (0x2c)
-#define CR     (0x30)
-#define IFLS   (0x34)
-#define IMSC   (0x38)
-#define RIS    (0x3c)
-#define MIS    (0x40)
-#define ICR    (0x44)
-#define DMACR  (0x48)
-
-/* CR bits */
-#define RXE    (1<<9) /* Receive enable */
-#define TXE    (1<<8) /* Transmit enable */
-#define UARTEN (1<<0) /* UART enable */
-
-/* FR bits */
-#define TXFE   (1<<7) /* TX FIFO empty */
-#define RXFE   (1<<4) /* RX FIFO empty */
-
-/* LCR_H bits */
-#define SPS    (1<<7) /* Stick parity select */
-#define FEN    (1<<4) /* FIFO enable */
-#define STP2   (1<<3) /* Two stop bits select */
-#define EPS    (1<<2) /* Even parity select */
-#define PEN    (1<<1) /* Parity enable */
-#define BRK    (1<<0) /* Send break */
-
-/* Interrupt bits (IMSC, MIS, ICR) */
-#define OEI   (1<<10) /* Overrun Error interrupt mask */
-#define BEI   (1<<9)  /* Break Error interrupt mask */
-#define PEI   (1<<8)  /* Parity Error interrupt mask */
-#define FEI   (1<<7)  /* Framing Error interrupt mask */
-#define RTI   (1<<6)  /* Receive Timeout interrupt mask */
-#define TXI   (1<<5)  /* Transmit interrupt mask */
-#define RXI   (1<<4)  /* Receive interrupt mask */
-#define DSRMI (1<<3)  /* nUARTDSR Modem interrupt mask */
-#define DCDMI (1<<2)  /* nUARTDCD Modem interrupt mask */
-#define CTSMI (1<<1)  /* nUARTCTS Modem interrupt mask */
-#define RIMI  (1<<0)  /* nUARTRI Modem interrupt mask */
-#define ALLI  OEI|BEI|PEI|FEI|RTI|TXI|RXI|DSRMI|DCDMI|CTSMI|RIMI
 
 /* These parity settings can be ORed directly into the LCR. */
 #define PARITY_NONE  (0)
