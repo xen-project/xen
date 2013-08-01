@@ -45,6 +45,7 @@
 /* FR bits */
 #define TXFE   (1<<7) /* TX FIFO empty */
 #define RXFE   (1<<4) /* RX FIFO empty */
+#define BUSY   (1<<3) /* Transmit is not complete */
 
 /* LCR_H bits */
 #define SPS    (1<<7) /* Stick parity select */
