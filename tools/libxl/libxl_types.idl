@@ -132,6 +132,10 @@ libxl_vga_interface_type = Enumeration("vga_interface_type", [
     (2, "STD"),
     ], init_val = 0)
 
+libxl_vendor_device = Enumeration("vendor_device", [
+    (0, "NONE"),
+    (1, "XENSERVER"),
+    ])
 #
 # Complex libxl types
 #
@@ -332,6 +336,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("soundhw",          string),
                                        ("xen_platform_pci", libxl_defbool),
                                        ("usbdevice_list",   libxl_string_list),
+                                       ("vendor_device",    libxl_vendor_device),
                                        ])),
                  ("pv", Struct(None, [("kernel", string),
                                       ("slack_memkb", MemKB),

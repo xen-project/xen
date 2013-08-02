@@ -82,6 +82,14 @@
 #define LIBXL_HAVE_DOMAIN_NODEAFFINITY 1
 
 /*
+ * LIBXL_HAVE_BUILDINFO_HVM_VENDOR_DEVICE indicates that the
+ * libxl_vendor_device field is present in the hvm sections of
+ * libxl_domain_build_info. This field tells libxl which
+ * flavour of xen-pvdevice to enable in QEMU.
+ */
+#define LIBXL_HAVE_BUILDINFO_HVM_VENDOR_DEVICE 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

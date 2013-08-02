@@ -1532,6 +1532,20 @@ skip_vfb:
             exit (1);
 
         }
+
+        if (!xlu_cfg_get_string (config, "vendor_device", &buf, 0)) {
+            libxl_vendor_device d;
+
+            e = libxl_vendor_device_from_string(buf, &d);
+            if (e) {
+                fprintf(stderr,
+                        "xl: unknown vendor_device '%s'\n",
+                        buf);
+                exit(-ERROR_FAIL);
+            }
+
+            b_info->u.hvm.vendor_device = d;
+        }
     }
 
     xlu_cfg_destroy(config);

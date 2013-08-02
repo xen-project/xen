@@ -647,6 +647,15 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append(dm_args, "-drive");
             flexarray_append(dm_args, drive);
         }
+
+        switch (b_info->u.hvm.vendor_device) {
+        case LIBXL_VENDOR_DEVICE_XENSERVER:
+            flexarray_append(dm_args, "-device");
+            flexarray_append(dm_args, "xen-pvdevice,device-id=0xc000");
+            break;
+        default:
+            break;
+        }
     }
     flexarray_append(dm_args, NULL);
     return (char **) flexarray_contents(dm_args);

@@ -1176,6 +1176,29 @@ documentation.
 
 =back
 
+=item B<vendor_device="VENDOR_DEVICE">
+
+Selects which variant of the QEMU xen-pvdevice should be used for this
+guest. Valid values are:
+
+=over 4
+
+=item B<none>
+
+The xen-pvdevice should be omitted. This is the default.
+
+=item B<xenserver>
+
+The xenserver variant of the xen-pvdevice (device-id=C000) will be
+specified, enabling the use of XenServer PV drivers in the guest.
+
+=back
+
+This parameter only takes effect when device_model_version=qemu-xen.
+See F<docs/misc/pci-device-reservations.txt> for more information.
+
+=back
+
 =head2 Device-Model Options
 
 The following options control the selection of the device-model.  This
