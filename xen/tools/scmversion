@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # This scripts adds local version information from the version
-# control systems git, mercurial (hg) and subversion (svn).
+# control systems git and mercurial (hg).
 #
 # If something goes wrong, send a mail the kernel build mailinglist
 # (see MAINTAINERS) and CC Nico Schottelius
@@ -73,15 +73,6 @@ scm_version()
 		esac
 
 		# All done with mercurial
-		return
-	fi
-
-	# Check for svn and a svn repo.
-	if rev=`LANG= LC_ALL= LC_MESSAGES=C svn info 2>/dev/null | grep '^Last Changed Rev'`; then
-		rev=`echo $rev | awk '{print $NF}'`
-		printf -- 'svn:%s' "$rev"
-
-		# All done with svn
 		return
 	fi
 }
