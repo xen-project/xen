@@ -69,10 +69,6 @@ prep-kernels:
 install-xen:
 	$(MAKE) -C xen install
 
-.PHONY: install-tools
-install-tools:
-	$(MAKE) -C tools install
-
 ifeq ($(CONFIG_QEMU_TRAD),y)
 QEMU_TRAD_DIR_TGT := tools/qemu-xen-traditional-dir
 
@@ -95,9 +91,9 @@ tools/qemu-xen-dir-force-update:
 	$(MAKE) -C tools qemu-xen-dir-force-update
 endif
 
-ifeq ($(CONFIG_IOEMU),y)
+.PHONY: install-tools
 install-tools: $(QEMU_TRAD_DIR_TARGET) $(QEMU_XEN_DIR_TARGET)
-endif
+	$(MAKE) -C tools install
 
 .PHONY: install-kernels
 install-kernels:
