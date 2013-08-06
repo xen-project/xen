@@ -709,6 +709,7 @@ void paging_update_nestedmode(struct vcpu *v)
     else
         /* TODO: shadow-on-shadow */
         v->arch.paging.nestedmode = NULL;
+    hvm_asid_flush_vcpu(v);
 }
 
 void paging_write_p2m_entry(struct p2m_domain *p2m, unsigned long gfn,
