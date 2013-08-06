@@ -264,6 +264,10 @@ $(CROSS_ROOT): cross-newlib cross-zlib cross-libpci
 
 QEMU_ROOT := $(shell if [ -d "$(CONFIG_QEMU)" ]; then echo "$(CONFIG_QEMU)"; else echo .; fi)
 
+ifneq ($(filter ioemu,$(STUBDOM_TARGETS)),)
+IOEMU_LINKFARM_TARGET := ioemu/linkfarm.stamp
+endif
+
 ifeq ($(QEMU_ROOT),.)
 $(XEN_ROOT)/tools/qemu-xen-traditional-dir:
 	$(MAKE) DESTDIR= -C $(XEN_ROOT)/tools qemu-xen-traditional-dir-find
@@ -289,7 +293,7 @@ ioemu/linkfarm.stamp:
 	touch ioemu/linkfarm.stamp
 endif
 
-mk-headers-$(XEN_TARGET_ARCH): ioemu/linkfarm.stamp
+mk-headers-$(XEN_TARGET_ARCH): $(IOEMU_LINKFARM_TARGET)
 	mkdir -p include/xen && \
           ln -sf $(wildcard $(XEN_ROOT)/xen/include/public/*.h) include/xen && \
           ln -sf $(addprefix $(XEN_ROOT)/xen/include/public/,arch-x86 hvm io xsm) include/xen && \

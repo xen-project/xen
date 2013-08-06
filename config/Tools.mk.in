@@ -50,6 +50,7 @@ FLASK_POLICY        := @xsmpolicy@
 CONFIG_OVMF         := @ovmf@
 CONFIG_ROMBIOS      := @rombios@
 CONFIG_SEABIOS      := @seabios@
+CONFIG_QEMU_TRAD    := @qemu_traditional@
 CONFIG_XEND         := @xend@
 CONFIG_BLKTAP1      := @blktap1@
 

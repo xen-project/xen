@@ -654,6 +654,7 @@ APPEND_LIB
 APPEND_INCLUDES
 PREPEND_LIB
 PREPEND_INCLUDES
+qemu_traditional
 blktap1
 xend
 debug
@@ -734,6 +735,7 @@ enable_seabios
 enable_debug
 enable_xend
 enable_blktap1
+enable_qemu_traditional
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1394,6 +1396,9 @@ Optional Features:
   --disable-debug         Disable debug build of tools (default is ENABLED)
   --disable-xend          Disable xend toolstack (default is ENABLED)
   --enable-blktap1        Disable blktap1 tools (default is DISABLED)
+  --enable-qemu-traditional
+                          Enable qemu traditional device model, (DEFAULT is on
+                          for x86, otherwise off)
 
 Some influential environment variables:
   CC          C compiler command
@@ -3652,6 +3657,32 @@ elif test -z $ax_cv_blktap1; then :
 fi
 blktap1=$ax_cv_blktap1
 
+
+
+# Check whether --enable-qemu-traditional was given.
+if test "${enable_qemu_traditional+set}" = set; then :
+  enableval=$enable_qemu_traditional;
+else
+
+    case "$host_cpu" in
+        i[3456]86|x86_64)
+           enable_qemu_traditional="yes";;
+        *) enable_qemu_traditional="no";;
+    esac
+
+fi
+
+if test "x$enable_qemu_traditional" = "xyes"; then :
+
+
+$as_echo "#define HAVE_QEMU_TRADITIONAL 1" >>confdefs.h
+
+    qemu_traditional=y
+else
+
+    qemu_traditional=n
+
+fi
 
 
 

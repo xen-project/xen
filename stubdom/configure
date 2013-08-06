@@ -562,6 +562,7 @@ LIBOBJS
 STUBDOM_INSTALL
 STUBDOM_BUILD
 STUBDOM_TARGETS
+ioemu
 vtpmmgr
 vtpm
 TPMEMU_VERSION
@@ -603,7 +604,14 @@ xenstore
 grub
 caml
 c
-ioemu
+host_os
+host_vendor
+host_cpu
+host
+build_os
+build_vendor
+build_cpu
+build
 target_alias
 host_alias
 build_alias
@@ -652,6 +660,7 @@ enable_pv_grub
 enable_xenstore_stubdom
 enable_vtpm_stubdom
 enable_vtpmmgr_stubdom
+enable_qemu_traditional
 enable_debug
 enable_extfiles
 '
@@ -1271,6 +1280,10 @@ Fine tuning of the installation directories:
 _ACEOF
 
   cat <<\_ACEOF
+
+System types:
+  --build=BUILD     configure for building on BUILD [guessed]
+  --host=HOST       cross-compile to build programs to run on HOST [BUILD]
 _ACEOF
 fi
 
@@ -1284,7 +1297,7 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --disable-ioemu-stubdom Build and install ioemu-stubdom (default is ENABLED)
+  --enable-ioemu-stubdom  Build and install ioemu-stubdom
   --enable-c-stubdom      Build and install c-stubdom (default is DISABLED)
   --enable-caml-stubdom   Build and install caml-stubdom (default is DISABLED)
   --disable-pv-grub       Build and install pv-grub (default is ENABLED)
@@ -1294,6 +1307,7 @@ Optional Features:
   --enable-vtpm-stubdom   Build and install vtpm-stubdom
   --enable-vtpmmgr-stubdom
                           Build and install vtpmmgr-stubdom
+
   --disable-debug         Disable debug build of stubdom (default is ENABLED)
   --disable-extfiles      Use xen extfiles repository for libraries (default
                           is ENABLED)
@@ -1821,6 +1835,78 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 
 
+# Make sure we can run config.sub.
+$SHELL "$ac_aux_dir/config.sub" sun4 >/dev/null 2>&1 ||
+  as_fn_error $? "cannot run $SHELL $ac_aux_dir/config.sub" "$LINENO" 5
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking build system type" >&5
+$as_echo_n "checking build system type... " >&6; }
+if test "${ac_cv_build+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_build_alias=$build_alias
+test "x$ac_build_alias" = x &&
+  ac_build_alias=`$SHELL "$ac_aux_dir/config.guess"`
+test "x$ac_build_alias" = x &&
+  as_fn_error $? "cannot guess build type; you must specify one" "$LINENO" 5
+ac_cv_build=`$SHELL "$ac_aux_dir/config.sub" $ac_build_alias` ||
+  as_fn_error $? "$SHELL $ac_aux_dir/config.sub $ac_build_alias failed" "$LINENO" 5
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_build" >&5
+$as_echo "$ac_cv_build" >&6; }
+case $ac_cv_build in
+*-*-*) ;;
+*) as_fn_error $? "invalid value of canonical build" "$LINENO" 5 ;;
+esac
+build=$ac_cv_build
+ac_save_IFS=$IFS; IFS='-'
+set x $ac_cv_build
+shift
+build_cpu=$1
+build_vendor=$2
+shift; shift
+# Remember, the first character of IFS is used to create $*,
+# except with old shells:
+build_os=$*
+IFS=$ac_save_IFS
+case $build_os in *\ *) build_os=`echo "$build_os" | sed 's/ /-/g'`;; esac
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking host system type" >&5
+$as_echo_n "checking host system type... " >&6; }
+if test "${ac_cv_host+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "x$host_alias" = x; then
+  ac_cv_host=$ac_cv_build
+else
+  ac_cv_host=`$SHELL "$ac_aux_dir/config.sub" $host_alias` ||
+    as_fn_error $? "$SHELL $ac_aux_dir/config.sub $host_alias failed" "$LINENO" 5
+fi
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_host" >&5
+$as_echo "$ac_cv_host" >&6; }
+case $ac_cv_host in
+*-*-*) ;;
+*) as_fn_error $? "invalid value of canonical host" "$LINENO" 5 ;;
+esac
+host=$ac_cv_host
+ac_save_IFS=$IFS; IFS='-'
+set x $ac_cv_host
+shift
+host_cpu=$1
+host_vendor=$2
+shift; shift
+# Remember, the first character of IFS is used to create $*,
+# except with old shells:
+host_os=$*
+IFS=$ac_save_IFS
+case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
+
+
+
 # M4 Macro includes
 
 
@@ -1887,17 +1973,7 @@ fi
 fi
 
 
-else
-
-
-ioemu=y
-STUBDOM_TARGETS="$STUBDOM_TARGETS ioemu"
-STUBDOM_BUILD="$STUBDOM_BUILD ioemu-stubdom"
-STUBDOM_INSTALL="$STUBDOM_INSTALL install-ioemu"
-
-
 fi
-
 
 
 
@@ -2114,6 +2190,39 @@ fi
 fi
 
 
+
+# Check whether --enable-qemu-traditional was given.
+if test "${enable_qemu_traditional+set}" = set; then :
+  enableval=$enable_qemu_traditional;
+else
+
+    case "$host_cpu" in
+        i[3456]86|x86_64)
+           enable_qemu_traditional="yes";;
+        *) enable_qemu_traditional="no";;
+    esac
+
+fi
+
+if test "x$enable_qemu_traditional" = "xyes"; then :
+
+    qemu_traditional=y
+else
+
+    qemu_traditional=n
+
+fi
+if test "x$ioemu" = "x"; then :
+
+    ioemu=$qemu_traditional
+
+fi
+echo "x$ioemu$qemu_traditional"
+if test "x$ioemu$qemu_traditional" = "xyn"; then :
+
+    as_fn_error $? "IOEMU stubdomain requires qemu-traditional" "$LINENO" 5
+
+fi
 
 
 # Check whether --enable-debug was given.
@@ -3468,6 +3577,25 @@ else
 
 
 vtpmmgr=n
+
+
+fi
+
+
+
+if test "x$ioemu" = "xy" || test "x$ioemu" = "x"; then :
+
+
+ioemu=y
+STUBDOM_TARGETS="$STUBDOM_TARGETS ioemu"
+STUBDOM_BUILD="$STUBDOM_BUILD ioemu-stubdom"
+STUBDOM_INSTALL="$STUBDOM_INSTALL install-ioemu"
+
+
+else
+
+
+ioemu=n
 
 
 fi
