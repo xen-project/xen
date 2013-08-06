@@ -2914,8 +2914,8 @@ Bit16u device;
 // 8.2.1 (a) -- set SRST in DC
   outb(iobase2+ATA_CB_DC, ATA_CB_DC_HD15 | ATA_CB_DC_NIEN | ATA_CB_DC_SRST);
 
-// 8.2.1 (b) -- wait for BSY
-  await_ide(BSY, iobase1, 20);
+// 8.2.1 (b) -- wait
+  outb(0x80, 0x00);
 
 // 8.2.1 (f) -- clear SRST
   outb(iobase2+ATA_CB_DC, ATA_CB_DC_HD15 | ATA_CB_DC_NIEN);
