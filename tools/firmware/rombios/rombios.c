@@ -2540,7 +2540,6 @@ static int await_ide(when_done,base,timeout)
   Bit32u time=0,last=0;
   Bit16u status;
   Bit8u result;
-  status = inb(base + ATA_CB_STAT); // for the times you're supposed to throw one away
   for(;;) {
     status = inb(base+ATA_CB_STAT);
     time++;
