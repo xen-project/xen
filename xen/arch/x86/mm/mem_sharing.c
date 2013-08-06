@@ -900,20 +900,8 @@ int mem_sharing_nominate_page(struct domain *d,
         goto out;
     }
 
-    /* Change the p2m type */
-    if ( p2m_change_type(d, gfn, p2mt, p2m_ram_shared) != p2mt ) 
-    {
-        /* This is unlikely, as the type must have changed since we've checked
-         * it a few lines above.
-         * The mfn needs to revert back to rw type. This should never fail,
-         * since no-one knew that the mfn was temporarily sharable */
-        mem_sharing_gfn_destroy(page, d, gfn_info);
-        xfree(page->sharing);
-        page->sharing = NULL;
-        /* NOTE: We haven't yet added this to the audit list. */
-        BUG_ON(page_make_private(d, page) != 0);
-        goto out;
-    }
+    /* Change the p2m type, should never fail with p2m locked. */
+    BUG_ON(p2m_change_type(d, gfn, p2mt, p2m_ram_shared) != p2mt);
 
     /* Account for this page. */
     atomic_inc(&nr_shared_mfns);
