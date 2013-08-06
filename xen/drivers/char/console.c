@@ -175,10 +175,15 @@ static char * __init loglvl_str(int lvl)
  * ********************************************************
  */
 
-static void putchar_console_ring(int c)
+static void conring_puts(const char *str)
 {
+    char c;
+
     ASSERT(spin_is_locked(&console_lock));
-    conring[CONRING_IDX_MASK(conringp++)] = c;
+
+    while ( (c = *str++) != '\0' )
+        conring[CONRING_IDX_MASK(conringp++)] = c;
+
     if ( (uint32_t)(conringp - conringc) > conring_size )
         conringc = conringp - conring_size;
 }
@@ -368,7 +373,7 @@ static DECLARE_SOFTIRQ_TASKLET(notify_dom0_con_ring_tasklet,
 
 static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
 {
-    char kbuf[128], *kptr;
+    char kbuf[128];
     int kcount;
 
     while ( count > 0 )
@@ -390,8 +395,7 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
 
         if ( opt_console_to_ring )
         {
-            for ( kptr = kbuf; *kptr != '\0'; kptr++ )
-                putchar_console_ring(*kptr);
+            conring_puts(kbuf);
             tasklet_schedule(&notify_dom0_con_ring_tasklet);
         }
 
@@ -456,8 +460,6 @@ static bool_t console_locks_busted;
 
 static void __putstr(const char *str)
 {
-    int c;
-
     ASSERT(spin_is_locked(&console_lock));
 
     sercon_puts(str);
@@ -465,8 +467,7 @@ static void __putstr(const char *str)
 
     if ( !console_locks_busted )
     {
-        while ( (c = *str++) != '\0' )
-            putchar_console_ring(c);
+        conring_puts(str);
         tasklet_schedule(&notify_dom0_con_ring_tasklet);
     }
 }
