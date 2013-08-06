@@ -465,11 +465,10 @@ static void __putstr(const char *str)
     sercon_puts(str);
     video_puts(str);
 
+    conring_puts(str);
+
     if ( !console_locks_busted )
-    {
-        conring_puts(str);
         tasklet_schedule(&notify_dom0_con_ring_tasklet);
-    }
 }
 
 static int printk_prefix_check(char *p, char **pp)
