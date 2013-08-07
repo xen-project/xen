@@ -1031,7 +1031,10 @@ long set_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
     cpu_id = get_cpu_id(cpu);
     if ( cpu_id == -1 )
     {
-        printk(XENLOG_ERR "no cpu_id for acpi_id %d\n", cpu);
+        static bool_t warn_once = 1;
+        if ( warn_once || opt_cpu_info )
+            printk(XENLOG_WARNING "No CPU ID for APIC ID %#x\n", cpu);
+        warn_once = 0;
         return -EINVAL;
     }
 

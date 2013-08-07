@@ -63,7 +63,7 @@ static struct cpu_dev default_cpu = {
 };
 static struct cpu_dev * this_cpu = &default_cpu;
 
-bool_t __cpuinitdata opt_cpu_info;
+bool_t opt_cpu_info;
 boolean_param("cpuinfo", opt_cpu_info);
 
 int __cpuinit get_model_name(struct cpuinfo_x86 *c)
