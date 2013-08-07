@@ -101,7 +101,7 @@ obj-y    := $(patsubst %/,%/built-in.o,$(obj-y))
 
 subdir-all := $(subdir-y) $(subdir-n)
 
-$(filter %.init.o,$(obj-y) $(obj-bin-y)): CFLAGS += -DINIT_SECTIONS_ONLY
+$(filter %.init.o,$(obj-y) $(obj-bin-y) $(extra-y)): CFLAGS += -DINIT_SECTIONS_ONLY
 
 $(obj-$(coverage)): CFLAGS += -fprofile-arcs -ftest-coverage -DTEST_COVERAGE
 
