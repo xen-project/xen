@@ -288,6 +288,7 @@ extern l1_pgentry_t l1_identmap[L1_PAGETABLE_ENTRIES],
 void paging_init(void);
 #endif /* !defined(__ASSEMBLY__) */
 
+#define _PAGE_NONE     _AC(0x000,U)
 #define _PAGE_PRESENT  _AC(0x001,U)
 #define _PAGE_RW       _AC(0x002,U)
 #define _PAGE_USER     _AC(0x004,U)
