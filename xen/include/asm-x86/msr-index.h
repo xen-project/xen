@@ -33,7 +33,7 @@
 
 /* Intel MSRs. Some also available on other CPUs */
 #define MSR_IA32_PERFCTR0		0x000000c1
-#define MSR_IA32_PERFCTR1		0x000000c2
+#define MSR_IA32_A_PERFCTR0		0x000004c1
 #define MSR_FSB_FREQ			0x000000cd
 
 #define MSR_NHM_SNB_PKG_CST_CFG_CTL	0x000000e2
