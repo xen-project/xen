@@ -57,8 +57,8 @@ void *vm_alloc(unsigned int nr, unsigned int align)
     {
         struct page_info *pg;
 
-        ASSERT(!test_bit(vm_low, vm_bitmap));
-        for ( start = vm_low; ; )
+        ASSERT(vm_low == vm_top || !test_bit(vm_low, vm_bitmap));
+        for ( start = vm_low; start < vm_top; )
         {
             bit = find_next_bit(vm_bitmap, vm_top, start + 1);
             if ( bit > vm_top )
@@ -68,12 +68,18 @@ void *vm_alloc(unsigned int nr, unsigned int align)
              * corresponding page a guard one.
              */
             start = (start + align) & ~(align - 1);
-            if ( start + nr <= bit )
-                break;
-            start = bit < vm_top ?
-                    find_next_zero_bit(vm_bitmap, vm_top, bit + 1) : bit;
-            if ( start >= vm_top )
-                break;
+            if ( bit < vm_top )
+            {
+                if ( start + nr < bit )
+                    break;
+                start = find_next_zero_bit(vm_bitmap, vm_top, bit + 1);
+            }
+            else
+            {
+                if ( start + nr <= bit )
+                    break;
+                start = bit;
+            }
         }
 
         if ( start < vm_top )
@@ -115,6 +121,10 @@ void *vm_alloc(unsigned int nr, unsigned int align)
 
     for ( bit = start; bit < start + nr; ++bit )
         __set_bit(bit, vm_bitmap);
+    if ( bit < vm_top )
+        ASSERT(!test_bit(bit, vm_bitmap));
+    else
+        ASSERT(bit == vm_top);
     if ( start <= vm_low + 2 )
         vm_low = bit;
     spin_unlock(&vm_lock);
