@@ -71,10 +71,28 @@ void xsave(struct vcpu *v, uint64_t mask)
 
     if ( word_size <= 0 || !is_pv_32bit_vcpu(v) )
     {
+        typeof(ptr->fpu_sse.fip.sel) fcs = ptr->fpu_sse.fip.sel;
+        typeof(ptr->fpu_sse.fdp.sel) fds = ptr->fpu_sse.fdp.sel;
+
         if ( cpu_has_xsaveopt )
+        {
+            /*
+             * xsaveopt may not write the FPU portion even when the respective
+             * mask bit is set. For the check further down to work we hence
+             * need to put the save image back into the state that it was in
+             * right after the previous xsaveopt.
+             */
+            if ( word_size > 0 &&
+                 (ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] == 4 ||
+                  ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] == 2) )
+            {
+                ptr->fpu_sse.fip.sel = 0;
+                ptr->fpu_sse.fdp.sel = 0;
+            }
             asm volatile ( ".byte 0x48,0x0f,0xae,0x37"
                            : "=m" (*ptr)
                            : "a" (lmask), "d" (hmask), "D" (ptr) );
+        }
         else
             asm volatile ( ".byte 0x48,0x0f,0xae,0x27"
                            : "=m" (*ptr)
@@ -87,7 +105,14 @@ void xsave(struct vcpu *v, uint64_t mask)
               */
              (!(ptr->fpu_sse.fsw & 0x0080) &&
               boot_cpu_data.x86_vendor == X86_VENDOR_AMD) )
+        {
+            if ( cpu_has_xsaveopt && word_size > 0 )
+            {
+                ptr->fpu_sse.fip.sel = fcs;
+                ptr->fpu_sse.fdp.sel = fds;
+            }
             return;
+        }
 
         if ( word_size > 0 &&
              !((ptr->fpu_sse.fip.addr | ptr->fpu_sse.fdp.addr) >> 32) )
