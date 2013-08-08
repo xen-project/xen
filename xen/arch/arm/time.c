@@ -104,7 +104,6 @@ int __init init_xen_time(void)
     struct dt_device_node *dev;
     int res;
     unsigned int i;
-    u32 rate;
 
     dev = dt_find_compatible_node(NULL, NULL, "arm,armv7-timer");
     if ( !dev )
@@ -135,11 +134,7 @@ int __init init_xen_time(void)
     if ( !cpu_has_gentimer )
         panic("CPU does not support the Generic Timer v1 interface.\n");
 
-    res = dt_property_read_u32(dev, "clock-frequency", &rate);
-    if ( res )
-        cpu_khz = rate / 1000;
-    else
-        cpu_khz = READ_SYSREG32(CNTFRQ_EL0) / 1000;
+    cpu_khz = READ_SYSREG32(CNTFRQ_EL0) / 1000;
 
     boot_count = READ_SYSREG64(CNTPCT_EL0);
     printk("Using generic timer at %lu KHz\n", cpu_khz);
