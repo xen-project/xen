@@ -60,6 +60,7 @@ lpae_t boot_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 /* Per-CPU pagetable pages */
 /* xen_pgtable == root of the trie (zeroeth level on 64-bit, first on 32-bit) */
 static DEFINE_PER_CPU(lpae_t *, xen_pgtable);
+#define THIS_CPU_PGTABLE this_cpu(xen_pgtable)
 /* xen_dommap == pages used by map_domain_page, these pages contain
  * the second level pagetables which mapp the domheap region
  * DOMHEAP_VIRT_START...DOMHEAP_VIRT_END in 2MB chunks. */
@@ -147,7 +148,7 @@ done:
 void dump_hyp_walk(vaddr_t addr)
 {
     uint64_t ttbr = READ_SYSREG64(TTBR0_EL2);
-    lpae_t *pgtable = this_cpu(xen_pgtable);
+    lpae_t *pgtable = THIS_CPU_PGTABLE;
 
     printk("Walking Hypervisor VA 0x%"PRIvaddr" "
            "on CPU%d via TTBR 0x%016"PRIx64"\n",
@@ -502,7 +503,7 @@ void __cpuinit mmu_init_secondary_cpu(void)
     uint64_t ttbr;
 
     /* Change to this CPU's pagetables */
-    ttbr = (uintptr_t)virt_to_maddr(this_cpu(xen_pgtable));
+    ttbr = (uintptr_t)virt_to_maddr(THIS_CPU_PGTABLE);
     WRITE_TTBR(ttbr);
 
     /* From now on, no mapping may be both writable and executable. */
