@@ -309,9 +309,15 @@ static inline int gva_to_ipa(vaddr_t va, paddr_t *paddr)
 
 #endif /* __ASSEMBLY__ */
 
-/* These numbers add up to a 39-bit input address space.  The  ARMv7-A
- * architecture actually specifies a 40-bit input address space for the p2m,
- * with an 8K (1024-entry) top-level table. */
+/*
+ * These numbers add up to a 48-bit input address space.
+ *
+ * On 32-bit the zeroeth level does not exist, therefore the total is
+ * 39-bits. The ARMv7-A architecture actually specifies a 40-bit input
+ * address space for the p2m, with an 8K (1024-entry) top-level table.
+ * However Xen only supports 16GB of RAM on 32-bit ARM systems and
+ * therefore 39-bits are sufficient.
+ */
 
 #define LPAE_SHIFT      9
 #define LPAE_ENTRIES    (1u << LPAE_SHIFT)
@@ -326,8 +332,12 @@ static inline int gva_to_ipa(vaddr_t va, paddr_t *paddr)
 #define FIRST_SHIFT  (SECOND_SHIFT + LPAE_SHIFT)
 #define FIRST_SIZE   (1u << FIRST_SHIFT)
 #define FIRST_MASK   (~(FIRST_SIZE - 1))
+#define ZEROETH_SHIFT  (FIRST_SHIFT + LPAE_SHIFT)
+#define ZEROETH_SIZE   (1u << ZEROETH_SHIFT)
+#define ZEROETH_MASK   (~(ZEROETH_SIZE - 1))
 
 /* Calculate the offsets into the pagetables for a given VA */
+#define zeroeth_linear_offset(va) ((va) >> ZEROETH_SHIFT)
 #define first_linear_offset(va) ((va) >> FIRST_SHIFT)
 #define second_linear_offset(va) ((va) >> SECOND_SHIFT)
 #define third_linear_offset(va) ((va) >> THIRD_SHIFT)
@@ -336,8 +346,9 @@ static inline int gva_to_ipa(vaddr_t va, paddr_t *paddr)
 #define first_table_offset(va)  TABLE_OFFSET(first_linear_offset(va))
 #define second_table_offset(va) TABLE_OFFSET(second_linear_offset(va))
 #define third_table_offset(va)  TABLE_OFFSET(third_linear_offset(va))
+#define zeroeth_table_offset(va)  TABLE_OFFSET(zeroeth_linear_offset(va))
 
-#define clear_page(page)memset((void *)(page), 0, PAGE_SIZE)
+#define clear_page(page) memset((void *)(page), 0, PAGE_SIZE)
 
 #define PAGE_ALIGN(x) (((x) + PAGE_SIZE - 1) & PAGE_MASK)
 
