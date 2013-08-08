@@ -46,6 +46,7 @@
 #define XEN_PCI_OP_aer_resume		(7)
 #define XEN_PCI_OP_aer_mmio		(8)
 #define XEN_PCI_OP_aer_slotreset	(9)
+#define XEN_PCI_OP_enable_multi_msi	(10)
 
 /* xen_pci_op error numbers */
 #define XEN_PCI_ERR_success          (0)
