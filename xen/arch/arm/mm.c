@@ -37,6 +37,7 @@
 #include <public/memory.h>
 #include <xen/sched.h>
 #include <xen/vmap.h>
+#include <asm/early_printk.h>
 #include <xsm/xsm.h>
 #include <xen/pfn.h>
 
@@ -48,6 +49,14 @@ struct domain *dom_xen, *dom_io, *dom_cow;
 lpae_t boot_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 #ifdef CONFIG_ARM_64
 lpae_t boot_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+/* The first page of the first level mapping of the xenheap. The
+ * subsequent xenheap first level pages are dynamically allocated, but
+ * we need this one to bootstrap ourselves. */
+lpae_t xenheap_first_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+/* The zeroeth level slot which uses xenheap_first_first. Used because
+ * setup_xenheap_mappings otherwise relies on mfn_to_virt which isn't
+ * valid for a non-xenheap mapping. */
+static __initdata int xenheap_first_first_slot = -1;
 #endif
 
 /*
@@ -57,6 +66,9 @@ lpae_t boot_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
  * xen_second, xen_fixmap and xen_xenmap are shared between all PCPUs.
  */
 
+#ifdef CONFIG_ARM_64
+#define THIS_CPU_PGTABLE boot_pgtable
+#else
 /* Per-CPU pagetable pages */
 /* xen_pgtable == root of the trie (zeroeth level on 64-bit, first on 32-bit) */
 static DEFINE_PER_CPU(lpae_t *, xen_pgtable);
@@ -65,6 +77,7 @@ static DEFINE_PER_CPU(lpae_t *, xen_pgtable);
  * the second level pagetables which mapp the domheap region
  * DOMHEAP_VIRT_START...DOMHEAP_VIRT_END in 2MB chunks. */
 static DEFINE_PER_CPU(lpae_t *, xen_dommap);
+#endif
 
 /* Common pagetable leaves */
 /* Second level page tables.
@@ -73,10 +86,16 @@ static DEFINE_PER_CPU(lpae_t *, xen_dommap);
  * addresses from 0 to 0x7fffffff. Offsets into it are calculated
  * with second_linear_offset(), not second_table_offset().
  *
- * Addresses 0x80000000 to 0xffffffff are covered by the per-cpu
- * xen_domheap mappings described above. However we allocate 4 pages
+ * On 32bit addresses 0x80000000 to 0xffffffff are covered by the
+ * per-cpu xen_domheap mappings described above. We allocate 4 pages
  * here for use in the boot page tables and the second two pages
  * become the boot CPUs xen_dommap pages.
+ *
+ * On 64bit addresses 0x80000000 to 0xffffffff are unused. However we
+ * allocate 4 pages here for use while relocating Xen, which currently
+ * expects a second level page to exist for all addresses in the first
+ * 4GB. We need to keep these extra mappings in place for seconary CPU
+ * bring up too. For now we just leave them forever.
  */
 lpae_t xen_second[LPAE_ENTRIES*4] __attribute__((__aligned__(4096*4)));
 /* First level page table used for fixmap */
@@ -92,7 +111,7 @@ uint64_t boot_ttbr;
 static paddr_t phys_offset;
 
 /* Limits of the Xen heap */
-unsigned long xenheap_mfn_start __read_mostly;
+unsigned long xenheap_mfn_start __read_mostly = ~0UL;
 unsigned long xenheap_mfn_end __read_mostly;
 unsigned long xenheap_virt_end __read_mostly;
 
@@ -112,7 +131,9 @@ static inline void check_memory_layout_alignment_constraints(void) {
     BUILD_BUG_ON(BOOT_MISC_VIRT_START & ~SECOND_MASK);
     /* 1GB aligned regions */
     BUILD_BUG_ON(XENHEAP_VIRT_START & ~FIRST_MASK);
+#ifdef CONFIG_DOMAIN_PAGE
     BUILD_BUG_ON(DOMHEAP_VIRT_START & ~FIRST_MASK);
+#endif
 }
 
 void dump_pt_walk(lpae_t *first, paddr_t addr)
@@ -180,6 +201,7 @@ void clear_fixmap(unsigned map)
     flush_xen_data_tlb_range_va(FIXMAP_ADDR(map), PAGE_SIZE);
 }
 
+#ifdef CONFIG_DOMAIN_PAGE
 void *map_domain_page_global(unsigned long mfn)
 {
     return vmap(&mfn, 1);
@@ -284,6 +306,7 @@ unsigned long domain_page_map_to_mfn(const void *va)
 
     return map[slot].pt.base + offset;
 }
+#endif
 
 void __init arch_init_memory(void)
 {
@@ -431,6 +454,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     /* Flush everything after setting WXN bit. */
     flush_xen_text_tlb();
 
+#ifdef CONFIG_ARM_32
     per_cpu(xen_pgtable, 0) = boot_pgtable;
     per_cpu(xen_dommap, 0) = xen_second +
         second_linear_offset(DOMHEAP_VIRT_START);
@@ -440,43 +464,33 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     memset(this_cpu(xen_dommap), 0, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
     flush_xen_dcache_va_range(this_cpu(xen_dommap),
                               DOMHEAP_SECOND_PAGES*PAGE_SIZE);
+#endif
 }
-
+#ifdef CONFIG_ARM_64
 int init_secondary_pagetables(int cpu)
 {
-    lpae_t *root, *first, *domheap, pte;
+    /* All CPUs share a single page table on 64 bit */
+    return 0;
+}
+#else
+int init_secondary_pagetables(int cpu)
+{
+    lpae_t *first, *domheap, pte;
     int i;
 
-    root = alloc_xenheap_page();
-#ifdef CONFIG_ARM_64
-    first = alloc_xenheap_page();
-#else
-    first = root; /* root == first level on 32-bit 3-level trie */
-#endif
+    first = alloc_xenheap_page(); /* root == first level on 32-bit 3-level trie */
     domheap = alloc_xenheap_pages(get_order_from_pages(DOMHEAP_SECOND_PAGES), 0);
 
-    if ( root == NULL || domheap == NULL || first == NULL )
+    if ( domheap == NULL || first == NULL )
     {
         printk("Not enough free memory for secondary CPU%d pagetables\n", cpu);
         free_xenheap_pages(domheap, get_order_from_pages(DOMHEAP_SECOND_PAGES));
-#ifdef CONFIG_ARM_64
         free_xenheap_page(first);
-#endif
-        free_xenheap_page(root);
         return -ENOMEM;
     }
 
     /* Initialise root pagetable from root of boot tables */
-    memcpy(root, boot_pgtable, PAGE_SIZE);
-
-#ifdef CONFIG_ARM_64
-    /* Initialise first pagetable from first level of boot tables, and
-     * hook into the new root. */
-    memcpy(first, boot_first, PAGE_SIZE);
-    pte = mfn_to_xen_entry(virt_to_mfn(first));
-    pte.pt.table = 1;
-    write_pte(root, pte);
-#endif
+    memcpy(first, boot_pgtable, PAGE_SIZE);
 
     /* Ensure the domheap has no stray mappings */
     memset(domheap, 0, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
@@ -490,17 +504,15 @@ int init_secondary_pagetables(int cpu)
         write_pte(&first[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)], pte);
     }
 
-    flush_xen_dcache_va_range(root, PAGE_SIZE);
-#ifdef CONFIG_ARM_64
     flush_xen_dcache_va_range(first, PAGE_SIZE);
-#endif
     flush_xen_dcache_va_range(domheap, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
 
-    per_cpu(xen_pgtable, cpu) = root;
+    per_cpu(xen_pgtable, cpu) = first;
     per_cpu(xen_dommap, cpu) = domheap;
 
     return 0;
 }
+#endif
 
 /* MMU setup for secondary CPUS (which already have paging enabled) */
 void __cpuinit mmu_init_secondary_cpu(void)
@@ -544,6 +556,7 @@ static void __init create_32mb_mappings(lpae_t *second,
     flush_xen_data_tlb();
 }
 
+#ifdef CONFIG_ARM_32
 /* Set up the xenheap: up to 1GB of contiguous, always-mapped memory. */
 void __init setup_xenheap_mappings(unsigned long base_mfn,
                                    unsigned long nr_mfns)
@@ -555,6 +568,73 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
     xenheap_mfn_start = base_mfn;
     xenheap_mfn_end = base_mfn + nr_mfns;
 }
+#else /* CONFIG_ARM_64 */
+void __init setup_xenheap_mappings(unsigned long base_mfn,
+                                   unsigned long nr_mfns)
+{
+    lpae_t *first, pte;
+    unsigned long offset, end_mfn;
+    vaddr_t vaddr;
+
+    /* First call sets the xenheap physical offset. */
+    if ( xenheap_mfn_start == ~0UL )
+        xenheap_mfn_start = base_mfn;
+
+    if ( base_mfn < xenheap_mfn_start )
+        early_panic("cannot add xenheap mapping at %lx below heap start %lx\n",
+                    base_mfn, xenheap_mfn_start);
+
+    end_mfn = base_mfn + nr_mfns;
+
+    /* Align to previous 1GB boundary */
+    base_mfn &= ~FIRST_MASK;
+
+    offset = base_mfn - xenheap_mfn_start;
+    vaddr = DIRECTMAP_VIRT_START + offset*PAGE_SIZE;
+
+    while ( base_mfn < end_mfn )
+    {
+        int slot = zeroeth_table_offset(vaddr);
+        lpae_t *p = &boot_pgtable[slot];
+
+        if ( p->pt.valid )
+        {
+            /* mfn_to_virt is not valid on the 1st 1st mfn, since it
+             * is not within the xenheap. */
+            first = slot == xenheap_first_first_slot ?
+                xenheap_first_first : mfn_to_virt(p->pt.base);
+        }
+        else if ( xenheap_first_first_slot == -1)
+        {
+            /* Use xenheap_first_first to bootstrap the mappings */
+            first = xenheap_first_first;
+
+            pte = pte_of_xenaddr((vaddr_t)xenheap_first_first);
+            pte.pt.table = 1;
+            write_pte(p, pte);
+
+            xenheap_first_first_slot = slot;
+        }
+        else
+        {
+            unsigned long first_mfn = alloc_boot_pages(1, 1);
+            pte = mfn_to_xen_entry(first_mfn);
+            pte.pt.table = 1;
+            write_pte(p, pte);
+            first = mfn_to_virt(first_mfn);
+        }
+
+        pte = mfn_to_xen_entry(base_mfn);
+        /* TODO: Set pte.pt.contig when appropriate. */
+        write_pte(&first[first_table_offset(vaddr)], pte);
+
+        base_mfn += FIRST_SIZE>>PAGE_SHIFT;
+        vaddr += FIRST_SIZE;
+    }
+
+    flush_xen_data_tlb();
+}
+#endif
 
 /* Map a frame table to cover physical addresses ps through pe */
 void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
@@ -562,13 +642,32 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     unsigned long nr_pages = (pe - ps) >> PAGE_SHIFT;
     unsigned long frametable_size = nr_pages * sizeof(struct page_info);
     unsigned long base_mfn;
+#ifdef CONFIG_ARM_64
+    lpae_t *second, pte;
+    unsigned long nr_second, second_base;
+    int i;
+#endif
 
     frametable_base_mfn = ps >> PAGE_SHIFT;
 
     /* Round up to 32M boundary */
     frametable_size = (frametable_size + 0x1ffffff) & ~0x1ffffff;
     base_mfn = alloc_boot_pages(frametable_size >> PAGE_SHIFT, 32<<(20-12));
+
+#ifdef CONFIG_ARM_64
+    nr_second = frametable_size >> SECOND_SHIFT;
+    second_base = alloc_boot_pages(nr_second, 1);
+    second = mfn_to_virt(second_base);
+    for ( i = 0; i < nr_second; i++ )
+    {
+        pte = mfn_to_xen_entry(second_base + i);
+        pte.pt.table = 1;
+        write_pte(&boot_first[first_table_offset(FRAMETABLE_VIRT_START)+i], pte);
+    }
+    create_32mb_mappings(second, 0, base_mfn, frametable_size >> PAGE_SHIFT);
+#else
     create_32mb_mappings(xen_second, FRAMETABLE_VIRT_START, base_mfn, frametable_size >> PAGE_SHIFT);
+#endif
 
     memset(&frame_table[0], 0, nr_pages * sizeof(struct page_info));
     memset(&frame_table[nr_pages], -1,

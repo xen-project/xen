@@ -278,6 +278,7 @@ static paddr_t __init get_xen_paddr(void)
     return paddr;
 }
 
+#ifdef CONFIG_ARM_32
 static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 {
     paddr_t ram_start;
@@ -402,6 +403,82 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     end_boot_allocator();
 }
+#else /* CONFIG_ARM_64 */
+static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
+{
+    paddr_t ram_start = ~0;
+    paddr_t ram_end = 0;
+    int bank;
+    unsigned long  xenheap_pages = 0;
+    unsigned long dtb_pages;
+
+    total_pages = 0;
+    for ( bank = 0 ; bank < early_info.mem.nr_banks; bank++ )
+    {
+        paddr_t bank_start = early_info.mem.bank[bank].start;
+        paddr_t bank_size  = early_info.mem.bank[bank].size;
+        paddr_t  bank_end = bank_start + bank_size;
+        unsigned long bank_pages = bank_size >> PAGE_SHIFT;
+        paddr_t s, e;
+
+        total_pages += bank_pages;
+
+        if ( bank_start < ram_start )
+            ram_start = bank_start;
+        if ( bank_end > ram_end )
+            ram_end = bank_end;
+
+        xenheap_pages += (bank_size >> PAGE_SHIFT);
+
+        /* XXX we assume that the ram regions are ordered */
+        s = bank_start;
+        while ( s < bank_end )
+        {
+            paddr_t n = bank_end;
+
+            e = next_module(s, &n);
+
+            if ( e == ~(paddr_t)0 )
+            {
+                e = n = bank_end;
+            }
+
+            setup_xenheap_mappings(s>>PAGE_SHIFT, (e-s)>>PAGE_SHIFT);
+
+            xenheap_mfn_end = e;
+
+            init_boot_pages(s, e);
+            s = n;
+        }
+    }
+
+    xenheap_virt_end = XENHEAP_VIRT_START + ram_end - ram_start;
+    xenheap_mfn_start = ram_start >> PAGE_SHIFT;
+    xenheap_mfn_end = ram_end >> PAGE_SHIFT;
+    xenheap_max_mfn(xenheap_mfn_end);
+
+    /*
+     * Need enough mapped pages for copying the DTB.
+     *
+     * TODO: The DTB (and other payloads) are assumed to be towards
+     * the start of RAM.
+     */
+    dtb_pages = (dtb_size + PAGE_SIZE-1) >> PAGE_SHIFT;
+
+    /*
+     * Copy the DTB.
+     *
+     * TODO: handle other payloads too.
+     */
+    device_tree_flattened = mfn_to_virt(alloc_boot_pages(dtb_pages, 1));
+    copy_from_paddr(device_tree_flattened, dtb_paddr, dtb_size, BUFFERABLE);
+
+    setup_frametable_mappings(ram_start, ram_end);
+    max_page = PFN_DOWN(ram_end);
+
+    end_boot_allocator();
+}
+#endif
 
 size_t __read_mostly cacheline_bytes;
 

@@ -118,11 +118,18 @@ struct page_info
 extern unsigned long xenheap_mfn_start, xenheap_mfn_end;
 extern unsigned long xenheap_virt_end;
 
+#ifdef CONFIG_ARM_32
 #define is_xen_heap_page(page) is_xen_heap_mfn(page_to_mfn(page))
 #define is_xen_heap_mfn(mfn) ({                                 \
     unsigned long _mfn = (mfn);                                 \
     (_mfn >= xenheap_mfn_start && _mfn < xenheap_mfn_end);      \
 })
+#else
+#define is_xen_heap_page(page) ((page)->count_info & PGC_xen_heap)
+#define is_xen_heap_mfn(mfn) \
+    (mfn_valid(mfn) && is_xen_heap_page(__mfn_to_page(mfn)))
+#endif
+
 #define is_xen_fixed_mfn(mfn)                                   \
     ((((mfn) << PAGE_SHIFT) >= virt_to_maddr(&_start)) &&       \
      (((mfn) << PAGE_SHIFT) <= virt_to_maddr(&_end)))
@@ -215,12 +222,21 @@ static inline paddr_t __virt_to_maddr(vaddr_t va)
 }
 #define virt_to_maddr(va)   __virt_to_maddr((vaddr_t)(va))
 
+#ifdef CONFIG_ARM_32
 static inline void *maddr_to_virt(paddr_t ma)
 {
     ASSERT(is_xen_heap_mfn(ma >> PAGE_SHIFT));
     ma -= pfn_to_paddr(xenheap_mfn_start);
     return (void *)(unsigned long) ma + XENHEAP_VIRT_START;
 }
+#else
+static inline void *maddr_to_virt(paddr_t ma)
+{
+    ASSERT((ma >> PAGE_SHIFT) < (DIRECTMAP_SIZE >> PAGE_SHIFT));
+    ma -= pfn_to_paddr(xenheap_mfn_start);
+    return (void *)(unsigned long) ma + DIRECTMAP_VIRT_START;
+}
+#endif
 
 static inline int gvirt_to_maddr(vaddr_t va, paddr_t *pa)
 {

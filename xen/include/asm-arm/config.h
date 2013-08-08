@@ -35,9 +35,6 @@
 
 #define CONFIG_SMP 1
 
-#define CONFIG_DOMAIN_PAGE 1
-#define CONFIG_SEPARATE_XENHEAP 1
-
 #define CONFIG_VIDEO 1
 
 #define OPT_CONSOLE_STR "dtuart"
@@ -76,37 +73,88 @@
 #include <xen/const.h>
 
 /*
- * Memory layout:
- *  0  -   2M   Unmapped
- *  2M -   4M   Xen text, data, bss
- *  4M -   6M   Fixmap: special-purpose 4K mapping slots
- *  6M  -  8M   Early boot misc (see below)
- *
- * 32M - 128M   Frametable: 24 bytes per page for 16GB of RAM
- * 256M -  1G   VMAP: ioremap and early_ioremap use this virtual address
- *                    space
- *
- *  1G -   2G   Xenheap: always-mapped memory
- *  2G -   4G   Domheap: on-demand-mapped
+ * Common ARM32 and ARM64 layout:
+ *   0  -   2M   Unmapped
+ *   2M -   4M   Xen text, data, bss
+ *   4M -   6M   Fixmap: special-purpose 4K mapping slots
+ *   6M -   8M   Early boot misc (see below)
  *
  * The early boot misc area is used:
  *   - in head.S for the DTB for device_tree_early_init().
  *   - in setup_pagetables() when relocating Xen.
+ *
+ * ARM32 layout:
+ *   0  -   8M   <COMMON>
+ *
+ *  32M - 128M   Frametable: 24 bytes per page for 16GB of RAM
+ * 256M -   1G   VMAP: ioremap and early_ioremap use this virtual address
+ *                    space
+ *
+ *   1G -   2G   Xenheap: always-mapped memory
+ *   2G -   4G   Domheap: on-demand-mapped
+ *
+ * ARM64 layout:
+ * 0x0000000000000000 - 0x0000007fffffffff (512GB, L0 slot [0])
+ *   0  -   8M   <COMMON>
+ *
+ *   1G -   2G   VMAP: ioremap and early_ioremap
+ *
+ *  32G -  64G   Frametable: 24 bytes per page for 5.3TB of RAM
+ *
+ * 0x0000008000000000 - 0x00007fffffffffff (127.5TB, L0 slots [1..255])
+ *  Unused
+ *
+ * 0x0000800000000000 - 0x000084ffffffffff (5TB, L0 slots [256..265])
+ *  1:1 mapping of RAM
+ *
+ * 0x0000850000000000 - 0x0000ffffffffffff (123TB, L0 slots [266..511])
+ *  Unused
  */
 
-#define XEN_VIRT_START         _AC(0x00200000,UL)
-#define FIXMAP_ADDR(n)        (_AC(0x00400000,UL) + (n) * PAGE_SIZE)
-#define BOOT_MISC_VIRT_START   _AC(0x00600000,UL)
-#define FRAMETABLE_VIRT_START  _AC(0x02000000,UL)
-#define VMAP_VIRT_START        _AC(0x10000000,UL)
-#define XENHEAP_VIRT_START     _AC(0x40000000,UL)
-#define DOMHEAP_VIRT_START     _AC(0x80000000,UL)
-#define DOMHEAP_VIRT_END       _AC(0xffffffff,UL)
+#define XEN_VIRT_START         _AT(vaddr_t,0x00200000)
+#define FIXMAP_ADDR(n)        (_AT(vaddr_t,0x00400000) + (n) * PAGE_SIZE)
+#define BOOT_MISC_VIRT_START   _AT(vaddr_t,0x00600000)
 
-#define VMAP_VIRT_END          XENHEAP_VIRT_START
 #define HYPERVISOR_VIRT_START  XEN_VIRT_START
 
+#ifdef CONFIG_ARM_32
+
+#define CONFIG_DOMAIN_PAGE 1
+#define CONFIG_SEPARATE_XENHEAP 1
+
+#define FRAMETABLE_VIRT_START  _AT(vaddr_t,0x02000000)
+#define VMAP_VIRT_START  _AT(vaddr_t,0x10000000)
+#define XENHEAP_VIRT_START     _AT(vaddr_t,0x40000000)
+#define XENHEAP_VIRT_END       _AT(vaddr_t,0x7fffffff)
+#define DOMHEAP_VIRT_START     _AT(vaddr_t,0x80000000)
+#define DOMHEAP_VIRT_END       _AT(vaddr_t,0xffffffff)
+
+#define VMAP_VIRT_END    XENHEAP_VIRT_START
+
 #define DOMHEAP_ENTRIES        1024  /* 1024 2MB mapping slots */
+
+#else /* ARM_64 */
+
+#define SLOT0_ENTRY_BITS  39
+#define SLOT0(slot) (_AT(vaddr_t,slot) << SLOT0_ENTRY_BITS)
+#define SLOT0_ENTRY_SIZE  SLOT0(1)
+#define GB(_gb)     (_AC(_gb, UL) << 30)
+
+#define VMAP_VIRT_START  GB(1)
+#define VMAP_VIRT_END    (VMAP_VIRT_START + GB(1) - 1)
+
+#define FRAMETABLE_VIRT_START  GB(32)
+#define FRAMETABLE_VIRT_END    (FRAMETABLE_VIRT_START + GB(32) - 1)
+
+#define DIRECTMAP_VIRT_START   SLOT0(256)
+#define DIRECTMAP_SIZE         (SLOT0_ENTRY_SIZE * (265-256))
+#define DIRECTMAP_VIRT_END     (DIRECTMAP_VIRT_START + DIRECTMAP_SIZE - 1)
+
+#define XENHEAP_VIRT_START     DIRECTMAP_VIRT_START
+
+#define HYPERVISOR_VIRT_END    DIRECTMAP_VIRT_END
+
+#endif
 
 /* Number of domheap pagetable pages required at the second level (2MB mappings) */
 #define DOMHEAP_SECOND_PAGES ((DOMHEAP_VIRT_END - DOMHEAP_VIRT_START + 1) >> FIRST_SHIFT)
