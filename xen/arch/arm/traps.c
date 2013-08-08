@@ -36,6 +36,7 @@
 #include <asm/cpregs.h>
 #include <asm/psci.h>
 
+#include "decode.h"
 #include "io.h"
 #include "vtimer.h"
 #include <asm/gic.h>
@@ -1335,6 +1336,20 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     /* XXX: Decode the instruction if ISS is not valid */
     if ( !dabt.valid )
         goto bad_data_abort;
+
+    /*
+     * Erratum 766422: Thumb store translation fault to Hypervisor may
+     * not have correct HSR Rt value.
+     */
+    if ( cpu_has_erratum_766422() && (regs->cpsr & PSR_THUMB) && dabt.write )
+    {
+        rc = decode_instruction(regs, &info.dabt);
+        if ( rc )
+        {
+            gdprintk(XENLOG_ERR, "Unable to decode instruction\n");
+            goto bad_data_abort;
+        }
+    }
 
     if (handle_mmio(&info))
     {
