@@ -115,7 +115,7 @@ typedef struct {
 
     /* These seven bits are only used in Block entries and are ignored
      * in Table entries. */
-    unsigned long hint:1;       /* In a block of 16 contiguous entries */
+    unsigned long contig:1;     /* In a block of 16 contiguous entries */
     unsigned long pxn:1;        /* Privileged-XN */
     unsigned long xn:1;         /* eXecute-Never */
     unsigned long avail:4;      /* Ignored by hardware */
@@ -150,7 +150,7 @@ typedef struct {
 
     /* These seven bits are only used in Block entries and are ignored
      * in Table entries. */
-    unsigned long hint:1;       /* In a block of 16 contiguous entries */
+    unsigned long contig:1;     /* In a block of 16 contiguous entries */
     unsigned long sbz2:1;
     unsigned long xn:1;         /* eXecute-Never */
     unsigned long avail:4;      /* Ignored by hardware */

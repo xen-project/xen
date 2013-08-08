@@ -526,7 +526,7 @@ static void __init create_mappings(unsigned long virt,
     count = nr_mfns / LPAE_ENTRIES;
     p = xen_second + second_linear_offset(virt);
     pte = mfn_to_xen_entry(base_mfn);
-    pte.pt.hint = 1;  /* These maps are in 16-entry contiguous chunks. */
+    pte.pt.contig = 1;  /* These maps are in 16-entry contiguous chunks. */
     for ( i = 0; i < count; i++ )
     {
         write_pte(p + i, pte);
