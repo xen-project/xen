@@ -140,8 +140,11 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
         break;
 
     case MAP_PIRQ_TYPE_MSI:
+        if ( !msi->table_base )
+            msi->entry_nr = 1;
         irq = *index;
         if ( irq == -1 )
+    case MAP_PIRQ_TYPE_MULTI_MSI:
             irq = create_irq(NUMA_NO_NODE);
 
         if ( irq < nr_irqs_gsi || irq >= nr_irqs )
@@ -179,6 +182,30 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
                 goto done;
             }
         }
+        else if ( type == MAP_PIRQ_TYPE_MULTI_MSI )
+        {
+            if ( msi->entry_nr <= 0 || msi->entry_nr > 32 )
+                ret = -EDOM;
+            else if ( msi->entry_nr != 1 && !iommu_intremap )
+                ret = -EOPNOTSUPP;
+            else
+            {
+                while ( msi->entry_nr & (msi->entry_nr - 1) )
+                    msi->entry_nr += msi->entry_nr & -msi->entry_nr;
+                pirq = get_free_pirqs(d, msi->entry_nr);
+                if ( pirq < 0 )
+                {
+                    while ( (msi->entry_nr >>= 1) > 1 )
+                        if ( get_free_pirqs(d, msi->entry_nr) > 0 )
+                            break;
+                    dprintk(XENLOG_G_ERR, "dom%d: no block of %d free pirqs\n",
+                            d->domain_id, msi->entry_nr << 1);
+                    ret = pirq;
+                }
+            }
+            if ( ret < 0 )
+                goto done;
+        }
         else
         {
             pirq = get_free_pirq(d, type);
@@ -210,8 +237,15 @@ int physdev_map_pirq(domid_t domid, int type, int *index, int *pirq_p,
  done:
     spin_unlock(&d->event_lock);
     spin_unlock(&pcidevs_lock);
-    if ( (ret != 0) && (type == MAP_PIRQ_TYPE_MSI) && (*index == -1) )
-        destroy_irq(irq);
+    if ( ret != 0 )
+        switch ( type )
+        {
+        case MAP_PIRQ_TYPE_MSI:
+            if ( *index == -1 )
+        case MAP_PIRQ_TYPE_MULTI_MSI:
+                destroy_irq(irq);
+            break;
+        }
  free_domain:
     rcu_unlock_domain(d);
     return ret;
@@ -390,14 +424,22 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&map, arg, 1) != 0 )
             break;
 
-        if ( map.type == MAP_PIRQ_TYPE_MSI_SEG )
+        switch ( map.type )
         {
+        case MAP_PIRQ_TYPE_MSI_SEG:
             map.type = MAP_PIRQ_TYPE_MSI;
             msi.seg = map.bus >> 16;
-        }
-        else
-        {
+            break;
+
+        case MAP_PIRQ_TYPE_MULTI_MSI:
+            if ( map.table_base )
+                return -EINVAL;
+            msi.seg = map.bus >> 16;
+            break;
+
+        default:
             msi.seg = 0;
+            break;
         }
         msi.bus = map.bus;
         msi.devfn = map.devfn;
@@ -406,6 +448,8 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         ret = physdev_map_pirq(map.domid, map.type, &map.index, &map.pirq,
                                &msi);
 
+        if ( map.type == MAP_PIRQ_TYPE_MULTI_MSI )
+            map.entry_nr = msi.entry_nr;
         if ( __copy_to_guest(arg, &map, 1) )
             ret = -EFAULT;
         break;
