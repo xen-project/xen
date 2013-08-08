@@ -814,7 +814,7 @@ static bool_t __init set_iommu_interrupt_handler(struct amd_iommu *iommu)
         handler = &iommu_msi_type;
     ret = __setup_msi_irq(irq_to_desc(irq), &iommu->msi, handler);
     if ( !ret )
-        ret = request_irq(irq, iommu_interrupt_handler, 0, "amd_iommu", iommu);
+        ret = request_irq(irq, iommu_interrupt_handler, "amd_iommu", iommu);
     if ( ret )
     {
         destroy_irq(irq);

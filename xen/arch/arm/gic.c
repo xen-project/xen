@@ -893,7 +893,7 @@ void gic_dump_info(struct vcpu *v)
 void __cpuinit init_maintenance_interrupt(void)
 {
     request_dt_irq(&gic.maintenance, maintenance_interrupt,
-                   0, "irq-maintenance", NULL);
+                   "irq-maintenance", NULL);
 }
 
 /*

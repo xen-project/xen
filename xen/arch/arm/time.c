@@ -238,11 +238,11 @@ void __cpuinit init_timer_interrupt(void)
     WRITE_SYSREG32(0, CNTHP_CTL_EL2);   /* Hypervisor's timer disabled */
     isb();
 
-    request_dt_irq(&timer_irq[TIMER_HYP_PPI], timer_interrupt, 0,
+    request_dt_irq(&timer_irq[TIMER_HYP_PPI], timer_interrupt,
                    "hyptimer", NULL);
-    request_dt_irq(&timer_irq[TIMER_VIRT_PPI], vtimer_interrupt, 0,
+    request_dt_irq(&timer_irq[TIMER_VIRT_PPI], vtimer_interrupt,
                    "virtimer", NULL);
-    request_dt_irq(&timer_irq[TIMER_PHYS_NONSECURE_PPI], timer_interrupt, 0,
+    request_dt_irq(&timer_irq[TIMER_PHYS_NONSECURE_PPI], timer_interrupt,
                    "phytimer", NULL);
 }
 

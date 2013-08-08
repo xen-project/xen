@@ -951,7 +951,7 @@ __initcall(irq_ratelimit_init);
 
 int __init request_irq(unsigned int irq,
         void (*handler)(int, void *, struct cpu_user_regs *),
-        unsigned long irqflags, const char * devname, void *dev_id)
+        const char * devname, void *dev_id)
 {
     struct irqaction * action;
     int retval;

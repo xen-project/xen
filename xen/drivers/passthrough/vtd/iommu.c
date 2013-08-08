@@ -1098,7 +1098,7 @@ static int __init iommu_set_interrupt(struct acpi_drhd_unit *drhd)
 
     desc = irq_to_desc(irq);
     desc->handler = &dma_msi_type;
-    ret = request_irq(irq, iommu_page_fault, 0, "dmar", iommu);
+    ret = request_irq(irq, iommu_page_fault, "dmar", iommu);
     if ( ret )
     {
         desc->handler = &no_irq_type;

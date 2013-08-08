@@ -42,8 +42,7 @@ void init_secondary_IRQ(void);
 
 int __init request_dt_irq(const struct dt_irq *irq,
                           void (*handler)(int, void *, struct cpu_user_regs *),
-                          unsigned long irqflags, const char *devname,
-                          void *dev_id);
+                          const char *devname, void *dev_id);
 int __init setup_dt_irq(const struct dt_irq *irq, struct irqaction *new);
 
 #endif /* _ASM_HW_IRQ_H */

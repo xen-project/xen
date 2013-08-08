@@ -95,7 +95,7 @@ void __cpuinit init_secondary_IRQ(void)
 
 int __init request_dt_irq(const struct dt_irq *irq,
         void (*handler)(int, void *, struct cpu_user_regs *),
-        unsigned long irqflags, const char *devname, void *dev_id)
+        const char *devname, void *dev_id)
 {
     struct irqaction *action;
     int retval;

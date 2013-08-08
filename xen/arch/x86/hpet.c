@@ -355,7 +355,7 @@ static int __init hpet_setup_msi_irq(struct hpet_event_channel *ch)
     hpet_write32(cfg, HPET_Tn_CFG(ch->idx));
 
     desc->handler = &hpet_msi_type;
-    ret = request_irq(ch->msi.irq, hpet_interrupt_handler, 0, "HPET", ch);
+    ret = request_irq(ch->msi.irq, hpet_interrupt_handler, "HPET", ch);
     if ( ret >= 0 )
         ret = __hpet_setup_msi_irq(desc);
     if ( ret < 0 )
