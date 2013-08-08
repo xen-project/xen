@@ -1305,7 +1305,7 @@ void __init scrub_heap_pages(void)
  * XEN-HEAP SUB-ALLOCATOR
  */
 
-#if !defined(CONFIG_X86)
+#if defined(CONFIG_SEPARATE_XENHEAP)
 
 void init_xenheap_pages(paddr_t ps, paddr_t pe)
 {

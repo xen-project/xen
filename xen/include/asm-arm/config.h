@@ -36,6 +36,7 @@
 #define CONFIG_SMP 1
 
 #define CONFIG_DOMAIN_PAGE 1
+#define CONFIG_SEPARATE_XENHEAP 1
 
 #define CONFIG_VIDEO 1
 
