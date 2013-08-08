@@ -151,21 +151,22 @@ DEFINE_XEN_GUEST_HANDLE(physdev_irq_t);
 #define MAP_PIRQ_TYPE_GSI               0x1
 #define MAP_PIRQ_TYPE_UNKNOWN           0x2
 #define MAP_PIRQ_TYPE_MSI_SEG           0x3
+#define MAP_PIRQ_TYPE_MULTI_MSI         0x4
 
 #define PHYSDEVOP_map_pirq               13
 struct physdev_map_pirq {
     domid_t domid;
     /* IN */
     int type;
-    /* IN */
+    /* IN (ignored for ..._MULTI_MSI) */
     int index;
     /* IN or OUT */
     int pirq;
-    /* IN - high 16 bits hold segment for MAP_PIRQ_TYPE_MSI_SEG */
+    /* IN - high 16 bits hold segment for ..._MSI_SEG and ..._MULTI_MSI */
     int bus;
     /* IN */
     int devfn;
-    /* IN */
+    /* IN (also OUT for ..._MULTI_MSI) */
     int entry_nr;
     /* IN */
     uint64_t table_base;

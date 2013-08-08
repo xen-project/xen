@@ -1863,6 +1863,25 @@ int get_free_pirq(struct domain *d, int type)
     return -ENOSPC;
 }
 
+int get_free_pirqs(struct domain *d, unsigned int nr)
+{
+    unsigned int i, found = 0;
+
+    ASSERT(spin_is_locked(&d->event_lock));
+
+    for ( i = d->nr_pirqs - 1; i >= nr_irqs_gsi; --i )
+        if ( is_free_pirq(d, pirq_info(d, i)) )
+        {
+            pirq_get_info(d, i);
+            if ( ++found == nr )
+                return i;
+        }
+        else
+            found = 0;
+
+    return -ENOSPC;
+}
+
 int map_domain_pirq(
     struct domain *d, int pirq, int irq, int type, void *data)
 {
@@ -1918,11 +1937,12 @@ int map_domain_pirq(
 
     desc = irq_to_desc(irq);
 
-    if ( type == MAP_PIRQ_TYPE_MSI )
+    if ( type == MAP_PIRQ_TYPE_MSI || type == MAP_PIRQ_TYPE_MULTI_MSI )
     {
         struct msi_info *msi = (struct msi_info *)data;
         struct msi_desc *msi_desc;
         struct pci_dev *pdev;
+        unsigned int nr = 0;
 
         ASSERT(spin_is_locked(&pcidevs_lock));
 
@@ -1933,7 +1953,14 @@ int map_domain_pirq(
         pdev = pci_get_pdev(msi->seg, msi->bus, msi->devfn);
         ret = pci_enable_msi(msi, &msi_desc);
         if ( ret )
+        {
+            if ( ret > 0 )
+            {
+                msi->entry_nr = ret;
+                ret = -ENFILE;
+            }
             goto done;
+        }
 
         spin_lock_irqsave(&desc->lock, flags);
 
@@ -1947,25 +1974,73 @@ int map_domain_pirq(
             goto done;
         }
 
-        ret = setup_msi_irq(desc, msi_desc);
+        while ( !(ret = setup_msi_irq(desc, msi_desc + nr)) )
+        {
+            if ( opt_irq_vector_map == OPT_IRQ_VECTOR_MAP_PERDEV &&
+                 !desc->arch.used_vectors )
+            {
+                desc->arch.used_vectors = &pdev->arch.used_vectors;
+                if ( desc->arch.vector != IRQ_VECTOR_UNASSIGNED )
+                {
+                    int vector = desc->arch.vector;
+
+                    ASSERT(!test_bit(vector, desc->arch.used_vectors));
+                    set_bit(vector, desc->arch.used_vectors);
+                }
+            }
+            if ( type == MAP_PIRQ_TYPE_MSI ||
+                 msi_desc->msi_attrib.type != PCI_CAP_ID_MSI ||
+                 ++nr == msi->entry_nr )
+                break;
+
+            set_domain_irq_pirq(d, irq, info);
+            spin_unlock_irqrestore(&desc->lock, flags);
+
+            info = NULL;
+            irq = create_irq(NUMA_NO_NODE);
+            ret = irq >= 0 ? prepare_domain_irq_pirq(d, irq, pirq + nr, &info)
+                           : irq;
+            if ( ret )
+                break;
+            msi_desc[nr].irq = irq;
+
+            if ( irq_permit_access(d, irq) != 0 )
+                printk(XENLOG_G_WARNING
+                       "dom%d: could not permit access to IRQ%d (pirq %d)\n",
+                       d->domain_id, irq, pirq);
+
+            desc = irq_to_desc(irq);
+            spin_lock_irqsave(&desc->lock, flags);
+
+            if ( desc->handler != &no_irq_type )
+            {
+                dprintk(XENLOG_G_ERR, "dom%d: irq %d (pirq %u) in use (%s)\n",
+                        d->domain_id, irq, pirq + nr, desc->handler->typename);
+                ret = -EBUSY;
+                break;
+            }
+        }
+
         if ( ret )
         {
             spin_unlock_irqrestore(&desc->lock, flags);
+            while ( nr-- )
+            {
+                if ( irq >= 0 )
+                {
+                    if ( irq_deny_access(d, irq) )
+                        printk(XENLOG_G_ERR
+                               "dom%d: could not revoke access to IRQ%d (pirq %d)\n",
+                               d->domain_id, irq, pirq);
+                    destroy_irq(irq);
+                }
+                if ( info )
+                    cleanup_domain_irq_pirq(d, irq, info);
+                info = pirq_info(d, pirq + nr);
+                irq = info->arch.irq;
+            }
             pci_disable_msi(msi_desc);
             goto done;
-        }
-
-        if ( opt_irq_vector_map == OPT_IRQ_VECTOR_MAP_PERDEV
-             && !desc->arch.used_vectors )
-        {
-            desc->arch.used_vectors = &pdev->arch.used_vectors;
-            if ( desc->arch.vector != IRQ_VECTOR_UNASSIGNED )
-            {
-                int vector = desc->arch.vector;
-                ASSERT(!test_bit(vector, desc->arch.used_vectors));
-
-                set_bit(vector, desc->arch.used_vectors);
-            }
         }
 
         set_domain_irq_pirq(d, irq, info);
@@ -1996,7 +2071,8 @@ int unmap_domain_pirq(struct domain *d, int pirq)
 {
     unsigned long flags;
     struct irq_desc *desc;
-    int irq, ret = 0;
+    int irq, ret = 0, rc;
+    unsigned int i, nr = 1;
     bool_t forced_unbind;
     struct pirq *info;
     struct msi_desc *msi_desc = NULL;
@@ -2018,6 +2094,18 @@ int unmap_domain_pirq(struct domain *d, int pirq)
 
     desc = irq_to_desc(irq);
     msi_desc = desc->msi_desc;
+    if ( msi_desc && msi_desc->msi_attrib.type == PCI_CAP_ID_MSI )
+    {
+        if ( msi_desc->msi_attrib.entry_nr )
+        {
+            printk(XENLOG_G_ERR
+                   "dom%d: trying to unmap secondary MSI pirq %d\n",
+                   d->domain_id, pirq);
+            ret = -EBUSY;
+            goto done;
+        }
+        nr = msi_desc->msi.nvec;
+    }
 
     ret = xsm_unmap_domain_irq(XSM_HOOK, d, irq, msi_desc);
     if ( ret )
@@ -2033,36 +2121,82 @@ int unmap_domain_pirq(struct domain *d, int pirq)
 
     spin_lock_irqsave(&desc->lock, flags);
 
-    BUG_ON(irq != domain_pirq_to_irq(d, pirq));
-
-    if ( !forced_unbind )
-        clear_domain_irq_pirq(d, irq, info);
-    else
+    for ( i = 0; ; )
     {
-        info->arch.irq = -irq;
-        radix_tree_replace_slot(
-            radix_tree_lookup_slot(&d->arch.irq_pirq, irq),
-            radix_tree_int_to_ptr(-pirq));
+        BUG_ON(irq != domain_pirq_to_irq(d, pirq + i));
+
+        if ( !forced_unbind )
+            clear_domain_irq_pirq(d, irq, info);
+        else
+        {
+            info->arch.irq = -irq;
+            radix_tree_replace_slot(
+                radix_tree_lookup_slot(&d->arch.irq_pirq, irq),
+                radix_tree_int_to_ptr(-pirq));
+        }
+
+        if ( msi_desc )
+        {
+            desc->handler = &no_irq_type;
+            desc->msi_desc = NULL;
+        }
+
+        if ( ++i == nr )
+            break;
+
+        spin_unlock_irqrestore(&desc->lock, flags);
+
+        if ( !forced_unbind )
+           cleanup_domain_irq_pirq(d, irq, info);
+
+        rc = irq_deny_access(d, irq);
+        if ( rc )
+        {
+            printk(XENLOG_G_ERR
+                   "dom%d: could not deny access to IRQ%d (pirq %d)\n",
+                   d->domain_id, irq, pirq + i);
+            ret = rc;
+        }
+
+        do {
+            info = pirq_info(d, pirq + i);
+            if ( info && (irq = info->arch.irq) > 0 )
+                break;
+            printk(XENLOG_G_ERR "dom%d: MSI pirq %d not mapped\n",
+                   d->domain_id, pirq + i);
+        } while ( ++i < nr );
+
+        if ( i == nr )
+        {
+            desc = NULL;
+            break;
+        }
+
+        desc = irq_to_desc(irq);
+        BUG_ON(desc->msi_desc != msi_desc + i);
+
+        spin_lock_irqsave(&desc->lock, flags);
     }
 
-    if ( msi_desc )
+    if ( desc )
     {
-        desc->handler = &no_irq_type;
-        desc->msi_desc = NULL;
+        spin_unlock_irqrestore(&desc->lock, flags);
+
+        if ( !forced_unbind )
+            cleanup_domain_irq_pirq(d, irq, info);
+
+        rc = irq_deny_access(d, irq);
+        if ( rc )
+        {
+            printk(XENLOG_G_ERR
+                   "dom%d: could not deny access to IRQ%d (pirq %d)\n",
+                   d->domain_id, irq, pirq + nr - 1);
+            ret = rc;
+        }
     }
 
-    spin_unlock_irqrestore(&desc->lock, flags);
     if (msi_desc)
         msi_free_irq(msi_desc);
-
-    if ( !forced_unbind )
-        cleanup_domain_irq_pirq(d, irq, info);
-
-    ret = irq_deny_access(d, irq);
-    if ( ret )
-        printk(XENLOG_G_ERR
-               "dom%d: could not deny access to IRQ%d (pirq %d)\n",
-               d->domain_id, irq, pirq);
 
  done:
     return ret;
