@@ -511,20 +511,23 @@ void __cpuinit mmu_init_secondary_cpu(void)
 }
 
 /* Create Xen's mappings of memory.
- * Base and virt must be 32MB aligned and size a multiple of 32MB. */
-static void __init create_mappings(unsigned long virt,
-                                   unsigned long base_mfn,
-                                   unsigned long nr_mfns)
+ * Base and virt must be 32MB aligned and size a multiple of 32MB.
+ * second must be a contiguous set of second level page tables
+ * covering the region starting at virt_offset. */
+static void __init create_32mb_mappings(lpae_t *second,
+                                        unsigned long virt_offset,
+                                        unsigned long base_mfn,
+                                        unsigned long nr_mfns)
 {
     unsigned long i, count;
     lpae_t pte, *p;
 
-    ASSERT(!((virt >> PAGE_SHIFT) % (16 * LPAE_ENTRIES)));
+    ASSERT(!((virt_offset >> PAGE_SHIFT) % (16 * LPAE_ENTRIES)));
     ASSERT(!(base_mfn % (16 * LPAE_ENTRIES)));
     ASSERT(!(nr_mfns % (16 * LPAE_ENTRIES)));
 
     count = nr_mfns / LPAE_ENTRIES;
-    p = xen_second + second_linear_offset(virt);
+    p = second + second_linear_offset(virt_offset);
     pte = mfn_to_xen_entry(base_mfn);
     pte.pt.contig = 1;  /* These maps are in 16-entry contiguous chunks. */
     for ( i = 0; i < count; i++ )
@@ -539,7 +542,7 @@ static void __init create_mappings(unsigned long virt,
 void __init setup_xenheap_mappings(unsigned long base_mfn,
                                    unsigned long nr_mfns)
 {
-    create_mappings(XENHEAP_VIRT_START, base_mfn, nr_mfns);
+    create_32mb_mappings(xen_second, XENHEAP_VIRT_START, base_mfn, nr_mfns);
 
     /* Record where the xenheap is, for translation routines. */
     xenheap_virt_end = XENHEAP_VIRT_START + nr_mfns * PAGE_SIZE;
@@ -559,7 +562,7 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     /* Round up to 32M boundary */
     frametable_size = (frametable_size + 0x1ffffff) & ~0x1ffffff;
     base_mfn = alloc_boot_pages(frametable_size >> PAGE_SHIFT, 32<<(20-12));
-    create_mappings(FRAMETABLE_VIRT_START, base_mfn, frametable_size >> PAGE_SHIFT);
+    create_32mb_mappings(xen_second, FRAMETABLE_VIRT_START, base_mfn, frametable_size >> PAGE_SHIFT);
 
     memset(&frame_table[0], 0, nr_pages * sizeof(struct page_info));
     memset(&frame_table[nr_pages], -1,
