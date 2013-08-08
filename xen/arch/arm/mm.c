@@ -331,6 +331,13 @@ void __cpuinit setup_virt_paging(void)
      * write to TTBR0 has completed. */                                 \
     flush_xen_text_tlb()
 
+static inline lpae_t pte_of_xenaddr(vaddr_t va)
+{
+    paddr_t ma = va + phys_offset;
+    unsigned long mfn = ma >> PAGE_SHIFT;
+    return mfn_to_xen_entry(mfn);
+}
+
 /* Boot-time pagetable setup.
  * Changes here may need matching changes in head.S */
 void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
@@ -387,8 +394,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     flush_xen_text_tlb();
 
     /* Link in the fixmap pagetable */
-    pte = mfn_to_xen_entry((((unsigned long) xen_fixmap) + phys_offset)
-                           >> PAGE_SHIFT);
+    pte = pte_of_xenaddr((vaddr_t)xen_fixmap);
     pte.pt.table = 1;
     write_pte(xen_second + second_table_offset(FIXMAP_ADDR(0)), pte);
     /*
@@ -415,8 +421,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
         write_pte(xen_xenmap + i, pte);
         /* No flush required here as page table is not hooked in yet. */
     }
-    pte = mfn_to_xen_entry((((unsigned long) xen_xenmap) + phys_offset)
-                           >> PAGE_SHIFT);
+    pte = pte_of_xenaddr((vaddr_t)xen_xenmap);
     pte.pt.table = 1;
     write_pte(xen_second + second_linear_offset(XEN_VIRT_START), pte);
     /* TLBFLUSH and ISB would be needed here, but wait until we set WXN */
