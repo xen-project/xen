@@ -72,6 +72,8 @@
   END(name)
 #endif
 
+#include <xen/const.h>
+
 /*
  * Memory layout:
  *  0  -   2M   Unmapped
@@ -91,14 +93,14 @@
  *   - in setup_pagetables() when relocating Xen.
  */
 
-#define XEN_VIRT_START         mk_unsigned_long(0x00200000)
-#define FIXMAP_ADDR(n)        (mk_unsigned_long(0x00400000) + (n) * PAGE_SIZE)
-#define BOOT_MISC_VIRT_START   mk_unsigned_long(0x00600000)
-#define FRAMETABLE_VIRT_START  mk_unsigned_long(0x02000000)
-#define VMAP_VIRT_START        mk_unsigned_long(0x10000000)
-#define XENHEAP_VIRT_START     mk_unsigned_long(0x40000000)
-#define DOMHEAP_VIRT_START     mk_unsigned_long(0x80000000)
-#define DOMHEAP_VIRT_END       mk_unsigned_long(0xffffffff)
+#define XEN_VIRT_START         _AC(0x00200000,UL)
+#define FIXMAP_ADDR(n)        (_AC(0x00400000,UL) + (n) * PAGE_SIZE)
+#define BOOT_MISC_VIRT_START   _AC(0x00600000,UL)
+#define FRAMETABLE_VIRT_START  _AC(0x02000000,UL)
+#define VMAP_VIRT_START        _AC(0x10000000,UL)
+#define XENHEAP_VIRT_START     _AC(0x40000000,UL)
+#define DOMHEAP_VIRT_START     _AC(0x80000000,UL)
+#define DOMHEAP_VIRT_END       _AC(0xffffffff,UL)
 
 #define VMAP_VIRT_END          XENHEAP_VIRT_START
 #define HYPERVISOR_VIRT_START  XEN_VIRT_START
