@@ -30,6 +30,7 @@ obj-y += vtimer.o
 obj-y += vuart.o
 obj-y += hvm.o
 obj-y += device.o
+obj-y += decode.o
 
 #obj-bin-y += ....o
 
