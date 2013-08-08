@@ -208,11 +208,12 @@ static inline void __iomem *ioremap_wc(paddr_t start, size_t len)
 #define paddr_to_pdx(pa)    pfn_to_pdx(paddr_to_pfn(pa))
 
 
-static inline paddr_t virt_to_maddr(const void *va)
+static inline paddr_t __virt_to_maddr(vaddr_t va)
 {
-    uint64_t par = va_to_par((vaddr_t)va);
-    return (par & PADDR_MASK & PAGE_MASK) | ((vaddr_t) va & ~PAGE_MASK);
+    uint64_t par = va_to_par(va);
+    return (par & PADDR_MASK & PAGE_MASK) | (va & ~PAGE_MASK);
 }
+#define virt_to_maddr(va)   __virt_to_maddr((vaddr_t)(va))
 
 static inline void *maddr_to_virt(paddr_t ma)
 {
