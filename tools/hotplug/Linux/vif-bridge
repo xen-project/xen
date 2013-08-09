@@ -37,8 +37,7 @@ bridge=$(xenstore_read_default "$XENBUS_PATH/bridge" "$bridge")
 
 if [ -z "$bridge" ]
 then
-  bridge=$(brctl show | cut -d "
-" -f 2 | cut -f 1)
+  bridge=$(brctl show | awk 'NR==2{print$1}')
 
   if [ -z "$bridge" ]
   then
