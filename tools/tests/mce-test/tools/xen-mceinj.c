@@ -92,7 +92,8 @@ static void Lprintf(const char *fmt, ...)
     va_list args;
 
     va_start(args, fmt);
-    vasprintf(&buf, fmt, args);
+    if (vasprintf(&buf, fmt, args) < 0)
+        abort();
     fprintf(LOGFILE, "%s", buf);
     va_end(args);
     free(buf);
@@ -104,7 +105,8 @@ static void err(xc_interface *xc_handle, const char *fmt, ...)
     va_list args;
 
     va_start(args, fmt);
-    vasprintf(&buf, fmt, args);
+    if (vasprintf(&buf, fmt, args) < 0)
+        abort();
     perror(buf);
     va_end(args);
     free(buf);
