@@ -1779,15 +1779,17 @@ static void
 svm_vmexit_do_vmrun(struct cpu_user_regs *regs,
                     struct vcpu *v, uint64_t vmcbaddr)
 {
-    if (!nestedhvm_enabled(v->domain)) {
+    if ( !nsvm_efer_svm_enabled(v) )
+    {
         gdprintk(XENLOG_ERR, "VMRUN: nestedhvm disabled, injecting #UD\n");
         hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
         return;
     }
 
-    if (!nestedsvm_vmcb_map(v, vmcbaddr)) {
-        gdprintk(XENLOG_ERR, "VMRUN: mapping vmcb failed, injecting #UD\n");
-        hvm_inject_hw_exception(TRAP_invalid_op, HVM_DELIVER_NO_ERROR_CODE);
+    if ( !nestedsvm_vmcb_map(v, vmcbaddr) )
+    {
+        gdprintk(XENLOG_ERR, "VMRUN: mapping vmcb failed, injecting #GP\n");
+        hvm_inject_hw_exception(TRAP_gp_fault, HVM_DELIVER_NO_ERROR_CODE);
         return;
     }
 
@@ -1833,7 +1835,8 @@ svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
     if ( (inst_len = __get_instruction_length(v, INSTR_VMLOAD)) == 0 )
         return;
 
-    if (!nestedhvm_enabled(v->domain)) {
+    if ( !nsvm_efer_svm_enabled(v) ) 
+    {
         gdprintk(XENLOG_ERR, "VMLOAD: nestedhvm disabled, injecting #UD\n");
         ret = TRAP_invalid_op;
         goto inject;
@@ -1843,8 +1846,8 @@ svm_vmexit_do_vmload(struct vmcb_struct *vmcb,
     if ( !page )
     {
         gdprintk(XENLOG_ERR,
-            "VMLOAD: mapping failed, injecting #UD\n");
-        ret = TRAP_invalid_op;
+            "VMLOAD: mapping failed, injecting #GP\n");
+        ret = TRAP_gp_fault;
         goto inject;
     }
 
@@ -1874,7 +1877,8 @@ svm_vmexit_do_vmsave(struct vmcb_struct *vmcb,
     if ( (inst_len = __get_instruction_length(v, INSTR_VMSAVE)) == 0 )
         return;
 
-    if (!nestedhvm_enabled(v->domain)) {
+    if ( !nsvm_efer_svm_enabled(v) ) 
+    {
         gdprintk(XENLOG_ERR, "VMSAVE: nestedhvm disabled, injecting #UD\n");
         ret = TRAP_invalid_op;
         goto inject;
@@ -1884,8 +1888,8 @@ svm_vmexit_do_vmsave(struct vmcb_struct *vmcb,
     if ( !page )
     {
         gdprintk(XENLOG_ERR,
-            "VMSAVE: mapping vmcb failed, injecting #UD\n");
-        ret = TRAP_invalid_op;
+            "VMSAVE: mapping vmcb failed, injecting #GP\n");
+        ret = TRAP_gp_fault;
         goto inject;
     }
 

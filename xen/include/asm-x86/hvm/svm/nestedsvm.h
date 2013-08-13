@@ -94,7 +94,7 @@ struct nestedsvm {
 #define vcpu_nestedsvm(v) (vcpu_nestedhvm(v).u.nsvm)
 
 /* True when l1 guest enabled SVM in EFER */
-#define hvm_svm_enabled(v) \
+#define nsvm_efer_svm_enabled(v) \
     (!!((v)->arch.hvm_vcpu.guest_efer & EFER_SVME))
 
 int nestedsvm_vmcb_map(struct vcpu *v, uint64_t vmcbaddr);
