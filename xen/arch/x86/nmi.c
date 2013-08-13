@@ -435,8 +435,7 @@ void nmi_watchdog_tick(struct cpu_user_regs * regs)
 {
     unsigned int sum = this_cpu(nmi_timer_ticks);
 
-    if ( (this_cpu(last_irq_sums) == sum) &&
-         !atomic_read(&watchdog_disable_count) )
+    if ( (this_cpu(last_irq_sums) == sum) && watchdog_enabled() )
     {
         /*
          * Ayiee, looks like this CPU is stuck ... wait for the timeout
