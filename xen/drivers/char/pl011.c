@@ -87,7 +87,7 @@ static void __init pl011_init_preirq(struct serial_port *port)
     unsigned int divisor;
 
     /* No interrupts, please. */
-    pl011_write(uart, IMSC, ALLI);
+    pl011_write(uart, IMSC, 0);
 
     /* Definitely no DMA */
     pl011_write(uart, DMACR, 0x0);
@@ -115,7 +115,7 @@ static void __init pl011_init_preirq(struct serial_port *port)
     pl011_write(uart, RSR, 0);
 
     /* Mask and clear the interrupts */
-    pl011_write(uart, IMSC, ALLI);
+    pl011_write(uart, IMSC, 0);
     pl011_write(uart, ICR, ALLI);
 
     /* Enable the UART for RX and TX; no flow ctrl */
@@ -140,7 +140,7 @@ static void __init pl011_init_postirq(struct serial_port *port)
     pl011_write(uart, ICR, OEI|BEI|PEI|FEI);
 
     /* Unmask interrupts */
-    pl011_write(uart, IMSC, RTI|DSRMI|DCDMI|CTSMI|RIMI);
+    pl011_write(uart, IMSC, OEI|BEI|PEI|FEI|TXI|RXI);
 }
 
 static void pl011_suspend(struct serial_port *port)
