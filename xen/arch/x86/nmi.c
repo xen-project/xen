@@ -410,7 +410,12 @@ void watchdog_enable(void)
     atomic_dec(&watchdog_disable_count);
 }
 
-void __init watchdog_setup(void)
+bool_t watchdog_enabled(void)
+{
+    return !atomic_read(&watchdog_disable_count);
+}
+
+int __init watchdog_setup(void)
 {
     unsigned int cpu;
 
@@ -423,6 +428,7 @@ void __init watchdog_setup(void)
     register_cpu_notifier(&cpu_nmi_nfb);
 
     watchdog_enable();
+    return 0;
 }
 
 void nmi_watchdog_tick(struct cpu_user_regs * regs)

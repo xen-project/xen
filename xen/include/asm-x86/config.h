@@ -49,6 +49,7 @@
 
 #define CONFIG_XENOPROF 1
 #define CONFIG_KEXEC 1
+#define CONFIG_WATCHDOG 1
 
 #define HZ 100
 

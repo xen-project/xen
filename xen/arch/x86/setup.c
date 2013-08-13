@@ -26,6 +26,7 @@
 #include <xen/pfn.h>
 #include <xen/nodemask.h>
 #include <xen/tmem_xen.h> /* for opt_tmem only */
+#include <xen/watchdog.h>
 #include <public/version.h>
 #include <compat/platform.h>
 #include <compat/xen.h>

@@ -12,7 +12,7 @@
 #include <xen/ctype.h>
 #include <xen/errno.h>
 #include <xen/guest_access.h>
-#include <xen/nmi.h>
+#include <xen/watchdog.h>
 #include <xen/sched.h>
 #include <xen/types.h>
 #include <xen/hypercall.h>

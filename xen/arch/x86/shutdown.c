@@ -12,7 +12,7 @@
 #include <xen/delay.h>
 #include <xen/dmi.h>
 #include <xen/irq.h>
-#include <xen/nmi.h>
+#include <xen/watchdog.h>
 #include <xen/console.h>
 #include <xen/shutdown.h>
 #include <xen/acpi.h>
