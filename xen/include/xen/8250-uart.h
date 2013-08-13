@@ -1,5 +1,5 @@
 /*
- * xen/include/xen/ns16550-uart.h
+ * xen/include/xen/8250-uart.h
  *
  * This header is extracted from driver/char/ns16550.c
  *
@@ -19,8 +19,8 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __XEN_NS16550_UART_H__
-#define __XEN_NS16550_UART_H__
+#ifndef __XEN_8250_UART_H__
+#define __XEN_8250_UART_H__
 
 /* Register offsets */
 #define UART_RBR          0x00    /* receive buffer       */
@@ -43,11 +43,11 @@
 
 /* Interrupt Identificatiegister */
 #define UART_IIR_NOINT    0x01    /* no interrupt pending */
-#define UART_UART_IIR_IMA 0x06    /* interrupt identity:  */
-#define UART_UART_IIR_LSI 0x06    /*  - rx line status    */
-#define UART_UART_IIR_RDA 0x04    /*  - rx data recv'd    */
-#define UART_UART_IIR_THR 0x02    /*  - tx reg. empty     */
-#define UART_UART_IIR_MSI 0x00    /*  - MODEM status      */
+#define UART_IIR_IMA      0x06    /* interrupt identity:  */
+#define UART_IIR_LSI      0x06    /*  - rx line status    */
+#define UART_IIR_RDA      0x04    /*  - rx data recv'd    */
+#define UART_IIR_THR      0x02    /*  - tx reg. empty     */
+#define UART_IIR_MSI      0x00    /*  - MODEM status      */
 
 /* FIFO Control Register */
 #define UART_FCR_ENABLE   0x01    /* enable FIFO          */
@@ -92,7 +92,7 @@
 #define RESUME_DELAY      MILLISECS(10)
 #define RESUME_RETRIES    100
 
-#endif /* __XEN_NS16550_UART_H__ */
+#endif /* __XEN_8250_UART_H__ */
 
 /*
  * Local variables:

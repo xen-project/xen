@@ -19,7 +19,7 @@
 #include <xen/iocap.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
-#include <xen/ns16550-uart.h>
+#include <xen/8250-uart.h>
 #include <asm/io.h>
 #ifdef CONFIG_X86
 #include <asm/fixmap.h>
