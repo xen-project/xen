@@ -229,7 +229,7 @@ static int __init pl011_uart_init(struct dt_device_node *dev,
     uart = &pl011_com;
 
     uart->clock_hz  = 0x16e3600;
-    uart->baud      = 38400;
+    uart->baud      = BAUD_AUTO;
     uart->data_bits = 8;
     uart->parity    = PARITY_NONE;
     uart->stop_bits = 1;
