@@ -46,6 +46,9 @@ boolean_param("vpid", opt_vpid_enabled);
 static bool_t __read_mostly opt_unrestricted_guest_enabled = 1;
 boolean_param("unrestricted_guest", opt_unrestricted_guest_enabled);
 
+static bool_t __read_mostly opt_apicv_enabled = 1;
+boolean_param("apicv", opt_apicv_enabled);
+
 /*
  * These two parameters are used to config the controls for Pause-Loop Exiting:
  * ple_gap:    upper bound on the amount of time between two successive
@@ -196,11 +199,11 @@ static int vmx_init_vmcs_config(void)
          * "APIC Register Virtualization" and "Virtual Interrupt Delivery"
          * can be set only when "use TPR shadow" is set
          */
-        if ( _vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW )
+        if ( (_vmx_cpu_based_exec_control & CPU_BASED_TPR_SHADOW) &&
+             opt_apicv_enabled )
             opt |= SECONDARY_EXEC_APIC_REGISTER_VIRT |
                    SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
                    SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE;
-
 
         _vmx_secondary_exec_control = adjust_vmx_controls(
             "Secondary Exec Control", min, opt,
