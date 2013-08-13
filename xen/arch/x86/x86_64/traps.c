@@ -227,8 +227,6 @@ void do_double_fault(struct cpu_user_regs *regs)
     unsigned int cpu;
     unsigned long crs[8];
 
-    watchdog_disable();
-
     console_force_unlock();
 
     asm ( "lsll %1, %0" : "=r" (cpu) : "rm" (PER_CPU_GDT_ENTRY << 3) );

@@ -737,6 +737,7 @@ void console_end_log_everything(void)
 
 void console_force_unlock(void)
 {
+    watchdog_disable();
     spin_lock_init(&console_lock);
     serial_force_unlock(sercon_handle);
     console_locks_busted = 1;
