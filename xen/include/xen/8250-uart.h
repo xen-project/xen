@@ -59,14 +59,45 @@
 #define UART_FCR_TRG8     0x80    /* Rx FIFO trig lev 8   */
 #define UART_FCR_TRG14    0xc0    /* Rx FIFO trig lev 14  */
 
+/*
+ * Note: The FIFO trigger levels are chip specific:
+ *	RX:76 = 00  01  10  11	TX:54 = 00  01  10  11
+ * PC16550D:	 1   4   8  14		xx  xx  xx  xx
+ * TI16C550A:	 1   4   8  14          xx  xx  xx  xx
+ * TI16C550C:	 1   4   8  14          xx  xx  xx  xx
+ * ST16C550:	 1   4   8  14		xx  xx  xx  xx
+ * ST16C650:	 8  16  24  28		16   8  24  30	PORT_16650V2
+ * NS16C552:	 1   4   8  14		xx  xx  xx  xx
+ * ST16C654:	 8  16  56  60		 8  16  32  56	PORT_16654
+ * TI16C750:	 1  16  32  56		xx  xx  xx  xx	PORT_16750
+ * TI16C752:	 8  16  56  60		 8  16  32  56
+ * Tegra:	 1   4   8  14		16   8   4   1	PORT_TEGRA
+ */
+#define UART_FCR_R_TRIG_00 0x00
+#define UART_FCR_R_TRIG_01 0x40
+#define UART_FCR_R_TRIG_10 0x80
+#define UART_FCR_R_TRIG_11 0xc0
+#define UART_FCR_T_TRIG_00 0x00
+#define UART_FCR_T_TRIG_01 0x10
+#define UART_FCR_T_TRIG_10 0x20
+#define UART_FCR_T_TRIG_11 0x30
+
 /* Line Control Register */
 #define UART_LCR_DLAB     0x80    /* Divisor Latch Access */
+
+/*
+ * Access to some registers depends on register access / configuration
+ * mode.
+ */
+#define UART_LCR_CONF_MODE_A	UART_LCR_DLAB	/* Configuration mode A */
+#define UART_LCR_CONF_MODE_B	0xBF		/* Configuration mode B */
 
 /* Modem Control Register */
 #define UART_MCR_DTR      0x01    /* Data Terminal Ready  */
 #define UART_MCR_RTS      0x02    /* Request to Send      */
 #define UART_MCR_OUT2     0x08    /* OUT2: interrupt mask */
 #define UART_MCR_LOOP     0x10    /* Enable loopback test mode */
+#define UART_MCR_TCRTLR   0x40    /* Access TCR/TLR (TI16C752, EFR[4]=1) */
 
 /* Line Status Register */
 #define UART_LSR_DR       0x01    /* Data ready           */
@@ -91,6 +122,26 @@
 /* Resume retry settings */
 #define RESUME_DELAY      MILLISECS(10)
 #define RESUME_RETRIES    100
+
+/* Enhanced feature register */
+#define UART_OMAP_EFR     0x02
+
+#define UART_OMAP_EFR_ECB 0x10 /* Enhanced control bit */
+
+/* Mode definition register 1 */
+#define UART_OMAP_MDR1    0x08
+
+/*
+ * These are the definitions for the MDR1 register
+ */
+#define UART_OMAP_MDR1_16X_MODE 0x00 /* UART 16x mode           */
+#define UART_OMAP_MDR1_DISABLE  0x07 /* Disable (default state) */
+
+/* Supplementary control register */
+#define UART_OMAP_SCR     0x10
+
+/* SCR register bitmasks */
+#define OMAP_UART_SCR_RX_TRIG_GRANU1_MASK (1 << 7)
 
 #endif /* __XEN_8250_UART_H__ */
 

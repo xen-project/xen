@@ -11,6 +11,7 @@ CFLAGS += -marm
 
 HAS_PL011 := y
 HAS_EXYNOS4210 := y
+HAS_OMAP := y
 
 # Use only if calling $(LD) directly.
 LDFLAGS_DIRECT += -EL
