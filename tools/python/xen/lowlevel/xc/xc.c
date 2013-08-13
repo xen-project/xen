@@ -178,10 +178,6 @@ static PyObject *pyxc_domain_unpause(XcObject *self, PyObject *args)
 
 static PyObject *pyxc_domain_destroy_hook(XcObject *self, PyObject *args)
 {
-#ifdef __ia64__
-    dom_op(self, args, xc_ia64_save_to_nvram);
-#endif
-
     Py_INCREF(zero);
     return zero;
 }
@@ -779,39 +775,6 @@ static PyObject *pyxc_get_device_group(XcObject *self,
     return Pystr;
 }
 
-#ifdef __ia64__
-static PyObject *pyxc_nvram_init(XcObject *self,
-                                 PyObject *args)
-{
-    char *dom_name;
-    uint32_t dom;
-
-    if ( !PyArg_ParseTuple(args, "si", &dom_name, &dom) )
-        return NULL;
-
-    xc_ia64_nvram_init(self->xc_handle, dom_name, dom);
-
-    Py_INCREF(zero);
-    return zero;
-}
-
-static PyObject *pyxc_set_os_type(XcObject *self,
-                                  PyObject *args)
-{
-    char *os_type;
-    uint32_t dom;
-
-    if ( !PyArg_ParseTuple(args, "si", &os_type, &dom) )
-        return NULL;
-
-    xc_ia64_set_os_type(self->xc_handle, os_type, dom);
-
-    Py_INCREF(zero);
-    return zero;
-}
-#endif /* __ia64__ */
-
-
 #if defined(__i386__) || defined(__x86_64__)
 static void pyxc_dom_extract_cpuid(PyObject *config,
                                   char **regs)
@@ -950,10 +913,8 @@ static PyObject *pyxc_hvm_build(XcObject *self,
                                 PyObject *kwds)
 {
     uint32_t dom;
-#if !defined(__ia64__)
     struct hvm_info_table *va_hvm;
     uint8_t *va_map, sum;
-#endif
     int i;
     char *image;
     int memsize, target=-1, vcpus = 1, acpi = 0, apic = 1;
@@ -1000,7 +961,6 @@ static PyObject *pyxc_hvm_build(XcObject *self,
                                  target, image) != 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
-#if !defined(__ia64__)
     /* Fix up the HVM info table. */
     va_map = xc_map_foreign_range(self->xc_handle, dom, XC_PAGE_SIZE,
                                   PROT_READ | PROT_WRITE,
@@ -1015,7 +975,6 @@ static PyObject *pyxc_hvm_build(XcObject *self,
         sum += ((uint8_t *)va_hvm)[i];
     va_hvm->checksum -= sum;
     munmap(va_map, XC_PAGE_SIZE);
-#endif
 
     return Py_BuildValue("{}");
 }
@@ -2713,18 +2672,6 @@ static PyMethodDef pyxc_methods[] = {
       " map_limitkb [int]: .\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-#ifdef __ia64__
-    { "nvram_init",
-      (PyCFunction)pyxc_nvram_init,
-      METH_VARARGS, "\n"
-      "Init nvram in IA64 platform\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
-    { "set_os_type",
-      (PyCFunction)pyxc_set_os_type,
-      METH_VARARGS, "\n"
-      "Set guest OS type on IA64 platform\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
-#endif /* __ia64__ */
     { "domain_ioport_permission",
       (PyCFunction)pyxc_domain_ioport_permission,
       METH_VARARGS | METH_KEYWORDS, "\n"

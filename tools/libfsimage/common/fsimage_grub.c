@@ -138,52 +138,6 @@ fsig_log2 (unsigned long word)
   return word;
 }
 
-#elif defined(__ia64__)
-
-#if __GNUC__ >= 4 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
-# define ia64_popcnt(x) __builtin_popcountl(x)
-#else
-# define ia64_popcnt(x)                                     \
-  ({                                                        \
-    uint64_t ia64_intri_res;                                \
-    asm ("popcnt %0=%1" : "=r" (ia64_intri_res) : "r" (x)); \
-    ia64_intri_res;                                         \
-  })
-#endif
-
-unsigned long
-fsig_log2 (unsigned long word)
-{
-  unsigned long result;
-
-  result = ia64_popcnt((word - 1) & ~word);
-  return result;
-}
-
-#elif defined(__powerpc__)
-
-#ifdef __powerpc64__
-#define PPC_CNTLZL "cntlzd"
-#else
-#define PPC_CNTLZL "cntlzw"
-#endif
-#define BITS_PER_LONG (sizeof(long) * 8)
-
-static int
-__ilog2(unsigned long x)
-{
-  int lz;
-
-  asm (PPC_CNTLZL " %0,%1" : "=r" (lz) : "r" (x));
-  return BITS_PER_LONG - 1 - lz;
-}
-
-unsigned long
-fsig_log2 (unsigned long word)
-{
-  return __ilog2(word & -word);
-}
-
 #else /* Unoptimized */
 
 unsigned long
