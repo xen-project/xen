@@ -574,6 +574,21 @@ const void *dt_get_property(const struct dt_device_node *np,
     return pp ? pp->value : NULL;
 }
 
+bool_t dt_property_read_u32(const struct dt_device_node *np,
+                         const char *name, u32 *out_value)
+{
+    u32 len;
+    const __be32 *val;
+
+    val = dt_get_property(np, name, &len);
+    if ( !val || len < sizeof(*out_value) )
+        return 0;
+
+    *out_value = be32_to_cpup(val);
+
+    return 1;
+}
+
 bool_t dt_device_is_compatible(const struct dt_device_node *device,
                                const char *compat)
 {

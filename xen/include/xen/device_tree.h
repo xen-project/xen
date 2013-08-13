@@ -300,6 +300,17 @@ const void *dt_get_property(const struct dt_device_node *np,
                             const char *name, u32 *lenp);
 
 /**
+ * dt_property_read_u32 - Helper to read a u32 property.
+ * @np: node to get the value
+ * @name: name of the property
+ * @out_value: pointer to return value
+ *
+ * Return true if get the desired value.
+ */
+bool_t dt_property_read_u32(const struct dt_device_node *np,
+                            const char *name, u32 *out_value);
+
+/**
  * Checks if the given "compat" string matches one of the strings in
  * the device's "compatible" property
  */
