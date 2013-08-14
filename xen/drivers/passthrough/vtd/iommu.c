@@ -1160,6 +1160,9 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
         dprintk(VTDPREFIX,
                 "cap = %"PRIx64" ecap = %"PRIx64"\n", iommu->cap, iommu->ecap);
     }
+    if ( !(iommu->cap + 1) || !(iommu->ecap + 1) )
+        return -ENODEV;
+
     if ( cap_fault_reg_offset(iommu->cap) +
          cap_num_fault_regs(iommu->cap) * PRIMARY_FAULT_REG_LEN >= PAGE_SIZE ||
          ecap_iotlb_offset(iommu->ecap) >= PAGE_SIZE )

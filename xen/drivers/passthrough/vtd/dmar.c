@@ -447,6 +447,9 @@ acpi_parse_one_drhd(struct acpi_dmar_header *header)
     if ( (ret = acpi_dmar_check_length(header, sizeof(*drhd))) != 0 )
         return ret;
 
+    if ( !drhd->address || !(drhd->address + 1) )
+        return -ENODEV;
+
     dmaru = xzalloc(struct acpi_drhd_unit);
     if ( !dmaru )
         return -ENOMEM;
