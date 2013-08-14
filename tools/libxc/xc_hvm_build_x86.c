@@ -281,7 +281,7 @@ static int setup_guest(xc_interface *xch,
         goto error_out;
     }
 
-    IPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
+    DPRINTF("VIRTUAL MEMORY ARRANGEMENT:\n"
             "  Loader:        %016"PRIx64"->%016"PRIx64"\n"
             "  Modules:       %016"PRIx64"->%016"PRIx64"\n"
             "  TOTAL:         %016"PRIx64"->%016"PRIx64"\n"
@@ -443,7 +443,7 @@ static int setup_guest(xc_interface *xch,
         goto error_out;
     }
 
-    IPRINTF("PHYSICAL MEMORY ALLOCATION:\n"
+    DPRINTF("PHYSICAL MEMORY ALLOCATION:\n"
             "  4KB PAGES: 0x%016lx\n"
             "  2MB PAGES: 0x%016lx\n"
             "  1GB PAGES: 0x%016lx\n",
