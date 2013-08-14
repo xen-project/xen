@@ -96,8 +96,7 @@ static inline void fpu_fxrstor(struct vcpu *v)
             ".previous                \n"
             _ASM_EXTABLE(1b, 2b)
             :
-            : "m" (*fpu_ctxt), "i" (sizeof(*fpu_ctxt) / 4),
-              "cdaSDb" (fpu_ctxt) );
+            : "m" (*fpu_ctxt), "i" (sizeof(*fpu_ctxt) / 4), "R" (fpu_ctxt) );
         break;
     case 4: case 2:
         asm volatile (
@@ -162,7 +161,7 @@ static inline void fpu_fxsave(struct vcpu *v)
          * addressing mode that doesn't require extended registers.
          */
         asm volatile ( REX64_PREFIX "fxsave (%1)"
-                       : "=m" (*fpu_ctxt) : "cdaSDb" (fpu_ctxt) );
+                       : "=m" (*fpu_ctxt) : "R" (fpu_ctxt) );
 
         /*
          * AMD CPUs don't save/restore FDP/FIP/FOP unless an exception
