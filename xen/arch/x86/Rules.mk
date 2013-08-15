@@ -19,12 +19,6 @@ xenoprof := y
 #
 supervisor_mode_kernel ?= n
 
-# Solaris grabs stdarg.h and friends from the system include directory.
-# Clang likewise.
-ifneq ($(XEN_OS),SunOS)
-CFLAGS-$(gcc) += -nostdinc
-endif
-
 CFLAGS += -I$(BASEDIR)/include 
 CFLAGS += -I$(BASEDIR)/include/asm-x86/mach-generic
 CFLAGS += -I$(BASEDIR)/include/asm-x86/mach-default
