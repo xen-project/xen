@@ -20,5 +20,9 @@ EFI_DIR ?= /usr/lib64/efi
 ifeq ($(XEN_OS),OpenBSD)
 LDFLAGS_DIRECT += -melf_x86_64_obsd
 else
+ifeq ($(XEN_OS),FreeBSD)
+LDFLAGS_DIRECT += -melf_x86_64_fbsd
+else
 LDFLAGS_DIRECT += -melf_x86_64
+endif
 endif

@@ -1,7 +1,7 @@
 #ifndef __XEN_STDARG_H__
 #define __XEN_STDARG_H__
 
-#if defined(__OpenBSD__) || defined (__NetBSD__)
+#if defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD__)
    typedef __builtin_va_list va_list;
 #  ifdef __GNUC__
 #    define __GNUC_PREREQ__(x, y)                                       \
