@@ -13,6 +13,10 @@
 #define OMAP5_CM_CLKSEL_SYS                     0x10
 #define SYS_CLKSEL_MASK                         0xfffffff8
 
+#define OMAP5_PRCM_MPU_BASE                     0x48243000
+#define OMAP5_WKUPGEN_BASE                      0x48281000
+#define OMAP5_SRAM_PA                           0x40300000
+
 #endif /* __ASM_ARM_PLATFORMS_OMAP5_H */
 
 /*

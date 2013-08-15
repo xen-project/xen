@@ -17,6 +17,7 @@
  * GNU General Public License for more details.
  */
 
+#include <asm/p2m.h>
 #include <xen/config.h>
 #include <asm/platform.h>
 #include <asm/platforms/omap5.h>
@@ -96,6 +97,34 @@ static int omap5_init_time(void)
     return 0;
 }
 
+/* Additional mappings for dom0 (not in the DTS) */
+static int omap5_specific_mapping(struct domain *d)
+{
+    /* Map the PRM module */
+    map_mmio_regions(d, OMAP5_PRM_BASE, OMAP5_PRM_BASE + (PAGE_SIZE * 2) - 1,
+                     OMAP5_PRM_BASE);
+
+    /* Map the PRM_MPU */
+    map_mmio_regions(d, OMAP5_PRCM_MPU_BASE,
+                     OMAP5_PRCM_MPU_BASE + PAGE_SIZE - 1,
+                     OMAP5_PRCM_MPU_BASE);
+
+    /* Map the Wakeup Gen */
+    map_mmio_regions(d, OMAP5_WKUPGEN_BASE, OMAP5_WKUPGEN_BASE + PAGE_SIZE - 1,
+                     OMAP5_WKUPGEN_BASE);
+
+    /* Map the on-chip SRAM */
+    map_mmio_regions(d, OMAP5_SRAM_PA, OMAP5_SRAM_PA + (PAGE_SIZE * 32) - 1,
+                     OMAP5_SRAM_PA);
+
+    return 0;
+}
+
+static uint32_t omap5_quirks(void)
+{
+    return PLATFORM_QUIRK_DOM0_MAPPING_11;
+}
+
 static const char const *omap5_dt_compat[] __initdata =
 {
     "ti,omap5",
@@ -105,6 +134,8 @@ static const char const *omap5_dt_compat[] __initdata =
 PLATFORM_START(omap5, "TI OMAP5")
     .compatible = omap5_dt_compat,
     .init_time = omap5_init_time,
+    .specific_mapping = omap5_specific_mapping,
+    .quirks = omap5_quirks,
 PLATFORM_END
 
 /*
