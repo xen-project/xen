@@ -131,10 +131,10 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
 
 #ifdef CONFIG_X86_32
     asm (
-        "mul  %5       ; "
+        "mull  %5       ; "
         "mov  %4,%%eax ; "
         "mov  %%edx,%4 ; "
-        "mul  %5       ; "
+        "mull  %5       ; "
         "xor  %5,%5    ; "
         "add  %4,%%eax ; "
         "adc  %5,%%edx ; "
@@ -142,7 +142,7 @@ static inline u64 scale_delta(u64 delta, struct time_scale *scale)
         : "a" ((u32)delta), "1" ((u32)(delta >> 32)), "2" (scale->mul_frac) );
 #else
     asm (
-        "mul %2 ; shrd $32,%1,%0"
+        "mulq %2 ; shrd $32,%1,%0"
         : "=a" (product), "=d" (delta)
         : "rm" (delta), "0" ((u64)scale->mul_frac) );
 #endif
