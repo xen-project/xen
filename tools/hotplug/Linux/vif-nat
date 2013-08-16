@@ -170,7 +170,7 @@ case "$command" in
           exit 0
         fi
 
-        do_or_die ip link set "${dev}" up arp on
+        do_or_die ip link set dev "${dev}" up arp on
         do_or_die ip addr add "$router_ip" dev "${dev}"
         do_or_die ip route add "$vif_ip" dev "${dev}" src "$router_ip"
         echo 1 >/proc/sys/net/ipv4/conf/${dev}/proxy_arp

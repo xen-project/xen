@@ -85,18 +85,18 @@ _setup_bridge_port() {
     local virtual="$2"
 
     # take interface down ...
-    ip link set ${dev} down
+    ip link set dev ${dev} down
 
     if [ $virtual -ne 0 ] ; then
         # Initialise a dummy MAC address. We choose the numerically
         # largest non-broadcast address to prevent the address getting
         # stolen by an Ethernet bridge for STP purposes.
         # (FE:FF:FF:FF:FF:FF)
-        ip link set ${dev} address fe:ff:ff:ff:ff:ff || true
+        ip link set dev ${dev} address fe:ff:ff:ff:ff:ff || true
     fi
 
     # ... and configure it
-    ip addr flush ${dev}
+    ip address flush dev ${dev}
 }
 
 setup_physical_bridge_port() {
@@ -125,20 +125,20 @@ add_to_bridge () {
 
     # Don't add $dev to $bridge if it's already on a bridge.
     if [ -e "/sys/class/net/${bridge}/brif/${dev}" ]; then
-	ip link set ${dev} up || true
+	ip link set dev ${dev} up || true
 	return
     fi
     brctl addif ${bridge} ${dev}
-    ip link set ${dev} up
+    ip link set dev ${dev} up
 }
 
 # Usage: set_mtu bridge dev
 set_mtu () {
     local bridge=$1
     local dev=$2
-    mtu="`ip link show ${bridge}| awk '/mtu/ { print $5 }'`"
+    mtu="`ip link show dev ${bridge}| awk '/mtu/ { print $5 }'`"
     if [ -n "$mtu" ] && [ "$mtu" -gt 0 ]
     then
-            ip link set ${dev} mtu $mtu || :
+            ip link set dev ${dev} mtu $mtu || :
     fi
 }
