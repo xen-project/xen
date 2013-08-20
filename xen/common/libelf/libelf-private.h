@@ -14,7 +14,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #ifndef __LIBELF_PRIVATE_H__
-#define __LIBELF_PRIVATE_H_
+#define __LIBELF_PRIVATE_H__
 
 #ifdef __XEN__
 
@@ -99,7 +99,7 @@ do { strncpy((d),(s),sizeof((d))-1);            \
    * of memcpy, memset, memmove and strcpy.  Every call site
    * must either use elf_mem*_unchecked, or elf_mem*_safe. */
 
-#endif /* __LIBELF_PRIVATE_H_ */
+#endif /* __LIBELF_PRIVATE_H__ */
 
 /*
  * Local variables:
