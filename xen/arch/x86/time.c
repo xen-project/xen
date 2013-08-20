@@ -817,7 +817,8 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
 
     if ( d->arch.vtsc )
     {
-        u64 stime = t->stime_local_stamp;
+        s_time_t stime = t->stime_local_stamp;
+
         if ( is_hvm_domain(d) )
         {
             struct pl_time *pl = &v->domain->arch.hvm_domain.pl_time;
