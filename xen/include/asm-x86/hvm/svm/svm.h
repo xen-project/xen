@@ -41,18 +41,21 @@
 #define SVM_REG_R14 (14)
 #define SVM_REG_R15 (15)
 
-static inline void svm_vmload(void *vmcb)
+#define svm_vmload(x)     svm_vmload_pa(__pa(x))
+#define svm_vmsave(x)     svm_vmsave_pa(__pa(x))
+
+static inline void svm_vmload_pa(paddr_t vmcb)
 {
     asm volatile (
         ".byte 0x0f,0x01,0xda" /* vmload */
-        : : "a" (__pa(vmcb)) : "memory" );
+        : : "a" (vmcb) : "memory" );
 }
 
-static inline void svm_vmsave(void *vmcb)
+static inline void svm_vmsave_pa(paddr_t vmcb)
 {
     asm volatile (
         ".byte 0x0f,0x01,0xdb" /* vmsave */
-        : : "a" (__pa(vmcb)) : "memory" );
+        : : "a" (vmcb) : "memory" );
 }
 
 static inline void svm_invlpga(unsigned long vaddr, uint32_t asid)
