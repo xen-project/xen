@@ -29,8 +29,6 @@
 #error define architectural endianness
 #endif
 
-#include <stdbool.h>
-
 typedef int elf_errorstatus; /* 0: ok; -ve (normally -1): error */
 typedef int elf_negerrnoval; /* 0: ok; -EFOO: error */
 
@@ -39,11 +37,13 @@ typedef int elf_negerrnoval; /* 0: ok; -EFOO: error */
 #ifdef __XEN__
 #include <public/elfnote.h>
 #include <public/features.h>
+#include <xen/stdbool.h>
 #else
 #include <xen/elfnote.h>
 #include <xen/features.h>
 
 #include <stdarg.h>
+#include <stdbool.h>
 
 struct elf_binary;
 typedef void elf_log_callback(struct elf_binary*, void *caller_data,
