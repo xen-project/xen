@@ -712,8 +712,8 @@ int enable_intremap(struct iommu *iommu, int eim)
 
     if ( !platform_supports_intremap() )
     {
-        dprintk(XENLOG_ERR VTDPREFIX,
-                "Platform firmware does not support interrupt remapping\n");
+        printk(XENLOG_ERR VTDPREFIX
+               " Platform firmware does not support interrupt remapping\n");
         return -EINVAL;
     }
 
@@ -724,14 +724,18 @@ int enable_intremap(struct iommu *iommu, int eim)
     if ( (sts & DMA_GSTS_IRES) && ir_ctrl->iremap_maddr )
         return 0;
 
-    sts = dmar_readl(iommu->reg, DMAR_GSTS_REG);
     if ( !(sts & DMA_GSTS_QIES) )
     {
-        dprintk(XENLOG_ERR VTDPREFIX,
-                "Queued invalidation is not enabled, should not enable "
-                "interrupt remapping\n");
+        printk(XENLOG_ERR VTDPREFIX
+               " Queued invalidation is not enabled on IOMMU #%u:"
+               " Should not enable interrupt remapping\n", iommu->index);
         return -EINVAL;
     }
+
+    if ( !eim && (sts & DMA_GSTS_CFIS) )
+        printk(XENLOG_WARNING VTDPREFIX
+               " Compatibility Format Interrupts permitted on IOMMU #%u:"
+               " Device pass-through will be insecure\n", iommu->index);
 
     if ( ir_ctrl->iremap_maddr == 0 )
     {
