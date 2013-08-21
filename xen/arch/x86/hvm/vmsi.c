@@ -169,6 +169,7 @@ struct msixtbl_entry
         uint32_t msi_ad[3];	/* Shadow of address low, high and data */
     } gentries[MAX_MSIX_ACC_ENTRIES];
     struct rcu_head rcu;
+    const struct pirq *pirq;
 };
 
 static DEFINE_RCU_READ_LOCK(msixtbl_rcu_lock);
@@ -254,6 +255,8 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     void *virt;
     unsigned int nr_entry, index;
     int r = X86EMUL_UNHANDLEABLE;
+    unsigned long flags, orig;
+    struct irq_desc *desc;
 
     if ( len != 4 || (address & 3) )
         return r;
@@ -283,22 +286,49 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     if ( !virt )
         goto out;
 
-    /* Do not allow the mask bit to be changed. */
-#if 0 /* XXX
-       * As the mask bit is the only defined bit in the word, and as the
-       * host MSI-X code doesn't preserve the other bits anyway, doing
-       * this is pointless. So for now just discard the write (also
-       * saving us from having to determine the matching irq_desc).
-       */
-    spin_lock_irqsave(&desc->lock, flags);
-    orig = readl(virt);
-    val &= ~PCI_MSIX_VECTOR_BITMASK;
-    val |= orig & PCI_MSIX_VECTOR_BITMASK;
-    writel(val, virt);
-    spin_unlock_irqrestore(&desc->lock, flags);
-#endif
+    desc = pirq_spin_lock_irq_desc(entry->pirq, &flags);
+    if ( !desc )
+        goto out;
 
+    if ( !desc->msi_desc )
+        goto unlock;
+
+    orig = readl(virt);
+
+    /*
+     * Do not allow guest to modify MSI-X control bit if it is masked
+     * by Xen. We'll only handle the case where Xen thinks that
+     * bit is unmasked, but hardware has silently masked the bit
+     * (in case of SR-IOV VF reset, etc). On the other hand, if Xen
+     * thinks that the bit is masked, but it's really not,
+     * we log a warning.
+     */
+    if ( desc->msi_desc->msi_attrib.masked )
+    {
+        if ( !(orig & PCI_MSIX_VECTOR_BITMASK) )
+            printk(XENLOG_WARNING "MSI-X control bit is unmasked when"
+                   " it is expected to be masked [%04x:%02x:%02x.%01x]\n",
+                   entry->pdev->seg, entry->pdev->bus,
+                   PCI_SLOT(entry->pdev->devfn),
+                   PCI_FUNC(entry->pdev->devfn));
+
+        goto unlock;
+    }
+
+    /*
+     * The mask bit is the only defined bit in the word. But we
+     * ought to preserve the reserved bits. Clearing the reserved
+     * bits can result in undefined behaviour (see PCI Local Bus
+     * Specification revision 2.3).
+     */
+    val &= PCI_MSIX_VECTOR_BITMASK;
+    val |= (orig & ~PCI_MSIX_VECTOR_BITMASK);
+    writel(val, virt);
+
+unlock:
+    spin_unlock_irqrestore(&desc->lock, flags);
     r = X86EMUL_OKAY;
+
 out:
     rcu_read_unlock(&msixtbl_rcu_lock);
     return r;
@@ -328,7 +358,8 @@ const struct hvm_mmio_handler msixtbl_mmio_handler = {
 static void add_msixtbl_entry(struct domain *d,
                               struct pci_dev *pdev,
                               uint64_t gtable,
-                              struct msixtbl_entry *entry)
+                              struct msixtbl_entry *entry,
+                              const struct pirq *pirq)
 {
     u32 len;
 
@@ -342,6 +373,7 @@ static void add_msixtbl_entry(struct domain *d,
     entry->table_len = len;
     entry->pdev = pdev;
     entry->gtable = (unsigned long) gtable;
+    entry->pirq = pirq;
 
     list_add_rcu(&entry->list, &d->arch.hvm_domain.msixtbl_list);
 }
@@ -404,9 +436,10 @@ int msixtbl_pt_register(struct domain *d, struct pirq *pirq, uint64_t gtable)
 
     entry = new_entry;
     new_entry = NULL;
-    add_msixtbl_entry(d, pdev, gtable, entry);
+    add_msixtbl_entry(d, pdev, gtable, entry, pirq);
 
 found:
+    ASSERT(entry->pirq == pirq);
     atomic_inc(&entry->refcnt);
     spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
     r = 0;
