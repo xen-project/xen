@@ -39,7 +39,7 @@ u32 __read_mostly x86_acpiid_to_apicid[MAX_MADT_ENTRIES] =
  * from the fixed base.  That's why we start at FIX_ACPI_END and
  * count idx down while incrementing the phys address.
  */
-char *__acpi_map_table(unsigned long phys, unsigned long size)
+char *__acpi_map_table(paddr_t phys, unsigned long size)
 {
 	unsigned long base, offset, mapped_size;
 	int idx;
