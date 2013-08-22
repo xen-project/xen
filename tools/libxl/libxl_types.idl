@@ -32,14 +32,16 @@ libxl_domain_type = Enumeration("domain_type", [
     (-1, "INVALID"),
     (1, "HVM"),
     (2, "PV"),
-    ])
+    ], init_val = -1)
 
 libxl_device_model_version = Enumeration("device_model_version", [
+    (0, "UNKNOWN"),
     (1, "QEMU_XEN_TRADITIONAL"), # Historical qemu-xen device model (qemu-dm)
     (2, "QEMU_XEN"),             # Upstream based qemu-xen device model
     ])
 
 libxl_console_type = Enumeration("console_type", [
+    (0, "UNKNOWN"),
     (1, "SERIAL"),
     (2, "PV"),
     ])
@@ -61,6 +63,7 @@ libxl_disk_backend = Enumeration("disk_backend", [
     ])
 
 libxl_nic_type = Enumeration("nic_type", [
+    (0, "UNKNOWN"),
     (1, "VIF_IOEMU"),
     (2, "VIF"),
     ])
@@ -75,7 +78,7 @@ libxl_action_on_shutdown = Enumeration("action_on_shutdown", [
 
     (5, "COREDUMP_DESTROY"),
     (6, "COREDUMP_RESTART"),
-    ])
+    ], init_val = 1)
 
 libxl_trigger = Enumeration("trigger", [
     (0, "UNKNOWN"),
@@ -96,6 +99,7 @@ libxl_tsc_mode = Enumeration("tsc_mode", [
 
 # Consistent with the values defined for HVM_PARAM_TIMER_MODE.
 libxl_timer_mode = Enumeration("timer_mode", [
+    (-1, "unknown"),
     (0, "delay_for_missed_ticks"),
     (1, "no_delay_for_missed_ticks"),
     (2, "no_missed_ticks_pending"),
@@ -103,6 +107,7 @@ libxl_timer_mode = Enumeration("timer_mode", [
     ], init_val = "LIBXL_TIMER_MODE_DEFAULT")
 
 libxl_bios_type = Enumeration("bios_type", [
+    (0, "unknown"),
     (1, "rombios"),
     (2, "seabios"),
     (3, "ovmf"),
@@ -131,7 +136,7 @@ libxl_shutdown_reason = Enumeration("shutdown_reason", [
 libxl_vga_interface_type = Enumeration("vga_interface_type", [
     (1, "CIRRUS"),
     (2, "STD"),
-    ], init_val = 0)
+    ], init_val = 1)
 
 libxl_vendor_device = Enumeration("vendor_device", [
     (0, "NONE"),
