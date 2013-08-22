@@ -37,6 +37,7 @@
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
+#include <asm/hvm/nestedhvm.h>
 #include <public/hvm/ioreq.h>
 #include <public/hvm/params.h>
 
@@ -1037,7 +1038,8 @@ int vlapic_has_pending_irq(struct vcpu *v)
     if ( irr == -1 )
         return -1;
 
-    if ( vlapic_virtual_intr_delivery_enabled() )
+    if ( vlapic_virtual_intr_delivery_enabled() &&
+         !nestedhvm_vcpu_in_guestmode(v) )
         return irr;
 
     isr = vlapic_find_highest_isr(vlapic);
