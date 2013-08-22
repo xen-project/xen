@@ -96,7 +96,7 @@ bool_t is_vlapic_lvtpc_enabled(struct vlapic *vlapic);
 void vlapic_set_irq(struct vlapic *vlapic, uint8_t vec, uint8_t trig);
 
 int vlapic_has_pending_irq(struct vcpu *v);
-int vlapic_ack_pending_irq(struct vcpu *v, int vector);
+int vlapic_ack_pending_irq(struct vcpu *v, int vector, bool_t force_ack);
 
 int  vlapic_init(struct vcpu *v);
 void vlapic_destroy(struct vcpu *v);
@@ -108,6 +108,7 @@ void vlapic_tdt_msr_set(struct vlapic *vlapic, uint64_t value);
 uint64_t vlapic_tdt_msr_get(struct vlapic *vlapic);
 
 int vlapic_accept_pic_intr(struct vcpu *v);
+uint32_t vlapic_set_ppr(struct vlapic *vlapic);
 
 void vlapic_adjust_i8259_target(struct domain *d);
 

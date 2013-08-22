@@ -1208,7 +1208,7 @@ static void vmx_update_guest_efer(struct vcpu *v)
 }
 
 void nvmx_enqueue_n2_exceptions(struct vcpu *v, 
-            unsigned long intr_fields, int error_code)
+            unsigned long intr_fields, int error_code, uint8_t source)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
 
@@ -1216,6 +1216,7 @@ void nvmx_enqueue_n2_exceptions(struct vcpu *v,
         /* enqueue the exception till the VMCS switch back to L1 */
         nvmx->intr.intr_info = intr_fields;
         nvmx->intr.error_code = error_code;
+        nvmx->intr.source = source;
         vcpu_nestedhvm(v).nv_vmexit_pending = 1;
         return;
     }
@@ -1227,7 +1228,8 @@ void nvmx_enqueue_n2_exceptions(struct vcpu *v,
 
 static int nvmx_vmexit_trap(struct vcpu *v, struct hvm_trap *trap)
 {
-    nvmx_enqueue_n2_exceptions(v, trap->vector, trap->error_code);
+    nvmx_enqueue_n2_exceptions(v, trap->vector, trap->error_code,
+                               hvm_intsrc_none);
     return NESTEDHVM_VMEXIT_DONE;
 }
 
@@ -1258,7 +1260,7 @@ static void __vmx_inject_exception(int trap, int type, int error_code)
         curr->arch.hvm_vmx.vmx_emulate = 1;
 }
 
-void vmx_inject_extint(int trap)
+void vmx_inject_extint(int trap, uint8_t source)
 {
     struct vcpu *v = current;
     u32    pin_based_cntrl;
@@ -1269,7 +1271,7 @@ void vmx_inject_extint(int trap)
         if ( pin_based_cntrl & PIN_BASED_EXT_INTR_MASK ) {
             nvmx_enqueue_n2_exceptions (v, 
                INTR_INFO_VALID_MASK | (X86_EVENTTYPE_EXT_INTR<<8) | trap,
-               HVM_DELIVER_NO_ERROR_CODE);
+               HVM_DELIVER_NO_ERROR_CODE, source);
             return;
         }
     }
@@ -1288,7 +1290,7 @@ void vmx_inject_nmi(void)
         if ( pin_based_cntrl & PIN_BASED_NMI_EXITING ) {
             nvmx_enqueue_n2_exceptions (v, 
                INTR_INFO_VALID_MASK | (X86_EVENTTYPE_NMI<<8) | TRAP_nmi,
-               HVM_DELIVER_NO_ERROR_CODE);
+               HVM_DELIVER_NO_ERROR_CODE, hvm_intsrc_nmi);
             return;
         }
     }
@@ -1356,7 +1358,7 @@ static void vmx_inject_trap(struct hvm_trap *trap)
     {
         nvmx_enqueue_n2_exceptions (curr, 
             INTR_INFO_VALID_MASK | (_trap.type<<8) | _trap.vector,
-            _trap.error_code); 
+            _trap.error_code, hvm_intsrc_none);
         return;
     }
     else

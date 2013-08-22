@@ -168,6 +168,14 @@ static uint32_t vlapic_get_ppr(struct vlapic *vlapic)
     return ppr;
 }
 
+uint32_t vlapic_set_ppr(struct vlapic *vlapic)
+{
+   uint32_t ppr = vlapic_get_ppr(vlapic);
+
+   vlapic_set_reg(vlapic, APIC_PROCPRI, ppr);
+   return ppr;
+}
+
 static int vlapic_match_logical_addr(struct vlapic *vlapic, uint8_t mda)
 {
     int result = 0;
@@ -1050,15 +1058,15 @@ int vlapic_has_pending_irq(struct vcpu *v)
     return irr;
 }
 
-int vlapic_ack_pending_irq(struct vcpu *v, int vector)
+int vlapic_ack_pending_irq(struct vcpu *v, int vector, bool_t force_ack)
 {
     struct vlapic *vlapic = vcpu_vlapic(v);
 
-    if ( vlapic_virtual_intr_delivery_enabled() )
-        return 1;
-
-    vlapic_set_vector(vector, &vlapic->regs->data[APIC_ISR]);
-    vlapic_clear_irr(vector, vlapic);
+    if ( force_ack || !vlapic_virtual_intr_delivery_enabled() )
+    {
+        vlapic_set_vector(vector, &vlapic->regs->data[APIC_ISR]);
+        vlapic_clear_irr(vector, vlapic);
+    }
 
     return 1;
 }

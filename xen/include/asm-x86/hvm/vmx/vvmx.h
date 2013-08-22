@@ -36,6 +36,7 @@ struct nestedvmx {
     struct {
         unsigned long intr_info;
         u32           error_code;
+        u8            source;
     } intr;
     struct {
         bool_t   enabled;
