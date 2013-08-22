@@ -79,12 +79,14 @@ def gen_ocaml_ml(ty, interface, indent=""):
         s = ("""(* %s interface *)\n""" % ty.typename)
     else:
         s = ("""(* %s implementation *)\n""" % ty.typename)
+        
     if isinstance(ty, idl.Enumeration):
-        s = "type %s = \n" % ty.rawname
+        s += "type %s = \n" % ty.rawname
         for v in ty.values:
             s += "\t | %s\n" % v.rawname
     elif isinstance(ty, idl.Aggregate):
-        s = ""
+        s += ""
+        
         if ty.typename is None:
             raise NotImplementedError("%s has no typename" % type(ty))
         else:
