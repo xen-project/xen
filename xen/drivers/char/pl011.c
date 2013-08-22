@@ -104,6 +104,8 @@ static void __init pl011_init_preirq(struct serial_port *port)
     {
         /* Baud rate already set: read it out from the divisor latch. */
         divisor = (pl011_read(uart, IBRD) << 6) | (pl011_read(uart, FBRD));
+        if (!divisor)
+            early_panic("pl011: No Baud rate configured\n");
         uart->baud = (uart->clock_hz << 2) / divisor;
     }
     /* This write must follow FBRD and IBRD writes. */
