@@ -118,14 +118,15 @@ libxl_scheduler = Enumeration("scheduler", [
     (7, "arinc653"),
     ])
 
-# Consistent with SHUTDOWN_* in sched.h
+# Consistent with SHUTDOWN_* in sched.h (apart from UNKNOWN)
 libxl_shutdown_reason = Enumeration("shutdown_reason", [
+    (-1, "unknown"),
     (0, "poweroff"),
     (1, "reboot"),
     (2, "suspend"),
     (3, "crash"),
     (4, "watchdog"),
-    ])
+    ], init_val = "LIBXL_SHUTDOWN_REASON_UNKNOWN")
 
 libxl_vga_interface_type = Enumeration("vga_interface_type", [
     (1, "CIRRUS"),

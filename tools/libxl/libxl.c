@@ -526,7 +526,7 @@ static void xcinfo2xlinfo(const xc_domaininfo_t *xcinfo,
     if (xlinfo->shutdown || xlinfo->dying)
         xlinfo->shutdown_reason = (xcinfo->flags>>XEN_DOMINF_shutdownshift) & XEN_DOMINF_shutdownmask;
     else
-        xlinfo->shutdown_reason  = ~0;
+        xlinfo->shutdown_reason = LIBXL_SHUTDOWN_REASON_UNKNOWN;
 
     xlinfo->outstanding_memkb = PAGE_TO_MEMKB(xcinfo->outstanding_pages);
     xlinfo->current_memkb = PAGE_TO_MEMKB(xcinfo->tot_pages);
