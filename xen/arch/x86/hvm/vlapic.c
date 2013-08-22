@@ -868,6 +868,7 @@ int hvm_x2apic_msr_write(struct vcpu *v, unsigned int msr, uint64_t msr_content)
         rc = vlapic_reg_write(v, APIC_ICR2, (uint32_t)(msr_content >> 32));
         if ( rc )
             return rc;
+        break;
 
     case APIC_ICR2:
         return X86EMUL_UNHANDLEABLE;
