@@ -119,7 +119,7 @@ static void vexpress_reset(void)
     iounmap(sp810);
 }
 
-static const char const *vexpress_dt_compat[] __initdata =
+static const char * const vexpress_dt_compat[] __initdata =
 {
     "arm,vexpress",
     NULL
