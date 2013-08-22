@@ -209,6 +209,7 @@ libxl_dominfo = Struct("dominfo",[
     ("vcpu_max_id", uint32),
     ("vcpu_online", uint32),
     ("cpupool",     uint32),
+    ("domain_type", libxl_domain_type),
     ], dir=DIR_OUT)
 
 libxl_cpupoolinfo = Struct("cpupoolinfo", [

@@ -537,6 +537,8 @@ static void xcinfo2xlinfo(const xc_domaininfo_t *xcinfo,
     xlinfo->vcpu_max_id = xcinfo->max_vcpu_id;
     xlinfo->vcpu_online = xcinfo->nr_online_vcpus;
     xlinfo->cpupool = xcinfo->cpupool;
+    xlinfo->domain_type = (xcinfo->flags & XEN_DOMINF_hvm_guest) ?
+        LIBXL_DOMAIN_TYPE_HVM : LIBXL_DOMAIN_TYPE_PV;
 }
 
 libxl_dominfo * libxl_list_domain(libxl_ctx *ctx, int *nb_domain_out)
