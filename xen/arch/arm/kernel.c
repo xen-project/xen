@@ -307,10 +307,10 @@ int kernel_prepare(struct kernel_info *info)
 
     paddr_t start, size;
 
-    if ( early_info.modules.nr_mods > 1 )
+    if ( early_info.modules.nr_mods > MOD_INITRD )
         panic("Cannot handle dom0 initrd yet\n");
 
-    if ( early_info.modules.nr_mods < 1 )
+    if ( early_info.modules.nr_mods < MOD_KERNEL )
     {
         printk("No boot modules found, trying flash\n");
         start = KERNEL_FLASH_ADDRESS;
@@ -319,9 +319,9 @@ int kernel_prepare(struct kernel_info *info)
     }
     else
     {
-        printk("Loading kernel from boot module 1\n");
-        start = early_info.modules.module[1].start;
-        size = early_info.modules.module[1].size;
+        printk("Loading kernel from boot module %d\n", MOD_KERNEL);
+        start = early_info.modules.module[MOD_KERNEL].start;
+        size = early_info.modules.module[MOD_KERNEL].size;
         info->load_attr = BUFFERABLE;
     }
 

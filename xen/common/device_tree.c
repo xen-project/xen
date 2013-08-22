@@ -445,9 +445,9 @@ static void __init process_multiboot_node(const void *fdt, int node,
     int len;
 
     if ( fdt_node_check_compatible(fdt, node, "xen,linux-zimage") == 0 )
-        nr = 1;
+        nr = MOD_KERNEL;
     else if ( fdt_node_check_compatible(fdt, node, "xen,linux-initrd") == 0)
-        nr = 2;
+        nr = MOD_INITRD;
     else
         early_panic("%s not a known xen multiboot type\n", name);
 

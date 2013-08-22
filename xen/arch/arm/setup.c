@@ -152,7 +152,7 @@ void __init discard_initial_modules(void)
     struct dt_module_info *mi = &early_info.modules;
     int i;
 
-    for ( i = 1; i <= mi->nr_mods; i++ )
+    for ( i = MOD_DISCARD_FIRST; i <= mi->nr_mods; i++ )
     {
         paddr_t s = mi->module[i].start;
         paddr_t e = s + PAGE_ALIGN(mi->module[i].size);
@@ -271,9 +271,8 @@ static paddr_t __init get_xen_paddr(void)
     early_printk("Placing Xen at 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
                  paddr, paddr + min_size);
 
-    /* Xen is module 0 */
-    early_info.modules.module[0].start = paddr;
-    early_info.modules.module[0].size = min_size;
+    early_info.modules.module[MOD_XEN].start = paddr;
+    early_info.modules.module[MOD_XEN].size = min_size;
 
     return paddr;
 }

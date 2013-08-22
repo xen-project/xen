@@ -142,9 +142,9 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
     const char *bootargs = NULL;
     int prop;
 
-    if ( early_info.modules.nr_mods >= 1 &&
-         early_info.modules.module[1].cmdline[0] )
-        bootargs = &early_info.modules.module[1].cmdline[0];
+    if ( early_info.modules.nr_mods >= MOD_KERNEL &&
+         early_info.modules.module[MOD_KERNEL].cmdline[0] )
+        bootargs = &early_info.modules.module[MOD_KERNEL].cmdline[0];
 
     for ( prop = fdt_first_property_offset(fdt, node);
           prop >= 0;

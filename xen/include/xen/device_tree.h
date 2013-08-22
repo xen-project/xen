@@ -19,7 +19,13 @@
 #define DEVICE_TREE_MAX_DEPTH 16
 
 #define NR_MEM_BANKS 8
-#define NR_MODULES 2
+
+#define MOD_XEN 0
+#define MOD_KERNEL 1
+#define MOD_INITRD 2
+#define NR_MODULES 3
+
+#define MOD_DISCARD_FIRST MOD_KERNEL
 
 struct membank {
     paddr_t start;
@@ -40,7 +46,7 @@ struct dt_mb_module {
 struct dt_module_info {
     int nr_mods;
     /* Module 0 is Xen itself, followed by the provided modules-proper */
-    struct dt_mb_module module[NR_MODULES + 1];
+    struct dt_mb_module module[NR_MODULES];
 };
 
 struct dt_early_info {
