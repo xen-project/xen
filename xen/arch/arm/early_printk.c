@@ -61,5 +61,7 @@ early_panic(const char *fmt, ...)
     early_vprintk(fmt, args);
     va_end(args);
 
+    early_printk("\nEarly Panic: Stopping\n");
+
     while(1);
 }
