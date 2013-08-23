@@ -641,7 +641,7 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
         cpu = cpumask_test_cpu(vc->processor, &cpus)
                 ? vc->processor
                 : cpumask_cycle(vc->processor, &cpus);
-        ASSERT( !cpumask_empty(&cpus) && cpumask_test_cpu(cpu, &cpus) );
+        ASSERT(cpumask_test_cpu(cpu, &cpus));
 
         /*
          * Try to find an idle processor within the above constraints.
@@ -1520,10 +1520,9 @@ csched_load_balance(struct csched_private *prv, int cpu,
             cpumask_and(&workers, &workers, &node_to_cpumask(peer_node));
             cpumask_clear_cpu(cpu, &workers);
 
-            if ( cpumask_empty(&workers) )
-                goto next_node;
-
             peer_cpu = cpumask_first(&workers);
+            if ( peer_cpu >= nr_cpu_ids )
+                goto next_node;
             do
             {
                 /*
