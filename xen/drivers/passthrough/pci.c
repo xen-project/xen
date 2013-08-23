@@ -179,8 +179,22 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
     *((u8*) &pdev->devfn) = devfn;
     pdev->domain = NULL;
     INIT_LIST_HEAD(&pdev->msi_list);
+
+    if ( pci_find_cap_offset(pseg->nr, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),
+                             PCI_CAP_ID_MSIX) )
+    {
+        struct arch_msix *msix = xzalloc(struct arch_msix);
+
+        if ( !msix )
+        {
+            xfree(pdev);
+            return NULL;
+        }
+        spin_lock_init(&msix->table_lock);
+        pdev->msix = msix;
+    }
+
     list_add(&pdev->alldevs_list, &pseg->alldevs_list);
-    spin_lock_init(&pdev->msix_table_lock);
 
     /* update bus2bridge */
     switch ( pdev->type = pdev_type(pseg->nr, bus, devfn) )
@@ -277,6 +291,7 @@ static void free_pdev(struct pci_seg *pseg, struct pci_dev *pdev)
     }
 
     list_del(&pdev->alldevs_list);
+    xfree(pdev->msix);
     xfree(pdev);
 }
 

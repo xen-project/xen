@@ -199,7 +199,7 @@ static void __iomem *msixtbl_addr_to_virt(
     nr_page = (addr >> PAGE_SHIFT) -
               (entry->gtable >> PAGE_SHIFT);
 
-    idx = entry->pdev->msix_table_idx[nr_page];
+    idx = entry->pdev->msix->table_idx[nr_page];
     if ( !idx )
         return NULL;
 

@@ -32,10 +32,6 @@
 #define PCI_BDF(b,d,f)  ((((b) & 0xff) << 8) | PCI_DEVFN(d,f))
 #define PCI_BDF2(b,df)  ((((b) & 0xff) << 8) | ((df) & 0xff))
 
-#define MAX_MSIX_TABLE_ENTRIES  (PCI_MSIX_FLAGS_QSIZE + 1)
-#define MAX_MSIX_TABLE_PAGES    PFN_UP(MAX_MSIX_TABLE_ENTRIES * \
-                                       PCI_MSIX_ENTRY_SIZE + \
-                                       (~PCI_MSIX_BIRMASK & (PAGE_SIZE - 1)))
 struct pci_dev_info {
     bool_t is_extfn;
     bool_t is_virtfn;
@@ -50,14 +46,8 @@ struct pci_dev {
     struct list_head domain_list;
 
     struct list_head msi_list;
-    unsigned int msix_nr_entries, msix_used_entries;
-    struct {
-        unsigned long first, last;
-    } msix_table, msix_pba;
-    int msix_table_refcnt[MAX_MSIX_TABLE_PAGES];
-    int msix_table_idx[MAX_MSIX_TABLE_PAGES];
-    spinlock_t msix_table_lock;
-    domid_t msix_warned;
+
+    struct arch_msix *msix;
 
     struct domain *domain;
     const u16 seg;

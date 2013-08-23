@@ -214,6 +214,22 @@ struct msg_address {
 	__u32 	hi_address;
 } __attribute__ ((packed));
 
+#define MAX_MSIX_TABLE_ENTRIES  (PCI_MSIX_FLAGS_QSIZE + 1)
+#define MAX_MSIX_TABLE_PAGES    PFN_UP(MAX_MSIX_TABLE_ENTRIES * \
+                                       PCI_MSIX_ENTRY_SIZE + \
+                                       (~PCI_MSIX_BIRMASK & (PAGE_SIZE - 1)))
+
+struct arch_msix {
+    unsigned int nr_entries, used_entries;
+    struct {
+        unsigned long first, last;
+    } table, pba;
+    int table_refcnt[MAX_MSIX_TABLE_PAGES];
+    int table_idx[MAX_MSIX_TABLE_PAGES];
+    spinlock_t table_lock;
+    domid_t warned;
+};
+
 void early_msi_init(void);
 void msi_compose_msg(struct irq_desc *, struct msi_msg *);
 void __msi_set_enable(u16 seg, u8 bus, u8 slot, u8 func, int pos, int enable);
