@@ -277,15 +277,15 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
  *  refer to Intel SDM 10.12. The PAT allows to set the caching attributes of
  *  pages instead of using MTRRs.
  *
- *  The PAT MSR is as follow (it is a 64-bit value, each entry is 8 bits):
- *             PAT4                 PAT0
- *   +---+----+----+----+-----+----+----+
- *    WC | WC | WB | UC | UC- | WC | WB |  <= Linux
- *   +---+----+----+----+-----+----+----+
- *    WC | WT | WB | UC | UC- | WT | WB |  <= BIOS (default when machine boots)
- *   +---+----+----+----+-----+----+----+
- *    WC | WP | WC | UC | UC- | WT | WB |  <= Xen
- *   +---+----+----+----+-----+----+----+
+ *  The PAT MSR is as follows (it is a 64-bit value, each entry is 8 bits):
+ *                    PAT4                 PAT0
+ *  +-----+-----+----+----+----+-----+----+----+
+ *  | UC  | UC- | WC | WB | UC | UC- | WC | WB |  <= Linux
+ *  +-----+-----+----+----+----+-----+----+----+
+ *  | UC  | UC- | WT | WB | UC | UC- | WT | WB |  <= BIOS (default when machine boots)
+ *  +-----+-----+----+----+----+-----+----+----+
+ *  | rsv | rsv | WP | WC | UC | UC- | WT | WB |  <= Xen
+ *  +-----+-----+----+----+----+-----+----+----+
  *
  *  The lookup of this index table translates to looking up
  *  Bit 7, Bit 4, and Bit 3 of val entry:
