@@ -51,6 +51,18 @@ SECTIONS
   } :text = 0x9090
 
   .rodata : {
+       /* Bug frames table */
+       . = ALIGN(4);
+       __start_bug_frames = .;
+       *(.bug_frames.0)
+       __stop_bug_frames_0 = .;
+       *(.bug_frames.1)
+       __stop_bug_frames_1 = .;
+       *(.bug_frames.2)
+       __stop_bug_frames_2 = .;
+       *(.bug_frames.3)
+       __stop_bug_frames_3 = .;
+
        *(.rodata)
        *(.rodata.*)
   } :text

@@ -952,11 +952,18 @@ static int emulate_forced_invalid_op(struct cpu_user_regs *regs)
 
 void do_invalid_op(struct cpu_user_regs *regs)
 {
-    struct bug_frame bug;
-    struct bug_frame_str bug_str;
-    const char *p, *filename, *predicate, *eip = (char *)regs->eip;
+    const struct bug_frame *bug;
+    u8 bug_insn[2];
+    const char *filename, *predicate, *eip = (char *)regs->eip;
     unsigned long fixup;
     int id, lineno;
+    static const struct bug_frame *const stop_frames[] = {
+        __stop_bug_frames_0,
+        __stop_bug_frames_1,
+        __stop_bug_frames_2,
+        __stop_bug_frames_3,
+        NULL
+    };
 
     DEBUGGER_trap_entry(TRAP_invalid_op, regs);
 
@@ -968,70 +975,65 @@ void do_invalid_op(struct cpu_user_regs *regs)
         return;
     }
 
-    if ( !is_kernel(eip) ||
-         __copy_from_user(&bug, eip, sizeof(bug)) ||
-         memcmp(bug.ud2, "\xf\xb", sizeof(bug.ud2)) ||
-         (bug.ret != 0xc2) )
+    if ( (!is_kernel_text(eip) &&
+          (system_state > SYS_STATE_boot || !is_kernel_inittext(eip))) ||
+         __copy_from_user(bug_insn, eip, sizeof(bug_insn)) ||
+         memcmp(bug_insn, "\xf\xb", sizeof(bug_insn)) )
         goto die;
-    eip += sizeof(bug);
 
-    /* Decode first pointer argument. */
-    if ( !is_kernel(eip) ||
-         __copy_from_user(&bug_str, eip, sizeof(bug_str)) ||
-         (bug_str.mov != 0xbc) )
+    for ( bug = __start_bug_frames, id = 0; stop_frames[id]; ++bug )
+    {
+        while ( unlikely(bug == stop_frames[id]) )
+            ++id;
+        if ( bug_loc(bug) == eip )
+            break;
+    }
+    if ( !stop_frames[id] )
         goto die;
-    p = bug_str(bug_str, eip);
-    if ( !is_kernel(p) )
-        goto die;
-    eip += sizeof(bug_str);
 
-    id = bug.id & 3;
-
+    eip += sizeof(bug_insn);
     if ( id == BUGFRAME_run_fn )
     {
-        void (*fn)(struct cpu_user_regs *) = (void *)p;
-        (*fn)(regs);
+        void (*fn)(struct cpu_user_regs *) = bug_ptr(bug);
+
+        fn(regs);
         regs->eip = (unsigned long)eip;
         return;
     }
 
     /* WARN, BUG or ASSERT: decode the filename pointer and line number. */
-    filename = p;
-    lineno = bug.id >> 2;
+    filename = bug_ptr(bug);
+    if ( !is_kernel(filename) )
+        goto die;
+    lineno = bug_line(bug);
 
-    if ( id == BUGFRAME_warn )
+    switch ( id )
     {
+    case BUGFRAME_warn:
         printk("Xen WARN at %.50s:%d\n", filename, lineno);
         show_execution_state(regs);
         regs->eip = (unsigned long)eip;
         return;
-    }
 
-    if ( id == BUGFRAME_bug )
-    {
+    case BUGFRAME_bug:
         printk("Xen BUG at %.50s:%d\n", filename, lineno);
         DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
         show_execution_state(regs);
         panic("Xen BUG at %.50s:%d\n", filename, lineno);
+
+    case BUGFRAME_assert:
+        /* ASSERT: decode the predicate string pointer. */
+        predicate = bug_msg(bug);
+        if ( !is_kernel(predicate) )
+            predicate = "<unknown>";
+
+        printk("Assertion '%s' failed at %.50s:%d\n",
+               predicate, filename, lineno);
+        DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
+        show_execution_state(regs);
+        panic("Assertion '%s' failed at %.50s:%d\n",
+              predicate, filename, lineno);
     }
-
-    /* ASSERT: decode the predicate string pointer. */
-    ASSERT(id == BUGFRAME_assert);
-    if ( !is_kernel(eip) ||
-         __copy_from_user(&bug_str, eip, sizeof(bug_str)) ||
-         (bug_str.mov != 0xbc) )
-        goto die;
-    predicate = bug_str(bug_str, eip);
-    eip += sizeof(bug_str);
-
-    if ( !is_kernel(predicate) )
-        predicate = "<unknown>";
-    printk("Assertion '%s' failed at %.50s:%d\n",
-           predicate, filename, lineno);
-    DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
-    show_execution_state(regs);
-    panic("Assertion '%s' failed at %.50s:%d\n",
-          predicate, filename, lineno);
 
  die:
     if ( (fixup = search_exception_table(regs->eip)) != 0 )

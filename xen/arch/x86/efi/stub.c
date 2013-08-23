@@ -1,7 +1,7 @@
 #include <xen/efi.h>
 #include <xen/errno.h>
 #include <xen/init.h>
-#include <asm/bug.h>
+#include <xen/lib.h>
 
 #ifndef efi_enabled
 const bool_t efi_enabled = 0;
