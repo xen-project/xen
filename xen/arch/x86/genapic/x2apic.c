@@ -81,7 +81,7 @@ static const cpumask_t *vector_allocation_cpumask_x2apic_cluster(int cpu)
 
 static unsigned int cpu_mask_to_apicid_x2apic_cluster(const cpumask_t *cpumask)
 {
-    unsigned int cpu = cpumask_first(cpumask);
+    unsigned int cpu = cpumask_any(cpumask);
     unsigned int dest = per_cpu(cpu_2_logical_apicid, cpu);
     const cpumask_t *cluster_cpus = per_cpu(cluster_cpus, cpu);
 
