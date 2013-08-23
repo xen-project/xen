@@ -876,6 +876,11 @@ int libxl__qmp_pci_del(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
     return qmp_device_del(gc, domid, id);
 }
 
+int libxl__qmp_system_wakeup(libxl__gc *gc, int domid)
+{
+    return qmp_run_command(gc, domid, "system_wakeup", NULL, NULL, NULL);
+}
+
 int libxl__qmp_save(libxl__gc *gc, int domid, const char *filename)
 {
     libxl__json_object *args = NULL;

@@ -1408,6 +1408,8 @@ _hidden int libxl__qmp_query_serial(libxl__qmp_handler *qmp);
 _hidden int libxl__qmp_pci_add(libxl__gc *gc, int d, libxl_device_pci *pcidev);
 _hidden int libxl__qmp_pci_del(libxl__gc *gc, int domid,
                                libxl_device_pci *pcidev);
+/* Resume hvm domain */
+_hidden int libxl__qmp_system_wakeup(libxl__gc *gc, int domid);
 /* Suspend QEMU. */
 _hidden int libxl__qmp_stop(libxl__gc *gc, int domid);
 /* Resume QEMU. */

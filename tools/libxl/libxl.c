@@ -4654,10 +4654,37 @@ int libxl_domain_sched_params_get(libxl_ctx *ctx, uint32_t domid,
     return ret;
 }
 
+static int libxl__domain_s3_resume(libxl__gc *gc, int domid)
+{
+    int rc = 0;
+
+    switch (libxl__domain_type(gc, domid)) {
+    case LIBXL_DOMAIN_TYPE_HVM:
+        switch (libxl__device_model_version_running(gc, domid)) {
+        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL:
+            rc = xc_set_hvm_param(CTX->xch, domid, HVM_PARAM_ACPI_S_STATE, 0);
+            break;
+        case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
+            rc = libxl__qmp_system_wakeup(gc, domid);
+            break;
+        default:
+            rc = ERROR_INVAL;
+            break;
+        }
+        break;
+    default:
+        rc = ERROR_INVAL;
+        break;
+    }
+
+    return rc;
+}
+
 int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
                        libxl_trigger trigger, uint32_t vcpuid)
 {
     int rc;
+    GC_INIT(ctx);
 
     switch (trigger) {
     case LIBXL_TRIGGER_POWER:
@@ -4681,8 +4708,7 @@ int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
                                     XEN_DOMCTL_SENDTRIGGER_RESET, vcpuid);
         break;
     case LIBXL_TRIGGER_S3RESUME:
-        xc_set_hvm_param(ctx->xch, domid, HVM_PARAM_ACPI_S_STATE, 0);
-        rc = 0;
+        rc = libxl__domain_s3_resume(gc, domid);
         break;
     default:
         rc = -1;
@@ -4697,6 +4723,7 @@ int libxl_send_trigger(libxl_ctx *ctx, uint32_t domid,
         rc = ERROR_FAIL;
     }
 
+    GC_FREE;
     return rc;
 }
 
