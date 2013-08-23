@@ -190,7 +190,7 @@ static inline void __iomem *ioremap_wc(paddr_t start, size_t len)
 
 #define mfn_valid(mfn)        ({                                              \
     unsigned long __m_f_n = (mfn);                                            \
-    likely(__m_f_n < max_page);                                               \
+    likely(__m_f_n >= frametable_base_mfn && __m_f_n < max_page);             \
 })
 
 #define max_pdx                 max_page
