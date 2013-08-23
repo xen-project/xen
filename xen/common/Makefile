@@ -17,6 +17,7 @@ obj-y += multicall.o
 obj-y += notifier.o
 obj-y += page_alloc.o
 obj-y += preempt.o
+obj-y += random.o
 obj-y += rangeset.o
 obj-y += sched_credit.o
 obj-y += sched_credit2.o

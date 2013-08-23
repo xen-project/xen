@@ -2,6 +2,17 @@
 #define __ARM_PERCPU_H__
 
 #ifndef __ASSEMBLY__
+
+#include <xen/types.h>
+#include <asm/cpregs.h>
+#if defined(CONFIG_ARM_32)
+# include <asm/arm32/processor.h>
+#elif defined(CONFIG_ARM_64)
+# include <asm/arm64/processor.h>
+#else
+# error "unknown ARM variant"
+#endif
+
 extern char __per_cpu_start[], __per_cpu_data_end[];
 extern unsigned long __per_cpu_offset[NR_CPUS];
 void percpu_init_areas(void);
