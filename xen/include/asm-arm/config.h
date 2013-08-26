@@ -63,6 +63,9 @@
   .globl name;                                  \
   ALIGN;                                        \
   name:
+#define GLOBAL(name)                            \
+  .globl name;                                  \
+  name:
 #define END(name) \
   .size name, .-name
 #define ENDPROC(name) \

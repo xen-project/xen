@@ -29,8 +29,7 @@
  * TODO: Move this code either later (via platform specific desc) or in a bootwrapper
  * r5: Machine ID
  * Clobber r0 r2 */
-.globl kick_cpus
-kick_cpus:
+GLOBAL(kick_cpus)
         ldr   r0, =MACH_TYPE_SMDK5250
         teq   r5, r0                          /* Are we running on the arndale? */
         beq   kick_cpus_arndale
@@ -79,9 +78,7 @@ kick_cpus_sgi:
  * integration with the bootloader/firmware so that Xen always starts
  * in Hyp mode.
  * Clobber r0 - r4 */
-
-.globl enter_hyp_mode
-enter_hyp_mode:
+GLOBAL(enter_hyp_mode)
         mov   r3, lr                 /* Put return address in non-banked reg */
         cpsid aif, #0x16             /* Enter Monitor mode */
         mrc   CP32(r0, SCR)

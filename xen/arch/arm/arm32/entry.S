@@ -65,9 +65,8 @@ trap_##trap:                                                            \
         bic sp, #7; /* Align the stack pointer (noop on guest trap) */  \
         b do_trap_##trap
 
-.globl hyp_traps_vector
         .align 5
-hyp_traps_vector:
+GLOBAL(hyp_traps_vector)
         .word 0                         /* 0x00 - Reset */
         b trap_undefined_instruction    /* 0x04 - Undefined Instruction */
         b trap_supervisor_call          /* 0x08 - Supervisor Call */

@@ -20,8 +20,7 @@
 #include <asm/asm_defns.h>
 #include <asm/arm32/processor.h>
 
-.globl v7_init
-v7_init:
+GLOBAL(v7_init)
         /* Set up the SMP bit in ACTLR */
         mrc   CP32(r0, ACTLR)
         orr   r0, r0, #(ACTLR_V7_SMP) /* enable SMP bit */

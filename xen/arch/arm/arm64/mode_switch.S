@@ -34,9 +34,7 @@
  * integration with the bootloader/firmware so that Xen always starts
  * at EL2.
  */
-
-.globl enter_el2_mode
-enter_el2_mode:
+GLOBAL(enter_el2_mode)
         mov     x0, #0x30                       // RES1
         orr     x0, x0, #(1 << 0)               // Non-secure EL1
         orr     x0, x0, #(1 << 8)               // HVC enable
