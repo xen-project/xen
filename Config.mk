@@ -180,7 +180,7 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 4904cdf6166687198fc29cb30ca0fa09f316486f
+QEMU_TAG ?= xen-4.1.6-rc2
 # Tue May 14 18:48:49 2013 +0100
 # piix4acpi, xen, hotplug: Fix race with ACPI AML code and hotplug.
 
