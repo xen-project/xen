@@ -118,8 +118,8 @@ struct arch_vmx_struct {
     unsigned int         host_msr_count;
     struct vmx_msr_entry *host_msr_area;
 
-    uint32_t             eoi_exitmap_changed;
-    uint64_t             eoi_exit_bitmap[4];
+    unsigned long        eoi_exitmap_changed;
+    DECLARE_BITMAP(eoi_exit_bitmap, NR_VECTORS);
     struct pi_desc       pi_desc;
 
     unsigned long        host_cr0;
@@ -331,13 +331,7 @@ enum vmcs_field {
     EPT_POINTER                     = 0x0000201a,
     EPT_POINTER_HIGH                = 0x0000201b,
     EOI_EXIT_BITMAP0                = 0x0000201c,
-    EOI_EXIT_BITMAP0_HIGH           = 0x0000201d,
-    EOI_EXIT_BITMAP1                = 0x0000201e,
-    EOI_EXIT_BITMAP1_HIGH           = 0x0000201f,
-    EOI_EXIT_BITMAP2                = 0x00002020,
-    EOI_EXIT_BITMAP2_HIGH           = 0x00002021,
-    EOI_EXIT_BITMAP3                = 0x00002022,
-    EOI_EXIT_BITMAP3_HIGH           = 0x00002023,
+#define EOI_EXIT_BITMAP(n) (EOI_EXIT_BITMAP0 + (n) * 2) /* n = 0...3 */
     VMREAD_BITMAP                   = 0x00002026,
     VMREAD_BITMAP_HIGH              = 0x00002027,
     VMWRITE_BITMAP                  = 0x00002028,

@@ -915,15 +915,12 @@ static int construct_vmcs(struct vcpu *v)
 
     if ( cpu_has_vmx_virtual_intr_delivery )
     {
+        unsigned int i;
+
         /* EOI-exit bitmap */
-        v->arch.hvm_vmx.eoi_exit_bitmap[0] = (uint64_t)0;
-        __vmwrite(EOI_EXIT_BITMAP0, v->arch.hvm_vmx.eoi_exit_bitmap[0]);
-        v->arch.hvm_vmx.eoi_exit_bitmap[1] = (uint64_t)0;
-        __vmwrite(EOI_EXIT_BITMAP1, v->arch.hvm_vmx.eoi_exit_bitmap[1]);
-        v->arch.hvm_vmx.eoi_exit_bitmap[2] = (uint64_t)0;
-        __vmwrite(EOI_EXIT_BITMAP2, v->arch.hvm_vmx.eoi_exit_bitmap[2]);
-        v->arch.hvm_vmx.eoi_exit_bitmap[3] = (uint64_t)0;
-        __vmwrite(EOI_EXIT_BITMAP3, v->arch.hvm_vmx.eoi_exit_bitmap[3]);
+        bitmap_zero(v->arch.hvm_vmx.eoi_exit_bitmap, NR_VECTORS);
+        for ( i = 0; i < ARRAY_SIZE(v->arch.hvm_vmx.eoi_exit_bitmap); ++i )
+            __vmwrite(EOI_EXIT_BITMAP(i), 0);
 
         /* Initialise Guest Interrupt Status (RVI and SVI) to 0 */
         __vmwrite(GUEST_INTR_STATUS, 0);
@@ -1171,26 +1168,16 @@ int vmx_add_host_load_msr(u32 msr)
 
 void vmx_set_eoi_exit_bitmap(struct vcpu *v, u8 vector)
 {
-    int index, offset, changed;
-
-    index = vector >> 6; 
-    offset = vector & 63;
-    changed = !test_and_set_bit(offset,
-                  (uint64_t *)&v->arch.hvm_vmx.eoi_exit_bitmap[index]);
-    if (changed)
-        set_bit(index, &v->arch.hvm_vmx.eoi_exitmap_changed);
+    if ( !test_and_set_bit(vector, v->arch.hvm_vmx.eoi_exit_bitmap) )
+        set_bit(vector / BITS_PER_LONG,
+                &v->arch.hvm_vmx.eoi_exitmap_changed);
 }
 
 void vmx_clear_eoi_exit_bitmap(struct vcpu *v, u8 vector)
 {
-    int index, offset, changed;
-
-    index = vector >> 6; 
-    offset = vector & 63;
-    changed = test_and_clear_bit(offset,
-                  (uint64_t *)&v->arch.hvm_vmx.eoi_exit_bitmap[index]);
-    if (changed)
-        set_bit(index, &v->arch.hvm_vmx.eoi_exitmap_changed);
+    if ( test_and_clear_bit(vector, v->arch.hvm_vmx.eoi_exit_bitmap) )
+        set_bit(vector / BITS_PER_LONG,
+                &v->arch.hvm_vmx.eoi_exitmap_changed);
 }
 
 int vmx_create_vmcs(struct vcpu *v)

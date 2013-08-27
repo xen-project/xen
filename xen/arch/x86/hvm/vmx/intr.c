@@ -285,6 +285,7 @@ void vmx_intr_assist(void)
               intack.source != hvm_intsrc_vector )
     {
         unsigned long status = __vmread(GUEST_INTR_STATUS);
+        unsigned int i, n;
 
        /*
         * Set eoi_exit_bitmap for periodic timer interrup to cause EOI-induced VM
@@ -299,14 +300,13 @@ void vmx_intr_assist(void)
         status |= VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK &
                     intack.vector;
         __vmwrite(GUEST_INTR_STATUS, status);
-        if (v->arch.hvm_vmx.eoi_exitmap_changed) {
-#define UPDATE_EOI_EXITMAP(v, e) {                             \
-        if (test_and_clear_bit(e, &v->arch.hvm_vmx.eoi_exitmap_changed)) {      \
-                __vmwrite(EOI_EXIT_BITMAP##e, v->arch.hvm_vmx.eoi_exit_bitmap[e]);}}
-                UPDATE_EOI_EXITMAP(v, 0);
-                UPDATE_EOI_EXITMAP(v, 1);
-                UPDATE_EOI_EXITMAP(v, 2);
-                UPDATE_EOI_EXITMAP(v, 3);
+
+        n = ARRAY_SIZE(v->arch.hvm_vmx.eoi_exit_bitmap);
+        while ( (i = find_first_bit(&v->arch.hvm_vmx.eoi_exitmap_changed,
+                                    n)) < n )
+        {
+            clear_bit(i, &v->arch.hvm_vmx.eoi_exitmap_changed);
+            __vmwrite(EOI_EXIT_BITMAP(i), v->arch.hvm_vmx.eoi_exit_bitmap[i]);
         }
 
         pt_intr_post(v, intack);
