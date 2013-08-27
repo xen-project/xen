@@ -1122,6 +1122,10 @@ int __init construct_dom0(
         if ( !rangeset_contains_singleton(mmio_ro_ranges, mfn) )
             rc |= iomem_deny_access(dom0, mfn, mfn);
     }
+    /* MSI range. */
+    rc |= iomem_deny_access(dom0, paddr_to_pfn(MSI_ADDR_BASE_LO),
+                            paddr_to_pfn(MSI_ADDR_BASE_LO +
+                                         MSI_ADDR_DEST_ID_MASK));
 
     /* Remove access to E820_UNUSABLE I/O regions above 1MB. */
     for ( i = 0; i < e820.nr_map; i++ )
