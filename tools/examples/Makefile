@@ -14,7 +14,6 @@ XEN_CONFIGS-$(CONFIG_XEND) += xmexample.hvm
 XEN_CONFIGS-$(CONFIG_XEND) += xmexample.hvm-stubdom
 XEN_CONFIGS-$(CONFIG_XEND) += xmexample.pv-grub
 XEN_CONFIGS-$(CONFIG_XEND) += xmexample.nbd
-XEN_CONFIGS-$(CONFIG_XEND) += xmexample.vti
 XEN_CONFIGS-$(CONFIG_XEND) += xend-pci-quirks.sxp
 XEN_CONFIGS-$(CONFIG_XEND) += xend-pci-permissive.sxp
 
