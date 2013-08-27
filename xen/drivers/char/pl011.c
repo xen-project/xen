@@ -140,7 +140,7 @@ static void __init pl011_init_postirq(struct serial_port *port)
     pl011_write(uart, ICR, OEI|BEI|PEI|FEI);
 
     /* Unmask interrupts */
-    pl011_write(uart, IMSC, OEI|BEI|PEI|FEI|TXI|RXI);
+    pl011_write(uart, IMSC, RTI|OEI|BEI|PEI|FEI|TXI|RXI);
 }
 
 static void pl011_suspend(struct serial_port *port)
