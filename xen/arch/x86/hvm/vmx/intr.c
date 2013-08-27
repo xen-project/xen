@@ -165,6 +165,11 @@ static int nvmx_intr_intercept(struct vcpu *v, struct hvm_intack intack)
 {
     u32 ctrl;
 
+    /* If blocked by L1's tpr, then nothing to do. */
+    if ( nestedhvm_vcpu_in_guestmode(v) &&
+         hvm_interrupt_blocked(v, intack) == hvm_intblk_tpr )
+        return 1;
+
     if ( nvmx_intr_blocked(v) != hvm_intblk_none )
     {
         enable_intr_window(v, intack);
