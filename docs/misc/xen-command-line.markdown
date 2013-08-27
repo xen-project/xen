@@ -194,7 +194,7 @@ and reboots.
 If set, override Xen's calculation of the level 2 cache line size.
 
 ### clocksource
-> `= pit | hpet | cyclone | acpi`
+> `= pit | hpet | acpi`
 
 If set, override Xen's default choice for the platform timer.
 

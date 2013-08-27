@@ -39,7 +39,7 @@
 #include <asm/setup.h> /* for early_time_init */
 #include <public/arch-x86/cpuid.h>
 
-/* opt_clocksource: Force clocksource to one of: pit, hpet, cyclone, acpi. */
+/* opt_clocksource: Force clocksource to one of: pit, hpet, acpi. */
 static char __initdata opt_clocksource[10];
 string_param("clocksource", opt_clocksource);
 
@@ -378,72 +378,7 @@ static struct platform_timesource __initdata plt_hpet =
 };
 
 /************************************************************
- * PLATFORM TIMER 3: IBM 'CYCLONE' TIMER
- */
-
-bool_t __initdata use_cyclone;
-
-/*
- * Although the counter is read via a 64-bit register, I believe it is actually
- * a 40-bit counter. Since this will wrap, I read only the low 32 bits and
- * periodically fold into a 64-bit software counter, just as for PIT and HPET.
- */
-#define CYCLONE_CBAR_ADDR   0xFEB00CD0
-#define CYCLONE_PMCC_OFFSET 0x51A0
-#define CYCLONE_MPMC_OFFSET 0x51D0
-#define CYCLONE_MPCS_OFFSET 0x51A8
-#define CYCLONE_TIMER_FREQ  100000000
-
-/* Cyclone MPMC0 register. */
-static volatile u32 *__read_mostly cyclone_timer;
-
-static u64 read_cyclone_count(void)
-{
-    return *cyclone_timer;
-}
-
-static volatile u32 *__init map_cyclone_reg(unsigned long regaddr)
-{
-    unsigned long pageaddr = regaddr &  PAGE_MASK;
-    unsigned long offset   = regaddr & ~PAGE_MASK;
-    set_fixmap_nocache(FIX_CYCLONE_TIMER, pageaddr);
-    return (volatile u32 *)(fix_to_virt(FIX_CYCLONE_TIMER) + offset);
-}
-
-static int __init init_cyclone(struct platform_timesource *pts)
-{
-    u32 base;
-    
-    if ( !use_cyclone )
-        return 0;
-
-    /* Find base address. */
-    base = *(map_cyclone_reg(CYCLONE_CBAR_ADDR));
-    if ( base == 0 )
-    {
-        printk(KERN_ERR "Cyclone: Could not find valid CBAR value.\n");
-        return 0;
-    }
-
-    /* Enable timer and map the counter register. */
-    *(map_cyclone_reg(base + CYCLONE_PMCC_OFFSET)) = 1;
-    *(map_cyclone_reg(base + CYCLONE_MPCS_OFFSET)) = 1;
-    cyclone_timer = map_cyclone_reg(base + CYCLONE_MPMC_OFFSET);
-    return 1;
-}
-
-static struct platform_timesource __initdata plt_cyclone =
-{
-    .id = "cyclone",
-    .name = "IBM Cyclone",
-    .frequency = CYCLONE_TIMER_FREQ,
-    .read_counter = read_cyclone_count,
-    .counter_bits = 32,
-    .init = init_cyclone
-};
-
-/************************************************************
- * PLATFORM TIMER 4: ACPI PM TIMER
+ * PLATFORM TIMER 3: ACPI PM TIMER
  */
 
 u32 __read_mostly pmtmr_ioport;
@@ -600,7 +535,7 @@ static void resume_platform_timer(void)
 static void __init init_platform_timer(void)
 {
     static struct platform_timesource * __initdata plt_timers[] = {
-        &plt_cyclone, &plt_hpet, &plt_pmtimer, &plt_pit
+        &plt_hpet, &plt_pmtimer, &plt_pit
     };
 
     struct platform_timesource *pts = NULL;
