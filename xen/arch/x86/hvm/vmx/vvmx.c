@@ -613,8 +613,15 @@ void nvmx_update_secondary_exec_control(struct vcpu *v,
     u32 shadow_cntrl;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    u32 apicv_bit = SECONDARY_EXEC_APIC_REGISTER_VIRT |
+                    SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY;
 
+    host_cntrl &= ~apicv_bit;
     shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, SECONDARY_VM_EXEC_CONTROL);
+
+    /* No vAPIC-v support, so it shouldn't be set in vmcs12. */
+    ASSERT(!(shadow_cntrl & apicv_bit));
+
     nvmx->ept.enabled = !!(shadow_cntrl & SECONDARY_EXEC_ENABLE_EPT);
     shadow_cntrl |= host_cntrl;
     __vmwrite(SECONDARY_VM_EXEC_CONTROL, shadow_cntrl);
@@ -625,7 +632,12 @@ static void nvmx_update_pin_control(struct vcpu *v, unsigned long host_cntrl)
     u32 shadow_cntrl;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
 
+    host_cntrl &= ~PIN_BASED_POSTED_INTERRUPT;
     shadow_cntrl = __get_vvmcs(nvcpu->nv_vvmcx, PIN_BASED_VM_EXEC_CONTROL);
+
+    /* No vAPIC-v support, so it shouldn't be set in vmcs12. */
+    ASSERT(!(shadow_cntrl & PIN_BASED_POSTED_INTERRUPT));
+
     shadow_cntrl |= host_cntrl;
     __vmwrite(PIN_BASED_VM_EXEC_CONTROL, shadow_cntrl);
 }
