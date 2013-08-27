@@ -132,7 +132,7 @@ domain 0 command line
 Permit Xen to use superpages when performing memory management.
 
 ### apic
-> `= summit | bigsmp | default`
+> `= bigsmp | default`
 
 Override Xen's logic for choosing the APIC driver.  By default, if
 there are more than 8 CPUs, Xen will switch to `bigsmp` over

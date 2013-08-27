@@ -16,13 +16,11 @@
 #include <asm/mach-generic/mach_apic.h>
 #include <asm/setup.h>
 
-extern const struct genapic apic_summit;
 extern const struct genapic apic_bigsmp;
 
 const struct genapic *__read_mostly genapic;
 
 const struct genapic *apic_probe[] __initdata = {
-	&apic_summit,
 	&apic_bigsmp, 
 	&apic_default,	/* must be last */
 	NULL,
