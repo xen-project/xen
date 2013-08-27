@@ -38,6 +38,7 @@
 #include <xen/spinlock.h>
 #include <xen/domain_page.h>
 #include <xen/efi.h>
+#include <xen/vmap.h>
 
 #define _COMPONENT		ACPI_OS_SERVICES
 ACPI_MODULE_NAME("osl")
@@ -83,14 +84,25 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
 	}
 }
 
-void __iomem *__init
+void __iomem *
 acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
 {
-	return __acpi_map_table((unsigned long)phys, size);
+	if (system_state >= SYS_STATE_active) {
+		unsigned long pfn = PFN_DOWN(phys);
+		unsigned int offs = phys & (PAGE_SIZE - 1);
+
+		/* The low first Mb is always mapped. */
+		if ( !((phys + size - 1) >> 20) )
+			return __va(phys);
+		return __vmap(&pfn, PFN_UP(offs + size), 1, 1, PAGE_HYPERVISOR_NOCACHE) + offs;
+	}
+	return __acpi_map_table(phys, size);
 }
 
-void __init acpi_os_unmap_memory(void __iomem * virt, acpi_size size)
+void acpi_os_unmap_memory(void __iomem * virt, acpi_size size)
 {
+	if (system_state >= SYS_STATE_active)
+		vunmap((void *)((unsigned long)virt & PAGE_MASK));
 }
 
 acpi_status acpi_os_read_port(acpi_io_address port, u32 * value, u32 width)
@@ -133,9 +145,8 @@ acpi_status
 acpi_os_read_memory(acpi_physical_address phys_addr, u32 * value, u32 width)
 {
 	u32 dummy;
-	void __iomem *virt_addr;
+	void __iomem *virt_addr = acpi_os_map_memory(phys_addr, width >> 3);
 
-	virt_addr = map_domain_page(phys_addr>>PAGE_SHIFT);
 	if (!value)
 		value = &dummy;
 
@@ -153,7 +164,7 @@ acpi_os_read_memory(acpi_physical_address phys_addr, u32 * value, u32 width)
 		BUG();
 	}
 
-	unmap_domain_page(virt_addr);
+	acpi_os_unmap_memory(virt_addr, width >> 3);
 
 	return AE_OK;
 }
@@ -161,9 +172,7 @@ acpi_os_read_memory(acpi_physical_address phys_addr, u32 * value, u32 width)
 acpi_status
 acpi_os_write_memory(acpi_physical_address phys_addr, u32 value, u32 width)
 {
-	void __iomem *virt_addr;
-
-	virt_addr = map_domain_page(phys_addr>>PAGE_SHIFT);
+	void __iomem *virt_addr = acpi_os_map_memory(phys_addr, width >> 3);
 
 	switch (width) {
 	case 8:
@@ -179,7 +188,7 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u32 value, u32 width)
 		BUG();
 	}
 
-	unmap_domain_page(virt_addr);
+	acpi_os_unmap_memory(virt_addr, width >> 3);
 
 	return AE_OK;
 }
