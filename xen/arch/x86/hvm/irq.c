@@ -437,7 +437,7 @@ struct hvm_intack hvm_vcpu_ack_pending_irq(
             intack.vector = (uint8_t)vector;
         break;
     case hvm_intsrc_lapic:
-        if ( !vlapic_ack_pending_irq(v, intack.vector) )
+        if ( !vlapic_ack_pending_irq(v, intack.vector, 0) )
             intack = hvm_intack_none;
         break;
     case hvm_intsrc_vector:

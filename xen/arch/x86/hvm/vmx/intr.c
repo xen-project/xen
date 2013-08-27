@@ -185,7 +185,7 @@ static int nvmx_intr_intercept(struct vcpu *v, struct hvm_intack intack)
             if ( !(ctrl & PIN_BASED_EXT_INTR_MASK) )
                 return 0;
 
-            vmx_inject_extint(intack.vector);
+            vmx_inject_extint(intack.vector, intack.source);
 
             ctrl = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, VM_EXIT_CONTROLS);
             if ( ctrl & VM_EXIT_ACK_INTR_ON_EXIT )
@@ -314,7 +314,7 @@ void vmx_intr_assist(void)
     else
     {
         HVMTRACE_2D(INJ_VIRQ, intack.vector, /*fake=*/ 0);
-        vmx_inject_extint(intack.vector);
+        vmx_inject_extint(intack.vector, intack.source);
         pt_intr_post(v, intack);
     }
 
