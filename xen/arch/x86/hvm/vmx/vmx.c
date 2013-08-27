@@ -1815,7 +1815,7 @@ static const struct lbr_info *last_branch_msr_get(void)
         /* Ivy Bridge */
         case 58: case 62:
         /* Haswell */
-        case 60: case 69:
+        case 60: case 63: case 69: case 70:
             return nh_lbr;
             break;
         /* Atom */
