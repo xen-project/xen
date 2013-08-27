@@ -659,10 +659,6 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, 0);
     if ( stack_base[cpu] == NULL )
         goto oom;
-#ifndef NDEBUG
-    for ( order = 0 ; order < (1<<STACK_ORDER); ++order )
-        clear_page(stack_base[cpu] + order * PAGE_SIZE);
-#endif
     memguard_guard_stack(stack_base[cpu]);
 
     order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
