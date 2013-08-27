@@ -13,6 +13,15 @@
         mov     mmu_cr4_features(%rip),%rcx
         mov     %rcx,%cr4
 
+#ifndef NDEBUG
+        /* Clean stack. */
+        mov     stack_start(%rip),%rdi
+        mov     $(STACK_SIZE / 8),%rcx
+        xor     %eax,%eax
+        rep stosq
+#endif
+
+        /* Switch to cpu0_stack. */
         mov     stack_start(%rip),%rsp
         or      $(STACK_SIZE-CPUINFO_sizeof),%rsp
 
