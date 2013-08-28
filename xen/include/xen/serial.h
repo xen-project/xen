@@ -70,8 +70,9 @@ struct uart_driver {
     /* Driver suspend/resume. */
     void (*suspend)(struct serial_port *);
     void (*resume)(struct serial_port *);
-    /* Return number of characters the port can hold for transmit. */
-    unsigned int (*tx_ready)(struct serial_port *);
+    /* Return number of characters the port can hold for transmit,
+     * or -EIO if port is inaccesible */
+    int (*tx_ready)(struct serial_port *);
     /* Put a character onto the serial line. */
     void (*putc)(struct serial_port *, char);
     /* Flush accumulated characters. */

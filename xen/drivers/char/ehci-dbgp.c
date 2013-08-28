@@ -1204,7 +1204,7 @@ static void ehci_dbgp_putc(struct serial_port *port, char c)
         ehci_dbgp_flush(port);
 }
 
-static unsigned int ehci_dbgp_tx_ready(struct serial_port *port)
+static int ehci_dbgp_tx_ready(struct serial_port *port)
 {
     struct ehci_dbgp *dbgp = port->uart;
 

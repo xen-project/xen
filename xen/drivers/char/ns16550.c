@@ -75,6 +75,11 @@ static void ns_write_reg(struct ns16550 *uart, int reg, char c)
     writeb(c, uart->remapped_io_base + reg);
 }
 
+static int ns16550_ioport_invalid(struct ns16550 *uart)
+{
+    return (unsigned char)ns_read_reg(uart, UART_IER) == 0xff;
+}
+
 static void ns16550_interrupt(
     int irq, void *dev_id, struct cpu_user_regs *regs)
 {
@@ -105,11 +110,17 @@ static void __ns16550_poll(struct cpu_user_regs *regs)
         return; /* Interrupts work - no more polling */
 
     while ( ns_read_reg(uart, UART_LSR) & UART_LSR_DR )
+    {
+        if ( ns16550_ioport_invalid(uart) )
+            goto out;
+
         serial_rx_interrupt(port, regs);
+    }
 
     if ( ns_read_reg(uart, UART_LSR) & UART_LSR_THRE )
         serial_tx_interrupt(port, regs);
 
+out:
     set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
 }
 
@@ -123,10 +134,12 @@ static void ns16550_poll(void *data)
 #endif
 }
 
-static unsigned int ns16550_tx_ready(struct serial_port *port)
+static int ns16550_tx_ready(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
 
+    if ( ns16550_ioport_invalid(uart) )
+        return -EIO;
     return ns_read_reg(uart, UART_LSR) & UART_LSR_THRE ? uart->fifo_size : 0;
 }
 
@@ -140,7 +153,8 @@ static int ns16550_getc(struct serial_port *port, char *pc)
 {
     struct ns16550 *uart = port->uart;
 
-    if ( !(ns_read_reg(uart, UART_LSR) & UART_LSR_DR) )
+    if ( ns16550_ioport_invalid(uart) ||
+        !(ns_read_reg(uart, UART_LSR) & UART_LSR_DR) )
         return 0;
 
     *pc = ns_read_reg(uart, UART_RBR);
@@ -306,15 +320,6 @@ static void _ns16550_resume(struct serial_port *port)
 
     ns16550_setup_preirq(port->uart);
     ns16550_setup_postirq(port->uart);
-}
-
-static int ns16550_ioport_invalid(struct ns16550 *uart)
-{
-    return ((((unsigned char)ns_read_reg(uart, UART_LSR)) == 0xff) &&
-            (((unsigned char)ns_read_reg(uart, UART_MCR)) == 0xff) &&
-            (((unsigned char)ns_read_reg(uart, UART_IER)) == 0xff) &&
-            (((unsigned char)ns_read_reg(uart, UART_IIR)) == 0xff) &&
-            (((unsigned char)ns_read_reg(uart, UART_LCR)) == 0xff));
 }
 
 static int delayed_resume_tries;
