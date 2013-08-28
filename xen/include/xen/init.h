@@ -10,6 +10,7 @@
 #define __init            __text_section(".init.text")
 #define __exit            __text_section(".exit.text")
 #define __initdata        __section(".init.data")
+#define __initconst       __section(".init.rodata")
 #define __exitdata        __used_section(".exit.data")
 #define __initsetup       __used_section(".init.setup")
 #define __init_call(lvl)  __used_section(".initcall" lvl ".init")
