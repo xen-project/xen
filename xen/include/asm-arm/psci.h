@@ -6,6 +6,11 @@
 #define PSCI_EINVAL  -2
 #define PSCI_DENIED  -3
 
+#define __PSCI_cpu_suspend 0
+#define __PSCI_cpu_off     1
+#define __PSCI_cpu_on      2
+#define __PSCI_migrate     3
+
 int do_psci_cpu_on(uint32_t vcpuid, register_t entry_point);
 int do_psci_cpu_off(uint32_t power_state);
 int do_psci_cpu_suspend(uint32_t power_state, register_t entry_point);

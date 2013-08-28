@@ -848,11 +848,6 @@ static arm_hypercall_t arm_hypercall_table[] = {
     HYPERCALL_ARM(vcpu_op, 3),
 };
 
-#define __PSCI_cpu_suspend 0
-#define __PSCI_cpu_off     1
-#define __PSCI_cpu_on      2
-#define __PSCI_migrate     3
-
 typedef int (*arm_psci_fn_t)(uint32_t, register_t);
 
 typedef struct {
