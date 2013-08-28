@@ -4,6 +4,7 @@
  * Architecture-independent PCI access functions.
  */
 
+#include <xen/init.h>
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
 
@@ -101,4 +102,45 @@ int pci_find_ext_capability(int seg, int bus, int devfn, int cap)
         header = pci_conf_read32(seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn), pos);
     }
     return 0;
+}
+
+const char *__init parse_pci(const char *s, unsigned int *seg_p,
+                             unsigned int *bus_p, unsigned int *dev_p,
+                             unsigned int *func_p)
+{
+    unsigned long seg = simple_strtoul(s, &s, 16), bus, dev, func;
+
+    if ( *s != ':' )
+        return NULL;
+    bus = simple_strtoul(s + 1, &s, 16);
+    if ( *s == ':' )
+        dev = simple_strtoul(s + 1, &s, 16);
+    else
+    {
+        dev = bus;
+        bus = seg;
+        seg = 0;
+    }
+    if ( func_p )
+    {
+        if ( *s != '.' )
+            return NULL;
+        func = simple_strtoul(s + 1, &s, 0);
+    }
+    else
+        func = 0;
+    if ( seg != (seg_p ? (u16)seg : 0) ||
+         bus != PCI_BUS(PCI_BDF2(bus, 0)) ||
+         dev != PCI_SLOT(PCI_DEVFN(dev, 0)) ||
+         func != PCI_FUNC(PCI_DEVFN(0, func)) )
+        return NULL;
+
+    if ( seg_p )
+        *seg_p = seg;
+    *bus_p = bus;
+    *dev_p = dev;
+    if ( func_p )
+        *func_p = func;
+
+    return s;
 }

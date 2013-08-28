@@ -403,19 +403,6 @@ static int __init parse_parity_char(int c)
     return 0;
 }
 
-static void __init parse_pci_bdf(const char **conf, unsigned int bdf[3])
-{
-    bdf[0] = simple_strtoul(*conf, conf, 16);
-    if ( **conf != ':' )
-        return;
-    (*conf)++;
-    bdf[1] = simple_strtoul(*conf, conf, 16);
-    if ( **conf != '.' )
-        return;
-    (*conf)++;
-    bdf[2] = simple_strtoul(*conf, conf, 16);
-}
-
 static int __init check_existence(struct ns16550 *uart)
 {
     unsigned char status, scratch, scratch2, scratch3;
@@ -593,14 +580,19 @@ static void __init ns16550_parse_port_config(
 
     if ( *conf == ',' && *++conf != ',' )
     {
+        conf = parse_pci(conf, NULL, &uart->ps_bdf[0],
+                         &uart->ps_bdf[1], &uart->ps_bdf[2]);
+        if ( !conf )
+            PARSE_ERR("Bad port PCI coordinates");
         uart->ps_bdf_enable = 1;
-        parse_pci_bdf(&conf, &uart->ps_bdf[0]);
     }
 
     if ( *conf == ',' && *++conf != ',' )
     {
+        if ( !parse_pci(conf, NULL, &uart->pb_bdf[0],
+                        &uart->pb_bdf[1], &uart->pb_bdf[2]) )
+            PARSE_ERR("Bad bridge PCI coordinates");
         uart->pb_bdf_enable = 1;
-        parse_pci_bdf(&conf, &uart->pb_bdf[0]);
     }
 
  config_parsed:

@@ -1482,31 +1482,25 @@ void __init ehci_dbgp_init(void)
     }
     else if ( strncmp(opt_dbgp + 4, "@pci", 4) == 0 )
     {
-        unsigned long val = simple_strtoul(opt_dbgp + 8, &e, 16);
+        unsigned int bus, slot, func;
 
-        dbgp->bus = val;
-        if ( dbgp->bus != val || *e != ':' )
+        e = parse_pci(opt_dbgp + 8, NULL, &bus, &slot, &func);
+        if ( !e || *e )
             return;
 
-        val = simple_strtoul(e + 1, &e, 16);
-        if ( PCI_SLOT(PCI_DEVFN(val, 0)) != val || *e != '.' )
-            return;
-        dbgp->slot = val;
+        dbgp->bus = bus;
+        dbgp->slot = slot;
+        dbgp->func = func;
 
-        val = simple_strtoul(e + 1, &e, 16);
-        if ( PCI_FUNC(PCI_DEVFN(0, val)) != val || *e )
-            return;
-        dbgp->func = val;
-
-        if ( !pci_device_detect(0, dbgp->bus, dbgp->slot, dbgp->func) )
+        if ( !pci_device_detect(0, bus, slot, func) )
             return;
 
-        dbgp->cap = __find_dbgp(dbgp->bus, dbgp->slot, dbgp->func);
+        dbgp->cap = __find_dbgp(bus, slot, func);
         if ( !dbgp->cap )
             return;
 
         dbgp_printk("Using EHCI debug port on %02x:%02x.%u\n",
-                    dbgp->bus, dbgp->slot, dbgp->func);
+                    bus, slot, func);
     }
     else
         return;

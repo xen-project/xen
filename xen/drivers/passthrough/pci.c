@@ -127,29 +127,20 @@ static unsigned int nr_phantom_devs;
 
 static void __init parse_phantom_dev(char *str) {
     const char *s = str;
+    unsigned int seg, bus, slot;
     struct phantom_dev phantom;
 
     if ( !s || !*s || nr_phantom_devs >= ARRAY_SIZE(phantom_devs) )
         return;
 
-    phantom.seg = simple_strtol(s, &s, 16);
-    if ( *s != ':' )
+    s = parse_pci(s, &seg, &bus, &slot, NULL);
+    if ( !s || *s != ',' )
         return;
 
-    phantom.bus = simple_strtol(s + 1, &s, 16);
-    if ( *s == ',' )
-    {
-        phantom.slot = phantom.bus;
-        phantom.bus = phantom.seg;
-        phantom.seg = 0;
-    }
-    else if ( *s == ':' )
-        phantom.slot = simple_strtol(s + 1, &s, 16);
-    else
-        return;
+    phantom.seg = seg;
+    phantom.bus = bus;
+    phantom.slot = slot;
 
-    if ( *s != ',' )
-        return;
     switch ( phantom.stride = simple_strtol(s + 1, &s, 0) )
     {
     case 1: case 2: case 4:
