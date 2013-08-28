@@ -155,7 +155,7 @@ static void pl011_resume(struct serial_port *port)
     BUG(); // XXX
 }
 
-static unsigned int pl011_tx_ready(struct serial_port *port)
+static int pl011_tx_ready(struct serial_port *port)
 {
     struct pl011 *uart = port->uart;
 

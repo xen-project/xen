@@ -226,7 +226,7 @@ static void omap_uart_resume(struct serial_port *port)
     BUG();
 }
 
-static unsigned int omap_uart_tx_ready(struct serial_port *port)
+static int omap_uart_tx_ready(struct serial_port *port)
 {
     struct omap_uart *uart = port->uart;
     uint32_t reg;

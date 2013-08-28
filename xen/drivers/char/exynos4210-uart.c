@@ -221,7 +221,7 @@ static void exynos4210_uart_resume(struct serial_port *port)
     BUG(); // XXX
 }
 
-static unsigned int exynos4210_uart_tx_ready(struct serial_port *port)
+static int exynos4210_uart_tx_ready(struct serial_port *port)
 {
     struct exynos4210_uart *uart = port->uart;
 
