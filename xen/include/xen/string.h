@@ -43,6 +43,9 @@ extern int strncmp(const char *,const char *,__kernel_size_t);
 #ifndef __HAVE_ARCH_STRNICMP
 extern int strnicmp(const char *, const char *, __kernel_size_t);
 #endif
+#ifndef __HAVE_ARCH_STRCASECMP
+extern int strcasecmp(const char *, const char *);
+#endif
 #ifndef __HAVE_ARCH_STRCHR
 extern char * strchr(const char *,int);
 #endif
