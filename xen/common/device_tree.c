@@ -414,12 +414,6 @@ static void __init process_cpu_node(const void *fdt, int node,
     const u32 *cell;
     paddr_t start, size;
 
-    if ( address_cells != 1 || size_cells != 0 )
-    {
-        early_printk("fdt: node `%s': invalid #address-cells or #size-cells",
-                     name);
-        return;
-    }
 
     prop = fdt_get_property(fdt, node, "reg", NULL);
     if ( !prop )
