@@ -26,9 +26,10 @@
 
 /*
  * Configure UART port with a string:
- * alias,options
+ * path,options
  *
- * @alias: alias used in the device tree for the UART
+ * @path: full path used in the device tree for the UART. If the path
+ * doesn't start with '/', we assuming that it's an alias.
  * @options: UART speficic options (see in each UART driver)
  */
 static char __initdata opt_dtuart[30] = "";
@@ -38,7 +39,7 @@ void __init dt_uart_init(void)
 {
     struct dt_device_node *dev;
     int ret;
-    const char *devalias = opt_dtuart;
+    const char *devpath = opt_dtuart;
     char *options;
 
     if ( !console_has("dtuart") || !strcmp(opt_dtuart, "") )
@@ -53,12 +54,15 @@ void __init dt_uart_init(void)
     else
         options = "";
 
-    early_printk("Looking for UART console %s\n", devalias);
-    dev = dt_find_node_by_alias(devalias);
+    early_printk("Looking for UART console %s\n", devpath);
+    if ( *devpath == '/' )
+        dev = dt_find_node_by_path(devpath);
+    else
+        dev = dt_find_node_by_alias(devpath);
 
     if ( !dev )
     {
-        early_printk("Unable to find device \"%s\"\n", devalias);
+        early_printk("Unable to find device \"%s\"\n", devpath);
         return;
     }
 
