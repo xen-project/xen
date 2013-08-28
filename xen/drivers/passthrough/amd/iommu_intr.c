@@ -595,14 +595,31 @@ void* __init amd_iommu_alloc_intremap_table(unsigned long **inuse_map)
 
 int __init amd_setup_hpet_msi(struct msi_desc *msi_desc)
 {
-    if ( (!msi_desc->hpet_id != hpet_sbdf.id) ||
-         (hpet_sbdf.iommu == NULL) )
+    spinlock_t *lock;
+    unsigned long flags;
+    int rc = 0;
+
+    if ( msi_desc->hpet_id != hpet_sbdf.id || !hpet_sbdf.iommu )
     {
-        AMD_IOMMU_DEBUG("Fail to setup HPET MSI remapping\n");
-        return 1;
+        AMD_IOMMU_DEBUG("Failed to setup HPET MSI remapping: %s\n",
+                        hpet_sbdf.iommu ? "Wrong HPET" : "No IOMMU");
+        return -ENODEV;
     }
 
-    return 0;
+    lock = get_intremap_lock(hpet_sbdf.seg, hpet_sbdf.bdf);
+    spin_lock_irqsave(lock, flags);
+
+    msi_desc->remap_index = alloc_intremap_entry(hpet_sbdf.seg,
+                                                 hpet_sbdf.bdf, 1);
+    if ( msi_desc->remap_index >= INTREMAP_ENTRIES )
+    {
+        msi_desc->remap_index = -1;
+        rc = -ENXIO;
+    }
+
+    spin_unlock_irqrestore(lock, flags);
+
+    return rc;
 }
 
 static void dump_intremap_table(const u32 *table)
