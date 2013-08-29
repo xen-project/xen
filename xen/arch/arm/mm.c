@@ -43,12 +43,62 @@
 
 struct domain *dom_xen, *dom_io, *dom_cow;
 
-/* Static start-of-day pagetables that we use before the
- * allocators are up. These go on to become the boot CPU's real pagetables.
+/* Static start-of-day pagetables that we use before the allocators
+ * are up. These are used by all CPUs during bringup before switching
+ * to the CPUs own pagetables.
+ *
+ * These pagetables have a very simple structure. They include:
+ *  - a 2MB mapping of xen at XEN_VIRT_START, boot_first and
+ *    boot_second are used to populate the trie down to that mapping.
+ *  - a 1:1 mapping of xen at its current physical address. This uses a
+ *    section mapping at whichever of boot_{pgtable,first,second}
+ *    covers that physical address.
+ *
+ * For the boot CPU these mappings point to the address where Xen was
+ * loaded by the bootloader. For secondary CPUs they point to the
+ * relocated copy of Xen for the benefit of secondary CPUs.
+ *
+ * In addition to the above for the boot CPU the device-tree is
+ * initially mapped in the boot misc slot. This mapping is not present
+ * for secondary CPUs.
+ *
+ * Finally, if EARLY_PRINTK is enabled then xen_fixmap will be mapped
+ * by the CPU once it has moved off the 1:1 mapping.
  */
 lpae_t boot_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 #ifdef CONFIG_ARM_64
 lpae_t boot_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+#endif
+lpae_t boot_second[LPAE_ENTRIES]  __attribute__((__aligned__(4096)));
+
+/* Main runtime page tables */
+
+/*
+ * For arm32 xen_pgtable and xen_dommap are per-PCPU and are allocated before
+ * bringing up each CPU. For arm64 xen_pgtable is common to all PCPUs.
+ *
+ * xen_second, xen_fixmap and xen_xenmap are always shared between all
+ * PCPUs.
+ */
+
+#ifdef CONFIG_ARM_64
+lpae_t xen_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+lpae_t xen_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+#define THIS_CPU_PGTABLE xen_pgtable
+#else
+/* Per-CPU pagetable pages */
+/* xen_pgtable == root of the trie (zeroeth level on 64-bit, first on 32-bit) */
+static DEFINE_PER_CPU(lpae_t *, xen_pgtable);
+#define THIS_CPU_PGTABLE this_cpu(xen_pgtable)
+/* xen_dommap == pages used by map_domain_page, these pages contain
+ * the second level pagetables which map the domheap region
+ * DOMHEAP_VIRT_START...DOMHEAP_VIRT_END in 2MB chunks. */
+static DEFINE_PER_CPU(lpae_t *, xen_dommap);
+/* Root of the trie for cpu0 */
+lpae_t cpu0_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+#endif
+
+#ifdef CONFIG_ARM_64
 /* The first page of the first level mapping of the xenheap. The
  * subsequent xenheap first level pages are dynamically allocated, but
  * we need this one to bootstrap ourselves. */
@@ -57,26 +107,6 @@ lpae_t xenheap_first_first[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
  * setup_xenheap_mappings otherwise relies on mfn_to_virt which isn't
  * valid for a non-xenheap mapping. */
 static __initdata int xenheap_first_first_slot = -1;
-#endif
-
-/*
- * xen_pgtable and xen_dommap are per-PCPU and are allocated before
- * bringing up each CPU. On 64-bit a first level table is also allocated.
- *
- * xen_second, xen_fixmap and xen_xenmap are shared between all PCPUs.
- */
-
-#ifdef CONFIG_ARM_64
-#define THIS_CPU_PGTABLE boot_pgtable
-#else
-/* Per-CPU pagetable pages */
-/* xen_pgtable == root of the trie (zeroeth level on 64-bit, first on 32-bit) */
-static DEFINE_PER_CPU(lpae_t *, xen_pgtable);
-#define THIS_CPU_PGTABLE this_cpu(xen_pgtable)
-/* xen_dommap == pages used by map_domain_page, these pages contain
- * the second level pagetables which mapp the domheap region
- * DOMHEAP_VIRT_START...DOMHEAP_VIRT_END in 2MB chunks. */
-static DEFINE_PER_CPU(lpae_t *, xen_dommap);
 #endif
 
 /* Common pagetable leaves */
@@ -104,9 +134,8 @@ lpae_t xen_fixmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
  * as appropriate. */
 static lpae_t xen_xenmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 
-
 /* Non-boot CPUs use this to find the correct pagetables. */
-uint64_t boot_ttbr;
+uint64_t init_ttbr;
 
 static paddr_t phys_offset;
 
@@ -131,6 +160,12 @@ static inline void check_memory_layout_alignment_constraints(void) {
     BUILD_BUG_ON(BOOT_RELOC_VIRT_START & ~SECOND_MASK);
     /* 1GB aligned regions */
     BUILD_BUG_ON(XENHEAP_VIRT_START & ~FIRST_MASK);
+    /* Page table structure constraints */
+#ifdef CONFIG_ARM_64
+    BUILD_BUG_ON(zeroeth_table_offset(XEN_VIRT_START));
+#endif
+    BUILD_BUG_ON(first_table_offset(XEN_VIRT_START));
+    BUILD_BUG_ON(second_linear_offset(XEN_VIRT_START) >= LPAE_ENTRIES);
 #ifdef CONFIG_DOMAIN_PAGE
     BUILD_BUG_ON(DOMHEAP_VIRT_START & ~FIRST_MASK);
 #endif
@@ -344,16 +379,6 @@ void __cpuinit setup_virt_paging(void)
     WRITE_SYSREG32(0x80002558, VTCR_EL2); isb();
 }
 
-/* This needs to be a macro to stop the compiler spilling to the stack
- * which will change when we change pagetables */
-#define WRITE_TTBR(ttbr)                                                \
-    flush_xen_text_tlb();                                               \
-    WRITE_SYSREG64(ttbr, TTBR0_EL2);                                    \
-    dsb(); /* ensure memory accesses do not cross over the TTBR0 write */ \
-    /* flush_xen_text_tlb contains an initial isb which ensures the     \
-     * write to TTBR0 has completed. */                                 \
-    flush_xen_text_tlb()
-
 static inline lpae_t pte_of_xenaddr(vaddr_t va)
 {
     paddr_t ma = va + phys_offset;
@@ -368,70 +393,77 @@ void __init remove_early_mappings(void)
     flush_xen_data_tlb_range_va(BOOT_FDT_VIRT_START, SECOND_SIZE);
 }
 
+extern void relocate_xen(uint64_t ttbr, void *src, void *dst, size_t len);
+
 /* Boot-time pagetable setup.
  * Changes here may need matching changes in head.S */
 void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 {
+    uint64_t ttbr;
     unsigned long dest_va;
     lpae_t pte, *p;
     int i;
 
-    /* Map the destination in the boot misc area. */
-    dest_va = BOOT_RELOC_VIRT_START;
-    pte = mfn_to_xen_entry(xen_paddr >> PAGE_SHIFT);
-    write_pte(xen_second + second_table_offset(dest_va), pte);
-    flush_xen_data_tlb_range_va(dest_va, SECOND_SIZE);
-
     /* Calculate virt-to-phys offset for the new location */
     phys_offset = xen_paddr - (unsigned long) _start;
 
-    /* Copy */
-    memcpy((void *) dest_va, _start, _end - _start);
-
-    /* Beware!  Any state we modify between now and the PT switch may be
-     * discarded when we switch over to the copy. */
-
-    /* Update the copy of boot_pgtable to use the new paddrs */
-    p = (void *) boot_pgtable + dest_va - (unsigned long) _start;
 #ifdef CONFIG_ARM_64
-    p[0].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
-    p = (void *) boot_first + dest_va - (unsigned long) _start;
+    p = (void *) xen_pgtable;
+    p[0] = pte_of_xenaddr((uintptr_t)xen_first);
+    p[0].pt.table = 1;
+    p[0].pt.xn = 0;
+    p = (void *) xen_first;
+#else
+    p = (void *) cpu0_pgtable;
 #endif
+
+    /* Initialise first level entries, to point to second level entries */
     for ( i = 0; i < 4; i++)
-        p[i].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
-
-    p = (void *) xen_second + dest_va - (unsigned long) _start;
-    if ( boot_phys_offset != 0 )
     {
-        /* Remove the old identity mapping of the boot paddr */
-        vaddr_t va = (vaddr_t)_start + boot_phys_offset;
-        p[second_linear_offset(va)].bits = 0;
+        p[i] = pte_of_xenaddr((uintptr_t)(xen_second+i*LPAE_ENTRIES));
+        p[i].pt.table = 1;
+        p[i].pt.xn = 0;
     }
-    for ( i = 0; i < 4 * LPAE_ENTRIES; i++)
-        /* The FDT is not relocated */
-        if ( p[i].pt.valid && i != second_linear_offset(BOOT_FDT_VIRT_START) )
-            p[i].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
 
-    /* Change pagetables to the copy in the relocated Xen */
-    boot_ttbr = (uintptr_t) boot_pgtable + phys_offset;
-    flush_xen_dcache(boot_ttbr);
-    flush_xen_dcache_va_range((void*)dest_va, _end - _start);
+    /* Initialise xen second level entries ... */
+    /* ... Xen's text etc */
 
-    WRITE_TTBR(boot_ttbr);
+    pte = mfn_to_xen_entry(xen_paddr>>PAGE_SHIFT);
+    pte.pt.xn = 0;/* Contains our text mapping! */
+    xen_second[second_table_offset(XEN_VIRT_START)] = pte;
 
-    /* Undo the temporary map */
-    pte.bits = 0;
-    write_pte(xen_second + second_table_offset(dest_va), pte);
-    flush_xen_text_tlb();
-
-    /* Link in the fixmap pagetable */
+    /* ... Fixmap */
     pte = pte_of_xenaddr((vaddr_t)xen_fixmap);
     pte.pt.table = 1;
-    write_pte(xen_second + second_table_offset(FIXMAP_ADDR(0)), pte);
-    /*
-     * No flush required here. Individual flushes are done in
-     * set_fixmap as entries are used.
-     */
+    xen_second[second_table_offset(FIXMAP_ADDR(0))] = pte;
+
+    /* ... DTB */
+    pte = boot_second[second_table_offset(BOOT_FDT_VIRT_START)];
+    xen_second[second_table_offset(BOOT_FDT_VIRT_START)] = pte;
+
+    /* Map the destination in the boot misc area. */
+    dest_va = BOOT_RELOC_VIRT_START;
+    pte = mfn_to_xen_entry(xen_paddr >> PAGE_SHIFT);
+    write_pte(boot_second + second_table_offset(dest_va), pte);
+    flush_xen_data_tlb_range_va(dest_va, SECOND_SIZE);
+#ifdef CONFIG_ARM_64
+    ttbr = (uintptr_t) xen_pgtable + phys_offset;
+#else
+    ttbr = (uintptr_t) cpu0_pgtable + phys_offset;
+#endif
+
+    relocate_xen(ttbr, _start, (void*)dest_va, _end - _start);
+
+    /* Clear the copy of the boot pagetables. Each secondary CPU
+     * rebuilds these itself (see head.S) */
+    memset(boot_pgtable, 0x0, PAGE_SIZE);
+    flush_xen_dcache(boot_pgtable);
+#ifdef CONFIG_ARM_64
+    memset(boot_pgtable, 0x0, PAGE_SIZE);
+    flush_xen_dcache(boot_first);
+#endif
+    memset(boot_second, 0x0, PAGE_SIZE);
+    flush_xen_dcache(boot_second);
 
     /* Break up the Xen mapping into 4k pages and protect them separately. */
     for ( i = 0; i < LPAE_ENTRIES; i++ )
@@ -452,6 +484,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
         write_pte(xen_xenmap + i, pte);
         /* No flush required here as page table is not hooked in yet. */
     }
+
     pte = pte_of_xenaddr((vaddr_t)xen_xenmap);
     pte.pt.table = 1;
     write_pte(xen_second + second_linear_offset(XEN_VIRT_START), pte);
@@ -463,7 +496,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     flush_xen_text_tlb();
 
 #ifdef CONFIG_ARM_32
-    per_cpu(xen_pgtable, 0) = boot_pgtable;
+    per_cpu(xen_pgtable, 0) = cpu0_pgtable;
     per_cpu(xen_dommap, 0) = xen_second +
         second_linear_offset(DOMHEAP_VIRT_START);
 
@@ -474,10 +507,14 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
                               DOMHEAP_SECOND_PAGES*PAGE_SIZE);
 #endif
 }
+
 #ifdef CONFIG_ARM_64
 int init_secondary_pagetables(int cpu)
 {
-    /* All CPUs share a single page table on 64 bit */
+    /* Set init_ttbr for this CPU coming up. All CPus share a single setof
+     * pagetables, but rewrite it each time for consistency with 32 bit. */
+    init_ttbr = (uintptr_t) xen_pgtable + phys_offset;
+    flush_xen_dcache(init_ttbr);
     return 0;
 }
 #else
@@ -498,7 +535,7 @@ int init_secondary_pagetables(int cpu)
     }
 
     /* Initialise root pagetable from root of boot tables */
-    memcpy(first, boot_pgtable, PAGE_SIZE);
+    memcpy(first, cpu0_pgtable, PAGE_SIZE);
 
     /* Ensure the domheap has no stray mappings */
     memset(domheap, 0, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
@@ -518,6 +555,10 @@ int init_secondary_pagetables(int cpu)
     per_cpu(xen_pgtable, cpu) = first;
     per_cpu(xen_dommap, cpu) = domheap;
 
+    /* Set init_ttbr for this CPU coming up */
+    init_ttbr = __pa(first);
+    flush_xen_dcache(init_ttbr);
+
     return 0;
 }
 #endif
@@ -525,12 +566,6 @@ int init_secondary_pagetables(int cpu)
 /* MMU setup for secondary CPUS (which already have paging enabled) */
 void __cpuinit mmu_init_secondary_cpu(void)
 {
-    uint64_t ttbr;
-
-    /* Change to this CPU's pagetables */
-    ttbr = (uintptr_t)virt_to_maddr(THIS_CPU_PGTABLE);
-    WRITE_TTBR(ttbr);
-
     /* From now on, no mapping may be both writable and executable. */
     WRITE_SYSREG32(READ_SYSREG32(SCTLR_EL2) | SCTLR_WXN, SCTLR_EL2);
     flush_xen_text_tlb();
@@ -603,7 +638,7 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
     while ( base_mfn < end_mfn )
     {
         int slot = zeroeth_table_offset(vaddr);
-        lpae_t *p = &boot_pgtable[slot];
+        lpae_t *p = &xen_pgtable[slot];
 
         if ( p->pt.valid )
         {
@@ -670,7 +705,7 @@ void __init setup_frametable_mappings(paddr_t ps, paddr_t pe)
     {
         pte = mfn_to_xen_entry(second_base + i);
         pte.pt.table = 1;
-        write_pte(&boot_first[first_table_offset(FRAMETABLE_VIRT_START)+i], pte);
+        write_pte(&xen_first[first_table_offset(FRAMETABLE_VIRT_START)+i], pte);
     }
     create_32mb_mappings(second, 0, base_mfn, frametable_size >> PAGE_SHIFT);
 #else

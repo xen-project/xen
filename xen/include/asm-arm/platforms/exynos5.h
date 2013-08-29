@@ -14,20 +14,6 @@
 
 #define S5P_PA_SYSRAM   0x02020000
 
-/* Constants below is only used in assembly because the DTS is not yet parsed */
-#ifdef __ASSEMBLY__
-
-/* GIC Base Address */
-#define EXYNOS5_GIC_BASE_ADDRESS    0x10480000
-
-/* Timer's frequency */
-#define EXYNOS5_TIMER_FREQUENCY     (24 * 1000 * 1000) /* 24 MHz */
-
-/* Arndale machine ID */
-#define MACH_TYPE_SMDK5250          3774
-
-#endif /* __ASSEMBLY__ */
-
 #endif /* __ASM_ARM_PLATFORMS_EXYNOS5_H */
 /*
  * Local variables:

@@ -592,7 +592,7 @@ void __init setup_cache(void)
  * MPIDR values related to logical cpus
  * Code base on Linux arch/arm/kernel/devtree.c
  */
-static void __init init_cpus_maps(void)
+static void __init smp_init_cpus(void)
 {
     register_t mpidr;
     struct dt_device_node *cpus = dt_find_node_by_path("/cpus");
@@ -604,6 +604,14 @@ static void __init init_cpus_maps(void)
         [0 ... NR_CPUS - 1] = MPIDR_INVALID
     };
     bool_t bootcpu_valid = 0;
+    int rc;
+
+    if ( (rc = arch_smp_init()) < 0 )
+    {
+        printk(XENLOG_WARNING "SMP init failed (%d)\n"
+               "Using only 1 CPU\n", rc);
+        return;
+    }
 
     mpidr = boot_cpu_data.mpidr.bits & MPIDR_HWID_MASK;
 
@@ -673,13 +681,20 @@ static void __init init_cpus_maps(void)
 
         if ( cpuidx > NR_CPUS )
         {
-            printk(XENLOG_WARNING "DT /cpu %u node greater than max cores %u, capping them\n",
+            printk(XENLOG_WARNING
+                   "DT /cpu %u node greater than max cores %u, capping them\n",
                    cpuidx, NR_CPUS);
             cpuidx = NR_CPUS;
             break;
         }
 
-        tmp_map[i] = hwid;
+        if ( (rc = arch_cpu_init(i, cpu)) < 0 )
+        {
+            printk("cpu%d init failed (hwid %x): %d\n", i, hwid, rc);
+            tmp_map[i] = MPIDR_INVALID;
+        }
+        else
+            tmp_map[i] = hwid;
     }
 
     if ( !bootcpu_valid )
@@ -691,6 +706,8 @@ static void __init init_cpus_maps(void)
 
     for ( i = 0; i < cpuidx; i++ )
     {
+        if ( tmp_map[i] == MPIDR_INVALID )
+            continue;
         cpumask_set_cpu(i, &cpu_possible_map);
         cpu_logical_map(i) = tmp_map[i];
     }
@@ -732,15 +749,14 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     processor_id();
 
-    init_cpus_maps();
-    cpus = smp_get_max_cpus();
-
     platform_init();
+
+    smp_init_cpus();
+    cpus = smp_get_max_cpus();
 
     init_xen_time();
 
     gic_init();
-    make_cpus_ready(cpus, boot_phys_offset);
 
     set_current((struct vcpu *)0xfffff000); /* debug sanity */
     idle_vcpu[0] = current;

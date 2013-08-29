@@ -37,6 +37,25 @@
 #include EARLY_PRINTK_INC
 #endif
 
+/*
+ * Common register usage in this file:
+ *   r0  -
+ *   r1  -
+ *   r2  -
+ *   r3  -
+ *   r4  -
+ *   r5  -
+ *   r6  -
+ *   r7  - CPUID
+ *   r8  - DTB address (boot CPU only)
+ *   r9  - paddr(start)
+ *   r10 - phys offset
+ *   r11 - UART address
+ *   r12 - is_secondary_cpu
+ *   r13 - SP
+ *   r14 - LR
+ *   r15 - PC
+ */
 /* Macro to print a string to the UART, if there is one.
  * Clobbers r0-r3. */
 #ifdef EARLY_PRINTK
@@ -59,7 +78,6 @@
          * or the initial pagetable code below will need adjustment. */
         .global start
 start:
-GLOBAL(init_secondary) /* currently unused */
         /* zImage magic header, see:
          * http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html#d0e309
          */
@@ -77,7 +95,6 @@ past_zImage:
         cpsid aif                    /* Disable all interrupts */
 
         /* Save the bootloader arguments in less-clobberable registers */
-        mov   r5, r1                 /* r5: ARM-linux machine type */
         mov   r8, r2                 /* r8 := DTB base address */
 
         /* Find out where we are */
@@ -91,53 +108,55 @@ past_zImage:
         add   r8, r10                /* r8 := paddr(DTB) */
 #endif
 
-        /* Are we the boot CPU? */
-        mov   r12, #0                /* r12 := CPU ID */
-        mrc   CP32(r0, MPIDR)
-        tst   r0, #(1<<31)           /* Multiprocessor extension supported? */
-        beq   boot_cpu
-        tst   r0, #(1<<30)           /* Uniprocessor system? */
-        bne   boot_cpu
-        bics  r12, r0, #(~MPIDR_HWID_MASK) /* Mask out flags to get CPU ID */
-        beq   boot_cpu               /* If we're CPU 0, boot now */
+        mov   r12, #0                /* r12 := is_secondary_cpu */
 
-        /* Non-boot CPUs wait here to be woken up one at a time. */
-1:      dsb
-        ldr   r0, =smp_up_cpu        /* VA of gate */
-        add   r0, r0, r10            /* PA of gate */
-        ldr   r1, [r0]               /* Which CPU is being booted? */
-        teq   r1, r12                /* Is it us? */
-        wfene
-        bne   1b
+        b     common_start
 
-boot_cpu:
+GLOBAL(init_secondary)
+        cpsid aif                    /* Disable all interrupts */
+
+        /* Find out where we are */
+        ldr   r0, =start
+        adr   r9, start              /* r9  := paddr (start) */
+        sub   r10, r9, r0            /* r10 := phys-offset */
+
+        mov   r12, #1                /* r12 := is_secondary_cpu */
+
+common_start:
+        mov   r7, #0                 /* r7 := CPU ID. Initialy zero until we
+                                      * find that multiprocessor extensions are
+                                      * present and the system is SMP */
+        mrc   CP32(r1, MPIDR)
+        tst   r1, #(1<<31)           /* Multiprocessor extension supported? */
+        beq   1f
+        tst   r1, #(1<<30)           /* Uniprocessor system? */
+        bne   1f
+        bic   r7, r1, #(~MPIDR_HWID_MASK) /* Mask out flags to get CPU ID */
+1:
+
+        /* Non-boot CPUs wait here until __cpu_up is ready for them */
+        teq   r12, #0
+        beq   1f
+
+        ldr   r0, =smp_up_cpu
+        add   r0, r0, r10            /* Apply physical offset */
+        dsb
+2:      ldr   r1, [r0]
+        cmp   r1, r7
+        beq   1f
+        wfe
+        b     2b
+1:
+
 #ifdef EARLY_PRINTK
         ldr   r11, =EARLY_UART_BASE_ADDRESS  /* r11 := UART base address */
-        teq   r12, #0                   /* CPU 0 sets up the UART too */
+        teq   r12, #0                /* Boot CPU sets up the UART too */
         bleq  init_uart
         PRINT("- CPU ")
-        mov   r0, r12
+        mov   r0, r7
         bl    putn
         PRINT(" booting -\r\n")
 #endif
-        /* Secondary CPUs doesn't have machine ID
-         *  - Store machine ID on boot CPU
-         *  - Load machine ID on secondary CPUs
-         * Machine ID is needed in kick_cpus and enter_hyp_mode */
-        ldr   r0, =machine_id           /* VA of machine_id */
-        add   r0, r0, r10               /* PA of machine_id */
-        teq   r12, #0
-        streq r5, [r0]                  /* On boot CPU save machine ID */
-        ldrne r5, [r0]                  /* If non boot cpu r5 := machine ID */
-
-        /* Wake up secondary cpus */
-        teq   r12, #0
-        bleq  kick_cpus
-
-        PRINT("- Machine ID ")
-        mov   r0, r5
-        bl    putn
-        PRINT(" -\r\n")
 
         /* Check that this CPU has Hyp mode */
         mrc   CP32(r0, ID_PFR1)
@@ -147,28 +166,19 @@ boot_cpu:
         PRINT("- CPU doesn't support the virtualization extensions -\r\n")
         b     fail
 1:
-        /* Check if we're already in it */
+
+        /* Check that we're already in Hyp mode */
         mrs   r0, cpsr
         and   r0, r0, #0x1f          /* Mode is in the low 5 bits of CPSR */
         teq   r0, #0x1a              /* Hyp Mode? */
-        bne   1f
-        PRINT("- Started in Hyp mode -\r\n")
-        b     hyp
-1:
-        /* Otherwise, it must have been Secure Supervisor mode */
-        mrc   CP32(r0, SCR)
-        tst   r0, #0x1               /* Not-Secure bit set? */
-        beq   1f
-        PRINT("- CPU is not in Hyp mode or Secure state -\r\n")
-        b     fail
-1:
-        /* OK, we're in Secure state. */
-        PRINT("- Started in Secure state -\r\n- Entering Hyp mode -\r\n")
-        ldr   r0, =enter_hyp_mode    /* VA of function */
-        adr   lr, hyp                /* Set return address for call */
-        add   pc, r0, r10            /* Call PA of function */
+        beq   hyp
 
-hyp:
+        /* OK, we're boned. */
+        PRINT("- Xen must be entered in NS Hyp mode -\r\n" \
+              "- Please update the bootloader -\r\n")
+        b     fail
+
+hyp:    PRINT("- Xen starting in Hyp mode -\r\n")
 
         /* Zero BSS On the boot CPU to avoid nasty surprises */
         teq   r12, #0
@@ -208,8 +218,8 @@ skip_bss:
         bl    putn
         PRINT(" -\r\n")
         b     fail
-
 2:
+
         /* Jump to cpu_init */
         ldr   r1, [r1, #PROCINFO_cpu_init]  /* r1 := vaddr(init func) */
         adr   lr, cpu_init_done             /* Save return address */
@@ -242,68 +252,69 @@ cpu_init_done:
         ldr   r0, =(HSCTLR_BASE|SCTLR_A)
         mcr   CP32(r0, HSCTLR)
 
+        /* Rebuild the boot pagetable's first-level entries. The structure
+         * is described in mm.c.
+         *
+         * After the CPU enables paging it will add the fixmap mapping
+         * to these page tables, however this may clash with the 1:1
+         * mapping. So each CPU must rebuild the page tables here with
+         * the 1:1 in place. */
+
         /* Write Xen's PT's paddr into the HTTBR */
         ldr   r4, =boot_pgtable
-        add   r4, r4, r10            /* r4 := paddr (xen_pagetable) */
-        mov   r5, #0                 /* r4:r5 is paddr (xen_pagetable) */
+        add   r4, r4, r10            /* r4 := paddr (boot_pagetable) */
+        mov   r5, #0                 /* r4:r5 is paddr (boot_pagetable) */
         mcrr  CP64(r4, r5, HTTBR)
 
-        /* Non-boot CPUs don't need to rebuild the pagetable */
-        teq   r12, #0
-        bne   pt_ready
-
-        /* console fixmap */
-#if defined(EARLY_PRINTK)
-        ldr   r1, =xen_fixmap
-        add   r1, r1, r10            /* r1 := paddr (xen_fixmap) */
-        mov   r3, #0
-        lsr   r2, r11, #12
-        lsl   r2, r2, #12            /* 4K aligned paddr of UART */
-        orr   r2, r2, #PT_UPPER(DEV_L3)
-        orr   r2, r2, #PT_LOWER(DEV_L3) /* r2:r3 := 4K dev map including UART */
-        strd  r2, r3, [r1, #(FIXMAP_CONSOLE*8)] /* Map it in the first fixmap's slot */
-#endif
-
-        /* Build the baseline idle pagetable's first-level entries */
-        ldr   r1, =xen_second
-        add   r1, r1, r10            /* r1 := paddr (xen_second) */
+        /* Setup boot_pgtable: */
+        ldr   r1, =boot_second
+        add   r1, r1, r10            /* r1 := paddr (boot_second) */
         mov   r3, #0x0
-        orr   r2, r1, #PT_UPPER(PT)  /* r2:r3 := table map of xen_second */
+
+        /* ... map boot_second in boot_pgtable[0] */
+        orr   r2, r1, #PT_UPPER(PT)  /* r2:r3 := table map of boot_second */
         orr   r2, r2, #PT_LOWER(PT)  /* (+ rights for linear PT) */
         strd  r2, r3, [r4, #0]       /* Map it in slot 0 */
-        add   r2, r2, #0x1000
-        strd  r2, r3, [r4, #8]       /* Map 2nd page in slot 1 */
-        add   r2, r2, #0x1000
-        strd  r2, r3, [r4, #16]      /* Map 3rd page in slot 2 */
-        add   r2, r2, #0x1000
-        strd  r2, r3, [r4, #24]      /* Map 4th page in slot 3 */
 
-        /* Now set up the second-level entries */
-        orr   r2, r9, #PT_UPPER(MEM)
-        orr   r2, r2, #PT_LOWER(MEM) /* r2:r3 := 2MB normal map of Xen */
-        mov   r4, r9, lsr #18        /* Slot for paddr(start) */
-        strd  r2, r3, [r1, r4]       /* Map Xen there */
-        ldr   r4, =start
-        lsr   r4, #18                /* Slot for vaddr(start) */
-        strd  r2, r3, [r1, r4]       /* Map Xen there too */
+        /* ... map of paddr(start) in boot_pgtable */
+        lsrs  r1, r9, #30            /* Offset of base paddr in boot_pgtable */
+        beq   1f                     /* If it is in slot 0 then map in boot_second
+                                      * later on */
+        lsl   r2, r1, #30            /* Base address for 1GB mapping */
+        orr   r2, r2, #PT_UPPER(MEM) /* r2:r3 := section map */
+        orr   r2, r2, #PT_LOWER(MEM)
+        lsl   r1, r1, #3             /* r1 := Slot offset */
+        strd  r2, r3, [r4, r1]       /* Mapping of paddr(start) */
 
-        /* xen_fixmap pagetable */
-        ldr   r2, =xen_fixmap
-        add   r2, r2, r10            /* r2 := paddr (xen_fixmap) */
-        orr   r2, r2, #PT_UPPER(PT)
-        orr   r2, r2, #PT_LOWER(PT)  /* r2:r3 := table map of xen_fixmap */
-        add   r4, r4, #8
-        strd  r2, r3, [r1, r4]       /* Map it in the fixmap's slot */
+1:      /* Setup boot_second: */
+        ldr   r4, =boot_second
+        add   r4, r4, r10            /* r1 := paddr (boot_second) */
 
-        mov   r3, #0x0
-        lsr   r2, r8, #21
-        lsl   r2, r2, #21            /* 2MB-aligned paddr of DTB */
-        orr   r2, r2, #PT_UPPER(MEM)
-        orr   r2, r2, #PT_LOWER(MEM) /* r2:r3 := 2MB RAM incl. DTB */
-        add   r4, r4, #8
-        strd  r2, r3, [r1, r4]       /* Map it in the early fdt slot */
+        lsr   r2, r9, #20            /* Base address for 2MB mapping */
+        lsl   r2, r2, #20
+        orr   r2, r2, #PT_UPPER(MEM) /* r2:r3 := section map */
+        orr   r2, r2, #PT_LOWER(MEM)
 
-pt_ready:
+        /* ... map of vaddr(start) in boot_second */
+        ldr   r1, =start
+        lsr   r1, #18                /* Slot for vaddr(start) */
+        strd  r2, r3, [r4, r1]       /* Map vaddr(start) */
+
+        /* ... map of paddr(start) in boot_second */
+        lsrs  r1, r9, #30            /* Base paddr */
+        bne   1f                     /* If paddr(start) is not in slot 0
+                                      * then the mapping was done in
+                                      * boot_pgtable above */
+
+        mov   r1, r9, lsr #18        /* Slot for paddr(start) */
+        strd  r2, r3, [r4, r1]       /* Map Xen there */
+1:
+
+        /* Defer fixmap and dtb mapping until after paging enabled, to
+         * avoid them clashing with the 1:1 mapping. */
+
+        /* boot pagetable setup complete */
+
         PRINT("- Turning on paging -\r\n")
 
         ldr   r1, =paging            /* Explicit vaddr, not RIP-relative */
@@ -315,11 +326,53 @@ pt_ready:
         mov   pc, r1                 /* Get a proper vaddr into PC */
 paging:
 
+        /* Now we can install the fixmap and dtb mappings, since we
+         * don't need the 1:1 map any more */
+        dsb
+#if defined(EARLY_PRINTK) /* Fixmap is only used by early printk */
+        /* Non-boot CPUs don't need to rebuild the fixmap itself, just
+	 * the mapping from boot_second to xen_fixmap */
+        teq   r12, #0
+        bne   1f
 
-#ifdef EARLY_PRINTK
+        /* Add UART to the fixmap table */
+        ldr   r1, =xen_fixmap        /* r1 := vaddr (xen_fixmap) */
+        mov   r3, #0
+        lsr   r2, r11, #12
+        lsl   r2, r2, #12            /* 4K aligned paddr of UART */
+        orr   r2, r2, #PT_UPPER(DEV_L3)
+        orr   r2, r2, #PT_LOWER(DEV_L3) /* r2:r3 := 4K dev map including UART */
+        strd  r2, r3, [r1, #(FIXMAP_CONSOLE*8)] /* Map it in the first fixmap's slot */
+1:
+
+        /* Map fixmap into boot_second */
+        ldr   r1, =boot_second       /* r1 := vaddr (xen_fixmap) */
+        ldr   r2, =xen_fixmap
+        add   r2, r2, r10            /* r2 := paddr (xen_fixmap) */
+        orr   r2, r2, #PT_UPPER(PT)
+        orr   r2, r2, #PT_LOWER(PT)  /* r2:r3 := table map of xen_fixmap */
+        ldr   r4, =FIXMAP_ADDR(0)
+        mov   r4, r4, lsr #18        /* r4 := Slot for FIXMAP(0) */
+        strd  r2, r3, [r1, r4]       /* Map it in the fixmap's slot */
+
         /* Use a virtual address to access the UART. */
         ldr   r11, =FIXMAP_ADDR(FIXMAP_CONSOLE)
 #endif
+        /* Map the DTB in the boot misc slot */
+        teq   r12, #0                /* Only on boot CPU */
+        bne   1f
+
+        ldr   r1, =boot_second
+        mov   r3, #0x0
+        lsr   r2, r8, #21
+        lsl   r2, r2, #21            /* r2: 2MB-aligned paddr of DTB */
+        orr   r2, r2, #PT_UPPER(MEM)
+        orr   r2, r2, #PT_LOWER(MEM) /* r2:r3 := 2MB RAM incl. DTB */
+        ldr   r4, =BOOT_FDT_VIRT_START
+        mov   r4, r4, lsr #18        /* Slot for BOOT_FDT_VIRT_START */
+        strd  r2, r3, [r1, r4]       /* Map it in the early fdt slot */
+        dsb
+1:
 
         PRINT("- Ready -\r\n")
 
@@ -327,10 +380,10 @@ paging:
         teq   r12, #0
         beq   launch
 
-        /* Non-boot CPUs need to move on to the relocated pagetables */
-        mov   r0, #0
-        ldr   r4, =boot_ttbr         /* VA of HTTBR value stashed by CPU 0 */
-        add   r4, r4, r10            /* PA of it */
+        /* Non-boot CPUs need to move on to the proper pagetables, which were
+         * setup in init_secondary_pagetables. */
+
+        ldr   r4, =init_ttbr         /* VA of HTTBR value stashed by CPU 0 */
         ldrd  r4, r5, [r4]           /* Actual value */
         dsb
         mcrr  CP64(r4, r5, HTTBR)
@@ -342,29 +395,6 @@ paging:
         dsb                          /* Ensure completion of TLB+BP flush */
         isb
 
-        /* Non-boot CPUs report that they've got this far */
-        ldr   r0, =ready_cpus
-1:      ldrex r1, [r0]               /*            { read # of ready CPUs } */
-        add   r1, r1, #1             /* Atomically { ++                   } */
-        strex r2, r1, [r0]           /*            { writeback            } */
-        teq   r2, #0
-        bne   1b
-        dsb
-        mcr   CP32(r0, DCCMVAC)      /* flush D-Cache */
-        dsb
-
-        /* Here, the non-boot CPUs must wait again -- they're now running on
-         * the boot CPU's pagetables so it's safe for the boot CPU to
-         * overwrite the non-relocated copy of Xen.  Once it's done that,
-         * and brought up the memory allocator, non-boot CPUs can get their
-         * own stacks and enter C. */
-1:      wfe
-        dsb
-        ldr   r0, =smp_up_cpu
-        ldr   r1, [r0]               /* Which CPU is being booted? */
-        teq   r1, r12                /* Is it us? */
-        bne   1b
-
 launch:
         ldr   r0, =init_data
         add   r0, #INITINFO_stack    /* Find the boot-time stack */
@@ -373,7 +403,7 @@ launch:
         sub   sp, #CPUINFO_sizeof    /* Make room for CPU save record */
         mov   r0, r10                /* Marshal args: - phys_offset */
         mov   r1, r8                 /*               - DTB address */
-        movs  r2, r12                /*               - CPU ID */
+        movs  r2, r7                 /*               - CPU ID */
         beq   start_xen              /* and disappear into the land of C */
         b     start_secondary        /* (to the appropriate entry point) */
 
@@ -383,6 +413,82 @@ fail:   PRINT("- Boot failed -\r\n")
 1:      wfe
         b     1b
 
+/* Copy Xen to new location and switch TTBR
+ * r1:r0       ttbr
+ * r2          source address
+ * r3          destination address
+ * [sp]=>r4    length
+ *
+ * Source and destination must be word aligned, length is rounded up
+ * to a 16 byte boundary.
+ *
+ * MUST BE VERY CAREFUL when saving things to RAM over the copy */
+ENTRY(relocate_xen)
+        push {r4,r5,r6,r7,r8,r9,r10,r11}
+
+        ldr   r4, [sp, #8*4]                /* Get 4th argument from stack */
+
+        /* Copy 16 bytes at a time using:
+         * r5:  counter
+         * r6:  data
+         * r7:  data
+         * r8:  data
+         * r9:  data
+         * r10: source
+         * r11: destination
+         */
+        mov   r5, r4
+        mov   r10, r2
+        mov   r11, r3
+1:      ldmia r10!, {r6, r7, r8, r9}
+        stmia r11!, {r6, r7, r8, r9}
+
+        subs  r5, r5, #16
+        bgt   1b
+
+        /* Flush destination from dcache using:
+         * r5: counter
+         * r6: step
+         * r7: vaddr
+         */
+        dsb        /* So the CPU issues all writes to the range */
+
+        mov   r5, r4
+        ldr   r6, =cacheline_bytes /* r6 := step */
+        ldr   r6, [r6]
+        mov   r7, r3
+
+1:      mcr   CP32(r7, DCCMVAC)
+
+        add   r7, r7, r6
+        subs  r5, r5, r6
+        bgt   1b
+
+        dsb                            /* Ensure the flushes happen before
+                                        * continuing */
+        isb                            /* Ensure synchronization with previous
+                                        * changes to text */
+        mcr   CP32(r0, TLBIALLH)       /* Flush hypervisor TLB */
+        mcr   CP32(r0, ICIALLU)        /* Flush I-cache */
+        mcr   CP32(r0, BPIALL)         /* Flush branch predictor */
+        dsb                            /* Ensure completion of TLB+BP flush */
+        isb
+
+        mcrr  CP64(r0, r1, HTTBR)
+
+        dsb                            /* ensure memory accesses do not cross
+                                        * over the TTBR0 write */
+        isb                            /* Ensure synchronization with previous
+                                        * changes to text */
+        mcr   CP32(r0, TLBIALLH)       /* Flush hypervisor TLB */
+        mcr   CP32(r0, ICIALLU)        /* Flush I-cache */
+        mcr   CP32(r0, BPIALL)         /* Flush branch predictor */
+        dsb                            /* Ensure completion of TLB+BP flush */
+        isb
+
+        pop {r4, r5,r6,r7,r8,r9,r10,r11}
+
+        mov pc, lr
 
 #ifdef EARLY_PRINTK
 /* Bring up the UART.
@@ -438,9 +544,6 @@ puts:
 putn:   mov   pc, lr
 
 #endif /* !EARLY_PRINTK */
-
-/* Place holder for machine ID */
-machine_id: .word 0x0
 
 /*
  * Local variables:

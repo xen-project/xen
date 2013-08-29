@@ -17,12 +17,6 @@ DECLARE_PER_CPU(cpumask_var_t, cpu_core_mask);
 
 extern void stop_cpu(void);
 
-/* Bring the non-boot CPUs up to paging and ready to enter C.  
- * Must be called after Xen is relocated but before the original copy of
- * .text gets overwritten. */
-extern void
-make_cpus_ready(unsigned int max_cpus, unsigned long boot_phys_offset);
-
 extern int arch_smp_init(void);
 extern int arch_cpu_init(int cpu, struct dt_device_node *dn);
 extern int arch_cpu_up(int cpu);

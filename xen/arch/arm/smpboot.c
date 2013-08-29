@@ -56,11 +56,9 @@ struct init_info __initdata init_data =
 };
 
 /* Shared state for coordinating CPU bringup */
-unsigned long smp_up_cpu = 0;
+unsigned long smp_up_cpu = MPIDR_INVALID;
+/* Shared state for coordinating CPU teardown */
 static bool_t cpu_is_dead = 0;
-
-/* Number of non-boot CPUs ready to enter C */
-unsigned long __initdata ready_cpus = 0;
 
 /* ID of the PCPU we're running on */
 DEFINE_PER_CPU(unsigned int, cpu_id);
@@ -103,39 +101,12 @@ smp_get_max_cpus (void)
     return max_cpus;
 }
 
-
 void __init
 smp_prepare_cpus (unsigned int max_cpus)
 {
     cpumask_copy(&cpu_present_map, &cpu_possible_map);
 
     setup_cpu_sibling_map(0);
-}
-
-void __init
-make_cpus_ready(unsigned int max_cpus, unsigned long boot_phys_offset)
-{
-    unsigned long *gate;
-    paddr_t gate_pa;
-    int i;
-
-    printk("Waiting for %i other CPUs to be ready\n", max_cpus - 1);
-    /* We use the unrelocated copy of smp_up_cpu as that's the one the
-     * others can see. */ 
-    gate_pa = ((paddr_t) (unsigned long) &smp_up_cpu) + boot_phys_offset;
-    gate = map_domain_page(gate_pa >> PAGE_SHIFT) + (gate_pa & ~PAGE_MASK); 
-    for ( i = 1; i < max_cpus; i++ )
-    {
-        /* Tell the next CPU to get ready */
-        *gate = cpu_logical_map(i);
-        flush_xen_dcache(*gate);
-        isb();
-        sev();
-        /* And wait for it to respond */
-        while ( ready_cpus < i )
-            smp_rmb();
-    }
-    unmap_domain_page(gate);
 }
 
 /* Boot the current CPU */
@@ -176,6 +147,7 @@ void __cpuinit start_secondary(unsigned long boot_phys_offset,
     wmb();
 
     /* Now report this CPU is up */
+    smp_up_cpu = MPIDR_INVALID;
     cpumask_set_cpu(cpuid, &cpu_online_map);
     wmb();
 
@@ -226,6 +198,8 @@ int __cpu_up(unsigned int cpu)
 {
     int rc;
 
+    printk("Bringing up CPU%d\n", cpu);
+
     rc = init_secondary_pagetables(cpu);
     if ( rc < 0 )
         return rc;
@@ -236,14 +210,22 @@ int __cpu_up(unsigned int cpu)
     /* Tell the remote CPU what is it's logical CPU ID */
     init_data.cpuid = cpu;
 
-    /* Unblock the CPU.  It should be waiting in the loop in head.S
-     * for an event to arrive when smp_up_cpu matches its cpuid. */
+    /* Open the gate for this CPU */
     smp_up_cpu = cpu_logical_map(cpu);
-    /* we need to make sure that the change to smp_up_cpu is visible to
-     * secondary cpus with D-cache off */
     flush_xen_dcache(smp_up_cpu);
-    isb();
-    sev();
+
+    rc = arch_cpu_up(cpu);
+
+    if ( rc < 0 )
+    {
+        printk("Failed to bring up CPU%d\n", cpu);
+        return rc;
+    }
+
+    /* We don't know the GIC ID of the CPU until it has woken up, so just signal
+     * everyone and rely on our own smp_up_cpu gate to ensure only the one we
+     * want gets through. */
+    send_SGI_allbutself(GIC_SGI_EVENT_CHECK);
 
     while ( !cpu_online(cpu) )
     {
@@ -271,7 +253,6 @@ void __cpu_die(unsigned int cpu)
     cpu_is_dead = 0;
     mb();
 }
-
 
 /*
  * Local variables:
