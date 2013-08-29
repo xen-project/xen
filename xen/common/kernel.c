@@ -81,9 +81,15 @@ void __init cmdline_parse(const char *cmdline)
         /* Search for value part of a key=value option. */
         optval = strchr(opt, '=');
         if ( optval != NULL )
+        {
             *optval++ = '\0'; /* nul-terminate the option value */
+            q = strpbrk(opt, "([{<");
+        }
         else
+        {
             optval = q;       /* default option value is empty string */
+            q = NULL;
+        }
 
         /* Boolean parameters can be inverted with 'no-' prefix. */
         bool_assert = !!strncmp("no-", optkey, 3);
@@ -93,7 +99,17 @@ void __init cmdline_parse(const char *cmdline)
         for ( param = &__setup_start; param < &__setup_end; param++ )
         {
             if ( strcmp(param->name, optkey) )
+            {
+                if ( param->type == OPT_CUSTOM && q &&
+                     strlen(param->name) == q + 1 - opt &&
+                     !strncmp(param->name, opt, q + 1 - opt) )
+                {
+                    optval[-1] = '=';
+                    ((void (*)(const char *))param->var)(q);
+                    optval[-1] = '\0';
+                }
                 continue;
+            }
 
             switch ( param->type )
             {

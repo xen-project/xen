@@ -108,6 +108,7 @@ extern struct ioapic_sbdf {
 
 extern struct hpet_sbdf {
     u16 bdf, seg, id;
+    bool_t cmdline;
     struct amd_iommu *iommu;
 } hpet_sbdf;
 

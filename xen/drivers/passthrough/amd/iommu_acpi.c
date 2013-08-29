@@ -633,6 +633,50 @@ static u16 __init parse_ivhd_device_extended_range(
     return dev_length;
 }
 
+static __initdata DECLARE_BITMAP(ioapic_cmdline, ARRAY_SIZE(ioapic_sbdf));
+
+static void __init parse_ivrs_ioapic(char *str)
+{
+    const char *s = str;
+    unsigned long id;
+    unsigned int seg, bus, dev, func;
+
+    ASSERT(*s == '[');
+    id = simple_strtoul(s + 1, &s, 0);
+    if ( id >= ARRAY_SIZE(ioapic_sbdf) || *s != ']' || *++s != '=' )
+        return;
+
+    s = parse_pci(s + 1, &seg, &bus, &dev, &func);
+    if ( !s || *s )
+        return;
+
+    ioapic_sbdf[id].bdf = PCI_BDF(bus, dev, func);
+    ioapic_sbdf[id].seg = seg;
+    __set_bit(id, ioapic_cmdline);
+}
+custom_param("ivrs_ioapic[", parse_ivrs_ioapic);
+
+static void __init parse_ivrs_hpet(char *str)
+{
+    const char *s = str;
+    unsigned long id;
+    unsigned int seg, bus, dev, func;
+
+    ASSERT(*s == '[');
+    id = simple_strtoul(s + 1, &s, 0);
+    if ( id != (typeof(hpet_sbdf.id))id || *s != ']' || *++s != '=' )
+        return;
+
+    s = parse_pci(s + 1, &seg, &bus, &dev, &func);
+    if ( !s || *s )
+        return;
+
+    hpet_sbdf.bdf = PCI_BDF(bus, dev, func);
+    hpet_sbdf.seg = seg;
+    hpet_sbdf.cmdline = 1;
+}
+custom_param("ivrs_hpet[", parse_ivrs_hpet);
+
 static u16 __init parse_ivhd_device_special(
     const struct acpi_ivrs_device8c *special, u16 seg,
     u16 header_length, u16 block_length, struct amd_iommu *iommu)
@@ -681,7 +725,10 @@ static u16 __init parse_ivhd_device_special(
                 return 0;
             }
 
-            if ( ioapic_sbdf[special->handle].pin_2_idx )
+            if ( test_bit(special->handle, ioapic_cmdline) )
+                AMD_IOMMU_DEBUG("IVHD: Command line override present for IO-APIC %#x\n",
+                                special->handle);
+            else if ( ioapic_sbdf[special->handle].pin_2_idx )
             {
                 if ( ioapic_sbdf[special->handle].bdf == bdf &&
                      ioapic_sbdf[special->handle].seg == seg )
@@ -724,14 +771,18 @@ static u16 __init parse_ivhd_device_special(
         break;
     case ACPI_IVHD_HPET:
         /* set device id of hpet */
-        if ( hpet_sbdf.iommu )
+        if ( hpet_sbdf.iommu ||
+             (hpet_sbdf.cmdline && hpet_sbdf.id != special->handle) )
         {
             printk(XENLOG_WARNING "Only one IVHD HPET entry is supported\n");
             break;
         }
         hpet_sbdf.id = special->handle;
-        hpet_sbdf.bdf = bdf;
-        hpet_sbdf.seg = seg;
+        if ( !hpet_sbdf.cmdline )
+        {
+            hpet_sbdf.bdf = bdf;
+            hpet_sbdf.seg = seg;
+        }
         hpet_sbdf.iommu = iommu;
         break;
     default:
@@ -942,22 +993,23 @@ static int __init parse_ivrs_table(struct acpi_table_header *table)
              ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx )
             continue;
 
-        printk(XENLOG_ERR "IVHD Error: no information for IO-APIC %#x\n",
-               IO_APIC_ID(apic));
-        if ( amd_iommu_perdev_intremap )
-            error = -ENXIO;
+        if ( !test_bit(IO_APIC_ID(apic), ioapic_cmdline) )
+        {
+            printk(XENLOG_ERR "IVHD Error: no information for IO-APIC %#x\n",
+                   IO_APIC_ID(apic));
+            if ( amd_iommu_perdev_intremap )
+                return -ENXIO;
+        }
+
+        ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx = xmalloc_array(
+            u16, nr_ioapic_entries[apic]);
+        if ( ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx )
+            memset(ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx, -1,
+                   nr_ioapic_entries[apic] * sizeof(*ioapic_sbdf->pin_2_idx));
         else
         {
-            ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx = xmalloc_array(
-                u16, nr_ioapic_entries[apic]);
-            if ( ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx )
-                memset(ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx, -1,
-                       nr_ioapic_entries[apic] * sizeof(*ioapic_sbdf->pin_2_idx));
-            else
-            {
-                printk(XENLOG_ERR "IVHD Error: Out of memory\n");
-                error = -ENOMEM;
-            }
+            printk(XENLOG_ERR "IVHD Error: Out of memory\n");
+            error = -ENOMEM;
         }
     }
 

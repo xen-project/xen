@@ -578,6 +578,20 @@ debug hypervisor only).
 > `= <integer>`
 
 ### irq\_vector\_map
+### ivrs_hpet[`<hpet>`]
+> `=[<seg>:]<bus>:<device>.<func>`
+
+Force the use of `[<seg>:]<bus>:<device>.<func>` as device ID of HPET
+`<hpet>` instead of the one specified by the IVHD sub-tables of the IVRS
+ACPI table.
+
+### ivrs_ioapic[`<ioapic>`]
+> `=[<seg>:]<bus>:<device>.<func>`
+
+Force the use of `[<seg>:]<bus>:<device>.<func>` as device ID of IO-APIC
+`<ioapic>` instead of the one specified by the IVHD sub-tables of the IVRS
+ACPI table.
+
 ### lapic
 
 Force the use of use of the local APIC on a uniprocessor system, even
