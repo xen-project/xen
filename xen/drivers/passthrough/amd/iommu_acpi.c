@@ -674,6 +674,13 @@ static u16 __init parse_ivhd_device_special(
             if ( IO_APIC_ID(apic) != special->handle )
                 continue;
 
+            if ( special->handle >= ARRAY_SIZE(ioapic_sbdf) )
+            {
+                printk(XENLOG_ERR "IVHD Error: IO-APIC %#x entry beyond bounds\n",
+                       special->handle);
+                return 0;
+            }
+
             if ( ioapic_sbdf[special->handle].pin_2_idx )
             {
                 if ( ioapic_sbdf[special->handle].bdf == bdf &&
@@ -943,13 +950,14 @@ static int __init parse_ivrs_table(struct acpi_table_header *table)
         {
             ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx = xmalloc_array(
                 u16, nr_ioapic_entries[apic]);
-            if ( !ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx )
+            if ( ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx )
+                memset(ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx, -1,
+                       nr_ioapic_entries[apic] * sizeof(*ioapic_sbdf->pin_2_idx));
+            else
             {
                 printk(XENLOG_ERR "IVHD Error: Out of memory\n");
                 error = -ENOMEM;
             }
-            memset(ioapic_sbdf[IO_APIC_ID(apic)].pin_2_idx, -1,
-                   nr_ioapic_entries[apic] * sizeof(*ioapic_sbdf->pin_2_idx));
         }
     }
 
