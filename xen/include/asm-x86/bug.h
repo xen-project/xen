@@ -25,7 +25,7 @@ struct bug_frame {
 #define BUGFRAME_bug    2
 #define BUGFRAME_assert 3
 
-#define BUG_FRAME(type, line, ptr, msg) do {                                 \
+#define BUG_FRAME(type, line, ptr, second_frame, msg) do {                   \
     BUILD_BUG_ON((line) >> (BUG_LINE_LO_WIDTH + BUG_LINE_HI_WIDTH));         \
     asm volatile ( ".Lbug%=: ud2\n"                                          \
                    ".pushsection .bug_frames.%c0, \"a\", @progbits\n"        \
@@ -33,7 +33,7 @@ struct bug_frame {
                    ".Lfrm%=:\n"                                              \
                    ".long (.Lbug%= - .Lfrm%=) + %c4\n"                       \
                    ".long (%c1 - .Lfrm%=) + %c3\n"                           \
-                   ".ifnes \"" msg "\", \"\"\n"                              \
+                   ".if " #second_frame "\n"                                 \
                    ".long 0, %c2 - .Lfrm%=\n"                                \
                    ".endif\n"                                                \
                    ".popsection"                                             \
@@ -44,12 +44,14 @@ struct bug_frame {
                      "i" (((line) >> BUG_LINE_LO_WIDTH) << BUG_DISP_WIDTH)); \
 } while (0)
 
-#define WARN() BUG_FRAME(BUGFRAME_warn, __LINE__, __FILE__, "")
-#define BUG()  BUG_FRAME(BUGFRAME_bug,  __LINE__, __FILE__, "")
 
-#define run_in_exception_handler(fn) BUG_FRAME(BUGFRAME_run_fn, 0, fn, "")
+#define WARN() BUG_FRAME(BUGFRAME_warn, __LINE__, __FILE__, 0, NULL)
+#define BUG()  BUG_FRAME(BUGFRAME_bug,  __LINE__, __FILE__, 0, NULL)
 
-#define assert_failed(msg) BUG_FRAME(BUGFRAME_assert, __LINE__, __FILE__, msg)
+#define run_in_exception_handler(fn) BUG_FRAME(BUGFRAME_run_fn, 0, fn, 0, NULL)
+
+#define assert_failed(msg)                                      \
+    BUG_FRAME(BUGFRAME_assert, __LINE__, __FILE__, 1, msg)
 
 extern const struct bug_frame __start_bug_frames[],
                               __stop_bug_frames_0[],
