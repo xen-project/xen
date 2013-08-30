@@ -198,10 +198,6 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 			set_bit(X86_FEATURE_ARCH_PERFMON, c->x86_capability);
 	}
 
-	/* SEP CPUID bug: Pentium Pro reports SEP but doesn't have it until model 3 mask 3 */
-	if ((c->x86<<8 | c->x86_model<<4 | c->x86_mask) < 0x633)
-		clear_bit(X86_FEATURE_SEP, c->x86_capability);
-
 	if ( !cpu_has(c, X86_FEATURE_XTOPOLOGY) )
 	{
 		c->x86_max_cores = num_cpu_cores(c);
