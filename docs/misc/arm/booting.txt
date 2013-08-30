@@ -1,0 +1,30 @@
+Booting Xen
+===========
+
+Xen follows the zImage protocol defined for 32-bit ARM Linux[1] and the
+Image protocol defined for ARM64 Linux[2].
+
+In both cases the recommendation to boot in HYP/EL2 mode is a strict
+requirement for Xen.
+
+The exceptions to this on 32-bit ARM are as follows:
+
+ Xen does not require the machine type to be passed in r1. This
+ register is ignored (so may be invalid or the actual machine type).
+
+ Xen does not support the ATAG list and requires Device
+ Tree. Therefore r2 must point to the physical address of device tree
+ block (dtb) in system RAM.
+
+ NOTE: although Xen uses the zImage protocol there is no compression
+ actually used. This should be transparent to the bootloader. The
+ zImage protocol should still be used and not the stricter "raw
+ (non-zImage)" protocol described in arm/Booting.
+
+There are no exception on 64-bit ARM.
+
+[1] linux/Documentation/arm/Booting
+Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm/Booting
+
+[2] linux/Documentation/arm64/booting.txt
+Latest version: http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/arm64/booting.txt
