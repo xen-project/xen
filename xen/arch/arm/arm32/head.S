@@ -98,7 +98,7 @@ past_zImage:
         beq   boot_cpu
         tst   r0, #(1<<30)           /* Uniprocessor system? */
         bne   boot_cpu
-        bics  r12, r0, #(0xff << 24) /* Mask out flags to get CPU ID */
+        bics  r12, r0, #(~MPIDR_HWID_MASK) /* Mask out flags to get CPU ID */
         beq   boot_cpu               /* If we're CPU 0, boot now */
 
         /* Non-boot CPUs wait here to be woken up one at a time. */
