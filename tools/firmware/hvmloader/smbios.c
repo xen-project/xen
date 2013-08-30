@@ -192,7 +192,8 @@ write_smbios_tables(void *ep, void *start,
 
 #define do_struct(fn) do {                      \
     q = (fn);                                   \
-    (*nr_structs)++;                            \
+    if ( q != p )                               \
+        (*nr_structs)++;                        \
     if ( (q - p) > *max_struct_size )           \
         *max_struct_size = q - p;               \
     p = q;                                      \
