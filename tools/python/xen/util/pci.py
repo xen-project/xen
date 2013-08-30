@@ -969,18 +969,22 @@ class PciDevice:
         ttl = 480; # 3840 bytes, minimum 8 bytes per capability
         pos = 0x100
 
+        fd = None
         try:
             fd = os.open(path, os.O_RDONLY)
             os.lseek(fd, pos, 0)
             h = os.read(fd, 4)
             if len(h) == 0: # MMCONF is not enabled?
+                os.close(fd)
                 return 0
             header = struct.unpack('I', h)[0]
             if header == 0 or header == -1:
+                os.close(fd)
                 return 0
 
             while ttl > 0:
                 if (header & 0x0000ffff) == cap:
+                    os.close(fd)
                     return pos
                 pos = (header >> 20) & 0xffc
                 if pos < 0x100:
@@ -990,6 +994,8 @@ class PciDevice:
                 ttl = ttl - 1
             os.close(fd)
         except OSError, (errno, strerr):
+            if fd is not None:
+                os.close(fd)
             raise PciDeviceParseError(('Error when accessing sysfs: %s (%d)' %
                 (strerr, errno)))
         return 0
