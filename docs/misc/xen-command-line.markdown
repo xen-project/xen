@@ -761,7 +761,7 @@ This option can be specified more than once (up to 8 times at present).
 > `= <integer>`
 
 ### reboot
-> `= b[ios] | t[riple] | k[bd] | n[o] [, [w]arm | [c]old]`
+> `= t[riple] | k[bd] | n[o] [, [w]arm | [c]old]`
 
 Default: `0`
 
@@ -770,9 +770,6 @@ Specify the host reboot method.
 `warm` instructs Xen to not set the cold reboot flag.
 
 `cold` instructs Xen to set the cold reboot flag.
-
-`bios` instructs Xen to reboot the host by jumping to BIOS. This is
-only available on 32-bit x86 platforms.
 
 `triple` instructs Xen to reboot the host by causing a triple fault.
 

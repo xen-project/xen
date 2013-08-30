@@ -31,7 +31,6 @@ enum reboot_type {
         BOOT_TRIPLE = 't',
         BOOT_KBD = 'k',
         BOOT_ACPI = 'a',
-        BOOT_BIOS = 'b',
         BOOT_CF9 = 'p',
 };
 
@@ -42,7 +41,6 @@ static int reboot_mode;
  * reboot=b[ios] | t[riple] | k[bd] | n[o] [, [w]arm | [c]old]
  * warm   Don't set the cold reboot flag
  * cold   Set the cold reboot flag
- * bios   Reboot by jumping through the BIOS (only for X86_32)
  * triple Force a triple fault (init)
  * kbd    Use the keyboard controller. cold reset (default)
  * acpi   Use the RESET_REG in the FADT
@@ -64,7 +62,6 @@ static void __init set_reboot_type(char *str)
         case 'c': /* "cold" reboot (with memory testing etc) */
             reboot_mode = 0x0;
             break;
-        case 'b':
         case 'a':
         case 'k':
         case 't':
@@ -112,7 +109,6 @@ static int __init override_reboot(struct dmi_system_id *d)
     {
         static const char *__initdata msg[] =
         {
-            [BOOT_BIOS] = "BIOS",
             [BOOT_KBD]  = "keyboard controller",
             [BOOT_CF9]  = "PCI",
         };
@@ -128,7 +124,7 @@ static int __init override_reboot(struct dmi_system_id *d)
 static struct dmi_system_id __initdata reboot_dmi_table[] = {
     {    /* Handle problems with rebooting on Dell E520's */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell E520",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
@@ -137,7 +133,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Dell 1300's */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell PowerEdge 1300",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
@@ -146,7 +142,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Dell 300's */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell PowerEdge 300",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
@@ -155,7 +151,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Dell Optiplex 745's SFF */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell OptiPlex 745",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
@@ -164,7 +160,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Dell Optiplex 745's DFF */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell OptiPlex 745",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
@@ -174,7 +170,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Dell Optiplex 745 with 0KW626 */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell OptiPlex 745",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
@@ -184,7 +180,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Dell Optiplex 330 with 0KP561 */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell OptiPlex 330",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
@@ -194,7 +190,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Dell Optiplex 360 with 0T656F */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell OptiPlex 360",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
@@ -204,7 +200,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Dell OptiPlex 760 with 0G919G */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell OptiPlex 760",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
@@ -214,7 +210,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Dell 2400's */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell PowerEdge 2400",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
@@ -223,7 +219,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Dell T5400's */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell Precision T5400",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
@@ -232,7 +228,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Dell T7400's */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell Precision T7400",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
@@ -241,7 +237,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on HP laptops */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "HP Compaq Laptop",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Hewlett-Packard"),
@@ -250,7 +246,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Dell XPS710 */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell XPS710",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
@@ -259,7 +255,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Dell DXP061 */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Dell DXP061",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
@@ -268,7 +264,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on Sony VGN-Z540N */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "Sony VGN-Z540N",
         .matches = {
             DMI_MATCH(DMI_SYS_VENDOR, "Sony Corporation"),
@@ -277,7 +273,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
     },
     {    /* Handle problems with rebooting on ASUS P4S800 */
         .callback = override_reboot,
-        .driver_data = (void *)(long)BOOT_BIOS,
+        .driver_data = (void *)(long)BOOT_KBD,
         .ident = "ASUS P4S800",
         .matches = {
             DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
@@ -528,10 +524,6 @@ void machine_restart(unsigned int delay_millisecs)
             break;
         case BOOT_TRIPLE:
             asm volatile ( "lidt %0 ; int3" : "=m" (no_idt) );
-            reboot_type = BOOT_KBD;
-            break;
-        case BOOT_BIOS:
-            /* unsupported on x86_64 */
             reboot_type = BOOT_KBD;
             break;
         case BOOT_ACPI:
