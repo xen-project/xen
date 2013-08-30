@@ -251,11 +251,10 @@ void xstate_free_save_area(struct vcpu *v)
 }
 
 /* Collect the information of processor's extended state */
-void xstate_init(void)
+void xstate_init(bool_t bsp)
 {
-    u32 eax, ebx, ecx, edx;
-    int cpu = smp_processor_id();
-    u32 min_size;
+    u32 eax, ebx, ecx, edx, min_size;
+    u64 feature_mask;
 
     if ( boot_cpu_data.cpuid_level < XSTATE_CPUID )
         return;
@@ -264,6 +263,7 @@ void xstate_init(void)
 
     BUG_ON((eax & XSTATE_FP_SSE) != XSTATE_FP_SSE);
     BUG_ON((eax & XSTATE_YMM) && !(eax & XSTATE_SSE));
+    feature_mask = (((u64)edx << 32) | eax) & XCNTXT_MASK;
 
     /* FP/SSE, XSAVE.HEADER, YMM */
     min_size =  XSTATE_AREA_MIN_SIZE;
@@ -275,31 +275,33 @@ void xstate_init(void)
      * Set CR4_OSXSAVE and run "cpuid" to get xsave_cntxt_size.
      */
     set_in_cr4(X86_CR4_OSXSAVE);
-    if ( !set_xcr0((((u64)edx << 32) | eax) & XCNTXT_MASK) )
+    if ( !set_xcr0(feature_mask) )
         BUG();
     cpuid_count(XSTATE_CPUID, 0, &eax, &ebx, &ecx, &edx);
 
-    if ( cpu == 0 )
+    if ( bsp )
     {
+        xfeature_mask = feature_mask;
         /*
          * xsave_cntxt_size is the max size required by enabled features.
          * We know FP/SSE and YMM about eax, and nothing about edx at present.
          */
         xsave_cntxt_size = ebx;
-        xfeature_mask = eax + ((u64)edx << 32);
-        xfeature_mask &= XCNTXT_MASK;
         printk("%s: using cntxt_size: %#x and states: %#"PRIx64"\n",
             __func__, xsave_cntxt_size, xfeature_mask);
-
-        /* Check XSAVEOPT feature. */
-        cpuid_count(XSTATE_CPUID, 1, &eax, &ebx, &ecx, &edx);
-        cpu_has_xsaveopt = !!(eax & XSTATE_FEATURE_XSAVEOPT);
     }
     else
     {
+        BUG_ON(xfeature_mask != feature_mask);
         BUG_ON(xsave_cntxt_size != ebx);
-        BUG_ON(xfeature_mask != (xfeature_mask & XCNTXT_MASK));
     }
+
+    /* Check XSAVEOPT feature. */
+    cpuid_count(XSTATE_CPUID, 1, &eax, &ebx, &ecx, &edx);
+    if ( bsp )
+        cpu_has_xsaveopt = !!(eax & XSTATE_FEATURE_XSAVEOPT);
+    else
+        BUG_ON(!cpu_has_xsaveopt != !(eax & XSTATE_FEATURE_XSAVEOPT));
 }
 
 int handle_xsetbv(u32 index, u64 new_bv)

@@ -82,6 +82,6 @@ int __must_check handle_xsetbv(u32 index, u64 new_bv);
 /* extended state init and cleanup functions */
 void xstate_free_save_area(struct vcpu *v);
 int xstate_alloc_save_area(struct vcpu *v);
-void xstate_init(void);
+void xstate_init(bool_t bsp);
 
 #endif /* __ASM_XSTATE_H */
