@@ -88,6 +88,7 @@ struct idle_cpu {
 	 * Indicate which enable bits to clear here.
 	 */
 	unsigned long auto_demotion_disable_flags;
+	bool_t disable_promotion_to_c1e;
 };
 
 static const struct idle_cpu *icpu;
@@ -132,6 +133,12 @@ static const struct cpuidle_state nehalem_cstates[] = {
 		.target_residency = 6,
 	},
 	{
+		.name = "C1E-NHM",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 10,
+		.target_residency = 20,
+	},
+	{
 		.name = "C3-NHM",
 		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 20,
@@ -150,8 +157,14 @@ static const struct cpuidle_state snb_cstates[] = {
 	{
 		.name = "C1-SNB",
 		.flags = MWAIT2flg(0x00),
-		.exit_latency = 1,
-		.target_residency = 1,
+		.exit_latency = 2,
+		.target_residency = 2,
+	},
+	{
+		.name = "C1E-SNB",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 10,
+		.target_residency = 20,
 	},
 	{
 		.name = "C3-SNB",
@@ -182,6 +195,12 @@ static const struct cpuidle_state ivb_cstates[] = {
 		.target_residency = 1,
 	},
 	{
+		.name = "C1E-IVB",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 10,
+		.target_residency = 20,
+	},
+	{
 		.name = "C3-IVB",
 		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 59,
@@ -210,6 +229,12 @@ static const struct cpuidle_state hsw_cstates[] = {
 		.target_residency = 2,
 	},
 	{
+		.name = "C1E-HSW",
+		.flags = MWAIT2flg(0x01),
+		.exit_latency = 10,
+		.target_residency = 20,
+	},
+	{
 		.name = "C3-HSW",
 		.flags = MWAIT2flg(0x10) | CPUIDLE_FLAG_TLB_FLUSHED,
 		.exit_latency = 33,
@@ -232,10 +257,10 @@ static const struct cpuidle_state hsw_cstates[] = {
 
 static const struct cpuidle_state atom_cstates[] = {
 	{
-		.name = "C1-ATM",
+		.name = "C1E-ATM",
 		.flags = MWAIT2flg(0x00),
-		.exit_latency = 1,
-		.target_residency = 4,
+		.exit_latency = 10,
+		.target_residency = 20,
 	},
 	{
 		.name = "C2-ATM",
@@ -354,9 +379,19 @@ static void auto_demotion_disable(void *dummy)
 	wrmsrl(MSR_NHM_SNB_PKG_CST_CFG_CTL, msr_bits);
 }
 
+static void c1e_promotion_disable(void *dummy)
+{
+	u64 msr_bits;
+
+	rdmsrl(MSR_IA32_POWER_CTL, msr_bits);
+	msr_bits &= ~0x2;
+	wrmsrl(MSR_IA32_POWER_CTL, msr_bits);
+}
+
 static const struct idle_cpu idle_cpu_nehalem = {
 	.state_table = nehalem_cstates,
 	.auto_demotion_disable_flags = NHM_C1_AUTO_DEMOTE | NHM_C3_AUTO_DEMOTE,
+	.disable_promotion_to_c1e = 1,
 };
 
 static const struct idle_cpu idle_cpu_atom = {
@@ -370,14 +405,17 @@ static const struct idle_cpu idle_cpu_lincroft = {
 
 static const struct idle_cpu idle_cpu_snb = {
 	.state_table = snb_cstates,
+	.disable_promotion_to_c1e = 1,
 };
 
 static const struct idle_cpu idle_cpu_ivb = {
 	.state_table = ivb_cstates,
+	.disable_promotion_to_c1e = 1,
 };
 
 static const struct idle_cpu idle_cpu_hsw = {
 	.state_table = hsw_cstates,
+	.disable_promotion_to_c1e = 1,
 };
 
 #define ICPU(model, cpu) { 6, model, &idle_cpu_##cpu }
@@ -519,6 +557,9 @@ static int mwait_idle_cpu_init(struct notifier_block *nfb,
 
 	if (icpu->auto_demotion_disable_flags)
 		on_selected_cpus(cpumask_of(cpu), auto_demotion_disable, NULL, 1);
+
+	if (icpu->disable_promotion_to_c1e)
+		on_selected_cpus(cpumask_of(cpu), c1e_promotion_disable, NULL, 1);
 
 	return NOTIFY_DONE;
 }
