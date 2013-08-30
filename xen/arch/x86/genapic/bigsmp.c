@@ -21,15 +21,6 @@ static __init int force_bigsmp(struct dmi_system_id *d)
 
 
 static struct dmi_system_id __initdata bigsmp_dmi_table[] = {
-	{ force_bigsmp, "HP ProLiant DL760 G2", {
-		DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
-		DMI_MATCH(DMI_BIOS_VERSION, "P44-"),
-	}},
-
-	{ force_bigsmp, "HP ProLiant DL740", {
-		DMI_MATCH(DMI_BIOS_VENDOR, "HP"),
-		DMI_MATCH(DMI_BIOS_VERSION, "P47-"),
-	 }},
 	{ force_bigsmp, "UNISYS ES7000-ONE", {
 		DMI_MATCH(DMI_PRODUCT_NAME, "ES7000-ONE")
 	 }},
