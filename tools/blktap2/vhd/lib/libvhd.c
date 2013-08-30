@@ -41,6 +41,10 @@
 #include "libvhd.h"
 #include "relative-path.h"
 
+/* VHD uses an epoch of 12:00AM, Jan 1, 2000. This is the Unix timestamp for
+ * the start of the VHD epoch. */
+#define VHD_EPOCH_START 946684800
+
 static int libvhd_dbg = 0;
 
 void
@@ -694,19 +698,10 @@ vhd_end_of_data(vhd_context_t *ctx, off_t *end)
 	return 0;
 }
 
-uint32_t
+uint32_t inline
 vhd_time(time_t time)
 {
-	struct tm tm;
-	time_t micro_epoch;
-
-	memset(&tm, 0, sizeof(struct tm));
-	tm.tm_year   = 100;
-	tm.tm_mon    = 0;
-	tm.tm_mday   = 1;
-	micro_epoch  = mktime(&tm);
-
-	return (uint32_t)(time - micro_epoch);
+	return (uint32_t)(time - VHD_EPOCH_START);
 }
 
 /* 
@@ -717,20 +712,10 @@ size_t
 vhd_time_to_string(uint32_t timestamp, char *target)
 {
 	char *cr;
-	struct tm tm;
-	time_t t1, t2;
+	time_t unix_timestamp;
 
-	memset(&tm, 0, sizeof(struct tm));
-
-	/* VHD uses an epoch of 12:00AM, Jan 1, 2000.         */
-	/* Need to adjust this to the expected epoch of 1970. */
-	tm.tm_year  = 100;
-	tm.tm_mon   = 0;
-	tm.tm_mday  = 1;
-
-	t1 = mktime(&tm);
-	t2 = t1 + (time_t)timestamp;
-	ctime_r(&t2, target);
+	unix_timestamp = (time_t)timestamp + VHD_EPOCH_START;
+	ctime_r(&unix_timestamp, target);
 
 	/* handle mad ctime_r newline appending. */
 	if ((cr = strchr(target, '\n')) != NULL)
