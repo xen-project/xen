@@ -521,8 +521,9 @@ def save_pci_conf_space(devs_string):
         pci_path = sysfs_mnt + SYSFS_PCI_DEVS_PATH + '/' + pci_str + \
                 SYSFS_PCI_DEV_CONFIG_PATH
         fd = os.open(pci_path, os.O_RDONLY)
+        size = os.fstat(fd).st_size
         configs = []
-        for i in range(0, 256, 4):
+        for i in range(0, size, 4):
             configs = configs + [os.read(fd,4)]
         os.close(fd)
         pci_list = pci_list + [pci_path]
