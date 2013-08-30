@@ -252,6 +252,24 @@ static const struct cpuidle_state hsw_cstates[] = {
 		.exit_latency = 166,
 		.target_residency = 500,
 	},
+ 	{
+		.name = "C8-HSW",
+		.flags = MWAIT2flg(0x40) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 300,
+		.target_residency = 900,
+	},
+	{
+		.name = "C9-HSW",
+		.flags = MWAIT2flg(0x50) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 600,
+		.target_residency = 1800,
+	},
+	{
+		.name = "C10-HSW",
+		.flags = MWAIT2flg(0x60) | CPUIDLE_FLAG_TLB_FLUSHED,
+		.exit_latency = 2600,
+		.target_residency = 7700,
+	},
 	{}
 };
 
