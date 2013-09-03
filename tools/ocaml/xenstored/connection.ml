@@ -38,6 +38,11 @@ and t = {
 	mutable perm: Perms.Connection.t;
 }
 
+let mark_as_bad con =
+	match con.dom with
+	|None -> ()
+	| Some domain -> Domain.mark_as_bad domain
+
 let get_path con =
 Printf.sprintf "/local/domain/%i/" (match con.dom with None -> 0 | Some d -> Domain.get_id d)
 
