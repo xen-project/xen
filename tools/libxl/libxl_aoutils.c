@@ -89,7 +89,7 @@ void libxl__datacopier_prefixdata(libxl__egc *egc, libxl__datacopier_state *dc,
 
     assert(len < dc->maxsz - dc->used);
 
-    buf = libxl__zalloc(NOGC, sizeof(*buf) - sizeof(buf->buf) + len);
+    buf = libxl__zalloc(NOGC, sizeof(*buf));
     buf->used = len;
     memcpy(buf->buf, data, len);
 
