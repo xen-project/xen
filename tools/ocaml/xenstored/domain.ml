@@ -26,6 +26,7 @@ type t =
 	interface: Mmap.mmap_interface;
 	eventchn: Event.t;
 	mutable port: int;
+	mutable bad_client: bool;
 }
 
 let get_path dom = "/local/domain/" ^ (sprintf "%u" dom.id)
@@ -33,6 +34,9 @@ let get_id domain = domain.id
 let get_interface d = d.interface
 let get_mfn d = d.mfn
 let get_remote_port d = d.remote_port
+
+let is_bad_domain domain = domain.bad_client
+let mark_as_bad domain = domain.bad_client <- true
 
 let dump d chan =
 	fprintf chan "dom,%d,%nd,%d\n" d.id d.mfn d.port
@@ -56,7 +60,8 @@ let make id mfn remote_port interface eventchn = {
 	remote_port = remote_port;
 	interface = interface;
 	eventchn = eventchn;
-	port = -1
+	port = -1;
+	bad_client = false
 }
 
 let is_dom0 d = d.id = 0
