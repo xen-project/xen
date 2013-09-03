@@ -173,6 +173,12 @@ qemu-xen-dir-force-update:
 		$(GIT) reset --hard $(QEMU_UPSTREAM_REVISION); \
 	fi
 
+ifeq ($(debug),y)
+QEMU_XEN_ENABLE_DEBUG := --enable-debug
+else
+QEMU_XEN_ENABLE_DEBUG :=
+endif
+
 subdir-all-qemu-xen-dir: qemu-xen-dir-find
 	if test -d $(QEMU_UPSTREAM_URL) ; then \
 		source=$(QEMU_UPSTREAM_URL); \
@@ -181,6 +187,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 	fi; \
 	cd qemu-xen-dir; \
 	$$source/configure --enable-xen --target-list=i386-softmmu \
+		$(QEMU_XEN_ENABLE_DEBUG) \
 		--prefix=$(PREFIX) \
 		--source-path=$$source \
 		--extra-cflags="-I$(XEN_ROOT)/tools/include \
