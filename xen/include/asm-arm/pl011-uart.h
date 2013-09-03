@@ -38,6 +38,10 @@
 #define DMACR  (0x48)
 
 /* CR bits */
+#define CTSEN  (1<<15) /* automatic CTS hardware flow control */
+#define RTSEN  (1<<14) /* automatic RTS hardware flow control */
+#define RTS    (1<<11) /* RTS signal */
+#define DTR    (1<<10) /* DTR signal */
 #define RXE    (1<<9) /* Receive enable */
 #define TXE    (1<<8) /* Transmit enable */
 #define UARTEN (1<<0) /* UART enable */

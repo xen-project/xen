@@ -85,6 +85,7 @@ static void __init pl011_init_preirq(struct serial_port *port)
 {
     struct pl011 *uart = port->uart;
     unsigned int divisor;
+    unsigned int cr;
 
     /* No interrupts, please. */
     pl011_write(uart, IMSC, 0);
@@ -120,8 +121,10 @@ static void __init pl011_init_preirq(struct serial_port *port)
     pl011_write(uart, IMSC, 0);
     pl011_write(uart, ICR, ALLI);
 
-    /* Enable the UART for RX and TX; no flow ctrl */
-    pl011_write(uart, CR, RXE | TXE | UARTEN);
+    /* Enable the UART for RX and TX; keep RTS and DTR */
+    cr = pl011_read(uart, CR);
+    cr &= RTS | DTR;
+    pl011_write(uart, CR, cr | RXE | TXE | UARTEN);
 }
 
 static void __init pl011_init_postirq(struct serial_port *port)
