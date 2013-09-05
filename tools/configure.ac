@@ -97,6 +97,17 @@ AS_IF([test "x$qemu_xen" = "xn"], [
 ])
 AC_SUBST(qemu_xen)
 
+AC_ARG_WITH([system-seabios],
+    AS_HELP_STRING([--with-system-seabios@<:@=PATH@:>@],
+       [Use system supplied seabios PATH instead of building and installing
+        our own version]),[
+    case $withval in
+        no) seabios_path= ;;
+        *)  seabios_path=$withval ;;
+    esac
+],[])
+AC_SUBST(seabios_path)
+
 AC_ARG_VAR([PREPEND_INCLUDES],
     [List of include folders to prepend to CFLAGS (without -I)])
 AC_ARG_VAR([PREPEND_LIB],

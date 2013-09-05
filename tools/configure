@@ -654,6 +654,7 @@ APPEND_LIB
 APPEND_INCLUDES
 PREPEND_LIB
 PREPEND_INCLUDES
+seabios_path
 qemu_xen
 qemu_traditional
 blktap1
@@ -738,6 +739,7 @@ enable_xend
 enable_blktap1
 enable_qemu_traditional
 with_system_qemu
+with_system_seabios
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1408,6 +1410,9 @@ Optional Packages:
   --with-system-qemu[=PATH]
                           Use system supplied qemu PATH or qemu (taken from
                           $PATH) as qemu-xen device model instead of building
+                          and installing our own version
+  --with-system-seabios[=PATH]
+                          Use system supplied seabios PATH instead of building
                           and installing our own version
 
 Some influential environment variables:
@@ -3724,6 +3729,19 @@ _ACEOF
 
 
 fi
+
+
+
+# Check whether --with-system-seabios was given.
+if test "${with_system_seabios+set}" = set; then :
+  withval=$with_system_seabios;
+    case $withval in
+        no) seabios_path= ;;
+        *)  seabios_path=$withval ;;
+    esac
+
+fi
+
 
 
 

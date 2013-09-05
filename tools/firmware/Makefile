@@ -7,7 +7,9 @@ INST_DIR := $(DESTDIR)$(XENFIRMWAREDIR)
 
 SUBDIRS-y :=
 SUBDIRS-$(CONFIG_OVMF) += ovmf
+ifeq ($(SEABIOS_PATH),)
 SUBDIRS-$(CONFIG_SEABIOS) += seabios-dir
+endif
 SUBDIRS-$(CONFIG_ROMBIOS) += rombios
 SUBDIRS-$(CONFIG_ROMBIOS) += vgabios
 SUBDIRS-$(CONFIG_ROMBIOS) += etherboot

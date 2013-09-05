@@ -23,6 +23,7 @@ LD86                := @LD86@
 BCC                 := @BCC@
 IASL                := @IASL@
 FETCHER             := @FETCHER@
+SEABIOS_PATH        := @seabios_path@
 
 # Extra folder for libs/includes
 PREPEND_INCLUDES    := @PREPEND_INCLUDES@
