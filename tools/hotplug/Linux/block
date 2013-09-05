@@ -206,6 +206,13 @@ and so cannot be mounted ${m2}${when}."
 
 
 t=$(xenstore_read_default "$XENBUS_PATH/type" 'MISSING')
+p=$(xenstore_read "$XENBUS_PATH/params")
+mode=$(xenstore_read "$XENBUS_PATH/mode")
+if [ -b "$p" ]; then
+    truetype="phy"
+elif [ -f "$p" ]; then
+    truetype="file"
+fi
 
 case "$command" in
   add)
@@ -217,16 +224,11 @@ case "$command" in
       exit 0
     fi
 
-    if [ -n "$t" ]
-    then
-      p=$(xenstore_read "$XENBUS_PATH/params")
-      mode=$(xenstore_read "$XENBUS_PATH/mode")
-    fi
     FRONTEND_ID=$(xenstore_read "$XENBUS_PATH/frontend-id")
     FRONTEND_UUID=$(xenstore_read_default \
             "/local/domain/$FRONTEND_ID/vm" 'unknown')
 
-    case $t in 
+    case $truetype in
       phy)
         dev=$(expand_dev $p)
 
@@ -319,7 +321,7 @@ mount it read-write in a guest domain."
     ;;
 
   remove)
-    case $t in 
+    case $truetype in
       phy)
 	exit 0
 	;;
