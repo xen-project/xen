@@ -747,6 +747,7 @@ int vmx_vpmu_initialise(struct vcpu *v, unsigned int vpmu_flags)
         case 46:
         case 47:
         case 58:
+        case 62:
             ret = core2_vpmu_initialise(v, vpmu_flags);
             if ( !ret )
                 vpmu->arch_vpmu_ops = &core2_vpmu_ops;
