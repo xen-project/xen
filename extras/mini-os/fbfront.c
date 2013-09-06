@@ -272,7 +272,6 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
                 XenbusStateInitialising, err);
         goto close_kbdfront;
     }
-    err = NULL;
     state = xenbus_read_integer(path);
     while (err == NULL && (state < XenbusStateInitWait || state >= XenbusStateClosed))
     err = xenbus_wait_for_state_change(path, &state, &dev->events);
@@ -664,8 +663,6 @@ void shutdown_fbfront(struct fbfront_dev *dev)
                 XenbusStateInitialising, err);
         goto close_fbfront;
     }
-
-    err = NULL;
     state = xenbus_read_integer(path);
     while (err == NULL && (state < XenbusStateInitWait || state >= XenbusStateClosed))
         err = xenbus_wait_for_state_change(path, &state, &dev->events);

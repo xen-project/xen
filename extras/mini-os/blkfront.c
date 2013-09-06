@@ -289,7 +289,6 @@ void shutdown_blkfront(struct blkfront_dev *dev)
                 XenbusStateInitialising, err);
         goto close;
     }
-    err = NULL;
     state = xenbus_read_integer(path);
     while (err == NULL && (state < XenbusStateInitWait || state >= XenbusStateClosed))
         err = xenbus_wait_for_state_change(path, &state, &dev->events);
