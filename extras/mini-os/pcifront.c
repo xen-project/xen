@@ -149,7 +149,7 @@ struct pcifront_dev *init_pcifront(char *_nodename)
 
     struct pcifront_dev *dev;
 
-    char path[strlen(nodename) + 1 + 10 + 1];
+    char path[strlen(nodename) + strlen("/backend-id") + 1];
 
     if (!_nodename && pcidev)
         return pcidev;
@@ -237,8 +237,8 @@ done:
     printk("backend at %s\n", dev->backend);
 
     {
-        char path[strlen(dev->backend) + 1 + 5 + 1];
-        char frontpath[strlen(nodename) + 1 + 5 + 1];
+        char path[strlen(dev->backend) + strlen("/state") + 1];
+        char frontpath[strlen(nodename) + strlen("/state") + 1];
         XenbusState state;
         snprintf(path, sizeof(path), "%s/state", dev->backend);
 
@@ -322,7 +322,7 @@ void shutdown_pcifront(struct pcifront_dev *dev)
     char* err = NULL;
     XenbusState state;
 
-    char path[strlen(dev->backend) + 1 + 5 + 1];
+    char path[strlen(dev->backend) + strlen("/state") + 1];
     char nodename[strlen(dev->nodename) + strlen("/event-channel") + 1];
 
     printk("close pci: backend at %s\n",dev->backend);

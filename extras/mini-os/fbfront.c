@@ -75,7 +75,7 @@ struct kbdfront_dev *init_kbdfront(char *_nodename, int abs_pointer)
     char* nodename = _nodename ? _nodename : "device/vkbd/0";
     struct kbdfront_dev *dev;
 
-    char path[strlen(nodename) + 1 + 10 + 1];
+    char path[strlen(nodename) + strlen("/backend-id") + 1];
 
     printk("******************* KBDFRONT for %s **********\n\n\n", nodename);
 
@@ -239,7 +239,7 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
     char* err = NULL;
     XenbusState state;
 
-    char path[strlen(dev->backend) + 1 + 5 + 1];
+    char path[strlen(dev->backend) + strlen("/state") + 1];
     char nodename[strlen(dev->nodename) + strlen("/request-abs-pointer") + 1];
 
     printk("close kbd: backend at %s\n",dev->backend);
@@ -413,7 +413,7 @@ struct fbfront_dev *init_fbfront(char *_nodename, unsigned long *mfns, int width
     unsigned long mapped;
     char* nodename = _nodename ? _nodename : "device/vfb/0";
 
-    char path[strlen(nodename) + 1 + 10 + 1];
+    char path[strlen(nodename) + strlen("/backend-id") + 1];
 
     printk("******************* FBFRONT for %s **********\n\n\n", nodename);
 
@@ -520,7 +520,7 @@ done:
 
     {
         XenbusState state;
-        char path[strlen(dev->backend) + 1 + 14 + 1];
+        char path[strlen(dev->backend) + strlen("/request-update") + 1];
         char frontpath[strlen(nodename) + strlen("/state") + 1];
 
         snprintf(path, sizeof(path), "%s/state", dev->backend);
@@ -631,7 +631,7 @@ void shutdown_fbfront(struct fbfront_dev *dev)
     char* err = NULL;
     XenbusState state;
 
-    char path[strlen(dev->backend) + 1 + 5 + 1];
+    char path[strlen(dev->backend) + strlen("/state") + 1];
     char nodename[strlen(dev->nodename) + strlen("/feature-update") + 1];
 
     printk("close fb: backend at %s\n",dev->backend);

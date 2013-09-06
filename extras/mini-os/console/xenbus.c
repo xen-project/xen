@@ -18,8 +18,8 @@ void free_consfront(struct consfront_dev *dev)
     char* err = NULL;
     XenbusState state;
 
-    char path[strlen(dev->backend) + 1 + 5 + 1];
-    char nodename[strlen(dev->nodename) + 1 + 5 + 1];
+    char path[strlen(dev->backend) + strlen("/state") + 1];
+    char nodename[strlen(dev->nodename) + strlen("/state") + 1];
 
     snprintf(path, sizeof(path), "%s/state", dev->backend);
     snprintf(nodename, sizeof(nodename), "%s/state", dev->nodename);

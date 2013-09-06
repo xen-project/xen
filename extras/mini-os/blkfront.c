@@ -99,7 +99,7 @@ struct blkfront_dev *init_blkfront(char *_nodename, struct blkfront_info *info)
 
     struct blkfront_dev *dev;
 
-    char path[strlen(nodename) + 1 + 10 + 1];
+    char path[strlen(nodename) + strlen("/backend-id") + 1];
 
     printk("******************* BLKFRONT for %s **********\n\n\n", nodename);
 
@@ -189,7 +189,7 @@ done:
 
     {
         XenbusState state;
-        char path[strlen(dev->backend) + 1 + 19 + 1];
+        char path[strlen(dev->backend) + strlen("/feature-flush-cache") + 1];
         snprintf(path, sizeof(path), "%s/mode", dev->backend);
         msg = xenbus_read(XBT_NIL, path, &c);
         if (msg) {
@@ -253,7 +253,7 @@ void shutdown_blkfront(struct blkfront_dev *dev)
     char* err = NULL;
     XenbusState state;
 
-    char path[strlen(dev->backend) + 1 + 5 + 1];
+    char path[strlen(dev->backend) + strlen("/state") + 1];
     char nodename[strlen(dev->nodename) + strlen("/event-channel") + 1];
 
     blkfront_sync(dev);

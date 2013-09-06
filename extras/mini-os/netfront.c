@@ -441,7 +441,7 @@ done:
 
     {
         XenbusState state;
-        char path[strlen(dev->backend) + 1 + 5 + 1];
+        char path[strlen(dev->backend) + strlen("/state") + 1];
         snprintf(path, sizeof(path), "%s/state", dev->backend);
 
         xenbus_watch_path_token(XBT_NIL, path, path, &dev->events);
@@ -507,7 +507,7 @@ void shutdown_netfront(struct netfront_dev *dev)
     char* err = NULL;
     XenbusState state;
 
-    char path[strlen(dev->backend) + 1 + 5 + 1];
+    char path[strlen(dev->backend) + strlen("/state") + 1];
     char nodename[strlen(dev->nodename) + strlen("/request-rx-copy") + 1];
 
     printk("close network: backend at %s\n",dev->backend);
