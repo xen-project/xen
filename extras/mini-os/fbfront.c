@@ -280,12 +280,12 @@ close_kbdfront:
     if (err) free(err);
     xenbus_unwatch_path_token(XBT_NIL, path, path);
 
-    snprintf(path, sizeof(path), "%s/page-ref", nodename);
-    xenbus_rm(XBT_NIL, path);
-    snprintf(path, sizeof(path), "%s/event-channel", nodename);
-    xenbus_rm(XBT_NIL, path);
-    snprintf(path, sizeof(path), "%s/request-abs-pointer", nodename);
-    xenbus_rm(XBT_NIL, path);
+    snprintf(nodename, sizeof(nodename), "%s/page-ref", dev->nodename);
+    xenbus_rm(XBT_NIL, nodename);
+    snprintf(nodename, sizeof(nodename), "%s/event-channel", dev->nodename);
+    xenbus_rm(XBT_NIL, nodename);
+    snprintf(nodename, sizeof(nodename), "%s/request-abs-pointer", dev->nodename);
+    xenbus_rm(XBT_NIL, nodename);
 
     if (!err)
         free_kbdfront(dev);
@@ -671,14 +671,14 @@ close_fbfront:
     if (err) free(err);
     xenbus_unwatch_path_token(XBT_NIL, path, path);
 
-    snprintf(path, sizeof(path), "%s/page-ref", nodename);
-    xenbus_rm(XBT_NIL, path);
-    snprintf(path, sizeof(path), "%s/event-channel", nodename);
-    xenbus_rm(XBT_NIL, path);
-    snprintf(path, sizeof(path), "%s/protocol", nodename);
-    xenbus_rm(XBT_NIL, path);
-    snprintf(path, sizeof(path), "%s/feature-update", nodename);
-    xenbus_rm(XBT_NIL, path);
+    snprintf(nodename, sizeof(nodename), "%s/page-ref", dev->nodename);
+    xenbus_rm(XBT_NIL, nodename);
+    snprintf(nodename, sizeof(nodename), "%s/event-channel", dev->nodename);
+    xenbus_rm(XBT_NIL, nodename);
+    snprintf(nodename, sizeof(nodename), "%s/protocol", dev->nodename);
+    xenbus_rm(XBT_NIL, nodename);
+    snprintf(nodename, sizeof(nodename), "%s/feature-update", dev->nodename);
+    xenbus_rm(XBT_NIL, nodename);
 
     if (!err)
         free_fbfront(dev);

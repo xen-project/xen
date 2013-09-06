@@ -549,14 +549,14 @@ close:
     if (err) free(err);
     xenbus_unwatch_path_token(XBT_NIL, path, path);
 
-    snprintf(path, sizeof(path), "%s/tx-ring-ref", nodename);
-    xenbus_rm(XBT_NIL, path);
-    snprintf(path, sizeof(path), "%s/rx-ring-ref", nodename);
-    xenbus_rm(XBT_NIL, path);
-    snprintf(path, sizeof(path), "%s/event-channel", nodename);
-    xenbus_rm(XBT_NIL, path);
-    snprintf(path, sizeof(path), "%s/request-rx-copy", nodename);
-    xenbus_rm(XBT_NIL, path);
+    snprintf(nodename, sizeof(nodename), "%s/tx-ring-ref", dev->nodename);
+    xenbus_rm(XBT_NIL, nodename);
+    snprintf(nodename, sizeof(nodename), "%s/rx-ring-ref", dev->nodename);
+    xenbus_rm(XBT_NIL, nodename);
+    snprintf(nodename, sizeof(nodename), "%s/event-channel", dev->nodename);
+    xenbus_rm(XBT_NIL, nodename);
+    snprintf(nodename, sizeof(nodename), "%s/request-rx-copy", dev->nodename);
+    xenbus_rm(XBT_NIL, nodename);
 
     if (!err)
         free_netfront(dev);
