@@ -113,7 +113,9 @@ static void do_get_hw_residencies(void *arg)
     case 0x3E:
     /* Haswell */
     case 0x3C:
+    case 0x3F:
     case 0x45:
+    case 0x46:
         GET_PC2_RES(hw_res->pc2);
         GET_CC7_RES(hw_res->cc7);
         /* fall through */
