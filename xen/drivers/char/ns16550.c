@@ -125,6 +125,8 @@ static struct ns16550 {
 #define RESUME_DELAY    MILLISECS(10)
 #define RESUME_RETRIES  100
 
+static void ns16550_delayed_resume(void *data);
+
 static char ns_read_reg(struct ns16550 *uart, int reg)
 {
     if ( uart->remapped_io_base == NULL )
@@ -306,6 +308,7 @@ static void __init ns16550_init_postirq(struct serial_port *port)
     serial_async_transmit(port);
 
     init_timer(&uart->timer, ns16550_poll, port, 0);
+    init_timer(&uart->resume_timer, ns16550_delayed_resume, port, 0);
 
     /* Calculate time to fill RX FIFO and/or empty TX FIFO for polling. */
     bits = uart->data_bits + uart->stop_bits + !!uart->parity;
@@ -392,7 +395,6 @@ static void ns16550_resume(struct serial_port *port)
     if ( ns16550_ioport_invalid(uart) )
     {
         delayed_resume_tries = RESUME_RETRIES;
-        init_timer(&uart->resume_timer, ns16550_delayed_resume, port, 0);
         set_timer(&uart->resume_timer, NOW() + RESUME_DELAY);
     }
     else
