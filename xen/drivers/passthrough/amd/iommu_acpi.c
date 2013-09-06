@@ -677,6 +677,13 @@ static u16 __init parse_ivhd_device_special(
         if ( IO_APIC_ID(apic) != ivhd_device->special.handle )
             continue;
 
+        if ( ivhd_device->special.handle >= MAX_IO_APICS )
+        {
+            printk(XENLOG_ERR "IVHD Error: IO-APIC %#x entry beyond bounds\n",
+                   ivhd_device->special.handle);
+            return 0;
+        }
+
         if ( ioapic_bdf[ivhd_device->special.handle].pin_setup )
         {
             if ( ioapic_bdf[ivhd_device->special.handle].bdf == bdf )
