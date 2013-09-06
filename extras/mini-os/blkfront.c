@@ -254,7 +254,7 @@ void shutdown_blkfront(struct blkfront_dev *dev)
     XenbusState state;
 
     char path[strlen(dev->backend) + 1 + 5 + 1];
-    char nodename[strlen(dev->nodename) + 1 + 5 + 1];
+    char nodename[strlen(dev->nodename) + strlen("/event-channel") + 1];
 
     blkfront_sync(dev);
 

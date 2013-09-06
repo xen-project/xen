@@ -158,8 +158,8 @@ done:
 
     {
         XenbusState state;
-        char path[strlen(dev->backend) + 1 + 6 + 1];
-        char frontpath[strlen(nodename) + 1 + 6 + 1];
+        char path[strlen(dev->backend) + strlen("/state") + 1];
+        char frontpath[strlen(nodename) + strlen("/state") + 1];
 
         snprintf(path, sizeof(path), "%s/state", dev->backend);
 
@@ -240,7 +240,7 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
     XenbusState state;
 
     char path[strlen(dev->backend) + 1 + 5 + 1];
-    char nodename[strlen(dev->nodename) + 1 + 5 + 1];
+    char nodename[strlen(dev->nodename) + strlen("/request-abs-pointer") + 1];
 
     printk("close kbd: backend at %s\n",dev->backend);
 
@@ -521,7 +521,7 @@ done:
     {
         XenbusState state;
         char path[strlen(dev->backend) + 1 + 14 + 1];
-        char frontpath[strlen(nodename) + 1 + 6 + 1];
+        char frontpath[strlen(nodename) + strlen("/state") + 1];
 
         snprintf(path, sizeof(path), "%s/state", dev->backend);
 
@@ -632,7 +632,7 @@ void shutdown_fbfront(struct fbfront_dev *dev)
     XenbusState state;
 
     char path[strlen(dev->backend) + 1 + 5 + 1];
-    char nodename[strlen(dev->nodename) + 1 + 5 + 1];
+    char nodename[strlen(dev->nodename) + strlen("/feature-update") + 1];
 
     printk("close fb: backend at %s\n",dev->backend);
 

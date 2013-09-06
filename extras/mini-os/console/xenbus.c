@@ -158,7 +158,7 @@ done:
 
     {
         XenbusState state;
-        char path[strlen(dev->backend) + 1 + 19 + 1];
+        char path[strlen(dev->backend) + strlen("/state") + 1];
         snprintf(path, sizeof(path), "%s/state", dev->backend);
         
 	xenbus_watch_path_token(XBT_NIL, path, path, &dev->events);

@@ -323,7 +323,7 @@ void shutdown_pcifront(struct pcifront_dev *dev)
     XenbusState state;
 
     char path[strlen(dev->backend) + 1 + 5 + 1];
-    char nodename[strlen(dev->nodename) + 1 + 5 + 1];
+    char nodename[strlen(dev->nodename) + strlen("/event-channel") + 1];
 
     printk("close pci: backend at %s\n",dev->backend);
 
@@ -379,7 +379,10 @@ int pcifront_physical_to_virtual (struct pcifront_dev *dev,
                                   unsigned int *slot,
                                   unsigned long *fun)
 {
-    char path[strlen(dev->backend) + 1 + 5 + 10 + 1];
+    /* FIXME: the buffer sizing is a little lazy here. 10 extra bytes
+       should be enough to hold the paths we need to construct, even
+       if the number of devices is large */
+    char path[strlen(dev->backend) + strlen("/num_devs") + 10 + 1];
     int i, n;
     char *s, *msg = NULL;
     unsigned int dom1, bus1, slot1, fun1;
