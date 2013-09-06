@@ -2234,8 +2234,15 @@ static int libxl__device_disk_from_xs_be(libxl__gc *gc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     unsigned int len;
     char *tmp;
+    int rc;
 
     libxl_device_disk_init(disk);
+
+    rc = sscanf(be_path, "/local/domain/%d/", &disk->backend_domid);
+    if (rc != 1) {
+        LOG(ERROR, "Unable to fetch device backend domid from %s", be_path);
+        goto cleanup;
+    }
 
     /* "params" may not be present; but everything else must be. */
     tmp = xs_read(ctx->xsh, XBT_NULL,
