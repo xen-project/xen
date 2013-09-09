@@ -127,6 +127,8 @@ static void rombios_load(const struct bios_config *config)
     uint32_t bioshigh;
     struct rombios_info *info;
 
+    BUILD_BUG_ON(sizeof(rombios) > 0x100000 - ROMBIOS_PHYSICAL_ADDRESS);
+
     memcpy((void *)config->bios_address, config->image,
            config->image_size);
 
@@ -205,8 +207,6 @@ static void rombios_create_smbios_tables(void)
         SMBIOS_PHYSICAL_ADDRESS + sizeof(struct smbios_entry_point),
         SMBIOS_PHYSICAL_END);
 }
-
-//BUILD_BUG_ON(sizeof(rombios) > (0x00100000U - ROMBIOS_PHYSICAL_ADDRESS));
 
 struct bios_config rombios_config =  {
     .name = "ROMBIOS",

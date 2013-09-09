@@ -292,8 +292,12 @@ int main(void)
     if ( bios->bios_load )
         bios->bios_load(bios);
     else
+    {
+        BUG_ON(bios->bios_address + bios->image_size >
+               HVMLOADER_PHYSICAL_ADDRESS);
         memcpy((void *)bios->bios_address, bios->image,
                bios->image_size);
+    }
 
     if ( (hvm_info->nr_vcpus > 1) || hvm_info->apic_mode )
     {
