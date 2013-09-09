@@ -963,13 +963,11 @@ fallback:
         vvmcs_to_shadow(vvmcs, field[i]);
 }
 
-static void shadow_to_vvmcs(void *vvmcs, unsigned int field)
+static inline void shadow_to_vvmcs(void *vvmcs, unsigned int field)
 {
-    u64 value;
-    int rc;
+    unsigned long value;
 
-    value = __vmread_safe(field, &rc);
-    if ( !rc )
+    if ( __vmread_safe(field, &value) )
         __set_vvmcs(vvmcs, field, value);
 }
 

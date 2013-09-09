@@ -1292,12 +1292,11 @@ void vmx_do_resume(struct vcpu *v)
     reset_stack_and_jump(vmx_asm_do_vmentry);
 }
 
-static unsigned long vmr(unsigned long field)
+static inline unsigned long vmr(unsigned long field)
 {
-    int rc;
     unsigned long val;
-    val = __vmread_safe(field, &rc);
-    return rc ? 0 : val;
+
+    return __vmread_safe(field, &val) ? val : 0;
 }
 
 static void vmx_dump_sel(char *name, uint32_t selector)

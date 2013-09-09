@@ -4,6 +4,12 @@ ifeq ($(filter /%,$(XEN_ROOT)),)
 $(error XEN_ROOT must be absolute)
 endif
 
+# Convenient variables
+comma   := ,
+squote  := '
+empty   :=
+space   := $(empty) $(empty)
+
 # fallback for older make
 realpath = $(wildcard $(foreach file,$(1),$(shell cd -P $(dir $(file)) && echo "$$PWD/$(notdir $(file))")))
 
@@ -127,6 +133,21 @@ endef
 # Require GCC v4.1+
 check-$(gcc) = $(call cc-ver-check,CC,0x040100,"Xen requires at least gcc-4.1")
 $(eval $(check-y))
+
+# as-insn: Check whether assembler supports an instruction.
+# Usage: cflags-y += $(call as-insn "insn",option-yes,option-no)
+as-insn = $(if $(shell echo 'void _(void) { asm volatile ( $(2) ); }' \
+                       | $(1) -c -x c -o /dev/null - 2>&1),$(4),$(3))
+
+# as-insn-check: Add an option to compilation flags, but only if insn is
+#                supported by assembler.
+# Usage: $(call as-insn-check CFLAGS,CC,"nop",-DHAVE_GAS_NOP)
+as-insn-check = $(eval $(call as-insn-check-closure,$(1),$(2),$(3),$(4)))
+define as-insn-check-closure
+    ifeq ($$(call as-insn,$$($(2)),$(3),y,n),y)
+        $(1) += $(4)
+    endif
+endef
 
 define buildmakevars2shellvars
     export PREFIX="$(PREFIX)";                                            \

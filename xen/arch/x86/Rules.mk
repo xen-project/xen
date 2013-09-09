@@ -28,6 +28,8 @@ CFLAGS += -msoft-float
 
 $(call cc-options-add,CFLAGS,CC,$(EMBEDDED_EXTRA_CFLAGS))
 $(call cc-option-add,CFLAGS,CC,-Wnested-externs)
+$(call as-insn-check,CFLAGS,CC,"vmcall",-DHAVE_GAS_VMX)
+$(call as-insn-check,CFLAGS,CC,"invept (%rax)$$(comma)%rax",-DHAVE_GAS_EPT)
 
 ifeq ($(supervisor_mode_kernel),y)
 CFLAGS += -DCONFIG_X86_SUPERVISOR_MODE_KERNEL=1
