@@ -187,6 +187,19 @@ static struct msixtbl_entry *msixtbl_find_entry(
     return NULL;
 }
 
+static struct msi_desc *virt_to_msi_desc(struct pci_dev *dev, void *virt)
+{
+    struct msi_desc *desc;
+
+    list_for_each_entry( desc, &dev->msi_list, list )
+        if ( desc->msi_attrib.type == PCI_CAP_ID_MSIX  &&
+             virt >= desc->mask_base &&
+             virt < desc->mask_base + PCI_MSIX_ENTRY_SIZE ) 
+            return desc;
+
+    return NULL;
+}
+
 static void __iomem *msixtbl_addr_to_virt(
     struct msixtbl_entry *entry, unsigned long addr)
 {
@@ -247,13 +260,16 @@ out:
 }
 
 static int msixtbl_write(struct vcpu *v, unsigned long address,
-                        unsigned long len, unsigned long val)
+                         unsigned long len, unsigned long val)
 {
     unsigned long offset;
     struct msixtbl_entry *entry;
+    const struct msi_desc *msi_desc;
     void *virt;
     unsigned int nr_entry, index;
     int r = X86EMUL_UNHANDLEABLE;
+    unsigned long flags, orig;
+    struct irq_desc *desc;
 
     if ( len != 4 || (address & 3) )
         return r;
@@ -283,22 +299,57 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     if ( !virt )
         goto out;
 
-    /* Do not allow the mask bit to be changed. */
-#if 0 /* XXX
-       * As the mask bit is the only defined bit in the word, and as the
-       * host MSI-X code doesn't preserve the other bits anyway, doing
-       * this is pointless. So for now just discard the write (also
-       * saving us from having to determine the matching irq_desc).
-       */
-    spin_lock_irqsave(&desc->lock, flags);
-    orig = readl(virt);
-    val &= ~PCI_MSIX_VECTOR_BITMASK;
-    val |= orig & PCI_MSIX_VECTOR_BITMASK;
-    writel(val, virt);
-    spin_unlock_irqrestore(&desc->lock, flags);
-#endif
+    msi_desc = virt_to_msi_desc(entry->pdev, virt);
+    if ( !msi_desc || msi_desc->irq < 0 )
+        goto out;
+    
+    desc = irq_to_desc(msi_desc->irq);
+    if ( !desc )
+        goto out;
 
+    spin_lock_irqsave(&desc->lock, flags);
+
+    if ( !desc->msi_desc )
+        goto unlock;
+
+    ASSERT(msi_desc == desc->msi_desc);
+   
+    orig = readl(virt);
+
+    /*
+     * Do not allow guest to modify MSI-X control bit if it is masked 
+     * by Xen. We'll only handle the case where Xen thinks that
+     * bit is unmasked, but hardware has silently masked the bit
+     * (in case of SR-IOV VF reset, etc). On the other hand, if Xen 
+     * thinks that the bit is masked, but it's really not, 
+     * we log a warning.
+     */
+    if ( msi_desc->msi_attrib.masked )
+    {
+        if ( !(orig & PCI_MSIX_VECTOR_BITMASK) )
+            printk(XENLOG_WARNING "MSI-X control bit is unmasked when"
+                   " it is expected to be masked [%04x:%02x:%02x.%u]\n", 
+                   entry->pdev->seg, entry->pdev->bus,
+                   PCI_SLOT(entry->pdev->devfn), 
+                   PCI_FUNC(entry->pdev->devfn));
+
+        goto unlock;
+    }
+
+    /*
+     * The mask bit is the only defined bit in the word. But we 
+     * ought to preserve the reserved bits. Clearing the reserved 
+     * bits can result in undefined behaviour (see PCI Local Bus
+     * Specification revision 2.3).
+     */
+    val &= PCI_MSIX_VECTOR_BITMASK;
+    val |= (orig & ~PCI_MSIX_VECTOR_BITMASK);
+    writel(val, virt);
+
+unlock:
+    spin_unlock_irqrestore(&desc->lock, flags);
     r = X86EMUL_OKAY;
+
 out:
     rcu_read_unlock(&msixtbl_rcu_lock);
     return r;
