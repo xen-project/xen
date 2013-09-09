@@ -368,7 +368,7 @@ static inline int hvm_event_pending(struct vcpu *v)
         ((nestedhvm_enabled((_v)->domain) && cpu_has_vmx)\
                       ? X86_CR4_VMXE : 0)  |             \
         (cpu_has_pcid ? X86_CR4_PCIDE : 0) |             \
-        (xsave_enabled(_v) ? X86_CR4_OSXSAVE : 0))))
+        (cpu_has_xsave ? X86_CR4_OSXSAVE : 0))))
 
 /* These exceptions must always be intercepted. */
 #define HVM_TRAP_MASK ((1U << TRAP_machine_check) | (1U << TRAP_invalid_op))

@@ -618,7 +618,7 @@ unsigned long pv_guest_cr4_fixup(const struct vcpu *v, unsigned long guest_cr4)
         hv_cr4_mask &= ~X86_CR4_DE;
     if ( cpu_has_fsgsbase && !is_pv_32bit_domain(v->domain) )
         hv_cr4_mask &= ~X86_CR4_FSGSBASE;
-    if ( xsave_enabled(v) )
+    if ( cpu_has_xsave )
         hv_cr4_mask &= ~X86_CR4_OSXSAVE;
 
     if ( (guest_cr4 & hv_cr4_mask) != (hv_cr4 & hv_cr4_mask) )
@@ -1351,9 +1351,13 @@ static void __context_switch(void)
     if ( !is_idle_vcpu(n) )
     {
         memcpy(stack_regs, &n->arch.user_regs, CTXT_SWITCH_STACK_BYTES);
-        if ( xsave_enabled(n) && n->arch.xcr0 != get_xcr0() &&
-             !set_xcr0(n->arch.xcr0) )
-            BUG();
+        if ( cpu_has_xsave )
+        {
+            u64 xcr0 = n->arch.xcr0 ?: XSTATE_FP_SSE;
+
+            if ( xcr0 != get_xcr0() && !set_xcr0(xcr0) )
+                BUG();
+        }
         vcpu_restore_fpu_eager(n);
         n->arch.ctxt_switch_to(n);
     }

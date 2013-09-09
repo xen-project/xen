@@ -38,14 +38,15 @@ static inline void fpu_xrstor(struct vcpu *v, uint64_t mask)
 {
     bool_t ok;
 
+    ASSERT(v->arch.xsave_area);
     /*
      * XCR0 normally represents what guest OS set. In case of Xen itself, 
-     * we set all supported feature mask before doing save/restore.
+     * we set the accumulated feature mask before doing save/restore.
      */
-    ok = set_xcr0(v->arch.xcr0_accum);
+    ok = set_xcr0(v->arch.xcr0_accum | XSTATE_FP_SSE);
     ASSERT(ok);
     xrstor(v, mask);
-    ok = set_xcr0(v->arch.xcr0);
+    ok = set_xcr0(v->arch.xcr0 ?: XSTATE_FP_SSE);
     ASSERT(ok);
 }
 
@@ -137,13 +138,15 @@ static inline void fpu_xsave(struct vcpu *v)
 {
     bool_t ok;
 
-    /* XCR0 normally represents what guest OS set. In case of Xen itself,
-     * we set all accumulated feature mask before doing save/restore.
+    ASSERT(v->arch.xsave_area);
+    /*
+     * XCR0 normally represents what guest OS set. In case of Xen itself,
+     * we set the accumulated feature mask before doing save/restore.
      */
-    ok = set_xcr0(v->arch.xcr0_accum);
+    ok = set_xcr0(v->arch.xcr0_accum | XSTATE_FP_SSE);
     ASSERT(ok);
     xsave(v, v->arch.nonlazy_xstate_used ? XSTATE_ALL : XSTATE_LAZY);
-    ok = set_xcr0(v->arch.xcr0);
+    ok = set_xcr0(v->arch.xcr0 ?: XSTATE_FP_SSE);
     ASSERT(ok);
 }
 
@@ -232,7 +235,7 @@ void vcpu_restore_fpu_lazy(struct vcpu *v)
     if ( v->fpu_dirtied )
         return;
 
-    if ( xsave_enabled(v) )
+    if ( cpu_has_xsave )
         fpu_xrstor(v, XSTATE_LAZY);
     else if ( v->fpu_initialised )
     {
@@ -262,7 +265,7 @@ void vcpu_save_fpu(struct vcpu *v)
     /* This can happen, if a paravirtualised guest OS has set its CR0.TS. */
     clts();
 
-    if ( xsave_enabled(v) )
+    if ( cpu_has_xsave )
         fpu_xsave(v);
     else if ( cpu_has_fxsr )
         fpu_fxsave(v);

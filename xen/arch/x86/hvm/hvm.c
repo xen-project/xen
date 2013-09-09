@@ -906,14 +906,12 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     hvm_set_segment_register(v, x86_seg_ldtr, &seg);
 
     /* In case xsave-absent save file is restored on a xsave-capable host */
-    if ( xsave_enabled(v) )
+    if ( cpu_has_xsave && !xsave_enabled(v) )
     {
         struct xsave_struct *xsave_area = v->arch.xsave_area;
 
         memcpy(v->arch.xsave_area, ctxt.fpu_regs, sizeof(ctxt.fpu_regs));
         xsave_area->xsave_hdr.xstate_bv = XSTATE_FP_SSE;
-        v->arch.xcr0_accum = XSTATE_FP_SSE;
-        v->arch.xcr0 = XSTATE_FP_SSE;
     }
     else
         memcpy(v->arch.fpu_ctxt, ctxt.fpu_regs, sizeof(ctxt.fpu_regs));
@@ -957,7 +955,9 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 HVM_REGISTER_SAVE_RESTORE(CPU, hvm_save_cpu_ctxt, hvm_load_cpu_ctxt,
                           1, HVMSR_PER_VCPU);
 
-#define HVM_CPU_XSAVE_SIZE  (3 * sizeof(uint64_t) + xsave_cntxt_size)
+#define HVM_CPU_XSAVE_SIZE(xcr0) (offsetof(struct hvm_hw_cpu_xsave, \
+                                           save_area) + \
+                                  xstate_ctxt_size(xcr0))
 
 static int hvm_save_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
 {
@@ -969,20 +969,20 @@ static int hvm_save_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
 
     for_each_vcpu ( d, v )
     {
+        unsigned int size = HVM_CPU_XSAVE_SIZE(v->arch.xcr0_accum);
+
         if ( !xsave_enabled(v) )
             continue;
-        if ( _hvm_init_entry(h, CPU_XSAVE_CODE, v->vcpu_id, HVM_CPU_XSAVE_SIZE) )
+        if ( _hvm_init_entry(h, CPU_XSAVE_CODE, v->vcpu_id, size) )
             return 1;
         ctxt = (struct hvm_hw_cpu_xsave *)&h->data[h->cur];
-        h->cur += HVM_CPU_XSAVE_SIZE;
-        memset(ctxt, 0, HVM_CPU_XSAVE_SIZE);
+        h->cur += size;
 
         ctxt->xfeature_mask = xfeature_mask;
         ctxt->xcr0 = v->arch.xcr0;
         ctxt->xcr0_accum = v->arch.xcr0_accum;
-        if ( v->fpu_initialised )
-            memcpy(&ctxt->save_area,
-                v->arch.xsave_area, xsave_cntxt_size);
+        memcpy(&ctxt->save_area, v->arch.xsave_area,
+               size - offsetof(struct hvm_hw_cpu_xsave, save_area));
     }
 
     return 0;
@@ -990,11 +990,11 @@ static int hvm_save_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
 
 static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
 {
-    int vcpuid;
+    unsigned int vcpuid, size;
+    int err;
     struct vcpu *v;
     struct hvm_hw_cpu_xsave *ctxt;
     struct hvm_save_descriptor *desc;
-    uint64_t _xfeature_mask;
 
     /* Which vcpu is this? */
     vcpuid = hvm_load_instance(h);
@@ -1006,47 +1006,74 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
     }
 
     /* Fails since we can't restore an img saved on xsave-capable host. */
-    if ( !xsave_enabled(v) )
-        return -EINVAL;
+    if ( !cpu_has_xsave )
+        return -EOPNOTSUPP;
 
     /* Customized checking for entry since our entry is of variable length */
     desc = (struct hvm_save_descriptor *)&h->data[h->cur];
     if ( sizeof (*desc) > h->size - h->cur)
     {
         printk(XENLOG_G_WARNING
-               "HVM%d restore: not enough data left to read descriptor"
-               "for type %u\n", d->domain_id, CPU_XSAVE_CODE);
-        return -1;
+               "HVM%d.%d restore: not enough data left to read xsave descriptor\n",
+               d->domain_id, vcpuid);
+        return -ENODATA;
     }
     if ( desc->length + sizeof (*desc) > h->size - h->cur)
     {
         printk(XENLOG_G_WARNING
-               "HVM%d restore: not enough data left to read %u bytes "
-               "for type %u\n", d->domain_id, desc->length, CPU_XSAVE_CODE);
-        return -1;
+               "HVM%d.%d restore: not enough data left to read %u xsave bytes\n",
+               d->domain_id, vcpuid, desc->length);
+        return -ENODATA;
     }
-    if ( CPU_XSAVE_CODE != desc->typecode || (desc->length > HVM_CPU_XSAVE_SIZE) )
+    if ( desc->length < offsetof(struct hvm_hw_cpu_xsave, save_area) +
+                        XSTATE_AREA_MIN_SIZE )
     {
         printk(XENLOG_G_WARNING
-               "HVM%d restore mismatch: expected type %u with max length %u, "
-               "saw type %u length %u\n", d->domain_id, CPU_XSAVE_CODE,
-               (unsigned int)HVM_CPU_XSAVE_SIZE,
-               desc->typecode, desc->length);
-        return -1;
+               "HVM%d.%d restore mismatch: xsave length %u < %zu\n",
+               d->domain_id, vcpuid, desc->length,
+               offsetof(struct hvm_hw_cpu_xsave,
+                        save_area) + XSTATE_AREA_MIN_SIZE);
+        return -EINVAL;
+    }
+    size = HVM_CPU_XSAVE_SIZE(xfeature_mask);
+    if ( desc->length > size )
+    {
+        printk(XENLOG_G_WARNING
+               "HVM%d.%d restore mismatch: xsave length %u > %u\n",
+               d->domain_id, vcpuid, desc->length, size);
+        return -EOPNOTSUPP;
     }
     h->cur += sizeof (*desc);
-    /* Checking finished */
 
     ctxt = (struct hvm_hw_cpu_xsave *)&h->data[h->cur];
     h->cur += desc->length;
 
-    _xfeature_mask = ctxt->xfeature_mask;
-    if ( (_xfeature_mask & xfeature_mask) != _xfeature_mask )
-        return -EINVAL;
+    err = validate_xstate(ctxt->xcr0, ctxt->xcr0_accum,
+                          ctxt->save_area.xsave_hdr.xstate_bv,
+                          ctxt->xfeature_mask);
+    if ( err )
+    {
+        printk(XENLOG_G_WARNING
+               "HVM%d.%d restore: inconsistent xsave state (feat=%#"PRIx64
+               " accum=%#"PRIx64" xcr0=%#"PRIx64" bv=%#"PRIx64" err=%d)\n",
+               d->domain_id, vcpuid, ctxt->xfeature_mask, ctxt->xcr0_accum,
+               ctxt->xcr0, ctxt->save_area.xsave_hdr.xstate_bv, err);
+        return err;
+    }
+    size = HVM_CPU_XSAVE_SIZE(ctxt->xcr0_accum);
+    if ( desc->length > size )
+    {
+        printk(XENLOG_G_WARNING
+               "HVM%d.%d restore mismatch: xsave length %u > %u\n",
+               d->domain_id, vcpuid, desc->length, size);
+        return -EOPNOTSUPP;
+    }
+    /* Checking finished */
 
     v->arch.xcr0 = ctxt->xcr0;
     v->arch.xcr0_accum = ctxt->xcr0_accum;
-    memcpy(v->arch.xsave_area, &ctxt->save_area, xsave_cntxt_size);
+    memcpy(v->arch.xsave_area, &ctxt->save_area,
+           desc->length - offsetof(struct hvm_hw_cpu_xsave, save_area));
 
     return 0;
 }
@@ -1060,7 +1087,8 @@ static int __init __hvm_register_CPU_XSAVE_save_and_restore(void)
                         "CPU_XSAVE",
                         hvm_save_cpu_xsave_states,
                         hvm_load_cpu_xsave_states,
-                        HVM_CPU_XSAVE_SIZE + sizeof (struct hvm_save_descriptor),
+                        HVM_CPU_XSAVE_SIZE(xfeature_mask) +
+                            sizeof(struct hvm_save_descriptor),
                         HVMSR_PER_VCPU);
     return 0;
 }
@@ -2767,7 +2795,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
             __clear_bit(X86_FEATURE_APIC & 31, edx);
 
         /* Fix up OSXSAVE. */
-        if ( xsave_enabled(v) )
+        if ( cpu_has_xsave )
             *ecx |= (v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_OSXSAVE) ?
                      cpufeat_mask(X86_FEATURE_OSXSAVE) : 0;
 

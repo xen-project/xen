@@ -1047,11 +1047,8 @@ long arch_do_domctl(
         struct xen_domctl_vcpuextstate *evc;
         struct vcpu *v;
         uint32_t offset = 0;
-        uint64_t _xfeature_mask = 0;
-        uint64_t _xcr0, _xcr0_accum;
-        void *receive_buf = NULL, *_xsave_area;
 
-#define PV_XSAVE_SIZE (2 * sizeof(uint64_t) + xsave_cntxt_size)
+#define PV_XSAVE_SIZE(xcr0) (2 * sizeof(uint64_t) + xstate_ctxt_size(xcr0))
 
         evc = &domctl->u.vcpuextstate;
 
@@ -1062,15 +1059,16 @@ long arch_do_domctl(
 
         if ( domctl->cmd == XEN_DOMCTL_getvcpuextstate )
         {
+            unsigned int size = PV_XSAVE_SIZE(v->arch.xcr0_accum);
+
             if ( !evc->size && !evc->xfeature_mask )
             {
                 evc->xfeature_mask = xfeature_mask;
-                evc->size = PV_XSAVE_SIZE;
+                evc->size = size;
                 ret = 0;
                 goto vcpuextstate_out;
             }
-            if ( evc->size != PV_XSAVE_SIZE ||
-                 evc->xfeature_mask != xfeature_mask )
+            if ( evc->size != size || evc->xfeature_mask != xfeature_mask )
             {
                 ret = -EINVAL;
                 goto vcpuextstate_out;
@@ -1093,7 +1091,7 @@ long arch_do_domctl(
             offset += sizeof(v->arch.xcr0_accum);
             if ( copy_to_guest_offset(domctl->u.vcpuextstate.buffer,
                                       offset, (void *)v->arch.xsave_area,
-                                      xsave_cntxt_size) )
+                                      size - 2 * sizeof(uint64_t)) )
             {
                 ret = -EFAULT;
                 goto vcpuextstate_out;
@@ -1101,13 +1099,14 @@ long arch_do_domctl(
         }
         else
         {
-            ret = -EINVAL;
+            void *receive_buf;
+            uint64_t _xcr0, _xcr0_accum;
+            const struct xsave_struct *_xsave_area;
 
-            _xfeature_mask = evc->xfeature_mask;
-            /* xsave context must be restored on compatible target CPUs */
-            if ( (_xfeature_mask & xfeature_mask) != _xfeature_mask )
-                goto vcpuextstate_out;
-            if ( evc->size > PV_XSAVE_SIZE || evc->size < 2 * sizeof(uint64_t) )
+            ret = -EINVAL;
+            if ( evc->size < 2 * sizeof(uint64_t) ||
+                 evc->size > 2 * sizeof(uint64_t) +
+                             xstate_ctxt_size(xfeature_mask) )
                 goto vcpuextstate_out;
 
             receive_buf = xmalloc_bytes(evc->size);
@@ -1128,20 +1127,30 @@ long arch_do_domctl(
             _xcr0_accum = *(uint64_t *)(receive_buf + sizeof(uint64_t));
             _xsave_area = receive_buf + 2 * sizeof(uint64_t);
 
-            if ( !(_xcr0 & XSTATE_FP) || _xcr0 & ~xfeature_mask )
+            if ( _xcr0_accum )
             {
-                xfree(receive_buf);
-                goto vcpuextstate_out;
+                if ( evc->size >= 2 * sizeof(uint64_t) + XSTATE_AREA_MIN_SIZE )
+                    ret = validate_xstate(_xcr0, _xcr0_accum,
+                                          _xsave_area->xsave_hdr.xstate_bv,
+                                          evc->xfeature_mask);
             }
-            if ( (_xcr0 & _xcr0_accum) != _xcr0 )
+            else if ( !_xcr0 )
+                ret = 0;
+            if ( ret )
             {
                 xfree(receive_buf);
                 goto vcpuextstate_out;
             }
 
-            v->arch.xcr0 = _xcr0;
-            v->arch.xcr0_accum = _xcr0_accum;
-            memcpy(v->arch.xsave_area, _xsave_area, evc->size - 2 * sizeof(uint64_t) );
+            if ( evc->size <= PV_XSAVE_SIZE(_xcr0_accum) )
+            {
+                v->arch.xcr0 = _xcr0;
+                v->arch.xcr0_accum = _xcr0_accum;
+                memcpy(v->arch.xsave_area, _xsave_area,
+                       evc->size - 2 * sizeof(uint64_t));
+            }
+            else
+                ret = -EINVAL;
 
             xfree(receive_buf);
         }

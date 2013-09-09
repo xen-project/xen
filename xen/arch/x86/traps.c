@@ -817,7 +817,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_PDCM % 32, &c);
         __clear_bit(X86_FEATURE_PCID % 32, &c);
         __clear_bit(X86_FEATURE_DCA % 32, &c);
-        if ( !xsave_enabled(current) )
+        if ( !cpu_has_xsave )
         {
             __clear_bit(X86_FEATURE_XSAVE % 32, &c);
             __clear_bit(X86_FEATURE_AVX % 32, &c);
@@ -842,7 +842,7 @@ static void pv_cpuid(struct cpu_user_regs *regs)
         break;
 
     case 0x0000000d: /* XSAVE */
-        if ( !xsave_enabled(current) )
+        if ( !cpu_has_xsave )
             goto unsupported;
         break;
 
