@@ -285,7 +285,9 @@ static inline void __vmptrld(u64 addr)
     asm volatile ( VMPTRLD_OPCODE
                    MODRM_EAX_06
                    /* CF==1 or ZF==1 --> crash (ud2) */
-                   "ja 1f ; ud2 ; 1:\n"
+                   UNLIKELY_START(be, vmptrld)
+                   "\tud2\n"
+                   UNLIKELY_END_SECTION
                    :
                    : "a" (&addr)
                    : "memory");
@@ -296,7 +298,9 @@ static inline void __vmpclear(u64 addr)
     asm volatile ( VMCLEAR_OPCODE
                    MODRM_EAX_06
                    /* CF==1 or ZF==1 --> crash (ud2) */
-                   "ja 1f ; ud2 ; 1:\n"
+                   UNLIKELY_START(be, vmclear)
+                   "\tud2\n"
+                   UNLIKELY_END_SECTION
                    :
                    : "a" (&addr)
                    : "memory");
@@ -309,7 +313,9 @@ static inline unsigned long __vmread(unsigned long field)
     asm volatile ( VMREAD_OPCODE
                    MODRM_EAX_ECX
                    /* CF==1 or ZF==1 --> crash (ud2) */
-                   "ja 1f ; ud2 ; 1:\n"
+                   UNLIKELY_START(be, vmread)
+                   "\tud2\n"
+                   UNLIKELY_END_SECTION
                    : "=c" (ecx)
                    : "a" (field)
                    : "memory");
@@ -322,7 +328,9 @@ static inline void __vmwrite(unsigned long field, unsigned long value)
     asm volatile ( VMWRITE_OPCODE
                    MODRM_EAX_ECX
                    /* CF==1 or ZF==1 --> crash (ud2) */
-                   "ja 1f ; ud2 ; 1:\n"
+                   UNLIKELY_START(be, vmwrite)
+                   "\tud2\n"
+                   UNLIKELY_END_SECTION
                    : 
                    : "a" (field) , "c" (value)
                    : "memory");
@@ -360,7 +368,9 @@ static inline void __invept(int type, u64 eptp, u64 gpa)
     asm volatile ( INVEPT_OPCODE
                    MODRM_EAX_08
                    /* CF==1 or ZF==1 --> crash (ud2) */
-                   "ja 1f ; ud2 ; 1:\n"
+                   UNLIKELY_START(be, invept)
+                   "\tud2\n"
+                   UNLIKELY_END_SECTION
                    :
                    : "a" (&operand), "c" (type)
                    : "memory" );
@@ -377,7 +387,10 @@ static inline void __invvpid(int type, u16 vpid, u64 gva)
     /* Fix up #UD exceptions which occur when TLBs are flushed before VMXON. */
     asm volatile ( "1: " INVVPID_OPCODE MODRM_EAX_08
                    /* CF==1 or ZF==1 --> crash (ud2) */
-                   "ja 2f ; ud2 ; 2:\n"
+                   UNLIKELY_START(be, invvpid)
+                   "\tud2\n"
+                   UNLIKELY_END_SECTION "\n"
+                   "2:"
                    _ASM_EXTABLE(1b, 2b)
                    :
                    : "a" (&operand), "c" (type)

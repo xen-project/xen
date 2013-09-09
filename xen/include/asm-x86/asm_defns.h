@@ -67,6 +67,30 @@ void ret_from_intr(void);
 #define ASSERT_NOT_IN_ATOMIC
 #endif
 
+#else
+
+#ifdef __clang__ /* clang's builtin assember can't do .subsection */
+
+#define UNLIKELY_START_SECTION ".pushsection .fixup,\"ax\""
+#define UNLIKELY_END_SECTION   ".popsection"
+
+#else
+
+#define UNLIKELY_START_SECTION ".subsection 1"
+#define UNLIKELY_END_SECTION   ".subsection 0"
+
+#endif
+
+#define UNLIKELY_START(cond, tag)          \
+        "j" #cond " .Lunlikely%=.tag;\n\t" \
+        UNLIKELY_START_SECTION "\n"        \
+        ".Lunlikely%=.tag:"
+
+#define UNLIKELY_END(tag)                  \
+        "jmp .Llikely%=.tag;\n\t"          \
+        UNLIKELY_END_SECTION "\n"          \
+        ".Llikely%=.tag:"
+
 #endif
 
 #endif /* __X86_ASM_DEFNS_H__ */
