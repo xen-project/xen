@@ -281,7 +281,7 @@ Flag to indicate whether all guest console output should be copied
 into the console ring buffer.
 
 ### conswitch
-> `= <switch char>[,x]`
+> `= <switch char>[x]`
 
 > Default `conswitch=a`
 
@@ -292,7 +292,8 @@ times.
 The optional trailing `x` indicates that Xen should not automatically
 switch the console input to dom0 during boot.  Any other value,
 including omission, causes Xen to automatically switch to the dom0
-console during dom0 boot.
+console during dom0 boot.  Use `conswitch=ax` to keep the default switch
+character, but for xen to keep the console.
 
 ### cpu\_type
 > `= arch_perfmon`
