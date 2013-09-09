@@ -629,6 +629,7 @@ void xfree(void *p)
         unsigned int i, order = get_order_from_pages(size);
 
         BUG_ON((unsigned long)p & ((PAGE_SIZE << order) - 1));
+        PFN_ORDER(virt_to_page(p)) = 0;
         for ( i = 0; ; ++i )
         {
             if ( !(size & (1 << i)) )
