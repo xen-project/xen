@@ -32,28 +32,34 @@
 #define CLGI   .byte 0x0F,0x01,0xDD
 
 ENTRY(svm_asm_do_resume)
+        GET_CURRENT(%rbx)
+.Lsvm_do_resume:
         call svm_intr_assist
         mov  %rsp,%rdi
         call nsvm_vcpu_switch
         ASSERT_NOT_IN_ATOMIC
 
-        GET_CURRENT(%rbx)
-        CLGI
-
         mov  VCPU_processor(%rbx),%eax
-        shl  $IRQSTAT_shift,%eax
         lea  irq_stat+IRQSTAT_softirq_pending(%rip),%rdx
-        cmpl $0,(%rdx,%rax,1)
+        xor  %ecx,%ecx
+        shl  $IRQSTAT_shift,%eax
+        CLGI
+        cmp  %ecx,(%rdx,%rax,1)
         jne  .Lsvm_process_softirqs
 
-        testb $0, VCPU_nsvm_hap_enabled(%rbx)
-UNLIKELY_START(nz, nsvm_hap)
-        mov  VCPU_nhvm_p2m(%rbx),%rax
-        test %rax,%rax
+        cmp  %cl,VCPU_nsvm_hap_enabled(%rbx)
+UNLIKELY_START(ne, nsvm_hap)
+        cmp  %rcx,VCPU_nhvm_p2m(%rbx)
         sete %al
-        andb VCPU_nhvm_guestmode(%rbx),%al
-        jnz  .Lsvm_nsvm_no_p2m
-UNLIKELY_END(nsvm_hap)
+        test VCPU_nhvm_guestmode(%rbx),%al
+        UNLIKELY_DONE(z, nsvm_hap)
+        /*
+         * Someone shot down our nested p2m table; go round again
+         * and nsvm_vcpu_switch() will fix it for us.
+         */
+        STGI
+        jmp  .Lsvm_do_resume
+__UNLIKELY_END(nsvm_hap)
 
         call svm_asid_handle_vmrun
 
@@ -72,13 +78,12 @@ UNLIKELY_END(svm_trace)
         mov  UREGS_eflags(%rsp),%rax
         mov  %rax,VMCB_rflags(%rcx)
 
-        mov  VCPU_svm_vmcb_pa(%rbx),%rax
-
         pop  %r15
         pop  %r14
         pop  %r13
         pop  %r12
         pop  %rbp
+        mov  VCPU_svm_vmcb_pa(%rbx),%rax
         pop  %rbx
         pop  %r11
         pop  %r10
@@ -92,25 +97,26 @@ UNLIKELY_END(svm_trace)
 
         VMRUN
 
+        GET_CURRENT(%rax)
         push %rdi
         push %rsi
         push %rdx
         push %rcx
+        mov  VCPU_svm_vmcb(%rax),%rcx
         push %rax
         push %r8
         push %r9
         push %r10
         push %r11
         push %rbx
+        mov  %rax,%rbx
         push %rbp
         push %r12
         push %r13
         push %r14
         push %r15
 
-        GET_CURRENT(%rbx)
         movb $0,VCPU_svm_vmcb_in_sync(%rbx)
-        mov  VCPU_svm_vmcb(%rbx),%rcx
         mov  VMCB_rax(%rcx),%rax
         mov  %rax,UREGS_rax(%rsp)
         mov  VMCB_rip(%rcx),%rax
@@ -120,33 +126,14 @@ UNLIKELY_END(svm_trace)
         mov  VMCB_rflags(%rcx),%rax
         mov  %rax,UREGS_eflags(%rsp)
 
-#ifndef NDEBUG
-        mov  $0xbeef,%ax
-        mov  %ax,UREGS_error_code(%rsp)
-        mov  %ax,UREGS_entry_vector(%rsp)
-        mov  %ax,UREGS_saved_upcall_mask(%rsp)
-        mov  %ax,UREGS_cs(%rsp)
-        mov  %ax,UREGS_ds(%rsp)
-        mov  %ax,UREGS_es(%rsp)
-        mov  %ax,UREGS_fs(%rsp)
-        mov  %ax,UREGS_gs(%rsp)
-        mov  %ax,UREGS_ss(%rsp)
-#endif
-
         STGI
 .globl svm_stgi_label
 svm_stgi_label:
         mov  %rsp,%rdi
         call svm_vmexit_handler
-        jmp  svm_asm_do_resume
+        jmp  .Lsvm_do_resume
 
 .Lsvm_process_softirqs:
         STGI
         call do_softirq
-        jmp  svm_asm_do_resume
-
-.Lsvm_nsvm_no_p2m:
-        /* Someone shot down our nested p2m table; go round again
-         * and nsvm_vcpu_switch() will fix it for us. */
-        STGI
-        jmp  svm_asm_do_resume
+        jmp  .Lsvm_do_resume

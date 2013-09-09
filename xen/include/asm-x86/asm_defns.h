@@ -39,10 +39,16 @@ void ret_from_intr(void);
         .subsection 1;            \
         .Lunlikely.tag:
 
-#define UNLIKELY_END(tag)         \
-        jmp .Llikely.tag;         \
+#define UNLIKELY_DONE(cond, tag)  \
+        j##cond .Llikely.tag
+
+#define __UNLIKELY_END(tag)       \
         .subsection 0;            \
         .Llikely.tag:
+
+#define UNLIKELY_END(tag)         \
+        UNLIKELY_DONE(mp, tag);   \
+        __UNLIKELY_END(tag)
 
 #define STACK_CPUINFO_FIELD(field) (STACK_SIZE-CPUINFO_sizeof+CPUINFO_##field)
 #define GET_STACK_BASE(reg)                       \

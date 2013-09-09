@@ -2069,6 +2069,8 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     vintr_t intr;
     bool_t vcpu_guestmode = 0;
 
+    hvm_invalidate_regs_fields(regs);
+
     if ( paging_mode_hap(v->domain) )
         v->arch.hvm_vcpu.guest_cr[3] = v->arch.hvm_vcpu.hw_cr[3] =
             vmcb_get_cr3(vmcb);
