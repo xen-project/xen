@@ -26,6 +26,9 @@
 #include <asm/msr.h>
 #include <asm/processor.h>
 
+/* Using SetVirtualAddressMap() is incompatible with kexec: */
+#undef USE_SET_VIRTUAL_ADDRESS_MAP
+
 #define SHIM_LOCK_PROTOCOL_GUID \
   { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} }
 
@@ -1434,7 +1437,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     /* Adjust pointers into EFI. */
     efi_ct = (void *)efi_ct + DIRECTMAP_VIRT_START;
-#if 0 /* Only needed when using virtual mode (see efi_init_memory()). */
+#ifdef USE_SET_VIRTUAL_ADDRESS_MAP
     efi_rs = (void *)efi_rs + DIRECTMAP_VIRT_START;
 #endif
     efi_memmap = (void *)efi_memmap + DIRECTMAP_VIRT_START;
@@ -1477,6 +1480,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     for( ; ; ); /* not reached */
 }
 
+#ifndef USE_SET_VIRTUAL_ADDRESS_MAP
 static __init void copy_mapping(unsigned long mfn, unsigned long end,
                                 bool_t (*is_valid)(unsigned long smfn,
                                                    unsigned long emfn))
@@ -1520,6 +1524,7 @@ static bool_t __init rt_range_valid(unsigned long smfn, unsigned long emfn)
 {
     return 1;
 }
+#endif
 
 #define INVALID_VIRTUAL_ADDRESS (0xBAAADUL << \
                                  (EFI_PAGE_SHIFT + BITS_PER_LONG - 32))
@@ -1527,6 +1532,13 @@ static bool_t __init rt_range_valid(unsigned long smfn, unsigned long emfn)
 void __init efi_init_memory(void)
 {
     unsigned int i;
+#ifndef USE_SET_VIRTUAL_ADDRESS_MAP
+    struct rt_extra {
+        struct rt_extra *next;
+        unsigned long smfn, emfn;
+        unsigned int prot;
+    } *extra, *extra_head = NULL;
+#endif
 
     printk(XENLOG_INFO "EFI memory map:\n");
     for ( i = 0; i < efi_memmap_size; i += efi_mdesc_size )
@@ -1573,6 +1585,8 @@ void __init efi_init_memory(void)
              !(smfn & pfn_hole_mask) &&
              !((smfn ^ (emfn - 1)) & ~pfn_pdx_bottom_mask) )
         {
+            if ( (unsigned long)mfn_to_virt(emfn - 1) >= HYPERVISOR_VIRT_END )
+                prot &= ~_PAGE_GLOBAL;
             if ( map_pages_to_xen((unsigned long)mfn_to_virt(smfn),
                                   smfn, emfn - smfn, prot) == 0 )
                 desc->VirtualStart =
@@ -1581,15 +1595,29 @@ void __init efi_init_memory(void)
                 printk(XENLOG_ERR "Could not map MFNs %#lx-%#lx\n",
                        smfn, emfn - 1);
         }
+#ifndef USE_SET_VIRTUAL_ADDRESS_MAP
+        else if ( !((desc->PhysicalStart + len - 1) >> (VADDR_BITS - 1)) &&
+                  (extra = xmalloc(struct rt_extra)) != NULL )
+        {
+            extra->smfn = smfn;
+            extra->emfn = emfn;
+            extra->prot = prot & ~_PAGE_GLOBAL;
+            extra->next = extra_head;
+            extra_head = extra;
+            desc->VirtualStart = desc->PhysicalStart;
+        }
+#endif
         else
         {
+#ifdef USE_SET_VIRTUAL_ADDRESS_MAP
             /* XXX allocate e.g. down from FIXADDR_START */
+#endif
             printk(XENLOG_ERR "No mapping for MFNs %#lx-%#lx\n",
                    smfn, emfn - 1);
         }
     }
 
-#if 0 /* Incompatible with kexec. */
+#ifdef USE_SET_VIRTUAL_ADDRESS_MAP
     efi_rs->SetVirtualAddressMap(efi_memmap_size, efi_mdesc_size,
                                  mdesc_ver, efi_memmap);
 #else
@@ -1600,20 +1628,74 @@ void __init efi_init_memory(void)
 
     copy_mapping(0, max_page, ram_range_valid);
 
-    /* Insert non-RAM runtime mappings. */
+    /* Insert non-RAM runtime mappings inside the direct map. */
     for ( i = 0; i < efi_memmap_size; i += efi_mdesc_size )
     {
         const EFI_MEMORY_DESCRIPTOR *desc = efi_memmap + i;
 
-        if ( desc->Attribute & EFI_MEMORY_RUNTIME )
+        if ( (desc->Attribute & EFI_MEMORY_RUNTIME) &&
+             desc->VirtualStart != INVALID_VIRTUAL_ADDRESS &&
+             desc->VirtualStart != desc->PhysicalStart )
+            copy_mapping(PFN_DOWN(desc->PhysicalStart),
+                         PFN_UP(desc->PhysicalStart +
+                                (desc->NumberOfPages << EFI_PAGE_SHIFT)),
+                         rt_range_valid);
+    }
+
+    /* Insert non-RAM runtime mappings outside of the direct map. */
+    while ( (extra = extra_head) != NULL )
+    {
+        unsigned long addr = extra->smfn << PAGE_SHIFT;
+        l4_pgentry_t l4e = efi_l4_pgtable[l4_table_offset(addr)];
+        l3_pgentry_t *pl3e;
+        l2_pgentry_t *pl2e;
+        l1_pgentry_t *l1t;
+
+        if ( !(l4e_get_flags(l4e) & _PAGE_PRESENT) )
         {
-            if ( desc->VirtualStart != INVALID_VIRTUAL_ADDRESS )
-                copy_mapping(PFN_DOWN(desc->PhysicalStart),
-                             PFN_UP(desc->PhysicalStart +
-                                    (desc->NumberOfPages << EFI_PAGE_SHIFT)),
-                             rt_range_valid);
-            else
-                /* XXX */;
+            pl3e = alloc_xen_pagetable();
+            BUG_ON(!pl3e);
+            clear_page(pl3e);
+            efi_l4_pgtable[l4_table_offset(addr)] =
+                l4e_from_paddr(virt_to_maddr(pl3e), __PAGE_HYPERVISOR);
+        }
+        else
+            pl3e = l4e_to_l3e(l4e);
+        pl3e += l3_table_offset(addr);
+        if ( !(l3e_get_flags(*pl3e) & _PAGE_PRESENT) )
+        {
+            pl2e = alloc_xen_pagetable();
+            BUG_ON(!pl2e);
+            clear_page(pl2e);
+            *pl3e = l3e_from_paddr(virt_to_maddr(pl2e), __PAGE_HYPERVISOR);
+        }
+        else
+        {
+            BUG_ON(l3e_get_flags(*pl3e) & _PAGE_PSE);
+            pl2e = l3e_to_l2e(*pl3e);
+        }
+        pl2e += l2_table_offset(addr);
+        if ( !(l2e_get_flags(*pl2e) & _PAGE_PRESENT) )
+        {
+            l1t = alloc_xen_pagetable();
+            BUG_ON(!l1t);
+            clear_page(l1t);
+            *pl2e = l2e_from_paddr(virt_to_maddr(l1t), __PAGE_HYPERVISOR);
+        }
+        else
+        {
+            BUG_ON(l2e_get_flags(*pl2e) & _PAGE_PSE);
+            l1t = l2e_to_l1e(*pl2e);
+        }
+        for ( i = l1_table_offset(addr);
+              i < L1_PAGETABLE_ENTRIES && extra->smfn < extra->emfn;
+              ++i, ++extra->smfn )
+            l1t[i] = l1e_from_pfn(extra->smfn, extra->prot);
+
+        if ( extra->smfn == extra->emfn )
+        {
+            extra_head = extra->next;
+            xfree(extra);
         }
     }
 
