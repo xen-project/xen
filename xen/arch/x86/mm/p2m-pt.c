@@ -691,7 +691,7 @@ static void p2m_change_type_global(struct p2m_domain *p2m,
                 l1mfn = _mfn(l2e_get_pfn(l2e[i2]));
                 l1e = map_domain_page(mfn_x(l1mfn));
 
-                for ( i1 = 0; i1 < L1_PAGETABLE_ENTRIES; i1++, gfn++ )
+                for ( i1 = 0; i1 < L1_PAGETABLE_ENTRIES; i1++ )
                 {
                     flags = l1e_get_flags(l1e[i1]);
                     if ( p2m_flags_to_type(flags) != ot )
