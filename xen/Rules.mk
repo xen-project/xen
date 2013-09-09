@@ -41,13 +41,12 @@ ALL_OBJS-y               += $(BASEDIR)/xsm/built_in.o
 ALL_OBJS-y               += $(BASEDIR)/arch/$(TARGET_ARCH)/built_in.o
 ALL_OBJS-$(x86)          += $(BASEDIR)/crypto/built_in.o
 
-CFLAGS-y                += -fno-builtin -fno-common
-CFLAGS-y                += -Werror -Wredundant-decls -Wno-pointer-arith
-CFLAGS-y                += -pipe
-CFLAGS-y                += -g -D__XEN__ -include $(BASEDIR)/include/xen/config.h
+CFLAGS += -fno-builtin -fno-common
+CFLAGS += -Werror -Wredundant-decls -Wno-pointer-arith
+CFLAGS += -pipe -g -D__XEN__ -include $(BASEDIR)/include/xen/config.h
 # Solaris puts stdarg.h &c in the system include directory.
 ifneq ($(XEN_OS),SunOS)
-CFLAGS-y                += -nostdinc -iwithprefix include
+CFLAGS += -nostdinc -iwithprefix include
 endif
 
 CFLAGS-$(XSM_ENABLE)    += -DXSM_ENABLE
