@@ -80,6 +80,9 @@
   .globl name;                                  \
   ALIGN;                                        \
   name:
+#define GLOBAL(name)                            \
+  .globl name;                                  \
+  name:
 #endif
 
 #define NR_hypercalls 64

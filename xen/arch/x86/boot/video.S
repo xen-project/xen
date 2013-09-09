@@ -993,14 +993,17 @@ force_size:     .word   0       # Use this size instead of the one in BIOS vars
 
 vesa_size:      .word   0,0,0   # width x depth x height
 
-                .globl  boot_vid_info, boot_edid_info, boot_edid_caps
 /* If we don't run at all, assume basic video mode 3 at 80x25. */
-boot_vid_mode:  .word   VIDEO_80x25
-boot_vid_info:  .byte   0, 0    /* orig_x, orig_y */
-                .byte   3       /* text mode 3    */
-                .byte   80, 25  /* 80x25          */
-                .byte   1       /* isVGA          */
-                .word   16      /* 8x16 font      */
-                .fill   0x28,1,0
-boot_edid_info: .fill   128,1,0x13
-boot_edid_caps: .word   0x1313
+GLOBAL(boot_vid_mode)
+        .word   VIDEO_80x25
+GLOBAL(boot_vid_info)
+        .byte   0, 0    /* orig_x, orig_y */
+        .byte   3       /* text mode 3    */
+        .byte   80, 25  /* 80x25          */
+        .byte   1       /* isVGA          */
+        .word   16      /* 8x16 font      */
+        .fill   0x28,1,0
+GLOBAL(boot_edid_info)
+        .fill   128,1,0x13
+GLOBAL(boot_edid_caps)
+        .word   0x1313

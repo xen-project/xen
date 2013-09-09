@@ -67,12 +67,11 @@ get_memory_map:
 
         ret
 
-        .globl e820map, e820nr, lowmem_kb, highmem_kb
-e820map:
+GLOBAL(e820map)
         .fill   E820MAX*20,1,0
-e820nr:
+GLOBAL(e820nr)
         .long   0
-lowmem_kb:
+GLOBAL(lowmem_kb)
         .long   0
-highmem_kb:
+GLOBAL(highmem_kb)
         .long   0

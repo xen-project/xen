@@ -98,9 +98,10 @@ bogus_real_magic:
 
         .align 4
 real_magic:     .long 0x12345678
-         .globl video_mode, video_flags
-video_mode:     .long 0
-video_flags:    .long 0
+GLOBAL(video_mode)
+        .long 0
+GLOBAL(video_flags)
+        .long 0
 trampoline_seg: .word 0
         .pushsection .trampoline_seg, "a"
         .long   trampoline_seg - .

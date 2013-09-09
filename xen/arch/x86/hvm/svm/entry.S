@@ -127,8 +127,7 @@ UNLIKELY_END(svm_trace)
         mov  %rax,UREGS_eflags(%rsp)
 
         STGI
-.globl svm_stgi_label
-svm_stgi_label:
+GLOBAL(svm_stgi_label)
         mov  %rsp,%rdi
         call svm_vmexit_handler
         jmp  .Lsvm_do_resume

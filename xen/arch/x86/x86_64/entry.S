@@ -272,8 +272,7 @@ ENTRY(sysenter_entry)
         pushq $FLAT_USER_SS
         pushq $0
         pushfq
-        .globl sysenter_eflags_saved
-sysenter_eflags_saved:
+GLOBAL(sysenter_eflags_saved)
         pushq $3 /* ring 3 null cs */
         pushq $0 /* null rip */
         pushq $0
@@ -479,8 +478,7 @@ ENTRY(ret_from_intr)
 ENTRY(page_fault)
         movl  $TRAP_page_fault,4(%rsp)
 /* No special register assumptions. */
-	.globl handle_exception
-handle_exception:
+GLOBAL(handle_exception)
         SAVE_ALL
 handle_exception_saved:
         testb $X86_EFLAGS_IF>>8,UREGS_eflags+1(%rsp)
@@ -689,11 +687,8 @@ ENTRY(enable_nmis)
 1:
         retq
 
-/* No op trap handler.  Required for kexec crash path.  This is not
- * declared with the ENTRY() macro to avoid wasted alignment space.
- */
-.globl trap_nop
-trap_nop:
+/* No op trap handler.  Required for kexec crash path. */
+GLOBAL(trap_nop)
         iretq
 
 

@@ -64,9 +64,8 @@ ENTRY(do_suspend_lowlevel)
         call    acpi_enter_sleep_state
         jmp     __ret_point
 
-        .align  16
-        .globl  __ret_point
-__ret_point:
+
+ENTRY(__ret_point)
 
         /* mmu_cr4_features contains latest cr4 setting */
         mov     REF(mmu_cr4_features), GREG(ax)
@@ -118,8 +117,9 @@ __ret_point:
 
 .data
         .align 16
-        .globl   saved_magic
-saved_magic:     .long   0x9abcdef0
+
+GLOBAL(saved_magic)
+        .long   0x9abcdef0
 
 saved_ss:        .word   0
 

@@ -145,13 +145,11 @@ edd_done:
 opt_edd:
         .byte   0                               # edd=on/off/skipmbr
 
-.globl  boot_edd_info, boot_edd_info_nr
-.globl  boot_mbr_signature, boot_mbr_signature_nr
-boot_edd_info_nr:
+GLOBAL(boot_edd_info_nr)
         .byte   0
-boot_mbr_signature_nr:
+GLOBAL(boot_mbr_signature_nr)
         .byte   0
-boot_mbr_signature:
+GLOBAL(boot_mbr_signature)
         .fill   EDD_MBR_SIG_MAX*8,1,0
-boot_edd_info:
+GLOBAL(boot_edd_info)
         .fill   512,1,0                         # big enough for a disc sector

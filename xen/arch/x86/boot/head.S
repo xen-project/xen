@@ -195,11 +195,9 @@ __start:
 reloc:
 #include "reloc.S"
 
-        .align 16
-        .globl trampoline_start, trampoline_end
-trampoline_start:
+ENTRY(trampoline_start)
 #include "trampoline.S"
-trampoline_end:
+GLOBAL(trampoline_end)
 
         .text
 __high_start:
@@ -212,8 +210,7 @@ __high_start:
  * to avoid type conflicts with fixed-range MTRRs covering the lowest megabyte
  * of physical memory. In any case the VGA hole should be mapped with type UC.
  */
-        .globl l1_identmap
-l1_identmap:
+GLOBAL(l1_identmap)
         pfn = 0
         .rept L1_PAGETABLE_ENTRIES
         /* VGA hole (0xa0000-0xc0000) should be mapped UC. */

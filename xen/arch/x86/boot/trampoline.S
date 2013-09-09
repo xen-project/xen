@@ -18,8 +18,7 @@
         .long 111b - (off) - .;            \
         .popsection
 
-        .globl trampoline_realmode_entry
-trampoline_realmode_entry:
+GLOBAL(trampoline_realmode_entry)
         mov     %cs,%ax
         mov     %ax,%ds
         movb    $0xA5,bootsym(trampoline_cpu_started)
@@ -57,16 +56,13 @@ trampoline_gdt:
         .long   trampoline_gdt + BOOT_PSEUDORM_DS + 2 - .
         .popsection
 
-        .globl cpuid_ext_features
-cpuid_ext_features:
+GLOBAL(cpuid_ext_features)
         .long   0
 
-        .globl trampoline_xen_phys_start
-trampoline_xen_phys_start:
+GLOBAL(trampoline_xen_phys_start)
         .long   0
 
-        .globl trampoline_cpu_started
-trampoline_cpu_started:
+GLOBAL(trampoline_cpu_started)
         .byte   0
 
         .code32
@@ -206,8 +202,7 @@ trampoline_boot_cpu_entry:
 skip_realmode:
         .byte   0
 
-        .globl kbd_shift_flags
-kbd_shift_flags:
+GLOBAL(kbd_shift_flags)
         .byte   0
 
 rm_idt: .word   256*4-1, 0, 0
