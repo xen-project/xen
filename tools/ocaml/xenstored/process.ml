@@ -372,8 +372,8 @@ let do_input store cons doms con =
 		try
 			Connection.do_input con
 		with Failure exp ->
-			error "caught exception %s" exp;
-			error "got a bad client %s" (sprintf "%-8s" (Connection.get_domstr con));
+			Logs.error "general" "caught exception %s" exp;
+			Logs.error "general" "got a bad client %s" (sprintf "%-8s" (Connection.get_domstr con));
 			Connection.mark_as_bad con;
 			false
 	in
