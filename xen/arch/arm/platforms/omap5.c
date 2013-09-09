@@ -23,6 +23,7 @@
 #include <asm/platforms/omap5.h>
 #include <xen/mm.h>
 #include <xen/vmap.h>
+#include <asm/io.h>
 
 static uint16_t num_den[8][2] = {
     {         0,          0 },  /* not used */
@@ -59,7 +60,7 @@ static int omap5_init_time(void)
         return -ENOMEM;
     }
 
-    sys_clksel = ioreadl(ckgen_prm_base + OMAP5_CM_CLKSEL_SYS) &
+    sys_clksel = readl(ckgen_prm_base + OMAP5_CM_CLKSEL_SYS) &
         ~SYS_CLKSEL_MASK;
 
     iounmap(ckgen_prm_base);
@@ -72,7 +73,7 @@ static int omap5_init_time(void)
         return -ENOMEM;
     }
 
-    frac1 = ioreadl(rt_ct_base + INCREMENTER_NUMERATOR_OFFSET);
+    frac1 = readl(rt_ct_base + INCREMENTER_NUMERATOR_OFFSET);
     num = frac1 & ~NUMERATOR_DENUMERATOR_MASK;
     if ( num_den[sys_clksel][0] != num )
     {
@@ -80,7 +81,7 @@ static int omap5_init_time(void)
         frac1 |= num_den[sys_clksel][0];
     }
 
-    frac2 = ioreadl(rt_ct_base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
+    frac2 = readl(rt_ct_base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
     den = frac2 & ~NUMERATOR_DENUMERATOR_MASK;
     if ( num_den[sys_clksel][1] != num )
     {
@@ -88,9 +89,9 @@ static int omap5_init_time(void)
         frac2 |= num_den[sys_clksel][1];
     }
 
-    iowritel(rt_ct_base + INCREMENTER_NUMERATOR_OFFSET, frac1);
-    iowritel(rt_ct_base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET,
-             frac2 | PRM_FRAC_INCREMENTER_DENUMERATOR_RELOAD);
+    writel(frac1, rt_ct_base + INCREMENTER_NUMERATOR_OFFSET);
+    writel(frac2 | PRM_FRAC_INCREMENTER_DENUMERATOR_RELOAD,
+           rt_ct_base + INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
 
     iounmap(rt_ct_base);
 

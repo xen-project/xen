@@ -21,6 +21,7 @@
 #include <asm/platform.h>
 #include <xen/mm.h>
 #include <xen/vmap.h>
+#include <asm/io.h>
 
 #define DCC_SHIFT      26
 #define FUNCTION_SHIFT 20
@@ -110,10 +111,10 @@ static void vexpress_reset(void)
     }
 
     /* switch to slow mode */
-    iowritel(sp810, 0x3);
+    writel(0x3, sp810);
     dsb(); isb();
     /* writing any value to SCSYSSTAT reg will reset the system */
-    iowritel(sp810 + 4, 0x1);
+    writel(0x1, sp810 + 4);
     dsb(); isb();
 
     iounmap(sp810);

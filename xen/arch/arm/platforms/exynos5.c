@@ -25,6 +25,7 @@
 #include <xen/vmap.h>
 #include <asm/platforms/exynos5.h>
 #include <asm/platform.h>
+#include <asm/io.h>
 
 static int exynos5_init_time(void)
 {
@@ -41,8 +42,8 @@ static int exynos5_init_time(void)
     }
 
     /* Enable timer on Exynos 5250 should probably be done by u-boot */
-    reg = ioreadl(mct + EXYNOS5_MCT_G_TCON);
-    iowritel(mct + EXYNOS5_MCT_G_TCON, reg | EXYNOS5_MCT_G_TCON_START);
+    reg = readl(mct + EXYNOS5_MCT_G_TCON);
+    writel(reg | EXYNOS5_MCT_G_TCON_START, mct + EXYNOS5_MCT_G_TCON);
 
     iounmap(mct);
 
@@ -77,7 +78,7 @@ static void exynos5_reset(void)
         return;
     }
 
-    iowritel(pmu + EXYNOS5_SWRESET, 1);
+    writel(1, pmu + EXYNOS5_SWRESET);
     iounmap(pmu);
 }
 

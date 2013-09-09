@@ -29,6 +29,7 @@
 #include <xen/mm.h>
 #include <xen/vmap.h>
 #include <asm/pl011-uart.h>
+#include <asm/io.h>
 
 static struct pl011 {
     unsigned int baud, clock_hz, data_bits, parity, stop_bits;
@@ -50,8 +51,8 @@ static struct pl011 {
 #define PARITY_MARK  (PEN|SPS)
 #define PARITY_SPACE (PEN|EPS|SPS)
 
-#define pl011_read(uart, off)           ioreadl((uart)->regs + (off))
-#define pl011_write(uart, off,val)      iowritel((uart)->regs + (off), (val))
+#define pl011_read(uart, off)           readl((uart)->regs + (off))
+#define pl011_write(uart, off,val)      writel((val), (uart)->regs + (off))
 
 static void pl011_interrupt(int irq, void *data, struct cpu_user_regs *regs)
 {

@@ -27,6 +27,7 @@
 #include <asm/early_printk.h>
 #include <asm/device.h>
 #include <asm/exynos4210-uart.h>
+#include <asm/io.h>
 
 static struct exynos4210_uart {
     unsigned int baud, clock_hz, data_bits, parity, stop_bits;
@@ -43,8 +44,8 @@ static struct exynos4210_uart {
 #define FORCED_CHECKED_AS_ONE (0x6)
 #define FORCED_CHECKED_AS_ZERO (0x7)
 
-#define exynos4210_read(uart, off)          ioreadl((uart)->regs + off)
-#define exynos4210_write(uart, off, val)    iowritel((uart->regs) + off, val)
+#define exynos4210_read(uart, off)          readl((uart)->regs + off)
+#define exynos4210_write(uart, off, val)    writel(val, (uart->regs) + off)
 
 static void exynos4210_uart_interrupt(int irq, void *data, struct cpu_user_regs *regs)
 {

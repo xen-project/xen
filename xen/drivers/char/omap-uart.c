@@ -22,11 +22,12 @@
 #include <xen/mm.h>
 #include <xen/vmap.h>
 #include <xen/8250-uart.h>
+#include <asm/io.h>
 
 #define REG_SHIFT 2
 
-#define omap_read(uart, off)       ioreadl((uart)->regs + (off<<REG_SHIFT))
-#define omap_write(uart, off, val) iowritel((uart)->regs + (off<<REG_SHIFT), (val))
+#define omap_read(uart, off)       readl((uart)->regs + (off<<REG_SHIFT))
+#define omap_write(uart, off, val) writel((val), (uart)->regs + (off<<REG_SHIFT))
 
 static struct omap_uart {
     u32 baud, clock_hz, data_bits, parity, stop_bits, fifo_size;

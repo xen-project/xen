@@ -21,6 +21,7 @@
 #include <xen/vmap.h>
 #include <asm/platforms/midway.h>
 #include <asm/platform.h>
+#include <asm/io.h>
 
 static void midway_reset(void)
 {
@@ -36,8 +37,8 @@ static void midway_reset(void)
         return;
     }
 
-    iowritel(pmu + (MW_SREG_PWR_REQ & ~PAGE_MASK), MW_PWR_HARD_RESET);
-    iowritel(pmu + (MW_SREG_A15_PWR_CTRL & ~PAGE_MASK), 1);
+    writel(MW_PWR_HARD_RESET, pmu + (MW_SREG_PWR_REQ & ~PAGE_MASK));
+    writel(1, pmu + (MW_SREG_A15_PWR_CTRL & ~PAGE_MASK));
     iounmap(pmu);
 }
 
