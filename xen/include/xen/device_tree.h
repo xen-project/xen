@@ -233,7 +233,7 @@ struct dt_device_node * __init dt_find_interrupt_controller(const char *compat);
 #define dt_compat_cmp(s1, s2, l) strnicmp((s1), (s2), l)
 
 /* Default #address and #size cells */
-#define DT_ROOT_NODE_ADDR_CELLS_DEFAULT 1
+#define DT_ROOT_NODE_ADDR_CELLS_DEFAULT 2
 #define DT_ROOT_NODE_SIZE_CELLS_DEFAULT 1
 
 #define for_each_property_of_node(dn, pp)                   \
