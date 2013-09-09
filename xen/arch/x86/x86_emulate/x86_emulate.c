@@ -1454,10 +1454,10 @@ x86_emulate(
                 /* VEX */
                 generate_exception_if(rex_prefix || vex.pfx, EXC_UD, -1);
 
-                vex.raw[0] = b;
+                vex.raw[0] = modrm;
                 if ( b & 1 )
                 {
-                    vex.raw[1] = b;
+                    vex.raw[1] = modrm;
                     vex.opcx = vex_0f;
                     vex.x = 1;
                     vex.b = 1;
@@ -1479,10 +1479,7 @@ x86_emulate(
                         }
                     }
                 }
-                vex.reg ^= 0xf;
-                if ( !mode_64bit() )
-                    vex.reg &= 0x7;
-                else if ( !vex.r )
+                if ( mode_64bit() && !vex.r )
                     rex_prefix |= REX_R;
 
                 fail_if(vex.opcx != vex_0f);
@@ -3899,8 +3896,9 @@ x86_emulate(
         else
         {
             fail_if((vex.opcx != vex_0f) ||
-                    (vex.reg && ((ea.type == OP_MEM) ||
-                                 !(vex.pfx & VEX_PREFIX_SCALAR_MASK))));
+                    ((vex.reg != 0xf) &&
+                     ((ea.type == OP_MEM) ||
+                      !(vex.pfx & VEX_PREFIX_SCALAR_MASK))));
             vcpu_must_have_avx();
             get_fpu(X86EMUL_FPU_ymm, &fic);
             ea.bytes = 16 << vex.l;
@@ -4168,7 +4166,7 @@ x86_emulate(
         }
         else
         {
-            fail_if((vex.opcx != vex_0f) || vex.reg ||
+            fail_if((vex.opcx != vex_0f) || (vex.reg != 0xf) ||
                     ((vex.pfx != vex_66) && (vex.pfx != vex_f3)));
             vcpu_must_have_avx();
             get_fpu(X86EMUL_FPU_ymm, &fic);
