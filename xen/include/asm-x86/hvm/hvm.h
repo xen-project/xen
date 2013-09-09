@@ -439,6 +439,21 @@ static inline void hvm_set_info_guest(struct vcpu *v)
 
 int hvm_debug_op(struct vcpu *v, int32_t op);
 
+static inline void hvm_invalidate_regs_fields(struct cpu_user_regs *regs)
+{
+#ifndef NDEBUG
+    regs->error_code = 0xbeef;
+    regs->entry_vector = 0xbeef;
+    regs->saved_upcall_mask = 0xbf;
+    regs->cs = 0xbeef;
+    regs->ss = 0xbeef;
+    regs->ds = 0xbeef;
+    regs->es = 0xbeef;
+    regs->fs = 0xbeef;
+    regs->gs = 0xbeef;
+#endif
+}
+
 int hvm_hap_nested_page_fault(paddr_t gpa,
                               bool_t gla_valid, unsigned long gla,
                               bool_t access_r,

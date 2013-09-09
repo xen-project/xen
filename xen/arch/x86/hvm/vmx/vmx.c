@@ -2377,6 +2377,12 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     unsigned long exit_qualification, inst_len = 0;
     struct vcpu *v = current;
 
+    regs->rip    = __vmread(GUEST_RIP);
+    regs->rsp    = __vmread(GUEST_RSP);
+    regs->rflags = __vmread(GUEST_RFLAGS);
+
+    hvm_invalidate_regs_fields(regs);
+
     if ( paging_mode_hap(v->domain) && hvm_paging_enabled(v) )
         v->arch.hvm_vcpu.guest_cr[3] = v->arch.hvm_vcpu.hw_cr[3] =
             __vmread(GUEST_CR3);
@@ -2870,7 +2876,7 @@ out:
         nvmx_idtv_handling();
 }
 
-void vmx_vmenter_helper(void)
+void vmx_vmenter_helper(const struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
     u32 new_asid, old_asid;
@@ -2912,6 +2918,10 @@ void vmx_vmenter_helper(void)
 
  out:
     HVMTRACE_ND(VMENTRY, 0, 1/*cycles*/, 0, 0, 0, 0, 0, 0, 0);
+
+    __vmwrite(GUEST_RIP,    regs->rip);
+    __vmwrite(GUEST_RSP,    regs->rsp);
+    __vmwrite(GUEST_RFLAGS, regs->rflags);
 }
 
 /*
