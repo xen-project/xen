@@ -203,7 +203,7 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-4.2-testing.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= b0855f925c6e2e0b21fbb03fab4b5fb5b6876871
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.2.2
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.2.3
 SEABIOS_UPSTREAM_TAG ?= rel-1.6.3.2
 # Sun Mar 11 09:27:07 2012 -0400
 # Update version to 1.6.3.2
@@ -215,7 +215,7 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.2.3-rc2
+QEMU_TAG ?= xen-4.2.3
 # Tue May 14 18:48:49 2013 +0100
 # piix4acpi, xen, hotplug: Fix race with ACPI AML code and hotplug.
 
