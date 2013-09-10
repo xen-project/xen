@@ -1648,7 +1648,11 @@ int hypercall_xlat_continuation(unsigned int *id, unsigned int mask, ...)
     if ( test_bit(_MCSF_in_multicall, &mcs->flags) )
     {
         if ( !test_bit(_MCSF_call_preempted, &mcs->flags) )
+        {
+            va_end(args);
             return 0;
+        }
+
         for ( i = 0; i < 6; ++i, mask >>= 1 )
         {
             if ( mask & 1 )
