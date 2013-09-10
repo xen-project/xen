@@ -635,12 +635,21 @@ a653sched_adjust_global(const struct scheduler *ops,
     switch ( sc->cmd )
     {
     case XEN_SYSCTL_SCHEDOP_putinfo:
-        copy_from_guest(&local_sched, sc->u.sched_arinc653.schedule, 1);
+        if ( copy_from_guest(&local_sched, sc->u.sched_arinc653.schedule, 1) )
+        {
+            rc = -EFAULT;
+            break;
+        }
+
         rc = arinc653_sched_set(ops, &local_sched);
         break;
     case XEN_SYSCTL_SCHEDOP_getinfo:
         rc = arinc653_sched_get(ops, &local_sched);
-        copy_to_guest(sc->u.sched_arinc653.schedule, &local_sched, 1);
+        if ( rc )
+            break;
+
+        if ( copy_to_guest(sc->u.sched_arinc653.schedule, &local_sched, 1) )
+            rc = -EFAULT;
         break;
     }
 
