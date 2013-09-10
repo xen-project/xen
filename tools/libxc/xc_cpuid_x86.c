@@ -436,17 +436,15 @@ static void xc_cpuid_pv_policy(
     const unsigned int *input, unsigned int *regs)
 {
     DECLARE_DOMCTL;
+    unsigned int guest_width;
     int guest_64bit, xen_64bit = hypervisor_is_64bit(xch);
     char brand[13];
     uint64_t xfeature_mask;
 
     xc_cpuid_brand_get(brand);
 
-    memset(&domctl, 0, sizeof(domctl));
-    domctl.domain = domid;
-    domctl.cmd = XEN_DOMCTL_get_address_size;
-    do_domctl(xch, &domctl);
-    guest_64bit = (domctl.u.address_size.size == 64);
+    xc_domain_get_guest_width(xch, domid, &guest_width);
+    guest_64bit = (guest_width == 8);
 
     /* Detecting Xen's atitude towards XSAVE */
     memset(&domctl, 0, sizeof(domctl));

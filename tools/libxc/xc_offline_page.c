@@ -193,20 +193,13 @@ static int get_pt_level(xc_interface *xch, uint32_t domid,
                         unsigned int *pt_level,
                         unsigned int *gwidth)
 {
-    DECLARE_DOMCTL;
     xen_capabilities_info_t xen_caps = "";
 
     if (xc_version(xch, XENVER_capabilities, &xen_caps) != 0)
         return -1;
 
-    memset(&domctl, 0, sizeof(domctl));
-    domctl.domain = domid;
-    domctl.cmd = XEN_DOMCTL_get_address_size;
-
-    if ( do_domctl(xch, &domctl) != 0 )
+    if (xc_domain_get_guest_width(xch, domid, gwidth) != 0)
         return -1;
-
-    *gwidth = domctl.u.address_size.size / 8;
 
     if (strstr(xen_caps, "xen-3.0-x86_64"))
         /* Depends on whether it's a compat 32-on-64 guest */

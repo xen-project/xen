@@ -51,15 +51,13 @@ unsigned long xc_translate_foreign_address(xc_interface *xch, uint32_t dom,
         pt_levels = (ctx.msr_efer&EFER_LMA) ? 4 : (ctx.cr4&CR4_PAE) ? 3 : 2;
         paddr = ctx.cr3 & ((pt_levels == 3) ? ~0x1full : ~0xfffull);
     } else {
-        DECLARE_DOMCTL;
+        unsigned int gwidth;
         vcpu_guest_context_any_t ctx;
         if (xc_vcpu_getcontext(xch, dom, vcpu, &ctx) != 0)
             return 0;
-        domctl.domain = dom;
-        domctl.cmd = XEN_DOMCTL_get_address_size;
-        if ( do_domctl(xch, &domctl) != 0 )
+        if (xc_domain_get_guest_width(xch, dom, &gwidth) != 0)
             return 0;
-        if (domctl.u.address_size.size == 64) {
+        if (gwidth == 8) {
             pt_levels = 4;
             paddr = (uint64_t)xen_cr3_to_pfn_x86_64(ctx.x64.ctrlreg[3])
                 << PAGE_SHIFT;

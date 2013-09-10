@@ -270,6 +270,22 @@ out:
     return ret;
 }
 
+int xc_domain_get_guest_width(xc_interface *xch, uint32_t domid,
+                              unsigned int *guest_width)
+{
+    DECLARE_DOMCTL;
+
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.domain = domid;
+    domctl.cmd = XEN_DOMCTL_get_address_size;
+
+    if ( do_domctl(xch, &domctl) != 0 )
+        return 1;
+
+    /* We want the result in bytes */
+    *guest_width = domctl.u.address_size.size / 8;
+    return 0;
+}
 
 int xc_domain_getinfo(xc_interface *xch,
                       uint32_t first_domid,

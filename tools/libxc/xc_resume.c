@@ -24,19 +24,6 @@
 #include <xen/foreign/x86_64.h>
 #include <xen/hvm/params.h>
 
-static int pv_guest_width(xc_interface *xch, uint32_t domid)
-{
-    DECLARE_DOMCTL;
-    domctl.domain = domid;
-    domctl.cmd = XEN_DOMCTL_get_address_size;
-    if ( xc_domctl(xch, &domctl) != 0 )
-    {
-        PERROR("Could not get guest address size");
-        return -1;
-    }
-    return domctl.u.address_size.size / 8;
-}
-
 static int modify_returncode(xc_interface *xch, uint32_t domid)
 {
     vcpu_guest_context_any_t ctxt;
@@ -71,8 +58,7 @@ static int modify_returncode(xc_interface *xch, uint32_t domid)
     else
     {
         /* Probe PV guest address width. */
-        dinfo->guest_width = pv_guest_width(xch, domid);
-        if ( dinfo->guest_width < 0 )
+        if ( xc_domain_get_guest_width(xch, domid, &dinfo->guest_width) )
             return -1;
     }
 
@@ -120,7 +106,8 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
     xc_dominfo_t info;
     int i, rc = -1;
 #if defined(__i386__) || defined(__x86_64__)
-    struct domain_info_context _dinfo = { .p2m_size = 0 };
+    struct domain_info_context _dinfo = { .guest_width = 0,
+                                          .p2m_size = 0 };
     struct domain_info_context *dinfo = &_dinfo;
     unsigned long mfn;
     vcpu_guest_context_any_t ctxt;
@@ -147,7 +134,7 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
         return rc;
     }
 
-    dinfo->guest_width = pv_guest_width(xch, domid);
+    xc_domain_get_guest_width(xch, domid, &dinfo->guest_width);
     if ( dinfo->guest_width != sizeof(long) )
     {
         ERROR("Cannot resume uncooperative cross-address-size guests");

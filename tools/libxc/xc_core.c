@@ -417,24 +417,6 @@ elfnote_dump_format_version(xc_interface *xch,
     return dump_rtn(xch, args, (char*)&format_version, sizeof(format_version));
 }
 
-static int
-get_guest_width(xc_interface *xch,
-                uint32_t domid,
-                unsigned int *guest_width)
-{
-    DECLARE_DOMCTL;
-
-    memset(&domctl, 0, sizeof(domctl));
-    domctl.domain = domid;
-    domctl.cmd = XEN_DOMCTL_get_address_size;
-
-    if ( do_domctl(xch, &domctl) != 0 )
-        return 1;
-        
-    *guest_width = domctl.u.address_size.size / 8;
-    return 0;
-}
-
 int
 xc_domain_dumpcore_via_callback(xc_interface *xch,
                                 uint32_t domid,
@@ -478,7 +460,7 @@ xc_domain_dumpcore_via_callback(xc_interface *xch,
     struct xc_core_section_headers *sheaders = NULL;
     Elf64_Shdr *shdr;
  
-    if ( get_guest_width(xch, domid, &dinfo->guest_width) != 0 )
+    if ( xc_domain_get_guest_width(xch, domid, &dinfo->guest_width) != 0 )
     {
         PERROR("Could not get address size for domain");
         return sts;
