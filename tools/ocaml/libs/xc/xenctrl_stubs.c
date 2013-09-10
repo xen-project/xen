@@ -461,8 +461,6 @@ CAMLprim value stub_xc_vcpu_getaffinity(value xch, value domid,
 
 	retval = xc_vcpu_getaffinity(_H(xch), _D(domid),
 	                             Int_val(vcpu), c_cpumap);
-	free(c_cpumap);
-
 	if (retval < 0) {
 		free(c_cpumap);
 		failwith_xc(_H(xch));
