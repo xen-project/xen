@@ -654,6 +654,7 @@ libxl_cpupoolinfo * libxl_list_cpupool(libxl_ctx *ctx, int *nb_pool_out)
         if (!tmp) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "allocating cpupool info");
             libxl_cpupoolinfo_list_free(ptr, i);
+            ptr = NULL;
             goto out;
         }
         ptr = tmp;
