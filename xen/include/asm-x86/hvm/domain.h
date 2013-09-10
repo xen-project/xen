@@ -62,12 +62,6 @@ struct hvm_domain {
     /* emulated irq to pirq */
     struct radix_tree_root emuirq_pirq;
 
-    /* hvm_print_line() logging. */
-#define HVM_PBUF_SIZE 80
-    char                  *pbuf;
-    int                    pbuf_idx;
-    spinlock_t             pbuf_lock;
-
     uint64_t              *params;
 
     /* Memory ranges with pinned cache attributes. */

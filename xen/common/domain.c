@@ -231,6 +231,8 @@ struct domain *domain_create(
     spin_lock_init(&d->shutdown_lock);
     d->shutdown_code = -1;
 
+    spin_lock_init(&d->pbuf_lock);
+
     err = -ENOMEM;
     if ( !zalloc_cpumask_var(&d->domain_dirty_cpumask) )
         goto fail;
@@ -286,6 +288,10 @@ struct domain *domain_create(
         d->mem_event = xzalloc(struct mem_event_per_domain);
         if ( !d->mem_event )
             goto fail;
+
+        d->pbuf = xzalloc_array(char, DOMAIN_PBUF_SIZE);
+        if ( !d->pbuf )
+            goto fail;
     }
 
     if ( (err = arch_domain_create(d, domcr_flags)) != 0 )
@@ -318,6 +324,7 @@ struct domain *domain_create(
     d->is_dying = DOMDYING_dead;
     atomic_set(&d->refcnt, DOMAIN_DESTROYED);
     xfree(d->mem_event);
+    xfree(d->pbuf);
     if ( init_status & INIT_arch )
         arch_domain_destroy(d);
     if ( init_status & INIT_gnttab )
@@ -730,6 +737,7 @@ static void complete_domain_destroy(struct rcu_head *head)
 #endif
 
     xfree(d->mem_event);
+    xfree(d->pbuf);
 
     for ( i = d->max_vcpus - 1; i >= 0; i-- )
         if ( (v = d->vcpu[i]) != NULL )

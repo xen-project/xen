@@ -341,6 +341,12 @@ struct domain
     /* Control-plane tools handle for this domain. */
     xen_domain_handle_t handle;
 
+    /* hvm_print_line() and guest_console_write() logging. */
+#define DOMAIN_PBUF_SIZE 80
+    char       *pbuf;
+    unsigned    pbuf_idx;
+    spinlock_t  pbuf_lock;
+
     /* OProfile support. */
     struct xenoprof *xenoprof;
     int32_t time_offset_seconds;

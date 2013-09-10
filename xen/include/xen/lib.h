@@ -83,6 +83,8 @@ extern void debugtrace_printk(const char *fmt, ...);
 #define _p(_x) ((void *)(unsigned long)(_x))
 extern void printk(const char *format, ...)
     __attribute__ ((format (printf, 1, 2)));
+extern void guest_printk(const struct domain *d, const char *format, ...)
+    __attribute__ ((format (printf, 2, 3)));
 extern void panic(const char *format, ...)
     __attribute__ ((format (printf, 1, 2)));
 extern long vm_assist(struct domain *, unsigned int, unsigned int);

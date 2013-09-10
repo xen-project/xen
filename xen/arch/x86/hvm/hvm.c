@@ -485,8 +485,7 @@ static int hvm_set_ioreq_page(
 static int hvm_print_line(
     int dir, uint32_t port, uint32_t bytes, uint32_t *val)
 {
-    struct vcpu *curr = current;
-    struct hvm_domain *hd = &curr->domain->arch.hvm_domain;
+    struct domain *cd = current->domain;
     char c = *val;
 
     BUG_ON(bytes != 1);
@@ -495,17 +494,16 @@ static int hvm_print_line(
     if ( !isprint(c) && (c != '\n') && (c != '\t') )
         return X86EMUL_OKAY;
 
-    spin_lock(&hd->pbuf_lock);
-    hd->pbuf[hd->pbuf_idx++] = c;
-    if ( (hd->pbuf_idx == (HVM_PBUF_SIZE - 2)) || (c == '\n') )
+    spin_lock(&cd->pbuf_lock);
+    if ( c != '\n' )
+        cd->pbuf[cd->pbuf_idx++] = c;
+    if ( (cd->pbuf_idx == (DOMAIN_PBUF_SIZE - 1)) || (c == '\n') )
     {
-        if ( c != '\n' )
-            hd->pbuf[hd->pbuf_idx++] = '\n';
-        hd->pbuf[hd->pbuf_idx] = '\0';
-        printk(XENLOG_G_DEBUG "HVM%u: %s", curr->domain->domain_id, hd->pbuf);
-        hd->pbuf_idx = 0;
+        cd->pbuf[cd->pbuf_idx] = '\0';
+        guest_printk(cd, XENLOG_G_DEBUG "%s\n", cd->pbuf);
+        cd->pbuf_idx = 0;
     }
-    spin_unlock(&hd->pbuf_lock);
+    spin_unlock(&cd->pbuf_lock);
 
     return X86EMUL_OKAY;
 }
@@ -521,19 +519,16 @@ int hvm_domain_initialise(struct domain *d)
         return -EINVAL;
     }
 
-    spin_lock_init(&d->arch.hvm_domain.pbuf_lock);
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
     spin_lock_init(&d->arch.hvm_domain.uc_lock);
 
     INIT_LIST_HEAD(&d->arch.hvm_domain.msixtbl_list);
     spin_lock_init(&d->arch.hvm_domain.msixtbl_list_lock);
 
-    d->arch.hvm_domain.pbuf = xzalloc_array(char, HVM_PBUF_SIZE);
     d->arch.hvm_domain.params = xzalloc_array(uint64_t, HVM_NR_PARAMS);
     d->arch.hvm_domain.io_handler = xmalloc(struct hvm_io_handler);
     rc = -ENOMEM;
-    if ( !d->arch.hvm_domain.pbuf || !d->arch.hvm_domain.params ||
-         !d->arch.hvm_domain.io_handler )
+    if ( !d->arch.hvm_domain.params || !d->arch.hvm_domain.io_handler )
         goto fail0;
     d->arch.hvm_domain.io_handler->num_slot = 0;
 
@@ -578,7 +573,6 @@ int hvm_domain_initialise(struct domain *d)
  fail0:
     xfree(d->arch.hvm_domain.io_handler);
     xfree(d->arch.hvm_domain.params);
-    xfree(d->arch.hvm_domain.pbuf);
     return rc;
 }
 
@@ -603,7 +597,6 @@ void hvm_domain_relinquish_resources(struct domain *d)
 
     xfree(d->arch.hvm_domain.io_handler);
     xfree(d->arch.hvm_domain.params);
-    xfree(d->arch.hvm_domain.pbuf);
 }
 
 void hvm_domain_destroy(struct domain *d)

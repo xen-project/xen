@@ -24,6 +24,7 @@
 #include <xen/shutdown.h>
 #include <xen/video.h>
 #include <xen/kexec.h>
+#include <xen/ctype.h>
 #include <asm/debugger.h>
 #include <asm/div64.h>
 #include <xen/hypercall.h> /* for do_console_io */
@@ -375,6 +376,7 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
 {
     char kbuf[128];
     int kcount;
+    struct domain *cd = current->domain;
 
     while ( count > 0 )
     {
@@ -388,18 +390,58 @@ static long guest_console_write(XEN_GUEST_HANDLE_PARAM(char) buffer, int count)
             return -EFAULT;
         kbuf[kcount] = '\0';
 
-        spin_lock_irq(&console_lock);
-
-        sercon_puts(kbuf);
-        video_puts(kbuf);
-
-        if ( opt_console_to_ring )
+        if ( is_hardware_domain(cd) )
         {
-            conring_puts(kbuf);
-            tasklet_schedule(&notify_dom0_con_ring_tasklet);
-        }
+            /* Use direct console output as it could be interactive */
+            spin_lock_irq(&console_lock);
 
-        spin_unlock_irq(&console_lock);
+            sercon_puts(kbuf);
+            video_puts(kbuf);
+
+            if ( opt_console_to_ring )
+            {
+                conring_puts(kbuf);
+                tasklet_schedule(&notify_dom0_con_ring_tasklet);
+            }
+
+            spin_unlock_irq(&console_lock);
+        }
+        else
+        {
+            char *kin = kbuf, *kout = kbuf, c;
+
+            /* Strip non-printable characters */
+            for ( ; ; )
+            {
+                c = *kin++;
+                if ( c == '\0' || c == '\n' )
+                    break;
+                if ( isprint(c) || c == '\t' )
+                    *kout++ = c;
+            }
+            *kout = '\0';
+            spin_lock(&cd->pbuf_lock);
+            if ( c == '\n' )
+            {
+                kcount = kin - kbuf;
+                cd->pbuf[cd->pbuf_idx] = '\0';
+                guest_printk(cd, XENLOG_G_DEBUG "%s%s\n", cd->pbuf, kbuf);
+                cd->pbuf_idx = 0;
+            }
+            else if ( cd->pbuf_idx + kcount < (DOMAIN_PBUF_SIZE - 1) )
+            {
+                /* buffer the output until a newline */
+                memcpy(cd->pbuf + cd->pbuf_idx, kbuf, kcount);
+                cd->pbuf_idx += kcount;
+            }
+            else
+            {
+                cd->pbuf[cd->pbuf_idx] = '\0';
+                guest_printk(cd, XENLOG_G_DEBUG "%s%s\n", cd->pbuf, kbuf);
+                cd->pbuf_idx = 0;
+            }
+            spin_unlock(&cd->pbuf_lock);
+        }
 
         guest_handle_add_offset(buffer, kcount);
         count -= kcount;
@@ -504,12 +546,12 @@ static int printk_prefix_check(char *p, char **pp)
             ((loglvl < upper_thresh) && printk_ratelimit()));
 } 
 
-static void printk_start_of_line(void)
+static void printk_start_of_line(const char *prefix)
 {
     struct tm tm;
     char tstr[32];
 
-    __putstr("(XEN) ");
+    __putstr(prefix);
 
     if ( !opt_console_timestamps )
         return;
@@ -524,12 +566,11 @@ static void printk_start_of_line(void)
     __putstr(tstr);
 }
 
-void printk(const char *fmt, ...)
+static void vprintk_common(const char *prefix, const char *fmt, va_list args)
 {
     static char   buf[1024];
     static int    start_of_line = 1, do_print;
 
-    va_list       args;
     char         *p, *q;
     unsigned long flags;
 
@@ -537,9 +578,7 @@ void printk(const char *fmt, ...)
     local_irq_save(flags);
     spin_lock_recursive(&console_lock);
 
-    va_start(args, fmt);
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
-    va_end(args);        
 
     p = buf;
 
@@ -551,7 +590,7 @@ void printk(const char *fmt, ...)
         if ( do_print )
         {
             if ( start_of_line )
-                printk_start_of_line();
+                printk_start_of_line(prefix);
             __putstr(p);
             __putstr("\n");
         }
@@ -566,7 +605,7 @@ void printk(const char *fmt, ...)
         if ( do_print )
         {
             if ( start_of_line )
-                printk_start_of_line();
+                printk_start_of_line(prefix);
             __putstr(p);
         }
         start_of_line = 0;
@@ -574,6 +613,26 @@ void printk(const char *fmt, ...)
 
     spin_unlock_recursive(&console_lock);
     local_irq_restore(flags);
+}
+
+void printk(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    vprintk_common("(XEN) ", fmt, args);
+    va_end(args);
+}
+
+void guest_printk(const struct domain *d, const char *fmt, ...)
+{
+    va_list args;
+    char prefix[16];
+
+    snprintf(prefix, sizeof(prefix), "(d%d) ", d->domain_id);
+
+    va_start(args, fmt);
+    vprintk_common(prefix, fmt, args);
+    va_end(args);
 }
 
 void __init console_init_preirq(void)
@@ -792,7 +851,7 @@ int __printk_ratelimit(int ratelimit_ms, int ratelimit_burst)
             snprintf(lost_str, sizeof(lost_str), "%d", lost);
             /* console_lock may already be acquired by printk(). */
             spin_lock_recursive(&console_lock);
-            printk_start_of_line();
+            printk_start_of_line("(XEN) ");
             __putstr("printk: ");
             __putstr(lost_str);
             __putstr(" messages suppressed.\n");
