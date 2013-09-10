@@ -27,6 +27,7 @@ static const char *const elf_xen_feature_names[] = {
     [XENFEAT_auto_translated_physmap] = "auto_translated_physmap",
     [XENFEAT_supervisor_mode_kernel] = "supervisor_mode_kernel",
     [XENFEAT_pae_pgdir_above_4gb] = "pae_pgdir_above_4gb",
+    [XENFEAT_hvm_callback_vector] = "hvm_callback_vector",
     [XENFEAT_dom0] = "dom0"
 };
 static const unsigned elf_xen_features =
