@@ -2113,11 +2113,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
             }
             ctxt->x64.ctrlreg[1] = FOLD_CR3(ctx->p2m[pfn]);
         }
-        domctl.cmd = XEN_DOMCTL_setvcpucontext;
-        domctl.domain = (domid_t)dom;
-        domctl.u.vcpucontext.vcpu = i;
-        set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
-        frc = xc_domctl(xch, &domctl);
+        frc = xc_vcpu_setcontext(xch, dom, i, ctxt);
         if ( frc != 0 )
         {
             PERROR("Couldn't build vcpu%d", i);
