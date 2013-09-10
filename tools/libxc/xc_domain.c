@@ -1141,12 +1141,6 @@ int xc_vcpu_setcontext(xc_interface *xch,
     DECLARE_HYPERCALL_BOUNCE(ctxt, sizeof(vcpu_guest_context_any_t), XC_HYPERCALL_BUFFER_BOUNCE_IN);
     int rc;
 
-    if (ctxt == NULL)
-    {
-        errno = EINVAL;
-        return -1;
-    }
-
     if ( xc_hypercall_bounce_pre(xch, ctxt) )
         return -1;
 
