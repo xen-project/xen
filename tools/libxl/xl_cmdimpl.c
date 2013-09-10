@@ -1495,6 +1495,10 @@ skip_vfb:
                                 &b_info->u.hvm.spice.passwd, 0);
         xlu_cfg_get_defbool(config, "spiceagent_mouse",
                             &b_info->u.hvm.spice.agent_mouse, 0);
+        xlu_cfg_get_defbool(config, "spicevdagent",
+                            &b_info->u.hvm.spice.vdagent, 0);
+        xlu_cfg_get_defbool(config, "spice_clipboard_sharing",
+                            &b_info->u.hvm.spice.clipboard_sharing, 0);
         xlu_cfg_get_defbool(config, "nographic", &b_info->u.hvm.nographic, 0);
         xlu_cfg_get_defbool(config, "gfx_passthru", 
                             &b_info->u.hvm.gfx_passthru, 0);

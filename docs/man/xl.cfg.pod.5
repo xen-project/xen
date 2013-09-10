@@ -1130,6 +1130,20 @@ Specify the ticket password which is used by a client for connection.
 Whether SPICE agent is used for client mouse mode. The default is true (1)
 (turn on)
 
+=item B<spicevdagent=BOOLEAN>
+
+Enables spice vdagent. The Spice vdagent is an optional component for
+enhancing user experience and performing guest-oriented management
+tasks. Its features includes: client mouse mode (no need to grab mouse
+by client, no mouse lag), automatic adjustment of screen resolution,
+copy and paste (text and image) between client and domU. It also
+requires vdagent service installed on domU o.s. to work. The default is 0.
+
+=item B<spice_clipboard_sharing=BOOLEAN>
+
+Enables Spice clipboard sharing (copy/paste). It requires spicevdagent
+enabled. The default is false (0).
+
 =back
 
 =head3 Miscellaneous Emulated Hardware

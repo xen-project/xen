@@ -344,6 +344,17 @@
  */
 #define LIBXL_HAVE_DOMINFO_OUTSTANDING_MEMKB 1
 
+/*
+ * LIBXL_HAVE_SPICE_VDAGENT
+ *
+ * If defined, then the libxl_spice_info structure will contain a boolean type:
+ * vdagent and clipboard_sharing. These values define if Spice vdagent and
+ * clipboard sharing are enabled.
+ *
+ * If this is not defined, the Spice vdagent support is ignored.
+ */
+#define LIBXL_HAVE_SPICE_VDAGENT 1
+
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who
  * do not #include libxl_internal.h, are fine. */

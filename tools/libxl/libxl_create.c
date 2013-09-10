@@ -272,6 +272,9 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             libxl_defbool_setdefault(&b_info->u.hvm.spice.disable_ticketing,
                                      false);
             libxl_defbool_setdefault(&b_info->u.hvm.spice.agent_mouse, true);
+            libxl_defbool_setdefault(&b_info->u.hvm.spice.vdagent, false);
+            libxl_defbool_setdefault(&b_info->u.hvm.spice.clipboard_sharing,
+                                     false);
         }
 
         libxl_defbool_setdefault(&b_info->u.hvm.nographic, false);
