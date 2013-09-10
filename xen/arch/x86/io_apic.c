@@ -1828,7 +1828,7 @@ static void __init unlock_ExtINT_logic(void)
 
     pin = find_isa_irq_pin(8, mp_INT);
     apic = find_isa_irq_apic(8, mp_INT);
-    if (pin == -1)
+    if ( pin == -1 || apic == -1 )
         return;
 
     entry0 = ioapic_read_entry(apic, pin, 0);
