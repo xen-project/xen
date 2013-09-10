@@ -197,8 +197,8 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
 
 int xc_dom_boot_image(struct xc_dom_image *dom)
 {
-    DECLARE_DOMCTL;
     DECLARE_HYPERCALL_BUFFER(vcpu_guest_context_any_t, ctxt);
+    xc_dominfo_t info;
     int rc;
 
     ctxt = xc_hypercall_buffer_alloc(dom->xch, ctxt, sizeof(*ctxt));
@@ -212,23 +212,22 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
         return rc;
 
     /* collect some info */
-    domctl.cmd = XEN_DOMCTL_getdomaininfo;
-    domctl.domain = dom->guest_domid;
-    rc = do_domctl(dom->xch, &domctl);
-    if ( rc != 0 )
+    rc = xc_domain_getinfo(dom->xch, dom->guest_domid, 1, &info);
+    if ( rc < 0 )
     {
         xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
                      "%s: getdomaininfo failed (rc=%d)", __FUNCTION__, rc);
         return rc;
     }
-    if ( domctl.domain != dom->guest_domid )
+    if ( rc == 0 || info.domid != dom->guest_domid )
     {
         xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "%s: Huh? domid mismatch (%d != %d)", __FUNCTION__,
-                     domctl.domain, dom->guest_domid);
+                     "%s: Huh? No domains found (nr_domains=%d) "
+                     "or domid mismatch (%d != %d)", __FUNCTION__,
+                     rc, info.domid, dom->guest_domid);
         return -1;
     }
-    dom->shared_info_mfn = domctl.u.getdomaininfo.shared_info_frame;
+    dom->shared_info_mfn = info.shared_info_frame;
 
     /* sanity checks */
     if ( !xc_dom_compat_check(dom) )
