@@ -208,15 +208,15 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 						    node->num_domains, 
 						    DOMAIN_CHUNK_SIZE, 
 						    domaininfo);
+		if (new_domains < 0)
+			goto err;
 
 		tmp = realloc(node->domains,
 			      (node->num_domains + new_domains)
 			      * sizeof(xenstat_domain));
-		if (tmp == NULL) {
-			free(node->domains);
-			free(node);
-			return NULL;
-		}
+		if (tmp == NULL)
+			goto err;
+
 		node->domains = tmp;
 
 		domain = node->domains + node->num_domains;
@@ -280,6 +280,10 @@ xenstat_node *xenstat_get_node(xenstat_handle * handle, unsigned int flags)
 	}
 
 	return node;
+err:
+	free(node->domains);
+	free(node);
+	return NULL;
 }
 
 void xenstat_free_node(xenstat_node * node)
