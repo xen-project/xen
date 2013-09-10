@@ -70,8 +70,10 @@ struct consfront_dev *init_consfront(char *_nodename)
 
     if (!_nodename)
         snprintf(nodename, sizeof(nodename), "device/console/%d", consfrontends);
-    else
-        strncpy(nodename, _nodename, sizeof(nodename));
+    else {
+        strncpy(nodename, _nodename, sizeof(nodename) - 1);
+        nodename[sizeof(nodename) - 1] = 0;
+    }
 
     printk("******************* CONSFRONT for %s **********\n\n\n", nodename);
 
