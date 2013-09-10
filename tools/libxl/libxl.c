@@ -122,8 +122,8 @@ static void free_disable_deaths(libxl__gc *gc,
 
 static void discard_events(struct libxl__event_list *l) {
     /* doesn't bother unlinking from the list, so l is corrupt on return */
-    libxl_event *ev;
-    LIBXL_TAILQ_FOREACH(ev, l, link)
+    libxl_event *ev, *next;
+    LIBXL_TAILQ_FOREACH_SAFE(ev, l, link, next)
         libxl_event_free(0, ev);
 }
 
