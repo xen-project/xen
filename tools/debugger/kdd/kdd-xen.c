@@ -619,7 +619,6 @@ void kdd_guest_teardown(kdd_guest *g)
 {
     flush_maps(g);
     xc_interface_close(g->xc_handle);
-    free(g->id);
     free(g->hvm_buf);
     free(g);
 }
