@@ -285,7 +285,7 @@ int xc_set_cpufreq_gov(xc_interface *xch, int cpuid, char *govname)
     DECLARE_SYSCTL;
     char *scaling_governor = sysctl.u.pm_op.u.set_gov.scaling_governor;
 
-    if ( (xch < 0) || (!govname) )
+    if ( !xch || !govname )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
@@ -302,7 +302,7 @@ int xc_set_cpufreq_para(xc_interface *xch, int cpuid,
 {
     DECLARE_SYSCTL;
 
-    if ( xch < 0 )
+    if ( !xch )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
@@ -319,7 +319,7 @@ int xc_get_cpufreq_avgfreq(xc_interface *xch, int cpuid, int *avg_freq)
     int ret = 0;
     DECLARE_SYSCTL;
 
-    if ( (xch < 0) || (!avg_freq) )
+    if ( !xch || !avg_freq )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
@@ -384,7 +384,7 @@ int xc_get_cpuidle_max_cstate(xc_interface *xch, uint32_t *value)
     int rc;
     DECLARE_SYSCTL;
 
-    if ( xch < 0 || !value )
+    if ( !xch || !value )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
@@ -401,7 +401,7 @@ int xc_set_cpuidle_max_cstate(xc_interface *xch, uint32_t value)
 {
     DECLARE_SYSCTL;
 
-    if ( xch < 0 )
+    if ( !xch )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
@@ -416,7 +416,7 @@ int xc_enable_turbo(xc_interface *xch, int cpuid)
 {
     DECLARE_SYSCTL;
 
-    if ( xch < 0 )
+    if ( !xch )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
@@ -429,7 +429,7 @@ int xc_disable_turbo(xc_interface *xch, int cpuid)
 {
     DECLARE_SYSCTL;
 
-    if ( xch < 0 )
+    if ( !xch )
         return -EINVAL;
 
     sysctl.cmd = XEN_SYSCTL_pm_op;
