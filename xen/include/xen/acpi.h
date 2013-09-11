@@ -56,7 +56,7 @@ typedef int (*acpi_table_handler) (struct acpi_table_header *table);
 typedef int (*acpi_table_entry_handler) (struct acpi_subtable_header *header, const unsigned long end);
 
 unsigned int acpi_get_processor_id (unsigned int cpu);
-char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
+char * __acpi_map_table (paddr_t phys_addr, unsigned long size);
 int acpi_boot_init (void);
 int acpi_boot_table_init (void);
 int acpi_numa_init (void);
