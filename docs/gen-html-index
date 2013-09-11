@@ -71,16 +71,16 @@ sub make_link ($$) {
     my ($ref,$base) = @_;
 
     my $txt = make_linktext($ref);
-    $ref = basename($ref) if $base;
+    $ref =~ s,^$base/,, if $base; #/
 
     return "<li><a href=\"$ref\">$txt</a></li>\n";
 }
 
-sub make_links ($$@) {
-    my ($dir,$base,@docs) = @_;
+sub make_links ($@) {
+    my ($dir,@docs) = @_;
     my $idx = '';
     foreach my $of (sort { make_linktext($a) cmp make_linktext($b) } @docs) {
-        $idx .= make_link($of,$base);
+        $idx .= make_link($of,$dir);
     }
     return $idx;
 }
@@ -103,22 +103,37 @@ sub uniq (@) {
     foreach (@_) { $h{$_} = 1; }
     return keys %h;
 }
-    
+
 for (@docs) { s,^\Q$outdir\E/,, }
 
 @docs = grep { -e "$outdir/$_" && (make_linktext($_) ne "NO-INDEX") } @docs;
 
 my $top = '';
 
-foreach my $od (sort { $a cmp $b } uniq map { dirname($_) } @docs) {
+# Return a list of all directories leading to $path
+sub dirs($)
+{
+    my ($path) = @_;
+    my @dirs;
+    while ( $path =~ m,/, )
+    {
+	$path =~ m,/([^/]+)$,;
+	push @dirs, $`;#`
+	$path = $`;#`
+    }
+    return @dirs;
+}
+
+foreach my $od (sort { $a cmp $b } uniq map { dirs($_) } @docs) {
     my @d = (grep /^\Q$od\E/, @docs);
     if ( @d == 1 and $d[0] eq "$od/index.html" )
     {
+        next if $d[0] =~ m,/,;#/ linked to from the subdirectory entry.
         $top .= make_link("$od/index.html", 0);
     }
     else
     {
-	my $links = make_links($od,0,@d);
+	my $links = make_links(undef,@d);
 	my $secttitle = make_linktext($od);
 	$top .= <<END;
 <li><a href=\"${od}/index.html\">$secttitle</a></li>
@@ -127,8 +142,8 @@ $links
 </ul>
 END
 
-	$links = make_links($od,1,@d);
-        my $idx = '';
+	$links = make_links($od,@d);
+	my $idx = '';
 	$idx .= <<END;
 <li>$secttitle</li>
 <ul>

@@ -1,4 +1,7 @@
-hypercall/index			Hypercall Interfaces
+hypercall			Hypercall Interfaces
+hypercall/arm/index		ARM
+hypercall/x86_32/index		x86_32
+hypercall/x86_64/index		x86_64
 
 man				Man Pages
 

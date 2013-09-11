@@ -15,8 +15,7 @@ DOC_HTML	:= $(patsubst %.markdown,html/%.html,$(DOC_MARKDOWN)) \
 		   $(patsubst man/%.pod.1,html/man/%.1.html,$(DOC_MAN1SRC)) \
 		   $(patsubst man/%.pod.5,html/man/%.5.html,$(DOC_MAN5SRC)) \
 		   $(patsubst %.txt,html/%.txt,$(wildcard misc/*.txt)) \
-		   html/hypercall/index.html \
-		   $(patsubst %,html/hypercall-%/index.html,$(DOC_ARCHES))
+		   $(patsubst %,html/hypercall/%/index.html,$(DOC_ARCHES))
 DOC_TXT         := $(patsubst %.txt,txt/%.txt,$(wildcard misc/*.txt)) \
 		   $(patsubst %.markdown,txt/%.txt,$(DOC_MARKDOWN)) \
 		   $(patsubst man/%.pod.1,txt/man/%.1.txt,$(DOC_MAN1SRC)) \
@@ -125,9 +124,9 @@ else
 endif
 
 # For non-x86 arches exclude the subarch whole x86 arch.
-$(foreach i,$(filter-out x86_32 x86_64,$(DOC_ARCHES)),html/hypercall-$(i)/index.html): EXTRA_EXCLUDE := -X arch-x86
+$(foreach i,$(filter-out x86_32 x86_64,$(DOC_ARCHES)),html/hypercall/$(i)/index.html): EXTRA_EXCLUDE := -X arch-x86
 
-html/hypercall-%/index.html: $(CURDIR)/xen-headers Makefile
+html/hypercall/%/index.html: $(CURDIR)/xen-headers Makefile
 	rm -rf $(@D)
 	$(INSTALL_DIR) $(@D)
 	$(PERL) -w $(CURDIR)/xen-headers -O $(@D) \
@@ -137,10 +136,7 @@ html/hypercall-%/index.html: $(CURDIR)/xen-headers Makefile
 		$(EXTRA_EXCLUDE) \
 		$(XEN_ROOT)/xen include/public include/xen/errno.h
 
-html/hypercall/index.html: html/hypercall-x86_64/index.html
-	ln -nfs hypercall-x86_64 html/hypercall
-
--include $(wildcard html/hypercall-*/.deps)
+-include $(wildcard html/hypercall/*/.deps)
 
 txt/%.txt: %.txt
 	$(INSTALL_DIR) $(@D)
