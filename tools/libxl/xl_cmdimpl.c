@@ -6570,7 +6570,7 @@ int main_cpupoollist(int argc, char **argv)
     char *name;
     int ret = 0;
 
-    SWITCH_FOREACH_OPT(opt, "hc", opts, "cpupool-list", 1) {
+    SWITCH_FOREACH_OPT(opt, "hc", opts, "cpupool-list", 0) {
     case 'c':
         opt_cpus = 1;
         break;
