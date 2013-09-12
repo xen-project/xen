@@ -264,13 +264,13 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
     op->u.get_para.scaling_max_freq = policy->max;
     op->u.get_para.scaling_min_freq = policy->min;
 
-    if ( cpufreq_driver->name )
+    if ( cpufreq_driver->name[0] )
         strlcpy(op->u.get_para.scaling_driver, 
             cpufreq_driver->name, CPUFREQ_NAME_LEN);
     else
         strlcpy(op->u.get_para.scaling_driver, "Unknown", CPUFREQ_NAME_LEN);
 
-    if ( policy->governor->name )
+    if ( policy->governor->name[0] )
         strlcpy(op->u.get_para.scaling_governor, 
             policy->governor->name, CPUFREQ_NAME_LEN);
     else
