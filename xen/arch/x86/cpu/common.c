@@ -304,7 +304,7 @@ void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 		clear_bit(X86_FEATURE_XSAVE, boot_cpu_data.x86_capability);
 
 	if ( cpu_has_xsave )
-		xstate_init();
+		xstate_init(c == &boot_cpu_data);
 
 	/*
 	 * The vendor-specific functions might have changed features.  Now
