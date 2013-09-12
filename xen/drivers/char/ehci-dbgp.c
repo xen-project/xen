@@ -946,11 +946,6 @@ try_again:
         dbgp_printk("could not find attached debug device\n");
         goto err;
     }
-    if ( ret < 0 )
-    {
-        dbgp_printk("attached device is not a debug device\n");
-        goto err;
-    }
     dbgp->out.endpoint = dbgp_desc.bDebugOutEndpoint;
     dbgp->in.endpoint = dbgp_desc.bDebugInEndpoint;
 
