@@ -144,7 +144,7 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
     }
 
     /* Check for frequency increase */
-    if (max_load_freq > dbs_tuners_ins.up_threshold * policy->cur) {
+    if (max_load_freq > (uint64_t) dbs_tuners_ins.up_threshold * policy->cur) {
         /* if we are already at full speed then break out early */
         if (policy->cur == max)
             return;
@@ -162,7 +162,8 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
      * can support the current CPU usage without triggering the up
      * policy. To be safe, we focus 10 points under the threshold.
      */
-    if (max_load_freq < (dbs_tuners_ins.up_threshold - 10) * policy->cur) {
+    if (max_load_freq
+        < (uint64_t) (dbs_tuners_ins.up_threshold - 10) * policy->cur) {
         uint64_t freq_next;
 
         freq_next = max_load_freq / (dbs_tuners_ins.up_threshold - 10);
@@ -246,7 +247,7 @@ int cpufreq_governor_dbs(struct cpufreq_policy *policy, unsigned int event)
          * is used for first time
          */
         if ((dbs_enable == 1) && !dbs_tuners_ins.sampling_rate) {
-            def_sampling_rate = policy->cpuinfo.transition_latency *
+            def_sampling_rate = (uint64_t) policy->cpuinfo.transition_latency *
                 DEF_SAMPLING_RATE_LATENCY_MULTIPLIER;
 
             if (def_sampling_rate < MIN_STAT_SAMPLING_RATE)
