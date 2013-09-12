@@ -1,5 +1,0 @@
-# This is run first except when booting in single-user mode.
-#
-::sysinit:/etc/init.d/rcS
-
-::askfirst:-/bin/sh
