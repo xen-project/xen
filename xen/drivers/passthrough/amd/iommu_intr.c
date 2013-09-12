@@ -443,7 +443,6 @@ static int update_intremap_entry_from_msi_msg(
      * devices.
      */
 
-    lock = get_intremap_lock(iommu->seg, alias_id);
     if ( ( req_id != alias_id ) &&
          get_ivrs_mappings(iommu->seg)[alias_id].intremap_table != NULL )
     {
