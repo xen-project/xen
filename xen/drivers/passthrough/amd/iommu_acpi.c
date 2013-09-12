@@ -633,7 +633,7 @@ static u16 __init parse_ivhd_device_extended_range(
     return dev_length;
 }
 
-static __initdata DECLARE_BITMAP(ioapic_cmdline, ARRAY_SIZE(ioapic_sbdf));
+static DECLARE_BITMAP(ioapic_cmdline, ARRAY_SIZE(ioapic_sbdf)) __initdata;
 
 static void __init parse_ivrs_ioapic(char *str)
 {
