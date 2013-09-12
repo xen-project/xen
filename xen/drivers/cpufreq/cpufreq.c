@@ -471,8 +471,12 @@ int set_px_pminfo(uint32_t acpi_id, struct xen_processor_performance *dom0_px_in
             ret = -ENOMEM;
             goto out;
         }
-        copy_from_guest(pxpt->states, dom0_px_info->states, 
-                                      dom0_px_info->state_count);
+        if ( copy_from_guest(pxpt->states, dom0_px_info->states,
+                             dom0_px_info->state_count) )
+        {
+            ret = -EFAULT;
+            goto out;
+        }
         pxpt->state_count = dom0_px_info->state_count;
 
         if ( cpufreq_verbose )
