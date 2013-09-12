@@ -1094,6 +1094,9 @@ try_next_port:
     dbgp_printk("n_ports:    %u\n", n_ports);
     ehci_dbgp_status(dbgp, "");
 
+    if ( n_ports == 0 )
+        return -1;
+
     for ( i = 1; i <= n_ports; i++ )
     {
         portsc = readl(&dbgp->ehci_regs->port_status[i-1]);
