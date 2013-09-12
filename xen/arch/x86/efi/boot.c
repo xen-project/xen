@@ -459,7 +459,8 @@ static bool_t __init read_file(EFI_FILE_HANDLE dir_handle, CHAR16 *name,
         what = what ?: L"Seek";
     else
     {
-        file->addr = (EFI_PHYSICAL_ADDRESS)1 << (32 + PAGE_SHIFT);
+        file->addr = min(1UL << (32 + PAGE_SHIFT),
+                         HYPERVISOR_VIRT_END - DIRECTMAP_VIRT_START);
         ret = efi_bs->AllocatePages(AllocateMaxAddress, EfiLoaderData,
                                     PFN_UP(size), &file->addr);
     }

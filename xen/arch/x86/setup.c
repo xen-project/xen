@@ -378,9 +378,9 @@ static uint64_t __init consider_modules(
     return e;
 }
 
-static void __init setup_max_pdx(void)
+static void __init setup_max_pdx(unsigned long top_page)
 {
-    max_pdx = pfn_to_pdx(max_page - 1) + 1;
+    max_pdx = pfn_to_pdx(top_page - 1) + 1;
 
     if ( max_pdx > (DIRECTMAP_SIZE >> PAGE_SHIFT) )
         max_pdx = DIRECTMAP_SIZE >> PAGE_SHIFT;
@@ -548,7 +548,7 @@ void __init __start_xen(unsigned long mbi_p)
     unsigned int initrdidx;
     multiboot_info_t *mbi = __va(mbi_p);
     module_t *mod = (module_t *)__va(mbi->mods_addr);
-    unsigned long nr_pages, modules_headroom, *module_map;
+    unsigned long nr_pages, raw_max_page, modules_headroom, *module_map;
     int i, j, e820_warn = 0, bytes = 0;
     bool_t acpi_boot_table_init_done = 0;
     struct ns16550_defaults ns16550 = {
@@ -752,7 +752,7 @@ void __init __start_xen(unsigned long mbi_p)
     }
 
     /* Sanitise the raw E820 map to produce a final clean version. */
-    max_page = init_e820(memmap_type, e820_raw, &e820_raw_nr);
+    max_page = raw_max_page = init_e820(memmap_type, e820_raw, &e820_raw_nr);
 
     /* Create a temporary copy of the E820 map. */
     memcpy(&boot_e820, &e820, sizeof(e820));
@@ -821,7 +821,10 @@ void __init __start_xen(unsigned long mbi_p)
                              (end - s) >> PAGE_SHIFT, PAGE_HYPERVISOR);
         }
 
-        e = min_t(uint64_t, e, 1ULL << (PAGE_SHIFT + 32));
+        if ( e > min(HYPERVISOR_VIRT_END - DIRECTMAP_VIRT_START,
+                     1UL << (PAGE_SHIFT + 32)) )
+            e = min(HYPERVISOR_VIRT_END - DIRECTMAP_VIRT_START,
+                    1UL << (PAGE_SHIFT + 32));
 #define reloc_size ((__pa(&_end) + mask) & ~mask)
         /* Is the region suitable for relocating Xen? */
         if ( !xen_phys_start && e <= limit )
@@ -970,7 +973,7 @@ void __init __start_xen(unsigned long mbi_p)
     /* Late kexec reservation (dynamic start address). */
     kexec_reserve_area(&boot_e820);
 
-    setup_max_pdx();
+    setup_max_pdx(raw_max_page);
     if ( highmem_start )
         xenheap_max_mfn(PFN_DOWN(highmem_start));
 
@@ -996,7 +999,7 @@ void __init __start_xen(unsigned long mbi_p)
         {
             acpi_boot_table_init_done = 1;
             srat_parse_regions(s);
-            setup_max_pdx();
+            setup_max_pdx(raw_max_page);
         }
 
         if ( pfn_to_pdx((e - 1) >> PAGE_SHIFT) >= max_pdx )
@@ -1134,7 +1137,7 @@ void __init __start_xen(unsigned long mbi_p)
 
     acpi_numa_init();
 
-    numa_initmem_init(0, max_page);
+    numa_initmem_init(0, raw_max_page);
 
     end_boot_allocator();
     system_state = SYS_STATE_boot;
