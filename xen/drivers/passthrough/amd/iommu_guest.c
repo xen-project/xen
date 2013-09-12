@@ -728,6 +728,7 @@ static void guest_iommu_mmio_write64(struct guest_iommu *iommu,
         break;
     case IOMMU_EVENT_LOG_BASE_LOW_OFFSET:
         u64_to_reg(&iommu->event_log.reg_base, val);
+        break;
     case IOMMU_PPR_LOG_BASE_LOW_OFFSET:
         u64_to_reg(&iommu->ppr_log.reg_base, val);
         break;
