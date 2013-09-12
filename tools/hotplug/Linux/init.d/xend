@@ -38,6 +38,10 @@ function await_daemons_up
 
 case "$1" in
   start)
+	echo "WARNING: Enabling the xend toolstack."
+	echo "xend is deprecated and scheduled for removal. Please migrate"
+	echo "to another toolstack ASAP."
+
 	if [ -z "`ps -C xenconsoled -o pid=`" ]; then
 		echo "xencommons should be started first."
 		exit 1

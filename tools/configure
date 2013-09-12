@@ -1424,7 +1424,7 @@ Optional Features:
   --disable-rombios       Disable ROM BIOS (default is ENABLED)
   --disable-seabios       Disable SeaBIOS (default is ENABLED)
   --disable-debug         Disable debug build of tools (default is ENABLED)
-  --disable-xend          Disable xend toolstack (default is ENABLED)
+  --enable-xend           Enable xend toolstack (default is DISABLED)
   --enable-blktap1        Disable blktap1 tools (default is DISABLED)
   --enable-qemu-traditional
                           Enable qemu traditional device model, (DEFAULT is on
@@ -3671,7 +3671,7 @@ elif test "x$enable_xend" = "xyes"; then :
 
 elif test -z $ax_cv_xend; then :
 
-    ax_cv_xend="y"
+    ax_cv_xend="n"
 
 fi
 xend=$ax_cv_xend
@@ -9235,3 +9235,26 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
 
+
+if test "x$xend" = "xy" ; then :
+
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: You have enabled the xend toolstack.
+
+xend is deprecated and scheduled for removal. Please migrate to another
+toolstack ASAP.
+
+See http://wiki.xen.org/wiki/Choice_of_Toolstacks for information on
+other alternatives, including xl which is designed to be a drop in
+replacement for xm (http://wiki.xen.org/wiki/XL).
+" >&5
+$as_echo "$as_me: WARNING: You have enabled the xend toolstack.
+
+xend is deprecated and scheduled for removal. Please migrate to another
+toolstack ASAP.
+
+See http://wiki.xen.org/wiki/Choice_of_Toolstacks for information on
+other alternatives, including xl which is designed to be a drop in
+replacement for xm (http://wiki.xen.org/wiki/XL).
+" >&2;}
+
+fi

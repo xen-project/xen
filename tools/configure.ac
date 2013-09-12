@@ -57,7 +57,7 @@ AX_ARG_DEFAULT_DISABLE([ovmf], [Enable OVMF])
 AX_ARG_DEFAULT_ENABLE([rombios], [Disable ROM BIOS])
 AX_ARG_DEFAULT_ENABLE([seabios], [Disable SeaBIOS])
 AX_ARG_DEFAULT_ENABLE([debug], [Disable debug build of tools])
-AX_ARG_DEFAULT_ENABLE([xend], [Disable xend toolstack])
+AX_ARG_DEFAULT_DISABLE([xend], [Enable xend toolstack])
 AX_ARG_DEFAULT_DISABLE([blktap1], [Disable blktap1 tools])
 
 AC_ARG_ENABLE([qemu-traditional],
@@ -220,3 +220,16 @@ AC_SUBST(libiconv)
 AC_CHECK_HEADERS([yajl/yajl_version.h sys/eventfd.h])
 
 AC_OUTPUT()
+
+AS_IF([test "x$xend" = "xy" ], [
+    AC_MSG_WARN(
+[You have enabled the xend toolstack.
+
+xend is deprecated and scheduled for removal. Please migrate to another
+toolstack ASAP.
+
+See http://wiki.xen.org/wiki/Choice_of_Toolstacks for information on
+other alternatives, including xl which is designed to be a drop in
+replacement for xm (http://wiki.xen.org/wiki/XL).
+])
+])
