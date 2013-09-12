@@ -453,13 +453,15 @@ void p2m_teardown(struct p2m_domain *p2m)
  * We know we don't have any extra mappings to these pages */
 {
     struct page_info *pg;
-    struct domain *d = p2m->domain;
+    struct domain *d;
     unsigned long gfn;
     p2m_type_t t;
     mfn_t mfn;
 
     if (p2m == NULL)
         return;
+
+    d = p2m->domain;
 
     p2m_lock(p2m);
 
