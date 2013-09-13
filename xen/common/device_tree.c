@@ -445,6 +445,13 @@ static void __init process_cpu_node(const void *fdt, int node,
 
     cpuid = dt_read_number((const __be32 *)prop->data, 1);
 
+    /* TODO: handle non-contiguous CPU ID */
+    if ( cpuid >= NR_CPUS )
+    {
+        dt_printk("fdt: node `%s': reg(0x%x) >= NR_CPUS(%d)\n",
+                  name, cpuid, NR_CPUS);
+        return;
+    }
     cpumask_set_cpu(cpuid, &cpu_possible_map);
 }
 
