@@ -512,6 +512,67 @@ static int make_gic_node(const struct domain *d, void *fdt,
     return res;
 }
 
+static int make_timer_node(const struct domain *d, void *fdt,
+                           const struct dt_device_node *parent)
+{
+    static const struct dt_device_match timer_ids[] __initconst =
+    {
+        DT_MATCH_COMPATIBLE("arm,armv7-timer"),
+        DT_MATCH_COMPATIBLE("arm,armv8-timer"),
+        { /* sentinel */ },
+    };
+    struct dt_device_node *dev;
+    u32 len;
+    const void *compatible;
+    int res;
+    const struct dt_irq *irq;
+    gic_interrupt_t intrs[3];
+
+    DPRINT("Create timer node\n");
+
+    dev = dt_find_matching_node(NULL, timer_ids);
+    if ( !dev )
+    {
+        dprintk(XENLOG_ERR, "Missing timer node in the device tree?\n");
+        return -FDT_ERR_XEN(ENOENT);
+    }
+
+    compatible = dt_get_property(dev, "compatible", &len);
+    if ( !compatible )
+    {
+        dprintk(XENLOG_ERR, "Can't find compatible property for timer node\n");
+        return -FDT_ERR_XEN(ENOENT);
+    }
+
+    res = fdt_begin_node(fdt, "timer");
+    if ( res )
+        return res;
+
+    res = fdt_property(fdt, "compatible", compatible, len);
+    if ( res )
+        return res;
+
+    irq = timer_dt_irq(TIMER_PHYS_SECURE_PPI);
+    DPRINT("  Secure interrupt %u\n", irq->irq);
+    set_interrupt_ppi(intrs[0], irq->irq, 0xf, irq->type);
+
+    irq = timer_dt_irq(TIMER_PHYS_NONSECURE_PPI);
+    DPRINT("  Non secure interrupt %u\n", irq->irq);
+    set_interrupt_ppi(intrs[1], irq->irq, 0xf, irq->type);
+
+    irq = timer_dt_irq(TIMER_VIRT_PPI);
+    DPRINT("  Virt interrupt %u\n", irq->irq);
+    set_interrupt_ppi(intrs[2], irq->irq, 0xf, irq->type);
+
+    res = fdt_property_interrupts(fdt, intrs, 3);
+    if ( res )
+        return res;
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+
 /* Map the device in the domain */
 static int map_device(struct domain *d, const struct dt_device_node *dev)
 {
@@ -602,6 +663,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         DT_MATCH_COMPATIBLE("arm,psci"),
         DT_MATCH_PATH("/cpus"),
         DT_MATCH_GIC,
+        DT_MATCH_TIMER,
         { /* sentinel */ },
     };
     const struct dt_device_node *child;
@@ -677,6 +739,10 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
             return res;
 
         res = make_gic_node(d, kinfo->fdt, np);
+        if ( res )
+            return res;
+
+        res = make_timer_node(d, kinfo->fdt, np);
         if ( res )
             return res;
     }
