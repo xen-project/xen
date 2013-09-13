@@ -154,25 +154,11 @@ static bool_t __init device_tree_node_compatible(const void *fdt, int node,
     return 0;
 }
 
-static void __init get_val(const __be32 **cell, u32 cells, u64 *val)
-{
-    *val = 0;
-
-    if ( cells > 2 )
-        early_panic("dtb value contains > 2 cells\n");
-
-    while ( cells-- )
-    {
-        *val <<= 32;
-        *val |= fdt32_to_cpu(*(*cell)++);
-    }
-}
-
 static void __init device_tree_get_reg(const __be32 **cell, u32 address_cells,
                                        u32 size_cells, u64 *start, u64 *size)
 {
-    get_val(cell, address_cells, start);
-    get_val(cell, size_cells, size);
+    *start = dt_next_cell(address_cells, cell);
+    *size = dt_next_cell(size_cells, cell);
 }
 
 void dt_get_range(const __be32 **cell, const struct dt_device_node *np,
