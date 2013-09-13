@@ -624,7 +624,7 @@ struct dt_device_node *dt_find_node_by_name(struct dt_device_node *from,
     struct dt_device_node *dt;
 
     dt = from ? from->allnext : dt_host;
-    for_each_device_node(dt, np)
+    dt_for_each_device_node(dt, np)
         if ( np->name && (dt_node_cmp(np->name, name) == 0) )
             break;
 
@@ -635,7 +635,7 @@ struct dt_device_node *dt_find_node_by_path(const char *path)
 {
     struct dt_device_node *np;
 
-    for_each_device_node(dt_host, np)
+    dt_for_each_device_node(dt_host, np)
         if ( np->full_name && (dt_node_cmp(np->full_name, path) == 0) )
             break;
 
@@ -672,7 +672,7 @@ dt_find_compatible_node(struct dt_device_node *from,
     struct dt_device_node *dt;
 
     dt = from ? from->allnext : dt_host;
-    for_each_device_node(dt, np)
+    dt_for_each_device_node(dt, np)
     {
         if ( type
              && !(np->type && (dt_node_cmp(np->type, type) == 0)) )
@@ -1009,7 +1009,7 @@ static const struct dt_device_node *dt_find_node_by_phandle(dt_phandle handle)
 {
     const struct dt_device_node *np;
 
-    for_each_device_node(dt_host, np)
+    dt_for_each_device_node(dt_host, np)
         if ( np->phandle == handle )
             break;
 
@@ -1679,7 +1679,7 @@ static void __init dt_alias_scan(void)
     if ( !aliases )
         return;
 
-    for_each_property_of_node( aliases, pp )
+    dt_for_each_property_node( aliases, pp )
     {
         const char *start = pp->name;
         const char *end = start + strlen(start);

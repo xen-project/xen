@@ -236,10 +236,10 @@ struct dt_device_node * __init dt_find_interrupt_controller(const char *compat);
 #define DT_ROOT_NODE_ADDR_CELLS_DEFAULT 2
 #define DT_ROOT_NODE_SIZE_CELLS_DEFAULT 1
 
-#define for_each_property_of_node(dn, pp)                   \
+#define dt_for_each_property_node(dn, pp)                   \
     for ( pp = dn->properties; pp != NULL; pp = pp->next )
 
-#define for_each_device_node(dt, dn)                         \
+#define dt_for_each_device_node(dt, dn)                     \
     for ( dn = dt; dn != NULL; dn = dn->allnext )
 
 /* Helper to read a big number; size is in cells (not bytes) */
