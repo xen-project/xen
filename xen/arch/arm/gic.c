@@ -355,10 +355,15 @@ int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
 /* Set up the GIC */
 void __init gic_init(void)
 {
+    static const struct dt_device_match gic_ids[] __initconst =
+    {
+        DT_MATCH_GIC,
+        { /* sentinel */ },
+    };
     struct dt_device_node *node;
     int res;
 
-    node = dt_find_interrupt_controller("arm,cortex-a15-gic");
+    node = dt_find_interrupt_controller(gic_ids);
     if ( !node )
         panic("Unable to find compatible GIC in the device tree\n");
 

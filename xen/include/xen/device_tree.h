@@ -240,7 +240,8 @@ extern const struct dt_device_node *dt_interrupt_controller;
  *
  * If found, return the interrupt controller device node.
  */
-struct dt_device_node * __init dt_find_interrupt_controller(const char *compat);
+struct dt_device_node * __init
+dt_find_interrupt_controller(const struct dt_device_match *matches);
 
 #define dt_prop_cmp(s1, s2) strcmp((s1), (s2))
 #define dt_node_cmp(s1, s2) strcasecmp((s1), (s2))

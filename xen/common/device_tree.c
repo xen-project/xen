@@ -1834,11 +1834,12 @@ static void __init dt_alias_scan(void)
     }
 }
 
-struct dt_device_node * __init dt_find_interrupt_controller(const char *compat)
+struct dt_device_node * __init
+dt_find_interrupt_controller(const struct dt_device_match *matches)
 {
     struct dt_device_node *np = NULL;
 
-    while ( (np = dt_find_compatible_node(np, NULL, compat)) )
+    while ( (np = dt_find_matching_node(np, matches)) )
     {
         if ( !dt_find_property(np, "interrupt-controller", NULL) )
             continue;
