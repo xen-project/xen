@@ -1,6 +1,10 @@
 #ifndef __ARM_TIME_H__
 #define __ARM_TIME_H__
 
+#define DT_MATCH_TIMER                      \
+    DT_MATCH_COMPATIBLE("arm,armv7-timer"), \
+    DT_MATCH_COMPATIBLE("arm,armv8-timer")
+
 typedef unsigned long cycles_t;
 
 static inline cycles_t get_cycles (void)

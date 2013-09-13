@@ -437,15 +437,20 @@ static int map_device(struct domain *d, const struct dt_device_node *dev)
 
 static int handle_node(struct domain *d, const struct dt_device_node *np)
 {
+    static const struct dt_device_match skip_matches[] __initconst =
+    {
+        DT_MATCH_COMPATIBLE("xen,xen"),
+        DT_MATCH_TYPE("memory"),
+        DT_MATCH_PATH("/chosen"),
+        { /* sentinel */ },
+    };
     const struct dt_device_node *child;
     int res;
 
     DPRINT("handle %s\n", dt_node_full_name(np));
 
     /* Skip theses nodes and the sub-nodes */
-    if ( dt_device_is_compatible(np, "xen,xen") ||
-         dt_device_type_is_equal(np, "memory") ||
-         !strcmp("/chosen", dt_node_full_name(np)) )
+    if ( dt_match_node(skip_matches, np ) )
         return 0;
 
     if ( dt_device_used_by(np) != DOMID_XEN )

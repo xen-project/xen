@@ -101,14 +101,17 @@ static uint32_t calibrate_timer(void)
 /* Set up the timer on the boot CPU */
 int __init init_xen_time(void)
 {
+    static const struct dt_device_match timer_ids[] __initconst =
+    {
+        DT_MATCH_TIMER,
+        { /* sentinel */ },
+    };
     struct dt_device_node *dev;
     int res;
     unsigned int i;
     u32 rate;
 
-    dev = dt_find_compatible_node(NULL, NULL, "arm,armv7-timer");
-    if ( !dev )
-        dev = dt_find_compatible_node(NULL, NULL, "arm,armv8-timer");
+    dev = dt_find_matching_node(NULL, timer_ids);
     if ( !dev )
         panic("Unable to find a compatible timer in the device tree\n");
 
