@@ -146,13 +146,13 @@ void __init video_init(void)
 
     if ( !hdlcd_start )
     {
-        printk(KERN_ERR "HDLCD address missing from device tree, disabling driver\n");
+        early_printk(KERN_ERR "HDLCD: address missing from device tree, disabling driver\n");
         return;
     }
 
     if ( !hdlcd_start || !framebuffer_start )
     {
-        printk(KERN_ERR "HDLCD: framebuffer address missing from device tree, disabling driver\n");
+        early_printk(KERN_ERR "HDLCD: framebuffer address missing from device tree, disabling driver\n");
         return;
     }
 
@@ -166,27 +166,27 @@ void __init video_init(void)
     else if ( strlen(mode_string) < strlen("800x600@60") ||
             strlen(mode_string) > sizeof(_mode_string) - 1 )
     {
-        printk(KERN_ERR "HDLCD: invalid modeline=%s\n", mode_string);
+        early_printk(KERN_ERR "HDLCD: invalid modeline=%s\n", mode_string);
         return;
     } else {
         char *s = strchr(mode_string, '-');
         if ( !s )
         {
-            printk(KERN_INFO "HDLCD: bpp not found in modeline %s, assume 32 bpp\n",
-                    mode_string);
+            early_printk(KERN_INFO "HDLCD: bpp not found in modeline %s, assume 32 bpp\n",
+                         mode_string);
             get_color_masks("32", &c);
             memcpy(_mode_string, mode_string, strlen(mode_string) + 1);
             bytes_per_pixel = 4;
         } else {
             if ( strlen(s) < 6 )
             {
-                printk(KERN_ERR "HDLCD: invalid mode %s\n", mode_string);
+                early_printk(KERN_ERR "HDLCD: invalid mode %s\n", mode_string);
                 return;
             }
             s++;
             if ( get_color_masks(s, &c) < 0 )
             {
-                printk(KERN_WARNING "HDLCD: unsupported bpp %s\n", s);
+                early_printk(KERN_WARNING "HDLCD: unsupported bpp %s\n", s);
                 return;
             }
             bytes_per_pixel = simple_strtoll(s, NULL, 10) / 8;
@@ -205,22 +205,23 @@ void __init video_init(void)
     }
     if ( !videomode )
     {
-        printk(KERN_WARNING "HDLCD: unsupported videomode %s\n", _mode_string);
+        early_printk(KERN_WARNING "HDLCD: unsupported videomode %s\n",
+                     _mode_string);
         return;
     }
 
     if ( framebuffer_size < bytes_per_pixel * videomode->xres * videomode->yres )
     {
-        printk(KERN_ERR "HDLCD: the framebuffer is too small, disabling the HDLCD driver\n");
+        early_printk(KERN_ERR "HDLCD: the framebuffer is too small, disabling the HDLCD driver\n");
         return;
     }
 
-    printk(KERN_INFO "Initializing HDLCD driver\n");
+    early_printk(KERN_INFO "Initializing HDLCD driver\n");
 
     lfb = ioremap_wc(framebuffer_start, framebuffer_size);
     if ( !lfb )
     {
-        printk(KERN_ERR "Couldn't map the framebuffer\n");
+        early_printk(KERN_ERR "Couldn't map the framebuffer\n");
         return;
     }
     memset(lfb, 0x00, bytes_per_pixel * videomode->xres * videomode->yres);
