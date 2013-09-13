@@ -475,7 +475,7 @@ static int map_devices_from_device_tree(struct domain *d)
 
 static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 {
-    void *fdt;
+    const void *fdt;
     int new_size;
     int ret;
     paddr_t end;

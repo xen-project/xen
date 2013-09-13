@@ -26,7 +26,7 @@
 #include <asm/early_printk.h>
 
 struct dt_early_info __initdata early_info;
-void *device_tree_flattened;
+const void *device_tree_flattened;
 dt_irq_xlate_func dt_irq_xlate;
 /* Host device tree */
 struct dt_device_node *dt_host;

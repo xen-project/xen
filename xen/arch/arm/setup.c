@@ -289,6 +289,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     unsigned long dtb_pages;
     unsigned long boot_mfn_start, boot_mfn_end;
     int i = 0;
+    void *fdt;
 
     /* TODO: Handle non-contiguous memory bank */
     if ( !early_info.mem.nr_banks )
@@ -363,8 +364,9 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
      *
      * TODO: handle other payloads too.
      */
-    device_tree_flattened = mfn_to_virt(alloc_boot_pages(dtb_pages, 1));
-    copy_from_paddr(device_tree_flattened, dtb_paddr, dtb_size, BUFFERABLE);
+    fdt = mfn_to_virt(alloc_boot_pages(dtb_pages, 1));
+    copy_from_paddr(fdt, dtb_paddr, dtb_size, BUFFERABLE);
+    device_tree_flattened = fdt;
 
     /* Add non-xenheap memory */
     s = ram_start;
@@ -410,6 +412,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     int bank;
     unsigned long  xenheap_pages = 0;
     unsigned long dtb_pages;
+    void *fdt;
 
     total_pages = 0;
     for ( bank = 0 ; bank < early_info.mem.nr_banks; bank++ )
@@ -469,8 +472,9 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
      *
      * TODO: handle other payloads too.
      */
-    device_tree_flattened = mfn_to_virt(alloc_boot_pages(dtb_pages, 1));
-    copy_from_paddr(device_tree_flattened, dtb_paddr, dtb_size, BUFFERABLE);
+    fdt = mfn_to_virt(alloc_boot_pages(dtb_pages, 1));
+    copy_from_paddr(fdt, dtb_paddr, dtb_size, BUFFERABLE);
+    device_tree_flattened = fdt;
 
     setup_frametable_mappings(ram_start, ram_end);
     max_page = PFN_DOWN(ram_end);

@@ -164,7 +164,7 @@ typedef int (*device_tree_node_func)(const void *fdt,
                                      void *data);
 
 extern struct dt_early_info early_info;
-extern void *device_tree_flattened;
+extern const void *device_tree_flattened;
 
 size_t __init device_tree_early_init(const void *fdt);
 
