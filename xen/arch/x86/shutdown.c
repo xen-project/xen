@@ -466,8 +466,6 @@ void machine_restart(unsigned int delay_millisecs)
     console_start_sync();
     spin_debug_disable();
 
-    acpi_dmar_reinstate();
-
     local_irq_enable();
 
     /* Ensure we are the boot CPU. */
@@ -492,7 +490,10 @@ void machine_restart(unsigned int delay_millisecs)
     mdelay(delay_millisecs);
 
     if ( tboot_in_measured_env() )
+    {
+        acpi_dmar_reinstate();
         tboot_shutdown(TB_SHUTDOWN_REBOOT);
+    }
 
     efi_reset_system(reboot_mode != 0);
 
