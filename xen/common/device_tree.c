@@ -426,21 +426,26 @@ static void __init process_cpu_node(const void *fdt, int node,
                                     u32 address_cells, u32 size_cells)
 {
     const struct fdt_property *prop;
-    const u32 *cell;
-    paddr_t start, size;
+    u32 cpuid;
+    int len;
 
-
-    prop = fdt_get_property(fdt, node, "reg", NULL);
+    prop = fdt_get_property(fdt, node, "reg", &len);
     if ( !prop )
     {
         early_printk("fdt: node `%s': missing `reg' property\n", name);
         return;
     }
 
-    cell = (const u32 *)prop->data;
-    device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
+    if ( len < sizeof (cpuid) )
+    {
+        dt_printk("fdt: node `%s': `reg` property length is too short\n",
+                  name);
+        return;
+    }
 
-    cpumask_set_cpu(start, &cpu_possible_map);
+    cpuid = dt_read_number((const __be32 *)prop->data, 1);
+
+    cpumask_set_cpu(cpuid, &cpu_possible_map);
 }
 
 static void __init process_multiboot_node(const void *fdt, int node,
