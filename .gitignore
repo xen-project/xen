@@ -356,6 +356,7 @@ tools/include/xen-foreign/arm64.h
 
 .git
 tools/misc/xen-hptool
+tools/misc/xen-mfndump
 tools/libxl/_*.[ch]
 tools/libxl/testidl
 tools/libxl/testidl.c
