@@ -676,7 +676,8 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
     DPRINT("handle %s\n", path);
 
     /* Skip theses nodes and the sub-nodes */
-    if ( dt_match_node(skip_matches, np ) )
+    if ( dt_match_node(skip_matches, np ) ||
+         platform_device_is_blacklisted(np) )
     {
         DPRINT("  Skip it!\n");
         return 0;

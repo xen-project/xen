@@ -4,6 +4,7 @@
 #include <xen/init.h>
 #include <xen/sched.h>
 #include <xen/mm.h>
+#include <xen/device_tree.h>
 
 /* Describe specific operation for a board */
 struct platform_desc {
@@ -26,6 +27,11 @@ struct platform_desc {
      * board with different quirk on each
      */
     uint32_t (*quirks)(void);
+    /*
+     * Platform blacklist devices
+     * List of devices which must not pass-through to a guest
+     */
+    const struct dt_device_match *blacklist_dev;
 };
 
 /*
@@ -40,6 +46,7 @@ int __init platform_specific_mapping(struct domain *d);
 void platform_reset(void);
 void platform_poweroff(void);
 bool_t platform_has_quirk(uint32_t quirk);
+bool_t platform_device_is_blacklisted(const struct dt_device_node *node);
 
 #define PLATFORM_START(_name, _namestr)                         \
 static const struct platform_desc  __plat_desc_##_name __used   \

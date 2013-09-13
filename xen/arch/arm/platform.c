@@ -127,6 +127,16 @@ bool_t platform_has_quirk(uint32_t quirk)
     return !!(quirks & quirk);
 }
 
+bool_t platform_device_is_blacklisted(const struct dt_device_node *node)
+{
+    const struct dt_device_match *blacklist = NULL;
+
+    if ( platform && platform->blacklist_dev )
+        blacklist = platform->blacklist_dev;
+
+    return dt_match_node(blacklist, node);
+}
+
 /*
  * Local variables:
  * mode: C
