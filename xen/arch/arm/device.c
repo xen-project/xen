@@ -47,6 +47,9 @@ int __init device_init(struct dt_device_node *dev, enum device_type type,
 
     ASSERT(dev != NULL);
 
+    if ( !dt_device_is_available(dev) )
+        return  -ENODEV;
+
     for ( desc = _sdevice; desc != _edevice; desc++ )
     {
         if ( desc->type != type )
