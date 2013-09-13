@@ -858,8 +858,6 @@ csched_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
     INIT_LIST_HEAD(&svc->active_vcpu_elem);
     svc->sdom = dd;
     svc->vcpu = vc;
-    atomic_set(&svc->credit, 0);
-    svc->flags = 0U;
     svc->pri = is_idle_domain(vc->domain) ?
         CSCHED_PRI_IDLE : CSCHED_PRI_TS_UNDER;
     SCHED_VCPU_STATS_RESET(svc);
@@ -1081,11 +1079,9 @@ csched_alloc_domdata(const struct scheduler *ops, struct domain *dom)
 
     /* Initialize credit and weight */
     INIT_LIST_HEAD(&sdom->active_vcpu);
-    sdom->active_vcpu_count = 0;
     INIT_LIST_HEAD(&sdom->active_sdom_elem);
     sdom->dom = dom;
     sdom->weight = CSCHED_DEFAULT_WEIGHT;
-    sdom->cap = 0U;
 
     return (void *)sdom;
 }
