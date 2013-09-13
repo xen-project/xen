@@ -429,9 +429,13 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
      *  - Device used by Xen: Obviously dom0 can't use them
      *  - Memory: the guest will see a different view of memory. It will
      *  be allocated later.
+     *  - Disabled device: Linux is able to cope with status="disabled"
+     *  property. Therefore these device doesn't need to be mapped. This
+     *  solution can be use later for pass through.
      */
     if ( dt_device_used_by(np) != DOMID_XEN &&
-         !dt_device_type_is_equal(np, "memory") )
+         !dt_device_type_is_equal(np, "memory") &&
+         dt_device_is_available(np) )
     {
         res = map_device(d, np);
 
