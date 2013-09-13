@@ -125,9 +125,26 @@ static const char * const vexpress_dt_compat[] __initdata =
     NULL
 };
 
+static const struct dt_device_match vexpress_blacklist_dev[] __initconst =
+{
+    /* Cache Coherent Interconnect */
+    DT_MATCH_COMPATIBLE("arm,cci-400"),
+    DT_MATCH_COMPATIBLE("arm,cci-400-pmu"),
+    /* Video device
+     * TODO: remove it once memreserve is handled properly by Xen
+     */
+    DT_MATCH_COMPATIBLE("arm,hdlcd"),
+    /* Hardware power management */
+    DT_MATCH_COMPATIBLE("arm,vexpress-reset"),
+    DT_MATCH_COMPATIBLE("arm,vexpress-reboot"),
+    DT_MATCH_COMPATIBLE("arm,vexpress-shutdown"),
+    { /* sentinel */ },
+};
+
 PLATFORM_START(vexpress, "VERSATILE EXPRESS")
     .compatible = vexpress_dt_compat,
     .reset = vexpress_reset,
+    .blacklist_dev = vexpress_blacklist_dev,
 PLATFORM_END
 
 /*
