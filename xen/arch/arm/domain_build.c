@@ -63,10 +63,10 @@ struct vcpu *__init alloc_dom0_vcpu0(void)
 }
 
 static int set_memory_reg_11(struct domain *d, struct kernel_info *kinfo,
-                             const void *fdt, const u32 *cell, int len,
-                             int address_cells, int size_cells, u32 *new_cell)
+                             const struct dt_property *pp,
+                             const struct dt_device_node *np, __be32 *new_cell)
 {
-    int reg_size = (address_cells + size_cells) * sizeof(*cell);
+    int reg_size = dt_cells_to_size(dt_n_addr_cells(np) + dt_n_size_cells(np));
     paddr_t start;
     paddr_t size;
     struct page_info *pg;
@@ -90,7 +90,7 @@ static int set_memory_reg_11(struct domain *d, struct kernel_info *kinfo,
     if ( res )
         panic("Unable to add pages in DOM0: %d\n", res);
 
-    device_tree_set_reg(&new_cell, address_cells, size_cells, start, size);
+    dt_set_range(&new_cell, np, start, size);
 
     kinfo->mem.bank[0].start = start;
     kinfo->mem.bank[0].size = size;
@@ -100,25 +100,30 @@ static int set_memory_reg_11(struct domain *d, struct kernel_info *kinfo,
 }
 
 static int set_memory_reg(struct domain *d, struct kernel_info *kinfo,
-                          const void *fdt, const u32 *cell, int len,
-                          int address_cells, int size_cells, u32 *new_cell)
+                          const struct dt_property *pp,
+                          const struct dt_device_node *np, __be32 *new_cell)
 {
-    int reg_size = (address_cells + size_cells) * sizeof(*cell);
+    int reg_size = dt_cells_to_size(dt_n_addr_cells(np) + dt_n_size_cells(np));
     int l = 0;
+    unsigned int bank = 0;
     u64 start;
     u64 size;
+    int ret;
 
     if ( platform_has_quirk(PLATFORM_QUIRK_DOM0_MAPPING_11) )
-        return set_memory_reg_11(d, kinfo, fdt, cell, len, address_cells,
-                                 size_cells, new_cell);
+        return set_memory_reg_11(d, kinfo, pp, np, new_cell);
 
-    while ( kinfo->unassigned_mem > 0 && l + reg_size <= len
+    while ( kinfo->unassigned_mem > 0 && l + reg_size <= pp->length
             && kinfo->mem.nr_banks < NR_MEM_BANKS )
     {
-        device_tree_get_reg(&cell, address_cells, size_cells, &start, &size);
+        ret = dt_device_get_address(np, bank, &start, &size);
+        if ( ret )
+            panic("Unable to retrieve the bank %u for %s\n",
+                  bank, dt_node_full_name(np));
+
         if ( size > kinfo->unassigned_mem )
             size = kinfo->unassigned_mem;
-        device_tree_set_reg(&new_cell, address_cells, size_cells, start, size);
+        dt_set_range(&new_cell, np, start, size);
 
         printk("Populate P2M %#"PRIx64"->%#"PRIx64"\n", start, start + size);
         if ( p2m_populate_ram(d, start, start + size) < 0 )
@@ -135,31 +140,21 @@ static int set_memory_reg(struct domain *d, struct kernel_info *kinfo,
 }
 
 static int write_properties(struct domain *d, struct kernel_info *kinfo,
-                            const void *fdt,
-                            int node, const char *name, int depth,
-                            u32 address_cells, u32 size_cells)
+                            const struct dt_device_node *np)
 {
     const char *bootargs = NULL;
-    int prop;
+    const struct dt_property *pp;
+    int res = 0;
 
     if ( early_info.modules.nr_mods >= MOD_KERNEL &&
          early_info.modules.module[MOD_KERNEL].cmdline[0] )
         bootargs = &early_info.modules.module[MOD_KERNEL].cmdline[0];
 
-    for ( prop = fdt_first_property_offset(fdt, node);
-          prop >= 0;
-          prop = fdt_next_property_offset(fdt, prop) )
+    dt_for_each_property_node (np, pp)
     {
-        const struct fdt_property *p;
-        const char *prop_name;
-        const char *prop_data;
-        int prop_len;
-        char *new_data = NULL;
-
-        p = fdt_get_property_by_offset(fdt, prop, NULL);
-        prop_name = fdt_string(fdt, fdt32_to_cpu(p->nameoff));
-        prop_data = p->data;
-        prop_len  = fdt32_to_cpu(p->len);
+        const void *prop_data = pp->value;
+        void *new_data = NULL;
+        u32 prop_len = pp->length;
 
         /*
          * In chosen node:
@@ -168,105 +163,114 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
          *   bootargs (from module #1, above).
          * * remove bootargs and xen,dom0-bootargs.
          */
-        if ( device_tree_node_matches(fdt, node, "chosen") )
+        if ( dt_node_path_is_equal(np, "/chosen") )
         {
-            if ( strcmp(prop_name, "bootargs") == 0 )
+            if ( dt_property_name_is_equal(pp, "bootargs") )
                 continue;
-            else if ( strcmp(prop_name, "xen,dom0-bootargs") == 0 )
+            else if ( dt_property_name_is_equal(pp, "xen,dom0-bootargs") )
             {
                 if ( !bootargs )
-                    bootargs = prop_data;
+                    bootargs = pp->value;
                 continue;
             }
         }
         /*
          * In a memory node: adjust reg property.
+         * TODO: handle properly memory node (ie: device_type = "memory")
          */
-        else if ( device_tree_node_matches(fdt, node, "memory") )
+        else if ( dt_node_name_is_equal(np, "memory") )
         {
-            if ( strcmp(prop_name, "reg") == 0 )
+            if ( dt_property_name_is_equal(pp, "reg") )
             {
-                new_data = xzalloc_bytes(prop_len);
+                new_data = xzalloc_bytes(pp->length);
                 if ( new_data  == NULL )
                     return -FDT_ERR_XEN(ENOMEM);
 
-                prop_len = set_memory_reg(d, kinfo, fdt,
-                                          (u32 *)prop_data, prop_len,
-                                          address_cells, size_cells,
-                                          (u32 *)new_data);
+                prop_len = set_memory_reg(d, kinfo, pp, np,
+                                          (__be32 *)new_data);
                 prop_data = new_data;
             }
         }
 
-        /*
-         * TODO: Should call map_mmio_regions() for all devices in the
-         * tree that have a "reg" parameter (except cpus).  This
-         * requires looking into the parent node's "ranges" property
-         * to translate the bus address in the "reg" value into
-         * physical addresses.  Regions also need to be rounded up to
-         * whole pages.
-         */
-
-        fdt_property(kinfo->fdt, prop_name, prop_data, prop_len);
+        res = fdt_property(kinfo->fdt, pp->name, prop_data, prop_len);
 
         xfree(new_data);
+
+        if ( res )
+            return res;
     }
 
-    if ( device_tree_node_matches(fdt, node, "chosen") && bootargs )
-        fdt_property(kinfo->fdt, "bootargs", bootargs, strlen(bootargs) + 1);
+    if ( dt_node_path_is_equal(np, "/chosen") && bootargs )
+    {
+        res = fdt_property(kinfo->fdt, "bootargs", bootargs,
+                           strlen(bootargs) + 1);
+        if ( res )
+            return res;
+    }
 
     /*
      * XXX should populate /chosen/linux,initrd-{start,end} here if we
      * have module[2]
      */
 
-    if ( prop == -FDT_ERR_NOTFOUND )
-        return 0;
-    return prop;
+    return 0;
 }
 
-/* Returns the next node in fdt (starting from offset) which should be
- * passed through to dom0.
+/*
+ * Helper to write an interrupts with the GIC format
+ * This code is assuming the irq is an PPI.
  */
-static int fdt_next_dom0_node(const void *fdt, int node,
-                              int *depth_out)
+
+typedef __be32 gic_interrupt_t[3];
+
+static void set_interrupt_ppi(gic_interrupt_t interrupt, unsigned int irq,
+                              unsigned int cpumask, unsigned int level)
 {
-    int depth = *depth_out;
+    __be32 *cells = interrupt;
 
-    while ( (node = fdt_next_node(fdt, node, &depth)) &&
-            node >= 0 && depth >= 0 )
-    {
-        if ( depth >= DEVICE_TREE_MAX_DEPTH )
-            break;
+    BUG_ON(irq < 16 && irq >= 32);
 
-        /* Skip /hypervisor/ node. We will inject our own. */
-        if ( fdt_node_check_compatible(fdt, node, "xen,xen" ) == 0 )
-        {
-            printk("Device-tree contains \"xen,xen\" node. Ignoring.\n");
-            continue;
-        }
-
-        /* Skip multiboot subnodes */
-        if ( fdt_node_check_compatible(fdt, node,
-                                       "xen,multiboot-module" ) == 0 )
-            continue;
-
-        /* We've arrived at a node which dom0 is interested in. */
-        break;
-    }
-
-    *depth_out = depth;
-    return node;
+    /* See linux Documentation/devictree/bindings/arm/gic.txt */
+    dt_set_cell(&cells, 1, 1); /* is a PPI */
+    dt_set_cell(&cells, 1, irq - 16); /* PPIs start at 16 */
+    dt_set_cell(&cells, 1, (cpumask << 8) | level);
 }
 
-static void make_hypervisor_node(void *fdt, int addrcells, int sizecells)
+/*
+ * Helper to set interrupts for a node in the flat device tree.
+ * It needs 2 property:
+ *  "interrupts": contains the list of interrupts
+ *  "interrupt-parent": link to the GIC
+ */
+static int fdt_property_interrupts(void *fdt, gic_interrupt_t *intr,
+                                   unsigned num_irq)
+{
+    int res;
+
+    res = fdt_property(fdt, "interrupts", intr, sizeof (intr[0]) * num_irq);
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "interrupt-parent",
+                            dt_interrupt_controller->phandle);
+
+    return res;
+}
+
+
+static int make_hypervisor_node(void *fdt, const struct dt_device_node *parent)
 {
     const char compat[] =
         "xen,xen-"__stringify(XEN_VERSION)"."__stringify(XEN_SUBVERSION)"\0"
         "xen,xen";
-    u32 reg[4];
-    u32 intr[3];
-    u32 *cell;
+    __be32 reg[4];
+    gic_interrupt_t intr;
+    __be32 *cells;
+    int res;
+    int addrcells = dt_n_addr_cells(parent);
+    int sizecells = dt_n_size_cells(parent);
+
+    DPRINT("Create hypervisor node\n");
 
     /*
      * Sanity-check address sizes, since addresses and sizes which do
@@ -277,82 +281,42 @@ static void make_hypervisor_node(void *fdt, int addrcells, int sizecells)
         panic("Cannot cope with this size");
 
     /* See linux Documentation/devicetree/bindings/arm/xen.txt */
-    fdt_begin_node(fdt, "hypervisor");
+    res = fdt_begin_node(fdt, "hypervisor");
+    if ( res )
+        return res;
 
     /* Cannot use fdt_property_string due to embedded nulls */
-    fdt_property(fdt, "compatible", compat, sizeof(compat));
+    res = fdt_property(fdt, "compatible", compat, sizeof(compat));
+    if ( res )
+        return res;
 
+    DPRINT("  Grant table range: 0xb0000000-0x20000\n");
     /* reg 0 is grant table space */
-    cell = &reg[0];
-    device_tree_set_reg(&cell, addrcells, sizecells, 0xb0000000, 0x20000);
-    fdt_property(fdt, "reg", reg,
-                 sizeof(reg[0]) * (addrcells + sizecells));
+    cells = &reg[0];
+    dt_set_range(&cells, parent, 0xb0000000, 0x20000);
+    res = fdt_property(fdt, "reg", reg,
+                       dt_cells_to_size(addrcells + sizecells));
+    if ( res )
+        return res;
 
     /*
-     * interrupts is evtchn upcall  <1 15 0xf08>
-     * See linux Documentation/devicetree/bindings/arm/gic.txt
+     * interrupts is evtchn upcall:
+     *  - Active-low level-sensitive
+     *  - All cpus
+     *
+     * TODO: Handle correctly the cpumask
      */
-    intr[0] = cpu_to_fdt32(1); /* is a PPI */
-    intr[1] = cpu_to_fdt32(VGIC_IRQ_EVTCHN_CALLBACK - 16); /* PPIs start at 16 */
-    intr[2] = cpu_to_fdt32(0xf08); /* Active-low level-sensitive */
+    DPRINT("  Event channel interrupt to %u\n", VGIC_IRQ_EVTCHN_CALLBACK);
+    set_interrupt_ppi(intr, VGIC_IRQ_EVTCHN_CALLBACK, 0xf,
+                   DT_IRQ_TYPE_LEVEL_LOW);
 
-    fdt_property(fdt, "interrupts", intr, sizeof(intr[0]) * 3);
+    res = fdt_property_interrupts(fdt, &intr, 1);
+    if ( res )
+        return res;
 
-    fdt_end_node(fdt);
-}
+    res = fdt_end_node(fdt);
 
-static int write_nodes(struct domain *d, struct kernel_info *kinfo,
-                       const void *fdt)
-{
-    int node;
-    int depth = 0, last_depth = -1;
-    u32 address_cells[DEVICE_TREE_MAX_DEPTH];
-    u32 size_cells[DEVICE_TREE_MAX_DEPTH];
-    int ret;
-
-    for ( node = 0, depth = 0;
-          node >= 0 && depth >= 0;
-          node = fdt_next_dom0_node(fdt, node, &depth) )
-    {
-        const char *name;
-
-        name = fdt_get_name(fdt, node, NULL);
-
-        if ( depth >= DEVICE_TREE_MAX_DEPTH )
-        {
-            printk("warning: node `%s' is nested too deep (%d)\n",
-                   name, depth);
-            continue;
-        }
-
-        /* We cannot handle descending more than one level at a time */
-        ASSERT( depth <= last_depth + 1 );
-
-        while ( last_depth-- >= depth )
-            fdt_end_node(kinfo->fdt);
-
-        address_cells[depth] = device_tree_get_u32(fdt, node, "#address-cells",
-                                    depth > 0 ? address_cells[depth-1] : 0);
-        size_cells[depth] = device_tree_get_u32(fdt, node, "#size-cells",
-                                    depth > 0 ? size_cells[depth-1] : 0);
-
-        fdt_begin_node(kinfo->fdt, name);
-
-        ret = write_properties(d, kinfo, fdt, node, name, depth,
-                               address_cells[depth-1], size_cells[depth-1]);
-        if ( ret < 0 )
-            return ret;
-
-        last_depth = depth;
-    }
-
-    while ( last_depth-- >= 1 )
-        fdt_end_node(kinfo->fdt);
-
-    make_hypervisor_node(kinfo->fdt, address_cells[0], size_cells[0]);
-
-    fdt_end_node(kinfo->fdt);
-    return 0;
+    return res;
 }
 
 /* Map the device in the domain */
@@ -435,25 +399,39 @@ static int map_device(struct domain *d, const struct dt_device_node *dev)
     return 0;
 }
 
-static int handle_node(struct domain *d, const struct dt_device_node *np)
+static int handle_node(struct domain *d, struct kernel_info *kinfo,
+                       const struct dt_device_node *np)
 {
     static const struct dt_device_match skip_matches[] __initconst =
     {
         DT_MATCH_COMPATIBLE("xen,xen"),
-        DT_MATCH_TYPE("memory"),
-        DT_MATCH_PATH("/chosen"),
+        DT_MATCH_COMPATIBLE("xen,multiboot-module"),
         { /* sentinel */ },
     };
     const struct dt_device_node *child;
     int res;
+    const char *name;
+    const char *path;
 
-    DPRINT("handle %s\n", dt_node_full_name(np));
+    path = dt_node_full_name(np);
+
+    DPRINT("handle %s\n", path);
 
     /* Skip theses nodes and the sub-nodes */
     if ( dt_match_node(skip_matches, np ) )
+    {
+        DPRINT("  Skip it!\n");
         return 0;
+    }
 
-    if ( dt_device_used_by(np) != DOMID_XEN )
+    /*
+     * Some device doesn't need to be mapped in Xen:
+     *  - Device used by Xen: Obviously dom0 can't use them
+     *  - Memory: the guest will see a different view of memory. It will
+     *  be allocated later.
+     */
+    if ( dt_device_used_by(np) != DOMID_XEN &&
+         !dt_device_type_is_equal(np, "memory") )
     {
         res = map_device(d, np);
 
@@ -461,21 +439,39 @@ static int handle_node(struct domain *d, const struct dt_device_node *np)
             return res;
     }
 
+    /*
+     * The property "name" is used to have a different name on older FDT
+     * version. We want to keep the name retrieved during the tree
+     * structure creation, that is store in the node path.
+     */
+    name = strrchr(path, '/');
+    name = name ? name + 1 : path;
+
+    res = fdt_begin_node(kinfo->fdt, name);
+    if ( res )
+        return res;
+
+    res = write_properties(d, kinfo, np);
+    if ( res )
+        return res;
+
     for ( child = np->child; child != NULL; child = child->sibling )
     {
-        res = handle_node(d, child);
+        res = handle_node(d, kinfo, child);
         if ( res )
             return res;
     }
 
-    return 0;
-}
+    if ( np == dt_host )
+    {
+        res = make_hypervisor_node(kinfo->fdt, np);
+        if ( res )
+            return res;
+    }
 
-static int map_devices_from_device_tree(struct domain *d)
-{
-    ASSERT(dt_host && (dt_host->sibling == NULL));
+    res = fdt_end_node(kinfo->fdt);
 
-    return handle_node(d, dt_host);
+    return res;
 }
 
 static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
@@ -484,6 +480,8 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
     int new_size;
     int ret;
     paddr_t end;
+
+    ASSERT(dt_host && (dt_host->sibling == NULL));
 
     kinfo->unassigned_mem = dom0_mem;
 
@@ -500,8 +498,8 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 
     fdt_finish_reservemap(kinfo->fdt);
 
-    ret = write_nodes(d, kinfo, fdt);
-    if ( ret < 0 )
+    ret = handle_node(d, kinfo, dt_host);
+    if ( ret )
         goto err;
 
     ret = fdt_finish(kinfo->fdt);
@@ -576,7 +574,6 @@ int construct_dom0(struct domain *d)
     if ( rc < 0 )
         return rc;
 
-    map_devices_from_device_tree(d);
     rc = platform_specific_mapping(d);
     if ( rc < 0 )
         return rc;
