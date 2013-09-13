@@ -105,6 +105,7 @@ int main_getenforce(int argc, char **argv);
 int main_setenforce(int argc, char **argv);
 int main_loadpolicy(int argc, char **argv);
 int main_remus(int argc, char **argv);
+int main_devd(int argc, char **argv);
 
 void help(const char *command);
 

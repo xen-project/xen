@@ -7210,6 +7210,30 @@ int main_remus(int argc, char **argv)
     return -ERROR_FAIL;
 }
 
+int main_devd(int argc, char **argv)
+{
+    int ret = 0, opt = 0, daemonize = 1;
+
+    SWITCH_FOREACH_OPT(opt, "F", NULL, "devd", 0) {
+    case 'F':
+        daemonize = 0;
+        break;
+    }
+
+    if (daemonize) {
+        ret = do_daemonize("xldevd");
+        if (ret) {
+            ret = (ret == 1) ? 0 : ret;
+            goto out;
+        }
+    }
+
+    libxl_device_events_handler(ctx, 0);
+
+out:
+    return ret;
+}
+
 /*
  * Local variables:
  * mode: C

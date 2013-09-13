@@ -488,6 +488,12 @@ struct cmd_spec cmd_table[] = {
       "                        of the domain."
 
     },
+    { "devd",
+      &main_devd, 0, 1,
+      "Daemon that listens for devices and launches backends",
+      "[options]",
+      "-F                      Run in the foreground",
+    },
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

@@ -3528,6 +3528,345 @@ DEFINE_DEVICE_ADD(vtpm)
 
 /******************************************************************************/
 
+/*
+ * Data structures used to track devices handled by driver domains
+ */
+
+/*
+ * Structure that describes a device handled by a driver domain
+ */
+typedef struct libxl__ddomain_device {
+    libxl__device *dev;
+    LIBXL_SLIST_ENTRY(struct libxl__ddomain_device) next;
+} libxl__ddomain_device;
+
+/*
+ * Structure that describes a domain and it's associated devices
+ */
+typedef struct libxl__ddomain_guest {
+    uint32_t domid;
+    int num_vifs, num_vbds, num_qdisks;
+    LIBXL_SLIST_HEAD(, struct libxl__ddomain_device) devices;
+    LIBXL_SLIST_ENTRY(struct libxl__ddomain_guest) next;
+} libxl__ddomain_guest;
+
+/*
+ * Main structure used by a driver domain to keep track of devices
+ * currently in use
+ */
+typedef struct {
+    libxl__ao *ao;
+    libxl__ev_xswatch watch;
+    LIBXL_SLIST_HEAD(, struct libxl__ddomain_guest) guests;
+} libxl__ddomain;
+
+static libxl__ddomain_guest *search_for_guest(libxl__ddomain *ddomain,
+                                               uint32_t domid)
+{
+    libxl__ddomain_guest *dguest;
+
+    LIBXL_SLIST_FOREACH(dguest, &ddomain->guests, next) {
+        if (dguest->domid == domid)
+            return dguest;
+    }
+    return NULL;
+}
+
+static libxl__ddomain_device *search_for_device(libxl__ddomain_guest *dguest,
+                                                libxl__device *dev)
+{
+    libxl__ddomain_device *ddev;
+
+    LIBXL_SLIST_FOREACH(ddev, &dguest->devices, next) {
+#define LIBXL_DEVICE_CMP(dev1, dev2, entry) (dev1->entry == dev2->entry)
+        if (LIBXL_DEVICE_CMP(ddev->dev, dev, backend_devid) &&
+            LIBXL_DEVICE_CMP(ddev->dev, dev, backend_domid) &&
+            LIBXL_DEVICE_CMP(ddev->dev, dev, devid) &&
+            LIBXL_DEVICE_CMP(ddev->dev, dev, domid) &&
+            LIBXL_DEVICE_CMP(ddev->dev, dev, backend_kind) &&
+            LIBXL_DEVICE_CMP(ddev->dev, dev, kind))
+            return ddev;
+#undef LIBXL_DEVICE_CMP
+    }
+
+    return NULL;
+}
+
+static void device_complete(libxl__egc *egc, libxl__ao_device *aodev)
+{
+    STATE_AO_GC(aodev->ao);
+
+    if (aodev->action == LIBXL__DEVICE_ACTION_REMOVE)
+        free(aodev->dev);
+
+    LOG(DEBUG, "device %s %s %s",
+               libxl__device_backend_path(gc, aodev->dev),
+               libxl__device_action_to_string(aodev->action),
+               aodev->rc ? "failed" : "succeed");
+
+    libxl__nested_ao_free(aodev->ao);
+}
+
+static void qdisk_spawn_outcome(libxl__egc *egc, libxl__dm_spawn_state *dmss,
+                                int rc)
+{
+    STATE_AO_GC(dmss->spawn.ao);
+
+    LOG(DEBUG, "qdisk backend spawn for domain %u %s", dmss->guest_domid,
+               rc ? "failed" : "succeed");
+
+    libxl__nested_ao_free(dmss->spawn.ao);
+}
+
+/*
+ * The following comment applies to both add_device and remove_device.
+ *
+ * If the return value is greater than 0, it means there's no ao dispatched,
+ * so the free of the nested ao should be done by the parent when it has
+ * finished.
+ */
+static int add_device(libxl__egc *egc, libxl__ao *ao,
+                      libxl__ddomain_guest *dguest,
+                      libxl__ddomain_device *ddev)
+{
+    AO_GC;
+    libxl__device *dev = ddev->dev;
+    libxl__ao_device *aodev;
+    libxl__dm_spawn_state *dmss;
+    int rc = 0;
+
+    switch(dev->backend_kind) {
+    case LIBXL__DEVICE_KIND_VBD:
+    case LIBXL__DEVICE_KIND_VIF:
+        if (dev->backend_kind == LIBXL__DEVICE_KIND_VBD) dguest->num_vbds++;
+        if (dev->backend_kind == LIBXL__DEVICE_KIND_VIF) dguest->num_vifs++;
+
+        GCNEW(aodev);
+        libxl__prepare_ao_device(ao, aodev);
+        aodev->dev = dev;
+        aodev->action = LIBXL__DEVICE_ACTION_ADD;
+        aodev->callback = device_complete;
+        libxl__wait_device_connection(egc, aodev);
+
+        break;
+    case LIBXL__DEVICE_KIND_QDISK:
+        if (dguest->num_qdisks == 0) {
+            GCNEW(dmss);
+            dmss->guest_domid = dev->domid;
+            dmss->spawn.ao = ao;
+            dmss->callback = qdisk_spawn_outcome;
+
+            libxl__spawn_qdisk_backend(egc, dmss);
+        }
+        dguest->num_qdisks++;
+
+        break;
+    default:
+        rc = 1;
+        break;
+    }
+
+    return rc;
+}
+
+static int remove_device(libxl__egc *egc, libxl__ao *ao,
+                         libxl__ddomain_guest *dguest,
+                         libxl__ddomain_device *ddev)
+{
+    AO_GC;
+    libxl__device *dev = ddev->dev;
+    libxl__ao_device *aodev;
+    int rc = 0;
+
+    switch(ddev->dev->backend_kind) {
+    case LIBXL__DEVICE_KIND_VBD:
+    case LIBXL__DEVICE_KIND_VIF:
+        if (dev->backend_kind == LIBXL__DEVICE_KIND_VBD) dguest->num_vbds--;
+        if (dev->backend_kind == LIBXL__DEVICE_KIND_VIF) dguest->num_vifs--;
+
+        GCNEW(aodev);
+        libxl__prepare_ao_device(ao, aodev);
+        aodev->dev = dev;
+        aodev->action = LIBXL__DEVICE_ACTION_REMOVE;
+        aodev->callback = device_complete;
+        libxl__initiate_device_remove(egc, aodev);
+        break;
+    case LIBXL__DEVICE_KIND_QDISK:
+        if (--dguest->num_qdisks == 0) {
+            rc = libxl__destroy_qdisk_backend(gc, dev->domid);
+            if (rc)
+                goto out;
+        }
+        libxl__device_destroy(gc, dev);
+        free(dev);
+        /* Fall through to return > 0, no ao has been dispatched */
+    default:
+        rc = 1;
+        break;
+    }
+
+out:
+    return rc;
+}
+
+static void backend_watch_callback(libxl__egc *egc, libxl__ev_xswatch *watch,
+                                   const char *watch_path,
+                                   const char *event_path)
+{
+    libxl__ddomain *ddomain = CONTAINER_OF(watch, *ddomain, watch);
+    libxl__ao *nested_ao = libxl__nested_ao_create(ddomain->ao);
+    STATE_AO_GC(nested_ao);
+    char *p, *path;
+    const char *sstate;
+    int state, rc, num_devs;
+    libxl__device *dev = NULL;
+    libxl__ddomain_device *ddev = NULL;
+    libxl__ddomain_guest *dguest = NULL;
+    bool free_ao = false;
+
+    /* Check if event_path ends with "state" and truncate it */
+    if (strlen(event_path) < strlen("state"))
+        goto skip;
+
+    path = libxl__strdup(gc, event_path);
+    p = path + strlen(path) - strlen("state") - 1;
+    if (*p != '/')
+        goto skip;
+    *p = '\0';
+    p++;
+    if (strcmp(p, "state") != 0)
+        goto skip;
+
+    /* Check if the state is 1 (XenbusStateInitialising) or greater */
+    rc = libxl__xs_read_checked(gc, XBT_NULL, event_path, &sstate);
+    if (rc || !sstate)
+        goto skip;
+    state = atoi(sstate);
+
+    dev = libxl__zalloc(NOGC, sizeof(*dev));
+    rc = libxl__parse_backend_path(gc, path, dev);
+    if (rc)
+        goto skip;
+
+    dguest = search_for_guest(ddomain, dev->domid);
+    if (dguest == NULL && state == XenbusStateClosed) {
+        /*
+         * Spurious state change, device has already been disconnected
+         * or never attached.
+         */
+        goto skip;
+    }
+    if (dguest == NULL) {
+        /* Create a new guest struct and initialize it */
+        dguest = libxl__zalloc(NOGC, sizeof(*dguest));
+        dguest->domid = dev->domid;
+        LIBXL_SLIST_INIT(&dguest->devices);
+        LIBXL_SLIST_INSERT_HEAD(&ddomain->guests, dguest, next);
+        LOG(DEBUG, "added domain %u to the list of active guests",
+                   dguest->domid);
+    }
+    ddev = search_for_device(dguest, dev);
+    if (ddev == NULL && state == XenbusStateClosed) {
+        /*
+         * Spurious state change, device has already been disconnected
+         * or never attached.
+         */
+        goto skip;
+    } else if (ddev == NULL) {
+        /*
+         * New device addition, allocate a struct to hold it and add it
+         * to the list of active devices for a given guest.
+         */
+        ddev = libxl__zalloc(NOGC, sizeof(*ddev));
+        ddev->dev = dev;
+        LIBXL_SLIST_INSERT_HEAD(&dguest->devices, ddev, next);
+        LOG(DEBUG, "added device %s to the list of active devices", path);
+        rc = add_device(egc, nested_ao, dguest, ddev);
+        if (rc > 0)
+            free_ao = true;
+    } else if (state == XenbusStateClosed) {
+        /*
+         * Removal of an active device, remove it from the list and
+         * free it's data structures if they are no longer needed.
+         *
+         * The free of the associated libxl__device is left to the
+         * helper remove_device function.
+         */
+        LIBXL_SLIST_REMOVE(&dguest->devices, ddev, libxl__ddomain_device,
+                           next);
+        LOG(DEBUG, "removed device %s from the list of active devices", path);
+        rc = remove_device(egc, nested_ao, dguest, ddev);
+        if (rc > 0)
+            free_ao = true;
+
+        free(ddev);
+        /* If this was the last device in the domain, remove it from the list */
+        num_devs = dguest->num_vifs + dguest->num_vbds + dguest->num_qdisks;
+        if (num_devs == 0) {
+            LIBXL_SLIST_REMOVE(&ddomain->guests, dguest, libxl__ddomain_guest,
+                               next);
+            LOG(DEBUG, "removed domain %u from the list of active guests",
+                       dguest->domid);
+            /* Clear any leftovers in libxl/<domid> */
+            libxl__xs_rm_checked(gc, XBT_NULL,
+                                 GCSPRINTF("libxl/%u", dguest->domid));
+            free(dguest);
+        }
+    }
+
+    if (free_ao)
+        libxl__nested_ao_free(nested_ao);
+
+    return;
+
+skip:
+    libxl__nested_ao_free(nested_ao);
+    free(dev);
+    free(ddev);
+    free(dguest);
+    return;
+}
+
+/* Handler of events for device driver domains */
+int libxl_device_events_handler(libxl_ctx *ctx,
+                                const libxl_asyncop_how *ao_how)
+{
+    AO_CREATE(ctx, 0, ao_how);
+    int rc;
+    uint32_t domid;
+    libxl__ddomain ddomain;
+    char *be_path;
+
+    ddomain.ao = ao;
+    LIBXL_SLIST_INIT(&ddomain.guests);
+
+    rc = libxl__get_domid(gc, &domid);
+    if (rc) {
+        LOG(ERROR, "unable to get domain id");
+        goto out;
+    }
+
+    rc = libxl__xs_write_checked(gc, XBT_NULL, DISABLE_UDEV_PATH, "1");
+    if (rc) {
+        LOGE(ERROR, "unable to write %s = 1", DISABLE_UDEV_PATH);
+        goto out;
+    }
+
+    /*
+     * We use absolute paths because we want xswatch to also return
+     * absolute paths that can be parsed by libxl__parse_backend_path.
+     */
+    be_path = GCSPRINTF("/local/domain/%u/backend", domid);
+    rc = libxl__ev_xswatch_register(gc, &ddomain.watch, backend_watch_callback,
+                                    be_path);
+
+out:
+    GC_FREE;
+    return rc ? : AO_INPROGRESS;
+}
+
+/******************************************************************************/
+
 int libxl_domain_setmaxmem(libxl_ctx *ctx, uint32_t domid, uint32_t max_memkb)
 {
     GC_INIT(ctx);

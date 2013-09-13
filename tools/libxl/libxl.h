@@ -911,6 +911,18 @@ libxl_device_pci *libxl_device_pci_list(libxl_ctx *ctx, uint32_t domid,
                                         int *num);
 
 /*
+ * Turns the current process into a backend device service daemon
+ * for a driver domain.
+ *
+ * From a libxl API point of view, this starts a long-running
+ * operation.  That operation consists of "being a driver domain"
+ * and never completes.
+ */
+int libxl_device_events_handler(libxl_ctx *ctx,
+                                const libxl_asyncop_how *ao_how)
+                                LIBXL_EXTERNAL_CALLERS_ONLY;
+
+/*
  * Functions related to making devices assignable -- that is, bound to
  * the pciback driver, ready to be given to a guest via
  * libxl_pci_device_add.
