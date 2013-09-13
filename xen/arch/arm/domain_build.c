@@ -677,7 +677,8 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
 
     /* Skip theses nodes and the sub-nodes */
     if ( dt_match_node(skip_matches, np ) ||
-         platform_device_is_blacklisted(np) )
+         platform_device_is_blacklisted(np) ||
+         dt_device_used_by(np) == DOMID_XEN )
     {
         DPRINT("  Skip it!\n");
         return 0;
@@ -685,15 +686,13 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
 
     /*
      * Some device doesn't need to be mapped in Xen:
-     *  - Device used by Xen: Obviously dom0 can't use them
      *  - Memory: the guest will see a different view of memory. It will
      *  be allocated later.
      *  - Disabled device: Linux is able to cope with status="disabled"
      *  property. Therefore these device doesn't need to be mapped. This
      *  solution can be use later for pass through.
      */
-    if ( dt_device_used_by(np) != DOMID_XEN &&
-         !dt_device_type_is_equal(np, "memory") &&
+    if ( !dt_device_type_is_equal(np, "memory") &&
          dt_device_is_available(np) )
     {
         res = map_device(d, np);
