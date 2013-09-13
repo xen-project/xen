@@ -182,23 +182,38 @@ void __init device_tree_get_reg(const u32 **cell, u32 address_cells,
     get_val(cell, size_cells, size);
 }
 
-static void __init set_val(u32 **cell, u32 cells, u64 val)
+void dt_get_range(const __be32 **cell, const struct dt_device_node *np,
+                  u64 *address, u64 *size)
 {
-    u32 c = cells;
+    *address = dt_next_cell(dt_n_addr_cells(np), cell);
+    *size = dt_next_cell(dt_n_size_cells(np), cell);
+}
 
-    while ( c-- )
+void dt_set_cell(__be32 **cellp, int size, u64 val)
+{
+    int cells = size;
+
+    while ( size-- )
     {
-        (*cell)[c] = cpu_to_fdt32(val);
+        (*cellp)[size] = cpu_to_fdt32(val);
         val >>= 32;
     }
-    (*cell) += cells;
+
+    (*cellp) += cells;
 }
 
 void __init device_tree_set_reg(u32 **cell, u32 address_cells, u32 size_cells,
                                 u64 start, u64 size)
 {
-    set_val(cell, address_cells, start);
-    set_val(cell, size_cells, size);
+    dt_set_cell(cell, address_cells, start);
+    dt_set_cell(cell, size_cells, size);
+}
+
+void dt_set_range(__be32 **cellp, const struct dt_device_node *np,
+                  u64 address, u64 size)
+{
+    dt_set_cell(cellp, dt_n_addr_cells(np), address);
+    dt_set_cell(cellp, dt_n_size_cells(np), size);
 }
 
 u32 __init device_tree_get_u32(const void *fdt, int node, const char *prop_name,
@@ -583,6 +598,23 @@ bool_t dt_property_read_u32(const struct dt_device_node *np,
     return 1;
 }
 
+int dt_property_read_string(const struct dt_device_node *np,
+                            const char *propname, const char **out_string)
+{
+    const struct dt_property *pp = dt_find_property(np, propname, NULL);
+
+    if ( !pp )
+        return -EINVAL;
+    if ( !pp->value )
+        return -ENODATA;
+    if ( strnlen(pp->value, pp->length) >= pp->length )
+        return -EILSEQ;
+
+    *out_string = pp->value;
+
+    return 0;
+}
+
 bool_t dt_device_is_compatible(const struct dt_device_node *device,
                                const char *compat)
 {
@@ -655,6 +687,34 @@ struct dt_device_node *dt_find_node_by_alias(const char *alias)
     return NULL;
 }
 
+bool_t dt_match_node(const struct dt_device_match *matches,
+                     const struct dt_device_node *node)
+{
+    if ( !matches )
+        return 0;
+
+    while ( matches->path || matches->type || matches->compatible )
+    {
+        bool_t match = 1;
+
+        if ( matches->path )
+            match &= dt_node_path_is_equal(node, matches->path);
+
+        if ( matches->type )
+            match &= dt_device_type_is_equal(node, matches->type);
+
+        if ( matches->compatible )
+            match &= dt_device_is_compatible(node, matches->compatible);
+
+        if ( match )
+            return match;
+
+        matches++;
+    }
+
+    return 0;
+}
+
 const struct dt_device_node *dt_get_parent(const struct dt_device_node *node)
 {
     if ( !node )
@@ -682,6 +742,23 @@ dt_find_compatible_node(struct dt_device_node *from,
     }
 
     return np;
+}
+
+struct dt_device_node *
+dt_find_matching_node(struct dt_device_node *from,
+                      const struct dt_device_match *matches)
+{
+    struct dt_device_node *np;
+    struct dt_device_node *dt;
+
+    dt = from ? from->allnext : dt_host;
+    dt_for_each_device_node(dt, np)
+    {
+        if ( dt_match_node(matches, np) )
+            return np;
+    }
+
+    return NULL;
 }
 
 int dt_n_addr_cells(const struct dt_device_node *np)
@@ -1370,6 +1447,24 @@ int dt_device_get_irq(const struct dt_device_node *device, int index,
         return res;
 
     return dt_irq_translate(&raw, out_irq);
+}
+
+bool_t dt_device_is_available(const struct dt_device_node *device)
+{
+    const char *status;
+    u32 statlen;
+
+    status = dt_get_property(device, "status", &statlen);
+    if ( status == NULL )
+        return 1;
+
+    if ( statlen > 0 )
+    {
+        if ( !strcmp(status, "okay") || !strcmp(status, "ok") )
+            return 1;
+    }
+
+    return 0;
 }
 
 /**
