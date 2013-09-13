@@ -10,7 +10,7 @@ CFLAGS += $(CFLAGS_libxenstore)
 HDRS     = $(wildcard *.h)
 
 TARGETS-y := xenperf xenpm xen-tmem-list-parse gtraceview gtracestat xenlockprof xenwatchdogd xencov
-TARGETS-$(CONFIG_X86) += xen-detect xen-hvmctx xen-hvmcrash xen-lowmemd
+TARGETS-$(CONFIG_X86) += xen-detect xen-hvmctx xen-hvmcrash xen-lowmemd xen-mfndump
 TARGETS-$(CONFIG_MIGRATE) += xen-hptool
 TARGETS := $(TARGETS-y)
 
@@ -22,7 +22,7 @@ INSTALL_BIN := $(INSTALL_BIN-y)
 
 INSTALL_SBIN-y := xen-bugtool xen-python-path xenperf xenpm xen-tmem-list-parse gtraceview \
 	gtracestat xenlockprof xenwatchdogd xen-ringwatch xencov
-INSTALL_SBIN-$(CONFIG_X86) += xen-hvmctx xen-hvmcrash xen-lowmemd
+INSTALL_SBIN-$(CONFIG_X86) += xen-hvmctx xen-hvmcrash xen-lowmemd xen-mfndump
 INSTALL_SBIN-$(CONFIG_MIGRATE) += xen-hptool
 INSTALL_SBIN := $(INSTALL_SBIN-y)
 
@@ -73,6 +73,9 @@ xenlockprof: xenlockprof.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
 
 xen-hptool: xen-hptool.o
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(APPEND_LDFLAGS)
+
+xen-mfndump: xen-mfndump.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(LDLIBS_libxenstore) $(APPEND_LDFLAGS)
 
 xenwatchdogd: xenwatchdogd.o

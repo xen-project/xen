@@ -771,12 +771,9 @@ static void dump_ctx(int vcpu)
             }
             ctxt_word_size = (strstr(xen_caps, "xen-3.0-x86_64")) ? 8 : 4;
         } else {
-            struct xen_domctl domctl;
-            memset(&domctl, 0, sizeof domctl);
-            domctl.domain = xenctx.domid;
-            domctl.cmd = XEN_DOMCTL_get_address_size;
-            if (xc_domctl(xenctx.xc_handle, &domctl) == 0)
-                ctxt_word_size = guest_word_size = domctl.u.address_size.size / 8;
+            unsigned int gw;
+            if ( !xc_domain_get_guest_width(xenctx.xc_handle, xenctx.domid, &gw) )
+                ctxt_word_size = guest_word_size = gw;
         }
     }
 #endif

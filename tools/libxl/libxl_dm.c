@@ -351,6 +351,10 @@ static char *dm_spice_options(libxl__gc *gc,
         opt = libxl__sprintf(gc, "%s,password=%s", opt, spice->passwd);
     opt = libxl__sprintf(gc, "%s,agent-mouse=%s", opt,
                          libxl_defbool_val(spice->agent_mouse) ? "on" : "off");
+
+    if (!libxl_defbool_val(spice->clipboard_sharing))
+        opt = libxl__sprintf(gc, "%s,disable-copy-paste", opt);
+
     return opt;
 }
 
@@ -472,6 +476,12 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
 
             flexarray_append(dm_args, "-spice");
             flexarray_append(dm_args, spiceoptions);
+            if (libxl_defbool_val(b_info->u.hvm.spice.vdagent)) {
+                flexarray_vappend(dm_args, "-device", "virtio-serial",
+                    "-chardev", "spicevmc,id=vdagent,name=vdagent", "-device",
+                    "virtserialport,chardev=vdagent,name=com.redhat.spice.0",
+                    NULL);
+            }
         }
 
         switch (b_info->u.hvm.vga.kind) {

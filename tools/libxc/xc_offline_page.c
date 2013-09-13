@@ -33,17 +33,6 @@
 #include "xg_private.h"
 #include "xg_save_restore.h"
 
-struct domain_mem_info{
-    int domid;
-    unsigned int pt_level;
-    unsigned int guest_width;
-    xen_pfn_t *pfn_type;
-    xen_pfn_t *p2m_table;
-    unsigned long p2m_size;
-    xen_pfn_t *m2p_table;
-    int max_mfn;
-};
-
 struct pte_backup_entry
 {
     xen_pfn_t table_mfn;
@@ -180,146 +169,6 @@ static int xc_is_page_granted_v2(xc_interface *xch, xen_pfn_t gpfn,
    return (i != gnt_num);
 }
 
-static xen_pfn_t pfn_to_mfn(xen_pfn_t pfn, xen_pfn_t *p2m, int gwidth)
-{
-  return ((xen_pfn_t) ((gwidth==8)?
-                       (((uint64_t *)p2m)[(pfn)]):
-                       ((((uint32_t *)p2m)[(pfn)]) == 0xffffffffU ?
-                            (-1UL) :
-                            (((uint32_t *)p2m)[(pfn)]))));
-}
-
-static int get_pt_level(xc_interface *xch, uint32_t domid,
-                        unsigned int *pt_level,
-                        unsigned int *gwidth)
-{
-    DECLARE_DOMCTL;
-    xen_capabilities_info_t xen_caps = "";
-
-    if (xc_version(xch, XENVER_capabilities, &xen_caps) != 0)
-        return -1;
-
-    memset(&domctl, 0, sizeof(domctl));
-    domctl.domain = domid;
-    domctl.cmd = XEN_DOMCTL_get_address_size;
-
-    if ( do_domctl(xch, &domctl) != 0 )
-        return -1;
-
-    *gwidth = domctl.u.address_size.size / 8;
-
-    if (strstr(xen_caps, "xen-3.0-x86_64"))
-        /* Depends on whether it's a compat 32-on-64 guest */
-        *pt_level = ( (*gwidth == 8) ? 4 : 3 );
-    else if (strstr(xen_caps, "xen-3.0-x86_32p"))
-        *pt_level = 3;
-    else if (strstr(xen_caps, "xen-3.0-x86_32"))
-        *pt_level = 2;
-    else
-        return -1;
-
-    return 0;
-}
-
-static int close_mem_info(xc_interface *xch, struct domain_mem_info *minfo)
-{
-    if (minfo->pfn_type)
-        free(minfo->pfn_type);
-    munmap(minfo->m2p_table, M2P_SIZE(minfo->max_mfn));
-    munmap(minfo->p2m_table, P2M_FLL_ENTRIES * PAGE_SIZE);
-    minfo->p2m_table = minfo->m2p_table = NULL;
-
-    return 0;
-}
-
-static int init_mem_info(xc_interface *xch, int domid,
-                 struct domain_mem_info *minfo,
-                 xc_dominfo_t *info)
-{
-    uint64_aligned_t shared_info_frame;
-    shared_info_any_t *live_shinfo = NULL;
-    int i, rc;
-
-    /* Only be initialized once */
-    if (minfo->pfn_type || minfo->m2p_table || minfo->p2m_table)
-        return -EINVAL;
-
-    if ( get_pt_level(xch, domid, &minfo->pt_level,
-                      &minfo->guest_width) )
-    {
-        ERROR("Unable to get PT level info.");
-        return -EFAULT;
-    }
-    dinfo->guest_width = minfo->guest_width;
-
-    shared_info_frame = info->shared_info_frame;
-
-    live_shinfo = xc_map_foreign_range(xch, domid,
-                     PAGE_SIZE, PROT_READ, shared_info_frame);
-    if ( !live_shinfo )
-    {
-        ERROR("Couldn't map live_shinfo");
-        return -EFAULT;
-    }
-
-    if ( (rc = xc_core_arch_map_p2m_writable(xch, minfo->guest_width,
-              info, live_shinfo, &minfo->p2m_table,  &minfo->p2m_size)) )
-    {
-        ERROR("Couldn't map p2m table %x\n", rc);
-        goto failed;
-    }
-    munmap(live_shinfo, PAGE_SIZE);
-    live_shinfo = NULL;
-
-    dinfo->p2m_size = minfo->p2m_size;
-
-    minfo->max_mfn = xc_maximum_ram_page(xch);
-    if ( !(minfo->m2p_table =
-        xc_map_m2p(xch, minfo->max_mfn, PROT_READ, NULL)) )
-    {
-        ERROR("Failed to map live M2P table");
-        goto failed;
-    }
-
-    /* Get pfn type */
-    minfo->pfn_type = calloc(sizeof(*minfo->pfn_type), minfo->p2m_size);
-    if (!minfo->pfn_type)
-    {
-        ERROR("Failed to malloc pfn_type\n");
-        goto failed;
-    }
-
-    for (i = 0; i < minfo->p2m_size; i++)
-        minfo->pfn_type[i] = pfn_to_mfn(i, minfo->p2m_table,
-                                        minfo->guest_width);
-
-    for (i = 0; i < minfo->p2m_size ; i+=1024)
-    {
-        int count = ((dinfo->p2m_size - i ) > 1024 ) ? 1024: (dinfo->p2m_size - i);
-        if ( ( rc = xc_get_pfn_type_batch(xch, domid, count,
-                  minfo->pfn_type + i)) )
-        {
-            ERROR("Failed to get pfn_type %x\n", rc);
-            goto failed;
-        }
-    }
-    return 0;
-
-failed:
-    if (minfo->pfn_type)
-    {
-        free(minfo->pfn_type);
-        minfo->pfn_type = NULL;
-    }
-    if (live_shinfo)
-        munmap(live_shinfo, PAGE_SIZE);
-    munmap(minfo->m2p_table, M2P_SIZE(minfo->max_mfn));
-    munmap(minfo->p2m_table, P2M_FLL_ENTRIES * PAGE_SIZE);
-    minfo->p2m_table = minfo->m2p_table = NULL;
-
-    return -1;
-}
-
 static int backup_ptes(xen_pfn_t table_mfn, int offset,
                        struct pte_backup *backup)
 {
@@ -409,7 +258,7 @@ static int __update_pte(xc_interface *xch,
 }
 
 static int change_pte(xc_interface *xch, int domid,
-                     struct domain_mem_info *minfo,
+                     struct xc_domain_meminfo *minfo,
                      struct pte_backup *backup,
                      struct xc_mmu *mmu,
                      pte_func func,
@@ -419,7 +268,7 @@ static int change_pte(xc_interface *xch, int domid,
     uint64_t i;
     void *content = NULL;
 
-    pte_num = PAGE_SIZE / ((minfo->pt_level == 2) ? 4 : 8);
+    pte_num = PAGE_SIZE / ((minfo->pt_levels == 2) ? 4 : 8);
 
     for (i = 0; i < minfo->p2m_size; i++)
     {
@@ -442,7 +291,7 @@ static int change_pte(xc_interface *xch, int domid,
 
             for (j = 0; j < pte_num; j++)
             {
-                if ( minfo->pt_level == 2 )
+                if ( minfo->pt_levels == 2 )
                     pte = ((const uint32_t*)content)[j];
                 else
                     pte = ((const uint64_t*)content)[j];
@@ -454,7 +303,7 @@ static int change_pte(xc_interface *xch, int domid,
                     case 1:
                     if ( xc_add_mmu_update(xch, mmu,
                           table_mfn << PAGE_SHIFT |
-                          j * ( (minfo->pt_level == 2) ?
+                          j * ( (minfo->pt_levels == 2) ?
                               sizeof(uint32_t): sizeof(uint64_t)) |
                           MMU_PT_UPDATE_PRESERVE_AD,
                           new_pte) )
@@ -487,7 +336,7 @@ failed:
 }
 
 static int update_pte(xc_interface *xch, int domid,
-                     struct domain_mem_info *minfo,
+                     struct xc_domain_meminfo *minfo,
                      struct pte_backup *backup,
                      struct xc_mmu *mmu,
                      unsigned long new_mfn)
@@ -497,7 +346,7 @@ static int update_pte(xc_interface *xch, int domid,
 }
 
 static int clear_pte(xc_interface *xch, int domid,
-                     struct domain_mem_info *minfo,
+                     struct xc_domain_meminfo *minfo,
                      struct pte_backup *backup,
                      struct xc_mmu *mmu,
                      xen_pfn_t mfn)
@@ -545,7 +394,7 @@ static int is_page_exchangable(xc_interface *xch, int domid, xen_pfn_t mfn,
 int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
 {
     xc_dominfo_t info;
-    struct domain_mem_info minfo;
+    struct xc_domain_meminfo minfo;
     struct xc_mmu *mmu = NULL;
     struct pte_backup old_ptes = {NULL, 0, 0};
     grant_entry_v1_t *gnttab_v1 = NULL;
@@ -556,6 +405,8 @@ int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
     int rc, result = -1;
     uint32_t status;
     xen_pfn_t new_mfn, gpfn;
+    xen_pfn_t *m2p_table;
+    int max_mfn;
 
     if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 )
     {
@@ -575,10 +426,26 @@ int xc_exchange_page(xc_interface *xch, int domid, xen_pfn_t mfn)
         return -EINVAL;
     }
 
-    /* Get domain's memory information */
+    /* Map M2P and obtain gpfn */
+    max_mfn = xc_maximum_ram_page(xch);
+    if ( !(m2p_table = xc_map_m2p(xch, max_mfn, PROT_READ, NULL)) )
+    {
+        PERROR("Failed to map live M2P table");
+        return -EFAULT;
+    }
+    gpfn = m2p_table[mfn];
+
+    /* Map domain's memory information */
     memset(&minfo, 0, sizeof(minfo));
-    init_mem_info(xch, domid, &minfo, &info);
-    gpfn = minfo.m2p_table[mfn];
+    if ( xc_map_domain_meminfo(xch, domid, &minfo) )
+    {
+        PERROR("Could not map domain's memory information\n");
+        return -EFAULT;
+    }
+
+    /* For translation macros */
+    dinfo->guest_width = minfo.guest_width;
+    dinfo->p2m_size = minfo.p2m_size;
 
     /* Don't exchange CR3 for PAE guest in PAE host environment */
     if (minfo.guest_width > sizeof(long))
@@ -773,7 +640,8 @@ failed:
     if (gnttab_v2)
         munmap(gnttab_v2, gnt_num / (PAGE_SIZE/sizeof(grant_entry_v2_t)));
 
-    close_mem_info(xch, &minfo);
+    xc_unmap_domain_meminfo(xch, &minfo);
+    munmap(m2p_table, M2P_SIZE(max_mfn));
 
     return result;
 }

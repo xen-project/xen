@@ -301,7 +301,6 @@ static inline int get_platform_info(xc_interface *xch, uint32_t dom,
 {
     xen_capabilities_info_t xen_caps = "";
     xen_platform_parameters_t xen_params;
-    DECLARE_DOMCTL;
 
     if (xc_version(xch, XENVER_platform_parameters, &xen_params) != 0)
         return 0;
@@ -313,14 +312,8 @@ static inline int get_platform_info(xc_interface *xch, uint32_t dom,
 
     *hvirt_start = xen_params.virt_start;
 
-    memset(&domctl, 0, sizeof(domctl));
-    domctl.domain = dom;
-    domctl.cmd = XEN_DOMCTL_get_address_size;
-
-    if ( do_domctl(xch, &domctl) != 0 )
+    if ( xc_domain_get_guest_width(xch, dom, guest_width) != 0)
         return 0; 
-
-    *guest_width = domctl.u.address_size.size / 8;
 
     /* 64-bit tools will see the 64-bit hvirt_start, but 32-bit guests 
      * will be using the compat one. */

@@ -1495,6 +1495,10 @@ skip_vfb:
                                 &b_info->u.hvm.spice.passwd, 0);
         xlu_cfg_get_defbool(config, "spiceagent_mouse",
                             &b_info->u.hvm.spice.agent_mouse, 0);
+        xlu_cfg_get_defbool(config, "spicevdagent",
+                            &b_info->u.hvm.spice.vdagent, 0);
+        xlu_cfg_get_defbool(config, "spice_clipboard_sharing",
+                            &b_info->u.hvm.spice.clipboard_sharing, 0);
         xlu_cfg_get_defbool(config, "nographic", &b_info->u.hvm.nographic, 0);
         xlu_cfg_get_defbool(config, "gfx_passthru", 
                             &b_info->u.hvm.gfx_passthru, 0);
@@ -6570,7 +6574,7 @@ int main_cpupoollist(int argc, char **argv)
     char *name;
     int ret = 0;
 
-    SWITCH_FOREACH_OPT(opt, "hc", opts, "cpupool-list", 1) {
+    SWITCH_FOREACH_OPT(opt, "hc", opts, "cpupool-list", 0) {
     case 'c':
         opt_cpus = 1;
         break;

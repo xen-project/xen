@@ -62,19 +62,13 @@ static int setup_hypercall_page(struct xc_dom_image *dom)
     return rc;
 }
 
-static int launch_vm(xc_interface *xch, domid_t domid, xc_hypercall_buffer_t *ctxt)
+static int launch_vm(xc_interface *xch, domid_t domid,
+                     vcpu_guest_context_any_t *ctxt)
 {
-    DECLARE_DOMCTL;
-    DECLARE_HYPERCALL_BUFFER_ARGUMENT(ctxt);
     int rc;
 
     xc_dom_printf(xch, "%s: called, ctxt=%p", __FUNCTION__, ctxt);
-    memset(&domctl, 0, sizeof(domctl));
-    domctl.cmd = XEN_DOMCTL_setvcpucontext;
-    domctl.domain = domid;
-    domctl.u.vcpucontext.vcpu = 0;
-    set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
-    rc = do_domctl(xch, &domctl);
+    rc = xc_vcpu_setcontext(xch, domid, 0, ctxt);
     if ( rc != 0 )
         xc_dom_panic(xch, XC_INTERNAL_ERROR,
                      "%s: SETVCPUCONTEXT failed (rc=%d)", __FUNCTION__, rc);
@@ -203,8 +197,8 @@ void *xc_dom_boot_domU_map(struct xc_dom_image *dom, xen_pfn_t pfn,
 
 int xc_dom_boot_image(struct xc_dom_image *dom)
 {
-    DECLARE_DOMCTL;
     DECLARE_HYPERCALL_BUFFER(vcpu_guest_context_any_t, ctxt);
+    xc_dominfo_t info;
     int rc;
 
     ctxt = xc_hypercall_buffer_alloc(dom->xch, ctxt, sizeof(*ctxt));
@@ -218,23 +212,22 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
         return rc;
 
     /* collect some info */
-    domctl.cmd = XEN_DOMCTL_getdomaininfo;
-    domctl.domain = dom->guest_domid;
-    rc = do_domctl(dom->xch, &domctl);
-    if ( rc != 0 )
+    rc = xc_domain_getinfo(dom->xch, dom->guest_domid, 1, &info);
+    if ( rc < 0 )
     {
         xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
                      "%s: getdomaininfo failed (rc=%d)", __FUNCTION__, rc);
         return rc;
     }
-    if ( domctl.domain != dom->guest_domid )
+    if ( rc == 0 || info.domid != dom->guest_domid )
     {
         xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
-                     "%s: Huh? domid mismatch (%d != %d)", __FUNCTION__,
-                     domctl.domain, dom->guest_domid);
+                     "%s: Huh? No domains found (nr_domains=%d) "
+                     "or domid mismatch (%d != %d)", __FUNCTION__,
+                     rc, info.domid, dom->guest_domid);
         return -1;
     }
-    dom->shared_info_mfn = domctl.u.getdomaininfo.shared_info_frame;
+    dom->shared_info_mfn = info.shared_info_frame;
 
     /* sanity checks */
     if ( !xc_dom_compat_check(dom) )
@@ -270,7 +263,7 @@ int xc_dom_boot_image(struct xc_dom_image *dom)
     if ( (rc = dom->arch_hooks->vcpu(dom, ctxt)) != 0 )
         return rc;
     xc_dom_unmap_all(dom);
-    rc = launch_vm(dom->xch, dom->guest_domid, HYPERCALL_BUFFER(ctxt));
+    rc = launch_vm(dom->xch, dom->guest_domid, ctxt);
 
     xc_hypercall_buffer_free(dom->xch, ctxt);
     return rc;

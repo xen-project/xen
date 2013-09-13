@@ -33,7 +33,7 @@ static void check_open_fds(const char *what)
 
     for (i = 4; i < 256; i++) {
 #ifdef __linux__
-        size_t len;
+        ssize_t len;
         char path[PATH_MAX];
         char linkpath[PATH_MAX+1];
 #endif

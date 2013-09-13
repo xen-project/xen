@@ -29,9 +29,12 @@ struct xs_handle *xs_daemon_open()
 void xs_daemon_close(struct xs_handle *h)
 {
     int fd = _xs_fileno(h);
-    struct xenbus_event *event;
-    for (event = files[fd].xenbus.events; event; event = event->next)
+    struct xenbus_event *event, *next;
+    for (event = files[fd].xenbus.events; event; event = next)
+    {
+        next = event->next;
         free(event);
+    }
     files[fd].type = FTYPE_NONE;
 }
 

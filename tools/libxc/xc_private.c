@@ -609,11 +609,9 @@ int xc_get_pfn_list(xc_interface *xch,
 
 long xc_get_tot_pages(xc_interface *xch, uint32_t domid)
 {
-    DECLARE_DOMCTL;
-    domctl.cmd = XEN_DOMCTL_getdomaininfo;
-    domctl.domain = (domid_t)domid;
-    return (do_domctl(xch, &domctl) < 0) ?
-        -1 : domctl.u.getdomaininfo.tot_pages;
+    xc_dominfo_t info;
+    return (xc_domain_getinfo(xch, domid, 1, &info) != 1) ?
+        -1 : info.nr_pages;
 }
 
 int xc_copy_to_domain_page(xc_interface *xch,

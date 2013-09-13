@@ -560,6 +560,19 @@ int xc_vcpu_getaffinity(xc_interface *xch,
                         int vcpu,
                         xc_cpumap_t cpumap);
 
+
+/**
+ * This function will return the guest_width (in bytes) for the
+ * specified domain.
+ *
+ * @param xch a handle to an open hypervisor interface.
+ * @param domid the domain id one wants the address size width of.
+ * @param addr_size the address size.
+ */
+int xc_domain_get_guest_width(xc_interface *xch, uint32_t domid,
+                              unsigned int *guest_width);
+
+
 /**
  * This function will return information about one or more domains. It is
  * designed to iterate over the list of domains. If a single domain is

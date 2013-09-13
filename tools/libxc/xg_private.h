@@ -136,6 +136,15 @@ struct domain_info_context {
     unsigned long p2m_size;
 };
 
+static inline xen_pfn_t pfn_to_mfn(xen_pfn_t pfn, xen_pfn_t *p2m, int gwidth)
+{
+  return ((xen_pfn_t) ((gwidth==8)?
+                       (((uint64_t *)p2m)[(pfn)]):
+                       ((((uint32_t *)p2m)[(pfn)]) == 0xffffffffU ?
+                            (-1UL) :
+                            (((uint32_t *)p2m)[(pfn)]))));
+}
+
 /* Number of xen_pfn_t in a page */
 #define FPP             (PAGE_SIZE/(dinfo->guest_width))
 

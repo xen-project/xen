@@ -122,8 +122,8 @@ static void free_disable_deaths(libxl__gc *gc,
 
 static void discard_events(struct libxl__event_list *l) {
     /* doesn't bother unlinking from the list, so l is corrupt on return */
-    libxl_event *ev;
-    LIBXL_TAILQ_FOREACH(ev, l, link)
+    libxl_event *ev, *next;
+    LIBXL_TAILQ_FOREACH_SAFE(ev, l, link, next)
         libxl_event_free(0, ev);
 }
 
@@ -2234,8 +2234,15 @@ static int libxl__device_disk_from_xs_be(libxl__gc *gc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     unsigned int len;
     char *tmp;
+    int rc;
 
     libxl_device_disk_init(disk);
+
+    rc = sscanf(be_path, "/local/domain/%d/", &disk->backend_domid);
+    if (rc != 1) {
+        LOG(ERROR, "Unable to fetch device backend domid from %s", be_path);
+        goto cleanup;
+    }
 
     /* "params" may not be present; but everything else must be. */
     tmp = xs_read(ctx->xsh, XBT_NULL,

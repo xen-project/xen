@@ -1406,6 +1406,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       struct restore_callbacks *callbacks)
 {
     DECLARE_DOMCTL;
+    xc_dominfo_t info;
     int rc = 1, frc, i, j, n, m, pae_extended_cr3 = 0, ext_vcpucontext = 0;
     int vcpuextstate = 0;
     uint32_t vcpuextstate_size = 0;
@@ -1562,14 +1563,12 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
            ROUNDUP(MAX_BATCH_SIZE * sizeof(xen_pfn_t), PAGE_SHIFT)); 
 
     /* Get the domain's shared-info frame. */
-    domctl.cmd = XEN_DOMCTL_getdomaininfo;
-    domctl.domain = (domid_t)dom;
-    if ( xc_domctl(xch, &domctl) < 0 )
+    if ( xc_domain_getinfo(xch, (domid_t)dom, 1, &info) != 1 )
     {
         PERROR("Could not get information on new domain");
         goto out;
     }
-    shared_info_frame = domctl.u.getdomaininfo.shared_info_frame;
+    shared_info_frame = info.shared_info_frame;
 
     /* Mark all PFNs as invalid; we allocate on demand */
     for ( pfn = 0; pfn < dinfo->p2m_size; pfn++ )
@@ -2113,11 +2112,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
             }
             ctxt->x64.ctrlreg[1] = FOLD_CR3(ctx->p2m[pfn]);
         }
-        domctl.cmd = XEN_DOMCTL_setvcpucontext;
-        domctl.domain = (domid_t)dom;
-        domctl.u.vcpucontext.vcpu = i;
-        set_xen_guest_handle(domctl.u.vcpucontext.ctxt, ctxt);
-        frc = xc_domctl(xch, &domctl);
+        frc = xc_vcpu_setcontext(xch, dom, i, ctxt);
         if ( frc != 0 )
         {
             PERROR("Couldn't build vcpu%d", i);

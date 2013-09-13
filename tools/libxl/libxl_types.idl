@@ -181,6 +181,8 @@ libxl_spice_info = Struct("spice_info", [
     ("disable_ticketing", libxl_defbool),
     ("passwd",      string),
     ("agent_mouse", libxl_defbool),
+    ("vdagent",     libxl_defbool),
+    ("clipboard_sharing", libxl_defbool),
     ])
 
 libxl_sdl_info = Struct("sdl_info", [

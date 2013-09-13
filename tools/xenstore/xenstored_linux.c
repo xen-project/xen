@@ -32,7 +32,7 @@ evtchn_port_t xenbus_evtchn(void)
 	if (fd == -1)
 		return -1;
 
-	rc = read(fd, str, sizeof(str)); 
+	rc = read(fd, str, sizeof(str) - 1);
 	if (rc == -1)
 	{
 		int err = errno;

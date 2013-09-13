@@ -21,6 +21,8 @@
  */
 
 #include "xc_private.h"
+#include "xc_core.h"
+#include "xg_private.h"
 #include "xg_save_restore.h"
 #include <xen/memory.h>
 #include <xen/hvm/hvm_op.h>
@@ -270,6 +272,22 @@ out:
     return ret;
 }
 
+int xc_domain_get_guest_width(xc_interface *xch, uint32_t domid,
+                              unsigned int *guest_width)
+{
+    DECLARE_DOMCTL;
+
+    memset(&domctl, 0, sizeof(domctl));
+    domctl.domain = domid;
+    domctl.cmd = XEN_DOMCTL_get_address_size;
+
+    if ( do_domctl(xch, &domctl) != 0 )
+        return 1;
+
+    /* We want the result in bytes */
+    *guest_width = domctl.u.address_size.size / 8;
+    return 0;
+}
 
 int xc_domain_getinfo(xc_interface *xch,
                       uint32_t first_domid,
@@ -1125,12 +1143,6 @@ int xc_vcpu_setcontext(xc_interface *xch,
     DECLARE_HYPERCALL_BOUNCE(ctxt, sizeof(vcpu_guest_context_any_t), XC_HYPERCALL_BUFFER_BOUNCE_IN);
     int rc;
 
-    if (ctxt == NULL)
-    {
-        errno = EINVAL;
-        return -1;
-    }
-
     if ( xc_hypercall_bounce_pre(xch, ctxt) )
         return -1;
 
@@ -1465,6 +1477,131 @@ int xc_domain_bind_pt_isa_irq(
 
     return (xc_domain_bind_pt_irq(xch, domid, machine_irq,
                                   PT_IRQ_TYPE_ISA, 0, 0, 0, machine_irq));
+}
+
+int xc_unmap_domain_meminfo(xc_interface *xch, struct xc_domain_meminfo *minfo)
+{
+    struct domain_info_context _di = { .guest_width = minfo->guest_width };
+    struct domain_info_context *dinfo = &_di;
+
+    free(minfo->pfn_type);
+    if ( minfo->p2m_table )
+        munmap(minfo->p2m_table, P2M_FLL_ENTRIES * PAGE_SIZE);
+    minfo->p2m_table = NULL;
+
+    return 0;
+}
+
+int xc_map_domain_meminfo(xc_interface *xch, int domid,
+                          struct xc_domain_meminfo *minfo)
+{
+    struct domain_info_context _di;
+    struct domain_info_context *dinfo = &_di;
+
+    xc_dominfo_t info;
+    shared_info_any_t *live_shinfo;
+    xen_capabilities_info_t xen_caps = "";
+    int i;
+
+    /* Only be initialized once */
+    if ( minfo->pfn_type || minfo->p2m_table )
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if ( xc_domain_getinfo(xch, domid, 1, &info) != 1 )
+    {
+        PERROR("Could not get domain info");
+        return -1;
+    }
+
+    if ( xc_domain_get_guest_width(xch, domid, &minfo->guest_width) )
+    {
+        PERROR("Could not get domain address size");
+        return -1;
+    }
+    _di.guest_width = minfo->guest_width;
+
+    /* Get page table levels (see get_platform_info() in xg_save_restore.h */
+    if ( xc_version(xch, XENVER_capabilities, &xen_caps) )
+    {
+        PERROR("Could not get Xen capabilities (for page table levels)");
+        return -1;
+    }
+    if ( strstr(xen_caps, "xen-3.0-x86_64") )
+        /* Depends on whether it's a compat 32-on-64 guest */
+        minfo->pt_levels = ( (minfo->guest_width == 8) ? 4 : 3 );
+    else if ( strstr(xen_caps, "xen-3.0-x86_32p") )
+        minfo->pt_levels = 3;
+    else if ( strstr(xen_caps, "xen-3.0-x86_32") )
+        minfo->pt_levels = 2;
+    else
+    {
+        errno = EFAULT;
+        return -1;
+    }
+
+    /* We need the shared info page for mapping the P2M */
+    live_shinfo = xc_map_foreign_range(xch, domid, PAGE_SIZE, PROT_READ,
+                                       info.shared_info_frame);
+    if ( !live_shinfo )
+    {
+        PERROR("Could not map the shared info frame (MFN 0x%lx)",
+               info.shared_info_frame);
+        return -1;
+    }
+
+    if ( xc_core_arch_map_p2m_writable(xch, minfo->guest_width, &info,
+                                       live_shinfo, &minfo->p2m_table,
+                                       &minfo->p2m_size) )
+    {
+        PERROR("Could not map the P2M table");
+        munmap(live_shinfo, PAGE_SIZE);
+        return -1;
+    }
+    munmap(live_shinfo, PAGE_SIZE);
+    _di.p2m_size = minfo->p2m_size;
+
+    /* Make space and prepare for getting the PFN types */
+    minfo->pfn_type = calloc(sizeof(*minfo->pfn_type), minfo->p2m_size);
+    if ( !minfo->pfn_type )
+    {
+        PERROR("Could not allocate memory for the PFN types");
+        goto failed;
+    }
+    for ( i = 0; i < minfo->p2m_size; i++ )
+        minfo->pfn_type[i] = pfn_to_mfn(i, minfo->p2m_table,
+                                        minfo->guest_width);
+
+    /* Retrieve PFN types in batches */
+    for ( i = 0; i < minfo->p2m_size ; i+=1024 )
+    {
+        int count = ((minfo->p2m_size - i ) > 1024 ) ?
+                        1024: (minfo->p2m_size - i);
+
+        if ( xc_get_pfn_type_batch(xch, domid, count, minfo->pfn_type + i) )
+        {
+            PERROR("Could not get %d-eth batch of PFN types", (i+1)/1024);
+            goto failed;
+        }
+    }
+
+    return 0;
+
+failed:
+    if ( minfo->pfn_type )
+    {
+        free(minfo->pfn_type);
+        minfo->pfn_type = NULL;
+    }
+    if ( minfo->p2m_table )
+    {
+        munmap(minfo->p2m_table, P2M_FLL_ENTRIES * PAGE_SIZE);
+        minfo->p2m_table = NULL;
+    }
+
+    return -1;
 }
 
 int xc_domain_memory_mapping(

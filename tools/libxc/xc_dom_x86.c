@@ -54,24 +54,17 @@ const char *xc_domain_get_native_protocol(xc_interface *xch,
     int ret;
     uint32_t guest_width;
     const char *protocol;
-    DECLARE_DOMCTL;
 
-    memset(&domctl, 0, sizeof(domctl));
-    domctl.domain = domid;
-    domctl.cmd = XEN_DOMCTL_get_address_size;
-
-    ret = do_domctl(xch, &domctl);
+    ret = xc_domain_get_guest_width(xch, domid, &guest_width);
 
     if ( ret )
         return NULL;
 
-    guest_width = domctl.u.address_size.size;
-
     switch (guest_width) {
-    case 32: /* 32 bit guest */
+    case 4: /* 32 bit guest */
         protocol = XEN_IO_PROTO_ABI_X86_32;
         break;
-    case 64: /* 64 bit guest */
+    case 8: /* 64 bit guest */
         protocol = XEN_IO_PROTO_ABI_X86_64;
         break;
     default:
