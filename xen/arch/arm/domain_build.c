@@ -352,6 +352,93 @@ static int make_psci_node(void *fdt, const struct dt_device_node *parent)
     return res;
 }
 
+static int make_cpus_node(const struct domain *d, void *fdt,
+                          const struct dt_device_node *parent)
+{
+    int res;
+    const struct dt_device_node *cpus = dt_find_node_by_path("/cpus");
+    const struct dt_device_node *npcpu;
+    unsigned int cpu;
+    const void *compatible = NULL;
+    u32 len;
+    /* Placeholder for cpu@ + a 32-bit number + \0 */
+    char buf[15];
+
+    DPRINT("Create cpus node\n");
+
+    if ( !cpus )
+    {
+        dprintk(XENLOG_ERR, "Missing /cpus node in the device tree?\n");
+        return -ENOENT;
+    }
+
+    /*
+     * Get the compatible property of CPUs from the device tree.
+     * We are assuming that all CPUs are the same so we are just look
+     * for the first one.
+     * TODO: Handle compatible per VCPU
+     */
+    dt_for_each_child_node(cpus, npcpu)
+    {
+        if ( dt_device_type_is_equal(npcpu, "cpu") )
+        {
+            compatible = dt_get_property(npcpu, "compatible", &len);
+            break;
+        }
+    }
+
+    if ( !compatible )
+    {
+        dprintk(XENLOG_ERR, "Can't find cpu in the device tree?\n");
+        return -ENOENT;
+    }
+
+    /* See Linux Documentation/devicetree/booting-without-of.txt
+     * section III.5.b
+     */
+    res = fdt_begin_node(fdt, "cpus");
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "#address-cells", 1);
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "#size-cells", 0);
+    if ( res )
+        return res;
+
+    for ( cpu = 0; cpu < d->max_vcpus; cpu++ )
+    {
+        DPRINT("Create cpu@%u node\n", cpu);
+
+        snprintf(buf, sizeof(buf), "cpu@%u", cpu);
+        res = fdt_begin_node(fdt, buf);
+        if ( res )
+            return res;
+
+        res = fdt_property(fdt, "compatible", compatible, len);
+        if ( res )
+            return res;
+
+        res = fdt_property_string(fdt, "device_type", "cpu");
+        if ( res )
+            return res;
+
+        res = fdt_property_cell(fdt, "reg", cpu);
+        if ( res )
+            return res;
+
+        res = fdt_end_node(fdt);
+        if ( res )
+            return res;
+    }
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+
 /* Map the device in the domain */
 static int map_device(struct domain *d, const struct dt_device_node *dev)
 {
@@ -440,6 +527,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         DT_MATCH_COMPATIBLE("xen,xen"),
         DT_MATCH_COMPATIBLE("xen,multiboot-module"),
         DT_MATCH_COMPATIBLE("arm,psci"),
+        DT_MATCH_PATH("/cpus"),
         { /* sentinel */ },
     };
     const struct dt_device_node *child;
@@ -507,6 +595,10 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
             return res;
 
         res = make_psci_node(kinfo->fdt, np);
+        if ( res )
+            return res;
+
+        res = make_cpus_node(d, kinfo->fdt, np);
         if ( res )
             return res;
     }
