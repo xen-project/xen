@@ -92,12 +92,23 @@ static const char * const exynos5_dt_compat[] __initdata =
     NULL
 };
 
+static const struct dt_device_match exynos5_blacklist_dev[] __initconst =
+{
+    /* Multi core Timer
+     * TODO: this device set up IRQ to CPU 1 which is not yet handled by Xen.
+     * This is result to random freeze.
+     */
+    DT_MATCH_COMPATIBLE("samsung,exynos4210-mct"),
+    { /* sentinel */ },
+};
+
 PLATFORM_START(exynos5, "SAMSUNG EXYNOS5")
     .compatible = exynos5_dt_compat,
     .init_time = exynos5_init_time,
     .specific_mapping = exynos5_specific_mapping,
     .reset = exynos5_reset,
     .quirks = exynos5_quirks,
+    .blacklist_dev = exynos5_blacklist_dev,
 PLATFORM_END
 
 /*
