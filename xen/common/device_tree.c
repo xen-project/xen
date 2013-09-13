@@ -467,9 +467,13 @@ static void __init process_multiboot_node(const void *fdt, int node,
 
     mod = &early_info.modules.module[nr];
 
-    prop = fdt_get_property(fdt, node, "reg", NULL);
+    prop = fdt_get_property(fdt, node, "reg", &len);
     if ( !prop )
         early_panic("node %s missing `reg' property\n", name);
+
+    if ( len < dt_cells_to_size(address_cells + size_cells) )
+        early_panic("fdt: node `%s': `reg` property length is too short\n",
+                    name);
 
     cell = (const u32 *)prop->data;
     device_tree_get_reg(&cell, address_cells, size_cells,
