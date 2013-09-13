@@ -439,6 +439,79 @@ static int make_cpus_node(const struct domain *d, void *fdt,
     return res;
 }
 
+static int make_gic_node(const struct domain *d, void *fdt,
+                         const struct dt_device_node *parent)
+{
+    const struct dt_device_node *gic = dt_interrupt_controller;
+    const void *compatible = NULL;
+    u32 len;
+    __be32 *new_cells, *tmp;
+    int res = 0;
+
+    DPRINT("Create gic node\n");
+
+    compatible = dt_get_property(gic, "compatible", &len);
+    if ( !compatible )
+    {
+        dprintk(XENLOG_ERR, "Can't find compatible property for the gic node\n");
+        return -FDT_ERR_XEN(ENOENT);
+    }
+
+    res = fdt_begin_node(fdt, "interrupt-controller");
+    if ( res )
+        return res;
+
+    res = fdt_property(fdt, "compatible", compatible, len);
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "#interrupt-cells", 3);
+    if ( res )
+        return res;
+
+    res = fdt_property(fdt, "interrupt-controller", NULL, 0);
+
+    if ( res )
+        return res;
+
+    len = dt_cells_to_size(dt_n_addr_cells(parent) + dt_n_size_cells(parent));
+    len *= 2;
+    new_cells = xzalloc_bytes(dt_cells_to_size(len));
+    if ( new_cells == NULL )
+        return -FDT_ERR_XEN(ENOMEM);
+
+    tmp = new_cells;
+    DPRINT("  Set Distributor Base 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
+           d->arch.vgic.dbase, d->arch.vgic.dbase + PAGE_SIZE - 1);
+    dt_set_range(&tmp, parent, d->arch.vgic.dbase, PAGE_SIZE);
+
+    DPRINT("  Set Cpu Base 0x%"PRIpaddr" size = 0x%"PRIpaddr"\n",
+           d->arch.vgic.cbase, d->arch.vgic.cbase + (PAGE_SIZE * 2) - 1);
+    dt_set_range(&tmp, parent, d->arch.vgic.cbase, PAGE_SIZE * 2);
+
+    res = fdt_property(fdt, "reg", new_cells, len);
+    xfree(new_cells);
+
+    if ( res )
+        return res;
+
+    /*
+     * The value of the property "phandle" in the property "interrupts"
+     * to know on which interrupt controller the interrupt is wired.
+     */
+    if ( gic->phandle )
+    {
+        DPRINT("  Set phandle = 0x%x\n", gic->phandle);
+        res = fdt_property_cell(fdt, "phandle", gic->phandle);
+        if ( res )
+            return res;
+    }
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+
 /* Map the device in the domain */
 static int map_device(struct domain *d, const struct dt_device_node *dev)
 {
@@ -528,6 +601,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         DT_MATCH_COMPATIBLE("xen,multiboot-module"),
         DT_MATCH_COMPATIBLE("arm,psci"),
         DT_MATCH_PATH("/cpus"),
+        DT_MATCH_GIC,
         { /* sentinel */ },
     };
     const struct dt_device_node *child;
@@ -599,6 +673,10 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
             return res;
 
         res = make_cpus_node(d, kinfo->fdt, np);
+        if ( res )
+            return res;
+
+        res = make_gic_node(d, kinfo->fdt, np);
         if ( res )
             return res;
     }
