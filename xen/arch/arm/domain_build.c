@@ -13,6 +13,7 @@
 #include <xen/guest_access.h>
 #include <asm/setup.h>
 #include <asm/platform.h>
+#include <asm/psci.h>
 
 #include <asm/gic.h>
 #include <xen/irq.h>
@@ -319,6 +320,38 @@ static int make_hypervisor_node(void *fdt, const struct dt_device_node *parent)
     return res;
 }
 
+static int make_psci_node(void *fdt, const struct dt_device_node *parent)
+{
+    int res;
+
+    DPRINT("Create PSCI node\n");
+
+    /* See linux Documentation/devicetree/bindings/arm/psci.txt */
+    res = fdt_begin_node(fdt, "psci");
+    if ( res )
+        return res;
+
+    res = fdt_property_string(fdt, "compatible", "arm,psci");
+    if ( res )
+        return res;
+
+    res = fdt_property_string(fdt, "method", "hvc");
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "cpu_off", __PSCI_cpu_off);
+    if ( res )
+        return res;
+
+    res = fdt_property_cell(fdt, "cpu_on", __PSCI_cpu_on);
+    if ( res )
+        return res;
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
+
 /* Map the device in the domain */
 static int map_device(struct domain *d, const struct dt_device_node *dev)
 {
@@ -406,6 +439,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
     {
         DT_MATCH_COMPATIBLE("xen,xen"),
         DT_MATCH_COMPATIBLE("xen,multiboot-module"),
+        DT_MATCH_COMPATIBLE("arm,psci"),
         { /* sentinel */ },
     };
     const struct dt_device_node *child;
@@ -469,6 +503,10 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
     if ( np == dt_host )
     {
         res = make_hypervisor_node(kinfo->fdt, np);
+        if ( res )
+            return res;
+
+        res = make_psci_node(kinfo->fdt, np);
         if ( res )
             return res;
     }
