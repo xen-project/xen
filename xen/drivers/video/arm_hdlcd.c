@@ -25,6 +25,7 @@
 #include <xen/libfdt/libfdt.h>
 #include <xen/init.h>
 #include <xen/mm.h>
+#include <asm/early_printk.h>
 #include "font.h"
 #include "lfb.h"
 #include "modelines.h"
@@ -96,47 +97,52 @@ static int __init get_color_masks(const char* bpp, struct color_masks **masks)
 
 static void __init set_pixclock(uint32_t pixclock)
 {
-    if ( device_tree_node_compatible(device_tree_flattened, 0, "arm,vexpress") )
+    if ( dt_find_compatible_node(NULL, NULL, "arm,vexpress") )
             vexpress_syscfg(1, V2M_SYS_CFG_OSC_FUNC,
                             V2M_SYS_CFG_OSC5, &pixclock);
 }
 
 void __init video_init(void)
 {
-    int node, depth;
-    u32 address_cells, size_cells;
     struct lfb_prop lfbp;
     unsigned char *lfb;
     paddr_t hdlcd_start, hdlcd_size;
     paddr_t framebuffer_start, framebuffer_size;
-    const struct fdt_property *prop;
-    const u32 *cell;
     const char *mode_string;
     char _mode_string[16];
     int bytes_per_pixel = 4;
     struct color_masks *c = NULL;
     struct modeline *videomode = NULL;
     int i;
+    const struct dt_device_node *dev;
+    const __be32 *cells;
+    u32 lenp;
+    int res;
 
-    if ( find_compatible_node("arm,hdlcd", &node, &depth,
-                &address_cells, &size_cells) <= 0 )
+    dev = dt_find_compatible_node(NULL, NULL, "arm,hdlcd");
+
+    if ( !dev )
+    {
+        early_printk("HDLCD: Cannot find node compatible with \"arm,hdcld\"\n");
         return;
+    }
 
-    prop = fdt_get_property(device_tree_flattened, node, "reg", NULL);
-    if ( !prop )
+    res = dt_device_get_address(dev, 0, &hdlcd_start, &hdlcd_size);
+    if ( !res )
+    {
+        early_printk("HDLCD: Unable to retrieve MMIO base address\n");
         return;
+    }
 
-    cell = (const u32 *)prop->data;
-    device_tree_get_reg(&cell, address_cells, size_cells,
-            &hdlcd_start, &hdlcd_size);
-
-    prop = fdt_get_property(device_tree_flattened, node, "framebuffer", NULL);
-    if ( !prop )
+    cells = dt_get_property(dev, "framebuffer", &lenp);
+    if ( !cells )
+    {
+        early_printk("HDLCD: Unable to retrieve framebuffer property\n");
         return;
+    }
 
-    cell = (const u32 *)prop->data;
-    device_tree_get_reg(&cell, address_cells, size_cells,
-            &framebuffer_start, &framebuffer_size);
+    framebuffer_start = dt_next_cell(dt_n_addr_cells(dev), &cells);
+    framebuffer_size = dt_next_cell(dt_n_size_cells(dev), &cells);
 
     if ( !hdlcd_start )
     {
@@ -150,8 +156,8 @@ void __init video_init(void)
         return;
     }
 
-    mode_string = fdt_getprop(device_tree_flattened, node, "mode", NULL);
-    if ( !mode_string )
+    res = dt_property_read_string(dev, "mode", &mode_string);
+    if ( res )
     {
         get_color_masks("32", &c);
         memcpy(_mode_string, "1280x1024@60", strlen("1280x1024@60") + 1);
