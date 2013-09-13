@@ -261,7 +261,12 @@ const char *device_tree_bootargs(const void *fdt)
     if ( node < 0 )
         return NULL;
 
-    prop = fdt_get_property(fdt, node, "bootargs", NULL);
+    prop = fdt_get_property(fdt, node, "xen,xen-bootargs", NULL);
+    if ( prop == NULL )
+    {
+        if (fdt_get_property(fdt, node, "xen,dom0-bootargs", NULL))
+            prop = fdt_get_property(fdt, node, "bootargs", NULL);
+    }
     if ( prop == NULL )
         return NULL;
 

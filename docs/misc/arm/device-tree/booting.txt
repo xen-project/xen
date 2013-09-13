@@ -1,3 +1,6 @@
+Dom0 kernel and ramdisk modules
+================================
+
 Xen is passed the dom0 kernel and initrd via a reference in the /chosen
 node of the device tree.
 
@@ -22,4 +25,27 @@ properties:
 
 - bootargs (optional)
 
-	Command line associated with this module
+	Command line associated with this module. This is deprecated and should
+	be replaced by the bootargs variations described below.
+
+
+Command lines
+=============
+
+Xen also checks for properties directly under /chosen to find suitable command
+lines for Xen and Dom0. The logic is the following:
+
+ - If xen,xen-bootargs is present, it will be used for Xen.
+ - If xen,dom0-bootargs is present, it will be used for Dom0.
+ - If xen,xen-bootargs is _not_ present, but xen,dom0-bootargs is,
+   bootargs will be used for Xen.
+ - If no Xen specific properties are present, bootargs is for Dom0.
+ - If xen,xen-bootargs is present, but xen,dom0-bootargs is missing,
+   bootargs will be used for Dom0.
+
+Most of these cases is to make booting with Xen-unaware bootloaders easier.
+For those you would hardcode the Xen commandline in the DTB under
+/chosen/xen,xen-bootargs and would let the bootloader set the Dom0 command
+line by writing bootargs (as for native Linux).
+A Xen-aware bootloader would set xen,xen-bootargs for Xen, xen,dom0-bootargs
+for Dom0 and bootargs for native Linux.

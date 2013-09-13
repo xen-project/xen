@@ -146,6 +146,7 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
     const char *bootargs = NULL;
     const struct dt_property *pp;
     int res = 0;
+    int had_dom0_bootargs = 0;
 
     if ( early_info.modules.nr_mods >= MOD_KERNEL &&
          early_info.modules.module[MOD_KERNEL].cmdline[0] )
@@ -162,15 +163,21 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
          *
          * * remember xen,dom0-bootargs if we don't already have
          *   bootargs (from module #1, above).
-         * * remove bootargs and xen,dom0-bootargs.
+         * * remove bootargs,  xen,dom0-bootargs and xen,xen-bootargs.
          */
         if ( dt_node_path_is_equal(np, "/chosen") )
         {
-            if ( dt_property_name_is_equal(pp, "bootargs") )
+            if ( dt_property_name_is_equal(pp, "xen,xen-bootargs") )
                 continue;
-            else if ( dt_property_name_is_equal(pp, "xen,dom0-bootargs") )
+            if ( dt_property_name_is_equal(pp, "xen,dom0-bootargs") )
             {
-                if ( !bootargs )
+                had_dom0_bootargs = 1;
+                bootargs = pp->value;
+                continue;
+            }
+            if ( dt_property_name_is_equal(pp, "bootargs") )
+            {
+                if ( !bootargs  && !had_dom0_bootargs )
                     bootargs = pp->value;
                 continue;
             }
