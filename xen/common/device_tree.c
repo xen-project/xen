@@ -154,7 +154,7 @@ static bool_t __init device_tree_node_compatible(const void *fdt, int node,
     return 0;
 }
 
-static void __init get_val(const u32 **cell, u32 cells, u64 *val)
+static void __init get_val(const __be32 **cell, u32 cells, u64 *val)
 {
     *val = 0;
 
@@ -168,7 +168,7 @@ static void __init get_val(const u32 **cell, u32 cells, u64 *val)
     }
 }
 
-static void __init device_tree_get_reg(const u32 **cell, u32 address_cells,
+static void __init device_tree_get_reg(const __be32 **cell, u32 address_cells,
                                        u32 size_cells, u64 *start, u64 *size)
 {
     get_val(cell, address_cells, start);
@@ -327,7 +327,7 @@ static void __init process_memory_node(const void *fdt, int node,
     const struct fdt_property *prop;
     int i;
     int banks;
-    const u32 *cell;
+    const __be32 *cell;
     paddr_t start, size;
     u32 reg_cells = address_cells + size_cells;
 
@@ -345,7 +345,7 @@ static void __init process_memory_node(const void *fdt, int node,
         return;
     }
 
-    cell = (const u32 *)prop->data;
+    cell = (const __be32 *)prop->data;
     banks = fdt32_to_cpu(prop->len) / (reg_cells * sizeof (u32));
 
     for ( i = 0; i < banks && early_info.mem.nr_banks < NR_MEM_BANKS; i++ )
@@ -396,7 +396,7 @@ static void __init process_multiboot_node(const void *fdt, int node,
                                           u32 address_cells, u32 size_cells)
 {
     const struct fdt_property *prop;
-    const u32 *cell;
+    const __be32 *cell;
     int nr;
     struct dt_mb_module *mod;
     int len;
@@ -418,7 +418,7 @@ static void __init process_multiboot_node(const void *fdt, int node,
         early_panic("fdt: node `%s': `reg` property length is too short\n",
                     name);
 
-    cell = (const u32 *)prop->data;
+    cell = (const __be32 *)prop->data;
     device_tree_get_reg(&cell, address_cells, size_cells,
                         &mod->start, &mod->size);
 
