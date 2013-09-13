@@ -243,8 +243,8 @@ extern const struct dt_device_node *dt_interrupt_controller;
 struct dt_device_node * __init dt_find_interrupt_controller(const char *compat);
 
 #define dt_prop_cmp(s1, s2) strcmp((s1), (s2))
-#define dt_node_cmp(s1, s2) strcmp((s1), (s2))
-#define dt_compat_cmp(s1, s2, l) strnicmp((s1), (s2), l)
+#define dt_node_cmp(s1, s2) strcasecmp((s1), (s2))
+#define dt_compat_cmp(s1, s2) strcasecmp((s1), (s2))
 
 /* Default #address and #size cells */
 #define DT_ROOT_NODE_ADDR_CELLS_DEFAULT 2

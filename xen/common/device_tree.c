@@ -144,7 +144,7 @@ bool_t __init device_tree_node_compatible(const void *fdt, int node,
         return 0;
 
     while ( len > 0 ) {
-        if ( !dt_compat_cmp(prop, match, mlen) )
+        if ( !dt_compat_cmp(prop, match) )
             return 1;
         l = strlen(prop) + 1;
         prop += l;
@@ -564,7 +564,7 @@ dt_find_property(const struct dt_device_node *np,
 
     for ( pp = np->properties; pp; pp = pp->next )
     {
-        if ( strcmp(pp->name, name) == 0 )
+        if ( dt_prop_cmp(pp->name, name) == 0 )
         {
             if ( lenp )
                 *lenp = pp->length;
@@ -626,7 +626,7 @@ bool_t dt_device_is_compatible(const struct dt_device_node *device,
         return 0;
     while ( cplen > 0 )
     {
-        if ( dt_compat_cmp(cp, compat, strlen(compat)) == 0 )
+        if ( dt_compat_cmp(cp, compat) == 0 )
             return 1;
         l = strlen(cp) + 1;
         cp += l;
