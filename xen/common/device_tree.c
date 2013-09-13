@@ -1563,8 +1563,17 @@ static unsigned long __init unflatten_dt_node(const void *fdt,
             pp->name = "name";
             pp->length = sz;
             pp->value = pp + 1;
+            /*
+             * The device tree creation code assume that the property
+             * "name" is not a fake.
+             * To avoid a big divergence with Linux code, only remove
+             * property link. In this case we will lose a bit of memory
+             */
+#if 0
             *prev_pp = pp;
             prev_pp = &pp->next;
+#endif
+            np->name = pp->value;
             memcpy(pp->value, ps, sz - 1);
             ((char *)pp->value)[sz - 1] = 0;
             dt_dprintk("fixed up name for %s -> %s\n", pathp,
@@ -1574,7 +1583,7 @@ static unsigned long __init unflatten_dt_node(const void *fdt,
     if ( allnextpp )
     {
         *prev_pp = NULL;
-        np->name = dt_get_property(np, "name", NULL);
+        np->name = (np->name) ? : dt_get_property(np, "name", NULL);
         np->type = dt_get_property(np, "device_type", NULL);
 
         if ( !np->name )
