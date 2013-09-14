@@ -3,6 +3,7 @@
 #include <xc_core.h>
 #include <errno.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include "xg_save_restore.h"
 
@@ -233,7 +234,7 @@ int dump_ptes_func(int argc, char *argv[])
     printf("\n");
 
     for ( i = 0; i < pte_num; i++ )
-        printf("  pte[%lu]: 0x%lx\n", i, ((const uint64_t*)page)[i]);
+        printf("  pte[%lu]: 0x%"PRIx64"\n", i, ((const uint64_t*)page)[i]);
 
     printf(" --- End of PTEs for domain %d, pfn=0x%lx (mfn=0x%lx) ---\n",
            domid, pfn, minfo.p2m_table[pfn]);
@@ -301,7 +302,7 @@ int lookup_pte_func(int argc, char *argv[])
 #define __MADDR_BITS_X86  ((minfo.guest_width == 8) ? 52 : 44)
 #define __MFN_MASK_X86    ((1ULL << (__MADDR_BITS_X86 - PAGE_SHIFT_X86)) - 1)
             if ( ((pte >> PAGE_SHIFT_X86) & __MFN_MASK_X86) == mfn)
-                printf("  0x%lx <-- [0x%lx][%lu]: 0x%lx\n",
+                printf("  0x%lx <-- [0x%lx][%lu]: 0x%"PRIx64"\n",
                        mfn, minfo.p2m_table[i], j, pte);
 #undef __MADDR_BITS_X86
 #undef __MFN_MASK_X8
