@@ -671,6 +671,7 @@ static void __init parse_ivrs_hpet(char *str)
     if ( !s || *s )
         return;
 
+    hpet_sbdf.id = id;
     hpet_sbdf.bdf = PCI_BDF(bus, dev, func);
     hpet_sbdf.seg = seg;
     hpet_sbdf.cmdline = 1;
