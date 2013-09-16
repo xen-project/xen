@@ -264,9 +264,11 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
  * Return the end of the non-module region starting at s. In other
  * words return s the start of the next modules after s.
  *
- * Also returns the end of that module in *n.
+ * On input *end is the end of the region which should be considered
+ * and it is updated to reflect the end of the module, clipped to the
+ * end of the region if it would run over.
  */
-static paddr_t __init next_module(paddr_t s, paddr_t *n)
+static paddr_t __init next_module(paddr_t s, paddr_t *end)
 {
     struct dt_module_info *mi = &early_info.modules;
     paddr_t lowest = ~(paddr_t)0;
@@ -281,8 +283,10 @@ static paddr_t __init next_module(paddr_t s, paddr_t *n)
             continue;
         if ( mod_s > lowest )
             continue;
+        if ( mod_s > *end )
+            continue;
         lowest = mod_s;
-        *n = mod_e;
+        *end = min(*end, mod_e);
     }
     return lowest;
 }
@@ -527,6 +531,9 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
             {
                 e = n = bank_end;
             }
+
+            if ( e > bank_end )
+                e = bank_end;
 
             setup_xenheap_mappings(s>>PAGE_SHIFT, (e-s)>>PAGE_SHIFT);
 
