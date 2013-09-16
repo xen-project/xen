@@ -19,11 +19,11 @@
  
 int libxl__try_phy_backend(mode_t st_mode)
 {
-    if (S_ISBLK(st_mode) || S_ISREG(st_mode)) {
-        return 1;
+    if (!S_ISBLK(st_mode)) {
+        return 0;
     }
 
-    return 0;
+    return 1;
 }
 
 #define EXT_SHIFT 28
