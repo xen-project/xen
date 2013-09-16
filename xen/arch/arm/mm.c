@@ -94,8 +94,11 @@ static DEFINE_PER_CPU(lpae_t *, xen_pgtable);
  * the second level pagetables which map the domheap region
  * DOMHEAP_VIRT_START...DOMHEAP_VIRT_END in 2MB chunks. */
 static DEFINE_PER_CPU(lpae_t *, xen_dommap);
-/* Root of the trie for cpu0 */
+/* Root of the trie for cpu0, other CPU's PTs are dynamically allocated */
 lpae_t cpu0_pgtable[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
+/* cpu0's domheap page tables */
+lpae_t cpu0_dommap[LPAE_ENTRIES*DOMHEAP_SECOND_PAGES]
+    __attribute__((__aligned__(4096*DOMHEAP_SECOND_PAGES)));
 #endif
 
 #ifdef CONFIG_ARM_64
@@ -115,19 +118,8 @@ static __initdata int xenheap_first_first_slot = -1;
  * The second-level table is 2 contiguous pages long, and covers all
  * addresses from 0 to 0x7fffffff. Offsets into it are calculated
  * with second_linear_offset(), not second_table_offset().
- *
- * On 32bit addresses 0x80000000 to 0xffffffff are covered by the
- * per-cpu xen_domheap mappings described above. We allocate 4 pages
- * here for use in the boot page tables and the second two pages
- * become the boot CPUs xen_dommap pages.
- *
- * On 64bit addresses 0x80000000 to 0xffffffff are unused. However we
- * allocate 4 pages here for use while relocating Xen, which currently
- * expects a second level page to exist for all addresses in the first
- * 4GB. We need to keep these extra mappings in place for seconary CPU
- * bring up too. For now we just leave them forever.
  */
-lpae_t xen_second[LPAE_ENTRIES*4] __attribute__((__aligned__(4096*4)));
+lpae_t xen_second[LPAE_ENTRIES*2] __attribute__((__aligned__(4096*2)));
 /* First level page table used for fixmap */
 lpae_t xen_fixmap[LPAE_ENTRIES] __attribute__((__aligned__(4096)));
 /* First level page table used to map Xen itself with the XN bit set
@@ -418,12 +410,21 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 #endif
 
     /* Initialise first level entries, to point to second level entries */
-    for ( i = 0; i < 4; i++)
+    for ( i = 0; i < 2; i++)
     {
         p[i] = pte_of_xenaddr((uintptr_t)(xen_second+i*LPAE_ENTRIES));
         p[i].pt.table = 1;
         p[i].pt.xn = 0;
     }
+
+#ifdef CONFIG_ARM_32
+    for ( i = 0; i < DOMHEAP_SECOND_PAGES; i++ )
+    {
+        p[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)]
+            = pte_of_xenaddr((uintptr_t)(cpu0_dommap+i*LPAE_ENTRIES));
+        p[first_table_offset(DOMHEAP_VIRT_START+i*FIRST_SIZE)].pt.table = 1;
+    }
+#endif
 
     /* Initialise xen second level entries ... */
     /* ... Xen's text etc */
@@ -497,11 +498,9 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
 
 #ifdef CONFIG_ARM_32
     per_cpu(xen_pgtable, 0) = cpu0_pgtable;
-    per_cpu(xen_dommap, 0) = xen_second +
-        second_linear_offset(DOMHEAP_VIRT_START);
+    per_cpu(xen_dommap, 0) = cpu0_dommap;
 
-    /* Some of these slots may have been used during start of day and/or
-     * relocation. Make sure they are clear now. */
+    /* Make sure it is clear */
     memset(this_cpu(xen_dommap), 0, DOMHEAP_SECOND_PAGES*PAGE_SIZE);
     flush_xen_dcache_va_range(this_cpu(xen_dommap),
                               DOMHEAP_SECOND_PAGES*PAGE_SIZE);
