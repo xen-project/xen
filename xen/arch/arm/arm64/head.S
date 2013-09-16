@@ -224,12 +224,12 @@ skip_bss:
         msr   mair_el2, x0
 
         /* Set up the HTCR:
-         * PASize -- 4G
+         * PASize -- 40 bits / 1TB
          * Top byte is used
          * PT walks use Outer-Shareable accesses,
          * PT walks are write-back, write-allocate in both cache levels,
          * Full 64-bit address space goes through this table. */
-        ldr   x0, =0x80802500
+        ldr   x0, =0x80822500
         msr   tcr_el2, x0
 
         /* Set up the SCTLR_EL2:
