@@ -84,8 +84,9 @@ static void __init processor_id(void)
         printk("Huh, cpu architecture %x, expected 0xf (defined by cpuid)\n",
                c->midr.architecture);
 
-    printk("Processor: \"%s\", variant: 0x%x, part 0x%03x, rev 0x%x\n",
-           implementer, c->midr.variant, c->midr.part_number, c->midr.revision);
+    printk("Processor: %08"PRIx32": \"%s\", variant: 0x%x, part 0x%03x, rev 0x%x\n",
+           c->midr.bits, implementer,
+           c->midr.variant, c->midr.part_number, c->midr.revision);
 
 #if defined(CONFIG_ARM_64)
     printk("64-bit Execution:\n");
