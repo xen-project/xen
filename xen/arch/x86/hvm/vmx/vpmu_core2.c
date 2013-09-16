@@ -678,11 +678,11 @@ static void core2_vpmu_do_cpuid(unsigned int input,
 }
 
 /* Dump vpmu info on console, called in the context of keyhandler 'q'. */
-static void core2_vpmu_dump(struct vcpu *v)
+static void core2_vpmu_dump(const struct vcpu *v)
 {
-    struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    const struct vpmu_struct *vpmu = vcpu_vpmu(v);
     int i, num;
-    struct core2_vpmu_context *core2_vpmu_cxt = NULL;
+    const struct core2_vpmu_context *core2_vpmu_cxt = NULL;
     u64 val;
 
     if ( !vpmu_is_set(vpmu, VPMU_CONTEXT_ALLOCATED) )
@@ -690,7 +690,7 @@ static void core2_vpmu_dump(struct vcpu *v)
 
     if ( !vpmu_is_set(vpmu, VPMU_RUNNING) )
     {
-        if ( vpmu_set(vpmu, VPMU_CONTEXT_LOADED) )
+        if ( vpmu_is_set(vpmu, VPMU_CONTEXT_LOADED) )
             printk("    vPMU loaded\n");
         else
             printk("    vPMU allocated\n");
@@ -703,10 +703,11 @@ static void core2_vpmu_dump(struct vcpu *v)
     /* Print the contents of the counter and its configuration msr. */
     for ( i = 0; i < num; i++ )
     {
-        struct arch_msr_pair* msr_pair = core2_vpmu_cxt->arch_msr_pair;
+        const struct arch_msr_pair *msr_pair = core2_vpmu_cxt->arch_msr_pair;
+
         if ( core2_vpmu_cxt->pmu_enable->arch_pmc_enable[i] )
             printk("      general_%d: 0x%016lx ctrl: 0x%016lx\n",
-                             i, msr_pair[i].counter, msr_pair[i].control);
+                   i, msr_pair[i].counter, msr_pair[i].control);
     }
     /*
      * The configuration of the fixed counter is 4 bits each in the
@@ -716,9 +717,9 @@ static void core2_vpmu_dump(struct vcpu *v)
     for ( i = 0; i < core2_fix_counters.num; i++ )
     {
         if ( core2_vpmu_cxt->pmu_enable->fixed_ctr_enable[i] )
-            printk("      fixed_%d:   0x%016lx ctrl: 0x%lx\n",
-                             i, core2_vpmu_cxt->fix_counters[i],
-                             val & FIXED_CTR_CTRL_MASK);
+            printk("      fixed_%d:   0x%016lx ctrl: %#lx\n",
+                   i, core2_vpmu_cxt->fix_counters[i],
+                   val & FIXED_CTR_CTRL_MASK);
         val >>= FIXED_CTR_CTRL_BITS;
     }
 }

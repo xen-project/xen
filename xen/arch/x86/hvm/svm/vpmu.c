@@ -415,10 +415,10 @@ static void amd_vpmu_destroy(struct vcpu *v)
 }
 
 /* VPMU part of the 'q' keyhandler */
-static void amd_vpmu_dump(struct vcpu *v)
+static void amd_vpmu_dump(const struct vcpu *v)
 {
-    struct vpmu_struct *vpmu = vcpu_vpmu(v);
-    struct amd_vpmu_context *ctxt = vpmu->context;
+    const struct vpmu_struct *vpmu = vcpu_vpmu(v);
+    const struct amd_vpmu_context *ctxt = vpmu->context;
     unsigned int i;
 
     printk("    VPMU state: 0x%x ", vpmu->flags);
@@ -447,9 +447,9 @@ static void amd_vpmu_dump(struct vcpu *v)
 
         rdmsrl(ctrls[i], ctrl);
         rdmsrl(counters[i], cntr);
-        printk("      0x%08x: 0x%lx (0x%lx in HW)    0x%08x: 0x%lx (0x%lx in HW)\n",
-            ctrls[i], ctxt->ctrls[i], ctrl,
-            counters[i], ctxt->counters[i], cntr);
+        printk("      %#x: %#lx (%#lx in HW)    %#x: %#lx (%#lx in HW)\n",
+               ctrls[i], ctxt->ctrls[i], ctrl,
+               counters[i], ctxt->counters[i], cntr);
     }
 }
 

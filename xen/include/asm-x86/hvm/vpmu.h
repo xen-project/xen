@@ -54,7 +54,7 @@ struct arch_vpmu_ops {
     void (*arch_vpmu_destroy)(struct vcpu *v);
     int (*arch_vpmu_save)(struct vcpu *v);
     void (*arch_vpmu_load)(struct vcpu *v);
-    void (*arch_vpmu_dump)(struct vcpu *v);
+    void (*arch_vpmu_dump)(const struct vcpu *);
 };
 
 int vmx_vpmu_initialise(struct vcpu *, unsigned int flags);
