@@ -714,6 +714,24 @@ static u16 __init parse_ivhd_device_special(
          * consistency here --- whether entry's IOAPIC ID is valid and
          * whether there are conflicting/duplicated entries.
          */
+        apic = find_first_bit(ioapic_cmdline, ARRAY_SIZE(ioapic_sbdf));
+        while ( apic < ARRAY_SIZE(ioapic_sbdf) )
+        {
+            if ( ioapic_sbdf[apic].bdf == bdf &&
+                 ioapic_sbdf[apic].seg == seg )
+                break;
+            apic = find_next_bit(ioapic_cmdline, ARRAY_SIZE(ioapic_sbdf),
+                                 apic + 1);
+        }
+        if ( apic < ARRAY_SIZE(ioapic_sbdf) )
+        {
+            AMD_IOMMU_DEBUG("IVHD: Command line override present for IO-APIC %#x"
+                            "(IVRS: %#x devID %04x:%02x:%02x.%u)\n",
+                            apic, special->handle, seg, PCI_BUS(bdf),
+                            PCI_SLOT(bdf), PCI_FUNC(bdf));
+            break;
+        }
+
         for ( apic = 0; apic < nr_ioapics; apic++ )
         {
             if ( IO_APIC_ID(apic) != special->handle )
