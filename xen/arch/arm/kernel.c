@@ -211,11 +211,32 @@ static int kernel_try_zimage32_prepare(struct kernel_info *info,
     info->zimage.kernel_addr = addr;
 
     /*
-     * If start is zero, the zImage is position independent -- load it
-     * at 32k from start of RAM.
+     * If start is zero, the zImage is position independent, in this
+     * case Documentation/arm/Booting recommends loading below 128MiB
+     * and above 32MiB. Load it as high as possible within these
+     * constraints, while also avoiding the DTB.
      */
     if (start == 0)
-        info->zimage.load_addr = info->mem.bank[0].start + 0x8000;
+    {
+        paddr_t load_end;
+
+        load_end = info->mem.bank[0].start + info->mem.bank[0].size;
+        load_end = MIN(info->mem.bank[0].start + (128<<20), load_end);
+
+        /*
+         * FDT is loaded above 128M or as high as possible, so the
+         * only way we can clash is if we have <=128MB, in which case
+         * FDT will be right at the end and so dtb_paddr will be below
+         * the proposed kernel load address. Move the kernel down if
+         * necessary.
+         */
+        if ( load_end >= info->dtb_paddr )
+            load_end = info->dtb_paddr;
+
+        info->zimage.load_addr = load_end - end;
+        /* Align to 2MB */
+        info->zimage.load_addr &= ~((2 << 20) - 1);
+    }
     else
         info->zimage.load_addr = start;
     info->zimage.len = end - start;

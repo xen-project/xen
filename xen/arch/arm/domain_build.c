@@ -791,26 +791,33 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
     if ( ret < 0 )
         goto err;
 
+    /* Actual new size */
+    new_size = fdt_totalsize(kinfo->fdt);
+
     /*
-     * DTB must be load below 4GiB and far enough from linux (Linux uses
-     * the space after it to decompress)
-     * Load the DTB at the end of the first bank, while ensuring it is
-     * also below 4G
+     * DTB must be loaded such that it does not conflict with the
+     * kernel decompressor. For 32-bit Linux Documentation/arm/Booting
+     * recommends just after the 128MB boundary while for 64-bit Linux
+     * the recommendation in Documentation/arm64/booting.txt is below
+     * 512MB. Place at 128MB, (or, if we have less RAM, as high as
+     * possible) in order to satisfy both.
      */
     end = kinfo->mem.bank[0].start + kinfo->mem.bank[0].size;
-    end = MIN(1ull << 32, end);
-    kinfo->dtb_paddr = end - fdt_totalsize(kinfo->fdt);
+    end = MIN(kinfo->mem.bank[0].start + (128<<20) + new_size, end);
+
+    kinfo->dtb_paddr = end - new_size;
+
     /* Align the address to 2Mb. Linux only requires 4 byte alignment */
     kinfo->dtb_paddr &= ~((2 << 20) - 1);
 
-    if ( fdt_totalsize(kinfo->fdt) > end )
+    if ( kinfo->dtb_paddr < kinfo->mem.bank[0].start ||
+         kinfo->mem.bank[0].start + new_size > end )
     {
         printk(XENLOG_ERR "Not enough memory in the first bank for "
                "the device tree.");
         ret = -FDT_ERR_XEN(EINVAL);
         goto err;
     }
-
 
     return 0;
 
