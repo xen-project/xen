@@ -511,6 +511,21 @@ bool_t dt_property_read_u32(const struct dt_device_node *np,
     return 1;
 }
 
+
+bool_t dt_property_read_u64(const struct dt_device_node *np,
+                         const char *name, u64 *out_value)
+{
+    u32 len;
+    const __be32 *val;
+
+    val = dt_get_property(np, name, &len);
+    if ( !val || len < sizeof(*out_value) )
+        return 0;
+
+    *out_value = dt_read_number(val, 2);
+
+    return 1;
+}
 int dt_property_read_string(const struct dt_device_node *np,
                             const char *propname, const char **out_string)
 {
@@ -571,6 +586,20 @@ struct dt_device_node *dt_find_node_by_name(struct dt_device_node *from,
     dt = from ? from->allnext : dt_host;
     dt_for_each_device_node(dt, np)
         if ( np->name && (dt_node_cmp(np->name, name) == 0) )
+            break;
+
+    return np;
+}
+
+struct dt_device_node *dt_find_node_by_type(struct dt_device_node *from,
+                                            const char *type)
+{
+    struct dt_device_node *np;
+    struct dt_device_node *dt;
+
+    dt = from ? from->allnext : dt_host;
+    dt_for_each_device_node(dt, np)
+        if ( np->type && (dt_node_cmp(np->type, type) == 0) )
             break;
 
     return np;

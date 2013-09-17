@@ -352,6 +352,17 @@ const void *dt_get_property(const struct dt_device_node *np,
 bool_t dt_property_read_u32(const struct dt_device_node *np,
                             const char *name, u32 *out_value);
 /**
+ * dt_property_read_u64 - Helper to read a u64 property.
+ * @np: node to get the value
+ * @name: name of the property
+ * @out_value: pointer to return value
+ *
+ * Return true if get the desired value.
+ */
+bool_t dt_property_read_u64(const struct dt_device_node *np,
+                            const char *name, u64 *out_value);
+
+/**
  * dt_property_read_string - Find and read a string from a property
  * @np:         Device node from which the property value is to be read
  * @propname:   Name of the property to be searched
@@ -398,6 +409,12 @@ bool_t dt_machine_is_compatible(const char *compat);
  */
 struct dt_device_node *dt_find_node_by_name(struct dt_device_node *node,
                                             const char *name);
+
+/**
+ * dt_find_node_by_type - Find a node by its "type" property
+ */
+struct dt_device_node *dt_find_node_by_type(struct dt_device_node *from,
+                                            const char *type);
 
 /**
  * df_find_node_by_alias - Find a node matching an alias
