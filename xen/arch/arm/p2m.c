@@ -3,6 +3,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/domain_page.h>
+#include <xen/bitops.h>
 #include <asm/flushtlb.h>
 #include <asm/gic.h>
 
@@ -306,6 +307,59 @@ int p2m_alloc_table(struct domain *d)
     return 0;
 }
 
+#define MAX_VMID 256
+#define INVALID_VMID 0 /* VMID 0 is reserved */
+
+static spinlock_t vmid_alloc_lock = SPIN_LOCK_UNLOCKED;
+
+/* VTTBR_EL2 VMID field is 8 bits. Using a bitmap here limits us to
+ * 256 concurrent domains. */
+static DECLARE_BITMAP(vmid_mask, MAX_VMID);
+
+void p2m_vmid_allocator_init(void)
+{
+    set_bit(INVALID_VMID, vmid_mask);
+}
+
+static int p2m_alloc_vmid(struct domain *d)
+{
+    struct p2m_domain *p2m = &d->arch.p2m;
+
+    int rc, nr;
+
+    spin_lock(&vmid_alloc_lock);
+
+    nr = find_first_zero_bit(vmid_mask, MAX_VMID);
+
+    ASSERT(nr != INVALID_VMID);
+
+    if ( nr == MAX_VMID )
+    {
+        rc = -EBUSY;
+        printk(XENLOG_ERR "p2m.c: dom%d: VMID pool exhausted\n", d->domain_id);
+        goto out;
+    }
+
+    set_bit(nr, vmid_mask);
+
+    p2m->vmid = nr;
+
+    rc = 0;
+
+out:
+    spin_unlock(&vmid_alloc_lock);
+    return rc;
+}
+
+static void p2m_free_vmid(struct domain *d)
+{
+    struct p2m_domain *p2m = &d->arch.p2m;
+    spin_lock(&vmid_alloc_lock);
+    if ( p2m->vmid != INVALID_VMID )
+        clear_bit(p2m->vmid, vmid_mask);
+    spin_unlock(&vmid_alloc_lock);
+}
+
 void p2m_teardown(struct domain *d)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
@@ -318,25 +372,34 @@ void p2m_teardown(struct domain *d)
 
     p2m->first_level = NULL;
 
+    p2m_free_vmid(d);
+
     spin_unlock(&p2m->lock);
 }
 
 int p2m_init(struct domain *d)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
+    int rc = 0;
 
     spin_lock_init(&p2m->lock);
     INIT_PAGE_LIST_HEAD(&p2m->pages);
 
-    /* XXX allocate properly */
-    /* Zero is reserved */
-    p2m->vmid = d->domain_id + 1;
+    spin_lock(&p2m->lock);
+    p2m->vmid = INVALID_VMID;
+
+    rc = p2m_alloc_vmid(d);
+    if ( rc != 0 )
+        goto err;
 
     d->arch.vttbr = 0;
 
     p2m->first_level = NULL;
 
-    return 0;
+err:
+    spin_unlock(&p2m->lock);
+
+    return rc;
 }
 
 unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)

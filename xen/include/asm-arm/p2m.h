@@ -20,6 +20,9 @@ struct p2m_domain {
     uint8_t vmid;
 };
 
+/* Initialise vmid allocator */
+void p2m_vmid_allocator_init(void);
+
 /* Init the datastructures for later use by the p2m code */
 int p2m_init(struct domain *d);
 

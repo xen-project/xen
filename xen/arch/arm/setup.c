@@ -548,6 +548,8 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     setup_virt_paging();
 
+    p2m_vmid_allocator_init();
+
     softirq_init();
 
     tasklet_subsys_init();
