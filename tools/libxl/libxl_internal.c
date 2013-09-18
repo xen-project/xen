@@ -228,7 +228,7 @@ int libxl__file_reference_map(libxl__file_reference *f)
         return 0;
 
     fd = open(f->path, O_RDONLY);
-    if (f < 0)
+    if (fd < 0)
         return ERROR_FAIL;
 
     ret = fstat(fd, &st_buf);
