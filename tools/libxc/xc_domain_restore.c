@@ -368,6 +368,7 @@ static xen_pfn_t *load_p2m_frame_list(
                  (P2M_FL_ENTRIES - 1) * sizeof(xen_pfn_t)) )
     {
         PERROR("read p2m_frame_list failed");
+        free(p2m_frame_list);
         return NULL;
     }
     
