@@ -171,7 +171,8 @@ done:
             err = xenbus_wait_for_state_change(path, &state, &dev->events);
         if (state != XenbusStateConnected) {
             printk("backend not available, state=%d\n", state);
-            xenbus_unwatch_path_token(XBT_NIL, path, path);
+            if (err) free(err);
+            err = xenbus_unwatch_path_token(XBT_NIL, path, path);
             goto error;
         }
 
@@ -181,7 +182,8 @@ done:
         if((err = xenbus_switch_state(XBT_NIL, frontpath, XenbusStateConnected))
             != NULL) {
             printk("error switching state: %s\n", err);
-            xenbus_unwatch_path_token(XBT_NIL, path, path);
+            free(err);
+            err = xenbus_unwatch_path_token(XBT_NIL, path, path);
             goto error;
         }
     }
@@ -236,7 +238,7 @@ int kbdfront_receive(struct kbdfront_dev *dev, union xenkbd_in_event *buf, int n
 
 void shutdown_kbdfront(struct kbdfront_dev *dev)
 {
-    char* err = NULL;
+    char* err = NULL, *err2;
     XenbusState state;
 
     char path[strlen(dev->backend) + strlen("/state") + 1];
@@ -278,14 +280,18 @@ void shutdown_kbdfront(struct kbdfront_dev *dev)
 
 close_kbdfront:
     if (err) free(err);
-    xenbus_unwatch_path_token(XBT_NIL, path, path);
+    err2 = xenbus_unwatch_path_token(XBT_NIL, path, path);
+    if (err2) free(err2);
 
     snprintf(nodename, sizeof(nodename), "%s/page-ref", dev->nodename);
-    xenbus_rm(XBT_NIL, nodename);
+    err2 = xenbus_rm(XBT_NIL, nodename);
+    if (err2) free(err2);
     snprintf(nodename, sizeof(nodename), "%s/event-channel", dev->nodename);
-    xenbus_rm(XBT_NIL, nodename);
+    err2 = xenbus_rm(XBT_NIL, nodename);
+    if (err2) free(err2);
     snprintf(nodename, sizeof(nodename), "%s/request-abs-pointer", dev->nodename);
-    xenbus_rm(XBT_NIL, nodename);
+    err2 = xenbus_rm(XBT_NIL, nodename);
+    if (err2) free(err2);
 
     if (!err)
         free_kbdfront(dev);
@@ -405,7 +411,7 @@ struct fbfront_dev *init_fbfront(char *_nodename, unsigned long *mfns, int width
     char* message=NULL;
     struct xenfb_page *s;
     int retry=0;
-    char* msg;
+    char* msg=NULL;
     int i, j;
     struct fbfront_dev *dev;
     int max_pd;
@@ -532,7 +538,8 @@ done:
             err = xenbus_wait_for_state_change(path, &state, &dev->events);
         if (state != XenbusStateConnected) {
             printk("backend not available, state=%d\n", state);
-            xenbus_unwatch_path_token(XBT_NIL, path, path);
+            if (err) free(err);
+            err = xenbus_unwatch_path_token(XBT_NIL, path, path);
             goto error;
         }
 
@@ -545,7 +552,8 @@ done:
         if ((err = xenbus_switch_state(XBT_NIL, frontpath, XenbusStateConnected))
             != NULL) {
             printk("error switching state: %s\n", err);
-            xenbus_unwatch_path_token(XBT_NIL, path, path);
+            free(err);
+            err = xenbus_unwatch_path_token(XBT_NIL, path, path);
             goto error;
         }
     }
@@ -556,6 +564,7 @@ done:
     return dev;
 
 error:
+    free(msg);
     free(err);
     free_fbfront(dev);
     return NULL;
@@ -627,7 +636,7 @@ void fbfront_resize(struct fbfront_dev *dev, int width, int height, int stride, 
 
 void shutdown_fbfront(struct fbfront_dev *dev)
 {
-    char* err = NULL;
+    char* err = NULL, *err2;
     XenbusState state;
 
     char path[strlen(dev->backend) + strlen("/state") + 1];
@@ -654,7 +663,7 @@ void shutdown_fbfront(struct fbfront_dev *dev)
     }
     state = xenbus_read_integer(path);
     if (state < XenbusStateClosed) {
-        xenbus_wait_for_state_change(path, &state, &dev->events);
+        err = xenbus_wait_for_state_change(path, &state, &dev->events);
         if (err) free(err);
     }
 
@@ -669,16 +678,21 @@ void shutdown_fbfront(struct fbfront_dev *dev)
 
 close_fbfront:
     if (err) free(err);
-    xenbus_unwatch_path_token(XBT_NIL, path, path);
+    err2 = xenbus_unwatch_path_token(XBT_NIL, path, path);
+    if (err2) free(err2);
 
     snprintf(nodename, sizeof(nodename), "%s/page-ref", dev->nodename);
-    xenbus_rm(XBT_NIL, nodename);
+    err2 = xenbus_rm(XBT_NIL, nodename);
+    if (err2) free(err2);
     snprintf(nodename, sizeof(nodename), "%s/event-channel", dev->nodename);
-    xenbus_rm(XBT_NIL, nodename);
+    err2 = xenbus_rm(XBT_NIL, nodename);
+    if (err2) free(err2);
     snprintf(nodename, sizeof(nodename), "%s/protocol", dev->nodename);
-    xenbus_rm(XBT_NIL, nodename);
+    err2 = xenbus_rm(XBT_NIL, nodename);
+    if (err2) free(err2);
     snprintf(nodename, sizeof(nodename), "%s/feature-update", dev->nodename);
-    xenbus_rm(XBT_NIL, nodename);
+    err2 = xenbus_rm(XBT_NIL, nodename);
+    if (err2) free(err2);
 
     if (!err)
         free_fbfront(dev);
