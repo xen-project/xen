@@ -48,7 +48,7 @@ static void make_bootloader_args(libxl__gc *gc, libxl__bootloader_state *bl,
 {
     const libxl_domain_build_info *info = bl->info;
 
-    bl->argsspace = 7 + libxl_string_list_length(&info->u.pv.bootloader_args);
+    bl->argsspace = 9 + libxl_string_list_length(&info->u.pv.bootloader_args);
 
     GCNEW_ARRAY(bl->args, bl->argsspace);
 

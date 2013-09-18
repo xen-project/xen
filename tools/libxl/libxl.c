@@ -202,7 +202,7 @@ int libxl_string_list_length(const libxl_string_list *psl)
 {
     if (!psl) return 0;
     int i = 0;
-    while (*psl++) i++;
+    while ((*psl)[i]) i++;
     return i;
 }
 
