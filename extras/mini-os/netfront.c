@@ -309,8 +309,10 @@ struct netfront_dev *init_netfront(char *_nodename, void (*thenetif_rx)(unsigned
 
     if (!_nodename)
         snprintf(nodename, sizeof(nodename), "device/vif/%d", netfrontends);
-    else
-        strncpy(nodename, _nodename, strlen(nodename));
+    else {
+        strncpy(nodename, _nodename, sizeof(nodename) - 1);
+        nodename[sizeof(nodename) - 1] = 0;
+    }
     netfrontends++;
 
     if (!thenetif_rx)
