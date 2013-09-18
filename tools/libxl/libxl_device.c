@@ -551,6 +551,10 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
     const char *tapdisk_params;
     xs_transaction_t t = 0;
     int rc;
+    uint32_t domid;
+
+    rc = libxl__get_domid(gc, &domid);
+    if (rc) goto out;
 
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
@@ -560,8 +564,20 @@ int libxl__device_destroy(libxl__gc *gc, libxl__device *dev)
         rc = libxl__xs_read_checked(gc, t, tapdisk_path, &tapdisk_params);
         if (rc) goto out;
 
-        libxl__xs_path_cleanup(gc, t, fe_path);
-        libxl__xs_path_cleanup(gc, t, be_path);
+        if (domid == LIBXL_TOOLSTACK_DOMID) {
+            /*
+             * The toolstack domain is in charge for removing both the
+             * frontend and the backend path
+             */
+            libxl__xs_path_cleanup(gc, t, fe_path);
+            libxl__xs_path_cleanup(gc, t, be_path);
+        } else if (dev->backend_domid == domid) {
+            /*
+             * The driver domain is in charge for removing what it can
+             * from the backend path
+             */
+            libxl__xs_path_cleanup(gc, t, be_path);
+        }
 
         rc = libxl__xs_transaction_commit(gc, &t);
         if (!rc) break;
