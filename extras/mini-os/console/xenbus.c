@@ -42,7 +42,8 @@ void free_consfront(struct consfront_dev *dev)
 
 close:
     if (err) free(err);
-    xenbus_unwatch_path_token(XBT_NIL, path, path);
+    err = xenbus_unwatch_path_token(XBT_NIL, path, path);
+    if (err) free(err);
 
     mask_evtchn(dev->evtchn);
     unbind_evtchn(dev->evtchn);
@@ -58,7 +59,7 @@ close:
 struct consfront_dev *init_consfront(char *_nodename)
 {
     xenbus_transaction_t xbt;
-    char* err;
+    char* err = NULL;
     char* message=NULL;
     int retry=0;
     char* msg = NULL;
@@ -87,7 +88,7 @@ struct consfront_dev *init_consfront(char *_nodename)
 
     snprintf(path, sizeof(path), "%s/backend-id", nodename);
     if ((res = xenbus_read_integer(path)) < 0) 
-        return NULL;
+        goto error;
     else
         dev->dom = res;
     evtchn_alloc_unbound(dev->dom, console_handle_input, dev, &dev->evtchn);
@@ -170,7 +171,7 @@ done:
             msg = xenbus_wait_for_state_change(path, &state, &dev->events);
         if (msg != NULL || state != XenbusStateConnected) {
             printk("backend not available, state=%d\n", state);
-            xenbus_unwatch_path_token(XBT_NIL, path, path);
+            err = xenbus_unwatch_path_token(XBT_NIL, path, path);
             goto error;
         }
     }
