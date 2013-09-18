@@ -6554,6 +6554,7 @@ int main_cpupoolcreate(int argc, char **argv)
 out_cfg:
     xlu_cfg_destroy(config);
 out:
+    free(config_data);
     return rc;
 }
 
