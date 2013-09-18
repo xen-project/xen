@@ -1621,6 +1621,7 @@ static int handle_domain_death(uint32_t *r_domid,
             LOG("dumping core to %s", corefile);
             rc=libxl_domain_core_dump(ctx, *r_domid, corefile, NULL);
             if (rc) LOG("core dump failed (rc=%d).", rc);
+            free(corefile);
         }
         /* No point crying over spilled milk, continue on failure. */
 
