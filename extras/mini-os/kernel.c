@@ -84,8 +84,10 @@ static void shutdown_thread(void *p)
         free(err);
         xenbus_wait_for_watch(&events);
     }
-    xenbus_unwatch_path_token(XBT_NIL, path, token);
-    xenbus_write(XBT_NIL, path, "");
+    err = xenbus_unwatch_path_token(XBT_NIL, path, token);
+    if (err) free(err);
+    err = xenbus_write(XBT_NIL, path, "");
+    if (err) free(err);
     printk("Shutting down (%s)\n", shutdown);
 
     if (!strcmp(shutdown, "poweroff"))
@@ -96,6 +98,7 @@ static void shutdown_thread(void *p)
         /* Unknown */
         shutdown_reason = SHUTDOWN_crash;
     app_shutdown(shutdown_reason);
+    free(shutdown);
 }
 #endif
 

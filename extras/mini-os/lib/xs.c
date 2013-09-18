@@ -144,6 +144,7 @@ char **xs_directory(struct xs_handle *h, xs_transaction_t t,
     msg = xenbus_ls(t, path, &res);
     if (msg) {
 	printk("xs_directory(%s): %s\n", path, msg);
+	free(msg);
 	return NULL;
     }
 
@@ -163,6 +164,7 @@ char **xs_directory(struct xs_handle *h, xs_transaction_t t,
     }
 
     *num = n;
+    free(res);
     return entries;
 }
 
