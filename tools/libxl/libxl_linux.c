@@ -170,7 +170,7 @@ static int libxl__hotplug_nic(libxl__gc *gc, libxl__device *dev,
     }
 
     *env = get_hotplug_env(gc, script, dev);
-    if (!env) {
+    if (!*env) {
         rc = ERROR_FAIL;
         goto out;
     }
