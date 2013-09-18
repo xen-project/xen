@@ -4,10 +4,10 @@ import sys, os.path
 
 from xen.xm import main
 
-print("WARNING: xend/xm is deprecated.")
+print >>sys.stderr, ("WARNING: xend/xm is deprecated.")
 
 if not os.path.exists("/tmp/xm-deprecation-long-warning"):
-    print("""
+    print >>sys.stderr, ("""
 xend is deprecated and scheduled for removal. Please migrate to another
 toolstack ASAP.
 
