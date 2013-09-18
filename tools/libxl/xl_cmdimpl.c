@@ -5537,7 +5537,8 @@ int main_dmesg(int argc, char **argv)
         printf("%s", line);
 
 finish:
-    libxl_xen_console_read_finish(ctx, cr);
+    if (cr)
+        libxl_xen_console_read_finish(ctx, cr);
     return ret;
 }
 
