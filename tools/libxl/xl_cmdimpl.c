@@ -7125,6 +7125,9 @@ int main_remus(int argc, char **argv)
 
         migrate_do_preamble(send_fd, recv_fd, child, config_data, config_len,
                             rune);
+
+        if (ssh_command[0])
+            free(rune);
     }
 
     /* Point of no return */
