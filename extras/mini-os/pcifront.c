@@ -122,11 +122,12 @@ void pcifront_watches(void *opaque)
             } else if (state == XenbusStateClosing)
                 break;
         }
-        if (err)
+        if (err) {
             printk("pcifront_watches: done waiting err=%s\n", err);
-        else
+            free(err);
+        } else
             printk("pcifront_watches: done waiting\n");
-        xenbus_unwatch_path_token(XBT_NIL, be_state, be_state);
+        err = xenbus_unwatch_path_token(XBT_NIL, be_state, be_state);
         shutdown_pcifront(pcidev);
         free(be_state);
         free(be_path);
@@ -143,7 +144,7 @@ struct pcifront_dev *init_pcifront(char *_nodename)
     char* err;
     char* message=NULL;
     int retry=0;
-    char* msg;
+    char* msg = NULL;
     char* nodename = _nodename ? _nodename : "device/pci/0";
     int dom;
 
@@ -250,7 +251,8 @@ done:
             err = xenbus_wait_for_state_change(path, &state, &dev->events);
         if (state != XenbusStateConnected) {
             printk("backend not avalable, state=%d\n", state);
-            xenbus_unwatch_path_token(XBT_NIL, path, path);
+            if (err) free(err);
+            err = xenbus_unwatch_path_token(XBT_NIL, path, path);
             goto error;
         }
 
@@ -258,7 +260,8 @@ done:
         if ((err = xenbus_switch_state(XBT_NIL, frontpath, XenbusStateConnected))
             != NULL) {
             printk("error switching state %s\n", err);
-            xenbus_unwatch_path_token(XBT_NIL, path, path);
+            free(err);
+            err = xenbus_unwatch_path_token(XBT_NIL, path, path);
             goto error;
         }
     }
@@ -272,6 +275,7 @@ done:
     return dev;
 
 error:
+    free(msg);
     free(err);
     free_pcifront(dev);
     return NULL;
@@ -301,6 +305,7 @@ void pcifront_scan(struct pcifront_dev *dev, void (*func)(unsigned int domain, u
         msg = xenbus_read(XBT_NIL, path, &s);
         if (msg) {
             printk("Error %s when reading the PCI root name at %s\n", msg, path);
+            free(msg);
             continue;
         }
 
@@ -319,7 +324,7 @@ void pcifront_scan(struct pcifront_dev *dev, void (*func)(unsigned int domain, u
 
 void shutdown_pcifront(struct pcifront_dev *dev)
 {
-    char* err = NULL;
+    char* err = NULL, *err2;
     XenbusState state;
 
     char path[strlen(dev->backend) + strlen("/state") + 1];
@@ -361,12 +366,15 @@ void shutdown_pcifront(struct pcifront_dev *dev)
 
 close_pcifront:
     if (err) free(err);
-    xenbus_unwatch_path_token(XBT_NIL, path, path);
+    err2 = xenbus_unwatch_path_token(XBT_NIL, path, path);
+    if (err2) free(err2);
 
     snprintf(nodename, sizeof(nodename), "%s/info-ref", dev->nodename);
-    xenbus_rm(XBT_NIL, nodename);
+    err2 = xenbus_rm(XBT_NIL, nodename);
+    if (err2) free(err2);
     snprintf(nodename, sizeof(nodename), "%s/event-channel", dev->nodename);
-    xenbus_rm(XBT_NIL, nodename);
+    err2 = xenbus_rm(XBT_NIL, nodename);
+    if (err2) free(err2);
 
     if (!err)
         free_pcifront(dev);
@@ -397,6 +405,7 @@ int pcifront_physical_to_virtual (struct pcifront_dev *dev,
         msg = xenbus_read(XBT_NIL, path, &s);
         if (msg) {
             printk("Error %s when reading the PCI root name at %s\n", msg, path);
+            free(msg);
             continue;
         }
 
