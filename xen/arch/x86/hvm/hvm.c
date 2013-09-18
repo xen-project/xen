@@ -1118,7 +1118,7 @@ int hvm_vcpu_initialise(struct vcpu *v)
         /* Create bufioreq event channel. */
         rc = alloc_unbound_xen_event_channel(v, dm_domid, NULL);
         if ( rc < 0 )
-            goto fail2;
+            goto fail4;
         d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_EVTCHN] = rc;
     }
 
