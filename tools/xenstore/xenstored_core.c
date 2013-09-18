@@ -523,8 +523,10 @@ static enum xs_perm_type ask_parents(struct connection *conn, const char *name)
 	} while (!streq(name, "/"));
 
 	/* No permission at root?  We're in trouble. */
-	if (!node)
+	if (!node) {
 		corrupt(conn, "No permissions file at root");
+		return XS_PERM_NONE;
+	}
 
 	return perm_for_conn(conn, node->perms, node->num_perms);
 }
