@@ -318,6 +318,16 @@ protocol definition.
 
 A domain writable path. Available for arbitrary domain use.
 
+### Paths private to the toolstack
+
+#### ~/device-model/$DOMID/state [w]
+
+Contains the status of the device models running on the domain.
+
+#### ~/libxl/$DOMID/qdisk-backend-pid [w]
+
+Contains the PIDs of the device models running on the domain.
+
 ## Virtual Machine Paths
 
 The /vm/$UUID namespace is used by toolstacks to store various

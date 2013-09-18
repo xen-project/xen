@@ -39,6 +39,7 @@ int libxl__domain_create_info_setdefault(libxl__gc *gc,
     }
 
     libxl_defbool_setdefault(&c_info->run_hotplug_scripts, true);
+    libxl_defbool_setdefault(&c_info->driver_domain, false);
 
     return 0;
 }
@@ -546,6 +547,22 @@ retry_transaction:
     libxl__xs_mkdir(gc, t,
                     libxl__sprintf(gc, "%s/data", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
+
+    if (libxl_defbool_val(info->driver_domain)) {
+        /*
+         * Create a local "libxl" directory for each guest, since we might want
+         * to use libxl from inside the guest
+         */
+        libxl__xs_mkdir(gc, t, GCSPRINTF("%s/libxl", dom_path), rwperm,
+                        ARRAY_SIZE(rwperm));
+        /*
+         * Create a local "device-model" directory for each guest, since we
+         * might want to use Qemu from inside the guest
+         */
+        libxl__xs_mkdir(gc, t, GCSPRINTF("%s/device-model", dom_path), rwperm,
+                        ARRAY_SIZE(rwperm));
+    }
+
     if (info->type == LIBXL_DOMAIN_TYPE_HVM)
         libxl__xs_mkdir(gc, t,
             libxl__sprintf(gc, "%s/hvmloader/generation-id-address", dom_path),

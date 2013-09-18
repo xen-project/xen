@@ -849,6 +849,8 @@ static void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_long(config, "max_event_channels", &l, 0))
         b_info->event_channels = l;
 
+    xlu_cfg_get_defbool(config, "driver_domain", &c_info->driver_domain, 0);
+
     switch(b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         if (!xlu_cfg_get_string (config, "kernel", &buf, 0))

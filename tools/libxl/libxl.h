@@ -375,6 +375,15 @@
  */
 #define LIBXL_HAVE_CREATEINFO_PVH 1
 
+/*
+ * LIBXL_HAVE_DRIVER_DOMAIN_CREATION 1
+ *
+ * If this is defined, libxl_domain_create_info contains a driver_domain
+ * field that can be used to tell libxl that the domain that is going
+ * to be created is a driver domain, so the necessary actions are taken.
+ */
+#define LIBXL_HAVE_DRIVER_DOMAIN_CREATION 1
+
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who
  * do not #include libxl_internal.h, are fine. */
