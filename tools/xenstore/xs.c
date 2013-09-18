@@ -196,6 +196,10 @@ static int get_socket(const char *connect_to)
 		goto error;
 
 	addr.sun_family = AF_UNIX;
+	if(strlen(connect_to) >= sizeof(addr.sun_path)) {
+		errno = EINVAL;
+		goto error;
+	}
 	strcpy(addr.sun_path, connect_to);
 
 	if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
