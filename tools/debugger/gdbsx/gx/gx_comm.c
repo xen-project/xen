@@ -84,6 +84,7 @@ do_tcp(char *port_str)
     tmp = 1;
     setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&tmp,sizeof(tmp));
 
+    memset(&sockaddr, 0, sizeof(sockaddr));
     sockaddr.sin_family = PF_INET;
     sockaddr.sin_port = htons (port);
     sockaddr.sin_addr.s_addr = INADDR_ANY;
