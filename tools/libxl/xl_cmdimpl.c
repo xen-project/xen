@@ -2529,18 +2529,16 @@ int main_memset(int argc, char **argv)
 
 static int cd_insert(uint32_t domid, const char *virtdev, char *phys)
 {
-    libxl_device_disk disk; /* we don't free disk's contents */
+    libxl_device_disk disk;
     char *buf = NULL;
     XLU_Config *config = 0;
     struct stat b;
     int rc = 0;
 
-
     if (asprintf(&buf, "vdev=%s,access=r,devtype=cdrom,target=%s",
                  virtdev, phys ? phys : "") < 0) {
         fprintf(stderr, "out of memory\n");
-        rc = 1;
-        goto out;
+        return 1;
     }
 
     parse_disk_config(&config, buf, &disk);
