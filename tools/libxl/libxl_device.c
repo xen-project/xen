@@ -772,31 +772,38 @@ void libxl__initiate_device_remove(libxl__egc *egc,
     char *online_path = GCSPRINTF("%s/online", be_path);
     const char *state;
     libxl_dominfo info;
-    uint32_t domid = aodev->dev->domid;
+    uint32_t my_domid, domid = aodev->dev->domid;
     int rc = 0;
 
-    libxl_dominfo_init(&info);
-    rc = libxl_domain_info(CTX, &info, domid);
+    rc = libxl__get_domid(gc, &my_domid);
     if (rc) {
-        LOG(ERROR, "unable to get info for domain %d", domid);
+        LOG(ERROR, "unable to get my domid");
         goto out;
     }
 
-    if (QEMU_BACKEND(aodev->dev) &&
-        (info.paused || info.dying || info.shutdown)) {
-        /*
-         * TODO: 4.2 Bodge due to QEMU, see comment on top of
-         * libxl__initiate_device_remove in libxl_internal.h
-         */
-        rc = libxl__ev_time_register_rel(gc, &aodev->timeout,
-                                         device_qemu_timeout,
-                                         LIBXL_QEMU_BODGE_TIMEOUT * 1000);
+    if (my_domid == LIBXL_TOOLSTACK_DOMID) {
+        libxl_dominfo_init(&info);
+        rc = libxl_domain_info(CTX, &info, domid);
         if (rc) {
-            LOG(ERROR, "unable to register timeout for Qemu device %s",
-                       be_path);
+            LOG(ERROR, "unable to get info for domain %d", domid);
             goto out;
         }
-        return;
+        if (QEMU_BACKEND(aodev->dev) &&
+            (info.paused || info.dying || info.shutdown)) {
+            /*
+             * TODO: 4.2 Bodge due to QEMU, see comment on top of
+             * libxl__initiate_device_remove in libxl_internal.h
+             */
+            rc = libxl__ev_time_register_rel(gc, &aodev->timeout,
+                                             device_qemu_timeout,
+                                             LIBXL_QEMU_BODGE_TIMEOUT * 1000);
+            if (rc) {
+                LOG(ERROR, "unable to register timeout for Qemu device %s",
+                           be_path);
+                goto out;
+            }
+            return;
+        }
     }
 
     for (;;) {
@@ -865,17 +872,43 @@ static void device_qemu_timeout(libxl__egc *egc, libxl__ev_time *ev,
     STATE_AO_GC(aodev->ao);
     char *be_path = libxl__device_backend_path(gc, aodev->dev);
     char *state_path = GCSPRINTF("%s/state", be_path);
+    const char *xs_state;
+    xs_transaction_t t = 0;
     int rc = 0;
 
     libxl__ev_time_deregister(gc, &aodev->timeout);
 
-    rc = libxl__xs_write_checked(gc, XBT_NULL, state_path, "6");
-    if (rc) goto out;
+    for (;;) {
+        rc = libxl__xs_transaction_start(gc, &t);
+        if (rc) {
+            LOG(ERROR, "unable to start transaction");
+            goto out;
+        }
+
+        /*
+         * Check that the state path exists and is actually different than
+         * 6 before unconditionally setting it. If Qemu runs on a driver
+         * domain it is possible that the driver domain has already cleaned
+         * the backend path if the device has reached state 6.
+         */
+        rc = libxl__xs_read_checked(gc, XBT_NULL, state_path, &xs_state);
+        if (rc) goto out;
+
+        if (xs_state && atoi(xs_state) != XenbusStateClosed) {
+            rc = libxl__xs_write_checked(gc, XBT_NULL, state_path, "6");
+            if (rc) goto out;
+        }
+
+        rc = libxl__xs_transaction_commit(gc, &t);
+        if (!rc) break;
+        if (rc < 0) goto out;
+    }
 
     device_hotplug(egc, aodev);
     return;
 
 out:
+    libxl__xs_transaction_abort(gc, &t);
     aodev->rc = rc;
     device_hotplug_done(egc, aodev);
 }
