@@ -1354,6 +1354,7 @@ int libxl__need_xenpv_qemu(libxl__gc *gc,
         int nr_disks, libxl_device_disk *disks)
 {
     int i, ret = 0;
+    uint32_t domid;
 
     /*
      * qemu is required in order to support 2 or more consoles. So switch all
@@ -1379,8 +1380,11 @@ int libxl__need_xenpv_qemu(libxl__gc *gc,
     }
 
     if (nr_disks > 0) {
+        ret = libxl__get_domid(gc, &domid);
+        if (ret) goto out;
         for (i = 0; i < nr_disks; i++) {
-            if (disks[i].backend == LIBXL_DISK_BACKEND_QDISK) {
+            if (disks[i].backend == LIBXL_DISK_BACKEND_QDISK &&
+                disks[i].backend_domid == domid) {
                 ret = 1;
                 goto out;
             }
