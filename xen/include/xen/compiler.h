@@ -14,6 +14,12 @@
 #define always_inline __inline__ __attribute__ ((always_inline))
 #define noinline      __attribute__((noinline))
 
+#if (!defined(__clang__) && (__GNUC__ == 4) && (__GNUC_MINOR__ < 5))
+#define unreachable() do {} while (1)
+#else
+#define unreachable() __builtin_unreachable()
+#endif
+
 #ifdef __clang__
 /* Clang can replace some vars with new automatic ones that go in .data;
  * mark all explicit-segment vars 'used' to prevent that. */

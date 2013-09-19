@@ -46,12 +46,17 @@ struct bug_frame {
 
 
 #define WARN() BUG_FRAME(BUGFRAME_warn, __LINE__, __FILE__, 0, NULL)
-#define BUG()  BUG_FRAME(BUGFRAME_bug,  __LINE__, __FILE__, 0, NULL)
+#define BUG() do {                                              \
+    BUG_FRAME(BUGFRAME_bug,  __LINE__, __FILE__, 0, NULL);      \
+    unreachable();                                              \
+} while (0)
 
 #define run_in_exception_handler(fn) BUG_FRAME(BUGFRAME_run_fn, 0, fn, 0, NULL)
 
-#define assert_failed(msg)                                      \
-    BUG_FRAME(BUGFRAME_assert, __LINE__, __FILE__, 1, msg)
+#define assert_failed(msg) do {                                 \
+    BUG_FRAME(BUGFRAME_assert, __LINE__, __FILE__, 1, msg);     \
+    unreachable();                                              \
+} while (0)
 
 extern const struct bug_frame __start_bug_frames[],
                               __stop_bug_frames_0[],
