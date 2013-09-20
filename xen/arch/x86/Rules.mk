@@ -1,6 +1,7 @@
 ########################################
 # x86-specific definitions
 
+HAS_IOPORTS := y
 HAS_ACPI := y
 HAS_VGA  := y
 HAS_VIDEO  := y

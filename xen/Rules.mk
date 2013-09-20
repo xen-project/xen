@@ -60,6 +60,9 @@ CFLAGS-$(lock_profile)  += -DLOCK_PROFILE
 CFLAGS-$(HAS_ACPI)      += -DHAS_ACPI
 CFLAGS-$(HAS_GDBSX)     += -DHAS_GDBSX
 CFLAGS-$(HAS_PASSTHROUGH) += -DHAS_PASSTHROUGH
+CFLAGS-$(HAS_DEVICE_TREE) += -DHAS_DEVICE_TREE
+CFLAGS-$(HAS_PCI)       += -DHAS_PCI
+CFLAGS-$(HAS_IOPORTS)   += -DHAS_IOPORTS
 CFLAGS-$(frame_pointer) += -fno-omit-frame-pointer -DCONFIG_FRAME_POINTER
 
 ifneq ($(max_phys_cpus),)

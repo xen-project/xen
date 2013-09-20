@@ -13,14 +13,19 @@
 #include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/sched.h>
-#include <xen/pci.h>
 #include <xen/timer.h>
 #include <xen/serial.h>
 #include <xen/iocap.h>
+#ifdef HAS_PCI
 #include <xen/pci.h>
 #include <xen/pci_regs.h>
+#endif
 #include <xen/8250-uart.h>
+#include <xen/vmap.h>
 #include <asm/io.h>
+#ifdef HAS_DEVICE_TREE
+#include <asm/device.h>
+#endif
 #ifdef CONFIG_X86
 #include <asm/fixmap.h>
 #endif
@@ -40,15 +45,23 @@ string_param("com2", opt_com2);
 
 static struct ns16550 {
     int baud, clock_hz, data_bits, parity, stop_bits, fifo_size, irq;
-    unsigned long io_base;   /* I/O port or memory-mapped I/O address. */
+    u64 io_base;   /* I/O port or memory-mapped I/O address. */
+    u32 io_size;
+    int reg_shift; /* Bits to shift register offset by */
+    int reg_width; /* Size of access to use, the registers
+                    * themselves are still bytes */
     char __iomem *remapped_io_base;  /* Remapped virtual address of MMIO. */
     /* UART with IRQ line: interrupt-driven I/O. */
     struct irqaction irqaction;
+#ifdef CONFIG_ARM
+    struct vuart_info vuart;
+#endif
     /* UART with no IRQ line: periodically-polled I/O. */
     struct timer timer;
     struct timer resume_timer;
     unsigned int timeout_ms;
     bool_t intr_works;
+#ifdef HAS_PCI
     /* PCI card parameters. */
     unsigned int pb_bdf[3]; /* pci bridge BDF */
     unsigned int ps_bdf[3]; /* pci serial port BDF */
@@ -57,22 +70,51 @@ static struct ns16550 {
     u32 bar;
     u16 cr;
     u8 bar_idx;
+#endif
+#ifdef HAS_DEVICE_TREE
+    struct dt_irq dt_irq;
+#endif
 } ns16550_com[2] = { { 0 } };
 
 static void ns16550_delayed_resume(void *data);
 
 static char ns_read_reg(struct ns16550 *uart, int reg)
 {
+    void __iomem *addr = uart->remapped_io_base + (reg << uart->reg_shift);
+#ifdef HAS_IOPORTS
     if ( uart->remapped_io_base == NULL )
         return inb(uart->io_base + reg);
-    return readb(uart->remapped_io_base + reg);
+#endif
+    switch ( uart->reg_width )
+    {
+    case 1:
+        return readb(addr);
+    case 4:
+        return readl(addr);
+    default:
+        return 0xff;
+    }
 }
 
 static void ns_write_reg(struct ns16550 *uart, int reg, char c)
 {
+    void __iomem *addr = uart->remapped_io_base + (reg << uart->reg_shift);
+#ifdef HAS_IOPORTS
     if ( uart->remapped_io_base == NULL )
         return outb(c, uart->io_base + reg);
-    writeb(c, uart->remapped_io_base + reg);
+#endif
+    switch ( uart->reg_width )
+    {
+    case 1:
+        writeb(c, addr);
+        break;
+    case 4:
+        writel(c, addr);
+        break;
+    default:
+        /* Ignored */
+        break;
+    }
 }
 
 static int ns16550_ioport_invalid(struct ns16550 *uart)
@@ -163,9 +205,10 @@ static int ns16550_getc(struct serial_port *port, char *pc)
 
 static void pci_serial_early_init(struct ns16550 *uart)
 {
+#ifdef HAS_PCI
     if ( !uart->ps_bdf_enable || uart->io_base >= 0x10000 )
         return;
-    
+
     if ( uart->pb_bdf_enable )
         pci_conf_write16(0, uart->pb_bdf[0], uart->pb_bdf[1], uart->pb_bdf[2],
                          PCI_IO_BASE,
@@ -177,6 +220,7 @@ static void pci_serial_early_init(struct ns16550 *uart)
                      uart->io_base | PCI_BASE_ADDRESS_SPACE_IO);
     pci_conf_write16(0, uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
                      PCI_COMMAND, PCI_COMMAND_IO);
+#endif
 }
 
 static void ns16550_setup_preirq(struct ns16550 *uart)
@@ -223,8 +267,10 @@ static void __init ns16550_init_preirq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
 
+#ifdef HAS_IOPORTS
     /* I/O ports are distinguished by their size (16 bits). */
     if ( uart->io_base >= 0x10000 )
+#endif
     {
 #ifdef CONFIG_X86
         enum fixed_addresses idx = FIX_COM_BEGIN + (uart - ns16550_com);
@@ -233,7 +279,7 @@ static void __init ns16550_init_preirq(struct serial_port *port)
         uart->remapped_io_base = (void __iomem *)fix_to_virt(idx);
         uart->remapped_io_base += uart->io_base & ~PAGE_MASK;
 #else
-        uart->remapped_io_base = (char *)ioremap(uart->io_base, 8);
+        uart->remapped_io_base = (char *)ioremap(uart->io_base, uart->io_size);
 #endif
     }
 
@@ -284,15 +330,22 @@ static void __init ns16550_init_postirq(struct serial_port *port)
         uart->irqaction.handler = ns16550_interrupt;
         uart->irqaction.name    = "ns16550";
         uart->irqaction.dev_id  = port;
+#ifdef HAS_DEVICE_TREE
+        if ( (rc = setup_dt_irq(&uart->dt_irq, &uart->irqaction)) != 0 )
+            printk("ERROR: Failed to allocate ns16550 DT IRQ.\n");
+#else
         if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
             printk("ERROR: Failed to allocate ns16550 IRQ %d\n", uart->irq);
+#endif
     }
 
     ns16550_setup_postirq(uart);
 
+#ifdef HAS_PCI
     if ( uart->bar || uart->ps_bdf_enable )
         pci_hide_device(uart->ps_bdf[0], PCI_DEVFN(uart->ps_bdf[1],
                                                    uart->ps_bdf[2]));
+#endif
 }
 
 static void ns16550_suspend(struct serial_port *port)
@@ -301,13 +354,16 @@ static void ns16550_suspend(struct serial_port *port)
 
     stop_timer(&uart->timer);
 
+#ifdef HAS_PCI
     if ( uart->bar )
        uart->cr = pci_conf_read16(0, uart->ps_bdf[0], uart->ps_bdf[1],
                                   uart->ps_bdf[2], PCI_COMMAND);
+#endif
 }
 
 static void _ns16550_resume(struct serial_port *port)
 {
+#ifdef HAS_PCI
     struct ns16550 *uart = port->uart;
 
     if ( uart->bar )
@@ -317,6 +373,7 @@ static void _ns16550_resume(struct serial_port *port)
        pci_conf_write16(0, uart->ps_bdf[0], uart->ps_bdf[1], uart->ps_bdf[2],
                         PCI_COMMAND, uart->cr);
     }
+#endif
 
     ns16550_setup_preirq(port->uart);
     ns16550_setup_postirq(port->uart);
@@ -360,25 +417,40 @@ static void ns16550_resume(struct serial_port *port)
         _ns16550_resume(port);
 }
 
-#ifdef CONFIG_X86
 static void __init ns16550_endboot(struct serial_port *port)
 {
+#ifdef HAS_IOPORTS
     struct ns16550 *uart = port->uart;
 
     if ( uart->remapped_io_base )
         return;
     if ( ioports_deny_access(dom0, uart->io_base, uart->io_base + 7) != 0 )
         BUG();
-}
-#else
-#define ns16550_endboot NULL
 #endif
+}
 
 static int __init ns16550_irq(struct serial_port *port)
 {
     struct ns16550 *uart = port->uart;
     return ((uart->irq > 0) ? uart->irq : -1);
 }
+
+#ifdef HAS_DEVICE_TREE
+static const struct dt_irq __init *ns16550_dt_irq(struct serial_port *port)
+{
+    struct ns16550 *uart = port->uart;
+    return &uart->dt_irq;
+}
+#endif
+
+#ifdef CONFIG_ARM
+static const struct vuart_info *ns16550_vuart_info(struct serial_port *port)
+{
+    struct ns16550 *uart = port->uart;
+
+    return &uart->vuart;
+}
+#endif
 
 static struct uart_driver __read_mostly ns16550_driver = {
     .init_preirq  = ns16550_init_preirq,
@@ -389,7 +461,13 @@ static struct uart_driver __read_mostly ns16550_driver = {
     .tx_ready     = ns16550_tx_ready,
     .putc         = ns16550_putc,
     .getc         = ns16550_getc,
-    .irq          = ns16550_irq
+    .irq          = ns16550_irq,
+#ifdef HAS_DEVICE_TREE
+    .dt_irq_get   = ns16550_dt_irq,
+#endif
+#ifdef CONFIG_ARM
+    .vuart_info   = ns16550_vuart_info,
+#endif
 };
 
 static int __init parse_parity_char(int c)
@@ -414,15 +492,21 @@ static int __init check_existence(struct ns16550 *uart)
 {
     unsigned char status, scratch, scratch2, scratch3;
 
+#ifdef HAS_IO_PORTS
     /*
      * We can't poke MMIO UARTs until they get I/O remapped later. Assume that
      * if we're getting MMIO UARTs, the arch code knows what it's doing.
      */
     if ( uart->io_base >= 0x10000 )
         return 1;
+#else
+    return 1; /* Everything is MMIO */
+#endif
 
+#ifdef HAS_PCI
     pci_serial_early_init(uart);
-    
+#endif
+
     /*
      * Do a simple existence test first; if we fail this,
      * there's no point trying anything else.
@@ -450,6 +534,7 @@ static int __init check_existence(struct ns16550 *uart)
     return (status == 0x90);
 }
 
+#ifdef HAS_PCI
 static int
 pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
 {
@@ -518,6 +603,7 @@ pci_uart_config (struct ns16550 *uart, int skip_amt, int bar_idx)
 
     return 0;
 }
+#endif
 
 #define PARSE_ERR(_f, _a...)                 \
     do {                                     \
@@ -564,6 +650,7 @@ static void __init ns16550_parse_port_config(
 
     if ( *conf == ',' && *++conf != ',' )
     {
+#ifdef HAS_PCI
         if ( strncmp(conf, "pci", 3) == 0 )
         {
             if ( pci_uart_config(uart, 1/* skip AMT */, uart - ns16550_com) )
@@ -577,6 +664,7 @@ static void __init ns16550_parse_port_config(
             conf += 3;
         }
         else
+#endif
         {
             uart->io_base = simple_strtoul(conf, &conf, 0);
         }
@@ -585,6 +673,7 @@ static void __init ns16550_parse_port_config(
     if ( *conf == ',' && *++conf != ',' )
         uart->irq = simple_strtol(conf, &conf, 10);
 
+#ifdef HAS_PCI
     if ( *conf == ',' && *++conf != ',' )
     {
         conf = parse_pci(conf, NULL, &uart->ps_bdf[0],
@@ -601,6 +690,7 @@ static void __init ns16550_parse_port_config(
             PARSE_ERR("Bad bridge PCI coordinates");
         uart->pb_bdf_enable = 1;
     }
+#endif
 
  config_parsed:
     /* Sanity checks. */
@@ -638,12 +728,91 @@ void __init ns16550_init(int index, struct ns16550_defaults *defaults)
     uart->stop_bits = defaults->stop_bits;
     uart->irq       = defaults->irq;
     uart->io_base   = defaults->io_base;
+    uart->io_size   = 8;
+    uart->reg_width = 1;
+    uart->reg_shift = 0;
+
     /* Default is no transmit FIFO. */
     uart->fifo_size = 1;
 
     ns16550_parse_port_config(uart, (index == 0) ? opt_com1 : opt_com2);
 }
 
+#ifdef HAS_DEVICE_TREE
+static int __init ns16550_uart_dt_init(struct dt_device_node *dev,
+                                       const void *data)
+{
+    struct ns16550 *uart;
+    int res;
+    u32 reg_shift, reg_width;
+    u64 io_size;
+
+    uart = &ns16550_com[0];
+
+    uart->baud      = BAUD_AUTO;
+    uart->clock_hz  = UART_CLOCK_HZ;
+    uart->data_bits = 8;
+    uart->parity    = UART_PARITY_NONE;
+    uart->stop_bits = 1;
+    /* Default is no transmit FIFO. */
+    uart->fifo_size = 1;
+
+    res = dt_device_get_address(dev, 0, &uart->io_base, &io_size);
+    if ( res )
+        return res;
+
+    uart->io_size = io_size;
+
+    ASSERT(uart->io_size == io_size); /* Detect truncation */
+
+    res = dt_property_read_u32(dev, "reg-shift", &reg_shift);
+    if ( !res )
+        uart->reg_shift = 0;
+    else
+        uart->reg_shift = reg_shift;
+
+    res = dt_property_read_u32(dev, "reg-io-width", &reg_width);
+    if ( !res )
+        uart->reg_width = 1;
+    else
+        uart->reg_width = reg_width;
+
+    if ( uart->reg_width != 1 && uart->reg_width != 4 )
+        return -EINVAL;
+
+    res = dt_device_get_irq(dev, 0, &uart->dt_irq);
+    if ( res )
+        return res;
+
+    /* The common bit of the driver mostly deals with irq not dt_irq. */
+    uart->irq = uart->dt_irq.irq;
+
+    uart->vuart.base_addr = uart->io_base;
+    uart->vuart.size = uart->io_size;
+    uart->vuart.data_off = UART_THR <<uart->reg_shift;
+    uart->vuart.status_off = UART_LSR<<uart->reg_shift;
+    uart->vuart.status = UART_LSR_THRE|UART_LSR_TEMT;
+
+    /* Register with generic serial driver. */
+    serial_register_uart(uart - ns16550_com, &ns16550_driver, uart);
+
+    dt_device_set_used_by(dev, DOMID_XEN);
+
+    return 0;
+}
+
+static const char const *ns16550_dt_compat[] __initconst =
+{
+    "ns16550",
+    NULL
+};
+
+DT_DEVICE_START(ns16550, "NS16550 UART", DEVICE_SERIAL)
+        .compatible = ns16550_dt_compat,
+        .init = ns16550_uart_dt_init,
+DT_DEVICE_END
+
+#endif /* HAS_DEVICE_TREE */
 /*
  * Local variables:
  * mode: C
