@@ -1116,7 +1116,6 @@ protmode_load_seg(
 {
     struct segment_register desctab, ss, segr;
     struct { uint32_t a, b; } desc;
-    unsigned long val;
     uint8_t dpl, rpl, cpl;
     uint32_t new_desc_b, a_flag = 0x100;
     int rc, fault_type = EXC_GP;
@@ -1143,14 +1142,9 @@ protmode_load_seg(
     if ( ((sel & 0xfff8) + 7) > desctab.limit )
         goto raise_exn;
 
-    if ( (rc = read_ulong(x86_seg_none, desctab.base + (sel & 0xfff8),
-                          &val, 4, ctxt, ops)) )
+    if ( (rc = ops->read(x86_seg_none, desctab.base + (sel & 0xfff8),
+                         &desc, sizeof(desc), ctxt)) )
         return rc;
-    desc.a = val;
-    if ( (rc = read_ulong(x86_seg_none, desctab.base + (sel & 0xfff8) + 4,
-                          &val, 4, ctxt, ops)) )
-        return rc;
-    desc.b = val;
 
     /* Segment present in memory? */
     if ( !(desc.b & (1u<<15)) )
@@ -4454,7 +4448,6 @@ x86_emulate(
 
     case 0xc7: /* Grp9 (cmpxchg8b/cmpxchg16b) */ {
         unsigned long old[2], exp[2], new[2];
-        unsigned int i;
 
         generate_exception_if((modrm_reg & 7) != 1, EXC_UD, -1);
         generate_exception_if(ea.type != OP_MEM, EXC_UD, -1);
@@ -4463,10 +4456,9 @@ x86_emulate(
         op_bytes *= 2;
 
         /* Get actual old value. */
-        for ( i = 0; i < (op_bytes/sizeof(long)); i++ )
-            if ( (rc = read_ulong(ea.mem.seg, ea.mem.off + i*sizeof(long),
-                                  &old[i], sizeof(long), ctxt, ops)) != 0 )
-                goto done;
+        if ( (rc = ops->read(ea.mem.seg, ea.mem.off, old, op_bytes,
+                             ctxt)) != 0 )
+            goto done;
 
         /* Get expected and proposed values. */
         if ( op_bytes == 8 )
