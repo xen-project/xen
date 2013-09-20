@@ -402,6 +402,56 @@ out:
     if (ferror(stdout) || fflush(stdout)) { perror("stdout"); exit(-1); }
 }
 
+static int do_daemonize(char *name)
+{
+    char *fullname;
+    pid_t child1, got_child;
+    int nullfd, ret = 0;
+    int status = 0;
+
+    child1 = xl_fork(child_waitdaemon);
+    if (child1) {
+        for (;;) {
+            got_child = xl_waitpid(child_waitdaemon, &status, 0);
+            if (got_child == child1) break;
+            assert(got_child == -1);
+            perror("failed to wait for daemonizing child");
+            ret = ERROR_FAIL;
+            goto out;
+        }
+        if (status) {
+            libxl_report_child_exitstatus(ctx, XTL_ERROR,
+                       "daemonizing child", child1, status);
+            ret = ERROR_FAIL;
+            goto out;
+        }
+        ret = 1;
+        goto out;
+    }
+
+    postfork();
+
+    ret = libxl_create_logfile(ctx, name, &fullname);
+    if (ret) {
+        LOG("failed to open logfile %s: %s",fullname,strerror(errno));
+        exit(-1);
+    }
+
+    CHK_ERRNO(( logfile = open(fullname, O_WRONLY|O_CREAT|O_APPEND,
+                               0644) )<0);
+    free(fullname);
+
+    CHK_ERRNO(( nullfd = open("/dev/null", O_RDONLY) )<0);
+    dup2(nullfd, 0);
+    dup2(logfile, 1);
+    dup2(logfile, 2);
+
+    CHK_ERRNO(daemon(0, 1) < 0);
+
+out:
+    return ret;
+}
+
 static int parse_action_on_shutdown(const char *buf, libxl_action_on_shutdown *a)
 {
     int i;
@@ -1902,7 +1952,6 @@ static uint32_t create_domain(struct domain_create *dom_info)
     void *config_data = 0;
     int config_len = 0;
     int restore_fd = -1;
-    int status = 0;
     const libxl_asyncprogress_how *autoconnect_console_how;
     struct save_file_header hdr;
 
@@ -2141,52 +2190,18 @@ start:
         autoconnect_vncviewer(domid, vncautopass);
 
     if (need_daemon) {
-        char *fullname, *name;
-        pid_t child1, got_child;
-        int nullfd;
-
-        child1 = xl_fork(child_waitdaemon);
-        if (child1) {
-            got_child = xl_waitpid(child_waitdaemon, &status, 0);
-            if (got_child != child1) {
-                assert(got_child == -1);
-                perror("failed to wait for daemonizing child");
-                ret = ERROR_FAIL;
-                goto out;
-            }
-            if (status) {
-                libxl_report_child_exitstatus(ctx, XTL_ERROR,
-                           "daemonizing child", child1, status);
-                ret = ERROR_FAIL;
-                goto out;
-            }
-            ret = domid;
-            goto out;
-        }
-
-        postfork();
+        char *name;
 
         if (asprintf(&name, "xl-%s", d_config.c_info.name) < 0) {
             LOG("Failed to allocate memory in asprintf");
             exit(1);
         }
-        rc = libxl_create_logfile(ctx, name, &fullname);
-        if (rc) {
-            LOG("failed to open logfile %s: %s",fullname,strerror(errno));
-            exit(-1);
-        }
-
-        CHK_ERRNO(( logfile = open(fullname, O_WRONLY|O_CREAT|O_APPEND,
-                                   0644) )<0);
-        free(fullname);
+        ret = do_daemonize(name);
         free(name);
-
-        CHK_ERRNO(( nullfd = open("/dev/null", O_RDONLY) )<0);
-        dup2(nullfd, 0);
-        dup2(logfile, 1);
-        dup2(logfile, 2);
-
-        CHK_ERRNO(daemon(0, 1) < 0);
+        if (ret) {
+            ret = (ret == 1) ? domid : ret;
+            goto out;
+        }
         need_daemon = 0;
     }
     LOG("Waiting for domain %s (domid %d) to die [pid %ld]",
