@@ -22,6 +22,7 @@
 #include <xen/mm.h>
 #include <xen/vmap.h>
 #include <asm/io.h>
+#include <asm/gic.h>
 
 #define DCC_SHIFT      26
 #define FUNCTION_SHIFT 20
@@ -120,6 +121,39 @@ static void vexpress_reset(void)
     iounmap(sp810);
 }
 
+#ifdef CONFIG_ARM_32
+
+static int __init vexpress_smp_init(void)
+{
+    void __iomem *sysflags;
+
+    sysflags = ioremap_nocache(V2M_SYS_MMIO_BASE, PAGE_SIZE);
+    if ( !sysflags )
+    {
+        dprintk(XENLOG_ERR, "Unable to map vexpress MMIO\n");
+        return -EFAULT;
+    }
+
+    printk("Set SYS_FLAGS to %"PRIpaddr" (%p)\n",
+           __pa(init_secondary), init_secondary);
+    writel(~0, sysflags + V2M_SYS_FLAGSCLR);
+    writel(__pa(init_secondary), sysflags + V2M_SYS_FLAGSSET);
+
+    iounmap(sysflags);
+
+    return 0;
+}
+
+static int __init vexpress_cpu_up(int cpu)
+{
+    /* Nothing to do here, the generic sev() will suffice to kick CPUs
+     * out of either the firmware or our own smp_up_cpu gate,
+     * depending on where they have ended up. */
+
+    return 0;
+}
+#endif
+
 static const char * const vexpress_dt_compat[] __initdata =
 {
     "arm,vexpress",
@@ -144,6 +178,10 @@ static const struct dt_device_match vexpress_blacklist_dev[] __initconst =
 
 PLATFORM_START(vexpress, "VERSATILE EXPRESS")
     .compatible = vexpress_dt_compat,
+#ifdef CONFIG_ARM_32
+    .smp_init = vexpress_smp_init,
+    .cpu_up = vexpress_cpu_up,
+#endif
     .reset = vexpress_reset,
     .blacklist_dev = vexpress_blacklist_dev,
 PLATFORM_END

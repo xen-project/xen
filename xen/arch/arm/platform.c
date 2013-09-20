@@ -105,6 +105,24 @@ int __init platform_specific_mapping(struct domain *d)
     return res;
 }
 
+#ifdef CONFIG_ARM_32
+int __init platform_cpu_up(int cpu)
+{
+    if ( platform && platform->cpu_up )
+        return platform->cpu_up(cpu);
+
+    return -EAGAIN;
+}
+
+int __init platform_smp_init(void)
+{
+    if ( platform && platform->smp_init )
+        return platform->smp_init();
+
+    return 0;
+}
+#endif
+
 void platform_reset(void)
 {
     if ( platform && platform->reset )

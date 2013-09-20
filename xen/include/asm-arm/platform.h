@@ -15,6 +15,11 @@ struct platform_desc {
     /* Platform initialization */
     int (*init)(void);
     int (*init_time)(void);
+#ifdef CONFIG_ARM_32
+    /* SMP */
+    int (*smp_init)(void);
+    int (*cpu_up)(int cpu);
+#endif
     /* Specific mapping for dom0 */
     int (*specific_mapping)(struct domain *d);
     /* Platform reset */
@@ -43,6 +48,10 @@ struct platform_desc {
 int __init platform_init(void);
 int __init platform_init_time(void);
 int __init platform_specific_mapping(struct domain *d);
+#ifdef CONFIG_ARM_32
+int platform_smp_init(void);
+int platform_cpu_up(int cpu);
+#endif
 void platform_reset(void);
 void platform_poweroff(void);
 bool_t platform_has_quirk(uint32_t quirk);

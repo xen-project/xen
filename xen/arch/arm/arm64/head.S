@@ -65,6 +65,7 @@
 
         .global start
 start:
+GLOBAL(init_secondary) /* currently unused */
         /*
          * DO NOT MODIFY. Image header expected by Linux boot-loaders.
          */

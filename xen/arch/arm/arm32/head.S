@@ -59,7 +59,7 @@
          * or the initial pagetable code below will need adjustment. */
         .global start
 start:
-
+GLOBAL(init_secondary) /* currently unused */
         /* zImage magic header, see:
          * http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html#d0e309
          */

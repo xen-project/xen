@@ -4,6 +4,7 @@
 #ifndef __ASSEMBLY__
 #include <xen/config.h>
 #include <xen/cpumask.h>
+#include <xen/device_tree.h>
 #include <asm/current.h>
 #endif
 
@@ -22,9 +23,17 @@ extern void stop_cpu(void);
 extern void
 make_cpus_ready(unsigned int max_cpus, unsigned long boot_phys_offset);
 
+extern int arch_smp_init(void);
+extern int arch_cpu_init(int cpu, struct dt_device_node *dn);
+extern int arch_cpu_up(int cpu);
+
+/* Secondary CPU entry point */
+extern void init_secondary(void);
+
 extern void smp_clear_cpu_maps (void);
 extern int smp_get_max_cpus (void);
 #endif
+
 /*
  * Local variables:
  * mode: C
