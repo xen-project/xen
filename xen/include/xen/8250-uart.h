@@ -32,6 +32,7 @@
 #define UART_MCR          0x04    /* Modem control        */
 #define UART_LSR          0x05    /* line status          */
 #define UART_MSR          0x06    /* Modem status         */
+#define UART_USR          0x1f    /* Status register (DW) */
 #define UART_DLL          0x00    /* divisor latch (ls) (DLAB=1) */
 #define UART_DLM          0x01    /* divisor latch (ms) (DLAB=1) */
 
@@ -48,6 +49,7 @@
 #define UART_IIR_RDA      0x04    /*  - rx data recv'd    */
 #define UART_IIR_THR      0x02    /*  - tx reg. empty     */
 #define UART_IIR_MSI      0x00    /*  - MODEM status      */
+#define UART_IIR_BSY      0x07    /*  - busy detect (DW) */
 
 /* FIFO Control Register */
 #define UART_FCR_ENABLE   0x01    /* enable FIFO          */

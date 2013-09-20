@@ -61,6 +61,7 @@ static struct ns16550 {
     struct timer resume_timer;
     unsigned int timeout_ms;
     bool_t intr_works;
+    bool_t dw_usr_bsy;
 #ifdef HAS_PCI
     /* PCI card parameters. */
     unsigned int pb_bdf[3]; /* pci bridge BDF */
@@ -236,6 +237,16 @@ static void ns16550_setup_preirq(struct ns16550 *uart)
 
     /* No interrupts. */
     ns_write_reg(uart, UART_IER, 0);
+
+    if ( uart->dw_usr_bsy &&
+         (ns_read_reg(uart, UART_IIR) & UART_IIR_BSY) == UART_IIR_BSY )
+    {
+        /* DesignWare 8250 detects if LCR is written while the UART is
+         * busy and raises a "busy detect" interrupt. Read the UART
+         * Status Register to clear this state.
+         */
+        ns_read_reg(uart, UART_USR);
+    }
 
     /* Line control and baud-rate generator. */
     ns_write_reg(uart, UART_LCR, lcr | UART_LCR_DLAB);
@@ -787,6 +798,8 @@ static int __init ns16550_uart_dt_init(struct dt_device_node *dev,
     /* The common bit of the driver mostly deals with irq not dt_irq. */
     uart->irq = uart->dt_irq.irq;
 
+    uart->dw_usr_bsy = dt_device_is_compatible(dev, "snps,dw-apb-uart");
+
     uart->vuart.base_addr = uart->io_base;
     uart->vuart.size = uart->io_size;
     uart->vuart.data_off = UART_THR <<uart->reg_shift;
@@ -804,6 +817,7 @@ static int __init ns16550_uart_dt_init(struct dt_device_node *dev,
 static const char const *ns16550_dt_compat[] __initconst =
 {
     "ns16550",
+    "snps,dw-apb-uart",
     NULL
 };
 
