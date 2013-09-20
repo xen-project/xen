@@ -1632,6 +1632,41 @@ x86_emulate(
     if ( override_seg != -1 )
         ea.mem.seg = override_seg;
 
+    /* Early operand adjustments. */
+    if ( !twobyte )
+        switch ( b )
+        {
+        case 0xf6 ... 0xf7: /* Grp3 */
+            switch ( modrm_reg & 7 )
+            {
+            case 0 ... 1: /* test */
+                d = (d & ~SrcMask) | SrcImm;
+                break;
+            case 4: /* mul */
+            case 5: /* imul */
+            case 6: /* div */
+            case 7: /* idiv */
+                d = (d & (ByteOp | ModRM)) | DstImplicit | SrcMem;
+                break;
+            }
+            break;
+        case 0xff: /* Grp5 */
+            switch ( modrm_reg & 7 )
+            {
+            case 2: /* call (near) */
+            case 4: /* jmp (near) */
+            case 6: /* push */
+                if ( mode_64bit() && op_bytes == 4 )
+                    op_bytes = 8;
+                /* fall through */
+            case 3: /* call (far, absolute indirect) */
+            case 5: /* jmp (far, absolute indirect) */
+                d = DstNone|SrcMem|ModRM;
+                break;
+            }
+            break;
+        }
+
     /* Decode and fetch the source operand: register, memory or immediate. */
     switch ( d & SrcMask )
     {
@@ -3318,16 +3353,6 @@ x86_emulate(
         switch ( modrm_reg & 7 )
         {
         case 0 ... 1: /* test */
-            /* Special case in Grp3: test has an immediate source operand. */
-            src.type = OP_IMM;
-            src.bytes = (d & ByteOp) ? 1 : op_bytes;
-            if ( src.bytes == 8 ) src.bytes = 4;
-            switch ( src.bytes )
-            {
-            case 1: src.val = insn_fetch_type(int8_t);  break;
-            case 2: src.val = insn_fetch_type(int16_t); break;
-            case 4: src.val = insn_fetch_type(int32_t); break;
-            }
             goto test;
         case 2: /* not */
             dst.val = ~dst.val;
@@ -3336,12 +3361,11 @@ x86_emulate(
             emulate_1op("neg", dst, _regs.eflags);
             break;
         case 4: /* mul */
-            src = dst;
             dst.type = OP_REG;
             dst.reg  = (unsigned long *)&_regs.eax;
             dst.val  = *dst.reg;
             _regs.eflags &= ~(EFLG_OF|EFLG_CF);
-            switch ( src.bytes )
+            switch ( dst.bytes = src.bytes )
             {
             case 1:
                 dst.val = (uint8_t)dst.val;
@@ -3377,12 +3401,11 @@ x86_emulate(
             }
             break;
         case 5: /* imul */
-            src = dst;
             dst.type = OP_REG;
             dst.reg  = (unsigned long *)&_regs.eax;
             dst.val  = *dst.reg;
             _regs.eflags &= ~(EFLG_OF|EFLG_CF);
-            switch ( src.bytes )
+            switch ( dst.bytes = src.bytes )
             {
             case 1:
                 dst.val = ((uint16_t)(int8_t)src.val *
@@ -3419,10 +3442,10 @@ x86_emulate(
             break;
         case 6: /* div */ {
             unsigned long u[2], v;
-            src = dst;
+
             dst.type = OP_REG;
             dst.reg  = (unsigned long *)&_regs.eax;
-            switch ( src.bytes )
+            switch ( dst.bytes = src.bytes )
             {
             case 1:
                 u[0] = (uint16_t)_regs.eax;
@@ -3469,10 +3492,10 @@ x86_emulate(
         }
         case 7: /* idiv */ {
             unsigned long u[2], v;
-            src = dst;
+
             dst.type = OP_REG;
             dst.reg  = (unsigned long *)&_regs.eax;
-            switch ( src.bytes )
+            switch ( dst.bytes = src.bytes )
             {
             case 1:
                 u[0] = (int16_t)_regs.eax;
@@ -3564,20 +3587,13 @@ x86_emulate(
             emulate_1op("dec", dst, _regs.eflags);
             break;
         case 2: /* call (near) */
+            dst.val = _regs.eip;
+            _regs.eip = src.val;
+            src.val = dst.val;
+            goto push;
+            break;
         case 4: /* jmp (near) */
-            if ( (dst.bytes == 4) && mode_64bit() )
-            {
-                dst.bytes = op_bytes = 8;
-                if ( dst.type == OP_REG )
-                    dst.val = *dst.reg;
-                else if ( (rc = read_ulong(dst.mem.seg, dst.mem.off,
-                                           &dst.val, 8, ctxt, ops)) != 0 )
-                    goto done;
-            }
-            src.val = _regs.eip;
-            _regs.eip = dst.val;
-            if ( (modrm_reg & 7) == 2 )
-                goto push; /* call */
+            _regs.eip = src.val;
             dst.type = OP_NONE;
             break;
         case 3: /* call (far, absolute indirect) */
@@ -3610,21 +3626,7 @@ x86_emulate(
             break;
         }
         case 6: /* push */
-            /* 64-bit mode: PUSH defaults to a 64-bit operand. */
-            if ( mode_64bit() && (dst.bytes == 4) )
-            {
-                dst.bytes = 8;
-                if ( dst.type == OP_REG )
-                    dst.val = *dst.reg;
-                else if ( (rc = read_ulong(dst.mem.seg, dst.mem.off,
-                                           &dst.val, 8, ctxt, ops)) != 0 )
-                    goto done;
-            }
-            if ( (rc = ops->write(x86_seg_ss, sp_pre_dec(dst.bytes),
-                                  &dst.val, dst.bytes, ctxt)) != 0 )
-                goto done;
-            dst.type = OP_NONE;
-            break;
+            goto push;
         case 7:
             generate_exception_if(1, EXC_UD, -1);
         default:
