@@ -296,15 +296,28 @@ static void csched_set_node_affinity(
  * vcpu-affinity balancing is always necessary and must never be skipped.
  * OTOH, if a domain's node-affinity is said to be automatically computed
  * (or if it just spans all the nodes), we can safely avoid dealing with
- * node-affinity entirely. Ah, node-affinity is also deemed meaningless
- * in case it has empty intersection with the vcpu's vcpu-affinity, as it
- * would mean trying to schedule it on _no_ pcpu!
+ * node-affinity entirely.
+ *
+ * Node-affinity is also deemed meaningless in case it has empty
+ * intersection with mask, to cover the cases where using the node-affinity
+ * mask seems legit, but would instead led to trying to schedule the vcpu
+ * on _no_ pcpu! Typical use cases are for mask to be equal to the vcpu's
+ * vcpu-affinity, or to the && of vcpu-affinity and the set of online cpus
+ * in the domain's cpupool.
  */
-#define __vcpu_has_node_affinity(vc)                                          \
-    ( !(cpumask_full(CSCHED_DOM(vc->domain)->node_affinity_cpumask)           \
-        || !cpumask_intersects(vc->cpu_affinity,                              \
-                               CSCHED_DOM(vc->domain)->node_affinity_cpumask) \
-        || vc->domain->auto_node_affinity == 1) )
+static inline int __vcpu_has_node_affinity(const struct vcpu *vc,
+                                           const cpumask_t *mask)
+{
+    const struct domain *d = vc->domain;
+    const struct csched_dom *sdom = CSCHED_DOM(d);
+
+    if ( d->auto_node_affinity
+         || cpumask_full(sdom->node_affinity_cpumask)
+         || !cpumask_intersects(sdom->node_affinity_cpumask, mask) )
+        return 0;
+
+    return 1;
+}
 
 /*
  * Each csched-balance step uses its own cpumask. This function determines
@@ -393,7 +406,8 @@ __runq_tickle(unsigned int cpu, struct csched_vcpu *new)
             int new_idlers_empty;
 
             if ( balance_step == CSCHED_BALANCE_NODE_AFFINITY
-                 && !__vcpu_has_node_affinity(new->vcpu) )
+                 && !__vcpu_has_node_affinity(new->vcpu,
+                                              new->vcpu->cpu_affinity) )
                 continue;
 
             /* Are there idlers suitable for new (for this balance step)? */
@@ -626,11 +640,32 @@ _csched_cpu_pick(const struct scheduler *ops, struct vcpu *vc, bool_t commit)
     int cpu = vc->processor;
     int balance_step;
 
+    /* Store in cpus the mask of online cpus on which the domain can run */
     online = cpupool_scheduler_cpumask(vc->domain->cpupool);
+    cpumask_and(&cpus, vc->cpu_affinity, online);
+
     for_each_csched_balance_step( balance_step )
     {
+        /*
+         * We want to pick up a pcpu among the ones that are online and
+         * can accommodate vc, which is basically what we computed above
+         * and stored in cpus. As far as vcpu-affinity is concerned,
+         * there always will be at least one of these pcpus, hence cpus
+         * is never empty and the calls to cpumask_cycle() and
+         * cpumask_test_cpu() below are ok.
+         *
+         * On the other hand, when considering node-affinity too, it
+         * is possible for the mask to become empty (for instance, if the
+         * domain has been put in a cpupool that does not contain any of the
+         * nodes in its node-affinity), which would result in the ASSERT()-s
+         * inside cpumask_*() operations triggering (in debug builds).
+         *
+         * Therefore, in this case, we filter the node-affinity mask against
+         * cpus and, if the result is empty, we just skip the node-affinity
+         * balancing step all together.
+         */
         if ( balance_step == CSCHED_BALANCE_NODE_AFFINITY
-             && !__vcpu_has_node_affinity(vc) )
+             && !__vcpu_has_node_affinity(vc, &cpus) )
             continue;
 
         /* Pick an online CPU from the proper affinity mask */
@@ -1445,7 +1480,7 @@ csched_runq_steal(int peer_cpu, int cpu, int pri, int balance_step)
              * or counter.
              */
             if ( balance_step == CSCHED_BALANCE_NODE_AFFINITY
-                 && !__vcpu_has_node_affinity(vc) )
+                 && !__vcpu_has_node_affinity(vc, vc->cpu_affinity) )
                 continue;
 
             csched_balance_cpumask(vc, balance_step, csched_balance_mask);
