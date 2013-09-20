@@ -135,7 +135,8 @@
 #ifndef __ASSEMBLY__
 #include <xen/device_tree.h>
 
-#define DT_MATCH_GIC    DT_MATCH_COMPATIBLE("arm,cortex-a15-gic")
+#define DT_MATCH_GIC    DT_MATCH_COMPATIBLE("arm,cortex-a15-gic"), \
+                        DT_MATCH_COMPATIBLE("arm,cortex-a7-gic")
 
 extern int domain_vgic_init(struct domain *d);
 extern void domain_vgic_free(struct domain *d);
