@@ -64,6 +64,7 @@ static const char * __initdata processor_implementers[] = {
     ['B'] = "Broadcom Corporation",
     ['D'] = "Digital Equipment Corp",
     ['M'] = "Motorola, Freescale Semiconductor Inc.",
+    ['P'] = "Applied Micro",
     ['Q'] = "Qualcomm Inc.",
     ['V'] = "Marvell Semiconductor Inc.",
     ['i'] = "Intel Corporation",
