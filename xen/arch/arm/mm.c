@@ -694,6 +694,11 @@ void *ioremap_attr(paddr_t pa, size_t len, unsigned int attributes)
     return (__vmap(&pfn, nr, 1, 1, attributes) + offs);
 }
 
+void *ioremap(paddr_t pa, size_t len)
+{
+    return ioremap_attr(pa, len, PAGE_HYPERVISOR_NOCACHE);
+}
+
 static int create_xen_table(lpae_t *entry)
 {
     void *p;
