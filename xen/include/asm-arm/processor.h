@@ -8,11 +8,13 @@
 #define MIDR_MASK    0xff0ffff0
 
 /* MPIDR Multiprocessor Affinity Register */
-#define MPIDR_UP            (1 << 30)
-#define MPIDR_SMP           (1 << 31)
+#define _MPIDR_UP           (30)
+#define MPIDR_UP            (_AC(1,U) << _MPIDR_UP)
+#define _MPIDR_SMP          (31)
+#define MPIDR_SMP           (_AC(1,U) << _MPIDR_SMP)
 #define MPIDR_AFF0_SHIFT    (0)
-#define MPIDR_AFF0_MASK     (0xff << MPIDR_AFF0_SHIFT)
-#define MPIDR_HWID_MASK     0xffffff
+#define MPIDR_AFF0_MASK     (_AC(0xff,U) << MPIDR_AFF0_SHIFT)
+#define MPIDR_HWID_MASK     _AC(0xffffff,U)
 #define MPIDR_INVALID       (~MPIDR_HWID_MASK)
 
 /* TTBCR Translation Table Base Control Register */

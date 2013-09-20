@@ -153,10 +153,10 @@ common_start:
                                       * find that multiprocessor extensions are
                                       * present and the system is SMP  */
         mrs   x0, mpidr_el1
-        tbz   x0, 31, 1f             /* Multiprocessor extension not supported? */
-        tbnz  x0, 30, 1f             /* Uniprocessor system? */
+        tbz   x0, _MPIDR_SMP, 1f     /* Multiprocessor extension not supported? */
+        tbnz  x0, _MPIDR_UP, 1f      /* Uniprocessor system? */
 
-        mov   x13, #(0xff << 24)
+        mov   x13, #(~MPIDR_HWID_MASK)
         bic   x24, x0, x13           /* Mask out flags to get CPU ID */
 1:
 

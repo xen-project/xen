@@ -127,9 +127,9 @@ common_start:
                                       * find that multiprocessor extensions are
                                       * present and the system is SMP */
         mrc   CP32(r1, MPIDR)
-        tst   r1, #(1<<31)           /* Multiprocessor extension supported? */
+        tst   r1, #MPIDR_SMP         /* Multiprocessor extension supported? */
         beq   1f
-        tst   r1, #(1<<30)           /* Uniprocessor system? */
+        tst   r1, #MPIDR_UP          /* Uniprocessor system? */
         bne   1f
         bic   r7, r1, #(~MPIDR_HWID_MASK) /* Mask out flags to get CPU ID */
 1:
