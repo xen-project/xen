@@ -25,7 +25,6 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
                     unsigned flags, xentoollog_logger * lg)
 {
     libxl_ctx *ctx = NULL;
-    struct stat stat_buf;
     int rc;
 
     if (version != LIBXL_VERSION) { rc = ERROR_VERSION; goto out; }
@@ -81,12 +80,6 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
 
     rc = libxl__poller_init(ctx, &ctx->poller_app);
     if (rc) goto out;
-
-    if ( stat(XENSTORE_PID_FILE, &stat_buf) != 0 ) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Is xenstore daemon running?\n"
-                     "failed to stat %s", XENSTORE_PID_FILE);
-        rc = ERROR_FAIL; goto out;
-    }
 
     ctx->xch = xc_interface_open(lg,lg,0);
     if (!ctx->xch) {
