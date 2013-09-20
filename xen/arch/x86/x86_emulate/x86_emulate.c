@@ -92,7 +92,7 @@ static uint8_t opcode_table[256] = {
     ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
     ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov, ImplicitOps|Mov,
     /* 0x60 - 0x67 */
-    ImplicitOps, ImplicitOps, DstReg|SrcMem|ModRM, DstReg|SrcMem16|ModRM|Mov,
+    ImplicitOps, ImplicitOps, DstReg|SrcMem|ModRM, DstReg|SrcNone|ModRM|Mov,
     0, 0, 0, 0,
     /* 0x68 - 0x6F */
     ImplicitOps|Mov, DstReg|SrcImm|ModRM|Mov,
@@ -2021,9 +2021,9 @@ x86_emulate(
         if ( mode_64bit() )
         {
             /* movsxd */
-            if ( src.type == OP_REG )
-                src.val = *(int32_t *)src.reg;
-            else if ( (rc = read_ulong(src.mem.seg, src.mem.off,
+            if ( ea.type == OP_REG )
+                src.val = *ea.reg;
+            else if ( (rc = read_ulong(ea.mem.seg, ea.mem.off,
                                        &src.val, 4, ctxt, ops)) )
                 goto done;
             dst.val = (int32_t)src.val;
@@ -2031,14 +2031,25 @@ x86_emulate(
         else
         {
             /* arpl */
-            uint16_t src_val = dst.val;
-            dst = src;
-            _regs.eflags &= ~EFLG_ZF;
-            _regs.eflags |= ((src_val & 3) > (dst.val & 3)) ? EFLG_ZF : 0;
-            if ( _regs.eflags & EFLG_ZF )
-                dst.val  = (dst.val & ~3) | (src_val & 3);
+            unsigned int src_rpl = dst.val & 3;
+
+            dst = ea;
+            dst.bytes = 2;
+            if ( dst.type == OP_REG )
+                dst.val = *dst.reg;
+            else if ( (rc = read_ulong(dst.mem.seg, dst.mem.off,
+                                       &dst.val, 2, ctxt, ops)) )
+                goto done;
+            if ( src_rpl > (dst.val & 3) )
+            {
+                _regs.eflags |= EFLG_ZF;
+                dst.val = (dst.val & ~3) | src_rpl;
+            }
             else
+            {
+                _regs.eflags &= ~EFLG_ZF;
                 dst.type = OP_NONE;
+            }
             generate_exception_if(!in_protmode(ctxt, ops), EXC_UD, -1);
         }
         break;

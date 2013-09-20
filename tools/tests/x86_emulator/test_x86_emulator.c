@@ -21,7 +21,21 @@
 #define EFLG_PF (1<<2)
 #define EFLG_CF (1<<0)
 
+static unsigned int bytes_read;
+
 static int read(
+    unsigned int seg,
+    unsigned long offset,
+    void *p_data,
+    unsigned int bytes,
+    struct x86_emulate_ctxt *ctxt)
+{
+    bytes_read += bytes;
+    memcpy(p_data, (void *)offset, bytes);
+    return X86EMUL_OKAY;
+}
+
+static int fetch(
     unsigned int seg,
     unsigned long offset,
     void *p_data,
@@ -140,7 +154,7 @@ int get_fpu(
 
 static struct x86_emulate_ops emulops = {
     .read       = read,
-    .insn_fetch = read,
+    .insn_fetch = fetch,
     .write      = write,
     .cmpxchg    = cmpxchg,
     .cpuid      = cpuid,
@@ -162,8 +176,8 @@ int main(int argc, char **argv)
 
     ctxt.regs = &regs;
     ctxt.force_writeback = 0;
-    ctxt.addr_size = 32;
-    ctxt.sp_size   = 32;
+    ctxt.addr_size = 8 * sizeof(void *);
+    ctxt.sp_size   = 8 * sizeof(void *);
 
     res = mmap((void *)0x100000, MMAP_SZ, PROT_READ|PROT_WRITE|PROT_EXEC,
                MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);
@@ -428,6 +442,44 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
+#ifndef __x86_64__
+    printf("%-40s", "Testing arpl %cx,(%%eax)...");
+    instr[0] = 0x63; instr[1] = 0x08;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = 0x22222222;
+    regs.eax    = (unsigned long)res;
+    *res        = 0x33331111;
+    bytes_read  = 0;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (*res != 0x33331112) ||
+         (regs.ecx != 0x22222222) ||
+         !(regs.eflags & EFLG_ZF) ||
+         (regs.eip != (unsigned long)&instr[2]) )
+        goto fail;
+#else
+    printf("%-40s", "Testing movsxd (%%rax),%%rcx...");
+    instr[0] = 0x48; instr[1] = 0x63; instr[2] = 0x08;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = 0x123456789abcdef;
+    regs.eax    = (unsigned long)res;
+    *res        = 0xfedcba98;
+    bytes_read  = 0;
+    rc = x86_emulate(&ctxt, &emulops);
+    if ( (rc != X86EMUL_OKAY) ||
+         (*res != 0xfedcba98) ||
+         (regs.ecx != 0xfffffffffedcba98) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    if ( bytes_read != 4 )
+    {
+        printf("%u bytes read - ", bytes_read);
+        goto fail;
+    }
+#endif
+    printf("okay\n");
+
     printf("%-40s", "Testing xadd %%ax,(%%ecx)...");
     instr[0] = 0x66; instr[1] = 0x0f; instr[2] = 0xc1; instr[3] = 0x01;
     regs.eflags = 0x200;
@@ -445,7 +497,11 @@ int main(int argc, char **argv)
     printf("okay\n");
 
     printf("%-40s", "Testing dec %%ax...");
+#ifndef __x86_64__
     instr[0] = 0x66; instr[1] = 0x48;
+#else
+    instr[0] = 0x66; instr[1] = 0xff; instr[2] = 0xc8;
+#endif
     regs.eflags = 0x200;
     regs.eip    = (unsigned long)&instr[0];
     regs.eax    = 0x00000000;
@@ -453,7 +509,7 @@ int main(int argc, char **argv)
     if ( (rc != X86EMUL_OKAY) ||
          (regs.eax != 0x0000ffff) ||
          ((regs.eflags&0x240) != 0x200) ||
-         (regs.eip != (unsigned long)&instr[2]) )
+         (regs.eip != (unsigned long)&instr[2 + (ctxt.addr_size > 32)]) )
         goto fail;
     printf("okay\n");
 
@@ -821,6 +877,8 @@ int main(int argc, char **argv)
         if ( j == 2 ) break;
         memcpy(res, blowfish32_code, sizeof(blowfish32_code));
 #else
+        ctxt.addr_size = 16 << j;
+        ctxt.sp_size   = 16 << j;
         memcpy(res, (j == 1) ? blowfish32_code : blowfish64_code,
                (j == 1) ? sizeof(blowfish32_code) : sizeof(blowfish64_code));
 #endif
