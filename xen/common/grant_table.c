@@ -783,7 +783,6 @@ __gnttab_map_grant_ref(
     spin_lock(&rgt->lock);
 
     act = &active_entry(rgt, op->ref);
-    shah = shared_entry_header(rgt, op->ref);
 
     if ( op->flags & GNTMAP_device_map )
         act->pin -= (op->flags & GNTMAP_readonly) ?
