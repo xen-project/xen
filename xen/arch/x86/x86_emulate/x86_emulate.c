@@ -773,13 +773,20 @@ static void __put_rep_prefix(
         __put_rep_prefix(&_regs, ctxt->regs, ad_bytes, reps_completed); \
 })
 
-/* Clip maximum repetitions so that the index register only just wraps. */
+/* Clip maximum repetitions so that the index register at most just wraps. */
 #define truncate_ea_and_reps(ea, reps, bytes_per_rep) ({                  \
-    unsigned long __todo = (ctxt->regs->eflags & EFLG_DF) ? (ea) : ~(ea); \
-    __todo = truncate_word(__todo, ad_bytes);                             \
-    __todo = (__todo / (bytes_per_rep)) + 1;                              \
-    (reps) = (__todo < (reps)) ? __todo : (reps);                         \
-    truncate_word((ea), ad_bytes);                                        \
+    unsigned long todo__, ea__ = truncate_word(ea, ad_bytes);             \
+    if ( !(ctxt->regs->eflags & EFLG_DF) )                                \
+        todo__ = truncate_word(-(ea), ad_bytes) / (bytes_per_rep);        \
+    else if ( truncate_word((ea) + (bytes_per_rep) - 1, ad_bytes) < ea__ )\
+        todo__ = 1;                                                       \
+    else                                                                  \
+        todo__ = ea__ / (bytes_per_rep) + 1;                              \
+    if ( !todo__ )                                                        \
+        (reps) = 1;                                                       \
+    else if ( todo__ < (reps) )                                           \
+        (reps) = todo__;                                                  \
+    ea__;                                                                 \
 })
 
 /* Compatibility function: read guest memory, zero-extend result to a ulong. */
@@ -2385,8 +2392,9 @@ x86_emulate(
         dst.bytes = (d & ByteOp) ? 1 : op_bytes;
         dst.mem.seg = x86_seg_es;
         dst.mem.off = truncate_ea_and_reps(_regs.edi, nr_reps, dst.bytes);
+        src.mem.off = truncate_ea_and_reps(_regs.esi, nr_reps, dst.bytes);
         if ( (nr_reps > 1) && (ops->rep_movs != NULL) &&
-             ((rc = ops->rep_movs(ea.mem.seg, truncate_ea(_regs.esi),
+             ((rc = ops->rep_movs(ea.mem.seg, src.mem.off,
                                   dst.mem.seg, dst.mem.off, dst.bytes,
                                   &nr_reps, ctxt)) != X86EMUL_UNHANDLEABLE) )
         {
@@ -2395,7 +2403,7 @@ x86_emulate(
         }
         else
         {
-            if ( (rc = read_ulong(ea.mem.seg, truncate_ea(_regs.esi),
+            if ( (rc = read_ulong(ea.mem.seg, src.mem.off,
                                   &dst.val, dst.bytes, ctxt, ops)) != 0 )
                 goto done;
             dst.type = OP_MEM;
