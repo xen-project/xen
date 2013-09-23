@@ -336,12 +336,11 @@ static inline void __vmread(unsigned long field, unsigned long *value)
                    UNLIKELY_END_SECTION
 #ifdef HAVE_GAS_VMX
                    : "=rm" (*value)
-                   : "r" (field)
+                   : "r" (field));
 #else
                    : "=c" (*value)
-                   : "a" (field)
+                   : "a" (field));
 #endif
-                   : "memory");
 }
 
 static inline void __vmwrite(unsigned long field, unsigned long value)
@@ -358,11 +357,10 @@ static inline void __vmwrite(unsigned long field, unsigned long value)
                    UNLIKELY_END_SECTION
                    : 
 #ifdef HAVE_GAS_VMX
-                   : "r" (field) , "rm" (value)
+                   : "r" (field) , "rm" (value));
 #else
-                   : "a" (field) , "c" (value)
+                   : "a" (field) , "c" (value));
 #endif
-                   : "memory");
 }
 
 static inline bool_t __vmread_safe(unsigned long field, unsigned long *value)
@@ -379,12 +377,11 @@ static inline bool_t __vmread_safe(unsigned long field, unsigned long *value)
                    "setnbe %0"
 #ifdef HAVE_GAS_VMX
                    : "=qm" (okay), "=rm" (*value)
-                   : "r" (field)
+                   : "r" (field));
 #else
                    : "=qm" (okay), "=c" (*value)
-                   : "a" (field)
+                   : "a" (field));
 #endif
-                   : "memory");
 
     return okay;
 }
