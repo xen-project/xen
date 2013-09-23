@@ -234,9 +234,9 @@ SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= b0855f925c6e2e0b21fbb03fab4b5fb5b6876871
 QEMU_UPSTREAM_REVISION ?= 1c514a7734b7f98625a0d18d5e8ee7581f26e50c
-SEABIOS_UPSTREAM_TAG ?= 3a28511b46f0c2af5fae1b6ed2b0c19d7913cee3
-# Wed Jun 26 16:30:45 2013 +0100
-# xen: Don't perform SMP setup.
+SEABIOS_UPSTREAM_TAG ?= rel-1.7.3.1
+# Fri Aug 2 14:12:09 2013 -0400
+# Fix bug in CBFS file walking with compressed files.
 
 ETHERBOOT_NICS ?= rtl8139 8086100e
 
