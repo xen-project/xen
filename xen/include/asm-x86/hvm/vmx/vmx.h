@@ -322,21 +322,26 @@ static inline void __vmpclear(u64 addr)
                    : "memory");
 }
 
-static inline unsigned long __vmread(unsigned long field)
+static inline void __vmread(unsigned long field, unsigned long *value)
 {
-    unsigned long ecx;
-
-    asm volatile ( VMREAD_OPCODE
-                   MODRM_EAX_ECX
+    asm volatile (
+#ifdef HAVE_GAS_VMX
+                   "vmread %1, %0\n\t"
+#else
+                   VMREAD_OPCODE MODRM_EAX_ECX
+#endif
                    /* CF==1 or ZF==1 --> crash (ud2) */
                    UNLIKELY_START(be, vmread)
                    "\tud2\n"
                    UNLIKELY_END_SECTION
-                   : "=c" (ecx)
+#ifdef HAVE_GAS_VMX
+                   : "=rm" (*value)
+                   : "r" (field)
+#else
+                   : "=c" (*value)
                    : "a" (field)
+#endif
                    : "memory");
-
-    return ecx;
 }
 
 static inline void __vmwrite(unsigned long field, unsigned long value)

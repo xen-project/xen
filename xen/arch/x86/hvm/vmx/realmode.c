@@ -104,7 +104,6 @@ static void realmode_deliver_exception(
 static void realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
     struct vcpu *curr = current;
-    uint32_t intr_info;
     int rc;
 
     perfc_incr(realmode_emulations);
@@ -121,7 +120,9 @@ static void realmode_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt)
     {
         if ( !hvmemul_ctxt->exn_pending )
         {
-            intr_info = __vmread(VM_ENTRY_INTR_INFO);
+            unsigned long intr_info;
+
+            __vmread(VM_ENTRY_INTR_INFO, &intr_info);
             __vmwrite(VM_ENTRY_INTR_INFO, 0);
             if ( !(intr_info & INTR_INFO_VALID_MASK) )
             {
@@ -177,7 +178,7 @@ void vmx_realmode(struct cpu_user_regs *regs)
     unsigned int emulations = 0;
 
     /* Get-and-clear VM_ENTRY_INTR_INFO. */
-    intr_info = __vmread(VM_ENTRY_INTR_INFO);
+    __vmread(VM_ENTRY_INTR_INFO, &intr_info);
     if ( intr_info & INTR_INFO_VALID_MASK )
         __vmwrite(VM_ENTRY_INTR_INFO, 0);
 

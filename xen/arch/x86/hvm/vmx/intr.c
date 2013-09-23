@@ -76,7 +76,9 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
 
     if ( unlikely(tb_init_done) )
     {
-        unsigned int intr = __vmread(VM_ENTRY_INTR_INFO);
+        unsigned long intr;
+
+        __vmread(VM_ENTRY_INTR_INFO, &intr);
         HVMTRACE_3D(INTR_WINDOW, intack.vector, intack.source,
                     (intr & INTR_INFO_VALID_MASK) ? intr & 0xff : -1);
     }
@@ -92,7 +94,9 @@ static void enable_intr_window(struct vcpu *v, struct hvm_intack intack)
          * we may immediately vmexit and hance make no progress!
          * (see SDM 3B 21.3, "Other Causes of VM Exits").
          */
-        u32 intr_shadow = __vmread(GUEST_INTERRUPTIBILITY_INFO);
+        unsigned long intr_shadow;
+
+        __vmread(GUEST_INTERRUPTIBILITY_INFO, &intr_shadow);
         if ( intr_shadow & VMX_INTR_SHADOW_STI )
         {
             /* Having both STI-blocking and MOV-SS-blocking fails vmentry. */
@@ -151,9 +155,16 @@ enum hvm_intblk nvmx_intr_blocked(struct vcpu *v)
     if ( nestedhvm_vcpu_in_guestmode(v) )
     {
         if ( nvcpu->nv_vmexit_pending ||
-             nvcpu->nv_vmswitch_in_progress ||
-             (__vmread(VM_ENTRY_INTR_INFO) & INTR_INFO_VALID_MASK) )
+             nvcpu->nv_vmswitch_in_progress )
             r = hvm_intblk_rflags_ie;
+        else
+        {
+            unsigned long intr_info;
+
+            __vmread(VM_ENTRY_INTR_INFO, &intr_info);
+            if ( intr_info & INTR_INFO_VALID_MASK )
+                r = hvm_intblk_rflags_ie;
+        }
     }
     else if ( nvcpu->nv_vmentry_pending )
         r = hvm_intblk_rflags_ie;
@@ -228,6 +239,8 @@ void vmx_intr_assist(void)
     pt_vector = pt_update_irq(v);
 
     do {
+        unsigned long intr_info;
+
         intack = hvm_vcpu_has_pending_irq(v);
         if ( likely(intack.source == hvm_intsrc_none) )
             goto out;
@@ -247,7 +260,8 @@ void vmx_intr_assist(void)
                 goto out;
             }
 
-            if ( __vmread(VM_ENTRY_INTR_INFO) & INTR_INFO_VALID_MASK )
+            __vmread(VM_ENTRY_INTR_INFO, &intr_info);
+            if ( intr_info & INTR_INFO_VALID_MASK )
             {
                 if ( (intack.source == hvm_intsrc_pic) ||
                      (intack.source == hvm_intsrc_nmi) ||
@@ -262,11 +276,20 @@ void vmx_intr_assist(void)
             ASSERT(intack.source == hvm_intsrc_lapic);
             tpr_threshold = intack.vector >> 4;
             goto out;
-        } else if ( (intblk != hvm_intblk_none) ||
-                    (__vmread(VM_ENTRY_INTR_INFO) & INTR_INFO_VALID_MASK) )
+        }
+        else if ( intblk != hvm_intblk_none )
         {
             enable_intr_window(v, intack);
             goto out;
+        }
+        else
+        {
+            __vmread(VM_ENTRY_INTR_INFO, &intr_info);
+            if ( intr_info & INTR_INFO_VALID_MASK )
+            {
+                enable_intr_window(v, intack);
+                goto out;
+            }
         }
 
         intack = hvm_vcpu_ack_pending_irq(v, intack);
@@ -284,7 +307,7 @@ void vmx_intr_assist(void)
               intack.source != hvm_intsrc_pic &&
               intack.source != hvm_intsrc_vector )
     {
-        unsigned long status = __vmread(GUEST_INTR_STATUS);
+        unsigned long status;
         unsigned int i, n;
 
        /*
@@ -296,6 +319,7 @@ void vmx_intr_assist(void)
             vmx_set_eoi_exit_bitmap(v, pt_vector);
 
         /* we need update the RVI field */
+        __vmread(GUEST_INTR_STATUS, &status);
         status &= ~VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK;
         status |= VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK &
                     intack.vector;

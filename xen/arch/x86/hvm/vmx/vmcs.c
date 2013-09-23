@@ -815,7 +815,7 @@ u64 virtual_vmcs_vmread(void *vvmcs, u32 vmcs_encoding)
     u64 res;
 
     virtual_vmcs_enter(vvmcs);
-    res = __vmread(vmcs_encoding);
+    __vmread(vmcs_encoding, &res);
     virtual_vmcs_exit(vvmcs);
 
     return res;
@@ -1219,14 +1219,18 @@ void vmx_destroy_vmcs(struct vcpu *v)
 
 void vm_launch_fail(void)
 {
-    unsigned long error = __vmread(VM_INSTRUCTION_ERROR);
+    unsigned long error;
+
+    __vmread(VM_INSTRUCTION_ERROR, &error);
     printk("<vm_launch_fail> error code %lx\n", error);
     domain_crash_synchronous();
 }
 
 void vm_resume_fail(void)
 {
-    unsigned long error = __vmread(VM_INSTRUCTION_ERROR);
+    unsigned long error;
+
+    __vmread(VM_INSTRUCTION_ERROR, &error);
     printk("<vm_resume_fail> error code %lx\n", error);
     domain_crash_synchronous();
 }

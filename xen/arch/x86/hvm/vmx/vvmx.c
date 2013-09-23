@@ -425,7 +425,8 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
     if ( vmx_inst_check_privilege(regs, vmxon_check) != X86EMUL_OKAY )
         return X86EMUL_EXCEPTION;
 
-    info.word = __vmread(VMX_INSTRUCTION_INFO);
+    __vmread(VMX_INSTRUCTION_INFO, &offset);
+    info.word = offset;
 
     if ( info.fields.memreg ) {
         decode->type = VMX_INST_MEMREG_TYPE_REG;
@@ -458,7 +459,7 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
 
         scale = 1 << info.fields.scaling;
 
-        disp = __vmread(EXIT_QUALIFICATION);
+        __vmread(EXIT_QUALIFICATION, &disp);
 
         size = 1 << (info.fields.addr_size + 1);
 
@@ -950,7 +951,7 @@ static void vvmcs_to_shadow_bulk(struct vcpu *v, unsigned int n,
 
     virtual_vmcs_enter(vvmcs);
     for ( i = 0; i < n; i++ )
-        value[i] = __vmread(field[i]);
+        __vmread(field[i], &value[i]);
     virtual_vmcs_exit(vvmcs);
 
     for ( i = 0; i < n; i++ )
@@ -991,7 +992,7 @@ static void shadow_to_vvmcs_bulk(struct vcpu *v, unsigned int n,
     }
 
     for ( i = 0; i < n; i++ )
-        value[i] = __vmread(field[i]);
+        __vmread(field[i], &value[i]);
 
     virtual_vmcs_enter(vvmcs);
     for ( i = 0; i < n; i++ )
@@ -1959,11 +1960,12 @@ nvmx_hap_walk_L1_p2m(struct vcpu *v, paddr_t L2_gpa, paddr_t *L1_gpa,
 {
     int rc;
     unsigned long gfn;
-    uint64_t exit_qual = __vmread(EXIT_QUALIFICATION);
+    uint64_t exit_qual;
     uint32_t exit_reason = EXIT_REASON_EPT_VIOLATION;
     uint32_t rwx_rights = (access_x << 2) | (access_w << 1) | access_r;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
 
+    __vmread(EXIT_QUALIFICATION, &exit_qual);
     rc = nept_translate_l2ga(v, L2_gpa, page_order, rwx_rights, &gfn, p2m_acc,
                              &exit_qual, &exit_reason);
     switch ( rc )
@@ -1995,8 +1997,9 @@ void nvmx_idtv_handling(void)
     struct vcpu *v = current;
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-    unsigned int idtv_info = __vmread(IDT_VECTORING_INFO);
+    unsigned long idtv_info, reason;
 
+    __vmread(IDT_VECTORING_INFO, &idtv_info);
     if ( likely(!(idtv_info & INTR_INFO_VALID_MASK)) )
         return;
 
@@ -2004,15 +2007,17 @@ void nvmx_idtv_handling(void)
      * If L0 can solve the fault that causes idt vectoring, it should
      * be reinjected, otherwise, pass to L1.
      */
-    if ( (__vmread(VM_EXIT_REASON) != EXIT_REASON_EPT_VIOLATION &&
-          !(nvmx->intr.intr_info & INTR_INFO_VALID_MASK)) ||
-         (__vmread(VM_EXIT_REASON) == EXIT_REASON_EPT_VIOLATION &&
-          !nvcpu->nv_vmexit_pending) )
+    __vmread(VM_EXIT_REASON, &reason);
+    if ( reason != EXIT_REASON_EPT_VIOLATION ?
+         !(nvmx->intr.intr_info & INTR_INFO_VALID_MASK) :
+         !nvcpu->nv_vmexit_pending )
     {
         __vmwrite(VM_ENTRY_INTR_INFO, idtv_info & ~INTR_INFO_RESVD_BITS_MASK);
         if ( idtv_info & INTR_INFO_DELIVER_CODE_MASK )
-           __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE,
-                        __vmread(IDT_VECTORING_ERROR_CODE));
+        {
+            __vmread(IDT_VECTORING_ERROR_CODE, &reason);
+            __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, reason);
+        }
         /*
          * SDM 23.2.4, if L1 tries to inject a software interrupt
          * and the delivery fails, VM_EXIT_INSTRUCTION_LEN receives
@@ -2021,7 +2026,8 @@ void nvmx_idtv_handling(void)
          * This means EXIT_INSTRUCTION_LEN is always valid here, for
          * software interrupts both injected by L1, and generated in L2.
          */
-        __vmwrite(VM_ENTRY_INSTRUCTION_LEN, __vmread(VM_EXIT_INSTRUCTION_LEN));
+        __vmread(VM_EXIT_INSTRUCTION_LEN, &reason);
+        __vmwrite(VM_ENTRY_INSTRUCTION_LEN, reason);
    }
 }
 
@@ -2039,7 +2045,6 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     u32 ctrl;
-    u16 port;
     u8 *bitmap;
 
     nvcpu->nv_vmexit_pending = 0;
@@ -2049,12 +2054,14 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     switch (exit_reason) {
     case EXIT_REASON_EXCEPTION_NMI:
     {
-        u32 intr_info = __vmread(VM_EXIT_INTR_INFO);
+        unsigned long intr_info;
         u32 valid_mask = (X86_EVENTTYPE_HW_EXCEPTION << 8) |
                          INTR_INFO_VALID_MASK;
         u64 exec_bitmap;
-        int vector = intr_info & INTR_INFO_VECTOR_MASK;
+        int vector;
 
+        __vmread(VM_EXIT_INTR_INFO, &intr_info);
+        vector = intr_info & INTR_INFO_VECTOR_MASK;
         /*
          * decided by L0 and L1 exception bitmap, if the vetor is set by
          * both, L0 has priority on #PF and #NM, L1 has priority on others
@@ -2123,7 +2130,11 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         ctrl = __n2_exec_control(v);
         if ( ctrl & CPU_BASED_ACTIVATE_IO_BITMAP )
         {
-            port = __vmread(EXIT_QUALIFICATION) >> 16;
+            unsigned long qual;
+            u16 port;
+
+            __vmread(EXIT_QUALIFICATION, &qual);
+            port = qual >> 16;
             bitmap = nvmx->iobitmap[port >> 15];
             if ( bitmap[(port & 0x7fff) >> 4] & (1 << (port & 0x7)) )
                 nvcpu->nv_vmexit_pending = 1;
@@ -2220,11 +2231,13 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         break;
     case EXIT_REASON_CR_ACCESS:
     {
-        u64 exit_qualification = __vmread(EXIT_QUALIFICATION);
-        int cr = exit_qualification & 15;
-        int write = (exit_qualification >> 4) & 3;
+        unsigned long exit_qualification;
+        int cr, write;
         u32 mask = 0;
 
+        __vmread(EXIT_QUALIFICATION, &exit_qualification);
+        cr = exit_qualification & 0xf;
+        write = (exit_qualification >> 4) & 3;
         /* also according to guest exec_control */
         ctrl = __n2_exec_control(v);
 
@@ -2268,7 +2281,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                 {
                     u64 cr0_gh_mask = __get_vvmcs(nvcpu->nv_vvmcx, CR0_GUEST_HOST_MASK);
 
-                    old_val = __vmread(CR0_READ_SHADOW);
+                    __vmread(CR0_READ_SHADOW, &old_val);
                     changed_bits = old_val ^ val;
                     if ( changed_bits & cr0_gh_mask )
                         nvcpu->nv_vmexit_pending = 1;
@@ -2283,7 +2296,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
                 {
                     u64 cr4_gh_mask = __get_vvmcs(nvcpu->nv_vvmcx, CR4_GUEST_HOST_MASK);
 
-                    old_val = __vmread(CR4_READ_SHADOW);
+                    __vmread(CR4_READ_SHADOW, &old_val);
                     changed_bits = old_val ^ val;
                     if ( changed_bits & cr4_gh_mask )
                         nvcpu->nv_vmexit_pending = 1;
@@ -2315,7 +2328,8 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
             {
                 u64 cr0_gh_mask = __get_vvmcs(nvcpu->nv_vvmcx, CR0_GUEST_HOST_MASK);
 
-                old_val = __vmread(CR0_READ_SHADOW) & 0xf;
+                __vmread(CR0_READ_SHADOW, &old_val);
+                old_val &= 0xf;
                 val = (exit_qualification >> 16) & 0xf;
                 changed_bits = old_val ^ val;
                 if ( changed_bits & cr0_gh_mask )

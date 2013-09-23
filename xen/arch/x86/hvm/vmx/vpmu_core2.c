@@ -743,7 +743,7 @@ static int core2_vpmu_do_interrupt(struct cpu_user_regs *regs)
     else
     {
         /* No PMC overflow but perhaps a Trace Message interrupt. */
-        msr_content = __vmread(GUEST_IA32_DEBUGCTL);
+        __vmread(GUEST_IA32_DEBUGCTL, &msr_content);
         if ( !(msr_content & IA32_DEBUGCTLMSR_TR) )
             return 0;
     }
