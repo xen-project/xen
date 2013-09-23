@@ -1931,8 +1931,7 @@ int hvm_virtual_to_linear_addr(
     unsigned int addr_size,
     unsigned long *linear_addr)
 {
-    unsigned long addr = offset;
-    uint32_t last_byte;
+    unsigned long addr = offset, last_byte;
 
     if ( !(current->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE) )
     {
@@ -1941,6 +1940,9 @@ int hvm_virtual_to_linear_addr(
          * Certain of them are not done in native real mode anyway.
          */
         addr = (uint32_t)(addr + reg->base);
+        last_byte = (uint32_t)addr + bytes - 1;
+        if ( last_byte < addr )
+            return 0;
     }
     else if ( addr_size != 64 )
     {
@@ -1952,17 +1954,17 @@ int hvm_virtual_to_linear_addr(
         {
         case hvm_access_read:
             if ( (reg->attr.fields.type & 0xa) == 0x8 )
-                goto gpf; /* execute-only code segment */
+                return 0; /* execute-only code segment */
             break;
         case hvm_access_write:
             if ( (reg->attr.fields.type & 0xa) != 0x2 )
-                goto gpf; /* not a writable data segment */
+                return 0; /* not a writable data segment */
             break;
         default:
             break;
         }
 
-        last_byte = offset + bytes - 1;
+        last_byte = (uint32_t)offset + bytes - 1;
 
         /* Is this a grows-down data segment? Special limit check if so. */
         if ( (reg->attr.fields.type & 0xc) == 0x4 )
@@ -1973,10 +1975,10 @@ int hvm_virtual_to_linear_addr(
 
             /* Check first byte and last byte against respective bounds. */
             if ( (offset <= reg->limit) || (last_byte < offset) )
-                goto gpf;
+                return 0;
         }
         else if ( (last_byte > reg->limit) || (last_byte < offset) )
-            goto gpf; /* last byte is beyond limit or wraps 0xFFFFFFFF */
+            return 0; /* last byte is beyond limit or wraps 0xFFFFFFFF */
 
         /*
          * Hardware truncates to 32 bits in compatibility mode.
@@ -1993,15 +1995,14 @@ int hvm_virtual_to_linear_addr(
         if ( (seg == x86_seg_fs) || (seg == x86_seg_gs) )
             addr += reg->base;
 
-        if ( !is_canonical_address(addr) )
-            goto gpf;
+        last_byte = addr + bytes - 1;
+        if ( !is_canonical_address(addr) || last_byte < addr ||
+             !is_canonical_address(last_byte) )
+            return 0;
     }
 
     *linear_addr = addr;
     return 1;
-
- gpf:
-    return 0;
 }
 
 /* On non-NULL return, we leave this function holding an additional 
