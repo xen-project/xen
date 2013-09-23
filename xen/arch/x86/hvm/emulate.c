@@ -438,6 +438,7 @@ static int __hvmemul_read(
 {
     struct vcpu *curr = current;
     unsigned long addr, reps = 1;
+    unsigned int off, chunk = min(bytes, 1U << LONG_BYTEORDER);
     uint32_t pfec = PFEC_page_present;
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     paddr_t gpa;
@@ -447,16 +448,38 @@ static int __hvmemul_read(
         seg, offset, bytes, &reps, access_type, hvmemul_ctxt, &addr);
     if ( rc != X86EMUL_OKAY )
         return rc;
+    off = addr & (PAGE_SIZE - 1);
+    /*
+     * We only need to handle sizes actual instruction operands can have. All
+     * such sizes are either powers of 2 or the sum of two powers of 2. Thus
+     * picking as initial chunk size the largest power of 2 not greater than
+     * the total size will always result in only power-of-2 size requests
+     * issued to hvmemul_do_mmio() (hvmemul_do_io() rejects non-powers-of-2).
+     */
+    while ( chunk & (chunk - 1) )
+        chunk &= chunk - 1;
+    if ( off + bytes > PAGE_SIZE )
+        while ( off & (chunk - 1) )
+            chunk >>= 1;
 
     if ( unlikely(vio->mmio_gva == (addr & PAGE_MASK)) && vio->mmio_gva )
     {
-        unsigned int off = addr & (PAGE_SIZE - 1);
         if ( access_type == hvm_access_insn_fetch )
             return X86EMUL_UNHANDLEABLE;
         gpa = (((paddr_t)vio->mmio_gpfn << PAGE_SHIFT) | off);
-        if ( (off + bytes) <= PAGE_SIZE )
-            return hvmemul_do_mmio(gpa, &reps, bytes, 0,
-                                   IOREQ_READ, 0, p_data);
+        while ( (off + chunk) <= PAGE_SIZE )
+        {
+            rc = hvmemul_do_mmio(gpa, &reps, chunk, 0, IOREQ_READ, 0, p_data);
+            if ( rc != X86EMUL_OKAY || bytes == chunk )
+                return rc;
+            addr += chunk;
+            off += chunk;
+            gpa += chunk;
+            p_data += chunk;
+            bytes -= chunk;
+            if ( bytes < chunk )
+                chunk = bytes;
+        }
     }
 
     if ( (seg != x86_seg_none) &&
@@ -473,14 +496,32 @@ static int __hvmemul_read(
         return X86EMUL_EXCEPTION;
     case HVMCOPY_unhandleable:
         return X86EMUL_UNHANDLEABLE;
-    case  HVMCOPY_bad_gfn_to_mfn:
+    case HVMCOPY_bad_gfn_to_mfn:
         if ( access_type == hvm_access_insn_fetch )
             return X86EMUL_UNHANDLEABLE;
-        rc = hvmemul_linear_to_phys(
-            addr, &gpa, bytes, &reps, pfec, hvmemul_ctxt);
-        if ( rc != X86EMUL_OKAY )
-            return rc;
-        return hvmemul_do_mmio(gpa, &reps, bytes, 0, IOREQ_READ, 0, p_data);
+        rc = hvmemul_linear_to_phys(addr, &gpa, chunk, &reps, pfec,
+                                    hvmemul_ctxt);
+        while ( rc == X86EMUL_OKAY )
+        {
+            rc = hvmemul_do_mmio(gpa, &reps, chunk, 0, IOREQ_READ, 0, p_data);
+            if ( rc != X86EMUL_OKAY || bytes == chunk )
+                break;
+            addr += chunk;
+            off += chunk;
+            p_data += chunk;
+            bytes -= chunk;
+            if ( bytes < chunk )
+                chunk = bytes;
+            if ( off < PAGE_SIZE )
+                gpa += chunk;
+            else
+            {
+                rc = hvmemul_linear_to_phys(addr, &gpa, chunk, &reps, pfec,
+                                            hvmemul_ctxt);
+                off = 0;
+            }
+        }
+        return rc;
     case HVMCOPY_gfn_paged_out:
         return X86EMUL_RETRY;
     case HVMCOPY_gfn_shared:
@@ -537,6 +578,7 @@ static int hvmemul_write(
         container_of(ctxt, struct hvm_emulate_ctxt, ctxt);
     struct vcpu *curr = current;
     unsigned long addr, reps = 1;
+    unsigned int off, chunk = min(bytes, 1U << LONG_BYTEORDER);
     uint32_t pfec = PFEC_page_present | PFEC_write_access;
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     paddr_t gpa;
@@ -546,14 +588,30 @@ static int hvmemul_write(
         seg, offset, bytes, &reps, hvm_access_write, hvmemul_ctxt, &addr);
     if ( rc != X86EMUL_OKAY )
         return rc;
+    off = addr & (PAGE_SIZE - 1);
+    /* See the respective comment in __hvmemul_read(). */
+    while ( chunk & (chunk - 1) )
+        chunk &= chunk - 1;
+    if ( off + bytes > PAGE_SIZE )
+        while ( off & (chunk - 1) )
+            chunk >>= 1;
 
     if ( unlikely(vio->mmio_gva == (addr & PAGE_MASK)) && vio->mmio_gva )
     {
-        unsigned int off = addr & (PAGE_SIZE - 1);
         gpa = (((paddr_t)vio->mmio_gpfn << PAGE_SHIFT) | off);
-        if ( (off + bytes) <= PAGE_SIZE )
-            return hvmemul_do_mmio(gpa, &reps, bytes, 0,
-                                   IOREQ_WRITE, 0, p_data);
+        while ( (off + chunk) <= PAGE_SIZE )
+        {
+            rc = hvmemul_do_mmio(gpa, &reps, chunk, 0, IOREQ_WRITE, 0, p_data);
+            if ( rc != X86EMUL_OKAY || bytes == chunk )
+                return rc;
+            addr += chunk;
+            off += chunk;
+            gpa += chunk;
+            p_data += chunk;
+            bytes -= chunk;
+            if ( bytes < chunk )
+                chunk = bytes;
+        }
     }
 
     if ( (seg != x86_seg_none) &&
@@ -569,12 +627,29 @@ static int hvmemul_write(
     case HVMCOPY_unhandleable:
         return X86EMUL_UNHANDLEABLE;
     case HVMCOPY_bad_gfn_to_mfn:
-        rc = hvmemul_linear_to_phys(
-            addr, &gpa, bytes, &reps, pfec, hvmemul_ctxt);
-        if ( rc != X86EMUL_OKAY )
-            return rc;
-        return hvmemul_do_mmio(gpa, &reps, bytes, 0,
-                               IOREQ_WRITE, 0, p_data);
+        rc = hvmemul_linear_to_phys(addr, &gpa, chunk, &reps, pfec,
+                                    hvmemul_ctxt);
+        while ( rc == X86EMUL_OKAY )
+        {
+            rc = hvmemul_do_mmio(gpa, &reps, chunk, 0, IOREQ_WRITE, 0, p_data);
+            if ( rc != X86EMUL_OKAY || bytes == chunk )
+                break;
+            addr += chunk;
+            off += chunk;
+            p_data += chunk;
+            bytes -= chunk;
+            if ( bytes < chunk )
+                chunk = bytes;
+            if ( off < PAGE_SIZE )
+                gpa += chunk;
+            else
+            {
+                rc = hvmemul_linear_to_phys(addr, &gpa, chunk, &reps, pfec,
+                                            hvmemul_ctxt);
+                off = 0;
+            }
+        }
+        return rc;
     case HVMCOPY_gfn_paged_out:
         return X86EMUL_RETRY;
     case HVMCOPY_gfn_shared:
