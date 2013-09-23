@@ -291,7 +291,7 @@ if __name__ == "__main__":
     try:
         run = t.runCmd(sys.argv[2])
     except ConsoleError, e:
-        print "Console failed (%)" % str(e)
+        print "Console failed (%s)" % str(e)
         sys.exit(255)
         
     t._XmConsole__closeConsole()
