@@ -66,7 +66,7 @@ MODULE_LICENSE("GPL");
 static char *dev_unplug;
 module_param(dev_unplug, charp, 0644);
 MODULE_PARM_DESC(dev_unplug, "Emulated devices to unplug: "
-		 "[all,][ide-disks,][aux-ide-disks,][nics]\n");
+		 "[all,][ide-disks,][aux-ide-disks,][nics,][never] (default is 'all')\n");
 
 struct pci_dev *xen_platform_pdev;
 
@@ -290,6 +290,10 @@ static int check_platform_magic(struct device *dev, long ioaddr, long iolen)
 	short magic, unplug = 0;
 	char protocol, *p, *q, *err;
 
+	/* Unconditionally unplug everything */
+	if (!dev_unplug)
+		unplug = UNPLUG_ALL;
+
 	for (p = dev_unplug; p; p = q) {
 		q = strchr(dev_unplug, ',');
 		if (q)
@@ -302,6 +306,8 @@ static int check_platform_magic(struct device *dev, long ioaddr, long iolen)
 			unplug |= UNPLUG_AUX_IDE_DISKS;
 		else if (!strcmp(p, "nics"))
 			unplug |= UNPLUG_ALL_NICS;
+		else if (!strcmp(p, "never"))
+			unplug = 0;
 		else
 			dev_warn(dev, "unrecognised option '%s' "
 				 "in module parameter 'dev_unplug'\n", p);
