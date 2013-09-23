@@ -251,7 +251,7 @@ static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
     l3_pgentry_64_t *l3tab;
     l2_pgentry_64_t *l2tab = NULL;
     l1_pgentry_64_t *l1tab = NULL;
-    unsigned long l3off, l2off, l1off;
+    unsigned long l3off, l2off = 0, l1off;
     xen_vaddr_t addr;
     xen_pfn_t pgpfn;
     xen_pfn_t l3mfn = xc_dom_p2m_guest(dom, l3pfn);
@@ -299,8 +299,6 @@ static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
             l2off = l2_table_offset_pae(addr);
             l2tab[l2off] =
                 pfn_to_paddr(xc_dom_p2m_guest(dom, l1pfn)) | L2_PROT;
-            if ( l2off == (L2_PAGETABLE_ENTRIES_PAE - 1) )
-                l2tab = NULL;
             l1pfn++;
         }
 
@@ -312,8 +310,13 @@ static int setup_pgtables_x86_32_pae(struct xc_dom_image *dom)
         if ( (addr >= dom->pgtables_seg.vstart) &&
              (addr < dom->pgtables_seg.vend) )
             l1tab[l1off] &= ~_PAGE_RW; /* page tables are r/o */
+
         if ( l1off == (L1_PAGETABLE_ENTRIES_PAE - 1) )
+        {
             l1tab = NULL;
+            if ( l2off == (L2_PAGETABLE_ENTRIES_PAE - 1) )
+                l2tab = NULL;
+        }
     }
 
     if ( dom->virt_pgtab_end <= 0xc0000000 )
@@ -360,7 +363,7 @@ static int setup_pgtables_x86_64(struct xc_dom_image *dom)
     l3_pgentry_64_t *l3tab = NULL;
     l2_pgentry_64_t *l2tab = NULL;
     l1_pgentry_64_t *l1tab = NULL;
-    uint64_t l4off, l3off, l2off, l1off;
+    uint64_t l4off, l3off = 0, l2off = 0, l1off;
     uint64_t addr;
     xen_pfn_t pgpfn;
 
@@ -391,8 +394,6 @@ static int setup_pgtables_x86_64(struct xc_dom_image *dom)
             l3off = l3_table_offset_x86_64(addr);
             l3tab[l3off] =
                 pfn_to_paddr(xc_dom_p2m_guest(dom, l2pfn)) | L3_PROT;
-            if ( l3off == (L3_PAGETABLE_ENTRIES_X86_64 - 1) )
-                l3tab = NULL;
             l2pfn++;
         }
 
@@ -405,8 +406,6 @@ static int setup_pgtables_x86_64(struct xc_dom_image *dom)
             l2off = l2_table_offset_x86_64(addr);
             l2tab[l2off] =
                 pfn_to_paddr(xc_dom_p2m_guest(dom, l1pfn)) | L2_PROT;
-            if ( l2off == (L2_PAGETABLE_ENTRIES_X86_64 - 1) )
-                l2tab = NULL;
             l1pfn++;
         }
 
@@ -418,8 +417,17 @@ static int setup_pgtables_x86_64(struct xc_dom_image *dom)
         if ( (addr >= dom->pgtables_seg.vstart) && 
              (addr < dom->pgtables_seg.vend) )
             l1tab[l1off] &= ~_PAGE_RW; /* page tables are r/o */
+
         if ( l1off == (L1_PAGETABLE_ENTRIES_X86_64 - 1) )
+        {
             l1tab = NULL;
+            if ( l2off == (L2_PAGETABLE_ENTRIES_X86_64 - 1) )
+            {
+                l2tab = NULL;
+                if ( l3off == (L3_PAGETABLE_ENTRIES_X86_64 - 1) )
+                    l3tab = NULL;
+            }
+        }
     }
     return 0;
 
