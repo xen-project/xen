@@ -894,7 +894,10 @@ static int construct_vmcs(struct vcpu *v)
         unsigned long *msr_bitmap = alloc_xenheap_page();
 
         if ( msr_bitmap == NULL )
+        {
+            vmx_vmcs_exit(v);
             return -ENOMEM;
+        }
 
         memset(msr_bitmap, ~0, PAGE_SIZE);
         v->arch.hvm_vmx.msr_bitmap = msr_bitmap;
