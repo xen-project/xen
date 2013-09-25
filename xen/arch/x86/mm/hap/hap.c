@@ -289,7 +289,6 @@ static void hap_free_p2m_page(struct domain *d, struct page_info *pg)
     d->arch.paging.hap.p2m_pages--;
     d->arch.paging.hap.total_pages++;
     hap_free(d, page_to_mfn(pg));
-    ASSERT(d->arch.paging.hap.p2m_pages >= 0);
 
     paging_unlock(d);
 }
