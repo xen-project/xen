@@ -103,9 +103,9 @@ void setup_fpu(struct vcpu *v)
     {
         /*
          * XCR0 normally represents what guest OS set. In case of Xen itself, 
-         * we set all supported feature mask before doing save/restore.
+         * we set all supported feature mask before restoring.
          */
-        set_xcr0(v->arch.xcr0_accum);
+        set_xcr0(xfeature_mask);
         xrstor(v);
         set_xcr0(v->arch.xcr0);
     }
@@ -149,7 +149,7 @@ void save_init_fpu(struct vcpu *v)
     if ( xsave_enabled(v) )
     {
         /* XCR0 normally represents what guest OS set. In case of Xen itself,
-         * we set all accumulated feature mask before doing save/restore.
+         * we set all accumulated feature mask before saving.
          */
         set_xcr0(v->arch.xcr0_accum);
         if ( cpu_has_xsaveopt )
