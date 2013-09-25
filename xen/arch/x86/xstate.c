@@ -346,6 +346,7 @@ int validate_xstate(u64 xcr0, u64 xcr0_accum, u64 xstate_bv, u64 xfeat_mask)
 int handle_xsetbv(u32 index, u64 new_bv)
 {
     struct vcpu *curr = current;
+    u64 mask;
 
     if ( index != XCR_XFEATURE_ENABLED_MASK )
         return -EOPNOTSUPP;
@@ -359,8 +360,22 @@ int handle_xsetbv(u32 index, u64 new_bv)
     if ( !set_xcr0(new_bv) )
         return -EFAULT;
 
+    mask = new_bv & ~curr->arch.xcr0_accum;
     curr->arch.xcr0 = new_bv;
     curr->arch.xcr0_accum |= new_bv;
+
+    mask &= curr->fpu_dirtied ? ~XSTATE_FP_SSE : XSTATE_NONLAZY;
+    if ( mask )
+    {
+        unsigned long cr0 = read_cr0();
+
+        clts();
+        if ( curr->fpu_dirtied )
+            asm ( "stmxcsr %0" : "=m" (curr->arch.xsave_area->fpu_sse.mxcsr) );
+        xrstor(curr, mask);
+        if ( cr0 & X86_CR0_TS )
+            write_cr0(cr0);
+    }
 
     return 0;
 }
