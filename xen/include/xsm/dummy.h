@@ -570,8 +570,6 @@ static XSM_INLINE int xsm_mmu_update(XSM_DEFAULT_ARG struct domain *d, struct do
     int rc;
     XSM_ASSERT_ACTION(XSM_TARGET);
     rc = xsm_default_action(action, d, f);
-    if ( t == dom_io )
-        return rc;
     if ( t && !rc )
         rc = xsm_default_action(action, d, t);
     return rc;
