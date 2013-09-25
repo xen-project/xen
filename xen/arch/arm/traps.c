@@ -612,6 +612,12 @@ static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
     void *mapped;
     unsigned long *stack, addr;
 
+    if ( test_bit(_VPF_down, &v->pause_flags) )
+    {
+        printk("No stack trace, VCPU offline\n");
+        return;
+    }
+
     switch ( regs->cpsr & PSR_MODE_MASK )
     {
     case PSR_MODE_USR:
