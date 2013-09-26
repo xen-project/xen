@@ -14,17 +14,11 @@ DEFINE_XEN_GUEST_HANDLE(compat_platform_op_t);
 #define efi_get_info        efi_compat_get_info
 #define efi_runtime_call(x) efi_compat_runtime_call(x)
 
-#define xen_processor_px    compat_processor_px
-#define xen_processor_px_t  compat_processor_px_t
-#define xen_processor_performance    compat_processor_performance
-#define xen_processor_performance_t  compat_processor_performance_t
-#define xenpf_set_processor_pminfo   compat_pf_set_processor_pminfo
+#define xen_processor_performance compat_processor_performance
+#define set_px_pminfo       compat_set_px_pminfo
 
-#define set_px_pminfo		compat_set_px_pminfo
-
-#define xen_processor_power     compat_processor_power
-#define xen_processor_power_t   compat_processor_power_t
-#define set_cx_pminfo           compat_set_cx_pminfo
+#define xen_processor_power compat_processor_power
+#define set_cx_pminfo       compat_set_cx_pminfo
 
 #define xen_pf_pcpuinfo xenpf_pcpuinfo
 CHECK_pf_pcpuinfo;
@@ -34,7 +28,9 @@ CHECK_pf_pcpuinfo;
 CHECK_pf_pcpu_version;
 #undef xen_pf_pcpu_version
 
-#define xenpf_enter_acpi_sleep compat_pf_enter_acpi_sleep
+#define xen_pf_enter_acpi_sleep xenpf_enter_acpi_sleep
+CHECK_pf_enter_acpi_sleep;
+#undef xen_pf_enter_acpi_sleep
 
 #define COMPAT
 #define _XEN_GUEST_HANDLE(t) XEN_GUEST_HANDLE(t)

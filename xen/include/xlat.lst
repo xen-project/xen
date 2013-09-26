@@ -83,6 +83,7 @@
 !	processor_power			platform.h
 ?	processor_px			platform.h
 !	psd_package			platform.h
+?	xenpf_enter_acpi_sleep		platform.h
 ?	xenpf_pcpuinfo			platform.h
 ?	xenpf_pcpu_version		platform.h
 !	sched_poll			sched.h
