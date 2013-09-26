@@ -184,10 +184,14 @@ static hw_irq_controller gic_guest_irq_type = {
 
 /* needs to be called with gic.lock held */
 static void gic_set_irq_properties(unsigned int irq, bool_t level,
-        unsigned int cpu_mask, unsigned int priority)
+                                   const cpumask_t *cpu_mask,
+                                   unsigned int priority)
 {
     volatile unsigned char *bytereg;
     uint32_t cfg, edgebit;
+    unsigned int mask = cpumask_bits(cpu_mask)[0];
+
+    ASSERT(!(mask & ~0xff)); /* Target bitmap only support 8 CPUS */
 
     /* Set edge / level */
     cfg = GICD[GICD_ICFGR + irq / 16];
@@ -200,7 +204,7 @@ static void gic_set_irq_properties(unsigned int irq, bool_t level,
 
     /* Set target CPU mask (RAZ/WI on uniprocessor) */
     bytereg = (unsigned char *) (GICD + GICD_ITARGETSR);
-    bytereg[irq] = cpu_mask;
+    bytereg[irq] = mask;
 
     /* Set priority */
     bytereg = (unsigned char *) (GICD + GICD_IPRIORITYR);
@@ -210,12 +214,11 @@ static void gic_set_irq_properties(unsigned int irq, bool_t level,
 
 /* Program the GIC to route an interrupt */
 static int gic_route_irq(unsigned int irq, bool_t level,
-                         unsigned int cpu_mask, unsigned int priority)
+                         const cpumask_t *cpu_mask, unsigned int priority)
 {
     struct irq_desc *desc = irq_to_desc(irq);
     unsigned long flags;
 
-    ASSERT(!(cpu_mask & ~0xff));  /* Targets bitmap only supports 8 CPUs */
     ASSERT(priority <= 0xff);     /* Only 8 bits of priority */
     ASSERT(irq < gic.lines);      /* Can't route interrupts that don't exist */
 
@@ -242,7 +245,7 @@ static int gic_route_irq(unsigned int irq, bool_t level,
 }
 
 /* Program the GIC to route an interrupt with a dt_irq */
-void gic_route_dt_irq(const struct dt_irq *irq, unsigned int cpu_mask,
+void gic_route_dt_irq(const struct dt_irq *irq, const cpumask_t *cpu_mask,
                       unsigned int priority)
 {
     bool_t level;
@@ -496,7 +499,7 @@ void gic_disable_cpu(void)
 void gic_route_ppis(void)
 {
     /* GIC maintenance */
-    gic_route_dt_irq(&gic.maintenance, 1u << smp_processor_id(), 0xa0);
+    gic_route_dt_irq(&gic.maintenance, cpumask_of(smp_processor_id()), 0xa0);
     /* Route timer interrupt */
     route_timer_interrupt();
 }
@@ -511,7 +514,7 @@ void gic_route_spis(void)
         if ( (irq = serial_dt_irq(seridx)) == NULL )
             continue;
 
-        gic_route_dt_irq(irq, 1u << smp_processor_id(), 0xa0);
+        gic_route_dt_irq(irq, cpumask_of(smp_processor_id()), 0xa0);
     }
 }
 
@@ -718,7 +721,8 @@ int gic_route_irq_to_guest(struct domain *d, const struct dt_irq *irq,
 
     level = dt_irq_is_level_triggered(irq);
 
-    gic_set_irq_properties(irq->irq, level, 1u << smp_processor_id(), 0xa0);
+    gic_set_irq_properties(irq->irq, level, cpumask_of(smp_processor_id()),
+                           0xa0);
 
     retval = __setup_irq(desc, irq->irq, action);
     if (retval) {

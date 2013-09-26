@@ -148,7 +148,8 @@ extern void vgic_clear_pending_irqs(struct vcpu *v);
 extern struct pending_irq *irq_to_pending(struct vcpu *v, unsigned int irq);
 
 /* Program the GIC to route an interrupt with a dt_irq */
-extern void gic_route_dt_irq(const struct dt_irq *irq, unsigned int cpu_mask,
+extern void gic_route_dt_irq(const struct dt_irq *irq,
+                             const cpumask_t *cpu_mask,
                              unsigned int priority);
 extern void gic_route_ppis(void);
 extern void gic_route_spis(void);

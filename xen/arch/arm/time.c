@@ -222,11 +222,11 @@ static void vtimer_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 void __cpuinit route_timer_interrupt(void)
 {
     gic_route_dt_irq(&timer_irq[TIMER_PHYS_NONSECURE_PPI],
-                     1u << smp_processor_id(), 0xa0);
+                     cpumask_of(smp_processor_id()), 0xa0);
     gic_route_dt_irq(&timer_irq[TIMER_HYP_PPI],
-                     1u << smp_processor_id(), 0xa0);
+                     cpumask_of(smp_processor_id()), 0xa0);
     gic_route_dt_irq(&timer_irq[TIMER_VIRT_PPI],
-                     1u << smp_processor_id(), 0xa0);
+                     cpumask_of(smp_processor_id()), 0xa0);
 }
 
 /* Set up the timer interrupt on this CPU */
