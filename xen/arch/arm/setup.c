@@ -407,8 +407,10 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     domheap_pages = heap_pages - xenheap_pages;
 
-    early_printk("Xen heap: %lu pages  Dom heap: %lu pages\n",
-                 xenheap_pages, domheap_pages);
+    early_printk("Xen heap: %"PRIpaddr"-%"PRIpaddr" (%lu pages)\n",
+                 e - (xenheap_pages << PAGE_SHIFT), e,
+                 xenheap_pages);
+    early_printk("Dom heap: %lu pages\n", domheap_pages);
 
     setup_xenheap_mappings((e >> PAGE_SHIFT) - xenheap_pages, xenheap_pages);
 
