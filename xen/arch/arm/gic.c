@@ -477,7 +477,7 @@ void send_SGI_mask(const cpumask_t *cpumask, enum gic_sgi sgi)
 
 void send_SGI_one(unsigned int cpu, enum gic_sgi sgi)
 {
-    ASSERT(cpu < 7);  /* Targets bitmap only supports 8 CPUs */
+    ASSERT(cpu < NR_GIC_CPU_IF);  /* Targets bitmap only supports 8 CPUs */
     send_SGI_mask(cpumask_of(cpu), sgi);
 }
 
