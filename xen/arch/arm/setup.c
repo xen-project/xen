@@ -240,16 +240,24 @@ static paddr_t __init get_xen_paddr(void)
 {
     struct dt_mem_info *mi = &early_info.mem;
     paddr_t min_size;
-    paddr_t paddr = 0;
+    paddr_t paddr = 0, last_end;
     int i;
 
     min_size = (_end - _start + (XEN_PADDR_ALIGN-1)) & ~(XEN_PADDR_ALIGN-1);
+
+    last_end = mi->bank[0].start;
 
     /* Find the highest bank with enough space. */
     for ( i = 0; i < mi->nr_banks; i++ )
     {
         const struct membank *bank = &mi->bank[i];
         paddr_t s, e;
+
+        /* We can only deal with contiguous memory at the moment */
+        if ( last_end != bank->start )
+            break;
+
+        last_end = bank->start + bank->size;
 
         if ( bank->size >= min_size )
         {
