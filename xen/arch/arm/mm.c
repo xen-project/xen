@@ -128,7 +128,7 @@ static inline void check_memory_layout_alignment_constraints(void) {
     /* 2MB aligned regions */
     BUILD_BUG_ON(XEN_VIRT_START & ~SECOND_MASK);
     BUILD_BUG_ON(FIXMAP_ADDR(0) & ~SECOND_MASK);
-    BUILD_BUG_ON(BOOT_MISC_VIRT_START & ~SECOND_MASK);
+    BUILD_BUG_ON(BOOT_RELOC_VIRT_START & ~SECOND_MASK);
     /* 1GB aligned regions */
     BUILD_BUG_ON(XENHEAP_VIRT_START & ~FIRST_MASK);
 #ifdef CONFIG_DOMAIN_PAGE
@@ -377,7 +377,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     int i;
 
     /* Map the destination in the boot misc area. */
-    dest_va = BOOT_MISC_VIRT_START;
+    dest_va = BOOT_RELOC_VIRT_START;
     pte = mfn_to_xen_entry(xen_paddr >> PAGE_SHIFT);
     write_pte(xen_second + second_table_offset(dest_va), pte);
     flush_xen_data_tlb_range_va(dest_va, SECOND_SIZE);
