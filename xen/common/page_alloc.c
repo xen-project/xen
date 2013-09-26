@@ -257,11 +257,11 @@ unsigned long __init alloc_boot_pages(
  */
 
 #define MEMZONE_XEN 0
-#define NR_ZONES    (PADDR_BITS - PAGE_SHIFT)
+#define NR_ZONES    (PADDR_BITS - PAGE_SHIFT + 1)
 
-#define bits_to_zone(b) (((b) < (PAGE_SHIFT + 1)) ? 0 : ((b) - PAGE_SHIFT - 1))
+#define bits_to_zone(b) (((b) < (PAGE_SHIFT + 1)) ? 1 : ((b) - PAGE_SHIFT))
 #define page_to_zone(pg) (is_xen_heap_page(pg) ? MEMZONE_XEN :  \
-                          (fls(page_to_mfn(pg)) - 1))
+                          (fls(page_to_mfn(pg)) ? : 1))
 
 typedef struct page_list_head heap_by_zone_and_order_t[NR_ZONES][MAX_ORDER+1];
 static heap_by_zone_and_order_t *_heap[MAX_NUMNODES];
