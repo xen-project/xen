@@ -390,6 +390,12 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
             e = n = ram_end;
         }
 
+        /* Module in RAM which we cannot see here, due to not handling
+         * non-contiguous memory regions yet
+         */
+        if ( e > ram_end )
+            e = ram_end;
+
         /* Avoid the xenheap */
         if ( s < ((xenheap_mfn_start+xenheap_pages) << PAGE_SHIFT)
              && (xenheap_mfn_start << PAGE_SHIFT) < e )
