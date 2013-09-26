@@ -39,6 +39,9 @@ EXPORT_SYMBOL(cpu_possible_map);
 
 struct cpuinfo_arm cpu_data[NR_CPUS];
 
+/* CPU logical map: map xen cpuid to an MPIDR */
+u32 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = MPIDR_INVALID };
+
 /* Fake one node for now. See also include/asm-arm/numa.h */
 nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
 
@@ -85,6 +88,7 @@ smp_clear_cpu_maps (void)
     cpumask_clear(&cpu_online_map);
     cpumask_set_cpu(0, &cpu_online_map);
     cpumask_set_cpu(0, &cpu_possible_map);
+    cpu_logical_map(0) = READ_SYSREG(MPIDR_EL1) & MPIDR_HWID_MASK;
 }
 
 int __init

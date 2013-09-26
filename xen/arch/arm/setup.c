@@ -498,6 +498,114 @@ void __init setup_cache(void)
     cacheline_bytes = 1U << (4 + (ccsid & 0x7));
 }
 
+/* Parse the device tree and build the logical map array containing
+ * MPIDR values related to logical cpus
+ * Code base on Linux arch/arm/kernel/devtree.c
+ */
+static void __init init_cpus_maps(void)
+{
+    register_t mpidr;
+    struct dt_device_node *cpus = dt_find_node_by_path("/cpus");
+    struct dt_device_node *cpu;
+    unsigned int i, j;
+    unsigned int cpuidx = 1;
+    static u32 tmp_map[NR_CPUS] __initdata =
+    {
+        [0 ... NR_CPUS - 1] = MPIDR_INVALID
+    };
+    bool_t bootcpu_valid = 0;
+
+    mpidr = boot_cpu_data.mpidr.bits & MPIDR_HWID_MASK;
+
+    if ( !cpus )
+    {
+        printk(XENLOG_WARNING "WARNING: Can't find /cpus in the device tree.\n"
+               "Using only 1 CPU\n");
+        return;
+    }
+
+    dt_for_each_child_node( cpus, cpu )
+    {
+        u32 hwid;
+
+        if ( !dt_device_type_is_equal(cpu, "cpu") )
+            continue;
+
+        if ( !dt_property_read_u32(cpu, "reg", &hwid) )
+        {
+            printk(XENLOG_WARNING "cpu node `%s`: missing reg property\n",
+                   dt_node_full_name(cpu));
+            continue;
+        }
+
+        /*
+         * 8 MSBs must be set to 0 in the DT since the reg property
+         * defines the MPIDR[23:0]
+         */
+        if ( hwid & ~MPIDR_HWID_MASK )
+        {
+            printk(XENLOG_WARNING "cpu node `%s`: invalid hwid value (0x%x)\n",
+                   dt_node_full_name(cpu), hwid);
+            continue;
+        }
+
+        /*
+         * Duplicate MPIDRs are a recipe for disaster. Scan all initialized
+         * entries and check for duplicates. If any found just skip the node.
+         * temp values values are initialized to MPIDR_INVALID to avoid
+         * matching valid MPIDR[23:0] values.
+         */
+        for ( j = 0; j < cpuidx; j++ )
+        {
+            if ( tmp_map[j] == hwid )
+            {
+                printk(XENLOG_WARNING "cpu node `%s`: duplicate /cpu reg properties in the DT\n",
+                       dt_node_full_name(cpu));
+                continue;
+            }
+        }
+
+        /*
+         * Build a stashed array of MPIDR values. Numbering scheme requires
+         * that if detected the boot CPU must be assigned logical id 0. Other
+         * CPUs get sequential indexes starting from 1. If a CPU node
+         * with a reg property matching the boot CPU MPIDR is detected,
+         * this is recorded and so that the logical map build from DT is
+         * validated and can be used to set the map.
+         */
+        if ( hwid == mpidr )
+        {
+            i = 0;
+            bootcpu_valid = 1;
+        }
+        else
+            i = cpuidx++;
+
+        if ( cpuidx > NR_CPUS )
+        {
+            printk(XENLOG_WARNING "DT /cpu %u node greater than max cores %u, capping them\n",
+                   cpuidx, NR_CPUS);
+            cpuidx = NR_CPUS;
+            break;
+        }
+
+        tmp_map[i] = hwid;
+    }
+
+    if ( !bootcpu_valid )
+    {
+        printk(XENLOG_WARNING "DT missing boot CPU MPIDR[23:0]\n"
+               "Using only 1 CPU\n");
+        return;
+    }
+
+    for ( i = 0; i < cpuidx; i++ )
+    {
+        cpumask_set_cpu(i, &cpu_possible_map);
+        cpu_logical_map(i) = tmp_map[i];
+    }
+}
+
 /* C entry point for boot CPU */
 void __init start_xen(unsigned long boot_phys_offset,
                       unsigned long fdt_paddr,
@@ -517,7 +625,6 @@ void __init start_xen(unsigned long boot_phys_offset,
         + (fdt_paddr & ((1 << SECOND_SHIFT) - 1));
     fdt_size = device_tree_early_init(device_tree_flattened);
 
-    cpus = smp_get_max_cpus();
     cmdline_parse(device_tree_bootargs(device_tree_flattened));
 
     setup_pagetables(boot_phys_offset, get_xen_paddr());
@@ -533,6 +640,9 @@ void __init start_xen(unsigned long boot_phys_offset,
     system_state = SYS_STATE_boot;
 
     processor_id();
+
+    init_cpus_maps();
+    cpus = smp_get_max_cpus();
 
     platform_init();
 

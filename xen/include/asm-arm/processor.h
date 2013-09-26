@@ -13,6 +13,7 @@
 #define MPIDR_AFF0_SHIFT    (0)
 #define MPIDR_AFF0_MASK     (0xff << MPIDR_AFF0_SHIFT)
 #define MPIDR_HWID_MASK     0xffffff
+#define MPIDR_INVALID       (~MPIDR_HWID_MASK)
 
 /* TTBCR Translation Table Base Control Register */
 #define TTBCR_EAE    0x80000000
@@ -229,6 +230,9 @@ extern void identify_cpu(struct cpuinfo_arm *);
 
 extern struct cpuinfo_arm cpu_data[];
 #define current_cpu_data cpu_data[smp_processor_id()]
+
+extern u32 __cpu_logical_map[];
+#define cpu_logical_map(cpu) __cpu_logical_map[cpu]
 
 union hsr {
     uint32_t bits;

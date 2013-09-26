@@ -118,18 +118,6 @@ static bool_t __init device_tree_node_matches(const void *fdt, int node,
         && (name[match_len] == '@' || name[match_len] == '\0');
 }
 
-static bool_t __init device_tree_type_matches(const void *fdt, int node,
-                                       const char *match)
-{
-    const void *prop;
-
-    prop = fdt_getprop(fdt, node, "device_type", NULL);
-    if ( prop == NULL )
-        return 0;
-
-    return !dt_node_cmp(prop, match);
-}
-
 static bool_t __init device_tree_node_compatible(const void *fdt, int node,
                                                  const char *match)
 {
@@ -348,40 +336,6 @@ static void __init process_memory_node(const void *fdt, int node,
     }
 }
 
-static void __init process_cpu_node(const void *fdt, int node,
-                                    const char *name,
-                                    u32 address_cells, u32 size_cells)
-{
-    const struct fdt_property *prop;
-    u32 cpuid;
-    int len;
-
-    prop = fdt_get_property(fdt, node, "reg", &len);
-    if ( !prop )
-    {
-        early_printk("fdt: node `%s': missing `reg' property\n", name);
-        return;
-    }
-
-    if ( len < sizeof (cpuid) )
-    {
-        dt_printk("fdt: node `%s': `reg` property length is too short\n",
-                  name);
-        return;
-    }
-
-    cpuid = dt_read_number((const __be32 *)prop->data, 1);
-
-    /* TODO: handle non-contiguous CPU ID */
-    if ( cpuid >= NR_CPUS )
-    {
-        dt_printk("fdt: node `%s': reg(0x%x) >= NR_CPUS(%d)\n",
-                  name, cpuid, NR_CPUS);
-        return;
-    }
-    cpumask_set_cpu(cpuid, &cpu_possible_map);
-}
-
 static void __init process_multiboot_node(const void *fdt, int node,
                                           const char *name,
                                           u32 address_cells, u32 size_cells)
@@ -435,8 +389,6 @@ static int __init early_scan_node(const void *fdt,
 {
     if ( device_tree_node_matches(fdt, node, "memory") )
         process_memory_node(fdt, node, name, address_cells, size_cells);
-    else if ( device_tree_type_matches(fdt, node, "cpu") )
-        process_cpu_node(fdt, node, name, address_cells, size_cells);
     else if ( device_tree_node_compatible(fdt, node, "xen,multiboot-module" ) )
         process_multiboot_node(fdt, node, name, address_cells, size_cells);
 
