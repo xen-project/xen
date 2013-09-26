@@ -57,6 +57,31 @@ static DEFINE_PER_CPU(uint64_t, lr_mask);
 
 static unsigned nr_lrs;
 
+/* The GIC mapping of CPU interfaces does not necessarily match the
+ * logical CPU numbering. Let's use mapping as returned by the GIC
+ * itself
+ */
+static DEFINE_PER_CPU(u8, gic_cpu_id);
+
+/* Maximum cpu interface per GIC */
+#define NR_GIC_CPU_IF 8
+
+static unsigned int gic_cpu_mask(const cpumask_t *cpumask)
+{
+    unsigned int cpu;
+    unsigned int mask = 0;
+    cpumask_t possible_mask;
+
+    cpumask_and(&possible_mask, cpumask, &cpu_possible_map);
+    for_each_cpu(cpu, &possible_mask)
+    {
+        ASSERT(cpu < NR_GIC_CPU_IF);
+        mask |= per_cpu(gic_cpu_id, cpu);
+    }
+
+    return mask;
+}
+
 unsigned int gic_number_lines(void)
 {
     return gic.lines;
@@ -182,16 +207,18 @@ static hw_irq_controller gic_guest_irq_type = {
     .set_affinity = gic_irq_set_affinity,
 };
 
-/* needs to be called with gic.lock held */
+/*
+ * - needs to be called with gic.lock held
+ * - needs to be called with a valid cpu_mask, ie each cpu in the mask has
+ * already called gic_cpu_init
+ */
 static void gic_set_irq_properties(unsigned int irq, bool_t level,
                                    const cpumask_t *cpu_mask,
                                    unsigned int priority)
 {
     volatile unsigned char *bytereg;
     uint32_t cfg, edgebit;
-    unsigned int mask = cpumask_bits(cpu_mask)[0];
-
-    ASSERT(!(mask & ~0xff)); /* Target bitmap only support 8 CPUS */
+    unsigned int mask = gic_cpu_mask(cpu_mask);
 
     /* Set edge / level */
     cfg = GICD[GICD_ICFGR + irq / 16];
@@ -299,6 +326,8 @@ static void __init gic_dist_init(void)
 static void __cpuinit gic_cpu_init(void)
 {
     int i;
+
+    this_cpu(gic_cpu_id) = GICD[GICD_ITARGETSR] & 0xff;
 
     /* The first 32 interrupts (PPI and SGI) are banked per-cpu, so
      * even though they are controlled with GICD registers, they must
@@ -431,13 +460,13 @@ void __init gic_init(void)
 
 void send_SGI_mask(const cpumask_t *cpumask, enum gic_sgi sgi)
 {
-    unsigned long mask = cpumask_bits(cpumask)[0];
+    unsigned int mask = 0;
+    cpumask_t online_mask;
 
     ASSERT(sgi < 16); /* There are only 16 SGIs */
 
-    mask &= cpumask_bits(&cpu_online_map)[0];
-
-    ASSERT(mask < 0x100); /* The target bitmap only supports 8 CPUs */
+    cpumask_and(&online_mask, cpumask, &cpu_online_map);
+    mask = gic_cpu_mask(&online_mask);
 
     dsb();
 
