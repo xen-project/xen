@@ -136,6 +136,9 @@
 
 #define DOMHEAP_ENTRIES        1024  /* 1024 2MB mapping slots */
 
+/* Number of domheap pagetable pages required at the second level (2MB mappings) */
+#define DOMHEAP_SECOND_PAGES ((DOMHEAP_VIRT_END - DOMHEAP_VIRT_START + 1) >> FIRST_SHIFT)
+
 #else /* ARM_64 */
 
 #define SLOT0_ENTRY_BITS  39
@@ -158,9 +161,6 @@
 #define HYPERVISOR_VIRT_END    DIRECTMAP_VIRT_END
 
 #endif
-
-/* Number of domheap pagetable pages required at the second level (2MB mappings) */
-#define DOMHEAP_SECOND_PAGES ((DOMHEAP_VIRT_END - DOMHEAP_VIRT_START + 1) >> FIRST_SHIFT)
 
 /* Fixmap slots */
 #define FIXMAP_CONSOLE  0  /* The primary UART */
