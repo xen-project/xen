@@ -147,6 +147,8 @@ extern unsigned long total_pages;
 
 /* Boot-time pagetable setup */
 extern void setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr);
+/* Remove early mappings */
+extern void remove_early_mappings(void);
 /* Allocate and initialise pagetables for a secondary CPU */
 extern int __cpuinit init_secondary_pagetables(int cpu);
 /* Switch secondary CPUS to its own pagetables and finalise MMU setup */

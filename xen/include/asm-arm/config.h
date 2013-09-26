@@ -80,10 +80,10 @@
  *   0  -   2M   Unmapped
  *   2M -   4M   Xen text, data, bss
  *   4M -   6M   Fixmap: special-purpose 4K mapping slots
- *   6M -   8M   Early boot misc (see below)
+ *   6M -   8M   Early boot mapping of FDT
+ *   8M -  10M   Early boot misc (see below)
  *
  * The early boot misc area is used:
- *   - in head.S for the DTB for device_tree_early_init().
  *   - in setup_pagetables() when relocating Xen.
  *
  * ARM32 layout:
@@ -116,7 +116,8 @@
 
 #define XEN_VIRT_START         _AT(vaddr_t,0x00200000)
 #define FIXMAP_ADDR(n)        (_AT(vaddr_t,0x00400000) + (n) * PAGE_SIZE)
-#define BOOT_MISC_VIRT_START   _AT(vaddr_t,0x00600000)
+#define BOOT_FDT_VIRT_START    _AT(vaddr_t,0x00600000)
+#define BOOT_MISC_VIRT_START   _AT(vaddr_t,0x00800000)
 
 #define HYPERVISOR_VIRT_START  XEN_VIRT_START
 

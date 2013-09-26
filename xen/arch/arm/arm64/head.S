@@ -263,7 +263,7 @@ skip_bss:
         mov   x3, #PT_MEM            /* x2 := 2MB RAM incl. DTB */
         orr   x2, x2, x3
         add   x4, x4, #8
-        str   x2, [x1, x4]           /* Map it in the early boot slot */
+        str   x2, [x1, x4]           /* Map it in the early fdt slot */
 
 pt_ready:
         PRINT("- Turning on paging -\r\n")

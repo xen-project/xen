@@ -361,6 +361,13 @@ static inline lpae_t pte_of_xenaddr(vaddr_t va)
     return mfn_to_xen_entry(mfn);
 }
 
+void __init remove_early_mappings(void)
+{
+    lpae_t pte = {0};
+    write_pte(xen_second + second_table_offset(BOOT_FDT_VIRT_START), pte);
+    flush_xen_data_tlb_range_va(BOOT_FDT_VIRT_START, SECOND_SIZE);
+}
+
 /* Boot-time pagetable setup.
  * Changes here may need matching changes in head.S */
 void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
@@ -401,7 +408,8 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
         p[second_linear_offset(va)].bits = 0;
     }
     for ( i = 0; i < 4 * LPAE_ENTRIES; i++)
-        if ( p[i].pt.valid )
+        /* The FDT is not relocated */
+        if ( p[i].pt.valid && i != second_linear_offset(BOOT_FDT_VIRT_START) )
             p[i].pt.base += (phys_offset - boot_phys_offset) >> PAGE_SHIFT;
 
     /* Change pagetables to the copy in the relocated Xen */

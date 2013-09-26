@@ -35,6 +35,7 @@
 #include <xen/cpu.h>
 #include <xen/pfn.h>
 #include <xen/vmap.h>
+#include <xen/libfdt/libfdt.h>
 #include <asm/page.h>
 #include <asm/current.h>
 #include <asm/setup.h>
@@ -147,6 +148,32 @@ static void __init processor_id(void)
     }
 }
 
+static void dt_unreserved_regions(paddr_t s, paddr_t e,
+                                  void (*cb)(paddr_t, paddr_t), int first)
+{
+    int i, nr = fdt_num_mem_rsv(device_tree_flattened);
+
+    for ( i = first; i < nr ; i++ )
+    {
+        paddr_t r_s, r_e;
+
+        if ( fdt_get_mem_rsv(device_tree_flattened, i, &r_s, &r_e ) < 0 )
+            /* If we can't read it, pretend it doesn't exist... */
+            continue;
+
+        r_e += r_s; /* fdt_get_mem_rsc returns length */
+
+        if ( s < r_e && r_s < e )
+        {
+            dt_unreserved_regions(r_e, e, cb, i+1);
+            dt_unreserved_regions(s, r_s, cb, i+1);
+            return;
+        }
+    }
+
+    cb(s, e);
+}
+
 void __init discard_initial_modules(void)
 {
     struct dt_module_info *mi = &early_info.modules;
@@ -157,10 +184,12 @@ void __init discard_initial_modules(void)
         paddr_t s = mi->module[i].start;
         paddr_t e = s + PAGE_ALIGN(mi->module[i].size);
 
-        init_domheap_pages(s, e);
+        dt_unreserved_regions(s, e, init_domheap_pages, 0);
     }
 
     mi->nr_mods = 0;
+
+    remove_early_mappings();
 }
 
 /*
@@ -177,6 +206,7 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
 {
     const struct dt_module_info *mi = &early_info.modules;
     int i;
+    int nr_rsvd;
 
     s = (s+align-1) & ~(align-1);
     e = e & ~(align-1);
@@ -184,6 +214,7 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
     if ( s > e ||  e - s < size )
         return 0;
 
+    /* First check the boot modules */
     for ( i = first_mod; i <= mi->nr_mods; i++ )
     {
         paddr_t mod_s = mi->module[i].start;
@@ -199,6 +230,32 @@ static paddr_t __init consider_modules(paddr_t s, paddr_t e,
         }
     }
 
+    /* Now check any fdt reserved areas. */
+
+    nr_rsvd = fdt_num_mem_rsv(device_tree_flattened);
+
+    for ( ; i < mi->nr_mods + nr_rsvd; i++ )
+    {
+        paddr_t mod_s, mod_e;
+
+        if ( fdt_get_mem_rsv(device_tree_flattened,
+                             i - mi->nr_mods,
+                             &mod_s, &mod_e ) < 0 )
+            /* If we can't read it, pretend it doesn't exist... */
+            continue;
+
+        /* fdt_get_mem_rsv returns length */
+        mod_e += mod_s;
+
+        if ( s < mod_e && mod_s < e )
+        {
+            mod_e = consider_modules(mod_e, e, size, align, i+1);
+            if ( mod_e )
+                return mod_e;
+
+            return consider_modules(s, mod_s, size, align, i+1);
+        }
+    }
     return e;
 }
 
@@ -404,7 +461,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
             n = pfn_to_paddr(xenheap_mfn_start+xenheap_pages);
         }
 
-        init_boot_pages(s, e);
+        dt_unreserved_regions(s, e, init_boot_pages, 0);
 
         s = n;
     }
@@ -464,7 +521,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
             xenheap_mfn_end = e;
 
-            init_boot_pages(s, e);
+            dt_unreserved_regions(s, e, init_boot_pages, 0);
             s = n;
         }
     }
@@ -637,7 +694,7 @@ void __init start_xen(unsigned long boot_phys_offset,
     smp_clear_cpu_maps();
 
     /* This is mapped by head.S */
-    device_tree_flattened = (void *)BOOT_MISC_VIRT_START
+    device_tree_flattened = (void *)BOOT_FDT_VIRT_START
         + (fdt_paddr & ((1 << SECOND_SHIFT) - 1));
     fdt_size = device_tree_early_init(device_tree_flattened, fdt_paddr);
 

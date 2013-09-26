@@ -301,7 +301,7 @@ cpu_init_done:
         orr   r2, r2, #PT_UPPER(MEM)
         orr   r2, r2, #PT_LOWER(MEM) /* r2:r3 := 2MB RAM incl. DTB */
         add   r4, r4, #8
-        strd  r2, r3, [r1, r4]       /* Map it in the early boot slot */
+        strd  r2, r3, [r1, r4]       /* Map it in the early fdt slot */
 
 pt_ready:
         PRINT("- Turning on paging -\r\n")

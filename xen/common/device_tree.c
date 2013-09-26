@@ -399,7 +399,7 @@ static void __init early_print_info(void)
 {
     struct dt_mem_info *mi = &early_info.mem;
     struct dt_module_info *mods = &early_info.modules;
-    int i;
+    int i, nr_rsvd;
 
     for ( i = 0; i < mi->nr_banks; i++ )
         early_printk("RAM: %"PRIpaddr" - %"PRIpaddr"\n",
@@ -412,6 +412,17 @@ static void __init early_print_info(void)
                      mods->module[i].start,
                      mods->module[i].start + mods->module[i].size,
                      mods->module[i].cmdline);
+    nr_rsvd = fdt_num_mem_rsv(device_tree_flattened);
+    for ( i = 0; i < nr_rsvd; i++ )
+    {
+        paddr_t s, e;
+        if ( fdt_get_mem_rsv(device_tree_flattened, i, &s, &e) < 0 )
+            continue;
+        /* fdt_get_mem_rsv returns length */
+        e += s;
+        early_printk(" RESVD[%d]: %"PRIpaddr" - %"PRIpaddr"\n",
+                     i, s, e);
+    }
 }
 
 /**
