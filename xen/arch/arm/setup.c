@@ -324,7 +324,8 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
      * constraints.
      */
     heap_pages = (ram_size >> PAGE_SHIFT);
-    xenheap_pages = max(heap_pages/8, 128UL<<(20-PAGE_SHIFT));
+    xenheap_pages = (heap_pages/8 + 0x1fffUL) & ~0x1fffUL;
+    xenheap_pages = max(xenheap_pages, 128UL<<(20-PAGE_SHIFT));
 
     do
     {
