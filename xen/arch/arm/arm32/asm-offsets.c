@@ -69,6 +69,10 @@ void __dummy__(void)
    OFFSET(PROCINFO_cpu_val, struct proc_info_list, cpu_val);
    OFFSET(PROCINFO_cpu_mask, struct proc_info_list, cpu_mask);
    OFFSET(PROCINFO_cpu_init, struct proc_info_list, cpu_init);
+
+   BLANK();
+   OFFSET(INITINFO_stack, struct init_info, stack);
+
 }
 
 /*

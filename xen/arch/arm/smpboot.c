@@ -46,8 +46,11 @@ nodemask_t __read_mostly node_online_map = { { [0] = 1UL } };
 static unsigned char __initdata cpu0_boot_stack[STACK_SIZE]
        __attribute__((__aligned__(STACK_SIZE)));
 
-/* Pointer to the stack, used by head.S when entering C */
-unsigned char *init_stack = cpu0_boot_stack;
+/* Initial boot cpu data */
+struct init_info __initdata init_data =
+{
+    .stack = cpu0_boot_stack,
+};
 
 /* Shared state for coordinating CPU bringup */
 unsigned long smp_up_cpu = 0;
@@ -224,7 +227,7 @@ int __cpu_up(unsigned int cpu)
         return rc;
 
     /* Tell the remote CPU which stack to boot on. */
-    init_stack = idle_vcpu[cpu]->arch.stack;
+    init_data.stack = idle_vcpu[cpu]->arch.stack;
 
     /* Unblock the CPU.  It should be waiting in the loop in head.S
      * for an event to arrive when smp_up_cpu matches its cpuid. */

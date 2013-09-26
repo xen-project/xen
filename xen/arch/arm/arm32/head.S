@@ -366,7 +366,8 @@ paging:
         bne   1b
 
 launch:
-        ldr   r0, =init_stack        /* Find the boot-time stack */
+        ldr   r0, =init_data
+        add   r0, #INITINFO_stack    /* Find the boot-time stack */
         ldr   sp, [r0]
         add   sp, #STACK_SIZE        /* (which grows down from the top). */
         sub   sp, #CPUINFO_sizeof    /* Make room for CPU save record */
