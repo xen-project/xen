@@ -20,12 +20,13 @@
 
 #define NR_MEM_BANKS 8
 
-#define MOD_XEN 0
-#define MOD_KERNEL 1
-#define MOD_INITRD 2
-#define NR_MODULES 3
+#define MOD_XEN    0
+#define MOD_FDT    1
+#define MOD_KERNEL 2
+#define MOD_INITRD 3
+#define NR_MODULES 4
 
-#define MOD_DISCARD_FIRST MOD_KERNEL
+#define MOD_DISCARD_FIRST MOD_FDT
 
 struct membank {
     paddr_t start;
@@ -179,7 +180,7 @@ typedef int (*device_tree_node_func)(const void *fdt,
 extern struct dt_early_info early_info;
 extern const void *device_tree_flattened;
 
-size_t __init device_tree_early_init(const void *fdt);
+size_t __init device_tree_early_init(const void *fdt, paddr_t paddr);
 
 const char __init *device_tree_bootargs(const void *fdt);
 void __init device_tree_dump(const void *fdt);

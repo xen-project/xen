@@ -420,13 +420,20 @@ static void __init early_print_info(void)
  *
  * Returns the size of the DTB.
  */
-size_t __init device_tree_early_init(const void *fdt)
+size_t __init device_tree_early_init(const void *fdt, paddr_t paddr)
 {
+    struct dt_mb_module *mod;
     int ret;
 
     ret = fdt_check_header(fdt);
     if ( ret < 0 )
         early_panic("No valid device tree\n");
+
+    mod = &early_info.modules.module[MOD_FDT];
+    mod->start = paddr;
+    mod->size = fdt_totalsize(fdt);
+
+    early_info.modules.nr_mods = max(MOD_FDT, early_info.modules.nr_mods);
 
     device_tree_for_each_node((void *)fdt, early_scan_node, NULL);
     early_print_info();

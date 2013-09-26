@@ -622,9 +622,10 @@ void __init start_xen(unsigned long boot_phys_offset,
 
     smp_clear_cpu_maps();
 
+    /* This is mapped by head.S */
     device_tree_flattened = (void *)BOOT_MISC_VIRT_START
         + (fdt_paddr & ((1 << SECOND_SHIFT) - 1));
-    fdt_size = device_tree_early_init(device_tree_flattened);
+    fdt_size = device_tree_early_init(device_tree_flattened, fdt_paddr);
 
     cmdline_parse(device_tree_bootargs(device_tree_flattened));
 
