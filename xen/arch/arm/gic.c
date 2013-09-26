@@ -258,9 +258,10 @@ void gic_route_dt_irq(const struct dt_irq *irq, const cpumask_t *cpu_mask,
 static void __init gic_dist_init(void)
 {
     uint32_t type;
-    uint32_t cpumask = 1 << smp_processor_id();
+    uint32_t cpumask;
     int i;
 
+    cpumask = GICD[GICD_ITARGETSR] & 0xff;
     cpumask |= cpumask << 8;
     cpumask |= cpumask << 16;
 
