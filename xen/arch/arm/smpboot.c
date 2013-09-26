@@ -127,8 +127,7 @@ make_cpus_ready(unsigned int max_cpus, unsigned long boot_phys_offset)
     for ( i = 1; i < max_cpus; i++ )
     {
         /* Tell the next CPU to get ready */
-        /* TODO: handle boards where CPUIDs are not contiguous */
-        *gate = i;
+        *gate = cpu_logical_map(i);
         flush_xen_dcache(*gate);
         isb();
         sev();
@@ -142,11 +141,12 @@ make_cpus_ready(unsigned int max_cpus, unsigned long boot_phys_offset)
 /* Boot the current CPU */
 void __cpuinit start_secondary(unsigned long boot_phys_offset,
                                unsigned long fdt_paddr,
-                               unsigned long cpuid)
+                               unsigned long hwid)
 {
+    unsigned int cpuid = init_data.cpuid;
+
     memset(get_cpu_info(), 0, sizeof (struct cpu_info));
 
-    /* TODO: handle boards where CPUIDs are not contiguous */
     set_processor_id(cpuid);
 
     current_cpu_data = boot_cpu_data;
@@ -233,9 +233,12 @@ int __cpu_up(unsigned int cpu)
     /* Tell the remote CPU which stack to boot on. */
     init_data.stack = idle_vcpu[cpu]->arch.stack;
 
+    /* Tell the remote CPU what is it's logical CPU ID */
+    init_data.cpuid = cpu;
+
     /* Unblock the CPU.  It should be waiting in the loop in head.S
      * for an event to arrive when smp_up_cpu matches its cpuid. */
-    smp_up_cpu = cpu;
+    smp_up_cpu = cpu_logical_map(cpu);
     /* we need to make sure that the change to smp_up_cpu is visible to
      * secondary cpus with D-cache off */
     flush_xen_dcache(smp_up_cpu);

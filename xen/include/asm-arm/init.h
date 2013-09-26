@@ -5,6 +5,8 @@ struct init_info
 {
     /* Pointer to the stack, used by head.S when entering in C */
     unsigned char *stack;
+    /* Logical CPU ID, used by start_secondary */
+    unsigned int cpuid;
 };
 
 #endif /* _XEN_ASM_INIT_H */
