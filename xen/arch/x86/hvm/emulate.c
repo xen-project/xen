@@ -686,6 +686,7 @@ static int hvmemul_rep_ins(
     unsigned long addr;
     uint32_t pfec = PFEC_page_present | PFEC_write_access;
     paddr_t gpa;
+    p2m_type_t p2mt;
     int rc;
 
     rc = hvmemul_virtual_to_linear(
@@ -701,6 +702,10 @@ static int hvmemul_rep_ins(
         addr, &gpa, bytes_per_rep, reps, pfec, hvmemul_ctxt);
     if ( rc != X86EMUL_OKAY )
         return rc;
+
+    (void) get_gfn_query_unlocked(current->domain, gpa >> PAGE_SHIFT, &p2mt);
+    if ( p2mt == p2m_mmio_direct || p2mt == p2m_mmio_dm )
+        return X86EMUL_UNHANDLEABLE;
 
     return hvmemul_do_pio(src_port, reps, bytes_per_rep, gpa, IOREQ_READ,
                           !!(ctxt->regs->eflags & X86_EFLAGS_DF), NULL);
@@ -719,6 +724,7 @@ static int hvmemul_rep_outs(
     unsigned long addr;
     uint32_t pfec = PFEC_page_present;
     paddr_t gpa;
+    p2m_type_t p2mt;
     int rc;
 
     rc = hvmemul_virtual_to_linear(
@@ -734,6 +740,10 @@ static int hvmemul_rep_outs(
         addr, &gpa, bytes_per_rep, reps, pfec, hvmemul_ctxt);
     if ( rc != X86EMUL_OKAY )
         return rc;
+
+    (void) get_gfn_query_unlocked(current->domain, gpa >> PAGE_SHIFT, &p2mt);
+    if ( p2mt == p2m_mmio_direct || p2mt == p2m_mmio_dm )
+        return X86EMUL_UNHANDLEABLE;
 
     return hvmemul_do_pio(dst_port, reps, bytes_per_rep, gpa, IOREQ_WRITE,
                           !!(ctxt->regs->eflags & X86_EFLAGS_DF), NULL);
@@ -786,6 +796,10 @@ static int hvmemul_rep_movs(
     /* Check for MMIO ops */
     (void) get_gfn_query_unlocked(current->domain, sgpa >> PAGE_SHIFT, &sp2mt);
     (void) get_gfn_query_unlocked(current->domain, dgpa >> PAGE_SHIFT, &dp2mt);
+
+    if ( sp2mt == p2m_mmio_direct || dp2mt == p2m_mmio_direct ||
+         (sp2mt == p2m_mmio_dm && dp2mt == p2m_mmio_dm) )
+        return X86EMUL_UNHANDLEABLE;
 
     if ( sp2mt == p2m_mmio_dm )
         return hvmemul_do_mmio(
