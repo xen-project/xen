@@ -69,6 +69,9 @@
 #define __force
 #define __bitwise
 
+#define MB(_mb)     (_AC(_mb, UL) << 20)
+#define GB(_gb)     (_AC(_gb, UL) << 30)
+
 #ifndef __ASSEMBLY__
 
 int current_domain_id(void);

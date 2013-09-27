@@ -142,7 +142,6 @@
 #define SLOT0_ENTRY_BITS  39
 #define SLOT0(slot) (_AT(vaddr_t,slot) << SLOT0_ENTRY_BITS)
 #define SLOT0_ENTRY_SIZE  SLOT0(1)
-#define GB(_gb)     (_AC(_gb, UL) << 30)
 
 #define VMAP_VIRT_START  GB(1)
 #define VMAP_VIRT_END    (VMAP_VIRT_START + GB(1) - 1)
