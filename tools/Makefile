@@ -174,7 +174,7 @@ qemu-xen-dir-force-update:
 	fi
 
 ifeq ($(debug),y)
-QEMU_XEN_ENABLE_DEBUG := --enable-debug
+QEMU_XEN_ENABLE_DEBUG := --enable-debug --enable-trace-backend=stderr
 else
 QEMU_XEN_ENABLE_DEBUG :=
 endif
