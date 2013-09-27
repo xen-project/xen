@@ -72,15 +72,22 @@ static void kernel_zimage_check_overlap(struct kernel_info *info)
 {
     paddr_t zimage_start = info->zimage.load_addr;
     paddr_t zimage_end = info->zimage.load_addr + info->zimage.len;
-    paddr_t dtb_start = info->dtb_paddr;
-    paddr_t dtb_end = info->dtb_paddr + fdt_totalsize(info->fdt);
+    paddr_t start = info->dtb_paddr;
+    paddr_t end;
 
-    if ( (dtb_start > zimage_end) || (dtb_end < zimage_start) )
+    end = info->initrd_paddr + early_info.modules.module[MOD_INITRD].size;
+
+    /*
+     * In the dom0 memory, the initrd will be just after the DTB. So we
+     * only need to check if the zImage range will overlap the
+     * DTB-initrd range.
+     */
+    if ( (start > zimage_end) || (end < zimage_start) )
         return;
 
     panic(XENLOG_ERR "The kernel(0x%"PRIpaddr"-0x%"PRIpaddr
-          ") is overlapping the DTB(0x%"PRIpaddr"-0x%"PRIpaddr")\n",
-          zimage_start, zimage_end, dtb_start, dtb_end);
+          ") is overlapping the DTB-initrd(0x%"PRIpaddr"-0x%"PRIpaddr")\n",
+          zimage_start, zimage_end, start, end);
 }
 
 static void kernel_zimage_load(struct kernel_info *info)
@@ -334,9 +341,6 @@ int kernel_prepare(struct kernel_info *info)
     int rc;
 
     paddr_t start, size;
-
-    if ( early_info.modules.nr_mods > MOD_INITRD )
-        panic("Cannot handle dom0 initrd yet\n");
 
     if ( early_info.modules.nr_mods < MOD_KERNEL )
     {

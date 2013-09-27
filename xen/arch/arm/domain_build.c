@@ -163,12 +163,16 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
          *
          * * remember xen,dom0-bootargs if we don't already have
          *   bootargs (from module #1, above).
-         * * remove bootargs,  xen,dom0-bootargs and xen,xen-bootargs.
+         * * remove bootargs,  xen,dom0-bootargs, xen,xen-bootargs,
+         *   linux,initrd-start and linux,initrd-end.
          */
         if ( dt_node_path_is_equal(np, "/chosen") )
         {
-            if ( dt_property_name_is_equal(pp, "xen,xen-bootargs") )
+            if ( dt_property_name_is_equal(pp, "xen,xen-bootargs") ||
+                 dt_property_name_is_equal(pp, "linux,initrd-start") ||
+                 dt_property_name_is_equal(pp, "linux,initrd-end") )
                 continue;
+
             if ( dt_property_name_is_equal(pp, "xen,dom0-bootargs") )
             {
                 had_dom0_bootargs = 1;
@@ -214,12 +218,22 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
                            strlen(bootargs) + 1);
         if ( res )
             return res;
-    }
 
-    /*
-     * XXX should populate /chosen/linux,initrd-{start,end} here if we
-     * have module[2]
-     */
+        /*
+         * If the bootloader provides an initrd, we must create a placeholder
+         * for the initrd properties. The values will be replaced later.
+         */
+        if ( early_info.modules.module[MOD_INITRD].size )
+        {
+            res = fdt_property_cell(kinfo->fdt, "linux,initrd-start", 0);
+            if ( res )
+                return res;
+
+            res = fdt_property_cell(kinfo->fdt, "linux,initrd-end", 0);
+            if ( res )
+                return res;
+        }
+    }
 
     return 0;
 }
@@ -765,6 +779,8 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
     int new_size;
     int ret;
     paddr_t end;
+    paddr_t initrd_len;
+    paddr_t dtb_len;
 
     ASSERT(dt_host && (dt_host->sibling == NULL));
 
@@ -791,8 +807,10 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
     if ( ret < 0 )
         goto err;
 
-    /* Actual new size */
-    new_size = fdt_totalsize(kinfo->fdt);
+    /* Align DTB and initrd size to 2Mb. Linux only requires 4 byte alignment */
+    initrd_len = ROUNDUP(early_info.modules.module[MOD_INITRD].size, MB(2));
+    dtb_len = ROUNDUP(fdt_totalsize(kinfo->fdt), MB(2));
+    new_size = initrd_len + dtb_len;
 
     /*
      * DTB must be loaded such that it does not conflict with the
@@ -801,14 +819,14 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
      * the recommendation in Documentation/arm64/booting.txt is below
      * 512MB. Place at 128MB, (or, if we have less RAM, as high as
      * possible) in order to satisfy both.
+     * If the bootloader provides an initrd, it will be loaded just
+     * after the DTB.
      */
     end = kinfo->mem.bank[0].start + kinfo->mem.bank[0].size;
     end = MIN(kinfo->mem.bank[0].start + (128<<20) + new_size, end);
 
-    kinfo->dtb_paddr = end - new_size;
-
-    /* Align the address to 2Mb. Linux only requires 4 byte alignment */
-    kinfo->dtb_paddr &= ~((2 << 20) - 1);
+    kinfo->initrd_paddr = end - initrd_len;
+    kinfo->dtb_paddr = kinfo->initrd_paddr - dtb_len;
 
     if ( kinfo->dtb_paddr < kinfo->mem.bank[0].start ||
          kinfo->mem.bank[0].start + new_size > end )
@@ -839,6 +857,61 @@ static void dtb_load(struct kernel_info *kinfo)
     if ( rc != 0 )
         panic("Unable to copy the DTB to dom0 memory (rc = %lu)\n", rc);
     xfree(kinfo->fdt);
+}
+
+static void initrd_load(struct kernel_info *kinfo)
+{
+    paddr_t load_addr = kinfo->initrd_paddr;
+    paddr_t paddr = early_info.modules.module[MOD_INITRD].start;
+    paddr_t len = early_info.modules.module[MOD_INITRD].size;
+    unsigned long offs;
+    int node;
+    int res;
+
+    if ( !len )
+        return;
+
+    printk("Loading dom0 initrd from %"PRIpaddr" to 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
+           paddr, load_addr, load_addr + len);
+
+    /* Fix up linux,initrd-start and linux,initrd-end in /chosen */
+    node = fdt_path_offset(kinfo->fdt, "/chosen");
+    if ( node < 0 )
+        panic("Cannot find the /chosen node");
+
+    res = fdt_setprop_inplace_cell(kinfo->fdt, node, "linux,initrd-start",
+                                   load_addr);
+    if ( res )
+        panic("Cannot fix up \"linux,initrd-start\" property\n");
+
+    res = fdt_setprop_inplace_cell(kinfo->fdt, node, "linux,initrd-end",
+                                   load_addr + len);
+    if ( res )
+        panic("Cannot fix up \"linux,initrd-end\" property\n");
+
+    for ( offs = 0; offs < len; )
+    {
+        int rc;
+        paddr_t s, l, ma;
+        void *dst;
+
+        s = offs & ~PAGE_MASK;
+        l = min(PAGE_SIZE - s, len);
+
+        rc = gvirt_to_maddr(load_addr + offs, &ma);
+        if ( rc )
+        {
+            panic("\nUnable to translate guest address\n");
+            return;
+        }
+
+        dst = map_domain_page(ma>>PAGE_SHIFT);
+
+        copy_from_paddr(dst + s, paddr + offs, l, BUFFERABLE);
+
+        unmap_domain_page(dst);
+        offs += l;
+    }
 }
 
 int construct_dom0(struct domain *d)
@@ -877,6 +950,8 @@ int construct_dom0(struct domain *d)
     p2m_load_VTTBR(d);
 
     kernel_load(&kinfo);
+    /* initrd_load will fix up the fdt, so call it before dtb_load */
+    initrd_load(&kinfo);
     dtb_load(&kinfo);
 
     discard_initial_modules();

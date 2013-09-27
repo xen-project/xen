@@ -21,6 +21,8 @@ struct kernel_info {
     paddr_t dtb_paddr;
     paddr_t entry;
 
+    paddr_t initrd_paddr;
+
     void *kernel_img;
     unsigned kernel_order;
 
