@@ -63,6 +63,8 @@ do {                                                            \
 #define MASK_EXTR(v, m) (((v) & (m)) / ((m) & -(m)))
 #define MASK_INSR(v, m) (((v) * ((m) & -(m))) & (m))
 
+#define ROUNDUP(x, a) (((x) + (a) - 1) & ~((a) - 1))
+
 #define reserve_bootmem(_p,_l) ((void)0)
 
 struct domain;
