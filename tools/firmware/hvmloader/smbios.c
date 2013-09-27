@@ -347,18 +347,18 @@ smbios_entry_point_init(void *start,
 {
     uint8_t sum;
     int i;
-    struct smbios_entry_point *ep = (struct smbios_entry_point *)start;
+    struct smbios_entry_point *ep = start;
 
     memset(ep, 0, sizeof(*ep));
 
-    strncpy(ep->anchor_string, "_SM_", 4);
+    memcpy(ep->anchor_string, "_SM_", 4);
     ep->length = 0x1f;
     ep->smbios_major_version = 2;
     ep->smbios_minor_version = 4;
     ep->max_structure_size = max_structure_size;
     ep->entry_point_revision = 0;
-    strncpy(ep->intermediate_anchor_string, "_DMI_", 5);
-    
+    memcpy(ep->intermediate_anchor_string, "_DMI_", 5);
+
     ep->structure_table_length = structure_table_length;
     ep->structure_table_address = structure_table_address;
     ep->number_of_structures = number_of_structures;
