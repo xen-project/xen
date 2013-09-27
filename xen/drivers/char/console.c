@@ -463,12 +463,11 @@ static void __putstr(const char *str)
     sercon_puts(str);
     video_puts(str);
 
+    while ( (c = *str++) != '\0' )
+        putchar_console_ring(c);
+
     if ( !console_locks_busted )
-    {
-        while ( (c = *str++) != '\0' )
-            putchar_console_ring(c);
         tasklet_schedule(&notify_dom0_con_ring_tasklet);
-    }
 }
 
 static int printk_prefix_check(char *p, char **pp)
