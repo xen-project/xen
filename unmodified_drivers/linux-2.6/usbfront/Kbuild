@@ -1,0 +1,5 @@
+include $(M)/overrides.mk
+
+obj-m += xen-usb.o
+
+xen-usb-objs := usbfront-hcd.o xenbus.o
