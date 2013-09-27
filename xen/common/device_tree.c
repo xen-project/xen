@@ -380,6 +380,29 @@ static void __init process_multiboot_node(const void *fdt, int node,
         early_info.modules.nr_mods = nr;
 }
 
+static void __init process_chosen_node(const void *fdt, int node,
+                                       const char *name,
+                                       u32 address_cells, u32 size_cells)
+{
+    struct dt_mb_module *mod = &early_info.modules.module[MOD_INITRD];
+    u32 start, end;
+
+    dt_printk("Checking for initrd in /chosen\n");
+
+    start = device_tree_get_u32(fdt, node, "linux,initrd-start", 0);
+    end = device_tree_get_u32(fdt, node, "linux,initrd-end", 0);
+
+    if ( !start || !end || (start >= end) )
+        return;
+
+    dt_printk("Initrd 0x%x-0x%x\n", start, end);
+
+    mod->start = start;
+    mod->size = end - start;
+
+    early_info.modules.nr_mods = MAX(MOD_INITRD, early_info.modules.nr_mods);
+}
+
 static int __init early_scan_node(const void *fdt,
                                   int node, const char *name, int depth,
                                   u32 address_cells, u32 size_cells,
@@ -389,6 +412,8 @@ static int __init early_scan_node(const void *fdt,
         process_memory_node(fdt, node, name, address_cells, size_cells);
     else if ( device_tree_node_compatible(fdt, node, "xen,multiboot-module" ) )
         process_multiboot_node(fdt, node, name, address_cells, size_cells);
+    else if ( depth == 1 && device_tree_node_matches(fdt, node, "chosen") )
+        process_chosen_node(fdt, node, name, address_cells, size_cells);
 
     return 0;
 }
