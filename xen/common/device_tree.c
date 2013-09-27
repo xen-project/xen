@@ -65,8 +65,6 @@ static LIST_HEAD(aliases_lookup);
             printk(fmt, ## __VA_ARGS__);            \
     } while (0)
 
-#define ALIGN(x, a) ((x + (a) - 1) & ~((a) - 1));
-
 // #define DEBUG_DT
 
 #ifdef DEBUG_DT
@@ -457,7 +455,7 @@ static void __init *unflatten_dt_alloc(unsigned long *mem, unsigned long size,
 {
     void *res;
 
-    *mem = ALIGN(*mem, align);
+    *mem = ROUNDUP(*mem, align);
     res = (void *)*mem;
     *mem += size;
 
@@ -1442,7 +1440,7 @@ static unsigned long __init unflatten_dt_node(const void *fdt,
     *p += 4;
     pathp = (char *)*p;
     l = allocl = strlen(pathp) + 1;
-    *p = ALIGN(*p + l, 4);
+    *p = ROUNDUP(*p + l, 4);
 
     /* version 0x10 has a more compact unit name here instead of the full
      * path. we accumulate the full path size using "fpsize", we'll rebuild
@@ -1535,7 +1533,7 @@ static unsigned long __init unflatten_dt_node(const void *fdt,
         noff = be32_to_cpup((__be32 *)((*p) + 4));
         *p += 8;
         if ( fdt_version(fdt) < 0x10 )
-            *p = ALIGN(*p, sz >= 8 ? 8 : 4);
+            *p = ROUNDUP(*p, sz >= 8 ? 8 : 4);
 
         pname = fdt_string(fdt, noff);
         if ( pname == NULL )
@@ -1572,7 +1570,7 @@ static unsigned long __init unflatten_dt_node(const void *fdt,
             *prev_pp = pp;
             prev_pp = &pp->next;
         }
-        *p = ALIGN((*p) + sz, 4);
+        *p = ROUNDUP((*p) + sz, 4);
     }
     /* with version 0x10 we may not have the name property, recreate
      * it here from the unit name if absent
