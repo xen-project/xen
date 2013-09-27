@@ -897,10 +897,12 @@ pages) must also be specified via the tbuf\_size parameter.
 > `= unstable | skewed`
 
 ### ucode
-> `= <integer>`
+> `= [<integer> | scan]`
 
-Specify the CPU microcode update blob module index. When positive, this
-specifies the n-th module (in the GrUB entry, zero based) to be used
+Specify how and where to find CPU microcode update blob.
+
+'integer' specifies the CPU microcode update blob module index. When positive,
+this specifies the n-th module (in the GrUB entry, zero based) to be used
 for updating CPU micrcode. When negative, counting starts at the end of
 the modules in the GrUB entry (so with the blob commonly being last,
 one could specify `ucode=-1`). Note that the value of zero is not valid
@@ -909,6 +911,12 @@ image). Note further that use of this option has an unspecified effect
 when used with xen.efi (there the concept of modules doesn't exist, and
 the blob gets specified via the `ucode=<filename>` config file/section
 entry; see [EFI configuration file description](efi.html)).
+
+'scan' instructs the hypervisor to scan the multiboot images for an cpio
+image that contains microcode. Depending on the platform the blob with the
+microcode in the cpio name space must be:
+  - on Intel: kernel/x86/microcode/GenuineIntel.bin
+  - on AMD  : kernel/x86/microcode/AuthenticAMD.bin
 
 ### unrestricted\_guest
 > `= <boolean>`

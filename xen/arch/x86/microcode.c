@@ -33,6 +33,7 @@
 #include <xen/spinlock.h>
 #include <xen/tasklet.h>
 #include <xen/guest_access.h>
+#include <xen/earlycpio.h>
 
 #include <asm/msr.h>
 #include <asm/processor.h>
@@ -45,19 +46,123 @@ static signed int __initdata ucode_mod_idx;
 static bool_t __initdata ucode_mod_forced;
 static cpumask_t __initdata init_mask;
 
+/*
+ * If we scan the initramfs.cpio for the early microcode code
+ * and find it, then 'ucode_blob' will contain the pointer
+ * and the size of said blob. It is allocated from Xen's heap
+ * memory.
+ */
+struct ucode_mod_blob {
+    void *data;
+    size_t size;
+};
+
+static struct ucode_mod_blob __initdata ucode_blob;
+/*
+ * By default we will NOT parse the multiboot modules to see if there is
+ * cpio image with the microcode images.
+ */
+static bool_t __initdata ucode_scan;
+
 void __init microcode_set_module(unsigned int idx)
 {
     ucode_mod_idx = idx;
     ucode_mod_forced = 1;
 }
 
+/*
+ * The format is '[<integer>|scan]'. Both options are optional.
+ * If the EFI has forced which of the multiboot payloads is to be used,
+ * no parsing will be attempted.
+ */
 static void __init parse_ucode(char *s)
 {
-    if ( !ucode_mod_forced )
+    if ( ucode_mod_forced ) /* Forced by EFI */
+       return;
+
+    if ( !strncmp(s, "scan", 4) )
+        ucode_scan = 1;
+    else
         ucode_mod_idx = simple_strtol(s, NULL, 0);
 }
 custom_param("ucode", parse_ucode);
 
+/*
+ * 8MB ought to be enough.
+ */
+#define MAX_EARLY_CPIO_MICROCODE (8 << 20)
+
+void __init microcode_scan_module(
+    unsigned long *module_map,
+    const multiboot_info_t *mbi,
+    void *(*bootmap)(const module_t *))
+{
+    module_t *mod = (module_t *)__va(mbi->mods_addr);
+    uint64_t *_blob_start;
+    unsigned long _blob_size;
+    struct cpio_data cd;
+    long offset;
+    const char *p = NULL;
+    int i;
+
+    ucode_blob.size = 0;
+    if ( !ucode_scan )
+        return;
+
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+        p = "kernel/x86/microcode/AuthenticAMD.bin";
+    else if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+        p = "kernel/x86/microcode/GenuineIntel.bin";
+    else
+        return;
+
+    /*
+     * Try all modules and see whichever could be the microcode blob.
+     */
+    for ( i = 1 /* Ignore dom0 kernel */; i < mbi->mods_count; i++ )
+    {
+        if ( !test_bit(i, module_map) )
+            continue;
+
+        _blob_start = bootmap(&mod[i]);
+        _blob_size = mod[i].mod_end;
+        if ( !_blob_start )
+        {
+            printk("Could not map multiboot module #%d (size: %ld)\n",
+                   i, _blob_size);
+            continue;
+        }
+        cd.data = NULL;
+        cd.size = 0;
+        cd = find_cpio_data(p, _blob_start, _blob_size, &offset /* ignore */);
+        if ( cd.data )
+        {
+                /*
+                 * This is an arbitrary check - it would be sad if the blob
+                 * consumed most of the memory and did not allow guests
+                 * to launch.
+                 */
+                if ( cd.size > MAX_EARLY_CPIO_MICROCODE )
+                {
+                    printk("Multiboot %d microcode payload too big! (%ld, we can do %d)\n",
+                           i, cd.size, MAX_EARLY_CPIO_MICROCODE);
+                    goto err;
+                }
+                ucode_blob.size = cd.size;
+                ucode_blob.data = xmalloc_bytes(cd.size);
+                if ( !ucode_blob.data )
+                    cd.data = NULL;
+                else
+                    memcpy(ucode_blob.data, cd.data, cd.size);
+        }
+        bootmap(NULL);
+        if ( cd.data )
+            break;
+    }
+    return;
+err:
+    bootmap(NULL);
+}
 void __init microcode_grab_module(
     unsigned long *module_map,
     const multiboot_info_t *mbi,
@@ -69,9 +174,12 @@ void __init microcode_grab_module(
         ucode_mod_idx += mbi->mods_count;
     if ( ucode_mod_idx <= 0 || ucode_mod_idx >= mbi->mods_count ||
          !__test_and_clear_bit(ucode_mod_idx, module_map) )
-        return;
+        goto scan;
     ucode_mod = mod[ucode_mod_idx];
     ucode_mod_map = map;
+scan:
+    if ( ucode_scan )
+        microcode_scan_module(module_map, mbi, map);
 }
 
 const struct microcode_ops *microcode_ops;
@@ -236,7 +344,10 @@ int microcode_update(XEN_GUEST_HANDLE_PARAM(const_void) buf, unsigned long len)
 
 static void __init _do_microcode_update(unsigned long data)
 {
-    microcode_update_cpu((void *)data, ucode_mod.mod_end);
+    void *_data = (void *)data;
+    size_t len = ucode_blob.size ? ucode_blob.size : ucode_mod.mod_end;
+
+    microcode_update_cpu(_data, len);
     cpumask_set_cpu(smp_processor_id(), &init_mask);
 }
 
@@ -246,18 +357,19 @@ static int __init microcode_init(void)
     static struct tasklet __initdata tasklet;
     unsigned int cpu;
 
-    if ( !microcode_ops || !ucode_mod.mod_end )
+    if ( !microcode_ops )
         return 0;
 
-    data = ucode_mod_map(&ucode_mod);
+    if ( !ucode_mod.mod_end && !ucode_blob.size )
+        return 0;
+
+    data = ucode_blob.size ? ucode_blob.data : ucode_mod_map(&ucode_mod);
+
     if ( !data )
         return -ENOMEM;
 
     if ( microcode_ops->start_update && microcode_ops->start_update() != 0 )
-    {
-        ucode_mod_map(NULL);
-        return 0;
-    }
+        goto out;
 
     softirq_tasklet_init(&tasklet, _do_microcode_update, (unsigned long)data);
 
@@ -269,7 +381,11 @@ static int __init microcode_init(void)
         } while ( !cpumask_test_cpu(cpu, &init_mask) );
     }
 
-    ucode_mod_map(NULL);
+out:
+    if ( ucode_blob.size )
+        xfree(data);
+    else
+        ucode_mod_map(NULL);
 
     return 0;
 }
@@ -298,14 +414,26 @@ static int __init microcode_presmp_init(void)
 {
     if ( microcode_ops )
     {
-        if ( ucode_mod.mod_end )
+        if ( ucode_mod.mod_end || ucode_blob.size )
         {
-            void *data = ucode_mod_map(&ucode_mod);
+            void *data;
+            size_t len;
 
+            if ( ucode_blob.size )
+            {
+                len = ucode_blob.size;
+                data = ucode_blob.data;
+            }
+            else
+            {
+                len = ucode_mod.mod_end;
+                data = ucode_mod_map(&ucode_mod);
+            }
             if ( data )
-                microcode_update_cpu(data, ucode_mod.mod_end);
+                microcode_update_cpu(data, len);
 
-            ucode_mod_map(NULL);
+            if ( !ucode_blob.size )
+                ucode_mod_map(NULL);
         }
 
         register_cpu_notifier(&microcode_percpu_nfb);
