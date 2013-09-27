@@ -63,6 +63,7 @@ struct pci_dev {
         DEV_TYPE_PCIe2PCI_BRIDGE,   // PCIe-to-PCI/PCIx bridge
         DEV_TYPE_PCI2PCIe_BRIDGE,   // PCI/PCIx-to-PCIe bridge
         DEV_TYPE_LEGACY_PCI_BRIDGE, // Legacy PCI bridge
+        DEV_TYPE_PCI_HOST_BRIDGE,   // PCI Host bridge
         DEV_TYPE_PCI,
     } type;
 

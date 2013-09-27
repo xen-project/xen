@@ -1433,6 +1433,15 @@ static int domain_context_mapping(
 
     switch ( pdev->type )
     {
+    case DEV_TYPE_PCI_HOST_BRIDGE:
+        if ( iommu_verbose )
+            dprintk(VTDPREFIX, "d%d:Hostbridge: skip %04x:%02x:%02x.%u map\n",
+                    domain->domain_id, seg, bus,
+                    PCI_SLOT(devfn), PCI_FUNC(devfn));
+        if ( !is_hardware_domain(domain) )
+            return -EPERM;
+        break;
+
     case DEV_TYPE_PCIe_BRIDGE:
     case DEV_TYPE_PCIe2PCI_BRIDGE:
     case DEV_TYPE_LEGACY_PCI_BRIDGE:
@@ -1563,6 +1572,15 @@ static int domain_context_unmap(
 
     switch ( pdev->type )
     {
+    case DEV_TYPE_PCI_HOST_BRIDGE:
+        if ( iommu_verbose )
+            dprintk(VTDPREFIX, "d%d:Hostbridge: skip %04x:%02x:%02x.%u unmap\n",
+                    domain->domain_id, seg, bus,
+                    PCI_SLOT(devfn), PCI_FUNC(devfn));
+        if ( !is_hardware_domain(domain) )
+            return -EPERM;
+        goto out;
+
     case DEV_TYPE_PCIe_BRIDGE:
     case DEV_TYPE_PCIe2PCI_BRIDGE:
     case DEV_TYPE_LEGACY_PCI_BRIDGE:

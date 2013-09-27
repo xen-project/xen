@@ -147,9 +147,10 @@ static void amd_iommu_setup_domain_device(
 
         amd_iommu_flush_device(iommu, req_id);
 
-        AMD_IOMMU_DEBUG("Setup I/O page table: device id = %#x, "
+        AMD_IOMMU_DEBUG("Setup I/O page table: device id = %#x, type = %#x, "
                         "root table = %#"PRIx64", "
-                        "domain = %d, paging mode = %d\n", req_id,
+                        "domain = %d, paging mode = %d\n",
+                        req_id, pdev->type,
                         page_to_maddr(hd->root_table),
                         hd->domain_id, hd->paging_mode);
     }
@@ -175,6 +176,15 @@ static int __init amd_iommu_setup_dom0_device(u8 devfn, struct pci_dev *pdev)
 
     if ( unlikely(!iommu) )
     {
+        /* Filter the bridge devices */
+        if ( pdev->type == DEV_TYPE_PCI_HOST_BRIDGE )
+        {
+            AMD_IOMMU_DEBUG("Skipping host bridge %04x:%02x:%02x.%u\n",
+                            pdev->seg, PCI_BUS(bdf), PCI_SLOT(bdf),
+                            PCI_FUNC(bdf));
+            return 0;
+        }
+
         AMD_IOMMU_DEBUG("No iommu for device %04x:%02x:%02x.%u\n",
                         pdev->seg, pdev->bus,
                         PCI_SLOT(devfn), PCI_FUNC(devfn));

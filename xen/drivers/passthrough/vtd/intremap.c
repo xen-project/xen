@@ -442,6 +442,7 @@ static void set_msi_source_id(struct pci_dev *pdev, struct iremap_entry *ire)
     case DEV_TYPE_PCIe_ENDPOINT:
     case DEV_TYPE_PCIe_BRIDGE:
     case DEV_TYPE_PCIe2PCI_BRIDGE:
+    case DEV_TYPE_PCI_HOST_BRIDGE:
         switch ( pdev->phantom_stride )
         {
         case 1: sq = SQ_13_IGNORE_3; break;

@@ -194,9 +194,6 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
         u16 cap;
         u8 sec_bus, sub_bus;
 
-        case DEV_TYPE_PCIe_BRIDGE:
-            break;
-
         case DEV_TYPE_PCIe2PCI_BRIDGE:
         case DEV_TYPE_LEGACY_PCI_BRIDGE:
             sec_bus = pci_conf_read8(pseg->nr, bus, PCI_SLOT(devfn),
@@ -244,6 +241,8 @@ static struct pci_dev *alloc_pdev(struct pci_seg *pseg, u8 bus, u8 devfn)
             break;
 
         case DEV_TYPE_PCI:
+        case DEV_TYPE_PCIe_BRIDGE:
+        case DEV_TYPE_PCI_HOST_BRIDGE:
             break;
 
         default:
@@ -697,6 +696,7 @@ void pci_release_devices(struct domain *d)
     spin_unlock(&pcidevs_lock);
 }
 
+#define PCI_CLASS_BRIDGE_HOST    0x0600
 #define PCI_CLASS_BRIDGE_PCI     0x0604
 
 enum pdev_type pdev_type(u16 seg, u8 bus, u8 devfn)
@@ -720,6 +720,8 @@ enum pdev_type pdev_type(u16 seg, u8 bus, u8 devfn)
             return DEV_TYPE_PCI2PCIe_BRIDGE;
         }
         return DEV_TYPE_PCIe_BRIDGE;
+    case PCI_CLASS_BRIDGE_HOST:
+        return DEV_TYPE_PCI_HOST_BRIDGE;
 
     case 0x0000: case 0xffff:
         return DEV_TYPE_PCI_UNKNOWN;
