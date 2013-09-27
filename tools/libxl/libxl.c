@@ -200,9 +200,12 @@ void libxl_string_list_dispose(libxl_string_list *psl)
 
 int libxl_string_list_length(const libxl_string_list *psl)
 {
-    if (!psl) return 0;
     int i = 0;
-    while ((*psl)[i]) i++;
+
+    if (*psl)
+        while ((*psl)[i])
+            i++;
+
     return i;
 }
 
