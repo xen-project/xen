@@ -418,6 +418,7 @@ static int __init microcode_presmp_init(void)
         {
             void *data;
             size_t len;
+            int rc = 0;
 
             if ( ucode_blob.size )
             {
@@ -430,10 +431,24 @@ static int __init microcode_presmp_init(void)
                 data = ucode_mod_map(&ucode_mod);
             }
             if ( data )
-                microcode_update_cpu(data, len);
+                rc = microcode_update_cpu(data, len);
+            else
+                rc = -ENOMEM;
 
             if ( !ucode_blob.size )
                 ucode_mod_map(NULL);
+
+            if ( rc )
+            {
+                if ( ucode_blob.size )
+                {
+                    xfree(ucode_blob.data);
+                    ucode_blob.size = 0;
+                    ucode_blob.data = NULL;
+                }
+                else
+                    ucode_mod.mod_end = 0;
+            }
         }
 
         register_cpu_notifier(&microcode_percpu_nfb);
