@@ -65,6 +65,35 @@ static int exynos5_specific_mapping(struct domain *d)
     return 0;
 }
 
+static int __init exynos5_smp_init(void)
+{
+    void __iomem *sysram;
+
+    sysram = ioremap_nocache(S5P_PA_SYSRAM, PAGE_SIZE);
+    if ( !sysram )
+    {
+        dprintk(XENLOG_ERR, "Unable to map exynos5 MMIO\n");
+        return -EFAULT;
+    }
+
+    printk("Set SYSRAM to %"PRIpaddr" (%p)\n",
+           __pa(init_secondary), init_secondary);
+    writel(__pa(init_secondary), sysram);
+
+    iounmap(sysram);
+
+    return 0;
+}
+
+static int __init exynos5_cpu_up(int cpu)
+{
+    /* Nothing to do here, the generic sev() will suffice to kick CPUs
+     * out of either the firmware or our own smp_up_cpu gate,
+     * depending on where they have ended up. */
+
+    return 0;
+}
+
 static void exynos5_reset(void)
 {
     void __iomem *pmu;
@@ -107,6 +136,8 @@ PLATFORM_START(exynos5, "SAMSUNG EXYNOS5")
     .compatible = exynos5_dt_compat,
     .init_time = exynos5_init_time,
     .specific_mapping = exynos5_specific_mapping,
+    .smp_init = exynos5_smp_init,
+    .cpu_up = exynos5_cpu_up,
     .reset = exynos5_reset,
     .quirks = exynos5_quirks,
     .blacklist_dev = exynos5_blacklist_dev,
