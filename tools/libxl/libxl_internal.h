@@ -1928,6 +1928,8 @@ struct libxl__ao_device {
     libxl__ev_devstate backend_ds;
     /* Bodge for Qemu devices, also used for timeout of hotplug execution */
     libxl__ev_time timeout;
+    /* xenstore watch for backend path of driver domains */
+    libxl__ev_xswatch xs_watch;
     /* device hotplug execution */
     const char *what;
     int num_exec;
