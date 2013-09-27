@@ -128,7 +128,7 @@ typedef struct {
 } xlchild;
 
 typedef enum {
-    child_console, child_waitdaemon, child_migration,
+    child_console, child_waitdaemon, child_migration, child_vncviewer,
     child_max
 } xlchildnum;
 

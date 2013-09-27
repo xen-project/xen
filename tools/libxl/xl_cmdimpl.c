@@ -194,6 +194,37 @@ static int vncviewer(uint32_t domid, int autopass)
     return 1;
 }
 
+static void vncviewer_child_report(void)
+{
+    if (xl_child_pid(child_vncviewer)) {
+        int status;
+        pid_t got = xl_waitpid(child_vncviewer, &status, 0);
+        if (got < 0)
+            perror("xl: warning, failed to waitpid for vncviewer child");
+        else if (status)
+            libxl_report_child_exitstatus(ctx, XTL_ERROR, "vncviewer child",
+                                          xl_child_pid(child_vncviewer), status);
+    }
+}
+
+static void autoconnect_vncviewer(uint32_t domid, int autopass)
+{
+    vncviewer_child_report();
+
+    pid_t pid = xl_fork(child_vncviewer);
+    if (pid < 0) {
+        perror("unable to fork vncviewer");
+        return;
+    } else if (pid > 0)
+        return;
+
+    postfork();
+
+    sleep(1);
+    vncviewer(domid, autopass);
+    _exit(1);
+}
+
 static int acquire_lock(void)
 {
     int rc;
@@ -2093,7 +2124,7 @@ start:
         goto out;
 
     if (dom_info->vnc)
-        vncviewer(domid, vncautopass);
+        autoconnect_vncviewer(domid, vncautopass);
 
     if (need_daemon) {
         char *fullname, *name;
