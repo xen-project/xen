@@ -1476,7 +1476,8 @@ int libxl_event_wait(libxl_ctx *ctx, libxl_event **event_r,
     }
 
  out:
-    libxl__poller_put(ctx, poller);
+    if (poller)
+        libxl__poller_put(ctx, poller);
 
     CTX_UNLOCK;
     EGC_FREE;
