@@ -650,7 +650,7 @@ int libxl_nodemap_to_cpumap(libxl_ctx *ctx,
                             libxl_bitmap *cpumap)
 {
     libxl_cputopology *tinfo = NULL;
-    int nr_cpus, i, rc = 0;
+    int nr_cpus = 0, i, rc = 0;
 
     tinfo = libxl_get_cpu_topology(ctx, &nr_cpus);
     if (tinfo == NULL) {
@@ -673,7 +673,7 @@ int libxl_cpumap_to_nodemap(libxl_ctx *ctx,
                             libxl_bitmap *nodemap)
 {
     libxl_cputopology *tinfo = NULL;
-    int nr_cpus, i, rc = 0;
+    int nr_cpus = 0, i, rc = 0;
 
     tinfo = libxl_get_cpu_topology(ctx, &nr_cpus);
     if (tinfo == NULL) {
