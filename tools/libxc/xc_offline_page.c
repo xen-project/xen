@@ -317,10 +317,10 @@ static int change_pte(xc_interface *xch, int domid,
                     goto failed;
                 }
             }
-        }
 
-        munmap(content, PAGE_SIZE);
-        content = NULL;
+            munmap(content, PAGE_SIZE);
+            content = NULL;
+        }
     }
 
     if ( xc_flush_mmu_updates(xch, mmu) )
