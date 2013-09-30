@@ -259,7 +259,15 @@ void *map_domain_page(unsigned long mfn)
           i < DOMHEAP_ENTRIES;
           slot = (slot + 1) % DOMHEAP_ENTRIES, i++ )
     {
-        if ( map[slot].pt.avail == 0 )
+        if ( map[slot].pt.avail < 0xf &&
+             map[slot].pt.base == slot_mfn &&
+             map[slot].pt.valid )
+        {
+            /* This slot already points to the right place; reuse it */
+            map[slot].pt.avail++;
+            break;
+        }
+        else if ( map[slot].pt.avail == 0 )
         {
             /* Commandeer this 2MB slot */
             pte = mfn_to_xen_entry(slot_mfn);
@@ -267,12 +275,7 @@ void *map_domain_page(unsigned long mfn)
             write_pte(map + slot, pte);
             break;
         }
-        else if ( map[slot].pt.avail < 0xf && map[slot].pt.base == slot_mfn )
-        {
-            /* This slot already points to the right place; reuse it */
-            map[slot].pt.avail++;
-            break;
-        }
+
     }
     /* If the map fills up, the callers have misbehaved. */
     BUG_ON(i == DOMHEAP_ENTRIES);
