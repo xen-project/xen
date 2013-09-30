@@ -674,7 +674,7 @@ static void __init parse_ivrs_hpet(char *str)
     hpet_sbdf.id = id;
     hpet_sbdf.bdf = PCI_BDF(bus, dev, func);
     hpet_sbdf.seg = seg;
-    hpet_sbdf.cmdline = 1;
+    hpet_sbdf.init = HPET_CMDL;
 }
 custom_param("ivrs_hpet[", parse_ivrs_hpet);
 
@@ -789,20 +789,28 @@ static u16 __init parse_ivhd_device_special(
         }
         break;
     case ACPI_IVHD_HPET:
-        /* set device id of hpet */
-        if ( hpet_sbdf.iommu ||
-             (hpet_sbdf.cmdline && hpet_sbdf.id != special->handle) )
+        switch (hpet_sbdf.init)
         {
-            printk(XENLOG_WARNING "Only one IVHD HPET entry is supported\n");
+        case HPET_IVHD:
+            printk(XENLOG_WARNING "Only one IVHD HPET entry is supported.\n");
             break;
-        }
-        hpet_sbdf.id = special->handle;
-        if ( !hpet_sbdf.cmdline )
-        {
+        case HPET_CMDL:
+            AMD_IOMMU_DEBUG("IVHD: Command line override present for HPET %#x "
+                            "(IVRS: %#x devID %04x:%02x:%02x.%u)\n",
+                            hpet_sbdf.id, special->handle, seg, PCI_BUS(bdf),
+                            PCI_SLOT(bdf), PCI_FUNC(bdf));
+            break;
+        case HPET_NONE:
+            /* set device id of hpet */
+            hpet_sbdf.id = special->handle;
             hpet_sbdf.bdf = bdf;
             hpet_sbdf.seg = seg;
+            hpet_sbdf.init = HPET_IVHD;
+            break;
+        default:
+            ASSERT(0);
+            break;
         }
-        hpet_sbdf.iommu = iommu;
         break;
     default:
         printk(XENLOG_ERR "Unrecognized IVHD special variety %#x\n",

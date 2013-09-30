@@ -598,10 +598,16 @@ int __init amd_setup_hpet_msi(struct msi_desc *msi_desc)
     unsigned long flags;
     int rc = 0;
 
-    if ( msi_desc->hpet_id != hpet_sbdf.id || !hpet_sbdf.iommu )
+    if ( hpet_sbdf.init == HPET_NONE )
     {
-        AMD_IOMMU_DEBUG("Failed to setup HPET MSI remapping: %s\n",
-                        hpet_sbdf.iommu ? "Wrong HPET" : "No IOMMU");
+        AMD_IOMMU_DEBUG("Failed to setup HPET MSI remapping."
+                        " Missing IVRS HPET info.\n");
+        return -ENODEV;
+    }
+    if ( msi_desc->hpet_id != hpet_sbdf.id )
+    {
+        AMD_IOMMU_DEBUG("Failed to setup HPET MSI remapping."
+                        " Wrong HPET.\n");
         return -ENODEV;
     }
 

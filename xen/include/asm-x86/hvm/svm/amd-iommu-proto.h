@@ -108,8 +108,11 @@ extern struct ioapic_sbdf {
 
 extern struct hpet_sbdf {
     u16 bdf, seg, id;
-    bool_t cmdline;
-    struct amd_iommu *iommu;
+    enum {
+        HPET_NONE,
+        HPET_CMDL,
+        HPET_IVHD,
+    } init;
 } hpet_sbdf;
 
 extern void *shared_intremap_table;
