@@ -355,6 +355,12 @@ int cpupool_unassign_cpu(struct cpupool *c, unsigned int cpu)
     atomic_inc(&c->refcnt);
     cpupool_cpu_moving = c;
     cpumask_clear_cpu(cpu, c->cpu_valid);
+
+    rcu_read_lock(&domlist_read_lock);
+    for_each_domain_in_cpupool(d, c)
+        domain_update_node_affinity(d);
+    rcu_read_unlock(&domlist_read_lock);
+
     spin_unlock(&cpupool_lock);
 
     work_cpu = smp_processor_id();
