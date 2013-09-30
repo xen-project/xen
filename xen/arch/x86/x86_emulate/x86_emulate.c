@@ -3177,11 +3177,11 @@ x86_emulate(
                 break;
             case 4: /* fbld m80dec */
                 ea.bytes = 10;
-                dst = ea;
+                src = ea;
                 if ( (rc = ops->read(src.mem.seg, src.mem.off,
                                      &src.val, src.bytes, ctxt)) != 0 )
                     goto done;
-                emulate_fpu_insn_memdst("fbld", src.val);
+                emulate_fpu_insn_memsrc("fbld", src.val);
                 break;
             case 5: /* fild m64i */
                 ea.bytes = 8;
