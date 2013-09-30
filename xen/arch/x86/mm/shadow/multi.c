@@ -1433,15 +1433,19 @@ void sh_install_xen_entries_in_l4(struct vcpu *v, mfn_t gl4mfn, mfn_t sl4mfn)
 {
     struct domain *d = v->domain;
     shadow_l4e_t *sl4e;
+    unsigned int slots;
 
     sl4e = sh_map_domain_page(sl4mfn);
     ASSERT(sl4e != NULL);
     ASSERT(sizeof (l4_pgentry_t) == sizeof (shadow_l4e_t));
     
     /* Copy the common Xen mappings from the idle domain */
+    slots = (shadow_mode_external(d)
+             ? ROOT_PAGETABLE_XEN_SLOTS
+             : ROOT_PAGETABLE_PV_XEN_SLOTS);
     memcpy(&sl4e[ROOT_PAGETABLE_FIRST_XEN_SLOT],
            &idle_pg_table[ROOT_PAGETABLE_FIRST_XEN_SLOT],
-           ROOT_PAGETABLE_XEN_SLOTS * sizeof(l4_pgentry_t));
+           slots * sizeof(l4_pgentry_t));
 
     /* Install the per-domain mappings for this domain */
     sl4e[shadow_l4_table_offset(PERDOMAIN_VIRT_START)] =
