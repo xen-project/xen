@@ -39,7 +39,9 @@ static void realmode_deliver_exception(
 
  again:
     last_byte = (vector * 4) + 3;
-    if ( idtr->limit < last_byte )
+    if ( idtr->limit < last_byte ||
+         hvm_copy_from_guest_phys(&cs_eip, idtr->base + vector * 4, 4) !=
+         HVMCOPY_okay )
     {
         /* Software interrupt? */
         if ( insn_len != 0 )
@@ -63,8 +65,6 @@ static void realmode_deliver_exception(
             goto again;
         }
     }
-
-    (void)hvm_copy_from_guest_phys(&cs_eip, idtr->base + vector * 4, 4);
 
     frame[0] = regs->eip + insn_len;
     frame[1] = csr->sel;

@@ -340,14 +340,24 @@ static int dpci_ioport_write(uint32_t mport, ioreq_t *p)
         data = p->data;
         if ( p->data_is_ptr )
         {
-            int ret;
-            
-            ret = hvm_copy_from_guest_phys(&data, 
-                                           p->data + (sign * i * p->size),
-                                           p->size);
-            if ( (ret == HVMCOPY_gfn_paged_out) &&
-                 (ret == HVMCOPY_gfn_shared) )
+            switch ( hvm_copy_from_guest_phys(&data,
+                                              p->data + sign * i * p->size,
+                                              p->size) )
+            {
+            case HVMCOPY_okay:
+                break;
+            case HVMCOPY_gfn_paged_out:
+            case HVMCOPY_gfn_shared:
                 return X86EMUL_RETRY;
+            case HVMCOPY_bad_gfn_to_mfn:
+                data = ~0;
+                break;
+            case HVMCOPY_bad_gva_to_gfn:
+                ASSERT(0);
+                /* fall through */
+            default:
+                return X86EMUL_UNHANDLEABLE;
+            }
         }
 
         switch ( p->size )

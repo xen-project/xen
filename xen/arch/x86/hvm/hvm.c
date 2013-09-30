@@ -2310,11 +2310,7 @@ void hvm_task_switch(
 
     rc = hvm_copy_from_guest_virt(
         &tss, prev_tr.base, sizeof(tss), PFEC_page_present);
-    if ( rc == HVMCOPY_bad_gva_to_gfn )
-        goto out;
-    if ( rc == HVMCOPY_gfn_paged_out )
-        goto out;
-    if ( rc == HVMCOPY_gfn_shared )
+    if ( rc != HVMCOPY_okay )
         goto out;
 
     eflags = regs->eflags;
@@ -2359,13 +2355,11 @@ void hvm_task_switch(
 
     rc = hvm_copy_from_guest_virt(
         &tss, tr.base, sizeof(tss), PFEC_page_present);
-    if ( rc == HVMCOPY_bad_gva_to_gfn )
-        goto out;
-    if ( rc == HVMCOPY_gfn_paged_out )
-        goto out;
-    /* Note: this could be optimised, if the callee functions knew we want RO
-     * access */
-    if ( rc == HVMCOPY_gfn_shared )
+    /*
+     * Note: The HVMCOPY_gfn_shared case could be optimised, if the callee
+     * functions knew we want RO access.
+     */
+    if ( rc != HVMCOPY_okay )
         goto out;
 
 
