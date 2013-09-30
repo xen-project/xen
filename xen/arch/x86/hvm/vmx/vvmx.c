@@ -1342,6 +1342,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
 
     nestedhvm_vcpu_exit_guestmode(v);
     nvcpu->nv_vmexit_pending = 0;
+    nvcpu->nv_vmswitch_in_progress = 1;
 
     lm_l2 = !!hvm_long_mode_enabled(v);
     lm_l1 = !!(__get_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_CONTROLS) &
@@ -1372,6 +1373,7 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     if ( cpu_has_vmx_virtual_intr_delivery )
         nvmx_update_apicv(v);
 
+    nvcpu->nv_vmswitch_in_progress = 0;
     vmreturn(regs, VMSUCCEED);
 }
 
@@ -1877,6 +1879,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         data = SECONDARY_EXEC_DESCRIPTOR_TABLE_EXITING |
                SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
                SECONDARY_EXEC_ENABLE_VPID |
+               SECONDARY_EXEC_UNRESTRICTED_GUEST |
                SECONDARY_EXEC_ENABLE_EPT;
         data = gen_vmx_msr(data, 0, host_data);
         break;

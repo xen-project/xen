@@ -1732,7 +1732,8 @@ int hvm_set_cr0(unsigned long value)
     {
         if ( v->arch.hvm_vcpu.guest_efer & EFER_LME )
         {
-            if ( !(v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PAE) )
+            if ( !(v->arch.hvm_vcpu.guest_cr[4] & X86_CR4_PAE) &&
+                 !nestedhvm_vmswitch_in_progress(v) )
             {
                 HVM_DBG_LOG(DBG_LEVEL_1, "Enable paging before PAE enable");
                 goto gpf;
