@@ -137,7 +137,7 @@ l1_pgentry_t __attribute__ ((__section__ (".bss.page_aligned")))
 #define PTE_UPDATE_WITH_CMPXCHG
 #endif
 
-bool_t __read_mostly mem_hotplug = 0;
+paddr_t __read_mostly mem_hotplug;
 
 /* Private domain structs for DOMID_XEN and DOMID_IO. */
 struct domain *dom_xen, *dom_io, *dom_cow;
