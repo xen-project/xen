@@ -159,7 +159,8 @@ class NetConfig:
     def setUsedIP(self, domname, interface, ip):
         self.used_ips['%s:%s' % (domname, interface)] = ip
 
-    def __findFirstOctetIP(self, prefix, min, max):
+    def __findFirstOctetIP(self, prefix, min, len):
+        max = min + len
         for i in range(min, max):
             ip = '%s%s' % (prefix, str(i))
             found = False
