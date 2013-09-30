@@ -392,6 +392,13 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     flexarray_append(dm_args, "-mon");
     flexarray_append(dm_args, "chardev=libxl-cmd,mode=control");
 
+    /*
+     * Remove default devices created by qemu. Qemu will create only devices
+     * defined by xen, since the devices not defined by xen are not usable.
+     * Remove deleting of empty floppy no more needed with nodefault.
+     */
+    flexarray_append(dm_args, "-nodefaults");
+
     if (b_info->type == LIBXL_DOMAIN_TYPE_PV) {
         flexarray_append(dm_args, "-xen-attach");
     }
@@ -456,9 +463,6 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
 
     if (b_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         int ioemu_nics = 0;
-
-        /* Disable useless empty floppy drive */
-        flexarray_vappend(dm_args, "-global", "isa-fdc.driveA=", NULL);
 
         if (b_info->u.hvm.serial) {
             flexarray_vappend(dm_args, "-serial", b_info->u.hvm.serial, NULL);
