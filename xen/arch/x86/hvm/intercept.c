@@ -87,17 +87,28 @@ static int hvm_mmio_access(struct vcpu *v,
     {
         for ( i = 0; i < p->count; i++ )
         {
-            int ret;
-
-            ret = hvm_copy_from_guest_phys(&data,
-                                           p->data + (sign * i * p->size),
-                                           p->size);
-            if ( (ret == HVMCOPY_gfn_paged_out) || 
-                 (ret == HVMCOPY_gfn_shared) )
+            switch ( hvm_copy_from_guest_phys(&data,
+                                              p->data + sign * i * p->size,
+                                              p->size) )
             {
+            case HVMCOPY_okay:
+                break;
+            case HVMCOPY_gfn_paged_out:
+            case HVMCOPY_gfn_shared:
                 rc = X86EMUL_RETRY;
                 break;
+            case HVMCOPY_bad_gfn_to_mfn:
+                data = ~0;
+                break;
+            case HVMCOPY_bad_gva_to_gfn:
+                ASSERT(0);
+                /* fall through */
+            default:
+                rc = X86EMUL_UNHANDLEABLE;
+                break;
             }
+            if ( rc != X86EMUL_OKAY )
+                break;
             rc = write_handler(v, p->addr + (sign * i * p->size), p->size,
                                data);
             if ( rc != X86EMUL_OKAY )
@@ -165,8 +176,28 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
         for ( i = 0; i < p->count; i++ )
         {
             data = 0;
-            (void)hvm_copy_from_guest_phys(&data, p->data + sign*i*p->size,
-                                           p->size);
+            switch ( hvm_copy_from_guest_phys(&data,
+                                              p->data + sign * i * p->size,
+                                              p->size) )
+            {
+            case HVMCOPY_okay:
+                break;
+            case HVMCOPY_gfn_paged_out:
+            case HVMCOPY_gfn_shared:
+                rc = X86EMUL_RETRY;
+                break;
+            case HVMCOPY_bad_gfn_to_mfn:
+                data = ~0;
+                break;
+            case HVMCOPY_bad_gva_to_gfn:
+                ASSERT(0);
+                /* fall through */
+            default:
+                rc = X86EMUL_UNHANDLEABLE;
+                break;
+            }
+            if ( rc != X86EMUL_OKAY )
+                break;
             rc = action(IOREQ_WRITE, p->addr, p->size, &data);
             if ( rc != X86EMUL_OKAY )
                 break;
