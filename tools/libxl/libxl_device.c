@@ -715,16 +715,8 @@ void libxl__wait_device_connection(libxl__egc *egc, libxl__ao_device *aodev)
     STATE_AO_GC(aodev->ao);
     char *be_path = libxl__device_backend_path(gc, aodev->dev);
     char *state_path = libxl__sprintf(gc, "%s/state", be_path);
-    libxl_dominfo info;
-    uint32_t domid = aodev->dev->domid;
     int rc = 0;
 
-    libxl_dominfo_init(&info);
-    rc = libxl_domain_info(CTX, &info, domid);
-    if (rc) {
-        LOG(ERROR, "unable to get info for domain %d", domid);
-        goto out;
-    }
     if (QEMU_BACKEND(aodev->dev)) {
         /*
          * If Qemu is not running, there's no point in waiting for
@@ -746,12 +738,10 @@ void libxl__wait_device_connection(libxl__egc *egc, libxl__ao_device *aodev)
         goto out;
     }
 
-    libxl_dominfo_dispose(&info);
     return;
 
 out:
     aodev->rc = rc;
-    libxl_dominfo_dispose(&info);
     device_hotplug_done(egc, aodev);
     return;
 }
