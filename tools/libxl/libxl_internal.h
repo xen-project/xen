@@ -101,6 +101,7 @@
 #define STUBDOM_SPECIAL_CONSOLES 3
 #define TAP_DEVICE_SUFFIX "-emu"
 #define DISABLE_UDEV_PATH "libxl/disable_udev"
+#define DOMID_XS_PATH "domid"
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
@@ -977,6 +978,8 @@ _hidden const char *libxl__device_nic_devname(libxl__gc *gc,
                                               uint32_t domid,
                                               uint32_t devid,
                                               libxl_nic_type type);
+
+_hidden int libxl__get_domid(libxl__gc *gc, uint32_t *domid);
 
 /*
  * libxl__ev_devstate - waits a given time for a device to
