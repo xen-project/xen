@@ -908,12 +908,15 @@ static void device_hotplug(libxl__egc *egc, libxl__ao_device *aodev)
     int rc = 0;
     int hotplug;
     pid_t pid;
+    uint32_t domid;
 
     /*
      * If device is attached from a driver domain don't try to execute
      * hotplug scripts
      */
-    if (aodev->dev->backend_domid != LIBXL_TOOLSTACK_DOMID)
+    rc = libxl__get_domid(gc, &domid);
+    if (rc) goto out;
+    if (aodev->dev->backend_domid != domid)
         goto out;
 
     /* Check if we have to execute hotplug scripts for this device
