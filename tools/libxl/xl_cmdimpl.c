@@ -4501,7 +4501,7 @@ int main_vcpulist(int argc, char **argv)
 {
     int opt;
 
-    SWITCH_FOREACH_OPT(opt, "", NULL, "cpu-list", 0) {
+    SWITCH_FOREACH_OPT(opt, "", NULL, "vcpu-list", 0) {
         /* No options */
     }
 
