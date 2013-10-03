@@ -104,8 +104,8 @@ created online and the remainder will be offline.
 
 =item B<cpus="CPU-LIST">
 
-List of which cpus the guest is allowed to use. By default xl will pick
-some cpus on its own (see below). A C<CPU-LIST> may be specified as follows:
+List of which cpus the guest is allowed to use. Default is no pinning at
+all (more on this below). A C<CPU-LIST> may be specified as follows:
 
 =over 4
 
@@ -125,11 +125,19 @@ run on cpu #3 of the host.
 
 =back
 
-If this option is not specified, libxl automatically tries to place the new
-domain on the host's NUMA nodes (provided the host has more than one NUMA
-node) by pinning it to the cpus of those nodes. A heuristic approach is
-utilized with the goals of maximizing performance for the domain and, at
-the same time, achieving efficient utilization of the host's CPUs and RAM.
+If this option is not specified, no vcpu to cpu pinning is established,
+and the vcpus of the guest can run on all the cpus of the host.
+
+If we are on a NUMA machine (i.e., if the host has more than one NUMA
+node) and this option is not specified, libxl automatically tries to
+place the guest on the least possible number of nodes. That, however,
+will not affect vcpu pinning, so the guest will still be able to run on
+all the cpus, it will just prefer the ones from the node it has been
+placed on. A heuristic approach is used for choosing the best node (or
+set of nodes), with the goals of maximizing performance for the guest
+and, at the same time, achieving efficient utilization of host cpus
+and memory. See F<docs/misc/xl-numa-placement.markdown> for more
+details.
 
 =back
 
