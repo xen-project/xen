@@ -668,6 +668,28 @@ int libxl_nodemap_to_cpumap(libxl_ctx *ctx,
     return rc;
 }
 
+int libxl_node_to_cpumap(libxl_ctx *ctx, int node,
+                         libxl_bitmap *cpumap)
+{
+    libxl_bitmap nodemap;
+    int rc = 0;
+
+    libxl_bitmap_init(&nodemap);
+
+    rc = libxl_node_bitmap_alloc(ctx, &nodemap, 0);
+    if (rc)
+        goto out;
+
+    libxl_bitmap_set_none(&nodemap);
+    libxl_bitmap_set(&nodemap, node);
+
+    rc = libxl_nodemap_to_cpumap(ctx, &nodemap, cpumap);
+
+ out:
+    libxl_bitmap_dispose(&nodemap);
+    return rc;
+}
+
 int libxl_cpumap_to_nodemap(libxl_ctx *ctx,
                             const libxl_bitmap *cpumap,
                             libxl_bitmap *nodemap)

@@ -129,6 +129,9 @@ static inline int libxl_node_bitmap_alloc(libxl_ctx *ctx,
 int libxl_nodemap_to_cpumap(libxl_ctx *ctx,
                             const libxl_bitmap *nodemap,
                             libxl_bitmap *cpumap);
+/* Populate cpumap with the cpus spanned by node */
+int libxl_node_to_cpumap(libxl_ctx *ctx, int node,
+                         libxl_bitmap *cpumap);
 /* Populate nodemap with the nodes of the cpus in cpumap */
 int libxl_cpumap_to_nodemap(libxl_ctx *ctx,
                             const libxl_bitmap *cpuemap,
