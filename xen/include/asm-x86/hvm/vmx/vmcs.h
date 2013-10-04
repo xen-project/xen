@@ -210,8 +210,6 @@ extern u32 vmx_vmentry_control;
 #define SECONDARY_EXEC_ENABLE_VMCS_SHADOWING    0x00004000
 extern u32 vmx_secondary_exec_control;
 
-extern bool_t cpu_has_vmx_ins_outs_instr_info;
-
 #define VMX_EPT_EXEC_ONLY_SUPPORTED             0x00000001
 #define VMX_EPT_WALK_LENGTH_4_SUPPORTED         0x00000040
 #define VMX_EPT_MEMORY_TYPE_UC                  0x00000100
@@ -278,6 +276,12 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
 #define VMX_INTR_SHADOW_SMI             0x00000004
 #define VMX_INTR_SHADOW_NMI             0x00000008
 
+#define VMX_BASIC_REVISION_MASK         0x7fffffff
+#define VMX_BASIC_VMCS_SIZE_MASK        (0x1fffULL << 32)
+#define VMX_BASIC_32BIT_ADDRESSES       (1ULL << 48)
+#define VMX_BASIC_DUAL_MONITOR          (1ULL << 49)
+#define VMX_BASIC_MEMORY_TYPE_MASK      (0xfULL << 50)
+#define VMX_BASIC_INS_OUT_INFO          (1ULL << 54)
 /* 
  * bit 55 of IA32_VMX_BASIC MSR, indicating whether any VMX controls that
  * default to 1 may be cleared to 0.
@@ -285,6 +289,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
 #define VMX_BASIC_DEFAULT1_ZERO		(1ULL << 55)
 
 extern u64 vmx_basic_msr;
+#define cpu_has_vmx_ins_outs_instr_info \
+    (!!(vmx_basic_msr & VMX_BASIC_INS_OUT_INFO))
 
 /* Guest interrupt status */
 #define VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK  0x0FF

@@ -70,7 +70,6 @@ u32 vmx_secondary_exec_control __read_mostly;
 u32 vmx_vmexit_control __read_mostly;
 u32 vmx_vmentry_control __read_mostly;
 u64 vmx_ept_vpid_cap __read_mostly;
-bool_t cpu_has_vmx_ins_outs_instr_info __read_mostly;
 
 static DEFINE_PER_CPU_READ_MOSTLY(struct vmcs_struct *, vmxon_region);
 static DEFINE_PER_CPU(struct vmcs_struct *, current_vmcs);
@@ -294,24 +293,33 @@ static int vmx_init_vmcs_config(void)
     if ( !vmx_pin_based_exec_control )
     {
         /* First time through. */
-        vmcs_revision_id = vmx_basic_msr_low;
+        vmcs_revision_id           = vmx_basic_msr_low & VMX_BASIC_REVISION_MASK;
         vmx_pin_based_exec_control = _vmx_pin_based_exec_control;
         vmx_cpu_based_exec_control = _vmx_cpu_based_exec_control;
         vmx_secondary_exec_control = _vmx_secondary_exec_control;
         vmx_ept_vpid_cap           = _vmx_ept_vpid_cap;
         vmx_vmexit_control         = _vmx_vmexit_control;
         vmx_vmentry_control        = _vmx_vmentry_control;
-        cpu_has_vmx_ins_outs_instr_info = !!(vmx_basic_msr_high & (1U<<22));
         vmx_basic_msr              = ((u64)vmx_basic_msr_high << 32) |
                                      vmx_basic_msr_low;
         vmx_display_features();
+
+        /* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */
+        if ( (vmx_basic_msr_high & (VMX_BASIC_VMCS_SIZE_MASK >> 32)) >
+             PAGE_SIZE )
+        {
+            printk("VMX: CPU%d VMCS size is too big (%Lu bytes)\n",
+                   smp_processor_id(),
+                   vmx_basic_msr_high & (VMX_BASIC_VMCS_SIZE_MASK >> 32));
+            return -EINVAL;
+        }
     }
     else
     {
         /* Globals are already initialised: re-check them. */
         mismatch |= cap_check(
             "VMCS revision ID",
-            vmcs_revision_id, vmx_basic_msr_low);
+            vmcs_revision_id, vmx_basic_msr_low & VMX_BASIC_REVISION_MASK);
         mismatch |= cap_check(
             "Pin-Based Exec Control",
             vmx_pin_based_exec_control, _vmx_pin_based_exec_control);
@@ -331,11 +339,19 @@ static int vmx_init_vmcs_config(void)
             "EPT and VPID Capability",
             vmx_ept_vpid_cap, _vmx_ept_vpid_cap);
         if ( cpu_has_vmx_ins_outs_instr_info !=
-             !!(vmx_basic_msr_high & (1U<<22)) )
+             !!(vmx_basic_msr_high & (VMX_BASIC_INS_OUT_INFO >> 32)) )
         {
             printk("VMX INS/OUTS Instruction Info: saw %d expected %d\n",
-                   !!(vmx_basic_msr_high & (1U<<22)),
+                   !!(vmx_basic_msr_high & (VMX_BASIC_INS_OUT_INFO >> 32)),
                    cpu_has_vmx_ins_outs_instr_info);
+            mismatch = 1;
+        }
+        if ( (vmx_basic_msr_high & (VMX_BASIC_VMCS_SIZE_MASK >> 32)) !=
+             ((vmx_basic_msr & VMX_BASIC_VMCS_SIZE_MASK) >> 32) )
+        {
+            printk("VMX: CPU%d unexpected VMCS size %Lu\n",
+                   smp_processor_id(),
+                   vmx_basic_msr_high & (VMX_BASIC_VMCS_SIZE_MASK >> 32));
             mismatch = 1;
         }
         if ( mismatch )
@@ -346,16 +362,8 @@ static int vmx_init_vmcs_config(void)
         }
     }
 
-    /* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */
-    if ( (vmx_basic_msr_high & 0x1fff) > PAGE_SIZE )
-    {
-        printk("VMX: CPU%d VMCS size is too big (%u bytes)\n",
-               smp_processor_id(), vmx_basic_msr_high & 0x1fff);
-        return -EINVAL;
-    }
-
     /* IA-32 SDM Vol 3B: 64-bit CPUs always have VMX_BASIC_MSR[48]==0. */
-    if ( vmx_basic_msr_high & (1u<<16) )
+    if ( vmx_basic_msr_high & (VMX_BASIC_32BIT_ADDRESSES >> 32) )
     {
         printk("VMX: CPU%d limits VMX structure pointers to 32 bits\n",
                smp_processor_id());
@@ -363,10 +371,12 @@ static int vmx_init_vmcs_config(void)
     }
 
     /* Require Write-Back (WB) memory type for VMCS accesses. */
-    if ( ((vmx_basic_msr_high >> 18) & 15) != 6 )
+    opt = (vmx_basic_msr_high & (VMX_BASIC_MEMORY_TYPE_MASK >> 32)) /
+          ((VMX_BASIC_MEMORY_TYPE_MASK & -VMX_BASIC_MEMORY_TYPE_MASK) >> 32);
+    if ( opt != MTRR_TYPE_WRBACK )
     {
         printk("VMX: CPU%d has unexpected VMCS access type %u\n",
-               smp_processor_id(), (vmx_basic_msr_high >> 18) & 15);
+               smp_processor_id(), opt);
         return -EINVAL;
     }
 
