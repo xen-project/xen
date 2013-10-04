@@ -2764,7 +2764,17 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
-    unsigned int count = *ecx;
+    unsigned int count, dummy = 0;
+
+    if ( !eax )
+        eax = &dummy;
+    if ( !ebx )
+        ebx = &dummy;
+    if ( !ecx )
+        ecx = &dummy;
+    count = *ecx;
+    if ( !edx )
+        edx = &dummy;
 
     if ( cpuid_viridian_leaves(input, eax, ebx, ecx, edx) )
         return;
@@ -2772,7 +2782,7 @@ void hvm_cpuid(unsigned int input, unsigned int *eax, unsigned int *ebx,
     if ( cpuid_hypervisor_leaves(input, count, eax, ebx, ecx, edx) )
         return;
 
-    domain_cpuid(d, input, *ecx, eax, ebx, ecx, edx);
+    domain_cpuid(d, input, count, eax, ebx, ecx, edx);
 
     switch ( input )
     {
@@ -2860,15 +2870,15 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 {
     struct vcpu *v = current;
     uint64_t *var_range_base, *fixed_range_base;
-    int index, mtrr;
-    uint32_t cpuid[4];
+    bool_t mtrr;
+    unsigned int edx, index;
     int ret = X86EMUL_OKAY;
 
     var_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.var_ranges;
     fixed_range_base = (uint64_t *)v->arch.hvm_vcpu.mtrr.fixed_ranges;
 
-    hvm_cpuid(1, &cpuid[0], &cpuid[1], &cpuid[2], &cpuid[3]);
-    mtrr = !!(cpuid[3] & cpufeat_mask(X86_FEATURE_MTRR));
+    hvm_cpuid(1, NULL, NULL, NULL, &edx);
+    mtrr = !!(edx & cpufeat_mask(X86_FEATURE_MTRR));
 
     switch ( msr )
     {
@@ -2976,15 +2986,15 @@ int hvm_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
 int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content)
 {
     struct vcpu *v = current;
-    int index, mtrr;
-    uint32_t cpuid[4];
+    bool_t mtrr;
+    unsigned int edx, index;
     int ret = X86EMUL_OKAY;
 
     HVMTRACE_3D(MSR_WRITE, msr,
                (uint32_t)msr_content, (uint32_t)(msr_content >> 32));
 
-    hvm_cpuid(1, &cpuid[0], &cpuid[1], &cpuid[2], &cpuid[3]);
-    mtrr = !!(cpuid[3] & cpufeat_mask(X86_FEATURE_MTRR));
+    hvm_cpuid(1, NULL, NULL, NULL, &edx);
+    mtrr = !!(edx & cpufeat_mask(X86_FEATURE_MTRR));
 
     hvm_memory_event_msr(msr, msr_content);
 

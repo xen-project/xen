@@ -1815,7 +1815,7 @@ int nvmx_handle_invvpid(struct cpu_user_regs *regs)
 int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
 {
     struct vcpu *v = current;
-    unsigned int eax, ebx, ecx, edx, dummy;
+    unsigned int eax, ebx, ecx, edx;
     u64 data = 0, host_data = 0;
     int r = 1;
 
@@ -1823,7 +1823,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         return 0;
 
     /* VMX capablity MSRs are available only when guest supports VMX. */
-    hvm_cpuid(0x1, &dummy, &dummy, &ecx, &edx);
+    hvm_cpuid(0x1, NULL, NULL, &ecx, &edx);
     if ( !(ecx & cpufeat_mask(X86_FEATURE_VMXE)) )
         return 0;
 
@@ -1975,18 +1975,18 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         if ( ecx & cpufeat_mask(X86_FEATURE_XSAVE) )
             data |= X86_CR4_OSXSAVE;
 
-        hvm_cpuid(0x0, &eax, &dummy, &dummy, &dummy);
+        hvm_cpuid(0x0, &eax, NULL, NULL, NULL);
         switch ( eax )
         {
         default:
-            hvm_cpuid(0xa, &eax, &dummy, &dummy, &dummy);
+            hvm_cpuid(0xa, &eax, NULL, NULL, NULL);
             /* Check whether guest has the perf monitor feature. */
             if ( (eax & 0xff) && (eax & 0xff00) )
                 data |= X86_CR4_PCE;
             /* fall through */
         case 0x7 ... 0x9:
             ecx = 0;
-            hvm_cpuid(0x7, &dummy, &ebx, &ecx, &dummy);
+            hvm_cpuid(0x7, NULL, &ebx, &ecx, NULL);
             if ( ebx & cpufeat_mask(X86_FEATURE_FSGSBASE) )
                 data |= X86_CR4_FSGSBASE;
             if ( ebx & cpufeat_mask(X86_FEATURE_SMEP) )

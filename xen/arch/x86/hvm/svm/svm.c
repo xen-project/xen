@@ -806,13 +806,13 @@ static inline void svm_lwp_load(struct vcpu *v)
 /* Update LWP_CFG MSR (0xc0000105). Return -1 if error; otherwise returns 0. */
 static int svm_update_lwp_cfg(struct vcpu *v, uint64_t msr_content)
 {
-    unsigned int eax, ebx, ecx, edx;
+    unsigned int edx;
     uint32_t msr_low;
     static uint8_t lwp_intr_vector;
 
     if ( xsave_enabled(v) && cpu_has_lwp )
     {
-        hvm_cpuid(0x8000001c, &eax, &ebx, &ecx, &edx);
+        hvm_cpuid(0x8000001c, NULL, NULL, NULL, &edx);
         msr_low = (uint32_t)msr_content;
         
         /* generate #GP if guest tries to turn on unsupported features. */
@@ -1163,10 +1163,10 @@ static void svm_init_erratum_383(struct cpuinfo_x86 *c)
 
 static int svm_handle_osvw(struct vcpu *v, uint32_t msr, uint64_t *val, bool_t read)
 {
-    uint eax, ebx, ecx, edx;
+    unsigned int ecx;
 
     /* Guest OSVW support */
-    hvm_cpuid(0x80000001, &eax, &ebx, &ecx, &edx);
+    hvm_cpuid(0x80000001, NULL, NULL, &ecx, NULL);
     if ( !test_bit((X86_FEATURE_OSVW & 31), &ecx) )
         return -1;
 
