@@ -329,7 +329,10 @@ UNLIKELY_END(compat_bounce_failsafe)
         movzwl TRAPBOUNCE_cs(%rdx),%eax
         /* Null selectors (0-3) are not allowed. */
         testl $~3,%eax
-        jz    domain_crash_synchronous
+UNLIKELY_START(z, compat_bounce_null_selector)
+        lea   UNLIKELY_DISPATCH_LABEL(compat_bounce_null_selector)(%rip), %rdi
+        jmp   asm_domain_crash_synchronous  /* Does not return */
+__UNLIKELY_END(compat_bounce_null_selector)
         movl  %eax,UREGS_cs+8(%rsp)
         movl  TRAPBOUNCE_eip(%rdx),%eax
         movl  %eax,UREGS_rip+8(%rsp)
@@ -339,10 +342,10 @@ UNLIKELY_END(compat_bounce_failsafe)
         xorl  %edi,%edi
         jmp   .Lft13
 .previous
-        _ASM_EXTABLE(.Lft1,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft1,  dom_crash_sync_extable)
         _ASM_EXTABLE(.Lft2,  compat_crash_page_fault)
         _ASM_EXTABLE(.Lft3,  compat_crash_page_fault_4)
-        _ASM_EXTABLE(.Lft4,  domain_crash_synchronous)
+        _ASM_EXTABLE(.Lft4,  dom_crash_sync_extable)
         _ASM_EXTABLE(.Lft5,  compat_crash_page_fault_4)
         _ASM_EXTABLE(.Lft6,  compat_crash_page_fault_8)
         _ASM_EXTABLE(.Lft7,  compat_crash_page_fault)
@@ -363,7 +366,7 @@ compat_crash_page_fault:
 .Lft14: mov   %edi,%fs
         movl  %esi,%edi
         call  show_page_walk
-        jmp   domain_crash_synchronous
+        jmp   dom_crash_sync_extable
 .section .fixup,"ax"
 .Lfx14:
         xorl  %edi,%edi

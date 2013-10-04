@@ -3748,6 +3748,17 @@ unsigned long do_get_debugreg(int reg)
     return -EINVAL;
 }
 
+void asm_domain_crash_synchronous(unsigned long addr)
+{
+    if ( addr == 0 )
+        addr = this_cpu(last_extable_addr);
+
+    printk("domain_crash_sync called from entry.S: fault at %p ", _p(addr));
+    print_symbol("%s\n", addr);
+
+    __domain_crash_synchronous();
+}
+
 /*
  * Local variables:
  * mode: C

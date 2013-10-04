@@ -35,9 +35,13 @@ void ret_from_intr(void);
 #ifdef __ASSEMBLY__
 
 #define UNLIKELY_START(cond, tag) \
+        .Ldispatch.tag:           \
         j##cond .Lunlikely.tag;   \
         .subsection 1;            \
         .Lunlikely.tag:
+
+#define UNLIKELY_DISPATCH_LABEL(tag) \
+        .Ldispatch.tag
 
 #define UNLIKELY_DONE(cond, tag)  \
         j##cond .Llikely.tag
