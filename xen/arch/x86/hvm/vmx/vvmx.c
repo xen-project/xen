@@ -1815,7 +1815,7 @@ int nvmx_handle_invvpid(struct cpu_user_regs *regs)
 int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
 {
     struct vcpu *v = current;
-    unsigned int ecx, dummy;
+    unsigned int eax, ebx, ecx, edx, dummy;
     u64 data = 0, host_data = 0;
     int r = 1;
 
@@ -1823,7 +1823,7 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         return 0;
 
     /* VMX capablity MSRs are available only when guest supports VMX. */
-    hvm_cpuid(0x1, &dummy, &dummy, &ecx, &dummy);
+    hvm_cpuid(0x1, &dummy, &dummy, &ecx, &edx);
     if ( !(ecx & cpufeat_mask(X86_FEATURE_VMXE)) )
         return 0;
 
@@ -1948,8 +1948,55 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         data = X86_CR4_VMXE;
         break;
     case MSR_IA32_VMX_CR4_FIXED1:
-        /* allow 0-settings except SMXE */
-        data = 0x267ff & ~X86_CR4_SMXE;
+        if ( edx & cpufeat_mask(X86_FEATURE_VME) )
+            data |= X86_CR4_VME | X86_CR4_PVI;
+        if ( edx & cpufeat_mask(X86_FEATURE_TSC) )
+            data |= X86_CR4_TSD;
+        if ( edx & cpufeat_mask(X86_FEATURE_DE) )
+            data |= X86_CR4_DE;
+        if ( edx & cpufeat_mask(X86_FEATURE_PSE) )
+            data |= X86_CR4_PSE;
+        if ( edx & cpufeat_mask(X86_FEATURE_PAE) )
+            data |= X86_CR4_PAE;
+        if ( edx & cpufeat_mask(X86_FEATURE_MCE) )
+            data |= X86_CR4_MCE;
+        if ( edx & cpufeat_mask(X86_FEATURE_PGE) )
+            data |= X86_CR4_PGE;
+        if ( edx & cpufeat_mask(X86_FEATURE_FXSR) )
+            data |= X86_CR4_OSFXSR;
+        if ( edx & cpufeat_mask(X86_FEATURE_XMM) )
+            data |= X86_CR4_OSXMMEXCPT;
+        if ( ecx & cpufeat_mask(X86_FEATURE_VMXE) )
+            data |= X86_CR4_VMXE;
+        if ( ecx & cpufeat_mask(X86_FEATURE_SMXE) )
+            data |= X86_CR4_SMXE;
+        if ( ecx & cpufeat_mask(X86_FEATURE_PCID) )
+            data |= X86_CR4_PCIDE;
+        if ( ecx & cpufeat_mask(X86_FEATURE_XSAVE) )
+            data |= X86_CR4_OSXSAVE;
+
+        hvm_cpuid(0x0, &eax, &dummy, &dummy, &dummy);
+        switch ( eax )
+        {
+        default:
+            hvm_cpuid(0xa, &eax, &dummy, &dummy, &dummy);
+            /* Check whether guest has the perf monitor feature. */
+            if ( (eax & 0xff) && (eax & 0xff00) )
+                data |= X86_CR4_PCE;
+            /* fall through */
+        case 0x7 ... 0x9:
+            ecx = 0;
+            hvm_cpuid(0x7, &dummy, &ebx, &ecx, &dummy);
+            if ( ebx & cpufeat_mask(X86_FEATURE_FSGSBASE) )
+                data |= X86_CR4_FSGSBASE;
+            if ( ebx & cpufeat_mask(X86_FEATURE_SMEP) )
+                data |= X86_CR4_SMEP;
+            if ( ebx & cpufeat_mask(X86_FEATURE_SMAP) )
+                data |= X86_CR4_SMAP;
+            /* fall through */
+        case 0x0 ... 0x6:
+            break;
+        }
         break;
     case MSR_IA32_VMX_MISC:
         /* Do not support CR3-target feature now */
