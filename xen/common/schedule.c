@@ -176,13 +176,12 @@ void vcpu_runstate_get(struct vcpu *v, struct vcpu_runstate_info *runstate)
 
 uint64_t get_cpu_idle_time(unsigned int cpu)
 {
-    struct vcpu_runstate_info state;
-    struct vcpu *v;
+    struct vcpu_runstate_info state = { 0 };
+    struct vcpu *v = idle_vcpu[cpu];
 
-    if ( (v = idle_vcpu[cpu]) == NULL )
-        return 0;
+    if ( cpu_online(cpu) && v )
+        vcpu_runstate_get(v, &state);
 
-    vcpu_runstate_get(v, &state);
     return state.time[RUNSTATE_running];
 }
 
