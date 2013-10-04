@@ -284,6 +284,8 @@ extern bool_t cpu_has_vmx_ins_outs_instr_info;
  */
 #define VMX_BASIC_DEFAULT1_ZERO		(1ULL << 55)
 
+extern u64 vmx_basic_msr;
+
 /* Guest interrupt status */
 #define VMX_GUEST_INTR_STATUS_SUBFIELD_BITMASK  0x0FF
 #define VMX_GUEST_INTR_STATUS_SVI_OFFSET        8

@@ -78,6 +78,7 @@ static DEFINE_PER_CPU(struct list_head, active_vmcs_list);
 static DEFINE_PER_CPU(bool_t, vmxon);
 
 static u32 vmcs_revision_id __read_mostly;
+u64 __read_mostly vmx_basic_msr;
 
 static void __init vmx_display_features(void)
 {
@@ -301,6 +302,8 @@ static int vmx_init_vmcs_config(void)
         vmx_vmexit_control         = _vmx_vmexit_control;
         vmx_vmentry_control        = _vmx_vmentry_control;
         cpu_has_vmx_ins_outs_instr_info = !!(vmx_basic_msr_high & (1U<<22));
+        vmx_basic_msr              = ((u64)vmx_basic_msr_high << 32) |
+                                     vmx_basic_msr_low;
         vmx_display_features();
     }
     else

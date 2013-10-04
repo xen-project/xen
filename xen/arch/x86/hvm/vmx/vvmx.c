@@ -1815,11 +1815,32 @@ int nvmx_handle_invvpid(struct cpu_user_regs *regs)
 int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
 {
     struct vcpu *v = current;
+    unsigned int ecx, dummy;
     u64 data = 0, host_data = 0;
     int r = 1;
 
     if ( !nestedhvm_enabled(v->domain) )
         return 0;
+
+    /* VMX capablity MSRs are available only when guest supports VMX. */
+    hvm_cpuid(0x1, &dummy, &dummy, &ecx, &dummy);
+    if ( !(ecx & cpufeat_mask(X86_FEATURE_VMXE)) )
+        return 0;
+
+    /*
+     * Those MSRs are available only when bit 55 of
+     * MSR_IA32_VMX_BASIC is set.
+     */
+    switch ( msr )
+    {
+    case MSR_IA32_VMX_TRUE_PINBASED_CTLS:
+    case MSR_IA32_VMX_TRUE_PROCBASED_CTLS:
+    case MSR_IA32_VMX_TRUE_EXIT_CTLS:
+    case MSR_IA32_VMX_TRUE_ENTRY_CTLS:
+        if ( !(vmx_basic_msr & VMX_BASIC_DEFAULT1_ZERO) )
+            return 0;
+        break;
+    }
 
     rdmsrl(msr, host_data);
 
