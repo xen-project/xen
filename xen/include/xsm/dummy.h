@@ -231,7 +231,7 @@ static XSM_INLINE int xsm_console_io(XSM_DEFAULT_ARG struct domain *d, int cmd)
 static XSM_INLINE int xsm_profile(XSM_DEFAULT_ARG struct domain *d, int op)
 {
     XSM_ASSERT_ACTION(XSM_HOOK);
-    return xsm_default_action(action, current->domain, NULL);
+    return xsm_default_action(action, d, NULL);
 }
 
 static XSM_INLINE int xsm_kexec(XSM_DEFAULT_VOID)
@@ -281,7 +281,7 @@ static XSM_INLINE void xsm_evtchn_close_post(struct evtchn *chn)
 static XSM_INLINE int xsm_evtchn_send(XSM_DEFAULT_ARG struct domain *d, struct evtchn *chn)
 {
     XSM_ASSERT_ACTION(XSM_HOOK);
-    return xsm_default_action(action, current->domain, NULL);
+    return xsm_default_action(action, d, NULL);
 }
 
 static XSM_INLINE int xsm_evtchn_status(XSM_DEFAULT_ARG struct domain *d, struct evtchn *chn)
