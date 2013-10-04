@@ -77,8 +77,9 @@ unsigned long raw_clear_guest(void *to, unsigned len);
  * Clear an array of objects in guest context via a guest handle,
  * specifying an offset into the guest array.
  */
-#define clear_guest_offset(hnd, off, ptr, nr) ({      \
-    raw_clear_guest(_d+(off), nr);  \
+#define clear_guest_offset(hnd, off, nr) ({    \
+    void *_d = (hnd).p;                        \
+    raw_clear_guest(_d+(off), nr);             \
 })
 
 /*
