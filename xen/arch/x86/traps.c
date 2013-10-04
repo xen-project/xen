@@ -89,6 +89,7 @@ static char __read_mostly opt_nmi[10] = "fatal";
 string_param("nmi", opt_nmi);
 
 DEFINE_PER_CPU(u64, efer);
+static DEFINE_PER_CPU(unsigned long, last_extable_addr);
 
 DEFINE_PER_CPU_READ_MOSTLY(u32, ler_msr);
 
@@ -550,6 +551,7 @@ static inline void do_trap(
     {
         dprintk(XENLOG_ERR, "Trap %d: %p -> %p\n",
                 trapnr, _p(regs->eip), _p(fixup));
+        this_cpu(last_extable_addr) = regs->eip;
         regs->eip = fixup;
         return;
     }
@@ -1038,6 +1040,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
  die:
     if ( (fixup = search_exception_table(regs->eip)) != 0 )
     {
+        this_cpu(last_extable_addr) = regs->eip;
         regs->eip = fixup;
         return;
     }
@@ -1370,6 +1373,7 @@ void do_page_fault(struct cpu_user_regs *regs)
             perfc_incr(copy_user_faults);
             if ( unlikely(regs->error_code & PFEC_reserved_bit) )
                 reserved_bit_page_fault(addr, regs);
+            this_cpu(last_extable_addr) = regs->eip;
             regs->eip = fixup;
             return;
         }
@@ -3062,6 +3066,7 @@ void do_general_protection(struct cpu_user_regs *regs)
     {
         dprintk(XENLOG_INFO, "GPF (%04x): %p -> %p\n",
                 regs->error_code, _p(regs->eip), _p(fixup));
+        this_cpu(last_extable_addr) = regs->eip;
         regs->eip = fixup;
         return;
     }
