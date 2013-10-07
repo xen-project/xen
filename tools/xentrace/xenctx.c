@@ -497,7 +497,7 @@ static void print_ctx_64(vcpu_guest_context_t *ctx)
     print_symbol(regs->pc64);
     printf("\n");
 
-    printf("LR:       %016"PRIx64"zn", regs->x30);
+    printf("LR:       %016"PRIx64"\n", regs->x30);
     printf("ELR_EL1:  %016"PRIx64"\n", regs->elr_el1);
 
     printf("CPSR:     %08"PRIx32"\n", regs->cpsr);
