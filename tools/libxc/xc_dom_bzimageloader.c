@@ -33,7 +33,7 @@
 #include <inttypes.h>
 
 #include "xg_private.h"
-#include "xc_dom.h"
+#include "xc_dom_decompress.h"
 
 #ifndef __MINIOS__
 
@@ -729,6 +729,17 @@ static int xc_dom_probe_bzimage_kernel(struct xc_dom_image *dom)
         {
             xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
                          "%s unable to LZO decompress kernel\n",
+                         __FUNCTION__);
+            return -EINVAL;
+        }
+    }
+    else if ( check_magic(dom, "\x02\x21", 2) )
+    {
+        ret = xc_try_lz4_decode(dom, &dom->kernel_blob, &dom->kernel_size);
+        if ( ret < 0 )
+        {
+            xc_dom_panic(dom->xch, XC_INVALID_KERNEL,
+                         "%s unable to LZ4 decompress kernel\n",
                          __FUNCTION__);
             return -EINVAL;
         }
