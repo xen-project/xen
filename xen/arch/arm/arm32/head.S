@@ -403,7 +403,8 @@ launch:
         sub   sp, #CPUINFO_sizeof    /* Make room for CPU save record */
         mov   r0, r10                /* Marshal args: - phys_offset */
         mov   r1, r8                 /*               - DTB address */
-        movs  r2, r7                 /*               - CPU ID */
+        mov   r2, r7                 /*               - CPU ID */
+        teq   r12, #0
         beq   start_xen              /* and disappear into the land of C */
         b     start_secondary        /* (to the appropriate entry point) */
 
