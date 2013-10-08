@@ -696,25 +696,9 @@ static void iommu_free_pagetable(u64 pt_maddr, int level)
 
 static int iommu_set_root_entry(struct iommu *iommu)
 {
-    struct acpi_drhd_unit *drhd;
     u32 sts;
     unsigned long flags;
 
-    spin_lock(&iommu->lock);
-
-    if ( iommu->root_maddr == 0 )
-    {
-        drhd = iommu_to_drhd(iommu);
-        iommu->root_maddr = alloc_pgtable_maddr(drhd, 1);
-    }
-
-    if ( iommu->root_maddr == 0 )
-    {
-        spin_unlock(&iommu->lock);
-        return -ENOMEM;
-    }
-
-    spin_unlock(&iommu->lock);
     spin_lock_irqsave(&iommu->register_lock, flags);
     dmar_writeq(iommu->reg, DMAR_RTADDR_REG, iommu->root_maddr);
 
@@ -1143,6 +1127,9 @@ int __init iommu_alloc(struct acpi_drhd_unit *drhd)
     }
     iommu->intel->drhd = drhd;
     drhd->iommu = iommu;
+
+    if ( !(iommu->root_maddr = alloc_pgtable_maddr(drhd, 1)) )
+        return -ENOMEM;
 
     iommu->reg = ioremap(drhd->address, PAGE_SIZE);
     if ( !iommu->reg )
