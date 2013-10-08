@@ -201,6 +201,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		--datadir=$(SHAREDIR)/qemu-xen \
 		--disable-kvm \
 		--disable-docs \
+		--disable-guest-agent \
 		--python=$(PYTHON) \
 		$(IOEMU_CONFIGURE_CROSS); \
 	$(MAKE) all
