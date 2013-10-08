@@ -3,8 +3,8 @@
 
 /*
  * Documentation on HPET can be found at:
- *      http://www.intel.com/ial/home/sp/pcmmspec.htm
- *      ftp://download.intel.com/ial/home/sp/mmts098.pdf
+ *      http://www.intel.com/content/dam/www/public/us/en/documents/
+ *      technical-specifications/software-developers-hpet-spec-1-0a.pdf
  */
 
 #define HPET_MMAP_SIZE	1024
@@ -24,9 +24,7 @@
 #define HPET_ID_NUMBER	0x00001f00
 #define HPET_ID_REV	0x000000ff
 #define	HPET_ID_NUMBER_SHIFT	8
-
 #define HPET_ID_VENDOR_SHIFT	16
-#define HPET_ID_VENDOR_8086	0x8086
 
 #define HPET_CFG_ENABLE	0x001
 #define HPET_CFG_LEGACY	0x002

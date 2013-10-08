@@ -1,6 +1,6 @@
 /******************************************************************************
  * arch/x86/hpet.c
- * 
+ *
  * HPET management.
  */
 
@@ -50,7 +50,7 @@ static unsigned int __read_mostly num_hpets_used;
 
 DEFINE_PER_CPU(struct hpet_event_channel *, cpu_bc_channel);
 
-unsigned long __read_mostly hpet_address;
+unsigned long __initdata hpet_address;
 u8 __initdata hpet_blockid;
 
 /*
@@ -540,7 +540,7 @@ static void handle_rtc_once(uint8_t index, uint8_t value)
 {
     if ( index != RTC_REG_B )
         return;
-    
+
     /* RTC Reg B, contain PIE/AIE/UIE */
     if ( value & (RTC_PIE | RTC_AIE | RTC_UIE ) )
     {

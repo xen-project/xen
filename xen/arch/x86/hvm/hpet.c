@@ -47,7 +47,7 @@
 
 /* can be routed to IOAPIC.redirect_table[23..20] */
 #define HPET_TN_INT_ROUTE_CAP      (0x00f00000ULL \
-                    << HPET_TN_INT_ROUTE_CAP_SHIFT) 
+                    << HPET_TN_INT_ROUTE_CAP_SHIFT)
 
 #define HPET_TN_INT_ROUTE_CAP_MASK (0xffffffffULL \
                     << HPET_TN_INT_ROUTE_CAP_SHIFT)
@@ -79,7 +79,7 @@ static inline uint64_t hpet_read_maincounter(HPETState *h)
 
     if ( hpet_enabled(h) )
         return guest_time_hpet(h) + h->mc_offset;
-    else 
+    else
         return h->hpet.mc64;
 }
 
@@ -100,7 +100,7 @@ static uint64_t hpet_get_comparator(HPETState *h, unsigned int tn)
             h->hpet.comparator64[tn] = comparator;
         }
     }
-    
+
     /* truncate if timer is in 32 bit mode */
     if ( timer_is_32bit(h, tn) )
         comparator = (uint32_t)comparator;
@@ -249,7 +249,7 @@ static void hpet_set_timer(HPETState *h, unsigned int tn)
         irq = timer_int_route(h, tn);
 
     /*
-     * diff is the time from now when the timer should fire, for a periodic 
+     * diff is the time from now when the timer should fire, for a periodic
      * timer we also need the period which may be different because time may
      * have elapsed between the time the comparator was written and the timer
      * being enabled (now).
@@ -331,7 +331,7 @@ static int hpet_write(
         h->hpet.mc64 = new_val;
         if ( hpet_enabled(h) )
         {
-            gdprintk(XENLOG_WARNING, 
+            gdprintk(XENLOG_WARNING,
                      "HPET: writing main counter but it's not halted!\n");
             for ( i = 0; i < HPET_TIMER_NUM; i++ )
                 if ( timer_enabled(h, i) )
@@ -396,7 +396,7 @@ static int hpet_write(
              * timer's accumulator."  That is, set the comparator without
              * adjusting the period.  Much the same as just setting the
              * comparator on an enabled one-shot timer.
-             * 
+             *
              * This configuration bit clears when the comparator is written.
              */
             h->hpet.timers[tn].config &= ~HPET_TN_SETVAL;
@@ -553,7 +553,7 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
         hp->hpet.timers[i].cmp = cmp;
     }
 #undef C
-    
+
     /* Recalculate the offset between the main counter and guest time */
     hp->mc_offset = hp->hpet.mc64 - guest_time_hpet(hp);
 
@@ -563,7 +563,7 @@ static int hpet_load(struct domain *d, hvm_domain_context_t *h)
         for ( i = 0; i < HPET_TIMER_NUM; i++ )
             if ( timer_enabled(hp, i) )
                 hpet_set_timer(hp, i);
- 
+
     spin_unlock(&hp->lock);
 
     return 0;
@@ -595,7 +595,7 @@ void hpet_init(struct vcpu *v)
 
     for ( i = 0; i < HPET_TIMER_NUM; i++ )
     {
-        h->hpet.timers[i].config = 
+        h->hpet.timers[i].config =
             HPET_TN_INT_ROUTE_CAP | HPET_TN_64BIT_CAP | HPET_TN_PERIODIC_CAP;
         h->hpet.timers[i].cmp = ~0ULL;
         h->pt[i].source = PTSRC_isa;
