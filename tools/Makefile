@@ -199,6 +199,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 		-L$(XEN_ROOT)/tools/xenstore" \
 		--bindir=$(LIBEXEC) \
 		--datadir=$(SHAREDIR)/qemu-xen \
+		--localstatedir=/var \
 		--disable-kvm \
 		--disable-docs \
 		--disable-guest-agent \
