@@ -129,7 +129,6 @@ extern unsigned char boot_edid_info[128];
 #define PML4_ADDR(_slot)                              \
     (((_AC(_slot, UL) >> 8) * _AC(0xffff000000000000,UL)) | \
      (_AC(_slot, UL) << PML4_ENTRY_BITS))
-#define GB(_gb) (_AC(_gb, UL) << 30)
 
 /*
  * Memory layout:
