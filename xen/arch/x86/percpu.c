@@ -6,7 +6,14 @@
 #include <xen/rcupdate.h>
 
 unsigned long __per_cpu_offset[NR_CPUS];
-#define INVALID_PERCPU_AREA (-(long)__per_cpu_start)
+
+/*
+ * Force uses of per_cpu() with an invalid area to attempt to access the
+ * middle of the non-canonical address space resulting in a #GP, rather than a
+ * possible #PF at (NULL + a little) which has security implications in the
+ * context of PV guests.
+ */
+#define INVALID_PERCPU_AREA (0x8000000000000000L - (long)__per_cpu_start)
 #define PERCPU_ORDER (get_order_from_bytes(__per_cpu_data_end-__per_cpu_start))
 
 void __init percpu_init_areas(void)
