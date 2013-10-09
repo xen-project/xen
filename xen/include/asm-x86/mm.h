@@ -399,7 +399,7 @@ static inline int get_page_and_type(struct page_info *page,
 int check_descriptor(const struct domain *, struct desc_struct *d);
 
 extern bool_t opt_allow_superpage;
-extern bool_t mem_hotplug;
+extern paddr_t mem_hotplug;
 
 /******************************************************************************
  * With shadow pagetables, the different kinds of address start 

@@ -113,6 +113,7 @@ static __init void bad_srat(void)
 		apicid_to_node[i] = NUMA_NO_NODE;
 	for (i = 0; i < ARRAY_SIZE(pxm2node); i++)
 		pxm2node[i] = NUMA_NO_NODE;
+	mem_hotplug = 0;
 }
 
 /*
@@ -257,13 +258,6 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 		return;
 	}
 	/* It is fine to add this area to the nodes data it will be used later*/
-	if (ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE)
-	{
-		printk(KERN_INFO "SRAT: hot plug zone found %"PRIx64" - %"PRIx64" \n",
-				start, end);
-		mem_hotplug = 1;
-	}
-
 	i = conflicting_memblks(start, end);
 	if (i == node) {
 		printk(KERN_WARNING
@@ -287,8 +281,11 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 		if (nd->end < end)
 			nd->end = end;
 	}
-	printk(KERN_INFO "SRAT: Node %u PXM %u %"PRIx64"-%"PRIx64"\n", node, pxm,
-	       start, end);
+	if ((ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE) && end > mem_hotplug)
+		mem_hotplug = end;
+	printk(KERN_INFO "SRAT: Node %u PXM %u %"PRIx64"-%"PRIx64"%s\n",
+	       node, pxm, start, end,
+	       ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE ? " (hotplug)" : "");
 
 	node_memblk_range[num_node_memblks].start = start;
 	node_memblk_range[num_node_memblks].end = end;
