@@ -595,55 +595,47 @@ DO_ERROR_NOCODE(TRAP_copro_error,     coprocessor_error)
 DO_ERROR(       TRAP_alignment_check, alignment_check)
 DO_ERROR_NOCODE(TRAP_simd_error,      simd_coprocessor_error)
 
+/* Returns 0 if not handled, and non-0 for success. */
 int rdmsr_hypervisor_regs(uint32_t idx, uint64_t *val)
 {
     struct domain *d = current->domain;
     /* Optionally shift out of the way of Viridian architectural MSRs. */
     uint32_t base = is_viridian_domain(d) ? 0x40000200 : 0x40000000;
 
-    idx -= base;
-    if ( idx > 0 )
-        return 0;
-
-    switch ( idx )
+    switch ( idx - base )
     {
-    case 0:
+    case 0: /* Write hypercall page MSR.  Read as zero. */
     {
         *val = 0;
-        break;
+        return 1;
     }
-    default:
-        BUG();
     }
 
-    return 1;
+    return 0;
 }
 
+/* Returns 1 if handled, 0 if not and -Exx for error. */
 int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
 {
     struct domain *d = current->domain;
     /* Optionally shift out of the way of Viridian architectural MSRs. */
     uint32_t base = is_viridian_domain(d) ? 0x40000200 : 0x40000000;
 
-    idx -= base;
-    if ( idx > 0 )
-        return 0;
-
-    switch ( idx )
+    switch ( idx - base )
     {
-    case 0:
+    case 0: /* Write hypercall page */
     {
         void *hypercall_page;
-        unsigned long gmfn = val >> 12;
-        unsigned int idx  = val & 0xfff;
+        unsigned long gmfn = val >> PAGE_SHIFT;
+        unsigned int page_index = val & (PAGE_SIZE - 1);
         struct page_info *page;
         p2m_type_t t;
 
-        if ( idx > 0 )
+        if ( page_index > 0 )
         {
             gdprintk(XENLOG_WARNING,
-                     "Out of range index %u to MSR %08x\n",
-                     idx, 0x40000000);
+                     "wrmsr hypercall page index %#x unsupported\n",
+                     page_index);
             return 0;
         }
 
@@ -671,14 +663,11 @@ int wrmsr_hypervisor_regs(uint32_t idx, uint64_t val)
         unmap_domain_page(hypercall_page);
 
         put_page_and_type(page);
-        break;
+        return 1;
+    }
     }
 
-    default:
-        BUG();
-    }
-
-    return 1;
+    return 0;
 }
 
 int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
