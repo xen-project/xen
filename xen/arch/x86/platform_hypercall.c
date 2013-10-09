@@ -355,9 +355,13 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 
         for_each_cpu ( cpu, cpumap )
         {
-            if ( idle_vcpu[cpu] == NULL )
-                cpumask_clear_cpu(cpu, cpumap);
             idletime = get_cpu_idle_time(cpu);
+
+            if ( !idletime )
+            {
+                cpumask_clear_cpu(cpu, cpumap);
+                continue;
+            }
 
             if ( copy_to_guest_offset(idletimes, cpu, &idletime, 1) )
             {
