@@ -2499,27 +2499,25 @@ static enum hvm_copy_result __hvm_copy(
 
         page = get_page_from_gfn(curr->domain, gfn, &p2mt, P2M_UNSHARE);
 
+        if ( !page )
+            return HVMCOPY_bad_gfn_to_mfn;
+
         if ( p2m_is_paging(p2mt) )
         {
-            if ( page )
-                put_page(page);
+            put_page(page);
             p2m_mem_paging_populate(curr->domain, gfn);
             return HVMCOPY_gfn_paged_out;
         }
         if ( p2m_is_shared(p2mt) )
         {
-            if ( page )
-                put_page(page);
+            put_page(page);
             return HVMCOPY_gfn_shared;
         }
         if ( p2m_is_grant(p2mt) )
         {
-            if ( page )
-                put_page(page);
+            put_page(page);
             return HVMCOPY_unhandleable;
         }
-        if ( !page )
-            return HVMCOPY_bad_gfn_to_mfn;
 
         p = (char *)__map_domain_page(page) + (addr & ~PAGE_MASK);
 
@@ -2597,27 +2595,25 @@ static enum hvm_copy_result __hvm_clear(paddr_t addr, int size)
 
         page = get_page_from_gfn(curr->domain, gfn, &p2mt, P2M_UNSHARE);
 
+        if ( !page )
+            return HVMCOPY_bad_gfn_to_mfn;
+
         if ( p2m_is_paging(p2mt) )
         {
-            if ( page )
-                put_page(page);
+            put_page(page);
             p2m_mem_paging_populate(curr->domain, gfn);
             return HVMCOPY_gfn_paged_out;
         }
         if ( p2m_is_shared(p2mt) )
         {
-            if ( page )
-                put_page(page);
+            put_page(page);
             return HVMCOPY_gfn_shared;
         }
         if ( p2m_is_grant(p2mt) )
         {
-            if ( page )
-                put_page(page);
+            put_page(page);
             return HVMCOPY_unhandleable;
         }
-        if ( !page )
-            return HVMCOPY_bad_gfn_to_mfn;
 
         p = (char *)__map_domain_page(page) + (addr & ~PAGE_MASK);
 

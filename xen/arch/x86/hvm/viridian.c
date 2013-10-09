@@ -157,7 +157,7 @@ static void enable_hypercall_page(struct domain *d)
         if ( page )
             put_page(page);
         gdprintk(XENLOG_WARNING, "Bad GMFN %lx (MFN %lx)\n", gmfn,
-                 page_to_mfn(page));
+                 page ? page_to_mfn(page) : INVALID_MFN);
         return;
     }
 
@@ -202,7 +202,7 @@ static void initialize_apic_assist(struct vcpu *v)
         if ( page )
             put_page(page);
         gdprintk(XENLOG_WARNING, "Bad GMFN %lx (MFN %lx)\n", gmfn,
-                 page_to_mfn(page));
+                 page ? page_to_mfn(page) : INVALID_MFN);
         return;
     }
 
