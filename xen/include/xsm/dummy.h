@@ -222,10 +222,10 @@ static XSM_INLINE int xsm_console_io(XSM_DEFAULT_ARG struct domain *d, int cmd)
 {
     XSM_ASSERT_ACTION(XSM_OTHER);
 #ifdef VERBOSE
-    return xsm_default_action(XSM_HOOK, current->domain, NULL);
-#else
-    return xsm_default_action(XSM_PRIV, current->domain, NULL);
+    if ( cmd == CONSOLEIO_write )
+        return xsm_default_action(XSM_HOOK, d, NULL);
 #endif
+    return xsm_default_action(XSM_PRIV, d, NULL);
 }
 
 static XSM_INLINE int xsm_profile(XSM_DEFAULT_ARG struct domain *d, int op)
