@@ -148,6 +148,7 @@
 #define X86_FEATURE_INVPCID	(7*32+10) /* Invalidate Process Context ID */
 #define X86_FEATURE_RTM 	(7*32+11) /* Restricted Transactional Memory */
 #define X86_FEATURE_NO_FPU_SEL 	(7*32+13) /* FPU CS/DS stored as zero */
+#define X86_FEATURE_SMAP	(7*32+20) /* Supervisor Mode Access Prevention */
 
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
