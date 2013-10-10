@@ -4,6 +4,8 @@
 #include <xen/errno.h>
 #include <xen/mm.h>
 #include <xen/smp.h>
+#include <xen/vmap.h>
+#include <asm/io.h>
 
 struct smp_enable_ops {
         int             (*prepare_cpu)(int);
@@ -14,7 +16,7 @@ static struct smp_enable_ops smp_enable_ops[NR_CPUS];
 
 static int __init smp_spin_table_cpu_up(int cpu)
 {
-    paddr_t *release;
+    paddr_t __iomem *release;
 
     if (!cpu_release_addr[cpu])
     {
@@ -22,12 +24,20 @@ static int __init smp_spin_table_cpu_up(int cpu)
         return -ENODEV;
     }
 
-    release = __va(cpu_release_addr[cpu]);
+    release = ioremap_nocache(cpu_release_addr[cpu], 8);
+    if ( !release )
+    {
+        dprintk(XENLOG_ERR, "CPU%d: Unable to map release address\n", cpu);
+        return -EFAULT;
+    }
 
     release[0] = __pa(init_secondary);
     flush_xen_data_tlb_range_va((vaddr_t)release, sizeof(*release));
 
+    iounmap(release);
+
     sev();
+
     return 0;
 }
 
