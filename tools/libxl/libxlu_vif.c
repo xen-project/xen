@@ -95,23 +95,30 @@ int xlu_vif_parse_rate(XLU_Config *cfg, const char *rate, libxl_device_nic *nic)
     uint64_t bytes_per_sec = 0;
     uint64_t bytes_per_interval = 0;
     uint32_t interval_usecs = 50000UL; /* Default to 50ms */
-    char *ratetok, *tmprate;
+    char *p, *tmprate;
     int rc = 0;
 
     tmprate = strdup(rate);
+    if (tmprate == NULL) {
+        rc = ENOMEM;
+        goto out;
+    }
+
+    p = strchr(tmprate, '@');
+    if (p != NULL)
+        *p++ = 0;
+
     if (!strcmp(tmprate,"")) {
         xlu__vif_err(cfg, "no rate specified", rate);
         rc = EINVAL;
         goto out;
     }
 
-    ratetok = strtok(tmprate, "@");
-    rc = vif_parse_rate_bytes_per_sec(cfg, ratetok, &bytes_per_sec);
+    rc = vif_parse_rate_bytes_per_sec(cfg, tmprate, &bytes_per_sec);
     if (rc) goto out;
 
-    ratetok = strtok(NULL, "@");
-    if (ratetok != NULL) {
-        rc = vif_parse_rate_interval_usecs(cfg, ratetok, &interval_usecs);
+    if (p != NULL) {
+        rc = vif_parse_rate_interval_usecs(cfg, p, &interval_usecs);
         if (rc) goto out;
     }
 
