@@ -955,6 +955,13 @@ int construct_dom0(struct domain *d)
 
     /* The following loads use the domain's p2m */
     p2m_load_VTTBR(d);
+#ifdef CONFIG_ARM_64
+    d->arch.type = kinfo.type;
+    if ( is_pv32_domain(d) )
+        WRITE_SYSREG(READ_SYSREG(HCR_EL2) & ~HCR_RW, HCR_EL2);
+    else
+        WRITE_SYSREG(READ_SYSREG(HCR_EL2) | HCR_RW, HCR_EL2);
+#endif
 
     kernel_load(&kinfo);
     /* initrd_load will fix up the fdt, so call it before dtb_load */
@@ -970,9 +977,6 @@ int construct_dom0(struct domain *d)
 
     regs->pc = (register_t)kinfo.entry;
 
-#ifdef CONFIG_ARM_64
-    d->arch.type = kinfo.type;
-#endif
 
     if ( is_pv32_domain(d) )
     {
