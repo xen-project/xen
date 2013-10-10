@@ -639,7 +639,7 @@ void __init setup_xenheap_mappings(unsigned long base_mfn,
     end_mfn = base_mfn + nr_mfns;
 
     /* Align to previous 1GB boundary */
-    base_mfn &= ~FIRST_MASK;
+    base_mfn &= ~((FIRST_SIZE>>PAGE_SHIFT)-1);
 
     offset = base_mfn - xenheap_mfn_start;
     vaddr = DIRECTMAP_VIRT_START + offset*PAGE_SIZE;
