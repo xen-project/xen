@@ -67,7 +67,11 @@ class GrubDiskPart(object):
         return self._disk
     def set_disk(self, val):
         val = val.replace("(", "").replace(")", "")
-        self._disk = int(val[2:])
+        if val.startswith("/dev/xvd"):
+            disk = val[len("/dev/xvd")]
+            self._disk = ord(disk)-ord('a')
+        else:
+            self._disk = int(val[2:])
     disk = property(get_disk, set_disk)
 
     def get_part(self):
