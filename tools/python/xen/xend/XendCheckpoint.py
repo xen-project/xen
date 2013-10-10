@@ -301,7 +301,7 @@ def restore(xd, fd, dominfo = None, paused = False, relocating = False):
 
         cmd = map(str, [xen.util.auxbin.pathTo(XC_RESTORE),
                         fd, dominfo.getDomid(),
-                        store_port, console_port, int(is_hvm), pae, apic, superpages])
+                        store_port, console_port, int(is_hvm), pae, apic, superpages, 1])
         log.debug("[xc_restore]: %s", string.join(cmd))
 
         handler = RestoreInputHandler()

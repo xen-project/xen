@@ -283,7 +283,8 @@
 
 /* API compatibility. */
 #ifdef LIBXL_API_VERSION
-#if LIBXL_API_VERSION != 0x040200 && LIBXL_API_VERSION != 0x040300
+#if LIBXL_API_VERSION != 0x040200 && LIBXL_API_VERSION != 0x040300 && \
+    LIBXL_API_VERSION != 0x040400
 #error Unknown LIBXL_API_VERSION
 #endif
 #endif
@@ -354,6 +355,14 @@
  * If this is not defined, the Spice vdagent support is ignored.
  */
 #define LIBXL_HAVE_SPICE_VDAGENT 1
+
+/*
+ * LIBXL_HAVE_DOMAIN_CREATE_RESTORE_PARAMS 1
+ *
+ * If this is defined, libxl_domain_create_restore()'s API has changed to
+ * include a params structure.
+ */
+#define LIBXL_HAVE_DOMAIN_CREATE_RESTORE_PARAMS 1
 
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who
@@ -578,9 +587,31 @@ int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config,
                             LIBXL_EXTERNAL_CALLERS_ONLY;
 int libxl_domain_create_restore(libxl_ctx *ctx, libxl_domain_config *d_config,
                                 uint32_t *domid, int restore_fd,
+                                const libxl_domain_restore_params *params,
                                 const libxl_asyncop_how *ao_how,
                                 const libxl_asyncprogress_how *aop_console_how)
                                 LIBXL_EXTERNAL_CALLERS_ONLY;
+
+#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x040400
+
+int static inline libxl_domain_create_restore_0x040200(
+    libxl_ctx *ctx, libxl_domain_config *d_config,
+    uint32_t *domid, int restore_fd,
+    const libxl_asyncop_how *ao_how,
+    const libxl_asyncprogress_how *aop_console_how)
+    LIBXL_EXTERNAL_CALLERS_ONLY
+{
+    libxl_domain_restore_params params;
+    params.checkpointed_stream = 0;
+
+    return libxl_domain_create_restore(
+        ctx, d_config, domid, restore_fd, &params, ao_how, aop_console_how);
+}
+
+#define libxl_domain_create_restore libxl_domain_create_restore_0x040200
+
+#endif
+
   /* A progress report will be made via ao_console_how, of type
    * domain_create_console_available, when the domain's primary
    * console is available and can be connected to.

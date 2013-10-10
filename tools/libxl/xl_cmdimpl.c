@@ -132,6 +132,7 @@ struct domain_create {
     int vnc;
     int vncautopass;
     int console_autoconnect;
+    int checkpointed_stream;
     const char *config_file;
     const char *extra_config; /* extra config string */
     const char *restore_file;
@@ -2064,8 +2065,11 @@ start:
     }
 
     if ( restoring ) {
+        libxl_domain_restore_params params;
+        params.checkpointed_stream = dom_info->checkpointed_stream;
         ret = libxl_domain_create_restore(ctx, &d_config,
                                           &domid, restore_fd,
+                                          &params,
                                           0, autoconnect_console_how);
         /*
          * On subsequent reboot etc we should create the domain, not
@@ -3679,6 +3683,7 @@ static void migrate_receive(int debug, int daemonize, int monitor,
     dom_info.paused = 1;
     dom_info.migrate_fd = recv_fd;
     dom_info.migration_domname_r = &migration_domname;
+    dom_info.checkpointed_stream = remus;
 
     rc = create_domain(&dom_info);
     if (rc < 0) {

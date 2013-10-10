@@ -19,7 +19,7 @@ int
 main(int argc, char **argv)
 {
     unsigned int domid, store_evtchn, console_evtchn;
-    unsigned int hvm, pae, apic, lflags;
+    unsigned int hvm, pae, apic, lflags, checkpointed;
     xc_interface *xch;
     int io_fd, ret;
     int superpages;
@@ -27,9 +27,9 @@ main(int argc, char **argv)
     xentoollog_level lvl;
     xentoollog_logger *l;
 
-    if ( (argc != 8) && (argc != 9) )
+    if ( !( argc >= 8 && argc <= 10) )
         errx(1, "usage: %s iofd domid store_evtchn "
-             "console_evtchn hvm pae apic [superpages]", argv[0]);
+             "console_evtchn hvm pae apic [superpages [checkpointed]]", argv[0]);
 
     lvl = XTL_DETAIL;
     lflags = XTL_STDIOSTREAM_SHOW_PID | XTL_STDIOSTREAM_HIDE_PROGRESS;
@@ -45,14 +45,18 @@ main(int argc, char **argv)
     hvm  = atoi(argv[5]);
     pae  = atoi(argv[6]);
     apic = atoi(argv[7]);
-    if ( argc == 9 )
+    if ( argc >= 9 )
 	    superpages = atoi(argv[8]);
     else
 	    superpages = !!hvm;
+    if ( argc >= 10 )
+        checkpointed = atoi(argv[9]);
+    else
+        checkpointed = 0;
 
     ret = xc_domain_restore(xch, io_fd, domid, store_evtchn, &store_mfn, 0,
                             console_evtchn, &console_mfn, 0, hvm, pae, superpages,
-                            0, NULL, NULL);
+                            0, checkpointed, NULL, NULL);
 
     if ( ret == 0 )
     {
