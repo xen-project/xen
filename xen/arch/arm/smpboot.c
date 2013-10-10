@@ -125,15 +125,39 @@ void __init smp_init_cpus(void)
 
     dt_for_each_child_node( cpus, cpu )
     {
-        u32 hwid;
+        const __be32 *prop;
+        u64 addr;
+        u32 reg_len, hwid;
 
         if ( !dt_device_type_is_equal(cpu, "cpu") )
             continue;
 
-        if ( !dt_property_read_u32(cpu, "reg", &hwid) )
+        if ( dt_n_size_cells(cpu) != 0 )
+            printk(XENLOG_WARNING "cpu node `%s`: #size-cells %d\n",
+                   dt_node_full_name(cpu), dt_n_size_cells(cpu));
+
+        prop = dt_get_property(cpu, "reg", &reg_len);
+        if ( !prop )
         {
-            printk(XENLOG_WARNING "cpu node `%s`: missing reg property\n",
+            printk(XENLOG_WARNING "cpu node `%s`: has no reg property\n",
                    dt_node_full_name(cpu));
+            continue;
+        }
+
+        if ( reg_len < dt_cells_to_size(dt_n_addr_cells(cpu)) )
+        {
+            printk(XENLOG_WARNING "cpu node `%s`: reg property too short\n",
+                   dt_node_full_name(cpu));
+            continue;
+        }
+
+        addr = dt_read_number(prop, dt_n_addr_cells(cpu));
+
+        hwid = addr;
+        if ( hwid != addr )
+        {
+            printk(XENLOG_WARNING "cpu node `%s`: hwid overflow %"PRIx64"\n",
+                   dt_node_full_name(cpu), addr);
             continue;
         }
 
@@ -159,8 +183,8 @@ void __init smp_init_cpus(void)
             if ( tmp_map[j] == hwid )
             {
                 printk(XENLOG_WARNING
-                       "cpu node `%s`: duplicate /cpu reg properties in the DT\n",
-                       dt_node_full_name(cpu));
+                       "cpu node `%s`: duplicate /cpu reg properties %"PRIx32" in the DT\n",
+                       dt_node_full_name(cpu), hwid);
                 break;
             }
         }
