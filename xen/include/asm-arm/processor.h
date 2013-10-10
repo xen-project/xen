@@ -18,71 +18,71 @@
 #define MPIDR_INVALID       (~MPIDR_HWID_MASK)
 
 /* TTBCR Translation Table Base Control Register */
-#define TTBCR_EAE    0x80000000
-#define TTBCR_N_MASK 0x07
-#define TTBCR_N_16KB 0x00
-#define TTBCR_N_8KB  0x01
-#define TTBCR_N_4KB  0x02
-#define TTBCR_N_2KB  0x03
-#define TTBCR_N_1KB  0x04
+#define TTBCR_EAE    _AC(0x80000000,U)
+#define TTBCR_N_MASK _AC(0x07,U)
+#define TTBCR_N_16KB _AC(0x00,U)
+#define TTBCR_N_8KB  _AC(0x01,U)
+#define TTBCR_N_4KB  _AC(0x02,U)
+#define TTBCR_N_2KB  _AC(0x03,U)
+#define TTBCR_N_1KB  _AC(0x04,U)
 
 /* SCTLR System Control Register. */
 /* HSCTLR is a subset of this. */
-#define SCTLR_TE        (1<<30)
-#define SCTLR_AFE       (1<<29)
-#define SCTLR_TRE       (1<<28)
-#define SCTLR_NMFI      (1<<27)
-#define SCTLR_EE        (1<<25)
-#define SCTLR_VE        (1<<24)
-#define SCTLR_U         (1<<22)
-#define SCTLR_FI        (1<<21)
-#define SCTLR_WXN       (1<<19)
-#define SCTLR_HA        (1<<17)
-#define SCTLR_RR        (1<<14)
-#define SCTLR_V         (1<<13)
-#define SCTLR_I         (1<<12)
-#define SCTLR_Z         (1<<11)
-#define SCTLR_SW        (1<<10)
-#define SCTLR_B         (1<<7)
-#define SCTLR_C         (1<<2)
-#define SCTLR_A         (1<<1)
-#define SCTLR_M         (1<<0)
+#define SCTLR_TE        (_AC(1,U)<<30)
+#define SCTLR_AFE       (_AC(1,U)<<29)
+#define SCTLR_TRE       (_AC(1,U)<<28)
+#define SCTLR_NMFI      (_AC(1,U)<<27)
+#define SCTLR_EE        (_AC(1,U)<<25)
+#define SCTLR_VE        (_AC(1,U)<<24)
+#define SCTLR_U         (_AC(1,U)<<22)
+#define SCTLR_FI        (_AC(1,U)<<21)
+#define SCTLR_WXN       (_AC(1,U)<<19)
+#define SCTLR_HA        (_AC(1,U)<<17)
+#define SCTLR_RR        (_AC(1,U)<<14)
+#define SCTLR_V         (_AC(1,U)<<13)
+#define SCTLR_I         (_AC(1,U)<<12)
+#define SCTLR_Z         (_AC(1,U)<<11)
+#define SCTLR_SW        (_AC(1,U)<<10)
+#define SCTLR_B         (_AC(1,U)<<7)
+#define SCTLR_C         (_AC(1,U)<<2)
+#define SCTLR_A         (_AC(1,U)<<1)
+#define SCTLR_M         (_AC(1,U)<<0)
 
-#define HSCTLR_BASE       0x30c51878
+#define HSCTLR_BASE     _AC(0x30c51878,U)
 
 /* HCR Hyp Configuration Register */
-#define HCR_RW          (1<<31) /* Register Width, ARM64 only */
-#define HCR_TGE         (1<<27) /* Trap General Exceptions */
-#define HCR_TVM         (1<<26) /* Trap Virtual Memory Controls */
-#define HCR_TTLB        (1<<25) /* Trap TLB Maintenance Operations */
-#define HCR_TPU         (1<<24) /* Trap Cache Maintenance Operations to PoU */
-#define HCR_TPC         (1<<23) /* Trap Cache Maintenance Operations to PoC */
-#define HCR_TSW         (1<<22) /* Trap Set/Way Cache Maintenance Operations */
-#define HCR_TAC         (1<<21) /* Trap ACTLR Accesses */
-#define HCR_TIDCP       (1<<20) /* Trap lockdown */
-#define HCR_TSC         (1<<19) /* Trap SMC instruction */
-#define HCR_TID3        (1<<18) /* Trap ID Register Group 3 */
-#define HCR_TID2        (1<<17) /* Trap ID Register Group 2 */
-#define HCR_TID1        (1<<16) /* Trap ID Register Group 1 */
-#define HCR_TID0        (1<<15) /* Trap ID Register Group 0 */
-#define HCR_TWE         (1<<14) /* Trap WFE instruction */
-#define HCR_TWI         (1<<13) /* Trap WFI instruction */
-#define HCR_DC          (1<<12) /* Default cacheable */
-#define HCR_BSU_MASK    (3<<10) /* Barrier Shareability Upgrade */
-#define HCR_BSU_NONE     (0<<10)
-#define HCR_BSU_INNER    (1<<10)
-#define HCR_BSU_OUTER    (2<<10)
-#define HCR_BSU_FULL     (3<<10)
-#define HCR_FB          (1<<9) /* Force Broadcast of Cache/BP/TLB operations */
-#define HCR_VA          (1<<8) /* Virtual Asynchronous Abort */
-#define HCR_VI          (1<<7) /* Virtual IRQ */
-#define HCR_VF          (1<<6) /* Virtual FIQ */
-#define HCR_AMO         (1<<5) /* Override CPSR.A */
-#define HCR_IMO         (1<<4) /* Override CPSR.I */
-#define HCR_FMO         (1<<3) /* Override CPSR.F */
-#define HCR_PTW         (1<<2) /* Protected Walk */
-#define HCR_SWIO        (1<<1) /* Set/Way Invalidation Override */
-#define HCR_VM          (1<<0) /* Virtual MMU Enable */
+#define HCR_RW          (_AC(1,UL)<<31) /* Register Width, ARM64 only */
+#define HCR_TGE         (_AC(1,UL)<<27) /* Trap General Exceptions */
+#define HCR_TVM         (_AC(1,UL)<<26) /* Trap Virtual Memory Controls */
+#define HCR_TTLB        (_AC(1,UL)<<25) /* Trap TLB Maintenance Operations */
+#define HCR_TPU         (_AC(1,UL)<<24) /* Trap Cache Maintenance Operations to PoU */
+#define HCR_TPC         (_AC(1,UL)<<23) /* Trap Cache Maintenance Operations to PoC */
+#define HCR_TSW         (_AC(1,UL)<<22) /* Trap Set/Way Cache Maintenance Operations */
+#define HCR_TAC         (_AC(1,UL)<<21) /* Trap ACTLR Accesses */
+#define HCR_TIDCP       (_AC(1,UL)<<20) /* Trap lockdown */
+#define HCR_TSC         (_AC(1,UL)<<19) /* Trap SMC instruction */
+#define HCR_TID3        (_AC(1,UL)<<18) /* Trap ID Register Group 3 */
+#define HCR_TID2        (_AC(1,UL)<<17) /* Trap ID Register Group 2 */
+#define HCR_TID1        (_AC(1,UL)<<16) /* Trap ID Register Group 1 */
+#define HCR_TID0        (_AC(1,UL)<<15) /* Trap ID Register Group 0 */
+#define HCR_TWE         (_AC(1,UL)<<14) /* Trap WFE instruction */
+#define HCR_TWI         (_AC(1,UL)<<13) /* Trap WFI instruction */
+#define HCR_DC          (_AC(1,UL)<<12) /* Default cacheable */
+#define HCR_BSU_MASK    (_AC(3,UL)<<10) /* Barrier Shareability Upgrade */
+#define HCR_BSU_NONE     (_AC(0,UL)<<10)
+#define HCR_BSU_INNER    (_AC(1,UL)<<10)
+#define HCR_BSU_OUTER    (_AC(2,UL)<<10)
+#define HCR_BSU_FULL     (_AC(3,UL)<<10)
+#define HCR_FB          (_AC(1,UL)<<9) /* Force Broadcast of Cache/BP/TLB operations */
+#define HCR_VA          (_AC(1,UL)<<8) /* Virtual Asynchronous Abort */
+#define HCR_VI          (_AC(1,UL)<<7) /* Virtual IRQ */
+#define HCR_VF          (_AC(1,UL)<<6) /* Virtual FIQ */
+#define HCR_AMO         (_AC(1,UL)<<5) /* Override CPSR.A */
+#define HCR_IMO         (_AC(1,UL)<<4) /* Override CPSR.I */
+#define HCR_FMO         (_AC(1,UL)<<3) /* Override CPSR.F */
+#define HCR_PTW         (_AC(1,UL)<<2) /* Protected Walk */
+#define HCR_SWIO        (_AC(1,UL)<<1) /* Set/Way Invalidation Override */
+#define HCR_VM          (_AC(1,UL)<<0) /* Virtual MMU Enable */
 
 #define HSR_EC_UNKNOWN              0x00
 #define HSR_EC_WFI_WFE              0x01
@@ -346,20 +346,20 @@ union hsr {
                               HSR_SYSREG_OP2_MASK)
 
 /* Physical Address Register */
-#define PAR_F           (1<<0)
+#define PAR_F           (_AC(1,U)<<0)
 
 /* .... If F == 1 */
 #define PAR_FSC_SHIFT   (1)
-#define PAR_FSC_MASK    (0x3f<<PAR_FSC_SHIFT)
-#define PAR_STAGE21     (1<<8)     /* Stage 2 Fault During Stage 1 Walk */
-#define PAR_STAGE2      (1<<9)     /* Stage 2 Fault */
+#define PAR_FSC_MASK    (_AC(0x3f,U)<<PAR_FSC_SHIFT)
+#define PAR_STAGE21     (_AC(1,U)<<8)     /* Stage 2 Fault During Stage 1 Walk */
+#define PAR_STAGE2      (_AC(1,U)<<9)     /* Stage 2 Fault */
 
 /* If F == 0 */
 #define PAR_MAIR_SHIFT  56                       /* Memory Attributes */
 #define PAR_MAIR_MASK   (0xffLL<<PAR_MAIR_SHIFT)
-#define PAR_NS          (1<<9)                   /* Non-Secure */
+#define PAR_NS          (_AC(1,U)<<9)                   /* Non-Secure */
 #define PAR_SH_SHIFT    7                        /* Shareability */
-#define PAR_SH_MASK     (3<<PAR_SH_SHIFT)
+#define PAR_SH_MASK     (_AC(3,U)<<PAR_SH_SHIFT)
 
 /* Fault Status Register */
 /*
@@ -372,11 +372,11 @@ union hsr {
  * 10xxxx -- Other
  * 11xxxx -- Implementation Defined
  */
-#define FSC_TYPE_MASK (0x3<<4)
-#define FSC_TYPE_FAULT (0x00<<4)
-#define FSC_TYPE_ABT   (0x01<<4)
-#define FSC_TYPE_OTH   (0x02<<4)
-#define FSC_TYPE_IMPL  (0x03<<4)
+#define FSC_TYPE_MASK (_AC(0x3,U)<<4)
+#define FSC_TYPE_FAULT (_AC(0x00,U)<<4)
+#define FSC_TYPE_ABT   (_AC(0x01,U)<<4)
+#define FSC_TYPE_OTH   (_AC(0x02,U)<<4)
+#define FSC_TYPE_IMPL  (_AC(0x03,U)<<4)
 
 #define FSC_FLT_TRANS  (0x04)
 #define FSC_FLT_ACCESS (0x08)
@@ -391,7 +391,7 @@ union hsr {
 #define FSC_LKD        (0x34) /* Lockdown Abort */
 #define FSC_CPR        (0x3a) /* Coprocossor Abort */
 
-#define FSC_LL_MASK    (0x03<<0)
+#define FSC_LL_MASK    (_AC(0x03,U)<<0)
 
 /* Time counter hypervisor control register */
 #define CNTHCTL_PA      (1u<<0)  /* Kernel/user access to physical counter */
