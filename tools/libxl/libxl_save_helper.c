@@ -264,7 +264,7 @@ int main(int argc, char **argv)
         r = xc_domain_restore(xch, io_fd, dom, store_evtchn, &store_mfn,
                               store_domid, console_evtchn, &console_mfn,
                               console_domid, hvm, pae, superpages,
-                              no_incr_genidad, &genidad,
+                              no_incr_genidad, 0, &genidad,
                               &helper_restore_callbacks);
         helper_stub_restore_results(store_mfn,console_mfn,genidad,0);
         complete(r);

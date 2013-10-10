@@ -35,7 +35,7 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
                       domid_t store_domid, unsigned int console_evtchn,
                       unsigned long *console_mfn, domid_t console_domid,
                       unsigned int hvm, unsigned int pae, int superpages,
-                      int no_incr_generationid,
+                      int no_incr_generationid, int checkpointed_stream,
                       unsigned long *vm_generationid_addr,
                       struct restore_callbacks *callbacks)
 {
