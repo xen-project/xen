@@ -520,6 +520,8 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
         xenheap_pages += (bank_size >> PAGE_SHIFT);
 
+        setup_xenheap_mappings(bank_start>>PAGE_SHIFT, bank_size>>PAGE_SHIFT);
+
         /* XXX we assume that the ram regions are ordered */
         s = bank_start;
         while ( s < bank_end )
@@ -535,8 +537,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
             if ( e > bank_end )
                 e = bank_end;
-
-            setup_xenheap_mappings(s>>PAGE_SHIFT, (e-s)>>PAGE_SHIFT);
 
             xenheap_mfn_end = e;
 
