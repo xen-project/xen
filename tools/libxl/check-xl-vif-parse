@@ -206,4 +206,8 @@ expected </dev/null
 one $e rate=4294967295GB/s@5us
 one $e rate=4296MB/s@4294s
 
+# test include of single '@'
+expected </dev/null
+one $e rate=@
+
 complete
