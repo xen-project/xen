@@ -7,6 +7,7 @@ CONFIG_XEN_INSTALL_SUFFIX :=
 CFLAGS += #-marm -march= -mcpu= etc
 
 HAS_PL011 := y
+HAS_NS16550 := y
 
 # Use only if calling $(LD) directly.
 LDFLAGS_DIRECT += -EL
