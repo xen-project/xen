@@ -369,9 +369,16 @@ void __cpuinit setup_virt_paging(void)
     /* Setup Stage 2 address translation */
     /* SH0=00, ORGN0=IRGN0=01
      * SL0=01 (Level-1)
-     * T0SZ=(1)1000 = -8 (40 bit physical addresses)
+     * ARVv7: T0SZ=(1)1000 = -8 (32-(-8) = 40 bit physical addresses)
+     * ARMv8: T0SZ=01 1000 = 24 (64-24   = 40 bit physical addresses)
+     *        PS=010 == 40 bits
      */
-    WRITE_SYSREG32(0x80002558, VTCR_EL2); isb();
+#ifdef CONFIG_ARM_32
+    WRITE_SYSREG32(0x80002558, VTCR_EL2);
+#else
+    WRITE_SYSREG32(0x80022558, VTCR_EL2);
+#endif
+    isb();
 }
 
 static inline lpae_t pte_of_xenaddr(vaddr_t va)
