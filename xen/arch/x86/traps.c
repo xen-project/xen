@@ -1986,10 +1986,10 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
                     break;
                 }
             }
-            else
-                read_descriptor(data_sel, v, regs,
-                                &data_base, &data_limit, &ar,
-                                0);
+            else if ( !read_descriptor(data_sel, v, regs,
+                                       &data_base, &data_limit, &ar, 0) ||
+                      !(ar & _SEGMENT_S) || !(ar & _SEGMENT_P) )
+                goto fail;
             data_limit = ~0UL;
             ar = _SEGMENT_WR|_SEGMENT_S|_SEGMENT_DPL|_SEGMENT_P;
         }
