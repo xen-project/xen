@@ -1364,7 +1364,7 @@ static unsigned int __read_mostly xenheap_bits;
 
 void __init xenheap_max_mfn(unsigned long mfn)
 {
-    xenheap_bits = fls(mfn) + PAGE_SHIFT - 1;
+    xenheap_bits = fls(mfn) + PAGE_SHIFT;
 }
 
 void init_xenheap_pages(paddr_t ps, paddr_t pe)
