@@ -360,7 +360,8 @@ guest_map_l1e(struct vcpu *v, unsigned long addr, unsigned long *gl1mfn)
         return paging_get_hostmode(v)->guest_map_l1e(v, addr, gl1mfn);
 
     /* Find this l1e and its enclosing l1mfn in the linear map */
-    if ( __copy_from_user(&l2e, 
+    if ( !__addr_ok(addr) ||
+         __copy_from_user(&l2e,
                           &__linear_l2_table[l2_linear_offset(addr)],
                           sizeof(l2_pgentry_t)) != 0 )
         return NULL;
