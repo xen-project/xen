@@ -1349,6 +1349,7 @@ libxl__poller *libxl__poller_get(libxl_ctx *ctx)
 
 void libxl__poller_put(libxl_ctx *ctx, libxl__poller *p)
 {
+    if (!p) return;
     LIBXL_LIST_INSERT_HEAD(&ctx->pollers_idle, p, entry);
 }
 
@@ -1541,7 +1542,7 @@ void libxl__ao__destroy(libxl_ctx *ctx, libxl__ao *ao)
     AO_GC;
     if (!ao) return;
     LOG(DEBUG,"ao %p: destroy",ao);
-    if (ao->poller) libxl__poller_put(ctx, ao->poller);
+    libxl__poller_put(ctx, ao->poller);
     ao->magic = LIBXL__AO_MAGIC_DESTROYED;
     libxl__free_all(&ao->gc);
     free(ao);
