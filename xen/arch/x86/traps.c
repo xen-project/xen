@@ -1065,11 +1065,23 @@ static void reserved_bit_page_fault(
     show_execution_state(regs);
 }
 
-void propagate_page_fault(unsigned long addr, u16 error_code)
+struct trap_bounce *propagate_page_fault(unsigned long addr, u16 error_code)
 {
     struct trap_info *ti;
     struct vcpu *v = current;
     struct trap_bounce *tb = &v->arch.pv_vcpu.trap_bounce;
+
+    if ( unlikely(!is_canonical_address(addr)) )
+    {
+        ti = &v->arch.pv_vcpu.trap_ctxt[TRAP_gp_fault];
+        tb->flags      = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
+        tb->error_code = 0;
+        tb->cs         = ti->cs;
+        tb->eip        = ti->address;
+        if ( TI_GET_IF(ti) )
+            tb->flags |= TBF_INTERRUPT;
+        return tb;
+    }
 
     v->arch.pv_vcpu.ctrlreg[2] = addr;
     arch_set_cr2(v, addr);
@@ -1097,6 +1109,8 @@ void propagate_page_fault(unsigned long addr, u16 error_code)
 
     if ( unlikely(error_code & PFEC_reserved_bit) )
         reserved_bit_page_fault(addr, guest_cpu_user_regs());
+
+    return NULL;
 }
 
 static int handle_gdt_ldt_mapping_fault(
@@ -1130,13 +1144,16 @@ static int handle_gdt_ldt_mapping_fault(
         }
         else
         {
+            struct trap_bounce *tb;
+
             /* In hypervisor mode? Leave it to the #PF handler to fix up. */
             if ( !guest_mode(regs) )
                 return 0;
-            /* In guest mode? Propagate #PF to guest, with adjusted %cr2. */
-            propagate_page_fault(
-                curr->arch.pv_vcpu.ldt_base + offset,
-                regs->error_code);
+            /* In guest mode? Propagate fault to guest, with adjusted %cr2. */
+            tb = propagate_page_fault(curr->arch.pv_vcpu.ldt_base + offset,
+                                      regs->error_code);
+            if ( tb )
+                tb->error_code = ((u16)offset & ~3) | 4;
         }
     }
     else

@@ -674,12 +674,7 @@ int arch_set_info_guest(
                 fixup_guest_code_selector(d, c.nat->trap_ctxt[i].cs);
             }
 
-            /* LDT safety checks. */
-            if ( ((c.nat->ldt_base & (PAGE_SIZE-1)) != 0) ||
-                 (c.nat->ldt_ents > 8192) ||
-                 !array_access_ok(c.nat->ldt_base,
-                                  c.nat->ldt_ents,
-                                  LDT_ENTRY_SIZE) )
+            if ( !__addr_ok(c.nat->ldt_base) )
                 return -EINVAL;
         }
         else
@@ -692,15 +687,12 @@ int arch_set_info_guest(
 
             for ( i = 0; i < ARRAY_SIZE(c.cmp->trap_ctxt); i++ )
                 fixup_guest_code_selector(d, c.cmp->trap_ctxt[i].cs);
-
-            /* LDT safety checks. */
-            if ( ((c.cmp->ldt_base & (PAGE_SIZE-1)) != 0) ||
-                 (c.cmp->ldt_ents > 8192) ||
-                 !compat_array_access_ok(c.cmp->ldt_base,
-                                         c.cmp->ldt_ents,
-                                         LDT_ENTRY_SIZE) )
-                return -EINVAL;
         }
+
+        /* LDT safety checks. */
+        if ( ((c(ldt_base) & (PAGE_SIZE - 1)) != 0) ||
+             (c(ldt_ents) > 8192) )
+            return -EINVAL;
     }
 
     v->fpu_initialised = !!(flags & VGCF_I387_VALID);

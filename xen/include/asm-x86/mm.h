@@ -555,7 +555,7 @@ int new_guest_cr3(unsigned long pfn);
 void make_cr3(struct vcpu *v, unsigned long mfn);
 void update_cr3(struct vcpu *v);
 int vcpu_destroy_pagetables(struct vcpu *);
-void propagate_page_fault(unsigned long addr, u16 error_code);
+struct trap_bounce *propagate_page_fault(unsigned long addr, u16 error_code);
 void *do_page_walk(struct vcpu *v, unsigned long addr);
 
 int __sync_local_execstate(void);
