@@ -6,7 +6,7 @@ from xen.xm import main
 
 print >>sys.stderr, ("WARNING: xend/xm is deprecated.")
 
-if not os.path.exists("/tmp/xm-deprecation-long-warning"):
+if not os.path.exists("/var/run/xm-deprecation-long-warning"):
     print >>sys.stderr, ("""
 xend is deprecated and scheduled for removal. Please migrate to another
 toolstack ASAP.
@@ -15,6 +15,6 @@ See http://wiki.xen.org/wiki/Choice_of_Toolstacks for information on
 other alternatives, including xl which is designed to be a drop in
 replacement for xm (http://wiki.xen.org/wiki/XL).
 """)
-    open("/tmp/xm-deprecation-long-warning", "w").close()
+    open("/var/run/xm-deprecation-long-warning", "w").close()
 
 main.main(sys.argv)
