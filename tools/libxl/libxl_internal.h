@@ -829,7 +829,7 @@ _hidden void libxl__poller_dispose(libxl__poller *p);
  * away again afterwards.  _get can fail, returning NULL.
  * ctx must be locked. */
 _hidden libxl__poller *libxl__poller_get(libxl_ctx *ctx);
-_hidden void libxl__poller_put(libxl_ctx *ctx, libxl__poller *p);
+_hidden void libxl__poller_put(libxl_ctx*, libxl__poller *p /* may be NULL */);
 
 /* Notifies whoever is polling using p that they should wake up.
  * ctx must be locked. */
