@@ -224,9 +224,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.3.0
-# Mon Jun 17 17:39:51 2013 +0100
-# qemu-xen-traditional: disable docs
+QEMU_TAG ?= 0bd3d991be73031b8d9c07ccf43e5785ca26ca71
+# Thu Jul 25 08:11:55 2013 +0000
+# passthrough: Correctly expose PCH ISA bridge for IGD passthrough
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
