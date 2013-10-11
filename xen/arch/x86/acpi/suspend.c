@@ -27,8 +27,8 @@ void save_rest_processor_state(void)
     asm volatile (
         "movw %%ds,(%0); movw %%es,2(%0); movw %%fs,4(%0); movw %%gs,6(%0)"
         : : "r" (saved_segs) : "memory" );
-    rdmsrl(MSR_FS_BASE, saved_fs_base);
-    rdmsrl(MSR_GS_BASE, saved_gs_base);
+    saved_fs_base = rdfsbase();
+    saved_gs_base = rdgsbase();
     rdmsrl(MSR_SHADOW_GS_BASE, saved_kernel_gs_base);
     rdmsrl(MSR_CSTAR, saved_cstar);
     rdmsrl(MSR_LSTAR, saved_lstar);
@@ -56,8 +56,8 @@ void restore_rest_processor_state(void)
           X86_EFLAGS_DF|X86_EFLAGS_IF|X86_EFLAGS_TF,
           0U);
 
-    wrmsrl(MSR_FS_BASE, saved_fs_base);
-    wrmsrl(MSR_GS_BASE, saved_gs_base);
+    wrfsbase(saved_fs_base);
+    wrgsbase(saved_gs_base);
     wrmsrl(MSR_SHADOW_GS_BASE, saved_kernel_gs_base);
 
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL ||

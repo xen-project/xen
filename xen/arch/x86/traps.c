@@ -1985,28 +1985,18 @@ static int emulate_privileged_op(struct cpu_user_regs *regs)
         }
         else
         {
-            if ( lm_ovr == lm_seg_none || data_sel < 4 )
+            switch ( lm_ovr )
             {
-                switch ( lm_ovr )
-                {
-                case lm_seg_none:
-                    data_base = 0UL;
-                    break;
-                case lm_seg_fs:
-                    data_base = v->arch.pv_vcpu.fs_base;
-                    break;
-                case lm_seg_gs:
-                    if ( guest_kernel_mode(v, regs) )
-                        data_base = v->arch.pv_vcpu.gs_base_kernel;
-                    else
-                        data_base = v->arch.pv_vcpu.gs_base_user;
-                    break;
-                }
+            default:
+                data_base = 0UL;
+                break;
+            case lm_seg_fs:
+                data_base = rdfsbase();
+                break;
+            case lm_seg_gs:
+                data_base = rdgsbase();
+                break;
             }
-            else if ( !read_descriptor(data_sel, v, regs,
-                                       &data_base, &data_limit, &ar, 0) ||
-                      !(ar & _SEGMENT_S) || !(ar & _SEGMENT_P) )
-                goto fail;
             data_limit = ~0UL;
             ar = _SEGMENT_WR|_SEGMENT_S|_SEGMENT_DPL|_SEGMENT_P;
         }

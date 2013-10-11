@@ -1264,6 +1264,9 @@ void __init __start_xen(unsigned long mbi_p)
     if ( cpu_has_smep )
         set_in_cr4(X86_CR4_SMEP);
 
+    if ( cpu_has_fsgsbase )
+        set_in_cr4(X86_CR4_FSGSBASE);
+
     local_irq_enable();
 
     pt_pci_init();
