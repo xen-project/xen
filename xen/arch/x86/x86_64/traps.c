@@ -170,6 +170,8 @@ void show_page_walk(unsigned long addr)
     l1_pgentry_t l1e, *l1t;
 
     printk("Pagetable walk from %016lx:\n", addr);
+    if ( !is_canonical_address(addr) )
+        return;
 
     l4t = map_domain_page(mfn);
     l4e = l4t[l4_table_offset(addr)];

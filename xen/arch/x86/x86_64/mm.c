@@ -73,7 +73,7 @@ void *do_page_walk(struct vcpu *v, unsigned long addr)
     l2_pgentry_t l2e, *l2t;
     l1_pgentry_t l1e, *l1t;
 
-    if ( is_hvm_vcpu(v) )
+    if ( is_hvm_vcpu(v) || !is_canonical_address(addr) )
         return NULL;
 
     l4t = map_domain_page(mfn);
