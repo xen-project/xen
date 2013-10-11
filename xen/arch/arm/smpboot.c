@@ -28,6 +28,7 @@
 #include <xen/softirq.h>
 #include <xen/timer.h>
 #include <xen/irq.h>
+#include <xen/console.h>
 #include <asm/gic.h>
 
 cpumask_t cpu_online_map;
@@ -356,6 +357,8 @@ int __cpu_up(unsigned int cpu)
     if ( rc < 0 )
         return rc;
 
+    console_start_sync(); /* Secondary may use early_printk */
+
     /* Tell the remote CPU which stack to boot on. */
     init_data.stack = idle_vcpu[cpu]->arch.stack;
 
@@ -367,6 +370,8 @@ int __cpu_up(unsigned int cpu)
     flush_xen_dcache(smp_up_cpu);
 
     rc = arch_cpu_up(cpu);
+
+    console_end_sync();
 
     if ( rc < 0 )
     {
