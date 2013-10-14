@@ -552,11 +552,13 @@ struct multicall_entry {
 typedef struct multicall_entry multicall_entry_t;
 DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);
 
+#if __XEN_INTERFACE_VERSION__ < 0x00040400
 /*
- * Event channel endpoints per domain:
+ * Event channel endpoints per domain (when using the 2-level ABI):
  *  1024 if a long is 32 bits; 4096 if a long is 64 bits.
  */
-#define NR_EVENT_CHANNELS (sizeof(xen_ulong_t) * sizeof(xen_ulong_t) * 64)
+#define NR_EVENT_CHANNELS EVTCHN_2L_NR_CHANNELS
+#endif
 
 struct vcpu_time_info {
     /*

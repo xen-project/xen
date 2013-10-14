@@ -61,7 +61,7 @@ extern struct domain *dom0;
 #define next_power_of_2(x)      (__RDU32((x)-1) + 1)
 
 /* Maximum number of event channels for any ABI. */
-#define MAX_NR_EVTCHNS NR_EVENT_CHANNELS
+#define MAX_NR_EVTCHNS EVTCHN_2L_NR_CHANNELS
 
 #define EVTCHNS_PER_BUCKET (PAGE_SIZE / next_power_of_2(sizeof(struct evtchn)))
 #define EVTCHNS_PER_GROUP  (BUCKETS_PER_GROUP * EVTCHNS_PER_BUCKET)
