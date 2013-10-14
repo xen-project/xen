@@ -137,6 +137,8 @@ struct evtchn_port_ops {
     void (*unmask)(struct domain *d, struct evtchn *evtchn);
     bool_t (*is_pending)(struct domain *d, const struct evtchn *evtchn);
     bool_t (*is_masked)(struct domain *d, const struct evtchn *evtchn);
+    int (*set_priority)(struct domain *d, struct evtchn *evtchn,
+                        unsigned int priority);
     void (*print_state)(struct domain *d, const struct evtchn *evtchn);
 };
 
@@ -168,6 +170,15 @@ static inline bool_t evtchn_port_is_masked(struct domain *d,
                                            const struct evtchn *evtchn)
 {
     return d->evtchn_port_ops->is_masked(d, evtchn);
+}
+
+static inline int evtchn_port_set_priority(struct domain *d,
+                                           struct evtchn *evtchn,
+                                           unsigned int priority)
+{
+    if ( !d->evtchn_port_ops->set_priority )
+        return -ENOSYS;
+    return d->evtchn_port_ops->set_priority(d, evtchn, priority);
 }
 
 static inline void evtchn_port_print_state(struct domain *d,

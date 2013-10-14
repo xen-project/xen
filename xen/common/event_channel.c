@@ -955,6 +955,27 @@ out:
     return rc;
 }
 
+static long evtchn_set_priority(const struct evtchn_set_priority *set_priority)
+{
+    struct domain *d = current->domain;
+    unsigned int port = set_priority->port;
+    long ret;
+
+    spin_lock(&d->event_lock);
+
+    if ( !port_is_valid(d, port) )
+    {
+        spin_unlock(&d->event_lock);
+        return -EINVAL;
+    }
+
+    ret = evtchn_port_set_priority(d, evtchn_from_port(d, port),
+                                   set_priority->priority);
+
+    spin_unlock(&d->event_lock);
+
+    return ret;
+}
 
 long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
@@ -1061,6 +1082,14 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&reset, arg, 1) != 0 )
             return -EFAULT;
         rc = evtchn_reset(&reset);
+        break;
+    }
+
+    case EVTCHNOP_set_priority: {
+        struct evtchn_set_priority set_priority;
+        if ( copy_from_guest(&set_priority, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_set_priority(&set_priority);
         break;
     }
 
