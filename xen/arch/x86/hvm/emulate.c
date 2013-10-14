@@ -569,9 +569,19 @@ static int hvmemul_insn_fetch(
 
     /* Fall back if requested bytes are not in the prefetch cache. */
     if ( unlikely((insn_off + bytes) > hvmemul_ctxt->insn_buf_bytes) )
-        return __hvmemul_read(
-            seg, offset, p_data, bytes,
-            hvm_access_insn_fetch, hvmemul_ctxt);
+    {
+        int rc = __hvmemul_read(seg, offset, p_data, bytes,
+                                hvm_access_insn_fetch, hvmemul_ctxt);
+
+        if ( rc == X86EMUL_OKAY )
+        {
+            ASSERT(insn_off + bytes <= sizeof(hvmemul_ctxt->insn_buf));
+            memcpy(&hvmemul_ctxt->insn_buf[insn_off], p_data, bytes);
+            hvmemul_ctxt->insn_buf_bytes = insn_off + bytes;
+        }
+
+        return rc;
+    }
 
     /* Hit the cache. Simple memcpy. */
     memcpy(p_data, &hvmemul_ctxt->insn_buf[insn_off], bytes);
@@ -1148,17 +1158,27 @@ int hvm_emulate_one(
         pfec |= PFEC_user_mode;
 
     hvmemul_ctxt->insn_buf_eip = regs->eip;
-    hvmemul_ctxt->insn_buf_bytes =
-        hvm_get_insn_bytes(curr, hvmemul_ctxt->insn_buf)
-        ? :
-        (hvm_virtual_to_linear_addr(
-            x86_seg_cs, &hvmemul_ctxt->seg_reg[x86_seg_cs],
-            regs->eip, sizeof(hvmemul_ctxt->insn_buf),
-            hvm_access_insn_fetch, hvmemul_ctxt->ctxt.addr_size, &addr) &&
-         !hvm_fetch_from_guest_virt_nofault(
-             hvmemul_ctxt->insn_buf, addr,
-             sizeof(hvmemul_ctxt->insn_buf), pfec))
-        ? sizeof(hvmemul_ctxt->insn_buf) : 0;
+    if ( !vio->mmio_insn_bytes )
+    {
+        hvmemul_ctxt->insn_buf_bytes =
+            hvm_get_insn_bytes(curr, hvmemul_ctxt->insn_buf) ?:
+            (hvm_virtual_to_linear_addr(x86_seg_cs,
+                                        &hvmemul_ctxt->seg_reg[x86_seg_cs],
+                                        regs->eip,
+                                        sizeof(hvmemul_ctxt->insn_buf),
+                                        hvm_access_insn_fetch,
+                                        hvmemul_ctxt->ctxt.addr_size,
+                                        &addr) &&
+             hvm_fetch_from_guest_virt_nofault(hvmemul_ctxt->insn_buf, addr,
+                                               sizeof(hvmemul_ctxt->insn_buf),
+                                               pfec) == HVMCOPY_okay) ?
+            sizeof(hvmemul_ctxt->insn_buf) : 0;
+    }
+    else
+    {
+        hvmemul_ctxt->insn_buf_bytes = vio->mmio_insn_bytes;
+        memcpy(hvmemul_ctxt->insn_buf, vio->mmio_insn, vio->mmio_insn_bytes);
+    }
 
     hvmemul_ctxt->exn_pending = 0;
     vio->mmio_retrying = vio->mmio_retry;
@@ -1169,7 +1189,16 @@ int hvm_emulate_one(
     if ( rc == X86EMUL_OKAY && vio->mmio_retry )
         rc = X86EMUL_RETRY;
     if ( rc != X86EMUL_RETRY )
+    {
         vio->mmio_large_read_bytes = vio->mmio_large_write_bytes = 0;
+        vio->mmio_insn_bytes = 0;
+    }
+    else
+    {
+        BUILD_BUG_ON(sizeof(vio->mmio_insn) < sizeof(hvmemul_ctxt->insn_buf));
+        vio->mmio_insn_bytes = hvmemul_ctxt->insn_buf_bytes;
+        memcpy(vio->mmio_insn, hvmemul_ctxt->insn_buf, vio->mmio_insn_bytes);
+    }
 
     if ( rc != X86EMUL_OKAY )
         return rc;
