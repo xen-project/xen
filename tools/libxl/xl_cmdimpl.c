@@ -205,6 +205,19 @@ static uint32_t find_domain(const char *p)
     return domid;
 }
 
+static void console_child_report(xlchildnum child)
+{
+    if (xl_child_pid(child)) {
+        int status;
+        pid_t got = xl_waitpid(child, &status, 0);
+        if (got < 0)
+            fprintf(stderr, "xl: warning, failed to waitpid for %s: %s\n",
+                    children[child].description, strerror(errno));
+        else if (status)
+            xl_report_child_exitstatus(XTL_ERROR, child, got, status);
+    }
+}
+
 static int vncviewer(uint32_t domid, int autopass)
 {
     libxl_vncviewer_exec(ctx, domid, autopass);
@@ -212,22 +225,9 @@ static int vncviewer(uint32_t domid, int autopass)
     return 1;
 }
 
-static void vncviewer_child_report(void)
-{
-    if (xl_child_pid(child_vncviewer)) {
-        int status;
-        pid_t got = xl_waitpid(child_vncviewer, &status, 0);
-        if (got < 0)
-            perror("xl: warning, failed to waitpid for vncviewer child");
-        else if (status)
-            xl_report_child_exitstatus(XTL_ERROR, child_vncviewer,
-                                       got, status);
-    }
-}
-
 static void autoconnect_vncviewer(uint32_t domid, int autopass)
 {
-    vncviewer_child_report();
+   console_child_report(child_vncviewer);
 
     pid_t pid = xl_fork(child_vncviewer, "vncviewer child");
     if (pid)
@@ -1983,19 +1983,6 @@ static int freemem(uint32_t domid, libxl_domain_build_info *b_info)
     return ERROR_NOMEM;
 }
 
-static void console_child_report(void)
-{
-    if (xl_child_pid(child_console)) {
-        int status;
-        pid_t got = xl_waitpid(child_console, &status, 0);
-        if (got < 0)
-            perror("xl: warning, failed to waitpid for console child");
-        else if (status)
-            xl_report_child_exitstatus(XTL_ERROR, child_console,
-                                       got, status);
-    }
-}
-
 static void autoconnect_console(libxl_ctx *ctx_ignored,
                                 libxl_event *ev, void *priv)
 {
@@ -2003,7 +1990,7 @@ static void autoconnect_console(libxl_ctx *ctx_ignored,
 
     libxl_event_free(ctx, ev);
 
-    console_child_report();
+    console_child_report(child_console);
 
     pid_t pid = xl_fork(child_console, "console child");
     if (pid)
@@ -2461,7 +2448,7 @@ out:
 
     free(config_data);
 
-    console_child_report();
+    console_child_report(child_console);
 
     if (deathw)
         libxl_evdisable_domain_death(ctx, deathw);
