@@ -294,12 +294,21 @@ void hvm_io_assist(void)
 
 static int dpci_ioport_read(uint32_t mport, ioreq_t *p)
 {
-    int i, step = p->df ? -p->size : p->size;
+    struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
+    int rc = X86EMUL_OKAY, i, step = p->df ? -p->size : p->size;
     uint32_t data = 0;
 
     for ( i = 0; i < p->count; i++ )
     {
-        switch ( p->size )
+        if ( vio->mmio_retrying )
+        {
+            if ( vio->mmio_large_read_bytes != p->size )
+                return X86EMUL_UNHANDLEABLE;
+            memcpy(&data, vio->mmio_large_read, p->size);
+            vio->mmio_large_read_bytes = 0;
+            vio->mmio_retrying = 0;
+        }
+        else switch ( p->size )
         {
         case 1:
             data = inb(mport);
@@ -316,22 +325,51 @@ static int dpci_ioport_read(uint32_t mport, ioreq_t *p)
 
         if ( p->data_is_ptr )
         {
-            int ret;
-            ret = hvm_copy_to_guest_phys(p->data + step * i, &data, p->size);
-            if ( (ret == HVMCOPY_gfn_paged_out) ||
-                 (ret == HVMCOPY_gfn_shared) )
-                return X86EMUL_RETRY;
+            switch ( hvm_copy_to_guest_phys(p->data + step * i,
+                                            &data, p->size) )
+            {
+            case HVMCOPY_okay:
+                break;
+            case HVMCOPY_gfn_paged_out:
+            case HVMCOPY_gfn_shared:
+                rc = X86EMUL_RETRY;
+                break;
+            case HVMCOPY_bad_gfn_to_mfn:
+                /* Drop the write as real hardware would. */
+                continue;
+            case HVMCOPY_bad_gva_to_gfn:
+                ASSERT(0);
+                /* fall through */
+            default:
+                rc = X86EMUL_UNHANDLEABLE;
+                break;
+            }
+            if ( rc != X86EMUL_OKAY)
+                break;
         }
         else
             p->data = data;
     }
-    
-    return X86EMUL_OKAY;
+
+    if ( rc == X86EMUL_RETRY )
+    {
+        vio->mmio_retry = 1;
+        vio->mmio_large_read_bytes = p->size;
+        memcpy(vio->mmio_large_read, &data, p->size);
+    }
+
+    if ( i != 0 )
+    {
+        p->count = i;
+        rc = X86EMUL_OKAY;
+    }
+
+    return rc;
 }
 
 static int dpci_ioport_write(uint32_t mport, ioreq_t *p)
 {
-    int i, step = p->df ? -p->size : p->size;
+    int rc = X86EMUL_OKAY, i, step = p->df ? -p->size : p->size;
     uint32_t data;
 
     for ( i = 0; i < p->count; i++ )
@@ -346,7 +384,8 @@ static int dpci_ioport_write(uint32_t mport, ioreq_t *p)
                 break;
             case HVMCOPY_gfn_paged_out:
             case HVMCOPY_gfn_shared:
-                return X86EMUL_RETRY;
+                rc = X86EMUL_RETRY;
+                break;
             case HVMCOPY_bad_gfn_to_mfn:
                 data = ~0;
                 break;
@@ -354,8 +393,11 @@ static int dpci_ioport_write(uint32_t mport, ioreq_t *p)
                 ASSERT(0);
                 /* fall through */
             default:
-                return X86EMUL_UNHANDLEABLE;
+                rc = X86EMUL_UNHANDLEABLE;
+                break;
             }
+            if ( rc != X86EMUL_OKAY)
+                break;
         }
 
         switch ( p->size )
@@ -374,7 +416,16 @@ static int dpci_ioport_write(uint32_t mport, ioreq_t *p)
         }
     }
 
-    return X86EMUL_OKAY;
+    if ( rc == X86EMUL_RETRY )
+        current->arch.hvm_vcpu.hvm_io.mmio_retry = 1;
+
+    if ( i != 0 )
+    {
+        p->count = i;
+        rc = X86EMUL_OKAY;
+    }
+
+    return rc;
 }
 
 int dpci_ioport_intercept(ioreq_t *p)

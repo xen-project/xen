@@ -173,6 +173,13 @@ static int hvmemul_do_io(
         (p_data == NULL) ? HVMIO_dispatched : HVMIO_awaiting_completion;
     vio->io_size = size;
 
+    /*
+     * When retrying a repeated string instruction, force exit to guest after
+     * completion of the retried iteration to allow handling of interrupts.
+     */
+    if ( vio->mmio_retrying )
+        *reps = 1;
+
     p->dir = dir;
     p->data_is_ptr = value_is_ptr;
     p->type = is_mmio ? IOREQ_TYPE_COPY : IOREQ_TYPE_PIO;
@@ -202,8 +209,14 @@ static int hvmemul_do_io(
     case X86EMUL_RETRY:
         *reps = p->count;
         p->state = STATE_IORESP_READY;
-        hvm_io_assist();
-        vio->io_state = HVMIO_none;
+        if ( !vio->mmio_retry )
+        {
+            hvm_io_assist();
+            vio->io_state = HVMIO_none;
+        }
+        else
+            /* Defer hvm_io_assist() invocation to hvm_do_resume(). */
+            vio->io_state = HVMIO_handle_mmio_awaiting_completion;
         break;
     case X86EMUL_UNHANDLEABLE:
         rc = X86EMUL_RETRY;
@@ -249,10 +262,9 @@ static int hvmemul_do_io(
             if ( bytes == 0 )
                 pa = vio->mmio_large_read_pa = addr;
             if ( (addr == (pa + bytes)) &&
-                 ((bytes + size) <
-                  sizeof(vio->mmio_large_read)) )
+                 ((bytes + size) <= sizeof(vio->mmio_large_read)) )
             {
-                memcpy(&vio->mmio_large_read[addr - pa], p_data, size);
+                memcpy(&vio->mmio_large_read[bytes], p_data, size);
                 vio->mmio_large_read_bytes += size;
             }
         }
@@ -1151,9 +1163,13 @@ int hvm_emulate_one(
         ? sizeof(hvmemul_ctxt->insn_buf) : 0;
 
     hvmemul_ctxt->exn_pending = 0;
+    vio->mmio_retrying = vio->mmio_retry;
+    vio->mmio_retry = 0;
 
     rc = x86_emulate(&hvmemul_ctxt->ctxt, &hvm_emulate_ops);
 
+    if ( rc == X86EMUL_OKAY && vio->mmio_retry )
+        rc = X86EMUL_RETRY;
     if ( rc != X86EMUL_RETRY )
         vio->mmio_large_read_bytes = vio->mmio_large_write_bytes = 0;
 
