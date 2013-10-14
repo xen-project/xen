@@ -310,16 +310,9 @@ static void dump_domains(unsigned char key)
     {
         for_each_vcpu ( d, v )
         {
-            printk("Notifying guest %d:%d (virq %d, port %d, stat %d/%d/%d)\n",
+            printk("Notifying guest %d:%d (virq %d, port %d)\n",
                    d->domain_id, v->vcpu_id,
-                   VIRQ_DEBUG, v->virq_to_evtchn[VIRQ_DEBUG],
-                   test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
-                            &shared_info(d, evtchn_pending)),
-                   test_bit(v->virq_to_evtchn[VIRQ_DEBUG], 
-                            &shared_info(d, evtchn_mask)),
-                   test_bit(v->virq_to_evtchn[VIRQ_DEBUG] /
-                            BITS_PER_EVTCHN_WORD(d),
-                            &vcpu_info(v, evtchn_pending_sel)));
+                   VIRQ_DEBUG, v->virq_to_evtchn[VIRQ_DEBUG]);
             send_guest_vcpu_virq(v, VIRQ_DEBUG);
         }
     }

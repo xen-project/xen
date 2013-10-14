@@ -2262,14 +2262,11 @@ static void dump_irqs(unsigned char key)
                 d = action->guest[i];
                 pirq = domain_irq_to_pirq(d, irq);
                 info = pirq_info(d, pirq);
-                printk("%u:%3d(%c%c%c%c)",
+                printk("%u:%3d(%c%c%c)",
                        d->domain_id, pirq,
                        (test_bit(info->evtchn,
                                  &shared_info(d, evtchn_pending)) ?
                         'P' : '-'),
-                       (test_bit(info->evtchn / BITS_PER_EVTCHN_WORD(d),
-                                 &vcpu_info(d->vcpu[0], evtchn_pending_sel)) ?
-                        'S' : '-'),
                        (test_bit(info->evtchn, &shared_info(d, evtchn_mask)) ?
                         'M' : '-'),
                        (info->masked ? 'M' : '-'));
