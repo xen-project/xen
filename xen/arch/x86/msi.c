@@ -1158,11 +1158,11 @@ int pci_restore_msi_state(struct pci_dev *pdev)
         for ( i = 0; ; )
         {
             msi_set_mask_bit(desc, entry[i].msi_attrib.masked);
-            spin_unlock_irqrestore(&desc->lock, flags);
 
             if ( !--nr )
                 break;
 
+            spin_unlock_irqrestore(&desc->lock, flags);
             desc = &irq_desc[entry[++i].irq];
             spin_lock_irqsave(&desc->lock, flags);
             if ( desc->msi_desc != entry + i )
