@@ -115,6 +115,7 @@ struct evtchn_port_ops {
     void (*unmask)(struct domain *d, struct evtchn *evtchn);
     bool_t (*is_pending)(struct domain *d, const struct evtchn *evtchn);
     bool_t (*is_masked)(struct domain *d, const struct evtchn *evtchn);
+    void (*print_state)(struct domain *d, const struct evtchn *evtchn);
 };
 
 static inline void evtchn_port_set_pending(struct vcpu *v,
@@ -145,6 +146,12 @@ static inline bool_t evtchn_port_is_masked(struct domain *d,
                                            const struct evtchn *evtchn)
 {
     return d->evtchn_port_ops->is_masked(d, evtchn);
+}
+
+static inline void evtchn_port_print_state(struct domain *d,
+                                           const struct evtchn *evtchn)
+{
+    d->evtchn_port_ops->print_state(d, evtchn);
 }
 
 #endif /* __XEN_EVENT_H__ */

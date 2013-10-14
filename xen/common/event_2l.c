@@ -74,6 +74,15 @@ static bool_t evtchn_2l_is_masked(struct domain *d,
     return test_bit(evtchn->port, &shared_info(d, evtchn_mask));
 }
 
+static void evtchn_2l_print_state(struct domain *d,
+                                  const struct evtchn *evtchn)
+{
+    struct vcpu *v = d->vcpu[evtchn->notify_vcpu_id];
+
+    printk("%d", !!test_bit(evtchn->port / BITS_PER_EVTCHN_WORD(d),
+                            &vcpu_info(v, evtchn_pending_sel)));
+}
+
 static const struct evtchn_port_ops evtchn_port_ops_2l =
 {
     .set_pending   = evtchn_2l_set_pending,
@@ -81,6 +90,7 @@ static const struct evtchn_port_ops evtchn_port_ops_2l =
     .unmask        = evtchn_2l_unmask,
     .is_pending    = evtchn_2l_is_pending,
     .is_masked     = evtchn_2l_is_masked,
+    .print_state   = evtchn_2l_print_state,
 };
 
 void evtchn_2l_init(struct domain *d)

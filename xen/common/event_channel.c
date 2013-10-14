@@ -1232,7 +1232,7 @@ static void domain_dump_evtchn_info(struct domain *d)
                          d->poll_mask, d->max_vcpus);
     printk("Event channel information for domain %d:\n"
            "Polling vCPUs: {%s}\n"
-           "    port [p/m]\n", d->domain_id, keyhandler_scratch);
+           "    port [p/m/s]\n", d->domain_id, keyhandler_scratch);
 
     spin_lock(&d->event_lock);
 
@@ -1247,10 +1247,12 @@ static void domain_dump_evtchn_info(struct domain *d)
         if ( chn->state == ECS_FREE )
             continue;
 
-        printk("    %4u [%d/%d]: s=%d n=%d x=%d",
+        printk("    %4u [%d/%d/",
                port,
                !!evtchn_port_is_pending(d, chn),
-               !!evtchn_port_is_masked(d, chn),
+               !!evtchn_port_is_masked(d, chn));
+        evtchn_port_print_state(d, chn);
+        printk("]: s=%d n=%d x=%d",
                chn->state, chn->notify_vcpu_id, chn->xen_consumer);
 
         switch ( chn->state )
