@@ -230,10 +230,7 @@ static void autoconnect_vncviewer(uint32_t domid, int autopass)
     vncviewer_child_report();
 
     pid_t pid = xl_fork(child_vncviewer);
-    if (pid < 0) {
-        perror("unable to fork vncviewer");
-        return;
-    } else if (pid > 0)
+    if (pid)
         return;
 
     postfork();
@@ -2009,10 +2006,7 @@ static void autoconnect_console(libxl_ctx *ctx_ignored,
     console_child_report();
 
     pid_t pid = xl_fork(child_console);
-    if (pid < 0) {
-        perror("unable to fork xenconsole");
-        return;
-    } else if (pid > 0)
+    if (pid)
         return;
 
     postfork();
