@@ -15,9 +15,11 @@ struct bug_frame {
 
 #define bug_loc(b) ((const void *)(b) + (b)->loc_disp)
 #define bug_ptr(b) ((const void *)(b) + (b)->ptr_disp)
-#define bug_line(b) ((((b)->line_hi + ((b)->loc_disp < 0)) <<                \
+#define bug_line(b) (((((b)->line_hi + ((b)->loc_disp < 0)) &                \
+                       ((1 << BUG_LINE_HI_WIDTH) - 1)) <<                    \
                       BUG_LINE_LO_WIDTH) +                                   \
-                     (b)->line_lo + ((b)->ptr_disp < 0))
+                     (((b)->line_lo + ((b)->ptr_disp < 0)) &                 \
+                      ((1 << BUG_LINE_LO_WIDTH) - 1)))
 #define bug_msg(b) ((const char *)(b) + (b)->msg_disp[1])
 
 #define BUGFRAME_run_fn 0
