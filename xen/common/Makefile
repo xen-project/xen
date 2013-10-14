@@ -5,6 +5,7 @@ obj-y += cpupool.o
 obj-$(HAS_DEVICE_TREE) += device_tree.o
 obj-y += domctl.o
 obj-y += domain.o
+obj-y += event_2l.o
 obj-y += event_channel.o
 obj-y += grant_table.o
 obj-y += irq.o

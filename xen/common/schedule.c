@@ -34,6 +34,7 @@
 #include <xen/multicall.h>
 #include <xen/cpu.h>
 #include <xen/preempt.h>
+#include <xen/event.h>
 #include <public/sched.h>
 #include <xsm/xsm.h>
 
@@ -759,7 +760,7 @@ static long do_poll(struct sched_poll *sched_poll)
             goto out;
 
         rc = 0;
-        if ( test_bit(port, &shared_info(d, evtchn_pending)) )
+        if ( evtchn_port_is_pending(d, evtchn_from_port(d, port)) )
             goto out;
     }
 

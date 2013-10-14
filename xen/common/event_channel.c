@@ -150,6 +150,7 @@ static int get_free_port(struct domain *d)
             xfree(chn);
             return -ENOMEM;
         }
+        chn[i].port = port + i;
     }
 
     bucket_from_port(d, port) = chn;
@@ -530,7 +531,7 @@ static long __evtchn_close(struct domain *d1, int port1)
     }
 
     /* Clear pending event to avoid unexpected behavior on re-bind. */
-    clear_bit(port1, &shared_info(d1, evtchn_pending));
+    evtchn_port_clear_pending(d1, chn1);
 
     /* Reset binding to vcpu0 when the channel is freed. */
     chn1->state          = ECS_FREE;
@@ -615,43 +616,7 @@ out:
 
 static void evtchn_set_pending(struct vcpu *v, int port)
 {
-    struct domain *d = v->domain;
-    int vcpuid;
-
-    /*
-     * The following bit operations must happen in strict order.
-     * NB. On x86, the atomic bit operations also act as memory barriers.
-     * There is therefore sufficiently strict ordering for this architecture --
-     * others may require explicit memory barriers.
-     */
-
-    if ( test_and_set_bit(port, &shared_info(d, evtchn_pending)) )
-        return;
-
-    if ( !test_bit        (port, &shared_info(d, evtchn_mask)) &&
-         !test_and_set_bit(port / BITS_PER_EVTCHN_WORD(d),
-                           &vcpu_info(v, evtchn_pending_sel)) )
-    {
-        vcpu_mark_events_pending(v);
-    }
-    
-    /* Check if some VCPU might be polling for this event. */
-    if ( likely(bitmap_empty(d->poll_mask, d->max_vcpus)) )
-        return;
-
-    /* Wake any interested (or potentially interested) pollers. */
-    for ( vcpuid = find_first_bit(d->poll_mask, d->max_vcpus);
-          vcpuid < d->max_vcpus;
-          vcpuid = find_next_bit(d->poll_mask, d->max_vcpus, vcpuid+1) )
-    {
-        v = d->vcpu[vcpuid];
-        if ( ((v->poll_evtchn <= 0) || (v->poll_evtchn == port)) &&
-             test_and_clear_bit(vcpuid, d->poll_mask) )
-        {
-            v->poll_evtchn = 0;
-            vcpu_unblock(v);
-        }
-    }
+    evtchn_port_set_pending(v, evtchn_from_port(v->domain, port));
 }
 
 int guest_enabled_event(struct vcpu *v, uint32_t virq)
@@ -920,26 +885,15 @@ long evtchn_bind_vcpu(unsigned int port, unsigned int vcpu_id)
 int evtchn_unmask(unsigned int port)
 {
     struct domain *d = current->domain;
-    struct vcpu   *v;
+    struct evtchn *evtchn;
 
     ASSERT(spin_is_locked(&d->event_lock));
 
     if ( unlikely(!port_is_valid(d, port)) )
         return -EINVAL;
 
-    v = d->vcpu[evtchn_from_port(d, port)->notify_vcpu_id];
-
-    /*
-     * These operations must happen in strict order. Based on
-     * include/xen/event.h:evtchn_set_pending(). 
-     */
-    if ( test_and_clear_bit(port, &shared_info(d, evtchn_mask)) &&
-         test_bit          (port, &shared_info(d, evtchn_pending)) &&
-         !test_and_set_bit (port / BITS_PER_EVTCHN_WORD(d),
-                            &vcpu_info(v, evtchn_pending_sel)) )
-    {
-        vcpu_mark_events_pending(v);
-    }
+    evtchn = evtchn_from_port(d, port);
+    evtchn_port_unmask(d, evtchn);
 
     return 0;
 }
@@ -1170,9 +1124,34 @@ void notify_via_xen_event_channel(struct domain *ld, int lport)
     spin_unlock(&ld->event_lock);
 }
 
+void evtchn_check_pollers(struct domain *d, unsigned int port)
+{
+    struct vcpu *v;
+    unsigned int vcpuid;
+
+    /* Check if some VCPU might be polling for this event. */
+    if ( likely(bitmap_empty(d->poll_mask, d->max_vcpus)) )
+        return;
+
+    /* Wake any interested (or potentially interested) pollers. */
+    for ( vcpuid = find_first_bit(d->poll_mask, d->max_vcpus);
+          vcpuid < d->max_vcpus;
+          vcpuid = find_next_bit(d->poll_mask, d->max_vcpus, vcpuid+1) )
+    {
+        v = d->vcpu[vcpuid];
+        if ( ((v->poll_evtchn <= 0) || (v->poll_evtchn == port)) &&
+             test_and_clear_bit(vcpuid, d->poll_mask) )
+        {
+            v->poll_evtchn = 0;
+            vcpu_unblock(v);
+        }
+    }
+}
 
 int evtchn_init(struct domain *d)
 {
+    evtchn_2l_init(d);
+
     spin_lock_init(&d->event_lock);
     if ( get_free_port(d) != 0 )
         return -EINVAL;
@@ -1270,8 +1249,8 @@ static void domain_dump_evtchn_info(struct domain *d)
 
         printk("    %4u [%d/%d]: s=%d n=%d x=%d",
                port,
-               !!test_bit(port, &shared_info(d, evtchn_pending)),
-               !!test_bit(port, &shared_info(d, evtchn_mask)),
+               !!evtchn_port_is_pending(d, chn),
+               !!evtchn_port_is_masked(d, chn),
                chn->state, chn->notify_vcpu_id, chn->xen_consumer);
 
         switch ( chn->state )

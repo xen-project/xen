@@ -102,4 +102,49 @@ void notify_via_xen_event_channel(struct domain *ld, int lport);
         smp_mb(); /* set blocked status /then/ caller does his work */  \
     } while ( 0 )
 
+void evtchn_check_pollers(struct domain *d, unsigned int port);
+
+void evtchn_2l_init(struct domain *d);
+
+/*
+ * Low-level event channel port ops.
+ */
+struct evtchn_port_ops {
+    void (*set_pending)(struct vcpu *v, struct evtchn *evtchn);
+    void (*clear_pending)(struct domain *d, struct evtchn *evtchn);
+    void (*unmask)(struct domain *d, struct evtchn *evtchn);
+    bool_t (*is_pending)(struct domain *d, const struct evtchn *evtchn);
+    bool_t (*is_masked)(struct domain *d, const struct evtchn *evtchn);
+};
+
+static inline void evtchn_port_set_pending(struct vcpu *v,
+                                           struct evtchn *evtchn)
+{
+    v->domain->evtchn_port_ops->set_pending(v, evtchn);
+}
+
+static inline void evtchn_port_clear_pending(struct domain *d,
+                                             struct evtchn *evtchn)
+{
+    d->evtchn_port_ops->clear_pending(d, evtchn);
+}
+
+static inline void evtchn_port_unmask(struct domain *d,
+                                      struct evtchn *evtchn)
+{
+    d->evtchn_port_ops->unmask(d, evtchn);
+}
+
+static inline bool_t evtchn_port_is_pending(struct domain *d,
+                                            const struct evtchn *evtchn)
+{
+    return d->evtchn_port_ops->is_pending(d, evtchn);
+}
+
+static inline bool_t evtchn_port_is_masked(struct domain *d,
+                                           const struct evtchn *evtchn)
+{
+    return d->evtchn_port_ops->is_masked(d, evtchn);
+}
+
 #endif /* __XEN_EVENT_H__ */

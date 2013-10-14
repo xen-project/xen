@@ -1474,7 +1474,7 @@ int pirq_guest_unmask(struct domain *d)
         {
             pirq = pirqs[i]->pirq;
             if ( pirqs[i]->masked &&
-                 !test_bit(pirqs[i]->evtchn, &shared_info(d, evtchn_mask)) )
+                 !evtchn_port_is_masked(d, evtchn_from_port(d, pirqs[i]->evtchn)) )
                 pirq_guest_eoi(pirqs[i]);
         }
     } while ( ++pirq < d->nr_pirqs && n == ARRAY_SIZE(pirqs) );
@@ -2222,6 +2222,7 @@ static void dump_irqs(unsigned char key)
     int i, irq, pirq;
     struct irq_desc *desc;
     irq_guest_action_t *action;
+    struct evtchn *evtchn;
     struct domain *d;
     const struct pirq *info;
     unsigned long flags;
@@ -2262,13 +2263,11 @@ static void dump_irqs(unsigned char key)
                 d = action->guest[i];
                 pirq = domain_irq_to_pirq(d, irq);
                 info = pirq_info(d, pirq);
+                evtchn = evtchn_from_port(d, info->evtchn);
                 printk("%u:%3d(%c%c%c)",
                        d->domain_id, pirq,
-                       (test_bit(info->evtchn,
-                                 &shared_info(d, evtchn_pending)) ?
-                        'P' : '-'),
-                       (test_bit(info->evtchn, &shared_info(d, evtchn_mask)) ?
-                        'M' : '-'),
+                       (evtchn_port_is_pending(d, evtchn) ? 'P' : '-'),
+                       (evtchn_port_is_masked(d, evtchn) ? 'M' : '-'),
                        (info->masked ? 'M' : '-'));
                 if ( i != action->nr_guests )
                     printk(",");

@@ -66,6 +66,7 @@ struct evtchn
     u8  state;             /* ECS_* */
     u8  xen_consumer;      /* Consumer in Xen, if any? (0 = send to guest) */
     u16 notify_vcpu_id;    /* VCPU for local delivery notification */
+    u32 port;
     union {
         struct {
             domid_t remote_domid;
@@ -238,6 +239,8 @@ struct mem_event_per_domain
     struct mem_event_domain access;
 };
 
+struct evtchn_port_ops;
+
 struct domain
 {
     domid_t          domain_id;
@@ -271,6 +274,7 @@ struct domain
     /* Event channel information. */
     struct evtchn   *evtchn[NR_EVTCHN_BUCKETS];
     spinlock_t       event_lock;
+    const struct evtchn_port_ops *evtchn_port_ops;
 
     struct grant_table *grant_table;
 
