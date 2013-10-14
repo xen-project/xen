@@ -567,9 +567,9 @@ void sched_set_node_affinity(struct domain *, nodemask_t *);
 int  sched_id(void);
 void sched_tick_suspend(void);
 void sched_tick_resume(void);
-void vcpu_wake(struct vcpu *d);
-void vcpu_sleep_nosync(struct vcpu *d);
-void vcpu_sleep_sync(struct vcpu *d);
+void vcpu_wake(struct vcpu *v);
+void vcpu_sleep_nosync(struct vcpu *v);
+void vcpu_sleep_sync(struct vcpu *v);
 
 /*
  * Force synchronisation of given VCPU's state. If it is currently descheduled,
