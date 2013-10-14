@@ -1766,6 +1766,17 @@ int xc_domain_set_virq_handler(xc_interface *xch, uint32_t domid, int virq)
     return do_domctl(xch, &domctl);
 }
 
+int xc_domain_set_max_evtchn(xc_interface *xch, uint32_t domid,
+                             uint32_t max_port)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_set_max_evtchn;
+    domctl.domain = domid;
+    domctl.u.set_max_evtchn.max_port = max_port;
+    return do_domctl(xch, &domctl);
+}
+
 /*
  * Local variables:
  * mode: C

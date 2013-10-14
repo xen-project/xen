@@ -847,6 +847,18 @@ int xc_domain_set_access_required(xc_interface *xch,
  */
 int xc_domain_set_virq_handler(xc_interface *xch, uint32_t domid, int virq);
 
+/**
+ * Set the maximum event channel port a domain may bind.
+ *
+ * This does not affect ports that are already bound.
+ *
+ * @param xch a handle to an open hypervisor interface
+ * @param domid the domain id
+ * @param max_port maximum port number
+ */
+int xc_domain_set_max_evtchn(xc_interface *xch, uint32_t domid,
+                             uint32_t max_port);
+
 /*
  * CPUPOOL MANAGEMENT FUNCTIONS
  */
