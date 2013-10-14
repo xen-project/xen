@@ -294,7 +294,7 @@ void hvm_io_assist(void)
 
 static int dpci_ioport_read(uint32_t mport, ioreq_t *p)
 {
-    int i, sign = p->df ? -1 : 1;
+    int i, step = p->df ? -p->size : p->size;
     uint32_t data = 0;
 
     for ( i = 0; i < p->count; i++ )
@@ -317,8 +317,7 @@ static int dpci_ioport_read(uint32_t mport, ioreq_t *p)
         if ( p->data_is_ptr )
         {
             int ret;
-            ret = hvm_copy_to_guest_phys(p->data + (sign * i * p->size), &data,
-                                         p->size);
+            ret = hvm_copy_to_guest_phys(p->data + step * i, &data, p->size);
             if ( (ret == HVMCOPY_gfn_paged_out) ||
                  (ret == HVMCOPY_gfn_shared) )
                 return X86EMUL_RETRY;
@@ -332,7 +331,7 @@ static int dpci_ioport_read(uint32_t mport, ioreq_t *p)
 
 static int dpci_ioport_write(uint32_t mport, ioreq_t *p)
 {
-    int i, sign = p->df ? -1 : 1;
+    int i, step = p->df ? -p->size : p->size;
     uint32_t data;
 
     for ( i = 0; i < p->count; i++ )
@@ -340,8 +339,7 @@ static int dpci_ioport_write(uint32_t mport, ioreq_t *p)
         data = p->data;
         if ( p->data_is_ptr )
         {
-            switch ( hvm_copy_from_guest_phys(&data,
-                                              p->data + sign * i * p->size,
+            switch ( hvm_copy_from_guest_phys(&data, p->data + step * i,
                                               p->size) )
             {
             case HVMCOPY_okay:

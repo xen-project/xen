@@ -467,15 +467,17 @@ static uint32_t read_data;
 static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
 {
     int i;
-    int sign = p->df ? -1 : 1;
+    uint64_t addr = p->addr;
     p2m_type_t p2mt;
     struct domain *d = current->domain;
 
     if ( p->data_is_ptr )
     {
+        uint64_t data = p->data, tmp;
+        int step = p->df ? -p->size : p->size;
+
         if ( p->dir == IOREQ_READ )
         {
-            uint64_t addr = p->addr, data = p->data, tmp;
             for ( i = 0; i < p->count; i++ ) 
             {
                 tmp = stdvga_mem_read(addr, p->size);
@@ -498,13 +500,12 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
                     ASSERT(!dp);
                     stdvga_mem_write(data, tmp, p->size);
                 }
-                data += sign * p->size;
-                addr += sign * p->size;
+                data += step;
+                addr += step;
             }
         }
         else
         {
-            uint32_t addr = p->addr, data = p->data, tmp;
             for ( i = 0; i < p->count; i++ )
             {
                 if ( hvm_copy_from_guest_phys(&tmp, data, p->size) !=
@@ -523,31 +524,18 @@ static int mmio_move(struct hvm_hw_stdvga *s, ioreq_t *p)
                     tmp = stdvga_mem_read(data, p->size);
                 }
                 stdvga_mem_write(addr, tmp, p->size);
-                data += sign * p->size;
-                addr += sign * p->size;
+                data += step;
+                addr += step;
             }
         }
     }
     else
     {
+        ASSERT(p->count == 1);
         if ( p->dir == IOREQ_READ )
-        {
-            uint32_t addr = p->addr;
-            for ( i = 0; i < p->count; i++ )
-            {
-                p->data = stdvga_mem_read(addr, p->size);
-                addr += sign * p->size;
-            }
-        }
+            p->data = stdvga_mem_read(addr, p->size);
         else
-        {
-            uint32_t addr = p->addr;
-            for ( i = 0; i < p->count; i++ )
-            {
-                stdvga_mem_write(addr, p->data, p->size);
-                addr += sign * p->size;
-            }
-        }
+            stdvga_mem_write(addr, p->data, p->size);
     }
 
     read_data = p->data;

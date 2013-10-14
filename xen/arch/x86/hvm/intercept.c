@@ -48,7 +48,7 @@ static int hvm_mmio_access(struct vcpu *v,
                            hvm_mmio_write_t write_handler)
 {
     unsigned long data;
-    int rc = X86EMUL_OKAY, i, sign = p->df ? -1 : 1;
+    int rc = X86EMUL_OKAY, i, step = p->df ? -p->size : p->size;
 
     if ( !p->data_is_ptr )
     {
@@ -68,13 +68,10 @@ static int hvm_mmio_access(struct vcpu *v,
         {
             int ret;
 
-            rc = read_handler(v, p->addr + (sign * i * p->size), p->size,
-                              &data);
+            rc = read_handler(v, p->addr + step * i, p->size, &data);
             if ( rc != X86EMUL_OKAY )
                 break;
-            ret = hvm_copy_to_guest_phys(p->data + (sign * i * p->size),
-                                         &data,
-                                         p->size);
+            ret = hvm_copy_to_guest_phys(p->data + step * i, &data, p->size);
             if ( (ret == HVMCOPY_gfn_paged_out) || 
                  (ret == HVMCOPY_gfn_shared) )
             {
@@ -87,8 +84,7 @@ static int hvm_mmio_access(struct vcpu *v,
     {
         for ( i = 0; i < p->count; i++ )
         {
-            switch ( hvm_copy_from_guest_phys(&data,
-                                              p->data + sign * i * p->size,
+            switch ( hvm_copy_from_guest_phys(&data, p->data + step * i,
                                               p->size) )
             {
             case HVMCOPY_okay:
@@ -109,8 +105,7 @@ static int hvm_mmio_access(struct vcpu *v,
             }
             if ( rc != X86EMUL_OKAY )
                 break;
-            rc = write_handler(v, p->addr + (sign * i * p->size), p->size,
-                               data);
+            rc = write_handler(v, p->addr + step * i, p->size, data);
             if ( rc != X86EMUL_OKAY )
                 break;
         }
@@ -142,7 +137,7 @@ int hvm_mmio_intercept(ioreq_t *p)
 
 static int process_portio_intercept(portio_action_t action, ioreq_t *p)
 {
-    int rc = X86EMUL_OKAY, i, sign = p->df ? -1 : 1;
+    int rc = X86EMUL_OKAY, i, step = p->df ? -p->size : p->size;
     uint32_t data;
 
     if ( !p->data_is_ptr )
@@ -167,8 +162,7 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
             rc = action(IOREQ_READ, p->addr, p->size, &data);
             if ( rc != X86EMUL_OKAY )
                 break;
-            (void)hvm_copy_to_guest_phys(p->data + sign*i*p->size,
-                                         &data, p->size);
+            (void)hvm_copy_to_guest_phys(p->data + step * i, &data, p->size);
         }
     }
     else /* p->dir == IOREQ_WRITE */
@@ -176,8 +170,7 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
         for ( i = 0; i < p->count; i++ )
         {
             data = 0;
-            switch ( hvm_copy_from_guest_phys(&data,
-                                              p->data + sign * i * p->size,
+            switch ( hvm_copy_from_guest_phys(&data, p->data + step * i,
                                               p->size) )
             {
             case HVMCOPY_okay:
