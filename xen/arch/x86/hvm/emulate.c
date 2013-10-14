@@ -504,10 +504,10 @@ static int __hvmemul_read(
 
     switch ( rc )
     {
+    case HVMCOPY_okay:
+        break;
     case HVMCOPY_bad_gva_to_gfn:
         return X86EMUL_EXCEPTION;
-    case HVMCOPY_unhandleable:
-        return X86EMUL_UNHANDLEABLE;
     case HVMCOPY_bad_gfn_to_mfn:
         if ( access_type == hvm_access_insn_fetch )
             return X86EMUL_UNHANDLEABLE;
@@ -535,11 +535,10 @@ static int __hvmemul_read(
         }
         return rc;
     case HVMCOPY_gfn_paged_out:
-        return X86EMUL_RETRY;
     case HVMCOPY_gfn_shared:
         return X86EMUL_RETRY;
     default:
-        break;
+        return X86EMUL_UNHANDLEABLE;
     }
 
     return X86EMUL_OKAY;
@@ -634,10 +633,10 @@ static int hvmemul_write(
 
     switch ( rc )
     {
+    case HVMCOPY_okay:
+        break;
     case HVMCOPY_bad_gva_to_gfn:
         return X86EMUL_EXCEPTION;
-    case HVMCOPY_unhandleable:
-        return X86EMUL_UNHANDLEABLE;
     case HVMCOPY_bad_gfn_to_mfn:
         rc = hvmemul_linear_to_phys(addr, &gpa, chunk, &reps, pfec,
                                     hvmemul_ctxt);
@@ -663,11 +662,10 @@ static int hvmemul_write(
         }
         return rc;
     case HVMCOPY_gfn_paged_out:
-        return X86EMUL_RETRY;
     case HVMCOPY_gfn_shared:
         return X86EMUL_RETRY;
     default:
-        break;
+        return X86EMUL_UNHANDLEABLE;
     }
 
     return X86EMUL_OKAY;

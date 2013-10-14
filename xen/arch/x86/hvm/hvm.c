@@ -2346,11 +2346,7 @@ void hvm_task_switch(
 
     rc = hvm_copy_to_guest_virt(
         prev_tr.base, &tss, sizeof(tss), PFEC_page_present);
-    if ( rc == HVMCOPY_bad_gva_to_gfn )
-        goto out;
-    if ( rc == HVMCOPY_gfn_paged_out )
-        goto out;
-    if ( rc == HVMCOPY_gfn_shared )
+    if ( rc != HVMCOPY_okay )
         goto out;
 
     rc = hvm_copy_from_guest_virt(
@@ -2397,9 +2393,7 @@ void hvm_task_switch(
         tr.base, &tss, sizeof(tss), PFEC_page_present);
     if ( rc == HVMCOPY_bad_gva_to_gfn )
         exn_raised = 1;
-    if ( rc == HVMCOPY_gfn_paged_out )
-        goto out;
-    if ( rc == HVMCOPY_gfn_shared )
+    else if ( rc != HVMCOPY_okay )
         goto out;
 
     if ( (tss.trace & 1) && !exn_raised )
