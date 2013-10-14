@@ -189,12 +189,13 @@ void postfork(void)
     xl_ctx_alloc();
 }
 
-pid_t xl_fork(xlchildnum child) {
+pid_t xl_fork(xlchildnum child, const char *description) {
     xlchild *ch = &children[child];
     int i;
 
     assert(!ch->pid);
     ch->reaped = 0;
+    ch->description = description;
 
     ch->pid = fork();
     if (ch->pid == -1) {
@@ -236,6 +237,13 @@ int xl_child_pid(xlchildnum child)
 {
     xlchild *ch = &children[child];
     return ch->pid;
+}
+
+void xl_report_child_exitstatus(xentoollog_level level,
+                                xlchildnum child, pid_t pid, int status)
+{
+    libxl_report_child_exitstatus(ctx, level, children[child].description,
+                                  pid, status);
 }
 
 static int xl_reaped_callback(pid_t got, int status, void *user)

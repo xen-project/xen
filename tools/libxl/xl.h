@@ -130,6 +130,7 @@ typedef struct {
     pid_t pid; /* 0: not in use */
     int reaped; /* valid iff pid!=0 */
     int status; /* valid iff reaped */
+    const char *description; /* valid iff pid!=0 */
 } xlchild;
 
 typedef enum {
@@ -139,13 +140,18 @@ typedef enum {
 
 extern xlchild children[child_max];
 
-pid_t xl_fork(xlchildnum); /* like fork, but prints and dies if it fails */
+pid_t xl_fork(xlchildnum, const char *description);
+    /* like fork, but prints and dies if it fails */
 void postfork(void); /* needed only if we aren't going to exec right away */
 
 /* Handles EINTR.  Clears out the xlchild so it can be reused. */
 pid_t xl_waitpid(xlchildnum, int *status, int flags);
 
 int xl_child_pid(xlchildnum); /* returns 0 if child struct is not in use */
+
+void xl_report_child_exitstatus(xentoollog_level level,
+                                xlchildnum child, pid_t pid, int status);
+    /* like libxl_report_child_exitstatus, but uses children[].description */
 
 /* global options */
 extern int autoballoon;

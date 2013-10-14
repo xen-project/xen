@@ -220,8 +220,8 @@ static void vncviewer_child_report(void)
         if (got < 0)
             perror("xl: warning, failed to waitpid for vncviewer child");
         else if (status)
-            libxl_report_child_exitstatus(ctx, XTL_ERROR, "vncviewer child",
-                                          xl_child_pid(child_vncviewer), status);
+            xl_report_child_exitstatus(XTL_ERROR, child_vncviewer,
+                                       got, status);
     }
 }
 
@@ -229,7 +229,7 @@ static void autoconnect_vncviewer(uint32_t domid, int autopass)
 {
     vncviewer_child_report();
 
-    pid_t pid = xl_fork(child_vncviewer);
+    pid_t pid = xl_fork(child_vncviewer, "vncviewer child");
     if (pid)
         return;
 
@@ -435,7 +435,7 @@ static int do_daemonize(char *name)
     int nullfd, ret = 0;
     int status = 0;
 
-    child1 = xl_fork(child_waitdaemon);
+    child1 = xl_fork(child_waitdaemon, "domain monitoring daemon");
     if (child1) {
         got_child = xl_waitpid(child_waitdaemon, &status, 0);
         if (got_child != child1) {
@@ -1991,8 +1991,8 @@ static void console_child_report(void)
         if (got < 0)
             perror("xl: warning, failed to waitpid for console child");
         else if (status)
-            libxl_report_child_exitstatus(ctx, XTL_ERROR, "console child",
-                                          xl_child_pid(child_console), status);
+            xl_report_child_exitstatus(XTL_ERROR, child_console,
+                                       got, status);
     }
 }
 
@@ -2005,7 +2005,7 @@ static void autoconnect_console(libxl_ctx *ctx_ignored,
 
     console_child_report();
 
-    pid_t pid = xl_fork(child_console);
+    pid_t pid = xl_fork(child_console, "console child");
     if (pid)
         return;
 
@@ -3525,7 +3525,7 @@ static pid_t create_migration_child(const char *rune, int *send_fd,
     MUST( libxl_pipe(ctx, sendpipe) );
     MUST( libxl_pipe(ctx, recvpipe) );
 
-    child = xl_fork(child_migration);
+    child = xl_fork(child_migration, "migration transport process");
 
     if (!child) {
         dup2(sendpipe[0], 0);
@@ -3586,9 +3586,8 @@ static void migration_child_report(int recv_fd) {
 
         if (child == migration_child) {
             if (status)
-                libxl_report_child_exitstatus(ctx, XTL_INFO,
-                                              "migration target process",
-                                              migration_child, status);
+                xl_report_child_exitstatus(XTL_INFO, child_migration,
+                                           migration_child, status);
             break;
         }
         if (child == -1) {
