@@ -852,6 +852,17 @@ struct xen_domctl_set_broken_page_p2m {
 typedef struct xen_domctl_set_broken_page_p2m xen_domctl_set_broken_page_p2m_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_broken_page_p2m_t);
 
+/*
+ * XEN_DOMCTL_set_max_evtchn: sets the maximum event channel port
+ * number the guest may use.  Use this limit the amount of resources
+ * (global mapping space, xenheap) a guest may use for event channels.
+ */
+struct xen_domctl_set_max_evtchn {
+    uint32_t max_port;
+};
+typedef struct xen_domctl_set_max_evtchn xen_domctl_set_max_evtchn_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_max_evtchn_t);
+
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -920,6 +931,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_set_broken_page_p2m           67
 #define XEN_DOMCTL_setnodeaffinity               68
 #define XEN_DOMCTL_getnodeaffinity               69
+#define XEN_DOMCTL_set_max_evtchn                70
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -975,6 +987,7 @@ struct xen_domctl {
         struct xen_domctl_set_access_required access_required;
         struct xen_domctl_audit_p2m         audit_p2m;
         struct xen_domctl_set_virq_handler  set_virq_handler;
+        struct xen_domctl_set_max_evtchn    set_max_evtchn;
         struct xen_domctl_gdbsx_memio       gdbsx_guest_memio;
         struct xen_domctl_set_broken_page_p2m set_broken_page_p2m;
         struct xen_domctl_gdbsx_pauseunp_vcpu gdbsx_pauseunp_vcpu;

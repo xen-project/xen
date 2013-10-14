@@ -194,6 +194,8 @@ class domain2
     setscheduler
 # XENMEM_claim_pages
     setclaim
+# XEN_DOMCTL_set_max_evtchn
+    set_max_evtchn
 }
 
 # Similar to class domain, but primarily contains domctls related to HVM domains

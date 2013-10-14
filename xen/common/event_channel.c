@@ -168,10 +168,14 @@ static int get_free_port(struct domain *d)
         return -EINVAL;
 
     for ( port = 0; port_is_valid(d, port); port++ )
+    {
+        if ( port > d->max_evtchn_port )
+            return -ENOSPC;
         if ( evtchn_from_port(d, port)->state == ECS_FREE )
             return port;
+    }
 
-    if ( port == d->max_evtchns )
+    if ( port == d->max_evtchns || port > d->max_evtchn_port )
         return -ENOSPC;
 
     if ( !group_from_port(d, port) )
@@ -1230,6 +1234,7 @@ void evtchn_check_pollers(struct domain *d, unsigned int port)
 int evtchn_init(struct domain *d)
 {
     evtchn_2l_init(d);
+    d->max_evtchn_port = INT_MAX;
 
     d->evtchn = alloc_evtchn_bucket(d, 0);
     if ( !d->evtchn )

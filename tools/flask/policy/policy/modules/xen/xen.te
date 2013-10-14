@@ -76,7 +76,7 @@ allow dom0_t dom0_t:domain {
 	getpodtarget setpodtarget set_misc_info set_virq_handler
 };
 allow dom0_t dom0_t:domain2 {
-	set_cpuid gettsc settsc setscheduler
+	set_cpuid gettsc settsc setscheduler set_max_evtchn
 };
 allow dom0_t dom0_t:resource { add remove };
 

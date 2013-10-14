@@ -863,6 +863,14 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     }
     break;
 
+    case XEN_DOMCTL_set_max_evtchn:
+    {
+        d->max_evtchn_port = min_t(unsigned int,
+                                   op->u.set_max_evtchn.max_port,
+                                   INT_MAX);
+    }
+    break;
+
     default:
         ret = arch_do_domctl(op, d, u_domctl);
         break;
