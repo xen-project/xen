@@ -1166,6 +1166,7 @@ csched_runq_sort(struct csched_private *prv, unsigned int cpu)
     struct csched_pcpu * const spc = CSCHED_PCPU(cpu);
     struct list_head *runq, *elem, *next, *last_under;
     struct csched_vcpu *svc_elem;
+    spinlock_t *lock;
     unsigned long flags;
     int sort_epoch;
 
@@ -1175,7 +1176,7 @@ csched_runq_sort(struct csched_private *prv, unsigned int cpu)
 
     spc->runq_sort_last = sort_epoch;
 
-    pcpu_schedule_lock_irqsave(cpu, flags);
+    lock = pcpu_schedule_lock_irqsave(cpu, &flags);
 
     runq = &spc->runq;
     elem = runq->next;
@@ -1200,7 +1201,7 @@ csched_runq_sort(struct csched_private *prv, unsigned int cpu)
         elem = next;
     }
 
-    pcpu_schedule_unlock_irqrestore(cpu, flags);
+    pcpu_schedule_unlock_irqrestore(lock, flags, cpu);
 }
 
 static void
@@ -1563,7 +1564,9 @@ csched_load_balance(struct csched_private *prv, int cpu,
                  * could cause a deadlock if the peer CPU is also load
                  * balancing and trying to lock this CPU.
                  */
-                if ( !pcpu_schedule_trylock(peer_cpu) )
+                spinlock_t *lock = pcpu_schedule_trylock(peer_cpu);
+
+                if ( !lock )
                 {
                     SCHED_STAT_CRANK(steal_trylock_failed);
                     peer_cpu = cpumask_cycle(peer_cpu, &workers);
@@ -1573,7 +1576,7 @@ csched_load_balance(struct csched_private *prv, int cpu,
                 /* Any work over there to steal? */
                 speer = cpumask_test_cpu(peer_cpu, online) ?
                     csched_runq_steal(peer_cpu, cpu, snext->pri, bstep) : NULL;
-                pcpu_schedule_unlock(peer_cpu);
+                pcpu_schedule_unlock(lock, peer_cpu);
 
                 /* As soon as one vcpu is found, balancing ends */
                 if ( speer != NULL )
