@@ -61,7 +61,7 @@ extern struct domain *dom0;
 #define next_power_of_2(x)      (__RDU32((x)-1) + 1)
 
 /* Maximum number of event channels for any ABI. */
-#define MAX_NR_EVTCHNS EVTCHN_2L_NR_CHANNELS
+#define MAX_NR_EVTCHNS MAX(EVTCHN_2L_NR_CHANNELS, EVTCHN_FIFO_NR_CHANNELS)
 
 #define EVTCHNS_PER_BUCKET (PAGE_SIZE / next_power_of_2(sizeof(struct evtchn)))
 #define EVTCHNS_PER_GROUP  (BUCKETS_PER_GROUP * EVTCHNS_PER_BUCKET)
@@ -95,6 +95,7 @@ struct evtchn
         } pirq;        /* state == ECS_PIRQ */
         u16 virq;      /* state == ECS_VIRQ */
     } u;
+    u8 priority;
 #ifdef FLASK_ENABLE
     void *ssid;
 #endif
@@ -209,6 +210,8 @@ struct vcpu
     /* Guest-specified relocation of vcpu_info. */
     unsigned long vcpu_info_mfn;
 
+    struct evtchn_fifo_vcpu *evtchn_fifo;
+
     struct arch_vcpu arch;
 };
 
@@ -290,6 +293,7 @@ struct domain
     unsigned int     max_evtchns;
     spinlock_t       event_lock;
     const struct evtchn_port_ops *evtchn_port_ops;
+    struct evtchn_fifo_domain *evtchn_fifo;
 
     struct grant_table *grant_table;
 

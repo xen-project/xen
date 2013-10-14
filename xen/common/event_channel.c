@@ -26,6 +26,7 @@
 #include <xen/compat.h>
 #include <xen/guest_access.h>
 #include <xen/keyhandler.h>
+#include <xen/event_fifo.h>
 #include <asm/current.h>
 
 #include <public/xen.h>
@@ -1085,6 +1086,24 @@ long do_event_channel_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         break;
     }
 
+    case EVTCHNOP_init_control: {
+        struct evtchn_init_control init_control;
+        if ( copy_from_guest(&init_control, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_fifo_init_control(&init_control);
+        if ( !rc && __copy_to_guest(arg, &init_control, 1) )
+            rc = -EFAULT;
+        break;
+    }
+
+    case EVTCHNOP_expand_array: {
+        struct evtchn_expand_array expand_array;
+        if ( copy_from_guest(&expand_array, arg, 1) != 0 )
+            return -EFAULT;
+        rc = evtchn_fifo_expand_array(&expand_array);
+        break;
+    }
+
     case EVTCHNOP_set_priority: {
         struct evtchn_set_priority set_priority;
         if ( copy_from_guest(&set_priority, arg, 1) != 0 )
@@ -1269,6 +1288,8 @@ void evtchn_destroy(struct domain *d)
     spin_unlock(&d->event_lock);
 
     clear_global_virq_handlers(d);
+
+    evtchn_fifo_destroy(d);
 }
 
 
