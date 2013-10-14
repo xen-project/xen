@@ -90,6 +90,11 @@
 #define LIBXL_HAVE_BUILDINFO_HVM_VENDOR_DEVICE 1
 
 /*
+ * The libxl_domain_build_info has the event_channels field.
+ */
+#define LIBXL_HAVE_BUILDINFO_EVENT_CHANNELS 1
+
+/*
  * libxl ABI compatibility
  *
  * The only guarantee which libxl makes regarding ABI compatibility

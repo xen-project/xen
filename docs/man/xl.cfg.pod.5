@@ -580,6 +580,17 @@ Allow a guest to access specific physical IRQs.
 It is recommended to use this option only for trusted VMs under
 administrator control.
 
+=item B<max_event_channels=N>
+
+Limit the guest to using at most N event channels (PV interrupts).
+Guests use hypervisor resources for each event channel they use.
+
+The default of 1023 should be sufficient for typical guests.  The
+maximum value depends what the guest supports.  Guests supporting the
+FIFO-based event channel ABI support up to 131,071 event channels.
+Other guests are limited to 4095 (64-bit x86 and ARM) or 1023 (32-bit
+x86).
+
 =back
 
 =head2 Paravirtualised (PV) Guest Specific Options

@@ -208,6 +208,9 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
 
     libxl_defbool_setdefault(&b_info->disable_migrate, false);
 
+    if (!b_info->event_channels)
+        b_info->event_channels = 1023;
+
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         if (b_info->shadow_memkb == LIBXL_MEMKB_DEFAULT)

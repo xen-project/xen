@@ -268,6 +268,13 @@ int libxl__build_post(libxl__gc *gc, uint32_t domid,
     if (rc)
         return rc;
 
+    rc = xc_domain_set_max_evtchn(ctx->xch, domid, info->event_channels);
+    if (rc) {
+        LOG(ERROR, "Failed to set event channel limit to %d (%d)",
+            info->event_channels, rc);
+        return ERROR_FAIL;
+    }
+
     libxl_cpuid_apply_policy(ctx, domid);
     if (info->cpuid != NULL)
         libxl_cpuid_set(ctx, domid, info->cpuid);

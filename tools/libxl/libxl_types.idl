@@ -312,6 +312,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("irqs",             Array(uint32, "num_irqs")),
     ("iomem",            Array(libxl_iomem_range, "num_iomem")),
     ("claim_mode",	     libxl_defbool),
+    ("event_channels",   uint32),
     ("u", KeyedUnion(None, libxl_domain_type, "type",
                 [("hvm", Struct(None, [("firmware",         string),
                                        ("bios",             libxl_bios_type),

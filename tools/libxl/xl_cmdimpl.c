@@ -845,6 +845,9 @@ static void parse_config_data(const char *config_source,
     if (!xlu_cfg_get_long (config, "videoram", &l, 0))
         b_info->video_memkb = l * 1024;
 
+    if (!xlu_cfg_get_long(config, "max_event_channels", &l, 0))
+        b_info->event_channels = l;
+
     switch(b_info->type) {
     case LIBXL_DOMAIN_TYPE_HVM:
         if (!xlu_cfg_get_string (config, "kernel", &buf, 0))
