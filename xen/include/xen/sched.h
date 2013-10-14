@@ -50,7 +50,6 @@ extern struct domain *dom0;
 #else
 #define BITS_PER_EVTCHN_WORD(d) (has_32bit_shinfo(d) ? 32 : BITS_PER_XEN_ULONG)
 #endif
-#define MAX_EVTCHNS(d) (BITS_PER_EVTCHN_WORD(d) * BITS_PER_EVTCHN_WORD(d))
 #define EVTCHNS_PER_BUCKET 128
 #define NR_EVTCHN_BUCKETS  (NR_EVENT_CHANNELS / EVTCHNS_PER_BUCKET)
 
@@ -273,6 +272,7 @@ struct domain
 
     /* Event channel information. */
     struct evtchn   *evtchn[NR_EVTCHN_BUCKETS];
+    unsigned int     max_evtchns;
     spinlock_t       event_lock;
     const struct evtchn_port_ops *evtchn_port_ops;
 

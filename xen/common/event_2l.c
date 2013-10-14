@@ -96,6 +96,7 @@ static const struct evtchn_port_ops evtchn_port_ops_2l =
 void evtchn_2l_init(struct domain *d)
 {
     d->evtchn_port_ops = &evtchn_port_ops_2l;
+    d->max_evtchns = BITS_PER_EVTCHN_WORD(d) * BITS_PER_EVTCHN_WORD(d);
 }
 
 /*

@@ -756,7 +756,7 @@ static long do_poll(struct sched_poll *sched_poll)
             goto out;
 
         rc = -EINVAL;
-        if ( port >= MAX_EVTCHNS(d) )
+        if ( port >= d->max_evtchns )
             goto out;
 
         rc = 0;

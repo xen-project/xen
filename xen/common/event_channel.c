@@ -134,7 +134,7 @@ static int get_free_port(struct domain *d)
         if ( evtchn_from_port(d, port)->state == ECS_FREE )
             return port;
 
-    if ( port == MAX_EVTCHNS(d) )
+    if ( port == d->max_evtchns )
         return -ENOSPC;
 
     chn = xzalloc_array(struct evtchn, EVTCHNS_PER_BUCKET);
@@ -1236,7 +1236,7 @@ static void domain_dump_evtchn_info(struct domain *d)
 
     spin_lock(&d->event_lock);
 
-    for ( port = 1; port < MAX_EVTCHNS(d); ++port )
+    for ( port = 1; port < d->max_evtchns; ++port )
     {
         const struct evtchn *chn;
         char *ssid;

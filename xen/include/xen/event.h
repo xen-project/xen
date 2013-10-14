@@ -73,7 +73,7 @@ void notify_via_xen_event_channel(struct domain *ld, int lport);
 #define bucket_from_port(d,p) \
     ((d)->evtchn[(p)/EVTCHNS_PER_BUCKET])
 #define port_is_valid(d,p)    \
-    (((p) >= 0) && ((p) < MAX_EVTCHNS(d)) && \
+    (((p) >= 0) && ((p) < (d)->max_evtchns) &&  \
      (bucket_from_port(d,p) != NULL))
 #define evtchn_from_port(d,p) \
     (&(bucket_from_port(d,p))[(p)&(EVTCHNS_PER_BUCKET-1)])
