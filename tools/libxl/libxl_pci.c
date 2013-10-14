@@ -823,7 +823,7 @@ static int qemu_pci_add_xenstore(libxl__gc *gc, uint32_t domid,
     }
 
     libxl__qemu_traditional_cmd(gc, domid, "pci-ins");
-    rc = libxl__wait_for_device_model(gc, domid, NULL, NULL,
+    rc = libxl__wait_for_device_model_deprecated(gc, domid, NULL, NULL,
                                       pci_ins_check, state);
     path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/parameter",
                           domid);
@@ -851,7 +851,7 @@ static int do_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, i
     switch (libxl__domain_type(gc, domid)) {
     case LIBXL_DOMAIN_TYPE_HVM:
         hvm = 1;
-        if (libxl__wait_for_device_model(gc, domid, "running",
+        if (libxl__wait_for_device_model_deprecated(gc, domid, "running",
                                          NULL, NULL, NULL) < 0) {
             return ERROR_FAIL;
         }
@@ -1137,7 +1137,7 @@ static int qemu_pci_remove_xenstore(libxl__gc *gc, uint32_t domid,
      * device-model for function 0 */
     if ( !force && (pcidev->vdevfn & 0x7) == 0 ) {
         libxl__qemu_traditional_cmd(gc, domid, "pci-rem");
-        if (libxl__wait_for_device_model(gc, domid, "pci-removed",
+        if (libxl__wait_for_device_model_deprecated(gc, domid, "pci-removed",
                                          NULL, NULL, NULL) < 0) {
             LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Device Model didn't respond in time");
             /* This depends on guest operating system acknowledging the
@@ -1179,7 +1179,7 @@ static int do_pci_remove(libxl__gc *gc, uint32_t domid,
     switch (libxl__domain_type(gc, domid)) {
     case LIBXL_DOMAIN_TYPE_HVM:
         hvm = 1;
-        if (libxl__wait_for_device_model(gc, domid, "running",
+        if (libxl__wait_for_device_model_deprecated(gc, domid, "running",
                                          NULL, NULL, NULL) < 0)
             goto out_fail;
 

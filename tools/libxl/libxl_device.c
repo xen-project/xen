@@ -1057,7 +1057,7 @@ static void devices_remove_callback(libxl__egc *egc,
     return;
 }
 
-int libxl__wait_for_device_model(libxl__gc *gc,
+int libxl__wait_for_device_model_deprecated(libxl__gc *gc,
                                  uint32_t domid, char *state,
                                  libxl__spawn_starting *spawning,
                                  int (*check_callback)(libxl__gc *gc,
@@ -1068,7 +1068,7 @@ int libxl__wait_for_device_model(libxl__gc *gc,
 {
     char *path;
     path = GCSPRINTF("/local/domain/0/device-model/%d/state", domid);
-    return libxl__wait_for_offspring(gc, domid,
+    return libxl__xenstore_child_wait_deprecated(gc, domid,
                                      LIBXL_DEVICE_MODEL_START_TIMEOUT,
                                      "Device Model", path, state, spawning,
                                      check_callback, check_callback_userdata);

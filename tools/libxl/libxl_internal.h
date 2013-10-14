@@ -1226,7 +1226,19 @@ _hidden int libxl__spawn_record_pid(libxl__gc*, libxl__spawn_state*,
                                     pid_t innerchild);
 
 /*
- * libxl__wait_for_offspring - Wait for child state
+ * libxl__xenstore_child_wait_deprecated - Wait for daemonic child IPC
+ *
+ * This is a NOT function for waiting for ordinary child processes.
+ * If you want to run (fork/exec/wait) subprocesses from libxl:
+ *  - Make your libxl entrypoint use the ao machinery
+ *  - Use libxl__ev_fork, and use the callback programming style
+ *
+ * This function is intended for interprocess communication with a
+ * service process.  If the service process does not respond quickly,
+ * the whole caller may be blocked.  Therefore this function is
+ * deprecated.  This function is currently used only by
+ * libxl__wait_for_device_model_deprecated.
+ *
  * gc: allocation pool
  * domid: guest to work with
  * timeout: how many seconds to wait for the state to appear
@@ -1243,9 +1255,9 @@ _hidden int libxl__spawn_record_pid(libxl__gc*, libxl__spawn_state*,
  * in xenstore, and optionally for state in path.
  * If path appears and state matches, check_callback is called.
  * If check_callback returns > 0, waiting for path or state continues.
- * Otherwise libxl__wait_for_offspring returns.
+ * Otherwise libxl__xenstore_child_wait_deprecated returns.
  */
-_hidden int libxl__wait_for_offspring(libxl__gc *gc,
+_hidden int libxl__xenstore_child_wait_deprecated(libxl__gc *gc,
                                  uint32_t domid,
                                  uint32_t timeout, char *what,
                                  char *path, char *state,
@@ -1298,12 +1310,20 @@ _hidden int libxl__need_xenpv_qemu(libxl__gc *gc,
         int nr_consoles, libxl__device_console *consoles,
         int nr_vfbs, libxl_device_vfb *vfbs,
         int nr_disks, libxl_device_disk *disks);
-  /* Caller must either: pass starting_r==0, or on successful
-   * return pass *starting_r (which will be non-0) to
-   * libxl__confirm_device_model_startup or libxl__detach_device_model. */
-_hidden int libxl__wait_for_device_model(libxl__gc *gc,
+
+/*
+ * This function will cause the whole libxl process to hang
+ * if the device model does not respond.  It is deprecated.
+ *
+ * Instead of calling this function:
+ *  - Make your libxl entrypoint use the ao machinery
+ *  - Use libxl__ev_xswatch_register, and use the callback programming
+ *    style
+ */
+_hidden int libxl__wait_for_device_model_deprecated(libxl__gc *gc,
                                 uint32_t domid, char *state,
-                                libxl__spawn_starting *spawning,
+                                libxl__spawn_starting *spawning
+                                                    /* NULL allowed */,
                                 int (*check_callback)(libxl__gc *gc,
                                                       uint32_t domid,
                                                       const char *state,

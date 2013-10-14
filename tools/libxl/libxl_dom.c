@@ -965,7 +965,7 @@ int libxl__domain_suspend_device_model(libxl__gc *gc,
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
         LOG(DEBUG, "Saving device model state to %s", filename);
         libxl__qemu_traditional_cmd(gc, domid, "save");
-        libxl__wait_for_device_model(gc, domid, "paused", NULL, NULL, NULL);
+        libxl__wait_for_device_model_deprecated(gc, domid, "paused", NULL, NULL, NULL);
         break;
     }
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:
@@ -989,7 +989,7 @@ int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid)
     switch (libxl__device_model_version_running(gc, domid)) {
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN_TRADITIONAL: {
         libxl__qemu_traditional_cmd(gc, domid, "continue");
-        libxl__wait_for_device_model(gc, domid, "running", NULL, NULL, NULL);
+        libxl__wait_for_device_model_deprecated(gc, domid, "running", NULL, NULL, NULL);
         break;
     }
     case LIBXL_DEVICE_MODEL_VERSION_QEMU_XEN:

@@ -157,7 +157,7 @@ out:
     return rc ? SIGTERM : 0;
 }
 
-int libxl__wait_for_offspring(libxl__gc *gc,
+int libxl__xenstore_child_wait_deprecated(libxl__gc *gc,
                                  uint32_t domid,
                                  uint32_t timeout, char *what,
                                  char *path, char *state,

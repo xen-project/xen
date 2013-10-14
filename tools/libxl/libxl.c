@@ -846,7 +846,7 @@ int libxl_domain_unpause(libxl_ctx *ctx, uint32_t domid)
         state = libxl__xs_read(gc, XBT_NULL, path);
         if (state != NULL && !strcmp(state, "paused")) {
             libxl__qemu_traditional_cmd(gc, domid, "continue");
-            libxl__wait_for_device_model(gc, domid, "running",
+            libxl__wait_for_device_model_deprecated(gc, domid, "running",
                                          NULL, NULL, NULL);
         }
     }
