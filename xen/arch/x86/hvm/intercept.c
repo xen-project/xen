@@ -47,6 +47,7 @@ static int hvm_mmio_access(struct vcpu *v,
                            hvm_mmio_read_t read_handler,
                            hvm_mmio_write_t write_handler)
 {
+    struct hvm_vcpu_io *vio = &v->arch.hvm_vcpu.hvm_io;
     unsigned long data;
     int rc = X86EMUL_OKAY, i, step = p->df ? -p->size : p->size;
 
@@ -54,7 +55,16 @@ static int hvm_mmio_access(struct vcpu *v,
     {
         if ( p->dir == IOREQ_READ )
         {
-            rc = read_handler(v, p->addr, p->size, &data);
+            if ( vio->mmio_retrying )
+            {
+                if ( vio->mmio_large_read_bytes != p->size )
+                    return X86EMUL_UNHANDLEABLE;
+                memcpy(&data, vio->mmio_large_read, p->size);
+                vio->mmio_large_read_bytes = 0;
+                vio->mmio_retrying = 0;
+            }
+            else
+                rc = read_handler(v, p->addr, p->size, &data);
             p->data = data;
         }
         else /* p->dir == IOREQ_WRITE */
@@ -66,18 +76,48 @@ static int hvm_mmio_access(struct vcpu *v,
     {
         for ( i = 0; i < p->count; i++ )
         {
-            int ret;
-
-            rc = read_handler(v, p->addr + step * i, p->size, &data);
-            if ( rc != X86EMUL_OKAY )
-                break;
-            ret = hvm_copy_to_guest_phys(p->data + step * i, &data, p->size);
-            if ( (ret == HVMCOPY_gfn_paged_out) || 
-                 (ret == HVMCOPY_gfn_shared) )
+            if ( vio->mmio_retrying )
             {
+                if ( vio->mmio_large_read_bytes != p->size )
+                    return X86EMUL_UNHANDLEABLE;
+                memcpy(&data, vio->mmio_large_read, p->size);
+                vio->mmio_large_read_bytes = 0;
+                vio->mmio_retrying = 0;
+            }
+            else
+            {
+                rc = read_handler(v, p->addr + step * i, p->size, &data);
+                if ( rc != X86EMUL_OKAY )
+                    break;
+            }
+            switch ( hvm_copy_to_guest_phys(p->data + step * i,
+                                            &data, p->size) )
+            {
+            case HVMCOPY_okay:
+                break;
+            case HVMCOPY_gfn_paged_out:
+            case HVMCOPY_gfn_shared:
                 rc = X86EMUL_RETRY;
                 break;
+            case HVMCOPY_bad_gfn_to_mfn:
+                /* Drop the write as real hardware would. */
+                continue;
+            case HVMCOPY_bad_gva_to_gfn:
+                ASSERT(0);
+                /* fall through */
+            default:
+                rc = X86EMUL_UNHANDLEABLE;
+                break;
             }
+            if ( rc != X86EMUL_OKAY)
+                break;
+        }
+
+        if ( rc == X86EMUL_RETRY )
+        {
+            vio->mmio_retry = 1;
+            vio->mmio_large_read_bytes = p->size;
+            memcpy(vio->mmio_large_read, &data, p->size);
         }
     }
     else
@@ -109,6 +149,9 @@ static int hvm_mmio_access(struct vcpu *v,
             if ( rc != X86EMUL_OKAY )
                 break;
         }
+
+        if ( rc == X86EMUL_RETRY )
+            vio->mmio_retry = 1;
     }
 
     if ( i != 0 )
@@ -137,6 +180,7 @@ int hvm_mmio_intercept(ioreq_t *p)
 
 static int process_portio_intercept(portio_action_t action, ioreq_t *p)
 {
+    struct hvm_vcpu_io *vio = &current->arch.hvm_vcpu.hvm_io;
     int rc = X86EMUL_OKAY, i, step = p->df ? -p->size : p->size;
     uint32_t data;
 
@@ -144,7 +188,16 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
     {
         if ( p->dir == IOREQ_READ )
         {
-            rc = action(IOREQ_READ, p->addr, p->size, &data);
+            if ( vio->mmio_retrying )
+            {
+                if ( vio->mmio_large_read_bytes != p->size )
+                    return X86EMUL_UNHANDLEABLE;
+                memcpy(&data, vio->mmio_large_read, p->size);
+                vio->mmio_large_read_bytes = 0;
+                vio->mmio_retrying = 0;
+            }
+            else
+                rc = action(IOREQ_READ, p->addr, p->size, &data);
             p->data = data;
         }
         else
@@ -159,10 +212,48 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
     {
         for ( i = 0; i < p->count; i++ )
         {
-            rc = action(IOREQ_READ, p->addr, p->size, &data);
-            if ( rc != X86EMUL_OKAY )
+            if ( vio->mmio_retrying )
+            {
+                if ( vio->mmio_large_read_bytes != p->size )
+                    return X86EMUL_UNHANDLEABLE;
+                memcpy(&data, vio->mmio_large_read, p->size);
+                vio->mmio_large_read_bytes = 0;
+                vio->mmio_retrying = 0;
+            }
+            else
+            {
+                rc = action(IOREQ_READ, p->addr, p->size, &data);
+                if ( rc != X86EMUL_OKAY )
+                    break;
+            }
+            switch ( hvm_copy_to_guest_phys(p->data + step * i,
+                                            &data, p->size) )
+            {
+            case HVMCOPY_okay:
                 break;
-            (void)hvm_copy_to_guest_phys(p->data + step * i, &data, p->size);
+            case HVMCOPY_gfn_paged_out:
+            case HVMCOPY_gfn_shared:
+                rc = X86EMUL_RETRY;
+                break;
+            case HVMCOPY_bad_gfn_to_mfn:
+                /* Drop the write as real hardware would. */
+                continue;
+            case HVMCOPY_bad_gva_to_gfn:
+                ASSERT(0);
+                /* fall through */
+            default:
+                rc = X86EMUL_UNHANDLEABLE;
+                break;
+            }
+            if ( rc != X86EMUL_OKAY)
+                break;
+        }
+
+        if ( rc == X86EMUL_RETRY )
+        {
+            vio->mmio_retry = 1;
+            vio->mmio_large_read_bytes = p->size;
+            memcpy(vio->mmio_large_read, &data, p->size);
         }
     }
     else /* p->dir == IOREQ_WRITE */
@@ -195,6 +286,9 @@ static int process_portio_intercept(portio_action_t action, ioreq_t *p)
             if ( rc != X86EMUL_OKAY )
                 break;
         }
+
+        if ( rc == X86EMUL_RETRY )
+            vio->mmio_retry = 1;
     }
 
     if ( i != 0 )
