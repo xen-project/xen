@@ -50,8 +50,22 @@ extern struct domain *dom0;
 #else
 #define BITS_PER_EVTCHN_WORD(d) (has_32bit_shinfo(d) ? 32 : BITS_PER_XEN_ULONG)
 #endif
-#define EVTCHNS_PER_BUCKET 128
-#define NR_EVTCHN_BUCKETS  (NR_EVENT_CHANNELS / EVTCHNS_PER_BUCKET)
+
+#define BUCKETS_PER_GROUP  (PAGE_SIZE/sizeof(struct evtchn *))
+/* Round size of struct evtchn up to power of 2 size */
+#define __RDU2(x)   (       (x) | (   (x) >> 1))
+#define __RDU4(x)   ( __RDU2(x) | ( __RDU2(x) >> 2))
+#define __RDU8(x)   ( __RDU4(x) | ( __RDU4(x) >> 4))
+#define __RDU16(x)  ( __RDU8(x) | ( __RDU8(x) >> 8))
+#define __RDU32(x)  (__RDU16(x) | (__RDU16(x) >>16))
+#define next_power_of_2(x)      (__RDU32((x)-1) + 1)
+
+/* Maximum number of event channels for any ABI. */
+#define MAX_NR_EVTCHNS NR_EVENT_CHANNELS
+
+#define EVTCHNS_PER_BUCKET (PAGE_SIZE / next_power_of_2(sizeof(struct evtchn)))
+#define EVTCHNS_PER_GROUP  (BUCKETS_PER_GROUP * EVTCHNS_PER_BUCKET)
+#define NR_EVTCHN_GROUPS   DIV_ROUND_UP(MAX_NR_EVTCHNS, EVTCHNS_PER_GROUP)
 
 struct evtchn
 {
@@ -271,7 +285,8 @@ struct domain
     spinlock_t       rangesets_lock;
 
     /* Event channel information. */
-    struct evtchn   *evtchn[NR_EVTCHN_BUCKETS];
+    struct evtchn   *evtchn;                         /* first bucket only */
+    struct evtchn  **evtchn_group[NR_EVTCHN_GROUPS]; /* all other buckets */
     unsigned int     max_evtchns;
     spinlock_t       event_lock;
     const struct evtchn_port_ops *evtchn_port_ops;

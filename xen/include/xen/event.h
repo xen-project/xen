@@ -69,15 +69,37 @@ int guest_enabled_event(struct vcpu *v, uint32_t virq);
 /* Notify remote end of a Xen-attached event channel.*/
 void notify_via_xen_event_channel(struct domain *ld, int lport);
 
-/* Internal event channel object accessors */
-#define bucket_from_port(d,p) \
-    ((d)->evtchn[(p)/EVTCHNS_PER_BUCKET])
-#define port_is_valid(d,p)    \
-    (((p) >= 0) && ((p) < (d)->max_evtchns) &&  \
-     (bucket_from_port(d,p) != NULL))
-#define evtchn_from_port(d,p) \
-    (&(bucket_from_port(d,p))[(p)&(EVTCHNS_PER_BUCKET-1)])
+/*
+ * Internal event channel object storage.
+ *
+ * The objects (struct evtchn) are indexed using a two level scheme of
+ * groups and buckets.  Each group is a page of bucket pointers.  Each
+ * bucket is a page-sized array of struct evtchn's.
+ *
+ * The first bucket is directly accessed via d->evtchn.
+ */
+#define group_from_port(d, p) \
+    ((d)->evtchn_group[(p) / EVTCHNS_PER_GROUP])
+#define bucket_from_port(d, p) \
+    ((group_from_port(d, p))[((p) % EVTCHNS_PER_GROUP) / EVTCHNS_PER_BUCKET])
 
+static inline bool_t port_is_valid(struct domain *d, unsigned int p)
+{
+    if ( p >= d->max_evtchns )
+        return 0;
+    if ( !d->evtchn )
+        return 0;
+    if ( p < EVTCHNS_PER_BUCKET )
+        return 1;
+    return group_from_port(d, p) != NULL && bucket_from_port(d, p) != NULL;
+}
+
+static inline struct evtchn *evtchn_from_port(struct domain *d, unsigned int p)
+{
+    if ( p < EVTCHNS_PER_BUCKET )
+        return &d->evtchn[p];
+    return bucket_from_port(d, p) + (p % EVTCHNS_PER_BUCKET);
+}
 
 /* Wait on a Xen-attached event channel. */
 #define wait_on_xen_event_channel(port, condition)                      \

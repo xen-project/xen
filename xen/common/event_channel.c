@@ -121,11 +121,47 @@ static int virq_is_global(uint32_t virq)
 }
 
 
+static struct evtchn *alloc_evtchn_bucket(struct domain *d, unsigned int port)
+{
+    struct evtchn *chn;
+    unsigned int i;
+
+    chn = xzalloc_array(struct evtchn, EVTCHNS_PER_BUCKET);
+    if ( !chn )
+        return NULL;
+
+    for ( i = 0; i < EVTCHNS_PER_BUCKET; i++ )
+    {
+        if ( xsm_alloc_security_evtchn(&chn[i]) )
+        {
+            while ( i-- )
+                xsm_free_security_evtchn(&chn[i]);
+            xfree(chn);
+            return NULL;
+        }
+        chn[i].port = port + i;
+    }
+    return chn;
+}
+
+static void free_evtchn_bucket(struct domain *d, struct evtchn *bucket)
+{
+    unsigned int i;
+
+    if ( !bucket )
+        return;
+
+    for ( i = 0; i < EVTCHNS_PER_BUCKET; i++ )
+        xsm_free_security_evtchn(bucket + i);
+
+    xfree(bucket);
+}
+
 static int get_free_port(struct domain *d)
 {
     struct evtchn *chn;
+    struct evtchn **grp;
     int            port;
-    int            i, j;
 
     if ( d->is_dying )
         return -EINVAL;
@@ -137,22 +173,17 @@ static int get_free_port(struct domain *d)
     if ( port == d->max_evtchns )
         return -ENOSPC;
 
-    chn = xzalloc_array(struct evtchn, EVTCHNS_PER_BUCKET);
-    if ( unlikely(chn == NULL) )
-        return -ENOMEM;
-
-    for ( i = 0; i < EVTCHNS_PER_BUCKET; i++ )
+    if ( !group_from_port(d, port) )
     {
-        if ( xsm_alloc_security_evtchn(&chn[i]) )
-        {
-            for ( j = 0; j < i; j++ )
-                xsm_free_security_evtchn(&chn[j]);
-            xfree(chn);
+        grp = xzalloc_array(struct evtchn *, BUCKETS_PER_GROUP);
+        if ( !grp )
             return -ENOMEM;
-        }
-        chn[i].port = port + i;
+        group_from_port(d, port) = grp;
     }
 
+    chn = alloc_evtchn_bucket(d, port);
+    if ( !chn )
+        return -ENOMEM;
     bucket_from_port(d, port) = chn;
 
     return port;
@@ -1152,15 +1183,25 @@ int evtchn_init(struct domain *d)
 {
     evtchn_2l_init(d);
 
+    d->evtchn = alloc_evtchn_bucket(d, 0);
+    if ( !d->evtchn )
+        return -ENOMEM;
+
     spin_lock_init(&d->event_lock);
     if ( get_free_port(d) != 0 )
+    {
+        free_evtchn_bucket(d, d->evtchn);
         return -EINVAL;
+    }
     evtchn_from_port(d, 0)->state = ECS_RESERVED;
 
 #if MAX_VIRT_CPUS > BITS_PER_LONG
     d->poll_mask = xmalloc_array(unsigned long, BITS_TO_LONGS(MAX_VIRT_CPUS));
     if ( !d->poll_mask )
+    {
+        free_evtchn_bucket(d, d->evtchn);
         return -ENOMEM;
+    }
     bitmap_zero(d->poll_mask, MAX_VIRT_CPUS);
 #endif
 
@@ -1170,7 +1211,7 @@ int evtchn_init(struct domain *d)
 
 void evtchn_destroy(struct domain *d)
 {
-    int i;
+    unsigned int i, j;
 
     /* After this barrier no new event-channel allocations can occur. */
     BUG_ON(!d->is_dying);
@@ -1185,12 +1226,17 @@ void evtchn_destroy(struct domain *d)
 
     /* Free all event-channel buckets. */
     spin_lock(&d->event_lock);
-    for ( i = 0; i < NR_EVTCHN_BUCKETS; i++ )
+    for ( i = 0; i < NR_EVTCHN_GROUPS; i++ )
     {
-        xsm_free_security_evtchn(d->evtchn[i]);
-        xfree(d->evtchn[i]);
-        d->evtchn[i] = NULL;
+        if ( !d->evtchn_group[i] )
+            continue;
+        for ( j = 0; j < BUCKETS_PER_GROUP; j++ )
+            free_evtchn_bucket(d, d->evtchn_group[i][j]);
+        xfree(d->evtchn_group[i]);
+        d->evtchn_group[i] = NULL;
     }
+    free_evtchn_bucket(d, d->evtchn);
+    d->evtchn = NULL;
     spin_unlock(&d->event_lock);
 
     clear_global_virq_handlers(d);
