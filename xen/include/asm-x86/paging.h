@@ -386,7 +386,8 @@ guest_get_eff_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
     if ( likely(!paging_mode_translate(v->domain)) )
     {
         ASSERT(!paging_mode_external(v->domain));
-        if ( __copy_from_user(eff_l1e, 
+        if ( !__addr_ok(addr) ||
+             __copy_from_user(eff_l1e,
                               &__linear_l1_table[l1_linear_offset(addr)],
                               sizeof(l1_pgentry_t)) != 0 )
             *(l1_pgentry_t *)eff_l1e = l1e_empty();

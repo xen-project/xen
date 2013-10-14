@@ -582,6 +582,8 @@ int map_ldt_shadow_page(unsigned int off)
 
     BUG_ON(unlikely(in_irq()));
 
+    if ( is_pv_32bit_domain(d) )
+        gva = (u32)gva;
     guest_get_eff_kern_l1e(v, gva, &l1e);
     if ( unlikely(!(l1e_get_flags(l1e) & _PAGE_PRESENT)) )
         return 0;
@@ -3229,9 +3231,8 @@ long do_mmuext_op(
                 MEM_LOG("ignoring SET_LDT hypercall from external domain");
                 okay = 0;
             }
-            else if ( ((ptr & (PAGE_SIZE-1)) != 0) || 
-                      (ents > 8192) ||
-                      !array_access_ok(ptr, ents, LDT_ENTRY_SIZE) )
+            else if ( ((ptr & (PAGE_SIZE - 1)) != 0) || !__addr_ok(ptr) ||
+                      (ents > 8192) )
             {
                 okay = 0;
                 MEM_LOG("Bad args to SET_LDT: ptr=%lx, ents=%lx", ptr, ents);
@@ -3244,8 +3245,6 @@ long do_mmuext_op(
                 curr->arch.pv_vcpu.ldt_base = ptr;
                 curr->arch.pv_vcpu.ldt_ents = ents;
                 load_LDT(curr);
-                if ( ents != 0 )
-                    (void)map_ldt_shadow_page(0);
             }
             break;
         }
