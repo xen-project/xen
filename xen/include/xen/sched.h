@@ -24,6 +24,7 @@
 #include <public/sysctl.h>
 #include <public/vcpu.h>
 #include <public/mem_event.h>
+#include <public/event_channel.h>
 
 #ifdef CONFIG_COMPAT
 #include <compat/vcpu.h>

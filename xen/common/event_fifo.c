@@ -16,6 +16,7 @@
 #include <xen/event_fifo.h>
 #include <xen/paging.h>
 #include <xen/mm.h>
+#include <xen/domain_page.h>
 
 #include <public/event_channel.h>
 
