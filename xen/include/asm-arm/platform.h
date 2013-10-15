@@ -41,7 +41,7 @@ struct platform_desc {
 
 /*
  * Quirk to map dom0 memory in 1:1
- * Usefull on platform where System MMU is not yet implemented
+ * Useful on platform where System MMU is not yet implemented
  */
 #define PLATFORM_QUIRK_DOM0_MAPPING_11 (1 << 0)
 
