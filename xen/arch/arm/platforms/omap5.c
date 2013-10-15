@@ -121,6 +121,38 @@ static int omap5_specific_mapping(struct domain *d)
     return 0;
 }
 
+static int __init omap5_smp_init(void)
+{
+    void __iomem *wugen_base;
+
+    wugen_base = ioremap_nocache(OMAP5_WKUPGEN_BASE, PAGE_SIZE);
+    if ( !wugen_base )
+    {
+        dprintk(XENLOG_ERR, "Unable to map omap5 MMIO\n");
+        return -EFAULT;
+    }
+
+    printk("Set AuxCoreBoot1 to %"PRIpaddr" (%p)\n",
+           __pa(init_secondary), init_secondary);
+    writel(__pa(init_secondary), wugen_base + OMAP_AUX_CORE_BOOT_1_OFFSET);
+
+    printk("Set AuxCoreBoot0 to 0x20\n");
+    writel(0x20, wugen_base + OMAP_AUX_CORE_BOOT_0_OFFSET);
+
+    iounmap(wugen_base);
+
+    return 0;
+}
+
+static int __init omap5_cpu_up(int cpu)
+{
+    /* Nothing to do here, the generic sev() will suffice to kick CPUs
+     * out of either the firmware or our own smp_up_cpu gate,
+     * depending on where they have ended up. */
+
+    return 0;
+}
+
 static uint32_t omap5_quirks(void)
 {
     return PLATFORM_QUIRK_DOM0_MAPPING_11;
@@ -136,6 +168,8 @@ PLATFORM_START(omap5, "TI OMAP5")
     .compatible = omap5_dt_compat,
     .init_time = omap5_init_time,
     .specific_mapping = omap5_specific_mapping,
+    .smp_init = omap5_smp_init,
+    .cpu_up = omap5_cpu_up,
     .quirks = omap5_quirks,
 PLATFORM_END
 

@@ -17,6 +17,9 @@
 #define OMAP5_WKUPGEN_BASE                      0x48281000
 #define OMAP5_SRAM_PA                           0x40300000
 
+#define OMAP_AUX_CORE_BOOT_0_OFFSET             0x800
+#define OMAP_AUX_CORE_BOOT_1_OFFSET             0x804
+
 #endif /* __ASM_ARM_PLATFORMS_OMAP5_H */
 
 /*
