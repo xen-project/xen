@@ -355,7 +355,7 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
     e = errno;
     assert(e != ENOENT);
     if (f) fclose(f);
-    if (data) free(data);
+    free(data);
     return e;
 }
 

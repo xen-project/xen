@@ -1156,8 +1156,7 @@ LWIP_STUB(int, getsockname, (int s, struct sockaddr *name, socklen_t *namelen), 
 static char *syslog_ident;
 void openlog(const char *ident, int option, int facility)
 {
-    if (syslog_ident)
-        free(syslog_ident);
+    free(syslog_ident);
     syslog_ident = strdup(ident);
 }
 

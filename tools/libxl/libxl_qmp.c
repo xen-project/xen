@@ -406,12 +406,10 @@ static void qmp_close(libxl__qmp_handler *qmp)
 
     close(qmp->qmp_fd);
     LIBXL_STAILQ_FOREACH(pp, &qmp->callback_list, next) {
-        if (tmp)
-            free(tmp);
+        free(tmp);
         tmp = pp;
     }
-    if (tmp)
-        free(tmp);
+    free(tmp);
 }
 
 static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)

@@ -291,8 +291,7 @@ main(int argc, char * const argv[])
 
 		switch(type) {
 		case DEVTYPE_VIF:
-			if (s)
-				free(s);
+			free(s);
 			snprintf(buf, sizeof(buf), "%s/script",
 			    vec[XS_WATCH_PATH]);
 			s = xs_read(xs, XBT_NULL, buf, 0);
@@ -314,8 +313,7 @@ main(int argc, char * const argv[])
 		}
 
 next2:
-		if (s)
-			free(s);
+		free(s);
 		free(sstate);
 
 next1:

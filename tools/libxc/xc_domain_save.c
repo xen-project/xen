@@ -773,11 +773,9 @@ static xen_pfn_t *map_and_save_p2m_table(xc_interface *xch,
     if ( live_p2m_frame_list )
         munmap(live_p2m_frame_list, P2M_FLL_ENTRIES * PAGE_SIZE);
 
-    if ( p2m_frame_list_list ) 
-        free(p2m_frame_list_list);
+    free(p2m_frame_list_list);
 
-    if ( p2m_frame_list ) 
-        free(p2m_frame_list);
+    free(p2m_frame_list);
 
     return success ? p2m : NULL;
 }

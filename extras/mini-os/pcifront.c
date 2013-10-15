@@ -212,7 +212,7 @@ again:
     }
 
     err = xenbus_transaction_end(xbt, 0, &retry);
-    if (err) free(err);
+    free(err);
     if (retry) {
             goto again;
         printk("completing transaction\n");
@@ -251,7 +251,7 @@ done:
             err = xenbus_wait_for_state_change(path, &state, &dev->events);
         if (state != XenbusStateConnected) {
             printk("backend not avalable, state=%d\n", state);
-            if (err) free(err);
+            free(err);
             err = xenbus_unwatch_path_token(XBT_NIL, path, path);
             goto error;
         }
@@ -342,7 +342,7 @@ void shutdown_pcifront(struct pcifront_dev *dev)
     state = xenbus_read_integer(path);
     while (err == NULL && state < XenbusStateClosing)
         err = xenbus_wait_for_state_change(path, &state, &dev->events);
-    if (err) free(err);
+    free(err);
 
     if ((err = xenbus_switch_state(XBT_NIL, nodename, XenbusStateClosed)) != NULL) {
         printk("shutdown_pcifront: error changing state to %d: %s\n",
@@ -365,16 +365,16 @@ void shutdown_pcifront(struct pcifront_dev *dev)
         err = xenbus_wait_for_state_change(path, &state, &dev->events);
 
 close_pcifront:
-    if (err) free(err);
+    free(err);
     err2 = xenbus_unwatch_path_token(XBT_NIL, path, path);
-    if (err2) free(err2);
+    free(err2);
 
     snprintf(nodename, sizeof(nodename), "%s/info-ref", dev->nodename);
     err2 = xenbus_rm(XBT_NIL, nodename);
-    if (err2) free(err2);
+    free(err2);
     snprintf(nodename, sizeof(nodename), "%s/event-channel", dev->nodename);
     err2 = xenbus_rm(XBT_NIL, nodename);
-    if (err2) free(err2);
+    free(err2);
 
     if (!err)
         free_pcifront(dev);

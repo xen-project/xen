@@ -32,7 +32,7 @@ void free_consfront(struct consfront_dev *dev)
     state = xenbus_read_integer(path);
     while (err == NULL && state < XenbusStateClosing)
         err = xenbus_wait_for_state_change(path, &state, &dev->events);
-    if (err) free(err);
+    free(err);
 
     if ((err = xenbus_switch_state(XBT_NIL, nodename, XenbusStateClosed)) != NULL) {
         printk("free_consfront: error changing state to %d: %s\n",
@@ -41,9 +41,9 @@ void free_consfront(struct consfront_dev *dev)
     }
 
 close:
-    if (err) free(err);
+    free(err);
     err = xenbus_unwatch_path_token(XBT_NIL, path, path);
-    if (err) free(err);
+    free(err);
 
     mask_evtchn(dev->evtchn);
     unbind_evtchn(dev->evtchn);
@@ -134,7 +134,7 @@ again:
 
 
     err = xenbus_transaction_end(xbt, 0, &retry);
-    if (err) free(err);
+    free(err);
     if (retry) {
             goto again;
         printk("completing transaction\n");

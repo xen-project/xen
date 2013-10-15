@@ -959,8 +959,7 @@ int time_mode_rebuild(uint64_t start_time, uint64_t time_scale)
     state = malloc(sizeof(struct state) * number);
     if (!state)
         return 1;
-    if (this->state)
-        free(this->state);
+    free(this->state);
     this->state = state;
     this->width = 9;
     this->row = 0;

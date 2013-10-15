@@ -457,16 +457,11 @@ void xc_compression_free_context(xc_interface *xch, comp_ctx *ctx)
 {
     if (!ctx) return;
 
-    if (ctx->inputbuf)
-        free(ctx->inputbuf);
-    if (ctx->sendbuf_pfns)
-        free(ctx->sendbuf_pfns);
-    if (ctx->cache_base)
-        free(ctx->cache_base);
-    if (ctx->pfn2cache)
-        free(ctx->pfn2cache);
-    if (ctx->cache)
-        free(ctx->cache);
+    free(ctx->inputbuf);
+    free(ctx->sendbuf_pfns);
+    free(ctx->cache_base);
+    free(ctx->pfn2cache);
+    free(ctx->cache);
     free(ctx);
 }
 

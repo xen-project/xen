@@ -208,8 +208,8 @@ static void free_buckets(struct __hash *h,
                          struct bucket *buckets,
                          struct bucket_lock *bucket_locks)
 {
-    if(buckets) free(buckets);
-    if(bucket_locks) free(bucket_locks);
+    free(buckets);
+    free(bucket_locks);
 }
 
 static int max_entries(struct __hash *h)

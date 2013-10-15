@@ -124,8 +124,7 @@ static void *_gnttab_map_table(xc_interface *xch, int domid, int *gnt_num)
 err:
     if ( frame_list )
         xc_hypercall_buffer_free(xch, frame_list);
-    if ( pfn_list )
-        free(pfn_list);
+    free(pfn_list);
 
     return gnt;
 }

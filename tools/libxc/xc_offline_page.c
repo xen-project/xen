@@ -626,14 +626,11 @@ failed:
         }
     }
 
-    if (mmu)
-        free(mmu);
+    free(mmu);
 
-    if (old_ptes.entries)
-        free(old_ptes.entries);
+    free(old_ptes.entries);
 
-    if (backup)
-        free(backup);
+    free(backup);
 
     if (gnttab_v1)
         munmap(gnttab_v1, gnt_num / (PAGE_SIZE/sizeof(grant_entry_v1_t)));

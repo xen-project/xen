@@ -219,10 +219,8 @@ int xenaccess_teardown(xc_interface *xch, xenaccess_t *xenaccess)
     }
     xenaccess->xc_handle = NULL;
 
-    if ( xenaccess->platform_info )
-        free(xenaccess->platform_info);
-    if ( xenaccess->domain_info )
-        free(xenaccess->domain_info);
+    free(xenaccess->platform_info);
+    free(xenaccess->domain_info);
     free(xenaccess);
 
     return 0;

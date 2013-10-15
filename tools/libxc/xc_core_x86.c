@@ -180,11 +180,9 @@ out:
     if ( live_p2m_frame_list )
         munmap(live_p2m_frame_list, P2M_FLL_ENTRIES * PAGE_SIZE);
 
-    if ( p2m_frame_list_list )
-        free(p2m_frame_list_list);
+    free(p2m_frame_list_list);
 
-    if ( p2m_frame_list )
-        free(p2m_frame_list);
+    free(p2m_frame_list);
 
     errno = err;
     return ret;

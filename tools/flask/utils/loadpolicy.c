@@ -108,8 +108,7 @@ int main (int argCnt, const char *args[])
     }
 
 done:
-    if ( polMemCp )
-        free(polMemCp);
+    free(polMemCp);
     if ( polMem )
     {
         ret = munmap(polMem, info.st_size);

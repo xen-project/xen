@@ -578,8 +578,7 @@ int libxl__ev_xswatch_register(libxl__gc *gc, libxl__ev_xswatch *w,
  out_rc:
     if (use)
         LIBXL_SLIST_INSERT_HEAD(&CTX->watch_freeslots, use, empty);
-    if (path_copy)
-        free(path_copy);
+    free(path_copy);
     CTX_UNLOCK;
     return rc;
 }
