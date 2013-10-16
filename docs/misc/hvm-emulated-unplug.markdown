@@ -65,4 +65,8 @@ decimal number.  `{product_name}` is a string corresponding to the
 product number in step 3.
 
 The master registry of product names and numbers is in
-xen/include/public/hvm/pvdrivers.h
+xen/include/public/hvm/pvdrivers.h.
+
+NOTE: The IO ports implementing the unplug protocol are implemented
+as part of the Xen Platform PCI Device, so if that device is not
+present in the system then this protocol will not work.
