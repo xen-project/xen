@@ -929,6 +929,12 @@ csched_vcpu_remove(const struct scheduler *ops, struct vcpu *vc)
 
     SCHED_STAT_CRANK(vcpu_destroy);
 
+    if ( test_and_clear_bit(CSCHED_FLAG_VCPU_PARKED, &svc->flags) )
+    {
+        SCHED_STAT_CRANK(vcpu_unpark);
+        vcpu_unpause(svc->vcpu);
+    }
+
     if ( __vcpu_on_runq(svc) )
         __runq_remove(svc);
 
