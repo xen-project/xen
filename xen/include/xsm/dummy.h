@@ -567,9 +567,10 @@ static XSM_INLINE int xsm_domain_memory_map(XSM_DEFAULT_ARG struct domain *d)
 static XSM_INLINE int xsm_mmu_update(XSM_DEFAULT_ARG struct domain *d, struct domain *t,
                                      struct domain *f, uint32_t flags)
 {
-    int rc;
+    int rc = 0;
     XSM_ASSERT_ACTION(XSM_TARGET);
-    rc = xsm_default_action(action, d, f);
+    if ( f != dom_io )
+        rc = xsm_default_action(action, d, f);
     if ( t && !rc )
         rc = xsm_default_action(action, d, t);
     return rc;
