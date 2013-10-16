@@ -1750,7 +1750,8 @@ csched_dump_vcpu(struct csched_vcpu *svc)
 
     if ( sdom )
     {
-        printk(" credit=%i [w=%u]", atomic_read(&svc->credit), sdom->weight);
+        printk(" credit=%i [w=%u,cap=%u]", atomic_read(&svc->credit),
+                sdom->weight, sdom->cap);
 #ifdef CSCHED_STATS
         printk(" (%d+%u) {a/i=%u/%u m=%u+%u (k=%u)}",
                 svc->stats.credit_last,
