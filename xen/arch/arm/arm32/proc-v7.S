@@ -43,6 +43,14 @@ __v7_ca7mp_proc_info:
         .long v7_init
         .size __v7_ca7mp_proc_info, . - __v7_ca7mp_proc_info
 
+        .section ".init.proc.info", #alloc, #execinstr
+        .type __v7_brahma15mp_proc_info, #object
+__v7_brahma15mp_proc_info:
+        .long 0x420F00F2             /* Broadcom Brahma-B15 */
+        .long 0xFF0FFFFF             /* Mask */
+        .long v7_init
+        .size __v7_brahma15mp_proc_info, . - __v7_brahma15mp_proc_info
+
 /*
  * Local variables:
  * mode: ASM
