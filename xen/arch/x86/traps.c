@@ -945,7 +945,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
 {
     const struct bug_frame *bug;
     u8 bug_insn[2];
-    const char *filename, *predicate, *eip = (char *)regs->eip;
+    const char *prefix = "", *filename, *predicate, *eip = (char *)regs->eip;
     unsigned long fixup;
     int id, lineno;
     static const struct bug_frame *const stop_frames[] = {
@@ -996,21 +996,27 @@ void do_invalid_op(struct cpu_user_regs *regs)
     filename = bug_ptr(bug);
     if ( !is_kernel(filename) )
         goto die;
+    fixup = strlen(filename);
+    if ( fixup > 50 )
+    {
+        filename += fixup - 47;
+        prefix = "...";
+    }
     lineno = bug_line(bug);
 
     switch ( id )
     {
     case BUGFRAME_warn:
-        printk("Xen WARN at %.50s:%d\n", filename, lineno);
+        printk("Xen WARN at %s%s:%d\n", prefix, filename, lineno);
         show_execution_state(regs);
         regs->eip = (unsigned long)eip;
         return;
 
     case BUGFRAME_bug:
-        printk("Xen BUG at %.50s:%d\n", filename, lineno);
+        printk("Xen BUG at %s%s:%d\n", prefix, filename, lineno);
         DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
         show_execution_state(regs);
-        panic("Xen BUG at %.50s:%d\n", filename, lineno);
+        panic("Xen BUG at %s%s:%d\n", prefix, filename, lineno);
 
     case BUGFRAME_assert:
         /* ASSERT: decode the predicate string pointer. */
@@ -1018,12 +1024,12 @@ void do_invalid_op(struct cpu_user_regs *regs)
         if ( !is_kernel(predicate) )
             predicate = "<unknown>";
 
-        printk("Assertion '%s' failed at %.50s:%d\n",
-               predicate, filename, lineno);
+        printk("Assertion '%s' failed at %s%s:%d\n",
+               predicate, prefix, filename, lineno);
         DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
         show_execution_state(regs);
-        panic("Assertion '%s' failed at %.50s:%d\n",
-              predicate, filename, lineno);
+        panic("Assertion '%s' failed at %s%s:%d\n",
+              predicate, prefix, filename, lineno);
     }
 
  die:
