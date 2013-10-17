@@ -212,7 +212,7 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-4.3-testing.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= b0855f925c6e2e0b21fbb03fab4b5fb5b6876871
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.3.0
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.3.1-rc2
 SEABIOS_UPSTREAM_TAG ?= 3a28511b46f0c2af5fae1b6ed2b0c19d7913cee3
 # Wed Jun 26 16:30:45 2013 +0100
 # xen: Don't perform SMP setup.
@@ -224,7 +224,7 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 0bd3d991be73031b8d9c07ccf43e5785ca26ca71
+QEMU_TAG ?= xen-4.3.1-rc2
 # Thu Jul 25 08:11:55 2013 +0000
 # passthrough: Correctly expose PCH ISA bridge for IGD passthrough
 
