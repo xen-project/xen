@@ -39,6 +39,8 @@ lines for Xen and Dom0. The logic is the following:
  - If xen,dom0-bootargs is present, it will be used for Dom0.
  - If xen,xen-bootargs is _not_ present, but xen,dom0-bootargs is,
    bootargs will be used for Xen.
+ - If a kernel boot module is present and has a bootargs property then
+   the top-level bootargs will used for Xen.
  - If no Xen specific properties are present, bootargs is for Dom0.
  - If xen,xen-bootargs is present, but xen,dom0-bootargs is missing,
    bootargs will be used for Dom0.

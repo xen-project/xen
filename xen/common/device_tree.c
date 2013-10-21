@@ -240,7 +240,7 @@ static int __init device_tree_for_each_node(const void *fdt,
  */
 const char *device_tree_bootargs(const void *fdt)
 {
-    int node; 
+    int node;
     const struct fdt_property *prop;
 
     node = fdt_path_offset(fdt, "/chosen");
@@ -250,7 +250,13 @@ const char *device_tree_bootargs(const void *fdt)
     prop = fdt_get_property(fdt, node, "xen,xen-bootargs", NULL);
     if ( prop == NULL )
     {
-        if (fdt_get_property(fdt, node, "xen,dom0-bootargs", NULL))
+        struct dt_mb_module *dom0_mod = NULL;
+
+        if ( early_info.modules.nr_mods >= MOD_KERNEL )
+            dom0_mod = &early_info.modules.module[MOD_KERNEL];
+
+        if (fdt_get_property(fdt, node, "xen,dom0-bootargs", NULL) ||
+            ( dom0_mod && dom0_mod->cmdline[0] ) )
             prop = fdt_get_property(fdt, node, "bootargs", NULL);
     }
     if ( prop == NULL )
