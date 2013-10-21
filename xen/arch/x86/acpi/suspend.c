@@ -13,12 +13,14 @@
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/support.h>
 #include <asm/i387.h>
+#include <asm/xstate.h>
 #include <xen/hypercall.h>
 
 static unsigned long saved_lstar, saved_cstar;
 static unsigned long saved_sysenter_esp, saved_sysenter_eip;
 static unsigned long saved_fs_base, saved_gs_base, saved_kernel_gs_base;
 static uint16_t saved_segs[4];
+static uint64_t saved_xcr0;
 
 void save_rest_processor_state(void)
 {
@@ -38,6 +40,8 @@ void save_rest_processor_state(void)
         rdmsrl(MSR_IA32_SYSENTER_ESP, saved_sysenter_esp);
         rdmsrl(MSR_IA32_SYSENTER_EIP, saved_sysenter_eip);
     }
+    if ( cpu_has_xsave )
+        saved_xcr0 = get_xcr0();
 }
 
 
@@ -76,6 +80,9 @@ void restore_rest_processor_state(void)
             : : "r" (saved_segs) : "memory" );
         do_set_segment_base(SEGBASE_GS_USER_SEL, saved_segs[3]);
     }
+
+    if ( cpu_has_xsave && !set_xcr0(saved_xcr0) )
+        BUG();
 
     /* Maybe load the debug registers. */
     BUG_ON(is_hvm_vcpu(curr));
