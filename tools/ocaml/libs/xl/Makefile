@@ -19,7 +19,7 @@ OCAML_LIBRARY = xenlight
 
 GENERATED_FILES += xenlight.ml xenlight.ml.tmp xenlight.mli xenlight.mli.tmp
 GENERATED_FILES += _libxl_types.ml.in _libxl_types.mli.in
-GENERATED_FILES += _libxl_types.inc
+GENERATED_FILES += _libxl_types.inc META
 
 all: $(INTF) $(LIBS)
 
