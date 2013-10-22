@@ -363,11 +363,14 @@ long do_console_io(int cmd, int count, XEN_GUEST_HANDLE(char) buffer)
     long rc;
     unsigned int idx, len;
 
-#ifndef VERBOSE
-    /* Only domain 0 may access the emergency console. */
     if ( current->domain->domain_id != 0 )
-        return -EPERM;
+#ifndef VERBOSE
+        /* Only domain 0 may access the emergency console. */
+#else
+        /* Only console writes are permitted for other than Dom0. */
+        if ( cmd != CONSOLEIO_write )
 #endif
+            return -EPERM;
 
     rc = xsm_console_io(current->domain, cmd);
     if ( rc )
