@@ -70,12 +70,19 @@ static int set_memory_reg_11(struct domain *d, struct kernel_info *kinfo,
     int reg_size = dt_cells_to_size(dt_n_addr_cells(np) + dt_n_size_cells(np));
     paddr_t start;
     paddr_t size;
-    struct page_info *pg;
+    struct page_info *pg = NULL;
     unsigned int order = get_order_from_bytes(dom0_mem);
     int res;
     paddr_t spfn;
+    unsigned int bits;
 
-    pg = alloc_domheap_pages(d, order, 0);
+    for ( bits = PAGE_SHIFT + 1; bits < PADDR_BITS; bits++ )
+    {
+        pg = alloc_domheap_pages(d, order, MEMF_bits(bits));
+        if ( pg != NULL )
+            break;
+    }
+
     if ( !pg )
         panic("Failed to allocate contiguous memory for dom0\n");
 
