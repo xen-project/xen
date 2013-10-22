@@ -1480,7 +1480,7 @@ static void *
 csched_alloc_domdata(const struct scheduler *ops, struct domain *dom)
 {
     struct csched_dom *sdom;
-    int flags;
+    unsigned long flags;
 
     sdom = xzalloc(struct csched_dom);
     if ( sdom == NULL )
@@ -1524,7 +1524,7 @@ csched_dom_init(const struct scheduler *ops, struct domain *dom)
 static void
 csched_free_domdata(const struct scheduler *ops, void *data)
 {
-    int flags;
+    unsigned long flags;
     struct csched_dom *sdom = data;
 
     spin_lock_irqsave(&CSCHED_PRIV(ops)->lock, flags);
@@ -1944,7 +1944,8 @@ static void deactivate_runqueue(struct csched_private *prv, int rqi)
 
 static void init_pcpu(const struct scheduler *ops, int cpu)
 {
-    int rqi, flags;
+    int rqi;
+    unsigned long flags;
     struct csched_private *prv = CSCHED_PRIV(ops);
     struct csched_runqueue_data *rqd;
     spinlock_t *old_lock;

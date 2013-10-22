@@ -420,7 +420,7 @@ int tb_control(xen_sysctl_tbuf_op_t *tbc)
          * hypercall returns, no more records should be placed into the buffers. */
         for_each_online_cpu(i)
         {
-            int flags;
+            unsigned long flags;
             spin_lock_irqsave(&per_cpu(t_lock, i), flags);
             per_cpu(lost_records, i)=0;
             spin_unlock_irqrestore(&per_cpu(t_lock, i), flags);
