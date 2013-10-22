@@ -188,7 +188,11 @@ int _rw_is_write_locked(rwlock_t *lock);
 
 #define spin_lock(l)                  _spin_lock(l)
 #define spin_lock_irq(l)              _spin_lock_irq(l)
-#define spin_lock_irqsave(l, f)       ((f) = _spin_lock_irqsave(l))
+#define spin_lock_irqsave(l, f)                                 \
+    ({                                                          \
+        BUILD_BUG_ON(sizeof(f) != sizeof(unsigned long));       \
+        ((f) = _spin_lock_irqsave(l));                          \
+    })
 
 #define spin_unlock(l)                _spin_unlock(l)
 #define spin_unlock_irq(l)            _spin_unlock_irq(l)
@@ -220,7 +224,11 @@ int _rw_is_write_locked(rwlock_t *lock);
 
 #define read_lock(l)                  _read_lock(l)
 #define read_lock_irq(l)              _read_lock_irq(l)
-#define read_lock_irqsave(l, f)       ((f) = _read_lock_irqsave(l))
+#define read_lock_irqsave(l, f)                                 \
+    ({                                                          \
+        BUILD_BUG_ON(sizeof(f) != sizeof(unsigned long));       \
+        ((f) = _read_lock_irqsave(l));                          \
+    })
 
 #define read_unlock(l)                _read_unlock(l)
 #define read_unlock_irq(l)            _read_unlock_irq(l)
@@ -229,7 +237,11 @@ int _rw_is_write_locked(rwlock_t *lock);
 
 #define write_lock(l)                 _write_lock(l)
 #define write_lock_irq(l)             _write_lock_irq(l)
-#define write_lock_irqsave(l, f)      ((f) = _write_lock_irqsave(l))
+#define write_lock_irqsave(l, f)                                \
+    ({                                                          \
+        BUILD_BUG_ON(sizeof(f) != sizeof(unsigned long));       \
+        ((f) = _write_lock_irqsave(l));                         \
+    })
 #define write_trylock(l)              _write_trylock(l)
 
 #define write_unlock(l)               _write_unlock(l)
