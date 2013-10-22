@@ -15,6 +15,7 @@
 		:"1" (addr),"g" ((int)(size)),"r" (HYPERVISOR_VIRT_START)); \
 	flag; })
 
+#define __addr_ok(addr) (likely((unsigned long)(addr) < HYPERVISOR_VIRT_START))
 #define access_ok(addr,size) (likely(__range_not_ok(addr,size) == 0))
 
 #define array_access_ok(addr,count,size) \
