@@ -3,6 +3,7 @@
 
 #include <xen/lib.h>
 #include <xen/bitops.h>
+#include <asm/processor.h>
 
 #define read_segment_register(name)                             \
 ({  u16 __sel;                                                  \
@@ -159,15 +160,19 @@ static always_inline unsigned long __cmpxchg(
 #define local_irq_restore(x)                                     \
 ({                                                               \
     BUILD_BUG_ON(sizeof(x) != sizeof(long));                     \
-    asm volatile ( "push" __OS " %0 ; popf" __OS                 \
-                   : : "g" (x) : "memory", "cc" );               \
+    asm volatile ( "pushfq\n\t"                                  \
+                   "andq %0, (%%rsp)\n\t"                        \
+                   "orq  %1, (%%rsp)\n\t"                        \
+                   "popfq"                                       \
+                   : : "i?r" ( ~X86_EFLAGS_IF ),                 \
+                       "ri" ( (x) & X86_EFLAGS_IF ) );           \
 })
 
 static inline int local_irq_is_enabled(void)
 {
     unsigned long flags;
     local_save_flags(flags);
-    return !!(flags & (1<<9)); /* EFLAGS_IF */
+    return !!(flags & X86_EFLAGS_IF);
 }
 
 #define BROKEN_ACPI_Sx          0x0001
