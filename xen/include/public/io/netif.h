@@ -69,6 +69,20 @@
  */
 
 /*
+ * "feature-no-csum-offload" should be used to turn IPv4 TCP/UDP checksum
+ * offload off or on. If it is missing then the feature is assumed to be on.
+ * "feature-ipv6-csum-offload" should be used to turn IPv6 TCP/UDP checksum
+ * offload on or off. If it is missing then the feature is assumed to be off.
+ */
+
+/*
+ * "feature-gso-tcpv4" and "feature-gso-tcpv6" advertise the capability to
+ * handle large TCP packets (in IPv4 or IPv6 form respectively). Neither
+ * frontends nor backends are assumed to be capable unless the flags are
+ * present.
+ */
+
+/*
  * This is the 'wire' format for packets:
  *  Request 1: netif_tx_request -- NETTXF_* (any flags)
  * [Request 2: netif_tx_extra]  (only if request 1 has NETTXF_extra_info)
@@ -116,8 +130,10 @@ typedef struct netif_tx_request netif_tx_request_t;
 #define _XEN_NETIF_EXTRA_FLAG_MORE (0)
 #define XEN_NETIF_EXTRA_FLAG_MORE  (1U<<_XEN_NETIF_EXTRA_FLAG_MORE)
 
-/* GSO types - only TCPv4 currently supported. */
+/* GSO types */
+#define XEN_NETIF_GSO_TYPE_NONE         (0)
 #define XEN_NETIF_GSO_TYPE_TCPV4        (1)
+#define XEN_NETIF_GSO_TYPE_TCPV6        (2)
 
 /*
  * This structure needs to fit within both netif_tx_request and
