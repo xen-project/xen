@@ -1028,14 +1028,16 @@ in the B<VFB_SPEC_STRING> for configuring virtual frame buffer devices
 Sets the amount of RAM which the emulated video card will contain,
 which in turn limits the resolutions and bit depths which will be
 available.
-The default amount of video ram for stdvga is 8MB which is sufficient
-for e.g. 1600x1200 at 32bpp and videoram option is currently working
-only when using the qemu-xen-traditional device-model.
 
-When using the emulated Cirrus graphics card (B<vga="cirrus">)
-the amount of video ram is fixed at 4MB which is sufficient
-for 1024x768 at 32 bpp and videoram option is currently working
-only when using the upstream qemu-xen device-model.
+When using the qemu-xen-traditional device-model, the default as well as
+minimum amount of video RAM for stdvga is 8 MB, which is sufficient for e.g.
+1600x1200 at 32bpp. For the upstream qemu-xen device-model, the default and
+minimum is 16 MB.
+
+When using the emulated Cirrus graphics card (B<vga="cirrus">) and the
+qemu-xen-traditional device-model, the amount of video RAM is fixed at 4 MB,
+which is sufficient for 1024x768 at 32 bpp. For the upstream qemu-xen
+device-model, the default and minimum is 8 MB.
 
 =item B<stdvga=BOOLEAN>
 
