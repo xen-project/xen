@@ -345,7 +345,7 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
         return ERROR_FAIL;
     }
 
-    LOG(DEBUG, "pv kernel mapped %d path %s\n", state->pv_kernel.mapped, state->pv_kernel.path);
+    LOG(DEBUG, "pv kernel mapped %d path %s", state->pv_kernel.mapped, state->pv_kernel.path);
     if (state->pv_kernel.mapped) {
         ret = xc_dom_kernel_mem(dom,
                                 state->pv_kernel.data,
