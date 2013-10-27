@@ -2140,8 +2140,6 @@ start:
 
         child1 = xl_fork(child_waitdaemon);
         if (child1) {
-            printf("Daemon running with PID %d\n", child1);
-
             for (;;) {
                 got_child = xl_waitpid(child_waitdaemon, &status, 0);
                 if (got_child == child1) break;
