@@ -374,7 +374,9 @@ static elf_errorstatus elf_xen_note_check(struct elf_binary *elf,
           strncmp(parms->guest_os, "linux", 5)) )
     {
         elf_err(elf, "%s: ERROR: Will only load images built for the generic "
-                "loader or Linux images", __FUNCTION__);
+                "loader or Linux images (Not '%.*s' and '%.*s')\n",
+                __FUNCTION__, (int)sizeof(parms->loader), parms->loader,
+                (int)sizeof(parms->guest_os), parms->guest_os);
         return -1;
     }
 
@@ -382,7 +384,8 @@ static elf_errorstatus elf_xen_note_check(struct elf_binary *elf,
          strncmp(parms->xen_ver, "xen-3.0", 7) )
     {
         elf_err(elf, "%s: ERROR: Xen will only load images built "
-                "for Xen v3.0\n", __FUNCTION__);
+                "for Xen v3.0 (Not '%.*s')\n", __FUNCTION__,
+                (int)sizeof(parms->xen_ver), parms->xen_ver);
         return -1;
     }
     return 0;
