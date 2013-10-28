@@ -2228,7 +2228,7 @@ static void dump_irqs(unsigned char key)
     unsigned long flags;
     char *ssid;
 
-    printk("Guest interrupt information:\n");
+    printk("IRQ information:\n");
 
     for ( irq = 0; irq < nr_irqs; irq++ )
     {
@@ -2284,6 +2284,14 @@ static void dump_irqs(unsigned char key)
 
         xfree(ssid);
     }
+
+    printk("Direct vector information:\n");
+    for ( i = FIRST_DYNAMIC_VECTOR; i < NR_VECTORS; ++i )
+        if ( direct_apic_vector[i] )
+        {
+            printk("   %#02x -> ", i);
+            print_symbol("%s\n", (unsigned long)direct_apic_vector[i]);
+        }
 
     dump_ioapic_irq_info();
 }
