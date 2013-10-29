@@ -83,7 +83,8 @@ __attribute__((unused))
     XSD_ERROR(EROFS),
     XSD_ERROR(EBUSY),
     XSD_ERROR(EAGAIN),
-    XSD_ERROR(EISCONN)
+    XSD_ERROR(EISCONN),
+    XSD_ERROR(E2BIG)
 };
 #endif
 

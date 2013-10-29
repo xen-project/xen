@@ -629,6 +629,11 @@ void send_reply(struct connection *conn, enum xsd_sockmsg_type type,
 {
 	struct buffered_data *bdata;
 
+	if ( len > XENSTORE_PAYLOAD_MAX ) {
+		send_error(conn, E2BIG);
+		return;
+	}
+
 	/* Message is a child of the connection context for auto-cleanup. */
 	bdata = new_buffer(conn);
 	bdata->buffer = talloc_array(bdata, char, len);
