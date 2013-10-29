@@ -601,7 +601,8 @@ int cpu_disable_scheduler(unsigned int cpu)
     {
         for_each_vcpu ( d, v )
         {
-            spinlock_t *lock = vcpu_schedule_lock_irq(v);
+            unsigned long flags;
+            spinlock_t *lock = vcpu_schedule_lock_irqsave(v, &flags);
 
             cpumask_and(&online_affinity, v->cpu_affinity, c->cpu_valid);
             if ( cpumask_empty(&online_affinity) &&
@@ -622,14 +623,12 @@ int cpu_disable_scheduler(unsigned int cpu)
             if ( v->processor == cpu )
             {
                 set_bit(_VPF_migrating, &v->pause_flags);
-                vcpu_schedule_unlock_irq(lock, v);
+                vcpu_schedule_unlock_irqrestore(lock, flags, v);
                 vcpu_sleep_nosync(v);
                 vcpu_migrate(v);
             }
             else
-            {
-                vcpu_schedule_unlock_irq(lock, v);
-            }
+                vcpu_schedule_unlock_irqrestore(lock, flags, v);
 
             /*
              * A vcpu active in the hypervisor will not be migratable.
