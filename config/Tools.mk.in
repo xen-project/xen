@@ -24,6 +24,7 @@ BCC                 := @BCC@
 IASL                := @IASL@
 FETCHER             := @FETCHER@
 SEABIOS_PATH        := @seabios_path@
+OVMF_PATH           := @ovmf_path@
 
 # Extra folder for libs/includes
 PREPEND_INCLUDES    := @PREPEND_INCLUDES@

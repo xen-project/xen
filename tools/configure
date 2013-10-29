@@ -682,6 +682,7 @@ APPEND_LIB
 APPEND_INCLUDES
 PREPEND_LIB
 PREPEND_INCLUDES
+ovmf_path
 seabios_path
 qemu_xen
 qemu_traditional
@@ -768,6 +769,7 @@ enable_blktap1
 enable_qemu_traditional
 with_system_qemu
 with_system_seabios
+with_system_ovmf
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1439,6 +1441,9 @@ Optional Packages:
                           and installing our own version
   --with-system-seabios[=PATH]
                           Use system supplied seabios PATH instead of building
+                          and installing our own version
+  --with-system-ovmf[=PATH]
+                          Use system supplied OVMF PATH instead of building
                           and installing our own version
 
 Some influential environment variables:
@@ -3765,6 +3770,19 @@ if test "${with_system_seabios+set}" = set; then :
     case $withval in
         no) seabios_path= ;;
         *)  seabios_path=$withval ;;
+    esac
+
+fi
+
+
+
+
+# Check whether --with-system-ovmf was given.
+if test "${with_system_ovmf+set}" = set; then :
+  withval=$with_system_ovmf;
+    case $withval in
+        no) ovmf_path= ;;
+        *)  ovmf_path=$withval ;;
     esac
 
 fi

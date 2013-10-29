@@ -6,7 +6,9 @@ TARGET      := hvmloader/hvmloader
 INST_DIR := $(DESTDIR)$(XENFIRMWAREDIR)
 
 SUBDIRS-y :=
+ifeq ($(OVMF_PATH),)
 SUBDIRS-$(CONFIG_OVMF) += ovmf-dir
+endif
 ifeq ($(SEABIOS_PATH),)
 SUBDIRS-$(CONFIG_SEABIOS) += seabios-dir
 endif

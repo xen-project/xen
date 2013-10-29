@@ -108,6 +108,17 @@ AC_ARG_WITH([system-seabios],
 ],[])
 AC_SUBST(seabios_path)
 
+AC_ARG_WITH([system-ovmf],
+    AS_HELP_STRING([--with-system-ovmf@<:@=PATH@:>@],
+       [Use system supplied OVMF PATH instead of building and installing
+        our own version]),[
+    case $withval in
+        no) ovmf_path= ;;
+        *)  ovmf_path=$withval ;;
+    esac
+],[])
+AC_SUBST(ovmf_path)
+
 AC_ARG_VAR([PREPEND_INCLUDES],
     [List of include folders to prepend to CFLAGS (without -I)])
 AC_ARG_VAR([PREPEND_LIB],
