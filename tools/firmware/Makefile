@@ -6,7 +6,7 @@ TARGET      := hvmloader/hvmloader
 INST_DIR := $(DESTDIR)$(XENFIRMWAREDIR)
 
 SUBDIRS-y :=
-SUBDIRS-$(CONFIG_OVMF) += ovmf
+SUBDIRS-$(CONFIG_OVMF) += ovmf-dir
 ifeq ($(SEABIOS_PATH),)
 SUBDIRS-$(CONFIG_SEABIOS) += seabios-dir
 endif
@@ -15,9 +15,9 @@ SUBDIRS-$(CONFIG_ROMBIOS) += vgabios
 SUBDIRS-$(CONFIG_ROMBIOS) += etherboot
 SUBDIRS-y += hvmloader
 
-ovmf:
-	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh $(OVMF_UPSTREAM_URL) $(OVMF_UPSTREAM_REVISION) ovmf
-	cp ovmf-makefile ovmf/Makefile;
+ovmf-dir:
+	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh $(OVMF_UPSTREAM_URL) $(OVMF_UPSTREAM_REVISION) ovmf-dir
+	cp ovmf-makefile ovmf-dir/Makefile;
 
 seabios-dir:
 	GIT=$(GIT) $(XEN_ROOT)/scripts/git-checkout.sh $(SEABIOS_UPSTREAM_URL) $(SEABIOS_UPSTREAM_TAG) seabios-dir
@@ -52,32 +52,23 @@ subdir-distclean-etherboot: .phony
 	$(MAKE) -C etherboot distclean
 
 subdir-distclean-ovmf: .phony
-	rm -rf ovmf ovmf-remote
+	rm -rf ovmf-dir ovmf-dir-remote
 
 subdir-distclean-seabios-dir: .phony
 	rm -rf seabios-dir seabios-dir-remote
 
-.PHONY: ovmf-find
-ovmf-find:
-	if test -d $(OVMF_UPSTREAM_URL) ; then \
-	               mkdir -p ovmf; \
-        else \
-                export GIT=$(GIT); \
-                $(XEN_ROOT)/scripts/git-checkout.sh $(OVMF_UPSTREAM_URL) $(OVMF_UPSTREAM_REVISION) ovmf ; \
-        fi
-
-.PHONY: ovmf-force-update
-ovmf-force-update:
+.PHONY: ovmf-dir-force-update
+ovmf-dir-force-update:
 	set -ex; \
 	if [ "$(OVMF_UPSTREAM_REVISION)" ]; then \
-		cd ovmf-remote; \
+		cd ovmf-dir-remote; \
 		$(GIT) fetch origin; \
 		$(GIT) reset --hard $(OVMF_UPSTREAM_REVISION); \
 	fi
 
 subdir-clean-ovmf:
-	set -e; if test -d ovmf/.; then \
-		$(MAKE) -C ovmf clean; \
+	set -e; if test -d ovmf-dir/.; then \
+		$(MAKE) -C ovmf-dir clean; \
 	fi
 
 .PHONY: seabios-dir-force-update

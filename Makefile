@@ -110,6 +110,10 @@ endif
 tools/firmware/seabios-dir-force-update:
 	$(MAKE) -C tools/firmware seabios-dir-force-update
 
+.PHONY: tools/firmware/ovmf-dir-force-update
+tools/firmware/ovmf-dir-force-update:
+	$(MAKE) -C tools/firmware ovmf-dir-force-update
+
 .PHONY: install-docs
 install-docs:
 	$(MAKE) -C docs install

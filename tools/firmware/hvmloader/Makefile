@@ -37,7 +37,7 @@ endif
 
 CIRRUSVGA_DEBUG ?= n
 
-OVMF_DIR := ../ovmf
+OVMF_DIR := ../ovmf-dir
 ROMBIOS_DIR := ../rombios
 SEABIOS_DIR := ../seabios-dir
 
