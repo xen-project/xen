@@ -425,22 +425,18 @@ fail:
 static void disable_tbufs(void)
 {
     xc_interface *xc_handle = xc_interface_open(0,0,0);
-    int ret;
 
     if ( !xc_handle ) 
     {
         perror("Couldn't open xc handle to disable tbufs.");
-        goto out;
+        return;
     }
 
-    ret = xc_tbuf_disable(xc_handle);
-
-    if ( ret != 0 )
+    if ( xc_tbuf_disable(xc_handle) != 0 )
     {
         perror("Couldn't disable trace buffers");
     }
 
-out:
     xc_interface_close(xc_handle);
 }
 
