@@ -172,6 +172,7 @@ xentoollog_logger_stdiostream *xtl_createlogger_stdiostream
     if (newlogger.flags & XTL_STDIOSTREAM_SHOW_DATE) tzset();
 
     newlogger.progress_erase_len = 0;
+    newlogger.progress_last_percent = 0;
 
     return XTL_NEW_LOGGER(stdiostream, newlogger);
 }
