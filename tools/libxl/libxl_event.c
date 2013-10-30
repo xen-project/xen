@@ -1339,7 +1339,10 @@ libxl__poller *libxl__poller_get(libxl_ctx *ctx)
     memset(p, 0, sizeof(*p));
 
     rc = libxl__poller_init(ctx, p);
-    if (rc) return NULL;
+    if (rc) {
+        free(p);
+        return NULL;
+    }
 
     return p;
 }
