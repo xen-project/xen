@@ -897,7 +897,7 @@ int main(int argc, char **argv)
         read_symbol_table(symbol_table);
 
     xenctx.xc_handle = xc_interface_open(0,0,0); /* for accessing control interface */
-    if (xenctx.xc_handle < 0) {
+    if (xenctx.xc_handle == NULL) {
         perror("xc_interface_open");
         exit(-1);
     }
