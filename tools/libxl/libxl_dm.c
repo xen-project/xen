@@ -1259,8 +1259,8 @@ retry_transaction:
     rc = 0;
 
 out_close:
-    close(null);
-    close(logfile_w);
+    if (null != -1) close(null);
+    if (logfile_w != -1) close(logfile_w);
 out:
     if (rc)
         device_model_spawn_outcome(egc, dmss, rc);
