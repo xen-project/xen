@@ -167,6 +167,7 @@ static void read_symbol_table(const char *symtab)
     char *p;
     struct symbol *symbol;
     FILE *f;
+    guest_word_t address;
 
     f = fopen(symtab, "r");
     if(f == NULL) {
@@ -178,10 +179,8 @@ static void read_symbol_table(const char *symtab)
         if(fgets(line,256,f)==NULL)
             break;
 
-        symbol = malloc(sizeof(*symbol));
-
         /* need more checks for syntax here... */
-        symbol->address = strtoull(line, &p, 16);
+        address = strtoull(line, &p, 16);
         if (!isspace((uint8_t)*p++))
             continue;
         type = *p++;
@@ -196,7 +195,6 @@ static void read_symbol_table(const char *symtab)
          */
         if (p[strlen(p)-1] == '\n')
             p[strlen(p)-1] = '\0';
-        symbol->name = strdup(p);
 
         switch (type) {
         case 'A': /* global absolute */
@@ -207,20 +205,31 @@ static void read_symbol_table(const char *symtab)
         case 'w': /* undefined weak function */
             continue;
         default:
+            symbol = malloc(sizeof(*symbol));
+            if (symbol == NULL)
+                return;
+
+            symbol->address = address;
+            symbol->name = strdup(p);
+            if (symbol->name == NULL) {
+                free(symbol);
+                return;
+            }
+
             insert_symbol(symbol);
             break;
         }
 
-        if (strcmp(symbol->name, "_stext") == 0)
-            kernel_stext = symbol->address;
-        else if (strcmp(symbol->name, "_etext") == 0)
-            kernel_etext = symbol->address;
-        else if (strcmp(symbol->name, "_sinittext") == 0)
-            kernel_sinittext = symbol->address;
-        else if (strcmp(symbol->name, "_einittext") == 0)
-            kernel_einittext = symbol->address;
-        else if (strcmp(symbol->name, "hypercall_page") == 0)
-            kernel_hypercallpage = symbol->address;
+        if (strcmp(p, "_stext") == 0)
+            kernel_stext = address;
+        else if (strcmp(p, "_etext") == 0)
+            kernel_etext = address;
+        else if (strcmp(p, "_sinittext") == 0)
+            kernel_sinittext = address;
+        else if (strcmp(p, "_einittext") == 0)
+            kernel_einittext = address;
+        else if (strcmp(p, "hypercall_page") == 0)
+            kernel_hypercallpage = address;
     }
 
     fclose(f);
