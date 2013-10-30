@@ -3251,7 +3251,7 @@ static void list_vm(void)
     info = libxl_list_vm(ctx, &nb_vm);
 
     if (!info) {
-        fprintf(stderr, "libxl_domain_infolist failed.\n");
+        fprintf(stderr, "libxl_list_vm failed.\n");
         exit(1);
     }
     printf("UUID                                  ID    name\n");
@@ -4147,7 +4147,7 @@ int main_list(int argc, char **argv)
     if (optind >= argc) {
         info = libxl_list_domain(ctx, &nb_domain);
         if (!info) {
-            fprintf(stderr, "libxl_domain_infolist failed.\n");
+            fprintf(stderr, "libxl_list_domain failed.\n");
             return 1;
         }
         info_free = info;
@@ -4856,7 +4856,7 @@ int main_sharing(int argc, char **argv)
     if (optind >= argc) {
         info = libxl_list_domain(ctx, &nb_domain);
         if (!info) {
-            fprintf(stderr, "libxl_domain_infolist failed.\n");
+            fprintf(stderr, "libxl_list_domain failed.\n");
             return 1;
         }
         info_free = info;
@@ -5070,7 +5070,7 @@ static int sched_domain_output(libxl_scheduler sched, int (*output)(int),
 
     info = libxl_list_domain(ctx, &nb_domain);
     if (!info) {
-        fprintf(stderr, "libxl_domain_infolist failed.\n");
+        fprintf(stderr, "libxl_list_domain failed.\n");
         return 1;
     }
     poolinfo = libxl_list_cpupool(ctx, &n_pools);
@@ -6025,7 +6025,7 @@ int main_claims(int argc, char **argv)
 
     info = libxl_list_domain(ctx, &nb_domain);
     if (!info) {
-        fprintf(stderr, "libxl_domain_infolist failed.\n");
+        fprintf(stderr, "libxl_list_domain failed.\n");
         return 1;
     }
 
