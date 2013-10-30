@@ -71,6 +71,12 @@ char *xc_read_image(xc_interface *xch,
             image = NULL;
             goto out;
         case 0: /* EOF */
+            if ( *size == 0 )
+            {
+                PERROR("Could not read kernel image");
+                free(image);
+                image = NULL;
+            }
             goto out;
         default:
             *size += bytes;
@@ -80,13 +86,7 @@ char *xc_read_image(xc_interface *xch,
 #undef CHUNK
 
  out:
-    if ( *size == 0 )
-    {
-        PERROR("Could not read kernel image");
-        free(image);
-        image = NULL;
-    }
-    else if ( image )
+    if ( image )
     {
         /* Shrink allocation to fit image. */
         tmp = realloc(image, *size);
