@@ -327,7 +327,11 @@ static xen_pfn_t *load_p2m_frame_list(
             else if ( !strncmp(chunk_sig, "xcnt", 4) )
             {
                 *vcpuextstate = 1;
-                RDEXACT(io_fd, vcpuextstate_size, sizeof(*vcpuextstate_size));
+                if ( RDEXACT(io_fd, vcpuextstate_size, sizeof(*vcpuextstate_size)) )
+                {
+                    PERROR("read extended vcpu state size failed");
+                    return NULL;
+                }
                 tot_bytes -= chunk_bytes;
                 chunk_bytes = 0;
             }
@@ -928,14 +932,22 @@ static int pagebuf_get_one(xc_interface *xch, struct restore_ctx *ctx,
 
     case XC_SAVE_ID_TOOLSTACK:
         {
-            RDEXACT(fd, &buf->tdata.len, sizeof(buf->tdata.len));
+            if ( RDEXACT(fd, &buf->tdata.len, sizeof(buf->tdata.len)) )
+            {
+                PERROR("error read toolstack id size");
+                return -1;
+            }
             buf->tdata.data = (uint8_t*) realloc(buf->tdata.data, buf->tdata.len);
             if ( buf->tdata.data == NULL )
             {
                 PERROR("error memory allocation");
                 return -1;
             }
-            RDEXACT(fd, buf->tdata.data, buf->tdata.len);
+            if ( RDEXACT(fd, buf->tdata.data, buf->tdata.len) )
+            {
+                PERROR("error read toolstack id");
+                return -1;
+            }
             return pagebuf_get_one(xch, ctx, buf, fd, dom);
         }
 
