@@ -134,7 +134,11 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
         return rc;
     }
 
-    xc_domain_get_guest_width(xch, domid, &dinfo->guest_width);
+    if ( xc_domain_get_guest_width(xch, domid, &dinfo->guest_width) != 0 )
+    {
+        PERROR("Could not get domain width");
+        return rc;
+    }
     if ( dinfo->guest_width != sizeof(long) )
     {
         ERROR("Cannot resume uncooperative cross-address-size guests");
