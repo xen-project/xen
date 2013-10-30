@@ -3676,12 +3676,11 @@ retry_transaction:
     target = libxl__xs_read(gc, t, libxl__sprintf(gc,
                 "%s/memory/target", dompath));
     if (!target && !domid) {
-        xs_transaction_end(ctx->xsh, t, 1);
+        if (!xs_transaction_end(ctx->xsh, t, 1))
+            goto out_no_transaction;
         rc = libxl__fill_dom0_memory_info(gc, &current_target_memkb);
-        if (rc < 0) {
-            abort_transaction = 1;
-            goto out;
-        }
+        if (rc < 0)
+            goto out_no_transaction;
         goto retry_transaction;
     } else if (!target) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
@@ -3786,6 +3785,7 @@ out:
         if (errno == EAGAIN)
             goto retry_transaction;
 
+out_no_transaction:
     GC_FREE;
     return rc;
 }
