@@ -189,7 +189,7 @@ static struct xc_interface_core *xc_interface_open_common(xentoollog_logger *log
 err_put_iface:
     xc_osdep_put(&xch->osdep);
  err:
-    if (xch) xtl_logger_destroy(xch->error_handler_tofree);
+    xtl_logger_destroy(xch->error_handler_tofree);
     if (xch != &xch_buf) free(xch);
     return NULL;
 }
