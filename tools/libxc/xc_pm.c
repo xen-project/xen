@@ -51,7 +51,7 @@ int xc_pm_get_pxstat(xc_interface *xch, int cpuid, struct xc_px_stat *pxpt)
 
     int max_px, ret;
 
-    if ( !pxpt || !(pxpt->trans_pt) || !(pxpt->pt) )
+    if ( !pxpt->trans_pt || !pxpt->pt )
         return -EINVAL;
 
     if ( (ret = xc_pm_get_max_px(xch, cpuid, &max_px)) != 0)
@@ -128,7 +128,7 @@ int xc_pm_get_cxstat(xc_interface *xch, int cpuid, struct xc_cx_stat *cxpt)
     DECLARE_NAMED_HYPERCALL_BOUNCE(residencies, cxpt->residencies, 0, XC_HYPERCALL_BUFFER_BOUNCE_BOTH);
     int max_cx, ret;
 
-    if( !cxpt || !(cxpt->triggers) || !(cxpt->residencies) )
+    if( !cxpt->triggers || !cxpt->residencies )
         return -EINVAL;
 
     if ( (ret = xc_pm_get_max_cx(xch, cpuid, &max_cx)) )
