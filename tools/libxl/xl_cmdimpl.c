@@ -2144,9 +2144,8 @@ start:
 
         child1 = xl_fork(child_waitdaemon);
         if (child1) {
-            for (;;) {
-                got_child = xl_waitpid(child_waitdaemon, &status, 0);
-                if (got_child == child1) break;
+            got_child = xl_waitpid(child_waitdaemon, &status, 0);
+            if (got_child != child1) {
                 assert(got_child == -1);
                 perror("failed to wait for daemonizing child");
                 ret = ERROR_FAIL;
