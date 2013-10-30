@@ -220,7 +220,7 @@ static xen_pfn_t move_l3_below_4G(struct xc_dom_image *dom,
     {
         DOMPRINTF("%s: xc_dom_pfn_to_ptr(dom, l3pfn, 1) => NULL",
                   __FUNCTION__);
-        return l3mfn; /* our one call site will call xc_dom_panic and fail */
+        goto out; /* our one call site will call xc_dom_panic and fail */
     }
     memset(l3tab, 0, XC_DOM_PAGE_SIZE(dom));
 
