@@ -3247,7 +3247,7 @@ static void list_vm(void)
 
     info = libxl_list_vm(ctx, &nb_vm);
 
-    if (info < 0) {
+    if (!info) {
         fprintf(stderr, "libxl_domain_infolist failed.\n");
         exit(1);
     }
