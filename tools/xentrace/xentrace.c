@@ -858,10 +858,11 @@ long sargtol(const char *restrict arg, int base)
 
 
     return val;
+
 invalid:
-    return 0;
     fprintf(stderr, "Invalid option argument: %s\n\n", arg);
     usage();
+    return 0; /* not actually reached */
 }
 
 /* convert the argument string pointed to by arg to a long int representation */
