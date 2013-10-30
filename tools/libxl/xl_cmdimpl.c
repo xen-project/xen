@@ -1919,6 +1919,10 @@ static uint32_t create_domain(struct domain_create *dom_info)
         } else {
             restore_source = restore_file;
             restore_fd = open(restore_file, O_RDONLY);
+            if (restore_fd == -1) {
+                fprintf(stderr, "Can't open restore file: %s\n", strerror(errno));
+                return ERROR_INVAL;
+            }
             rc = libxl_fd_set_cloexec(ctx, restore_fd, 1);
             if (rc) return rc;
         }
