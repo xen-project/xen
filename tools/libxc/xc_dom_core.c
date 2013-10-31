@@ -294,8 +294,8 @@ size_t xc_dom_check_gzip(xc_interface *xch, void *blob, size_t ziplen)
         return 0;
 
     gzlen = blob + ziplen - 4;
-    unziplen = gzlen[3] << 24 | gzlen[2] << 16 | gzlen[1] << 8 | gzlen[0];
-    if ( (unziplen < 0) || (unziplen > XC_DOM_DECOMPRESS_MAX) )
+    unziplen = (size_t)gzlen[3] << 24 | gzlen[2] << 16 | gzlen[1] << 8 | gzlen[0];
+    if ( unziplen > XC_DOM_DECOMPRESS_MAX )
     {
         xc_dom_printf
             (xch,
