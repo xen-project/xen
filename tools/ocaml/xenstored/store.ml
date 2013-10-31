@@ -180,12 +180,12 @@ let get_node rnode path =
 		try Some (lookup_get rnode path) with Define.Doesnt_exist -> None
 	)
 
-(* get the deepest existing node for this path *)
+(* get the deepest existing node for this path, return the node and a flag on the existence of the full path *)
 let rec get_deepest_existing_node node = function
-	| [] -> node
+	| [] -> node, true
 	| h :: t ->
 		try get_deepest_existing_node (Node.find node h) t 
-		with Not_found -> node
+		with Not_found -> node, false
 
 let set_node rnode path nnode =
 	let quota = Quota.create () in
@@ -348,7 +348,7 @@ let traversal root_node f =
 		List.iter (_traversal (path @ [ Symbol.to_string node.Node.name ])) node.Node.children
 		in
 	_traversal [] root_node
-		
+
 let dump_store_buf root_node =
 	let buf = Buffer.create 8192 in
 	let dump_node path node =
@@ -381,16 +381,24 @@ let set_node store path node =
 	Quota.add store.quota quota_diff
 
 let write store perm path value =
-	let owner = Node.get_owner (get_deepest_existing_node store path) in
-	Quota.check store.quota owner (String.length value);
+	let node, existing = get_deepest_existing_node store path in
+	let owner = Node.get_owner node in
+	if existing then
+		(* Only check the string length limit *)
+		Quota.check store.quota (-1) (String.length value)
+	else
+		(* Check the domain entries limit too *)
+		Quota.check store.quota owner (String.length value);
 	let root, node_created = path_write store perm path value in
 	store.root <- root;
 	if node_created
 	then Quota.add_entry store.quota owner
 
 let mkdir store perm path =
-	let owner = Node.get_owner (get_deepest_existing_node store path) in
-	Quota.check store.quota owner 0;
+	let node, existing = get_deepest_existing_node store path in
+	let owner = Node.get_owner node in
+	(* It's upt to the mkdir logic to decide what to do with existing path *)
+	if not existing then Quota.check store.quota owner 0;
 	store.root <- path_mkdir store perm path;
 	Quota.add_entry store.quota owner
 
@@ -408,7 +416,7 @@ let setperms store perm path nperms =
 	| Some node ->
 		let old_owner = Node.get_owner node in
 		let new_owner = Perms.Node.get_owner nperms in
-		Quota.check store.quota new_owner 0;
+		if old_owner <> new_owner then Quota.check store.quota new_owner 0;
 		store.root <- path_setperms store perm path nperms;
 		Quota.del_entry store.quota old_owner;
 		Quota.add_entry store.quota new_owner
