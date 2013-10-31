@@ -337,7 +337,7 @@ void libxenvchan_close(struct libxenvchan *ctrl)
 		}
 	}
 	if (ctrl->event) {
-		if (ctrl->event_port >= 0 && ctrl->ring)
+		if (ctrl->ring)
 			xc_evtchn_notify(ctrl->event, ctrl->event_port);
 		xc_evtchn_close(ctrl->event);
 	}
