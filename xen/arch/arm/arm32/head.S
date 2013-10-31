@@ -22,6 +22,7 @@
 #include <asm/processor-ca15.h>
 #include <asm/processor-ca7.h>
 #include <asm/asm_defns.h>
+#include <asm/early_printk.h>
 
 #define ZIMAGE_MAGIC_NUMBER 0x016f2818
 
@@ -356,7 +357,7 @@ paging:
         strd  r2, r3, [r1, r4]       /* Map it in the fixmap's slot */
 
         /* Use a virtual address to access the UART. */
-        ldr   r11, =FIXMAP_ADDR(FIXMAP_CONSOLE)
+        ldr   r11, =EARLY_UART_VIRTUAL_ADDRESS
 #endif
         /* Map the DTB in the boot misc slot */
         teq   r12, #0                /* Only on boot CPU */

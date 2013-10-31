@@ -23,6 +23,7 @@
 #include <asm/config.h>
 #include <asm/page.h>
 #include <asm/asm_defns.h>
+#include <asm/early_printk.h>
 
 #define PT_PT     0xe7f /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=111 T=1 P=1 */
 #define PT_MEM    0xe7d /* nG=1 AF=1 SH=10 AP=01 NS=1 ATTR=111 T=0 P=1 */
@@ -368,7 +369,7 @@ paging:
         str   x2, [x4, x1]           /* Map it in the fixmap's slot */
 
         /* Use a virtual address to access the UART. */
-        ldr   x23, =FIXMAP_ADDR(FIXMAP_CONSOLE)
+        ldr   x23, =EARLY_UART_VIRTUAL_ADDRESS
 #endif
 
         /* Map the DTB in the boot misc slot */

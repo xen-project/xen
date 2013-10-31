@@ -18,6 +18,7 @@
  */
 
 #include <asm/config.h>
+#include <asm/early_printk.h>
 
 #ifdef EARLY_PRINTK_INC
 #include EARLY_PRINTK_INC
@@ -26,14 +27,14 @@
 /* Print a character on the UART - this function is called by C
  * x0: character to print */
 GLOBAL(early_putch)
-        ldr   x15, =FIXMAP_ADDR(FIXMAP_CONSOLE)
+        ldr   x15, =EARLY_UART_VIRTUAL_ADDRESS
         early_uart_ready x15, 1
         early_uart_transmit x15, w0
         ret
 
 /* Flush the UART - this function is called by C */
 GLOBAL(early_flush)
-        ldr   x15, =FIXMAP_ADDR(FIXMAP_CONSOLE)  /* x15 := VA UART base address */
+        ldr   x15, =EARLY_UART_VIRTUAL_ADDRESS  /* x15 := VA UART base address */
         early_uart_ready x15, 1
         ret
 
