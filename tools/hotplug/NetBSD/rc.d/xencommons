@@ -68,8 +68,9 @@ xen_startcmd()
 
 	printf "\n"
 
-	printf "Setting domain 0 name.\n"
+	printf "Setting domain 0 name and domid.\n"
 	${BINDIR}/xenstore-write "/local/domain/0/name" "Domain-0"
+	${BINDIR}/xenstore-write "/local/domain/0/domid" 0
 }
 
 xen_stop()
