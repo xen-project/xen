@@ -209,7 +209,10 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     char *xs_domid, *con_domid;
     int rc;
 
-    xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus);
+    if (xc_domain_max_vcpus(ctx->xch, domid, info->max_vcpus) != 0) {
+        LOG(ERROR, "Couldn't set max vcpu count");
+        return ERROR_FAIL;
+    }
 
     /*
      * Check if the domain has any CPU affinity. If not, try to build
