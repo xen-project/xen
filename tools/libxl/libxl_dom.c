@@ -1041,7 +1041,11 @@ int libxl__domain_suspend_common_callback(void *user)
 
     if (dss->hvm && (!hvm_pvdrv || hvm_s_state)) {
         LOG(DEBUG, "Calling xc_domain_shutdown on HVM domain");
-        xc_domain_shutdown(CTX->xch, domid, SHUTDOWN_suspend);
+        ret = xc_domain_shutdown(CTX->xch, domid, SHUTDOWN_suspend);
+        if (ret < 0) {
+            LOGE(ERROR, "xc_domain_shutdown failed");
+            return 0;
+        }
         /* The guest does not (need to) respond to this sort of request. */
         dss->guest_responded = 1;
     } else {
