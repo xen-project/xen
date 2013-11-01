@@ -80,6 +80,22 @@ void stdout_wr() {
 	}
 }
 
+static int set_nonblocking(int fd, int nonblocking) {
+	int flags = fcntl(fd, F_GETFL);
+	if (flags == -1)
+		return -1;
+
+	if (nonblocking)
+		flags |= O_NONBLOCK;
+	else
+		flags &= ~O_NONBLOCK;
+
+	if (fcntl(fd, F_SETFL, flags) == -1)
+		return -1;
+
+	return 0;
+}
+
 /**
     Simple libxenvchan application, both client and server.
 	Both sides may write and read, both from the libxenvchan and from 
@@ -105,8 +121,10 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	fcntl(0, F_SETFL, O_NONBLOCK);
-	fcntl(1, F_SETFL, O_NONBLOCK);
+	if (set_nonblocking(0, 1) || set_nonblocking(1, 1)) {
+		perror("set_nonblocking");
+		exit(1);
+	}
 
 	libxenvchan_fd = libxenvchan_fd_for_select(ctrl);
 	for (;;) {
@@ -153,7 +171,10 @@ int main(int argc, char **argv)
 			stdout_wr();
 		}
 		if (!libxenvchan_is_open(ctrl)) {
-			fcntl(1, F_SETFL, 0);
+			if (set_nonblocking(1, 0)) {
+				perror("set_nonblocking");
+				exit(1);
+			}
 			while (outsiz)
 				stdout_wr();
 			return 0;
