@@ -116,7 +116,7 @@ static uint32_t exynos5_quirks(void)
     return PLATFORM_QUIRK_DOM0_MAPPING_11;
 }
 
-static const char * const exynos5_dt_compat[] __initdata =
+static const char * const exynos5_dt_compat[] __initconst =
 {
     "samsung,exynos5250",
     NULL

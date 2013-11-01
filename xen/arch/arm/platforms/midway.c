@@ -42,7 +42,7 @@ static void midway_reset(void)
     iounmap(pmu);
 }
 
-static const char * const midway_dt_compat[] __initdata =
+static const char * const midway_dt_compat[] __initconst =
 {
     "calxeda,ecx-2000",
     NULL

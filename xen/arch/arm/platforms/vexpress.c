@@ -154,7 +154,7 @@ static int __init vexpress_cpu_up(int cpu)
 }
 #endif
 
-static const char * const vexpress_dt_compat[] __initdata =
+static const char * const vexpress_dt_compat[] __initconst =
 {
     "arm,vexpress",
     NULL

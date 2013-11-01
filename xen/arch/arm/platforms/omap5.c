@@ -158,7 +158,7 @@ static uint32_t omap5_quirks(void)
     return PLATFORM_QUIRK_DOM0_MAPPING_11;
 }
 
-static const char const *omap5_dt_compat[] __initdata =
+static const char const *omap5_dt_compat[] __initconst =
 {
     "ti,omap5",
     NULL
