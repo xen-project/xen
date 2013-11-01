@@ -24,8 +24,19 @@ static const char * const sunxi_dt_compat[] __initconst =
     NULL
 };
 
+static const struct dt_device_match sunxi_blacklist_dev[] __initconst =
+{
+    /*
+     * The UARTs share a page which runs the risk of mapping the Xen console
+     * UART to dom0, so don't map any of them.
+     */
+    DT_MATCH_COMPATIBLE("snps,dw-apb-uart"),
+    { /* sentinel */ },
+};
+
 PLATFORM_START(sunxi, "Allwinner A20")
     .compatible = sunxi_dt_compat,
+    .blacklist_dev = sunxi_blacklist_dev,
 PLATFORM_END
 
 /*
