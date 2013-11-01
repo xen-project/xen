@@ -211,15 +211,19 @@ static int xc_domain_resume_any(xc_interface *xch, uint32_t domid)
 
     /* Reset all secondary CPU states. */
     for ( i = 1; i <= info.max_vcpu_id; i++ )
-        xc_vcpu_setcontext(xch, domid, i, NULL);
+        if ( xc_vcpu_setcontext(xch, domid, i, NULL) != 0 )
+        {
+            ERROR("Couldn't reset vcpu state");
+            goto out;
+        }
 
     /* Ready to resume domain execution now. */
     domctl.cmd = XEN_DOMCTL_resumedomain;
     domctl.domain = domid;
     rc = do_domctl(xch, &domctl);
 
+out:
 #if defined(__i386__) || defined(__x86_64__)
- out:
     if (p2m)
         munmap(p2m, P2M_FL_ENTRIES*PAGE_SIZE);
     if (p2m_frame_list)
