@@ -418,7 +418,9 @@ a653sched_free_vdata(const struct scheduler *ops, void *priv)
     if (av == NULL)
         return;
 
-    list_del(&av->list);
+    if ( !is_idle_vcpu(av->vc) )
+        list_del(&av->list);
+
     xfree(av);
     update_schedule_vcpus(ops);
 }
