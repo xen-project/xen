@@ -427,7 +427,7 @@ struct libxl__ao {
      * only in libxl__ao_complete.)
      */
     uint32_t magic;
-    unsigned constructing:1, in_initiator:1, complete:1, notified:1;
+    unsigned constructing:1, in_initiator:1, complete:1, notified:1, nested:1;
     int progress_reports_outstanding;
     int rc;
     libxl__gc gc;
@@ -1777,6 +1777,29 @@ _hidden void libxl__ao_progress_report(libxl__egc *egc, libxl__ao *ao,
 /* For use by ao machinery ONLY */
 _hidden void libxl__ao__destroy(libxl_ctx*, libxl__ao *ao);
 _hidden void libxl__ao_complete_check_progress_reports(libxl__egc*, libxl__ao*);
+
+
+/*
+ * Short-lived sub-ao, aka "nested ao".
+ *
+ * Some asynchronous operations are very long-running.  Generally,
+ * since an ao has a gc, any allocations made in that ao will live
+ * until the ao is completed.  When this is not desirable, these
+ * functions may be used to manage a "sub-ao".
+ *
+ * The returned sub-ao is suitable for passing to gc-related functions
+ * and macros such as libxl__ao_inprogress_gc, AO_GC, and STATE_AO_GC.
+ *
+ * It MUST NOT be used with AO_INPROGRESS, AO_ABORT,
+ * libxl__ao_complete, libxl__ao_progress_report, and so on.
+ *
+ * The caller must ensure that all of the sub-ao's are freed before
+ * the parent is.  Multiple levels of nesting are OK (although
+ * hopefully they won't be necessary).
+ */
+
+_hidden libxl__ao *libxl__nested_ao_create(libxl__ao *parent); /* cannot fail */
+_hidden void libxl__nested_ao_free(libxl__ao *child);
 
 
 /*

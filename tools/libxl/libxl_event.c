@@ -1572,6 +1572,7 @@ void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc)
     LOG(DEBUG,"ao %p: complete, rc=%d",ao,rc);
     assert(ao->magic == LIBXL__AO_MAGIC);
     assert(!ao->complete);
+    assert(!ao->nested);
     ao->complete = 1;
     ao->rc = rc;
 
@@ -1736,6 +1737,7 @@ void libxl__ao_progress_report(libxl__egc *egc, libxl__ao *ao,
         const libxl_asyncprogress_how *how, libxl_event *ev)
 {
     AO_GC;
+    assert(!ao->nested);
     if (how->callback == dummy_asyncprogress_callback_ignore) {
         LOG(DEBUG,"ao %p: progress report: ignored",ao);
         libxl_event_free(CTX,ev);
@@ -1753,6 +1755,39 @@ void libxl__ao_progress_report(libxl__egc *egc, libxl__ao *ao,
             ao, ev, libxl_event_type_to_string(ev->type));
         libxl__event_occurred(egc, ev);
     }
+}
+
+
+/* nested ao */
+
+_hidden libxl__ao *libxl__nested_ao_create(libxl__ao *parent)
+{
+    /* We only use the parent to get the ctx.  However, we require the
+     * caller to provide us with an ao, not just a ctx, to prove that
+     * they are already in an asynchronous operation.  That will avoid
+     * people using this to (for example) make an ao in a non-ao_how
+     * function somewhere in the middle of libxl. */
+    libxl__ao *child = NULL;
+    libxl_ctx *ctx = libxl__gc_owner(&parent->gc);
+
+    assert(parent->magic == LIBXL__AO_MAGIC);
+
+    child = libxl__zalloc(&ctx->nogc_gc, sizeof(*child));
+    child->magic = LIBXL__AO_MAGIC;
+    child->nested = 1;
+    LIBXL_INIT_GC(child->gc, ctx);
+    libxl__gc *gc = &child->gc;
+
+    LOG(DEBUG,"ao %p: nested ao, parent %p", child, parent);
+    return child;
+}
+
+_hidden void libxl__nested_ao_free(libxl__ao *child)
+{
+    assert(child->magic == LIBXL__AO_MAGIC);
+    assert(child->nested);
+    libxl_ctx *ctx = libxl__gc_owner(&child->gc);
+    libxl__ao__destroy(ctx, child);
 }
 
 
