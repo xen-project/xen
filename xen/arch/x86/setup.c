@@ -1155,6 +1155,8 @@ void __init __start_xen(unsigned long mbi_p)
         {
             uint64_t s, e;
 
+            if ( boot_e820.map[i].type != E820_RAM )
+                continue;
             s = (boot_e820.map[i].addr + mask) & ~mask;
             e = (boot_e820.map[i].addr + boot_e820.map[i].size) & ~mask;
             if ( PFN_DOWN(e) <= limit )
