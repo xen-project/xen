@@ -380,11 +380,14 @@ a653sched_deinit(const struct scheduler *ops)
 static void *
 a653sched_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
 {
-    /* 
+    arinc653_vcpu_t *svc;
+
+    /*
      * Allocate memory for the ARINC 653-specific scheduler data information
-     * associated with the given VCPU (vc). 
-     */ 
-    if ( (vc->sched_priv = xmalloc(arinc653_vcpu_t)) == NULL )
+     * associated with the given VCPU (vc).
+     */
+    svc = xmalloc(arinc653_vcpu_t);
+    if ( svc == NULL )
         return NULL;
 
     /*
@@ -393,13 +396,13 @@ a653sched_alloc_vdata(const struct scheduler *ops, struct vcpu *vc, void *dd)
      * will call the vcpu_wake scheduler callback function and our scheduler 
      * will mark the VCPU awake.
      */
-    AVCPU(vc)->vc = vc;
-    AVCPU(vc)->awake = 0;
+    svc->vc = vc;
+    svc->awake = 0;
     if ( !is_idle_vcpu(vc) )
-        list_add(&AVCPU(vc)->list, &SCHED_PRIV(ops)->vcpu_list);
+        list_add(&svc->list, &SCHED_PRIV(ops)->vcpu_list);
     update_schedule_vcpus(ops);
 
-    return AVCPU(vc);
+    return svc;
 }
 
 /**
@@ -415,7 +418,9 @@ a653sched_free_vdata(const struct scheduler *ops, void *priv)
     if (av == NULL)
         return;
 
-    list_del(&av->list);
+    if ( !is_idle_vcpu(av->vc) )
+        list_del(&av->list);
+
     xfree(av);
     update_schedule_vcpus(ops);
 }
