@@ -1020,10 +1020,8 @@ int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid)
     return 0;
 }
 
-int libxl__domain_suspend_common_callback(void *user)
+int libxl__domain_suspend_callback_common(libxl__domain_suspend_state *dss)
 {
-    libxl__save_helper_state *shs = user;
-    libxl__domain_suspend_state *dss = CONTAINER_OF(shs, *dss, shs);
     STATE_AO_GC(dss->ao);
     unsigned long hvm_s_state = 0, hvm_pvdrv = 0;
     int ret;
@@ -1242,12 +1240,27 @@ int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
     return 0;
 }
 
+static void libxl__domain_suspend_callback(void *data)
+{
+    libxl__save_helper_state *shs = data;
+    libxl__egc *egc = shs->egc;
+    libxl__domain_suspend_state *dss = CONTAINER_OF(shs, *dss, shs);
+
+    int ok = libxl__domain_suspend_callback_common(dss);
+    libxl__xc_domain_saverestore_async_callback_done(egc, shs, ok);
+}
+
 /*----- remus callbacks -----*/
 
-static int libxl__remus_domain_suspend_callback(void *data)
+static void libxl__remus_domain_suspend_callback(void *data)
 {
+    libxl__save_helper_state *shs = data;
+    libxl__egc *egc = shs->egc;
+    libxl__domain_suspend_state *dss = CONTAINER_OF(shs, *dss, shs);
+
     /* REMUS TODO: Issue disk and network checkpoint reqs. */
-    return libxl__domain_suspend_common_callback(data);
+    int ok = libxl__domain_suspend_callback_common(dss);
+    libxl__xc_domain_saverestore_async_callback_done(egc, shs, ok);
 }
 
 static int libxl__remus_domain_resume_callback(void *data)
@@ -1373,7 +1386,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
         callbacks->postcopy = libxl__remus_domain_resume_callback;
         callbacks->checkpoint = libxl__remus_domain_checkpoint_callback;
     } else
-        callbacks->suspend = libxl__domain_suspend_common_callback;
+        callbacks->suspend = libxl__domain_suspend_callback;
 
     callbacks->switch_qemu_logdirty = libxl__domain_suspend_common_switch_qemu_logdirty;
     dss->shs.callbacks.save.toolstack_save = libxl__toolstack_save;

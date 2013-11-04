@@ -23,7 +23,7 @@ our @msgs = (
                                                  STRING doing_what),
                                                 'unsigned long', 'done',
                                                 'unsigned long', 'total'] ],
-    [  3, 'scxW',   "suspend", [] ],
+    [  3, 'scxA',   "suspend", [] ],
     [  4, 'scxW',   "postcopy", [] ],
     [  5, 'scxA',   "checkpoint", [] ],
     [  6, 'scxA',   "switch_qemu_logdirty",  [qw(int domid
