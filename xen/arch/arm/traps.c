@@ -629,12 +629,20 @@ static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
         return;
 
     case PSR_MODE_FIQ:
+        sp = regs->sp_fiq;
+        break;
     case PSR_MODE_IRQ:
+        sp = regs->sp_irq;
+        break;
     case PSR_MODE_SVC:
+        sp = regs->sp_svc;
+        break;
     case PSR_MODE_ABT:
+        sp = regs->sp_abt;
+        break;
     case PSR_MODE_UND:
-        printk("No stack trace for 32-bit guest kernel-mode\n");
-        return;
+        sp = regs->sp_und;
+        break;
 
 #ifdef CONFIG_ARM_64
     case PSR_MODE_EL1t:
