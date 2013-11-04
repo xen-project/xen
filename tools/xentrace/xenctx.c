@@ -69,10 +69,12 @@ struct symbol {
 
 guest_word_t kernel_stext, kernel_etext, kernel_sinittext, kernel_einittext, kernel_hypercallpage;
 
-#if defined (__i386__)
+#if defined (__i386__) || defined (__arm__)
 unsigned long long kernel_start = 0xc0000000;
-#else
+#elif defined (__x86_64__)
 unsigned long long kernel_start = 0xffffffff80000000UL;
+#elif defined (__aarch64__)
+unsigned long long kernel_start = 0xffffff8000000000UL;
 #endif
 
 static int is_kernel_text(guest_word_t addr)
