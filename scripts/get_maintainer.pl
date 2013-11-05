@@ -28,7 +28,7 @@ my $email_git = 0;
 my $email_git_all_signature_types = 0;
 my $email_git_blame = 0;
 my $email_git_blame_signatures = 1;
-my $email_git_fallback = 1;
+my $email_git_fallback = 0;
 my $email_git_min_signatures = 1;
 my $email_git_max_maintainers = 5;
 my $email_git_min_percent = 5;
@@ -37,10 +37,11 @@ my $email_hg_since = "-365";
 my $interactive = 0;
 my $email_remove_duplicates = 1;
 my $email_use_mailmap = 1;
+my $email_drop_the_rest_supporter_if_supporter_found = 1;
 my $output_multiline = 1;
 my $output_separator = ", ";
 my $output_roles = 0;
-my $output_rolestats = 1;
+my $output_rolestats = 0;
 my $scm = 0;
 my $web = 0;
 my $subsystem = 0;
@@ -196,6 +197,7 @@ if (!GetOptions(
 		'i|interactive!' => \$interactive,
 		'remove-duplicates!' => \$email_remove_duplicates,
 		'mailmap!' => \$email_use_mailmap,
+		'drop_the_rest_supporter!' => \$email_drop_the_rest_supporter_if_supporter_found,
 		'm!' => \$email_maintainer,
 		'n!' => \$email_usename,
 		'l!' => \$email_list,
@@ -649,6 +651,19 @@ sub get_maintainers {
 	foreach my $line (@keyword_tvi) {
 	    add_categories($line);
 	}
+    }
+
+    if ($email_drop_the_rest_supporter_if_supporter_found && $#email_to > 0) {
+        my @email_new;
+        my $do_replace = 0;
+        foreach my $email (@email_to) {
+            if ($email->[1] ne 'supporter:THE REST') {
+                $do_replace = 1;
+                push @email_new, $email;
+            }
+        }
+        @email_to = @email_new
+            if $do_replace;
     }
 
     foreach my $email (@email_to, @list_to) {
