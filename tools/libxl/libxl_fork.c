@@ -224,18 +224,23 @@ int libxl__sigchld_installhandler(libxl__gc *gc) /* non-reentrant */
     return rc;
 }
 
-static int chldmode_ours(libxl_ctx *ctx)
+static bool chldmode_ours(libxl_ctx *ctx, bool creating)
 {
-    return ctx->childproc_hooks->chldowner == libxl_sigchld_owner_libxl;
+    switch (ctx->childproc_hooks->chldowner) {
+    case libxl_sigchld_owner_libxl:
+        return creating || !LIBXL_LIST_EMPTY(&ctx->children);
+    case libxl_sigchld_owner_mainloop:
+        return 0;
+    case libxl_sigchld_owner_libxl_always:
+        return 1;
+    }
+    abort();
 }
 
 int libxl__fork_selfpipe_active(libxl_ctx *ctx)
 {
     /* Returns the fd to read, or -1 */
-    if (!chldmode_ours(ctx))
-        return -1;
-
-    if (LIBXL_LIST_EMPTY(&ctx->children))
+    if (!chldmode_ours(ctx, 0))
         return -1;
 
     return ctx->sigchld_selfpipe[0];
@@ -243,9 +248,19 @@ int libxl__fork_selfpipe_active(libxl_ctx *ctx)
 
 static void perhaps_removehandler(libxl__gc *gc)
 {
-    if (LIBXL_LIST_EMPTY(&CTX->children) &&
-        CTX->childproc_hooks->chldowner != libxl_sigchld_owner_libxl_always)
+    if (!chldmode_ours(CTX, 0))
         libxl__sigchld_removehandler(gc);
+}
+
+static int perhaps_installhandler(libxl__gc *gc, bool creating)
+{
+    int rc;
+
+    if (chldmode_ours(CTX, creating)) {
+        rc = libxl__sigchld_installhandler(gc);
+        if (rc) return rc;
+    }
+    return 0;
 }
 
 static int childproc_reaped(libxl__egc *egc, pid_t pid, int status)
@@ -286,7 +301,7 @@ void libxl__fork_selfpipe_woken(libxl__egc *egc)
      * ctx must be locked EXACTLY ONCE */
     EGC_GC;
 
-    while (chldmode_ours(CTX) /* in case the app changes the mode */) {
+    while (chldmode_ours(CTX, 0) /* in case the app changes the mode */) {
         int status;
         pid_t pid = waitpid(-1, &status, WNOHANG);
 
@@ -332,10 +347,7 @@ pid_t libxl__ev_child_fork(libxl__gc *gc, libxl__ev_child *ch,
     CTX_LOCK;
     int rc;
 
-    if (chldmode_ours(CTX)) {
-        rc = libxl__sigchld_installhandler(gc);
-        if (rc) goto out;
-    }
+    perhaps_installhandler(gc, 1);
 
     pid_t pid =
         CTX->childproc_hooks->fork_replacement
@@ -382,17 +394,8 @@ void libxl_childproc_setmode(libxl_ctx *ctx, const libxl_childproc_hooks *hooks,
     ctx->childproc_hooks = hooks;
     ctx->childproc_user = user;
 
-    switch (ctx->childproc_hooks->chldowner) {
-    case libxl_sigchld_owner_mainloop:
-    case libxl_sigchld_owner_libxl:
-        libxl__sigchld_removehandler(gc);
-        break;
-    case libxl_sigchld_owner_libxl_always:
-        libxl__sigchld_installhandler(gc);
-        break;
-    default:
-        abort();
-    }
+    perhaps_removehandler(gc);
+    perhaps_installhandler(gc, 0); /* idempotent, ok to ignore errors for now */
 
     CTX_UNLOCK;
     GC_FREE;
