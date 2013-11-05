@@ -5,14 +5,14 @@ include $(XEN_ROOT)/tools/Rules.mk
 include Config
 
 ifeq ($(GIT_HTTP),y)
-IPXE_GIT_URL := http://git.ipxe.org/ipxe.git
+IPXE_GIT_URL ?= http://git.ipxe.org/ipxe.git
 else
-IPXE_GIT_URL := git://git.ipxe.org/ipxe.git
+IPXE_GIT_URL ?= git://git.ipxe.org/ipxe.git
 endif
 
 IPXE_GIT_TAG := 9a93db3f0947484e30e753bbd61a10b17336e20e
 
-IPXE_TARBALL_URL := $(XEN_EXTFILES_URL)/ipxe-git-$(IPXE_GIT_TAG).tar.gz
+IPXE_TARBALL_URL ?= $(XEN_EXTFILES_URL)/ipxe-git-$(IPXE_GIT_TAG).tar.gz
 
 D=ipxe
 T=ipxe.tar.gz
