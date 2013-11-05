@@ -13,11 +13,11 @@
 use strict;
 
 my $P = $0;
-my $V = '0.26';
+my $V = '0.26-xen';
 
 use Getopt::Long qw(:config no_auto_abbrev);
 
-my $lk_path = "./";
+my $xen_path = "./";
 my $email = 1;
 my $email_usename = 1;
 my $email_maintainer = 1;
@@ -260,9 +260,9 @@ if ($email &&
     die "$P: Please select at least 1 email option\n";
 }
 
-if (!top_of_kernel_tree($lk_path)) {
+if (!top_of_tree($xen_path)) {
     die "$P: The current directory does not appear to be "
-	. "a linux kernel source tree.\n";
+	. "a Xen source tree.\n";
 }
 
 ## Read MAINTAINERS for type/value pairs
@@ -270,7 +270,7 @@ if (!top_of_kernel_tree($lk_path)) {
 my @typevalue = ();
 my %keyword_hash;
 
-open (my $maint, '<', "${lk_path}MAINTAINERS")
+open (my $maint, '<', "${xen_path}MAINTAINERS")
     or die "$P: Can't open MAINTAINERS: $!\n";
 while (<$maint>) {
     my $line = $_;
@@ -314,9 +314,9 @@ sub read_mailmap {
 	addresses => {}
     };
 
-    return if (!$email_use_mailmap || !(-f "${lk_path}.mailmap"));
+    return if (!$email_use_mailmap || !(-f "${xen_path}.mailmap"));
 
-    open(my $mailmap_file, '<', "${lk_path}.mailmap")
+    open(my $mailmap_file, '<', "${xen_path}.mailmap")
 	or warn "$P: Can't open .mailmap: $!\n";
 
     while (<$mailmap_file>) {
@@ -798,7 +798,7 @@ Notes:
           --git-min-signatures, --git-max-maintainers, --git-min-percent, and
           --git-blame
       Use --hg-since not --git-since to control date selection
-  File ".get_maintainer.conf", if it exists in the linux kernel source root
+  File ".get_maintainer.conf", if it exists in the Xen source root
       directory, can change whatever get_maintainer defaults are desired.
       Entries in this file can be any command line argument.
       This file is prepended to any additional command line arguments.
@@ -806,28 +806,18 @@ Notes:
 EOT
 }
 
-sub top_of_kernel_tree {
-    my ($lk_path) = @_;
+sub top_of_tree {
+    my ($xen_path) = @_;
 
-    if ($lk_path ne "" && substr($lk_path,length($lk_path)-1,1) ne "/") {
-	$lk_path .= "/";
+    if ($xen_path ne "" && substr($xen_path,length($xen_path)-1,1) ne "/") {
+	$xen_path .= "/";
     }
-    if (   (-f "${lk_path}COPYING")
-	&& (-f "${lk_path}CREDITS")
-	&& (-f "${lk_path}Kbuild")
-	&& (-f "${lk_path}MAINTAINERS")
-	&& (-f "${lk_path}Makefile")
-	&& (-f "${lk_path}README")
-	&& (-d "${lk_path}Documentation")
-	&& (-d "${lk_path}arch")
-	&& (-d "${lk_path}include")
-	&& (-d "${lk_path}drivers")
-	&& (-d "${lk_path}fs")
-	&& (-d "${lk_path}init")
-	&& (-d "${lk_path}ipc")
-	&& (-d "${lk_path}kernel")
-	&& (-d "${lk_path}lib")
-	&& (-d "${lk_path}scripts")) {
+    if (    (-f "${xen_path}COPYING")
+        && (-f "${xen_path}MAINTAINERS")
+        && (-f "${xen_path}Makefile")
+        && (-d "${xen_path}docs")
+        && (-f "${xen_path}CODING_STYLE")
+        && (-d "${xen_path}xen")) {
 	return 1;
     }
     return 0;
@@ -1398,8 +1388,8 @@ sub vcs_exists {
     if (!$printed_novcs) {
 	warn("$P: No supported VCS found.  Add --nogit to options?\n");
 	warn("Using a git repository produces better results.\n");
-	warn("Try Linus Torvalds' latest git repository using:\n");
-	warn("git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git\n");
+	warn("Try latest git repository using:\n");
+	warn("git clone git://xenbits.xen.org/xen.git\n");
 	$printed_novcs = 1;
     }
     return 0;
