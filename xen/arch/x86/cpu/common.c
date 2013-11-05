@@ -18,6 +18,9 @@
 static bool_t __cpuinitdata use_xsave = 1;
 boolean_param("xsave", use_xsave);
 
+bool_t __devinitdata opt_arat = 1;
+boolean_param("arat", opt_arat);
+
 unsigned int __devinitdata opt_cpuid_mask_ecx = ~0u;
 integer_param("cpuid_mask_ecx", opt_cpuid_mask_ecx);
 unsigned int __devinitdata opt_cpuid_mask_edx = ~0u;

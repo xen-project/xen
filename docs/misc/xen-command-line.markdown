@@ -155,6 +155,15 @@ to boot on systems with the following errata:
 
 Increase the verbosity of the APIC code from the default value.
 
+### arat
+> `= <boolean>`
+
+> Default: `true`
+
+Permit Xen to use "Always Running APIC Timer" support on compatible hardware
+in combination with cpuidle.  This option is only expected to be useful for
+developers wishing Xen to fall back to older timing methods on newer hardware.
+
 ### ats
 > `= <boolean>`
 

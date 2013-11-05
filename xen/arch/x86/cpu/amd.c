@@ -502,7 +502,7 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	 * Family 0x12 and above processors have APIC timer
 	 * running in deep C states.
 	 */
-	if (c->x86 > 0x11)
+	if ( opt_arat && c->x86 > 0x11 )
 		set_bit(X86_FEATURE_ARAT, c->x86_capability);
 
 	/*
