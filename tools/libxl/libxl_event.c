@@ -774,10 +774,6 @@ static int beforepoll_internal(libxl__gc *gc, libxl__poller *poller,
                                                                        \
         REQUIRE_FD(poller->wakeup_pipe[0], POLLIN, BODY);              \
                                                                        \
-        int selfpipe = libxl__fork_selfpipe_active(CTX);               \
-        if (selfpipe >= 0)                                             \
-            REQUIRE_FD(selfpipe, POLLIN, BODY);                        \
-                                                                       \
     }while(0)
 
 #define REQUIRE_FD(req_fd_, req_events_, BODY) do{      \
@@ -997,14 +993,6 @@ static void afterpoll_internal(libxl__egc *egc, libxl__poller *poller,
     if (afterpoll_check_fd(poller,fds,nfds, poller->wakeup_pipe[0],POLLIN)) {
         int e = libxl__self_pipe_eatall(poller->wakeup_pipe[0]);
         if (e) LIBXL__EVENT_DISASTER(egc, "read wakeup", e, 0);
-    }
-
-    int selfpipe = libxl__fork_selfpipe_active(CTX);
-    if (selfpipe >= 0 &&
-        afterpoll_check_fd(poller,fds,nfds, selfpipe, POLLIN)) {
-        int e = libxl__self_pipe_eatall(selfpipe);
-        if (e) LIBXL__EVENT_DISASTER(egc, "read sigchld pipe", e, 0);
-        libxl__fork_selfpipe_woken(egc);
     }
 
     for (;;) {

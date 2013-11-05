@@ -353,6 +353,7 @@ struct libxl__ctx {
     const libxl_childproc_hooks *childproc_hooks;
     void *childproc_user;
     int sigchld_selfpipe[2]; /* [0]==-1 means handler not installed */
+    libxl__ev_fd sigchld_selfpipe_efd;
     LIBXL_LIST_HEAD(, libxl__ev_child) children;
 
     libxl_version_info version_info;
@@ -839,8 +840,6 @@ _hidden void libxl__poller_wakeup(libxl__egc *egc, libxl__poller *p);
 extern const libxl_childproc_hooks libxl__childproc_default_hooks;
 int libxl__sigchld_installhandler(libxl__gc*); /* non-reentrant; logs errs */
 void libxl__sigchld_removehandler(libxl__gc*); /* non-reentrant */
-int libxl__fork_selfpipe_active(libxl_ctx *ctx); /* returns read fd or -1 */
-void libxl__fork_selfpipe_woken(libxl__egc *egc);
 int libxl__self_pipe_wakeup(int fd); /* returns 0 or -1 setting errno */
 int libxl__self_pipe_eatall(int fd); /* returns 0 or -1 setting errno */
 

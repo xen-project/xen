@@ -155,6 +155,9 @@ int libxl__carefd_fd(const libxl__carefd *cf)
  * Actual child process handling
  */
 
+static void sigchld_selfpipe_handler(libxl__egc *egc, libxl__ev_fd *ev,
+                                     int fd, short events, short revents);
+
 static void sigchld_handler(int signo)
 {
     int esave = errno;
@@ -177,10 +180,18 @@ static void sigchld_removehandler_core(void)
 
 void libxl__sigchld_removehandler(libxl__gc *gc) /* non-reentrant */
 {
+    int rc;
+
     atfork_lock();
     if (sigchld_owner == CTX)
         sigchld_removehandler_core();
     atfork_unlock();
+
+    if (libxl__ev_fd_isregistered(&CTX->sigchld_selfpipe_efd)) {
+        rc = libxl__ev_fd_modify(gc, &CTX->sigchld_selfpipe_efd, 0);
+        if (rc)
+            libxl__ev_fd_deregister(gc, &CTX->sigchld_selfpipe_efd);
+    }
 }
 
 int libxl__sigchld_installhandler(libxl__gc *gc) /* non-reentrant */
@@ -196,6 +207,15 @@ int libxl__sigchld_installhandler(libxl__gc *gc) /* non-reentrant */
             rc = ERROR_FAIL;
             goto out;
         }
+    }
+    if (!libxl__ev_fd_isregistered(&CTX->sigchld_selfpipe_efd)) {
+        rc = libxl__ev_fd_register(gc, &CTX->sigchld_selfpipe_efd,
+                                   sigchld_selfpipe_handler,
+                                   CTX->sigchld_selfpipe[0], POLLIN);
+        if (rc) goto out;
+    } else {
+        rc = libxl__ev_fd_modify(gc, &CTX->sigchld_selfpipe_efd, POLLIN);
+        if (rc) goto out;
     }
 
     atfork_lock();
@@ -235,15 +255,6 @@ static bool chldmode_ours(libxl_ctx *ctx, bool creating)
         return 1;
     }
     abort();
-}
-
-int libxl__fork_selfpipe_active(libxl_ctx *ctx)
-{
-    /* Returns the fd to read, or -1 */
-    if (!chldmode_ours(ctx, 0))
-        return -1;
-
-    return ctx->sigchld_selfpipe[0];
 }
 
 static void perhaps_removehandler(libxl__gc *gc)
@@ -295,11 +306,28 @@ int libxl_childproc_reaped(libxl_ctx *ctx, pid_t pid, int status)
     return rc;
 }
 
-void libxl__fork_selfpipe_woken(libxl__egc *egc)
+static void sigchld_selfpipe_handler(libxl__egc *egc, libxl__ev_fd *ev,
+                                     int fd, short events, short revents)
 {
     /* May make callbacks into the application for child processes.
-     * ctx must be locked EXACTLY ONCE */
+     * So, this function may unlock and relock the CTX.  This is OK
+     * because event callback functions are always called with the CTX
+     * locked exactly once, and from code which copes with reentrancy.
+     * (See also the comment in afterpoll_internal.) */
     EGC_GC;
+
+    int selfpipe = CTX->sigchld_selfpipe[0];
+
+    if (revents & ~POLLIN) {
+        LOG(ERROR, "unexpected poll event 0x%x on SIGCHLD self pipe", revents);
+        LIBXL__EVENT_DISASTER(egc,
+                              "unexpected poll event on SIGCHLD self pipe",
+                              0, 0);
+    }
+    assert(revents & POLLIN);
+
+    int e = libxl__self_pipe_eatall(selfpipe);
+    if (e) LIBXL__EVENT_DISASTER(egc, "read sigchld pipe", e, 0);
 
     while (chldmode_ours(CTX, 0) /* in case the app changes the mode */) {
         int status;

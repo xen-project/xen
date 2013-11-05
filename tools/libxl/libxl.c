@@ -64,6 +64,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     ctx->childproc_user = 0;
         
     ctx->sigchld_selfpipe[0] = -1;
+    libxl__ev_fd_init(&ctx->sigchld_selfpipe_efd);
 
     /* The mutex is special because we can't idempotently destroy it */
 
@@ -139,6 +140,7 @@ int libxl_ctx_free(libxl_ctx *ctx)
     for (i = 0; i < ctx->watch_nslots; i++)
         assert(!libxl__watch_slot_contents(gc, i));
     libxl__ev_fd_deregister(gc, &ctx->watch_efd);
+    libxl__ev_fd_deregister(gc, &ctx->sigchld_selfpipe_efd);
 
     /* Now there should be no more events requested from the application: */
 
