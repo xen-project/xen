@@ -221,12 +221,14 @@ int handle_mmio_with_translation(unsigned long gva, unsigned long gpfn)
     return handle_mmio();
 }
 
-int handle_pio(uint16_t port, int size, int dir)
+int handle_pio(uint16_t port, unsigned int size, int dir)
 {
     struct vcpu *curr = current;
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
     unsigned long data, reps = 1;
     int rc;
+
+    ASSERT((size - 1) < 4 && size != 3);
 
     if ( dir == IOREQ_WRITE )
         data = guest_cpu_user_regs()->eax;
@@ -237,7 +239,12 @@ int handle_pio(uint16_t port, int size, int dir)
     {
     case X86EMUL_OKAY:
         if ( dir == IOREQ_READ )
-            memcpy(&guest_cpu_user_regs()->eax, &data, vio->io_size);
+        {
+            if ( size == 4 ) /* Needs zero extension. */
+                guest_cpu_user_regs()->rax = (uint32_t)data;
+            else
+                memcpy(&guest_cpu_user_regs()->rax, &data, size);
+        }
         break;
     case X86EMUL_RETRY:
         if ( vio->io_state != HVMIO_awaiting_completion )
