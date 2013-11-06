@@ -24,7 +24,7 @@ ALL_OCAML_OBJS ?= $(OBJS)
 %.cmi: %.mli
 	$(call quiet-command, $(OCAMLC) $(OCAMLCFLAGS) -c -o $@ $<,MLI,$@)
 
-%.cmx: %.ml
+%.cmx %.o: %.ml
 	$(call quiet-command, $(OCAMLOPT) $(OCAMLOPTFLAGS) -c -o $@ $<,MLOPT,$@)
 
 %.ml: %.mll

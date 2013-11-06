@@ -1,0 +1,4 @@
+version = "@VERSION@"
+description = "Xen Tools Logger Interface"
+archive(byte) = "xentoollog.cma"
+archive(native) = "xentoollog.cmxa"

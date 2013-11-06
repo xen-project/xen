@@ -3,6 +3,7 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS= \
 	mmap \
+	xentoollog \
 	xc eventchn \
 	xb xs xl
 
