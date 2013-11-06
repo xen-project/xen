@@ -17,13 +17,14 @@
 #include <public/hvm/hvm_op.h>
 
 /* Viridian MSR numbers. */
-#define VIRIDIAN_MSR_GUEST_OS_ID 0x40000000
-#define VIRIDIAN_MSR_HYPERCALL   0x40000001
-#define VIRIDIAN_MSR_VP_INDEX    0x40000002
-#define VIRIDIAN_MSR_EOI         0x40000070
-#define VIRIDIAN_MSR_ICR         0x40000071
-#define VIRIDIAN_MSR_TPR         0x40000072
-#define VIRIDIAN_MSR_APIC_ASSIST 0x40000073
+#define VIRIDIAN_MSR_GUEST_OS_ID                0x40000000
+#define VIRIDIAN_MSR_HYPERCALL                  0x40000001
+#define VIRIDIAN_MSR_VP_INDEX                   0x40000002
+#define VIRIDIAN_MSR_TIME_REF_COUNT             0x40000020
+#define VIRIDIAN_MSR_EOI                        0x40000070
+#define VIRIDIAN_MSR_ICR                        0x40000071
+#define VIRIDIAN_MSR_TPR                        0x40000072
+#define VIRIDIAN_MSR_APIC_ASSIST                0x40000073
 
 /* Viridian Hypercall Status Codes. */
 #define HV_STATUS_SUCCESS                       0x0000
@@ -33,6 +34,7 @@
 #define HvNotifyLongSpinWait    8
 
 /* Viridian CPUID 4000003, Viridian MSR availability. */
+#define CPUID3A_MSR_REF_COUNT   (1 << 1)
 #define CPUID3A_MSR_APIC_ACCESS (1 << 4)
 #define CPUID3A_MSR_HYPERCALL   (1 << 5)
 #define CPUID3A_MSR_VP_INDEX    (1 << 6)
@@ -83,7 +85,8 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
         break;
     case 3:
         /* Which hypervisor MSRs are available to the guest */
-        *eax = (CPUID3A_MSR_APIC_ACCESS |
+        *eax = (CPUID3A_MSR_REF_COUNT   |
+                CPUID3A_MSR_APIC_ACCESS |
                 CPUID3A_MSR_HYPERCALL   |
                 CPUID3A_MSR_VP_INDEX);
         break;
@@ -303,6 +306,11 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
     case VIRIDIAN_MSR_VP_INDEX:
         perfc_incr(mshv_rdmsr_vp_index);
         *val = v->vcpu_id;
+        break;
+
+    case VIRIDIAN_MSR_TIME_REF_COUNT:
+        perfc_incr(mshv_rdmsr_time_ref_count);
+        *val = hvm_get_guest_time(v) / 100;
         break;
 
     case VIRIDIAN_MSR_ICR:
