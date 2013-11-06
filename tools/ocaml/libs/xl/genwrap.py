@@ -13,9 +13,13 @@ builtins = {
     "libxl_devid":          ("devid",                  "%(c)s = Int_val(%(o)s)",            "Val_int(%(c)s)"  ),
     "libxl_defbool":        ("bool option",            "%(c)s = Defbool_val(%(o)s)",        "Val_defbool(%(c)s)" ),
     "libxl_uuid":           ("int array",              "Uuid_val(gc, lg, &%(c)s, %(o)s)",   "Val_uuid(&%(c)s)"),
-    "libxl_key_value_list": ("(string * string) list", None,                                None),
+    "libxl_bitmap":         ("bool array",             "Bitmap_val(gc, lg, &%(c)s, %(o)s)",   "Val_bitmap(&%(c)s)"),    
+    "libxl_key_value_list": ("(string * string) list", "libxl_key_value_list_val(gc, lg, &%(c)s, %(o)s)", "Val_key_value_list(&%(c)s)"),
+    "libxl_string_list":    ("string list",            "libxl_string_list_val(gc, lg, &%(c)s, %(o)s)", "Val_string_list(&%(c)s)"),
     "libxl_mac":            ("int array",              "Mac_val(gc, lg, &%(c)s, %(o)s)",    "Val_mac(&%(c)s)"),
     "libxl_hwcap":          ("int32 array",            None,                                "Val_hwcap(&%(c)s)"),
+    # The following needs to be sorted out later
+    "libxl_cpuid_policy_list": ("unit",                "%(c)s = 0",                         "Val_unit"),
     }
 
 DEVICE_FUNCTIONS = [ ("add",            ["t", "domid", "unit"]),
