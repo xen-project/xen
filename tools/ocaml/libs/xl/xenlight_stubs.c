@@ -695,10 +695,10 @@ value stub_xl_send_debug_keys(value ctx, value keys)
 	c_keys = dup_String_val(keys);
 
 	ret = libxl_send_debug_keys(CTX, c_keys);
+	free(c_keys);
+
 	if (ret != 0)
 		failwith_xl(ret, "send_debug_keys");
-
-	free(c_keys);
 
 	CAMLreturn(Val_unit);
 }
