@@ -97,6 +97,7 @@ struct evtchn
         u16 virq;      /* state == ECS_VIRQ */
     } u;
     u8 priority;
+    u8 pending:1;
 #ifdef FLASK_ENABLE
     void *ssid;
 #endif

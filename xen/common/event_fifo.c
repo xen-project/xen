@@ -61,8 +61,16 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
 
     port = evtchn->port;
     word = evtchn_fifo_word_from_port(d, port);
+
+    /*
+     * Event array page may not exist yet, save the pending state for
+     * when the page is added.
+     */
     if ( unlikely(!word) )
+    {
+        evtchn->pending = 1;
         return;
+    }
 
     /*
      * No locking around getting the queue. This may race with
@@ -322,16 +330,29 @@ static void cleanup_event_array(struct domain *d)
     xfree(d->evtchn_fifo);
 }
 
-static void set_priority_all(struct domain *d, unsigned int priority)
+static void setup_ports(struct domain *d)
 {
     unsigned int port;
 
+    /*
+     * For each port that is already bound:
+     *
+     * - save its pending state.
+     * - set default priority.
+     */
     for ( port = 1; port < d->max_evtchns; port++ )
     {
+        struct evtchn *evtchn;
+
         if ( !port_is_valid(d, port) )
             break;
 
-        evtchn_port_set_priority(d, evtchn_from_port(d, port), priority);
+        evtchn = evtchn_from_port(d, port);
+
+        if ( test_bit(port, &shared_info(d, evtchn_pending)) )
+            evtchn->pending = 1;
+
+        evtchn_fifo_set_priority(d, evtchn, EVTCHN_FIFO_PRIORITY_DEFAULT);
     }
 }
 
@@ -369,9 +390,6 @@ int evtchn_fifo_init_control(struct evtchn_init_control *init_control)
     /*
      * If this is the first control block, setup an empty event array
      * and switch to the fifo port ops.
-     *
-     * Any ports currently bound will have their priority set to the
-     * default.
      */
     if ( rc == 0 && !d->evtchn_fifo )
     {
@@ -382,7 +400,7 @@ int evtchn_fifo_init_control(struct evtchn_init_control *init_control)
         {
             d->evtchn_port_ops = &evtchn_port_ops_fifo;
             d->max_evtchns = EVTCHN_FIFO_NR_CHANNELS;
-            set_priority_all(d, EVTCHN_FIFO_PRIORITY_DEFAULT);
+            setup_ports(d);
         }
     }
 
@@ -395,6 +413,7 @@ static int add_page_to_event_array(struct domain *d, unsigned long gfn)
 {
     void *virt;
     unsigned int slot;
+    unsigned int port = d->evtchn_fifo->num_evtchns;
     int rc;
 
     slot = d->evtchn_fifo->num_evtchns / EVTCHN_FIFO_EVENT_WORDS_PER_PAGE;
@@ -407,6 +426,22 @@ static int add_page_to_event_array(struct domain *d, unsigned long gfn)
 
     d->evtchn_fifo->event_array[slot] = virt;
     d->evtchn_fifo->num_evtchns += EVTCHN_FIFO_EVENT_WORDS_PER_PAGE;
+
+    /*
+     * Re-raise any events that were pending while this array page was
+     * missing.
+     */
+    for ( ; port < d->evtchn_fifo->num_evtchns; port++ )
+    {
+        struct evtchn *evtchn;
+
+        if ( !port_is_valid(d, port) )
+            break;
+
+        evtchn = evtchn_from_port(d, port);
+        if ( evtchn->pending )
+            evtchn_fifo_set_pending(d->vcpu[evtchn->notify_vcpu_id], evtchn);
+    }
 
     return 0;
 }
