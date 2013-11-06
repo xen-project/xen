@@ -8,23 +8,23 @@ import idl
 builtins = {
     "bool":                 ("bool",                   "%(c)s = Bool_val(%(o)s)",           "Val_bool(%(c)s)" ),
     "int":                  ("int",                    "%(c)s = Int_val(%(o)s)",            "Val_int(%(c)s)"  ),
-    "char *":               ("string",                 "%(c)s = dup_String_val(gc, %(o)s)", "caml_copy_string(%(c)s)"),
+    "char *":               ("string",                 "%(c)s = dup_String_val(%(o)s)", "caml_copy_string(%(c)s)"),
     "libxl_domid":          ("domid",                  "%(c)s = Int_val(%(o)s)",            "Val_int(%(c)s)"  ),
     "libxl_devid":          ("devid",                  "%(c)s = Int_val(%(o)s)",            "Val_int(%(c)s)"  ),
     "libxl_defbool":        ("bool option",            "%(c)s = Defbool_val(%(o)s)",        "Val_defbool(%(c)s)" ),
-    "libxl_uuid":           ("int array",              "Uuid_val(gc, lg, &%(c)s, %(o)s)",   "Val_uuid(&%(c)s)"),
-    "libxl_bitmap":         ("bool array",             "Bitmap_val(gc, lg, &%(c)s, %(o)s)",   "Val_bitmap(&%(c)s)"),    
-    "libxl_key_value_list": ("(string * string) list", "libxl_key_value_list_val(gc, lg, &%(c)s, %(o)s)", "Val_key_value_list(&%(c)s)"),
-    "libxl_string_list":    ("string list",            "libxl_string_list_val(gc, lg, &%(c)s, %(o)s)", "Val_string_list(&%(c)s)"),
-    "libxl_mac":            ("int array",              "Mac_val(gc, lg, &%(c)s, %(o)s)",    "Val_mac(&%(c)s)"),
+    "libxl_uuid":           ("int array",              "Uuid_val(&%(c)s, %(o)s)",   "Val_uuid(&%(c)s)"),
+    "libxl_bitmap":         ("bool array",             "Bitmap_val(ctx, &%(c)s, %(o)s)",   "Val_bitmap(&%(c)s)"),    
+    "libxl_key_value_list": ("(string * string) list", "libxl_key_value_list_val(&%(c)s, %(o)s)", "Val_key_value_list(&%(c)s)"),
+    "libxl_string_list":    ("string list",            "libxl_string_list_val(&%(c)s, %(o)s)", "Val_string_list(&%(c)s)"),
+    "libxl_mac":            ("int array",              "Mac_val(&%(c)s, %(o)s)",    "Val_mac(&%(c)s)"),
     "libxl_hwcap":          ("int32 array",            None,                                "Val_hwcap(&%(c)s)"),
     # The following needs to be sorted out later
     "libxl_cpuid_policy_list": ("unit",                "%(c)s = 0",                         "Val_unit"),
     }
 
-DEVICE_FUNCTIONS = [ ("add",            ["t", "domid", "unit"]),
-                     ("remove",         ["t", "domid", "unit"]),
-                     ("destroy",        ["t", "domid", "unit"]),
+DEVICE_FUNCTIONS = [ ("add",            ["ctx", "t", "domid", "unit"]),
+                     ("remove",         ["ctx", "t", "domid", "unit"]),
+                     ("destroy",        ["ctx", "t", "domid", "unit"]),
                    ]
 
 functions = { # ( name , [type1,type2,....] )
@@ -33,13 +33,13 @@ functions = { # ( name , [type1,type2,....] )
     "device_disk":    DEVICE_FUNCTIONS,
     "device_nic":     DEVICE_FUNCTIONS,
     "device_pci":     DEVICE_FUNCTIONS,
-    "physinfo":       [ ("get",            ["unit", "t"]),
+    "physinfo":       [ ("get",            ["ctx", "t"]),
                       ],
-    "cputopology":    [ ("get",            ["unit", "t array"]),
+    "cputopology":    [ ("get",            ["ctx", "t array"]),
                       ],
     "domain_sched_params":
-                      [ ("get",            ["domid", "t"]),
-                        ("set",            ["domid", "t", "unit"]),
+                      [ ("get",            ["ctx", "domid", "t"]),
+                        ("set",            ["ctx", "domid", "t", "unit"]),
                       ],
 }
 def stub_fn_name(ty, name):
@@ -236,7 +236,7 @@ def c_val(ty, c, o, indent="", parent = None):
         for e in ty.values:
             s += "    case %d: *%s = %s; break;\n" % (n, c, e.name)
             n += 1
-        s += "    default: failwith_xl(\"cannot convert value to %s\", lg); break;\n" % ty.typename
+        s += "    default: failwith_xl(\"cannot convert value to %s\"); break;\n" % ty.typename
         s += "}"
     elif isinstance(ty, idl.KeyedUnion):
         s += "{\n"
@@ -249,7 +249,7 @@ def c_val(ty, c, o, indent="", parent = None):
                                                     parent + ty.keyvar.name,
                                                     f.enumname)
                 n += 1
-        s += "\t\t    default: failwith_xl(\"variant handling bug %s%s (long)\", lg); break;\n" % (parent, ty.keyvar.name)        
+        s += "\t\t    default: failwith_xl(\"variant handling bug %s%s (long)\"); break;\n" % (parent, ty.keyvar.name)        
         s += "\t\t}\n"
         s += "\t} else {\n"
         s += "\t\t/* Is block... */\n"
@@ -265,7 +265,7 @@ def c_val(ty, c, o, indent="", parent = None):
                 s += "%s" % c_val(f.type, fexpr, "Field(%s, 0)" % o, indent=indent+"\t\t        ")
                 s += "break;\n"
                 n += 1
-        s += "\t\t    default: failwith_xl(\"variant handling bug %s%s (block)\", lg); break;\n" % (parent, ty.keyvar.name)
+        s += "\t\t    default: failwith_xl(\"variant handling bug %s%s (block)\"); break;\n" % (parent, ty.keyvar.name)
         s += "\t\t}\n"
         s += "\t}\n"
         s += "}"
@@ -278,14 +278,14 @@ def c_val(ty, c, o, indent="", parent = None):
             s += "%s\n" % c_val(f.type, fexpr, "Field(%s, %d)" % (o,n), parent=nparent)
             n = n + 1
     else:
-        s += "%s_val(gc, lg, %s, %s);" % (ty.rawname, ty.pass_arg(c, parent is None, passby=idl.PASS_BY_REFERENCE), o)
+        s += "%s_val(ctx, %s, %s);" % (ty.rawname, ty.pass_arg(c, parent is None, passby=idl.PASS_BY_REFERENCE), o)
     
     return s.replace("\n", "\n%s" % indent)
 
 def gen_c_val(ty, indent=""):
     s = "/* Convert caml value to %s */\n" % ty.rawname
     
-    s += "static int %s_val (caml_gc *gc, struct caml_logger *lg, %s, value v)\n" % (ty.rawname, ty.make_arg("c_val", passby=idl.PASS_BY_REFERENCE))
+    s += "static int %s_val (libxl_ctx *ctx, %s, value v)\n" % (ty.rawname, ty.make_arg("c_val", passby=idl.PASS_BY_REFERENCE))
     s += "{\n"
     s += "\tCAMLparam1(v);\n"
     s += "\n"
@@ -334,7 +334,7 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
         for e in ty.values:
             s += "    case %s: %s = Int_val(%d); break;\n" % (e.name, o, n)
             n += 1
-        s += "    default: failwith_xl(\"cannot convert value from %s\", lg); break;\n" % ty.typename
+        s += "    default: failwith_xl(\"cannot convert value from %s\"); break;\n" % ty.typename
         s += "}"
     elif isinstance(ty, idl.KeyedUnion):
         n = 0
@@ -363,7 +363,7 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
                 m += 1
                 #s += "\t        %s = caml_alloc(%d,%d);\n" % (o,len(f.type.fields),n)
             s += "\t        break;\n"
-        s += "\t    default: failwith_xl(\"cannot convert value from %s\", lg); break;\n" % ty.typename
+        s += "\t    default: failwith_xl(\"cannot convert value from %s\"); break;\n" % ty.typename
         s += "\t}"
     elif isinstance(ty,idl.Aggregate) and (parent is None or ty.rawname is None):
         s += "{\n"
@@ -388,14 +388,14 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
             n = n + 1
         s += "}"
     else:
-        s += "%s = Val_%s(gc, lg, %s);" % (o, ty.rawname, ty.pass_arg(c, parent is None))
+        s += "%s = Val_%s(%s);" % (o, ty.rawname, ty.pass_arg(c, parent is None))
     
     return s.replace("\n", "\n%s" % indent).rstrip(indent)
 
 def gen_Val_ocaml(ty, indent=""):
     s = "/* Convert %s to a caml value */\n" % ty.rawname
 
-    s += "static value Val_%s (caml_gc *gc, struct caml_logger *lg, %s)\n" % (ty.rawname, ty.make_arg(ty.rawname+"_c"))
+    s += "static value Val_%s (%s)\n" % (ty.rawname, ty.make_arg(ty.rawname+"_c"))
     s += "{\n"
     s += "\tCAMLparam0();\n"
     s += "\tCAMLlocal1(%s_ocaml);\n" % ty.rawname

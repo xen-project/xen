@@ -15,15 +15,14 @@
 
 exception Error of string
 
+type ctx
 type domid = int
 type devid = int
 
 (* @@LIBXL_TYPES@@ *)
 
-type ctx
-
 external ctx_alloc: Xentoollog.handle -> ctx = "stub_libxl_ctx_alloc"
 
-external send_trigger : domid -> trigger -> int -> unit = "stub_xl_send_trigger"
-external send_sysrq : domid -> char -> unit = "stub_xl_send_sysrq"
-external send_debug_keys : domid -> string -> unit = "stub_xl_send_debug_keys"
+external send_trigger : ctx -> domid -> trigger -> int -> unit = "stub_xl_send_trigger"
+external send_sysrq : ctx -> domid -> char -> unit = "stub_xl_send_sysrq"
+external send_debug_keys : ctx -> string -> unit = "stub_xl_send_debug_keys"
