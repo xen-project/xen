@@ -70,8 +70,21 @@ def ocaml_type_of(ty):
     else:
         return ty.rawname
 
+ocaml_keywords = ['and', 'as', 'assert', 'begin', 'end', 'class', 'constraint',
+    'do', 'done', 'downto', 'else', 'if', 'end', 'exception', 'external', 'false',
+    'for', 'fun', 'function', 'functor', 'if', 'in', 'include', 'inherit',
+    'initializer', 'lazy', 'let', 'match', 'method', 'module', 'mutable', 'new',
+    'object', 'of', 'open', 'or', 'private', 'rec', 'sig', 'struct', 'then', 'to',
+    'true', 'try', 'type', 'val', 'virtual', 'when', 'while', 'with']
+
+def munge_name(name):
+    if name in ocaml_keywords:
+        return "xl_" + name
+    else:
+        return name
+
 def ocaml_instance_of(type, name):
-    return "%s : %s" % (name, ocaml_type_of(type))
+    return "%s : %s" % (munge_name(name), ocaml_type_of(type))
 
 def gen_ocaml_ml(ty, interface, indent=""):
 
