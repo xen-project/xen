@@ -47,12 +47,34 @@ static char * dup_String_val(value s)
 	return c;
 }
 
-static void failwith_xl(char *fname)
+/* Forward reference: this is defined in the auto-generated include file below. */
+static value Val_error (libxl_error error_c);
+
+static void failwith_xl(int error, char *fname)
 {
-	value *exc = caml_named_value("Xenlight.Error");
+	CAMLlocal1(arg);
+	static value *exc = NULL;
+
+	/* First time around, lookup by name */
 	if (!exc)
-		caml_invalid_argument("Exception Xenlight.Error not initialized, please link xl.cma");
-	caml_raise_with_string(*exc, fname);
+		exc = caml_named_value("Xenlight.Error");
+
+	if (!exc)
+		caml_invalid_argument("Exception Xenlight.Error not initialized, please link xenlight.cma");
+
+	arg = caml_alloc(2, 0);
+
+	Store_field(arg, 0, Val_error(error));
+	Store_field(arg, 1, caml_copy_string(fname));
+
+	caml_raise_with_arg(*exc, arg);
+}
+
+CAMLprim value stub_raise_exception(value unit)
+{
+	CAMLparam1(unit);
+	failwith_xl(ERROR_FAIL, "test exception");
+	CAMLreturn(Val_unit);
 }
 
 void ctx_finalize(value ctx)
@@ -78,7 +100,7 @@ CAMLprim value stub_libxl_ctx_alloc(value logger)
 
 	ret = libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, (xentoollog_logger *) Xtl_val(logger));
 	if (ret != 0) \
-		failwith_xl("cannot init context");
+		failwith_xl(ERROR_FAIL, "cannot init context");
 
 	handle = caml_alloc_custom(&libxl_ctx_custom_operations, sizeof(ctx), 0, 1);
 	Ctx_val(handle) = ctx;
@@ -246,7 +268,7 @@ static int Bitmap_val(libxl_ctx *ctx, libxl_bitmap *c_val, value v)
 
 	c_val->size = 0;
 	if (len > 0 && libxl_bitmap_alloc(ctx, c_val, len))
-		failwith_xl("cannot allocate bitmap");
+		failwith_xl(ERROR_NOMEM, "cannot allocate bitmap");
 	for (i=0; i<len; i++) {
 		if (Int_val(Field(v, i)))
 			libxl_bitmap_set(c_val, i);
@@ -342,7 +364,7 @@ value stub_xl_device_##type##_##op(value ctx, value info, value domid)	\
 	libxl_device_##type##_dispose(&c_info);				\
 									\
 	if (ret != 0)							\
-		failwith_xl(STRINGIFY(type) "_" STRINGIFY(op));		\
+		failwith_xl(ret, STRINGIFY(type) "_" STRINGIFY(op));	\
 									\
 	CAMLreturn(Val_unit);						\
 }
@@ -368,7 +390,7 @@ value stub_xl_physinfo_get(value ctx)
 	ret = libxl_get_physinfo(CTX, &c_physinfo);
 
 	if (ret != 0)
-		failwith_xl("get_physinfo");
+		failwith_xl(ret, "get_physinfo");
 
 	physinfo = Val_physinfo(&c_physinfo);
 
@@ -387,7 +409,7 @@ value stub_xl_cputopology_get(value ctx)
 	c_topology = libxl_get_cpu_topology(CTX, &nr);
 
 	if (!c_topology)
-		failwith_xl("topologyinfo");
+		failwith_xl(ERROR_FAIL, "get_cpu_topologyinfo");
 
 	topology = caml_alloc_tuple(nr);
 	for (i = 0; i < nr; i++) {
@@ -414,7 +436,7 @@ value stub_xl_domain_sched_params_get(value ctx, value domid)
 
 	ret = libxl_domain_sched_params_get(CTX, Int_val(domid), &c_scinfo);
 	if (ret != 0)
-		failwith_xl("domain_sched_params_get");
+		failwith_xl(ret, "domain_sched_params_get");
 
 	scinfo = Val_domain_sched_params(&c_scinfo);
 
@@ -436,7 +458,7 @@ value stub_xl_domain_sched_params_set(value ctx, value domid, value scinfo)
 	libxl_domain_sched_params_dispose(&c_scinfo);
 
 	if (ret != 0)
-		failwith_xl("domain_sched_params_set");
+		failwith_xl(ret, "domain_sched_params_set");
 
 	CAMLreturn(Val_unit);
 }
@@ -453,7 +475,7 @@ value stub_xl_send_trigger(value ctx, value domid, value trigger, value vcpuid)
 				 c_trigger, Int_val(vcpuid));
 
 	if (ret != 0)
-		failwith_xl("send_trigger");
+		failwith_xl(ret, "send_trigger");
 
 	CAMLreturn(Val_unit);
 }
@@ -466,7 +488,7 @@ value stub_xl_send_sysrq(value ctx, value domid, value sysrq)
 	ret = libxl_send_sysrq(CTX, Int_val(domid), Int_val(sysrq));
 
 	if (ret != 0)
-		failwith_xl("send_sysrq");
+		failwith_xl(ret, "send_sysrq");
 
 	CAMLreturn(Val_unit);
 }
@@ -481,7 +503,7 @@ value stub_xl_send_debug_keys(value ctx, value keys)
 
 	ret = libxl_send_debug_keys(CTX, c_keys);
 	if (ret != 0)
-		failwith_xl("send_debug_keys");
+		failwith_xl(ret, "send_debug_keys");
 
 	free(c_keys);
 
