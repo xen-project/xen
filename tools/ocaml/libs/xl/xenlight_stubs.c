@@ -442,6 +442,96 @@ value stub_xl_device_nic_list(value ctx, value domid)
 	CAMLreturn(list);
 }
 
+value stub_xl_device_pci_list(value ctx, value domid)
+{
+	CAMLparam2(ctx, domid);
+	CAMLlocal2(list, temp);
+	libxl_device_pci *c_list;
+	int i, nb;
+	uint32_t c_domid;
+
+	c_domid = Int_val(domid);
+
+	c_list = libxl_device_pci_list(CTX, c_domid, &nb);
+	if (!c_list)
+		failwith_xl(ERROR_FAIL, "pci_list");
+
+	list = temp = Val_emptylist;
+	for (i = 0; i < nb; i++) {
+		list = caml_alloc_small(2, Tag_cons);
+		Field(list, 0) = Val_int(0);
+		Field(list, 1) = temp;
+		temp = list;
+		Store_field(list, 0, Val_device_pci(&c_list[i]));
+		libxl_device_pci_dispose(&c_list[i]);
+	}
+	free(c_list);
+
+	CAMLreturn(list);
+}
+
+value stub_xl_device_pci_assignable_add(value ctx, value info, value rebind)
+{
+	CAMLparam3(ctx, info, rebind);
+	libxl_device_pci c_info;
+	int ret, marker_var;
+
+	device_pci_val(CTX, &c_info, info);
+
+	ret = libxl_device_pci_assignable_add(CTX, &c_info, (int) Bool_val(rebind));
+
+	libxl_device_pci_dispose(&c_info);
+
+	if (ret != 0)
+		failwith_xl(ret, "pci_assignable_add");
+
+	CAMLreturn(Val_unit);
+}
+
+value stub_xl_device_pci_assignable_remove(value ctx, value info, value rebind)
+{
+	CAMLparam3(ctx, info, rebind);
+	libxl_device_pci c_info;
+	int ret, marker_var;
+
+	device_pci_val(CTX, &c_info, info);
+
+	ret = libxl_device_pci_assignable_remove(CTX, &c_info, (int) Bool_val(rebind));
+
+	libxl_device_pci_dispose(&c_info);
+
+	if (ret != 0)
+		failwith_xl(ret, "pci_assignable_remove");
+
+	CAMLreturn(Val_unit);
+}
+
+value stub_xl_device_pci_assignable_list(value ctx)
+{
+	CAMLparam1(ctx);
+	CAMLlocal2(list, temp);
+	libxl_device_pci *c_list;
+	int i, nb;
+	uint32_t c_domid;
+
+	c_list = libxl_device_pci_assignable_list(CTX, &nb);
+	if (!c_list)
+		failwith_xl(ERROR_FAIL, "pci_assignable_list");
+
+	list = temp = Val_emptylist;
+	for (i = 0; i < nb; i++) {
+		list = caml_alloc_small(2, Tag_cons);
+		Field(list, 0) = Val_int(0);
+		Field(list, 1) = temp;
+		temp = list;
+		Store_field(list, 0, Val_device_pci(&c_list[i]));
+		libxl_device_pci_dispose(&c_list[i]);
+	}
+	free(c_list);
+
+	CAMLreturn(list);
+}
+
 value stub_xl_physinfo_get(value ctx)
 {
 	CAMLparam1(ctx);

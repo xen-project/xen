@@ -35,7 +35,12 @@ functions = { # ( name , [type1,type2,....] )
                       [ ("list",           ["ctx", "domid", "t list"]),
                         ("of_devid",       ["ctx", "domid", "int", "t"]),
                       ],
-    "device_pci":     DEVICE_FUNCTIONS,
+    "device_pci":     DEVICE_FUNCTIONS +
+                      [ ("list",              ["ctx", "domid", "t list"]),
+                        ("assignable_add",    ["ctx", "t", "bool", "unit"]),
+                        ("assignable_remove", ["ctx", "t", "bool", "unit"]),
+                        ("assignable_list",   ["ctx", "t list"]),
+                      ],
     "dominfo":        [ ("list",           ["ctx", "t list"]),
                         ("get",            ["ctx", "domid", "t"]),
                       ],
