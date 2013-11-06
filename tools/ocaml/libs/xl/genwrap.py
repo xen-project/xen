@@ -143,7 +143,14 @@ def c_val(ty, c, o, indent="", parent = None):
             raise NotImplementedError("No c_val fn for Builtin %s (%s)" % (ty.typename, type(ty)))
         s += "%s;" % (fn % { "o": o, "c": c })
     elif isinstance (ty,idl.Array):
-        raise("Cannot handle Array type\n")
+        s += "{\n"
+        s += "\tint i;\n"
+        s += "\t%s = Wosize_val(%s);\n" % (parent + ty.lenvar.name, o)
+        s += "\t%s = (%s) calloc(%s, sizeof(*%s));\n" % (c, ty.typename, parent + ty.lenvar.name, c)
+        s += "\tfor(i=0; i<%s; i++) {\n" % (parent + ty.lenvar.name)
+        s += c_val(ty.elem_type, c+"[i]", "Field(%s, i)" % o, indent="\t\t", parent=parent) + "\n"
+        s += "\t}\n"
+        s += "}\n"
     elif isinstance(ty,idl.Enumeration) and (parent is None):
         n = 0
         s += "switch(Int_val(%s)) {\n" % o
@@ -207,7 +214,7 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
         s += "\t    value array_elem;\n"
         s += "\t    %s = caml_alloc(%s,0);\n" % (o, parent + ty.lenvar.name)
         s += "\t    for(i=0; i<%s; i++) {\n" % (parent + ty.lenvar.name)
-        s += "\t        %s\n" % ocaml_Val(ty.elem_type, "array_elem", c + "[i]", "")
+        s += "\t        %s\n" % ocaml_Val(ty.elem_type, "array_elem", c + "[i]", "", parent=parent)
         s += "\t        Store_field(%s, i, array_elem);\n" % o
         s += "\t    }\n"
         s += "\t}"
