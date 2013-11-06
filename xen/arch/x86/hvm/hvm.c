@@ -1701,6 +1701,40 @@ int hvm_mov_from_cr(unsigned int cr, unsigned int gpr)
     return X86EMUL_UNHANDLEABLE;
 }
 
+void hvm_shadow_handle_cd(struct vcpu *v, unsigned long value)
+{
+    if ( value & X86_CR0_CD )
+    {
+        /* Entering no fill cache mode. */
+        spin_lock(&v->domain->arch.hvm_domain.uc_lock);
+        v->arch.hvm_vcpu.cache_mode = NO_FILL_CACHE_MODE;
+
+        if ( !v->domain->arch.hvm_domain.is_in_uc_mode )
+        {
+            domain_pause_nosync(v->domain);
+
+            /* Flush physical caches. */
+            on_each_cpu(local_flush_cache, NULL, 1);
+            hvm_set_uc_mode(v, 1);
+
+            domain_unpause(v->domain);
+        }
+        spin_unlock(&v->domain->arch.hvm_domain.uc_lock);
+    }
+    else if ( !(value & X86_CR0_CD) &&
+              (v->arch.hvm_vcpu.cache_mode == NO_FILL_CACHE_MODE) )
+    {
+        /* Exit from no fill cache mode. */
+        spin_lock(&v->domain->arch.hvm_domain.uc_lock);
+        v->arch.hvm_vcpu.cache_mode = NORMAL_CACHE_MODE;
+
+        if ( domain_exit_uc_mode(v) )
+            hvm_set_uc_mode(v, 0);
+
+        spin_unlock(&v->domain->arch.hvm_domain.uc_lock);
+    }
+}
+
 int hvm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
@@ -1784,35 +1818,18 @@ int hvm_set_cr0(unsigned long value)
         }
     }
 
-    if ( has_arch_mmios(v->domain) )
-    {
-        if ( (value & X86_CR0_CD) && !(value & X86_CR0_NW) )
-        {
-            /* Entering no fill cache mode. */
-            spin_lock(&v->domain->arch.hvm_domain.uc_lock);
-            v->arch.hvm_vcpu.cache_mode = NO_FILL_CACHE_MODE;
-
-            if ( !v->domain->arch.hvm_domain.is_in_uc_mode )
-            {
-                /* Flush physical caches. */
-                on_each_cpu(local_flush_cache, NULL, 1);
-                hvm_set_uc_mode(v, 1);
-            }
-            spin_unlock(&v->domain->arch.hvm_domain.uc_lock);
-        }
-        else if ( !(value & (X86_CR0_CD | X86_CR0_NW)) &&
-                  (v->arch.hvm_vcpu.cache_mode == NO_FILL_CACHE_MODE) )
-        {
-            /* Exit from no fill cache mode. */
-            spin_lock(&v->domain->arch.hvm_domain.uc_lock);
-            v->arch.hvm_vcpu.cache_mode = NORMAL_CACHE_MODE;
-
-            if ( domain_exit_uc_mode(v) )
-                hvm_set_uc_mode(v, 0);
-
-            spin_unlock(&v->domain->arch.hvm_domain.uc_lock);
-        }
-    }
+    /*
+     * When cr0.cd setting
+     * 1. For guest w/o VT-d, and for guest with VT-d but snooped, Xen need not
+     * do anything, since hardware snoop mechanism has ensured cache coherency;
+     * 2. For guest with VT-d but non-snooped, cache coherency cannot be
+     * guaranteed by h/w so need emulate UC memory type to guest.
+     */
+    if ( ((value ^ old_value) & X86_CR0_CD) &&
+           has_arch_pdevs(v->domain) &&
+           iommu_enabled && !iommu_snoop &&
+           hvm_funcs.handle_cd )
+        hvm_funcs.handle_cd(v, value);
 
     v->arch.hvm_vcpu.guest_cr[0] = value;
     hvm_update_guest_cr(v, 0);

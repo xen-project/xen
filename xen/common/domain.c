@@ -825,6 +825,16 @@ void domain_pause(struct domain *d)
         vcpu_sleep_sync(v);
 }
 
+void domain_pause_nosync(struct domain *d)
+{
+    struct vcpu *v;
+
+    atomic_inc(&d->pause_count);
+
+    for_each_vcpu( d, v )
+        vcpu_sleep_nosync(v);
+}
+
 void domain_unpause(struct domain *d)
 {
     struct vcpu *v;
