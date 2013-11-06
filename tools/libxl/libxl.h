@@ -459,24 +459,6 @@ typedef struct libxl__ctx libxl_ctx;
 
 const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx);
 
-enum {
-    ERROR_NONSPECIFIC = -1,
-    ERROR_VERSION = -2,
-    ERROR_FAIL = -3,
-    ERROR_NI = -4,
-    ERROR_NOMEM = -5,
-    ERROR_INVAL = -6,
-    ERROR_BADFAIL = -7,
-    ERROR_GUEST_TIMEDOUT = -8,
-    ERROR_TIMEDOUT = -9,
-    ERROR_NOPARAVIRT = -10,
-    ERROR_NOT_READY = -11,
-    ERROR_OSEVENT_REG_FAIL = -12,
-    ERROR_BUFFERFULL = -13,
-    ERROR_UNKNOWN_CHILD = -14,
-};
-
-
 /*
  * Some libxl operations can take a long time.  These functions take a
  * parameter to control their concurrency:
