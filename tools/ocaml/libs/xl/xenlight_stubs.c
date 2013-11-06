@@ -308,15 +308,17 @@ static int Uuid_val(libxl_uuid *c_val, value v)
 static value Val_defbool(libxl_defbool c_val)
 {
 	CAMLparam0();
-	CAMLlocal1(v);
+	CAMLlocal2(v1, v2);
+	bool b;
 
 	if (libxl_defbool_is_default(c_val))
-		v = Val_none;
+		v2 = Val_none;
 	else {
-		bool b = libxl_defbool_val(c_val);
-		v = Val_some(b ? Val_bool(true) : Val_bool(false));
+		b = libxl_defbool_val(c_val);
+		v1 = b ? Val_bool(true) : Val_bool(false);
+		v2 = Val_some(v1);
 	}
-	CAMLreturn(v);
+	CAMLreturn(v2);
 }
 
 static libxl_defbool Defbool_val(value v)
