@@ -727,9 +727,9 @@ static void complete_domain_destroy(struct rcu_head *head)
 
     rangeset_domain_destroy(d);
 
-    cpupool_rm_domain(d);
-
     sched_destroy_domain(d);
+
+    cpupool_rm_domain(d);
 
     /* Free page used by xen oprofile buffer. */
 #ifdef CONFIG_XENOPROF
