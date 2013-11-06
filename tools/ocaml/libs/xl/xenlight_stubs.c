@@ -450,6 +450,47 @@ value stub_xl_cputopology_get(value ctx)
 	CAMLreturn(topology);
 }
 
+value stub_xl_dominfo_list(value ctx)
+{
+	CAMLparam1(ctx);
+	CAMLlocal2(domlist, temp);
+	libxl_dominfo *c_domlist;
+	int i, nb;
+
+	c_domlist = libxl_list_domain(CTX, &nb);
+	if (!c_domlist)
+		failwith_xl(ERROR_FAIL, "dominfo_list");
+
+	domlist = temp = Val_emptylist;
+	for (i = nb - 1; i >= 0; i--) {
+		domlist = caml_alloc_small(2, Tag_cons);
+		Field(domlist, 0) = Val_int(0);
+		Field(domlist, 1) = temp;
+		temp = domlist;
+
+		Store_field(domlist, 0, Val_dominfo(&c_domlist[i]));
+	}
+
+	libxl_dominfo_list_free(c_domlist, nb);
+
+	CAMLreturn(domlist);
+}
+
+value stub_xl_dominfo_get(value ctx, value domid)
+{
+	CAMLparam2(ctx, domid);
+	CAMLlocal1(dominfo);
+	libxl_dominfo c_dominfo;
+	int ret;
+
+	ret = libxl_domain_info(CTX, &c_dominfo, Int_val(domid));
+	if (ret != 0)
+		failwith_xl(ERROR_FAIL, "domain_info");
+	dominfo = Val_dominfo(&c_dominfo);
+
+	CAMLreturn(dominfo);
+}
+
 value stub_xl_domain_sched_params_get(value ctx, value domid)
 {
 	CAMLparam2(ctx, domid);
