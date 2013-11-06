@@ -21,6 +21,7 @@
 #include <caml/signals.h>
 #include <caml/fail.h>
 #include <caml/callback.h>
+#include <caml/custom.h>
 
 #include <sys/mman.h>
 #include <stdint.h>
@@ -28,6 +29,11 @@
 
 #include <libxl.h>
 #include <libxl_utils.h>
+
+#include "caml_xentoollog.h"
+
+#define Ctx_val(x)(*((libxl_ctx **) Data_custom_val(x)))
+#define CTX ((libxl_ctx *) Ctx_val(ctx))
 
 struct caml_logger {
 	struct xentoollog_logger logger;
@@ -95,6 +101,37 @@ static void failwith_xl(char *fname, struct caml_logger *lg)
 	char *s;
 	s = (lg) ? lg->log_buf : fname;
 	caml_raise_with_string(*caml_named_value("xl.error"), s);
+}
+
+void ctx_finalize(value ctx)
+{
+	libxl_ctx_free(CTX);
+}
+
+static struct custom_operations libxl_ctx_custom_operations = {
+	"libxl_ctx_custom_operations",
+	ctx_finalize /* custom_finalize_default */,
+	custom_compare_default,
+	custom_hash_default,
+	custom_serialize_default,
+	custom_deserialize_default
+};
+
+CAMLprim value stub_libxl_ctx_alloc(value logger)
+{
+	CAMLparam1(logger);
+	CAMLlocal1(handle);
+	libxl_ctx *ctx;
+	int ret;
+
+	ret = libxl_ctx_alloc(&ctx, LIBXL_VERSION, 0, (xentoollog_logger *) Xtl_val(logger));
+	if (ret != 0) \
+		failwith_xl("cannot init context", NULL);
+
+	handle = caml_alloc_custom(&libxl_ctx_custom_operations, sizeof(ctx), 0, 1);
+	Ctx_val(handle) = ctx;
+
+	CAMLreturn(handle);
 }
 
 static void * gc_calloc(caml_gc *gc, size_t nmemb, size_t size)

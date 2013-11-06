@@ -5,10 +5,13 @@ include $(TOPLEVEL)/common.make
 # ignore unused generated functions
 CFLAGS += -Wno-unused
 CFLAGS += $(CFLAGS_libxenlight)
+CFLAGS += -I ../xentoollog
 
 OBJS = xenlight
 INTF = xenlight.cmi
 LIBS = xenlight.cma xenlight.cmxa
+
+OCAMLINCLUDE += -I ../xentoollog
 
 LIBS_xenlight = $(LDLIBS_libxenlight)
 
