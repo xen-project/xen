@@ -353,7 +353,7 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
     elif isinstance(ty, idl.Array):
         s += "{\n"
         s += "\t    int i;\n"
-        s += "\t    value array_elem;\n"
+        s += "\t    CAMLlocal1(array_elem);\n"
         s += "\t    %s = caml_alloc(%s,0);\n" % (o, parent + ty.lenvar.name)
         s += "\t    for(i=0; i<%s; i++) {\n" % (parent + ty.lenvar.name)
         s += "\t        %s\n" % ocaml_Val(ty.elem_type, "array_elem", c + "[i]", "", parent=parent)
@@ -403,7 +403,7 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
             fn = "anon_field"
         else:
             fn = "%s_field" % ty.rawname
-        s += "\tvalue %s;\n" % fn
+        s += "\tCAMLlocal1(%s);\n" % fn
         s += "\n"
         s += "\t%s = caml_alloc_tuple(%d);\n" % (o, len(ty.fields))
         
