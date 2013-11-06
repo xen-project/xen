@@ -2974,6 +2974,13 @@ void vmx_vmenter_helper(const struct cpu_user_regs *regs)
     struct hvm_vcpu_asid *p_asid;
     bool_t need_flush;
 
+    /* In case hypervisor access hvm memory when guest uc mode */
+    if ( unlikely(curr->arch.hvm_vcpu.hypervisor_access_uc_hvm_memory) )
+    {
+        curr->arch.hvm_vcpu.hypervisor_access_uc_hvm_memory = 0;
+        wbinvd();
+    }
+
     if ( !cpu_has_vmx_vpid )
         goto out;
     if ( nestedhvm_vcpu_in_guestmode(curr) )
