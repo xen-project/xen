@@ -1392,14 +1392,6 @@ static int vmx_event_pending(struct vcpu *v)
     return intr_info & INTR_INFO_VALID_MASK;
 }
 
-static void vmx_set_uc_mode(struct vcpu *v)
-{
-    if ( paging_mode_hap(v->domain) )
-        ept_change_entry_emt_with_range(
-            v->domain, 0, p2m_get_hostp2m(v->domain)->max_mapped_pfn);
-    hvm_asid_flush_vcpu(v);
-}
-
 static void vmx_set_info_guest(struct vcpu *v)
 {
     unsigned long intr_shadow;
@@ -1558,7 +1550,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .msr_read_intercept   = vmx_msr_read_intercept,
     .msr_write_intercept  = vmx_msr_write_intercept,
     .invlpg_intercept     = vmx_invlpg_intercept,
-    .set_uc_mode          = vmx_set_uc_mode,
     .set_info_guest       = vmx_set_info_guest,
     .set_rdtsc_exiting    = vmx_set_rdtsc_exiting,
     .nhvm_vcpu_initialise = nvmx_vcpu_initialise,

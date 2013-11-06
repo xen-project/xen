@@ -1619,8 +1619,6 @@ static void hvm_set_uc_mode(struct vcpu *v, bool_t is_in_uc_mode)
 {
     v->domain->arch.hvm_domain.is_in_uc_mode = is_in_uc_mode;
     shadow_blow_tables_per_domain(v->domain);
-    if ( hvm_funcs.set_uc_mode )
-        return hvm_funcs.set_uc_mode(v);
 }
 
 int hvm_mov_to_cr(unsigned int cr, unsigned int gpr)

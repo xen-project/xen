@@ -156,7 +156,6 @@ struct hvm_function_table {
     int (*msr_read_intercept)(unsigned int msr, uint64_t *msr_content);
     int (*msr_write_intercept)(unsigned int msr, uint64_t msr_content);
     void (*invlpg_intercept)(unsigned long vaddr);
-    void (*set_uc_mode)(struct vcpu *v);
     void (*set_info_guest)(struct vcpu *v);
     void (*set_rdtsc_exiting)(struct vcpu *v, bool_t);
 
