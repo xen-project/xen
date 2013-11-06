@@ -340,7 +340,7 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
         n = 0
         s += "switch(%s) {\n" % c
         for e in ty.values:
-            s += "    case %s: %s = Int_val(%d); break;\n" % (e.name, o, n)
+            s += "    case %s: %s = Val_int(%d); break;\n" % (e.name, o, n)
             n += 1
         s += "    default: failwith_xl(ERROR_FAIL, \"cannot convert value from %s\"); break;\n" % ty.typename
         s += "}"
