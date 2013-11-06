@@ -216,6 +216,9 @@ class Struct(Aggregate):
         kwargs.setdefault('passby', PASS_BY_REFERENCE)
         Aggregate.__init__(self, "struct", name, fields, **kwargs)
 
+    def has_fields(self):
+        return len(self.fields) != 0
+
 class Union(Aggregate):
     def __init__(self, name, fields, **kwargs):
         # Generally speaking some intelligence is required to free a

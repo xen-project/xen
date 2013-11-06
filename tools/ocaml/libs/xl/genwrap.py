@@ -65,6 +65,8 @@ def ocaml_type_of(ty):
         if not typename:
             raise NotImplementedError("No typename for Builtin %s (%s)" % (ty.typename, type(ty)))
         return typename
+    elif isinstance(ty,idl.KeyedUnion):
+        return ty.union_name
     elif isinstance(ty,idl.Aggregate):
         return ty.rawname.capitalize() + ".t"
     else:
@@ -83,8 +85,67 @@ def munge_name(name):
     else:
         return name
 
-def ocaml_instance_of(type, name):
-    return "%s : %s" % (munge_name(name), ocaml_type_of(type))
+def ocaml_instance_of_field(f):
+    if isinstance(f.type, idl.KeyedUnion):
+        name = f.type.keyvar.name
+    else:
+        name = f.name
+    return "%s : %s" % (munge_name(name), ocaml_type_of(f.type))
+
+def gen_struct(ty):
+    s = ""
+    for f in ty.fields:
+        if f.type.private:
+            continue
+        x = ocaml_instance_of_field(f)
+        x = x.replace("\n", "\n\t\t")
+        s += "\t\t" + x + ";\n"
+    return s
+
+def gen_ocaml_keyedunions(ty, interface, indent, parent = None):
+    s = ""
+    
+    if ty.rawname is not None:
+        # Non-anonymous types need no special handling
+        pass
+    elif isinstance(ty, idl.KeyedUnion):
+        if parent is None:
+            nparent = ty.keyvar.name
+        else:
+            nparent = parent + "_" + ty.keyvar.name
+
+        for f in ty.fields:
+            if f.type is None: continue
+            if f.type.rawname is not None: continue
+            if isinstance(f.type, idl.Struct) and not f.type.has_fields(): continue
+            s += "\ntype %s_%s =\n" % (nparent,f.name)
+            s += "{\n"
+            s += gen_struct(f.type)
+            s += "}\n"
+
+        name = "%s__union" % ty.keyvar.name
+        s += "\n"
+        s += "type %s = " % name
+        u = []
+        for f in ty.fields:
+            if f.type is None:
+                u.append("%s" % (f.name.capitalize()))
+            elif isinstance(f.type, idl.Struct):
+                if f.type.rawname is not None:
+                    u.append("%s of %s" % (f.name.capitalize(), f.type.rawname.capitalize()))
+                elif f.type.has_fields():
+                    u.append("%s of %s_%s" % (f.name.capitalize(), nparent, f.name))
+                else:
+                    u.append("%s" % (f.name.capitalize()))
+            else:
+                raise NotImplementedError("Cannot handle KeyedUnion fields which are not Structs")
+            
+        s += " | ".join(u) + "\n"
+        ty.union_name = name
+
+    if s == "":
+        return None
+    return s.replace("\n", "\n%s" % indent)
 
 def gen_ocaml_ml(ty, interface, indent=""):
 
@@ -110,16 +171,17 @@ def gen_ocaml_ml(ty, interface, indent=""):
                 s += "module %s : sig\n" % module_name
             else:
                 s += "module %s = struct\n" % module_name
-            s += "\ttype t =\n"
-            s += "\t{\n"
-            
+                
+        # Handle KeyedUnions...
         for f in ty.fields:
-            if f.type.private:
-                continue
-            x = ocaml_instance_of(f.type, f.name)
-            x = x.replace("\n", "\n\t\t")
-            s += "\t\t" + x + ";\n"
+            ku = gen_ocaml_keyedunions(f.type, interface, "\t")
+            if ku is not None:
+                s += ku
+                s += "\n"
 
+        s += "\ttype t =\n"
+        s += "\t{\n"
+        s += gen_struct(ty)
         s += "\t}\n"
         
         if functions.has_key(ty.rawname):
@@ -172,12 +234,43 @@ def c_val(ty, c, o, indent="", parent = None):
             n += 1
         s += "    default: failwith_xl(\"cannot convert value to %s\", lg); break;\n" % ty.typename
         s += "}"
-    elif isinstance(ty, idl.Aggregate) and (parent is None):
+    elif isinstance(ty, idl.KeyedUnion):
+        s += "{\n"
+        s += "\tif(Is_long(%s)) {\n" % o
+        n = 0
+        s += "\t\tswitch(Int_val(%s)) {\n" % o
+        for f in ty.fields:
+            if f.type is None or not f.type.has_fields():
+                s += "\t\t    case %d: %s = %s; break;\n" % (n,
+                                                    parent + ty.keyvar.name,
+                                                    f.enumname)
+                n += 1
+        s += "\t\t    default: failwith_xl(\"variant handling bug %s%s (long)\", lg); break;\n" % (parent, ty.keyvar.name)        
+        s += "\t\t}\n"
+        s += "\t} else {\n"
+        s += "\t\t/* Is block... */\n"
+        s += "\t\tswitch(Tag_val(%s)) {\n" % o
+        n = 0
+        for f in ty.fields:
+            if f.type is not None and f.type.has_fields():
+                if f.type.private:
+                    continue
+                s += "\t\t    case %d:\n" % (n)
+                s += "\t\t        %s = %s;\n" % (parent + ty.keyvar.name, f.enumname)
+                (nparent,fexpr) = ty.member(c, f, False)
+                s += "%s" % c_val(f.type, fexpr, "Field(%s, 0)" % o, indent=indent+"\t\t        ")
+                s += "break;\n"
+                n += 1
+        s += "\t\t    default: failwith_xl(\"variant handling bug %s%s (block)\", lg); break;\n" % (parent, ty.keyvar.name)
+        s += "\t\t}\n"
+        s += "\t}\n"
+        s += "}"
+    elif isinstance(ty, idl.Aggregate) and (parent is None or ty.rawname is None):
         n = 0
         for f in ty.fields:
             if f.type.private:
                 continue
-            (nparent,fexpr) = ty.member(c, f, parent is None)
+            (nparent,fexpr) = ty.member(c, f, ty.rawname is not None)
             s += "%s\n" % c_val(f.type, fexpr, "Field(%s, %d)" % (o,n), parent=nparent)
             n = n + 1
     else:
@@ -199,7 +292,7 @@ def gen_c_val(ty, indent=""):
     s += "}\n"
     
     return s.replace("\n", "\n%s" % indent)
-
+    
 def ocaml_Val(ty, o, c, indent="", parent = None):
     s = indent
     if isinstance(ty,idl.UInt):
@@ -239,9 +332,42 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
             n += 1
         s += "    default: failwith_xl(\"cannot convert value from %s\", lg); break;\n" % ty.typename
         s += "}"
-    elif isinstance(ty,idl.Aggregate) and (parent is None):
+    elif isinstance(ty, idl.KeyedUnion):
+        n = 0
+        m = 0
+        s += "switch(%s) {\n" % (parent + ty.keyvar.name)
+        for f in ty.fields:
+            s += "\t    case %s:\n" % f.enumname
+            if f.type is None:
+                s += "\t        /* %d: None */\n" % n
+                s += "\t        %s = Val_long(%d);\n" % (o,n)
+                n += 1
+            elif not f.type.has_fields():
+                s += "\t        /* %d: Long */\n" % n
+                s += "\t        %s = Val_long(%d);\n" % (o,n)
+                n += 1
+            else:
+                s += "\t        /* %d: Block */\n" % m
+                (nparent,fexpr) = ty.member(c, f, parent is None)
+                s += "\t        {\n"
+                s += "\t\t        CAMLlocal1(tmp);\n"
+                s += "\t\t        %s = caml_alloc(%d,%d);\n" % (o, 1, m)
+                s += ocaml_Val(f.type, 'tmp', fexpr, indent="\t\t        ", parent=nparent)
+                s += "\n"
+                s += "\t\t        Store_field(%s, 0, tmp);\n" % o
+                s += "\t        }\n"
+                m += 1
+                #s += "\t        %s = caml_alloc(%d,%d);\n" % (o,len(f.type.fields),n)
+            s += "\t        break;\n"
+        s += "\t    default: failwith_xl(\"cannot convert value from %s\", lg); break;\n" % ty.typename
+        s += "\t}"
+    elif isinstance(ty,idl.Aggregate) and (parent is None or ty.rawname is None):
         s += "{\n"
-        s += "\tvalue %s_field;\n" % ty.rawname
+        if ty.rawname is None:
+            fn = "anon_field"
+        else:
+            fn = "%s_field" % ty.rawname
+        s += "\tvalue %s;\n" % fn
         s += "\n"
         s += "\t%s = caml_alloc_tuple(%d);\n" % (o, len(ty.fields))
         
@@ -253,8 +379,8 @@ def ocaml_Val(ty, o, c, indent="", parent = None):
             (nparent,fexpr) = ty.member(c, f, parent is None)
 
             s += "\n"
-            s += "\t%s\n" % ocaml_Val(f.type, "%s_field" % ty.rawname, ty.pass_arg(fexpr, c), parent=nparent)
-            s += "\tStore_field(%s, %d, %s);\n" % (o, n, "%s_field" % ty.rawname)
+            s += "\t%s\n" % ocaml_Val(f.type, fn, ty.pass_arg(fexpr, c), parent=nparent)
+            s += "\tStore_field(%s, %d, %s);\n" % (o, n, fn)
             n = n + 1
         s += "}"
     else:
