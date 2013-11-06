@@ -90,6 +90,13 @@ Complex type-Classes
 idl.Enumeration
 
   A class representing an enumeration (named integer values).
+  This class has one property besides the ones defined for the Type
+  class:
+
+  Enumeration.value_namespace: (default: namespace)
+
+    The namespace in which the values of the Enumeration (see below) reside.
+    This prefix is prepended to the name of the value.
 
   The values are available in the list Enumeration.values. Each
   element in the list is of type idl.EnumerationValue.
