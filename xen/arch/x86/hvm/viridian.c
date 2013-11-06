@@ -21,6 +21,8 @@
 #define VIRIDIAN_MSR_HYPERCALL                  0x40000001
 #define VIRIDIAN_MSR_VP_INDEX                   0x40000002
 #define VIRIDIAN_MSR_TIME_REF_COUNT             0x40000020
+#define VIRIDIAN_MSR_TSC_FREQUENCY              0x40000022
+#define VIRIDIAN_MSR_APIC_FREQUENCY             0x40000023
 #define VIRIDIAN_MSR_EOI                        0x40000070
 #define VIRIDIAN_MSR_ICR                        0x40000071
 #define VIRIDIAN_MSR_TPR                        0x40000072
@@ -38,6 +40,7 @@
 #define CPUID3A_MSR_APIC_ACCESS (1 << 4)
 #define CPUID3A_MSR_HYPERCALL   (1 << 5)
 #define CPUID3A_MSR_VP_INDEX    (1 << 6)
+#define CPUID3A_MSR_FREQ        (1 << 11)
 
 /* Viridian CPUID 4000004, Implementation Recommendations. */
 #define CPUID4A_MSR_BASED_APIC  (1 << 3)
@@ -88,7 +91,8 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
         *eax = (CPUID3A_MSR_REF_COUNT   |
                 CPUID3A_MSR_APIC_ACCESS |
                 CPUID3A_MSR_HYPERCALL   |
-                CPUID3A_MSR_VP_INDEX);
+                CPUID3A_MSR_VP_INDEX    |
+                CPUID3A_MSR_FREQ);
         break;
     case 4:
         /* Recommended hypercall usage. */
@@ -311,6 +315,16 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
     case VIRIDIAN_MSR_TIME_REF_COUNT:
         perfc_incr(mshv_rdmsr_time_ref_count);
         *val = hvm_get_guest_time(v) / 100;
+        break;
+
+    case VIRIDIAN_MSR_TSC_FREQUENCY:
+        perfc_incr(mshv_rdmsr_tsc_frequency);
+        *val = (uint64_t)d->arch.tsc_khz * 1000ull;
+        break;
+
+    case VIRIDIAN_MSR_APIC_FREQUENCY:
+        perfc_incr(mshv_rdmsr_apic_frequency);
+        *val = 1000000000ull / APIC_BUS_CYCLE_NS;
         break;
 
     case VIRIDIAN_MSR_ICR:

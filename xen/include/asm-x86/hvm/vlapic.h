@@ -80,6 +80,9 @@ struct vlapic {
     } init_sipi;
 };
 
+/* vlapic's frequence is 100 MHz */
+#define APIC_BUS_CYCLE_NS               10
+
 static inline uint32_t vlapic_get_reg(struct vlapic *vlapic, uint32_t reg)
 {
     return *((uint32_t *)(&vlapic->regs->data[reg]));

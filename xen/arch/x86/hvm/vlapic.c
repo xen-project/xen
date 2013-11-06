@@ -44,9 +44,6 @@
 #define VLAPIC_VERSION                  0x00050014
 #define VLAPIC_LVT_NUM                  6
 
-/* vlapic's frequence is 100 MHz */
-#define APIC_BUS_CYCLE_NS               10
-
 #define LVT_MASK \
     APIC_LVT_MASKED | APIC_SEND_PENDING | APIC_VECTOR_MASK
 
