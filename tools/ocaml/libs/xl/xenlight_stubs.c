@@ -347,6 +347,27 @@ static value Val_hwcap(libxl_hwcap *c_val)
 	CAMLreturn(hwcap);
 }
 
+static value Val_string_option(const char *c_val)
+{
+	CAMLparam0();
+	CAMLlocal2(tmp1, tmp2);
+	if (c_val) {
+		tmp1 = caml_copy_string(c_val);
+		tmp2 = Val_some(tmp1);
+		CAMLreturn(tmp2);
+	}
+	else
+		CAMLreturn(Val_none);
+}
+
+static char *String_option_val(value v)
+{
+	char *s = NULL;
+	if (v != Val_none)
+		s = dup_String_val(Some_val(v));
+	return s;
+}
+
 #include "_libxl_types.inc"
 
 #define _STRINGIFY(x) #x

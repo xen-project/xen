@@ -8,7 +8,7 @@ import idl
 builtins = {
     "bool":                 ("bool",                   "%(c)s = Bool_val(%(o)s)",           "Val_bool(%(c)s)" ),
     "int":                  ("int",                    "%(c)s = Int_val(%(o)s)",            "Val_int(%(c)s)"  ),
-    "char *":               ("string",                 "%(c)s = dup_String_val(%(o)s)", "caml_copy_string(%(c)s)"),
+    "char *":               ("string option",          "%(c)s = String_option_val(%(o)s)",  "Val_string_option(%(c)s)"),
     "libxl_domid":          ("domid",                  "%(c)s = Int_val(%(o)s)",            "Val_int(%(c)s)"  ),
     "libxl_devid":          ("devid",                  "%(c)s = Int_val(%(o)s)",            "Val_int(%(c)s)"  ),
     "libxl_defbool":        ("bool option",            "%(c)s = Defbool_val(%(o)s)",        "Val_defbool(%(c)s)" ),
