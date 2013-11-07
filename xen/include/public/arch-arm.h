@@ -120,6 +120,40 @@
  *   Exactly these sub-operations are supported:
  *    * VCPUOP_register_vcpu_info
  *    * VCPUOP_register_runstate_memory_area
+ *
+ *
+ * Other notes on the ARM ABI:
+ *
+ * - struct start_info is not exported to ARM guests.
+ *
+ * - struct shared_info is mapped by ARM guests using the
+ *   HYPERVISOR_memory_op sub-op XENMEM_add_to_physmap, passing
+ *   XENMAPSPACE_shared_info as space parameter.
+ *
+ * - All the per-cpu struct vcpu_info are mapped by ARM guests using the
+ *   HYPERVISOR_vcpu_op sub-op VCPUOP_register_vcpu_info, including cpu0
+ *   struct vcpu_info.
+ *
+ * - The grant table is mapped using the HYPERVISOR_memory_op sub-op
+ *   XENMEM_add_to_physmap, passing XENMAPSPACE_grant_table as space
+ *   parameter. The memory range specified under the Xen compatible
+ *   hypervisor node on device tree can be used as target gpfn for the
+ *   mapping.
+ *
+ * - Xenstore is initialized by using the two hvm_params
+ *   HVM_PARAM_STORE_PFN and HVM_PARAM_STORE_EVTCHN. They can be read
+ *   with the HYPERVISOR_hvm_op sub-op HVMOP_get_param.
+ *
+ * - The paravirtualized console is initialized by using the two
+ *   hvm_params HVM_PARAM_CONSOLE_PFN and HVM_PARAM_CONSOLE_EVTCHN. They
+ *   can be read with the HYPERVISOR_hvm_op sub-op HVMOP_get_param.
+ *
+ * - Event channel notifications are delivered using the percpu GIC
+ *   interrupt specified under the Xen compatible hypervisor node on
+ *   device tree.
+ *
+ * - The device tree Xen compatible node is fully described under Linux
+ *   at Documentation/devicetree/bindings/arm/xen.txt.
  */
 
 #define XEN_HYPERCALL_TAG   0XEA1
