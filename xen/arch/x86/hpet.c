@@ -430,8 +430,8 @@ static void __init hpet_fsb_cap_lookup(void)
             num_hpets_used++;
     }
 
-    printk(XENLOG_INFO "HPET: %u timers (%u will be used for broadcast)\n",
-           num_chs, num_hpets_used);
+    printk(XENLOG_INFO "HPET: %u timers usable for broadcast (%u total)\n",
+           num_hpets_used, num_chs);
 }
 
 static struct hpet_event_channel *hpet_get_channel(unsigned int cpu)
