@@ -289,6 +289,22 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
 		return -1;
 	}
 
+	/*
+	 * Some BIOSes provide multiple HPET tables.  Sometimes this is a BIOS
+	 * bug; the intended way of supporting more than 1 HPET is to use AML
+	 * entries.
+	 *
+	 * If someone finds a real system with two genuine HPET tables, perhaps
+	 * they will be kind and implement support.  Until then however, warn
+	 * that we will ignore subsequent tables.
+	 */
+	if (hpet_address)
+	{
+		printk(KERN_WARNING PREFIX
+		       "Found multiple HPET tables. Only using first\n");
+		return -1;
+	}
+
 	hpet_address = hpet_tbl->address.address;
 	hpet_blockid = hpet_tbl->sequence;
 	printk(KERN_INFO PREFIX "HPET id: %#x base: %#lx\n",
