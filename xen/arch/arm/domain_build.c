@@ -391,6 +391,8 @@ static int make_cpus_node(const struct domain *d, void *fdt,
     u32 len;
     /* Placeholder for cpu@ + a 32-bit number + \0 */
     char buf[15];
+    u32 clock_frequency;
+    bool_t clock_valid;
 
     DPRINT("Create cpus node\n");
 
@@ -411,6 +413,8 @@ static int make_cpus_node(const struct domain *d, void *fdt,
         if ( dt_device_type_is_equal(npcpu, "cpu") )
         {
             compatible = dt_get_property(npcpu, "compatible", &len);
+            clock_valid = dt_property_read_u32(npcpu, "clock-frequency",
+                                            &clock_frequency);
             break;
         }
     }
@@ -456,6 +460,12 @@ static int make_cpus_node(const struct domain *d, void *fdt,
         res = fdt_property_cell(fdt, "reg", cpu);
         if ( res )
             return res;
+
+        if (clock_valid) {
+            res = fdt_property_cell(fdt, "clock-frequency", clock_frequency);
+            if ( res )
+                return res;
+        }
 
         res = fdt_end_node(fdt);
         if ( res )
