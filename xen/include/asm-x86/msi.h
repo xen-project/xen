@@ -231,7 +231,8 @@ struct arch_msix {
 };
 
 void early_msi_init(void);
-void msi_compose_msg(struct irq_desc *, struct msi_msg *);
+void msi_compose_msg(unsigned vector, const cpumask_t *mask,
+                     struct msi_msg *msg);
 void __msi_set_enable(u16 seg, u8 bus, u8 slot, u8 func, int pos, int enable);
 void mask_msi_irq(struct irq_desc *);
 void unmask_msi_irq(struct irq_desc *);

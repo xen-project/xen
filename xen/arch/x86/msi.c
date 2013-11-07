@@ -124,13 +124,12 @@ static void msix_put_fixmap(struct arch_msix *msix, int idx)
 /*
  * MSI message composition
  */
-void msi_compose_msg(struct irq_desc *desc, struct msi_msg *msg)
+void msi_compose_msg(unsigned vector, const cpumask_t *cpu_mask, struct msi_msg *msg)
 {
     unsigned dest;
-    int vector = desc->arch.vector;
 
     memset(msg, 0, sizeof(*msg));
-    if ( !cpumask_intersects(desc->arch.cpu_mask, &cpu_online_map) ) {
+    if ( !cpumask_intersects(cpu_mask, &cpu_online_map) ) {
         dprintk(XENLOG_ERR,"%s, compose msi message error!!\n", __func__);
         return;
     }
@@ -138,7 +137,7 @@ void msi_compose_msg(struct irq_desc *desc, struct msi_msg *msg)
     if ( vector ) {
         cpumask_t *mask = this_cpu(scratch_mask);
 
-        cpumask_and(mask, desc->arch.cpu_mask, &cpu_online_map);
+        cpumask_and(mask, cpu_mask, &cpu_online_map);
         dest = cpu_mask_to_apicid(mask);
 
         msg->address_hi = MSI_ADDR_BASE_HI;
@@ -491,7 +490,7 @@ int __setup_msi_irq(struct irq_desc *desc, struct msi_desc *msidesc,
 
     desc->msi_desc = msidesc;
     desc->handler = handler;
-    msi_compose_msg(desc, &msg);
+    msi_compose_msg(desc->arch.vector, desc->arch.cpu_mask, &msg);
     return write_msi_msg(msidesc, &msg);
 }
 
