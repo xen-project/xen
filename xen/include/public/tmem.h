@@ -95,7 +95,6 @@
 
 
 #ifndef __ASSEMBLY__
-typedef xen_pfn_t tmem_cli_mfn_t;
 typedef XEN_GUEST_HANDLE(char) tmem_cli_va_t;
 struct tmem_op {
     uint32_t cmd;
@@ -121,7 +120,7 @@ struct tmem_op {
             uint32_t tmem_offset;
             uint32_t pfn_offset;
             uint32_t len;
-            tmem_cli_mfn_t cmfn; /* client machine page frame */
+            xen_pfn_t cmfn; /* client machine page frame */
         } gen; /* for all other cmd ("generic") */
     } u;
 };

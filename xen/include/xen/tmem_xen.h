@@ -489,19 +489,19 @@ static inline void tmh_copy_to_client_buf_offset(tmem_cli_va_param_t clibuf,
 #define tmh_cli_id_str "domid"
 #define tmh_client_str "domain"
 
-int tmh_decompress_to_client(tmem_cli_mfn_t, void *, size_t,
+int tmh_decompress_to_client(xen_pfn_t, void *, size_t,
 			     tmem_cli_va_param_t);
 
-int tmh_compress_from_client(tmem_cli_mfn_t, void **, size_t *,
+int tmh_compress_from_client(xen_pfn_t, void **, size_t *,
 			     tmem_cli_va_param_t);
 
-int tmh_copy_from_client(struct page_info *, tmem_cli_mfn_t, pagesize_t tmem_offset,
+int tmh_copy_from_client(struct page_info *, xen_pfn_t, pagesize_t tmem_offset,
     pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t);
 
-int tmh_copy_to_client(tmem_cli_mfn_t, struct page_info *, pagesize_t tmem_offset,
+int tmh_copy_to_client(xen_pfn_t, struct page_info *, pagesize_t tmem_offset,
     pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t);
 
-extern int tmh_copy_tze_to_client(tmem_cli_mfn_t cmfn, void *tmem_va, pagesize_t len);
+extern int tmh_copy_tze_to_client(xen_pfn_t cmfn, void *tmem_va, pagesize_t len);
 
 #define tmh_client_err(fmt, args...)  printk(XENLOG_G_ERR fmt, ##args)
 #define tmh_client_warn(fmt, args...) printk(XENLOG_G_WARNING fmt, ##args)

@@ -370,7 +370,7 @@ static NOINLINE void tmem_page_free(pool_t *pool, struct page_info *pfp)
 
 #define NOT_SHAREABLE ((uint16_t)-1UL)
 
-static NOINLINE int pcd_copy_to_client(tmem_cli_mfn_t cmfn, pgp_t *pgp)
+static NOINLINE int pcd_copy_to_client(xen_pfn_t cmfn, pgp_t *pgp)
 {
     uint8_t firstbyte = pgp->firstbyte;
     pcd_t *pcd;
@@ -1436,7 +1436,7 @@ static inline void tmem_ensure_avail_pages(void)
 
 /************ TMEM CORE OPERATIONS ************************************/
 
-static NOINLINE int do_tmem_put_compress(pgp_t *pgp, tmem_cli_mfn_t cmfn,
+static NOINLINE int do_tmem_put_compress(pgp_t *pgp, xen_pfn_t cmfn,
                                          tmem_cli_va_param_t clibuf)
 {
     void *dst, *p;
@@ -1479,7 +1479,7 @@ out:
     return ret;
 }
 
-static NOINLINE int do_tmem_dup_put(pgp_t *pgp, tmem_cli_mfn_t cmfn,
+static NOINLINE int do_tmem_dup_put(pgp_t *pgp, xen_pfn_t cmfn,
        pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len,
        tmem_cli_va_param_t clibuf)
 {
@@ -1571,7 +1571,7 @@ cleanup:
 
 static NOINLINE int do_tmem_put(pool_t *pool,
               OID *oidp, uint32_t index,
-              tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
+              xen_pfn_t cmfn, pagesize_t tmem_offset,
               pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t clibuf)
 {
     obj_t *obj = NULL, *objfound = NULL, *objnew = NULL;
@@ -1714,7 +1714,7 @@ free:
 }
 
 static NOINLINE int do_tmem_get(pool_t *pool, OID *oidp, uint32_t index,
-              tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
+              xen_pfn_t cmfn, pagesize_t tmem_offset,
               pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t clibuf)
 {
     obj_t *obj;
