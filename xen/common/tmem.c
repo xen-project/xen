@@ -104,7 +104,8 @@ struct tmem_page_content_descriptor;
 struct client {
     struct list_head client_list;
     struct tmem_pool *pools[MAX_POOLS_PER_DOMAIN];
-    tmem_client_t *tmem;
+    struct domain *domain;
+    struct xmem_pool *persistent_pool;
     struct list_head ephemeral_page_list;
     long eph_count, eph_count_max;
     domid_t cli_id;
@@ -1190,7 +1191,9 @@ static void pool_flush(struct tmem_pool *pool, domid_t cli_id, bool_t destroy)
 static struct client *client_create(domid_t cli_id)
 {
     struct client *client = xzalloc(struct client);
-    int i;
+    int i, shift;
+    char name[5];
+    struct domain *d;
 
     tmem_client_info("tmem: initializing tmem capability for %s=%d...",
                     tmem_cli_id_str, cli_id);
@@ -1199,16 +1202,30 @@ static struct client *client_create(domid_t cli_id)
         tmem_client_err("failed... out of memory\n");
         goto fail;
     }
-    if ( (client->tmem = tmem_client_init(cli_id)) == NULL )
+
+    for (i = 0, shift = 12; i < 4; shift -=4, i++)
+        name[i] = (((unsigned short)cli_id >> shift) & 0xf) + '0';
+    name[4] = '\0';
+    client->persistent_pool = xmem_pool_create(name, tmem_persistent_pool_page_get,
+        tmem_persistent_pool_page_put, PAGE_SIZE, 0, PAGE_SIZE);
+    if ( client->persistent_pool == NULL )
     {
-        tmem_client_err("failed... can't allocate host-dependent part of client\n");
+        tmem_client_err("failed... can't alloc persistent pool\n");
         goto fail;
     }
-    if ( !tmem_set_client_from_id(client, client->tmem, cli_id) )
-    {
+
+    d = rcu_lock_domain_by_id(cli_id);
+    if ( d == NULL ) {
         tmem_client_err("failed... can't set client\n");
+        xmem_pool_destroy(client->persistent_pool);
         goto fail;
     }
+    if ( !d->is_dying ) {
+        d->tmem = client;
+	client->domain = d;
+    }
+    rcu_unlock_domain(d);
+
     client->cli_id = cli_id;
     client->compress = tmem_compression_enabled();
     client->shared_auth_required = tmem_shared_auth();
@@ -1235,7 +1252,7 @@ static struct client *client_create(domid_t cli_id)
 static void client_free(struct client *client)
 {
     list_del(&client->client_list);
-    tmem_client_destroy(client->tmem);
+    xmem_pool_destroy(client->persistent_pool);
     xfree(client);
 }
 

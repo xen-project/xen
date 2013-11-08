@@ -341,7 +341,7 @@ static int __init tmem_mempool_init(void)
 
 /* persistent pools are per-domain */
 
-static void *tmem_persistent_pool_page_get(unsigned long size)
+void *tmem_persistent_pool_page_get(unsigned long size)
 {
     struct page_info *pi;
     struct domain *d = current->domain;
@@ -353,7 +353,7 @@ static void *tmem_persistent_pool_page_get(unsigned long size)
     return page_to_virt(pi);
 }
 
-static void tmem_persistent_pool_page_put(void *page_va)
+void tmem_persistent_pool_page_put(void *page_va)
 {
     struct page_info *pi;
 
@@ -361,36 +361,6 @@ static void tmem_persistent_pool_page_put(void *page_va)
     pi = mfn_to_page(virt_to_mfn(page_va));
     ASSERT(IS_VALID_PAGE(pi));
     _tmem_free_page_thispool(pi);
-}
-
-/******************  XEN-SPECIFIC CLIENT HANDLING ********************/
-
-EXPORT tmem_client_t *tmem_client_init(domid_t cli_id)
-{
-    tmem_client_t *tmem;
-    char name[5];
-    int i, shift;
-
-    if ( (tmem = xmalloc(tmem_client_t)) == NULL )
-        return NULL;
-    for (i = 0, shift = 12; i < 4; shift -=4, i++)
-        name[i] = (((unsigned short)cli_id >> shift) & 0xf) + '0';
-    name[4] = '\0';
-    tmem->persistent_pool = xmem_pool_create(name, tmem_persistent_pool_page_get,
-        tmem_persistent_pool_page_put, PAGE_SIZE, 0, PAGE_SIZE);
-    if ( tmem->persistent_pool == NULL )
-    {
-        xfree(tmem);
-        return NULL;
-    }
-    return tmem;
-}
-
-EXPORT void tmem_client_destroy(tmem_client_t *tmem)
-{
-    ASSERT(tmem->domain->is_dying);
-    xmem_pool_destroy(tmem->persistent_pool);
-    tmem->domain = NULL;
 }
 
 /******************  XEN-SPECIFIC HOST INITIALIZATION ********************/

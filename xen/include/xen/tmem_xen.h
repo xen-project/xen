@@ -21,13 +21,6 @@
 #ifdef CONFIG_COMPAT
 #include <compat/tmem.h>
 #endif
-
-struct tmem_host_dependent_client {
-    struct domain *domain;
-    struct xmem_pool *persistent_pool;
-};
-typedef struct tmem_host_dependent_client tmem_client_t;
-
 typedef uint32_t pagesize_t;  /* like size_t, must handle largest PAGE_SIZE */
 
 #define IS_PAGE_ALIGNED(addr) \
@@ -123,7 +116,7 @@ static inline bool_t domain_fully_allocated(struct domain *d)
     return ( d->tot_pages >= d->max_pages );
 }
 #define tmem_client_memory_fully_allocated(_pool) \
- domain_fully_allocated(_pool->client->tmem->domain)
+ domain_fully_allocated(_pool->client->domain)
 
 static inline void *_tmem_alloc_subpage_thispool(struct xmem_pool *cmem_mempool,
                                                  size_t size, size_t align)
@@ -138,7 +131,7 @@ static inline void *_tmem_alloc_subpage_thispool(struct xmem_pool *cmem_mempool,
     return xmem_pool_alloc(size, cmem_mempool);
 }
 #define tmem_alloc_subpage_thispool(_pool, _s, _a) \
-            _tmem_alloc_subpage_thispool(pool->client->tmem->persistent_pool, \
+            _tmem_alloc_subpage_thispool(pool->client->persistent_pool, \
                                          _s, _a)
 
 static inline void _tmem_free_subpage_thispool(struct xmem_pool *cmem_mempool,
@@ -149,7 +142,7 @@ static inline void _tmem_free_subpage_thispool(struct xmem_pool *cmem_mempool,
     xmem_pool_free(ptr,cmem_mempool);
 }
 #define tmem_free_subpage_thispool(_pool, _p, _s) \
- _tmem_free_subpage_thispool(_pool->client->tmem->persistent_pool, _p, _s)
+ _tmem_free_subpage_thispool(_pool->client->persistent_pool, _p, _s)
 
 static inline struct page_info *_tmem_alloc_page_thispool(struct domain *d)
 {
@@ -179,7 +172,7 @@ out:
     return pi;
 }
 #define tmem_alloc_page_thispool(_pool) \
-    _tmem_alloc_page_thispool(_pool->client->tmem->domain)
+    _tmem_alloc_page_thispool(_pool->client->domain)
 
 static inline void _tmem_free_page_thispool(struct page_info *pi)
 {
@@ -251,10 +244,6 @@ static inline unsigned long tmem_free_mb(void)
 /*  "Client" (==domain) abstraction */
 
 struct client;
-
-extern tmem_client_t *tmem_client_init(domid_t);
-extern void tmem_client_destroy(tmem_client_t *);
-
 static inline struct client *tmem_client_from_cli_id(domid_t cli_id)
 {
     struct client *c;
@@ -271,7 +260,7 @@ static inline struct client *tmem_client_from_current(void)
     return (struct client *)(current->domain->tmem);
 }
 
-#define tmem_client_is_dying(_client) (!!_client->tmem->domain->is_dying)
+#define tmem_client_is_dying(_client) (!!_client->domain->is_dying)
 
 static inline domid_t tmem_get_cli_id_from_current(void)
 {
@@ -281,23 +270,6 @@ static inline domid_t tmem_get_cli_id_from_current(void)
 static inline struct domain *tmem_get_cli_ptr_from_current(void)
 {
     return current->domain;
-}
-
-static inline bool_t tmem_set_client_from_id(
-    struct client *client, tmem_client_t *tmem, domid_t cli_id)
-{
-    struct domain *d = rcu_lock_domain_by_id(cli_id);
-    bool_t rc = 0;
-    if ( d == NULL )
-        return 0;
-    if ( !d->is_dying )
-    {
-        d->tmem = client;
-        tmem->domain = d;
-        rc = 1;
-    }
-    rcu_unlock_domain(d);
-    return rc;
 }
 
 static inline bool_t tmem_current_permitted(void)
@@ -476,6 +448,8 @@ int tmem_copy_to_client(xen_pfn_t, struct page_info *, pagesize_t tmem_offset,
     pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t);
 
 extern int tmem_copy_tze_to_client(xen_pfn_t cmfn, void *tmem_va, pagesize_t len);
+extern void *tmem_persistent_pool_page_get(unsigned long size);
+extern void tmem_persistent_pool_page_put(void *page_va);
 
 #define tmem_client_err(fmt, args...)  printk(XENLOG_G_ERR fmt, ##args)
 #define tmem_client_warn(fmt, args...) printk(XENLOG_G_WARNING fmt, ##args)
