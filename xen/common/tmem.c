@@ -232,7 +232,7 @@ struct tmem_page_descriptor {
     bool_t eviction_attempted;  /* CHANGE TO lifetimes? (settable) */
     struct list_head pcd_siblings;
     union {
-        pfp_t *pfp;  /* page frame pointer */
+        struct page_info *pfp;  /* page frame pointer */
         char *cdata; /* compressed data */
         struct tmem_page_content_descriptor *pcd; /* page dedup */
     };
@@ -248,7 +248,7 @@ typedef struct tmem_page_descriptor pgp_t;
 
 struct tmem_page_content_descriptor {
     union {
-        pfp_t *pfp;  /* page frame pointer */
+        struct page_info *pfp;  /* page frame pointer */
         char *cdata; /* if compression_enabled */
         char *tze; /* if !compression_enabled, trailing zeroes eliminated */
     };
@@ -341,9 +341,9 @@ static NOINLINE void tmem_free(void *p, size_t size, pool_t *pool)
         tmh_free_subpage_thispool(pool,p,size);
 }
 
-static NOINLINE pfp_t *tmem_page_alloc(pool_t *pool)
+static NOINLINE struct page_info *tmem_page_alloc(pool_t *pool)
 {
-    pfp_t *pfp = NULL;
+    struct page_info *pfp = NULL;
 
     if ( pool != NULL && is_persistent(pool) )
         pfp = tmh_alloc_page_thispool(pool);
@@ -356,7 +356,7 @@ static NOINLINE pfp_t *tmem_page_alloc(pool_t *pool)
     return pfp;
 }
 
-static NOINLINE void tmem_page_free(pool_t *pool, pfp_t *pfp)
+static NOINLINE void tmem_page_free(pool_t *pool, struct page_info *pfp)
 {
     ASSERT(pfp);
     if ( pool == NULL || !is_persistent(pool) )
@@ -397,7 +397,7 @@ static NOINLINE int pcd_copy_to_client(tmem_cli_mfn_t cmfn, pgp_t *pgp)
 static NOINLINE void pcd_disassociate(pgp_t *pgp, pool_t *pool, bool_t have_pcd_rwlock)
 {
     pcd_t *pcd = pgp->pcd;
-    pfp_t *pfp = pgp->pcd->pfp;
+    struct page_info *pfp = pgp->pcd->pfp;
     uint16_t firstbyte = pgp->firstbyte;
     char *pcd_tze = pgp->pcd->tze;
     pagesize_t pcd_size = pcd->size;
@@ -2873,7 +2873,7 @@ EXPORT void tmem_freeze_all(unsigned char key)
 
 EXPORT void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
 {
-    pfp_t *pfp;
+    struct page_info *pfp;
     unsigned long evicts_per_relinq = 0;
     int max_evictions = 10;
 

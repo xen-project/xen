@@ -277,7 +277,6 @@ static inline void tmh_free_infra(void *p)
 struct client;
 typedef domid_t cli_id_t;
 typedef struct domain tmh_cli_ptr_t;
-typedef struct page_info pfp_t;
 
 extern tmh_client_t *tmh_client_init(cli_id_t);
 extern void tmh_client_destroy(tmh_client_t *);
@@ -337,14 +336,14 @@ static inline bool_t tmh_current_is_privileged(void)
     return !xsm_tmem_control(XSM_PRIV);
 }
 
-static inline uint8_t tmh_get_first_byte(pfp_t *pfp)
+static inline uint8_t tmh_get_first_byte(struct page_info *pfp)
 {
     void *p = __map_domain_page(pfp);
 
     return (uint8_t)(*(char *)p);
 }
 
-static inline int tmh_page_cmp(pfp_t *pfp1, pfp_t *pfp2)
+static inline int tmh_page_cmp(struct page_info *pfp1, struct page_info *pfp2)
 {
     const uint64_t *p1 = (uint64_t *)__map_domain_page(pfp1);
     const uint64_t *p2 = (uint64_t *)__map_domain_page(pfp2);
@@ -382,14 +381,14 @@ static inline int tmh_pcd_cmp(void *va1, pagesize_t len1, void *va2, pagesize_t 
     return 1;
 }
 
-static inline int tmh_tze_pfp_cmp(pfp_t *pfp1, pagesize_t pfp_len, void *tva, pagesize_t tze_len)
+static inline int tmh_tze_pfp_cmp(struct page_info *pfp1, pagesize_t pfp_len, void *tva, pagesize_t tze_len)
 {
     const uint64_t *p1 = (uint64_t *)__map_domain_page(pfp1);
     const uint64_t *p2;
     pagesize_t i;
 
     if ( tze_len == PAGE_SIZE )
-       p2 = (uint64_t *)__map_domain_page((pfp_t *)tva);
+       p2 = (uint64_t *)__map_domain_page((struct page_info *)tva);
     else
        p2 = (uint64_t *)tva;
     ASSERT(pfp_len <= PAGE_SIZE);
@@ -411,7 +410,7 @@ static inline int tmh_tze_pfp_cmp(pfp_t *pfp1, pagesize_t pfp_len, void *tva, pa
 
 /* return the size of the data in the pfp, ignoring trailing zeroes and
  * rounded up to the nearest multiple of 8 */
-static inline pagesize_t tmh_tze_pfp_scan(pfp_t *pfp)
+static inline pagesize_t tmh_tze_pfp_scan(struct page_info *pfp)
 {
     const uint64_t *p = (uint64_t *)__map_domain_page(pfp);
     pagesize_t bytecount = PAGE_SIZE;
@@ -422,7 +421,7 @@ static inline pagesize_t tmh_tze_pfp_scan(pfp_t *pfp)
     return bytecount;
 }
 
-static inline void tmh_tze_copy_from_pfp(void *tva, pfp_t *pfp, pagesize_t len)
+static inline void tmh_tze_copy_from_pfp(void *tva, struct page_info *pfp, pagesize_t len)
 {
     uint64_t *p1 = (uint64_t *)tva;
     const uint64_t *p2 = (uint64_t *)__map_domain_page(pfp);
@@ -496,10 +495,10 @@ int tmh_decompress_to_client(tmem_cli_mfn_t, void *, size_t,
 int tmh_compress_from_client(tmem_cli_mfn_t, void **, size_t *,
 			     tmem_cli_va_param_t);
 
-int tmh_copy_from_client(pfp_t *, tmem_cli_mfn_t, pagesize_t tmem_offset,
+int tmh_copy_from_client(struct page_info *, tmem_cli_mfn_t, pagesize_t tmem_offset,
     pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t);
 
-int tmh_copy_to_client(tmem_cli_mfn_t, pfp_t *, pagesize_t tmem_offset,
+int tmh_copy_to_client(tmem_cli_mfn_t, struct page_info *, pagesize_t tmem_offset,
     pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t);
 
 extern int tmh_copy_tze_to_client(tmem_cli_mfn_t cmfn, void *tmem_va, pagesize_t len);

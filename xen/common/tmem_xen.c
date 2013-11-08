@@ -56,13 +56,13 @@ void tmh_copy_page(char *to, char*from)
 
 #if defined(CONFIG_ARM)
 static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
-                                 pfp_t **pcli_pfp, bool_t cli_write)
+                                 struct page_info **pcli_pfp, bool_t cli_write)
 {
     ASSERT(0);
     return NULL;
 }
 
-static inline void cli_put_page(void *cli_va, pfp_t *cli_pfp,
+static inline void cli_put_page(void *cli_va, struct page_info *cli_pfp,
                                 unsigned long cli_mfn, bool_t mark_dirty)
 {
     ASSERT(0);
@@ -71,7 +71,7 @@ static inline void cli_put_page(void *cli_va, pfp_t *cli_pfp,
 #include <asm/p2m.h>
 
 static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
-                                 pfp_t **pcli_pfp, bool_t cli_write)
+                                 struct page_info **pcli_pfp, bool_t cli_write)
 {
     p2m_type_t t;
     struct page_info *page;
@@ -95,7 +95,7 @@ static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
     return map_domain_page(*pcli_mfn);
 }
 
-static inline void cli_put_page(void *cli_va, pfp_t *cli_pfp,
+static inline void cli_put_page(void *cli_va, struct page_info *cli_pfp,
                                 unsigned long cli_mfn, bool_t mark_dirty)
 {
     if ( mark_dirty )
@@ -109,13 +109,13 @@ static inline void cli_put_page(void *cli_va, pfp_t *cli_pfp,
 }
 #endif
 
-EXPORT int tmh_copy_from_client(pfp_t *pfp,
+EXPORT int tmh_copy_from_client(struct page_info *pfp,
     tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
     pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t clibuf)
 {
     unsigned long tmem_mfn, cli_mfn = 0;
     char *tmem_va, *cli_va = NULL;
-    pfp_t *cli_pfp = NULL;
+    struct page_info *cli_pfp = NULL;
     int rc = 1;
 
     if ( tmem_offset > PAGE_SIZE || pfn_offset > PAGE_SIZE || len > PAGE_SIZE )
@@ -165,7 +165,7 @@ EXPORT int tmh_compress_from_client(tmem_cli_mfn_t cmfn,
     unsigned char *dmem = this_cpu(dstmem);
     unsigned char *wmem = this_cpu(workmem);
     char *scratch = this_cpu(scratch_page);
-    pfp_t *cli_pfp = NULL;
+    struct page_info *cli_pfp = NULL;
     unsigned long cli_mfn = 0;
     void *cli_va = NULL;
 
@@ -190,13 +190,13 @@ EXPORT int tmh_compress_from_client(tmem_cli_mfn_t cmfn,
     return 1;
 }
 
-EXPORT int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
+EXPORT int tmh_copy_to_client(tmem_cli_mfn_t cmfn, struct page_info *pfp,
     pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len,
     tmem_cli_va_param_t clibuf)
 {
     unsigned long tmem_mfn, cli_mfn = 0;
     char *tmem_va, *cli_va = NULL;
-    pfp_t *cli_pfp = NULL;
+    struct page_info *cli_pfp = NULL;
     int rc = 1;
 
     if ( tmem_offset > PAGE_SIZE || pfn_offset > PAGE_SIZE || len > PAGE_SIZE )
@@ -233,7 +233,7 @@ EXPORT int tmh_decompress_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
                                     size_t size, tmem_cli_va_param_t clibuf)
 {
     unsigned long cli_mfn = 0;
-    pfp_t *cli_pfp = NULL;
+    struct page_info *cli_pfp = NULL;
     void *cli_va = NULL;
     char *scratch = this_cpu(scratch_page);
     size_t out_len = PAGE_SIZE;
@@ -263,7 +263,7 @@ EXPORT int tmh_copy_tze_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
 {
     void *cli_va;
     unsigned long cli_mfn;
-    pfp_t *cli_pfp = NULL;
+    struct page_info *cli_pfp = NULL;
 
     ASSERT(!(len & (sizeof(uint64_t)-1)));
     ASSERT(len <= PAGE_SIZE);
