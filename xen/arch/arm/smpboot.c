@@ -161,9 +161,11 @@ void __init smp_init_cpus(void)
                 printk(XENLOG_WARNING
                        "cpu node `%s`: duplicate /cpu reg properties in the DT\n",
                        dt_node_full_name(cpu));
-                continue;
+                break;
             }
         }
+        if ( j != cpuidx )
+            continue;
 
         /*
          * Build a stashed array of MPIDR values. Numbering scheme requires
