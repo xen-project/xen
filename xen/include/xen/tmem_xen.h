@@ -110,14 +110,6 @@ static inline void tmem_page_list_put(struct page_info *pi)
 /*
  * Memory allocation for persistent data 
  */
-
-static inline bool_t domain_fully_allocated(struct domain *d)
-{
-    return ( d->tot_pages >= d->max_pages );
-}
-#define tmem_client_memory_fully_allocated(_pool) \
- domain_fully_allocated(_pool->client->domain)
-
 static inline void *tmem_alloc_subpage_thispool(struct xmem_pool *cmem_mempool,
                                                  size_t size, size_t align)
 {
