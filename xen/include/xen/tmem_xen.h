@@ -245,20 +245,6 @@ static inline unsigned long tmem_free_mb(void)
     return (tmem_page_list_pages + total_free_pages()) >> (20 - PAGE_SHIFT);
 }
 
-/*
- * Memory allocation for "infrastructure" data
- */
-
-static inline void *tmem_alloc_infra(size_t size, size_t align)
-{
-    return _xmalloc(size,align);
-}
-
-static inline void tmem_free_infra(void *p)
-{
-    return xfree(p);
-}
-
 #define tmem_lock_all  opt_tmem_lock
 #define tmem_called_from_tmem(_memflags) (_memflags & MEMF_tmem)
 

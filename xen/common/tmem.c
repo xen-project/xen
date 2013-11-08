@@ -1041,7 +1041,7 @@ static struct tmem_pool * pool_alloc(void)
     struct tmem_pool *pool;
     int i;
 
-    if ( (pool = tmem_alloc_infra(sizeof(struct tmem_pool),__alignof__(struct tmem_pool))) == NULL )
+    if ( (pool = xmalloc(struct tmem_pool)) == NULL )
         return NULL;
     for (i = 0; i < OBJ_HASH_BUCKETS; i++)
         pool->obj_rb_root[i] = RB_ROOT;
@@ -1070,7 +1070,7 @@ static NOINLINE void pool_free(struct tmem_pool *pool)
     INVERT_SENTINEL(pool,POOL);
     pool->client = NULL;
     list_del(&pool->pool_list);
-    tmem_free_infra(pool);
+    xfree(pool);
 }
 
 /* register new_client as a user of this shared pool and return new
@@ -1189,7 +1189,7 @@ static void pool_flush(struct tmem_pool *pool, domid_t cli_id, bool_t destroy)
 
 static struct client *client_create(domid_t cli_id)
 {
-    struct client *client = tmem_alloc_infra(sizeof(struct client),__alignof__(struct client));
+    struct client *client = xzalloc(struct client);
     int i;
 
     tmem_client_info("tmem: initializing tmem capability for %s=%d...",
@@ -1199,7 +1199,6 @@ static struct client *client_create(domid_t cli_id)
         tmem_client_err("failed... out of memory\n");
         goto fail;
     }
-    memset(client,0,sizeof(struct client));
     if ( (client->tmem = tmem_client_init(cli_id)) == NULL )
     {
         tmem_client_err("failed... can't allocate host-dependent part of client\n");
@@ -1229,7 +1228,7 @@ static struct client *client_create(domid_t cli_id)
     return client;
 
  fail:
-    tmem_free_infra(client);
+    xfree(client);
     return NULL;
 }
 
@@ -1237,7 +1236,7 @@ static void client_free(struct client *client)
 {
     list_del(&client->client_list);
     tmem_client_destroy(client->tmem);
-    tmem_free_infra(client);
+    xfree(client);
 }
 
 /* flush all data from a client and, optionally, free it */
