@@ -486,7 +486,7 @@ static int json_callback_number(void *opaque, const char *s, libxl_yajl_length l
     if (is_decimal(s, len)) {
         double d = strtod(s, NULL);
 
-        if ((d == HUGE_VAL || d == HUGE_VAL) && errno == ERANGE) {
+        if ((d == HUGE_VALF || d == HUGE_VALL) && errno == ERANGE) {
             goto error;
         }
 
