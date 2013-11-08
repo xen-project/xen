@@ -150,7 +150,7 @@ void __init video_init(void)
         return;
     }
 
-    if ( !hdlcd_start || !framebuffer_start )
+    if ( !framebuffer_start )
     {
         early_printk(KERN_ERR "HDLCD: framebuffer address missing from device tree, disabling driver\n");
         return;
