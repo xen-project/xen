@@ -365,7 +365,7 @@ static void tmem_persistent_pool_page_put(void *page_va)
 
 /******************  XEN-SPECIFIC CLIENT HANDLING ********************/
 
-EXPORT tmem_client_t *tmem_client_init(cli_id_t cli_id)
+EXPORT tmem_client_t *tmem_client_init(domid_t cli_id)
 {
     tmem_client_t *tmem;
     char name[5];

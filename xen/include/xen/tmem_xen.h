@@ -265,13 +265,11 @@ static inline void tmem_free_infra(void *p)
 /*  "Client" (==domain) abstraction */
 
 struct client;
-typedef domid_t cli_id_t;
-typedef struct domain tmem_cli_ptr_t;
 
-extern tmem_client_t *tmem_client_init(cli_id_t);
+extern tmem_client_t *tmem_client_init(domid_t);
 extern void tmem_client_destroy(tmem_client_t *);
 
-static inline struct client *tmem_client_from_cli_id(cli_id_t cli_id)
+static inline struct client *tmem_client_from_cli_id(domid_t cli_id)
 {
     struct client *c;
     struct domain *d = rcu_lock_domain_by_id(cli_id);
@@ -289,18 +287,18 @@ static inline struct client *tmem_client_from_current(void)
 
 #define tmem_client_is_dying(_client) (!!_client->tmem->domain->is_dying)
 
-static inline cli_id_t tmem_get_cli_id_from_current(void)
+static inline domid_t tmem_get_cli_id_from_current(void)
 {
     return current->domain->domain_id;
 }
 
-static inline tmem_cli_ptr_t *tmem_get_cli_ptr_from_current(void)
+static inline struct domain *tmem_get_cli_ptr_from_current(void)
 {
     return current->domain;
 }
 
 static inline bool_t tmem_set_client_from_id(
-    struct client *client, tmem_client_t *tmem, cli_id_t cli_id)
+    struct client *client, tmem_client_t *tmem, domid_t cli_id)
 {
     struct domain *d = rcu_lock_domain_by_id(cli_id);
     bool_t rc = 0;
@@ -474,7 +472,7 @@ static inline void tmem_copy_to_client_buf_offset(tmem_cli_va_param_t clibuf,
 
 #define tmem_client_buf_add guest_handle_add_offset
 
-#define TMEM_CLI_ID_NULL ((cli_id_t)((domid_t)-1L))
+#define TMEM_CLI_ID_NULL ((domid_t)((domid_t)-1L))
 
 #define tmem_cli_id_str "domid"
 #define tmem_client_str "domain"
