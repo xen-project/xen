@@ -311,7 +311,7 @@ static NOINLINE void *_tmem_malloc(size_t size, size_t align, struct tmem_pool *
     void *v;
 
     if ( (pool != NULL) && is_persistent(pool) )
-        v = tmem_alloc_subpage_thispool(pool,size,align);
+        v = tmem_alloc_subpage_thispool(pool->client->persistent_pool,size,align);
     else
         v = tmem_alloc_subpage(pool, size, align);
     if ( v == NULL )
@@ -324,7 +324,7 @@ static NOINLINE void tmem_free(void *p, size_t size, struct tmem_pool *pool)
     if ( pool == NULL || !is_persistent(pool) )
         tmem_free_subpage(p,size);
     else
-        tmem_free_subpage_thispool(pool,p,size);
+        tmem_free_subpage_thispool(pool->client->persistent_pool,p,size);
 }
 
 static NOINLINE struct page_info *tmem_page_alloc(struct tmem_pool *pool)
@@ -332,7 +332,7 @@ static NOINLINE struct page_info *tmem_page_alloc(struct tmem_pool *pool)
     struct page_info *pfp = NULL;
 
     if ( pool != NULL && is_persistent(pool) )
-        pfp = tmem_alloc_page_thispool(pool);
+        pfp = tmem_alloc_page_thispool(pool->client->domain);
     else
         pfp = tmem_alloc_page(pool,0);
     if ( pfp == NULL )
@@ -348,7 +348,7 @@ static NOINLINE void tmem_page_free(struct tmem_pool *pool, struct page_info *pf
     if ( pool == NULL || !is_persistent(pool) )
         tmem_free_page(pfp);
     else
-        tmem_free_page_thispool(pool,pfp);
+        tmem_free_page_thispool(pfp);
     atomic_dec_and_assert(global_page_count);
 }
 

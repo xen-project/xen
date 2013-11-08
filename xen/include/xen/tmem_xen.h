@@ -118,7 +118,7 @@ static inline bool_t domain_fully_allocated(struct domain *d)
 #define tmem_client_memory_fully_allocated(_pool) \
  domain_fully_allocated(_pool->client->domain)
 
-static inline void *_tmem_alloc_subpage_thispool(struct xmem_pool *cmem_mempool,
+static inline void *tmem_alloc_subpage_thispool(struct xmem_pool *cmem_mempool,
                                                  size_t size, size_t align)
 {
 #if 0
@@ -130,21 +130,16 @@ static inline void *_tmem_alloc_subpage_thispool(struct xmem_pool *cmem_mempool,
         return NULL;
     return xmem_pool_alloc(size, cmem_mempool);
 }
-#define tmem_alloc_subpage_thispool(_pool, _s, _a) \
-            _tmem_alloc_subpage_thispool(pool->client->persistent_pool, \
-                                         _s, _a)
 
-static inline void _tmem_free_subpage_thispool(struct xmem_pool *cmem_mempool,
+static inline void tmem_free_subpage_thispool(struct xmem_pool *cmem_mempool,
                                                void *ptr, size_t size)
 {
     ASSERT( size < tmem_mempool_maxalloc );
     ASSERT( cmem_mempool != NULL );
     xmem_pool_free(ptr,cmem_mempool);
 }
-#define tmem_free_subpage_thispool(_pool, _p, _s) \
- _tmem_free_subpage_thispool(_pool->client->persistent_pool, _p, _s)
 
-static inline struct page_info *_tmem_alloc_page_thispool(struct domain *d)
+static inline struct page_info *tmem_alloc_page_thispool(struct domain *d)
 {
     struct page_info *pi;
 
@@ -171,10 +166,8 @@ out:
     ASSERT((pi == NULL) || IS_VALID_PAGE(pi));
     return pi;
 }
-#define tmem_alloc_page_thispool(_pool) \
-    _tmem_alloc_page_thispool(_pool->client->domain)
 
-static inline void _tmem_free_page_thispool(struct page_info *pi)
+static inline void tmem_free_page_thispool(struct page_info *pi)
 {
     struct domain *d = page_get_owner(pi);
 
@@ -188,8 +181,6 @@ static inline void _tmem_free_page_thispool(struct page_info *pi)
         free_domheap_pages(pi,0);
     }
 }
-#define tmem_free_page_thispool(_pool,_pg) \
-    _tmem_free_page_thispool(_pg)
 
 /*
  * Memory allocation for ephemeral (non-persistent) data

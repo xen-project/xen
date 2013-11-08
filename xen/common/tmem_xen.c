@@ -347,7 +347,7 @@ void *tmem_persistent_pool_page_get(unsigned long size)
     struct domain *d = current->domain;
 
     ASSERT(size == PAGE_SIZE);
-    if ( (pi = _tmem_alloc_page_thispool(d)) == NULL )
+    if ( (pi = tmem_alloc_page_thispool(d)) == NULL )
         return NULL;
     ASSERT(IS_VALID_PAGE(pi));
     return page_to_virt(pi);
@@ -360,7 +360,7 @@ void tmem_persistent_pool_page_put(void *page_va)
     ASSERT(IS_PAGE_ALIGNED(page_va));
     pi = mfn_to_page(virt_to_mfn(page_va));
     ASSERT(IS_VALID_PAGE(pi));
-    _tmem_free_page_thispool(pi);
+    tmem_free_page_thispool(pi);
 }
 
 /******************  XEN-SPECIFIC HOST INITIALIZATION ********************/
