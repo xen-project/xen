@@ -289,30 +289,6 @@ EXPORT DEFINE_SPINLOCK(tmem_page_list_lock);
 EXPORT PAGE_LIST_HEAD(tmem_page_list);
 EXPORT unsigned long tmem_page_list_pages = 0;
 
-/* free anything on tmem_page_list to Xen's scrub list */
-EXPORT void tmem_release_avail_pages_to_host(void)
-{
-    spin_lock(&tmem_page_list_lock);
-    while ( !page_list_empty(&tmem_page_list) )
-    {
-        struct page_info *pg = page_list_remove_head(&tmem_page_list);
-        scrub_one_page(pg);
-        tmem_page_list_pages--;
-        free_domheap_page(pg);
-    }
-    ASSERT(tmem_page_list_pages == 0);
-    INIT_PAGE_LIST_HEAD(&tmem_page_list);
-    spin_unlock(&tmem_page_list_lock);
-}
-
-EXPORT void tmem_scrub_page(struct page_info *pi, unsigned int memflags)
-{
-    if ( pi == NULL )
-        return;
-    if ( !(memflags & MEMF_tmem) )
-        scrub_one_page(pi);
-}
-
 static noinline void *tmem_mempool_page_get(unsigned long size)
 {
     struct page_info *pi;

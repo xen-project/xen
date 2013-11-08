@@ -1418,7 +1418,19 @@ static unsigned long tmem_relinquish_npages(unsigned long n)
             break;
     }
     if ( avail_pages )
-        tmem_release_avail_pages_to_host();
+    {
+        spin_lock(&tmem_page_list_lock);
+        while ( !page_list_empty(&tmem_page_list) )
+        {
+            struct page_info *pg = page_list_remove_head(&tmem_page_list);
+            scrub_one_page(pg);
+            tmem_page_list_pages--;
+            free_domheap_page(pg);
+        }
+        ASSERT(tmem_page_list_pages == 0);
+        INIT_PAGE_LIST_HEAD(&tmem_page_list);
+        spin_unlock(&tmem_page_list_lock);
+    }
     return avail_pages;
 }
 
@@ -2911,9 +2923,12 @@ EXPORT void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
     }
     if ( evicts_per_relinq > max_evicts_per_relinq )
         max_evicts_per_relinq = evicts_per_relinq;
-    tmem_scrub_page(pfp, memflags);
     if ( pfp != NULL )
+    {
+        if ( !(memflags & MEMF_tmem) )
+            scrub_one_page(pfp);
         relinq_pgs++;
+    }
 
     if ( tmem_called_from_tmem(memflags) )
     {

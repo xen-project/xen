@@ -42,9 +42,6 @@ extern void tmem_copy_page(char *to, char*from);
 extern int tmem_init(void);
 #define tmem_hash hash_long
 
-extern void tmem_release_avail_pages_to_host(void);
-extern void tmem_scrub_page(struct page_info *pi, unsigned int memflags);
-
 extern bool_t opt_tmem_compress;
 static inline bool_t tmem_compression_enabled(void)
 {
