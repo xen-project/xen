@@ -5095,8 +5095,8 @@ static int sched_domain_output(libxl_scheduler sched, int (*output)(int),
                 break;
         }
     }
-    if (poolinfo)
-        libxl_cpupoolinfo_list_free(poolinfo, n_pools);
+
+    libxl_cpupoolinfo_list_free(poolinfo, n_pools);
     return 0;
 }
 
