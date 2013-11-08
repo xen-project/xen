@@ -847,7 +847,6 @@ nsvm_vmcb_guest_intercepts_msr(unsigned long *msr_bitmap,
         /* MSR not in the permission map: Let the guest handle it. */
         return NESTEDHVM_VMEXIT_INJECT;
 
-    BUG_ON(msr_bit == NULL);
     msr &= 0x1fff;
 
     if (write)
