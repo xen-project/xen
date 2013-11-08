@@ -36,14 +36,7 @@ integer_param("tmem_lock", opt_tmem_lock);
 
 EXPORT atomic_t freeable_page_count = ATOMIC_INIT(0);
 
-#ifdef COMPARE_COPY_PAGE_SSE2
-DECL_CYC_COUNTER(pg_copy1);
-DECL_CYC_COUNTER(pg_copy2);
-DECL_CYC_COUNTER(pg_copy3);
-DECL_CYC_COUNTER(pg_copy4);
-#else
 DECL_CYC_COUNTER(pg_copy);
-#endif
 
 /* these are a concurrency bottleneck, could be percpu and dynamically
  * allocated iff opt_tmem_compress */
@@ -53,40 +46,12 @@ static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, workmem);
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, dstmem);
 static DEFINE_PER_CPU_READ_MOSTLY(void *, scratch_page);
 
-#ifdef COMPARE_COPY_PAGE_SSE2
-#include <asm/flushtlb.h>  /* REMOVE ME AFTER TEST */
-#include <asm/page.h>  /* REMOVE ME AFTER TEST */
-#endif
 void tmh_copy_page(char *to, char*from)
 {
-#ifdef COMPARE_COPY_PAGE_SSE2
-    DECL_LOCAL_CYC_COUNTER(pg_copy1);
-    DECL_LOCAL_CYC_COUNTER(pg_copy2);
-    DECL_LOCAL_CYC_COUNTER(pg_copy3);
-    DECL_LOCAL_CYC_COUNTER(pg_copy4);
-    *to = *from;  /* don't measure TLB misses */
-    flush_area_local(to,FLUSH_CACHE|FLUSH_ORDER(0));
-    flush_area_local(from,FLUSH_CACHE|FLUSH_ORDER(0));
-    START_CYC_COUNTER(pg_copy1);
-    copy_page_sse2(to, from);  /* cold cache */
-    END_CYC_COUNTER(pg_copy1);
-    START_CYC_COUNTER(pg_copy2);
-    copy_page_sse2(to, from);  /* hot cache */
-    END_CYC_COUNTER(pg_copy2);
-    flush_area_local(to,FLUSH_CACHE|FLUSH_ORDER(0));
-    flush_area_local(from,FLUSH_CACHE|FLUSH_ORDER(0));
-    START_CYC_COUNTER(pg_copy3);
-    memcpy(to, from, PAGE_SIZE);  /* cold cache */
-    END_CYC_COUNTER(pg_copy3);
-    START_CYC_COUNTER(pg_copy4);
-    memcpy(to, from, PAGE_SIZE); /* hot cache */
-    END_CYC_COUNTER(pg_copy4);
-#else
     DECL_LOCAL_CYC_COUNTER(pg_copy);
     START_CYC_COUNTER(pg_copy);
     memcpy(to, from, PAGE_SIZE);
     END_CYC_COUNTER(pg_copy);
-#endif
 }
 
 #if defined(CONFIG_ARM)

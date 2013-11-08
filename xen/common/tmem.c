@@ -95,14 +95,7 @@ DECL_CYC_COUNTER(non_succ_get);
 DECL_CYC_COUNTER(non_succ_put);
 DECL_CYC_COUNTER(flush);
 DECL_CYC_COUNTER(flush_obj);
-#ifdef COMPARE_COPY_PAGE_SSE2
-EXTERN_CYC_COUNTER(pg_copy1);
-EXTERN_CYC_COUNTER(pg_copy2);
-EXTERN_CYC_COUNTER(pg_copy3);
-EXTERN_CYC_COUNTER(pg_copy4);
-#else
 EXTERN_CYC_COUNTER(pg_copy);
-#endif
 DECL_CYC_COUNTER(compress);
 DECL_CYC_COUNTER(decompress);
 
@@ -2172,14 +2165,7 @@ static int tmemc_list_global_perf(tmem_cli_va_param_t buf, int off,
     n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,non_succ_put,"p");
     n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,flush,"F");
     n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,flush_obj,"O");
-#ifdef COMPARE_COPY_PAGE_SSE2
-    n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,pg_copy1,"1");
-    n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,pg_copy2,"2");
-    n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,pg_copy3,"3");
-    n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,pg_copy4,"4");
-#else
     n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,pg_copy,"C");
-#endif
     n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,compress,"c");
     n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,decompress,"d");
     n--; /* overwrite trailing comma */
