@@ -906,7 +906,7 @@ static int dt_translate_one(const struct dt_device_node *parent,
         dt_printk(XENLOG_ERR "DT: no ranges; cannot translate\n");
         return 1;
     }
-    if ( ranges == NULL || rlen == 0 )
+    if ( rlen == 0 )
     {
         offset = dt_read_number(addr, na);
         memset(addr, 0, pna * 4);
