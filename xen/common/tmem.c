@@ -299,32 +299,37 @@ static atomic_t global_rtree_node_count = ATOMIC_INIT(0);
 
 
 /************ MEMORY ALLOCATION INTERFACE *****************************/
-
-#define tmem_malloc(_type,_pool) \
-       _tmem_malloc(sizeof(_type), __alignof__(_type), _pool)
-
-#define tmem_malloc_bytes(_size,_pool) \
-       _tmem_malloc(_size, 1, _pool)
-
-static NOINLINE void *_tmem_malloc(size_t size, size_t align, struct tmem_pool *pool)
+static NOINLINE void *tmem_malloc(size_t size, struct tmem_pool *pool)
 {
-    void *v;
+    void *v = NULL;
 
-    if ( (pool != NULL) && is_persistent(pool) )
-        v = tmem_alloc_subpage_thispool(pool->client->persistent_pool,size,align);
+    if ( (pool != NULL) && is_persistent(pool) ) {
+        if ( pool->client->persistent_pool )
+            v = xmem_pool_alloc(size, pool->client->persistent_pool);
+    }
     else
-        v = tmem_alloc_subpage(pool, size, align);
+    {
+        ASSERT( size < tmem_mempool_maxalloc );
+        ASSERT( tmem_mempool != NULL );
+        v = xmem_pool_alloc(size, tmem_mempool);
+    }
     if ( v == NULL )
         alloc_failed++;
     return v;
 }
 
-static NOINLINE void tmem_free(void *p, size_t size, struct tmem_pool *pool)
+static NOINLINE void tmem_free(void *p, struct tmem_pool *pool)
 {
     if ( pool == NULL || !is_persistent(pool) )
-        tmem_free_subpage(p,size);
+    {
+        ASSERT( tmem_mempool != NULL );
+        xmem_pool_free(p, tmem_mempool);
+    }
     else
-        tmem_free_subpage_thispool(pool->client->persistent_pool,p,size);
+    {
+        ASSERT( pool->client->persistent_pool != NULL );
+        xmem_pool_free(p, pool->client->persistent_pool);
+    }
 }
 
 static NOINLINE struct page_info *tmem_page_alloc(struct tmem_pool *pool)
@@ -417,12 +422,12 @@ static NOINLINE void pcd_disassociate(struct tmem_page_descriptor *pgp, struct t
     /* reinit the struct for safety for now */
     RB_CLEAR_NODE(&pcd->pcd_rb_tree_node);
     /* now free up the pcd memory */
-    tmem_free(pcd,sizeof(struct tmem_page_content_descriptor),NULL);
+    tmem_free(pcd, NULL);
     atomic_dec_and_assert(global_pcd_count);
     if ( pgp_size != 0 && pcd_size < PAGE_SIZE )
     {
         /* compressed data */
-        tmem_free(pcd_cdata,pcd_csize,pool);
+        tmem_free(pcd_cdata, pool);
         pcd_tot_csize -= pcd_csize;
     }
     else if ( pcd_size != PAGE_SIZE )
@@ -430,7 +435,7 @@ static NOINLINE void pcd_disassociate(struct tmem_page_descriptor *pgp, struct t
         /* trailing zero data */
         pcd_tot_tze_size -= pcd_size;
         if ( pcd_size )
-            tmem_free(pcd_tze,pcd_size,pool);
+            tmem_free(pcd_tze, pool);
     } else {
         /* real physical page */
         if ( tmem_tze_enabled() )
@@ -523,14 +528,14 @@ static NOINLINE int pcd_associate(struct tmem_page_descriptor *pgp, char *cdata,
     }
 
     /* exited while loop with no match, so alloc a pcd and put it in the tree */
-    if ( (pcd = tmem_malloc(struct tmem_page_content_descriptor, NULL)) == NULL )
+    if ( (pcd = tmem_malloc(sizeof(struct tmem_page_content_descriptor), NULL)) == NULL )
     {
         ret = -ENOMEM;
         goto unlock;
     } else if ( cdata != NULL ) {
-        if ( (pcd->cdata = tmem_malloc_bytes(csize,pgp->us.obj->pool)) == NULL )
+        if ( (pcd->cdata = tmem_malloc(csize,pgp->us.obj->pool)) == NULL )
         {
-            tmem_free(pcd,sizeof(struct tmem_page_content_descriptor),NULL);
+            tmem_free(pcd, NULL);
             ret = -ENOMEM;
             goto unlock;
         }
@@ -549,7 +554,7 @@ static NOINLINE int pcd_associate(struct tmem_page_descriptor *pgp, char *cdata,
         pcd->size = 0;
         pcd->tze = NULL;
     } else if ( pfp_size < PAGE_SIZE &&
-         ((pcd->tze = tmem_malloc_bytes(pfp_size,pgp->us.obj->pool)) != NULL) ) {
+         ((pcd->tze = tmem_malloc(pfp_size,pgp->us.obj->pool)) != NULL) ) {
         tmem_tze_copy_from_pfp(pcd->tze,pgp->pfp,pfp_size);
         pcd->size = pfp_size;
         pcd_tot_tze_size += pfp_size;
@@ -588,7 +593,7 @@ static NOINLINE struct tmem_page_descriptor *pgp_alloc(struct tmem_object_root *
     ASSERT(obj != NULL);
     ASSERT(obj->pool != NULL);
     pool = obj->pool;
-    if ( (pgp = tmem_malloc(struct tmem_page_descriptor, pool)) == NULL )
+    if ( (pgp = tmem_malloc(sizeof(struct tmem_page_descriptor), pool)) == NULL )
         return NULL;
     pgp->us.obj = obj;
     INIT_LIST_HEAD(&pgp->global_eph_pages);
@@ -628,7 +633,7 @@ static NOINLINE void pgp_free_data(struct tmem_page_descriptor *pgp, struct tmem
     if ( tmem_dedup_enabled() && pgp->firstbyte != NOT_SHAREABLE )
         pcd_disassociate(pgp,pool,0); /* pgp->size lost */
     else if ( pgp_size )
-        tmem_free(pgp->cdata,pgp_size,pool);
+        tmem_free(pgp->cdata, pool);
     else
         tmem_page_free(pgp->us.obj->pool,pgp->pfp);
     if ( pool != NULL && pgp_size )
@@ -671,7 +676,7 @@ static NOINLINE void pgp_free(struct tmem_page_descriptor *pgp, int from_delete)
     INVERT_SENTINEL(pgp,PGD);
     pgp->us.obj = NULL;
     pgp->index = -1;
-    tmem_free(pgp,sizeof(struct tmem_page_descriptor),pool);
+    tmem_free(pgp, pool);
 }
 
 static NOINLINE void pgp_free_from_inv_list(struct client *client, struct tmem_page_descriptor *pgp)
@@ -683,7 +688,7 @@ static NOINLINE void pgp_free_from_inv_list(struct client *client, struct tmem_p
     INVERT_SENTINEL(pgp,PGD);
     pgp->us.obj = NULL;
     pgp->index = -1;
-    tmem_free(pgp,sizeof(struct tmem_page_descriptor),pool);
+    tmem_free(pgp, pool);
 }
 
 /* remove the page from appropriate lists but not from parent object */
@@ -793,7 +798,7 @@ static NOINLINE struct radix_tree_node *rtn_alloc(void *arg)
     ASSERT_SENTINEL(obj,OBJ);
     ASSERT(obj->pool != NULL);
     ASSERT_SENTINEL(obj->pool,POOL);
-    objnode = tmem_malloc(struct tmem_object_node,obj->pool);
+    objnode = tmem_malloc(sizeof(struct tmem_object_node),obj->pool);
     if (objnode == NULL)
         return NULL;
     objnode->obj = obj;
@@ -825,7 +830,7 @@ static void rtn_free(struct radix_tree_node *rtn, void *arg)
     pool->objnode_count--;
     objnode->obj->objnode_count--;
     objnode->obj = NULL;
-    tmem_free(objnode,sizeof(struct tmem_object_node),pool);
+    tmem_free(objnode, pool);
     atomic_dec_and_assert(global_rtree_node_count);
 }
 
@@ -934,7 +939,7 @@ static NOINLINE void obj_free(struct tmem_object_root *obj, int no_rebalance)
     if ( !no_rebalance )
         rb_erase(&obj->rb_tree_node,&pool->obj_rb_root[oid_hash(&old_oid)]);
     tmem_spin_unlock(&obj->obj_spinlock);
-    tmem_free(obj,sizeof(struct tmem_object_root),pool);
+    tmem_free(obj, pool);
 }
 
 static NOINLINE int obj_rb_insert(struct rb_root *root, struct tmem_object_root *obj)
@@ -974,7 +979,7 @@ static NOINLINE struct tmem_object_root * obj_new(struct tmem_pool *pool, struct
 
     ASSERT(pool != NULL);
     ASSERT_WRITELOCK(&pool->pool_rwlock);
-    if ( (obj = tmem_malloc(struct tmem_object_root,pool)) == NULL )
+    if ( (obj = tmem_malloc(sizeof(struct tmem_object_root), pool)) == NULL )
         return NULL;
     pool->obj_count++;
     if (pool->obj_count > pool->obj_count_max)
@@ -1081,7 +1086,7 @@ static int shared_pool_join(struct tmem_pool *pool, struct client *new_client)
     struct share_list *sl;
 
     ASSERT(is_shared(pool));
-    if ( (sl = tmem_malloc(struct share_list,NULL)) == NULL )
+    if ( (sl = tmem_malloc(sizeof(struct share_list), NULL)) == NULL )
         return -1;
     sl->client = new_client;
     list_add_tail(&sl->share_list, &pool->share_list);
@@ -1138,7 +1143,7 @@ static NOINLINE int shared_pool_quit(struct tmem_pool *pool, domid_t cli_id)
         if (sl->client->cli_id != cli_id)
             continue;
         list_del(&sl->share_list);
-        tmem_free(sl,sizeof(struct share_list),pool);
+        tmem_free(sl, pool);
         --pool->shared_count;
         if (pool->client->cli_id == cli_id)
             shared_pool_reassign(pool);
@@ -1463,7 +1468,7 @@ static NOINLINE int do_tmem_put_compress(struct tmem_page_descriptor *pgp, xen_p
     } else if ( tmem_dedup_enabled() && !is_persistent(pgp->us.obj->pool) ) {
         if ( (ret = pcd_associate(pgp,dst,size)) == -ENOMEM )
             goto out;
-    } else if ( (p = tmem_malloc_bytes(size,pgp->us.obj->pool)) == NULL ) {
+    } else if ( (p = tmem_malloc(size,pgp->us.obj->pool)) == NULL ) {
         ret = -ENOMEM;
         goto out;
     } else {

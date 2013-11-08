@@ -110,27 +110,6 @@ static inline void tmem_page_list_put(struct page_info *pi)
 /*
  * Memory allocation for persistent data 
  */
-static inline void *tmem_alloc_subpage_thispool(struct xmem_pool *cmem_mempool,
-                                                 size_t size, size_t align)
-{
-#if 0
-    if ( d->tot_pages >= d->max_pages )
-        return NULL;
-#endif
-    ASSERT( size < tmem_mempool_maxalloc );
-    if ( cmem_mempool == NULL )
-        return NULL;
-    return xmem_pool_alloc(size, cmem_mempool);
-}
-
-static inline void tmem_free_subpage_thispool(struct xmem_pool *cmem_mempool,
-                                               void *ptr, size_t size)
-{
-    ASSERT( size < tmem_mempool_maxalloc );
-    ASSERT( cmem_mempool != NULL );
-    xmem_pool_free(ptr,cmem_mempool);
-}
-
 static inline struct page_info *tmem_alloc_page_thispool(struct domain *d)
 {
     struct page_info *pi;
@@ -177,21 +156,6 @@ static inline void tmem_free_page_thispool(struct page_info *pi)
 /*
  * Memory allocation for ephemeral (non-persistent) data
  */
-
-static inline void *tmem_alloc_subpage(void *pool, size_t size,
-                                                 size_t align)
-{
-    ASSERT( size < tmem_mempool_maxalloc );
-    ASSERT( tmem_mempool != NULL );
-    return xmem_pool_alloc(size, tmem_mempool);
-}
-
-static inline void tmem_free_subpage(void *ptr, size_t size)
-{
-    ASSERT( size < tmem_mempool_maxalloc );
-    xmem_pool_free(ptr,tmem_mempool);
-}
-
 static inline struct page_info *tmem_alloc_page(void *pool, int no_heap)
 {
     struct page_info *pi = tmem_page_list_get();
