@@ -444,8 +444,7 @@ int xc_domain_hvm_getcontext_partial(xc_interface *xch,
 
     ret = do_domctl(xch, &domctl);
 
-    if ( ctxt_buf )
-        xc_hypercall_bounce_post(xch, ctxt_buf);
+    xc_hypercall_bounce_post(xch, ctxt_buf);
 
     return ret ? -1 : 0;
 }
