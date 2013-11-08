@@ -194,8 +194,6 @@ netfront_input(struct netif *netif, unsigned char* data, int len)
 
   /* points to packet payload, which starts with an Ethernet header */
   ethhdr = p->payload;
-
-  ethhdr = p->payload;
     
   switch (htons(ethhdr->type)) {
   /* IP packet? */
