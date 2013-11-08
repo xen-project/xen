@@ -61,8 +61,8 @@ struct file {
 static EFI_BOOT_SERVICES *__initdata efi_bs;
 static EFI_HANDLE __initdata efi_ih;
 
-static SIMPLE_TEXT_OUTPUT_INTERFACE __initdata *StdOut;
-static SIMPLE_TEXT_OUTPUT_INTERFACE __initdata *StdErr;
+static SIMPLE_TEXT_OUTPUT_INTERFACE *__initdata StdOut;
+static SIMPLE_TEXT_OUTPUT_INTERFACE *__initdata StdErr;
 
 static UINT32 __initdata mdesc_ver;
 
@@ -736,7 +736,7 @@ static void __init relocate_image(unsigned long delta)
                 }
                 break;
             default:
-                blexit(L"Unsupported relocation type\r\n");
+                blexit(L"Unsupported relocation type");
             }
         }
         base_relocs = (const void *)(base_relocs->entries + i + (i & 1));
@@ -804,9 +804,9 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     xen_phys_start = (UINTN)loaded_image->ImageBase;
     if ( (xen_phys_start + loaded_image->ImageSize - 1) >> 32 )
-        blexit(L"Xen must be loaded below 4Gb.\r\n");
+        blexit(L"Xen must be loaded below 4Gb.");
     if ( xen_phys_start & ((1 << L2_PAGETABLE_SHIFT) - 1) )
-        blexit(L"Xen must be loaded at a 2Mb boundary.\r\n");
+        blexit(L"Xen must be loaded at a 2Mb boundary.");
     trampoline_xen_phys_start = xen_phys_start;
 
     /* Get the file system interface. */
@@ -925,13 +925,13 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             *tail = 0;
         }
         if ( !tail )
-            blexit(L"No configuration file found\r\n");
+            blexit(L"No configuration file found.");
         PrintStr(L"Using configuration file '");
         PrintStr(file_name);
         PrintStr(L"'\r\n");
     }
     else if ( !read_file(dir_handle, cfg_file_name, &cfg) )
-        blexit(L"Configuration file not found\r\n");
+        blexit(L"Configuration file not found.");
     pre_parse(&cfg);
 
     if ( section.w )
@@ -954,13 +954,13 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             PrintStr(L"Chained configuration file '");
             PrintStr(name.w);
             efi_bs->FreePool(name.w);
-            blexit(L"'not found\r\n");
+            blexit(L"'not found.");
         }
         pre_parse(&cfg);
         efi_bs->FreePool(name.w);
     }
     if ( !name.s )
-        blexit(L"No Dom0 kernel image specified\r\n");
+        blexit(L"No Dom0 kernel image specified.");
     split_value(name.s);
     read_file(dir_handle, s2w(&name), &kernel);
     efi_bs->FreePool(name.w);
@@ -968,7 +968,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     if ( !EFI_ERROR(efi_bs->LocateProtocol(&shim_lock_guid, NULL,
                     (void **)&shim_lock)) &&
          shim_lock->Verify(kernel.ptr, kernel.size) != EFI_SUCCESS )
-        blexit(L"Dom0 kernel image could not be verified\r\n");
+        blexit(L"Dom0 kernel image could not be verified.");
 
     name.s = get_value(&cfg, section.s, "ramdisk");
     if ( name.s )
@@ -1384,12 +1384,12 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     mbi.mem_upper -= efi_memmap_size;
     mbi.mem_upper &= -__alignof__(EFI_MEMORY_DESCRIPTOR);
     if ( mbi.mem_upper < xen_phys_start )
-        blexit(L"Out of static memory\r\n");
+        blexit(L"Out of static memory");
     efi_memmap = (void *)(long)mbi.mem_upper;
     status = efi_bs->GetMemoryMap(&efi_memmap_size, efi_memmap, &map_key,
                                   &efi_mdesc_size, &mdesc_ver);
     if ( EFI_ERROR(status) )
-        blexit(L"Cannot obtain memory map\r\n");
+        blexit(L"Cannot obtain memory map");
 
     /* Populate E820 table and check trampoline area availability. */
     e = e820map - 1;
