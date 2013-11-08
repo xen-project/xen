@@ -746,6 +746,22 @@ static void __init relocate_image(unsigned long delta)
 extern const s32 __trampoline_rel_start[], __trampoline_rel_stop[];
 extern const s32 __trampoline_seg_start[], __trampoline_seg_stop[];
 
+static void __init relocate_trampoline(unsigned long phys)
+{
+    const s32 *trampoline_ptr;
+
+    trampoline_phys = phys;
+    /* Apply relocations to trampoline. */
+    for ( trampoline_ptr = __trampoline_rel_start;
+          trampoline_ptr < __trampoline_rel_stop;
+          ++trampoline_ptr )
+        *(u32 *)(*trampoline_ptr + (long)trampoline_ptr) += phys;
+    for ( trampoline_ptr = __trampoline_seg_start;
+          trampoline_ptr < __trampoline_seg_stop;
+          ++trampoline_ptr )
+        *(u16 *)(*trampoline_ptr + (long)trampoline_ptr) = phys >> 4;
+}
+
 void EFIAPI __init __attribute__((__noreturn__))
 efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
@@ -765,7 +781,6 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *mode_info;
     EFI_FILE_HANDLE dir_handle;
     union string section = { NULL }, name;
-    const s32 *trampoline_ptr;
     struct e820entry *e;
     u64 efer;
     bool_t base_video = 0;
@@ -1268,23 +1283,13 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     cfg.size = trampoline_end - trampoline_start;
     status = efi_bs->AllocatePages(AllocateMaxAddress, EfiLoaderData,
                                    PFN_UP(cfg.size), &cfg.addr);
-    if ( EFI_ERROR(status) )
+    if ( status == EFI_SUCCESS )
+        relocate_trampoline(cfg.addr);
+    else
     {
         cfg.addr = 0;
-        blexit(L"No memory for trampoline\r\n");
+        PrintStr(L"Trampoline space cannot be allocated; will try fallback.\r\n");
     }
-    trampoline_phys = cfg.addr;
-    /* Apply relocations to trampoline. */
-    for ( trampoline_ptr = __trampoline_rel_start;
-          trampoline_ptr < __trampoline_rel_stop;
-          ++trampoline_ptr )
-        *(u32 *)(*trampoline_ptr + (long)trampoline_ptr) +=
-            trampoline_phys;
-    for ( trampoline_ptr = __trampoline_seg_start;
-          trampoline_ptr < __trampoline_seg_stop;
-          ++trampoline_ptr )
-        *(u16 *)(*trampoline_ptr + (long)trampoline_ptr) =
-            trampoline_phys >> 4;
 
     /* Initialise L2 identity-map and boot-map page table entries (16MB). */
     for ( i = 0; i < 8; ++i )
@@ -1400,10 +1405,14 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             type = E820_RESERVED;
             break;
         case EfiConventionalMemory:
-        case EfiLoaderCode:
-        case EfiLoaderData:
         case EfiBootServicesCode:
         case EfiBootServicesData:
+            if ( !trampoline_phys && desc->PhysicalStart + len <= 0x100000 &&
+                 len >= cfg.size && desc->PhysicalStart + len > cfg.addr )
+                cfg.addr = (desc->PhysicalStart + len - cfg.size) & PAGE_MASK;
+            /* fall through */
+        case EfiLoaderCode:
+        case EfiLoaderData:
             if ( desc->Attribute & EFI_MEMORY_WB )
                 type = E820_RAM;
             else
@@ -1430,6 +1439,12 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             e->type = type;
             ++e820nr;
         }
+    }
+    if ( !trampoline_phys )
+    {
+        if ( !cfg.addr )
+            blexit(L"No memory for trampoline");
+        relocate_trampoline(cfg.addr);
     }
 
     status = efi_bs->ExitBootServices(ImageHandle, map_key);
