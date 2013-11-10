@@ -31,7 +31,7 @@
 
 #ifdef DEBUG_RECEIVED
 #  define DEBUG_REPORT_RECEIVED(buf, len) \
-    LIBXL__LOG(qmp->ctx, LIBXL__LOG_DEBUG, "received: '%.*s'", len, buf)
+    LOG(DEBUG, "received: '%.*s'", len, buf)
 #else
 #  define DEBUG_REPORT_RECEIVED(buf, len) ((void)0)
 #endif
@@ -190,8 +190,7 @@ static int qmp_register_vnc_callback(libxl__qmp_handler *qmp,
     port = libxl__json_object_get_string(obj);
 
     if (!addr || !port) {
-        LIBXL__LOG(qmp->ctx, LIBXL__LOG_ERROR,
-                   "Failed to retreive VNC connect information.");
+        LOG(ERROR, "Failed to retreive VNC connect information.");
         goto out;
     }
 
@@ -435,7 +434,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
 
         ret = select(qmp->qmp_fd + 1, &rfds, NULL, NULL, &timeout);
         if (ret == 0) {
-            LIBXL__LOG(qmp->ctx, LIBXL__LOG_ERROR, "timeout");
+            LOG(ERROR, "timeout");
             return -1;
         } else if (ret < 0) {
             if (errno == EINTR)
@@ -446,7 +445,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
 
         rd = read(qmp->qmp_fd, qmp->buffer, QMP_RECEIVE_BUFFER_SIZE);
         if (rd == 0) {
-            LIBXL__LOG(qmp->ctx, LIBXL__LOG_ERROR, "Unexpected end of socket");
+            LOG(ERROR, "Unexpected end of socket");
             return -1;
         } else if (rd < 0) {
             LIBXL__LOG_ERRNO(qmp->ctx, LIBXL__LOG_ERROR, "Socket read error");
@@ -484,8 +483,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
                 if (o) {
                     rc = qmp_handle_response(qmp, o);
                 } else {
-                    LIBXL__LOG(qmp->ctx, LIBXL__LOG_ERROR,
-                               "Parse error of : %s\n", s);
+                    LOG(ERROR, "Parse error of : %s\n", s);
                     return -1;
                 }
 
@@ -531,8 +529,7 @@ static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
     s = yajl_gen_get_buf(hand, &buf, &len);
 
     if (s) {
-        LIBXL__LOG(qmp->ctx, LIBXL__LOG_ERROR,
-                   "Failed to generate a qmp command");
+        LOG(ERROR, "Failed to generate a qmp command");
         goto out;
     }
 
@@ -550,7 +547,7 @@ static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
 
     ret = libxl__strndup(gc, (const char*)buf, len);
 
-    LIBXL__LOG(qmp->ctx, LIBXL__LOG_DEBUG, "next qmp command: '%s'", buf);
+    LOG(DEBUG, "next qmp command: '%s'", buf);
 
 out:
     yajl_gen_free(hand);
@@ -702,7 +699,7 @@ libxl__qmp_handler *libxl__qmp_initialize(libxl__gc *gc, uint32_t domid)
         return NULL;
     }
 
-    LIBXL__LOG(qmp->ctx, LIBXL__LOG_DEBUG, "connected to %s", qmp_socket);
+    LOG(DEBUG, "connected to %s", qmp_socket);
 
     /* Wait for the response to qmp_capabilities */
     while (!qmp->connected) {
@@ -712,7 +709,7 @@ libxl__qmp_handler *libxl__qmp_initialize(libxl__gc *gc, uint32_t domid)
     }
 
     if (!qmp->connected) {
-        LIBXL__LOG(qmp->ctx, LIBXL__LOG_ERROR, "Failed to connect to QMP");
+        LOG(ERROR, "Failed to connect to QMP");
         libxl__qmp_close(qmp);
         return NULL;
     }
