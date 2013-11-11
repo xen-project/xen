@@ -561,9 +561,9 @@ static int qmp_send(libxl__qmp_handler *qmp,
 {
     char *buf = NULL;
     int rc = -1;
-    libxl__gc gc; LIBXL_INIT_GC(gc,qmp->ctx);
+    GC_INIT(qmp->ctx);
 
-    buf = qmp_send_prepare(&gc, qmp, cmd, args, callback, opaque, context);
+    buf = qmp_send_prepare(gc, qmp, cmd, args, callback, opaque, context);
 
     if (buf == NULL) {
         goto out;
@@ -578,7 +578,7 @@ static int qmp_send(libxl__qmp_handler *qmp,
 
     rc = qmp->last_id_used;
 out:
-    libxl__free_all(&gc);
+    GC_FREE;
     return rc;
 }
 
