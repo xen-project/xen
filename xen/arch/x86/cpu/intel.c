@@ -204,7 +204,7 @@ static void __devinit init_intel(struct cpuinfo_x86 *c)
 		detect_ht(c);
 	}
 
-	if (smp_processor_id() == 0) {
+	if (c == &boot_cpu_data && c->x86 == 6) {
 		if (probe_intel_cpuid_faulting())
 			set_bit(X86_FEATURE_CPUID_FAULTING, c->x86_capability);
 	} else if (boot_cpu_has(X86_FEATURE_CPUID_FAULTING)) {
