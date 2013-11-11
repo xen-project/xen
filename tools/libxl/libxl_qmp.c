@@ -342,8 +342,7 @@ static libxl__qmp_handler *qmp_init_handler(libxl__gc *gc, uint32_t domid)
 
     qmp = calloc(1, sizeof (libxl__qmp_handler));
     if (qmp == NULL) {
-        LIBXL__LOG_ERRNO(libxl__gc_owner(gc), LIBXL__LOG_ERROR,
-                         "Failed to allocate qmp_handler");
+        LOGE(ERROR, "Failed to allocate qmp_handler");
         return NULL;
     }
     qmp->ctx = CTX;
@@ -437,7 +436,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
         } else if (ret < 0) {
             if (errno == EINTR)
                 continue;
-            LIBXL__LOG_ERRNO(qmp->ctx, LIBXL__LOG_ERROR, "Select error");
+            LOGE(ERROR, "Select error");
             return -1;
         }
 
@@ -446,7 +445,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
             LOG(ERROR, "Unexpected end of socket");
             return -1;
         } else if (rd < 0) {
-            LIBXL__LOG_ERRNO(qmp->ctx, LIBXL__LOG_ERROR, "Socket read error");
+            LOGE(ERROR, "Socket read error");
             return rd;
         }
 
@@ -533,8 +532,7 @@ static char *qmp_send_prepare(libxl__gc *gc, libxl__qmp_handler *qmp,
 
     elm = malloc(sizeof (callback_id_pair));
     if (elm == NULL) {
-        LIBXL__LOG_ERRNO(qmp->ctx, LIBXL__LOG_ERROR,
-                         "Failed to allocate a QMP callback");
+        LOGE(ERROR, "Failed to allocate a QMP callback");
         goto out;
     }
     elm->id = qmp->last_id_used;
@@ -692,7 +690,7 @@ libxl__qmp_handler *libxl__qmp_initialize(libxl__gc *gc, uint32_t domid)
     qmp_socket = libxl__sprintf(gc, "%s/qmp-libxl-%d",
                                 libxl__run_dir_path(), domid);
     if ((ret = qmp_open(qmp, qmp_socket, QMP_SOCKET_CONNECT_TIMEOUT)) < 0) {
-        LIBXL__LOG_ERRNO(qmp->ctx, LIBXL__LOG_ERROR, "Connection error");
+        LOGE(ERROR, "Connection error");
         qmp_free_handler(qmp);
         return NULL;
     }
@@ -724,16 +722,13 @@ void libxl__qmp_close(libxl__qmp_handler *qmp)
 
 void libxl__qmp_cleanup(libxl__gc *gc, uint32_t domid)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     char *qmp_socket;
 
     qmp_socket = libxl__sprintf(gc, "%s/qmp-libxl-%d",
                                 libxl__run_dir_path(), domid);
     if (unlink(qmp_socket) == -1) {
         if (errno != ENOENT) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR,
-                             "Failed to remove QMP socket file %s",
-                             qmp_socket);
+            LOGE(ERROR, "Failed to remove QMP socket file %s", qmp_socket);
         }
     }
 }
