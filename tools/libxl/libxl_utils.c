@@ -478,11 +478,14 @@ int libxl__remove_directory(libxl__gc *gc, const char *dirpath)
 
 int libxl_pipe(libxl_ctx *ctx, int pipes[2])
 {
+    GC_INIT(ctx);
+    int ret = 0;
     if (pipe(pipes) < 0) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Failed to create a pipe");
-        return -1;
+        LOG(ERROR, "Failed to create a pipe");
+        ret = -1;
     }
-    return 0;
+    GC_FREE;
+    return ret;
 }
 
 int libxl_uuid_to_device_vtpm(libxl_ctx *ctx, uint32_t domid,
