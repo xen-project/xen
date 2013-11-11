@@ -157,8 +157,10 @@ int libxl__carefd_fd(const libxl__carefd *cf)
 
 static void sigchld_handler(int signo)
 {
+    int esave = errno;
     int e = libxl__self_pipe_wakeup(sigchld_owner->sigchld_selfpipe[1]);
     assert(!e); /* errors are probably EBADF, very bad */
+    errno = esave;
 }
 
 static void sigchld_removehandler_core(void)
