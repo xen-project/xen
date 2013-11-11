@@ -1509,15 +1509,10 @@ static void clear_vvmcs_launched(struct list_head *launched_list,
     }
 }
 
-int nvmx_vmresume(struct vcpu *v, struct cpu_user_regs *regs)
+static int nvmx_vmresume(struct vcpu *v, struct cpu_user_regs *regs)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-    int rc;
-
-    rc = vmx_inst_check_privilege(regs, 0);
-    if ( rc != X86EMUL_OKAY )
-        return rc;
 
     /* check VMCS is valid and IO BITMAP is set */
     if ( (nvcpu->nv_vvmcxaddr != VMCX_EADDR) &&
@@ -1536,6 +1531,10 @@ int nvmx_handle_vmresume(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    int rc = vmx_inst_check_privilege(regs, 0);
+
+    if ( rc != X86EMUL_OKAY )
+        return rc;
 
     if ( vcpu_nestedhvm(v).nv_vvmcxaddr == VMCX_EADDR )
     {
@@ -1555,10 +1554,13 @@ int nvmx_handle_vmresume(struct cpu_user_regs *regs)
 int nvmx_handle_vmlaunch(struct cpu_user_regs *regs)
 {
     bool_t launched;
-    int rc;
     struct vcpu *v = current;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
+    int rc = vmx_inst_check_privilege(regs, 0);
+
+    if ( rc != X86EMUL_OKAY )
+        return rc;
 
     if ( vcpu_nestedhvm(v).nv_vvmcxaddr == VMCX_EADDR )
     {
