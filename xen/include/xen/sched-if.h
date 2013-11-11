@@ -47,95 +47,69 @@ DECLARE_PER_CPU(struct schedule_data, schedule_data);
 DECLARE_PER_CPU(struct scheduler *, scheduler);
 DECLARE_PER_CPU(struct cpupool *, cpupool);
 
-static inline spinlock_t * pcpu_schedule_lock(int cpu)
-{
-    spinlock_t * lock=NULL;
-
-    for ( ; ; )
-    {
-        /* The per_cpu(v->processor) may also change, if changing
-         * cpu pool also changes the scheduler lock.  Retry
-         * until they match.
-         */
-        lock=per_cpu(schedule_data, cpu).schedule_lock;
-
-        spin_lock(lock);
-        if ( likely(lock == per_cpu(schedule_data, cpu).schedule_lock) )
-            break;
-        spin_unlock(lock);
-    }
-    return lock;
+#define sched_lock(kind, param, cpu, irq, arg...) \
+static inline spinlock_t *kind##_schedule_lock##irq(param EXTRA_TYPE(arg)) \
+{ \
+    for ( ; ; ) \
+    { \
+        spinlock_t *lock = per_cpu(schedule_data, cpu).schedule_lock; \
+        /* \
+         * v->processor may change when grabbing the lock; but \
+         * per_cpu(v->processor) may also change, if changing cpu pool \
+         * also changes the scheduler lock.  Retry until they match. \
+         * \
+         * It may also be the case that v->processor may change but the \
+         * lock may be the same; this will succeed in that case. \
+         */ \
+        spin_lock##irq(lock, ## arg); \
+        if ( likely(lock == per_cpu(schedule_data, cpu).schedule_lock) ) \
+            return lock; \
+        spin_unlock##irq(lock, ## arg); \
+    } \
 }
 
-static inline int pcpu_schedule_trylock(int cpu)
-{
-    spinlock_t * lock=NULL;
+#define sched_unlock(kind, param, cpu, irq, arg...) \
+static inline void kind##_schedule_unlock##irq(spinlock_t *lock \
+                                               EXTRA_TYPE(arg), param) \
+{ \
+    ASSERT(lock == per_cpu(schedule_data, cpu).schedule_lock); \
+    spin_unlock##irq(lock, ## arg); \
+}
 
-    lock=per_cpu(schedule_data, cpu).schedule_lock;
-    if ( ! spin_trylock(lock) )
-        return 0;
+#define EXTRA_TYPE(arg)
+sched_lock(pcpu, unsigned int cpu,     cpu, )
+sched_lock(vcpu, const struct vcpu *v, v->processor, )
+sched_lock(pcpu, unsigned int cpu,     cpu,          _irq)
+sched_lock(vcpu, const struct vcpu *v, v->processor, _irq)
+sched_unlock(pcpu, unsigned int cpu,     cpu, )
+sched_unlock(vcpu, const struct vcpu *v, v->processor, )
+sched_unlock(pcpu, unsigned int cpu,     cpu,          _irq)
+sched_unlock(vcpu, const struct vcpu *v, v->processor, _irq)
+#undef EXTRA_TYPE
+
+#define EXTRA_TYPE(arg) , unsigned long arg
+#define spin_unlock_irqsave spin_unlock_irqrestore
+sched_lock(pcpu, unsigned int cpu,     cpu,          _irqsave, *flags)
+sched_lock(vcpu, const struct vcpu *v, v->processor, _irqsave, *flags)
+#undef spin_unlock_irqsave
+sched_unlock(pcpu, unsigned int cpu,     cpu,          _irqrestore, flags)
+sched_unlock(vcpu, const struct vcpu *v, v->processor, _irqrestore, flags)
+#undef EXTRA_TYPE
+
+#undef sched_unlock
+#undef sched_lock
+
+static inline spinlock_t *pcpu_schedule_trylock(unsigned int cpu)
+{
+    spinlock_t *lock = per_cpu(schedule_data, cpu).schedule_lock;
+
+    if ( !spin_trylock(lock) )
+        return NULL;
     if ( lock == per_cpu(schedule_data, cpu).schedule_lock )
-        return 1;
-    else
-    {
-        spin_unlock(lock);
-        return 0;
-    }
+        return lock;
+    spin_unlock(lock);
+    return NULL;
 }
-
-#define pcpu_schedule_lock_irq(p) \
-    do { local_irq_disable(); pcpu_schedule_lock(p); } while ( 0 )
-#define pcpu_schedule_lock_irqsave(p, flags) \
-    do { local_irq_save(flags); pcpu_schedule_lock(p); } while ( 0 )
-
-static inline void pcpu_schedule_unlock(int cpu)
-{
-    spin_unlock(per_cpu(schedule_data, cpu).schedule_lock);
-}
-
-#define pcpu_schedule_unlock_irq(p) \
-    do { pcpu_schedule_unlock(p); local_irq_enable(); } while ( 0 )
-#define pcpu_schedule_unlock_irqrestore(p, flags) \
-    do { pcpu_schedule_unlock(p); local_irq_restore(flags); } while ( 0 )
-
-static inline void vcpu_schedule_lock(struct vcpu *v)
-{
-    spinlock_t * lock;
-
-    for ( ; ; )
-    {
-        /* v->processor may change when grabbing the lock; but
-         * per_cpu(v->processor) may also change, if changing
-         * cpu pool also changes the scheduler lock.  Retry
-         * until they match.
-         *
-         * It may also be the case that v->processor may change
-         * but the lock may be the same; this will succeed
-         * in that case.
-         */
-        lock=per_cpu(schedule_data, v->processor).schedule_lock;
-
-        spin_lock(lock);
-        if ( likely(lock == per_cpu(schedule_data, v->processor).schedule_lock) )
-            break;
-        spin_unlock(lock);
-    }
-}
-
-#define vcpu_schedule_lock_irq(v) \
-    do { local_irq_disable(); vcpu_schedule_lock(v); } while ( 0 )
-#define vcpu_schedule_lock_irqsave(v, flags) \
-    do { local_irq_save(flags); vcpu_schedule_lock(v); } while ( 0 )
-
-static inline void vcpu_schedule_unlock(struct vcpu *v)
-{
-    spin_unlock(per_cpu(schedule_data, v->processor).schedule_lock);
-}
-
-#define vcpu_schedule_unlock_irq(v) \
-    do { vcpu_schedule_unlock(v); local_irq_enable(); } while ( 0 )
-#define vcpu_schedule_unlock_irqrestore(v, flags) \
-    do { vcpu_schedule_unlock(v); local_irq_restore(flags); } while ( 0 )
 
 struct task_slice {
     struct vcpu *task;
