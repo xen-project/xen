@@ -290,6 +290,7 @@ out:
 
 int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
                              void **data_r, int *datalen_r) {
+    GC_INIT(ctx);
     FILE *f = 0;
     uint8_t *data = 0;
     int datalen = 0;
@@ -300,23 +301,23 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
     f = fopen(filename, "r");
     if (!f) {
         if (errno == ENOENT) return ENOENT;
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to open %s", filename);
+        LOGE(ERROR, "failed to open %s", filename);
         goto xe;
     }
 
     if (fstat(fileno(f), &stab)) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to fstat %s", filename);
+        LOGE(ERROR, "failed to fstat %s", filename);
         goto xe;
     }
 
     if (!S_ISREG(stab.st_mode)) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "%s is not a plain file", filename);
+        LOGE(ERROR, "%s is not a plain file", filename);
         errno = ENOTTY;
         goto xe;
     }
 
     if (stab.st_size > INT_MAX) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "file %s is far too large", filename);
+        LOG(ERROR, "file %s is far too large", filename);
         errno = EFBIG;
         goto xe;
     }
@@ -330,10 +331,10 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
         rs = fread(data, 1, datalen, f);
         if (rs != datalen) {
             if (ferror(f))
-                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to read %s", filename);
+                LOGE(ERROR, "failed to read %s", filename);
             else if (feof(f))
-                LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "%s changed size while we"
-                       " were reading it", filename);
+                LOG(ERROR, "%s changed size while we were reading it",
+		    filename);
             else
                 abort();
             goto xe;
@@ -342,16 +343,18 @@ int libxl_read_file_contents(libxl_ctx *ctx, const char *filename,
 
     if (fclose(f)) {
         f = 0;
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to close %s", filename);
+        LOGE(ERROR, "failed to close %s", filename);
         goto xe;
     }
 
     if (data_r) *data_r = data;
     if (datalen_r) *datalen_r = datalen;
 
+    GC_FREE;
     return 0;
 
  xe:
+    GC_FREE;
     e = errno;
     assert(e != ENOENT);
     if (f) fclose(f);
