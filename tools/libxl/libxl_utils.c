@@ -57,7 +57,7 @@ char *libxl_domid_to_name(libxl_ctx *ctx, uint32_t domid)
 
 char *libxl__domid_to_name(libxl__gc *gc, uint32_t domid)
 {
-    char *s = libxl_domid_to_name(libxl__gc_owner(gc), domid);
+    char *s = libxl_domid_to_name(CTX, domid);
     libxl__ptr_add(gc, s);
     return s;
 }
@@ -135,7 +135,7 @@ int libxl_cpupoolid_is_valid(libxl_ctx *ctx, uint32_t poolid)
 
 char *libxl__cpupoolid_to_name(libxl__gc *gc, uint32_t poolid)
 {
-    char *s = libxl_cpupoolid_to_name(libxl__gc_owner(gc), poolid);
+    char *s = libxl_cpupoolid_to_name(CTX, poolid);
     libxl__ptr_add(gc, s);
     return s;
 }
