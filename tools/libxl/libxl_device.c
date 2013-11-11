@@ -24,20 +24,20 @@ char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device)
 
     /* Console 0 is a special case */
     if (device->kind == LIBXL__DEVICE_KIND_CONSOLE && device->devid == 0)
-        return libxl__sprintf(gc, "%s/console", dom_path);
+        return GCSPRINTF("%s/console", dom_path);
 
-    return libxl__sprintf(gc, "%s/device/%s/%d", dom_path,
-                          libxl__device_kind_to_string(device->kind),
-                          device->devid);
+    return GCSPRINTF("%s/device/%s/%d", dom_path,
+                     libxl__device_kind_to_string(device->kind),
+                     device->devid);
 }
 
 char *libxl__device_backend_path(libxl__gc *gc, libxl__device *device)
 {
     char *dom_path = libxl__xs_get_dompath(gc, device->backend_domid);
 
-    return libxl__sprintf(gc, "%s/backend/%s/%u/%d", dom_path,
-                          libxl__device_kind_to_string(device->backend_kind),
-                          device->domid, device->devid);
+    return GCSPRINTF("%s/backend/%s/%u/%d", dom_path,
+                     libxl__device_kind_to_string(device->backend_kind),
+                     device->domid, device->devid);
 }
 
 int libxl__parse_backend_path(libxl__gc *gc,
@@ -125,7 +125,8 @@ retry_transaction:
         else
             xs_set_permissions(ctx->xsh, t, frontend_path,
                                frontend_perms, ARRAY_SIZE(frontend_perms));
-        xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/backend", frontend_path), backend_path, strlen(backend_path));
+        xs_write(ctx->xsh, t, GCSPRINTF("%s/backend", frontend_path),
+                 backend_path, strlen(backend_path));
         if (fents)
             libxl__xs_writev_perms(gc, t, frontend_path, fents,
                                    frontend_perms, ARRAY_SIZE(frontend_perms));
@@ -138,7 +139,8 @@ retry_transaction:
         xs_rm(ctx->xsh, t, backend_path);
         xs_mkdir(ctx->xsh, t, backend_path);
         xs_set_permissions(ctx->xsh, t, backend_path, backend_perms, ARRAY_SIZE(backend_perms));
-        xs_write(ctx->xsh, t, libxl__sprintf(gc, "%s/frontend", backend_path), frontend_path, strlen(frontend_path));
+        xs_write(ctx->xsh, t, GCSPRINTF("%s/frontend", backend_path),
+                 frontend_path, strlen(frontend_path));
         libxl__xs_writev(gc, t, backend_path, bents);
     }
 
@@ -149,7 +151,7 @@ retry_transaction:
         if (errno == EAGAIN)
             goto retry_transaction;
         else {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "xs transaction failed");
+            LOGE(ERROR, "xs transaction failed");
             return ERROR_FAIL;
         }
     }
@@ -168,7 +170,6 @@ static int disk_try_backend(disk_try_backend_args *a,
     libxl__gc *gc = a->gc;
     /* returns 0 (ie, DISK_BACKEND_UNKNOWN) on failure, or
      * backend on success */
-    libxl_ctx *ctx = libxl__gc_owner(gc);
 
     switch (backend) {
     case LIBXL_DISK_BACKEND_PHY:
@@ -192,24 +193,21 @@ static int disk_try_backend(disk_try_backend_args *a,
         if (libxl__try_phy_backend(a->stab.st_mode))
             return backend;
 
-        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend phy"
-                   " unsuitable as phys path not a block device",
-                   a->disk->vdev);
+        LOG(DEBUG, "Disk vdev=%s, backend phy unsuitable as phys path not a "
+                   "block device", a->disk->vdev);
         return 0;
 
     case LIBXL_DISK_BACKEND_TAP:
         if (a->disk->script) goto bad_script;
 
         if (a->disk->is_cdrom) {
-            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend tap"
-                       " unsuitable for cdroms",
+            LOG(DEBUG, "Disk vdev=%s, backend tap unsuitable for cdroms",
                        a->disk->vdev);
             return 0;
         }
         if (!libxl__blktap_enabled(a->gc)) {
-            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend tap"
-                       " unsuitable because blktap not available",
-                       a->disk->vdev);
+            LOG(DEBUG, "Disk vdev=%s, backend tap unsuitable because blktap "
+                       "not available", a->disk->vdev);
             return 0;
         }
         if (!(a->disk->format == LIBXL_DISK_FORMAT_RAW ||
@@ -223,16 +221,14 @@ static int disk_try_backend(disk_try_backend_args *a,
         return backend;
 
     default:
-        LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend "
-                   " %d unknown", a->disk->vdev, backend);
+        LOG(DEBUG, "Disk vdev=%s, backend %d unknown", a->disk->vdev, backend);
         return 0;
 
     }
     abort(); /* notreached */
 
  bad_format:
-    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, backend %s"
-               " unsuitable due to format %s",
+    LOG(DEBUG, "Disk vdev=%s, backend %s unsuitable due to format %s",
                a->disk->vdev,
                libxl_disk_backend_to_string(backend),
                libxl_disk_format_to_string(a->disk->format));
@@ -245,22 +241,18 @@ static int disk_try_backend(disk_try_backend_args *a,
 }
 
 int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     libxl_disk_backend ok;
     disk_try_backend_args a;
 
     a.gc = gc;
     a.disk = disk;
 
-    LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s spec.backend=%s",
-               disk->vdev,
+    LOG(DEBUG, "Disk vdev=%s spec.backend=%s", disk->vdev,
                libxl_disk_backend_to_string(disk->backend));
 
     if (disk->format == LIBXL_DISK_FORMAT_EMPTY) {
         if (!disk->is_cdrom) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Disk vdev=%s is empty"
-                       " but not cdrom",
-                       disk->vdev);
+            LOG(ERROR, "Disk vdev=%s is empty but not cdrom", disk->vdev);
             return ERROR_INVAL;
         }
         memset(&a.stab, 0, sizeof(a.stab));
@@ -269,16 +261,14 @@ int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
                disk->backend_domid == LIBXL_TOOLSTACK_DOMID &&
                !disk->script) {
         if (stat(disk->pdev_path, &a.stab)) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Disk vdev=%s "
-                             "failed to stat: %s",
-                             disk->vdev, disk->pdev_path);
+            LOGE(ERROR, "Disk vdev=%s failed to stat: %s",
+                        disk->vdev, disk->pdev_path);
             return ERROR_INVAL;
         }
         if (!S_ISBLK(a.stab.st_mode) &
             !S_ISREG(a.stab.st_mode)) {
-            LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Disk vdev=%s "
-                             "phys path is not a block dev or file: %s",
-                             disk->vdev, disk->pdev_path);
+            LOG(ERROR, "Disk vdev=%s phys path is not a block dev or file: %s",
+                       disk->vdev, disk->pdev_path);
             return ERROR_INVAL;
         }
     }
@@ -291,13 +281,12 @@ int libxl__device_disk_set_backend(libxl__gc *gc, libxl_device_disk *disk) {
             disk_try_backend(&a, LIBXL_DISK_BACKEND_QDISK) ?:
             disk_try_backend(&a, LIBXL_DISK_BACKEND_TAP);
         if (ok)
-            LIBXL__LOG(ctx, LIBXL__LOG_DEBUG, "Disk vdev=%s, using backend %s",
+            LOG(DEBUG, "Disk vdev=%s, using backend %s",
                        disk->vdev,
                        libxl_disk_backend_to_string(ok));
     }
     if (!ok) {
-        LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "no suitable backend for disk %s",
-                   disk->vdev);
+        LOG(ERROR, "no suitable backend for disk %s", disk->vdev);
         return ERROR_INVAL;
     }
     disk->backend = ok;
@@ -595,7 +584,6 @@ static void devices_remove_callback(libxl__egc *egc,
 void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
 {
     STATE_AO_GC(drs->ao);
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     uint32_t domid = drs->domid;
     char *path;
     unsigned int num_kinds, num_dev_xsentries;
@@ -609,12 +597,11 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
     libxl__multidev_begin(ao, multidev);
     multidev->callback = devices_remove_callback;
 
-    path = libxl__sprintf(gc, "/local/domain/%d/device", domid);
+    path = GCSPRINTF("/local/domain/%d/device", domid);
     kinds = libxl__xs_directory(gc, XBT_NULL, path, &num_kinds);
     if (!kinds) {
         if (errno != ENOENT) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "unable to get xenstore"
-                             " device listing %s", path);
+            LOGE(ERROR, "unable to get xenstore device listing %s", path);
             goto out;
         }
         num_kinds = 0;
@@ -623,13 +610,13 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
         if (libxl__device_kind_from_string(kinds[i], &kind))
             continue;
 
-        path = libxl__sprintf(gc, "/local/domain/%d/device/%s", domid, kinds[i]);
+        path = GCSPRINTF("/local/domain/%d/device/%s", domid, kinds[i]);
         devs = libxl__xs_directory(gc, XBT_NULL, path, &num_dev_xsentries);
         if (!devs)
             continue;
         for (j = 0; j < num_dev_xsentries; j++) {
-            path = libxl__sprintf(gc, "/local/domain/%d/device/%s/%s/backend",
-                                  domid, kinds[i], devs[j]);
+            path = GCSPRINTF("/local/domain/%d/device/%s/%s/backend",
+                             domid, kinds[i], devs[j]);
             path = libxl__xs_read(gc, XBT_NULL, path);
             GCNEW(dev);
             if (path && libxl__parse_backend_path(gc, path, dev) == 0) {
@@ -654,7 +641,7 @@ void libxl__devices_destroy(libxl__egc *egc, libxl__devices_remove_state *drs)
     }
 
     /* console 0 frontend directory is not under /local/domain/<domid>/device */
-    path = libxl__sprintf(gc, "/local/domain/%d/console/backend", domid);
+    path = GCSPRINTF("/local/domain/%d/console/backend", domid);
     path = libxl__xs_read(gc, XBT_NULL, path);
     GCNEW(dev);
     if (path && strcmp(path, "") &&
@@ -714,7 +701,7 @@ void libxl__wait_device_connection(libxl__egc *egc, libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
     char *be_path = libxl__device_backend_path(gc, aodev->dev);
-    char *state_path = libxl__sprintf(gc, "%s/state", be_path);
+    char *state_path = GCSPRINTF("%s/state", be_path);
     int rc = 0;
 
     if (QEMU_BACKEND(aodev->dev)) {
@@ -752,7 +739,7 @@ void libxl__initiate_device_remove(libxl__egc *egc,
     STATE_AO_GC(aodev->ao);
     xs_transaction_t t = 0;
     char *be_path = libxl__device_backend_path(gc, aodev->dev);
-    char *state_path = libxl__sprintf(gc, "%s/state", be_path);
+    char *state_path = GCSPRINTF("%s/state", be_path);
     char *online_path = GCSPRINTF("%s/online", be_path);
     const char *state;
     libxl_dominfo info;
@@ -1080,7 +1067,7 @@ int libxl__wait_for_device_model(libxl__gc *gc,
                                  void *check_callback_userdata)
 {
     char *path;
-    path = libxl__sprintf(gc, "/local/domain/0/device-model/%d/state", domid);
+    path = GCSPRINTF("/local/domain/0/device-model/%d/state", domid);
     return libxl__wait_for_offspring(gc, domid,
                                      LIBXL_DEVICE_MODEL_START_TIMEOUT,
                                      "Device Model", path, state, spawning,
@@ -1093,18 +1080,16 @@ int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state)
     int watchdog = 100;
     unsigned int len;
     char *p;
-    char *path = libxl__sprintf(gc, "%s/state", be_path);
+    char *path = GCSPRINTF("%s/state", be_path);
     int rc = -1;
 
     while (watchdog > 0) {
         p = xs_read(ctx->xsh, XBT_NULL, path, &len);
         if (p == NULL) {
             if (errno == ENOENT) {
-                LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Backend %s does not exist",
-                       be_path);
+                LOG(ERROR, "Backend %s does not exist", be_path);
             } else {
-                LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Failed to access backend %s",
-                       be_path);
+                LOGE(ERROR, "Failed to access backend %s", be_path);
             }
             goto out;
         } else {
@@ -1117,7 +1102,7 @@ int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state)
             }
         }
     }
-    LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Backend %s not ready", be_path);
+    LOG(ERROR, "Backend %s not ready", be_path);
 out:
     return rc;
 }
