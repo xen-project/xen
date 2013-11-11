@@ -953,7 +953,7 @@ void do_invalid_op(struct cpu_user_regs *regs)
 {
     struct bug_frame bug;
     struct bug_frame_str bug_str;
-    const char *p, *filename, *predicate, *eip = (char *)regs->eip;
+    const char *p, *prefix = "", *filename, *predicate, *eip = (char *)regs->eip;
     unsigned long fixup;
     int id, lineno;
 
@@ -995,12 +995,19 @@ void do_invalid_op(struct cpu_user_regs *regs)
     }
 
     /* WARN, BUG or ASSERT: decode the filename pointer and line number. */
-    filename = p;
+    fixup = strlen(p);
+    if ( fixup > 50 )
+    {
+        filename = p + fixup - 47;
+        prefix = "...";
+    }
+    else
+        filename = p;
     lineno = bug.id >> 2;
 
     if ( id == BUGFRAME_warn )
     {
-        printk("Xen WARN at %.50s:%d\n", filename, lineno);
+        printk("Xen WARN at %s%s:%d\n", prefix, filename, lineno);
         show_execution_state(regs);
         regs->eip = (unsigned long)eip;
         return;
@@ -1008,10 +1015,10 @@ void do_invalid_op(struct cpu_user_regs *regs)
 
     if ( id == BUGFRAME_bug )
     {
-        printk("Xen BUG at %.50s:%d\n", filename, lineno);
+        printk("Xen BUG at %s%s:%d\n", prefix, filename, lineno);
         DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
         show_execution_state(regs);
-        panic("Xen BUG at %.50s:%d\n", filename, lineno);
+        panic("Xen BUG at %s%s:%d\n", prefix, filename, lineno);
     }
 
     /* ASSERT: decode the predicate string pointer. */
@@ -1025,12 +1032,12 @@ void do_invalid_op(struct cpu_user_regs *regs)
 
     if ( !is_kernel(predicate) )
         predicate = "<unknown>";
-    printk("Assertion '%s' failed at %.50s:%d\n",
-           predicate, filename, lineno);
+    printk("Assertion '%s' failed at %s%s:%d\n",
+           predicate, prefix, filename, lineno);
     DEBUGGER_trap_fatal(TRAP_invalid_op, regs);
     show_execution_state(regs);
-    panic("Assertion '%s' failed at %.50s:%d\n",
-          predicate, filename, lineno);
+    panic("Assertion '%s' failed at %s%s:%d\n",
+          predicate, prefix, filename, lineno);
 
  die:
     if ( (fixup = search_exception_table(regs->eip)) != 0 )
