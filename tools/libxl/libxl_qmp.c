@@ -632,7 +632,7 @@ static void qmp_parameters_common_add(libxl__gc *gc,
         *param = libxl__json_object_alloc(gc, JSON_MAP);
     }
 
-    arg = libxl__zalloc(gc, sizeof(*arg));
+    GCNEW(arg);
 
     arg->map_key = libxl__strdup(gc, name);
     arg->obj = obj;
