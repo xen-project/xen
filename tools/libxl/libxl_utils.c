@@ -173,8 +173,8 @@ int libxl_get_stubdom_id(libxl_ctx *ctx, int guest_domid)
     int ret;
 
     stubdom_id_s = libxl__xs_read(gc, XBT_NULL,
-                                 libxl__sprintf(gc, "%s/image/device-model-domid",
-                                               libxl__xs_get_dompath(gc, guest_domid)));
+                                  GCSPRINTF("%s/image/device-model-domid",
+                                  libxl__xs_get_dompath(gc, guest_domid)));
     if (stubdom_id_s)
         ret = atoi(stubdom_id_s);
     else
@@ -190,7 +190,8 @@ int libxl_is_stubdom(libxl_ctx *ctx, uint32_t domid, uint32_t *target_domid)
     uint32_t value;
     int ret = 0;
 
-    target = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/target", libxl__xs_get_dompath(gc, domid)));
+    target = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/target",
+			    libxl__xs_get_dompath(gc, domid)));
     if (!target)
         goto out;
     value = strtol(target, &endptr, 10);
@@ -227,20 +228,20 @@ int libxl_create_logfile(libxl_ctx *ctx, const char *name, char **full_name)
     char *logfile, *logfile_new;
     int i, rc;
 
-    logfile = libxl__sprintf(gc, "/var/log/xen/%s.log", name);
+    logfile = GCSPRINTF("/var/log/xen/%s.log", name);
     if (stat(logfile, &stat_buf) == 0) {
         /* file exists, rotate */
-        logfile = libxl__sprintf(gc, "/var/log/xen/%s.log.10", name);
+        logfile = GCSPRINTF("/var/log/xen/%s.log.10", name);
         unlink(logfile);
         for (i = 9; i > 0; i--) {
-            logfile = libxl__sprintf(gc, "/var/log/xen/%s.log.%d", name, i);
-            logfile_new = libxl__sprintf(gc, "/var/log/xen/%s.log.%d", name, i + 1);
+            logfile = GCSPRINTF("/var/log/xen/%s.log.%d", name, i);
+            logfile_new = GCSPRINTF("/var/log/xen/%s.log.%d", name, i + 1);
             rc = logrename(gc, logfile, logfile_new);
             if (rc)
                 goto out;
         }
-        logfile = libxl__sprintf(gc, "/var/log/xen/%s.log", name);
-        logfile_new = libxl__sprintf(gc, "/var/log/xen/%s.log.1", name);
+        logfile = GCSPRINTF("/var/log/xen/%s.log", name);
+        logfile_new = GCSPRINTF("/var/log/xen/%s.log.1", name);
 
         rc = logrename(gc, logfile, logfile_new);
         if (rc)
