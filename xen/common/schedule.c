@@ -276,6 +276,8 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
     new_p = cpumask_first(c->cpu_valid);
     for_each_vcpu ( d, v )
     {
+        spinlock_t *lock;
+
         vcpudata = v->sched_priv;
 
         migrate_timer(&v->periodic_timer, new_p);
@@ -283,7 +285,16 @@ int sched_move_domain(struct domain *d, struct cpupool *c)
         migrate_timer(&v->poll_timer, new_p);
 
         cpumask_setall(v->cpu_affinity);
+
+        lock = vcpu_schedule_lock_irq(v);
         v->processor = new_p;
+        /*
+         * With v->processor modified we must not
+         * - make any further changes assuming we hold the scheduler lock,
+         * - use vcpu_schedule_unlock_irq().
+         */
+        spin_unlock_irq(lock);
+
         v->sched_priv = vcpu_priv[v->vcpu_id];
         evtchn_move_pirqs(v);
 
