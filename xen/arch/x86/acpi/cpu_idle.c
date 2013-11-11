@@ -439,8 +439,8 @@ static void acpi_processor_idle(void)
          (next_state = cpuidle_current_governor->select(power)) > 0 )
     {
         cx = &power->states[next_state];
-        if ( power->flags.bm_check && acpi_idle_bm_check()
-             && cx->type == ACPI_STATE_C3 )
+        if ( cx->type == ACPI_STATE_C3 && power->flags.bm_check &&
+             acpi_idle_bm_check() )
             cx = power->safe_state;
         if ( cx->idx > max_cstate )
             cx = &power->states[max_cstate];
@@ -563,8 +563,8 @@ static void acpi_processor_idle(void)
         {
             /* Enable bus master arbitration */
             spin_lock(&c3_cpu_status.lock);
-            acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
-            c3_cpu_status.count--;
+            if ( c3_cpu_status.count-- == num_online_cpus() )
+                acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0);
             spin_unlock(&c3_cpu_status.lock);
         }
 
@@ -821,12 +821,10 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
             return -EINVAL;
 
         /* All the logic here assumes flags.bm_check is same across all CPUs */
-        if ( bm_check_flag == -1 )
+        if ( bm_check_flag < 0 )
         {
             /* Determine whether bm_check is needed based on CPU  */
             acpi_processor_power_init_bm_check(&(power->flags));
-            bm_check_flag = power->flags.bm_check;
-            bm_control_flag = power->flags.bm_control;
         }
         else
         {
@@ -853,14 +851,13 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
                 }
             }
             /*
-             * On older chipsets, BM_RLD needs to be set
-             * in order for Bus Master activity to wake the
-             * system from C3.  Newer chipsets handle DMA
-             * during C3 automatically and BM_RLD is a NOP.
-             * In either case, the proper way to
-             * handle BM_RLD is to set it and leave it set.
+             * On older chipsets, BM_RLD needs to be set in order for Bus
+             * Master activity to wake the system from C3, hence
+             * acpi_set_register() is always being called once below.  Newer
+             * chipsets handle DMA during C3 automatically and BM_RLD is a
+             * NOP.  In either case, the proper way to handle BM_RLD is to
+             * set it and leave it set.
              */
-            acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 1);
         }
         else
         {
@@ -875,7 +872,13 @@ static int check_cx(struct acpi_processor_power *power, xen_processor_cx_t *cx)
                           " for C3 to be enabled on SMP systems\n"));
                 return -EINVAL;
             }
-            acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0);
+        }
+
+        if ( bm_check_flag < 0 )
+        {
+            bm_check_flag = power->flags.bm_check;
+            bm_control_flag = power->flags.bm_control;
+            acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, bm_check_flag);
         }
 
         break;
