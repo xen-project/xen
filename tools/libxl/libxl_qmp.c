@@ -348,7 +348,7 @@ static libxl__qmp_handler *qmp_init_handler(libxl__gc *gc, uint32_t domid)
                          "Failed to allocate qmp_handler");
         return NULL;
     }
-    qmp->ctx = libxl__gc_owner(gc);
+    qmp->ctx = CTX;
     qmp->domid = domid;
     qmp->timeout = 5;
 
