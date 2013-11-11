@@ -101,7 +101,7 @@ static int store_serial_port_info(libxl__qmp_handler *qmp,
     }
 
     path = libxl__xs_get_dompath(gc, qmp->domid);
-    path = libxl__sprintf(gc, "%s/serial/%d/tty", path, port);
+    path = GCSPRINTF("%s/serial/%d/tty", path, port);
 
     ret = libxl__xs_write(gc, XBT_NULL, path, "%s", chardev + 4);
 
@@ -160,7 +160,7 @@ static int qmp_write_domain_console_item(libxl__gc *gc, int domid,
     char *path;
 
     path = libxl__xs_get_dompath(gc, domid);
-    path = libxl__sprintf(gc, "%s/console/%s", path, item);
+    path = GCSPRINTF("%s/console/%s", path, item);
 
     return libxl__xs_write(gc, XBT_NULL, path, "%s", value);
 }
@@ -672,8 +672,7 @@ static void qmp_parameters_add_integer(libxl__gc *gc,
 }
 
 #define QMP_PARAMETERS_SPRINTF(args, name, format, ...) \
-    qmp_parameters_add_string(gc, args, name, \
-                              libxl__sprintf(gc, format, __VA_ARGS__))
+    qmp_parameters_add_string(gc, args, name, GCSPRINTF(format, __VA_ARGS__))
 
 /*
  * API
@@ -687,8 +686,7 @@ libxl__qmp_handler *libxl__qmp_initialize(libxl__gc *gc, uint32_t domid)
 
     qmp = qmp_init_handler(gc, domid);
 
-    qmp_socket = libxl__sprintf(gc, "%s/qmp-libxl-%d",
-                                libxl__run_dir_path(), domid);
+    qmp_socket = GCSPRINTF("%s/qmp-libxl-%d", libxl__run_dir_path(), domid);
     if ((ret = qmp_open(qmp, qmp_socket, QMP_SOCKET_CONNECT_TIMEOUT)) < 0) {
         LOGE(ERROR, "Connection error");
         qmp_free_handler(qmp);
@@ -724,8 +722,7 @@ void libxl__qmp_cleanup(libxl__gc *gc, uint32_t domid)
 {
     char *qmp_socket;
 
-    qmp_socket = libxl__sprintf(gc, "%s/qmp-libxl-%d",
-                                libxl__run_dir_path(), domid);
+    qmp_socket = GCSPRINTF("%s/qmp-libxl-%d", libxl__run_dir_path(), domid);
     if (unlink(qmp_socket) == -1) {
         if (errno != ENOENT) {
             LOGE(ERROR, "Failed to remove QMP socket file %s", qmp_socket);
@@ -754,8 +751,8 @@ static int pci_add_callback(libxl__qmp_handler *qmp,
     const libxl__json_object *bus = NULL;
     GC_INIT(qmp->ctx);
     int i, j, rc = -1;
-    char *asked_id = libxl__sprintf(gc, PCI_PT_QDEV_ID,
-                                    pcidev->bus, pcidev->dev, pcidev->func);
+    char *asked_id = GCSPRINTF(PCI_PT_QDEV_ID,
+                               pcidev->bus, pcidev->dev, pcidev->func);
 
     for (i = 0; (bus = libxl__json_array_get(response, i)); i++) {
         const libxl__json_object *devices = NULL;
@@ -823,8 +820,8 @@ int libxl__qmp_pci_add(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
     if (!qmp)
         return -1;
 
-    hostaddr = libxl__sprintf(gc, "%04x:%02x:%02x.%01x", pcidev->domain,
-                              pcidev->bus, pcidev->dev, pcidev->func);
+    hostaddr = GCSPRINTF("%04x:%02x:%02x.%01x", pcidev->domain,
+                         pcidev->bus, pcidev->dev, pcidev->func);
     if (!hostaddr)
         return -1;
 
@@ -860,8 +857,7 @@ int libxl__qmp_pci_del(libxl__gc *gc, int domid, libxl_device_pci *pcidev)
 {
     char *id = NULL;
 
-    id = libxl__sprintf(gc, PCI_PT_QDEV_ID,
-                        pcidev->bus, pcidev->dev, pcidev->func);
+    id = GCSPRINTF(PCI_PT_QDEV_ID, pcidev->bus, pcidev->dev, pcidev->func);
 
     return qmp_device_del(gc, domid, id);
 }
