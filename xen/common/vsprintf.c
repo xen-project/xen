@@ -261,6 +261,20 @@ static char *string(char *str, char *end, const char *s,
     return str;
 }
 
+static char *pointer(char *str, char *end,
+                     const void *arg, int field_width, int precision,
+                     int flags)
+{
+    if ( field_width == -1 )
+    {
+        field_width = 2 * sizeof(void *);
+        flags |= ZEROPAD;
+    }
+
+    return number(str, end, (unsigned long)arg,
+                  16, field_width, precision, flags);
+}
+
 /**
  * vsnprintf - Format a string and place it in a buffer
  * @buf: The buffer to place the result into
@@ -399,13 +413,8 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
             continue;
 
         case 'p':
-            if (field_width == -1) {
-                field_width = 2*sizeof(void *);
-                flags |= ZEROPAD;
-            }
-            str = number(str, end,
-                         (unsigned long) va_arg(args, void *),
-                         16, field_width, precision, flags);
+            str = pointer(str, end, va_arg(args, const void *),
+                          field_width, precision, flags);
             continue;
 
 
