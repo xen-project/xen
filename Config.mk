@@ -246,9 +246,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 84411871262363200e70fa087d7b21647091a450
-# Wed Jul 31 16:16:16 2013 +0100
-# qemu-xen-traditional: allow build without blktap1
+QEMU_TAG ?= 832f9bde25542961ea4f768be6e00e4801484e3a
+# Mon Nov 11 13:42:56 2013 -0500
+# hw/piix4acpi: Make writes to ACPI_DBG_IO_ADDR actually work.
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
