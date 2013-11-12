@@ -175,10 +175,19 @@ static int do_kimage_alloc(struct kexec_image **rimage, paddr_t entry,
     image->control_code_page = kimage_alloc_control_page(image, MEMF_bits(32));
     if ( !image->control_code_page )
         goto out;
+    result = machine_kexec_add_page(image,
+                                    page_to_maddr(image->control_code_page),
+                                    page_to_maddr(image->control_code_page));
+    if ( result < 0 )
+        goto out;
 
     /* Add an empty indirection page. */
     image->entry_page = kimage_alloc_control_page(image, 0);
     if ( !image->entry_page )
+        goto out;
+    result = machine_kexec_add_page(image, page_to_maddr(image->entry_page),
+                                    page_to_maddr(image->entry_page));
+    if ( result < 0 )
         goto out;
 
     image->head = page_to_maddr(image->entry_page);
@@ -594,7 +603,7 @@ static struct page_info *kimage_alloc_page(struct kexec_image *image,
         if ( addr == destination )
         {
             page_list_del(page, &image->dest_pages);
-            return page;
+            goto found;
         }
     }
     page = NULL;
@@ -646,6 +655,8 @@ static struct page_info *kimage_alloc_page(struct kexec_image *image,
             page_list_add(page, &image->dest_pages);
         }
     }
+found:
+    machine_kexec_add_page(image, page_to_maddr(page), page_to_maddr(page));
     return page;
 }
 
@@ -752,6 +763,7 @@ static int kimage_load_crash_segment(struct kexec_image *image,
 static int kimage_load_segment(struct kexec_image *image, xen_kexec_segment_t *segment)
 {
     int result = -ENOMEM;
+    paddr_t addr;
 
     if ( !guest_handle_is_null(segment->buf.h) )
     {
@@ -764,6 +776,14 @@ static int kimage_load_segment(struct kexec_image *image, xen_kexec_segment_t *s
             result = kimage_load_crash_segment(image, segment);
             break;
         }
+    }
+
+    for ( addr = segment->dest_maddr & PAGE_MASK;
+          addr < segment->dest_maddr + segment->dest_size; addr += PAGE_SIZE )
+    {
+        result = machine_kexec_add_page(image, addr, addr);
+        if ( result < 0 )
+            break;
     }
 
     return result;
@@ -807,6 +827,106 @@ int kimage_load_segments(struct kexec_image *image)
     }
     kimage_terminate(image);
     return 0;
+}
+
+kimage_entry_t *kimage_entry_next(kimage_entry_t *entry, bool_t compat)
+{
+    if ( compat )
+        return (kimage_entry_t *)((uint32_t *)entry + 1);
+    return entry + 1;
+}
+
+unsigned long kimage_entry_mfn(kimage_entry_t *entry, bool_t compat)
+{
+    if ( compat )
+        return *(uint32_t *)entry >> PAGE_SHIFT;
+    return *entry >> PAGE_SHIFT;
+}
+
+unsigned long kimage_entry_ind(kimage_entry_t *entry, bool_t compat)
+{
+    if ( compat )
+        return *(uint32_t *)entry & 0xf;
+    return *entry & 0xf;
+}
+
+int kimage_build_ind(struct kexec_image *image, unsigned long ind_mfn,
+                     bool_t compat)
+{
+    void *page;
+    kimage_entry_t *entry;
+    int ret = 0;
+    paddr_t dest = KIMAGE_NO_DEST;
+
+    page = map_domain_page(ind_mfn);
+    if ( !page )
+        return -ENOMEM;
+
+    /*
+     * Walk the guest-supplied indirection pages, adding entries to
+     * the image's indirection pages.
+     */
+    for ( entry = page; ;  )
+    {
+        unsigned long ind;
+        unsigned long mfn;
+
+        ind = kimage_entry_ind(entry, compat);
+        mfn = kimage_entry_mfn(entry, compat);
+
+        switch ( ind )
+        {
+        case IND_DESTINATION:
+            dest = (paddr_t)mfn << PAGE_SHIFT;
+            ret = kimage_set_destination(image, dest);
+            if ( ret < 0 )
+                goto done;
+            break;
+        case IND_INDIRECTION:
+            unmap_domain_page(page);
+            page = map_domain_page(mfn);
+            entry = page;
+            continue;
+        case IND_DONE:
+            kimage_terminate(image);
+            goto done;
+        case IND_SOURCE:
+        {
+            struct page_info *guest_page, *xen_page;
+
+            guest_page = mfn_to_page(mfn);
+            if ( !get_page(guest_page, current->domain) )
+            {
+                ret = -EFAULT;
+                goto done;
+            }
+
+            xen_page = kimage_alloc_page(image, dest);
+            if ( !xen_page )
+            {
+                put_page(guest_page);
+                ret = -ENOMEM;
+                goto done;
+            }
+
+            copy_domain_page(page_to_mfn(xen_page), mfn);
+            put_page(guest_page);
+
+            ret = kimage_add_page(image, page_to_maddr(xen_page));
+            if ( ret < 0 )
+                goto done;
+            dest += PAGE_SIZE;
+            break;
+        }
+        default:
+            ret = -EINVAL;
+            goto done;
+        }
+        entry = kimage_entry_next(entry, compat);
+    }
+done:
+    unmap_domain_page(page);
+    return ret;
 }
 
 /*

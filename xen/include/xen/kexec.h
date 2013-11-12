@@ -6,6 +6,7 @@
 #include <public/kexec.h>
 #include <asm/percpu.h>
 #include <xen/elfcore.h>
+#include <xen/kimage.h>
 
 typedef struct xen_kexec_reserve {
     unsigned long size;
@@ -40,22 +41,19 @@ extern enum low_crashinfo low_crashinfo_mode;
 extern paddr_t crashinfo_maxaddr_bits;
 void kexec_early_calculations(void);
 
-int machine_kexec_load(int type, int slot, xen_kexec_image_t *image);
-void machine_kexec_unload(int type, int slot, xen_kexec_image_t *image);
+int machine_kexec_add_page(struct kexec_image *image, unsigned long vaddr,
+                           unsigned long maddr);
+int machine_kexec_load(struct kexec_image *image);
+void machine_kexec_unload(struct kexec_image *image);
 void machine_kexec_reserved(xen_kexec_reserve_t *reservation);
-void machine_reboot_kexec(xen_kexec_image_t *image);
-void machine_kexec(xen_kexec_image_t *image);
+void machine_reboot_kexec(struct kexec_image *image);
+void machine_kexec(struct kexec_image *image);
 void kexec_crash(void);
 void kexec_crash_save_cpu(void);
 crash_xen_info_t *kexec_crash_save_info(void);
 void machine_crash_shutdown(void);
 int machine_kexec_get(xen_kexec_range_t *range);
 int machine_kexec_get_xen(xen_kexec_range_t *range);
-
-void compat_machine_kexec(unsigned long rnk,
-                          unsigned long indirection_page,
-                          unsigned long *page_list,
-                          unsigned long start_address);
 
 /* vmcoreinfo stuff */
 #define VMCOREINFO_BYTES           (4096)

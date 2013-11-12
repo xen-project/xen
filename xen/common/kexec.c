@@ -25,6 +25,7 @@
 #include <xen/version.h>
 #include <xen/console.h>
 #include <xen/kexec.h>
+#include <xen/kimage.h>
 #include <public/elfnote.h>
 #include <xsm/xsm.h>
 #include <xen/cpu.h>
@@ -47,15 +48,13 @@ static Elf_Note *xen_crash_note;
 
 static cpumask_t crash_saved_cpus;
 
-static xen_kexec_image_t kexec_image[KEXEC_IMAGE_NR];
+static struct kexec_image *kexec_image[KEXEC_IMAGE_NR];
 
 #define KEXEC_FLAG_DEFAULT_POS   (KEXEC_IMAGE_NR + 0)
 #define KEXEC_FLAG_CRASH_POS     (KEXEC_IMAGE_NR + 1)
 #define KEXEC_FLAG_IN_PROGRESS   (KEXEC_IMAGE_NR + 2)
 
 static unsigned long kexec_flags = 0; /* the lowest bits are for KEXEC_IMAGE... */
-
-static spinlock_t kexec_lock = SPIN_LOCK_UNLOCKED;
 
 static unsigned char vmcoreinfo_data[VMCOREINFO_BYTES];
 static size_t vmcoreinfo_size = 0;
@@ -311,14 +310,14 @@ void kexec_crash(void)
     kexec_common_shutdown();
     kexec_crash_save_cpu();
     machine_crash_shutdown();
-    machine_kexec(&kexec_image[KEXEC_IMAGE_CRASH_BASE + pos]);
+    machine_kexec(kexec_image[KEXEC_IMAGE_CRASH_BASE + pos]);
 
     BUG();
 }
 
 static long kexec_reboot(void *_image)
 {
-    xen_kexec_image_t *image = _image;
+    struct kexec_image *image = _image;
 
     kexecing = TRUE;
 
@@ -734,63 +733,264 @@ static void crash_save_vmcoreinfo(void)
 #endif
 }
 
-static int kexec_load_unload_internal(unsigned long op, xen_kexec_load_v1_t *load)
+static void kexec_unload_image(struct kexec_image *image)
 {
-    xen_kexec_image_t *image;
-    int base, bit, pos;
-    int ret = 0;
+    if ( !image )
+        return;
 
-    if ( kexec_load_get_bits(load->type, &base, &bit) )
+    machine_kexec_unload(image);
+    kimage_free(image);
+}
+
+static int kexec_exec(XEN_GUEST_HANDLE_PARAM(void) uarg)
+{
+    xen_kexec_exec_t exec;
+    struct kexec_image *image;
+    int base, bit, pos, ret = -EINVAL;
+
+    if ( unlikely(copy_from_guest(&exec, uarg, 1)) )
+        return -EFAULT;
+
+    if ( kexec_load_get_bits(exec.type, &base, &bit) )
         return -EINVAL;
 
     pos = (test_bit(bit, &kexec_flags) != 0);
 
-    /* Load the user data into an unused image */
-    if ( op == KEXEC_CMD_kexec_load )
+    /* Only allow kexec/kdump into loaded images */
+    if ( !test_bit(base + pos, &kexec_flags) )
+        return -ENOENT;
+
+    switch (exec.type)
     {
-        image = &kexec_image[base + !pos];
-
-        BUG_ON(test_bit((base + !pos), &kexec_flags)); /* must be free */
-
-        memcpy(image, &load->image, sizeof(*image));
-
-        if ( !(ret = machine_kexec_load(load->type, base + !pos, image)) )
-        {
-            /* Set image present bit */
-            set_bit((base + !pos), &kexec_flags);
-
-            /* Make new image the active one */
-            change_bit(bit, &kexec_flags);
-        }
-
-        crash_save_vmcoreinfo();
+    case KEXEC_TYPE_DEFAULT:
+        image = kexec_image[base + pos];
+        ret = continue_hypercall_on_cpu(0, kexec_reboot, image);
+        break;
+    case KEXEC_TYPE_CRASH:
+        kexec_crash(); /* Does not return */
+        break;
     }
 
-    /* Unload the old image if present and load successful */
-    if ( ret == 0 && !test_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags) )
+    return -EINVAL; /* never reached */
+}
+
+static int kexec_swap_images(int type, struct kexec_image *new,
+                             struct kexec_image **old)
+{
+    static DEFINE_SPINLOCK(kexec_lock);
+    int base, bit, pos;
+    int new_slot, old_slot;
+
+    *old = NULL;
+
+    spin_lock(&kexec_lock);
+
+    if ( test_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags) )
     {
-        if ( test_and_clear_bit((base + pos), &kexec_flags) )
-        {
-            image = &kexec_image[base + pos];
-            machine_kexec_unload(load->type, base + pos, image);
-        }
+        spin_unlock(&kexec_lock);
+        return -EBUSY;
     }
 
+    if ( kexec_load_get_bits(type, &base, &bit) )
+        return -EINVAL;
+
+    pos = (test_bit(bit, &kexec_flags) != 0);
+    old_slot = base + pos;
+    new_slot = base + !pos;
+
+    if ( new )
+    {
+        kexec_image[new_slot] = new;
+        set_bit(new_slot, &kexec_flags);
+    }
+    change_bit(bit, &kexec_flags);
+
+    clear_bit(old_slot, &kexec_flags);
+    *old = kexec_image[old_slot];
+
+    spin_unlock(&kexec_lock);
+
+    return 0;
+}
+
+static int kexec_load_slot(struct kexec_image *kimage)
+{
+    struct kexec_image *old_kimage;
+    int ret = -ENOMEM;
+
+    ret = machine_kexec_load(kimage);
+    if ( ret < 0 )
+        return ret;
+
+    crash_save_vmcoreinfo();
+
+    ret = kexec_swap_images(kimage->type, kimage, &old_kimage);
+    if ( ret < 0 )
+        return ret;
+
+    kexec_unload_image(old_kimage);
+
+    return 0;
+}
+
+static uint16_t kexec_load_v1_arch(void)
+{
+#ifdef CONFIG_X86
+    return is_pv_32on64_domain(dom0) ? EM_386 : EM_X86_64;
+#else
+    return EM_NONE;
+#endif
+}
+
+static int kexec_segments_add_segment(
+    unsigned int *nr_segments, xen_kexec_segment_t *segments,
+    unsigned long mfn)
+{
+    paddr_t maddr = (paddr_t)mfn << PAGE_SHIFT;
+    unsigned int n = *nr_segments;
+
+    /* Need a new segment? */
+    if ( n == 0
+         || segments[n-1].dest_maddr + segments[n-1].dest_size != maddr )
+    {
+        n++;
+        if ( n > KEXEC_SEGMENT_MAX )
+            return -EINVAL;
+        *nr_segments = n;
+
+        set_xen_guest_handle(segments[n-1].buf.h, NULL);
+        segments[n-1].buf_size = 0;
+        segments[n-1].dest_maddr = maddr;
+        segments[n-1].dest_size = 0;
+    }
+
+    return 0;
+}
+
+static int kexec_segments_from_ind_page(unsigned long mfn,
+                                        unsigned int *nr_segments,
+                                        xen_kexec_segment_t *segments,
+                                        bool_t compat)
+{
+    void *page;
+    kimage_entry_t *entry;
+    int ret = 0;
+
+    page = map_domain_page(mfn);
+
+    /*
+     * Walk the indirection page list, adding destination pages to the
+     * segments.
+     */
+    for ( entry = page; ; )
+    {
+        unsigned long ind;
+
+        ind = kimage_entry_ind(entry, compat);
+        mfn = kimage_entry_mfn(entry, compat);
+
+        switch ( ind )
+        {
+        case IND_DESTINATION:
+            ret = kexec_segments_add_segment(nr_segments, segments, mfn);
+            if ( ret < 0 )
+                goto done;
+            break;
+        case IND_INDIRECTION:
+            unmap_domain_page(page);
+            entry = page = map_domain_page(mfn);
+            continue;
+        case IND_DONE:
+            goto done;
+        case IND_SOURCE:
+            if ( *nr_segments == 0 )
+            {
+                ret = -EINVAL;
+                goto done;
+            }
+            segments[*nr_segments-1].dest_size += PAGE_SIZE;
+            break;
+        default:
+            ret = -EINVAL;
+            goto done;
+        }
+        entry = kimage_entry_next(entry, compat);
+    }
+done:
+    unmap_domain_page(page);
     return ret;
 }
 
-static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg)
+static int kexec_do_load_v1(xen_kexec_load_v1_t *load, int compat)
+{
+    struct kexec_image *kimage = NULL;
+    xen_kexec_segment_t *segments;
+    uint16_t arch;
+    unsigned int nr_segments = 0;
+    unsigned long ind_mfn = load->image.indirection_page >> PAGE_SHIFT;
+    int ret;
+
+    arch = kexec_load_v1_arch();
+    if ( arch == EM_NONE )
+        return -ENOSYS;
+
+    segments = xmalloc_array(xen_kexec_segment_t, KEXEC_SEGMENT_MAX);
+    if ( segments == NULL )
+        return -ENOMEM;
+
+    /*
+     * Work out the image segments (destination only) from the
+     * indirection pages.
+     *
+     * This is needed so we don't allocate pages that will overlap
+     * with the destination when building the new set of indirection
+     * pages below.
+     */
+    ret = kexec_segments_from_ind_page(ind_mfn, &nr_segments, segments, compat);
+    if ( ret < 0 )
+        goto error;
+
+    ret = kimage_alloc(&kimage, load->type, arch, load->image.start_address,
+                       nr_segments, segments);
+    if ( ret < 0 )
+        goto error;
+
+    /*
+     * Build a new set of indirection pages in the native format.
+     *
+     * This walks the guest provided indirection pages a second time.
+     * The guest could have altered then, invalidating the segment
+     * information constructed above.  This will only result in the
+     * resulting image being potentially unrelocatable.
+     */
+    ret = kimage_build_ind(kimage, ind_mfn, compat);
+    if ( ret < 0 )
+        goto error;
+
+    ret = kexec_load_slot(kimage);
+    if ( ret < 0 )
+        goto error;
+
+    return 0;
+
+error:
+    if ( !kimage )
+        xfree(segments);
+    kimage_free(kimage);
+    return ret;
+}
+
+static int kexec_load_v1(XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
     xen_kexec_load_v1_t load;
 
     if ( unlikely(copy_from_guest(&load, uarg, 1)) )
         return -EFAULT;
 
-    return kexec_load_unload_internal(op, &load);
+    return kexec_do_load_v1(&load, 0);
 }
 
-static int kexec_load_unload_compat(unsigned long op,
-                                    XEN_GUEST_HANDLE_PARAM(void) uarg)
+static int kexec_load_v1_compat(XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
 #ifdef CONFIG_COMPAT
     compat_kexec_load_v1_t compat_load;
@@ -809,49 +1009,113 @@ static int kexec_load_unload_compat(unsigned long op,
     load.type = compat_load.type;
     XLAT_kexec_image(&load.image, &compat_load.image);
 
-    return kexec_load_unload_internal(op, &load);
-#else /* CONFIG_COMPAT */
+    return kexec_do_load_v1(&load, 1);
+#else
     return 0;
-#endif /* CONFIG_COMPAT */
+#endif
 }
 
-static int kexec_exec(XEN_GUEST_HANDLE_PARAM(void) uarg)
+static int kexec_load(XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
-    xen_kexec_exec_t exec;
-    xen_kexec_image_t *image;
-    int base, bit, pos, ret = -EINVAL;
+    xen_kexec_load_t load;
+    xen_kexec_segment_t *segments;
+    struct kexec_image *kimage = NULL;
+    int ret;
 
-    if ( unlikely(copy_from_guest(&exec, uarg, 1)) )
+    if ( copy_from_guest(&load, uarg, 1) )
         return -EFAULT;
 
-    if ( kexec_load_get_bits(exec.type, &base, &bit) )
+    if ( load.nr_segments >= KEXEC_SEGMENT_MAX )
         return -EINVAL;
 
-    pos = (test_bit(bit, &kexec_flags) != 0);
+    segments = xmalloc_array(xen_kexec_segment_t, load.nr_segments);
+    if ( segments == NULL )
+        return -ENOMEM;
 
-    /* Only allow kexec/kdump into loaded images */
-    if ( !test_bit(base + pos, &kexec_flags) )
-        return -ENOENT;
-
-    switch (exec.type)
+    if ( copy_from_guest(segments, load.segments.h, load.nr_segments) )
     {
-    case KEXEC_TYPE_DEFAULT:
-        image = &kexec_image[base + pos];
-        ret = continue_hypercall_on_cpu(0, kexec_reboot, image);
-        break;
-    case KEXEC_TYPE_CRASH:
-        kexec_crash(); /* Does not return */
-        break;
+        ret = -EFAULT;
+        goto error;
     }
 
-    return -EINVAL; /* never reached */
+    ret = kimage_alloc(&kimage, load.type, load.arch, load.entry_maddr,
+                       load.nr_segments, segments);
+    if ( ret < 0 )
+        goto error;
+
+    ret = kimage_load_segments(kimage);
+    if ( ret < 0 )
+        goto error;
+
+    ret = kexec_load_slot(kimage);
+    if ( ret < 0 )
+        goto error;
+
+    return 0;
+
+error:
+    if ( ! kimage )
+        xfree(segments);
+    kimage_free(kimage);
+    return ret;
+}
+
+static int kexec_do_unload(xen_kexec_unload_t *unload)
+{
+    struct kexec_image *old_kimage;
+    int ret;
+
+    ret = kexec_swap_images(unload->type, NULL, &old_kimage);
+    if ( ret < 0 )
+        return ret;
+
+    kexec_unload_image(old_kimage);
+
+    return 0;
+}
+
+static int kexec_unload_v1(XEN_GUEST_HANDLE_PARAM(void) uarg)
+{
+    xen_kexec_load_v1_t load;
+    xen_kexec_unload_t unload;
+
+    if ( copy_from_guest(&load, uarg, 1) )
+        return -EFAULT;
+
+    unload.type = load.type;
+    return kexec_do_unload(&unload);
+}
+
+static int kexec_unload_v1_compat(XEN_GUEST_HANDLE_PARAM(void) uarg)
+{
+#ifdef CONFIG_COMPAT
+    compat_kexec_load_v1_t compat_load;
+    xen_kexec_unload_t unload;
+
+    if ( copy_from_guest(&compat_load, uarg, 1) )
+        return -EFAULT;
+
+    unload.type = compat_load.type;
+    return kexec_do_unload(&unload);
+#else
+    return 0;
+#endif
+}
+
+static int kexec_unload(XEN_GUEST_HANDLE_PARAM(void) uarg)
+{
+    xen_kexec_unload_t unload;
+
+    if ( unlikely(copy_from_guest(&unload, uarg, 1)) )
+        return -EFAULT;
+
+    return kexec_do_unload(&unload);
 }
 
 static int do_kexec_op_internal(unsigned long op,
                                 XEN_GUEST_HANDLE_PARAM(void) uarg,
                                 bool_t compat)
 {
-    unsigned long flags;
     int ret = -EINVAL;
 
     ret = xsm_kexec(XSM_PRIV);
@@ -867,19 +1131,25 @@ static int do_kexec_op_internal(unsigned long op,
                 ret = kexec_get_range(uarg);
         break;
     case KEXEC_CMD_kexec_load_v1:
+        if ( compat )
+            ret = kexec_load_v1_compat(uarg);
+        else
+            ret = kexec_load_v1(uarg);
+        break;
     case KEXEC_CMD_kexec_unload_v1:
-        spin_lock_irqsave(&kexec_lock, flags);
-        if (!test_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags))
-        {
-                if (compat)
-                        ret = kexec_load_unload_compat(op, uarg);
-                else
-                        ret = kexec_load_unload(op, uarg);
-        }
-        spin_unlock_irqrestore(&kexec_lock, flags);
+        if ( compat )
+            ret = kexec_unload_v1_compat(uarg);
+        else
+            ret = kexec_unload_v1(uarg);
         break;
     case KEXEC_CMD_kexec:
         ret = kexec_exec(uarg);
+        break;
+    case KEXEC_CMD_kexec_load:
+        ret = kexec_load(uarg);
+        break;
+    case KEXEC_CMD_kexec_unload:
+        ret = kexec_unload(uarg);
         break;
     }
 
