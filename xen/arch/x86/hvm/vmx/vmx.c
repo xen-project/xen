@@ -675,7 +675,27 @@ void vmx_get_segment_register(struct vcpu *v, enum x86_segment seg,
 {
     unsigned long attr = 0, sel = 0, limit;
 
-    vmx_vmcs_enter(v);
+    /*
+     * We may get here in the context of dump_execstate(), which may have
+     * interrupted context switching between setting "current" and
+     * vmx_do_resume() reaching the end of vmx_load_vmcs(). That would make
+     * all the VMREADs below fail if we don't bail right away.
+     */
+    if ( unlikely(!vmx_vmcs_try_enter(v)) )
+    {
+        static bool_t warned;
+
+        if ( !warned )
+        {
+            warned = 1;
+            printk(XENLOG_WARNING "Segment register inaccessible for d%dv%d\n"
+                   "(If you see this outside of debugging activity,"
+                   " please report to xen-devel@lists.xenproject.org)\n",
+                   v->domain->domain_id, v->vcpu_id);
+        }
+        memset(reg, 0, sizeof(*reg));
+        return;
+    }
 
     switch ( seg )
     {

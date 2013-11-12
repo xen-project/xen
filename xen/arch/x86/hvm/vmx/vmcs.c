@@ -601,16 +601,16 @@ struct foreign_vmcs {
 };
 static DEFINE_PER_CPU(struct foreign_vmcs, foreign_vmcs);
 
-void vmx_vmcs_enter(struct vcpu *v)
+bool_t vmx_vmcs_try_enter(struct vcpu *v)
 {
     struct foreign_vmcs *fv;
 
     /*
      * NB. We must *always* run an HVM VCPU on its own VMCS, except for
-     * vmx_vmcs_enter/exit critical regions.
+     * vmx_vmcs_enter/exit and scheduling tail critical regions.
      */
     if ( likely(v == current) )
-        return;
+        return v->arch.hvm_vmx.vmcs == this_cpu(current_vmcs);
 
     fv = &this_cpu(foreign_vmcs);
 
@@ -633,6 +633,15 @@ void vmx_vmcs_enter(struct vcpu *v)
     }
 
     fv->count++;
+
+    return 1;
+}
+
+void vmx_vmcs_enter(struct vcpu *v)
+{
+    bool_t okay = vmx_vmcs_try_enter(v);
+
+    ASSERT(okay);
 }
 
 void vmx_vmcs_exit(struct vcpu *v)
