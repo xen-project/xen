@@ -49,7 +49,7 @@ static void _show_registers(
 
     printk("RIP:    %04x:[<%016lx>]", regs->cs, regs->rip);
     if ( context == CTXT_hypervisor )
-        print_symbol(" %s", regs->rip);
+        printk(" %pS", _p(regs->rip));
     printk("\nRFLAGS: %016lx   ", regs->rflags);
     if ( (context == CTXT_pv_guest) && v && v->vcpu_info )
         printk("EM: %d   ", !!vcpu_info(v, evtchn_upcall_mask));

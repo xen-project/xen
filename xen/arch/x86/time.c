@@ -1475,8 +1475,8 @@ static int _disable_pit_irq(void(*hpet_broadcast_setup)(void))
         {
             if ( xen_cpuidle > 0 )
             {
-                print_symbol("%s() failed, turning to PIT broadcast\n",
-                             (unsigned long)hpet_broadcast_setup);
+                printk("%ps() failed, turning to PIT broadcast\n",
+                       hpet_broadcast_setup);
                 return -1;
             }
             ret = 0;

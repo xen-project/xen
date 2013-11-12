@@ -2276,7 +2276,7 @@ static void dump_irqs(unsigned char key)
             printk("\n");
         }
         else if ( desc->action )
-            print_symbol("%s\n", (unsigned long)desc->action->handler);
+            printk("%ps()\n", desc->action->handler);
         else
             printk("mapped, unbound\n");
 
@@ -2288,10 +2288,7 @@ static void dump_irqs(unsigned char key)
     printk("Direct vector information:\n");
     for ( i = FIRST_DYNAMIC_VECTOR; i < NR_VECTORS; ++i )
         if ( direct_apic_vector[i] )
-        {
-            printk("   %#02x -> ", i);
-            print_symbol("%s\n", (unsigned long)direct_apic_vector[i]);
-        }
+            printk("   %#02x -> %ps()\n", i, direct_apic_vector[i]);
 
     dump_ioapic_irq_info();
 }

@@ -198,19 +198,14 @@ static void show_trace(struct cpu_user_regs *regs)
 {
     unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), addr;
 
-    printk("Xen call trace:\n   ");
-
-    printk("[<%p>]", _p(regs->eip));
-    print_symbol(" %s\n   ", regs->eip);
+    printk("Xen call trace:\n"
+           "   [<%p>] %pS\n", _p(regs->eip), _p(regs->eip));
 
     while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )
     {
         addr = *stack++;
         if ( is_active_kernel_text(addr) )
-        {
-            printk("[<%p>]", _p(addr));
-            print_symbol(" %s\n   ", addr);
-        }
+            printk("   [<%p>] %pS\n", _p(addr), _p(addr));
     }
 
     printk("\n");
@@ -222,8 +217,6 @@ static void show_trace(struct cpu_user_regs *regs)
 {
     unsigned long *frame, next, addr, low, high;
 
-    printk("Xen call trace:\n   ");
-
     /*
      * If RIP is not pointing into hypervisor code then someone may have
      * called into oblivion. Peek to see if they left a return address at
@@ -232,8 +225,9 @@ static void show_trace(struct cpu_user_regs *regs)
     addr = is_active_kernel_text(regs->eip) ||
            !is_active_kernel_text(*ESP_BEFORE_EXCEPTION(regs)) ?
            regs->eip : *ESP_BEFORE_EXCEPTION(regs);
-    printk("[<%p>]", _p(addr));
-    print_symbol(" %s\n   ", addr);
+
+    printk("Xen call trace:\n"
+           "   [<%p>] %pS\n", _p(addr), _p(addr));
 
     /* Bounds for range of valid frame pointer. */
     low  = (unsigned long)(ESP_BEFORE_EXCEPTION(regs) - 2);
@@ -269,8 +263,7 @@ static void show_trace(struct cpu_user_regs *regs)
             addr  = frame[1];
         }
 
-        printk("[<%p>]", _p(addr));
-        print_symbol(" %s\n   ", addr);
+        printk("   [<%p>] %pS\n", _p(addr), _p(addr));
 
         low = (unsigned long)&frame[2];
     }
@@ -338,10 +331,7 @@ void show_stack_overflow(unsigned int cpu, unsigned long esp)
     {
         addr = *stack++;
         if ( is_active_kernel_text(addr) )
-        {
-            printk("%p: [<%p>]", stack, _p(addr));
-            print_symbol(" %s\n   ", addr);
-        }
+            printk("%p: [<%p>] %pS\n", stack, _p(addr), _p(addr));
     }
 
     printk("\n");
@@ -3755,8 +3745,8 @@ void asm_domain_crash_synchronous(unsigned long addr)
     if ( addr == 0 )
         addr = this_cpu(last_extable_addr);
 
-    printk("domain_crash_sync called from entry.S: fault at %p ", _p(addr));
-    print_symbol("%s\n", addr);
+    printk("domain_crash_sync called from entry.S: fault at %p %pS\n",
+           _p(addr), _p(addr));
 
     __domain_crash_synchronous();
 }
