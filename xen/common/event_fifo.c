@@ -34,19 +34,67 @@ static inline event_word_t *evtchn_fifo_word_from_port(struct domain *d,
     return d->evtchn_fifo->event_array[p] + w;
 }
 
-static bool_t evtchn_fifo_set_link(event_word_t *word, uint32_t link)
+static int try_set_link(event_word_t *word, event_word_t *w, uint32_t link)
 {
-    event_word_t n, o, w;
+    event_word_t new, old;
 
-    w = *word;
+    if ( !(*w & (1 << EVTCHN_FIFO_LINKED)) )
+        return 0;
 
-    do {
-        if ( !(w & (1 << EVTCHN_FIFO_LINKED)) )
-            return 0;
-        o = w;
-        n = (w & ~EVTCHN_FIFO_LINK_MASK) | link;
-    } while ( (w = cmpxchg(word, o, n)) != o );
+    old = *w;
+    new = (old & ~((1 << EVTCHN_FIFO_BUSY) | EVTCHN_FIFO_LINK_MASK)) | link;
+    *w = cmpxchg(word, old, new);
+    if ( *w == old )
+        return 1;
 
+    return -EAGAIN;
+}
+
+/*
+ * Atomically set the LINK field iff it is still LINKED.
+ *
+ * The guest is only permitted to make the following changes to a
+ * LINKED event.
+ *
+ * - set MASKED
+ * - clear MASKED
+ * - clear PENDING
+ * - clear LINKED (and LINK)
+ *
+ * We block unmasking by the guest by marking the tail word as BUSY,
+ * therefore, the cmpxchg() may fail at most 4 times.
+ */
+static bool_t evtchn_fifo_set_link(const struct domain *d, event_word_t *word,
+                                   uint32_t link)
+{
+    event_word_t w;
+    unsigned int try;
+    int ret;
+
+    w = read_atomic(word);
+
+    ret = try_set_link(word, &w, link);
+    if ( ret >= 0 )
+        return ret;
+
+    /* Lock the word to prevent guest unmasking. */
+    set_bit(EVTCHN_FIFO_BUSY, word);
+
+    w = read_atomic(word);
+
+    for ( try = 0; try < 4; try++ )
+    {
+        ret = try_set_link(word, &w, link);
+        if ( ret >= 0 )
+        {
+            if ( ret == 0 )
+                clear_bit(EVTCHN_FIFO_BUSY, word);
+            return ret;
+        }
+    }
+    gdprintk(XENLOG_WARNING, "domain %d, port %d not linked\n",
+             d->domain_id, link);
+    clear_bit(EVTCHN_FIFO_BUSY, word);
     return 1;
 }
 
@@ -105,7 +153,7 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
         if ( port != q->tail )
         {
             tail_word = evtchn_fifo_word_from_port(d, q->tail);
-            linked = evtchn_fifo_set_link(tail_word, port);
+            linked = evtchn_fifo_set_link(d, tail_word, port);
         }
         if ( !linked )
             write_atomic(q->head, port);
@@ -202,11 +250,12 @@ static void evtchn_fifo_print_state(struct domain *d,
 
     word = evtchn_fifo_word_from_port(d, evtchn->port);
     if ( !word )
-        printk("?   ");
+        printk("?     ");
     else if ( test_bit(EVTCHN_FIFO_LINKED, word) )
-        printk("%-4u", *word & EVTCHN_FIFO_LINK_MASK);
+        printk("%c %-4u", test_bit(EVTCHN_FIFO_BUSY, word) ? 'B' : ' ',
+               *word & EVTCHN_FIFO_LINK_MASK);
     else
-        printk("-   ");
+        printk("%c -   ", test_bit(EVTCHN_FIFO_BUSY, word) ? 'B' : ' ');
 }
 
 static const struct evtchn_port_ops evtchn_port_ops_fifo =

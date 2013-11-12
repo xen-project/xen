@@ -343,6 +343,7 @@ typedef uint32_t event_word_t;
 #define EVTCHN_FIFO_PENDING 31
 #define EVTCHN_FIFO_MASKED  30
 #define EVTCHN_FIFO_LINKED  29
+#define EVTCHN_FIFO_BUSY    28
 
 #define EVTCHN_FIFO_LINK_BITS 17
 #define EVTCHN_FIFO_LINK_MASK ((1 << EVTCHN_FIFO_LINK_BITS) - 1)
