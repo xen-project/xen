@@ -228,6 +228,79 @@ void xc__hypercall_bounce_post(xc_interface *xch, xc_hypercall_buffer_t *b)
     xc__hypercall_buffer_free(xch, b);
 }
 
+struct xc_hypercall_buffer_array {
+    unsigned max_bufs;
+    xc_hypercall_buffer_t *bufs;
+};
+
+xc_hypercall_buffer_array_t *xc_hypercall_buffer_array_create(xc_interface *xch,
+                                                              unsigned n)
+{
+    xc_hypercall_buffer_array_t *array;
+    xc_hypercall_buffer_t *bufs = NULL;
+
+    array = malloc(sizeof(*array));
+    if ( array == NULL )
+        goto error;
+
+    bufs = calloc(n, sizeof(*bufs));
+    if ( bufs == NULL )
+        goto error;
+
+    array->max_bufs = n;
+    array->bufs     = bufs;
+
+    return array;
+
+error:
+    free(bufs);
+    free(array);
+    return NULL;
+}
+
+void *xc__hypercall_buffer_array_alloc(xc_interface *xch,
+                                       xc_hypercall_buffer_array_t *array,
+                                       unsigned index,
+                                       xc_hypercall_buffer_t *hbuf,
+                                       size_t size)
+{
+    void *buf;
+
+    if ( index >= array->max_bufs || array->bufs[index].hbuf )
+        abort();
+
+    buf = xc__hypercall_buffer_alloc(xch, hbuf, size);
+    if ( buf )
+        array->bufs[index] = *hbuf;
+    return buf;
+}
+
+void *xc__hypercall_buffer_array_get(xc_interface *xch,
+                                     xc_hypercall_buffer_array_t *array,
+                                     unsigned index,
+                                     xc_hypercall_buffer_t *hbuf)
+{
+    if ( index >= array->max_bufs || array->bufs[index].hbuf == NULL )
+        abort();
+
+    *hbuf = array->bufs[index];
+    return array->bufs[index].hbuf;
+}
+
+void xc_hypercall_buffer_array_destroy(xc_interface *xc,
+                                       xc_hypercall_buffer_array_t *array)
+{
+    unsigned i;
+
+    if ( array == NULL )
+        return;
+
+    for (i = 0; i < array->max_bufs; i++ )
+        xc__hypercall_buffer_free(xc, &array->bufs[i]);
+    free(array->bufs);
+    free(array);
+}
+
 /*
  * Local variables:
  * mode: C

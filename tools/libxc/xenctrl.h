@@ -321,6 +321,33 @@ void xc__hypercall_buffer_free_pages(xc_interface *xch, xc_hypercall_buffer_t *b
 #define xc_hypercall_buffer_free_pages(_xch, _name, _nr) xc__hypercall_buffer_free_pages(_xch, HYPERCALL_BUFFER(_name), _nr)
 
 /*
+ * Array of hypercall buffers.
+ *
+ * Create an array with xc_hypercall_buffer_array_create() and
+ * populate it by declaring one hypercall buffer in a loop and
+ * allocating the buffer with xc_hypercall_buffer_array_alloc().
+ *
+ * To access a previously allocated buffers, declare a new hypercall
+ * buffer and call xc_hypercall_buffer_array_get().
+ *
+ * Destroy the array with xc_hypercall_buffer_array_destroy() to free
+ * the array and all its alocated hypercall buffers.
+ */
+struct xc_hypercall_buffer_array;
+typedef struct xc_hypercall_buffer_array xc_hypercall_buffer_array_t;
+
+xc_hypercall_buffer_array_t *xc_hypercall_buffer_array_create(xc_interface *xch, unsigned n);
+void *xc__hypercall_buffer_array_alloc(xc_interface *xch, xc_hypercall_buffer_array_t *array,
+                                       unsigned index, xc_hypercall_buffer_t *hbuf, size_t size);
+#define xc_hypercall_buffer_array_alloc(_xch, _array, _index, _name, _size) \
+    xc__hypercall_buffer_array_alloc(_xch, _array, _index, HYPERCALL_BUFFER(_name), _size)
+void *xc__hypercall_buffer_array_get(xc_interface *xch, xc_hypercall_buffer_array_t *array,
+                                     unsigned index, xc_hypercall_buffer_t *hbuf);
+#define xc_hypercall_buffer_array_get(_xch, _array, _index, _name, _size) \
+    xc__hypercall_buffer_array_get(_xch, _array, _index, HYPERCALL_BUFFER(_name))
+void xc_hypercall_buffer_array_destroy(xc_interface *xc, xc_hypercall_buffer_array_t *array);
+
+/*
  * CPUMAP handling
  */
 typedef uint8_t *xc_cpumap_t;
