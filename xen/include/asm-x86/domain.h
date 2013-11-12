@@ -316,7 +316,6 @@ struct arch_domain
 } __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
-#define has_arch_mmios(d)    (!rangeset_is_empty((d)->iomem_caps))
 
 #define gdt_ldt_pt_idx(v) \
       ((v)->vcpu_id >> (PAGETABLE_ORDER - GDT_LDT_VCPU_SHIFT))

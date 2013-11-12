@@ -28,6 +28,7 @@
 #include <xen/perfc.h>
 #include <asm/current.h>
 #include <asm/io.h>
+#include <asm/iocap.h>
 #include <asm/regs.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -2236,10 +2237,7 @@ static void wbinvd_ipi(void *info)
 
 static void vmx_wbinvd_intercept(void)
 {
-    if ( !has_arch_mmios(current->domain) )
-        return;
-
-    if ( iommu_snoop )
+    if ( !cache_flush_permitted(current->domain) || iommu_snoop )
         return;
 
     if ( cpu_has_wbinvd_exiting )

@@ -40,6 +40,7 @@
 #include <asm/debugreg.h>
 #include <asm/msr.h>
 #include <asm/i387.h>
+#include <asm/iocap.h>
 #include <asm/spinlock.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/hvm.h>
@@ -1973,7 +1974,7 @@ static void wbinvd_ipi(void *info)
 
 static void svm_wbinvd_intercept(void)
 {
-    if ( has_arch_mmios(current->domain) )
+    if ( cache_flush_permitted(current->domain) )
         on_each_cpu(wbinvd_ipi, NULL, 1);
 }
 
