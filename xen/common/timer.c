@@ -511,9 +511,8 @@ s_time_t align_timer(s_time_t firsttick, uint64_t period)
 
 static void dump_timer(struct timer *t, s_time_t now)
 {
-    printk("  ex=%8"PRId64"us timer=%p cb=%p(%p)",
+    printk("  ex=%12"PRId64"us timer=%p cb=%ps(%p)\n",
            (t->expires - now) / 1000, t, t->function, t->data);
-    print_symbol(" %s\n", (unsigned long)t->function);
 }
 
 static void dump_timerq(unsigned char key)
