@@ -342,7 +342,7 @@ static int nsvm_vmrun_permissionmap(struct vcpu *v, bool_t viopm)
     unsigned int i;
     enum hvm_copy_result ret;
     unsigned long *ns_viomap;
-    bool_t ioport_80, ioport_ed;
+    bool_t ioport_80 = 1, ioport_ed = 1;
 
     ns_msrpm_ptr = (unsigned long *)svm->ns_cached_msrpm;
 
@@ -360,10 +360,12 @@ static int nsvm_vmrun_permissionmap(struct vcpu *v, bool_t viopm)
     svm->ns_iomap_pa = ns_vmcb->_iopm_base_pa;
 
     ns_viomap = hvm_map_guest_frame_ro(svm->ns_iomap_pa >> PAGE_SHIFT, 0);
-    ASSERT(ns_viomap != NULL);
-    ioport_80 = test_bit(0x80, ns_viomap);
-    ioport_ed = test_bit(0xed, ns_viomap);
-    hvm_unmap_guest_frame(ns_viomap, 0);
+    if ( ns_viomap )
+    {
+        ioport_80 = test_bit(0x80, ns_viomap);
+        ioport_ed = test_bit(0xed, ns_viomap);
+        hvm_unmap_guest_frame(ns_viomap, 0);
+    }
 
     svm->ns_iomap = nestedhvm_vcpu_iomap_get(ioport_80, ioport_ed);
 
@@ -865,40 +867,45 @@ nsvm_vmcb_guest_intercepts_msr(unsigned long *msr_bitmap,
 static int
 nsvm_vmcb_guest_intercepts_ioio(paddr_t iopm_pa, uint64_t exitinfo1)
 {
-    unsigned long iopm_gfn = iopm_pa >> PAGE_SHIFT;
-    unsigned long *io_bitmap = NULL;
+    unsigned long gfn = iopm_pa >> PAGE_SHIFT;
+    unsigned long *io_bitmap;
     ioio_info_t ioinfo;
     uint16_t port;
+    unsigned int size;
     bool_t enabled;
-    unsigned long gfn = 0; /* gcc ... */
 
     ioinfo.bytes = exitinfo1;
     port = ioinfo.fields.port;
+    size = ioinfo.fields.sz32 ? 4 : ioinfo.fields.sz16 ? 2 : 1;
 
-    switch (port) {
-    case 0 ... 32767: /* first 4KB page */
-        gfn = iopm_gfn;
+    switch ( port )
+    {
+    case 0 ... 8 * PAGE_SIZE - 1: /* first 4KB page */
         break;
-    case 32768 ... 65535: /* second 4KB page */
-        port -= 32768;
-        gfn = iopm_gfn + 1;
+    case 8 * PAGE_SIZE ... 2 * 8 * PAGE_SIZE - 1: /* second 4KB page */
+        port -= 8 * PAGE_SIZE;
+        ++gfn;
         break;
     default:
         BUG();
         break;
     }
 
-    io_bitmap = hvm_map_guest_frame_ro(gfn, 0);
-    if (io_bitmap == NULL) {
-        gdprintk(XENLOG_ERR,
-            "IOIO intercept: mapping of permission map failed\n");
-        return NESTEDHVM_VMEXIT_ERROR;
+    for ( io_bitmap = hvm_map_guest_frame_ro(gfn, 0); ; )
+    {
+        enabled = io_bitmap && test_bit(port, io_bitmap);
+        if ( !enabled || !--size )
+            break;
+        if ( unlikely(++port == 8 * PAGE_SIZE) )
+        {
+            hvm_unmap_guest_frame(io_bitmap, 0);
+            io_bitmap = hvm_map_guest_frame_ro(++gfn, 0);
+            port -= 8 * PAGE_SIZE;
+        }
     }
-
-    enabled = test_bit(port, io_bitmap);
     hvm_unmap_guest_frame(io_bitmap, 0);
 
-    if (!enabled)
+    if ( !enabled )
         return NESTEDHVM_VMEXIT_HOST;
 
     return NESTEDHVM_VMEXIT_INJECT;
@@ -965,8 +972,8 @@ nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
     switch (exitcode) {
     case VMEXIT_MSR:
         ASSERT(regs != NULL);
-        nestedsvm_vmcb_map(v, nv->nv_vvmcxaddr);
-        ASSERT(nv->nv_vvmcx != NULL);
+        if ( !nestedsvm_vmcb_map(v, nv->nv_vvmcxaddr) )
+            break;
         ns_vmcb = nv->nv_vvmcx;
         vmexits = nsvm_vmcb_guest_intercepts_msr(svm->ns_cached_msrpm,
             regs->ecx, ns_vmcb->exitinfo1 != 0);
@@ -974,8 +981,8 @@ nsvm_vmcb_guest_intercepts_exitcode(struct vcpu *v,
             return 0;
         break;
     case VMEXIT_IOIO:
-        nestedsvm_vmcb_map(v, nv->nv_vvmcxaddr);
-        ASSERT(nv->nv_vvmcx != NULL);
+        if ( !nestedsvm_vmcb_map(v, nv->nv_vvmcxaddr) )
+            break;
         ns_vmcb = nv->nv_vvmcx;
         vmexits = nsvm_vmcb_guest_intercepts_ioio(ns_vmcb->_iopm_base_pa,
             ns_vmcb->exitinfo1);
