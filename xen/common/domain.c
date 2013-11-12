@@ -352,7 +352,6 @@ void domain_update_node_affinity(struct domain *d)
     cpumask_var_t cpumask;
     cpumask_var_t online_affinity;
     const cpumask_t *online;
-    nodemask_t nodemask = NODE_MASK_NONE;
     struct vcpu *v;
     unsigned int node;
 
@@ -374,28 +373,19 @@ void domain_update_node_affinity(struct domain *d)
         cpumask_or(cpumask, cpumask, online_affinity);
     }
 
+    /*
+     * If d->auto_node_affinity is true, the domain's node-affinity mask
+     * (d->node_affinity) is automaically computed from all the domain's
+     * vcpus' vcpu-affinity masks (the union of which we have just built
+     * above in cpumask). OTOH, if d->auto_node_affinity is false, we
+     * must leave the node-affinity of the domain alone.
+     */
     if ( d->auto_node_affinity )
     {
-        /* Node-affinity is automaically computed from all vcpu-affinities */
+        nodes_clear(d->node_affinity);
         for_each_online_node ( node )
             if ( cpumask_intersects(&node_to_cpumask(node), cpumask) )
-                node_set(node, nodemask);
-
-        d->node_affinity = nodemask;
-    }
-    else
-    {
-        /* Node-affinity is provided by someone else, just filter out cpus
-         * that are either offline or not in the affinity of any vcpus. */
-        nodemask = d->node_affinity;
-        for_each_node_mask ( node, d->node_affinity )
-            if ( !cpumask_intersects(&node_to_cpumask(node), cpumask) )
-                node_clear(node, nodemask);//d->node_affinity);
-
-        /* Avoid loosing track of node-affinity because of a bad
-         * vcpu-affinity has been specified. */
-        if ( !nodes_empty(nodemask) )
-            d->node_affinity = nodemask;
+                node_set(node, d->node_affinity);
     }
 
     sched_set_node_affinity(d, &d->node_affinity);
