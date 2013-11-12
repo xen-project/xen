@@ -46,6 +46,7 @@
 #include <xen/hvm/params.h>
 #include <xen/xsm/flask_op.h>
 #include <xen/tmem.h>
+#include <xen/kexec.h>
 
 #include "xentoollog.h"
 
@@ -2339,5 +2340,59 @@ void xc_compression_reset_pagebuf(xc_interface *xch, comp_ctx *ctx);
 int xc_compression_uncompress_page(xc_interface *xch, char *compbuf,
 				   unsigned long compbuf_size,
 				   unsigned long *compbuf_pos, char *dest);
+
+/*
+ * Execute an image previously loaded with xc_kexec_load().
+ *
+ * Does not return on success.
+ *
+ * Fails with:
+ *   ENOENT if the specified image has not been loaded.
+ */
+int xc_kexec_exec(xc_interface *xch, int type);
+
+/*
+ * Find the machine address and size of certain memory areas.
+ *
+ *   KEXEC_RANGE_MA_CRASH       crash area
+ *   KEXEC_RANGE_MA_XEN         Xen itself
+ *   KEXEC_RANGE_MA_CPU         CPU note for CPU number 'nr'
+ *   KEXEC_RANGE_MA_XENHEAP     xenheap
+ *   KEXEC_RANGE_MA_EFI_MEMMAP  EFI Memory Map
+ *   KEXEC_RANGE_MA_VMCOREINFO  vmcoreinfo
+ *
+ * Fails with:
+ *   EINVAL if the range or CPU number isn't valid.
+ */
+int xc_kexec_get_range(xc_interface *xch, int range,  int nr,
+                       uint64_t *size, uint64_t *start);
+
+/*
+ * Load a kexec image into memory.
+ *
+ * The image may be of type KEXEC_TYPE_DEFAULT (executed on request)
+ * or KEXEC_TYPE_CRASH (executed on a crash).
+ *
+ * The image architecture may be a 32-bit variant of the hypervisor
+ * architecture (e.g, EM_386 on a x86-64 hypervisor).
+ *
+ * Fails with:
+ *   ENOMEM if there is insufficient memory for the new image.
+ *   EINVAL if the image does not fit into the crash area or the entry
+ *          point isn't within one of segments.
+ *   EBUSY  if another image is being executed.
+ */
+int xc_kexec_load(xc_interface *xch, uint8_t type, uint16_t arch,
+                  uint64_t entry_maddr,
+                  uint32_t nr_segments, xen_kexec_segment_t *segments);
+
+/*
+ * Unload a kexec image.
+ *
+ * This prevents a KEXEC_TYPE_DEFAULT or KEXEC_TYPE_CRASH image from
+ * being executed.  The crash images are not cleared from the crash
+ * region.
+ */
+int xc_kexec_unload(xc_interface *xch, int type);
 
 #endif /* XENCTRL_H */
