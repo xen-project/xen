@@ -538,8 +538,6 @@ static inline void __init construct_default_ISA_mptable(int mpc_default_type)
 	}
 }
 
-#define FIX_EFI_MPF FIX_KEXEC_BASE_0
-
 static __init void efi_unmap_mpf(void)
 {
 	if (efi_enabled)
