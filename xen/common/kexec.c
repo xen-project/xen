@@ -305,6 +305,8 @@ void kexec_crash(void)
     if ( !test_bit(KEXEC_IMAGE_CRASH_BASE + pos, &kexec_flags) )
         return;
 
+    printk("Executing crash image\n");
+
     kexecing = TRUE;
 
     kexec_common_shutdown();
