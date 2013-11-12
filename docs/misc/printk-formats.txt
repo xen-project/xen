@@ -1,0 +1,17 @@
+Xen custom %p format options.  A subset, borrowed from Linux.
+
+All parameters to a %p option should be compatible with void*.  Regular
+pointers are fine.  Numbers should make use of the _p() macro.
+
+Symbol/Function pointers:
+
+       %ps     Symbol name with condition offset and size (iff offset != 0)
+                 e.g.  printk
+                       default_idle+0x78/0x7d
+
+       %pS     Symbol name with unconditional offset and size
+                 e.g.  printk+0/0x48
+                       default_idle+0x78/0x7d
+
+       In the case that an appropriate symbol name can't be found, %p[sS] will
+       fall back to '%p' and print the address in hex.

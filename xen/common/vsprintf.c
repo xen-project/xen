@@ -17,6 +17,7 @@
  */
 
 #include <xen/ctype.h>
+#include <xen/symbols.h>
 #include <xen/lib.h>
 #include <asm/div64.h>
 #include <asm/page.h>
@@ -261,10 +262,46 @@ static char *string(char *str, char *end, const char *s,
     return str;
 }
 
-static char *pointer(char *str, char *end,
+static char *pointer(char *str, char *end, const char **fmt_ptr,
                      const void *arg, int field_width, int precision,
                      int flags)
 {
+    const char *fmt = *fmt_ptr, *s;
+
+    /* Custom %p suffixes. See XEN_ROOT/docs/misc/printk-formats.txt */
+    switch ( fmt[1] )
+    {
+    case 's': /* Symbol name with offset and size (iff offset != 0) */
+    case 'S': /* Symbol name unconditionally with offset and size */
+    {
+        unsigned long sym_size, sym_offset;
+        char namebuf[KSYM_NAME_LEN+1];
+
+        /* Advance parents fmt string, as we have consumed 's' or 'S' */
+        ++*fmt_ptr;
+
+        s = symbols_lookup((unsigned long)arg, &sym_size, &sym_offset, namebuf);
+
+        /* If the symbol is not found, fall back to printing the address */
+        if ( !s )
+            break;
+
+        /* Print symbol name */
+        str = string(str, end, s, -1, -1, 0);
+
+        if ( fmt[1] == 'S' || sym_offset != 0 )
+        {
+            /* Print '+<offset>/<len>' */
+            str = number(str, end, sym_offset, 16, -1, -1, SPECIAL|SIGN|PLUS);
+            if ( str <= end )
+                *str++ = '/';
+            str = number(str, end, sym_size, 16, -1, -1, SPECIAL);
+        }
+
+        return str;
+    }
+    }
+
     if ( field_width == -1 )
     {
         field_width = 2 * sizeof(void *);
@@ -413,7 +450,8 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
             continue;
 
         case 'p':
-            str = pointer(str, end, va_arg(args, const void *),
+            /* pointer() might advance fmt (%pS for example) */
+            str = pointer(str, end, &fmt, va_arg(args, const void *),
                           field_width, precision, flags);
             continue;
 
