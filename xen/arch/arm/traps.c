@@ -387,7 +387,7 @@ static void show_registers_32(struct cpu_user_regs *regs,
 #else
     printk("PC:     %08"PRIx32, regs->pc);
     if ( !guest_mode )
-        print_symbol(" %s", regs->pc);
+        printk(" %pS", _p(regs->pc));
     printk("\n");
 #endif
     printk("CPSR:   %08"PRIx32" MODE:%s\n", regs->cpsr,
@@ -462,7 +462,7 @@ static void show_registers_64(struct cpu_user_regs *regs,
 
     printk("PC:     %016"PRIx64, regs->pc);
     if ( !guest_mode )
-        print_symbol(" %s", regs->pc);
+        printk(" %pS", _p(regs->pc));
     printk("\n");
     printk("LR:     %016"PRIx64"\n", regs->lr);
     if ( guest_mode )
@@ -735,12 +735,10 @@ static void show_trace(struct cpu_user_regs *regs)
 {
     register_t *frame, next, addr, low, high;
 
-    printk("Xen call trace:\n   ");
+    printk("Xen call trace:\n");
 
-    printk("[<%p>]", _p(regs->pc));
-    print_symbol(" %s (PC)\n   ", regs->pc);
-    printk("[<%p>]", _p(regs->lr));
-    print_symbol(" %s (LR)\n   ", regs->lr);
+    printk("   [<%p>] %pS (PC)\n", _p(regs->pc), _p(regs->pc));
+    printk("   [<%p>] %pS (LR)\n", _p(regs->lr), _p(regs->lr));
 
     /* Bounds for range of valid frame pointer. */
     low  = (register_t)(STACK_BEFORE_EXCEPTION(regs));
@@ -760,8 +758,7 @@ static void show_trace(struct cpu_user_regs *regs)
         next  = frame[0];
         addr  = frame[1];
 
-        printk("[<%p>]", _p(addr));
-        print_symbol(" %s\n   ", addr);
+        printk("   [<%p>] %pS\n", _p(addr), _p(addr));
 
         low = (register_t)&frame[1];
     }
