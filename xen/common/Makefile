@@ -13,6 +13,7 @@ obj-y += irq.o
 obj-y += kernel.o
 obj-y += keyhandler.o
 obj-$(HAS_KEXEC) += kexec.o
+obj-$(HAS_KEXEC) += kimage.o
 obj-y += lib.o
 obj-y += memory.o
 obj-y += multicall.o
