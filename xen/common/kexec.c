@@ -734,7 +734,7 @@ static void crash_save_vmcoreinfo(void)
 #endif
 }
 
-static int kexec_load_unload_internal(unsigned long op, xen_kexec_load_t *load)
+static int kexec_load_unload_internal(unsigned long op, xen_kexec_load_v1_t *load)
 {
     xen_kexec_image_t *image;
     int base, bit, pos;
@@ -781,7 +781,7 @@ static int kexec_load_unload_internal(unsigned long op, xen_kexec_load_t *load)
 
 static int kexec_load_unload(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
-    xen_kexec_load_t load;
+    xen_kexec_load_v1_t load;
 
     if ( unlikely(copy_from_guest(&load, uarg, 1)) )
         return -EFAULT;
@@ -793,8 +793,8 @@ static int kexec_load_unload_compat(unsigned long op,
                                     XEN_GUEST_HANDLE_PARAM(void) uarg)
 {
 #ifdef CONFIG_COMPAT
-    compat_kexec_load_t compat_load;
-    xen_kexec_load_t load;
+    compat_kexec_load_v1_t compat_load;
+    xen_kexec_load_v1_t load;
 
     if ( unlikely(copy_from_guest(&compat_load, uarg, 1)) )
         return -EFAULT;
@@ -866,8 +866,8 @@ static int do_kexec_op_internal(unsigned long op,
         else
                 ret = kexec_get_range(uarg);
         break;
-    case KEXEC_CMD_kexec_load:
-    case KEXEC_CMD_kexec_unload:
+    case KEXEC_CMD_kexec_load_v1:
+    case KEXEC_CMD_kexec_unload_v1:
         spin_lock_irqsave(&kexec_lock, flags);
         if (!test_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags))
         {
