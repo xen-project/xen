@@ -235,6 +235,32 @@ static char *number(
     return buf;
 }
 
+static char *string(char *str, char *end, const char *s,
+                    int field_width, int precision, int flags)
+{
+    unsigned int i, len = strnlen(s, precision);
+
+    if (!(flags & LEFT)) {
+        while (len < field_width--) {
+            if (str <= end)
+                *str = ' ';
+            ++str;
+        }
+    }
+    for (i = 0; i < len; ++i) {
+        if (str <= end)
+            *str = *s;
+        ++str; ++s;
+    }
+    while (len < field_width--) {
+        if (str <= end)
+            *str = ' ';
+        ++str;
+    }
+
+    return str;
+}
+
 /**
  * vsnprintf - Format a string and place it in a buffer
  * @buf: The buffer to place the result into
@@ -255,9 +281,8 @@ static char *number(
  */
 int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 {
-    int len;
     unsigned long long num;
-    int i, base;
+    int base;
     char *str, *end, c;
     const char *s;
 
@@ -370,25 +395,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
             if ((unsigned long)s < PAGE_SIZE)
                 s = "<NULL>";
 
-            len = strnlen(s, precision);
-
-            if (!(flags & LEFT)) {
-                while (len < field_width--) {
-                    if (str <= end)
-                        *str = ' ';
-                    ++str;
-                }
-            }
-            for (i = 0; i < len; ++i) {
-                if (str <= end)
-                    *str = *s;
-                ++str; ++s;
-            }
-            while (len < field_width--) {
-                if (str <= end)
-                    *str = ' ';
-                ++str;
-            }
+            str = string(str, end, s, field_width, precision, flags);
             continue;
 
         case 'p':
