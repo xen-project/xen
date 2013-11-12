@@ -239,7 +239,7 @@ static char *number(
 static char *string(char *str, char *end, const char *s,
                     int field_width, int precision, int flags)
 {
-    unsigned int i, len = strnlen(s, precision);
+    int i, len = strnlen(s, precision);
 
     if (!(flags & LEFT)) {
         while (len < field_width--) {
