@@ -3278,14 +3278,16 @@ static long hvm_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     switch ( cmd )
     {
-        case PHYSDEVOP_map_pirq:
-        case PHYSDEVOP_unmap_pirq:
-        case PHYSDEVOP_eoi:
-        case PHYSDEVOP_irq_status_query:
-        case PHYSDEVOP_get_free_pirq:
-            return do_physdev_op(cmd, arg);
-        default:
+    default:
+        if ( !is_pvh_vcpu(current) || !is_hardware_domain(current->domain) )
             return -ENOSYS;
+        /* fall through */
+    case PHYSDEVOP_map_pirq:
+    case PHYSDEVOP_unmap_pirq:
+    case PHYSDEVOP_eoi:
+    case PHYSDEVOP_irq_status_query:
+    case PHYSDEVOP_get_free_pirq:
+        return do_physdev_op(cmd, arg);
     }
 }
 
