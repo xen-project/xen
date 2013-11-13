@@ -90,6 +90,9 @@ struct hvm_function_table {
     /* Support Hardware-Assisted Paging? */
     int hap_supported;
 
+    /* Necessary hardware support for PVH mode? */
+    int pvh_supported;
+
     /* Indicate HAP capabilities. */
     int hap_capabilities;
 

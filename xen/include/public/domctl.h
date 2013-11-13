@@ -47,7 +47,7 @@ struct xen_domctl_createdomain {
     /* IN parameters */
     uint32_t ssidref;
     xen_domain_handle_t handle;
- /* Is this an HVM guest (as opposed to a PV guest)? */
+ /* Is this an HVM guest (as opposed to a PVH or PV guest)? */
 #define _XEN_DOMCTL_CDF_hvm_guest     0
 #define XEN_DOMCTL_CDF_hvm_guest      (1U<<_XEN_DOMCTL_CDF_hvm_guest)
  /* Use hardware-assisted paging if available? */
@@ -59,6 +59,9 @@ struct xen_domctl_createdomain {
  /* Disable out-of-sync shadow page tables? */
 #define _XEN_DOMCTL_CDF_oos_off       3
 #define XEN_DOMCTL_CDF_oos_off        (1U<<_XEN_DOMCTL_CDF_oos_off)
+ /* Is this a PVH guest (as opposed to an HVM or PV guest)? */
+#define _XEN_DOMCTL_CDF_pvh_guest     4
+#define XEN_DOMCTL_CDF_pvh_guest      (1U<<_XEN_DOMCTL_CDF_pvh_guest)
     uint32_t flags;
 };
 typedef struct xen_domctl_createdomain xen_domctl_createdomain_t;
@@ -89,6 +92,9 @@ struct xen_domctl_getdomaininfo {
  /* Being debugged.  */
 #define _XEN_DOMINF_debugged  6
 #define XEN_DOMINF_debugged   (1U<<_XEN_DOMINF_debugged)
+/* domain is PVH */
+#define _XEN_DOMINF_pvh_guest 7
+#define XEN_DOMINF_pvh_guest  (1U<<_XEN_DOMINF_pvh_guest)
  /* XEN_DOMINF_shutdown guest-supplied code.  */
 #define XEN_DOMINF_shutdownmask 255
 #define XEN_DOMINF_shutdownshift 16

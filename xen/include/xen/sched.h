@@ -259,8 +259,12 @@ struct mem_event_per_domain
 
 struct evtchn_port_ops;
 
+/*
+ * PVH is a PV guest running in an HVM container.  is_hvm_* checks
+ * will be false, but has_hvm_container_* checks will be true.
+ */
 enum guest_type {
-    guest_type_pv, guest_type_hvm
+    guest_type_pv, guest_type_pvh, guest_type_hvm
 };
 
 struct domain
@@ -500,6 +504,9 @@ struct domain *domain_create(
  /* DOMCRF_oos_off: dont use out-of-sync optimization for shadow page tables */
 #define _DOMCRF_oos_off         4
 #define DOMCRF_oos_off          (1U<<_DOMCRF_oos_off)
+ /* DOMCRF_pvh: Create PV domain in HVM container. */
+#define _DOMCRF_pvh             5
+#define DOMCRF_pvh              (1U<<_DOMCRF_pvh)
 
 /*
  * rcu_lock_domain_by_id() is more efficient than get_domain_by_id().
@@ -778,6 +785,8 @@ void watchdog_domain_destroy(struct domain *d);
 
 #define is_pv_domain(d) ((d)->guest_type == guest_type_pv)
 #define is_pv_vcpu(v)   (is_pv_domain((v)->domain))
+#define is_pvh_domain(d) ((d)->guest_type == guest_type_pvh)
+#define is_pvh_vcpu(v)   (is_pvh_domain((v)->domain))
 #define is_hvm_domain(d) ((d)->guest_type == guest_type_hvm)
 #define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
 #define has_hvm_container_domain(d) ((d)->guest_type != guest_type_pv)

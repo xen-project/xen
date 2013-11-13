@@ -239,6 +239,8 @@ struct domain *domain_create(
 
     if ( domcr_flags & DOMCRF_hvm )
         d->guest_type = guest_type_hvm;
+    else if ( domcr_flags & DOMCRF_pvh )
+        d->guest_type = guest_type_pvh;
 
     if ( domid == 0 )
     {

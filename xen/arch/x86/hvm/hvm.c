@@ -145,6 +145,9 @@ static int __init hvm_enable(void)
         printk("\n");
     }
 
+    if ( !fns->pvh_supported )
+        printk(XENLOG_INFO "HVM: PVH mode not supported on this platform\n");
+
     /*
      * Allow direct access to the PC debug ports 0x80 and 0xed (they are
      * often used for I/O delays, but the vmexits simply slow things down).
@@ -520,6 +523,22 @@ int hvm_domain_initialise(struct domain *d)
         gdprintk(XENLOG_WARNING, "Attempt to create a HVM guest "
                  "on a non-VT/AMDV platform.\n");
         return -EINVAL;
+    }
+
+    if ( is_pvh_domain(d) )
+    {
+        if ( !hvm_funcs.pvh_supported )
+        {
+            printk(XENLOG_G_WARNING "Attempt to create a PVH guest "
+                   "on a system without necessary hardware support\n");
+            return -EINVAL;
+        }
+        if ( !hap_enabled(d) )
+        {
+            printk(XENLOG_G_INFO "PVH guest must have HAP on\n");
+            return -EINVAL;
+        }
+
     }
 
     spin_lock_init(&d->arch.hvm_domain.irq_lock);
