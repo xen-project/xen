@@ -691,6 +691,17 @@ int arch_set_info_guest(
              (c(ldt_ents) > 8192) )
             return -EINVAL;
     }
+    else if ( is_pvh_vcpu(v) )
+    {
+        /* PVH 32bitfixme */
+        ASSERT(!compat);
+
+        if ( c(ctrlreg[1]) || c(ldt_base) || c(ldt_ents) ||
+             c(user_regs.cs) || c(user_regs.ss) || c(user_regs.es) ||
+             c(user_regs.ds) || c(user_regs.fs) || c(user_regs.gs) ||
+             c.nat->gdt_ents || c.nat->fs_base || c.nat->gs_base_user )
+            return -EINVAL;
+    }
 
     v->fpu_initialised = !!(flags & VGCF_I387_VALID);
 
@@ -728,8 +739,28 @@ int arch_set_info_guest(
 
     if ( has_hvm_container_vcpu(v) )
     {
-        hvm_set_info_guest(v);
-        goto out;
+        /*
+         * NB: TF_kernel_mode is set unconditionally for HVM guests,
+         * so we always use the gs_base_kernel here. If we change this
+         * function to imitate the PV functionality, we'll need to
+         * make it pay attention to the kernel bit.
+         */
+        hvm_set_info_guest(v, compat ? 0 : c.nat->gs_base_kernel);
+
+        if ( is_hvm_vcpu(v) || v->is_initialised )
+            goto out;
+
+        /* NB: No need to use PV cr3 un-pickling macros */
+        cr3_gfn = c(ctrlreg[3]) >> PAGE_SHIFT;
+        cr3_page = get_page_from_gfn(d, cr3_gfn, NULL, P2M_ALLOC);
+
+        v->arch.cr3 = page_to_maddr(cr3_page);
+        v->arch.hvm_vcpu.guest_cr[3] = c.nat->ctrlreg[3];
+        v->arch.guest_table = pagetable_from_page(cr3_page);
+
+        ASSERT(paging_mode_enabled(d));
+
+        goto pvh_skip_pv_stuff;
     }
 
     init_int80_direct_trap(v);
@@ -934,6 +965,7 @@ int arch_set_info_guest(
 
     clear_bit(_VPF_in_reset, &v->pause_flags);
 
+ pvh_skip_pv_stuff:
     if ( v->vcpu_id == 0 )
         update_domain_wallclock_time(d);
 
