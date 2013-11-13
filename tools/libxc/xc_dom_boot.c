@@ -361,16 +361,26 @@ int xc_dom_gnttab_hvm_seed(xc_interface *xch, domid_t domid,
                            domid_t xenstore_domid)
 {
     int rc;
+    xen_pfn_t max_gfn;
     struct xen_add_to_physmap xatp = {
         .domid = domid,
         .space = XENMAPSPACE_grant_table,
         .idx   = 0,
-        .gpfn  = SCRATCH_PFN_GNTTAB
     };
     struct xen_remove_from_physmap xrfp = {
         .domid = domid,
-        .gpfn  = SCRATCH_PFN_GNTTAB
     };
+
+    max_gfn = xc_domain_maximum_gpfn(xch, domid);
+    if ( max_gfn <= 0 ) {
+        xc_dom_panic(xch, XC_INTERNAL_ERROR,
+                     "%s: failed to get max gfn "
+                     "[errno=%d]\n",
+                     __FUNCTION__, errno);
+        return -1;
+    }
+    xatp.gpfn = max_gfn + 1;
+    xrfp.gpfn = max_gfn + 1;
 
     rc = do_memory_op(xch, XENMEM_add_to_physmap, &xatp, sizeof(xatp));
     if ( rc != 0 )

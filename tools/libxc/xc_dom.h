@@ -18,9 +18,6 @@
 
 #define INVALID_P2M_ENTRY   ((xen_pfn_t)-1)
 
-/* Scrach PFN for temporary mappings in HVM */
-#define SCRATCH_PFN_GNTTAB 0xFFFFE
-
 /* --- typedefs and structs ---------------------------------------- */
 
 typedef uint64_t xen_vaddr_t;
