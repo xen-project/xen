@@ -234,11 +234,6 @@ struct pv_domain
 
     /* map_domain_page() mapping cache. */
     struct mapcache_domain mapcache;
-
-    /* Pseudophysical e820 map (XENMEM_memory_map).  */
-    spinlock_t e820_lock;
-    struct e820entry *e820;
-    unsigned int nr_e820;
 };
 
 struct arch_domain
@@ -313,6 +308,11 @@ struct arch_domain
                                 (possibly other cases in the future */
     uint64_t vtsc_kerncount; /* for hvm, counts all vtsc */
     uint64_t vtsc_usercount; /* not used for hvm */
+
+    /* Pseudophysical e820 map (XENMEM_memory_map).  */
+    spinlock_t e820_lock;
+    struct e820entry *e820;
+    unsigned int nr_e820;
 } __cacheline_aligned;
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))

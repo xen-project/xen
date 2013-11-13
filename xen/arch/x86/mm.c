@@ -4759,11 +4759,11 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -EFAULT;
         }
 
-        spin_lock(&d->arch.pv_domain.e820_lock);
-        xfree(d->arch.pv_domain.e820);
-        d->arch.pv_domain.e820 = e820;
-        d->arch.pv_domain.nr_e820 = fmap.map.nr_entries;
-        spin_unlock(&d->arch.pv_domain.e820_lock);
+        spin_lock(&d->arch.e820_lock);
+        xfree(d->arch.e820);
+        d->arch.e820 = e820;
+        d->arch.nr_e820 = fmap.map.nr_entries;
+        spin_unlock(&d->arch.e820_lock);
 
         rcu_unlock_domain(d);
         return rc;
@@ -4777,26 +4777,24 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&map, arg, 1) )
             return -EFAULT;
 
-        spin_lock(&d->arch.pv_domain.e820_lock);
+        spin_lock(&d->arch.e820_lock);
 
         /* Backwards compatibility. */
-        if ( (d->arch.pv_domain.nr_e820 == 0) ||
-             (d->arch.pv_domain.e820 == NULL) )
+        if ( (d->arch.nr_e820 == 0) || (d->arch.e820 == NULL) )
         {
-            spin_unlock(&d->arch.pv_domain.e820_lock);
+            spin_unlock(&d->arch.e820_lock);
             return -ENOSYS;
         }
 
-        map.nr_entries = min(map.nr_entries, d->arch.pv_domain.nr_e820);
-        if ( copy_to_guest(map.buffer, d->arch.pv_domain.e820,
-                           map.nr_entries) ||
+        map.nr_entries = min(map.nr_entries, d->arch.nr_e820);
+        if ( copy_to_guest(map.buffer, d->arch.e820, map.nr_entries) ||
              __copy_to_guest(arg, &map, 1) )
         {
-            spin_unlock(&d->arch.pv_domain.e820_lock);
+            spin_unlock(&d->arch.e820_lock);
             return -EFAULT;
         }
 
-        spin_unlock(&d->arch.pv_domain.e820_lock);
+        spin_unlock(&d->arch.e820_lock);
         return 0;
     }
 

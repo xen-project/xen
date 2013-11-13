@@ -553,6 +553,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         if ( (rc = iommu_domain_init(d)) != 0 )
             goto fail;
     }
+    spin_lock_init(&d->arch.e820_lock);
 
     if ( has_hvm_container_domain(d) )
     {
@@ -563,12 +564,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
         }
     }
     else
-    {
         /* 64-bit PV guest by default. */
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
-
-        spin_lock_init(&d->arch.pv_domain.e820_lock);
-    }
 
     /* initialize default tsc behavior in case tools don't */
     tsc_set_info(d, TSC_MODE_DEFAULT, 0UL, 0, 0);
@@ -592,8 +589,8 @@ void arch_domain_destroy(struct domain *d)
 {
     if ( has_hvm_container_domain(d) )
         hvm_domain_destroy(d);
-    else
-        xfree(d->arch.pv_domain.e820);
+
+    xfree(d->arch.e820);
 
     free_domain_pirqs(d);
     if ( !is_idle_domain(d) )
