@@ -3413,6 +3413,24 @@ static hvm_hypercall_t *const hvm_hypercall32_table[NR_hypercalls] = {
     HYPERCALL(tmem_op)
 };
 
+/* PVH 32bitfixme. */
+static hvm_hypercall_t *const pvh_hypercall64_table[NR_hypercalls] = {
+    HYPERCALL(platform_op),
+    HYPERCALL(memory_op),
+    HYPERCALL(xen_version),
+    HYPERCALL(console_io),
+    [ __HYPERVISOR_grant_table_op ]  = (hvm_hypercall_t *)hvm_grant_table_op,
+    HYPERCALL(vcpu_op),
+    HYPERCALL(mmuext_op),
+    HYPERCALL(xsm_op),
+    HYPERCALL(sched_op),
+    HYPERCALL(event_channel_op),
+    [ __HYPERVISOR_physdev_op ]      = (hvm_hypercall_t *)hvm_physdev_op,
+    HYPERCALL(hvm_op),
+    HYPERCALL(sysctl),
+    HYPERCALL(domctl)
+};
+
 int hvm_do_hypercall(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
@@ -3439,7 +3457,9 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
     if ( (eax & 0x80000000) && is_viridian_domain(curr->domain) )
         return viridian_hypercall(regs);
 
-    if ( (eax >= NR_hypercalls) || !hvm_hypercall32_table[eax] )
+    if ( (eax >= NR_hypercalls) ||
+         (is_pvh_vcpu(curr) ? !pvh_hypercall64_table[eax]
+                            : !hvm_hypercall32_table[eax]) )
     {
         regs->eax = -ENOSYS;
         return HVM_HCALL_completed;
@@ -3454,16 +3474,20 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
                     regs->r10, regs->r8, regs->r9);
 
         curr->arch.hvm_vcpu.hcall_64bit = 1;
-        regs->rax = hvm_hypercall64_table[eax](regs->rdi,
-                                               regs->rsi,
-                                               regs->rdx,
-                                               regs->r10,
-                                               regs->r8,
-                                               regs->r9); 
+        if ( is_pvh_vcpu(curr) )
+            regs->rax = pvh_hypercall64_table[eax](regs->rdi, regs->rsi,
+                                                   regs->rdx, regs->r10,
+                                                   regs->r8, regs->r9);
+        else
+            regs->rax = hvm_hypercall64_table[eax](regs->rdi, regs->rsi,
+                                                   regs->rdx, regs->r10,
+                                                   regs->r8, regs->r9);
         curr->arch.hvm_vcpu.hcall_64bit = 0;
     }
     else
     {
+        ASSERT(!is_pvh_vcpu(curr));   /* PVH 32bitfixme. */
+
         HVM_DBG_LOG(DBG_LEVEL_HCALL, "hcall%u(%x, %x, %x, %x, %x, %x)", eax,
                     (uint32_t)regs->ebx, (uint32_t)regs->ecx,
                     (uint32_t)regs->edx, (uint32_t)regs->esi,
@@ -3888,7 +3912,11 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -ESRCH;
 
         rc = -EINVAL;
-        if ( !is_hvm_domain(d) )
+        if ( !has_hvm_container_domain(d) )
+            goto param_fail;
+
+        if ( is_pvh_domain(d)
+             && (a.index != HVM_PARAM_CALLBACK_IRQ) )
             goto param_fail;
 
         rc = xsm_hvm_param(XSM_TARGET, d, op);

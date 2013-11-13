@@ -519,6 +519,11 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case PHYSDEVOP_set_iopl: {
         struct physdev_set_iopl set_iopl;
+
+        ret = -ENOSYS;
+        if ( is_pvh_vcpu(current) )
+            break;
+
         ret = -EFAULT;
         if ( copy_from_guest(&set_iopl, arg, 1) != 0 )
             break;
@@ -532,6 +537,11 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case PHYSDEVOP_set_iobitmap: {
         struct physdev_set_iobitmap set_iobitmap;
+
+        ret = -ENOSYS;
+        if ( is_pvh_vcpu(current) )
+            break;
+
         ret = -EFAULT;
         if ( copy_from_guest(&set_iobitmap, arg, 1) != 0 )
             break;

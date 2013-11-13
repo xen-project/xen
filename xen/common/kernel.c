@@ -306,14 +306,24 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             if ( current->domain == dom0 )
                 fi.submap |= 1U << XENFEAT_dom0;
 #ifdef CONFIG_X86
-            if ( is_pv_vcpu(current) )
+            switch ( d->guest_type )
+            {
+            case guest_type_pv:
                 fi.submap |= (1U << XENFEAT_mmu_pt_update_preserve_ad) |
                              (1U << XENFEAT_highmem_assist) |
                              (1U << XENFEAT_gnttab_map_avail_bits);
-            else
+                break;
+            case guest_type_pvh:
+                fi.submap |= (1U << XENFEAT_hvm_safe_pvclock) |
+                             (1U << XENFEAT_supervisor_mode_kernel) |
+                             (1U << XENFEAT_hvm_callback_vector);
+                break;
+            case guest_type_hvm:
                 fi.submap |= (1U << XENFEAT_hvm_safe_pvclock) |
                              (1U << XENFEAT_hvm_callback_vector) |
                              (1U << XENFEAT_hvm_pirqs);
+                break;
+            }
 #endif
             break;
         default:
