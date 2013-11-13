@@ -347,13 +347,15 @@ void hvm_do_resume(struct vcpu *v)
     check_wakeup_from_wait();
 
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
-    p = get_ioreq(v);
+    if ( !(p = get_ioreq(v)) )
+        goto check_inject_trap;
+
     while ( p->state != STATE_IOREQ_NONE )
     {
         switch ( p->state )
         {
         case STATE_IORESP_READY: /* IORESP_READY -> NONE */
-            hvm_io_assist();
+            hvm_io_assist(p);
             break;
         case STATE_IOREQ_READY:  /* IOREQ_{READY,INPROCESS} -> IORESP_READY */
         case STATE_IOREQ_INPROCESS:
@@ -368,6 +370,7 @@ void hvm_do_resume(struct vcpu *v)
         }
     }
 
+ check_inject_trap:
     /* Inject pending hw/sw trap */
     if ( v->arch.hvm_vcpu.inject_trap.vector != -1 ) 
     {
@@ -1227,7 +1230,9 @@ bool_t hvm_send_assist_req(struct vcpu *v)
     if ( unlikely(!vcpu_start_shutdown_deferral(v)) )
         return 0; /* implicitly bins the i/o operation */
 
-    p = get_ioreq(v);
+    if ( !(p = get_ioreq(v)) )
+        return 0;
+
     if ( unlikely(p->state != STATE_IOREQ_NONE) )
     {
         /* This indicates a bug in the device model. Crash the domain. */

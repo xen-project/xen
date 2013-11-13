@@ -32,8 +32,7 @@ static inline ioreq_t *get_ioreq(struct vcpu *v)
     struct domain *d = v->domain;
     shared_iopage_t *p = d->arch.hvm_domain.ioreq.va;
     ASSERT((v == current) || spin_is_locked(&d->arch.hvm_domain.ioreq.lock));
-    ASSERT(d->arch.hvm_domain.ioreq.va != NULL);
-    return &p->vcpu_ioreq[v->vcpu_id];
+    return p ? &p->vcpu_ioreq[v->vcpu_id] : NULL;
 }
 
 #define HVM_DELIVER_NO_ERROR_CODE  -1

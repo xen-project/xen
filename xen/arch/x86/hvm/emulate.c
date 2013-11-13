@@ -58,10 +58,23 @@ static int hvmemul_do_io(
     struct vcpu *curr = current;
     struct hvm_vcpu_io *vio;
     ioreq_t *p = get_ioreq(curr);
+    ioreq_t _ioreq;
     unsigned long ram_gfn = paddr_to_pfn(ram_gpa);
     p2m_type_t p2mt;
     struct page_info *ram_page;
     int rc;
+    bool_t has_dm = 1;
+
+    /*
+     * Domains without a backing DM, don't have an ioreq page.  Just
+     * point to a struct on the stack, initialising the state as needed.
+     */
+    if ( !p )
+    {
+        has_dm = 0;
+        p = &_ioreq;
+        p->state = STATE_IOREQ_NONE;
+    }
 
     /* Check for paged out page */
     ram_page = get_page_from_gfn(curr->domain, ram_gfn, &p2mt, P2M_UNSHARE);
@@ -211,7 +224,7 @@ static int hvmemul_do_io(
         p->state = STATE_IORESP_READY;
         if ( !vio->mmio_retry )
         {
-            hvm_io_assist();
+            hvm_io_assist(p);
             vio->io_state = HVMIO_none;
         }
         else
@@ -219,11 +232,20 @@ static int hvmemul_do_io(
             vio->io_state = HVMIO_handle_mmio_awaiting_completion;
         break;
     case X86EMUL_UNHANDLEABLE:
-        rc = X86EMUL_RETRY;
-        if ( !hvm_send_assist_req(curr) )
-            vio->io_state = HVMIO_none;
-        else if ( p_data == NULL )
+        /* If there is no backing DM, just ignore accesses */
+        if ( !has_dm )
+        {
             rc = X86EMUL_OKAY;
+            vio->io_state = HVMIO_none;
+        }
+        else
+        {
+            rc = X86EMUL_RETRY;
+            if ( !hvm_send_assist_req(curr) )
+                vio->io_state = HVMIO_none;
+            else if ( p_data == NULL )
+                rc = X86EMUL_OKAY;
+        }
         break;
     default:
         BUG();

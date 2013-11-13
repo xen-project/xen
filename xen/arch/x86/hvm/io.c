@@ -152,6 +152,9 @@ void send_invalidate_req(void)
     struct vcpu *v = current;
     ioreq_t *p = get_ioreq(v);
 
+    if ( !p )
+        return;
+
     if ( p->state != STATE_IOREQ_NONE )
     {
         gdprintk(XENLOG_ERR, "WARNING: send invalidate req with something "
@@ -262,11 +265,10 @@ int handle_pio(uint16_t port, unsigned int size, int dir)
     return 1;
 }
 
-void hvm_io_assist(void)
+void hvm_io_assist(ioreq_t *p)
 {
     struct vcpu *curr = current;
     struct hvm_vcpu_io *vio = &curr->arch.hvm_vcpu.hvm_io;
-    ioreq_t *p = get_ioreq(curr);
     enum hvm_io_state io_state;
 
     rmb(); /* see IORESP_READY /then/ read contents of ioreq */
