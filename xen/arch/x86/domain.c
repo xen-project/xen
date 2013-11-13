@@ -339,6 +339,14 @@ int switch_compat(struct domain *d)
 
     if ( d == NULL )
         return -EINVAL;
+
+    if ( is_pvh_domain(d) )
+    {
+        printk(XENLOG_G_INFO
+               "Xen currently does not support 32bit PVH guests\n");
+        return -EINVAL;
+    }
+
     if ( !may_switch_mode(d) )
         return -EACCES;
     if ( is_pv_32on64_domain(d) )
