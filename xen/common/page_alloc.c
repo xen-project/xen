@@ -1429,6 +1429,9 @@ void init_domheap_pages(paddr_t ps, paddr_t pe)
     smfn = round_pgup(ps) >> PAGE_SHIFT;
     emfn = round_pgdown(pe) >> PAGE_SHIFT;
 
+    if ( emfn <= smfn )
+        return;
+
     init_heap_pages(mfn_to_page(smfn), emfn - smfn);
 }
 
