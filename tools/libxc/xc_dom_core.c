@@ -766,6 +766,15 @@ int xc_dom_parse_image(struct xc_dom_image *dom)
         goto err;
     }
 
+    if ( dom->pvh_enabled )
+    {
+        const char *pvh_features = "writable_descriptor_tables|"
+                                   "auto_translated_physmap|"
+                                   "supervisor_mode_kernel|"
+                                   "hvm_callback_vector";
+        elf_xen_parse_features(pvh_features, dom->f_requested, NULL);
+    }
+
     /* check features */
     for ( i = 0; i < XENFEAT_NR_SUBMAPS; i++ )
     {
