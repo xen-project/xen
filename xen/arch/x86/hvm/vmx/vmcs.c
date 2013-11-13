@@ -659,7 +659,7 @@ void vmx_vmcs_exit(struct vcpu *v)
     {
         /* Don't confuse vmx_do_resume (for @v or @current!) */
         vmx_clear_vmcs(v);
-        if ( is_hvm_vcpu(current) )
+        if ( has_hvm_container_vcpu(current) )
             vmx_load_vmcs(current);
 
         spin_unlock(&v->arch.hvm_vmx.vmcs_lock);
@@ -1488,7 +1488,7 @@ static void vmcs_dump(unsigned char ch)
 
     for_each_domain ( d )
     {
-        if ( !is_hvm_domain(d) )
+        if ( !has_hvm_container_domain(d) )
             continue;
         printk("\n>>> Domain %d <<<\n", d->domain_id);
         for_each_vcpu ( d, v )

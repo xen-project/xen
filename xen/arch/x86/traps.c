@@ -120,6 +120,7 @@ static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
     unsigned long *stack, addr;
     unsigned long mask = STACK_SIZE;
 
+    /* Avoid HVM as we don't know what the stack looks like. */
     if ( is_hvm_vcpu(v) )
         return;
 
@@ -547,7 +548,7 @@ static inline void do_trap(
     }
 
     if ( ((trapnr == TRAP_copro_error) || (trapnr == TRAP_simd_error)) &&
-         is_hvm_vcpu(curr) && curr->arch.hvm_vcpu.fpu_exception_callback )
+         has_hvm_container_vcpu(curr) && curr->arch.hvm_vcpu.fpu_exception_callback )
     {
         curr->arch.hvm_vcpu.fpu_exception_callback(
             curr->arch.hvm_vcpu.fpu_exception_callback_arg, regs);
@@ -702,7 +703,7 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
             *ebx = 0x40000200;
         *ecx = 0;          /* Features 1 */
         *edx = 0;          /* Features 2 */
-        if ( !is_hvm_vcpu(current) )
+        if ( is_pv_vcpu(current) )
             *ecx |= XEN_CPUID_FEAT1_MMU_PT_UPDATE_PRESERVE_AD;
         break;
 

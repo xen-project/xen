@@ -16,7 +16,7 @@
 #define is_pv_32on64_domain(d) (is_pv_32bit_domain(d))
 #define is_pv_32on64_vcpu(v)   (is_pv_32on64_domain((v)->domain))
 
-#define is_hvm_pv_evtchn_domain(d) (is_hvm_domain(d) && \
+#define is_hvm_pv_evtchn_domain(d) (has_hvm_container_domain(d) && \
         d->arch.hvm_domain.irq.callback_via_type == HVMIRQ_callback_vector)
 #define is_hvm_pv_evtchn_vcpu(v) (is_hvm_pv_evtchn_domain(v->domain))
 

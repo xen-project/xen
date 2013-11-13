@@ -85,7 +85,7 @@ void restore_rest_processor_state(void)
         BUG();
 
     /* Maybe load the debug registers. */
-    BUG_ON(is_hvm_vcpu(curr));
+    BUG_ON(!is_pv_vcpu(curr));
     if ( !is_idle_vcpu(curr) && curr->arch.debugreg[7] )
     {
         write_debugreg(0, curr->arch.debugreg[0]);

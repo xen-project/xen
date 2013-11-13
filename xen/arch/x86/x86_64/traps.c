@@ -86,7 +86,7 @@ void show_registers(struct cpu_user_regs *regs)
     enum context context;
     struct vcpu *v = current;
 
-    if ( is_hvm_vcpu(v) && guest_mode(regs) )
+    if ( has_hvm_container_vcpu(v) && guest_mode(regs) )
     {
         struct segment_register sreg;
         context = CTXT_hvm_guest;
@@ -147,8 +147,8 @@ void vcpu_show_registers(const struct vcpu *v)
     const struct cpu_user_regs *regs = &v->arch.user_regs;
     unsigned long crs[8];
 
-    /* No need to handle HVM for now. */
-    if ( is_hvm_vcpu(v) )
+    /* Only handle PV guests for now */
+    if ( !is_pv_vcpu(v) )
         return;
 
     crs[0] = v->arch.pv_vcpu.ctrlreg[0];
@@ -624,7 +624,7 @@ static void hypercall_page_initialise_ring3_kernel(void *hypercall_page)
 void hypercall_page_initialise(struct domain *d, void *hypercall_page)
 {
     memset(hypercall_page, 0xCC, PAGE_SIZE);
-    if ( is_hvm_domain(d) )
+    if ( has_hvm_container_domain(d) )
         hvm_hypercall_page_initialise(d, hypercall_page);
     else if ( !is_pv_32bit_domain(d) )
         hypercall_page_initialise_ring3_kernel(hypercall_page);

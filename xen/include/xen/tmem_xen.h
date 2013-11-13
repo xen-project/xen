@@ -442,7 +442,7 @@ typedef XEN_GUEST_HANDLE_PARAM(char) tmem_cli_va_param_t;
 static inline int tmh_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
 {
 #ifdef CONFIG_COMPAT
-    if ( is_hvm_vcpu(current) ?
+    if ( has_hvm_container_vcpu(current) ?
          hvm_guest_x86_mode(current) != 8 :
          is_pv_32on64_vcpu(current) )
     {

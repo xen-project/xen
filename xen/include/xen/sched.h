@@ -259,6 +259,10 @@ struct mem_event_per_domain
 
 struct evtchn_port_ops;
 
+enum guest_type {
+    guest_type_pv, guest_type_hvm
+};
+
 struct domain
 {
     domid_t          domain_id;
@@ -311,8 +315,8 @@ struct domain
     struct rangeset *iomem_caps;
     struct rangeset *irq_caps;
 
-    /* Is this an HVM guest? */
-    bool_t           is_hvm;
+    enum guest_type guest_type;
+
 #ifdef HAS_PASSTHROUGH
     /* Does this guest need iommu mappings? */
     bool_t           need_iommu;
@@ -772,8 +776,12 @@ void watchdog_domain_destroy(struct domain *d);
 
 #define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))
 
-#define is_hvm_domain(d) ((d)->is_hvm)
+#define is_pv_domain(d) ((d)->guest_type == guest_type_pv)
+#define is_pv_vcpu(v)   (is_pv_domain((v)->domain))
+#define is_hvm_domain(d) ((d)->guest_type == guest_type_hvm)
 #define is_hvm_vcpu(v)   (is_hvm_domain(v->domain))
+#define has_hvm_container_domain(d) ((d)->guest_type != guest_type_pv)
+#define has_hvm_container_vcpu(v)   (has_hvm_container_domain((v)->domain))
 #define is_pinned_vcpu(v) ((v)->domain->is_pinned || \
                            cpumask_weight((v)->cpu_affinity) == 1)
 #ifdef HAS_PASSTHROUGH

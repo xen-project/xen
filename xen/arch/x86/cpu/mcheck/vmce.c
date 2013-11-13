@@ -83,7 +83,7 @@ int vmce_restore_vcpu(struct vcpu *v, const struct hvm_vmce_vcpu *ctxt)
     {
         dprintk(XENLOG_G_ERR, "%s restore: unsupported MCA capabilities"
                 " %#" PRIx64 " for d%d:v%u (supported: %#Lx)\n",
-                is_hvm_vcpu(v) ? "HVM" : "PV", ctxt->caps,
+                has_hvm_container_vcpu(v) ? "HVM" : "PV", ctxt->caps,
                 v->domain->domain_id, v->vcpu_id,
                 guest_mcg_cap & ~MCG_CAP_COUNT);
         return -EPERM;
@@ -357,7 +357,7 @@ int inject_vmce(struct domain *d, int vcpu)
         if ( vcpu != VMCE_INJECT_BROADCAST && vcpu != v->vcpu_id )
             continue;
 
-        if ( (is_hvm_domain(d) ||
+        if ( (has_hvm_container_domain(d) ||
               guest_has_trap_callback(d, v->vcpu_id, TRAP_machine_check)) &&
              !test_and_set_bool(v->mce_pending) )
         {
@@ -439,7 +439,7 @@ int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn)
     if (!mfn_valid(mfn_x(mfn)))
         return -EINVAL;
 
-    if ( !is_hvm_domain(d) || !paging_mode_hap(d) )
+    if ( !has_hvm_container_domain(d) || !paging_mode_hap(d) )
         return -ENOSYS;
 
     rc = -1;

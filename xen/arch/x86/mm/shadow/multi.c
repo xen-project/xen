@@ -712,7 +712,7 @@ _sh_propagate(struct vcpu *v,
     // supervisor permissions, making the guest's _PAGE_USER bit irrelevant.
     // It is always shadowed as present...
     if ( (GUEST_PAGING_LEVELS == 4) && !is_pv_32on64_domain(d) 
-         && !is_hvm_domain(d) )
+         && is_pv_domain(d) )
     {
         sflags |= _PAGE_USER;
     }
@@ -3922,7 +3922,7 @@ sh_update_cr3(struct vcpu *v, int do_locking)
 #endif
 
     /* Don't do anything on an uninitialised vcpu */
-    if ( !is_hvm_domain(d) && !v->is_initialised )
+    if ( is_pv_domain(d) && !v->is_initialised )
     {
         ASSERT(v->arch.cr3 == 0);
         return;

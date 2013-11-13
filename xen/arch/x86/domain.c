@@ -167,7 +167,7 @@ void dump_pageframe_info(struct domain *d)
         spin_unlock(&d->page_alloc_lock);
     }
 
-    if ( is_hvm_domain(d) )
+    if ( has_hvm_container_domain(d) )
         p2m_pod_dump_data(d);
 
     spin_lock(&d->page_alloc_lock);
@@ -385,7 +385,7 @@ int vcpu_initialise(struct vcpu *v)
 
     vmce_init_vcpu(v);
 
-    if ( is_hvm_domain(d) )
+    if ( has_hvm_container_domain(d) )
     {
         rc = hvm_vcpu_initialise(v);
         goto done;
@@ -438,7 +438,7 @@ int vcpu_initialise(struct vcpu *v)
     {
         vcpu_destroy_fpu(v);
 
-        if ( !is_hvm_domain(d) )
+        if ( is_pv_domain(d) )
             xfree(v->arch.pv_vcpu.trap_ctxt);
     }
 
@@ -452,7 +452,7 @@ void vcpu_destroy(struct vcpu *v)
 
     vcpu_destroy_fpu(v);
 
-    if ( is_hvm_vcpu(v) )
+    if ( has_hvm_container_vcpu(v) )
         hvm_vcpu_destroy(v);
     else
         xfree(v->arch.pv_vcpu.trap_ctxt);
@@ -464,7 +464,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     int rc = -ENOMEM;
 
     d->arch.hvm_domain.hap_enabled =
-        is_hvm_domain(d) &&
+        has_hvm_container_domain(d) &&
         hvm_funcs.hap_supported &&
         (domcr_flags & DOMCRF_hap);
     d->arch.hvm_domain.mem_sharing_enabled = 0;
@@ -490,7 +490,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
                d->domain_id);
     }
 
-    if ( is_hvm_domain(d) )
+    if ( has_hvm_container_domain(d) )
         rc = create_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0, NULL, NULL);
     else if ( is_idle_domain(d) )
         rc = 0;
@@ -512,7 +512,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     mapcache_domain_init(d);
 
     HYPERVISOR_COMPAT_VIRT_START(d) =
-        is_hvm_domain(d) ? ~0u : __HYPERVISOR_COMPAT_VIRT_START;
+        is_pv_domain(d) ? __HYPERVISOR_COMPAT_VIRT_START : ~0u;
 
     if ( (rc = paging_domain_init(d, domcr_flags)) != 0 )
         goto fail;
@@ -554,7 +554,7 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
             goto fail;
     }
 
-    if ( is_hvm_domain(d) )
+    if ( has_hvm_container_domain(d) )
     {
         if ( (rc = hvm_domain_initialise(d)) != 0 )
         {
@@ -583,14 +583,14 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     if ( paging_initialised )
         paging_final_teardown(d);
     free_perdomain_mappings(d);
-    if ( !is_hvm_domain(d) )
+    if ( is_pv_domain(d) )
         free_xenheap_page(d->arch.pv_domain.gdt_ldt_l1tab);
     return rc;
 }
 
 void arch_domain_destroy(struct domain *d)
 {
-    if ( is_hvm_domain(d) )
+    if ( has_hvm_container_domain(d) )
         hvm_domain_destroy(d);
     else
         xfree(d->arch.pv_domain.e820);
@@ -602,7 +602,7 @@ void arch_domain_destroy(struct domain *d)
     paging_final_teardown(d);
 
     free_perdomain_mappings(d);
-    if ( !is_hvm_domain(d) )
+    if ( is_pv_domain(d) )
         free_xenheap_page(d->arch.pv_domain.gdt_ldt_l1tab);
 
     free_xenheap_page(d->shared_info);
@@ -653,7 +653,7 @@ int arch_set_info_guest(
 #define c(fld) (compat ? (c.cmp->fld) : (c.nat->fld))
     flags = c(flags);
 
-    if ( !is_hvm_vcpu(v) )
+    if ( is_pv_vcpu(v) )
     {
         if ( !compat )
         {
@@ -698,7 +698,7 @@ int arch_set_info_guest(
     v->fpu_initialised = !!(flags & VGCF_I387_VALID);
 
     v->arch.flags &= ~TF_kernel_mode;
-    if ( (flags & VGCF_in_kernel) || is_hvm_vcpu(v)/*???*/ )
+    if ( (flags & VGCF_in_kernel) || has_hvm_container_vcpu(v)/*???*/ )
         v->arch.flags |= TF_kernel_mode;
 
     v->arch.vgc_flags = flags;
@@ -713,7 +713,7 @@ int arch_set_info_guest(
     if ( !compat )
     {
         memcpy(&v->arch.user_regs, &c.nat->user_regs, sizeof(c.nat->user_regs));
-        if ( !is_hvm_vcpu(v) )
+        if ( is_pv_vcpu(v) )
             memcpy(v->arch.pv_vcpu.trap_ctxt, c.nat->trap_ctxt,
                    sizeof(c.nat->trap_ctxt));
     }
@@ -729,7 +729,7 @@ int arch_set_info_guest(
 
     v->arch.user_regs.eflags |= 2;
 
-    if ( is_hvm_vcpu(v) )
+    if ( has_hvm_container_vcpu(v) )
     {
         hvm_set_info_guest(v);
         goto out;
@@ -959,7 +959,7 @@ int arch_set_info_guest(
 
 int arch_vcpu_reset(struct vcpu *v)
 {
-    if ( !is_hvm_vcpu(v) )
+    if ( is_pv_vcpu(v) )
     {
         destroy_gdt(v);
         return vcpu_destroy_pagetables(v);
@@ -1309,7 +1309,7 @@ static void update_runstate_area(struct vcpu *v)
 
 static inline int need_full_gdt(struct vcpu *v)
 {
-    return (!is_hvm_vcpu(v) && !is_idle_vcpu(v));
+    return (is_pv_vcpu(v) && !is_idle_vcpu(v));
 }
 
 static void __context_switch(void)
@@ -1435,9 +1435,9 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
     {
         __context_switch();
 
-        if ( !is_hvm_vcpu(next) &&
+        if ( is_pv_vcpu(next) &&
              (is_idle_vcpu(prev) ||
-              is_hvm_vcpu(prev) ||
+              has_hvm_container_vcpu(prev) ||
               is_pv_32on64_vcpu(prev) != is_pv_32on64_vcpu(next)) )
         {
             uint64_t efer = read_efer();
@@ -1448,13 +1448,13 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         /* Re-enable interrupts before restoring state which may fault. */
         local_irq_enable();
 
-        if ( !is_hvm_vcpu(next) )
+        if ( is_pv_vcpu(next) )
         {
             load_LDT(next);
             load_segments(next);
         }
 
-        set_cpuid_faulting(!is_hvm_vcpu(next) &&
+        set_cpuid_faulting(is_pv_vcpu(next) &&
                            (next->domain->domain_id != 0));
     }
 
@@ -1537,7 +1537,7 @@ void hypercall_cancel_continuation(void)
     }
     else
     {
-        if ( !is_hvm_vcpu(current) )
+        if ( is_pv_vcpu(current) )
             regs->eip += 2; /* skip re-execute 'syscall' / 'int $xx' */
         else
             current->arch.hvm_vcpu.hcall_preempted = 0;
@@ -1574,12 +1574,12 @@ unsigned long hypercall_create_continuation(
         regs->eax  = op;
 
         /* Ensure the hypercall trap instruction is re-executed. */
-        if ( !is_hvm_vcpu(current) )
+        if ( is_pv_vcpu(current) )
             regs->eip -= 2;  /* re-execute 'syscall' / 'int $xx' */
         else
             current->arch.hvm_vcpu.hcall_preempted = 1;
 
-        if ( !is_hvm_vcpu(current) ?
+        if ( is_pv_vcpu(current) ?
              !is_pv_32on64_vcpu(current) :
              (hvm_guest_x86_mode(current) == 8) )
         {
@@ -1851,7 +1851,7 @@ int domain_relinquish_resources(struct domain *d)
                 return ret;
         }
 
-        if ( !is_hvm_domain(d) )
+        if ( is_pv_domain(d) )
         {
             for_each_vcpu ( d, v )
             {
@@ -1924,7 +1924,7 @@ int domain_relinquish_resources(struct domain *d)
         BUG();
     }
 
-    if ( is_hvm_domain(d) )
+    if ( has_hvm_container_domain(d) )
         hvm_domain_relinquish_resources(d);
 
     return 0;
@@ -2008,7 +2008,7 @@ void vcpu_mark_events_pending(struct vcpu *v)
     if ( already_pending )
         return;
 
-    if ( is_hvm_vcpu(v) )
+    if ( has_hvm_container_vcpu(v) )
         hvm_assert_evtchn_irq(v);
     else
         vcpu_kick(v);

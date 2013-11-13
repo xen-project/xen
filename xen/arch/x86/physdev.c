@@ -310,10 +310,10 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             spin_unlock(&v->domain->event_lock);
             break;
         }
-        if ( !is_hvm_domain(v->domain) &&
+        if ( is_pv_domain(v->domain) &&
              v->domain->arch.pv_domain.auto_unmask )
             evtchn_unmask(pirq->evtchn);
-        if ( !is_hvm_domain(v->domain) ||
+        if ( is_pv_domain(v->domain) ||
              domain_pirq_to_irq(v->domain, eoi.irq) > 0 )
             pirq_guest_eoi(pirq);
         if ( is_hvm_domain(v->domain) &&

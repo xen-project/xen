@@ -23,7 +23,7 @@ int hvm_local_events_need_delivery(struct vcpu *v);
 static inline int local_events_need_delivery(void)
 {
     struct vcpu *v = current;
-    return (is_hvm_vcpu(v) ? hvm_local_events_need_delivery(v) :
+    return (has_hvm_container_vcpu(v) ? hvm_local_events_need_delivery(v) :
             (vcpu_info(v, evtchn_upcall_pending) &&
              !vcpu_info(v, evtchn_upcall_mask)));
 }

@@ -181,7 +181,7 @@ static uint32_t base_disallow_mask;
      (rangeset_is_empty((d)->iomem_caps) &&                     \
       rangeset_is_empty((d)->arch.ioport_caps) &&               \
       !has_arch_pdevs(d) &&                                     \
-      !is_hvm_domain(d)) ?                                      \
+      is_pv_domain(d)) ?                                        \
      L1_DISALLOW_MASK : (L1_DISALLOW_MASK & ~PAGE_CACHE_ATTRS))
 
 static void __init init_frametable_chunk(void *start, void *end)
@@ -433,7 +433,7 @@ int page_is_ram_type(unsigned long mfn, unsigned long mem_type)
 
 unsigned long domain_get_maximum_gpfn(struct domain *d)
 {
-    if ( is_hvm_domain(d) )
+    if ( has_hvm_container_domain(d) )
         return p2m_get_hostp2m(d)->max_mapped_pfn;
     /* NB. PV guests specify nr_pfns rather than max_pfn so we adjust here. */
     return (arch_get_max_pfn(d) ?: 1) - 1;
@@ -2381,7 +2381,7 @@ static int __get_page_type(struct page_info *page, unsigned long type,
     {
         /* Special pages should not be accessible from devices. */
         struct domain *d = page_get_owner(page);
-        if ( d && !is_hvm_domain(d) && unlikely(need_iommu(d)) )
+        if ( d && is_pv_domain(d) && unlikely(need_iommu(d)) )
         {
             if ( (x & PGT_type_mask) == PGT_writable_page )
                 iommu_unmap_page(d, mfn_to_gmfn(d, page_to_mfn(page)));

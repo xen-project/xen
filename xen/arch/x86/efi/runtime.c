@@ -52,7 +52,7 @@ unsigned long efi_rs_enter(void)
     /* prevent fixup_page_fault() from doing anything */
     irq_enter();
 
-    if ( !is_hvm_vcpu(current) && !is_idle_vcpu(current) )
+    if ( is_pv_vcpu(current) && !is_idle_vcpu(current) )
     {
         struct desc_ptr gdt_desc = {
             .limit = LAST_RESERVED_GDT_BYTE,
@@ -71,7 +71,7 @@ unsigned long efi_rs_enter(void)
 void efi_rs_leave(unsigned long cr3)
 {
     write_cr3(cr3);
-    if ( !is_hvm_vcpu(current) && !is_idle_vcpu(current) )
+    if ( is_pv_vcpu(current) && !is_idle_vcpu(current) )
     {
         struct desc_ptr gdt_desc = {
             .limit = LAST_RESERVED_GDT_BYTE,

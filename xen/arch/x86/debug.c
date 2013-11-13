@@ -158,7 +158,7 @@ dbg_rw_guest_mem(dbgva_t addr, dbgbyte_t *buf, int len, struct domain *dp,
 
         pagecnt = min_t(long, PAGE_SIZE - (addr & ~PAGE_MASK), len);
 
-        mfn = (dp->is_hvm
+        mfn = (has_hvm_container_domain(dp)
                ? dbg_hvm_va2mfn(addr, dp, toaddr, &gfn)
                : dbg_pv_va2mfn(addr, dp, pgd3));
         if ( mfn == INVALID_MFN ) 

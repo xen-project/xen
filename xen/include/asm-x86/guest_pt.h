@@ -196,7 +196,7 @@ guest_supports_superpages(struct vcpu *v)
     /* The _PAGE_PSE bit must be honoured in HVM guests, whenever
      * CR4.PSE is set or the guest is in PAE or long mode. 
      * It's also used in the dummy PT for vcpus with CR4.PG cleared. */
-    return (!is_hvm_vcpu(v)
+    return (is_pv_vcpu(v)
             ? opt_allow_superpage
             : (GUEST_PAGING_LEVELS != 2 
                || !hvm_paging_enabled(v)
@@ -214,7 +214,7 @@ guest_supports_nx(struct vcpu *v)
 {
     if ( GUEST_PAGING_LEVELS == 2 || !cpu_has_nx )
         return 0;
-    if ( !is_hvm_vcpu(v) )
+    if ( is_pv_vcpu(v) )
         return cpu_has_nx;
     return hvm_nx_enabled(v);
 }

@@ -14,27 +14,27 @@
 
 /* Raw access functions: no type checking. */
 #define raw_copy_to_guest(dst, src, len)        \
-    (is_hvm_vcpu(current) ?                     \
+    (has_hvm_container_vcpu(current) ?                     \
      copy_to_user_hvm((dst), (src), (len)) :    \
      copy_to_user((dst), (src), (len)))
 #define raw_copy_from_guest(dst, src, len)      \
-    (is_hvm_vcpu(current) ?                     \
+    (has_hvm_container_vcpu(current) ?                     \
      copy_from_user_hvm((dst), (src), (len)) :  \
      copy_from_user((dst), (src), (len)))
 #define raw_clear_guest(dst,  len)              \
-    (is_hvm_vcpu(current) ?                     \
+    (has_hvm_container_vcpu(current) ?                     \
      clear_user_hvm((dst), (len)) :             \
      clear_user((dst), (len)))
 #define __raw_copy_to_guest(dst, src, len)      \
-    (is_hvm_vcpu(current) ?                     \
+    (has_hvm_container_vcpu(current) ?                     \
      copy_to_user_hvm((dst), (src), (len)) :    \
      __copy_to_user((dst), (src), (len)))
 #define __raw_copy_from_guest(dst, src, len)    \
-    (is_hvm_vcpu(current) ?                     \
+    (has_hvm_container_vcpu(current) ?                     \
      copy_from_user_hvm((dst), (src), (len)) :  \
      __copy_from_user((dst), (src), (len)))
 #define __raw_clear_guest(dst,  len)            \
-    (is_hvm_vcpu(current) ?                     \
+    (has_hvm_container_vcpu(current) ?                     \
      clear_user_hvm((dst), (len)) :             \
      clear_user((dst), (len)))
 

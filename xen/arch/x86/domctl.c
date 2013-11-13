@@ -800,7 +800,7 @@ long arch_do_domctl(
         if ( domctl->cmd == XEN_DOMCTL_get_ext_vcpucontext )
         {
             evc->size = sizeof(*evc);
-            if ( !is_hvm_domain(d) )
+            if ( is_pv_domain(d) )
             {
                 evc->sysenter_callback_cs      =
                     v->arch.pv_vcpu.sysenter_callback_cs;
@@ -833,7 +833,7 @@ long arch_do_domctl(
             ret = -EINVAL;
             if ( evc->size < offsetof(typeof(*evc), vmce) )
                 goto ext_vcpucontext_out;
-            if ( !is_hvm_domain(d) )
+            if ( is_pv_domain(d) )
             {
                 if ( !is_canonical_address(evc->sysenter_callback_eip) ||
                      !is_canonical_address(evc->syscall32_callback_eip) )
@@ -1246,7 +1246,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     bool_t compat = is_pv_32on64_domain(v->domain);
 #define c(fld) (!compat ? (c.nat->fld) : (c.cmp->fld))
 
-    if ( is_hvm_vcpu(v) )
+    if ( !is_pv_vcpu(v) )
         memset(c.nat, 0, sizeof(*c.nat));
     memcpy(&c.nat->fpu_ctxt, v->arch.fpu_ctxt, sizeof(c.nat->fpu_ctxt));
     c(flags = v->arch.vgc_flags & ~(VGCF_i387_valid|VGCF_in_kernel));
@@ -1257,7 +1257,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     if ( !compat )
     {
         memcpy(&c.nat->user_regs, &v->arch.user_regs, sizeof(c.nat->user_regs));
-        if ( !is_hvm_vcpu(v) )
+        if ( is_pv_vcpu(v) )
             memcpy(c.nat->trap_ctxt, v->arch.pv_vcpu.trap_ctxt,
                    sizeof(c.nat->trap_ctxt));
     }
@@ -1272,7 +1272,7 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
         c(debugreg[i] = v->arch.debugreg[i]);
 
-    if ( is_hvm_vcpu(v) )
+    if ( has_hvm_container_vcpu(v) )
     {
         struct segment_register sreg;
 

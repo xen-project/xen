@@ -35,7 +35,7 @@ static inline struct vcpu *mapcache_current_vcpu(void)
      * then it means we are running on the idle domain's page table and must
      * therefore use its mapcache.
      */
-    if ( unlikely(pagetable_is_null(v->arch.guest_table)) && !is_hvm_vcpu(v) )
+    if ( unlikely(pagetable_is_null(v->arch.guest_table)) && is_pv_vcpu(v) )
     {
         /* If we really are idling, perform lazy context switch now. */
         if ( (v = idle_vcpu[smp_processor_id()]) == current )
@@ -72,7 +72,7 @@ void *map_domain_page(unsigned long mfn)
 #endif
 
     v = mapcache_current_vcpu();
-    if ( !v || is_hvm_vcpu(v) )
+    if ( !v || !is_pv_vcpu(v) )
         return mfn_to_virt(mfn);
 
     dcache = &v->domain->arch.pv_domain.mapcache;
@@ -177,7 +177,7 @@ void unmap_domain_page(const void *ptr)
     ASSERT(va >= MAPCACHE_VIRT_START && va < MAPCACHE_VIRT_END);
 
     v = mapcache_current_vcpu();
-    ASSERT(v && !is_hvm_vcpu(v));
+    ASSERT(v && is_pv_vcpu(v));
 
     dcache = &v->domain->arch.pv_domain.mapcache;
     ASSERT(dcache->inuse);
@@ -244,7 +244,7 @@ int mapcache_domain_init(struct domain *d)
     struct mapcache_domain *dcache = &d->arch.pv_domain.mapcache;
     unsigned int bitmap_pages;
 
-    if ( is_hvm_domain(d) || is_idle_domain(d) )
+    if ( !is_pv_domain(d) || is_idle_domain(d) )
         return 0;
 
 #ifdef NDEBUG
@@ -275,7 +275,7 @@ int mapcache_vcpu_init(struct vcpu *v)
     unsigned int ents = d->max_vcpus * MAPCACHE_VCPU_ENTRIES;
     unsigned int nr = PFN_UP(BITS_TO_LONGS(ents) * sizeof(long));
 
-    if ( is_hvm_vcpu(v) || !dcache->inuse )
+    if ( !is_pv_vcpu(v) || !dcache->inuse )
         return 0;
 
     if ( ents > dcache->entries )

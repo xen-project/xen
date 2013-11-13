@@ -238,7 +238,7 @@ struct domain *domain_create(
         goto fail;
 
     if ( domcr_flags & DOMCRF_hvm )
-        d->is_hvm = 1;
+        d->guest_type = guest_type_hvm;
 
     if ( domid == 0 )
     {

@@ -721,7 +721,7 @@ __gnttab_map_grant_ref(
 
     double_gt_lock(lgt, rgt);
 
-    if ( !is_hvm_domain(ld) && need_iommu(ld) )
+    if ( is_pv_domain(ld) && need_iommu(ld) )
     {
         unsigned int wrc, rdc;
         int err = 0;
@@ -931,7 +931,7 @@ __gnttab_unmap_common(
             act->pin -= GNTPIN_hstw_inc;
     }
 
-    if ( !is_hvm_domain(ld) && need_iommu(ld) )
+    if ( is_pv_domain(ld) && need_iommu(ld) )
     {
         unsigned int wrc, rdc;
         int err = 0;
