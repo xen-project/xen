@@ -743,8 +743,6 @@ int arch_set_info_guest(
     for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
         v->arch.debugreg[i] = c(debugreg[i]);
 
-    v->arch.user_regs.eflags |= 2;
-
     if ( has_hvm_container_vcpu(v) )
     {
         /*

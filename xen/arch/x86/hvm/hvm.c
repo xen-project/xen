@@ -972,7 +972,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     v->arch.user_regs.edi = ctxt.rdi;
     v->arch.user_regs.esp = ctxt.rsp;
     v->arch.user_regs.eip = ctxt.rip;
-    v->arch.user_regs.eflags = ctxt.rflags | 2;
+    v->arch.user_regs.eflags = ctxt.rflags | X86_EFLAGS_MBS;
     v->arch.user_regs.r8  = ctxt.r8;
     v->arch.user_regs.r9  = ctxt.r9;
     v->arch.user_regs.r10 = ctxt.r10;
@@ -1169,8 +1169,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
         &v->arch.hvm_vcpu.assert_evtchn_irq_tasklet,
         (void(*)(unsigned long))hvm_assert_evtchn_irq,
         (unsigned long)v);
-
-    v->arch.user_regs.eflags = 2;
 
     v->arch.hvm_vcpu.inject_trap.vector = -1;
 
@@ -3636,7 +3634,7 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
 
     v->arch.vgc_flags = VGCF_online;
     memset(&v->arch.user_regs, 0, sizeof(v->arch.user_regs));
-    v->arch.user_regs.eflags = 2;
+    v->arch.user_regs.eflags = X86_EFLAGS_MBS;
     v->arch.user_regs.edx = 0x00000f00;
     v->arch.user_regs.eip = ip;
     memset(&v->arch.debugreg, 0, sizeof(v->arch.debugreg));

@@ -35,6 +35,7 @@
  * EFLAGS bits
  */
 #define X86_EFLAGS_CF	0x00000001 /* Carry Flag */
+#define X86_EFLAGS_MBS	0x00000002 /* Resvd bit */
 #define X86_EFLAGS_PF	0x00000004 /* Parity Flag */
 #define X86_EFLAGS_AF	0x00000010 /* Auxillary carry Flag */
 #define X86_EFLAGS_ZF	0x00000040 /* Zero Flag */

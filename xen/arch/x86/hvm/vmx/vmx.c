@@ -3048,7 +3048,7 @@ void vmx_vmenter_helper(const struct cpu_user_regs *regs)
 
     __vmwrite(GUEST_RIP,    regs->rip);
     __vmwrite(GUEST_RSP,    regs->rsp);
-    __vmwrite(GUEST_RFLAGS, regs->rflags);
+    __vmwrite(GUEST_RFLAGS, regs->rflags | X86_EFLAGS_MBS);
 }
 
 /*

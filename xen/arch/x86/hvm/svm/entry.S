@@ -76,6 +76,7 @@ UNLIKELY_END(svm_trace)
         mov  UREGS_rsp(%rsp),%rax
         mov  %rax,VMCB_rsp(%rcx)
         mov  UREGS_eflags(%rsp),%rax
+        or   $X86_EFLAGS_MBS,%rax
         mov  %rax,VMCB_rflags(%rcx)
 
         pop  %r15
