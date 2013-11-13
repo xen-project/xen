@@ -525,23 +525,23 @@ int hvm_domain_initialise(struct domain *d)
     INIT_LIST_HEAD(&d->arch.hvm_domain.msixtbl_list);
     spin_lock_init(&d->arch.hvm_domain.msixtbl_list_lock);
 
+    hvm_init_cacheattr_region_list(d);
+
+    rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
+    if ( rc != 0 )
+        goto fail0;
+
     d->arch.hvm_domain.params = xzalloc_array(uint64_t, HVM_NR_PARAMS);
     d->arch.hvm_domain.io_handler = xmalloc(struct hvm_io_handler);
     rc = -ENOMEM;
     if ( !d->arch.hvm_domain.params || !d->arch.hvm_domain.io_handler )
-        goto fail0;
+        goto fail1;
     d->arch.hvm_domain.io_handler->num_slot = 0;
 
     hvm_init_guest_time(d);
 
     d->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] = 1;
     d->arch.hvm_domain.params[HVM_PARAM_TRIPLE_FAULT_REASON] = SHUTDOWN_reboot;
-
-    hvm_init_cacheattr_region_list(d);
-
-    rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
-    if ( rc != 0 )
-        goto fail1;
 
     vpic_init(d);
 
@@ -569,10 +569,10 @@ int hvm_domain_initialise(struct domain *d)
     stdvga_deinit(d);
     vioapic_deinit(d);
  fail1:
-    hvm_destroy_cacheattr_region_list(d);
- fail0:
     xfree(d->arch.hvm_domain.io_handler);
     xfree(d->arch.hvm_domain.params);
+ fail0:
+    hvm_destroy_cacheattr_region_list(d);
     return rc;
 }
 
@@ -601,11 +601,11 @@ void hvm_domain_relinquish_resources(struct domain *d)
 
 void hvm_domain_destroy(struct domain *d)
 {
+    hvm_destroy_cacheattr_region_list(d);
     hvm_funcs.domain_destroy(d);
     rtc_deinit(d);
     stdvga_deinit(d);
     vioapic_deinit(d);
-    hvm_destroy_cacheattr_region_list(d);
 }
 
 static int hvm_save_tsc_adjust(struct domain *d, hvm_domain_context_t *h)
@@ -1091,54 +1091,23 @@ int hvm_vcpu_initialise(struct vcpu *v)
 {
     int rc;
     struct domain *d = v->domain;
-    domid_t dm_domid = d->arch.hvm_domain.params[HVM_PARAM_DM_DOMAIN];
+    domid_t dm_domid;
 
     hvm_asid_flush_vcpu(v);
-
-    if ( (rc = vlapic_init(v)) != 0 )
-        goto fail1;
-
-    if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 )
-        goto fail2;
-
-    if ( nestedhvm_enabled(d) 
-         && (rc = nestedhvm_vcpu_initialise(v)) < 0 ) 
-        goto fail3;
-
-    /* Create ioreq event channel. */
-    rc = alloc_unbound_xen_event_channel(v, dm_domid, NULL);
-    if ( rc < 0 )
-        goto fail4;
-
-    /* Register ioreq event channel. */
-    v->arch.hvm_vcpu.xen_port = rc;
-
-    if ( v->vcpu_id == 0 )
-    {
-        /* Create bufioreq event channel. */
-        rc = alloc_unbound_xen_event_channel(v, dm_domid, NULL);
-        if ( rc < 0 )
-            goto fail4;
-        d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_EVTCHN] = rc;
-    }
-
-    spin_lock(&d->arch.hvm_domain.ioreq.lock);
-    if ( d->arch.hvm_domain.ioreq.va != NULL )
-        get_ioreq(v)->vp_eport = v->arch.hvm_vcpu.xen_port;
-    spin_unlock(&d->arch.hvm_domain.ioreq.lock);
 
     spin_lock_init(&v->arch.hvm_vcpu.tm_lock);
     INIT_LIST_HEAD(&v->arch.hvm_vcpu.tm_list);
 
-    v->arch.hvm_vcpu.inject_trap.vector = -1;
-
-    rc = setup_compat_arg_xlat(v);
+    rc = hvm_vcpu_cacheattr_init(v); /* teardown: vcpu_cacheattr_destroy */
     if ( rc != 0 )
-        goto fail4;
+        goto fail1;
 
-    rc = hvm_vcpu_cacheattr_init(v);
-    if ( rc != 0 )
-        goto fail5;
+    /* NB: vlapic_init must be called before hvm_funcs.vcpu_initialise */
+    if ( (rc = vlapic_init(v)) != 0 ) /* teardown: vlapic_destroy */
+        goto fail2;
+
+    if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 ) /* teardown: hvm_funcs.vcpu_destroy */
+        goto fail3;
 
     softirq_tasklet_init(
         &v->arch.hvm_vcpu.assert_evtchn_irq_tasklet,
@@ -1146,6 +1115,40 @@ int hvm_vcpu_initialise(struct vcpu *v)
         (unsigned long)v);
 
     v->arch.user_regs.eflags = 2;
+
+    v->arch.hvm_vcpu.inject_trap.vector = -1;
+
+    rc = setup_compat_arg_xlat(v); /* teardown: free_compat_arg_xlat() */
+    if ( rc != 0 )
+        goto fail4;
+
+    if ( nestedhvm_enabled(d)
+         && (rc = nestedhvm_vcpu_initialise(v)) < 0 ) /* teardown: nestedhvm_vcpu_destroy */
+        goto fail5;
+
+    dm_domid = d->arch.hvm_domain.params[HVM_PARAM_DM_DOMAIN];
+
+    /* Create ioreq event channel. */
+    rc = alloc_unbound_xen_event_channel(v, dm_domid, NULL); /* teardown: none */
+    if ( rc < 0 )
+        goto fail6;
+
+    /* Register ioreq event channel. */
+    v->arch.hvm_vcpu.xen_port = rc;
+
+    if ( v->vcpu_id == 0 )
+    {
+        /* Create bufioreq event channel. */
+        rc = alloc_unbound_xen_event_channel(v, dm_domid, NULL); /* teardown: none */
+        if ( rc < 0 )
+            goto fail6;
+        d->arch.hvm_domain.params[HVM_PARAM_BUFIOREQ_EVTCHN] = rc;
+    }
+
+    spin_lock(&d->arch.hvm_domain.ioreq.lock);
+    if ( d->arch.hvm_domain.ioreq.va != NULL )
+        get_ioreq(v)->vp_eport = v->arch.hvm_vcpu.xen_port;
+    spin_unlock(&d->arch.hvm_domain.ioreq.lock);
 
     if ( v->vcpu_id == 0 )
     {
@@ -1164,14 +1167,16 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     return 0;
 
+ fail6:
+    nestedhvm_vcpu_destroy(v);
  fail5:
     free_compat_arg_xlat(v);
  fail4:
-    nestedhvm_vcpu_destroy(v);
- fail3:
     hvm_funcs.vcpu_destroy(v);
- fail2:
+ fail3:
     vlapic_destroy(v);
+ fail2:
+    hvm_vcpu_cacheattr_destroy(v);
  fail1:
     return rc;
 }
