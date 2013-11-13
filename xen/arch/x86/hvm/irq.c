@@ -405,6 +405,9 @@ struct hvm_intack hvm_vcpu_has_pending_irq(struct vcpu *v)
          && vcpu_info(v, evtchn_upcall_pending) )
         return hvm_intack_vector(plat->irq.callback_via.vector);
 
+    if ( is_pvh_vcpu(v) )
+        return hvm_intack_none;
+
     if ( vlapic_accept_pic_intr(v) && plat->vpic[0].int_output )
         return hvm_intack_pic(0);
 

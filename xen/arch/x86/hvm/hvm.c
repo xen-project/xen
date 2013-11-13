@@ -304,6 +304,10 @@ u64 hvm_get_guest_tsc_adjust(struct vcpu *v)
 
 void hvm_migrate_timers(struct vcpu *v)
 {
+    /* PVH doesn't use rtc and emulated timers, it uses pvclock mechanism. */
+    if ( is_pvh_vcpu(v) )
+        return;
+
     rtc_migrate_timers(v);
     pt_migrate(v);
 }
@@ -345,9 +349,10 @@ void hvm_do_resume(struct vcpu *v)
 {
     ioreq_t *p;
 
-    pt_restore_timer(v);
-
     check_wakeup_from_wait();
+
+    if ( is_hvm_vcpu(v) )
+        pt_restore_timer(v);
 
     /* NB. Optimised for common case (p->state == STATE_IOREQ_NONE). */
     if ( !(p = get_ioreq(v)) )
@@ -560,6 +565,9 @@ int hvm_domain_initialise(struct domain *d)
         goto fail1;
     d->arch.hvm_domain.io_handler->num_slot = 0;
 
+    if ( is_pvh_domain(d) )
+        return 0;
+
     hvm_init_guest_time(d);
 
     d->arch.hvm_domain.params[HVM_PARAM_HPET_ENABLED] = 1;
@@ -600,6 +608,12 @@ int hvm_domain_initialise(struct domain *d)
 
 void hvm_domain_relinquish_resources(struct domain *d)
 {
+    xfree(d->arch.hvm_domain.io_handler);
+    xfree(d->arch.hvm_domain.params);
+
+    if ( is_pvh_domain(d) )
+        return;
+
     if ( hvm_funcs.nhvm_domain_relinquish_resources )
         hvm_funcs.nhvm_domain_relinquish_resources(d);
 
@@ -616,14 +630,15 @@ void hvm_domain_relinquish_resources(struct domain *d)
         pmtimer_deinit(d);
         hpet_deinit(d);
     }
-
-    xfree(d->arch.hvm_domain.io_handler);
-    xfree(d->arch.hvm_domain.params);
 }
 
 void hvm_domain_destroy(struct domain *d)
 {
     hvm_destroy_cacheattr_region_list(d);
+
+    if ( is_pvh_domain(d) )
+        return;
+
     hvm_funcs.domain_destroy(d);
     rtc_deinit(d);
     stdvga_deinit(d);
@@ -1125,7 +1140,9 @@ int hvm_vcpu_initialise(struct vcpu *v)
         goto fail1;
 
     /* NB: vlapic_init must be called before hvm_funcs.vcpu_initialise */
-    if ( (rc = vlapic_init(v)) != 0 ) /* teardown: vlapic_destroy */
+    if ( is_hvm_vcpu(v) )
+        rc = vlapic_init(v);
+    if ( rc != 0 ) /* teardown: vlapic_destroy */
         goto fail2;
 
     if ( (rc = hvm_funcs.vcpu_initialise(v)) != 0 ) /* teardown: hvm_funcs.vcpu_destroy */
@@ -1139,6 +1156,14 @@ int hvm_vcpu_initialise(struct vcpu *v)
     v->arch.user_regs.eflags = 2;
 
     v->arch.hvm_vcpu.inject_trap.vector = -1;
+
+    if ( is_pvh_vcpu(v) )
+    {
+        v->arch.hvm_vcpu.hcall_64bit = 1;    /* PVH 32bitfixme. */
+        /* This is for hvm_long_mode_enabled(v). */
+        v->arch.hvm_vcpu.guest_efer = EFER_SCE | EFER_LMA | EFER_LME;
+        return 0;
+    }
 
     rc = setup_compat_arg_xlat(v); /* teardown: free_compat_arg_xlat() */
     if ( rc != 0 )
@@ -1211,7 +1236,10 @@ void hvm_vcpu_destroy(struct vcpu *v)
 
     tasklet_kill(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet);
     hvm_vcpu_cacheattr_destroy(v);
-    vlapic_destroy(v);
+
+    if ( is_hvm_vcpu(v) )
+        vlapic_destroy(v);
+
     hvm_funcs.vcpu_destroy(v);
 
     /* Event channel is already freed by evtchn_destroy(). */
@@ -1414,6 +1442,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa,
     /* For the benefit of 32-bit WinXP (& older Windows) on AMD CPUs,
      * a fast path for LAPIC accesses, skipping the p2m lookup. */
     if ( !nestedhvm_vcpu_in_guestmode(v)
+         && is_hvm_vcpu(v)
          && gfn == PFN_DOWN(vlapic_base_address(vcpu_vlapic(v))) )
     {
         if ( !handle_mmio() )

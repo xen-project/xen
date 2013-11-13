@@ -236,7 +236,8 @@ void vmx_intr_assist(void)
     }
 
     /* Crank the handle on interrupt state. */
-    pt_vector = pt_update_irq(v);
+    if ( is_hvm_vcpu(v) )
+        pt_vector = pt_update_irq(v);
 
     do {
         unsigned long intr_info;
