@@ -719,7 +719,7 @@ int cpuid_hypervisor_leaves( uint32_t idx, uint32_t sub_idx,
     return 1;
 }
 
-static void pv_cpuid(struct cpu_user_regs *regs)
+void pv_cpuid(struct cpu_user_regs *regs)
 {
     uint32_t a, b, c, d;
 
