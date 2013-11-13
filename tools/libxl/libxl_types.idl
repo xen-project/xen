@@ -274,6 +274,7 @@ libxl_domain_create_info = Struct("domain_create_info",[
     ("platformdata", libxl_key_value_list),
     ("poolid",       uint32),
     ("run_hotplug_scripts",libxl_defbool),
+    ("pvh",          libxl_defbool),
     ], dir=DIR_IN)
 
 libxl_domain_restore_params = Struct("domain_restore_params", [

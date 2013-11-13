@@ -887,6 +887,7 @@ typedef struct {
     libxl__file_reference pv_kernel;
     libxl__file_reference pv_ramdisk;
     const char * pv_cmdline;
+    bool pvh_enabled;
 } libxl__domain_build_state;
 
 _hidden int libxl__build_pre(libxl__gc *gc, uint32_t domid,

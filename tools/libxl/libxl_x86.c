@@ -290,7 +290,9 @@ int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
     if (rtc_timeoffset)
         xc_domain_set_time_offset(ctx->xch, domid, rtc_timeoffset);
 
-    if (d_config->b_info.type == LIBXL_DOMAIN_TYPE_HVM) {
+    if (d_config->b_info.type == LIBXL_DOMAIN_TYPE_HVM ||
+        libxl_defbool_val(d_config->c_info.pvh)) {
+
         unsigned long shadow;
         shadow = (d_config->b_info.shadow_memkb + 1023) / 1024;
         xc_shadow_control(ctx->xch, domid, XEN_DOMCTL_SHADOW_OP_SET_ALLOCATION, NULL, 0, &shadow, 0, NULL);

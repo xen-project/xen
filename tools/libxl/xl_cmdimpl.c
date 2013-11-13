@@ -642,6 +642,7 @@ static void parse_config_data(const char *config_source,
         !strncmp(buf, "hvm", strlen(buf)))
         c_info->type = LIBXL_DOMAIN_TYPE_HVM;
 
+    xlu_cfg_get_defbool(config, "pvh", &c_info->pvh, 0);
     xlu_cfg_get_defbool(config, "hap", &c_info->hap, 0);
 
     if (xlu_cfg_replace_string (config, "name", &c_info->name, 0)) {
