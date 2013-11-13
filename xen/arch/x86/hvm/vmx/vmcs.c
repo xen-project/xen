@@ -28,6 +28,7 @@
 #include <asm/msr.h>
 #include <asm/xstate.h>
 #include <asm/hvm/hvm.h>
+#include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
@@ -896,7 +897,29 @@ static int construct_vmcs(struct vcpu *v)
     /* Do not enable Monitor Trap Flag unless start single step debug */
     v->arch.hvm_vmx.exec_control &= ~CPU_BASED_MONITOR_TRAP_FLAG;
 
+    if ( is_pvh_domain(d) )
+    {
+        /* Disable virtual apics, TPR */
+        v->arch.hvm_vmx.secondary_exec_control &=
+            ~(SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES
+              | SECONDARY_EXEC_APIC_REGISTER_VIRT
+              | SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY);
+        v->arch.hvm_vmx.exec_control &= ~CPU_BASED_TPR_SHADOW;
+
+        /* Unrestricted guest (real mode for EPT) */
+        v->arch.hvm_vmx.secondary_exec_control &=
+            ~SECONDARY_EXEC_UNRESTRICTED_GUEST;
+
+        /* Start in 64-bit mode. PVH 32bitfixme. */
+        vmentry_ctl |= VM_ENTRY_IA32E_MODE;       /* GUEST_EFER.LME/LMA ignored */
+
+        ASSERT(v->arch.hvm_vmx.exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS);
+        ASSERT(v->arch.hvm_vmx.exec_control & CPU_BASED_ACTIVATE_MSR_BITMAP);
+        ASSERT(!(v->arch.hvm_vmx.exec_control & CPU_BASED_RDTSC_EXITING));
+    }
+
     vmx_update_cpu_exec_control(v);
+
     __vmwrite(VM_EXIT_CONTROLS, vmexit_ctl);
     __vmwrite(VM_ENTRY_CONTROLS, vmentry_ctl);
 
@@ -1020,7 +1043,11 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(GUEST_DS_AR_BYTES, 0xc093);
     __vmwrite(GUEST_FS_AR_BYTES, 0xc093);
     __vmwrite(GUEST_GS_AR_BYTES, 0xc093);
-    __vmwrite(GUEST_CS_AR_BYTES, 0xc09b); /* exec/read, accessed */
+    if ( is_pvh_domain(d) )
+        /* CS.L == 1, exec, read/write, accessed. PVH 32bitfixme. */
+        __vmwrite(GUEST_CS_AR_BYTES, 0xa09b);
+    else
+        __vmwrite(GUEST_CS_AR_BYTES, 0xc09b); /* exec/read, accessed */
 
     /* Guest IDT. */
     __vmwrite(GUEST_IDTR_BASE, 0);
@@ -1050,10 +1077,25 @@ static int construct_vmcs(struct vcpu *v)
               | (1U << TRAP_no_device);
     vmx_update_exception_bitmap(v);
 
+    /*
+     * In HVM domains, this happens on the realmode->paging
+     * transition.  Since PVH never goes through this transition, we
+     * need to do it at start-of-day.
+     */
+    if ( is_pvh_domain(d) )
+        vmx_update_debug_state(v);
+
     v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_PE | X86_CR0_ET;
+
+    /* PVH domains always start in paging mode */
+    if ( is_pvh_domain(d) )
+        v->arch.hvm_vcpu.guest_cr[0] |= X86_CR0_PG | X86_CR0_NE | X86_CR0_WP;
+
     hvm_update_guest_cr(v, 0);
 
-    v->arch.hvm_vcpu.guest_cr[4] = 0;
+    v->arch.hvm_vcpu.guest_cr[4] = is_pvh_domain(d) ?
+        (real_cr4_to_pv_guest_cr4(mmu_cr4_features)
+         & ~HVM_CR4_GUEST_RESERVED_BITS(v)) : 0;
     hvm_update_guest_cr(v, 4);
 
     if ( cpu_has_vmx_tpr_shadow )
@@ -1085,9 +1127,14 @@ static int construct_vmcs(struct vcpu *v)
 
     vmx_vmcs_exit(v);
 
-    paging_update_paging_modes(v); /* will update HOST & GUEST_CR3 as reqd */
+    /* PVH: paging mode is updated by arch_set_info_guest(). */
+    if ( is_hvm_vcpu(v) )
+    {
+        /* will update HOST & GUEST_CR3 as reqd */
+        paging_update_paging_modes(v);
 
-    vmx_vlapic_msr_changed(v);
+        vmx_vlapic_msr_changed(v);
+    }
 
     return 0;
 }

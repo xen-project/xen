@@ -1691,6 +1691,12 @@ const struct hvm_function_table * __init start_vmx(void)
         vmx_function_table.sync_pir_to_irr = NULL;
     }
 
+    if ( cpu_has_vmx_ept
+         && cpu_has_vmx_pat
+         && cpu_has_vmx_msr_bitmap
+         && cpu_has_vmx_secondary_exec_control )
+        vmx_function_table.pvh_supported = 1;
+
     setup_vmcs_dump();
 
     return &vmx_function_table;
