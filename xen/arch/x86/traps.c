@@ -1671,7 +1671,7 @@ static int pci_cfg_ok(struct domain *d, int write, int size)
     return 1;
 }
 
-static uint32_t guest_io_read(
+uint32_t guest_io_read(
     unsigned int port, unsigned int bytes,
     struct vcpu *v, struct cpu_user_regs *regs)
 {
@@ -1738,7 +1738,7 @@ static uint32_t guest_io_read(
     return data;
 }
 
-static void guest_io_write(
+void guest_io_write(
     unsigned int port, unsigned int bytes, uint32_t data,
     struct vcpu *v, struct cpu_user_regs *regs)
 {

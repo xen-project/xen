@@ -49,4 +49,9 @@ extern int guest_has_trap_callback(struct domain *d, uint16_t vcpuid,
 extern int send_guest_trap(struct domain *d, uint16_t vcpuid,
 				unsigned int trap_nr);
 
+uint32_t guest_io_read(unsigned int port, unsigned int bytes,
+                       struct vcpu *, struct cpu_user_regs *);
+void guest_io_write(unsigned int port, unsigned int bytes, uint32_t data,
+                    struct vcpu *, struct cpu_user_regs *);
+
 #endif /* ASM_TRAP_H */

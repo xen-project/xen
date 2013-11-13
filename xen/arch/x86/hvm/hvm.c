@@ -519,6 +519,20 @@ static int hvm_print_line(
     return X86EMUL_OKAY;
 }
 
+static int handle_pvh_io(
+    int dir, uint32_t port, uint32_t bytes, uint32_t *val)
+{
+    struct vcpu *curr = current;
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+
+    if ( dir == IOREQ_WRITE )
+        guest_io_write(port, bytes, *val, curr, regs);
+    else
+        *val = guest_io_read(port, bytes, curr, regs);
+
+    return X86EMUL_OKAY;
+}
+
 int hvm_domain_initialise(struct domain *d)
 {
     int rc;
@@ -566,7 +580,10 @@ int hvm_domain_initialise(struct domain *d)
     d->arch.hvm_domain.io_handler->num_slot = 0;
 
     if ( is_pvh_domain(d) )
+    {
+        register_portio_handler(d, 0, 0x10003, handle_pvh_io);
         return 0;
+    }
 
     hvm_init_guest_time(d);
 
