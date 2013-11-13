@@ -1818,6 +1818,15 @@ int hvm_set_cr0(unsigned long value)
          (value & (X86_CR0_PE | X86_CR0_PG)) == X86_CR0_PG )
         goto gpf;
 
+    /* A pvh is not expected to change to real mode. */
+    if ( is_pvh_vcpu(v)
+         && (value & (X86_CR0_PE | X86_CR0_PG)) != (X86_CR0_PG | X86_CR0_PE) )
+    {
+        printk(XENLOG_G_WARNING
+               "PVH attempting to turn off PE/PG. CR0:%lx\n", value);
+        goto gpf;
+    }
+
     if ( (value & X86_CR0_PG) && !(old_value & X86_CR0_PG) )
     {
         if ( v->arch.hvm_vcpu.guest_efer & EFER_LME )
