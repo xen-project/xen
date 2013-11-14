@@ -302,6 +302,15 @@ int p2m_alloc_table(struct domain *d)
     d->arch.vttbr = page_to_maddr(p2m->first_level)
         | ((uint64_t)p2m->vmid&0xff)<<48;
 
+    p2m_load_VTTBR(d);
+
+    /* Make sure that all TLBs corresponding to the new VMID are flushed
+     * before using it
+     */
+    flush_tlb();
+
+    p2m_load_VTTBR(current->domain);
+
     spin_unlock(&p2m->lock);
 
     return 0;
@@ -357,6 +366,7 @@ static void p2m_free_vmid(struct domain *d)
     spin_lock(&vmid_alloc_lock);
     if ( p2m->vmid != INVALID_VMID )
         clear_bit(p2m->vmid, vmid_mask);
+
     spin_unlock(&vmid_alloc_lock);
 }
 

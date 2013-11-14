@@ -12,6 +12,17 @@ static inline void flush_tlb_local(void)
     isb();
 }
 
+/* Flush inner shareable TLBs, current VMID only */
+static inline void flush_tlb(void)
+{
+    dsb();
+
+    WRITE_CP32((uint32_t) 0, TLBIALLIS);
+
+    dsb();
+    isb();
+}
+
 /* Flush local TLBs, all VMIDs, non-hypervisor mode */
 static inline void flush_tlb_all_local(void)
 {

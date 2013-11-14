@@ -12,6 +12,17 @@ static inline void flush_tlb_local(void)
         : : : "memory");
 }
 
+/* Flush innershareable TLBs, current VMID only */
+static inline void flush_tlb(void)
+{
+    asm volatile(
+        "dsb sy;"
+        "tlbi vmalle1is;"
+        "dsb sy;"
+        "isb;"
+        : : : "memory");
+}
+
 /* Flush local TLBs, all VMIDs, non-hypervisor mode */
 static inline void flush_tlb_all_local(void)
 {
