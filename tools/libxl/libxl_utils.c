@@ -191,7 +191,7 @@ int libxl_is_stubdom(libxl_ctx *ctx, uint32_t domid, uint32_t *target_domid)
     int ret = 0;
 
     target = libxl__xs_read(gc, XBT_NULL, GCSPRINTF("%s/target",
-			    libxl__xs_get_dompath(gc, domid)));
+                            libxl__xs_get_dompath(gc, domid)));
     if (!target)
         goto out;
     value = strtol(target, &endptr, 10);
@@ -207,15 +207,14 @@ out:
 
 static int logrename(libxl__gc *gc, const char *old, const char *new)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     int r;
 
     r = rename(old, new);
     if (r) {
         if (errno == ENOENT) return 0; /* ok */
 
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "failed to rotate logfile - could not"
-                     " rename %s to %s", old, new);
+        LOGE(ERROR, "failed to rotate logfile - "
+                    "could not rename %s to %s", old, new);
         return ERROR_FAIL;
     }
     return 0;
@@ -248,9 +247,9 @@ int libxl_create_logfile(libxl_ctx *ctx, const char *name, char **full_name)
             goto out;
     } else {
         if (errno != ENOENT)
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_WARNING, "problem checking existence of"
-                         " logfile %s, which might have needed to be rotated",
-                         name);
+            LOGE(WARN, "problem checking existence of logfile %s, "
+                       "which might have needed to be rotated",
+                 name);
     }
     *full_name = strdup(logfile);
     rc = 0;
