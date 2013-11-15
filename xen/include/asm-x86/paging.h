@@ -356,12 +356,14 @@ guest_map_l1e(struct vcpu *v, unsigned long addr, unsigned long *gl1mfn)
 {
     l2_pgentry_t l2e;
 
+    if ( unlikely(!__addr_ok(addr)) )
+        return NULL;
+
     if ( unlikely(paging_mode_translate(v->domain)) )
         return paging_get_hostmode(v)->guest_map_l1e(v, addr, gl1mfn);
 
     /* Find this l1e and its enclosing l1mfn in the linear map */
-    if ( !__addr_ok(addr) ||
-         __copy_from_user(&l2e,
+    if ( __copy_from_user(&l2e,
                           &__linear_l2_table[l2_linear_offset(addr)],
                           sizeof(l2_pgentry_t)) != 0 )
         return NULL;
@@ -382,16 +384,21 @@ guest_unmap_l1e(struct vcpu *v, void *p)
 
 /* Read the guest's l1e that maps this address. */
 static inline void
-guest_get_eff_l1e(struct vcpu *v, unsigned long addr, void *eff_l1e)
+guest_get_eff_l1e(struct vcpu *v, unsigned long addr, l1_pgentry_t *eff_l1e)
 {
+    if ( unlikely(!__addr_ok(addr)) )
+    {
+        *eff_l1e = l1e_empty();
+        return;
+    }
+
     if ( likely(!paging_mode_translate(v->domain)) )
     {
         ASSERT(!paging_mode_external(v->domain));
-        if ( !__addr_ok(addr) ||
-             __copy_from_user(eff_l1e,
+        if ( __copy_from_user(eff_l1e,
                               &__linear_l1_table[l1_linear_offset(addr)],
                               sizeof(l1_pgentry_t)) != 0 )
-            *(l1_pgentry_t *)eff_l1e = l1e_empty();
+            *eff_l1e = l1e_empty();
         return;
     }
         
