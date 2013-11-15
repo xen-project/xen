@@ -592,6 +592,7 @@ static struct page_info *kimage_alloc_page(struct kexec_image *image,
      */
     struct page_info *page;
     paddr_t addr;
+    int ret;
 
     /*
      * Walk through the list of destination pages, and see if I have a
@@ -656,7 +657,13 @@ static struct page_info *kimage_alloc_page(struct kexec_image *image,
         }
     }
 found:
-    machine_kexec_add_page(image, page_to_maddr(page), page_to_maddr(page));
+    ret = machine_kexec_add_page(image, page_to_maddr(page),
+                                 page_to_maddr(page));
+    if ( ret < 0 )
+    {
+        free_domheap_page(page);
+        return NULL;
+    }
     return page;
 }
 
