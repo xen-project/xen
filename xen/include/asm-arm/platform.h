@@ -45,7 +45,7 @@ struct platform_desc {
  */
 #define PLATFORM_QUIRK_DOM0_MAPPING_11 (1 << 0)
 
-int __init platform_init(void);
+void __init platform_init(void);
 int __init platform_init_time(void);
 int __init platform_specific_mapping(struct domain *d);
 #ifdef CONFIG_ARM_32

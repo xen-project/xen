@@ -54,7 +54,7 @@ static void dump_platform_table(void)
         printk("    - %s\n", p->name);
 }
 
-int __init platform_init(void)
+void __init platform_init(void)
 {
     int res = 0;
 
@@ -82,7 +82,8 @@ int __init platform_init(void)
     if ( platform && platform->init )
         res = platform->init();
 
-    return res;
+    if ( res )
+        panic("Unable to initialize the platform\n");
 }
 
 int __init platform_init_time(void)
