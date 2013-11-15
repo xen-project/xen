@@ -97,7 +97,20 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 
 	acpi_table_print_madt_entry(header);
 
-	/* Record local apic id only when enabled */
+	/* Record local apic id only when enabled and fitting. */
+	if (processor->local_apic_id >= MAX_APICS ||
+	    processor->uid >= MAX_MADT_ENTRIES) {
+		printk("%sAPIC ID %#x and/or ACPI ID %#x beyond limit"
+		       " - processor ignored\n",
+		       processor->lapic_flags & ACPI_MADT_ENABLED ?
+				KERN_WARNING "WARNING: " : KERN_INFO,
+		       processor->local_apic_id, processor->uid);
+		/*
+		 * Must not return an error here, to prevent
+		 * acpi_table_parse_entries() from terminating early.
+		 */
+		return 0 /* -ENOSPC */;
+	}
 	if (processor->lapic_flags & ACPI_MADT_ENABLED) {
 		x86_acpiid_to_apicid[processor->uid] =
 			processor->local_apic_id;
