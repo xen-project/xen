@@ -1071,6 +1071,17 @@ csched_dom_cntl(
     return 0;
 }
 
+static inline void
+__csched_set_tslice(struct csched_private *prv, unsigned timeslice)
+{
+    prv->tslice_ms = timeslice;
+    prv->ticks_per_tslice = CSCHED_TICKS_PER_TSLICE;
+    if ( prv->tslice_ms < prv->ticks_per_tslice )
+        prv->ticks_per_tslice = 1;
+    prv->tick_period_us = prv->tslice_ms * 1000 / prv->ticks_per_tslice;
+    prv->credits_per_tslice = CSCHED_CREDITS_PER_MSEC * prv->tslice_ms;
+}
+
 static int
 csched_sys_cntl(const struct scheduler *ops,
                         struct xen_sysctl_scheduler_op *sc)
@@ -1089,7 +1100,7 @@ csched_sys_cntl(const struct scheduler *ops,
                     || params->ratelimit_us < XEN_SYSCTL_SCHED_RATELIMIT_MIN))
             || MICROSECS(params->ratelimit_us) > MILLISECS(params->tslice_ms) )
                 goto out;
-        prv->tslice_ms = params->tslice_ms;
+        __csched_set_tslice(prv, params->tslice_ms);
         prv->ratelimit_us = params->ratelimit_us;
         /* FALLTHRU */
     case XEN_SYSCTL_SCHEDOP_getinfo:
@@ -1899,12 +1910,7 @@ csched_init(struct scheduler *ops)
         sched_credit_tslice_ms = CSCHED_DEFAULT_TSLICE_MS;
     }
 
-    prv->tslice_ms = sched_credit_tslice_ms;
-    prv->ticks_per_tslice = CSCHED_TICKS_PER_TSLICE;
-    if ( prv->tslice_ms < prv->ticks_per_tslice )
-        prv->ticks_per_tslice = 1;
-    prv->tick_period_us = prv->tslice_ms * 1000 / prv->ticks_per_tslice;
-    prv->credits_per_tslice = CSCHED_CREDITS_PER_MSEC * prv->tslice_ms;
+    __csched_set_tslice(prv, sched_credit_tslice_ms);
 
     if ( MICROSECS(sched_ratelimit_us) > MILLISECS(sched_credit_tslice_ms) )
     {
