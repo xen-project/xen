@@ -130,7 +130,10 @@ static void rtc_timer_update(RTCState *s)
                 s->pt_code = period_code;
                 period = 1 << (period_code - 1); /* period in 32 Khz cycles */
                 period = DIV_ROUND(period * 1000000000ULL, 32768); /* in ns */
-                delta = period - ((NOW() - s->start_time) % period);
+                if ( v->domain->arch.hvm_domain.params[HVM_PARAM_VPT_ALIGN] )
+                    delta = 0;
+                else
+                    delta = period - ((NOW() - s->start_time) % period);
                 create_periodic_time(v, &s->pt, delta, period,
                                      RTC_IRQ, NULL, s);
             }
