@@ -401,7 +401,7 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
     mctelem_cookie_t mctc = NULL;
     struct mca_summary bs;
     struct mc_info *mci = NULL;
-    int irqlocked = 0;
+    spinlock_t *lock = NULL;
     uint64_t gstatus;
     int ripv;
 
@@ -411,8 +411,7 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
 
     /* Disable interrupts for the _vcpu_. It may not re-scheduled to
      * another physical CPU. */
-    vcpu_schedule_lock_irq(v);
-    irqlocked = 1;
+    lock = vcpu_schedule_lock_irq(v);
 
     /* Read global status;  if it does not indicate machine check
      * in progress then bail as long as we have a valid ip to return to. */
@@ -420,8 +419,8 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
     ripv = ((gstatus & MCG_STATUS_RIPV) != 0);
     if (!(gstatus & MCG_STATUS_MCIP) && ripv) {
         add_taint(TAINT_MACHINE_CHECK); /* questionable */
-        vcpu_schedule_unlock_irq(v);
-        irqlocked = 0;
+        vcpu_schedule_unlock_irq(lock, v);
+        lock = NULL;
         goto cmn_handler_done;
     }
 
@@ -440,8 +439,8 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
 
     /* If no valid errors and our stack is intact, we're done */
     if (ripv && bs.errcnt == 0) {
-        vcpu_schedule_unlock_irq(v);
-        irqlocked = 0;
+        vcpu_schedule_unlock_irq(lock, v);
+        lock = NULL;
         goto cmn_handler_done;
     }
 
@@ -484,8 +483,8 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
     if (xen_state_lost) {
         /* Now we are going to panic anyway. Allow interrupts, so that
          * printk on serial console can work. */
-        vcpu_schedule_unlock_irq(v);
-        irqlocked = 0;
+        vcpu_schedule_unlock_irq(lock, v);
+        lock = NULL;
 
         printk("Terminal machine check exception occurred in "
                "hypervisor context.\n");
@@ -557,8 +556,8 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
              * domain_crash() the vcpu pointer is invalid.
              * Therefore, we must unlock the irqs before killing
              * it. */
-            vcpu_schedule_unlock_irq(v);
-            irqlocked = 0;
+            vcpu_schedule_unlock_irq(lock, v);
+            lock = NULL;
 
             /* DomU is impacted. Kill it and continue. */
             domain_crash(curdom);
@@ -569,8 +568,8 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
     case DOM0_TRAP:
     case DOMU_TRAP:
         /* Enable interrupts. */
-        vcpu_schedule_unlock_irq(v);
-        irqlocked = 0;
+        vcpu_schedule_unlock_irq(lock, v);
+        lock = NULL;
 
         /* guest softirqs and event callbacks are scheduled
          * immediately after this handler exits. */
@@ -580,13 +579,13 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
         break;
 
     case DOM_NORMAL:
-        vcpu_schedule_unlock_irq(v);
-        irqlocked = 0;
+        vcpu_schedule_unlock_irq(lock, v);
+        lock = NULL;
         break;
     }
 
  cmn_handler_done:
-    BUG_ON(irqlocked);
+    BUG_ON(lock != NULL);
     BUG_ON(!ripv);
 
     if (bs.errcnt) {
