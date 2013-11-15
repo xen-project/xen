@@ -110,6 +110,7 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     local_irq_disable();
     stopmachine_set_state(STOPMACHINE_DISABLE_IRQ);
     stopmachine_wait_state();
+    spin_debug_disable();
 
     stopmachine_set_state(STOPMACHINE_INVOKE);
     if ( (cpu == smp_processor_id()) || (cpu == NR_CPUS) )
@@ -117,6 +118,7 @@ int stop_machine_run(int (*fn)(void *), void *data, unsigned int cpu)
     stopmachine_wait_state();
     ret = stopmachine_data.fn_result;
 
+    spin_debug_enable();
     stopmachine_set_state(STOPMACHINE_EXIT);
     stopmachine_wait_state();
     local_irq_enable();
