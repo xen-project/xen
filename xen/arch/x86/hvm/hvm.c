@@ -40,6 +40,7 @@
 #include <asm/current.h>
 #include <asm/e820.h>
 #include <asm/io.h>
+#include <asm/iocap.h>
 #include <asm/regs.h>
 #include <asm/cpufeature.h>
 #include <asm/processor.h>
@@ -1792,7 +1793,7 @@ int hvm_set_cr0(unsigned long value)
         }
     }
 
-    if ( has_arch_mmios(v->domain) )
+    if ( cache_flush_permitted(v->domain) )
     {
         if ( (value & X86_CR0_CD) && !(value & X86_CR0_NW) )
         {
