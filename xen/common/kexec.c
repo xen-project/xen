@@ -785,16 +785,13 @@ static int kexec_swap_images(int type, struct kexec_image *new,
 
     *old = NULL;
 
-    spin_lock(&kexec_lock);
-
     if ( test_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags) )
-    {
-        spin_unlock(&kexec_lock);
         return -EBUSY;
-    }
 
     if ( kexec_load_get_bits(type, &base, &bit) )
         return -EINVAL;
+
+    spin_lock(&kexec_lock);
 
     pos = (test_bit(bit, &kexec_flags) != 0);
     old_slot = base + pos;
