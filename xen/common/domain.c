@@ -736,6 +736,7 @@ static void complete_domain_destroy(struct rcu_head *head)
         {
             free_cpumask_var(v->cpu_affinity);
             free_cpumask_var(v->cpu_affinity_tmp);
+            free_cpumask_var(v->cpu_affinity_saved);
             free_cpumask_var(v->vcpu_dirty_cpumask);
             free_vcpu_struct(v);
         }
