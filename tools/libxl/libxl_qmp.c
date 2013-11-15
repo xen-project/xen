@@ -260,7 +260,7 @@ static callback_id_pair *qmp_get_callback_from_id(libxl__qmp_handler *qmp,
     return NULL;
 }
 
-static void qmp_handle_error_response(libxl__qmp_handler *qmp,
+static void qmp_handle_error_response(libxl__gc *gc, libxl__qmp_handler *qmp,
                                       const libxl__json_object *resp)
 {
     callback_id_pair *pp = qmp_get_callback_from_id(qmp, resp);
@@ -283,19 +283,17 @@ static void qmp_handle_error_response(libxl__qmp_handler *qmp,
         free(pp);
     }
 
-    LIBXL__LOG(qmp->ctx, LIBXL__LOG_ERROR,
-               "received an error message from QMP server: %s",
-               libxl__json_object_get_string(resp));
+    LOG(ERROR, "received an error message from QMP server: %s",
+        libxl__json_object_get_string(resp));
 }
 
-static int qmp_handle_response(libxl__qmp_handler *qmp,
+static int qmp_handle_response(libxl__gc *gc, libxl__qmp_handler *qmp,
                                const libxl__json_object *resp)
 {
     libxl__qmp_message_type type = LIBXL__QMP_MESSAGE_TYPE_INVALID;
 
     type = qmp_response_type(qmp, resp);
-    LIBXL__LOG(qmp->ctx, LIBXL__LOG_DEBUG,
-               "message type: %s", libxl__qmp_message_type_to_string(type));
+    LOG(DEBUG, "message type: %s", libxl__qmp_message_type_to_string(type));
 
     switch (type) {
     case LIBXL__QMP_MESSAGE_TYPE_QMP:
@@ -317,14 +315,14 @@ static int qmp_handle_response(libxl__qmp_handler *qmp,
                 /* tell that the id have been processed */
                 qmp->wait_for_id = 0;
             }
-            LIBXL_STAILQ_REMOVE(
-                &qmp->callback_list, pp, callback_id_pair, next);
+            LIBXL_STAILQ_REMOVE(&qmp->callback_list, pp, callback_id_pair,
+                                next);
             free(pp);
         }
         return 0;
     }
     case LIBXL__QMP_MESSAGE_TYPE_ERROR:
-        qmp_handle_error_response(qmp, resp);
+        qmp_handle_error_response(gc, qmp, resp);
         return -1;
     case LIBXL__QMP_MESSAGE_TYPE_EVENT:
         return 0;
@@ -481,7 +479,7 @@ static int qmp_next(libxl__gc *gc, libxl__qmp_handler *qmp)
                 o = libxl__json_parse(gc, s);
 
                 if (o) {
-                    rc = qmp_handle_response(qmp, o);
+                    rc = qmp_handle_response(gc, qmp, o);
                 } else {
                     LOG(ERROR, "Parse error of : %s\n", s);
                     return -1;
