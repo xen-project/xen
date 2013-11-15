@@ -132,7 +132,7 @@ int __init init_xen_time(void)
 
     res = platform_init_time();
     if ( res )
-        return res;
+        panic("Timer: Cannot initialize platform timer\n");
 
     /* Check that this CPU supports the Generic Timer interface */
     if ( !cpu_has_gentimer )
