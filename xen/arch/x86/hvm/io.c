@@ -290,8 +290,10 @@ void hvm_io_assist(ioreq_t *p)
         (void)handle_mmio();
         break;
     case HVMIO_handle_pio_awaiting_completion:
-        memcpy(&guest_cpu_user_regs()->eax,
-               &p->data, vio->io_size);
+        if ( vio->io_size == 4 ) /* Needs zero extension. */
+            guest_cpu_user_regs()->rax = (uint32_t)p->data;
+        else
+            memcpy(&guest_cpu_user_regs()->rax, &p->data, vio->io_size);
         break;
     default:
         break;
