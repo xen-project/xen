@@ -742,8 +742,12 @@ void *ioremap_attr(paddr_t pa, size_t len, unsigned int attributes)
     unsigned long pfn = PFN_DOWN(pa);
     unsigned int offs = pa & (PAGE_SIZE - 1);
     unsigned int nr = PFN_UP(offs + len);
+    void *ptr = __vmap(&pfn, nr, 1, 1, attributes);
 
-    return (__vmap(&pfn, nr, 1, 1, attributes) + offs);
+    if ( ptr == NULL )
+        return NULL;
+
+    return ptr + offs;
 }
 
 void *ioremap(paddr_t pa, size_t len)
