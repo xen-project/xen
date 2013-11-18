@@ -1013,9 +1013,17 @@ void __init __start_xen(unsigned long mbi_p)
                     ASSERT(j);
                 }
                 map_e = boot_e820.map[j].addr + boot_e820.map[j].size;
-                if ( (map_e >> PAGE_SHIFT) < max_page )
+                for ( j = 0; j < mbi->mods_count; ++j )
                 {
-                    max_page = map_e >> PAGE_SHIFT;
+                    uint64_t end = pfn_to_paddr(mod[j].mod_start) +
+                                   mod[j].mod_end;
+
+                    if ( map_e < end )
+                        map_e = end;
+                }
+                if ( PFN_UP(map_e) < max_page )
+                {
+                    max_page = PFN_UP(map_e);
                     max_pdx = pfn_to_pdx(max_page - 1) + 1;
                 }
                 printk(XENLOG_WARNING "Ignoring inaccessible memory range"
