@@ -747,7 +747,7 @@ static void __clear_current_vvmcs(struct vcpu *v)
         __vmpclear(virt_to_maddr(nvcpu->nv_n2vmcx));
 }
 
-static void __map_msr_bitmap(struct vcpu *v)
+static bool_t __must_check _map_msr_bitmap(struct vcpu *v)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     unsigned long gpa;
@@ -756,9 +756,11 @@ static void __map_msr_bitmap(struct vcpu *v)
         hvm_unmap_guest_frame(nvmx->msrbitmap, 1);
     gpa = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, MSR_BITMAP);
     nvmx->msrbitmap = hvm_map_guest_frame_ro(gpa >> PAGE_SHIFT, 1);
+
+    return nvmx->msrbitmap != NULL;
 }
 
-static void __map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
+static bool_t __must_check _map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
 {
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     unsigned long gpa;
@@ -769,12 +771,14 @@ static void __map_io_bitmap(struct vcpu *v, u64 vmcs_reg)
         hvm_unmap_guest_frame(nvmx->iobitmap[index], 1);
     gpa = __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, vmcs_reg);
     nvmx->iobitmap[index] = hvm_map_guest_frame_ro(gpa >> PAGE_SHIFT, 1);
+
+    return nvmx->iobitmap[index] != NULL;
 }
 
-static inline void map_io_bitmap_all(struct vcpu *v)
+static inline bool_t __must_check map_io_bitmap_all(struct vcpu *v)
 {
-   __map_io_bitmap (v, IO_BITMAP_A);
-   __map_io_bitmap (v, IO_BITMAP_B);
+   return _map_io_bitmap(v, IO_BITMAP_A) &&
+          _map_io_bitmap(v, IO_BITMAP_B);
 }
 
 static void nvmx_purge_vvmcs(struct vcpu *v)
@@ -1610,9 +1614,15 @@ int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
     if ( nvcpu->nv_vvmcxaddr == VMCX_EADDR )
     {
         nvcpu->nv_vvmcx = hvm_map_guest_frame_rw(gpa >> PAGE_SHIFT, 1);
-        nvcpu->nv_vvmcxaddr = gpa;
-        map_io_bitmap_all (v);
-        __map_msr_bitmap(v);
+        if ( nvcpu->nv_vvmcx )
+            nvcpu->nv_vvmcxaddr = gpa;
+        if ( !nvcpu->nv_vvmcx ||
+             !map_io_bitmap_all(v) ||
+             !_map_msr_bitmap(v) )
+        {
+            vmreturn(regs, VMFAIL_VALID);
+            goto out;
+        }
     }
 
     if ( cpu_has_vmx_vmcs_shadowing )
@@ -1724,6 +1734,7 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     unsigned long operand; 
     u64 vmcs_encoding;
+    bool_t okay = 1;
 
     if ( decode_vmx_inst(regs, &decode, &operand, 0)
              != X86EMUL_OKAY )
@@ -1732,16 +1743,21 @@ int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
     vmcs_encoding = reg_read(regs, decode.reg2);
     __set_vvmcs(nvcpu->nv_vvmcx, vmcs_encoding, operand);
 
-    if ( vmcs_encoding == IO_BITMAP_A || vmcs_encoding == IO_BITMAP_A_HIGH )
-        __map_io_bitmap (v, IO_BITMAP_A);
-    else if ( vmcs_encoding == IO_BITMAP_B || 
-              vmcs_encoding == IO_BITMAP_B_HIGH )
-        __map_io_bitmap (v, IO_BITMAP_B);
+    switch ( vmcs_encoding )
+    {
+    case IO_BITMAP_A: case IO_BITMAP_A_HIGH:
+        okay = _map_io_bitmap(v, IO_BITMAP_A);
+        break;
+    case IO_BITMAP_B: case IO_BITMAP_B_HIGH:
+        okay = _map_io_bitmap(v, IO_BITMAP_B);
+        break;
+    case MSR_BITMAP: case MSR_BITMAP_HIGH:
+        okay = _map_msr_bitmap(v);
+        break;
+    }
 
-    if ( vmcs_encoding == MSR_BITMAP || vmcs_encoding == MSR_BITMAP_HIGH )
-        __map_msr_bitmap(v);
+    vmreturn(regs, okay ? VMSUCCEED : VMFAIL_VALID);
 
-    vmreturn(regs, VMSUCCEED);
     return X86EMUL_OKAY;
 }
 
