@@ -794,6 +794,14 @@ int xc_dom_parse_image(struct xc_dom_image *dom)
     return -1;
 }
 
+int xc_dom_rambase_init(struct xc_dom_image *dom, uint64_t rambase)
+{
+    dom->rambase_pfn = rambase >> XC_PAGE_SHIFT;
+    DOMPRINTF("%s: RAM starts at %"PRI_xen_pfn,
+              __FUNCTION__, dom->rambase_pfn);
+    return 0;
+}
+
 int xc_dom_mem_init(struct xc_dom_image *dom, unsigned int mem_mb)
 {
     unsigned int page_shift;

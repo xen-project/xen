@@ -393,6 +393,12 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
         LOGE(ERROR, "xc_dom_boot_xen_init failed");
         goto out;
     }
+#ifdef GUEST_RAM_BASE
+    if ( (ret = xc_dom_rambase_init(dom, GUEST_RAM_BASE)) != 0 ) {
+        LOGE(ERROR, "xc_dom_rambase failed");
+        goto out;
+    }
+#endif
     if ( (ret = xc_dom_parse_image(dom)) != 0 ) {
         LOGE(ERROR, "xc_dom_parse_image failed");
         goto out;

@@ -30,12 +30,6 @@
 
 #include <arpa/inet.h> /* XXX ntohl is not the right function... */
 
-/*
- * Guest virtual RAM starts here. This must be consistent with the DTB
- * appended to the guest kernel.
- */
-#define GUEST_RAM_BASE 0x80000000
-
 struct minimal_dtb_header {
     uint32_t magic;
     uint32_t total_size;
@@ -103,13 +97,11 @@ static int xc_dom_parse_zimage32_kernel(struct xc_dom_image *dom)
     uint32_t *zimage;
     uint32_t start, entry_addr;
     uint64_t v_start, v_end;
-    uint64_t rambase = GUEST_RAM_BASE;
+    uint64_t rambase = dom->rambase_pfn << XC_PAGE_SHIFT;
 
     DOMPRINTF_CALLED(dom->xch);
 
     zimage = (uint32_t *)dom->kernel_blob;
-
-    dom->rambase_pfn = rambase >> XC_PAGE_SHIFT;
 
     /* Do not load kernel at the very first RAM address */
     v_start = rambase + 0x8000;
@@ -130,8 +122,6 @@ static int xc_dom_parse_zimage32_kernel(struct xc_dom_image *dom)
     dom->parms.virt_base = rambase;
 
     dom->guest_type = "xen-3.0-armv7l";
-    DOMPRINTF("%s: %s: RAM starts at %"PRI_xen_pfn,
-              __FUNCTION__, dom->guest_type, dom->rambase_pfn);
     DOMPRINTF("%s: %s: 0x%" PRIx64 " -> 0x%" PRIx64 "",
               __FUNCTION__, dom->guest_type,
               dom->kernel_seg.vstart, dom->kernel_seg.vend);

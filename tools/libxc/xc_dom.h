@@ -195,6 +195,7 @@ struct xc_dom_image *xc_dom_allocate(xc_interface *xch,
                                      const char *cmdline, const char *features);
 void xc_dom_release_phys(struct xc_dom_image *dom);
 void xc_dom_release(struct xc_dom_image *dom);
+int xc_dom_rambase_init(struct xc_dom_image *dom, uint64_t rambase);
 int xc_dom_mem_init(struct xc_dom_image *dom, unsigned int mem_mb);
 
 /* Set this larger if you have enormous ramdisks/kernels. Note that
