@@ -28,9 +28,12 @@ CFLAGS_LIBXL += $(CFLAGS_libxenstore)
 CFLAGS_LIBXL += $(CFLAGS_libblktapctl) 
 CFLAGS_LIBXL += -Wshadow
 
+LIBXL_LIBS-$(CONFIG_ARM) += -lfdt
+
 CFLAGS += $(PTHREAD_CFLAGS)
 LDFLAGS += $(PTHREAD_LDFLAGS)
 LIBXL_LIBS += $(PTHREAD_LIBS)
+LIBXL_LIBS += $(LIBXL_LIBS-y)
 
 LIBXLU_LIBS =
 
@@ -41,8 +44,7 @@ else
 LIBXL_OBJS-y += libxl_noblktap2.o
 endif
 LIBXL_OBJS-$(CONFIG_X86) += libxl_cpuid.o libxl_x86.o
-LIBXL_OBJS-$(CONFIG_IA64) += libxl_nocpuid.o libxl_noarch.o
-LIBXL_OBJS-$(CONFIG_ARM) += libxl_nocpuid.o libxl_noarch.o
+LIBXL_OBJS-$(CONFIG_ARM) += libxl_nocpuid.o libxl_arm.o
 
 ifeq ($(CONFIG_NetBSD),y)
 LIBXL_OBJS-y += libxl_netbsd.o

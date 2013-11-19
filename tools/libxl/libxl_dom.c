@@ -403,6 +403,10 @@ int libxl__build_pv(libxl__gc *gc, uint32_t domid,
         LOGE(ERROR, "xc_dom_parse_image failed");
         goto out;
     }
+    if ( (ret = libxl__arch_domain_configure(gc, info, dom)) != 0 ) {
+        LOGE(ERROR, "libxl__arch_domain_configure failed");
+        goto out;
+    }
     if ( (ret = xc_dom_mem_init(dom, info->target_memkb / 1024)) != 0 ) {
         LOGE(ERROR, "xc_dom_mem_init failed");
         goto out;

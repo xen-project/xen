@@ -310,3 +310,10 @@ int libxl__arch_domain_create(libxl__gc *gc, libxl_domain_config *d_config,
 
     return ret;
 }
+
+int libxl__arch_domain_configure(libxl__gc *gc,
+                                 libxl_domain_build_info *info,
+                                 struct xc_dom_image *dom)
+{
+    return 0;
+}
