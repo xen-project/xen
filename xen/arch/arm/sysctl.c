@@ -10,6 +10,7 @@
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
+#include <xen/hypercall.h>
 #include <public/sysctl.h>
 
 void arch_do_physinfo(xen_sysctl_physinfo_t *pi) { }

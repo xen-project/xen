@@ -9,6 +9,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
+#include <xen/hypercall.h>
 #include <public/domctl.h>
 
 long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
