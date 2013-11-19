@@ -68,26 +68,56 @@ void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len, int attrindx)
     clear_fixmap(FIXMAP_MISC);
 }
 
-static void kernel_zimage_check_overlap(struct kernel_info *info)
+static void place_modules(struct kernel_info *info,
+                         paddr_t kernel_start,
+                         paddr_t kernel_end)
 {
-    paddr_t zimage_start = info->zimage.load_addr;
-    paddr_t zimage_end = info->zimage.load_addr + info->zimage.len;
-    paddr_t start = info->dtb_paddr;
-    paddr_t end;
+    /* Align DTB and initrd size to 2Mb. Linux only requires 4 byte alignment */
+    const paddr_t initrd_len =
+        ROUNDUP(early_info.modules.module[MOD_INITRD].size, MB(2));
+    const paddr_t dtb_len = ROUNDUP(fdt_totalsize(info->fdt), MB(2));
+    const paddr_t total = initrd_len + dtb_len;
 
-    end = info->initrd_paddr + early_info.modules.module[MOD_INITRD].size;
+    /* Convenient */
+    const paddr_t mem_start = info->mem.bank[0].start;
+    const paddr_t mem_size = info->mem.bank[0].size;
+    const paddr_t mem_end = mem_start + mem_size;
+    const paddr_t kernel_size = kernel_end - kernel_start;
+
+    paddr_t addr;
+
+    if ( total + kernel_size > mem_size )
+        panic("Not enough memory in the first bank for the dtb+initrd.");
 
     /*
-     * In the dom0 memory, the initrd will be just after the DTB. So we
-     * only need to check if the zImage range will overlap the
-     * DTB-initrd range.
+     * DTB must be loaded such that it does not conflict with the
+     * kernel decompressor. For 32-bit Linux Documentation/arm/Booting
+     * recommends just after the 128MB boundary while for 64-bit Linux
+     * the recommendation in Documentation/arm64/booting.txt is below
+     * 512MB.
+     *
+     * If the bootloader provides an initrd, it will be loaded just
+     * after the DTB.
+     *
+     * We try to place dtb+initrd at 128MB, (or, if we have less RAM,
+     * as high as possible). If there is no space then fallback to
+     * just after the kernel, if there is room, otherwise just before.
      */
-    if ( (start > zimage_end) || (end < zimage_start) )
-        return;
 
-    panic(XENLOG_ERR "The kernel(0x%"PRIpaddr"-0x%"PRIpaddr
-          ") is overlapping the DTB-initrd(0x%"PRIpaddr"-0x%"PRIpaddr")\n",
-          zimage_start, zimage_end, start, end);
+    if ( kernel_end < MIN(mem_start + MB(128), mem_end - total) )
+        addr = MIN(mem_start + MB(128), mem_end - total);
+    else if ( mem_end - ROUNDUP(kernel_end, MB(2)) >= total )
+        addr = ROUNDUP(kernel_end, MB(2));
+    else if ( kernel_start - mem_start >= total )
+        addr = kernel_start - total;
+    else
+    {
+        panic("Unable to find suitable location for dtb+initrd.");
+        return;
+    }
+
+    info->dtb_paddr = addr;
+    info->initrd_paddr = info->dtb_paddr + dtb_len;
 }
 
 static void kernel_zimage_load(struct kernel_info *info)
@@ -97,6 +127,8 @@ static void kernel_zimage_load(struct kernel_info *info)
     paddr_t attr = info->load_attr;
     paddr_t len = info->zimage.len;
     unsigned long offs;
+
+    place_modules(info, load_addr, load_addr + len);
 
     printk("Loading zImage from %"PRIpaddr" to %"PRIpaddr"-%"PRIpaddr"\n",
            paddr, load_addr, load_addr + len);
@@ -176,7 +208,6 @@ static int kernel_try_zimage64_prepare(struct kernel_info *info,
 
     info->entry = info->zimage.load_addr;
     info->load = kernel_zimage_load;
-    info->check_overlap = kernel_zimage_check_overlap;
 
     info->type = DOMAIN_PV64;
 
@@ -236,17 +267,7 @@ static int kernel_try_zimage32_prepare(struct kernel_info *info,
         paddr_t load_end;
 
         load_end = info->mem.bank[0].start + info->mem.bank[0].size;
-        load_end = MIN(info->mem.bank[0].start + (128<<20), load_end);
-
-        /*
-         * FDT is loaded above 128M or as high as possible, so the
-         * only way we can clash is if we have <=128MB, in which case
-         * FDT will be right at the end and so dtb_paddr will be below
-         * the proposed kernel load address. Move the kernel down if
-         * necessary.
-         */
-        if ( load_end >= info->dtb_paddr )
-            load_end = info->dtb_paddr;
+        load_end = MIN(info->mem.bank[0].start + MB(128), load_end);
 
         info->zimage.load_addr = load_end - end;
         /* Align to 2MB */
@@ -258,7 +279,6 @@ static int kernel_try_zimage32_prepare(struct kernel_info *info,
 
     info->entry = info->zimage.load_addr;
     info->load = kernel_zimage_load;
-    info->check_overlap = kernel_zimage_check_overlap;
 
 #ifdef CONFIG_ARM_64
     info->type = DOMAIN_PV32;
@@ -269,10 +289,15 @@ static int kernel_try_zimage32_prepare(struct kernel_info *info,
 
 static void kernel_elf_load(struct kernel_info *info)
 {
+    place_modules(info,
+                  info->elf.parms.virt_kstart,
+                  info->elf.parms.virt_kend);
+
     printk("Loading ELF image into guest memory\n");
     info->elf.elf.dest_base = (void*)(unsigned long)info->elf.parms.virt_kstart;
     info->elf.elf.dest_size =
          info->elf.parms.virt_kend - info->elf.parms.virt_kstart;
+
     elf_load_binary(&info->elf.elf);
 
     printk("Free temporary kernel buffer\n");
@@ -321,7 +346,6 @@ static int kernel_try_elf_prepare(struct kernel_info *info,
      */
     info->entry = info->elf.parms.virt_entry;
     info->load = kernel_elf_load;
-    info->check_overlap = NULL;
 
     if ( elf_check_broken(&info->elf.elf) )
         printk("Xen: warning: ELF kernel broken: %s\n",

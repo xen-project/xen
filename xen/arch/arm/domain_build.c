@@ -81,11 +81,8 @@ struct vcpu *__init alloc_dom0_vcpu0(void)
     return alloc_vcpu(dom0, 0, 0);
 }
 
-static int set_memory_reg_11(struct domain *d, struct kernel_info *kinfo,
-                             const struct dt_property *pp,
-                             const struct dt_device_node *np, __be32 *new_cell)
+static void allocate_memory_11(struct domain *d, struct kernel_info *kinfo)
 {
-    int reg_size = dt_cells_to_size(dt_n_addr_cells(np) + dt_n_size_cells(np));
     paddr_t start;
     paddr_t size;
     struct page_info *pg = NULL;
@@ -116,53 +113,61 @@ static int set_memory_reg_11(struct domain *d, struct kernel_info *kinfo,
     if ( res )
         panic("Unable to add pages in DOM0: %d\n", res);
 
-    dt_set_range(&new_cell, np, start, size);
-
     kinfo->mem.bank[0].start = start;
     kinfo->mem.bank[0].size = size;
     kinfo->mem.nr_banks = 1;
 
-    return reg_size;
+    kinfo->unassigned_mem -= size;
 }
 
-static int set_memory_reg(struct domain *d, struct kernel_info *kinfo,
-                          const struct dt_property *pp,
-                          const struct dt_device_node *np, __be32 *new_cell)
+static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
 {
-    int reg_size = dt_cells_to_size(dt_n_addr_cells(np) + dt_n_size_cells(np));
-    int l = 0;
+
+    struct dt_device_node *memory = NULL;
+    const void *reg;
+    u32 reg_len, reg_size;
     unsigned int bank = 0;
-    u64 start;
-    u64 size;
-    int ret;
 
     if ( platform_has_quirk(PLATFORM_QUIRK_DOM0_MAPPING_11) )
-        return set_memory_reg_11(d, kinfo, pp, np, new_cell);
+        return allocate_memory_11(d, kinfo);
 
-    while ( kinfo->unassigned_mem > 0 && l + reg_size <= pp->length
-            && kinfo->mem.nr_banks < NR_MEM_BANKS )
+    while ( (memory = dt_find_node_by_type(memory, "memory")) )
     {
-        ret = dt_device_get_address(np, bank, &start, &size);
-        if ( ret )
-            panic("Unable to retrieve the bank %u for %s\n",
-                  bank, dt_node_full_name(np));
+        int l;
 
-        if ( size > kinfo->unassigned_mem )
-            size = kinfo->unassigned_mem;
-        dt_set_range(&new_cell, np, start, size);
+        DPRINT("memory node\n");
 
-        printk("Populate P2M %#"PRIx64"->%#"PRIx64"\n", start, start + size);
-        if ( p2m_populate_ram(d, start, start + size) < 0 )
-            panic("Failed to populate P2M\n");
-        kinfo->mem.bank[kinfo->mem.nr_banks].start = start;
-        kinfo->mem.bank[kinfo->mem.nr_banks].size = size;
-        kinfo->mem.nr_banks++;
-        kinfo->unassigned_mem -= size;
+        reg_size = dt_cells_to_size(dt_n_addr_cells(memory) + dt_n_size_cells(memory));
 
-        l += reg_size;
+        reg = dt_get_property(memory, "reg", &reg_len);
+        if ( reg == NULL )
+            panic("Memory node has no reg property!\n");
+
+        for ( l = 0;
+              kinfo->unassigned_mem > 0 && l + reg_size <= reg_len
+                  && kinfo->mem.nr_banks < NR_MEM_BANKS;
+              l += reg_size )
+        {
+            paddr_t start, size;
+
+            if ( dt_device_get_address(memory, bank, &start, &size) )
+                panic("Unable to retrieve the bank %u for %s\n",
+                      bank, dt_node_full_name(memory));
+
+            if ( size > kinfo->unassigned_mem )
+                size = kinfo->unassigned_mem;
+
+            printk("Populate P2M %#"PRIx64"->%#"PRIx64"\n",
+                   start, start + size);
+            if ( p2m_populate_ram(d, start, start + size) < 0 )
+                panic("Failed to populate P2M\n");
+            kinfo->mem.bank[kinfo->mem.nr_banks].start = start;
+            kinfo->mem.bank[kinfo->mem.nr_banks].size = size;
+            kinfo->mem.nr_banks++;
+
+            kinfo->unassigned_mem -= size;
+        }
     }
-
-    return l;
 }
 
 static int write_properties(struct domain *d, struct kernel_info *kinfo,
@@ -209,23 +214,6 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
                 if ( !bootargs  && !had_dom0_bootargs )
                     bootargs = pp->value;
                 continue;
-            }
-        }
-        /*
-         * In a memory node: adjust reg property.
-         * TODO: handle properly memory node (ie: device_type = "memory")
-         */
-        else if ( dt_node_name_is_equal(np, "memory") )
-        {
-            if ( dt_property_name_is_equal(pp, "reg") )
-            {
-                new_data = xzalloc_bytes(pp->length);
-                if ( new_data  == NULL )
-                    return -FDT_ERR_XEN(ENOMEM);
-
-                prop_len = set_memory_reg(d, kinfo, pp, np,
-                                          (__be32 *)new_data);
-                prop_data = new_data;
             }
         }
 
@@ -304,6 +292,46 @@ static int fdt_property_interrupts(void *fdt, gic_interrupt_t *intr,
     return res;
 }
 
+static int make_memory_node(const struct domain *d,
+                            void *fdt,
+                            const struct kernel_info *kinfo)
+{
+    int res, i;
+    int nr_cells = XEN_FDT_NODE_REG_SIZE*kinfo->mem.nr_banks;
+    __be32 reg[nr_cells];
+    __be32 *cells;
+
+    DPRINT("Create memory node\n");
+
+    /* ePAPR 3.4 */
+    res = fdt_begin_node(fdt, "memory");
+    if ( res )
+        return res;
+
+    res = fdt_property_string(fdt, "device_type", "memory");
+    if ( res )
+        return res;
+
+    cells = &reg[0];
+    for ( i = 0 ; i < kinfo->mem.nr_banks; i++ )
+    {
+        u64 start = kinfo->mem.bank[i].start;
+        u64 size = kinfo->mem.bank[i].size;
+
+        DPRINT("  Bank %d: %#"PRIx64"->%#"PRIx64"\n",
+                i, start, start + size);
+
+        set_xen_range(&cells, start, size);
+    }
+
+    res = fdt_property(fdt, "reg", reg, nr_cells);
+    if ( res )
+        return res;
+
+    res = fdt_end_node(fdt);
+
+    return res;
+}
 
 static int make_hypervisor_node(void *fdt, const struct dt_device_node *parent)
 {
@@ -627,7 +655,8 @@ static int make_timer_node(const struct domain *d, void *fdt)
 }
 
 static int make_xen_node(const struct domain *d, void *fdt,
-                         const struct dt_device_node *parent)
+                         const struct dt_device_node *parent,
+                         const struct kernel_info *kinfo)
 {
     int res;
 
@@ -646,6 +675,10 @@ static int make_xen_node(const struct domain *d, void *fdt,
         return res;
 
     res = fdt_property(fdt, "ranges", NULL, 0);
+    if ( res )
+        return res;
+
+    res = make_memory_node(d, fdt, kinfo);
     if ( res )
         return res;
 
@@ -750,6 +783,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         DT_MATCH_COMPATIBLE("xen,multiboot-module"),
         DT_MATCH_COMPATIBLE("arm,psci"),
         DT_MATCH_PATH("/cpus"),
+        DT_MATCH_TYPE("memory"),
         DT_MATCH_GIC,
         DT_MATCH_TIMER,
         { /* sentinel */ },
@@ -826,7 +860,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         if ( res )
             return res;
 
-        res = make_xen_node(d, kinfo->fdt, np);
+        res = make_xen_node(d, kinfo->fdt, np, kinfo);
         if ( res )
             return res;
     }
@@ -841,13 +875,8 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
     const void *fdt;
     int new_size;
     int ret;
-    paddr_t end;
-    paddr_t initrd_len;
-    paddr_t dtb_len;
 
     ASSERT(dt_host && (dt_host->sibling == NULL));
-
-    kinfo->unassigned_mem = dom0_mem;
 
     fdt = device_tree_flattened;
 
@@ -869,36 +898,6 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
     ret = fdt_finish(kinfo->fdt);
     if ( ret < 0 )
         goto err;
-
-    /* Align DTB and initrd size to 2Mb. Linux only requires 4 byte alignment */
-    initrd_len = ROUNDUP(early_info.modules.module[MOD_INITRD].size, MB(2));
-    dtb_len = ROUNDUP(fdt_totalsize(kinfo->fdt), MB(2));
-    new_size = initrd_len + dtb_len;
-
-    /*
-     * DTB must be loaded such that it does not conflict with the
-     * kernel decompressor. For 32-bit Linux Documentation/arm/Booting
-     * recommends just after the 128MB boundary while for 64-bit Linux
-     * the recommendation in Documentation/arm64/booting.txt is below
-     * 512MB. Place at 128MB, (or, if we have less RAM, as high as
-     * possible) in order to satisfy both.
-     * If the bootloader provides an initrd, it will be loaded just
-     * after the DTB.
-     */
-    end = kinfo->mem.bank[0].start + kinfo->mem.bank[0].size;
-    end = MIN(kinfo->mem.bank[0].start + (128<<20) + new_size, end);
-
-    kinfo->initrd_paddr = end - initrd_len;
-    kinfo->dtb_paddr = kinfo->initrd_paddr - dtb_len;
-
-    if ( kinfo->dtb_paddr < kinfo->mem.bank[0].start ||
-         kinfo->mem.bank[0].start + new_size > end )
-    {
-        printk(XENLOG_ERR "Not enough memory in the first bank for "
-               "the device tree.");
-        ret = -FDT_ERR_XEN(EINVAL);
-        goto err;
-    }
 
     return 0;
 
@@ -994,20 +993,25 @@ int construct_dom0(struct domain *d)
 
     d->max_pages = ~0U;
 
-    rc = prepare_dtb(d, &kinfo);
+    kinfo.unassigned_mem = dom0_mem;
+
+    allocate_memory(d, &kinfo);
+
+    rc = kernel_prepare(&kinfo);
     if ( rc < 0 )
         return rc;
 
-    rc = kernel_prepare(&kinfo);
+#ifdef CONFIG_ARM_64
+    d->arch.type = kinfo.type;
+#endif
+
+    rc = prepare_dtb(d, &kinfo);
     if ( rc < 0 )
         return rc;
 
     rc = platform_specific_mapping(d);
     if ( rc < 0 )
         return rc;
-
-    if ( kinfo.check_overlap )
-        kinfo.check_overlap(&kinfo);
 
     /* The following loads use the domain's p2m */
     p2m_load_VTTBR(d);
@@ -1019,6 +1023,10 @@ int construct_dom0(struct domain *d)
         WRITE_SYSREG(READ_SYSREG(HCR_EL2) | HCR_RW, HCR_EL2);
 #endif
 
+    /*
+     * kernel_load will determine the placement of the initrd & fdt in
+     * RAM, so call it first.
+     */
     kernel_load(&kinfo);
     /* initrd_load will fix up the fdt, so call it before dtb_load */
     initrd_load(&kinfo);
@@ -1032,7 +1040,6 @@ int construct_dom0(struct domain *d)
     memset(regs, 0, sizeof(*regs));
 
     regs->pc = (register_t)kinfo.entry;
-
 
     if ( is_pv32_domain(d) )
     {
