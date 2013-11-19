@@ -550,7 +550,7 @@ void arch_domain_destroy(struct domain *d)
     free_xenheap_page(d->shared_info);
 }
 
-static int is_guest_psr(uint32_t psr)
+static int is_guest_pv32_psr(uint32_t psr)
 {
     switch (psr & PSR_MODE_MASK)
     {
@@ -569,6 +569,29 @@ static int is_guest_psr(uint32_t psr)
     }
 }
 
+
+#ifdef CONFIG_ARM_64
+static int is_guest_pv64_psr(uint32_t psr)
+{
+    if ( psr & PSR_MODE_BIT )
+        return 0;
+
+    switch (psr & PSR_MODE_MASK)
+    {
+    case PSR_MODE_EL1h:
+    case PSR_MODE_EL1t:
+    case PSR_MODE_EL0t:
+        return 1;
+    case PSR_MODE_EL3h:
+    case PSR_MODE_EL3t:
+    case PSR_MODE_EL2h:
+    case PSR_MODE_EL2t:
+    default:
+        return 0;
+    }
+}
+#endif
+
 /*
  * Initialise VCPU state. The context can be supplied by either the
  * toolstack (XEN_DOMCTL_setvcpucontext) or the guest
@@ -580,19 +603,32 @@ int arch_set_info_guest(
     struct vcpu_guest_context *ctxt = c.nat;
     struct vcpu_guest_core_regs *regs = &c.nat->user_regs;
 
-    if ( !is_guest_psr(regs->cpsr) )
-        return -EINVAL;
+    if ( is_pv32_domain(v->domain) )
+    {
+        if ( !is_guest_pv32_psr(regs->cpsr) )
+            return -EINVAL;
 
-    if ( regs->spsr_svc && !is_guest_psr(regs->spsr_svc) )
-        return -EINVAL;
-    if ( regs->spsr_abt && !is_guest_psr(regs->spsr_abt) )
-        return -EINVAL;
-    if ( regs->spsr_und && !is_guest_psr(regs->spsr_und) )
-        return -EINVAL;
-    if ( regs->spsr_irq && !is_guest_psr(regs->spsr_irq) )
-        return -EINVAL;
-    if ( regs->spsr_fiq && !is_guest_psr(regs->spsr_fiq) )
-        return -EINVAL;
+        if ( regs->spsr_svc && !is_guest_pv32_psr(regs->spsr_svc) )
+            return -EINVAL;
+        if ( regs->spsr_abt && !is_guest_pv32_psr(regs->spsr_abt) )
+            return -EINVAL;
+        if ( regs->spsr_und && !is_guest_pv32_psr(regs->spsr_und) )
+            return -EINVAL;
+        if ( regs->spsr_irq && !is_guest_pv32_psr(regs->spsr_irq) )
+            return -EINVAL;
+        if ( regs->spsr_fiq && !is_guest_pv32_psr(regs->spsr_fiq) )
+            return -EINVAL;
+    }
+#ifdef CONFIG_ARM_64
+    else
+    {
+        if ( !is_guest_pv64_psr(regs->cpsr) )
+            return -EINVAL;
+
+        if ( regs->spsr_el1 && !is_guest_pv64_psr(regs->spsr_el1) )
+            return -EINVAL;
+    }
+#endif
 
     vcpu_regs_user_to_hyp(v, regs);
 
