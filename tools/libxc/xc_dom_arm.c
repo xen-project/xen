@@ -105,7 +105,7 @@ static int shared_info_arm(struct xc_dom_image *dom, void *ptr)
 
 /* ------------------------------------------------------------------------ */
 
-static int vcpu_arm(struct xc_dom_image *dom, void *ptr)
+static int vcpu_arm32(struct xc_dom_image *dom, void *ptr)
 {
     vcpu_guest_context_t *ctxt = ptr;
 
@@ -143,6 +143,41 @@ static int vcpu_arm(struct xc_dom_image *dom, void *ptr)
     return 0;
 }
 
+static int vcpu_arm64(struct xc_dom_image *dom, void *ptr)
+{
+    vcpu_guest_context_t *ctxt = ptr;
+
+    DOMPRINTF_CALLED(dom->xch);
+    /* clear everything */
+    memset(ctxt, 0, sizeof(*ctxt));
+
+    ctxt->user_regs.pc64 = dom->parms.virt_entry;
+
+    /* Linux boot protocol. See linux.Documentation/arm64/booting.txt. */
+    ctxt->user_regs.x0 = dom->devicetree_blob ?
+        dom->devicetree_seg.vstart : 0xffffffff;
+    ctxt->user_regs.x1 = 0;
+    ctxt->user_regs.x2 = 0;
+    ctxt->user_regs.x3 = 0;
+
+    DOMPRINTF("DTB %"PRIx64, ctxt->user_regs.x0);
+
+    ctxt->sctlr = SCTLR_GUEST_INIT;
+
+    ctxt->ttbr0 = 0;
+    ctxt->ttbr1 = 0;
+    ctxt->ttbcr = 0; /* Defined Reset Value */
+
+    ctxt->user_regs.cpsr = PSR_GUEST64_INIT;
+
+    ctxt->flags = VGCF_online;
+
+    DOMPRINTF("Initial state CPSR %#"PRIx32" PC %#"PRIx64,
+           ctxt->user_regs.cpsr, ctxt->user_regs.pc64);
+
+    return 0;
+}
+
 /* ------------------------------------------------------------------------ */
 
 static struct xc_dom_arch xc_dom_32 = {
@@ -155,18 +190,69 @@ static struct xc_dom_arch xc_dom_32 = {
     .setup_pgtables = setup_pgtables_arm,
     .start_info = start_info_arm,
     .shared_info = shared_info_arm,
-    .vcpu = vcpu_arm,
+    .vcpu = vcpu_arm32,
+};
+
+static struct xc_dom_arch xc_dom_64 = {
+    .guest_type = "xen-3.0-aarch64",
+    .native_protocol = XEN_IO_PROTO_ABI_ARM,
+    .page_shift = PAGE_SHIFT_ARM,
+    .sizeof_pfn = 8,
+    .alloc_magic_pages = alloc_magic_pages,
+    .count_pgtables = count_pgtables_arm,
+    .setup_pgtables = setup_pgtables_arm,
+    .start_info = start_info_arm,
+    .shared_info = shared_info_arm,
+    .vcpu = vcpu_arm64,
 };
 
 static void __init register_arch_hooks(void)
 {
     xc_dom_register_arch_hooks(&xc_dom_32);
+    xc_dom_register_arch_hooks(&xc_dom_64);
+}
+
+static int set_mode(xc_interface *xch, domid_t domid, char *guest_type)
+{
+    static const struct {
+        char           *guest;
+        uint32_t        size;
+    } types[] = {
+        { "xen-3.0-aarch64", 64 },
+        { "xen-3.0-armv7l",  32 },
+    };
+    DECLARE_DOMCTL;
+    int i,rc;
+
+    domctl.domain = domid;
+    domctl.cmd    = XEN_DOMCTL_set_address_size;
+    for ( i = 0; i < sizeof(types)/sizeof(types[0]); i++ )
+        if ( !strcmp(types[i].guest, guest_type) )
+            domctl.u.address_size.size = types[i].size;
+    if ( domctl.u.address_size.size == 0 )
+    {
+        xc_dom_printf(xch, "%s: warning: unknown guest type %s",
+                      __FUNCTION__, guest_type);
+        return -EINVAL;
+    }
+
+    xc_dom_printf(xch, "%s: guest %s, address size %" PRId32 "", __FUNCTION__,
+                  guest_type, domctl.u.address_size.size);
+    rc = do_domctl(xch, &domctl);
+    if ( rc != 0 )
+        xc_dom_printf(xch, "%s: warning: failed (rc=%d)",
+                      __FUNCTION__, rc);
+    return rc;
 }
 
 int arch_setup_meminit(struct xc_dom_image *dom)
 {
     int rc;
     xen_pfn_t pfn, allocsz, i;
+
+    rc = set_mode(dom->xch, dom->guest_domid, dom->guest_type);
+    if ( rc )
+        return rc;
 
     dom->shadow_enabled = 1;
 
