@@ -376,6 +376,17 @@
 #define LIBXL_HAVE_SPICE_VDAGENT 1
 
 /*
+ * LIBXL_HAVE_SPICE_USBREDIRECTION
+ *
+ * If defined, then the libxl_spice_info structure will contain an integer type
+ * field: usbredirection. This value defines if Spice usbredirection is enabled
+ * and with how much channels.
+ *
+ * If this is not defined, the Spice usbredirection support is ignored.
+ */
+#define LIBXL_HAVE_SPICE_USBREDIREDIRECTION 1
+
+/*
  * LIBXL_HAVE_DOMAIN_CREATE_RESTORE_PARAMS 1
  *
  * If this is defined, libxl_domain_create_restore()'s API has changed to

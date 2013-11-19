@@ -1176,6 +1176,13 @@ requires vdagent service installed on domU o.s. to work. The default is 0.
 Enables Spice clipboard sharing (copy/paste). It requires spicevdagent
 enabled. The default is false (0).
 
+=item B<spiceusbredirection=NUMBER>
+
+Enables spice usbredirection. Creates NUMBER usbredirection channels
+for redirection of up to 4 usb devices from spice client to domU's qemu.
+It requires an usb controller and if not defined it will automatically adds
+an usb2 controller. The default is disabled (0).
+
 =back
 
 =head3 Miscellaneous Emulated Hardware

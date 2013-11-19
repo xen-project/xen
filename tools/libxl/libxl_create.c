@@ -284,12 +284,16 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_defbool_setdefault(&b_info->u.hvm.usb,                false);
         libxl_defbool_setdefault(&b_info->u.hvm.xen_platform_pci,   true);
 
-        if (b_info->u.hvm.usbversion &&
+        if (!b_info->u.hvm.usbversion &&
+            (b_info->u.hvm.spice.usbredirection > 0) )
+            b_info->u.hvm.usbversion = 2;
+
+        if ((b_info->u.hvm.usbversion || b_info->u.hvm.spice.usbredirection) &&
             ( libxl_defbool_val(b_info->u.hvm.usb)
             || b_info->u.hvm.usbdevice_list
             || b_info->u.hvm.usbdevice) ){
-            LOG(ERROR,"usbversion cannot be enabled with usb or"
-            "usbdevice parameters.");
+            LOG(ERROR,"usbversion and/or usbredirection cannot be "
+            "enabled with usb and/or usbdevice parameters.");
             return ERROR_INVAL;
         }
 

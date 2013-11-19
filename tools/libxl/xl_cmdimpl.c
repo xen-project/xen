@@ -1586,6 +1586,8 @@ skip_vfb:
                             &b_info->u.hvm.spice.vdagent, 0);
         xlu_cfg_get_defbool(config, "spice_clipboard_sharing",
                             &b_info->u.hvm.spice.clipboard_sharing, 0);
+        if (!xlu_cfg_get_long (config, "spiceusbredirection", &l, 0))
+            b_info->u.hvm.spice.usbredirection = l;
         xlu_cfg_get_defbool(config, "nographic", &b_info->u.hvm.nographic, 0);
         xlu_cfg_get_defbool(config, "gfx_passthru", 
                             &b_info->u.hvm.gfx_passthru, 0);
