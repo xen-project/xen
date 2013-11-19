@@ -124,7 +124,8 @@ static int vcpu_arm(struct xc_dom_image *dom, void *ptr)
      * using CONFIG_ARM_APPENDED_DTB. Ensure that r2 does not look
      * like a valid pointer to a set of ATAGS or a DTB.
      */
-    ctxt->user_regs.r2_usr = 0xffffffff;
+    ctxt->user_regs.r2_usr = dom->devicetree_blob ?
+        dom->devicetree_seg.vstart : 0xffffffff;
 
     ctxt->sctlr = SCTLR_GUEST_INIT;
 
@@ -189,6 +190,25 @@ int arch_setup_meminit(struct xc_dom_image *dom)
         rc = xc_domain_populate_physmap_exact(
             dom->xch, dom->guest_domid, allocsz,
             0, 0, &dom->p2m_host[i]);
+    }
+
+    if ( dom->devicetree_blob )
+    {
+        const uint64_t rambase = dom->rambase_pfn << XC_PAGE_SHIFT;
+        const uint64_t ramend = rambase + ( dom->total_pages << XC_PAGE_SHIFT );
+        const uint64_t dtbsize = ( dom->devicetree_size + 3 ) & ~0x3;
+
+        /* Place at 128MB if there is sufficient RAM */
+        if ( ramend >= rambase + 128*1024*1024 + dtbsize )
+            dom->devicetree_seg.vstart = rambase + 128*1024*1024;
+        else /* otherwise at top of RAM */
+            dom->devicetree_seg.vstart = ramend - dtbsize;
+
+        dom->devicetree_seg.vend =
+            dom->devicetree_seg.vstart + dom->devicetree_size;
+        DOMPRINTF("%s: devicetree: 0x%" PRIx64 " -> 0x%" PRIx64 "",
+                  __FUNCTION__,
+                  dom->devicetree_seg.vstart, dom->devicetree_seg.vend);
     }
 
     return 0;
