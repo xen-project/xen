@@ -139,6 +139,7 @@ static int kernel_try_zimage64_prepare(struct kernel_info *info,
         uint64_t text_offset;  /* Image load offset */
         uint64_t res1;
         uint64_t res2;
+        /* zImage V1 only from here */
         uint64_t res3;
         uint64_t res4;
         uint64_t res5;
