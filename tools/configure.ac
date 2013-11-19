@@ -227,6 +227,12 @@ AC_CHECK_LIB([z], [deflateCopy], [], [AC_MSG_ERROR([Could not find zlib])])
 AC_CHECK_LIB([iconv], [libiconv_open], [libiconv="y"], [libiconv="n"])
 AC_SUBST(libiconv)
 
+# FDT is needed only on ARM
+case "$host_cpu" in
+arm*|aarch64)
+AC_CHECK_LIB([fdt], [fdt_create], [], [AC_MSG_ERROR([Could not find libfdt])])
+esac
+
 # Checks for header files.
 AC_CHECK_HEADERS([yajl/yajl_version.h sys/eventfd.h])
 
