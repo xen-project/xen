@@ -731,6 +731,10 @@ void arch_get_xen_caps(xen_capabilities_info_t *info)
 
     (*info)[0] = '\0';
 
+#ifdef CONFIG_ARM_64
+    snprintf(s, sizeof(s), "xen-%d.%d-aarch64 ", major, minor);
+    safe_strcat(*info, s);
+#endif
     snprintf(s, sizeof(s), "xen-%d.%d-armv7l ", major, minor);
     safe_strcat(*info, s);
 }
