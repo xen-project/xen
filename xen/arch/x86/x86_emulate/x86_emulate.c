@@ -3571,7 +3571,6 @@ x86_emulate(
             _regs.eip = src.val;
             src.val = dst.val;
             goto push;
-            break;
         case 4: /* jmp (near) */
             _regs.eip = src.val;
             dst.type = OP_NONE;
@@ -3580,9 +3579,9 @@ x86_emulate(
         case 5: /* jmp (far, absolute indirect) */ {
             unsigned long sel;
 
-            generate_exception_if(dst.type != OP_MEM, EXC_UD, -1);
+            generate_exception_if(src.type != OP_MEM, EXC_UD, -1);
 
-            if ( (rc = read_ulong(dst.mem.seg, dst.mem.off+dst.bytes,
+            if ( (rc = read_ulong(src.mem.seg, src.mem.off + op_bytes,
                                   &sel, 2, ctxt, ops)) )
                 goto done;
 
@@ -3600,7 +3599,7 @@ x86_emulate(
 
             if ( (rc = load_seg(x86_seg_cs, sel, ctxt, ops)) != 0 )
                 goto done;
-            _regs.eip = dst.val;
+            _regs.eip = src.val;
 
             dst.type = OP_NONE;
             break;
