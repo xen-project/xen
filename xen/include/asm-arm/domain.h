@@ -112,6 +112,7 @@ struct arch_domain
         spinlock_t                  lock;
     } vuart;
 
+    unsigned int evtchn_irq;
 }  __cacheline_aligned;
 
 struct arch_vcpu

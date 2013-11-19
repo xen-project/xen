@@ -129,9 +129,6 @@
 #define GICH_LR_CPUID_SHIFT     9
 #define GICH_VTR_NRLRGS         0x3f
 
-/* XXX: write this into the DT */
-#define VGIC_IRQ_EVTCHN_CALLBACK 31
-
 #ifndef __ASSEMBLY__
 #include <xen/device_tree.h>
 

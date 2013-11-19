@@ -717,7 +717,7 @@ int gic_events_need_delivery(void)
 void gic_inject(void)
 {
     if ( vcpu_info(current, evtchn_upcall_pending) )
-        vgic_vcpu_inject_irq(current, VGIC_IRQ_EVTCHN_CALLBACK, 1);
+        vgic_vcpu_inject_irq(current, current->domain->arch.evtchn_irq, 1);
 
     gic_restore_pending_irqs(current);
     if (!gic_events_need_delivery())
@@ -823,13 +823,20 @@ void gic_interrupt(struct cpu_user_regs *regs, int is_fiq)
 
 int gicv_setup(struct domain *d)
 {
-    /* TODO: Retrieve distributor and CPU guest base address from the
-     * guest DTS
-     * For the moment we use dom0 DTS
+    /*
+     * Domain 0 gets the hardware address.
+     * Guests get the virtual platform layout.
      */
-    d->arch.vgic.dbase = gic.dbase;
-    d->arch.vgic.cbase = gic.cbase;
-
+    if ( d == dom0 )
+    {
+        d->arch.vgic.dbase = gic.dbase;
+        d->arch.vgic.cbase = gic.cbase;
+    }
+    else
+    {
+        d->arch.vgic.dbase = GUEST_GICD_BASE;
+        d->arch.vgic.cbase = GUEST_GICC_BASE;
+    }
 
     d->arch.vgic.nr_lines = 0;
 

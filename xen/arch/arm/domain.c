@@ -461,7 +461,8 @@ int vcpu_initialise(struct vcpu *v)
     if ( is_idle_vcpu(v) )
         return rc;
 
-    v->arch.sctlr = SCTLR_BASE;
+    v->arch.sctlr = SCTLR_GUEST_INIT;
+
     /*
      * By default exposes an SMP system with AFF0 set to the VCPU ID
      * TODO: Handle multi-threading processor and cluster
@@ -524,6 +525,9 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 
     if ( (rc = vcpu_domain_init(d)) != 0 )
         goto fail;
+
+    /* XXX dom0 needs more intelligent selection of PPI */
+    d->arch.evtchn_irq = GUEST_EVTCHN_PPI;
 
     /*
      * Virtual UART is only used by linux early printk and decompress code.
@@ -740,7 +744,7 @@ void vcpu_mark_events_pending(struct vcpu *v)
     if ( already_pending )
         return;
 
-    vgic_vcpu_inject_irq(v, VGIC_IRQ_EVTCHN_CALLBACK, 1);
+    vgic_vcpu_inject_irq(v, v->domain->arch.evtchn_irq, 1);
 }
 
 /*

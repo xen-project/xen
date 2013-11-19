@@ -333,7 +333,8 @@ static int make_memory_node(const struct domain *d,
     return res;
 }
 
-static int make_hypervisor_node(void *fdt, const struct dt_device_node *parent)
+static int make_hypervisor_node(struct domain *d,
+                                void *fdt, const struct dt_device_node *parent)
 {
     const char compat[] =
         "xen,xen-"__stringify(XEN_VERSION)"."__stringify(XEN_SUBVERSION)"\0"
@@ -381,8 +382,8 @@ static int make_hypervisor_node(void *fdt, const struct dt_device_node *parent)
      *
      * TODO: Handle correctly the cpumask
      */
-    DPRINT("  Event channel interrupt to %u\n", VGIC_IRQ_EVTCHN_CALLBACK);
-    set_interrupt_ppi(intr, VGIC_IRQ_EVTCHN_CALLBACK, 0xf,
+    DPRINT("  Event channel interrupt to %u\n", d->arch.evtchn_irq);
+    set_interrupt_ppi(intr, d->arch.evtchn_irq, 0xf,
                    DT_IRQ_TYPE_LEVEL_LOW);
 
     res = fdt_property_interrupts(fdt, &intr, 1);
@@ -413,11 +414,11 @@ static int make_psci_node(void *fdt, const struct dt_device_node *parent)
     if ( res )
         return res;
 
-    res = fdt_property_cell(fdt, "cpu_off", __PSCI_cpu_off);
+    res = fdt_property_cell(fdt, "cpu_off", PSCI_cpu_off);
     if ( res )
         return res;
 
-    res = fdt_property_cell(fdt, "cpu_on", __PSCI_cpu_on);
+    res = fdt_property_cell(fdt, "cpu_on", PSCI_cpu_on);
     if ( res )
         return res;
 
@@ -855,7 +856,7 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
 
     if ( np == dt_host )
     {
-        res = make_hypervisor_node(kinfo->fdt, np);
+        res = make_hypervisor_node(d, kinfo->fdt, np);
         if ( res )
             return res;
 

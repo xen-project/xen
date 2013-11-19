@@ -54,21 +54,26 @@ int vcpu_domain_init(struct domain *d)
 int vcpu_vtimer_init(struct vcpu *v)
 {
     struct vtimer *t = &v->arch.phys_timer;
+    bool_t d0 = (v->domain == dom0);
 
-    /* TODO: Retrieve physical and virtual timer IRQ from the guest
-     * DT. For the moment we use dom0 DT
+    /*
+     * Domain 0 uses the hardware interrupts, guests get the virtual platform.
      */
 
     init_timer(&t->timer, phys_timer_expired, t, v->processor);
     t->ctl = 0;
     t->cval = NOW();
-    t->irq = timer_dt_irq(TIMER_PHYS_NONSECURE_PPI)->irq;
+    t->irq = d0
+        ? timer_dt_irq(TIMER_PHYS_NONSECURE_PPI)->irq
+        : GUEST_TIMER_PHYS_NS_PPI;
     t->v = v;
 
     t = &v->arch.virt_timer;
     init_timer(&t->timer, virt_timer_expired, t, v->processor);
     t->ctl = 0;
-    t->irq = timer_dt_irq(TIMER_VIRT_PPI)->irq;
+    t->irq = d0
+        ? timer_dt_irq(TIMER_VIRT_PPI)->irq
+        : GUEST_TIMER_VIRT_PPI;
     t->v = v;
 
     return 0;

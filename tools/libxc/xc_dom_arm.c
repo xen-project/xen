@@ -126,13 +126,13 @@ static int vcpu_arm(struct xc_dom_image *dom, void *ptr)
      */
     ctxt->user_regs.r2_usr = 0xffffffff;
 
-    ctxt->sctlr = /* #define SCTLR_BASE */0x00c50078;
+    ctxt->sctlr = SCTLR_GUEST_INIT;
 
     ctxt->ttbr0 = 0;
     ctxt->ttbr1 = 0;
     ctxt->ttbcr = 0; /* Defined Reset Value */
 
-    ctxt->user_regs.cpsr = PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_SVC;
+    ctxt->user_regs.cpsr = PSR_GUEST32_INIT;
 
     ctxt->flags = VGCF_online;
 

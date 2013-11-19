@@ -302,7 +302,18 @@ typedef uint64_t xen_callback_t;
 
 #endif
 
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
+
 /* PSR bits (CPSR, SPSR)*/
+
+#define PSR_THUMB       (1<<5)        /* Thumb Mode enable */
+#define PSR_FIQ_MASK    (1<<6)        /* Fast Interrupt mask */
+#define PSR_IRQ_MASK    (1<<7)        /* Interrupt mask */
+#define PSR_ABT_MASK    (1<<8)        /* Asynchronous Abort mask */
+#define PSR_BIG_ENDIAN  (1<<9)        /* arm32: Big Endian Mode */
+#define PSR_DBG_MASK    (1<<9)        /* arm64: Debug Exception mask */
+#define PSR_IT_MASK     (0x0600fc00)  /* Thumb If-Then Mask */
+#define PSR_JAZELLE     (1<<24)       /* Jazelle Mode */
 
 /* 32 bit modes */
 #define PSR_MODE_USR 0x10
@@ -316,7 +327,6 @@ typedef uint64_t xen_callback_t;
 #define PSR_MODE_SYS 0x1f
 
 /* 64 bit modes */
-#ifdef __aarch64__
 #define PSR_MODE_BIT  0x10 /* Set iff AArch32 */
 #define PSR_MODE_EL3h 0x0d
 #define PSR_MODE_EL3t 0x0c
@@ -325,18 +335,44 @@ typedef uint64_t xen_callback_t;
 #define PSR_MODE_EL1h 0x05
 #define PSR_MODE_EL1t 0x04
 #define PSR_MODE_EL0t 0x00
-#endif
 
-#define PSR_THUMB       (1<<5)        /* Thumb Mode enable */
-#define PSR_FIQ_MASK    (1<<6)        /* Fast Interrupt mask */
-#define PSR_IRQ_MASK    (1<<7)        /* Interrupt mask */
-#define PSR_ABT_MASK    (1<<8)        /* Asynchronous Abort mask */
-#define PSR_BIG_ENDIAN  (1<<9)        /* Big Endian Mode */
-#ifdef __aarch64__ /* For Aarch64 bit 9 is repurposed. */
-#define PSR_DBG_MASK    (1<<9)
+#define PSR_GUEST32_INIT  (PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_SVC)
+#define PSR_GUEST64_INIT (PSR_ABT_MASK|PSR_FIQ_MASK|PSR_IRQ_MASK|PSR_MODE_EL1h)
+
+#define SCTLR_GUEST_INIT    0x00c50078
+
+/*
+ * Virtual machine platform (memory layout, interrupts)
+ *
+ * These are defined for consistency between the tools and the
+ * hypervisor. Guests must not rely on these hardcoded values but
+ * should instead use the FDT.
+ */
+
+/* Physical Address Space */
+#define GUEST_GICD_BASE   0x2c001000ULL
+#define GUEST_GICD_SIZE   0x1000ULL
+#define GUEST_GICC_BASE   0x2c002000ULL
+#define GUEST_GICC_SIZE   0x100ULL
+
+#define GUEST_RAM_BASE    0x80000000ULL
+
+#define GUEST_GNTTAB_BASE 0xb0000000ULL
+#define GUEST_GNTTAB_SIZE 0x00020000ULL
+
+/* Interrupts */
+#define GUEST_TIMER_VIRT_PPI    27
+#define GUEST_TIMER_PHYS_S_PPI  29
+#define GUEST_TIMER_PHYS_NS_PPI 30
+#define GUEST_EVTCHN_PPI        31
+
+/* PSCI functions */
+#define PSCI_cpu_suspend 0
+#define PSCI_cpu_off     1
+#define PSCI_cpu_on      2
+#define PSCI_migrate     3
+
 #endif
-#define PSR_IT_MASK     (0x0600fc00)  /* Thumb If-Then Mask */
-#define PSR_JAZELLE     (1<<24)       /* Jazelle Mode */
 
 #endif /*  __XEN_PUBLIC_ARCH_ARM_H__ */
 

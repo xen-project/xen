@@ -867,7 +867,7 @@ typedef struct {
 } arm_psci_t;
 
 #define PSCI(_name, _nr_args)                                  \
-    [ __PSCI_ ## _name ] =  {                                  \
+    [ PSCI_ ## _name ] =  {                                    \
         .fn = (arm_psci_fn_t) &do_psci_ ## _name,              \
         .nr_args = _nr_args,                                   \
     }

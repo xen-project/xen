@@ -43,7 +43,7 @@ int do_psci_cpu_on(uint32_t vcpuid, register_t entry_point)
 
     memset(ctxt, 0, sizeof(*ctxt));
     ctxt->user_regs.pc64 = (u64) entry_point;
-    ctxt->sctlr = SCTLR_BASE;
+    ctxt->sctlr = SCTLR_GUEST_INIT;
     ctxt->ttbr0 = 0;
     ctxt->ttbr1 = 0;
     ctxt->ttbcr = 0; /* Defined Reset Value */

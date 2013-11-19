@@ -15,7 +15,8 @@ static inline int vcpu_event_delivery_is_enabled(struct vcpu *v)
 
 static inline int local_events_need_delivery_nomask(void)
 {
-    struct pending_irq *p = irq_to_pending(current, VGIC_IRQ_EVTCHN_CALLBACK);
+    struct pending_irq *p = irq_to_pending(current,
+                                           current->domain->arch.evtchn_irq);
 
     /* XXX: if the first interrupt has already been delivered, we should
      * check whether any other interrupts with priority higher than the
