@@ -513,6 +513,13 @@ static int make_cpus_node(const struct domain *d, void *fdt,
                 return res;
         }
 
+        if ( is_pv64_domain(d) )
+        {
+            res = fdt_property_string(fdt, "enable-method", "psci");
+            if ( res )
+                return res;
+        }
+
         res = fdt_end_node(fdt);
         if ( res )
             return res;
