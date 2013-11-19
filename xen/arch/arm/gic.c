@@ -827,7 +827,7 @@ int gicv_setup(struct domain *d)
      * Domain 0 gets the hardware address.
      * Guests get the virtual platform layout.
      */
-    if ( d == dom0 )
+    if ( d->domain_id == 0 )
     {
         d->arch.vgic.dbase = gic.dbase;
         d->arch.vgic.cbase = gic.cbase;
