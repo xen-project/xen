@@ -129,6 +129,83 @@ static int xc_dom_parse_zimage32_kernel(struct xc_dom_image *dom)
 }
 
 /* ------------------------------------------------------------ */
+/* 64-bit zImage Support                                        */
+/* ------------------------------------------------------------ */
+
+#define ZIMAGE64_MAGIC_V0 0x14000008
+#define ZIMAGE64_MAGIC_V1 0x644d5241 /* "ARM\x64" */
+
+/* linux/Documentation/arm64/booting.txt */
+struct zimage64_hdr {
+    uint32_t magic0;
+    uint32_t res0;
+    uint64_t text_offset;  /* Image load offset */
+    uint64_t res1;
+    uint64_t res2;
+    /* zImage V1 only from here */
+    uint64_t res3;
+    uint64_t res4;
+    uint64_t res5;
+    uint32_t magic1;
+    uint32_t res6;
+};
+static int xc_dom_probe_zimage64_kernel(struct xc_dom_image *dom)
+{
+    struct zimage64_hdr *zimage;
+
+    if ( dom->kernel_blob == NULL )
+    {
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "%s: no kernel image loaded", __FUNCTION__);
+        return -EINVAL;
+    }
+
+    if ( dom->kernel_size < sizeof(*zimage) )
+    {
+        xc_dom_printf(dom->xch, "%s: kernel image too small", __FUNCTION__);
+        return -EINVAL;
+    }
+
+    zimage =  dom->kernel_blob;
+    if ( zimage->magic0 != ZIMAGE64_MAGIC_V0 &&
+         zimage->magic1 != ZIMAGE64_MAGIC_V1 )
+    {
+        xc_dom_printf(dom->xch, "%s: kernel is not an arm64 Image", __FUNCTION__);
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+static int xc_dom_parse_zimage64_kernel(struct xc_dom_image *dom)
+{
+    struct zimage64_hdr *zimage;
+    uint64_t v_start, v_end;
+    uint64_t rambase = dom->rambase_pfn << XC_PAGE_SHIFT;
+
+    DOMPRINTF_CALLED(dom->xch);
+
+    zimage = dom->kernel_blob;
+
+    v_start = rambase + zimage->text_offset;
+    v_end = v_start + dom->kernel_size;
+
+    dom->kernel_seg.vstart = v_start;
+    dom->kernel_seg.vend   = v_end;
+
+    /* Call the kernel at offset 0 */
+    dom->parms.virt_entry = v_start;
+    dom->parms.virt_base = rambase;
+
+    dom->guest_type = "xen-3.0-aarch64";
+    DOMPRINTF("%s: %s: 0x%" PRIx64 " -> 0x%" PRIx64 "",
+              __FUNCTION__, dom->guest_type,
+              dom->kernel_seg.vstart, dom->kernel_seg.vend);
+
+    return 0;
+}
+
+/* ------------------------------------------------------------ */
 /* Common zImage Support                                        */
 /* ------------------------------------------------------------ */
 
@@ -163,9 +240,17 @@ static struct xc_dom_loader zimage32_loader = {
     .loader = xc_dom_load_zimage_kernel,
 };
 
+static struct xc_dom_loader zimage64_loader = {
+    .name = "Linux zImage (ARM64)",
+    .probe = xc_dom_probe_zimage64_kernel,
+    .parser = xc_dom_parse_zimage64_kernel,
+    .loader = xc_dom_load_zimage_kernel,
+};
+
 static void __init register_loader(void)
 {
     xc_dom_register_loader(&zimage32_loader);
+    xc_dom_register_loader(&zimage64_loader);
 }
 
 /*
