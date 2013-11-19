@@ -15,7 +15,11 @@
 long arch_do_domctl(struct xen_domctl *domctl, struct domain *d,
                     XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
 {
-    return -ENOSYS;
+    switch ( domctl->cmd )
+    {
+    default:
+        return subarch_do_domctl(domctl, d, u_domctl);
+    }
 }
 
 void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
