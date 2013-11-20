@@ -31,6 +31,7 @@
 #include <asm/processor-ca15.h>
 
 #include <asm/gic.h>
+#include <asm/platform.h>
 #include "vtimer.h"
 #include "vuart.h"
 
@@ -526,8 +527,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     if ( (rc = vcpu_domain_init(d)) != 0 )
         goto fail;
 
-    /* XXX dom0 needs more intelligent selection of PPI */
-    d->arch.evtchn_irq = GUEST_EVTCHN_PPI;
+    if ( d->domain_id )
+        d->arch.evtchn_irq = GUEST_EVTCHN_PPI;
+    else
+        d->arch.evtchn_irq = platform_dom0_evtchn_ppi();
 
     /*
      * Virtual UART is only used by linux early printk and decompress code.

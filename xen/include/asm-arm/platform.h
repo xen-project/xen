@@ -37,6 +37,10 @@ struct platform_desc {
      * List of devices which must not pass-through to a guest
      */
     const struct dt_device_match *blacklist_dev;
+    /*
+     * The IRQ (PPI) to use to inject event channels to dom0.
+     */
+    unsigned int dom0_evtchn_ppi;
 };
 
 /*
@@ -61,6 +65,7 @@ void platform_reset(void);
 void platform_poweroff(void);
 bool_t platform_has_quirk(uint32_t quirk);
 bool_t platform_device_is_blacklisted(const struct dt_device_node *node);
+unsigned int platform_dom0_evtchn_ppi(void);
 
 #define PLATFORM_START(_name, _namestr)                         \
 static const struct platform_desc  __plat_desc_##_name __used   \

@@ -36,6 +36,7 @@ static const char * const xgene_storm_dt_compat[] __initconst =
 PLATFORM_START(xgene_storm, "APM X-GENE STORM")
     .compatible = xgene_storm_dt_compat,
     .quirks = xgene_storm_quirks,
+    .dom0_evtchn_ppi = 24,
 PLATFORM_END
 
 /*
