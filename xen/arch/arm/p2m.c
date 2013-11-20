@@ -7,12 +7,22 @@
 #include <asm/flushtlb.h>
 #include <asm/gic.h>
 
+/* First level P2M is 2 consecutive pages */
+#define P2M_FIRST_ORDER 1
+#define P2M_FIRST_ENTRIES (LPAE_ENTRIES<<P2M_FIRST_ORDER)
+
 void dump_p2m_lookup(struct domain *d, paddr_t addr)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
     lpae_t *first;
 
     printk("dom%d IPA 0x%"PRIpaddr"\n", d->domain_id, addr);
+
+    if ( first_linear_offset(addr) > LPAE_ENTRIES )
+    {
+        printk("Cannot dump addresses in second of first level pages...\n");
+        return;
+    }
 
     printk("P2M @ %p mfn:0x%lx\n",
            p2m->first_level, page_to_mfn(p2m->first_level));
@@ -31,6 +41,30 @@ void p2m_load_VTTBR(struct domain *d)
     isb(); /* Ensure update is visible */
 }
 
+static int p2m_first_level_index(paddr_t addr)
+{
+    /*
+     * 1st pages are concatenated so zeroeth offset gives us the
+     * index of the 1st page
+     */
+    return zeroeth_table_offset(addr);
+}
+
+/*
+ * Map whichever of the first pages contain addr. The caller should
+ * then use first_table_offset as an index.
+ */
+static lpae_t *p2m_map_first(struct p2m_domain *p2m, paddr_t addr)
+{
+    struct page_info *page;
+
+    BUG_ON(first_linear_offset(addr) > P2M_FIRST_ENTRIES);
+
+    page = p2m->first_level + p2m_first_level_index(addr);
+
+    return __map_domain_page(page);
+}
+
 /*
  * Lookup the MFN corresponding to a domain's PFN.
  *
@@ -45,7 +79,7 @@ paddr_t p2m_lookup(struct domain *d, paddr_t paddr)
 
     spin_lock(&p2m->lock);
 
-    first = __map_domain_page(p2m->first_level);
+    first = p2m_map_first(p2m, paddr);
 
     pte = first[first_table_offset(paddr)];
     if ( !pte.p2m.valid || !pte.p2m.table )
@@ -135,18 +169,21 @@ static int create_p2m_entries(struct domain *d,
     struct p2m_domain *p2m = &d->arch.p2m;
     lpae_t *first = NULL, *second = NULL, *third = NULL;
     paddr_t addr;
-    unsigned long cur_first_offset = ~0, cur_second_offset = ~0;
+    unsigned long cur_first_page = ~0,
+                  cur_first_offset = ~0,
+                  cur_second_offset = ~0;
 
     spin_lock(&p2m->lock);
 
-    /* XXX Don't actually handle 40 bit guest physical addresses */
-    BUG_ON(start_gpaddr & 0x8000000000ULL);
-    BUG_ON(end_gpaddr   & 0x8000000000ULL);
-
-    first = __map_domain_page(p2m->first_level);
-
     for(addr = start_gpaddr; addr < end_gpaddr; addr += PAGE_SIZE)
     {
+        if ( cur_first_page != p2m_first_level_index(addr) )
+        {
+            if ( first ) unmap_domain_page(first);
+            first = p2m_map_first(p2m, addr);
+            cur_first_page = p2m_first_level_index(addr);
+        }
+
         if ( !first[first_table_offset(addr)].p2m.valid )
         {
             rc = p2m_create_table(d, &first[first_table_offset(addr)]);
@@ -279,14 +316,11 @@ int p2m_alloc_table(struct domain *d)
     struct page_info *page;
     void *p;
 
-    /* First level P2M is 2 consecutive pages */
-    page = alloc_domheap_pages(NULL, 1, 0);
+    page = alloc_domheap_pages(NULL, P2M_FIRST_ORDER, 0);
     if ( page == NULL )
         return -ENOMEM;
 
     spin_lock(&p2m->lock);
-
-    page_list_add(page, &p2m->pages);
 
     /* Clear both first level pages */
     p = __map_domain_page(page);
@@ -379,6 +413,8 @@ void p2m_teardown(struct domain *d)
 
     while ( (pg = page_list_remove_head(&p2m->pages)) )
         free_domheap_page(pg);
+
+    free_domheap_pages(p2m->first_level, P2M_FIRST_ORDER);
 
     p2m->first_level = NULL;
 
