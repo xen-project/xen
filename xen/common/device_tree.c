@@ -452,6 +452,7 @@ static void __init early_print_info(void)
         early_printk(" RESVD[%d]: %"PRIpaddr" - %"PRIpaddr"\n",
                      i, s, e);
     }
+    early_printk("\n");
 }
 
 /**
