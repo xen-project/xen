@@ -282,7 +282,7 @@ int arch_setup_meminit(struct xc_dom_image *dom)
     {
         const uint64_t rambase = dom->rambase_pfn << XC_PAGE_SHIFT;
         const uint64_t ramend = rambase + ( dom->total_pages << XC_PAGE_SHIFT );
-        const uint64_t dtbsize = ( dom->devicetree_size + 3 ) & ~0x3;
+        const uint64_t dtbsize = ROUNDUP(dom->devicetree_size, XC_PAGE_SHIFT);
 
         /* Place at 128MB if there is sufficient RAM */
         if ( ramend >= rambase + 128*1024*1024 + dtbsize )
