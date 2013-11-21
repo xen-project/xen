@@ -3596,13 +3596,13 @@ static void device_complete(libxl__egc *egc, libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
 
-    if (aodev->action == LIBXL__DEVICE_ACTION_REMOVE)
-        free(aodev->dev);
-
     LOG(DEBUG, "device %s %s %s",
                libxl__device_backend_path(gc, aodev->dev),
                libxl__device_action_to_string(aodev->action),
                aodev->rc ? "failed" : "succeed");
+
+    if (aodev->action == LIBXL__DEVICE_ACTION_REMOVE)
+        free(aodev->dev);
 
     libxl__nested_ao_free(aodev->ao);
 }
