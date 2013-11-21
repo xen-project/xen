@@ -30,6 +30,7 @@
 #include <xen/device_tree.h>
 #include <asm/p2m.h>
 #include <asm/domain.h>
+#include <asm/platform.h>
 
 #include <asm/gic.h>
 
@@ -444,7 +445,10 @@ void __init gic_init(void)
     BUILD_BUG_ON(FIXMAP_ADDR(FIXMAP_GICC1) !=
                  FIXMAP_ADDR(FIXMAP_GICC2)-PAGE_SIZE);
     set_fixmap(FIXMAP_GICC1, gic.cbase >> PAGE_SHIFT, DEV_SHARED);
-    set_fixmap(FIXMAP_GICC2, (gic.cbase >> PAGE_SHIFT) + 1, DEV_SHARED);
+    if ( platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
+        set_fixmap(FIXMAP_GICC2, (gic.cbase >> PAGE_SHIFT) + 0x10, DEV_SHARED);
+    else
+        set_fixmap(FIXMAP_GICC2, (gic.cbase >> PAGE_SHIFT) + 0x1, DEV_SHARED);
     set_fixmap(FIXMAP_GICH, gic.hbase >> PAGE_SHIFT, DEV_SHARED);
 
     /* Global settings: interrupt distributor */
@@ -823,6 +827,8 @@ void gic_interrupt(struct cpu_user_regs *regs, int is_fiq)
 
 int gicv_setup(struct domain *d)
 {
+    int ret;
+
     /*
      * Domain 0 gets the hardware address.
      * Guests get the virtual platform layout.
@@ -840,11 +846,30 @@ int gicv_setup(struct domain *d)
 
     d->arch.vgic.nr_lines = 0;
 
-    /* map the gic virtual cpu interface in the gic cpu interface region of
-     * the guest */
-    return map_mmio_regions(d, d->arch.vgic.cbase,
-                            d->arch.vgic.cbase + (2 * PAGE_SIZE) - 1,
-                            gic.vbase);
+    /*
+     * Map the gic virtual cpu interface in the gic cpu interface
+     * region of the guest.
+     *
+     * The second page is always mapped at +4K irrespective of the
+     * GIC_64K_STRIDE quirk. The DTB passed to the guest reflects this.
+     */
+    ret = map_mmio_regions(d, d->arch.vgic.cbase,
+                           d->arch.vgic.cbase + PAGE_SIZE - 1,
+                           gic.vbase);
+    if (ret)
+        return ret;
+
+    if ( !platform_has_quirk(PLATFORM_QUIRK_GIC_64K_STRIDE) )
+        ret = map_mmio_regions(d, d->arch.vgic.cbase + PAGE_SIZE,
+                               d->arch.vgic.cbase + (2 * PAGE_SIZE) - 1,
+                               gic.vbase + PAGE_SIZE);
+    else
+        ret = map_mmio_regions(d, d->arch.vgic.cbase + PAGE_SIZE,
+                               d->arch.vgic.cbase + (2 * PAGE_SIZE) - 1,
+                               gic.vbase + 16*PAGE_SIZE);
+
+    return ret;
+
 }
 
 static void gic_irq_eoi(void *info)
