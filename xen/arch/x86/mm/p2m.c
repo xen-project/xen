@@ -379,13 +379,18 @@ void p2m_free_ptp(struct p2m_domain *p2m, struct page_info *pg)
 //
 int p2m_alloc_table(struct p2m_domain *p2m)
 {
-    mfn_t mfn = _mfn(INVALID_MFN);
-    struct page_info *page, *p2m_top;
-    unsigned int page_count = 0;
-    unsigned long gfn = -1UL;
+    struct page_info *p2m_top;
     struct domain *d = p2m->domain;
 
     p2m_lock(p2m);
+
+    if ( !p2m_is_nestedp2m(p2m)
+         && !page_list_empty(&d->page_list) )
+    {
+        P2M_ERROR("dom %d already has memory allocated\n", d->domain_id);
+        p2m_unlock(p2m);
+        return -EINVAL;
+    }
 
     if ( pagetable_get_pfn(p2m_get_pagetable(p2m)) != 0 )
     {
@@ -415,31 +420,12 @@ int p2m_alloc_table(struct p2m_domain *p2m)
     if ( !set_p2m_entry(p2m, 0, _mfn(INVALID_MFN), PAGE_ORDER_4K,
                         p2m_invalid, p2m->default_access) )
         goto error;
-
-    if ( !p2m_is_nestedp2m(p2m) )
-    {
-        /* Copy all existing mappings from the page list and m2p */
-        spin_lock(&p2m->domain->page_alloc_lock);
-        page_list_for_each(page, &p2m->domain->page_list)
-        {
-            mfn = page_to_mfn(page);
-            gfn = get_gpfn_from_mfn(mfn_x(mfn));
-            /* Pages should not be shared that early */
-            ASSERT(gfn != SHARED_M2P_ENTRY);
-            page_count++;
-            if ( gfn != INVALID_M2P_ENTRY
-                && !set_p2m_entry(p2m, gfn, mfn, PAGE_ORDER_4K, p2m_ram_rw, p2m->default_access) )
-                goto error_unlock;
-        }
-        spin_unlock(&p2m->domain->page_alloc_lock);
-    }
     p2m->defer_nested_flush = 0;
 
     P2M_PRINTK("p2m table initialised (%u pages)\n", page_count);
     p2m_unlock(p2m);
     return 0;
 
-error_unlock:
     spin_unlock(&p2m->domain->page_alloc_lock);
  error:
     P2M_PRINTK("failed to initialize p2m table, gfn=%05lx, mfn=%"
