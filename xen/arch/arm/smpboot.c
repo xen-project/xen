@@ -32,11 +32,8 @@
 #include <asm/gic.h>
 
 cpumask_t cpu_online_map;
-EXPORT_SYMBOL(cpu_online_map);
 cpumask_t cpu_present_map;
-EXPORT_SYMBOL(cpu_online_map);
 cpumask_t cpu_possible_map;
-EXPORT_SYMBOL(cpu_possible_map);
 
 struct cpuinfo_arm cpu_data[NR_CPUS];
 
