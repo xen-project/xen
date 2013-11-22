@@ -21,68 +21,58 @@
 #ifdef CONFIG_COMPAT
 #include <compat/tmem.h>
 #endif
-
-struct tmem_host_dependent_client {
-    struct domain *domain;
-    struct xmem_pool *persistent_pool;
-};
-typedef struct tmem_host_dependent_client tmh_client_t;
-
 typedef uint32_t pagesize_t;  /* like size_t, must handle largest PAGE_SIZE */
 
 #define IS_PAGE_ALIGNED(addr) \
   ((void *)((((unsigned long)addr + (PAGE_SIZE - 1)) & PAGE_MASK)) == addr)
 #define IS_VALID_PAGE(_pi)  ( mfn_valid(page_to_mfn(_pi)) )
 
-extern struct xmem_pool *tmh_mempool;
-extern unsigned int tmh_mempool_maxalloc;
-extern struct page_list_head tmh_page_list;
-extern spinlock_t tmh_page_list_lock;
-extern unsigned long tmh_page_list_pages;
+extern struct xmem_pool *tmem_mempool;
+extern unsigned int tmem_mempool_maxalloc;
+extern struct page_list_head tmem_page_list;
+extern spinlock_t tmem_page_list_lock;
+extern unsigned long tmem_page_list_pages;
 extern atomic_t freeable_page_count;
 
 extern spinlock_t tmem_lock;
 extern spinlock_t tmem_spinlock;
 extern rwlock_t tmem_rwlock;
 
-extern void tmh_copy_page(char *to, char*from);
-extern int tmh_init(void);
-#define tmh_hash hash_long
-
-extern void tmh_release_avail_pages_to_host(void);
-extern void tmh_scrub_page(struct page_info *pi, unsigned int memflags);
+extern void tmem_copy_page(char *to, char*from);
+extern int tmem_init(void);
+#define tmem_hash hash_long
 
 extern bool_t opt_tmem_compress;
-static inline bool_t tmh_compression_enabled(void)
+static inline bool_t tmem_compression_enabled(void)
 {
     return opt_tmem_compress;
 }
 
 extern bool_t opt_tmem_dedup;
-static inline bool_t tmh_dedup_enabled(void)
+static inline bool_t tmem_dedup_enabled(void)
 {
     return opt_tmem_dedup;
 }
 
 extern bool_t opt_tmem_tze;
-static inline bool_t tmh_tze_enabled(void)
+static inline bool_t tmem_tze_enabled(void)
 {
     return opt_tmem_tze;
 }
 
-static inline void tmh_tze_disable(void)
+static inline void tmem_tze_disable(void)
 {
     opt_tmem_tze = 0;
 }
 
 extern bool_t opt_tmem_shared_auth;
-static inline bool_t tmh_shared_auth(void)
+static inline bool_t tmem_shared_auth(void)
 {
     return opt_tmem_shared_auth;
 }
 
 extern bool_t opt_tmem;
-static inline bool_t tmh_enabled(void)
+static inline bool_t tmem_enabled(void)
 {
     return opt_tmem;
 }
@@ -93,70 +83,31 @@ extern int opt_tmem_lock;
  * Memory free page list management
  */
 
-static inline struct page_info *tmh_page_list_get(void)
+static inline struct page_info *tmem_page_list_get(void)
 {
     struct page_info *pi;
 
-    spin_lock(&tmh_page_list_lock);
-    if ( (pi = page_list_remove_head(&tmh_page_list)) != NULL )
-        tmh_page_list_pages--;
-    spin_unlock(&tmh_page_list_lock);
+    spin_lock(&tmem_page_list_lock);
+    if ( (pi = page_list_remove_head(&tmem_page_list)) != NULL )
+        tmem_page_list_pages--;
+    spin_unlock(&tmem_page_list_lock);
     ASSERT((pi == NULL) || IS_VALID_PAGE(pi));
     return pi;
 }
 
-static inline void tmh_page_list_put(struct page_info *pi)
+static inline void tmem_page_list_put(struct page_info *pi)
 {
     ASSERT(IS_VALID_PAGE(pi));
-    spin_lock(&tmh_page_list_lock);
-    page_list_add(pi, &tmh_page_list);
-    tmh_page_list_pages++;
-    spin_unlock(&tmh_page_list_lock);
-}
-
-static inline unsigned long tmh_avail_pages(void)
-{
-    return tmh_page_list_pages;
+    spin_lock(&tmem_page_list_lock);
+    page_list_add(pi, &tmem_page_list);
+    tmem_page_list_pages++;
+    spin_unlock(&tmem_page_list_lock);
 }
 
 /*
  * Memory allocation for persistent data 
  */
-
-static inline bool_t domain_fully_allocated(struct domain *d)
-{
-    return ( d->tot_pages >= d->max_pages );
-}
-#define tmh_client_memory_fully_allocated(_pool) \
- domain_fully_allocated(_pool->client->tmh->domain)
-
-static inline void *_tmh_alloc_subpage_thispool(struct xmem_pool *cmem_mempool,
-                                                 size_t size, size_t align)
-{
-#if 0
-    if ( d->tot_pages >= d->max_pages )
-        return NULL;
-#endif
-    ASSERT( size < tmh_mempool_maxalloc );
-    if ( cmem_mempool == NULL )
-        return NULL;
-    return xmem_pool_alloc(size, cmem_mempool);
-}
-#define tmh_alloc_subpage_thispool(_pool, _s, _a) \
-            _tmh_alloc_subpage_thispool(pool->client->tmh->persistent_pool, \
-                                         _s, _a)
-
-static inline void _tmh_free_subpage_thispool(struct xmem_pool *cmem_mempool,
-                                               void *ptr, size_t size)
-{
-    ASSERT( size < tmh_mempool_maxalloc );
-    ASSERT( cmem_mempool != NULL );
-    xmem_pool_free(ptr,cmem_mempool);
-}
-#define tmh_free_subpage_thispool(_pool, _p, _s) \
- _tmh_free_subpage_thispool(_pool->client->tmh->persistent_pool, _p, _s)
-
-static inline struct page_info *_tmh_alloc_page_thispool(struct domain *d)
+static inline struct page_info *tmem_alloc_page_thispool(struct domain *d)
 {
     struct page_info *pi;
 
@@ -166,14 +117,14 @@ static inline struct page_info *_tmh_alloc_page_thispool(struct domain *d)
     if ( d->tot_pages >= d->max_pages )
         return NULL;
 
-    if ( tmh_page_list_pages )
+    if ( tmem_page_list_pages )
     {
-        if ( (pi = tmh_page_list_get()) != NULL )
+        if ( (pi = tmem_page_list_get()) != NULL )
         {
             if ( donate_page(d,pi,0) == 0 )
                 goto out;
             else
-                tmh_page_list_put(pi);
+                tmem_page_list_put(pi);
         }
     }
 
@@ -183,16 +134,14 @@ out:
     ASSERT((pi == NULL) || IS_VALID_PAGE(pi));
     return pi;
 }
-#define tmh_alloc_page_thispool(_pool) \
-    _tmh_alloc_page_thispool(_pool->client->tmh->domain)
 
-static inline void _tmh_free_page_thispool(struct page_info *pi)
+static inline void tmem_free_page_thispool(struct page_info *pi)
 {
     struct domain *d = page_get_owner(pi);
 
     ASSERT(IS_VALID_PAGE(pi));
     if ( (d == NULL) || steal_page(d,pi,0) == 0 )
-        tmh_page_list_put(pi);
+        tmem_page_list_put(pi);
     else
     {
         scrub_one_page(pi);
@@ -200,30 +149,13 @@ static inline void _tmh_free_page_thispool(struct page_info *pi)
         free_domheap_pages(pi,0);
     }
 }
-#define tmh_free_page_thispool(_pool,_pg) \
-    _tmh_free_page_thispool(_pg)
 
 /*
  * Memory allocation for ephemeral (non-persistent) data
  */
-
-static inline void *tmh_alloc_subpage(void *pool, size_t size,
-                                                 size_t align)
+static inline struct page_info *tmem_alloc_page(void *pool, int no_heap)
 {
-    ASSERT( size < tmh_mempool_maxalloc );
-    ASSERT( tmh_mempool != NULL );
-    return xmem_pool_alloc(size, tmh_mempool);
-}
-
-static inline void tmh_free_subpage(void *ptr, size_t size)
-{
-    ASSERT( size < tmh_mempool_maxalloc );
-    xmem_pool_free(ptr,tmh_mempool);
-}
-
-static inline struct page_info *tmh_alloc_page(void *pool, int no_heap)
-{
-    struct page_info *pi = tmh_page_list_get();
+    struct page_info *pi = tmem_page_list_get();
 
     if ( pi == NULL && !no_heap )
         pi = alloc_domheap_pages(0,0,MEMF_tmem);
@@ -233,56 +165,30 @@ static inline struct page_info *tmh_alloc_page(void *pool, int no_heap)
     return pi;
 }
 
-static inline void tmh_free_page(struct page_info *pi)
+static inline void tmem_free_page(struct page_info *pi)
 {
     ASSERT(IS_VALID_PAGE(pi));
-    tmh_page_list_put(pi);
+    tmem_page_list_put(pi);
     atomic_dec(&freeable_page_count);
 }
 
 static inline unsigned int tmem_subpage_maxsize(void)
 {
-    return tmh_mempool_maxalloc;
+    return tmem_mempool_maxalloc;
 }
 
-static inline unsigned long tmh_freeable_pages(void)
+static inline unsigned long tmem_free_mb(void)
 {
-    return tmh_avail_pages() + _atomic_read(freeable_page_count);
+    return (tmem_page_list_pages + total_free_pages()) >> (20 - PAGE_SHIFT);
 }
 
-static inline unsigned long tmh_free_mb(void)
-{
-    return (tmh_avail_pages() + total_free_pages()) >> (20 - PAGE_SHIFT);
-}
-
-/*
- * Memory allocation for "infrastructure" data
- */
-
-static inline void *tmh_alloc_infra(size_t size, size_t align)
-{
-    return _xmalloc(size,align);
-}
-
-static inline void tmh_free_infra(void *p)
-{
-    return xfree(p);
-}
-
-#define tmh_lock_all  opt_tmem_lock
-#define tmh_called_from_tmem(_memflags) (_memflags & MEMF_tmem)
+#define tmem_lock_all  opt_tmem_lock
+#define tmem_called_from_tmem(_memflags) (_memflags & MEMF_tmem)
 
 /*  "Client" (==domain) abstraction */
 
 struct client;
-typedef domid_t cli_id_t;
-typedef struct domain tmh_cli_ptr_t;
-typedef struct page_info pfp_t;
-
-extern tmh_client_t *tmh_client_init(cli_id_t);
-extern void tmh_client_destroy(tmh_client_t *);
-
-static inline struct client *tmh_client_from_cli_id(cli_id_t cli_id)
+static inline struct client *tmem_client_from_cli_id(domid_t cli_id)
 {
     struct client *c;
     struct domain *d = rcu_lock_domain_by_id(cli_id);
@@ -293,58 +199,41 @@ static inline struct client *tmh_client_from_cli_id(cli_id_t cli_id)
     return c;
 }
 
-static inline struct client *tmh_client_from_current(void)
+static inline struct client *tmem_client_from_current(void)
 {
     return (struct client *)(current->domain->tmem);
 }
 
-#define tmh_client_is_dying(_client) (!!_client->tmh->domain->is_dying)
+#define tmem_client_is_dying(_client) (!!_client->domain->is_dying)
 
-static inline cli_id_t tmh_get_cli_id_from_current(void)
+static inline domid_t tmem_get_cli_id_from_current(void)
 {
     return current->domain->domain_id;
 }
 
-static inline tmh_cli_ptr_t *tmh_get_cli_ptr_from_current(void)
+static inline struct domain *tmem_get_cli_ptr_from_current(void)
 {
     return current->domain;
 }
 
-static inline bool_t tmh_set_client_from_id(
-    struct client *client, tmh_client_t *tmh, cli_id_t cli_id)
-{
-    struct domain *d = rcu_lock_domain_by_id(cli_id);
-    bool_t rc = 0;
-    if ( d == NULL )
-        return 0;
-    if ( !d->is_dying )
-    {
-        d->tmem = client;
-        tmh->domain = d;
-        rc = 1;
-    }
-    rcu_unlock_domain(d);
-    return rc;
-}
-
-static inline bool_t tmh_current_permitted(void)
+static inline bool_t tmem_current_permitted(void)
 {
     return !xsm_tmem_op(XSM_HOOK);
 }
 
-static inline bool_t tmh_current_is_privileged(void)
+static inline bool_t tmem_current_is_privileged(void)
 {
     return !xsm_tmem_control(XSM_PRIV);
 }
 
-static inline uint8_t tmh_get_first_byte(pfp_t *pfp)
+static inline uint8_t tmem_get_first_byte(struct page_info *pfp)
 {
     void *p = __map_domain_page(pfp);
 
     return (uint8_t)(*(char *)p);
 }
 
-static inline int tmh_page_cmp(pfp_t *pfp1, pfp_t *pfp2)
+static inline int tmem_page_cmp(struct page_info *pfp1, struct page_info *pfp2)
 {
     const uint64_t *p1 = (uint64_t *)__map_domain_page(pfp1);
     const uint64_t *p2 = (uint64_t *)__map_domain_page(pfp2);
@@ -361,7 +250,7 @@ ASSERT(p2 != NULL);
     return 1;
 }
 
-static inline int tmh_pcd_cmp(void *va1, pagesize_t len1, void *va2, pagesize_t len2)
+static inline int tmem_pcd_cmp(void *va1, pagesize_t len1, void *va2, pagesize_t len2)
 {
     const char *p1 = (char *)va1;
     const char *p2 = (char *)va2;
@@ -382,14 +271,14 @@ static inline int tmh_pcd_cmp(void *va1, pagesize_t len1, void *va2, pagesize_t 
     return 1;
 }
 
-static inline int tmh_tze_pfp_cmp(pfp_t *pfp1, pagesize_t pfp_len, void *tva, pagesize_t tze_len)
+static inline int tmem_tze_pfp_cmp(struct page_info *pfp1, pagesize_t pfp_len, void *tva, pagesize_t tze_len)
 {
     const uint64_t *p1 = (uint64_t *)__map_domain_page(pfp1);
     const uint64_t *p2;
     pagesize_t i;
 
     if ( tze_len == PAGE_SIZE )
-       p2 = (uint64_t *)__map_domain_page((pfp_t *)tva);
+       p2 = (uint64_t *)__map_domain_page((struct page_info *)tva);
     else
        p2 = (uint64_t *)tva;
     ASSERT(pfp_len <= PAGE_SIZE);
@@ -411,7 +300,7 @@ static inline int tmh_tze_pfp_cmp(pfp_t *pfp1, pagesize_t pfp_len, void *tva, pa
 
 /* return the size of the data in the pfp, ignoring trailing zeroes and
  * rounded up to the nearest multiple of 8 */
-static inline pagesize_t tmh_tze_pfp_scan(pfp_t *pfp)
+static inline pagesize_t tmem_tze_pfp_scan(struct page_info *pfp)
 {
     const uint64_t *p = (uint64_t *)__map_domain_page(pfp);
     pagesize_t bytecount = PAGE_SIZE;
@@ -422,7 +311,7 @@ static inline pagesize_t tmh_tze_pfp_scan(pfp_t *pfp)
     return bytecount;
 }
 
-static inline void tmh_tze_copy_from_pfp(void *tva, pfp_t *pfp, pagesize_t len)
+static inline void tmem_tze_copy_from_pfp(void *tva, struct page_info *pfp, pagesize_t len)
 {
     uint64_t *p1 = (uint64_t *)tva;
     const uint64_t *p2 = (uint64_t *)__map_domain_page(pfp);
@@ -439,7 +328,7 @@ typedef XEN_GUEST_HANDLE(char) cli_va_t;
 typedef XEN_GUEST_HANDLE_PARAM(tmem_op_t) tmem_cli_op_t;
 typedef XEN_GUEST_HANDLE_PARAM(char) tmem_cli_va_param_t;
 
-static inline int tmh_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
+static inline int tmem_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
 {
 #ifdef CONFIG_COMPAT
     if ( has_hvm_container_vcpu(current) ?
@@ -471,42 +360,44 @@ static inline int tmh_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
     return copy_from_guest(op, uops, 1);
 }
 
-#define tmh_cli_buf_null guest_handle_from_ptr(NULL, char)
+#define tmem_cli_buf_null guest_handle_from_ptr(NULL, char)
 
-static inline void tmh_copy_to_client_buf_offset(tmem_cli_va_param_t clibuf,
+static inline void tmem_copy_to_client_buf_offset(tmem_cli_va_param_t clibuf,
 						 int off,
 						 char *tmembuf, int len)
 {
     copy_to_guest_offset(clibuf,off,tmembuf,len);
 }
 
-#define tmh_copy_to_client_buf(clibuf, tmembuf, cnt) \
+#define tmem_copy_to_client_buf(clibuf, tmembuf, cnt) \
     copy_to_guest(guest_handle_cast(clibuf, void), tmembuf, cnt)
 
-#define tmh_client_buf_add guest_handle_add_offset
+#define tmem_client_buf_add guest_handle_add_offset
 
-#define TMH_CLI_ID_NULL ((cli_id_t)((domid_t)-1L))
+#define TMEM_CLI_ID_NULL ((domid_t)((domid_t)-1L))
 
-#define tmh_cli_id_str "domid"
-#define tmh_client_str "domain"
+#define tmem_cli_id_str "domid"
+#define tmem_client_str "domain"
 
-int tmh_decompress_to_client(tmem_cli_mfn_t, void *, size_t,
+int tmem_decompress_to_client(xen_pfn_t, void *, size_t,
 			     tmem_cli_va_param_t);
 
-int tmh_compress_from_client(tmem_cli_mfn_t, void **, size_t *,
+int tmem_compress_from_client(xen_pfn_t, void **, size_t *,
 			     tmem_cli_va_param_t);
 
-int tmh_copy_from_client(pfp_t *, tmem_cli_mfn_t, pagesize_t tmem_offset,
+int tmem_copy_from_client(struct page_info *, xen_pfn_t, pagesize_t tmem_offset,
     pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t);
 
-int tmh_copy_to_client(tmem_cli_mfn_t, pfp_t *, pagesize_t tmem_offset,
+int tmem_copy_to_client(xen_pfn_t, struct page_info *, pagesize_t tmem_offset,
     pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t);
 
-extern int tmh_copy_tze_to_client(tmem_cli_mfn_t cmfn, void *tmem_va, pagesize_t len);
+extern int tmem_copy_tze_to_client(xen_pfn_t cmfn, void *tmem_va, pagesize_t len);
+extern void *tmem_persistent_pool_page_get(unsigned long size);
+extern void tmem_persistent_pool_page_put(void *page_va);
 
-#define tmh_client_err(fmt, args...)  printk(XENLOG_G_ERR fmt, ##args)
-#define tmh_client_warn(fmt, args...) printk(XENLOG_G_WARNING fmt, ##args)
-#define tmh_client_info(fmt, args...) printk(XENLOG_G_INFO fmt, ##args)
+#define tmem_client_err(fmt, args...)  printk(XENLOG_G_ERR fmt, ##args)
+#define tmem_client_warn(fmt, args...) printk(XENLOG_G_WARNING fmt, ##args)
+#define tmem_client_info(fmt, args...) printk(XENLOG_G_INFO fmt, ##args)
 
 #define TMEM_PERF
 #ifdef TMEM_PERF

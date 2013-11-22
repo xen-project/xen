@@ -36,14 +36,7 @@ integer_param("tmem_lock", opt_tmem_lock);
 
 EXPORT atomic_t freeable_page_count = ATOMIC_INIT(0);
 
-#ifdef COMPARE_COPY_PAGE_SSE2
-DECL_CYC_COUNTER(pg_copy1);
-DECL_CYC_COUNTER(pg_copy2);
-DECL_CYC_COUNTER(pg_copy3);
-DECL_CYC_COUNTER(pg_copy4);
-#else
 DECL_CYC_COUNTER(pg_copy);
-#endif
 
 /* these are a concurrency bottleneck, could be percpu and dynamically
  * allocated iff opt_tmem_compress */
@@ -53,51 +46,23 @@ static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, workmem);
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, dstmem);
 static DEFINE_PER_CPU_READ_MOSTLY(void *, scratch_page);
 
-#ifdef COMPARE_COPY_PAGE_SSE2
-#include <asm/flushtlb.h>  /* REMOVE ME AFTER TEST */
-#include <asm/page.h>  /* REMOVE ME AFTER TEST */
-#endif
-void tmh_copy_page(char *to, char*from)
+void tmem_copy_page(char *to, char*from)
 {
-#ifdef COMPARE_COPY_PAGE_SSE2
-    DECL_LOCAL_CYC_COUNTER(pg_copy1);
-    DECL_LOCAL_CYC_COUNTER(pg_copy2);
-    DECL_LOCAL_CYC_COUNTER(pg_copy3);
-    DECL_LOCAL_CYC_COUNTER(pg_copy4);
-    *to = *from;  /* don't measure TLB misses */
-    flush_area_local(to,FLUSH_CACHE|FLUSH_ORDER(0));
-    flush_area_local(from,FLUSH_CACHE|FLUSH_ORDER(0));
-    START_CYC_COUNTER(pg_copy1);
-    copy_page_sse2(to, from);  /* cold cache */
-    END_CYC_COUNTER(pg_copy1);
-    START_CYC_COUNTER(pg_copy2);
-    copy_page_sse2(to, from);  /* hot cache */
-    END_CYC_COUNTER(pg_copy2);
-    flush_area_local(to,FLUSH_CACHE|FLUSH_ORDER(0));
-    flush_area_local(from,FLUSH_CACHE|FLUSH_ORDER(0));
-    START_CYC_COUNTER(pg_copy3);
-    memcpy(to, from, PAGE_SIZE);  /* cold cache */
-    END_CYC_COUNTER(pg_copy3);
-    START_CYC_COUNTER(pg_copy4);
-    memcpy(to, from, PAGE_SIZE); /* hot cache */
-    END_CYC_COUNTER(pg_copy4);
-#else
     DECL_LOCAL_CYC_COUNTER(pg_copy);
     START_CYC_COUNTER(pg_copy);
     memcpy(to, from, PAGE_SIZE);
     END_CYC_COUNTER(pg_copy);
-#endif
 }
 
 #if defined(CONFIG_ARM)
-static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
-                                 pfp_t **pcli_pfp, bool_t cli_write)
+static inline void *cli_get_page(xen_pfn_t cmfn, unsigned long *pcli_mfn,
+                                 struct page_info **pcli_pfp, bool_t cli_write)
 {
     ASSERT(0);
     return NULL;
 }
 
-static inline void cli_put_page(void *cli_va, pfp_t *cli_pfp,
+static inline void cli_put_page(void *cli_va, struct page_info *cli_pfp,
                                 unsigned long cli_mfn, bool_t mark_dirty)
 {
     ASSERT(0);
@@ -105,8 +70,8 @@ static inline void cli_put_page(void *cli_va, pfp_t *cli_pfp,
 #else
 #include <asm/p2m.h>
 
-static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
-                                 pfp_t **pcli_pfp, bool_t cli_write)
+static inline void *cli_get_page(xen_pfn_t cmfn, unsigned long *pcli_mfn,
+                                 struct page_info **pcli_pfp, bool_t cli_write)
 {
     p2m_type_t t;
     struct page_info *page;
@@ -130,7 +95,7 @@ static inline void *cli_get_page(tmem_cli_mfn_t cmfn, unsigned long *pcli_mfn,
     return map_domain_page(*pcli_mfn);
 }
 
-static inline void cli_put_page(void *cli_va, pfp_t *cli_pfp,
+static inline void cli_put_page(void *cli_va, struct page_info *cli_pfp,
                                 unsigned long cli_mfn, bool_t mark_dirty)
 {
     if ( mark_dirty )
@@ -144,13 +109,13 @@ static inline void cli_put_page(void *cli_va, pfp_t *cli_pfp,
 }
 #endif
 
-EXPORT int tmh_copy_from_client(pfp_t *pfp,
-    tmem_cli_mfn_t cmfn, pagesize_t tmem_offset,
+EXPORT int tmem_copy_from_client(struct page_info *pfp,
+    xen_pfn_t cmfn, pagesize_t tmem_offset,
     pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t clibuf)
 {
     unsigned long tmem_mfn, cli_mfn = 0;
     char *tmem_va, *cli_va = NULL;
-    pfp_t *cli_pfp = NULL;
+    struct page_info *cli_pfp = NULL;
     int rc = 1;
 
     if ( tmem_offset > PAGE_SIZE || pfn_offset > PAGE_SIZE || len > PAGE_SIZE )
@@ -175,7 +140,7 @@ EXPORT int tmh_copy_from_client(pfp_t *pfp,
     }
     smp_mb();
     if ( len == PAGE_SIZE && !tmem_offset && !pfn_offset && cli_va )
-        tmh_copy_page(tmem_va, cli_va);
+        tmem_copy_page(tmem_va, cli_va);
     else if ( (tmem_offset+len <= PAGE_SIZE) &&
               (pfn_offset+len <= PAGE_SIZE) )
     {
@@ -193,14 +158,14 @@ EXPORT int tmh_copy_from_client(pfp_t *pfp,
     return rc;
 }
 
-EXPORT int tmh_compress_from_client(tmem_cli_mfn_t cmfn,
+EXPORT int tmem_compress_from_client(xen_pfn_t cmfn,
     void **out_va, size_t *out_len, tmem_cli_va_param_t clibuf)
 {
     int ret = 0;
     unsigned char *dmem = this_cpu(dstmem);
     unsigned char *wmem = this_cpu(workmem);
     char *scratch = this_cpu(scratch_page);
-    pfp_t *cli_pfp = NULL;
+    struct page_info *cli_pfp = NULL;
     unsigned long cli_mfn = 0;
     void *cli_va = NULL;
 
@@ -225,13 +190,13 @@ EXPORT int tmh_compress_from_client(tmem_cli_mfn_t cmfn,
     return 1;
 }
 
-EXPORT int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
+EXPORT int tmem_copy_to_client(xen_pfn_t cmfn, struct page_info *pfp,
     pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len,
     tmem_cli_va_param_t clibuf)
 {
     unsigned long tmem_mfn, cli_mfn = 0;
     char *tmem_va, *cli_va = NULL;
-    pfp_t *cli_pfp = NULL;
+    struct page_info *cli_pfp = NULL;
     int rc = 1;
 
     if ( tmem_offset > PAGE_SIZE || pfn_offset > PAGE_SIZE || len > PAGE_SIZE )
@@ -246,7 +211,7 @@ EXPORT int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
     tmem_mfn = page_to_mfn(pfp);
     tmem_va = map_domain_page(tmem_mfn);
     if ( len == PAGE_SIZE && !tmem_offset && !pfn_offset && cli_va )
-        tmh_copy_page(cli_va, tmem_va);
+        tmem_copy_page(cli_va, tmem_va);
     else if ( (tmem_offset+len <= PAGE_SIZE) && (pfn_offset+len <= PAGE_SIZE) )
     {
         if ( cli_va )
@@ -264,11 +229,11 @@ EXPORT int tmh_copy_to_client(tmem_cli_mfn_t cmfn, pfp_t *pfp,
     return rc;
 }
 
-EXPORT int tmh_decompress_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
+EXPORT int tmem_decompress_to_client(xen_pfn_t cmfn, void *tmem_va,
                                     size_t size, tmem_cli_va_param_t clibuf)
 {
     unsigned long cli_mfn = 0;
-    pfp_t *cli_pfp = NULL;
+    struct page_info *cli_pfp = NULL;
     void *cli_va = NULL;
     char *scratch = this_cpu(scratch_page);
     size_t out_len = PAGE_SIZE;
@@ -293,12 +258,12 @@ EXPORT int tmh_decompress_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
     return 1;
 }
 
-EXPORT int tmh_copy_tze_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
+EXPORT int tmem_copy_tze_to_client(xen_pfn_t cmfn, void *tmem_va,
                                     pagesize_t len)
 {
     void *cli_va;
     unsigned long cli_mfn;
-    pfp_t *cli_pfp = NULL;
+    struct page_info *cli_pfp = NULL;
 
     ASSERT(!(len & (sizeof(uint64_t)-1)));
     ASSERT(len <= PAGE_SIZE);
@@ -317,115 +282,61 @@ EXPORT int tmh_copy_tze_to_client(tmem_cli_mfn_t cmfn, void *tmem_va,
 
 /******************  XEN-SPECIFIC MEMORY ALLOCATION ********************/
 
-EXPORT struct xmem_pool *tmh_mempool = 0;
-EXPORT unsigned int tmh_mempool_maxalloc = 0;
+EXPORT struct xmem_pool *tmem_mempool = 0;
+EXPORT unsigned int tmem_mempool_maxalloc = 0;
 
-EXPORT DEFINE_SPINLOCK(tmh_page_list_lock);
-EXPORT PAGE_LIST_HEAD(tmh_page_list);
-EXPORT unsigned long tmh_page_list_pages = 0;
+EXPORT DEFINE_SPINLOCK(tmem_page_list_lock);
+EXPORT PAGE_LIST_HEAD(tmem_page_list);
+EXPORT unsigned long tmem_page_list_pages = 0;
 
-/* free anything on tmh_page_list to Xen's scrub list */
-EXPORT void tmh_release_avail_pages_to_host(void)
-{
-    spin_lock(&tmh_page_list_lock);
-    while ( !page_list_empty(&tmh_page_list) )
-    {
-        struct page_info *pg = page_list_remove_head(&tmh_page_list);
-        scrub_one_page(pg);
-        tmh_page_list_pages--;
-        free_domheap_page(pg);
-    }
-    ASSERT(tmh_page_list_pages == 0);
-    INIT_PAGE_LIST_HEAD(&tmh_page_list);
-    spin_unlock(&tmh_page_list_lock);
-}
-
-EXPORT void tmh_scrub_page(struct page_info *pi, unsigned int memflags)
-{
-    if ( pi == NULL )
-        return;
-    if ( !(memflags & MEMF_tmem) )
-        scrub_one_page(pi);
-}
-
-static noinline void *tmh_mempool_page_get(unsigned long size)
+static noinline void *tmem_mempool_page_get(unsigned long size)
 {
     struct page_info *pi;
 
     ASSERT(size == PAGE_SIZE);
-    if ( (pi = tmh_alloc_page(NULL,0)) == NULL )
+    if ( (pi = tmem_alloc_page(NULL,0)) == NULL )
         return NULL;
     ASSERT(IS_VALID_PAGE(pi));
     return page_to_virt(pi);
 }
 
-static void tmh_mempool_page_put(void *page_va)
+static void tmem_mempool_page_put(void *page_va)
 {
     ASSERT(IS_PAGE_ALIGNED(page_va));
-    tmh_free_page(virt_to_page(page_va));
+    tmem_free_page(virt_to_page(page_va));
 }
 
-static int __init tmh_mempool_init(void)
+static int __init tmem_mempool_init(void)
 {
-    tmh_mempool = xmem_pool_create("tmem", tmh_mempool_page_get,
-        tmh_mempool_page_put, PAGE_SIZE, 0, PAGE_SIZE);
-    if ( tmh_mempool )
-        tmh_mempool_maxalloc = xmem_pool_maxalloc(tmh_mempool);
-    return tmh_mempool != NULL;
+    tmem_mempool = xmem_pool_create("tmem", tmem_mempool_page_get,
+        tmem_mempool_page_put, PAGE_SIZE, 0, PAGE_SIZE);
+    if ( tmem_mempool )
+        tmem_mempool_maxalloc = xmem_pool_maxalloc(tmem_mempool);
+    return tmem_mempool != NULL;
 }
 
 /* persistent pools are per-domain */
 
-static void *tmh_persistent_pool_page_get(unsigned long size)
+void *tmem_persistent_pool_page_get(unsigned long size)
 {
     struct page_info *pi;
     struct domain *d = current->domain;
 
     ASSERT(size == PAGE_SIZE);
-    if ( (pi = _tmh_alloc_page_thispool(d)) == NULL )
+    if ( (pi = tmem_alloc_page_thispool(d)) == NULL )
         return NULL;
     ASSERT(IS_VALID_PAGE(pi));
     return page_to_virt(pi);
 }
 
-static void tmh_persistent_pool_page_put(void *page_va)
+void tmem_persistent_pool_page_put(void *page_va)
 {
     struct page_info *pi;
 
     ASSERT(IS_PAGE_ALIGNED(page_va));
     pi = mfn_to_page(virt_to_mfn(page_va));
     ASSERT(IS_VALID_PAGE(pi));
-    _tmh_free_page_thispool(pi);
-}
-
-/******************  XEN-SPECIFIC CLIENT HANDLING ********************/
-
-EXPORT tmh_client_t *tmh_client_init(cli_id_t cli_id)
-{
-    tmh_client_t *tmh;
-    char name[5];
-    int i, shift;
-
-    if ( (tmh = xmalloc(tmh_client_t)) == NULL )
-        return NULL;
-    for (i = 0, shift = 12; i < 4; shift -=4, i++)
-        name[i] = (((unsigned short)cli_id >> shift) & 0xf) + '0';
-    name[4] = '\0';
-    tmh->persistent_pool = xmem_pool_create(name, tmh_persistent_pool_page_get,
-        tmh_persistent_pool_page_put, PAGE_SIZE, 0, PAGE_SIZE);
-    if ( tmh->persistent_pool == NULL )
-    {
-        xfree(tmh);
-        return NULL;
-    }
-    return tmh;
-}
-
-EXPORT void tmh_client_destroy(tmh_client_t *tmh)
-{
-    ASSERT(tmh->domain->is_dying);
-    xmem_pool_destroy(tmh->persistent_pool);
-    tmh->domain = NULL;
+    tmem_free_page_thispool(pi);
 }
 
 /******************  XEN-SPECIFIC HOST INITIALIZATION ********************/
@@ -478,11 +389,11 @@ static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback
 };
 
-EXPORT int __init tmh_init(void)
+EXPORT int __init tmem_init(void)
 {
     unsigned int cpu;
 
-    if ( !tmh_mempool_init() )
+    if ( !tmem_mempool_init() )
         return 0;
 
     dstmem_order = get_order_from_pages(LZO_DSTMEM_PAGES);
