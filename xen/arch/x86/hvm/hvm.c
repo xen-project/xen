@@ -3737,7 +3737,13 @@ static void hvm_s3_suspend(struct domain *d)
 static void hvm_s3_resume(struct domain *d)
 {
     if ( test_and_clear_bool(d->arch.hvm_domain.is_s3_suspended) )
+    {
+        struct vcpu *v;
+
+        for_each_vcpu( d, v )
+            hvm_set_guest_tsc(v, 0);
         domain_unpause(d);
+    }
 }
 
 static int hvmop_set_isa_irq_level(
