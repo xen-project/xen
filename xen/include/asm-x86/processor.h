@@ -509,7 +509,7 @@ extern always_inline void prefetchw(const void *x)
 #endif
 
 void show_stack(struct cpu_user_regs *regs);
-void show_stack_overflow(unsigned int cpu, unsigned long esp);
+void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs);
 void show_registers(struct cpu_user_regs *regs);
 void show_execution_state(struct cpu_user_regs *regs);
 #define dump_execution_state() run_in_exception_handler(show_execution_state)

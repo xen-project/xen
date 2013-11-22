@@ -316,11 +316,11 @@ void show_stack(struct cpu_user_regs *regs)
     show_trace(regs);
 }
 
-void show_stack_overflow(unsigned int cpu, unsigned long esp)
+void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
 {
 #ifdef MEMORY_GUARD
+    unsigned long esp = regs->rsp;
     unsigned long esp_top, esp_bottom;
-    unsigned long *stack, addr;
 
     esp_bottom = (esp | (STACK_SIZE - 1)) + 1;
     esp_top    = esp_bottom - PRIMARY_STACK_SIZE;
@@ -340,16 +340,10 @@ void show_stack_overflow(unsigned int cpu, unsigned long esp)
     if ( esp < esp_top )
         esp = esp_top;
 
-    printk("Xen stack overflow (dumping trace %p-%p):\n   ",
+    printk("Xen stack overflow (dumping trace %p-%p):\n",
            (void *)esp, (void *)esp_bottom);
 
-    stack = (unsigned long *)esp;
-    while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )
-    {
-        addr = *stack++;
-        if ( is_active_kernel_text(addr) )
-            printk("%p: [<%p>] %pS\n", stack, _p(addr), _p(addr));
-    }
+    _show_trace(esp, regs->rbp);
 
     printk("\n");
 #endif

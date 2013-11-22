@@ -248,7 +248,7 @@ void do_double_fault(struct cpu_user_regs *regs)
 
     printk("CPU:    %d\n", cpu);
     _show_registers(regs, crs, CTXT_hypervisor, NULL);
-    show_stack_overflow(cpu, regs->rsp);
+    show_stack_overflow(cpu, regs);
 
     panic("DOUBLE FAULT -- system shutdown\n");
 }
