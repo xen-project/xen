@@ -596,6 +596,7 @@ void __init start_xen(unsigned long boot_phys_offset,
 {
     size_t fdt_size;
     int cpus, i;
+    const char *cmdline;
 
     setup_cache();
 
@@ -609,7 +610,9 @@ void __init start_xen(unsigned long boot_phys_offset,
         + (fdt_paddr & ((1 << SECOND_SHIFT) - 1));
     fdt_size = device_tree_early_init(device_tree_flattened, fdt_paddr);
 
-    cmdline_parse(device_tree_bootargs(device_tree_flattened));
+    cmdline = device_tree_bootargs(device_tree_flattened);
+    early_printk("Command line: %s\n", cmdline);
+    cmdline_parse(cmdline);
 
     setup_pagetables(boot_phys_offset, get_xen_paddr());
     setup_mm(fdt_paddr, fdt_size);
