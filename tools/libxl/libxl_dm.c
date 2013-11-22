@@ -1228,6 +1228,11 @@ void libxl__spawn_local_dm(libxl__egc *egc, libxl__dm_spawn_state *dmss)
         goto out;
     }
     null = open("/dev/null", O_RDONLY);
+    if (null < 0) {
+        LOGE(ERROR, "unable to open /dev/null");
+        rc = ERROR_FAIL;
+        goto out_close;
+    }
 
     const char *dom_path = libxl__xs_get_dompath(gc, domid);
     spawn->pidpath = GCSPRINTF("%s/%s", dom_path, "image/device-model-pid");
@@ -1275,8 +1280,8 @@ retry_transaction:
     rc = 0;
 
 out_close:
-    if (null != -1) close(null);
-    if (logfile_w != -1) close(logfile_w);
+    if (null >= 0) close(null);
+    if (logfile_w >= 0) close(logfile_w);
 out:
     if (rc)
         device_model_spawn_outcome(egc, dmss, rc);
