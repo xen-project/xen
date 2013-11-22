@@ -118,6 +118,7 @@ static void nmi_shootdown_cpus(void)
     unsigned long msecs;
     int i, cpu = smp_processor_id();
 
+    disable_lapic_nmi_watchdog();
     local_irq_disable();
 
     crashing_cpu = cpu;
