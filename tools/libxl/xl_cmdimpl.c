@@ -411,14 +411,14 @@ static int do_daemonize(char *name)
 
     child1 = xl_fork(child_waitdaemon);
     if (child1) {
-        for (;;) {
-            got_child = xl_waitpid(child_waitdaemon, &status, 0);
-            if (got_child == child1) break;
+        got_child = xl_waitpid(child_waitdaemon, &status, 0);
+        if (got_child != child1) {
             assert(got_child == -1);
-            perror("failed to wait for daemonizing child");
+            LOG("failed to wait for daemonizing child: %s", strerror(errno));
             ret = ERROR_FAIL;
             goto out;
         }
+
         if (status) {
             libxl_report_child_exitstatus(ctx, XTL_ERROR,
                        "daemonizing child", child1, status);
@@ -437,16 +437,15 @@ static int do_daemonize(char *name)
         exit(-1);
     }
 
-    CHK_ERRNO(( logfile = open(fullname, O_WRONLY|O_CREAT|O_APPEND,
-                               0644) )<0);
+    CHK_ERRNO(logfile = open(fullname, O_WRONLY|O_CREAT|O_APPEND, 0644));
     free(fullname);
 
-    CHK_ERRNO(( nullfd = open("/dev/null", O_RDONLY) )<0);
+    CHK_ERRNO(nullfd = open("/dev/null", O_RDONLY));
     dup2(nullfd, 0);
     dup2(logfile, 1);
     dup2(logfile, 2);
 
-    CHK_ERRNO(daemon(0, 1) < 0);
+    CHK_ERRNO(daemon(0, 1));
 
 out:
     return ret;
