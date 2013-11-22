@@ -292,7 +292,7 @@ tools/xm-test/lib/XmTestLib/config.py
 tools/xm-test/lib/XmTestReport/xmtest.py
 tools/xm-test/tests/*.test
 tools/ocaml-xenstored*
-xen/.banner*
+xen/.banner
 xen/System.map
 xen/arch/arm/asm-offsets.s
 xen/arch/arm/xen.lds
@@ -315,7 +315,6 @@ xen/include/linux
 xen/include/public/public
 xen/include/xen/*.new
 xen/include/xen/acm_policy.h
-xen/include/xen/banner.h
 xen/include/xen/compile.h
 xen/tools/figlet/figlet
 xen/tools/symbols

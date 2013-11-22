@@ -71,6 +71,7 @@ disabled at compile time:
       includes the alternative ocaml xenstored.
     * cmake (if building vtpm stub domains)
     * markdown
+    * figlet (for generating the traditional Xen start of day banner)
 
 Second, you need to acquire a suitable kernel for use in domain 0. If
 possible you should use a kernel provided by your OS distributor. If

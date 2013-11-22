@@ -86,7 +86,7 @@ _clean: delete-unfresh-files
 	$(MAKE) -f $(BASEDIR)/Rules.mk -C arch/$(TARGET_ARCH) clean
 	rm -f include/asm *.o $(TARGET) $(TARGET).gz $(TARGET)-syms *~ core
 	rm -f include/asm-*/asm-offsets.h
-	[ -d tools/figlet ] && rm -f .banner*
+	rm -f .banner
 
 .PHONY: _distclean
 _distclean: clean
@@ -114,10 +114,12 @@ delete-unfresh-files:
 	fi
 
 .banner: Makefile
-	$(MAKE) -C tools
-	@tools/figlet/figlet -d tools/figlet Xen $(XEN_FULLVERSION) 2>$@2 >$@1
-	@cat $@1 $@2 >$@
-	@rm -f $@1 $@2
+	@if which figlet >/dev/null 2>&1 ; then \
+		echo " Xen $(XEN_FULLVERSION)" | figlet -f tools/xen.flf > $@.tmp; \
+	else \
+		echo " Xen $(XEN_FULLVERSION)" > $@.tmp; \
+	fi
+	@mv -f $@.tmp $@
 
 # compile.h contains dynamic build info. Rebuilt on every 'make' invocation.
 include/xen/compile.h: include/xen/compile.h.in .banner
@@ -132,8 +134,8 @@ include/xen/compile.h: include/xen/compile.h.in .banner
 	    -e 's/@@extraversion@@/$(XEN_EXTRAVERSION)/g' \
 	    -e 's!@@changeset@@!$(shell tools/scmversion $(XEN_ROOT) || echo "unavailable")!g' \
 	    < include/xen/compile.h.in > $@.new
-	@grep \" .banner >> $@.new
-	@grep -v \" .banner
+	@cat .banner
+	@$(PYTHON) tools/fig-to-oct.py < .banner >> $@.new
 	@mv -f $@.new $@
 
 include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
