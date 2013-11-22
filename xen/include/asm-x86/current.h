@@ -50,6 +50,15 @@ static inline struct cpu_info *get_cpu_info(void)
 #define get_stack_bottom()                      \
     ((unsigned long)&get_cpu_info()->guest_cpu_user_regs.es)
 
+/*
+ * Get the bottom-of-stack, as useful for printing stack traces.  This is the
+ * highest word on the stack which might be part of a stack trace, and is the
+ * adjacent word to a struct cpu_info on the stack.
+ */
+#define get_printable_stack_bottom(sp)          \
+    ((sp & (~(STACK_SIZE-1))) +                 \
+     (STACK_SIZE - sizeof(struct cpu_info) - sizeof(unsigned long)))
+
 #define reset_stack_and_jump(__fn)              \
     __asm__ __volatile__ (                      \
         "mov %0,%%"__OP"sp; jmp %c1"            \

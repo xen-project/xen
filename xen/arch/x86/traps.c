@@ -203,8 +203,9 @@ static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
 static void _show_trace(unsigned long sp, unsigned long __maybe_unused bp)
 {
     unsigned long *stack = (unsigned long *)sp, addr;
+    unsigned long *bottom = (unsigned long *)get_printable_stack_bottom(sp);
 
-    while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )
+    while ( stack <= bottom )
     {
         addr = *stack++;
         if ( is_active_kernel_text(addr) )
@@ -217,12 +218,10 @@ static void _show_trace(unsigned long sp, unsigned long __maybe_unused bp)
 /* Stack trace from frames in the stack, using frame pointers */
 static void _show_trace(unsigned long sp, unsigned long bp)
 {
-    unsigned long *frame, next, addr, low, high;
+    unsigned long *frame, next, addr;
 
     /* Bounds for range of valid frame pointer. */
-    low  = sp - 2*sizeof(unsigned long);
-    high = (low & ~(STACK_SIZE - 1)) + 
-        (STACK_SIZE - sizeof(struct cpu_info) - 2*sizeof(unsigned long));
+    unsigned long low = sp, high = get_printable_stack_bottom(sp);
 
     /* The initial frame pointer. */
     next = bp;
