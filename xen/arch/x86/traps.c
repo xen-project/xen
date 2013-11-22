@@ -195,12 +195,14 @@ static void show_guest_stack(struct vcpu *v, struct cpu_user_regs *regs)
 
 #if !defined(CONFIG_FRAME_POINTER)
 
-static void show_trace(struct cpu_user_regs *regs)
+/*
+ * Stack trace from pointers found in stack, unaided by frame pointers.  For
+ * caller convenience, this has the same prototype as its alternative, and
+ * simply ignores the base pointer parameter.
+ */
+static void _show_trace(unsigned long sp, unsigned long __maybe_unused bp)
 {
-    unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), addr;
-
-    printk("Xen call trace:\n"
-           "   [<%p>] %pS\n", _p(regs->eip), _p(regs->eip));
+    unsigned long *stack = (unsigned long *)sp, addr;
 
     while ( ((long)stack & (STACK_SIZE-BYTES_PER_LONG)) != 0 )
     {
@@ -208,35 +210,22 @@ static void show_trace(struct cpu_user_regs *regs)
         if ( is_active_kernel_text(addr) )
             printk("   [<%p>] %pS\n", _p(addr), _p(addr));
     }
-
-    printk("\n");
 }
 
 #else
 
-static void show_trace(struct cpu_user_regs *regs)
+/* Stack trace from frames in the stack, using frame pointers */
+static void _show_trace(unsigned long sp, unsigned long bp)
 {
     unsigned long *frame, next, addr, low, high;
 
-    /*
-     * If RIP is not pointing into hypervisor code then someone may have
-     * called into oblivion. Peek to see if they left a return address at
-     * top of stack.
-     */
-    addr = is_active_kernel_text(regs->eip) ||
-           !is_active_kernel_text(*ESP_BEFORE_EXCEPTION(regs)) ?
-           regs->eip : *ESP_BEFORE_EXCEPTION(regs);
-
-    printk("Xen call trace:\n"
-           "   [<%p>] %pS\n", _p(addr), _p(addr));
-
     /* Bounds for range of valid frame pointer. */
-    low  = (unsigned long)(ESP_BEFORE_EXCEPTION(regs) - 2);
+    low  = sp - 2*sizeof(unsigned long);
     high = (low & ~(STACK_SIZE - 1)) + 
         (STACK_SIZE - sizeof(struct cpu_info) - 2*sizeof(unsigned long));
 
     /* The initial frame pointer. */
-    next = regs->ebp;
+    next = bp;
 
     for ( ; ; )
     {
@@ -268,11 +257,39 @@ static void show_trace(struct cpu_user_regs *regs)
 
         low = (unsigned long)&frame[2];
     }
-
-    printk("\n");
 }
 
 #endif
+
+static void show_trace(const struct cpu_user_regs *regs)
+{
+    unsigned long *sp = ESP_BEFORE_EXCEPTION(regs);
+
+    printk("Xen call trace:\n");
+
+    /*
+     * If RIP looks sensible, or the top of the stack doesn't, print RIP at
+     * the top of the stack trace.
+     */
+    if ( is_active_kernel_text(regs->rip) ||
+         !is_active_kernel_text(*sp) )
+        printk("   [<%p>] %pS\n", _p(regs->rip), _p(regs->rip));
+    /*
+     * Else RIP looks bad but the top of the stack looks good.  Perhaps we
+     * followed a wild function pointer? Lets assume the top of the stack is a
+     * return address; print it and skip past so _show_trace() doesn't print
+     * it again.
+     */
+    else
+    {
+        printk("   [<%p>] %pS\n", _p(*sp), _p(*sp));
+        sp++;
+    }
+
+    _show_trace((unsigned long)sp, regs->rbp);
+
+    printk("\n");
+}
 
 void show_stack(struct cpu_user_regs *regs)
 {
