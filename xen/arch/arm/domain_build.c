@@ -48,24 +48,6 @@ custom_param("dom0_mem", parse_dom0_mem);
  */
 #define DOM0_FDT_EXTRA_SIZE (128 + sizeof(struct fdt_reserve_entry))
 
-/*
- * Number of cells used for addresses and sizes under the /xen/
- * node.
- *
- * We don't have a struct dt_device_node we can reference as a parent
- * to get these values, so use these constants instead.
- */
-#define XEN_FDT_NODE_ADDRESS_CELLS 2
-#define XEN_FDT_NODE_SIZE_CELLS 2
-#define XEN_FDT_NODE_REG_SIZE \
-    dt_cells_to_size(XEN_FDT_NODE_ADDRESS_CELLS + XEN_FDT_NODE_SIZE_CELLS)
-
-static void set_xen_range(__be32 **cellp, u64 address, u64 size)
-{
-    dt_set_cell(cellp, XEN_FDT_NODE_ADDRESS_CELLS, address);
-    dt_set_cell(cellp, XEN_FDT_NODE_SIZE_CELLS, size);
-}
-
 struct vcpu *__init alloc_dom0_vcpu0(void)
 {
     if ( opt_dom0_max_vcpus == 0 )
@@ -294,14 +276,16 @@ static int fdt_property_interrupts(void *fdt, gic_interrupt_t *intr,
 
 static int make_memory_node(const struct domain *d,
                             void *fdt,
+                            const struct dt_device_node *parent,
                             const struct kernel_info *kinfo)
 {
     int res, i;
-    int nr_cells = XEN_FDT_NODE_REG_SIZE*kinfo->mem.nr_banks;
+    int reg_size = dt_n_addr_cells(parent) + dt_n_size_cells(parent);
+    int nr_cells = reg_size*kinfo->mem.nr_banks;
     __be32 reg[nr_cells];
     __be32 *cells;
 
-    DPRINT("Create memory node\n");
+    DPRINT("Create memory node (reg size %d, nr cells %d)\n", reg_size, nr_cells);
 
     /* ePAPR 3.4 */
     res = fdt_begin_node(fdt, "memory");
@@ -321,10 +305,10 @@ static int make_memory_node(const struct domain *d,
         DPRINT("  Bank %d: %#"PRIx64"->%#"PRIx64"\n",
                 i, start, start + size);
 
-        set_xen_range(&cells, start, size);
+        dt_set_range(&cells, parent, start, size);
     }
 
-    res = fdt_property(fdt, "reg", reg, nr_cells);
+    res = fdt_property(fdt, "reg", reg, sizeof(reg));
     if ( res )
         return res;
 
@@ -531,13 +515,24 @@ static int make_cpus_node(const struct domain *d, void *fdt,
     return res;
 }
 
-static int make_gic_node(const struct domain *d, void *fdt)
+static int make_gic_node(const struct domain *d, void *fdt,
+                         const struct dt_device_node *parent)
 {
     const struct dt_device_node *gic = dt_interrupt_controller;
     const void *compatible = NULL;
     u32 len;
     __be32 *new_cells, *tmp;
     int res = 0;
+
+    /*
+     * Xen currently supports only a single GIC. Discard any secondary
+     * GIC entries.
+     */
+    if ( parent != dt_interrupt_controller )
+    {
+        DPRINT("  Skipping (secondary GIC)\n");
+        return 0;
+    }
 
     DPRINT("Create gic node\n");
 
@@ -565,7 +560,8 @@ static int make_gic_node(const struct domain *d, void *fdt)
     if ( res )
         return res;
 
-    len = XEN_FDT_NODE_REG_SIZE * 2;
+    len = dt_cells_to_size(dt_n_addr_cells(parent) + dt_n_size_cells(parent));
+    len *= 2; /* GIC has two memory regions: Distributor + CPU interface */
     new_cells = xzalloc_bytes(len);
     if ( new_cells == NULL )
         return -FDT_ERR_XEN(ENOMEM);
@@ -573,11 +569,11 @@ static int make_gic_node(const struct domain *d, void *fdt)
     tmp = new_cells;
     DPRINT("  Set Distributor Base 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
            d->arch.vgic.dbase, d->arch.vgic.dbase + PAGE_SIZE - 1);
-    set_xen_range(&tmp, d->arch.vgic.dbase, PAGE_SIZE);
+    dt_set_range(&tmp, parent, d->arch.vgic.dbase, PAGE_SIZE);
 
     DPRINT("  Set Cpu Base 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
            d->arch.vgic.cbase, d->arch.vgic.cbase + (PAGE_SIZE * 2) - 1);
-    set_xen_range(&tmp, d->arch.vgic.cbase, PAGE_SIZE * 2);
+    dt_set_range(&tmp, parent, d->arch.vgic.cbase, PAGE_SIZE * 2);
 
     res = fdt_property(fdt, "reg", new_cells, len);
     xfree(new_cells);
@@ -602,7 +598,8 @@ static int make_gic_node(const struct domain *d, void *fdt)
     return res;
 }
 
-static int make_timer_node(const struct domain *d, void *fdt)
+static int make_timer_node(const struct domain *d, void *fdt,
+                           const struct dt_device_node *parent)
 {
     static const struct dt_device_match timer_ids[] __initconst =
     {
@@ -659,46 +656,6 @@ static int make_timer_node(const struct domain *d, void *fdt)
 
     res = fdt_end_node(fdt);
 
-    return res;
-}
-
-static int make_xen_node(const struct domain *d, void *fdt,
-                         const struct dt_device_node *parent,
-                         const struct kernel_info *kinfo)
-{
-    int res;
-
-    res = fdt_begin_node(fdt, "xen-core-devices");
-    if ( res )
-        return res;
-
-    res = fdt_property_cell(fdt, "#address-cells",
-                            XEN_FDT_NODE_ADDRESS_CELLS);
-    if ( res )
-        return res;
-
-    res = fdt_property_cell(fdt, "#size-cells",
-                            XEN_FDT_NODE_SIZE_CELLS);
-    if ( res )
-        return res;
-
-    res = fdt_property(fdt, "ranges", NULL, 0);
-    if ( res )
-        return res;
-
-    res = make_memory_node(d, fdt, kinfo);
-    if ( res )
-        return res;
-
-    res = make_gic_node(d, fdt);
-    if ( res )
-        return res;
-
-    res = make_timer_node(d, fdt);
-    if ( res )
-        return res;
-
-    res = fdt_end_node(fdt);
     return res;
 }
 
@@ -792,7 +749,15 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         DT_MATCH_COMPATIBLE("arm,psci"),
         DT_MATCH_PATH("/cpus"),
         DT_MATCH_TYPE("memory"),
+        { /* sentinel */ },
+    };
+    static const struct dt_device_match gic_matches[] __initconst =
+    {
         DT_MATCH_GIC,
+        { /* sentinel */ },
+    };
+    static const struct dt_device_match timer_matches[] __initconst =
+    {
         DT_MATCH_TIMER,
         { /* sentinel */ },
     };
@@ -806,11 +771,28 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
     DPRINT("handle %s\n", path);
 
     /* Skip theses nodes and the sub-nodes */
-    if ( dt_match_node(skip_matches, np ) ||
-         platform_device_is_blacklisted(np) ||
-         dt_device_used_by(np) == DOMID_XEN )
+    if ( dt_match_node(skip_matches, np) )
     {
-        DPRINT("  Skip it!\n");
+        DPRINT("  Skip it (matched)\n");
+        return 0;
+    }
+    if ( platform_device_is_blacklisted(np) )
+    {
+        DPRINT("  Skip it (blacklisted)\n");
+        return 0;
+    }
+
+    /* Replace these nodes with our own. Note that the original may be
+     * used_by DOMID_XEN so this check comes first. */
+    if ( dt_match_node(gic_matches, np) )
+        return make_gic_node(d, kinfo->fdt, np);
+    if ( dt_match_node(timer_matches, np) )
+        return make_timer_node(d, kinfo->fdt, np);
+
+    /* Skip nodes used by Xen */
+    if ( dt_device_used_by(np) == DOMID_XEN )
+    {
+        DPRINT("  Skip it (used by Xen)\n");
         return 0;
     }
 
@@ -868,9 +850,10 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
         if ( res )
             return res;
 
-        res = make_xen_node(d, kinfo->fdt, np, kinfo);
+        res = make_memory_node(d, kinfo->fdt, np, kinfo);
         if ( res )
             return res;
+
     }
 
     res = fdt_end_node(kinfo->fdt);
