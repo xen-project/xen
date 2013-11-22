@@ -316,7 +316,6 @@ xen/include/public/public
 xen/include/xen/*.new
 xen/include/xen/acm_policy.h
 xen/include/xen/compile.h
-xen/tools/figlet/figlet
 xen/tools/symbols
 xen/xsm/flask/include/av_perm_to_string.h
 xen/xsm/flask/include/av_permissions.h
