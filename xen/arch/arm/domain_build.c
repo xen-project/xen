@@ -153,10 +153,10 @@ static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
 }
 
 static int write_properties(struct domain *d, struct kernel_info *kinfo,
-                            const struct dt_device_node *np)
+                            const struct dt_device_node *node)
 {
     const char *bootargs = NULL;
-    const struct dt_property *pp;
+    const struct dt_property *prop;
     int res = 0;
     int had_dom0_bootargs = 0;
 
@@ -164,11 +164,11 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
          early_info.modules.module[MOD_KERNEL].cmdline[0] )
         bootargs = &early_info.modules.module[MOD_KERNEL].cmdline[0];
 
-    dt_for_each_property_node (np, pp)
+    dt_for_each_property_node (node, prop)
     {
-        const void *prop_data = pp->value;
+        const void *prop_data = prop->value;
         void *new_data = NULL;
-        u32 prop_len = pp->length;
+        u32 prop_len = prop->length;
 
         /*
          * In chosen node:
@@ -178,28 +178,28 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
          * * remove bootargs,  xen,dom0-bootargs, xen,xen-bootargs,
          *   linux,initrd-start and linux,initrd-end.
          */
-        if ( dt_node_path_is_equal(np, "/chosen") )
+        if ( dt_node_path_is_equal(node, "/chosen") )
         {
-            if ( dt_property_name_is_equal(pp, "xen,xen-bootargs") ||
-                 dt_property_name_is_equal(pp, "linux,initrd-start") ||
-                 dt_property_name_is_equal(pp, "linux,initrd-end") )
+            if ( dt_property_name_is_equal(prop, "xen,xen-bootargs") ||
+                 dt_property_name_is_equal(prop, "linux,initrd-start") ||
+                 dt_property_name_is_equal(prop, "linux,initrd-end") )
                 continue;
 
-            if ( dt_property_name_is_equal(pp, "xen,dom0-bootargs") )
+            if ( dt_property_name_is_equal(prop, "xen,dom0-bootargs") )
             {
                 had_dom0_bootargs = 1;
-                bootargs = pp->value;
+                bootargs = prop->value;
                 continue;
             }
-            if ( dt_property_name_is_equal(pp, "bootargs") )
+            if ( dt_property_name_is_equal(prop, "bootargs") )
             {
                 if ( !bootargs  && !had_dom0_bootargs )
-                    bootargs = pp->value;
+                    bootargs = prop->value;
                 continue;
             }
         }
 
-        res = fdt_property(kinfo->fdt, pp->name, prop_data, prop_len);
+        res = fdt_property(kinfo->fdt, prop->name, prop_data, prop_len);
 
         xfree(new_data);
 
@@ -207,7 +207,7 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
             return res;
     }
 
-    if ( dt_node_path_is_equal(np, "/chosen") && bootargs )
+    if ( dt_node_path_is_equal(node, "/chosen") && bootargs )
     {
         res = fdt_property(kinfo->fdt, "bootargs", bootargs,
                            strlen(bootargs) + 1);
@@ -516,7 +516,7 @@ static int make_cpus_node(const struct domain *d, void *fdt,
 }
 
 static int make_gic_node(const struct domain *d, void *fdt,
-                         const struct dt_device_node *parent)
+                         const struct dt_device_node *node)
 {
     const struct dt_device_node *gic = dt_interrupt_controller;
     const void *compatible = NULL;
@@ -528,7 +528,7 @@ static int make_gic_node(const struct domain *d, void *fdt,
      * Xen currently supports only a single GIC. Discard any secondary
      * GIC entries.
      */
-    if ( parent != dt_interrupt_controller )
+    if ( node != dt_interrupt_controller )
     {
         DPRINT("  Skipping (secondary GIC)\n");
         return 0;
@@ -560,7 +560,7 @@ static int make_gic_node(const struct domain *d, void *fdt,
     if ( res )
         return res;
 
-    len = dt_cells_to_size(dt_n_addr_cells(parent) + dt_n_size_cells(parent));
+    len = dt_cells_to_size(dt_n_addr_cells(node) + dt_n_size_cells(node));
     len *= 2; /* GIC has two memory regions: Distributor + CPU interface */
     new_cells = xzalloc_bytes(len);
     if ( new_cells == NULL )
@@ -569,11 +569,11 @@ static int make_gic_node(const struct domain *d, void *fdt,
     tmp = new_cells;
     DPRINT("  Set Distributor Base 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
            d->arch.vgic.dbase, d->arch.vgic.dbase + PAGE_SIZE - 1);
-    dt_set_range(&tmp, parent, d->arch.vgic.dbase, PAGE_SIZE);
+    dt_set_range(&tmp, node, d->arch.vgic.dbase, PAGE_SIZE);
 
     DPRINT("  Set Cpu Base 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
            d->arch.vgic.cbase, d->arch.vgic.cbase + (PAGE_SIZE * 2) - 1);
-    dt_set_range(&tmp, parent, d->arch.vgic.cbase, PAGE_SIZE * 2);
+    dt_set_range(&tmp, node, d->arch.vgic.cbase, PAGE_SIZE * 2);
 
     res = fdt_property(fdt, "reg", new_cells, len);
     xfree(new_cells);
@@ -599,7 +599,7 @@ static int make_gic_node(const struct domain *d, void *fdt,
 }
 
 static int make_timer_node(const struct domain *d, void *fdt,
-                           const struct dt_device_node *parent)
+                           const struct dt_device_node *node)
 {
     static const struct dt_device_match timer_ids[] __initconst =
     {
@@ -740,7 +740,7 @@ static int map_device(struct domain *d, const struct dt_device_node *dev)
 }
 
 static int handle_node(struct domain *d, struct kernel_info *kinfo,
-                       const struct dt_device_node *np)
+                       const struct dt_device_node *node)
 {
     static const struct dt_device_match skip_matches[] __initconst =
     {
@@ -766,17 +766,17 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
     const char *name;
     const char *path;
 
-    path = dt_node_full_name(np);
+    path = dt_node_full_name(node);
 
     DPRINT("handle %s\n", path);
 
     /* Skip theses nodes and the sub-nodes */
-    if ( dt_match_node(skip_matches, np) )
+    if ( dt_match_node(skip_matches, node) )
     {
         DPRINT("  Skip it (matched)\n");
         return 0;
     }
-    if ( platform_device_is_blacklisted(np) )
+    if ( platform_device_is_blacklisted(node) )
     {
         DPRINT("  Skip it (blacklisted)\n");
         return 0;
@@ -784,13 +784,13 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
 
     /* Replace these nodes with our own. Note that the original may be
      * used_by DOMID_XEN so this check comes first. */
-    if ( dt_match_node(gic_matches, np) )
-        return make_gic_node(d, kinfo->fdt, np);
-    if ( dt_match_node(timer_matches, np) )
-        return make_timer_node(d, kinfo->fdt, np);
+    if ( dt_match_node(gic_matches, node) )
+        return make_gic_node(d, kinfo->fdt, node);
+    if ( dt_match_node(timer_matches, node) )
+        return make_timer_node(d, kinfo->fdt, node);
 
     /* Skip nodes used by Xen */
-    if ( dt_device_used_by(np) == DOMID_XEN )
+    if ( dt_device_used_by(node) == DOMID_XEN )
     {
         DPRINT("  Skip it (used by Xen)\n");
         return 0;
@@ -804,10 +804,10 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
      *  property. Therefore these device doesn't need to be mapped. This
      *  solution can be use later for pass through.
      */
-    if ( !dt_device_type_is_equal(np, "memory") &&
-         dt_device_is_available(np) )
+    if ( !dt_device_type_is_equal(node, "memory") &&
+         dt_device_is_available(node) )
     {
-        res = map_device(d, np);
+        res = map_device(d, node);
 
         if ( res )
             return res;
@@ -825,32 +825,32 @@ static int handle_node(struct domain *d, struct kernel_info *kinfo,
     if ( res )
         return res;
 
-    res = write_properties(d, kinfo, np);
+    res = write_properties(d, kinfo, node);
     if ( res )
         return res;
 
-    for ( child = np->child; child != NULL; child = child->sibling )
+    for ( child = node->child; child != NULL; child = child->sibling )
     {
         res = handle_node(d, kinfo, child);
         if ( res )
             return res;
     }
 
-    if ( np == dt_host )
+    if ( node == dt_host )
     {
-        res = make_hypervisor_node(d, kinfo->fdt, np);
+        res = make_hypervisor_node(d, kinfo->fdt, node);
         if ( res )
             return res;
 
-        res = make_psci_node(kinfo->fdt, np);
+        res = make_psci_node(kinfo->fdt, node);
         if ( res )
             return res;
 
-        res = make_cpus_node(d, kinfo->fdt, np);
+        res = make_cpus_node(d, kinfo->fdt, node);
         if ( res )
             return res;
 
-        res = make_memory_node(d, kinfo->fdt, np, kinfo);
+        res = make_memory_node(d, kinfo->fdt, node, kinfo);
         if ( res )
             return res;
 
