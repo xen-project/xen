@@ -81,6 +81,7 @@ int xgtrc_on = 0;
 struct xen_domctl domctl;         /* just use a global domctl */
 
 static int     _hvm_guest;        /* hvm guest? 32bit HVMs have 64bit context */
+static int     _pvh_guest;        /* PV guest in HVM container */
 static domid_t _dom_id;           /* guest domid */
 static int     _max_vcpu_id;      /* thus max_vcpu_id+1 VCPUs */
 static int     _dom0_fd;          /* fd of /dev/privcmd */
@@ -309,6 +310,7 @@ xg_attach(int domid, int guest_bitness)
 
     _max_vcpu_id = domctl.u.getdomaininfo.max_vcpu_id;
     _hvm_guest = (domctl.u.getdomaininfo.flags & XEN_DOMINF_hvm_guest);
+    _pvh_guest = (domctl.u.getdomaininfo.flags & XEN_DOMINF_pvh_guest);
     return _max_vcpu_id;
 }
 
@@ -369,7 +371,7 @@ _change_TF(vcpuid_t which_vcpu, int guest_bitness, int setit)
     int sz = sizeof(anyc);
 
     /* first try the MTF for hvm guest. otherwise do manually */
-    if (_hvm_guest) {
+    if (_hvm_guest || _pvh_guest) {
         domctl.u.debug_op.vcpu = which_vcpu;
         domctl.u.debug_op.op = setit ? XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON :
                                        XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF;
