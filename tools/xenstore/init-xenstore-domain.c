@@ -18,51 +18,60 @@ static int build(xc_interface *xch, char** argv)
 	char cmdline[512];
 	uint32_t ssid;
 	xen_domain_handle_t handle = { 0 };
-	int rv;
-	int xs_fd = open("/dev/xen/xenbus_backend", O_RDWR);
-	struct xc_dom_image *dom;
+	int rv, xs_fd;
+	struct xc_dom_image *dom = NULL;
 	int maxmem = atoi(argv[2]);
 	int limit_kb = (maxmem + 1)*1024;
 
+	xs_fd = open("/dev/xen/xenbus_backend", O_RDWR);
+	if (xs_fd == -1) return -1;
+
 	rv = xc_flask_context_to_sid(xch, argv[3], strlen(argv[3]), &ssid);
-	if (rv) return rv;
+	if (rv) goto err;
 	rv = xc_domain_create(xch, ssid, handle, 0, &domid);
-	if (rv) return rv;
+	if (rv) goto err;
 	rv = xc_domain_max_vcpus(xch, domid, 1);
-	if (rv) return rv;
+	if (rv) goto err;
 	rv = xc_domain_setmaxmem(xch, domid, limit_kb);
-	if (rv) return rv;
+	if (rv) goto err;
 	rv = xc_domain_set_memmap_limit(xch, domid, limit_kb);
-	if (rv) return rv;
+	if (rv) goto err;
 
 	rv = ioctl(xs_fd, IOCTL_XENBUS_BACKEND_SETUP, domid);
-	if (rv < 0) return rv;
+	if (rv < 0) goto err;
 	snprintf(cmdline, 512, "--event %d --internal-db", rv);
 
 	dom = xc_dom_allocate(xch, cmdline, NULL);
 	rv = xc_dom_kernel_file(dom, argv[1]);
-	if (rv) return rv;
+	if (rv) goto err;
 	rv = xc_dom_boot_xen_init(dom, xch, domid);
-	if (rv) return rv;
+	if (rv) goto err;
 	rv = xc_dom_parse_image(dom);
-	if (rv) return rv;
+	if (rv) goto err;
 	rv = xc_dom_mem_init(dom, maxmem);
-	if (rv) return rv;
+	if (rv) goto err;
 	rv = xc_dom_boot_mem_init(dom);
-	if (rv) return rv;
+	if (rv) goto err;
 	rv = xc_dom_build_image(dom);
-	if (rv) return rv;
+	if (rv) goto err;
 	rv = xc_dom_boot_image(dom);
-	if (rv) return rv;
+	if (rv) goto err;
 
 	xc_dom_release(dom);
+	dom = NULL;
 
 	rv = xc_domain_set_virq_handler(xch, domid, VIRQ_DOM_EXC);
-	if (rv) return rv;
+	if (rv) goto err;
 	rv = xc_domain_unpause(xch, domid);
-	if (rv) return rv;
+	if (rv) goto err;
 
 	return 0;
+
+err:
+	if (dom)
+		xc_dom_release(dom);
+	close(xs_fd);
+	return rv;
 }
 
 int main(int argc, char** argv)
