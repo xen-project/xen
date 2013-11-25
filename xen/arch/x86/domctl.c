@@ -1146,6 +1146,8 @@ long arch_do_domctl(
             {
                 v->arch.xcr0 = _xcr0;
                 v->arch.xcr0_accum = _xcr0_accum;
+                if ( _xcr0_accum & XSTATE_NONLAZY )
+                    v->arch.nonlazy_xstate_used = 1;
                 memcpy(v->arch.xsave_area, _xsave_area,
                        evc->size - 2 * sizeof(uint64_t));
             }

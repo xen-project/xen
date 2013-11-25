@@ -133,11 +133,22 @@ static inline void fpu_frstor(struct vcpu *v)
 /*******************************/
 /*      FPU Save Functions     */
 /*******************************/
+
+static inline uint64_t vcpu_xsave_mask(const struct vcpu *v)
+{
+    if ( v->fpu_dirtied )
+        return v->arch.nonlazy_xstate_used ? XSTATE_ALL : XSTATE_LAZY;
+
+    return v->arch.nonlazy_xstate_used ? XSTATE_NONLAZY : 0;
+}
+
 /* Save x87 extended state */
 static inline void fpu_xsave(struct vcpu *v)
 {
     bool_t ok;
+    uint64_t mask = vcpu_xsave_mask(v);
 
+    ASSERT(mask);
     ASSERT(v->arch.xsave_area);
     /*
      * XCR0 normally represents what guest OS set. In case of Xen itself,
@@ -145,7 +156,7 @@ static inline void fpu_xsave(struct vcpu *v)
      */
     ok = set_xcr0(v->arch.xcr0_accum | XSTATE_FP_SSE);
     ASSERT(ok);
-    xsave(v, v->arch.nonlazy_xstate_used ? XSTATE_ALL : XSTATE_LAZY);
+    xsave(v, mask);
     ok = set_xcr0(v->arch.xcr0 ?: XSTATE_FP_SSE);
     ASSERT(ok);
 }
@@ -257,7 +268,7 @@ void vcpu_restore_fpu_lazy(struct vcpu *v)
  */
 void vcpu_save_fpu(struct vcpu *v)
 {
-    if ( !v->fpu_dirtied )
+    if ( !v->fpu_dirtied && !v->arch.nonlazy_xstate_used )
         return;
 
     ASSERT(!is_idle_vcpu(v));
