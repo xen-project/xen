@@ -104,6 +104,7 @@ void daemonize(const char *pidfile)
 	signal(SIGTSTP, SIG_IGN);
 	signal(SIGTTOU, SIG_IGN);
 	signal(SIGTTIN, SIG_IGN);
+	close(fd);
 }
 
 bool xen_setup(void)
