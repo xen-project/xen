@@ -208,13 +208,16 @@ static void read_symbol_table(const char *symtab)
             continue;
         default:
             symbol = malloc(sizeof(*symbol));
-            if (symbol == NULL)
+            if (symbol == NULL) {
+                fclose(f);
                 return;
+            }
 
             symbol->address = address;
             symbol->name = strdup(p);
             if (symbol->name == NULL) {
                 free(symbol);
+                fclose(f);
                 return;
             }
 
