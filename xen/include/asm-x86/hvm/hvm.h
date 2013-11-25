@@ -160,7 +160,7 @@ struct hvm_function_table {
     int (*msr_write_intercept)(unsigned int msr, uint64_t msr_content);
     void (*invlpg_intercept)(unsigned long vaddr);
     void (*handle_cd)(struct vcpu *v, unsigned long value);
-    void (*set_info_guest)(struct vcpu *v, uint64_t gs_base_kernel);
+    void (*set_info_guest)(struct vcpu *v);
     void (*set_rdtsc_exiting)(struct vcpu *v, bool_t);
 
     /* Nested HVM */
@@ -434,10 +434,10 @@ void *hvm_map_guest_frame_rw(unsigned long gfn, bool_t permanent);
 void *hvm_map_guest_frame_ro(unsigned long gfn, bool_t permanent);
 void hvm_unmap_guest_frame(void *p, bool_t permanent);
 
-static inline void hvm_set_info_guest(struct vcpu *v, uint64_t gs_base_kernel)
+static inline void hvm_set_info_guest(struct vcpu *v)
 {
     if ( hvm_funcs.set_info_guest )
-        return hvm_funcs.set_info_guest(v, gs_base_kernel);
+        return hvm_funcs.set_info_guest(v);
 }
 
 int hvm_debug_op(struct vcpu *v, int32_t op);

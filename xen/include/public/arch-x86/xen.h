@@ -161,10 +161,8 @@ typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
  * - For HVM guests, the structures read include: fpu_ctxt (if
  * VGCT_I387_VALID is set), flags, user_regs, debugreg[*]
  *
- * - PVH guests are the same as HVM guests, but additionally set cr3,
- * and for 64-bit guests, gs_base_kernel.  Additionally, the following
- * entries must be 0: ctrlreg[1], ldt_base, ldt_ents, user_regs.{cs,
- * ss, es, ds, fs, gs), gdt_ents, fs_base, and gs_base_user.
+ * - PVH guests are the same as HVM guests, but additionally use ctrlreg[3] to
+ * set cr3. All other fields not used should be set to 0.
  */
 struct vcpu_guest_context {
     /* FPU registers come first so they can be aligned for FXSAVE/FXRSTOR. */

@@ -704,9 +704,12 @@ int arch_set_info_guest(
         /* PVH 32bitfixme */
         ASSERT(!compat);
 
-        if ( c(ctrlreg[1]) || c(ldt_base) || c(ldt_ents) ||
+        if ( c(ctrlreg[0]) || c(ctrlreg[1]) || c(ctrlreg[2]) ||
+             c(ctrlreg[4]) || c(ctrlreg[5]) || c(ctrlreg[6]) ||
+             c(ctrlreg[7]) ||  c(ldt_base) || c(ldt_ents) ||
              c(user_regs.cs) || c(user_regs.ss) || c(user_regs.es) ||
              c(user_regs.ds) || c(user_regs.fs) || c(user_regs.gs) ||
+             c(kernel_ss) || c(kernel_sp) || c.nat->gs_base_kernel ||
              c.nat->gdt_ents || c.nat->fs_base || c.nat->gs_base_user )
             return -EINVAL;
     }
@@ -745,13 +748,7 @@ int arch_set_info_guest(
 
     if ( has_hvm_container_vcpu(v) )
     {
-        /*
-         * NB: TF_kernel_mode is set unconditionally for HVM guests,
-         * so we always use the gs_base_kernel here. If we change this
-         * function to imitate the PV functionality, we'll need to
-         * make it pay attention to the kernel bit.
-         */
-        hvm_set_info_guest(v, compat ? 0 : c.nat->gs_base_kernel);
+        hvm_set_info_guest(v);
 
         if ( is_hvm_vcpu(v) || v->is_initialised )
             goto out;
