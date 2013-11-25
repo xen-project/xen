@@ -31,7 +31,9 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
 
     ctx = malloc(sizeof(*ctx));
     if (!ctx) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Failed to allocate context\n");
+        xtl_log(lg, XTL_ERROR, errno, "libxl",
+                "%s:%d:%s: Failed to allocate context\n",
+                __FILE__, __LINE__, __func__);
         rc = ERROR_NOMEM; goto out;
     }
 
