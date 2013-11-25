@@ -176,13 +176,25 @@ void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
 {
     struct xc_dom_mem *block = NULL;
     int fd = -1;
+    off_t offset;
 
     fd = open(filename, O_RDONLY);
-    if ( fd == -1 )
+    if ( fd == -1 ) {
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "failed to open file: %s",
+                     strerror(errno));
         goto err;
+    }
 
-    lseek(fd, 0, SEEK_SET);
-    *size = lseek(fd, 0, SEEK_END);
+    if ( (lseek(fd, 0, SEEK_SET) == -1) ||
+         ((offset = lseek(fd, 0, SEEK_END)) == -1) ) {
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "failed to seek on file: %s",
+                     strerror(errno));
+        goto err;
+    }
+
+    *size = offset;
 
     if ( max_size && *size > max_size )
     {
@@ -192,14 +204,24 @@ void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
     }
 
     block = malloc(sizeof(*block));
-    if ( block == NULL )
+    if ( block == NULL ) {
+        xc_dom_panic(dom->xch, XC_OUT_OF_MEMORY,
+                     "failed to allocate block (%zu bytes)",
+                     sizeof(*block));
         goto err;
+    }
+
     memset(block, 0, sizeof(*block));
     block->mmap_len = *size;
     block->mmap_ptr = mmap(NULL, block->mmap_len, PROT_READ,
                            MAP_SHARED, fd, 0);
-    if ( block->mmap_ptr == MAP_FAILED )
+    if ( block->mmap_ptr == MAP_FAILED ) {
+        xc_dom_panic(dom->xch, XC_INTERNAL_ERROR,
+                     "failed to mmap file: %s",
+                     strerror(errno));
         goto err;
+    }
+
     block->next = dom->memblocks;
     dom->memblocks = block;
     dom->alloc_malloc += sizeof(*block);
@@ -212,8 +234,7 @@ void *xc_dom_malloc_filemap(struct xc_dom_image *dom,
  err:
     if ( fd != -1 )
         close(fd);
-    if ( block != NULL )
-        free(block);
+    free(block);
     DOMPRINTF("%s: failed (on file `%s')", __FUNCTION__, filename);
     return NULL;
 }
