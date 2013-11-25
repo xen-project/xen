@@ -367,10 +367,13 @@ perform(enum mode mode, int optind, int argc, char **argv, struct xs_handle *xsh
 
                         if (list) {
                             free(list);
-                            if (num == 0)
+                            if (num == 0){
+                                free(val);
                                 goto again;
+                            }
                         }
                     }
+                    free(val);
                 }
 
                 free(path);
