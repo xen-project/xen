@@ -446,13 +446,16 @@ void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl)
  * 
  *     libxl_sigchld_owner_mainloop:
  *       The application must install a SIGCHLD handler and reap (at
- *       least) all of libxl's children and pass their exit status
- *       to libxl by calling libxl_childproc_exited.
+ *       least) all of libxl's children and pass their exit status to
+ *       libxl by calling libxl_childproc_exited.  (If the application
+ *       has multiple libxl ctx's, it must call libxl_childproc_exited
+ *       on each ctx.)
  *
  *     libxl_sigchld_owner_libxl_always:
  *       The application expects libxl to reap all of its children,
  *       and provides a callback to be notified of their exit
- *       statues.
+ *       statues.  The application must have only one libxl_ctx
+ *       configured this way.
  *
  * An application which fails to call setmode, or which passes 0 for
  * hooks, while it uses any libxl operation which might
