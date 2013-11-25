@@ -161,7 +161,7 @@ int main(int argc, char* argv[])
       exit(EXIT_FAILURE);
     }
     if (fwrite(bios_data, 1, bios_len, stream) < bios_len) {
-      printf("Error writing %d KBytes to %s.\n", bios_len / 1024, argv[1]);
+      printf("Error writing %ld KBytes to %s.\n", bios_len / 1024, argv[1]);
       fclose(stream);
       exit(EXIT_FAILURE);
     }
