@@ -161,8 +161,9 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
 
         spin_unlock_irqrestore(&q->lock, flags);
 
-        if ( !test_and_set_bit(q->priority,
-                               &v->evtchn_fifo->control_block->ready) )
+        if ( !linked
+             && !test_and_set_bit(q->priority,
+                                  &v->evtchn_fifo->control_block->ready) )
             vcpu_mark_events_pending(v);
     }
 
