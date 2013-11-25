@@ -4924,11 +4924,11 @@ static int sched_sedf_domain_set(libxl__gc *gc, uint32_t domid,
     }
 
     if (scinfo->period != LIBXL_DOMAIN_SCHED_PARAM_PERIOD_DEFAULT)
-        period = scinfo->period * 1000000;
+        period = (uint64_t)scinfo->period * 1000000;
     if (scinfo->slice != LIBXL_DOMAIN_SCHED_PARAM_SLICE_DEFAULT)
-        slice = scinfo->slice * 1000000;
+        slice = (uint64_t)scinfo->slice * 1000000;
     if (scinfo->latency != LIBXL_DOMAIN_SCHED_PARAM_LATENCY_DEFAULT)
-        latency = scinfo->latency * 1000000;
+        latency = (uint64_t)scinfo->latency * 1000000;
     if (scinfo->extratime != LIBXL_DOMAIN_SCHED_PARAM_EXTRATIME_DEFAULT)
         extratime = scinfo->extratime;
     if (scinfo->weight != LIBXL_DOMAIN_SCHED_PARAM_WEIGHT_DEFAULT)
