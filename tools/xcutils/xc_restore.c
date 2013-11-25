@@ -23,7 +23,7 @@ main(int argc, char **argv)
     xc_interface *xch;
     int io_fd, ret;
     int superpages;
-    unsigned long store_mfn, console_mfn;
+    unsigned long store_mfn = 0, console_mfn = 0;
     xentoollog_level lvl;
     xentoollog_logger *l;
 
