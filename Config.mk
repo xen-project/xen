@@ -180,9 +180,9 @@ endif
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.1.6.1
-# Tue May 14 18:48:49 2013 +0100
-# piix4acpi, xen, hotplug: Fix race with ACPI AML code and hotplug.
+QEMU_TAG ?= 2d4fa397ba0fbae0c62282de619e1f088a320b33
+# Mon Nov 11 13:42:56 2013 -0500
+# hw/piix4acpi: Make writes to ACPI_DBG_IO_ADDR actually work.
 
 # Optional components
 XENSTAT_XENTOP     ?= y
