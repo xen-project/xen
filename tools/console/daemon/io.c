@@ -270,6 +270,7 @@ static int create_hv_log(void)
 			dolog(LOG_ERR, "Failed to log opening timestamp "
 				       "in %s: %d (%s)", logfile, errno,
 				       strerror(errno));
+			close(fd);
 			return -1;
 		}
 	}
@@ -315,6 +316,7 @@ static int create_domain_log(struct domain *dom)
 			dolog(LOG_ERR, "Failed to log opening timestamp "
 				       "in %s: %d (%s)", logfile, errno,
 				       strerror(errno));
+			close(fd);
 			return -1;
 		}
 	}
