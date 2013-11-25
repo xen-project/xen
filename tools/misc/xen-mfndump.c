@@ -240,7 +240,8 @@ int dump_ptes_func(int argc, char *argv[])
            domid, pfn, minfo.p2m_table[pfn]);
 
  out:
-    munmap(page, PAGE_SIZE);
+    if ( page )
+        munmap(page, PAGE_SIZE);
     xc_unmap_domain_meminfo(xch, &minfo);
     munmap(m2p_table, M2P_SIZE(max_mfn));
     return rc;
@@ -359,8 +360,10 @@ int memcmp_mfns_func(int argc, char *argv[])
     printf("  memcpy(1, 2) = %d\n", memcmp(page1, page2, PAGE_SIZE));
 
  out:
-    munmap(page1, PAGE_SIZE);
-    munmap(page2, PAGE_SIZE);
+    if ( page1 )
+        munmap(page1, PAGE_SIZE);
+    if ( page2 )
+        munmap(page2, PAGE_SIZE);
     return rc;
 }
 
