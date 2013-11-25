@@ -215,9 +215,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= xen-4.2.3
-# Tue May 14 18:48:49 2013 +0100
-# piix4acpi, xen, hotplug: Fix race with ACPI AML code and hotplug.
+QEMU_TAG ?= 7c51fb2971cd455eb728e716f16a488c01f8e759
+# Mon Nov 11 13:42:56 2013 -0500
+# hw/piix4acpi: Make writes to ACPI_DBG_IO_ADDR actually work.
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
