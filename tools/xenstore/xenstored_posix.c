@@ -44,6 +44,8 @@ void write_pidfile(const char *pidfile)
 	len = snprintf(buf, sizeof(buf), "%ld\n", (long)getpid());
 	if (write(fd, buf, len) != len)
 		barf_perror("Writing pid file %s", pidfile);
+
+	close(fd);
 }
 
 /* Stevens. */
