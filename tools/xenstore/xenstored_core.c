@@ -1718,6 +1718,9 @@ static void init_sockets(int **psock, int **pro_sock)
 {
 	struct sockaddr_un addr;
 	int *sock, *ro_sock;
+	const char *soc_str = xs_daemon_socket();
+	const char *soc_str_ro = xs_daemon_socket_ro();
+
 	/* Create sockets for them to listen to. */
 	*psock = sock = talloc(talloc_autofree_context(), int);
 	*sock = socket(PF_UNIX, SOCK_STREAM, 0);
@@ -1731,19 +1734,25 @@ static void init_sockets(int **psock, int **pro_sock)
 	talloc_set_destructor(ro_sock, destroy_fd);
 
 	/* FIXME: Be more sophisticated, don't mug running daemon. */
-	unlink(xs_daemon_socket());
-	unlink(xs_daemon_socket_ro());
+	unlink(soc_str);
+	unlink(soc_str_ro);
 
 	addr.sun_family = AF_UNIX;
-	strcpy(addr.sun_path, xs_daemon_socket());
+
+	if(strlen(soc_str) >= sizeof(addr.sun_path))
+		barf_perror("socket string '%s' too long", soc_str);
+	strcpy(addr.sun_path, soc_str);
 	if (bind(*sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
-		barf_perror("Could not bind socket to %s", xs_daemon_socket());
-	strcpy(addr.sun_path, xs_daemon_socket_ro());
+		barf_perror("Could not bind socket to %s", soc_str);
+
+	if(strlen(soc_str_ro) >= sizeof(addr.sun_path))
+		barf_perror("socket string '%s' too long", soc_str_ro);
+	strcpy(addr.sun_path, soc_str_ro);
 	if (bind(*ro_sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
-		barf_perror("Could not bind socket to %s",
-			    xs_daemon_socket_ro());
-	if (chmod(xs_daemon_socket(), 0600) != 0
-	    || chmod(xs_daemon_socket_ro(), 0660) != 0)
+		barf_perror("Could not bind socket to %s", soc_str_ro);
+
+	if (chmod(soc_str, 0600) != 0
+	    || chmod(soc_str_ro, 0660) != 0)
 		barf_perror("Could not chmod sockets");
 
 	if (listen(*sock, 1) != 0
