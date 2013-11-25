@@ -4761,6 +4761,7 @@ static int sched_domain_output(libxl_scheduler sched, int (*output)(int),
     poolinfo = libxl_list_cpupool(ctx, &n_pools);
     if (!poolinfo) {
         fprintf(stderr, "error getting cpupool info\n");
+        libxl_dominfo_list_free(info, nb_domain);
         return -ERROR_NOMEM;
     }
 
@@ -4782,6 +4783,7 @@ static int sched_domain_output(libxl_scheduler sched, int (*output)(int),
     }
     if (poolinfo)
         libxl_cpupoolinfo_list_free(poolinfo, n_pools);
+    libxl_dominfo_list_free(info, nb_domain);
     return 0;
 }
 
