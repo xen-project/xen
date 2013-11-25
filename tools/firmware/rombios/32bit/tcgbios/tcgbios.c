@@ -428,7 +428,7 @@ uint32_t tcpa_get_laml(void)
  *  data       : pointer to the data (i.e., string) to be added to the log
  *  length     : length of the data
  */
-static uint16_t
+static uint32_t
 tcpa_add_measurement_to_log(uint32_t pcrIndex,
                             uint32_t event_type,
                             uint32_t event_id,
