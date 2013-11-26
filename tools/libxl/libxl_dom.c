@@ -1358,7 +1358,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
 
         if (port >= 0) {
             dss->suspend_eventchn =
-                xc_suspend_evtchn_init(CTX->xch, dss->xce, dss->domid, port);
+                xc_suspend_evtchn_init_exclusive(CTX->xch, dss->xce, dss->domid, port);
 
             if (dss->suspend_eventchn < 0)
                 LOG(WARN, "Suspend event channel initialization failed");

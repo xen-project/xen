@@ -111,7 +111,7 @@ static int suspend_guest(xc_interface *xch, xc_evtchn *xce, int domid, int *evtc
         fprintf(stderr, "DOM%d: No suspend port, try live migration\n", domid);
         goto failed;
     }
-    suspend_evtchn = xc_suspend_evtchn_init(xch, xce, domid, port);
+    suspend_evtchn = xc_suspend_evtchn_init_exclusive(xch, xce, domid, port);
     if (suspend_evtchn < 0)
     {
         fprintf(stderr, "Suspend evtchn initialization failed\n");

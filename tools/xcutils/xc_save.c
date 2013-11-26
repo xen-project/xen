@@ -199,7 +199,7 @@ main(int argc, char **argv)
         else
         {
             si.suspend_evtchn =
-              xc_suspend_evtchn_init(si.xch, si.xce, si.domid, port);
+              xc_suspend_evtchn_init_exclusive(si.xch, si.xce, si.domid, port);
 
             if (si.suspend_evtchn < 0)
                 warnx("suspend event channel initialization failed, "

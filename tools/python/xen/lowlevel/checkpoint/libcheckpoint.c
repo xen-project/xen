@@ -360,7 +360,7 @@ static int setup_suspend_evtchn(checkpoint_state* s)
     return -1;
   }
 
-  s->suspend_evtchn = xc_suspend_evtchn_init(s->xch, s->xce, s->domid, port);
+  s->suspend_evtchn = xc_suspend_evtchn_init_exclusive(s->xch, s->xce, s->domid, port);
   if (s->suspend_evtchn < 0) {
       s->errstr = "failed to bind suspend event channel";
       return -1;
