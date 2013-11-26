@@ -38,9 +38,9 @@
 #define ROM_INCLUDE_OVMF
 #include "roms.inc"
 
-#define OVMF_BEGIN              0xFFF00000ULL
-#define OVMF_SIZE               0x00100000ULL
+#define OVMF_SIZE               (sizeof(ovmf))
 #define OVMF_MAXOFFSET          0x000FFFFFULL
+#define OVMF_BEGIN              (0x100000000ULL - ((OVMF_SIZE + OVMF_MAXOFFSET) & ~OVMF_MAXOFFSET))
 #define OVMF_END                (OVMF_BEGIN + OVMF_SIZE)
 #define LOWCHUNK_BEGIN          0x000F0000
 #define LOWCHUNK_SIZE           0x00010000
