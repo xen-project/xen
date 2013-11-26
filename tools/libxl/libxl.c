@@ -2983,45 +2983,51 @@ out:
     return;
 }
 
-static void libxl__device_nic_from_xs_be(libxl__gc *gc,
-                                         const char *be_path,
-                                         libxl_device_nic *nic)
+static int libxl__device_nic_from_xs_be(libxl__gc *gc,
+                                        const char *be_path,
+                                        libxl_device_nic *nic)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
-    unsigned int len;
-    char *tmp;
+    const char *tmp;
     int rc;
 
     libxl_device_nic_init(nic);
 
-    tmp = xs_read(ctx->xsh, XBT_NULL,
-                  libxl__sprintf(gc, "%s/handle", be_path), &len);
-    if ( tmp )
+#define READ_BACKEND(tgc, subpath) ({                                   \
+        rc = libxl__xs_read_checked(tgc, XBT_NULL,                      \
+                                    GCSPRINTF("%s/" subpath, be_path),  \
+                                    &tmp);                              \
+        if (rc) goto out;                                               \
+        (char*)tmp;                                                     \
+    });
+
+    tmp = READ_BACKEND(gc, "handle");
+    if (tmp)
         nic->devid = atoi(tmp);
     else
         nic->devid = 0;
 
     /* nic->mtu = */
 
-    tmp = xs_read(ctx->xsh, XBT_NULL,
-                  libxl__sprintf(gc, "%s/mac", be_path), &len);
-    rc = libxl__parse_mac(tmp, nic->mac);
-    if (rc)
+    tmp = READ_BACKEND(gc, "mac");
+    if (tmp) {
+        rc = libxl__parse_mac(tmp, nic->mac);
+        if (rc) goto out;
+    } else {
         memset(nic->mac, 0, sizeof(nic->mac));
+    }
 
-    nic->ip = xs_read(ctx->xsh, XBT_NULL,
-                      libxl__sprintf(gc, "%s/ip", be_path), &len);
-
-    nic->bridge = xs_read(ctx->xsh, XBT_NULL,
-                      libxl__sprintf(gc, "%s/bridge", be_path), &len);
-
-    nic->script = xs_read(ctx->xsh, XBT_NULL,
-                      libxl__sprintf(gc, "%s/script", be_path), &len);
+    nic->ip = READ_BACKEND(NOGC, "ip");
+    nic->bridge = READ_BACKEND(NOGC, "bridge");
+    nic->script = READ_BACKEND(NOGC, "script");
 
     /* vif_ioemu nics use the same xenstore entries as vif interfaces */
     nic->nictype = LIBXL_NIC_TYPE_VIF;
     nic->model = NULL; /* XXX Only for TYPE_IOEMU */
     nic->ifname = NULL; /* XXX Only for TYPE_IOEMU */
+
+    rc = 0;
+ out:
+    return rc;
 }
 
 int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
@@ -3042,7 +3048,8 @@ int libxl_devid_to_device_nic(libxl_ctx *ctx, uint32_t domid,
     if (!path)
         goto out;
 
-    libxl__device_nic_from_xs_be(gc, path, nic);
+    rc = libxl__device_nic_from_xs_be(gc, path, nic);
+    if (rc) goto out;
 
     rc = 0;
 out:
@@ -3060,6 +3067,7 @@ static int libxl__append_nic_list_of_type(libxl__gc *gc,
     char **dir = NULL;
     unsigned int n = 0;
     libxl_device_nic *pnic = NULL, *pnic_end = NULL;
+    int rc;
 
     be_path = libxl__sprintf(gc, "%s/backend/%s/%d",
                              libxl__xs_get_dompath(gc, 0), type, domid);
@@ -3071,16 +3079,20 @@ static int libxl__append_nic_list_of_type(libxl__gc *gc,
             return ERROR_NOMEM;
         *nics = tmp;
         pnic = *nics + *nnics;
-        *nnics += n;
-        pnic_end = *nics + *nnics;
+        pnic_end = *nics + *nnics + n;
         for (; pnic < pnic_end; pnic++, dir++) {
             const char *p;
             p = libxl__sprintf(gc, "%s/%s", be_path, *dir);
-            libxl__device_nic_from_xs_be(gc, p, pnic);
+            rc = libxl__device_nic_from_xs_be(gc, p, pnic);
+            if (rc) goto out;
             pnic->backend_domid = 0;
         }
+        *nnics += n;
     }
     return 0;
+
+ out:
+    return rc;
 }
 
 libxl_device_nic *libxl_device_nic_list(libxl_ctx *ctx, uint32_t domid, int *num)
