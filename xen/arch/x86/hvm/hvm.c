@@ -2259,7 +2259,7 @@ static int hvm_load_segment_selector(
         desc = *pdesc;
 
         /* Segment present in memory? */
-        if ( !(desc.b & (1u<<15)) )
+        if ( !(desc.b & _SEGMENT_P) )
         {
             fault_type = TRAP_no_segment;
             goto unmap_and_fail;
@@ -2277,7 +2277,7 @@ static int hvm_load_segment_selector(
         {
         case x86_seg_cs:
             /* Code segment? */
-            if ( !(desc.b & (1u<<11)) )
+            if ( !(desc.b & _SEGMENT_CODE) )
                 goto unmap_and_fail;
             /* Non-conforming segment: check DPL against RPL. */
             if ( !(desc.b & _SEGMENT_EC) && (dpl != rpl) )
@@ -2285,19 +2285,19 @@ static int hvm_load_segment_selector(
             break;
         case x86_seg_ss:
             /* Writable data segment? */
-            if ( (desc.b & (5u<<9)) != (1u<<9) )
+            if ( (desc.b & (_SEGMENT_CODE|_SEGMENT_WR)) != _SEGMENT_WR )
                 goto unmap_and_fail;
             if ( (dpl != cpl) || (dpl != rpl) )
                 goto unmap_and_fail;
             break;
         case x86_seg_ldtr:
             /* LDT system segment? */
-            if ( (desc.b & (15u<<8)) != (2u<<8) )
+            if ( (desc.b & _SEGMENT_TYPE) != (2u<<8) )
                 goto unmap_and_fail;
             goto skip_accessed_flag;
         default:
             /* Readable code or data segment? */
-            if ( (desc.b & (5u<<9)) == (4u<<9) )
+            if ( (desc.b & (_SEGMENT_CODE|_SEGMENT_WR)) == _SEGMENT_CODE )
                 goto unmap_and_fail;
             /*
              * Data or non-conforming code segment:
