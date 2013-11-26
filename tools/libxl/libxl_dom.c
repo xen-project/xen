@@ -755,6 +755,10 @@ int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
 
 static void domain_suspend_done(libxl__egc *egc,
                         libxl__domain_suspend_state *dss, int rc);
+static void domain_suspend_callback_common_done(libxl__egc *egc,
+                                libxl__domain_suspend_state *dss, int ok);
+static void remus_domain_suspend_callback_common_done(libxl__egc *egc,
+                                libxl__domain_suspend_state *dss, int ok);
 
 /*----- complicated callback, called by xc_domain_save -----*/
 
@@ -1020,7 +1024,9 @@ int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid)
     return 0;
 }
 
-int libxl__domain_suspend_callback_common(libxl__domain_suspend_state *dss)
+/* calls dss->callback_common_done when done */
+static void domain_suspend_callback_common(libxl__egc *egc,
+                                           libxl__domain_suspend_state *dss)
 {
     STATE_AO_GC(dss->ao);
     unsigned long hvm_s_state = 0, hvm_pvdrv = 0;
@@ -1043,12 +1049,12 @@ int libxl__domain_suspend_callback_common(libxl__domain_suspend_state *dss)
         ret = xc_evtchn_notify(dss->xce, dss->suspend_eventchn);
         if (ret < 0) {
             LOG(ERROR, "xc_evtchn_notify failed ret=%d", ret);
-            return 0;
+            goto err;
         }
         ret = xc_await_suspend(CTX->xch, dss->xce, dss->suspend_eventchn);
         if (ret < 0) {
             LOG(ERROR, "xc_await_suspend failed ret=%d", ret);
-            return 0;
+            goto err;
         }
         dss->guest_responded = 1;
         goto guest_suspended;
@@ -1059,7 +1065,7 @@ int libxl__domain_suspend_callback_common(libxl__domain_suspend_state *dss)
         ret = xc_domain_shutdown(CTX->xch, domid, SHUTDOWN_suspend);
         if (ret < 0) {
             LOGE(ERROR, "xc_domain_shutdown failed");
-            return 0;
+            goto err;
         }
         /* The guest does not (need to) respond to this sort of request. */
         dss->guest_responded = 1;
@@ -1113,7 +1119,7 @@ int libxl__domain_suspend_callback_common(libxl__domain_suspend_state *dss)
          */
         if (!strcmp(state, "suspend")) {
             LOG(ERROR, "guest didn't acknowledge suspend, request cancelled");
-            return 0;
+            goto err;
         }
 
         LOG(DEBUG, "guest acknowledged suspend request");
@@ -1143,17 +1149,19 @@ int libxl__domain_suspend_callback_common(libxl__domain_suspend_state *dss)
     }
 
     LOG(ERROR, "guest did not suspend");
-    return 0;
+ err:
+    dss->callback_common_done(egc, dss, 0);
+    return;
 
  guest_suspended:
     if (dss->hvm) {
         ret = libxl__domain_suspend_device_model(gc, dss);
         if (ret) {
             LOG(ERROR, "libxl__domain_suspend_device_model failed ret=%d", ret);
-            return 0;
+            goto err;
         }
     }
-    return 1;
+    dss->callback_common_done(egc, dss, 1);
 }
 
 static inline char *physmap_path(libxl__gc *gc, uint32_t domid,
@@ -1246,8 +1254,14 @@ static void libxl__domain_suspend_callback(void *data)
     libxl__egc *egc = shs->egc;
     libxl__domain_suspend_state *dss = CONTAINER_OF(shs, *dss, shs);
 
-    int ok = libxl__domain_suspend_callback_common(dss);
-    libxl__xc_domain_saverestore_async_callback_done(egc, shs, ok);
+    dss->callback_common_done = domain_suspend_callback_common_done;
+    domain_suspend_callback_common(egc, dss);
+}
+
+static void domain_suspend_callback_common_done(libxl__egc *egc,
+                                libxl__domain_suspend_state *dss, int ok)
+{
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, ok);
 }
 
 /*----- remus callbacks -----*/
@@ -1258,9 +1272,15 @@ static void libxl__remus_domain_suspend_callback(void *data)
     libxl__egc *egc = shs->egc;
     libxl__domain_suspend_state *dss = CONTAINER_OF(shs, *dss, shs);
 
+    dss->callback_common_done = remus_domain_suspend_callback_common_done;
+    domain_suspend_callback_common(egc, dss);
+}
+
+static void remus_domain_suspend_callback_common_done(libxl__egc *egc,
+                                libxl__domain_suspend_state *dss, int ok)
+{
     /* REMUS TODO: Issue disk and network checkpoint reqs. */
-    int ok = libxl__domain_suspend_callback_common(dss);
-    libxl__xc_domain_saverestore_async_callback_done(egc, shs, ok);
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, ok);
 }
 
 static int libxl__remus_domain_resume_callback(void *data)

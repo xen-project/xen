@@ -2447,6 +2447,8 @@ struct libxl__domain_suspend_state {
     int interval; /* checkpoint interval (for Remus) */
     libxl__save_helper_state shs;
     libxl__logdirty_switch logdirty;
+    void (*callback_common_done)(libxl__egc*,
+                                 struct libxl__domain_suspend_state*, int ok);
     /* private for libxl__domain_save_device_model */
     libxl__save_device_model_cb *save_dm_callback;
     libxl__datacopier_state save_dm_datacopier;
@@ -2739,7 +2741,7 @@ _hidden void libxl__xc_domain_save_done(libxl__egc*, void *dss_void,
 void libxl__xc_domain_saverestore_async_callback_done(libxl__egc *egc,
                            libxl__save_helper_state *shs, int return_value);
 
-_hidden int libxl__domain_suspend_callback_common(libxl__domain_suspend_state*);
+
 _hidden void libxl__domain_suspend_common_switch_qemu_logdirty
                                (int domid, unsigned int enable, void *data);
 _hidden int libxl__toolstack_save(uint32_t domid, uint8_t **buf,
