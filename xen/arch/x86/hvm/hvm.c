@@ -2280,7 +2280,7 @@ static int hvm_load_segment_selector(
             if ( !(desc.b & (1u<<11)) )
                 goto unmap_and_fail;
             /* Non-conforming segment: check DPL against RPL. */
-            if ( ((desc.b & (6u<<9)) != 6) && (dpl != rpl) )
+            if ( !(desc.b & _SEGMENT_EC) && (dpl != rpl) )
                 goto unmap_and_fail;
             break;
         case x86_seg_ss:
@@ -2299,8 +2299,13 @@ static int hvm_load_segment_selector(
             /* Readable code or data segment? */
             if ( (desc.b & (5u<<9)) == (4u<<9) )
                 goto unmap_and_fail;
-            /* Non-conforming segment: check DPL against RPL and CPL. */
-            if ( ((desc.b & (6u<<9)) != 6) && ((dpl < cpl) || (dpl < rpl)) )
+            /*
+             * Data or non-conforming code segment:
+             * check DPL against RPL and CPL.
+             */
+            if ( ((desc.b & (_SEGMENT_EC|_SEGMENT_CODE)) !=
+                  (_SEGMENT_EC|_SEGMENT_CODE))
+                 && ((dpl < cpl) || (dpl < rpl)) )
                 goto unmap_and_fail;
             break;
         }
