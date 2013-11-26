@@ -99,7 +99,7 @@ struct bios_config ovmf_config =  {
     .image = ovmf,
     .image_size = sizeof(ovmf),
 
-    .bios_address = 0,
+    .bios_address = OVMF_BEGIN,
     .bios_load = ovmf_load,
 
     .load_roms = 0,
