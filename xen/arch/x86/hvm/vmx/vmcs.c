@@ -28,7 +28,6 @@
 #include <asm/msr.h>
 #include <asm/xstate.h>
 #include <asm/hvm/hvm.h>
-#include <asm/hvm/nestedhvm.h>
 #include <asm/hvm/io.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/vmx/vmx.h>
@@ -1090,13 +1089,11 @@ static int construct_vmcs(struct vcpu *v)
 
     /* PVH domains always start in paging mode */
     if ( is_pvh_domain(d) )
-        v->arch.hvm_vcpu.guest_cr[0] |= X86_CR0_PG | X86_CR0_NE | X86_CR0_WP;
+        v->arch.hvm_vcpu.guest_cr[0] |= X86_CR0_PG;
 
     hvm_update_guest_cr(v, 0);
 
-    v->arch.hvm_vcpu.guest_cr[4] = is_pvh_domain(d) ?
-        (real_cr4_to_pv_guest_cr4(mmu_cr4_features)
-         & ~HVM_CR4_GUEST_RESERVED_BITS(v)) : 0;
+    v->arch.hvm_vcpu.guest_cr[4] = is_pvh_domain(d) ? X86_CR4_PAE : 0;
     hvm_update_guest_cr(v, 4);
 
     if ( cpu_has_vmx_tpr_shadow )
