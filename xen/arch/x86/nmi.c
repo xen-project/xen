@@ -165,7 +165,7 @@ static void nmi_timer_fn(void *unused)
     set_timer(&this_cpu(nmi_timer), NOW() + MILLISECS(1000));
 }
 
-static void disable_lapic_nmi_watchdog(void)
+void disable_lapic_nmi_watchdog(void)
 {
     if (nmi_active <= 0)
         return;
