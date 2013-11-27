@@ -329,6 +329,26 @@ long arch_do_domctl(
             break;
         }
 
+        /*
+         * XSA-74: This sub-hypercall is broken in several ways:
+         * - lock order inversion (p2m locks inside page_alloc_lock)
+         * - no preemption on huge max_pfns input
+         * - not (re-)checking d->is_dying with page_alloc_lock held
+         * - not honoring start_pfn input (which libxc also doesn't set)
+         * Additionally it is rather useless, as the result is stale by the
+         * time the caller gets to look at it.
+         * As it only has a single, non-production consumer (xen-mceinj),
+         * rather than trying to fix it we restrict it for the time being.
+         */
+        if ( /* No nested locks inside copy_to_guest_offset(). */
+             paging_mode_external(current->domain) ||
+             /* Arbitrary limit capping processing time. */
+             max_pfns > GB(4) / PAGE_SIZE )
+        {
+            ret = -EOPNOTSUPP;
+            break;
+        }
+
         spin_lock(&d->page_alloc_lock);
 
         ret = i = 0;
