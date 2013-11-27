@@ -233,11 +233,39 @@ void __init set_kexec_crash_area_size(u64 system_ram)
     }
 }
 
-static void one_cpu_only(void)
+/*
+ * Only allow one cpu to continue on the crash path, forcing others to spin.
+ * Racing on the crash path from here will end in misery.  If we reenter,
+ * something has very gone wrong and retrying will (almost certainly) be
+ * futile.  Return up to our nested panic() to try and reboot.
+ *
+ * This is noinline to make it obvious in stack traces which cpus have lost
+ * the race (as opposed to being somewhere in kexec_common_shutdown())
+ */
+static int noinline one_cpu_only(void)
 {
-    /* Only allow the first cpu to continue - force other cpus to spin */
-    if ( test_and_set_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags) )
-        for ( ; ; ) ;
+    static unsigned int crashing_cpu = -1;
+    unsigned int cpu = smp_processor_id();
+
+    if ( cmpxchg(&crashing_cpu, -1, cpu) != -1 )
+    {
+        /* Not the first entry into one_cpu_only(). */
+        if ( crashing_cpu == cpu )
+        {
+            printk("Reentered the crash path.  Something is very broken\n");
+            return -EBUSY;
+        }
+
+        /*
+         * Another cpu has beaten us to this point.  Wait here patiently for
+         * it to kill us.
+         */
+        for ( ; ; )
+            halt();
+    }
+
+    set_bit(KEXEC_FLAG_IN_PROGRESS, &kexec_flags);
+    return 0;
 }
 
 /* Save the registers in the per-cpu crash note buffer. */
@@ -288,13 +316,20 @@ crash_xen_info_t *kexec_crash_save_info(void)
     return out;
 }
 
-static void kexec_common_shutdown(void)
+static int kexec_common_shutdown(void)
 {
+    int ret;
+
+    ret = one_cpu_only();
+    if ( ret )
+        return ret;
+
     watchdog_disable();
     console_start_sync();
     spin_debug_disable();
-    one_cpu_only();
     acpi_dmar_reinstate();
+
+    return 0;
 }
 
 void kexec_crash(void)
@@ -309,7 +344,9 @@ void kexec_crash(void)
 
     kexecing = TRUE;
 
-    kexec_common_shutdown();
+    if ( kexec_common_shutdown() != 0 )
+        return;
+
     kexec_crash_save_cpu();
     machine_crash_shutdown();
     machine_kexec(kexec_image[KEXEC_IMAGE_CRASH_BASE + pos]);
