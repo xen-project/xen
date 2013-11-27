@@ -608,7 +608,8 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
     }
     for (i = 0; b_info->extra && b_info->extra[i] != NULL; i++)
         flexarray_append(dm_args, b_info->extra[i]);
-    flexarray_append(dm_args, "-M");
+
+    flexarray_append(dm_args, "-machine");
     switch (b_info->type) {
     case LIBXL_DOMAIN_TYPE_PV:
         flexarray_append(dm_args, "xenpv");
@@ -616,7 +617,14 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append(dm_args, b_info->extra_pv[i]);
         break;
     case LIBXL_DOMAIN_TYPE_HVM:
-        flexarray_append(dm_args, "xenfv");
+        if (!libxl_defbool_val(b_info->u.hvm.xen_platform_pci)) {
+            /* Switching here to the machine "pc" which does not add
+             * the xen-platform device instead of the default "xenfv" machine.
+             */
+            flexarray_append(dm_args, "pc,accel=xen");
+        } else {
+            flexarray_append(dm_args, "xenfv");
+        }
         for (i = 0; b_info->extra_hvm && b_info->extra_hvm[i] != NULL; i++)
             flexarray_append(dm_args, b_info->extra_hvm[i]);
         break;
