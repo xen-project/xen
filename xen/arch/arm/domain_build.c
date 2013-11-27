@@ -906,7 +906,8 @@ static void dtb_load(struct kernel_info *kinfo)
     printk("Loading dom0 DTB to 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
            kinfo->dtb_paddr, kinfo->dtb_paddr + fdt_totalsize(kinfo->fdt));
 
-    rc = raw_copy_to_guest(dtb_virt, kinfo->fdt, fdt_totalsize(kinfo->fdt));
+    rc = raw_copy_to_guest_flush_dcache(dtb_virt, kinfo->fdt,
+                                        fdt_totalsize(kinfo->fdt));
     if ( rc != 0 )
         panic("Unable to copy the DTB to dom0 memory (rc = %lu)\n", rc);
     xfree(kinfo->fdt);
