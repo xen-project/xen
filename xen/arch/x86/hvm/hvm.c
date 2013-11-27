@@ -3468,7 +3468,7 @@ int hvm_do_hypercall(struct cpu_user_regs *regs)
     case 4:
     case 2:
         hvm_get_segment_register(curr, x86_seg_ss, &sreg);
-        if ( unlikely(sreg.attr.fields.dpl == 3) )
+        if ( unlikely(sreg.attr.fields.dpl) )
         {
     default:
             regs->eax = -EPERM;
