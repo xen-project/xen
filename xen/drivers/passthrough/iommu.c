@@ -125,9 +125,23 @@ int iommu_domain_init(struct domain *d)
     return hd->platform_ops->init(d);
 }
 
+static __init void check_dom0_pvh_reqs(struct domain *d)
+{
+    if ( !iommu_enabled )
+        panic("Presently, iommu must be enabled for pvh dom0\n");
+
+    if ( iommu_passthrough )
+        panic("For pvh dom0, dom0-passthrough must not be enabled\n");
+
+    iommu_dom0_strict = 1;
+}
+
 void __init iommu_dom0_init(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
+
+    if ( is_pvh_domain(d) )
+        check_dom0_pvh_reqs(d);
 
     if ( !iommu_enabled )
         return;
@@ -141,12 +155,14 @@ void __init iommu_dom0_init(struct domain *d)
         page_list_for_each ( page, &d->page_list )
         {
             unsigned long mfn = page_to_mfn(page);
+            unsigned long gfn = mfn_to_gmfn(d, mfn);
             unsigned int mapping = IOMMUF_readable;
+
             if ( ((page->u.inuse.type_info & PGT_count_mask) == 0) ||
                  ((page->u.inuse.type_info & PGT_type_mask)
                   == PGT_writable_page) )
                 mapping |= IOMMUF_writable;
-            hd->platform_ops->map_page(d, mfn, mfn, mapping);
+            hd->platform_ops->map_page(d, gfn, mfn, mapping);
             if ( !(i++ & 0xfffff) )
                 process_pending_softirqs();
         }
