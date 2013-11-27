@@ -124,6 +124,7 @@ void hvm_interrupt_post(struct vcpu *v, int vector, int type);
 void hvm_io_assist(ioreq_t *p);
 void hvm_dpci_eoi(struct domain *d, unsigned int guest_irq,
                   union vioapic_redir_entry *ent);
+void msix_write_completion(struct vcpu *);
 
 struct hvm_hw_stdvga {
     uint8_t sr_index;

@@ -293,7 +293,11 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
 
     /* exit to device model if address/data has been modified */
     if ( test_and_clear_bit(nr_entry, &entry->table_flags) )
+    {
+        if ( !(val & PCI_MSIX_VECTOR_BITMASK) )
+            v->arch.hvm_vcpu.hvm_io.msix_unmask_address = address;
         goto out;
+    }
 
     virt = msixtbl_addr_to_virt(entry, address);
     if ( !virt )
@@ -527,4 +531,16 @@ void msixtbl_pt_cleanup(struct domain *d)
 
     spin_unlock(&d->arch.hvm_domain.msixtbl_list_lock);
     local_irq_restore(flags);
+}
+
+void msix_write_completion(struct vcpu *v)
+{
+    unsigned long ctrl_address = v->arch.hvm_vcpu.hvm_io.msix_unmask_address;
+
+    if ( !ctrl_address )
+        return;
+
+    v->arch.hvm_vcpu.hvm_io.msix_unmask_address = 0;
+    if ( msixtbl_write(v, ctrl_address, 4, 0) != X86EMUL_OKAY )
+        gdprintk(XENLOG_WARNING, "MSI-X write completion failure\n");
 }

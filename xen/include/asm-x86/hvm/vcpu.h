@@ -74,6 +74,8 @@ struct hvm_vcpu_io {
      * necessary retry through other than function return codes.
      */
     bool_t mmio_retry, mmio_retrying;
+
+    unsigned long msix_unmask_address;
 };
 
 #define VMCX_EADDR    (~0ULL)
