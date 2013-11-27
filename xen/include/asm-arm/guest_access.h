@@ -11,6 +11,8 @@
     (likely(count < (~0UL/size)) && access_ok(addr,count*size))
 
 unsigned long raw_copy_to_guest(void *to, const void *from, unsigned len);
+unsigned long raw_copy_to_guest_flush_dcache(void *to, const void *from,
+                                             unsigned len);
 unsigned long raw_copy_from_guest(void *to, const void *from, unsigned len);
 unsigned long raw_clear_guest(void *to, unsigned len);
 
