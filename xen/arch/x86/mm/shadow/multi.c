@@ -692,21 +692,7 @@ _sh_propagate(struct vcpu *v,
                        && (ft == ft_demand_write))
 #endif /* OOS */
                   ) )
-    {
-        if ( shadow_mode_trap_reads(d) )
-        {
-            // if we are trapping both reads & writes, then mark this page
-            // as not present...
-            //
-            sflags &= ~_PAGE_PRESENT;
-        }
-        else
-        {
-            // otherwise, just prevent any writes...
-            //
-            sflags &= ~_PAGE_RW;
-        }
-    }
+        sflags &= ~_PAGE_RW;
 
     // PV guests in 64-bit mode use two different page tables for user vs
     // supervisor permissions, making the guest's _PAGE_USER bit irrelevant.
@@ -3181,18 +3167,10 @@ static int sh_page_fault(struct vcpu *v,
          && !(mfn_is_out_of_sync(gmfn)
               && !(regs->error_code & PFEC_user_mode))
 #endif
-         )
+         && (ft == ft_demand_write) )
     {
-        if ( ft == ft_demand_write )
-        {
-            perfc_incr(shadow_fault_emulate_write);
-            goto emulate;
-        }
-        else if ( shadow_mode_trap_reads(d) && ft == ft_demand_read )
-        {
-            perfc_incr(shadow_fault_emulate_read);
-            goto emulate;
-        }
+        perfc_incr(shadow_fault_emulate_write);
+        goto emulate;
     }
 
     /* Need to hand off device-model MMIO to the device model */
