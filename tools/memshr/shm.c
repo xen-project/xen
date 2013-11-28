@@ -217,9 +217,9 @@ uint16_t shm_vbd_image_get(const char* file, vbd_image_info_t *vbd_imgs)
         DPRINTF("No space in vbds table.\n");
         return 0;
     }
-    if(strlen(file) > MAX_NAME_LEN)
+    if(strlen(file) > MAX_NAME_LEN - 1)
     {
-        DPRINTF("Filename: %s too long (>%d).\n", file, MAX_NAME_LEN);
+        DPRINTF("Filename: %s too long (>%d).\n", file, MAX_NAME_LEN - 1);
         return 0; 
     }
     /* Init the entry */
