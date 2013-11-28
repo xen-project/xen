@@ -240,7 +240,7 @@ static char *number(
 static char *string(char *str, char *end, const char *s,
                     int field_width, int precision, int flags)
 {
-    int i, len = strnlen(s, precision);
+    int i, len = (precision < 0) ? strlen(s) : strnlen(s, precision);
 
     if (!(flags & LEFT)) {
         while (len < field_width--) {
