@@ -335,23 +335,20 @@ static inline unsigned int __scanbit(unsigned long val, unsigned long max)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-#define find_next_bit(addr, size, off) ({ \
-    unsigned int r__ = (size); \
-    unsigned int o__ = (off); \
-    switch ( -!__builtin_constant_p(size) | r__ ) \
-    { \
-    case 0: (void)(addr); break; \
-    case 1 ... BITS_PER_LONG: \
-        r__ = o__ + __scanbit(*(const unsigned long *)(addr) >> o__, r__); \
-        break; \
-    default: \
-        if ( __builtin_constant_p(off) && !o__ ) \
-            r__ = __find_first_bit(addr, r__); \
-        else \
-            r__ = __find_next_bit(addr, r__, o__); \
-        break; \
-    } \
-    r__; \
+#define find_next_bit(addr, size, off) ({                                   \
+    unsigned int r__;                                                       \
+    const unsigned long *a__ = (addr);                                      \
+    unsigned int s__ = (size);                                              \
+    unsigned int o__ = (off);                                               \
+    if ( __builtin_constant_p(size) && !s__ )                               \
+        r__ = s__;                                                          \
+    else if ( __builtin_constant_p(size) && s__ <= BITS_PER_LONG )          \
+        r__ = o__ + __scanbit(*(const unsigned long *)(a__) >> o__, s__);   \
+    else if ( __builtin_constant_p(off) && !o__ )                           \
+        r__ = __find_first_bit(a__, s__);                                   \
+    else                                                                    \
+        r__ = __find_next_bit(a__, s__, o__);                               \
+    r__;                                                                    \
 })
 
 /**
@@ -370,23 +367,20 @@ static inline unsigned int __scanbit(unsigned long val, unsigned long max)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-#define find_next_zero_bit(addr, size, off) ({ \
-    unsigned int r__ = (size); \
-    unsigned int o__ = (off); \
-    switch ( -!__builtin_constant_p(size) | r__ ) \
-    { \
-    case 0: (void)(addr); break; \
-    case 1 ... BITS_PER_LONG: \
-        r__ = o__ + __scanbit(~*(const unsigned long *)(addr) >> o__, r__); \
-        break; \
-    default: \
-        if ( __builtin_constant_p(off) && !o__ ) \
-            r__ = __find_first_zero_bit(addr, r__); \
-        else \
-            r__ = __find_next_zero_bit(addr, r__, o__); \
-        break; \
-    } \
-    r__; \
+#define find_next_zero_bit(addr, size, off) ({                              \
+    unsigned int r__;                                                       \
+    const unsigned long *a__ = (addr);                                      \
+    unsigned int s__ = (size);                                              \
+    unsigned int o__ = (off);                                               \
+    if ( __builtin_constant_p(size) && !s__ )                               \
+        r__ = s__;                                                          \
+    else if ( __builtin_constant_p(size) && s__ <= BITS_PER_LONG )          \
+        r__ = o__ + __scanbit(~*(const unsigned long *)(a__) >> o__, s__);  \
+    else if ( __builtin_constant_p(off) && !o__ )                           \
+        r__ = __find_first_zero_bit(a__, s__);                              \
+    else                                                                    \
+        r__ = __find_next_zero_bit(a__, s__, o__);                          \
+    r__;                                                                    \
 })
 
 /**

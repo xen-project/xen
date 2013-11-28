@@ -110,13 +110,14 @@ extern int bitmap_allocate_region(unsigned long *bitmap, int pos, int order);
 
 #define bitmap_bytes(nbits) (BITS_TO_LONGS(nbits) * sizeof(unsigned long))
 
-#define bitmap_switch(nbits, zero_ret, small, large)			\
-	switch (-!__builtin_constant_p(nbits) | (nbits)) {		\
-	case 0:	return zero_ret;					\
-	case 1 ... BITS_PER_LONG:					\
-		small; break;						\
-	default:							\
-		large; break;						\
+#define bitmap_switch(nbits, zero, small, large)			  \
+	unsigned int n__ = (nbits);					  \
+	if (__builtin_constant_p(nbits) && !n__) {			  \
+		zero;							  \
+	} else if (__builtin_constant_p(nbits) && n__ <= BITS_PER_LONG) { \
+		small;							  \
+	} else {							  \
+		large;							  \
 	}
 
 static inline void bitmap_zero(unsigned long *dst, int nbits)
@@ -191,7 +192,8 @@ static inline void bitmap_complement(unsigned long *dst, const unsigned long *sr
 static inline int bitmap_equal(const unsigned long *src1,
 			const unsigned long *src2, int nbits)
 {
-	bitmap_switch(nbits, -1,
+	bitmap_switch(nbits,
+		return -1,
 		return !((*src1 ^ *src2) & BITMAP_LAST_WORD_MASK(nbits)),
 		return __bitmap_equal(src1, src2, nbits));
 }
@@ -199,7 +201,8 @@ static inline int bitmap_equal(const unsigned long *src1,
 static inline int bitmap_intersects(const unsigned long *src1,
 			const unsigned long *src2, int nbits)
 {
-	bitmap_switch(nbits, -1,
+	bitmap_switch(nbits,
+		return -1,
 		return ((*src1 & *src2) & BITMAP_LAST_WORD_MASK(nbits)) != 0,
 		return __bitmap_intersects(src1, src2, nbits));
 }
@@ -207,21 +210,24 @@ static inline int bitmap_intersects(const unsigned long *src1,
 static inline int bitmap_subset(const unsigned long *src1,
 			const unsigned long *src2, int nbits)
 {
-	bitmap_switch(nbits, -1,
+	bitmap_switch(nbits,
+		return -1,
 		return !((*src1 & ~*src2) & BITMAP_LAST_WORD_MASK(nbits)),
 		return __bitmap_subset(src1, src2, nbits));
 }
 
 static inline int bitmap_empty(const unsigned long *src, int nbits)
 {
-	bitmap_switch(nbits, -1,
+	bitmap_switch(nbits,
+		return -1,
 		return !(*src & BITMAP_LAST_WORD_MASK(nbits)),
 		return __bitmap_empty(src, nbits));
 }
 
 static inline int bitmap_full(const unsigned long *src, int nbits)
 {
-	bitmap_switch(nbits, -1,
+	bitmap_switch(nbits,
+		return -1,
 		return !(~*src & BITMAP_LAST_WORD_MASK(nbits)),
 		return __bitmap_full(src, nbits));
 }
