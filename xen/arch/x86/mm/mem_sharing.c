@@ -846,7 +846,6 @@ int mem_sharing_nominate_page(struct domain *d,
     mfn_t mfn;
     struct page_info *page = NULL; /* gcc... */
     int ret;
-    struct gfn_info *gfn_info;
 
     *phandle = 0UL;
 
@@ -905,7 +904,7 @@ int mem_sharing_nominate_page(struct domain *d,
     page->sharing->handle = get_next_handle();  
 
     /* Create the local gfn info */
-    if ( (gfn_info = mem_sharing_gfn_alloc(page, d, gfn)) == NULL )
+    if ( mem_sharing_gfn_alloc(page, d, gfn) == NULL )
     {
         xfree(page->sharing);
         page->sharing = NULL;
