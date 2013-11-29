@@ -342,7 +342,7 @@ static inline void *xc_dom_vaddr_to_ptr(struct xc_dom_image *dom,
     if ( ptr == NULL )
         return ptr;
     *safe_region_out = (safe_region_count << XC_DOM_PAGE_SHIFT(dom)) - offset;
-    return ptr;
+    return ptr + offset;
 }
 
 static inline xen_pfn_t xc_dom_p2m_host(struct xc_dom_image *dom, xen_pfn_t pfn)
