@@ -1146,6 +1146,12 @@ static int read_message(struct xs_handle *h, int nonblocking)
 		goto error_freemsg;
 	}
 
+	/* Sanity check message body length. */
+	if (msg->hdr.len > XENSTORE_PAYLOAD_MAX) {
+		saved_errno = E2BIG;
+		goto error_freemsg;
+	}
+
 	/* Allocate and read the message body. */
 	body = msg->body = malloc(msg->hdr.len + 1);
 	if (body == NULL)
