@@ -4544,15 +4544,15 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
     for (*nb_vcpu = 0; *nb_vcpu <= domaininfo.max_vcpu_id; ++*nb_vcpu, ++ptr) {
         if (libxl_cpu_bitmap_alloc(ctx, &ptr->cpumap, 0)) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "allocating cpumap");
-            return NULL;
+            goto err;
         }
         if (xc_vcpu_getinfo(ctx->xch, domid, *nb_vcpu, &vcpuinfo) == -1) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting vcpu info");
-            return NULL;
+            goto err;
         }
         if (xc_vcpu_getaffinity(ctx->xch, domid, *nb_vcpu, ptr->cpumap.map) == -1) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting vcpu affinity");
-            return NULL;
+            goto err;
         }
         ptr->vcpuid = *nb_vcpu;
         ptr->cpu = vcpuinfo.cpu;
@@ -4562,6 +4562,10 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
         ptr->vcpu_time = vcpuinfo.cpu_time;
     }
     return ret;
+
+err:
+    free(ret);
+    return NULL;
 }
 
 int libxl_set_vcpuaffinity(libxl_ctx *ctx, uint32_t domid, uint32_t vcpuid,
