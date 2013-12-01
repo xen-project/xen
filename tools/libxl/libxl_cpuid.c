@@ -298,7 +298,7 @@ int libxl_cpuid_parse_config_xend(libxl_cpuid_policy_list *cpuid,
         }
         value = str[1] - 'a';
         endptr = strchr(str, '=');
-        if (value < 0 || value > 3 || endptr == NULL) {
+        if (value > 3 || endptr == NULL) {
             return 4;
         }
         str = endptr + 1;
