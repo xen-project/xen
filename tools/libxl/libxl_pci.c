@@ -1021,11 +1021,10 @@ static int libxl_pcidev_assignable(libxl_ctx *ctx, libxl_device_pci *pcidev)
             pcidevs[i].bus == pcidev->bus &&
             pcidevs[i].dev == pcidev->dev &&
             pcidevs[i].func == pcidev->func)
-        {
-            return 1;
-        }
+            break;
     }
-    return 0;
+    free(pcidevs);
+    return i != num;
 }
 
 int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcidev, int starting)
