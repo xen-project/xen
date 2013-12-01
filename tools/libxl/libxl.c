@@ -74,6 +74,8 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
         LIBXL__LOG(ctx, LIBXL__LOG_ERROR, "Failed to initialize mutex");
         free(ctx);
         ctx = 0;
+        rc = ERROR_FAIL;
+        goto out;
     }
 
     /* Now ctx is safe for ctx_free; failures simply set rc and "goto out" */
