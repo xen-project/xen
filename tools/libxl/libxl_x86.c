@@ -125,7 +125,7 @@ static int e820_sanitize(libxl_ctx *ctx, struct e820entry src[],
             src[i].type = E820_UNUSABLE;
             delta = ram_end - src[i].addr;
             /* The end < ram_end should weed this out */
-            if (src[i].size - delta < 0)
+            if (src[i].size < delta)
                 src[i].type = 0;
             else {
                 src[i].size -= delta;
