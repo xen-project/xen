@@ -979,7 +979,7 @@ static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned 
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Failed to access pciback path %s", reset);
     reset = libxl__sprintf(gc, "%s/"PCI_BDF"/reset", SYSFS_PCI_DEV, domain, bus, dev, func);
     fd = open(reset, O_WRONLY);
-    if (fd > 0) {
+    if (fd >= 0) {
         rc = write(fd, "1", 1);
         if (rc < 0)
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "write to %s returned %d", reset, rc);
