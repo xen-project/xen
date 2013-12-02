@@ -360,35 +360,80 @@ static paddr_t __init get_xen_paddr(void)
 #ifdef CONFIG_ARM_32
 static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 {
-    paddr_t ram_start;
-    paddr_t ram_end;
-    paddr_t ram_size;
+    paddr_t ram_start, ram_end, ram_size;
+    paddr_t contig_start, contig_end;
     paddr_t s, e;
     unsigned long ram_pages;
     unsigned long heap_pages, xenheap_pages, domheap_pages;
     unsigned long dtb_pages;
     unsigned long boot_mfn_start, boot_mfn_end;
-    int i = 0;
+    int i;
     void *fdt;
 
-    /* TODO: Handle non-contiguous memory bank */
     if ( !early_info.mem.nr_banks )
         early_panic("No memory bank");
-    ram_start = early_info.mem.bank[0].start;
+
+    /*
+     * We are going to accumulate two regions here.
+     *
+     * The first is the bounds of the initial memory region which is
+     * contiguous with the first bank. For simplicity the xenheap is
+     * always allocated from this region.
+     *
+     * The second is the complete bounds of the regions containing RAM
+     * (ie. from the lowest RAM address to the highest), which
+     * includes any holes.
+     *
+     * We also track the number of actual RAM pages (i.e. not counting
+     * the holes).
+     */
     ram_size  = early_info.mem.bank[0].size;
-    ram_end = ram_start + ram_size;
+
+    contig_start = ram_start = early_info.mem.bank[0].start;
+    contig_end   = ram_end = ram_start + ram_size;
 
     for ( i = 1; i < early_info.mem.nr_banks; i++ )
     {
-        if ( ram_end != early_info.mem.bank[i].start )
+        paddr_t bank_start = early_info.mem.bank[i].start;
+        paddr_t bank_size = early_info.mem.bank[i].size;
+        paddr_t bank_end = bank_start + bank_size;
+
+        paddr_t new_ram_size = ram_size + bank_size;
+        paddr_t new_ram_start = min(ram_start,bank_start);
+        paddr_t new_ram_end = max(ram_end,bank_end);
+
+        /*
+         * If the new bank is contiguous with the initial contiguous
+         * region then incorporate it into the contiguous region.
+         *
+         * Otherwise we allow non-contigious regions so long as at
+         * least half of the total RAM region actually contains
+         * RAM. We actually fudge this slightly and require that
+         * adding the current bank does not cause us to violate this
+         * restriction.
+         *
+         * This restriction ensures that the frametable (which is not
+         * currently sparse) does not consume all available RAM.
+         */
+        if ( bank_start == contig_end )
+            contig_end = bank_end;
+        else if ( bank_end == contig_start )
+            contig_start = bank_start;
+        else if ( 2 * new_ram_size < new_ram_end - new_ram_start )
+            /* Would create memory map which is too sparse, so stop here. */
             break;
 
-        ram_size += early_info.mem.bank[i].size;
-        ram_end += early_info.mem.bank[i].size;
+        ram_size = new_ram_size;
+        ram_start = new_ram_start;
+        ram_end = new_ram_end;
     }
 
     if ( i != early_info.mem.nr_banks )
-        early_printk("WARNING: some memory banks are not used\n");
+    {
+        early_printk("WARNING: only using %d out of %d memory banks\n",
+                     i, early_info.mem.nr_banks);
+        early_info.mem.nr_banks = i;
+    }
 
     total_pages = ram_pages = ram_size >> PAGE_SHIFT;
 
@@ -403,13 +448,14 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
      * We try to allocate the largest xenheap possible within these
      * constraints.
      */
-    heap_pages = (ram_size >> PAGE_SHIFT);
+    heap_pages = ram_pages;
     xenheap_pages = (heap_pages/8 + 0x1fffUL) & ~0x1fffUL;
     xenheap_pages = max(xenheap_pages, 128UL<<(20-PAGE_SHIFT));
 
     do
     {
-        e = consider_modules(ram_start, ram_end,
+        /* xenheap is always in the initial contiguous region */
+        e = consider_modules(contig_start, contig_end,
                              pfn_to_paddr(xenheap_pages),
                              32<<20, 0);
         if ( e )
@@ -433,9 +479,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     /*
      * Need a single mapped page for populating bootmem_region_list
      * and enough mapped pages for copying the DTB.
-     *
-     * TODO: The DTB (and other payloads) are assumed to be towards
-     * the start of RAM.
      */
     dtb_pages = (dtb_size + PAGE_SIZE-1) >> PAGE_SHIFT;
     boot_mfn_start = xenheap_mfn_end - dtb_pages - 1;
@@ -443,47 +486,51 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     init_boot_pages(pfn_to_paddr(boot_mfn_start), pfn_to_paddr(boot_mfn_end));
 
-    /*
-     * Copy the DTB.
-     *
-     * TODO: handle other payloads too.
-     */
+    /* Copy the DTB. */
     fdt = mfn_to_virt(alloc_boot_pages(dtb_pages, 1));
     copy_from_paddr(fdt, dtb_paddr, dtb_size, BUFFERABLE);
     device_tree_flattened = fdt;
 
     /* Add non-xenheap memory */
-    s = ram_start;
-    while ( s < ram_end )
+    for ( i = 0; i < early_info.mem.nr_banks; i++ )
     {
-        paddr_t n = ram_end;
+        paddr_t bank_start = early_info.mem.bank[i].start;
+        paddr_t bank_end = bank_start + early_info.mem.bank[i].size;
 
-        e = next_module(s, &n);
-
-        if ( e == ~(paddr_t)0 )
+        s = bank_start;
+        while ( s < bank_end )
         {
-            e = n = ram_end;
+            paddr_t n = bank_end;
+
+            e = next_module(s, &n);
+
+            if ( e == ~(paddr_t)0 )
+            {
+                e = n = ram_end;
+            }
+
+            /*
+             * Module in a RAM bank other than the one which we are
+             * not dealing with here.
+             */
+            if ( e > bank_end )
+                e = bank_end;
+
+            /* Avoid the xenheap */
+            if ( s < pfn_to_paddr(xenheap_mfn_start+xenheap_pages)
+                 && pfn_to_paddr(xenheap_mfn_start) < e )
+            {
+                e = pfn_to_paddr(xenheap_mfn_start);
+                n = pfn_to_paddr(xenheap_mfn_start+xenheap_pages);
+            }
+
+            dt_unreserved_regions(s, e, init_boot_pages, 0);
+
+            s = n;
         }
-
-        /* Module in RAM which we cannot see here, due to not handling
-         * non-contiguous memory regions yet
-         */
-        if ( e > ram_end )
-            e = ram_end;
-
-        /* Avoid the xenheap */
-        if ( s < pfn_to_paddr(xenheap_mfn_start+xenheap_pages)
-             && pfn_to_paddr(xenheap_mfn_start) < e )
-        {
-            e = pfn_to_paddr(xenheap_mfn_start);
-            n = pfn_to_paddr(xenheap_mfn_start+xenheap_pages);
-        }
-
-        dt_unreserved_regions(s, e, init_boot_pages, 0);
-
-        s = n;
     }
 
+    /* Frame table covers all of RAM region, including holes */
     setup_frametable_mappings(ram_start, ram_end);
     max_page = PFN_DOWN(ram_end);
 
@@ -499,8 +546,8 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 {
     paddr_t ram_start = ~0;
     paddr_t ram_end = 0;
+    paddr_t ram_size = 0;
     int bank;
-    unsigned long  xenheap_pages = 0;
     unsigned long dtb_pages;
     void *fdt;
 
@@ -508,23 +555,33 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     for ( bank = 0 ; bank < early_info.mem.nr_banks; bank++ )
     {
         paddr_t bank_start = early_info.mem.bank[bank].start;
-        paddr_t bank_size  = early_info.mem.bank[bank].size;
-        paddr_t  bank_end = bank_start + bank_size;
-        unsigned long bank_pages = bank_size >> PAGE_SHIFT;
+        paddr_t bank_size = early_info.mem.bank[bank].size;
+        paddr_t bank_end = bank_start + bank_size;
         paddr_t s, e;
 
-        total_pages += bank_pages;
+        paddr_t new_ram_size = ram_size + bank_size;
+        paddr_t new_ram_start = min(ram_start,bank_start);
+        paddr_t new_ram_end = max(ram_end,bank_end);
 
-        if ( bank_start < ram_start )
-            ram_start = bank_start;
-        if ( bank_end > ram_end )
-            ram_end = bank_end;
+        /*
+         * We allow non-contigious regions so long as at least half of
+         * the total RAM region actually contains RAM. We actually
+         * fudge this slightly and require that adding the current
+         * bank does not cause us to violate this restriction.
+         *
+         * This restriction ensures that the frametable (which is not
+         * currently sparse) does not consume all available RAM.
+         */
+        if ( bank > 0 && 2 * new_ram_size < new_ram_end - new_ram_start )
+            /* Would create memory map which is too sparse, so stop here. */
+            break;
 
-        xenheap_pages += (bank_size >> PAGE_SHIFT);
+        ram_start = new_ram_start;
+        ram_end = new_ram_end;
+        ram_size = new_ram_size;
 
         setup_xenheap_mappings(bank_start>>PAGE_SHIFT, bank_size>>PAGE_SHIFT);
 
-        /* XXX we assume that the ram regions are ordered */
         s = bank_start;
         while ( s < bank_end )
         {
@@ -547,6 +604,15 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
         }
     }
 
+    if ( bank != early_info.mem.nr_banks )
+    {
+        early_printk("WARNING: only using %d out of %d memory banks\n",
+                     bank, early_info.mem.nr_banks);
+        early_info.mem.nr_banks = bank;
+    }
+
+    total_pages += ram_size >> PAGE_SHIFT;
+
     xenheap_virt_end = XENHEAP_VIRT_START + ram_end - ram_start;
     xenheap_mfn_start = ram_start >> PAGE_SHIFT;
     xenheap_mfn_end = ram_end >> PAGE_SHIFT;
@@ -554,17 +620,10 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     /*
      * Need enough mapped pages for copying the DTB.
-     *
-     * TODO: The DTB (and other payloads) are assumed to be towards
-     * the start of RAM.
      */
     dtb_pages = (dtb_size + PAGE_SIZE-1) >> PAGE_SHIFT;
 
-    /*
-     * Copy the DTB.
-     *
-     * TODO: handle other payloads too.
-     */
+    /* Copy the DTB. */
     fdt = mfn_to_virt(alloc_boot_pages(dtb_pages, 1));
     copy_from_paddr(fdt, dtb_paddr, dtb_size, BUFFERABLE);
     device_tree_flattened = fdt;
