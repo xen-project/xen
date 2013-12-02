@@ -84,8 +84,8 @@ static void allocate_memory_11(struct domain *d, struct kernel_info *kinfo)
         panic("Failed to allocate contiguous memory for dom0\n");
 
     spfn = page_to_mfn(pg);
-    start = spfn << PAGE_SHIFT;
-    size = (1 << order) << PAGE_SHIFT;
+    start = pfn_to_paddr(spfn);
+    size = pfn_to_paddr((1 << order));
 
     // 1:1 mapping
     printk("Populate P2M %#"PRIx64"->%#"PRIx64" (1:1 mapping for dom0)\n",

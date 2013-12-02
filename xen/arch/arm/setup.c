@@ -409,7 +409,8 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     do
     {
-        e = consider_modules(ram_start, ram_end, xenheap_pages<<PAGE_SHIFT,
+        e = consider_modules(ram_start, ram_end,
+                             pfn_to_paddr(xenheap_pages),
                              32<<20, 0);
         if ( e )
             break;
@@ -423,7 +424,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     domheap_pages = heap_pages - xenheap_pages;
 
     early_printk("Xen heap: %"PRIpaddr"-%"PRIpaddr" (%lu pages)\n",
-                 e - (xenheap_pages << PAGE_SHIFT), e,
+                 e - (pfn_to_paddr(xenheap_pages)), e,
                  xenheap_pages);
     early_printk("Dom heap: %lu pages\n", domheap_pages);
 
@@ -471,8 +472,8 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
             e = ram_end;
 
         /* Avoid the xenheap */
-        if ( s < ((xenheap_mfn_start+xenheap_pages) << PAGE_SHIFT)
-             && (xenheap_mfn_start << PAGE_SHIFT) < e )
+        if ( s < pfn_to_paddr(xenheap_mfn_start+xenheap_pages)
+             && pfn_to_paddr(xenheap_mfn_start) < e )
         {
             e = pfn_to_paddr(xenheap_mfn_start);
             n = pfn_to_paddr(xenheap_mfn_start+xenheap_pages);

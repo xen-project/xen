@@ -296,18 +296,20 @@ int guest_physmap_add_page(struct domain *d,
                            unsigned long mfn,
                            unsigned int page_order)
 {
-    return create_p2m_entries(d, INSERT, gpfn << PAGE_SHIFT,
-                              (gpfn + (1<<page_order)) << PAGE_SHIFT,
-                              mfn << PAGE_SHIFT, MATTR_MEM);
+    return create_p2m_entries(d, INSERT,
+                              pfn_to_paddr(gpfn),
+                              pfn_to_paddr(gpfn + (1<<page_order)),
+                              pfn_to_paddr(mfn), MATTR_MEM);
 }
 
 void guest_physmap_remove_page(struct domain *d,
                                unsigned long gpfn,
                                unsigned long mfn, unsigned int page_order)
 {
-    create_p2m_entries(d, REMOVE, gpfn << PAGE_SHIFT,
-                       (gpfn + (1<<page_order)) << PAGE_SHIFT,
-                       mfn << PAGE_SHIFT, MATTR_MEM);
+    create_p2m_entries(d, REMOVE,
+                       pfn_to_paddr(gpfn),
+                       pfn_to_paddr(gpfn + (1<<page_order)),
+                       pfn_to_paddr(mfn), MATTR_MEM);
 }
 
 int p2m_alloc_table(struct domain *d)
@@ -450,7 +452,7 @@ err:
 
 unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)
 {
-    paddr_t p = p2m_lookup(d, gpfn << PAGE_SHIFT);
+    paddr_t p = p2m_lookup(d, pfn_to_paddr(gpfn));
     return p >> PAGE_SHIFT;
 }
 
