@@ -198,6 +198,9 @@ static int xc_interface_close_common(xc_interface *xch)
 {
     int rc = 0;
 
+    if (!xch)
+	return 0;
+
     xc__hypercall_buffer_cache_release(xch);
 
     xtl_logger_destroy(xch->dombuild_logger_tofree);
