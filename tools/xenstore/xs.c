@@ -146,20 +146,20 @@ struct xs_handle {
 
 static int read_message(struct xs_handle *h, int nonblocking);
 
-static void setnonblock(int fd, int nonblock) {
-	int esave = errno;
+static bool setnonblock(int fd, int nonblock) {
 	int flags = fcntl(fd, F_GETFL);
 	if (flags == -1)
-		goto out;
+		return false;
 
 	if (nonblock)
 		flags |= O_NONBLOCK;
 	else
 		flags &= ~O_NONBLOCK;
 
-	fcntl(fd, F_SETFL, flags);
-out:
-	errno = esave;
+	if (fcntl(fd, F_SETFL, flags) == -1)
+		return false;
+
+	return true;
 }
 
 int xs_fileno(struct xs_handle *h)
@@ -369,8 +369,8 @@ static bool read_all(int fd, void *data, unsigned int len, int nonblocking)
 	if (!len)
 		return true;
 
-	if (nonblocking)
-		setnonblock(fd, 1);
+	if (nonblocking && !setnonblock(fd, 1))
+		return false;
 
 	while (len) {
 		int done;
@@ -390,8 +390,9 @@ static bool read_all(int fd, void *data, unsigned int len, int nonblocking)
 		len -= done;
 
 		if (nonblocking) {
-			setnonblock(fd, 0);
 			nonblocking = 0;
+			if (!setnonblock(fd, 0))
+				goto out_false;
 		}
 	}
 
