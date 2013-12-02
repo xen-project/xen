@@ -1199,37 +1199,30 @@ int libxl__wait_for_device_model_deprecated(libxl__gc *gc,
                                      check_callback, check_callback_userdata);
 }
 
-int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state)
+int libxl__wait_for_backend(libxl__gc *gc, const char *be_path,
+                            const char *state)
 {
-    libxl_ctx *ctx = libxl__gc_owner(gc);
     int watchdog = 100;
-    unsigned int len;
-    char *p;
-    char *path = GCSPRINTF("%s/state", be_path);
-    int rc = -1;
+    const char *p, *path = GCSPRINTF("%s/state", be_path);
+    int rc;
 
-    while (watchdog > 0) {
-        p = xs_read(ctx->xsh, XBT_NULL, path, &len);
+    while (watchdog-- > 0) {
+        rc = libxl__xs_read_checked(gc, XBT_NULL, path, &p);
+        if (rc) return rc;
+
         if (p == NULL) {
-            if (errno == ENOENT) {
-                LOG(ERROR, "Backend %s does not exist", be_path);
-            } else {
-                LOGE(ERROR, "Failed to access backend %s", be_path);
-            }
-            goto out;
-        } else {
-            if (!strcmp(p, state)) {
-                rc = 0;
-                goto out;
-            } else {
-                usleep(100000);
-                watchdog--;
-            }
+            LOG(ERROR, "Backend %s does not exist", be_path);
+            return ERROR_FAIL;
         }
+
+        if (!strcmp(p, state))
+            return 0;
+
+        usleep(100000);
     }
+
     LOG(ERROR, "Backend %s not ready", be_path);
-out:
-    return rc;
+    return ERROR_FAIL;
 }
 
 /*

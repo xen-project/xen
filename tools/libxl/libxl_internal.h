@@ -944,7 +944,8 @@ _hidden char *libxl__device_frontend_path(libxl__gc *gc, libxl__device *device);
 _hidden int libxl__parse_backend_path(libxl__gc *gc, const char *path,
                                       libxl__device *dev);
 _hidden int libxl__device_destroy(libxl__gc *gc, libxl__device *dev);
-_hidden int libxl__wait_for_backend(libxl__gc *gc, char *be_path, char *state);
+_hidden int libxl__wait_for_backend(libxl__gc *gc, const char *be_path,
+                                    const char *state);
 _hidden int libxl__nic_type(libxl__gc *gc, libxl__device *dev,
                             libxl_nic_type *nictype);
 
