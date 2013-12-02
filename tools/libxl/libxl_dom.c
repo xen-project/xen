@@ -224,7 +224,6 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
      * whatever that turns out to be.
      */
     if (libxl_defbool_val(info->numa_placement)) {
-
         if (!libxl_bitmap_is_full(&info->cpumap)) {
             LOG(ERROR, "Can run NUMA placement only if no vcpu "
                        "affinity is specified");
@@ -238,7 +237,12 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     libxl_domain_set_nodeaffinity(ctx, domid, &info->nodemap);
     libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus, &info->cpumap);
 
-    xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb + LIBXL_MAXMEM_CONSTANT);
+    if (xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb +
+        LIBXL_MAXMEM_CONSTANT) < 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Couldn't set max memory");
+        return ERROR_FAIL;
+    }
+
     xs_domid = xs_read(ctx->xsh, XBT_NULL, "/tool/xenstored/domid", NULL);
     state->store_domid = xs_domid ? atoi(xs_domid) : 0;
     free(xs_domid);
