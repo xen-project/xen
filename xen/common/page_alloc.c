@@ -1519,8 +1519,9 @@ struct page_info *alloc_domheap_pages(
 
 void free_domheap_pages(struct page_info *pg, unsigned int order)
 {
-    int            i, drop_dom_ref;
     struct domain *d = page_get_owner(pg);
+    unsigned int i;
+    bool_t drop_dom_ref;
 
     ASSERT(!in_irq());
 
@@ -1548,8 +1549,7 @@ void free_domheap_pages(struct page_info *pg, unsigned int order)
             page_list_del2(&pg[i], &d->page_list, &d->arch.relmem_list);
         }
 
-        domain_adjust_tot_pages(d, -(1 << order));
-        drop_dom_ref = (d->tot_pages == 0);
+        drop_dom_ref = !domain_adjust_tot_pages(d, -(1 << order));
 
         spin_unlock_recursive(&d->page_alloc_lock);
 
