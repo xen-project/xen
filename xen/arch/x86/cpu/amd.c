@@ -476,6 +476,20 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 		       "*** Pass \"allow_unsafe\" if you're trusting"
 		       " all your (PV) guest kernels. ***\n");
 
+	if (c->x86 == 0x16 && c->x86_model <= 0xf) {
+		rdmsrl(MSR_AMD64_LS_CFG, value);
+		if (!(value & (1 << 15))) {
+			static bool_t warned;
+
+			if (c == &boot_cpu_data || opt_cpu_info ||
+			    !test_and_set_bool(warned))
+				printk(KERN_WARNING
+				       "CPU%u: Applying workaround for erratum 793\n",
+				       smp_processor_id());
+			wrmsrl(MSR_AMD64_LS_CFG, value | (1 << 15));
+		}
+	}
+
 	/* AMD CPUs do not support SYSENTER outside of legacy mode. */
 	clear_bit(X86_FEATURE_SEP, c->x86_capability);
 
