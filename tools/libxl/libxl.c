@@ -669,20 +669,24 @@ out:
  * be an aggregate of multiple domains. */
 libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm_out)
 {
-    libxl_vminfo *ptr;
+    GC_INIT(ctx);
+    libxl_vminfo *ptr = NULL;
     int idx, i, ret;
     xc_domaininfo_t info[1024];
-    int size = 1024;
 
-    ptr = calloc(size, sizeof(libxl_vminfo));
-    if (!ptr)
-        return NULL;
-
-    ret = xc_domain_getinfolist(ctx->xch, 1, 1024, info);
-    if (ret<0) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "geting domain info list");
-        return NULL;
+    ret = xc_domain_getinfolist(ctx->xch, 1, ARRAY_SIZE(info), info);
+    if (ret < 0) {
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting domain info list");
+        goto out;
     }
+
+    /*
+     * Always make sure to allocate at least one element; if we don't and we
+     * request zero, libxl__calloc (might) think its internal call to calloc
+     * has failed (if it returns null), if so it would kill our process.
+     */
+    ptr = libxl__calloc(NOGC, ret ? ret : 1, sizeof(libxl_vminfo));
+
     for (idx = i = 0; i < ret; i++) {
         if (libxl_is_stubdom(ctx, info[i].domain, NULL))
             continue;
@@ -692,6 +696,9 @@ libxl_vminfo * libxl_list_vm(libxl_ctx *ctx, int *nb_vm_out)
         idx++;
     }
     *nb_vm_out = idx;
+
+out:
+    GC_FREE;
     return ptr;
 }
 
