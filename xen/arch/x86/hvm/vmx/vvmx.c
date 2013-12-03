@@ -2225,7 +2225,7 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
             __vmread(EXIT_QUALIFICATION, &qual);
             port = qual >> 16;
             bitmap = nvmx->iobitmap[port >> 15];
-            if ( bitmap[(port & 0x7fff) >> 4] & (1 << (port & 0x7)) )
+            if ( bitmap[(port & 0x7fff) >> 3] & (1 << (port & 0x7)) )
                 nvcpu->nv_vmexit_pending = 1;
             if ( !nvcpu->nv_vmexit_pending )
                gdprintk(XENLOG_WARNING, "L0 PIO %x.\n", port);
