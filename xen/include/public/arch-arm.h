@@ -278,6 +278,7 @@ typedef uint64_t xen_pfn_t;
 typedef uint64_t xen_ulong_t;
 #define PRI_xen_ulong PRIx64
 
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
 struct vcpu_guest_context {
 #define _VGCF_online                   0
 #define VGCF_online                    (1<<_VGCF_online)
@@ -285,11 +286,12 @@ struct vcpu_guest_context {
 
     struct vcpu_guest_core_regs user_regs;  /* Core CPU registers */
 
-    uint32_t sctlr, ttbcr;
-    uint64_t ttbr0, ttbr1;
+    uint32_t sctlr;
+    uint64_t ttbcr, ttbr0, ttbr1;
 };
 typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
+#endif
 
 struct arch_vcpu_info {
 };

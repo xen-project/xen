@@ -578,7 +578,7 @@ static void print_ctx(vcpu_guest_context_any_t *ctx_any)
 #endif
 
     printf("SCTLR: %08"PRIx32"\n", ctx->sctlr);
-    printf("TTBCR: %08"PRIx32"\n", ctx->ttbcr);
+    printf("TTBCR: %016"PRIx64"\n", ctx->ttbcr);
     printf("TTBR0: %016"PRIx64"\n", ctx->ttbr0);
     printf("TTBR1: %016"PRIx64"\n", ctx->ttbr1);
 }

@@ -165,7 +165,7 @@ struct arch_vcpu
 
     /* MMU */
     register_t vbar;
-    uint32_t ttbcr;
+    register_t ttbcr;
     uint64_t ttbr0, ttbr1;
 
     uint32_t dacr; /* 32-bit guests only */

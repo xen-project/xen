@@ -330,7 +330,8 @@ static void inject_undef64_exception(struct cpu_user_regs *regs, int instr_len)
 
 struct reg_ctxt {
     /* Guest-side state */
-    uint32_t sctlr_el1, tcr_el1;
+    uint32_t sctlr_el1;
+    register_t tcr_el1;
     uint64_t ttbr0_el1, ttbr1_el1;
 #ifdef CONFIG_ARM_32
     uint32_t dfsr, ifsr;
@@ -433,7 +434,7 @@ static void show_registers_32(struct cpu_user_regs *regs,
     if ( guest_mode )
     {
         printk("     SCTLR: %08"PRIx32"\n", ctxt->sctlr_el1);
-        printk("       TCR: %08"PRIx32"\n", ctxt->tcr_el1);
+        printk("       TCR: %08"PRIregister"\n", ctxt->tcr_el1);
         printk("     TTBR0: %016"PRIx64"\n", ctxt->ttbr0_el1);
         printk("     TTBR1: %016"PRIx64"\n", ctxt->ttbr1_el1);
         printk("      IFAR: %08"PRIx32", IFSR: %08"PRIx32"\n"
@@ -505,7 +506,7 @@ static void show_registers_64(struct cpu_user_regs *regs,
         printk("   FAR_EL1: %016"PRIx64"\n", ctxt->far);
         printk("\n");
         printk(" SCTLR_EL1: %08"PRIx32"\n", ctxt->sctlr_el1);
-        printk("   TCR_EL1: %08"PRIx32"\n", ctxt->tcr_el1);
+        printk("   TCR_EL1: %08"PRIregister"\n", ctxt->tcr_el1);
         printk(" TTBR0_EL1: %016"PRIx64"\n", ctxt->ttbr0_el1);
         printk(" TTBR1_EL1: %016"PRIx64"\n", ctxt->ttbr1_el1);
         printk("\n");
@@ -1257,14 +1258,14 @@ static void do_sysreg(struct cpu_user_regs *regs,
 
 void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
 {
-    uint32_t ttbcr = READ_SYSREG32(TCR_EL1);
+    register_t ttbcr = READ_SYSREG(TCR_EL1);
     uint64_t ttbr0 = READ_SYSREG64(TTBR0_EL1);
     paddr_t paddr;
     uint32_t offset;
     uint32_t *first = NULL, *second = NULL;
 
     printk("dom%d VA 0x%08"PRIvaddr"\n", d->domain_id, addr);
-    printk("    TTBCR: 0x%08"PRIx32"\n", ttbcr);
+    printk("    TTBCR: 0x%08"PRIregister"\n", ttbcr);
     printk("    TTBR0: 0x%016"PRIx64" = 0x%"PRIpaddr"\n",
            ttbr0, p2m_lookup(d, ttbr0 & PAGE_MASK));
 
