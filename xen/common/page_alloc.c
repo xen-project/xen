@@ -92,7 +92,7 @@ static unsigned int __initdata nr_bootmem_regions;
 
 static void __init boot_bug(int line)
 {
-    panic("Boot BUG at %s:%d\n", __FILE__, line);
+    panic("Boot BUG at %s:%d", __FILE__, line);
 }
 #define BOOT_BUG_ON(p) if ( p ) boot_bug(__LINE__);
 

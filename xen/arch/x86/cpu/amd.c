@@ -465,7 +465,7 @@ static void __devinit init_amd(struct cpuinfo_x86 *c)
 	if (!cpu_has_amd_erratum(c, AMD_ERRATUM_121))
 		opt_allow_unsafe = 1;
 	else if (opt_allow_unsafe < 0)
-		panic("Xen will not boot on this CPU for security reasons.\n"
+		panic("Xen will not boot on this CPU for security reasons"
 		      "Pass \"allow_unsafe\" if you're trusting all your"
 		      " (PV) guest kernels.\n");
 	else if (!opt_allow_unsafe && c == &boot_cpu_data)

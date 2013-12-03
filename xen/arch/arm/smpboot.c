@@ -70,7 +70,7 @@ static void setup_cpu_sibling_map(int cpu)
 {
     if ( !zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, cpu)) ||
          !zalloc_cpumask_var(&per_cpu(cpu_core_mask, cpu)) )
-        panic("No memory for CPU sibling/core maps\n");
+        panic("No memory for CPU sibling/core maps");
 
     /* A CPU is a sibling with itself and is always on its own core. */
     cpumask_set_cpu(cpu, per_cpu(cpu_sibling_mask, cpu));

@@ -439,7 +439,7 @@ int __init construct_dom0(
         value = (parms.virt_hv_start_low + mask) & ~mask;
         BUG_ON(!is_pv_32bit_domain(d));
         if ( value > __HYPERVISOR_COMPAT_VIRT_START )
-            panic("Domain 0 expects too high a hypervisor start address.\n");
+            panic("Domain 0 expects too high a hypervisor start address");
         HYPERVISOR_COMPAT_VIRT_START(d) =
             max_t(unsigned int, m2p_compat_vstart, value);
     }
@@ -509,7 +509,7 @@ int __init construct_dom0(
         count -= PAGE_ALIGN(initrd_len);
     order = get_order_from_bytes(count);
     if ( (1UL << order) + PFN_UP(initrd_len) > nr_pages )
-        panic("Domain 0 allocation is too small for kernel image.\n");
+        panic("Domain 0 allocation is too small for kernel image");
 
     if ( parms.p2m_base != UNSET_ADDR )
     {
@@ -518,7 +518,7 @@ int __init construct_dom0(
     }
     page = alloc_domheap_pages(d, order, 0);
     if ( page == NULL )
-        panic("Not enough RAM for domain 0 allocation.\n");
+        panic("Not enough RAM for domain 0 allocation");
     alloc_spfn = page_to_mfn(page);
     alloc_epfn = alloc_spfn + d->tot_pages;
 
@@ -535,7 +535,7 @@ int __init construct_dom0(
             order = get_order_from_pages(count);
             page = alloc_domheap_pages(d, order, 0);
             if ( !page )
-                panic("Not enough RAM for domain 0 initrd.\n");
+                panic("Not enough RAM for domain 0 initrd");
             for ( count = -count; order--; )
                 if ( count & (1UL << order) )
                 {
@@ -618,7 +618,7 @@ int __init construct_dom0(
     {
         page = alloc_domheap_page(NULL, 0);
         if ( !page )
-            panic("Not enough RAM for domain 0 PML4.\n");
+            panic("Not enough RAM for domain 0 PML4");
         page->u.inuse.type_info = PGT_l4_page_table|PGT_validated|1;
         l4start = l4tab = page_to_virt(page);
         maddr_to_page(mpt_alloc)->u.inuse.type_info = PGT_l3_page_table;
@@ -830,7 +830,7 @@ int __init construct_dom0(
         {
             if ( d->tot_pages + ((round_pgup(vphysmap_end) - va)
                                  >> PAGE_SHIFT) + 3 > nr_pages )
-                panic("Dom0 allocation too small for initial P->M table.\n");
+                panic("Dom0 allocation too small for initial P->M table");
 
             if ( l1tab )
             {
@@ -929,7 +929,7 @@ int __init construct_dom0(
             va &= PAGE_MASK;
         }
         if ( !page )
-            panic("Not enough RAM for DOM0 P->M table.\n");
+            panic("Not enough RAM for DOM0 P->M table");
     }
 
     if ( l1tab )
@@ -990,7 +990,7 @@ int __init construct_dom0(
     while ( pfn < nr_pages )
     {
         if ( (page = alloc_chunk(d, nr_pages - d->tot_pages)) == NULL )
-            panic("Not enough RAM for DOM0 reservation.\n");
+            panic("Not enough RAM for DOM0 reservation");
         while ( pfn < d->tot_pages )
         {
             mfn = page_to_mfn(page);
@@ -1072,12 +1072,12 @@ int __init construct_dom0(
         printk("Dom0 runs in ring 0 (supervisor mode)\n");
         if ( !test_bit(XENFEAT_supervisor_mode_kernel,
                        parms.f_supported) )
-            panic("Dom0 does not support supervisor-mode execution\n");
+            panic("Dom0 does not support supervisor-mode execution");
     }
     else
     {
         if ( test_bit(XENFEAT_supervisor_mode_kernel, parms.f_required) )
-            panic("Dom0 requires supervisor-mode execution\n");
+            panic("Dom0 requires supervisor-mode execution");
     }
 
     rc = 0;

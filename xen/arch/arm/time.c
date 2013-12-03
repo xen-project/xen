@@ -113,7 +113,7 @@ int __init init_xen_time(void)
 
     dev = dt_find_matching_node(NULL, timer_ids);
     if ( !dev )
-        panic("Unable to find a compatible timer in the device tree\n");
+        panic("Unable to find a compatible timer in the device tree");
 
     dt_device_set_used_by(dev, DOMID_XEN);
 
@@ -122,7 +122,7 @@ int __init init_xen_time(void)
     {
         res = dt_device_get_irq(dev, i, &timer_irq[i]);
         if ( res )
-            panic("Timer: Unable to retrieve IRQ %u from the device tree\n", i);
+            panic("Timer: Unable to retrieve IRQ %u from the device tree", i);
     }
 
     printk("Generic Timer IRQ: phys=%u hyp=%u virt=%u\n",
@@ -132,11 +132,11 @@ int __init init_xen_time(void)
 
     res = platform_init_time();
     if ( res )
-        panic("Timer: Cannot initialize platform timer\n");
+        panic("Timer: Cannot initialize platform timer");
 
     /* Check that this CPU supports the Generic Timer interface */
     if ( !cpu_has_gentimer )
-        panic("CPU does not support the Generic Timer v1 interface.\n");
+        panic("CPU does not support the Generic Timer v1 interface");
 
     res = dt_property_read_u32(dev, "clock-frequency", &rate);
     if ( res )

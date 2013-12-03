@@ -80,7 +80,7 @@ static __init int vfp_init(void)
 
     vfparch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;
     if ( vfparch < 2 )
-        panic("Xen only support VFP 3\n");
+        panic("Xen only support VFP 3");
 
     return 0;
 }

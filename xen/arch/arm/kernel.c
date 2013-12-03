@@ -87,7 +87,7 @@ static void place_modules(struct kernel_info *info,
     paddr_t addr;
 
     if ( total + kernel_size > mem_size )
-        panic("Not enough memory in the first bank for the dtb+initrd.");
+        panic("Not enough memory in the first bank for the dtb+initrd");
 
     /*
      * DTB must be loaded such that it does not conflict with the
@@ -112,7 +112,7 @@ static void place_modules(struct kernel_info *info,
         addr = kernel_start - total;
     else
     {
-        panic("Unable to find suitable location for dtb+initrd.");
+        panic("Unable to find suitable location for dtb+initrd");
         return;
     }
 
@@ -144,7 +144,7 @@ static void kernel_zimage_load(struct kernel_info *info)
         rc = gvirt_to_maddr(load_addr + offs, &ma);
         if ( rc )
         {
-            panic("\nUnable to map translate guest address\n");
+            panic("Unable to map translate guest address");
             return;
         }
 
@@ -314,7 +314,7 @@ static int kernel_try_elf_prepare(struct kernel_info *info,
     info->kernel_order = get_order_from_bytes(size);
     info->kernel_img = alloc_xenheap_pages(info->kernel_order, 0);
     if ( info->kernel_img == NULL )
-        panic("Cannot allocate temporary buffer for kernel.\n");
+        panic("Cannot allocate temporary buffer for kernel");
 
     copy_from_paddr(info->kernel_img, addr, size, info->load_attr);
 

@@ -26,7 +26,7 @@
 
 asmlinkage void do_trap_serror(struct cpu_user_regs *regs)
 {
-    panic("Unhandled serror trap\n");
+    panic("Unhandled serror trap");
 }
 
 static const char *handler[]= {

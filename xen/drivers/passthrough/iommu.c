@@ -491,7 +491,7 @@ int __init iommu_setup(void)
 
     if ( (force_iommu && !iommu_enabled) ||
          (force_intremap && !iommu_intremap) )
-        panic("Couldn't enable %s and iommu=required/force\n",
+        panic("Couldn't enable %s and iommu=required/force",
               !iommu_enabled ? "IOMMU" : "Interrupt Remapping");
 
     if ( !iommu_enabled )

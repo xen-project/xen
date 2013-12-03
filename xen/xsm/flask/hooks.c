@@ -1586,7 +1586,7 @@ static __init int flask_init(void)
 
     original_ops = xsm_ops;
     if ( register_xsm(&flask_ops) )
-        panic("Flask: Unable to register with XSM.\n");
+        panic("Flask: Unable to register with XSM");
 
     ret = security_load_policy(policy_buffer, policy_size);
 

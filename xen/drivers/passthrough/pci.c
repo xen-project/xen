@@ -104,7 +104,7 @@ void __init pt_pci_init(void)
 {
     radix_tree_init(&pci_segments);
     if ( !alloc_pseg(0) )
-        panic("Could not initialize PCI segment 0\n");
+        panic("Could not initialize PCI segment 0");
 }
 
 int __init pci_add_segment(u16 seg)

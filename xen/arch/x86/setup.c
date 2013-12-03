@@ -1330,12 +1330,12 @@ void __init __start_xen(unsigned long mbi_p)
         watchdog_setup();
 
     if ( !tboot_protect_mem_regions() )
-        panic("Could not protect TXT memory regions\n");
+        panic("Could not protect TXT memory regions");
 
     /* Create initial domain 0. */
     dom0 = domain_create(0, DOMCRF_s3_integrity, 0);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0() == NULL) )
-        panic("Error creating domain 0\n");
+        panic("Error creating domain 0");
 
     dom0->is_privileged = 1;
     dom0->target = NULL;
@@ -1390,7 +1390,7 @@ void __init __start_xen(unsigned long mbi_p)
                         (initrdidx > 0) && (initrdidx < mbi->mods_count)
                         ? mod + initrdidx : NULL,
                         bootstrap_map, cmdline) != 0)
-        panic("Could not set up DOM0 guest OS\n");
+        panic("Could not set up DOM0 guest OS");
 
     /* Scrub RAM that is still free and so may go to an unprivileged domain. */
     scrub_heap_pages();

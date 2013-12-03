@@ -399,29 +399,29 @@ void __init gic_init(void)
 
     node = dt_find_interrupt_controller(gic_ids);
     if ( !node )
-        panic("Unable to find compatible GIC in the device tree\n");
+        panic("Unable to find compatible GIC in the device tree");
 
     dt_device_set_used_by(node, DOMID_XEN);
 
     res = dt_device_get_address(node, 0, &gic.dbase, NULL);
     if ( res || !gic.dbase || (gic.dbase & ~PAGE_MASK) )
-        panic("GIC: Cannot find a valid address for the distributor\n");
+        panic("GIC: Cannot find a valid address for the distributor");
 
     res = dt_device_get_address(node, 1, &gic.cbase, NULL);
     if ( res || !gic.cbase || (gic.cbase & ~PAGE_MASK) )
-        panic("GIC: Cannot find a valid address for the CPU\n");
+        panic("GIC: Cannot find a valid address for the CPU");
 
     res = dt_device_get_address(node, 2, &gic.hbase, NULL);
     if ( res || !gic.hbase || (gic.hbase & ~PAGE_MASK) )
-        panic("GIC: Cannot find a valid address for the hypervisor\n");
+        panic("GIC: Cannot find a valid address for the hypervisor");
 
     res = dt_device_get_address(node, 3, &gic.vbase, NULL);
     if ( res || !gic.vbase || (gic.vbase & ~PAGE_MASK) )
-        panic("GIC: Cannot find a valid address for the virtual CPU\n");
+        panic("GIC: Cannot find a valid address for the virtual CPU");
 
     res = dt_device_get_irq(node, 0, &gic.maintenance);
     if ( res )
-        panic("GIC: Cannot find the maintenance IRQ\n");
+        panic("GIC: Cannot find the maintenance IRQ");
 
     /* Set the GIC as the primary interrupt controller */
     dt_interrupt_controller = node;
@@ -439,7 +439,7 @@ void __init gic_init(void)
 
     if ( (gic.dbase & ~PAGE_MASK) || (gic.cbase & ~PAGE_MASK) ||
          (gic.hbase & ~PAGE_MASK) || (gic.vbase & ~PAGE_MASK) )
-        panic("GIC interfaces not page aligned.\n");
+        panic("GIC interfaces not page aligned");
 
     set_fixmap(FIXMAP_GICD, gic.dbase >> PAGE_SHIFT, DEV_SHARED);
     BUILD_BUG_ON(FIXMAP_ADDR(FIXMAP_GICC1) !=
@@ -787,7 +787,7 @@ static void do_sgi(struct cpu_user_regs *regs, int othercpu, enum gic_sgi sgi)
         smp_call_function_interrupt();
         break;
     default:
-        panic("Unhandled SGI %d on CPU%d\n", sgi, smp_processor_id());
+        panic("Unhandled SGI %d on CPU%d", sgi, smp_processor_id());
         break;
     }
 
