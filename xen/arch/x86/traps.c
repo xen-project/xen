@@ -1448,7 +1448,8 @@ void __init do_early_page_fault(struct cpu_user_regs *regs)
         printk("Stack dump: ");
         while ( ((long)stk & ((PAGE_SIZE - 1) & ~(BYTES_PER_LONG - 1))) != 0 )
             printk("%p ", _p(*stk++));
-        for ( ; ; ) ;
+        for ( ; ; )
+            halt();
     }
 }
 
