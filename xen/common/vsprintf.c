@@ -294,7 +294,8 @@ static char *pointer(char *str, char *end, const char **fmt_ptr,
             /* Print '+<offset>/<len>' */
             str = number(str, end, sym_offset, 16, -1, -1, SPECIAL|SIGN|PLUS);
             if ( str <= end )
-                *str++ = '/';
+                *str = '/';
+            ++str;
             str = number(str, end, sym_size, 16, -1, -1, SPECIAL);
         }
 
