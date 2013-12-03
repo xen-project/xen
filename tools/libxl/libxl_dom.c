@@ -1599,8 +1599,6 @@ int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
     const char *newfilename;
     int e, rc;
     int fd = -1;
-    FILE *f = NULL;
-    size_t rs;
 
     filename = userdata_path(gc, domid, userdata_userid, "d");
     if (!filename) {
@@ -1621,38 +1619,33 @@ int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
 
     rc = ERROR_FAIL;
 
-    fd= open(newfilename, O_RDWR|O_CREAT|O_TRUNC, 0600);
-    if (fd<0)
+    fd = open(newfilename, O_RDWR | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0)
         goto err;
 
-    f= fdopen(fd, "wb");
-    if (!f)
+    if (libxl_write_exactly(ctx, fd, data, datalen, "userdata", newfilename))
         goto err;
-    fd = -1;
 
-    rs = fwrite(data, 1, datalen, f);
-    if (rs != datalen) {
-        assert(ferror(f));
+    if (close(fd) < 0) {
+        fd = -1;
         goto err;
     }
+    fd = -1;
 
-    if (fclose(f))
-        goto err;
-    f = 0;
-
-    if (rename(newfilename,filename))
+    if (rename(newfilename, filename))
         goto err;
 
     rc = 0;
 
 err:
-    e = errno;
-    if (f) fclose(f);
-    if (fd>=0) close(fd);
+    if (fd >= 0) {
+        e = errno;
+        close(fd);
+        errno = e;
+    }
 
-    errno = e;
-    if ( rc )
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "cannot write %s for %s",
+    if (rc)
+        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "cannot write/rename %s for %s",
                  newfilename, filename);
 out:
     GC_FREE;
