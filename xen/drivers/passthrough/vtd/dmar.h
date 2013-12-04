@@ -118,7 +118,7 @@ do {                                                \
             break;                                  \
         if ( NOW() > start_time + DMAR_OPERATION_TIMEOUT ) {    \
             if ( !kexecing )                                    \
-                panic("%s:%d:%s: DMAR hardware is malfunctional\n",\
+                panic("%s:%d:%s: DMAR hardware is malfunctional",\
                       __FILE__, __LINE__, __func__);            \
             else                                                \
                 break;                                          \

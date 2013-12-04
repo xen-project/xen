@@ -253,7 +253,7 @@ void panic_PAR(uint64_t par)
            second_in_first ? " during second stage lookup" : "",
            fsc_level_str(level));
 
-    panic("Error during Hypervisor-to-physical address translation\n");
+    panic("Error during Hypervisor-to-physical address translation");
 }
 
 static void cpsr_switch_mode(struct cpu_user_regs *regs, int mode)
@@ -902,7 +902,7 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
         show_execution_state(regs);
         break;
     default:
-        panic("DOM%d: Unhandled debug trap %#x\n", domid, code);
+        panic("DOM%d: Unhandled debug trap %#x", domid, code);
         break;
     }
 }
@@ -1187,7 +1187,7 @@ static void do_cp15_32(struct cpu_user_regs *regs,
         printk("%s p15, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
                cp32.read ? "mrc" : "mcr",
                cp32.op1, cp32.reg, cp32.crn, cp32.crm, cp32.op2, regs->pc);
-        panic("unhandled 32-bit CP15 access %#x\n", hsr.bits & HSR_CP32_REGS_MASK);
+        panic("unhandled 32-bit CP15 access %#x", hsr.bits & HSR_CP32_REGS_MASK);
     }
     advance_pc(regs, hsr);
 }
@@ -1217,7 +1217,7 @@ static void do_cp15_64(struct cpu_user_regs *regs,
         printk("%s p15, %d, r%d, r%d, cr%d @ 0x%"PRIregister"\n",
                cp64.read ? "mrrc" : "mcrr",
                cp64.op1, cp64.reg1, cp64.reg2, cp64.crm, regs->pc);
-        panic("unhandled 64-bit CP15 access %#x\n", hsr.bits & HSR_CP64_REGS_MASK);
+        panic("unhandled 64-bit CP15 access %#x", hsr.bits & HSR_CP64_REGS_MASK);
     }
     advance_pc(regs, hsr);
 }
@@ -1247,7 +1247,7 @@ static void do_sysreg(struct cpu_user_regs *regs,
                sysreg.op2,
                sysreg.read ? "=>" : "<=",
                sysreg.reg, regs->pc);
-        panic("unhandled 64-bit sysreg access %#x\n",
+        panic("unhandled 64-bit sysreg access %#x",
               hsr.bits & HSR_SYSREG_REGS_MASK);
     }
 

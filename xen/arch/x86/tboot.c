@@ -528,7 +528,7 @@ void tboot_s3_error(int error)
 
     printk("MAC for %s before S3 is: 0x%08"PRIx64"\n", what, orig_mac);
     printk("MAC for %s after S3 is: 0x%08"PRIx64"\n", what, resume_mac);
-    panic("Memory integrity was lost on resume (%d)\n", error);
+    panic("Memory integrity was lost on resume (%d)", error);
 }
 
 int tboot_wake_ap(int apicid, unsigned long sipi_vec)

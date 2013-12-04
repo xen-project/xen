@@ -946,7 +946,7 @@ void __init x2apic_bsp_setup(void)
             return;
         }
         panic("x2APIC: already enabled by BIOS, but "
-              "iommu_supports_eim failed!\n");
+              "iommu_supports_eim failed");
     }
 
     if ( (ioapic_entries = alloc_ioapic_entries()) == NULL )
@@ -968,7 +968,7 @@ void __init x2apic_bsp_setup(void)
     {
         if ( x2apic_enabled )
             panic("Interrupt remapping could not be enabled while "
-                  "x2APIC is already enabled by BIOS!\n");
+                  "x2APIC is already enabled by BIOS");
 
         printk(XENLOG_ERR
                "Failed to enable Interrupt Remapping: Will not enable x2APIC.\n");

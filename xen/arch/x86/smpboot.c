@@ -735,7 +735,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
     if ( !zalloc_cpumask_var(&per_cpu(cpu_sibling_mask, 0)) ||
          !zalloc_cpumask_var(&per_cpu(cpu_core_mask, 0)) )
-        panic("No memory for boot CPU sibling/core maps\n");
+        panic("No memory for boot CPU sibling/core maps");
 
     set_cpu_sibling_map(0);
 

@@ -81,7 +81,7 @@ static void allocate_memory_11(struct domain *d, struct kernel_info *kinfo)
     }
 
     if ( !pg )
-        panic("Failed to allocate contiguous memory for dom0\n");
+        panic("Failed to allocate contiguous memory for dom0");
 
     spfn = page_to_mfn(pg);
     start = pfn_to_paddr(spfn);
@@ -93,7 +93,7 @@ static void allocate_memory_11(struct domain *d, struct kernel_info *kinfo)
     res = guest_physmap_add_page(d, spfn, spfn, order);
 
     if ( res )
-        panic("Unable to add pages in DOM0: %d\n", res);
+        panic("Unable to add pages in DOM0: %d", res);
 
     kinfo->mem.bank[0].start = start;
     kinfo->mem.bank[0].size = size;
@@ -123,7 +123,7 @@ static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
 
         reg = dt_get_property(memory, "reg", &reg_len);
         if ( reg == NULL )
-            panic("Memory node has no reg property!\n");
+            panic("Memory node has no reg property");
 
         for ( l = 0;
               kinfo->unassigned_mem > 0 && l + reg_size <= reg_len
@@ -133,7 +133,7 @@ static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
             paddr_t start, size;
 
             if ( dt_device_get_address(memory, bank, &start, &size) )
-                panic("Unable to retrieve the bank %u for %s\n",
+                panic("Unable to retrieve the bank %u for %s",
                       bank, dt_node_full_name(memory));
 
             if ( size > kinfo->unassigned_mem )
@@ -142,7 +142,7 @@ static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
             printk("Populate P2M %#"PRIx64"->%#"PRIx64"\n",
                    start, start + size);
             if ( p2m_populate_ram(d, start, start + size) < 0 )
-                panic("Failed to populate P2M\n");
+                panic("Failed to populate P2M");
             kinfo->mem.bank[kinfo->mem.nr_banks].start = start;
             kinfo->mem.bank[kinfo->mem.nr_banks].size = size;
             kinfo->mem.nr_banks++;
@@ -909,7 +909,7 @@ static void dtb_load(struct kernel_info *kinfo)
     rc = raw_copy_to_guest_flush_dcache(dtb_virt, kinfo->fdt,
                                         fdt_totalsize(kinfo->fdt));
     if ( rc != 0 )
-        panic("Unable to copy the DTB to dom0 memory (rc = %lu)\n", rc);
+        panic("Unable to copy the DTB to dom0 memory (rc = %lu)", rc);
     xfree(kinfo->fdt);
 }
 
@@ -936,12 +936,12 @@ static void initrd_load(struct kernel_info *kinfo)
     res = fdt_setprop_inplace_cell(kinfo->fdt, node, "linux,initrd-start",
                                    load_addr);
     if ( res )
-        panic("Cannot fix up \"linux,initrd-start\" property\n");
+        panic("Cannot fix up \"linux,initrd-start\" property");
 
     res = fdt_setprop_inplace_cell(kinfo->fdt, node, "linux,initrd-end",
                                    load_addr + len);
     if ( res )
-        panic("Cannot fix up \"linux,initrd-end\" property\n");
+        panic("Cannot fix up \"linux,initrd-end\" property");
 
     for ( offs = 0; offs < len; )
     {
@@ -955,7 +955,7 @@ static void initrd_load(struct kernel_info *kinfo)
         rc = gvirt_to_maddr(load_addr + offs, &ma);
         if ( rc )
         {
-            panic("\nUnable to translate guest address\n");
+            panic("Unable to translate guest address");
             return;
         }
 

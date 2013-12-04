@@ -346,7 +346,7 @@ static paddr_t __init get_xen_paddr(void)
     }
 
     if ( !paddr )
-        early_panic("Not enough memory to relocate Xen\n");
+        early_panic("Not enough memory to relocate Xen");
 
     early_printk("Placing Xen at 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
                  paddr, paddr + min_size);
@@ -373,7 +373,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
 
     /* TODO: Handle non-contiguous memory bank */
     if ( !early_info.mem.nr_banks )
-        early_panic("No memory bank\n");
+        early_panic("No memory bank");
     ram_start = early_info.mem.bank[0].start;
     ram_size  = early_info.mem.bank[0].size;
     ram_end = ram_start + ram_size;
@@ -419,7 +419,7 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
     } while ( xenheap_pages > 128<<(20-PAGE_SHIFT) );
 
     if ( ! e )
-        early_panic("Not not enough space for xenheap\n");
+        early_panic("Not not enough space for xenheap");
 
     domheap_pages = heap_pages - xenheap_pages;
 
@@ -697,13 +697,13 @@ void __init start_xen(unsigned long boot_phys_offset,
     /* Create initial domain 0. */
     dom0 = domain_create(0, 0, 0);
     if ( IS_ERR(dom0) || (alloc_dom0_vcpu0() == NULL) )
-            panic("Error creating domain 0\n");
+            panic("Error creating domain 0");
 
     dom0->is_privileged = 1;
     dom0->target = NULL;
 
     if ( construct_dom0(dom0) != 0)
-            panic("Could not set up DOM0 guest OS\n");
+            panic("Could not set up DOM0 guest OS");
 
     /* Scrub RAM that is still free and so may go to an unprivileged domain.
        XXX too slow in simulator

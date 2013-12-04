@@ -73,7 +73,7 @@ static inline void _mm_lock(mm_lock_t *l, const char *func, int level, int rec)
         l->unlock_level = __get_lock_level();
     }
     else if ( (unlikely(!rec)) )
-        panic("mm lock already held by %s\n", l->locker_function);
+        panic("mm lock already held by %s", l->locker_function);
     __set_lock_level(level);
 }
 

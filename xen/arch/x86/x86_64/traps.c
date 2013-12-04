@@ -250,7 +250,7 @@ void do_double_fault(struct cpu_user_regs *regs)
     _show_registers(regs, crs, CTXT_hypervisor, NULL);
     show_stack_overflow(cpu, regs);
 
-    panic("DOUBLE FAULT -- system shutdown\n");
+    panic("DOUBLE FAULT -- system shutdown");
 }
 
 void toggle_guest_mode(struct vcpu *v)

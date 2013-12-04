@@ -611,8 +611,15 @@ static int page_make_sharable(struct domain *d,
                        struct page_info *page, 
                        int expected_refcnt)
 {
-    int drop_dom_ref;
+    bool_t drop_dom_ref;
+
     spin_lock(&d->page_alloc_lock);
+
+    if ( d->is_dying )
+    {
+        spin_unlock(&d->page_alloc_lock);
+        return -EBUSY;
+    }
 
     /* Change page type and count atomically */
     if ( !get_page_and_type(page, d, PGT_shared_page) )
@@ -624,8 +631,8 @@ static int page_make_sharable(struct domain *d,
     /* Check it wasn't already sharable and undo if it was */
     if ( (page->u.inuse.type_info & PGT_count_mask) != 1 )
     {
-        put_page_and_type(page);
         spin_unlock(&d->page_alloc_lock);
+        put_page_and_type(page);
         return -EEXIST;
     }
 
@@ -633,15 +640,14 @@ static int page_make_sharable(struct domain *d,
      * the second from get_page_and_type at the top of this function */
     if ( page->count_info != (PGC_allocated | (2 + expected_refcnt)) )
     {
+        spin_unlock(&d->page_alloc_lock);
         /* Return type count back to zero */
         put_page_and_type(page);
-        spin_unlock(&d->page_alloc_lock);
         return -E2BIG;
     }
 
     page_set_owner(page, dom_cow);
-    domain_adjust_tot_pages(d, -1);
-    drop_dom_ref = (d->tot_pages == 0);
+    drop_dom_ref = !domain_adjust_tot_pages(d, -1);
     page_list_del(page, &d->page_list);
     spin_unlock(&d->page_alloc_lock);
 
@@ -659,6 +665,13 @@ static int page_make_private(struct domain *d, struct page_info *page)
     
     spin_lock(&d->page_alloc_lock);
 
+    if ( d->is_dying )
+    {
+        spin_unlock(&d->page_alloc_lock);
+        put_page(page);
+        return -EBUSY;
+    }
+
     /* We can only change the type if count is one */
     /* Because we are locking pages individually, we need to drop
      * the lock here, while the page is typed. We cannot risk the 
@@ -666,8 +679,8 @@ static int page_make_private(struct domain *d, struct page_info *page)
     expected_type = (PGT_shared_page | PGT_validated | PGT_locked | 2);
     if ( page->u.inuse.type_info != expected_type )
     {
-        put_page(page);
         spin_unlock(&d->page_alloc_lock);
+        put_page(page);
         return -EEXIST;
     }
 
@@ -682,7 +695,7 @@ static int page_make_private(struct domain *d, struct page_info *page)
     page_set_owner(page, d);
 
     if ( domain_adjust_tot_pages(d, 1) == 1 )
-        get_domain(d);
+        get_knownalive_domain(d);
     page_list_add_tail(page, &d->page_list);
     spin_unlock(&d->page_alloc_lock);
 

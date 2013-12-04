@@ -475,8 +475,8 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
                              (j * (1UL << exch.out.extent_order)));
 
                 spin_lock(&d->page_alloc_lock);
-                domain_adjust_tot_pages(d, -dec_count);
-                drop_dom_ref = (dec_count && !d->tot_pages);
+                drop_dom_ref = (dec_count &&
+                                !domain_adjust_tot_pages(d, -dec_count));
                 spin_unlock(&d->page_alloc_lock);
 
                 if ( drop_dom_ref )

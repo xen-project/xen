@@ -740,7 +740,7 @@ void __init paging_init(void)
     return;
 
  nomem:
-    panic("Not enough memory for m2p table\n");    
+    panic("Not enough memory for m2p table");
 }
 
 void __init zap_low_mappings(void)

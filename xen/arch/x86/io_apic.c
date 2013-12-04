@@ -1421,7 +1421,7 @@ static void __init setup_ioapic_ids_from_mpc(void)
                 if (!physid_isset(i, phys_id_present_map))
                     break;
             if (i >= get_physical_broadcast())
-                panic("Max APIC ID exceeded!\n");
+                panic("Max APIC ID exceeded");
             printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
                    i);
             mp_ioapics[apic].mpc_apicid = i;
@@ -2135,7 +2135,7 @@ int __init io_apic_get_unique_id (int ioapic, int apic_id)
         }
 
         if (i == get_physical_broadcast())
-            panic("Max apic_id exceeded!\n");
+            panic("Max apic_id exceeded");
 
         printk(KERN_WARNING "IOAPIC[%d]: apic_id %d already used, "
                "trying %d\n", ioapic, apic_id, i);

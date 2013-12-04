@@ -523,7 +523,7 @@ void mcheck_cmn_handler(struct cpu_user_regs *regs, long error_code,
          * recovery job but to reset the system.
          */
         if (atomic_read(&found_error) == 0)
-            mc_panic("MCE: No CPU found valid MCE, need reset\n");
+            mc_panic("MCE: No CPU found valid MCE, need reset");
         if (!cpumask_empty(&mce_fatal_cpus))
         {
             char *ebufp, ebuf[96] = "MCE: Fatal error happened on CPUs ";
@@ -1642,7 +1642,7 @@ static int mce_delayed_action(mctelem_cookie_t mctc)
         dprintk(XENLOG_ERR, "MCE delayed action failed\n");
         is_mc_panic = 1;
         x86_mcinfo_dump(mctelem_dataptr(mctc));
-        panic("MCE: Software recovery failed for the UCR\n");
+        panic("MCE: Software recovery failed for the UCR");
         break;
     case MCER_RECOVERED:
         dprintk(XENLOG_INFO, "MCE: Error is successfully recovered\n");

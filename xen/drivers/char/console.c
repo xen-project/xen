@@ -1057,7 +1057,7 @@ void panic(const char *fmt, ...)
     console_start_sync();
     printk("\n****************************************\n");
     printk("Panic on CPU %d:\n", smp_processor_id());
-    printk("%s", buf);
+    printk("%s\n", buf);
     printk("****************************************\n\n");
     if ( opt_noreboot )
         printk("Manual reset required ('noreboot' specified)\n");
@@ -1088,7 +1088,7 @@ void __bug(char *file, int line)
     console_start_sync();
     printk("Xen BUG at %s:%d\n", file, line);
     dump_execution_state();
-    panic("Xen BUG at %s:%d\n", file, line);
+    panic("Xen BUG at %s:%d", file, line);
     for ( ; ; ) ;
 }
 

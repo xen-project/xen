@@ -690,7 +690,7 @@ static unsigned long get_cmos_time(void)
     }
 
     if ( unlikely(acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_CMOS_RTC) )
-        panic("System without CMOS RTC must be booted from EFI\n");
+        panic("System without CMOS RTC must be booted from EFI");
 
     spin_lock_irqsave(&rtc_lock, flags);
 

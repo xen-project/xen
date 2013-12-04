@@ -5111,29 +5111,18 @@ int libxl_send_debug_keys(libxl_ctx *ctx, char *keys)
 libxl_xen_console_reader *
     libxl_xen_console_read_start(libxl_ctx *ctx, int clear)
 {
+    GC_INIT(ctx);
     libxl_xen_console_reader *cr;
     unsigned int size = 16384;
-    char *buf = malloc(size);
 
-    if (!buf) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "cannot malloc buffer for libxl_xen_console_reader,"
-            " size is %u", size);
-        return NULL;
-    }
-
-    cr = malloc(sizeof(libxl_xen_console_reader));
-    if (!cr) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "cannot malloc libxl_xen_console_reader");
-        return NULL;
-    }
-
-    memset(cr, 0, sizeof(libxl_xen_console_reader));
-    cr->buffer = buf;
+    cr = libxl__zalloc(NOGC, sizeof(libxl_xen_console_reader));
+    cr->buffer = libxl__zalloc(NOGC, size);
     cr->size = size;
     cr->count = size;
     cr->clear = clear;
     cr->incremental = 1;
 
+    GC_FREE;
     return cr;
 }
 

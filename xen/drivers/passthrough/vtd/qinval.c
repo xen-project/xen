@@ -220,7 +220,7 @@ static int queue_invalidate_wait(struct iommu *iommu,
             if ( NOW() > (start_time + DMAR_OPERATION_TIMEOUT) )
             {
                 print_qi_regs(iommu);
-                panic("queue invalidate wait descriptor was not executed\n");
+                panic("queue invalidate wait descriptor was not executed");
             }
             cpu_relax();
         }
