@@ -2134,7 +2134,6 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
     struct nestedvmx *nvmx = &vcpu_2_nvmx(v);
     u32 ctrl;
-    u8 *bitmap;
 
     nvcpu->nv_vmexit_pending = 0;
     nvmx->intr.intr_info = 0;
@@ -2220,15 +2219,23 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         if ( ctrl & CPU_BASED_ACTIVATE_IO_BITMAP )
         {
             unsigned long qual;
-            u16 port;
+            u16 port, size;
 
             __vmread(EXIT_QUALIFICATION, &qual);
             port = qual >> 16;
-            bitmap = nvmx->iobitmap[port >> 15];
-            if ( bitmap[(port & 0x7fff) >> 3] & (1 << (port & 0x7)) )
-                nvcpu->nv_vmexit_pending = 1;
+            size = (qual & 7) + 1;
+            do {
+                const u8 *bitmap = nvmx->iobitmap[port >> 15];
+
+                if ( bitmap[(port & 0x7fff) >> 3] & (1 << (port & 7)) )
+                    nvcpu->nv_vmexit_pending = 1;
+                if ( !--size )
+                    break;
+                if ( !++port )
+                    nvcpu->nv_vmexit_pending = 1;
+            } while ( !nvcpu->nv_vmexit_pending );
             if ( !nvcpu->nv_vmexit_pending )
-               gdprintk(XENLOG_WARNING, "L0 PIO %x.\n", port);
+                printk(XENLOG_G_WARNING "L0 PIO %04x\n", port);
         }
         else if ( ctrl & CPU_BASED_UNCOND_IO_EXITING )
             nvcpu->nv_vmexit_pending = 1;
