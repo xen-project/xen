@@ -470,7 +470,7 @@ void __init setup_pagetables(unsigned long boot_phys_offset, paddr_t xen_paddr)
     memset(boot_pgtable, 0x0, PAGE_SIZE);
     flush_xen_dcache(boot_pgtable);
 #ifdef CONFIG_ARM_64
-    memset(boot_pgtable, 0x0, PAGE_SIZE);
+    memset(boot_first, 0x0, PAGE_SIZE);
     flush_xen_dcache(boot_first);
 #endif
     memset(boot_second, 0x0, PAGE_SIZE);
