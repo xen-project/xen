@@ -118,7 +118,10 @@ PLATFORM_START(xgene_storm, "APM X-GENE STORM")
     .compatible = xgene_storm_dt_compat,
     .quirks = xgene_storm_quirks,
     .specific_mapping = xgene_storm_specific_mapping,
+
     .dom0_evtchn_ppi = 24,
+    .dom0_gnttab_start = 0x1f800000,
+    .dom0_gnttab_size = 0x20000,
 PLATFORM_END
 
 /*

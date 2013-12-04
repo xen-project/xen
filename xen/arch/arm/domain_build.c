@@ -331,6 +331,7 @@ static int make_hypervisor_node(struct domain *d,
     int res;
     int addrcells = dt_n_addr_cells(parent);
     int sizecells = dt_n_size_cells(parent);
+    paddr_t gnttab_start, gnttab_size;
 
     DPRINT("Create hypervisor node\n");
 
@@ -352,10 +353,12 @@ static int make_hypervisor_node(struct domain *d,
     if ( res )
         return res;
 
-    DPRINT("  Grant table range: 0xb0000000-0x20000\n");
+    platform_dom0_gnttab(&gnttab_start, &gnttab_size);
+    DPRINT("  Grant table range: %#"PRIpaddr"-%#"PRIpaddr"\n",
+           gnttab_start, gnttab_start + gnttab_size);
     /* reg 0 is grant table space */
     cells = &reg[0];
-    dt_set_range(&cells, parent, 0xb0000000, 0x20000);
+    dt_set_range(&cells, parent, gnttab_start, gnttab_size);
     res = fdt_property(fdt, "reg", reg,
                        dt_cells_to_size(addrcells + sizecells));
     if ( res )

@@ -37,6 +37,9 @@ static const struct dt_device_match sunxi_blacklist_dev[] __initconst =
 PLATFORM_START(sunxi, "Allwinner A20")
     .compatible = sunxi_dt_compat,
     .blacklist_dev = sunxi_blacklist_dev,
+
+    .dom0_gnttab_start = 0x01d00000,
+    .dom0_gnttab_size = 0x20000,
 PLATFORM_END
 
 /*

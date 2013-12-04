@@ -156,6 +156,9 @@ PLATFORM_START(omap5, "TI OMAP5")
     .specific_mapping = omap5_specific_mapping,
     .smp_init = omap5_smp_init,
     .cpu_up = cpu_up_send_sgi,
+
+    .dom0_gnttab_start = 0x4b000000,
+    .dom0_gnttab_size = 0x20000,
 PLATFORM_END
 
 /*

@@ -167,6 +167,20 @@ unsigned int platform_dom0_evtchn_ppi(void)
     return GUEST_EVTCHN_PPI;
 }
 
+void platform_dom0_gnttab(paddr_t *start, paddr_t *size)
+{
+    if ( platform && platform->dom0_gnttab_size )
+    {
+        *start = platform->dom0_gnttab_start;
+        *size = platform->dom0_gnttab_size;
+    }
+    else
+    {
+        *start = 0xb0000000;
+        *size = 0x20000;
+    }
+}
+
 /*
  * Local variables:
  * mode: C
