@@ -24,7 +24,7 @@
 
 static uint32_t xgene_storm_quirks(void)
 {
-    return PLATFORM_QUIRK_DOM0_MAPPING_11|PLATFORM_QUIRK_GIC_64K_STRIDE;
+    return PLATFORM_QUIRK_GIC_64K_STRIDE;
 }
 
 static int map_one_mmio(struct domain *d, const char *what,

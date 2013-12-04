@@ -42,11 +42,6 @@ static void midway_reset(void)
     iounmap(pmu);
 }
 
-static uint32_t midway_quirks(void)
-{
-    return PLATFORM_QUIRK_DOM0_MAPPING_11;
-}
-
 static const char * const midway_dt_compat[] __initconst =
 {
     "calxeda,ecx-2000",
@@ -56,7 +51,6 @@ static const char * const midway_dt_compat[] __initconst =
 PLATFORM_START(midway, "CALXEDA MIDWAY")
     .compatible = midway_dt_compat,
     .reset = midway_reset,
-    .quirks = midway_quirks,
 PLATFORM_END
 
 /*

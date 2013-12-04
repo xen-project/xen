@@ -153,11 +153,6 @@ static int __init omap5_cpu_up(int cpu)
     return 0;
 }
 
-static uint32_t omap5_quirks(void)
-{
-    return PLATFORM_QUIRK_DOM0_MAPPING_11;
-}
-
 static const char const *omap5_dt_compat[] __initconst =
 {
     "ti,omap5",
@@ -170,7 +165,6 @@ PLATFORM_START(omap5, "TI OMAP5")
     .specific_mapping = omap5_specific_mapping,
     .smp_init = omap5_smp_init,
     .cpu_up = omap5_cpu_up,
-    .quirks = omap5_quirks,
 PLATFORM_END
 
 /*

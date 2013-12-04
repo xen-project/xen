@@ -111,11 +111,6 @@ static void exynos5_reset(void)
     iounmap(pmu);
 }
 
-static uint32_t exynos5_quirks(void)
-{
-    return PLATFORM_QUIRK_DOM0_MAPPING_11;
-}
-
 static const char * const exynos5_dt_compat[] __initconst =
 {
     "samsung,exynos5250",
@@ -139,7 +134,6 @@ PLATFORM_START(exynos5, "SAMSUNG EXYNOS5")
     .smp_init = exynos5_smp_init,
     .cpu_up = exynos5_cpu_up,
     .reset = exynos5_reset,
-    .quirks = exynos5_quirks,
     .blacklist_dev = exynos5_blacklist_dev,
 PLATFORM_END
 

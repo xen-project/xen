@@ -44,15 +44,10 @@ struct platform_desc {
 };
 
 /*
- * Quirk to map dom0 memory in 1:1
- * Useful on platform where System MMU is not yet implemented
- */
-#define PLATFORM_QUIRK_DOM0_MAPPING_11 (1 << 0)
-/*
  * Quirk for platforms where the 4K GIC register ranges are placed at
  * 64K stride.
  */
-#define PLATFORM_QUIRK_GIC_64K_STRIDE (1 << 1)
+#define PLATFORM_QUIRK_GIC_64K_STRIDE (1 << 0)
 
 void __init platform_init(void);
 int __init platform_init_time(void);

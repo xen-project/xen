@@ -22,6 +22,8 @@
 static unsigned int __initdata opt_dom0_max_vcpus;
 integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
 
+static int dom0_11_mapping = 1;
+
 #define DOM0_MEM_DEFAULT 0x8000000 /* 128 MiB */
 static u64 __initdata dom0_mem = DOM0_MEM_DEFAULT;
 
@@ -110,7 +112,7 @@ static void allocate_memory(struct domain *d, struct kernel_info *kinfo)
     u32 reg_len, reg_size;
     unsigned int bank = 0;
 
-    if ( platform_has_quirk(PLATFORM_QUIRK_DOM0_MAPPING_11) )
+    if ( dom0_11_mapping )
         return allocate_memory_11(d, kinfo);
 
     while ( (memory = dt_find_node_by_type(memory, "memory")) )
