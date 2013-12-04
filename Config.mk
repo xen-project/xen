@@ -246,9 +246,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 832f9bde25542961ea4f768be6e00e4801484e3a
-# Mon Nov 11 13:42:56 2013 -0500
-# hw/piix4acpi: Make writes to ACPI_DBG_IO_ADDR actually work.
+QEMU_TAG ?= 96b58a44756a8821c108358439b0f2c06e531159
+# Wed Dec 4 15:16:18 2013 +1300
+# xen_disk: fix memory leak
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
