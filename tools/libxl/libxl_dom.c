@@ -1024,6 +1024,16 @@ int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid)
     return 0;
 }
 
+static void domain_suspend_common_wait_guest(libxl__egc *egc,
+                                             libxl__domain_suspend_state *dss);
+static void domain_suspend_common_guest_suspended(libxl__egc *egc,
+                                         libxl__domain_suspend_state *dss);
+static void domain_suspend_common_failed(libxl__egc *egc,
+                                         libxl__domain_suspend_state *dss);
+static void domain_suspend_common_done(libxl__egc *egc,
+                                       libxl__domain_suspend_state *dss,
+                                       bool ok);
+
 /* calls dss->callback_common_done when done */
 static void domain_suspend_callback_common(libxl__egc *egc,
                                            libxl__domain_suspend_state *dss)
@@ -1057,7 +1067,8 @@ static void domain_suspend_callback_common(libxl__egc *egc,
             goto err;
         }
         dss->guest_responded = 1;
-        goto guest_suspended;
+        domain_suspend_common_guest_suspended(egc, dss);
+        return;
     }
 
     if (dss->hvm && (!hvm_pvdrv || hvm_s_state)) {
@@ -1069,62 +1080,80 @@ static void domain_suspend_callback_common(libxl__egc *egc,
         }
         /* The guest does not (need to) respond to this sort of request. */
         dss->guest_responded = 1;
-    } else {
-        LOG(DEBUG, "issuing %s suspend request via XenBus control node",
-            dss->hvm ? "PVHVM" : "PV");
-
-        libxl__domain_pvcontrol_write(gc, XBT_NULL, domid, "suspend");
-
-        LOG(DEBUG, "wait for the guest to acknowledge suspend request");
-        watchdog = 60;
-        while (!strcmp(state, "suspend") && watchdog > 0) {
-            usleep(100000);
-
-            state = libxl__domain_pvcontrol_read(gc, XBT_NULL, domid);
-            if (!state) state = "";
-
-            watchdog--;
-        }
-
-        /*
-         * Guest appears to not be responding. Cancel the suspend
-         * request.
-         *
-         * We re-read the suspend node and clear it within a
-         * transaction in order to handle the case where we race
-         * against the guest catching up and acknowledging the request
-         * at the last minute.
-         */
-        if (!strcmp(state, "suspend")) {
-            LOG(ERROR, "guest didn't acknowledge suspend, cancelling request");
-        retry_transaction:
-            t = xs_transaction_start(CTX->xsh);
-
-            state = libxl__domain_pvcontrol_read(gc, t, domid);
-            if (!state) state = "";
-
-            if (!strcmp(state, "suspend"))
-                libxl__domain_pvcontrol_write(gc, t, domid, "");
-
-            if (!xs_transaction_end(CTX->xsh, t, 0))
-                if (errno == EAGAIN)
-                    goto retry_transaction;
-
-        }
-
-        /*
-         * Final check for guest acknowledgement. The guest may have
-         * acknowledged while we were cancelling the request in which
-         * case we lost the race while cancelling and should continue.
-         */
-        if (!strcmp(state, "suspend")) {
-            LOG(ERROR, "guest didn't acknowledge suspend, request cancelled");
-            goto err;
-        }
-
-        LOG(DEBUG, "guest acknowledged suspend request");
-        dss->guest_responded = 1;
+        domain_suspend_common_wait_guest(egc, dss);
+        return;
     }
+
+    LOG(DEBUG, "issuing %s suspend request via XenBus control node",
+        dss->hvm ? "PVHVM" : "PV");
+
+    libxl__domain_pvcontrol_write(gc, XBT_NULL, domid, "suspend");
+
+    LOG(DEBUG, "wait for the guest to acknowledge suspend request");
+    watchdog = 60;
+    while (!strcmp(state, "suspend") && watchdog > 0) {
+        usleep(100000);
+
+        state = libxl__domain_pvcontrol_read(gc, XBT_NULL, domid);
+        if (!state) state = "";
+
+        watchdog--;
+    }
+
+    /*
+     * Guest appears to not be responding. Cancel the suspend
+     * request.
+     *
+     * We re-read the suspend node and clear it within a
+     * transaction in order to handle the case where we race
+     * against the guest catching up and acknowledging the request
+     * at the last minute.
+     */
+    if (!strcmp(state, "suspend")) {
+        LOG(ERROR, "guest didn't acknowledge suspend, cancelling request");
+    retry_transaction:
+        t = xs_transaction_start(CTX->xsh);
+
+        state = libxl__domain_pvcontrol_read(gc, t, domid);
+        if (!state) state = "";
+
+        if (!strcmp(state, "suspend"))
+            libxl__domain_pvcontrol_write(gc, t, domid, "");
+
+        if (!xs_transaction_end(CTX->xsh, t, 0))
+            if (errno == EAGAIN)
+                goto retry_transaction;
+
+    }
+
+    /*
+     * Final check for guest acknowledgement. The guest may have
+     * acknowledged while we were cancelling the request in which
+     * case we lost the race while cancelling and should continue.
+     */
+    if (!strcmp(state, "suspend")) {
+        LOG(ERROR, "guest didn't acknowledge suspend, request cancelled");
+        goto err;
+    }
+
+    LOG(DEBUG, "guest acknowledged suspend request");
+    dss->guest_responded = 1;
+    domain_suspend_common_wait_guest(egc,dss);
+    return;
+
+ err:
+    domain_suspend_common_failed(egc, dss);
+}
+
+static void domain_suspend_common_wait_guest(libxl__egc *egc,
+                                             libxl__domain_suspend_state *dss)
+{
+    STATE_AO_GC(dss->ao);
+    int ret;
+    int watchdog;
+
+    /* Convenience aliases */
+    const uint32_t domid = dss->domid;
 
     LOG(DEBUG, "wait for the guest to suspend");
     watchdog = 60;
@@ -1141,7 +1170,8 @@ static void domain_suspend_callback_common(libxl__egc *egc,
                 & XEN_DOMINF_shutdownmask;
             if (shutdown_reason == SHUTDOWN_suspend) {
                 LOG(DEBUG, "guest has suspended");
-                goto guest_suspended;
+                domain_suspend_common_guest_suspended(egc, dss);
+                return;
             }
         }
 
@@ -1149,19 +1179,37 @@ static void domain_suspend_callback_common(libxl__egc *egc,
     }
 
     LOG(ERROR, "guest did not suspend");
- err:
-    dss->callback_common_done(egc, dss, 0);
-    return;
+    domain_suspend_common_failed(egc, dss);
+}
 
- guest_suspended:
+static void domain_suspend_common_guest_suspended(libxl__egc *egc,
+                                         libxl__domain_suspend_state *dss)
+{
+    STATE_AO_GC(dss->ao);
+    int ret;
+
     if (dss->hvm) {
         ret = libxl__domain_suspend_device_model(gc, dss);
         if (ret) {
             LOG(ERROR, "libxl__domain_suspend_device_model failed ret=%d", ret);
-            goto err;
+            domain_suspend_common_failed(egc, dss);
+            return;
         }
     }
-    dss->callback_common_done(egc, dss, 1);
+    domain_suspend_common_done(egc, dss, 1);
+}
+
+static void domain_suspend_common_failed(libxl__egc *egc,
+                                         libxl__domain_suspend_state *dss)
+{
+    domain_suspend_common_done(egc, dss, 0);
+}
+
+static void domain_suspend_common_done(libxl__egc *egc,
+                                       libxl__domain_suspend_state *dss,
+                                       bool ok)
+{
+    dss->callback_common_done(egc, dss, ok);
 }
 
 static inline char *physmap_path(libxl__gc *gc, uint32_t domid,
