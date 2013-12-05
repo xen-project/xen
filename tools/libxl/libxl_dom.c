@@ -1028,6 +1028,8 @@ static void domain_suspend_common_wait_guest(libxl__egc *egc,
                                              libxl__domain_suspend_state *dss);
 static void domain_suspend_common_guest_suspended(libxl__egc *egc,
                                          libxl__domain_suspend_state *dss);
+static void domain_suspend_common_pvcontrol_suspending(libxl__egc *egc,
+      libxl__xswait_state *xswa, int rc, const char *state);
 static void domain_suspend_common_failed(libxl__egc *egc,
                                          libxl__domain_suspend_state *dss);
 static void domain_suspend_common_done(libxl__egc *egc,
@@ -1047,10 +1049,6 @@ static void domain_suspend_callback_common(libxl__egc *egc,
     STATE_AO_GC(dss->ao);
     unsigned long hvm_s_state = 0, hvm_pvdrv = 0;
     int ret;
-    char *state = "suspend";
-    int watchdog;
-    xs_transaction_t t;
-    int rc;
 
     /* Convenience aliases */
     const uint32_t domid = dss->domid;
@@ -1096,59 +1094,82 @@ static void domain_suspend_callback_common(libxl__egc *egc,
 
     libxl__domain_pvcontrol_write(gc, XBT_NULL, domid, "suspend");
 
-    LOG(DEBUG, "wait for the guest to acknowledge suspend request");
-    watchdog = 60;
-    while (!domain_suspend_pvcontrol_acked(state) && watchdog > 0) {
-        usleep(100000);
+    dss->pvcontrol.path = libxl__domain_pvcontrol_xspath(gc, domid);
+    if (!dss->pvcontrol.path) goto err;
 
-        state = libxl__domain_pvcontrol_read(gc, XBT_NULL, domid);
+    dss->pvcontrol.ao = ao;
+    dss->pvcontrol.what = "guest acknowledgement of suspend request";
+    dss->pvcontrol.timeout_ms = 60 * 1000;
+    dss->pvcontrol.callback = domain_suspend_common_pvcontrol_suspending;
+    libxl__xswait_start(gc, &dss->pvcontrol);
+    return;
 
-        watchdog--;
-    }
+ err:
+    domain_suspend_common_failed(egc, dss);
+}
 
-    /*
-     * Guest appears to not be responding. Cancel the suspend
-     * request.
-     *
-     * We re-read the suspend node and clear it within a
-     * transaction in order to handle the case where we race
-     * against the guest catching up and acknowledging the request
-     * at the last minute.
-     */
-    if (!domain_suspend_pvcontrol_acked(state)) {
-        LOG(ERROR, "guest didn't acknowledge suspend, cancelling request");
+static void domain_suspend_common_pvcontrol_suspending(libxl__egc *egc,
+      libxl__xswait_state *xswa, int rc, const char *state)
+{
+    libxl__domain_suspend_state *dss = CONTAINER_OF(xswa, *dss, pvcontrol);
+    STATE_AO_GC(dss->ao);
+    xs_transaction_t t = 0;
+
+    if (!rc && !domain_suspend_pvcontrol_acked(state))
+        /* keep waiting */
+        return;
+
+    libxl__xswait_stop(gc, &dss->pvcontrol);
+
+    if (rc == ERROR_TIMEDOUT) {
+        /*
+         * Guest appears to not be responding. Cancel the suspend
+         * request.
+         *
+         * We re-read the suspend node and clear it within a
+         * transaction in order to handle the case where we race
+         * against the guest catching up and acknowledging the request
+         * at the last minute.
+         */
         for (;;) {
             rc = libxl__xs_transaction_start(gc, &t);
             if (rc) goto err;
 
-            state = libxl__domain_pvcontrol_read(gc, t, domid);
+            rc = libxl__xs_read_checked(gc, t, xswa->path, &state);
+            if (rc) goto err;
 
-            if (!domain_suspend_pvcontrol_acked(state))
-                libxl__domain_pvcontrol_write(gc, t, domid, "");
+            if (domain_suspend_pvcontrol_acked(state))
+                /* last minute ack */
+                break;
+
+            rc = libxl__xs_write_checked(gc, t, xswa->path, "");
+            if (rc) goto err;
 
             rc = libxl__xs_transaction_commit(gc, &t);
-            if (!rc) break;
+            if (!rc) {
+                LOG(ERROR,
+                    "guest didn't acknowledge suspend, cancelling request");
+                goto err;
+            }
             if (rc<0) goto err;
         }
-    }
-
-    /*
-     * Final check for guest acknowledgement. The guest may have
-     * acknowledged while we were cancelling the request in which
-     * case we lost the race while cancelling and should continue.
-     */
-    if (!domain_suspend_pvcontrol_acked(state)) {
-        LOG(ERROR, "guest didn't acknowledge suspend, request cancelled");
+    } else if (rc) {
+        /* some error in xswait's read of xenstore, already logged */
         goto err;
     }
 
+    assert(domain_suspend_pvcontrol_acked(state));
     LOG(DEBUG, "guest acknowledged suspend request");
+
+    libxl__xs_transaction_abort(gc, &t);
     dss->guest_responded = 1;
     domain_suspend_common_wait_guest(egc,dss);
     return;
 
  err:
+    libxl__xs_transaction_abort(gc, &t);
     domain_suspend_common_failed(egc, dss);
+    return;
 }
 
 static void domain_suspend_common_wait_guest(libxl__egc *egc,
@@ -1215,6 +1236,8 @@ static void domain_suspend_common_done(libxl__egc *egc,
                                        libxl__domain_suspend_state *dss,
                                        bool ok)
 {
+    EGC_GC;
+    assert(!libxl__xswait_inuse(&dss->pvcontrol));
     dss->callback_common_done(egc, dss, ok);
 }
 
@@ -1400,6 +1423,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
         &dss->shs.callbacks.save.a;
 
     logdirty_init(&dss->logdirty);
+    libxl__xswait_init(&dss->pvcontrol);
 
     switch (type) {
     case LIBXL_DOMAIN_TYPE_HVM: {
