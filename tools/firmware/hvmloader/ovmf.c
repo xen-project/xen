@@ -137,6 +137,17 @@ static void ovmf_create_smbios_tables(void)
         SMBIOS_PHYSICAL_END);
 }
 
+static void ovmf_setup_e820(void)
+{
+    struct ovmf_info *info = (void *)OVMF_INFO_PHYSICAL_ADDRESS;
+    struct e820entry *e820 = scratch_alloc(sizeof(struct e820entry)*16, 0);
+    info->e820 = (uint32_t)e820;
+
+    /* Reserve LOWCHUNK_BEGIN to 0x100000 as well, that's reset vector. */
+    info->e820_nr = build_e820_table(e820, 0, LOWCHUNK_BEGIN);
+    dump_e820_table(e820, info->e820_nr);
+}
+
 struct bios_config ovmf_config =  {
     .name = "OVMF",
 
@@ -151,7 +162,7 @@ struct bios_config ovmf_config =  {
     .bios_info_setup = ovmf_setup_bios_info,
     .bios_info_finish = ovmf_finish_bios_info,
 
-    .e820_setup = NULL,
+    .e820_setup = ovmf_setup_e820,
 
     .acpi_build_tables = ovmf_acpi_build_tables,
     .create_mp_tables = NULL,
