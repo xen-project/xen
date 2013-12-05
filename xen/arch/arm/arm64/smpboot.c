@@ -6,6 +6,7 @@
 #include <xen/smp.h>
 #include <xen/vmap.h>
 #include <asm/io.h>
+#include <asm/psci.h>
 
 struct smp_enable_ops {
         int             (*prepare_cpu)(int);
@@ -52,6 +53,18 @@ static void __init smp_spin_table_init(int cpu, struct dt_device_node *dn)
     smp_enable_ops[cpu].prepare_cpu = smp_spin_table_cpu_up;
 }
 
+static int __init smp_psci_init(int cpu)
+{
+    if ( !psci_available )
+    {
+        printk("CPU%d asks for PSCI, but DTB has no PSCI node\n", cpu);
+        return -ENODEV;
+    }
+
+    smp_enable_ops[cpu].prepare_cpu = call_psci_cpu_on;
+    return 0;
+}
+
 int __init arch_smp_init(void)
 {
     /* Nothing */
@@ -71,7 +84,8 @@ int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
 
     if ( !strcmp(enable_method, "spin-table") )
         smp_spin_table_init(cpu, dn);
-    /* TODO: method "psci" */
+    else if ( !strcmp(enable_method, "psci") )
+        return smp_psci_init(cpu);
     else
     {
         printk("CPU%d has unknown enable method \"%s\"\n", cpu, enable_method);
