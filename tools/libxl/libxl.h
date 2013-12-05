@@ -311,6 +311,20 @@
 #define LIBXL_HAVE_BUILDINFO_USBDEVICE_LIST 1
 
 /*
+ * LIBXL_HAVE_BUILDINFO_USBVERSION
+ *
+ * If this is defined, then the libxl_domain_build_info structure will
+ * contain hvm.usbversion, a integer type that contains a USB
+ * controller version to specify on the qemu upstream command-line.
+ *
+ * If it is set, callers may use hvm.usbversion to specify if the usb
+ * controller is usb1, usb2 or usb3.
+ *
+ * If this is not defined, the hvm.usbversion field does not exist.
+ */
+#define LIBXL_HAVE_BUILDINFO_USBVERSION 1
+
+/*
  * LIBXL_HAVE_DEVICE_BACKEND_DOMNAME
  *
  * If this is defined, libxl_device_* structures containing a backend_domid

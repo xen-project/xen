@@ -544,6 +544,30 @@ static char ** libxl__build_device_model_args_new(libxl__gc *gc,
                                       *p, NULL);
                 }
             }
+        } else if (b_info->u.hvm.usbversion) {
+            switch (b_info->u.hvm.usbversion) {
+            case 1:
+                flexarray_vappend(dm_args,
+                    "-device", "piix3-usb-uhci,id=usb", NULL);
+                break;
+            case 2:
+                flexarray_append_pair(dm_args, "-device",
+                    "ich9-usb-ehci1,id=usb,addr=0x1d.0x7,multifunction=on");
+                for (i = 1; i < 4; i++)
+                    flexarray_append_pair(dm_args, "-device",
+                        GCSPRINTF("ich9-usb-uhci%d,masterbus=usb.0,"
+                        "firstport=%d,addr=0x1d.%#x,multifunction=on",
+                        i, 2*(i-1), i-1));
+                break;
+            case 3:
+                flexarray_vappend(dm_args,
+                    "-device", "nec-usb-xhci,id=usb", NULL);
+                break;
+            default:
+                LOG(ERROR, "%s: usbversion parameter is invalid, "
+                    "must be between 1 and 3", __func__);
+                return NULL;
+            }
         }
         if (b_info->u.hvm.soundhw) {
             flexarray_vappend(dm_args, "-soundhw", b_info->u.hvm.soundhw, NULL);

@@ -362,6 +362,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("serial",           string),
                                        ("boot",             string),
                                        ("usb",              libxl_defbool),
+                                       ("usbversion",       integer),
                                        # usbdevice:
                                        # - "tablet" for absolute mouse,
                                        # - "mouse" for PS/2 protocol relative mouse

@@ -284,6 +284,15 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_defbool_setdefault(&b_info->u.hvm.usb,                false);
         libxl_defbool_setdefault(&b_info->u.hvm.xen_platform_pci,   true);
 
+        if (b_info->u.hvm.usbversion &&
+            ( libxl_defbool_val(b_info->u.hvm.usb)
+            || b_info->u.hvm.usbdevice_list
+            || b_info->u.hvm.usbdevice) ){
+            LOG(ERROR,"usbversion cannot be enabled with usb or"
+            "usbdevice parameters.");
+            return ERROR_INVAL;
+        }
+
         if (!b_info->u.hvm.boot) {
             b_info->u.hvm.boot = strdup("cda");
             if (!b_info->u.hvm.boot) return ERROR_NOMEM;
