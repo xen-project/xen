@@ -30,6 +30,7 @@
 #include <xen/irq.h>
 #include <xen/console.h>
 #include <asm/gic.h>
+#include <asm/psci.h>
 
 cpumask_t cpu_online_map;
 cpumask_t cpu_present_map;
@@ -104,6 +105,9 @@ void __init smp_init_cpus(void)
     };
     bool_t bootcpu_valid = 0;
     int rc;
+
+    /* scan the DTB for a PSCI node and set a global variable */
+    psci_init();
 
     if ( (rc = arch_smp_init()) < 0 )
     {
