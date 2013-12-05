@@ -1034,6 +1034,12 @@ static void domain_suspend_common_done(libxl__egc *egc,
                                        libxl__domain_suspend_state *dss,
                                        bool ok);
 
+static bool domain_suspend_pvcontrol_acked(const char *state) {
+    /* any value other than "suspend", including ENOENT (i.e. !state), is OK */
+    if (!state) return 1;
+    return strcmp(state,"suspend");
+}
+
 /* calls dss->callback_common_done when done */
 static void domain_suspend_callback_common(libxl__egc *egc,
                                            libxl__domain_suspend_state *dss)
@@ -1091,11 +1097,10 @@ static void domain_suspend_callback_common(libxl__egc *egc,
 
     LOG(DEBUG, "wait for the guest to acknowledge suspend request");
     watchdog = 60;
-    while (!strcmp(state, "suspend") && watchdog > 0) {
+    while (!domain_suspend_pvcontrol_acked(state) && watchdog > 0) {
         usleep(100000);
 
         state = libxl__domain_pvcontrol_read(gc, XBT_NULL, domid);
-        if (!state) state = "";
 
         watchdog--;
     }
@@ -1109,21 +1114,19 @@ static void domain_suspend_callback_common(libxl__egc *egc,
      * against the guest catching up and acknowledging the request
      * at the last minute.
      */
-    if (!strcmp(state, "suspend")) {
+    if (!domain_suspend_pvcontrol_acked(state)) {
         LOG(ERROR, "guest didn't acknowledge suspend, cancelling request");
     retry_transaction:
         t = xs_transaction_start(CTX->xsh);
 
         state = libxl__domain_pvcontrol_read(gc, t, domid);
-        if (!state) state = "";
 
-        if (!strcmp(state, "suspend"))
+        if (!domain_suspend_pvcontrol_acked(state))
             libxl__domain_pvcontrol_write(gc, t, domid, "");
 
         if (!xs_transaction_end(CTX->xsh, t, 0))
             if (errno == EAGAIN)
                 goto retry_transaction;
-
     }
 
     /*
@@ -1131,7 +1134,7 @@ static void domain_suspend_callback_common(libxl__egc *egc,
      * acknowledged while we were cancelling the request in which
      * case we lost the race while cancelling and should continue.
      */
-    if (!strcmp(state, "suspend")) {
+    if (!domain_suspend_pvcontrol_acked(state)) {
         LOG(ERROR, "guest didn't acknowledge suspend, request cancelled");
         goto err;
     }
