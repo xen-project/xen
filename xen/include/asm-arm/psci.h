@@ -10,6 +10,7 @@
 extern bool_t psci_available;
 
 int psci_init(void);
+int call_psci_cpu_on(int cpu);
 
 /* functions to handle guest PSCI requests */
 int do_psci_cpu_on(uint32_t vcpuid, register_t entry_point);

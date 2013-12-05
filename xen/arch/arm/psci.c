@@ -25,7 +25,37 @@
 
 bool_t psci_available;
 
+#ifdef CONFIG_ARM_32
+#define REG_PREFIX "r"
+#else
+#define REG_PREFIX "x"
+#endif
+
+static noinline int __invoke_psci_fn_smc(register_t function_id,
+                                         register_t arg0,
+                                         register_t arg1,
+                                         register_t arg2)
+{
+    asm volatile(
+        __asmeq("%0", REG_PREFIX"0")
+        __asmeq("%1", REG_PREFIX"1")
+        __asmeq("%2", REG_PREFIX"2")
+        __asmeq("%3", REG_PREFIX"3")
+        "smc #0"
+        : "+r" (function_id)
+        : "r" (arg0), "r" (arg1), "r" (arg2));
+
+    return function_id;
+}
+
+#undef REG_PREFIX
+
 static uint32_t psci_cpu_on_nr;
+
+int call_psci_cpu_on(int cpu)
+{
+    return __invoke_psci_fn_smc(psci_cpu_on_nr, cpu, __pa(init_secondary), 0);
+}
 
 int __init psci_init(void)
 {
