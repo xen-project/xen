@@ -894,17 +894,23 @@ int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid)
     return !!pvdriver;
 }
 
-char * libxl__domain_pvcontrol_read(libxl__gc *gc, xs_transaction_t t,
-                                    uint32_t domid)
+const char *libxl__domain_pvcontrol_xspath(libxl__gc *gc, uint32_t domid)
 {
-    const char *shutdown_path;
     const char *dom_path;
 
     dom_path = libxl__xs_get_dompath(gc, domid);
     if (!dom_path)
         return NULL;
 
-    shutdown_path = libxl__sprintf(gc, "%s/control/shutdown", dom_path);
+    return GCSPRINTF("%s/control/shutdown", dom_path);
+}
+
+char * libxl__domain_pvcontrol_read(libxl__gc *gc, xs_transaction_t t,
+                                    uint32_t domid)
+{
+    const char *shutdown_path;
+
+    shutdown_path = libxl__domain_pvcontrol_xspath(gc, domid);
     if (!shutdown_path)
         return NULL;
 
@@ -915,13 +921,8 @@ int libxl__domain_pvcontrol_write(libxl__gc *gc, xs_transaction_t t,
                                   uint32_t domid, const char *cmd)
 {
     const char *shutdown_path;
-    const char *dom_path;
 
-    dom_path = libxl__xs_get_dompath(gc, domid);
-    if (!dom_path)
-        return ERROR_FAIL;
-
-    shutdown_path = libxl__sprintf(gc, "%s/control/shutdown", dom_path);
+    shutdown_path = libxl__domain_pvcontrol_xspath(gc, domid);
     if (!shutdown_path)
         return ERROR_FAIL;
 

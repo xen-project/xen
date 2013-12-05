@@ -999,6 +999,7 @@ _hidden int libxl__domain_resume(libxl__gc *gc, uint32_t domid,
 /* returns 0 or 1, or a libxl error code */
 _hidden int libxl__domain_pvcontrol_available(libxl__gc *gc, uint32_t domid);
 
+_hidden const char *libxl__domain_pvcontrol_xspath(libxl__gc*, uint32_t domid);
 _hidden char * libxl__domain_pvcontrol_read(libxl__gc *gc,
                                             xs_transaction_t t, uint32_t domid);
 _hidden int libxl__domain_pvcontrol_write(libxl__gc *gc, xs_transaction_t t,
