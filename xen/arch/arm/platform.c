@@ -20,6 +20,7 @@
 #include <asm/platform.h>
 #include <xen/device_tree.h>
 #include <xen/init.h>
+#include <asm/psci.h>
 
 extern const struct platform_desc _splatform[], _eplatform[];
 
@@ -109,6 +110,9 @@ int __init platform_specific_mapping(struct domain *d)
 #ifdef CONFIG_ARM_32
 int __init platform_cpu_up(int cpu)
 {
+    if ( psci_available )
+        return call_psci_cpu_on(cpu);
+
     if ( platform && platform->cpu_up )
         return platform->cpu_up(cpu);
 

@@ -10,7 +10,9 @@ int __init arch_smp_init(void)
 
 int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
 {
-    /* TODO handle PSCI init */
+    /* Not needed on ARM32, as there is no relevant information in
+     * the CPU device tree node for ARMv7 CPUs.
+     */
     return 0;
 }
 
