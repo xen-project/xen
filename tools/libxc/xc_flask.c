@@ -27,7 +27,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
-#include <stdint.h>
 
 #define OCON_ISID    0    /* initial SIDs */
 #define OCON_PIRQ    1    /* physical irqs */

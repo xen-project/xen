@@ -33,7 +33,6 @@
 #include <getopt.h>
 #include <sys/select.h>
 #include <err.h>
-#include <errno.h>
 #include <string.h>
 #ifdef __sun__
 #include <sys/stropts.h>

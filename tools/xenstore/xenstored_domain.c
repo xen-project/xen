@@ -22,7 +22,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <xenctrl.h>
 
 #include "utils.h"
 #include "talloc.h"
