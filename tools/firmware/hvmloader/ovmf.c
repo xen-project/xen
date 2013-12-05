@@ -46,9 +46,53 @@
 #define LOWCHUNK_SIZE           0x00010000
 #define LOWCHUNK_MAXOFFSET      0x0000FFFF
 #define LOWCHUNK_END            (OVMF_BEGIN + OVMF_SIZE)
+#define OVMF_INFO_PHYSICAL_ADDRESS 0x00001000
 
 extern unsigned char dsdt_anycpu[];
 extern int dsdt_anycpu_len;
+
+#define OVMF_INFO_MAX_TABLES 4
+struct ovmf_info {
+    char signature[14]; /* XenHVMOVMF\0\0\0\0 */
+    uint8_t length;     /* Length of this struct */
+    uint8_t checksum;   /* Set such that the sum over bytes 0..length == 0 */
+    /*
+     * Physical address of an array of tables_nr elements.
+     *
+     * Each element is a 64 bit value containing the physical address
+     * of a BIOS table.
+     */
+    uint64_t tables;
+    uint32_t tables_nr;
+    /*
+     * Physical address of the e820 table, contains e820_nr entries.
+     */
+    uint64_t e820;
+    uint32_t e820_nr;
+} __attribute__ ((packed));
+
+static void ovmf_setup_bios_info(void)
+{
+    struct ovmf_info *info = (void *)OVMF_INFO_PHYSICAL_ADDRESS;
+
+    memset(info, 0, sizeof(*info));
+
+    memcpy(info->signature, "XenHVMOVMF", sizeof(info->signature));
+    info->length = sizeof(*info);
+}
+
+static void ovmf_finish_bios_info(void)
+{
+    struct ovmf_info *info = (void *)OVMF_INFO_PHYSICAL_ADDRESS;
+    uint32_t i;
+    uint8_t checksum;
+
+    checksum = 0;
+    for ( i = 0; i < info->length; i++ )
+        checksum += ((uint8_t *)(info))[i];
+
+    info->checksum = -checksum;
+}
 
 static void ovmf_load(const struct bios_config *config)
 {
@@ -104,8 +148,8 @@ struct bios_config ovmf_config =  {
 
     .load_roms = 0,
 
-    .bios_info_setup = NULL,
-    .bios_info_finish = NULL,
+    .bios_info_setup = ovmf_setup_bios_info,
+    .bios_info_finish = ovmf_finish_bios_info,
 
     .e820_setup = NULL,
 
