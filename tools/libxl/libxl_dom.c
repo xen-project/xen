@@ -1050,6 +1050,7 @@ static void domain_suspend_callback_common(libxl__egc *egc,
     char *state = "suspend";
     int watchdog;
     xs_transaction_t t;
+    int rc;
 
     /* Convenience aliases */
     const uint32_t domid = dss->domid;
@@ -1116,17 +1117,19 @@ static void domain_suspend_callback_common(libxl__egc *egc,
      */
     if (!domain_suspend_pvcontrol_acked(state)) {
         LOG(ERROR, "guest didn't acknowledge suspend, cancelling request");
-    retry_transaction:
-        t = xs_transaction_start(CTX->xsh);
+        for (;;) {
+            rc = libxl__xs_transaction_start(gc, &t);
+            if (rc) goto err;
 
-        state = libxl__domain_pvcontrol_read(gc, t, domid);
+            state = libxl__domain_pvcontrol_read(gc, t, domid);
 
-        if (!domain_suspend_pvcontrol_acked(state))
-            libxl__domain_pvcontrol_write(gc, t, domid, "");
+            if (!domain_suspend_pvcontrol_acked(state))
+                libxl__domain_pvcontrol_write(gc, t, domid, "");
 
-        if (!xs_transaction_end(CTX->xsh, t, 0))
-            if (errno == EAGAIN)
-                goto retry_transaction;
+            rc = libxl__xs_transaction_commit(gc, &t);
+            if (!rc) break;
+            if (rc<0) goto err;
+        }
     }
 
     /*
