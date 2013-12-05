@@ -21,6 +21,8 @@ extern int arch_smp_init(void);
 extern int arch_cpu_init(int cpu, struct dt_device_node *dn);
 extern int arch_cpu_up(int cpu);
 
+int cpu_up_send_sgi(int cpu);
+
 /* Secondary CPU entry point */
 extern void init_secondary(void);
 

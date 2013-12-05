@@ -144,14 +144,6 @@ static int __init vexpress_smp_init(void)
     return 0;
 }
 
-static int __init vexpress_cpu_up(int cpu)
-{
-    /* Nothing to do here, the generic sev() will suffice to kick CPUs
-     * out of either the firmware or our own smp_up_cpu gate,
-     * depending on where they have ended up. */
-
-    return 0;
-}
 #endif
 
 static const char * const vexpress_dt_compat[] __initconst =
@@ -180,7 +172,7 @@ PLATFORM_START(vexpress, "VERSATILE EXPRESS")
     .compatible = vexpress_dt_compat,
 #ifdef CONFIG_ARM_32
     .smp_init = vexpress_smp_init,
-    .cpu_up = vexpress_cpu_up,
+    .cpu_up = cpu_up_send_sgi,
 #endif
     .reset = vexpress_reset,
     .blacklist_dev = vexpress_blacklist_dev,

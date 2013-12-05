@@ -343,6 +343,16 @@ void stop_cpu(void)
         wfi();
 }
 
+int __init cpu_up_send_sgi(int cpu)
+{
+    /* We don't know the GIC ID of the CPU until it has woken up, so just
+     * signal everyone and rely on our own smp_up_cpu gate to ensure only
+     * the one we want gets through. */
+    send_SGI_allbutself(GIC_SGI_EVENT_CHECK);
+
+    return 0;
+}
+
 /* Bring up a remote CPU */
 int __cpu_up(unsigned int cpu)
 {
@@ -375,11 +385,6 @@ int __cpu_up(unsigned int cpu)
         printk("Failed to bring up CPU%d\n", cpu);
         return rc;
     }
-
-    /* We don't know the GIC ID of the CPU until it has woken up, so just signal
-     * everyone and rely on our own smp_up_cpu gate to ensure only the one we
-     * want gets through. */
-    send_SGI_allbutself(GIC_SGI_EVENT_CHECK);
 
     while ( !cpu_online(cpu) )
     {

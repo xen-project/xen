@@ -144,15 +144,6 @@ static int __init omap5_smp_init(void)
     return 0;
 }
 
-static int __init omap5_cpu_up(int cpu)
-{
-    /* Nothing to do here, the generic sev() will suffice to kick CPUs
-     * out of either the firmware or our own smp_up_cpu gate,
-     * depending on where they have ended up. */
-
-    return 0;
-}
-
 static const char const *omap5_dt_compat[] __initconst =
 {
     "ti,omap5",
@@ -164,7 +155,7 @@ PLATFORM_START(omap5, "TI OMAP5")
     .init_time = omap5_init_time,
     .specific_mapping = omap5_specific_mapping,
     .smp_init = omap5_smp_init,
-    .cpu_up = omap5_cpu_up,
+    .cpu_up = cpu_up_send_sgi,
 PLATFORM_END
 
 /*

@@ -85,15 +85,6 @@ static int __init exynos5_smp_init(void)
     return 0;
 }
 
-static int __init exynos5_cpu_up(int cpu)
-{
-    /* Nothing to do here, the generic sev() will suffice to kick CPUs
-     * out of either the firmware or our own smp_up_cpu gate,
-     * depending on where they have ended up. */
-
-    return 0;
-}
-
 static void exynos5_reset(void)
 {
     void __iomem *pmu;
@@ -132,7 +123,7 @@ PLATFORM_START(exynos5, "SAMSUNG EXYNOS5")
     .init_time = exynos5_init_time,
     .specific_mapping = exynos5_specific_mapping,
     .smp_init = exynos5_smp_init,
-    .cpu_up = exynos5_cpu_up,
+    .cpu_up = cpu_up_send_sgi,
     .reset = exynos5_reset,
     .blacklist_dev = exynos5_blacklist_dev,
 PLATFORM_END

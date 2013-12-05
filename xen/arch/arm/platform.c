@@ -112,7 +112,7 @@ int __init platform_cpu_up(int cpu)
     if ( platform && platform->cpu_up )
         return platform->cpu_up(cpu);
 
-    return -EAGAIN;
+    return -ENODEV;
 }
 
 int __init platform_smp_init(void)
