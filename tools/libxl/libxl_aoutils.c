@@ -16,6 +16,83 @@
 
 #include "libxl_internal.h"
 
+/*----- xswait -----*/
+
+static libxl__ev_xswatch_callback xswait_xswatch_callback;
+static libxl__ev_time_callback xswait_timeout_callback;
+static void xswait_report_error(libxl__egc*, libxl__xswait_state*, int rc);
+
+void libxl__xswait_init(libxl__xswait_state *xswa)
+{
+    libxl__ev_time_init(&xswa->time_ev);
+    libxl__ev_xswatch_init(&xswa->watch_ev);
+}
+
+void libxl__xswait_stop(libxl__gc *gc, libxl__xswait_state *xswa)
+{
+    libxl__ev_time_deregister(gc, &xswa->time_ev);
+    libxl__ev_xswatch_deregister(gc, &xswa->watch_ev);
+}
+
+bool libxl__xswait_inuse(const libxl__xswait_state *xswa)
+{
+    bool time_inuse = libxl__ev_time_isregistered(&xswa->time_ev);
+    bool watch_inuse = libxl__ev_xswatch_isregistered(&xswa->watch_ev);
+    assert(time_inuse == watch_inuse);
+    return time_inuse;
+}
+
+int libxl__xswait_start(libxl__gc *gc, libxl__xswait_state *xswa)
+{
+    int rc;
+
+    rc = libxl__ev_time_register_rel(gc, &xswa->time_ev,
+                                     xswait_timeout_callback, xswa->timeout_ms);
+    if (rc) goto err;
+
+    rc = libxl__ev_xswatch_register(gc, &xswa->watch_ev,
+                                    xswait_xswatch_callback, xswa->path);
+    if (rc) goto err;
+
+    return 0;
+
+ err:
+    libxl__xswait_stop(gc, xswa);
+    return rc;
+}
+
+void xswait_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *xsw,
+                             const char *watch_path, const char *event_path)
+{
+    EGC_GC;
+    libxl__xswait_state *xswa = CONTAINER_OF(xsw, *xswa, watch_ev);
+    int rc;
+    const char *data;
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL, xswa->path, &data);
+    if (rc) { xswait_report_error(egc, xswa, rc); return; }
+
+    xswa->callback(egc, xswa, 0, data);
+}
+
+void xswait_timeout_callback(libxl__egc *egc, libxl__ev_time *ev,
+                             const struct timeval *requested_abs)
+{
+    EGC_GC;
+    libxl__xswait_state *xswa = CONTAINER_OF(ev, *xswa, time_ev);
+    LOG(DEBUG, "%s: xswait timeout (path=%s)", xswa->what, xswa->path);
+    xswait_report_error(egc, xswa, ERROR_TIMEDOUT);
+}
+
+static void xswait_report_error(libxl__egc *egc, libxl__xswait_state *xswa,
+                                int rc)
+{
+    EGC_GC;
+    libxl__xswait_stop(gc, xswa);
+    xswa->callback(egc, xswa, rc, 0);
+}
+
+
 /*----- data copier -----*/
 
 void libxl__datacopier_init(libxl__datacopier_state *dc)
