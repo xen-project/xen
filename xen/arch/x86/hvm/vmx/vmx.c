@@ -643,10 +643,6 @@ static void vmx_ctxt_switch_to(struct vcpu *v)
             __invept(INVEPT_SINGLE_CONTEXT, ept_get_eptp(ept_data), 0);
     }
 
-    /* For guest cr0.cd setting, do not use potentially polluted cache */
-    if ( unlikely(v->arch.hvm_vcpu.cache_mode == NO_FILL_CACHE_MODE) )
-        wbinvd();
-
     vmx_restore_guest_msrs(v);
     vmx_restore_dr(v);
 }
@@ -3007,13 +3003,6 @@ void vmx_vmenter_helper(const struct cpu_user_regs *regs)
     u32 new_asid, old_asid;
     struct hvm_vcpu_asid *p_asid;
     bool_t need_flush;
-
-    /* In case hypervisor access hvm memory when guest uc mode */
-    if ( unlikely(curr->arch.hvm_vcpu.hypervisor_access_uc_hvm_memory) )
-    {
-        curr->arch.hvm_vcpu.hypervisor_access_uc_hvm_memory = 0;
-        wbinvd();
-    }
 
     if ( !cpu_has_vmx_vpid )
         goto out;

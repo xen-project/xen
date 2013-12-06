@@ -2571,9 +2571,6 @@ static enum hvm_copy_result __hvm_copy(
         return HVMCOPY_unhandleable;
 #endif
 
-    if ( unlikely(curr->arch.hvm_vcpu.cache_mode == NO_FILL_CACHE_MODE) )
-        curr->arch.hvm_vcpu.hypervisor_access_uc_hvm_memory = 1;
-
     while ( todo > 0 )
     {
         count = min_t(int, PAGE_SIZE - (addr & ~PAGE_MASK), todo);
@@ -2684,9 +2681,6 @@ static enum hvm_copy_result __hvm_clear(paddr_t addr, int size)
     if ( in_atomic() )
         return HVMCOPY_unhandleable;
 #endif
-
-    if ( unlikely(curr->arch.hvm_vcpu.cache_mode == NO_FILL_CACHE_MODE) )
-        curr->arch.hvm_vcpu.hypervisor_access_uc_hvm_memory = 1;
 
     while ( todo > 0 )
     {

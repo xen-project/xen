@@ -172,7 +172,6 @@ struct hvm_vcpu {
 
     /* Which cache mode is this VCPU in (CR0:CD/NW)? */
     u8                  cache_mode;
-    bool_t              hypervisor_access_uc_hvm_memory;
 
     struct hvm_vcpu_io  hvm_io;
 
