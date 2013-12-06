@@ -154,7 +154,7 @@
 #define BPIALL          p15,0,c7,c5,6   /* Invalidate entire branch predictor array */
 #define BPIMVA          p15,0,c7,c5,7   /* Invalidate MVA from branch predictor array */
 #define DCIMVAC         p15,0,c7,c6,1   /* Invalidate data cache line by MVA to PoC */
-#define DCISW           p15,0,c7,c2,1   /* Invalidate data cache line by set/way */
+#define DCISW           p15,0,c7,c6,2   /* Invalidate data cache line by set/way */
 #define ATS1CPR         p15,0,c7,c8,0   /* Address Translation Stage 1. Non-Secure Kernel Read */
 #define ATS1CPW         p15,0,c7,c8,1   /* Address Translation Stage 1. Non-Secure Kernel Write */
 #define ATS1CUR         p15,0,c7,c8,2   /* Address Translation Stage 1. Non-Secure User Read */
@@ -166,6 +166,7 @@
 #define DCCMVAC         p15,0,c7,c10,1  /* Clean data or unified cache line by MVA to PoC */
 #define DCCSW           p15,0,c7,c10,2  /* Clean data cache line by set/way */
 #define DCCMVAU         p15,0,c7,c11,1  /* Clean data cache line by MVA to PoU */
+#define DCCIMVAC        p15,0,c7,c14,1  /* Data cache clean and invalidate by MVA */
 #define DCCISW          p15,0,c7,c14,2  /* Clean and invalidate data cache line by set/way */
 #define ATS1HR          p15,4,c7,c8,0   /* Address Translation Stage 1 Hyp. Read */
 #define ATS1HW          p15,4,c7,c8,1   /* Address Translation Stage 1 Hyp. Write */
