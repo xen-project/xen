@@ -95,6 +95,9 @@
 
 
 #ifndef __ASSEMBLY__
+#if __XEN_INTERFACE_VERSION__ < 0x00040400
+typedef xen_pfn_t tmem_cli_mfn_t;
+#endif
 typedef XEN_GUEST_HANDLE(char) tmem_cli_va_t;
 struct tmem_op {
     uint32_t cmd;
