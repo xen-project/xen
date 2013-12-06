@@ -2445,6 +2445,8 @@ struct libxl__domain_suspend_state {
     int xcflags;
     int guest_responded;
     libxl__xswait_state pvcontrol;
+    libxl__ev_xswatch guest_watch;
+    libxl__ev_time guest_timeout;
     const char *dm_savefile;
     int interval; /* checkpoint interval (for Remus) */
     libxl__save_helper_state shs;
