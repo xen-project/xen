@@ -727,7 +727,7 @@ _hidden int libxl__ev_fd_modify(libxl__gc*, libxl__ev_fd *ev,
 _hidden void libxl__ev_fd_deregister(libxl__gc*, libxl__ev_fd *ev);
 static inline void libxl__ev_fd_init(libxl__ev_fd *efd)
                     { efd->fd = -1; }
-static inline int libxl__ev_fd_isregistered(libxl__ev_fd *efd)
+static inline int libxl__ev_fd_isregistered(const libxl__ev_fd *efd)
                     { return efd->fd >= 0; }
 
 _hidden int libxl__ev_time_register_rel(libxl__gc*, libxl__ev_time *ev_out,
@@ -743,7 +743,7 @@ _hidden int libxl__ev_time_modify_abs(libxl__gc*, libxl__ev_time *ev,
 _hidden void libxl__ev_time_deregister(libxl__gc*, libxl__ev_time *ev);
 static inline void libxl__ev_time_init(libxl__ev_time *ev)
                 { ev->func = 0; }
-static inline int libxl__ev_time_isregistered(libxl__ev_time *ev)
+static inline int libxl__ev_time_isregistered(const libxl__ev_time *ev)
                 { return !!ev->func; }
 
 
@@ -783,7 +783,7 @@ _hidden pid_t libxl__ev_child_fork(libxl__gc *gc, libxl__ev_child *childw_out,
                                  libxl__ev_child_callback *death);
 static inline void libxl__ev_child_init(libxl__ev_child *childw_out)
                 { childw_out->pid = -1; }
-static inline int libxl__ev_child_inuse(libxl__ev_child *childw_out)
+static inline int libxl__ev_child_inuse(const libxl__ev_child *childw_out)
                 { return childw_out->pid >= 0; }
 
 /* Useable (only) in the child to once more make the ctx useable for
@@ -1225,7 +1225,7 @@ struct libxl__spawn_state {
     libxl__ev_xswatch xswatch;
 };
 
-static inline int libxl__spawn_inuse(libxl__spawn_state *ss)
+static inline int libxl__spawn_inuse(const libxl__spawn_state *ss)
     { return libxl__ev_child_inuse(&ss->mid); }
 
 /*
