@@ -143,7 +143,7 @@ trampoline_boot_cpu_entry:
         mov     %ax,%ss
 
         /* Initialise stack pointer and IDT, and enable irqs. */
-        xor     %sp,%sp
+        xor     %esp,%esp
         lidt    bootsym(rm_idt)
         sti
 
@@ -151,6 +151,11 @@ trampoline_boot_cpu_entry:
          * Declare that our target operating mode is long mode.
          * Initialise 32-bit registers since some buggy BIOSes depend on it.
          */
+        xor     %ecx,%ecx
+        xor     %edx,%edx
+        xor     %esi,%esi
+        xor     %edi,%edi
+        xor     %ebp,%ebp
         movl    $0xec00,%eax      # declare target operating mode
         movl    $0x0002,%ebx      # long mode
         int     $0x15
