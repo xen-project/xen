@@ -1810,6 +1810,13 @@ void hvm_shadow_handle_cd(struct vcpu *v, unsigned long value)
     }
 }
 
+static void hvm_update_cr(struct vcpu *v, unsigned int cr, unsigned long value)
+{
+    v->arch.hvm_vcpu.guest_cr[cr] = value;
+    nestedhvm_set_cr(v, cr, value);
+    hvm_update_guest_cr(v, cr);
+}
+
 int hvm_set_cr0(unsigned long value)
 {
     struct vcpu *v = current;
@@ -1915,8 +1922,7 @@ int hvm_set_cr0(unsigned long value)
            hvm_funcs.handle_cd )
         hvm_funcs.handle_cd(v, value);
 
-    v->arch.hvm_vcpu.guest_cr[0] = value;
-    hvm_update_guest_cr(v, 0);
+    hvm_update_cr(v, 0, value);
 
     if ( (value ^ old_value) & X86_CR0_PG ) {
         if ( !nestedhvm_vmswitch_in_progress(v) && nestedhvm_vcpu_in_guestmode(v) )
@@ -1997,8 +2003,7 @@ int hvm_set_cr4(unsigned long value)
         goto gpf;
     }
 
-    v->arch.hvm_vcpu.guest_cr[4] = value;
-    hvm_update_guest_cr(v, 4);
+    hvm_update_cr(v, 4, value);
     hvm_memory_event_cr4(value, old_cr);
 
     /*

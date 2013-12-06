@@ -110,6 +110,9 @@ struct nestedvcpu {
      */
     bool_t nv_ioport80;
     bool_t nv_ioportED;
+
+    /* L2's control-resgister, just as the L2 sees them. */
+    unsigned long       guest_cr[5];
 };
 
 #define vcpu_nestedhvm(v) ((v)->arch.hvm_vcpu.nvcpu)

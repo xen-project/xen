@@ -1046,6 +1046,8 @@ static void load_shadow_guest_state(struct vcpu *v)
     vvmcs_to_shadow_bulk(v, ARRAY_SIZE(vmcs_gstate_field),
                          vmcs_gstate_field);
 
+    nvcpu->guest_cr[0] = __get_vvmcs(vvmcs, CR0_READ_SHADOW);
+    nvcpu->guest_cr[4] = __get_vvmcs(vvmcs, CR4_READ_SHADOW);
     hvm_set_cr0(__get_vvmcs(vvmcs, GUEST_CR0));
     hvm_set_cr4(__get_vvmcs(vvmcs, GUEST_CR4));
     hvm_set_cr3(__get_vvmcs(vvmcs, GUEST_CR3));
@@ -2461,3 +2463,45 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
     return ( nvcpu->nv_vmexit_pending == 1 );
 }
 
+void nvmx_set_cr_read_shadow(struct vcpu *v, unsigned int cr)
+{
+    unsigned long cr_field, read_shadow_field, mask_field;
+
+    switch ( cr )
+    {
+    case 0:
+        cr_field = GUEST_CR0;
+        read_shadow_field = CR0_READ_SHADOW;
+        mask_field = CR0_GUEST_HOST_MASK;
+        break;
+    case 4:
+        cr_field = GUEST_CR4;
+        read_shadow_field = CR4_READ_SHADOW;
+        mask_field = CR4_GUEST_HOST_MASK;
+        break;
+    default:
+        gdprintk(XENLOG_WARNING, "Set read shadow for CR%d.\n", cr);
+        return;
+    }
+
+    if ( !nestedhvm_vmswitch_in_progress(v) )
+    {
+        unsigned long virtual_cr_mask = 
+            __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, mask_field);
+
+        /*
+         * We get here when L2 changed cr in a way that did not change
+         * any of L1's shadowed bits (see nvmx_n2_vmexit_handler),
+         * but did change L0 shadowed bits. So we first calculate the
+         * effective cr value that L1 would like to write into the
+         * hardware. It consists of the L2-owned bits from the new
+         * value combined with the L1-owned bits from L1's guest cr.
+         */
+        v->arch.hvm_vcpu.guest_cr[cr] &= ~virtual_cr_mask;
+        v->arch.hvm_vcpu.guest_cr[cr] |= virtual_cr_mask &
+            __get_vvmcs(vcpu_nestedhvm(v).nv_vvmcx, cr_field);
+    }
+
+    /* nvcpu.guest_cr is what L2 write to cr actually. */
+    __vmwrite(read_shadow_field, v->arch.hvm_vcpu.nvcpu.guest_cr[cr]);
+}

@@ -1171,6 +1171,11 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
             vmx_update_cpu_exec_control(v);
         }
 
+        if ( !nestedhvm_vcpu_in_guestmode(v) )
+            __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
+        else
+            nvmx_set_cr_read_shadow(v, 0);
+
         if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
         {
             if ( v != current )
@@ -1219,7 +1224,6 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         v->arch.hvm_vcpu.hw_cr[0] =
             v->arch.hvm_vcpu.guest_cr[0] | hw_cr0_mask;
         __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
-        __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
 
         /* Changing CR0 can change some bits in real CR4. */
         vmx_update_guest_cr(v, 4);
@@ -1244,6 +1248,12 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
         v->arch.hvm_vcpu.hw_cr[4] = HVM_CR4_HOST_MASK;
         if ( paging_mode_hap(v->domain) )
             v->arch.hvm_vcpu.hw_cr[4] &= ~X86_CR4_PAE;
+
+        if ( !nestedhvm_vcpu_in_guestmode(v) )
+            __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[4]);
+        else
+            nvmx_set_cr_read_shadow(v, 4);
+
         v->arch.hvm_vcpu.hw_cr[4] |= v->arch.hvm_vcpu.guest_cr[4];
         if ( v->arch.hvm_vmx.vmx_realmode ) 
             v->arch.hvm_vcpu.hw_cr[4] |= X86_CR4_VME;
@@ -1263,7 +1273,6 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
             v->arch.hvm_vcpu.hw_cr[4] &= ~X86_CR4_SMEP;
         }
         __vmwrite(GUEST_CR4, v->arch.hvm_vcpu.hw_cr[4]);
-        __vmwrite(CR4_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[4]);
         break;
     default:
         BUG();
