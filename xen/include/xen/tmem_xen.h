@@ -228,26 +228,24 @@ static inline bool_t tmem_current_is_privileged(void)
 
 static inline uint8_t tmem_get_first_byte(struct page_info *pfp)
 {
-    void *p = __map_domain_page(pfp);
+    const uint8_t *p = __map_domain_page(pfp);
+    uint8_t byte = p[0];
 
-    return (uint8_t)(*(char *)p);
+    unmap_domain_page(p);
+
+    return byte;
 }
 
 static inline int tmem_page_cmp(struct page_info *pfp1, struct page_info *pfp2)
 {
-    const uint64_t *p1 = (uint64_t *)__map_domain_page(pfp1);
-    const uint64_t *p2 = (uint64_t *)__map_domain_page(pfp2);
-    int i;
+    const uint64_t *p1 = __map_domain_page(pfp1);
+    const uint64_t *p2 = __map_domain_page(pfp2);
+    int rc = memcmp(p1, p2, PAGE_SIZE);
 
-    // FIXME: code in assembly?
-ASSERT(p1 != NULL);
-ASSERT(p2 != NULL);
-    for ( i = PAGE_SIZE/sizeof(uint64_t); i && *p1 == *p2; i--, p1++, p2++ );
-    if ( !i )
-        return 0;
-    if ( *p1 < *p2 )
-        return -1;
-    return 1;
+    unmap_domain_page(p2);
+    unmap_domain_page(p1);
+
+    return rc;
 }
 
 static inline int tmem_pcd_cmp(void *va1, pagesize_t len1, void *va2, pagesize_t len2)
@@ -271,54 +269,58 @@ static inline int tmem_pcd_cmp(void *va1, pagesize_t len1, void *va2, pagesize_t
     return 1;
 }
 
-static inline int tmem_tze_pfp_cmp(struct page_info *pfp1, pagesize_t pfp_len, void *tva, pagesize_t tze_len)
+static inline int tmem_tze_pfp_cmp(struct page_info *pfp1, pagesize_t pfp_len,
+                                   void *tva, const pagesize_t tze_len)
 {
-    const uint64_t *p1 = (uint64_t *)__map_domain_page(pfp1);
-    const uint64_t *p2;
-    pagesize_t i;
+    const uint64_t *p1 = __map_domain_page(pfp1);
+    const uint64_t *p2 = tze_len == PAGE_SIZE ?
+        __map_domain_page((struct page_info *)tva) : tva;
+    int rc;
 
-    if ( tze_len == PAGE_SIZE )
-       p2 = (uint64_t *)__map_domain_page((struct page_info *)tva);
-    else
-       p2 = (uint64_t *)tva;
     ASSERT(pfp_len <= PAGE_SIZE);
     ASSERT(!(pfp_len & (sizeof(uint64_t)-1)));
     ASSERT(tze_len <= PAGE_SIZE);
     ASSERT(!(tze_len & (sizeof(uint64_t)-1)));
     if ( pfp_len < tze_len )
-        return -1;
-    if ( pfp_len > tze_len )
-        return 1;
-    ASSERT(pfp_len == tze_len);
-    for ( i = tze_len/sizeof(uint64_t); i && *p1 == *p2; i--, p1++, p2++ );
-    if ( !i )
-        return 0;
-    if ( *p1 < *p2 )
-        return -1;
-    return 1;
+        rc = -1;
+    else if ( pfp_len > tze_len )
+        rc = 1;
+    else
+        rc = memcmp(p1, p2, tze_len);
+
+    if ( tze_len == PAGE_SIZE )
+        unmap_domain_page(p2);
+    unmap_domain_page(p1);
+
+    return rc;
 }
 
 /* return the size of the data in the pfp, ignoring trailing zeroes and
  * rounded up to the nearest multiple of 8 */
 static inline pagesize_t tmem_tze_pfp_scan(struct page_info *pfp)
 {
-    const uint64_t *p = (uint64_t *)__map_domain_page(pfp);
+    const uint64_t *const page = __map_domain_page(pfp);
+    const uint64_t *p = page;
     pagesize_t bytecount = PAGE_SIZE;
     pagesize_t len = PAGE_SIZE/sizeof(uint64_t);
+
     p += len;
     while ( len-- && !*--p )
         bytecount -= sizeof(uint64_t);
+
+    unmap_domain_page(page);
+
     return bytecount;
 }
 
 static inline void tmem_tze_copy_from_pfp(void *tva, struct page_info *pfp, pagesize_t len)
 {
-    uint64_t *p1 = (uint64_t *)tva;
-    const uint64_t *p2 = (uint64_t *)__map_domain_page(pfp);
+    const uint64_t *p = __map_domain_page(pfp);
 
-    pagesize_t i;
     ASSERT(!(len & (sizeof(uint64_t)-1)));
-    for ( i = len/sizeof(uint64_t); i--; *p1++ = *p2++);
+    memcpy(tva, p, len);
+
+    unmap_domain_page(p);
 }
 
 /* these typedefs are in the public/tmem.h interface
