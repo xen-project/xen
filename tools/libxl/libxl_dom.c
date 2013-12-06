@@ -1209,24 +1209,41 @@ static void suspend_common_wait_guest_watch(libxl__egc *egc,
     STATE_AO_GC(dss->ao);
     xc_domaininfo_t info;
     int ret;
+    int shutdown_reason;
 
     /* Convenience aliases */
     const uint32_t domid = dss->domid;
 
     ret = xc_domain_getinfolist(CTX->xch, domid, 1, &info);
-    if (ret == 1 && info.domain == domid &&
-        (info.flags & XEN_DOMINF_shutdown)) {
-        int shutdown_reason;
-
-        shutdown_reason = (info.flags >> XEN_DOMINF_shutdownshift)
-            & XEN_DOMINF_shutdownmask;
-        if (shutdown_reason == SHUTDOWN_suspend) {
-            LOG(DEBUG, "guest has suspended");
-            domain_suspend_common_guest_suspended(egc, dss);
-            return;
-        }
+    if (ret < 0) {
+        LOGE(ERROR, "unable to check for status of guest %"PRId32"", domid);
+        goto err;
     }
-    /* otherwise, keep waiting */
+
+    if (!(ret == 1 && info.domain == domid)) {
+        LOGE(ERROR, "guest %"PRId32" we were suspending has been destroyed",
+             domid);
+        goto err;
+    }
+
+    if (!(info.flags & XEN_DOMINF_shutdown))
+        /* keep waiting */
+        return;
+
+    shutdown_reason = (info.flags >> XEN_DOMINF_shutdownshift)
+        & XEN_DOMINF_shutdownmask;
+    if (shutdown_reason != SHUTDOWN_suspend) {
+        LOG(DEBUG, "guest %"PRId32" we were suspending has shut down"
+            " with unexpected reason code %d", domid, shutdown_reason);
+        goto err;
+    }
+
+    LOG(DEBUG, "guest has suspended");
+    domain_suspend_common_guest_suspended(egc, dss);
+    return;
+
+ err:
+    domain_suspend_common_failed(egc, dss);
 }
 
 static void suspend_common_wait_guest_timeout(libxl__egc *egc,
