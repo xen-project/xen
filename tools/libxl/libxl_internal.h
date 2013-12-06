@@ -1295,8 +1295,7 @@ struct libxl__spawn_state {
     int detaching; /* we are in Detaching */
     int failed; /* might be true whenever we are not Idle */
     libxl__ev_child mid; /* always in use whenever we are not Idle */
-    libxl__ev_time timeout;
-    libxl__ev_xswatch xswatch;
+    libxl__xswait_state xswait;
 };
 
 static inline int libxl__spawn_inuse(const libxl__spawn_state *ss)

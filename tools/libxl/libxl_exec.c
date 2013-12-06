@@ -257,10 +257,8 @@ err:
  */
 
 /* Event callbacks. */
-static void spawn_watch_event(libxl__egc *egc, libxl__ev_xswatch *xsw,
-                              const char *watch_path, const char *event_path);
-static void spawn_timeout(libxl__egc *egc, libxl__ev_time *ev,
-                          const struct timeval *requested_abs);
+static void spawn_watch_event(libxl__egc *egc, libxl__xswait_state *xswa,
+                              int rc, const char *xsdata);
 static void spawn_middle_death(libxl__egc *egc, libxl__ev_child *childw,
                                pid_t pid, int status);
 
@@ -274,8 +272,7 @@ static void spawn_fail(libxl__egc *egc, libxl__spawn_state *ss);
 void libxl__spawn_init(libxl__spawn_state *ss)
 {
     libxl__ev_child_init(&ss->mid);
-    libxl__ev_time_init(&ss->timeout);
-    libxl__ev_xswatch_init(&ss->xswatch);
+    libxl__xswait_init(&ss->xswait);
 }
 
 int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *ss)
@@ -288,12 +285,12 @@ int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *ss)
     libxl__spawn_init(ss);
     ss->failed = ss->detaching = 0;
 
-    rc = libxl__ev_time_register_rel(gc, &ss->timeout,
-                                     spawn_timeout, ss->timeout_ms);
-    if (rc) goto out_err;
-
-    rc = libxl__ev_xswatch_register(gc, &ss->xswatch,
-                                    spawn_watch_event, ss->xspath);
+    ss->xswait.ao = ao;
+    ss->xswait.what = GCSPRINTF("%s startup", ss->what);
+    ss->xswait.path = ss->xspath;
+    ss->xswait.timeout_ms = ss->timeout_ms;
+    ss->xswait.callback = spawn_watch_event;
+    rc = libxl__xswait_start(gc, &ss->xswait);
     if (rc) goto out_err;
 
     pid_t middle = libxl__ev_child_fork(gc, &ss->mid, spawn_middle_death);
@@ -350,8 +347,7 @@ int libxl__spawn_spawn(libxl__egc *egc, libxl__spawn_state *ss)
 static void spawn_cleanup(libxl__gc *gc, libxl__spawn_state *ss)
 {
     assert(!libxl__ev_child_inuse(&ss->mid));
-    libxl__ev_time_deregister(gc, &ss->timeout);
-    libxl__ev_xswatch_deregister(gc, &ss->xswatch);
+    libxl__xswait_stop(gc, &ss->xswait);
 }
 
 static void spawn_detach(libxl__gc *gc, libxl__spawn_state *ss)
@@ -362,8 +358,7 @@ static void spawn_detach(libxl__gc *gc, libxl__spawn_state *ss)
     int r;
 
     assert(libxl__ev_child_inuse(&ss->mid));
-    libxl__ev_time_deregister(gc, &ss->timeout);
-    libxl__ev_xswatch_deregister(gc, &ss->xswatch);
+    libxl__xswait_stop(gc, &ss->xswait);
 
     pid_t child = ss->mid.pid;
     r = kill(child, SIGKILL);
@@ -387,25 +382,15 @@ static void spawn_fail(libxl__egc *egc, libxl__spawn_state *ss)
     spawn_detach(gc, ss);
 }
 
-static void spawn_timeout(libxl__egc *egc, libxl__ev_time *ev,
-                          const struct timeval *requested_abs)
-{
-    /* Before event, was Attached. */
-    EGC_GC;
-    libxl__spawn_state *ss = CONTAINER_OF(ev, *ss, timeout);
-    LOG(ERROR, "%s: startup timed out", ss->what);
-    spawn_fail(egc, ss); /* must be last */
-}
-
-static void spawn_watch_event(libxl__egc *egc, libxl__ev_xswatch *xsw,
-                              const char *watch_path, const char *event_path)
+static void spawn_watch_event(libxl__egc *egc, libxl__xswait_state *xswa,
+                              int rc, const char *p)
 {
     /* On entry, is Attached. */
     EGC_GC;
-    libxl__spawn_state *ss = CONTAINER_OF(xsw, *ss, xswatch);
-    char *p = libxl__xs_read(gc, 0, ss->xspath);
-    if (!p && errno != ENOENT) {
-        LOG(ERROR, "%s: xenstore read of %s failed", ss->what, ss->xspath);
+    libxl__spawn_state *ss = CONTAINER_OF(xswa, *ss, xswait);
+    if (rc) {
+        if (rc == ERROR_TIMEDOUT)
+            LOG(ERROR, "%s: startup timed out", ss->what);
         spawn_fail(egc, ss); /* must be last */
         return;
     }
