@@ -211,7 +211,7 @@ struct cmd_spec cmd_table[] = {
       "[Domain, ...]",
     },
     { "vcpu-pin",
-      &main_vcpupin, 0, 1,
+      &main_vcpupin, 1, 1,
       "Set which CPUs a VCPU can use",
       "<Domain> <VCPU|all> <CPUs|all>",
     },

@@ -4586,40 +4586,62 @@ int main_vcpulist(int argc, char **argv)
     return 0;
 }
 
-static void vcpupin(uint32_t domid, const char *vcpu, char *cpu)
+static int vcpupin(uint32_t domid, const char *vcpu, char *cpu)
 {
     libxl_vcpuinfo *vcpuinfo;
     libxl_bitmap cpumap;
 
     uint32_t vcpuid;
     char *endptr;
-    int i, nb_vcpu;
+    int i, nb_cpu, nb_vcpu, rc = -1;
+
+    libxl_bitmap_init(&cpumap);
 
     vcpuid = strtoul(vcpu, &endptr, 10);
     if (vcpu == endptr) {
         if (strcmp(vcpu, "all")) {
             fprintf(stderr, "Error: Invalid argument.\n");
-            return;
+            goto out;
         }
         vcpuid = -1;
     }
 
-    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0)) {
-        goto vcpupin_out;
-    }
+    if (libxl_cpu_bitmap_alloc(ctx, &cpumap, 0))
+        goto out;
 
     if (vcpupin_parse(cpu, &cpumap))
-        goto vcpupin_out1;
+        goto out;
+
+    if (dryrun_only) {
+        nb_cpu = libxl_get_online_cpus(ctx);
+        if (nb_cpu < 0) {
+            fprintf(stderr, "libxl_get_online_cpus failed.\n");
+            goto out;
+        }
+
+        fprintf(stdout, "cpumap: ");
+        print_bitmap(cpumap.map, nb_cpu, stdout);
+        fprintf(stdout, "\n");
+
+        if (ferror(stdout) || fflush(stdout)) {
+            perror("stdout");
+            exit(-1);
+        }
+
+        rc = 0;
+        goto out;
+    }
 
     if (vcpuid != -1) {
         if (libxl_set_vcpuaffinity(ctx, domid, vcpuid, &cpumap) == -1) {
             fprintf(stderr, "Could not set affinity for vcpu `%u'.\n", vcpuid);
+            goto out;
         }
     }
     else {
         if (!(vcpuinfo = libxl_list_vcpu(ctx, domid, &nb_vcpu, &i))) {
             fprintf(stderr, "libxl_list_vcpu failed.\n");
-            goto vcpupin_out1;
+            goto out;
         }
         for (i = 0; i < nb_vcpu; i++) {
             if (libxl_set_vcpuaffinity(ctx, domid, vcpuinfo[i].vcpuid,
@@ -4630,10 +4652,11 @@ static void vcpupin(uint32_t domid, const char *vcpu, char *cpu)
         }
         libxl_vcpuinfo_list_free(vcpuinfo, nb_vcpu);
     }
-  vcpupin_out1:
+
+    rc = 0;
+ out:
     libxl_bitmap_dispose(&cpumap);
-  vcpupin_out:
-    ;
+    return rc;
 }
 
 int main_vcpupin(int argc, char **argv)
@@ -4644,8 +4667,7 @@ int main_vcpupin(int argc, char **argv)
         /* No options */
     }
 
-    vcpupin(find_domain(argv[optind]), argv[optind+1] , argv[optind+2]);
-    return 0;
+    return vcpupin(find_domain(argv[optind]), argv[optind+1] , argv[optind+2]);
 }
 
 static void vcpuset(uint32_t domid, const char* nr_vcpus, int check_host)
