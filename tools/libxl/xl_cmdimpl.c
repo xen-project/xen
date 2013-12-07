@@ -59,6 +59,11 @@
         }                                                               \
     })
 
+#define STR_HAS_PREFIX( a, b )  \
+    ( strncmp(a, b, strlen(b)) == 0 )
+#define STR_SKIP_PREFIX( a, b ) \
+    ( STR_HAS_PREFIX(a, b) ? ((a) += strlen(b), 1) : 0 )
+
 
 int logfile = 2;
 
@@ -562,61 +567,121 @@ static void split_string_into_string_list(const char *str,
     free(s);
 }
 
+static int parse_range(const char *str, unsigned long *a, unsigned long *b)
+{
+    const char *nstr;
+    char *endptr;
+
+    *a = *b = strtoul(str, &endptr, 10);
+    if (endptr == str || *a == ULONG_MAX)
+        return ERROR_INVAL;
+
+    if (*endptr == '-') {
+        nstr = endptr + 1;
+
+        *b = strtoul(nstr, &endptr, 10);
+        if (endptr == nstr || *b == ULONG_MAX || *b < *a)
+            return ERROR_INVAL;
+    }
+
+    /* Valid value or range so far, but we also don't want junk after that */
+    if (*endptr != '\0')
+        return ERROR_INVAL;
+
+    return 0;
+}
+
+/*
+ * Add or removes a specific set of cpus (specified in str, either as
+ * single cpus or as entire NUMA nodes) to/from cpumap.
+ */
+static int update_cpumap_range(const char *str, libxl_bitmap *cpumap)
+{
+    unsigned long ida, idb;
+    libxl_bitmap node_cpumap;
+    bool is_not = false, is_nodes = false;
+    int rc = 0;
+
+    libxl_bitmap_init(&node_cpumap);
+
+    rc = libxl_node_bitmap_alloc(ctx, &node_cpumap, 0);
+    if (rc) {
+        fprintf(stderr, "libxl_node_bitmap_alloc failed.\n");
+        goto out;
+    }
+
+    /* Are we adding or removing cpus/nodes? */
+    if (STR_SKIP_PREFIX(str, "^")) {
+        is_not = true;
+    }
+
+    /* Are we dealing with cpus or full nodes? */
+    if (STR_SKIP_PREFIX(str, "node:") || STR_SKIP_PREFIX(str, "nodes:")) {
+        is_nodes = true;
+    }
+
+    if (strcmp(str, "all") == 0) {
+        /* We do not accept "^all" or "^nodes:all" */
+        if (is_not) {
+            fprintf(stderr, "Can't combine \"^\" and \"all\".\n");
+            rc = ERROR_INVAL;
+        } else
+            libxl_bitmap_set_any(cpumap);
+        goto out;
+    }
+
+    rc = parse_range(str, &ida, &idb);
+    if (rc) {
+        fprintf(stderr, "Invalid pcpu range: %s.\n", str);
+        goto out;
+    }
+
+    /* Add or remove the specified cpus in the range */
+    while (ida <= idb) {
+        if (is_nodes) {
+            /* Add/Remove all the cpus of a NUMA node */
+            int i;
+
+            rc = libxl_node_to_cpumap(ctx, ida, &node_cpumap);
+            if (rc) {
+                fprintf(stderr, "libxl_node_to_cpumap failed.\n");
+                goto out;
+            }
+
+            /* Add/Remove all the cpus in the node cpumap */
+            libxl_for_each_set_bit(i, node_cpumap) {
+                is_not ? libxl_bitmap_reset(cpumap, i) :
+                         libxl_bitmap_set(cpumap, i);
+            }
+        } else {
+            /* Add/Remove this cpu */
+            is_not ? libxl_bitmap_reset(cpumap, ida) :
+                     libxl_bitmap_set(cpumap, ida);
+        }
+        ida++;
+    }
+
+ out:
+    libxl_bitmap_dispose(&node_cpumap);
+    return rc;
+}
+
+/*
+ * Takes a string representing a set of cpus (specified either as
+ * single cpus or as eintire NUMA nodes) and turns it into the
+ * corresponding libxl_bitmap (in cpumap).
+ */
 static int vcpupin_parse(char *cpu, libxl_bitmap *cpumap)
 {
-    libxl_bitmap exclude_cpumap;
-    uint32_t cpuida, cpuidb;
-    char *endptr, *toka, *tokb, *saveptr = NULL;
-    int i, rc = 0, rmcpu;
+    char *ptr, *saveptr = NULL;
+    int rc = 0;
 
-    if (!strcmp(cpu, "all")) {
-        libxl_bitmap_set_any(cpumap);
-        return 0;
+    for (ptr = strtok_r(cpu, ",", &saveptr); ptr;
+         ptr = strtok_r(NULL, ",", &saveptr)) {
+        rc = update_cpumap_range(ptr, cpumap);
+        if (rc)
+            break;
     }
-
-    if (libxl_cpu_bitmap_alloc(ctx, &exclude_cpumap, 0)) {
-        fprintf(stderr, "Error: Failed to allocate cpumap.\n");
-        return ENOMEM;
-    }
-
-    for (toka = strtok_r(cpu, ",", &saveptr); toka;
-         toka = strtok_r(NULL, ",", &saveptr)) {
-        rmcpu = 0;
-        if (*toka == '^') {
-            /* This (These) Cpu(s) will be removed from the map */
-            toka++;
-            rmcpu = 1;
-        }
-        /* Extract a valid (range of) cpu(s) */
-        cpuida = cpuidb = strtoul(toka, &endptr, 10);
-        if (endptr == toka) {
-            fprintf(stderr, "Error: Invalid argument.\n");
-            rc = EINVAL;
-            goto vcpp_out;
-        }
-        if (*endptr == '-') {
-            tokb = endptr + 1;
-            cpuidb = strtoul(tokb, &endptr, 10);
-            if (endptr == tokb || cpuida > cpuidb) {
-                fprintf(stderr, "Error: Invalid argument.\n");
-                rc = EINVAL;
-                goto vcpp_out;
-            }
-        }
-        while (cpuida <= cpuidb) {
-            rmcpu == 0 ? libxl_bitmap_set(cpumap, cpuida) :
-                         libxl_bitmap_set(&exclude_cpumap, cpuida);
-            cpuida++;
-        }
-    }
-
-    /* Clear all the cpus from the removal list */
-    libxl_for_each_set_bit(i, exclude_cpumap) {
-        libxl_bitmap_reset(cpumap, i);
-    }
-
-vcpp_out:
-    libxl_bitmap_dispose(&exclude_cpumap);
 
     return rc;
 }
