@@ -4525,7 +4525,7 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
 }
 
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
-                                       int *nb_vcpu, int *nr_vcpus_out)
+                                       int *nr_vcpus_out, int *nr_cpus_out)
 {
     libxl_vcpuinfo *ptr, *ret;
     xc_domaininfo_t domaininfo;
@@ -4535,26 +4535,29 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting infolist");
         return NULL;
     }
-    *nr_vcpus_out = libxl_get_max_cpus(ctx);
+    *nr_cpus_out = libxl_get_max_cpus(ctx);
     ret = ptr = calloc(domaininfo.max_vcpu_id + 1, sizeof (libxl_vcpuinfo));
     if (!ptr) {
         return NULL;
     }
 
-    for (*nb_vcpu = 0; *nb_vcpu <= domaininfo.max_vcpu_id; ++*nb_vcpu, ++ptr) {
+    for (*nr_vcpus_out = 0;
+         *nr_vcpus_out <= domaininfo.max_vcpu_id;
+         ++*nr_vcpus_out, ++ptr) {
         if (libxl_cpu_bitmap_alloc(ctx, &ptr->cpumap, 0)) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "allocating cpumap");
             goto err;
         }
-        if (xc_vcpu_getinfo(ctx->xch, domid, *nb_vcpu, &vcpuinfo) == -1) {
+        if (xc_vcpu_getinfo(ctx->xch, domid, *nr_vcpus_out, &vcpuinfo) == -1) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting vcpu info");
             goto err;
         }
-        if (xc_vcpu_getaffinity(ctx->xch, domid, *nb_vcpu, ptr->cpumap.map) == -1) {
+        if (xc_vcpu_getaffinity(ctx->xch, domid, *nr_vcpus_out,
+                                ptr->cpumap.map) == -1) {
             LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting vcpu affinity");
             goto err;
         }
-        ptr->vcpuid = *nb_vcpu;
+        ptr->vcpuid = *nr_vcpus_out;
         ptr->cpu = vcpuinfo.cpu;
         ptr->online = !!vcpuinfo.online;
         ptr->blocked = !!vcpuinfo.blocked;

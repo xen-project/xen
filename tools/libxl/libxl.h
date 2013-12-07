@@ -769,7 +769,7 @@ libxl_numainfo *libxl_get_numainfo(libxl_ctx *ctx, int *nr);
 void libxl_numainfo_list_free(libxl_numainfo *, int nr);
 
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
-                                int *nb_vcpu, int *nr_vcpus_out);
+                                int *nb_vcpu, int *nr_cpus_out);
 void libxl_vcpuinfo_list_free(libxl_vcpuinfo *, int nr_vcpus);
 
 void libxl_device_vtpm_list_free(libxl_device_vtpm*, int nr_vtpms);
