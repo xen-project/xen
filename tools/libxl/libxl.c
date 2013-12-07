@@ -615,10 +615,8 @@ static int cpupool_info(libxl__gc *gc,
     info->n_dom = xcinfo->n_dom;
     rc = libxl_cpu_bitmap_alloc(CTX, &info->cpumap, 0);
     if (rc)
-    {
-        LOG(ERROR, "unable to allocate cpumap %d\n", rc);
         goto out;
-    }
+
     memcpy(info->cpumap.map, xcinfo->cpumap, info->cpumap.size);
 
     rc = 0;
@@ -4355,7 +4353,7 @@ libxl_cputopology *libxl_get_cpu_topology(libxl_ctx *ctx, int *nb_cpu_out)
     int max_cpus;
 
     max_cpus = libxl_get_max_cpus(ctx);
-    if (max_cpus == 0)
+    if (max_cpus < 0)
     {
         LIBXL__LOG(ctx, XTL_ERROR, "Unable to determine number of CPUS");
         ret = NULL;
@@ -4420,7 +4418,7 @@ libxl_numainfo *libxl_get_numainfo(libxl_ctx *ctx, int *nr)
     int i, j, max_nodes;
 
     max_nodes = libxl_get_max_nodes(ctx);
-    if (max_nodes == 0)
+    if (max_nodes < 0)
     {
         LIBXL__LOG(ctx, XTL_ERROR, "Unable to determine number of NODES");
         ret = NULL;
@@ -4545,10 +4543,8 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
          *nr_vcpus_out <= domaininfo.max_vcpu_id;
          ++*nr_vcpus_out, ++ptr) {
         libxl_bitmap_init(&ptr->cpumap);
-        if (libxl_cpu_bitmap_alloc(ctx, &ptr->cpumap, 0)) {
-            LOGE(ERROR, "allocating cpumap");
+        if (libxl_cpu_bitmap_alloc(ctx, &ptr->cpumap, 0))
             goto err;
-        }
         if (xc_vcpu_getinfo(ctx->xch, domid, *nr_vcpus_out, &vcpuinfo) == -1) {
             LOGE(ERROR, "getting vcpu info");
             goto err;
@@ -5308,8 +5304,8 @@ int libxl_get_freecpus(libxl_ctx *ctx, libxl_bitmap *cpumap)
     int ncpus;
 
     ncpus = libxl_get_max_cpus(ctx);
-    if (ncpus == 0)
-        return ERROR_FAIL;
+    if (ncpus < 0)
+        return ncpus;
 
     cpumap->map = xc_cpupool_freeinfo(ctx->xch);
     if (cpumap->map == NULL)

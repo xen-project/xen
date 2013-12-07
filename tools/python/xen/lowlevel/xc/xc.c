@@ -233,7 +233,7 @@ static PyObject *pyxc_vcpu_setaffinity(XcObject *self,
         return NULL;
 
     nr_cpus = xc_get_max_cpus(self->xc_handle);
-    if ( nr_cpus == 0 )
+    if ( nr_cpus < 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
     cpumap = xc_cpumap_alloc(self->xc_handle);
@@ -392,7 +392,7 @@ static PyObject *pyxc_vcpu_getinfo(XcObject *self,
         return NULL;
 
     nr_cpus = xc_get_max_cpus(self->xc_handle);
-    if ( nr_cpus == 0 )
+    if ( nr_cpus < 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
     rc = xc_vcpu_getinfo(self->xc_handle, dom, vcpu, &info);
@@ -1923,7 +1923,7 @@ static PyObject *cpumap_to_cpulist(XcObject *self, xc_cpumap_t cpumap)
     int nr_cpus;
 
     nr_cpus = xc_get_max_cpus(self->xc_handle);
-    if ( nr_cpus == 0 )
+    if ( nr_cpus < 0 )
         return pyxc_error_to_exception(self->xc_handle);
 
     cpulist = PyList_New(0);

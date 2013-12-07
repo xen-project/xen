@@ -653,27 +653,54 @@ char *libxl_bitmap_to_hex_string(libxl_ctx *ctx, const libxl_bitmap *bitmap)
 
 int libxl_cpu_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *cpumap, int max_cpus)
 {
-    if (max_cpus < 0)
-        return ERROR_INVAL;
+    GC_INIT(ctx);
+    int rc = 0;
+
+    if (max_cpus < 0) {
+        rc = ERROR_INVAL;
+        LOG(ERROR, "invalid number of cpus provided");
+        goto out;
+    }
     if (max_cpus == 0)
         max_cpus = libxl_get_max_cpus(ctx);
-    if (max_cpus == 0)
-        return ERROR_FAIL;
+    if (max_cpus < 0) {
+        LOG(ERROR, "failed to retrieve the maximum number of cpus");
+        rc = max_cpus;
+        goto out;
+    }
+    /* This can't fail: no need to check and log */
+    libxl_bitmap_alloc(ctx, cpumap, max_cpus);
 
-    return libxl_bitmap_alloc(ctx, cpumap, max_cpus);
+ out:
+    GC_FREE;
+    return rc;
 }
 
 int libxl_node_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *nodemap,
                             int max_nodes)
 {
-    if (max_nodes < 0)
-        return ERROR_INVAL;
+    GC_INIT(ctx);
+    int rc = 0;
+
+    if (max_nodes < 0) {
+        rc = ERROR_INVAL;
+        LOG(ERROR, "invalid number of nodes provided");
+        goto out;
+    }
+
     if (max_nodes == 0)
         max_nodes = libxl_get_max_nodes(ctx);
-    if (max_nodes == 0)
-        return ERROR_FAIL;
+    if (max_nodes < 0) {
+        LOG(ERROR, "failed to retrieve the maximum number of nodes");
+        rc = max_nodes;
+        goto out;
+    }
+    /* This can't fail: no need to check and log */
+    libxl_bitmap_alloc(ctx, nodemap, max_nodes);
 
-    return libxl_bitmap_alloc(ctx, nodemap, max_nodes);
+ out:
+    GC_FREE;
+    return rc;
 }
 
 int libxl_nodemap_to_cpumap(libxl_ctx *ctx,
@@ -744,12 +771,16 @@ int libxl_cpumap_to_nodemap(libxl_ctx *ctx,
 
 int libxl_get_max_cpus(libxl_ctx *ctx)
 {
-    return xc_get_max_cpus(ctx->xch);
+    int max_cpus = xc_get_max_cpus(ctx->xch);
+
+    return max_cpus < 0 ? ERROR_FAIL : max_cpus;
 }
 
 int libxl_get_max_nodes(libxl_ctx *ctx)
 {
-    return xc_get_max_nodes(ctx->xch);
+    int max_nodes = xc_get_max_nodes(ctx->xch);
+
+    return max_nodes < 0 ? ERROR_FAIL : max_nodes;
 }
 
 int libxl__enum_from_string(const libxl_enum_string_table *t,
