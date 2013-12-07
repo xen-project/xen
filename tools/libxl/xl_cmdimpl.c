@@ -3121,8 +3121,7 @@ out:
     }
 }
 
-/* If map is not full, prints it and returns 0. Returns 1 otherwise. */
-static int print_bitmap(uint8_t *map, int maplen, FILE *stream)
+static void print_bitmap(uint8_t *map, int maplen, FILE *stream)
 {
     int i;
     uint8_t pmap = 0, bitmask = 0;
@@ -3160,28 +3159,16 @@ static int print_bitmap(uint8_t *map, int maplen, FILE *stream)
         case 2:
             break;
         case 1:
-            if (firstset == 0)
-                return 1;
+            if (firstset == 0) {
+                fprintf(stream, "all");
+                break;
+            }
         case 3:
             fprintf(stream, "%s%d", state > 1 ? "," : "", firstset);
             if (i - 1 > firstset)
                 fprintf(stream, "-%d", i - 1);
             break;
     }
-
-    return 0;
-}
-
-static void print_cpumap(uint8_t *map, int maplen, FILE *stream)
-{
-    if (print_bitmap(map, maplen, stream))
-        fprintf(stream, "any cpu");
-}
-
-static void print_nodemap(uint8_t *map, int maplen, FILE *stream)
-{
-    if (print_bitmap(map, maplen, stream))
-        fprintf(stream, "any node");
 }
 
 static void list_domains(int verbose, int context, int claim, int numa,
@@ -3254,7 +3241,7 @@ static void list_domains(int verbose, int context, int claim, int numa,
             libxl_domain_get_nodeaffinity(ctx, info[i].domid, &nodemap);
 
             putchar(' ');
-            print_nodemap(nodemap.map, physinfo.nr_nodes, stdout);
+            print_bitmap(nodemap.map, physinfo.nr_nodes, stdout);
         }
         putchar('\n');
     }
@@ -4466,7 +4453,7 @@ static void print_vcpuinfo(uint32_t tdomid,
     /*      TIM */
     printf("%9.1f  ", ((float)vcpuinfo->vcpu_time / 1e9));
     /* CPU AFFINITY */
-    print_cpumap(vcpuinfo->cpumap.map, nr_cpus, stdout);
+    print_bitmap(vcpuinfo->cpumap.map, nr_cpus, stdout);
     printf("\n");
 }
 
