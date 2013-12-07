@@ -4527,34 +4527,35 @@ const libxl_version_info* libxl_get_version_info(libxl_ctx *ctx)
 libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
                                        int *nr_vcpus_out, int *nr_cpus_out)
 {
+    GC_INIT(ctx);
     libxl_vcpuinfo *ptr, *ret;
     xc_domaininfo_t domaininfo;
     xc_vcpuinfo_t vcpuinfo;
 
     if (xc_domain_getinfolist(ctx->xch, domid, 1, &domaininfo) != 1) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting infolist");
+        LOGE(ERROR, "getting infolist");
+        GC_FREE;
         return NULL;
     }
     *nr_cpus_out = libxl_get_max_cpus(ctx);
-    ret = ptr = calloc(domaininfo.max_vcpu_id + 1, sizeof (libxl_vcpuinfo));
-    if (!ptr) {
-        return NULL;
-    }
+    ret = ptr = libxl__calloc(NOGC, domaininfo.max_vcpu_id + 1,
+                              sizeof(libxl_vcpuinfo));
 
     for (*nr_vcpus_out = 0;
          *nr_vcpus_out <= domaininfo.max_vcpu_id;
          ++*nr_vcpus_out, ++ptr) {
+        libxl_bitmap_init(&ptr->cpumap);
         if (libxl_cpu_bitmap_alloc(ctx, &ptr->cpumap, 0)) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "allocating cpumap");
+            LOGE(ERROR, "allocating cpumap");
             goto err;
         }
         if (xc_vcpu_getinfo(ctx->xch, domid, *nr_vcpus_out, &vcpuinfo) == -1) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting vcpu info");
+            LOGE(ERROR, "getting vcpu info");
             goto err;
         }
         if (xc_vcpu_getaffinity(ctx->xch, domid, *nr_vcpus_out,
                                 ptr->cpumap.map) == -1) {
-            LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "getting vcpu affinity");
+            LOGE(ERROR, "getting vcpu affinity");
             goto err;
         }
         ptr->vcpuid = *nr_vcpus_out;
@@ -4564,10 +4565,13 @@ libxl_vcpuinfo *libxl_list_vcpu(libxl_ctx *ctx, uint32_t domid,
         ptr->running = !!vcpuinfo.running;
         ptr->vcpu_time = vcpuinfo.cpu_time;
     }
+    GC_FREE;
     return ret;
 
 err:
+    libxl_bitmap_dispose(&ptr->cpumap);
     free(ret);
+    GC_FREE;
     return NULL;
 }
 
