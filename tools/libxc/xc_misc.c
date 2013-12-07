@@ -38,6 +38,16 @@ int xc_get_max_cpus(xc_interface *xch)
     return -1;
 }
 
+int xc_get_online_cpus(xc_interface *xch)
+{
+    xc_physinfo_t physinfo;
+
+    if ( !xc_physinfo(xch, &physinfo) )
+        return physinfo.nr_cpus;
+
+    return -1;
+}
+
 int xc_get_max_nodes(xc_interface *xch)
 {
     static int max_nodes = 0;

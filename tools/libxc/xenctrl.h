@@ -356,6 +356,9 @@ typedef uint8_t *xc_cpumap_t;
 /* return maximum number of cpus the hypervisor supports */
 int xc_get_max_cpus(xc_interface *xch);
 
+/* return the number of online cpus */
+int xc_get_online_cpus(xc_interface *xch);
+
 /* return array size for cpumap */
 int xc_get_cpumap_size(xc_interface *xch);
 

@@ -677,6 +677,14 @@ int libxl_domain_preserve(libxl_ctx *ctx, uint32_t domid, libxl_domain_create_in
 /* get max. number of cpus supported by hypervisor */
 int libxl_get_max_cpus(libxl_ctx *ctx);
 
+/* get the actual number of currently online cpus on the host */
+int libxl_get_online_cpus(libxl_ctx *ctx);
+  /* Beware that no locking or serialization is provided by libxl,
+   * so the information can be outdated as far as the function
+   * returns. If there are other entities in the system capable
+   * of onlining/offlining CPUs, it is up to the application
+   * to guarantee consistency, if that is important. */
+
 /* get max. number of NUMA nodes supported by hypervisor */
 int libxl_get_max_nodes(libxl_ctx *ctx);
 

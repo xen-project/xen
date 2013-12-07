@@ -776,6 +776,13 @@ int libxl_get_max_cpus(libxl_ctx *ctx)
     return max_cpus < 0 ? ERROR_FAIL : max_cpus;
 }
 
+int libxl_get_online_cpus(libxl_ctx *ctx)
+{
+    int online_cpus = xc_get_online_cpus(ctx->xch);
+
+    return online_cpus < 0 ? ERROR_FAIL : online_cpus;
+}
+
 int libxl_get_max_nodes(libxl_ctx *ctx)
 {
     int max_nodes = xc_get_max_nodes(ctx->xch);
