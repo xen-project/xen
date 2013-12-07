@@ -651,6 +651,31 @@ char *libxl_bitmap_to_hex_string(libxl_ctx *ctx, const libxl_bitmap *bitmap)
     return q;
 }
 
+int libxl_cpu_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *cpumap, int max_cpus)
+{
+    if (max_cpus < 0)
+        return ERROR_INVAL;
+    if (max_cpus == 0)
+        max_cpus = libxl_get_max_cpus(ctx);
+    if (max_cpus == 0)
+        return ERROR_FAIL;
+
+    return libxl_bitmap_alloc(ctx, cpumap, max_cpus);
+}
+
+int libxl_node_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *nodemap,
+                            int max_nodes)
+{
+    if (max_nodes < 0)
+        return ERROR_INVAL;
+    if (max_nodes == 0)
+        max_nodes = libxl_get_max_nodes(ctx);
+    if (max_nodes == 0)
+        return ERROR_FAIL;
+
+    return libxl_bitmap_alloc(ctx, nodemap, max_nodes);
+}
+
 int libxl_nodemap_to_cpumap(libxl_ctx *ctx,
                             const libxl_bitmap *nodemap,
                             libxl_bitmap *cpumap)

@@ -98,32 +98,9 @@ static inline int libxl_bitmap_cpu_valid(libxl_bitmap *bitmap, int bit)
 #define libxl_for_each_set_bit(v, m) for (v = 0; v < (m).size * 8; v++) \
                                              if (libxl_bitmap_test(&(m), v))
 
-static inline int libxl_cpu_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *cpumap,
-                                         int max_cpus)
-{
-    if (max_cpus < 0)
-        return ERROR_INVAL;
-    if (max_cpus == 0)
-        max_cpus = libxl_get_max_cpus(ctx);
-    if (max_cpus == 0)
-        return ERROR_FAIL;
-
-    return libxl_bitmap_alloc(ctx, cpumap, max_cpus);
-}
-
-static inline int libxl_node_bitmap_alloc(libxl_ctx *ctx,
-                                          libxl_bitmap *nodemap,
-                                          int max_nodes)
-{
-    if (max_nodes < 0)
-        return ERROR_INVAL;
-    if (max_nodes == 0)
-        max_nodes = libxl_get_max_nodes(ctx);
-    if (max_nodes == 0)
-        return ERROR_FAIL;
-
-    return libxl_bitmap_alloc(ctx, nodemap, max_nodes);
-}
+int libxl_cpu_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *cpumap, int max_cpus);
+int libxl_node_bitmap_alloc(libxl_ctx *ctx, libxl_bitmap *nodemap,
+                            int max_nodes);
 
 /* Populate cpumap with the cpus spanned by the nodes in nodemap */
 int libxl_nodemap_to_cpumap(libxl_ctx *ctx,
