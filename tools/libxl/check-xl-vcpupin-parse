@@ -1,0 +1,294 @@
+#!/bin/bash
+
+set -e
+
+if [ -x ./xl ] ; then
+    export LD_LIBRARY_PATH=.:../libxc:../xenstore:
+    XL=./xl
+else
+    XL=xl
+fi
+
+fprefix=tmp.check-xl-vcpupin-parse
+outfile=check-xl-vcpupin-parse.data
+
+usage () {
+cat <<END
+usage: $0 [options]
+
+Tests various vcpu-pinning strings. If run without arguments acts
+as follows:
+ - generates some test data and saves them in $outfile;
+ - tests all the generated configurations (reading them back from
+   $outfile).
+
+An example of a test vector file is provided in ${outfile}-example.
+
+Options:
+ -h         prints this message
+ -r seed    uses seed for initializing the rundom number generator
+            (default: the script PID)
+ -s string  tries using string as a vcpu pinning configuration and
+            reports whether that succeeds or not
+ -o ofile   save the test data in ofile (default: $outfile)
+ -i ifile   read test data from ifile
+END
+}
+
+expected () {
+    cat >$fprefix.expected
+}
+
+# by default, re-seed with our PID
+seed=$$
+failures=0
+
+# Execute one test and check the result against the provided
+# rc value and output
+one () {
+    expected_rc=$1; shift
+    printf "test case %s...\n" "$*"
+    set +e
+    ${XL} -N vcpu-pin 0 all "$@" </dev/null >$fprefix.actual 2>/dev/null
+    actual_rc=$?
+    if [ $actual_rc != $expected_rc ]; then
+        diff -u $fprefix.expected $fprefix.actual
+        echo >&2 "test case \`$*' failed ($actual_rc $diff_rc)"
+        failures=$(( $failures + 1 ))
+    fi
+    set -e
+}
+
+# Write an entry in the test vector file. Format is as follows:
+#  test-string*expected-rc*expected-output
+write () {
+    printf "$1*$2*$3\n" >> $outfile
+}
+
+complete () {
+    if [ "$failures" = 0 ]; then
+        echo all ok.; exit 0
+    else
+        echo "$failures tests failed."; exit 1
+    fi
+}
+
+# Test a specific pinning string
+string () {
+    expected_rc=$1; shift
+    printf "test case %s...\n" "$*"
+    set +e
+    ${XL} -N vcpu-pin 0 all "$@" &> /dev/null
+    actual_rc=$?
+    set -e
+
+    if [ $actual_rc != $expected_rc ]; then
+        echo >&2 "test case \`$*' failed ($actual_rc)"
+    else
+        echo >&2 "test case \`$*' succeeded"
+    fi
+
+    exit 0
+}
+
+# Read a test vector file (provided as $1) line by line and
+# test all the entries it contains
+run ()
+{
+    while read line
+    do
+        if [ ${line:0:1} != '#' ]; then
+            test_string="`echo $line | cut -f1 -d'*'`"
+            exp_rc="`echo $line | cut -f2 -d'*'`"
+            exp_output="`echo $line | cut -f3 -d'*'`"
+
+            expected <<END
+$exp_output
+END
+            one $exp_rc "$test_string"
+        fi
+    done < $1
+
+    complete
+
+    exit 0
+}
+
+while getopts "hr:s:o:i:" option
+do
+    case $option in
+    h)
+        usage
+        exit 0
+        ;;
+    r)
+        seed=$OPTARG
+        ;;
+    s)
+        string 0 "$OPTARG"
+        ;;
+    o)
+        outfile=$OPTARG
+        ;;
+    i)
+        run $OPTARG
+        ;;
+    esac
+done
+
+#---------- test data ----------
+#
+nr_cpus=`xl info | grep nr_cpus | cut -f2 -d':'`
+nr_nodes=`xl info | grep nr_nodes | cut -f2 -d':'`
+nr_cpus_per_node=`xl info -n | sed '/cpu:/,/numa_info/!d' | head -n -1 | \
+    awk '{print $4}' | uniq -c | tail -1 | awk '{print $1}'`
+cat >$outfile <<END
+# WARNING: some of these tests are topology based tests.
+# Expect failures if the topology is not detected correctly
+# detected topology: $nr_cpus CPUs, $nr_nodes nodes, $nr_cpus_per_node CPUs per node.
+#
+# seed used for random number generation: seed=${seed}.
+#
+# Format is as follows:
+#  test-string*expected-return-code*expected-output
+#
+END
+
+# Re-seed the random number generator
+RANDOM=$seed
+
+echo "# Testing a wrong configuration" >> $outfile
+write foo 255 ""
+
+echo "# Testing the 'all' syntax" >> $outfile
+write "all" 0 "cpumap: all"
+write "nodes:all" 0 "cpumap: all"
+write "all,nodes:all" 0 "cpumap: all"
+write "all,^nodes:0,all" 0 "cpumap: all"
+
+echo "# Testing the empty cpumap case" >> $outfile
+write "^0" 0 "cpumap: none"
+
+echo "# A few attempts of pinning to just one random cpu" >> $outfile
+if [ $nr_cpus -gt 1 ]; then
+    for i in `seq 0 3`; do
+        cpu=$(($RANDOM % nr_cpus))
+        write "$cpu" 0 "cpumap: $cpu"
+    done
+fi
+
+echo "# A few attempts of pinning to all but one random cpu" >> $outfile
+if [ $nr_cpus -gt 2 ]; then
+    for i in `seq 0 3`; do
+        cpu=$(($RANDOM % nr_cpus))
+        if [ $cpu -eq 0 ]; then
+            expected_range="1-$((nr_cpus - 1))"
+        elif [ $cpu -eq 1 ]; then
+            expected_range="0,2-$((nr_cpus - 1))"
+        elif [ $cpu -eq $((nr_cpus - 2)) ]; then
+            expected_range="0-$((cpu - 1)),$((nr_cpus - 1))"
+        elif [ $cpu -eq $((nr_cpus - 1)) ]; then
+            expected_range="0-$((nr_cpus - 2))"
+        else
+            expected_range="0-$((cpu - 1)),$((cpu + 1))-$((nr_cpus - 1))"
+        fi
+        write "all,^$cpu" 0 "cpumap: $expected_range"
+    done
+fi
+
+echo "# A few attempts of pinning to a random range of cpus" >> $outfile
+if [ $nr_cpus -gt 2 ]; then
+    for i in `seq 0 3`; do
+        cpua=$(($RANDOM % nr_cpus))
+        range=$((nr_cpus - cpua))
+        cpub=$(($RANDOM % range))
+        cpubb=$((cpua + cpub))
+        if [ $cpua -eq $cpubb ]; then
+            expected_range="$cpua"
+        else
+            expected_range="$cpua-$cpubb"
+        fi
+        write "$expected_range" 0 "cpumap: $expected_range"
+    done
+fi
+
+echo "# A few attempts of pinning to just one random node" >> $outfile
+if [ $nr_nodes -gt 1 ]; then
+    for i in `seq 0 3`; do
+        node=$(($RANDOM % nr_nodes))
+        # this assumes that the first $nr_cpus_per_node (from cpu
+        # 0 to cpu $nr_cpus_per_node-1) are assigned to the first node
+        # (node 0), the second $nr_cpus_per_node (from $nr_cpus_per_node
+        # to 2*$nr_cpus_per_node-1) are assigned to the second node (node
+        # 1), etc. Expect failures if that is not the case.
+        write "nodes:$node" 0 "cpumap: $((nr_cpus_per_node*node))-$((nr_cpus_per_node*(node+1)-1))"
+    done
+fi
+
+echo "# A few attempts of pinning to all but one random node" >> $outfile
+if [ $nr_nodes -gt 1 ]; then
+    for i in `seq 0 3`; do
+        node=$(($RANDOM % nr_nodes))
+        # this assumes that the first $nr_cpus_per_node (from cpu
+        # 0 to cpu $nr_cpus_per_node-1) are assigned to the first node
+        # (node 0), the second $nr_cpus_per_node (from $nr_cpus_per_node
+        # to 2*$nr_cpus_per_node-1) are assigned to the second node (node
+        # 1), etc. Expect failures if that is not the case.
+        if [ $node -eq 0 ]; then
+            expected_range="$nr_cpus_per_node-$((nr_cpus - 1))"
+        elif [ $node -eq $((nr_nodes - 1)) ]; then
+            expected_range="0-$((nr_cpus - nr_cpus_per_node - 1))"
+        else
+            expected_range="0-$((nr_cpus_per_node*node-1)),$((nr_cpus_per_node*(node+1)))-$nr_cpus"
+        fi
+        write "all,^nodes:$node" 0 "cpumap: $expected_range"
+    done
+fi
+
+echo "# A few attempts of pinning to a random range of nodes" >> $outfile
+if [ $nr_nodes -gt 1 ]; then
+    for i in `seq 0 3`; do
+        nodea=$(($RANDOM % nr_nodes))
+        range=$((nr_nodes - nodea))
+        nodeb=$(($RANDOM % range))
+        nodebb=$((nodea + nodeb))
+        # this assumes that the first $nr_cpus_per_node (from cpu
+        # 0 to cpu $nr_cpus_per_node-1) are assigned to the first node
+        # (node 0), the second $nr_cpus_per_node (from $nr_cpus_per_node
+        # to 2*$nr_cpus_per_node-1) are assigned to the second node (node
+        # 1), etc. Expect failures if that is not the case.
+        if [ $nodea -eq 0 ] && [ $nodebb -eq $((nr_nodes - 1)) ]; then
+            expected_range="all"
+        else
+            expected_range="$((nr_cpus_per_node*nodea))-$((nr_cpus_per_node*(nodebb+1) - 1))"
+        fi
+        write "nodes:$nodea-$nodebb" 0 "cpumap: $expected_range"
+    done
+fi
+
+echo "# A few attempts of pinning to a node but excluding one random cpu" >> $outfile
+if [ $nr_nodes -gt 1 ]; then
+    for i in `seq 0 3`; do
+        node=$(($RANDOM % nr_nodes))
+        # this assumes that the first $nr_cpus_per_node (from cpu
+        # 0 to cpu $nr_cpus_per_node-1) are assigned to the first node
+        # (node 0), the second $nr_cpus_per_node (from $nr_cpus_per_node
+        # to 2*$nr_cpus_per_node-1) are assigned to the second node (node
+        # 1), etc. Expect failures if that is not the case.
+        cpu=$(($RANDOM % nr_cpus_per_node + nr_cpus_per_node*node))
+        if [ $cpu -eq $((nr_cpus_per_node*node)) ]; then
+            expected_range="$((nr_cpus_per_node*node + 1))-$((nr_cpus_per_node*(node+1) - 1))"
+        elif [ $cpu -eq $((nr_cpus_per_node*node + 1)) ]; then
+            expected_range="$((nr_cpus_per_node*node)),$((nr_cpus_per_node*node + 2))-$((nr_cpus_per_node*(node+1) - 1))"
+        elif [ $cpu -eq $((nr_cpus_per_node*(node+1) - 2)) ]; then
+            expected_range="$((nr_cpus_per_node*node))-$((nr_cpus_per_node*(node+1) - 3)),$((nr_cpus_per_node*(node+1) - 1))"
+        elif [ $cpu -eq $((nr_cpus_per_node*(node+1) - 1)) ]; then
+            expected_range="$((nr_cpus_per_node*node))-$((nr_cpus_per_node*(node+1) - 2))"
+        else
+            expected_range="$((nr_cpus_per_node*node))-$((cpu - 1)),$((cpu + 1))-$((nr_cpus_per_node*(node+1) - 1))"
+        fi
+        write "nodes:$node,^$cpu" 0 "cpumap: $expected_range"
+    done
+fi
+
+run $outfile

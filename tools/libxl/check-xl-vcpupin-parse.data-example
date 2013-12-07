@@ -1,0 +1,53 @@
+# WARNING: some of these tests are topology based tests.
+# Expect failures if the topology is not detected correctly
+# detected topology:  16 CPUs,  2 nodes, 8 CPUs per node.
+#
+# seed used for random number generation: seed=13328.
+#
+# Format is as follows:
+#  test-string*expected-return-code*expected-output
+#
+# Testing a wrong configuration
+foo*255*
+# Testing the 'all' syntax
+all*0*cpumap: all
+nodes:all*0*cpumap: all
+all,nodes:all*0*cpumap: all
+all,^nodes:0,all*0*cpumap: all
+# Testing the empty cpumap case
+^0*0*cpumap: none
+# A few attempts of pinning to just one random cpu
+0*0*cpumap: 0
+9*0*cpumap: 9
+6*0*cpumap: 6
+0*0*cpumap: 0
+# A few attempts of pinning to all but one random cpu
+all,^12*0*cpumap: 0-11,13-15
+all,^6*0*cpumap: 0-5,7-15
+all,^3*0*cpumap: 0-2,4-15
+all,^7*0*cpumap: 0-6,8-15
+# A few attempts of pinning to a random range of cpus
+13-15*0*cpumap: 13-15
+7*0*cpumap: 7
+3-5*0*cpumap: 3-5
+8-11*0*cpumap: 8-11
+# A few attempts of pinning to just one random node
+nodes:1*0*cpumap: 8-15
+nodes:0*0*cpumap: 0-7
+nodes:0*0*cpumap: 0-7
+nodes:0*0*cpumap: 0-7
+# A few attempts of pinning to all but one random node
+all,^nodes:0*0*cpumap: 8-15
+all,^nodes:1*0*cpumap: 0-7
+all,^nodes:1*0*cpumap: 0-7
+all,^nodes:0*0*cpumap: 8-15
+# A few attempts of pinning to a random range of nodes
+nodes:1-1*0*cpumap: 8-15
+nodes:1-1*0*cpumap: 8-15
+nodes:0-1*0*cpumap: all
+nodes:0-0*0*cpumap: 0-7
+# A few attempts of pinning to a node but excluding one random cpu
+nodes:1,^8*0*cpumap: 9-15
+nodes:0,^6*0*cpumap: 0-5,7
+nodes:1,^9*0*cpumap: 8,10-15
+nodes:0,^5*0*cpumap: 0-4,6-7
