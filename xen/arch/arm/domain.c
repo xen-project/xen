@@ -501,10 +501,10 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
     if ( is_idle_domain(d) )
         return 0;
 
-    rc = -ENOMEM;
     if ( (rc = p2m_init(d)) != 0 )
         goto fail;
 
+    rc = -ENOMEM;
     if ( (d->shared_info = alloc_xenheap_pages(0, 0)) == NULL )
         goto fail;
 
