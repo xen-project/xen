@@ -165,6 +165,27 @@ static void vtimer_cntp_tval(struct cpu_user_regs *regs, uint32_t *r, int read)
     }
 }
 
+static int vtimer_cntpct(struct cpu_user_regs *regs, uint64_t *r, int read)
+{
+    struct vcpu *v = current;
+    uint64_t ticks;
+    s_time_t now;
+
+    if ( read )
+    {
+        now = NOW() - v->domain->arch.phys_timer_base.offset;
+        ticks = ns_to_ticks(now);
+        *r = ticks;
+        return 1;
+    }
+    else
+    {
+        gdprintk(XENLOG_DEBUG, "WRITE to R/O CNTPCT\n");
+        return 0;
+    }
+}
+
+
 static int vtimer_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr)
 {
     struct hsr_cp32 cp32 = hsr.cp32;
@@ -187,29 +208,23 @@ static int vtimer_emulate_cp32(struct cpu_user_regs *regs, union hsr hsr)
 
 static int vtimer_emulate_cp64(struct cpu_user_regs *regs, union hsr hsr)
 {
-    struct vcpu *v = current;
     struct hsr_cp64 cp64 = hsr.cp64;
     uint32_t *r1 = (uint32_t *)select_user_reg(regs, cp64.reg1);
     uint32_t *r2 = (uint32_t *)select_user_reg(regs, cp64.reg2);
-    uint64_t ticks;
-    s_time_t now;
+    uint64_t x;
 
     switch ( hsr.bits & HSR_CP64_REGS_MASK )
     {
     case HSR_CPREG64(CNTPCT):
+        if (!vtimer_cntpct(regs, &x, cp64.read))
+            return 0;
+
         if ( cp64.read )
         {
-            now = NOW() - v->domain->arch.phys_timer_base.offset;
-            ticks = ns_to_ticks(now);
-            *r1 = (uint32_t)(ticks & 0xffffffff);
-            *r2 = (uint32_t)(ticks >> 32);
-            return 1;
+            *r1 = (uint32_t)(x & 0xffffffff);
+            *r2 = (uint32_t)(x >> 32);
         }
-        else
-        {
-            printk("READ from R/O CNTPCT\n");
-            return 0;
-        }
+        return 1;
 
     default:
         return 0;
@@ -227,12 +242,18 @@ static int vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
     {
     case CNTP_CTL_EL0:
         vtimer_cntp_ctl(regs, &r, sysreg.read);
-        *x = r;
+        if ( sysreg.read )
+            *x = r;
         return 1;
     case CNTP_TVAL_EL0:
         vtimer_cntp_tval(regs, &r, sysreg.read);
-        *x = r;
+        if ( sysreg.read )
+            *x = r;
         return 1;
+
+    case HSR_CPREG64(CNTPCT):
+        return vtimer_cntpct(regs, x, sysreg.read);
+
     default:
         return 0;
     }
