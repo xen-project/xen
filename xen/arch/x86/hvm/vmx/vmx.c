@@ -923,7 +923,7 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
 
 static int vmx_set_guest_pat(struct vcpu *v, u64 gpat)
 {
-    if ( !cpu_has_vmx_pat || !paging_mode_hap(v->domain) )
+    if ( !paging_mode_hap(v->domain) )
         return 0;
 
     vmx_vmcs_enter(v);
@@ -937,7 +937,7 @@ static int vmx_set_guest_pat(struct vcpu *v, u64 gpat)
 
 static int vmx_get_guest_pat(struct vcpu *v, u64 *gpat)
 {
-    if ( !cpu_has_vmx_pat || !paging_mode_hap(v->domain) )
+    if ( !paging_mode_hap(v->domain) )
         return 0;
 
     vmx_vmcs_enter(v);
@@ -1450,7 +1450,11 @@ struct hvm_function_table * __init start_vmx(void)
         return NULL;
     }
 
-    if ( cpu_has_vmx_ept )
+    /*
+     * Do not enable EPT when (!cpu_has_vmx_pat), to prevent security hole
+     * (refer to http://xenbits.xen.org/xsa/advisory-60.html).
+     */
+    if ( cpu_has_vmx_ept && cpu_has_vmx_pat )
     {
         vmx_function_table.hap_supported = 1;
 
