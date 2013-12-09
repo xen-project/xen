@@ -779,7 +779,7 @@ static int construct_vmcs(struct vcpu *v)
         vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_CS);
         vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_ESP);
         vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_EIP);
-        if ( cpu_has_vmx_pat && paging_mode_hap(d) )
+        if ( paging_mode_hap(d) )
             vmx_disable_intercept_for_msr(v, MSR_IA32_CR_PAT);
     }
 
@@ -905,7 +905,7 @@ static int construct_vmcs(struct vcpu *v)
 #endif
     }
 
-    if ( cpu_has_vmx_pat && paging_mode_hap(d) )
+    if ( paging_mode_hap(d) )
     {
         u64 host_pat, guest_pat;
 
