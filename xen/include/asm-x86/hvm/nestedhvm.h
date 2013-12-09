@@ -68,4 +68,12 @@ void nestedhvm_vmcx_flushtlb(struct p2m_domain *p2m);
 
 bool_t nestedhvm_is_n2(struct vcpu *v);
 
+static inline void nestedhvm_set_cr(struct vcpu *v, unsigned int cr,
+                                    unsigned long value)
+{
+    if ( !nestedhvm_vmswitch_in_progress(v) &&
+         nestedhvm_vcpu_in_guestmode(v) )
+        v->arch.hvm_vcpu.nvcpu.guest_cr[cr] = value;
+}
+
 #endif /* _HVM_NESTEDHVM_H */
