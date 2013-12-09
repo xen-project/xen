@@ -66,6 +66,8 @@ struct hvm_vcpu_io {
     /* We may write up to m256 as a number of device-model transactions. */
     unsigned int mmio_large_write_bytes;
     paddr_t mmio_large_write_pa;
+
+    unsigned long msix_unmask_address;
 };
 
 #define VMCX_EADDR    (~0ULL)

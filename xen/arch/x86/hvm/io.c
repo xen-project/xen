@@ -302,7 +302,10 @@ void hvm_io_assist(void)
     }
 
     if ( p->state == STATE_IOREQ_NONE )
+    {
+        msix_write_completion(curr);
         vcpu_end_shutdown_deferral(curr);
+    }
 }
 
 static int dpci_ioport_read(uint32_t mport, ioreq_t *p)
