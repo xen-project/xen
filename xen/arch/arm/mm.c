@@ -1084,15 +1084,16 @@ static int xenmem_add_to_physmap_range(struct domain *d,
         rc = xenmem_add_to_physmap_one(d, xatpr->space,
                                        xatpr->foreign_domid,
                                        idx, gpfn);
-        if ( rc < 0 )
-            goto out;
 
         if ( unlikely(copy_to_guest_offset(xatpr->errs,
-                                           xatpr->size-1, &rc, 1)) );
+                                           xatpr->size-1, &rc, 1)) )
         {
             rc = -EFAULT;
             goto out;
         }
+
+        if ( rc < 0 )
+            goto out;
 
         xatpr->size--;
 
