@@ -87,8 +87,6 @@ static void stub_xtl_ocaml_vmessage(struct xentoollog_logger *logger,
 	value *func = caml_named_value(xtl->vmessage_cb) ;
 	char *msg;
 
-	if (args == NULL)
-		caml_raise_out_of_memory();
 	if (func == NULL)
 		caml_raise_sys_error(caml_copy_string("Unable to find callback"));
 	if (vasprintf(&msg, format, al) < 0)
@@ -116,8 +114,6 @@ static void stub_xtl_ocaml_progress(struct xentoollog_logger *logger,
 	struct caml_xtl *xtl = (struct caml_xtl*)logger;
 	value *func = caml_named_value(xtl->progress_cb) ;
 
-	if (args == NULL)
-		caml_raise_out_of_memory();
 	if (func == NULL)
 		caml_raise_sys_error(caml_copy_string("Unable to find callback"));
 
