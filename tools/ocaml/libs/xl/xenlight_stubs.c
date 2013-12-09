@@ -151,8 +151,8 @@ static value Val_key_value_list(libxl_key_value_list *c_val)
 
 	list = Val_emptylist;
 	for (i = libxl_string_list_length((libxl_string_list *) c_val) - 1; i >= 0; i -= 2) {
-		val = caml_copy_string((char *) c_val[i]);
-		key = caml_copy_string((char *) c_val[i - 1]);
+		val = caml_copy_string((*c_val)[i]);
+		key = caml_copy_string((*c_val)[i - 1]);
 		kv = caml_alloc_tuple(2);
 		Store_field(kv, 0, key);
 		Store_field(kv, 1, val);
@@ -193,7 +193,7 @@ static value Val_string_list(libxl_string_list *c_val)
 
 	list = Val_emptylist;
 	for (i = libxl_string_list_length(c_val) - 1; i >= 0; i--) {
-		string = caml_copy_string((char *) c_val[i]);
+		string = caml_copy_string((*c_val)[i]);
 		cons = caml_alloc(2, 0);
 		Store_field(cons, 0, string);   // head
 		Store_field(cons, 1, list);     // tail
