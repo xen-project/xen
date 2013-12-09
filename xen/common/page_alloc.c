@@ -819,7 +819,6 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
 {
     unsigned long old_info = 0;
     struct domain *owner;
-    int ret = 0;
     struct page_info *pg;
 
     if ( !mfn_valid(mfn) )
@@ -869,16 +868,28 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
     if ( page_state_is(pg, offlined) )
     {
         reserve_heap_page(pg);
-        *status = PG_OFFLINE_OFFLINED;
+
+        spin_unlock(&heap_lock);
+
+        *status = broken ? PG_OFFLINE_OFFLINED | PG_OFFLINE_BROKEN
+                         : PG_OFFLINE_OFFLINED;
+        return 0;
     }
-    else if ( (owner = page_get_owner_and_reference(pg)) )
+
+    spin_unlock(&heap_lock);
+
+    if ( (owner = page_get_owner_and_reference(pg)) )
     {
         if ( p2m_pod_offline_or_broken_hit(pg) )
-            goto pod_replace;
+        {
+            put_page(pg);
+            p2m_pod_offline_or_broken_replace(pg);
+            *status = PG_OFFLINE_OFFLINED;
+        }
         else
         {
             *status = PG_OFFLINE_OWNED | PG_OFFLINE_PENDING |
-              (owner->domain_id << PG_OFFLINE_OWNER_SHIFT);
+                      (owner->domain_id << PG_OFFLINE_OWNER_SHIFT);
             /* Release the reference since it will not be allocated anymore */
             put_page(pg);
         }
@@ -886,7 +897,7 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
     else if ( old_info & PGC_xen_heap )
     {
         *status = PG_OFFLINE_XENPAGE | PG_OFFLINE_PENDING |
-          (DOMID_XEN << PG_OFFLINE_OWNER_SHIFT);
+                  (DOMID_XEN << PG_OFFLINE_OWNER_SHIFT);
     }
     else
     {
@@ -905,21 +916,7 @@ int offline_page(unsigned long mfn, int broken, uint32_t *status)
     if ( broken )
         *status |= PG_OFFLINE_BROKEN;
 
-    spin_unlock(&heap_lock);
-
-    return ret;
-
-pod_replace:
-    put_page(pg);
-    spin_unlock(&heap_lock);
-
-    p2m_pod_offline_or_broken_replace(pg);
-    *status = PG_OFFLINE_OFFLINED;
-
-    if ( broken )
-        *status |= PG_OFFLINE_BROKEN;
-
-    return ret;
+    return 0;
 }
 
 /*
