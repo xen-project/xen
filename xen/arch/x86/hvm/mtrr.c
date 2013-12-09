@@ -696,9 +696,6 @@ uint8_t epte_get_entry_emt(struct domain *d, unsigned long gfn, mfn_t mfn,
     if ( !v->domain->arch.hvm_domain.params[HVM_PARAM_IDENT_PT] )
         return MTRR_TYPE_WRBACK;
 
-    if ( (v == current) && v->domain->arch.hvm_domain.is_in_uc_mode )
-        return MTRR_TYPE_UNCACHABLE;
-
     if ( !mfn_valid(mfn_x(mfn)) )
         return MTRR_TYPE_UNCACHABLE;
 

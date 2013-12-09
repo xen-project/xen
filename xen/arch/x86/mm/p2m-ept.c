@@ -587,44 +587,6 @@ out:
     return mfn;
 }
 
-/* WARNING: Only caller doesn't care about PoD pages.  So this function will
- * always return 0 for PoD pages, not populate them.  If that becomes necessary,
- * pass a p2m_query_t type along to distinguish. */
-static ept_entry_t ept_get_entry_content(struct p2m_domain *p2m,
-    unsigned long gfn, int *level)
-{
-    ept_entry_t *table = map_domain_page(pagetable_get_pfn(p2m_get_pagetable(p2m)));
-    unsigned long gfn_remainder = gfn;
-    ept_entry_t *ept_entry;
-    ept_entry_t content = { .epte = 0 };
-    u32 index;
-    int i;
-    int ret=0;
-    struct ept_data *ept = &p2m->ept;
-
-    /* This pfn is higher than the highest the p2m map currently holds */
-    if ( gfn > p2m->max_mapped_pfn )
-        goto out;
-
-    for ( i = ept_get_wl(ept); i > 0; i-- )
-    {
-        ret = ept_next_level(p2m, 1, &table, &gfn_remainder, i);
-        if ( !ret || ret == GUEST_TABLE_POD_PAGE )
-            goto out;
-        else if ( ret == GUEST_TABLE_SUPER_PAGE )
-            break;
-    }
-
-    index = gfn_remainder >> (i * EPT_TABLE_ORDER);
-    ept_entry = table + index;
-    content = *ept_entry;
-    *level = i;
-
- out:
-    unmap_domain_page(table);
-    return content;
-}
-
 void ept_walk_table(struct domain *d, unsigned long gfn)
 {
     struct p2m_domain *p2m = p2m_get_hostp2m(d);
@@ -674,88 +636,6 @@ void ept_walk_table(struct domain *d, unsigned long gfn)
 out:
     unmap_domain_page(table);
     return;
-}
-
-/*
- * To test if the new emt type is the same with old,
- * return 1 to not to reset ept entry.
- */
-static int need_modify_ept_entry(struct p2m_domain *p2m, unsigned long gfn,
-                                 mfn_t mfn, uint8_t o_ipat, uint8_t o_emt,
-                                 p2m_type_t p2mt)
-{
-    uint8_t ipat;
-    uint8_t emt;
-    bool_t direct_mmio = (p2mt == p2m_mmio_direct);
-
-    emt = epte_get_entry_emt(p2m->domain, gfn, mfn, &ipat, direct_mmio);
-
-    if ( (emt == o_emt) && (ipat == o_ipat) )
-        return 0;
-
-    return 1;
-}
-
-void ept_change_entry_emt_with_range(struct domain *d,
-                                     unsigned long start_gfn,
-                                     unsigned long end_gfn)
-{
-    unsigned long gfn;
-    ept_entry_t e;
-    mfn_t mfn;
-    int order = 0;
-    struct p2m_domain *p2m = p2m_get_hostp2m(d);
-    int rc;
-
-    p2m_lock(p2m);
-    for ( gfn = start_gfn; gfn <= end_gfn; gfn++ )
-    {
-        int level = 0;
-        uint64_t trunk = 0;
-
-        e = ept_get_entry_content(p2m, gfn, &level);
-        if ( !is_epte_present(&e) || !p2m_has_emt(e.sa_p2mt) )
-            continue;
-
-        order = 0;
-        mfn = _mfn(e.mfn);
-
-        if ( is_epte_superpage(&e) )
-        {
-            while ( level )
-            {
-                trunk = (1UL << (level * EPT_TABLE_ORDER)) - 1;
-                if ( !(gfn & trunk) && (gfn + trunk <= end_gfn) )
-                {
-                    /* gfn assigned with 2M or 1G, and the end covers more than
-                     * the super page areas.
-                     * Set emt for super page.
-                     */
-                    order = level * EPT_TABLE_ORDER;
-                    if ( need_modify_ept_entry(p2m, gfn, mfn, 
-                          e.ipat, e.emt, e.sa_p2mt) )
-                    {
-                        rc = ept_set_entry(p2m, gfn, mfn, order,
-                                           e.sa_p2mt, e.access);
-                        ASSERT(rc);
-                    }
-                    gfn += trunk;
-                    break;
-                }
-                level--;
-             }
-        }
-        else /* gfn assigned with 4k */
-        {
-            if ( need_modify_ept_entry(p2m, gfn, mfn,
-                                       e.ipat, e.emt, e.sa_p2mt) )
-            {
-                rc = ept_set_entry(p2m, gfn, mfn, order, e.sa_p2mt, e.access);
-                ASSERT(rc);
-            }
-        }
-    }
-    p2m_unlock(p2m);
 }
 
 /*
