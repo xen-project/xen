@@ -742,7 +742,7 @@ static int construct_vmcs(struct vcpu *v)
         vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_CS);
         vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_ESP);
         vmx_disable_intercept_for_msr(v, MSR_IA32_SYSENTER_EIP);
-        if ( paging_mode_hap(d) )
+        if ( paging_mode_hap(d) && (!iommu_enabled || iommu_snoop) )
             vmx_disable_intercept_for_msr(v, MSR_IA32_CR_PAT);
     }
 

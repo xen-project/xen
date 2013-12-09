@@ -923,7 +923,8 @@ static void vmx_set_segment_register(struct vcpu *v, enum x86_segment seg,
 
 static int vmx_set_guest_pat(struct vcpu *v, u64 gpat)
 {
-    if ( !paging_mode_hap(v->domain) )
+    if ( !paging_mode_hap(v->domain) ||
+         unlikely(v->arch.hvm_vcpu.cache_mode == NO_FILL_CACHE_MODE) )
         return 0;
 
     vmx_vmcs_enter(v);
@@ -937,7 +938,8 @@ static int vmx_set_guest_pat(struct vcpu *v, u64 gpat)
 
 static int vmx_get_guest_pat(struct vcpu *v, u64 *gpat)
 {
-    if ( !paging_mode_hap(v->domain) )
+    if ( !paging_mode_hap(v->domain) ||
+         unlikely(v->arch.hvm_vcpu.cache_mode == NO_FILL_CACHE_MODE) )
         return 0;
 
     vmx_vmcs_enter(v);
@@ -947,6 +949,53 @@ static int vmx_get_guest_pat(struct vcpu *v, u64 *gpat)
 #endif
     vmx_vmcs_exit(v);
     return 1;
+}
+
+static void vmx_handle_cd(struct vcpu *v, unsigned long value)
+{
+    if ( !paging_mode_hap(v->domain) )
+    {
+        /*
+         * For shadow, 'load IA32_PAT' VM-entry control is 0, so it cannot
+         * set guest memory type as UC via IA32_PAT. Xen drop all shadows
+         * so that any new ones would be created on demand.
+         */
+        hvm_shadow_handle_cd(v, value);
+    }
+    else
+    {
+        u64 *pat = &v->arch.hvm_vcpu.pat_cr;
+
+        if ( value & X86_CR0_CD )
+        {
+            /*
+             * For EPT, set guest IA32_PAT fields as UC so that guest
+             * memory type are all UC.
+             */
+            u64 uc_pat =
+                ((uint64_t)PAT_TYPE_UNCACHABLE)       |       /* PAT0 */
+                ((uint64_t)PAT_TYPE_UNCACHABLE << 8)  |       /* PAT1 */
+                ((uint64_t)PAT_TYPE_UNCACHABLE << 16) |       /* PAT2 */
+                ((uint64_t)PAT_TYPE_UNCACHABLE << 24) |       /* PAT3 */
+                ((uint64_t)PAT_TYPE_UNCACHABLE << 32) |       /* PAT4 */
+                ((uint64_t)PAT_TYPE_UNCACHABLE << 40) |       /* PAT5 */
+                ((uint64_t)PAT_TYPE_UNCACHABLE << 48) |       /* PAT6 */
+                ((uint64_t)PAT_TYPE_UNCACHABLE << 56);        /* PAT7 */
+
+            vmx_get_guest_pat(v, pat);
+            vmx_set_guest_pat(v, uc_pat);
+
+            wbinvd();               /* flush possibly polluted cache */
+            hvm_asid_flush_vcpu(v); /* invalidate memory type cached in TLB */
+            v->arch.hvm_vcpu.cache_mode = NO_FILL_CACHE_MODE;
+        }
+        else
+        {
+            v->arch.hvm_vcpu.cache_mode = NORMAL_CACHE_MODE;
+            vmx_set_guest_pat(v, *pat);
+            hvm_asid_flush_vcpu(v); /* no need to flush cache */
+        }
+    }
 }
 
 static void vmx_set_tsc_offset(struct vcpu *v, u64 offset)
@@ -1424,6 +1473,7 @@ static struct hvm_function_table __read_mostly vmx_function_table = {
     .msr_read_intercept   = vmx_msr_read_intercept,
     .msr_write_intercept  = vmx_msr_write_intercept,
     .invlpg_intercept     = vmx_invlpg_intercept,
+    .handle_cd            = vmx_handle_cd,
     .set_info_guest       = vmx_set_info_guest,
     .set_rdtsc_exiting    = vmx_set_rdtsc_exiting
 };
