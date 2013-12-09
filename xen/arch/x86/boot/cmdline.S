@@ -138,7 +138,8 @@
         call    .Lstrlen
         add     $4,%esp
         xadd    %eax,%ebx
-        cmpb    $'\0',(%ebx)
+        /* NUL check (as $'\0' == 0x30 in GAS) */
+        cmpb    $0,(%ebx)
         je      3f
         cmpb    $' ',(%ebx)
         je      3f
