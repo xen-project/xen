@@ -6,21 +6,19 @@
 #include <asm/guest_access.h>
 
 static unsigned long raw_copy_to_guest_helper(void *to, const void *from,
-                                              unsigned len, unsigned flush_dcache)
+                                              unsigned len, int flush_dcache)
 {
     /* XXX needs to handle faults */
     unsigned offset = (vaddr_t)to & ~PAGE_MASK;
 
     while ( len )
     {
-        int rc;
         paddr_t g;
         void *p;
         unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
 
-        rc = gvirt_to_maddr((vaddr_t) to, &g);
-        if ( rc )
-            return rc;
+        if ( gvirt_to_maddr((vaddr_t) to, &g) )
+            return len;
 
         p = map_domain_page(g>>PAGE_SHIFT);
         p += offset;
@@ -56,14 +54,12 @@ unsigned long raw_clear_guest(void *to, unsigned len)
 
     while ( len )
     {
-        int rc;
         paddr_t g;
         void *p;
         unsigned size = min(len, (unsigned)PAGE_SIZE - offset);
 
-        rc = gvirt_to_maddr((vaddr_t) to, &g);
-        if ( rc )
-            return rc;
+        if ( gvirt_to_maddr((vaddr_t) to, &g) )
+            return len;
 
         p = map_domain_page(g>>PAGE_SHIFT);
         p += offset;
@@ -84,14 +80,12 @@ unsigned long raw_copy_from_guest(void *to, const void __user *from, unsigned le
 
     while ( len )
     {
-        int rc;
         paddr_t g;
         void *p;
         unsigned size = min(len, (unsigned)(PAGE_SIZE - offset));
 
-        rc = gvirt_to_maddr((vaddr_t) from & PAGE_MASK, &g);
-        if ( rc )
-            return rc;
+        if ( gvirt_to_maddr((vaddr_t) from & PAGE_MASK, &g) )
+            return len;
 
         p = map_domain_page(g>>PAGE_SHIFT);
         p += ((vaddr_t)from & (~PAGE_MASK));

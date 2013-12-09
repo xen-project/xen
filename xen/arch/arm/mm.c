@@ -1067,21 +1067,32 @@ static int xenmem_add_to_physmap_range(struct domain *d,
         xen_ulong_t idx;
         xen_pfn_t gpfn;
 
-        rc = copy_from_guest_offset(&idx, xatpr->idxs, xatpr->size-1, 1);
-        if ( rc < 0 )
+        if ( unlikely(copy_from_guest_offset(&idx, xatpr->idxs,
+                                             xatpr->size-1, 1)) )
+        {
+            rc = -EFAULT;
             goto out;
+        }
 
-        rc = copy_from_guest_offset(&gpfn, xatpr->gpfns, xatpr->size-1, 1);
-        if ( rc < 0 )
+        if ( unlikely(copy_from_guest_offset(&gpfn, xatpr->gpfns,
+                                             xatpr->size-1, 1)) )
+        {
+            rc = -EFAULT;
             goto out;
+        }
 
         rc = xenmem_add_to_physmap_one(d, xatpr->space,
                                        xatpr->foreign_domid,
                                        idx, gpfn);
-
-        rc = copy_to_guest_offset(xatpr->errs, xatpr->size-1, &rc, 1);
         if ( rc < 0 )
             goto out;
+
+        if ( unlikely(copy_to_guest_offset(xatpr->errs,
+                                           xatpr->size-1, &rc, 1)) );
+        {
+            rc = -EFAULT;
+            goto out;
+        }
 
         xatpr->size--;
 

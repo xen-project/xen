@@ -36,12 +36,10 @@ static void update_dabt(struct hsr_dabt *dabt, int reg,
 static int decode_thumb2(register_t pc, struct hsr_dabt *dabt, uint16_t hw1)
 {
     uint16_t hw2;
-    int rc;
     uint16_t rt;
 
-    rc = raw_copy_from_guest(&hw2, (void *__user)(pc + 2), sizeof (hw2));
-    if ( rc )
-        return rc;
+    if ( raw_copy_from_guest(&hw2, (void *__user)(pc + 2), sizeof (hw2)) )
+        return -EFAULT;
 
     rt = (hw2 >> 12) & 0x7;
 
@@ -88,11 +86,9 @@ bad_thumb2:
 static int decode_thumb(register_t pc, struct hsr_dabt *dabt)
 {
     uint16_t instr;
-    int rc;
 
-    rc = raw_copy_from_guest(&instr, (void * __user)pc, sizeof (instr));
-    if ( rc )
-        return rc;
+    if ( raw_copy_from_guest(&instr, (void * __user)pc, sizeof (instr)) )
+        return -EFAULT;
 
     switch ( instr >> 12 )
     {
@@ -163,3 +159,13 @@ int decode_instruction(const struct cpu_user_regs *regs, struct hsr_dabt *dabt)
 
     return 1;
 }
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

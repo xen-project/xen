@@ -907,15 +907,15 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
 static void dtb_load(struct kernel_info *kinfo)
 {
     void * __user dtb_virt = (void * __user)(register_t)kinfo->dtb_paddr;
-    unsigned long rc;
+    unsigned long left;
 
     printk("Loading dom0 DTB to 0x%"PRIpaddr"-0x%"PRIpaddr"\n",
            kinfo->dtb_paddr, kinfo->dtb_paddr + fdt_totalsize(kinfo->fdt));
 
-    rc = raw_copy_to_guest_flush_dcache(dtb_virt, kinfo->fdt,
+    left = raw_copy_to_guest_flush_dcache(dtb_virt, kinfo->fdt,
                                         fdt_totalsize(kinfo->fdt));
-    if ( rc != 0 )
-        panic("Unable to copy the DTB to dom0 memory (rc = %lu)", rc);
+    if ( left != 0 )
+        panic("Unable to copy the DTB to dom0 memory (left = %lu bytes)", left);
     xfree(kinfo->fdt);
 }
 
