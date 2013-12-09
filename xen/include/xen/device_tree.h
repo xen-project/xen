@@ -256,10 +256,16 @@ static inline u64 dt_read_number(const __be32 *cell, int size)
     return r;
 }
 
-/* Helper to convert a number of cells in bytes */
+/* Helper to convert a number of cells to bytes */
 static inline int dt_cells_to_size(int size)
 {
     return (size * sizeof (u32));
+}
+
+/* Helper to convert a number of bytes to cells, rounds down */
+static inline int dt_size_to_cells(int bytes)
+{
+    return (bytes / sizeof(u32));
 }
 
 static inline u64 dt_next_cell(int s, const __be32 **cellp)

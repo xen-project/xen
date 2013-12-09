@@ -390,18 +390,45 @@ static void __init process_chosen_node(const void *fdt, int node,
                                        const char *name,
                                        u32 address_cells, u32 size_cells)
 {
+    const struct fdt_property *prop;
     struct dt_mb_module *mod = &early_info.modules.module[MOD_INITRD];
-    u32 start, end;
+    paddr_t start, end;
+    int len;
 
     dt_printk("Checking for initrd in /chosen\n");
 
-    start = device_tree_get_u32(fdt, node, "linux,initrd-start", 0);
-    end = device_tree_get_u32(fdt, node, "linux,initrd-end", 0);
-
-    if ( !start || !end || (start >= end) )
+    prop = fdt_get_property(fdt, node, "linux,initrd-start", &len);
+    if ( !prop )
+        /* No initrd present. */
         return;
+    if ( len != sizeof(u32) && len != sizeof(u64) )
+    {
+        dt_printk("linux,initrd-start property has invalid length %d\n", len);
+        return;
+    }
+    start = dt_read_number((void *)&prop->data, dt_size_to_cells(len));
 
-    dt_printk("Initrd 0x%x-0x%x\n", start, end);
+    prop = fdt_get_property(fdt, node, "linux,initrd-end", &len);
+    if ( !prop )
+    {
+        dt_printk("linux,initrd-end not present but -start was\n");
+        return;
+    }
+    if ( len != sizeof(u32) && len != sizeof(u64) )
+    {
+        dt_printk("linux,initrd-end property has invalid length %d\n", len);
+        return;
+    }
+    end = dt_read_number((void *)&prop->data, dt_size_to_cells(len));
+
+    if ( start >= end )
+    {
+        dt_printk("linux,initrd limits invalid: %"PRIpaddr" >= %"PRIpaddr"\n",
+                  start, end);
+        return;
+    }
+
+    dt_printk("Initrd %"PRIpaddr"-%"PRIpaddr"\n", start, end);
 
     mod->start = start;
     mod->size = end - start;

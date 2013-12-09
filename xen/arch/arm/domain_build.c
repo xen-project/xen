@@ -222,11 +222,12 @@ static int write_properties(struct domain *d, struct kernel_info *kinfo,
          */
         if ( early_info.modules.module[MOD_INITRD].size )
         {
-            res = fdt_property_cell(kinfo->fdt, "linux,initrd-start", 0);
+            u64 a = 0;
+            res = fdt_property(kinfo->fdt, "linux,initrd-start", &a, sizeof(a));
             if ( res )
                 return res;
 
-            res = fdt_property_cell(kinfo->fdt, "linux,initrd-end", 0);
+            res = fdt_property(kinfo->fdt, "linux,initrd-end", &a, sizeof(a));
             if ( res )
                 return res;
         }
@@ -926,6 +927,8 @@ static void initrd_load(struct kernel_info *kinfo)
     unsigned long offs;
     int node;
     int res;
+    __be32 val[2];
+    __be32 *cellp;
 
     if ( !len )
         return;
@@ -938,13 +941,17 @@ static void initrd_load(struct kernel_info *kinfo)
     if ( node < 0 )
         panic("Cannot find the /chosen node");
 
-    res = fdt_setprop_inplace_cell(kinfo->fdt, node, "linux,initrd-start",
-                                   load_addr);
+    cellp = (__be32 *)val;
+    dt_set_cell(&cellp, ARRAY_SIZE(val), load_addr);
+    res = fdt_setprop_inplace(kinfo->fdt, node, "linux,initrd-start",
+                              val, sizeof(val));
     if ( res )
         panic("Cannot fix up \"linux,initrd-start\" property");
 
-    res = fdt_setprop_inplace_cell(kinfo->fdt, node, "linux,initrd-end",
-                                   load_addr + len);
+    cellp = (__be32 *)val;
+    dt_set_cell(&cellp, ARRAY_SIZE(val), load_addr + len);
+    res = fdt_setprop_inplace(kinfo->fdt, node, "linux,initrd-end",
+                              val, sizeof(val));
     if ( res )
         panic("Cannot fix up \"linux,initrd-end\" property");
 
