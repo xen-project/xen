@@ -58,7 +58,8 @@ static lpae_t *p2m_map_first(struct p2m_domain *p2m, paddr_t addr)
 {
     struct page_info *page;
 
-    BUG_ON(first_linear_offset(addr) > P2M_FIRST_ENTRIES);
+    if ( first_linear_offset(addr) >= P2M_FIRST_ENTRIES )
+        return NULL;
 
     page = p2m->first_level + p2m_first_level_index(addr);
 
@@ -80,6 +81,8 @@ paddr_t p2m_lookup(struct domain *d, paddr_t paddr)
     spin_lock(&p2m->lock);
 
     first = p2m_map_first(p2m, paddr);
+    if ( !first )
+        goto err;
 
     pte = first[first_table_offset(paddr)];
     if ( !pte.p2m.valid || !pte.p2m.table )
@@ -105,6 +108,7 @@ done:
     if (second) unmap_domain_page(second);
     if (first) unmap_domain_page(first);
 
+err:
     spin_unlock(&p2m->lock);
 
     return maddr;
@@ -181,6 +185,11 @@ static int create_p2m_entries(struct domain *d,
         {
             if ( first ) unmap_domain_page(first);
             first = p2m_map_first(p2m, addr);
+            if ( !first )
+            {
+                rc = -EINVAL;
+                goto out;
+            }
             cur_first_page = p2m_first_level_index(addr);
         }
 
