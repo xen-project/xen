@@ -103,10 +103,17 @@
 #define HSR_EC_SMC64                0x17
 #define HSR_EC_SYSREG               0x18
 #endif
-#define HSR_EC_INSTR_ABORT_GUEST    0x20
-#define HSR_EC_INSTR_ABORT_HYP      0x21
-#define HSR_EC_DATA_ABORT_GUEST     0x24
-#define HSR_EC_DATA_ABORT_HYP       0x25
+#define HSR_EC_INSTR_ABORT_LOWER_EL 0x20
+#define HSR_EC_INSTR_ABORT_CURR_EL  0x21
+#define HSR_EC_DATA_ABORT_LOWER_EL  0x24
+#define HSR_EC_DATA_ABORT_CURR_EL   0x25
+
+/* FSR format, common */
+#define FSR_LPAE                (_AC(1,UL)<<9)
+/* FSR short format */
+#define FSRS_FS_DEBUG           (_AC(0,UL)<<10|_AC(0x2,UL)<<0)
+/* FSR long format */
+#define FSRL_STATUS_DEBUG       (_AC(0x22,UL)<<0)
 
 #ifndef __ASSEMBLY__
 

@@ -259,6 +259,7 @@
 #define CSSELR_EL1              CSSELR
 #define DACR32_EL2              DACR
 #define ESR_EL2                 HSR
+#define FAR_EL2                 HIFAR
 #define HCR_EL2                 HCR
 #define HPFAR_EL2               HPFAR
 #define ID_AFR0_EL1             ID_AFR0

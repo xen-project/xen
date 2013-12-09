@@ -264,9 +264,11 @@ static void cpsr_switch_mode(struct cpu_user_regs *regs, int mode)
 
     regs->cpsr |= mode;
     regs->cpsr |= PSR_IRQ_MASK;
-    if (sctlr & SCTLR_TE)
+    if ( mode == PSR_MODE_ABT )
+        regs->cpsr |= PSR_ABT_MASK;
+    if ( sctlr & SCTLR_TE )
         regs->cpsr |= PSR_THUMB;
-    if (sctlr & SCTLR_EE)
+    if ( sctlr & SCTLR_EE )
         regs->cpsr |= PSR_BIG_ENDIAN;
 }
 
@@ -283,7 +285,7 @@ static vaddr_t exception_handler(vaddr_t offset)
 /* Injects an Undefined Instruction exception into the current vcpu,
  * PC is the exact address of the faulting instruction (without
  * pipeline adjustments). See TakeUndefInstrException pseudocode in
- * ARM.
+ * ARM ARM.
  */
 static void inject_undef32_exception(struct cpu_user_regs *regs)
 {
@@ -303,6 +305,81 @@ static void inject_undef32_exception(struct cpu_user_regs *regs)
 
     /* Branch to exception vector */
     regs->pc32 = exception_handler(VECTOR32_UND);
+}
+
+/* Injects an Abort exception into the current vcpu, PC is the exact
+ * address of the faulting instruction (without pipeline
+ * adjustments). See TakePrefetchAbortException and
+ * TakeDataAbortException pseudocode in ARM ARM.
+ */
+static void inject_abt32_exception(struct cpu_user_regs *regs,
+                                   int prefetch,
+                                   register_t addr)
+{
+    uint32_t spsr = regs->cpsr;
+    int is_thumb = (regs->cpsr & PSR_THUMB);
+    /* Saved PC points to the instruction past the faulting instruction. */
+    uint32_t return_offset = is_thumb ? 4 : 0;
+    register_t fsr;
+
+    BUG_ON( !is_pv32_domain(current->domain) );
+
+    cpsr_switch_mode(regs, PSR_MODE_ABT);
+
+    /* Update banked registers */
+    regs->spsr_abt = spsr;
+    regs->lr_abt = regs->pc32 + return_offset;
+
+    regs->pc32 = exception_handler(prefetch ? VECTOR32_PABT : VECTOR32_DABT);
+
+    /* Inject a debug fault, best we can do right now */
+    if ( READ_SYSREG(TCR_EL1) & TTBCR_EAE )
+        fsr = FSR_LPAE | FSRL_STATUS_DEBUG;
+    else
+        fsr = FSRS_FS_DEBUG;
+
+    if ( prefetch )
+    {
+        /* Set IFAR and IFSR */
+#ifdef CONFIG_ARM_32
+        WRITE_SYSREG(addr, IFAR);
+        WRITE_SYSREG(fsr, IFSR);
+#else
+        /* FAR_EL1[63:32] is AArch32 register IFAR */
+        register_t far = READ_SYSREG(FAR_EL1) & 0xffffffffUL;
+        far |= addr << 32;
+        WRITE_SYSREG(far, FAR_EL1);
+        WRITE_SYSREG(fsr, IFSR32_EL2);
+
+#endif
+    }
+    else
+    {
+#ifdef CONFIG_ARM_32
+        /* Set DFAR and DFSR */
+        WRITE_SYSREG(addr, DFAR);
+        WRITE_SYSREG(fsr, DFSR);
+#else
+        /* FAR_EL1[31:0] is AArch32 register DFAR */
+        register_t far = READ_SYSREG(FAR_EL1) & ~0xffffffffUL;
+        far |= addr;
+        WRITE_SYSREG(far, FAR_EL1);
+        /* ESR_EL1 is AArch32 register DFSR */
+        WRITE_SYSREG(fsr, ESR_EL1);
+#endif
+    }
+}
+
+static void inject_dabt32_exception(struct cpu_user_regs *regs,
+                                    register_t addr)
+{
+    inject_abt32_exception(regs, 0, addr);
+}
+
+static void inject_pabt32_exception(struct cpu_user_regs *regs,
+                                    register_t addr)
+{
+    inject_abt32_exception(regs, 1, addr);
 }
 
 #ifdef CONFIG_ARM_64
@@ -326,7 +403,84 @@ static void inject_undef64_exception(struct cpu_user_regs *regs, int instr_len)
 
     WRITE_SYSREG32(esr.bits, ESR_EL1);
 }
+
+/* Inject an abort exception into a 64 bit guest */
+static void inject_abt64_exception(struct cpu_user_regs *regs,
+                                   int prefetch,
+                                   register_t addr,
+                                   int instr_len)
+{
+    union hsr esr = {
+        .iss = 0,
+        .len = instr_len,
+    };
+
+    /*
+     * Trap may have been taken from EL0, which might be in AArch32
+     * mode (PSR_MODE_BIT set), or in AArch64 mode (PSR_MODE_EL0t).
+     *
+     * Since we know the kernel must be 64-bit any trap from a 32-bit
+     * mode must have been from EL0.
+     */
+    if ( psr_mode_is_32bit(regs->cpsr) || psr_mode(regs->cpsr,PSR_MODE_EL0t) )
+        esr.ec = prefetch
+            ? HSR_EC_INSTR_ABORT_LOWER_EL : HSR_EC_DATA_ABORT_LOWER_EL;
+    else
+        esr.ec = prefetch
+            ? HSR_EC_INSTR_ABORT_CURR_EL : HSR_EC_DATA_ABORT_CURR_EL;
+
+    BUG_ON( is_pv32_domain(current->domain) );
+
+    regs->spsr_el1 = regs->cpsr;
+    regs->elr_el1 = regs->pc;
+
+    regs->cpsr = PSR_MODE_EL1h | PSR_ABT_MASK | PSR_FIQ_MASK | \
+        PSR_IRQ_MASK | PSR_DBG_MASK;
+    regs->pc = READ_SYSREG(VBAR_EL1) + VECTOR64_CURRENT_SPx_SYNC;
+
+    WRITE_SYSREG(addr, FAR_EL1);
+    WRITE_SYSREG32(esr.bits, ESR_EL1);
+}
+
+static void inject_dabt64_exception(struct cpu_user_regs *regs,
+                                   register_t addr,
+                                   int instr_len)
+{
+    inject_abt64_exception(regs, 0, addr, instr_len);
+}
+
+static void inject_iabt64_exception(struct cpu_user_regs *regs,
+                                   register_t addr,
+                                   int instr_len)
+{
+    inject_abt64_exception(regs, 1, addr, instr_len);
+}
+
 #endif
+
+static void inject_iabt_exception(struct cpu_user_regs *regs,
+                                  register_t addr,
+                                  int instr_len)
+{
+        if ( is_pv32_domain(current->domain) )
+            inject_pabt32_exception(regs, addr);
+#ifdef CONFIG_ARM_64
+        else
+            inject_iabt64_exception(regs, addr, instr_len);
+#endif
+}
+
+static void inject_dabt_exception(struct cpu_user_regs *regs,
+                                  register_t addr,
+                                  int instr_len)
+{
+        if ( is_pv32_domain(current->domain) )
+            inject_dabt32_exception(regs, addr);
+#ifdef CONFIG_ARM_64
+        else
+            inject_dabt64_exception(regs, addr, instr_len);
+#endif
+}
 
 struct reg_ctxt {
     /* Guest-side state */
@@ -1312,12 +1466,19 @@ done:
     if (first) unmap_domain_page(first);
 }
 
+
+static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
+                                      union hsr hsr)
+{
+    register_t addr = READ_SYSREG(FAR_EL2);
+    inject_iabt_exception(regs, addr, hsr.len);
+}
+
 static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
                                      union hsr hsr)
 {
     struct hsr_dabt dabt = hsr.dabt;
-    const char *msg;
-    int rc, level = -1;
+    int rc;
     mmio_info_t info;
 
     if ( !check_conditional_instr(regs, hsr) )
@@ -1353,7 +1514,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
         rc = decode_instruction(regs, &info.dabt);
         if ( rc )
         {
-            gdprintk(XENLOG_ERR, "Unable to decode instruction\n");
+            gdprintk(XENLOG_DEBUG, "Unable to decode instruction\n");
             goto bad_data_abort;
         }
     }
@@ -1365,30 +1526,7 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
     }
 
 bad_data_abort:
-
-    msg = decode_fsc( dabt.dfsc, &level);
-
-    /* XXX inject a suitable fault into the guest */
-    printk("Guest data abort: %s%s%s\n"
-           "    gva=%"PRIvaddr"\n",
-           msg, dabt.s1ptw ? " S2 during S1" : "",
-           fsc_level_str(level),
-           info.gva);
-    if ( !dabt.s1ptw )
-        printk("    gpa=%"PRIpaddr"\n", info.gpa);
-    if ( dabt.valid )
-        printk("    size=%d sign=%d write=%d reg=%d\n",
-               dabt.size, dabt.sign, dabt.write, dabt.reg);
-    else
-        printk("    instruction syndrome invalid\n");
-    printk("    eat=%d cm=%d s1ptw=%d dfsc=%d\n",
-           dabt.eat, dabt.cache, dabt.s1ptw, dabt.dfsc);
-    if ( !dabt.s1ptw )
-        dump_p2m_lookup(current->domain, info.gpa);
-    else
-        dump_guest_s1_walk(current->domain, info.gva);
-    show_execution_state(regs);
-    domain_crash_synchronous();
+    inject_dabt_exception(regs, info.gva, hsr.len);
 }
 
 asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
@@ -1456,7 +1594,10 @@ asmlinkage void do_trap_hypervisor(struct cpu_user_regs *regs)
         break;
 #endif
 
-    case HSR_EC_DATA_ABORT_GUEST:
+    case HSR_EC_INSTR_ABORT_LOWER_EL:
+        do_trap_instr_abort_guest(regs, hsr);
+        break;
+    case HSR_EC_DATA_ABORT_LOWER_EL:
         do_trap_data_abort_guest(regs, hsr);
         break;
     default:

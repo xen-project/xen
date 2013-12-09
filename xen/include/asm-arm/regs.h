@@ -11,6 +11,8 @@
 
 #define psr_mode(psr,m) (((psr) & PSR_MODE_MASK) == m)
 
+#define psr_mode_is_32bit(psr) !!((psr) & PSR_MODE_BIT)
+
 #define usr_mode(r)     psr_mode((r)->cpsr,PSR_MODE_USR)
 #define fiq_mode(r)     psr_mode((r)->cpsr,PSR_MODE_FIQ)
 #define irq_mode(r)     psr_mode((r)->cpsr,PSR_MODE_IRQ)
