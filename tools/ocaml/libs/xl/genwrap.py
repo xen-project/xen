@@ -22,9 +22,9 @@ builtins = {
     "libxl_cpuid_policy_list": ("unit",                "%(c)s = 0",                         "Val_unit"),
     }
 
-DEVICE_FUNCTIONS = [ ("add",            ["ctx", "t", "domid", "unit"]),
-                     ("remove",         ["ctx", "t", "domid", "unit"]),
-                     ("destroy",        ["ctx", "t", "domid", "unit"]),
+DEVICE_FUNCTIONS = [ ("add",            ["ctx", "t", "domid", "?async:'a", "unit", "unit"]),
+                     ("remove",         ["ctx", "t", "domid", "?async:'a", "unit", "unit"]),
+                     ("destroy",        ["ctx", "t", "domid", "?async:'a", "unit", "unit"]),
                    ]
 
 functions = { # ( name , [type1,type2,....] )
