@@ -26,18 +26,21 @@ DEVICE_FUNCTIONS = [ ("add",            ["ctx", "t", "domid", "?async:'a", "unit
                      ("remove",         ["ctx", "t", "domid", "?async:'a", "unit", "unit"]),
                      ("destroy",        ["ctx", "t", "domid", "?async:'a", "unit", "unit"]),
                    ]
+DEVICE_LIST =      [ ("list",           ["ctx", "domid", "t list"]),
+                   ]
 
 functions = { # ( name , [type1,type2,....] )
     "device_vfb":     DEVICE_FUNCTIONS,
     "device_vkb":     DEVICE_FUNCTIONS,
-    "device_disk":    DEVICE_FUNCTIONS,
-    "device_nic":     DEVICE_FUNCTIONS +
-                      [ ("list",           ["ctx", "domid", "t list"]),
-                        ("of_devid",       ["ctx", "domid", "int", "t"]),
+    "device_disk":    DEVICE_FUNCTIONS + DEVICE_LIST +
+                      [ ("insert",         ["ctx", "t", "domid", "?async:'a", "unit", "unit"]),
+                        ("of_vdev",        ["ctx", "domid", "string", "t"]),
                       ],
-    "device_pci":     DEVICE_FUNCTIONS +
-                      [ ("list",              ["ctx", "domid", "t list"]),
-                        ("assignable_add",    ["ctx", "t", "bool", "unit"]),
+    "device_nic":     DEVICE_FUNCTIONS + DEVICE_LIST +
+                      [ ("of_devid",       ["ctx", "domid", "int", "t"]),
+                      ],
+    "device_pci":     DEVICE_FUNCTIONS + DEVICE_LIST +
+                      [ ("assignable_add",    ["ctx", "t", "bool", "unit"]),
                         ("assignable_remove", ["ctx", "t", "bool", "unit"]),
                         ("assignable_list",   ["ctx", "t list"]),
                       ],
