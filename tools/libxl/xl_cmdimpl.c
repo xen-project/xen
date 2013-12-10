@@ -41,11 +41,23 @@
 #include "libxlutil.h"
 #include "xl.h"
 
-#define CHK_ERRNO( call ) ({                                            \
-        int chk_errno = (call);                                         \
-        if (chk_errno < 0) {                                                \
+/* For calls which return an errno on failure */
+#define CHK_ERRNOVAL( call ) ({                                         \
+        int chk_errnoval = (call);                                      \
+        if (chk_errnoval < 0)                                           \
+            abort();                                                    \
+        else if (chk_errnoval > 0) {                                    \
             fprintf(stderr,"xl: fatal error: %s:%d: %s: %s\n",          \
-                    __FILE__,__LINE__, strerror(chk_errno), #call);     \
+                    __FILE__,__LINE__, strerror(chk_errnoval), #call);  \
+            exit(-ERROR_FAIL);                                          \
+        }                                                               \
+    })
+
+/* For calls which return -1 and set errno on failure */
+#define CHK_SYSCALL( call ) ({                                          \
+        if ((call) == -1) {                                             \
+            fprintf(stderr,"xl: fatal error: %s:%d: %s: %s\n",          \
+                    __FILE__,__LINE__, strerror(errno), #call);         \
             exit(-ERROR_FAIL);                                          \
         }                                                               \
     })
@@ -442,15 +454,15 @@ static int do_daemonize(char *name)
         exit(-1);
     }
 
-    CHK_ERRNO(logfile = open(fullname, O_WRONLY|O_CREAT|O_APPEND, 0644));
+    CHK_SYSCALL(logfile = open(fullname, O_WRONLY|O_CREAT|O_APPEND, 0644));
     free(fullname);
 
-    CHK_ERRNO(nullfd = open("/dev/null", O_RDONLY));
+    CHK_SYSCALL(nullfd = open("/dev/null", O_RDONLY));
     dup2(nullfd, 0);
     dup2(logfile, 1);
     dup2(logfile, 2);
 
-    CHK_ERRNO(daemon(0, 1));
+    CHK_SYSCALL(daemon(0, 1));
 
 out:
     return ret;
@@ -2047,8 +2059,9 @@ static uint32_t create_domain(struct domain_create *dom_info)
             if (rc) return rc;
         }
 
-        CHK_ERRNO( libxl_read_exactly(ctx, restore_fd, &hdr,
-                   sizeof(hdr), restore_source, "header") );
+        CHK_ERRNOVAL(libxl_read_exactly(
+                         ctx, restore_fd, &hdr, sizeof(hdr),
+                         restore_source, "header"));
         if (memcmp(hdr.magic, savefileheader_magic, sizeof(hdr.magic))) {
             fprintf(stderr, "File has wrong magic number -"
                     " corrupt or for a different tool?\n");
@@ -2073,8 +2086,10 @@ static uint32_t create_domain(struct domain_create *dom_info)
         }
         if (hdr.optional_data_len) {
             optdata_begin = xmalloc(hdr.optional_data_len);
-            CHK_ERRNO( libxl_read_exactly(ctx, restore_fd, optdata_begin,
-                   hdr.optional_data_len, restore_source, "optdata") );
+            CHK_ERRNOVAL(libxl_read_exactly(
+                             ctx, restore_fd, optdata_begin,
+                             hdr.optional_data_len, restore_source,
+                             "optdata"));
         }
 
 #define OPTDATA_LEFT  (hdr.optional_data_len - (optdata_here - optdata_begin))
@@ -3151,7 +3166,7 @@ static void list_domains_details(const libxl_dominfo *info, int nb_domain)
         rc = libxl_userdata_retrieve(ctx, info[i].domid, "xl", &data, &len);
         if (rc)
             continue;
-        CHK_ERRNO(asprintf(&config_source, "<domid %d data>", info[i].domid));
+        CHK_SYSCALL(asprintf(&config_source, "<domid %d data>", info[i].domid));
         libxl_domain_config_init(&d_config);
         parse_config_data(config_source, (char *)data, len, &d_config, NULL);
         if (default_output_format == OUTPUT_FORMAT_JSON)
@@ -3389,10 +3404,11 @@ static void save_domain_core_writeconfig(int fd, const char *source,
 
     /* that's the optional data */
 
-    CHK_ERRNO( libxl_write_exactly(ctx, fd,
-        &hdr, sizeof(hdr), source, "header") );
-    CHK_ERRNO( libxl_write_exactly(ctx, fd,
-        optdata_begin, hdr.optional_data_len, source, "header") );
+    CHK_ERRNOVAL(libxl_write_exactly(
+                     ctx, fd, &hdr, sizeof(hdr), source, "header"));
+    CHK_ERRNOVAL(libxl_write_exactly(
+                     ctx, fd, optdata_begin, hdr.optional_data_len,
+                     source, "header"));
 
     fprintf(stderr, "Saving to %s new xl format (info"
             " 0x%"PRIx32"/0x%"PRIx32"/%"PRIu32")\n",
@@ -3504,7 +3520,7 @@ static void migration_child_report(int recv_fd) {
 
     if (!xl_child_pid(child_migration)) return;
 
-    CHK_ERRNO( gettimeofday(&waituntil, 0) );
+    CHK_SYSCALL(gettimeofday(&waituntil, 0));
     waituntil.tv_sec += 2;
 
     for (;;) {
@@ -3525,7 +3541,7 @@ static void migration_child_report(int recv_fd) {
         }
         assert(child == 0);
 
-        CHK_ERRNO( gettimeofday(&now, 0) );
+        CHK_SYSCALL(gettimeofday(&now, 0));
         if (timercmp(&now, &waituntil, >)) {
             fprintf(stderr, "migration child [%ld] not exiting, no longer"
                     " waiting (exit status will be unreported)\n",
@@ -3747,11 +3763,10 @@ static void migrate_receive(int debug, int daemonize, int monitor,
 
     fprintf(stderr, "migration target: Ready to receive domain.\n");
 
-    CHK_ERRNO( libxl_write_exactly(ctx, send_fd,
-                                   migrate_receiver_banner,
-                                   sizeof(migrate_receiver_banner)-1,
-                                   "migration ack stream",
-                                   "banner") );
+    CHK_ERRNOVAL(libxl_write_exactly(
+                     ctx, send_fd, migrate_receiver_banner,
+                     sizeof(migrate_receiver_banner)-1,
+                     "migration ack stream", "banner") );
 
     memset(&dom_info, 0, sizeof(dom_info));
     dom_info.debug = debug;
