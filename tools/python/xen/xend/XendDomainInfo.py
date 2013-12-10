@@ -35,8 +35,10 @@ import stat
 import shutil
 import traceback
 from types import StringTypes
+import errno
 
 import xen.lowlevel.xc
+from xen.lowlevel.xc import Error as XCError
 from xen.util import asserts, auxbin, mkdir
 from xen.util.blkif import parse_uname
 import xen.util.xsm.xsm as security
@@ -1540,7 +1542,10 @@ class XendDomainInfo:
 
             return sxpr
 
-        except RuntimeError, exn:
+        except XCError, exn:
+            # Domain already died.
+            if exn.args[0] == errno.ESRCH:
+                return sxpr
             raise XendError(str(exn))
 
 
