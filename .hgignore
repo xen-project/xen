@@ -309,6 +309,8 @@
 ^tools/ocaml/libs/xl/xenlight\.mli$
 ^tools/ocaml/xenstored/oxenstored$
 ^tools/ocaml/test/xtl$
+^tools/ocaml/test/send_debug_keys$
+^tools/ocaml/test/list_domains$
 ^tools/autom4te\.cache$
 ^tools/config\.h$
 ^tools/config\.log$
