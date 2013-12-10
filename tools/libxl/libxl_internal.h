@@ -2438,8 +2438,7 @@ struct libxl__domain_suspend_state {
     int debug;
     const libxl_domain_remus_info *remus;
     /* private */
-    xc_evtchn *xce; /* event channel handle */
-    int suspend_eventchn;
+    libxl__ev_evtchn guest_evtchn;
     int guest_evtchn_lockfd;
     int hvm;
     int xcflags;

@@ -1031,8 +1031,12 @@ static void domain_suspend_common_guest_suspended(libxl__egc *egc,
 
 static void domain_suspend_common_pvcontrol_suspending(libxl__egc *egc,
       libxl__xswait_state *xswa, int rc, const char *state);
+static void domain_suspend_common_wait_guest_evtchn(libxl__egc *egc,
+        libxl__ev_evtchn *evev);
 static void suspend_common_wait_guest_watch(libxl__egc *egc,
       libxl__ev_xswatch *xsw, const char *watch_path, const char *event_path);
+static void suspend_common_wait_guest_check(libxl__egc *egc,
+        libxl__domain_suspend_state *dss);
 static void suspend_common_wait_guest_timeout(libxl__egc *egc,
       libxl__ev_time *ev, const struct timeval *requested_abs);
 
@@ -1054,7 +1058,7 @@ static void domain_suspend_callback_common(libxl__egc *egc,
 {
     STATE_AO_GC(dss->ao);
     unsigned long hvm_s_state = 0, hvm_pvdrv = 0;
-    int ret;
+    int ret, rc;
 
     /* Convenience aliases */
     const uint32_t domid = dss->domid;
@@ -1064,21 +1068,19 @@ static void domain_suspend_callback_common(libxl__egc *egc,
         xc_get_hvm_param(CTX->xch, domid, HVM_PARAM_ACPI_S_STATE, &hvm_s_state);
     }
 
-    if ((hvm_s_state == 0) && (dss->suspend_eventchn >= 0)) {
+    if ((hvm_s_state == 0) && (dss->guest_evtchn.port >= 0)) {
         LOG(DEBUG, "issuing %s suspend request via event channel",
             dss->hvm ? "PVHVM" : "PV");
-        ret = xc_evtchn_notify(dss->xce, dss->suspend_eventchn);
+        ret = xc_evtchn_notify(CTX->xce, dss->guest_evtchn.port);
         if (ret < 0) {
             LOG(ERROR, "xc_evtchn_notify failed ret=%d", ret);
             goto err;
         }
-        ret = xc_await_suspend(CTX->xch, dss->xce, dss->suspend_eventchn);
-        if (ret < 0) {
-            LOG(ERROR, "xc_await_suspend failed ret=%d", ret);
-            goto err;
-        }
-        dss->guest_responded = 1;
-        domain_suspend_common_guest_suspended(egc, dss);
+
+        dss->guest_evtchn.callback = domain_suspend_common_wait_guest_evtchn;
+        rc = libxl__ev_evtchn_wait(gc, &dss->guest_evtchn);
+        if (rc) goto err;
+
         return;
     }
 
@@ -1112,6 +1114,19 @@ static void domain_suspend_callback_common(libxl__egc *egc,
 
  err:
     domain_suspend_common_failed(egc, dss);
+}
+
+static void domain_suspend_common_wait_guest_evtchn(libxl__egc *egc,
+        libxl__ev_evtchn *evev)
+{
+    libxl__domain_suspend_state *dss = CONTAINER_OF(evev, *dss, guest_evtchn);
+    STATE_AO_GC(dss->ao);
+    /* If we should be done waiting, suspend_common_wait_guest_check
+     * will end up calling domain_suspend_common_guest_suspended or
+     * domain_suspend_common_failed, both of which cancel the evtchn
+     * wait.  So re-enable it now. */
+    libxl__ev_evtchn_wait(gc, &dss->guest_evtchn);
+    suspend_common_wait_guest_check(egc, dss);
 }
 
 static void domain_suspend_common_pvcontrol_suspending(libxl__egc *egc,
@@ -1204,8 +1219,13 @@ static void domain_suspend_common_wait_guest(libxl__egc *egc,
 static void suspend_common_wait_guest_watch(libxl__egc *egc,
       libxl__ev_xswatch *xsw, const char *watch_path, const char *event_path)
 {
-    libxl__domain_suspend_state *dss =
-        CONTAINER_OF(xsw, *dss, guest_watch);
+    libxl__domain_suspend_state *dss = CONTAINER_OF(xsw, *dss, guest_watch);
+    suspend_common_wait_guest_check(egc, dss);
+}
+
+static void suspend_common_wait_guest_check(libxl__egc *egc,
+        libxl__domain_suspend_state *dss)
+{
     STATE_AO_GC(dss->ao);
     xc_domaininfo_t info;
     int ret;
@@ -1261,6 +1281,7 @@ static void domain_suspend_common_guest_suspended(libxl__egc *egc,
     STATE_AO_GC(dss->ao);
     int ret;
 
+    libxl__ev_evtchn_cancel(gc, &dss->guest_evtchn);
     libxl__ev_xswatch_deregister(gc, &dss->guest_watch);
     libxl__ev_time_deregister(gc, &dss->guest_timeout);
 
@@ -1287,6 +1308,7 @@ static void domain_suspend_common_done(libxl__egc *egc,
 {
     EGC_GC;
     assert(!libxl__xswait_inuse(&dss->pvcontrol));
+    libxl__ev_evtchn_cancel(gc, &dss->guest_evtchn);
     libxl__ev_xswatch_deregister(gc, &dss->guest_watch);
     libxl__ev_time_deregister(gc, &dss->guest_timeout);
     dss->callback_common_done(egc, dss, ok);
@@ -1475,6 +1497,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
 
     logdirty_init(&dss->logdirty);
     libxl__xswait_init(&dss->pvcontrol);
+    libxl__ev_evtchn_init(&dss->guest_evtchn);
     libxl__ev_xswatch_init(&dss->guest_watch);
     libxl__ev_time_init(&dss->guest_timeout);
 
@@ -1503,7 +1526,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
           | (debug ? XCFLAGS_DEBUG : 0)
           | (dss->hvm ? XCFLAGS_HVM : 0);
 
-    dss->suspend_eventchn = -1;
+    dss->guest_evtchn.port = -1;
     dss->guest_evtchn_lockfd = -1;
     dss->guest_responded = 0;
     dss->dm_savefile = libxl__device_model_savefile(gc, domid);
@@ -1514,20 +1537,17 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
             dss->xcflags |= XCFLAGS_CHECKPOINT_COMPRESS;
     }
 
-    dss->xce = xc_evtchn_open(NULL, 0);
-    if (dss->xce == NULL)
-        goto out;
-    else
-    {
-        port = xs_suspend_evtchn_port(dss->domid);
+    port = xs_suspend_evtchn_port(dss->domid);
 
-        if (port >= 0) {
-            dss->suspend_eventchn =
-                xc_suspend_evtchn_init_exclusive(CTX->xch, dss->xce,
+    if (port >= 0) {
+        dss->guest_evtchn.port =
+            xc_suspend_evtchn_init_exclusive(CTX->xch, CTX->xce,
                                   dss->domid, port, &dss->guest_evtchn_lockfd);
 
-            if (dss->suspend_eventchn < 0)
-                LOG(WARN, "Suspend event channel initialization failed");
+        if (dss->guest_evtchn.port < 0) {
+            LOG(WARN, "Suspend event channel initialization failed");
+            rc = ERROR_FAIL;
+            goto out;
         }
     }
 
@@ -1686,11 +1706,11 @@ static void domain_suspend_done(libxl__egc *egc,
     /* Convenience aliases */
     const uint32_t domid = dss->domid;
 
-    if (dss->suspend_eventchn > 0)
-        xc_suspend_evtchn_release(CTX->xch, dss->xce, domid,
-                           dss->suspend_eventchn, &dss->guest_evtchn_lockfd);
-    if (dss->xce != NULL)
-        xc_evtchn_close(dss->xce);
+    libxl__ev_evtchn_cancel(gc, &dss->guest_evtchn);
+
+    if (dss->guest_evtchn.port > 0)
+        xc_suspend_evtchn_release(CTX->xch, CTX->xce, domid,
+                           dss->guest_evtchn.port, &dss->guest_evtchn_lockfd);
 
     dss->callback(egc, dss, rc);
 }
