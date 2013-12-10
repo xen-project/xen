@@ -4917,7 +4917,7 @@ static int xenmem_add_to_physmap(struct domain *d,
         {
             rc = xenmem_add_to_physmap_once(d, xatp);
             if ( rc < 0 )
-                return rc;
+                break;
 
             xatp->idx++;
             xatp->gpfn++;
