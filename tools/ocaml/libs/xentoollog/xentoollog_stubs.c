@@ -31,6 +31,11 @@
 
 #include "caml_xentoollog.h"
 
+/* The following is equal to the CAMLreturn macro, but without the return */
+#define CAMLdone do{ \
+caml_local_roots = caml__frame; \
+}while (0)
+
 #define XTL ((xentoollog_logger *) Xtl_val(handle))
 
 static char * dup_String_val(value s)
@@ -81,6 +86,7 @@ static void stub_xtl_ocaml_vmessage(struct xentoollog_logger *logger,
 	const char *format,
 	va_list al)
 {
+	caml_leave_blocking_section();
 	CAMLparam0();
 	CAMLlocalN(args, 4);
 	struct caml_xtl *xtl = (struct caml_xtl*)logger;
@@ -101,7 +107,8 @@ static void stub_xtl_ocaml_vmessage(struct xentoollog_logger *logger,
 	free(msg);
 
 	caml_callbackN(*func, 4, args);
-	CAMLreturn0;
+	CAMLdone;
+	caml_enter_blocking_section();
 }
 
 static void stub_xtl_ocaml_progress(struct xentoollog_logger *logger,
@@ -109,6 +116,7 @@ static void stub_xtl_ocaml_progress(struct xentoollog_logger *logger,
 	const char *doing_what /* no \r,\n */,
 	int percent, unsigned long done, unsigned long total)
 {
+	caml_leave_blocking_section();
 	CAMLparam0();
 	CAMLlocalN(args, 5);
 	struct caml_xtl *xtl = (struct caml_xtl*)logger;
@@ -125,7 +133,8 @@ static void stub_xtl_ocaml_progress(struct xentoollog_logger *logger,
 	args[4] = caml_copy_int64(total);
 
 	caml_callbackN(*func, 5, args);
-	CAMLreturn0;
+	CAMLdone;
+	caml_enter_blocking_section();
 }
 
 static void xtl_destroy(struct xentoollog_logger *logger)

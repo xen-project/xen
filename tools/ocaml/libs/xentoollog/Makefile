@@ -2,6 +2,9 @@ TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 
+# allow mixed declarations and code
+CFLAGS += -Wno-declaration-after-statement
+
 CFLAGS += $(CFLAGS_libxenctrl) $(CFLAGS_libxenguest)
 OCAMLINCLUDE +=
 

@@ -2,8 +2,9 @@ TOPLEVEL=$(CURDIR)/../..
 XEN_ROOT=$(TOPLEVEL)/../..
 include $(TOPLEVEL)/common.make
 
-# ignore unused generated functions
-CFLAGS += -Wno-unused
+# ignore unused generated functions and allow mixed declarations and code
+CFLAGS += -Wno-unused -Wno-declaration-after-statement
+
 CFLAGS += $(CFLAGS_libxenlight)
 CFLAGS += -I ../xentoollog
 
