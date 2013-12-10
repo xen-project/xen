@@ -4,7 +4,7 @@ open Xenlight
 
 let send_keys ctx s =
   printf "Sending debug key %s\n" s;
-  Xenlight.send_debug_keys ctx s;
+  Xenlight.Host.send_debug_keys ctx s;
   ()
   
 let _ =
