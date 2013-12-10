@@ -939,6 +939,74 @@ value stub_xl_send_debug_keys(value ctx, value keys)
 	CAMLreturn(Val_unit);
 }
 
+static struct custom_operations libxl_console_reader_custom_operations = {
+	"libxl_console_reader_custom_operations",
+	custom_finalize_default,
+	custom_compare_default,
+	custom_hash_default,
+	custom_serialize_default,
+	custom_deserialize_default
+};
+
+#define Console_reader_val(x)(*((libxl_xen_console_reader **) Data_custom_val(x)))
+
+value stub_libxl_xen_console_read_start(value ctx, value clear)
+{
+	CAMLparam2(ctx, clear);
+	CAMLlocal1(handle);
+	libxl_xen_console_reader *cr;
+
+	cr = libxl_xen_console_read_start(CTX, Int_val(clear));
+
+	handle = caml_alloc_custom(&libxl_console_reader_custom_operations, sizeof(cr), 0, 1);
+	Console_reader_val(handle) = cr;
+
+	CAMLreturn(handle);
+}
+
+static void raise_eof(void)
+{
+	static value *exc = NULL;
+
+	/* First time around, lookup by name */
+	if (!exc)
+		exc = caml_named_value("Xenlight.Host.End_of_file");
+
+	if (!exc)
+		caml_invalid_argument("Exception Xenlight.Host.End_of_file not initialized, please link xenlight.cma");
+
+	caml_raise_constant(*exc);
+}
+
+value stub_libxl_xen_console_read_line(value ctx, value reader)
+{
+	CAMLparam2(ctx, reader);
+	CAMLlocal1(line);
+	int ret;
+	char *c_line;
+	libxl_xen_console_reader *cr = (libxl_xen_console_reader *) Console_reader_val(reader);
+
+	ret = libxl_xen_console_read_line(CTX, cr, &c_line);
+
+	if (ret < 0)
+		failwith_xl(ret, "xen_console_read_line");
+	if (ret == 0)
+		raise_eof();
+
+	line = caml_copy_string(c_line);
+
+	CAMLreturn(line);
+}
+
+value stub_libxl_xen_console_read_finish(value ctx, value reader)
+{
+	CAMLparam2(ctx, reader);
+	libxl_xen_console_reader *cr = (libxl_xen_console_reader *) Console_reader_val(reader);
+
+	libxl_xen_console_read_finish(CTX, cr);
+
+	CAMLreturn(Val_unit);
+}
 
 /* Event handling */
 

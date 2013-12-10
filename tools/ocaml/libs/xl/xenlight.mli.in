@@ -51,6 +51,13 @@ module Domain : sig
 end
 
 module Host : sig
+	type console_reader
+	exception End_of_file
+
+	external xen_console_read_start : ctx -> int -> console_reader  = "stub_libxl_xen_console_read_start"
+	external xen_console_read_line : ctx -> console_reader -> string = "stub_libxl_xen_console_read_line"
+	external xen_console_read_finish : ctx -> console_reader -> unit = "stub_libxl_xen_console_read_finish"
+
 	external send_debug_keys : ctx -> string -> unit = "stub_xl_send_debug_keys"
 end
 
