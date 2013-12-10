@@ -25,9 +25,46 @@ external ctx_alloc: Xentoollog.handle -> ctx = "stub_libxl_ctx_alloc"
 
 external test_raise_exception: unit -> unit = "stub_raise_exception"
 
+type event =
+	| POLLIN (* There is data to read *)
+	| POLLPRI (* There is urgent data to read *)
+	| POLLOUT (* Writing now will not block *)
+	| POLLERR (* Error condition (revents only) *)
+	| POLLHUP (* Device has been disconnected (revents only) *)
+	| POLLNVAL (* Invalid request: fd not open (revents only). *)
+
 external send_trigger : ctx -> domid -> trigger -> int -> unit = "stub_xl_send_trigger"
 external send_sysrq : ctx -> domid -> char -> unit = "stub_xl_send_sysrq"
 external send_debug_keys : ctx -> string -> unit = "stub_xl_send_debug_keys"
+
+module Async = struct
+	type for_libxl
+	type event_hooks
+	type osevent_hooks
+
+	external osevent_register_hooks' : ctx -> 'a -> osevent_hooks = "stub_libxl_osevent_register_hooks"
+	external osevent_occurred_fd : ctx -> for_libxl -> Unix.file_descr -> event list -> event list -> unit = "stub_libxl_osevent_occurred_fd"
+	external osevent_occurred_timeout : ctx -> for_libxl -> unit = "stub_libxl_osevent_occurred_timeout"
+
+	let osevent_register_hooks ctx ~user ~fd_register ~fd_modify ~fd_deregister ~timeout_register ~timeout_modify =
+		Callback.register "libxl_fd_register" fd_register;
+		Callback.register "libxl_fd_modify" fd_modify;
+		Callback.register "libxl_fd_deregister" fd_deregister;
+		Callback.register "libxl_timeout_register" timeout_register;
+		Callback.register "libxl_timeout_modify" timeout_modify;
+		osevent_register_hooks' ctx user
+
+	let async_register_callback ~async_callback =
+		Callback.register "libxl_async_callback" async_callback
+
+	external evenable_domain_death : ctx -> domid -> int -> unit = "stub_libxl_evenable_domain_death"
+	external event_register_callbacks' : ctx -> 'a -> event_hooks = "stub_libxl_event_register_callbacks"
+
+	let event_register_callbacks ctx ~user ~event_occurs_callback ~event_disaster_callback =
+		Callback.register "libxl_event_occurs_callback" event_occurs_callback;
+		Callback.register "libxl_event_disaster_callback" event_disaster_callback;
+		event_register_callbacks' ctx user
+end
 
 let register_exceptions () =
 	Callback.register_exception "Xenlight.Error" (Error(ERROR_FAIL, ""))

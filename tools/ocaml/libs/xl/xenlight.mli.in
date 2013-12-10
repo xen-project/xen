@@ -27,7 +27,45 @@ external ctx_alloc: Xentoollog.handle -> ctx = "stub_libxl_ctx_alloc"
 
 external test_raise_exception: unit -> unit = "stub_raise_exception"
 
+type event =
+	| POLLIN (* There is data to read *)
+	| POLLPRI (* There is urgent data to read *)
+	| POLLOUT (* Writing now will not block *)
+	| POLLERR (* Error condition (revents only) *)
+	| POLLHUP (* Device has been disconnected (revents only) *)
+	| POLLNVAL (* Invalid request: fd not open (revents only). *)
+
 external send_trigger : ctx -> domid -> trigger -> int -> unit = "stub_xl_send_trigger"
 external send_sysrq : ctx -> domid -> char -> unit = "stub_xl_send_sysrq"
 external send_debug_keys : ctx -> string -> unit = "stub_xl_send_debug_keys"
+
+module Async : sig
+	type for_libxl
+	type event_hooks
+	type osevent_hooks
+
+	val osevent_register_hooks : ctx ->
+		user:'a ->
+		fd_register:('a -> Unix.file_descr -> event list -> for_libxl -> unit) ->
+		fd_modify:('a -> Unix.file_descr -> event list -> unit) ->
+		fd_deregister:('a -> Unix.file_descr -> unit) ->
+		timeout_register:('a -> int -> int -> for_libxl -> unit) ->
+		timeout_modify:('a -> unit) ->
+		osevent_hooks
+
+	external osevent_occurred_fd : ctx -> for_libxl -> Unix.file_descr -> event list -> event list -> unit = "stub_libxl_osevent_occurred_fd"
+	external osevent_occurred_timeout : ctx -> for_libxl -> unit = "stub_libxl_osevent_occurred_timeout"
+
+	val async_register_callback :
+		async_callback:(result:error option -> user:'a -> unit) ->
+		unit
+
+	external evenable_domain_death : ctx -> domid -> int -> unit = "stub_libxl_evenable_domain_death"
+
+	val event_register_callbacks : ctx ->
+		user:'a ->
+		event_occurs_callback:('a -> Event.t -> unit) ->
+		event_disaster_callback:('a -> event_type -> string -> int -> unit) ->
+		event_hooks
+end
 

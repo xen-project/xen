@@ -30,6 +30,8 @@
 #include <libxl.h>
 #include <libxl_utils.h>
 
+#include <unistd.h>
+
 #include "caml_xentoollog.h"
 
 #define Ctx_val(x)(*((libxl_ctx **) Data_custom_val(x)))
@@ -370,6 +372,35 @@ static char *String_option_val(value v)
 
 #include "_libxl_types.inc"
 
+void async_callback(libxl_ctx *ctx, int rc, void *for_callback)
+{
+	CAMLparam0();
+	CAMLlocal2(error, tmp);
+	static value *func = NULL;
+	value *p = (value *) for_callback;
+
+	if (func == NULL) {
+		/* First time around, lookup by name */
+		func = caml_named_value("libxl_async_callback");
+	}
+
+	if (rc == 0)
+		error = Val_none;
+	else {
+		tmp = Val_error(rc);
+		error = Val_some(tmp);
+	}
+
+	/* for_callback is a pointer to a "value" that was malloc'ed and
+	 * registered with the OCaml GC. The value is handed back to OCaml
+	 * in the following callback, after which the pointer is unregistered
+	 * and freed. */
+	caml_callback2(*func, error, *p);
+
+	caml_remove_global_root(p);
+	free(p);
+}
+
 #define _STRINGIFY(x) #x
 #define STRINGIFY(x) _STRINGIFY(x)
 
@@ -699,6 +730,329 @@ value stub_xl_send_debug_keys(value ctx, value keys)
 
 	if (ret != 0)
 		failwith_xl(ret, "send_debug_keys");
+
+	CAMLreturn(Val_unit);
+}
+
+
+/* Event handling */
+
+short Poll_val(value event)
+{
+	CAMLparam1(event);
+	short res = -1;
+
+	switch (Int_val(event)) {
+		case 0: res = POLLIN; break;
+		case 1: res = POLLPRI; break;
+		case 2: res = POLLOUT; break;
+		case 3: res = POLLERR; break;
+		case 4: res = POLLHUP; break;
+		case 5: res = POLLNVAL; break;
+	}
+
+	CAMLreturn(res);
+}
+
+short Poll_events_val(value event_list)
+{
+	CAMLparam1(event_list);
+	short events = 0;
+
+	while (event_list != Val_emptylist) {
+		events |= Poll_val(Field(event_list, 0));
+		event_list = Field(event_list, 1);
+	}
+
+	CAMLreturn(events);
+}
+
+value Val_poll(short event)
+{
+	CAMLparam0();
+	CAMLlocal1(res);
+
+	switch (event) {
+		case POLLIN: res = Val_int(0); break;
+		case POLLPRI: res = Val_int(1); break;
+		case POLLOUT: res = Val_int(2); break;
+		case POLLERR: res = Val_int(3); break;
+		case POLLHUP: res = Val_int(4); break;
+		case POLLNVAL: res = Val_int(5); break;
+		default: failwith_xl(ERROR_FAIL, "cannot convert poll event value"); break;
+	}
+
+	CAMLreturn(res);
+}
+
+value add_event(value event_list, short event)
+{
+	CAMLparam1(event_list);
+	CAMLlocal1(new_list);
+
+	new_list = caml_alloc(2, 0);
+	Store_field(new_list, 0, Val_poll(event));
+	Store_field(new_list, 1, event_list);
+
+	CAMLreturn(new_list);
+}
+
+value Val_poll_events(short events)
+{
+	CAMLparam0();
+	CAMLlocal1(event_list);
+
+	event_list = Val_emptylist;
+	if (events & POLLIN)
+		event_list = add_event(event_list, POLLIN);
+	if (events & POLLPRI)
+		event_list = add_event(event_list, POLLPRI);
+	if (events & POLLOUT)
+		event_list = add_event(event_list, POLLOUT);
+	if (events & POLLERR)
+		event_list = add_event(event_list, POLLERR);
+	if (events & POLLHUP)
+		event_list = add_event(event_list, POLLHUP);
+	if (events & POLLNVAL)
+		event_list = add_event(event_list, POLLNVAL);
+
+	CAMLreturn(event_list);
+}
+
+int fd_register(void *user, int fd, void **for_app_registration_out,
+                     short events, void *for_libxl)
+{
+	CAMLparam0();
+	CAMLlocalN(args, 4);
+	static value *func = NULL;
+	value *p = (value *) user;
+
+	if (func == NULL) {
+		/* First time around, lookup by name */
+		func = caml_named_value("libxl_fd_register");
+	}
+
+	args[0] = *p;
+	args[1] = Val_int(fd);
+	args[2] = Val_poll_events(events);
+	args[3] = (value) for_libxl;
+
+	caml_callbackN(*func, 4, args);
+	CAMLreturn(0);
+}
+
+int fd_modify(void *user, int fd, void **for_app_registration_update,
+                   short events)
+{
+	CAMLparam0();
+	CAMLlocalN(args, 3);
+	static value *func = NULL;
+	value *p = (value *) user;
+
+	if (func == NULL) {
+		/* First time around, lookup by name */
+		func = caml_named_value("libxl_fd_modify");
+	}
+
+	args[0] = *p;
+	args[1] = Val_int(fd);
+	args[2] = Val_poll_events(events);
+
+	caml_callbackN(*func, 3, args);
+	CAMLreturn(0);
+}
+
+void fd_deregister(void *user, int fd, void *for_app_registration)
+{
+	CAMLparam0();
+	CAMLlocalN(args, 2);
+	static value *func = NULL;
+	value *p = (value *) user;
+
+	if (func == NULL) {
+		/* First time around, lookup by name */
+		func = caml_named_value("libxl_fd_deregister");
+	}
+
+	args[0] = *p;
+	args[1] = Val_int(fd);
+
+	caml_callbackN(*func, 2, args);
+	CAMLreturn0;
+}
+
+int timeout_register(void *user, void **for_app_registration_out,
+                          struct timeval abs, void *for_libxl)
+{
+	CAMLparam0();
+	CAMLlocalN(args, 4);
+	static value *func = NULL;
+	value *p = (value *) user;
+
+	if (func == NULL) {
+		/* First time around, lookup by name */
+		func = caml_named_value("libxl_timeout_register");
+	}
+
+	args[0] = *p;
+	args[1] = Val_int(abs.tv_sec);
+	args[2] = Val_int(abs.tv_usec);
+	args[3] = (value) for_libxl;
+
+	caml_callbackN(*func, 4, args);
+	CAMLreturn(0);
+}
+
+int timeout_modify(void *user, void **for_app_registration_update,
+                         struct timeval abs)
+{
+	CAMLparam0();
+	static value *func = NULL;
+	value *p = (value *) user;
+
+	if (func == NULL) {
+		/* First time around, lookup by name */
+		func = caml_named_value("libxl_timeout_modify");
+	}
+
+	caml_callback(*func, *p);
+	CAMLreturn(0);
+}
+
+void timeout_deregister(void *user, void *for_app_registration)
+{
+	failwith_xl(ERROR_FAIL, "timeout_deregister not yet implemented");
+	return;
+}
+
+value stub_libxl_osevent_register_hooks(value ctx, value user)
+{
+	CAMLparam2(ctx, user);
+	CAMLlocal1(result);
+	libxl_osevent_hooks *hooks;
+	value *p;
+
+	hooks = malloc(sizeof(*hooks));
+	if (!hooks)
+		failwith_xl(ERROR_NOMEM, "cannot allocate osevent hooks");
+	hooks->fd_register = fd_register;
+	hooks->fd_modify = fd_modify;
+	hooks->fd_deregister = fd_deregister;
+	hooks->timeout_register = timeout_register;
+	hooks->timeout_modify = timeout_modify;
+	hooks->timeout_deregister = timeout_deregister;
+
+	p = malloc(sizeof(value));
+	if (!p)
+		failwith_xl(ERROR_NOMEM, "cannot allocate value");
+	*p = user;
+	caml_register_global_root(p);
+
+	libxl_osevent_register_hooks(CTX, hooks, (void *) p);
+
+	result = caml_alloc(1, Abstract_tag);
+	*((libxl_osevent_hooks **) result) = hooks;
+
+	CAMLreturn(result);
+}
+
+value stub_libxl_osevent_occurred_fd(value ctx, value for_libxl, value fd,
+	value events, value revents)
+{
+	CAMLparam5(ctx, for_libxl, fd, events, revents);
+	libxl_osevent_occurred_fd(CTX, (void *) for_libxl, Int_val(fd),
+		Poll_events_val(events), Poll_events_val(revents));
+	CAMLreturn(Val_unit);
+}
+
+value stub_libxl_osevent_occurred_timeout(value ctx, value for_libxl)
+{
+	CAMLparam2(ctx, for_libxl);
+	libxl_osevent_occurred_timeout(CTX, (void *) for_libxl);
+	CAMLreturn(Val_unit);
+}
+
+struct user_with_ctx {
+	libxl_ctx *ctx;
+	value user;
+};
+
+void event_occurs(void *user, libxl_event *event)
+{
+	CAMLparam0();
+	CAMLlocalN(args, 2);
+	struct user_with_ctx *c_user = (struct user_with_ctx *) user;
+	static value *func = NULL;
+
+	if (func == NULL) {
+		/* First time around, lookup by name */
+		func = caml_named_value("libxl_event_occurs_callback");
+	}
+
+	args[0] = c_user->user;
+	args[1] = Val_event(event);
+	libxl_event_free(c_user->ctx, event);
+
+	caml_callbackN(*func, 2, args);
+	CAMLreturn0;
+}
+
+void disaster(void *user, libxl_event_type type,
+                     const char *msg, int errnoval)
+{
+	CAMLparam0();
+	CAMLlocalN(args, 4);
+	struct user_with_ctx *c_user = (struct user_with_ctx *) user;
+	static value *func = NULL;
+
+	if (func == NULL) {
+		/* First time around, lookup by name */
+		func = caml_named_value("libxl_event_disaster_callback");
+	}
+
+	args[0] = c_user->user;
+	args[1] = Val_event_type(type);
+	args[2] = caml_copy_string(msg);
+	args[3] = Val_int(errnoval);
+
+	caml_callbackN(*func, 4, args);
+	CAMLreturn0;
+}
+
+value stub_libxl_event_register_callbacks(value ctx, value user)
+{
+	CAMLparam2(ctx, user);
+	CAMLlocal1(result);
+	struct user_with_ctx *c_user = NULL;
+	libxl_event_hooks *hooks;
+
+	c_user = malloc(sizeof(*c_user));
+	if (!c_user)
+		failwith_xl(ERROR_NOMEM, "cannot allocate user value");
+	c_user->user = user;
+	c_user->ctx = CTX;
+	caml_register_global_root(&c_user->user);
+
+	hooks = malloc(sizeof(*hooks));
+	if (!hooks)
+		failwith_xl(ERROR_NOMEM, "cannot allocate event hooks");
+	hooks->event_occurs_mask = LIBXL_EVENTMASK_ALL;
+	hooks->event_occurs = event_occurs;
+	hooks->disaster = disaster;
+
+	libxl_event_register_callbacks(CTX, hooks, (void *) c_user);
+	result = caml_alloc(1, Abstract_tag);
+	*((libxl_event_hooks **) result) = hooks;
+
+	CAMLreturn(result);
+}
+
+value stub_libxl_evenable_domain_death(value ctx, value domid, value user)
+{
+	CAMLparam3(ctx, domid, user);
+	libxl_evgen_domain_death *evgen_out;
+
+	libxl_evenable_domain_death(CTX, Int_val(domid), Int_val(user), &evgen_out);
 
 	CAMLreturn(Val_unit);
 }
