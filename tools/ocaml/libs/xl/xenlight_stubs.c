@@ -59,6 +59,7 @@ static value Val_error (libxl_error error_c);
 
 static void failwith_xl(int error, char *fname)
 {
+	CAMLparam0();
 	CAMLlocal1(arg);
 	static value *exc = NULL;
 
@@ -75,6 +76,7 @@ static void failwith_xl(int error, char *fname)
 	Store_field(arg, 1, caml_copy_string(fname));
 
 	caml_raise_with_arg(*exc, arg);
+	CAMLreturn0;
 }
 
 CAMLprim value stub_raise_exception(value unit)
@@ -338,7 +340,7 @@ static libxl_defbool Defbool_val(value v)
 		bool b = Bool_val(Some_val(v));
 		libxl_defbool_set(&db, b);
 	}
-	return db;
+	CAMLreturnT(libxl_defbool, db);
 }
 
 static value Val_hwcap(libxl_hwcap *c_val)
@@ -369,10 +371,11 @@ static value Val_string_option(const char *c_val)
 
 static char *String_option_val(value v)
 {
+	CAMLparam1(v);
 	char *s = NULL;
 	if (v != Val_none)
 		s = dup_String_val(Some_val(v));
-	return s;
+	CAMLreturnT(char *, s);
 }
 
 #include "_libxl_types.inc"
