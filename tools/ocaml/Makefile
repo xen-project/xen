@@ -1,7 +1,7 @@
 XEN_ROOT = $(CURDIR)/../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-SUBDIRS_PROGRAMS = xenstored
+SUBDIRS_PROGRAMS = xenstored test
 
 SUBDIRS = libs $(SUBDIRS_PROGRAMS)
 

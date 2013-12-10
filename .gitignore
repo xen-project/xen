@@ -385,6 +385,7 @@ tools/ocaml/libs/xentoollog/_xtl_levels.*
 tools/ocaml/libs/xentoollog/xentoollog.ml
 tools/ocaml/libs/xentoollog/xentoollog.mli
 tools/ocaml/xenstored/oxenstored
+tools/ocaml/test/xtl
 
 tools/debugger/kdd/kdd
 tools/firmware/etherboot/ipxe.tar.gz

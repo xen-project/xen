@@ -308,6 +308,7 @@
 ^tools/ocaml/libs/xl/xenlight\.ml$
 ^tools/ocaml/libs/xl/xenlight\.mli$
 ^tools/ocaml/xenstored/oxenstored$
+^tools/ocaml/test/xtl$
 ^tools/autom4te\.cache$
 ^tools/config\.h$
 ^tools/config\.log$
