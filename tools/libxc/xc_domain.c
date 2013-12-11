@@ -122,7 +122,7 @@ int xc_domain_node_setaffinity(xc_interface *xch,
     int nodesize;
 
     nodesize = xc_get_nodemap_size(xch);
-    if (!nodesize)
+    if (nodesize <= 0)
     {
         PERROR("Could not get number of nodes");
         goto out;
@@ -160,7 +160,7 @@ int xc_domain_node_getaffinity(xc_interface *xch,
     int nodesize;
 
     nodesize = xc_get_nodemap_size(xch);
-    if (!nodesize)
+    if (nodesize <= 0)
     {
         PERROR("Could not get number of nodes");
         goto out;
@@ -200,7 +200,7 @@ int xc_vcpu_setaffinity(xc_interface *xch,
     int cpusize;
 
     cpusize = xc_get_cpumap_size(xch);
-    if (!cpusize)
+    if (cpusize <= 0)
     {
         PERROR("Could not get number of cpus");
         goto out;
@@ -243,7 +243,7 @@ int xc_vcpu_getaffinity(xc_interface *xch,
     int cpusize;
 
     cpusize = xc_get_cpumap_size(xch);
-    if (!cpusize)
+    if (cpusize <= 0)
     {
         PERROR("Could not get number of cpus");
         goto out;

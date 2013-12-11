@@ -88,7 +88,7 @@ xc_cpumap_t xc_cpumap_alloc(xc_interface *xch)
     int sz;
 
     sz = xc_get_cpumap_size(xch);
-    if (sz == 0)
+    if (sz <= 0)
         return NULL;
     return calloc(1, sz);
 }
@@ -98,7 +98,7 @@ xc_nodemap_t xc_nodemap_alloc(xc_interface *xch)
     int sz;
 
     sz = xc_get_nodemap_size(xch);
-    if (sz == 0)
+    if (sz <= 0)
         return NULL;
     return calloc(1, sz);
 }
