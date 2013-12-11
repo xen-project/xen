@@ -1097,9 +1097,7 @@ void __init __start_xen(unsigned long mbi_p)
                          mod[i].mod_start,
                          PFN_UP(mod[i].mod_end), PAGE_HYPERVISOR);
     }
-    map_pages_to_xen((unsigned long)__va(kexec_crash_area.start),
-                     kexec_crash_area.start >> PAGE_SHIFT,
-                     PFN_UP(kexec_crash_area.size), PAGE_HYPERVISOR);
+
     xen_virt_end = ((unsigned long)_end + (1UL << L2_PAGETABLE_SHIFT) - 1) &
                    ~((1UL << L2_PAGETABLE_SHIFT) - 1);
     destroy_xen_mappings(xen_virt_end, XEN_VIRT_START + BOOTSTRAP_MAP_BASE);
