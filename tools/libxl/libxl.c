@@ -60,6 +60,10 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     LIBXL_SLIST_INIT(&ctx->watch_freeslots);
     libxl__ev_fd_init(&ctx->watch_efd);
 
+    ctx->xce = 0;
+    LIBXL_LIST_INIT(&ctx->evtchns_waiting);
+    libxl__ev_fd_init(&ctx->evtchn_efd);
+
     LIBXL_TAILQ_INIT(&ctx->death_list);
     libxl__ev_xswatch_init(&ctx->death_watch);
 
@@ -104,6 +108,8 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
         rc = ERROR_FAIL; goto out;
     }
 
+    rc = libxl__ctx_evtchn_init(gc);
+
     *pctx = ctx;
     return 0;
 
@@ -147,16 +153,19 @@ int libxl_ctx_free(libxl_ctx *ctx)
     for (i = 0; i < ctx->watch_nslots; i++)
         assert(!libxl__watch_slot_contents(gc, i));
     libxl__ev_fd_deregister(gc, &ctx->watch_efd);
+    libxl__ev_fd_deregister(gc, &ctx->evtchn_efd);
     libxl__ev_fd_deregister(gc, &ctx->sigchld_selfpipe_efd);
 
     /* Now there should be no more events requested from the application: */
 
     assert(LIBXL_LIST_EMPTY(&ctx->efds));
     assert(LIBXL_TAILQ_EMPTY(&ctx->etimes));
+    assert(LIBXL_LIST_EMPTY(&ctx->evtchns_waiting));
 
     if (ctx->xch) xc_interface_close(ctx->xch);
     libxl_version_info_dispose(&ctx->version_info);
     if (ctx->xsh) xs_daemon_close(ctx->xsh);
+    if (ctx->xce) xc_evtchn_close(ctx->xce);
 
     libxl__poller_dispose(&ctx->poller_app);
     assert(LIBXL_LIST_EMPTY(&ctx->pollers_event));

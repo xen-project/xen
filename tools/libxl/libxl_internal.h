@@ -197,6 +197,17 @@ struct libxl__ev_xswatch {
     uint32_t counterval;
 };
 
+typedef struct libxl__ev_evtchn libxl__ev_evtchn;
+typedef void libxl__ev_evtchn_callback(libxl__egc *egc, libxl__ev_evtchn*);
+struct libxl__ev_evtchn {
+    /* caller must fill these in, and they must all remain valid */
+    libxl__ev_evtchn_callback *callback;
+    int port;
+    /* remainder is private for libxl__ev_evtchn_... */
+    bool waiting;
+    LIBXL_LIST_ENTRY(libxl__ev_evtchn) entry;
+};
+
 /*
  * An entry in the watch_slots table is either:
  *  1. an entry in the free list, ie NULL or pointer to next free list entry
@@ -342,6 +353,10 @@ struct libxl__ctx {
     LIBXL_SLIST_HEAD(, libxl__ev_watch_slot) watch_freeslots;
     uint32_t watch_counter; /* helps disambiguate slot reuse */
     libxl__ev_fd watch_efd;
+
+    xc_evtchn *xce; /* waiting must be done only with libxl__ev_evtchn* */
+    LIBXL_LIST_HEAD(, libxl__ev_evtchn) evtchns_waiting;
+    libxl__ev_fd evtchn_efd;
 
     LIBXL_TAILQ_HEAD(libxl__evgen_domain_death_list, libxl_evgen_domain_death)
         death_list /* sorted by domid */,
@@ -777,6 +792,39 @@ static inline void libxl__ev_xswatch_init(libxl__ev_xswatch *xswatch_out)
 static inline int libxl__ev_xswatch_isregistered(const libxl__ev_xswatch *xw)
                 { return xw->slotnum >= 0; }
 
+
+/*
+ * The evtchn facility is one-shot per call to libxl__ev_evtchn_wait.
+ * You should call some suitable xc bind function on (or to obtain)
+ * the port, then libxl__ev_evtchn_wait.
+ *
+ * When the event is signaled then the callback will be made, once.
+ * Then you must call libxl__ev_evtchn_wait again, if desired.
+ *
+ * You must NOT call xc_evtchn_unmask.  wait will do that for you.
+ *
+ * Calling libxl__ev_evtchn_cancel will arrange for libxl to disregard
+ * future occurrences of event.  Both libxl__ev_evtchn_wait and
+ * libxl__ev_evtchn_cancel are idempotent.
+ *
+ * (Note of course that an event channel becomes signaled when it is
+ * first bound, so you will get one call to libxl__ev_evtchn_wait
+ * "right away"; unless you have won a very fast race, the condition
+ * you were waiting for won't exist yet so when you check for it
+ * you'll find you need to call wait again.)
+ *
+ * You must not wait on the same port twice at once (that is, with
+ * two separate libxl__ev_evtchn's).
+ */
+_hidden int libxl__ev_evtchn_wait(libxl__gc*, libxl__ev_evtchn *evev);
+_hidden void libxl__ev_evtchn_cancel(libxl__gc *gc, libxl__ev_evtchn *evev);
+
+static inline void libxl__ev_evtchn_init(libxl__ev_evtchn *evev)
+                { evev->waiting = 0; }
+static inline bool libxl__ev_evtchn_iswaiting(const libxl__ev_evtchn *evev)
+                { return evev->waiting; }
+
+_hidden int libxl__ctx_evtchn_init(libxl__gc *gc); /* for libxl_ctx_alloc */
 
 /*
  * For making subprocesses.  This is the only permitted mechanism for
