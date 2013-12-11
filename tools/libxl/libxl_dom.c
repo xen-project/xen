@@ -1340,6 +1340,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
           | (dss->hvm ? XCFLAGS_HVM : 0);
 
     dss->suspend_eventchn = -1;
+    dss->guest_evtchn_lockfd = -1;
     dss->guest_responded = 0;
     dss->dm_savefile = libxl__device_model_savefile(gc, domid);
 
@@ -1358,7 +1359,8 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
 
         if (port >= 0) {
             dss->suspend_eventchn =
-                xc_suspend_evtchn_init_exclusive(CTX->xch, dss->xce, dss->domid, port);
+                xc_suspend_evtchn_init_exclusive(CTX->xch, dss->xce,
+                                  dss->domid, port, &dss->guest_evtchn_lockfd);
 
             if (dss->suspend_eventchn < 0)
                 LOG(WARN, "Suspend event channel initialization failed");
@@ -1522,7 +1524,7 @@ static void domain_suspend_done(libxl__egc *egc,
 
     if (dss->suspend_eventchn > 0)
         xc_suspend_evtchn_release(CTX->xch, dss->xce, domid,
-                                  dss->suspend_eventchn);
+                           dss->suspend_eventchn, &dss->guest_evtchn_lockfd);
     if (dss->xce != NULL)
         xc_evtchn_close(dss->xce);
 

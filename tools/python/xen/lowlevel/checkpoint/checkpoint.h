@@ -27,7 +27,7 @@ typedef struct {
     checkpoint_domtype domtype;
     int fd;
 
-    int suspend_evtchn;
+    int suspend_evtchn, suspend_lockfd;
 
     char* errstr;
 

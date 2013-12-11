@@ -57,6 +57,7 @@ void checkpoint_init(checkpoint_state* s)
     s->fd = -1;
 
     s->suspend_evtchn = -1;
+    s->suspend_lockfd = -1;
 
     s->errstr = NULL;
 
@@ -360,7 +361,8 @@ static int setup_suspend_evtchn(checkpoint_state* s)
     return -1;
   }
 
-  s->suspend_evtchn = xc_suspend_evtchn_init_exclusive(s->xch, s->xce, s->domid, port);
+  s->suspend_evtchn = xc_suspend_evtchn_init_exclusive(s->xch, s->xce,
+                                    s->domid, port, &s->suspend_lockfd);
   if (s->suspend_evtchn < 0) {
       s->errstr = "failed to bind suspend event channel";
       return -1;
@@ -377,7 +379,8 @@ static void release_suspend_evtchn(checkpoint_state *s)
 {
   /* TODO: teach xen to clean up if port is unbound */
   if (s->xce != NULL && s->suspend_evtchn >= 0) {
-    xc_suspend_evtchn_release(s->xch, s->xce, s->domid, s->suspend_evtchn);
+    xc_suspend_evtchn_release(s->xch, s->xce, s->domid,
+                              s->suspend_evtchn, &s->suspend_lockfd);
     s->suspend_evtchn = -1;
   }
 }

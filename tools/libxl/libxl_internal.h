@@ -2439,6 +2439,7 @@ struct libxl__domain_suspend_state {
     /* private */
     xc_evtchn *xce; /* event channel handle */
     int suspend_eventchn;
+    int guest_evtchn_lockfd;
     int hvm;
     int xcflags;
     int guest_responded;

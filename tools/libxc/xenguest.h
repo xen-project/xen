@@ -254,13 +254,19 @@ int xc_hvm_build_target_mem(xc_interface *xch,
                             int target,
                             const char *image_name);
 
-int xc_suspend_evtchn_release(xc_interface *xch, xc_evtchn *xce, int domid, int suspend_evtchn);
+/*
+ * Sets *lockfd to -1.
+ * Has deallocated everything even on error.
+ */
+int xc_suspend_evtchn_release(xc_interface *xch, xc_evtchn *xce, int domid, int suspend_evtchn, int *lockfd);
 
 /**
  * This function eats the initial notification.
  * xce must not be used for anything else
+ * See xc_suspend_evtchn_init_sane re lockfd.
  */
-int xc_suspend_evtchn_init_exclusive(xc_interface *xch, xc_evtchn *xce, int domid, int port);
+int xc_suspend_evtchn_init_exclusive(xc_interface *xch, xc_evtchn *xce,
+                                     int domid, int port, int *lockfd);
 
 /* xce must not be used for anything else */
 int xc_await_suspend(xc_interface *xch, xc_evtchn *xce, int suspend_evtchn);
@@ -268,8 +274,12 @@ int xc_await_suspend(xc_interface *xch, xc_evtchn *xce, int suspend_evtchn);
 /**
  * The port will be signaled immediately after this call
  * The caller should check the domain status and look for the next event
+ * On success, *lockfd will be set to >=0 and *lockfd must be preserved
+ * and fed to xc_suspend_evtchn_release.  (On error *lockfd is
+ * undefined and xc_suspend_evtchn_release is not allowed.)
  */
-int xc_suspend_evtchn_init_sane(xc_interface *xch, xc_evtchn *xce, int domid, int port);
+int xc_suspend_evtchn_init_sane(xc_interface *xch, xc_evtchn *xce,
+                                int domid, int port, int *lockfd);
 
 int xc_get_bit_size(xc_interface *xch,
                     const char *image_name, const char *cmdline,

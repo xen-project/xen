@@ -164,7 +164,7 @@ int
 main(int argc, char **argv)
 {
     unsigned int maxit, max_f, lflags;
-    int io_fd, ret, port;
+    int io_fd, ret, port, suspend_lockfd = -1;
     struct save_callbacks callbacks;
     xentoollog_level lvl;
     xentoollog_logger *l;
@@ -199,7 +199,8 @@ main(int argc, char **argv)
         else
         {
             si.suspend_evtchn =
-              xc_suspend_evtchn_init_exclusive(si.xch, si.xce, si.domid, port);
+              xc_suspend_evtchn_init_exclusive(si.xch, si.xce, si.domid,
+                                               port, &suspend_lockfd);
 
             if (si.suspend_evtchn < 0)
                 warnx("suspend event channel initialization failed, "
@@ -213,7 +214,8 @@ main(int argc, char **argv)
                          &callbacks, !!(si.flags & XCFLAGS_HVM), 0);
 
     if (si.suspend_evtchn > 0)
-	 xc_suspend_evtchn_release(si.xch, si.xce, si.domid, si.suspend_evtchn);
+	 xc_suspend_evtchn_release(si.xch, si.xce, si.domid,
+                                   si.suspend_evtchn, &suspend_lockfd);
 
     if (si.xce > 0)
         xc_evtchn_close(si.xce);
