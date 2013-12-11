@@ -17,6 +17,189 @@ Some examples of what FLASK can do:
 Some of these examples require dom0 disaggregation to be useful, since the
 domain build process requires the ability to write to the new domain's memory.
 
+Security Status of dom0 disaggregation
+--------------------------------------
+
+Xen supports disaggregation of various support and management
+functions into their own domains, via the XSM mechanisms described in
+this document.
+
+However the implementations of these support and management interfaces
+were originally written to be used only by the totally-privileged
+dom0, and have not been reviewed for security when exposed to
+supposedly-only-semi-privileged disaggregated management domains.  But
+such management domains are (in such a design) to be seen as
+potentially hostile, e.g. due to privilege escalation following
+exploitation of a bug in the management domain.
+
+Until the interfaces have been properly reviewed for security against
+hostile callers, the Xen.org security team intends (subject of course
+to the permission of anyone disclosing to us) to handle these and
+future vulnerabilities in these interfaces in public, as if they were
+normal non-security-related bugs.
+
+This applies only to bugs which do no more than reduce the security of
+a radically disaggregated system to the security of a
+non-disaggregated one.  Here a "radically disaggregated system" is one
+which uses the XSM mechanism to delegate the affected interfaces to
+other-than-fully-trusted domains.
+
+This policy does not apply to bugs which affect stub device models,
+driver domains, or stub xenstored - even if those bugs do no worse
+than reduce the security of such a system to one whose device models,
+backend drivers, or xenstore, run in dom0.
+
+For more information see http://xenbits.xen.org/xsa/advisory-77.html.
+
+The following interfaces are covered by this statement.  Interfaces
+not listed here are considered safe for disaggregation, security
+issues found in interfaces not listed here will be handled according
+to the normal security problem response policy
+http://www.xenproject.org/security-policy.html.
+
+__HYPERVISOR_domctl (xen/include/public/domctl.h)
+
+ The following subops are covered by this statement. subops not listed
+ here are considered safe for disaggregation.
+
+ * XEN_DOMCTL_createdomain
+ * XEN_DOMCTL_destroydomain
+ * XEN_DOMCTL_pausedomain
+ * XEN_DOMCTL_unpausedomain
+ * XEN_DOMCTL_getdomaininfo
+ * XEN_DOMCTL_getmemlist
+ * XEN_DOMCTL_getpageframeinfo
+ * XEN_DOMCTL_getpageframeinfo2
+ * XEN_DOMCTL_setvcpuaffinity
+ * XEN_DOMCTL_shadow_op
+ * XEN_DOMCTL_max_mem
+ * XEN_DOMCTL_setvcpucontext
+ * XEN_DOMCTL_getvcpucontext
+ * XEN_DOMCTL_getvcpuinfo
+ * XEN_DOMCTL_max_vcpus
+ * XEN_DOMCTL_scheduler_op
+ * XEN_DOMCTL_setdomainhandle
+ * XEN_DOMCTL_setdebugging
+ * XEN_DOMCTL_irq_permission
+ * XEN_DOMCTL_iomem_permission
+ * XEN_DOMCTL_ioport_permission
+ * XEN_DOMCTL_hypercall_init
+ * XEN_DOMCTL_arch_setup
+ * XEN_DOMCTL_settimeoffset
+ * XEN_DOMCTL_getvcpuaffinity
+ * XEN_DOMCTL_real_mode_area
+ * XEN_DOMCTL_resumedomain
+ * XEN_DOMCTL_sendtrigger
+ * XEN_DOMCTL_subscribe
+ * XEN_DOMCTL_gethvmcontext
+ * XEN_DOMCTL_sethvmcontext
+ * XEN_DOMCTL_set_address_size
+ * XEN_DOMCTL_get_address_size
+ * XEN_DOMCTL_assign_device
+ * XEN_DOMCTL_pin_mem_cacheattr
+ * XEN_DOMCTL_set_ext_vcpucontext
+ * XEN_DOMCTL_get_ext_vcpucontext
+ * XEN_DOMCTL_set_opt_feature
+ * XEN_DOMCTL_test_assign_device
+ * XEN_DOMCTL_set_target
+ * XEN_DOMCTL_deassign_device
+ * XEN_DOMCTL_set_cpuid
+ * XEN_DOMCTL_get_device_group
+ * XEN_DOMCTL_set_machine_address_size
+ * XEN_DOMCTL_get_machine_address_size
+ * XEN_DOMCTL_suppress_spurious_page_faults
+ * XEN_DOMCTL_debug_op
+ * XEN_DOMCTL_gethvmcontext_partial
+ * XEN_DOMCTL_mem_event_op
+ * XEN_DOMCTL_mem_sharing_op
+ * XEN_DOMCTL_disable_migrate
+ * XEN_DOMCTL_gettscinfo
+ * XEN_DOMCTL_settscinfo
+ * XEN_DOMCTL_getpageframeinfo3
+ * XEN_DOMCTL_setvcpuextstate
+ * XEN_DOMCTL_getvcpuextstate
+ * XEN_DOMCTL_set_access_required
+ * XEN_DOMCTL_audit_p2m
+ * XEN_DOMCTL_set_virq_handler
+ * XEN_DOMCTL_set_broken_page_p2m
+ * XEN_DOMCTL_setnodeaffinity
+ * XEN_DOMCTL_getnodeaffinity
+ * XEN_DOMCTL_set_max_evtchn
+ * XEN_DOMCTL_gdbsx_guestmemio
+ * XEN_DOMCTL_gdbsx_pausevcpu
+ * XEN_DOMCTL_gdbsx_unpausevcpu
+ * XEN_DOMCTL_gdbsx_domstatus
+
+__HYPERVISOR_sysctl (xen/include/public/sysctl.h)
+
+ The following subops are covered by this statement. subops not listed
+ here are considered safe for disaggregation.
+
+ * XEN_SYSCTL_readconsole
+ * XEN_SYSCTL_tbuf_op
+ * XEN_SYSCTL_physinfo
+ * XEN_SYSCTL_sched_id
+ * XEN_SYSCTL_perfc_op
+ * XEN_SYSCTL_getdomaininfolist
+ * XEN_SYSCTL_debug_keys
+ * XEN_SYSCTL_getcpuinfo
+ * XEN_SYSCTL_availheap
+ * XEN_SYSCTL_get_pmstat
+ * XEN_SYSCTL_cpu_hotplug
+ * XEN_SYSCTL_pm_op
+ * XEN_SYSCTL_page_offline_op
+ * XEN_SYSCTL_lockprof_op
+ * XEN_SYSCTL_topologyinfo
+ * XEN_SYSCTL_numainfo
+ * XEN_SYSCTL_cpupool_op
+ * XEN_SYSCTL_scheduler_op
+ * XEN_SYSCTL_coverage_op
+
+__HYPERVISOR_memory_op (xen/include/public/memory.h)
+
+ The following subops are covered by this statement. subops not listed
+ here are considered safe for disaggregation.
+
+ * XENMEM_set_pod_target
+ * XENMEM_get_pod_target
+ * XENMEM_claim_pages
+
+__HYPERVISOR_tmem_op (xen/include/public/tmem.h)
+
+ The following tmem control ops, that is the sub-subops of
+ TMEM_CONTROL, are covered by this statement. 
+
+ Note that TMEM is also subject to a similar policy arising from
+ XSA-15 http://lists.xen.org/archives/html/xen-announce/2012-09/msg00006.html.
+ Due to this existing policy all TMEM Ops are already subject to
+ reduced security support.
+
+ * TMEMC_THAW
+ * TMEMC_FREEZE
+ * TMEMC_FLUSH
+ * TMEMC_DESTROY
+ * TMEMC_LIST
+ * TMEMC_SET_WEIGHT
+ * TMEMC_SET_CAP
+ * TMEMC_SET_COMPRESS
+ * TMEMC_QUERY_FREEABLE_MB
+ * TMEMC_SAVE_BEGIN
+ * TMEMC_SAVE_GET_VERSION
+ * TMEMC_SAVE_GET_MAXPOOLS
+ * TMEMC_SAVE_GET_CLIENT_WEIGHT
+ * TMEMC_SAVE_GET_CLIENT_CAP
+ * TMEMC_SAVE_GET_CLIENT_FLAGS
+ * TMEMC_SAVE_GET_POOL_FLAGS
+ * TMEMC_SAVE_GET_POOL_NPAGES
+ * TMEMC_SAVE_GET_POOL_UUID
+ * TMEMC_SAVE_GET_NEXT_PAGE
+ * TMEMC_SAVE_GET_NEXT_INV
+ * TMEMC_SAVE_END
+ * TMEMC_RESTORE_BEGIN
+ * TMEMC_RESTORE_PUT_PAGE
+ * TMEMC_RESTORE_FLUSH_PAGE
+
+
 
 Setting up FLASK
 ----------------

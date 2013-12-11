@@ -322,11 +322,11 @@ static int iommu_populate_page_table(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct page_info *page;
-    int rc;
-
-    spin_lock(&d->page_alloc_lock);
+    int rc = 0;
 
     this_cpu(iommu_dont_flush_iotlb) = 1;
+    spin_lock(&d->page_alloc_lock);
+
     page_list_for_each ( page, &d->page_list )
     {
         if ( is_hvm_domain(d) ||
@@ -336,18 +336,20 @@ static int iommu_populate_page_table(struct domain *d)
             rc = hd->platform_ops->map_page(
                 d, mfn_to_gmfn(d, page_to_mfn(page)), page_to_mfn(page),
                 IOMMUF_readable|IOMMUF_writable);
-            if (rc)
-            {
-                spin_unlock(&d->page_alloc_lock);
-                hd->platform_ops->teardown(d);
-                return rc;
-            }
+            if ( rc )
+                break;
         }
     }
-    this_cpu(iommu_dont_flush_iotlb) = 0;
-    iommu_iotlb_flush_all(d);
+
     spin_unlock(&d->page_alloc_lock);
-    return 0;
+    this_cpu(iommu_dont_flush_iotlb) = 0;
+
+    if ( !rc )
+        iommu_iotlb_flush_all(d);
+    else
+        hd->platform_ops->teardown(d);
+
+    return rc;
 }
 
 

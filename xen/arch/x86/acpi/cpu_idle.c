@@ -912,7 +912,7 @@ static void set_cx(
                    acpi_power->cpu, xen_cx->type);
             return;
         }
-        cx = &acpi_power->states[acpi_power->count++];
+        cx = &acpi_power->states[acpi_power->count];
         cx->type = xen_cx->type;
         break;
     }
@@ -937,11 +937,14 @@ static void set_cx(
         break;
     default:
         cx->entry_method = ACPI_CSTATE_EM_NONE;
+        break;
     }
 
-    cx->latency  = xen_cx->latency;
-    
+    cx->latency = xen_cx->latency;
     cx->target_residency = cx->latency * latency_factor;
+
+    smp_wmb();
+    acpi_power->count++;
     if ( cx->type == ACPI_STATE_C1 || cx->type == ACPI_STATE_C2 )
         acpi_power->safe_state = cx;
 }

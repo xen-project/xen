@@ -743,11 +743,12 @@ int arch_set_info_guest(
             XLAT_trap_info(v->arch.pv_vcpu.trap_ctxt + i,
                            c.cmp->trap_ctxt + i);
     }
-    for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
-        v->arch.debugreg[i] = c(debugreg[i]);
 
     if ( has_hvm_container_vcpu(v) )
     {
+        for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
+            v->arch.debugreg[i] = c(debugreg[i]);
+
         hvm_set_info_guest(v);
 
         if ( is_hvm_vcpu(v) || v->is_initialised )
