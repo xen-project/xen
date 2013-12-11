@@ -71,8 +71,8 @@
 #define XEN_ELFNOTE_VIRT_BASE      3
 
 /*
- * The offset of the ELF paddr field from the acutal required
- * psuedo-physical address (numeric).
+ * The offset of the ELF paddr field from the actual required
+ * pseudo-physical address (numeric).
  *
  * This is used to maintain backwards compatibility with older kernels
  * which wrote __PAGE_OFFSET into that field. This field defaults to 0
