@@ -164,13 +164,7 @@ static inline void __tmem_free_page(struct page_info *pi)
     atomic_dec(&freeable_page_count);
 }
 
-static inline unsigned long tmem_free_mb(void)
-{
-    return (tmem_page_list_pages + total_free_pages()) >> (20 - PAGE_SHIFT);
-}
-
 /*  "Client" (==domain) abstraction */
-
 static inline struct client *tmem_client_from_cli_id(domid_t cli_id)
 {
     struct client *c;

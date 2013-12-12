@@ -1409,22 +1409,28 @@ static unsigned long tmem_relinquish_npages(unsigned long n)
     return avail_pages;
 }
 
-/* Under certain conditions (e.g. if each client is putting pages for exactly
+/*
+ * Under certain conditions (e.g. if each client is putting pages for exactly
  * one object), once locks are held, freeing up memory may
  * result in livelocks and very long "put" times, so we try to ensure there
  * is a minimum amount of memory (1MB) available BEFORE any data structure
- * locks are held */
-static inline void tmem_ensure_avail_pages(void)
+ * locks are held.
+ */
+static inline bool_t tmem_ensure_avail_pages(void)
 {
     int failed_evict = 10;
+    unsigned long free_mem;
 
-    while ( !tmem_free_mb() )
-    {
-        if ( tmem_evict() )
-            continue;
-        else if ( failed_evict-- <= 0 )
-            break;
-    }
+    do {
+        free_mem = (tmem_page_list_pages + total_free_pages())
+                        >> (20 - PAGE_SHIFT);
+        if ( free_mem )
+            return 1;
+        if ( !tmem_evict() )
+            failed_evict--;
+    } while ( failed_evict > 0 );
+
+    return 0;
 }
 
 /************ TMEM CORE OPERATIONS ************************************/
@@ -2681,9 +2687,11 @@ long do_tmem_op(tmem_cli_op_t uops)
                               op.u.creat.uuid[0], op.u.creat.uuid[1]);
         break;
     case TMEM_PUT_PAGE:
-        tmem_ensure_avail_pages();
-        rc = do_tmem_put(pool, oidp, op.u.gen.index, op.u.gen.cmfn,
+        if (tmem_ensure_avail_pages())
+            rc = do_tmem_put(pool, oidp, op.u.gen.index, op.u.gen.cmfn,
                         tmem_cli_buf_null);
+        else
+            rc = -ENOMEM;
         if (rc == 1) succ_put = 1;
         else non_succ_put = 1;
         break;
