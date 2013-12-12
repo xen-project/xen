@@ -1081,6 +1081,11 @@ static void domain_suspend_callback_common(libxl__egc *egc,
         rc = libxl__ev_evtchn_wait(gc, &dss->guest_evtchn);
         if (rc) goto err;
 
+        rc = libxl__ev_time_register_rel(gc, &dss->guest_timeout,
+                                         suspend_common_wait_guest_timeout,
+                                         60*1000);
+        if (rc) goto err;
+
         return;
     }
 
