@@ -880,7 +880,7 @@ static void gic_irq_eoi(void *info)
 
 static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *regs)
 {
-    int i = 0, virq;
+    int i = 0, virq, pirq = -1;
     uint32_t lr;
     struct vcpu *v = current;
     uint64_t eisr = GICH[GICH_EISR0] | (((uint64_t) GICH[GICH_EISR1]) << 32);
@@ -888,10 +888,9 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
     while ((i = find_next_bit((const long unsigned int *) &eisr,
                               64, i)) < 64) {
         struct pending_irq *p;
-        int cpu, eoi;
+        int cpu;
 
         cpu = -1;
-        eoi = 0;
 
         spin_lock_irq(&gic.lock);
         lr = GICH[GICH_LR + i];
@@ -915,19 +914,19 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
             p->desc->status &= ~IRQ_INPROGRESS;
             /* Assume only one pcpu needs to EOI the irq */
             cpu = p->desc->arch.eoi_cpu;
-            eoi = 1;
+            pirq = p->desc->irq;
         }
         list_del_init(&p->inflight);
         spin_unlock_irq(&v->arch.vgic.lock);
 
-        if ( eoi ) {
+        if ( p->desc != NULL ) {
             /* this is not racy because we can't receive another irq of the
              * same type until we EOI it.  */
             if ( cpu == smp_processor_id() )
-                gic_irq_eoi((void*)(uintptr_t)virq);
+                gic_irq_eoi((void*)(uintptr_t)pirq);
             else
                 on_selected_cpus(cpumask_of(cpu),
-                                 gic_irq_eoi, (void*)(uintptr_t)virq, 0);
+                                 gic_irq_eoi, (void*)(uintptr_t)pirq, 0);
         }
 
         i++;
