@@ -372,6 +372,8 @@ static void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
         set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
         if ( !list_empty(&p->inflight) && !test_bit(GIC_IRQ_GUEST_VISIBLE, &p->status) )
             gic_set_guest_irq(v, irq, GICH_LR_PENDING, p->priority);
+        if ( p->desc != NULL )
+            p->desc->handler->enable(p->desc);
         i++;
     }
 }
@@ -694,10 +696,6 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
     n->irq = irq;
     set_bit(GIC_IRQ_GUEST_PENDING, &n->status);
     n->priority = priority;
-    if (!virtual)
-        n->desc = irq_to_desc(irq);
-    else
-        n->desc = NULL;
 
     /* the irq is enabled */
     if ( test_bit(GIC_IRQ_GUEST_ENABLED, &n->status) )

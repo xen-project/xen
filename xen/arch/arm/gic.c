@@ -132,17 +132,29 @@ void gic_restore_state(struct vcpu *v)
 static void gic_irq_enable(struct irq_desc *desc)
 {
     int irq = desc->irq;
+    unsigned long flags;
 
+    spin_lock_irqsave(&desc->lock, flags);
+    spin_lock(&gic.lock);
+    desc->status &= ~IRQ_DISABLED;
+    dsb();
     /* Enable routing */
     GICD[GICD_ISENABLER + irq / 32] = (1u << (irq % 32));
+    spin_unlock(&gic.lock);
+    spin_unlock_irqrestore(&desc->lock, flags);
 }
 
 static void gic_irq_disable(struct irq_desc *desc)
 {
     int irq = desc->irq;
 
+    spin_lock(&desc->lock);
+    spin_lock(&gic.lock);
     /* Disable routing */
     GICD[GICD_ICENABLER + irq / 32] = (1u << (irq % 32));
+    desc->status |= IRQ_DISABLED;
+    spin_unlock(&gic.lock);
+    spin_unlock(&desc->lock);
 }
 
 static unsigned int gic_irq_startup(struct irq_desc *desc)
@@ -247,24 +259,20 @@ static int gic_route_irq(unsigned int irq, bool_t level,
     ASSERT(priority <= 0xff);     /* Only 8 bits of priority */
     ASSERT(irq < gic.lines);      /* Can't route interrupts that don't exist */
 
-    spin_lock_irqsave(&desc->lock, flags);
-    spin_lock(&gic.lock);
-
     if ( desc->action != NULL )
-    {
-        spin_unlock(&gic.lock);
-        spin_unlock(&desc->lock);
         return -EBUSY;
-    }
-
-    desc->handler = &gic_host_irq_type;
 
     /* Disable interrupt */
     desc->handler->shutdown(desc);
 
-    gic_set_irq_properties(irq, level, cpu_mask, priority);
+    spin_lock_irqsave(&desc->lock, flags);
 
+    desc->handler = &gic_host_irq_type;
+
+    spin_lock(&gic.lock);
+    gic_set_irq_properties(irq, level, cpu_mask, priority);
     spin_unlock(&gic.lock);
+
     spin_unlock_irqrestore(&desc->lock, flags);
     return 0;
 }
@@ -557,15 +565,12 @@ void __init release_irq(unsigned int irq)
 
     desc = irq_to_desc(irq);
 
+    desc->handler->shutdown(desc);
+
     spin_lock_irqsave(&desc->lock,flags);
     action = desc->action;
     desc->action  = NULL;
-    desc->status |= IRQ_DISABLED;
     desc->status &= ~IRQ_GUEST;
-
-    spin_lock(&gic.lock);
-    desc->handler->shutdown(desc);
-    spin_unlock(&gic.lock);
 
     spin_unlock_irqrestore(&desc->lock,flags);
 
@@ -583,10 +588,7 @@ static int __setup_irq(struct irq_desc *desc, unsigned int irq,
         return -EBUSY;
 
     desc->action  = new;
-    desc->status &= ~IRQ_DISABLED;
     dsb();
-
-    desc->handler->startup(desc);
 
     return 0;
 }
@@ -600,10 +602,11 @@ int __init setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
     desc = irq_to_desc(irq->irq);
 
     spin_lock_irqsave(&desc->lock, flags);
-
     rc = __setup_irq(desc, irq->irq, new);
-
     spin_unlock_irqrestore(&desc->lock, flags);
+
+    desc->handler->startup(desc);
+
 
     return rc;
 }
@@ -745,6 +748,7 @@ int gic_route_irq_to_guest(struct domain *d, const struct dt_irq *irq,
     unsigned long flags;
     int retval;
     bool_t level;
+    struct pending_irq *p;
 
     action = xmalloc(struct irqaction);
     if (!action)
@@ -770,6 +774,10 @@ int gic_route_irq_to_guest(struct domain *d, const struct dt_irq *irq,
         xfree(action);
         goto out;
     }
+
+    /* TODO: do not assume delivery to vcpu0 */
+    p = irq_to_pending(d->vcpu[0], irq->irq);
+    p->desc = desc;
 
 out:
     spin_unlock(&gic.lock);
