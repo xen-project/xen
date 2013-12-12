@@ -24,9 +24,6 @@
 #include <xen/list.h>
 #include <xen/init.h>
 
-#define EXPORT /* indicates code other modules are dependent upon */
-#define FORWARD
-
 #define TMEM_SPEC_VERSION 1
 
 /* global statistics (none need to be locked) */
@@ -212,8 +209,8 @@ static int tmem_initialized = 0;
 
 /************ CONCURRENCY  ***********************************************/
 
-EXPORT DEFINE_SPINLOCK(tmem_spinlock);  /* used iff tmem_lock_all */
-EXPORT DEFINE_RWLOCK(tmem_rwlock);      /* used iff !tmem_lock_all */
+DEFINE_SPINLOCK(tmem_spinlock);  /* used iff tmem_lock_all */
+DEFINE_RWLOCK(tmem_rwlock);      /* used iff !tmem_lock_all */
 static DEFINE_SPINLOCK(eph_lists_spinlock); /* protects global AND clients */
 static DEFINE_SPINLOCK(pers_lists_spinlock);
 
@@ -2537,7 +2534,7 @@ static int do_tmem_control(struct tmem_op *op)
 
 /************ EXPORTed FUNCTIONS **************************************/
 
-EXPORT long do_tmem_op(tmem_cli_op_t uops)
+long do_tmem_op(tmem_cli_op_t uops)
 {
     struct tmem_op op;
     struct client *client = tmem_client_from_current();
@@ -2702,7 +2699,7 @@ out:
 }
 
 /* this should be called when the host is destroying a client */
-EXPORT void tmem_destroy(void *v)
+void tmem_destroy(void *v)
 {
     struct client *client = (struct client *)v;
 
@@ -2731,7 +2728,7 @@ EXPORT void tmem_destroy(void *v)
 }
 
 /* freezing all pools guarantees that no additional memory will be consumed */
-EXPORT void tmem_freeze_all(unsigned char key)
+void tmem_freeze_all(unsigned char key)
 {
     static int freeze = 0;
  
@@ -2750,8 +2747,7 @@ EXPORT void tmem_freeze_all(unsigned char key)
 }
 
 #define MAX_EVICTS 10  /* should be variable or set via TMEMC_ ?? */
-
-EXPORT void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
+void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
 {
     struct page_info *pfp;
     unsigned long evicts_per_relinq = 0;

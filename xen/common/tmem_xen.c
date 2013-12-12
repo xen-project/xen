@@ -14,27 +14,25 @@
 #include <xen/cpu.h>
 #include <xen/init.h>
 
-#define EXPORT /* indicates code other modules are dependent upon */
-
-EXPORT bool_t __read_mostly opt_tmem = 0;
+bool_t __read_mostly opt_tmem = 0;
 boolean_param("tmem", opt_tmem);
 
-EXPORT bool_t __read_mostly opt_tmem_compress = 0;
+bool_t __read_mostly opt_tmem_compress = 0;
 boolean_param("tmem_compress", opt_tmem_compress);
 
-EXPORT bool_t __read_mostly opt_tmem_dedup = 0;
+bool_t __read_mostly opt_tmem_dedup = 0;
 boolean_param("tmem_dedup", opt_tmem_dedup);
 
-EXPORT bool_t __read_mostly opt_tmem_tze = 0;
+bool_t __read_mostly opt_tmem_tze = 0;
 boolean_param("tmem_tze", opt_tmem_tze);
 
-EXPORT bool_t __read_mostly opt_tmem_shared_auth = 0;
+bool_t __read_mostly opt_tmem_shared_auth = 0;
 boolean_param("tmem_shared_auth", opt_tmem_shared_auth);
 
-EXPORT int __read_mostly opt_tmem_lock = 0;
+int __read_mostly opt_tmem_lock = 0;
 integer_param("tmem_lock", opt_tmem_lock);
 
-EXPORT atomic_t freeable_page_count = ATOMIC_INIT(0);
+atomic_t freeable_page_count = ATOMIC_INIT(0);
 
 /* these are a concurrency bottleneck, could be percpu and dynamically
  * allocated iff opt_tmem_compress */
@@ -99,7 +97,7 @@ static inline void cli_put_page(void *cli_va, struct page_info *cli_pfp,
 }
 #endif
 
-EXPORT int tmem_copy_from_client(struct page_info *pfp,
+int tmem_copy_from_client(struct page_info *pfp,
     xen_pfn_t cmfn, tmem_cli_va_param_t clibuf)
 {
     unsigned long tmem_mfn, cli_mfn = 0;
@@ -131,7 +129,7 @@ EXPORT int tmem_copy_from_client(struct page_info *pfp,
     return rc;
 }
 
-EXPORT int tmem_compress_from_client(xen_pfn_t cmfn,
+int tmem_compress_from_client(xen_pfn_t cmfn,
     void **out_va, size_t *out_len, tmem_cli_va_param_t clibuf)
 {
     int ret = 0;
@@ -163,7 +161,7 @@ EXPORT int tmem_compress_from_client(xen_pfn_t cmfn,
     return 1;
 }
 
-EXPORT int tmem_copy_to_client(xen_pfn_t cmfn, struct page_info *pfp,
+int tmem_copy_to_client(xen_pfn_t cmfn, struct page_info *pfp,
     tmem_cli_va_param_t clibuf)
 {
     unsigned long tmem_mfn, cli_mfn = 0;
@@ -192,7 +190,7 @@ EXPORT int tmem_copy_to_client(xen_pfn_t cmfn, struct page_info *pfp,
     return rc;
 }
 
-EXPORT int tmem_decompress_to_client(xen_pfn_t cmfn, void *tmem_va,
+int tmem_decompress_to_client(xen_pfn_t cmfn, void *tmem_va,
                                     size_t size, tmem_cli_va_param_t clibuf)
 {
     unsigned long cli_mfn = 0;
@@ -221,7 +219,7 @@ EXPORT int tmem_decompress_to_client(xen_pfn_t cmfn, void *tmem_va,
     return 1;
 }
 
-EXPORT int tmem_copy_tze_to_client(xen_pfn_t cmfn, void *tmem_va,
+int tmem_copy_tze_to_client(xen_pfn_t cmfn, void *tmem_va,
                                     pagesize_t len)
 {
     void *cli_va;
@@ -245,12 +243,12 @@ EXPORT int tmem_copy_tze_to_client(xen_pfn_t cmfn, void *tmem_va,
 
 /******************  XEN-SPECIFIC MEMORY ALLOCATION ********************/
 
-EXPORT struct xmem_pool *tmem_mempool = 0;
-EXPORT unsigned int tmem_mempool_maxalloc = 0;
+struct xmem_pool *tmem_mempool = 0;
+unsigned int tmem_mempool_maxalloc = 0;
 
-EXPORT DEFINE_SPINLOCK(tmem_page_list_lock);
-EXPORT PAGE_LIST_HEAD(tmem_page_list);
-EXPORT unsigned long tmem_page_list_pages = 0;
+DEFINE_SPINLOCK(tmem_page_list_lock);
+PAGE_LIST_HEAD(tmem_page_list);
+unsigned long tmem_page_list_pages = 0;
 
 static noinline void *tmem_mempool_page_get(unsigned long size)
 {
@@ -352,7 +350,7 @@ static struct notifier_block cpu_nfb = {
     .notifier_call = cpu_callback
 };
 
-EXPORT int __init tmem_init(void)
+int __init tmem_init(void)
 {
     unsigned int cpu;
 
