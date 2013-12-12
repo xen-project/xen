@@ -44,11 +44,6 @@ static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, workmem);
 static DEFINE_PER_CPU_READ_MOSTLY(unsigned char *, dstmem);
 static DEFINE_PER_CPU_READ_MOSTLY(void *, scratch_page);
 
-void tmem_copy_page(char *to, char*from)
-{
-    memcpy(to, from, PAGE_SIZE);
-}
-
 #if defined(CONFIG_ARM)
 static inline void *cli_get_page(xen_pfn_t cmfn, unsigned long *pcli_mfn,
                                  struct page_info **pcli_pfp, bool_t cli_write)
@@ -135,7 +130,7 @@ EXPORT int tmem_copy_from_client(struct page_info *pfp,
     }
     smp_mb();
     if ( len == PAGE_SIZE && !tmem_offset && !pfn_offset && cli_va )
-        tmem_copy_page(tmem_va, cli_va);
+        memcpy(tmem_va, cli_va, PAGE_SIZE);
     else if ( (tmem_offset+len <= PAGE_SIZE) &&
               (pfn_offset+len <= PAGE_SIZE) )
     {
@@ -206,7 +201,7 @@ EXPORT int tmem_copy_to_client(xen_pfn_t cmfn, struct page_info *pfp,
     tmem_mfn = page_to_mfn(pfp);
     tmem_va = map_domain_page(tmem_mfn);
     if ( len == PAGE_SIZE && !tmem_offset && !pfn_offset && cli_va )
-        tmem_copy_page(cli_va, tmem_va);
+        memcpy(cli_va, tmem_va, PAGE_SIZE);
     else if ( (tmem_offset+len <= PAGE_SIZE) && (pfn_offset+len <= PAGE_SIZE) )
     {
         if ( cli_va )
