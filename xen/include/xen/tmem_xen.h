@@ -34,11 +34,6 @@ extern spinlock_t tmem_page_list_lock;
 extern unsigned long tmem_page_list_pages;
 extern atomic_t freeable_page_count;
 
-extern spinlock_t tmem_lock;
-extern spinlock_t tmem_spinlock;
-extern rwlock_t tmem_rwlock;
-
-extern void tmem_copy_page(char *to, char*from);
 extern int tmem_init(void);
 #define tmem_hash hash_long
 
@@ -76,8 +71,6 @@ static inline bool_t tmem_enabled(void)
 {
     return opt_tmem;
 }
-
-extern int opt_tmem_lock;
 
 /*
  * Memory free page list management
@@ -182,7 +175,6 @@ static inline unsigned long tmem_free_mb(void)
     return (tmem_page_list_pages + total_free_pages()) >> (20 - PAGE_SHIFT);
 }
 
-#define tmem_lock_all  opt_tmem_lock
 #define tmem_called_from_tmem(_memflags) (_memflags & MEMF_tmem)
 
 /*  "Client" (==domain) abstraction */
