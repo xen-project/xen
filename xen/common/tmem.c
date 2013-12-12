@@ -1383,7 +1383,7 @@ out:
     return ret;
 }
 
-static unsigned long tmem_relinquish_npages(unsigned long n)
+static unsigned long tmem_flush_npages(unsigned long n)
 {
     unsigned long avail_pages = 0;
 
@@ -2028,7 +2028,7 @@ static int tmemc_flush_mem(domid_t cli_id, uint32_t kb)
     }
     /* convert kb to pages, rounding up if necessary */
     npages = (kb + ((1 << (PAGE_SHIFT-10))-1)) >> (PAGE_SHIFT-10);
-    flushed_pages = tmem_relinquish_npages(npages);
+    flushed_pages = tmem_flush_npages(npages);
     flushed_kb = flushed_pages << (PAGE_SHIFT-10);
     return flushed_kb;
 }
