@@ -528,9 +528,9 @@ int domain_kill(struct domain *d)
         spin_barrier(&d->domain_lock);
         evtchn_destroy(d);
         gnttab_release_mappings(d);
-        tmem_destroy(d->tmem);
+        tmem_destroy(d->tmem_client);
         domain_set_outstanding_pages(d, 0);
-        d->tmem = NULL;
+        d->tmem_client = NULL;
         /* fallthrough */
     case DOMDYING_dying:
         rc = domain_relinquish_resources(d);

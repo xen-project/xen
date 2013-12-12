@@ -1206,7 +1206,7 @@ static struct client *client_create(domid_t cli_id)
         goto fail;
     }
     if ( !d->is_dying ) {
-        d->tmem = client;
+        d->tmem_client = client;
 	client->domain = d;
     }
     rcu_unlock_domain(d);
@@ -1324,7 +1324,7 @@ obj_unlock:
 
 static int tmem_evict(void)
 {
-    struct client *client = tmem_client_from_current();
+    struct client *client = current->domain->tmem_client;
     struct tmem_page_descriptor *pgp = NULL, *pgp2, *pgp_del;
     struct tmem_object_root *obj;
     struct tmem_pool *pool;
@@ -1761,7 +1761,7 @@ static int do_tmem_get(struct tmem_pool *pool, struct oid *oidp, uint32_t index,
             list_del(&pgp->us.client_eph_pages);
             list_add_tail(&pgp->us.client_eph_pages,&client->ephemeral_page_list);
             spin_unlock(&eph_lists_spinlock);
-            obj->last_client = tmem_get_cli_id_from_current();
+            obj->last_client = current->domain->domain_id;
         }
     }
     if ( obj != NULL )
@@ -1836,7 +1836,7 @@ out:
 
 static int do_tmem_destroy_pool(uint32_t pool_id)
 {
-    struct client *client = tmem_client_from_current();
+    struct client *client = current->domain->tmem_client;
     struct tmem_pool *pool;
 
     if ( client->pools == NULL )
@@ -1867,7 +1867,7 @@ static int do_tmem_new_pool(domid_t this_cli_id,
     int i;
 
     if ( this_cli_id == TMEM_CLI_ID_NULL )
-        cli_id = tmem_get_cli_id_from_current();
+        cli_id = current->domain->domain_id;
     else
         cli_id = this_cli_id;
     tmem_client_info("tmem: allocating %s-%s tmem pool for %s=%d...",
@@ -1908,7 +1908,7 @@ static int do_tmem_new_pool(domid_t this_cli_id,
     }
     else
     {
-        client = tmem_client_from_current();
+        client = current->domain->tmem_client;
         ASSERT(client != NULL);
         for ( d_poolid = 0; d_poolid < MAX_POOLS_PER_DOMAIN; d_poolid++ )
             if ( client->pools[d_poolid] == NULL )
@@ -2511,7 +2511,7 @@ static int do_tmem_control(struct tmem_op *op)
     uint32_t subop = op->u.ctrl.subop;
     struct oid *oidp = (struct oid *)(&op->u.ctrl.oid[0]);
 
-    if (!tmem_current_is_privileged())
+    if ( xsm_tmem_control(XSM_PRIV) )
         return -EPERM;
 
     switch(subop)
@@ -2583,7 +2583,7 @@ static int do_tmem_control(struct tmem_op *op)
 long do_tmem_op(tmem_cli_op_t uops)
 {
     struct tmem_op op;
-    struct client *client = tmem_client_from_current();
+    struct client *client = current->domain->tmem_client;
     struct tmem_pool *pool = NULL;
     struct oid *oidp;
     int rc = 0;
@@ -2595,12 +2595,12 @@ long do_tmem_op(tmem_cli_op_t uops)
     if ( !tmem_initialized )
         return -ENODEV;
 
-    if ( !tmem_current_permitted() )
+    if ( xsm_tmem_op(XSM_HOOK) )
         return -EPERM;
 
     total_tmem_ops++;
 
-    if ( client != NULL && tmem_client_is_dying(client) )
+    if ( client != NULL && client->domain->is_dying )
     {
         rc = -ENODEV;
  simple_error:
@@ -2640,7 +2640,7 @@ long do_tmem_op(tmem_cli_op_t uops)
     {
         write_lock(&tmem_rwlock);
         write_lock_set = 1;
-        if ( (client = client_create(tmem_get_cli_id_from_current())) == NULL )
+        if ( (client = client_create(current->domain->domain_id)) == NULL )
         {
             tmem_client_err("tmem: can't create tmem structure for %s\n",
                            tmem_client_str);
@@ -2732,7 +2732,7 @@ void tmem_destroy(void *v)
     if ( client == NULL )
         return;
 
-    if ( !tmem_client_is_dying(client) )
+    if ( !client->domain->is_dying )
     {
         printk("tmem: tmem_destroy can only destroy dying client\n");
         return;

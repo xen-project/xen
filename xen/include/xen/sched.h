@@ -402,7 +402,7 @@ struct domain
     spinlock_t hypercall_deadlock_mutex;
 
     /* transcendent memory, auto-allocated on first tmem op by each domain */
-    void *tmem;
+    struct client *tmem_client;
 
     struct lock_profile_qhead profile_head;
 

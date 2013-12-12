@@ -171,43 +171,15 @@ static inline unsigned long tmem_free_mb(void)
 
 /*  "Client" (==domain) abstraction */
 
-struct client;
 static inline struct client *tmem_client_from_cli_id(domid_t cli_id)
 {
     struct client *c;
     struct domain *d = rcu_lock_domain_by_id(cli_id);
     if (d == NULL)
         return NULL;
-    c = (struct client *)(d->tmem);
+    c = d->tmem_client;
     rcu_unlock_domain(d);
     return c;
-}
-
-static inline struct client *tmem_client_from_current(void)
-{
-    return (struct client *)(current->domain->tmem);
-}
-
-#define tmem_client_is_dying(_client) (!!_client->domain->is_dying)
-
-static inline domid_t tmem_get_cli_id_from_current(void)
-{
-    return current->domain->domain_id;
-}
-
-static inline struct domain *tmem_get_cli_ptr_from_current(void)
-{
-    return current->domain;
-}
-
-static inline bool_t tmem_current_permitted(void)
-{
-    return !xsm_tmem_op(XSM_HOOK);
-}
-
-static inline bool_t tmem_current_is_privileged(void)
-{
-    return !xsm_tmem_control(XSM_PRIV);
 }
 
 static inline uint8_t tmem_get_first_byte(struct page_info *pfp)
