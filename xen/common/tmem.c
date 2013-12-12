@@ -303,7 +303,7 @@ static struct page_info *tmem_alloc_page(struct tmem_pool *pool)
     if ( pool != NULL && is_persistent(pool) )
         pfp = __tmem_alloc_page_thispool(pool->client->domain);
     else
-        pfp = __tmem_alloc_page(pool,0);
+        pfp = __tmem_alloc_page();
     if ( pfp == NULL )
         alloc_page_failed++;
     else
@@ -326,9 +326,8 @@ static noinline void *tmem_mempool_page_get(unsigned long size)
     struct page_info *pi;
 
     ASSERT(size == PAGE_SIZE);
-    if ( (pi = __tmem_alloc_page(NULL,0)) == NULL )
+    if ( (pi = __tmem_alloc_page()) == NULL )
         return NULL;
-    ASSERT(IS_VALID_PAGE(pi));
     return page_to_virt(pi);
 }
 
@@ -2780,10 +2779,10 @@ void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
         return NULL;
     }
 
-    if ( tmem_called_from_tmem(memflags) )
+    if ( memflags & MEMF_tmem )
         read_lock(&tmem_rwlock);
 
-    while ( (pfp = __tmem_alloc_page(NULL,1)) == NULL )
+    while ( (pfp = tmem_page_list_get()) == NULL )
     {
         if ( (max_evictions-- <= 0) || !tmem_evict())
             break;
@@ -2798,7 +2797,7 @@ void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
         relinq_pgs++;
     }
 
-    if ( tmem_called_from_tmem(memflags) )
+    if ( memflags & MEMF_tmem )
         read_unlock(&tmem_rwlock);
 
     return pfp;

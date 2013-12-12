@@ -144,15 +144,16 @@ static inline void __tmem_free_page_thispool(struct page_info *pi)
 /*
  * Memory allocation for ephemeral (non-persistent) data
  */
-static inline struct page_info *__tmem_alloc_page(void *pool, int no_heap)
+static inline struct page_info *__tmem_alloc_page(void)
 {
     struct page_info *pi = tmem_page_list_get();
 
-    if ( pi == NULL && !no_heap )
+    if ( pi == NULL)
         pi = alloc_domheap_pages(0,0,MEMF_tmem);
-    ASSERT((pi == NULL) || IS_VALID_PAGE(pi));
-    if ( pi != NULL && !no_heap )
+
+    if ( pi )
         atomic_inc(&freeable_page_count);
+    ASSERT((pi == NULL) || IS_VALID_PAGE(pi));
     return pi;
 }
 
@@ -167,8 +168,6 @@ static inline unsigned long tmem_free_mb(void)
 {
     return (tmem_page_list_pages + total_free_pages()) >> (20 - PAGE_SHIFT);
 }
-
-#define tmem_called_from_tmem(_memflags) (_memflags & MEMF_tmem)
 
 /*  "Client" (==domain) abstraction */
 
