@@ -2755,19 +2755,6 @@ void tmem_destroy(void *v)
     write_unlock(&tmem_rwlock);
 }
 
-/* freezing all pools guarantees that no additional memory will be consumed */
-void tmem_freeze_all(unsigned char key)
-{
-    static int freeze = 0;
-
-    write_lock(&tmem_rwlock);
-
-    freeze = !freeze;
-    tmemc_freeze_pools(TMEM_CLI_ID_NULL,freeze);
-
-    write_unlock(&tmem_rwlock);
-}
-
 #define MAX_EVICTS 10  /* should be variable or set via TMEMC_ ?? */
 void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
 {
