@@ -36,8 +36,6 @@ integer_param("tmem_lock", opt_tmem_lock);
 
 EXPORT atomic_t freeable_page_count = ATOMIC_INIT(0);
 
-DECL_CYC_COUNTER(pg_copy);
-
 /* these are a concurrency bottleneck, could be percpu and dynamically
  * allocated iff opt_tmem_compress */
 #define LZO_WORKMEM_BYTES LZO1X_1_MEM_COMPRESS
@@ -48,10 +46,7 @@ static DEFINE_PER_CPU_READ_MOSTLY(void *, scratch_page);
 
 void tmem_copy_page(char *to, char*from)
 {
-    DECL_LOCAL_CYC_COUNTER(pg_copy);
-    START_CYC_COUNTER(pg_copy);
     memcpy(to, from, PAGE_SIZE);
-    END_CYC_COUNTER(pg_copy);
 }
 
 #if defined(CONFIG_ARM)

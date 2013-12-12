@@ -29,39 +29,6 @@
 
 #define TMEM_SPEC_VERSION 1
 
-/************ DEBUG and STATISTICS (+ some compression testing) *******/
-
-#ifndef NDEBUG
-#define SENTINELS
-#define NOINLINE noinline
-#else
-#define NOINLINE
-#endif
-
-#ifdef SENTINELS
-#define DECL_SENTINEL unsigned long sentinel;
-#define SET_SENTINEL(_x,_y) _x->sentinel = _y##_SENTINEL
-#define INVERT_SENTINEL(_x,_y) _x->sentinel = ~_y##_SENTINEL
-#define ASSERT_SENTINEL(_x,_y) \
-    ASSERT(_x->sentinel != ~_y##_SENTINEL);ASSERT(_x->sentinel == _y##_SENTINEL)
-#if defined(CONFIG_ARM)
-#define POOL_SENTINEL 0x87658765
-#define OBJ_SENTINEL 0x12345678
-#define OBJNODE_SENTINEL 0xfedcba09
-#define PGD_SENTINEL  0x43214321
-#else
-#define POOL_SENTINEL 0x8765876587658765
-#define OBJ_SENTINEL 0x1234567812345678
-#define OBJNODE_SENTINEL 0xfedcba0987654321
-#define PGD_SENTINEL  0x4321432143214321
-#endif
-#else
-#define DECL_SENTINEL
-#define SET_SENTINEL(_x,_y) do { } while (0)
-#define ASSERT_SENTINEL(_x,_y) do { } while (0)
-#define INVERT_SENTINEL(_x,_y) do { } while (0)
-#endif
-
 /* global statistics (none need to be locked) */
 static unsigned long total_tmem_ops = 0;
 static unsigned long errored_tmem_ops = 0;
@@ -82,16 +49,6 @@ static long global_eph_count_max = 0;
 static unsigned long failed_copies;
 static unsigned long pcd_tot_tze_size = 0;
 static unsigned long pcd_tot_csize = 0;
-
-DECL_CYC_COUNTER(succ_get);
-DECL_CYC_COUNTER(succ_put);
-DECL_CYC_COUNTER(non_succ_get);
-DECL_CYC_COUNTER(non_succ_put);
-DECL_CYC_COUNTER(flush);
-DECL_CYC_COUNTER(flush_obj);
-EXTERN_CYC_COUNTER(pg_copy);
-DECL_CYC_COUNTER(compress);
-DECL_CYC_COUNTER(decompress);
 
 /************ CORE DATA STRUCTURES ************************************/
 
@@ -166,7 +123,6 @@ struct tmem_pool {
     unsigned long gets, found_gets;
     unsigned long flushs, flushs_found;
     unsigned long flush_objs, flush_objs_found;
-    DECL_SENTINEL
 };
 
 #define is_persistent(_p)  (_p->persistent)
@@ -179,7 +135,6 @@ struct oid {
 };
 
 struct tmem_object_root {
-    DECL_SENTINEL
     struct oid oid;
     struct rb_node rb_tree_node; /* protected by pool->pool_rwlock */
     unsigned long objnode_count; /* atomicity depends on obj_spinlock */
@@ -193,7 +148,6 @@ struct tmem_object_root {
 
 struct tmem_object_node {
     struct tmem_object_root *obj;
-    DECL_SENTINEL
     struct radix_tree_node rtn;
 };
 
@@ -228,7 +182,6 @@ struct tmem_page_descriptor {
         uint64_t timestamp;
         uint32_t pool_id;  /* used for invalid list only */
     };
-    DECL_SENTINEL
 };
 
 #define PCD_TZE_MAX_SIZE (PAGE_SIZE - (PAGE_SIZE/64))
@@ -299,7 +252,7 @@ static atomic_t global_rtree_node_count = ATOMIC_INIT(0);
 
 
 /************ MEMORY ALLOCATION INTERFACE *****************************/
-static NOINLINE void *tmem_malloc(size_t size, struct tmem_pool *pool)
+static void *tmem_malloc(size_t size, struct tmem_pool *pool)
 {
     void *v = NULL;
 
@@ -318,7 +271,7 @@ static NOINLINE void *tmem_malloc(size_t size, struct tmem_pool *pool)
     return v;
 }
 
-static NOINLINE void tmem_free(void *p, struct tmem_pool *pool)
+static void tmem_free(void *p, struct tmem_pool *pool)
 {
     if ( pool == NULL || !is_persistent(pool) )
     {
@@ -332,7 +285,7 @@ static NOINLINE void tmem_free(void *p, struct tmem_pool *pool)
     }
 }
 
-static NOINLINE struct page_info *tmem_page_alloc(struct tmem_pool *pool)
+static struct page_info *tmem_page_alloc(struct tmem_pool *pool)
 {
     struct page_info *pfp = NULL;
 
@@ -347,7 +300,7 @@ static NOINLINE struct page_info *tmem_page_alloc(struct tmem_pool *pool)
     return pfp;
 }
 
-static NOINLINE void tmem_page_free(struct tmem_pool *pool, struct page_info *pfp)
+static void tmem_page_free(struct tmem_pool *pool, struct page_info *pfp)
 {
     ASSERT(pfp);
     if ( pool == NULL || !is_persistent(pool) )
@@ -361,7 +314,7 @@ static NOINLINE void tmem_page_free(struct tmem_pool *pool, struct page_info *pf
 
 #define NOT_SHAREABLE ((uint16_t)-1UL)
 
-static NOINLINE int pcd_copy_to_client(xen_pfn_t cmfn, struct tmem_page_descriptor *pgp)
+static int pcd_copy_to_client(xen_pfn_t cmfn, struct tmem_page_descriptor *pgp)
 {
     uint8_t firstbyte = pgp->firstbyte;
     struct tmem_page_content_descriptor *pcd;
@@ -385,7 +338,7 @@ static NOINLINE int pcd_copy_to_client(xen_pfn_t cmfn, struct tmem_page_descript
 
 /* ensure pgp no longer points to pcd, nor vice-versa */
 /* take pcd rwlock unless have_pcd_rwlock is set, always unlock when done */
-static NOINLINE void pcd_disassociate(struct tmem_page_descriptor *pgp, struct tmem_pool *pool, bool_t have_pcd_rwlock)
+static void pcd_disassociate(struct tmem_page_descriptor *pgp, struct tmem_pool *pool, bool_t have_pcd_rwlock)
 {
     struct tmem_page_content_descriptor *pcd = pgp->pcd;
     struct page_info *pfp = pgp->pcd->pfp;
@@ -448,7 +401,7 @@ static NOINLINE void pcd_disassociate(struct tmem_page_descriptor *pgp, struct t
 }
 
 
-static NOINLINE int pcd_associate(struct tmem_page_descriptor *pgp, char *cdata, pagesize_t csize)
+static int pcd_associate(struct tmem_page_descriptor *pgp, char *cdata, pagesize_t csize)
 {
     struct rb_node **new, *parent = NULL;
     struct rb_root *root;
@@ -585,7 +538,7 @@ unlock:
 /************ PAGE DESCRIPTOR MANIPULATION ROUTINES *******************/
 
 /* allocate a struct tmem_page_descriptor and associate it with an object */
-static NOINLINE struct tmem_page_descriptor *pgp_alloc(struct tmem_object_root *obj)
+static struct tmem_page_descriptor *pgp_alloc(struct tmem_object_root *obj)
 {
     struct tmem_page_descriptor *pgp;
     struct tmem_pool *pool;
@@ -608,7 +561,6 @@ static NOINLINE struct tmem_page_descriptor *pgp_alloc(struct tmem_object_root *
     pgp->size = -1;
     pgp->index = -1;
     pgp->timestamp = get_cycles();
-    SET_SENTINEL(pgp,PGD);
     atomic_inc_and_max(global_pgp_count);
     atomic_inc_and_max(pool->pgp_count);
     return pgp;
@@ -618,13 +570,11 @@ static struct tmem_page_descriptor *pgp_lookup_in_obj(struct tmem_object_root *o
 {
     ASSERT(obj != NULL);
     ASSERT_SPINLOCK(&obj->obj_spinlock);
-    ASSERT_SENTINEL(obj,OBJ);
     ASSERT(obj->pool != NULL);
-    ASSERT_SENTINEL(obj->pool,POOL);
     return radix_tree_lookup(&obj->tree_root, index);
 }
 
-static NOINLINE void pgp_free_data(struct tmem_page_descriptor *pgp, struct tmem_pool *pool)
+static void pgp_free_data(struct tmem_page_descriptor *pgp, struct tmem_pool *pool)
 {
     pagesize_t pgp_size = pgp->size;
 
@@ -645,14 +595,11 @@ static NOINLINE void pgp_free_data(struct tmem_page_descriptor *pgp, struct tmem
     pgp->size = -1;
 }
 
-static NOINLINE void pgp_free(struct tmem_page_descriptor *pgp, int from_delete)
+static void pgp_free(struct tmem_page_descriptor *pgp, int from_delete)
 {
     struct tmem_pool *pool = NULL;
 
-    ASSERT_SENTINEL(pgp,PGD);
     ASSERT(pgp->us.obj != NULL);
-    ASSERT_SENTINEL(pgp->us.obj,OBJ);
-    ASSERT_SENTINEL(pgp->us.obj->pool,POOL);
     ASSERT(pgp->us.obj->pool->client != NULL);
     if ( from_delete )
         ASSERT(pgp_lookup_in_obj(pgp->us.obj,pgp->index) == NULL);
@@ -673,19 +620,15 @@ static NOINLINE void pgp_free(struct tmem_page_descriptor *pgp, int from_delete)
         pgp->pool_id = pool->pool_id;
         return;
     }
-    INVERT_SENTINEL(pgp,PGD);
     pgp->us.obj = NULL;
     pgp->index = -1;
     tmem_free(pgp, pool);
 }
 
-static NOINLINE void pgp_free_from_inv_list(struct client *client, struct tmem_page_descriptor *pgp)
+static void pgp_free_from_inv_list(struct client *client, struct tmem_page_descriptor *pgp)
 {
     struct tmem_pool *pool = client->pools[pgp->pool_id];
 
-    ASSERT_SENTINEL(pool,POOL);
-    ASSERT_SENTINEL(pgp,PGD);
-    INVERT_SENTINEL(pgp,PGD);
     pgp->us.obj = NULL;
     pgp->index = -1;
     tmem_free(pgp, pool);
@@ -733,7 +676,7 @@ static void pgp_delist(struct tmem_page_descriptor *pgp, bool_t no_eph_lock)
 }
 
 /* remove page from lists (but not from parent object) and free it */
-static NOINLINE void pgp_delete(struct tmem_page_descriptor *pgp, bool_t no_eph_lock)
+static void pgp_delete(struct tmem_page_descriptor *pgp, bool_t no_eph_lock)
 {
     uint64_t life;
 
@@ -747,7 +690,7 @@ static NOINLINE void pgp_delete(struct tmem_page_descriptor *pgp, bool_t no_eph_
 }
 
 /* called only indirectly by radix_tree_destroy */
-static NOINLINE void pgp_destroy(void *v)
+static void pgp_destroy(void *v)
 {
     struct tmem_page_descriptor *pgp = (struct tmem_page_descriptor *)v;
 
@@ -770,15 +713,13 @@ static int pgp_add_to_obj(struct tmem_object_root *obj, uint32_t index, struct t
     return ret;
 }
 
-static NOINLINE struct tmem_page_descriptor *pgp_delete_from_obj(struct tmem_object_root *obj, uint32_t index)
+static struct tmem_page_descriptor *pgp_delete_from_obj(struct tmem_object_root *obj, uint32_t index)
 {
     struct tmem_page_descriptor *pgp;
 
     ASSERT(obj != NULL);
     ASSERT_SPINLOCK(&obj->obj_spinlock);
-    ASSERT_SENTINEL(obj,OBJ);
     ASSERT(obj->pool != NULL);
-    ASSERT_SENTINEL(obj->pool,POOL);
     pgp = radix_tree_delete(&obj->tree_root, index);
     if ( pgp != NULL )
         obj->pgp_count--;
@@ -790,19 +731,16 @@ static NOINLINE struct tmem_page_descriptor *pgp_delete_from_obj(struct tmem_obj
 /************ RADIX TREE NODE MANIPULATION ROUTINES *******************/
 
 /* called only indirectly from radix_tree_insert */
-static NOINLINE struct radix_tree_node *rtn_alloc(void *arg)
+static struct radix_tree_node *rtn_alloc(void *arg)
 {
     struct tmem_object_node *objnode;
     struct tmem_object_root *obj = (struct tmem_object_root *)arg;
 
-    ASSERT_SENTINEL(obj,OBJ);
     ASSERT(obj->pool != NULL);
-    ASSERT_SENTINEL(obj->pool,POOL);
     objnode = tmem_malloc(sizeof(struct tmem_object_node),obj->pool);
     if (objnode == NULL)
         return NULL;
     objnode->obj = obj;
-    SET_SENTINEL(objnode,OBJNODE);
     memset(&objnode->rtn, 0, sizeof(struct radix_tree_node));
     if (++obj->pool->objnode_count > obj->pool->objnode_count_max)
         obj->pool->objnode_count_max = obj->pool->objnode_count;
@@ -819,14 +757,10 @@ static void rtn_free(struct radix_tree_node *rtn, void *arg)
 
     ASSERT(rtn != NULL);
     objnode = container_of(rtn,struct tmem_object_node,rtn);
-    ASSERT_SENTINEL(objnode,OBJNODE);
-    INVERT_SENTINEL(objnode,OBJNODE);
     ASSERT(objnode->obj != NULL);
     ASSERT_SPINLOCK(&objnode->obj->obj_spinlock);
-    ASSERT_SENTINEL(objnode->obj,OBJ);
     pool = objnode->obj->pool;
     ASSERT(pool != NULL);
-    ASSERT_SENTINEL(pool,POOL);
     pool->objnode_count--;
     objnode->obj->objnode_count--;
     objnode->obj = NULL;
@@ -872,7 +806,7 @@ unsigned oid_hash(struct oid *oidp)
 }
 
 /* searches for object==oid in pool, returns locked object if found */
-static NOINLINE struct tmem_object_root * obj_find(struct tmem_pool *pool, struct oid *oidp)
+static struct tmem_object_root * obj_find(struct tmem_pool *pool, struct oid *oidp)
 {
     struct rb_node *node;
     struct tmem_object_root *obj;
@@ -910,14 +844,13 @@ restart_find:
 }
 
 /* free an object that has no more pgps in it */
-static NOINLINE void obj_free(struct tmem_object_root *obj, int no_rebalance)
+static void obj_free(struct tmem_object_root *obj, int no_rebalance)
 {
     struct tmem_pool *pool;
     struct oid old_oid;
 
     ASSERT_SPINLOCK(&obj->obj_spinlock);
     ASSERT(obj != NULL);
-    ASSERT_SENTINEL(obj,OBJ);
     ASSERT(obj->pgp_count == 0);
     pool = obj->pool;
     ASSERT(pool != NULL);
@@ -929,7 +862,6 @@ static NOINLINE void obj_free(struct tmem_object_root *obj, int no_rebalance)
     ASSERT(obj->tree_root.rnode == NULL);
     pool->obj_count--;
     ASSERT(pool->obj_count >= 0);
-    INVERT_SENTINEL(obj,OBJ);
     obj->pool = NULL;
     old_oid = obj->oid;
     oid_set_invalid(&obj->oid);
@@ -942,7 +874,7 @@ static NOINLINE void obj_free(struct tmem_object_root *obj, int no_rebalance)
     tmem_free(obj, pool);
 }
 
-static NOINLINE int obj_rb_insert(struct rb_root *root, struct tmem_object_root *obj)
+static int obj_rb_insert(struct rb_root *root, struct tmem_object_root *obj)
 {
     struct rb_node **new, *parent = NULL;
     struct tmem_object_root *this;
@@ -973,7 +905,7 @@ static NOINLINE int obj_rb_insert(struct rb_root *root, struct tmem_object_root 
  * allocate, initialize, and insert an tmem_object_root
  * (should be called only if find failed)
  */
-static NOINLINE struct tmem_object_root * obj_new(struct tmem_pool *pool, struct oid *oidp)
+static struct tmem_object_root * obj_new(struct tmem_pool *pool, struct oid *oidp)
 {
     struct tmem_object_root *obj;
 
@@ -993,7 +925,6 @@ static NOINLINE struct tmem_object_root * obj_new(struct tmem_pool *pool, struct
     obj->objnode_count = 0;
     obj->pgp_count = 0;
     obj->last_client = TMEM_CLI_ID_NULL;
-    SET_SENTINEL(obj,OBJ);
     tmem_spin_lock(&obj->obj_spinlock);
     obj_rb_insert(&pool->obj_rb_root[oid_hash(oidp)], obj);
     obj->no_evict = 1;
@@ -1002,7 +933,7 @@ static NOINLINE struct tmem_object_root * obj_new(struct tmem_pool *pool, struct
 }
 
 /* free an object after destroying any pgps in it */
-static NOINLINE void obj_destroy(struct tmem_object_root *obj, int no_rebalance)
+static void obj_destroy(struct tmem_object_root *obj, int no_rebalance)
 {
     ASSERT_WRITELOCK(&obj->pool->pool_rwlock);
     radix_tree_destroy(&obj->tree_root, pgp_destroy);
@@ -1066,14 +997,11 @@ static struct tmem_pool * pool_alloc(void)
     pool->flushs_found = pool->flushs = 0;
     pool->flush_objs_found = pool->flush_objs = 0;
     pool->is_dying = 0;
-    SET_SENTINEL(pool,POOL);
     return pool;
 }
 
-static NOINLINE void pool_free(struct tmem_pool *pool)
+static void pool_free(struct tmem_pool *pool)
 {
-    ASSERT_SENTINEL(pool,POOL);
-    INVERT_SENTINEL(pool,POOL);
     pool->client = NULL;
     list_del(&pool->pool_list);
     xfree(pool);
@@ -1097,7 +1025,7 @@ static int shared_pool_join(struct tmem_pool *pool, struct client *new_client)
 }
 
 /* reassign "ownership" of the pool to another client that shares this pool */
-static NOINLINE void shared_pool_reassign(struct tmem_pool *pool)
+static void shared_pool_reassign(struct tmem_pool *pool)
 {
     struct share_list *sl;
     int poolid;
@@ -1128,7 +1056,7 @@ static NOINLINE void shared_pool_reassign(struct tmem_pool *pool)
 
 /* destroy all objects with last_client same as passed cli_id,
    remove pool's cli_id from list of sharers of this pool */
-static NOINLINE int shared_pool_quit(struct tmem_pool *pool, domid_t cli_id)
+static int shared_pool_quit(struct tmem_pool *pool, domid_t cli_id)
 {
     struct share_list *sl;
     int s_poolid;
@@ -1374,12 +1302,10 @@ static int tmem_evict(void)
 
 found:
     ASSERT(pgp != NULL);
-    ASSERT_SENTINEL(pgp,PGD);
     obj = pgp->us.obj;
     ASSERT(obj != NULL);
     ASSERT(obj->no_evict == 0);
     ASSERT(obj->pool != NULL);
-    ASSERT_SENTINEL(obj,OBJ);
     pool = obj->pool;
 
     ASSERT_SPINLOCK(&obj->obj_spinlock);
@@ -1454,13 +1380,12 @@ static inline void tmem_ensure_avail_pages(void)
 
 /************ TMEM CORE OPERATIONS ************************************/
 
-static NOINLINE int do_tmem_put_compress(struct tmem_page_descriptor *pgp, xen_pfn_t cmfn,
+static int do_tmem_put_compress(struct tmem_page_descriptor *pgp, xen_pfn_t cmfn,
                                          tmem_cli_va_param_t clibuf)
 {
     void *dst, *p;
     size_t size;
     int ret = 0;
-    DECL_LOCAL_CYC_COUNTER(compress);
     
     ASSERT(pgp != NULL);
     ASSERT(pgp->us.obj != NULL);
@@ -1470,7 +1395,6 @@ static NOINLINE int do_tmem_put_compress(struct tmem_page_descriptor *pgp, xen_p
 
     if ( pgp->pfp != NULL )
         pgp_free_data(pgp, pgp->us.obj->pool);
-    START_CYC_COUNTER(compress);
     ret = tmem_compress_from_client(cmfn, &dst, &size, clibuf);
     if ( ret <= 0 )
         goto out;
@@ -1493,11 +1417,10 @@ static NOINLINE int do_tmem_put_compress(struct tmem_page_descriptor *pgp, xen_p
     ret = 1;
 
 out:
-    END_CYC_COUNTER(compress);
     return ret;
 }
 
-static NOINLINE int do_tmem_dup_put(struct tmem_page_descriptor *pgp, xen_pfn_t cmfn,
+static int do_tmem_dup_put(struct tmem_page_descriptor *pgp, xen_pfn_t cmfn,
        pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len,
        tmem_cli_va_param_t clibuf)
 {
@@ -1587,7 +1510,7 @@ cleanup:
 }
 
 
-static NOINLINE int do_tmem_put(struct tmem_pool *pool,
+static int do_tmem_put(struct tmem_pool *pool,
               struct oid *oidp, uint32_t index,
               xen_pfn_t cmfn, pagesize_t tmem_offset,
               pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t clibuf)
@@ -1731,14 +1654,13 @@ free:
     return ret;
 }
 
-static NOINLINE int do_tmem_get(struct tmem_pool *pool, struct oid *oidp, uint32_t index,
+static int do_tmem_get(struct tmem_pool *pool, struct oid *oidp, uint32_t index,
               xen_pfn_t cmfn, pagesize_t tmem_offset,
               pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t clibuf)
 {
     struct tmem_object_root *obj;
     struct tmem_page_descriptor *pgp;
     struct client *client = pool->client;
-    DECL_LOCAL_CYC_COUNTER(decompress);
     int rc;
 
     if ( !_atomic_read(pool->pgp_count) )
@@ -1766,10 +1688,8 @@ static NOINLINE int do_tmem_get(struct tmem_pool *pool, struct oid *oidp, uint32
         rc = pcd_copy_to_client(cmfn, pgp);
     else if ( pgp->size != 0 )
     {
-        START_CYC_COUNTER(decompress);
         rc = tmem_decompress_to_client(cmfn, pgp->cdata,
                                       pgp->size, clibuf);
-        END_CYC_COUNTER(decompress);
     }
     else
         rc = tmem_copy_to_client(cmfn, pgp->pfp, tmem_offset,
@@ -1818,7 +1738,7 @@ bad_copy:
     return rc;
 }
 
-static NOINLINE int do_tmem_flush_page(struct tmem_pool *pool, struct oid *oidp, uint32_t index)
+static int do_tmem_flush_page(struct tmem_pool *pool, struct oid *oidp, uint32_t index)
 {
     struct tmem_object_root *obj;
     struct tmem_page_descriptor *pgp;
@@ -1853,7 +1773,7 @@ out:
         return 1;
 }
 
-static NOINLINE int do_tmem_flush_object(struct tmem_pool *pool, struct oid *oidp)
+static int do_tmem_flush_object(struct tmem_pool *pool, struct oid *oidp)
 {
     struct tmem_object_root *obj;
 
@@ -1873,7 +1793,7 @@ out:
         return 1;
 }
 
-static NOINLINE int do_tmem_destroy_pool(uint32_t pool_id)
+static int do_tmem_destroy_pool(uint32_t pool_id)
 {
     struct client *client = tmem_client_from_current();
     struct tmem_pool *pool;
@@ -1889,7 +1809,7 @@ static NOINLINE int do_tmem_destroy_pool(uint32_t pool_id)
     return 1;
 }
 
-static NOINLINE int do_tmem_new_pool(domid_t this_cli_id,
+static int do_tmem_new_pool(domid_t this_cli_id,
                                      uint32_t d_poolid, uint32_t flags,
                                      uint64_t uuid_lo, uint64_t uuid_hi)
 {
@@ -2169,7 +2089,6 @@ static int tmemc_list_shared(tmem_cli_va_param_t buf, int off, uint32_t len,
     return sum;
 }
 
-#ifdef TMEM_PERF
 static int tmemc_list_global_perf(tmem_cli_va_param_t buf, int off,
                                   uint32_t len, bool_t use_long)
 {
@@ -2177,15 +2096,6 @@ static int tmemc_list_global_perf(tmem_cli_va_param_t buf, int off,
     int n = 0, sum = 0;
 
     n = scnprintf(info+n,BSIZE-n,"T=");
-    n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,succ_get,"G");
-    n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,succ_put,"P");
-    n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,non_succ_get,"g");
-    n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,non_succ_put,"p");
-    n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,flush,"F");
-    n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,flush_obj,"O");
-    n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,pg_copy,"C");
-    n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,compress,"c");
-    n += SCNPRINTF_CYC_COUNTER(info+n,BSIZE-n,decompress,"d");
     n--; /* overwrite trailing comma */
     n += scnprintf(info+n,BSIZE-n,"\n");
     if ( sum + n >= len )
@@ -2194,9 +2104,6 @@ static int tmemc_list_global_perf(tmem_cli_va_param_t buf, int off,
     sum += n;
     return sum;
 }
-#else
-#define tmemc_list_global_perf(_buf,_off,_len,_use) (0)
-#endif
 
 static int tmemc_list_global(tmem_cli_va_param_t buf, int off, uint32_t len,
                               bool_t use_long)
@@ -2304,7 +2211,7 @@ static int tmemc_set_var(domid_t cli_id, uint32_t subop, uint32_t arg1)
     return 0;
 }
 
-static NOINLINE int tmemc_shared_pool_auth(domid_t cli_id, uint64_t uuid_lo,
+static int tmemc_shared_pool_auth(domid_t cli_id, uint64_t uuid_lo,
                                   uint64_t uuid_hi, bool_t auth)
 {
     struct client *client;
@@ -2341,7 +2248,7 @@ static NOINLINE int tmemc_shared_pool_auth(domid_t cli_id, uint64_t uuid_lo,
     return 1;
 }
 
-static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
+static int tmemc_save_subop(int cli_id, uint32_t pool_id,
                         uint32_t subop, tmem_cli_va_param_t buf, uint32_t arg1)
 {
     struct client *client = tmem_client_from_cli_id(cli_id);
@@ -2430,7 +2337,7 @@ static NOINLINE int tmemc_save_subop(int cli_id, uint32_t pool_id,
     return rc;
 }
 
-static NOINLINE int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
+static int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
                         tmem_cli_va_param_t buf, uint32_t bufsize)
 {
     struct client *client = tmem_client_from_cli_id(cli_id);
@@ -2485,7 +2392,7 @@ out:
     return ret;
 }
 
-static NOINLINE int tmemc_save_get_next_inv(int cli_id, tmem_cli_va_param_t buf,
+static int tmemc_save_get_next_inv(int cli_id, tmem_cli_va_param_t buf,
                         uint32_t bufsize)
 {
     struct client *client = tmem_client_from_cli_id(cli_id);
@@ -2551,7 +2458,7 @@ static int tmemc_restore_flush_page(int cli_id, uint32_t pool_id, struct oid *oi
     return do_tmem_flush_page(pool,oidp,index);
 }
 
-static NOINLINE int do_tmem_control(struct tmem_op *op)
+static int do_tmem_control(struct tmem_op *op)
 {
     int ret;
     uint32_t pool_id = op->pool_id;
@@ -2638,12 +2545,6 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
     bool_t non_succ_get = 0, non_succ_put = 0;
     bool_t flush = 0, flush_obj = 0;
     bool_t tmem_write_lock_set = 0, tmem_read_lock_set = 0;
-    DECL_LOCAL_CYC_COUNTER(succ_get);
-    DECL_LOCAL_CYC_COUNTER(succ_put);
-    DECL_LOCAL_CYC_COUNTER(non_succ_get);
-    DECL_LOCAL_CYC_COUNTER(non_succ_put);
-    DECL_LOCAL_CYC_COUNTER(flush);
-    DECL_LOCAL_CYC_COUNTER(flush_obj);
 
     if ( !tmem_initialized )
         return -ENODEV;
@@ -2660,13 +2561,6 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
         else
             spin_lock(&tmem_spinlock);
     }
-
-    START_CYC_COUNTER(succ_get);
-    DUP_START_CYC_COUNTER(succ_put,succ_get);
-    DUP_START_CYC_COUNTER(non_succ_get,succ_get);
-    DUP_START_CYC_COUNTER(non_succ_put,succ_get);
-    DUP_START_CYC_COUNTER(flush,succ_get);
-    DUP_START_CYC_COUNTER(flush_obj,succ_get);
 
     if ( client != NULL && tmem_client_is_dying(client) )
     {
@@ -2743,7 +2637,6 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
             rc = -ENODEV;
             goto out;
         }
-        ASSERT_SENTINEL(pool,POOL);
     }
 
     oidp = (struct oid *)&op.u.gen.oid[0];
@@ -2787,19 +2680,6 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
 out:
     if ( rc < 0 )
         errored_tmem_ops++;
-    if ( succ_get )
-        END_CYC_COUNTER_CLI(succ_get,client);
-    else if ( succ_put )
-        END_CYC_COUNTER_CLI(succ_put,client);
-    else if ( non_succ_get )
-        END_CYC_COUNTER_CLI(non_succ_get,client);
-    else if ( non_succ_put )
-        END_CYC_COUNTER_CLI(non_succ_put,client);
-    else if ( flush )
-        END_CYC_COUNTER_CLI(flush,client);
-    else if ( flush_obj )
-        END_CYC_COUNTER_CLI(flush_obj,client);
-
     if ( tmem_lock_all )
     {
         if ( tmem_lock_all > 1 )
