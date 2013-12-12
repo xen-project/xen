@@ -370,7 +370,7 @@ static void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
         irq = i + (32 * n);
         p = irq_to_pending(v, irq);
         set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
-        if ( !list_empty(&p->inflight) )
+        if ( !list_empty(&p->inflight) && !test_bit(GIC_IRQ_GUEST_VISIBLE, &p->status) )
             gic_set_guest_irq(v, irq, GICH_LR_PENDING, p->priority);
         i++;
     }
