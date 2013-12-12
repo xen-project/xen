@@ -649,6 +649,16 @@ static inline void gic_add_to_lr_pending(struct vcpu *v, unsigned int irq,
     list_add_tail(&n->lr_queue, &v->arch.vgic.lr_pending);
 }
 
+void gic_remove_from_queues(struct vcpu *v, unsigned int virtual_irq)
+{
+    struct pending_irq *p = irq_to_pending(v, virtual_irq);
+
+    spin_lock(&gic.lock);
+    if ( !list_empty(&p->lr_queue) )
+        list_del_init(&p->lr_queue);
+    spin_unlock(&gic.lock);
+}
+
 void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
         unsigned int state, unsigned int priority)
 {

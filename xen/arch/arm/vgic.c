@@ -360,6 +360,23 @@ read_as_zero:
     return 1;
 }
 
+static void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
+{
+    struct pending_irq *p;
+    unsigned int irq;
+    int i = 0;
+
+    while ( (i = find_next_bit((const long unsigned int *) &r, 32, i)) < 32 ) {
+        irq = i + (32 * n);
+        p = irq_to_pending(v, irq);
+        clear_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
+        gic_remove_from_queues(v, irq);
+        if ( p->desc != NULL )
+            p->desc->handler->disable(p->desc);
+        i++;
+    }
+}
+
 static void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
 {
     struct pending_irq *p;
@@ -490,8 +507,10 @@ static int vgic_distr_mmio_write(struct vcpu *v, mmio_info_t *info)
         rank = vgic_irq_rank(v, 1, gicd_reg - GICD_ICENABLER);
         if ( rank == NULL) goto write_ignore;
         vgic_lock_rank(v, rank);
+        tr = rank->ienable;
         rank->ienable &= ~*r;
         vgic_unlock_rank(v, rank);
+        vgic_disable_irqs(v, (*r) & tr, gicd_reg - GICD_ICENABLER);
         return 1;
 
     case GICD_ISPENDR ... GICD_ISPENDRN:
