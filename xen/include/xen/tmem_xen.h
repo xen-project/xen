@@ -313,21 +313,7 @@ static inline int tmem_get_tmemop_from_client(tmem_op_t *op, tmem_cli_op_t uops)
 }
 
 #define tmem_cli_buf_null guest_handle_from_ptr(NULL, char)
-
-static inline void tmem_copy_to_client_buf_offset(tmem_cli_va_param_t clibuf,
-						 int off,
-						 char *tmembuf, int len)
-{
-    copy_to_guest_offset(clibuf,off,tmembuf,len);
-}
-
-#define tmem_copy_to_client_buf(clibuf, tmembuf, cnt) \
-    copy_to_guest(guest_handle_cast(clibuf, void), tmembuf, cnt)
-
-#define tmem_client_buf_add guest_handle_add_offset
-
 #define TMEM_CLI_ID_NULL ((domid_t)((domid_t)-1L))
-
 #define tmem_cli_id_str "domid"
 #define tmem_client_str "domain"
 

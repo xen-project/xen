@@ -2063,8 +2063,8 @@ static int tmemc_list_client(struct client *c, tmem_cli_va_param_t buf,
              c->eph_count, c->eph_count_max,
              c->compressed_pages, c->compressed_sum_size,
              c->compress_poor, c->compress_nomem);
-    tmem_copy_to_client_buf_offset(buf,off+sum,info,n+1);
-    sum += n;
+    if ( !copy_to_guest_offset(buf, off + sum, info, n + 1) )
+        sum += n;
     for ( i = 0; i < MAX_POOLS_PER_DOMAIN; i++ )
     {
         if ( (p = c->pools[i]) == NULL )
@@ -2091,8 +2091,8 @@ static int tmemc_list_client(struct client *c, tmem_cli_va_param_t buf,
              p->flushs_found, p->flushs, p->flush_objs_found, p->flush_objs);
         if ( sum + n >= len )
             return sum;
-        tmem_copy_to_client_buf_offset(buf,off+sum,info,n+1);
-        sum += n;
+        if ( !copy_to_guest_offset(buf, off + sum, info, n + 1) )
+            sum += n;
     }
     return sum;
 }
@@ -2130,8 +2130,8 @@ static int tmemc_list_shared(tmem_cli_va_param_t buf, int off, uint32_t len,
              p->flushs_found, p->flushs, p->flush_objs_found, p->flush_objs);
         if ( sum + n >= len )
             return sum;
-        tmem_copy_to_client_buf_offset(buf,off+sum,info,n+1);
-        sum += n;
+        if ( !copy_to_guest_offset(buf, off + sum, info, n + 1) )
+            sum += n;
     }
     return sum;
 }
@@ -2147,8 +2147,8 @@ static int tmemc_list_global_perf(tmem_cli_va_param_t buf, int off,
     n += scnprintf(info+n,BSIZE-n,"\n");
     if ( sum + n >= len )
         return sum;
-    tmem_copy_to_client_buf_offset(buf,off+sum,info,n+1);
-    sum += n;
+    if ( !copy_to_guest_offset(buf, off + sum, info, n + 1) )
+        sum += n;
     return sum;
 }
 
@@ -2179,8 +2179,8 @@ static int tmemc_list_global(tmem_cli_va_param_t buf, int off, uint32_t len,
          tot_good_eph_puts,deduped_puts,pcd_tot_tze_size,pcd_tot_csize);
     if ( sum + n >= len )
         return sum;
-    tmem_copy_to_client_buf_offset(buf,off+sum,info,n+1);
-    sum += n;
+    if ( !copy_to_guest_offset(buf, off + sum, info, n + 1) )
+        sum += n;
     return sum;
 }
 
@@ -2366,8 +2366,9 @@ static int tmemc_save_subop(int cli_id, uint32_t pool_id,
     case TMEMC_SAVE_GET_POOL_UUID:
          if ( pool == NULL )
              break;
-        tmem_copy_to_client_buf(buf, pool->uuid, 2);
         rc = 0;
+        if ( copy_to_guest(guest_handle_cast(buf, void), pool->uuid, 2) )
+            rc = -EFAULT;
         break;
     case TMEMC_SAVE_END:
         if ( client == NULL )
@@ -2430,8 +2431,12 @@ static int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
     BUILD_BUG_ON(sizeof(h.oid) != sizeof(oid));
     memcpy(h.oid, oid.oid, sizeof(h.oid));
     h.index = pgp->index;
-    tmem_copy_to_client_buf(buf, &h, 1);
-    tmem_client_buf_add(buf, sizeof(h));
+    if ( copy_to_guest(guest_handle_cast(buf, void), &h, 1) )
+    {
+        ret = -EFAULT;
+        goto out;
+    }
+    guest_handle_add_offset(buf, sizeof(h));
     ret = do_tmem_get(pool, &oid, pgp->index, 0, buf);
 
 out:
@@ -2474,8 +2479,9 @@ static int tmemc_save_get_next_inv(int cli_id, tmem_cli_va_param_t buf,
     BUILD_BUG_ON(sizeof(h.oid) != sizeof(pgp->inv_oid));
     memcpy(h.oid, pgp->inv_oid.oid, sizeof(h.oid));
     h.index = pgp->index;
-    tmem_copy_to_client_buf(buf, &h, 1);
     ret = 1;
+    if ( copy_to_guest(guest_handle_cast(buf, void), &h, 1) )
+        ret = -EFAULT;
 out:
     spin_unlock(&pers_lists_spinlock);
     return ret;
