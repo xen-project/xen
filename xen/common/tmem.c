@@ -206,6 +206,13 @@ static bool_t global_shared_auth = 0;
 static atomic_t client_weight_total = ATOMIC_INIT(0);
 static int tmem_initialized = 0;
 
+struct xmem_pool *tmem_mempool = 0;
+unsigned int tmem_mempool_maxalloc = 0;
+
+DEFINE_SPINLOCK(tmem_page_list_lock);
+PAGE_LIST_HEAD(tmem_page_list);
+unsigned long tmem_page_list_pages = 0;
+
 DEFINE_RWLOCK(tmem_rwlock);
 static DEFINE_SPINLOCK(eph_lists_spinlock); /* protects global AND clients */
 static DEFINE_SPINLOCK(pers_lists_spinlock);
@@ -233,7 +240,29 @@ static atomic_t global_rtree_node_count = ATOMIC_INIT(0);
 } while (0)
 
 
-/************ MEMORY ALLOCATION INTERFACE *****************************/
+/*
+ * There two types of memory allocation interfaces in tmem.
+ * One is based on xmem_pool and the other is used for allocate a whole page.
+ * Both of them are based on the lowlevel function __tmem_alloc_page/_thispool().
+ * The call trace of alloc path is like below.
+ * Persistant pool:
+ *     1.tmem_malloc()
+ *         > xmem_pool_alloc()
+ *             > tmem_persistent_pool_page_get()
+ *                 > __tmem_alloc_page_thispool()
+ *     2.tmem_alloc_page()
+ *         > __tmem_alloc_page_thispool()
+ *
+ * Ephemeral pool:
+ *     1.tmem_malloc()
+ *         > xmem_pool_alloc()
+ *             > tmem_mempool_page_get()
+ *                 > __tmem_alloc_page()
+ *     2.tmem_alloc_page()
+ *         > __tmem_alloc_page()
+ *
+ * The free path is done in the same manner.
+ */
 static void *tmem_malloc(size_t size, struct tmem_pool *pool)
 {
     void *v = NULL;
@@ -267,14 +296,14 @@ static void tmem_free(void *p, struct tmem_pool *pool)
     }
 }
 
-static struct page_info *tmem_page_alloc(struct tmem_pool *pool)
+static struct page_info *tmem_alloc_page(struct tmem_pool *pool)
 {
     struct page_info *pfp = NULL;
 
     if ( pool != NULL && is_persistent(pool) )
-        pfp = tmem_alloc_page_thispool(pool->client->domain);
+        pfp = __tmem_alloc_page_thispool(pool->client->domain);
     else
-        pfp = tmem_alloc_page(pool,0);
+        pfp = __tmem_alloc_page(pool,0);
     if ( pfp == NULL )
         alloc_page_failed++;
     else
@@ -282,18 +311,68 @@ static struct page_info *tmem_page_alloc(struct tmem_pool *pool)
     return pfp;
 }
 
-static void tmem_page_free(struct tmem_pool *pool, struct page_info *pfp)
+static void tmem_free_page(struct tmem_pool *pool, struct page_info *pfp)
 {
     ASSERT(pfp);
     if ( pool == NULL || !is_persistent(pool) )
-        tmem_free_page(pfp);
+        __tmem_free_page(pfp);
     else
-        tmem_free_page_thispool(pfp);
+        __tmem_free_page_thispool(pfp);
     atomic_dec_and_assert(global_page_count);
 }
 
-/************ PAGE CONTENT DESCRIPTOR MANIPULATION ROUTINES ***********/
+static noinline void *tmem_mempool_page_get(unsigned long size)
+{
+    struct page_info *pi;
 
+    ASSERT(size == PAGE_SIZE);
+    if ( (pi = __tmem_alloc_page(NULL,0)) == NULL )
+        return NULL;
+    ASSERT(IS_VALID_PAGE(pi));
+    return page_to_virt(pi);
+}
+
+static void tmem_mempool_page_put(void *page_va)
+{
+    ASSERT(IS_PAGE_ALIGNED(page_va));
+    __tmem_free_page(virt_to_page(page_va));
+}
+
+static int __init tmem_mempool_init(void)
+{
+    tmem_mempool = xmem_pool_create("tmem", tmem_mempool_page_get,
+        tmem_mempool_page_put, PAGE_SIZE, 0, PAGE_SIZE);
+    if ( tmem_mempool )
+        tmem_mempool_maxalloc = xmem_pool_maxalloc(tmem_mempool);
+    return tmem_mempool != NULL;
+}
+
+/* persistent pools are per-domain */
+static void *tmem_persistent_pool_page_get(unsigned long size)
+{
+    struct page_info *pi;
+    struct domain *d = current->domain;
+
+    ASSERT(size == PAGE_SIZE);
+    if ( (pi = __tmem_alloc_page_thispool(d)) == NULL )
+        return NULL;
+    ASSERT(IS_VALID_PAGE(pi));
+    return page_to_virt(pi);
+}
+
+static void tmem_persistent_pool_page_put(void *page_va)
+{
+    struct page_info *pi;
+
+    ASSERT(IS_PAGE_ALIGNED(page_va));
+    pi = mfn_to_page(virt_to_mfn(page_va));
+    ASSERT(IS_VALID_PAGE(pi));
+    __tmem_free_page_thispool(pi);
+}
+
+/*
+ * Page content descriptor manipulation routines
+ */
 #define NOT_SHAREABLE ((uint16_t)-1UL)
 
 static int pcd_copy_to_client(xen_pfn_t cmfn, struct tmem_page_descriptor *pgp)
@@ -376,7 +455,7 @@ static void pcd_disassociate(struct tmem_page_descriptor *pgp, struct tmem_pool 
             pcd_tot_tze_size -= PAGE_SIZE;
         if ( tmem_compression_enabled() )
             pcd_tot_csize -= PAGE_SIZE;
-        tmem_page_free(pool,pfp);
+        tmem_free_page(pool,pfp);
     }
     write_unlock(&pcd_tree_rwlocks[firstbyte]);
 }
@@ -455,7 +534,7 @@ static int pcd_associate(struct tmem_page_descriptor *pgp, char *cdata, pagesize
             /* match! if not compressed, free the no-longer-needed page */
             /* but if compressed, data is assumed static so don't free! */
             if ( cdata == NULL )
-                tmem_page_free(pgp->us.obj->pool,pgp->pfp);
+                tmem_free_page(pgp->us.obj->pool,pgp->pfp);
             deduped_puts++;
             goto match;
         }
@@ -492,7 +571,7 @@ static int pcd_associate(struct tmem_page_descriptor *pgp, char *cdata, pagesize
         tmem_tze_copy_from_pfp(pcd->tze,pgp->pfp,pfp_size);
         pcd->size = pfp_size;
         pcd_tot_tze_size += pfp_size;
-        tmem_page_free(pgp->us.obj->pool,pgp->pfp);
+        tmem_free_page(pgp->us.obj->pool,pgp->pfp);
     } else {
         pcd->pfp = pgp->pfp;
         pcd->size = PAGE_SIZE;
@@ -566,7 +645,7 @@ static void pgp_free_data(struct tmem_page_descriptor *pgp, struct tmem_pool *po
     else if ( pgp_size )
         tmem_free(pgp->cdata, pool);
     else
-        tmem_page_free(pgp->us.obj->pool,pgp->pfp);
+        tmem_free_page(pgp->us.obj->pool,pgp->pfp);
     if ( pool != NULL && pgp_size )
     {
         pool->client->compressed_pages--;
@@ -1369,7 +1448,7 @@ static int do_tmem_put_compress(struct tmem_page_descriptor *pgp, xen_pfn_t cmfn
     ret = tmem_compress_from_client(cmfn, &dst, &size, clibuf);
     if ( ret <= 0 )
         goto out;
-    else if ( (size == 0) || (size >= tmem_subpage_maxsize()) ) {
+    else if ( (size == 0) || (size >= tmem_mempool_maxalloc) ) {
         ret = 0;
         goto out;
     } else if ( tmem_dedup_enabled() && !is_persistent(pgp->us.obj->pool) ) {
@@ -1428,7 +1507,7 @@ static int do_tmem_dup_put(struct tmem_page_descriptor *pgp, xen_pfn_t cmfn,
 copy_uncompressed:
     if ( pgp->pfp )
         pgp_free_data(pgp, pool);
-    if ( ( pgp->pfp = tmem_page_alloc(pool) ) == NULL )
+    if ( ( pgp->pfp = tmem_alloc_page(pool) ) == NULL )
         goto failed_dup;
     pgp->size = 0;
     ret = tmem_copy_from_client(pgp->pfp, cmfn, tmem_cli_buf_null);
@@ -1551,7 +1630,7 @@ static int do_tmem_put(struct tmem_pool *pool,
     }
 
 copy_uncompressed:
-    if ( ( pgp->pfp = tmem_page_alloc(pool) ) == NULL )
+    if ( ( pgp->pfp = tmem_alloc_page(pool) ) == NULL )
     {
         ret = -ENOMEM;
         goto del_pgp_from_obj;
@@ -2704,7 +2783,7 @@ void *tmem_relinquish_pages(unsigned int order, unsigned int memflags)
     if ( tmem_called_from_tmem(memflags) )
         read_lock(&tmem_rwlock);
 
-    while ( (pfp = tmem_alloc_page(NULL,1)) == NULL )
+    while ( (pfp = __tmem_alloc_page(NULL,1)) == NULL )
     {
         if ( (max_evictions-- <= 0) || !tmem_evict())
             break;
@@ -2743,6 +2822,9 @@ static int __init init_tmem(void)
             pcd_tree_roots[i] = RB_ROOT;
             rwlock_init(&pcd_tree_rwlocks[i]);
         }
+
+    if ( !tmem_mempool_init() )
+        return 0;
 
     if ( tmem_init() )
     {

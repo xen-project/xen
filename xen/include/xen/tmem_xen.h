@@ -27,8 +27,6 @@ typedef uint32_t pagesize_t;  /* like size_t, must handle largest PAGE_SIZE */
   ((void *)((((unsigned long)addr + (PAGE_SIZE - 1)) & PAGE_MASK)) == addr)
 #define IS_VALID_PAGE(_pi)  ( mfn_valid(page_to_mfn(_pi)) )
 
-extern struct xmem_pool *tmem_mempool;
-extern unsigned int tmem_mempool_maxalloc;
 extern struct page_list_head tmem_page_list;
 extern spinlock_t tmem_page_list_lock;
 extern unsigned long tmem_page_list_pages;
@@ -100,7 +98,7 @@ static inline void tmem_page_list_put(struct page_info *pi)
 /*
  * Memory allocation for persistent data 
  */
-static inline struct page_info *tmem_alloc_page_thispool(struct domain *d)
+static inline struct page_info *__tmem_alloc_page_thispool(struct domain *d)
 {
     struct page_info *pi;
 
@@ -128,7 +126,7 @@ out:
     return pi;
 }
 
-static inline void tmem_free_page_thispool(struct page_info *pi)
+static inline void __tmem_free_page_thispool(struct page_info *pi)
 {
     struct domain *d = page_get_owner(pi);
 
@@ -146,7 +144,7 @@ static inline void tmem_free_page_thispool(struct page_info *pi)
 /*
  * Memory allocation for ephemeral (non-persistent) data
  */
-static inline struct page_info *tmem_alloc_page(void *pool, int no_heap)
+static inline struct page_info *__tmem_alloc_page(void *pool, int no_heap)
 {
     struct page_info *pi = tmem_page_list_get();
 
@@ -158,16 +156,11 @@ static inline struct page_info *tmem_alloc_page(void *pool, int no_heap)
     return pi;
 }
 
-static inline void tmem_free_page(struct page_info *pi)
+static inline void __tmem_free_page(struct page_info *pi)
 {
     ASSERT(IS_VALID_PAGE(pi));
     tmem_page_list_put(pi);
     atomic_dec(&freeable_page_count);
-}
-
-static inline unsigned int tmem_subpage_maxsize(void)
-{
-    return tmem_mempool_maxalloc;
 }
 
 static inline unsigned long tmem_free_mb(void)
@@ -375,17 +368,12 @@ static inline void tmem_copy_to_client_buf_offset(tmem_cli_va_param_t clibuf,
 
 int tmem_decompress_to_client(xen_pfn_t, void *, size_t,
 			     tmem_cli_va_param_t);
-
 int tmem_compress_from_client(xen_pfn_t, void **, size_t *,
 			     tmem_cli_va_param_t);
 
 int tmem_copy_from_client(struct page_info *, xen_pfn_t, tmem_cli_va_param_t);
-
 int tmem_copy_to_client(xen_pfn_t, struct page_info *, tmem_cli_va_param_t);
-
 extern int tmem_copy_tze_to_client(xen_pfn_t cmfn, void *tmem_va, pagesize_t len);
-extern void *tmem_persistent_pool_page_get(unsigned long size);
-extern void tmem_persistent_pool_page_put(void *page_va);
 
 #define tmem_client_err(fmt, args...)  printk(XENLOG_G_ERR fmt, ##args)
 #define tmem_client_warn(fmt, args...) printk(XENLOG_G_WARNING fmt, ##args)

@@ -238,67 +238,7 @@ int tmem_copy_tze_to_client(xen_pfn_t cmfn, void *tmem_va,
     return 1;
 }
 
-/******************  XEN-SPECIFIC MEMORY ALLOCATION ********************/
-
-struct xmem_pool *tmem_mempool = 0;
-unsigned int tmem_mempool_maxalloc = 0;
-
-DEFINE_SPINLOCK(tmem_page_list_lock);
-PAGE_LIST_HEAD(tmem_page_list);
-unsigned long tmem_page_list_pages = 0;
-
-static noinline void *tmem_mempool_page_get(unsigned long size)
-{
-    struct page_info *pi;
-
-    ASSERT(size == PAGE_SIZE);
-    if ( (pi = tmem_alloc_page(NULL,0)) == NULL )
-        return NULL;
-    ASSERT(IS_VALID_PAGE(pi));
-    return page_to_virt(pi);
-}
-
-static void tmem_mempool_page_put(void *page_va)
-{
-    ASSERT(IS_PAGE_ALIGNED(page_va));
-    tmem_free_page(virt_to_page(page_va));
-}
-
-static int __init tmem_mempool_init(void)
-{
-    tmem_mempool = xmem_pool_create("tmem", tmem_mempool_page_get,
-        tmem_mempool_page_put, PAGE_SIZE, 0, PAGE_SIZE);
-    if ( tmem_mempool )
-        tmem_mempool_maxalloc = xmem_pool_maxalloc(tmem_mempool);
-    return tmem_mempool != NULL;
-}
-
-/* persistent pools are per-domain */
-
-void *tmem_persistent_pool_page_get(unsigned long size)
-{
-    struct page_info *pi;
-    struct domain *d = current->domain;
-
-    ASSERT(size == PAGE_SIZE);
-    if ( (pi = tmem_alloc_page_thispool(d)) == NULL )
-        return NULL;
-    ASSERT(IS_VALID_PAGE(pi));
-    return page_to_virt(pi);
-}
-
-void tmem_persistent_pool_page_put(void *page_va)
-{
-    struct page_info *pi;
-
-    ASSERT(IS_PAGE_ALIGNED(page_va));
-    pi = mfn_to_page(virt_to_mfn(page_va));
-    ASSERT(IS_VALID_PAGE(pi));
-    tmem_free_page_thispool(pi);
-}
-
 /******************  XEN-SPECIFIC HOST INITIALIZATION ********************/
-
 static int dstmem_order, workmem_order;
 
 static int cpu_callback(
@@ -350,9 +290,6 @@ static struct notifier_block cpu_nfb = {
 int __init tmem_init(void)
 {
     unsigned int cpu;
-
-    if ( !tmem_mempool_init() )
-        return 0;
 
     dstmem_order = get_order_from_pages(LZO_DSTMEM_PAGES);
     workmem_order = get_order_from_bytes(LZO1X_1_MEM_COMPRESS);
