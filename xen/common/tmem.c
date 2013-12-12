@@ -1509,47 +1509,54 @@ static int do_tmem_put(struct tmem_pool *pool,
               struct oid *oidp, uint32_t index,
               xen_pfn_t cmfn, tmem_cli_va_param_t clibuf)
 {
-    struct tmem_object_root *obj = NULL, *objfound = NULL, *objnew = NULL;
-    struct tmem_page_descriptor *pgp = NULL, *pgpdel = NULL;
-    struct client *client = pool->client;
-    int ret = client->frozen ? -EFROZEN : -ENOMEM;
+    struct tmem_object_root *obj = NULL;
+    struct tmem_page_descriptor *pgp = NULL;
+    struct client *client;
+    int ret, newobj = 0;
 
     ASSERT(pool != NULL);
+    client = pool->client;
+    ret = client->frozen ? -EFROZEN : -ENOMEM;
     pool->puts++;
     /* does page already exist (dup)?  if so, handle specially */
-    if ( (obj = objfound = obj_find(pool,oidp)) != NULL )
+    if ( (obj = obj_find(pool,oidp)) != NULL )
     {
-        ASSERT_SPINLOCK(&objfound->obj_spinlock);
-        if ((pgp = pgp_lookup_in_obj(objfound, index)) != NULL)
+        if ((pgp = pgp_lookup_in_obj(obj, index)) != NULL)
+        {
             return do_tmem_dup_put(pgp, cmfn, clibuf);
+        }
+        else
+        {
+            /* no puts allowed into a frozen pool (except dup puts) */
+            if ( client->frozen )
+	        goto unlock_obj;
+        }
     }
-
-    /* no puts allowed into a frozen pool (except dup puts) */
-    if ( client->frozen )
-        goto free;
-
-    if ( (objfound == NULL) )
+    else
     {
+        /* no puts allowed into a frozen pool (except dup puts) */
+        if ( client->frozen )
+            return ret;
         tmem_write_lock(&pool->pool_rwlock);
-        if ( (obj = objnew = obj_new(pool,oidp)) == NULL )
+        if ( (obj = obj_new(pool,oidp)) == NULL )
         {
             tmem_write_unlock(&pool->pool_rwlock);
             return -ENOMEM;
         }
-        ASSERT_SPINLOCK(&objnew->obj_spinlock);
+        newobj = 1;
         tmem_write_unlock(&pool->pool_rwlock);
     }
 
-    ASSERT((obj != NULL)&&((objnew==obj)||(objfound==obj))&&(objnew!=objfound));
+    /* When arrive here, we have a spinlocked obj for use */
     ASSERT_SPINLOCK(&obj->obj_spinlock);
     if ( (pgp = pgp_alloc(obj)) == NULL )
-        goto free;
+        goto unlock_obj;
 
     ret = pgp_add_to_obj(obj, index, pgp);
     if ( ret == -ENOMEM  )
         /* warning, may result in partially built radix tree ("stump") */
-        goto free;
-    ASSERT(ret != -EEXIST);
+        goto free_pgp;
+
     pgp->index = index;
     pgp->size = 0;
 
@@ -1562,7 +1569,7 @@ static int do_tmem_put(struct tmem_pool *pool,
         if ( ret == -ENOMEM )
         {
             client->compress_nomem++;
-            goto delete_and_free;
+            goto del_pgp_from_obj;
         }
         if ( ret == 0 )
         {
@@ -1577,15 +1584,16 @@ copy_uncompressed:
     if ( ( pgp->pfp = tmem_page_alloc(pool) ) == NULL )
     {
         ret = -ENOMEM;
-        goto delete_and_free;
+        goto del_pgp_from_obj;
     }
     ret = tmem_copy_from_client(pgp->pfp, cmfn, clibuf);
     if ( ret < 0 )
         goto bad_copy;
+
     if ( tmem_dedup_enabled() && !is_persistent(pool) )
     {
         if ( pcd_associate(pgp,NULL,0) == -ENOMEM )
-            goto delete_and_free;
+            goto del_pgp_from_obj;
     }
 
 insert_page:
@@ -1601,18 +1609,23 @@ insert_page:
         if (++client->eph_count > client->eph_count_max)
             client->eph_count_max = client->eph_count;
         tmem_spin_unlock(&eph_lists_spinlock);
-    } else { /* is_persistent */
+    }
+    else
+    { /* is_persistent */
         tmem_spin_lock(&pers_lists_spinlock);
         list_add_tail(&pgp->us.pool_pers_pages,
             &pool->persistent_page_list);
         tmem_spin_unlock(&pers_lists_spinlock);
     }
-    ASSERT( ((objnew==obj)||(objfound==obj)) && (objnew!=objfound));
+
     if ( is_shared(pool) )
         obj->last_client = client->cli_id;
     obj->no_evict = 0;
+
+    /* free the obj spinlock */
     tmem_spin_unlock(&obj->obj_spinlock);
     pool->good_puts++;
+
     if ( is_persistent(pool) )
         client->succ_pers_puts++;
     else
@@ -1622,24 +1635,23 @@ insert_page:
 bad_copy:
     failed_copies++;
 
-delete_and_free:
+del_pgp_from_obj:
     ASSERT((obj != NULL) && (pgp != NULL) && (pgp->index != -1));
-    pgpdel = pgp_delete_from_obj(obj, pgp->index);
-    ASSERT(pgp == pgpdel);
+    pgp_delete_from_obj(obj, pgp->index);
 
-free:
-    if ( pgp )
-        pgp_delete(pgp,0);
-    if ( objfound )
-    {
-        objfound->no_evict = 0;
-        tmem_spin_unlock(&objfound->obj_spinlock);
-    }
-    if ( objnew )
+free_pgp:
+    pgp_delete(pgp, 0);
+unlock_obj:
+    if ( newobj )
     {
         tmem_write_lock(&pool->pool_rwlock);
-        obj_free(objnew,0);
+        obj_free(obj, 0);
         tmem_write_unlock(&pool->pool_rwlock);
+    }
+    else
+    {
+        obj->no_evict = 0;
+        tmem_spin_unlock(&obj->obj_spinlock);
     }
     pool->no_mem_puts++;
     return ret;
