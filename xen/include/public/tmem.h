@@ -36,14 +36,16 @@
 #define TMEM_CONTROL               0
 #define TMEM_NEW_POOL              1
 #define TMEM_DESTROY_POOL          2
-#define TMEM_NEW_PAGE              3
 #define TMEM_PUT_PAGE              4
 #define TMEM_GET_PAGE              5
 #define TMEM_FLUSH_PAGE            6
 #define TMEM_FLUSH_OBJECT          7
+#if __XEN_INTERFACE_VERSION__ < 0x00040400
+#define TMEM_NEW_PAGE              3
 #define TMEM_READ                  8
 #define TMEM_WRITE                 9
 #define TMEM_XCHG                 10
+#endif
 
 /* Privileged commands to HYPERVISOR_tmem_op() */
 #define TMEM_AUTH                 101 

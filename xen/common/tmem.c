@@ -2753,11 +2753,6 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
         rc = do_tmem_new_pool(TMEM_CLI_ID_NULL, 0, op.u.creat.flags,
                               op.u.creat.uuid[0], op.u.creat.uuid[1]);
         break;
-    case TMEM_NEW_PAGE:
-        tmem_ensure_avail_pages();
-        rc = do_tmem_put(pool, oidp, op.u.gen.index, op.u.gen.cmfn, 0, 0, 0,
-                         tmem_cli_buf_null);
-        break;
     case TMEM_PUT_PAGE:
         tmem_ensure_avail_pages();
         rc = do_tmem_put(pool, oidp, op.u.gen.index, op.u.gen.cmfn, 0, 0,
@@ -2783,25 +2778,9 @@ EXPORT long do_tmem_op(tmem_cli_op_t uops)
         flush = 1;
         rc = do_tmem_destroy_pool(op.pool_id);
         break;
-    case TMEM_READ:
-        rc = do_tmem_get(pool, oidp, op.u.gen.index, op.u.gen.cmfn,
-                         op.u.gen.tmem_offset, op.u.gen.pfn_offset,
-                         op.u.gen.len, tmem_cli_buf_null);
-        break;
-    case TMEM_WRITE:
-        rc = do_tmem_put(pool, oidp,
-                         op.u.gen.index, op.u.gen.cmfn,
-                         op.u.gen.tmem_offset, op.u.gen.pfn_offset,
-                         op.u.gen.len, tmem_cli_buf_null);
-        break;
-    case TMEM_XCHG:
-        /* need to hold global lock to ensure xchg is atomic */
-        tmem_client_warn("tmem_xchg op not implemented yet\n");
-        rc = 0;
-        break;
     default:
         tmem_client_warn("tmem: op %d not implemented\n", op.cmd);
-        rc = 0;
+        rc = -ENOSYS;
         break;
     }
 
