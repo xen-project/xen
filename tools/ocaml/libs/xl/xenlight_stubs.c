@@ -1286,6 +1286,7 @@ int timeout_register(void *user, void **for_app_registration_out,
 {
 	caml_leave_blocking_section();
 	CAMLparam0();
+	CAMLlocal2(sec, usec);
 	CAMLlocalN(args, 4);
 	static value *func = NULL;
 	value *p = (value *) user;
@@ -1295,9 +1296,12 @@ int timeout_register(void *user, void **for_app_registration_out,
 		func = caml_named_value("libxl_timeout_register");
 	}
 
+	sec = caml_copy_int64(abs.tv_sec);
+	usec = caml_copy_int64(abs.tv_usec);
+
 	args[0] = *p;
-	args[1] = Val_int(abs.tv_sec);
-	args[2] = Val_int(abs.tv_usec);
+	args[1] = sec;
+	args[2] = usec;
 	args[3] = (value) for_libxl;
 
 	caml_callbackN(*func, 4, args);

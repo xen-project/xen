@@ -71,7 +71,7 @@ module Async : sig
 		fd_register:('a -> Unix.file_descr -> event list -> for_libxl -> unit) ->
 		fd_modify:('a -> Unix.file_descr -> event list -> unit) ->
 		fd_deregister:('a -> Unix.file_descr -> unit) ->
-		timeout_register:('a -> int -> int -> for_libxl -> unit) ->
+		timeout_register:('a -> int64 -> int64 -> for_libxl -> unit) ->
 		timeout_modify:('a -> unit) ->
 		osevent_hooks
 
