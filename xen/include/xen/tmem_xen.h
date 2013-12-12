@@ -387,11 +387,9 @@ int tmem_decompress_to_client(xen_pfn_t, void *, size_t,
 int tmem_compress_from_client(xen_pfn_t, void **, size_t *,
 			     tmem_cli_va_param_t);
 
-int tmem_copy_from_client(struct page_info *, xen_pfn_t, pagesize_t tmem_offset,
-    pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t);
+int tmem_copy_from_client(struct page_info *, xen_pfn_t, tmem_cli_va_param_t);
 
-int tmem_copy_to_client(xen_pfn_t, struct page_info *, pagesize_t tmem_offset,
-    pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t);
+int tmem_copy_to_client(xen_pfn_t, struct page_info *, tmem_cli_va_param_t);
 
 extern int tmem_copy_tze_to_client(xen_pfn_t cmfn, void *tmem_va, pagesize_t len);
 extern void *tmem_persistent_pool_page_get(unsigned long size);

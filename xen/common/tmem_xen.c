@@ -100,25 +100,16 @@ static inline void cli_put_page(void *cli_va, struct page_info *cli_pfp,
 #endif
 
 EXPORT int tmem_copy_from_client(struct page_info *pfp,
-    xen_pfn_t cmfn, pagesize_t tmem_offset,
-    pagesize_t pfn_offset, pagesize_t len, tmem_cli_va_param_t clibuf)
+    xen_pfn_t cmfn, tmem_cli_va_param_t clibuf)
 {
     unsigned long tmem_mfn, cli_mfn = 0;
     char *tmem_va, *cli_va = NULL;
     struct page_info *cli_pfp = NULL;
     int rc = 1;
 
-    if ( tmem_offset > PAGE_SIZE || pfn_offset > PAGE_SIZE || len > PAGE_SIZE )
-        return -EINVAL;
     ASSERT(pfp != NULL);
     tmem_mfn = page_to_mfn(pfp);
     tmem_va = map_domain_page(tmem_mfn);
-    if ( tmem_offset == 0 && pfn_offset == 0 && len == 0 )
-    {
-        memset(tmem_va, 0, PAGE_SIZE);
-        unmap_domain_page(tmem_va);
-        return 1;
-    }
     if ( guest_handle_is_null(clibuf) )
     {
         cli_va = cli_get_page(cmfn, &cli_mfn, &cli_pfp, 0);
@@ -129,21 +120,13 @@ EXPORT int tmem_copy_from_client(struct page_info *pfp,
         }
     }
     smp_mb();
-    if ( len == PAGE_SIZE && !tmem_offset && !pfn_offset && cli_va )
-        memcpy(tmem_va, cli_va, PAGE_SIZE);
-    else if ( (tmem_offset+len <= PAGE_SIZE) &&
-              (pfn_offset+len <= PAGE_SIZE) )
-    {
-        if ( cli_va )
-            memcpy(tmem_va + tmem_offset, cli_va + pfn_offset, len);
-        else if ( copy_from_guest_offset(tmem_va + tmem_offset, clibuf,
-                                         pfn_offset, len) )
-            rc = -EFAULT;
-    }
-    else if ( len )
-        rc = -EINVAL;
     if ( cli_va )
+    {
+        memcpy(tmem_va, cli_va, PAGE_SIZE);
         cli_put_page(cli_va, cli_pfp, cli_mfn, 0);
+    }
+    else
+        rc = -EINVAL;
     unmap_domain_page(tmem_va);
     return rc;
 }
@@ -181,7 +164,6 @@ EXPORT int tmem_compress_from_client(xen_pfn_t cmfn,
 }
 
 EXPORT int tmem_copy_to_client(xen_pfn_t cmfn, struct page_info *pfp,
-    pagesize_t tmem_offset, pagesize_t pfn_offset, pagesize_t len,
     tmem_cli_va_param_t clibuf)
 {
     unsigned long tmem_mfn, cli_mfn = 0;
@@ -189,8 +171,6 @@ EXPORT int tmem_copy_to_client(xen_pfn_t cmfn, struct page_info *pfp,
     struct page_info *cli_pfp = NULL;
     int rc = 1;
 
-    if ( tmem_offset > PAGE_SIZE || pfn_offset > PAGE_SIZE || len > PAGE_SIZE )
-        return -EINVAL;
     ASSERT(pfp != NULL);
     if ( guest_handle_is_null(clibuf) )
     {
@@ -200,21 +180,14 @@ EXPORT int tmem_copy_to_client(xen_pfn_t cmfn, struct page_info *pfp,
     }
     tmem_mfn = page_to_mfn(pfp);
     tmem_va = map_domain_page(tmem_mfn);
-    if ( len == PAGE_SIZE && !tmem_offset && !pfn_offset && cli_va )
-        memcpy(cli_va, tmem_va, PAGE_SIZE);
-    else if ( (tmem_offset+len <= PAGE_SIZE) && (pfn_offset+len <= PAGE_SIZE) )
+    if ( cli_va )
     {
-        if ( cli_va )
-            memcpy(cli_va + pfn_offset, tmem_va + tmem_offset, len);
-        else if ( copy_to_guest_offset(clibuf, pfn_offset,
-                                       tmem_va + tmem_offset, len) )
-            rc = -EFAULT;
+        memcpy(cli_va, tmem_va, PAGE_SIZE);
+        cli_put_page(cli_va, cli_pfp, cli_mfn, 1);
     }
-    else if ( len )
+    else
         rc = -EINVAL;
     unmap_domain_page(tmem_va);
-    if ( cli_va )
-        cli_put_page(cli_va, cli_pfp, cli_mfn, 1);
     smp_mb();
     return rc;
 }
