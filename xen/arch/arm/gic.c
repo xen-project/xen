@@ -129,19 +129,15 @@ void gic_restore_state(struct vcpu *v)
     gic_restore_pending_irqs(v);
 }
 
-static unsigned int gic_irq_startup(struct irq_desc *desc)
+static void gic_irq_enable(struct irq_desc *desc)
 {
-    uint32_t enabler;
     int irq = desc->irq;
 
     /* Enable routing */
-    enabler = GICD[GICD_ISENABLER + irq / 32];
-    GICD[GICD_ISENABLER + irq / 32] = enabler | (1u << (irq % 32));
-
-    return 0;
+    GICD[GICD_ISENABLER + irq / 32] = (1u << (irq % 32));
 }
 
-static void gic_irq_shutdown(struct irq_desc *desc)
+static void gic_irq_disable(struct irq_desc *desc)
 {
     int irq = desc->irq;
 
@@ -149,14 +145,15 @@ static void gic_irq_shutdown(struct irq_desc *desc)
     GICD[GICD_ICENABLER + irq / 32] = (1u << (irq % 32));
 }
 
-static void gic_irq_enable(struct irq_desc *desc)
+static unsigned int gic_irq_startup(struct irq_desc *desc)
 {
-
+    gic_irq_enable(desc);
+    return 0;
 }
 
-static void gic_irq_disable(struct irq_desc *desc)
+static void gic_irq_shutdown(struct irq_desc *desc)
 {
-
+    gic_irq_disable(desc);
 }
 
 static void gic_irq_ack(struct irq_desc *desc)
