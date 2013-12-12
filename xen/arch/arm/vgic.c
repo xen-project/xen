@@ -369,6 +369,7 @@ static void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
     while ( (i = find_next_bit((const long unsigned int *) &r, 32, i)) < 32 ) {
         irq = i + (32 * n);
         p = irq_to_pending(v, irq);
+        set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
         if ( !list_empty(&p->inflight) )
             gic_set_guest_irq(v, irq, GICH_LR_PENDING, p->priority);
         i++;
@@ -672,8 +673,17 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
 
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
 
-    /* vcpu offline or irq already pending */
-    if (test_bit(_VPF_down, &v->pause_flags) || !list_empty(&n->inflight))
+    if ( !list_empty(&n->inflight) )
+    {
+        if ( (irq != current->domain->arch.evtchn_irq) ||
+             (!test_bit(GIC_IRQ_GUEST_VISIBLE, &n->status)) )
+            set_bit(GIC_IRQ_GUEST_PENDING, &n->status);
+        spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
+        return;
+    }
+
+    /* vcpu offline */
+    if ( test_bit(_VPF_down, &v->pause_flags) )
     {
         spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
         return;
@@ -682,6 +692,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
     priority = byte_read(rank->ipriority[REG_RANK_INDEX(8, idx)], 0, byte);
 
     n->irq = irq;
+    set_bit(GIC_IRQ_GUEST_PENDING, &n->status);
     n->priority = priority;
     if (!virtual)
         n->desc = irq_to_desc(irq);
@@ -689,7 +700,7 @@ void vgic_vcpu_inject_irq(struct vcpu *v, unsigned int irq, int virtual)
         n->desc = NULL;
 
     /* the irq is enabled */
-    if ( rank->ienable & (1 << (irq % 32)) )
+    if ( test_bit(GIC_IRQ_GUEST_ENABLED, &n->status) )
         gic_set_guest_irq(v, irq, GICH_LR_PENDING, priority);
 
     list_for_each_entry ( iter, &v->arch.vgic.inflight_irqs, inflight )

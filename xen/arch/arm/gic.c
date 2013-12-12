@@ -615,6 +615,7 @@ static inline void gic_set_lr(int lr, unsigned int virtual_irq,
         unsigned int state, unsigned int priority)
 {
     int maintenance_int = GICH_LR_MAINTENANCE_IRQ;
+    struct pending_irq *p = irq_to_pending(current, virtual_irq);
 
     BUG_ON(lr >= nr_lrs);
     BUG_ON(lr < 0);
@@ -624,13 +625,34 @@ static inline void gic_set_lr(int lr, unsigned int virtual_irq,
         maintenance_int |
         ((priority >> 3) << GICH_LR_PRIORITY_SHIFT) |
         ((virtual_irq & GICH_LR_VIRTUAL_MASK) << GICH_LR_VIRTUAL_SHIFT);
+
+    set_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
+    clear_bit(GIC_IRQ_GUEST_PENDING, &p->status);
+}
+
+static inline void gic_add_to_lr_pending(struct vcpu *v, unsigned int irq,
+        unsigned int priority)
+{
+    struct pending_irq *iter, *n = irq_to_pending(v, irq);
+
+    if ( !list_empty(&n->lr_queue) )
+        return;
+
+    list_for_each_entry ( iter, &v->arch.vgic.lr_pending, lr_queue )
+    {
+        if ( iter->priority > priority )
+        {
+            list_add_tail(&n->lr_queue, &iter->lr_queue);
+            return;
+        }
+    }
+    list_add_tail(&n->lr_queue, &v->arch.vgic.lr_pending);
 }
 
 void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
         unsigned int state, unsigned int priority)
 {
     int i;
-    struct pending_irq *iter, *n;
     unsigned long flags;
 
     spin_lock_irqsave(&gic.lock, flags);
@@ -645,19 +667,7 @@ void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
         }
     }
 
-    n = irq_to_pending(v, virtual_irq);
-    if ( !list_empty(&n->lr_queue) )
-        goto out;
-
-    list_for_each_entry ( iter, &v->arch.vgic.lr_pending, lr_queue )
-    {
-        if ( iter->priority > priority )
-        {
-            list_add_tail(&n->lr_queue, &iter->lr_queue);
-            goto out;
-        }
-    }
-    list_add_tail(&n->lr_queue, &v->arch.vgic.lr_pending);
+    gic_add_to_lr_pending(v, virtual_irq, priority);
 
 out:
     spin_unlock_irqrestore(&gic.lock, flags);
@@ -887,10 +897,12 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
 
     while ((i = find_next_bit((const long unsigned int *) &eisr,
                               64, i)) < 64) {
-        struct pending_irq *p;
+        struct pending_irq *p, *p2;
         int cpu;
+        bool_t inflight;
 
         cpu = -1;
+        inflight = 0;
 
         spin_lock_irq(&gic.lock);
         lr = GICH[GICH_LR + i];
@@ -898,17 +910,6 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
         GICH[GICH_LR + i] = 0;
         clear_bit(i, &this_cpu(lr_mask));
 
-        if ( !list_empty(&v->arch.vgic.lr_pending) ) {
-            p = list_entry(v->arch.vgic.lr_pending.next, typeof(*p), lr_queue);
-            gic_set_lr(i, p->irq, GICH_LR_PENDING, p->priority);
-            list_del_init(&p->lr_queue);
-            set_bit(i, &this_cpu(lr_mask));
-        } else {
-            gic_inject_irq_stop();
-        }
-        spin_unlock_irq(&gic.lock);
-
-        spin_lock_irq(&v->arch.vgic.lock);
         p = irq_to_pending(v, virq);
         if ( p->desc != NULL ) {
             p->desc->status &= ~IRQ_INPROGRESS;
@@ -916,8 +917,29 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
             cpu = p->desc->arch.eoi_cpu;
             pirq = p->desc->irq;
         }
-        list_del_init(&p->inflight);
-        spin_unlock_irq(&v->arch.vgic.lock);
+        if ( test_bit(GIC_IRQ_GUEST_PENDING, &p->status) &&
+             test_bit(GIC_IRQ_GUEST_ENABLED, &p->status))
+        {
+            inflight = 1;
+            gic_add_to_lr_pending(v, virq, p->priority);
+        }
+
+        clear_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
+
+        if ( !list_empty(&v->arch.vgic.lr_pending) ) {
+            p2 = list_entry(v->arch.vgic.lr_pending.next, typeof(*p2), lr_queue);
+            gic_set_lr(i, p2->irq, GICH_LR_PENDING, p2->priority);
+            list_del_init(&p2->lr_queue);
+            set_bit(i, &this_cpu(lr_mask));
+        }
+        spin_unlock_irq(&gic.lock);
+
+        if ( !inflight )
+        {
+            spin_lock_irq(&v->arch.vgic.lock);
+            list_del_init(&p->inflight);
+            spin_unlock_irq(&v->arch.vgic.lock);
+        }
 
         if ( p->desc != NULL ) {
             /* this is not racy because we can't receive another irq of the
