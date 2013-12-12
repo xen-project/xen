@@ -126,9 +126,7 @@ struct tmem_pool {
 };
 
 #define is_persistent(_p)  (_p->persistent)
-#define is_ephemeral(_p)   (!(_p->persistent))
 #define is_shared(_p)      (_p->shared)
-#define is_private(_p)     (!(_p->shared))
 
 struct oid {
     uint64_t oid[3];
@@ -604,7 +602,7 @@ static void pgp_free(struct tmem_page_descriptor *pgp, int from_delete)
         ASSERT(pgp_lookup_in_obj(pgp->us.obj,pgp->index) == NULL);
     ASSERT(pgp->us.obj->pool != NULL);
     pool = pgp->us.obj->pool;
-    if ( is_ephemeral(pool) )
+    if ( !is_persistent(pool) )
     {
         ASSERT(list_empty(&pgp->global_eph_pages));
         ASSERT(list_empty(&pgp->us.client_eph_pages));
@@ -643,7 +641,7 @@ static void pgp_delist(struct tmem_page_descriptor *pgp, bool_t no_eph_lock)
     ASSERT(pgp->us.obj->pool != NULL);
     client = pgp->us.obj->pool->client;
     ASSERT(client != NULL);
-    if ( is_ephemeral(pgp->us.obj->pool) )
+    if ( !is_persistent(pgp->us.obj->pool) )
     {
         if ( !no_eph_lock )
             tmem_spin_lock(&eph_lists_spinlock);
@@ -1597,7 +1595,7 @@ copy_uncompressed:
     }
 
 insert_page:
-    if ( is_ephemeral(pool) )
+    if ( !is_persistent(pool) )
     {
         tmem_spin_lock(&eph_lists_spinlock);
         list_add_tail(&pgp->global_eph_pages,
@@ -1697,9 +1695,9 @@ static int do_tmem_get(struct tmem_pool *pool, struct oid *oidp, uint32_t index,
     if ( rc <= 0 )
         goto bad_copy;
 
-    if ( is_ephemeral(pool) )
+    if ( !is_persistent(pool) )
     {
-        if ( is_private(pool) )
+        if ( !is_shared(pool) )
         {
             pgp_delete(pgp,0);
             if ( obj->pgp_count == 0 )
@@ -1725,10 +1723,10 @@ static int do_tmem_get(struct tmem_pool *pool, struct oid *oidp, uint32_t index,
         tmem_spin_unlock(&obj->obj_spinlock);
     }
     pool->found_gets++;
-    if ( is_ephemeral(pool) )
-        client->succ_eph_gets++;
-    else
+    if ( is_persistent(pool) )
         client->succ_pers_gets++;
+    else
+        client->succ_eph_gets++;
     return 1;
 
 bad_copy:
@@ -2349,7 +2347,7 @@ static int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
     struct tmem_handle h;
     unsigned int pagesize;
 
-    if ( pool == NULL || is_ephemeral(pool) )
+    if ( pool == NULL || !is_persistent(pool) )
         return -1;
 
     pagesize = 1 << (pool->pageshift + 12);
