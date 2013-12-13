@@ -304,6 +304,9 @@ void bitmap_byte_to_64(uint64_t *lp, const uint8_t *bp, int nbits);
 /* Optionally flush file to disk and discard page cache */
 void discard_file_cache(xc_interface *xch, int fd, int flush);
 
+/* Flush data cache */
+void xc_cache_flush(xc_interface *xch, const void *p, size_t n);
+
 #define MAX_MMU_UPDATES 1024
 struct xc_mmu {
     mmu_update_t updates[MAX_MMU_UPDATES];

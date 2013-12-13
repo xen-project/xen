@@ -63,6 +63,13 @@ static void *ENOSYS_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handl
     return MAP_FAILED;
 }
 
+static void ENOSYS_privcmd_cache_flush(xc_interface *xch, const void *p, size_t n)
+{
+    unsigned long start = (unsigned long)p;
+    unsigned long end = start + n;
+    IPRINTF(xch, "ENOSYS_privcmd: cache_flush: %#lx-%#lx\n", start, end);
+}
+
 static struct xc_osdep_ops ENOSYS_privcmd_ops =
 {
     .open      = &ENOSYS_privcmd_open,
@@ -74,6 +81,8 @@ static struct xc_osdep_ops ENOSYS_privcmd_ops =
         .map_foreign_bulk = &ENOSYS_privcmd_map_foreign_bulk,
         .map_foreign_range = &ENOSYS_privcmd_map_foreign_range,
         .map_foreign_ranges = &ENOSYS_privcmd_map_foreign_ranges,
+
+        .cache_flush = &ENOSYS_privcmd_cache_flush,
     }
 };
 
