@@ -6245,6 +6245,10 @@ static void print_uptime(int short_mode, uint32_t doms[], int nb_doms)
     if (nb_doms == 0) {
         print_dom0_uptime(short_mode, now);
         info = libxl_list_vm(ctx, &nb_vm);
+        if (info == NULL) {
+            fprintf(stderr, "Could not list vms.\n");
+            return;
+        }
         for (i = 0; i < nb_vm; i++)
             print_domU_uptime(info[i].domid, short_mode, now);
         libxl_vminfo_list_free(info, nb_vm);
