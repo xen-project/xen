@@ -284,7 +284,7 @@ static int map_guest_page(struct domain *d, uint64_t gfn, void **virt)
         return -EINVAL;
     }
 
-    *virt = map_domain_page_global(gfn);
+    *virt = __map_domain_page_global(p);
     if ( !*virt )
     {
         put_page_and_type(p);
