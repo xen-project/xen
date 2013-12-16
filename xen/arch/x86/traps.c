@@ -796,6 +796,8 @@ void pv_cpuid(struct cpu_user_regs *regs)
         __clear_bit(X86_FEATURE_DS, &d);
         __clear_bit(X86_FEATURE_ACC, &d);
         __clear_bit(X86_FEATURE_PBE, &d);
+        if ( is_pvh_vcpu(current) )
+            __clear_bit(X86_FEATURE_MTRR, &d);
 
         __clear_bit(X86_FEATURE_DTES64 % 32, &c);
         __clear_bit(X86_FEATURE_MWAIT % 32, &c);
