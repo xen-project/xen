@@ -328,10 +328,21 @@ static int create_p2m_entries(struct domain *d,
                 break;
             case REMOVE:
                 {
-                    lpae_t pte;
+                    lpae_t pte = third[third_table_offset(addr)];
+                    unsigned long mfn = pte.p2m.base;
+
+                    if ( !pte.p2m.valid )
+                        break;
+
+                    /* TODO: Handle other p2m type */
+                    if ( p2m_is_foreign(pte.p2m.type) )
+                    {
+                        ASSERT(mfn_valid(mfn));
+                        put_page(mfn_to_page(mfn));
+                    }
+
                     memset(&pte, 0x00, sizeof(pte));
                     write_pte(&third[third_table_offset(addr)], pte);
-                    maddr += PAGE_SIZE;
                 }
                 break;
         }

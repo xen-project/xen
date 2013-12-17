@@ -122,6 +122,18 @@ static inline struct page_info *get_page_from_gfn(
     if ( !mfn_valid(mfn) )
         return NULL;
     page = mfn_to_page(mfn);
+
+    /* get_page won't work on foreign mapping because the page doesn't
+     * belong to the current domain.
+     */
+    if ( p2mt == p2m_map_foreign )
+    {
+        struct domain *fdom = page_get_owner_and_reference(page);
+        ASSERT(fdom != NULL);
+        ASSERT(fdom != d);
+        return page;
+    }
+
     if ( !get_page(page, d) )
         return NULL;
     return page;
