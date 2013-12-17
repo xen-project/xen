@@ -109,11 +109,17 @@ static inline struct page_info *get_page_from_gfn(
     struct domain *d, unsigned long gfn, p2m_type_t *t, p2m_query_t q)
 {
     struct page_info *page;
-    unsigned long mfn = gmfn_to_mfn(d, gfn);
+    p2m_type_t p2mt;
+    paddr_t maddr = p2m_lookup(d, pfn_to_paddr(gfn), &p2mt);
+    unsigned long mfn = maddr >> PAGE_SHIFT;
 
-    ASSERT(t == NULL);
+    if (t)
+        *t = p2mt;
 
-    if (!mfn_valid(mfn))
+    if ( p2mt == p2m_invalid || p2mt == p2m_mmio_direct )
+        return NULL;
+
+    if ( !mfn_valid(mfn) )
         return NULL;
     page = mfn_to_page(mfn);
     if ( !get_page(page, d) )
