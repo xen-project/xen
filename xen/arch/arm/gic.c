@@ -614,11 +614,10 @@ int __init setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
     return rc;
 }
 
-static inline void gic_set_lr(int lr, unsigned int virtual_irq,
-        unsigned int state, unsigned int priority)
+static inline void gic_set_lr(int lr, struct pending_irq *p,
+        unsigned int state)
 {
     int maintenance_int = GICH_LR_MAINTENANCE_IRQ;
-    struct pending_irq *p = irq_to_pending(current, virtual_irq);
 
     BUG_ON(lr >= nr_lrs);
     BUG_ON(lr < 0);
@@ -626,24 +625,23 @@ static inline void gic_set_lr(int lr, unsigned int virtual_irq,
 
     GICH[GICH_LR + lr] = state |
         maintenance_int |
-        ((priority >> 3) << GICH_LR_PRIORITY_SHIFT) |
-        ((virtual_irq & GICH_LR_VIRTUAL_MASK) << GICH_LR_VIRTUAL_SHIFT);
+        ((p->priority >> 3) << GICH_LR_PRIORITY_SHIFT) |
+        ((p->irq & GICH_LR_VIRTUAL_MASK) << GICH_LR_VIRTUAL_SHIFT);
 
     set_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
     clear_bit(GIC_IRQ_GUEST_PENDING, &p->status);
 }
 
-static inline void gic_add_to_lr_pending(struct vcpu *v, unsigned int irq,
-        unsigned int priority)
+static inline void gic_add_to_lr_pending(struct vcpu *v, struct pending_irq *n)
 {
-    struct pending_irq *iter, *n = irq_to_pending(v, irq);
+    struct pending_irq *iter;
 
     if ( !list_empty(&n->lr_queue) )
         return;
 
     list_for_each_entry ( iter, &v->arch.vgic.lr_pending, lr_queue )
     {
-        if ( iter->priority > priority )
+        if ( iter->priority > n->priority )
         {
             list_add_tail(&n->lr_queue, &iter->lr_queue);
             return;
@@ -676,12 +674,12 @@ void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
         i = find_first_zero_bit(&this_cpu(lr_mask), nr_lrs);
         if (i < nr_lrs) {
             set_bit(i, &this_cpu(lr_mask));
-            gic_set_lr(i, virtual_irq, state, priority);
+            gic_set_lr(i, irq_to_pending(v, virtual_irq), state);
             goto out;
         }
     }
 
-    gic_add_to_lr_pending(v, virtual_irq, priority);
+    gic_add_to_lr_pending(v, irq_to_pending(v, virtual_irq));
 
 out:
     spin_unlock_irqrestore(&gic.lock, flags);
@@ -700,7 +698,7 @@ static void gic_restore_pending_irqs(struct vcpu *v)
         if ( i >= nr_lrs ) return;
 
         spin_lock_irqsave(&gic.lock, flags);
-        gic_set_lr(i, p->irq, GICH_LR_PENDING, p->priority);
+        gic_set_lr(i, p, GICH_LR_PENDING);
         list_del_init(&p->lr_queue);
         set_bit(i, &this_cpu(lr_mask));
         spin_unlock_irqrestore(&gic.lock, flags);
@@ -940,14 +938,14 @@ static void maintenance_interrupt(int irq, void *dev_id, struct cpu_user_regs *r
              test_bit(GIC_IRQ_GUEST_ENABLED, &p->status))
         {
             inflight = 1;
-            gic_add_to_lr_pending(v, virq, p->priority);
+            gic_add_to_lr_pending(v, p);
         }
 
         clear_bit(GIC_IRQ_GUEST_VISIBLE, &p->status);
 
         if ( !list_empty(&v->arch.vgic.lr_pending) ) {
             p2 = list_entry(v->arch.vgic.lr_pending.next, typeof(*p2), lr_queue);
-            gic_set_lr(i, p2->irq, GICH_LR_PENDING, p2->priority);
+            gic_set_lr(i, p2, GICH_LR_PENDING);
             list_del_init(&p2->lr_queue);
             set_bit(i, &this_cpu(lr_mask));
         }
