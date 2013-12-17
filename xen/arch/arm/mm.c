@@ -1306,19 +1306,17 @@ int create_grant_host_mapping(unsigned long addr, unsigned long frame,
                               unsigned int flags, unsigned int cache_flags)
 {
     int rc;
+    p2m_type_t t = p2m_grant_map_rw;
 
     if ( cache_flags  || (flags & ~GNTMAP_readonly) != GNTMAP_host_map )
         return GNTST_general_error;
 
-    /* XXX: read only mappings */
     if ( flags & GNTMAP_readonly )
-    {
-        gdprintk(XENLOG_WARNING, "read only mappings not implemented yet\n");
-        return GNTST_general_error;
-    }
+        t = p2m_grant_map_ro;
 
-    rc = guest_physmap_add_page(current->domain,
-                                 addr >> PAGE_SHIFT, frame, 0);
+    rc = guest_physmap_add_entry(current->domain, addr >> PAGE_SHIFT,
+                                 frame, 0, t);
+
     if ( rc )
         return GNTST_general_error;
     else
