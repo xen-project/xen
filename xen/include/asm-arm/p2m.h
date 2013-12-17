@@ -47,6 +47,7 @@ typedef enum {
 } p2m_type_t;
 
 #define p2m_is_foreign(_t)  ((_t) == p2m_map_foreign)
+#define p2m_is_ram(_t)      ((_t) == p2m_ram_rw || (_t) == p2m_ram_ro)
 
 /* Initialise vmid allocator */
 void p2m_vmid_allocator_init(void);

@@ -977,6 +977,7 @@ static int xenmem_add_to_physmap_one(
 {
     unsigned long mfn = 0;
     int rc;
+    p2m_type_t t;
 
     switch ( space )
     {
@@ -1009,21 +1010,32 @@ static int xenmem_add_to_physmap_one(
         
         d->arch.grant_table_gpfn[idx] = gpfn;
 
+        t = p2m_ram_rw;
+
         spin_unlock(&d->grant_table->lock);
         break;
     case XENMAPSPACE_shared_info:
-        if ( idx == 0 )
-            mfn = virt_to_mfn(d->shared_info);
-        else
+        if ( idx != 0 )
             return -EINVAL;
+
+        mfn = virt_to_mfn(d->shared_info);
+        t = p2m_ram_rw;
+
         break;
     case XENMAPSPACE_gmfn_foreign:
     {
-        paddr_t maddr;
         struct domain *od;
+        struct page_info *page;
+        p2m_type_t p2mt;
         od = rcu_lock_domain_by_any_id(foreign_domid);
         if ( od == NULL )
             return -ESRCH;
+
+        if ( od == d )
+        {
+            rcu_unlock_domain(od);
+            return -EINVAL;
+        }
 
         rc = xsm_map_gmfn_foreign(XSM_TARGET, d, od);
         if ( rc )
@@ -1032,15 +1044,25 @@ static int xenmem_add_to_physmap_one(
             return rc;
         }
 
-        maddr = p2m_lookup(od, pfn_to_paddr(idx), NULL);
-        if ( maddr == INVALID_PADDR )
+        /* Take reference to the foreign domain page.
+         * Reference will be released in XENMEM_remove_from_physmap */
+        page = get_page_from_gfn(od, idx, &p2mt, P2M_ALLOC);
+        if ( !page )
         {
             dump_p2m_lookup(od, pfn_to_paddr(idx));
             rcu_unlock_domain(od);
             return -EINVAL;
         }
 
-        mfn = maddr >> PAGE_SHIFT;
+        if ( !p2m_is_ram(p2mt) )
+        {
+            put_page(page);
+            rcu_unlock_domain(od);
+            return -EINVAL;
+        }
+
+        mfn = page_to_mfn(page);
+        t = p2m_map_foreign;
 
         rcu_unlock_domain(od);
         break;
@@ -1051,7 +1073,7 @@ static int xenmem_add_to_physmap_one(
     }
 
     /* Map at new location. */
-    rc = guest_physmap_add_page(d, gpfn, mfn, 0);
+    rc = guest_physmap_add_entry(d, gpfn, mfn, 0, t);
 
     return rc;
 }
