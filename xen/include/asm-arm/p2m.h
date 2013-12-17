@@ -20,6 +20,25 @@ struct p2m_domain {
     uint8_t vmid;
 };
 
+/* List of possible type for each page in the p2m entry.
+ * The number of available bit per page in the pte for this purpose is 4 bits.
+ * So it's possible to only have 16 fields. If we run out of value in the
+ * future, it's possible to use higher value for pseudo-type and don't store
+ * them in the p2m entry.
+ */
+typedef enum {
+    p2m_invalid = 0,    /* Nothing mapped here */
+    p2m_ram_rw,         /* Normal read/write guest RAM */
+    p2m_ram_ro,         /* Read-only; writes are silently dropped */
+    p2m_mmio_direct,    /* Read/write mapping of genuine MMIO area */
+    p2m_map_foreign,    /* Ram pages from foreign domain */
+    p2m_grant_map_rw,   /* Read/write grant mapping */
+    p2m_grant_map_ro,   /* Read-only grant mapping */
+    p2m_max_real_type,  /* Types after this won't be store in the p2m */
+} p2m_type_t;
+
+#define p2m_is_foreign(_t)  ((_t) == p2m_map_foreign)
+
 /* Initialise vmid allocator */
 void p2m_vmid_allocator_init(void);
 
@@ -72,7 +91,6 @@ p2m_pod_decrease_reservation(struct domain *d,
                              unsigned int order);
 
 /* Look up a GFN and take a reference count on the backing page. */
-typedef int p2m_type_t;
 typedef unsigned int p2m_query_t;
 #define P2M_ALLOC    (1u<<0)   /* Populate PoD and paged-out entries */
 #define P2M_UNSHARE  (1u<<1)   /* Break CoW sharing */

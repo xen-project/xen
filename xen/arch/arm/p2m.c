@@ -142,6 +142,8 @@ static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr)
         .p2m.valid = 1,
     };
 
+    BUILD_BUG_ON(p2m_max_real_type > (1 << 4));
+
     ASSERT(!(pa & ~PAGE_MASK));
     ASSERT(!(pa & ~PADDR_MASK));
 
