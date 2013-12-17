@@ -1347,13 +1347,13 @@ int libxl__self_pipe_eatall(int fd)
  * Manipulation of pollers
  */
 
-int libxl__poller_init(libxl_ctx *ctx, libxl__poller *p)
+int libxl__poller_init(libxl__gc *gc, libxl__poller *p)
 {
     int rc;
     p->fd_polls = 0;
     p->fd_rindices = 0;
 
-    rc = libxl__pipe_nonblock(ctx, p->wakeup_pipe);
+    rc = libxl__pipe_nonblock(CTX, p->wakeup_pipe);
     if (rc) goto out;
 
     return 0;
@@ -1370,25 +1370,20 @@ void libxl__poller_dispose(libxl__poller *p)
     free(p->fd_rindices);
 }
 
-libxl__poller *libxl__poller_get(libxl_ctx *ctx)
+libxl__poller *libxl__poller_get(libxl__gc *gc)
 {
     /* must be called with ctx locked */
     int rc;
 
-    libxl__poller *p = LIBXL_LIST_FIRST(&ctx->pollers_idle);
+    libxl__poller *p = LIBXL_LIST_FIRST(&CTX->pollers_idle);
     if (p) {
         LIBXL_LIST_REMOVE(p, entry);
         return p;
     }
 
-    p = malloc(sizeof(*p));
-    if (!p) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "cannot allocate poller");
-        return 0;
-    }
-    memset(p, 0, sizeof(*p));
+    p = libxl__zalloc(NOGC, sizeof(*p));
 
-    rc = libxl__poller_init(ctx, p);
+    rc = libxl__poller_init(gc, p);
     if (rc) {
         free(p);
         return NULL;
@@ -1477,7 +1472,7 @@ int libxl_event_wait(libxl_ctx *ctx, libxl_event **event_r,
     EGC_INIT(ctx);
     CTX_LOCK;
 
-    poller = libxl__poller_get(ctx);
+    poller = libxl__poller_get(gc);
     if (!poller) { rc = ERROR_FAIL; goto out; }
 
     for (;;) {
@@ -1653,7 +1648,7 @@ libxl__ao *libxl__ao_create(libxl_ctx *ctx, uint32_t domid,
     if (how) {
         ao->how = *how;
     } else {
-        ao->poller = libxl__poller_get(ctx);
+        ao->poller = libxl__poller_get(&ao->gc);
         if (!ao->poller) goto out;
     }
     libxl__log(ctx,XTL_DEBUG,-1,file,line,func,

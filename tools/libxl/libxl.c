@@ -87,7 +87,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     rc = libxl__atfork_init(ctx);
     if (rc) goto out;
 
-    rc = libxl__poller_init(ctx, &ctx->poller_app);
+    rc = libxl__poller_init(gc, &ctx->poller_app);
     if (rc) goto out;
 
     ctx->xch = xc_interface_open(lg,lg,0);

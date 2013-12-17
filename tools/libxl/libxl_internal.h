@@ -834,13 +834,13 @@ _hidden void libxl__event_disaster(libxl__egc*, const char *msg, int errnoval,
 
 /* Fills in, or disposes of, the resources held by, a poller whose
  * space the caller has allocated.  ctx must be locked. */
-_hidden int libxl__poller_init(libxl_ctx *ctx, libxl__poller *p);
+_hidden int libxl__poller_init(libxl__gc *gc, libxl__poller *p);
 _hidden void libxl__poller_dispose(libxl__poller *p);
 
 /* Obtain a fresh poller from malloc or the idle list, and put it
  * away again afterwards.  _get can fail, returning NULL.
  * ctx must be locked. */
-_hidden libxl__poller *libxl__poller_get(libxl_ctx *ctx);
+_hidden libxl__poller *libxl__poller_get(libxl__gc *gc);
 _hidden void libxl__poller_put(libxl_ctx*, libxl__poller *p /* may be NULL */);
 
 /* Notifies whoever is polling using p that they should wake up.
