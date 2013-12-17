@@ -327,6 +327,16 @@ static void *xrealloc(void *ptr, size_t sz) {
     return r;
 }
 
+#define ARRAY_EXTEND_INIT(array,count,initfn)                           \
+    ({                                                                  \
+        typeof((count)) array_extend_old_count = (count);               \
+        (count)++;                                                      \
+        (array) = xrealloc((array), sizeof(*array) * (count));          \
+        (initfn)(&(array)[array_extend_old_count]);                     \
+        (array)[array_extend_old_count].devid = array_extend_old_count; \
+        &(array)[array_extend_old_count];                               \
+    })
+
 #define LOG(_f, _a...)   dolog(__FILE__, __LINE__, __func__, _f "\n", ##_a)
 
 static void dolog(const char *file, int line, const char *func, char *fmt, ...)
@@ -696,6 +706,19 @@ static int vcpupin_parse(char *cpu, libxl_bitmap *cpumap)
     }
 
     return rc;
+}
+
+static void parse_top_level_vnc_options(XLU_Config *config,
+                                        libxl_vnc_info *vnc)
+{
+    long l;
+
+    xlu_cfg_get_defbool(config, "vnc", &vnc->enable, 0);
+    xlu_cfg_replace_string (config, "vnclisten", &vnc->listen, 0);
+    xlu_cfg_replace_string (config, "vncpasswd", &vnc->passwd, 0);
+    if (!xlu_cfg_get_long (config, "vncdisplay", &l, 0))
+        vnc->display = l;
+    xlu_cfg_get_defbool(config, "vncunused", &vnc->findunused, 0);
 }
 
 static void parse_config_data(const char *config_source,
@@ -1369,11 +1392,12 @@ skip_nic:
         fprintf(stderr, "WARNING: vif2: netchannel2 is deprecated and not supported by xl\n");
     }
 
+    d_config->num_vfbs = 0;
+    d_config->num_vkbs = 0;
+    d_config->vfbs = NULL;
+    d_config->vkbs = NULL;
+
     if (!xlu_cfg_get_list (config, "vfb", &cvfbs, 0, 0)) {
-        d_config->num_vfbs = 0;
-        d_config->num_vkbs = 0;
-        d_config->vfbs = NULL;
-        d_config->vkbs = NULL;
         while ((buf = xlu_cfg_get_listitem (cvfbs, d_config->num_vfbs)) != NULL) {
             libxl_device_vfb *vfb;
             libxl_device_vkb *vkb;
@@ -1381,15 +1405,11 @@ skip_nic:
             char *buf2 = strdup(buf);
             char *p, *p2;
 
-            d_config->vfbs = (libxl_device_vfb *) realloc(d_config->vfbs, sizeof(libxl_device_vfb) * (d_config->num_vfbs + 1));
-            vfb = d_config->vfbs + d_config->num_vfbs;
-            libxl_device_vfb_init(vfb);
-            vfb->devid = d_config->num_vfbs;
+            vfb = ARRAY_EXTEND_INIT(d_config->vfbs, d_config->num_vfbs,
+                                    libxl_device_vfb_init);
 
-            d_config->vkbs = (libxl_device_vkb *) realloc(d_config->vkbs, sizeof(libxl_device_vkb) * (d_config->num_vkbs + 1));
-            vkb = d_config->vkbs + d_config->num_vkbs;
-            libxl_device_vkb_init(vkb);
-            vkb->devid = d_config->num_vkbs;
+            vkb = ARRAY_EXTEND_INIT(d_config->vkbs, d_config->num_vkbs,
+                                    libxl_device_vkb_init);
 
             p = strtok(buf2, ",");
             if (!p)
@@ -1430,8 +1450,6 @@ skip_nic:
 
 skip_vfb:
             free(buf2);
-            d_config->num_vfbs++;
-            d_config->num_vkbs++;
         }
     }
 
@@ -1620,6 +1638,29 @@ skip_vfb:
 
 #undef parse_extra_args
 
+    /* If we've already got vfb=[] for PV guest then ignore top level
+     * VNC config. */
+    if (c_info->type == LIBXL_DOMAIN_TYPE_PV && !d_config->num_vfbs) {
+        long vnc_enabled = 0;
+
+        if (!xlu_cfg_get_long (config, "vnc", &l, 0))
+            vnc_enabled = l;
+
+        if (vnc_enabled) {
+            libxl_device_vfb *vfb;
+            libxl_device_vkb *vkb;
+
+            vfb = ARRAY_EXTEND_INIT(d_config->vfbs, d_config->num_vfbs,
+                                    libxl_device_vfb_init);
+
+            vkb = ARRAY_EXTEND_INIT(d_config->vkbs, d_config->num_vkbs,
+                                    libxl_device_vkb_init);
+
+            parse_top_level_vnc_options(config, &vfb->vnc);
+        }
+    } else
+        parse_top_level_vnc_options(config, &b_info->u.hvm.vnc);
+
     if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         if (!xlu_cfg_get_string (config, "vga", &buf, 0)) {
             if (!strcmp(buf, "stdvga")) {
@@ -1634,15 +1675,6 @@ skip_vfb:
             b_info->u.hvm.vga.kind = l ? LIBXL_VGA_INTERFACE_TYPE_STD :
                                          LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
 
-        xlu_cfg_get_defbool(config, "vnc", &b_info->u.hvm.vnc.enable, 0);
-        xlu_cfg_replace_string (config, "vnclisten",
-                                &b_info->u.hvm.vnc.listen, 0);
-        xlu_cfg_replace_string (config, "vncpasswd",
-                                &b_info->u.hvm.vnc.passwd, 0);
-        if (!xlu_cfg_get_long (config, "vncdisplay", &l, 0))
-            b_info->u.hvm.vnc.display = l;
-        xlu_cfg_get_defbool(config, "vncunused",
-                            &b_info->u.hvm.vnc.findunused, 0);
         xlu_cfg_replace_string (config, "keymap", &b_info->u.hvm.keymap, 0);
         xlu_cfg_get_defbool(config, "sdl", &b_info->u.hvm.sdl.enable, 0);
         xlu_cfg_get_defbool(config, "opengl", &b_info->u.hvm.sdl.opengl, 0);
