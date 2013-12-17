@@ -1290,15 +1290,21 @@ int relinquish_shared_pages(struct domain *d)
             set_rc = p2m->set_entry(p2m, gfn, _mfn(0), PAGE_ORDER_4K,
                                     p2m_invalid, p2m_access_rwx);
             ASSERT(set_rc != 0);
-            count++;
+            count += 0x10;
         }
+        else
+            ++count;
 
-        /* Preempt every 2MiB. Arbitrary */
-        if ( (count == 512) && hypercall_preempt_check() )
+        /* Preempt every 2MiB (shared) or 32MiB (unshared) - arbitrary. */
+        if ( count >= 0x2000 )
         {
-            p2m->next_shared_gfn_to_relinquish = gfn + 1;
-            rc = -EAGAIN;
-            break;
+            if ( hypercall_preempt_check() )
+            {
+                p2m->next_shared_gfn_to_relinquish = gfn + 1;
+                rc = -EAGAIN;
+                break;
+            }
+            count = 0;
         }
     }
 
