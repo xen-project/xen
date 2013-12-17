@@ -25,6 +25,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
                     unsigned flags, xentoollog_logger * lg)
 {
     libxl_ctx *ctx = NULL;
+    libxl__gc gc_buf, *gc = NULL;
     int rc;
 
     if (version != LIBXL_VERSION) { rc = ERROR_VERSION; goto out; }
@@ -79,6 +80,9 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     }
 
     /* Now ctx is safe for ctx_free; failures simply set rc and "goto out" */
+    LIBXL_INIT_GC(gc_buf,ctx);
+    gc = &gc_buf;
+    /* Now gc is useable */
 
     rc = libxl__atfork_init(ctx);
     if (rc) goto out;
@@ -88,8 +92,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
 
     ctx->xch = xc_interface_open(lg,lg,0);
     if (!ctx->xch) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, errno,
-                        "cannot open libxc handle");
+        LOGEV(ERROR, errno, "cannot open libxc handle");
         rc = ERROR_FAIL; goto out;
     }
 
@@ -97,8 +100,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     if (!ctx->xsh)
         ctx->xsh = xs_domain_open();
     if (!ctx->xsh) {
-        LIBXL__LOG_ERRNOVAL(ctx, LIBXL__LOG_ERROR, errno,
-                        "cannot connect to xenstore");
+        LOGEV(ERROR, errno, "cannot connect to xenstore");
         rc = ERROR_FAIL; goto out;
     }
 
@@ -106,6 +108,7 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     return 0;
 
  out:
+    if (gc) libxl__free_all(gc);
     libxl_ctx_free(ctx);
     *pctx = NULL;
     return rc;
