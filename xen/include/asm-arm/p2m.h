@@ -68,11 +68,21 @@ int p2m_populate_ram(struct domain *d, paddr_t start, paddr_t end);
 int map_mmio_regions(struct domain *d, paddr_t start_gaddr,
                      paddr_t end_gaddr, paddr_t maddr);
 
+int guest_physmap_add_entry(struct domain *d,
+                            unsigned long gfn,
+                            unsigned long mfn,
+                            unsigned long page_order,
+                            p2m_type_t t);
+
 /* Untyped version for RAM only, for compatibility */
-int guest_physmap_add_page(struct domain *d,
-                           unsigned long gfn,
-                           unsigned long mfn,
-                           unsigned int page_order);
+static inline int guest_physmap_add_page(struct domain *d,
+                                         unsigned long gfn,
+                                         unsigned long mfn,
+                                         unsigned int page_order)
+{
+    return guest_physmap_add_entry(d, gfn, mfn, page_order, p2m_ram_rw);
+}
+
 void guest_physmap_remove_page(struct domain *d,
                                unsigned long gpfn,
                                unsigned long mfn, unsigned int page_order);

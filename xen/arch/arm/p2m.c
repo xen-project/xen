@@ -128,21 +128,52 @@ int p2m_pod_decrease_reservation(struct domain *d,
     return -ENOSYS;
 }
 
-static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr)
+static lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr,
+                               p2m_type_t t)
 {
     paddr_t pa = ((paddr_t) mfn) << PAGE_SHIFT;
+    /* xn and write bit will be defined in the switch */
     lpae_t e = (lpae_t) {
-        .p2m.xn = 0,
         .p2m.af = 1,
         .p2m.sh = LPAE_SH_OUTER,
         .p2m.read = 1,
-        .p2m.write = 1,
         .p2m.mattr = mattr,
         .p2m.table = 1,
         .p2m.valid = 1,
+        .p2m.type = t,
     };
 
     BUILD_BUG_ON(p2m_max_real_type > (1 << 4));
+
+    switch (t)
+    {
+    case p2m_ram_rw:
+        e.p2m.xn = 0;
+        e.p2m.write = 1;
+        break;
+
+    case p2m_ram_ro:
+        e.p2m.xn = 0;
+        e.p2m.write = 0;
+        break;
+
+    case p2m_map_foreign:
+    case p2m_grant_map_rw:
+    case p2m_mmio_direct:
+        e.p2m.xn = 1;
+        e.p2m.write = 1;
+        break;
+
+    case p2m_grant_map_ro:
+    case p2m_invalid:
+        e.p2m.xn = 1;
+        e.p2m.write = 0;
+        break;
+
+    case p2m_max_real_type:
+        BUG();
+        break;
+    }
 
     ASSERT(!(pa & ~PAGE_MASK));
     ASSERT(!(pa & ~PADDR_MASK));
@@ -173,7 +204,7 @@ static int p2m_create_table(struct domain *d,
     clear_page(p);
     unmap_domain_page(p);
 
-    pte = mfn_to_p2m_entry(page_to_mfn(page), MATTR_MEM);
+    pte = mfn_to_p2m_entry(page_to_mfn(page), MATTR_MEM, p2m_invalid);
 
     write_pte(entry, pte);
 
@@ -191,7 +222,8 @@ static int create_p2m_entries(struct domain *d,
                      paddr_t start_gpaddr,
                      paddr_t end_gpaddr,
                      paddr_t maddr,
-                     int mattr)
+                     int mattr,
+                     p2m_type_t t)
 {
     int rc, flush;
     struct p2m_domain *p2m = &d->arch.p2m;
@@ -271,14 +303,15 @@ static int create_p2m_entries(struct domain *d,
                         goto out;
                     }
 
-                    pte = mfn_to_p2m_entry(page_to_mfn(page), mattr);
+                    pte = mfn_to_p2m_entry(page_to_mfn(page), mattr, t);
 
                     write_pte(&third[third_table_offset(addr)], pte);
                 }
                 break;
             case INSERT:
                 {
-                    lpae_t pte = mfn_to_p2m_entry(maddr >> PAGE_SHIFT, mattr);
+                    lpae_t pte = mfn_to_p2m_entry(maddr >> PAGE_SHIFT,
+                                                  mattr, t);
                     write_pte(&third[third_table_offset(addr)], pte);
                     maddr += PAGE_SIZE;
                 }
@@ -313,7 +346,8 @@ int p2m_populate_ram(struct domain *d,
                      paddr_t start,
                      paddr_t end)
 {
-    return create_p2m_entries(d, ALLOCATE, start, end, 0, MATTR_MEM);
+    return create_p2m_entries(d, ALLOCATE, start, end,
+                              0, MATTR_MEM, p2m_ram_rw);
 }
 
 int map_mmio_regions(struct domain *d,
@@ -321,18 +355,20 @@ int map_mmio_regions(struct domain *d,
                      paddr_t end_gaddr,
                      paddr_t maddr)
 {
-    return create_p2m_entries(d, INSERT, start_gaddr, end_gaddr, maddr, MATTR_DEV);
+    return create_p2m_entries(d, INSERT, start_gaddr, end_gaddr,
+                              maddr, MATTR_DEV, p2m_mmio_direct);
 }
 
-int guest_physmap_add_page(struct domain *d,
-                           unsigned long gpfn,
-                           unsigned long mfn,
-                           unsigned int page_order)
+int guest_physmap_add_entry(struct domain *d,
+                            unsigned long gpfn,
+                            unsigned long mfn,
+                            unsigned long page_order,
+                            p2m_type_t t)
 {
     return create_p2m_entries(d, INSERT,
                               pfn_to_paddr(gpfn),
-                              pfn_to_paddr(gpfn + (1<<page_order)),
-                              pfn_to_paddr(mfn), MATTR_MEM);
+                              pfn_to_paddr(gpfn + (1 << page_order)),
+                              pfn_to_paddr(mfn), MATTR_MEM, t);
 }
 
 void guest_physmap_remove_page(struct domain *d,
@@ -342,7 +378,7 @@ void guest_physmap_remove_page(struct domain *d,
     create_p2m_entries(d, REMOVE,
                        pfn_to_paddr(gpfn),
                        pfn_to_paddr(gpfn + (1<<page_order)),
-                       pfn_to_paddr(mfn), MATTR_MEM);
+                       pfn_to_paddr(mfn), MATTR_MEM, p2m_invalid);
 }
 
 int p2m_alloc_table(struct domain *d)

@@ -153,7 +153,7 @@ typedef struct {
     unsigned long contig:1;     /* In a block of 16 contiguous entries */
     unsigned long sbz2:1;
     unsigned long xn:1;         /* eXecute-Never */
-    unsigned long avail:4;      /* Ignored by hardware */
+    unsigned long type:4;       /* Ignore by hardware. Used to store p2m types */
 
     unsigned long sbz1:5;
 } __attribute__((__packed__)) lpae_p2m_t;
