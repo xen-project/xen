@@ -1032,7 +1032,7 @@ static int xenmem_add_to_physmap_one(
             return rc;
         }
 
-        maddr = p2m_lookup(od, pfn_to_paddr(idx));
+        maddr = p2m_lookup(od, pfn_to_paddr(idx), NULL);
         if ( maddr == INVALID_PADDR )
         {
             dump_p2m_lookup(od, pfn_to_paddr(idx));

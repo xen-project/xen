@@ -1421,7 +1421,7 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
     printk("dom%d VA 0x%08"PRIvaddr"\n", d->domain_id, addr);
     printk("    TTBCR: 0x%08"PRIregister"\n", ttbcr);
     printk("    TTBR0: 0x%016"PRIx64" = 0x%"PRIpaddr"\n",
-           ttbr0, p2m_lookup(d, ttbr0 & PAGE_MASK));
+           ttbr0, p2m_lookup(d, ttbr0 & PAGE_MASK, NULL));
 
     if ( ttbcr & TTBCR_EAE )
     {
@@ -1434,7 +1434,7 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
         return;
     }
 
-    paddr = p2m_lookup(d, ttbr0 & PAGE_MASK);
+    paddr = p2m_lookup(d, ttbr0 & PAGE_MASK, NULL);
     if ( paddr == INVALID_PADDR )
     {
         printk("Failed TTBR0 maddr lookup\n");
@@ -1449,7 +1449,7 @@ void dump_guest_s1_walk(struct domain *d, vaddr_t addr)
          !(first[offset] & 0x2) )
         goto done;
 
-    paddr = p2m_lookup(d, first[offset] & PAGE_MASK);
+    paddr = p2m_lookup(d, first[offset] & PAGE_MASK, NULL);
 
     if ( paddr == INVALID_PADDR )
     {

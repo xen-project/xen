@@ -72,11 +72,17 @@ static lpae_t *p2m_map_first(struct p2m_domain *p2m, paddr_t addr)
  * There are no processor functions to do a stage 2 only lookup therefore we
  * do a a software walk.
  */
-paddr_t p2m_lookup(struct domain *d, paddr_t paddr)
+paddr_t p2m_lookup(struct domain *d, paddr_t paddr, p2m_type_t *t)
 {
     struct p2m_domain *p2m = &d->arch.p2m;
     lpae_t pte, *first = NULL, *second = NULL, *third = NULL;
     paddr_t maddr = INVALID_PADDR;
+    p2m_type_t _t;
+
+    /* Allow t to be NULL */
+    t = t ?: &_t;
+
+    *t = p2m_invalid;
 
     spin_lock(&p2m->lock);
 
@@ -102,7 +108,11 @@ paddr_t p2m_lookup(struct domain *d, paddr_t paddr)
 
 done:
     if ( pte.p2m.valid )
+    {
+        ASSERT(pte.p2m.type != p2m_invalid);
         maddr = (pte.bits & PADDR_MASK & PAGE_MASK) | (paddr & ~PAGE_MASK);
+        *t = pte.p2m.type;
+    }
 
     if (third) unmap_domain_page(third);
     if (second) unmap_domain_page(second);
@@ -521,7 +531,7 @@ err:
 
 unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)
 {
-    paddr_t p = p2m_lookup(d, pfn_to_paddr(gpfn));
+    paddr_t p = p2m_lookup(d, pfn_to_paddr(gpfn), NULL);
     return p >> PAGE_SHIFT;
 }
 

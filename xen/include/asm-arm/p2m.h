@@ -58,7 +58,7 @@ int p2m_alloc_table(struct domain *d);
 void p2m_load_VTTBR(struct domain *d);
 
 /* Look up the MFN corresponding to a domain's PFN. */
-paddr_t p2m_lookup(struct domain *d, paddr_t gpfn);
+paddr_t p2m_lookup(struct domain *d, paddr_t gpfn, p2m_type_t *t);
 
 /* Setup p2m RAM mapping for domain d from start-end. */
 int p2m_populate_ram(struct domain *d, paddr_t start, paddr_t end);
