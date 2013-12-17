@@ -86,6 +86,9 @@ enum domain_type {
 #define is_pv64_domain(d) (0)
 #endif
 
+extern int dom0_11_mapping;
+#define is_domain_direct_mapped(d) ((d) == dom0 && dom0_11_mapping)
+
 struct vtimer {
         struct vcpu *v;
         int irq;

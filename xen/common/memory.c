@@ -29,6 +29,10 @@
 #include <xsm/xsm.h>
 #include <xen/trace.h>
 
+#ifndef is_domain_direct_mapped
+# define is_domain_direct_mapped(d) ((void)(d), 0)
+#endif
+
 struct memop_args {
     /* INPUT */
     struct domain *domain;     /* Domain to be affected. */
@@ -122,7 +126,29 @@ static void populate_physmap(struct memop_args *a)
         }
         else
         {
-            page = alloc_domheap_pages(d, a->extent_order, a->memflags);
+            if ( is_domain_direct_mapped(d) )
+            {
+                mfn = gpfn;
+                if ( !mfn_valid(mfn) )
+                {
+                    gdprintk(XENLOG_INFO, "Invalid mfn %#"PRI_xen_pfn"\n",
+                             mfn);
+                    goto out;
+                }
+
+                page = mfn_to_page(mfn);
+                if ( !get_page(page, d) )
+                {
+                    gdprintk(XENLOG_INFO,
+                             "mfn %#"PRI_xen_pfn" doesn't belong to the"
+                             " domain\n", mfn);
+                    goto out;
+                }
+                put_page(page);
+            }
+            else
+                page = alloc_domheap_pages(d, a->extent_order, a->memflags);
+
             if ( unlikely(page == NULL) ) 
             {
                 if ( !opt_tmem || (a->extent_order != 0) )
@@ -268,6 +294,13 @@ static void decrease_reservation(struct memop_args *a)
         /* See if populate-on-demand wants to handle this */
         if ( is_hvm_domain(a->domain)
              && p2m_pod_decrease_reservation(a->domain, gmfn, a->extent_order) )
+            continue;
+
+        /* With the lack for iommu on some ARM platform, domain with DMA-capable
+         * device must retrieve the same pfn when the hypercall
+         * populate_physmap is called.
+         */
+        if ( is_domain_direct_mapped(a->domain) )
             continue;
 
         for ( j = 0; j < (1 << a->extent_order); j++ )

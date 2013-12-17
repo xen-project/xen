@@ -22,7 +22,7 @@
 static unsigned int __initdata opt_dom0_max_vcpus;
 integer_param("dom0_max_vcpus", opt_dom0_max_vcpus);
 
-static int dom0_11_mapping = 1;
+int dom0_11_mapping = 1;
 
 #define DOM0_MEM_DEFAULT 0x8000000 /* 128 MiB */
 static u64 __initdata dom0_mem = DOM0_MEM_DEFAULT;
