@@ -717,6 +717,14 @@ int domain_relinquish_resources(struct domain *d)
         if ( ret )
             return ret;
 
+        d->arch.relmem = RELMEM_mapping;
+        /* Fallthrough */
+
+    case RELMEM_mapping:
+        ret = relinquish_p2m_mapping(d);
+        if ( ret )
+            return ret;
+
         d->arch.relmem = RELMEM_done;
         /* Fallthrough */
 

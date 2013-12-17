@@ -6,6 +6,8 @@
 #include <xen/bitops.h>
 #include <asm/flushtlb.h>
 #include <asm/gic.h>
+#include <asm/event.h>
+#include <asm/hardirq.h>
 
 /* First level P2M is 2 consecutive pages */
 #define P2M_FIRST_ORDER 1
@@ -224,7 +226,8 @@ static int p2m_create_table(struct domain *d,
 enum p2m_operation {
     INSERT,
     ALLOCATE,
-    REMOVE
+    REMOVE,
+    RELINQUISH,
 };
 
 static int create_p2m_entries(struct domain *d,
@@ -242,6 +245,7 @@ static int create_p2m_entries(struct domain *d,
     unsigned long cur_first_page = ~0,
                   cur_first_offset = ~0,
                   cur_second_offset = ~0;
+    unsigned long count = 0;
 
     spin_lock(&p2m->lock);
 
@@ -326,13 +330,19 @@ static int create_p2m_entries(struct domain *d,
                     maddr += PAGE_SIZE;
                 }
                 break;
+            case RELINQUISH:
             case REMOVE:
                 {
                     lpae_t pte = third[third_table_offset(addr)];
                     unsigned long mfn = pte.p2m.base;
 
                     if ( !pte.p2m.valid )
+                    {
+                        count++;
                         break;
+                    }
+
+                    count += 0x10;
 
                     /* TODO: Handle other p2m type */
                     if ( p2m_is_foreign(pte.p2m.type) )
@@ -343,12 +353,35 @@ static int create_p2m_entries(struct domain *d,
 
                     memset(&pte, 0x00, sizeof(pte));
                     write_pte(&third[third_table_offset(addr)], pte);
+                    count++;
                 }
                 break;
         }
 
         if ( flush )
             flush_tlb_all_local();
+
+        /* Preempt every 2MiB (mapped) or 32 MiB (unmapped) - arbitrary */
+        if ( op == RELINQUISH && count >= 0x2000 )
+        {
+            if ( hypercall_preempt_check() )
+            {
+                p2m->next_gfn_to_relinquish = maddr >> PAGE_SHIFT;
+                rc = -EAGAIN;
+                goto out;
+            }
+            count = 0;
+        }
+    }
+
+    if ( op == ALLOCATE || op == INSERT )
+    {
+        unsigned long sgfn = paddr_to_pfn(start_gpaddr);
+        unsigned long egfn = paddr_to_pfn(end_gpaddr);
+
+        p2m->max_mapped_gfn = MAX(p2m->max_mapped_gfn, egfn);
+        /* Use next_gfn_to_relinquish to store the lowest gfn mapped */
+        p2m->next_gfn_to_relinquish = MIN(p2m->next_gfn_to_relinquish, sgfn);
     }
 
     rc = 0;
@@ -534,10 +567,24 @@ int p2m_init(struct domain *d)
 
     p2m->first_level = NULL;
 
+    p2m->max_mapped_gfn = 0;
+    p2m->next_gfn_to_relinquish = ULONG_MAX;
+
 err:
     spin_unlock(&p2m->lock);
 
     return rc;
+}
+
+int relinquish_p2m_mapping(struct domain *d)
+{
+    struct p2m_domain *p2m = &d->arch.p2m;
+
+    return create_p2m_entries(d, RELINQUISH,
+                              pfn_to_paddr(p2m->next_gfn_to_relinquish),
+                              pfn_to_paddr(p2m->max_mapped_gfn),
+                              pfn_to_paddr(INVALID_MFN),
+                              MATTR_MEM, p2m_invalid);
 }
 
 unsigned long gmfn_to_mfn(struct domain *d, unsigned long gpfn)

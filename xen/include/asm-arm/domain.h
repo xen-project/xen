@@ -112,6 +112,7 @@ struct arch_domain
         RELMEM_not_started,
         RELMEM_xen,
         RELMEM_page,
+        RELMEM_mapping,
         RELMEM_done,
     } relmem;
 

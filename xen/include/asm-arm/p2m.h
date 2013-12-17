@@ -18,6 +18,15 @@ struct p2m_domain {
 
     /* Current VMID in use */
     uint8_t vmid;
+
+    /* Highest guest frame that's ever been mapped in the p2m
+     * Only takes into account ram and foreign mapping
+     */
+    unsigned long max_mapped_gfn;
+
+    /* When releasing mapped gfn's in a preemptible manner, recall where
+     * to resume the search */
+    unsigned long next_gfn_to_relinquish;
 };
 
 /* List of possible type for each page in the p2m entry.
@@ -47,6 +56,12 @@ int p2m_init(struct domain *d);
 
 /* Return all the p2m resources to Xen. */
 void p2m_teardown(struct domain *d);
+
+/* Remove mapping refcount on each mapping page in the p2m
+ *
+ * TODO: For the moment only foreign mappings are handled
+ */
+int relinquish_p2m_mapping(struct domain *d);
 
 /* Allocate a new p2m table for a domain.
  *
