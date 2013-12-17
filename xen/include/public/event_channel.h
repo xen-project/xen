@@ -101,6 +101,17 @@ typedef struct evtchn_alloc_unbound evtchn_alloc_unbound_t;
  * a port that is unbound and marked as accepting bindings from the calling
  * domain. A fresh port is allocated in the calling domain and returned as
  * <local_port>.
+ *
+ * In case the peer domain has already tried to set our event channel
+ * pending, before it was bound, EVTCHNOP_bind_interdomain always sets
+ * the local event channel pending.
+ *
+ * The usual pattern of use, in the guest's upcall (or subsequent
+ * handler) is as follows: (Re-enable the event channel for subsequent
+ * signalling and then) check for the existence of whatever condition
+ * is being waited for by other means, and take whatever action is
+ * needed (if any).
+ *
  * NOTES:
  *  1. <remote_dom> may be DOMID_SELF, allowing loopback connections.
  */
