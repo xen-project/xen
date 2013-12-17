@@ -497,6 +497,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags)
 {
     int rc;
 
+    d->arch.relmem = RELMEM_not_started;
+
     /* Idle domains do not need this setup */
     if ( is_idle_domain(d) )
         return 0;
@@ -696,15 +698,36 @@ int domain_relinquish_resources(struct domain *d)
 {
     int ret = 0;
 
-    ret = relinquish_memory(d, &d->xenpage_list);
-    if ( ret )
-        return ret;
+    switch ( d->arch.relmem )
+    {
+    case RELMEM_not_started:
+        d->arch.relmem = RELMEM_xen;
+        /* Falltrough */
 
-    ret = relinquish_memory(d, &d->page_list);
-    if ( ret )
-        return ret;
+    case RELMEM_xen:
+        ret = relinquish_memory(d, &d->xenpage_list);
+        if ( ret )
+            return ret;
 
-    return ret;
+        d->arch.relmem = RELMEM_page;
+        /* Fallthrough */
+
+    case RELMEM_page:
+        ret = relinquish_memory(d, &d->page_list);
+        if ( ret )
+            return ret;
+
+        d->arch.relmem = RELMEM_done;
+        /* Fallthrough */
+
+    case RELMEM_done:
+        break;
+
+    default:
+        BUG();
+    }
+
+    return 0;
 }
 
 void arch_dump_domain_info(struct domain *d)

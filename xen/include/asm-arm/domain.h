@@ -107,6 +107,14 @@ struct arch_domain
     struct hvm_domain hvm_domain;
     xen_pfn_t *grant_table_gpfn;
 
+    /* Continuable domain_relinquish_resources(). */
+    enum {
+        RELMEM_not_started,
+        RELMEM_xen,
+        RELMEM_page,
+        RELMEM_done,
+    } relmem;
+
     /* Virtual CPUID */
     uint32_t vpidr;
 
