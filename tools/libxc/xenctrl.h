@@ -1043,6 +1043,18 @@ int xc_evtchn_close(xc_evtchn *xce);
 
 /*
  * Return an fd that can be select()ed on.
+ *
+ * Note that due to bugs, setting this fd to non blocking may not
+ * work: you would hope that it would result in xc_evtchn_pending
+ * failing with EWOULDBLOCK if there are no events signaled, but in
+ * fact it may block.  (Bug is present in at least Linux 3.12, and
+ * perhaps on other platforms or later version.)
+ *
+ * To be safe, you must use poll() or select() before each call to
+ * xc_evtchn_pending.  If you have multiple threads (or processes)
+ * sharing a single xce handle this will not work, and there is no
+ * straightforward workaround.  Please design your program some other
+ * way.
  */
 int xc_evtchn_fd(xc_evtchn *xce);
 
@@ -1082,7 +1094,20 @@ int xc_evtchn_unbind(xc_evtchn *xce, evtchn_port_t port);
 
 /*
  * Return the next event channel to become pending, or -1 on failure, in which
- * case errno will be set appropriately.  
+ * case errno will be set appropriately.
+ *
+ * At the hypervisor level the event channel will have been masked,
+ * and then cleared, by the underlying machinery (evtchn kernel
+ * driver, or equivalent).  So if the event channel is signaled again
+ * after it is returned here, it will be queued up, and delivered
+ * again after you unmask it.  (See the documentation in the Xen
+ * public header event_channel.h.)
+ *
+ * On receiving the notification from xc_evtchn_pending, you should
+ * normally: check (by other means) what work needs doing; do the
+ * necessary work (if any); unmask the event channel with
+ * xc_evtchn_unmask (if you want to receive any further
+ * notifications).
  */
 evtchn_port_or_error_t
 xc_evtchn_pending(xc_evtchn *xce);
