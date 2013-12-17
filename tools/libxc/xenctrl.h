@@ -1452,8 +1452,10 @@ int xc_version(xc_interface *xch, int cmd, void *arg);
 int xc_flask_op(xc_interface *xch, xen_flask_op_t *op);
 
 /*
- * Subscribe to state changes in a domain via evtchn.
+ * Subscribe to domain suspend via evtchn.
  * Returns -1 on failure, in which case errno will be set appropriately.
+ * Just calls XEN_DOMCTL_subscribe - see the caveats for that domctl
+ * (in its doc comment in domctl.h).
  */
 int xc_domain_subscribe_for_suspend(
     xc_interface *xch, domid_t domid, evtchn_port_t port);

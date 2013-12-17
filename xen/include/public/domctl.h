@@ -619,6 +619,22 @@ typedef struct xen_domctl_cpuid xen_domctl_cpuid_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_cpuid_t);
 #endif
 
+/*
+ * Arranges that if the domain suspends (specifically, if it shuts
+ * down with code SHUTDOWN_suspend), this event channel will be
+ * notified.
+ *
+ * This is _instead of_ the usual notification to the global
+ * VIRQ_DOM_EXC.  (In most systems that pirq is owned by xenstored.)
+ *
+ * Only one subscription per domain is possible.  Last subscriber
+ * wins; others are silently displaced.
+ *
+ * NB that contrary to the rather general name, it only applies to
+ * domain shutdown with code suspend.  Shutdown for other reasons
+ * (including crash), and domain death, are notified to VIRQ_DOM_EXC
+ * regardless.
+ */
 /* XEN_DOMCTL_subscribe */
 struct xen_domctl_subscribe {
     uint32_t port; /* IN */
