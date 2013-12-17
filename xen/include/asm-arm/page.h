@@ -213,28 +213,6 @@ static inline lpae_t mfn_to_xen_entry(unsigned long mfn)
     return e;
 }
 
-static inline lpae_t mfn_to_p2m_entry(unsigned long mfn, unsigned int mattr)
-{
-    paddr_t pa = ((paddr_t) mfn) << PAGE_SHIFT;
-    lpae_t e = (lpae_t) {
-        .p2m.xn = 0,
-        .p2m.af = 1,
-        .p2m.sh = LPAE_SH_OUTER,
-        .p2m.write = 1,
-        .p2m.read = 1,
-        .p2m.mattr = mattr,
-        .p2m.table = 1,
-        .p2m.valid = 1,
-    };
-
-    ASSERT(!(pa & ~PAGE_MASK));
-    ASSERT(!(pa & ~PADDR_MASK));
-
-    e.bits |= pa;
-
-    return e;
-}
-
 #if defined(CONFIG_ARM_32)
 # include <asm/arm32/page.h>
 #elif defined(CONFIG_ARM_64)
