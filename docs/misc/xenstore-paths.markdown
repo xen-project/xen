@@ -143,9 +143,28 @@ The size of the video RAM this domain is configured with.
 
 #### ~/device/suspend/event-channel = ""|EVTCHN [w]
 
-The domain's suspend event channel. The use of a suspend event channel
-is optional at the domain's discretion. The toolstack will create this
+The domain's suspend event channel. The toolstack will create this
 path with an empty value which the guest may choose to overwrite.
+
+If the guest overwrites this, it will be with the number of an unbound
+event channel port it has acquired.  The toolstack is expected to use
+an interdomain bind, and then, when it wishes to ask the guest to
+suspend, to signal the event channel.
+
+The guest does not need to explicitly acknowledge the request; indeed,
+there is no explicit signalling by the guest in the reverse direction.
+The guest, when it is ready, simply shuts down (`SCHEDOP_shutdown`)
+with reason code `SHUTDOWN_suspend`.  The toolstack is expected to use
+`XEN_DOMCTL_subscribe` to be alerted to guest state changes, and
+`XEN_SYSCTL_getdomaininfolist` to verify that the domain has
+suspended.
+
+Note that the use of this event channel suspend protocol is optional
+for both sides.  By writing a non-empty string to the node, the guest
+is advertising its support.  However, the toolstack is at liberty to
+use the xenstore-based protocol instead (see ~/control/shutdown,
+below) even if the guest has advertised support for the event channel
+protocol.
 
 #### ~/hvmloader/generation-id-address = ADDRESS [r,HVM,INTERNAL]
 
