@@ -58,6 +58,11 @@
  * (AAPCS64). Where there is a conflict the 64-bit standard should be
  * used regardless of guest type. Structures which are passed as
  * hypercall arguments are always little endian.
+ *
+ * All hypercall arguments passed via a pointer to guest memory must
+ * reside in memory which is mapped as Normal Inner-cacheable. Any
+ * Inner cache allocation strategy (Write-Back, Write-Through etc) is
+ * acceptable. There is no restriction on the Outer-cacheability.
  */
 
 /*
