@@ -366,7 +366,7 @@ static int create_p2m_entries(struct domain *d,
         {
             if ( hypercall_preempt_check() )
             {
-                p2m->next_gfn_to_relinquish = maddr >> PAGE_SHIFT;
+                p2m->next_gfn_to_relinquish = addr >> PAGE_SHIFT;
                 rc = -EAGAIN;
                 goto out;
             }
