@@ -303,6 +303,7 @@ xen/arch/x86/boot/reloc.S
 xen/arch/x86/boot/reloc.bin
 xen/arch/x86/boot/reloc.lnk
 xen/arch/x86/efi.lds
+xen/arch/x86/efi/check.efi
 xen/arch/x86/efi/disabled
 xen/arch/x86/efi/mkreloc
 xen/ddb/*
