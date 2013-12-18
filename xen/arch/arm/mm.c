@@ -1061,21 +1061,18 @@ static int xenmem_add_to_physmap_range(struct domain *d,
 {
     int rc;
 
-    /* Process entries in reverse order to allow continuations */
     while ( xatpr->size > 0 )
     {
         xen_ulong_t idx;
         xen_pfn_t gpfn;
 
-        if ( unlikely(copy_from_guest_offset(&idx, xatpr->idxs,
-                                             xatpr->size-1, 1)) )
+        if ( unlikely(copy_from_guest_offset(&idx, xatpr->idxs, 0, 1)) )
         {
             rc = -EFAULT;
             goto out;
         }
 
-        if ( unlikely(copy_from_guest_offset(&gpfn, xatpr->gpfns,
-                                             xatpr->size-1, 1)) )
+        if ( unlikely(copy_from_guest_offset(&gpfn, xatpr->gpfns, 0, 1)) )
         {
             rc = -EFAULT;
             goto out;
@@ -1085,8 +1082,7 @@ static int xenmem_add_to_physmap_range(struct domain *d,
                                        xatpr->foreign_domid,
                                        idx, gpfn);
 
-        if ( unlikely(copy_to_guest_offset(xatpr->errs,
-                                           xatpr->size-1, &rc, 1)) )
+        if ( unlikely(copy_to_guest_offset(xatpr->errs, 0, &rc, 1)) )
         {
             rc = -EFAULT;
             goto out;
@@ -1095,6 +1091,9 @@ static int xenmem_add_to_physmap_range(struct domain *d,
         if ( rc < 0 )
             goto out;
 
+        guest_handle_add_offset(xatpr->idxs, 1);
+        guest_handle_add_offset(xatpr->gpfns, 1);
+        guest_handle_add_offset(xatpr->errs, 1);
         xatpr->size--;
 
         /* Check for continuation if it's not the last interation */
