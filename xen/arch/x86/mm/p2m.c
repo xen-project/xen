@@ -440,9 +440,6 @@ void p2m_teardown(struct p2m_domain *p2m)
 {
     struct page_info *pg;
     struct domain *d;
-    unsigned long gfn;
-    p2m_type_t t;
-    mfn_t mfn;
 
     if (p2m == NULL)
         return;
@@ -450,23 +447,7 @@ void p2m_teardown(struct p2m_domain *p2m)
     d = p2m->domain;
 
     p2m_lock(p2m);
-
-    /* Try to unshare any remaining shared p2m entries. Safeguard
-     * Since relinquish_shared_pages should have done the work. */ 
-    for ( gfn=0; gfn < p2m->max_mapped_pfn; gfn++ )
-    {
-        p2m_access_t a;
-        if ( atomic_read(&d->shr_pages) == 0 )
-            break;
-        mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, NULL);
-        if ( mfn_valid(mfn) && (t == p2m_ram_shared) )
-        {
-            ASSERT(!p2m_is_nestedp2m(p2m));
-            /* Does not fail with ENOMEM given the DESTROY flag */
-            BUG_ON(mem_sharing_unshare_page(d, gfn, MEM_SHARING_DESTROY_GFN));
-        }
-    }
-
+    ASSERT(atomic_read(&d->shr_pages) == 0);
     p2m->phys_table = pagetable_null();
 
     while ( (pg = page_list_remove_head(&p2m->pages)) )
