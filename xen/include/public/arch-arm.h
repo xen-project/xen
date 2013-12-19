@@ -59,10 +59,17 @@
  * used regardless of guest type. Structures which are passed as
  * hypercall arguments are always little endian.
  *
- * All hypercall arguments passed via a pointer to guest memory must
- * reside in memory which is mapped as Normal Inner-cacheable. Any
- * Inner cache allocation strategy (Write-Back, Write-Through etc) is
- * acceptable. There is no restriction on the Outer-cacheability.
+ * All memory which is shared with other entities in the system
+ * (including the hypervisor and other guests) must reside in memory
+ * which is mapped as Normal Inner-cacheable. This applies to:
+ *  - hypercall arguments passed via a pointer to guest memory.
+ *  - memory shared via the grant table mechanism (including PV I/O
+ *    rings etc).
+ *  - memory shared with the hypervisor (struct shared_info, struct
+ *    vcpu_info, the grant table, etc).
+ *
+ * Any Inner cache allocation strategy (Write-Back, Write-Through etc)
+ * is acceptable. There is no restriction on the Outer-cacheability.
  */
 
 /*
