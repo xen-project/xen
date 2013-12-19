@@ -246,9 +246,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 96b58a44756a8821c108358439b0f2c06e531159
-# Wed Dec 4 15:16:18 2013 +1300
-# xen_disk: fix memory leak
+QEMU_TAG ?= 7f5b3c338e0f8938ba575dec18255dcbee0c2ee2
+# Wed Dec 18 15:25:14 2013 +0000
+# qemu-traditional: Fix build warnings on Wheezy
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
