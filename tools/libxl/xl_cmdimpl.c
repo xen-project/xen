@@ -6285,7 +6285,7 @@ int main_uptime(int argc, char **argv)
     int nb_doms = 0;
     int opt;
 
-    SWITCH_FOREACH_OPT(opt, "s", NULL, "uptime", 1) {
+    SWITCH_FOREACH_OPT(opt, "s", NULL, "uptime", 0) {
     case 's':
         short_mode = 1;
         break;
