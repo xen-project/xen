@@ -1261,6 +1261,7 @@ static void domain_suspend_switch_qemu_xen_logdirty
         libxl__xc_domain_saverestore_async_callback_done(egc, shs, 0);
     } else {
         LOG(ERROR,"logdirty switch failed (rc=%d), aborting suspend",rc);
+        dss->rc = rc;
         libxl__xc_domain_saverestore_async_callback_done(egc, shs, -1);
     }
 }
@@ -1283,6 +1284,7 @@ void libxl__domain_suspend_common_switch_qemu_logdirty
     default:
         LOG(ERROR,"logdirty switch failed"
             ", no valid device model version found, aborting suspend");
+        dss->rc = ERROR_FAIL;
         libxl__xc_domain_saverestore_async_callback_done(egc, shs, -1);
     }
 }
@@ -1364,6 +1366,7 @@ static void switch_logdirty_done(libxl__egc *egc,
     int broke;
     if (rc) {
         broke = -1;
+        dss->rc = rc;
     } else {
         broke = 0;
     }
@@ -1826,6 +1829,7 @@ static void libxl__domain_suspend_callback(void *data)
 static void domain_suspend_callback_common_done(libxl__egc *egc,
                                 libxl__domain_suspend_state *dss, int rc)
 {
+    dss->rc = rc;
     libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, !rc);
 }
 
@@ -1861,6 +1865,7 @@ static void remus_domain_suspend_callback_common_done(libxl__egc *egc,
     return;
 
 out:
+    dss->rc = rc;
     libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, !rc);
 }
 
@@ -1868,16 +1873,17 @@ static void remus_devices_postsuspend_cb(libxl__egc *egc,
                                          libxl__remus_devices_state *rds,
                                          int rc)
 {
-    int ok = 0;
     libxl__domain_suspend_state *dss = CONTAINER_OF(rds, *dss, rds);
 
     if (rc)
         goto out;
 
-    ok = 1;
+    rc = 0;
 
 out:
-    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, ok);
+    if (rc)
+        dss->rc = rc;
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, !rc);
 }
 
 static void libxl__remus_domain_resume_callback(void *data)
@@ -1896,7 +1902,6 @@ static void remus_devices_preresume_cb(libxl__egc *egc,
                                        libxl__remus_devices_state *rds,
                                        int rc)
 {
-    int ok = 0;
     libxl__domain_suspend_state *dss = CONTAINER_OF(rds, *dss, rds);
     STATE_AO_GC(dss->ao);
 
@@ -1908,10 +1913,12 @@ static void remus_devices_preresume_cb(libxl__egc *egc,
     if (rc)
         goto out;
 
-    ok = 1;
+    rc = 0;
 
 out:
-    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, ok);
+    if (rc)
+        dss->rc = rc;
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, !rc);
 }
 
 /*----- remus asynchronous checkpoint callback -----*/
@@ -2029,6 +2036,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
     libxl__srm_save_autogen_callbacks *const callbacks =
         &dss->shs.callbacks.save.a;
 
+    dss->rc = 0;
     logdirty_init(&dss->logdirty);
     libxl__xswait_init(&dss->pvcontrol);
     libxl__ev_evtchn_init(&dss->guest_evtchn);
@@ -2117,6 +2125,8 @@ void libxl__xc_domain_save_done(libxl__egc *egc, void *dss_void,
                          "domain did not respond to suspend request");
         if ( !dss->guest_responded )
             rc = ERROR_GUEST_TIMEDOUT;
+        else if (dss->rc)
+            rc = dss->rc;
         else
             rc = ERROR_FAIL;
         goto out;
