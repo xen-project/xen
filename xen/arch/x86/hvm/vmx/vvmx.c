@@ -1293,6 +1293,12 @@ static void sync_exception_state(struct vcpu *v)
                     nvmx->intr.error_code);
         break;
     case X86_EVENTTYPE_NMI:
+        __set_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_REASON,
+                    EXIT_REASON_EXCEPTION_NMI);
+        __set_vvmcs(nvcpu->nv_vvmcx, EXIT_QUALIFICATION, 0);
+        __set_vvmcs(nvcpu->nv_vvmcx, VM_EXIT_INTR_INFO,
+                    nvmx->intr.intr_info);
+        break;
     default:
         gdprintk(XENLOG_ERR, "Exception state %lx not handled\n",
                nvmx->intr.intr_info); 
