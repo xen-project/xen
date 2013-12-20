@@ -246,10 +246,12 @@ static int create_p2m_entries(struct domain *d,
                   cur_first_offset = ~0,
                   cur_second_offset = ~0;
     unsigned long count = 0;
+    bool_t populate = (op == INSERT || op == ALLOCATE);
 
     spin_lock(&p2m->lock);
 
-    for(addr = start_gpaddr; addr < end_gpaddr; addr += PAGE_SIZE)
+    addr = start_gpaddr;
+    while ( addr < end_gpaddr )
     {
         if ( cur_first_page != p2m_first_level_index(addr) )
         {
@@ -265,8 +267,15 @@ static int create_p2m_entries(struct domain *d,
 
         if ( !first[first_table_offset(addr)].p2m.valid )
         {
+            if ( !populate )
+            {
+                addr = (addr + FIRST_SIZE) & FIRST_MASK;
+                continue;
+            }
+
             rc = p2m_create_table(d, &first[first_table_offset(addr)]);
-            if ( rc < 0 ) {
+            if ( rc < 0 )
+            {
                 printk("p2m_populate_ram: L1 failed\n");
                 goto out;
             }
@@ -284,6 +293,12 @@ static int create_p2m_entries(struct domain *d,
 
         if ( !second[second_table_offset(addr)].p2m.valid )
         {
+            if ( !populate )
+            {
+                addr = (addr + SECOND_SIZE) & SECOND_MASK;
+                continue;
+            }
+
             rc = p2m_create_table(d, &second[second_table_offset(addr)]);
             if ( rc < 0 ) {
                 printk("p2m_populate_ram: L2 failed\n");
@@ -372,6 +387,9 @@ static int create_p2m_entries(struct domain *d,
             }
             count = 0;
         }
+
+        /* Got the next page */
+        addr += PAGE_SIZE;
     }
 
     if ( op == ALLOCATE || op == INSERT )
