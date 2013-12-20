@@ -31,6 +31,9 @@
 #define DBG(args, ...) LIBXL__DBG_LOG(CTX, args, __VA_ARGS__)
 
 
+static libxl__ao *ao_nested_root(libxl__ao *ao);
+
+
 /*
  * The counter osevent_in_hook is used to ensure that the application
  * honours the reentrancy restriction documented in libxl_event.h.
@@ -1761,7 +1764,7 @@ void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc)
     LOG(DEBUG,"ao %p: complete, rc=%d",ao,rc);
     assert(ao->magic == LIBXL__AO_MAGIC);
     assert(!ao->complete);
-    assert(!ao->nested);
+    assert(!ao->nested_root);
     ao->complete = 1;
     ao->rc = rc;
 
@@ -1932,7 +1935,7 @@ void libxl__ao_progress_report(libxl__egc *egc, libxl__ao *ao,
         const libxl_asyncprogress_how *how, libxl_event *ev)
 {
     AO_GC;
-    assert(!ao->nested);
+    assert(!ao->nested_root);
     if (how->callback == dummy_asyncprogress_callback_ignore) {
         LOG(DEBUG,"ao %p: progress report: ignored",ao);
         libxl_event_free(CTX,ev);
@@ -1955,21 +1958,23 @@ void libxl__ao_progress_report(libxl__egc *egc, libxl__ao *ao,
 
 /* nested ao */
 
+static libxl__ao *ao_nested_root(libxl__ao *ao) {
+    libxl__ao *root = ao->nested_root ? : ao;
+    assert(!root->nested_root);
+    return root;
+}
+
 _hidden libxl__ao *libxl__nested_ao_create(libxl__ao *parent)
 {
-    /* We only use the parent to get the ctx.  However, we require the
-     * caller to provide us with an ao, not just a ctx, to prove that
-     * they are already in an asynchronous operation.  That will avoid
-     * people using this to (for example) make an ao in a non-ao_how
-     * function somewhere in the middle of libxl. */
-    libxl__ao *child = NULL;
+    libxl__ao *child = NULL, *root;
     libxl_ctx *ctx = libxl__gc_owner(&parent->gc);
 
     assert(parent->magic == LIBXL__AO_MAGIC);
+    root = ao_nested_root(parent);
 
     child = libxl__zalloc(&ctx->nogc_gc, sizeof(*child));
     child->magic = LIBXL__AO_MAGIC;
-    child->nested = 1;
+    child->nested_root = root;
     LIBXL_INIT_GC(child->gc, ctx);
     libxl__gc *gc = &child->gc;
 
@@ -1980,7 +1985,7 @@ _hidden libxl__ao *libxl__nested_ao_create(libxl__ao *parent)
 _hidden void libxl__nested_ao_free(libxl__ao *child)
 {
     assert(child->magic == LIBXL__AO_MAGIC);
-    assert(child->nested);
+    assert(child->nested_root);
     libxl_ctx *ctx = libxl__gc_owner(&child->gc);
     libxl__ao__destroy(ctx, child);
 }

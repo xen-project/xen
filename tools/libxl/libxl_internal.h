@@ -468,7 +468,8 @@ struct libxl__ao {
      * only in libxl__ao_complete.)
      */
     uint32_t magic;
-    unsigned constructing:1, in_initiator:1, complete:1, notified:1, nested:1;
+    unsigned constructing:1, in_initiator:1, complete:1, notified:1;
+    libxl__ao *nested_root;
     int progress_reports_outstanding;
     int rc;
     libxl__gc gc;
