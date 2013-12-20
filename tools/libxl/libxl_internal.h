@@ -242,6 +242,7 @@ struct libxl__ev_time {
     LIBXL_TAILQ_ENTRY(libxl__ev_time) entry;
     struct timeval abs;
     libxl__osevent_hook_nexus *nexus;
+    libxl__ao_abortable abrt;
 };
 
 typedef struct libxl__ev_xswatch libxl__ev_xswatch;
@@ -848,7 +849,7 @@ _hidden int libxl__ev_time_modify_abs(libxl__gc*, libxl__ev_time *ev,
                                       struct timeval);
 _hidden void libxl__ev_time_deregister(libxl__gc*, libxl__ev_time *ev);
 static inline void libxl__ev_time_init(libxl__ev_time *ev)
-                { ev->func = 0; }
+                { ev->func = 0; libxl__ao_abortable_init(&ev->abrt); }
 static inline int libxl__ev_time_isregistered(const libxl__ev_time *ev)
                 { return !!ev->func; }
 

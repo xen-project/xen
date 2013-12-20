@@ -315,6 +315,8 @@ static int time_register_finite(libxl__gc *gc, libxl__ev_time *ev,
 
 static void time_deregister(libxl__gc *gc, libxl__ev_time *ev)
 {
+    libxl__ao_abortable_deregister(&ev->abrt);
+
     if (!ev->infinite) {
         struct timeval right_away = { 0, 0 };
         if (ev->nexus) /* only set if app provided hooks */
@@ -337,6 +339,23 @@ static void time_done_debug(libxl__gc *gc, const char *func,
 #endif
 }
 
+static void time_aborted(libxl__egc *egc, libxl__ao_abortable *abrt, int rc)
+{
+    libxl__ev_time *ev = CONTAINER_OF(abrt, *ev, abrt);
+    EGC_GC;
+
+    time_deregister(gc, ev);
+    DBG("ev_time=%p aborted", ev);
+    ev->func(egc, ev, &ev->abs, rc);
+}
+
+static int time_register_abortable(libxl__ao *ao, libxl__ev_time *ev)
+{
+    ev->abrt.ao = ao;
+    ev->abrt.callback = time_aborted;
+    return libxl__ao_abortable_register(&ev->abrt);
+}
+
 int libxl__ev_time_register_abs(libxl__ao *ao, libxl__ev_time *ev,
                                 libxl__ev_time_callback *func,
                                 struct timeval absolute)
@@ -349,6 +368,9 @@ int libxl__ev_time_register_abs(libxl__ao *ao, libxl__ev_time *ev,
     DBG("ev_time=%p register abs=%lu.%06lu",
         ev, (unsigned long)absolute.tv_sec, (unsigned long)absolute.tv_usec);
 
+    rc = time_register_abortable(ao, ev);
+    if (rc) goto out;
+
     rc = time_register_finite(gc, ev, absolute);
     if (rc) goto out;
 
@@ -356,6 +378,7 @@ int libxl__ev_time_register_abs(libxl__ao *ao, libxl__ev_time *ev,
 
     rc = 0;
  out:
+    libxl__ao_abortable_deregister(&ev->abrt);
     time_done_debug(gc,__func__,ev,rc);
     CTX_UNLOCK;
     return rc;
@@ -374,6 +397,9 @@ int libxl__ev_time_register_rel(libxl__ao *ao, libxl__ev_time *ev,
 
     DBG("ev_time=%p register ms=%d", ev, milliseconds);
 
+    rc = time_register_abortable(ao, ev);
+    if (rc) goto out;
+
     if (milliseconds < 0) {
         ev->infinite = 1;
     } else {
@@ -388,6 +414,8 @@ int libxl__ev_time_register_rel(libxl__ao *ao, libxl__ev_time *ev,
     rc = 0;
 
  out:
+    if (!libxl__ev_time_isregistered(ev))
+        libxl__ao_abortable_deregister(&ev->abrt);
     time_done_debug(gc,__func__,ev,rc);
     CTX_UNLOCK;
     return rc;
