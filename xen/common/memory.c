@@ -596,11 +596,21 @@ static int xenmem_add_to_physmap(struct domain *d,
 }
 
 static int xenmem_add_to_physmap_range(struct domain *d,
-                                       struct xen_add_to_physmap_range *xatpr)
+                                       struct xen_add_to_physmap_range *xatpr,
+                                       unsigned int start)
 {
+    unsigned int done = 0;
     int rc;
 
-    while ( xatpr->size > 0 )
+    if ( xatpr->size < start )
+        return -EILSEQ;
+
+    guest_handle_add_offset(xatpr->idxs, start);
+    guest_handle_add_offset(xatpr->gpfns, start);
+    guest_handle_add_offset(xatpr->errs, start);
+    xatpr->size -= start;
+
+    while ( xatpr->size > done )
     {
         xen_ulong_t idx;
         xen_pfn_t gpfn;
@@ -630,12 +640,11 @@ static int xenmem_add_to_physmap_range(struct domain *d,
         guest_handle_add_offset(xatpr->idxs, 1);
         guest_handle_add_offset(xatpr->gpfns, 1);
         guest_handle_add_offset(xatpr->errs, 1);
-        xatpr->size--;
 
         /* Check for continuation if it's not the last iteration. */
-        if ( xatpr->size > 0 && hypercall_preempt_check() )
+        if ( xatpr->size > ++done && hypercall_preempt_check() )
         {
-            rc = -EAGAIN;
+            rc = start + done;
             goto out;
         }
     }
@@ -820,6 +829,13 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         struct xen_add_to_physmap_range xatpr;
         struct domain *d;
 
+        BUILD_BUG_ON((typeof(xatpr.size))-1 >
+                     (UINT_MAX >> MEMOP_EXTENT_SHIFT));
+
+        /* Check for malicious or buggy input. */
+        if ( start_extent != (typeof(xatpr.size))start_extent )
+            return -EDOM;
+
         if ( copy_from_guest(&xatpr, arg, 1) ||
              !guest_handle_okay(xatpr.idxs, xatpr.size) ||
              !guest_handle_okay(xatpr.gpfns, xatpr.size) ||
@@ -841,18 +857,14 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return rc;
         }
 
-        rc = xenmem_add_to_physmap_range(d, &xatpr);
+        rc = xenmem_add_to_physmap_range(d, &xatpr, start_extent);
 
         rcu_unlock_domain(d);
 
-        if ( rc == -EAGAIN )
-        {
-            if ( !__copy_to_guest(arg, &xatpr, 1) )
-                rc = hypercall_create_continuation(
-                    __HYPERVISOR_memory_op, "ih", op, arg);
-            else
-                rc = -EFAULT;
-        }
+        if ( rc > 0 )
+            rc = hypercall_create_continuation(
+                    __HYPERVISOR_memory_op, "lh",
+                    op | (rc << MEMOP_EXTENT_SHIFT), arg);
 
         return rc;
     }
