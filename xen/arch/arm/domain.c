@@ -98,8 +98,11 @@ static void ctxt_switch_from(struct vcpu *p)
 #if defined(CONFIG_ARM_32)
     p->arch.mair0 = READ_CP32(MAIR0);
     p->arch.mair1 = READ_CP32(MAIR1);
+    p->arch.amair0 = READ_CP32(AMAIR0);
+    p->arch.amair1 = READ_CP32(AMAIR1);
 #else
     p->arch.mair = READ_SYSREG64(MAIR_EL1);
+    p->arch.amair = READ_SYSREG64(AMAIR_EL1);
 #endif
 
     /* Fault Status */
@@ -177,8 +180,11 @@ static void ctxt_switch_to(struct vcpu *n)
 #if defined(CONFIG_ARM_32)
     WRITE_CP32(n->arch.mair0, MAIR0);
     WRITE_CP32(n->arch.mair1, MAIR1);
+    WRITE_CP32(n->arch.amair0, AMAIR0);
+    WRITE_CP32(n->arch.amair1, AMAIR1);
 #elif defined(CONFIG_ARM_64)
     WRITE_SYSREG64(n->arch.mair, MAIR_EL1);
+    WRITE_SYSREG64(n->arch.amair, AMAIR_EL1);
 #endif
     isb();
 

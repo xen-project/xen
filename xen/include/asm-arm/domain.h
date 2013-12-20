@@ -221,8 +221,10 @@ struct arch_vcpu
     uint64_t par;
 #ifdef CONFIG_ARM_32
     uint32_t mair0, mair1;
+    uint32_t amair0, amair1;
 #else
     uint64_t mair;
+    uint64_t amair;
 #endif
 
     /* Control Registers */
