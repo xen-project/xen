@@ -975,6 +975,10 @@ int libxl_ctx_free(libxl_ctx *ctx /* 0 is OK */);
 
 /* domain related functions */
 
+/* If the result is ERROR_ABORTED, the domain may or may not exist
+ * (in a half-created state).  *domid will be valid and will be the
+ * domain id, or -1, as appropriate */
+
 int libxl_domain_create_new(libxl_ctx *ctx, libxl_domain_config *d_config,
                             uint32_t *domid,
                             const libxl_asyncop_how *ao_how,

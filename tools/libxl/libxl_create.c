@@ -1519,7 +1519,9 @@ static void domcreate_complete(libxl__egc *egc,
     if (!rc && d_config->b_info.exec_ssidref)
         rc = xc_flask_relabel_domain(CTX->xch, dcs->guest_domid, d_config->b_info.exec_ssidref);
 
-    if (!rc) {
+    bool retain_domain = !rc || rc == ERROR_ABORTED;
+
+    if (retain_domain) {
         libxl__domain_userdata_lock *lock;
 
         /* Note that we hold CTX lock at this point so only need to
@@ -1530,15 +1532,17 @@ static void domcreate_complete(libxl__egc *egc,
             rc = ERROR_LOCK_FAIL;
         } else {
             libxl__update_domain_configuration(gc, d_config_saved, d_config);
-            rc = libxl__set_domain_configuration(gc, dcs->guest_domid,
-                                                 d_config_saved);
+            int cfg_rc = libxl__set_domain_configuration
+                (gc, dcs->guest_domid, d_config_saved);
+            if (!rc)
+                rc = cfg_rc;
             libxl__unlock_domain_userdata(lock);
         }
     }
 
     libxl_domain_config_dispose(d_config_saved);
 
-    if (rc) {
+    if (!retain_domain) {
         if (dcs->guest_domid) {
             dcs->dds.ao = ao;
             dcs->dds.domid = dcs->guest_domid;
@@ -1608,8 +1612,7 @@ static void domain_create_cb(libxl__egc *egc,
     libxl__app_domain_create_state *cdcs = CONTAINER_OF(dcs, *cdcs, dcs);
     STATE_AO_GC(cdcs->dcs.ao);
 
-    if (!rc)
-        *cdcs->domid_out = domid;
+    *cdcs->domid_out = domid;
 
     libxl__ao_complete(egc, ao, rc);
 }
