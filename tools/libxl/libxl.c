@@ -73,6 +73,8 @@ int libxl_ctx_alloc(libxl_ctx **pctx, int version,
     LIBXL_LIST_INIT(&ctx->evtchns_waiting);
     libxl__ev_fd_init(&ctx->evtchn_efd);
 
+    LIBXL_LIST_INIT(&ctx->aos_inprogress);
+
     LIBXL_TAILQ_INIT(&ctx->death_list);
     libxl__ev_xswatch_init(&ctx->death_watch);
 
@@ -174,6 +176,7 @@ int libxl_ctx_free(libxl_ctx *ctx)
     assert(LIBXL_LIST_EMPTY(&ctx->efds));
     assert(LIBXL_TAILQ_EMPTY(&ctx->etimes));
     assert(LIBXL_LIST_EMPTY(&ctx->evtchns_waiting));
+    assert(LIBXL_LIST_EMPTY(&ctx->aos_inprogress));
 
     if (ctx->xch) xc_interface_close(ctx->xch);
     libxl_version_info_dispose(&ctx->version_info);

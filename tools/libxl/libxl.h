@@ -688,6 +688,11 @@ typedef struct libxl__ctx libxl_ctx;
  */
 #define LIBXL_HAVE_DEVICE_CHANNEL 1
 
+/*
+ * LIBXL_HAVE_AO_ABORT indicates the availability of libxl_ao_abort
+ */
+#define LIBXL_HAVE_AO_ABORT 1
+
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who
  * do not #include libxl_internal.h, are fine. */
@@ -964,6 +969,59 @@ typedef struct {
     libxl_ev_user for_event; /* always used */
     void *for_callback; /* passed to callback */
 } libxl_asyncprogress_how;
+
+/*
+ * It is sometimes possible to abort an asynchronous operation.
+ *
+ * libxl_ao_abort searches for an ongoing asynchronous operation whose
+ * ao_how is identical to *how, and tries to abort it.  The return
+ * values from libxl_ao_abort are as follows:
+ *
+ *  0
+ *
+ *     The operation was found, and attempts are being made to cut it
+ *     short.  However, it may still take some time to stop.  It is
+ *     also possible that the operation will nevertheless complete
+ *     successfully.
+ *
+ *  ERROR_NOTFOUND
+ *
+ *      No matching ongoing operation was found.  This might happen
+ *      for an actual operation if the operation has already completed
+ *      (perhaps on another thread).  The call to libxl_ao_abort has
+ *      had no effect.
+ *
+ *  ERROR_ABORTED
+ *
+ *     The operation has already been the subject of at least one
+ *     call to libxl_ao_abort.
+ *
+ * If the operation was indeed cut short due to the abort request, it
+ * will complete, at some point in the future, with ERROR_ABORTED.  In
+ * that case, depending on the operation it have performed some of the
+ * work in question and left the operation half-done.  Consult the
+ * documentation for individual operations.
+ *
+ * Note that an aborted operation might still fail for other reasons
+ * even after the abort was requested.
+ *
+ * If your application is multithreaded you must not reuse an
+ * ao_how->for_event or ao_how->for_callback value (with a particular
+ * ao_how->callback) unless you are sure that none of your other
+ * threads are going to abort the previous operation using that
+ * value; otherwise you risk aborting the wrong operation if the
+ * intended target of the abort request completes in the meantime.
+ *
+ * It is possible to abort even an operation which is being performed
+ * synchronously, but since in that case how==NULL you had better only
+ * have one such operation, because it is not possible to tell them
+ * apart (and libxl_ao_abort will abort only the first one it finds).
+ * (And, if you want to do this, obviously the abort would have to be
+ * requested on a different thread.)
+ */
+int libxl_ao_abort(libxl_ctx *ctx, const libxl_asyncop_how *how)
+                   LIBXL_EXTERNAL_CALLERS_ONLY;
+
 
 #define LIBXL_VERSION 0
 

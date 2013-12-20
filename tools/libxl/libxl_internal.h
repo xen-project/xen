@@ -193,6 +193,40 @@ struct libxl__ev_fd {
 };
 
 
+typedef struct libxl__ao_abortable libxl__ao_abortable;
+typedef void libxl__ao_abortable_callback(libxl__egc *egc,
+                  libxl__ao_abortable *ao_abortable, int rc /* ABORTED */);
+
+struct libxl__ao_abortable {
+    /* caller must fill this in and it must remain valid */
+    libxl__ao *ao;
+    libxl__ao_abortable_callback *callback;
+    /* remainder is private for abort machinery */
+    bool registered;
+    LIBXL_LIST_ENTRY(libxl__ao_abortable) entry;
+    /*
+     * For nested aos:
+     *  Semantically, abort affects the whole tree of aos,
+     *    not just the parent.
+     *  libxl__ao_abortable.ao refers to the child, so
+     *    that the child callback sees the right ao.  (After all,
+     *    it was code dealing with the child that set .ao.)
+     *  But, the abortable is recorded on the "abortables" list
+     *    for the ultimate root ao, so that every possible child
+     *    abort occurs as a result of the abort of the parent.
+     *  We set ao->aborting only in the root.
+     */
+};
+
+_hidden int libxl__ao_abortable_register(libxl__ao_abortable*);
+_hidden void libxl__ao_abortable_deregister(libxl__ao_abortable*);
+
+static inline void libxl__ao_abortable_init
+  (libxl__ao_abortable *c) { c->registered = 0; }
+static inline bool libxl__ao_abortable_isregistered
+  (const libxl__ao_abortable *c) { return c->registered; }
+
+
 typedef struct libxl__ev_time libxl__ev_time;
 typedef void libxl__ev_time_callback(libxl__egc *egc, libxl__ev_time *ev,
                                      const struct timeval *requested_abs,
@@ -382,6 +416,8 @@ struct libxl__ctx {
     LIBXL_LIST_HEAD(, libxl__ev_evtchn) evtchns_waiting;
     libxl__ev_fd evtchn_efd;
 
+    LIBXL_LIST_HEAD(, libxl__ao) aos_inprogress;
+
     LIBXL_TAILQ_HEAD(libxl__evgen_domain_death_list, libxl_evgen_domain_death)
         death_list /* sorted by domid */,
         death_reported;
@@ -468,12 +504,15 @@ struct libxl__ao {
      * only in libxl__ao_complete.)
      */
     uint32_t magic;
-    unsigned constructing:1, in_initiator:1, complete:1, notified:1;
+    unsigned constructing:1, in_initiator:1, complete:1, notified:1,
+        aborting:1;
     int manip_refcnt;
     libxl__ao *nested_root;
     int nested_progeny;
     int progress_reports_outstanding;
     int rc;
+    LIBXL_LIST_HEAD(, libxl__ao_abortable) abortables;
+    LIBXL_LIST_ENTRY(libxl__ao) inprogress_entry;
     libxl__gc gc;
     libxl_asyncop_how how;
     libxl__poller *poller;

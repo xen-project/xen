@@ -1776,6 +1776,8 @@ void libxl__ao_create_fail(libxl__ao *ao)
     assert(ao->in_initiator);
     assert(!ao->complete);
     assert(!ao->progress_reports_outstanding);
+    assert(!ao->aborting);
+    LIBXL_LIST_REMOVE(ao, inprogress_entry);
     libxl__ao__destroy(CTX, ao);
 }
 
@@ -1796,7 +1798,7 @@ void libxl__ao_complete(libxl__egc *egc, libxl__ao *ao, int rc)
     assert(!ao->nested_progeny);
     ao->complete = 1;
     ao->rc = rc;
-
+    LIBXL_LIST_REMOVE(ao, inprogress_entry);
     libxl__ao_complete_check_progress_reports(egc, ao);
 }
 
@@ -1869,6 +1871,8 @@ libxl__ao *libxl__ao_create(libxl_ctx *ctx, uint32_t domid,
                "ao %p: create: how=%p callback=%p poller=%p",
                ao, how, ao->how.callback, ao->poller);
 
+    LIBXL_LIST_INSERT_HEAD(&ctx->aos_inprogress, ao, inprogress_entry);
+
     return ao;
 
  out:
@@ -1922,8 +1926,8 @@ int libxl__ao_inprogress(libxl__ao *ao,
                 sleep(1);
                 /* It's either this or return ERROR_I_DONT_KNOW_WHETHER
                  * _THE_THING_YOU_ASKED_FOR_WILL_BE_DONE_LATER_WHEN
-                 * _YOU_DIDNT_EXPECT_IT, since we don't have any kind of
-                 * cancellation ability. */
+                 * _YOU_DIDNT_EXPECT_IT, since we don't have a
+                 * synchronous cancellation ability. */
             }
 
             CTX_UNLOCK;
@@ -1938,6 +1942,128 @@ int libxl__ao_inprogress(libxl__ao *ao,
     ao__manip_leave(CTX, ao);
 
     return rc;
+}
+
+
+/* abort requests */
+
+static int ao__abort(libxl_ctx *ctx, libxl__ao *parent)
+/* Temporarily unlocks ctx, which must be locked exactly once on entry. */
+{
+    int rc;
+    ao__manip_enter(parent);
+
+    if (parent->aborting) {
+        rc = ERROR_ABORTED;
+        goto out;
+    }
+
+    parent->aborting = 1;
+
+    if (LIBXL_LIST_EMPTY(&parent->abortables)) {
+        LIBXL__LOG(ctx, XTL_DEBUG,
+                   "ao %p: abort requested and noted, but no-one interested",
+                   parent);
+        rc = 0;
+        goto out;
+    }
+
+    /* We keep calling abort hooks until there are none left */
+    while (!LIBXL_LIST_EMPTY(&parent->abortables)) {
+        libxl__egc egc;
+        LIBXL_INIT_EGC(egc,ctx);
+
+        assert(!parent->complete);
+
+        libxl__ao_abortable *abrt = LIBXL_LIST_FIRST(&parent->abortables);
+        assert(parent == ao_nested_root(abrt->ao));
+
+        LIBXL_LIST_REMOVE(abrt, entry);
+        abrt->registered = 0;
+
+        LIBXL__LOG(ctx, XTL_DEBUG, "ao %p: abrt=%p: aborting",
+                   parent, abrt->ao);
+        abrt->callback(&egc, abrt, ERROR_ABORTED);
+
+        libxl__ctx_unlock(ctx);
+        libxl__egc_cleanup(&egc);
+        libxl__ctx_lock(ctx);
+    }
+
+    rc = 0;
+
+ out:
+    ao__manip_leave(ctx, parent);
+    return rc;
+}
+
+int libxl_ao_abort(libxl_ctx *ctx, const libxl_asyncop_how *how)
+{
+    libxl__ao *search;
+    libxl__ctx_lock(ctx);
+    int rc;
+
+    LIBXL_LIST_FOREACH(search, &ctx->aos_inprogress, inprogress_entry) {
+        if (how) {
+            /* looking for ao to be reported by callback or event */
+            if (search->poller)
+                /* sync */
+                continue;
+            if (how->callback != search->how.callback)
+                continue;
+            if (how->callback
+                ? (how->u.for_callback != search->how.u.for_callback)
+                : (how->u.for_event != search->how.u.for_event))
+                continue;
+        } else {
+            /* looking for synchronous call */
+            if (!search->poller)
+                /* async */
+                continue;
+        }
+        goto found;
+    }
+    rc = ERROR_NOTFOUND;
+    goto out;
+
+ found:
+    rc = ao__abort(ctx, search);
+ out:
+    libxl__ctx_unlock(ctx);
+    return rc;
+}
+
+int libxl__ao_abortable_register(libxl__ao_abortable *abrt)
+{
+    libxl__ao *ao = abrt->ao;
+    libxl__ao *root = ao_nested_root(ao);
+    AO_GC;
+
+    if (root->aborting) {
+ DBG("ao=%p: preemptively aborting ao_abortable registration %p (root=%p)",
+            ao, abrt, root);
+        return ERROR_ABORTED;
+    }
+
+    DBG("ao=%p, abrt=%p: registering (root=%p)", ao, abrt, root);
+    LIBXL_LIST_INSERT_HEAD(&root->abortables, abrt, entry);
+    abrt->registered = 1;
+
+    return 0;
+}
+
+_hidden void libxl__ao_abortable_deregister(libxl__ao_abortable *abrt)
+{
+    if (!abrt->registered)
+        return;
+
+    libxl__ao *ao = abrt->ao;
+    libxl__ao *root __attribute__((unused)) = ao_nested_root(ao);
+    AO_GC;
+
+    DBG("ao=%p, abrt=%p: deregistering (root=%p)", ao, abrt, root);
+    LIBXL_LIST_REMOVE(abrt, entry);
+    abrt->registered = 0;
 }
 
 
