@@ -1078,103 +1078,10 @@ int xenmem_add_to_physmap_one(
     return rc;
 }
 
-static int xenmem_add_to_physmap_range(struct domain *d,
-                                       struct xen_add_to_physmap_range *xatpr)
-{
-    int rc;
-
-    while ( xatpr->size > 0 )
-    {
-        xen_ulong_t idx;
-        xen_pfn_t gpfn;
-
-        if ( unlikely(copy_from_guest_offset(&idx, xatpr->idxs, 0, 1)) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
-
-        if ( unlikely(copy_from_guest_offset(&gpfn, xatpr->gpfns, 0, 1)) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
-
-        rc = xenmem_add_to_physmap_one(d, xatpr->space,
-                                       xatpr->foreign_domid,
-                                       idx, gpfn);
-
-        if ( unlikely(copy_to_guest_offset(xatpr->errs, 0, &rc, 1)) )
-        {
-            rc = -EFAULT;
-            goto out;
-        }
-
-        if ( rc < 0 )
-            goto out;
-
-        guest_handle_add_offset(xatpr->idxs, 1);
-        guest_handle_add_offset(xatpr->gpfns, 1);
-        guest_handle_add_offset(xatpr->errs, 1);
-        xatpr->size--;
-
-        /* Check for continuation if it's not the last interation */
-        if ( xatpr->size > 0 && hypercall_preempt_check() )
-        {
-            rc = -EAGAIN;
-            goto out;
-        }
-    }
-
-    rc = 0;
-
-out:
-    return rc;
-
-}
-
 long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
-    int rc;
-
     switch ( op )
     {
-    case XENMEM_add_to_physmap_range:
-    {
-        struct xen_add_to_physmap_range xatpr;
-        struct domain *d;
-
-        if ( copy_from_guest(&xatpr, arg, 1) )
-            return -EFAULT;
-
-        /* This mapspace is redundant for this hypercall */
-        if ( xatpr.space == XENMAPSPACE_gmfn_range )
-            return -EINVAL;
-
-        d = rcu_lock_domain_by_any_id(xatpr.domid);
-        if ( d == NULL )
-            return -ESRCH;
-
-        rc = xsm_add_to_physmap(XSM_TARGET, current->domain, d);
-        if ( rc )
-        {
-            rcu_unlock_domain(d);
-            return rc;
-        }
-
-        rc = xenmem_add_to_physmap_range(d, &xatpr);
-
-        rcu_unlock_domain(d);
-
-        if ( rc && copy_to_guest(arg, &xatpr, 1) )
-            rc = -EFAULT;
-
-        if ( rc == -EAGAIN )
-            rc = hypercall_create_continuation(
-                __HYPERVISOR_memory_op, "ih", op, arg);
-
-        return rc;
-    }
     /* XXX: memsharing not working yet */
     case XENMEM_get_sharing_shared_pages:
     case XENMEM_get_sharing_freed_pages:
