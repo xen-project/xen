@@ -1149,7 +1149,7 @@ out:
 static void domain_suspend_done(libxl__egc *egc,
                         libxl__domain_suspend_state *dss, int rc);
 static void domain_suspend_callback_common_done(libxl__egc *egc,
-                                libxl__domain_suspend_state *dss, int ok);
+                                libxl__domain_suspend_state *dss, int rc);
 
 /*----- complicated callback, called by xc_domain_save -----*/
 
@@ -1437,11 +1437,9 @@ static void suspend_common_wait_guest_check(libxl__egc *egc,
 static void suspend_common_wait_guest_timeout(libxl__egc *egc,
       libxl__ev_time *ev, const struct timeval *requested_abs);
 
-static void domain_suspend_common_failed(libxl__egc *egc,
-                                         libxl__domain_suspend_state *dss);
 static void domain_suspend_common_done(libxl__egc *egc,
                                        libxl__domain_suspend_state *dss,
-                                       bool ok);
+                                       int rc);
 
 static bool domain_suspend_pvcontrol_acked(const char *state) {
     /* any value other than "suspend", including ENOENT (i.e. !state), is OK */
@@ -1471,6 +1469,7 @@ static void domain_suspend_callback_common(libxl__egc *egc,
         ret = xc_evtchn_notify(CTX->xce, dss->guest_evtchn.port);
         if (ret < 0) {
             LOG(ERROR, "xc_evtchn_notify failed ret=%d", ret);
+            rc = ERROR_FAIL;
             goto err;
         }
 
@@ -1491,6 +1490,7 @@ static void domain_suspend_callback_common(libxl__egc *egc,
         ret = xc_domain_shutdown(CTX->xch, domid, SHUTDOWN_suspend);
         if (ret < 0) {
             LOGE(ERROR, "xc_domain_shutdown failed");
+            rc = ERROR_FAIL;
             goto err;
         }
         /* The guest does not (need to) respond to this sort of request. */
@@ -1505,7 +1505,7 @@ static void domain_suspend_callback_common(libxl__egc *egc,
     libxl__domain_pvcontrol_write(gc, XBT_NULL, domid, "suspend");
 
     dss->pvcontrol.path = libxl__domain_pvcontrol_xspath(gc, domid);
-    if (!dss->pvcontrol.path) goto err;
+    if (!dss->pvcontrol.path) { rc = ERROR_FAIL; goto err; }
 
     dss->pvcontrol.ao = ao;
     dss->pvcontrol.what = "guest acknowledgement of suspend request";
@@ -1515,7 +1515,7 @@ static void domain_suspend_callback_common(libxl__egc *egc,
     return;
 
  err:
-    domain_suspend_common_failed(egc, dss);
+    domain_suspend_common_done(egc, dss, rc);
 }
 
 static void domain_suspend_common_wait_guest_evtchn(libxl__egc *egc,
@@ -1525,8 +1525,8 @@ static void domain_suspend_common_wait_guest_evtchn(libxl__egc *egc,
     STATE_AO_GC(dss->ao);
     /* If we should be done waiting, suspend_common_wait_guest_check
      * will end up calling domain_suspend_common_guest_suspended or
-     * domain_suspend_common_failed, both of which cancel the evtchn
-     * wait.  So re-enable it now. */
+     * domain_suspend_common_done, both of which cancel the evtchn
+     * wait as needed.  So re-enable it now. */
     libxl__ev_evtchn_wait(gc, &dss->guest_evtchn);
     suspend_common_wait_guest_check(egc, dss);
 }
@@ -1591,7 +1591,7 @@ static void domain_suspend_common_pvcontrol_suspending(libxl__egc *egc,
 
  err:
     libxl__xs_transaction_abort(gc, &t);
-    domain_suspend_common_failed(egc, dss);
+    domain_suspend_common_done(egc, dss, rc);
     return;
 }
 
@@ -1615,7 +1615,7 @@ static void domain_suspend_common_wait_guest(libxl__egc *egc,
     return;
 
  err:
-    domain_suspend_common_failed(egc, dss);
+    domain_suspend_common_done(egc, dss, rc);
 }
 
 static void suspend_common_wait_guest_watch(libxl__egc *egc,
@@ -1665,7 +1665,7 @@ static void suspend_common_wait_guest_check(libxl__egc *egc,
     return;
 
  err:
-    domain_suspend_common_failed(egc, dss);
+    domain_suspend_common_done(egc, dss, ERROR_FAIL);
 }
 
 static void suspend_common_wait_guest_timeout(libxl__egc *egc,
@@ -1674,46 +1674,40 @@ static void suspend_common_wait_guest_timeout(libxl__egc *egc,
     libxl__domain_suspend_state *dss = CONTAINER_OF(ev, *dss, guest_timeout);
     STATE_AO_GC(dss->ao);
     LOG(ERROR, "guest did not suspend, timed out");
-    domain_suspend_common_failed(egc, dss);
+    domain_suspend_common_done(egc, dss, ERROR_GUEST_TIMEDOUT);
 }
 
 static void domain_suspend_common_guest_suspended(libxl__egc *egc,
                                          libxl__domain_suspend_state *dss)
 {
     STATE_AO_GC(dss->ao);
-    int ret;
+    int rc;
 
     libxl__ev_evtchn_cancel(gc, &dss->guest_evtchn);
     libxl__ev_xswatch_deregister(gc, &dss->guest_watch);
     libxl__ev_time_deregister(gc, &dss->guest_timeout);
 
     if (dss->hvm) {
-        ret = libxl__domain_suspend_device_model(gc, dss);
-        if (ret) {
-            LOG(ERROR, "libxl__domain_suspend_device_model failed ret=%d", ret);
-            domain_suspend_common_failed(egc, dss);
+        rc = libxl__domain_suspend_device_model(gc, dss);
+        if (rc) {
+            LOG(ERROR, "libxl__domain_suspend_device_model failed ret=%d", rc);
+            domain_suspend_common_done(egc, dss, rc);
             return;
         }
     }
-    domain_suspend_common_done(egc, dss, 1);
-}
-
-static void domain_suspend_common_failed(libxl__egc *egc,
-                                         libxl__domain_suspend_state *dss)
-{
     domain_suspend_common_done(egc, dss, 0);
 }
 
 static void domain_suspend_common_done(libxl__egc *egc,
                                        libxl__domain_suspend_state *dss,
-                                       bool ok)
+                                       int rc)
 {
     EGC_GC;
     assert(!libxl__xswait_inuse(&dss->pvcontrol));
     libxl__ev_evtchn_cancel(gc, &dss->guest_evtchn);
     libxl__ev_xswatch_deregister(gc, &dss->guest_watch);
     libxl__ev_time_deregister(gc, &dss->guest_timeout);
-    dss->callback_common_done(egc, dss, ok);
+    dss->callback_common_done(egc, dss, rc);
 }
 
 static inline char *physmap_path(libxl__gc *gc, uint32_t dm_domid,
@@ -1830,9 +1824,9 @@ static void libxl__domain_suspend_callback(void *data)
 }
 
 static void domain_suspend_callback_common_done(libxl__egc *egc,
-                                libxl__domain_suspend_state *dss, int ok)
+                                libxl__domain_suspend_state *dss, int rc)
 {
-    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, ok);
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, !rc);
 }
 
 /*----- remus callbacks -----*/
@@ -1856,9 +1850,9 @@ static void libxl__remus_domain_suspend_callback(void *data)
 }
 
 static void remus_domain_suspend_callback_common_done(libxl__egc *egc,
-                                libxl__domain_suspend_state *dss, int ok)
+                                libxl__domain_suspend_state *dss, int rc)
 {
-    if (!ok)
+    if (rc)
         goto out;
 
     libxl__remus_devices_state *const rds = &dss->rds;
@@ -1867,7 +1861,7 @@ static void remus_domain_suspend_callback_common_done(libxl__egc *egc,
     return;
 
 out:
-    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, ok);
+    libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, !rc);
 }
 
 static void remus_devices_postsuspend_cb(libxl__egc *egc,
