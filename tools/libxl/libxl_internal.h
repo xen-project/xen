@@ -1116,6 +1116,61 @@ _hidden const char *libxl__device_nic_devname(libxl__gc *gc,
 
 _hidden int libxl__get_domid(libxl__gc *gc, uint32_t *domid);
 
+/*----- xswait: wait for a xenstore node to be suitable -----*/
+
+typedef struct libxl__xswait_state libxl__xswait_state;
+
+/*
+ * rc describes the circumstances of this callback:
+ *
+ * rc==0
+ *
+ *     The xenstore path (may have) changed.  It has been read for
+ *     you.  The result is in data (allocated from the ao gc).
+ *     data may be NULL, which means that the xenstore read gave
+ *     ENOENT.
+ *
+ *     If you are satisfied, you MUST call libxl__xswait_stop.
+ *     Otherwise, xswait will continue waiting and watching and
+ *     will call you back later.
+ *
+ * rc==ERROR_TIMEDOUT
+ *
+ *     The specified timeout was reached.
+ *     This has NOT been logged (except to the debug log).
+ *     xswait will not continue (but calling libxl__xswait_stop is OK).
+ *
+ * rc!=0, !=ERROR_TIMEDOUT
+ *
+ *     Some other error occurred.
+ *     This HAS been logged.
+ *     xswait will not continue (but calling libxl__xswait_stop is OK).
+ *
+ * xswait.path may start with with '@', in which case no read is done
+ * and the callback will always get data==0.
+ */
+typedef void libxl__xswait_callback(libxl__egc *egc,
+      libxl__xswait_state *xswa, int rc, const char *data);
+
+struct libxl__xswait_state {
+    /* caller must fill these in, and they must all remain valid */
+    libxl__ao *ao;
+    const char *what; /* for error msgs: noun phrase, what we're waiting for */
+    const char *path;
+    int timeout_ms; /* as for poll(2) */
+    libxl__xswait_callback *callback;
+    /* remaining fields are private to xswait */
+    libxl__ev_time time_ev;
+    libxl__ev_xswatch watch_ev;
+};
+
+void libxl__xswait_init(libxl__xswait_state*);
+void libxl__xswait_stop(libxl__gc*, libxl__xswait_state*); /*idempotent*/
+bool libxl__xswait_inuse(const libxl__xswait_state *ss);
+
+int libxl__xswait_start(libxl__gc*, libxl__xswait_state*);
+
+
 /*
  * libxl__ev_devstate - waits a given time for a device to
  * reach a given state.  Follows the libxl_ev_* conventions.
@@ -1212,60 +1267,6 @@ _hidden int libxl__device_pci_destroy_all(libxl__gc *gc, uint32_t domid);
 
 _hidden int libxl__device_dt_add(libxl__gc *gc, uint32_t domid,
                                  const libxl_device_dtdev *dtdev);
-
-/*----- xswait: wait for a xenstore node to be suitable -----*/
-
-typedef struct libxl__xswait_state libxl__xswait_state;
-
-/*
- * rc describes the circumstances of this callback:
- *
- * rc==0
- *
- *     The xenstore path (may have) changed.  It has been read for
- *     you.  The result is in data (allocated from the ao gc).
- *     data may be NULL, which means that the xenstore read gave
- *     ENOENT.
- *
- *     If you are satisfied, you MUST call libxl__xswait_stop.
- *     Otherwise, xswait will continue waiting and watching and
- *     will call you back later.
- *
- * rc==ERROR_TIMEDOUT
- *
- *     The specified timeout was reached.
- *     This has NOT been logged (except to the debug log).
- *     xswait will not continue (but calling libxl__xswait_stop is OK).
- *
- * rc!=0, !=ERROR_TIMEDOUT
- *
- *     Some other error occurred.
- *     This HAS been logged.
- *     xswait will not continue (but calling libxl__xswait_stop is OK).
- *
- * xswait.path may start with with '@', in which case no read is done
- * and the callback will always get data==0.
- */
-typedef void libxl__xswait_callback(libxl__egc *egc,
-      libxl__xswait_state *xswa, int rc, const char *data);
-
-struct libxl__xswait_state {
-    /* caller must fill these in, and they must all remain valid */
-    libxl__ao *ao;
-    const char *what; /* for error msgs: noun phrase, what we're waiting for */
-    const char *path;
-    int timeout_ms; /* as for poll(2) */
-    libxl__xswait_callback *callback;
-    /* remaining fields are private to xswait */
-    libxl__ev_time time_ev;
-    libxl__ev_xswatch watch_ev;
-};
-
-void libxl__xswait_init(libxl__xswait_state*);
-void libxl__xswait_stop(libxl__gc*, libxl__xswait_state*); /*idempotent*/
-bool libxl__xswait_inuse(const libxl__xswait_state *ss);
-
-int libxl__xswait_start(libxl__gc*, libxl__xswait_state*);
 
 /*
  *----- spawn -----
