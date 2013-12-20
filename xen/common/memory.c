@@ -543,22 +543,29 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
 }
 
 static int xenmem_add_to_physmap(struct domain *d,
-                                 struct xen_add_to_physmap *xatp)
+                                 struct xen_add_to_physmap *xatp,
+                                 unsigned int start)
 {
-    struct xen_add_to_physmap start_xatp;
-    int rc = 0;
+    unsigned int done = 0;
+    long rc = 0;
 
     if ( xatp->space != XENMAPSPACE_gmfn_range )
         return xenmem_add_to_physmap_one(d, xatp->space, DOMID_INVALID,
                                          xatp->idx, xatp->gpfn);
+
+    if ( xatp->size < start )
+        return -EILSEQ;
+
+    xatp->idx += start;
+    xatp->gpfn += start;
+    xatp->size -= start;
 
 #ifdef HAS_PASSTHROUGH
     if ( need_iommu(d) )
         this_cpu(iommu_dont_flush_iotlb) = 1;
 #endif
 
-    start_xatp = *xatp;
-    while ( xatp->size > 0 )
+    while ( xatp->size > done )
     {
         rc = xenmem_add_to_physmap_one(d, xatp->space, DOMID_INVALID,
                                        xatp->idx, xatp->gpfn);
@@ -567,12 +574,11 @@ static int xenmem_add_to_physmap(struct domain *d,
 
         xatp->idx++;
         xatp->gpfn++;
-        xatp->size--;
 
         /* Check for continuation if it's not the last iteration. */
-        if ( xatp->size > 0 && hypercall_preempt_check() )
+        if ( xatp->size > ++done && hypercall_preempt_check() )
         {
-            rc = -EAGAIN;
+            rc = start + done;
             break;
         }
     }
@@ -581,8 +587,8 @@ static int xenmem_add_to_physmap(struct domain *d,
     if ( need_iommu(d) )
     {
         this_cpu(iommu_dont_flush_iotlb) = 0;
-        iommu_iotlb_flush(d, start_xatp.idx, start_xatp.size - xatp->size);
-        iommu_iotlb_flush(d, start_xatp.gpfn, start_xatp.size - xatp->size);
+        iommu_iotlb_flush(d, xatp->idx - done, done);
+        iommu_iotlb_flush(d, xatp->gpfn - done, done);
     }
 #endif
 
@@ -594,10 +600,10 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     struct domain *d;
     long rc;
     unsigned int address_bits;
-    unsigned long start_extent;
     struct xen_memory_reservation reservation;
     struct memop_args args;
     domid_t domid;
+    unsigned long start_extent = cmd >> MEMOP_EXTENT_SHIFT;
     int op = cmd & MEMOP_CMD_MASK;
 
     switch ( op )
@@ -605,8 +611,6 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     case XENMEM_increase_reservation:
     case XENMEM_decrease_reservation:
     case XENMEM_populate_physmap:
-        start_extent = cmd >> MEMOP_EXTENT_SHIFT;
-
         if ( copy_from_guest(&reservation, arg, 1) )
             return start_extent;
 
@@ -724,6 +728,12 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
     {
         struct xen_add_to_physmap xatp;
 
+        BUILD_BUG_ON((typeof(xatp.size))-1 > (UINT_MAX >> MEMOP_EXTENT_SHIFT));
+
+        /* Check for malicious or buggy input. */
+        if ( start_extent != (typeof(xatp.size))start_extent )
+            return -EDOM;
+
         if ( copy_from_guest(&xatp, arg, 1) )
             return -EFAULT;
 
@@ -742,18 +752,14 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return rc;
         }
 
-        rc = xenmem_add_to_physmap(d, &xatp);
+        rc = xenmem_add_to_physmap(d, &xatp, start_extent);
 
         rcu_unlock_domain(d);
 
-        if ( xatp.space == XENMAPSPACE_gmfn_range && rc == -EAGAIN )
-        {
-            if ( !__copy_to_guest(arg, &xatp, 1) )
-                rc = hypercall_create_continuation(
-                        __HYPERVISOR_memory_op, "ih", op, arg);
-            else
-                rc = -EFAULT;
-        }
+        if ( xatp.space == XENMAPSPACE_gmfn_range && rc > 0 )
+            rc = hypercall_create_continuation(
+                     __HYPERVISOR_memory_op, "lh",
+                     op | (rc << MEMOP_EXTENT_SHIFT), arg);
 
         return rc;
     }

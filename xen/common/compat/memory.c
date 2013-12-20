@@ -190,6 +190,9 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             break;
 
         case XENMEM_add_to_physmap:
+            BUILD_BUG_ON((typeof(cmp.atp.size))-1 >
+                         (UINT_MAX >> MEMOP_EXTENT_SHIFT));
+
             if ( copy_from_guest(&cmp.atp, compat, 1) )
                 return -EFAULT;
 
@@ -322,17 +325,8 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
         case XENMEM_current_reservation:
         case XENMEM_maximum_reservation:
         case XENMEM_maximum_gpfn:
-        case XENMEM_remove_from_physmap:
-            break;
-
         case XENMEM_add_to_physmap:
-            if ( !rc || cmp.atp.space != XENMAPSPACE_gmfn_range )
-                break;
-
-            XLAT_add_to_physmap(&cmp.atp, nat.atp);
-            if ( __copy_to_guest(compat, &cmp.atp, 1) )
-                rc = -EFAULT;
-
+        case XENMEM_remove_from_physmap:
             break;
 
         default:
