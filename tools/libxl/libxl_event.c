@@ -33,6 +33,8 @@
 
 static libxl__ao *ao_nested_root(libxl__ao *ao);
 
+static void ao__check_destroy(libxl_ctx *ctx, libxl__ao *ao);
+
 
 /*
  * The counter osevent_in_hook is used to ensure that the application
@@ -1347,8 +1349,7 @@ static void egc_run_callbacks(libxl__egc *egc)
         ao->how.callback(CTX, ao->rc, ao->how.u.for_callback);
         CTX_LOCK;
         ao->notified = 1;
-        if (!ao->in_initiator)
-            libxl__ao__destroy(CTX, ao);
+        ao__check_destroy(CTX, ao);
         CTX_UNLOCK;
     }
 }
@@ -1729,6 +1730,33 @@ int libxl_event_wait(libxl_ctx *ctx, libxl_event **event_r,
  *                              - destroy the ao
  */
 
+
+/*
+ * A "manip" is a libxl public function manipulating this ao, which
+ * has a pointer to it.  We have to not destroy it while that's the
+ * case, obviously.  Callers must have the ctx locked, obviously.
+ */
+static void ao__manip_enter(libxl__ao *ao)
+{
+    assert(ao->manip_refcnt < INT_MAX);
+    ao->manip_refcnt++;
+}
+
+static void ao__manip_leave(libxl_ctx *ctx, libxl__ao *ao)
+{
+    assert(ao->manip_refcnt > 0);
+    ao->manip_refcnt--;
+    ao__check_destroy(ctx, ao);
+}
+
+static void ao__check_destroy(libxl_ctx *ctx, libxl__ao *ao)
+{
+    if (!ao->manip_refcnt && ao->notified) {
+        assert(ao->complete);
+        libxl__ao__destroy(ctx, ao);
+    }
+}
+
 void libxl__ao__destroy(libxl_ctx *ctx, libxl__ao *ao)
 {
     AO_GC;
@@ -1810,8 +1838,8 @@ void libxl__ao_complete_check_progress_reports(libxl__egc *egc, libxl__ao *ao)
         }
         ao->notified = 1;
     }
-    if (!ao->in_initiator && ao->notified)
-        libxl__ao__destroy(ctx, ao);
+    
+    ao__check_destroy(ctx, ao);
 }
 
 libxl__ao *libxl__ao_create(libxl_ctx *ctx, uint32_t domid,
@@ -1826,6 +1854,7 @@ libxl__ao *libxl__ao_create(libxl_ctx *ctx, uint32_t domid,
     ao->magic = LIBXL__AO_MAGIC;
     ao->constructing = 1;
     ao->in_initiator = 1;
+    ao__manip_enter(ao);
     ao->poller = 0;
     ao->domid = domid;
     LIBXL_INIT_GC(ao->gc, ctx);
@@ -1906,11 +1935,7 @@ int libxl__ao_inprogress(libxl__ao *ao,
     }
 
     ao->in_initiator = 0;
-
-    if (ao->notified) {
-        assert(ao->complete);
-        libxl__ao__destroy(CTX,ao);
-    }
+    ao__manip_leave(CTX, ao);
 
     return rc;
 }
