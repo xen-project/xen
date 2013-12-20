@@ -2210,7 +2210,7 @@ struct libxl__ao_device {
     /* Bodge for Qemu devices */
     libxl__ev_time timeout;
     /* xenstore watch for backend path of driver domains */
-    libxl__ev_xswatch xs_watch;
+    libxl__xswait_state xswait;
     int num_exec;
     /* for calling hotplug scripts */
     libxl__async_exec_state aes;
