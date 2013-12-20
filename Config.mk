@@ -234,7 +234,7 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-unstable.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= 447d264115c476142f884af0be287622cd244423
-QEMU_UPSTREAM_REVISION ?= master
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.4.0-rc1
 SEABIOS_UPSTREAM_TAG ?= rel-1.7.3.1
 # Fri Aug 2 14:12:09 2013 -0400
 # Fix bug in CBFS file walking with compressed files.
@@ -246,9 +246,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 96b58a44756a8821c108358439b0f2c06e531159
-# Wed Dec 4 15:16:18 2013 +1300
-# xen_disk: fix memory leak
+QEMU_TAG ?= 7f5b3c338e0f8938ba575dec18255dcbee0c2ee2
+# Wed Dec 18 15:25:14 2013 +0000
+# qemu-traditional: Fix build warnings on Wheezy
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
