@@ -1166,7 +1166,7 @@ static void switch_logdirty_timeout(libxl__egc *egc, libxl__ev_time *ev,
 static void switch_logdirty_xswatch(libxl__egc *egc, libxl__ev_xswatch*,
                             const char *watch_path, const char *event_path);
 static void switch_logdirty_done(libxl__egc *egc,
-                                 libxl__domain_suspend_state *dss, int ok);
+                                 libxl__domain_suspend_state *dss, int rc);
 
 static void logdirty_init(libxl__logdirty_switch *lds)
 {
@@ -1244,7 +1244,7 @@ static void domain_suspend_switch_qemu_xen_traditional_logdirty
  out:
     LOG(ERROR,"logdirty switch failed (rc=%d), aborting suspend",rc);
     libxl__xs_transaction_abort(gc, &t);
-    switch_logdirty_done(egc,dss,-1);
+    switch_logdirty_done(egc,dss,rc);
 }
 
 static void domain_suspend_switch_qemu_xen_logdirty
@@ -1292,7 +1292,7 @@ static void switch_logdirty_timeout(libxl__egc *egc, libxl__ev_time *ev,
     libxl__domain_suspend_state *dss = CONTAINER_OF(ev, *dss, logdirty.timeout);
     STATE_AO_GC(dss->ao);
     LOG(ERROR,"logdirty switch: wait for device model timed out");
-    switch_logdirty_done(egc,dss,-1);
+    switch_logdirty_done(egc,dss,ERROR_FAIL);
 }
 
 static void switch_logdirty_xswatch(libxl__egc *egc, libxl__ev_xswatch *watch,
@@ -1344,17 +1344,16 @@ static void switch_logdirty_xswatch(libxl__egc *egc, libxl__ev_xswatch *watch,
      */
     libxl__xs_transaction_abort(gc, &t);
 
-    if (!rc) {
-        switch_logdirty_done(egc,dss,0);
-    } else if (rc < 0) {
-        LOG(ERROR,"logdirty switch: failed (rc=%d)",rc);
-        switch_logdirty_done(egc,dss,-1);
+    if (rc <= 0) {
+        if (rc < 0)
+            LOG(ERROR,"logdirty switch: failed (rc=%d)",rc);
+        switch_logdirty_done(egc,dss,rc);
     }
 }
 
 static void switch_logdirty_done(libxl__egc *egc,
                                  libxl__domain_suspend_state *dss,
-                                 int broke)
+                                 int rc)
 {
     STATE_AO_GC(dss->ao);
     libxl__logdirty_switch *lds = &dss->logdirty;
@@ -1362,6 +1361,12 @@ static void switch_logdirty_done(libxl__egc *egc,
     libxl__ev_xswatch_deregister(gc, &lds->watch);
     libxl__ev_time_deregister(gc, &lds->timeout);
 
+    int broke;
+    if (rc) {
+        broke = -1;
+    } else {
+        broke = 0;
+    }
     libxl__xc_domain_saverestore_async_callback_done(egc, &dss->shs, broke);
 }
 
