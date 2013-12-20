@@ -356,6 +356,10 @@ static inline unsigned int get_order_from_pages(unsigned long nr_pages)
 
 void scrub_one_page(struct page_info *);
 
+int xenmem_add_to_physmap_one(struct domain *d, uint16_t space,
+                              domid_t foreign_domid,
+                              unsigned long idx, xen_pfn_t gpfn);
+
 /* Returns 1 on success, 0 on error, negative if the ring
  * for event propagation is full in the presence of paging */
 int guest_remove_page(struct domain *d, unsigned long gmfn);

@@ -4520,20 +4520,23 @@ static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
     return 0;
 }
 
-static int xenmem_add_to_physmap_once(
+int xenmem_add_to_physmap_one(
     struct domain *d,
-    const struct xen_add_to_physmap *xatp)
+    uint16_t space,
+    domid_t foreign_domid,
+    unsigned long idx,
+    xen_pfn_t gpfn)
 {
     struct page_info *page = NULL;
     unsigned long gfn = 0; /* gcc ... */
-    unsigned long prev_mfn, mfn = 0, gpfn, idx;
+    unsigned long prev_mfn, mfn = 0, old_gpfn;
     int rc;
     p2m_type_t p2mt;
 
-    switch ( xatp->space )
+    switch ( space )
     {
         case XENMAPSPACE_shared_info:
-            if ( xatp->idx == 0 )
+            if ( idx == 0 )
                 mfn = virt_to_mfn(d->shared_info);
             break;
         case XENMAPSPACE_grant_table:
@@ -4542,9 +4545,8 @@ static int xenmem_add_to_physmap_once(
             if ( d->grant_table->gt_version == 0 )
                 d->grant_table->gt_version = 1;
 
-            idx = xatp->idx;
             if ( d->grant_table->gt_version == 2 &&
-                 (xatp->idx & XENMAPIDX_grant_table_status) )
+                 (idx & XENMAPIDX_grant_table_status) )
             {
                 idx &= ~XENMAPIDX_grant_table_status;
                 if ( idx < nr_status_frames(d->grant_table) )
@@ -4566,9 +4568,9 @@ static int xenmem_add_to_physmap_once(
         case XENMAPSPACE_gmfn:
         {
             p2m_type_t p2mt;
-            gfn = xatp->idx;
 
-            idx = mfn_x(get_gfn_unshare(d, xatp->idx, &p2mt));
+            gfn = idx;
+            idx = mfn_x(get_gfn_unshare(d, idx, &p2mt));
             /* If the page is still shared, exit early */
             if ( p2m_is_shared(p2mt) )
             {
@@ -4589,41 +4591,38 @@ static int xenmem_add_to_physmap_once(
     {
         if ( page )
             put_page(page);
-        if ( xatp->space == XENMAPSPACE_gmfn ||
-             xatp->space == XENMAPSPACE_gmfn_range )
+        if ( space == XENMAPSPACE_gmfn || space == XENMAPSPACE_gmfn_range )
             put_gfn(d, gfn);
         return -EINVAL;
     }
 
     /* Remove previously mapped page if it was present. */
-    prev_mfn = mfn_x(get_gfn(d, xatp->gpfn, &p2mt));
+    prev_mfn = mfn_x(get_gfn(d, gpfn, &p2mt));
     if ( mfn_valid(prev_mfn) )
     {
         if ( is_xen_heap_mfn(prev_mfn) )
             /* Xen heap frames are simply unhooked from this phys slot. */
-            guest_physmap_remove_page(d, xatp->gpfn, prev_mfn, PAGE_ORDER_4K);
+            guest_physmap_remove_page(d, gpfn, prev_mfn, PAGE_ORDER_4K);
         else
             /* Normal domain memory is freed, to avoid leaking memory. */
-            guest_remove_page(d, xatp->gpfn);
+            guest_remove_page(d, gpfn);
     }
     /* In the XENMAPSPACE_gmfn case we still hold a ref on the old page. */
-    put_gfn(d, xatp->gpfn);
+    put_gfn(d, gpfn);
 
     /* Unmap from old location, if any. */
-    gpfn = get_gpfn_from_mfn(mfn);
-    ASSERT( gpfn != SHARED_M2P_ENTRY );
-    if ( xatp->space == XENMAPSPACE_gmfn ||
-         xatp->space == XENMAPSPACE_gmfn_range )
-        ASSERT( gpfn == gfn );
-    if ( gpfn != INVALID_M2P_ENTRY )
-        guest_physmap_remove_page(d, gpfn, mfn, PAGE_ORDER_4K);
+    old_gpfn = get_gpfn_from_mfn(mfn);
+    ASSERT( old_gpfn != SHARED_M2P_ENTRY );
+    if ( space == XENMAPSPACE_gmfn || space == XENMAPSPACE_gmfn_range )
+        ASSERT( old_gpfn == gfn );
+    if ( old_gpfn != INVALID_M2P_ENTRY )
+        guest_physmap_remove_page(d, old_gpfn, mfn, PAGE_ORDER_4K);
 
     /* Map at new location. */
-    rc = guest_physmap_add_page(d, xatp->gpfn, mfn, PAGE_ORDER_4K);
+    rc = guest_physmap_add_page(d, gpfn, mfn, PAGE_ORDER_4K);
 
     /* In the XENMAPSPACE_gmfn, we took a ref of the gfn at the top */
-    if ( xatp->space == XENMAPSPACE_gmfn ||
-         xatp->space == XENMAPSPACE_gmfn_range )
+    if ( space == XENMAPSPACE_gmfn || space == XENMAPSPACE_gmfn_range )
         put_gfn(d, gfn);
 
     if ( page )
@@ -4632,90 +4631,12 @@ static int xenmem_add_to_physmap_once(
     return rc;
 }
 
-static int xenmem_add_to_physmap(struct domain *d,
-                                 struct xen_add_to_physmap *xatp)
-{
-    struct xen_add_to_physmap start_xatp;
-    int rc = 0;
-
-    if ( xatp->space == XENMAPSPACE_gmfn_range )
-    {
-        if ( need_iommu(d) )
-            this_cpu(iommu_dont_flush_iotlb) = 1;
-
-        start_xatp = *xatp;
-        while ( xatp->size > 0 )
-        {
-            rc = xenmem_add_to_physmap_once(d, xatp);
-            if ( rc < 0 )
-                break;
-
-            xatp->idx++;
-            xatp->gpfn++;
-            xatp->size--;
-
-            /* Check for continuation if it's not the last interation */
-            if ( xatp->size > 0 && hypercall_preempt_check() )
-            {
-                rc = -EAGAIN;
-                break;
-            }
-        }
-
-        if ( need_iommu(d) )
-        {
-            this_cpu(iommu_dont_flush_iotlb) = 0;
-            iommu_iotlb_flush(d, start_xatp.idx, start_xatp.size - xatp->size);
-            iommu_iotlb_flush(d, start_xatp.gpfn, start_xatp.size - xatp->size);
-        }
-
-        return rc;
-    }
-
-    return xenmem_add_to_physmap_once(d, xatp);
-}
-
 long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int rc;
 
     switch ( op )
     {
-    case XENMEM_add_to_physmap:
-    {
-        struct xen_add_to_physmap xatp;
-        struct domain *d;
-
-        if ( copy_from_guest(&xatp, arg, 1) )
-            return -EFAULT;
-
-        d = rcu_lock_domain_by_any_id(xatp.domid);
-        if ( d == NULL )
-            return -ESRCH;
-
-        if ( xsm_add_to_physmap(XSM_TARGET, current->domain, d) )
-        {
-            rcu_unlock_domain(d);
-            return -EPERM;
-        }
-
-        rc = xenmem_add_to_physmap(d, &xatp);
-
-        rcu_unlock_domain(d);
-
-        if ( xatp.space == XENMAPSPACE_gmfn_range )
-        {
-            if ( rc && __copy_to_guest(arg, &xatp, 1) )
-                rc = -EFAULT;
-
-            if ( rc == -EAGAIN )
-                rc = hypercall_create_continuation(
-                        __HYPERVISOR_memory_op, "ih", op, arg);
-        }
-
-        return rc;
-    }
-
     case XENMEM_set_memory_map:
     {
         struct xen_foreign_memory_map fmap;

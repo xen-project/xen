@@ -55,34 +55,6 @@ int compat_arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     switch ( op )
     {
-    case XENMEM_add_to_physmap:
-    {
-        struct compat_add_to_physmap cmp;
-        struct xen_add_to_physmap *nat = COMPAT_ARG_XLAT_VIRT_BASE;
-
-        if ( copy_from_guest(&cmp, arg, 1) )
-            return -EFAULT;
-
-        XLAT_add_to_physmap(nat, &cmp);
-        rc = arch_memory_op(op, guest_handle_from_ptr(nat, void));
-
-        if ( !rc || cmp.space != XENMAPSPACE_gmfn_range )
-            break;
-
-        XLAT_add_to_physmap(&cmp, nat);
-        if ( __copy_to_guest(arg, &cmp, 1) )
-        {
-            if ( rc == __HYPERVISOR_memory_op )
-                hypercall_cancel_continuation();
-            return -EFAULT;
-        }
-
-        if ( rc == __HYPERVISOR_memory_op )
-            hypercall_xlat_continuation(NULL, 0x2, nat, arg);
-
-        break;
-    }
-
     case XENMEM_set_memory_map:
     {
         struct compat_foreign_memory_map cmp;

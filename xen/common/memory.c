@@ -542,6 +542,53 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
     return rc;
 }
 
+static int xenmem_add_to_physmap(struct domain *d,
+                                 struct xen_add_to_physmap *xatp)
+{
+    struct xen_add_to_physmap start_xatp;
+    int rc = 0;
+
+    if ( xatp->space != XENMAPSPACE_gmfn_range )
+        return xenmem_add_to_physmap_one(d, xatp->space, DOMID_INVALID,
+                                         xatp->idx, xatp->gpfn);
+
+#ifdef HAS_PASSTHROUGH
+    if ( need_iommu(d) )
+        this_cpu(iommu_dont_flush_iotlb) = 1;
+#endif
+
+    start_xatp = *xatp;
+    while ( xatp->size > 0 )
+    {
+        rc = xenmem_add_to_physmap_one(d, xatp->space, DOMID_INVALID,
+                                       xatp->idx, xatp->gpfn);
+        if ( rc < 0 )
+            break;
+
+        xatp->idx++;
+        xatp->gpfn++;
+        xatp->size--;
+
+        /* Check for continuation if it's not the last iteration. */
+        if ( xatp->size > 0 && hypercall_preempt_check() )
+        {
+            rc = -EAGAIN;
+            break;
+        }
+    }
+
+#ifdef HAS_PASSTHROUGH
+    if ( need_iommu(d) )
+    {
+        this_cpu(iommu_dont_flush_iotlb) = 0;
+        iommu_iotlb_flush(d, start_xatp.idx, start_xatp.size - xatp->size);
+        iommu_iotlb_flush(d, start_xatp.gpfn, start_xatp.size - xatp->size);
+    }
+#endif
+
+    return rc;
+}
+
 long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     struct domain *d;
@@ -672,6 +719,44 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         rcu_unlock_domain(d);
 
         break;
+
+    case XENMEM_add_to_physmap:
+    {
+        struct xen_add_to_physmap xatp;
+
+        if ( copy_from_guest(&xatp, arg, 1) )
+            return -EFAULT;
+
+        /* Foreign mapping is only possible via add_to_physmap_range. */
+        if ( xatp.space == XENMAPSPACE_gmfn_foreign )
+            return -ENOSYS;
+
+        d = rcu_lock_domain_by_any_id(xatp.domid);
+        if ( d == NULL )
+            return -ESRCH;
+
+        rc = xsm_add_to_physmap(XSM_TARGET, current->domain, d);
+        if ( rc )
+        {
+            rcu_unlock_domain(d);
+            return rc;
+        }
+
+        rc = xenmem_add_to_physmap(d, &xatp);
+
+        rcu_unlock_domain(d);
+
+        if ( xatp.space == XENMAPSPACE_gmfn_range && rc == -EAGAIN )
+        {
+            if ( !__copy_to_guest(arg, &xatp, 1) )
+                rc = hypercall_create_continuation(
+                        __HYPERVISOR_memory_op, "ih", op, arg);
+            else
+                rc = -EFAULT;
+        }
+
+        return rc;
+    }
 
     case XENMEM_remove_from_physmap:
     {

@@ -968,7 +968,7 @@ void share_xen_page_with_privileged_guests(
     share_xen_page_with_guest(page, dom_xen, readonly);
 }
 
-static int xenmem_add_to_physmap_one(
+int xenmem_add_to_physmap_one(
     struct domain *d,
     uint16_t space,
     domid_t foreign_domid,
@@ -1139,37 +1139,6 @@ long arch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     switch ( op )
     {
-    case XENMEM_add_to_physmap:
-    {
-        struct xen_add_to_physmap xatp;
-        struct domain *d;
-
-        if ( copy_from_guest(&xatp, arg, 1) )
-            return -EFAULT;
-
-        /* Foreign mapping is only supported by add_to_physmap_range */
-        if ( xatp.space == XENMAPSPACE_gmfn_foreign )
-            return -EINVAL;
-
-        d = rcu_lock_domain_by_any_id(xatp.domid);
-        if ( d == NULL )
-            return -ESRCH;
-
-        rc = xsm_add_to_physmap(XSM_TARGET, current->domain, d);
-        if ( rc )
-        {
-            rcu_unlock_domain(d);
-            return rc;
-        }
-
-        rc = xenmem_add_to_physmap_one(d, xatp.space, DOMID_INVALID,
-                                       xatp.idx, xatp.gpfn);
-
-        rcu_unlock_domain(d);
-
-        return rc;
-    }
-
     case XENMEM_add_to_physmap_range:
     {
         struct xen_add_to_physmap_range xatpr;

@@ -26,11 +26,13 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             XEN_GUEST_HANDLE_PARAM(void) hnd;
             struct xen_memory_reservation *rsrv;
             struct xen_memory_exchange *xchg;
+            struct xen_add_to_physmap *atp;
             struct xen_remove_from_physmap *xrfp;
         } nat;
         union {
             struct compat_memory_reservation rsrv;
             struct compat_memory_exchange xchg;
+            struct compat_add_to_physmap atp;
         } cmp;
 
         set_xen_guest_handle(nat.hnd, COMPAT_ARG_XLAT_VIRT_BASE);
@@ -187,6 +189,14 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
             nat.hnd = compat;
             break;
 
+        case XENMEM_add_to_physmap:
+            if ( copy_from_guest(&cmp.atp, compat, 1) )
+                return -EFAULT;
+
+            XLAT_add_to_physmap(nat.atp, &cmp.atp);
+
+            break;
+
         case XENMEM_remove_from_physmap:
         {
             struct compat_remove_from_physmap cmp;
@@ -313,6 +323,16 @@ int compat_memory_op(unsigned int cmd, XEN_GUEST_HANDLE_PARAM(void) compat)
         case XENMEM_maximum_reservation:
         case XENMEM_maximum_gpfn:
         case XENMEM_remove_from_physmap:
+            break;
+
+        case XENMEM_add_to_physmap:
+            if ( !rc || cmp.atp.space != XENMAPSPACE_gmfn_range )
+                break;
+
+            XLAT_add_to_physmap(&cmp.atp, nat.atp);
+            if ( __copy_to_guest(compat, &cmp.atp, 1) )
+                rc = -EFAULT;
+
             break;
 
         default:
