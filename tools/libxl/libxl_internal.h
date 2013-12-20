@@ -1189,24 +1189,21 @@ struct libxl__ev_devstate {
     libxl__ev_devstate_callback *callback;
     /* as for the remainder, read-only public parts may also be
      * read by the caller (notably, watch.path), but only when waiting: */
-    libxl__ev_xswatch watch;
-    libxl__ev_time timeout;
+    libxl__xswait_state w;
 };
 
 static inline void libxl__ev_devstate_init(libxl__ev_devstate *ds)
 {
-    libxl__ev_time_init(&ds->timeout);
-    libxl__ev_xswatch_init(&ds->watch);
+    libxl__xswait_init(&ds->w);
 }
 
 static inline void libxl__ev_devstate_cancel(libxl__gc *gc,
                                              libxl__ev_devstate *ds)
 {
-    libxl__ev_time_deregister(gc,&ds->timeout);
-    libxl__ev_xswatch_deregister(gc,&ds->watch);
+    libxl__xswait_stop(gc,&ds->w);
 }
 
-_hidden int libxl__ev_devstate_wait(libxl__gc *gc, libxl__ev_devstate *ds,
+_hidden int libxl__ev_devstate_wait(libxl__ao *ao, libxl__ev_devstate *ds,
                                     libxl__ev_devstate_callback cb,
                                     const char *state_path,
                                     int state, int milliseconds);

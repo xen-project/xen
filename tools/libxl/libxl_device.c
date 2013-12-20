@@ -758,7 +758,7 @@ void libxl__wait_device_connection(libxl__egc *egc, libxl__ao_device *aodev)
         return;
     }
 
-    rc = libxl__ev_devstate_wait(gc, &aodev->backend_ds,
+    rc = libxl__ev_devstate_wait(ao, &aodev->backend_ds,
                                  device_backend_callback,
                                  state_path, XenbusStateInitWait,
                                  LIBXL_INIT_TIMEOUT * 1000);
@@ -859,7 +859,7 @@ void libxl__initiate_device_remove(libxl__egc *egc,
         if (rc < 0) goto out;
     }
 
-    rc = libxl__ev_devstate_wait(gc, &aodev->backend_ds,
+    rc = libxl__ev_devstate_wait(ao, &aodev->backend_ds,
                                  device_backend_callback,
                                  state_path, XenbusStateClosed,
                                  LIBXL_DESTROY_TIMEOUT * 1000);
