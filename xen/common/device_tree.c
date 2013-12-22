@@ -999,7 +999,7 @@ static u64 __dt_translate_address(const struct dt_device_node *dev,
     bus->count_cells(dev, &na, &ns);
     if ( !DT_CHECK_COUNTS(na, ns) )
     {
-        dt_printk(XENLOG_ERR "dt_parse: Bad cell count for %s\n",
+        dt_printk(XENLOG_ERR "dt_parse: Bad cell count for device %s\n",
                   dev->full_name);
         goto bail;
     }
@@ -1029,7 +1029,7 @@ static u64 __dt_translate_address(const struct dt_device_node *dev,
         pbus->count_cells(dev, &pna, &pns);
         if ( !DT_CHECK_COUNTS(pna, pns) )
         {
-            printk(XENLOG_ERR "dt_parse: Bad cell count for %s\n",
+            printk(XENLOG_ERR "dt_parse: Bad cell count for parent %s\n",
                    dev->full_name);
             break;
         }
