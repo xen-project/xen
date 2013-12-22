@@ -817,6 +817,7 @@ static int __init ns16550_uart_dt_init(struct dt_device_node *dev,
 static const char const *ns16550_dt_compat[] __initconst =
 {
     "ns16550",
+    "ns16550a",
     "snps,dw-apb-uart",
     NULL
 };
