@@ -354,7 +354,7 @@ static int __init omap_uart_init(struct dt_device_node *dev,
     return 0;
 }
 
-static const char * const omap_uart_dt_compat[] __initdata =
+static const char * const omap_uart_dt_compat[] __initconst =
 {
     "ti,omap4-uart",
     NULL

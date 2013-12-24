@@ -277,7 +277,7 @@ static int __init pl011_uart_init(struct dt_device_node *dev,
     return 0;
 }
 
-static const char const *pl011_dt_compat[] __initdata =
+static const char * const pl011_dt_compat[] __initconst =
 {
     "arm,pl011",
     NULL

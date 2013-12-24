@@ -361,7 +361,7 @@ static int __init exynos4210_uart_init(struct dt_device_node *dev,
     return 0;
 }
 
-static const char const *exynos4210_dt_compat[] __initdata =
+static const char * const exynos4210_dt_compat[] __initconst =
 {
     "samsung,exynos4210-uart",
     NULL
