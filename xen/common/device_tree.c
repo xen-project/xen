@@ -93,7 +93,7 @@ struct dt_bus
 {
     const char *name;
     const char *addresses;
-    int (*match)(const struct dt_device_node *parent);
+    bool_t (*match)(const struct dt_device_node *node);
     void (*count_cells)(const struct dt_device_node *child,
                         int *addrc, int *sizec);
     u64 (*map)(__be32 *addr, const __be32 *range, int na, int ns, int pna);
@@ -793,6 +793,18 @@ int dt_n_size_cells(const struct dt_device_node *np)
 /*
  * Default translator (generic bus)
  */
+static bool_t dt_bus_default_match(const struct dt_device_node *node)
+{
+    /* Root node doesn't have "ranges" property */
+    if ( node->parent == NULL )
+        return 1;
+
+    /* The default bus is only used when the "ranges" property exists.
+     * Otherwise we can't translate the address
+     */
+    return (dt_get_property(node, "ranges", NULL) != NULL);
+}
+
 static void dt_bus_default_count_cells(const struct dt_device_node *dev,
                                 int *addrc, int *sizec)
 {
@@ -856,7 +868,7 @@ static const struct dt_bus dt_busses[] =
     {
         .name = "default",
         .addresses = "reg",
-        .match = NULL,
+        .match = dt_bus_default_match,
         .count_cells = dt_bus_default_count_cells,
         .map = dt_bus_default_map,
         .translate = dt_bus_default_translate,
@@ -871,7 +883,6 @@ static const struct dt_bus *dt_match_bus(const struct dt_device_node *np)
     for ( i = 0; i < ARRAY_SIZE(dt_busses); i++ )
         if ( !dt_busses[i].match || dt_busses[i].match(np) )
             return &dt_busses[i];
-    BUG();
 
     return NULL;
 }
@@ -890,7 +901,10 @@ static const __be32 *dt_get_address(const struct dt_device_node *dev,
     parent = dt_get_parent(dev);
     if ( parent == NULL )
         return NULL;
+
     bus = dt_match_bus(parent);
+    if ( !bus )
+        return NULL;
     bus->count_cells(dev, &na, &ns);
 
     if ( !DT_CHECK_ADDR_COUNT(na) )
@@ -994,6 +1008,8 @@ static u64 __dt_translate_address(const struct dt_device_node *dev,
     if ( parent == NULL )
         goto bail;
     bus = dt_match_bus(parent);
+    if ( !bus )
+        goto bail;
 
     /* Count address cells & copy address locally */
     bus->count_cells(dev, &na, &ns);
@@ -1026,6 +1042,11 @@ static u64 __dt_translate_address(const struct dt_device_node *dev,
 
         /* Get new parent bus and counts */
         pbus = dt_match_bus(parent);
+        if ( pbus == NULL )
+        {
+            dt_printk("DT: %s is not a valid bus\n", parent->full_name);
+            break;
+        }
         pbus->count_cells(dev, &pna, &pns);
         if ( !DT_CHECK_COUNTS(pna, pns) )
         {
@@ -1164,6 +1185,8 @@ unsigned int dt_number_of_address(const struct dt_device_node *dev)
         return 0;
 
     bus = dt_match_bus(parent);
+    if ( !bus )
+        return 0;
     bus->count_cells(dev, &na, &ns);
 
     if ( !DT_CHECK_COUNTS(na, ns) )
