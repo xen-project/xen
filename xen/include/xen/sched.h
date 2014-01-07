@@ -322,8 +322,8 @@ struct domain
     enum guest_type guest_type;
 
 #ifdef HAS_PASSTHROUGH
-    /* Does this guest need iommu mappings? */
-    bool_t           need_iommu;
+    /* Does this guest need iommu mappings (-1 meaning "being set up")? */
+    s8               need_iommu;
 #endif
     /* is node-affinity automatically computed? */
     bool_t           auto_node_affinity;

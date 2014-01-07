@@ -18,6 +18,7 @@
 #include <asm/hvm/iommu.h>
 #include <xen/paging.h>
 #include <xen/guest_access.h>
+#include <xen/event.h>
 #include <xen/softirq.h>
 #include <xen/keyhandler.h>
 #include <xsm/xsm.h>
@@ -281,7 +282,23 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
              d->mem_event->paging.ring_page)) )
         return -EXDEV;
 
-    spin_lock(&pcidevs_lock);
+    if ( !spin_trylock(&pcidevs_lock) )
+        return -ERESTART;
+
+    if ( need_iommu(d) <= 0 )
+    {
+        if ( !iommu_use_hap_pt(d) )
+        {
+            rc = iommu_populate_page_table(d);
+            if ( rc )
+            {
+                spin_unlock(&pcidevs_lock);
+                return rc;
+            }
+        }
+        d->need_iommu = 1;
+    }
+
     pdev = pci_get_pdev_by_domain(dom0, seg, bus, devfn);
     if ( !pdev )
     {
@@ -306,15 +323,14 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
                    rc);
     }
 
-    if ( has_arch_pdevs(d) && !need_iommu(d) )
+ done:
+    if ( !has_arch_pdevs(d) && need_iommu(d) )
     {
-        d->need_iommu = 1;
-        if ( !iommu_use_hap_pt(d) )
-            rc = iommu_populate_page_table(d);
-        goto done;
+        d->need_iommu = 0;
+        hd->platform_ops->teardown(d);
     }
-done:
     spin_unlock(&pcidevs_lock);
+
     return rc;
 }
 
@@ -322,12 +338,17 @@ static int iommu_populate_page_table(struct domain *d)
 {
     struct hvm_iommu *hd = domain_hvm_iommu(d);
     struct page_info *page;
-    int rc = 0;
+    int rc = 0, n = 0;
+
+    d->need_iommu = -1;
 
     this_cpu(iommu_dont_flush_iotlb) = 1;
     spin_lock(&d->page_alloc_lock);
 
-    page_list_for_each ( page, &d->page_list )
+    if ( unlikely(d->is_dying) )
+        rc = -ESRCH;
+
+    while ( !rc && (page = page_list_remove_head(&d->page_list)) )
     {
         if ( is_hvm_domain(d) ||
             (page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page )
@@ -337,7 +358,32 @@ static int iommu_populate_page_table(struct domain *d)
                 d, mfn_to_gmfn(d, page_to_mfn(page)), page_to_mfn(page),
                 IOMMUF_readable|IOMMUF_writable);
             if ( rc )
+            {
+                page_list_add(page, &d->page_list);
                 break;
+            }
+        }
+        page_list_add_tail(page, &d->arch.relmem_list);
+        if ( !(++n & 0xff) && !page_list_empty(&d->page_list) &&
+             hypercall_preempt_check() )
+            rc = -ERESTART;
+    }
+
+    if ( !rc )
+    {
+        /*
+         * The expectation here is that generally there are many normal pages
+         * on relmem_list (the ones we put there) and only few being in an
+         * offline/broken state. The latter ones are always at the head of the
+         * list. Hence we first move the whole list, and then move back the
+         * first few entries.
+         */
+        page_list_move(&d->page_list, &d->arch.relmem_list);
+        while ( (page = page_list_first(&d->page_list)) != NULL &&
+                (page->count_info & (PGC_state|PGC_broken)) )
+        {
+            page_list_del(page, &d->page_list);
+            page_list_add_tail(page, &d->arch.relmem_list);
         }
     }
 
@@ -346,8 +392,11 @@ static int iommu_populate_page_table(struct domain *d)
 
     if ( !rc )
         iommu_iotlb_flush_all(d);
-    else
+    else if ( rc != -ERESTART )
+    {
+        d->need_iommu = 0;
         hd->platform_ops->teardown(d);
+    }
 
     return rc;
 }
@@ -704,7 +753,10 @@ int iommu_do_domctl(
 
         ret = device_assigned(seg, bus, devfn) ?:
               assign_device(d, seg, bus, devfn);
-        if ( ret )
+        if ( ret == -ERESTART )
+            ret = hypercall_create_continuation(__HYPERVISOR_domctl,
+                                                "h", u_domctl);
+        else if ( ret )
             printk(XENLOG_G_ERR "XEN_DOMCTL_assign_device: "
                    "assign %04x:%02x:%02x.%u to dom%d failed (%d)\n",
                    seg, bus, PCI_SLOT(devfn), PCI_FUNC(devfn),

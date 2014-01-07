@@ -459,7 +459,8 @@ p2m_pod_offline_or_broken_hit(struct page_info *p)
 
 pod_hit:
     lock_page_alloc(p2m);
-    page_list_add_tail(p, &d->arch.relmem_list);
+    /* Insertion must be at list head (see iommu_populate_page_table()). */
+    page_list_add(p, &d->arch.relmem_list);
     unlock_page_alloc(p2m);
     pod_unlock(p2m);
     return 1;

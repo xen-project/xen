@@ -1921,6 +1921,12 @@ int domain_relinquish_resources(struct domain *d)
         }
 
         d->arch.relmem = RELMEM_xen;
+
+        spin_lock(&d->page_alloc_lock);
+        page_list_splice(&d->arch.relmem_list, &d->page_list);
+        INIT_PAGE_LIST_HEAD(&d->arch.relmem_list);
+        spin_unlock(&d->page_alloc_lock);
+
         /* Fallthrough. Relinquish every page of memory. */
     case RELMEM_xen:
         ret = relinquish_memory(d, &d->xenpage_list, ~0UL);
