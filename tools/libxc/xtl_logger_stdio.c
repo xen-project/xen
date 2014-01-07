@@ -28,6 +28,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <stdbool.h>
 
 struct xentoollog_logger_stdiostream {
     xentoollog_logger vtable;
@@ -35,7 +36,7 @@ struct xentoollog_logger_stdiostream {
     xentoollog_level min_level;
     unsigned flags;
     int progress_erase_len, progress_last_percent;
-    int tty;
+    bool progress_use_cr;
 };
 
 static void progress_erase(xentoollog_logger_stdiostream *lg) {
@@ -119,7 +120,7 @@ static void stdiostream_progress(struct xentoollog_logger *logger_in,
 
     lg->progress_last_percent = percent;
 
-    if (!lg->tty) {
+    if (!lg->progress_use_cr) {
         stdiostream_message(logger_in, this_level, context,
                             "%s: %lu/%lu  %3d%%",
                             doing_what, done, total, percent);
@@ -167,7 +168,18 @@ xentoollog_logger_stdiostream *xtl_createlogger_stdiostream
     newlogger.f = f;
     newlogger.min_level = min_level;
     newlogger.flags = flags;
-    newlogger.tty = isatty(fileno(newlogger.f)) > 0;
+
+    switch (flags & (XTL_STDIOSTREAM_PROGRESS_USE_CR |
+                     XTL_STDIOSTREAM_PROGRESS_NO_CR)) {
+    case XTL_STDIOSTREAM_PROGRESS_USE_CR: newlogger.progress_use_cr = 1; break;
+    case XTL_STDIOSTREAM_PROGRESS_NO_CR:  newlogger.progress_use_cr = 0; break;
+    case 0:
+        newlogger.progress_use_cr = isatty(fileno(newlogger.f)) > 0;
+        break;
+    default:
+        errno = EINVAL;
+        return 0;
+    }
 
     if (newlogger.flags & XTL_STDIOSTREAM_SHOW_DATE) tzset();
 

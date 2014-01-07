@@ -65,9 +65,11 @@ struct xentoollog_logger {
 
 /*---------- facilities for consuming log messages ----------*/
 
-#define XTL_STDIOSTREAM_SHOW_PID      01u
-#define XTL_STDIOSTREAM_SHOW_DATE     02u
-#define XTL_STDIOSTREAM_HIDE_PROGRESS 04u
+#define XTL_STDIOSTREAM_SHOW_PID            001u
+#define XTL_STDIOSTREAM_SHOW_DATE           002u
+#define XTL_STDIOSTREAM_HIDE_PROGRESS       004u
+#define XTL_STDIOSTREAM_PROGRESS_USE_CR     010u /* default is to */
+#define XTL_STDIOSTREAM_PROGRESS_NO_CR      020u /* use \r to ttys */
 
 typedef struct xentoollog_logger_stdiostream  xentoollog_logger_stdiostream;
 
