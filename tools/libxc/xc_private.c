@@ -249,11 +249,6 @@ int do_xen_hypercall(xc_interface *xch, privcmd_hypercall_t *hypercall)
     return xch->ops->u.privcmd.hypercall(xch, xch->ops_handle, hypercall);
 }
 
-void xc_cache_flush(xc_interface *xch, const void *p, size_t n)
-{
-    xch->ops->u.privcmd.cache_flush(xch, p, n);
-}
-
 xc_evtchn *xc_evtchn_open(xentoollog_logger *logger,
                              unsigned open_flags)
 {

@@ -30,7 +30,6 @@
 
 #include <sys/mman.h>
 #include <sys/ioctl.h>
-#include <sys/syscall.h>
 
 #include <xen/memory.h>
 #include <xen/sys/evtchn.h>
@@ -417,44 +416,6 @@ static void *linux_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handle
     return ret;
 }
 
-static void linux_privcmd_cache_flush(xc_interface *xch,
-				      const void *ptr, size_t nr)
-{
-#if defined(__arm__)
-    unsigned long start = (unsigned long)ptr;
-    unsigned long end = start + nr;
-    /* cacheflush(unsigned long start, unsigned long end, int flags) */
-    int rc = syscall(__ARM_NR_cacheflush, start, end, 0);
-    if ( rc < 0 )
-	    PERROR("cache flush operation failed: %d\n", errno);
-#elif defined(__aarch64__)
-    unsigned long start = (unsigned long)ptr;
-    unsigned long end = start + nr;
-    unsigned long p, ctr;
-    int stride;
-
-    /* Flush cache using direct DC CVAC instructions. This is
-     * available to EL0 when SCTLR_EL1.UCI is set, which Linux does.
-     *
-     * Bits 19:16 of CTR_EL0 are log2 of the minimum dcache line size
-     * in words, which we use as our stride length. This is readable
-     * with SCTLR_EL1.UCT is set, which Linux does.
-     */
-    asm volatile ("mrs %0, ctr_el0" : "=r" (ctr));
-
-    stride = 4 * (1 << ((ctr & 0xf0000UL) >> 16));
-
-    for ( p = start ; p < end ; p += stride )
-        asm volatile ("dc cvac, %0" :  : "r" (p));
-    asm volatile ("dsb sy");
-#elif defined(__i386__) || defined(__x86_64__)
-    /* No need for cache maintenance on x86 */
-#else
-    PERROR("No cache flush operation defined for architecture");
-    abort();
-#endif
-}
-
 static struct xc_osdep_ops linux_privcmd_ops = {
     .open = &linux_privcmd_open,
     .close = &linux_privcmd_close,
@@ -469,8 +430,6 @@ static struct xc_osdep_ops linux_privcmd_ops = {
         .map_foreign_bulk = &linux_privcmd_map_foreign_bulk,
         .map_foreign_range = &linux_privcmd_map_foreign_range,
         .map_foreign_ranges = &linux_privcmd_map_foreign_ranges,
-
-        .cache_flush = &linux_privcmd_cache_flush,
     },
 };
 

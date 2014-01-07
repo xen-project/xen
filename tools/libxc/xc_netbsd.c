@@ -22,7 +22,6 @@
 
 #include <xen/sys/evtchn.h>
 #include <unistd.h>
-#include <stdlib.h>
 #include <fcntl.h>
 #include <malloc.h>
 #include <sys/mman.h>
@@ -208,17 +207,6 @@ mmap_failed:
 	return NULL;
 }
 
-static void netbsd_privcmd_cache_flush(xc_interface *xch,
-                                       const void *ptr, size_t nr)
-{
-#if defined(__i386__) || defined(__x86_64__)
-    /* No need for cache maintenance on x86 */
-#else
-    PERROR("No cache flush operation defined for architecture");
-    abort();
-#endif
-}
-
 static struct xc_osdep_ops netbsd_privcmd_ops = {
     .open = &netbsd_privcmd_open,
     .close = &netbsd_privcmd_close,
@@ -233,8 +221,6 @@ static struct xc_osdep_ops netbsd_privcmd_ops = {
         .map_foreign_bulk = &xc_map_foreign_bulk_compat,
         .map_foreign_range = &netbsd_privcmd_map_foreign_range,
         .map_foreign_ranges = &netbsd_privcmd_map_foreign_ranges,
-
-        .cache_flush = &netbsd_privcmd_cache_flush,
     },
 };
 

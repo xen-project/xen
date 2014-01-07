@@ -181,16 +181,6 @@ static void *minios_privcmd_map_foreign_ranges(xc_interface *xch, xc_osdep_handl
     return ret;
 }
 
-static void minios_privcmd_cache_flush(xc_interface *xch,
-                                       const void *ptr, size_t nr)
-{
-#if defined(__i386__) || defined(__x86_64__)
-    /* No need for cache maintenance on x86 */
-#else
-    printf("No cache flush operation defined for architecture");
-    BUG();
-#endif
-}
 
 static struct xc_osdep_ops minios_privcmd_ops = {
     .open = &minios_privcmd_open,
@@ -206,8 +196,6 @@ static struct xc_osdep_ops minios_privcmd_ops = {
         .map_foreign_bulk = &minios_privcmd_map_foreign_bulk,
         .map_foreign_range = &minios_privcmd_map_foreign_range,
         .map_foreign_ranges = &minios_privcmd_map_foreign_ranges,
-
-        .cache_flush = &minios_privcmd_cache_flush,
     },
 };
 

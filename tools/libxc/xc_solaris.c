@@ -23,7 +23,6 @@
 #include <xen/memory.h>
 #include <xen/sys/evtchn.h>
 #include <unistd.h>
-#include <stdlib.h>
 #include <fcntl.h>
 #include <malloc.h>
 
@@ -179,17 +178,6 @@ mmap_failed:
     return NULL;
 }
 
-static void solaris_privcmd_cache_flush(xc_interface *xch,
-                                        const void *ptr, size_t nr)
-{
-#if defined(__i386__) || defined(__x86_64__)
-    /* No need for cache maintenance on x86 */
-#else
-    PERROR("No cache flush operation defined for architecture");
-    abort();
-#endif
-}
-
 static struct xc_osdep_ops solaris_privcmd_ops = {
     .open = &solaris_privcmd_open,
     .close = &solaris_privcmd_close,
@@ -204,8 +192,6 @@ static struct xc_osdep_ops solaris_privcmd_ops = {
         .map_foreign_bulk = &xc_map_foreign_bulk_compat,
         .map_foreign_range = &solaris_privcmd_map_foreign_range,
         .map_foreign_ranges = &solaris_privcmd_map_foreign_ranges,
-
-        .cache_flush = &solaris_privcmd_cache_flush,
     },
 };
 

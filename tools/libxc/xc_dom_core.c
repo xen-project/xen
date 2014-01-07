@@ -978,7 +978,6 @@ int xc_dom_build_image(struct xc_dom_image *dom)
         }
         else
             memcpy(ramdiskmap, dom->ramdisk_blob, dom->ramdisk_size);
-        xc_cache_flush(dom->xch, ramdiskmap, ramdisklen);
     }
 
     /* load devicetree */
@@ -998,7 +997,6 @@ int xc_dom_build_image(struct xc_dom_image *dom)
             goto err;
         }
         memcpy(devicetreemap, dom->devicetree_blob, dom->devicetree_size);
-        xc_cache_flush(dom->xch, devicetreemap, dom->devicetree_size);
     }
 
     /* allocate other pages */

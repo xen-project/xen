@@ -229,7 +229,6 @@ static int xc_dom_load_zimage_kernel(struct xc_dom_image *dom)
               __func__, dom->kernel_size, dom->kernel_blob, dst);
 
     memcpy(dst, dom->kernel_blob, dom->kernel_size);
-    xc_cache_flush(dom->xch, dst, dom->kernel_size);
 
     return 0;
 }

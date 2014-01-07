@@ -301,7 +301,6 @@ static int xc_dom_load_bin_kernel(struct xc_dom_image *dom)
 
     memcpy(dest, image + skip, text_size);
     memset(dest + text_size, 0, bss_size);
-    xc_cache_flush(dom->xch, dest, text_size+bss_size);
 
     return 0;
 }
