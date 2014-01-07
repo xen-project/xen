@@ -48,6 +48,7 @@ char *default_gatewaydev = NULL;
 char *default_vifbackend = NULL;
 enum output_format default_output_format = OUTPUT_FORMAT_JSON;
 int claim_mode = 1;
+bool progress_use_cr = 0;
 
 static xentoollog_level minmsglevel = XTL_PROGRESS;
 
@@ -292,7 +293,7 @@ int main(int argc, char **argv)
     int config_len = 0;
     const char *locks[] = XEND_LOCK;
 
-    while ((opt = getopt(argc, argv, "+vfN")) >= 0) {
+    while ((opt = getopt(argc, argv, "+vftN")) >= 0) {
         switch (opt) {
         case 'v':
             if (minmsglevel > 0) minmsglevel--;
@@ -302,6 +303,9 @@ int main(int argc, char **argv)
             break;
         case 'f':
             force_execution = 1;
+            break;
+        case 't':
+            progress_use_cr = 1;
             break;
         default:
             fprintf(stderr, "unknown global option\n");
@@ -317,7 +321,8 @@ int main(int argc, char **argv)
     }
     opterr = 0;
 
-    logger = xtl_createlogger_stdiostream(stderr, minmsglevel,  0);
+    logger = xtl_createlogger_stdiostream(stderr, minmsglevel,
+        (progress_use_cr ? XTL_STDIOSTREAM_PROGRESS_USE_CR : 0));
     if (!logger) exit(1);
 
     atexit(xl_ctx_free);

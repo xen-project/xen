@@ -81,6 +81,12 @@ Force execution: xl will refuse to run some commands if it detects that xend is
 also running, this option will force the execution of those commands, even
 though it is unsafe.
 
+=item B<-t>
+
+Always use carriage-return-based overwriting for printing progress
+messages without scrolling the screen.  Without -t, this is done only
+if stderr is a tty.
+
 =back
 
 =head1 DOMAIN SUBCOMMANDS
