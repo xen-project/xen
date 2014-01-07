@@ -4110,11 +4110,14 @@ int main_migrate(int argc, char **argv)
     domid = find_domain(argv[optind]);
     host = argv[optind + 1];
 
+    bool pass_tty_arg = progress_use_cr || (isatty(2) > 0);
+
     if (!ssh_command[0]) {
         rune= host;
     } else {
-        if (asprintf(&rune, "exec %s %s xl migrate-receive%s%s",
+        if (asprintf(&rune, "exec %s %s xl%s migrate-receive%s%s",
                      ssh_command, host,
+                     pass_tty_arg ? " -t" : "",
                      daemonize ? "" : " -e",
                      debug ? " -d" : "") < 0)
             return 1;
