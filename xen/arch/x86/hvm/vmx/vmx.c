@@ -1157,7 +1157,7 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
             uint32_t cr3_ctls = (CPU_BASED_CR3_LOAD_EXITING |
                                  CPU_BASED_CR3_STORE_EXITING);
             v->arch.hvm_vmx.exec_control &= ~cr3_ctls;
-            if ( !hvm_paging_enabled(v) )
+            if ( !hvm_paging_enabled(v) && !vmx_unrestricted_guest(v) )
                 v->arch.hvm_vmx.exec_control |= cr3_ctls;
 
             /* Trap CR3 updates if CR3 memory events are enabled. */
@@ -1231,7 +1231,7 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr)
     case 3:
         if ( paging_mode_hap(v->domain) )
         {
-            if ( !hvm_paging_enabled(v) )
+            if ( !hvm_paging_enabled(v) && !vmx_unrestricted_guest(v) )
                 v->arch.hvm_vcpu.hw_cr[3] =
                     v->domain->arch.hvm_domain.params[HVM_PARAM_IDENT_PT];
             vmx_load_pdptrs(v);
@@ -2487,10 +2487,11 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     hvm_invalidate_regs_fields(regs);
 
-    if ( paging_mode_hap(v->domain) && hvm_paging_enabled(v) )
+    if ( paging_mode_hap(v->domain) )
     {
         __vmread(GUEST_CR3, &v->arch.hvm_vcpu.hw_cr[3]);
-        v->arch.hvm_vcpu.guest_cr[3] = v->arch.hvm_vcpu.hw_cr[3];
+        if ( vmx_unrestricted_guest(v) || hvm_paging_enabled(v) )
+            v->arch.hvm_vcpu.guest_cr[3] = v->arch.hvm_vcpu.hw_cr[3];
     }
 
     __vmread(VM_EXIT_REASON, &exit_reason);

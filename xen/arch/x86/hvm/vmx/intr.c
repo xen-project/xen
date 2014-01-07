@@ -252,10 +252,11 @@ void vmx_intr_assist(void)
         intblk = hvm_interrupt_blocked(v, intack);
         if ( cpu_has_vmx_virtual_intr_delivery )
         {
-            /* Set "Interrupt-window exiting" for ExtINT */
+            /* Set "Interrupt-window exiting" for ExtINT and NMI. */
             if ( (intblk != hvm_intblk_none) &&
-                 ( (intack.source == hvm_intsrc_pic) ||
-                 ( intack.source == hvm_intsrc_vector) ) )
+                 (intack.source == hvm_intsrc_pic ||
+                  intack.source == hvm_intsrc_vector ||
+                  intack.source == hvm_intsrc_nmi) )
             {
                 enable_intr_window(v, intack);
                 goto out;
