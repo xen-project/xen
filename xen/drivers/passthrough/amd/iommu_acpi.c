@@ -159,7 +159,7 @@ static int __init register_exclusion_range_for_all_devices(
     int seg = 0; /* XXX */
     unsigned long range_top, iommu_top, length;
     struct amd_iommu *iommu;
-    u16 bdf;
+    unsigned int bdf;
 
     /* is part of exclusion range inside of IOMMU virtual address space? */
     /* note: 'limit' parameter is assumed to be page-aligned */
@@ -237,7 +237,8 @@ static int __init register_exclusion_range_for_iommu_devices(
     unsigned long base, unsigned long limit, u8 iw, u8 ir)
 {
     unsigned long range_top, iommu_top, length;
-    u16 bdf, req;
+    unsigned int bdf;
+    u16 req;
 
     /* is part of exclusion range inside of IOMMU virtual address space? */
     /* note: 'limit' parameter is assumed to be page-aligned */
@@ -292,7 +293,7 @@ static int __init parse_ivmd_device_range(
     const struct acpi_ivrs_memory *ivmd_block,
     unsigned long base, unsigned long limit, u8 iw, u8 ir)
 {
-    u16 first_bdf, last_bdf, bdf;
+    unsigned int first_bdf, last_bdf, bdf;
     int error;
 
     first_bdf = ivmd_block->header.device_id;
@@ -430,7 +431,7 @@ static u16 __init parse_ivhd_device_range(
     const struct acpi_ivhd_device_range *range,
     u16 header_length, u16 block_length, struct amd_iommu *iommu)
 {
-    u16 dev_length, first_bdf, last_bdf, bdf;
+    unsigned int dev_length, first_bdf, last_bdf, bdf;
 
     dev_length = sizeof(*range);
     if ( header_length < (block_length + dev_length) )
@@ -511,7 +512,7 @@ static u16 __init parse_ivhd_device_alias_range(
     u16 header_length, u16 block_length, struct amd_iommu *iommu)
 {
 
-    u16 dev_length, first_bdf, last_bdf, alias_id, bdf;
+    unsigned int dev_length, first_bdf, last_bdf, alias_id, bdf;
 
     dev_length = sizeof(*range);
     if ( header_length < (block_length + dev_length) )
@@ -590,7 +591,7 @@ static u16 __init parse_ivhd_device_extended_range(
     const struct acpi_ivhd_device_extended_range *range,
     u16 header_length, u16 block_length, struct amd_iommu *iommu)
 {
-    u16 dev_length, first_bdf, last_bdf, bdf;
+    unsigned int dev_length, first_bdf, last_bdf, bdf;
 
     dev_length = sizeof(*range);
     if ( header_length < (block_length + dev_length) )
