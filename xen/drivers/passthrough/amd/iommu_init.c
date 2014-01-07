@@ -524,7 +524,8 @@ static hw_irq_controller iommu_maskable_msi_type = {
 
 static void parse_event_log_entry(struct amd_iommu *iommu, u32 entry[])
 {
-    u16 domain_id, device_id, bdf, flags;
+    u16 domain_id, device_id, flags;
+    unsigned int bdf;
     u32 code;
     u64 *addr;
     int count = 0;
@@ -1103,7 +1104,7 @@ int iterate_ivrs_entries(int (*handler)(u16 seg, struct ivrs_mappings *))
 
     do {
         struct ivrs_mappings *map;
-        int bdf;
+        unsigned int bdf;
 
         if ( !radix_tree_gang_lookup(&ivrs_maps, (void **)&map, seg, 1) )
             break;
@@ -1118,7 +1119,7 @@ int iterate_ivrs_entries(int (*handler)(u16 seg, struct ivrs_mappings *))
 static int __init alloc_ivrs_mappings(u16 seg)
 {
     struct ivrs_mappings *ivrs_mappings;
-    int bdf;
+    unsigned int bdf;
 
     BUG_ON( !ivrs_bdf_entries );
 
@@ -1156,7 +1157,7 @@ static int __init alloc_ivrs_mappings(u16 seg)
 static int __init amd_iommu_setup_device_table(
     u16 seg, struct ivrs_mappings *ivrs_mappings)
 {
-    int bdf;
+    unsigned int bdf;
     void *intr_tb, *dte;
 
     BUG_ON( (ivrs_bdf_entries == 0) );
@@ -1306,7 +1307,8 @@ static void invalidate_all_domain_pages(void)
 static int _invalidate_all_devices(
     u16 seg, struct ivrs_mappings *ivrs_mappings)
 {
-    int bdf, req_id;
+    unsigned int bdf; 
+    u16 req_id;
     unsigned long flags;
     struct amd_iommu *iommu;
 
