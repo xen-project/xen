@@ -76,7 +76,7 @@ static ssize_t rdexact(xc_interface *xch, struct restore_ctx *ctx,
             if ( len == -1 && errno == EINTR )
                 continue;
             if ( !FD_ISSET(fd, &rfds) ) {
-                ERROR("read_exact_timed failed (select returned %zd)", len);
+                ERROR("%s failed (select returned %zd)", __func__, len);
                 errno = ETIMEDOUT;
                 return -1;
             }
@@ -90,7 +90,7 @@ static ssize_t rdexact(xc_interface *xch, struct restore_ctx *ctx,
             errno = 0;
         }
         if ( len <= 0 ) {
-            ERROR("read_exact_timed failed (read rc: %d, errno: %d)", len, errno);
+            ERROR("%s failed (read rc: %d, errno: %d)", __func__, len, errno);
             return -1;
         }
         offset += len;
