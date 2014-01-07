@@ -668,13 +668,24 @@ static void dma_pte_clear_one(struct domain *domain, u64 addr)
 
 static void iommu_free_pagetable(u64 pt_maddr, int level)
 {
-    int i;
-    struct dma_pte *pt_vaddr, *pte;
-    int next_level = level - 1;
+    struct page_info *pg = maddr_to_page(pt_maddr);
 
     if ( pt_maddr == 0 )
         return;
 
+    PFN_ORDER(pg) = level;
+    spin_lock(&iommu_pt_cleanup_lock);
+    page_list_add_tail(pg, &iommu_pt_cleanup_list);
+    spin_unlock(&iommu_pt_cleanup_lock);
+}
+
+static void iommu_free_page_table(struct page_info *pg)
+{
+    unsigned int i, next_level = PFN_ORDER(pg) - 1;
+    u64 pt_maddr = page_to_maddr(pg);
+    struct dma_pte *pt_vaddr, *pte;
+
+    PFN_ORDER(pg) = 0;
     pt_vaddr = (struct dma_pte *)map_vtd_domain_page(pt_maddr);
 
     for ( i = 0; i < PTE_NUM; i++ )
@@ -2430,6 +2441,7 @@ const struct iommu_ops intel_iommu_ops = {
     .teardown = iommu_domain_teardown,
     .map_page = intel_iommu_map_page,
     .unmap_page = intel_iommu_unmap_page,
+    .free_page_table = iommu_free_page_table,
     .reassign_device = reassign_device_ownership,
     .get_device_group_id = intel_iommu_group_id,
     .update_ire_from_apic = io_apic_write_remap_rte,

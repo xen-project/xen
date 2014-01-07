@@ -88,6 +88,7 @@ bool_t pt_irq_need_timer(uint32_t flags);
 
 struct msi_desc;
 struct msi_msg;
+struct page_info;
 
 struct iommu_ops {
     int (*init)(struct domain *d);
@@ -100,6 +101,7 @@ struct iommu_ops {
     int (*map_page)(struct domain *d, unsigned long gfn, unsigned long mfn,
                     unsigned int flags);
     int (*unmap_page)(struct domain *d, unsigned long gfn);
+    void (*free_page_table)(struct page_info *);
     int (*reassign_device)(struct domain *s, struct domain *t,
 			   u8 devfn, struct pci_dev *);
     int (*get_device_group_id)(u16 seg, u8 bus, u8 devfn);
@@ -150,5 +152,8 @@ int adjust_vtd_irq_affinities(void);
  * the caller.
  */
 DECLARE_PER_CPU(bool_t, iommu_dont_flush_iotlb);
+
+extern struct spinlock iommu_pt_cleanup_lock;
+extern struct page_list_head iommu_pt_cleanup_list;
 
 #endif /* _IOMMU_H_ */

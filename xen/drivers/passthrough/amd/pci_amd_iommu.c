@@ -405,11 +405,21 @@ static int amd_iommu_assign_device(struct domain *d, u8 devfn,
     return reassign_device(dom0, d, devfn, pdev);
 }
 
-static void deallocate_next_page_table(struct page_info* pg, int level)
+static void deallocate_next_page_table(struct page_info *pg, int level)
+{
+    PFN_ORDER(pg) = level;
+    spin_lock(&iommu_pt_cleanup_lock);
+    page_list_add_tail(pg, &iommu_pt_cleanup_list);
+    spin_unlock(&iommu_pt_cleanup_lock);
+}
+
+static void deallocate_page_table(struct page_info *pg)
 {
     void *table_vaddr, *pde;
     u64 next_table_maddr;
-    int index, next_level;
+    unsigned int index, level = PFN_ORDER(pg), next_level;
+
+    PFN_ORDER(pg) = 0;
 
     if ( level <= 1 )
     {
@@ -599,6 +609,7 @@ const struct iommu_ops amd_iommu_ops = {
     .teardown = amd_iommu_domain_destroy,
     .map_page = amd_iommu_map_page,
     .unmap_page = amd_iommu_unmap_page,
+    .free_page_table = deallocate_page_table,
     .reassign_device = reassign_device,
     .get_device_group_id = amd_iommu_group_id,
     .update_ire_from_apic = amd_iommu_ioapic_update_ire,

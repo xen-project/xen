@@ -58,6 +58,10 @@ bool_t __read_mostly amd_iommu_perdev_intremap = 1;
 
 DEFINE_PER_CPU(bool_t, iommu_dont_flush_iotlb);
 
+DEFINE_SPINLOCK(iommu_pt_cleanup_lock);
+PAGE_LIST_HEAD(iommu_pt_cleanup_list);
+static struct tasklet iommu_pt_cleanup_tasklet;
+
 static struct keyhandler iommu_p2m_table = {
     .diagnostic = 0,
     .u.fn = iommu_dump_p2m_table,
@@ -251,6 +255,15 @@ int iommu_remove_device(struct pci_dev *pdev)
     return hd->platform_ops->remove_device(pdev->devfn, pdev);
 }
 
+static void iommu_teardown(struct domain *d)
+{
+    const struct hvm_iommu *hd = domain_hvm_iommu(d);
+
+    d->need_iommu = 0;
+    hd->platform_ops->teardown(d);
+    tasklet_schedule(&iommu_pt_cleanup_tasklet);
+}
+
 /*
  * If the device isn't owned by dom0, it means it already
  * has been assigned to other domain, or it doesn't exist.
@@ -325,10 +338,7 @@ static int assign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
 
  done:
     if ( !has_arch_pdevs(d) && need_iommu(d) )
-    {
-        d->need_iommu = 0;
-        hd->platform_ops->teardown(d);
-    }
+        iommu_teardown(d);
     spin_unlock(&pcidevs_lock);
 
     return rc;
@@ -393,10 +403,7 @@ static int iommu_populate_page_table(struct domain *d)
     if ( !rc )
         iommu_iotlb_flush_all(d);
     else if ( rc != -ERESTART )
-    {
-        d->need_iommu = 0;
-        hd->platform_ops->teardown(d);
-    }
+        iommu_teardown(d);
 
     return rc;
 }
@@ -413,10 +420,7 @@ void iommu_domain_destroy(struct domain *d)
         return;
 
     if ( need_iommu(d) )
-    {
-        d->need_iommu = 0;
-        hd->platform_ops->teardown(d);
-    }
+        iommu_teardown(d);
 
     list_for_each_safe ( ioport_list, tmp, &hd->g2m_ioport_list )
     {
@@ -452,6 +456,23 @@ int iommu_unmap_page(struct domain *d, unsigned long gfn)
         return 0;
 
     return hd->platform_ops->unmap_page(d, gfn);
+}
+
+static void iommu_free_pagetables(unsigned long unused)
+{
+    do {
+        struct page_info *pg;
+
+        spin_lock(&iommu_pt_cleanup_lock);
+        pg = page_list_remove_head(&iommu_pt_cleanup_list);
+        spin_unlock(&iommu_pt_cleanup_lock);
+        if ( !pg )
+            return;
+        iommu_get_ops()->free_page_table(pg);
+    } while ( !softirq_pending(smp_processor_id()) );
+
+    tasklet_schedule_on_cpu(&iommu_pt_cleanup_tasklet,
+                            cpumask_cycle(smp_processor_id(), &cpu_online_map));
 }
 
 void iommu_iotlb_flush(struct domain *d, unsigned long gfn, unsigned int page_count)
@@ -516,10 +537,7 @@ int deassign_device(struct domain *d, u16 seg, u8 bus, u8 devfn)
     pdev->fault.count = 0;
 
     if ( !has_arch_pdevs(d) && need_iommu(d) )
-    {
-        d->need_iommu = 0;
-        hd->platform_ops->teardown(d);
-    }
+        iommu_teardown(d);
 
     return ret;
 }
@@ -558,6 +576,7 @@ int __init iommu_setup(void)
                iommu_passthrough ? "Passthrough" :
                iommu_dom0_strict ? "Strict" : "Relaxed");
         printk("Interrupt remapping %sabled\n", iommu_intremap ? "en" : "dis");
+        tasklet_init(&iommu_pt_cleanup_tasklet, iommu_free_pagetables, 0);
     }
 
     return rc;
