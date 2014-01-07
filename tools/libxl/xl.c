@@ -50,7 +50,7 @@ enum output_format default_output_format = OUTPUT_FORMAT_JSON;
 int claim_mode = 1;
 bool progress_use_cr = 0;
 
-static xentoollog_level minmsglevel = XTL_PROGRESS;
+xentoollog_level minmsglevel = minmsglevel_default;
 
 /* Get autoballoon option based on presence of dom0_mem Xen command
    line option. */

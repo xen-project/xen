@@ -4115,9 +4115,21 @@ int main_migrate(int argc, char **argv)
     if (!ssh_command[0]) {
         rune= host;
     } else {
-        if (asprintf(&rune, "exec %s %s xl%s migrate-receive%s%s",
+        char verbose_buf[minmsglevel_default+3];
+        int verbose_len;
+        verbose_buf[0] = ' ';
+        verbose_buf[1] = '-';
+        memset(verbose_buf+2, 'v', minmsglevel_default);
+        verbose_buf[sizeof(verbose_buf)-1] = 0;
+        if (minmsglevel == minmsglevel_default) {
+            verbose_len = 0;
+        } else {
+            verbose_len = (minmsglevel_default - minmsglevel) + 2;
+        }
+        if (asprintf(&rune, "exec %s %s xl%s%.*s migrate-receive%s%s",
                      ssh_command, host,
                      pass_tty_arg ? " -t" : "",
+                     verbose_len, verbose_buf,
                      daemonize ? "" : " -e",
                      debug ? " -d" : "") < 0)
             return 1;
