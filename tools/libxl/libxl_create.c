@@ -706,6 +706,7 @@ static void initiate_domain_create(libxl__egc *egc,
     libxl_ctx *ctx = libxl__gc_owner(gc);
     uint32_t domid;
     int i, ret;
+    size_t last_devid = -1;
 
     /* convenience aliases */
     libxl_domain_config *const d_config = dcs->guest_config;
@@ -745,6 +746,29 @@ static void initiate_domain_create(libxl__egc *egc,
     dcs->bl.ao = ao;
     libxl_device_disk *bootdisk =
         d_config->num_disks > 0 ? &d_config->disks[0] : NULL;
+
+    /*
+     * The devid has to be set before launching the device model. For the
+     * hotplug case this is done in libxl_device_nic_add but on domain
+     * creation this is called too late.
+     * Make two runs over configured NICs in order to avoid duplicate IDs
+     * in case the caller partially assigned IDs.
+     */
+    for (i = 0; i < d_config->num_nics; i++) {
+        /* We have to init the nic here, because we still haven't
+         * called libxl_device_nic_add when domcreate_launch_dm gets called,
+         * but qemu needs the nic information to be complete.
+         */
+        ret = libxl__device_nic_setdefault(gc, &d_config->nics[i], domid);
+        if (ret) goto error_out;
+
+        if (d_config->nics[i].devid > last_devid)
+            last_devid = d_config->nics[i].devid;
+    }
+    for (i = 0; i < d_config->num_nics; i++) {
+        if (d_config->nics[i].devid < 0)
+            d_config->nics[i].devid = ++last_devid;
+    }
 
     if (restore_fd >= 0) {
         LOG(DEBUG, "restoring, not running bootloader\n");
@@ -1058,17 +1082,6 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         }
     }
 
-
-
-    for (i = 0; i < d_config->num_nics; i++) {
-        /* We have to init the nic here, because we still haven't
-         * called libxl_device_nic_add at this point, but qemu needs
-         * the nic information to be complete.
-         */
-        ret = libxl__device_nic_setdefault(gc, &d_config->nics[i], domid);
-        if (ret)
-            goto error_out;
-    }
     switch (d_config->c_info.type) {
     case LIBXL_DOMAIN_TYPE_HVM:
     {
