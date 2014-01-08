@@ -91,7 +91,7 @@
  *
  *   In addition the following arch specific sub-ops:
  *    * XENMEM_add_to_physmap
- *    * XENMEM_add_to_physmap_range
+ *    * XENMEM_add_to_physmap_batch
  *
  *  HYPERVISOR_domctl
  *   All generic sub-operations, with the exception of:

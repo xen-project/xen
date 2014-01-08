@@ -628,54 +628,54 @@ static int xenmem_add_to_physmap(struct domain *d,
     return rc;
 }
 
-static int xenmem_add_to_physmap_range(struct domain *d,
-                                       struct xen_add_to_physmap_range *xatpr,
+static int xenmem_add_to_physmap_batch(struct domain *d,
+                                       struct xen_add_to_physmap_batch *xatpb,
                                        unsigned int start)
 {
     unsigned int done = 0;
     int rc;
 
-    if ( xatpr->size < start )
+    if ( xatpb->size < start )
         return -EILSEQ;
 
-    guest_handle_add_offset(xatpr->idxs, start);
-    guest_handle_add_offset(xatpr->gpfns, start);
-    guest_handle_add_offset(xatpr->errs, start);
-    xatpr->size -= start;
+    guest_handle_add_offset(xatpb->idxs, start);
+    guest_handle_add_offset(xatpb->gpfns, start);
+    guest_handle_add_offset(xatpb->errs, start);
+    xatpb->size -= start;
 
-    while ( xatpr->size > done )
+    while ( xatpb->size > done )
     {
         xen_ulong_t idx;
         xen_pfn_t gpfn;
 
-        if ( unlikely(__copy_from_guest_offset(&idx, xatpr->idxs, 0, 1)) )
+        if ( unlikely(__copy_from_guest_offset(&idx, xatpb->idxs, 0, 1)) )
         {
             rc = -EFAULT;
             goto out;
         }
 
-        if ( unlikely(__copy_from_guest_offset(&gpfn, xatpr->gpfns, 0, 1)) )
+        if ( unlikely(__copy_from_guest_offset(&gpfn, xatpb->gpfns, 0, 1)) )
         {
             rc = -EFAULT;
             goto out;
         }
 
-        rc = xenmem_add_to_physmap_one(d, xatpr->space,
-                                       xatpr->foreign_domid,
+        rc = xenmem_add_to_physmap_one(d, xatpb->space,
+                                       xatpb->foreign_domid,
                                        idx, gpfn);
 
-        if ( unlikely(__copy_to_guest_offset(xatpr->errs, 0, &rc, 1)) )
+        if ( unlikely(__copy_to_guest_offset(xatpb->errs, 0, &rc, 1)) )
         {
             rc = -EFAULT;
             goto out;
         }
 
-        guest_handle_add_offset(xatpr->idxs, 1);
-        guest_handle_add_offset(xatpr->gpfns, 1);
-        guest_handle_add_offset(xatpr->errs, 1);
+        guest_handle_add_offset(xatpb->idxs, 1);
+        guest_handle_add_offset(xatpb->gpfns, 1);
+        guest_handle_add_offset(xatpb->errs, 1);
 
         /* Check for continuation if it's not the last iteration. */
-        if ( xatpr->size > ++done && hypercall_preempt_check() )
+        if ( xatpb->size > ++done && hypercall_preempt_check() )
         {
             rc = start + done;
             goto out;
@@ -830,7 +830,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         if ( copy_from_guest(&xatp, arg, 1) )
             return -EFAULT;
 
-        /* Foreign mapping is only possible via add_to_physmap_range. */
+        /* Foreign mapping is only possible via add_to_physmap_batch. */
         if ( xatp.space == XENMAPSPACE_gmfn_foreign )
             return -ENOSYS;
 
@@ -857,29 +857,29 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         return rc;
     }
 
-    case XENMEM_add_to_physmap_range:
+    case XENMEM_add_to_physmap_batch:
     {
-        struct xen_add_to_physmap_range xatpr;
+        struct xen_add_to_physmap_batch xatpb;
         struct domain *d;
 
-        BUILD_BUG_ON((typeof(xatpr.size))-1 >
+        BUILD_BUG_ON((typeof(xatpb.size))-1 >
                      (UINT_MAX >> MEMOP_EXTENT_SHIFT));
 
         /* Check for malicious or buggy input. */
-        if ( start_extent != (typeof(xatpr.size))start_extent )
+        if ( start_extent != (typeof(xatpb.size))start_extent )
             return -EDOM;
 
-        if ( copy_from_guest(&xatpr, arg, 1) ||
-             !guest_handle_okay(xatpr.idxs, xatpr.size) ||
-             !guest_handle_okay(xatpr.gpfns, xatpr.size) ||
-             !guest_handle_okay(xatpr.errs, xatpr.size) )
+        if ( copy_from_guest(&xatpb, arg, 1) ||
+             !guest_handle_okay(xatpb.idxs, xatpb.size) ||
+             !guest_handle_okay(xatpb.gpfns, xatpb.size) ||
+             !guest_handle_okay(xatpb.errs, xatpb.size) )
             return -EFAULT;
 
         /* This mapspace is unsupported for this hypercall. */
-        if ( xatpr.space == XENMAPSPACE_gmfn_range )
+        if ( xatpb.space == XENMAPSPACE_gmfn_range )
             return -EOPNOTSUPP;
 
-        d = rcu_lock_domain_by_any_id(xatpr.domid);
+        d = rcu_lock_domain_by_any_id(xatpb.domid);
         if ( d == NULL )
             return -ESRCH;
 
@@ -890,7 +890,7 @@ long do_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return rc;
         }
 
-        rc = xenmem_add_to_physmap_range(d, &xatpr, start_extent);
+        rc = xenmem_add_to_physmap_batch(d, &xatpb, start_extent);
 
         rcu_unlock_domain(d);
 

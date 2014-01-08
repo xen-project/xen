@@ -207,8 +207,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_machphys_mapping_t);
 #define XENMAPSPACE_gmfn         2 /* GMFN */
 #define XENMAPSPACE_gmfn_range   3 /* GMFN range, XENMEM_add_to_physmap only. */
 #define XENMAPSPACE_gmfn_foreign 4 /* GMFN from another dom,
-                                    * XENMEM_add_to_physmap_range only.
-                                    */
+                                    * XENMEM_add_to_physmap_batch only. */
 /* ` } */
 
 /*
@@ -238,8 +237,8 @@ typedef struct xen_add_to_physmap xen_add_to_physmap_t;
 DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_t);
 
 /* A batched version of add_to_physmap. */
-#define XENMEM_add_to_physmap_range 23
-struct xen_add_to_physmap_range {
+#define XENMEM_add_to_physmap_batch 23
+struct xen_add_to_physmap_batch {
     /* IN */
     /* Which domain to change the mapping for. */
     domid_t domid;
@@ -260,8 +259,15 @@ struct xen_add_to_physmap_range {
     /* Per index error code. */
     XEN_GUEST_HANDLE(int) errs;
 };
-typedef struct xen_add_to_physmap_range xen_add_to_physmap_range_t;
+typedef struct xen_add_to_physmap_batch xen_add_to_physmap_batch_t;
+DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_batch_t);
+
+#if __XEN_INTERFACE_VERSION__ < 0x00040400
+#define XENMEM_add_to_physmap_range XENMEM_add_to_physmap_batch
+#define xen_add_to_physmap_range xen_add_to_physmap_batch
+typedef struct xen_add_to_physmap_batch xen_add_to_physmap_range_t;
 DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_range_t);
+#endif
 
 /*
  * Unmaps the page appearing at a particular GPFN from the specified guest's
