@@ -50,6 +50,36 @@ static void evtchn_fifo_init(struct domain *d, struct evtchn *evtchn)
                  d->domain_id, evtchn->port);
 }
 
+static struct evtchn_fifo_queue *lock_old_queue(const struct domain *d,
+                                                struct evtchn *evtchn,
+                                                unsigned long *flags)
+{
+    struct vcpu *v;
+    struct evtchn_fifo_queue *q, *old_q;
+    unsigned int try;
+
+    for ( try = 0; try < 3; try++ )
+    {
+        v = d->vcpu[evtchn->last_vcpu_id];
+        old_q = &v->evtchn_fifo->queue[evtchn->last_priority];
+
+        spin_lock_irqsave(&old_q->lock, *flags);
+
+        v = d->vcpu[evtchn->last_vcpu_id];
+        q = &v->evtchn_fifo->queue[evtchn->last_priority];
+
+        if ( old_q == q )
+            return old_q;
+
+        spin_unlock_irqrestore(&old_q->lock, *flags);
+    }
+
+    gdprintk(XENLOG_WARNING,
+             "domain %d, port %d lost event (too many queue changes)\n",
+             d->domain_id, evtchn->port);
+    return NULL;
+}          
+
 static int try_set_link(event_word_t *word, event_word_t *w, uint32_t link)
 {
     event_word_t new, old;
@@ -119,7 +149,6 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
     struct domain *d = v->domain;
     unsigned int port;
     event_word_t *word;
-    struct evtchn_fifo_queue *q;
     unsigned long flags;
     bool_t was_pending;
 
@@ -136,25 +165,52 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
         return;
     }
 
-    /*
-     * No locking around getting the queue. This may race with
-     * changing the priority but we are allowed to signal the event
-     * once on the old priority.
-     */
-    q = &v->evtchn_fifo->queue[evtchn->priority];
-
     was_pending = test_and_set_bit(EVTCHN_FIFO_PENDING, word);
 
     /*
      * Link the event if it unmasked and not already linked.
      */
     if ( !test_bit(EVTCHN_FIFO_MASKED, word)
-         && !test_and_set_bit(EVTCHN_FIFO_LINKED, word) )
+         && !test_bit(EVTCHN_FIFO_LINKED, word) )
     {
+        struct evtchn_fifo_queue *q, *old_q;
         event_word_t *tail_word;
         bool_t linked = 0;
 
-        spin_lock_irqsave(&q->lock, flags);
+        /*
+         * No locking around getting the queue. This may race with
+         * changing the priority but we are allowed to signal the
+         * event once on the old priority.
+         */
+        q = &v->evtchn_fifo->queue[evtchn->priority];
+
+        old_q = lock_old_queue(d, evtchn, &flags);
+        if ( !old_q )
+            goto done;
+
+        if ( test_and_set_bit(EVTCHN_FIFO_LINKED, word) )
+        {
+            spin_unlock_irqrestore(&old_q->lock, flags);
+            goto done;
+        }
+
+        /*
+         * If this event was a tail, the old queue is now empty and
+         * its tail must be invalidated to prevent adding an event to
+         * the old queue from corrupting the new queue.
+         */
+        if ( old_q->tail == port )
+            old_q->tail = 0;
+
+        /* Moved to a different queue? */
+        if ( old_q != q )
+        {
+            evtchn->last_vcpu_id = evtchn->notify_vcpu_id;
+            evtchn->last_priority = evtchn->priority;
+
+            spin_unlock_irqrestore(&old_q->lock, flags);
+            spin_lock_irqsave(&q->lock, flags);
+        }
 
         /*
          * Atomically link the tail to port iff the tail is linked.
@@ -166,7 +222,7 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
          * If the queue is empty (i.e., we haven't linked to the new
          * event), head must be updated.
          */
-        if ( port != q->tail )
+        if ( q->tail )
         {
             tail_word = evtchn_fifo_word_from_port(d, q->tail);
             linked = evtchn_fifo_set_link(d, tail_word, port);
@@ -182,7 +238,7 @@ static void evtchn_fifo_set_pending(struct vcpu *v, struct evtchn *evtchn)
                                   &v->evtchn_fifo->control_block->ready) )
             vcpu_mark_events_pending(v);
     }
-
+ done:
     if ( !was_pending )
         evtchn_check_pollers(d, port);
 }

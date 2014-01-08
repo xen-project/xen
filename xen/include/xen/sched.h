@@ -98,6 +98,8 @@ struct evtchn
     } u;
     u8 priority;
     u8 pending:1;
+    u16 last_vcpu_id;
+    u8 last_priority;
 #ifdef FLASK_ENABLE
     void *ssid;
 #endif
