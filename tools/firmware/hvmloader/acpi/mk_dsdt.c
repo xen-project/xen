@@ -220,9 +220,13 @@ int main(int argc, char **argv)
 
     pop_block();
 
-    /* Define GPE control method '_L02'. */
+    /* Define GPE control method. */
     push_block("Scope", "\\_GPE");
-    push_block("Method", "_L02");
+    if (dm_version == QEMU_XEN_TRADITIONAL) {
+        push_block("Method", "_L02");
+    } else {
+        push_block("Method", "_E02");
+    }
     stmt("Return", "\\_SB.PRSC()");
     pop_block();
     pop_block();
@@ -428,7 +432,7 @@ int main(int argc, char **argv)
         decision_tree(0x00, 0x100, "SLT", pci_hotplug_notify);
         pop_block();
     } else {
-        push_block("Method", "_L01");
+        push_block("Method", "_E01");
         for (slot = 1; slot <= 31; slot++) {
             push_block("If", "And(PCIU, ShiftLeft(1, %i))", slot);
             stmt("Notify", "\\_SB.PCI0.S%i, 1", slot);
