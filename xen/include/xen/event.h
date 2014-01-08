@@ -132,6 +132,7 @@ void evtchn_2l_init(struct domain *d);
  * Low-level event channel port ops.
  */
 struct evtchn_port_ops {
+    void (*init)(struct domain *d, struct evtchn *evtchn);
     void (*set_pending)(struct vcpu *v, struct evtchn *evtchn);
     void (*clear_pending)(struct domain *d, struct evtchn *evtchn);
     void (*unmask)(struct domain *d, struct evtchn *evtchn);
@@ -141,6 +142,12 @@ struct evtchn_port_ops {
                         unsigned int priority);
     void (*print_state)(struct domain *d, const struct evtchn *evtchn);
 };
+
+static inline void evtchn_port_init(struct domain *d, struct evtchn *evtchn)
+{
+    if ( d->evtchn_port_ops->init )
+        d->evtchn_port_ops->init(d, evtchn);
+}
 
 static inline void evtchn_port_set_pending(struct vcpu *v,
                                            struct evtchn *evtchn)

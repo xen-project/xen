@@ -220,6 +220,7 @@ static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
     chn->state = ECS_UNBOUND;
     if ( (chn->u.unbound.remote_domid = alloc->remote_dom) == DOMID_SELF )
         chn->u.unbound.remote_domid = current->domain->domain_id;
+    evtchn_port_init(d, chn);
 
     alloc->port = port;
 
@@ -276,6 +277,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     lchn->u.interdomain.remote_dom  = rd;
     lchn->u.interdomain.remote_port = (u16)rport;
     lchn->state                     = ECS_INTERDOMAIN;
+    evtchn_port_init(ld, lchn);
     
     rchn->u.interdomain.remote_dom  = ld;
     rchn->u.interdomain.remote_port = (u16)lport;
@@ -330,6 +332,7 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
     chn->state          = ECS_VIRQ;
     chn->notify_vcpu_id = vcpu;
     chn->u.virq         = virq;
+    evtchn_port_init(d, chn);
 
     v->virq_to_evtchn[virq] = bind->port = port;
 
@@ -359,6 +362,7 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     chn = evtchn_from_port(d, port);
     chn->state          = ECS_IPI;
     chn->notify_vcpu_id = vcpu;
+    evtchn_port_init(d, chn);
 
     bind->port = port;
 
@@ -437,6 +441,7 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
     chn->state  = ECS_PIRQ;
     chn->u.pirq.irq = pirq;
     link_pirq_port(port, chn, v);
+    evtchn_port_init(d, chn);
 
     bind->port = port;
 

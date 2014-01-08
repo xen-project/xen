@@ -34,6 +34,22 @@ static inline event_word_t *evtchn_fifo_word_from_port(struct domain *d,
     return d->evtchn_fifo->event_array[p] + w;
 }
 
+static void evtchn_fifo_init(struct domain *d, struct evtchn *evtchn)
+{
+    event_word_t *word;
+
+    evtchn->priority = EVTCHN_FIFO_PRIORITY_DEFAULT;
+
+    /*
+     * If this event is still linked, the first event may be delivered
+     * on the wrong VCPU or with an unexpected priority.
+     */
+    word = evtchn_fifo_word_from_port(d, evtchn->port);
+    if ( word && test_bit(EVTCHN_FIFO_LINKED, word) )
+        gdprintk(XENLOG_WARNING, "domain %d, port %d already on a queue\n",
+                 d->domain_id, evtchn->port);
+}
+
 static int try_set_link(event_word_t *word, event_word_t *w, uint32_t link)
 {
     event_word_t new, old;
@@ -261,6 +277,7 @@ static void evtchn_fifo_print_state(struct domain *d,
 
 static const struct evtchn_port_ops evtchn_port_ops_fifo =
 {
+    .init          = evtchn_fifo_init,
     .set_pending   = evtchn_fifo_set_pending,
     .clear_pending = evtchn_fifo_clear_pending,
     .unmask        = evtchn_fifo_unmask,
