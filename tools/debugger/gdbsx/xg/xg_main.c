@@ -821,3 +821,11 @@ xg_write_mem(uint64_t guestva, char *frombuf, int buflen, uint64_t pgd3val)
     return iop->remain;
 }
 
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * indent-tabs-mode: nil
+ * End:
+ */
