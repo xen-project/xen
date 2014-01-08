@@ -29,12 +29,14 @@
 #include <xen/hypercall.h>
 #include <xen/softirq.h>
 #include <xen/domain_page.h>
+#include <xen/stdbool.h>
 #include <public/sched.h>
 #include <public/xen.h>
 #include <asm/event.h>
 #include <asm/regs.h>
 #include <asm/cpregs.h>
 #include <asm/psci.h>
+#include <asm/flushtlb.h>
 
 #include "decode.h"
 #include "io.h"
@@ -1279,6 +1281,29 @@ static void advance_pc(struct cpu_user_regs *regs, union hsr hsr)
     regs->pc += hsr.len ? 4 : 2;
 }
 
+static void update_sctlr(struct vcpu *v, uint32_t val)
+{
+    /*
+     * If MMU (SCTLR_M) is now enabled then we must disable HCR.DC
+     * because they are incompatible.
+     *
+     * Once HCR.DC is disabled then we do not need HCR_TVM either,
+     * since it's only purpose was to catch the MMU being enabled.
+     *
+     * Both are set appropriately on context switch but we need to
+     * clear them now since we may not context switch on return to
+     * guest.
+     */
+    if ( val & SCTLR_M )
+    {
+        WRITE_SYSREG(READ_SYSREG(HCR_EL2) & ~(HCR_DC|HCR_TVM), HCR_EL2);
+        /* ARM ARM 0406C.b B3.2.1: Disabling HCR.DC without changing
+         * VMID requires us to flush the TLB for that VMID. */
+        flush_tlb();
+        v->arch.default_cache = false;
+    }
+}
+
 static void do_cp15_32(struct cpu_user_regs *regs,
                        union hsr hsr)
 {
@@ -1338,6 +1363,89 @@ static void do_cp15_32(struct cpu_user_regs *regs,
         if ( cp32.read )
            *r = v->arch.actlr;
         break;
+
+/* Passthru a 32-bit AArch32 register which is also 32-bit under AArch64 */
+#define CP32_PASSTHRU32(R...) do {              \
+    if ( cp32.read )                            \
+        *r = READ_SYSREG32(R);                  \
+    else                                        \
+        WRITE_SYSREG32(*r, R);                  \
+} while(0)
+
+/*
+ * Passthru a 32-bit AArch32 register which is 64-bit under AArch64.
+ * Updates the lower 32-bits and clears the upper bits.
+ */
+#define CP32_PASSTHRU64(R...) do {              \
+    if ( cp32.read )                            \
+        *r = (uint32_t)READ_SYSREG64(R);        \
+    else                                        \
+        WRITE_SYSREG64((uint64_t)*r, R);        \
+} while(0)
+
+/*
+ * Passthru a 32-bit AArch32 register which is 64-bit under AArch64.
+ * Updates either the HI ([63:32]) or LO ([31:0]) 32-bits preserving
+ * the other half.
+ */
+#ifdef CONFIG_ARM_64
+#define CP32_PASSTHRU64_HI(R...) do {                   \
+    if ( cp32.read )                                    \
+        *r = (uint32_t)(READ_SYSREG64(R) >> 32);        \
+    else                                                \
+    {                                                   \
+        uint64_t t = READ_SYSREG64(R) & 0xffffffffUL;   \
+        t |= ((uint64_t)(*r)) << 32;                    \
+        WRITE_SYSREG64(t, R);                           \
+    }                                                   \
+} while(0)
+#define CP32_PASSTHRU64_LO(R...) do {                           \
+    if ( cp32.read )                                            \
+        *r = (uint32_t)(READ_SYSREG64(R) & 0xffffffff);         \
+    else                                                        \
+    {                                                           \
+        uint64_t t = READ_SYSREG64(R) & 0xffffffff00000000UL;   \
+        t |= *r;                                                \
+        WRITE_SYSREG64(t, R);                                   \
+    }                                                           \
+} while(0)
+#endif
+
+    /* HCR.TVM */
+    case HSR_CPREG32(SCTLR):
+        CP32_PASSTHRU32(SCTLR_EL1);
+        update_sctlr(v, *r);
+        break;
+    case HSR_CPREG32(TTBR0_32):   CP32_PASSTHRU64(TTBR0_EL1);      break;
+    case HSR_CPREG32(TTBR1_32):   CP32_PASSTHRU64(TTBR1_EL1);      break;
+    case HSR_CPREG32(TTBCR):      CP32_PASSTHRU32(TCR_EL1);        break;
+    case HSR_CPREG32(DACR):       CP32_PASSTHRU32(DACR32_EL2);     break;
+    case HSR_CPREG32(DFSR):       CP32_PASSTHRU32(ESR_EL1);        break;
+    case HSR_CPREG32(IFSR):       CP32_PASSTHRU32(IFSR32_EL2);     break;
+    case HSR_CPREG32(ADFSR):      CP32_PASSTHRU32(AFSR0_EL1);      break;
+    case HSR_CPREG32(AIFSR):      CP32_PASSTHRU32(AFSR1_EL1);      break;
+    case HSR_CPREG32(CONTEXTIDR): CP32_PASSTHRU32(CONTEXTIDR_EL1); break;
+
+#ifdef CONFIG_ARM_64
+    case HSR_CPREG32(DFAR):       CP32_PASSTHRU64_LO(FAR_EL1);     break;
+    case HSR_CPREG32(IFAR):       CP32_PASSTHRU64_HI(FAR_EL1);     break;
+    case HSR_CPREG32(MAIR0):      CP32_PASSTHRU64_LO(MAIR_EL1);    break;
+    case HSR_CPREG32(MAIR1):      CP32_PASSTHRU64_HI(MAIR_EL1);    break;
+    case HSR_CPREG32(AMAIR0):     CP32_PASSTHRU64_LO(AMAIR_EL1);   break;
+    case HSR_CPREG32(AMAIR1):     CP32_PASSTHRU64_HI(AMAIR_EL1);   break;
+#else
+    case HSR_CPREG32(DFAR):       CP32_PASSTHRU32(DFAR);           break;
+    case HSR_CPREG32(IFAR):       CP32_PASSTHRU32(IFAR);           break;
+    case HSR_CPREG32(MAIR0):      CP32_PASSTHRU32(MAIR0);          break;
+    case HSR_CPREG32(MAIR1):      CP32_PASSTHRU32(MAIR1);          break;
+    case HSR_CPREG32(AMAIR0):     CP32_PASSTHRU32(AMAIR0);         break;
+    case HSR_CPREG32(AMAIR1):     CP32_PASSTHRU32(AMAIR1);         break;
+#endif
+
+#undef CP32_PASSTHRU32
+#undef CP32_PASSTHRU64
+#undef CP32_PASSTHRU64_LO
+#undef CP32_PASSTHRU64_HI
     default:
         printk("%s p15, %d, r%d, cr%d, cr%d, %d @ 0x%"PRIregister"\n",
                cp32.read ? "mrc" : "mcr",
@@ -1351,6 +1459,9 @@ static void do_cp15_64(struct cpu_user_regs *regs,
                        union hsr hsr)
 {
     struct hsr_cp64 cp64 = hsr.cp64;
+    uint32_t *r1 = (uint32_t *)select_user_reg(regs, cp64.reg1);
+    uint32_t *r2 = (uint32_t *)select_user_reg(regs, cp64.reg2);
+    uint64_t r;
 
     if ( !check_conditional_instr(regs, hsr) )
     {
@@ -1368,6 +1479,26 @@ static void do_cp15_64(struct cpu_user_regs *regs,
             domain_crash_synchronous();
         }
         break;
+
+#define CP64_PASSTHRU(R...) do {                                  \
+    if ( cp64.read )                                            \
+    {                                                           \
+        r = READ_SYSREG64(R);                                   \
+        *r1 = r & 0xffffffffUL;                                 \
+        *r2 = r >> 32;                                          \
+    }                                                           \
+    else                                                        \
+    {                                                           \
+        r = (*r1) | (((uint64_t)(*r2))<<32);                    \
+        WRITE_SYSREG64(r, R);                                   \
+    }                                                           \
+} while(0)
+
+    case HSR_CPREG64(TTBR0): CP64_PASSTHRU(TTBR0_EL1); break;
+    case HSR_CPREG64(TTBR1): CP64_PASSTHRU(TTBR1_EL1); break;
+
+#undef CP64_PASSTHRU
+
     default:
         printk("%s p15, %d, r%d, r%d, cr%d @ 0x%"PRIregister"\n",
                cp64.read ? "mrrc" : "mcrr",
@@ -1382,11 +1513,13 @@ static void do_sysreg(struct cpu_user_regs *regs,
                       union hsr hsr)
 {
     struct hsr_sysreg sysreg = hsr.sysreg;
+    register_t *x = select_user_reg(regs, sysreg.reg);
+    struct vcpu *v = current;
 
     switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
     {
-    case CNTP_CTL_EL0:
-    case CNTP_TVAL_EL0:
+    case HSR_SYSREG_CNTP_CTL_EL0:
+    case HSR_SYSREG_CNTP_TVAL_EL0:
         if ( !vtimer_emulate(regs, hsr) )
         {
             dprintk(XENLOG_ERR,
@@ -1394,6 +1527,31 @@ static void do_sysreg(struct cpu_user_regs *regs,
             domain_crash_synchronous();
         }
         break;
+
+#define SYSREG_PASSTHRU(R...) do {              \
+    if ( sysreg.read )                          \
+        *x = READ_SYSREG(R);                    \
+    else                                        \
+        WRITE_SYSREG(*x, R);                    \
+} while(0)
+
+    case HSR_SYSREG_SCTLR_EL1:
+        SYSREG_PASSTHRU(SCTLR_EL1);
+        update_sctlr(v, *x);
+        break;
+    case HSR_SYSREG_TTBR0_EL1:      SYSREG_PASSTHRU(TTBR0_EL1);      break;
+    case HSR_SYSREG_TTBR1_EL1:      SYSREG_PASSTHRU(TTBR1_EL1);      break;
+    case HSR_SYSREG_TCR_EL1:        SYSREG_PASSTHRU(TCR_EL1);        break;
+    case HSR_SYSREG_ESR_EL1:        SYSREG_PASSTHRU(ESR_EL1);        break;
+    case HSR_SYSREG_FAR_EL1:        SYSREG_PASSTHRU(FAR_EL1);        break;
+    case HSR_SYSREG_AFSR0_EL1:      SYSREG_PASSTHRU(AFSR0_EL1);      break;
+    case HSR_SYSREG_AFSR1_EL1:      SYSREG_PASSTHRU(AFSR1_EL1);      break;
+    case HSR_SYSREG_MAIR_EL1:       SYSREG_PASSTHRU(MAIR_EL1);       break;
+    case HSR_SYSREG_AMAIR_EL1:      SYSREG_PASSTHRU(AMAIR_EL1);      break;
+    case HSR_SYSREG_CONTEXTIDR_EL1: SYSREG_PASSTHRU(CONTEXTIDR_EL1); break;
+
+#undef SYSREG_PASSTHRU
+
     default:
         printk("%s %d, %d, c%d, c%d, %d %s x%d @ 0x%"PRIregister"\n",
                sysreg.read ? "mrs" : "msr",
@@ -1465,7 +1623,6 @@ done:
     if (second) unmap_domain_page(second);
     if (first) unmap_domain_page(first);
 }
-
 
 static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
                                       union hsr hsr)

@@ -240,18 +240,18 @@ static int vtimer_emulate_sysreg(struct cpu_user_regs *regs, union hsr hsr)
 
     switch ( hsr.bits & HSR_SYSREG_REGS_MASK )
     {
-    case CNTP_CTL_EL0:
+    case HSR_SYSREG_CNTP_CTL_EL0:
         vtimer_cntp_ctl(regs, &r, sysreg.read);
         if ( sysreg.read )
             *x = r;
         return 1;
-    case CNTP_TVAL_EL0:
+    case HSR_SYSREG_CNTP_TVAL_EL0:
         vtimer_cntp_tval(regs, &r, sysreg.read);
         if ( sysreg.read )
             *x = r;
         return 1;
 
-    case HSR_CPREG64(CNTPCT):
+    case HSR_SYSREG_CNTPCT_EL0:
         return vtimer_cntpct(regs, x, sysreg.read);
 
     default:

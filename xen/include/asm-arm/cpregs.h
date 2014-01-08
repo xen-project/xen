@@ -121,6 +121,8 @@
 #define TTBR0           p15,0,c2        /* Translation Table Base Reg. 0 */
 #define TTBR1           p15,1,c2        /* Translation Table Base Reg. 1 */
 #define HTTBR           p15,4,c2        /* Hyp. Translation Table Base Register */
+#define TTBR0_32        p15,0,c2,c0,0   /* 32-bit access to TTBR0 */
+#define TTBR1_32        p15,0,c2,c0,1   /* 32-bit access to TTBR1 */
 #define HTCR            p15,4,c2,c0,2   /* Hyp. Translation Control Register */
 #define VTCR            p15,4,c2,c1,2   /* Virtualization Translation Control Register */
 #define VTTBR           p15,6,c2        /* Virtualization Translation Table Base Register */
@@ -260,7 +262,9 @@
 #define CPACR_EL1               CPACR
 #define CSSELR_EL1              CSSELR
 #define DACR32_EL2              DACR
+#define ESR_EL1                 DFSR
 #define ESR_EL2                 HSR
+#define FAR_EL1                 HIFAR
 #define FAR_EL2                 HIFAR
 #define HCR_EL2                 HCR
 #define HPFAR_EL2               HPFAR
