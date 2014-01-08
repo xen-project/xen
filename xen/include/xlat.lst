@@ -55,6 +55,7 @@
 !	kexec_image			kexec.h
 !	kexec_range			kexec.h
 !	add_to_physmap			memory.h
+!	add_to_physmap_batch		memory.h
 !	foreign_memory_map		memory.h
 !	memory_exchange			memory.h
 !	memory_map			memory.h
