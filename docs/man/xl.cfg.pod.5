@@ -387,7 +387,10 @@ to the domain.
 
 This options does not control the emulated graphics card presented to
 an HVM guest. See L<Emulated VGA Graphics Device> below for how to
-configure the emulated device.
+configure the emulated device. If L<Emulated VGA Graphics Device> options
+are used in a PV guest configuration, xl will pick up B<vnc>, B<vnclisten>,
+B<vncpasswd>, B<vncdisplay> and B<vncunused> to construct paravirtual
+framebuffer device for the guest.
 
 Each B<VFB_SPEC_STRING> is a comma-separated list of C<KEY=VALUE>
 settings, from the following list:
