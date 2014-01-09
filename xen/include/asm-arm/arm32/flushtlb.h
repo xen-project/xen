@@ -34,6 +34,17 @@ static inline void flush_tlb_all_local(void)
     isb();
 }
 
+/* Flush innershareable TLBs, all VMIDs, non-hypervisor mode */
+static inline void flush_tlb_all(void)
+{
+    dsb();
+
+    WRITE_CP32((uint32_t) 0, TLBIALLNSNHIS);
+
+    dsb();
+    isb();
+}
+
 #endif /* __ASM_ARM_ARM32_FLUSHTLB_H__ */
 /*
  * Local variables:

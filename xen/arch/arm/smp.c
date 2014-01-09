@@ -4,11 +4,12 @@
 #include <asm/cpregs.h>
 #include <asm/page.h>
 #include <asm/gic.h>
+#include <asm/flushtlb.h>
 
 void flush_tlb_mask(const cpumask_t *mask)
 {
     /* No need to IPI other processors on ARM, the processor takes care of it. */
-    flush_xen_data_tlb();
+    flush_tlb_all();
 }
 
 void smp_send_event_check_mask(const cpumask_t *mask)
