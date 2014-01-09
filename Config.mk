@@ -215,9 +215,9 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 7c51fb2971cd455eb728e716f16a488c01f8e759
-# Mon Nov 11 13:42:56 2013 -0500
-# hw/piix4acpi: Make writes to ACPI_DBG_IO_ADDR actually work.
+QEMU_TAG ?= 8d7e96f625c4a58d721db413b032fd0bb5671b96
+# Wed Dec 18 15:25:14 2013 +0000
+# qemu-traditional: Fix build warnings on Wheezy
 
 # Short answer -- do not enable this unless you know what you are
 # doing and are prepared for some pain.
