@@ -829,13 +829,14 @@ int arch_set_info_guest(
                            c.cmp->trap_ctxt + i);
     }
 #endif
-    for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
-        v->arch.debugreg[i] = c(debugreg[i]);
 
     v->arch.user_regs.eflags |= 2;
 
     if ( is_hvm_vcpu(v) )
     {
+        for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
+            v->arch.debugreg[i] = c(debugreg[i]);
+
         hvm_set_info_guest(v);
         goto out;
     }
