@@ -600,7 +600,11 @@ int set_p2m_entry(struct p2m_domain *p2m, unsigned long gfn, mfn_t mfn,
 extern void p2m_pt_init(struct p2m_domain *p2m);
 
 /* Debugging and auditing of the P2M code? */
+#ifndef NDEBUG
 #define P2M_AUDIT     1
+#else
+#define P2M_AUDIT     0
+#endif
 #define P2M_DEBUGGING 0
 
 #if P2M_AUDIT
