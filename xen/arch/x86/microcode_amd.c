@@ -275,7 +275,7 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
     struct microcode_amd *mc_amd, *mc_old;
     size_t offset = bufsize;
     size_t last_offset, applied_offset = 0;
-    int error = 0;
+    int error = 0, save_error = 1;
     struct ucode_cpu_info *uci = &per_cpu(ucode_cpu_info, cpu);
 
     /* We should bind the task to the CPU */
@@ -338,19 +338,20 @@ static int cpu_request_microcode(int cpu, const void *buf, size_t bufsize)
      */
     if ( applied_offset )
     {
-        int ret = get_ucode_from_buffer_amd(mc_amd, buf, bufsize,
-                                            &applied_offset);
-        if ( ret == 0 )
-            xfree(mc_old);
-        else
-            error = ret;
+        save_error = get_ucode_from_buffer_amd(
+            mc_amd, buf, bufsize, &applied_offset);
+
+        if ( save_error )
+            error = save_error;
     }
 
-    if ( !applied_offset || error )
+    if ( save_error )
     {
         xfree(mc_amd);
         uci->mc.mc_amd = mc_old;
     }
+    else
+        xfree(mc_old);
 
   out:
     svm_host_osvw_init();
