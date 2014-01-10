@@ -787,8 +787,10 @@ xg_read_mem(uint64_t guestva, char *tobuf, int tobuf_len, uint64_t pgd3val)
     iop->gwr = 0;       /* not writing to guest */
 
     if ( (rc = _domctl_hcall(XEN_DOMCTL_gdbsx_guestmemio, tobuf, tobuf_len)) )
-        XGTRC("ERROR: failed to read %d bytes. errno:%d rc:%d\n",
-              iop->remain, errno, rc);
+    {
+        XGTRC("ERROR: failed to read bytes. errno:%d rc:%d\n", errno, rc);
+        return tobuf_len;
+    }
 
     for(i=0; i < XGMIN(8, tobuf_len); u.buf8[i]=tobuf[i], i++);
     XGTRC("X:remain:%d buf8:0x%llx\n", iop->remain, u.llbuf8);
@@ -818,8 +820,11 @@ xg_write_mem(uint64_t guestva, char *frombuf, int buflen, uint64_t pgd3val)
     iop->gwr = 1;       /* writing to guest */
 
     if ((rc=_domctl_hcall(XEN_DOMCTL_gdbsx_guestmemio, frombuf, buflen)))
-        XGERR("ERROR: failed to write %d bytes. errno:%d rc:%d\n", 
-              iop->remain, errno, rc);
+    {
+        XGERR("ERROR: failed to write bytes to %llx. errno:%d rc:%d\n",
+              guestva, errno, rc);
+        return buflen;
+    }
     return iop->remain;
 }
 
