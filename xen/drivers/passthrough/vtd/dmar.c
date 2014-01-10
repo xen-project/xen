@@ -312,7 +312,7 @@ static int __init acpi_parse_dev_scope(
     const struct acpi_dmar_pci_path *path;
     struct acpi_drhd_unit *drhd = type == DMAR_TYPE ?
         container_of(scope, struct acpi_drhd_unit, scope) : NULL;
-    int depth, cnt, didx = 0;
+    int depth, cnt, didx = 0, ret;
 
     if ( (cnt = scope_device_count(start, end)) < 0 )
         return cnt;
@@ -364,9 +364,10 @@ static int __init acpi_parse_dev_scope(
             {
                 struct acpi_hpet_unit *acpi_hpet_unit;
 
+                ret = -ENOMEM;
                 acpi_hpet_unit = xmalloc(struct acpi_hpet_unit);
                 if ( !acpi_hpet_unit )
-                    return -ENOMEM;
+                    goto out;
                 acpi_hpet_unit->id = acpi_scope->enumeration_id;
                 acpi_hpet_unit->bus = bus;
                 acpi_hpet_unit->dev = path->dev;
@@ -397,9 +398,10 @@ static int __init acpi_parse_dev_scope(
 
             if ( drhd )
             {
+                ret = -ENOMEM;
                 acpi_ioapic_unit = xmalloc(struct acpi_ioapic_unit);
                 if ( !acpi_ioapic_unit )
-                    return -ENOMEM;
+                    goto out;
                 acpi_ioapic_unit->apic_id = acpi_scope->enumeration_id;
                 acpi_ioapic_unit->ioapic.bdf.bus = bus;
                 acpi_ioapic_unit->ioapic.bdf.dev = path->dev;
@@ -420,7 +422,13 @@ static int __init acpi_parse_dev_scope(
         start += acpi_scope->length;
    }
 
-    return 0;
+    ret = 0;
+
+ out:
+    if ( ret )
+        xfree(scope->devices);
+
+    return ret;
 }
 
 static int __init acpi_dmar_check_length(
@@ -708,7 +716,7 @@ acpi_parse_one_atsr(struct acpi_dmar_header *header)
     }
 
     if ( ret )
-        xfree(atsr);
+        xfree(atsru);
     else
         acpi_register_atsr_unit(atsru);
     return ret;
