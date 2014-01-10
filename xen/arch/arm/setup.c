@@ -764,10 +764,8 @@ void __init start_xen(unsigned long boot_phys_offset,
     if ( construct_dom0(dom0) != 0)
             panic("Could not set up DOM0 guest OS");
 
-    /* Scrub RAM that is still free and so may go to an unprivileged domain.
-       XXX too slow in simulator
-       scrub_heap_pages();
-    */
+    /* Scrub RAM that is still free and so may go to an unprivileged domain. */
+    scrub_heap_pages();
 
     init_constructors();
 
