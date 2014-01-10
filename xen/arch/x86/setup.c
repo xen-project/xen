@@ -1098,6 +1098,17 @@ void __init __start_xen(unsigned long mbi_p)
                          PFN_UP(mod[i].mod_end), PAGE_HYPERVISOR);
     }
 
+    if ( kexec_crash_area.size )
+    {
+        unsigned long s = PFN_DOWN(kexec_crash_area.start);
+        unsigned long e = min(s + PFN_UP(kexec_crash_area.size),
+                              PFN_UP(__pa(HYPERVISOR_VIRT_END - 1)));
+
+        if ( e > s ) 
+            map_pages_to_xen((unsigned long)__va(kexec_crash_area.start),
+                             s, e - s, PAGE_HYPERVISOR);
+    }
+
     xen_virt_end = ((unsigned long)_end + (1UL << L2_PAGETABLE_SHIFT) - 1) &
                    ~((1UL << L2_PAGETABLE_SHIFT) - 1);
     destroy_xen_mappings(xen_virt_end, XEN_VIRT_START + BOOTSTRAP_MAP_BASE);
