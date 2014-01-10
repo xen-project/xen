@@ -68,12 +68,12 @@ module Async = struct
 	external osevent_occurred_fd : ctx -> for_libxl -> Unix.file_descr -> event list -> event list -> unit = "stub_libxl_osevent_occurred_fd"
 	external osevent_occurred_timeout : ctx -> for_libxl -> unit = "stub_libxl_osevent_occurred_timeout"
 
-	let osevent_register_hooks ctx ~user ~fd_register ~fd_modify ~fd_deregister ~timeout_register ~timeout_modify =
+	let osevent_register_hooks ctx ~user ~fd_register ~fd_modify ~fd_deregister ~timeout_register ~timeout_fire_now =
 		Callback.register "libxl_fd_register" fd_register;
 		Callback.register "libxl_fd_modify" fd_modify;
 		Callback.register "libxl_fd_deregister" fd_deregister;
 		Callback.register "libxl_timeout_register" timeout_register;
-		Callback.register "libxl_timeout_modify" timeout_modify;
+		Callback.register "libxl_timeout_fire_now" timeout_fire_now;
 		osevent_register_hooks' ctx user
 
 	let async_register_callback ~async_callback =

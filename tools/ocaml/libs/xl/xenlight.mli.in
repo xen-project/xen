@@ -68,11 +68,11 @@ module Async : sig
 
 	val osevent_register_hooks : ctx ->
 		user:'a ->
-		fd_register:('a -> Unix.file_descr -> event list -> for_libxl -> unit) ->
-		fd_modify:('a -> Unix.file_descr -> event list -> unit) ->
-		fd_deregister:('a -> Unix.file_descr -> unit) ->
-		timeout_register:('a -> int64 -> int64 -> for_libxl -> unit) ->
-		timeout_modify:('a -> unit) ->
+		fd_register:('a -> Unix.file_descr -> event list -> for_libxl -> 'b) ->
+		fd_modify:('a -> Unix.file_descr -> 'b -> event list -> 'b) ->
+		fd_deregister:('a -> Unix.file_descr -> 'b -> unit) ->
+		timeout_register:('a -> int64 -> int64 -> for_libxl -> 'c) ->
+		timeout_fire_now:('a -> 'c -> 'c) ->
 		osevent_hooks
 
 	external osevent_occurred_fd : ctx -> for_libxl -> Unix.file_descr -> event list -> event list -> unit = "stub_libxl_osevent_occurred_fd"
