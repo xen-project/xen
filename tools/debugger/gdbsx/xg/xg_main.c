@@ -775,7 +775,7 @@ xg_read_mem(uint64_t guestva, char *tobuf, int tobuf_len, uint64_t pgd3val)
 {
     struct xen_domctl_gdbsx_memio *iop = &domctl.u.gdbsx_guest_memio;
     union {uint64_t llbuf8; char buf8[8];} u = {0};
-    int i;
+    int i, rc;
 
     XGTRC("E:gva:%llx tobuf:%lx len:%d\n", guestva, tobuf, tobuf_len);
 
@@ -786,7 +786,9 @@ xg_read_mem(uint64_t guestva, char *tobuf, int tobuf_len, uint64_t pgd3val)
     iop->len = tobuf_len;
     iop->gwr = 0;       /* not writing to guest */
 
-    _domctl_hcall(XEN_DOMCTL_gdbsx_guestmemio, tobuf, tobuf_len);
+    if ( (rc = _domctl_hcall(XEN_DOMCTL_gdbsx_guestmemio, tobuf, tobuf_len)) )
+        XGTRC("ERROR: failed to read %d bytes. errno:%d rc:%d\n",
+              iop->remain, errno, rc);
 
     for(i=0; i < XGMIN(8, tobuf_len); u.buf8[i]=tobuf[i], i++);
     XGTRC("X:remain:%d buf8:0x%llx\n", iop->remain, u.llbuf8);
