@@ -714,6 +714,7 @@ CAMLprim value stub_xc_domain_cpuid_set(value xch, value domid,
 {
 	CAMLparam4(xch, domid, input, config);
 	CAMLlocal2(array, tmp);
+#if defined(__i386__) || defined(__x86_64__)
 	int r;
 	unsigned int c_input[2];
 	char *c_config[4], *out_config[4];
@@ -742,17 +743,24 @@ CAMLprim value stub_xc_domain_cpuid_set(value xch, value domid,
 			 c_input, (const char **)c_config, out_config);
 	if (r < 0)
 		failwith_xc(_H(xch));
+#else
+	caml_failwith("xc_domain_cpuid_set: not implemented");
+#endif
 	CAMLreturn(array);
 }
 
 CAMLprim value stub_xc_domain_cpuid_apply_policy(value xch, value domid)
 {
 	CAMLparam2(xch, domid);
+#if defined(__i386__) || defined(__x86_64__)
 	int r;
 
 	r = xc_cpuid_apply_policy(_H(xch), _D(domid));
 	if (r < 0)
 		failwith_xc(_H(xch));
+#else
+	caml_failwith("xc_domain_cpuid_apply_policy: not implemented");
+#endif
 	CAMLreturn(Val_unit);
 }
 
@@ -760,6 +768,7 @@ CAMLprim value stub_xc_cpuid_check(value xch, value input, value config)
 {
 	CAMLparam3(xch, input, config);
 	CAMLlocal3(ret, array, tmp);
+#if defined(__i386__) || defined(__x86_64__)
 	int r;
 	unsigned int c_input[2];
 	char *c_config[4], *out_config[4];
@@ -792,6 +801,9 @@ CAMLprim value stub_xc_cpuid_check(value xch, value input, value config)
 	Store_field(ret, 0, Val_bool(r));
 	Store_field(ret, 1, array);
 
+#else
+	caml_failwith("xc_domain_cpuid_check: not implemented");
+#endif
 	CAMLreturn(ret);
 }
 
