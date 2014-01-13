@@ -1488,7 +1488,7 @@ static int alloc_l2_table(struct page_info *page, unsigned long type,
             l2e_write(&pl2e[l2_table_offset(PERDOMAIN_VIRT_START) + i],
                       l2e_from_page(perdomain_pt_page(d, i),
                                     __PAGE_HYPERVISOR));
-        pl2e[l2_table_offset(LINEAR_PT_VIRT_START)] =
+        pl2e[l2_table_offset(LINEAR_PT_VIRT_START) + 3] =
             l2e_from_pfn(pfn, __PAGE_HYPERVISOR);
 #else
         memcpy(&pl2e[COMPAT_L2_PAGETABLE_FIRST_XEN_SLOT(d)],
