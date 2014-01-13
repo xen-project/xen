@@ -330,8 +330,8 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
 {
     int rv = 0, clean = 0, peek = 1;
     unsigned long pages = 0;
-    mfn_t *l4, *l3, *l2;
-    unsigned long *l1;
+    mfn_t *l4 = NULL, *l3 = NULL, *l2 = NULL;
+    unsigned long *l1 = NULL;
     int i4, i3, i2;
 
     domain_pause(d);
@@ -434,6 +434,16 @@ int paging_log_dirty_op(struct domain *d, struct xen_domctl_shadow_op *sc)
  out:
     paging_unlock(d);
     domain_unpause(d);
+
+    if ( l1 )
+        unmap_domain_page(l1);
+    if ( l2 )
+        unmap_domain_page(l2);
+    if ( l3 )
+        unmap_domain_page(l3);
+    if ( l4 )
+        unmap_domain_page(l4);
+
     return rv;
 }
 
