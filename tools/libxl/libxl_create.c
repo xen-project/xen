@@ -707,6 +707,7 @@ static void initiate_domain_create(libxl__egc *egc,
     uint32_t domid;
     int i, ret;
     size_t last_devid = -1;
+    bool pod_enabled = false;
 
     /* convenience aliases */
     libxl_domain_config *const d_config = dcs->guest_config;
@@ -714,6 +715,25 @@ static void initiate_domain_create(libxl__egc *egc,
     memset(&dcs->build_state, 0, sizeof(dcs->build_state));
 
     domid = 0;
+
+    /* If target_memkb is smaller than max_memkb, the subsequent call
+     * to libxc when building HVM domain will enable PoD mode.
+     */
+    pod_enabled = (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM) &&
+        (d_config->b_info.target_memkb < d_config->b_info.max_memkb);
+
+    /* We cannot have PoD and PCI device assignment at the same time
+     * for HVM guest. It was reported that IOMMU cannot work with PoD
+     * enabled because it needs to populated entire page table for
+     * guest. To stay on the safe side, we disable PCI device
+     * assignment when PoD is enabled.
+     */
+    if (d_config->c_info.type == LIBXL_DOMAIN_TYPE_HVM &&
+        d_config->num_pcidevs && pod_enabled) {
+        ret = ERROR_INVAL;
+        LOG(ERROR, "PCI device assignment for HVM guest failed due to PoD enabled");
+        goto error_out;
+    }
 
     ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
     if (ret) goto error_out;
