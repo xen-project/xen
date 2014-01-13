@@ -98,9 +98,6 @@ int hvm_save_one(struct domain *d, uint16_t typecode, uint16_t instance,
     else 
         sz = hvm_sr_handlers[typecode].size;
     
-    if ( (instance + 1) * hvm_sr_handlers[typecode].size > sz )
-        return -EINVAL;
-
     ctxt.size = sz;
     ctxt.data = xmalloc_bytes(sz);
     if ( !ctxt.data )
@@ -112,13 +109,30 @@ int hvm_save_one(struct domain *d, uint16_t typecode, uint16_t instance,
                d->domain_id, typecode);
         rv = -EFAULT;
     }
-    else if ( copy_to_guest(handle,
-                            ctxt.data 
-                            + (instance * hvm_sr_handlers[typecode].size) 
-                            + sizeof (struct hvm_save_descriptor), 
-                            hvm_sr_handlers[typecode].size
-                            - sizeof (struct hvm_save_descriptor)) )
-        rv = -EFAULT;
+    else
+    {
+        uint32_t off;
+        const struct hvm_save_descriptor *desc;
+
+        rv = -EBADSLT;
+        for ( off = 0; off < (ctxt.cur - sizeof(*desc)); off += desc->length )
+        {
+            desc = (void *)(ctxt.data + off);
+            /* Move past header */
+            off += sizeof(*desc);
+            if ( instance == desc->instance )
+            {
+                uint32_t copy_length = desc->length;
+
+                if ( off + copy_length > ctxt.cur )
+                    copy_length = ctxt.cur - off;
+                rv = 0;
+                if ( copy_to_guest(handle, ctxt.data + off, copy_length) )
+                    rv = -EFAULT;
+                break;
+            }
+        }
+    }
 
     xfree(ctxt.data);
     return rv;
