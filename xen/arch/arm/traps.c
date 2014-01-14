@@ -1065,23 +1065,34 @@ static void do_debug_trap(struct cpu_user_regs *regs, unsigned int code)
 }
 #endif
 
+#ifdef CONFIG_ARM_64
+#define PSCI_OP_REG(r) (r)->x0
+#define PSCI_RESULT_REG(r) (r)->x0
+#define PSCI_ARGS(r) (r)->x1, (r)->x2
+#else
+#define PSCI_OP_REG(r) (r)->r0
+#define PSCI_RESULT_REG(r) (r)->r0
+#define PSCI_ARGS(r) (r)->r1, (r)->r2
+#endif
+
 static void do_trap_psci(struct cpu_user_regs *regs)
 {
     arm_psci_fn_t psci_call = NULL;
 
-    if ( regs->r0 >= ARRAY_SIZE(arm_psci_table) )
+    if ( PSCI_OP_REG(regs) >= ARRAY_SIZE(arm_psci_table) )
     {
         domain_crash_synchronous();
         return;
     }
 
-    psci_call = arm_psci_table[regs->r0].fn;
+    psci_call = arm_psci_table[PSCI_OP_REG(regs)].fn;
     if ( psci_call == NULL )
     {
         domain_crash_synchronous();
         return;
     }
-    regs->r0 = psci_call(regs->r1, regs->r2);
+
+    PSCI_RESULT_REG(regs) = psci_call(PSCI_ARGS(regs));
 }
 
 #ifdef CONFIG_ARM_64
