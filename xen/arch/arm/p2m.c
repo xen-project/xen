@@ -238,7 +238,7 @@ static int create_p2m_entries(struct domain *d,
                      int mattr,
                      p2m_type_t t)
 {
-    int rc, flush;
+    int rc;
     struct p2m_domain *p2m = &d->arch.p2m;
     lpae_t *first = NULL, *second = NULL, *third = NULL;
     paddr_t addr;
@@ -246,9 +246,14 @@ static int create_p2m_entries(struct domain *d,
                   cur_first_offset = ~0,
                   cur_second_offset = ~0;
     unsigned long count = 0;
+    unsigned int flush = 0;
     bool_t populate = (op == INSERT || op == ALLOCATE);
+    lpae_t pte;
 
     spin_lock(&p2m->lock);
+
+    if ( d != current->domain )
+        p2m_load_VTTBR(d);
 
     addr = start_gpaddr;
     while ( addr < end_gpaddr )
@@ -316,15 +321,31 @@ static int create_p2m_entries(struct domain *d,
             cur_second_offset = second_table_offset(addr);
         }
 
-        flush = third[third_table_offset(addr)].p2m.valid;
+        pte = third[third_table_offset(addr)];
+
+        flush |= pte.p2m.valid;
+
+        /* TODO: Handle other p2m type
+         *
+         * It's safe to do the put_page here because page_alloc will
+         * flush the TLBs if the page is reallocated before the end of
+         * this loop.
+         */
+        if ( pte.p2m.valid && p2m_is_foreign(pte.p2m.type) )
+        {
+            unsigned long mfn = pte.p2m.base;
+
+            ASSERT(mfn_valid(mfn));
+            put_page(mfn_to_page(mfn));
+        }
 
         /* Allocate a new RAM page and attach */
         switch (op) {
             case ALLOCATE:
                 {
                     struct page_info *page;
-                    lpae_t pte;
 
+                    ASSERT(!pte.p2m.valid);
                     rc = -ENOMEM;
                     page = alloc_domheap_page(d, 0);
                     if ( page == NULL ) {
@@ -339,8 +360,7 @@ static int create_p2m_entries(struct domain *d,
                 break;
             case INSERT:
                 {
-                    lpae_t pte = mfn_to_p2m_entry(maddr >> PAGE_SHIFT,
-                                                  mattr, t);
+                    pte = mfn_to_p2m_entry(maddr >> PAGE_SHIFT, mattr, t);
                     write_pte(&third[third_table_offset(addr)], pte);
                     maddr += PAGE_SIZE;
                 }
@@ -348,9 +368,6 @@ static int create_p2m_entries(struct domain *d,
             case RELINQUISH:
             case REMOVE:
                 {
-                    lpae_t pte = third[third_table_offset(addr)];
-                    unsigned long mfn = pte.p2m.base;
-
                     if ( !pte.p2m.valid )
                     {
                         count++;
@@ -359,22 +376,12 @@ static int create_p2m_entries(struct domain *d,
 
                     count += 0x10;
 
-                    /* TODO: Handle other p2m type */
-                    if ( p2m_is_foreign(pte.p2m.type) )
-                    {
-                        ASSERT(mfn_valid(mfn));
-                        put_page(mfn_to_page(mfn));
-                    }
-
                     memset(&pte, 0x00, sizeof(pte));
                     write_pte(&third[third_table_offset(addr)], pte);
                     count++;
                 }
                 break;
         }
-
-        if ( flush )
-            flush_tlb_all_local();
 
         /* Preempt every 2MiB (mapped) or 32 MiB (unmapped) - arbitrary */
         if ( op == RELINQUISH && count >= 0x2000 )
@@ -390,6 +397,16 @@ static int create_p2m_entries(struct domain *d,
 
         /* Got the next page */
         addr += PAGE_SIZE;
+    }
+
+    if ( flush )
+    {
+        /* At the beginning of the function, Xen is updating VTTBR
+         * with the domain where the mappings are created. In this
+         * case it's only necessary to flush TLBs on every CPUs with
+         * the current VMID (our domain).
+         */
+        flush_tlb();
     }
 
     if ( op == ALLOCATE || op == INSERT )
@@ -408,6 +425,9 @@ out:
     if (third) unmap_domain_page(third);
     if (second) unmap_domain_page(second);
     if (first) unmap_domain_page(first);
+
+    if ( d != current->domain )
+        p2m_load_VTTBR(current->domain);
 
     spin_unlock(&p2m->lock);
 
