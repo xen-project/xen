@@ -155,6 +155,22 @@ int libxl__carefd_fd(const libxl__carefd *cf)
  * Actual child process handling
  */
 
+/* Like waitpid(,,WNOHANG) but handles all errors except ECHILD. */
+static pid_t checked_waitpid(libxl__egc *egc, pid_t want, int *status)
+{
+    for (;;) {
+        pid_t got = waitpid(want, status, WNOHANG);
+        if (got != -1)
+            return got;
+        if (errno == ECHILD)
+            return got;
+        if (errno == EINTR)
+            continue;
+        LIBXL__EVENT_DISASTER(egc, "waitpid() failed", errno, 0);
+        return 0;
+    }
+}
+
 static void sigchld_selfpipe_handler(libxl__egc *egc, libxl__ev_fd *ev,
                                      int fd, short events, short revents);
 
@@ -331,16 +347,10 @@ static void sigchld_selfpipe_handler(libxl__egc *egc, libxl__ev_fd *ev,
 
     while (chldmode_ours(CTX, 0) /* in case the app changes the mode */) {
         int status;
-        pid_t pid = waitpid(-1, &status, WNOHANG);
+        pid_t pid = checked_waitpid(egc, -1, &status);
 
-        if (pid == 0) return;
-
-        if (pid == -1) {
-            if (errno == ECHILD) return;
-            if (errno == EINTR) continue;
-            LIBXL__EVENT_DISASTER(egc, "waitpid() failed", errno, 0);
+        if (pid == 0 || pid == -1 /* ECHILD */)
             return;
-        }
 
         int rc = childproc_reaped(egc, pid, status);
 
