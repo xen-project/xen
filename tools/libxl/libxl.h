@@ -409,6 +409,19 @@
  */
 #define LIBXL_HAVE_DRIVER_DOMAIN_CREATION 1
 
+/*
+ * LIBXL_HAVE_SIGCHLD_SELECTIVE_REAP
+ *
+ * If this is defined:
+ *
+ * Firstly, the enum libxl_sigchld_owner (in libxl_event.h) has the
+ * value libxl_sigchld_owner_libxl_always_selective_reap which may be
+ * passed to libxl_childproc_setmode in hooks->chldmode.
+ *
+ * Secondly, the function libxl_childproc_sigchld_occurred exists.
+ */
+#define LIBXL_HAVE_SIGCHLD_OWNER_SELECTIVE_REAP 1
+
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who
  * do not #include libxl_internal.h, are fine. */
