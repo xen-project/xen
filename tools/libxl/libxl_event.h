@@ -474,6 +474,12 @@ void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl)
  *       and provides a callback to be notified of their exit
  *       statues.  The application must have only one libxl_ctx
  *       configured this way.
+ *
+ *     libxl_sigchld_owner_libxl_always_selective_reap:
+ *
+ *       The application expects to reap all of its own children
+ *       synchronously, and does not use SIGCHLD.  libxl is
+ *       to install a SIGCHLD handler.
  */
 
 
@@ -491,6 +497,11 @@ typedef enum {
     /* libxl owns SIGCHLD all the time, and the application is
      * relying on libxl's event loop for reaping its children too. */
     libxl_sigchld_owner_libxl_always,
+
+    /* libxl owns SIGCHLD all the time, but it must only reap its own
+     * children.  The application will reap its own children
+     * synchronously with waitpid, without the assistance of SIGCHLD. */
+    libxl_sigchld_owner_libxl_always_selective_reap,
 } libxl_sigchld_owner;
 
 typedef struct {

@@ -268,6 +268,7 @@ static bool chldmode_ours(libxl_ctx *ctx, bool creating)
     case libxl_sigchld_owner_mainloop:
         return 0;
     case libxl_sigchld_owner_libxl_always:
+    case libxl_sigchld_owner_libxl_always_selective_reap:
         return 1;
     }
     abort();
@@ -397,6 +398,12 @@ static void sigchld_selfpipe_handler(libxl__egc *egc, libxl__ev_fd *ev,
 
     int e = libxl__self_pipe_eatall(selfpipe);
     if (e) LIBXL__EVENT_DISASTER(egc, "read sigchld pipe", e, 0);
+
+    if (CTX->childproc_hooks->chldowner
+        == libxl_sigchld_owner_libxl_always_selective_reap) {
+        childproc_checkall(egc);
+        return;
+    }
 
     while (chldmode_ours(CTX, 0) /* in case the app changes the mode */) {
         int status;
