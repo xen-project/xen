@@ -290,6 +290,14 @@ static int perhaps_installhandler(libxl__gc *gc, bool creating)
     return 0;
 }
 
+static void childproc_reaped_ours(libxl__egc *egc, libxl__ev_child *ch,
+                                 int status)
+{
+    LIBXL_LIST_REMOVE(ch, entry);
+    ch->pid = -1;
+    ch->callback(egc, ch, ch->pid, status);
+}
+
 static int childproc_reaped(libxl__egc *egc, pid_t pid, int status)
 {
     EGC_GC;
@@ -303,9 +311,7 @@ static int childproc_reaped(libxl__egc *egc, pid_t pid, int status)
     return ERROR_UNKNOWN_CHILD;
 
  found:
-    LIBXL_LIST_REMOVE(ch, entry);
-    ch->pid = -1;
-    ch->callback(egc, ch, pid, status);
+    childproc_reaped_ours(egc, ch, status);
 
     perhaps_removehandler(gc);
 
