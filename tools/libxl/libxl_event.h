@@ -467,7 +467,8 @@ void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl)
 
 
 typedef enum {
-    /* libxl owns SIGCHLD whenever it has a child. */
+    /* libxl owns SIGCHLD whenever it has a child, and reaps
+     * all children, including those not spawned by libxl. */
     libxl_sigchld_owner_libxl,
 
     /* Application promises to call libxl_childproc_exited but NOT
@@ -476,7 +477,7 @@ typedef enum {
     libxl_sigchld_owner_mainloop,
 
     /* libxl owns SIGCHLD all the time, and the application is
-     * relying on libxl's event loop for reaping its own children. */
+     * relying on libxl's event loop for reaping its children too. */
     libxl_sigchld_owner_libxl_always,
 } libxl_sigchld_owner;
 
