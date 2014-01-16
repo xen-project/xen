@@ -322,6 +322,8 @@ int libxl_childproc_reaped(libxl_ctx *ctx, pid_t pid, int status)
 {
     EGC_INIT(ctx);
     CTX_LOCK;
+    assert(CTX->childproc_hooks->chldowner
+           == libxl_sigchld_owner_mainloop);
     int rc = childproc_reaped(egc, pid, status);
     CTX_UNLOCK;
     EGC_FREE;
