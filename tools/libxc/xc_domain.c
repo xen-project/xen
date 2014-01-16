@@ -986,6 +986,12 @@ out:
     return rc;
 }
 
+/* Currently only implemented on x86. This cannot be handled in the
+ * caller, e.g. by looking for errno==ENOSYS because of the broken
+ * error reporting style. Once this is fixed then this condition can
+ * be removed.
+ */
+#if defined(__i386__)||defined(__x86_64__)
 static int xc_domain_pod_target(xc_interface *xch,
                                 int op,
                                 uint32_t domid,
@@ -1055,6 +1061,28 @@ int xc_domain_get_pod_target(xc_interface *xch,
                                 pod_cache_pages,
                                 pod_entries);
 }
+#else
+int xc_domain_set_pod_target(xc_interface *xch,
+                             uint32_t domid,
+                             uint64_t target_pages,
+                             uint64_t *tot_pages,
+                             uint64_t *pod_cache_pages,
+                             uint64_t *pod_entries)
+{
+    return 0;
+}
+int xc_domain_get_pod_target(xc_interface *xch,
+                             uint32_t domid,
+                             uint64_t *tot_pages,
+                             uint64_t *pod_cache_pages,
+                             uint64_t *pod_entries)
+{
+    /* On x86 (above) xc_domain_pod_target will incorrectly return -1
+     * with errno==-1 on error. Do the same for least surprise. */
+    errno = -1;
+    return -1;
+}
+#endif
 
 int xc_domain_max_vcpus(xc_interface *xch, uint32_t domid, unsigned int max)
 {
