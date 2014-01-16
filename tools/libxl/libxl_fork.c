@@ -330,6 +330,51 @@ int libxl_childproc_reaped(libxl_ctx *ctx, pid_t pid, int status)
     return rc;
 }
 
+static void childproc_checkall(libxl__egc *egc)
+{
+    EGC_GC;
+    libxl__ev_child *ch;
+
+    for (;;) {
+        int status;
+        pid_t got;
+
+        LIBXL_LIST_FOREACH(ch, &CTX->children, entry) {
+            got = checked_waitpid(egc, ch->pid, &status);
+            if (got)
+                goto found;
+        }
+        /* not found */
+        return;
+
+    found:
+        if (got == -1) {
+            LIBXL__EVENT_DISASTER
+                (egc, "waitpid() gave ECHILD but we have a child",
+                 ECHILD, 0);
+            /* it must have finished but we don't know its status */
+            status = 255<<8; /* no wait.h macro for this! */
+            assert(WIFEXITED(status));
+            assert(WEXITSTATUS(status)==255);
+            assert(!WIFSIGNALED(status));
+            assert(!WIFSTOPPED(status));
+        }
+        childproc_reaped_ours(egc, ch, status);
+        /* we need to restart the loop, as children may have been edited */
+    }
+}
+
+void libxl_childproc_sigchld_occurred(libxl_ctx *ctx)
+{
+    EGC_INIT(ctx);
+    CTX_LOCK;
+    assert(CTX->childproc_hooks->chldowner
+           == libxl_sigchld_owner_mainloop);
+    childproc_checkall(egc);
+    CTX_UNLOCK;
+    EGC_FREE;
+}
+
 static void sigchld_selfpipe_handler(libxl__egc *egc, libxl__ev_fd *ev,
                                      int fd, short events, short revents)
 {

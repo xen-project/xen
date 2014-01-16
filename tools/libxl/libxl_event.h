@@ -482,9 +482,10 @@ typedef enum {
      * all children, including those not spawned by libxl. */
     libxl_sigchld_owner_libxl,
 
-    /* Application promises to call libxl_childproc_exited but NOT
-     * from within a signal handler.  libxl will not itself arrange to
-     * (un)block or catch SIGCHLD. */
+    /* Application promises to discover when SIGCHLD occurs and call
+     * libxl_childproc_exited or libxl_childproc_sigchld_occurred (but
+     * NOT from within a signal handler).  libxl will not itself
+     * arrange to (un)block or catch SIGCHLD. */
     libxl_sigchld_owner_mainloop,
 
     /* libxl owns SIGCHLD all the time, and the application is
@@ -542,7 +543,8 @@ void libxl_childproc_setmode(libxl_ctx *ctx, const libxl_childproc_hooks *hooks,
 
 /*
  * This function is for an application which owns SIGCHLD and which
- * therefore reaps all of the process's children.
+ * reaps all of the process's children, and dispatches the exit status
+ * to the correct place inside the application.
  *
  * May be called only by an application which has called setmode with
  * chldowner == libxl_sigchld_owner_mainloop.  If pid was a process started
@@ -556,6 +558,25 @@ void libxl_childproc_setmode(libxl_ctx *ctx, const libxl_childproc_hooks *hooks,
  * ppoll) to implement this.
  */
 int libxl_childproc_reaped(libxl_ctx *ctx, pid_t, int status)
+                           LIBXL_EXTERNAL_CALLERS_ONLY;
+
+/*
+ * This function is for an application which owns SIGCHLD but which
+ * doesn't keep track of all of its own children in a manner suitable
+ * for reaping all of them and then dispatching them.
+ *
+ * Such an the application must notify libxl, by calling this
+ * function, that a SIGCHLD occurred.  libxl will then check all its
+ * children, reap any that are ready, and take any action necessary -
+ * but it will not reap anything else.
+ *
+ * May be called only by an application which has called setmode with
+ * chldowner == libxl_sigchld_owner_mainloop.
+ *
+ * May NOT be called from within a signal handler which might
+ * interrupt any libxl operation (just like libxl_childproc_reaped).
+ */
+void libxl_childproc_sigchld_occurred(libxl_ctx *ctx)
                            LIBXL_EXTERNAL_CALLERS_ONLY;
 
 
