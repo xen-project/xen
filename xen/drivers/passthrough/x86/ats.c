@@ -20,33 +20,8 @@
 
 LIST_HEAD(ats_devices);
 
-static void parse_ats_param(char *s);
-custom_param("ats", parse_ats_param);
-
 bool_t __read_mostly ats_enabled = 1;
-
-static void __init parse_ats_param(char *s)
-{
-    char *ss;
-
-    do {
-        ss = strchr(s, ',');
-        if ( ss )
-            *ss = '\0';
-
-        switch ( parse_bool(s) )
-        {
-        case 0:
-            ats_enabled = 0;
-            break;
-        case 1:
-            ats_enabled = 1;
-            break;
-        }
-
-        s = ss + 1;
-    } while ( ss );
-}
+boolean_param("ats", ats_enabled);
 
 int enable_ats_device(int seg, int bus, int devfn)
 {
