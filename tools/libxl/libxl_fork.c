@@ -182,6 +182,19 @@ static void sigchld_handler(int signo)
     errno = esave;
 }
 
+static void sigchld_sethandler_raw(void (*handler)(int), struct sigaction *old)
+{
+    struct sigaction ours;
+    int r;
+
+    memset(&ours,0,sizeof(ours));
+    ours.sa_handler = handler;
+    sigemptyset(&ours.sa_mask);
+    ours.sa_flags = SA_NOCLDSTOP | SA_RESTART;
+    r = sigaction(SIGCHLD, &ours, old);
+    assert(!r);
+}
+
 static void sigchld_removehandler_core(void)
 {
     struct sigaction was;
@@ -196,18 +209,10 @@ static void sigchld_removehandler_core(void)
 
 static void sigchld_installhandler_core(libxl__gc *gc)
 {
-    struct sigaction ours;
-    int r;
-
     assert(!sigchld_owner);
     sigchld_owner = CTX;
 
-    memset(&ours,0,sizeof(ours));
-    ours.sa_handler = sigchld_handler;
-    sigemptyset(&ours.sa_mask);
-    ours.sa_flags = SA_NOCLDSTOP | SA_RESTART;
-    r = sigaction(SIGCHLD, &ours, &sigchld_saved_action);
-    assert(!r);
+    sigchld_sethandler_raw(sigchld_handler, &sigchld_saved_action);
 
     assert(((void)"application must negotiate with libxl about SIGCHLD",
             !(sigchld_saved_action.sa_flags & SA_SIGINFO) &&
