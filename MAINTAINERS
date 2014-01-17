@@ -209,16 +209,6 @@ F:      xen/include/{kexec,kimage}.h
 F:      xen/arch/x86/machine_kexec.c
 F:      xen/arch/x86/x86_64/kexec_reloc.S
 
-LINUX (PV_OPS)
-M:	Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-S:	Supported
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/konrad/xen.git
-
-LINUX (XCP)
-M:	Ian Campbell <ian.campbell@citrix.com>
-S:	Supported
-T:	hg http://xenbits.xen.org/XCP/linux-2.6.*.pq.hg
-
 MACHINE CHECK (MCA) & RAS
 M:	Christoph Egger <chegger@amazon.de>
 M:	Liu Jinsong <jinsong.liu@intel.com>
