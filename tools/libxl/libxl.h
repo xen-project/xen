@@ -422,6 +422,15 @@
  */
 #define LIBXL_HAVE_SIGCHLD_OWNER_SELECTIVE_REAP 1
 
+/*
+ * LIBXL_HAVE_SIGCHLD_SHARING
+ *
+ * If this is defined, it is permissible for multiple libxl ctxs
+ * to simultaneously "own" SIGCHLD.  See "Subprocess handling"
+ * in libxl_event.h.
+ */
+#define LIBXL_HAVE_SIGCHLD_SHARING 1
+
 /* Functions annotated with LIBXL_EXTERNAL_CALLERS_ONLY may not be
  * called from within libxl itself. Callers outside libxl, who
  * do not #include libxl_internal.h, are fine. */

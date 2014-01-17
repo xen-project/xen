@@ -470,16 +470,18 @@ void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl)
  *
  *     libxl_sigchld_owner_libxl_always:
  *
- *       The application expects libxl to reap all of its children,
- *       and provides a callback to be notified of their exit
- *       statues.  The application must have only one libxl_ctx
- *       configured this way.
+ *       The application expects this libxl ctx to reap all of the
+ *       process's children, and provides a callback to be notified of
+ *       their exit statuses.  The application must have only one
+ *       libxl_ctx configured this way.
  *
  *     libxl_sigchld_owner_libxl_always_selective_reap:
  *
  *       The application expects to reap all of its own children
- *       synchronously, and does not use SIGCHLD.  libxl is
- *       to install a SIGCHLD handler.
+ *       synchronously, and does not use SIGCHLD.  libxl is to install
+ *       a SIGCHLD handler.  The application may have multiple
+ *       libxl_ctxs configured this way; in which case all of its ctxs
+ *       must be so configured.
  */
 
 
