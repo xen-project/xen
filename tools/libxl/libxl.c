@@ -170,7 +170,7 @@ int libxl_ctx_free(libxl_ctx *ctx)
     /* If we have outstanding children, then the application inherits
      * them; we wish the application good luck with understanding
      * this if and when it reaps them. */
-    libxl__sigchld_removehandler(gc);
+    libxl__sigchld_notneeded(gc);
 
     if (ctx->sigchld_selfpipe[0] >= 0) {
         close(ctx->sigchld_selfpipe[0]);

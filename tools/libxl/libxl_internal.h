@@ -838,8 +838,8 @@ _hidden void libxl__poller_wakeup(libxl__egc *egc, libxl__poller *p);
 
 /* Internal to fork and child reaping machinery */
 extern const libxl_childproc_hooks libxl__childproc_default_hooks;
-int libxl__sigchld_installhandler(libxl__gc*); /* non-reentrant; logs errs */
-void libxl__sigchld_removehandler(libxl__gc*); /* non-reentrant */
+int libxl__sigchld_needed(libxl__gc*); /* non-reentrant idempotent, logs errs */
+void libxl__sigchld_notneeded(libxl__gc*); /* non-reentrant idempotent */
 int libxl__self_pipe_wakeup(int fd); /* returns 0 or -1 setting errno */
 int libxl__self_pipe_eatall(int fd); /* returns 0 or -1 setting errno */
 

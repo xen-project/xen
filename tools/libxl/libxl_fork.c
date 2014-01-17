@@ -194,7 +194,7 @@ static void sigchld_removehandler_core(void)
     sigchld_owner = 0;
 }
 
-void libxl__sigchld_removehandler(libxl__gc *gc) /* non-reentrant */
+void libxl__sigchld_notneeded(libxl__gc *gc) /* non-reentrant, idempotent */
 {
     int rc;
 
@@ -210,7 +210,7 @@ void libxl__sigchld_removehandler(libxl__gc *gc) /* non-reentrant */
     }
 }
 
-int libxl__sigchld_installhandler(libxl__gc *gc) /* non-reentrant */
+int libxl__sigchld_needed(libxl__gc *gc) /* non-reentrant, idempotent */
 {
     int r, rc;
 
@@ -274,18 +274,18 @@ static bool chldmode_ours(libxl_ctx *ctx, bool creating)
     abort();
 }
 
-static void perhaps_removehandler(libxl__gc *gc)
+static void perhaps_sigchld_notneeded(libxl__gc *gc)
 {
     if (!chldmode_ours(CTX, 0))
-        libxl__sigchld_removehandler(gc);
+        libxl__sigchld_notneeded(gc);
 }
 
-static int perhaps_installhandler(libxl__gc *gc, bool creating)
+static int perhaps_sigchld_needed(libxl__gc *gc, bool creating)
 {
     int rc;
 
     if (chldmode_ours(CTX, creating)) {
-        rc = libxl__sigchld_installhandler(gc);
+        rc = libxl__sigchld_needed(gc);
         if (rc) return rc;
     }
     return 0;
@@ -314,7 +314,7 @@ static int childproc_reaped(libxl__egc *egc, pid_t pid, int status)
  found:
     childproc_reaped_ours(egc, ch, status);
 
-    perhaps_removehandler(gc);
+    perhaps_sigchld_notneeded(gc);
 
     return 0;
 }
@@ -445,7 +445,7 @@ pid_t libxl__ev_child_fork(libxl__gc *gc, libxl__ev_child *ch,
     CTX_LOCK;
     int rc;
 
-    perhaps_installhandler(gc, 1);
+    perhaps_sigchld_needed(gc, 1);
 
     pid_t pid =
         CTX->childproc_hooks->fork_replacement
@@ -473,7 +473,7 @@ pid_t libxl__ev_child_fork(libxl__gc *gc, libxl__ev_child *ch,
     rc = pid;
 
  out:
-    perhaps_removehandler(gc);
+    perhaps_sigchld_notneeded(gc);
     CTX_UNLOCK;
     return rc;
 }
@@ -492,8 +492,8 @@ void libxl_childproc_setmode(libxl_ctx *ctx, const libxl_childproc_hooks *hooks,
     ctx->childproc_hooks = hooks;
     ctx->childproc_user = user;
 
-    perhaps_removehandler(gc);
-    perhaps_installhandler(gc, 0); /* idempotent, ok to ignore errors for now */
+    perhaps_sigchld_notneeded(gc);
+    perhaps_sigchld_needed(gc, 0); /* idempotent, ok to ignore errors for now */
 
     CTX_UNLOCK;
     GC_FREE;
