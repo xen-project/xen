@@ -442,9 +442,26 @@ void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl)
  * For programs which run their own children alongside libxl's:
  *
  *     A program which does this must call libxl_childproc_setmode.
- *     There are two options:
+ *     There are three options:
  * 
+ *     libxl_sigchld_owner_libxl:
+ *
+ *       While any libxl operation which might use child processes
+ *       is running, works like libxl_sigchld_owner_libxl_always;
+ *       but, deinstalls the handler the rest of the time.
+ *
+ *       In this mode, the application, while it uses any libxl
+ *       operation which might create or use child processes (see
+ *       above):
+ *           - Must not have any child processes running.
+ *           - Must not install a SIGCHLD handler.
+ *           - Must not reap any children.
+ *
+ *       This is the default (i.e. if setmode is not called, or 0 is
+ *       passed for hooks).
+ *
  *     libxl_sigchld_owner_mainloop:
+ *
  *       The application must install a SIGCHLD handler and reap (at
  *       least) all of libxl's children and pass their exit status to
  *       libxl by calling libxl_childproc_exited.  (If the application
@@ -452,17 +469,11 @@ void libxl_osevent_occurred_timeout(libxl_ctx *ctx, void *for_libxl)
  *       on each ctx.)
  *
  *     libxl_sigchld_owner_libxl_always:
+ *
  *       The application expects libxl to reap all of its children,
  *       and provides a callback to be notified of their exit
  *       statues.  The application must have only one libxl_ctx
  *       configured this way.
- *
- * An application which fails to call setmode, or which passes 0 for
- * hooks, while it uses any libxl operation which might
- * create or use child processes (see above):
- *   - Must not have any child processes running.
- *   - Must not install a SIGCHLD handler.
- *   - Must not reap any children.
  */
 
 
