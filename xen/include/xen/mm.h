@@ -356,7 +356,7 @@ static inline unsigned int get_order_from_pages(unsigned long nr_pages)
 
 void scrub_one_page(struct page_info *);
 
-int xenmem_add_to_physmap_one(struct domain *d, uint16_t space,
+int xenmem_add_to_physmap_one(struct domain *d, unsigned int space,
                               domid_t foreign_domid,
                               unsigned long idx, xen_pfn_t gpfn);
 

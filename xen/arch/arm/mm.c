@@ -970,7 +970,7 @@ void share_xen_page_with_privileged_guests(
 
 int xenmem_add_to_physmap_one(
     struct domain *d,
-    uint16_t space,
+    unsigned int space,
     domid_t foreign_domid,
     unsigned long idx,
     xen_pfn_t gpfn)
