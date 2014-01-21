@@ -186,7 +186,7 @@ contains_something()
 rdname()
 {
     NM=$($CMD create --quiet --dryrun --defconfig "$1" |
-         sed -n 's/^.*(name \(.*\))$/\1/p')
+         sed -n 's/^.*(name \(.*\))$/\1/p;s/^.*"name": "\(.*\)",$/\1/p')
 }
 
 rdnames()
