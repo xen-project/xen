@@ -3442,6 +3442,8 @@ static void save_domain_core_writeconfig(int fd, const char *source,
                      ctx, fd, optdata_begin, hdr.optional_data_len,
                      source, "header"));
 
+    free(optdata_begin);
+
     fprintf(stderr, "Saving to %s new xl format (info"
             " 0x%"PRIx32"/0x%"PRIx32"/%"PRIu32")\n",
             source, hdr.mandatory_flags, hdr.optional_flags,
