@@ -343,17 +343,11 @@ void libxl__sigchld_notneeded(libxl__gc *gc) /* non-reentrant, idempotent */
 
 int libxl__sigchld_needed(libxl__gc *gc) /* non-reentrant, idempotent */
 {
-    int r, rc;
+    int rc;
 
     if (CTX->sigchld_selfpipe[0] < 0) {
-        r = pipe(CTX->sigchld_selfpipe);
-        if (r) {
-            CTX->sigchld_selfpipe[0] = -1;
-            LIBXL__LOG_ERRNO(CTX, LIBXL__LOG_ERROR,
-                             "failed to create sigchld pipe");
-            rc = ERROR_FAIL;
-            goto out;
-        }
+        rc = libxl__pipe_nonblock(CTX, CTX->sigchld_selfpipe);
+        if (rc) goto out;
     }
     if (!libxl__ev_fd_isregistered(&CTX->sigchld_selfpipe_efd)) {
         rc = libxl__ev_fd_register(gc, &CTX->sigchld_selfpipe_efd,
