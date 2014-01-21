@@ -1095,12 +1095,15 @@ int xs_suspend_evtchn_port(int domid)
     portstr = xs_read(xs, XBT_NULL, path, &plen);
     xs_daemon_close(xs);
 
-    if (!portstr || !plen)
-        return -1;
+    if (!portstr || !plen) {
+        port = -1;
+        goto out;
+    }
 
     port = atoi(portstr);
-    free(portstr);
 
+out:
+    free(portstr);
     return port;
 }
 
