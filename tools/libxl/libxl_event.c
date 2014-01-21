@@ -1386,7 +1386,7 @@ static int eventloop_iteration(libxl__egc *egc, libxl__poller *poller) {
      * can unlock it when it polls.
      */
     EGC_GC;
-    int rc;
+    int rc, nfds;
     struct timeval now;
     
     rc = libxl__gettimeofday(gc, &now);
@@ -1395,7 +1395,7 @@ static int eventloop_iteration(libxl__egc *egc, libxl__poller *poller) {
     int timeout;
 
     for (;;) {
-        int nfds = poller->fd_polls_allocd;
+        nfds = poller->fd_polls_allocd;
         timeout = -1;
         rc = beforepoll_internal(gc, poller, &nfds, poller->fd_polls,
                                  &timeout, now);
@@ -1413,7 +1413,7 @@ static int eventloop_iteration(libxl__egc *egc, libxl__poller *poller) {
     }
 
     CTX_UNLOCK;
-    rc = poll(poller->fd_polls, poller->fd_polls_allocd, timeout);
+    rc = poll(poller->fd_polls, nfds, timeout);
     CTX_LOCK;
 
     if (rc < 0) {
@@ -1428,8 +1428,7 @@ static int eventloop_iteration(libxl__egc *egc, libxl__poller *poller) {
     rc = libxl__gettimeofday(gc, &now);
     if (rc) goto out;
 
-    afterpoll_internal(egc, poller,
-                       poller->fd_polls_allocd, poller->fd_polls, now);
+    afterpoll_internal(egc, poller, nfds, poller->fd_polls, now);
 
     rc = 0;
  out:
