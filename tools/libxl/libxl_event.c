@@ -1271,26 +1271,81 @@ int libxl_event_check(libxl_ctx *ctx, libxl_event **event_r,
 }
 
 /*
+ * Utilities for pipes (specifically, useful for self-pipes)
+ */
+
+void libxl__pipe_close(int fds[2])
+{
+    if (fds[0] >= 0) close(fds[0]);
+    if (fds[1] >= 0) close(fds[1]);
+    fds[0] = fds[1] = -1;
+}
+
+int libxl__pipe_nonblock(libxl_ctx *ctx, int fds[2])
+{
+    int r, rc;
+
+    r = libxl_pipe(ctx, fds);
+    if (r) {
+        fds[0] = fds[1] = -1;
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    rc = libxl_fd_set_nonblock(ctx, fds[0], 1);
+    if (rc) goto out;
+
+    rc = libxl_fd_set_nonblock(ctx, fds[1], 1);
+    if (rc) goto out;
+
+    return 0;
+
+ out:
+    libxl__pipe_close(fds);
+    return rc;
+}
+
+int libxl__self_pipe_wakeup(int fd)
+{
+    static const char buf[1] = "";
+
+    for (;;) {
+        int r = write(fd, buf, 1);
+        if (r==1) return 0;
+        assert(r==-1);
+        if (errno == EINTR) continue;
+        if (errno == EWOULDBLOCK) return 0;
+        assert(errno);
+        return errno;
+    }
+}
+
+int libxl__self_pipe_eatall(int fd)
+{
+    char buf[256];
+    for (;;) {
+        int r = read(fd, buf, sizeof(buf));
+        if (r == sizeof(buf)) continue;
+        if (r >= 0) return 0;
+        assert(r == -1);
+        if (errno == EINTR) continue;
+        if (errno == EWOULDBLOCK) return 0;
+        assert(errno);
+        return errno;
+    }
+}
+
+/*
  * Manipulation of pollers
  */
 
 int libxl__poller_init(libxl_ctx *ctx, libxl__poller *p)
 {
-    int r, rc;
+    int rc;
     p->fd_polls = 0;
     p->fd_rindices = 0;
 
-    r = pipe(p->wakeup_pipe);
-    if (r) {
-        LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "cannot create poller pipe");
-        rc = ERROR_FAIL;
-        goto out;
-    }
-
-    rc = libxl_fd_set_nonblock(ctx, p->wakeup_pipe[0], 1);
-    if (rc) goto out;
-
-    rc = libxl_fd_set_nonblock(ctx, p->wakeup_pipe[1], 1);
+    rc = libxl__pipe_nonblock(ctx, p->wakeup_pipe);
     if (rc) goto out;
 
     return 0;
@@ -1302,8 +1357,7 @@ int libxl__poller_init(libxl_ctx *ctx, libxl__poller *p)
 
 void libxl__poller_dispose(libxl__poller *p)
 {
-    if (p->wakeup_pipe[1] > 0) close(p->wakeup_pipe[1]);
-    if (p->wakeup_pipe[0] > 0) close(p->wakeup_pipe[0]);
+    libxl__pipe_close(p->wakeup_pipe);
     free(p->fd_polls);
     free(p->fd_rindices);
 }
@@ -1345,36 +1399,6 @@ void libxl__poller_wakeup(libxl__egc *egc, libxl__poller *p)
 {
     int e = libxl__self_pipe_wakeup(p->wakeup_pipe[1]);
     if (e) LIBXL__EVENT_DISASTER(egc, "cannot poke watch pipe", e, 0);
-}
-
-int libxl__self_pipe_wakeup(int fd)
-{
-    static const char buf[1] = "";
-
-    for (;;) {
-        int r = write(fd, buf, 1);
-        if (r==1) return 0;
-        assert(r==-1);
-        if (errno == EINTR) continue;
-        if (errno == EWOULDBLOCK) return 0;
-        assert(errno);
-        return errno;
-    }
-}
-
-int libxl__self_pipe_eatall(int fd)
-{
-    char buf[256];
-    for (;;) {
-        int r = read(fd, buf, sizeof(buf));
-        if (r == sizeof(buf)) continue;
-        if (r >= 0) return 0;
-        assert(r == -1);
-        if (errno == EINTR) continue;
-        if (errno == EWOULDBLOCK) return 0;
-        assert(errno);
-        return errno;
-    }
 }
 
 /*

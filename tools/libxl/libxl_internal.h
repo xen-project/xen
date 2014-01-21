@@ -509,6 +509,15 @@ _hidden char *libxl__strndup(libxl__gc *gc_opt, const char *c, size_t n) NN1;
  * string. (similar to a gc'd dirname(3)). */
 _hidden char *libxl__dirname(libxl__gc *gc_opt, const char *s) NN1;
 
+/* Make a pipe and set both ends nonblocking.  On error, nothing
+ * is left open and both fds[]==-1, and a message is logged.
+ * Useful for self-pipes. */
+_hidden int libxl__pipe_nonblock(libxl_ctx *ctx, int fds[2]);
+/* Closes the pipe fd(s).  Either or both of fds[] may be -1 meaning
+ * `not open'.  Ignores any errors.  Sets fds[] to -1. */
+_hidden void libxl__pipe_close(int fds[2]);
+
+
 /* Each of these logs errors and returns a libxl error code.
  * They do not mind if path is already removed.
  * For _file, path must not be a directory; for _directory it must be. */
