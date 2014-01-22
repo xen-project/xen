@@ -104,6 +104,7 @@ xc_cpupoolinfo_t *xc_cpupool_getinfo(xc_interface *xch,
     info->cpumap = xc_cpumap_alloc(xch);
     if (!info->cpumap) {
         free(info);
+        info = NULL;
         goto out;
     }
     info->cpupool_id = sysctl.u.cpupool_op.cpupool_id;
