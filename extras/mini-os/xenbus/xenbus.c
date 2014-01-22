@@ -15,6 +15,7 @@
  *
  ****************************************************************************
  **/
+#include <inttypes.h>
 #include <mini-os/os.h>
 #include <mini-os/mm.h>
 #include <mini-os/traps.h>
@@ -672,7 +673,7 @@ char *xenbus_transaction_start(xenbus_transaction_t *xbt)
     err = errmsg(rep);
     if (err)
 	return err;
-    sscanf((char *)(rep + 1), "%u", xbt);
+    sscanf((char *)(rep + 1), "%lu", xbt);
     free(rep);
     return NULL;
 }
@@ -769,7 +770,7 @@ domid_t xenbus_get_self_id(void)
     domid_t ret;
 
     BUG_ON(xenbus_read(XBT_NIL, "domid", &dom_id));
-    sscanf(dom_id, "%d", &ret);
+    sscanf(dom_id, "%"SCNd16, &ret);
 
     return ret;
 }

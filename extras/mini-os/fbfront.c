@@ -105,7 +105,7 @@ again:
         free(err);
     }
 
-    err = xenbus_printf(xbt, nodename, "page-ref","%u", virt_to_mfn(s));
+    err = xenbus_printf(xbt, nodename, "page-ref","%lu", virt_to_mfn(s));
     if (err) {
         message = "writing page-ref";
         goto abort_transaction;
@@ -468,7 +468,7 @@ again:
         free(err);
     }
 
-    err = xenbus_printf(xbt, nodename, "page-ref","%u", virt_to_mfn(s));
+    err = xenbus_printf(xbt, nodename, "page-ref","%lu", virt_to_mfn(s));
     if (err) {
         message = "writing page-ref";
         goto abort_transaction;

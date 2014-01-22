@@ -384,7 +384,7 @@ int pcifront_physical_to_virtual (struct pcifront_dev *dev,
                                   unsigned int *dom,
                                   unsigned int *bus,
                                   unsigned int *slot,
-                                  unsigned long *fun)
+                                  unsigned int *fun)
 {
     /* FIXME: the buffer sizing is a little lazy here. 10 extra bytes
        should be enough to hold the paths we need to construct, even
@@ -456,7 +456,7 @@ void pcifront_op(struct pcifront_dev *dev, struct xen_pci_op *op)
 
 int pcifront_conf_read(struct pcifront_dev *dev,
                        unsigned int dom,
-                       unsigned int bus, unsigned int slot, unsigned long fun,
+                       unsigned int bus, unsigned int slot, unsigned int fun,
                        unsigned int off, unsigned int size, unsigned int *val)
 {
     struct xen_pci_op op;
@@ -486,7 +486,7 @@ int pcifront_conf_read(struct pcifront_dev *dev,
 
 int pcifront_conf_write(struct pcifront_dev *dev,
                         unsigned int dom,
-                        unsigned int bus, unsigned int slot, unsigned long fun,
+                        unsigned int bus, unsigned int slot, unsigned int fun,
                         unsigned int off, unsigned int size, unsigned int val)
 {
     struct xen_pci_op op;
@@ -513,7 +513,7 @@ int pcifront_conf_write(struct pcifront_dev *dev,
 
 int pcifront_enable_msi(struct pcifront_dev *dev,
                         unsigned int dom,
-                        unsigned int bus, unsigned int slot, unsigned long fun)
+                        unsigned int bus, unsigned int slot, unsigned int fun)
 {
     struct xen_pci_op op;
 
@@ -538,7 +538,7 @@ int pcifront_enable_msi(struct pcifront_dev *dev,
 
 int pcifront_disable_msi(struct pcifront_dev *dev,
                          unsigned int dom,
-                         unsigned int bus, unsigned int slot, unsigned long fun)
+                         unsigned int bus, unsigned int slot, unsigned int fun)
 {
     struct xen_pci_op op;
 
@@ -560,7 +560,7 @@ int pcifront_disable_msi(struct pcifront_dev *dev,
 
 int pcifront_enable_msix(struct pcifront_dev *dev,
                          unsigned int dom,
-                         unsigned int bus, unsigned int slot, unsigned long fun,
+                         unsigned int bus, unsigned int slot, unsigned int fun,
                          struct xen_msix_entry *entries, int n)
 {
     struct xen_pci_op op;
@@ -595,7 +595,7 @@ int pcifront_enable_msix(struct pcifront_dev *dev,
 
 int pcifront_disable_msix(struct pcifront_dev *dev,
                           unsigned int dom,
-                          unsigned int bus, unsigned int slot, unsigned long fun)
+                          unsigned int bus, unsigned int slot, unsigned int fun)
 {
     struct xen_pci_op op;
 
