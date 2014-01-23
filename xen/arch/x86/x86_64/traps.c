@@ -266,6 +266,18 @@ void toggle_guest_mode(struct vcpu *v)
 #else
     write_ptbase(v);
 #endif
+
+    if ( !(v->arch.flags & TF_kernel_mode) )
+        return;
+
+    if ( v->arch.pv_vcpu.need_update_runstate_area &&
+         update_runstate_area(v) )
+        v->arch.pv_vcpu.need_update_runstate_area = 0;
+
+    if ( v->arch.pv_vcpu.pending_system_time.version &&
+         update_secondary_system_time(v,
+                                      &v->arch.pv_vcpu.pending_system_time) )
+        v->arch.pv_vcpu.pending_system_time.version = 0;
 }
 
 unsigned long do_iret(void)

@@ -740,7 +740,6 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
 {
     struct cpu_time       *t;
     struct vcpu_time_info *u, _u;
-    XEN_GUEST_HANDLE(vcpu_time_info_t) user_u;
     struct domain *d = v->domain;
     s_time_t tsc_stamp = 0;
 
@@ -805,19 +804,31 @@ static void __update_vcpu_system_time(struct vcpu *v, int force)
     /* 3. Update guest kernel version. */
     u->version = version_update_end(u->version);
 
-    user_u = v->arch.time_info_guest;
-    if ( !guest_handle_is_null(user_u) )
-    {
-        /* 1. Update userspace version. */
-        __copy_field_to_guest(user_u, &_u, version);
-        wmb();
-        /* 2. Update all other userspavce fields. */
-        __copy_to_guest(user_u, &_u, 1);
-        wmb();
-        /* 3. Update userspace version. */
-        _u.version = version_update_end(_u.version);
-        __copy_field_to_guest(user_u, &_u, version);
-    }
+    if ( !update_secondary_system_time(v, &_u) && is_pv_domain(d) &&
+         !is_pv_32bit_domain(d) && !(v->arch.flags & TF_kernel_mode) )
+        v->arch.pv_vcpu.pending_system_time = _u;
+}
+
+bool_t update_secondary_system_time(const struct vcpu *v,
+                                    struct vcpu_time_info *u)
+{
+    XEN_GUEST_HANDLE(vcpu_time_info_t) user_u = v->arch.time_info_guest;
+
+    if ( guest_handle_is_null(user_u) )
+        return 1;
+
+    /* 1. Update userspace version. */
+    if ( __copy_field_to_guest(user_u, u, version) == sizeof(u->version) )
+        return 0;
+    wmb();
+    /* 2. Update all other userspace fields. */
+    __copy_to_guest(user_u, u, 1);
+    wmb();
+    /* 3. Update userspace version. */
+    u->version = version_update_end(u->version);
+    __copy_field_to_guest(user_u, u, version);
+
+    return 1;
 }
 
 void update_vcpu_system_time(struct vcpu *v)

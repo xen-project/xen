@@ -1323,10 +1323,10 @@ static void paravirt_ctxt_switch_to(struct vcpu *v)
 }
 
 /* Update per-VCPU guest runstate shared memory area (if registered). */
-static void update_runstate_area(struct vcpu *v)
+bool_t update_runstate_area(const struct vcpu *v)
 {
     if ( guest_handle_is_null(runstate_guest(v)) )
-        return;
+        return 1;
 
     if ( has_32bit_shinfo(v->domain) )
     {
@@ -1334,10 +1334,18 @@ static void update_runstate_area(struct vcpu *v)
 
         XLAT_vcpu_runstate_info(&info, &v->runstate);
         __copy_to_guest(v->runstate_guest.compat, &info, 1);
-        return;
+        return 1;
     }
 
-    __copy_to_guest(runstate_guest(v), &v->runstate, 1);
+    return __copy_to_guest(runstate_guest(v), &v->runstate, 1) !=
+           sizeof(v->runstate);
+}
+
+static void _update_runstate_area(struct vcpu *v)
+{
+    if ( !update_runstate_area(v) && is_pv_vcpu(v) &&
+         !(v->arch.flags & TF_kernel_mode) )
+        v->arch.pv_vcpu.need_update_runstate_area = 1;
 }
 
 static inline int need_full_gdt(struct vcpu *v)
@@ -1443,8 +1451,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         flush_tlb_mask(&dirty_mask);
     }
 
-    if (prev != next)
-        update_runstate_area(prev);
+    if ( prev != next )
+        _update_runstate_area(prev);
 
     if ( is_hvm_vcpu(prev) )
     {
@@ -1497,8 +1505,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
 
     context_saved(prev);
 
-    if (prev != next)
-        update_runstate_area(next);
+    if ( prev != next )
+        _update_runstate_area(next);
 
     /* Ensure that the vcpu has an up-to-date time base. */
     update_vcpu_system_time(next);
