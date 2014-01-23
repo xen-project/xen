@@ -1590,8 +1590,7 @@ int pirq_guest_bind(struct vcpu *v, struct pirq *pirq, int will_share)
             printk(XENLOG_G_INFO
                    "Cannot bind IRQ%d to dom%d. Out of memory.\n",
                    pirq->pirq, v->domain->domain_id);
-            rc = -ENOMEM;
-            goto out;
+            return -ENOMEM;
         }
 
         action = newaction;
