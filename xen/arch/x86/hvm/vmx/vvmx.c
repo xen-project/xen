@@ -1396,6 +1396,13 @@ void nvmx_switch_guest(void)
     struct cpu_user_regs *regs = guest_cpu_user_regs();
 
     /*
+     * a pending IO emualtion may still no finished. In this case,
+     * no virtual vmswith is allowed. Or else, the following IO
+     * emulation will handled in a wrong VCPU context.
+     */
+    if ( get_ioreq(v)->state != STATE_IOREQ_NONE )
+        return;
+    /*
      * a softirq may interrupt us between a virtual vmentry is
      * just handled and the true vmentry. If during this window,
      * a L1 virtual interrupt causes another virtual vmexit, we
