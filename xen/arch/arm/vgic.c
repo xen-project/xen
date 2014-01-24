@@ -362,11 +362,12 @@ read_as_zero:
 
 static void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
 {
+    const unsigned long mask = r;
     struct pending_irq *p;
     unsigned int irq;
     int i = 0;
 
-    while ( (i = find_next_bit((const long unsigned int *) &r, 32, i)) < 32 ) {
+    while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
         irq = i + (32 * n);
         p = irq_to_pending(v, irq);
         clear_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
@@ -379,11 +380,12 @@ static void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
 
 static void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
 {
+    const unsigned long mask = r;
     struct pending_irq *p;
     unsigned int irq;
     int i = 0;
 
-    while ( (i = find_next_bit((const long unsigned int *) &r, 32, i)) < 32 ) {
+    while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
         irq = i + (32 * n);
         p = irq_to_pending(v, irq);
         set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
