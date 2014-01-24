@@ -608,8 +608,8 @@ int __init setup_dt_irq(const struct dt_irq *irq, struct irqaction *new)
     rc = __setup_irq(desc, irq->irq, new);
     spin_unlock_irqrestore(&desc->lock, flags);
 
-    desc->handler->startup(desc);
-
+    if ( !rc )
+        desc->handler->startup(desc);
 
     return rc;
 }
