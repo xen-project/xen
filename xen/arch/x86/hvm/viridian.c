@@ -88,8 +88,7 @@ int cpuid_viridian_leaves(unsigned int leaf, unsigned int *eax,
         break;
     case 3:
         /* Which hypervisor MSRs are available to the guest */
-        *eax = (CPUID3A_MSR_REF_COUNT   |
-                CPUID3A_MSR_APIC_ACCESS |
+        *eax = (CPUID3A_MSR_APIC_ACCESS |
                 CPUID3A_MSR_HYPERCALL   |
                 CPUID3A_MSR_VP_INDEX    |
                 CPUID3A_MSR_FREQ);
@@ -310,11 +309,6 @@ int rdmsr_viridian_regs(uint32_t idx, uint64_t *val)
     case VIRIDIAN_MSR_VP_INDEX:
         perfc_incr(mshv_rdmsr_vp_index);
         *val = v->vcpu_id;
-        break;
-
-    case VIRIDIAN_MSR_TIME_REF_COUNT:
-        perfc_incr(mshv_rdmsr_time_ref_count);
-        *val = hvm_get_guest_time(v) / 100;
         break;
 
     case VIRIDIAN_MSR_TSC_FREQUENCY:
