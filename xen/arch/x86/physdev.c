@@ -612,7 +612,9 @@ ret_t do_physdev_op(int cmd, XEN_GUEST_HANDLE(void) arg)
     case PHYSDEVOP_release_msix: {
         struct physdev_pci_device dev;
 
-        if ( copy_from_guest(&dev, arg, 1) )
+        if ( !IS_PRIV(v->domain) )
+            ret = -EPERM;
+        else if ( copy_from_guest(&dev, arg, 1) )
             ret = -EFAULT;
         else
             ret = pci_prepare_msix(dev.seg, dev.bus, dev.devfn,
