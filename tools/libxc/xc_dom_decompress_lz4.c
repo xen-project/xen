@@ -98,6 +98,7 @@ int xc_try_lz4_decode(
 			goto exit_2;
 		}
 
+		ret = -1;
 		outp += dest_len;
 		size -= chunksize;
 
