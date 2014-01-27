@@ -49,6 +49,8 @@
 #define NR_SPECIAL_PAGES     8
 #define special_pfn(x) (0xff000u - NR_SPECIAL_PAGES + (x))
 
+#define VGA_HOLE_SIZE (0x20)
+
 static int modules_init(struct xc_hvm_build_args *args,
                         uint64_t vend, struct elf_binary *elf,
                         uint64_t *mstart_out, uint64_t *mend_out)
@@ -302,14 +304,31 @@ static int setup_guest(xc_interface *xch,
     for ( i = mmio_start >> PAGE_SHIFT; i < nr_pages; i++ )
         page_array[i] += mmio_size >> PAGE_SHIFT;
 
+    /*
+     * Try to claim pages for early warning of insufficient memory available.
+     * This should go before xc_domain_set_pod_target, becuase that function
+     * actually allocates memory for the guest. Claiming after memory has been
+     * allocated is pointless.
+     */
+    if ( claim_enabled ) {
+        rc = xc_domain_claim_pages(xch, dom, target_pages - VGA_HOLE_SIZE);
+        if ( rc != 0 )
+        {
+            PERROR("Could not allocate memory for HVM guest as we cannot claim memory!");
+            goto error_out;
+        }
+    }
+
     if ( pod_mode )
     {
         /*
-         * Subtract 0x20 from target_pages for the VGA "hole".  Xen will
-         * adjust the PoD cache size so that domain tot_pages will be
-         * target_pages - 0x20 after this call.
+         * Subtract VGA_HOLE_SIZE from target_pages for the VGA
+         * "hole".  Xen will adjust the PoD cache size so that domain
+         * tot_pages will be target_pages - VGA_HOLE_SIZE after
+         * this call.
          */
-        rc = xc_domain_set_pod_target(xch, dom, target_pages - 0x20,
+        rc = xc_domain_set_pod_target(xch, dom,
+                                      target_pages - VGA_HOLE_SIZE,
                                       NULL, NULL, NULL);
         if ( rc != 0 )
         {
@@ -333,15 +352,6 @@ static int setup_guest(xc_interface *xch,
     cur_pages = 0xc0;
     stat_normal_pages = 0xc0;
 
-    /* try to claim pages for early warning of insufficient memory available */
-    if ( claim_enabled ) {
-        rc = xc_domain_claim_pages(xch, dom, nr_pages - cur_pages);
-        if ( rc != 0 )
-        {
-            PERROR("Could not allocate memory for HVM guest as we cannot claim memory!");
-            goto error_out;
-        }
-    }
     while ( (rc == 0) && (nr_pages > cur_pages) )
     {
         /* Clip count to maximum 1GB extent. */
