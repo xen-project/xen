@@ -1778,14 +1778,14 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
 
     if ( pagebuf_get(xch, ctx, &pagebuf, io_fd, dom) ) {
         PERROR("error when buffering batch, finishing");
-        goto finish;
+        goto out;
     }
     memset(&tmptail, 0, sizeof(tmptail));
     tmptail.ishvm = hvm;
     if ( buffer_tail(xch, ctx, &tmptail, io_fd, max_vcpu_id, vcpumap,
                      ext_vcpucontext, vcpuextstate, vcpuextstate_size) < 0 ) {
         ERROR ("error buffering image tail, finishing");
-        goto finish;
+        goto out;
     }
     tailbuf_free(&tailbuf);
     memcpy(&tailbuf, &tmptail, sizeof(tailbuf));
