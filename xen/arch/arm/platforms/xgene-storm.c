@@ -20,7 +20,15 @@
 
 #include <xen/config.h>
 #include <asm/platform.h>
+#include <xen/stdbool.h>
+#include <xen/vmap.h>
+#include <asm/io.h>
 #include <asm/gic.h>
+
+/* Variables to save reset address of soc during platform initialization. */
+static u64 reset_addr, reset_size;
+static u32 reset_mask;
+static bool reset_vals_valid = false;
 
 static uint32_t xgene_storm_quirks(void)
 {
@@ -107,6 +115,68 @@ err:
     return ret;
 }
 
+static void xgene_storm_reset(void)
+{
+    void __iomem *addr;
+
+    if ( !reset_vals_valid )
+    {
+        printk("XGENE: Invalid reset values, can not reset XGENE...\n");
+        return;
+    }
+
+    addr = ioremap_nocache(reset_addr, reset_size);
+
+    if ( !addr )
+    {
+        printk("XGENE: Unable to map xgene reset address, can not reset XGENE...\n");
+        return;
+    }
+
+    /* Write reset mask to base address */
+    writel(reset_mask, addr);
+
+    iounmap(addr);
+}
+
+static int xgene_storm_init(void)
+{
+    static const struct dt_device_match reset_ids[] __initconst =
+    {
+        DT_MATCH_COMPATIBLE("apm,xgene-reboot"),
+        {},
+    };
+    struct dt_device_node *dev;
+    int res;
+
+    dev = dt_find_matching_node(NULL, reset_ids);
+    if ( !dev )
+    {
+        printk("XGENE: Unable to find a compatible reset node in the device tree");
+        return 0;
+    }
+
+    dt_device_set_used_by(dev, DOMID_XEN);
+
+    /* Retrieve base address and size */
+    res = dt_device_get_address(dev, 0, &reset_addr, &reset_size);
+    if ( res )
+    {
+        printk("XGENE: Unable to retrieve the base address for reset\n");
+        return 0;
+    }
+
+    /* Get reset mask */
+    res = dt_property_read_u32(dev, "mask", &reset_mask);
+    if ( !res )
+    {
+        printk("XGENE: Unable to retrieve the reset mask\n");
+        return 0;
+    }
+
+    reset_vals_valid = true;
+    return 0;
+}
 
 static const char * const xgene_storm_dt_compat[] __initconst =
 {
@@ -116,6 +186,8 @@ static const char * const xgene_storm_dt_compat[] __initconst =
 
 PLATFORM_START(xgene_storm, "APM X-GENE STORM")
     .compatible = xgene_storm_dt_compat,
+    .init = xgene_storm_init,
+    .reset = xgene_storm_reset,
     .quirks = xgene_storm_quirks,
     .specific_mapping = xgene_storm_specific_mapping,
 
