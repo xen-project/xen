@@ -1030,24 +1030,13 @@ static struct tmem_pool * pool_alloc(void)
     struct tmem_pool *pool;
     int i;
 
-    if ( (pool = xmalloc(struct tmem_pool)) == NULL )
+    if ( (pool = xzalloc(struct tmem_pool)) == NULL )
         return NULL;
     for (i = 0; i < OBJ_HASH_BUCKETS; i++)
         pool->obj_rb_root[i] = RB_ROOT;
     INIT_LIST_HEAD(&pool->pool_list);
     INIT_LIST_HEAD(&pool->persistent_page_list);
-    pool->cur_pgp = NULL;
     rwlock_init(&pool->pool_rwlock);
-    pool->pgp_count_max = pool->obj_count_max = 0;
-    pool->objnode_count = pool->objnode_count_max = 0;
-    atomic_set(&pool->pgp_count,0);
-    pool->obj_count = 0; pool->shared_count = 0;
-    pool->good_puts = pool->puts = pool->dup_puts_flushed = 0;
-    pool->dup_puts_replaced = pool->no_mem_puts = 0;
-    pool->found_gets = pool->gets = 0;
-    pool->flushs_found = pool->flushs = 0;
-    pool->flush_objs_found = pool->flush_objs = 0;
-    pool->is_dying = 0;
     return pool;
 }
 
@@ -1216,15 +1205,9 @@ static struct client *client_create(domid_t cli_id)
     for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++)
         client->shared_auth_uuid[i][0] =
             client->shared_auth_uuid[i][1] = -1L;
-    client->frozen = 0; client->live_migrating = 0;
-    client->weight = 0; client->cap = 0;
     list_add_tail(&client->client_list, &global_client_list);
     INIT_LIST_HEAD(&client->ephemeral_page_list);
     INIT_LIST_HEAD(&client->persistent_invalidated_list);
-    client->cur_pgp = NULL;
-    client->eph_count = client->eph_count_max = 0;
-    client->total_cycles = 0; client->succ_pers_puts = 0;
-    client->succ_eph_gets = 0; client->succ_pers_gets = 0;
     tmem_client_info("ok\n");
     return client;
 
