@@ -1021,21 +1021,24 @@ static void pool_free(struct tmem_pool *pool)
     xfree(pool);
 }
 
-/* register new_client as a user of this shared pool and return new
-   total number of registered users */
+/*
+ * Register new_client as a user of this shared pool and return 0 on succ.
+ */
 static int shared_pool_join(struct tmem_pool *pool, struct client *new_client)
 {
     struct share_list *sl;
-
     ASSERT(is_shared(pool));
+
     if ( (sl = tmem_malloc(sizeof(struct share_list), NULL)) == NULL )
         return -1;
     sl->client = new_client;
     list_add_tail(&sl->share_list, &pool->share_list);
     if ( new_client->cli_id != pool->client->cli_id )
         tmem_client_info("adding new %s %d to shared pool owned by %s %d\n",
-            tmem_client_str, new_client->cli_id, tmem_client_str, pool->client->cli_id);
-    return ++pool->shared_count;
+                    tmem_client_str, new_client->cli_id, tmem_client_str,
+                    pool->client->cli_id);
+    ++pool->shared_count;
+    return 0;
 }
 
 /* reassign "ownership" of the pool to another client that shares this pool */
@@ -1846,8 +1849,7 @@ static int do_tmem_new_pool(domid_t this_cli_id,
     int specversion = (flags >> TMEM_POOL_VERSION_SHIFT)
          & TMEM_POOL_VERSION_MASK;
     struct tmem_pool *pool, *shpool;
-    int s_poolid, first_unused_s_poolid;
-    int i;
+    int i, first_unused_s_poolid;
 
     if ( this_cli_id == TMEM_CLI_ID_NULL )
         cli_id = current->domain->domain_id;
@@ -1859,6 +1861,11 @@ static int do_tmem_new_pool(domid_t this_cli_id,
     if ( specversion != TMEM_SPEC_VERSION )
     {
         tmem_client_err("failed... unsupported spec version\n");
+        return -EPERM;
+    }
+    if ( shared && persistent )
+    {
+        tmem_client_err("failed... unable to create a shared-persistant pool\n");
         return -EPERM;
     }
     if ( pagebits != (PAGE_SHIFT - 12) )
@@ -1877,17 +1884,12 @@ static int do_tmem_new_pool(domid_t this_cli_id,
         tmem_client_err("failed... reserved bits must be zero\n");
         return -EPERM;
     }
-    if ( (pool = pool_alloc()) == NULL )
-    {
-        tmem_client_err("failed... out of memory\n");
-        return -ENOMEM;
-    }
     if ( this_cli_id != TMEM_CLI_ID_NULL )
     {
         if ( (client = tmem_client_from_cli_id(this_cli_id)) == NULL
              || d_poolid >= MAX_POOLS_PER_DOMAIN
              || client->pools[d_poolid] != NULL )
-            goto fail;
+            return -EPERM;
     }
     else
     {
@@ -1900,13 +1902,35 @@ static int do_tmem_new_pool(domid_t this_cli_id,
         {
             tmem_client_err("failed... no more pool slots available for this %s\n",
                    tmem_client_str);
-            goto fail;
+            return -EPERM;
         }
     }
+
+    if ( (pool = pool_alloc()) == NULL )
+    {
+        tmem_client_err("failed... out of memory\n");
+        return -ENOMEM;
+    }
+    client->pools[d_poolid] = pool;
+    pool->client = client;
+    pool->pool_id = d_poolid;
+    pool->shared = shared;
+    pool->persistent = persistent;
+    pool->uuid[0] = uuid_lo;
+    pool->uuid[1] = uuid_hi;
+
+    /*
+     * Already created a pool when arrived here, but need some special process
+     * for shared pool.
+     */
     if ( shared )
     {
         if ( uuid_lo == -1L && uuid_hi == -1L )
-            shared = 0;
+        {
+            tmem_client_info("Invalid uuid, create non shared pool instead!\n");
+            pool->shared = 0;
+            goto out;
+        }
         if ( client->shared_auth_required && !global_shared_auth )
         {
             for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++)
@@ -1914,48 +1938,60 @@ static int do_tmem_new_pool(domid_t this_cli_id,
                      (client->shared_auth_uuid[i][1] == uuid_hi) )
                     break;
             if ( i == MAX_GLOBAL_SHARED_POOLS )
-                shared = 0;
+	    {
+                tmem_client_info("Shared auth failed, create non shared pool instead!\n");
+                pool->shared = 0;
+                goto out;
+            }
         }
-    }
-    pool->shared = shared;
-    pool->client = client;
-    if ( shared )
-    {
+
+        /*
+         * Authorize okay, match a global shared pool or use the newly allocated
+         * one
+         */
         first_unused_s_poolid = MAX_GLOBAL_SHARED_POOLS;
-        for ( s_poolid = 0; s_poolid < MAX_GLOBAL_SHARED_POOLS; s_poolid++ )
+        for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++ )
         {
-            if ( (shpool = global_shared_pools[s_poolid]) != NULL )
+            if ( (shpool = global_shared_pools[i]) != NULL )
             {
                 if ( shpool->uuid[0] == uuid_lo && shpool->uuid[1] == uuid_hi )
                 {
+                    /* Succ to match a global shared pool */
                     tmem_client_info("(matches shared pool uuid=%"PRIx64".%"PRIx64") pool_id=%d\n",
                         uuid_hi, uuid_lo, d_poolid);
-                    client->pools[d_poolid] = global_shared_pools[s_poolid];
-                    shared_pool_join(global_shared_pools[s_poolid], client);
-                    pool_free(pool);
-                    return d_poolid;
+                    client->pools[d_poolid] = shpool;
+                    if ( !shared_pool_join(shpool, client) )
+                    {
+                        pool_free(pool);
+                        goto out;
+                    }
+                    else
+                        goto fail;
                 }
             }
-            else if ( first_unused_s_poolid == MAX_GLOBAL_SHARED_POOLS )
-                first_unused_s_poolid = s_poolid;
+            else
+            {
+                if ( first_unused_s_poolid == MAX_GLOBAL_SHARED_POOLS )
+                    first_unused_s_poolid = i;
+            }
         }
+
+        /* Failed to find a global shard pool slot */
         if ( first_unused_s_poolid == MAX_GLOBAL_SHARED_POOLS )
         {
             tmem_client_warn("tmem: failed... no global shared pool slots available\n");
             goto fail;
         }
+        /* Add pool to global shard pool */
         else
         {
             INIT_LIST_HEAD(&pool->share_list);
             pool->shared_count = 0;
             global_shared_pools[first_unused_s_poolid] = pool;
-            (void)shared_pool_join(pool,client);
         }
     }
-    client->pools[d_poolid] = pool;
-    pool->pool_id = d_poolid;
-    pool->persistent = persistent;
-    pool->uuid[0] = uuid_lo; pool->uuid[1] = uuid_hi;
+
+out:
     tmem_client_info("pool_id=%d\n", d_poolid);
     return d_poolid;
 
