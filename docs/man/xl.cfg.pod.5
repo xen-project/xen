@@ -1251,6 +1251,10 @@ Host devices can also be passed through in this way, by specifying
 host:USBID, where USBID is of the form xxxx:yyyy.  The USBID can
 typically be found by using lsusb or usb-devices.
 
+If you wish to use the "host:bus.addr" format, remove any leading '0' from the
+bus and addr. For example, for the USB device on bus 008 dev 002, you will
+write "host:8.2".
+
 The form usbdevice=DEVICE is also accepted for backwards compatibility.
 
 More valid options can be found in the "usbdevice" section of the qemu
