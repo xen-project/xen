@@ -959,12 +959,11 @@ static int obj_rb_insert(struct rb_root *root, struct tmem_object_root *obj)
  * allocate, initialize, and insert an tmem_object_root
  * (should be called only if find failed)
  */
-static struct tmem_object_root * obj_new(struct tmem_pool *pool, struct oid *oidp)
+static struct tmem_object_root * obj_alloc(struct tmem_pool *pool, struct oid *oidp)
 {
     struct tmem_object_root *obj;
 
     ASSERT(pool != NULL);
-    ASSERT_WRITELOCK(&pool->pool_rwlock);
     if ( (obj = tmem_malloc(sizeof(struct tmem_object_root), pool)) == NULL )
         return NULL;
     pool->obj_count++;
@@ -979,9 +978,6 @@ static struct tmem_object_root * obj_new(struct tmem_pool *pool, struct oid *oid
     obj->objnode_count = 0;
     obj->pgp_count = 0;
     obj->last_client = TMEM_CLI_ID_NULL;
-    spin_lock(&obj->obj_spinlock);
-    obj_rb_insert(&pool->obj_rb_root[oid_hash(oidp)], obj);
-    ASSERT_SPINLOCK(&obj->obj_spinlock);
     return obj;
 }
 
@@ -1552,10 +1548,13 @@ static int do_tmem_put(struct tmem_pool *pool,
 
     ASSERT(pool != NULL);
     client = pool->client;
+    ASSERT(client != NULL);
     ret = client->frozen ? -EFROZEN : -ENOMEM;
     pool->puts++;
+
+refind:
     /* does page already exist (dup)?  if so, handle specially */
-    if ( (obj = obj_find(pool,oidp)) != NULL )
+    if ( (obj = obj_find(pool, oidp)) != NULL )
     {
         if ((pgp = pgp_lookup_in_obj(obj, index)) != NULL)
         {
@@ -1573,12 +1572,22 @@ static int do_tmem_put(struct tmem_pool *pool,
         /* no puts allowed into a frozen pool (except dup puts) */
         if ( client->frozen )
             return ret;
-        write_lock(&pool->pool_rwlock);
-        if ( (obj = obj_new(pool,oidp)) == NULL )
-        {
-            write_unlock(&pool->pool_rwlock);
+        if ( (obj = obj_alloc(pool, oidp)) == NULL )
             return -ENOMEM;
+
+        write_lock(&pool->pool_rwlock);
+        /*
+	 * Parallel callers may already allocated obj and inserted to obj_rb_root
+	 * before us.
+	 */
+        if (!obj_rb_insert(&pool->obj_rb_root[oid_hash(oidp)], obj))
+        {
+            tmem_free(obj, pool);
+            write_unlock(&pool->pool_rwlock);
+            goto refind;
         }
+
+        spin_lock(&obj->obj_spinlock);
         newobj = 1;
         write_unlock(&pool->pool_rwlock);
     }
