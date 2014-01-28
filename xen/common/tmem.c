@@ -2186,7 +2186,7 @@ static int tmemc_list(domid_t cli_id, tmem_cli_va_param_t buf, uint32_t len,
     return 0;
 }
 
-static int tmemc_set_var_one(struct client *client, uint32_t subop, uint32_t arg1)
+static int __tmemc_set_var(struct client *client, uint32_t subop, uint32_t arg1)
 {
     domid_t cli_id = client->cli_id;
     uint32_t old_weight;
@@ -2228,15 +2228,24 @@ static int tmemc_set_var_one(struct client *client, uint32_t subop, uint32_t arg
 static int tmemc_set_var(domid_t cli_id, uint32_t subop, uint32_t arg1)
 {
     struct client *client;
+    int ret = -1;
 
     if ( cli_id == TMEM_CLI_ID_NULL )
+    {
         list_for_each_entry(client,&global_client_list,client_list)
-            tmemc_set_var_one(client, subop, arg1);
-    else if ( (client = tmem_client_from_cli_id(cli_id)) == NULL)
-        return -1;
+        {
+            ret =  __tmemc_set_var(client, subop, arg1);
+            if (ret)
+                break;
+        }
+    }
     else
-        tmemc_set_var_one(client, subop, arg1);
-    return 0;
+    {
+        client = tmem_client_from_cli_id(cli_id);
+        if ( client )
+            ret = __tmemc_set_var(client, subop, arg1);
+    }
+    return ret;
 }
 
 static int tmemc_shared_pool_auth(domid_t cli_id, uint64_t uuid_lo,
