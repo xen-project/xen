@@ -203,7 +203,7 @@ QEMU_UPSTREAM_URL ?= git://xenbits.xen.org/qemu-upstream-4.2-testing.git
 SEABIOS_UPSTREAM_URL ?= git://xenbits.xen.org/seabios.git
 endif
 OVMF_UPSTREAM_REVISION ?= b0855f925c6e2e0b21fbb03fab4b5fb5b6876871
-QEMU_UPSTREAM_REVISION ?= qemu-xen-4.2.3
+QEMU_UPSTREAM_REVISION ?= qemu-xen-4.2.4-rc1
 SEABIOS_UPSTREAM_TAG ?= rel-1.6.3.2
 # Sun Mar 11 09:27:07 2012 -0400
 # Update version to 1.6.3.2
@@ -215,7 +215,7 @@ ETHERBOOT_NICS ?= rtl8139 8086100e
 # CONFIG_QEMU ?= `pwd`/$(XEN_ROOT)/../qemu-xen.git
 CONFIG_QEMU ?= $(QEMU_REMOTE)
 
-QEMU_TAG ?= 8d7e96f625c4a58d721db413b032fd0bb5671b96
+QEMU_TAG ?= xen-4.2.4-rc1
 # Wed Dec 18 15:25:14 2013 +0000
 # qemu-traditional: Fix build warnings on Wheezy
 
