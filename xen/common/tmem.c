@@ -88,6 +88,7 @@ struct share_list {
     struct client *client;
 };
 
+#define POOL_PAGESHIFT (PAGE_SHIFT - 12)
 #define OBJ_HASH_BUCKETS 256 /* must be power of two */
 #define OBJ_HASH_BUCKETS_MASK (OBJ_HASH_BUCKETS-1)
 
@@ -95,7 +96,6 @@ struct tmem_pool {
     bool_t shared;
     bool_t persistent;
     bool_t is_dying;
-    int pageshift; /* 0 == 2**12 */
     struct list_head pool_list;
     struct client *client;
     uint64_t uuid[2]; /* 0 for private, non-zero for shared */
@@ -1042,7 +1042,6 @@ static struct tmem_pool * pool_alloc(void)
     pool->objnode_count = pool->objnode_count_max = 0;
     atomic_set(&pool->pgp_count,0);
     pool->obj_count = 0; pool->shared_count = 0;
-    pool->pageshift = PAGE_SHIFT - 12;
     pool->good_puts = pool->puts = pool->dup_puts_flushed = 0;
     pool->dup_puts_replaced = pool->no_mem_puts = 0;
     pool->found_gets = pool->gets = 0;
@@ -2356,7 +2355,7 @@ static int tmemc_save_subop(int cli_id, uint32_t pool_id,
              break;
          rc = (pool->persistent ? TMEM_POOL_PERSIST : 0) |
               (pool->shared ? TMEM_POOL_SHARED : 0) |
-              (pool->pageshift << TMEM_POOL_PAGESIZE_SHIFT) |
+              (POOL_PAGESHIFT << TMEM_POOL_PAGESIZE_SHIFT) |
               (TMEM_SPEC_VERSION << TMEM_POOL_VERSION_SHIFT);
         break;
     case TMEMC_SAVE_GET_POOL_NPAGES:
@@ -2396,13 +2395,11 @@ static int tmemc_save_get_next_page(int cli_id, uint32_t pool_id,
     struct oid oid;
     int ret = 0;
     struct tmem_handle h;
-    unsigned int pagesize;
 
     if ( pool == NULL || !is_persistent(pool) )
         return -1;
 
-    pagesize = 1 << (pool->pageshift + 12);
-    if ( bufsize < pagesize + sizeof(struct tmem_handle) )
+    if ( bufsize < PAGE_SIZE + sizeof(struct tmem_handle) )
         return -ENOMEM;
 
     spin_lock(&pers_lists_spinlock);
