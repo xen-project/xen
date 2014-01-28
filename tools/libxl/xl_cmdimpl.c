@@ -721,6 +721,15 @@ static void parse_top_level_vnc_options(XLU_Config *config,
     xlu_cfg_get_defbool(config, "vncunused", &vnc->findunused, 0);
 }
 
+static void parse_top_level_sdl_options(XLU_Config *config,
+                                        libxl_sdl_info *sdl)
+{
+    xlu_cfg_get_defbool(config, "sdl", &sdl->enable, 0);
+    xlu_cfg_get_defbool(config, "opengl", &sdl->opengl, 0);
+    xlu_cfg_replace_string (config, "display", &sdl->display, 0);
+    xlu_cfg_replace_string (config, "xauthority", &sdl->xauthority, 0);
+}
+
 static void parse_config_data(const char *config_source,
                               const char *config_data,
                               int config_len,
@@ -1662,9 +1671,13 @@ skip_vfb:
                                     libxl_device_vkb_init);
 
             parse_top_level_vnc_options(config, &vfb->vnc);
+            parse_top_level_sdl_options(config, &vfb->sdl);
+            xlu_cfg_replace_string (config, "keymap", &vfb->keymap, 0);
         }
-    } else
+    } else {
         parse_top_level_vnc_options(config, &b_info->u.hvm.vnc);
+        parse_top_level_sdl_options(config, &b_info->u.hvm.sdl);
+    }
 
     if (c_info->type == LIBXL_DOMAIN_TYPE_HVM) {
         if (!xlu_cfg_get_string (config, "vga", &buf, 0)) {
@@ -1681,8 +1694,6 @@ skip_vfb:
                                          LIBXL_VGA_INTERFACE_TYPE_CIRRUS;
 
         xlu_cfg_replace_string (config, "keymap", &b_info->u.hvm.keymap, 0);
-        xlu_cfg_get_defbool(config, "sdl", &b_info->u.hvm.sdl.enable, 0);
-        xlu_cfg_get_defbool(config, "opengl", &b_info->u.hvm.sdl.opengl, 0);
         xlu_cfg_get_defbool (config, "spice", &b_info->u.hvm.spice.enable, 0);
         if (!xlu_cfg_get_long (config, "spiceport", &l, 0))
             b_info->u.hvm.spice.port = l;
