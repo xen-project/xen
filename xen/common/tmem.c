@@ -883,7 +883,7 @@ restart_find:
 }
 
 /* free an object that has no more pgps in it */
-static void obj_free(struct tmem_object_root *obj, int no_rebalance)
+static void obj_free(struct tmem_object_root *obj)
 {
     struct tmem_pool *pool;
     struct oid old_oid;
@@ -906,9 +906,7 @@ static void obj_free(struct tmem_object_root *obj, int no_rebalance)
     oid_set_invalid(&obj->oid);
     obj->last_client = TMEM_CLI_ID_NULL;
     atomic_dec_and_assert(global_obj_count);
-    /* use no_rebalance only if all objects are being destroyed anyway */
-    if ( !no_rebalance )
-        rb_erase(&obj->rb_tree_node,&pool->obj_rb_root[oid_hash(&old_oid)]);
+    rb_erase(&obj->rb_tree_node, &pool->obj_rb_root[oid_hash(&old_oid)]);
     spin_unlock(&obj->obj_spinlock);
     tmem_free(obj, pool);
 }
@@ -967,15 +965,15 @@ static struct tmem_object_root * obj_alloc(struct tmem_pool *pool, struct oid *o
 }
 
 /* free an object after destroying any pgps in it */
-static void obj_destroy(struct tmem_object_root *obj, int no_rebalance)
+static void obj_destroy(struct tmem_object_root *obj)
 {
     ASSERT_WRITELOCK(&obj->pool->pool_rwlock);
     radix_tree_destroy(&obj->tree_root, pgp_destroy);
-    obj_free(obj,no_rebalance);
+    obj_free(obj);
 }
 
 /* destroys all objs in a pool, or only if obj->last_client matches cli_id */
-static void pool_destroy_objs(struct tmem_pool *pool, bool_t selective, domid_t cli_id)
+static void pool_destroy_objs(struct tmem_pool *pool, domid_t cli_id)
 {
     struct rb_node *node;
     struct tmem_object_root *obj;
@@ -991,11 +989,8 @@ static void pool_destroy_objs(struct tmem_pool *pool, bool_t selective, domid_t 
             obj = container_of(node, struct tmem_object_root, rb_tree_node);
             spin_lock(&obj->obj_spinlock);
             node = rb_next(node);
-            if ( !selective )
-                /* FIXME: should be obj,1 but walking/erasing rbtree is racy */
-                obj_destroy(obj,0);
-            else if ( obj->last_client == cli_id )
-                obj_destroy(obj,0);
+            if ( obj->last_client == cli_id )
+                obj_destroy(obj);
             else
                 spin_unlock(&obj->obj_spinlock);
         }
@@ -1084,7 +1079,7 @@ static int shared_pool_quit(struct tmem_pool *pool, domid_t cli_id)
     ASSERT(pool->client != NULL);
     
     ASSERT_WRITELOCK(&tmem_rwlock);
-    pool_destroy_objs(pool,1,cli_id);
+    pool_destroy_objs(pool, cli_id);
     list_for_each_entry(sl,&pool->share_list, share_list)
     {
         if (sl->client->cli_id != cli_id)
@@ -1130,7 +1125,7 @@ static void pool_flush(struct tmem_pool *pool, domid_t cli_id, bool_t destroy)
                destroy?"destroy":"flush", tmem_client_str);
         return;
     }
-    pool_destroy_objs(pool,0,TMEM_CLI_ID_NULL);
+    pool_destroy_objs(pool, TMEM_CLI_ID_NULL);
     if ( destroy )
     {
         pool->client->pools[pool->pool_id] = NULL;
@@ -1339,7 +1334,7 @@ found:
     if ( obj->pgp_count == 0 )
     {
         ASSERT_WRITELOCK(&pool->pool_rwlock);
-        obj_free(obj,0);
+        obj_free(obj);
     }
     else
         spin_unlock(&obj->obj_spinlock);
@@ -1518,7 +1513,7 @@ cleanup:
     if ( obj->pgp_count == 0 )
     {
         write_lock(&pool->pool_rwlock);
-        obj_free(obj,0);
+        obj_free(obj);
         write_unlock(&pool->pool_rwlock);
     } else {
         spin_unlock(&obj->obj_spinlock);
@@ -1682,7 +1677,7 @@ unlock_obj:
     if ( newobj )
     {
         write_lock(&pool->pool_rwlock);
-        obj_free(obj, 0);
+        obj_free(obj);
         write_unlock(&pool->pool_rwlock);
     }
     else
@@ -1740,7 +1735,7 @@ static int do_tmem_get(struct tmem_pool *pool, struct oid *oidp, uint32_t index,
             if ( obj->pgp_count == 0 )
             {
                 write_lock(&pool->pool_rwlock);
-                obj_free(obj,0);
+                obj_free(obj);
                 obj = NULL;
                 write_unlock(&pool->pool_rwlock);
             }
@@ -1790,7 +1785,7 @@ static int do_tmem_flush_page(struct tmem_pool *pool, struct oid *oidp, uint32_t
     if ( obj->pgp_count == 0 )
     {
         write_lock(&pool->pool_rwlock);
-        obj_free(obj,0);
+        obj_free(obj);
         write_unlock(&pool->pool_rwlock);
     } else {
         spin_unlock(&obj->obj_spinlock);
@@ -1813,7 +1808,7 @@ static int do_tmem_flush_object(struct tmem_pool *pool, struct oid *oidp)
     if ( obj == NULL )
         goto out;
     write_lock(&pool->pool_rwlock);
-    obj_destroy(obj,0);
+    obj_destroy(obj);
     pool->flush_objs_found++;
     write_unlock(&pool->pool_rwlock);
 
