@@ -133,6 +133,7 @@ STATIC int INIT unlz4(unsigned char *input, unsigned int in_len,
 			goto exit_2;
 		}
 
+		ret = -1;
 		if (flush && flush(outp, dest_len) != dest_len)
 			goto exit_2;
 		if (output)
