@@ -175,7 +175,7 @@
  *
  *------------------------- Backend Device Properties -------------------------
  *
- * discard-aligment
+ * discard-alignment
  *      Values:         <uint32_t>
  *      Default Value:  0
  *      Notes:          4, 5
@@ -194,6 +194,7 @@
  * discard-secure
  *      Values:         0/1 (boolean)
  *      Default Value:  0
+ *      Notes:          10
  *
  *      A value of "1" indicates that the backend can process BLKIF_OP_DISCARD
  *      requests with the BLKIF_DISCARD_SECURE flag set.
@@ -323,9 +324,15 @@
  *     For full interoperability, block front and backends should publish
  *     identical ring parameters, adjusted for unit differences, to the
  *     XenStore nodes used in both schemes.
- * (4) Devices that support discard functionality may internally allocate
- *     space (discardable extents) in units that are larger than the
- *     exported logical block size.
+ * (4) Devices that support discard functionality may internally allocate space
+ *     (discardable extents) in units that are larger than the exported logical
+ *     block size. If the backing device has such discardable extents the
+ *     backend should provide both discard-granularity and discard-alignment.
+ *     Providing just one of the two may be considered an error by the frontend.
+ *     Backends supporting discard should include discard-granularity and
+ *     discard-alignment even if it supports discarding individual sectors.
+ *     Frontends should assume discard-alignment == 0 and discard-granularity
+ *     == sector size if these keys are missing.
  * (5) The discard-alignment parameter allows a physical device to be
  *     partitioned into virtual devices that do not necessarily begin or
  *     end on a discardable extent boundary.
@@ -344,6 +351,8 @@
  *     grants that can be persistently mapped in the frontend driver, but
  *     due to the frontent driver implementation it should never be bigger
  *     than RING_SIZE * BLKIF_MAX_SEGMENTS_PER_REQUEST.
+ *(10) The discard-secure property may be present and will be set to 1 if the
+ *     backing device supports secure discard.
  */
 
 /*
