@@ -1236,11 +1236,6 @@ static bool_t client_over_quota(struct client *client)
              ((total*100L) / client->weight) );
 }
 
-static void client_freeze(struct client *client, int freeze)
-{
-    client->frozen = freeze;
-}
-
 /************ MEMORY REVOCATION ROUTINES *******************************/
 
 static bool_t tmem_try_to_evict_pgp(struct tmem_page_descriptor *pgp, bool_t *hold_pool_rwlock)
@@ -1993,14 +1988,14 @@ static int tmemc_freeze_pools(domid_t cli_id, int arg)
     if ( cli_id == TMEM_CLI_ID_NULL )
     {
         list_for_each_entry(client,&global_client_list,client_list)
-            client_freeze(client,freeze);
+            client->frozen = freeze;
         tmem_client_info("tmem: all pools %s for all %ss\n", s, tmem_client_str);
     }
     else
     {
         if ( (client = tmem_client_from_cli_id(cli_id)) == NULL)
             return -1;
-        client_freeze(client,freeze);
+        client->frozen = freeze;
         tmem_client_info("tmem: all pools %s for %s=%d\n",
                          s, tmem_cli_id_str, cli_id);
     }
