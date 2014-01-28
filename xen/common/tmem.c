@@ -96,7 +96,6 @@ struct tmem_pool {
     bool_t shared;
     bool_t persistent;
     bool_t is_dying;
-    struct list_head pool_list;
     struct client *client;
     uint64_t uuid[2]; /* 0 for private, non-zero for shared */
     uint32_t pool_id;
@@ -199,7 +198,6 @@ rwlock_t pcd_tree_rwlocks[256]; /* poor man's concurrency for now */
 static LIST_HEAD(global_ephemeral_page_list); /* all pages in ephemeral pools */
 
 static LIST_HEAD(global_client_list);
-static LIST_HEAD(global_pool_list);
 
 static struct tmem_pool *global_shared_pools[MAX_GLOBAL_SHARED_POOLS] = { 0 };
 static bool_t global_shared_auth = 0;
@@ -1017,7 +1015,6 @@ static struct tmem_pool * pool_alloc(void)
         return NULL;
     for (i = 0; i < OBJ_HASH_BUCKETS; i++)
         pool->obj_rb_root[i] = RB_ROOT;
-    INIT_LIST_HEAD(&pool->pool_list);
     INIT_LIST_HEAD(&pool->persistent_page_list);
     rwlock_init(&pool->pool_rwlock);
     return pool;
@@ -1026,7 +1023,6 @@ static struct tmem_pool * pool_alloc(void)
 static void pool_free(struct tmem_pool *pool)
 {
     pool->client = NULL;
-    list_del(&pool->pool_list);
     xfree(pool);
 }
 
@@ -1962,7 +1958,6 @@ static int do_tmem_new_pool(domid_t this_cli_id,
         }
     }
     client->pools[d_poolid] = pool;
-    list_add_tail(&pool->pool_list, &global_pool_list);
     pool->pool_id = d_poolid;
     pool->persistent = persistent;
     pool->uuid[0] = uuid_lo; pool->uuid[1] = uuid_hi;
