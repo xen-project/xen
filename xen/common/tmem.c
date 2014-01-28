@@ -2257,27 +2257,39 @@ static int tmemc_shared_pool_auth(domid_t cli_id, uint64_t uuid_lo,
     client = tmem_client_from_cli_id(cli_id);
     if ( client == NULL )
         return -EINVAL;
+
     for ( i = 0; i < MAX_GLOBAL_SHARED_POOLS; i++)
     {
-        if ( (client->shared_auth_uuid[i][0] == uuid_lo) &&
-             (client->shared_auth_uuid[i][1] == uuid_hi) )
+        if ( auth == 0 )
         {
-            if ( auth == 0 )
-                client->shared_auth_uuid[i][0] =
-                    client->shared_auth_uuid[i][1] = -1L;
-            return 1;
+            if ( (client->shared_auth_uuid[i][0] == uuid_lo) &&
+                    (client->shared_auth_uuid[i][1] == uuid_hi) )
+            {
+                client->shared_auth_uuid[i][0] = -1L;
+                client->shared_auth_uuid[i][1] = -1L;
+                return 1;
+            }
         }
-        if ( (auth == 1) && (client->shared_auth_uuid[i][0] == -1L) &&
-                 (client->shared_auth_uuid[i][1] == -1L) && (free == -1) )
-            free = i;
+        else
+        {
+            if ( (client->shared_auth_uuid[i][0] == -1L) &&
+                    (client->shared_auth_uuid[i][1] == -1L) )
+            {
+                free = i;
+                break;
+            }
+	}
     }
     if ( auth == 0 )
         return 0;
-    if ( auth == 1 && free == -1 )
+    else if ( free == -1)
         return -ENOMEM;
-    client->shared_auth_uuid[free][0] = uuid_lo;
-    client->shared_auth_uuid[free][1] = uuid_hi;
-    return 1;
+    else
+    {
+        client->shared_auth_uuid[free][0] = uuid_lo;
+        client->shared_auth_uuid[free][1] = uuid_hi;
+        return 1;
+    }
 }
 
 static int tmemc_save_subop(int cli_id, uint32_t pool_id,
