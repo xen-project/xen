@@ -127,13 +127,14 @@ static DEFINE_PER_CPU(struct mc_telem_cpu_ctl, mctctl);
 static DEFINE_SPINLOCK(processing_lock);
 
 static void mctelem_xchg_head(struct mctelem_ent **headp,
-				struct mctelem_ent **old,
+				struct mctelem_ent **linkp,
 				struct mctelem_ent *new)
 {
 	for (;;) {
-		*old = *headp;
-		wmb();
-		if (cmpxchgptr(headp, *old, new) == *old)
+		struct mctelem_ent *old;
+
+		*linkp = old = *headp;
+		if (cmpxchgptr(headp, old, new) == old)
 			break;
 	}
 }
