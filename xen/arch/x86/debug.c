@@ -63,10 +63,17 @@ dbg_hvm_va2mfn(dbgva_t vaddr, struct domain *dp, int toaddr,
     if ( p2m_is_readonly(gfntype) && toaddr )
     {
         DBGP2("kdb:p2m_is_readonly: gfntype:%x\n", gfntype);
-        return INVALID_MFN;
+        mfn = INVALID_MFN;
+    }
+    else
+        DBGP2("X: vaddr:%lx domid:%d mfn:%lx\n", vaddr, dp->domain_id, mfn);
+
+    if ( mfn == INVALID_MFN )
+    {
+        put_gfn(dp, *gfn);
+        *gfn = INVALID_GFN;
     }
 
-    DBGP2("X: vaddr:%lx domid:%d mfn:%lx\n", vaddr, dp->domain_id, mfn);
     return mfn;
 }
 
