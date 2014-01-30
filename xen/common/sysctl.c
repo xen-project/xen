@@ -309,12 +309,9 @@ long do_sysctl(XEN_GUEST_HANDLE(xen_sysctl_t) u_sysctl)
         }
 
         if ( copy_to_guest(
-            op->u.page_offline.status, status,
-            op->u.page_offline.end - op->u.page_offline.start + 1) )
-        {
+                 op->u.page_offline.status, status,
+                 op->u.page_offline.end - op->u.page_offline.start + 1) )
             ret = -EFAULT;
-            break;
-        }
 
         xfree(status);
     }
