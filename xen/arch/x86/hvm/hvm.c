@@ -4808,6 +4808,10 @@ static int hvm_memory_event_traps(long p, uint32_t reason,
         req.gla = gla;
         req.gla_valid = 1;
     }
+    else
+    {
+        req.gla = old;
+    }
     
     mem_event_put_request(d, &d->mem_event->access, &req);
     
