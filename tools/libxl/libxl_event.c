@@ -387,7 +387,9 @@ static void time_occurs(libxl__egc *egc, libxl__ev_time *etime)
         etime, (unsigned long)etime->abs.tv_sec,
         (unsigned long)etime->abs.tv_usec);
 
-    etime->func(egc, etime, &etime->abs);
+    libxl__ev_time_callback *func = etime->func;
+    etime->func = 0;
+    func(egc, etime, &etime->abs);
 }
 
 
