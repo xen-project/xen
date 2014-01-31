@@ -409,8 +409,10 @@ struct domain *alloc_domain_struct(void)
     struct domain *d;
     BUILD_BUG_ON(sizeof(*d) > PAGE_SIZE);
     d = alloc_xenheap_pages(0, 0);
-    if ( d != NULL )
-        clear_page(d);
+    if ( d == NULL )
+        return NULL;
+
+    clear_page(d);
     d->arch.grant_table_gpfn = xmalloc_array(xen_pfn_t, max_nr_grant_frames);
     return d;
 }
