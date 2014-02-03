@@ -147,14 +147,15 @@ static void gic_irq_enable(struct irq_desc *desc)
 static void gic_irq_disable(struct irq_desc *desc)
 {
     int irq = desc->irq;
+    unsigned long flags;
 
-    spin_lock(&desc->lock);
+    spin_lock_irqsave(&desc->lock, flags);
     spin_lock(&gic.lock);
     /* Disable routing */
     GICD[GICD_ICENABLER + irq / 32] = (1u << (irq % 32));
     desc->status |= IRQ_DISABLED;
     spin_unlock(&gic.lock);
-    spin_unlock(&desc->lock);
+    spin_unlock_irqrestore(&desc->lock, flags);
 }
 
 static unsigned int gic_irq_startup(struct irq_desc *desc)
@@ -652,11 +653,12 @@ static inline void gic_add_to_lr_pending(struct vcpu *v, unsigned int irq,
 void gic_remove_from_queues(struct vcpu *v, unsigned int virtual_irq)
 {
     struct pending_irq *p = irq_to_pending(v, virtual_irq);
+    unsigned long flags;
 
-    spin_lock(&gic.lock);
+    spin_lock_irqsave(&gic.lock, flags);
     if ( !list_empty(&p->lr_queue) )
         list_del_init(&p->lr_queue);
-    spin_unlock(&gic.lock);
+    spin_unlock_irqrestore(&gic.lock, flags);
 }
 
 void gic_set_guest_irq(struct vcpu *v, unsigned int virtual_irq,
