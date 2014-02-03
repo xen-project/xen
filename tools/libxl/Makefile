@@ -79,7 +79,23 @@ LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_qmp.o libxl_event.o libxl_fork.o $(LIBXL_OBJS-y)
 LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
 
-$(LIBXL_OBJS): CFLAGS += $(CFLAGS_LIBXL) -include $(XEN_ROOT)/tools/config.h
+LIBXL_TESTS +=
+# Each entry FOO in LIBXL_TESTS has two main .c files:
+#   libxl_test_FOO.c  "inside libxl" code to support the test case
+#   test_FOO.c        "outside libxl" code to exercise the test case
+# Conventionally there will also be:
+#   libxl_test_FOO.h  interface between the "inside" and "outside" parts
+# The "inside libxl" file is compiled exactly like a piece of libxl, and the
+# "outside libxl" file is compiled exactly like a piece of application
+# code.  They must share information via explicit libxl entrypoints.
+# Unlike proper parts of libxl, it is permissible for libxl_test_FOO.c
+# to use private global variables for its state.
+
+LIBXL_TEST_OBJS += $(foreach t, $(LIBXL_TESTS),libxl_test_$t.o)
+TEST_PROG_OBJS += $(foreach t, $(LIBXL_TESTS),test_$t.o) test_common.o
+TEST_PROGS += $(foreach t, $(LIBXL_TESTS),test_$t)
+
+$(LIBXL_OBJS) $(LIBXL_TEST_OBJS): CFLAGS += $(CFLAGS_LIBXL) -include $(XEN_ROOT)/tools/config.h
 
 AUTOINCS= libxlu_cfg_y.h libxlu_cfg_l.h _libxl_list.h _paths.h \
 	_libxl_save_msgs_callout.h _libxl_save_msgs_helper.h
@@ -95,7 +111,7 @@ CFLAGS_XL += $(CFLAGS_libxenlight)
 CFLAGS_XL += -Wshadow
 
 XL_OBJS = xl.o xl_cmdimpl.o xl_cmdtable.o xl_sxp.o
-$(XL_OBJS) _libxl.api-for-check: \
+$(XL_OBJS) $(TEST_PROG_OBJS) _libxl.api-for-check: \
             CFLAGS += $(CFLAGS_libxenctrl) # For xentoollog.h
 $(XL_OBJS): CFLAGS += $(CFLAGS_XL)
 $(XL_OBJS): CFLAGS += -include $(XEN_ROOT)/tools/config.h # libxl_json.h needs it.
@@ -109,10 +125,12 @@ testidl.c: libxl_types.idl gentest.py libxl.h $(AUTOINCS)
 	mv testidl.c.new testidl.c
 
 .PHONY: all
-all: $(CLIENTS) libxenlight.so libxenlight.a libxlutil.so libxlutil.a \
+all: $(CLIENTS) $(TEST_PROGS) \
+		libxenlight.so libxenlight.a libxlutil.so libxlutil.a \
 	$(AUTOSRCS) $(AUTOINCS)
 
-$(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS) $(SAVE_HELPER_OBJS): \
+$(LIBXL_OBJS) $(LIBXLU_OBJS) $(XL_OBJS) $(SAVE_HELPER_OBJS) \
+		$(LIBXL_TEST_OBJS): \
 	$(AUTOINCS) libxl.api-ok
 
 %.c %.h:: %.y
@@ -175,6 +193,9 @@ libxenlight.so.$(MAJOR): libxenlight.so.$(MAJOR).$(MINOR)
 libxenlight.so.$(MAJOR).$(MINOR): $(LIBXL_OBJS)
 	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenlight.so.$(MAJOR) $(SHLIB_LDFLAGS) -o $@ $^ $(LIBXL_LIBS) $(APPEND_LDFLAGS)
 
+libxenlight_test.so: $(LIBXL_OBJS) $(LIBXL_TEST_OBJS)
+	$(CC) $(LDFLAGS) -Wl,$(SONAME_LDFLAG) -Wl,libxenlight_test.so $(SHLIB_LDFLAGS) -o $@ $^ $(LIBXL_LIBS) $(APPEND_LDFLAGS)
+
 libxenlight.a: $(LIBXL_OBJS)
 	$(AR) rcs libxenlight.a $^
 
@@ -192,6 +213,9 @@ libxlutil.a: $(LIBXLU_OBJS)
 
 xl: $(XL_OBJS) libxlutil.so libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ $(XL_OBJS) libxlutil.so $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl) -lyajl $(APPEND_LDFLAGS)
+
+test_%: test_%.o test_common.o libxlutil.so libxenlight_test.so
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS_libxenlight) $(LDLIBS_libxenctrl) -lyajl $(APPEND_LDFLAGS)
 
 libxl-save-helper: $(SAVE_HELPER_OBJS) libxenlight.so
 	$(CC) $(LDFLAGS) -o $@ $(SAVE_HELPER_OBJS) $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(APPEND_LDFLAGS)
