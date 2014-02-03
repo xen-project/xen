@@ -79,7 +79,7 @@ LIBXL_OBJS = flexarray.o libxl.o libxl_create.o libxl_dm.o libxl_pci.o \
 			libxl_qmp.o libxl_event.o libxl_fork.o $(LIBXL_OBJS-y)
 LIBXL_OBJS += _libxl_types.o libxl_flask.o _libxl_types_internal.o
 
-LIBXL_TESTS +=
+LIBXL_TESTS += timedereg
 # Each entry FOO in LIBXL_TESTS has two main .c files:
 #   libxl_test_FOO.c  "inside libxl" code to support the test case
 #   test_FOO.c        "outside libxl" code to exercise the test case
