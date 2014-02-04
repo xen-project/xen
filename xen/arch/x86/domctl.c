@@ -815,7 +815,7 @@ long arch_do_domctl(
         ret = -ESRCH;
         if ( (evc->vcpu >= d->max_vcpus) ||
              ((v = d->vcpu[evc->vcpu]) == NULL) )
-            goto ext_vcpucontext_out;
+            break;
 
         if ( domctl->cmd == XEN_DOMCTL_get_ext_vcpucontext )
         {
@@ -847,17 +847,20 @@ long arch_do_domctl(
             evc->vmce.caps = v->arch.vmce.mcg_cap;
             evc->vmce.mci_ctl2_bank0 = v->arch.vmce.bank[0].mci_ctl2;
             evc->vmce.mci_ctl2_bank1 = v->arch.vmce.bank[1].mci_ctl2;
+
+            ret = 0;
+            copyback = 1;
         }
         else
         {
             ret = -EINVAL;
             if ( evc->size < offsetof(typeof(*evc), vmce) )
-                goto ext_vcpucontext_out;
+                break;
             if ( is_pv_domain(d) )
             {
                 if ( !is_canonical_address(evc->sysenter_callback_eip) ||
                      !is_canonical_address(evc->syscall32_callback_eip) )
-                    goto ext_vcpucontext_out;
+                    break;
                 fixup_guest_code_selector(d, evc->sysenter_callback_cs);
                 v->arch.pv_vcpu.sysenter_callback_cs      =
                     evc->sysenter_callback_cs;
@@ -873,13 +876,11 @@ long arch_do_domctl(
                 v->arch.pv_vcpu.syscall32_disables_events =
                     evc->syscall32_disables_events;
             }
-            else
-            /* We do not support syscall/syscall32/sysenter on 32-bit Xen. */
-            if ( (evc->sysenter_callback_cs & ~3) ||
-                 evc->sysenter_callback_eip ||
-                 (evc->syscall32_callback_cs & ~3) ||
-                 evc->syscall32_callback_eip )
-                goto ext_vcpucontext_out;
+            else if ( (evc->sysenter_callback_cs & ~3) ||
+                      evc->sysenter_callback_eip ||
+                      (evc->syscall32_callback_cs & ~3) ||
+                      evc->syscall32_callback_eip )
+                break;
 
             BUILD_BUG_ON(offsetof(struct xen_domctl_ext_vcpucontext,
                                   mcg_cap) !=
@@ -896,13 +897,9 @@ long arch_do_domctl(
 
                 ret = vmce_restore_vcpu(v, &vmce);
             }
+            else
+                ret = 0;
         }
-
-        ret = 0;
-
-    ext_vcpucontext_out:
-        if ( domctl->cmd == XEN_DOMCTL_get_ext_vcpucontext )
-            copyback = 1;
     }
     break;
 
