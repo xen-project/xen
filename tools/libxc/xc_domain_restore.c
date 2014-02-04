@@ -2240,9 +2240,9 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         memcpy(ctx->live_p2m, ctx->p2m, dinfo->p2m_size * sizeof(xen_pfn_t));
     munmap(ctx->live_p2m, P2M_FL_ENTRIES * PAGE_SIZE);
 
-    rc = xc_dom_gnttab_seed(xch, dom, *console_mfn, *store_mfn,
-                            console_domid, store_domid);
-    if (rc != 0)
+    frc = xc_dom_gnttab_seed(xch, dom, *console_mfn, *store_mfn,
+                             console_domid, store_domid);
+    if (frc != 0)
     {
         ERROR("error seeding grant table");
         goto out;
@@ -2257,10 +2257,10 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
     {
         if ( callbacks != NULL && callbacks->toolstack_restore != NULL )
         {
-            rc = callbacks->toolstack_restore(dom, tdata.data, tdata.len,
-                        callbacks->data);
+            frc = callbacks->toolstack_restore(dom, tdata.data, tdata.len,
+                                               callbacks->data);
             free(tdata.data);
-            if ( rc < 0 )
+            if ( frc < 0 )
             {
                 PERROR("error calling toolstack_restore");
                 goto out;
@@ -2326,9 +2326,9 @@ int xc_domain_restore(xc_interface *xch, int io_fd, uint32_t dom,
         goto out;
     }
 
-    rc = xc_dom_gnttab_hvm_seed(xch, dom, *console_mfn, *store_mfn,
-                                console_domid, store_domid);
-    if (rc != 0)
+    frc = xc_dom_gnttab_hvm_seed(xch, dom, *console_mfn, *store_mfn,
+                                 console_domid, store_domid);
+    if (frc != 0)
     {
         ERROR("error seeding grant table");
         goto out;
