@@ -348,7 +348,9 @@ class Grub2Image(_GrubImage):
                 
     commands = {'set:root': 'root',
                 'linux': 'kernel',
+                'linux16': 'kernel',
                 'initrd': 'initrd',
+                'initrd16': 'initrd',
                 'echo': None,
                 'insmod': None,
                 'search': None}
@@ -394,7 +396,7 @@ class Grub2ConfigFile(_GrubConfigFile):
                 continue
 
             # new image
-            title_match = re.match('^menuentry ["\'](.*)["\'] (.*){', l)
+            title_match = re.match('^menuentry ["\'](.*?)["\'] (.*){', l)
             if title_match:
                 if img is not None:
                     raise RuntimeError, "syntax error: cannot nest menuentry (%d %s)" % (len(img),img)
