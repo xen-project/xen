@@ -25,6 +25,11 @@
 #include <asm/io.h>
 #include <asm/gic.h>
 
+/* XGENE RESET Specific defines */
+#define XGENE_RESET_ADDR        0x17000014UL
+#define XGENE_RESET_SIZE        0x100
+#define XGENE_RESET_MASK        0x1
+
 /* Variables to save reset address of soc during platform initialization. */
 static u64 reset_addr, reset_size;
 static u32 reset_mask;
@@ -141,38 +146,12 @@ static void xgene_storm_reset(void)
 
 static int xgene_storm_init(void)
 {
-    static const struct dt_device_match reset_ids[] __initconst =
-    {
-        DT_MATCH_COMPATIBLE("apm,xgene-reboot"),
-        {},
-    };
-    struct dt_device_node *dev;
-    int res;
-
-    dev = dt_find_matching_node(NULL, reset_ids);
-    if ( !dev )
-    {
-        printk("XGENE: Unable to find a compatible reset node in the device tree");
-        return 0;
-    }
-
-    dt_device_set_used_by(dev, DOMID_XEN);
-
-    /* Retrieve base address and size */
-    res = dt_device_get_address(dev, 0, &reset_addr, &reset_size);
-    if ( res )
-    {
-        printk("XGENE: Unable to retrieve the base address for reset\n");
-        return 0;
-    }
-
-    /* Get reset mask */
-    res = dt_property_read_u32(dev, "mask", &reset_mask);
-    if ( !res )
-    {
-        printk("XGENE: Unable to retrieve the reset mask\n");
-        return 0;
-    }
+    /* TBD: Once Linux side device tree bindings are finalized retrieve
+     * these values from dts.
+     */
+    reset_addr = XGENE_RESET_ADDR;
+    reset_size = XGENE_RESET_SIZE;
+    reset_mask = XGENE_RESET_MASK;
 
     reset_vals_valid = true;
     return 0;
