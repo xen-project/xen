@@ -4,8 +4,7 @@ Dom0 kernel and ramdisk modules
 Xen is passed the dom0 kernel and initrd via a reference in the /chosen
 node of the device tree.
 
-Each node has the form /chosen/modules/module@<N> and contains the following
-properties:
+Each node contains the following properties:
 
 - compatible
 
