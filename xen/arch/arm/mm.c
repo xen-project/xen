@@ -325,11 +325,15 @@ void unmap_domain_page(const void *va)
     local_irq_restore(flags);
 }
 
-unsigned long domain_page_map_to_mfn(const void *va)
+unsigned long domain_page_map_to_mfn(const void *ptr)
 {
+    unsigned long va = (unsigned long)ptr;
     lpae_t *map = this_cpu(xen_dommap);
-    int slot = ((unsigned long) va - DOMHEAP_VIRT_START) >> SECOND_SHIFT;
-    unsigned long offset = ((unsigned long)va>>THIRD_SHIFT) & LPAE_ENTRY_MASK;
+    int slot = (va - DOMHEAP_VIRT_START) >> SECOND_SHIFT;
+    unsigned long offset = (va>>THIRD_SHIFT) & LPAE_ENTRY_MASK;
+
+    if ( va >= VMAP_VIRT_START && va < VMAP_VIRT_END )
+        return virt_to_mfn(va);
 
     ASSERT(slot >= 0 && slot < DOMHEAP_ENTRIES);
     ASSERT(map[slot].pt.avail != 0);
