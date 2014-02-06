@@ -853,6 +853,8 @@ long arch_do_domctl(
         }
         else
         {
+            if ( d == current->domain ) /* no domain_pause() */
+                break;
             ret = -EINVAL;
             if ( evc->size < offsetof(typeof(*evc), vmce) )
                 break;
@@ -861,6 +863,7 @@ long arch_do_domctl(
                 if ( !is_canonical_address(evc->sysenter_callback_eip) ||
                      !is_canonical_address(evc->syscall32_callback_eip) )
                     break;
+                domain_pause(d);
                 fixup_guest_code_selector(d, evc->sysenter_callback_cs);
                 v->arch.pv_vcpu.sysenter_callback_cs      =
                     evc->sysenter_callback_cs;
@@ -881,6 +884,8 @@ long arch_do_domctl(
                       (evc->syscall32_callback_cs & ~3) ||
                       evc->syscall32_callback_eip )
                 break;
+            else
+                domain_pause(d);
 
             BUILD_BUG_ON(offsetof(struct xen_domctl_ext_vcpucontext,
                                   mcg_cap) !=
@@ -899,6 +904,8 @@ long arch_do_domctl(
             }
             else
                 ret = 0;
+
+            domain_unpause(d);
         }
     }
     break;

@@ -334,10 +334,6 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
         unsigned int vcpu = op->u.vcpucontext.vcpu;
         struct vcpu *v;
 
-        ret = -ESRCH;
-        if ( d == NULL )
-            break;
-
         ret = -EINVAL;
         if ( (d == current->domain) || /* no domain_pause() */
              (vcpu >= d->max_vcpus) || ((v = d->vcpu[vcpu]) == NULL) )
