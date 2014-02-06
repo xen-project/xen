@@ -464,7 +464,7 @@ static int flask_security_avc_cachestats(struct xen_flask_cache_stats *arg)
 {
     struct avc_cache_stats *st;
 
-    if ( arg->cpu > nr_cpu_ids )
+    if ( arg->cpu >= nr_cpu_ids )
         return -ENOENT;
     if ( !cpu_online(arg->cpu) )
         return -ENOENT;
