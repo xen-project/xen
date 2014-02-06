@@ -13,7 +13,9 @@
 #ifndef _FLASK_CONDITIONAL_H_
 #define _FLASK_CONDITIONAL_H_
 
-int security_get_bools(int *len, char ***names, int **values);
+#include <xen/types.h>
+
+int security_get_bools(int *len, char ***names, int **values, size_t *maxstr);
 
 int security_set_bools(int len, int *values);
 
